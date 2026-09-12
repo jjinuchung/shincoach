@@ -2,6 +2,8 @@
 // 구형 브라우저에서도 돌아야 하므로 최신 문법(?., ??, ||=)은 쓰지 않는다.
 
 const $ = (id) => document.getElementById(id);
+let lastRecUrl = null;
+let lastAudio = null;
 
 function SpeechRecognitionCtor() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -61,7 +63,7 @@ async function testMic() {
   out.textContent = '🎤 마이크 권한을 허용해 주세요…';
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (err) {
     out.textContent = `❌ 마이크를 열 수 없어요: ${err.name} — 안드로이드 설정 → 앱 → Chrome → 권한 → 마이크 확인`;
     if (ctx && ctx.close) ctx.close();
@@ -118,12 +120,20 @@ async function testMic() {
   if (recorder) {
     await new Promise((resolve) => { recorder.onstop = resolve; try { recorder.stop(); } catch (e) { resolve(); } });
     recBytes = chunks.reduce((a, b) => a + b.size, 0);
+    if (recBytes > 0) {
+      // 녹음을 직접 들어볼 수 있게 버튼 제공 (데이터가 진짜 소리인지 귀로 확인)
+      const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+      if (lastRecUrl) URL.revokeObjectURL(lastRecUrl);
+      lastRecUrl = URL.createObjectURL(blob);
+      const btn = $('diag-play');
+      if (btn) { btn.hidden = false; btn.textContent = `▶ 방금 녹음 들어보기 (${Math.round(recBytes / 1024)}KB)`; }
+    }
   }
   stream.getTracks().forEach((t) => t.stop());
   if (ctx && ctx.close) ctx.close().catch(() => {});
 
   const ratio = frames ? Math.round((loudFrames / frames) * 100) : 0;
-  const verdict = peak > 0.02 ? '✅ 소리 감지됨' : (recBytes > 3000 ? '⚠️ 분석기는 0이지만 녹음 데이터는 있음(분석기 문제)' : '❌ 소리가 전혀 안 들어옴(마이크/권한 문제)');
+  const verdict = peak > 0.02 ? '✅ 소리 감지됨' : '⚠️ 소리 분석기에는 소리가 안 잡힘 → 아래 "녹음 들어보기"로 실제 녹음됐는지 확인해 주세요';
   steps.push(`최대 음량 ${Math.round(peak * 100)}, 말소리 비율 ${ratio}%, 3초 녹음 ${recBytes}바이트`);
   show(verdict);
 }
@@ -172,9 +182,23 @@ function testSpeech() {
   }
 }
 
+function playLastRecording() {
+  if (!lastRecUrl) return;
+  if (lastAudio) { lastAudio.pause(); lastAudio = null; }
+  lastAudio = new Audio(lastRecUrl);
+  lastAudio.volume = 1;
+  const out = $('diag-result');
+  lastAudio.onended = () => { out.textContent += '
+(재생 끝)'; };
+  lastAudio.play().catch((e) => { out.textContent += `
+재생 실패: ${e.name}`; });
+}
+
 export function initDiag() {
   const mic = $('diag-mic');
   const sp = $('diag-speech');
+  const pl = $('diag-play');
   if (mic) mic.addEventListener('click', testMic);
   if (sp) sp.addEventListener('click', testSpeech);
+  if (pl) pl.addEventListener('click', playLastRecording);
 }
