@@ -1,0 +1,10 @@
+{
+  "name": "shincoach",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "초등학생용 영어 섀도잉 학습 PWA",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}

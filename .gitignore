@@ -1,0 +1,19 @@
+# 영상/자막 콘텐츠는 커밋하지 않음
+*.mp4
+*.mkv
+*.webm
+*.m4v
+*.srt
+*.vtt
+content/
+!samples/*.srt
+
+# 기타
+.bkit/
+*.log
+Thumbs.db
+.DS_Store
+
+# Claude Code 로컬 기록
+.claude/
+.context/

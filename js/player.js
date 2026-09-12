@@ -1,0 +1,596 @@
+// 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
+import { getItem, getVideoBlob, updateItem } from './db.js';
+import {
+  parseSubtitle, mergeSubtitles, mergeIntoSentences,
+  estimateWordTimings, findCueIndex,
+} from './srt.js';
+
+const $ = (id) => document.getElementById(id);
+
+const SPEEDS = [0.6, 0.8, 1.0, 1.25];
+const REPEATS = [0, 3, 5, Infinity]; // 0 = 끔
+const END_EPS = 0.02; // 문장 끝 판정 여유(초) — rAF 간격(~16ms)만큼만. 크면 마지막 음절이 잘림
+
+const settings = loadSettings();
+
+const state = {
+  item: null,
+  cues: [],
+  idx: -1,
+  open: false,       // 플레이어 화면이 열려 있는지 (비동기 작업 완료 후 확인용)
+  seeking: false,    // video.seeking 중에는 문장 끝 판정 보류
+  onMeta: null,      // loadedmetadata 핸들러 (닫을 때 제거)
+  objectUrl: null,
+  speedIdx: 2,
+  repeatIdx: 0,
+  repeatCount: 0,
+  shadow: false,
+  showEn: true,
+  showKo: true,
+  shadowTimer: null,
+  shadowRaf: null,
+  raf: null,
+  wordSpans: [],
+  wordTimes: [],
+  lastWordIdx: -1,
+  saveTimer: null,
+  wakeLock: null,
+};
+
+let showView;
+let video;
+
+// ───────────────────── 초기화 ─────────────────────
+
+export function initPlayer(ctx) {
+  showView = ctx.showView;
+  video = $('video');
+
+  $('btn-back').addEventListener('click', closePlayer);
+  $('btn-play').addEventListener('click', onPlayButton);
+  $('btn-prev').addEventListener('click', () => step(-1));
+  $('btn-next').addEventListener('click', () => step(1));
+  $('btn-repeat').addEventListener('click', cycleRepeat);
+  $('btn-speed').addEventListener('click', cycleSpeed);
+  $('btn-shadow').addEventListener('click', toggleShadow);
+  $('btn-toggle-en').addEventListener('click', () => toggleSub('en'));
+  $('btn-toggle-ko').addEventListener('click', () => toggleSub('ko'));
+  $('btn-settings').addEventListener('click', openSettings);
+  $('shadow-overlay').addEventListener('click', skipShadowWait);
+  video.addEventListener('click', onPlayButton);
+
+  video.addEventListener('play', () => { updatePlayIcon(); hidePlayerMessage(); startLoop(); acquireWakeLock(); });
+  video.addEventListener('pause', () => { updatePlayIcon(); stopLoop(); releaseWakeLock(); scheduleSave(); });
+  video.addEventListener('ended', onVideoEnded);
+  video.addEventListener('seeking', () => { state.seeking = true; });
+  video.addEventListener('seeked', () => { state.seeking = false; syncToTime(); });
+  video.addEventListener('error', () => {
+    const code = video.error && video.error.code;
+    // 4 = MEDIA_ERR_SRC_NOT_SUPPORTED (이 기기에서 못 여는 형식), 3 = 디코딩 오류
+    const why = code === 4 ? '이 기기에서 재생할 수 없는 영상 형식이에요' : '영상을 재생하는 중 문제가 생겼어요';
+    showPlayerMessage(`😢 ${why}`);
+  });
+
+  // 홈 화면 이동/화면 꺼짐 → 학습 일시정지 (백그라운드에서 rAF/타이머가 멈춰 문장 상태가 어긋나는 것 방지)
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  document.addEventListener('keydown', onKeyDown);
+  initSettingsDialog();
+}
+
+function onVisibilityChange() {
+  if (!state.open || !document.hidden) return;
+  const wasShadowWaiting = !!state.shadowTimer;
+  cancelShadowWait();
+  if (!video.paused) video.pause();
+  if (wasShadowWaiting) showPlayerMessage('▶ 를 눌러 이어서 연습해요', 0);
+  releaseWakeLock();
+  scheduleSave(true);
+}
+
+// ───────────────────── 열기/닫기 ─────────────────────
+
+export async function openPlayer(id) {
+  const item = await getItem(id);
+  if (!item) return;
+  const blob = await getVideoBlob(id);
+  if (!blob) { alert('영상 파일을 찾을 수 없어요.'); return; }
+
+  closeMedia();
+  state.open = true;
+  state.item = item;
+  state.cues = buildCues(item);
+  state.idx = -1;
+  state.repeatCount = 0;
+  cancelShadowWait();
+  hidePlayerMessage();
+
+  $('player-title').textContent = item.title;
+  state.objectUrl = URL.createObjectURL(blob);
+  video.src = state.objectUrl;
+  video.defaultPlaybackRate = SPEEDS[state.speedIdx];
+  video.playbackRate = SPEEDS[state.speedIdx];
+
+  renderScriptList();
+  applySubVisibility();
+  updateChips();
+  showView('player');
+
+  state.onMeta = () => {
+    state.onMeta = null;
+    // 미디어 로드 과정에서 속도가 초기화될 수 있으므로 다시 적용
+    video.playbackRate = SPEEDS[state.speedIdx];
+    // 영상 길이를 벗어난 자막은 제외 (자막 파일이 다른 편이면 전부 벗어남 → 안내)
+    if (Number.isFinite(video.duration) && video.duration > 0) {
+      const inRange = state.cues.filter((c) => c.start < video.duration);
+      if (inRange.length !== state.cues.length) {
+        state.cues = inRange.map((c, i) => ({ ...c, index: i }));
+        renderScriptList();
+        showPlayerMessage(inRange.length === 0
+          ? '😢 자막 시간이 영상과 맞지 않아요. 자막 파일을 확인해 주세요'
+          : `자막 ${state.cues.length}개만 영상 길이 안에 있어요`, 4000);
+      }
+    }
+    const startIdx = Math.min(Math.max(item.lastCue || 0, 0), state.cues.length - 1);
+    goTo(startIdx, { play: false });
+  };
+  video.addEventListener('loadedmetadata', state.onMeta, { once: true });
+}
+
+function closePlayer() {
+  scheduleSave(true);
+  closeMedia();
+  showView('library');
+}
+
+function closeMedia() {
+  state.open = false;
+  cancelShadowWait();
+  stopLoop();
+  releaseWakeLock();
+  if (video) {
+    if (state.onMeta) { video.removeEventListener('loadedmetadata', state.onMeta); state.onMeta = null; }
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  }
+  if (state.objectUrl) {
+    URL.revokeObjectURL(state.objectUrl);
+    state.objectUrl = null;
+  }
+}
+
+function buildCues(item) {
+  let en = parseSubtitle(item.enText);
+  // 영어를 먼저 문장 단위로 합친 뒤 한글을 매칭해야, 긴 한글 큐가 두 번 붙지 않음
+  if (settings.mergeSentences) en = mergeIntoSentences(en);
+  const ko = item.koText ? parseSubtitle(item.koText) : [];
+  return mergeSubtitles(en, ko);
+}
+
+// ───────────────────── 이동/재생 ─────────────────────
+
+/** i번째 문장으로 이동 */
+function goTo(i, { play = true } = {}) {
+  if (state.cues.length === 0) return;
+  i = Math.max(0, Math.min(i, state.cues.length - 1));
+  cancelShadowWait();
+  state.idx = i;
+  state.repeatCount = 0;
+  video.currentTime = state.cues[i].start;
+  renderSubtitle();
+  updateProgress();
+  highlightScript();
+  updateChips();
+  scheduleSave();
+  if (play) safePlay();
+  else if (!video.paused) video.pause();
+}
+
+function step(delta) {
+  const base = state.idx < 0 ? 0 : state.idx;
+  goTo(base + delta, { play: true });
+}
+
+function safePlay() {
+  const p = video.play();
+  if (!p || !p.catch) return;
+  p.catch((err) => {
+    if (err.name === 'AbortError') return; // 영상 전환 중 정상적으로 취소된 경우
+    if (err.name === 'NotAllowedError') showPlayerMessage('▶ 버튼을 눌러 주세요', 0);
+    else showPlayerMessage(`😢 재생할 수 없어요 (${err.name})`);
+  });
+}
+
+/** 영상 위에 안내 문구 표시. ms=0이면 재생 시작까지 유지 */
+function showPlayerMessage(text, ms = 3000) {
+  const el = $('player-msg');
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(state.msgTimer);
+  if (ms > 0) state.msgTimer = setTimeout(hidePlayerMessage, ms);
+}
+
+function hidePlayerMessage() {
+  clearTimeout(state.msgTimer);
+  $('player-msg').hidden = true;
+}
+
+function onPlayButton() {
+  if (state.shadowTimer) { skipShadowWait(); return; }
+  if (video.paused) {
+    if (state.idx < 0) goTo(0);
+    else {
+      // 문장 끝에서 멈춘 상태면 그 문장을 처음부터 다시
+      const cue = state.cues[state.idx];
+      if (cue && video.currentTime >= cue.end - END_EPS) video.currentTime = cue.start;
+      safePlay();
+    }
+  } else {
+    video.pause();
+  }
+}
+
+function updatePlayIcon() {
+  $('btn-play').textContent = video.paused ? '▶' : '❚❚';
+}
+
+// ───────────────────── 재생 루프 (문장 끝 판정 + 단어 하이라이트) ─────────────────────
+
+function startLoop() {
+  stopLoop();
+  const tick = () => {
+    state.raf = requestAnimationFrame(tick);
+    onTick();
+  };
+  state.raf = requestAnimationFrame(tick);
+}
+
+function stopLoop() {
+  if (state.raf) cancelAnimationFrame(state.raf);
+  state.raf = null;
+}
+
+function onTick() {
+  if (state.seeking) return; // 탐색 완료 전에는 시간이 신뢰할 수 없음
+  const t = video.currentTime;
+  const cue = state.cues[state.idx];
+  if (!cue) return;
+
+  // 현재 문장 범위를 크게 벗어났으면 (외부 탐색/백그라운드 복귀) 먼저 동기화 — 문장 끝 판정보다 앞서야 함
+  if (t < cue.start - 0.5 || t > cue.end + 0.5) {
+    if (syncToTime()) return;
+  }
+
+  // 문장 끝 도달
+  if (t >= cue.end - END_EPS) {
+    onCueEnd();
+    return;
+  }
+  updateWordHighlight(t);
+}
+
+/** video.currentTime 기준으로 현재 문장 인덱스를 맞춘다. 바뀌었으면 true */
+function syncToTime() {
+  const t = video.currentTime;
+  const cue = state.cues[state.idx];
+  if (cue && t >= cue.start - 0.5 && t <= cue.end + 0.5) return false;
+  const j = findCueIndex(state.cues, t);
+  if (j < 0 || j === state.idx) return false;
+  state.idx = j;
+  state.repeatCount = 0;
+  renderSubtitle();
+  updateProgress();
+  highlightScript();
+  updateChips();
+  scheduleSave();
+  return true;
+}
+
+function onVideoEnded() {
+  updatePlayIcon();
+  stopLoop();
+  releaseWakeLock();
+  // rAF가 마지막 문장 끝을 놓친 경우: 남은 반복/섀도잉을 여기서 처리
+  const cue = state.cues[state.idx];
+  if (!cue) return;
+  const repeatMax = REPEATS[state.repeatIdx];
+  const repeatLeft = repeatMax > 0 && state.repeatCount < repeatMax - 1;
+  if (repeatLeft || state.shadow) onCueEnd();
+}
+
+function onCueEnd() {
+  const repeatMax = REPEATS[state.repeatIdx];
+  const cue = state.cues[state.idx];
+
+  // 반복 남았으면 같은 문장 처음으로
+  if (repeatMax > 0 && state.repeatCount < repeatMax - 1) {
+    state.repeatCount++;
+    updateChips();
+    video.currentTime = cue.start;
+    if (video.paused || video.ended) safePlay(); // 영상 끝에서 멈춘 상태면 다시 재생
+    return;
+  }
+
+  // 섀도잉: 멈추고 따라 말할 시간 주기
+  if (state.shadow) {
+    video.pause();
+    startShadowWait(cue);
+    return;
+  }
+
+  // 마지막 문장이면 멈춤
+  if (state.idx >= state.cues.length - 1) {
+    video.pause();
+    return;
+  }
+
+  // 연속 재생: 다음 문장으로 (반복 모드였으면 카운트 초기화)
+  state.idx++;
+  state.repeatCount = 0;
+  const next = state.cues[state.idx];
+  // 문장 사이 간격이 길면 건너뛰기
+  if (next.start - video.currentTime > 1.0) video.currentTime = next.start;
+  renderSubtitle();
+  updateProgress();
+  highlightScript();
+  updateChips();
+  scheduleSave();
+}
+
+// ───────────────────── 섀도잉 대기 ─────────────────────
+
+function startShadowWait(cue) {
+  if (state.shadowTimer) return; // rAF와 ended가 동시에 호출해도 타이머는 하나만
+  const dur = Math.max(1.5, (cue.end - cue.start) * settings.shadowFactor + 0.5) * 1000;
+  const overlay = $('shadow-overlay');
+  const fill = $('shadow-ring-fill');
+  overlay.hidden = false;
+  fill.style.width = '100%';
+  const started = performance.now();
+
+  const anim = () => {
+    const ratio = Math.max(0, 1 - (performance.now() - started) / dur);
+    fill.style.width = `${ratio * 100}%`;
+    state.shadowRaf = requestAnimationFrame(anim);
+  };
+  state.shadowRaf = requestAnimationFrame(anim);
+
+  state.shadowTimer = setTimeout(() => {
+    cancelShadowWait();
+    if (state.idx >= state.cues.length - 1) return; // 마지막 문장
+    goTo(state.idx + 1);
+  }, dur);
+}
+
+function cancelShadowWait() {
+  if (state.shadowTimer) clearTimeout(state.shadowTimer);
+  if (state.shadowRaf) cancelAnimationFrame(state.shadowRaf);
+  state.shadowTimer = null;
+  state.shadowRaf = null;
+  $('shadow-overlay').hidden = true;
+}
+
+function skipShadowWait() {
+  if (!state.shadowTimer) return;
+  cancelShadowWait();
+  if (state.idx >= state.cues.length - 1) return;
+  goTo(state.idx + 1);
+}
+
+// ───────────────────── 자막 렌더링 ─────────────────────
+
+function renderSubtitle() {
+  const cue = state.cues[state.idx];
+  const enEl = $('sub-en');
+  const koEl = $('sub-ko');
+  if (!cue) { enEl.textContent = ''; koEl.textContent = ''; return; }
+
+  // 영어: 단어별 span (하이라이트용)
+  state.wordTimes = estimateWordTimings(cue.start, cue.end, cue.en);
+  enEl.innerHTML = '';
+  state.wordSpans = state.wordTimes.map((w, i) => {
+    const span = document.createElement('span');
+    span.className = 'w';
+    span.textContent = w.word;
+    enEl.appendChild(span);
+    if (i < state.wordTimes.length - 1) enEl.appendChild(document.createTextNode(' '));
+    return span;
+  });
+  state.lastWordIdx = -1;
+  koEl.textContent = cue.ko || '';
+}
+
+function updateWordHighlight(t) {
+  const times = state.wordTimes;
+  if (times.length === 0) return;
+  let cur = -1;
+  for (let i = 0; i < times.length; i++) {
+    if (t >= times[i].start) cur = i; else break;
+  }
+  if (cur === state.lastWordIdx) return;
+  state.lastWordIdx = cur;
+  state.wordSpans.forEach((span, i) => {
+    span.classList.toggle('on', i === cur);
+    span.classList.toggle('done', i < cur);
+  });
+}
+
+function toggleSub(which) {
+  if (which === 'en') state.showEn = !state.showEn;
+  else state.showKo = !state.showKo;
+  applySubVisibility();
+}
+
+function applySubVisibility() {
+  $('sub-en').hidden = !state.showEn;
+  $('sub-ko').hidden = !state.showKo;
+  $('btn-toggle-en').classList.toggle('is-on', state.showEn);
+  $('btn-toggle-ko').classList.toggle('is-on', state.showKo);
+}
+
+function updateProgress() {
+  const n = state.cues.length;
+  $('cue-counter').textContent = `${state.idx + 1} / ${n}`;
+  $('progress-fill').style.width = n ? `${((state.idx + 1) / n) * 100}%` : '0%';
+}
+
+// ───────────────────── 전체 대사 목록 ─────────────────────
+
+function renderScriptList() {
+  const ol = $('script-list');
+  ol.innerHTML = '';
+  state.cues.forEach((cue, i) => {
+    const li = document.createElement('li');
+    li.className = 'script-item';
+    li.dataset.idx = i;
+    const en = document.createElement('div');
+    en.className = 'en';
+    en.textContent = cue.en;
+    li.appendChild(en);
+    if (cue.ko) {
+      const ko = document.createElement('div');
+      ko.className = 'ko';
+      ko.textContent = cue.ko;
+      li.appendChild(ko);
+    }
+    li.addEventListener('click', () => goTo(i));
+    ol.appendChild(li);
+  });
+}
+
+function highlightScript() {
+  const ol = $('script-list');
+  const prev = ol.querySelector('.script-item.active');
+  if (prev) prev.classList.remove('active');
+  const cur = ol.querySelector(`.script-item[data-idx="${state.idx}"]`);
+  if (cur) {
+    cur.classList.add('active');
+    // scrollIntoView는 페이지 전체를 스크롤시켜 화면이 튀므로 목록 컨테이너만 스크롤
+    const top = cur.offsetTop; // .script-list이 position:relative 라서 목록 기준 좌표
+    const bottom = top + cur.offsetHeight;
+    if (top < ol.scrollTop || bottom > ol.scrollTop + ol.clientHeight) {
+      ol.scrollTo({ top: top - ol.clientHeight / 2 + cur.offsetHeight / 2, behavior: 'smooth' });
+    }
+  }
+}
+
+// ───────────────────── 반복/속도/섀도잉 버튼 ─────────────────────
+
+function cycleRepeat() {
+  state.repeatIdx = (state.repeatIdx + 1) % REPEATS.length;
+  state.repeatCount = 0;
+  updateChips();
+}
+
+function cycleSpeed() {
+  state.speedIdx = (state.speedIdx + 1) % SPEEDS.length;
+  video.playbackRate = SPEEDS[state.speedIdx];
+  updateChips();
+}
+
+function toggleShadow() {
+  state.shadow = !state.shadow;
+  if (!state.shadow) cancelShadowWait();
+  updateChips();
+}
+
+function updateChips() {
+  const r = REPEATS[state.repeatIdx];
+  const repeatBtn = $('btn-repeat');
+  repeatBtn.dataset.state = r > 0 ? 'on' : 'off';
+  if (r === 0) $('repeat-label').textContent = '끔';
+  else if (r === Infinity) $('repeat-label').textContent = '∞';
+  else $('repeat-label').textContent = `${state.repeatCount + 1}/${r}`;
+
+  const sp = SPEEDS[state.speedIdx];
+  $('speed-label').textContent = `${sp === 1 ? '1.0' : String(sp)}x`;
+  $('btn-speed').firstChild.textContent = sp < 1 ? '🐢 ' : sp > 1 ? '🐇 ' : '🚶 ';
+
+  $('btn-shadow').dataset.state = state.shadow ? 'on' : 'off';
+}
+
+// ───────────────────── 키보드 (PC 테스트용) ─────────────────────
+
+function onKeyDown(e) {
+  if ($('view-player').hidden) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  switch (e.key) {
+    case ' ': e.preventDefault(); onPlayButton(); break;
+    case 'ArrowLeft': e.preventDefault(); step(-1); break;
+    case 'ArrowRight': e.preventDefault(); step(1); break;
+    case 'r': case 'R': cycleRepeat(); break;
+    case 's': case 'S': cycleSpeed(); break;
+    case 'd': case 'D': toggleShadow(); break;
+    case 'Escape': closePlayer(); break;
+    default: break;
+  }
+}
+
+// ───────────────────── 진행 저장 / 화면 꺼짐 방지 ─────────────────────
+
+function scheduleSave(immediate = false) {
+  if (!state.item || state.idx < 0) return;
+  clearTimeout(state.saveTimer);
+  const doSave = () => updateItem(state.item.id, { lastCue: state.idx }).catch(() => {});
+  if (immediate) doSave();
+  else state.saveTimer = setTimeout(doSave, 1500);
+}
+
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator) || state.wakeLock || state.wakeLockPending) return;
+  state.wakeLockPending = true;
+  try {
+    const lock = await navigator.wakeLock.request('screen');
+    // 요청이 끝나기 전에 플레이어가 닫히거나 정지됐으면 바로 해제
+    if (!state.open || video.paused) { lock.release().catch(() => {}); return; }
+    state.wakeLock = lock;
+    lock.addEventListener('release', () => { if (state.wakeLock === lock) state.wakeLock = null; });
+  } catch { /* 지원 안 하거나 거부 */ } finally {
+    state.wakeLockPending = false;
+  }
+}
+
+function releaseWakeLock() {
+  if (state.wakeLock) { state.wakeLock.release().catch(() => {}); state.wakeLock = null; }
+}
+
+// ───────────────────── 설정 ─────────────────────
+
+function loadSettings() {
+  const defaults = { mergeSentences: true, shadowFactor: 1.5 };
+  try {
+    return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
+  } catch {
+    return defaults;
+  }
+}
+
+function saveSettings() {
+  try { localStorage.setItem('shincoach.settings', JSON.stringify(settings)); } catch { /* 무시 */ }
+}
+
+function initSettingsDialog() {
+  $('set-merge').checked = settings.mergeSentences;
+  $('set-shadow-factor').value = String(settings.shadowFactor);
+  $('set-close').addEventListener('click', () => $('dlg-settings').close());
+  $('form-settings').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const mergeChanged = settings.mergeSentences !== $('set-merge').checked;
+    settings.mergeSentences = $('set-merge').checked;
+    settings.shadowFactor = Number($('set-shadow-factor').value);
+    saveSettings();
+    $('dlg-settings').close();
+    if (mergeChanged && state.item) {
+      // 문장 합치기 설정이 바뀌면 큐 다시 구성
+      const t = video.currentTime;
+      state.cues = buildCues(state.item);
+      renderScriptList();
+      const j = findCueIndex(state.cues, t);
+      goTo(j >= 0 ? j : 0, { play: false });
+    }
+  });
+}
+
+function openSettings() {
+  $('dlg-settings').showModal();
+}

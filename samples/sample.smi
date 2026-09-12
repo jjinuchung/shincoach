@@ -1,0 +1,28 @@
+<SAMI>
+<HEAD>
+<TITLE>Sample</TITLE>
+<STYLE TYPE="text/css">
+<!--
+P { margin-left:8pt; margin-right:8pt; margin-bottom:2pt; margin-top:2pt; font-size:20pt; text-align:center; font-family:Arial; font-weight:bold; color:white; background-color:black; }
+.KRCC { Name:Korean; lang:ko-KR; SAMIType:CC; }
+.ENCC { Name:English; lang:en-US; SAMIType:CC; }
+-->
+</STYLE>
+</HEAD>
+<BODY>
+<SYNC Start=1000><P Class=ENCC><i>Hello!</i> I'm Peppa Pig.
+<SYNC Start=1000><P Class=KRCC>안녕! 나는 페파 피그야.
+<SYNC Start=2800><P Class=ENCC>&nbsp;
+<SYNC Start=2800><P Class=KRCC>&nbsp;
+<SYNC Start=3000><P Class=ENCC>This is my little brother,<br>George.
+<SYNC Start=3000><P Class=KRCC>얘는 내 남동생,<br>조지야.
+<SYNC Start=5900><P Class=ENCC>&nbsp;
+<SYNC Start=5900><P Class=KRCC>&nbsp;
+<SYNC Start=6200><P Class=ENCC>- Where are we going today?<br>- To the park!
+<SYNC Start=6200><P Class=KRCC>- 오늘 어디 가?<br>- 공원에!
+<SYNC Start=8500><P Class=ENCC>I love jumping in muddy puddles.
+<SYNC Start=8500><P Class=KRCC>나는 진흙 웅덩이에서 뛰는 걸 좋아해.
+<SYNC Start=10000><P Class=ENCC>&nbsp;
+<SYNC Start=10000><P Class=KRCC>&nbsp;
+</BODY>
+</SAMI>

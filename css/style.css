@@ -1,0 +1,332 @@
+/* ===== 기본 ===== */
+:root {
+  --bg: #f5f7ff;
+  --card: #ffffff;
+  --text: #1f2340;
+  --muted: #6b7280;
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --accent: #f59e0b;
+  --ok: #10b981;
+  --danger: #ef4444;
+  --border: #e5e7eb;
+  --radius: 16px;
+  --shadow: 0 4px 14px rgba(31, 35, 64, 0.08);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  overscroll-behavior: none;
+}
+
+button { font-family: inherit; }
+
+.view {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+.view[hidden] { display: none; }
+
+/* ===== 상단 바 ===== */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.topbar-title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== 버튼 ===== */
+.btn {
+  border: none;
+  border-radius: 12px;
+  background: #eef0f7;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  user-select: none;
+  min-height: 44px;
+  transition: transform 0.08s, background 0.15s;
+}
+.btn:active { transform: scale(0.95); }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:active { background: var(--primary-dark); }
+.btn-icon {
+  width: 44px;
+  padding: 0;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-big {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  font-size: 1.6rem;
+  background: #fff;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-play {
+  width: 88px;
+  height: 88px;
+  font-size: 2rem;
+  background: var(--primary);
+  color: #fff;
+}
+.btn-chip {
+  border-radius: 999px;
+  padding: 8px 11px;
+  font-size: 0.9rem;
+  background: #fff;
+  border: 2px solid var(--border);
+  min-height: 40px;
+}
+.btn-chip.is-on { border-color: var(--primary); background: #eef2ff; color: var(--primary); }
+.btn-chip[data-state="on"] { border-color: var(--accent); background: #fff7ed; color: #b45309; }
+
+/* ===== 라이브러리 ===== */
+.library-main { flex: 1; padding: 14px; }
+.library-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.library-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px;
+  cursor: pointer;
+}
+.library-item:active { transform: scale(0.98); }
+.library-thumb {
+  width: 96px;
+  height: 64px;
+  border-radius: 10px;
+  background: #dfe3f5;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+}
+.library-info { flex: 1; min-width: 0; }
+.library-name { font-weight: 700; font-size: 1.05rem; margin: 0 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-meta { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.library-delete { color: var(--danger); background: transparent; font-size: 1.2rem; padding: 8px; }
+.library-empty { text-align: center; color: var(--muted); line-height: 1.8; margin-top: 60px; }
+.library-empty[hidden] { display: none; }
+.storage-info { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 10px; }
+
+/* ===== 대화상자 ===== */
+.dialog {
+  border: none;
+  border-radius: var(--radius);
+  padding: 0;
+  width: min(92vw, 420px);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+}
+.dialog::backdrop { background: rgba(0,0,0,0.45); }
+.dialog form { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.dialog h2 { margin: 0 0 4px; font-size: 1.2rem; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-weight: 600; font-size: 0.9rem; }
+.field-label small { color: var(--muted); font-weight: 400; }
+.field input[type="text"] {
+  font-size: 1rem;
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+}
+.field input[type="file"] { font-size: 0.9rem; }
+.field select { font-size: 1rem; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; background: #fff; }
+.field-row { flex-direction: row; align-items: center; gap: 10px; }
+.field-row input[type="checkbox"] { width: 22px; height: 22px; }
+.imp-status { margin: 0; min-height: 1.2em; font-size: 0.9rem; color: var(--primary); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ===== 플레이어 ===== */
+.player-body { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 20px; }
+/* 세로(폰)에서는 좌/우 컨테이너를 없는 것처럼 취급해 한 줄로 쌓임 */
+.player-left, .player-right { display: contents; }
+
+.video-wrap {
+  position: relative;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  max-height: 42vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+.player-msg {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  max-width: 90%;
+  background: rgba(31, 35, 64, 0.85);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 8px 14px;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 2;
+}
+.player-msg[hidden] { display: none; }
+
+.shadow-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(79, 70, 229, 0.85);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.shadow-overlay[hidden] { display: none; }
+.shadow-msg { font-size: 1.5rem; font-weight: 800; }
+.shadow-ring { width: 70%; height: 12px; background: rgba(255,255,255,0.3); border-radius: 999px; overflow: hidden; }
+.shadow-ring-fill { height: 100%; width: 100%; background: #fff; transition: width 0.1s linear; }
+
+.progress-row { display: flex; align-items: center; gap: 10px; }
+.cue-counter { font-size: 0.9rem; color: var(--muted); font-weight: 600; white-space: nowrap; min-width: 60px; }
+.progress-bar { flex: 1; height: 8px; background: #dfe3f5; border-radius: 999px; overflow: hidden; }
+.progress-fill { height: 100%; width: 0; background: var(--primary); transition: width 0.2s; }
+
+.subtitle-box {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.sub-en { margin: 0; font-size: 1.5rem; font-weight: 700; line-height: 1.4; word-break: keep-all; }
+.sub-ko { margin: 0; font-size: 1.1rem; color: var(--muted); line-height: 1.4; }
+.sub-en[hidden], .sub-ko[hidden] { display: none; }
+.sub-en .w { transition: color 0.1s, background 0.1s; border-radius: 4px; padding: 0 2px; }
+.sub-en .w.on { color: #fff; background: var(--accent); }
+.sub-en .w.done { color: var(--primary); }
+
+.controls-main { display: flex; justify-content: center; align-items: center; gap: 22px; padding: 6px 0; }
+.controls-sub { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+
+.script-panel {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 14px;
+}
+.script-panel summary { font-weight: 700; cursor: pointer; padding: 6px 0; }
+.script-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 40vh; overflow-y: auto; position: relative; }
+.script-item { padding: 10px 12px; border-radius: 10px; cursor: pointer; line-height: 1.4; }
+.script-item:active { background: #eef0f7; }
+.script-item.active { background: #eef2ff; border-left: 4px solid var(--primary); }
+.script-item .en { font-weight: 600; }
+.script-item .ko { color: var(--muted); font-size: 0.9rem; }
+
+/* ===== 새 버전 안내 ===== */
+.update-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + var(--safe-bottom));
+  transform: translateX(-50%);
+  background: var(--text);
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 8px 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  z-index: 90;
+}
+.update-toast[hidden] { display: none; }
+.update-toast .btn { min-height: 36px; padding: 6px 14px; border-radius: 999px; }
+
+/* ===== 로딩 오버레이 ===== */
+.loading {
+  position: fixed;
+  inset: 0;
+  background: rgba(245, 247, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.loading[hidden] { display: none; }
+.loading-box {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  font-weight: 700;
+}
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 5px solid #dfe3f5;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== 가로 모드 (태블릿/PC): 왼쪽 영상+진행바, 오른쪽 자막+조작+전체 대사 ===== */
+@media (min-width: 900px) and (orientation: landscape) {
+  .player-body { flex-direction: row; align-items: flex-start; gap: 16px; }
+  .player-left { display: flex; flex-direction: column; gap: 10px; flex: 1.4; min-width: 0; }
+  .player-right { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 320px; }
+  .video-wrap { max-height: calc(100vh - 150px); }
+  .controls-main { padding: 0; }
+  /* 전체 대사가 남는 높이를 채우도록 (details는 flex 자식 크기 계산이 불안정해서 vh로) */
+  .script-list { max-height: calc(100vh - 470px); min-height: 180px; }
+}
