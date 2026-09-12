@@ -334,6 +334,7 @@ button { font-family: inherit; }
 .script-item { padding: 10px 12px; border-radius: 10px; cursor: pointer; line-height: 1.4; }
 .script-item:active { background: #eef0f7; }
 .script-item.active { background: #eef2ff; border-left: 4px solid var(--primary); }
+.script-item.star .en::before { content: '⭐ '; }
 .script-item .en { font-weight: 600; }
 .script-item .ko { color: var(--muted); font-size: 0.9rem; }
 /* EN/KO 토글을 목록에도 적용 */
@@ -342,6 +343,57 @@ button { font-family: inherit; }
 /* 듣기 먼저: 아직 다 듣지 않은 문장의 영어는 목록에서도 가림 (공개된 문장은 revealed) */
 .script-list.listen-first .script-item:not(.revealed) .en { display: none; }
 .script-list.listen-first .script-item:not(.revealed) .ko::before { content: '👂 '; }
+
+/* ===== 오늘의 목표 칩 ===== */
+.goal-chip {
+  background: #fff7ed;
+  border: 2px solid #fdba74;
+  color: #b45309;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.goal-chip.reached { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
+.goal-chip[hidden] { display: none; }
+
+/* ===== 학습 기록 화면 ===== */
+.stats-main { flex: 1; padding: 14px; display: flex; flex-direction: column; }
+.stats-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.stats-card h2 { margin: 0 0 10px; font-size: 1.05rem; }
+.stats-summary { display: flex; flex-wrap: wrap; }
+.stats-kpi { flex: 1 1 110px; margin: 4px 8px 4px 0; }
+.stats-kpi .v { font-size: 1.4rem; font-weight: 800; color: var(--primary); }
+.stats-kpi .l { font-size: 0.8rem; color: var(--muted); }
+.stats-bars { display: flex; align-items: flex-end; height: 90px; margin-top: 10px; }
+.stats-bar { flex: 1; margin: 0 3px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.stats-bar .fill { width: 100%; background: var(--primary); border-radius: 6px 6px 0 0; min-height: 2px; }
+.stats-bar.today .fill { background: var(--accent); }
+.stats-bar .d { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+.stats-bar .m { font-size: 0.7rem; color: var(--text); }
+.stats-row { display: flex; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); }
+.stats-row:first-of-type { border-top: none; }
+.stats-row .name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-row .meta { color: var(--muted); font-size: 0.85rem; white-space: nowrap; margin-left: 8px; }
+.stats-progress { height: 10px; background: #dfe3f5; border-radius: 999px; overflow: hidden; margin: 6px 0 2px; }
+.stats-progress .fill { height: 100%; background: var(--ok); }
+.stats-item { display: block; }
+.stats-hard { padding: 8px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.stats-hard .en { font-weight: 600; }
+.stats-hard .ko { color: var(--muted); font-size: 0.85rem; }
+.stats-hard .why { font-size: 0.8rem; color: #b45309; margin-top: 2px; }
+.stats-hard:active { background: #eef0f7; }
+.stats-empty { color: var(--muted); font-size: 0.9rem; }
+.stats-chip { display: inline-block; background: #eef2ff; color: var(--primary); border-radius: 8px; padding: 3px 8px; margin: 3px 4px 3px 0; font-size: 0.9rem; }
+.stats-chip small { color: var(--muted); margin-left: 4px; }
+.topbar label.btn { display: inline-flex; align-items: center; }
 
 /* ===== 새 버전 안내 ===== */
 .update-toast {

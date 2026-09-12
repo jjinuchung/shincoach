@@ -1,10 +1,12 @@
 // 앱 진입점: 화면 전환, 서비스워커 등록, 모듈 초기화
 import { initLibrary } from './library.js';
-import { initPlayer } from './player.js';
+import { initPlayer, requirePin } from './player.js';
+import { initStats } from './stats.js';
 
 const views = {
   library: document.getElementById('view-library'),
   player: document.getElementById('view-player'),
+  stats: document.getElementById('view-stats'),
 };
 
 /** 화면 전환 (library | player) */
@@ -65,6 +67,7 @@ window.addEventListener('unhandledrejection', (e) => showError(`오류: ${(e.rea
 async function main() {
   // 버튼 연결을 가장 먼저 — 뒤의 어떤 단계가 실패해도 UI는 동작해야 함
   initPlayer({ showView });
+  initStats({ showView, requirePin });
   showView('library');
   window.__appReady = true; // index.html의 시작 감시 타이머 해제
   try {

@@ -33,7 +33,7 @@ function loadPlayer() {
   });
   els.video = video;
   const ctx = vm.createContext({
-    console, setTimeout, clearTimeout,
+    console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     performance: { now: () => Date.now() },
     localStorage: { getItem: () => null, setItem() {} },
@@ -49,6 +49,7 @@ function loadPlayer() {
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {} }), prepareMic: async () => null,
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, MASTER_RATIO: 0.8 },
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; // 테스트 기준: 반복 끔, 말하기 확인 끔', ctx);

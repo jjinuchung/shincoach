@@ -2,7 +2,15 @@
 // items 스토어: 메타데이터(제목, 자막, 진행) / blobs 스토어: 영상 Blob (목록 조회 시 무거운 Blob을 안 읽기 위해 분리)
 
 const DB_NAME = 'shincoach';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+
+// 학습 기록 스토어 (v2에서 추가)
+//  sentenceStats: 문장별 누적 { key: "<itemId>|<start×10>", itemId, start, en, ko, plays, listens, done, seconds,
+//                 speakAttempts, speakPass, speakFail, speakSkipped, bestRatio, lastRatio, lastAt }
+//  sessions:      앱을 열고 닫은 단위 { id, itemId, title, startedAt, endedAt, seconds, sentences, firstIdx, lastIdx, speakAttempts, speakPass }
+//  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass }
+//  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
+const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews'];
 
 let dbPromise = null;
 
@@ -18,6 +26,20 @@ function openDb() {
       }
       if (!db.objectStoreNames.contains('blobs')) {
         db.createObjectStore('blobs', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('sentenceStats')) {
+        const st = db.createObjectStore('sentenceStats', { keyPath: 'key' });
+        st.createIndex('itemId', 'itemId');
+      }
+      if (!db.objectStoreNames.contains('sessions')) {
+        const ss = db.createObjectStore('sessions', { keyPath: 'id' });
+        ss.createIndex('startedAt', 'startedAt');
+      }
+      if (!db.objectStoreNames.contains('daily')) {
+        db.createObjectStore('daily', { keyPath: 'date' });
+      }
+      if (!db.objectStoreNames.contains('vocabViews')) {
+        db.createObjectStore('vocabViews', { keyPath: 'word' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -125,4 +147,134 @@ export async function storageEstimate() {
   } catch {
     return null;
   }
+}
+
+// ───────────────────── 학습 기록 ─────────────────────
+
+/** 문장 기록 키: 문장 합치기 설정이 바뀌어도 대체로 안정적인 "시작 시각(0.1초 단위)" 기준 */
+export function sentenceKey(itemId, start) {
+  return `${itemId}|${Math.round(start * 10)}`;
+}
+
+/** 한 콘텐츠의 문장 기록 전부 → Map(key → record) */
+export async function getSentenceStats(itemId) {
+  const db = await openDb();
+  const tx = db.transaction('sentenceStats', 'readonly');
+  const all = await promisify(tx.objectStore('sentenceStats').index('itemId').getAll(itemId));
+  const map = new Map();
+  for (const r of all) map.set(r.key, r);
+  return map;
+}
+
+/** 모든 콘텐츠의 문장 기록 (대시보드용) */
+export async function getAllSentenceStats() {
+  const db = await openDb();
+  const tx = db.transaction('sentenceStats', 'readonly');
+  return promisify(tx.objectStore('sentenceStats').getAll());
+}
+
+/** 문장 기록 여러 건을 한 트랜잭션으로 저장 */
+export async function putSentenceStats(records) {
+  if (!records.length) return;
+  const db = await openDb();
+  const tx = db.transaction('sentenceStats', 'readwrite');
+  const store = tx.objectStore('sentenceStats');
+  for (const r of records) store.put(r);
+  await txDone(tx);
+}
+
+export async function putSession(session) {
+  const db = await openDb();
+  const tx = db.transaction('sessions', 'readwrite');
+  tx.objectStore('sessions').put(session);
+  await txDone(tx);
+}
+
+/** 최근 세션 (최신순, limit개) */
+export async function listSessions(limit = 30) {
+  const db = await openDb();
+  const tx = db.transaction('sessions', 'readonly');
+  const all = await promisify(tx.objectStore('sessions').getAll());
+  return all.sort((a, b) => b.startedAt - a.startedAt).slice(0, limit);
+}
+
+export async function getDaily(date) {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readonly');
+  return promisify(tx.objectStore('daily').get(date));
+}
+
+export async function putDaily(rec) {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readwrite');
+  tx.objectStore('daily').put(rec);
+  await txDone(tx);
+}
+
+export async function listDaily() {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readonly');
+  const all = await promisify(tx.objectStore('daily').getAll());
+  return all.sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/** 단어 조회 기록 누적 (views: 패널이 열린 채 보임, taps: 직접 눌러서 펼침) */
+export async function bumpVocabViews(entries, tapped) {
+  if (!entries.length) return;
+  const db = await openDb();
+  const tx = db.transaction('vocabViews', 'readwrite');
+  const store = tx.objectStore('vocabViews');
+  for (const e of entries) {
+    const cur = await promisify(store.get(e.term));
+    const rec = cur || { word: e.term, meaning: e.meaning, kind: e.kind, views: 0, taps: 0, lastAt: 0, sentence: '' };
+    rec.views++;
+    if (tapped) rec.taps++;
+    rec.lastAt = Date.now();
+    rec.sentence = e.sentence || rec.sentence;
+    rec.meaning = e.meaning || rec.meaning;
+    store.put(rec);
+  }
+  await txDone(tx);
+}
+
+export async function listVocabViews() {
+  const db = await openDb();
+  const tx = db.transaction('vocabViews', 'readonly');
+  return promisify(tx.objectStore('vocabViews').getAll());
+}
+
+/** 기록 전체 내보내기 (영상 제외) */
+export async function exportStats() {
+  const db = await openDb();
+  const tx = db.transaction(['items', ...STAT_STORES], 'readonly');
+  const items = (await promisify(tx.objectStore('items').getAll())).map((it) => ({
+    id: it.id, title: it.title, duration: it.duration, lastCue: it.lastCue, createdAt: it.createdAt,
+  }));
+  const out = { app: 'shincoach', version: 1, exportedAt: new Date().toISOString(), items };
+  for (const name of STAT_STORES) out[name] = await promisify(tx.objectStore(name).getAll());
+  return out;
+}
+
+/** 기록 가져오기: 같은 키는 덮어씀 (누적값은 더 큰 쪽 유지) */
+export async function importStats(data) {
+  if (!data || data.app !== 'shincoach') throw new Error('신코치 기록 파일이 아니에요');
+  const db = await openDb();
+  const tx = db.transaction(STAT_STORES, 'readwrite');
+  let n = 0;
+  for (const name of STAT_STORES) {
+    const store = tx.objectStore(name);
+    for (const rec of data[name] || []) {
+      const cur = await promisify(store.get(rec[store.keyPath]));
+      if (cur && name === 'sentenceStats') {
+        // 누적 수치는 큰 값, 시각은 최근 값
+        for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio']) rec[k] = Math.max(cur[k] || 0, rec[k] || 0);
+        rec.done = cur.done || rec.done;
+        rec.lastAt = Math.max(cur.lastAt || 0, rec.lastAt || 0);
+      }
+      store.put(rec);
+      n++;
+    }
+  }
+  await txDone(tx);
+  return n;
 }

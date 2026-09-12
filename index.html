@@ -19,6 +19,7 @@
   <section id="view-library" class="view">
     <header class="topbar">
       <h1 class="topbar-title">🎬 신코치 영어</h1>
+      <button id="btn-stats" class="btn btn-icon" aria-label="학습 기록">📊</button>
       <button id="btn-import" class="btn btn-primary">＋ 영상 가져오기</button>
     </header>
 
@@ -74,6 +75,7 @@
     <header class="topbar">
       <button id="btn-back" class="btn btn-icon" aria-label="목록으로">←</button>
       <h1 id="player-title" class="topbar-title"></h1>
+      <span id="goal-chip" class="goal-chip" hidden></span>
       <button id="btn-settings" class="btn btn-icon" aria-label="설정">⚙</button>
     </header>
 
@@ -128,6 +130,18 @@
     </div>
   </section>
 
+  <!-- ===== 학습 기록 (부모용) ===== -->
+  <section id="view-stats" class="view" hidden>
+    <header class="topbar">
+      <button id="btn-stats-back" class="btn btn-icon" aria-label="목록으로">←</button>
+      <h1 class="topbar-title">📊 학습 기록</h1>
+      <button id="btn-stats-export" class="btn">내보내기</button>
+      <label class="btn" for="stats-import-file">가져오기</label>
+      <input type="file" id="stats-import-file" accept=".json,application/json" hidden>
+    </header>
+    <main id="stats-main" class="stats-main"></main>
+  </section>
+
   <!-- ===== 새 버전 안내 ===== -->
   <div id="update-toast" class="update-toast" hidden>
     <span>새 버전이 준비됐어요</span>
@@ -174,6 +188,17 @@
           <option value="3">3번 듣고 보여주기</option>
           <option value="4">4번 듣고 보여주기</option>
           <option value="5">5번 듣고 보여주기</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">🔥 오늘의 목표 <small>— 하루에 할 문장 수 (아이 화면에 표시)</small></span>
+        <select id="set-goal">
+          <option value="0">끔</option>
+          <option value="10">10문장</option>
+          <option value="20">20문장</option>
+          <option value="30">30문장</option>
+          <option value="50">50문장</option>
         </select>
       </label>
 

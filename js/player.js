@@ -7,6 +7,7 @@ import {
 import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic } from './speak.js';
+import * as track from './track.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -106,6 +107,41 @@ export function initPlayer(ctx) {
   initPinDialog();
   initVocabPanel();
   initDiag();
+  // 학습 시간: 재생 중이거나 따라 말하는 중이면 1초씩 누적
+  setInterval(() => {
+    if (!state.open) return;
+    const cue = state.cues[state.idx];
+    if (cue && (!video.paused || state.speakRun)) track.tick(cue, 1);
+  }, 1000);
+}
+
+// ───────────────────── 학습 기록 표시 (⭐, 오늘의 목표) ─────────────────────
+
+/** 문장을 영어 공개 상태로 끝까지 들음 → 기록 + 오늘의 목표 갱신 */
+function markDone(cue) {
+  const before = track.todayDone();
+  track.done(cue);
+  const after = track.todayDone();
+  if (after !== before) {
+    updateGoalChip();
+    if (settings.dailyGoal > 0 && after === settings.dailyGoal) showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성!`, 5000);
+  }
+}
+
+/** 현재 문장 ⭐ 정복 표시 (목록) */
+function markStar() {
+  const cur = $('script-list').querySelector(`.script-item[data-idx="${state.idx}"]`);
+  if (cur) cur.classList.add('star');
+}
+
+function updateGoalChip() {
+  const chip = $('goal-chip');
+  if (!chip) return;
+  if (!settings.dailyGoal) { chip.hidden = true; return; }
+  const n = track.todayDone();
+  chip.hidden = false;
+  chip.textContent = n >= settings.dailyGoal ? `🎉 ${n}/${settings.dailyGoal}` : `🔥 ${n}/${settings.dailyGoal}`;
+  chip.classList.toggle('reached', n >= settings.dailyGoal);
 }
 
 // ───────────────────── 단어 패널 ─────────────────────
@@ -115,6 +151,7 @@ function initVocabPanel() {
   try { panel.open = localStorage.getItem('shincoach.vocabOpen') === '1'; } catch { /* 무시 */ }
   panel.addEventListener('toggle', () => {
     try { localStorage.setItem('shincoach.vocabOpen', panel.open ? '1' : '0'); } catch { /* 무시 */ }
+    if (panel.open && state.vocabItems) track.vocab(state.cues[state.idx], state.vocabItems, true); // 직접 눌러 펼침
   });
   loadVocab().then((v) => { state.vocab = v; renderVocab(); });
 }
@@ -125,7 +162,12 @@ function renderVocab() {
   const cue = state.cues[state.idx];
   if (!state.vocab || !cue || !state.enRevealed) { panel.hidden = true; return; }
   const items = state.vocab.lookup(cue.en);
+  state.vocabItems = items;
   if (items.length === 0) { panel.hidden = true; return; }
+  if (panel.open && state.vocabLoggedStart !== cue.start) { // 열린 채 보임 (문장당 1번만)
+    track.vocab(cue, items, false);
+    state.vocabLoggedStart = cue.start;
+  }
   const list = $('vocab-list');
   list.innerHTML = '';
   for (const it of items) {
@@ -144,6 +186,7 @@ function renderVocab() {
 function onVisibilityChange() {
   if (!state.open || !document.hidden) return;
   const wasShadowWaiting = !!state.shadowTimer || !!state.speakRun;
+  track.flush();
   cancelShadowWait();
   if (!video.paused) video.pause();
   if (wasShadowWaiting) showPlayerMessage('▶ 를 눌러 이어서 연습해요', 0);
@@ -153,7 +196,8 @@ function onVisibilityChange() {
 
 // ───────────────────── 열기/닫기 ─────────────────────
 
-export async function openPlayer(id) {
+/** 콘텐츠 열기. opts.startTime(초)을 주면 그 시각의 문장에서 시작 (학습 기록에서 이동) */
+export async function openPlayer(id, opts = {}) {
   const item = await getItem(id);
   if (!item) return;
   const blob = await getVideoBlob(id);
@@ -163,6 +207,7 @@ export async function openPlayer(id) {
   state.open = true;
   state.item = item;
   state.cues = buildCues(item);
+  await track.open(item).catch((e) => console.warn('기록 로드 실패:', e));
   state.idx = -1;
   state.repeatCount = 0;
   cancelShadowWait();
@@ -177,6 +222,7 @@ export async function openPlayer(id) {
   renderScriptList();
   applySubVisibility();
   updateChips();
+  updateGoalChip();
   showView('player');
 
   state.onMeta = () => {
@@ -194,7 +240,12 @@ export async function openPlayer(id) {
           : `자막 ${state.cues.length}개만 영상 길이 안에 있어요`, 4000);
       }
     }
-    const startIdx = Math.min(Math.max(item.lastCue || 0, 0), state.cues.length - 1);
+    let startIdx = Math.min(Math.max(item.lastCue || 0, 0), state.cues.length - 1);
+    if (typeof opts.startTime === 'number') {
+      let best = 0;
+      state.cues.forEach((c, i) => { if (Math.abs(c.start - opts.startTime) < Math.abs(state.cues[best].start - opts.startTime)) best = i; });
+      startIdx = best;
+    }
     goTo(startIdx, { play: false });
   };
   video.addEventListener('loadedmetadata', state.onMeta, { once: true });
@@ -202,6 +253,8 @@ export async function openPlayer(id) {
 
 function closePlayer() {
   scheduleSave(true);
+  track.close();
+  updateGoalChip();
   closeMedia();
   showView('library');
 }
@@ -388,10 +441,12 @@ function onVideoEnded() {
 function onCueEnd() {
   const repeatMax = REPEATS[state.repeatIdx];
   const cue = state.cues[state.idx];
+  track.play(cue, state.idx);
 
   // 듣기 먼저: 영어를 숨긴 채 N번 들을 때까지 같은 문장을 반복, N번째가 끝나면 영어 공개
   if (settings.listenFirst > 0 && !state.enRevealed) {
     state.listenCount++;
+    track.listen(cue);
     applySubVisibility(); // EN 버튼의 👂 n/N 갱신
     video.currentTime = cue.start;
     if (state.listenCount < settings.listenFirst) {
@@ -413,6 +468,7 @@ function onCueEnd() {
     return;
   }
 
+  markDone(cue);
   const repeatLeft = repeatMax > 0 && state.repeatCount < repeatMax - 1;
 
   // 섀도잉/말하기 확인: 매 재생이 끝날 때마다 멈추고 따라 말할 시간 → 반복이 남았으면 같은 문장, 아니면 다음 문장
@@ -564,6 +620,8 @@ function onSpeakResult(cue, result) {
 
   if (result.passed) {
     state.speakPassed = true;
+    track.speak(cue, { passed: true, skipped: false, score: result.score });
+    if (result.score && result.score.ratio >= track.MASTER_RATIO) markStar();
     if (result.method === 'speech' && result.score) {
       msg.textContent = result.score.ratio >= 0.8 ? '🌟 완벽해요!' : '🎯 잘했어요!';
       sub.textContent = `${result.score.matched}/${result.score.total} 단어 맞음: "${result.transcript}"`;
@@ -578,11 +636,13 @@ function onSpeakResult(cue, result) {
   state.speakFails++;
   if (state.speakFails >= 3) {
     state.speakPassed = true;
+    track.speak(cue, { passed: true, skipped: true, score: result.score });
     msg.textContent = '👍 괜찮아요, 넘어갈게요';
     sub.textContent = result.transcript ? `들린 말: "${result.transcript}"` : '';
     state.shadowTimer = setTimeout(afterShadowWait, 1400);
     return;
   }
+  track.speak(cue, { passed: false, skipped: false, score: result.score });
   msg.textContent = `🔁 다시 한번! (${state.speakFails}/3)`;
   sub.textContent = result.method === 'speech'
     ? `들린 말: "${result.transcript}" — 잘 듣고 따라 해봐요`
@@ -685,7 +745,7 @@ function renderScriptList() {
   ol.innerHTML = '';
   state.cues.forEach((cue, i) => {
     const li = document.createElement('li');
-    li.className = 'script-item';
+    li.className = 'script-item' + (track.isMastered(cue) ? ' star' : '');
     li.dataset.idx = i;
     const en = document.createElement('div');
     en.className = 'en';
@@ -805,7 +865,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true };
+  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, dailyGoal: 20 };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -821,6 +881,7 @@ function initSettingsDialog() {
   $('set-merge').checked = settings.mergeSentences;
   $('set-shadow-factor').value = String(settings.shadowFactor);
   $('set-listen-first').value = String(settings.listenFirst);
+  $('set-goal').value = String(settings.dailyGoal);
   $('set-speak').checked = settings.speakCheck;
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('form-settings').addEventListener('submit', (e) => {
@@ -829,6 +890,8 @@ function initSettingsDialog() {
     settings.mergeSentences = $('set-merge').checked;
     settings.shadowFactor = Number($('set-shadow-factor').value);
     settings.listenFirst = Number($('set-listen-first').value);
+    settings.dailyGoal = Number($('set-goal').value);
+    updateGoalChip();
     settings.speakCheck = $('set-speak').checked;
     if (settings.listenFirst === 0) state.enRevealed = true;
     applySubVisibility();
@@ -866,7 +929,11 @@ async function checkPin(pin) {
   return pin.split('').reverse().join('') === '5170';
 }
 
-function openSettings() {
+let pinCallback = null;
+
+/** 부모 비밀번호 확인 후 onOk 실행 (설정·학습 기록 공용) */
+export function requirePin(onOk) {
+  pinCallback = onOk;
   const dlg = $('dlg-pin');
   const input = $('pin-input');
   const err = $('pin-error');
@@ -874,6 +941,10 @@ function openSettings() {
   err.textContent = '';
   dlg.showModal();
   setTimeout(() => input.focus(), 50);
+}
+
+function openSettings() {
+  requirePin(() => { renderDiag(); $('dlg-settings').showModal(); });
 }
 
 function initPinDialog() {
@@ -889,7 +960,8 @@ function initPinDialog() {
       return;
     }
     $('dlg-pin').close();
-    renderDiag();
-    $('dlg-settings').showModal();
+    const cb = pinCallback;
+    pinCallback = null;
+    if (cb) cb();
   });
 }
