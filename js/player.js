@@ -27,6 +27,8 @@ const state = {
   shadow: false,
   showEn: true,
   showKo: true,
+  listenCount: 0,     // 듣기 먼저: 현재 문장을 (영어 숨긴 채) 끝까지 들은 횟수
+  enRevealed: true,   // 듣기 먼저: 현재 문장의 영어 자막 공개 여부
   shadowTimer: null,
   shadowRaf: null,
   raf: null,
@@ -176,8 +178,11 @@ function goTo(i, { play = true } = {}) {
   cancelShadowWait();
   state.idx = i;
   state.repeatCount = 0;
+  state.listenCount = 0;
+  state.enRevealed = settings.listenFirst === 0; // 듣기 먼저 모드면 새 문장은 영어 숨김으로 시작
   video.currentTime = state.cues[i].start;
   renderSubtitle();
+  applySubVisibility();
   updateProgress();
   highlightScript();
   updateChips();
@@ -302,6 +307,30 @@ function onCueEnd() {
   const repeatMax = REPEATS[state.repeatIdx];
   const cue = state.cues[state.idx];
 
+  // 듣기 먼저: 영어를 숨긴 채 N번 들을 때까지 같은 문장을 반복, N번째가 끝나면 영어 공개
+  if (settings.listenFirst > 0 && !state.enRevealed) {
+    state.listenCount++;
+    applySubVisibility(); // EN 버튼의 👂 n/N 갱신
+    video.currentTime = cue.start;
+    if (state.listenCount < settings.listenFirst) {
+      if (video.paused || video.ended) safePlay();
+      return;
+    }
+    state.enRevealed = true;
+    state.repeatCount = 0; // 반복 횟수는 공개 이후부터 셈
+    applySubVisibility();
+    markScriptRevealed();
+    updateChips();
+    if (state.shadow) { // 섀도잉이면 바로 따라 말하기 (영어 보면서)
+      video.pause();
+      startShadowWait(cue);
+      return;
+    }
+    video.pause();
+    showPlayerMessage('👀 이제 영어를 보면서 따라 말해봐요', 0);
+    return;
+  }
+
   // 반복 남았으면 같은 문장 처음으로
   if (repeatMax > 0 && state.repeatCount < repeatMax - 1) {
     state.repeatCount++;
@@ -416,16 +445,38 @@ function updateWordHighlight(t) {
 }
 
 function toggleSub(which) {
-  if (which === 'en') state.showEn = !state.showEn;
-  else state.showKo = !state.showKo;
+  if (which === 'en') {
+    if (!state.enRevealed) { // 듣기 먼저 진행 중에는 열 수 없음
+      showPlayerMessage(`👂 ${settings.listenFirst}번 듣고 나면 영어가 보여요 (지금 ${state.listenCount}번)`);
+      return;
+    }
+    state.showEn = !state.showEn;
+  } else {
+    state.showKo = !state.showKo;
+  }
   applySubVisibility();
 }
 
 function applySubVisibility() {
-  $('sub-en').hidden = !state.showEn;
+  const enOn = state.showEn && state.enRevealed;
+  $('sub-en').hidden = !enOn;
   $('sub-ko').hidden = !state.showKo;
-  $('btn-toggle-en').classList.toggle('is-on', state.showEn);
+  const enBtn = $('btn-toggle-en');
+  enBtn.classList.toggle('is-on', state.showEn && state.enRevealed);
+  enBtn.dataset.state = state.enRevealed ? 'off' : 'on'; // 숨김 진행 중이면 주황색
+  enBtn.textContent = state.enRevealed ? 'EN' : `👂 ${state.listenCount}/${settings.listenFirst}`;
   $('btn-toggle-ko').classList.toggle('is-on', state.showKo);
+  // 전체 대사 목록에도 EN/KO 토글 반영 (듣기 먼저 모드에서는 아직 안 들은 문장의 영어를 가림)
+  const list = $('script-list');
+  list.classList.toggle('hide-en', !state.showEn);
+  list.classList.toggle('hide-ko', !state.showKo);
+  list.classList.toggle('listen-first', settings.listenFirst > 0);
+}
+
+/** 듣기 먼저: 현재 문장이 공개되면 목록에서도 영어를 보여줌 (지나간 문장은 계속 보임) */
+function markScriptRevealed() {
+  const cur = $('script-list').querySelector(`.script-item[data-idx="${state.idx}"]`);
+  if (cur) cur.classList.add('revealed');
 }
 
 function updateProgress() {
@@ -465,6 +516,7 @@ function highlightScript() {
   const cur = ol.querySelector(`.script-item[data-idx="${state.idx}"]`);
   if (cur) {
     cur.classList.add('active');
+    if (state.enRevealed) cur.classList.add('revealed');
     // scrollIntoView는 페이지 전체를 스크롤시켜 화면이 튀므로 목록 컨테이너만 스크롤
     const top = cur.offsetTop; // .script-list이 position:relative 라서 목록 기준 좌표
     const bottom = top + cur.offsetHeight;
@@ -557,7 +609,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 1.5 };
+  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3 };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -572,12 +624,17 @@ function saveSettings() {
 function initSettingsDialog() {
   $('set-merge').checked = settings.mergeSentences;
   $('set-shadow-factor').value = String(settings.shadowFactor);
+  $('set-listen-first').value = String(settings.listenFirst);
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
     const mergeChanged = settings.mergeSentences !== $('set-merge').checked;
     settings.mergeSentences = $('set-merge').checked;
     settings.shadowFactor = Number($('set-shadow-factor').value);
+    settings.listenFirst = Number($('set-listen-first').value);
+    if (settings.listenFirst === 0) state.enRevealed = true;
+    applySubVisibility();
+    updateChips();
     saveSettings();
     $('dlg-settings').close();
     if (mergeChanged && state.item) {

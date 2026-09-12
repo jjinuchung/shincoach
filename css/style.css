@@ -282,6 +282,12 @@ button { font-family: inherit; }
 .script-item.active { background: #eef2ff; border-left: 4px solid var(--primary); }
 .script-item .en { font-weight: 600; }
 .script-item .ko { color: var(--muted); font-size: 0.9rem; }
+/* EN/KO 토글을 목록에도 적용 */
+.script-list.hide-en .script-item .en { display: none; }
+.script-list.hide-ko .script-item .ko { display: none; }
+/* 듣기 먼저: 아직 다 듣지 않은 문장의 영어는 목록에서도 가림 (공개된 문장은 revealed) */
+.script-list.listen-first .script-item:not(.revealed) .en { display: none; }
+.script-list.listen-first .script-item:not(.revealed) .ko::before { content: '👂 '; }
 
 /* ===== 새 버전 안내 ===== */
 .update-toast {

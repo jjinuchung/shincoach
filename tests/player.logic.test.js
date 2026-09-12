@@ -122,3 +122,59 @@ test('#1 화면이 숨겨지면 재생·섀도잉 대기를 멈추고 즉시 저
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(saved && saved.lastCue, 1, '즉시 저장'); // vm 객체라 deepEqual 대신 필드 비교
 });
+
+// ── 듣기 먼저 모드 ──
+
+test('듣기 먼저: 3번 들을 때까지 영어 숨기고 반복, 3번째 끝나면 공개 + 멈춤', () => {
+  const { run, video, els } = loadPlayer();
+  run('settings.listenFirst = 3; state.cues = [{start:0,end:2,en:"a",ko:"가"},{start:10,end:12,en:"b",ko:"나"}]; state.idx = -1;');
+  run('goTo(0)');
+  assert.equal(run('state.enRevealed'), false);
+  assert.equal(els['sub-en'].hidden, true, '영어 숨김');
+  assert.equal(els['sub-ko'].hidden, false, '한글 표시');
+  assert.equal(els['btn-toggle-en'].textContent, '👂 0/3');
+  for (let n = 1; n <= 2; n++) {
+    video.currentTime = 2; run('onCueEnd()');
+    assert.equal(run('state.listenCount'), n);
+    assert.equal(video.currentTime, 0, '처음으로 되감기');
+    assert.equal(video.paused, false, '계속 재생');
+    assert.equal(run('state.enRevealed'), false);
+  }
+  video.currentTime = 2; run('onCueEnd()');
+  assert.equal(run('state.enRevealed'), true, '3번째 끝 → 공개');
+  assert.equal(els['sub-en'].hidden, false, '영어 표시');
+  assert.equal(video.paused, true, '멈춤');
+  assert.equal(run('state.idx'), 0, '다음 문장으로 넘어가지 않음');
+  assert.equal(els['btn-toggle-en'].textContent, 'EN');
+});
+
+test('듣기 먼저: 공개 전 EN 버튼은 열리지 않음, 다음 문장으로 가면 다시 숨김', () => {
+  const { run, els } = loadPlayer();
+  run('settings.listenFirst = 2; state.cues = [{start:0,end:2,en:"a",ko:"가"},{start:10,end:12,en:"b",ko:"나"}]; state.idx = -1;');
+  run('goTo(0)');
+  run('toggleSub("en")');
+  assert.equal(els['sub-en'].hidden, true, '공개 전엔 토글 무시');
+  run('state.enRevealed = true; applySubVisibility();');
+  assert.equal(els['sub-en'].hidden, false);
+  run('goTo(1)');
+  assert.equal(run('state.enRevealed'), false, '새 문장 → 다시 숨김');
+  assert.equal(run('state.listenCount'), 0);
+});
+
+test('듣기 먼저 + 섀도잉: 공개 시점에 따라 말하기 대기로 이어짐', () => {
+  const { run, video } = loadPlayer();
+  run('settings.listenFirst = 1; state.shadow = true; state.cues = [{start:0,end:2,en:"a",ko:"가"}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  assert.equal(run('state.enRevealed'), true);
+  assert.ok(run('state.shadowTimer'), '섀도잉 대기 시작');
+  run('cancelShadowWait()');
+});
+
+test('듣기 먼저 끔(0): 기존 동작 그대로 (영어 바로 표시)', () => {
+  const { run, els } = loadPlayer();
+  run('settings.listenFirst = 0; state.cues = [{start:0,end:2,en:"a",ko:"가"}]; state.idx = -1;');
+  run('goTo(0)');
+  assert.equal(run('state.enRevealed'), true);
+  assert.equal(els['sub-en'].hidden, false);
+});
