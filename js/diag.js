@@ -188,10 +188,8 @@ function playLastRecording() {
   lastAudio = new Audio(lastRecUrl);
   lastAudio.volume = 1;
   const out = $('diag-result');
-  lastAudio.onended = () => { out.textContent += '
-(재생 끝)'; };
-  lastAudio.play().catch((e) => { out.textContent += `
-재생 실패: ${e.name}`; });
+  lastAudio.onended = () => { out.textContent += '\n(재생 끝)'; };
+  lastAudio.play().catch((e) => { out.textContent += `\n재생 실패: ${e.name}`; });
 }
 
 export function initDiag() {
