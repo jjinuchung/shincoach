@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <div id="error-banner" class="error-banner" hidden></div>
 
   <!-- ===== 라이브러리 화면 ===== -->
   <section id="view-library" class="view">
@@ -162,5 +163,14 @@
   </dialog>
 
   <script type="module" src="js/app.js"></script>
+  <!-- 모듈이 문법 오류 등으로 아예 실행되지 못한 경우를 감지 (오래된 브라우저) — 일부러 옛 문법으로 작성 -->
+  <script>
+    setTimeout(function () {
+      if (window.__appReady) return;
+      var el = document.getElementById('error-banner');
+      el.textContent = '⚠️ 앱을 시작하지 못했어요. 브라우저가 오래된 것 같아요 — Chrome을 최신 버전으로 업데이트해 주세요. (' + navigator.userAgent.replace(/^.*\((.*?)\).*$/, '$1') + ')';
+      el.hidden = false;
+    }, 4000);
+  </script>
 </body>
 </html>

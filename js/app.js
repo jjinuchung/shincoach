@@ -42,21 +42,37 @@ async function registerServiceWorker() {
   }
 }
 
-/** 브라우저가 저장 데이터를 임의로 지우지 않도록 영구 저장 요청 */
-async function requestPersistentStorage() {
+/** 브라우저가 저장 데이터를 임의로 지우지 않도록 영구 저장 요청 (결과를 기다리지 않음 — 일부 기기에서 응답이 없을 수 있음) */
+function requestPersistentStorage() {
   if (navigator.storage && navigator.storage.persist) {
-    try {
-      const granted = await navigator.storage.persist();
-      console.log('영구 저장:', granted ? '허용' : '거부');
-    } catch { /* 무시 */ }
+    navigator.storage.persist()
+      .then((granted) => console.log('영구 저장:', granted ? '허용' : '거부'))
+      .catch(() => {});
   }
 }
 
+/** 화면 상단에 오류를 표시 (태블릿 등 개발자 도구를 못 여는 기기에서 원인 파악용) */
+export function showError(message) {
+  const el = document.getElementById('error-banner');
+  if (!el) return;
+  el.textContent = `⚠️ ${message}`;
+  el.hidden = false;
+}
+
+window.addEventListener('error', (e) => showError(`오류: ${e.message || e.type}`));
+window.addEventListener('unhandledrejection', (e) => showError(`오류: ${(e.reason && e.reason.message) || e.reason}`));
+
 async function main() {
-  await requestPersistentStorage();
+  // 버튼 연결을 가장 먼저 — 뒤의 어떤 단계가 실패해도 UI는 동작해야 함
   initPlayer({ showView });
-  await initLibrary({ showView });
   showView('library');
+  window.__appReady = true; // index.html의 시작 감시 타이머 해제
+  try {
+    await initLibrary({ showView });
+  } catch (err) {
+    showError(`저장소를 열 수 없어요: ${err.message} (시크릿 모드이거나 저장 공간이 꺼져 있을 수 있어요)`);
+  }
+  requestPersistentStorage();
   registerServiceWorker();
 }
 

@@ -110,7 +110,8 @@ export function parseSami(text) {
         .replace(/<\/P>/gi, '')
         .replace(/<br\s*\/?>/gi, '\n');
       const txt = cleanText(decodeEntities(textHtml)).replace(/[ \t]*\n[ \t]*/g, '\n').trim();
-      (raw[cls] ||= []).push({ start: sync.start, text: txt });
+      if (!raw[cls]) raw[cls] = [];
+      raw[cls].push({ start: sync.start, text: txt });
     }
   }
 

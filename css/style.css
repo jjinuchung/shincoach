@@ -40,6 +40,18 @@ button { font-family: inherit; }
 }
 .view[hidden] { display: none; }
 
+/* ===== 오류 배너 ===== */
+.error-banner {
+  background: #fef2f2;
+  color: #991b1b;
+  border-bottom: 2px solid #fca5a5;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  word-break: break-all;
+}
+.error-banner[hidden] { display: none; }
+
 /* ===== 상단 바 ===== */
 .topbar {
   display: flex;
