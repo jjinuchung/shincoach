@@ -49,7 +49,7 @@ function loadPlayer() {
     loadVocab: async () => ({ lookup: () => [] }),
   });
   vm.runInContext(src, ctx);
-  vm.runInContext('initPlayer({ showView() {} }); state.open = true;', ctx);
+  vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; // 테스트 기준: 반복 끔', ctx);
   return { ctx, video, els, run: (code) => vm.runInContext(code, ctx) };
 }
 
@@ -178,4 +178,61 @@ test('듣기 먼저 끔(0): 기존 동작 그대로 (영어 바로 표시)', () 
   run('goTo(0)');
   assert.equal(run('state.enRevealed'), true);
   assert.equal(els['sub-en'].hidden, false);
+});
+
+// ── 반복 ∞ 기본값 + 섀도잉 순환 ──
+
+test('반복 기본값은 ∞ (localStorage에 저장된 선택이 없을 때)', () => {
+  const { run } = loadPlayer();
+  run('state.repeatIdx = 3;'); // loadPlayer가 테스트용으로 0으로 바꾸므로 원래 초기값을 확인
+  assert.equal(run('REPEATS[3]'), Infinity);
+  const src = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
+  assert.match(src, /repeatIdx: 3,/, '초기 state.repeatIdx = 3 (∞)');
+});
+
+test('반복 ∞ + 섀도잉: 재생 → 따라 말하기 → 같은 문장 다시 (다음으로 안 넘어감)', () => {
+  const { run, video } = loadPlayer();
+  run('settings.listenFirst = 0; state.repeatIdx = 3; state.shadow = true; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  assert.ok(run('state.shadowTimer'), '따라 말하기 대기');
+  assert.equal(run('state.shadowNext'), 'repeat');
+  run('skipShadowWait()');
+  assert.equal(run('state.idx'), 0, '같은 문장 유지');
+  assert.equal(run('state.repeatCount'), 1);
+  assert.equal(video.currentTime, 0);
+  assert.equal(video.paused, false, '다시 재생');
+});
+
+test('반복 끔 + 섀도잉: 따라 말하기 뒤 다음 문장', () => {
+  const { run, video } = loadPlayer();
+  run('settings.listenFirst = 0; state.repeatIdx = 0; state.shadow = true; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  assert.equal(run('state.shadowNext'), 'next');
+  run('skipShadowWait()');
+  assert.equal(run('state.idx'), 1);
+});
+
+test('반복 3회 + 섀도잉: 세 번 재생·따라 말하기 후 다음 문장', () => {
+  const { run, video } = loadPlayer();
+  run('settings.listenFirst = 0; state.repeatIdx = 1; state.shadow = true; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  for (let n = 1; n <= 3; n++) {
+    video.currentTime = 2; run('onCueEnd()');
+    assert.ok(run('state.shadowTimer'), `${n}번째 재생 뒤 따라 말하기`);
+    run('skipShadowWait()');
+    if (n < 3) assert.equal(run('state.idx'), 0, `${n}번째 뒤 같은 문장`);
+  }
+  assert.equal(run('state.idx'), 1, '3번째 뒤 다음 문장');
+});
+
+test('반복/속도/섀도잉 선택은 savePrefs로 저장', () => {
+  const { run, ctx } = loadPlayer();
+  let saved = null;
+  ctx.localStorage.setItem = (k, v) => { if (k === 'shincoach.prefs') saved = JSON.parse(v); };
+  run('cycleRepeat(); cycleSpeed(); toggleShadow();');
+  assert.equal(saved.repeatIdx, 1);
+  assert.equal(saved.speedIdx, 3);
+  assert.equal(saved.shadow, true);
 });

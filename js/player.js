@@ -23,7 +23,7 @@ const state = {
   onMeta: null,      // loadedmetadata 핸들러 (닫을 때 제거)
   objectUrl: null,
   speedIdx: 2,
-  repeatIdx: 0,
+  repeatIdx: 3,       // 기본 ∞ 반복 (아이가 다음 문장을 직접 넘길 때까지 같은 문장)
   repeatCount: 0,
   shadow: false,
   showEn: true,
@@ -32,6 +32,7 @@ const state = {
   enRevealed: true,   // 듣기 먼저: 현재 문장의 영어 자막 공개 여부
   shadowTimer: null,
   shadowRaf: null,
+  shadowNext: 'next', // 따라 말하기 뒤 동작: 'repeat' | 'next'
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -44,11 +45,27 @@ const state = {
 let showView;
 let video;
 
+/** 반복/속도/섀도잉 선택을 기기에 저장해 다음에 열 때 유지 */
+function loadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem('shincoach.prefs') || '{}');
+    if (Number.isInteger(p.repeatIdx) && REPEATS[p.repeatIdx] !== undefined) state.repeatIdx = p.repeatIdx;
+    if (Number.isInteger(p.speedIdx) && SPEEDS[p.speedIdx] !== undefined) state.speedIdx = p.speedIdx;
+    if (typeof p.shadow === 'boolean') state.shadow = p.shadow;
+  } catch { /* 무시 */ }
+}
+function savePrefs() {
+  try {
+    localStorage.setItem('shincoach.prefs', JSON.stringify({ repeatIdx: state.repeatIdx, speedIdx: state.speedIdx, shadow: state.shadow }));
+  } catch { /* 무시 */ }
+}
+
 // ───────────────────── 초기화 ─────────────────────
 
 export function initPlayer(ctx) {
   showView = ctx.showView;
   video = $('video');
+  loadPrefs();
 
   $('btn-back').addEventListener('click', closePlayer);
   $('btn-play').addEventListener('click', onPlayButton);
@@ -357,9 +374,9 @@ function onCueEnd() {
     applySubVisibility();
     markScriptRevealed();
     updateChips();
-    if (state.shadow) { // 섀도잉이면 바로 따라 말하기 (영어 보면서)
+    if (state.shadow) { // 섀도잉이면 바로 따라 말하기 (영어 보면서) → 반복 설정대로 이어감
       video.pause();
-      startShadowWait(cue);
+      startShadowWait(cue, { repeat: repeatMax > 0 });
       return;
     }
     video.pause();
@@ -367,19 +384,18 @@ function onCueEnd() {
     return;
   }
 
-  // 반복 남았으면 같은 문장 처음으로
-  if (repeatMax > 0 && state.repeatCount < repeatMax - 1) {
-    state.repeatCount++;
-    updateChips();
-    video.currentTime = cue.start;
-    if (video.paused || video.ended) safePlay(); // 영상 끝에서 멈춘 상태면 다시 재생
+  const repeatLeft = repeatMax > 0 && state.repeatCount < repeatMax - 1;
+
+  // 섀도잉: 매 재생이 끝날 때마다 멈추고 따라 말할 시간 → 반복이 남았으면 같은 문장, 아니면 다음 문장
+  if (state.shadow) {
+    video.pause();
+    startShadowWait(cue, { repeat: repeatLeft });
     return;
   }
 
-  // 섀도잉: 멈추고 따라 말할 시간 주기
-  if (state.shadow) {
-    video.pause();
-    startShadowWait(cue);
+  // 반복 남았으면 같은 문장 처음으로
+  if (repeatLeft) {
+    replayCurrent();
     return;
   }
 
@@ -402,10 +418,23 @@ function onCueEnd() {
   scheduleSave();
 }
 
+/** 같은 문장을 처음부터 다시 (반복 횟수 +1) */
+function replayCurrent() {
+  const cue = state.cues[state.idx];
+  state.repeatCount++;
+  updateChips();
+  video.currentTime = cue.start;
+  if (video.paused || video.ended) safePlay(); // 멈춘 상태(영상 끝/섀도잉 뒤)면 다시 재생
+}
+
 // ───────────────────── 섀도잉 대기 ─────────────────────
 
-function startShadowWait(cue) {
+/**
+ * 따라 말하기 대기. 끝나면(또는 탭하면) opts.repeat 이면 같은 문장 다시, 아니면 다음 문장
+ */
+function startShadowWait(cue, opts = {}) {
   if (state.shadowTimer) return; // rAF와 ended가 동시에 호출해도 타이머는 하나만
+  state.shadowNext = opts.repeat ? 'repeat' : 'next';
   const dur = Math.max(1.5, (cue.end - cue.start) * settings.shadowFactor + 0.5) * 1000;
   const overlay = $('shadow-overlay');
   const fill = $('shadow-ring-fill');
@@ -420,11 +449,16 @@ function startShadowWait(cue) {
   };
   state.shadowRaf = requestAnimationFrame(anim);
 
-  state.shadowTimer = setTimeout(() => {
-    cancelShadowWait();
-    if (state.idx >= state.cues.length - 1) return; // 마지막 문장
-    goTo(state.idx + 1);
-  }, dur);
+  state.shadowTimer = setTimeout(afterShadowWait, dur);
+}
+
+/** 따라 말하기가 끝난 뒤: 반복이면 같은 문장, 아니면 다음 문장 */
+function afterShadowWait() {
+  const next = state.shadowNext;
+  cancelShadowWait();
+  if (next === 'repeat') { replayCurrent(); return; }
+  if (state.idx >= state.cues.length - 1) return; // 마지막 문장
+  goTo(state.idx + 1);
 }
 
 function cancelShadowWait() {
@@ -437,9 +471,7 @@ function cancelShadowWait() {
 
 function skipShadowWait() {
   if (!state.shadowTimer) return;
-  cancelShadowWait();
-  if (state.idx >= state.cues.length - 1) return;
-  goTo(state.idx + 1);
+  afterShadowWait();
 }
 
 // ───────────────────── 자막 렌더링 ─────────────────────
@@ -569,18 +601,21 @@ function cycleRepeat() {
   state.repeatIdx = (state.repeatIdx + 1) % REPEATS.length;
   state.repeatCount = 0;
   updateChips();
+  savePrefs();
 }
 
 function cycleSpeed() {
   state.speedIdx = (state.speedIdx + 1) % SPEEDS.length;
   video.playbackRate = SPEEDS[state.speedIdx];
   updateChips();
+  savePrefs();
 }
 
 function toggleShadow() {
   state.shadow = !state.shadow;
   if (!state.shadow) cancelShadowWait();
   updateChips();
+  savePrefs();
 }
 
 function updateChips() {
