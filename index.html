@@ -141,6 +141,19 @@
     </div>
   </div>
 
+  <!-- ===== 설정 비밀번호 (아이가 설정을 못 바꾸게) ===== -->
+  <dialog id="dlg-pin" class="dialog dialog-pin">
+    <form id="form-pin" method="dialog">
+      <h2>🔒 부모님 비밀번호</h2>
+      <input type="password" id="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="숫자 입력">
+      <p id="pin-error" class="pin-error"></p>
+      <div class="dialog-actions">
+        <button type="button" id="pin-cancel" class="btn">취소</button>
+        <button type="submit" class="btn btn-primary">확인</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- ===== 설정 대화상자 ===== -->
   <dialog id="dlg-settings" class="dialog">
     <form id="form-settings" method="dialog">
@@ -158,6 +171,7 @@
           <option value="1">1번 듣고 보여주기</option>
           <option value="2">2번 듣고 보여주기</option>
           <option value="3">3번 듣고 보여주기</option>
+          <option value="4">4번 듣고 보여주기</option>
           <option value="5">5번 듣고 보여주기</option>
         </select>
       </label>

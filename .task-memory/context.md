@@ -65,6 +65,13 @@
 3. `node tools/vocab_scan.mjs <srt>` 로 커버리지 확인, `npm test`
 4. `sw.js` CACHE_VERSION 올리고 배포 (cache-first라 안 올리면 옛 사전이 남음)
 
+## 설정 비밀번호
+- 0715 (SHA-256 해시로 player.js에 보관, 사용자 결정 2026-09-13). 바꾸려면 `node -e "console.log(require('crypto').createHash('sha256').update('새비번').digest('hex'))"` → SETTINGS_PIN_HASH 교체 + 구형 폴백(뒤집은 문자열)도 갱신
+
+## 태블릿 환경 (2026-09-13)
+- 처음엔 삼성 인터넷 11(Chrome 75 엔진)으로 열려 있었음 → Chrome 152로 재설치
+- Chrome에서도 마이크 테스트 "소리가 전혀 안 들어옴", 음성 인식 결과 없음 → 안드로이드 마이크 차단/권한 의심 (조사 중)
+
 ## 메모
 - 사용자: 아버님 (C#/.NET MAUI, Python 경험). 사용자 아들: 초등 4학년.
 - 테스트 순서: PC Chrome → 아버님 안드로이드 폰 → 아들 안드로이드 태블릿

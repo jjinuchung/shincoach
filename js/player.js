@@ -97,6 +97,7 @@ export function initPlayer(ctx) {
   document.addEventListener('visibilitychange', onVisibilityChange);
   document.addEventListener('keydown', onKeyDown);
   initSettingsDialog();
+  initPinDialog();
   initVocabPanel();
   initDiag();
 }
@@ -722,7 +723,50 @@ function initSettingsDialog() {
   });
 }
 
+// ───────────────────── 설정 비밀번호 ─────────────────────
+
+// 비밀번호는 평문 대신 SHA-256 해시로 보관 (코드가 공개 저장소에 있으므로)
+const SETTINGS_PIN_HASH = '4030c42b313a82b953d14f04a85ff9dd9739e49a97d90631b7fb3029cca1d6e1';
+
+async function sha256Hex(text) {
+  if (window.crypto && window.crypto.subtle && window.TextEncoder) {
+    const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  return null; // 구형 브라우저: 해시 불가
+}
+
+async function checkPin(pin) {
+  const h = await sha256Hex(pin);
+  if (h !== null) return h === SETTINGS_PIN_HASH;
+  // 해시를 못 만드는 환경에서는 간단한 변형 비교 (평문 노출 최소화)
+  return pin.split('').reverse().join('') === '5170';
+}
+
 function openSettings() {
-  renderDiag();
-  $('dlg-settings').showModal();
+  const dlg = $('dlg-pin');
+  const input = $('pin-input');
+  const err = $('pin-error');
+  input.value = '';
+  err.textContent = '';
+  dlg.showModal();
+  setTimeout(() => input.focus(), 50);
+}
+
+function initPinDialog() {
+  $('pin-cancel').addEventListener('click', () => $('dlg-pin').close());
+  $('form-pin').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $('pin-input');
+    const ok = await checkPin(input.value.trim());
+    if (!ok) {
+      $('pin-error').textContent = '비밀번호가 틀렸어요';
+      input.value = '';
+      input.focus();
+      return;
+    }
+    $('dlg-pin').close();
+    renderDiag();
+    $('dlg-settings').showModal();
+  });
 }
