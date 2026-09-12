@@ -24,9 +24,19 @@ export async function initLibrary(ctx) {
   await refreshList();
 }
 
+/** File → ArrayBuffer. file.arrayBuffer()는 Chrome 76+ 전용이라 구형 태블릿을 위해 FileReader 사용 */
+function readArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(fr.error || new Error('파일을 읽을 수 없어요'));
+    fr.readAsArrayBuffer(file);
+  });
+}
+
 /** 파일 → 텍스트. UTF-8 우선, 실패하면 EUC-KR(CP949)로 재시도 (국내 smi/srt는 CP949가 많음) */
 async function readTextSmart(file) {
-  const buf = await file.arrayBuffer();
+  const buf = await readArrayBuffer(file);
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buf);
   } catch {

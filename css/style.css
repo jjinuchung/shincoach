@@ -187,7 +187,8 @@ button { font-family: inherit; }
 .field-row { flex-direction: row; align-items: center; gap: 10px; }
 .field-row input[type="checkbox"] { width: 22px; height: 22px; }
 .imp-status { margin: 0; min-height: 1.2em; font-size: 0.9rem; color: var(--primary); }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.dialog-actions { display: flex; justify-content: flex-end; }
+.dialog-actions > .btn { margin-left: 10px; }
 
 /* ===== 플레이어 ===== */
 .player-body { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 20px; }
@@ -226,7 +227,7 @@ button { font-family: inherit; }
 
 .shadow-overlay {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(79, 70, 229, 0.85);
   color: #fff;
   display: flex;
@@ -263,8 +264,10 @@ button { font-family: inherit; }
 .sub-en .w.on { color: #fff; background: var(--accent); }
 .sub-en .w.done { color: var(--primary); }
 
-.controls-main { display: flex; justify-content: center; align-items: center; gap: 22px; padding: 6px 0; }
-.controls-sub { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.controls-main { display: flex; justify-content: center; align-items: center; padding: 6px 0; }
+.controls-main > .btn { margin: 0 11px; }
+.controls-sub { display: flex; flex-wrap: wrap; justify-content: center; }
+.controls-sub > .btn { margin: 3px; }
 
 .script-panel {
   background: var(--card);
@@ -303,7 +306,7 @@ button { font-family: inherit; }
 /* ===== 로딩 오버레이 ===== */
 .loading {
   position: fixed;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(245, 247, 255, 0.85);
   display: flex;
   align-items: center;
