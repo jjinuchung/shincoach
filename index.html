@@ -83,8 +83,9 @@
           <video id="video" playsinline preload="metadata"></video>
           <div id="player-msg" class="player-msg" hidden></div>
           <div id="shadow-overlay" class="shadow-overlay" hidden>
-            <div class="shadow-msg">🗣 따라 말해보세요!</div>
+            <div id="shadow-msg" class="shadow-msg">🗣 따라 말해보세요!</div>
             <div class="shadow-ring"><div id="shadow-ring-fill" class="shadow-ring-fill"></div></div>
+            <div id="shadow-sub" class="shadow-sub"></div>
           </div>
         </div>
 
@@ -174,6 +175,11 @@
           <option value="4">4번 듣고 보여주기</option>
           <option value="5">5번 듣고 보여주기</option>
         </select>
+      </label>
+
+      <label class="field field-row">
+        <input type="checkbox" id="set-speak">
+        <span class="field-label">🎤 말하기 확인 <small>— 마이크로 따라 말해야 다음 문장으로 (3번 못 하면 넘어감)</small></span>
       </label>
 
       <label class="field">

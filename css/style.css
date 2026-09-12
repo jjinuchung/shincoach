@@ -257,6 +257,9 @@ button { font-family: inherit; }
 .shadow-msg { font-size: 1.5rem; font-weight: 800; }
 .shadow-ring { width: 70%; height: 12px; background: rgba(255,255,255,0.3); border-radius: 999px; overflow: hidden; }
 .shadow-ring-fill { height: 100%; width: 100%; background: #fff; transition: width 0.1s linear; }
+.shadow-sub { font-size: 1rem; font-weight: 600; opacity: 0.95; text-align: center; padding: 0 16px; min-height: 1.3em; }
+.shadow-overlay.speaking { background: rgba(220, 38, 38, 0.82); }
+.shadow-overlay.speaking .shadow-ring-fill { background: #fde047; transition: width 0.05s linear; }
 
 .progress-row { display: flex; align-items: center; gap: 10px; }
 

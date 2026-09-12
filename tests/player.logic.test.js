@@ -48,9 +48,10 @@ function loadPlayer() {
     getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null,
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
+    runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {} }), prepareMic: async () => null,
   });
   vm.runInContext(src, ctx);
-  vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; // 테스트 기준: 반복 끔', ctx);
+  vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; // 테스트 기준: 반복 끔, 말하기 확인 끔', ctx);
   return { ctx, video, els, run: (code) => vm.runInContext(code, ctx) };
 }
 
@@ -236,4 +237,91 @@ test('반복/속도/섀도잉 선택은 savePrefs로 저장', () => {
   assert.equal(saved.repeatIdx, 1);
   assert.equal(saved.speedIdx, 3);
   assert.equal(saved.shadow, true);
+});
+
+// ── 말하기 확인 (마이크) ──
+
+function loadPlayerWithSpeak(resultQueue) {
+  const p = loadPlayer();
+  // runSpeakCheck 스텁: 호출될 때마다 큐에서 결과를 꺼내 resolve (테스트가 제어)
+  p.ctx.runSpeakCheck = () => {
+    let resolveFn;
+    const promise = new Promise((r) => { resolveFn = r; });
+    const handle = { promise, stop() { resolveFn(resultQueue.shift()); } };
+    return handle;
+  };
+  p.run('settings.speakCheck = true; settings.listenFirst = 0; state.micPrepared = true;');
+  return p;
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+test('말하기 확인: 통과 전엔 다음 문장으로 못 감, 이전은 됨', () => {
+  const { run, els } = loadPlayerWithSpeak([]);
+  run('state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""},{start:20,end:22,en:"c",ko:""}]; state.idx = -1;');
+  run('goTo(1)');            // 처음 열 때(idx -1)는 허용
+  assert.equal(run('state.idx'), 1);
+  run('goTo(2)');            // 아직 안 말했음 → 차단
+  assert.equal(run('state.idx'), 1);
+  assert.match(els['player-msg'].textContent, /따라 말해야/);
+  run('goTo(0)');            // 뒤로는 허용
+  assert.equal(run('state.idx'), 0);
+});
+
+test('말하기 확인: 문장 끝 → 마이크 대기 → 통과하면 다음으로', async () => {
+  const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'speech', transcript: 'a', score: { matched: 1, total: 1, ratio: 1 } }]);
+  run('state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  assert.ok(run('state.speakRun'), '말하기 확인 진행 중');
+  assert.equal(video.paused, true);
+  run('skipShadowWait()');   // 탭 → 판정
+  await tick();
+  assert.equal(run('state.speakPassed'), true);
+  assert.equal(run('state.speakRun'), null);
+  await new Promise((r) => setTimeout(r, 1500)); // 결과 표시 뒤 다음 문장
+  assert.equal(run('state.idx'), 1);
+});
+
+test('말하기 확인: 미달이면 원문 다시 재생 후 재시도, 3번 미달 시 통과', async () => {
+  const fail = { passed: false, method: 'energy', transcript: '', score: null };
+  const { run, video } = loadPlayerWithSpeak([fail, fail, fail]);
+  run('state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  for (let n = 1; n <= 2; n++) {
+    video.currentTime = 2; run('onCueEnd()');
+    run('skipShadowWait()'); await tick();
+    assert.equal(run('state.speakFails'), n);
+    assert.equal(run('state.speakPassed'), false);
+    await new Promise((r) => setTimeout(r, 1700)); // 원문 다시 재생
+    assert.equal(video.currentTime, 0, `${n}번째 미달 → 처음부터 다시`);
+    assert.equal(video.paused, false);
+  }
+  video.currentTime = 2; run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.equal(run('state.speakFails'), 3);
+  assert.equal(run('state.speakPassed'), true, '3번 미달 → 통과');
+});
+
+test('말하기 확인: 마이크 못 쓰면 확인 없이 진행', async () => {
+  const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'none', transcript: '', score: null }]);
+  run('state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.equal(run('state.speakUnavailable'), true);
+  assert.equal(run('state.idx'), 1, '바로 다음 문장');
+});
+
+test('말하기 확인 + 반복 ∞: 통과 후엔 같은 문장 반복(섀도잉 대기 없이)', async () => {
+  const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'energy', transcript: '', score: null }]);
+  run('state.repeatIdx = 3; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(run('state.idx'), 0, '반복이라 같은 문장');
+  assert.equal(run('state.repeatCount'), 1);
+  video.currentTime = 2; run('onCueEnd()');
+  assert.equal(run('state.speakRun'), null, '이미 통과 → 마이크 확인 안 함');
+  assert.equal(video.currentTime, 0, '바로 반복');
 });

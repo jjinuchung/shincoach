@@ -6,6 +6,7 @@ import {
 } from './srt.js';
 import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
+import { runSpeakCheck, prepareMic } from './speak.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +35,11 @@ const state = {
   shadowTimer: null,
   shadowRaf: null,
   shadowNext: 'next', // 따라 말하기 뒤 동작: 'repeat' | 'next'
+  speakPassed: false, // 말하기 확인: 현재 문장 통과 여부
+  speakFails: 0,      // 말하기 확인: 현재 문장 실패 횟수 (3번이면 통과시킴)
+  speakRun: null,     // 진행 중인 말하기 확인 { promise, stop }
+  speakUnavailable: false, // 마이크 못 쓰면 확인 없이 진행
+  micPrepared: false,
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -137,7 +143,7 @@ function renderVocab() {
 
 function onVisibilityChange() {
   if (!state.open || !document.hidden) return;
-  const wasShadowWaiting = !!state.shadowTimer;
+  const wasShadowWaiting = !!state.shadowTimer || !!state.speakRun;
   cancelShadowWait();
   if (!video.paused) video.pause();
   if (wasShadowWaiting) showPlayerMessage('▶ 를 눌러 이어서 연습해요', 0);
@@ -228,10 +234,23 @@ function buildCues(item) {
 // ───────────────────── 이동/재생 ─────────────────────
 
 /** i번째 문장으로 이동 */
-function goTo(i, { play = true } = {}) {
+/** 말하기 확인이 켜져 있고 아직 통과 못 했으면 앞으로 못 넘어감 */
+function speakGateBlocks(targetIdx) {
+  if (!settings.speakCheck || state.speakUnavailable) return false;
+  if (state.idx < 0 || state.speakPassed) return false;
+  return targetIdx > state.idx;
+}
+
+function goTo(i, { play = true, force = false } = {}) {
   if (state.cues.length === 0) return;
   i = Math.max(0, Math.min(i, state.cues.length - 1));
+  if (!force && speakGateBlocks(i)) {
+    showPlayerMessage('🎤 따라 말해야 다음으로 넘어갈 수 있어요');
+    return;
+  }
   cancelShadowWait();
+  state.speakPassed = false;
+  state.speakFails = 0;
   state.idx = i;
   state.repeatCount = 0;
   state.listenCount = 0;
@@ -277,7 +296,14 @@ function hidePlayerMessage() {
 }
 
 function onPlayButton() {
-  if (state.shadowTimer) { skipShadowWait(); return; }
+  if (state.shadowTimer || state.speakRun) { skipShadowWait(); return; }
+  // 첫 재생(사용자 터치) 때 마이크 권한을 미리 받아 둠
+  if (settings.speakCheck && !state.speakUnavailable && !state.micPrepared) {
+    state.micPrepared = true;
+    prepareMic().then((stream) => {
+      if (!stream) { state.speakUnavailable = true; showPlayerMessage('🎤 마이크를 쓸 수 없어 말하기 확인 없이 진행해요', 4000); }
+    });
+  }
   if (video.paused) {
     if (state.idx < 0) goTo(0);
     else {
@@ -377,7 +403,7 @@ function onCueEnd() {
     applySubVisibility();
     markScriptRevealed();
     updateChips();
-    if (state.shadow) { // 섀도잉이면 바로 따라 말하기 (영어 보면서) → 반복 설정대로 이어감
+    if (state.shadow || speakCheckActive()) { // 섀도잉/말하기 확인이면 바로 따라 말하기 (영어 보면서) → 반복 설정대로 이어감
       video.pause();
       startShadowWait(cue, { repeat: repeatMax > 0 });
       return;
@@ -389,8 +415,8 @@ function onCueEnd() {
 
   const repeatLeft = repeatMax > 0 && state.repeatCount < repeatMax - 1;
 
-  // 섀도잉: 매 재생이 끝날 때마다 멈추고 따라 말할 시간 → 반복이 남았으면 같은 문장, 아니면 다음 문장
-  if (state.shadow) {
+  // 섀도잉/말하기 확인: 매 재생이 끝날 때마다 멈추고 따라 말할 시간 → 반복이 남았으면 같은 문장, 아니면 다음 문장
+  if (state.shadow || speakCheckActive()) {
     video.pause();
     startShadowWait(cue, { repeat: repeatLeft });
     return;
@@ -435,13 +461,22 @@ function replayCurrent() {
 /**
  * 따라 말하기 대기. 끝나면(또는 탭하면) opts.repeat 이면 같은 문장 다시, 아니면 다음 문장
  */
+/** 말하기 확인을 실제로 수행할 상황인지 (설정 켬 + 마이크 가능 + 아직 통과 전) */
+function speakCheckActive() {
+  return settings.speakCheck && !state.speakUnavailable && !state.speakPassed;
+}
+
 function startShadowWait(cue, opts = {}) {
-  if (state.shadowTimer) return; // rAF와 ended가 동시에 호출해도 타이머는 하나만
+  if (state.shadowTimer || state.speakRun) return; // rAF와 ended가 동시에 호출해도 하나만
   state.shadowNext = opts.repeat ? 'repeat' : 'next';
+  if (speakCheckActive()) { startSpeakWait(cue); return; }
   const dur = Math.max(1.5, (cue.end - cue.start) * settings.shadowFactor + 0.5) * 1000;
   const overlay = $('shadow-overlay');
   const fill = $('shadow-ring-fill');
   overlay.hidden = false;
+  overlay.classList.remove('speaking');
+  $('shadow-msg').textContent = '🗣 따라 말해보세요!';
+  $('shadow-sub').textContent = '';
   fill.style.width = '100%';
   const started = performance.now();
 
@@ -469,12 +504,98 @@ function cancelShadowWait() {
   if (state.shadowRaf) cancelAnimationFrame(state.shadowRaf);
   state.shadowTimer = null;
   state.shadowRaf = null;
-  $('shadow-overlay').hidden = true;
+  if (state.speakRun) { const r = state.speakRun; state.speakRun = null; r.cancelled = true; r.stop(); }
+  const overlay = $('shadow-overlay');
+  overlay.hidden = true;
+  overlay.classList.remove('speaking');
 }
 
 function skipShadowWait() {
+  if (state.speakRun) { state.speakRun.stop(); return; } // 탭 = "다 말했어요" → 바로 판정
   if (!state.shadowTimer) return;
   afterShadowWait();
+}
+
+// ───────────────────── 말하기 확인 (마이크) ─────────────────────
+
+/** 따라 말하기 시간에 마이크로 듣고 판정. 통과하면 다음(또는 반복), 미달이면 원문 다시 듣고 재시도 (3번 미달 시 통과) */
+function startSpeakWait(cue) {
+  const overlay = $('shadow-overlay');
+  const fill = $('shadow-ring-fill');
+  const msg = $('shadow-msg');
+  const sub = $('shadow-sub');
+  overlay.hidden = false;
+  overlay.classList.add('speaking');
+  msg.textContent = '🎤 따라 말해보세요!';
+  sub.textContent = state.speakFails > 0 ? `다시 한번! (${state.speakFails + 1}/3)` : '';
+  fill.style.width = '0%';
+
+  const run = runSpeakCheck({
+    target: cue.en,
+    durationSec: cue.end - cue.start,
+    onLevel: (level, spokenMs) => {
+      fill.style.width = `${Math.round(level * 100)}%`;
+      if (spokenMs > 300 && !sub.textContent.startsWith('🗣')) sub.textContent = '🗣 듣고 있어요…';
+    },
+    onInterim: (text) => { sub.textContent = `🗣 ${text}`; },
+  });
+  state.speakRun = run;
+  run.promise.then((result) => {
+    if (run.cancelled || state.speakRun !== run) return; // 문장 이동 등으로 취소됨
+    state.speakRun = null;
+    overlay.classList.remove('speaking');
+    onSpeakResult(cue, result);
+  });
+}
+
+function onSpeakResult(cue, result) {
+  const msg = $('shadow-msg');
+  const sub = $('shadow-sub');
+  const fill = $('shadow-ring-fill');
+  fill.style.width = '100%';
+
+  if (result.method === 'none') {
+    state.speakUnavailable = true;
+    state.speakPassed = true;
+    showPlayerMessage('🎤 마이크를 쓸 수 없어 말하기 확인 없이 진행해요', 4000);
+    afterShadowWait();
+    return;
+  }
+
+  if (result.passed) {
+    state.speakPassed = true;
+    if (result.method === 'speech' && result.score) {
+      msg.textContent = result.score.ratio >= 0.8 ? '🌟 완벽해요!' : '🎯 잘했어요!';
+      sub.textContent = `${result.score.matched}/${result.score.total} 단어 맞음: "${result.transcript}"`;
+    } else {
+      msg.textContent = '👍 잘했어요!';
+      sub.textContent = '';
+    }
+    state.shadowTimer = setTimeout(afterShadowWait, 1400);
+    return;
+  }
+
+  state.speakFails++;
+  if (state.speakFails >= 3) {
+    state.speakPassed = true;
+    msg.textContent = '👍 괜찮아요, 넘어갈게요';
+    sub.textContent = result.transcript ? `들린 말: "${result.transcript}"` : '';
+    state.shadowTimer = setTimeout(afterShadowWait, 1400);
+    return;
+  }
+  msg.textContent = `🔁 다시 한번! (${state.speakFails}/3)`;
+  sub.textContent = result.method === 'speech'
+    ? `들린 말: "${result.transcript}" — 잘 듣고 따라 해봐요`
+    : '조금 더 크게, 길게 말해봐요';
+  // 잠시 보여준 뒤 원문 다시 들려주기 → 끝나면 다시 말하기 확인
+  state.shadowTimer = setTimeout(() => {
+    state.shadowTimer = null;
+    const ov = $('shadow-overlay');
+    ov.hidden = true;
+    ov.classList.remove('speaking');
+    video.currentTime = cue.start;
+    safePlay();
+  }, 1600);
 }
 
 // ───────────────────── 자막 렌더링 ─────────────────────
@@ -684,7 +805,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3 };
+  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -700,6 +821,7 @@ function initSettingsDialog() {
   $('set-merge').checked = settings.mergeSentences;
   $('set-shadow-factor').value = String(settings.shadowFactor);
   $('set-listen-first').value = String(settings.listenFirst);
+  $('set-speak').checked = settings.speakCheck;
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -707,6 +829,7 @@ function initSettingsDialog() {
     settings.mergeSentences = $('set-merge').checked;
     settings.shadowFactor = Number($('set-shadow-factor').value);
     settings.listenFirst = Number($('set-listen-first').value);
+    settings.speakCheck = $('set-speak').checked;
     if (settings.listenFirst === 0) state.enRevealed = true;
     applySubVisibility();
     updateChips();
