@@ -12,6 +12,17 @@ function chromeVersion() {
   return m ? Number(m[1]) : 0;
 }
 
+/** 브라우저 종류 판별: 삼성 인터넷은 UA에 Chrome/xx 도 들어 있어서 따로 구분해야 함 */
+function browserInfo() {
+  const ua = navigator.userAgent;
+  const ver = chromeVersion();
+  const samsung = ua.match(/SamsungBrowser\/(\d+(?:\.\d+)?)/);
+  if (samsung) return { name: `삼성 인터넷 ${samsung[1]} (Chrome ${ver} 엔진)`, samsung: true, ver };
+  if (/EdgA\//.test(ua)) return { name: `Edge (Chrome ${ver} 엔진)`, samsung: false, ver };
+  if (/; wv\)/.test(ua)) return { name: `앱 내장 브라우저(WebView, Chrome ${ver})`, samsung: false, ver };
+  return { name: ver ? `Chrome ${ver}` : ua.slice(0, 60), samsung: false, ver };
+}
+
 /** 지원 여부 목록 렌더링 */
 export function renderDiag() {
   const ul = $('diag-list');
@@ -20,9 +31,10 @@ export function renderDiag() {
   const hasRec = typeof window.MediaRecorder !== 'undefined';
   const hasSpeech = !!SpeechRecognitionCtor();
   const hasAudio = !!(window.AudioContext || window.webkitAudioContext);
-  const ver = chromeVersion();
+  const b = browserInfo();
+  const ver = b.ver;
   const rows = [
-    ['브라우저', ver ? `Chrome ${ver}` : navigator.userAgent.slice(0, 60), ver >= 76 ? '✅' : (ver ? '⚠️ 오래됨' : '❓')],
+    ['브라우저', b.name + (b.samsung ? ' — 음성 인식이 안 됨. Play 스토어에서 Chrome을 설치해 Chrome으로 열어 주세요' : ''), b.samsung ? '❌' : (ver >= 76 ? '✅' : (ver ? '⚠️ 오래됨' : '❓'))],
     ['인터넷', navigator.onLine ? '연결됨' : '끊김', navigator.onLine ? '✅' : '⚠️'],
     ['마이크 접근', hasMic ? '지원' : '미지원', hasMic ? '✅' : '❌'],
     ['소리 분석(AudioContext)', hasAudio ? '지원' : '미지원', hasAudio ? '✅' : '❌'],
@@ -38,53 +50,82 @@ export function renderDiag() {
   }
 }
 
-/** 마이크 3초 테스트: 최대 음량 측정 */
+/** 마이크 3초 테스트: 최대 음량 측정 + 녹음 크기 (어디서 막히는지 단계별 표시) */
 async function testMic() {
   const out = $('diag-result');
   if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { out.textContent = '❌ 이 브라우저는 마이크 접근을 지원하지 않아요'; return; }
-  out.textContent = '🎤 마이크 권한을 허용해 주세요… 허용되면 3초 동안 아무 말이나 해 보세요';
+  // AudioContext는 반드시 터치(클릭) 직후 동기적으로 만들고 resume — 권한 대기 뒤에 만들면 옛 Chrome에서 suspended로 남음
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = AC ? new AC() : null;
+  if (ctx && ctx.resume) ctx.resume().catch(() => {});
+  out.textContent = '🎤 마이크 권한을 허용해 주세요…';
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
   } catch (err) {
-    out.textContent = `❌ 마이크를 열 수 없어요: ${err.name} (권한 거부 또는 마이크 없음)`;
+    out.textContent = `❌ 마이크를 열 수 없어요: ${err.name} — 안드로이드 설정 → 앱 → Chrome → 권한 → 마이크 확인`;
+    if (ctx && ctx.close) ctx.close();
     return;
   }
-  try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AC();
-    const src = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    src.connect(analyser);
-    const buf = new Uint8Array(analyser.fftSize);
-    let peak = 0;
-    let loudFrames = 0;
-    let frames = 0;
-    const started = Date.now();
-    await new Promise((resolve) => {
-      const tick = () => {
-        analyser.getByteTimeDomainData(buf);
-        let sum = 0;
-        for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
-        const rms = Math.sqrt(sum / buf.length);
-        peak = Math.max(peak, rms);
-        frames++;
-        if (rms > 0.02) loudFrames++;
-        out.textContent = `🎤 듣는 중… ${Math.max(0, 3 - Math.floor((Date.now() - started) / 1000))}초  (음량 ${Math.round(rms * 100)})`;
-        if (Date.now() - started < 3000) requestAnimationFrame(tick); else resolve();
-      };
-      tick();
-    });
-    const hasRecorder = typeof window.MediaRecorder !== 'undefined';
-    const ratio = frames ? Math.round((loudFrames / frames) * 100) : 0;
-    out.textContent = `${peak > 0.02 ? '✅ 소리 감지됨' : '⚠️ 소리가 거의 없음'} (최대 음량 ${Math.round(peak * 100)}, 말소리 비율 ${ratio}%) · 녹음 ${hasRecorder ? '가능' : '불가'}`;
-    ctx.close && ctx.close();
-  } catch (err) {
-    out.textContent = `❌ 소리 분석 실패: ${err.message}`;
-  } finally {
-    stream.getTracks().forEach((t) => t.stop());
+  const track = stream.getAudioTracks()[0];
+  const trackInfo = track ? `트랙: ${track.label || '(이름 없음)'} / enabled=${track.enabled} muted=${track.muted} state=${track.readyState}` : '트랙 없음';
+  const steps = [trackInfo];
+  const show = (msg) => { out.textContent = steps.concat([msg]).join('\n'); };
+
+  // 1) MediaRecorder로 3초 녹음 → 파일 크기 (소리 분석과 독립적인 두 번째 증거)
+  let recorder = null;
+  const chunks = [];
+  if (typeof window.MediaRecorder !== 'undefined') {
+    try {
+      recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.start(250);
+    } catch (e) { steps.push(`녹음기 시작 실패: ${e.message}`); recorder = null; }
   }
+
+  // 2) 소리 분석
+  let peak = 0; let loudFrames = 0; let frames = 0;
+  if (ctx) {
+    try {
+      if (ctx.resume) await ctx.resume();
+      steps.push(`소리 분석기 상태: ${ctx.state}`);
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+      const buf = new Uint8Array(analyser.fftSize);
+      const started = Date.now();
+      await new Promise((resolve) => {
+        const tick = () => {
+          analyser.getByteTimeDomainData(buf);
+          let sum = 0;
+          for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
+          const rms = Math.sqrt(sum / buf.length);
+          peak = Math.max(peak, rms); frames++;
+          if (rms > 0.02) loudFrames++;
+          show(`🎤 말해 보세요! ${Math.max(0, 3 - Math.floor((Date.now() - started) / 1000))}초  (지금 음량 ${Math.round(rms * 100)}, 최대 ${Math.round(peak * 100)})`);
+          if (Date.now() - started < 3000) requestAnimationFrame(tick); else resolve();
+        };
+        tick();
+      });
+    } catch (err) { steps.push(`소리 분석 실패: ${err.message}`); }
+  } else {
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  // 3) 녹음 결과
+  let recBytes = 0;
+  if (recorder) {
+    await new Promise((resolve) => { recorder.onstop = resolve; try { recorder.stop(); } catch (e) { resolve(); } });
+    recBytes = chunks.reduce((a, b) => a + b.size, 0);
+  }
+  stream.getTracks().forEach((t) => t.stop());
+  if (ctx && ctx.close) ctx.close().catch(() => {});
+
+  const ratio = frames ? Math.round((loudFrames / frames) * 100) : 0;
+  const verdict = peak > 0.02 ? '✅ 소리 감지됨' : (recBytes > 3000 ? '⚠️ 분석기는 0이지만 녹음 데이터는 있음(분석기 문제)' : '❌ 소리가 전혀 안 들어옴(마이크/권한 문제)');
+  steps.push(`최대 음량 ${Math.round(peak * 100)}, 말소리 비율 ${ratio}%, 3초 녹음 ${recBytes}바이트`);
+  show(verdict);
 }
 
 /** 음성 인식 5초 테스트 */
@@ -98,7 +139,12 @@ function testSpeech() {
   rec.maxAlternatives = 1;
   let finalText = '';
   let got = false;
-  out.textContent = '🗣 영어로 아무 문장이나 말해 보세요 (5초)… 예: "I love toys"';
+  const trace = [];
+  const show = (msg) => { out.textContent = `${msg}\n단계: ${trace.join(' → ') || '(시작 전)'}`; };
+  ['start', 'audiostart', 'soundstart', 'speechstart', 'speechend', 'soundend', 'audioend'].forEach((ev) => {
+    rec['on' + ev] = () => { trace.push(ev); show(out.textContent.split('\n')[0]); };
+  });
+  show('🗣 영어로 아무 문장이나 말해 보세요 (5초)… 예: "I love toys"');
   rec.onresult = (e) => {
     got = true;
     let interim = '';
@@ -107,15 +153,16 @@ function testSpeech() {
       if (r.isFinal) finalText += r[0].transcript + ' ';
       else interim += r[0].transcript;
     }
-    out.textContent = `🗣 인식 중: ${finalText}${interim}`;
+    show(`🗣 인식 중: ${finalText}${interim}`);
   };
   rec.onerror = (e) => {
     const why = { 'not-allowed': '마이크 권한 거부', 'no-speech': '말소리를 못 들음', network: '인터넷 필요(구글 음성 서버)', 'audio-capture': '마이크 없음', 'service-not-allowed': '음성 서비스 사용 불가' }[e.error] || e.error;
-    out.textContent = `❌ 음성 인식 오류: ${why}`;
+    show(`❌ 음성 인식 오류: ${why} (${e.error})`);
   };
   rec.onend = () => {
-    if (finalText || got) out.textContent = `✅ 음성 인식 결과: "${(finalText || '(중간 결과만)').trim()}"`;
-    else if (!out.textContent.startsWith('❌')) out.textContent = '⚠️ 인식된 말이 없어요 (마이크/인터넷 확인)';
+    trace.push('end');
+    if (finalText || got) show(`✅ 음성 인식 결과: "${(finalText || '(중간 결과만)').trim()}"`);
+    else if (!out.textContent.startsWith('❌')) show('⚠️ 인식된 말이 없어요');
   };
   try {
     rec.start();
