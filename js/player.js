@@ -5,6 +5,7 @@ import {
   estimateWordTimings, findCueIndex,
 } from './srt.js';
 import { loadVocab } from './vocab.js';
+import { initDiag, renderDiag } from './diag.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -97,6 +98,7 @@ export function initPlayer(ctx) {
   document.addEventListener('keydown', onKeyDown);
   initSettingsDialog();
   initVocabPanel();
+  initDiag();
 }
 
 // ───────────────────── 단어 패널 ─────────────────────
@@ -721,5 +723,6 @@ function initSettingsDialog() {
 }
 
 function openSettings() {
+  renderDiag();
   $('dlg-settings').showModal();
 }

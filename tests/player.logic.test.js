@@ -47,6 +47,7 @@ function loadPlayer() {
     estimateWordTimings: () => [], findCueIndex: (cues, t) => cues.findIndex((c) => t >= c.start && t < c.end),
     getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null,
     loadVocab: async () => ({ lookup: () => [] }),
+    initDiag() {}, renderDiag() {},
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; // 테스트 기준: 반복 끔', ctx);
