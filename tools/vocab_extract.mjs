@@ -37,9 +37,10 @@ for (const [lower, [capMid, total]] of capitalized) {
   if (lower.length < 2) continue;
   if (basic.has(lower)) continue;
   if (capMid > 0 && capMid >= total * 0.8) continue; // 거의 항상 대문자 → 이름
-  const stem = stemWord(lower, basic);
+  const known = new Set([...basic, ...Object.keys(existing)]);
+  const stem = stemWord(lower, known);
   if (basic.has(stem)) continue;
-  if (existing[stem] || existing[lower]) continue;   // 이미 사전에 있음
+  if (existing[stem] || existing[lower]) continue;   // 이미 사전에 있음 (변화형 포함)
   const e = counts.get(stem) || { n: 0, forms: new Set() };
   e.n += total;
   e.forms.add(lower);
