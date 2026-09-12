@@ -48,6 +48,8 @@
 ### 사용자 피드백 기능 (2026-09-12)
 - [x] 듣기 먼저 모드: 새 문장마다 영어 숨기고 N번(기본 3) 자동 반복 → 공개+멈춤(섀도잉이면 따라 말하기), 목록도 가림, ⚙에서 횟수/끄기
 - [x] 구형 안드로이드 태블릿 호환 (||= 제거, FileReader, inset/gap 폴백, 오류 배너)
+- [x] 단어 패널: 현재 문장의 모를 만한 단어·표현 한글 뜻 (접힘 기본, 듣기 먼저 공개 후 표시). 사전 vocab/words.json 645단어(토이스토리5 기준) + phrases.json 280표현 + basic.json 기초 925단어
+- [ ] 단어 사전 확장: 모아나·미니언즈 (`node tools/vocab_extract.mjs <srt>` 로 후보 추출 → 뜻 작성)
 
 ### 검증 단계
 - [x] 8. GitHub Pages 배포 (https://jjinuchung.github.io/shincoach/) — 노트북·태블릿 설치 완료, 아들 사용 중

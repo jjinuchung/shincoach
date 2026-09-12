@@ -4,6 +4,7 @@ import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   estimateWordTimings, findCueIndex,
 } from './srt.js';
+import { loadVocab } from './vocab.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,6 +38,7 @@ const state = {
   lastWordIdx: -1,
   saveTimer: null,
   wakeLock: null,
+  vocab: null,        // 단어장 (비동기 로드)
 };
 
 let showView;
@@ -77,6 +79,40 @@ export function initPlayer(ctx) {
   document.addEventListener('visibilitychange', onVisibilityChange);
   document.addEventListener('keydown', onKeyDown);
   initSettingsDialog();
+  initVocabPanel();
+}
+
+// ───────────────────── 단어 패널 ─────────────────────
+
+function initVocabPanel() {
+  const panel = $('vocab-panel');
+  try { panel.open = localStorage.getItem('shincoach.vocabOpen') === '1'; } catch { /* 무시 */ }
+  panel.addEventListener('toggle', () => {
+    try { localStorage.setItem('shincoach.vocabOpen', panel.open ? '1' : '0'); } catch { /* 무시 */ }
+  });
+  loadVocab().then((v) => { state.vocab = v; renderVocab(); });
+}
+
+/** 현재 문장의 모를 만한 단어·표현을 패널에 표시 (듣기 먼저 중에는 영어 공개 전까지 숨김) */
+function renderVocab() {
+  const panel = $('vocab-panel');
+  const cue = state.cues[state.idx];
+  if (!state.vocab || !cue || !state.enRevealed) { panel.hidden = true; return; }
+  const items = state.vocab.lookup(cue.en);
+  if (items.length === 0) { panel.hidden = true; return; }
+  const list = $('vocab-list');
+  list.innerHTML = '';
+  for (const it of items) {
+    const el = document.createElement('span');
+    el.className = `vocab-item ${it.kind}`;
+    const b = document.createElement('b');
+    b.textContent = it.term;
+    el.appendChild(b);
+    el.appendChild(document.createTextNode(it.meaning));
+    list.appendChild(el);
+  }
+  $('vocab-count').textContent = String(items.length);
+  panel.hidden = false;
 }
 
 function onVisibilityChange() {
@@ -471,6 +507,7 @@ function applySubVisibility() {
   list.classList.toggle('hide-en', !state.showEn);
   list.classList.toggle('hide-ko', !state.showKo);
   list.classList.toggle('listen-first', settings.listenFirst > 0);
+  renderVocab();
 }
 
 /** 듣기 먼저: 현재 문장이 공개되면 목록에서도 영어를 보여줌 (지나간 문장은 계속 보임) */

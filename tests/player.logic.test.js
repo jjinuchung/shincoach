@@ -46,6 +46,7 @@ function loadPlayer() {
     parseSubtitle: () => [], mergeSubtitles: (a) => a, mergeIntoSentences: (a) => a,
     estimateWordTimings: () => [], findCueIndex: (cues, t) => cues.findIndex((c) => t >= c.start && t < c.end),
     getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null,
+    loadVocab: async () => ({ lookup: () => [] }),
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true;', ctx);
