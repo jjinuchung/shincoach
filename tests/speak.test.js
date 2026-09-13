@@ -42,3 +42,11 @@ test('scoreTranscript: 변화형/긴 단어 편집거리 허용 (solving≈solve
   const s = scoreTranscript("solve my murder", 'solved my murderer');
   assert.equal(s.matched, 3);
 });
+
+test('#10 긴 문장은 대명사 2개만 맞아서는 통과 못 함, 내용어가 있으면 통과', () => {
+  const long = "But we didn't solve my murder because you were not here today.";
+  assert.equal(scoreTranscript(long, 'I you').passed, false, '대명사 나열');
+  assert.equal(scoreTranscript(long, 'we you').passed, false);
+  assert.equal(scoreTranscript(long, 'we solve murder').passed, true, '내용어 포함 3단어');
+  assert.equal(scoreTranscript('Step aside. I know CPR.', 'step I').passed, true, '6단어 이하: 내용어 1 + 2단어 일치');
+});

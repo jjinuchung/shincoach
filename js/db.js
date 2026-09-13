@@ -42,7 +42,16 @@ function openDb() {
         db.createObjectStore('vocabViews', { keyPath: 'word' });
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    // 다른 탭/옛 버전 앱이 DB를 잡고 있으면 업그레이드가 대기 상태에 빠짐 → 사용자에게 안내
+    req.onblocked = () => {
+      window.dispatchEvent(new CustomEvent('shincoach:dbblocked'));
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      // 새 버전 앱이 열리면 이 연결은 스스로 닫아서 업그레이드를 막지 않음
+      db.onversionchange = () => { db.close(); dbPromise = null; window.dispatchEvent(new CustomEvent('shincoach:dbversionchange')); };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
   return dbPromise;
@@ -255,7 +264,31 @@ export async function exportStats() {
   return out;
 }
 
-/** 기록 가져오기: 같은 키는 덮어씀 (누적값은 더 큰 쪽 유지) */
+const maxOf = (a, b) => Math.max(Number(a) || 0, Number(b) || 0);
+
+/**
+ * 가져온 기록(rec)과 기기에 있는 기록(cur) 병합 — 오래된 백업이 최신 누적을 줄이지 않도록
+ * 누적 수치는 큰 값, 시각은 최근 값, 날짜별 완료 문장은 합집합
+ */
+export function mergeStatRecord(name, cur, rec) {
+  if (!cur) return rec;
+  const out = { ...cur, ...rec };
+  if (name === 'sentenceStats') {
+    for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
+    out.done = !!(cur.done || rec.done);
+    out.lastRatio = (rec.lastAt || 0) >= (cur.lastAt || 0) ? (rec.lastRatio || 0) : (cur.lastRatio || 0);
+  } else if (name === 'daily') {
+    out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
+    for (const k of ['seconds', 'speakAttempts', 'speakPass']) out[k] = maxOf(cur[k], rec[k]);
+  } else if (name === 'vocabViews') {
+    for (const k of ['views', 'taps', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
+  } else if (name === 'sessions') {
+    for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt']) out[k] = maxOf(cur[k], rec[k]);
+  }
+  return out;
+}
+
+/** 기록 가져오기 (mergeStatRecord 규칙으로 병합). 반환: 처리한 레코드 수 */
 export async function importStats(data) {
   if (!data || data.app !== 'shincoach') throw new Error('신코치 기록 파일이 아니에요');
   const db = await openDb();
@@ -264,14 +297,9 @@ export async function importStats(data) {
   for (const name of STAT_STORES) {
     const store = tx.objectStore(name);
     for (const rec of data[name] || []) {
+      if (!rec || rec[store.keyPath] === undefined) continue;
       const cur = await promisify(store.get(rec[store.keyPath]));
-      if (cur && name === 'sentenceStats') {
-        // 누적 수치는 큰 값, 시각은 최근 값
-        for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio']) rec[k] = Math.max(cur[k] || 0, rec[k] || 0);
-        rec.done = cur.done || rec.done;
-        rec.lastAt = Math.max(cur.lastAt || 0, rec.lastAt || 0);
-      }
-      store.put(rec);
+      store.put(mergeStatRecord(name, cur, rec));
       n++;
     }
   }

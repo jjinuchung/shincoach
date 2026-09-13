@@ -30,8 +30,27 @@ function emptyRecord(itemId, cue) {
   };
 }
 
+/** 자정을 넘겼으면 어제 기록을 저장하고 오늘 기록으로 바꿈 (동기; 오늘 기록이 이미 있으면 뒤에서 합침) */
+function rollDailyIfNeeded() {
+  const key = todayKey();
+  if (!t.daily || t.daily.date === key) return;
+  const old = t.daily;
+  putDaily(old).catch(() => {});
+  t.daily = { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0 };
+  t.dailyDirty = false;
+  getDaily(key).then((existing) => {
+    if (!existing || !t.daily || t.daily.date !== key) return;
+    t.daily.doneKeys = [...new Set([...existing.doneKeys, ...t.daily.doneKeys])];
+    t.daily.seconds += existing.seconds || 0;
+    t.daily.speakAttempts += existing.speakAttempts || 0;
+    t.daily.speakPass += existing.speakPass || 0;
+    t.dailyDirty = true;
+  }).catch(() => {});
+}
+
 function rec(cue) {
   if (!t.item || !cue) return null;
+  rollDailyIfNeeded();
   const key = sentenceKey(t.item.id, cue.start);
   let r = t.stats.get(key);
   if (!r) { r = emptyRecord(t.item.id, cue); t.stats.set(key, r); }
@@ -142,18 +161,38 @@ export function todayDone() {
 }
 
 /** 저장 대기 중인 것을 IndexedDB에 씀 */
+export let lastFlushError = null;
+
 export async function flush() {
-  const recs = [...t.dirty].map((k) => t.stats.get(k)).filter(Boolean);
+  const keys = [...t.dirty];
+  const recs = keys.map((k) => t.stats.get(k)).filter(Boolean);
   t.dirty = new Set();
+  const wasDailyDirty = t.dailyDirty;
+  t.dailyDirty = false;
   const jobs = [];
-  if (recs.length) jobs.push(putSentenceStats(recs));
+  if (recs.length) {
+    // 실패하면 다시 대기 목록에 넣어 다음 flush에서 재시도
+    jobs.push(putSentenceStats(recs).catch((e) => { keys.forEach((k) => t.dirty.add(k)); throw e; }));
+  }
   if (t.session && t.session.seconds > 0) {
     const s = { ...t.session };
     delete s._keys;
     jobs.push(putSession(s));
   }
-  if (t.daily && t.dailyDirty) { t.dailyDirty = false; jobs.push(putDaily(t.daily)); }
-  await Promise.all(jobs.map((p) => p.catch((e) => console.warn('기록 저장 실패:', e))));
+  if (t.daily && wasDailyDirty) {
+    jobs.push(putDaily(t.daily).catch((e) => { t.dailyDirty = true; throw e; }));
+  }
+  const results = await Promise.all(jobs.map((p) => p.then(() => null, (e) => e)));
+  const err = results.find(Boolean);
+  lastFlushError = err || null;
+  if (err) console.warn('기록 저장 실패 (다음에 재시도):', err);
+}
+
+/** 가져오기 뒤: 메모리의 오늘 기록을 버리고 저장소에서 다시 읽음 */
+export async function reloadDaily() {
+  t.daily = null;
+  t.dailyDirty = false;
+  if (t.item) await ensureDaily();
 }
 
 /** 콘텐츠를 닫을 때: 세션 마감 + 저장 */

@@ -62,6 +62,8 @@ export function showError(message) {
 }
 
 window.addEventListener('error', (e) => showError(`오류: ${e.message || e.type}`));
+window.addEventListener('shincoach:dbblocked', () => showError('다른 창(또는 옛 버전 앱)이 저장소를 쓰고 있어요. 신코치 창을 모두 닫고 다시 열어 주세요'));
+window.addEventListener('shincoach:dbversionchange', () => showError('새 버전이 열렸어요. 이 창은 닫고 새 창을 사용해 주세요'));
 window.addEventListener('unhandledrejection', (e) => showError(`오류: ${(e.reason && e.reason.message) || e.reason}`));
 
 async function main() {

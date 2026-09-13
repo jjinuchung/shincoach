@@ -48,7 +48,7 @@ function loadPlayer() {
     getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null,
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
-    runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {} }), prepareMic: async () => null,
+    runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
     track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, MASTER_RATIO: 0.8 },
   });
   vm.runInContext(src, ctx);
@@ -248,7 +248,7 @@ function loadPlayerWithSpeak(resultQueue) {
   p.ctx.runSpeakCheck = () => {
     let resolveFn;
     const promise = new Promise((r) => { resolveFn = r; });
-    const handle = { promise, stop() { resolveFn(resultQueue.shift()); } };
+    const handle = { promise, stop() { resolveFn(resultQueue.shift()); }, cancel() {} };
     return handle;
   };
   p.run('settings.speakCheck = true; settings.listenFirst = 0; state.micPrepared = true;');
@@ -325,4 +325,36 @@ test('말하기 확인 + 반복 ∞: 통과 후엔 같은 문장 반복(섀도�
   video.currentTime = 2; run('onCueEnd()');
   assert.equal(run('state.speakRun'), null, '이미 통과 → 마이크 확인 안 함');
   assert.equal(video.currentTime, 0, '바로 반복');
+});
+
+// ── Codex 2차 리뷰 회귀 테스트 ──
+
+test('#1 연속 재생으로 자동 이동해도 다음 문장은 말하기 확인·듣기 먼저가 다시 걸림', async () => {
+  const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'energy', transcript: '', score: null }]);
+  run('settings.listenFirst = 0; state.repeatIdx = 0; state.shadow = false; state.cues = [{start:0,end:2,en:"a",ko:""},{start:2.5,end:4,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');       // 말하기 확인
+  run('skipShadowWait()'); await tick();          // 통과
+  assert.equal(run('state.speakPassed'), true);
+  await new Promise((r) => setTimeout(r, 1500));  // 반복 끔 → 다음 문장으로 (afterShadowWait → goTo)
+  assert.equal(run('state.idx'), 1);
+  assert.equal(run('state.speakPassed'), false, '다음 문장은 아직 통과 전');
+  // 통과 뒤 ∞ 반복 없이 연속 재생 경로(onCueEnd에서 idx++)로도 초기화되는지
+  run('state.idx = 0; state.speakPassed = true; state.enRevealed = true; settings.listenFirst = 3; settings.speakCheck = true;');
+  video.paused = false; video.currentTime = 2; run('onCueEnd()');
+  assert.equal(run('state.idx'), 1, '연속 재생으로 다음 문장');
+  assert.equal(run('state.speakPassed'), false, '연속 이동 뒤에도 말하기 확인 초기화');
+  assert.equal(run('state.enRevealed'), false, '연속 이동 뒤에도 듣기 먼저(영어 숨김) 초기화');
+  assert.equal(run('state.listenCount'), 0);
+});
+
+test('#9 듣기 먼저 + 반복 끔: 영어 공개 시점에 "한 문장"으로 기록됨', () => {
+  const { run, video, ctx } = loadPlayer();
+  let doneCalls = 0;
+  ctx.track.done = () => { doneCalls++; };
+  run('settings.listenFirst = 1; settings.speakCheck = false; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');   // 1번 듣고 공개
+  assert.equal(run('state.enRevealed'), true);
+  assert.equal(doneCalls, 1, '공개 시점에 done 기록');
 });

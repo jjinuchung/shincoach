@@ -6,7 +6,7 @@ import {
 } from './srt.js';
 import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
-import { runSpeakCheck, prepareMic } from './speak.js';
+import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
 import * as track from './track.js';
 
 const $ = (id) => document.getElementById(id);
@@ -190,6 +190,8 @@ function onVisibilityChange() {
   cancelShadowWait();
   if (!video.paused) video.pause();
   if (wasShadowWaiting) showPlayerMessage('▶ 를 눌러 이어서 연습해요', 0);
+  releaseMic(); // 백그라운드에서 마이크 표시등이 켜져 있지 않도록
+  state.micPrepared = false;
   releaseWakeLock();
   scheduleSave(true);
 }
@@ -262,6 +264,8 @@ function closePlayer() {
 function closeMedia() {
   state.open = false;
   cancelShadowWait();
+  releaseMic();
+  state.micPrepared = false;
   stopLoop();
   releaseWakeLock();
   if (video) {
@@ -294,6 +298,15 @@ function speakGateBlocks(targetIdx) {
   return targetIdx > state.idx;
 }
 
+/** 새 문장에 들어갈 때 문장별 상태 초기화 (goTo와 연속 재생 자동 이동 모두 여기를 거침) */
+function resetSentenceState() {
+  state.repeatCount = 0;
+  state.listenCount = 0;
+  state.enRevealed = settings.listenFirst === 0; // 듣기 먼저 모드면 새 문장은 영어 숨김으로 시작
+  state.speakPassed = false;
+  state.speakFails = 0;
+}
+
 function goTo(i, { play = true, force = false } = {}) {
   if (state.cues.length === 0) return;
   i = Math.max(0, Math.min(i, state.cues.length - 1));
@@ -302,12 +315,8 @@ function goTo(i, { play = true, force = false } = {}) {
     return;
   }
   cancelShadowWait();
-  state.speakPassed = false;
-  state.speakFails = 0;
   state.idx = i;
-  state.repeatCount = 0;
-  state.listenCount = 0;
-  state.enRevealed = settings.listenFirst === 0; // 듣기 먼저 모드면 새 문장은 영어 숨김으로 시작
+  resetSentenceState();
   video.currentTime = state.cues[i].start;
   renderSubtitle();
   applySubVisibility();
@@ -457,6 +466,7 @@ function onCueEnd() {
     state.repeatCount = 0; // 반복 횟수는 공개 이후부터 셈
     applySubVisibility();
     markScriptRevealed();
+    markDone(cue); // N번 다 들었으면 "한 문장"으로 인정 (반복 끔이면 이 뒤로 markDone을 거치지 않으므로)
     updateChips();
     if (state.shadow || speakCheckActive()) { // 섀도잉/말하기 확인이면 바로 따라 말하기 (영어 보면서) → 반복 설정대로 이어감
       video.pause();
@@ -490,13 +500,14 @@ function onCueEnd() {
     return;
   }
 
-  // 연속 재생: 다음 문장으로 (반복 모드였으면 카운트 초기화)
+  // 연속 재생: 다음 문장으로 — 문장별 상태(듣기 먼저·말하기 확인)는 goTo와 똑같이 초기화, 재생은 끊지 않음
   state.idx++;
-  state.repeatCount = 0;
+  resetSentenceState();
   const next = state.cues[state.idx];
   // 문장 사이 간격이 길면 건너뛰기
   if (next.start - video.currentTime > 1.0) video.currentTime = next.start;
   renderSubtitle();
+  applySubVisibility();
   updateProgress();
   highlightScript();
   updateChips();
@@ -560,7 +571,7 @@ function cancelShadowWait() {
   if (state.shadowRaf) cancelAnimationFrame(state.shadowRaf);
   state.shadowTimer = null;
   state.shadowRaf = null;
-  if (state.speakRun) { const r = state.speakRun; state.speakRun = null; r.cancelled = true; r.stop(); }
+  if (state.speakRun) { const r = state.speakRun; state.speakRun = null; r.cancelled = true; r.cancel(); }
   const overlay = $('shadow-overlay');
   overlay.hidden = true;
   overlay.classList.remove('speaking');
