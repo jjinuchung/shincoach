@@ -423,14 +423,19 @@ test('퍼즐: 열려 있는 동안 다시 듣기 구간이 끝나면 멈추고, 
   run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 1; state.idx = 3;');
   run('markDone(state.cues[3]); goTo(4)');
   assert.equal(puzzleCalls.length, 1);
-  puzzleCalls[0].opts.onPlay(); // 🔊 다시 듣기 → 문장 3(30~32초) 재생
+  let ended = 0;
+  puzzleCalls[0].opts.onPlay(() => { ended++; }); // 🔊 다시 듣기 → 문장 3(30~32초) 재생, 끝나면 콜백
   assert.equal(video.currentTime, 30);
   assert.equal(run('state.puzzlePlaying'), true);
   video.currentTime = 31; run('onTick()');
   assert.equal(run('state.idx'), 3, '탐색해도 현재 문장 유지');
+  assert.equal(ended, 0);
   video.currentTime = 32; run('onTick()');
   assert.equal(video.paused, true, '구간 끝에서 멈춤');
   assert.equal(run('state.puzzlePlaying'), false);
+  assert.equal(ended, 1, '끝나면 콜백 한 번');
+  video.currentTime = 32; run('onTick()');
+  assert.equal(ended, 1, '멈춘 뒤에는 다시 부르지 않음');
   video.currentTime = 0; run('syncToTime()');
   assert.equal(run('state.idx'), 3, '퍼즐 중에는 시간 동기화 안 함');
   puzzleCalls[0].opts.onClose({ solved: true, wrong: 1 });

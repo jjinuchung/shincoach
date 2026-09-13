@@ -77,14 +77,15 @@ const ui = {
   locked: false,  // 정답/정답 공개 뒤에는 조각을 못 움직임
   result: null,
   timer: null,
-  onPlay: null,   // 🔊 다시 듣기 → 플레이어가 그 문장을 재생
+  onPlay: null,   // 🔊 다시 듣기 → 플레이어가 그 문장을 재생. onPlay(onEnd)의 onEnd는 재생이 끝났을 때 호출됨
   onClose: null,  // 끝났을 때 { solved, wrong } 전달
   drag: null,     // 드래그 중 정보
   slots: {},      // 단어 모음의 자리 (원래 자리 인덱스 → 요소). 단어가 빠져나가도 자리는 그대로 남음
 };
 
 export function initPuzzle() {
-  $('puzzle-listen').addEventListener('click', () => { if (ui.onPlay) ui.onPlay(); });
+  // 정답 뒤에 다시 들으면 그 재생이 끝난 뒤 닫히도록 콜백을 다시 걸어줌
+  $('puzzle-listen').addEventListener('click', () => { if (ui.onPlay) ui.onPlay(ui.result && ui.result.solved ? onSolvedPlayEnd : undefined); });
   $('puzzle-check').addEventListener('click', check);
   $('puzzle-continue').addEventListener('click', finish);
 }
@@ -93,7 +94,7 @@ export function isPuzzleOpen() {
   return ui.open;
 }
 
-/** 퍼즐 열기. onClose(result)는 아이가 맞추거나(1.5초 뒤) 정답 공개 후 계속하기를 눌렀을 때 호출 */
+/** 퍼즐 열기. onClose(result)는 아이가 맞추고(문장을 한 번 더 들려준 뒤) 또는 정답 공개 후 계속하기를 눌렀을 때 호출 */
 export function openPuzzle(cue, { onPlay, onClose } = {}) {
   closePuzzle();
   ui.open = true;
@@ -155,6 +156,13 @@ export function closePuzzle() {
   ui.cue = null;
   ui.onPlay = null;
   ui.onClose = null;
+}
+
+/** 정답 뒤 들려주기가 끝남 → 잠깐 두고 닫기 */
+function onSolvedPlayEnd() {
+  if (!ui.open || !ui.result || !ui.result.solved) return;
+  clearTimeout(ui.timer);
+  ui.timer = setTimeout(finish, 700);
 }
 
 function finish() {
@@ -304,9 +312,15 @@ function check() {
     ui.result = { solved: true, wrong: ui.wrongCount };
     chips.forEach((c) => c.classList.add('ok'));
     root.classList.add('solved');
-    setMsg(ui.wrongCount === 0 ? '🎉 정답이에요! 한 번에 맞췄어요!' : '🎉 정답이에요!');
+    setMsg(ui.wrongCount === 0 ? '🎉 정답이에요! 한 번에 맞췄어요! 🔊' : '🎉 정답이에요! 🔊');
     afterChange();
-    ui.timer = setTimeout(finish, 1500);
+    // 맞춘 문장을 한 번 더 들려주고(각인), 재생이 끝나면 닫힘. 재생이 안 되는 경우를 대비한 안전망 타이머
+    if (ui.onPlay) {
+      ui.onPlay(onSolvedPlayEnd);
+      ui.timer = setTimeout(finish, 12000);
+    } else {
+      ui.timer = setTimeout(finish, 1500);
+    }
     return;
   }
 

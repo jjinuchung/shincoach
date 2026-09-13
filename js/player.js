@@ -46,6 +46,7 @@ const state = {
   puzzlePool: [],     // 🧩 마지막 퍼즐 이후 "한" 문장들 (중복 없이) → N개 차면 그중 하나로 퍼즐
   puzzleCue: null,    // 퍼즐이 열려 있는 동안 그 문장 (열려 있으면 재생 루프/키보드가 플레이어 상태를 건드리지 않음)
   puzzlePlaying: false, // 퍼즐의 🔊 다시 듣기로 그 문장을 재생 중 (끝나면 멈춤)
+  puzzleOnEnd: null,  // 퍼즐 다시 듣기가 끝났을 때 알릴 콜백 (정답 뒤 들려주기 → 닫기)
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -159,21 +160,31 @@ function showPuzzle(cue, onDone) {
   state.puzzleCue = cue;
   state.puzzlePlaying = false;
   openPuzzle(cue, {
-    onPlay: () => playPuzzleSentence(cue),
+    onPlay: (onEnd) => playPuzzleSentence(cue, onEnd),
     onClose: (result) => {
       state.puzzleCue = null;
       state.puzzlePlaying = false;
+      state.puzzleOnEnd = null;
       if (!video.paused) video.pause();
       onDone(result);
     },
   });
 }
 
-/** 퍼즐의 🔊 다시 듣기: 그 문장 구간만 재생 (끝은 onTick에서 판정해 멈춤) */
-function playPuzzleSentence(cue) {
+/** 퍼즐의 🔊 다시 듣기: 그 문장 구간만 재생 (끝은 onTick에서 판정해 멈춤). onEnd는 끝났을 때 한 번 호출 */
+function playPuzzleSentence(cue, onEnd) {
   state.puzzlePlaying = true;
+  state.puzzleOnEnd = onEnd || null;
   video.currentTime = cue.start;
   safePlay();
+}
+
+/** 퍼즐 다시 듣기 구간 끝 (또는 영상 끝) */
+function endPuzzlePlayback() {
+  state.puzzlePlaying = false;
+  const cb = state.puzzleOnEnd;
+  state.puzzleOnEnd = null;
+  if (cb) cb();
 }
 
 // ───────────────────── 학습 기록 표시 (⭐, 오늘의 목표) ─────────────────────
@@ -331,6 +342,7 @@ function closeMedia() {
   closePuzzle();
   state.puzzleCue = null;
   state.puzzlePlaying = false;
+  state.puzzleOnEnd = null;
   releaseMic();
   state.micPrepared = false;
   stopLoop();
@@ -477,8 +489,8 @@ function onTick() {
   // 🧩 퍼즐이 열려 있는 동안: 🔊 다시 듣기 구간이 끝나면 멈추기만 하고 문장 상태는 건드리지 않음
   if (state.puzzleCue) {
     if (state.puzzlePlaying && t >= state.puzzleCue.end - END_EPS) {
-      state.puzzlePlaying = false;
       video.pause();
+      endPuzzlePlayback();
     }
     return;
   }
@@ -520,7 +532,7 @@ function onVideoEnded() {
   updatePlayIcon();
   stopLoop();
   releaseWakeLock();
-  if (state.puzzleCue) { state.puzzlePlaying = false; return; } // 퍼즐 다시 듣기가 영상 끝까지 간 경우
+  if (state.puzzleCue) { endPuzzlePlayback(); return; } // 퍼즐 다시 듣기가 영상 끝까지 간 경우
   // rAF가 마지막 문장 끝을 놓친 경우: 남은 반복/섀도잉을 여기서 처리
   const cue = state.cues[state.idx];
   if (!cue) return;
