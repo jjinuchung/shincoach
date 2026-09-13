@@ -27,6 +27,7 @@ function emptyRecord(itemId, cue) {
     key: sentenceKey(itemId, cue.start), itemId, start: cue.start, en: cue.en, ko: cue.ko || '',
     plays: 0, listens: 0, done: false, seconds: 0,
     speakAttempts: 0, speakPass: 0, speakFail: 0, speakSkipped: 0, bestRatio: 0, lastRatio: 0, lastAt: 0,
+    puzzles: 0, puzzleSolved: 0, puzzleWrong: 0,
   };
 }
 
@@ -36,7 +37,7 @@ function rollDailyIfNeeded() {
   if (!t.daily || t.daily.date === key) return;
   const old = t.daily;
   putDaily(old).catch(() => {});
-  t.daily = { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0 };
+  t.daily = { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0 };
   t.dailyDirty = false;
   getDaily(key).then((existing) => {
     if (!existing || !t.daily || t.daily.date !== key) return;
@@ -44,6 +45,8 @@ function rollDailyIfNeeded() {
     t.daily.seconds += existing.seconds || 0;
     t.daily.speakAttempts += existing.speakAttempts || 0;
     t.daily.speakPass += existing.speakPass || 0;
+    t.daily.puzzles += existing.puzzles || 0;
+    t.daily.puzzleSolved += existing.puzzleSolved || 0;
     t.dailyDirty = true;
   }).catch(() => {});
 }
@@ -63,7 +66,7 @@ async function ensureDaily() {
   const key = todayKey();
   if (t.daily && t.daily.date === key) return t.daily;
   if (t.daily && t.dailyDirty) { await putDaily(t.daily).catch(() => {}); }
-  t.daily = (await getDaily(key).catch(() => null)) || { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0 };
+  t.daily = (await getDaily(key).catch(() => null)) || { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0 };
   t.dailyDirty = false;
   return t.daily;
 }
@@ -77,7 +80,7 @@ export async function open(item) {
   t.session = {
     id: `${Date.now()}-${item.id}`, itemId: item.id, title: item.title,
     startedAt: Date.now(), endedAt: null, seconds: 0, sentences: 0, _keys: new Set(),
-    firstIdx: null, lastIdx: null, speakAttempts: 0, speakPass: 0,
+    firstIdx: null, lastIdx: null, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0,
   };
   await ensureDaily();
   t.flushTimer = setInterval(() => { flush(); }, 5000);
@@ -123,6 +126,21 @@ export function speak(cue, result) {
   if (result.score && result.score.total) {
     r.lastRatio = result.score.ratio;
     if (result.score.ratio > r.bestRatio) r.bestRatio = result.score.ratio;
+  }
+}
+
+/** 🧩 문장 퍼즐 결과 (solved: 3번 안에 맞춤, wrong: 틀린 횟수). 옛 기록에는 필드가 없을 수 있어 || 0 */
+export function puzzle(cue, result) {
+  const r = rec(cue); if (!r) return;
+  const solved = !!(result && result.solved);
+  r.puzzles = (r.puzzles || 0) + 1;
+  r.puzzleSolved = (r.puzzleSolved || 0) + (solved ? 1 : 0);
+  r.puzzleWrong = (r.puzzleWrong || 0) + ((result && result.wrong) || 0);
+  if (t.session) { t.session.puzzles++; if (solved) t.session.puzzleSolved++; }
+  if (t.daily) {
+    t.daily.puzzles = (t.daily.puzzles || 0) + 1;
+    t.daily.puzzleSolved = (t.daily.puzzleSolved || 0) + (solved ? 1 : 0);
+    t.dailyDirty = true;
   }
 }
 

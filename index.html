@@ -142,6 +142,22 @@
     <main id="stats-main" class="stats-main"></main>
   </section>
 
+  <!-- ===== 🧩 문장 퍼즐 (N문장마다 배운 문장의 단어 순서 맞추기) ===== -->
+  <div id="puzzle" class="puzzle" hidden>
+    <div class="puzzle-card">
+      <div class="puzzle-title">🧩 문장 퍼즐</div>
+      <div id="puzzle-msg" class="puzzle-msg">단어를 순서대로 놓아봐요!</div>
+      <div id="puzzle-ko" class="puzzle-ko" hidden></div>
+      <div id="puzzle-answer" class="puzzle-answer empty" aria-label="정답 칸"></div>
+      <div id="puzzle-bank" class="puzzle-bank" aria-label="단어 모음"></div>
+      <div class="puzzle-actions">
+        <button type="button" id="puzzle-listen" class="btn">🔊 다시 듣기</button>
+        <button type="button" id="puzzle-check" class="btn btn-primary" disabled>✓ 확인</button>
+        <button type="button" id="puzzle-continue" class="btn btn-primary" hidden>계속하기 ▶</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== 새 버전 안내 ===== -->
   <div id="update-toast" class="update-toast" hidden>
     <span>새 버전이 준비됐어요</span>
@@ -202,9 +218,25 @@
         </select>
       </label>
 
+      <label class="field">
+        <span class="field-label">🧩 문장 퍼즐 <small>— N문장마다 방금 배운 문장의 단어 순서 맞추기 (3~8단어 문장만)</small></span>
+        <select id="set-puzzle">
+          <option value="0">끔</option>
+          <option value="5">5문장마다</option>
+          <option value="10">10문장마다</option>
+          <option value="15">15문장마다</option>
+          <option value="20">20문장마다</option>
+        </select>
+      </label>
+
       <label class="field field-row">
         <input type="checkbox" id="set-speak">
         <span class="field-label">🎤 말하기 확인 <small>— 마이크로 따라 말해야 다음 문장으로 (3번 못 하면 넘어감)</small></span>
+      </label>
+
+      <label class="field field-row">
+        <input type="checkbox" id="set-hide-en">
+        <span class="field-label">🙈 따라 말할 때 영어 숨김 <small>— 보고 읽지 않고 들은 대로 말하게 (결과가 나오면 다시 보임)</small></span>
       </label>
 
       <label class="field">

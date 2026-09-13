@@ -63,3 +63,21 @@ test('done/todayDone: 같은 문장은 하루에 한 번만 셈', async () => {
   run('done({ start: 1, end: 2, en: "a" }); done({ start: 1, end: 2, en: "a" }); done({ start: 5, end: 6, en: "b" });');
   assert.equal(run('todayDone()'), 2);
 });
+
+test('puzzle: 문장별·세션·일별 퍼즐 횟수/정답 누적 (옛 기록에 필드가 없어도 됨)', async () => {
+  const s = stub();
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  run('t.stats.set(sentenceKey("x", 1), { key: sentenceKey("x", 1), plays: 3 });'); // 퍼즐 필드 없는 옛 기록
+  run('puzzle({ start: 1, end: 2, en: "a b c" }, { solved: true, wrong: 1 }); puzzle({ start: 1, end: 2, en: "a b c" }, { solved: false, wrong: 3 });');
+  const r = run('t.stats.get(sentenceKey("x", 1))');
+  assert.equal(r.puzzles, 2);
+  assert.equal(r.puzzleSolved, 1);
+  assert.equal(r.puzzleWrong, 4);
+  assert.equal(r.plays, 3, '기존 필드 유지');
+  assert.equal(run('t.session.puzzles'), 2);
+  assert.equal(run('t.session.puzzleSolved'), 1);
+  assert.equal(run('t.daily.puzzles'), 2);
+  assert.equal(run('t.daily.puzzleSolved'), 1);
+  assert.equal(run('t.dailyDirty'), true);
+});

@@ -17,15 +17,18 @@ test('todayKey: 로컬 날짜 YYYY-MM-DD', () => {
 test('weekSeries: 오늘 포함 7일, 없는 날은 0', () => {
   const week = weekSeries([
     { date: '2026-09-13', doneKeys: ['a', 'b'], seconds: 600, speakAttempts: 4, speakPass: 3 },
-    { date: '2026-09-10', doneKeys: ['c'], seconds: 120, speakAttempts: 0, speakPass: 0 },
+    { date: '2026-09-10', doneKeys: ['c'], seconds: 120, speakAttempts: 0, speakPass: 0, puzzles: 2, puzzleSolved: 1 },
     { date: '2026-08-01', doneKeys: ['z'], seconds: 999, speakAttempts: 0, speakPass: 0 }, // 범위 밖
   ], '2026-09-13');
   assert.equal(week.length, 7);
   assert.equal(week[6].date, '2026-09-13');
   assert.equal(week[6].isToday, true);
   assert.equal(week[6].sentences, 2);
+  assert.equal(week[6].puzzles, 0, '퍼즐 필드 없는 옛 기록은 0');
   assert.equal(week[3].date, '2026-09-10');
   assert.equal(week[3].seconds, 120);
+  assert.equal(week[3].puzzles, 2);
+  assert.equal(week[3].puzzleSolved, 1);
   assert.equal(week[0].seconds, 0);
   assert.equal(week.reduce((a, d) => a + d.seconds, 0), 720);
 });

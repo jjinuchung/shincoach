@@ -32,6 +32,7 @@ function loadPlayer() {
     removeAttribute() {}, load() {},
   });
   els.video = video;
+  const puzzleCalls = [];
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
@@ -44,16 +45,21 @@ function loadPlayer() {
     alert() {},
     // srt.js 의존 함수 스텁
     parseSubtitle: () => [], mergeSubtitles: (a) => a, mergeIntoSentences: (a) => a,
-    estimateWordTimings: () => [], findCueIndex: (cues, t) => cues.findIndex((c) => t >= c.start && t < c.end),
+    wordTimings: () => [], findCueIndex: (cues, t) => cues.findIndex((c) => t >= c.start && t < c.end),
     getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null,
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, MASTER_RATIO: 0.8 },
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, MASTER_RATIO: 0.8, puzzle() {} },
+    // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
+    puzzleCalls,
+    initPuzzle() {}, closePuzzle() {},
+    openPuzzle(cue, opts) { puzzleCalls.push({ cue, opts }); },
+    pickPuzzle: (cues) => (cues.length ? cues[0] : null),
   });
   vm.runInContext(src, ctx);
-  vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; // 테스트 기준: 반복 끔, 말하기 확인 끔', ctx);
-  return { ctx, video, els, run: (code) => vm.runInContext(code, ctx) };
+  vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
+  return { ctx, video, els, puzzleCalls, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -357,4 +363,76 @@ test('#9 듣기 먼저 + 반복 끔: 영어 공개 시점에 "한 문장"으로 
   video.currentTime = 2; run('onCueEnd()');   // 1번 듣고 공개
   assert.equal(run('state.enRevealed'), true);
   assert.equal(doneCalls, 1, '공개 시점에 done 기록');
+});
+
+// ───────────────────── 🧩 문장 퍼즐 ─────────────────────
+
+const FIVE_CUES = 'state.cues = [{start:0,end:2,en:"a b c",ko:""},{start:10,end:12,en:"d e f",ko:""},{start:20,end:22,en:"g h i",ko:""},{start:30,end:32,en:"j k l",ko:""},{start:40,end:42,en:"m n o",ko:""}];';
+
+test('퍼즐: N문장을 "하면" 앞으로 넘어갈 때 퍼즐이 먼저 열리고, 끝나면 그 이동을 이어감', () => {
+  const { run, puzzleCalls } = loadPlayer();
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 2; state.idx = 1;');
+  run('markDone(state.cues[0]); markDone(state.cues[1]); markDone(state.cues[1]);'); // 같은 문장 반복은 한 번만
+  assert.equal(run('state.puzzlePool.length'), 2);
+  run('goTo(2)');
+  assert.equal(puzzleCalls.length, 1, '퍼즐이 열림');
+  assert.equal(puzzleCalls[0].cue.en, 'a b c', '모아둔 문장 중에서 출제');
+  assert.equal(run('state.idx'), 1, '아직 이동 안 함');
+  assert.equal(run('state.puzzleCue && state.puzzleCue.en'), 'a b c');
+  assert.equal(run('state.puzzlePool.length'), 0, '출제하면서 비움');
+  puzzleCalls[0].opts.onClose({ solved: true, wrong: 0 });
+  assert.equal(run('state.puzzleCue'), null);
+  assert.equal(run('state.idx'), 2, '퍼즐 뒤 원래 이동');
+  run('goTo(3)');
+  assert.equal(puzzleCalls.length, 1, '다시 차기 전에는 안 열림');
+});
+
+test('퍼즐: 뒤로 가기·퍼즐 끔·낼 만한 문장 없음이면 열리지 않음', () => {
+  const { run, puzzleCalls, ctx } = loadPlayer();
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 2; state.idx = 2;');
+  run('markDone(state.cues[1]); markDone(state.cues[2]);');
+  run('goTo(1)');
+  assert.equal(puzzleCalls.length, 0, '뒤로 가기는 퍼즐 없음');
+  assert.equal(run('state.idx'), 1);
+  run('settings.puzzleEvery = 0; goTo(2)');
+  assert.equal(puzzleCalls.length, 0, '설정 끔');
+  assert.equal(run('state.idx'), 2);
+  // 낼 만한 문장이 없으면(pickPuzzle → null) 바로 이동
+  ctx.pickPuzzle = () => null;
+  run('settings.puzzleEvery = 1; state.puzzlePool = [state.cues[2]]; goTo(3)');
+  assert.equal(puzzleCalls.length, 0);
+  assert.equal(run('state.idx'), 3, '퍼즐 없이 바로 이동');
+  assert.equal(run('state.puzzlePool.length'), 0, '모아둔 건 비움');
+});
+
+test('퍼즐: 연속 재생 자동 이동 직전에도 퍼즐이 열리고 영상은 멈춤', () => {
+  const { run, video, puzzleCalls } = loadPlayer();
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 2; state.repeatIdx = 0; state.shadow = false; state.idx = 1; state.enRevealed = true;');
+  run('markDone(state.cues[0]);');
+  video.paused = false; video.currentTime = 12;
+  run('onTick()'); // 문장 1 끝 → markDone → 2개 참 → 퍼즐
+  assert.equal(puzzleCalls.length, 1);
+  assert.equal(video.paused, true, '퍼즐 동안 영상 멈춤');
+  assert.equal(run('state.idx'), 1);
+  puzzleCalls[0].opts.onClose({ solved: false, wrong: 3 });
+  assert.equal(run('state.idx'), 2, '퍼즐 뒤 다음 문장');
+});
+
+test('퍼즐: 열려 있는 동안 다시 듣기 구간이 끝나면 멈추고, 문장 상태는 그대로', () => {
+  const { run, video, puzzleCalls } = loadPlayer();
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 1; state.idx = 3;');
+  run('markDone(state.cues[3]); goTo(4)');
+  assert.equal(puzzleCalls.length, 1);
+  puzzleCalls[0].opts.onPlay(); // 🔊 다시 듣기 → 문장 3(30~32초) 재생
+  assert.equal(video.currentTime, 30);
+  assert.equal(run('state.puzzlePlaying'), true);
+  video.currentTime = 31; run('onTick()');
+  assert.equal(run('state.idx'), 3, '탐색해도 현재 문장 유지');
+  video.currentTime = 32; run('onTick()');
+  assert.equal(video.paused, true, '구간 끝에서 멈춤');
+  assert.equal(run('state.puzzlePlaying'), false);
+  video.currentTime = 0; run('syncToTime()');
+  assert.equal(run('state.idx'), 3, '퍼즐 중에는 시간 동기화 안 함');
+  puzzleCalls[0].opts.onClose({ solved: true, wrong: 1 });
+  assert.equal(run('state.idx'), 4);
 });

@@ -46,7 +46,8 @@ export function weekSeries(dailyList, today = todayKey()) {
     out.push({
       date: key, label: ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()],
       seconds: rec ? rec.seconds : 0, sentences: rec ? rec.doneKeys.length : 0,
-      speakAttempts: rec ? rec.speakAttempts : 0, speakPass: rec ? rec.speakPass : 0, isToday: i === 0,
+      speakAttempts: rec ? rec.speakAttempts : 0, speakPass: rec ? rec.speakPass : 0,
+      puzzles: rec ? rec.puzzles || 0 : 0, puzzleSolved: rec ? rec.puzzleSolved || 0 : 0, isToday: i === 0,
     });
   }
   return out;
@@ -124,6 +125,8 @@ export async function renderStats() {
   const wSent = week.reduce((a, d) => a + d.sentences, 0);
   const wAtt = week.reduce((a, d) => a + d.speakAttempts, 0);
   const wPass = week.reduce((a, d) => a + d.speakPass, 0);
+  const wPz = week.reduce((a, d) => a + d.puzzles, 0);
+  const wPzOk = week.reduce((a, d) => a + d.puzzleSolved, 0);
   const allSec = daily.reduce((a, d) => a + d.seconds, 0);
   const c1 = card('이번 주 (최근 7일)');
   const sum = el('div', 'stats-summary');
@@ -132,6 +135,7 @@ export async function renderStats() {
   sum.appendChild(kpi(`${wDays}일`, '학습한 날'));
   sum.appendChild(kpi(`${wSent}문장`, '한 문장'));
   sum.appendChild(kpi(wAtt ? `${Math.round((wPass / wAtt) * 100)}%` : '-', `말하기 통과 (${wPass}/${wAtt})`));
+  sum.appendChild(kpi(wPz ? `${Math.round((wPzOk / wPz) * 100)}%` : '-', `🧩 퍼즐 정답 (${wPzOk}/${wPz})`));
   sum.appendChild(kpi(fmtDur(allSec), '전체 누적'));
   c1.appendChild(sum);
   const bars = el('div', 'stats-bars');
@@ -211,7 +215,7 @@ export async function renderStats() {
     const row = el('div', 'stats-row');
     const range = s.firstIdx !== null && s.firstIdx !== undefined ? ` #${s.firstIdx + 1}→#${(s.lastIdx || 0) + 1}` : '';
     row.appendChild(el('span', 'name', `${fmtDate(s.startedAt)} ${s.title}${range}`));
-    row.appendChild(el('span', 'meta', `${fmtDur(s.seconds)} · ${s.sentences}문장${s.speakAttempts ? ` · 말하기 ${s.speakPass}/${s.speakAttempts}` : ''}`));
+    row.appendChild(el('span', 'meta', `${fmtDur(s.seconds)} · ${s.sentences}문장${s.speakAttempts ? ` · 말하기 ${s.speakPass}/${s.speakAttempts}` : ''}${s.puzzles ? ` · 퍼즐 ${s.puzzleSolved}/${s.puzzles}` : ''}`));
     c5.appendChild(row);
   }
   main.appendChild(c5);

@@ -314,6 +314,9 @@ button { font-family: inherit; }
 .sub-en { margin: 0; font-size: 1.5rem; font-weight: 700; line-height: 1.4; word-break: keep-all; }
 .sub-ko { margin: 0; font-size: 1.1rem; color: var(--muted); line-height: 1.4; }
 .sub-en[hidden], .sub-ko[hidden] { display: none; }
+/* 따라 말하기 대기 중: 영어는 자리만 남기고 가림 (아이가 보고 읽지 않게) */
+.sub-en.speak-hide { visibility: hidden; }
+.script-list.speak-hide .script-item.active .en { visibility: hidden; }
 .sub-en .w { transition: color 0.1s, background 0.1s; border-radius: 4px; padding: 0 2px; }
 .sub-en .w.on { color: #fff; background: var(--accent); }
 .sub-en .w.done { color: var(--primary); }
@@ -394,6 +397,97 @@ button { font-family: inherit; }
 .stats-chip { display: inline-block; background: #eef2ff; color: var(--primary); border-radius: 8px; padding: 3px 8px; margin: 3px 4px 3px 0; font-size: 0.9rem; }
 .stats-chip small { color: var(--muted); margin-left: 4px; }
 .topbar label.btn { display: inline-flex; align-items: center; }
+
+/* ===== 🧩 문장 퍼즐 ===== */
+.puzzle {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: rgba(31, 35, 64, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  z-index: 60;
+}
+.puzzle[hidden] { display: none; }
+.puzzle-card {
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 640px;
+  max-height: 96vh;
+  overflow-y: auto;
+  padding: 18px 16px 14px;
+  display: flex;
+  flex-direction: column;
+}
+.puzzle-title { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
+.puzzle.solved .puzzle-title::after { content: ' 🎉'; }
+.puzzle-msg { margin: 6px 0 8px; font-weight: 700; font-size: 1.05rem; min-height: 1.4em; }
+.puzzle-ko { color: var(--muted); font-size: 1rem; margin-bottom: 8px; }
+.puzzle-ko[hidden] { display: none; }
+.puzzle-answer, .puzzle-bank {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  border-radius: 14px;
+  padding: 8px;
+  min-height: 130px;
+}
+.puzzle-answer { background: #eef2ff; border: 3px dashed #a5b4fc; position: relative; }
+.puzzle-answer.empty::before {
+  content: '여기에 단어를 순서대로 놓아요';
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  color: #818cf8;
+  font-weight: 600;
+  pointer-events: none;
+}
+.puzzle-bank { background: #f5f7ff; border: 3px solid transparent; margin-top: 12px; }
+.puzzle-chip {
+  border: 2px solid #c7d2fe;
+  background: #fff;
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 5px;
+  font-family: inherit;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  min-height: 48px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none; /* 드래그 중 화면 스크롤 방지 */
+  box-shadow: 0 2px 6px rgba(31, 35, 64, 0.12);
+}
+.puzzle-chip.ghost { opacity: 0.3; }
+.puzzle-chip.bad { border-color: var(--danger); background: #fef2f2; color: #991b1b; }
+.puzzle-chip.ok { border-color: var(--ok); background: #ecfdf5; color: #047857; }
+.puzzle-drag {
+  position: fixed;
+  left: 0; top: 0;
+  margin: 0;
+  pointer-events: none;
+  z-index: 61;
+  transform: translate(-1000px, -1000px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  transition: none;
+}
+.puzzle-actions { display: flex; justify-content: flex-end; align-items: center; margin-top: 12px; }
+.puzzle-actions > .btn { margin-left: 10px; font-size: 1.05rem; }
+.puzzle-actions > .btn[hidden] { display: none; }
+.puzzle-actions > .btn:disabled { opacity: 0.45; cursor: default; }
+.puzzle.shake .puzzle-answer { animation: puzzle-shake 0.4s; }
+@keyframes puzzle-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
 
 /* ===== 새 버전 안내 ===== */
 .update-toast {

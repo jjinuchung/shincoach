@@ -2,11 +2,12 @@
 import { getItem, getVideoBlob, updateItem } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
-  estimateWordTimings, findCueIndex,
+  wordTimings, findCueIndex,
 } from './srt.js';
 import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
+import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import * as track from './track.js';
 
 const $ = (id) => document.getElementById(id);
@@ -39,8 +40,12 @@ const state = {
   speakPassed: false, // 말하기 확인: 현재 문장 통과 여부
   speakFails: 0,      // 말하기 확인: 현재 문장 실패 횟수 (3번이면 통과시킴)
   speakRun: null,     // 진행 중인 말하기 확인 { promise, stop }
+  speakHideEn: false, // 따라 말하기 대기 중 영어 숨김 (보고 읽지 않고 들은 대로 말하게)
   speakUnavailable: false, // 마이크 못 쓰면 확인 없이 진행
   micPrepared: false,
+  puzzlePool: [],     // 🧩 마지막 퍼즐 이후 "한" 문장들 (중복 없이) → N개 차면 그중 하나로 퍼즐
+  puzzleCue: null,    // 퍼즐이 열려 있는 동안 그 문장 (열려 있으면 재생 루프/키보드가 플레이어 상태를 건드리지 않음)
+  puzzlePlaying: false, // 퍼즐의 🔊 다시 듣기로 그 문장을 재생 중 (끝나면 멈춤)
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -107,12 +112,53 @@ export function initPlayer(ctx) {
   initPinDialog();
   initVocabPanel();
   initDiag();
-  // 학습 시간: 재생 중이거나 따라 말하는 중이면 1초씩 누적
+  initPuzzle();
+  // 학습 시간: 재생 중이거나 따라 말하는 중·퍼즐 푸는 중이면 1초씩 누적
   setInterval(() => {
     if (!state.open) return;
     const cue = state.cues[state.idx];
-    if (cue && (!video.paused || state.speakRun)) track.tick(cue, 1);
+    if (cue && (!video.paused || state.speakRun || state.puzzleCue)) track.tick(cue, 1);
   }, 1000);
+}
+
+// ───────────────────── 🧩 문장 퍼즐 ─────────────────────
+
+/** N문장이 차서 다음 문장으로 넘어가기 전에 퍼즐을 낼 차례인지 */
+function puzzleReady() {
+  return settings.puzzleEvery > 0 && state.puzzlePool.length >= settings.puzzleEvery;
+}
+
+/**
+ * 퍼즐 열기. 모아둔 문장 중 낼 만한 것(3~8단어)이 없으면 바로 continueFn.
+ * 끝나면(맞춤/정답 공개 후 계속하기) 결과를 기록하고 continueFn으로 원래 하려던 이동을 이어감
+ */
+function startPuzzle(continueFn) {
+  const pool = state.puzzlePool;
+  state.puzzlePool = [];
+  const cue = pickPuzzle(pool);
+  if (!cue) { continueFn(); return; }
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  state.puzzleCue = cue;
+  state.puzzlePlaying = false;
+  openPuzzle(cue, {
+    onPlay: () => playPuzzleSentence(cue),
+    onClose: (result) => {
+      state.puzzleCue = null;
+      state.puzzlePlaying = false;
+      if (!video.paused) video.pause();
+      track.puzzle(cue, result);
+      continueFn();
+    },
+  });
+}
+
+/** 퍼즐의 🔊 다시 듣기: 그 문장 구간만 재생 (끝은 onTick에서 판정해 멈춤) */
+function playPuzzleSentence(cue) {
+  state.puzzlePlaying = true;
+  video.currentTime = cue.start;
+  safePlay();
 }
 
 // ───────────────────── 학습 기록 표시 (⭐, 오늘의 목표) ─────────────────────
@@ -126,6 +172,8 @@ function markDone(cue) {
     updateGoalChip();
     if (settings.dailyGoal > 0 && after === settings.dailyGoal) showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성!`, 5000);
   }
+  // 🧩 퍼즐 후보로 모아둠 (같은 문장을 반복해도 한 번만)
+  if (settings.puzzleEvery > 0 && !state.puzzlePool.some((c) => c.start === cue.start)) state.puzzlePool.push(cue);
 }
 
 /** 현재 문장 ⭐ 정복 표시 (목록) */
@@ -212,6 +260,7 @@ export async function openPlayer(id, opts = {}) {
   await track.open(item).catch((e) => console.warn('기록 로드 실패:', e));
   state.idx = -1;
   state.repeatCount = 0;
+  state.puzzlePool = [];
   cancelShadowWait();
   hidePlayerMessage();
 
@@ -264,6 +313,9 @@ function closePlayer() {
 function closeMedia() {
   state.open = false;
   cancelShadowWait();
+  closePuzzle();
+  state.puzzleCue = null;
+  state.puzzlePlaying = false;
   releaseMic();
   state.micPrepared = false;
   stopLoop();
@@ -312,6 +364,11 @@ function goTo(i, { play = true, force = false } = {}) {
   i = Math.max(0, Math.min(i, state.cues.length - 1));
   if (!force && speakGateBlocks(i)) {
     showPlayerMessage('🎤 따라 말해야 다음으로 넘어갈 수 있어요');
+    return;
+  }
+  // 🧩 앞으로 넘어갈 때 N문장이 차 있으면 먼저 퍼즐 → 끝나면 이 이동을 이어감 (퍼즐이 열리면서 모아둔 문장은 비워짐)
+  if (!force && i > state.idx && puzzleReady()) {
+    startPuzzle(() => goTo(i, { play }));
     return;
   }
   cancelShadowWait();
@@ -402,6 +459,14 @@ function stopLoop() {
 function onTick() {
   if (state.seeking) return; // 탐색 완료 전에는 시간이 신뢰할 수 없음
   const t = video.currentTime;
+  // 🧩 퍼즐이 열려 있는 동안: 🔊 다시 듣기 구간이 끝나면 멈추기만 하고 문장 상태는 건드리지 않음
+  if (state.puzzleCue) {
+    if (state.puzzlePlaying && t >= state.puzzleCue.end - END_EPS) {
+      state.puzzlePlaying = false;
+      video.pause();
+    }
+    return;
+  }
   const cue = state.cues[state.idx];
   if (!cue) return;
 
@@ -420,6 +485,7 @@ function onTick() {
 
 /** video.currentTime 기준으로 현재 문장 인덱스를 맞춘다. 바뀌었으면 true */
 function syncToTime() {
+  if (state.puzzleCue) return false; // 퍼즐의 다시 듣기로 탐색한 것 → 현재 문장은 그대로
   const t = video.currentTime;
   const cue = state.cues[state.idx];
   if (cue && t >= cue.start - 0.5 && t <= cue.end + 0.5) return false;
@@ -439,6 +505,7 @@ function onVideoEnded() {
   updatePlayIcon();
   stopLoop();
   releaseWakeLock();
+  if (state.puzzleCue) { state.puzzlePlaying = false; return; } // 퍼즐 다시 듣기가 영상 끝까지 간 경우
   // rAF가 마지막 문장 끝을 놓친 경우: 남은 반복/섀도잉을 여기서 처리
   const cue = state.cues[state.idx];
   if (!cue) return;
@@ -500,6 +567,13 @@ function onCueEnd() {
     return;
   }
 
+  // 🧩 N문장이 찼으면 다음 문장으로 가기 전에 퍼즐
+  if (puzzleReady()) {
+    const nextIdx = state.idx + 1;
+    startPuzzle(() => goTo(nextIdx));
+    return;
+  }
+
   // 연속 재생: 다음 문장으로 — 문장별 상태(듣기 먼저·말하기 확인)는 goTo와 똑같이 초기화, 재생은 끊지 않음
   state.idx++;
   resetSentenceState();
@@ -536,6 +610,7 @@ function speakCheckActive() {
 function startShadowWait(cue, opts = {}) {
   if (state.shadowTimer || state.speakRun) return; // rAF와 ended가 동시에 호출해도 하나만
   state.shadowNext = opts.repeat ? 'repeat' : 'next';
+  setSpeakHide(true); // 따라 말하는 동안은 영어를 가림 (결과가 나오거나 대기가 끝나면 다시 보임)
   if (speakCheckActive()) { startSpeakWait(cue); return; }
   const dur = Math.max(1.5, (cue.end - cue.start) * settings.shadowFactor + 0.5) * 1000;
   const overlay = $('shadow-overlay');
@@ -575,6 +650,15 @@ function cancelShadowWait() {
   const overlay = $('shadow-overlay');
   overlay.hidden = true;
   overlay.classList.remove('speaking');
+  setSpeakHide(false);
+}
+
+/** 따라 말하기 대기 중 영어 숨김 켜기/끄기 (설정이 꺼져 있으면 항상 보임) */
+function setSpeakHide(on) {
+  on = on && settings.hideEnWhileSpeaking;
+  if (state.speakHideEn === on) return;
+  state.speakHideEn = on;
+  applySubVisibility();
 }
 
 function skipShadowWait() {
@@ -620,6 +704,7 @@ function onSpeakResult(cue, result) {
   const sub = $('shadow-sub');
   const fill = $('shadow-ring-fill');
   fill.style.width = '100%';
+  setSpeakHide(false); // 결과를 볼 때는 영어를 다시 보여줌 (들린 말과 비교)
 
   if (result.method === 'none') {
     state.speakUnavailable = true;
@@ -678,7 +763,7 @@ function renderSubtitle() {
   if (!cue) { enEl.textContent = ''; koEl.textContent = ''; return; }
 
   // 영어: 단어별 span (하이라이트용)
-  state.wordTimes = estimateWordTimings(cue.start, cue.end, cue.en);
+  state.wordTimes = wordTimings(cue); // 노래방 태그가 있으면 실제 단어 시간, 없으면 글자 수 비례 추정
   enEl.innerHTML = '';
   state.wordSpans = state.wordTimes.map((w, i) => {
     const span = document.createElement('span');
@@ -723,6 +808,7 @@ function toggleSub(which) {
 function applySubVisibility() {
   const enOn = state.showEn && state.enRevealed;
   $('sub-en').hidden = !enOn;
+  $('sub-en').classList.toggle('speak-hide', state.speakHideEn); // 자리는 남기고 글자만 가림 (레이아웃 안 튀게)
   $('sub-ko').hidden = !state.showKo;
   const enBtn = $('btn-toggle-en');
   enBtn.classList.toggle('is-on', state.showEn && state.enRevealed);
@@ -734,6 +820,7 @@ function applySubVisibility() {
   list.classList.toggle('hide-en', !state.showEn);
   list.classList.toggle('hide-ko', !state.showKo);
   list.classList.toggle('listen-first', settings.listenFirst > 0);
+  list.classList.toggle('speak-hide', state.speakHideEn); // 목록의 현재 문장 영어도 가림
   renderVocab();
 }
 
@@ -832,6 +919,7 @@ function updateChips() {
 
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
+  if (state.puzzleCue) return; // 퍼즐 푸는 중에는 플레이어 단축키 무시
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   switch (e.key) {
     case ' ': e.preventDefault(); onPlayButton(); break;
@@ -876,7 +964,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, dailyGoal: 20 };
+  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10 };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -893,7 +981,9 @@ function initSettingsDialog() {
   $('set-shadow-factor').value = String(settings.shadowFactor);
   $('set-listen-first').value = String(settings.listenFirst);
   $('set-goal').value = String(settings.dailyGoal);
+  $('set-puzzle').value = String(settings.puzzleEvery);
   $('set-speak').checked = settings.speakCheck;
+  $('set-hide-en').checked = settings.hideEnWhileSpeaking;
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -903,7 +993,11 @@ function initSettingsDialog() {
     settings.listenFirst = Number($('set-listen-first').value);
     settings.dailyGoal = Number($('set-goal').value);
     updateGoalChip();
+    settings.puzzleEvery = Number($('set-puzzle').value);
+    if (settings.puzzleEvery === 0) state.puzzlePool = [];
     settings.speakCheck = $('set-speak').checked;
+    settings.hideEnWhileSpeaking = $('set-hide-en').checked;
+    if (!settings.hideEnWhileSpeaking) state.speakHideEn = false; // 끄면 대기 중이던 숨김도 해제
     if (settings.listenFirst === 0) state.enRevealed = true;
     applySubVisibility();
     updateChips();

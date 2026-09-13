@@ -6,9 +6,9 @@ const DB_VERSION = 2;
 
 // 학습 기록 스토어 (v2에서 추가)
 //  sentenceStats: 문장별 누적 { key: "<itemId>|<start×10>", itemId, start, en, ko, plays, listens, done, seconds,
-//                 speakAttempts, speakPass, speakFail, speakSkipped, bestRatio, lastRatio, lastAt }
-//  sessions:      앱을 열고 닫은 단위 { id, itemId, title, startedAt, endedAt, seconds, sentences, firstIdx, lastIdx, speakAttempts, speakPass }
-//  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass }
+//                 speakAttempts, speakPass, speakFail, speakSkipped, bestRatio, lastRatio, lastAt, puzzles, puzzleSolved, puzzleWrong }
+//  sessions:      앱을 열고 닫은 단위 { id, itemId, title, startedAt, endedAt, seconds, sentences, firstIdx, lastIdx, speakAttempts, speakPass, puzzles, puzzleSolved }
+//  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved }
 //  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
 const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews'];
 
@@ -274,16 +274,16 @@ export function mergeStatRecord(name, cur, rec) {
   if (!cur) return rec;
   const out = { ...cur, ...rec };
   if (name === 'sentenceStats') {
-    for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt', 'puzzles', 'puzzleSolved', 'puzzleWrong']) out[k] = maxOf(cur[k], rec[k]);
     out.done = !!(cur.done || rec.done);
     out.lastRatio = (rec.lastAt || 0) >= (cur.lastAt || 0) ? (rec.lastRatio || 0) : (cur.lastRatio || 0);
   } else if (name === 'daily') {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
-    for (const k of ['seconds', 'speakAttempts', 'speakPass']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'vocabViews') {
     for (const k of ['views', 'taps', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'sessions') {
-    for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt', 'puzzles', 'puzzleSolved']) out[k] = maxOf(cur[k], rec[k]);
   }
   return out;
 }

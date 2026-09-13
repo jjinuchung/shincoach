@@ -23,3 +23,11 @@ test('#6 vocabViews/sessions: 큰 값 유지, 없는 기록은 그대로', () =>
   assert.equal(mergeStatRecord('vocabViews', { word: 'w', views: 5, taps: 2, lastAt: 9 }, { word: 'w', views: 1, taps: 3, lastAt: 1 }).taps, 3);
   assert.deepEqual(mergeStatRecord('sessions', null, { id: 's', seconds: 10 }), { id: 's', seconds: 10 });
 });
+
+test('퍼즐 기록도 큰 값 유지 (sentenceStats/daily/sessions)', () => {
+  assert.equal(mergeStatRecord('sentenceStats', { key: 'k', puzzles: 4, puzzleSolved: 3, puzzleWrong: 2 }, { key: 'k', puzzles: 1, puzzleSolved: 1, puzzleWrong: 5 }).puzzleWrong, 5);
+  assert.equal(mergeStatRecord('sentenceStats', { key: 'k', puzzles: 4 }, { key: 'k', puzzles: 1 }).puzzles, 4);
+  const d = mergeStatRecord('daily', { date: 'd', doneKeys: [], puzzles: 2, puzzleSolved: 1 }, { date: 'd', doneKeys: [], puzzles: 3, puzzleSolved: 1 });
+  assert.equal(d.puzzles, 3); assert.equal(d.puzzleSolved, 1);
+  assert.equal(mergeStatRecord('sessions', { id: 's', puzzles: 2, puzzleSolved: 2 }, { id: 's', puzzles: 1, puzzleSolved: 0 }).puzzleSolved, 2);
+});
