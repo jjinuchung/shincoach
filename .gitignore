@@ -20,3 +20,7 @@ Thumbs.db
 
 # 작업 기억 문서(비밀번호 등 포함) — 공개 저장소에 올리지 않음
 .task-memory/
+
+# 파이썬 캐시 / 셸 크래시 덤프
+__pycache__/
+*.stackdump

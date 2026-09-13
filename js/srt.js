@@ -34,7 +34,7 @@ export function cleanText(text) {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/\([^)]*\)|\[[^\]]*\]/g, '')            // (효과음) [소리]
-    .replace(/^[ \t]*[A-Z][A-Z0-9 .'\-]{0,24}:\s*/gm, '') // 줄 앞 화자 표시 "WOODY:" "MAN 2:"
+    .replace(/^[ \t]*(?:[-–—][ \t]*)?[A-Z][A-Z0-9 .'\-]{0,24}:\s*/gm, '') // 줄 앞 화자 표시 "WOODY:" "MAN 2:" "-PO:"
     .replace(/[ \t]+/g, ' ')
     .replace(/^[ \t]*[-–—:]+[ \t]*/gm, '')    // 줄 앞 대사 표시 "- " 및 남은 ":"
     .replace(/^[ \t]*$\n?/gm, '')             // 빈 줄 제거
@@ -78,16 +78,63 @@ export function parseSubtitle(text) {
     if (!Number.isFinite(start) || !Number.isFinite(end)) { skipped++; continue; }
     if (end - start < MIN_CUE_DURATION) { skipped++; continue; }
 
-    const body = cleanText(lines.slice(li + 1).join('\n'));
+    const raw = lines.slice(li + 1).join('\n');
+    const body = cleanText(raw);
     if (!body) continue;
 
-    cues.push({ index: cues.length, start, end, text: body });
+    const cue = { index: cues.length, start, end, text: body };
+    const words = parseKaraokeWords(raw, start, end); // VTT 노래방 태그가 있으면 단어별 시간
+    if (words) cue.words = words;
+    cues.push(cue);
   }
 
   cues.sort((a, b) => a.start - b.start);
   cues.forEach((c, i) => { c.index = i; });
   cues.skipped = skipped;
   return cues;
+}
+
+const KARAOKE_TAG = /<((?:\d+:)?\d{1,2}:\d{1,2}[.,]\d{1,3})>/;
+
+/**
+ * VTT 노래방 타임스탬프(`<00:01:02.345>단어`)로 단어별 시작/끝 시간을 뽑는다. 태그가 없으면 null.
+ * 태그 바로 뒤 첫 단어가 그 시각에 시작, 태그 없는 단어는 앞뒤 알려진 시각 사이를 글자 수 비례로 나눔.
+ * 단어 목록은 cleanText 결과의 공백 분리 토큰과 같아야 하이라이트에 쓰인다 (wordTimings에서 검사).
+ * → [{ word, start, end }]
+ */
+export function parseKaraokeWords(raw, start, end) {
+  if (!KARAOKE_TAG.test(raw)) return null;
+  const parts = raw.replace(/\n/g, ' ').split(new RegExp(KARAOKE_TAG.source, 'g')); // [텍스트, 시각, 텍스트, 시각, …]
+  const words = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const t = i === 0 ? null : parseTimestamp(parts[i - 1]);
+    const tokens = cleanText(parts[i]).split(/\s+/).filter(Boolean);
+    tokens.forEach((word, k) => words.push({ word, start: k === 0 && Number.isFinite(t) ? t : null }));
+  }
+  if (words.length === 0) return null;
+
+  // 시각 없는 단어 채우기: 앞뒤 알려진 시각 사이를 글자 수 비례로
+  const weight = (w) => w.replace(/[^\p{L}\p{N}']/gu, '').length + 1;
+  let i = 0;
+  while (i < words.length) {
+    if (words[i].start !== null) { i++; continue; }
+    let j = i;
+    while (j < words.length && words[j].start === null) j++;
+    const a = i === 0 ? start : words[i - 1].start;
+    const b = j < words.length ? words[j].start : end;
+    const total = words.slice(i, j).reduce((s, w) => s + weight(w.word), 0) + (i === 0 ? 0 : weight(words[i - 1].word));
+    let t = a + (i === 0 ? 0 : (weight(words[i - 1].word) / total) * (b - a));
+    for (let k = i; k < j; k++) {
+      words[k].start = t;
+      t += (weight(words[k].word) / total) * (b - a);
+    }
+    i = j;
+  }
+  // 단조 증가·범위 안으로 정리, 끝 = 다음 단어 시작
+  let prev = start;
+  words.forEach((w) => { w.start = Math.min(Math.max(w.start, prev), end); prev = w.start; });
+  words.forEach((w, k) => { w.end = k + 1 < words.length ? words[k + 1].start : end; });
+  return words;
 }
 
 /** 두 구간의 겹치는 길이(초) */
@@ -114,8 +161,20 @@ export function mergeSubtitles(enCues, koCues = []) {
       // 한글 큐의 절반 이상 또는 영어 큐의 절반 이상이 겹치면 채택
       if (ov >= koDur * 0.5 || ov >= enDur * 0.5) parts.push(ko.text);
     }
-    return { index: i, start: en.start, end: en.end, en: en.text, ko: parts.join(' ') };
+    const cue = { index: i, start: en.start, end: en.end, en: en.text, ko: parts.join(' ') };
+    if (en.words) cue.words = en.words;
+    return cue;
   });
+}
+
+/**
+ * 문장의 단어별 시간: 자막에 노래방 태그가 있어 단어 수가 맞으면 그것을, 아니면 글자 수 비례 추정
+ * → [{ word, start, end }]
+ */
+export function wordTimings(cue) {
+  const tokens = cue.en.replace(/\n/g, ' ').split(/\s+/).filter(Boolean);
+  if (cue.words && cue.words.length === tokens.length) return cue.words;
+  return estimateWordTimings(cue.start, cue.end, cue.en);
 }
 
 const SENTENCE_END = /[.!?…]["'”’)]*$/;
@@ -139,6 +198,7 @@ export function mergeIntoSentences(cues, { maxGap = 0.7, maxOverlap = 0.3, maxDu
       if (!endsSentence && gap <= maxGap && gap >= -maxOverlap && !tooLong) {
         cur.end = mergedEnd;
         cur.text = joinText(cur.text, c.text);
+        cur.words = cur.words && c.words ? cur.words.concat(c.words) : undefined; // 한쪽이라도 없으면 추정으로
         continue;
       }
       out.push(cur);

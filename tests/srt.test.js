@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import {
   parseTimestamp, formatTime, cleanText, parseSubtitle,
   mergeSubtitles, mergeIntoSentences, estimateWordTimings,
-  findCueIndex, findNearestCueIndex,
+  findCueIndex, findNearestCueIndex, parseKaraokeWords, wordTimings,
 } from '../js/srt.js';
 
 const en = readFileSync(new URL('../samples/sample.en.srt', import.meta.url), 'utf8');
@@ -165,4 +165,37 @@ test('findCueIndex / findNearestCueIndex', () => {
   assert.equal(findNearestCueIndex(cues, 2.9), 0);
   assert.equal(findNearestCueIndex(cues, 0.2), 0);
   assert.equal(findNearestCueIndex(cues, 99), 4);
+});
+
+test('parseKaraokeWords: VTT 노래방 태그 → 단어별 시간, 태그 없는 단어는 보간', () => {
+  const raw = '<00:00:10.000>I <00:00:10.500>was a <00:00:11.500>ghost,';
+  const w = parseKaraokeWords(raw, 10, 12);
+  assert.deepEqual(w.map((x) => x.word), ['I', 'was', 'a', 'ghost,']);
+  assert.equal(w[0].start, 10);
+  assert.equal(w[1].start, 10.5);
+  assert.ok(w[2].start > 10.5 && w[2].start < 11.5, '"a"는 was~ghost 사이에서 보간');
+  assert.equal(w[3].start, 11.5);
+  assert.equal(w[3].end, 12);
+  assert.equal(w[1].end, w[2].start);
+  assert.equal(parseKaraokeWords('no tags here', 0, 1), null);
+});
+
+test('parseSubtitle: VTT 노래방 태그가 있으면 cue.words, 텍스트는 태그 제거', () => {
+  const vtt = 'WEBVTT\n\n1\n00:00:10.000 --> 00:00:12.000\n<00:00:10.000>Oh, <00:00:10.800>up, <00:00:11.300>up.\n\n2\n00:00:12.000 --> 00:00:13.000\nPlain line.\n';
+  const cues = parseSubtitle(vtt);
+  assert.equal(cues.length, 2);
+  assert.equal(cues[0].text, 'Oh, up, up.');
+  assert.equal(cues[0].words.length, 3);
+  assert.equal(cues[0].words[1].start, 10.8);
+  assert.equal(cues[1].words, undefined);
+  // 병합 결과에도 전달, 단어 수가 맞으면 wordTimings가 그대로 사용
+  const merged = mergeSubtitles(mergeIntoSentences(cues), []);
+  assert.equal(merged[0].words.length, 3);
+  assert.equal(wordTimings(merged[0])[1].start, 10.8);
+  assert.equal(wordTimings(merged[1]).length, 2, '태그 없으면 글자 수 비례 추정');
+  // 문장 합치기: 태그 있는 큐 + 없는 큐 → 추정으로
+  const cues2 = parseSubtitle(vtt.replace('up.\n', 'up\n'));
+  const merged2 = mergeIntoSentences(cues2);
+  assert.equal(merged2.length, 1);
+  assert.equal(merged2[0].words, undefined);
 });
