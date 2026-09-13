@@ -17,3 +17,6 @@ Thumbs.db
 # Claude Code 로컬 기록
 .claude/
 .context/
+
+# 작업 기억 문서(비밀번호 등 포함) — 공개 저장소에 올리지 않음
+.task-memory/
