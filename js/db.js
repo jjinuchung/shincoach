@@ -2,7 +2,7 @@
 // items 스토어: 메타데이터(제목, 자막, 진행) / blobs 스토어: 영상 Blob (목록 조회 시 무거운 Blob을 안 읽기 위해 분리)
 
 const DB_NAME = 'shincoach';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // 학습 기록 스토어 (v2에서 추가)
 //  sentenceStats: 문장별 누적 { key: "<itemId>|<start×10>", itemId, start, en, ko, plays, listens, done, seconds,
@@ -11,7 +11,8 @@ const DB_VERSION = 3;
 //  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved }
 //  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
 // characters (v3): 🎮 퍼즐 캐릭터 그림 { id, ko, en, blob, savedAt } — 인터넷에서 받아 기기에만 보관 (백업에 포함 안 함)
-const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews'];
+//  profile (v4):  ⚡ 아이 프로필 { id: 'me', xp, caught: { 포켓몬id: 마릿수 }, throws, catches, updatedAt } — 백업에 포함
+const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews', 'profile'];
 
 let dbPromise = null;
 
@@ -44,6 +45,9 @@ function openDb() {
       }
       if (!db.objectStoreNames.contains('characters')) {
         db.createObjectStore('characters', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('profile')) {
+        db.createObjectStore('profile', { keyPath: 'id' });
       }
     };
     // 다른 탭/옛 버전 앱이 DB를 잡고 있으면 업그레이드가 대기 상태에 빠짐 → 사용자에게 안내
@@ -278,6 +282,21 @@ export async function clearCharacters() {
   await txDone(tx);
 }
 
+// ───────────────────── ⚡ 프로필 ─────────────────────
+
+export async function getProfile() {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readonly');
+  return promisify(tx.objectStore('profile').get('me'));
+}
+
+export async function putProfile(rec) {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readwrite');
+  tx.objectStore('profile').put(rec);
+  await txDone(tx);
+}
+
 /** 기록 전체 내보내기 (영상 제외) */
 export async function exportStats() {
   const db = await openDb();
@@ -310,6 +329,10 @@ export function mergeStatRecord(name, cur, rec) {
     for (const k of ['views', 'taps', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'sessions') {
     for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt', 'puzzles', 'puzzleSolved']) out[k] = maxOf(cur[k], rec[k]);
+  } else if (name === 'profile') {
+    for (const k of ['xp', 'throws', 'catches', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
+    out.caught = { ...(cur.caught || {}) };
+    for (const id of Object.keys(rec.caught || {})) out.caught[id] = maxOf(out.caught[id], rec.caught[id]);
   }
   return out;
 }

@@ -5,6 +5,7 @@ import {
 import { parseSubtitle, mergeIntoSentences } from './srt.js';
 import { openPlayer } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
+import { reloadProfile } from './xp.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -243,6 +244,7 @@ function doImport(file) {
     try {
       const n = await importStats(JSON.parse(fr.result));
       await reloadDaily();
+      await reloadProfile();
       alert(`기록 ${n}건을 가져왔어요`);
       renderStats();
     } catch (e) {

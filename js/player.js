@@ -8,7 +8,9 @@ import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
-import { loadCharacters, downloadCharacters, ROSTER } from './pokemon.js';
+import { loadCharacters, downloadCharacters, pickCharacters, ROSTER } from './pokemon.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP } from './xp.js';
+import { initCatch, openCatch, closeCatch } from './catch.js';
 import * as track from './track.js';
 
 const $ = (id) => document.getElementById(id);
@@ -49,6 +51,7 @@ const state = {
   puzzlePlaying: false, // 퍼즐의 🔊 다시 듣기로 그 문장을 재생 중 (끝나면 멈춤)
   puzzleOnEnd: null,  // 퍼즐 다시 듣기가 끝났을 때 알릴 콜백 (정답 뒤 들려주기 → 닫기)
   characters: [],     // 🎮 기기에 받아둔 퍼즐 캐릭터 [{ id, ko, url }] (없으면 단어 조각만)
+  catchOpen: false,   // 🎯 잡기 화면이 열려 있음 (키보드 무시)
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -117,6 +120,9 @@ export function initPlayer(ctx) {
   initDiag();
   initPuzzle();
   initCharacters();
+  initCatch();
+  initProfile().then(updateLevelChip).catch(() => {});
+  $('level-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex()); });
   // 학습 시간: 재생 중이거나 따라 말하는 중·퍼즐 푸는 중이면 1초씩 누적
   setInterval(() => {
     if (!state.open) return;
@@ -143,7 +149,54 @@ function startPuzzle(continueFn) {
   if (!cue) { continueFn(); return; }
   showPuzzle(cue, (result) => {
     track.puzzle(cue, result);
+    const g = awardXp(puzzleXp(result));
+    // 정답이면 퍼즐에 나온 포켓몬 중 한 마리에게 몬스터볼 던지기 (캐릭터가 없으면 그냥 이어감)
+    if (result.solved && result.characters && result.characters.length) {
+      state.catchOpen = true;
+      openCatch({
+        candidates: result.characters, xpGain: g.gained, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
+        attempt: (id) => catchAttempt(id),
+        onDone: () => { state.catchOpen = false; updateLevelChip(); continueFn(); },
+      });
+      return;
+    }
     continueFn();
+  });
+}
+
+// ───────────────────── ⚡ 경험치·레벨 ─────────────────────
+
+function updateLevelChip() {
+  const chip = $('level-chip');
+  const i = getLevelInfo();
+  chip.textContent = `Lv.${i.level} ⚡${i.into}/${i.need}`;
+  chip.hidden = false;
+}
+
+/** XP 획득 + 칩 갱신 + 레벨업 알림 */
+function awardXp(amount) {
+  const g = gainXp(amount);
+  updateLevelChip();
+  if (g.leveledUp) {
+    showPlayerMessage(`🎉 레벨 업! Lv.${g.to}`, 5000);
+    const chip = $('level-chip');
+    chip.classList.remove('pulse');
+    void chip.offsetWidth;
+    chip.classList.add('pulse');
+  }
+  return g;
+}
+
+/** ⚙ 잡기 연습: 아무 캐릭터 4마리로 연출만 (기록 안 함) */
+function startCatchPractice() {
+  if (!state.characters.length) { showPlayerMessage('🎮 먼저 설정에서 포켓몬 캐릭터를 받아 주세요', 4000); return; }
+  if (!video.paused) video.pause();
+  cancelShadowWait();
+  state.catchOpen = true;
+  openCatch({
+    candidates: pickCharacters(state.characters, 4), levelInfo: getLevelInfo(), practice: true,
+    attempt: (id) => previewAttempt(id),
+    onDone: () => { state.catchOpen = false; },
   });
 }
 
@@ -230,6 +283,7 @@ function markDone(cue) {
   const after = track.todayDone();
   if (after !== before) {
     updateGoalChip();
+    awardXp(XP.done); // 오늘 처음 완료한 문장 → 경험치
     if (settings.dailyGoal > 0 && after === settings.dailyGoal) showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성!`, 5000);
   }
   // 🧩 퍼즐 후보로 모아둠 (같은 문장을 반복해도 한 번만)
@@ -374,6 +428,8 @@ function closeMedia() {
   state.open = false;
   cancelShadowWait();
   closePuzzle();
+  closeCatch();
+  state.catchOpen = false;
   state.puzzleCue = null;
   state.puzzlePlaying = false;
   state.puzzleOnEnd = null;
@@ -786,7 +842,9 @@ function onSpeakResult(cue, result) {
   if (result.passed) {
     state.speakPassed = true;
     track.speak(cue, { passed: true, skipped: false, score: result.score });
-    if (result.score && result.score.ratio >= track.MASTER_RATIO) markStar();
+    const star = !!(result.score && result.score.ratio >= track.MASTER_RATIO);
+    if (star) markStar();
+    awardXp(star ? XP.speakStar : XP.speak);
     if (result.method === 'speech' && result.score) {
       msg.textContent = result.score.ratio >= 0.8 ? '🌟 완벽해요!' : '🎯 잘했어요!';
       sub.textContent = `${result.score.matched}/${result.score.total} 단어 맞음: "${result.transcript}"`;
@@ -991,7 +1049,7 @@ function updateChips() {
 
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
-  if (state.puzzleCue) return; // 퍼즐 푸는 중에는 플레이어 단축키 무시
+  if (state.puzzleCue || state.catchOpen) return; // 퍼즐·잡기 화면 중에는 플레이어 단축키 무시
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   switch (e.key) {
     case ' ': e.preventDefault(); onPlayButton(); break;
@@ -1058,6 +1116,7 @@ function initSettingsDialog() {
   $('set-hide-en').checked = settings.hideEnWhileSpeaking;
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
+  $('set-catch-try').addEventListener('click', () => { $('dlg-settings').close(); startCatchPractice(); });
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
     const mergeChanged = settings.mergeSentences !== $('set-merge').checked;

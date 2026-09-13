@@ -33,6 +33,8 @@ function loadPlayer() {
   });
   els.video = video;
   const puzzleCalls = [];
+  const xpLog = [];
+  const catchCalls = [];
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
@@ -57,11 +59,19 @@ function loadPlayer() {
     openPuzzle(cue, opts) { puzzleCalls.push({ cue, opts }); },
     pickPuzzle: (cues) => (cues.length ? cues[0] : null),
     // pokemon.js 스텁
-    loadCharacters: async () => [], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [],
+    loadCharacters: async () => [], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [], pickCharacters: (a, n) => (a || []).slice(0, n),
+    // xp.js / catch.js 스텁: XP 획득과 잡기 화면 호출을 기록
+    xpLog, catchCalls,
+    initProfile: async () => ({}), getLevelInfo: () => ({ level: 1, into: 0, need: 100, xp: 0 }),
+    gainXp: (n) => { xpLog.push(n); return { gained: n, leveledUp: false, from: 1, to: 1, info: { level: 1, into: 0, need: 100 } }; },
+    catchAttempt: () => ({ caught: true }), previewAttempt: () => ({ caught: false }),
+    puzzleXp: (r) => (r && r.solved ? [30, 20, 10][Math.min(r.wrong || 0, 2)] : 3),
+    XP: { done: 2, speak: 3, speakStar: 5 },
+    initCatch() {}, closeCatch() {}, openCatch(o) { catchCalls.push(o); },
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, puzzleCalls, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -483,4 +493,55 @@ test('영어 숨김 단계: 처음 전부 숨김 → 1번 못 하면 절반(홀�
   run('settings.hideEnWhileSpeaking = false; state.speakFails = 0; startShadowWait(state.cues[0])');
   assert.equal(run('state.speakHideEn'), 'none');
   run('cancelShadowWait()');
+});
+
+// ───────────────────── ⚡ 경험치 · 🎯 잡기 ─────────────────────
+
+test('XP: 오늘 처음 완료한 문장 +2, 퍼즐 정답 → +XP → 잡기 화면 → 끝나면 이동', () => {
+  const { run, puzzleCalls, catchCalls, xpLog, ctx } = loadPlayer();
+  const keys = new Set();
+  ctx.track.done = (c) => keys.add(c.start);
+  ctx.track.todayDone = () => keys.size;
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 1; state.idx = 0;');
+  run('markDone(state.cues[0]); markDone(state.cues[0]);');
+  assert.deepEqual(xpLog, [2], '같은 문장은 하루 한 번만 XP');
+  run('goTo(1)');
+  assert.equal(puzzleCalls.length, 1);
+  puzzleCalls[0].opts.onClose({ solved: true, wrong: 0, characters: [{ id: 25, ko: '피카츄', url: 'x' }] });
+  assert.deepEqual(xpLog, [2, 30]);
+  assert.equal(catchCalls.length, 1, '정답이면 잡기 화면');
+  assert.equal(catchCalls[0].candidates[0].id, 25);
+  assert.equal(catchCalls[0].xpGain, 30);
+  assert.equal(run('state.idx'), 0, '잡기 끝날 때까지 이동 안 함');
+  assert.equal(run('state.catchOpen'), true);
+  catchCalls[0].onDone();
+  assert.equal(run('state.idx'), 1);
+  assert.equal(run('state.catchOpen'), false);
+  // 정답 공개(3번 틀림)면 +3, 잡기 없음
+  run('markDone(state.cues[1]); goTo(2)');
+  puzzleCalls[1].opts.onClose({ solved: false, wrong: 3, characters: [{ id: 1, ko: '이상해씨', url: 'x' }] });
+  assert.equal(xpLog[xpLog.length - 1], 3);
+  assert.equal(catchCalls.length, 1);
+  assert.equal(run('state.idx'), 2);
+  // 캐릭터를 안 받았으면(빈 목록) 잡기 없이 이동
+  run('markDone(state.cues[2]); goTo(3)');
+  puzzleCalls[2].opts.onClose({ solved: true, wrong: 1, characters: [] });
+  assert.equal(xpLog[xpLog.length - 1], 20);
+  assert.equal(catchCalls.length, 1);
+  assert.equal(run('state.idx'), 3);
+});
+
+test('XP: 말하기 통과 +3, ⭐면 +5', async () => {
+  const { run, video, xpLog } = loadPlayerWithSpeak([
+    { passed: true, method: 'speech', transcript: 'a', score: { matched: 1, total: 1, ratio: 1 } },
+    { passed: true, method: 'energy', transcript: '', score: null },
+  ]);
+  run('state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1; goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.ok(xpLog.includes(5), '⭐ 통과 +5');
+  run('cancelShadowWait(); goTo(1, { force: true })');
+  video.currentTime = 12; run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.ok(xpLog.includes(3), '통과 +3');
 });

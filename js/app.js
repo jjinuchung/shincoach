@@ -2,14 +2,16 @@
 import { initLibrary } from './library.js';
 import { initPlayer, requirePin } from './player.js';
 import { initStats } from './stats.js';
+import { initPokedex } from './pokedex.js';
 
 const views = {
   library: document.getElementById('view-library'),
   player: document.getElementById('view-player'),
   stats: document.getElementById('view-stats'),
+  pokedex: document.getElementById('view-pokedex'),
 };
 
-/** 화면 전환 (library | player) */
+/** 화면 전환 (library | player | stats | pokedex) */
 export function showView(name) {
   for (const [key, el] of Object.entries(views)) {
     el.hidden = key !== name;
@@ -71,6 +73,7 @@ async function main() {
   // 버튼 연결을 가장 먼저 — 뒤의 어떤 단계가 실패해도 UI는 동작해야 함
   initPlayer({ showView });
   initStats({ showView, requirePin });
+  initPokedex({ showView });
   showView('library');
   window.__appReady = true; // index.html의 시작 감시 타이머 해제
   try {

@@ -81,6 +81,7 @@ const ui = {
   onClose: null,  // 끝났을 때 { solved, wrong } 전달
   drag: null,     // 드래그 중 정보
   slots: {},      // 단어의 "집" (원래 자리 인덱스 → 요소): 캐릭터가 있으면 말풍선, 없으면 자리 자체. 단어가 나가도 자리는 그대로
+  chars: null,    // 이번 퍼즐에 나온 캐릭터 (결과에 실어 보냄 → 잡기 화면 후보)
 };
 
 export function initPuzzle() {
@@ -126,6 +127,7 @@ export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
   // 캐릭터가 충분하면 자리 = [말풍선(단어) + 캐릭터 그림 + 이름] 카드. 캐릭터를 눌러도 단어가 오간다
   const n = ui.answer.length;
   const chars = characters && characters.length >= n ? pickSome(characters, n) : null;
+  ui.chars = chars;
   ui.slots = {};
   const slots = [];
   const order = scrambleOrder(ui.answer);
@@ -211,7 +213,7 @@ function onSolvedPlayEnd() {
 function finish() {
   if (!ui.open) return;
   const cb = ui.onClose;
-  const result = ui.result || { solved: false, wrong: ui.wrongCount };
+  const result = ui.result || { solved: false, wrong: ui.wrongCount, characters: ui.chars || [] };
   closePuzzle();
   if (cb) cb(result);
 }
@@ -354,7 +356,7 @@ function check() {
 
   if (res.correct) {
     ui.locked = true;
-    ui.result = { solved: true, wrong: ui.wrongCount };
+    ui.result = { solved: true, wrong: ui.wrongCount, characters: ui.chars || [] };
     chips.forEach((c) => c.classList.add('ok'));
     root.classList.add('solved');
     setMsg(ui.wrongCount === 0 ? '🎉 정답이에요! 한 번에 맞췄어요! 🔊' : '🎉 정답이에요! 🔊');
@@ -377,7 +379,7 @@ function check() {
 
   if (ui.wrongCount >= PUZZLE_MAX_WRONG) {
     ui.locked = true;
-    ui.result = { solved: false, wrong: ui.wrongCount };
+    ui.result = { solved: false, wrong: ui.wrongCount, characters: ui.chars || [] };
     // 정답 순서로 다시 배열해 보여주고, 소리도 들려줌
     chips.slice().sort((a, b) => Number(a.dataset.idx) - Number(b.dataset.idx)).forEach((c) => {
       c.classList.remove('bad');

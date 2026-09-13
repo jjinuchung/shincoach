@@ -19,6 +19,7 @@
   <section id="view-library" class="view">
     <header class="topbar">
       <h1 class="topbar-title">🎬 신코치 영어</h1>
+      <button id="btn-pokedex" class="btn btn-icon" aria-label="내 포켓몬">🎒</button>
       <button id="btn-stats" class="btn btn-icon" aria-label="학습 기록">📊</button>
       <button id="btn-import" class="btn btn-primary">＋ 영상 가져오기</button>
     </header>
@@ -76,6 +77,7 @@
       <button id="btn-back" class="btn btn-icon" aria-label="목록으로">←</button>
       <h1 id="player-title" class="topbar-title"></h1>
       <span id="goal-chip" class="goal-chip" hidden></span>
+      <button id="level-chip" class="level-chip" aria-label="내 포켓몬" hidden>Lv.1</button>
       <button id="btn-settings" class="btn btn-icon" aria-label="설정">⚙</button>
     </header>
 
@@ -141,6 +143,36 @@
     </header>
     <main id="stats-main" class="stats-main"></main>
   </section>
+
+  <!-- ===== 🎒 내 포켓몬 (도감) ===== -->
+  <section id="view-pokedex" class="view" hidden>
+    <header class="topbar">
+      <button id="btn-pokedex-back" class="btn btn-icon" aria-label="목록으로">←</button>
+      <h1 class="topbar-title">🎒 내 포켓몬</h1>
+      <span id="pokedex-level" class="level-chip"></span>
+    </header>
+    <main id="pokedex-main" class="stats-main"></main>
+  </section>
+
+  <!-- ===== 🎯 포켓몬 잡기 (퍼즐 정답 뒤: 경험치 + 몬스터볼 던지기) ===== -->
+  <div id="catch" class="catch" hidden>
+    <div class="catch-card">
+      <div id="catch-xp" class="catch-xp"></div>
+      <div class="catch-xpbar"><div id="catch-xpbar-fill" class="catch-xpbar-fill"></div></div>
+      <div id="catch-levelup" class="catch-levelup" hidden></div>
+      <div id="catch-msg" class="catch-msg"></div>
+      <div id="catch-pick" class="catch-pick"></div>
+      <div id="catch-stage" class="catch-stage" hidden>
+        <img id="catch-mon" class="catch-mon" alt="" draggable="false">
+        <div id="catch-ball" class="catch-ball"></div>
+        <div id="catch-fx" class="catch-fx"></div>
+      </div>
+      <div id="catch-result" class="catch-result"></div>
+      <div class="catch-actions">
+        <button type="button" id="catch-continue" class="btn btn-primary" hidden>계속하기 ▶</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== 🧩 문장 퍼즐 (N문장마다 배운 문장의 단어 순서 맞추기) ===== -->
   <div id="puzzle" class="puzzle" hidden>
@@ -238,6 +270,9 @@
           <span id="char-status" class="char-status">확인 중…</span>
           <button type="button" id="char-download" class="btn btn-primary">받기</button>
         </div>
+      </div>
+      <div class="field-actions">
+        <button type="button" id="set-catch-try" class="btn">🎯 잡기 연습 <small>— 몬스터볼 던지기 연출 보기 (기록 안 함)</small></button>
       </div>
 
       <label class="field field-row">
