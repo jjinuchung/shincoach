@@ -6,7 +6,7 @@ export const PUZZLE_MIN_WORDS = 3; // 2단어는 너무 쉬움
 export const PUZZLE_MAX_WORDS = 8; // 9단어 이상은 태블릿 화면에 안 맞음
 export const PUZZLE_MAX_WRONG = 3; // 3번 틀리면 정답 공개
 
-const hasLetter = (s) => /[A-Za-z0-9À-ɏ]/.test(s);
+const hasLetter = (s) => /[A-Za-z0-9À-ɏ]/.test(s); // 영문·숫자·라틴 확장(é 등)
 
 /** 문장 → 단어 조각. 구두점·대문자는 단어에 붙은 채 둠(힌트 역할). 구두점만 있는 조각은 앞 단어에 붙이고, 맨 앞이면 버림 */
 export function splitWords(en) {
@@ -80,6 +80,7 @@ const ui = {
   onPlay: null,   // 🔊 다시 듣기 → 플레이어가 그 문장을 재생
   onClose: null,  // 끝났을 때 { solved, wrong } 전달
   drag: null,     // 드래그 중 정보
+  slots: {},      // 단어 모음의 자리 (원래 자리 인덱스 → 요소). 단어가 빠져나가도 자리는 그대로 남음
 };
 
 export function initPuzzle() {
@@ -111,14 +112,34 @@ export function openPuzzle(cue, { onPlay, onClose } = {}) {
   const ans = $('puzzle-answer');
   bank.innerHTML = '';
   ans.innerHTML = '';
-  for (const i of scrambleOrder(ui.answer)) bank.appendChild(makeChip(ui.answer[i], i));
   setMsg('단어를 순서대로 놓아봐요!');
   $('puzzle-check').hidden = false;
   $('puzzle-continue').hidden = true;
   const root = $('puzzle');
   root.classList.remove('solved', 'shake');
-  root.hidden = false;
+  root.hidden = false; // 크기를 재야 하므로 먼저 보이게
+  // 단어마다 고정된 "자리"를 만들고 그 안에 조각을 넣음 → 조각을 꺼내 가도 나머지 단어가 밀려오지 않음 (아이가 누르려던 단어가 움직이면 헷갈림)
+  ui.slots = {};
+  const slots = [];
+  for (const i of scrambleOrder(ui.answer)) {
+    const slot = document.createElement('span');
+    slot.className = 'puzzle-slot';
+    slot.appendChild(makeChip(ui.answer[i], i));
+    bank.appendChild(slot);
+    ui.slots[i] = slot;
+    slots.push(slot);
+  }
+  for (const slot of slots) { // 조각 크기로 자리 크기 고정 (빈 자리도 같은 크기)
+    const chip = slot.firstChild;
+    if (chip.offsetWidth) { slot.style.width = `${chip.offsetWidth}px`; slot.style.height = `${chip.offsetHeight}px`; }
+  }
   afterChange();
+}
+
+/** 조각을 단어 모음의 원래 자기 자리로 */
+function returnToBank(chip) {
+  const slot = ui.slots[chip.dataset.idx];
+  if (slot && chip.parentNode !== slot) slot.appendChild(chip);
 }
 
 /** 결과 전달 없이 닫기 (플레이어를 닫을 때 등) */
@@ -166,7 +187,7 @@ function afterChange() {
   const ans = $('puzzle-answer');
   const bank = $('puzzle-bank');
   ans.classList.toggle('empty', ans.children.length === 0);
-  $('puzzle-check').disabled = ui.locked || bank.children.length > 0;
+  $('puzzle-check').disabled = ui.locked || bank.querySelectorAll('.puzzle-chip').length > 0;
 }
 
 // ── 드래그 / 탭 ──
@@ -235,14 +256,14 @@ function endDrag(d) {
   d.chip.classList.remove('ghost');
 }
 
-/** 탭: 단어 모음에 있으면 정답 칸 끝에, 정답 칸에 있으면 단어 모음으로 */
+/** 탭: 단어 모음에 있으면 정답 칸 끝에, 정답 칸에 있으면 단어 모음의 원래 자리로 */
 function tapChip(chip) {
   if (ui.locked) return;
   chip.classList.remove('bad');
   const ans = $('puzzle-answer');
   const bank = $('puzzle-bank');
-  if (chip.parentNode === bank) ans.appendChild(chip);
-  else bank.appendChild(chip);
+  if (bank.contains(chip)) ans.appendChild(chip);
+  else returnToBank(chip);
 }
 
 /** 손가락 위치에 따라 조각을 정답 칸의 알맞은 자리(또는 단어 모음)로 옮김 — 드래그 중 실시간 */
@@ -254,7 +275,7 @@ function placeAt(d) {
   // 정답 칸과 단어 모음 사이 중간선 기준: 위쪽이면 정답 칸, 아래쪽이면 단어 모음 (어디에 떨어뜨려도 둘 중 하나)
   const mid = (ar.bottom + br.top) / 2;
   if (d.y >= mid) {
-    if (d.chip.parentNode !== bank) bank.appendChild(d.chip);
+    returnToBank(d.chip); // 단어 모음 쪽이면 원래 자리로
     return;
   }
   // 정답 칸: 손가락보다 "뒤"에 있는 첫 조각(아랫줄이거나, 같은 줄에서 오른쪽) 앞에 끼움

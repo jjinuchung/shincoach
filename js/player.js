@@ -40,7 +40,7 @@ const state = {
   speakPassed: false, // 말하기 확인: 현재 문장 통과 여부
   speakFails: 0,      // 말하기 확인: 현재 문장 실패 횟수 (3번이면 통과시킴)
   speakRun: null,     // 진행 중인 말하기 확인 { promise, stop }
-  speakHideEn: false, // 따라 말하기 대기 중 영어 숨김 (보고 읽지 않고 들은 대로 말하게)
+  speakHideEn: 'none', // 따라 말하기 대기 중 영어 숨김 단계: 'full'(전부) | 'partial'(절반 힌트) | 'none' — 못 할수록 더 보여줌
   speakUnavailable: false, // 마이크 못 쓰면 확인 없이 진행
   micPrepared: false,
   puzzlePool: [],     // 🧩 마지막 퍼즐 이후 "한" 문장들 (중복 없이) → N개 차면 그중 하나로 퍼즐
@@ -137,6 +137,22 @@ function startPuzzle(continueFn) {
   state.puzzlePool = [];
   const cue = pickPuzzle(pool);
   if (!cue) { continueFn(); return; }
+  showPuzzle(cue, (result) => {
+    track.puzzle(cue, result);
+    continueFn();
+  });
+}
+
+/** ⚙ "지금 퍼즐 해보기": 현재 문장(안 되면 바로 앞 문장들 중)으로 바로 퍼즐. 기록하지 않고 모아둔 문장도 그대로 둠 */
+function startPuzzleNow() {
+  if (!state.open || state.idx < 0) return;
+  const cue = pickPuzzle([state.cues[state.idx]]) || pickPuzzle(state.cues.slice(Math.max(0, state.idx - 10), state.idx));
+  if (!cue) { showPlayerMessage('🧩 이 근처에는 퍼즐로 낼 문장(3~8단어)이 없어요', 4000); return; }
+  showPuzzle(cue, () => {});
+}
+
+/** 퍼즐 화면 열기 (재생 멈춤·따라 말하기 취소). 끝나면 onDone(result) */
+function showPuzzle(cue, onDone) {
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
@@ -148,8 +164,7 @@ function startPuzzle(continueFn) {
       state.puzzleCue = null;
       state.puzzlePlaying = false;
       if (!video.paused) video.pause();
-      track.puzzle(cue, result);
-      continueFn();
+      onDone(result);
     },
   });
 }
@@ -653,11 +668,15 @@ function cancelShadowWait() {
   setSpeakHide(false);
 }
 
-/** 따라 말하기 대기 중 영어 숨김 켜기/끄기 (설정이 꺼져 있으면 항상 보임) */
+/**
+ * 따라 말하기 대기 중 영어 숨김 켜기/끄기 (설정이 꺼져 있으면 항상 보임).
+ * 켤 때의 단계는 이 문장에서 못 한 횟수로: 처음엔 전부 숨김 → 1번 못 하면 절반 힌트 → 2번 못 하면 전부 보여줌
+ */
 function setSpeakHide(on) {
-  on = on && settings.hideEnWhileSpeaking;
-  if (state.speakHideEn === on) return;
-  state.speakHideEn = on;
+  let level = 'none';
+  if (on && settings.hideEnWhileSpeaking) level = state.speakFails === 0 ? 'full' : state.speakFails === 1 ? 'partial' : 'none';
+  if (state.speakHideEn === level) return;
+  state.speakHideEn = level;
   applySubVisibility();
 }
 
@@ -678,7 +697,11 @@ function startSpeakWait(cue) {
   overlay.hidden = false;
   overlay.classList.add('speaking');
   msg.textContent = '🎤 따라 말해보세요!';
-  sub.textContent = state.speakFails > 0 ? `다시 한번! (${state.speakFails + 1}/3)` : '';
+  // 못 한 횟수에 따라 힌트 단계 안내 (영어 숨김 설정이 켜져 있을 때: 절반 힌트 → 전부 보임)
+  if (state.speakFails === 0) sub.textContent = '';
+  else if (settings.hideEnWhileSpeaking && state.speakFails === 1) sub.textContent = `다시 한번! 빈칸은 기억해서 말해봐요 (${state.speakFails + 1}/3)`;
+  else if (settings.hideEnWhileSpeaking && state.speakFails === 2) sub.textContent = `다시 한번! 이번엔 영어를 보면서 (${state.speakFails + 1}/3)`;
+  else sub.textContent = `다시 한번! (${state.speakFails + 1}/3)`;
   fill.style.width = '0%';
 
   const run = runSpeakCheck({
@@ -808,7 +831,10 @@ function toggleSub(which) {
 function applySubVisibility() {
   const enOn = state.showEn && state.enRevealed;
   $('sub-en').hidden = !enOn;
-  $('sub-en').classList.toggle('speak-hide', state.speakHideEn); // 자리는 남기고 글자만 가림 (레이아웃 안 튀게)
+  const hide = state.speakHideEn;
+  $('sub-en').classList.toggle('speak-hide', hide === 'full'); // 자리는 남기고 글자만 가림 (레이아웃 안 튀게)
+  $('sub-en').classList.toggle('speak-hide-partial', hide === 'partial');
+  state.wordSpans.forEach((span, i) => span.classList.toggle('masked', hide === 'partial' && i % 2 === 1)); // 절반 힌트: 홀수 번째 단어만 가림
   $('sub-ko').hidden = !state.showKo;
   const enBtn = $('btn-toggle-en');
   enBtn.classList.toggle('is-on', state.showEn && state.enRevealed);
@@ -820,7 +846,7 @@ function applySubVisibility() {
   list.classList.toggle('hide-en', !state.showEn);
   list.classList.toggle('hide-ko', !state.showKo);
   list.classList.toggle('listen-first', settings.listenFirst > 0);
-  list.classList.toggle('speak-hide', state.speakHideEn); // 목록의 현재 문장 영어도 가림
+  list.classList.toggle('speak-hide', hide !== 'none'); // 목록의 현재 문장 영어도 가림 (절반 힌트 때도 목록은 통째로)
   renderVocab();
 }
 
@@ -985,6 +1011,7 @@ function initSettingsDialog() {
   $('set-speak').checked = settings.speakCheck;
   $('set-hide-en').checked = settings.hideEnWhileSpeaking;
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
+  $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
     const mergeChanged = settings.mergeSentences !== $('set-merge').checked;
@@ -997,7 +1024,7 @@ function initSettingsDialog() {
     if (settings.puzzleEvery === 0) state.puzzlePool = [];
     settings.speakCheck = $('set-speak').checked;
     settings.hideEnWhileSpeaking = $('set-hide-en').checked;
-    if (!settings.hideEnWhileSpeaking) state.speakHideEn = false; // 끄면 대기 중이던 숨김도 해제
+    if (!settings.hideEnWhileSpeaking) state.speakHideEn = 'none'; // 끄면 대기 중이던 숨김도 해제
     if (settings.listenFirst === 0) state.enRevealed = true;
     applySubVisibility();
     updateChips();

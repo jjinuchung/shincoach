@@ -10,7 +10,7 @@ function makeEl() {
   return {
     hidden: false, textContent: '', innerHTML: '', className: '', dataset: {}, value: '', checked: false,
     style: {}, firstChild: { textContent: '' }, scrollTop: 0, clientHeight: 100, offsetTop: 0, offsetHeight: 20,
-    classList: { add() {}, remove() {}, toggle() {} },
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, toggle(c, f) { const on = f === undefined ? !this._s.has(c) : !!f; if (on) this._s.add(c); else this._s.delete(c); return on; }, contains(c) { return this._s.has(c); } },
     addEventListener(t, fn) { (listeners[t] ||= []).push(fn); },
     removeEventListener() {},
     appendChild() {}, querySelector() { return null; }, querySelectorAll() { return []; },
@@ -39,7 +39,7 @@ function loadPlayer() {
     performance: { now: () => Date.now() },
     localStorage: { getItem: () => null, setItem() {} },
     navigator: {},
-    document: { getElementById: $, addEventListener() {}, hidden: false },
+    document: { getElementById: $, addEventListener() {}, hidden: false, createElement: () => makeEl(), createTextNode: () => ({}) },
     window: { scrollTo() {} },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
     alert() {},
@@ -435,4 +435,45 @@ test('퍼즐: 열려 있는 동안 다시 듣기 구간이 끝나면 멈추고, 
   assert.equal(run('state.idx'), 3, '퍼즐 중에는 시간 동기화 안 함');
   puzzleCalls[0].opts.onClose({ solved: true, wrong: 1 });
   assert.equal(run('state.idx'), 4);
+});
+
+test('퍼즐: ⚙ "지금 퍼즐 해보기"는 현재 문장으로 바로 열고, 기록·모아둔 문장은 건드리지 않음', () => {
+  const { run, puzzleCalls, ctx } = loadPlayer();
+  let recorded = 0;
+  ctx.track.puzzle = () => { recorded++; };
+  run(FIVE_CUES + ' settings.puzzleEvery = 10; state.idx = 2; state.puzzlePool = [state.cues[0]];');
+  run('startPuzzleNow()');
+  assert.equal(puzzleCalls.length, 1);
+  assert.equal(puzzleCalls[0].cue.en, 'g h i', '현재 문장');
+  assert.equal(run('state.puzzlePool.length'), 1, '모아둔 문장 유지');
+  puzzleCalls[0].opts.onClose({ solved: true, wrong: 0 });
+  assert.equal(recorded, 0, '테스트 퍼즐은 기록 안 함');
+  assert.equal(run('state.idx'), 2, '문장 이동 없음');
+  assert.equal(run('state.puzzleCue'), null);
+});
+
+test('영어 숨김 단계: 처음 전부 숨김 → 1번 못 하면 절반(홀수 번째 단어) → 2번 못 하면 전부 보임', () => {
+  const { run, els, ctx } = loadPlayerWithSpeak([]);
+  ctx.wordTimings = () => [{ word: 'I', start: 0 }, { word: 'am', start: 0.5 }, { word: 'a', start: 1 }, { word: 'toy.', start: 1.5 }];
+  run('settings.hideEnWhileSpeaking = true; state.cues = [{start:0,end:2,en:"I am a toy.",ko:""}]; state.idx = -1; goTo(0)');
+  const masked = () => run('state.wordSpans.map((s) => s.classList.contains("masked") ? 1 : 0).join("")');
+  run('startShadowWait(state.cues[0])');
+  assert.equal(run('state.speakHideEn'), 'full');
+  assert.equal(els['sub-en'].classList.contains('speak-hide'), true);
+  assert.equal(els['script-list'].classList.contains('speak-hide'), true, '목록도 가림');
+  run('cancelShadowWait(); state.speakFails = 1; startShadowWait(state.cues[0])');
+  assert.equal(run('state.speakHideEn'), 'partial');
+  assert.equal(els['sub-en'].classList.contains('speak-hide'), false);
+  assert.equal(els['sub-en'].classList.contains('speak-hide-partial'), true);
+  assert.equal(masked(), '0101', '홀수 번째 단어만 빈칸');
+  assert.equal(els['script-list'].classList.contains('speak-hide'), true, '절반 힌트 때도 목록은 가림');
+  run('cancelShadowWait(); state.speakFails = 2; startShadowWait(state.cues[0])');
+  assert.equal(run('state.speakHideEn'), 'none');
+  assert.equal(masked(), '0000');
+  assert.equal(els['script-list'].classList.contains('speak-hide'), false);
+  run('cancelShadowWait()');
+  // 설정이 꺼져 있으면 처음부터 보임
+  run('settings.hideEnWhileSpeaking = false; state.speakFails = 0; startShadowWait(state.cues[0])');
+  assert.equal(run('state.speakHideEn'), 'none');
+  run('cancelShadowWait()');
 });

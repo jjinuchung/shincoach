@@ -185,6 +185,9 @@ button { font-family: inherit; }
 .field input[type="file"] { font-size: 0.9rem; }
 .field select { font-size: 1rem; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; background: #fff; }
 .field-row { flex-direction: row; align-items: center; gap: 10px; }
+.field-actions { margin-top: -6px; }
+.field-actions .btn { font-size: 0.95rem; text-align: left; }
+.field-actions .btn small { color: var(--muted); font-weight: 400; }
 .field-row input[type="checkbox"] { width: 22px; height: 22px; }
 .imp-status { margin: 0; min-height: 1.2em; font-size: 0.9rem; color: var(--primary); }
 .dialog-pin { width: min(88vw, 320px); }
@@ -317,6 +320,8 @@ button { font-family: inherit; }
 /* 따라 말하기 대기 중: 영어는 자리만 남기고 가림 (아이가 보고 읽지 않게) */
 .sub-en.speak-hide { visibility: hidden; }
 .script-list.speak-hide .script-item.active .en { visibility: hidden; }
+/* 한 번 못 했을 때: 절반 힌트 — 가린 단어는 빈칸 상자로 ("I ▢ a ▢ toy.") */
+.sub-en.speak-hide-partial .w.masked { color: transparent; background: #e0e7ff; border-radius: 6px; }
 .sub-en .w { transition: color 0.1s, background 0.1s; border-radius: 4px; padding: 0 2px; }
 .sub-en .w.on { color: #fff; background: var(--accent); }
 .sub-en .w.done { color: var(--primary); }
@@ -448,6 +453,10 @@ button { font-family: inherit; }
   pointer-events: none;
 }
 .puzzle-bank { background: #f5f7ff; border: 3px solid transparent; margin-top: 12px; }
+/* 단어 모음의 자리: 조각이 정답 칸으로 가도 자리는 남아서 다른 단어가 밀려오지 않음 */
+.puzzle-slot { margin: 5px; min-height: 48px; min-width: 48px; border-radius: 12px; flex-shrink: 0; }
+.puzzle-slot:empty { border: 2px dashed #c7d2fe; background: #eef2ff; }
+.puzzle-slot > .puzzle-chip { margin: 0; }
 .puzzle-chip {
   border: 2px solid #c7d2fe;
   background: #fff;
