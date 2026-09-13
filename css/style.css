@@ -533,6 +533,18 @@ button { font-family: inherit; }
   box-shadow: 0 2px 6px rgba(31, 35, 64, 0.12);
 }
 .puzzle-chip.ghost { opacity: 0.3; }
+/* 정답 칸에서 단어를 빼면 남는 빈 자리 — 다음에 누른 단어가 여기로 들어감 */
+.puzzle-gap {
+  display: inline-block;
+  width: 52px;
+  min-height: 48px;
+  margin: 5px;
+  border: 2px dashed #818cf8;
+  border-radius: 12px;
+  background: #fff;
+  animation: puzzle-gap-blink 1.2s ease-in-out infinite;
+}
+@keyframes puzzle-gap-blink { 0%, 100% { border-color: #818cf8; } 50% { border-color: #c7d2fe; } }
 .puzzle-chip.bad { border-color: var(--danger); background: #fef2f2; color: #991b1b; }
 .puzzle-chip.ok { border-color: var(--ok); background: #ecfdf5; color: #047857; }
 .puzzle-drag {

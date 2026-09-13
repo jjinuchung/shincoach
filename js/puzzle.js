@@ -182,10 +182,36 @@ function onSlotClick(e) {
   afterChange();
 }
 
-/** 조각을 단어 모음의 원래 자기 자리로 */
-function returnToBank(chip) {
+/** 조각을 단어 모음의 원래 자기 자리로. 정답 칸에서 빼는 거면 그 자리에 빈 자리(점선)를 남겨 다음 단어가 거기로 들어가게 */
+function returnToBank(chip, leaveGap = true) {
   const slot = ui.slots[chip.dataset.idx];
-  if (slot && chip.parentNode !== slot) slot.appendChild(chip);
+  if (!slot || chip.parentNode === slot) return;
+  const ans = $('puzzle-answer');
+  if (leaveGap && chip.parentNode === ans) ans.insertBefore(makeGap(), chip);
+  slot.appendChild(chip);
+}
+
+function makeGap() {
+  const g = document.createElement('span');
+  g.className = 'puzzle-gap';
+  g.setAttribute('aria-label', '빈 자리');
+  return g;
+}
+
+/** 정답 칸에 조각 넣기: 빈 자리가 있으면 첫 빈 자리에, 없으면 맨 뒤에 */
+function putInAnswer(chip) {
+  const ans = $('puzzle-answer');
+  const gap = ans.querySelector('.puzzle-gap');
+  if (gap) ans.replaceChild(chip, gap);
+  else ans.appendChild(chip);
+}
+
+/** 단어를 다 놓았으면 남은 빈 자리는 지움 (빈 자리는 "여기에 넣을 차례" 표시일 뿐) */
+function clearGapsIfDone() {
+  const ans = $('puzzle-answer');
+  if ($('puzzle-bank').querySelectorAll('.puzzle-chip').length === 0) {
+    for (const g of Array.from(ans.querySelectorAll('.puzzle-gap'))) g.remove();
+  }
 }
 
 /** 결과 전달 없이 닫기 (플레이어를 닫을 때 등) */
@@ -232,6 +258,7 @@ function makeChip(word, idx) {
   el.addEventListener('pointermove', onMove);
   el.addEventListener('pointerup', onUp);
   el.addEventListener('pointercancel', onCancel);
+  el.addEventListener('lostpointercapture', onCancel); // 캡처를 잃으면(시스템 제스처 등) 드래그 정리
   return el;
 }
 
@@ -239,6 +266,7 @@ function makeChip(word, idx) {
 function afterChange() {
   const ans = $('puzzle-answer');
   const bank = $('puzzle-bank');
+  clearGapsIfDone();
   ans.classList.toggle('empty', ans.children.length === 0);
   $('puzzle-check').disabled = ui.locked || bank.querySelectorAll('.puzzle-chip').length > 0;
   // 단어를 건네준 캐릭터는 흐리게
@@ -257,6 +285,7 @@ function onDown(e) {
   ui.drag = {
     chip, id: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY,
     offX: e.clientX - r.left, offY: e.clientY - r.top, w: r.width, h: r.height, moved: false, clone: null, raf: 0,
+    fromAnswer: chip.parentNode === $('puzzle-answer'), fromNext: chip.nextSibling, // 끌기 시작한 자리 (빈 자리 남기기용)
   };
   try { chip.setPointerCapture(e.pointerId); } catch { /* 지원 안 하는 브라우저 */ }
   e.preventDefault();
@@ -281,7 +310,7 @@ function onUp(e) {
   if (!d || e.pointerId !== d.id) return;
   ui.drag = null;
   if (d.raf) cancelAnimationFrame(d.raf);
-  if (d.moved) { placeAt(d); endDrag(d); } else tapChip(d.chip);
+  if (d.moved) { placeAt(d); settleDrop(d); endDrag(d); } else tapChip(d.chip);
   afterChange();
 }
 
@@ -311,14 +340,13 @@ function endDrag(d) {
   d.chip.classList.remove('ghost');
 }
 
-/** 탭: 단어 모음에 있으면 정답 칸 끝에, 정답 칸에 있으면 단어 모음의 원래 자리로 */
+/** 탭: 단어 모음에 있으면 정답 칸(빈 자리가 있으면 거기, 없으면 끝)에, 정답 칸에 있으면 단어 모음으로(빈 자리 남김) */
 function tapChip(chip) {
   if (ui.locked) return;
   chip.classList.remove('bad');
-  const ans = $('puzzle-answer');
   const bank = $('puzzle-bank');
-  if (bank.contains(chip)) ans.appendChild(chip);
-  else returnToBank(chip);
+  if (bank.contains(chip)) putInAnswer(chip);
+  else returnToBank(chip, true);
 }
 
 /** 손가락 위치에 따라 조각을 정답 칸의 알맞은 자리(또는 단어 모음)로 옮김 — 드래그 중 실시간 */
@@ -330,10 +358,10 @@ function placeAt(d) {
   // 정답 칸과 단어 모음 사이 중간선 기준: 위쪽이면 정답 칸, 아래쪽이면 단어 모음 (어디에 떨어뜨려도 둘 중 하나)
   const mid = (ar.bottom + br.top) / 2;
   if (d.y >= mid) {
-    returnToBank(d.chip); // 단어 모음 쪽이면 원래 자리로
+    returnToBank(d.chip, false); // 단어 모음 쪽이면 원래 자리로 (빈 자리는 드래그가 끝날 때 정리)
     return;
   }
-  // 정답 칸: 손가락보다 "뒤"에 있는 첫 조각(아랫줄이거나, 같은 줄에서 오른쪽) 앞에 끼움
+  // 정답 칸: 손가락보다 "뒤"에 있는 첫 조각/빈 자리(아랫줄이거나, 같은 줄에서 오른쪽) 앞에 끼움
   let ref = null;
   for (const c of Array.from(ans.children)) {
     if (c === d.chip) continue;
@@ -344,12 +372,28 @@ function placeAt(d) {
   ans.insertBefore(d.chip, ref);
 }
 
+/** 드래그 끝: 빈 자리에 떨어뜨렸으면 그 빈 자리를 채우고, 정답 칸에서 끌어내 단어 모음에 놓았으면 원래 자리에 빈 자리를 남김 */
+function settleDrop(d) {
+  const ans = $('puzzle-answer');
+  const chip = d.chip;
+  if (chip.parentNode === ans) {
+    // 바로 옆 빈 자리는 "그 자리에 넣은 것"으로 침
+    const near = (chip.nextSibling && chip.nextSibling.classList && chip.nextSibling.classList.contains('puzzle-gap')) ? chip.nextSibling
+      : (chip.previousSibling && chip.previousSibling.classList && chip.previousSibling.classList.contains('puzzle-gap')) ? chip.previousSibling : null;
+    if (near) near.remove();
+  } else if (d.fromAnswer) {
+    const next = d.fromNext && d.fromNext.parentNode === ans ? d.fromNext : null;
+    ans.insertBefore(makeGap(), next);
+  }
+}
+
 // ── 판정 ──
 
 function check() {
   if (ui.locked || !ui.open) return;
   const ans = $('puzzle-answer');
-  const chips = Array.from(ans.children);
+  for (const g of Array.from(ans.querySelectorAll('.puzzle-gap'))) g.remove();
+  const chips = Array.from(ans.querySelectorAll('.puzzle-chip'));
   const placed = chips.map((c) => c.textContent);
   const res = checkOrder(placed, ui.answer);
   const root = $('puzzle');
@@ -393,5 +437,5 @@ function check() {
     if (ui.onPlay) ui.onPlay();
     return;
   }
-  setMsg(`🤔 조금 달라요. 빨간 단어를 옮겨봐요! (${ui.wrongCount}/${PUZZLE_MAX_WRONG})`);
+  setMsg(`🤔 조금 달라요. 빨간 단어를 빼서 바꾸거나 끌어서 옮겨봐요! (${ui.wrongCount}/${PUZZLE_MAX_WRONG})`);
 }
