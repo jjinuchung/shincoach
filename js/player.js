@@ -8,6 +8,7 @@ import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
+import { loadCharacters, downloadCharacters, ROSTER } from './pokemon.js';
 import * as track from './track.js';
 
 const $ = (id) => document.getElementById(id);
@@ -47,6 +48,7 @@ const state = {
   puzzleCue: null,    // 퍼즐이 열려 있는 동안 그 문장 (열려 있으면 재생 루프/키보드가 플레이어 상태를 건드리지 않음)
   puzzlePlaying: false, // 퍼즐의 🔊 다시 듣기로 그 문장을 재생 중 (끝나면 멈춤)
   puzzleOnEnd: null,  // 퍼즐 다시 듣기가 끝났을 때 알릴 콜백 (정답 뒤 들려주기 → 닫기)
+  characters: [],     // 🎮 기기에 받아둔 퍼즐 캐릭터 [{ id, ko, url }] (없으면 단어 조각만)
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -114,6 +116,7 @@ export function initPlayer(ctx) {
   initVocabPanel();
   initDiag();
   initPuzzle();
+  initCharacters();
   // 학습 시간: 재생 중이거나 따라 말하는 중·퍼즐 푸는 중이면 1초씩 누적
   setInterval(() => {
     if (!state.open) return;
@@ -160,6 +163,7 @@ function showPuzzle(cue, onDone) {
   state.puzzleCue = cue;
   state.puzzlePlaying = false;
   openPuzzle(cue, {
+    characters: state.characters,
     onPlay: (onEnd) => playPuzzleSentence(cue, onEnd),
     onClose: (result) => {
       state.puzzleCue = null;
@@ -169,6 +173,36 @@ function showPuzzle(cue, onDone) {
       onDone(result);
     },
   });
+}
+
+// ───────────────────── 🎮 퍼즐 캐릭터 (⚙에서 한 번 받아 기기에 보관) ─────────────────────
+
+function initCharacters() {
+  loadCharacters().then((chars) => { state.characters = chars; updateCharStatus(); }).catch(() => {});
+  $('char-download').addEventListener('click', onDownloadCharacters);
+}
+
+function updateCharStatus(text) {
+  const el = $('char-status');
+  if (text) { el.textContent = text; return; }
+  const n = state.characters.length;
+  el.textContent = n >= ROSTER.length ? `✅ ${n}마리 준비됨` : n > 0 ? `${n}/${ROSTER.length}마리 (나머지는 받기)` : `아직 없음 (0/${ROSTER.length})`;
+  $('char-download').hidden = n >= ROSTER.length;
+}
+
+async function onDownloadCharacters() {
+  const btn = $('char-download');
+  btn.disabled = true;
+  try {
+    const r = await downloadCharacters((done, total, name) => updateCharStatus(`받는 중… ${done}/${total} ${name}`));
+    state.characters = await loadCharacters();
+    updateCharStatus();
+    if (r.fail) updateCharStatus(`${r.ok}마리 받음, ${r.fail}마리 실패 — 인터넷 연결을 확인하고 다시 눌러 주세요`);
+  } catch (e) {
+    updateCharStatus(`받지 못했어요 (${e.message || e}) — 인터넷 연결을 확인해 주세요`);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /** 퍼즐의 🔊 다시 듣기: 그 문장 구간만 재생 (끝은 onTick에서 판정해 멈춤). onEnd는 끝났을 때 한 번 호출 */

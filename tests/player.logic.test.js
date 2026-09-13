@@ -56,6 +56,8 @@ function loadPlayer() {
     initPuzzle() {}, closePuzzle() {},
     openPuzzle(cue, opts) { puzzleCalls.push({ cue, opts }); },
     pickPuzzle: (cues) => (cues.length ? cues[0] : null),
+    // pokemon.js 스텁
+    loadCharacters: async () => [], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [],
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);

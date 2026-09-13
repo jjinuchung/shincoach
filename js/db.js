@@ -2,7 +2,7 @@
 // items 스토어: 메타데이터(제목, 자막, 진행) / blobs 스토어: 영상 Blob (목록 조회 시 무거운 Blob을 안 읽기 위해 분리)
 
 const DB_NAME = 'shincoach';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // 학습 기록 스토어 (v2에서 추가)
 //  sentenceStats: 문장별 누적 { key: "<itemId>|<start×10>", itemId, start, en, ko, plays, listens, done, seconds,
@@ -10,6 +10,7 @@ const DB_VERSION = 2;
 //  sessions:      앱을 열고 닫은 단위 { id, itemId, title, startedAt, endedAt, seconds, sentences, firstIdx, lastIdx, speakAttempts, speakPass, puzzles, puzzleSolved }
 //  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved }
 //  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
+// characters (v3): 🎮 퍼즐 캐릭터 그림 { id, ko, en, blob, savedAt } — 인터넷에서 받아 기기에만 보관 (백업에 포함 안 함)
 const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews'];
 
 let dbPromise = null;
@@ -40,6 +41,9 @@ function openDb() {
       }
       if (!db.objectStoreNames.contains('vocabViews')) {
         db.createObjectStore('vocabViews', { keyPath: 'word' });
+      }
+      if (!db.objectStoreNames.contains('characters')) {
+        db.createObjectStore('characters', { keyPath: 'id' });
       }
     };
     // 다른 탭/옛 버전 앱이 DB를 잡고 있으면 업그레이드가 대기 상태에 빠짐 → 사용자에게 안내
@@ -250,6 +254,28 @@ export async function listVocabViews() {
   const db = await openDb();
   const tx = db.transaction('vocabViews', 'readonly');
   return promisify(tx.objectStore('vocabViews').getAll());
+}
+
+// ───────────────────── 🎮 캐릭터 그림 ─────────────────────
+
+export async function getCharacters() {
+  const db = await openDb();
+  const tx = db.transaction('characters', 'readonly');
+  return promisify(tx.objectStore('characters').getAll());
+}
+
+export async function putCharacter(rec) {
+  const db = await openDb();
+  const tx = db.transaction('characters', 'readwrite');
+  tx.objectStore('characters').put(rec);
+  await txDone(tx);
+}
+
+export async function clearCharacters() {
+  const db = await openDb();
+  const tx = db.transaction('characters', 'readwrite');
+  tx.objectStore('characters').clear();
+  await txDone(tx);
 }
 
 /** 기록 전체 내보내기 (영상 제외) */

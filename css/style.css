@@ -185,6 +185,9 @@ button { font-family: inherit; }
 .field input[type="file"] { font-size: 0.9rem; }
 .field select { font-size: 1rem; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; background: #fff; }
 .field-row { flex-direction: row; align-items: center; gap: 10px; }
+.char-row { display: flex; align-items: center; }
+.char-status { flex: 1; font-size: 0.9rem; color: var(--primary); font-weight: 600; }
+.char-row .btn { margin-left: 10px; }
 .field-actions { margin-top: -6px; }
 .field-actions .btn { font-size: 0.95rem; text-align: left; }
 .field-actions .btn small { color: var(--muted); font-weight: 400; }
@@ -423,7 +426,7 @@ button { font-family: inherit; }
   max-width: 640px;
   max-height: 96vh;
   overflow-y: auto;
-  padding: 18px 16px 14px;
+  padding: 18px 16px 0;
   display: flex;
   flex-direction: column;
 }
@@ -440,6 +443,7 @@ button { font-family: inherit; }
   border-radius: 14px;
   padding: 8px;
   min-height: 130px;
+  flex-shrink: 0; /* 카드가 화면보다 크면 줄어들지 말고 카드가 스크롤되게 */
 }
 .puzzle-answer { background: #eef2ff; border: 3px dashed #a5b4fc; position: relative; }
 .puzzle-answer.empty::before {
@@ -457,6 +461,60 @@ button { font-family: inherit; }
 .puzzle-slot { margin: 5px; min-height: 48px; min-width: 48px; border-radius: 12px; flex-shrink: 0; }
 .puzzle-slot:empty { border: 2px dashed #c7d2fe; background: #eef2ff; }
 .puzzle-slot > .puzzle-chip { margin: 0; }
+/* 🎮 캐릭터 카드: 말풍선(단어) + 그림 + 이름. 단어를 건네주면 말풍선이 비고 캐릭터는 흐려짐 */
+.puzzle-slot.has-char {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 92px;
+  padding: 4px 2px 2px;
+  cursor: pointer;
+  border-radius: 14px;
+}
+.puzzle-slot.has-char:active { background: #eef0f7; }
+.puzzle-bubble {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  min-height: 48px;
+  border-radius: 12px;
+}
+.puzzle-bubble:empty { border: 2px dashed #c7d2fe; background: #eef2ff; }
+.puzzle-bubble::after { /* 말풍선 꼬리 */
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-top-color: #c7d2fe;
+  border-bottom: 0;
+}
+.puzzle-bubble > .puzzle-chip { margin: 0; }
+.puzzle-char {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  margin-top: 10px;
+  user-select: none;
+  -webkit-user-drag: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.puzzle-char-name { font-size: 0.75rem; color: var(--muted); font-weight: 600; margin-top: 2px; white-space: nowrap; }
+.puzzle-slot.taken .puzzle-char { opacity: 0.4; filter: grayscale(0.5); transform: scale(0.92); }
+.puzzle-slot.taken .puzzle-char-name { opacity: 0.5; }
+.puzzle.solved .puzzle-slot.taken .puzzle-char { opacity: 1; filter: none; transform: none; animation: puzzle-bounce 0.5s ease-in-out 3; }
+@keyframes puzzle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+@media (max-width: 480px) {
+  .puzzle-slot.has-char { min-width: 84px; }
+  .puzzle-char { width: 64px; height: 64px; }
+  .puzzle-answer, .puzzle-bank { min-height: 100px; }
+}
 .puzzle-chip {
   border: 2px solid #c7d2fe;
   background: #fff;
@@ -487,7 +545,8 @@ button { font-family: inherit; }
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
   transition: none;
 }
-.puzzle-actions { display: flex; justify-content: flex-end; align-items: center; margin-top: 12px; }
+/* 카드가 길어져 스크롤돼도 확인 버튼은 항상 아래에 보이게 */
+.puzzle-actions { display: flex; justify-content: flex-end; align-items: center; margin-top: 12px; flex-shrink: 0; position: sticky; bottom: 0; background: var(--card); padding: 8px 0 14px; }
 .puzzle-actions > .btn { margin-left: 10px; font-size: 1.05rem; }
 .puzzle-actions > .btn[hidden] { display: none; }
 .puzzle-actions > .btn:disabled { opacity: 0.45; cursor: default; }

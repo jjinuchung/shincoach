@@ -1,0 +1,115 @@
+// 🎮 포켓몬 캐릭터: 문장 퍼즐에서 단어를 "들고 있는" 캐릭터
+// 그림(공식 일러스트)은 닌텐도 저작물이라 저장소에 넣지 않고, 앱이 처음 한 번 인터넷(PokeAPI 스프라이트)에서 받아
+// 기기 IndexedDB에 보관한다 (영상과 같은 취급). 이후엔 오프라인에서도 사용.
+import { getCharacters, putCharacter } from './db.js';
+
+/** 시작 명단 30마리 (인기 위주). 나중에 여기에 추가하면 "받기"가 없는 것만 받아옴 */
+export const ROSTER = [
+  { id: 25, ko: '피카츄', en: 'Pikachu' },
+  { id: 4, ko: '파이리', en: 'Charmander' },
+  { id: 6, ko: '리자몽', en: 'Charizard' },
+  { id: 7, ko: '꼬부기', en: 'Squirtle' },
+  { id: 9, ko: '거북왕', en: 'Blastoise' },
+  { id: 1, ko: '이상해씨', en: 'Bulbasaur' },
+  { id: 3, ko: '이상해꽃', en: 'Venusaur' },
+  { id: 133, ko: '이브이', en: 'Eevee' },
+  { id: 39, ko: '푸린', en: 'Jigglypuff' },
+  { id: 52, ko: '나옹', en: 'Meowth' },
+  { id: 54, ko: '고라파덕', en: 'Psyduck' },
+  { id: 58, ko: '가디', en: 'Growlithe' },
+  { id: 94, ko: '팬텀', en: 'Gengar' },
+  { id: 130, ko: '갸라도스', en: 'Gyarados' },
+  { id: 131, ko: '라프라스', en: 'Lapras' },
+  { id: 143, ko: '잠만보', en: 'Snorlax' },
+  { id: 149, ko: '망나뇽', en: 'Dragonite' },
+  { id: 150, ko: '뮤츠', en: 'Mewtwo' },
+  { id: 151, ko: '뮤', en: 'Mew' },
+  { id: 152, ko: '치코리타', en: 'Chikorita' },
+  { id: 155, ko: '브케인', en: 'Cyndaquil' },
+  { id: 158, ko: '리아코', en: 'Totodile' },
+  { id: 175, ko: '토게피', en: 'Togepi' },
+  { id: 197, ko: '블래키', en: 'Umbreon' },
+  { id: 384, ko: '레쿠쟈', en: 'Rayquaza' },
+  { id: 393, ko: '팽도리', en: 'Piplup' },
+  { id: 448, ko: '루카리오', en: 'Lucario' },
+  { id: 658, ko: '개굴닌자', en: 'Greninja' },
+  { id: 700, ko: '님피아', en: 'Sylveon' },
+  { id: 778, ko: '따라큐', en: 'Mimikyu' },
+];
+
+const ART_URL = (id) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+const STORE_SIZE = 256; // 원본 475px → 256px로 줄여 저장 (퍼즐에선 100px 이하로 보임, 용량 1/4)
+
+let cache = null; // 로드된 캐릭터 [{ id, ko, en, url }] — 객체 URL은 앱이 살아 있는 동안 유지
+
+/** 기기에 저장된 캐릭터 목록 (그림 객체 URL 포함). 없으면 [] */
+export async function loadCharacters(force = false) {
+  if (cache && !force) return cache;
+  let recs = [];
+  try { recs = await getCharacters(); } catch { recs = []; }
+  const byId = new Map(ROSTER.map((r) => [r.id, r]));
+  cache = recs
+    .filter((r) => r.blob && byId.has(r.id))
+    .map((r) => ({ id: r.id, ko: byId.get(r.id).ko, en: byId.get(r.id).en, url: URL.createObjectURL(r.blob) }));
+  return cache;
+}
+
+/** 아직 안 받은 캐릭터 수 */
+export async function missingCount() {
+  const have = new Set((await loadCharacters()).map((c) => c.id));
+  return ROSTER.filter((r) => !have.has(r.id)).length;
+}
+
+/** 큰 원본 PNG를 STORE_SIZE 정사각형 PNG로 축소 (안 되면 원본 그대로) */
+async function shrink(blob) {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = STORE_SIZE;
+    canvas.height = STORE_SIZE;
+    canvas.getContext('2d').drawImage(bmp, 0, 0, STORE_SIZE, STORE_SIZE);
+    bmp.close();
+    const out = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    return out || blob;
+  } catch {
+    return blob;
+  }
+}
+
+/**
+ * 명단 중 아직 없는 캐릭터를 인터넷에서 받아 저장. onProgress(done, total, name)
+ * 반환: { ok: 받은 수, fail: 실패 수 } — 일부 실패해도 받은 것은 남고, 다시 누르면 없는 것만 이어서 받음
+ */
+export async function downloadCharacters(onProgress) {
+  const have = new Set((await loadCharacters()).map((c) => c.id));
+  const todo = ROSTER.filter((r) => !have.has(r.id));
+  let ok = 0;
+  let fail = 0;
+  for (let i = 0; i < todo.length; i++) {
+    const r = todo[i];
+    if (onProgress) onProgress(i, todo.length, r.ko);
+    try {
+      const res = await fetch(ART_URL(r.id), { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await shrink(await res.blob());
+      await putCharacter({ id: r.id, ko: r.ko, en: r.en, blob, savedAt: Date.now() });
+      ok++;
+    } catch (e) {
+      console.warn('캐릭터 받기 실패:', r.ko, e);
+      fail++;
+    }
+  }
+  if (onProgress) onProgress(todo.length, todo.length, '');
+  await loadCharacters(true);
+  return { ok, fail };
+}
+
+/** 퍼즐 한 판에 쓸 캐릭터 n마리를 무작위로 (부족하면 있는 만큼) */
+export function pickCharacters(chars, n, rng = Math.random) {
+  const a = (chars || []).slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a.slice(0, n);
+}

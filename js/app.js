@@ -30,6 +30,7 @@ export function hideLoading() {
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol === 'file:') return;
+  if (/[?&]nosw\b/.test(location.search)) return; // 개발용: ?nosw 로 열면 캐시 없이 항상 최신 파일 (헤드리스 테스트)
   try {
     await navigator.serviceWorker.register('./sw.js');
     // 새 버전 SW가 페이지를 넘겨받으면 안내 (학습 중 자동 새로고침은 하지 않음)

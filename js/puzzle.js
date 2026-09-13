@@ -80,7 +80,7 @@ const ui = {
   onPlay: null,   // 🔊 다시 듣기 → 플레이어가 그 문장을 재생. onPlay(onEnd)의 onEnd는 재생이 끝났을 때 호출됨
   onClose: null,  // 끝났을 때 { solved, wrong } 전달
   drag: null,     // 드래그 중 정보
-  slots: {},      // 단어 모음의 자리 (원래 자리 인덱스 → 요소). 단어가 빠져나가도 자리는 그대로 남음
+  slots: {},      // 단어의 "집" (원래 자리 인덱스 → 요소): 캐릭터가 있으면 말풍선, 없으면 자리 자체. 단어가 나가도 자리는 그대로
 };
 
 export function initPuzzle() {
@@ -94,8 +94,11 @@ export function isPuzzleOpen() {
   return ui.open;
 }
 
-/** 퍼즐 열기. onClose(result)는 아이가 맞추고(문장을 한 번 더 들려준 뒤) 또는 정답 공개 후 계속하기를 눌렀을 때 호출 */
-export function openPuzzle(cue, { onPlay, onClose } = {}) {
+/**
+ * 퍼즐 열기. onClose(result)는 아이가 맞추고(문장을 한 번 더 들려준 뒤) 또는 정답 공개 후 계속하기를 눌렀을 때 호출.
+ * characters: [{ id, ko, url }] — 단어 수 이상 있으면 캐릭터가 단어를 말풍선에 들고 있는 모양으로 (없으면 단어 조각만)
+ */
+export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
   closePuzzle();
   ui.open = true;
   ui.cue = cue;
@@ -120,20 +123,60 @@ export function openPuzzle(cue, { onPlay, onClose } = {}) {
   root.classList.remove('solved', 'shake');
   root.hidden = false; // 크기를 재야 하므로 먼저 보이게
   // 단어마다 고정된 "자리"를 만들고 그 안에 조각을 넣음 → 조각을 꺼내 가도 나머지 단어가 밀려오지 않음 (아이가 누르려던 단어가 움직이면 헷갈림)
+  // 캐릭터가 충분하면 자리 = [말풍선(단어) + 캐릭터 그림 + 이름] 카드. 캐릭터를 눌러도 단어가 오간다
+  const n = ui.answer.length;
+  const chars = characters && characters.length >= n ? pickSome(characters, n) : null;
   ui.slots = {};
   const slots = [];
-  for (const i of scrambleOrder(ui.answer)) {
+  const order = scrambleOrder(ui.answer);
+  for (let k = 0; k < order.length; k++) {
+    const i = order[k];
     const slot = document.createElement('span');
-    slot.className = 'puzzle-slot';
-    slot.appendChild(makeChip(ui.answer[i], i));
+    slot.className = 'puzzle-slot' + (chars ? ' has-char' : '');
+    slot.dataset.idx = String(i);
+    let home = slot;
+    if (chars) {
+      home = document.createElement('span');
+      home.className = 'puzzle-bubble';
+      slot.appendChild(home);
+      const img = document.createElement('img');
+      img.className = 'puzzle-char';
+      img.src = chars[k].url;
+      img.alt = chars[k].ko;
+      img.draggable = false;
+      slot.appendChild(img);
+      const name = document.createElement('span');
+      name.className = 'puzzle-char-name';
+      name.textContent = chars[k].ko;
+      slot.appendChild(name);
+      slot.addEventListener('click', onSlotClick);
+    }
+    home.appendChild(makeChip(ui.answer[i], i));
     bank.appendChild(slot);
-    ui.slots[i] = slot;
+    ui.slots[i] = home;
     slots.push(slot);
   }
-  for (const slot of slots) { // 조각 크기로 자리 크기 고정 (빈 자리도 같은 크기)
-    const chip = slot.firstChild;
-    if (chip.offsetWidth) { slot.style.width = `${chip.offsetWidth}px`; slot.style.height = `${chip.offsetHeight}px`; }
+  for (const slot of slots) { // 크기 고정 (조각이 나가도 자리·말풍선이 줄어들지 않게)
+    const home = ui.slots[slot.dataset.idx];
+    if (home !== slot && home.offsetWidth) { home.style.width = `${home.offsetWidth}px`; home.style.height = `${home.offsetHeight}px`; }
+    if (slot.offsetWidth) { slot.style.width = `${slot.offsetWidth}px`; slot.style.height = `${slot.offsetHeight}px`; }
   }
+  afterChange();
+}
+
+/** 배열에서 n개를 무작위로 (캐릭터 고르기) */
+function pickSome(arr, n) {
+  return shuffle(arr).slice(0, n);
+}
+
+/** 캐릭터 카드(그림·이름·빈 말풍선)를 누름: 단어가 집에 있으면 정답 칸으로, 정답 칸에 있으면 다시 집으로 */
+function onSlotClick(e) {
+  if (ui.locked || !ui.open) return;
+  if (e.target.closest && e.target.closest('.puzzle-chip')) return; // 조각 자체는 포인터 핸들러가 처리
+  const idx = e.currentTarget.dataset.idx;
+  const home = ui.slots[idx];
+  const chip = home.querySelector('.puzzle-chip') || $('puzzle-answer').querySelector(`.puzzle-chip[data-idx="${idx}"]`);
+  if (chip) tapChip(chip);
   afterChange();
 }
 
@@ -196,6 +239,8 @@ function afterChange() {
   const bank = $('puzzle-bank');
   ans.classList.toggle('empty', ans.children.length === 0);
   $('puzzle-check').disabled = ui.locked || bank.querySelectorAll('.puzzle-chip').length > 0;
+  // 단어를 건네준 캐릭터는 흐리게
+  for (const slot of Array.from(bank.children)) slot.classList.toggle('taken', !slot.querySelector('.puzzle-chip'));
 }
 
 // ── 드래그 / 탭 ──
