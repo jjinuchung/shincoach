@@ -82,6 +82,7 @@ const ui = {
   drag: null,     // 드래그 중 정보
   slots: {},      // 단어의 "집" (원래 자리 인덱스 → 요소): 캐릭터가 있으면 말풍선, 없으면 자리 자체. 단어가 나가도 자리는 그대로
   chars: null,    // 이번 퍼즐에 나온 캐릭터 (결과에 실어 보냄 → 잡기 화면 후보)
+  dragEndAt: 0,   // 드래그가 끝난 시각 (직후에 따라오는 click을 무시)
 };
 
 export function initPuzzle() {
@@ -174,6 +175,7 @@ function pickSome(arr, n) {
 /** 캐릭터 카드(그림·이름·빈 말풍선)를 누름: 단어가 집에 있으면 정답 칸으로, 정답 칸에 있으면 다시 집으로 */
 function onSlotClick(e) {
   if (ui.locked || !ui.open) return;
+  if (Date.now() - ui.dragEndAt < 400) return; // 드래그 직후 생기는 click은 무시
   if (e.target.closest && e.target.closest('.puzzle-chip')) return; // 조각 자체는 포인터 핸들러가 처리
   const idx = e.currentTarget.dataset.idx;
   const home = ui.slots[idx];
@@ -204,6 +206,15 @@ function putInAnswer(chip) {
   const gap = ans.querySelector('.puzzle-gap');
   if (gap) ans.replaceChild(chip, gap);
   else ans.appendChild(chip);
+}
+
+/** 탭: 단어 모음에 있으면 정답 칸(빈 자리가 있으면 거기, 없으면 끝)에, 정답 칸에 있으면 단어 모음으로(빈 자리 남김) */
+function tapChip(chip) {
+  if (ui.locked) return;
+  chip.classList.remove('bad');
+  const bank = $('puzzle-bank');
+  if (bank.contains(chip)) putInAnswer(chip);
+  else returnToBank(chip, true);
 }
 
 /** 단어를 다 놓았으면 남은 빈 자리는 지움 (빈 자리는 "여기에 넣을 차례" 표시일 뿐) */
@@ -254,11 +265,7 @@ function makeChip(word, idx) {
   el.className = 'puzzle-chip';
   el.textContent = word;
   el.dataset.idx = String(idx); // 원래 자리 (정답 공개 때 이 순서로 재배열)
-  el.addEventListener('pointerdown', onDown);
-  el.addEventListener('pointermove', onMove);
-  el.addEventListener('pointerup', onUp);
-  el.addEventListener('pointercancel', onCancel);
-  el.addEventListener('lostpointercapture', onCancel); // 캡처를 잃으면(시스템 제스처 등) 드래그 정리
+  el.addEventListener('pointerdown', onDown); // 이동/놓기는 드래그 중에만 document에서 받음 (조각을 DOM에서 옮겨도 안 끊기게)
   return el;
 }
 
@@ -275,7 +282,9 @@ function afterChange() {
 
 // ── 드래그 / 탭 ──
 // HTML5 drag-and-drop은 안드로이드 터치에서 동작하지 않으므로 포인터 이벤트로 직접 구현.
-// 잡은 조각은 반투명(ghost)으로 남기고 복제본이 손가락을 따라다니며, 조각 자체를 실시간으로 그 자리에 끼워 넣는다.
+// 원칙: 드래그 중에는 잡은 조각을 DOM에서 옮기지 않는다 (옮기면 브라우저가 포인터 캡처를 놓쳐 드래그가 중간에 끊김 — 태블릿에서 재현).
+// 대신 원래 자리는 반투명(ghost)으로 남기고, 복제본이 손가락을 따라다니며, 들어갈 자리에는 점선 자리표시(drop)만 끼워 보여준다.
+// 이동/놓기 이벤트는 document에서 받아 손가락이 조각 밖으로 나가도 계속 따라온다.
 
 function onDown(e) {
   if (ui.locked || ui.drag) return;
@@ -284,11 +293,19 @@ function onDown(e) {
   const r = chip.getBoundingClientRect();
   ui.drag = {
     chip, id: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY,
-    offX: e.clientX - r.left, offY: e.clientY - r.top, w: r.width, h: r.height, moved: false, clone: null, raf: 0,
-    fromAnswer: chip.parentNode === $('puzzle-answer'), fromNext: chip.nextSibling, // 끌기 시작한 자리 (빈 자리 남기기용)
+    offX: e.clientX - r.left, offY: e.clientY - r.top, w: r.width, h: r.height,
+    moved: false, clone: null, drop: null, raf: 0, evalX: -1e9, evalY: -1e9,
   };
-  try { chip.setPointerCapture(e.pointerId); } catch { /* 지원 안 하는 브라우저 */ }
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onCancel);
   e.preventDefault();
+}
+
+function unbindDrag() {
+  document.removeEventListener('pointermove', onMove);
+  document.removeEventListener('pointerup', onUp);
+  document.removeEventListener('pointercancel', onCancel);
 }
 
 function onMove(e) {
@@ -301,16 +318,19 @@ function onMove(e) {
   }
   d.x = e.clientX;
   d.y = e.clientY;
-  d.clone.style.transform = `translate(${d.x - d.offX}px, ${d.y - d.offY}px)`;
-  if (!d.raf) d.raf = requestAnimationFrame(() => { d.raf = 0; if (ui.drag === d) placeAt(d); });
+  d.clone.style.transform = `translate(${d.x - d.offX}px, ${d.y - d.offY}px)`; // 복제본은 매번 (transform만이라 가벼움)
+  // 자리표시 계산은 6px 이상 움직였을 때 한 프레임에 한 번만
+  if (Math.abs(d.x - d.evalX) + Math.abs(d.y - d.evalY) < 6) return;
+  if (!d.raf) d.raf = requestAnimationFrame(() => { d.raf = 0; if (ui.drag === d) { d.evalX = d.x; d.evalY = d.y; updateDrop(d); } });
 }
 
 function onUp(e) {
   const d = ui.drag;
   if (!d || e.pointerId !== d.id) return;
   ui.drag = null;
+  unbindDrag();
   if (d.raf) cancelAnimationFrame(d.raf);
-  if (d.moved) { placeAt(d); settleDrop(d); endDrag(d); } else tapChip(d.chip);
+  if (d.moved) { updateDrop(d); finishDrop(d); endDrag(d); } else tapChip(d.chip);
   afterChange();
 }
 
@@ -318,6 +338,7 @@ function onCancel(e) {
   const d = ui.drag;
   if (!d || e.pointerId !== d.id) return;
   ui.drag = null;
+  unbindDrag();
   if (d.raf) cancelAnimationFrame(d.raf);
   if (d.moved) endDrag(d);
   afterChange();
@@ -335,22 +356,16 @@ function beginDrag(d) {
 }
 
 function endDrag(d) {
+  ui.dragEndAt = Date.now();
   if (d.clone) d.clone.remove();
   d.clone = null;
+  if (d.drop) d.drop.remove();
+  d.drop = null;
   d.chip.classList.remove('ghost');
 }
 
-/** 탭: 단어 모음에 있으면 정답 칸(빈 자리가 있으면 거기, 없으면 끝)에, 정답 칸에 있으면 단어 모음으로(빈 자리 남김) */
-function tapChip(chip) {
-  if (ui.locked) return;
-  chip.classList.remove('bad');
-  const bank = $('puzzle-bank');
-  if (bank.contains(chip)) putInAnswer(chip);
-  else returnToBank(chip, true);
-}
-
-/** 손가락 위치에 따라 조각을 정답 칸의 알맞은 자리(또는 단어 모음)로 옮김 — 드래그 중 실시간 */
-function placeAt(d) {
+/** 손가락 위치에 따라 정답 칸에 자리표시(drop)를 끼우거나 치움 — 잡은 조각 자체는 건드리지 않음 */
+function updateDrop(d) {
   const ans = $('puzzle-answer');
   const bank = $('puzzle-bank');
   const ar = ans.getBoundingClientRect();
@@ -358,33 +373,48 @@ function placeAt(d) {
   // 정답 칸과 단어 모음 사이 중간선 기준: 위쪽이면 정답 칸, 아래쪽이면 단어 모음 (어디에 떨어뜨려도 둘 중 하나)
   const mid = (ar.bottom + br.top) / 2;
   if (d.y >= mid) {
-    returnToBank(d.chip, false); // 단어 모음 쪽이면 원래 자리로 (빈 자리는 드래그가 끝날 때 정리)
+    if (d.drop) { d.drop.remove(); d.drop = null; }
+    d.zone = 'bank';
     return;
   }
-  // 정답 칸: 손가락보다 "뒤"에 있는 첫 조각/빈 자리(아랫줄이거나, 같은 줄에서 오른쪽) 앞에 끼움
+  d.zone = 'answer';
+  // 손가락보다 "뒤"에 있는 첫 조각/빈 자리(아랫줄이거나, 같은 줄에서 오른쪽) 앞이 들어갈 자리
   let ref = null;
   for (const c of Array.from(ans.children)) {
-    if (c === d.chip) continue;
+    if (c === d.chip || c === d.drop) continue;
     const r = c.getBoundingClientRect();
     if (d.y < r.top || (d.y <= r.bottom && d.x < r.left + r.width / 2)) { ref = c; break; }
   }
-  if (d.chip.parentNode === ans && d.chip.nextSibling === ref) return; // 이미 그 자리
-  ans.insertBefore(d.chip, ref);
+  // 원래 자기 자리(바로 앞/뒤)면 자리표시 없이 그대로
+  if (d.chip.parentNode === ans && (ref === d.chip || ref === d.chip.nextSibling)) {
+    if (d.drop) { d.drop.remove(); d.drop = null; }
+    return;
+  }
+  if (!d.drop) {
+    d.drop = document.createElement('span');
+    d.drop.className = 'puzzle-drop';
+    d.drop.style.width = `${d.w}px`;
+    d.drop.style.height = `${d.h}px`;
+  }
+  if (d.drop.parentNode === ans && d.drop.nextSibling === ref) return; // 이미 그 자리
+  ans.insertBefore(d.drop, ref);
 }
 
-/** 드래그 끝: 빈 자리에 떨어뜨렸으면 그 빈 자리를 채우고, 정답 칸에서 끌어내 단어 모음에 놓았으면 원래 자리에 빈 자리를 남김 */
-function settleDrop(d) {
+/** 놓기: 자리표시가 있으면 그 자리에, 단어 모음 쪽이면 원래 자리로(정답 칸에서 끌어냈으면 빈 자리 남김) */
+function finishDrop(d) {
   const ans = $('puzzle-answer');
   const chip = d.chip;
-  if (chip.parentNode === ans) {
-    // 바로 옆 빈 자리는 "그 자리에 넣은 것"으로 침
-    const near = (chip.nextSibling && chip.nextSibling.classList && chip.nextSibling.classList.contains('puzzle-gap')) ? chip.nextSibling
-      : (chip.previousSibling && chip.previousSibling.classList && chip.previousSibling.classList.contains('puzzle-gap')) ? chip.previousSibling : null;
-    if (near) near.remove();
-  } else if (d.fromAnswer) {
-    const next = d.fromNext && d.fromNext.parentNode === ans ? d.fromNext : null;
-    ans.insertBefore(makeGap(), next);
+  if (d.zone === 'bank') {
+    returnToBank(chip, true);
+    return;
   }
+  if (!d.drop) return; // 제자리
+  ans.replaceChild(chip, d.drop); // 정답 칸 안에서 옮기는 건 순서만 바뀜 (빈 자리 안 남김)
+  d.drop = null;
+  // 바로 옆 빈 자리는 "그 자리에 넣은 것"으로 침
+  const isGap = (n) => !!(n && n.classList && n.classList.contains('puzzle-gap'));
+  if (isGap(chip.nextSibling)) chip.nextSibling.remove();
+  else if (isGap(chip.previousSibling)) chip.previousSibling.remove();
 }
 
 // ── 판정 ──

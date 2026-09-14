@@ -545,6 +545,8 @@ button { font-family: inherit; }
   animation: puzzle-gap-blink 1.2s ease-in-out infinite;
 }
 @keyframes puzzle-gap-blink { 0%, 100% { border-color: #818cf8; } 50% { border-color: #c7d2fe; } }
+/* 드래그 중 들어갈 자리 미리보기 */
+.puzzle-drop { display: inline-block; margin: 5px; border: 2px dashed var(--primary); border-radius: 12px; background: #e0e7ff; }
 .puzzle-chip.bad { border-color: var(--danger); background: #fef2f2; color: #991b1b; }
 .puzzle-chip.ok { border-color: var(--ok); background: #ecfdf5; color: #047857; }
 .puzzle-drag {
