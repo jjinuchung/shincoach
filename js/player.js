@@ -11,6 +11,7 @@ import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, ROSTER } from './pokemon.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP } from './xp.js';
 import { initCatch, openCatch, closeCatch } from './catch.js';
+import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
 
 const $ = (id) => document.getElementById(id);
@@ -178,6 +179,7 @@ function awardXp(amount) {
   const g = gainXp(amount);
   updateLevelChip();
   if (g.leveledUp) {
+    sfx.levelUp();
     showPlayerMessage(`🎉 레벨 업! Lv.${g.to}`, 5000);
     const chip = $('level-chip');
     chip.classList.remove('pulse');
@@ -532,6 +534,7 @@ function hidePlayerMessage() {
 }
 
 function onPlayButton() {
+  unlock(); // 첫 터치에서 효과음 오디오 준비
   if (state.shadowTimer || state.speakRun) { skipShadowWait(); return; }
   // 첫 재생(사용자 터치) 때 마이크 권한을 미리 받아 둠
   if (settings.speakCheck && !state.speakUnavailable && !state.micPrepared) {
@@ -1094,7 +1097,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10 };
+  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -1112,11 +1115,15 @@ function initSettingsDialog() {
   $('set-listen-first').value = String(settings.listenFirst);
   $('set-goal').value = String(settings.dailyGoal);
   $('set-puzzle').value = String(settings.puzzleEvery);
+  $('set-sfx').checked = settings.sfx;
+  $('set-vibrate').checked = settings.vibrate;
+  setSfxEnabled(settings.sfx);
+  setVibrateEnabled(settings.vibrate);
   $('set-speak').checked = settings.speakCheck;
   $('set-hide-en').checked = settings.hideEnWhileSpeaking;
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
-  $('set-catch-try').addEventListener('click', () => { $('dlg-settings').close(); startCatchPractice(); });
+  $('set-catch-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startCatchPractice(); });
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
     const mergeChanged = settings.mergeSentences !== $('set-merge').checked;
@@ -1127,6 +1134,10 @@ function initSettingsDialog() {
     updateGoalChip();
     settings.puzzleEvery = Number($('set-puzzle').value);
     if (settings.puzzleEvery === 0) state.puzzlePool = [];
+    settings.sfx = $('set-sfx').checked;
+    settings.vibrate = $('set-vibrate').checked;
+    setSfxEnabled(settings.sfx);
+    setVibrateEnabled(settings.vibrate);
     settings.speakCheck = $('set-speak').checked;
     settings.hideEnWhileSpeaking = $('set-hide-en').checked;
     if (!settings.hideEnWhileSpeaking) state.speakHideEn = 'none'; // 끄면 대기 중이던 숨김도 해제

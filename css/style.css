@@ -705,9 +705,44 @@ button { font-family: inherit; }
   100% { transform: translateX(-50%) scale(1); }
 }
 .catch-fx { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); font-size: 2.2rem; pointer-events: none; }
+/* 볼이 흔들리는 동안 무대가 같이 두근거림 */
+.catch-stage.shaking { animation: catch-shake 0.75s ease-in-out; }
+@keyframes catch-shake {
+  0%, 100% { transform: translate(0, 0); }
+  15% { transform: translate(-3px, 1px); }
+  35% { transform: translate(3px, -1px); }
+  55% { transform: translate(-2px, 1px); }
+  75% { transform: translate(2px, 0); }
+}
+.catch-msg.beat { animation: catch-beat 0.75s ease-in-out infinite; color: #b91c1c; }
+@keyframes catch-beat { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.12); } }
+
+/* 🎊 종이가루 */
+.confetti-layer { position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; z-index: 70; overflow: hidden; }
+.confetti {
+  position: absolute;
+  top: -16px;
+  border-radius: 2px;
+  animation-name: confetti-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate3d(var(--dx, 0px), 105vh, 0) rotate(var(--rot, 720deg)); opacity: 0.85; }
+}
 .catch-result { text-align: center; font-weight: 800; font-size: 1.2rem; min-height: 1.5em; margin: 6px 0; }
 .catch-result small { display: block; font-weight: 600; color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
-.catch-result-img { display: block; width: 72px; height: 72px; object-fit: contain; margin: -70px auto 4px; animation: puzzle-bounce 0.6s ease 2; }
+.catch-mon.caughtpop { animation: catch-pop 0.7s ease-out forwards, catch-float 1.6s ease-in-out 0.7s infinite; }
+@keyframes catch-pop {
+  0% { transform: translateX(-50%) scale(0.1); opacity: 0; }
+  60% { transform: translateX(-50%) scale(0.85); opacity: 1; }
+  100% { transform: translateX(-50%) scale(0.75); opacity: 1; }
+}
+@keyframes catch-float {
+  0%, 100% { transform: translateX(-50%) scale(0.75) translateY(0); }
+  50% { transform: translateX(-50%) scale(0.75) translateY(-10px); }
+}
 .catch-actions { display: flex; justify-content: flex-end; }
 
 /* ===== 🎒 도감 ===== */

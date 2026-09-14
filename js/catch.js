@@ -1,6 +1,7 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
 import { rarityOf, RARITY, caughtCount } from './xp.js';
+import { sfx, vibrate, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -84,7 +85,7 @@ export function openCatch(o) {
       own.textContent = `✔ 잡음 ×${n}`;
       btn.appendChild(own);
     }
-    btn.addEventListener('click', () => throwBall(c));
+    btn.addEventListener('click', () => { unlock(); throwBall(c); });
     pick.appendChild(btn);
   }
   $('catch').hidden = false;
@@ -123,6 +124,28 @@ function renderHeader(xpGain, info, levelUp) {
   if (levelUp) lv.textContent = `🎉 레벨 업! Lv.${levelUp} — 포켓몬이 더 잘 잡혀요`;
 }
 
+/** 🎊 종이가루: 화면 위에서 색종이 조각이 쏟아짐 (CSS 애니메이션, 3.6초 뒤 정리) */
+export function burstConfetti(count = 70) {
+  const layer = document.createElement('div');
+  layer.className = 'confetti-layer';
+  const colors = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#a855f7', '#fbbf24', '#ec4899'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('span');
+    p.className = 'confetti';
+    p.style.left = `${Math.random() * 100}%`;
+    p.style.background = colors[i % colors.length];
+    p.style.width = `${6 + Math.random() * 8}px`;
+    p.style.height = `${10 + Math.random() * 8}px`;
+    p.style.animationDuration = `${1.8 + Math.random() * 1.2}s`;
+    p.style.animationDelay = `${Math.random() * 0.5}s`;
+    p.style.setProperty('--dx', `${(Math.random() - 0.5) * 200}px`);
+    p.style.setProperty('--rot', `${360 + Math.random() * 720}deg`);
+    layer.appendChild(p);
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 3600);
+}
+
 /** 볼 던지기 연출 → 판정 → 결과 */
 async function throwBall(c) {
   if (!ui.open || !ui.attempt) return;
@@ -141,12 +164,16 @@ async function throwBall(c) {
   fx.style.bottom = '';
   stage.hidden = false;
   $('catch-msg').textContent = `${c.ko}${josa(c.ko, '이', '가')} 나타났다! 몬스터볼, 가라!`;
+  $('catch-msg').classList.remove('beat');
   await sleep(700); if (!alive()) return;
 
   ball.className = 'catch-ball throw';
+  sfx.whoosh();
   await sleep(650); if (!alive()) return;
   fx.textContent = '💥';
   fx.style.bottom = '150px'; // 포켓몬 위치에서 맞는 효과
+  sfx.hit();
+  vibrate(25);
   mon.classList.add('captured');
   ball.className = 'catch-ball at-mon';
   await sleep(400); if (!alive()) return;
@@ -157,25 +184,33 @@ async function throwBall(c) {
 
   const res = ui.attempt(c.id); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만
   const wobbles = res.caught ? 3 : 1 + Math.floor(Math.random() * 3);
-  $('catch-msg').textContent = '…';
+  const msg = $('catch-msg');
+  msg.textContent = '두근두근…';
+  msg.classList.add('beat');
   for (let i = 0; i < wobbles; i++) {
     ball.className = 'catch-ball';
+    stage.classList.remove('shaking');
     void ball.offsetWidth; // 애니메이션 재시작
     ball.className = 'catch-ball wobble';
+    stage.classList.add('shaking'); // 화면이 같이 두근거림
+    sfx.tick();
+    vibrate(30);
     await sleep(750); if (!alive()) return;
   }
+  stage.classList.remove('shaking');
+  msg.classList.remove('beat');
 
   const result = $('catch-result');
   if (res.caught) {
     ball.className = 'catch-ball caught';
     fx.textContent = '✨';
     $('catch-msg').textContent = '찰칵!';
+    sfx.success();
+    vibrate([40, 60, 40, 60, 160]);
+    burstConfetti();
     result.innerHTML = '';
-    const pic = document.createElement('img');
-    pic.className = 'catch-result-img';
-    pic.src = c.url;
-    pic.alt = c.ko;
-    result.appendChild(pic);
+    mon.classList.remove('captured');
+    mon.classList.add('caughtpop'); // 잡은 포켓몬이 볼 위로 뿅 나타남 (기뻐하는 느낌)
     result.appendChild(document.createTextNode(`🎉 잡았다! ${c.ko}!`));
     const sub = document.createElement('small');
     sub.textContent = ui.practice ? '(연습이라 도감에는 안 들어가요)'
@@ -188,6 +223,8 @@ async function throwBall(c) {
     mon.classList.add('escaped');
     fx.textContent = '💨';
     $('catch-msg').textContent = '앗!';
+    sfx.fail();
+    vibrate(180);
     result.innerHTML = '';
     result.appendChild(document.createTextNode(`${c.ko}${josa(c.ko, '이', '가')} 도망갔어요…`));
     const sub = document.createElement('small');

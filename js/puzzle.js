@@ -6,6 +6,8 @@ export const PUZZLE_MIN_WORDS = 3; // 2단어는 너무 쉬움
 export const PUZZLE_MAX_WORDS = 8; // 9단어 이상은 태블릿 화면에 안 맞음
 export const PUZZLE_MAX_WRONG = 3; // 3번 틀리면 정답 공개
 
+import { sfx, unlock } from './sfx.js';
+
 const hasLetter = (s) => /[A-Za-z0-9À-ɏ]/.test(s); // 영문·숫자·라틴 확장(é 등)
 
 /** 문장 → 단어 조각. 구두점·대문자는 단어에 붙은 채 둠(힌트 역할). 구두점만 있는 조각은 앞 단어에 붙이고, 맨 앞이면 버림 */
@@ -88,7 +90,7 @@ const ui = {
 export function initPuzzle() {
   // 정답 뒤에 다시 들으면 그 재생이 끝난 뒤 닫히도록 콜백을 다시 걸어줌
   $('puzzle-listen').addEventListener('click', () => { if (ui.onPlay) ui.onPlay(ui.result && ui.result.solved ? onSolvedPlayEnd : undefined); });
-  $('puzzle-check').addEventListener('click', check);
+  $('puzzle-check').addEventListener('click', () => { unlock(); check(); });
   $('puzzle-continue').addEventListener('click', finish);
 }
 
@@ -433,6 +435,7 @@ function check() {
     ui.result = { solved: true, wrong: ui.wrongCount, characters: ui.chars || [] };
     chips.forEach((c) => c.classList.add('ok'));
     root.classList.add('solved');
+    sfx.ding();
     setMsg(ui.wrongCount === 0 ? '🎉 정답이에요! 한 번에 맞췄어요! 🔊' : '🎉 정답이에요! 🔊');
     afterChange();
     // 맞춘 문장을 한 번 더 들려주고(각인), 재생이 끝나면 닫힘. 재생이 안 되는 경우를 대비한 안전망 타이머
@@ -446,6 +449,7 @@ function check() {
   }
 
   ui.wrongCount++;
+  sfx.wrong();
   chips.forEach((c, i) => c.classList.toggle('bad', !!res.wrong[i]));
   root.classList.remove('shake');
   void root.offsetWidth; // 애니메이션 재시작
