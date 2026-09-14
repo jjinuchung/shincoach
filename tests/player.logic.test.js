@@ -40,9 +40,9 @@ function loadPlayer() {
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     performance: { now: () => Date.now() },
     localStorage: { getItem: () => null, setItem() {} },
-    navigator: {},
+    navigator: { onLine: true },
     document: { getElementById: $, addEventListener() {}, hidden: false, createElement: () => makeEl(), createTextNode: () => ({}) },
-    window: { scrollTo() {} },
+    window: { scrollTo() {}, addEventListener() {} },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
     alert() {},
     // srt.js 의존 함수 스텁
@@ -615,4 +615,24 @@ test('🧩 오늘 첫 퍼즐은 5문장에, 그 뒤엔 설정 간격(10)대로',
   for (let i = 12; i < 15; i++) run(`markDone(state.cues[${i}])`);
   run('goTo(4)');
   assert.equal(puzzleCalls.length, 2, '10문장 차면 퍼즐');
+});
+
+test('🎮 부족한 캐릭터는 인터넷이 되면 자동으로 받고, 오프라인이거나 다 있으면 안 받음', async () => {
+  const { run, ctx } = loadPlayer();
+  let calls = 0;
+  ctx.ROSTER = [{ id: 1 }, { id: 2 }];
+  ctx.downloadCharacters = async () => { calls++; return { ok: 2, fail: 0 }; };
+  ctx.loadCharacters = async () => [{ id: 1, url: 'a' }, { id: 2, url: 'b' }];
+  run('state.characters = []; autoDownloadCharacters()');
+  await tick(); await tick();
+  assert.equal(calls, 1, '부족하면 받음');
+  assert.equal(run('state.characters.length'), 2, '받은 뒤 목록 갱신');
+  run('autoDownloadCharacters()'); await tick();
+  assert.equal(calls, 1, '다 있으면 안 받음');
+  ctx.navigator.onLine = false;
+  run('state.characters = []; autoDownloadCharacters()'); await tick();
+  assert.equal(calls, 1, '오프라인이면 안 받음');
+  ctx.navigator.onLine = true;
+  run('state.charDownloading = true; autoDownloadCharacters()'); await tick();
+  assert.equal(calls, 1, '이미 받는 중이면 중복 실행 안 함');
 });

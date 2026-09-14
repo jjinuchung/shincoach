@@ -52,6 +52,7 @@ const state = {
   puzzlePlaying: false, // 퍼즐의 🔊 다시 듣기로 그 문장을 재생 중 (끝나면 멈춤)
   puzzleOnEnd: null,  // 퍼즐 다시 듣기가 끝났을 때 알릴 콜백 (정답 뒤 들려주기 → 닫기)
   characters: [],     // 🎮 기기에 받아둔 퍼즐 캐릭터 [{ id, ko, url }] (없으면 단어 조각만)
+  charDownloading: false, // 캐릭터 받는 중 (자동·수동 중복 실행 방지)
   catchOpen: false,   // 🎯 잡기 화면이 열려 있음 (키보드 무시)
   streakBase: 0,      // 🔥 어제까지의 연속 학습일 (오늘 5문장 채우면 +1)
   streakToday: false, // 오늘 5문장을 채워 스트릭에 들어갔는지
@@ -247,30 +248,49 @@ function showPuzzle(cue, onDone) {
 // ───────────────────── 🎮 퍼즐 캐릭터 (⚙에서 한 번 받아 기기에 보관) ─────────────────────
 
 function initCharacters() {
-  loadCharacters().then((chars) => { state.characters = chars; updateCharStatus(); }).catch(() => {});
-  $('char-download').addEventListener('click', onDownloadCharacters);
+  loadCharacters().then((chars) => { state.characters = chars; updateCharStatus(); autoDownloadCharacters(); }).catch(() => {});
+  $('char-download').addEventListener('click', () => runCharacterDownload(true));
+  // 인터넷이 다시 연결되면 부족한 캐릭터를 조용히 받아옴 (명단을 늘려도 부모가 신경 안 쓰게)
+  window.addEventListener('online', autoDownloadCharacters);
+}
+
+/** 인터넷이 되고 부족한 캐릭터가 있으면 자동으로 받기 (앱 시작·온라인 전환 때 한 번씩 시도) */
+function autoDownloadCharacters() {
+  if (state.charDownloading || navigator.onLine === false) return;
+  if (state.characters.length >= ROSTER.length) return;
+  runCharacterDownload(false);
 }
 
 function updateCharStatus(text) {
   const el = $('char-status');
   if (text) { el.textContent = text; return; }
   const n = state.characters.length;
-  el.textContent = n >= ROSTER.length ? `✅ ${n}마리 준비됨` : n > 0 ? `${n}/${ROSTER.length}마리 (나머지는 받기)` : `아직 없음 (0/${ROSTER.length})`;
+  el.textContent = n >= ROSTER.length ? `✅ ${n}마리 준비됨` : n > 0 ? `${n}/${ROSTER.length}마리 (인터넷이 되면 자동으로 받아요)` : `아직 없음 (0/${ROSTER.length}) — 인터넷이 되면 자동으로 받아요`;
   $('char-download').hidden = n >= ROSTER.length;
 }
 
-async function onDownloadCharacters() {
+/** 캐릭터 받기 (manual: ⚙ 버튼으로 눌렀는지 — 실패 안내를 보여줄지 결정) */
+async function runCharacterDownload(manual) {
+  if (state.charDownloading) return;
+  state.charDownloading = true;
   const btn = $('char-download');
   btn.disabled = true;
   try {
     const r = await downloadCharacters((done, total, name) => updateCharStatus(`받는 중… ${done}/${total} ${name}`));
     state.characters = await loadCharacters();
     updateCharStatus();
-    if (r.fail) updateCharStatus(`${r.ok}마리 받음, ${r.fail}마리 실패 — 인터넷 연결을 확인하고 다시 눌러 주세요`);
+    if (r.fail) {
+      if (manual) updateCharStatus(`${r.ok}마리 받음, ${r.fail}마리 실패 — 인터넷 연결을 확인하고 다시 눌러 주세요`);
+      else updateCharStatus(`${state.characters.length}/${ROSTER.length}마리 — 인터넷이 되면 나머지를 자동으로 받아요`);
+    } else if (r.ok > 0 && state.open) {
+      showPlayerMessage(`🎮 새 포켓몬 ${r.ok}마리가 도착했어요!`, 4000);
+    }
   } catch (e) {
-    updateCharStatus(`받지 못했어요 (${e.message || e}) — 인터넷 연결을 확인해 주세요`);
+    if (manual) updateCharStatus(`받지 못했어요 (${e.message || e}) — 인터넷 연결을 확인해 주세요`);
+    else updateCharStatus(`${state.characters.length}/${ROSTER.length}마리 — 인터넷이 되면 나머지를 자동으로 받아요`);
   } finally {
     btn.disabled = false;
+    state.charDownloading = false;
   }
 }
 
