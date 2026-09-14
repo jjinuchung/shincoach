@@ -7,6 +7,7 @@ export const PUZZLE_MAX_WORDS = 8; // 9단어 이상은 태블릿 화면에 안 
 export const PUZZLE_MAX_WRONG = 3; // 3번 틀리면 정답 공개
 
 import { sfx, unlock } from './sfx.js';
+import { makeFigure } from './items.js';
 
 const hasLetter = (s) => /[A-Za-z0-9À-ɏ]/.test(s); // 영문·숫자·라틴 확장(é 등)
 
@@ -114,7 +115,7 @@ export function isPuzzleOpen() {
 
 /**
  * 퍼즐 열기. onClose(result)는 아이가 맞추고(문장을 한 번 더 들려준 뒤) 또는 정답 공개 후 계속하기를 눌렀을 때 호출.
- * characters: [{ id, ko, url }] — 단어 수 이상 있으면 캐릭터가 단어를 말풍선에 들고 있는 모양으로 (없으면 단어 조각만)
+ * characters: [{ id, ko, url, look }] — 단어 수 이상 있으면 캐릭터가 단어를 말풍선에 들고 있는 모양으로 (없으면 단어 조각만). look = 장식·염색 (xp.getLook)
  */
 export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
   closePuzzle();
@@ -159,12 +160,7 @@ export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
       home = document.createElement('span');
       home.className = 'puzzle-bubble';
       slot.appendChild(home);
-      const img = document.createElement('img');
-      img.className = 'puzzle-char';
-      img.src = chars[k].url;
-      img.alt = chars[k].ko;
-      img.draggable = false;
-      slot.appendChild(img);
+      slot.appendChild(makeFigure(chars[k].url, chars[k].ko, chars[k].look, 'puzzle-char')); // 장식·염색이 있으면 같이 보임
       const name = document.createElement('span');
       name.className = 'puzzle-char-name';
       name.textContent = chars[k].ko;

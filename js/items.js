@@ -1,0 +1,109 @@
+// 🛒 아이템: 💰 코인 규칙, 상점 카탈로그(🎀 장식·🎨 염색약), 🎁 랜덤 상자, 꾸민 포켓몬 그림(figure) 만들기
+// 그림은 이모지 오버레이 + CSS filter 라 파일이 필요 없음 (오프라인·저작권 문제 없음)
+// 위쪽은 순수 규칙(테스트 가능), 아래쪽은 DOM 헬퍼. 프로필(코인·가방·꾸밈 상태)은 xp.js 가 들고 있음
+
+// ── 💰 코인 (XP와 별개: XP는 레벨·해금, 코인은 상점) ──
+export const COIN = {
+  done: 1,              // 문장 하나 완료 (하루에 문장당 한 번)
+  speak: 2,             // 말하기 통과
+  speakStar: 3,         // 말하기 ⭐(80%↑) 통과
+  puzzle: [5, 3, 2],    // 퍼즐 정답: 틀린 횟수 0/1/2번
+  puzzleRevealed: 0,    // 3번 틀려 정답 공개 → 코인 없음 (XP는 조금 줌)
+  goal: 10,             // 오늘의 목표 달성
+  streakPerDay: 5,      // 🔥 연속 학습일 × 5
+  streakMax: 50,        // 스트릭 코인 상한 (10일)
+};
+
+/** 퍼즐 결과 → 코인 */
+export function puzzleCoins(result) {
+  if (!result || !result.solved) return COIN.puzzleRevealed;
+  return COIN.puzzle[Math.min(result.wrong || 0, COIN.puzzle.length - 1)];
+}
+
+/** 오늘까지 n일 연속 → 코인 5, 10, 15 … 최대 50 */
+export function streakCoins(days) {
+  return Math.min(COIN.streakMax, COIN.streakPerDay * Math.max(1, days));
+}
+
+// ── 🎀 장식: 개수로 보유, 장착하면 가방에서 빠지고 벗기면 돌아옴. pos = head(머리 위) | face(얼굴) ──
+export const GEAR = [
+  { id: 'ribbon', emoji: '🎀', ko: '리본', price: 30, pos: 'head' },
+  { id: 'flower', emoji: '🌸', ko: '꽃', price: 30, pos: 'head' },
+  { id: 'cap', emoji: '🧢', ko: '야구모자', price: 40, pos: 'head' },
+  { id: 'tophat', emoji: '🎩', ko: '신사모자', price: 40, pos: 'head' },
+  { id: 'shades', emoji: '🕶️', ko: '선글라스', price: 50, pos: 'face' },
+  { id: 'star', emoji: '⭐', ko: '별', price: 60, pos: 'head' },
+  { id: 'butterfly', emoji: '🦋', ko: '나비', price: 60, pos: 'head' },
+  { id: 'grad', emoji: '🎓', ko: '학사모', price: 70, pos: 'head' },
+  { id: 'crown', emoji: '👑', ko: '왕관', price: 100, pos: 'head' },
+  { id: 'diamond', emoji: '💎', ko: '다이아몬드', price: 150, pos: 'head' },
+];
+
+// ── 🎨 염색약: 소모품(쓰면 사라짐). 어떤 그림이든 같은 색이 나오도록 sepia로 단색화한 뒤 색조를 돌림. 원래 색으로 되돌리기는 무료 ──
+export const DYE = [
+  // 각도·채도는 실제 일러스트(피카츄·파이리·꼬부기·뮤츠·이브이)로 비교해서 고름 — 밝은 노랑(피카츄)은 hue-rotate가 약하게 먹어 빨강은 크게 돌림
+  { id: 'red', emoji: '🔴', ko: '빨강', price: 50, filter: 'sepia(1) saturate(6) hue-rotate(-50deg) contrast(1.15) brightness(0.92)' },
+  { id: 'blue', emoji: '🔵', ko: '파랑', price: 50, filter: 'sepia(1) saturate(4) hue-rotate(180deg)' },
+  { id: 'green', emoji: '🟢', ko: '초록', price: 50, filter: 'sepia(1) hue-rotate(70deg) saturate(3) brightness(0.9)' },
+  { id: 'purple', emoji: '🟣', ko: '보라', price: 50, filter: 'sepia(1) hue-rotate(230deg) saturate(3) brightness(0.9)' },
+  { id: 'pink', emoji: '💗', ko: '분홍', price: 50, filter: 'sepia(1) hue-rotate(290deg) saturate(3)' },
+  { id: 'gold', emoji: '🟡', ko: '금색', price: 50, filter: 'sepia(1) saturate(4) contrast(1.2) brightness(1.05)' },
+  { id: 'shiny', emoji: '✨', ko: '반짝반짝', price: 150, filter: '', cls: 'shiny' }, // 무지개로 반짝이는 색 (CSS 애니메이션)
+];
+
+export const ITEMS = [
+  ...GEAR.map((g) => ({ ...g, kind: 'gear' })),
+  ...DYE.map((d) => ({ ...d, kind: 'dye' })),
+];
+const byId = {};
+for (const it of ITEMS) byId[it.id] = it;
+
+/** 아이템 id → { id, kind, emoji, ko, price, … } (없으면 null) */
+export function itemById(id) {
+  return byId[id] || null;
+}
+
+/** 🎁 레벨업 선물 상자: 아이템 중 하나를 고르게 뽑음 */
+export function lootBox(rng = Math.random) {
+  return ITEMS[Math.min(ITEMS.length - 1, Math.floor(rng() * ITEMS.length))].id;
+}
+
+/** 살 수 있는지 → { ok, short(부족한 코인) } */
+export function canBuy(id, coins) {
+  const it = itemById(id);
+  if (!it) return { ok: false, short: 0 };
+  const short = Math.max(0, it.price - (coins || 0));
+  return { ok: short === 0, short };
+}
+
+// ── DOM 헬퍼: 꾸민 포켓몬 그림 ──
+// <span class="mon-figure [cls]"><img> [<span class="mon-gear head|face">🎩</span>]</span>
+// 크기는 호출하는 쪽 CSS(.puzzle-char, .pokedex-cell 등)가 정함. look = { gear, dye } (xp.getLook)
+
+/** 새 figure 만들기 */
+export function makeFigure(url, alt, look, cls) {
+  const fig = document.createElement('span');
+  fig.className = 'mon-figure' + (cls ? ' ' + cls : '');
+  const img = document.createElement('img');
+  img.alt = alt || '';
+  img.draggable = false;
+  fig.appendChild(img);
+  setFigure(fig, url, look);
+  return fig;
+}
+
+/** 이미 있는 figure의 그림·꾸밈 갱신 (잡기 무대처럼 요소를 재사용하는 곳). url이 undefined면 그림은 그대로 */
+export function setFigure(fig, url, look) {
+  const img = fig.querySelector('img');
+  if (url !== undefined && img.getAttribute('src') !== url) img.src = url;
+  const dye = look && look.dye ? byId[look.dye] : null;
+  img.style.filter = dye && dye.filter ? dye.filter : '';
+  if (dye && dye.cls) img.classList.add(dye.cls); else img.classList.remove('shiny');
+  const gear = look && look.gear ? byId[look.gear] : null;
+  let g = fig.querySelector('.mon-gear');
+  if (gear) {
+    if (!g) { g = document.createElement('span'); fig.appendChild(g); }
+    g.className = 'mon-gear ' + (gear.pos || 'head');
+    g.textContent = gear.emoji;
+  } else if (g) g.remove();
+}

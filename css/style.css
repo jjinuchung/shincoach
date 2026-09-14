@@ -496,12 +496,12 @@ button { font-family: inherit; }
 .puzzle-char {
   width: 76px;
   height: 76px;
-  object-fit: contain;
   margin-top: 10px;
   user-select: none;
   -webkit-user-drag: none;
   transition: opacity 0.2s, transform 0.2s;
 }
+.puzzle-char .mon-gear { font-size: 26px; }
 .puzzle-char-name { font-size: 0.75rem; color: var(--muted); font-weight: 600; margin-top: 2px; white-space: nowrap; }
 .puzzle-slot.taken .puzzle-char { opacity: 0.4; filter: grayscale(0.5); transform: scale(0.92); }
 .puzzle-slot.taken .puzzle-char-name { opacity: 0.5; }
@@ -648,7 +648,8 @@ button { font-family: inherit; }
   box-shadow: 0 2px 6px rgba(31, 35, 64, 0.12);
 }
 .catch-cand:active { transform: scale(0.95); }
-.catch-cand img { width: 72px; height: 72px; object-fit: contain; }
+.catch-cand .mon-figure { width: 72px; height: 72px; }
+.catch-cand .mon-gear { font-size: 24px; }
 .catch-cand .nm { font-weight: 700; margin-top: 4px; font-size: 0.95rem; }
 .catch-cand .rr { font-size: 0.7rem; color: var(--muted); }
 .catch-cand .own { font-size: 0.7rem; color: #047857; font-weight: 700; }
@@ -660,10 +661,10 @@ button { font-family: inherit; }
   top: 10px;
   width: 170px;
   height: 170px;
-  object-fit: contain;
   transform: translateX(-50%);
   transition: transform 0.35s ease-in, opacity 0.35s;
 }
+.catch-mon .mon-gear { font-size: 56px; }
 .catch-mon.captured { transform: translateX(-50%) translateY(90px) scale(0); opacity: 0; }
 .catch-mon.escaped { animation: catch-escape 0.5s ease-out; }
 .catch-ball {
@@ -767,12 +768,147 @@ button { font-family: inherit; }
   align-items: center;
   position: relative;
 }
-.pokedex-cell img { width: 64px; height: 64px; object-fit: contain; }
+.pokedex-cell .mon-figure { width: 64px; height: 64px; }
+.pokedex-cell .mon-gear { font-size: 22px; }
+.pokedex-cell.got { cursor: pointer; }
+.pokedex-cell.got:active { background: #e0e7ff; }
 .pokedex-cell.unknown img { filter: brightness(0); opacity: 0.35; }
 .pokedex-cell .nm { font-size: 0.8rem; font-weight: 700; margin-top: 2px; }
 .pokedex-cell.unknown .nm { color: var(--muted); }
 .pokedex-cell .cnt { position: absolute; top: 4px; right: 6px; background: var(--accent); color: #fff; border-radius: 999px; font-size: 0.7rem; font-weight: 800; padding: 1px 6px; }
 .pokedex-noimg { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #c7d2fe; font-weight: 800; }
+.pokedex-coins { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 10px; }
+.pokedex-coins .amt { font-weight: 800; color: #b45309; font-size: 1.05rem; }
+
+/* ===== 꾸민 포켓몬 그림 (items.js makeFigure): <span.mon-figure><img>[<span.mon-gear>🎩]</span> ===== */
+.mon-figure { position: relative; display: inline-block; line-height: 0; }
+.mon-figure img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+/* ✨ 반짝반짝 염색: 무지개색으로 천천히 돌며 빛남 */
+.mon-figure img.shiny { animation: mon-shiny 3s linear infinite; }
+@keyframes mon-shiny {
+  0% { filter: hue-rotate(0deg) saturate(1.7) drop-shadow(0 0 3px #fde68a); }
+  50% { filter: hue-rotate(180deg) saturate(1.7) drop-shadow(0 0 8px #fff); }
+  100% { filter: hue-rotate(360deg) saturate(1.7) drop-shadow(0 0 3px #fde68a); }
+}
+.mon-gear {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 28px;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+.mon-gear.head { top: -16%; }
+.mon-gear.face { top: 18%; }
+.mon-figure.pop { animation: puzzle-bounce 0.45s ease-in-out 2; }
+
+/* ===== 🪙 코인 칩 ===== */
+.coin-chip {
+  border: 2px solid #f59e0b;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 0;
+}
+.coin-chip[hidden] { display: none; }
+.coin-chip.pulse { animation: level-pulse 0.8s ease 2; }
+/* 폰 폭에서는 상단 칩 3개(목표·레벨·코인)가 제목을 밀어내므로 조금 촘촘하게 */
+@media (max-width: 480px) {
+  .goal-chip, .level-chip, .coin-chip { padding: 4px 7px; font-size: 0.82rem; }
+  .topbar { gap: 6px; }
+}
+
+/* ===== 모달 (🛒 상점 · 포켓몬 상세) ===== */
+.modal {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: rgba(31, 35, 64, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  z-index: 64;
+}
+.modal[hidden] { display: none; }
+.modal-card {
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 560px;
+  max-height: 94vh;
+  overflow-y: auto;
+  padding: 14px 16px 16px;
+}
+.modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.modal-title { flex: 1; font-weight: 800; font-size: 1.15rem; }
+.modal-msg { min-height: 1.3em; font-weight: 700; color: var(--primary); text-align: center; margin: 4px 0 6px; font-size: 0.95rem; }
+.modal-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+/* 🛒 상점: 아이템 카드 */
+.shop-section-title { font-weight: 800; margin: 8px 0 2px; }
+.shop-section-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+.shop-grid { display: flex; flex-wrap: wrap; justify-content: center; }
+.shop-item {
+  width: 96px;
+  margin: 5px;
+  padding: 8px 4px 6px;
+  border-radius: 14px;
+  border: 2px solid #c7d2fe;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(31, 35, 64, 0.12);
+  transition: transform 0.15s;
+}
+.shop-item:active { transform: scale(0.94); }
+.shop-item:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+.shop-item .em { font-size: 2rem; line-height: 1.2; }
+.shop-item .nm { font-weight: 700; font-size: 0.85rem; margin-top: 2px; color: var(--text); }
+.shop-item .pr { font-size: 0.85rem; color: #b45309; font-weight: 800; }
+.shop-item .own { font-size: 0.7rem; color: #047857; font-weight: 700; }
+.shop-item .short { font-size: 0.7rem; color: var(--muted); }
+.shop-item.bought { animation: level-pulse 0.6s ease 1; border-color: var(--ok); }
+
+/* 포켓몬 상세: 큰 그림 + 장식/염색 고르기 */
+.mon-hero { display: flex; flex-direction: column; align-items: center; }
+.mon-big { width: 160px; height: 160px; }
+.mon-big .mon-gear { font-size: 52px; }
+.mon-sub { color: var(--muted); font-size: 0.9rem; font-weight: 600; margin-top: 6px; text-align: center; }
+.mon-section { margin-top: 8px; }
+.mon-section-title { font-weight: 800; margin-bottom: 2px; }
+.mon-options { display: flex; flex-wrap: wrap; }
+.mon-opt {
+  border: 2px solid #c7d2fe;
+  background: #fff;
+  border-radius: 12px;
+  padding: 6px 8px;
+  margin: 4px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+  color: var(--text);
+}
+.mon-opt:active { transform: scale(0.94); }
+.mon-opt .em { font-size: 1.6rem; line-height: 1.2; }
+.mon-opt .nm { font-size: 0.8rem; font-weight: 700; }
+.mon-opt .cnt { font-size: 0.7rem; color: var(--muted); }
+.mon-opt.on { border-color: var(--primary); background: #eef2ff; }
+.mon-opt.none .em { color: var(--muted); }
+.mon-empty { color: var(--muted); font-size: 0.85rem; padding: 4px 6px; }
 
 /* ===== 새 버전 안내 ===== */
 .update-toast {

@@ -3,11 +3,12 @@
 import { rarityOf, RARITY, caughtCount, xpToReach } from './xp.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
+import { makeFigure, setFigure } from './items.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const ui = { open: false, run: 0, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, pendingAuto: false };
+const ui = { open: false, run: 0, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, coinGain: 0, pendingAuto: false };
 
 export function initCatch() {
   $('catch-continue').addEventListener('click', finish);
@@ -44,6 +45,7 @@ export function josa(word, withBatchim, without) {
  * @param {object} o
  * @param {Array<{id:number, ko:string, url:string}>} o.candidates 고를 수 있는 포켓몬 (퍼즐에 나온 것)
  * @param {number} [o.xpGain] 방금 얻은 XP (머리글에 표시)
+ * @param {number} [o.coinGain] 방금 얻은 💰 코인 (머리글에 표시)
  * @param {{level:number, into:number, need:number}} o.levelInfo 현재 레벨
  * @param {number} [o.levelUp] 레벨업했으면 새 레벨
  * @param {(id:number) => {caught:boolean, chance:number, count:number, first:boolean, bonusXp:number, info:object}} o.attempt 던지기 판정
@@ -58,6 +60,7 @@ export function openCatch(o) {
   ui.attempt = o.attempt;
   ui.practice = !!o.practice;
   ui.xpGain = o.xpGain || 0;
+  ui.coinGain = o.coinGain || 0;
   ui.pendingAuto = false;
 
   renderHeader(o.xpGain, o.levelInfo, o.levelUp);
@@ -70,7 +73,7 @@ export function openCatch(o) {
   ball.className = 'catch-ball';
   ball.style.transform = '';
   const mon = $('catch-mon');
-  mon.className = 'catch-mon';
+  mon.className = 'catch-mon mon-figure';
   $('catch-fx').textContent = '';
 
   const pick = $('catch-pick');
@@ -81,11 +84,7 @@ export function openCatch(o) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'catch-cand';
-    const img = document.createElement('img');
-    img.src = c.url;
-    img.alt = c.ko;
-    img.draggable = false;
-    btn.appendChild(img);
+    btn.appendChild(makeFigure(c.url, c.ko, c.look));
     const nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = c.ko;
@@ -129,7 +128,7 @@ function renderHeader(xpGain, info, levelUp) {
   const head = $('catch-xp');
   head.innerHTML = '';
   const left = document.createElement('span');
-  left.textContent = ui.practice ? '🎯 잡기 연습' : xpGain ? `⚡ +${xpGain} 경험치!` : '';
+  left.textContent = ui.practice ? '🎯 잡기 연습' : xpGain ? `⚡ +${xpGain} 경험치!${ui.coinGain ? ` 💰 +${ui.coinGain}` : ''}` : '';
   const right = document.createElement('span');
   right.textContent = info ? `Lv.${info.level}  ${info.into}/${info.need}` : '';
   head.appendChild(left);
@@ -179,9 +178,9 @@ async function throwBall(c) {
   const mon = $('catch-mon');
   const ball = $('catch-ball');
   const fx = $('catch-fx');
-  mon.src = c.url;
-  mon.alt = c.ko;
-  mon.className = 'catch-mon';
+  setFigure(mon, c.url, c.look);
+  mon.querySelector('img').alt = c.ko;
+  mon.className = 'catch-mon mon-figure';
   ball.className = 'catch-ball';
   fx.textContent = '';
   fx.style.bottom = '';

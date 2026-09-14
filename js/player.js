@@ -9,7 +9,8 @@ import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook } from './xp.js';
+import { COIN, puzzleCoins, streakCoins, lootBox, itemById } from './items.js';
 import { initCatch, openCatch, closeCatch } from './catch.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
@@ -128,6 +129,7 @@ export function initPlayer(ctx) {
   initCatch();
   initProfile().then(updateLevelChip).catch(() => {});
   $('level-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex()); });
+  $('coin-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex({ shop: true })); });
   // 학습 시간: 재생 중이거나 따라 말하는 중·퍼즐 푸는 중이면 1초씩 누적
   setInterval(() => {
     if (!state.open) return;
@@ -158,11 +160,12 @@ function startPuzzle(continueFn) {
   showPuzzle(cue, (result) => {
     track.puzzle(cue, result);
     const g = awardXp(puzzleXp(result));
+    const c = awardCoins(puzzleCoins(result));
     // 정답이면 퍼즐에 나온 포켓몬 중 한 마리에게 몬스터볼 던지기 (캐릭터가 없으면 그냥 이어감)
     if (result.solved && result.characters && result.characters.length) {
       state.catchOpen = true;
       openCatch({
-        candidates: result.characters, xpGain: g.gained, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
+        candidates: result.characters, xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
         attempt: (id) => catchAttempt(id),
         onDone: () => { state.catchOpen = false; updateLevelChip(); continueFn(); },
       });
@@ -179,9 +182,19 @@ function updateLevelChip() {
   const i = getLevelInfo();
   chip.textContent = `Lv.${i.level} ⚡${i.into}/${i.need}`;
   chip.hidden = false;
+  const cc = $('coin-chip');
+  cc.textContent = `💰 ${coins()}`;
+  cc.hidden = false;
 }
 
-/** XP 획득 + 칩 갱신 + 레벨업 알림 */
+function pulseChip(id) {
+  const chip = $(id);
+  chip.classList.remove('pulse');
+  void chip.offsetWidth;
+  chip.classList.add('pulse');
+}
+
+/** XP 획득 + 칩 갱신 + 레벨업 알림(🎁 선물 상자로 아이템 하나) */
 function awardXp(amount) {
   const g = gainXp(amount);
   track.flush(); // 완료·목표 기록을 XP와 같은 시점에 저장 (강제 종료돼도 중복 지급 안 되게)
@@ -189,19 +202,28 @@ function awardXp(amount) {
   if (g.leveledUp) {
     sfx.levelUp();
     const fresh = unlockCountAt(g.to);
-    showPlayerMessage(fresh ? `🎉 레벨 업! Lv.${g.to} — 새 포켓몬 ${fresh}마리가 나타났어요!` : `🎉 레벨 업! Lv.${g.to}`, 6000);
-    const chip = $('level-chip');
-    chip.classList.remove('pulse');
-    void chip.offsetWidth;
-    chip.classList.add('pulse');
+    const gift = itemById(lootBox());
+    if (gift) addItem(gift.id);
+    const giftMsg = gift ? ` 🎁 선물: ${gift.emoji} ${gift.ko}!` : '';
+    showPlayerMessage((fresh ? `🎉 레벨 업! Lv.${g.to} — 새 포켓몬 ${fresh}마리가 나타났어요!` : `🎉 레벨 업! Lv.${g.to}`) + giftMsg, 7000);
+    pulseChip('level-chip');
   }
   return g;
 }
 
-/** 지금 레벨에서 열려 있는 캐릭터만 (마일스톤 해금) */
+/** 💰 코인 획득 + 칩 갱신. 반환: 얻은 코인 */
+function awardCoins(amount) {
+  const r = gainCoins(amount);
+  if (!r.gained) return 0;
+  updateLevelChip();
+  pulseChip('coin-chip');
+  return r.gained;
+}
+
+/** 지금 레벨에서 열려 있는 캐릭터만 (마일스톤 해금), 장식·염색 상태 포함 */
 function unlockedCharacters() {
   const level = getLevelInfo().level;
-  return state.characters.filter((c) => isUnlocked(c.id, level));
+  return state.characters.filter((c) => isUnlocked(c.id, level)).map((c) => ({ ...c, look: getLook(c.id) }));
 }
 
 /** ⚙ 잡기 연습: 아무 캐릭터 4마리로 연출만 (기록 안 함) */
@@ -320,13 +342,15 @@ function markDone(cue) {
   if (after !== before) {
     ensureStreakDate(); // 자정을 넘겼으면 스트릭 상태를 오늘 기준으로
     awardXp(XP.done); // 오늘 처음 완료한 문장 → 경험치
+    awardCoins(COIN.done);
     // 🔥 오늘 5문장을 채우면 연속 학습일에 들어가고 보너스 (연속일수록 큼)
     if (!state.streakToday && after >= STREAK_MIN_DONE) {
       state.streakToday = true;
       const days = state.streakBase + 1;
       const bonus = streakBonus(days);
       awardXp(bonus);
-      showPlayerMessage(days > 1 ? `🔥 ${days}일 연속 학습! ⚡+${bonus}` : `🔥 오늘 학습 시작! ⚡+${bonus} (내일도 하면 더 많이)`, 4500);
+      const sc = awardCoins(streakCoins(days));
+      showPlayerMessage(days > 1 ? `🔥 ${days}일 연속 학습! ⚡+${bonus} 💰+${sc}` : `🔥 오늘 학습 시작! ⚡+${bonus} 💰+${sc} (내일도 하면 더 많이)`, 4500);
     }
     updateGoalChip();
     if (settings.dailyGoal > 0) {
@@ -334,8 +358,9 @@ function markDone(cue) {
       if (left <= 0 && !track.goalRewarded()) { // 목표 수치를 바꿔도 하루 한 번만
         track.markGoalRewarded();
         awardXp(XP.goal);
-        showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal}`, 5000);
-      } else if (left === 3 && !track.goalRewarded()) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal}!`, 3500);
+        awardCoins(COIN.goal);
+        showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal} 💰+${COIN.goal}`, 5000);
+      } else if (left === 3 && !track.goalRewarded()) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal} 💰+${COIN.goal}!`, 3500);
     }
   }
   // 🧩 퍼즐 후보로 모아둠 (같은 문장을 반복해도 한 번만)
@@ -922,6 +947,7 @@ function onSpeakResult(cue, result) {
     const star = !!(result.score && result.score.ratio >= track.MASTER_RATIO);
     if (star) markStar();
     awardXp(star ? XP.speakStar : XP.speak);
+    awardCoins(star ? COIN.speakStar : COIN.speak);
     if (result.method === 'speech' && result.score) {
       msg.textContent = result.score.ratio >= 0.8 ? '🌟 완벽해요!' : '🎯 잘했어요!';
       sub.textContent = `${result.score.matched}/${result.score.total} 단어 맞음: "${result.transcript}"`;

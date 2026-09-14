@@ -11,7 +11,8 @@ const DB_VERSION = 4;
 //  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved }
 //  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
 // characters (v3): 🎮 퍼즐 캐릭터 그림 { id, ko, en, blob, savedAt } — 인터넷에서 받아 기기에만 보관 (백업에 포함 안 함)
-//  profile (v4):  ⚡ 아이 프로필 { id: 'me', xp, caught: { 포켓몬id: 마릿수 }, throws, catches, updatedAt } — 백업에 포함
+//  profile (v4):  ⚡ 아이 프로필 { id: 'me', xp, caught: { 포켓몬id: 마릿수 }, throws, catches,
+//                 coins, coinsEarned, items: { 아이템id: 개수 }, mons: { 포켓몬id: { gear, dye } }, updatedAt } — 백업에 포함
 const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews', 'profile'];
 
 let dbPromise = null;
@@ -298,12 +299,21 @@ export async function applyProfileDelta(delta) {
   const db = await openDb();
   const tx = db.transaction('profile', 'readwrite');
   const store = tx.objectStore('profile');
-  const cur = (await promisify(store.get('me'))) || { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, updatedAt: 0 };
-  const next = { ...cur, caught: { ...(cur.caught || {}) } };
+  const cur = (await promisify(store.get('me'))) || { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, updatedAt: 0 };
+  const next = { ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) } };
   next.xp = (Number(cur.xp) || 0) + (delta.xp || 0);
   next.throws = (Number(cur.throws) || 0) + (delta.throws || 0);
   next.catches = (Number(cur.catches) || 0) + (delta.catches || 0);
+  next.coins = Math.max(0, (Number(cur.coins) || 0) + (delta.coins || 0));
+  next.coinsEarned = (Number(cur.coinsEarned) || 0) + (delta.coinsEarned || 0);
   for (const id of Object.keys(delta.caught || {})) next.caught[id] = (next.caught[id] || 0) + delta.caught[id];
+  // 🎒 가방: 개수를 더하고(구매 +, 장착·사용 −) 0 이하는 지움
+  for (const id of Object.keys(delta.items || {})) {
+    const n = (next.items[id] || 0) + delta.items[id];
+    if (n > 0) next.items[id] = n; else delete next.items[id];
+  }
+  // 꾸밈: 포켓몬별로 바뀐 필드만 덮어씀
+  for (const id of Object.keys(delta.mons || {})) next.mons[id] = { ...(next.mons[id] || {}), ...delta.mons[id] };
   next.updatedAt = Date.now();
   store.put(next);
   await txDone(tx);
@@ -351,9 +361,14 @@ export function mergeStatRecord(name, cur, rec) {
   } else if (name === 'sessions') {
     for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt', 'puzzles', 'puzzleSolved']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'profile') {
-    for (const k of ['xp', 'throws', 'catches', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['xp', 'throws', 'catches', 'coinsEarned', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
     out.caught = { ...(cur.caught || {}) };
     for (const id of Object.keys(rec.caught || {})) out.caught[id] = maxOf(out.caught[id], rec.caught[id]);
+    // 💰 코인·🎒 가방·꾸밈은 구매·장착으로 줄어드는 값이라 큰 값이 아니라 "최근에 저장된 쪽"을 통째로 씀
+    const latest = (Number(rec.updatedAt) || 0) > (Number(cur.updatedAt) || 0) ? rec : cur;
+    out.coins = Number(latest.coins) || 0;
+    out.items = { ...(latest.items || {}) };
+    out.mons = { ...(latest.mons || {}) };
   }
   return out;
 }

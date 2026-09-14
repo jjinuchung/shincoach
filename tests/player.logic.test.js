@@ -35,6 +35,8 @@ function loadPlayer() {
   const puzzleCalls = [];
   const xpLog = [];
   const catchCalls = [];
+  const coinLog = [];
+  const itemLog = [];
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
@@ -68,12 +70,18 @@ function loadPlayer() {
     puzzleXp: (r) => (r && r.solved ? [30, 20, 10][Math.min(r.wrong || 0, 2)] : 3),
     XP: { done: 2, speak: 3, speakStar: 5, goal: 30 }, streakBefore: () => 0, streakBonus: (n) => Math.min(40, 10 + 5 * (n - 1)), STREAK_MIN_DONE: 5, flushProfile() {},
     initCatch() {}, closeCatch() {}, openCatch(o) { catchCalls.push(o); },
+    // items.js / 코인 스텁: 코인 획득과 🎁 상자 아이템을 기록
+    coinLog, itemLog,
+    coins: () => coinLog.reduce((a, b) => a + b, 0), gainCoins: (n) => { if (n) coinLog.push(n); return { gained: n, coins: 0 }; },
+    addItem: (id) => { itemLog.push(id); return true; }, getLook: () => ({ gear: null, dye: null }),
+    COIN: { done: 1, speak: 2, speakStar: 3, goal: 10 }, puzzleCoins: (r) => (r && r.solved ? [5, 3, 2][Math.min(r.wrong || 0, 2)] : 0),
+    streakCoins: (n) => Math.min(50, 5 * n), lootBox: () => 'cap', itemById: (id) => ({ id, emoji: '🧢', ko: '야구모자' }),
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -569,6 +577,38 @@ test('🔥 스트릭·오늘 목표: 5번째 문장에 스트릭 보너스, 목�
   // 목표를 올려도(7→8) 같은 날엔 다시 안 줌
   run('settings.dailyGoal = 8; markDone(state.cues[7])');
   assert.deepEqual(xpLog.slice(9), [2], '목표 보너스는 하루 한 번');
+});
+
+test('💰 코인: 문장 +1, 스트릭 5×일, 목표 +10, 퍼즐 5/3/2(정답 공개 0) → 잡기 화면에 coinGain, 레벨업엔 🎁 아이템', () => {
+  const { run, coinLog, itemLog, puzzleCalls, catchCalls, ctx, els } = loadPlayer();
+  const keys = new Set();
+  ctx.track.done = (c) => keys.add(c.start);
+  ctx.track.todayDone = () => keys.size;
+  let rewarded = false;
+  ctx.track.goalRewarded = () => rewarded;
+  ctx.track.markGoalRewarded = () => { rewarded = true; };
+  run('settings.dailyGoal = 6; settings.puzzleEvery = 1; settings.listenFirst = 0; state.streakBase = 1; state.streakToday = false; state.streakDate = "2026-09-14"; state.cues = Array.from({length: 8}, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
+  for (let i = 0; i < 6; i++) run(`markDone(state.cues[${i}])`);
+  assert.deepEqual(coinLog, [1, 1, 1, 1, 1, 10, 1, 10], '5번째 문장에 2일 연속 스트릭 💰10, 6번째에 목표 💰10');
+  assert.equal(els['coin-chip'].textContent, '💰 26', '칩에 잔액');
+  run('goTo(1)');
+  puzzleCalls[0].opts.onClose({ solved: true, wrong: 1, characters: [{ id: 25, ko: '피카츄', url: 'x', look: { gear: null, dye: null } }] });
+  assert.equal(coinLog[coinLog.length - 1], 3, '한 번 틀리고 맞춤 💰3');
+  assert.equal(catchCalls[0].coinGain, 3);
+  catchCalls[0].onDone();
+  run('markDone(state.cues[6]); goTo(2)');
+  puzzleCalls[1].opts.onClose({ solved: false, wrong: 3, characters: [] });
+  assert.equal(coinLog.length, 10, '정답 공개는 코인 없음(0은 기록 안 함)');
+  // 레벨업 → 🎁 선물 상자로 아이템 하나
+  ctx.gainXp = (n) => ({ gained: n, leveledUp: true, from: 1, to: 2, info: { level: 2, into: 0, need: 140 } });
+  run('awardXp(100)');
+  assert.deepEqual(itemLog, ['cap']);
+  // 퍼즐·잡기에 넘기는 캐릭터에는 꾸밈 상태(look)가 붙음
+  run('state.characters = [{ id: 25, ko: "피카츄", url: "x" }]');
+  const c = run('unlockedCharacters()[0]');
+  assert.equal(c.id, 25);
+  assert.equal(c.look.gear, null);
+  assert.equal(c.look.dye, null);
 });
 
 test('🔥 자정을 넘기면 스트릭 상태가 오늘 기준으로 다시 계산됨', () => {

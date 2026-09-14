@@ -1,16 +1,49 @@
-// 🎒 내 포켓몬(도감) 화면: 레벨·경험치, 잡은 포켓몬(그림·마릿수), 못 잡은 포켓몬(검은 실루엣 + ???)
+// 🎒 내 포켓몬(도감) 화면: 레벨·경험치·💰 코인, 잡은 포켓몬(그림·마릿수, 누르면 장식·염색), 못 잡은 포켓몬(검은 실루엣 + ???), 🛒 상점
 import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt } from './pokemon.js';
-import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach } from './xp.js';
+import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory } from './xp.js';
 import { listDaily } from './db.js';
 import { todayKey, todayDone } from './track.js';
+import { makeFigure, setFigure, itemById } from './items.js';
+import { initShop, openShop, openMon } from './shop.js';
 
 const $ = (id) => document.getElementById(id);
 let showView;
+let urlById = new Map(); // 포켓몬 id → 그림 객체 URL (열 때 채움)
 
 export function initPokedex(ctx) {
   showView = ctx.showView;
-  $('btn-pokedex').addEventListener('click', openPokedex);
+  $('btn-pokedex').addEventListener('click', () => openPokedex());
   $('btn-pokedex-back').addEventListener('click', () => showView('library'));
+  $('pokedex-shop').addEventListener('click', openShop);
+  initShop({ onChange: refreshAfterChange });
+}
+
+/** 상점에서 사거나 포켓몬을 꾸민 뒤: 코인 표시와 그 포켓몬 자리만 다시 그림 (화면 전체를 다시 그리면 스크롤이 튐) */
+function refreshAfterChange(monId) {
+  renderCoins();
+  if (monId === null || monId === undefined) return;
+  const fig = $('pokedex-main').querySelector(`.mon-figure[data-id="${monId}"]`);
+  if (fig) {
+    setFigure(fig, undefined, getLook(monId));
+    fig.classList.remove('pop');
+    void fig.offsetWidth;
+    fig.classList.add('pop');
+  }
+}
+
+function renderCoins() {
+  $('pokedex-shop').textContent = `💰 ${coins()} · 🛒`;
+  const amt = $('pokedex-main').querySelector('.pokedex-coins .amt');
+  if (amt) amt.textContent = `💰 ${coins()} 코인`;
+  const bag = $('pokedex-main').querySelector('.pokedex-bag');
+  if (bag) bag.textContent = bagText();
+}
+
+/** 🎒 가방 한 줄 요약: "🎩×1 🔴×2" */
+function bagText() {
+  const inv = inventory();
+  const parts = Object.keys(inv).map((id) => itemById(id)).filter(Boolean).map((it) => `${it.emoji}×${inv[it.id]}`);
+  return parts.length ? `가방: ${parts.join(' ')}` : '가방이 비어 있어요';
 }
 
 function el(tag, cls, text) {
@@ -20,9 +53,10 @@ function el(tag, cls, text) {
   return e;
 }
 
-export async function openPokedex() {
+/** 도감 열기. opts.shop = true 면 열자마자 🛒 상점도 띄움 (플레이어 코인 칩에서) */
+export async function openPokedex(opts) {
   const chars = await loadCharacters().catch(() => []);
-  const urlById = new Map(chars.map((c) => [c.id, c.url]));
+  urlById = new Map(chars.map((c) => [c.id, c.url]));
   const info = getLevelInfo();
   const p = getProfileSnapshot();
   const main = $('pokedex-main');
@@ -53,6 +87,17 @@ export async function openPokedex() {
   hint.appendChild(el('span', 'streak', streak > 0 ? `🔥 ${streak}일 연속 학습 중` : `🔥 하루 ${STREAK_MIN_DONE}문장 이상 하면 연속 학습이 시작돼요`));
   if (nextLv) hint.appendChild(el('span', 'unlock', `🔒 Lv.${nextLv}에 새 포켓몬 ${unlockCountAt(nextLv)}마리 — ⚡${xpToReach(nextLv) - p.xp} 남음`));
   card.appendChild(hint);
+  // 💰 코인·🎒 가방·🛒 상점
+  const coinRow = el('div', 'pokedex-coins');
+  const coinLeft = el('div');
+  coinLeft.appendChild(el('div', 'amt', `💰 ${coins()} 코인`));
+  coinLeft.appendChild(el('div', 'pokedex-bag pokedex-stats', bagText()));
+  coinRow.appendChild(coinLeft);
+  const shopBtn = el('button', 'btn btn-primary', '🛒 상점');
+  shopBtn.type = 'button';
+  shopBtn.addEventListener('click', openShop);
+  coinRow.appendChild(shopBtn);
+  card.appendChild(coinRow);
   main.appendChild(card);
 
   if (chars.length === 0) {
@@ -72,16 +117,16 @@ export async function openPokedex() {
       const cell = el('div', 'pokedex-cell' + (n > 0 ? ' got' : ' unknown'));
       const url = urlById.get(m.id);
       if (url) {
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = n > 0 ? m.ko : '???';
-        img.draggable = false;
-        cell.appendChild(img);
+        // 잡은 포켓몬은 장식·염색이 보이고, 누르면 꾸미기 화면
+        const fig = makeFigure(url, n > 0 ? m.ko : '???', n > 0 ? getLook(m.id) : null);
+        fig.dataset.id = String(m.id);
+        cell.appendChild(fig);
       } else {
         cell.appendChild(el('div', 'pokedex-noimg', '?'));
       }
       cell.appendChild(el('div', 'nm', n > 0 ? m.ko : '???'));
       if (n > 1) cell.appendChild(el('div', 'cnt', `×${n}`));
+      if (n > 0) cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url }));
       grid.appendChild(cell);
     }
     sec.appendChild(grid);
@@ -97,20 +142,15 @@ export async function openPokedex() {
     for (const m of list) {
       const cell = el('div', 'pokedex-cell unknown');
       const url = urlById.get(m.id);
-      if (url) {
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = '???';
-        img.draggable = false;
-        cell.appendChild(img);
-      } else {
-        cell.appendChild(el('div', 'pokedex-noimg', '?'));
-      }
+      if (url) cell.appendChild(makeFigure(url, '???', null));
+      else cell.appendChild(el('div', 'pokedex-noimg', '?'));
       cell.appendChild(el('div', 'nm', '???'));
       grid.appendChild(cell);
     }
     sec.appendChild(grid);
     main.appendChild(sec);
   }
+  renderCoins();
   showView('pokedex');
+  if (opts && opts.shop) openShop();
 }

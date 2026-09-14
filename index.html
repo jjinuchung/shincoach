@@ -78,6 +78,7 @@
       <h1 id="player-title" class="topbar-title"></h1>
       <span id="goal-chip" class="goal-chip" hidden></span>
       <button id="level-chip" class="level-chip" aria-label="내 포켓몬" hidden>Lv.1</button>
+      <button id="coin-chip" class="coin-chip" aria-label="상점" hidden>💰 0</button>
       <button id="btn-settings" class="btn btn-icon" aria-label="설정">⚙</button>
     </header>
 
@@ -150,9 +151,49 @@
       <button id="btn-pokedex-back" class="btn btn-icon" aria-label="목록으로">←</button>
       <h1 class="topbar-title">🎒 내 포켓몬</h1>
       <span id="pokedex-level" class="level-chip"></span>
+      <button id="pokedex-shop" class="coin-chip" aria-label="상점">💰 0 · 🛒</button>
     </header>
     <main id="pokedex-main" class="stats-main"></main>
   </section>
+
+  <!-- ===== 🛒 상점 (코인으로 장식·염색약 사기) ===== -->
+  <div id="shop" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="modal-title">🛒 상점</span>
+        <span id="shop-coins" class="coin-chip">💰 0</span>
+        <button type="button" id="shop-close" class="btn btn-icon" aria-label="닫기">✕</button>
+      </div>
+      <div id="shop-msg" class="modal-msg"></div>
+      <div id="shop-list" class="shop-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== 포켓몬 상세: 장식 장착·염색 ===== -->
+  <div id="mon" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span id="mon-title" class="modal-title"></span>
+        <button type="button" id="mon-close" class="btn btn-icon" aria-label="닫기">✕</button>
+      </div>
+      <div class="mon-hero">
+        <span id="mon-figure" class="mon-figure mon-big"><img alt="" draggable="false"></span>
+        <div id="mon-sub" class="mon-sub"></div>
+      </div>
+      <div id="mon-msg" class="modal-msg"></div>
+      <div class="mon-section">
+        <div class="mon-section-title">🎀 장식</div>
+        <div id="mon-gear" class="mon-options"></div>
+      </div>
+      <div class="mon-section">
+        <div class="mon-section-title">🎨 염색</div>
+        <div id="mon-dye" class="mon-options"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="mon-to-shop" class="btn">🛒 상점 가기</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== 🎯 포켓몬 잡기 (퍼즐 정답 뒤: 경험치 + 몬스터볼 던지기) ===== -->
   <div id="catch" class="catch" hidden>
@@ -164,7 +205,7 @@
       <div id="catch-msg" class="catch-msg"></div>
       <div id="catch-pick" class="catch-pick"></div>
       <div id="catch-stage" class="catch-stage" hidden>
-        <img id="catch-mon" class="catch-mon" alt="" draggable="false">
+        <span id="catch-mon" class="catch-mon mon-figure"><img alt="" draggable="false"></span>
         <div id="catch-ball" class="catch-ball"></div>
         <div id="catch-fx" class="catch-fx"></div>
       </div>
