@@ -39,6 +39,7 @@ test('희귀도: 명단 60마리 전부 등급이 있고 겹치지 않음', () =
   assert.deepEqual(new Set(all), new Set(ROSTER.map((r) => r.id)));
   assert.equal(rarityOf(25), 2, '피카츄 보통');
   assert.equal(rarityOf(150), 4, '뮤츠 전설');
+  assert.equal(rarityOf(149), 3, '망나뇽은 전설이 아님 (아이 지적)');
   assert.equal(rarityOf(99999), 2, '모르면 보통');
 });
 

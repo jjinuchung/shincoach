@@ -58,6 +58,7 @@ const state = {
   streakBase: 0,      // 🔥 어제까지의 연속 학습일 (오늘 5문장 채우면 +1)
   streakToday: false, // 오늘 5문장을 채워 스트릭에 들어갔는지
   streakDate: '',     // 위 두 값의 기준 날짜 (자정을 넘기면 다시 계산)
+  parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -130,19 +131,42 @@ export function initPlayer(ctx) {
   initProfile().then(updateLevelChip).catch(() => {});
   $('level-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex()); });
   $('coin-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex({ shop: true })); });
-  // 학습 시간: 재생 중이거나 따라 말하는 중·퍼즐 푸는 중이면 1초씩 누적
+  $('parent-chip').addEventListener('click', () => setParentMode(false)); // 끄는 건 비밀번호 없이 (학습 모드로 돌아가는 것이라 안전)
+  // 학습 시간: 재생 중이거나 따라 말하는 중·퍼즐 푸는 중이면 1초씩 누적 (부모 모드는 학습이 아니므로 제외 → 세션도 저장되지 않음)
   setInterval(() => {
-    if (!state.open) return;
+    if (!state.open || state.parentMode) return;
     const cue = state.cues[state.idx];
     if (cue && (!video.paused || state.speakRun || state.puzzleCue)) track.tick(cue, 1);
   }, 1000);
+}
+
+// ───────────────────── 👨‍👩‍👦 부모 모드 (그냥 보기) ─────────────────────
+
+/**
+ * 부모 모드 켜기/끄기. 켜면 진행 중인 따라 말하기·말하기 확인을 끝내고 영어를 바로 보여줌.
+ * 끌 때 현재 문장은 이미 본 것이므로 공개 상태로 두고, 다음 문장부터 학습 장치가 다시 걸림
+ */
+function setParentMode(on) {
+  on = !!on;
+  if (state.parentMode === on) { updateChips(); return; }
+  state.parentMode = on;
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (on) {
+    state.enRevealed = true;
+    state.speakHideEn = 'none';
+    if (state.idx >= 0) markScriptRevealed();
+  }
+  applySubVisibility();
+  updateChips();
+  if (state.open) showPlayerMessage(on ? '👀 그냥 보기: 자막 보면서 끝까지 이어서 재생돼요' : '🎓 다시 학습 모드예요', 3500);
 }
 
 // ───────────────────── 🧩 문장 퍼즐 ─────────────────────
 
 /** N문장이 차서 다음 문장으로 넘어가기 전에 퍼즐을 낼 차례인지 */
 function puzzleReady() {
-  if (settings.puzzleEvery <= 0) return false;
+  if (settings.puzzleEvery <= 0 || state.parentMode) return false;
   // 오늘 첫 퍼즐은 5문장(하루 최소 학습량)에 한 번 → 조금만 해도 잡기 기회가 생김. 그 뒤로는 설정 간격대로
   const need = track.todayPuzzles() === 0 ? Math.min(STREAK_MIN_DONE, settings.puzzleEvery) : settings.puzzleEvery;
   return state.puzzlePool.length >= need;
@@ -181,10 +205,10 @@ function updateLevelChip() {
   const chip = $('level-chip');
   const i = getLevelInfo();
   chip.textContent = `Lv.${i.level} ⚡${i.into}/${i.need}`;
-  chip.hidden = false;
+  chip.hidden = state.parentMode; // 부모 모드에서는 학습 칩 숨김 (안 쌓이니까)
   const cc = $('coin-chip');
   cc.textContent = `💰 ${coins()}`;
-  cc.hidden = false;
+  cc.hidden = state.parentMode;
 }
 
 function pulseChip(id) {
@@ -336,6 +360,7 @@ function endPuzzlePlayback() {
 
 /** 문장을 영어 공개 상태로 끝까지 들음 → 기록 + 오늘의 목표 갱신 */
 function markDone(cue) {
+  if (state.parentMode) return; // 그냥 보기는 학습이 아님 → 기록·XP·코인·퍼즐 후보 전부 없음
   const before = track.todayDone();
   track.done(cue);
   const after = track.todayDone();
@@ -376,7 +401,7 @@ function markStar() {
 function updateGoalChip() {
   const chip = $('goal-chip');
   if (!chip) return;
-  if (!settings.dailyGoal) { chip.hidden = true; return; }
+  if (!settings.dailyGoal || state.parentMode) { chip.hidden = true; return; } // 부모 모드에서는 학습 칩 숨김 (안 쌓이니까)
   const n = track.todayDone();
   chip.hidden = false;
   const days = state.streakBase + (state.streakToday ? 1 : 0);
@@ -410,7 +435,7 @@ function initVocabPanel() {
   try { panel.open = localStorage.getItem('shincoach.vocabOpen') === '1'; } catch { /* 무시 */ }
   panel.addEventListener('toggle', () => {
     try { localStorage.setItem('shincoach.vocabOpen', panel.open ? '1' : '0'); } catch { /* 무시 */ }
-    if (panel.open && state.vocabItems) track.vocab(state.cues[state.idx], state.vocabItems, true); // 직접 눌러 펼침
+    if (panel.open && state.vocabItems && !state.parentMode) track.vocab(state.cues[state.idx], state.vocabItems, true); // 직접 눌러 펼침
   });
   loadVocab().then((v) => { state.vocab = v; renderVocab(); });
 }
@@ -424,7 +449,7 @@ function renderVocab() {
   state.vocabItems = items;
   if (items.length === 0) { panel.hidden = true; return; }
   if (panel.open && state.vocabLoggedStart !== cue.start) { // 열린 채 보임 (문장당 1번만)
-    track.vocab(cue, items, false);
+    if (!state.parentMode) track.vocab(cue, items, false);
     state.vocabLoggedStart = cue.start;
   }
   const list = $('vocab-list');
@@ -562,7 +587,7 @@ function buildCues(item) {
 /** i번째 문장으로 이동 */
 /** 말하기 확인이 켜져 있고 아직 통과 못 했으면 앞으로 못 넘어감 */
 function speakGateBlocks(targetIdx) {
-  if (!settings.speakCheck || state.speakUnavailable) return false;
+  if (!settings.speakCheck || state.speakUnavailable || state.parentMode) return false;
   if (state.idx < 0 || state.speakPassed) return false;
   return targetIdx > state.idx;
 }
@@ -571,7 +596,7 @@ function speakGateBlocks(targetIdx) {
 function resetSentenceState() {
   state.repeatCount = 0;
   state.listenCount = 0;
-  state.enRevealed = settings.listenFirst === 0; // 듣기 먼저 모드면 새 문장은 영어 숨김으로 시작
+  state.enRevealed = settings.listenFirst === 0 || state.parentMode; // 듣기 먼저 모드면 새 문장은 영어 숨김으로 시작 (부모 모드는 항상 공개)
   state.speakPassed = false;
   state.speakFails = 0;
 }
@@ -634,8 +659,8 @@ function hidePlayerMessage() {
 function onPlayButton() {
   unlock(); // 첫 터치에서 효과음 오디오 준비
   if (state.shadowTimer || state.speakRun) { skipShadowWait(); return; }
-  // 첫 재생(사용자 터치) 때 마이크 권한을 미리 받아 둠
-  if (settings.speakCheck && !state.speakUnavailable && !state.micPrepared) {
+  // 첫 재생(사용자 터치) 때 마이크 권한을 미리 받아 둠 (부모 모드는 말하기 확인이 없으니 안 물어봄)
+  if (settings.speakCheck && !state.speakUnavailable && !state.micPrepared && !state.parentMode) {
     state.micPrepared = true;
     prepareMic().then((stream) => {
       if (!stream) { state.speakUnavailable = true; showPlayerMessage('🎤 마이크를 쓸 수 없어 말하기 확인 없이 진행해요', 4000); }
@@ -726,7 +751,7 @@ function onVideoEnded() {
   if (state.puzzleCue) { endPuzzlePlayback(); return; } // 퍼즐 다시 듣기가 영상 끝까지 간 경우
   // rAF가 마지막 문장 끝을 놓친 경우: 남은 반복/섀도잉을 여기서 처리
   const cue = state.cues[state.idx];
-  if (!cue) return;
+  if (!cue || state.parentMode) return; // 부모 모드: 영상이 끝나면 그냥 멈춤
   const repeatMax = REPEATS[state.repeatIdx];
   const repeatLeft = repeatMax > 0 && state.repeatCount < repeatMax - 1;
   if (repeatLeft || state.shadow) onCueEnd();
@@ -735,6 +760,13 @@ function onVideoEnded() {
 function onCueEnd() {
   const repeatMax = REPEATS[state.repeatIdx];
   const cue = state.cues[state.idx];
+
+  // 👨‍👩‍👦 부모 모드: 기록 없이 다음 문장으로 이어서, 마지막이면 멈춤
+  if (state.parentMode) {
+    if (state.idx >= state.cues.length - 1) { video.pause(); return; }
+    advanceContinuous();
+    return;
+  }
   track.play(cue, state.idx);
 
   // 듣기 먼저: 영어를 숨긴 채 N번 들을 때까지 같은 문장을 반복, N번째가 끝나면 영어 공개
@@ -793,7 +825,11 @@ function onCueEnd() {
     return;
   }
 
-  // 연속 재생: 다음 문장으로 — 문장별 상태(듣기 먼저·말하기 확인)는 goTo와 똑같이 초기화, 재생은 끊지 않음
+  advanceContinuous();
+}
+
+/** 연속 재생: 다음 문장으로 — 문장별 상태(듣기 먼저·말하기 확인)는 goTo와 똑같이 초기화, 재생은 끊지 않음 */
+function advanceContinuous() {
   state.idx++;
   resetSentenceState();
   const next = state.cues[state.idx];
@@ -1052,7 +1088,7 @@ function applySubVisibility() {
   const list = $('script-list');
   list.classList.toggle('hide-en', !state.showEn);
   list.classList.toggle('hide-ko', !state.showKo);
-  list.classList.toggle('listen-first', settings.listenFirst > 0);
+  list.classList.toggle('listen-first', settings.listenFirst > 0 && !state.parentMode); // 부모 모드는 목록 영어도 전부 보임
   list.classList.toggle('speak-hide', hide !== 'none'); // 목록의 현재 문장 영어도 가림 (절반 힌트 때도 목록은 통째로)
   renderVocab();
 }
@@ -1113,6 +1149,7 @@ function highlightScript() {
 // ───────────────────── 반복/속도/섀도잉 버튼 ─────────────────────
 
 function cycleRepeat() {
+  if (state.parentMode) { showPlayerMessage('👀 그냥 보기 중에는 반복이 쉬어요', 2500); return; }
   state.repeatIdx = (state.repeatIdx + 1) % REPEATS.length;
   state.repeatCount = 0;
   updateChips();
@@ -1127,6 +1164,7 @@ function cycleSpeed() {
 }
 
 function toggleShadow() {
+  if (state.parentMode) { showPlayerMessage('👀 그냥 보기 중에는 섀도잉이 쉬어요', 2500); return; }
   state.shadow = !state.shadow;
   if (!state.shadow) cancelShadowWait();
   updateChips();
@@ -1146,6 +1184,12 @@ function updateChips() {
   $('btn-speed').firstChild.textContent = sp < 1 ? '🐢 ' : sp > 1 ? '🐇 ' : '🚶 ';
 
   $('btn-shadow').dataset.state = state.shadow ? 'on' : 'off';
+  // 👨‍👩‍👦 부모 모드: 상단에 칩, 반복·섀도잉 칩은 흐리게
+  $('parent-chip').hidden = !state.parentMode;
+  updateGoalChip();
+  updateLevelChip();
+  repeatBtn.classList.toggle('parent-off', state.parentMode);
+  $('btn-shadow').classList.toggle('parent-off', state.parentMode);
 }
 
 // ───────────────────── 키보드 (PC 테스트용) ─────────────────────
@@ -1226,6 +1270,7 @@ function initSettingsDialog() {
   $('set-catch-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startCatchPractice(); });
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
+    setParentMode($('set-parent').checked); // 저장하지 않음 (앱을 다시 열면 학습 모드)
     const mergeChanged = settings.mergeSentences !== $('set-merge').checked;
     settings.mergeSentences = $('set-merge').checked;
     settings.shadowFactor = Number($('set-shadow-factor').value);
@@ -1292,7 +1337,7 @@ export function requirePin(onOk) {
 }
 
 function openSettings() {
-  requirePin(() => { renderDiag(); $('dlg-settings').showModal(); });
+  requirePin(() => { renderDiag(); $('set-parent').checked = state.parentMode; $('dlg-settings').showModal(); });
 }
 
 function initPinDialog() {

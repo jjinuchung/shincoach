@@ -819,9 +819,27 @@ button { font-family: inherit; }
 }
 .coin-chip[hidden] { display: none; }
 .coin-chip.pulse { animation: level-pulse 0.8s ease 2; }
-/* 폰 폭에서는 상단 칩 3개(목표·레벨·코인)가 제목을 밀어내므로 조금 촘촘하게 */
+/* ===== 👨‍👩‍👦 부모 모드(그냥 보기) 칩: 켜져 있는 동안 상단에 계속 보이고, 누르면 학습 모드로 복귀 ===== */
+.parent-chip {
+  border: 2px solid #6ee7b7;
+  background: #ecfdf5;
+  color: #047857;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 0;
+}
+.parent-chip[hidden] { display: none; }
+.parent-row { background: #ecfdf5; border: 2px solid #6ee7b7; border-radius: 12px; padding: 8px 10px; }
+/* 부모 모드 중에는 반복·섀도잉 칩이 쉼 (눌러도 효과 없음) */
+.btn-chip.parent-off { opacity: 0.4; }
+/* 폰 폭에서는 상단 칩(목표·레벨·코인·그냥 보기)이 제목을 밀어내므로 조금 촘촘하게 */
 @media (max-width: 480px) {
-  .goal-chip, .level-chip, .coin-chip { padding: 4px 7px; font-size: 0.82rem; }
+  .goal-chip, .level-chip, .coin-chip, .parent-chip { padding: 4px 7px; font-size: 0.82rem; }
   .topbar { gap: 6px; }
 }
 

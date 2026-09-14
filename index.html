@@ -76,6 +76,7 @@
     <header class="topbar">
       <button id="btn-back" class="btn btn-icon" aria-label="목록으로">←</button>
       <h1 id="player-title" class="topbar-title"></h1>
+      <button id="parent-chip" class="parent-chip" aria-label="학습 모드로 돌아가기" hidden>👀 그냥 보기 ✕</button>
       <span id="goal-chip" class="goal-chip" hidden></span>
       <button id="level-chip" class="level-chip" aria-label="내 포켓몬" hidden>Lv.1</button>
       <button id="coin-chip" class="coin-chip" aria-label="상점" hidden>💰 0</button>
@@ -263,6 +264,11 @@
   <dialog id="dlg-settings" class="dialog">
     <form id="form-settings" method="dialog">
       <h2>설정</h2>
+
+      <label class="field field-row parent-row">
+        <input type="checkbox" id="set-parent">
+        <span class="field-label">👨‍👩‍👦 부모 모드 — 그냥 보기 <small>— 반복·듣기 먼저·따라 말하기·퍼즐 없이 끝까지 이어서 재생. 학습 기록·경험치는 쌓이지 않고, 앱을 다시 열면 꺼져요</small></span>
+      </label>
 
       <label class="field field-row">
         <input type="checkbox" id="set-merge">

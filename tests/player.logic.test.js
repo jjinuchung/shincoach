@@ -611,6 +611,53 @@ test('💰 코인: 문장 +1, 스트릭 5×일, 목표 +10, 퍼즐 5/3/2(정답 
   assert.equal(c.look.dye, null);
 });
 
+test('👨‍👩‍👦 부모 모드: 반복·듣기 먼저·말하기 확인·퍼즐 없이 이어서 재생, 기록·XP 없음, 마지막이면 멈춤', () => {
+  const { run, video, els, xpLog, coinLog, puzzleCalls, ctx } = loadPlayer();
+  const plays = []; const dones = [];
+  ctx.track.play = (c) => plays.push(c.start);
+  ctx.track.done = (c) => dones.push(c.start);
+  run(FIVE_CUES + ' settings.listenFirst = 3; settings.speakCheck = true; settings.puzzleEvery = 1; state.repeatIdx = 3; state.shadow = true; state.idx = -1;');
+  run('setParentMode(true)');
+  assert.equal(run('state.parentMode'), true);
+  assert.equal(els['parent-chip'].hidden, false, '상단 칩 표시');
+  assert.ok(els['btn-repeat'].classList.contains('parent-off'), '반복 칩 흐림');
+  run('goTo(0)');
+  assert.equal(run('state.enRevealed'), true, '듣기 먼저여도 영어 바로 공개');
+  video.paused = false; video.currentTime = 2;
+  run('onCueEnd()');
+  assert.equal(run('state.idx'), 1, '반복 ∞·섀도잉·말하기 확인이 켜져 있어도 다음 문장으로');
+  assert.equal(video.paused, false, '재생 안 끊김');
+  assert.equal(run('state.shadowTimer'), null);
+  assert.equal(run('state.speakRun'), null);
+  assert.deepEqual(plays, [], '재생 기록 없음');
+  assert.deepEqual(dones, [], '완료 기록 없음');
+  assert.deepEqual(xpLog, []); assert.deepEqual(coinLog, []);
+  assert.equal(puzzleCalls.length, 0, '퍼즐 안 나옴');
+  run('goTo(3)');
+  assert.equal(run('state.idx'), 3, '말하기 확인 게이트 없이 앞으로 이동');
+  run('goTo(4)'); video.currentTime = 42; run('onCueEnd()');
+  assert.equal(run('state.idx'), 4, '마지막 문장은 그대로');
+  assert.equal(video.paused, true, '마지막 문장 끝에서 멈춤');
+  assert.equal(run('state.puzzlePool.length'), 0, '퍼즐 후보도 안 쌓임');
+  // 끄면 다음 문장부터 학습 장치가 돌아옴
+  run('setParentMode(false); goTo(0)');
+  assert.equal(els['parent-chip'].hidden, true);
+  assert.equal(run('state.enRevealed'), false, '듣기 먼저 다시 적용');
+  video.currentTime = 2; run('onCueEnd()');
+  assert.equal(run('state.idx'), 0, '듣기 먼저 반복으로 같은 문장');
+  assert.deepEqual(plays, [0]);
+});
+
+test('👨‍👩‍👦 부모 모드는 저장되지 않음 — 설정 저장에도 settings에 안 들어감', () => {
+  const { run, ctx } = loadPlayer();
+  const saved = [];
+  ctx.localStorage.setItem = (k, v) => saved.push([k, v]);
+  run('setParentMode(true); saveSettings()');
+  const s = saved.find(([k]) => k === 'shincoach.settings');
+  assert.ok(s, '설정은 저장됨');
+  assert.equal(s[1].includes('parent'), false, '부모 모드는 설정 파일에 없음');
+});
+
 test('🔥 자정을 넘기면 스트릭 상태가 오늘 기준으로 다시 계산됨', () => {
   const { run, xpLog, ctx } = loadPlayer();
   const keys = new Set();
