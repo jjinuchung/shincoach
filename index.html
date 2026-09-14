@@ -77,6 +77,7 @@
       <button id="btn-back" class="btn btn-icon" aria-label="목록으로">←</button>
       <h1 id="player-title" class="topbar-title"></h1>
       <button id="parent-chip" class="parent-chip" aria-label="학습 모드로 돌아가기" hidden>👀 그냥 보기 ✕</button>
+      <button id="partner-chip" class="partner-chip" aria-label="파트너 포켓몬" hidden><span class="mon-figure partner-face"><img alt="" draggable="false"></span><span id="partner-hp">❤️ 100</span></button>
       <span id="goal-chip" class="goal-chip" hidden></span>
       <button id="level-chip" class="level-chip" aria-label="내 포켓몬" hidden>Lv.1</button>
       <button id="coin-chip" class="coin-chip" aria-label="상점" hidden>💰 0</button>
@@ -182,6 +183,11 @@
         <div id="mon-sub" class="mon-sub"></div>
       </div>
       <div id="mon-msg" class="modal-msg"></div>
+      <div class="mon-section" id="mon-hp-section">
+        <div class="mon-section-title">❤️ HP <span id="mon-hp-text" class="mon-hp-text"></span></div>
+        <div class="mon-hpbar"><div id="mon-hp-fill" class="mon-hp-fill"></div></div>
+        <div id="mon-potion" class="mon-options"></div>
+      </div>
       <div class="mon-section">
         <div class="mon-section-title">🎀 장식</div>
         <div id="mon-gear" class="mon-options"></div>
@@ -191,6 +197,7 @@
         <div id="mon-dye" class="mon-options"></div>
       </div>
       <div class="modal-actions">
+        <button type="button" id="mon-partner" class="btn btn-primary">🤝 파트너로!</button>
         <button type="button" id="mon-to-shop" class="btn">🛒 상점 가기</button>
       </div>
     </div>
@@ -322,6 +329,11 @@
       <div class="field-actions">
         <button type="button" id="set-catch-try" class="btn">🎯 잡기 연습 <small>— 몬스터볼 던지기 연출 보기 (기록 안 함)</small></button>
       </div>
+
+      <label class="field field-row">
+        <input type="checkbox" id="set-hp">
+        <span class="field-label">❤️ 파트너 HP <small>— 퍼즐 정답 공개·따라 말하기 넘김·하루 빠짐에 깎이고 🧪 물약·오늘 목표로 회복. 여행처럼 사정이 있으면 잠깐 끄기</small></span>
+      </label>
 
       <label class="field field-row">
         <input type="checkbox" id="set-sfx">

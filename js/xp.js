@@ -2,7 +2,7 @@
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import { getProfile, applyProfileDelta } from './db.js';
-import { itemById } from './items.js';
+import { itemById, HP } from './items.js';
 
 // ── 경험치 ──
 export const XP = {
@@ -101,13 +101,13 @@ export function rollCatch(chance, rng = Math.random) {
 
 // ── 프로필 (아이 한 명) ──
 
-// coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye } }
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, updatedAt: 0 });
+// coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
-// 수치(xp·coins…)와 개수(caught·items)는 더하고, mons는 포켓몬별로 덮어씀
-const emptyDelta = () => ({ xp: 0, throws: 0, catches: 0, coins: 0, coinsEarned: 0, caught: {}, items: {}, mons: {} });
+// 수치(xp·coins…)와 개수(caught·items)는 더하고, mons는 포켓몬별로 덮어씀, partner는 정해지면 그 값으로
+const emptyDelta = () => ({ xp: 0, throws: 0, catches: 0, coins: 0, coinsEarned: 0, caught: {}, items: {}, mons: {}, partner: undefined });
 let pending = emptyDelta();
 let flushChain = Promise.resolve();
 
@@ -120,10 +120,11 @@ function mergeDelta(into, d) {
   for (const id of Object.keys(d.caught || {})) into.caught[id] = (into.caught[id] || 0) + d.caught[id];
   for (const id of Object.keys(d.items || {})) into.items[id] = (into.items[id] || 0) + d.items[id];
   for (const id of Object.keys(d.mons || {})) into.mons[id] = { ...(into.mons[id] || {}), ...d.mons[id] };
+  if (d.partner !== undefined) into.partner = d.partner;
 }
 
 function isEmptyDelta(d) {
-  return !d.xp && !d.throws && !d.catches && !d.coins && !d.coinsEarned
+  return !d.xp && !d.throws && !d.catches && !d.coins && !d.coinsEarned && d.partner === undefined
     && !Object.keys(d.caught).length && !Object.keys(d.items).length && !Object.keys(d.mons).length;
 }
 
@@ -159,7 +160,18 @@ export async function initProfile() {
     if (p) profile = fromStored(p);
   } catch { /* 저장소 문제면 메모리로만 */ }
   loaded = true;
+  ensurePartner();
   return profile;
+}
+
+/** 🤝 파트너가 없는데 잡은 포켓몬이 있으면(파트너 기능 이전에 잡은 아이) 가장 많이 잡은 포켓몬을 파트너로 */
+function ensurePartner() {
+  if (profile.partner) return;
+  const ids = Object.keys(profile.caught).filter((k) => profile.caught[k] > 0);
+  if (!ids.length) return;
+  const best = ids.reduce((a, b) => (profile.caught[b] > profile.caught[a] ? b : a));
+  profile.partner = Number(best);
+  addDelta({ partner: profile.partner });
 }
 
 export function getProfileSnapshot() {
@@ -189,6 +201,7 @@ export function catchAttempt(id, rng = Math.random) {
   let first = false;
   let bonusXp = 0;
   const delta = { throws: 1, catches: 0, xp: 0, caught: {} };
+  let partnerSet = false;
   if (caught) {
     profile.catches++;
     delta.catches = 1;
@@ -196,9 +209,10 @@ export function catchAttempt(id, rng = Math.random) {
     profile.caught[id] = (profile.caught[id] || 0) + 1;
     delta.caught[id] = 1;
     if (!first) { bonusXp = XP.recatch; profile.xp += bonusXp; delta.xp = bonusXp; }
+    if (!profile.partner) { profile.partner = id; delta.partner = id; partnerSet = true; } // 🤝 처음 잡은 포켓몬이 자동으로 파트너
   }
   addDelta(delta);
-  return { caught, chance, count: profile.caught[id] || 0, first, bonusXp, info: getLevelInfo() };
+  return { caught, chance, count: profile.caught[id] || 0, first, bonusXp, partnerSet, info: getLevelInfo() };
 }
 
 /** ⚙ 잡기 연습용: 기록하지 않고 판정만 (확률은 실제와 같음) */
@@ -261,10 +275,58 @@ export function buyItem(id) {
   return true;
 }
 
-/** 포켓몬의 꾸밈 상태 → { gear, dye } (없으면 null 필드) */
+/** 포켓몬의 꾸밈·상태 → { gear, dye, hp } (없으면 null 필드, hp는 기본 100) */
 export function getLook(monId) {
   const m = profile.mons[monId] || {};
-  return { gear: m.gear || null, dye: m.dye || null };
+  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId) };
+}
+
+// ── ❤️ HP · 🤝 파트너 · 🧪 물약 ──
+
+export function getPartner() {
+  return profile.partner || null;
+}
+
+/** 파트너 지정 (잡은 포켓몬만) */
+export function setPartner(monId) {
+  if (!profile.caught[monId]) return false;
+  profile.partner = monId;
+  addDelta({ partner: monId });
+  return true;
+}
+
+/** 포켓몬 HP (기록이 없으면 가득) */
+export function hpOf(monId) {
+  const m = profile.mons[monId];
+  const hp = m && typeof m.hp === 'number' ? m.hp : HP.max;
+  return Math.max(0, Math.min(HP.max, hp));
+}
+
+export function isTired(monId) {
+  return hpOf(monId) === 0;
+}
+
+/** HP 더하기/빼기 (0~max로 잘라 저장) → { from, to } */
+export function changeHp(monId, delta) {
+  const from = hpOf(monId);
+  const to = Math.max(0, Math.min(HP.max, from + Math.round(delta || 0)));
+  if (to !== from) {
+    profile.mons[monId] = { ...(profile.mons[monId] || {}), hp: to };
+    addDelta({ mons: { [monId]: { hp: to } } });
+  }
+  return { from, to };
+}
+
+/** 🧪 물약 먹이기 (가방에서 하나 소모) → { ok, from, to } */
+export function usePotion(monId, potionId) {
+  const it = itemById(potionId);
+  if (!it || it.kind !== 'potion' || (profile.items[potionId] || 0) < 1) return { ok: false, from: hpOf(monId), to: hpOf(monId) };
+  profile.items[potionId] -= 1;
+  const from = hpOf(monId);
+  const to = Math.min(HP.max, from + it.heal);
+  profile.mons[monId] = { ...(profile.mons[monId] || {}), hp: to };
+  addDelta({ items: { [potionId]: -1 }, mons: { [monId]: { hp: to } } });
+  return { ok: true, from, to };
 }
 
 /** 🎀 장식 장착(gearId) / 벗기(null). 이전 장식은 가방으로, 새 장식은 가방에서. 가방에 없으면 false */

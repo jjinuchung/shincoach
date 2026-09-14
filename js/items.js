@@ -1,4 +1,4 @@
-// 🛒 아이템: 💰 코인 규칙, 상점 카탈로그(🎀 장식·🎨 염색약), 🎁 랜덤 상자, 꾸민 포켓몬 그림(figure) 만들기
+// 🛒 아이템: 💰 코인 규칙, 상점 카탈로그(🎀 장식·🎨 염색약·🧪 물약), ❤️ HP 규칙, 🎁 랜덤 상자, 꾸민 포켓몬 그림(figure) 만들기
 // 그림은 이모지 오버레이 + CSS filter 라 파일이 필요 없음 (오프라인·저작권 문제 없음)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 DOM 헬퍼. 프로필(코인·가방·꾸밈 상태)은 xp.js 가 들고 있음
 
@@ -51,9 +51,25 @@ export const DYE = [
   { id: 'shiny', emoji: '✨', ko: '반짝반짝', price: 150, filter: '', cls: 'shiny' }, // 무지개로 반짝이는 색 (CSS 애니메이션)
 ];
 
+// ── 🧪 물약: 소모품. 파트너 HP 회복 ──
+export const POTION = [
+  { id: 'potion', emoji: '🧪', ko: '물약', price: 10, heal: 30 },
+  { id: 'potion_big', emoji: '⚗️', ko: '큰 물약', price: 25, heal: 100 },
+];
+
+// ── ❤️ HP: 파트너 한 마리에게만. "틀림"이 아니라 "대충 넘김·안 함"에만 깎임 (틀리는 건 배움의 과정) ──
+export const HP = {
+  max: 100,
+  revealed: -20,     // 퍼즐 3번 틀려 정답 공개
+  speakSkipped: -10, // 말하기 3번 미달로 그냥 통과
+  missedDay: -30,    // 어제 학습 안 함 (5문장 미만) → 오늘 첫 진입 때 한 번
+  goalHeal: 20,      // 오늘 목표 달성 → 자동 회복
+};
+
 export const ITEMS = [
   ...GEAR.map((g) => ({ ...g, kind: 'gear' })),
   ...DYE.map((d) => ({ ...d, kind: 'dye' })),
+  ...POTION.map((p) => ({ ...p, kind: 'potion' })),
 ];
 const byId = {};
 for (const it of ITEMS) byId[it.id] = it;
@@ -78,7 +94,7 @@ export function canBuy(id, coins) {
 
 // ── DOM 헬퍼: 꾸민 포켓몬 그림 ──
 // <span class="mon-figure [cls]"><img> [<span class="mon-gear head|face">🎩</span>]</span>
-// 크기는 호출하는 쪽 CSS(.puzzle-char, .pokedex-cell 등)가 정함. look = { gear, dye } (xp.getLook)
+// 크기는 호출하는 쪽 CSS(.puzzle-char, .pokedex-cell 등)가 정함. look = { gear, dye, hp } (xp.getLook). hp가 0이면 😴 쉬는 중(회색·누움)
 
 /** 새 figure 만들기 */
 export function makeFigure(url, alt, look, cls) {
@@ -106,4 +122,10 @@ export function setFigure(fig, url, look) {
     g.className = 'mon-gear ' + (gear.pos || 'head');
     g.textContent = gear.emoji;
   } else if (g) g.remove();
+  const tired = !!(look && look.hp === 0);
+  fig.classList.toggle('tired', tired);
+  let z = fig.querySelector('.mon-zzz');
+  if (tired) {
+    if (!z) { z = document.createElement('span'); z.className = 'mon-zzz'; z.textContent = '💤'; fig.appendChild(z); }
+  } else if (z) z.remove();
 }

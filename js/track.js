@@ -48,6 +48,7 @@ function rollDailyIfNeeded() {
     t.daily.puzzles += existing.puzzles || 0;
     t.daily.puzzleSolved += existing.puzzleSolved || 0;
     t.daily.goalRewarded = !!(t.daily.goalRewarded || existing.goalRewarded);
+    t.daily.hpMissed = !!(t.daily.hpMissed || existing.hpMissed);
     t.dailyDirty = true;
   }).catch(() => {});
 }
@@ -191,6 +192,16 @@ export function goalRewarded() {
 export function markGoalRewarded() {
   if (!t.daily) return;
   t.daily.goalRewarded = true;
+  t.dailyDirty = true;
+}
+
+/** ❤️ "어제 학습 안 함" HP 감소를 오늘 이미 적용했는지 / 적용했다고 표시 (하루 한 번) */
+export function hpMissedApplied() {
+  return !!(t.daily && t.daily.hpMissed);
+}
+export function markHpMissed() {
+  if (!t.daily) return;
+  t.daily.hpMissed = true;
   t.dailyDirty = true;
 }
 

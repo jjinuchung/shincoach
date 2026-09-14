@@ -37,6 +37,8 @@ function loadPlayer() {
   const catchCalls = [];
   const coinLog = [];
   const itemLog = [];
+  const hpLog = [];
+  const hpState = { partner: null, hp: {}, opened: null };
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
@@ -54,14 +56,14 @@ function loadPlayer() {
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, MASTER_RATIO: 0.8, puzzle() {} },
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, hpMissedApplied: () => false, markHpMissed() {}, MASTER_RATIO: 0.8, puzzle() {} },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
     puzzleCalls,
     initPuzzle() {}, closePuzzle() {},
     openPuzzle(cue, opts) { puzzleCalls.push({ cue, opts }); },
     pickPuzzle: (cues) => (cues.length ? cues[0] : null),
     // pokemon.js 스텁
-    loadCharacters: async () => [], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [], pickCharacters: (a, n) => (a || []).slice(0, n), isUnlocked: () => true, unlockCountAt: () => 0,
+    loadCharacters: async () => [], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [{ id: 25, ko: '피카츄' }, { id: 4, ko: '파이리' }], pickCharacters: (a, n) => (a || []).slice(0, n), isUnlocked: () => true, unlockCountAt: () => 0,
     // xp.js / catch.js 스텁: XP 획득과 잡기 화면 호출을 기록
     xpLog, catchCalls,
     initProfile: async () => ({}), getLevelInfo: () => ({ level: 1, into: 0, need: 100, xp: 0 }),
@@ -76,12 +78,17 @@ function loadPlayer() {
     addItem: (id) => { itemLog.push(id); return true; }, getLook: () => ({ gear: null, dye: null }),
     COIN: { done: 1, speak: 2, speakStar: 3, goal: 10 }, puzzleCoins: (r) => (r && r.solved ? [5, 3, 2][Math.min(r.wrong || 0, 2)] : 0),
     streakCoins: (n) => Math.min(50, 5 * n), lootBox: () => 'cap', itemById: (id) => ({ id, emoji: '🧢', ko: '야구모자' }),
+    // ❤️ 파트너 HP 스텁: hpState를 테스트가 직접 조작 (partner=null이면 HP 기능 없음)
+    hpState, hpLog,
+    getPartner: () => hpState.partner, hpOf: (id) => (hpState.hp[id] === undefined ? 100 : hpState.hp[id]), isTired: (id) => hpState.hp[id] === 0,
+    changeHp: (id, d) => { const from = hpState.hp[id] === undefined ? 100 : hpState.hp[id]; const to = Math.max(0, Math.min(100, from + d)); hpState.hp[id] = to; hpLog.push(d); return { from, to }; },
+    HP: { max: 100, revealed: -20, speakSkipped: -10, missedDay: -30, goalHeal: 20 }, setFigure() {}, openMon(m) { hpState.opened = m; },
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -646,6 +653,106 @@ test('👨‍👩‍👦 부모 모드: 반복·듣기 먼저·말하기 확인�
   video.currentTime = 2; run('onCueEnd()');
   assert.equal(run('state.idx'), 0, '듣기 먼저 반복으로 같은 문장');
   assert.deepEqual(plays, [0]);
+});
+
+test('❤️ HP: 정답 공개 −20, 말하기 넘김 −10, 목표 달성 +20, 첫 오답은 무벌, 0이면 😴 퍼즐·잡기에서 빠짐', async () => {
+  const { run, els, hpLog, hpState, puzzleCalls, ctx } = loadPlayer();
+  const keys = new Set();
+  ctx.track.done = (c) => keys.add(c.start);
+  ctx.track.todayDone = () => keys.size;
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 1; settings.dailyGoal = 0; state.idx = 0; state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }];');
+  // 파트너가 없으면 HP 기능 없음: 칩 숨김, 벌 없음
+  run('markDone(state.cues[0]); goTo(1)');
+  puzzleCalls[0].opts.onClose({ solved: false, wrong: 3, characters: [] });
+  assert.deepEqual(hpLog, [], '파트너 없으면 HP 안 깎임');
+  assert.equal(els['partner-chip'].hidden, true);
+  // 파트너 지정 → 칩 표시
+  hpState.partner = 25;
+  run('updateChips()');
+  assert.equal(els['partner-chip'].hidden, false);
+  assert.equal(els['partner-hp'].textContent, '❤️ 100');
+  // 퍼즐: 한두 번 틀리고 맞추면 무벌, 3번 틀려 정답 공개면 −20
+  run('markDone(state.cues[1]); goTo(2)');
+  puzzleCalls[1].opts.onClose({ solved: true, wrong: 2, characters: [] });
+  assert.deepEqual(hpLog, [], '틀렸어도 맞추면 무벌');
+  run('markDone(state.cues[2]); goTo(3)');
+  puzzleCalls[2].opts.onClose({ solved: false, wrong: 3, characters: [] });
+  assert.deepEqual(hpLog, [-20]);
+  assert.equal(els['partner-hp'].textContent, '❤️ 80');
+  assert.ok(els['partner-chip'].classList.contains('hurt'));
+  // 목표 달성(4문장) → +20
+  let rewarded = false;
+  ctx.track.goalRewarded = () => rewarded;
+  ctx.track.markGoalRewarded = () => { rewarded = true; };
+  run('settings.dailyGoal = 4; markDone(state.cues[3])');
+  assert.equal(hpLog[hpLog.length - 1], 20, '목표 달성 회복');
+  assert.equal(hpState.hp[25], 100);
+  // 0이 되면 😴: 칩 표시, 퍼즐·잡기 후보에서 빠짐 (다른 캐릭터는 남음)
+  hpState.hp[25] = 10;
+  run('markDone(state.cues[4]); goTo(4)');
+  puzzleCalls[3].opts.onClose({ solved: false, wrong: 3, characters: [] });
+  assert.equal(hpState.hp[25], 0);
+  assert.equal(els['partner-hp'].textContent, '😴 0');
+  assert.equal(run('unlockedCharacters().map((c) => c.id).join(",")'), '4', '쉬는 중인 파트너는 퍼즐에 안 나옴');
+  puzzleCalls[3] = null; // 이미 0이면 더 안 깎임
+  run('goTo(0); markDone(state.cues[0]); goTo(1)');
+  const n = hpLog.length;
+  puzzleCalls[puzzleCalls.length - 1].opts.onClose({ solved: false, wrong: 3, characters: [] });
+  assert.equal(hpLog.length, n, '0에서는 더 안 깎임');
+  // HP 설정 끄면 칩 숨김·벌 없음, 쉬는 중이어도 퍼즐에 나옴
+  run('settings.hp = false; updateChips()');
+  assert.equal(els['partner-chip'].hidden, true);
+  assert.equal(run('unlockedCharacters().map((c) => c.id).join(",")'), '25,4');
+  // 부모 모드에서도 벌 없음
+  run('settings.hp = true; hpState.hp[25] = 50; setParentMode(true); markDone(state.cues[2]); goTo(3)');
+  assert.equal(els['partner-chip'].hidden, true, '부모 모드는 칩 숨김');
+  assert.equal(hpState.hp[25], 50);
+});
+
+test('❤️ 말하기 3번 미달로 넘기면 −10, 통과하면 무벌', async () => {
+  const { run, video, hpLog, hpState } = loadPlayerWithSpeak([
+    { passed: false, method: 'speech', transcript: '', score: null },
+    { passed: false, method: 'speech', transcript: '', score: null },
+    { passed: false, method: 'speech', transcript: '', score: null },
+    { passed: true, method: 'energy', transcript: '', score: null },
+  ]);
+  hpState.partner = 25;
+  run('state.cues = [{start:0,end:2,en:"a b",ko:""},{start:10,end:12,en:"c d",ko:""}]; state.idx = -1; goTo(0)');
+  for (let i = 0; i < 3; i++) {
+    video.currentTime = 2; run('onCueEnd()');
+    run('skipShadowWait()'); await tick();
+    if (i < 2) { run('cancelShadowWait(); state.speakRun = null;'); }
+  }
+  assert.deepEqual(hpLog, [-10], '3번째 미달로 넘길 때 한 번 −10');
+  run('cancelShadowWait(); goTo(1, { force: true })');
+  video.currentTime = 12; run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.deepEqual(hpLog, [-10], '통과는 무벌');
+});
+
+test('❤️ 어제 학습을 안 했으면 콘텐츠를 열 때 한 번 −30 (처음 쓰는 아이·어제 한 아이는 제외, 하루 한 번)', async () => {
+  const { run, hpLog, hpState, ctx } = loadPlayer();
+  hpState.partner = 25;
+  const d = (date, n) => ({ date, doneKeys: Array.from({ length: n }, (_, i) => `k${i}`) });
+  const pad = (n) => String(n).padStart(2, '0');
+  const key = (dt) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+  const today = key(new Date());
+  const yest = key(new Date(Date.now() - 86400000));
+  const before = key(new Date(Date.now() - 3 * 86400000));
+  ctx.track.todayKey = (dt) => key(dt || new Date());
+  // 어제 안 함(기록 없음) + 그 전엔 학습한 적 있음 → −30
+  run(`checkMissedDay([${JSON.stringify(d(before, 7))}], "${today}")`);
+  assert.deepEqual(hpLog, [-30]);
+  // 어제 5문장 이상 했으면 없음
+  run(`checkMissedDay([${JSON.stringify(d(before, 7))}, ${JSON.stringify(d(yest, 5))}], "${today}")`);
+  assert.deepEqual(hpLog, [-30]);
+  // 처음 쓰는 아이(과거 학습일 없음)는 없음
+  run(`checkMissedDay([${JSON.stringify(d(yest, 2))}], "${today}")`);
+  assert.deepEqual(hpLog, [-30]);
+  // 오늘 이미 적용했으면 없음
+  ctx.track.hpMissedApplied = () => true;
+  run(`checkMissedDay([${JSON.stringify(d(before, 7))}], "${today}")`);
+  assert.deepEqual(hpLog, [-30]);
 });
 
 test('👨‍👩‍👦 부모 모드는 저장되지 않음 — 설정 저장에도 settings에 안 들어감', () => {

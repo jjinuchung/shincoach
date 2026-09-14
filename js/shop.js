@@ -1,7 +1,8 @@
-// 🛒 상점(💰 코인으로 🎀 장식·🎨 염색약 사기) + 포켓몬 상세(장식 장착·염색) 모달
-// 도감(pokedex.js)에서 연다. 코인·가방·꾸밈 상태는 xp.js 프로필, 카탈로그는 items.js
-import { GEAR, DYE, itemById, canBuy, setFigure } from './items.js';
-import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, RARITY } from './xp.js';
+// 🛒 상점(💰 코인으로 🎀 장식·🎨 염색약·🧪 물약 사기) + 포켓몬 상세(❤️ HP·물약·🤝 파트너·장식 장착·염색) 모달
+// 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
+// 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
+import { GEAR, DYE, POTION, HP, itemById, canBuy, setFigure } from './items.js';
+import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, RARITY, getPartner, setPartner, hpOf, usePotion } from './xp.js';
 import { sfx, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -22,10 +23,22 @@ export function initShop(ctx) {
   $('mon-close').addEventListener('click', closeMon);
   $('mon').addEventListener('click', (e) => { if (e.target === $('mon')) closeMon(); });
   $('mon-to-shop').addEventListener('click', () => { closeMon(); openShop(); });
+  $('mon-partner').addEventListener('click', () => {
+    if (!mon) return;
+    change(setPartner(mon.id), `🤝 ${mon.ko}${josaIga(mon.ko)} 파트너가 됐어요!`);
+  });
 }
 
 function notify(id) {
   if (onChange) onChange(id);
+  document.dispatchEvent(new CustomEvent('shincoach:profilechange', { detail: { id } }));
+}
+
+/** 받침에 따라 이/가 */
+function josaIga(word) {
+  const code = String(word || '').slice(-1).charCodeAt(0) - 0xAC00;
+  if (code < 0 || code > 11171) return '가';
+  return code % 28 === 0 ? '가' : '이';
 }
 
 // ───────────────────── 🛒 상점 ─────────────────────
@@ -50,6 +63,7 @@ function renderShop(msg, boughtId) {
   list.innerHTML = '';
   list.appendChild(shopSection('🎀 장식', '포켓몬 머리에 씌워요. 한 번 사면 계속 내 것 — 다른 포켓몬에게 옮길 수도 있어요', GEAR, boughtId));
   list.appendChild(shopSection('🎨 염색약', '포켓몬 색을 바꿔요. 한 번 쓰면 없어지고, 원래 색으로 돌아가는 건 공짜', DYE, boughtId));
+  list.appendChild(shopSection('🧪 물약', '파트너 HP를 채워요. 퍼즐 정답을 그냥 보거나 따라 말하기를 넘기거나 하루 빠지면 HP가 깎여요', POTION, boughtId));
 }
 
 function shopSection(title, sub, items, boughtId) {
@@ -82,7 +96,7 @@ function buy(id) {
   if (!it || !buyItem(id)) { renderShop('💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
   unlock();
   sfx.ding();
-  const hint = it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : '🎒 내 포켓몬을 눌러 색을 바꿔 주세요';
+  const hint = it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : '❤️ 파트너를 눌러 먹여 주세요';
   renderShop(`${it.emoji} ${it.ko}${josaEul(it.ko)} 샀어요! ${hint}`, id);
   notify(null);
 }
@@ -112,13 +126,42 @@ function renderMon(msg, pop) {
   if (!mon) return;
   const look = getLook(mon.id);
   const r = rarityOf(mon.id);
-  $('mon-title').textContent = mon.ko;
-  $('mon-sub').textContent = `${RARITY[r].stars} ${RARITY[r].label} · 잡은 수 ×${caughtCount(mon.id)}`;
+  const isPartner = getPartner() === mon.id;
+  $('mon-title').textContent = (isPartner ? '🤝 ' : '') + mon.ko;
+  $('mon-sub').textContent = `${RARITY[r].stars} ${RARITY[r].label} · 잡은 수 ×${caughtCount(mon.id)}` + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '');
   const fig = $('mon-figure');
   setFigure(fig, mon.url || '', look);
   fig.classList.remove('pop');
   if (pop) { void fig.offsetWidth; fig.classList.add('pop'); }
   $('mon-msg').textContent = msg || '';
+
+  // ❤️ HP 바 + 🧪 물약 (가방에 있는 것만, 가득이면 못 먹임)
+  const hp = hpOf(mon.id);
+  const hpText = $('mon-hp-text');
+  hpText.textContent = hp === 0 ? '😴 0 / ' + HP.max : `${hp} / ${HP.max}`;
+  hpText.classList.toggle('tired', hp === 0);
+  const fill = $('mon-hp-fill');
+  fill.style.width = `${Math.round((hp / HP.max) * 100)}%`;
+  fill.classList.toggle('low', hp > 0 && hp <= 30);
+  const potBox = $('mon-potion');
+  potBox.innerHTML = '';
+  let anyPotion = false;
+  for (const pt of POTION) {
+    const n = itemCount(pt.id);
+    if (!n) continue;
+    anyPotion = true;
+    const btn = option(pt.emoji, pt.ko, `가방 ${n}개 · +${pt.heal}`, false, '', () => {
+      const r = usePotion(mon.id, pt.id);
+      change(r.ok, r.from === 0 ? `${pt.emoji} ${mon.ko}${josaIga(mon.ko)} 기운을 차렸어요! ❤️ ${r.to}` : `${pt.emoji} ❤️ ${r.from} → ${r.to}`);
+    });
+    if (hp >= HP.max) btn.disabled = true;
+    potBox.appendChild(btn);
+  }
+  if (!anyPotion) potBox.appendChild(el('span', 'mon-empty', hp >= HP.max ? 'HP가 가득해요' : '가방에 물약이 없어요 — 🛒 상점에서 사 보세요 (💰10)'));
+  else if (hp >= HP.max) potBox.appendChild(el('span', 'mon-empty', 'HP가 가득해서 지금은 안 먹여도 돼요'));
+  const pb = $('mon-partner');
+  pb.textContent = isPartner ? '🤝 지금 파트너예요' : '🤝 파트너로!';
+  pb.disabled = isPartner;
 
   // 🎀 장식: [없음] [지금 쓰는 것] [가방에 있는 것들]
   const gearBox = $('mon-gear');

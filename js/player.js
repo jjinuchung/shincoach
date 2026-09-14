@@ -9,8 +9,9 @@ import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook } from './xp.js';
-import { COIN, puzzleCoins, streakCoins, lootBox, itemById } from './items.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp } from './xp.js';
+import { COIN, HP, puzzleCoins, streakCoins, lootBox, itemById, setFigure } from './items.js';
+import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch } from './catch.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
@@ -128,10 +129,12 @@ export function initPlayer(ctx) {
   initPuzzle();
   initCharacters();
   initCatch();
-  initProfile().then(updateLevelChip).catch(() => {});
+  initProfile().then(() => { updateLevelChip(); updatePartnerChip(); }).catch(() => {});
   $('level-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex()); });
   $('coin-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex({ shop: true })); });
   $('parent-chip').addEventListener('click', () => setParentMode(false)); // 끄는 건 비밀번호 없이 (학습 모드로 돌아가는 것이라 안전)
+  $('partner-chip').addEventListener('click', openPartner);
+  document.addEventListener('shincoach:profilechange', updatePartnerChip); // 상세 모달에서 물약·파트너 변경 → 칩 갱신
   // 학습 시간: 재생 중이거나 따라 말하는 중·퍼즐 푸는 중이면 1초씩 누적 (부모 모드는 학습이 아니므로 제외 → 세션도 저장되지 않음)
   setInterval(() => {
     if (!state.open || state.parentMode) return;
@@ -162,6 +165,86 @@ function setParentMode(on) {
   if (state.open) showPlayerMessage(on ? '👀 그냥 보기: 자막 보면서 끝까지 이어서 재생돼요' : '🎓 다시 학습 모드예요', 3500);
 }
 
+// ───────────────────── ❤️ 파트너 HP ─────────────────────
+
+/** 파트너 포켓몬 { id, ko, url } (없으면 null) */
+function partnerInfo() {
+  const id = getPartner();
+  if (!id) return null;
+  const r = ROSTER.find((m) => m.id === id);
+  const c = state.characters.find((x) => x.id === id);
+  return { id, ko: r ? r.ko : '파트너', url: c ? c.url : '' };
+}
+
+/** 상단 파트너 칩: 얼굴 + ❤️ HP. HP 기능이 꺼져 있거나 파트너가 없거나 부모 모드면 숨김 */
+function updatePartnerChip() {
+  const chip = $('partner-chip');
+  const p = partnerInfo();
+  if (!settings.hp || !p || state.parentMode) { chip.hidden = true; return; }
+  const hp = hpOf(p.id);
+  setFigure(chip.querySelector('.mon-figure'), p.url, getLook(p.id));
+  $('partner-hp').textContent = hp === 0 ? '😴 0' : `❤️ ${hp}`;
+  chip.classList.toggle('tired', hp === 0);
+  chip.hidden = false;
+}
+
+function openPartner() {
+  const p = partnerInfo();
+  if (!p) return;
+  if (!video.paused) video.pause();
+  openMon(p);
+}
+
+/**
+ * HP 깎기 — "틀림"이 아니라 "대충 넘김·안 함"에만 (정답 공개·말하기 넘김·하루 빠짐).
+ * 0이 되면 😴 쉬는 중: 퍼즐·잡기에서 빠지고 물약을 먹여야 돌아옴 (잃거나 도망가지 않음)
+ */
+function hpPenalty(amount, why) {
+  if (!settings.hp || state.parentMode) return null;
+  const p = partnerInfo();
+  if (!p || hpOf(p.id) === 0) return null;
+  const r = changeHp(p.id, amount);
+  updatePartnerChip();
+  const chip = $('partner-chip');
+  chip.classList.remove('hurt');
+  void chip.offsetWidth;
+  chip.classList.add('hurt');
+  sfx.wrong();
+  if (r.to === 0) showPlayerMessage(`😴 ${p.ko}${josaIga(p.ko)} 지쳤어요 (${why}). 🧪 물약을 먹여 주세요`, 6000);
+  else showPlayerMessage(`😢 ${p.ko} HP ${amount} (${why}) — ❤️ ${r.to}`, 4500);
+  return r;
+}
+
+/** HP 회복 (오늘 목표 달성 등). 쉬는 중이던 파트너도 깨어남 */
+function hpHeal(amount) {
+  if (!settings.hp || state.parentMode) return null;
+  const p = partnerInfo();
+  if (!p) return null;
+  const r = changeHp(p.id, amount);
+  updatePartnerChip();
+  if (r.to !== r.from) pulseChip('partner-chip');
+  return r;
+}
+
+/** 어제 학습을 안 했으면(5문장 미만) 오늘 처음 열 때 한 번 HP 감소. 앱을 처음 쓰는 아이(과거 학습일이 없음)는 제외 */
+function checkMissedDay(dailyList, today) {
+  if (!settings.hp || state.parentMode || !getPartner() || track.hpMissedApplied()) return;
+  const yesterday = track.todayKey(new Date(Date.now() - 86400000));
+  const learned = (d) => !!d && (d.doneKeys || []).length >= STREAK_MIN_DONE;
+  const hadBefore = dailyList.some((d) => d.date < yesterday && learned(d));
+  const yRec = dailyList.find((d) => d.date === yesterday);
+  if (!hadBefore || learned(yRec)) return;
+  track.markHpMissed();
+  hpPenalty(HP.missedDay, '어제 학습을 안 했어요');
+}
+
+/** 받침에 따라 이/가 */
+function josaIga(word) {
+  const code = String(word || '').slice(-1).charCodeAt(0) - 0xAC00;
+  if (code < 0 || code > 11171) return '가';
+  return code % 28 === 0 ? '가' : '이';
+}
+
 // ───────────────────── 🧩 문장 퍼즐 ─────────────────────
 
 /** N문장이 차서 다음 문장으로 넘어가기 전에 퍼즐을 낼 차례인지 */
@@ -185,13 +268,14 @@ function startPuzzle(continueFn) {
     track.puzzle(cue, result);
     const g = awardXp(puzzleXp(result));
     const c = awardCoins(puzzleCoins(result));
+    if (!result.solved) hpPenalty(HP.revealed, '퍼즐 정답을 봤어요');
     // 정답이면 퍼즐에 나온 포켓몬 중 한 마리에게 몬스터볼 던지기 (캐릭터가 없으면 그냥 이어감)
     if (result.solved && result.characters && result.characters.length) {
       state.catchOpen = true;
       openCatch({
         candidates: result.characters, xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
         attempt: (id) => catchAttempt(id),
-        onDone: () => { state.catchOpen = false; updateLevelChip(); continueFn(); },
+        onDone: () => { state.catchOpen = false; updateLevelChip(); updatePartnerChip(); continueFn(); },
       });
       return;
     }
@@ -244,10 +328,10 @@ function awardCoins(amount) {
   return r.gained;
 }
 
-/** 지금 레벨에서 열려 있는 캐릭터만 (마일스톤 해금), 장식·염색 상태 포함 */
+/** 지금 레벨에서 열려 있는 캐릭터만 (마일스톤 해금, 😴 쉬는 중 제외), 장식·염색 상태 포함 */
 function unlockedCharacters() {
   const level = getLevelInfo().level;
-  return state.characters.filter((c) => isUnlocked(c.id, level)).map((c) => ({ ...c, look: getLook(c.id) }));
+  return state.characters.filter((c) => isUnlocked(c.id, level) && !(settings.hp && isTired(c.id))).map((c) => ({ ...c, look: getLook(c.id) }));
 }
 
 /** ⚙ 잡기 연습: 아무 캐릭터 4마리로 연출만 (기록 안 함) */
@@ -294,7 +378,7 @@ function showPuzzle(cue, onDone) {
 // ───────────────────── 🎮 퍼즐 캐릭터 (⚙에서 한 번 받아 기기에 보관) ─────────────────────
 
 function initCharacters() {
-  loadCharacters().then((chars) => { state.characters = chars; updateCharStatus(); autoDownloadCharacters(); }).catch(() => {});
+  loadCharacters().then((chars) => { state.characters = chars; updateCharStatus(); updatePartnerChip(); autoDownloadCharacters(); }).catch(() => {});
   $('char-download').addEventListener('click', () => runCharacterDownload(true));
   // 인터넷이 다시 연결되면 부족한 캐릭터를 조용히 받아옴 (명단을 늘려도 부모가 신경 안 쓰게)
   window.addEventListener('online', autoDownloadCharacters);
@@ -384,7 +468,8 @@ function markDone(cue) {
         track.markGoalRewarded();
         awardXp(XP.goal);
         awardCoins(COIN.goal);
-        showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal} 💰+${COIN.goal}`, 5000);
+        const h = hpHeal(HP.goalHeal);
+        showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal} 💰+${COIN.goal}${h && h.to > h.from ? ` ❤️+${h.to - h.from}` : ''}`, 5000);
       } else if (left === 3 && !track.goalRewarded()) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal} 💰+${COIN.goal}!`, 3500);
     }
   }
@@ -420,6 +505,7 @@ function loadStreak() {
     if (state.streakDate !== today) return; // 그새 또 날짜가 바뀜
     state.streakBase = streakBefore(list, today);
     updateGoalChip();
+    if (state.open) checkMissedDay(list, today);
   }).catch(() => {});
 }
 
@@ -999,6 +1085,7 @@ function onSpeakResult(cue, result) {
   if (state.speakFails >= 3) {
     state.speakPassed = true;
     track.speak(cue, { passed: true, skipped: true, score: result.score });
+    hpPenalty(HP.speakSkipped, '따라 말하기를 넘겼어요');
     msg.textContent = '👍 괜찮아요, 넘어갈게요';
     sub.textContent = result.transcript ? `들린 말: "${result.transcript}"` : '';
     state.shadowTimer = setTimeout(afterShadowWait, 1400);
@@ -1188,6 +1275,7 @@ function updateChips() {
   $('parent-chip').hidden = !state.parentMode;
   updateGoalChip();
   updateLevelChip();
+  updatePartnerChip();
   repeatBtn.classList.toggle('parent-off', state.parentMode);
   $('btn-shadow').classList.toggle('parent-off', state.parentMode);
 }
@@ -1241,7 +1329,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true };
+  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -1261,6 +1349,7 @@ function initSettingsDialog() {
   $('set-puzzle').value = String(settings.puzzleEvery);
   $('set-sfx').checked = settings.sfx;
   $('set-vibrate').checked = settings.vibrate;
+  $('set-hp').checked = settings.hp;
   setSfxEnabled(settings.sfx);
   setVibrateEnabled(settings.vibrate);
   $('set-speak').checked = settings.speakCheck;
@@ -1281,6 +1370,7 @@ function initSettingsDialog() {
     if (settings.puzzleEvery === 0) state.puzzlePool = [];
     settings.sfx = $('set-sfx').checked;
     settings.vibrate = $('set-vibrate').checked;
+    settings.hp = $('set-hp').checked;
     setSfxEnabled(settings.sfx);
     setVibrateEnabled(settings.vibrate);
     settings.speakCheck = $('set-speak').checked;

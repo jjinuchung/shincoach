@@ -8,11 +8,11 @@ const DB_VERSION = 4;
 //  sentenceStats: 문장별 누적 { key: "<itemId>|<start×10>", itemId, start, en, ko, plays, listens, done, seconds,
 //                 speakAttempts, speakPass, speakFail, speakSkipped, bestRatio, lastRatio, lastAt, puzzles, puzzleSolved, puzzleWrong }
 //  sessions:      앱을 열고 닫은 단위 { id, itemId, title, startedAt, endedAt, seconds, sentences, firstIdx, lastIdx, speakAttempts, speakPass, puzzles, puzzleSolved }
-//  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved }
+//  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved, goalRewarded, hpMissed }
 //  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
 // characters (v3): 🎮 퍼즐 캐릭터 그림 { id, ko, en, blob, savedAt } — 인터넷에서 받아 기기에만 보관 (백업에 포함 안 함)
 //  profile (v4):  ⚡ 아이 프로필 { id: 'me', xp, caught: { 포켓몬id: 마릿수 }, throws, catches,
-//                 coins, coinsEarned, items: { 아이템id: 개수 }, mons: { 포켓몬id: { gear, dye } }, updatedAt } — 백업에 포함
+//                 coins, coinsEarned, items: { 아이템id: 개수 }, mons: { 포켓몬id: { gear, dye, hp } }, partner, updatedAt } — 백업에 포함
 const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews', 'profile'];
 
 let dbPromise = null;
@@ -299,7 +299,7 @@ export async function applyProfileDelta(delta) {
   const db = await openDb();
   const tx = db.transaction('profile', 'readwrite');
   const store = tx.objectStore('profile');
-  const cur = (await promisify(store.get('me'))) || { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, updatedAt: 0 };
+  const cur = (await promisify(store.get('me'))) || { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, updatedAt: 0 };
   const next = { ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) } };
   next.xp = (Number(cur.xp) || 0) + (delta.xp || 0);
   next.throws = (Number(cur.throws) || 0) + (delta.throws || 0);
@@ -314,6 +314,7 @@ export async function applyProfileDelta(delta) {
   }
   // 꾸밈: 포켓몬별로 바뀐 필드만 덮어씀
   for (const id of Object.keys(delta.mons || {})) next.mons[id] = { ...(next.mons[id] || {}), ...delta.mons[id] };
+  if (delta.partner !== undefined) next.partner = delta.partner; // 🤝 파트너는 정해진 값으로
   next.updatedAt = Date.now();
   store.put(next);
   await txDone(tx);
@@ -356,6 +357,7 @@ export function mergeStatRecord(name, cur, rec) {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
     for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved']) out[k] = maxOf(cur[k], rec[k]);
     out.goalRewarded = !!(cur.goalRewarded || rec.goalRewarded);
+    out.hpMissed = !!(cur.hpMissed || rec.hpMissed);
   } else if (name === 'vocabViews') {
     for (const k of ['views', 'taps', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'sessions') {
@@ -369,6 +371,7 @@ export function mergeStatRecord(name, cur, rec) {
     out.coins = Number(latest.coins) || 0;
     out.items = { ...(latest.items || {}) };
     out.mons = { ...(latest.mons || {}) };
+    out.partner = latest.partner || null;
   }
   return out;
 }

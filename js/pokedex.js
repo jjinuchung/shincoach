@@ -1,6 +1,6 @@
 // 🎒 내 포켓몬(도감) 화면: 레벨·경험치·💰 코인, 잡은 포켓몬(그림·마릿수, 누르면 장식·염색), 못 잡은 포켓몬(검은 실루엣 + ???), 🛒 상점
 import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt } from './pokemon.js';
-import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory } from './xp.js';
+import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
 import { listDaily } from './db.js';
 import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById } from './items.js';
@@ -21,6 +21,7 @@ export function initPokedex(ctx) {
 /** 상점에서 사거나 포켓몬을 꾸민 뒤: 코인 표시와 그 포켓몬 자리만 다시 그림 (화면 전체를 다시 그리면 스크롤이 튐) */
 function refreshAfterChange(monId) {
   renderCoins();
+  refreshPartnerBadges();
   if (monId === null || monId === undefined) return;
   const fig = $('pokedex-main').querySelector(`.mon-figure[data-id="${monId}"]`);
   if (fig) {
@@ -28,6 +29,18 @@ function refreshAfterChange(monId) {
     fig.classList.remove('pop');
     void fig.offsetWidth;
     fig.classList.add('pop');
+  }
+}
+
+/** 🤝 파트너 배지는 한 마리에게만 — 파트너가 바뀌면 전 자리의 배지를 떼고 새 자리에 붙임 */
+function refreshPartnerBadges() {
+  const partner = getPartner();
+  for (const cell of $('pokedex-main').querySelectorAll('.pokedex-cell.got')) {
+    const fig = cell.querySelector('.mon-figure');
+    const on = !!fig && String(partner) === fig.dataset.id;
+    let b = cell.querySelector('.partner');
+    if (on && !b) { b = el('div', 'partner', '🤝'); cell.appendChild(b); }
+    else if (!on && b) b.remove();
   }
 }
 
@@ -126,6 +139,7 @@ export async function openPokedex(opts) {
       }
       cell.appendChild(el('div', 'nm', n > 0 ? m.ko : '???'));
       if (n > 1) cell.appendChild(el('div', 'cnt', `×${n}`));
+      if (n > 0 && getPartner() === m.id) cell.appendChild(el('div', 'partner', '🤝'));
       if (n > 0) cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url }));
       grid.appendChild(cell);
     }

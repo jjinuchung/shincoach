@@ -236,6 +236,7 @@ async function throwBall(c) {
     result.appendChild(document.createTextNode(`🎉 잡았다! ${c.ko}!`));
     const sub = document.createElement('small');
     sub.textContent = ui.practice ? '(연습이라 도감에는 안 들어가요)'
+      : res.partnerSet ? '도감에 새로 등록됐어요! 🤝 첫 파트너가 됐어요 — 위쪽 ❤️ 칩에서 볼 수 있어요'
       : res.first ? '도감에 새로 등록됐어요!' : `또 잡았어요 ×${res.count} (+${res.bonusXp} 경험치)`;
     result.appendChild(sub);
     if (res.info) renderHeader(ui.xpGain + (res.bonusXp || 0), res.info, 0);
