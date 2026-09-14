@@ -6,7 +6,7 @@ import {
 } from './srt.js';
 import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
-import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
+import { runSpeakCheck, prepareMic, releaseMic, resetRecognition } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp } from './xp.js';
@@ -581,6 +581,7 @@ export async function openPlayer(id, opts = {}) {
   state.item = item;
   state.cues = buildCues(item);
   await track.open(item).catch((e) => console.warn('기록 로드 실패:', e));
+  resetRecognition(); // 콘텐츠를 열 때마다 음성 인식을 다시 시도 (인터넷이 돌아왔을 수 있음)
   loadStreak();
   state.idx = -1;
   state.repeatCount = 0;
@@ -1101,7 +1102,7 @@ function onSpeakResult(cue, result) {
   track.speak(cue, { passed: false, skipped: false, score: result.score });
   msg.textContent = `🔁 다시 한번! (${state.speakFails}/3)`;
   sub.textContent = result.method === 'speech'
-    ? `들린 말: "${result.transcript}" — 잘 듣고 따라 해봐요`
+    ? (result.transcript ? `들린 말: "${result.transcript}" — 잘 듣고 따라 해봐요` : '말소리를 못 들었어요 — 조금 더 크게, 또렷하게')
     : `조금 더 크게, 길게 말해봐요 ${srNote(result)}`;
   // 잠시 보여준 뒤 원문 다시 들려주기 → 끝나면 다시 말하기 확인
   state.shadowTimer = setTimeout(() => {

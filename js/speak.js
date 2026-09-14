@@ -1,4 +1,4 @@
-// 말하기 확인: 따라 말하기 시간에 마이크로 듣고 "말했는지"(소리 에너지) + 가능하면 "비슷하게 말했는지"(음성 인식) 판정
+// 말하기 확인: 가능하면 음성 인식으로 "비슷하게 말했는지", 안 되는 기기에서는 마이크 소리 에너지로 "말했는지"만 판정
 // 구형 브라우저 호환을 위해 최신 문법(?., ??, ||=)은 쓰지 않는다.
 
 const RMS_MIN = 0.012;        // 말소리 판정 문턱의 하한 (조용한 마이크 고려)
@@ -108,16 +108,163 @@ export function scoreTranscript(target, transcript) {
 }
 
 /**
- * 말하기 확인 실행
+ * 말하기 확인 실행 — 두 방식 중 하나로 판정
+ *   1) 음성 인식(Web Speech, 인터넷 필요): 들린 단어를 원문과 비교. 마이크는 인식 엔진이 직접 씀 (getUserMedia를 열지 않음)
+ *   2) 소리 에너지(getUserMedia): 인식을 못 쓰는 기기/오프라인 — "말소리를 문장 길이만큼 냈는지"만 봄
+ * 안드로이드 Chrome은 getUserMedia로 마이크를 잡고 있으면 음성 인식이 소리를 못 받아 조용히 실패한다(audiostart→audioend).
+ * 그래서 인식 방식일 때는 마이크 스트림을 먼저 놓고(releaseMic) 인식만 돌리며, 인식이 안 되는 것으로 확인되면(srBroken) 그 뒤로는 에너지 방식.
  * @param {{ target: string, durationSec: number, onLevel?: (level:number, spokenMs:number)=>void, onInterim?: (text:string)=>void }} opts
  * @returns {{ promise: Promise<Result>, stop: () => void, cancel: () => void }}
  *   stop()   = "다 말했어요" → 지금까지 들은 것으로 바로 판정
  *   cancel() = 문장 이동/닫기 → 판정 없이 정리 (결과는 { method: 'cancelled' })
  *   Result: { passed, method: 'speech'|'energy'|'none'|'cancelled', transcript, score, spokenMs, reason, srError }
- *   srError: 음성 인식이 결과 없이 끝난 이유 — 'unsupported'(브라우저 미지원) | 'offline' | 'start-failed' | 브라우저 오류명(audio-capture·network·not-allowed·no-speech…) | 'no-result'(오류 없이 결과만 없음)
+ *   srError: 음성 인식을 못 쓴 이유 — 'unsupported'(브라우저 미지원) | 'offline' | 'start-failed' | 브라우저 오류명(audio-capture·network·not-allowed·no-speech…) | 'no-result'(오류 없이 결과만 없음)
  */
 export function runSpeakCheck(opts) {
+  const SR = SpeechRecognitionCtor();
+  if (!srBroken && SR && navigator.onLine) return runWithRecognition(opts, SR);
+  return runWithEnergy(opts, !SR ? 'unsupported' : !navigator.onLine ? 'offline' : srBrokenWhy);
+}
+
+// 이 세션에서 음성 인식이 안 되는 것으로 확인되면 에너지 방식으로 (다음 콘텐츠를 열 때 resetRecognition()으로 다시 시도)
+let srBroken = false;
+let srBrokenWhy = '';
+let srNoResultStreak = 0;
+const SR_FATAL = { 'audio-capture': 1, 'not-allowed': 1, 'service-not-allowed': 1, network: 1, 'start-failed': 1 };
+
+/** 콘텐츠를 새로 열 때: 인식을 다시 시도해 봄 (인터넷이 돌아왔을 수 있음) */
+export function resetRecognition() {
+  srBroken = false;
+  srBrokenWhy = '';
+  srNoResultStreak = 0;
+}
+
+/** 진단용: 지금 인식이 막힌 상태인지 */
+export function recognitionState() {
+  return { broken: srBroken, why: srBrokenWhy };
+}
+
+function cancelledResult(spokenMs) {
+  return { passed: false, method: 'cancelled', transcript: '', score: null, spokenMs: Math.round(spokenMs || 0), reason: 'cancel', srError: '' };
+}
+
+/** 1) 음성 인식 방식 */
+function runWithRecognition(opts, SR) {
   const target = opts.target || '';
+  const maxMs = Math.max(5000, opts.durationSec * 1000 * 2.2 + 3000);
+  let resolveOuter = null;
+  let finished = false;
+  let transcript = '';
+  let srError = '';
+  let spokenMs = 0;
+  let speechStart = 0;
+  let stopTimer = null;
+  let maxTimer = null;
+  let fallback = null; // 인식이 못 쓰는 상태로 판명 → 에너지 방식 핸들
+  const started = performance.now();
+
+  const promise = new Promise((resolve) => { resolveOuter = resolve; });
+  function settle(result) {
+    if (finished) return;
+    finished = true;
+    clearTimeout(stopTimer); clearTimeout(maxTimer);
+    resolveOuter(result);
+  }
+
+  releaseMic(); // ★ 마이크를 인식 엔진에 넘김 (스트림을 잡고 있으면 안드로이드에서 인식이 소리를 못 받음)
+
+  let rec = null;
+  try {
+    rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    rec.maxAlternatives = 3;
+  } catch (e) { rec = null; }
+  if (!rec) return switchToEnergy('start-failed');
+
+  function cleanup() {
+    if (!rec) return;
+    try { rec.onresult = null; rec.onerror = null; rec.onend = null; rec.onsoundstart = null; rec.onspeechstart = null; rec.onspeechend = null; rec.abort ? rec.abort() : rec.stop(); } catch (e) { /* 무시 */ }
+    rec = null;
+  }
+
+  /** 인식을 못 쓰는 기기/상황 → 이 문장부터 에너지 방식으로 이어감 (아이는 그냥 계속 말하면 됨) */
+  function switchToEnergy(why) {
+    if (finished) return handle;
+    cleanup();
+    srBroken = true; srBrokenWhy = why;
+    fallback = runWithEnergy(opts, why);
+    fallback.promise.then(settle);
+    return handle;
+  }
+
+  function judge(reason) {
+    if (finished) return;
+    cleanup();
+    if (transcript) {
+      srNoResultStreak = 0;
+      const score = scoreTranscript(target, transcript);
+      settle({ passed: score.passed, method: 'speech', transcript, score, spokenMs: Math.round(spokenMs), reason, srError: '' });
+      return;
+    }
+    // 결과 없음: 말을 안 한 것(no-speech)이면 실패, 오류 없이 결과만 없는 게 두 번 이어지면 이 기기에선 인식이 안 되는 것으로 봄
+    if (!srError || srError === 'aborted') srError = 'no-result';
+    if (srError === 'no-result') srNoResultStreak++;
+    if (SR_FATAL[srError] || (srError === 'no-result' && srNoResultStreak >= 2)) { switchToEnergy(srError); return; }
+    settle({ passed: false, method: 'speech', transcript: '', score: null, spokenMs: Math.round(spokenMs), reason, srError });
+  }
+
+  rec.onsoundstart = () => { if (opts.onLevel) opts.onLevel(0.7, 350); };
+  rec.onspeechstart = () => { speechStart = performance.now(); if (opts.onLevel) opts.onLevel(0.8, 350); };
+  rec.onspeechend = () => { if (speechStart) spokenMs += performance.now() - speechStart; speechStart = 0; };
+  rec.onresult = (e) => {
+    let finalText = ''; let interim = '';
+    for (let i = 0; i < e.results.length; i++) {
+      const r = e.results[i];
+      // 대안 중 원문과 가장 잘 맞는 것을 택함
+      let best = r[0].transcript; let bestScore = -1;
+      for (let k = 0; k < r.length; k++) {
+        const sc = scoreTranscript(target, r[k].transcript).matched;
+        if (sc > bestScore) { bestScore = sc; best = r[k].transcript; }
+      }
+      if (r.isFinal) finalText += best + ' '; else interim += best + ' ';
+    }
+    transcript = (finalText + interim).trim();
+    if (opts.onInterim && transcript) opts.onInterim(transcript);
+  };
+  rec.onerror = (e) => { srError = (e && e.error) || 'error'; };
+  rec.onend = () => { if (speechStart) { spokenMs += performance.now() - speechStart; speechStart = 0; } judge('speech-end'); };
+
+  const handle = {
+    promise,
+    stop() {
+      if (finished) return;
+      if (fallback) { fallback.stop(); return; }
+      // "다 말했어요" 탭 → 인식을 멈추고 마지막 결과를 잠깐 기다림 (onend에서 판정). 안 오면 지금까지 것으로
+      try { if (rec) rec.stop(); } catch (e) { /* 무시 */ }
+      clearTimeout(stopTimer);
+      stopTimer = setTimeout(() => judge('tap'), 1500);
+    },
+    cancel() {
+      if (finished) return;
+      if (fallback) { fallback.cancel(); return; }
+      cleanup();
+      settle(cancelledResult(spokenMs));
+    },
+  };
+
+  try {
+    rec.start();
+  } catch (e) {
+    return switchToEnergy('start-failed');
+  }
+  maxTimer = setTimeout(() => { if (!finished && !fallback) handle.stop(); }, maxMs);
+  void started;
+  return handle;
+}
+
+/** 2) 소리 에너지 방식 (인식을 못 쓸 때). srError = 인식을 못 쓴 이유 (결과에 실어 화면·진단에 표시) */
+function runWithEnergy(opts, srError) {
   const needMs = Math.max(600, Math.min(4000, opts.durationSec * 1000 * 0.4)); // 말해야 하는 최소 시간
   const maxMs = Math.max(4000, opts.durationSec * 1000 * 2.2 + 2500);
 
@@ -144,14 +291,14 @@ export function runSpeakCheck(opts) {
     cancel() {
       cancelled = true;
       if (finishFn) finishFn('cancel');
-      else settle({ passed: false, method: 'cancelled', transcript: '', score: null, spokenMs: 0, reason: 'cancel' });
+      else settle(cancelledResult(0));
     },
   };
 
   (async () => {
     const stream = await prepareMic();
-    if (cancelled || finished) { settle({ passed: false, method: 'cancelled', transcript: '', score: null, spokenMs: 0, reason: 'cancel' }); return; }
-    if (!stream) { settle({ passed: true, method: 'none', transcript: '', score: null, spokenMs: 0, reason: 'mic-unavailable' }); return; }
+    if (cancelled || finished) { settle(cancelledResult(0)); return; }
+    if (!stream) { settle({ passed: true, method: 'none', transcript: '', score: null, spokenMs: 0, reason: 'mic-unavailable', srError }); return; }
 
     // ── 소리 에너지 추적 ──
     let src; let analyser;
@@ -161,7 +308,7 @@ export function runSpeakCheck(opts) {
       analyser.fftSize = 1024;
       src.connect(analyser);
     } catch (err) {
-      settle({ passed: true, method: 'none', transcript: '', score: null, spokenMs: 0, reason: 'audio-error' });
+      settle({ passed: true, method: 'none', transcript: '', score: null, spokenMs: 0, reason: 'audio-error', srError });
       return;
     }
     const buf = new Uint8Array(analyser.fftSize);
@@ -171,61 +318,16 @@ export function runSpeakCheck(opts) {
     const started = performance.now();
     let raf = 0;
 
-    // ── 음성 인식 (있으면) ──
-    let transcript = '';
-    let rec = null;
-    let recEnded = false;
-    let srError = ''; // 인식이 안 된 이유 (결과 화면·진단에 표시해 원인을 찾을 수 있게)
-    const SR = SpeechRecognitionCtor();
-    if (!SR) srError = 'unsupported';
-    else if (!navigator.onLine) srError = 'offline';
-    if (SR && navigator.onLine) {
-      try {
-        rec = new SR();
-        rec.lang = 'en-US';
-        rec.interimResults = true;
-        rec.maxAlternatives = 3;
-        rec.onresult = (e) => {
-          let finalText = ''; let interim = '';
-          for (let i = 0; i < e.results.length; i++) {
-            const r = e.results[i];
-            // 대안 중 원문과 가장 잘 맞는 것을 택함
-            let best = r[0].transcript; let bestScore = -1;
-            for (let k = 0; k < r.length; k++) {
-              const s = scoreTranscript(target, r[k].transcript).matched;
-              if (s > bestScore) { bestScore = s; best = r[k].transcript; }
-            }
-            if (r.isFinal) finalText += best + ' '; else interim += best + ' ';
-          }
-          transcript = (finalText + interim).trim();
-          if (opts.onInterim) opts.onInterim(transcript);
-        };
-        rec.onerror = (e) => { recEnded = true; srError = (e && e.error) || 'error'; };
-        rec.onend = () => { recEnded = true; if (!transcript && !srError) srError = 'no-result'; if (everLoud && spokenMs >= needMs) finish('speech-end'); };
-        rec.start();
-      } catch (e) { rec = null; srError = 'start-failed'; }
-    }
-
     function cleanup() {
       cancelAnimationFrame(raf);
       try { src.disconnect(); } catch (e) { /* 무시 */ }
-      if (rec) { try { rec.onend = null; rec.onresult = null; rec.onerror = null; rec.abort ? rec.abort() : rec.stop(); } catch (e) { /* 무시 */ } rec = null; }
     }
 
     function finish(reason) {
       if (finished) return;
       cleanup();
-      if (reason === 'cancel') { settle({ passed: false, method: 'cancelled', transcript: '', score: null, spokenMs: Math.round(spokenMs), reason }); return; }
-      let score = null; let passed; let method;
-      if (transcript) {
-        score = scoreTranscript(target, transcript);
-        method = 'speech';
-        passed = score.passed;
-      } else {
-        method = 'energy';
-        passed = spokenMs >= needMs;
-      }
-      settle({ passed, method, transcript, score, spokenMs: Math.round(spokenMs), reason, srError: transcript ? '' : (srError || (rec && !recEnded ? 'no-result' : srError)) });
+      if (reason === 'cancel') { settle(cancelledResult(spokenMs)); return; }
+      settle({ passed: spokenMs >= needMs, method: 'energy', transcript: '', score: null, spokenMs: Math.round(spokenMs), reason, srError });
     }
     finishFn = finish;
     if (cancelled) { finish('cancel'); return; }
@@ -253,14 +355,14 @@ export function runSpeakCheck(opts) {
       if (loud) { spokenMs += dt; lastLoud = now; everLoud = true; }
       if (opts.onLevel) opts.onLevel(Math.min(1, rms / 0.15), spokenMs);
       // 종료 조건: 충분히 말한 뒤 조용해짐 / 최대 시간
-      if (everLoud && spokenMs >= needMs && now - lastLoud > SILENCE_END_MS && (!rec || recEnded || now - lastLoud > SILENCE_END_MS + 1500)) { finish('silence'); return; }
+      if (everLoud && spokenMs >= needMs && now - lastLoud > SILENCE_END_MS) { finish('silence'); return; }
       if (elapsed > maxMs) { finish('timeout'); return; }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
   })().catch((err) => {
     console.warn('말하기 확인 오류:', err);
-    settle({ passed: true, method: 'none', transcript: '', score: null, spokenMs: 0, reason: 'error' });
+    settle({ passed: true, method: 'none', transcript: '', score: null, spokenMs: 0, reason: 'error', srError });
   });
 
   return handle;

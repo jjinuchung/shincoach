@@ -1,7 +1,7 @@
 // 기기 진단: 마이크·녹음·음성 인식 지원 여부와 실제 동작 테스트 (설정 화면)
 // 구형 브라우저에서도 돌아야 하므로 최신 문법(?., ??, ||=)은 쓰지 않는다.
 
-import { prepareMic, releaseMic, getAudioContext } from './speak.js';
+import { prepareMic, releaseMic, getAudioContext, recognitionState } from './speak.js';
 
 const $ = (id) => document.getElementById(id);
 let lastRecUrl = null;
@@ -44,6 +44,7 @@ export function renderDiag() {
     ['소리 분석(AudioContext)', hasAudio ? '지원' : '미지원', hasAudio ? '✅' : '❌'],
     ['녹음(MediaRecorder)', hasRec ? '지원' : '미지원', hasRec ? '✅' : '❌'],
     ['음성 인식(Web Speech)', hasSpeech ? '지원' : '미지원', hasSpeech ? '✅' : '❌ (1단계 "말했는지"만 가능)'],
+    ['이번 학습의 인식 상태', recognitionState().broken ? `막힘 (${recognitionState().why}) → 소리 길이로 판정 중` : '사용 중 (결과 없음이 2번 이어지면 소리 길이로 전환)', recognitionState().broken ? '⚠️' : '✅'],
     ['설치 앱으로 실행', window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? '예' : '아니오(브라우저 탭)', ''],
   ];
   ul.innerHTML = '';
