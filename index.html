@@ -96,9 +96,19 @@
           </div>
         </div>
 
+        <!-- 🗺️ 여행 길: 파트너 포켓몬이 문장 수만큼의 길을 🏠에서 🏁까지 걸어감 (진행 바 대신) -->
         <div class="progress-row">
+          <div id="journey" class="journey" aria-label="여행 길">
+            <span class="journey-end start">🏠</span>
+            <span class="journey-end goal">🏁</span>
+            <div class="journey-road"><div id="journey-done" class="journey-done"></div></div>
+            <div id="journey-scenery" class="journey-scenery"></div>
+            <div id="journey-walker" class="journey-walker">
+              <span id="journey-mon" class="mon-figure journey-mon" hidden><img alt="" draggable="false"></span>
+              <span id="journey-fallback" class="journey-fallback">🚶</span>
+            </div>
+          </div>
           <span id="cue-counter" class="cue-counter">0 / 0</span>
-          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
         </div>
 
         <details id="vocab-panel" class="vocab-panel" hidden>

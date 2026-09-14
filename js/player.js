@@ -12,7 +12,7 @@ import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockC
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp } from './xp.js';
 import { COIN, HP, puzzleCoins, streakCoins, lootBox, itemById, setFigure } from './items.js';
 import { openMon } from './shop.js';
-import { initCatch, openCatch, closeCatch } from './catch.js';
+import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
 
@@ -59,6 +59,7 @@ const state = {
   streakBase: 0,      // 🔥 어제까지의 연속 학습일 (오늘 5문장 채우면 +1)
   streakToday: false, // 오늘 5문장을 채워 스트릭에 들어갔는지
   streakDate: '',     // 위 두 값의 기준 날짜 (자정을 넘기면 다시 계산)
+  journeyCelebrated: false, // 🏁 이번에 연 콘텐츠에서 도착 연출을 이미 했는지 (세션당 한 번)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -107,8 +108,8 @@ export function initPlayer(ctx) {
   $('shadow-overlay').addEventListener('click', skipShadowWait);
   video.addEventListener('click', onPlayButton);
 
-  video.addEventListener('play', () => { updatePlayIcon(); hidePlayerMessage(); startLoop(); acquireWakeLock(); });
-  video.addEventListener('pause', () => { updatePlayIcon(); stopLoop(); releaseWakeLock(); scheduleSave(); });
+  video.addEventListener('play', () => { updatePlayIcon(); hidePlayerMessage(); startLoop(); acquireWakeLock(); $('journey').classList.add('playing'); });
+  video.addEventListener('pause', () => { updatePlayIcon(); stopLoop(); releaseWakeLock(); scheduleSave(); $('journey').classList.remove('playing'); });
   video.addEventListener('ended', onVideoEnded);
   video.addEventListener('seeking', () => { state.seeking = true; });
   video.addEventListener('seeked', () => { state.seeking = false; syncToTime(); });
@@ -178,6 +179,7 @@ function partnerInfo() {
 
 /** 상단 파트너 칩: 얼굴 + ❤️ HP. HP 기능이 꺼져 있거나 파트너가 없거나 부모 모드면 숨김 */
 function updatePartnerChip() {
+  updateJourneyWalker(); // 길 위의 캐릭터도 파트너·꾸밈 변화를 따라감 (HP 설정과 무관)
   const chip = $('partner-chip');
   const p = partnerInfo();
   if (!settings.hp || !p || state.parentMode) { chip.hidden = true; return; }
@@ -475,6 +477,8 @@ function markDone(cue) {
   }
   // 🧩 퍼즐 후보로 모아둠 (같은 문장을 반복해도 한 번만)
   if (settings.puzzleEvery > 0 && !state.puzzlePool.some((c) => c.start === cue.start)) state.puzzlePool.push(cue);
+  // 🏁 마지막 문장을 완료하면 여행 끝
+  if (state.cues.length && cue === state.cues[state.cues.length - 1]) celebrateJourney(false);
 }
 
 /** 현재 문장 ⭐ 정복 표시 (목록) */
@@ -586,6 +590,7 @@ export async function openPlayer(id, opts = {}) {
   state.idx = -1;
   state.repeatCount = 0;
   state.puzzlePool = [];
+  state.journeyCelebrated = false;
   cancelShadowWait();
   hidePlayerMessage();
 
@@ -596,6 +601,7 @@ export async function openPlayer(id, opts = {}) {
   video.playbackRate = SPEEDS[state.speedIdx];
 
   renderScriptList();
+  renderJourney();
   applySubVisibility();
   updateChips();
   updateGoalChip();
@@ -611,6 +617,7 @@ export async function openPlayer(id, opts = {}) {
       if (inRange.length !== state.cues.length) {
         state.cues = inRange.map((c, i) => ({ ...c, index: i }));
         renderScriptList();
+        renderJourney();
         showPlayerMessage(inRange.length === 0
           ? '😢 자막 시간이 영상과 맞지 않아요. 자막 파일을 확인해 주세요'
           : `자막 ${state.cues.length}개만 영상 길이 안에 있어요`, 4000);
@@ -850,7 +857,7 @@ function onCueEnd() {
 
   // 👨‍👩‍👦 부모 모드: 기록 없이 다음 문장으로 이어서, 마지막이면 멈춤
   if (state.parentMode) {
-    if (state.idx >= state.cues.length - 1) { video.pause(); return; }
+    if (state.idx >= state.cues.length - 1) { video.pause(); celebrateJourney(true); return; }
     advanceContinuous();
     return;
   }
@@ -1197,7 +1204,85 @@ function markScriptRevealed() {
 function updateProgress() {
   const n = state.cues.length;
   $('cue-counter').textContent = `${state.idx + 1} / ${n}`;
-  $('progress-fill').style.width = n ? `${((state.idx + 1) / n) * 100}%` : '0%';
+  // 🗺️ 여행 길: 지나온 길 색칠, 캐릭터 이동, 앞쪽 풍경은 안개
+  const pct = n ? ((state.idx + 1) / n) * 100 : 0;
+  $('journey-done').style.width = `${pct}%`;
+  $('journey-walker').style.left = `calc(30px + (100% - 60px) * ${pct / 100})`;
+  for (const el of $('journey-scenery').children) el.classList.toggle('ahead', Number(el.dataset.pos) > pct);
+}
+
+// ───────────────────── 🗺️ 여행 길 ─────────────────────
+
+// 풍경 이모지 (전부 Emoji 5.0 이하 — 안드로이드 10 태블릿에서 보임)
+const SCENERY = ['🌳', '🌲', '🏔️', '⛰️', '🌾', '🌻', '🌊', '🏝️', '🌉', '🏕️', '🌈', '🌴', '🌋', '🏞️', '🌵', '🏰'];
+
+/** 문자열 → 32비트 시드 → 0~1 난수 (같은 콘텐츠는 항상 같은 지도) */
+function seededRandom(seedStr) {
+  let h = 2166136261;
+  for (let i = 0; i < seedStr.length; i++) { h ^= seedStr.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return () => {
+    h += 0x6D2B79F5;
+    let t = h;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** 콘텐츠를 열 때: 길 위에 풍경 8~10개를 문장 위치에 비례해 배치 (콘텐츠 id로 고정) */
+function renderJourney() {
+  const box = $('journey-scenery');
+  box.innerHTML = '';
+  const n = state.cues.length;
+  if (!n || !state.item) { updateProgress(); return; }
+  const rng = seededRandom(String(state.item.id));
+  const count = Math.max(6, Math.min(10, Math.round(n / 25))); // 문장이 많을수록 풍경도 조금 더 (6~10개)
+  let prev = -1;
+  for (let i = 0; i < count; i++) {
+    let idx = Math.floor(rng() * SCENERY.length);
+    if (idx === prev) idx = (idx + 1) % SCENERY.length; // 같은 풍경 연달아 안 나오게
+    prev = idx;
+    const pos = ((i + 0.5) / count) * 100 + (rng() - 0.5) * (60 / count); // 균등 간격 + 살짝 흔들기
+    const el = document.createElement('span');
+    el.textContent = SCENERY[idx];
+    el.style.left = `${Math.max(4, Math.min(96, pos)).toFixed(1)}%`;
+    el.dataset.pos = String(pos);
+    box.appendChild(el);
+  }
+  updateJourneyWalker();
+  updateProgress();
+}
+
+/** 길 위의 캐릭터 = 파트너 포켓몬(장식·염색·😴 그대로). 파트너가 없으면 🚶 */
+function updateJourneyWalker() {
+  const p = partnerInfo();
+  const mon = $('journey-mon');
+  const fb = $('journey-fallback');
+  if (p && p.url) {
+    setFigure(mon, p.url, getLook(p.id));
+    mon.hidden = false;
+    fb.hidden = true;
+  } else {
+    mon.hidden = true;
+    fb.hidden = false;
+  }
+}
+
+/** 🏁 마지막 문장을 완료 → 도착 연출 (세션당 한 번). 보너스 ⚡·💰는 콘텐츠당 한 번, 부모 모드는 연출만 */
+function celebrateJourney(showOnly) {
+  if (state.journeyCelebrated || !state.item) return;
+  state.journeyCelebrated = true;
+  burstConfetti();
+  sfx.success();
+  if (showOnly || state.parentMode || state.item.journeyDone) {
+    showPlayerMessage('🏁 여행 끝! 끝까지 다 봤어요', 5000);
+    return;
+  }
+  state.item.journeyDone = Date.now();
+  updateItem(state.item.id, { journeyDone: state.item.journeyDone }).catch(() => {});
+  awardXp(XP.journey);
+  awardCoins(COIN.journey);
+  showPlayerMessage(`🏁 여행 끝! 끝까지 다 봤어요 ⚡+${XP.journey} 💰+${COIN.journey}`, 6000);
 }
 
 // ───────────────────── 전체 대사 목록 ─────────────────────
@@ -1394,6 +1479,7 @@ function initSettingsDialog() {
       const t = video.currentTime;
       state.cues = buildCues(state.item);
       renderScriptList();
+      renderJourney();
       const j = findCueIndex(state.cues, t);
       goTo(j >= 0 ? j : 0, { play: false });
     }

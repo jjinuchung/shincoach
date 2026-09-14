@@ -12,6 +12,7 @@ export const COIN = {
   goal: 10,             // 오늘의 목표 달성
   streakPerDay: 5,      // 🔥 연속 학습일 × 5
   streakMax: 50,        // 스트릭 코인 상한 (10일)
+  journey: 20,          // 🏁 콘텐츠 마지막 문장까지 도착 (콘텐츠당 한 번)
 };
 
 /** 퍼즐 결과 → 코인 */

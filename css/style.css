@@ -303,9 +303,38 @@ button { font-family: inherit; }
 .vocab-item b { color: var(--primary); margin-right: 6px; }
 .vocab-item.phrase { background: #eef2ff; border-color: #c7d2fe; }
 .vocab-item.phrase b { color: #4338ca; }
-.cue-counter { font-size: 0.9rem; color: var(--muted); font-weight: 600; white-space: nowrap; min-width: 60px; }
-.progress-bar { flex: 1; height: 8px; background: #dfe3f5; border-radius: 999px; overflow: hidden; }
-.progress-fill { height: 100%; width: 0; background: var(--primary); transition: width 0.2s; }
+.cue-counter { font-size: 0.8rem; color: var(--muted); font-weight: 600; white-space: nowrap; min-width: 52px; text-align: right; }
+
+/* ===== 🗺️ 여행 길 ===== */
+.journey { position: relative; flex: 1; height: 66px; min-width: 0; }
+.journey-end { position: absolute; bottom: 8px; font-size: 22px; line-height: 1; }
+.journey-end.start { left: 0; }
+.journey-end.goal { right: 0; }
+/* 길: 양 끝 아이콘 안쪽. 풍경·걷는 캐릭터의 % 좌표는 이 길 기준 */
+.journey-road { position: absolute; left: 30px; right: 30px; bottom: 14px; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+.journey-done { height: 100%; width: 0; background: linear-gradient(90deg, #86efac, #22c55e); transition: width 0.5s ease; }
+.journey-scenery { position: absolute; left: 30px; right: 30px; bottom: 20px; height: 30px; pointer-events: none; }
+.journey-scenery span { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 20px; line-height: 1; transition: opacity 0.5s, filter 0.5s; }
+.journey-scenery span.ahead { opacity: 0.4; filter: grayscale(0.7); } /* 아직 안 간 곳은 안개처럼 */
+.journey-walker { position: absolute; left: 30px; bottom: 16px; width: 0; height: 0; transition: left 0.6s ease; z-index: 2; }
+.journey-walker > .journey-mon, .journey-walker > .journey-fallback { position: absolute; left: 0; bottom: 0; transform: translateX(-50%); } /* .mon-figure의 relative보다 우선 */
+.journey-mon { width: 44px; height: 44px; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25)); }
+.journey-mon .mon-gear { font-size: 14px; }
+.journey-mon .mon-zzz { font-size: 14px; }
+.journey-fallback { font-size: 26px; line-height: 1; }
+.journey-fallback[hidden], .journey-mon[hidden] { display: none; }
+/* 재생 중엔 걷는 느낌으로 통통 */
+.journey.playing .journey-walker > .journey-mon, .journey.playing .journey-walker > .journey-fallback { animation: journey-walk 0.5s ease-in-out infinite; }
+@keyframes journey-walk {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-3deg); }
+  50% { transform: translateX(-50%) translateY(-5px) rotate(3deg); }
+}
+@media (max-width: 480px) {
+  .journey { height: 58px; }
+  .journey-mon { width: 38px; height: 38px; }
+  .journey-scenery span { font-size: 17px; }
+  .journey-end { font-size: 19px; }
+}
 
 .subtitle-box {
   background: var(--card);

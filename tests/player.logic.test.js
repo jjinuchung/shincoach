@@ -8,7 +8,7 @@ import vm from 'node:vm';
 function makeEl() {
   const listeners = {};
   return {
-    hidden: false, textContent: '', innerHTML: '', className: '', dataset: {}, value: '', checked: false,
+    hidden: false, textContent: '', innerHTML: '', className: '', dataset: {}, value: '', checked: false, children: [],
     style: {}, firstChild: { textContent: '' }, scrollTop: 0, clientHeight: 100, offsetTop: 0, offsetHeight: 20,
     classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, toggle(c, f) { const on = f === undefined ? !this._s.has(c) : !!f; if (on) this._s.add(c); else this._s.delete(c); return on; }, contains(c) { return this._s.has(c); } },
     addEventListener(t, fn) { (listeners[t] ||= []).push(fn); },
@@ -70,13 +70,13 @@ function loadPlayer() {
     gainXp: (n) => { xpLog.push(n); return { gained: n, leveledUp: false, from: 1, to: 1, info: { level: 1, into: 0, need: 100 } }; },
     catchAttempt: () => ({ caught: true }), previewAttempt: () => ({ caught: false }),
     puzzleXp: (r) => (r && r.solved ? [30, 20, 10][Math.min(r.wrong || 0, 2)] : 3),
-    XP: { done: 2, speak: 3, speakStar: 5, goal: 30 }, streakBefore: () => 0, streakBonus: (n) => Math.min(40, 10 + 5 * (n - 1)), STREAK_MIN_DONE: 5, flushProfile() {},
-    initCatch() {}, closeCatch() {}, openCatch(o) { catchCalls.push(o); },
+    XP: { done: 2, speak: 3, speakStar: 5, goal: 30, journey: 50 }, streakBefore: () => 0, streakBonus: (n) => Math.min(40, 10 + 5 * (n - 1)), STREAK_MIN_DONE: 5, flushProfile() {},
+    initCatch() {}, closeCatch() {}, openCatch(o) { catchCalls.push(o); }, burstConfetti() {},
     // items.js / 코인 스텁: 코인 획득과 🎁 상자 아이템을 기록
     coinLog, itemLog,
     coins: () => coinLog.reduce((a, b) => a + b, 0), gainCoins: (n) => { if (n) coinLog.push(n); return { gained: n, coins: 0 }; },
     addItem: (id) => { itemLog.push(id); return true; }, getLook: () => ({ gear: null, dye: null }),
-    COIN: { done: 1, speak: 2, speakStar: 3, goal: 10 }, puzzleCoins: (r) => (r && r.solved ? [5, 3, 2][Math.min(r.wrong || 0, 2)] : 0),
+    COIN: { done: 1, speak: 2, speakStar: 3, goal: 10, journey: 20 }, puzzleCoins: (r) => (r && r.solved ? [5, 3, 2][Math.min(r.wrong || 0, 2)] : 0),
     streakCoins: (n) => Math.min(50, 5 * n), lootBox: () => 'cap', itemById: (id) => ({ id, emoji: '🧢', ko: '야구모자' }),
     // ❤️ 파트너 HP 스텁: hpState를 테스트가 직접 조작 (partner=null이면 HP 기능 없음)
     hpState, hpLog,
@@ -753,6 +753,55 @@ test('❤️ 어제 학습을 안 했으면 콘텐츠를 열 때 한 번 −30 (
   ctx.track.hpMissedApplied = () => true;
   run(`checkMissedDay([${JSON.stringify(d(before, 7))}], "${today}")`);
   assert.deepEqual(hpLog, [-30]);
+});
+
+test('🏁 여행 끝: 마지막 문장을 완료하면 연출 + ⚡50 💰20 (콘텐츠당 한 번, 세션당 연출 한 번), 부모 모드는 연출만', () => {
+  const { run, xpLog, coinLog, ctx, els } = loadPlayer();
+  const keys = new Set();
+  ctx.track.done = (c) => keys.add(c.start);
+  ctx.track.todayDone = () => keys.size;
+  const saved = [];
+  ctx.updateItem = async (id, patch) => { saved.push(patch); return null; };
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.dailyGoal = 0; state.item = { id: "it1", title: "t" }; state.idx = 4; state.journeyCelebrated = false;');
+  run('markDone(state.cues[3])');
+  assert.equal(xpLog.includes(50), false, '마지막 문장이 아니면 없음');
+  run('markDone(state.cues[4])');
+  assert.ok(xpLog.includes(50), '도착 ⚡50');
+  assert.ok(coinLog.includes(20), '도착 💰20');
+  assert.equal(saved.length, 1); assert.ok(saved[0].journeyDone > 0, 'journeyDone 저장');
+  assert.equal(run('state.journeyCelebrated'), true);
+  run('markDone(state.cues[4])');
+  assert.equal(xpLog.filter((x) => x === 50).length, 1, '같은 세션에서 다시 없음');
+  // 다음에 열었을 때(journeyDone 있음): 연출만
+  run('state.journeyCelebrated = false; markDone(state.cues[4])');
+  assert.equal(xpLog.filter((x) => x === 50).length, 1, '콘텐츠당 한 번');
+  // 부모 모드: 연출만
+  run('state.journeyCelebrated = false; state.item = { id: "it2", title: "t2" }; setParentMode(true); state.idx = 4;');
+  els.video.currentTime = 42; run('onCueEnd()');
+  assert.equal(run('state.journeyCelebrated'), true, '부모 모드도 도착 연출');
+  assert.equal(xpLog.filter((x) => x === 50).length, 1, '부모 모드는 보너스 없음');
+  assert.equal(saved.length, 1);
+});
+
+test('🗺️ 여행 길: 풍경은 콘텐츠 id로 고정, 진행에 따라 캐릭터 위치·앞쪽 풍경 안개', () => {
+  const { run, els } = loadPlayer();
+  const made = [];
+  const sc = run("$('journey-scenery')"); // 요소는 처음 쓸 때 만들어지므로 먼저 만들어 둠
+  sc.appendChild = (el) => { made.push(el); sc.children.push(el); };
+  run('state.cues = Array.from({ length: 100 }, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a", ko: "" })); state.item = { id: "movie-1" }; state.idx = -1; renderJourney()');
+  const first = made.map((e) => e.textContent + '@' + e.style.left).join('|');
+  assert.ok(made.length >= 6 && made.length <= 10, `풍경 ${made.length}개`);
+  made.length = 0; sc.children.length = 0;
+  run('renderJourney()');
+  assert.equal(made.map((e) => e.textContent + '@' + e.style.left).join('|'), first, '같은 콘텐츠는 같은 지도');
+  made.length = 0; sc.children.length = 0;
+  run('state.item = { id: "movie-2" }; renderJourney()');
+  assert.notEqual(made.map((e) => e.textContent + '@' + e.style.left).join('|'), first, '다른 콘텐츠는 다른 지도');
+  run('state.idx = 49; updateProgress()');
+  assert.equal(els['journey-done'].style.width, '50%');
+  assert.ok(els['journey-walker'].style.left.includes('0.5'), '캐릭터가 절반 지점');
+  const ahead = made.filter((e) => e.classList.contains('ahead')).length;
+  assert.ok(ahead > 0 && ahead < made.length, '앞쪽 풍경만 안개');
 });
 
 test('👨‍👩‍👦 부모 모드는 저장되지 않음 — 설정 저장에도 settings에 안 들어감', () => {
