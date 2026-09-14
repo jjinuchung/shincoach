@@ -1,5 +1,5 @@
 // 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
-import { getItem, getVideoBlob, updateItem } from './db.js';
+import { getItem, getVideoBlob, updateItem, listDaily } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
@@ -8,8 +8,8 @@ import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
-import { loadCharacters, downloadCharacters, pickCharacters, ROSTER } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP } from './xp.js';
+import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE } from './xp.js';
 import { initCatch, openCatch, closeCatch } from './catch.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
@@ -53,6 +53,8 @@ const state = {
   puzzleOnEnd: null,  // 퍼즐 다시 듣기가 끝났을 때 알릴 콜백 (정답 뒤 들려주기 → 닫기)
   characters: [],     // 🎮 기기에 받아둔 퍼즐 캐릭터 [{ id, ko, url }] (없으면 단어 조각만)
   catchOpen: false,   // 🎯 잡기 화면이 열려 있음 (키보드 무시)
+  streakBase: 0,      // 🔥 어제까지의 연속 학습일 (오늘 5문장 채우면 +1)
+  streakToday: false, // 오늘 5문장을 채워 스트릭에 들어갔는지
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -180,13 +182,20 @@ function awardXp(amount) {
   updateLevelChip();
   if (g.leveledUp) {
     sfx.levelUp();
-    showPlayerMessage(`🎉 레벨 업! Lv.${g.to}`, 5000);
+    const fresh = unlockCountAt(g.to);
+    showPlayerMessage(fresh ? `🎉 레벨 업! Lv.${g.to} — 새 포켓몬 ${fresh}마리가 나타났어요!` : `🎉 레벨 업! Lv.${g.to}`, 6000);
     const chip = $('level-chip');
     chip.classList.remove('pulse');
     void chip.offsetWidth;
     chip.classList.add('pulse');
   }
   return g;
+}
+
+/** 지금 레벨에서 열려 있는 캐릭터만 (마일스톤 해금) */
+function unlockedCharacters() {
+  const level = getLevelInfo().level;
+  return state.characters.filter((c) => isUnlocked(c.id, level));
 }
 
 /** ⚙ 잡기 연습: 아무 캐릭터 4마리로 연출만 (기록 안 함) */
@@ -196,7 +205,7 @@ function startCatchPractice() {
   cancelShadowWait();
   state.catchOpen = true;
   openCatch({
-    candidates: pickCharacters(state.characters, 4), levelInfo: getLevelInfo(), practice: true,
+    candidates: pickCharacters(unlockedCharacters(), 4), levelInfo: getLevelInfo(), practice: true,
     attempt: (id) => previewAttempt(id),
     onDone: () => { state.catchOpen = false; },
   });
@@ -218,7 +227,7 @@ function showPuzzle(cue, onDone) {
   state.puzzleCue = cue;
   state.puzzlePlaying = false;
   openPuzzle(cue, {
-    characters: state.characters,
+    characters: unlockedCharacters(),
     onPlay: (onEnd) => playPuzzleSentence(cue, onEnd),
     onClose: (result) => {
       state.puzzleCue = null;
@@ -284,9 +293,21 @@ function markDone(cue) {
   track.done(cue);
   const after = track.todayDone();
   if (after !== before) {
-    updateGoalChip();
     awardXp(XP.done); // 오늘 처음 완료한 문장 → 경험치
-    if (settings.dailyGoal > 0 && after === settings.dailyGoal) showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성!`, 5000);
+    // 🔥 오늘 5문장을 채우면 연속 학습일에 들어가고 보너스 (연속일수록 큼)
+    if (!state.streakToday && after >= STREAK_MIN_DONE) {
+      state.streakToday = true;
+      const days = state.streakBase + 1;
+      const bonus = streakBonus(days);
+      awardXp(bonus);
+      showPlayerMessage(days > 1 ? `🔥 ${days}일 연속 학습! ⚡+${bonus}` : `🔥 오늘 학습 시작! ⚡+${bonus} (내일도 하면 더 많이)`, 4500);
+    }
+    updateGoalChip();
+    if (settings.dailyGoal > 0) {
+      const left = settings.dailyGoal - after;
+      if (left === 0) { awardXp(XP.goal); showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal}`, 5000); }
+      else if (left === 3) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal}!`, 3500);
+    }
   }
   // 🧩 퍼즐 후보로 모아둠 (같은 문장을 반복해도 한 번만)
   if (settings.puzzleEvery > 0 && !state.puzzlePool.some((c) => c.start === cue.start)) state.puzzlePool.push(cue);
@@ -304,8 +325,19 @@ function updateGoalChip() {
   if (!settings.dailyGoal) { chip.hidden = true; return; }
   const n = track.todayDone();
   chip.hidden = false;
-  chip.textContent = n >= settings.dailyGoal ? `🎉 ${n}/${settings.dailyGoal}` : `🔥 ${n}/${settings.dailyGoal}`;
+  const days = state.streakBase + (state.streakToday ? 1 : 0);
+  const streak = days > 0 ? `${days}일 · ` : ' ';
+  chip.textContent = n >= settings.dailyGoal ? `🎉${streak}${n}/${settings.dailyGoal}` : `🔥${streak}${n}/${settings.dailyGoal}`;
   chip.classList.toggle('reached', n >= settings.dailyGoal);
+}
+
+/** 🔥 어제까지의 연속 학습일을 기록에서 계산 (콘텐츠를 열 때 한 번) */
+function loadStreak() {
+  state.streakToday = track.todayDone() >= STREAK_MIN_DONE;
+  listDaily().then((list) => {
+    state.streakBase = streakBefore(list, track.todayKey());
+    updateGoalChip();
+  }).catch(() => {});
 }
 
 // ───────────────────── 단어 패널 ─────────────────────
@@ -374,6 +406,7 @@ export async function openPlayer(id, opts = {}) {
   state.item = item;
   state.cues = buildCues(item);
   await track.open(item).catch((e) => console.warn('기록 로드 실패:', e));
+  loadStreak();
   state.idx = -1;
   state.repeatCount = 0;
   state.puzzlePool = [];

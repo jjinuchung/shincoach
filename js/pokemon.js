@@ -3,7 +3,10 @@
 // 기기 IndexedDB에 보관한다 (영상과 같은 취급). 이후엔 오프라인에서도 사용.
 import { getCharacters, putCharacter } from './db.js';
 
-/** 시작 명단 30마리 (인기 위주). 나중에 여기에 추가하면 "받기"가 없는 것만 받아옴 */
+/**
+ * 명단: 처음 30마리(Lv1) + 레벨 마일스톤에서 열리는 10마리씩(Lv5·10·15). unlock 없으면 1.
+ * 여기에 추가하면 ⚙ "받기"가 없는 것만 받아옴
+ */
 export const ROSTER = [
   { id: 25, ko: '피카츄', en: 'Pikachu' },
   { id: 4, ko: '파이리', en: 'Charmander' },
@@ -35,7 +38,61 @@ export const ROSTER = [
   { id: 658, ko: '개굴닌자', en: 'Greninja' },
   { id: 700, ko: '님피아', en: 'Sylveon' },
   { id: 778, ko: '따라큐', en: 'Mimikyu' },
+  // ── Lv5에 열림 ──
+  { id: 26, ko: '라이츄', en: 'Raichu', unlock: 5 },
+  { id: 59, ko: '윈디', en: 'Arcanine', unlock: 5 },
+  { id: 68, ko: '괴력몬', en: 'Machamp', unlock: 5 },
+  { id: 95, ko: '롱스톤', en: 'Onix', unlock: 5 },
+  { id: 104, ko: '탕구리', en: 'Cubone', unlock: 5 },
+  { id: 113, ko: '럭키', en: 'Chansey', unlock: 5 },
+  { id: 129, ko: '잉어킹', en: 'Magikarp', unlock: 5 },
+  { id: 134, ko: '샤미드', en: 'Vaporeon', unlock: 5 },
+  { id: 135, ko: '쥬피썬더', en: 'Jolteon', unlock: 5 },
+  { id: 136, ko: '부스터', en: 'Flareon', unlock: 5 },
+  // ── Lv10에 열림 ──
+  { id: 144, ko: '프리져', en: 'Articuno', unlock: 10 },
+  { id: 145, ko: '썬더', en: 'Zapdos', unlock: 10 },
+  { id: 146, ko: '파이어', en: 'Moltres', unlock: 10 },
+  { id: 196, ko: '에브이', en: 'Espeon', unlock: 10 },
+  { id: 248, ko: '마기라스', en: 'Tyranitar', unlock: 10 },
+  { id: 249, ko: '루기아', en: 'Lugia', unlock: 10 },
+  { id: 250, ko: '칠색조', en: 'Ho-Oh', unlock: 10 },
+  { id: 251, ko: '세레비', en: 'Celebi', unlock: 10 },
+  { id: 282, ko: '가디안', en: 'Gardevoir', unlock: 10 },
+  { id: 445, ko: '한카리아스', en: 'Garchomp', unlock: 10 },
+  // ── Lv15에 열림 ──
+  { id: 382, ko: '가이오가', en: 'Kyogre', unlock: 15 },
+  { id: 383, ko: '그란돈', en: 'Groudon', unlock: 15 },
+  { id: 483, ko: '디아루가', en: 'Dialga', unlock: 15 },
+  { id: 484, ko: '펄기아', en: 'Palkia', unlock: 15 },
+  { id: 487, ko: '기라티나', en: 'Giratina', unlock: 15 },
+  { id: 493, ko: '아르세우스', en: 'Arceus', unlock: 15 },
+  { id: 643, ko: '레시라무', en: 'Reshiram', unlock: 15 },
+  { id: 644, ko: '제크로무', en: 'Zekrom', unlock: 15 },
+  { id: 716, ko: '제르네아스', en: 'Xerneas', unlock: 15 },
+  { id: 888, ko: '자시안', en: 'Zacian', unlock: 15 },
 ];
+
+/** 이 레벨에서 열려 있는 명단 */
+export function unlockedRoster(level) {
+  return ROSTER.filter((r) => (r.unlock || 1) <= level);
+}
+
+export function isUnlocked(id, level) {
+  const r = ROSTER.find((m) => m.id === id);
+  return !!r && (r.unlock || 1) <= level;
+}
+
+/** 다음 해금 레벨 (더 없으면 0) */
+export function nextUnlockLevel(level) {
+  const lv = [...new Set(ROSTER.map((r) => r.unlock || 1))].filter((u) => u > level).sort((a, b) => a - b);
+  return lv.length ? lv[0] : 0;
+}
+
+/** 그 레벨에서 새로 열리는 마리 수 */
+export function unlockCountAt(level) {
+  return ROSTER.filter((r) => (r.unlock || 1) === level).length;
+}
 
 const ART_URL = (id) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
 const STORE_SIZE = 256; // 원본 475px → 256px로 줄여 저장 (퍼즐에선 100px 이하로 보임, 용량 1/4)
@@ -50,7 +107,7 @@ export async function loadCharacters(force = false) {
   const byId = new Map(ROSTER.map((r) => [r.id, r]));
   cache = recs
     .filter((r) => r.blob && byId.has(r.id))
-    .map((r) => ({ id: r.id, ko: byId.get(r.id).ko, en: byId.get(r.id).en, url: URL.createObjectURL(r.blob) }));
+    .map((r) => ({ id: r.id, ko: byId.get(r.id).ko, en: byId.get(r.id).en, unlock: byId.get(r.id).unlock || 1, url: URL.createObjectURL(r.blob) }));
   return cache;
 }
 

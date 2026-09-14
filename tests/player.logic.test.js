@@ -48,25 +48,25 @@ function loadPlayer() {
     // srt.js 의존 함수 스텁
     parseSubtitle: () => [], mergeSubtitles: (a) => a, mergeIntoSentences: (a) => a,
     wordTimings: () => [], findCueIndex: (cues, t) => cues.findIndex((c) => t >= c.start && t < c.end),
-    getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null,
+    getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null, listDaily: async () => [],
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, MASTER_RATIO: 0.8, puzzle() {} },
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', MASTER_RATIO: 0.8, puzzle() {} },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
     puzzleCalls,
     initPuzzle() {}, closePuzzle() {},
     openPuzzle(cue, opts) { puzzleCalls.push({ cue, opts }); },
     pickPuzzle: (cues) => (cues.length ? cues[0] : null),
     // pokemon.js 스텁
-    loadCharacters: async () => [], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [], pickCharacters: (a, n) => (a || []).slice(0, n),
+    loadCharacters: async () => [], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [], pickCharacters: (a, n) => (a || []).slice(0, n), isUnlocked: () => true, unlockCountAt: () => 0,
     // xp.js / catch.js 스텁: XP 획득과 잡기 화면 호출을 기록
     xpLog, catchCalls,
     initProfile: async () => ({}), getLevelInfo: () => ({ level: 1, into: 0, need: 100, xp: 0 }),
     gainXp: (n) => { xpLog.push(n); return { gained: n, leveledUp: false, from: 1, to: 1, info: { level: 1, into: 0, need: 100 } }; },
     catchAttempt: () => ({ caught: true }), previewAttempt: () => ({ caught: false }),
     puzzleXp: (r) => (r && r.solved ? [30, 20, 10][Math.min(r.wrong || 0, 2)] : 3),
-    XP: { done: 2, speak: 3, speakStar: 5 },
+    XP: { done: 2, speak: 3, speakStar: 5, goal: 30 }, streakBefore: () => 0, streakBonus: (n) => Math.min(40, 10 + 5 * (n - 1)), STREAK_MIN_DONE: 5,
     initCatch() {}, closeCatch() {}, openCatch(o) { catchCalls.push(o); },
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
@@ -546,4 +546,21 @@ test('XP: 말하기 통과 +3, ⭐면 +5', async () => {
   video.currentTime = 12; run('onCueEnd()');
   run('skipShadowWait()'); await tick();
   assert.ok(xpLog.includes(3), '통과 +3');
+});
+
+test('🔥 스트릭·오늘 목표: 5번째 문장에 스트릭 보너스, 목표 달성에 +30', () => {
+  const { run, xpLog, ctx } = loadPlayer();
+  const keys = new Set();
+  ctx.track.done = (c) => keys.add(c.start);
+  ctx.track.todayDone = () => keys.size;
+  run('settings.dailyGoal = 7; state.streakBase = 2; state.streakToday = false; state.cues = Array.from({length: 8}, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
+  for (let i = 0; i < 4; i++) run(`markDone(state.cues[${i}])`);
+  assert.deepEqual(xpLog, [2, 2, 2, 2], '4문장까지는 문장 XP만');
+  run('markDone(state.cues[4])');
+  assert.deepEqual(xpLog.slice(4), [2, 20], '5번째 문장: 3일 연속(2+1) 보너스 20');
+  assert.equal(run('state.streakToday'), true);
+  run('markDone(state.cues[4]); markDone(state.cues[5])');
+  assert.equal(xpLog.length, 7, '같은 문장 반복은 XP 없음, 보너스는 한 번만');
+  run('markDone(state.cues[6])');
+  assert.deepEqual(xpLog.slice(7), [2, 30], '7번째 = 오늘 목표 달성 +30');
 });

@@ -10,7 +10,33 @@ export const XP = {
   speak: 3,             // 말하기 통과
   speakStar: 5,         // 말하기 ⭐(80%↑) 통과
   recatch: 10,          // 이미 잡은 포켓몬을 또 잡음 (보너스)
+  goal: 30,             // 오늘의 목표(문장 수) 달성
 };
+
+// ── 연속 학습일(스트릭) ──
+export const STREAK_MIN_DONE = 5; // 하루에 문장 5개 이상 완료해야 "학습한 날"
+
+/** 날짜 문자열 YYYY-MM-DD → 하루 전 */
+function prevDay(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1, d - 1);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
+
+/** 어제까지의 연속 학습일 수 (오늘은 제외 — 오늘 채웠는지는 호출하는 쪽이 더함) */
+export function streakBefore(dailyList, today, minDone = STREAK_MIN_DONE) {
+  const ok = new Set((dailyList || []).filter((d) => d && d.date !== today && (d.doneKeys || []).length >= minDone).map((d) => d.date));
+  let n = 0;
+  let day = prevDay(today);
+  while (ok.has(day)) { n++; day = prevDay(day); }
+  return n;
+}
+
+/** 오늘까지 n일 연속일 때 보너스 XP: 10, 15, 20 … 최대 40 */
+export function streakBonus(streak) {
+  return Math.min(40, 10 + 5 * (Math.max(1, streak) - 1));
+}
 
 /** level → level+1 에 필요한 XP: Lv1→2 100, 레벨마다 +40 */
 export function xpForLevel(level) {
@@ -39,11 +65,12 @@ export const RARITY = [
   { stars: '⭐⭐⭐', label: '희귀', base: 0.15 },
   { stars: '⭐⭐⭐⭐', label: '전설', base: 0.03 },
 ];
+// 명단(pokemon.js ROSTER) 확장 시 여기도 추가. 등급 없으면 보통(2)
 export const RARITY_IDS = {
-  1: [1, 4, 7, 152, 155, 158, 393, 39, 52, 54, 58],
-  2: [25, 133, 175, 143, 131, 94],
-  3: [6, 9, 3, 130, 197, 700, 448, 658, 778],
-  4: [149, 150, 151, 384],
+  1: [1, 4, 7, 152, 155, 158, 393, 39, 52, 54, 58, 104, 129],
+  2: [25, 133, 175, 143, 131, 94, 26, 95, 113],
+  3: [6, 9, 3, 130, 197, 700, 448, 658, 778, 59, 68, 134, 135, 136, 196, 248, 282, 445],
+  4: [149, 150, 151, 384, 144, 145, 146, 249, 250, 251, 382, 383, 483, 484, 487, 493, 643, 644, 716, 888],
 };
 const rarityById = {};
 for (const r of Object.keys(RARITY_IDS)) for (const id of RARITY_IDS[r]) rarityById[id] = Number(r);

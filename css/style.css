@@ -748,6 +748,11 @@ button { font-family: inherit; }
 /* ===== 🎒 도감 ===== */
 .pokedex-xp { display: flex; justify-content: space-between; font-weight: 800; color: #b45309; }
 .pokedex-stats { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+.pokedex-hint { display: flex; flex-wrap: wrap; margin-top: 8px; }
+.pokedex-hint span { background: #fff7ed; color: #b45309; border-radius: 8px; padding: 3px 8px; margin: 3px 6px 0 0; font-size: 0.85rem; font-weight: 700; }
+.pokedex-hint .unlock { background: #eef2ff; color: var(--primary); }
+.stats-card.locked { opacity: 0.85; }
+.stats-card.locked .pokedex-cell.unknown img { filter: brightness(0); opacity: 0.2; }
 .pokedex-grid { display: flex; flex-wrap: wrap; }
 .pokedex-cell {
   width: 92px;

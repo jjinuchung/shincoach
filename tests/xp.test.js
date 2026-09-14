@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   xpForLevel, levelFromXp, puzzleXp, rarityOf, RARITY_IDS, catchChance, rollCatch,
   gainXp, catchAttempt, previewAttempt, caughtCount, caughtKinds, getLevelInfo, XP,
+  streakBefore, streakBonus, STREAK_MIN_DONE,
 } from '../js/xp.js';
 import { ROSTER } from '../js/pokemon.js';
 import { josa } from '../js/catch.js';
@@ -27,9 +28,10 @@ test('puzzleXp: 틀린 횟수 0/1/2 → 30/20/10, 정답 공개 → 3', () => {
   assert.equal(puzzleXp(null), 3);
 });
 
-test('희귀도: 명단 30마리 전부 등급이 있고 겹치지 않음', () => {
+test('희귀도: 명단 60마리 전부 등급이 있고 겹치지 않음', () => {
   const all = Object.values(RARITY_IDS).flat();
-  assert.equal(all.length, 30);
+  assert.equal(all.length, 60);
+  assert.equal(new Set(all).size, 60, '겹침 없음');
   assert.deepEqual(new Set(all), new Set(ROSTER.map((r) => r.id)));
   assert.equal(rarityOf(25), 2, '피카츄 보통');
   assert.equal(rarityOf(150), 4, '뮤츠 전설');
@@ -71,4 +73,25 @@ test('josa: 받침에 따라 이/가', () => {
   assert.equal(josa('리자몽', '이', '가'), '이');
   assert.equal(josa('뮤', '이', '가'), '가');
   assert.equal(josa('Pikachu', '이', '가'), '가');
+});
+
+test('streakBefore: 어제까지 연속으로 5문장 이상 한 날 수 (오늘 제외, 하루라도 빠지면 끊김)', () => {
+  const d = (date, n) => ({ date, doneKeys: Array.from({ length: n }, (_, i) => `k${i}`) });
+  const list = [d('2026-09-13', 7), d('2026-09-12', 5), d('2026-09-11', 4), d('2026-09-10', 9), d('2026-09-14', 20)];
+  assert.equal(streakBefore(list, '2026-09-14'), 2, '13·12일 연속, 11일은 4문장이라 끊김');
+  assert.equal(streakBefore(list, '2026-09-13'), 1);
+  assert.equal(streakBefore(list, '2026-09-12'), 0, '11일이 미달');
+  assert.equal(streakBefore([], '2026-09-14'), 0);
+  assert.equal(streakBefore([d('2026-09-01', 9)], '2026-09-14'), 0, '옛날 기록은 무관');
+  assert.equal(streakBefore([d('2026-08-31', 5)], '2026-09-01'), 1, '월 경계');
+  assert.equal(STREAK_MIN_DONE, 5);
+});
+
+test('streakBonus: 10, 15, 20 … 최대 40', () => {
+  assert.equal(streakBonus(1), 10);
+  assert.equal(streakBonus(2), 15);
+  assert.equal(streakBonus(3), 20);
+  assert.equal(streakBonus(7), 40);
+  assert.equal(streakBonus(30), 40);
+  assert.equal(streakBonus(0), 10);
 });
