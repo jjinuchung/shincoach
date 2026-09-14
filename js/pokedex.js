@@ -1,6 +1,6 @@
 // 🎒 내 포켓몬(도감) 화면: 레벨·경험치, 잡은 포켓몬(그림·마릿수), 못 잡은 포켓몬(검은 실루엣 + ???)
 import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt } from './pokemon.js';
-import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE } from './xp.js';
+import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach } from './xp.js';
 import { listDaily } from './db.js';
 import { todayKey, todayDone } from './track.js';
 
@@ -51,7 +51,7 @@ export async function openPokedex() {
   card.appendChild(el('div', 'pokedex-stats', `잡은 포켓몬 ${caughtKinds()}/${unlocked.length}마리 · 몬스터볼 ${p.throws}번 던져서 ${p.catches}번 성공 · 총 경험치 ${p.xp}`));
   const hint = el('div', 'pokedex-hint');
   hint.appendChild(el('span', 'streak', streak > 0 ? `🔥 ${streak}일 연속 학습 중` : `🔥 하루 ${STREAK_MIN_DONE}문장 이상 하면 연속 학습이 시작돼요`));
-  if (nextLv) hint.appendChild(el('span', 'unlock', `🔒 Lv.${nextLv}에 새 포켓몬 ${unlockCountAt(nextLv)}마리`));
+  if (nextLv) hint.appendChild(el('span', 'unlock', `🔒 Lv.${nextLv}에 새 포켓몬 ${unlockCountAt(nextLv)}마리 — ⚡${xpToReach(nextLv) - p.xp} 남음`));
   card.appendChild(hint);
   main.appendChild(card);
 

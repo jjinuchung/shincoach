@@ -81,3 +81,16 @@ test('puzzle: 문장별·세션·일별 퍼즐 횟수/정답 누적 (옛 기록�
   assert.equal(run('t.daily.puzzleSolved'), 1);
   assert.equal(run('t.dailyDirty'), true);
 });
+
+test('goalRewarded: 오늘 목표 보너스 지급 표시는 하루 기록에 남고 dirty 처리', async () => {
+  const s = stub();
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  assert.equal(run('goalRewarded()'), false);
+  run('markGoalRewarded()');
+  assert.equal(run('goalRewarded()'), true);
+  assert.equal(run('t.dailyDirty'), true);
+  assert.equal(run('todayPuzzles()'), 0);
+  run('puzzle({ start: 1, end: 2, en: "a b c" }, { solved: true, wrong: 0 })');
+  assert.equal(run('todayPuzzles()'), 1);
+});

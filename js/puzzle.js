@@ -85,6 +85,7 @@ const ui = {
   slots: {},      // 단어의 "집" (원래 자리 인덱스 → 요소): 캐릭터가 있으면 말풍선, 없으면 자리 자체. 단어가 나가도 자리는 그대로
   chars: null,    // 이번 퍼즐에 나온 캐릭터 (결과에 실어 보냄 → 잡기 화면 후보)
   dragEndAt: 0,   // 드래그가 끝난 시각 (직후에 따라오는 click을 무시)
+  pendingAuto: false, // 화면이 꺼진 동안 자동 종료를 미뤄 둠
 };
 
 export function initPuzzle() {
@@ -92,6 +93,19 @@ export function initPuzzle() {
   $('puzzle-listen').addEventListener('click', () => { if (ui.onPlay) ui.onPlay(ui.result && ui.result.solved ? onSolvedPlayEnd : undefined); });
   $('puzzle-check').addEventListener('click', () => { unlock(); check(); });
   $('puzzle-continue').addEventListener('click', finish);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !ui.open || !ui.pendingAuto) return;
+    ui.pendingAuto = false;
+    clearTimeout(ui.timer);
+    ui.timer = setTimeout(autoFinish, 1000);
+  });
+}
+
+/** 자동 종료(정답 뒤): 화면이 꺼져 있으면 보류 — 잠긴 태블릿에서 다음 문장이 재생되지 않게 */
+function autoFinish() {
+  if (!ui.open) return;
+  if (document.hidden) { ui.pendingAuto = true; return; }
+  finish();
 }
 
 export function isPuzzleOpen() {
@@ -112,6 +126,7 @@ export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
   ui.result = null;
   ui.onPlay = onPlay || null;
   ui.onClose = onClose || null;
+  ui.pendingAuto = false;
 
   const ko = $('puzzle-ko');
   ko.textContent = cue.ko || '';
@@ -233,7 +248,13 @@ export function closePuzzle() {
   ui.open = false;
   clearTimeout(ui.timer);
   ui.timer = null;
-  if (ui.drag) { if (ui.drag.clone) ui.drag.clone.remove(); ui.drag = null; }
+  if (ui.drag) { // 드래그 중에 닫히면 리스너·자리표시·복제본까지 정리
+    const d = ui.drag;
+    ui.drag = null;
+    unbindDrag();
+    if (d.raf) cancelAnimationFrame(d.raf);
+    if (d.moved) endDrag(d);
+  }
   const root = $('puzzle');
   root.hidden = true;
   root.classList.remove('solved', 'shake');
@@ -246,7 +267,7 @@ export function closePuzzle() {
 function onSolvedPlayEnd() {
   if (!ui.open || !ui.result || !ui.result.solved) return;
   clearTimeout(ui.timer);
-  ui.timer = setTimeout(finish, 700);
+  ui.timer = setTimeout(autoFinish, 700);
 }
 
 function finish() {
@@ -441,9 +462,9 @@ function check() {
     // 맞춘 문장을 한 번 더 들려주고(각인), 재생이 끝나면 닫힘. 재생이 안 되는 경우를 대비한 안전망 타이머
     if (ui.onPlay) {
       ui.onPlay(onSolvedPlayEnd);
-      ui.timer = setTimeout(finish, 12000);
+      ui.timer = setTimeout(autoFinish, 12000);
     } else {
-      ui.timer = setTimeout(finish, 1500);
+      ui.timer = setTimeout(autoFinish, 1500);
     }
     return;
   }

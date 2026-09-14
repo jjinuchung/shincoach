@@ -31,3 +31,9 @@ test('퍼즐 기록도 큰 값 유지 (sentenceStats/daily/sessions)', () => {
   assert.equal(d.puzzles, 3); assert.equal(d.puzzleSolved, 1);
   assert.equal(mergeStatRecord('sessions', { id: 's', puzzles: 2, puzzleSolved: 2 }, { id: 's', puzzles: 1, puzzleSolved: 0 }).puzzleSolved, 2);
 });
+
+test('daily goalRewarded는 한쪽이라도 true면 true', () => {
+  assert.equal(mergeStatRecord('daily', { date: 'd', doneKeys: [], goalRewarded: true }, { date: 'd', doneKeys: [] }).goalRewarded, true);
+  assert.equal(mergeStatRecord('daily', { date: 'd', doneKeys: [] }, { date: 'd', doneKeys: [], goalRewarded: true }).goalRewarded, true);
+  assert.equal(mergeStatRecord('daily', { date: 'd', doneKeys: [] }, { date: 'd', doneKeys: [] }).goalRewarded, false);
+});

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   xpForLevel, levelFromXp, puzzleXp, rarityOf, RARITY_IDS, catchChance, rollCatch,
   gainXp, catchAttempt, previewAttempt, caughtCount, caughtKinds, getLevelInfo, XP,
-  streakBefore, streakBonus, STREAK_MIN_DONE,
+  streakBefore, streakBonus, STREAK_MIN_DONE, xpToReach,
 } from '../js/xp.js';
 import { ROSTER } from '../js/pokemon.js';
 import { josa } from '../js/catch.js';
@@ -18,6 +18,10 @@ test('xpForLevel / levelFromXp: Lv1→2 100, 레벨마다 +40', () => {
   assert.deepEqual(levelFromXp(100), { level: 2, into: 0, need: 140 });
   assert.deepEqual(levelFromXp(250), { level: 3, into: 10, need: 180 });
   assert.equal(levelFromXp(-5).level, 1);
+  assert.equal(xpToReach(1), 0);
+  assert.equal(xpToReach(2), 100);
+  assert.equal(xpToReach(5), 640, 'Codex 계산과 일치');
+  assert.equal(xpToReach(10), 2340);
 });
 
 test('puzzleXp: 틀린 횟수 0/1/2 → 30/20/10, 정답 공개 → 3', () => {

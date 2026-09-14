@@ -1,6 +1,6 @@
 // ⚡ 경험치·레벨·포켓몬 잡기 규칙 + 아이 프로필(IndexedDB 'profile' 스토어, 백업에 포함)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
-import { getProfile, putProfile } from './db.js';
+import { getProfile, applyProfileDelta } from './db.js';
 
 // ── 경험치 ──
 export const XP = {
@@ -41,6 +41,13 @@ export function streakBonus(streak) {
 /** level → level+1 에 필요한 XP: Lv1→2 100, 레벨마다 +40 */
 export function xpForLevel(level) {
   return 100 + 40 * (Math.max(1, level) - 1);
+}
+
+/** 레벨 L에 도달하는 데 필요한 누적 XP (Lv1 = 0) */
+export function xpToReach(level) {
+  let sum = 0;
+  for (let l = 1; l < level; l++) sum += xpForLevel(l);
+  return sum;
 }
 
 /** 누적 XP → { level, into(이번 레벨에서 쌓은 XP), need(레벨업까지 필요 총량) } */
@@ -95,6 +102,40 @@ export function rollCatch(chance, rng = Math.random) {
 const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
+// 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
+const emptyDelta = () => ({ xp: 0, throws: 0, catches: 0, caught: {} });
+let pending = emptyDelta();
+let flushChain = Promise.resolve();
+
+function addDelta(d) {
+  pending.xp += d.xp || 0;
+  pending.throws += d.throws || 0;
+  pending.catches += d.catches || 0;
+  for (const id of Object.keys(d.caught || {})) pending.caught[id] = (pending.caught[id] || 0) + d.caught[id];
+  if (loaded) flushProfile();
+}
+
+/** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
+export function flushProfile() {
+  flushChain = flushChain.then(async () => {
+    const d = pending;
+    if (!d.xp && !d.throws && !d.catches && !Object.keys(d.caught).length) return;
+    pending = emptyDelta();
+    try {
+      const next = await applyProfileDelta(d);
+      profile = { ...EMPTY(), ...next, caught: { ...(next.caught || {}) } };
+    } catch (e) {
+      console.warn('프로필 저장 실패 (다음에 재시도):', e);
+      const p = pending; pending = d; addDeltaSilently(p);
+    }
+  });
+  return flushChain;
+}
+
+function addDeltaSilently(d) {
+  pending.xp += d.xp; pending.throws += d.throws; pending.catches += d.catches;
+  for (const id of Object.keys(d.caught)) pending.caught[id] = (pending.caught[id] || 0) + d.caught[id];
+}
 
 export async function initProfile() {
   try {
@@ -113,17 +154,13 @@ export function getLevelInfo() {
   return { ...levelFromXp(profile.xp), xp: profile.xp };
 }
 
-function save() {
-  profile.updatedAt = Date.now();
-  putProfile({ ...profile, caught: { ...profile.caught } }).catch((e) => console.warn('프로필 저장 실패:', e));
-}
-
 /** XP 획득 → { gained, leveledUp, from, to, info } */
 export function gainXp(amount) {
   const from = levelFromXp(profile.xp).level;
-  profile.xp += Math.max(0, Math.floor(amount || 0));
+  const n = Math.max(0, Math.floor(amount || 0));
+  profile.xp += n;
   const info = getLevelInfo();
-  if (loaded) save();
+  addDelta({ xp: n });
   return { gained: amount, leveledUp: info.level > from, from, to: info.level, info };
 }
 
@@ -135,13 +172,16 @@ export function catchAttempt(id, rng = Math.random) {
   profile.throws++;
   let first = false;
   let bonusXp = 0;
+  const delta = { throws: 1, catches: 0, xp: 0, caught: {} };
   if (caught) {
     profile.catches++;
+    delta.catches = 1;
     first = !profile.caught[id];
     profile.caught[id] = (profile.caught[id] || 0) + 1;
-    if (!first) { bonusXp = XP.recatch; profile.xp += bonusXp; }
+    delta.caught[id] = 1;
+    if (!first) { bonusXp = XP.recatch; profile.xp += bonusXp; delta.xp = bonusXp; }
   }
-  if (loaded) save();
+  addDelta(delta);
   return { caught, chance, count: profile.caught[id] || 0, first, bonusXp, info: getLevelInfo() };
 }
 
@@ -163,7 +203,9 @@ export function caughtKinds() {
 
 /** 백업 가져오기 뒤 다시 읽기 */
 export async function reloadProfile() {
+  await flushProfile();
   loaded = false;
   profile = EMPTY();
+  pending = emptyDelta();
   return initProfile();
 }

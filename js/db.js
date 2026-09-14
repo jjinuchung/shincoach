@@ -290,6 +290,26 @@ export async function getProfile() {
   return promisify(tx.objectStore('profile').get('me'));
 }
 
+/**
+ * 프로필에 증분만 더해서 저장 (한 트랜잭션 안에서 최신값 읽기 → 더하기 → 쓰기).
+ * 홈 화면 앱과 Chrome 탭을 같이 열어도 서로의 XP·포켓몬을 덮어쓰지 않음. 반환: 저장된 최신 프로필
+ */
+export async function applyProfileDelta(delta) {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readwrite');
+  const store = tx.objectStore('profile');
+  const cur = (await promisify(store.get('me'))) || { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, updatedAt: 0 };
+  const next = { ...cur, caught: { ...(cur.caught || {}) } };
+  next.xp = (Number(cur.xp) || 0) + (delta.xp || 0);
+  next.throws = (Number(cur.throws) || 0) + (delta.throws || 0);
+  next.catches = (Number(cur.catches) || 0) + (delta.catches || 0);
+  for (const id of Object.keys(delta.caught || {})) next.caught[id] = (next.caught[id] || 0) + delta.caught[id];
+  next.updatedAt = Date.now();
+  store.put(next);
+  await txDone(tx);
+  return next;
+}
+
 export async function putProfile(rec) {
   const db = await openDb();
   const tx = db.transaction('profile', 'readwrite');
@@ -325,6 +345,7 @@ export function mergeStatRecord(name, cur, rec) {
   } else if (name === 'daily') {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
     for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved']) out[k] = maxOf(cur[k], rec[k]);
+    out.goalRewarded = !!(cur.goalRewarded || rec.goalRewarded);
   } else if (name === 'vocabViews') {
     for (const k of ['views', 'taps', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'sessions') {

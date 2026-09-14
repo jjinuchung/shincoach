@@ -1,15 +1,30 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
-import { rarityOf, RARITY, caughtCount } from './xp.js';
+import { rarityOf, RARITY, caughtCount, xpToReach } from './xp.js';
+import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const ui = { open: false, run: 0, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0 };
+const ui = { open: false, run: 0, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, pendingAuto: false };
 
 export function initCatch() {
   $('catch-continue').addEventListener('click', finish);
+  // 화면이 꺼진 동안 자동 종료가 밀려 있었으면, 돌아왔을 때 잠깐 보여주고 이어감
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !ui.open || !ui.pendingAuto) return;
+    ui.pendingAuto = false;
+    clearTimeout(ui.timer);
+    ui.timer = setTimeout(autoFinish, 1500);
+  });
+}
+
+/** 자동 종료: 화면이 꺼져 있으면(잠금 등) 보류 — 안 보이는 사이에 다음 문장이 재생되지 않게 */
+function autoFinish() {
+  if (!ui.open) return;
+  if (document.hidden) { ui.pendingAuto = true; return; }
+  finish();
 }
 
 export function isCatchOpen() {
@@ -43,6 +58,7 @@ export function openCatch(o) {
   ui.attempt = o.attempt;
   ui.practice = !!o.practice;
   ui.xpGain = o.xpGain || 0;
+  ui.pendingAuto = false;
 
   renderHeader(o.xpGain, o.levelInfo, o.levelUp);
   $('catch-msg').textContent = '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!';
@@ -119,6 +135,13 @@ function renderHeader(xpGain, info, levelUp) {
   head.appendChild(left);
   head.appendChild(right);
   $('catch-xpbar-fill').style.width = info ? `${Math.round((info.into / info.need) * 100)}%` : '0%';
+  // 다음 해금까지 남은 XP (레벨이 왜 중요한지 보이게)
+  const nx = $('catch-next');
+  if (nx) {
+    const lv = info ? nextUnlockLevel(info.level) : 0;
+    nx.hidden = !lv;
+    if (lv) nx.textContent = `🔒 Lv.${lv} 새 포켓몬 ${unlockCountAt(lv)}마리까지 ⚡${Math.max(0, xpToReach(lv) - (info.xp !== undefined ? info.xp : xpToReach(info.level) + info.into))}`;
+  }
   const lv = $('catch-levelup');
   lv.hidden = !levelUp;
   if (levelUp) lv.textContent = `🎉 레벨 업! Lv.${levelUp} — 포켓몬이 더 잘 잡혀요`;
@@ -232,5 +255,5 @@ async function throwBall(c) {
     result.appendChild(sub);
   }
   $('catch-continue').hidden = false;
-  ui.timer = setTimeout(finish, 5000);
+  ui.timer = setTimeout(autoFinish, 5000);
 }

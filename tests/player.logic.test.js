@@ -52,7 +52,7 @@ function loadPlayer() {
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', MASTER_RATIO: 0.8, puzzle() {} },
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, MASTER_RATIO: 0.8, puzzle() {} },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
     puzzleCalls,
     initPuzzle() {}, closePuzzle() {},
@@ -66,7 +66,7 @@ function loadPlayer() {
     gainXp: (n) => { xpLog.push(n); return { gained: n, leveledUp: false, from: 1, to: 1, info: { level: 1, into: 0, need: 100 } }; },
     catchAttempt: () => ({ caught: true }), previewAttempt: () => ({ caught: false }),
     puzzleXp: (r) => (r && r.solved ? [30, 20, 10][Math.min(r.wrong || 0, 2)] : 3),
-    XP: { done: 2, speak: 3, speakStar: 5, goal: 30 }, streakBefore: () => 0, streakBonus: (n) => Math.min(40, 10 + 5 * (n - 1)), STREAK_MIN_DONE: 5,
+    XP: { done: 2, speak: 3, speakStar: 5, goal: 30 }, streakBefore: () => 0, streakBonus: (n) => Math.min(40, 10 + 5 * (n - 1)), STREAK_MIN_DONE: 5, flushProfile() {},
     initCatch() {}, closeCatch() {}, openCatch(o) { catchCalls.push(o); },
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
@@ -553,7 +553,7 @@ test('🔥 스트릭·오늘 목표: 5번째 문장에 스트릭 보너스, 목�
   const keys = new Set();
   ctx.track.done = (c) => keys.add(c.start);
   ctx.track.todayDone = () => keys.size;
-  run('settings.dailyGoal = 7; state.streakBase = 2; state.streakToday = false; state.cues = Array.from({length: 8}, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
+  run('settings.dailyGoal = 7; state.streakBase = 2; state.streakToday = false; state.streakDate = "2026-09-14"; state.cues = Array.from({length: 8}, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
   for (let i = 0; i < 4; i++) run(`markDone(state.cues[${i}])`);
   assert.deepEqual(xpLog, [2, 2, 2, 2], '4문장까지는 문장 XP만');
   run('markDone(state.cues[4])');
@@ -561,6 +561,58 @@ test('🔥 스트릭·오늘 목표: 5번째 문장에 스트릭 보너스, 목�
   assert.equal(run('state.streakToday'), true);
   run('markDone(state.cues[4]); markDone(state.cues[5])');
   assert.equal(xpLog.length, 7, '같은 문장 반복은 XP 없음, 보너스는 한 번만');
+  let rewarded = false;
+  ctx.track.goalRewarded = () => rewarded;
+  ctx.track.markGoalRewarded = () => { rewarded = true; };
   run('markDone(state.cues[6])');
   assert.deepEqual(xpLog.slice(7), [2, 30], '7번째 = 오늘 목표 달성 +30');
+  // 목표를 올려도(7→8) 같은 날엔 다시 안 줌
+  run('settings.dailyGoal = 8; markDone(state.cues[7])');
+  assert.deepEqual(xpLog.slice(9), [2], '목표 보너스는 하루 한 번');
+});
+
+test('🔥 자정을 넘기면 스트릭 상태가 오늘 기준으로 다시 계산됨', () => {
+  const { run, xpLog, ctx } = loadPlayer();
+  const keys = new Set();
+  ctx.track.done = (c) => keys.add(c.start);
+  ctx.track.todayDone = () => keys.size;
+  run('settings.dailyGoal = 0; state.streakBase = 3; state.streakToday = true; state.streakDate = "2026-09-13"; state.cues = Array.from({length: 6}, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
+  // 날짜가 바뀐 뒤(track은 새 날짜) 첫 문장 → 어제의 streakToday가 남아 있으면 안 됨
+  run('markDone(state.cues[0])');
+  assert.equal(run('state.streakDate'), '2026-09-14');
+  assert.equal(run('state.streakToday'), false, '오늘은 아직 5문장 전');
+  for (let i = 1; i < 5; i++) run(`markDone(state.cues[${i}])`);
+  assert.equal(run('state.streakToday'), true);
+  assert.ok(xpLog.includes(10), '새 날의 첫 스트릭 보너스(어제 기록은 listDaily 스텁이 비어 있어 1일째=10)');
+});
+
+test('🧩 마지막 문장에서 N문장이 차면 퍼즐이 나오고 이동 없이 끝남', () => {
+  const { run, video, puzzleCalls } = loadPlayer();
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 2; state.repeatIdx = 0; state.shadow = false; state.idx = 4;');
+  run('markDone(state.cues[3]);');
+  video.paused = false; video.currentTime = 42;
+  run('onTick()'); // 마지막 문장 끝 → markDone → 2개 참 → 퍼즐
+  assert.equal(puzzleCalls.length, 1, '마지막 문장에서도 퍼즐');
+  assert.equal(video.paused, true);
+  puzzleCalls[0].opts.onClose({ solved: true, wrong: 0, characters: [] });
+  assert.equal(run('state.idx'), 4, '이동 없이 마지막 문장에 머묾');
+});
+
+test('🧩 오늘 첫 퍼즐은 5문장에, 그 뒤엔 설정 간격(10)대로', () => {
+  const { run, puzzleCalls, ctx } = loadPlayer();
+  run('state.cues = Array.from({length: 20}, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); settings.listenFirst = 0; settings.puzzleEvery = 10; state.idx = 0;');
+  ctx.track.todayPuzzles = () => 0;
+  for (let i = 0; i < 4; i++) run(`markDone(state.cues[${i}])`);
+  run('goTo(1)');
+  assert.equal(puzzleCalls.length, 0, '4문장은 아직');
+  run('markDone(state.cues[4]); goTo(2)');
+  assert.equal(puzzleCalls.length, 1, '오늘 첫 퍼즐은 5문장에');
+  puzzleCalls[0].opts.onClose({ solved: true, wrong: 0, characters: [] });
+  ctx.track.todayPuzzles = () => 1;
+  for (let i = 5; i < 12; i++) run(`markDone(state.cues[${i}])`);
+  run('goTo(3)');
+  assert.equal(puzzleCalls.length, 1, '두 번째부터는 10문장 필요 (지금 7)');
+  for (let i = 12; i < 15; i++) run(`markDone(state.cues[${i}])`);
+  run('goTo(4)');
+  assert.equal(puzzleCalls.length, 2, '10문장 차면 퍼즐');
 });

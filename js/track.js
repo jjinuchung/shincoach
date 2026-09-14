@@ -37,7 +37,7 @@ function rollDailyIfNeeded() {
   if (!t.daily || t.daily.date === key) return;
   const old = t.daily;
   putDaily(old).catch(() => {});
-  t.daily = { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0 };
+  t.daily = { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0, goalRewarded: false };
   t.dailyDirty = false;
   getDaily(key).then((existing) => {
     if (!existing || !t.daily || t.daily.date !== key) return;
@@ -47,6 +47,7 @@ function rollDailyIfNeeded() {
     t.daily.speakPass += existing.speakPass || 0;
     t.daily.puzzles += existing.puzzles || 0;
     t.daily.puzzleSolved += existing.puzzleSolved || 0;
+    t.daily.goalRewarded = !!(t.daily.goalRewarded || existing.goalRewarded);
     t.dailyDirty = true;
   }).catch(() => {});
 }
@@ -66,7 +67,7 @@ async function ensureDaily() {
   const key = todayKey();
   if (t.daily && t.daily.date === key) return t.daily;
   if (t.daily && t.dailyDirty) { await putDaily(t.daily).catch(() => {}); }
-  t.daily = (await getDaily(key).catch(() => null)) || { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0 };
+  t.daily = (await getDaily(key).catch(() => null)) || { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0, goalRewarded: false };
   t.dailyDirty = false;
   return t.daily;
 }
@@ -176,6 +177,21 @@ export function doneCount() {
 /** 오늘 한 문장 수 (모든 콘텐츠 합산) */
 export function todayDone() {
   return t.daily ? t.daily.doneKeys.length : 0;
+}
+
+/** 오늘 푼 퍼즐 수 (모든 콘텐츠 합산) */
+export function todayPuzzles() {
+  return t.daily ? (t.daily.puzzles || 0) : 0;
+}
+
+/** 오늘 목표 보너스를 이미 받았는지 / 받았다고 표시 (목표 수치를 바꿔도 하루 한 번만) */
+export function goalRewarded() {
+  return !!(t.daily && t.daily.goalRewarded);
+}
+export function markGoalRewarded() {
+  if (!t.daily) return;
+  t.daily.goalRewarded = true;
+  t.dailyDirty = true;
 }
 
 /** 저장 대기 중인 것을 IndexedDB에 씀 */

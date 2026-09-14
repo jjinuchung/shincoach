@@ -9,7 +9,7 @@ import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile } from './xp.js';
 import { initCatch, openCatch, closeCatch } from './catch.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
@@ -55,6 +55,7 @@ const state = {
   catchOpen: false,   // 🎯 잡기 화면이 열려 있음 (키보드 무시)
   streakBase: 0,      // 🔥 어제까지의 연속 학습일 (오늘 5문장 채우면 +1)
   streakToday: false, // 오늘 5문장을 채워 스트릭에 들어갔는지
+  streakDate: '',     // 위 두 값의 기준 날짜 (자정을 넘기면 다시 계산)
   raf: null,
   wordSpans: [],
   wordTimes: [],
@@ -138,7 +139,10 @@ export function initPlayer(ctx) {
 
 /** N문장이 차서 다음 문장으로 넘어가기 전에 퍼즐을 낼 차례인지 */
 function puzzleReady() {
-  return settings.puzzleEvery > 0 && state.puzzlePool.length >= settings.puzzleEvery;
+  if (settings.puzzleEvery <= 0) return false;
+  // 오늘 첫 퍼즐은 5문장(하루 최소 학습량)에 한 번 → 조금만 해도 잡기 기회가 생김. 그 뒤로는 설정 간격대로
+  const need = track.todayPuzzles() === 0 ? Math.min(STREAK_MIN_DONE, settings.puzzleEvery) : settings.puzzleEvery;
+  return state.puzzlePool.length >= need;
 }
 
 /**
@@ -179,6 +183,7 @@ function updateLevelChip() {
 /** XP 획득 + 칩 갱신 + 레벨업 알림 */
 function awardXp(amount) {
   const g = gainXp(amount);
+  track.flush(); // 완료·목표 기록을 XP와 같은 시점에 저장 (강제 종료돼도 중복 지급 안 되게)
   updateLevelChip();
   if (g.leveledUp) {
     sfx.levelUp();
@@ -293,6 +298,7 @@ function markDone(cue) {
   track.done(cue);
   const after = track.todayDone();
   if (after !== before) {
+    ensureStreakDate(); // 자정을 넘겼으면 스트릭 상태를 오늘 기준으로
     awardXp(XP.done); // 오늘 처음 완료한 문장 → 경험치
     // 🔥 오늘 5문장을 채우면 연속 학습일에 들어가고 보너스 (연속일수록 큼)
     if (!state.streakToday && after >= STREAK_MIN_DONE) {
@@ -305,8 +311,11 @@ function markDone(cue) {
     updateGoalChip();
     if (settings.dailyGoal > 0) {
       const left = settings.dailyGoal - after;
-      if (left === 0) { awardXp(XP.goal); showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal}`, 5000); }
-      else if (left === 3) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal}!`, 3500);
+      if (left <= 0 && !track.goalRewarded()) { // 목표 수치를 바꿔도 하루 한 번만
+        track.markGoalRewarded();
+        awardXp(XP.goal);
+        showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal}`, 5000);
+      } else if (left === 3 && !track.goalRewarded()) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal}!`, 3500);
     }
   }
   // 🧩 퍼즐 후보로 모아둠 (같은 문장을 반복해도 한 번만)
@@ -331,13 +340,22 @@ function updateGoalChip() {
   chip.classList.toggle('reached', n >= settings.dailyGoal);
 }
 
-/** 🔥 어제까지의 연속 학습일을 기록에서 계산 (콘텐츠를 열 때 한 번) */
+/** 🔥 어제까지의 연속 학습일을 기록에서 계산 (콘텐츠를 열 때, 그리고 날짜가 바뀌었을 때) */
 function loadStreak() {
+  const today = track.todayKey();
+  state.streakDate = today;
   state.streakToday = track.todayDone() >= STREAK_MIN_DONE;
+  state.streakBase = 0;
   listDaily().then((list) => {
-    state.streakBase = streakBefore(list, track.todayKey());
+    if (state.streakDate !== today) return; // 그새 또 날짜가 바뀜
+    state.streakBase = streakBefore(list, today);
     updateGoalChip();
   }).catch(() => {});
+}
+
+/** 플레이어를 켜둔 채 자정을 넘기면 스트릭 상태를 오늘 기준으로 다시 */
+function ensureStreakDate() {
+  if (state.streakDate !== track.todayKey()) loadStreak();
 }
 
 // ───────────────────── 단어 패널 ─────────────────────
@@ -380,6 +398,7 @@ function renderVocab() {
 }
 
 function onVisibilityChange() {
+  if (state.open && !document.hidden) { ensureStreakDate(); updateGoalChip(); }
   if (!state.open || !document.hidden) return;
   const wasShadowWaiting = !!state.shadowTimer || !!state.speakRun;
   track.flush();
@@ -454,6 +473,7 @@ export async function openPlayer(id, opts = {}) {
 function closePlayer() {
   scheduleSave(true);
   track.close();
+  flushProfile();
   updateGoalChip();
   closeMedia();
   showView('library');
@@ -714,9 +734,10 @@ function onCueEnd() {
     return;
   }
 
-  // 마지막 문장이면 멈춤
+  // 마지막 문장이면 멈춤 (N문장이 찼으면 퍼즐은 내고, 끝난 자리에 그대로)
   if (state.idx >= state.cues.length - 1) {
     video.pause();
+    if (puzzleReady()) startPuzzle(() => {});
     return;
   }
 
@@ -790,7 +811,7 @@ function afterShadowWait() {
   const next = state.shadowNext;
   cancelShadowWait();
   if (next === 'repeat') { replayCurrent(); return; }
-  if (state.idx >= state.cues.length - 1) return; // 마지막 문장
+  if (state.idx >= state.cues.length - 1) { if (puzzleReady()) startPuzzle(() => {}); return; } // 마지막 문장
   goTo(state.idx + 1);
 }
 
