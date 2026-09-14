@@ -1,6 +1,8 @@
 // 기기 진단: 마이크·녹음·음성 인식 지원 여부와 실제 동작 테스트 (설정 화면)
 // 구형 브라우저에서도 돌아야 하므로 최신 문법(?., ??, ||=)은 쓰지 않는다.
 
+import { prepareMic, releaseMic, getAudioContext } from './speak.js';
+
 const $ = (id) => document.getElementById(id);
 let lastRecUrl = null;
 let lastAudio = null;
@@ -138,11 +140,28 @@ async function testMic() {
   show(verdict);
 }
 
-/** 음성 인식 5초 테스트 */
-function testSpeech() {
+/**
+ * 음성 인식 5초 테스트. withMic=true 면 실전(따라 말하기)과 똑같이 마이크 음량 분석(getUserMedia+AudioContext)을 켠 채로 인식을 돌림
+ * — 안드로이드 Chrome은 마이크를 두 곳이 같이 못 잡아 인식이 조용히 실패하는 경우가 있어 이 차이를 잡아내기 위함
+ */
+async function testSpeech(withMic) {
   const out = $('diag-result');
   const SR = SpeechRecognitionCtor();
   if (!SR) { out.textContent = '❌ 이 브라우저는 음성 인식을 지원하지 않아요 → 1단계(말했는지 확인)만 사용 가능'; return; }
+  let micNote = '';
+  if (withMic) {
+    out.textContent = '🎤 마이크 분석을 켜는 중…';
+    const stream = await prepareMic();
+    if (!stream) { out.textContent = '❌ 마이크를 열 수 없어요 (권한?)'; return; }
+    try {
+      const ctx = getAudioContext();
+      const src = ctx.createMediaStreamSource(stream);
+      const an = ctx.createAnalyser();
+      an.fftSize = 1024;
+      src.connect(an);
+      micNote = ' [실전 조건: 마이크 분석 켜짐]';
+    } catch (e) { micNote = ` [마이크 분석 연결 실패: ${e.name}]`; }
+  }
   const rec = new SR();
   rec.lang = 'en-US';
   rec.interimResults = true;
@@ -154,7 +173,7 @@ function testSpeech() {
   ['start', 'audiostart', 'soundstart', 'speechstart', 'speechend', 'soundend', 'audioend'].forEach((ev) => {
     rec['on' + ev] = () => { trace.push(ev); show(out.textContent.split('\n')[0]); };
   });
-  show('🗣 영어로 아무 문장이나 말해 보세요 (5초)… 예: "I love toys"');
+  show(`🗣 영어로 아무 문장이나 말해 보세요 (5초)… 예: "I love toys"${micNote}`);
   rec.onresult = (e) => {
     got = true;
     let interim = '';
@@ -171,8 +190,9 @@ function testSpeech() {
   };
   rec.onend = () => {
     trace.push('end');
-    if (finalText || got) show(`✅ 음성 인식 결과: "${(finalText || '(중간 결과만)').trim()}"`);
-    else if (!out.textContent.startsWith('❌')) show('⚠️ 인식된 말이 없어요');
+    if (finalText || got) show(`✅ 음성 인식 결과: "${(finalText || '(중간 결과만)').trim()}"${micNote}`);
+    else if (!out.textContent.startsWith('❌')) show(`⚠️ 인식된 말이 없어요${micNote}`);
+    if (withMic) releaseMic();
   };
   try {
     rec.start();
@@ -195,8 +215,10 @@ function playLastRecording() {
 export function initDiag() {
   const mic = $('diag-mic');
   const sp = $('diag-speech');
+  const spm = $('diag-speech-mic');
   const pl = $('diag-play');
   if (mic) mic.addEventListener('click', testMic);
-  if (sp) sp.addEventListener('click', testSpeech);
+  if (sp) sp.addEventListener('click', () => testSpeech(false));
+  if (spm) spm.addEventListener('click', () => testSpeech(true));
   if (pl) pl.addEventListener('click', playLastRecording);
 }

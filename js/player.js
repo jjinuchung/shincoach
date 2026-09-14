@@ -1048,6 +1048,13 @@ function startSpeakWait(cue) {
   });
 }
 
+/** 음성 인식 없이 판정됐을 때 그 이유를 짧게 (부모가 원인을 볼 수 있게, ⚙ 진단과 같은 오류명) */
+function srNote(result) {
+  if (!result || result.method !== 'energy') return '';
+  const why = { unsupported: '브라우저 미지원', offline: '인터넷 없음', 'start-failed': '시작 실패', 'no-result': '결과 없음', 'audio-capture': '마이크 못 잡음', network: '구글 서버 연결 안 됨', 'not-allowed': '권한 거부', 'service-not-allowed': '음성 서비스 사용 불가', 'no-speech': '말소리 못 들음', aborted: '중단됨' }[result.srError] || result.srError || '결과 없음';
+  return `🎙 인식 안 됨(${why}) — 말소리 길이로 판정`;
+}
+
 function onSpeakResult(cue, result) {
   const msg = $('shadow-msg');
   const sub = $('shadow-sub');
@@ -1075,7 +1082,7 @@ function onSpeakResult(cue, result) {
       sub.textContent = `${result.score.matched}/${result.score.total} 단어 맞음: "${result.transcript}"`;
     } else {
       msg.textContent = '👍 잘했어요!';
-      sub.textContent = '';
+      sub.textContent = srNote(result); // 인식 없이 소리 길이로만 통과했음을 부모가 알 수 있게
     }
     state.shadowTimer = setTimeout(afterShadowWait, 1400);
     return;
@@ -1095,7 +1102,7 @@ function onSpeakResult(cue, result) {
   msg.textContent = `🔁 다시 한번! (${state.speakFails}/3)`;
   sub.textContent = result.method === 'speech'
     ? `들린 말: "${result.transcript}" — 잘 듣고 따라 해봐요`
-    : '조금 더 크게, 길게 말해봐요';
+    : `조금 더 크게, 길게 말해봐요 ${srNote(result)}`;
   // 잠시 보여준 뒤 원문 다시 들려주기 → 끝나면 다시 말하기 확인
   state.shadowTimer = setTimeout(() => {
     state.shadowTimer = null;

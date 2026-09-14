@@ -34,6 +34,11 @@ export async function prepareMic() {
   }
 }
 
+/** 진단용: prepareMic() 뒤의 AudioContext (실전과 같은 조건으로 분석기를 붙여 볼 때) */
+export function getAudioContext() {
+  return audioCtx;
+}
+
 /** 마이크 끄기 (학습 종료·백그라운드). 다음 prepareMic()에서 다시 연다 */
 export function releaseMic() {
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
@@ -108,7 +113,8 @@ export function scoreTranscript(target, transcript) {
  * @returns {{ promise: Promise<Result>, stop: () => void, cancel: () => void }}
  *   stop()   = "다 말했어요" → 지금까지 들은 것으로 바로 판정
  *   cancel() = 문장 이동/닫기 → 판정 없이 정리 (결과는 { method: 'cancelled' })
- *   Result: { passed, method: 'speech'|'energy'|'none'|'cancelled', transcript, score, spokenMs, reason }
+ *   Result: { passed, method: 'speech'|'energy'|'none'|'cancelled', transcript, score, spokenMs, reason, srError }
+ *   srError: 음성 인식이 결과 없이 끝난 이유 — 'unsupported'(브라우저 미지원) | 'offline' | 'start-failed' | 브라우저 오류명(audio-capture·network·not-allowed·no-speech…) | 'no-result'(오류 없이 결과만 없음)
  */
 export function runSpeakCheck(opts) {
   const target = opts.target || '';
@@ -169,7 +175,10 @@ export function runSpeakCheck(opts) {
     let transcript = '';
     let rec = null;
     let recEnded = false;
+    let srError = ''; // 인식이 안 된 이유 (결과 화면·진단에 표시해 원인을 찾을 수 있게)
     const SR = SpeechRecognitionCtor();
+    if (!SR) srError = 'unsupported';
+    else if (!navigator.onLine) srError = 'offline';
     if (SR && navigator.onLine) {
       try {
         rec = new SR();
@@ -191,10 +200,10 @@ export function runSpeakCheck(opts) {
           transcript = (finalText + interim).trim();
           if (opts.onInterim) opts.onInterim(transcript);
         };
-        rec.onerror = () => { recEnded = true; };
-        rec.onend = () => { recEnded = true; if (everLoud && spokenMs >= needMs) finish('speech-end'); };
+        rec.onerror = (e) => { recEnded = true; srError = (e && e.error) || 'error'; };
+        rec.onend = () => { recEnded = true; if (!transcript && !srError) srError = 'no-result'; if (everLoud && spokenMs >= needMs) finish('speech-end'); };
         rec.start();
-      } catch (e) { rec = null; }
+      } catch (e) { rec = null; srError = 'start-failed'; }
     }
 
     function cleanup() {
@@ -216,7 +225,7 @@ export function runSpeakCheck(opts) {
         method = 'energy';
         passed = spokenMs >= needMs;
       }
-      settle({ passed, method, transcript, score, spokenMs: Math.round(spokenMs), reason });
+      settle({ passed, method, transcript, score, spokenMs: Math.round(spokenMs), reason, srError: transcript ? '' : (srError || (rec && !recEnded ? 'no-result' : srError)) });
     }
     finishFn = finish;
     if (cancelled) { finish('cancel'); return; }
