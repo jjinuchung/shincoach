@@ -5,6 +5,7 @@ import {
   addDays, daysBetween, nextDue, enroll, schedule, isDue, stageIcon,
   pickReviews, reviewSummary, roundReward,
   REVIEW_INTERVALS, GRADUATED, STAGES, DEFAULT_COUNT, REWARD,
+  pickWordReviews, quizChoices,
 } from '../js/review.js';
 
 /** 테스트용 문장 기록 만들기 */
@@ -180,4 +181,58 @@ test('시나리오: 계속 못 하는 문장은 매일 나오고 box가 안 오�
   assert.deepEqual(s, { box: 0, dueAt: '2026-09-17' });
   s = schedule(s.box, false, '2026-09-17');
   assert.deepEqual(s, { box: 0, dueAt: '2026-09-18' }, '0 아래로는 안 내려가고 내일 또');
+});
+
+// ── 🔤 단어 뜻 문항 ──
+
+function word(patch = {}) {
+  return { word: 'brave', meaning: '용감한', kind: 'word', views: 3, taps: 0, lastAt: 1, sentence: '', box: 0, dueAt: '', quizzes: 0, quizPass: 0, ...patch };
+}
+
+test('pickWordReviews: 여러 번 본 단어만, 덜 익은 것 → 직접 찾아본 것 → 자주 본 것 순', () => {
+  const today = '2026-09-15';
+  const list = [
+    word({ word: 'once', views: 1 }),                       // 한 번만 봄 → 제외
+    word({ word: 'plain', views: 5, box: 2 }),
+    word({ word: 'tapped', views: 2, box: 0, taps: 1 }),
+    word({ word: 'often', views: 9, box: 0, taps: 0 }),
+  ];
+  const got = pickWordReviews(list, today, 3).map((r) => r.word);
+  assert.deepEqual(got, ['tapped', 'often', 'plain']);
+});
+
+test('pickWordReviews: 아직 때가 안 된 단어는 빼고, 처음 보는 단어(dueAt 없음)는 바로 낸다', () => {
+  const today = '2026-09-15';
+  const list = [
+    word({ word: 'later', dueAt: '2026-09-20' }),
+    word({ word: 'now', dueAt: '2026-09-15' }),
+    word({ word: 'fresh', dueAt: '' }),
+    word({ word: 'done', box: GRADUATED, dueAt: '' }),
+  ];
+  const got = pickWordReviews(list, today, 10).map((r) => r.word).sort();
+  assert.deepEqual(got, ['fresh', 'now'], '미래는 제외, 👑 졸업도 제외');
+});
+
+test('quizChoices: 정답 포함 최대 4개, 같은 뜻은 한 번만', () => {
+  const answer = word({ word: 'brave', meaning: '용감한' });
+  const others = [
+    word({ word: 'a', meaning: '조용한' }), word({ word: 'b', meaning: '빠른' }),
+    word({ word: 'c', meaning: '무서운' }), word({ word: 'd', meaning: '조용한' }), // 중복 뜻
+  ];
+  const ch = quizChoices(answer, others, () => 0);
+  assert.equal(ch.length, 4);
+  assert.ok(ch.includes('용감한'), '정답이 들어 있어야 함');
+  assert.equal(new Set(ch).size, 4, '보기가 겹치면 안 됨');
+});
+
+test('quizChoices: 뜻이 같은 다른 단어는 오답으로 쓰지 않는다 (정답이 둘이 되지 않게)', () => {
+  const answer = word({ word: 'brave', meaning: '용감한' });
+  const others = [word({ word: 'bold', meaning: '용감한' }), word({ word: 'x', meaning: '느린' })];
+  const ch = quizChoices(answer, others, () => 0);
+  assert.deepEqual(ch.sort(), ['느린', '용감한']);
+});
+
+test('quizChoices: 다른 단어가 없으면 정답 하나만 (호출 쪽에서 문항을 버린다)', () => {
+  const ch = quizChoices(word(), [], () => 0);
+  assert.deepEqual(ch, ['용감한']);
 });

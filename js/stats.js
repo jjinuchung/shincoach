@@ -224,7 +224,10 @@ export async function renderStats() {
   }
 
   // 4) 복습 단어장
-  const c4 = card('복습 단어장 — 아이가 찾아본 단어');
+  const wordRv = reviewSummary(vocabViews, today); // 🔤 단어 복습 현황
+  const c4 = card(wordRv.dueCount || wordRv.graduated
+    ? `복습 단어장 — 아이가 찾아본 단어 (오늘 물어볼 단어 ${wordRv.dueCount}개 · 👑 ${wordRv.graduated}개 완성)`
+    : '복습 단어장 — 아이가 찾아본 단어');
   const vv = vocabViews.filter((v) => v.taps > 0 || v.views > 1).sort((a, b) => (b.taps - a.taps) || (b.views - a.views) || (b.lastAt - a.lastAt)).slice(0, 40);
   if (!vv.length) c4.appendChild(el('p', 'stats-empty', '아직 단어 패널을 열어본 기록이 없어요'));
   else {

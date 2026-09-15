@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { pickReviews, reviewSummary, roundReward, REWARD } from '../js/review.js';
+import { pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD } from '../js/review.js';
 import { wordResults } from '../js/speak.js';
 import { wordTimings as realWordTimings } from '../js/srt.js';
 
@@ -62,6 +62,8 @@ function loadPlayer() {
   const reviewCalls = [];
   const reviewState = { stats: [], sentences: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
   const missedLog = [];
+  const vocabViewsStub = [];
+  const vocabReviewLog = [];
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
@@ -125,7 +127,9 @@ function loadPlayer() {
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
     initReview() {}, abortReview() {}, isReviewOpen: () => false, openReview(o) { reviewCalls.push(o); },
-    pickReviews, reviewSummary, roundReward, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
+    pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, reviewSchedule,
+    REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
+    listVocabViews: async () => vocabViewsStub, putVocabReview: async (w, patch) => { vocabReviewLog.push({ word: w, ...patch }); },
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
     // 🎯 말하기 단어별 결과: 실제 모듈을 그대로 씀
@@ -133,7 +137,7 @@ function loadPlayer() {
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, missedLog, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -1113,7 +1117,7 @@ test('🔁 [Codex #7] 자막에 없는 기록이 우선순위 상위를 차지�
   ];
   run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
   assert.equal(reviewCalls.length, 1, '복습이 아예 안 뜨면 안 됨');
-  assert.deepEqual(reviewCalls[0].items.map((x) => x.cue.start), [1, 2]);
+  assert.deepEqual(Array.from(reviewCalls[0].items).map((x) => x.cue.start), [1, 2]); // vm 배열 복사 후 비교
 });
 
 test('🔁 [Codex #9] ⚙ 연습 중에는 학습 시간이 쌓이지 않는다', () => {

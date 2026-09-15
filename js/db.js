@@ -244,7 +244,7 @@ export async function bumpVocabViews(entries, tapped) {
   const store = tx.objectStore('vocabViews');
   for (const e of entries) {
     const cur = await promisify(store.get(e.term));
-    const rec = cur || { word: e.term, meaning: e.meaning, kind: e.kind, views: 0, taps: 0, lastAt: 0, sentence: '' };
+    const rec = cur || { word: e.term, meaning: e.meaning, kind: e.kind, views: 0, taps: 0, lastAt: 0, sentence: '', box: 0, dueAt: '', quizzes: 0, quizPass: 0, reviewedAt: 0 };
     rec.views++;
     if (tapped) rec.taps++;
     rec.lastAt = Date.now();
@@ -252,6 +252,16 @@ export async function bumpVocabViews(entries, tapped) {
     rec.meaning = e.meaning || rec.meaning;
     store.put(rec);
   }
+  await txDone(tx);
+}
+
+/** 🔁 단어 복습 결과 저장 (box·dueAt·횟수) */
+export async function putVocabReview(word, patch) {
+  const db = await openDb();
+  const tx = db.transaction('vocabViews', 'readwrite');
+  const store = tx.objectStore('vocabViews');
+  const cur = await promisify(store.get(word));
+  if (cur) store.put({ ...cur, ...patch, reviewedAt: Date.now() });
   await txDone(tx);
 }
 
@@ -392,7 +402,11 @@ export function mergeStatRecord(name, cur, rec) {
     out.hpMissed = !!(cur.hpMissed || rec.hpMissed);
     out.reviewGolden = !!(cur.reviewGolden || rec.reviewGolden); // 🌟 하루 1개 — 백업을 되돌려 다시 받는 것도 막는다
   } else if (name === 'vocabViews') {
-    for (const k of ['views', 'taps', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['views', 'taps', 'lastAt', 'quizzes', 'quizPass', 'reviewedAt']) out[k] = maxOf(cur[k], rec[k]);
+    // 🔁 복습 진도는 문장과 같은 규칙 — 최근에 복습한 쪽의 box·dueAt을 한 쌍으로
+    const pv = pickReviewState(cur, rec);
+    out.box = pv.box;
+    out.dueAt = pv.dueAt;
   } else if (name === 'sessions') {
     for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt', 'puzzles', 'puzzleSolved', 'reviews', 'reviewPass']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'profile') {

@@ -104,6 +104,64 @@ export function pickReviews(records, today, count = DEFAULT_COUNT) {
   return due.slice(0, Math.max(0, count));
 }
 
+/** 한 회차에 단어 문항을 최대 몇 개 넣을지 (문장이 주, 단어는 보조) */
+export const MAX_WORD_ITEMS = 1;
+/** 단어를 복습 큐에 넣는 기준: 아이가 이만큼 본 단어 */
+export const WORD_MIN_VIEWS = 2;
+
+/**
+ * 🔤 오늘 낼 단어 고르기 — 아이가 여러 번 본 단어부터.
+ * 문장과 같은 라이트너 규칙을 쓰되, 아직 복습에 들어오지 않은 단어(dueAt 없음)는
+ * 여기서 바로 처음 출제한다 (단어는 "완료" 시점이 따로 없으므로).
+ */
+export function pickWordReviews(records, today, count = MAX_WORD_ITEMS) {
+  const pool = (records || []).filter((r) => {
+    if (!r || !r.word || !r.meaning) return false;
+    if ((r.box || 0) >= GRADUATED) return false;
+    if ((r.views || 0) < WORD_MIN_VIEWS) return false;
+    return !r.dueAt || r.dueAt <= today; // 처음 보는 단어이거나, 때가 된 단어
+  });
+  pool.sort((a, b) => {
+    const boxA = a.box || 0;
+    const boxB = b.box || 0;
+    if (boxA !== boxB) return boxA - boxB;               // 덜 익은 것 먼저
+    const tapA = (a.taps || 0) > 0 ? 0 : 1;
+    const tapB = (b.taps || 0) > 0 ? 0 : 1;
+    if (tapA !== tapB) return tapA - tapB;               // 직접 눌러 찾아본 단어 먼저
+    return (b.views || 0) - (a.views || 0);              // 자주 본 것 먼저
+  });
+  return pool.slice(0, Math.max(0, count));
+}
+
+/**
+ * 4지선다 보기 만들기 — 정답 + 다른 단어의 뜻 3개.
+ * 뜻이 같은 보기는 빼고(정답이 둘이 되지 않게), 모자라면 있는 만큼만.
+ */
+export function quizChoices(answer, others, rng = Math.random) {
+  const seen = new Set([String(answer.meaning)]);
+  const wrong = [];
+  const pool = (others || []).filter((r) => r && r.meaning && r.word !== answer.word);
+  // 섞어서 앞에서부터 (같은 뜻·같은 표기는 제외)
+  const idx = pool.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+  }
+  for (const i of idx) {
+    const m = String(pool[i].meaning);
+    if (seen.has(m)) continue;
+    seen.add(m);
+    wrong.push(m);
+    if (wrong.length >= 3) break;
+  }
+  const all = [String(answer.meaning), ...wrong];
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = all[i]; all[i] = all[j]; all[j] = t;
+  }
+  return all;
+}
+
 /** 복습 큐 현황 (📊·시작 화면 표시용) */
 export function reviewSummary(records, today) {
   let dueCount = 0;
@@ -185,9 +243,12 @@ export function openReview(o) {
   ui.busy = false;
   ui.speakStop = null;
 
-  const n = o.items.length;
+  const nWord = o.items.filter((it) => it.type === 'word').length;
+  const nSent = o.items.length - nWord;
   $('review-title').textContent = o.practice ? '🔁 복습 연습' : '🔁 오늘의 복습';
-  $('review-msg').textContent = `배운 문장 ${n}개를 다시 만나요`;
+  $('review-msg').textContent = nWord
+    ? `배운 문장 ${nSent}개와 단어 ${nWord}개를 다시 만나요`
+    : `배운 문장 ${nSent}개를 다시 만나요`;
   const rw = $('review-reward');
   rw.innerHTML = '';
   if (o.practice) {
@@ -209,6 +270,9 @@ export function openReview(o) {
 
   $('review-intro').hidden = false;
   $('review-stage').hidden = true;
+  const ch = $('review-choices');
+  ch.hidden = true;
+  ch.dataset.done = '';
   $('review-speak').hidden = true;
   $('review-done').hidden = true;
   $('review-continue').hidden = true;
@@ -257,7 +321,77 @@ async function runNext() {
   $('review-intro').hidden = true;
   if (ui.i >= o.items.length) { showDone(); return; }
   ui.fails = 0;
+  if (o.items[ui.i].type === 'word') { askWord(); return; } // 🔤 뜻 맞히기
   await askSentence();
+}
+
+/** 🔤 단어 문항: 영어 단어를 보여주고 뜻 4개 중에 고르기 */
+function askWord() {
+  const o = ui.o;
+  const item = o.items[ui.i];
+  ui.busy = true;
+
+  $('review-speak').hidden = true;
+  const stage = $('review-stage');
+  stage.hidden = false;
+  renderDots();
+  $('review-stage-icon').textContent = stageIcon(item.rec);
+  $('review-count').textContent = `${ui.i + 1} / ${o.items.length}`;
+  $('review-ko').textContent = '이 단어는 무슨 뜻일까요?';
+  $('review-en').textContent = item.word;
+  $('review-en').hidden = false;
+  $('review-feedback').textContent = '';
+  $('review-feedback').className = 'review-feedback';
+
+  const box = $('review-choices');
+  box.innerHTML = '';
+  box.hidden = false;
+  for (const choice of item.choices) {
+    const b = el('button', 'review-choice', choice);
+    b.type = 'button';
+    b.addEventListener('click', () => pickChoice(b, choice, item));
+    box.appendChild(b);
+  }
+}
+
+/** 보기를 고름 → 맞으면 바로, 틀리면 정답을 보여주고 다음 */
+async function pickChoice(btn, choice, item) {
+  const run = ui.run;
+  const alive = () => ui.open && ui.run === run;
+  const o = ui.o;
+  const box = $('review-choices');
+  if (box.dataset.done === '1') return; // 연타 방지
+  box.dataset.done = '1';
+
+  const passed = choice === item.meaning;
+  [...box.children].forEach((b) => {
+    b.disabled = true;
+    if (b.textContent === item.meaning) b.classList.add('right');
+  });
+  if (!passed) btn.classList.add('wrong');
+
+  const fb = $('review-feedback');
+  fb.className = `review-feedback ${passed ? 'good' : 'bad'}`;
+  fb.textContent = passed ? '🎯 맞았어요!' : `👍 괜찮아요 — "${item.word}"는 ${item.meaning}`;
+  if (o.sfx) (passed ? o.sfx.ding() : o.sfx.wrong());
+
+  const info = o.onWord ? o.onWord(item, passed) : null;
+  ui.i++;
+  if (passed) ui.passed++;
+  if (info && !info.graduated && passed) {
+    $('review-stage-icon').textContent = stageIcon({ box: info.box });
+    $('review-stage-icon').classList.add('up');
+  }
+  if (ui.i >= o.items.length && !ui.granted) {
+    ui.granted = true;
+    ui.reward = (o.onFinished && o.onFinished()) || null;
+  }
+  await sleep(passed ? 1500 : 2400);
+  if (!alive()) return;
+  $('review-stage-icon').classList.remove('up');
+  box.hidden = true;
+  box.dataset.done = '';
+  await runNext();
 }
 
 /** 문장 하나: 한글 뜻 → 🔊 듣기 → 🎤 따라 말하기 → 결과 */
@@ -270,6 +404,7 @@ async function askSentence() {
 
   const stage = $('review-stage');
   stage.hidden = false;
+  $('review-choices').hidden = true;
   renderDots();
   $('review-stage-icon').textContent = stageIcon(rec);
   $('review-count').textContent = `${ui.i + 1} / ${o.items.length}`;
@@ -367,11 +502,16 @@ function showDone() {
   ui.busy = false;
   $('review-stage').hidden = true;
   $('review-speak').hidden = true;
+  $('review-choices').hidden = true;
   const box = $('review-done');
   box.innerHTML = '';
   box.hidden = false;
   box.appendChild(el('div', 'review-done-title', '🎉 복습 끝!'));
-  box.appendChild(el('div', 'review-done-sub', `${o.items.length}문장 중 ${ui.passed}문장을 잘 말했어요`));
+  const total = o.items.length;
+  const hasWord = o.items.some((it) => it.type === 'word');
+  box.appendChild(el('div', 'review-done-sub', hasWord
+    ? `${total}개 중 ${ui.passed}개를 맞혔어요`
+    : `${total}문장 중 ${ui.passed}문장을 잘 말했어요`));
   // 보상은 마지막 문장을 확정할 때 이미 지급됐다 (settleSentence) — 여기서는 그 내용만 보여준다
   const given = ui.reward;
   if (!o.practice && given) {

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { stemWord, stripContraction, tokenize, createVocab } from '../js/vocab.js';
+import { stemWord, stripContraction, tokenize, createVocab, findTokenRange } from '../js/vocab.js';
 
 const read = (f) => JSON.parse(readFileSync(new URL('../vocab/' + f, import.meta.url), 'utf8'));
 const vocab = createVocab({ basic: read('basic.json'), words: read('words.json'), phrases: read('phrases.json') });
@@ -62,4 +62,28 @@ test('lookup: 별칭(=) 따라가기, 사투리 표기', () => {
 
 test('lookup: 아무것도 없으면 빈 배열', () => {
   assert.deepEqual(vocab.lookup('I am here.'), []);
+});
+
+test('findTokenRange: 문장 속 단어의 공백 토큰 자리 (기본형 ↔ 변화형)', () => {
+  const known = new Set(['walk', 'door', 'look', 'up', 'run']);
+  const t = 'I was walking through the door.';
+  assert.deepEqual(findTokenRange(t, 'walk', known), [2, 2], 'walking → walk 자리');
+  assert.deepEqual(findTokenRange(t, 'door', known), [5, 5], '구두점이 붙어도 찾음');
+  assert.equal(findTokenRange(t, 'zzz', known), null, '없는 단어');
+  assert.equal(findTokenRange(t, '', known), null);
+});
+
+test('findTokenRange: 표현은 첫 단어부터 마지막 단어까지', () => {
+  const known = new Set(['look', 'up', 'figure', 'out']);
+  assert.deepEqual(findTokenRange('Please look it up now.', 'look … up', known), [1, 3]);
+  assert.deepEqual(findTokenRange('Can you figure this out?', 'figure … out', known), [2, 4]);
+  // 마지막 단어가 없으면 첫 단어만
+  assert.deepEqual(findTokenRange('Just look at me.', 'look … up', known), [1, 1]);
+});
+
+test('findTokenRange 자리는 wordTimings 자리와 같은 규칙(공백 토큰)', () => {
+  const en = 'I was walking through the door.';
+  const tokens = en.split(/\s+/);
+  const r = findTokenRange(en, 'walk', new Set(['walk']));
+  assert.equal(tokens[r[0]], 'walking', '그 자리의 원문 토큰이 맞아야 그 소리가 재생됨');
 });

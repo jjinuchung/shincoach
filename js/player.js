@@ -1,5 +1,5 @@
 // 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
-import { getItem, getVideoBlob, updateItem, listDaily } from './db.js';
+import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, putVocabReview } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
@@ -14,7 +14,7 @@ import { COIN, HP, POTION, GOLDEN, puzzleCoins, streakCoins, lootBox, itemById, 
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
-import { initReview, openReview, abortReview, isReviewOpen, pickReviews, reviewSummary, roundReward, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT } from './review.js';
+import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT } from './review.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
 
@@ -72,6 +72,7 @@ const state = {
   wordPlayGuard: null, // 단어 재생이 어떤 이유로 끝나지 않을 때를 대비한 안전장치
   resultDelay: null,   // 결과 화면의 자동 진행 타이머를 다시 세는 함수 (단어를 누를 때마다). 반복 신호인 state.shadowNext와는 다른 것
   reviewDone: false,   // 이번에 연 콘텐츠에서 복습을 이미 제안했는지 (한 번 열 때 한 번만)
+  vocabViews: [],      // 🔤 아이가 본 단어 기록 (복습 문항을 만들 때 씀. 콘텐츠를 열 때 한 번 읽음)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -499,12 +500,23 @@ function cueForStart(start) {
 function reviewItems() {
   const per = settings.reviewCount;
   if (!per) return []; // ⚙에서 끔
+  const today = track.todayKey();
   const remain = per - (track.todayReviewSentences() % per); // 중간에 그만뒀으면 남은 만큼만 채우면 완주
+
+  // 🔤 단어 문항 (회차당 최대 1개) — 아이가 여러 번 본 단어의 뜻을 물어본다
+  const words = remain > 1 ? pickWordReviews(state.vocabViews, today, MAX_WORD_ITEMS) : [];
+  const wordItems = words.map((rec) => ({
+    type: 'word', rec, word: rec.word, meaning: rec.meaning,
+    choices: quizChoices(rec, state.vocabViews),
+  })).filter((it) => it.choices.length >= 2); // 보기가 2개는 돼야 문제가 된다
+
   // 지금 자막에 없는 기록을 먼저 걸러낸다 — 나중에 거르면 그런 기록이 상위를 차지했을 때
   // 뒤의 멀쩡한 문장까지 가려서 복습이 아예 안 뜬다 (Codex #7)
   const usable = track.statsList().filter((rec) => cueForStart(rec.start));
-  return pickReviews(usable, track.todayKey(), remain)
-    .map((rec) => ({ rec, cue: cueForStart(rec.start) }));
+  const sentences = pickReviews(usable, today, remain - wordItems.length)
+    .map((rec) => ({ type: 'sentence', rec, cue: cueForStart(rec.start) }));
+  if (!sentences.length) return []; // 문장이 없으면 단어만으로는 회차를 열지 않는다
+  return [...sentences, ...wordItems]; // 단어는 마지막에 (말하기로 시작해야 흐름이 자연스럽다)
 }
 
 /** 복습 화면 열림/닫힘: 키보드 단축키 차단 + 뒤 화면 inert */
@@ -564,6 +576,18 @@ function startReview(items, practice) {
       if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
       return info;
     },
+    onWord: (item, passed) => {
+      if (practice) return null;
+      const next = reviewSchedule(item.rec.box || 0, passed, track.todayKey());
+      const rec = item.rec;
+      rec.box = next.box;
+      rec.dueAt = next.dueAt;
+      rec.quizzes = (rec.quizzes || 0) + 1;
+      if (passed) rec.quizPass = (rec.quizPass || 0) + 1;
+      putVocabReview(rec.word, { box: rec.box, dueAt: rec.dueAt, quizzes: rec.quizzes, quizPass: rec.quizPass }).catch(() => {});
+      if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
+      return { box: next.box, graduated: next.box >= REVIEW_GRADUATED };
+    },
     onFinished: () => (practice ? null : grantReviewRound()),
     onDone: (s) => {
       setReviewOpen(false);
@@ -582,8 +606,12 @@ function startReviewNow() {
   const items = track.statsList()
     .filter((r) => r.done && cueForStart(r.start)) // 자막에 없는 기록을 먼저 제외 (Codex #7)
     .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0))
-    .slice(0, settings.reviewCount || REVIEW_COUNT)
-    .map((rec) => ({ rec, cue: cueForStart(rec.start) }));
+    .slice(0, Math.max(1, (settings.reviewCount || REVIEW_COUNT) - 1))
+    .map((rec) => ({ type: 'sentence', rec, cue: cueForStart(rec.start) }));
+  const w = pickWordReviews(state.vocabViews, track.todayKey(), MAX_WORD_ITEMS)
+    .map((rec) => ({ type: 'word', rec, word: rec.word, meaning: rec.meaning, choices: quizChoices(rec, state.vocabViews) }))
+    .filter((it) => it.choices.length >= 2);
+  items.push(...w);
   if (!items.length) { showPlayerMessage('🔁 아직 복습할 문장이 없어요 — 문장을 몇 개 끝내면 생겨요', 4000); return; }
   startReview(items, true);
 }
@@ -820,12 +848,24 @@ function renderVocab() {
   const list = $('vocab-list');
   list.innerHTML = '';
   for (const it of items) {
-    const el = document.createElement('span');
-    el.className = `vocab-item ${it.kind}`;
+    // 🔊 문장 안에서 이 단어가 있는 자리를 찾으면 눌러서 그 부분만 다시 들을 수 있게
+    const range = state.vocab.findRange ? state.vocab.findRange(cue.en, it.term) : null;
+    const el = document.createElement(range ? 'button' : 'span');
+    if (range) el.type = 'button';
+    el.className = `vocab-item ${it.kind}${range ? ' playable' : ''}`;
     const b = document.createElement('b');
     b.textContent = it.term;
     el.appendChild(b);
     el.appendChild(document.createTextNode(it.meaning));
+    if (range) {
+      el.title = '눌러서 이 단어만 다시 듣기';
+      el.addEventListener('click', (e) => {
+        e.stopPropagation(); // 패널 접기(details toggle)로 번지지 않게
+        e.preventDefault();
+        unlock();
+        playVocabWord(cue, range);
+      });
+    }
     list.appendChild(el);
   }
   $('vocab-count').textContent = String(items.length);
@@ -909,7 +949,9 @@ export async function openPlayer(id, opts = {}) {
       startIdx = best;
     }
     goTo(startIdx, { play: false });
-    maybeReview(); // 🔁 오늘 복습할 문장이 있으면 먼저 제안
+    // 🔤 단어 문항을 만들려면 본 단어 기록이 필요하다 — 읽고 나서 복습을 제안
+    listVocabViews().then((v) => { state.vocabViews = v || []; }).catch(() => { state.vocabViews = []; })
+      .then(() => { if (state.open) maybeReview(); });
   };
   video.addEventListener('loadedmetadata', state.onMeta, { once: true });
 }
@@ -1380,13 +1422,14 @@ function srNote(result) {
  * 🎯 단어 하나만 다시 듣기 — 못 말한 단어를 눌렀을 때.
  * 노래는 실제 단어 시간(VTT 노래방 태그), 영화는 글자 수 비례 추정이라 앞뒤로 조금 여유를 준다.
  */
-function playWord(cue, idx) {
+function playWord(cue, idx, endIdx) {
   const times = wordTimings(cue);
   const w = times[idx];
+  const last = times[endIdx === undefined ? idx : endIdx] || w;
   if (!w) return;
   const pad = 0.12;
   const from = Math.max(cue.start, w.start - pad);
-  const to = Math.min(cue.end, (w.end || w.start + 0.4) + pad);
+  const to = Math.min(cue.end, (last.end || last.start + 0.4) + pad);
   state.wordPlayUntil = to;
   video.currentTime = from;
   safePlay();
@@ -1406,6 +1449,15 @@ function endWordPlay() {
   state.wordPlayUntil = 0;
   if (!video.paused) video.pause();
   if (state.resultDelay) state.resultDelay();
+}
+
+/**
+ * 📖 단어 패널에서 그 단어(표현)만 다시 듣기.
+ * 재생 중이던 문장은 멈추고 그 구간만 들려준 뒤 다시 멈춘다.
+ */
+function playVocabWord(cue, range) {
+  cancelShadowWait();
+  playWord(cue, range[0], range[1]);
 }
 
 /** 결과 화면에서 "잠시 뒤 자동 진행" 타이머 — 단어를 누를 때마다 다시 센다 */

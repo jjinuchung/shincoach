@@ -60,6 +60,29 @@ export function tokenize(text) {
     .filter((t) => t.length > 1 && /[a-z]/.test(t));
 }
 
+/**
+ * 문장에서 이 단어·표현이 차지하는 **공백 토큰 범위** → [from, to] (없으면 null).
+ * 공백 토큰 기준이라 srt.wordTimings 자리와 1:1 — 그 구간만 다시 들려줄 때 쓴다.
+ * 단어장의 term은 기본형("walk")이라 문장의 "walking"과 다를 수 있어 stem으로 비교한다.
+ */
+export function findTokenRange(text, term, known) {
+  const raws = String(text).replace(/\n/g, ' ').split(/\s+/).filter(Boolean);
+  const stems = raws.map((r) => {
+    const t = tokenize(r)[0];
+    return t ? stemWord(t, known) : '';
+  });
+  const parts = String(term).replace(/…/g, ' ').split(/\s+/)
+    .map((w) => w.replace(/^[^A-Za-z']+|[^A-Za-z']+$/g, '').toLowerCase())
+    .filter(Boolean)
+    .map((w) => stemWord(w, known));
+  if (!parts.length) return null;
+  const from = stems.indexOf(parts[0]);
+  if (from < 0) return null;
+  if (parts.length === 1) return [from, from];
+  const last = stems.lastIndexOf(parts[parts.length - 1]);
+  return [from, last > from ? last : from];
+}
+
 /** 표현 사전의 키("figure * out")를 정규식으로 */
 function phraseRegex(key) {
   const esc = key.replace(/[.*+?^${}()|[\]\\]/g, (m) => (m === '*' ? '\\*' : '\\' + m));
@@ -109,7 +132,12 @@ export function createVocab(data) {
     return out;
   }
 
-  return { lookup, known, basic, size: Object.keys(words).length };
+  /** 문장에서 이 단어·표현의 공백 토큰 범위 (🔊 그 부분만 듣기용) */
+  function findRange(text, term) {
+    return findTokenRange(text, term, known);
+  }
+
+  return { lookup, findRange, known, basic, size: Object.keys(words).length };
 }
 
 /** 브라우저에서 vocab/*.json 로드 (실패해도 앱은 동작해야 하므로 빈 단어장 반환) */

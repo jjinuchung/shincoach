@@ -1254,3 +1254,20 @@ button { font-family: inherit; }
 .stats-missed-chip { background: #fef3c7; color: #92400e; border-radius: 999px; padding: 5px 11px; font-size: 0.92rem; }
 .stats-missed-chip .n { color: #b45309; font-weight: 700; }
 .stats-note { color: var(--muted); font-size: 0.88rem; margin-top: 4px; }
+
+/* 📖 단어 패널에서 그 단어만 다시 듣기 */
+.vocab-item.playable { cursor: pointer; border-style: solid; min-height: 40px; }
+.vocab-item.playable::after { content: ' 🔊'; opacity: 0.75; font-size: 0.85em; }
+.vocab-item.playable:active { transform: scale(0.97); filter: brightness(0.95); }
+
+/* 🔤 단어 뜻 4지선다 (복습 회차) */
+.review-choices { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 8px; }
+.review-choices[hidden] { display: none; }
+.review-choice {
+  min-height: 48px; padding: 10px 14px; border-radius: 12px; font-size: 1.02rem; font-weight: 700;
+  border: 2px solid #e2e8f0; background: #f8fafc; color: var(--fg); font-family: inherit; cursor: pointer; text-align: left;
+}
+.review-choice:active { transform: scale(0.98); }
+.review-choice.right { background: #dcfce7; border-color: #22c55e; color: #14532d; }
+.review-choice.wrong { background: #fee2e2; border-color: #ef4444; color: #7f1d1d; }
+.review-choice[disabled] { cursor: default; }
