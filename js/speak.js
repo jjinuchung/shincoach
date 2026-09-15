@@ -197,7 +197,9 @@ export function runSpeakCheck(opts) {
   // 막혀 있어도 잠시 뒤에는 다시 시도한다 — 와이파이가 순간 끊기거나 아이가 두 번 조용했던 것뿐일 수 있다
   if (srBroken && srBrokenAt && Date.now() - srBrokenAt >= SR_RETRY_MS) resetRecognition();
   if (!srBroken && SR && navigator.onLine) return runWithRecognition(opts, SR);
-  return runWithEnergy(opts, !SR ? 'unsupported' : !navigator.onLine ? 'offline' : srBrokenWhy);
+  const why = !SR ? 'unsupported' : !navigator.onLine ? 'offline' : srBrokenWhy;
+  logAttempt({ method: 'energy', ok: false, srError: why });
+  return runWithEnergy(opts, why);
 }
 
 // 음성 인식이 안 되는 것으로 확인되면 그동안은 에너지 방식으로.
@@ -208,25 +210,41 @@ export function runSpeakCheck(opts) {
 let srBroken = false;
 let srBrokenWhy = '';
 let srBrokenAt = 0;
-let srNoResultStreak = 0;
-/** 이만큼 지나면 인식을 다시 시도 */
-const SR_RETRY_MS = 3 * 60 * 1000;
-/** 오류 없이 결과만 없는 게 이만큼 이어지면 그때 폴백 (2번은 아이가 그냥 조용했던 경우가 많다) */
-const SR_NO_RESULT_LIMIT = 3;
-const SR_FATAL = { 'audio-capture': 1, 'not-allowed': 1, 'service-not-allowed': 1, network: 1, 'start-failed': 1 };
+let srFailStreak = 0;
+/** 이만큼 지나면 인식을 다시 시도 (학습 중이라 너무 길면 그 사이 계속 소리 길이로 판정된다) */
+const SR_RETRY_MS = 60 * 1000;
+/** 실패가 이만큼 이어지면 그때 폴백 */
+const SR_FAIL_LIMIT = 3;
+/**
+ * 진짜로 못 쓰는 상태 — 권한·마이크·서비스 자체가 막힌 경우만.
+ * network(구글 서버 순간 불안)와 start-failed(앞 인식이 덜 정리된 채 start)는
+ * 안드로이드에서 일시적으로 흔해서, 한 번 났다고 폴백하면 멀쩡한 기기가 소리 길이 판정에 갇힌다.
+ */
+const SR_FATAL = { 'audio-capture': 1, 'not-allowed': 1, 'service-not-allowed': 1 };
+
+// 최근 말하기 시도 기록 (⚙ 진단용) — 태블릿에서 "왜 인식이 멈췄나"를 추측하지 않고 보기 위해
+const srLog = [];
+function logAttempt(e) {
+  srLog.push({ at: Date.now(), ...e });
+  if (srLog.length > 12) srLog.shift();
+}
+/** 최근 말하기 시도 기록 (최신이 뒤) */
+export function speakLog() {
+  return srLog.slice();
+}
 
 /** 콘텐츠를 새로 열 때: 인식을 다시 시도해 봄 (인터넷이 돌아왔을 수 있음) */
 export function resetRecognition() {
   srBroken = false;
   srBrokenWhy = '';
   srBrokenAt = 0;
-  srNoResultStreak = 0;
+  srFailStreak = 0;
 }
 
 /** 진단용: 지금 인식이 막힌 상태인지 */
 export function recognitionState() {
   const retryInSec = srBroken && srBrokenAt ? Math.max(0, Math.ceil((SR_RETRY_MS - (Date.now() - srBrokenAt)) / 1000)) : 0;
-  return { broken: srBroken, why: srBrokenWhy, retryInSec };
+  return { broken: srBroken, why: srBrokenWhy, retryInSec, failStreak: srFailStreak };
 }
 
 function cancelledResult(spokenMs) {
@@ -265,7 +283,7 @@ function runWithRecognition(opts, SR) {
     rec.interimResults = true;
     rec.maxAlternatives = 3;
   } catch (e) { rec = null; }
-  if (!rec) return switchToEnergy('start-failed');
+  if (!rec) return useEnergy('no-ctor', true); // 생성자 자체가 안 되면 이 기기는 못 쓴다
 
   function cleanup() {
     if (!rec) return;
@@ -273,11 +291,15 @@ function runWithRecognition(opts, SR) {
     rec = null;
   }
 
-  /** 인식을 못 쓰는 기기/상황 → 이 문장부터 에너지 방식으로 이어감 (아이는 그냥 계속 말하면 됨) */
-  function switchToEnergy(why) {
+  /**
+   * 에너지(소리 길이) 방식으로 넘김.
+   * permanent면 그 뒤 문장들도 당분간 에너지로 (SR_RETRY_MS 뒤 자동 재시도),
+   * 아니면 **이번 문장만** — 일시적인 실패로 멀쩡한 기기를 가두지 않기 위해.
+   */
+  function useEnergy(why, permanent) {
     if (finished) return handle;
     cleanup();
-    srBroken = true; srBrokenWhy = why; srBrokenAt = Date.now();
+    if (permanent) { srBroken = true; srBrokenWhy = why; srBrokenAt = Date.now(); }
     fallback = runWithEnergy(opts, why);
     fallback.promise.then(settle);
     return handle;
@@ -287,15 +309,26 @@ function runWithRecognition(opts, SR) {
     if (finished) return;
     cleanup();
     if (transcript) {
-      srNoResultStreak = 0;
+      srFailStreak = 0; // 한 번이라도 들렸으면 이 기기는 멀쩡하다
       const score = scoreTranscript(target, transcript);
+      logAttempt({ method: 'speech', ok: true, srError: '', words: transcript.split(/\s+/).length });
       settle({ passed: score.passed, method: 'speech', transcript, score, spokenMs: Math.round(spokenMs), reason, srError: '' });
       return;
     }
-    // 결과 없음: 말을 안 한 것(no-speech)이면 실패, 오류 없이 결과만 없는 게 두 번 이어지면 이 기기에선 인식이 안 되는 것으로 봄
     if (!srError || srError === 'aborted') srError = 'no-result';
-    if (srError === 'no-result') srNoResultStreak++;
-    if (SR_FATAL[srError] || (srError === 'no-result' && srNoResultStreak >= SR_NO_RESULT_LIMIT)) { switchToEnergy(srError); return; }
+    // 권한·마이크·서비스가 막힌 건 바로 포기
+    if (SR_FATAL[srError]) { logAttempt({ method: 'speech', ok: false, srError, fatal: true }); useEnergy(srError, true); return; }
+    // no-speech = 마이크로 듣긴 했는데 아이가 말을 안 한 것. 인식은 멀쩡하므로 연속 실패로 세지 않는다
+    // (조용한 문장이 몇 개 이어졌다고 소리 길이 판정으로 빠지면 안 된다)
+    if (srError === 'no-speech') {
+      srFailStreak = 0;
+      logAttempt({ method: 'speech', ok: false, srError });
+      settle({ passed: false, method: 'speech', transcript: '', score: null, spokenMs: Math.round(spokenMs), reason, srError });
+      return;
+    }
+    srFailStreak++;
+    logAttempt({ method: 'speech', ok: false, srError, streak: srFailStreak });
+    if (srFailStreak >= SR_FAIL_LIMIT) { useEnergy(srError, true); return; }
     settle({ passed: false, method: 'speech', transcript: '', score: null, spokenMs: Math.round(spokenMs), reason, srError });
   }
 
@@ -341,7 +374,10 @@ function runWithRecognition(opts, SR) {
   try {
     rec.start();
   } catch (e) {
-    return switchToEnergy('start-failed');
+    // 앞 문장의 인식이 아직 정리되지 않았을 때 자주 난다 (안드로이드) — 이번 문장만 소리 길이로
+    srFailStreak++;
+    logAttempt({ method: 'speech', ok: false, srError: 'start-failed', streak: srFailStreak });
+    return useEnergy('start-failed', srFailStreak >= SR_FAIL_LIMIT);
   }
   maxTimer = setTimeout(() => { if (!finished && !fallback) handle.stop(); }, maxMs);
   void started;

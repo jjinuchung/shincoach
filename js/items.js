@@ -132,9 +132,14 @@ export function setFigure(fig, url, look) {
     if (!g) { g = document.createElement('span'); fig.appendChild(g); }
     g.className = 'mon-gear ' + (gear.pos || 'head');
     g.textContent = gear.emoji;
-    // 그림에서 찾아둔 머리 꼭대기 위에 얹는다 (없으면 CSS 기본값 = 가운데 위)
+    // 자리 정하기: ① 아이가 직접 끌어다 놓은 자리 ② 그림에서 찾은 머리 꼭대기 ③ CSS 기본값(가운데 위)
+    const pos = look && look.gearPos;
     const a = look && look.anchor;
-    if (a && Number.isFinite(a.x) && Number.isFinite(a.y)) {
+    g.classList.toggle('placed', !!pos);
+    if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+      g.style.left = `${pos.x * 100}%`;
+      g.style.top = `${pos.y * 100}%`;
+    } else if (a && Number.isFinite(a.x) && Number.isFinite(a.y)) {
       g.style.left = `${Math.min(88, Math.max(12, a.x * 100))}%`;
       g.style.top = `${a.y * 100 - 9}%`; // 머리 꼭대기에 살짝 걸치게
     } else {

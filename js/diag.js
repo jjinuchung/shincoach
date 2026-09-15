@@ -1,7 +1,7 @@
 // 기기 진단: 마이크·녹음·음성 인식 지원 여부와 실제 동작 테스트 (설정 화면)
 // 구형 브라우저에서도 돌아야 하므로 최신 문법(?., ??, ||=)은 쓰지 않는다.
 
-import { prepareMic, releaseMic, getAudioContext, recognitionState } from './speak.js';
+import { prepareMic, releaseMic, getAudioContext, recognitionState, speakLog } from './speak.js';
 
 const $ = (id) => document.getElementById(id);
 let lastRecUrl = null;
@@ -28,6 +28,23 @@ function browserInfo() {
 }
 
 /** 지원 여부 목록 렌더링 */
+/**
+ * 최근 말하기 시도를 한 줄로 — 태블릿에서 "언제부터 왜 소리 길이 판정으로 빠졌는지" 보려고.
+ * 예: "🎤3 · 🔇network×2 · 🔇no-result" (최신이 뒤)
+ */
+function recentSpeakSummary() {
+  const log = speakLog();
+  if (!log.length) return '아직 없음';
+  const parts = [];
+  for (const e of log) {
+    const tag = e.ok ? '🎤' : `🔇${e.srError || '?'}`;
+    const last = parts[parts.length - 1];
+    if (last && last.tag === tag) last.n++;
+    else parts.push({ tag, n: 1 });
+  }
+  return parts.map((p) => (p.n > 1 ? `${p.tag}×${p.n}` : p.tag)).join(' · ');
+}
+
 export function renderDiag() {
   const ul = $('diag-list');
   if (!ul) return;
@@ -44,7 +61,8 @@ export function renderDiag() {
     ['소리 분석(AudioContext)', hasAudio ? '지원' : '미지원', hasAudio ? '✅' : '❌'],
     ['녹음(MediaRecorder)', hasRec ? '지원' : '미지원', hasRec ? '✅' : '❌'],
     ['음성 인식(Web Speech)', hasSpeech ? '지원' : '미지원', hasSpeech ? '✅' : '❌ (1단계 "말했는지"만 가능)'],
-    ['이번 학습의 인식 상태', recognitionState().broken ? `막힘 (${recognitionState().why}) → 소리 길이로 판정 중, ${recognitionState().retryInSec}초 뒤 자동 재시도` : '사용 중 (결과 없음이 3번 이어지면 잠시 소리 길이로 전환)', recognitionState().broken ? '⚠️' : '✅'],
+    ['이번 학습의 인식 상태', recognitionState().broken ? `막힘 (${recognitionState().why}) → 소리 길이로 판정 중, ${recognitionState().retryInSec}초 뒤 자동 재시도` : `사용 중 (연속 실패 ${recognitionState().failStreak}/3)`, recognitionState().broken ? '⚠️' : '✅'],
+    ['최근 말하기 기록', recentSpeakSummary(), '🧾'],
     ['설치 앱으로 실행', window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? '예' : '아니오(브라우저 탭)', ''],
   ];
   ul.innerHTML = '';

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, GOLDEN, ITEMS, itemById, lootBox, canBuy } from '../js/items.js';
 import {
   coins, gainCoins, itemCount, inventory, addItem, buyItem, getLook, equipGear, applyDye, getProfileSnapshot,
-  getPartner, setPartner, hpOf, isTired, changeHp, usePotion, catchAttempt,
+  getPartner, setPartner, hpOf, isTired, changeHp, usePotion, catchAttempt, setGearPos,
 } from '../js/xp.js';
 import { mergeStatRecord } from '../js/db.js';
 
@@ -75,7 +75,7 @@ test('프로필: 코인 획득·구매·가방', () => {
 });
 
 test('프로필: 장식 장착·교체·벗기 (가방 개수 보존)', () => {
-  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null }); // anchor = 그림 머리 위치 (아직 안 받았으면 null)
+  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리
   assert.equal(equipGear(25, 'crown'), false, '가방에 없음');
   assert.equal(equipGear(25, 'ribbon'), true);
   assert.equal(getLook(25).gear, 'ribbon');
@@ -103,7 +103,7 @@ test('프로필: 염색은 소모, 원래 색은 무료', () => {
   assert.equal(getLook(25).dye, null);
   assert.equal(itemCount('red'), 1, '원래 색으로는 공짜');
   assert.equal(applyDye(25, 'cap'), false, '장식은 염색 불가');
-  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null }); // anchor = 그림 머리 위치 (아직 안 받았으면 null)
+  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리
 });
 
 test('❤️ 파트너·HP·물약: 처음 잡은 포켓몬이 파트너, HP는 0~100, 물약은 가방에서 소모', () => {
@@ -151,4 +151,23 @@ test('백업 병합: 코인·가방·꾸밈은 최근 저장 쪽, 누적치는 �
   assert.equal(m3.coins, 0); assert.deepEqual(m3.items, {}); assert.deepEqual(m3.mons, {}); assert.equal(m3.partner, null);
   const d = mergeStatRecord('daily', { date: 'd', doneKeys: [], hpMissed: true }, { date: 'd', doneKeys: [] });
   assert.equal(d.hpMissed, true, 'HP 감소 적용 표시는 한쪽이라도 true면 true');
+});
+
+test('🎀 장식 자리를 포켓몬마다 따로 저장한다 (자동 위치가 안 맞을 때)', () => {
+  assert.equal(getLook(7).gearPos, null, '처음엔 자동 위치');
+  const saved = setGearPos(7, { x: 0.4213, y: 0.1789 });
+  assert.deepEqual(saved, { x: 0.421, y: 0.179 }, '소수점 3자리로');
+  assert.deepEqual(getLook(7).gearPos, { x: 0.421, y: 0.179 });
+  assert.equal(getLook(25).gearPos, null, '다른 포켓몬은 영향 없음');
+
+  // null이면 자동 위치로 되돌림
+  assert.equal(setGearPos(7, null), null);
+  assert.equal(getLook(7).gearPos, null);
+});
+
+test('🎀 이상한 값은 저장하지 않는다', () => {
+  setGearPos(9, { x: 0.5, y: 0.5 });
+  assert.ok(getLook(9).gearPos);
+  setGearPos(9, { x: NaN, y: 0.5 });
+  assert.equal(getLook(9).gearPos, null, '숫자가 아니면 자동 위치로');
 });

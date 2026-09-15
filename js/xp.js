@@ -294,8 +294,24 @@ export function buyItem(id) {
 /** 포켓몬의 꾸밈·상태 → { gear, dye, hp } (없으면 null 필드, hp는 기본 100) */
 export function getLook(monId) {
   const m = profile.mons[monId] || {};
-  // anchor = 그림에서 찾아둔 머리 위치. 장식을 포켓몬마다 제자리에 얹기 위해 함께 넘긴다
-  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId) };
+  // anchor = 그림에서 자동으로 찾은 머리 위치 / gearPos = 아이가 직접 끌어다 놓은 자리(있으면 우선)
+  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId), gearPos: m.gearPos || null };
+}
+
+/**
+ * 🎀 장식 위치를 아이가 정한 자리로 저장 (그림 크기에 대한 0~1 비율, 이모지 중심 기준).
+ * 자동 추정은 머리 꼭대기만 알 뿐이라 포켓몬에 따라 손·등에 얹히기도 한다 — 그럴 때 직접 옮긴다.
+ * pos가 null이면 자동 위치로 되돌림.
+ */
+export function setGearPos(monId, pos) {
+  const m = profile.mons[monId] || (profile.mons[monId] = {});
+  if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+    m.gearPos = { x: +pos.x.toFixed(3), y: +pos.y.toFixed(3) };
+  } else {
+    delete m.gearPos;
+  }
+  addDelta({ mons: { [monId]: { gearPos: m.gearPos || null } } });
+  return m.gearPos || null;
 }
 
 // ── ❤️ HP · 🤝 파트너 · 🧪 물약 ──

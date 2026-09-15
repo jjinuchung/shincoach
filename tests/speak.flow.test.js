@@ -25,7 +25,7 @@ globalThis.performance = globalThis.performance || { now: () => Date.now() };
 globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 5);
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
-const { runSpeakCheck, resetRecognition, recognitionState, releaseMic } = await import('../js/speak.js');
+const { runSpeakCheck, resetRecognition, recognitionState, releaseMic, speakLog } = await import('../js/speak.js');
 const opts = () => ({ target: 'I love toys.', durationSec: 1.5 });
 const tick = (ms = 10) => new Promise((r) => setTimeout(r, ms));
 
@@ -51,7 +51,7 @@ test('인식 결과가 원문과 다르면 실패 (다시 말하기), 인식 자
   assert.equal(recognitionState().broken, false);
 });
 
-test('no-speech(말 안 함)는 실패이고 인식은 유지, 결과 없음이 2번 이어지면 에너지 방식으로 전환', async () => {
+test('no-speech(말 안 함)는 실패이고 인식은 유지, 결과 없음이 3번 이어지면 에너지 방식으로 전환', async () => {
   resetRecognition(); recs.length = 0; micOpens = 0;
   let h = runSpeakCheck(opts());
   recs[0].error('no-speech'); recs[0].end();
@@ -166,4 +166,51 @@ test('폴백은 영구가 아니다 — 시간이 지나면 인식을 다시 시
   } finally {
     Date.now = realNow;
   }
+});
+
+test('일시적 오류(network·start-failed)는 한 번으로 폴백하지 않는다', async () => {
+  resetRecognition(); recs.length = 0; micOpens = 0;
+  // network 오류 1번 → 그 문장만 실패, 인식은 유지
+  let h = runSpeakCheck(opts());
+  recs[0].error('network'); recs[0].end();
+  let r = await h.promise;
+  assert.equal(r.method, 'speech', '이번 문장은 인식 결과(실패)로');
+  assert.equal(recognitionState().broken, false, '한 번으로는 안 막힘');
+  assert.equal(recognitionState().failStreak, 1);
+
+  // 그 뒤에 잘 들리면 스트릭이 풀린다
+  h = runSpeakCheck(opts());
+  recs[1].result('i love toys'); recs[1].end();
+  r = await h.promise;
+  assert.equal(r.method, 'speech');
+  assert.equal(recognitionState().failStreak, 0, '한 번이라도 들리면 초기화');
+});
+
+test('아이가 조용한 문장이 이어져도(no-speech) 인식을 유지한다', async () => {
+  resetRecognition(); recs.length = 0;
+  for (let i = 0; i < 4; i++) {
+    const h = runSpeakCheck(opts());
+    recs[i].error('no-speech');
+    recs[i].end();
+    const r = await h.promise;
+    assert.equal(r.method, 'speech');
+    assert.equal(r.srError, 'no-speech');
+  }
+  assert.equal(recognitionState().broken, false, '말을 안 한 것은 기기 문제가 아니다');
+  assert.equal(recognitionState().failStreak, 0);
+});
+
+test('말하기 기록이 남아 무엇 때문에 막혔는지 볼 수 있다', async () => {
+  resetRecognition(); recs.length = 0;
+  let h = runSpeakCheck(opts());
+  recs[0].result('i love toys'); recs[0].end();
+  await h.promise;
+  h = runSpeakCheck(opts());
+  recs[1].error('network'); recs[1].end();
+  await h.promise;
+  const log = speakLog();
+  assert.ok(log.length >= 2);
+  assert.equal(log[log.length - 2].ok, true);
+  assert.equal(log[log.length - 1].srError, 'network');
+  assert.ok(log.every((e) => typeof e.at === 'number'));
 });

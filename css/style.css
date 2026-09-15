@@ -1290,3 +1290,10 @@ button { font-family: inherit; }
 .review-dict-listen { align-self: center; margin-top: 8px; min-height: 44px; }
 .review-dict-listen[hidden] { display: none; }
 .review-choice.dict { text-align: center; font-size: 1.08rem; }
+
+/* 🎀 장식을 아이가 끌어다 놓은 자리 (중심 기준) */
+.mon-gear.placed { transform: translate(-50%, -50%); }
+/* 상세 모달에서만 장식을 잡을 수 있게 (평소에는 그림을 가리지 않도록 pointer-events: none) */
+.mon-big .mon-gear { pointer-events: auto; cursor: grab; touch-action: none; }
+.mon-big .mon-gear.dragging { cursor: grabbing; filter: drop-shadow(0 0 6px #6366f1); }
+.mon-drag-hint { color: var(--muted); font-size: 0.88rem; text-align: center; margin-top: 4px; }

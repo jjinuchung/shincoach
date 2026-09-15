@@ -2,7 +2,7 @@
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, itemById, canBuy, setFigure } from './items.js';
-import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, RARITY, getPartner, setPartner, hpOf, usePotion } from './xp.js';
+import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos } from './xp.js';
 import { sfx, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -122,6 +122,54 @@ export function closeMon() {
   mon = null;
 }
 
+/**
+ * 🎀 장식을 끌어서 원하는 자리에 놓기.
+ * 그림에서 머리를 자동으로 찾지만 포켓몬에 따라 손·등에 얹히기도 한다 — 그럴 때 아이가 직접 옮긴다.
+ * 놓는 순간 그 포켓몬의 자리로 저장되고, 퍼즐·잡기·도감 어디서나 그 자리에 붙는다.
+ */
+function enableGearDrag() {
+  const fig = $('mon-figure');
+  const g = fig.querySelector('.mon-gear');
+  const hint = $('mon-drag-hint');
+  if (!g) { hint.hidden = true; return; }
+  hint.hidden = false;
+  hint.textContent = '🎀 장식을 끌어서 원하는 자리에 놓아 보세요';
+  if (g.dataset.drag === '1') return; // 리스너 중복 방지
+  g.dataset.drag = '1';
+
+  g.addEventListener('pointerdown', (e) => {
+    if (!mon) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = fig.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    g.classList.add('dragging', 'placed');
+    const clamp = (v) => Math.min(0.98, Math.max(0.02, v));
+    const put = (ev) => {
+      const x = clamp((ev.clientX - rect.left) / rect.width);
+      const y = clamp((ev.clientY - rect.top) / rect.height);
+      g.style.left = `${x * 100}%`;
+      g.style.top = `${y * 100}%`;
+      return { x, y };
+    };
+    let last = put(e);
+    const move = (ev) => { ev.preventDefault(); last = put(ev); };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
+      g.classList.remove('dragging');
+      setGearPos(mon.id, last);
+      hint.textContent = '✅ 여기에 놓았어요 (다시 끌어서 바꿀 수 있어요)';
+      if (onChange) onChange(mon.id);
+    };
+    // 포인터 캡처 대신 document 리스너 — 퍼즐에서 캡처가 풀리는 문제를 겪었다
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
+  });
+}
+
 function renderMon(msg, pop) {
   if (!mon) return;
   const look = getLook(mon.id);
@@ -131,6 +179,7 @@ function renderMon(msg, pop) {
   $('mon-sub').textContent = `${RARITY[r].stars} ${RARITY[r].label} · 잡은 수 ×${caughtCount(mon.id)}` + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '');
   const fig = $('mon-figure');
   setFigure(fig, mon.url || '', look);
+  enableGearDrag();
   fig.classList.remove('pop');
   if (pop) { void fig.offsetWidth; fig.classList.add('pop'); }
   $('mon-msg').textContent = msg || '';
@@ -166,7 +215,7 @@ function renderMon(msg, pop) {
   // 🎀 장식: [없음] [지금 쓰는 것] [가방에 있는 것들]
   const gearBox = $('mon-gear');
   gearBox.innerHTML = '';
-  gearBox.appendChild(option('🚫', '없음', '', !look.gear, 'none', () => change(equipGear(mon.id, null), '장식을 벗었어요')));
+  gearBox.appendChild(option('🚫', '없음', '', !look.gear, 'none', () => { setGearPos(mon.id, null); change(equipGear(mon.id, null), '장식을 벗었어요'); }));
   let anyGear = false;
   for (const g of GEAR) {
     const n = itemCount(g.id);
