@@ -84,3 +84,13 @@ test('강제 닫힘 결과(Codex #1): 확정된 승패는 그대로, 싸우던 �
 test('daily 병합: battles는 큰 값', () => {
   assert.equal(mergeStatRecord('daily', { date: 'd', doneKeys: [], battles: 1 }, { date: 'd', doneKeys: [], battles: 0 }).battles, 1);
 });
+
+test('명단 100마리 전부 배틀 타입이 있다 (없으면 전부 노말이 되어 기술이 단조로워짐)', () => {
+  const missing = ROSTER.filter((r) => !TYPE_OF[r.id]);
+  assert.deepEqual(missing.map((r) => `${r.id} ${r.ko}`), [], '타입 없는 포켓몬');
+  // 타입이 골고루 퍼져 있는지 (한 타입에 몰리면 배틀이 지루해짐)
+  const count = {};
+  for (const r of ROSTER) count[TYPE_OF[r.id]] = (count[TYPE_OF[r.id]] || 0) + 1;
+  assert.ok(Object.keys(count).length >= 10, `타입 종류: ${Object.keys(count).length}`);
+  assert.ok(Math.max(...Object.values(count)) <= ROSTER.length * 0.3, `한 타입이 너무 많음: ${JSON.stringify(count)}`);
+});

@@ -4,7 +4,7 @@
 import { getCharacters, putCharacter } from './db.js';
 
 /**
- * 명단: 처음 30마리(Lv1) + 레벨 마일스톤에서 열리는 10마리씩(Lv5·10·15). unlock 없으면 1.
+ * 명단: 처음 40마리(Lv1) + 레벨 마일스톤에서 열리는 20마리씩(Lv5·10·15). unlock 없으면 1.
  * 여기에 추가하면 ⚙ "받기"가 없는 것만 받아옴
  */
 export const ROSTER = [
@@ -38,6 +38,16 @@ export const ROSTER = [
   { id: 658, ko: '개굴닌자', en: 'Greninja' },
   { id: 700, ko: '님피아', en: 'Sylveon' },
   { id: 778, ko: '따라큐', en: 'Mimikyu' },
+  { id: 2, ko: '이상해풀', en: 'Ivysaur' },
+  { id: 5, ko: '리자드', en: 'Charmeleon' },
+  { id: 8, ko: '어니부기', en: 'Wartortle' },
+  { id: 172, ko: '피츄', en: 'Pichu' },
+  { id: 194, ko: '우파', en: 'Wooper' },
+  { id: 280, ko: '랄토스', en: 'Ralts' },
+  { id: 447, ko: '리오르', en: 'Riolu' },
+  { id: 179, ko: '메리프', en: 'Mareep' },
+  { id: 37, ko: '식스테일', en: 'Vulpix' },
+  { id: 35, ko: '삐삐', en: 'Clefairy' },
   // ── Lv5에 열림 ──
   { id: 26, ko: '라이츄', en: 'Raichu', unlock: 5 },
   { id: 59, ko: '윈디', en: 'Arcanine', unlock: 5 },
@@ -49,6 +59,16 @@ export const ROSTER = [
   { id: 134, ko: '샤미드', en: 'Vaporeon', unlock: 5 },
   { id: 135, ko: '쥬피썬더', en: 'Jolteon', unlock: 5 },
   { id: 136, ko: '부스터', en: 'Flareon', unlock: 5 },
+  { id: 12, ko: '버터플', en: 'Butterfree', unlock: 5 },
+  { id: 63, ko: '캐이시', en: 'Abra', unlock: 5 },
+  { id: 92, ko: '고오스', en: 'Gastly', unlock: 5 },
+  { id: 147, ko: '미뇽', en: 'Dratini', unlock: 5 },
+  { id: 246, ko: '애버라스', en: 'Larvitar', unlock: 5 },
+  { id: 66, ko: '알통몬', en: 'Machop', unlock: 5 },
+  { id: 116, ko: '쏘드라', en: 'Horsea', unlock: 5 },
+  { id: 187, ko: '통통코', en: 'Hoppip', unlock: 5 },
+  { id: 220, ko: '꾸꾸리', en: 'Swinub', unlock: 5 },
+  { id: 19, ko: '꼬렛', en: 'Rattata', unlock: 5 },
   // ── Lv10에 열림 ──
   { id: 144, ko: '프리져', en: 'Articuno', unlock: 10 },
   { id: 145, ko: '썬더', en: 'Zapdos', unlock: 10 },
@@ -60,6 +80,16 @@ export const ROSTER = [
   { id: 251, ko: '세레비', en: 'Celebi', unlock: 10 },
   { id: 282, ko: '가디안', en: 'Gardevoir', unlock: 10 },
   { id: 445, ko: '한카리아스', en: 'Garchomp', unlock: 10 },
+  { id: 65, ko: '후딘', en: 'Alakazam', unlock: 10 },
+  { id: 123, ko: '스라크', en: 'Scyther', unlock: 10 },
+  { id: 125, ko: '에레브', en: 'Electabuzz', unlock: 10 },
+  { id: 137, ko: '폴리곤', en: 'Porygon', unlock: 10 },
+  { id: 142, ko: '프테라', en: 'Aerodactyl', unlock: 10 },
+  { id: 148, ko: '신뇽', en: 'Dragonair', unlock: 10 },
+  { id: 212, ko: '핫삼', en: 'Scizor', unlock: 10 },
+  { id: 257, ko: '번치코', en: 'Blaziken', unlock: 10 },
+  { id: 260, ko: '대짱이', en: 'Swampert', unlock: 10 },
+  { id: 91, ko: '파르셀', en: 'Cloyster', unlock: 10 },
   // ── Lv15에 열림 ──
   { id: 382, ko: '가이오가', en: 'Kyogre', unlock: 15 },
   { id: 383, ko: '그란돈', en: 'Groudon', unlock: 15 },
@@ -71,6 +101,16 @@ export const ROSTER = [
   { id: 644, ko: '제크로무', en: 'Zekrom', unlock: 15 },
   { id: 716, ko: '제르네아스', en: 'Xerneas', unlock: 15 },
   { id: 888, ko: '자시안', en: 'Zacian', unlock: 15 },
+  { id: 373, ko: '보만다', en: 'Salamence', unlock: 15 },
+  { id: 376, ko: '메타그로스', en: 'Metagross', unlock: 15 },
+  { id: 380, ko: '라티아스', en: 'Latias', unlock: 15 },
+  { id: 381, ko: '라티오스', en: 'Latios', unlock: 15 },
+  { id: 386, ko: '테오키스', en: 'Deoxys', unlock: 15 },
+  { id: 887, ko: '드래펄트', en: 'Dragapult', unlock: 15 },
+  { id: 645, ko: '랜드로스', en: 'Landorus', unlock: 15 },
+  { id: 646, ko: '큐레무', en: 'Kyurem', unlock: 15 },
+  { id: 800, ko: '네크로즈마', en: 'Necrozma', unlock: 15 },
+  { id: 890, ko: '무한다이노', en: 'Eternatus', unlock: 15 },
 ];
 
 /** 이 레벨에서 열려 있는 명단 */

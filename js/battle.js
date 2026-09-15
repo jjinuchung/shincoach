@@ -45,21 +45,21 @@ export const DAMAGE = {
 
 // 명단 60마리의 타입 (pokemon.js ROSTER 순서와 무관, id 기준. 없으면 normal)
 export const TYPE_OF = {
-  25: 'electric', 26: 'electric', 135: 'electric', 145: 'electric', 644: 'electric',
-  4: 'fire', 6: 'fire', 58: 'fire', 59: 'fire', 136: 'fire', 146: 'fire', 155: 'fire', 250: 'fire', 643: 'fire',
-  7: 'water', 9: 'water', 54: 'water', 129: 'water', 130: 'water', 134: 'water', 158: 'water', 382: 'water', 393: 'water', 484: 'water', 658: 'water',
-  1: 'grass', 3: 'grass', 152: 'grass', 251: 'grass',
-  39: 'fairy', 175: 'fairy', 700: 'fairy', 716: 'fairy', 888: 'fairy',
-  52: 'normal', 113: 'normal', 133: 'normal', 143: 'normal', 493: 'normal',
-  94: 'ghost', 487: 'ghost', 778: 'ghost',
-  131: 'ice', 144: 'ice',
-  149: 'dragon', 384: 'dragon', 445: 'dragon',
-  150: 'psychic', 151: 'psychic', 196: 'psychic', 249: 'psychic', 282: 'psychic',
-  448: 'fighting', 68: 'fighting',
+  25: 'electric', 26: 'electric', 135: 'electric', 145: 'electric', 644: 'electric', 172: 'electric', 179: 'electric', 125: 'electric',
+  4: 'fire', 6: 'fire', 58: 'fire', 59: 'fire', 136: 'fire', 146: 'fire', 155: 'fire', 250: 'fire', 643: 'fire', 5: 'fire', 37: 'fire', 257: 'fire',
+  7: 'water', 9: 'water', 54: 'water', 129: 'water', 130: 'water', 134: 'water', 158: 'water', 382: 'water', 393: 'water', 484: 'water', 658: 'water', 8: 'water', 194: 'water', 116: 'water', 260: 'water', 91: 'water',
+  1: 'grass', 3: 'grass', 152: 'grass', 251: 'grass', 2: 'grass', 187: 'grass',
+  39: 'fairy', 175: 'fairy', 700: 'fairy', 716: 'fairy', 888: 'fairy', 35: 'fairy',
+  52: 'normal', 113: 'normal', 133: 'normal', 143: 'normal', 493: 'normal', 12: 'normal', 19: 'normal', 123: 'normal', 137: 'normal',
+  94: 'ghost', 487: 'ghost', 778: 'ghost', 92: 'ghost',
+  131: 'ice', 144: 'ice', 220: 'ice', 646: 'ice',
+  149: 'dragon', 384: 'dragon', 445: 'dragon', 147: 'dragon', 148: 'dragon', 373: 'dragon', 380: 'dragon', 381: 'dragon', 887: 'dragon', 890: 'dragon',
+  150: 'psychic', 151: 'psychic', 196: 'psychic', 249: 'psychic', 282: 'psychic', 280: 'psychic', 63: 'psychic', 65: 'psychic', 386: 'psychic', 800: 'psychic',
+  448: 'fighting', 68: 'fighting', 447: 'fighting', 66: 'fighting',
   197: 'dark',
-  95: 'rock', 248: 'rock',
-  104: 'ground', 383: 'ground',
-  483: 'steel',
+  95: 'rock', 248: 'rock', 246: 'rock', 142: 'rock',
+  104: 'ground', 383: 'ground', 645: 'ground',
+  483: 'steel', 212: 'steel', 376: 'steel',
 };
 
 export function typeOf(id) {
