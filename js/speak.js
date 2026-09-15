@@ -79,7 +79,29 @@ function editDistance(a, b) {
 }
 
 /**
- * 원문과 인식 결과 비교 → { matched, total, ratio, passed, matchedWords, contentMatched }
+ * 화면에 보여줄 단어별 결과 → [{ text, ok, skip }]
+ * text는 원문 그대로("Where", "going?") — 아이가 자막에서 본 모습과 같아야 한다.
+ * 토큰은 공백 기준이라 srt.wordTimings와 자리가 1:1로 맞는다 (단어 하나만 다시 듣기에 쓴다).
+ * "well-known"처럼 한 토큰이 비교용으로는 두 단어가 되는 경우, 둘 다 맞아야 ok.
+ */
+export function wordResults(target, transcript) {
+  const score = scoreTranscript(target, transcript);
+  const out = [];
+  let i = 0;
+  const raws = String(target).split(/\s+/).filter(Boolean);
+  for (const raw of raws) {
+    const n = normalizeWords(raw).length;
+    if (n === 0) { out.push({ text: raw, ok: true, skip: true }); continue; } // 비교 대상이 아닌 토큰(구두점만)
+    let ok = true;
+    for (let k = 0; k < n; k++) { if (!score.hits[i + k]) ok = false; }
+    i += n;
+    out.push({ text: raw, ok, skip: false });
+  }
+  return out;
+}
+
+/**
+ * 원문과 인식 결과 비교 → { matched, total, ratio, passed, matchedWords, contentMatched, hits }
  * 통과 기준:
  *  - 1~2단어 문장: 1단어 이상
  *  - 그 외: 일치율 ≥ 40%  또는  (2단어 이상 일치 + 그중 내용어 1개 이상, 6단어 이하 문장)
@@ -91,10 +113,12 @@ export function scoreTranscript(target, transcript) {
   const sw = normalizeWords(transcript);
   const used = new Array(sw.length).fill(false);
   const matchedWords = [];
+  const hits = []; // 원문 단어 자리마다 맞았는지 — 같은 단어가 두 번 나와도 자리를 구분한다
   let matched = 0;
   for (const w of tw) {
     let hit = -1;
     for (let i = 0; i < sw.length; i++) { if (!used[i] && similarWord(w, sw[i])) { hit = i; break; } }
+    hits.push(hit >= 0);
     if (hit >= 0) { used[hit] = true; matched++; matchedWords.push(w); }
   }
   const total = tw.length;
@@ -104,7 +128,7 @@ export function scoreTranscript(target, transcript) {
   if (total === 0) passed = true;
   else if (total <= 2) passed = matched >= 1;
   else passed = ratio >= PASS_RATIO || (matched >= 2 && contentMatched >= 1 && total <= 6) || (matched >= 3 && contentMatched >= 1);
-  return { matched, total, ratio, passed, matchedWords, contentMatched };
+  return { matched, total, ratio, passed, matchedWords, contentMatched, hits };
 }
 
 /**

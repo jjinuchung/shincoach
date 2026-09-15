@@ -5,19 +5,24 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { pickReviews, reviewSummary, roundReward, REWARD } from '../js/review.js';
+import { wordResults } from '../js/speak.js';
+import { wordTimings as realWordTimings } from '../js/srt.js';
 
 function makeEl() {
   const listeners = {};
-  return {
-    hidden: false, textContent: '', innerHTML: '', className: '', dataset: {}, value: '', checked: false, children: [],
+  const el = {
+    hidden: false, textContent: '', className: '', dataset: {}, value: '', checked: false, children: [],
     style: {}, firstChild: { textContent: '' }, scrollTop: 0, clientHeight: 100, offsetTop: 0, offsetHeight: 20,
     classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, toggle(c, f) { const on = f === undefined ? !this._s.has(c) : !!f; if (on) this._s.add(c); else this._s.delete(c); return on; }, contains(c) { return this._s.has(c); } },
     addEventListener(t, fn) { (listeners[t] ||= []).push(fn); },
     removeEventListener() {},
-    appendChild() {}, querySelector() { return null; }, querySelectorAll() { return []; },
+    appendChild(c) { if (c) this.children.push(c); return c; }, querySelector() { return null; }, querySelectorAll() { return []; },
     scrollTo() {}, showModal() {}, close() {},
     _fire(t, ev) { (listeners[t] || []).forEach((fn) => fn(ev)); },
   };
+  // innerHTML = '' 는 자식을 비우는 뜻으로만 쓴다 (실제 파싱은 안 함)
+  Object.defineProperty(el, 'innerHTML', { get() { return ''; }, set(v) { if (!v) el.children.length = 0; }, configurable: true });
+  return el;
 }
 
 function loadPlayer() {
@@ -44,6 +49,7 @@ function loadPlayer() {
   const battleState = { roll: false, caught: {}, won: [], lost: [] };
   const reviewCalls = [];
   const reviewState = { stats: [], sentences: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
+  const missedLog = [];
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
@@ -66,7 +72,9 @@ function loadPlayer() {
       statsList: () => reviewState.stats, review(cue, passed) { reviewState.reviewed.push({ start: cue.start, passed }); return { box: 1, graduated: false }; },
       todayReviewSentences: () => reviewState.sentences, todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
       reviewGoldenTaken: () => reviewState.golden, markReviewGolden() { reviewState.golden = true; },
-      todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; } },
+      todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; },
+      // 🎯 못 말한 단어 기록
+      missedWords(cue, words) { missedLog.push(words.slice()); } },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
     puzzleCalls,
     initPuzzle() {}, closePuzzle() {},
@@ -108,10 +116,12 @@ function loadPlayer() {
     pickReviews, reviewSummary, roundReward, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
+    // 🎯 말하기 단어별 결과: 실제 모듈을 그대로 씀
+    wordResults,
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, missedLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -351,7 +361,7 @@ test('말하기 확인: 미달이면 원문 다시 재생 후 재시도, 3번 �
     run('skipShadowWait()'); await tick();
     assert.equal(run('state.speakFails'), n);
     assert.equal(run('state.speakPassed'), false);
-    await new Promise((r) => setTimeout(r, 1700)); // 원문 다시 재생
+    await new Promise((r) => setTimeout(r, 2800)); // 원문 다시 재생 (못 말한 단어를 볼 시간 2.6초 뒤)
     assert.equal(video.currentTime, 0, `${n}번째 미달 → 처음부터 다시`);
     assert.equal(video.paused, false);
   }
@@ -1111,4 +1121,56 @@ test('🔁 복습 중에는 플레이어 단축키가 먹지 않는다', () => {
   run('state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = 0; state.reviewOpen = true;');
   run('onKeyDown({ key: "ArrowRight", target: { tagName: "BODY" }, preventDefault() {} })');
   assert.equal(run('state.idx'), 0);
+});
+
+// ── 🎯 말하기 단어별 결과 ──
+
+test('🎯 미달이면 단어별 결과를 보여주고, 못 말한 단어만 누를 수 있다', async () => {
+  const miss = { passed: false, method: 'speech', transcript: 'i walking the door', score: { matched: 4, total: 6, ratio: 0.66 } };
+  const { run, els } = loadPlayerWithSpeak([miss]);
+  run('state.cues = [{start:0,end:2,en:"I was walking through the door.",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  run('video.currentTime = 2; onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  const box = els['shadow-words'];
+  assert.equal(box.hidden, false, '단어별 결과가 보여야 함');
+  assert.equal(box.children.length, 6);
+  assert.deepEqual(box.children.map((c) => c.textContent), ['I', 'was', 'walking', 'through', 'the', 'door.']);
+  // 맞은 단어는 누를 수 없고(disabled), 못 말한 단어만 누를 수 있다
+  assert.deepEqual(box.children.map((c) => !!c.disabled), [true, false, true, false, true, true]);
+  assert.ok(box.children[1].className.includes('miss'));
+  assert.ok(box.children[0].className.includes('ok'));
+});
+
+test('🎯 못 말한 단어를 누르면 그 구간만 재생하고 자동 진행이 미뤄진다', async () => {
+  const miss = { passed: false, method: 'speech', transcript: 'i the door', score: { matched: 3, total: 6, ratio: 0.5 } };
+  const { run, els, video, ctx } = loadPlayerWithSpeak([miss]);
+  ctx.wordTimings = realWordTimings; // 단어 시간은 실제 모듈로 (글자 수 비례 추정)
+  run('state.cues = [{start:0,end:3,en:"I was walking through the door.",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  run('video.currentTime = 3; onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  const box = els['shadow-words'];
+  const before = run('state.shadowTimer');
+  box.children[1]._fire('click'); // "was"
+  assert.ok(run('state.wordPlayUntil') > 0, '그 단어 끝에서 멈추도록 예약');
+  assert.ok(video.currentTime < 3, '문장 앞쪽 그 단어 위치로 이동');
+  assert.equal(video.paused, false);
+  assert.notEqual(run('state.shadowTimer'), before, '자동 진행 타이머가 다시 세어짐');
+
+  // 단어 끝에 닿으면 멈추고, 문장 상태는 건드리지 않는다
+  run(`video.currentTime = state.wordPlayUntil + 0.01; onTick();`);
+  assert.equal(video.paused, true);
+  assert.equal(run('state.wordPlayUntil'), 0);
+  assert.equal(run('state.idx'), 0, '다음 문장으로 넘어가지 않음');
+});
+
+test('🎯 소리 길이로만 판정한 기기(인식 없음)에서는 단어별 결과를 숨긴다', async () => {
+  const energy = { passed: false, method: 'energy', transcript: '', score: null };
+  const { run, els } = loadPlayerWithSpeak([energy]);
+  run('state.cues = [{start:0,end:2,en:"I was walking.",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  run('video.currentTime = 2; onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.equal(els['shadow-words'].hidden, true);
 });

@@ -198,6 +198,26 @@ export async function renderStats() {
   }
   main.appendChild(c3);
 
+  // 3-1) 🎯 자주 놓치는 단어 — 따라 말하기에서 반복해서 안 나온 단어
+  const missCount = {};
+  for (const r of records) {
+    for (const w of Object.keys(r.missed || {})) missCount[w] = (missCount[w] || 0) + r.missed[w];
+  }
+  const missTop = Object.keys(missCount).sort((a, b) => missCount[b] - missCount[a]).slice(0, 12);
+  if (missTop.length) {
+    const c3b = card('자주 놓치는 단어 — 따라 말할 때 안 들린 단어');
+    const box = el('div', 'stats-missed');
+    for (const w of missTop) {
+      const chip = el('span', 'stats-missed-chip');
+      chip.appendChild(el('b', '', w));
+      chip.appendChild(el('span', 'n', ` ${missCount[w]}회`));
+      box.appendChild(chip);
+    }
+    c3b.appendChild(box);
+    c3b.appendChild(el('p', 'stats-note', '아이가 이 단어들을 말할 때 소리가 안 잡혀요. 발음이 어려운 소리(th, r/l, 과거형 -ed)가 모이면 같이 연습해 보세요.'));
+    main.appendChild(c3b);
+  }
+
   // 4) 복습 단어장
   const c4 = card('복습 단어장 — 아이가 찾아본 단어');
   const vv = vocabViews.filter((v) => v.taps > 0 || v.views > 1).sort((a, b) => (b.taps - a.taps) || (b.views - a.views) || (b.lastAt - a.lastAt)).slice(0, 40);

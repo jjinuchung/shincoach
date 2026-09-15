@@ -146,6 +146,20 @@ export function review(cue, passed) {
   return { box: r.box, dueAt: r.dueAt, graduated: r.box >= GRADUATED };
 }
 
+/**
+ * 🎯 따라 말할 때 못 말한 단어 (소문자 기준으로 누적).
+ * 자주 놓치는 소리를 부모가 볼 수 있게 — 문장 기록 안에 { 단어: 횟수 }로 둔다.
+ */
+export function missedWords(cue, words) {
+  const r = rec(cue); if (!r || !words || !words.length) return;
+  if (!r.missed) r.missed = {};
+  for (const w of words) {
+    const k = String(w).toLowerCase().replace(/[^a-z0-9']+/g, '');
+    if (!k) continue;
+    r.missed[k] = (r.missed[k] || 0) + 1;
+  }
+}
+
 /** 현재 콘텐츠의 문장 기록 전부 (복습 대상 고르기·현황 표시용) */
 export function statsList() {
   return [...t.stats.values()];

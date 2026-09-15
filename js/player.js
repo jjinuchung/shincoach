@@ -6,7 +6,7 @@ import {
 } from './srt.js';
 import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
-import { runSpeakCheck, prepareMic, releaseMic, resetRecognition } from './speak.js';
+import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory } from './xp.js';
@@ -68,6 +68,8 @@ const state = {
   sentenceSpeakStop: null, // ⚔️ 배틀·🔁 복습에서 진행 중인 듣기·말하기를 밖에서 중단하는 함수 (화면 꺼짐 → 그 턴 무효)
   reviewOpen: false,   // 🔁 복습 화면이 열려 있음 (키보드 무시)
   practiceOpen: false, // ⚙ 연습 중 (퍼즐·복습·배틀·잡기) — 학습 시간·기록을 쌓지 않음
+  wordPlayUntil: 0,    // 🎯 단어 하나만 다시 듣는 중이면 그 끝 시각(초) — 여기까지 재생하고 멈춤
+  resultDelay: null,   // 결과 화면의 자동 진행 타이머를 다시 세는 함수 (단어를 누를 때마다). 반복 신호인 state.shadowNext와는 다른 것
   reviewDone: false,   // 이번에 연 콘텐츠에서 복습을 이미 제안했는지 (한 번 열 때 한 번만)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
@@ -1084,6 +1086,11 @@ function stopLoop() {
 function onTick() {
   if (state.seeking) return; // 탐색 완료 전에는 시간이 신뢰할 수 없음
   const t = video.currentTime;
+  // 🎯 단어 하나만 다시 듣는 중: 그 끝에서 멈추기만 하고 문장 상태는 건드리지 않음
+  if (state.wordPlayUntil) {
+    if (t >= state.wordPlayUntil) { video.pause(); state.wordPlayUntil = 0; }
+    return;
+  }
   // 🧩 퍼즐이 열려 있는 동안: 🔊 다시 듣기 구간이 끝나면 멈추기만 하고 문장 상태는 건드리지 않음
   if (state.puzzleCue) {
     if (state.puzzlePlaying && t >= state.puzzleCue.end - END_EPS) {
@@ -1295,6 +1302,9 @@ function cancelShadowWait() {
   if (state.shadowRaf) cancelAnimationFrame(state.shadowRaf);
   state.shadowTimer = null;
   state.shadowRaf = null;
+  state.resultDelay = null;
+  state.wordPlayUntil = 0;
+  $('shadow-words').hidden = true;
   if (state.speakRun) { const r = state.speakRun; state.speakRun = null; r.cancelled = true; r.cancel(); }
   const overlay = $('shadow-overlay');
   overlay.hidden = true;
@@ -1363,6 +1373,61 @@ function srNote(result) {
   return `🎙 인식 안 됨(${why}) — 말소리 길이로 판정`;
 }
 
+/**
+ * 🎯 단어 하나만 다시 듣기 — 못 말한 단어를 눌렀을 때.
+ * 노래는 실제 단어 시간(VTT 노래방 태그), 영화는 글자 수 비례 추정이라 앞뒤로 조금 여유를 준다.
+ */
+function playWord(cue, idx) {
+  const times = wordTimings(cue);
+  const w = times[idx];
+  if (!w) return;
+  const pad = 0.12;
+  const from = Math.max(cue.start, w.start - pad);
+  const to = Math.min(cue.end, (w.end || w.start + 0.4) + pad);
+  state.wordPlayUntil = to;
+  video.currentTime = from;
+  safePlay();
+  startLoop(); // 결과 화면에서는 rAF 루프가 멈춰 있을 수 있음
+  if (state.resultDelay) state.resultDelay(); // 듣는 동안은 다음으로 안 넘어가게 타이머를 미룸
+}
+
+/** 결과 화면에서 "잠시 뒤 자동 진행" 타이머 — 단어를 누를 때마다 다시 센다 */
+function scheduleAfterResult(fn, ms) {
+  state.resultDelay = () => {
+    if (state.shadowTimer) clearTimeout(state.shadowTimer);
+    state.shadowTimer = setTimeout(() => { state.resultDelay = null; fn(); }, ms);
+  };
+  state.resultDelay();
+}
+
+/**
+ * 🎯 말하기 결과를 단어별로 보여준다. 못 말한 단어는 흐리게 + 누르면 그 부분만 다시 재생.
+ * 어느 단어가 안 됐는지 알려주면 문장 전체를 다시 하는 것보다 빨리 교정된다.
+ */
+function renderSpeakWords(cue, result) {
+  const box = $('shadow-words');
+  box.innerHTML = '';
+  if (!cue || !result || result.method !== 'speech' || !result.score || !result.score.total) { box.hidden = true; return; }
+  const words = wordResults(cue.en, result.transcript || '');
+  const missed = [];
+  words.forEach((w, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `sw-word${w.ok ? ' ok' : ' miss'}`;
+    b.textContent = w.text;
+    if (!w.ok && !w.skip) {
+      missed.push(w.text);
+      b.title = '눌러서 이 부분만 다시 듣기';
+      b.addEventListener('click', () => { unlock(); playWord(cue, i); });
+    } else {
+      b.disabled = true;
+    }
+    box.appendChild(b);
+  });
+  box.hidden = false;
+  if (missed.length) track.missedWords(cue, missed); // 📊 자주 놓치는 단어
+}
+
 function onSpeakResult(cue, result) {
   const msg = $('shadow-msg');
   const sub = $('shadow-sub');
@@ -1388,11 +1453,13 @@ function onSpeakResult(cue, result) {
     if (result.method === 'speech' && result.score) {
       msg.textContent = result.score.ratio >= 0.8 ? '🌟 완벽해요!' : '🎯 잘했어요!';
       sub.textContent = `${result.score.matched}/${result.score.total} 단어 맞음: "${result.transcript}"`;
+      renderSpeakWords(cue, result);
     } else {
       msg.textContent = '👍 잘했어요!';
       sub.textContent = srNote(result); // 인식 없이 소리 길이로만 통과했음을 부모가 알 수 있게
     }
-    state.shadowTimer = setTimeout(afterShadowWait, 1400);
+    const anyMiss = !!(result.score && result.score.matched < result.score.total);
+    scheduleAfterResult(afterShadowWait, anyMiss ? 2800 : 1400);
     return;
   }
 
@@ -1403,23 +1470,30 @@ function onSpeakResult(cue, result) {
     hpPenalty(HP.speakSkipped, '따라 말하기를 넘겼어요');
     msg.textContent = '👍 괜찮아요, 넘어갈게요';
     sub.textContent = result.transcript ? `들린 말: "${result.transcript}"` : '';
-    state.shadowTimer = setTimeout(afterShadowWait, 1400);
+    renderSpeakWords(cue, result);
+    scheduleAfterResult(afterShadowWait, 2800);
     return;
   }
   track.speak(cue, { passed: false, skipped: false, score: result.score });
   msg.textContent = `🔁 다시 한번! (${state.speakFails}/3)`;
+  renderSpeakWords(cue, result); // 어느 단어가 안 됐는지 보고 다시 하게
+  const missed = result.method === 'speech' && result.score && result.score.matched < result.score.total;
   sub.textContent = result.method === 'speech'
-    ? (result.transcript ? `들린 말: "${result.transcript}" — 잘 듣고 따라 해봐요` : '말소리를 못 들었어요 — 조금 더 크게, 또렷하게')
+    ? (missed ? '🔊 표시된 단어를 눌러 그 부분만 다시 들어봐요'
+      : result.transcript ? `들린 말: "${result.transcript}" — 잘 듣고 따라 해봐요` : '말소리를 못 들었어요 — 조금 더 크게, 또렷하게')
     : `조금 더 크게, 길게 말해봐요 ${srNote(result)}`;
   // 잠시 보여준 뒤 원문 다시 들려주기 → 끝나면 다시 말하기 확인
-  state.shadowTimer = setTimeout(() => {
+  // (못 말한 단어를 눌러보는 동안은 넘어가지 않는다 — scheduleAfterResult가 타이머를 다시 센다)
+  scheduleAfterResult(() => {
     state.shadowTimer = null;
+    state.wordPlayUntil = 0;
     const ov = $('shadow-overlay');
     ov.hidden = true;
     ov.classList.remove('speaking');
+    $('shadow-words').hidden = true;
     video.currentTime = cue.start;
     safePlay();
-  }, 1600);
+  }, 2600); // 못 말한 단어를 발견할 정도의 시간 — 누르기 시작하면 타이머가 계속 미뤄진다
 }
 
 // ───────────────────── 자막 렌더링 ─────────────────────
