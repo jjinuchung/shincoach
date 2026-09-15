@@ -199,9 +199,14 @@ export async function renderStats() {
   main.appendChild(c3);
 
   // 3-1) 🎯 자주 놓치는 단어 — 따라 말하기에서 반복해서 안 나온 단어
-  const missCount = {};
+  const missCount = Object.create(null); // 'constructor' 같은 단어가 상속 속성에 걸리지 않게
   for (const r of records) {
-    for (const w of Object.keys(r.missed || {})) missCount[w] = (missCount[w] || 0) + r.missed[w];
+    const m = r.missed || {};
+    for (const w of Object.keys(m)) {
+      const n = m[w];
+      if (!Number.isFinite(n)) continue;
+      missCount[w] = (missCount[w] || 0) + n;
+    }
   }
   const missTop = Object.keys(missCount).sort((a, b) => missCount[b] - missCount[a]).slice(0, 12);
   if (missTop.length) {
@@ -214,7 +219,7 @@ export async function renderStats() {
       box.appendChild(chip);
     }
     c3b.appendChild(box);
-    c3b.appendChild(el('p', 'stats-note', '아이가 이 단어들을 말할 때 소리가 안 잡혀요. 발음이 어려운 소리(th, r/l, 과거형 -ed)가 모이면 같이 연습해 보세요.'));
+    c3b.appendChild(el('p', 'stats-note', '지금까지 음성 인식에 안 잡힌 누적 횟수예요(지금 발음이 나쁘다는 뜻은 아닙니다). 많이 나온 단어일수록 위에 오니, 같은 소리(th, r/l, 과거형 -ed)가 모이면 같이 연습해 보세요.'));
     main.appendChild(c3b);
   }
 

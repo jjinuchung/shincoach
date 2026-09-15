@@ -380,7 +380,10 @@ export function mergeStatRecord(name, cur, rec) {
     // 🎯 못 말한 단어 { 단어: 횟수 }는 단어마다 큰 값 (기기를 옮겨도 약점이 남게)
     if (cur.missed || rec.missed) {
       out.missed = { ...(cur.missed || {}) };
-      for (const w of Object.keys(rec.missed || {})) out.missed[w] = maxOf(out.missed[w], rec.missed[w]);
+      for (const w of Object.keys(rec.missed || {})) {
+        const a = Object.prototype.hasOwnProperty.call(out.missed, w) ? out.missed[w] : 0;
+        out.missed[w] = maxOf(Number.isFinite(a) ? a : 0, rec.missed[w]);
+      }
     }
   } else if (name === 'daily') {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];

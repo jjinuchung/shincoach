@@ -89,3 +89,31 @@ test('scoreTranscript: hits 배열이 원문 단어 수와 같고 matched와 일
   assert.equal(s.hits.length, s.total);
   assert.equal(s.hits.filter(Boolean).length, s.matched);
 });
+
+test('🎯 [Codex #3] 굽은 아포스트로피와 감싼 따옴표를 통일한다', () => {
+  assert.deepEqual(normalizeWords('Don’t go'), ["don't", 'go'], '굽은 ’ → 곧은 \'');
+  assert.deepEqual(normalizeWords("'hello'"), ['hello'], '감싼 따옴표 제거');
+  assert.deepEqual(normalizeWords("' hello"), ['hello'], '단독 따옴표는 채점 대상 아님');
+  // 아이가 제대로 말했는데 틀린 것으로 나오면 안 된다
+  assert.ok(wordResults('Don’t go, Woody!', "don't go woody").every((w) => w.ok));
+});
+
+test('🎯 [Codex #4] 정확히 맞는 자리를 우선한다 (순서 보존 정렬)', () => {
+  // "walk"라고 말했으면 앞의 walking이 아니라 정확히 같은 뒤의 walk가 맞은 것
+  const r = wordResults('walking walk', 'walk');
+  assert.deepEqual(r.map((w) => w.ok), [false, true]);
+});
+
+test('🎯 [Codex #5] missed는 화면 토큰이 아니라 실제로 못 말한 단어', () => {
+  const r = wordResults('A well-known face.', 'a well face');
+  assert.equal(r[1].text, 'well-known', '화면에는 원문 그대로');
+  assert.deepEqual(r[1].missed, ['known'], '기록에는 실제 누락 단어만');
+  assert.deepEqual(r.flatMap((w) => w.missed), ['known']);
+});
+
+test('🎯 통과 판정 기준은 그대로 (자리 정렬은 표시용)', () => {
+  // 순서 정렬을 도입해도 기존 통과/미달 판정이 달라지면 안 된다
+  assert.equal(scoreTranscript('I am a toy.', 'i am a toy').passed, true);
+  assert.equal(scoreTranscript('Where are you going now?', 'i you').passed, false, '대명사만으로는 통과 못 함');
+  assert.equal(scoreTranscript('Let it go.', 'let it go').ratio, 1);
+});

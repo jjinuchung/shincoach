@@ -69,6 +69,7 @@ const state = {
   reviewOpen: false,   // 🔁 복습 화면이 열려 있음 (키보드 무시)
   practiceOpen: false, // ⚙ 연습 중 (퍼즐·복습·배틀·잡기) — 학습 시간·기록을 쌓지 않음
   wordPlayUntil: 0,    // 🎯 단어 하나만 다시 듣는 중이면 그 끝 시각(초) — 여기까지 재생하고 멈춤
+  wordPlayGuard: null, // 단어 재생이 어떤 이유로 끝나지 않을 때를 대비한 안전장치
   resultDelay: null,   // 결과 화면의 자동 진행 타이머를 다시 세는 함수 (단어를 누를 때마다). 반복 신호인 state.shadowNext와는 다른 것
   reviewDone: false,   // 이번에 연 콘텐츠에서 복습을 이미 제안했는지 (한 번 열 때 한 번만)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
@@ -1088,7 +1089,7 @@ function onTick() {
   const t = video.currentTime;
   // 🎯 단어 하나만 다시 듣는 중: 그 끝에서 멈추기만 하고 문장 상태는 건드리지 않음
   if (state.wordPlayUntil) {
-    if (t >= state.wordPlayUntil) { video.pause(); state.wordPlayUntil = 0; }
+    if (t >= state.wordPlayUntil) endWordPlay();
     return;
   }
   // 🧩 퍼즐이 열려 있는 동안: 🔊 다시 듣기 구간이 끝나면 멈추기만 하고 문장 상태는 건드리지 않음
@@ -1304,6 +1305,8 @@ function cancelShadowWait() {
   state.shadowRaf = null;
   state.resultDelay = null;
   state.wordPlayUntil = 0;
+  clearTimeout(state.wordPlayGuard);
+  state.wordPlayGuard = null;
   $('shadow-words').hidden = true;
   if (state.speakRun) { const r = state.speakRun; state.speakRun = null; r.cancelled = true; r.cancel(); }
   const overlay = $('shadow-overlay');
@@ -1388,7 +1391,21 @@ function playWord(cue, idx) {
   video.currentTime = from;
   safePlay();
   startLoop(); // 결과 화면에서는 rAF 루프가 멈춰 있을 수 있음
-  if (state.resultDelay) state.resultDelay(); // 듣는 동안은 다음으로 안 넘어가게 타이머를 미룸
+  // 다 들을 때까지 자동 진행을 아예 멈춘다 — 탭 시점부터 세면 긴 단어·느린 속도에서 도중에 넘어간다 (Codex #2)
+  if (state.shadowTimer) { clearTimeout(state.shadowTimer); state.shadowTimer = null; }
+  // 재생이 시작되지 않거나 영상이 끝나 onTick이 안 도는 경우를 대비한 안전장치
+  clearTimeout(state.wordPlayGuard);
+  const budget = ((to - from) / (video.playbackRate || 1)) * 1000 + 2500;
+  state.wordPlayGuard = setTimeout(() => { endWordPlay(); }, budget);
+}
+
+/** 단어 다시 듣기 끝 — 멈추고, 그제서야 자동 진행 대기를 다시 센다 */
+function endWordPlay() {
+  clearTimeout(state.wordPlayGuard);
+  state.wordPlayGuard = null;
+  state.wordPlayUntil = 0;
+  if (!video.paused) video.pause();
+  if (state.resultDelay) state.resultDelay();
 }
 
 /** 결과 화면에서 "잠시 뒤 자동 진행" 타이머 — 단어를 누를 때마다 다시 센다 */
@@ -1409,23 +1426,25 @@ function renderSpeakWords(cue, result) {
   box.innerHTML = '';
   if (!cue || !result || result.method !== 'speech' || !result.score || !result.score.total) { box.hidden = true; return; }
   const words = wordResults(cue.en, result.transcript || '');
-  const missed = [];
+  const missedNorm = []; // 기록용: "well-known"이 아니라 실제로 못 말한 "known" (Codex #5)
   words.forEach((w, i) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `sw-word${w.ok ? ' ok' : ' miss'}`;
     b.textContent = w.text;
     if (!w.ok && !w.skip) {
-      missed.push(w.text);
+      for (const n of w.missed) missedNorm.push(n);
       b.title = '눌러서 이 부분만 다시 듣기';
-      b.addEventListener('click', () => { unlock(); playWord(cue, i); });
+      // 결과 화면(shadow-overlay)에는 "탭하면 건너뛰기" 핸들러가 있다 —
+      // 전파를 막지 않으면 단어를 누르는 순간 다음 문장으로 넘어간다 (Codex #1)
+      b.addEventListener('click', (e) => { e.stopPropagation(); unlock(); playWord(cue, i); });
     } else {
       b.disabled = true;
     }
     box.appendChild(b);
   });
   box.hidden = false;
-  if (missed.length) track.missedWords(cue, missed); // 📊 자주 놓치는 단어
+  if (missedNorm.length) track.missedWords(cue, missedNorm); // 📊 자주 놓치는 단어
 }
 
 function onSpeakResult(cue, result) {

@@ -8,6 +8,18 @@ import { pickReviews, reviewSummary, roundReward, REWARD } from '../js/review.js
 import { wordResults } from '../js/speak.js';
 import { wordTimings as realWordTimings } from '../js/srt.js';
 
+/**
+ * 클릭이 부모(shadow-overlay)까지 전파되는 것을 모사한다.
+ * 스텁의 _fire는 그 요소의 핸들러만 부르기 때문에, 전파로 생기는 버그를 놓친다 (Codex #1).
+ */
+function clickWithBubble(child, parent) {
+  let stopped = false;
+  const ev = { stopPropagation() { stopped = true; }, preventDefault() {} };
+  child._fire('click', ev);
+  if (!stopped) parent._fire('click', ev);
+  return stopped;
+}
+
 function makeEl() {
   const listeners = {};
   const el = {
@@ -1152,7 +1164,7 @@ test('🎯 못 말한 단어를 누르면 그 구간만 재생하고 자동 진�
   run('skipShadowWait()'); await tick();
   const box = els['shadow-words'];
   const before = run('state.shadowTimer');
-  box.children[1]._fire('click'); // "was"
+  box.children[1]._fire('click', { stopPropagation() {}, preventDefault() {} }); // "was"
   assert.ok(run('state.wordPlayUntil') > 0, '그 단어 끝에서 멈추도록 예약');
   assert.ok(video.currentTime < 3, '문장 앞쪽 그 단어 위치로 이동');
   assert.equal(video.paused, false);
@@ -1173,4 +1185,52 @@ test('🎯 소리 길이로만 판정한 기기(인식 없음)에서는 단어�
   run('video.currentTime = 2; onCueEnd()');
   run('skipShadowWait()'); await tick();
   assert.equal(els['shadow-words'].hidden, true);
+});
+
+test('🎯 [Codex #1] 단어를 눌러도 결과 화면이 닫히거나 다음 문장으로 넘어가지 않는다', async () => {
+  const miss = { passed: true, method: 'speech', transcript: 'i the door', score: { matched: 3, total: 6, ratio: 0.5 } };
+  const { run, els, video, ctx } = loadPlayerWithSpeak([miss]);
+  ctx.wordTimings = realWordTimings;
+  run('state.cues = [{start:0,end:3,en:"I was walking through the door.",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  run('video.currentTime = 3; onCueEnd()');
+  run('skipShadowWait()'); await tick();
+
+  const box = els['shadow-words'];
+  const overlay = els['shadow-overlay'];
+  const stopped = clickWithBubble(box.children[1], overlay); // "was" — 부모까지 전파시켜 본다
+  assert.equal(stopped, true, '전파를 막아야 함');
+  assert.equal(run('state.idx'), 0, '다음 문장으로 넘어가면 안 됨');
+  assert.ok(run('state.wordPlayUntil') > 0, '단어 재생이 살아 있어야 함');
+});
+
+test('🎯 [Codex #2] 단어를 다 들은 뒤에야 자동 진행 대기가 시작된다', async () => {
+  const miss = { passed: true, method: 'speech', transcript: 'i the door', score: { matched: 3, total: 6, ratio: 0.5 } };
+  const { run, els, video, ctx } = loadPlayerWithSpeak([miss]);
+  ctx.wordTimings = realWordTimings;
+  run('state.cues = [{start:0,end:3,en:"I was walking through the door.",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  run('video.currentTime = 3; onCueEnd()');
+  run('skipShadowWait()'); await tick();
+
+  els['shadow-words'].children[1]._fire('click', { stopPropagation() {}, preventDefault() {} });
+  assert.equal(run('state.shadowTimer'), null, '듣는 동안에는 대기 타이머가 없어야 함');
+  assert.ok(run('state.wordPlayGuard'), '재생이 끝나지 않을 때를 대비한 안전장치');
+
+  run('video.currentTime = state.wordPlayUntil + 0.01; onTick();');
+  assert.equal(video.paused, true, '단어 끝에서 멈춤');
+  assert.equal(run('state.wordPlayUntil'), 0);
+  assert.equal(run('state.wordPlayGuard'), null, '안전장치 정리');
+  assert.ok(run('state.shadowTimer'), '이제서야 자동 진행 대기 시작');
+  assert.equal(run('state.idx'), 0);
+});
+
+test('🎯 [Codex #5] 기록에는 화면 토큰이 아니라 실제로 못 말한 단어를 남긴다', async () => {
+  const miss = { passed: false, method: 'speech', transcript: 'a well face', score: { matched: 3, total: 4, ratio: 0.75 } };
+  const { run, missedLog } = loadPlayerWithSpeak([miss]);
+  run('state.cues = [{start:0,end:2,en:"A well-known face.",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  run('video.currentTime = 2; onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.deepEqual(Array.from(missedLog[0]), ['known'], 'wellknown 같은 합성 단어가 아니라 실제 누락 단어'); // vm 배열이라 복사 후 비교
 });

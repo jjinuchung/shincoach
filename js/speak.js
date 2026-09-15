@@ -45,9 +45,20 @@ export function releaseMic() {
   micStream = null;
 }
 
-/** 텍스트 → 비교용 단어 배열 */
+/**
+ * 비교 전에 글자 모양을 통일한다.
+ * 자막에는 굽은 아포스트로피(’)가 흔한데 음성 인식은 곧은 것(')을 준다 —
+ * 통일하지 않으면 "Don’t"가 don·t로 쪼개져 아이가 제대로 말해도 틀린 것으로 나온다.
+ */
+function canon(text) {
+  return String(text).replace(/[‘’ʼ´`]/g, "'");
+}
+
+/** 텍스트 → 비교용 단어 배열 (영문자·숫자가 하나도 없는 토큰은 채점 대상이 아님) */
 export function normalizeWords(text) {
-  return String(text).toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter((w) => w.length > 0);
+  return canon(text).toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/)
+    .map((w) => w.replace(/^'+/, '').replace(/'+$/, '')) // 따옴표로 감싼 'hello' → hello
+    .filter((w) => /[a-z0-9]/.test(w));
 }
 
 /** 두 단어가 "비슷한" 발음/철자인지 (아이 발음 오차 허용) */
@@ -79,23 +90,59 @@ function editDistance(a, b) {
 }
 
 /**
+ * 원문 단어 자리 ↔ 들린 단어를 **순서를 지키며** 맞춘다 (피드백 전용).
+ *
+ * 통과 판정(scoreTranscript)은 "몇 개나 맞았나"만 보면 되지만, 화면에 "이 자리를 놓쳤다"고
+ * 표시하려면 자리가 맞아야 한다. 앞에서부터 먼저 걸리는 것을 소비하면
+ * "walking walk"를 "walk"라고 말했을 때 엉뚱하게 앞의 walking이 맞은 것으로 나온다.
+ * 그래서 정확히 같은 단어를 2점, 비슷한 단어를 1점으로 두고 점수가 가장 높은 정렬을 고른다.
+ * (같은 단어가 여러 번 나오면 어느 자리를 말한 것인지는 소리 없이는 알 수 없다 — 한계)
+ */
+function alignHits(tw, sw) {
+  const m = tw.length;
+  const n = sw.length;
+  const pair = (i, j) => (tw[i] === sw[j] ? 2 : (similarWord(tw[i], sw[j]) ? 1 : 0));
+  const dp = [];
+  for (let i = 0; i <= m; i++) dp.push(new Array(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      const s = pair(i, j);
+      dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1], s ? s + dp[i + 1][j + 1] : 0);
+    }
+  }
+  const hits = new Array(m).fill(false);
+  let i = 0;
+  let j = 0;
+  while (i < m && j < n) {
+    const s = pair(i, j);
+    if (s && dp[i][j] === s + dp[i + 1][j + 1]) { hits[i] = true; i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
+    else j++;
+  }
+  return hits;
+}
+
+/**
  * 화면에 보여줄 단어별 결과 → [{ text, ok, skip }]
  * text는 원문 그대로("Where", "going?") — 아이가 자막에서 본 모습과 같아야 한다.
  * 토큰은 공백 기준이라 srt.wordTimings와 자리가 1:1로 맞는다 (단어 하나만 다시 듣기에 쓴다).
  * "well-known"처럼 한 토큰이 비교용으로는 두 단어가 되는 경우, 둘 다 맞아야 ok.
  */
 export function wordResults(target, transcript) {
-  const score = scoreTranscript(target, transcript);
+  const tw = normalizeWords(target);
+  const sw = normalizeWords(transcript);
+  const hits = alignHits(tw, sw); // 통과 판정과 달리 자리를 지키는 정렬
   const out = [];
   let i = 0;
   const raws = String(target).split(/\s+/).filter(Boolean);
   for (const raw of raws) {
-    const n = normalizeWords(raw).length;
-    if (n === 0) { out.push({ text: raw, ok: true, skip: true }); continue; } // 비교 대상이 아닌 토큰(구두점만)
-    let ok = true;
-    for (let k = 0; k < n; k++) { if (!score.hits[i + k]) ok = false; }
-    i += n;
-    out.push({ text: raw, ok, skip: false });
+    const norm = normalizeWords(raw);
+    if (norm.length === 0) { out.push({ text: raw, ok: true, skip: true, missed: [] }); continue; } // 구두점·화자 표시 등
+    const missed = [];
+    for (let k = 0; k < norm.length; k++) { if (!hits[i + k]) missed.push(norm[k]); }
+    i += norm.length;
+    // missed는 기록용 — 화면 토큰("well-known")이 아니라 실제로 못 말한 단어("known")를 남긴다
+    out.push({ text: raw, ok: missed.length === 0, skip: false, missed });
   }
   return out;
 }
@@ -113,14 +160,14 @@ export function scoreTranscript(target, transcript) {
   const sw = normalizeWords(transcript);
   const used = new Array(sw.length).fill(false);
   const matchedWords = [];
-  const hits = []; // 원문 단어 자리마다 맞았는지 — 같은 단어가 두 번 나와도 자리를 구분한다
   let matched = 0;
   for (const w of tw) {
     let hit = -1;
     for (let i = 0; i < sw.length; i++) { if (!used[i] && similarWord(w, sw[i])) { hit = i; break; } }
-    hits.push(hit >= 0);
     if (hit >= 0) { used[hit] = true; matched++; matchedWords.push(w); }
   }
+  // 화면 표시용 자리 정보는 순서를 지키는 정렬로 따로 구한다 (통과 기준은 위 느슨한 셈 그대로)
+  const hits = alignHits(tw, sw);
   const total = tw.length;
   const ratio = total ? matched / total : 0;
   const contentMatched = matchedWords.filter((w) => !STOP_WORDS.has(w)).length;

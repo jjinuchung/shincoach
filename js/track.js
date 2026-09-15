@@ -156,7 +156,9 @@ export function missedWords(cue, words) {
   for (const w of words) {
     const k = String(w).toLowerCase().replace(/[^a-z0-9']+/g, '');
     if (!k) continue;
-    r.missed[k] = (r.missed[k] || 0) + 1;
+    // 일반 객체라 'constructor' 같은 단어는 상속 속성이 잡힌다 → 내 속성이고 숫자일 때만 더한다
+    const cur = Object.prototype.hasOwnProperty.call(r.missed, k) ? r.missed[k] : 0;
+    r.missed[k] = (Number.isFinite(cur) ? cur : 0) + 1;
   }
 }
 
