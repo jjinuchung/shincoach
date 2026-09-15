@@ -49,6 +49,7 @@ function rollDailyIfNeeded() {
     t.daily.puzzleSolved += existing.puzzleSolved || 0;
     t.daily.goalRewarded = !!(t.daily.goalRewarded || existing.goalRewarded);
     t.daily.hpMissed = !!(t.daily.hpMissed || existing.hpMissed);
+    t.daily.battles = (t.daily.battles || 0) + (existing.battles || 0);
     t.dailyDirty = true;
   }).catch(() => {});
 }
@@ -192,6 +193,16 @@ export function goalRewarded() {
 export function markGoalRewarded() {
   if (!t.daily) return;
   t.daily.goalRewarded = true;
+  t.dailyDirty = true;
+}
+
+/** ⚔️ 오늘 배틀 횟수 / 배틀 했다고 표시 (하루 상한용) */
+export function todayBattles() {
+  return t.daily ? (t.daily.battles || 0) : 0;
+}
+export function markBattle() {
+  if (!t.daily) return;
+  t.daily.battles = (t.daily.battles || 0) + 1;
   t.dailyDirty = true;
 }
 

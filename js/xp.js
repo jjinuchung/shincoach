@@ -266,6 +266,14 @@ export function addItem(id, n = 1) {
   return true;
 }
 
+/** 가방에서 하나 소모 (⚔️ 배틀 물약처럼 포켓몬 HP와 무관하게 쓰는 경우). 없으면 false */
+export function consumeItem(id) {
+  if ((profile.items[id] || 0) < 1) return false;
+  profile.items[id] -= 1;
+  addDelta({ items: { [id]: -1 } });
+  return true;
+}
+
 /** 🛒 구매: 코인이 모자라면 false. 코인 차감과 가방 추가를 한 증분으로 */
 export function buyItem(id) {
   const it = itemById(id);
@@ -359,6 +367,37 @@ export function applyDye(monId, dyeId) {
   profile.mons[monId] = { ...(profile.mons[monId] || {}), dye: dyeId || null };
   addDelta({ items, mons: { [monId]: { dye: dyeId || null } } });
   return true;
+}
+
+// ── ⚔️ 배틀 ──
+
+/** 포켓몬의 누적 패배 수 (3번이면 떠남) */
+export function lossesOf(monId) {
+  const m = profile.mons[monId];
+  return m && m.losses ? m.losses : 0;
+}
+
+/** 배틀 승리: 상대 포켓몬을 얻음 → { first } */
+export function battleWin(opponentId) {
+  const first = !profile.caught[opponentId];
+  profile.caught[opponentId] = (profile.caught[opponentId] || 0) + 1;
+  addDelta({ caught: { [opponentId]: 1 } });
+  return { first };
+}
+
+/** 배틀 패배: 그 포켓몬의 패배 +1, 정해진 횟수(lossesToLose)면 한 마리 잃고 패배 수 초기화 → { losses, lost } */
+export function battleLoss(monId, lossesToLose = 3) {
+  const cur = lossesOf(monId) + 1;
+  if (cur >= lossesToLose) {
+    const n = Math.max(0, (profile.caught[monId] || 0) - 1);
+    if (n > 0) profile.caught[monId] = n; else delete profile.caught[monId];
+    profile.mons[monId] = { ...(profile.mons[monId] || {}), losses: 0 };
+    addDelta({ caught: { [monId]: -1 }, mons: { [monId]: { losses: 0 } } });
+    return { losses: 0, lost: true };
+  }
+  profile.mons[monId] = { ...(profile.mons[monId] || {}), losses: cur };
+  addDelta({ mons: { [monId]: { losses: cur } } });
+  return { losses: cur, lost: false };
 }
 
 /** 백업 가져오기 뒤 다시 읽기 */

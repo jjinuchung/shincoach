@@ -39,6 +39,8 @@ function loadPlayer() {
   const itemLog = [];
   const hpLog = [];
   const hpState = { partner: null, hp: {}, opened: null };
+  const battleCalls = [];
+  const battleState = { roll: false, caught: {}, won: [], lost: [] };
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
@@ -56,7 +58,7 @@ function loadPlayer() {
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, hpMissedApplied: () => false, markHpMissed() {}, MASTER_RATIO: 0.8, puzzle() {} },
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, hpMissedApplied: () => false, markHpMissed() {}, todayBattles: () => 0, markBattle() {}, MASTER_RATIO: 0.8, puzzle() {} },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
     puzzleCalls,
     initPuzzle() {}, closePuzzle() {},
@@ -83,12 +85,21 @@ function loadPlayer() {
     getPartner: () => hpState.partner, hpOf: (id) => (hpState.hp[id] === undefined ? 100 : hpState.hp[id]), isTired: (id) => hpState.hp[id] === 0,
     changeHp: (id, d) => { const from = hpState.hp[id] === undefined ? 100 : hpState.hp[id]; const to = Math.max(0, Math.min(100, from + d)); hpState.hp[id] = to; hpLog.push(d); return { from, to }; },
     HP: { max: 100, revealed: -20, speakSkipped: -10, missedDay: -30, goalHeal: 20 }, setFigure() {}, openMon(m) { hpState.opened = m; },
+    // ⚔️ 배틀 스텁: 열린 배틀은 battleCalls에 기록, shouldBattle은 battleState.roll 로 제어
+    battleCalls, battleState,
+    initBattle() {}, abortBattle() {}, openBattle(o) { battleCalls.push(o); },
+    BATTLE: { chance: 0.03, maxPerDay: 1, minDoneToday: 5, hp: 100, winXp: 40, winCoins: 15, lossesToLose: 3 },
+    shouldBattle: ({ todayDone, todayBattles }) => battleState.roll && todayDone >= 5 && todayBattles < 1,
+    pickOpponent: (list, caught) => list.find((m) => !caught[m.id]) || null, eligibleMine: (ids, partner, tired) => ids.filter((id) => id !== partner && !(tired && tired(id))),
+    getProfileSnapshot: () => ({ caught: battleState.caught }), lossesOf: () => 0,
+    battleWin: (id) => { battleState.won.push(id); return { first: true }; }, battleLoss: (id) => { battleState.lost.push(id); return { losses: 1, lost: false }; },
+    consumeItem: () => true, inventory: () => ({}), POTION: [],
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -802,6 +813,51 @@ test('🗺️ 여행 길: 풍경은 콘텐츠 id로 고정, 진행에 따라 캐
   assert.ok(els['journey-walker'].style.left.includes('0.5'), '캐릭터가 절반 지점');
   const ahead = made.filter((e) => e.classList.contains('ahead')).length;
   assert.ok(ahead > 0 && ahead < made.length, '앞쪽 풍경만 안개');
+});
+
+test('⚔️ 배틀: 문장 완료 때 추첨 → 다음 전환에서 열림(퍼즐보다 먼저) → 승/패 반영 → 이동 이어감. 부모 모드·HP 끔이면 없음', () => {
+  const { run, els, video, puzzleCalls, battleCalls, battleState, xpLog, coinLog, ctx } = loadPlayer();
+  const keys = new Set();
+  ctx.track.done = (c) => keys.add(c.start);
+  ctx.track.todayDone = () => keys.size;
+  battleState.caught = { 25: 1, 4: 1 };
+  run('settings.listenFirst = 0; settings.puzzleEvery = 1; settings.dailyGoal = 0; state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }, { id: 7, ko: "꼬부기", url: "z" }]; state.cues = Array.from({ length: 8 }, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
+  for (let i = 0; i < 5; i++) run(`markDone(state.cues[${i}])`);
+  assert.equal(run('state.battlePending'), null, '추첨에 안 걸리면 없음');
+  battleState.roll = true;
+  run('markDone(state.cues[5])');
+  const pending = run('state.battlePending');
+  assert.ok(pending && pending.id === 7, '못 잡은 꼬부기가 상대');
+  run('goTo(6)');
+  assert.equal(battleCalls.length, 1, '전환 시 배틀 열림');
+  assert.equal(puzzleCalls.length, 0, '퍼즐보다 먼저');
+  assert.equal(run('state.battleOpen'), true);
+  assert.equal(run('state.idx'), 0, '끝날 때까지 이동 안 함');
+  assert.equal(video.paused, true);
+  const o = battleCalls[0];
+  assert.equal(o.opponent.id, 7);
+  assert.equal(o.mine.map((m) => m.id).sort().join(','), '25,4', '잡은 것 전부(파트너 없음)');
+  assert.equal(typeof o.nextCue().en, 'string', '따라 말할 문장');
+  // 승리 → 상대 획득 + ⚡40 💰15 → 이동 이어감
+  o.onDone({ outcome: 'win', my: o.mine.find((m) => m.id === 25), opponent: o.opponent, turns: 3 });
+  assert.deepEqual(battleState.won, [7]);
+  assert.ok(xpLog.includes(40) && coinLog.includes(15));
+  assert.equal(run('state.idx'), 6);
+  assert.equal(run('state.battleOpen'), false);
+  // 패배 → battleLoss
+  run('state.battlePending = { id: 7, ko: "꼬부기", url: "z" }; goTo(7)');
+  battleCalls[1].onDone({ outcome: 'lose', my: battleCalls[1].mine.find((m) => m.id === 4), opponent: battleCalls[1].opponent, turns: 5 });
+  assert.deepEqual(battleState.lost, [4]);
+  assert.equal(run('state.idx'), 7);
+  // 파트너는 내보낼 수 없음
+  ctx.getPartner = () => 25;
+  run('state.battlePending = { id: 7, ko: "꼬부기", url: "z" }; state.idx = 0; goTo(1)');
+  assert.equal(battleCalls[2].mine.map((m) => m.id).join(','), '4');
+  battleCalls[2].onDone({ outcome: 'declined', opponent: battleCalls[2].opponent, turns: 0 });
+  assert.equal(run('state.idx'), 1, '거절해도 이동은 이어감');
+  // 부모 모드·HP 끔이면 추첨 없음
+  run('setParentMode(true); markDone(state.cues[7]); setParentMode(false); settings.hp = false; markDone(state.cues[7])');
+  assert.equal(run('state.battlePending'), null);
 });
 
 test('👨‍👩‍👦 부모 모드는 저장되지 않음 — 설정 저장에도 settings에 안 들어감', () => {

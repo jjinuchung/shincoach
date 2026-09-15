@@ -9,8 +9,9 @@ import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp } from './xp.js';
-import { COIN, HP, puzzleCoins, streakCoins, lootBox, itemById, setFigure } from './items.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory } from './xp.js';
+import { COIN, HP, POTION, puzzleCoins, streakCoins, lootBox, itemById, setFigure } from './items.js';
+import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
@@ -60,6 +61,9 @@ const state = {
   streakToday: false, // 오늘 5문장을 채워 스트릭에 들어갔는지
   streakDate: '',     // 위 두 값의 기준 날짜 (자정을 넘기면 다시 계산)
   journeyCelebrated: false, // 🏁 이번에 연 콘텐츠에서 도착 연출을 이미 했는지 (세션당 한 번)
+  battlePending: null, // ⚔️ 다음 문장으로 넘어갈 때 걸어올 트레이너의 포켓몬 { id, ko, url } (markDone에서 확률로 정해짐)
+  battleOpen: false,   // ⚔️ 배틀 화면이 열려 있음 (키보드 무시)
+  battleLastCue: null, // 배틀에서 방금 따라 말한 문장 (연달아 같은 문장 안 나오게)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -130,6 +134,7 @@ export function initPlayer(ctx) {
   initPuzzle();
   initCharacters();
   initCatch();
+  initBattle();
   initProfile().then(() => { updateLevelChip(); updatePartnerChip(); }).catch(() => {});
   $('level-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex()); });
   $('coin-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex({ shop: true })); });
@@ -336,6 +341,142 @@ function unlockedCharacters() {
   return state.characters.filter((c) => isUnlocked(c.id, level) && !(settings.hp && isTired(c.id))).map((c) => ({ ...c, look: getLook(c.id) }));
 }
 
+// ───────────────────── ⚔️ 배틀 ─────────────────────
+
+/** 문장을 제대로 완료한 시점: 아주 가끔 다음 전환 때 배틀이 걸리게 예약 (HP 기능 켬·학습 모드에서만) */
+function maybeBattle(todayDone) {
+  if (!settings.hp || state.parentMode || state.battlePending) return;
+  if (!shouldBattle({ todayDone, todayBattles: track.todayBattles() })) return;
+  const opponent = pickBattleOpponent();
+  if (!opponent || !myBattleMons().length) return;
+  state.battlePending = opponent;
+}
+
+/** 상대: 열린 명단 중 아직 못 잡은 포켓몬 (그림이 있는 것만) */
+function pickBattleOpponent() {
+  const level = getLevelInfo().level;
+  const caught = getProfileSnapshot().caught;
+  return pickOpponent(state.characters.filter((c) => isUnlocked(c.id, level)), caught);
+}
+
+/** 내가 내보낼 수 있는 포켓몬: 잡은 것 중 파트너·😴 제외, 그림·꾸밈·패배 수 포함 */
+function myBattleMons(includePartner) {
+  const caught = getProfileSnapshot().caught;
+  const ids = Object.keys(caught).filter((k) => caught[k] > 0).map(Number);
+  const ok = eligibleMine(ids, includePartner ? null : getPartner(), (id) => settings.hp && isTired(id));
+  return ok.map((id) => {
+    const r = ROSTER.find((m) => m.id === id);
+    const c = state.characters.find((x) => x.id === id);
+    return { id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id) };
+  });
+}
+
+/** 가방의 물약 목록 [{ id, n }] */
+function potionList() {
+  const inv = inventory();
+  return POTION.filter((p) => inv[p.id] > 0).map((p) => ({ id: p.id, n: inv[p.id] }));
+}
+
+/** 배틀에서 따라 말할 문장: 모아둔 문장·근처 문장 중 퍼즐 낼 만한 것(3~8단어), 방금 것과 다른 것 */
+function battleCue() {
+  const near = state.cues.slice(Math.max(0, state.idx - 12), state.idx + 1);
+  const pool = [...state.puzzlePool, ...near].filter((c) => c !== state.battleLastCue);
+  const cue = pickPuzzle(pool) || pickPuzzle(near) || state.cues[state.idx] || null;
+  state.battleLastCue = cue;
+  return cue;
+}
+
+/**
+ * 배틀 턴의 말하기: 문장을 들려준 뒤(퍼즐의 🔊 재생 메커니즘) 말하기 확인 → 결과.
+ * hooks.register(stop) 로 "다 말했어요"/취소를 받음. stop('cancel')이면 결과 null
+ */
+function battleSpeak(cue, hooks) {
+  return new Promise((resolve) => {
+    if (!cue) { resolve(null); return; }
+    let run = null;
+    let done = false;
+    const finishWith = (r) => {
+      if (done) return;
+      done = true;
+      state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
+      if (!video.paused) video.pause();
+      resolve(r);
+    };
+    hooks.register((why) => {
+      if (why === 'cancel') { if (run) run.cancel(); else finishWith(null); return; }
+      if (run) run.stop();
+      else if (state.puzzlePlaying) { video.pause(); endPuzzlePlayback(); } // 아직 듣는 중이면 건너뛰고 바로 말하기
+    });
+    state.puzzleCue = cue; // onTick이 이 문장 끝에서 재생을 멈추게 (퍼즐과 같은 방식)
+    playPuzzleSentence(cue, () => {
+      if (done) return;
+      if (hooks.onListening) hooks.onListening();
+      run = runSpeakCheck({ target: cue.en, durationSec: cue.end - cue.start, onInterim: hooks.onInterim });
+      run.promise.then(finishWith);
+    });
+  });
+}
+
+/** 배틀 열기 (상대는 state.battlePending). 끝나면 결과 반영 후 continueFn */
+function startBattle(continueFn) {
+  const opponent = state.battlePending;
+  state.battlePending = null;
+  if (!opponent) { continueFn(); return; }
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  track.markBattle(); // 거절해도 오늘 배틀 기회는 쓴 것
+  state.battleOpen = true;
+  openBattle({
+    opponent,
+    mine: myBattleMons(false),
+    potions: potionList,
+    usePotion: (id) => consumeItem(id),
+    nextCue: battleCue,
+    speak: battleSpeak,
+    onDone: (r) => {
+      state.battleOpen = false;
+      state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
+      applyBattleResult(r);
+      if (state.open) continueFn();
+    },
+  });
+}
+
+/** 배틀 결과 반영: 승 → 상대 획득 + ⚡💰, 패/도중 이탈 → 그 포켓몬 패배 +1 (3번이면 잃음) */
+function applyBattleResult(r) {
+  if (!r || r.outcome === 'declined') return;
+  if (r.outcome === 'win') {
+    const w = battleWin(r.opponent.id);
+    awardXp(BATTLE.winXp);
+    awardCoins(BATTLE.winCoins);
+    showPlayerMessage(w.first ? `🎉 ${r.opponent.ko}${josaIga(r.opponent.ko)} 도감에 들어왔어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}` : `🎉 ${r.opponent.ko} 한 마리 더! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`, 5000);
+  } else if (r.my) {
+    const l = battleLoss(r.my.id, BATTLE.lossesToLose);
+    if (l.lost) showPlayerMessage(`😢 ${r.my.ko}${josaIga(r.my.ko)} ${BATTLE.lossesToLose}번 져서 떠났어요…`, 6000);
+    else showPlayerMessage(`😢 졌어요. ${r.my.ko} 패배 ${l.losses}/${BATTLE.lossesToLose}`, 4500);
+  }
+  track.flush();
+  updatePartnerChip();
+}
+
+/** ⚙ 배틀 연습: 아무 상대와 결과 반영 없이 (파트너도 내보낼 수 있음) */
+function startBattlePractice() {
+  if (!state.characters.length) { showPlayerMessage('🎮 먼저 설정에서 포켓몬 캐릭터를 받아 주세요', 4000); return; }
+  if (!state.open || state.idx < 0) { showPlayerMessage('▶ 문장을 하나 연 뒤에 해 보세요 (따라 말할 문장이 필요해요)', 4000); return; }
+  const mine = myBattleMons(true);
+  if (!mine.length) { showPlayerMessage('🎯 먼저 포켓몬을 한 마리 잡아야 배틀을 해요', 4000); return; }
+  const opponent = pickBattleOpponent() || pickCharacters(unlockedCharacters(), 1)[0];
+  if (!opponent) return;
+  if (!video.paused) video.pause();
+  cancelShadowWait();
+  state.battleOpen = true;
+  openBattle({
+    opponent, mine, potions: potionList, usePotion: () => true, nextCue: battleCue, speak: battleSpeak, practice: true,
+    onDone: () => { state.battleOpen = false; state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null; },
+  });
+}
+
 /** ⚙ 잡기 연습: 아무 캐릭터 4마리로 연출만 (기록 안 함) */
 function startCatchPractice() {
   if (!state.characters.length) { showPlayerMessage('🎮 먼저 설정에서 포켓몬 캐릭터를 받아 주세요', 4000); return; }
@@ -454,6 +595,7 @@ function markDone(cue) {
     ensureStreakDate(); // 자정을 넘겼으면 스트릭 상태를 오늘 기준으로
     awardXp(XP.done); // 오늘 처음 완료한 문장 → 경험치
     awardCoins(COIN.done);
+    maybeBattle(after); // ⚔️ 아주 가끔 트레이너가 걸어옴 (다음 문장으로 넘어갈 때 열림)
     // 🔥 오늘 5문장을 채우면 연속 학습일에 들어가고 보너스 (연속일수록 큼)
     if (!state.streakToday && after >= STREAK_MIN_DONE) {
       state.streakToday = true;
@@ -591,6 +733,8 @@ export async function openPlayer(id, opts = {}) {
   state.repeatCount = 0;
   state.puzzlePool = [];
   state.journeyCelebrated = false;
+  state.battlePending = null;
+  state.battleLastCue = null;
   cancelShadowWait();
   hidePlayerMessage();
 
@@ -648,6 +792,9 @@ function closeMedia() {
   cancelShadowWait();
   closePuzzle();
   closeCatch();
+  abortBattle(); // 배틀 중이었으면 패배 취급 (onDone에서 처리)
+  state.battleOpen = false;
+  state.battlePending = null;
   state.catchOpen = false;
   state.puzzleCue = null;
   state.puzzlePlaying = false;
@@ -700,6 +847,11 @@ function goTo(i, { play = true, force = false } = {}) {
   i = Math.max(0, Math.min(i, state.cues.length - 1));
   if (!force && speakGateBlocks(i)) {
     showPlayerMessage('🎤 따라 말해야 다음으로 넘어갈 수 있어요');
+    return;
+  }
+  // ⚔️ 배틀이 걸려 있으면 앞으로 넘어가기 전에 먼저 (퍼즐보다 먼저, 퍼즐은 다음 전환에)
+  if (!force && i > state.idx && state.battlePending) {
+    startBattle(() => goTo(i, { play, force: true })); // 배틀 뒤에는 같은 전환에서 퍼즐을 또 내지 않음 (다음 전환에)
     return;
   }
   // 🧩 앞으로 넘어갈 때 N문장이 차 있으면 먼저 퍼즐 → 끝나면 이 이동을 이어감 (퍼즐이 열리면서 모아둔 문장은 비워짐)
@@ -905,10 +1057,18 @@ function onCueEnd() {
     return;
   }
 
-  // 마지막 문장이면 멈춤 (N문장이 찼으면 퍼즐은 내고, 끝난 자리에 그대로)
+  // 마지막 문장이면 멈춤 (배틀·퍼즐이 걸려 있으면 내고, 끝난 자리에 그대로)
   if (state.idx >= state.cues.length - 1) {
     video.pause();
-    if (puzzleReady()) startPuzzle(() => {});
+    if (state.battlePending) startBattle(() => {});
+    else if (puzzleReady()) startPuzzle(() => {});
+    return;
+  }
+
+  // ⚔️ 배틀이 걸려 있으면 다음 문장으로 가기 전에
+  if (state.battlePending) {
+    const nextIdx = state.idx + 1;
+    startBattle(() => goTo(nextIdx, { force: true }));
     return;
   }
 
@@ -1377,7 +1537,7 @@ function updateChips() {
 
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
-  if (state.puzzleCue || state.catchOpen) return; // 퍼즐·잡기 화면 중에는 플레이어 단축키 무시
+  if (state.puzzleCue || state.catchOpen || state.battleOpen) return; // 퍼즐·잡기·배틀 화면 중에는 플레이어 단축키 무시
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   switch (e.key) {
     case ' ': e.preventDefault(); onPlayButton(); break;
@@ -1450,6 +1610,7 @@ function initSettingsDialog() {
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
   $('set-catch-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startCatchPractice(); });
+  $('set-battle-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startBattlePractice(); });
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
     setParentMode($('set-parent').checked); // 저장하지 않음 (앱을 다시 열면 학습 모드)

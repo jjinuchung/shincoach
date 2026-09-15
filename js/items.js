@@ -112,7 +112,10 @@ export function makeFigure(url, alt, look, cls) {
 /** 이미 있는 figure의 그림·꾸밈 갱신 (잡기 무대처럼 요소를 재사용하는 곳). url이 undefined면 그림은 그대로 */
 export function setFigure(fig, url, look) {
   const img = fig.querySelector('img');
-  if (url !== undefined && img.getAttribute('src') !== url) img.src = url;
+  if (url !== undefined) {
+    if (img.getAttribute('src') !== url) img.src = url;
+    img.hidden = !url; // 그림을 아직 못 받았으면 깨진 아이콘 대신 빈 자리
+  }
   const dye = look && look.dye ? byId[look.dye] : null;
   img.style.filter = dye && dye.filter ? dye.filter : '';
   if (dye && dye.cls) img.classList.add(dye.cls); else img.classList.remove('shiny');

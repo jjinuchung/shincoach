@@ -234,6 +234,47 @@
     </div>
   </div>
 
+  <!-- ===== ⚔️ 배틀 (학습 중 가끔 트레이너가 걸어옴: 문장을 따라 말해서 공격) ===== -->
+  <div id="battle" class="battle" hidden>
+    <div class="battle-card">
+      <div id="battle-title" class="battle-title">⚔️ 배틀!</div>
+      <div id="battle-msg" class="battle-msg"></div>
+      <div id="battle-intro" class="battle-intro">
+        <div class="battle-trainer-row">
+          <span id="battle-trainer" class="battle-trainer">🧢</span>
+          <span id="battle-intro-fig" class="mon-figure battle-intro-fig"><img alt="" draggable="false"></span>
+        </div>
+        <div id="battle-intro-name" class="battle-intro-name"></div>
+        <div class="battle-intro-actions">
+          <button type="button" id="battle-decline" class="btn">다음에</button>
+          <button type="button" id="battle-accept" class="btn btn-primary">⚔️ 좋아, 배틀!</button>
+        </div>
+      </div>
+      <div id="battle-pick" class="battle-pick catch-pick" hidden></div>
+      <div id="battle-stage" class="battle-stage" hidden>
+        <div id="battle-enemy" class="battle-side enemy">
+          <span id="battle-enemy-fig" class="mon-figure battle-fig"><img alt="" draggable="false"></span>
+          <div class="battle-info"><div id="battle-enemy-name" class="nm"></div><div class="battle-hpbar"><div id="battle-enemy-hp" class="battle-hp"></div></div><div class="hpt">❤️ <span id="battle-enemy-hpt">100</span></div></div>
+        </div>
+        <div class="battle-vs">VS</div>
+        <div id="battle-my" class="battle-side mine">
+          <div class="battle-info"><div id="battle-my-name" class="nm"></div><div class="battle-hpbar"><div id="battle-my-hp" class="battle-hp"></div></div><div class="hpt">❤️ <span id="battle-my-hpt">100</span></div></div>
+          <span id="battle-my-fig" class="mon-figure battle-fig"><img alt="" draggable="false"></span>
+        </div>
+      </div>
+      <div id="battle-speak" class="battle-speak" hidden>
+        <div class="battle-sentence-label">🗣 따라 말하기</div>
+        <div id="battle-sentence" class="battle-sentence"></div>
+        <div id="battle-speak-status" class="battle-speak-status"></div>
+        <button type="button" id="battle-speak-done" class="btn">다 말했어요 ✓</button>
+      </div>
+      <div id="battle-actions" class="battle-actions" hidden></div>
+      <div id="battle-result" class="battle-result"></div>
+      <div id="battle-note" class="battle-note"></div>
+      <div class="catch-actions"><button type="button" id="battle-continue" class="btn btn-primary" hidden>계속하기 ▶</button></div>
+    </div>
+  </div>
+
   <!-- ===== 🧩 문장 퍼즐 (N문장마다 배운 문장의 단어 순서 맞추기) ===== -->
   <div id="puzzle" class="puzzle" hidden>
     <div class="puzzle-card">
@@ -338,6 +379,7 @@
       </div>
       <div class="field-actions">
         <button type="button" id="set-catch-try" class="btn">🎯 잡기 연습 <small>— 몬스터볼 던지기 연출 보기 (기록 안 함)</small></button>
+        <button type="button" id="set-battle-try" class="btn">⚔️ 배틀 연습 <small>— 트레이너 배틀 해보기 (기록 안 함)</small></button>
       </div>
 
       <label class="field field-row">

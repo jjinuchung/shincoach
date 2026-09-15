@@ -12,7 +12,7 @@ const DB_VERSION = 4;
 //  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
 // characters (v3): 🎮 퍼즐 캐릭터 그림 { id, ko, en, blob, savedAt } — 인터넷에서 받아 기기에만 보관 (백업에 포함 안 함)
 //  profile (v4):  ⚡ 아이 프로필 { id: 'me', xp, caught: { 포켓몬id: 마릿수 }, throws, catches,
-//                 coins, coinsEarned, items: { 아이템id: 개수 }, mons: { 포켓몬id: { gear, dye, hp } }, partner, updatedAt } — 백업에 포함
+//                 coins, coinsEarned, items: { 아이템id: 개수 }, mons: { 포켓몬id: { gear, dye, hp, losses } }, partner, updatedAt } — 백업에 포함
 const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews', 'profile'];
 
 let dbPromise = null;
@@ -306,7 +306,10 @@ export async function applyProfileDelta(delta) {
   next.catches = (Number(cur.catches) || 0) + (delta.catches || 0);
   next.coins = Math.max(0, (Number(cur.coins) || 0) + (delta.coins || 0));
   next.coinsEarned = (Number(cur.coinsEarned) || 0) + (delta.coinsEarned || 0);
-  for (const id of Object.keys(delta.caught || {})) next.caught[id] = (next.caught[id] || 0) + delta.caught[id];
+  for (const id of Object.keys(delta.caught || {})) {
+    const n = (next.caught[id] || 0) + delta.caught[id]; // ⚔️ 배틀에서 잃으면 −1
+    if (n > 0) next.caught[id] = n; else delete next.caught[id];
+  }
   // 🎒 가방: 개수를 더하고(구매 +, 장착·사용 −) 0 이하는 지움
   for (const id of Object.keys(delta.items || {})) {
     const n = (next.items[id] || 0) + delta.items[id];
@@ -355,7 +358,7 @@ export function mergeStatRecord(name, cur, rec) {
     out.lastRatio = (rec.lastAt || 0) >= (cur.lastAt || 0) ? (rec.lastRatio || 0) : (cur.lastRatio || 0);
   } else if (name === 'daily') {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
-    for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles']) out[k] = maxOf(cur[k], rec[k]);
     out.goalRewarded = !!(cur.goalRewarded || rec.goalRewarded);
     out.hpMissed = !!(cur.hpMissed || rec.hpMissed);
   } else if (name === 'vocabViews') {
