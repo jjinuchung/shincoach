@@ -8,7 +8,7 @@ const NOISE_WINDOW_MS = 100;  // 소음 바닥 추정 창 (창 평균의 최솟�
 const SILENCE_END_MS = 1300;  // 말한 뒤 이만큼 조용하면 끝난 것으로
 const PASS_RATIO = 0.4;       // 음성 인식: 단어 일치율 기준
 // 내용 없는 짧은 단어 — 이것만 맞아서는 "따라 말했다"고 보지 않음
-const STOP_WORDS = new Set(['i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'my', 'a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'is', 'am', 'are', 'was', 'be', 'and', 'or', 'but', 'so', 'do', 'oh', 'uh', 'um', 'ah', 'yes', 'no', 'ok', 'okay', 'hey', 'this', 'that', 'what', 'for', 'with', 'up', 'not', "don't", "it's", "i'm"]);
+export const STOP_WORDS = new Set(['i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'my', 'a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'is', 'am', 'are', 'was', 'be', 'and', 'or', 'but', 'so', 'do', 'oh', 'uh', 'um', 'ah', 'yes', 'no', 'ok', 'okay', 'hey', 'this', 'that', 'what', 'for', 'with', 'up', 'not', "don't", "it's", "i'm"]);
 
 let micStream = null;         // 마이크 스트림은 한 번 열면 재사용 (매번 권한 프롬프트 방지)
 let audioCtx = null;
@@ -76,7 +76,8 @@ function similarWord(a, b) {
   return false;
 }
 
-function editDistance(a, b) {
+/** 두 단어의 편집 거리 (받아쓰기 오답 만들 때도 쓴다) */
+export function editDistance(a, b) {
   const m = a.length; const n = b.length;
   const dp = [];
   for (let i = 0; i <= m; i++) { dp[i] = [i]; }

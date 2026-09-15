@@ -207,9 +207,11 @@ export function roundReward(alreadyRewardedToday) {
 }
 
 // ── 화면 ──
+import { checkBlank as dictCheck } from './dictation.js';
+
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const ui = { open: false, run: 0, o: null, i: 0, fails: 0, passed: 0, started: false, granted: false, reward: null, busy: false, speakStop: null };
+const ui = { open: false, run: 0, o: null, i: 0, fails: 0, passed: 0, started: false, granted: false, reward: null, busy: false, speakStop: null, blankAt: 0, dictWrong: 0 };
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -229,6 +231,10 @@ export function initReview() {
   $('review-later').addEventListener('click', () => finish({ started: false }));
   $('review-continue').addEventListener('click', () => finish({ started: true }));
   $('review-speak-done').addEventListener('click', () => { if (ui.speakStop) ui.speakStop(); });
+  $('review-dict-listen').addEventListener('click', () => {
+    const it = ui.o && ui.o.items[ui.i];
+    if (it && it.type === 'dictation' && ui.o.onPlay) ui.o.onPlay(it.cue);
+  });
 }
 
 export function isReviewOpen() {
@@ -262,11 +268,14 @@ export function openReview(o) {
   ui.speakStop = null;
 
   const nWord = o.items.filter((it) => it.type === 'word').length;
-  const nSent = o.items.length - nWord;
+  const nDict = o.items.filter((it) => it.type === 'dictation').length;
+  const nSent = o.items.length - nWord - nDict;
   $('review-title').textContent = o.practice ? '🔁 복습 연습' : '🔁 오늘의 복습';
+  // 받아쓰기도 문장 복습의 한 종류라 문장으로 함께 센다 (아이에게는 "문장 2개"가 자연스럽다)
+  const sentTotal = nSent + nDict;
   $('review-msg').textContent = nWord
-    ? `배운 문장 ${nSent}개와 단어 ${nWord}개를 다시 만나요`
-    : `배운 문장 ${nSent}개를 다시 만나요`;
+    ? `배운 문장 ${sentTotal}개와 단어 ${nWord}개를 다시 만나요`
+    : `배운 문장 ${sentTotal}개를 다시 만나요`;
   const rw = $('review-reward');
   rw.innerHTML = '';
   if (o.practice) {
@@ -288,6 +297,8 @@ export function openReview(o) {
 
   $('review-intro').hidden = false;
   $('review-stage').hidden = true;
+  $('review-dict').hidden = true;
+  $('review-dict-listen').hidden = true;
   const ch = $('review-choices');
   ch.hidden = true;
   ch.dataset.done = '';
@@ -339,8 +350,135 @@ async function runNext() {
   $('review-intro').hidden = true;
   if (ui.i >= o.items.length) { showDone(); return; }
   ui.fails = 0;
-  if (o.items[ui.i].type === 'word') { askWord(); return; } // 🔤 뜻 맞히기
+  const kind = o.items[ui.i].type;
+  if (kind === 'word') { askWord(); return; }            // 🔤 뜻 맞히기
+  if (kind === 'dictation') { askDictation(); return; }  // ✍️ 듣고 빈칸 채우기
   await askSentence();
+}
+
+/**
+ * ✍️ 받아쓰기 문항: 문장을 거의 다 보여주고 한두 칸만 비운 뒤, 소리를 듣고 그 칸을 채운다.
+ * 빈칸이 둘이면 앞에서부터 하나씩. 문장은 자동으로 한 번 들려주고, 🔊로 다시 들을 수 있다.
+ */
+function askDictation() {
+  const o = ui.o;
+  const item = o.items[ui.i];
+  ui.busy = true;
+  ui.blankAt = 0;
+  ui.dictWrong = 0;
+
+  $('review-speak').hidden = true;
+  const stage = $('review-stage');
+  stage.hidden = false;
+  renderDots();
+  $('review-stage-icon').textContent = stageIcon(item.rec);
+  $('review-count').textContent = `${ui.i + 1} / ${o.items.length}`;
+  $('review-ko').textContent = '🔊 잘 듣고 빈칸을 채워요';
+  $('review-en').hidden = true; // 문장은 아래 빈칸 줄로 보여준다
+  $('review-feedback').textContent = '';
+  $('review-feedback').className = 'review-feedback';
+
+  renderDictLine(item);
+  renderDictChoices(item);
+  $('review-dict-listen').hidden = false;
+  if (o.onPlay) o.onPlay(item.cue); // 한 번 들려주기
+}
+
+/** 빈칸이 뚫린 문장 줄 */
+function renderDictLine(item) {
+  const box = $('review-dict');
+  box.innerHTML = '';
+  box.hidden = false;
+  item.words.forEach((w, i) => {
+    const b = item.blanks.find((x) => x.index === i);
+    if (!b) { box.appendChild(el('span', 'dict-word', w)); return; }
+    const filled = b.filled;
+    const span = el('span', `dict-blank${filled ? (b.ok ? ' ok' : ' bad') : ''}${!filled && item.blanks[ui.blankAt] === b ? ' now' : ''}`, filled || '＿＿');
+    box.appendChild(span);
+  });
+}
+
+/** 지금 채울 빈칸의 보기 */
+function renderDictChoices(item) {
+  const box = $('review-choices');
+  box.innerHTML = '';
+  box.dataset.done = '';
+  const b = item.blanks[ui.blankAt];
+  if (!b) { box.hidden = true; return; }
+  box.hidden = false;
+  for (const choice of b.choices) {
+    const btn = el('button', 'review-choice dict', choice);
+    btn.type = 'button';
+    btn.addEventListener('click', () => pickBlankChoice(btn, choice, item, b));
+    box.appendChild(btn);
+  }
+}
+
+/** 빈칸 하나를 채움 → 맞으면 다음 칸, 다 채우면 결과 */
+async function pickBlankChoice(btn, choice, item, blank) {
+  const run = ui.run;
+  const alive = () => ui.open && ui.run === run;
+  const o = ui.o;
+  const box = $('review-choices');
+  if (box.dataset.done === '1') return; // 연타 방지
+  box.dataset.done = '1';
+
+  const ok = dictCheck(blank, choice);
+  blank.filled = choice;
+  blank.ok = ok;
+  if (!ok) ui.dictWrong++;
+  [...box.children].forEach((c) => {
+    c.disabled = true;
+    if (dictCheck(blank, c.textContent)) c.classList.add('right');
+  });
+  if (!ok) btn.classList.add('wrong');
+  if (o.sfx) (ok ? o.sfx.ding() : o.sfx.wrong());
+  renderDictLine(item);
+
+  const fb = $('review-feedback');
+  fb.className = `review-feedback ${ok ? 'good' : 'bad'}`;
+  fb.textContent = ok ? '🎯 맞았어요!' : `👍 괜찮아요 — 정답은 "${blank.answer}"`;
+
+  await sleep(ok ? 1000 : 1900);
+  if (!alive()) return;
+
+  ui.blankAt++;
+  if (ui.blankAt < item.blanks.length) { // 다음 빈칸
+    fb.textContent = '';
+    fb.className = 'review-feedback';
+    renderDictLine(item);
+    renderDictChoices(item);
+    if (o.onPlay) o.onPlay(item.cue); // 다음 칸을 위해 한 번 더 들려주기
+    return;
+  }
+  await settleDictation(item);
+}
+
+/** 받아쓰기 문항 끝: 다 맞았으면 통과 */
+async function settleDictation(item) {
+  const run = ui.run;
+  const alive = () => ui.open && ui.run === run;
+  const o = ui.o;
+  const passed = ui.dictWrong === 0;
+  $('review-choices').hidden = true;
+  $('review-dict-listen').hidden = true;
+
+  const info = o.onDictation ? o.onDictation(item, passed) : null;
+  ui.i++;
+  if (passed) ui.passed++;
+  if (info && !info.graduated && passed) {
+    $('review-stage-icon').textContent = stageIcon({ box: info.box });
+    $('review-stage-icon').classList.add('up');
+  }
+  if (ui.i >= o.items.length && !ui.granted) {
+    ui.granted = true;
+    ui.reward = (o.onFinished && o.onFinished()) || null;
+  }
+  await sleep(1500);
+  if (!alive()) return;
+  $('review-stage-icon').classList.remove('up');
+  $('review-dict').hidden = true;
+  await runNext();
 }
 
 /** 🔤 단어 문항: 영어 단어를 보여주고 뜻 4개 중에 고르기 */
@@ -350,6 +488,8 @@ function askWord() {
   ui.busy = true;
 
   $('review-speak').hidden = true;
+  $('review-dict').hidden = true;
+  $('review-dict-listen').hidden = true;
   const stage = $('review-stage');
   stage.hidden = false;
   renderDots();
@@ -423,6 +563,8 @@ async function askSentence() {
   const stage = $('review-stage');
   stage.hidden = false;
   $('review-choices').hidden = true;
+  $('review-dict').hidden = true;
+  $('review-dict-listen').hidden = true;
   renderDots();
   $('review-stage-icon').textContent = stageIcon(rec);
   $('review-count').textContent = `${ui.i + 1} / ${o.items.length}`;
@@ -521,12 +663,14 @@ function showDone() {
   $('review-stage').hidden = true;
   $('review-speak').hidden = true;
   $('review-choices').hidden = true;
+  $('review-dict').hidden = true;
+  $('review-dict-listen').hidden = true;
   const box = $('review-done');
   box.innerHTML = '';
   box.hidden = false;
   box.appendChild(el('div', 'review-done-title', '🎉 복습 끝!'));
   const total = o.items.length;
-  const hasWord = o.items.some((it) => it.type === 'word');
+  const hasWord = o.items.some((it) => it.type !== 'sentence');
   box.appendChild(el('div', 'review-done-sub', hasWord
     ? `${total}개 중 ${ui.passed}개를 맞혔어요`
     : `${total}문장 중 ${ui.passed}문장을 잘 말했어요`));

@@ -6,6 +6,14 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD } from '../js/review.js';
 import { wordResults } from '../js/speak.js';
+import { makeDictation } from '../js/dictation.js';
+import fsNode from 'node:fs';
+
+// 받아쓰기 오답은 실제 사전에서 만들어지므로 테스트도 진짜 사전을 쓴다
+const VOCAB_KNOWN = new Set([
+  ...Object.keys(JSON.parse(fsNode.readFileSync(new URL('../vocab/words.json', import.meta.url), 'utf8'))),
+  ...JSON.parse(fsNode.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8')),
+]);
 import { wordTimings as realWordTimings } from '../js/srt.js';
 
 /**
@@ -129,7 +137,7 @@ function loadPlayer() {
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
     initReview() {}, abortReview() {}, isReviewOpen: () => false, openReview(o) { reviewCalls.push(o); },
-    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule,
+    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, makeDictation, VOCAB_KNOWN,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
     // sfx.js 스텁
@@ -1263,4 +1271,59 @@ test('🔤 [Codex #1] 단어를 푼 회차도 문항 수에 세어 다음 회차
   o.onWord(Array.from(o.items).find((it) => it.type === 'word'), true);
   assert.equal(reviewState.items, 3, '단어도 회차 진행 수에 들어가야 함');
   assert.equal(run('track.todayReviewItems() % settings.reviewCount'), 0, '다음 회차는 처음부터 3문항');
+});
+
+// ── ✍️ 받아쓰기 ──
+
+test('✍️ 익숙해진 문장(box 1+) 하나가 받아쓰기로 바뀐다', () => {
+  const { run, ctx, reviewCalls, reviewState } = loadPlayer();
+  ctx.state = ctx.state || {};
+  reviewState.stats = [
+    due(1, { box: 0, en: 'I was walking through the door.' }),
+    due(2, { box: 2, en: 'He was very brave that day.', missed: { brave: 2 } }),
+    due(3, { box: 1, en: 'She walked into the room.' }),
+  ];
+  run(`state.cues = [
+    {start:1,end:4,en:"I was walking through the door.",ko:""},
+    {start:2,end:5,en:"He was very brave that day.",ko:""},
+    {start:3,end:6,en:"She walked into the room.",ko:""}
+  ]; settings.reviewCount = 3; state.reviewDone = false; state.vocab = { known: VOCAB_KNOWN }; maybeReview();`);
+  assert.equal(reviewCalls.length, 1);
+  const items = Array.from(reviewCalls[0].items);
+  const dict = items.filter((it) => it.type === 'dictation');
+  assert.equal(dict.length, 1, '회차당 최대 1개');
+  assert.ok((dict[0].rec.box || 0) >= 1, '처음 만나는 문장(box 0)은 따라 말하기로 남는다');
+  assert.ok(dict[0].blanks.length >= 1);
+  assert.ok(Array.isArray(dict[0].words) && dict[0].words.length > 0);
+});
+
+test('✍️ 전부 처음 만나는 문장이면 받아쓰기를 내지 않는다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1, { box: 0, en: 'I was walking through the door.' }), due(2, { box: 0, en: 'He was very brave.' })];
+  run(`state.cues = [{start:1,end:4,en:"I was walking through the door.",ko:""},{start:2,end:5,en:"He was very brave.",ko:""}];
+    settings.reviewCount = 3; state.reviewDone = false; state.vocab = { known: VOCAB_KNOWN }; maybeReview();`);
+  const items = Array.from(reviewCalls[0].items);
+  assert.equal(items.filter((it) => it.type === 'dictation').length, 0);
+});
+
+test('✍️ 단어장이 없으면 받아쓰기 없이 평소대로', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1, { box: 3, en: 'He was very brave that day.' })];
+  run(`state.cues = [{start:1,end:4,en:"He was very brave that day.",ko:""}];
+    settings.reviewCount = 3; state.reviewDone = false; state.vocab = null; maybeReview();`);
+  const items = Array.from(reviewCalls[0].items);
+  assert.equal(items.filter((it) => it.type === 'dictation').length, 0);
+  assert.equal(items[0].type, 'sentence');
+});
+
+test('✍️ 받아쓰기 결과는 문장 복습과 같은 라이트너 규칙을 탄다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1, { box: 2, en: 'He was very brave that day.' })];
+  run(`state.cues = [{start:1,end:4,en:"He was very brave that day.",ko:""}];
+    settings.reviewCount = 3; state.reviewDone = false; state.vocab = { known: VOCAB_KNOWN }; maybeReview();`);
+  const o = reviewCalls[0];
+  const dict = Array.from(o.items).find((it) => it.type === 'dictation');
+  assert.ok(dict, '받아쓰기가 만들어져야 함');
+  o.onDictation(dict, true);
+  assert.deepEqual(reviewState.reviewed.map((r) => r.passed), [true], 'track.review로 기록');
 });

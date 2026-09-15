@@ -15,6 +15,7 @@ import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
 import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT } from './review.js';
+import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
 
@@ -524,7 +525,27 @@ function reviewItems() {
   const sentences = pickReviews(usable, today, remain - wordItems.length)
     .map((rec) => ({ type: 'sentence', rec, cue: cueForStart(rec.start) }));
   if (!sentences.length) return []; // 문장이 없으면 단어만으로는 회차를 열지 않는다
-  return [...sentences, ...wordItems]; // 단어는 마지막에 (말하기로 시작해야 흐름이 자연스럽다)
+  return [...withDictation(sentences), ...wordItems]; // 단어는 마지막에 (말하기로 시작해야 흐름이 자연스럽다)
+}
+
+/**
+ * ✍️ 문장 문항 중 하나를 받아쓰기로 바꾼다 (회차당 최대 1개).
+ * 처음 만나는 문장(box 0)은 따라 말하기가 맞고, 한 번 이상 맞힌 문장부터 듣고 채우게 한다.
+ * 오답을 만들 수 없는 문장은 그대로 따라 말하기로 둔다.
+ */
+function withDictation(items) {
+  if (!state.vocab) return items;
+  const pool = [...state.vocab.known];
+  const idx = items.findIndex((it) => (it.rec.box || 0) >= 1);
+  if (idx < 0) return items;
+  const it = items[idx];
+  const made = makeDictation(it.cue, {
+    box: it.rec.box, known: state.vocab.known, pool, missed: it.rec.missed || {},
+  });
+  if (!made) return items;
+  const out = items.slice();
+  out[idx] = { type: 'dictation', rec: it.rec, cue: it.cue, words: made.words, blanks: made.blanks };
+  return out;
 }
 
 /** 복습 화면 열림/닫힘: 키보드 단축키 차단 + 뒤 화면 inert */
@@ -581,6 +602,18 @@ function startReview(items, practice) {
     onSentence: (cue, passed) => {
       if (practice) return null;
       const info = track.review(cue, passed);
+      if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
+      return info;
+    },
+    // ✍️ 받아쓰기: 그 문장만 들려준다. state.puzzleCue가 있어야 onTick이 문장 끝에서 멈춘다
+    onPlay: (cue) => {
+      if (!cue) return;
+      state.puzzleCue = cue;
+      playPuzzleSentence(cue, () => {});
+    },
+    onDictation: (item, passed) => {
+      if (practice) return null;
+      const info = track.review(item.cue, passed); // 받아쓰기도 문장 복습이므로 같은 라이트너 규칙
       if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
       return info;
     },

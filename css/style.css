@@ -1271,3 +1271,22 @@ button { font-family: inherit; }
 .review-choice.right { background: #dcfce7; border-color: #22c55e; color: #14532d; }
 .review-choice.wrong { background: #fee2e2; border-color: #ef4444; color: #7f1d1d; }
 .review-choice[disabled] { cursor: default; }
+
+/* ✍️ 받아쓰기 — 빈칸이 뚫린 문장 */
+.review-dict {
+  display: flex; flex-wrap: wrap; gap: 6px 8px; justify-content: center; align-items: center;
+  width: 100%; padding: 10px 8px; background: #f1f5f9; border-radius: 12px; margin-top: 4px;
+}
+.review-dict[hidden] { display: none; }
+.dict-word { font-size: 1.14rem; font-weight: 700; color: #0f172a; }
+.dict-blank {
+  font-size: 1.14rem; font-weight: 800; min-width: 74px; text-align: center;
+  border-bottom: 3px solid #94a3b8; color: #64748b; padding: 0 6px;
+}
+.dict-blank.now { border-color: #0ea5e9; color: #0ea5e9; animation: dict-pulse 1.2s ease-in-out infinite; }
+.dict-blank.ok { border-color: #22c55e; color: #15803d; }
+.dict-blank.bad { border-color: #ef4444; color: #b91c1c; text-decoration: line-through; }
+@keyframes dict-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.review-dict-listen { align-self: center; margin-top: 8px; min-height: 44px; }
+.review-dict-listen[hidden] { display: none; }
+.review-choice.dict { text-align: center; font-size: 1.08rem; }
