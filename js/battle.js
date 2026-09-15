@@ -194,14 +194,23 @@ export function closeBattle() {
   ui.o = null;
 }
 
-/** 배틀 중 강제로 닫힘(콘텐츠 닫기 등) → 진행 중이었으면 패배 취급 */
+/**
+ * 강제로 닫힐 때 넘길 결과: 이미 확정된 승패가 있으면 그대로(Codex #1: '계속하기' 전에 닫아도 보상·패배가 사라지지 않게),
+ * 싸우던 중이면 패배(quit), 아직 안 싸웠으면 거절
+ */
+export function abortOutcome({ my, result, turn, opponent }) {
+  if (result && (result.outcome === 'win' || result.outcome === 'lose')) return { ...result };
+  if (my) return { outcome: 'quit', my, opponent, turns: turn || 0 };
+  return { outcome: 'declined', opponent, turns: 0 };
+}
+
+/** 배틀 중 강제로 닫힘(콘텐츠 닫기 등) */
 export function abortBattle() {
   if (!ui.open) return;
   const o = ui.o;
-  const my = ui.my;
-  const inFight = !!my && !ui.result;
+  const r = abortOutcome({ my: ui.my, result: ui.result, turn: ui.turn, opponent: o.opponent });
   closeBattle();
-  if (o && o.onDone) o.onDone(inFight ? { outcome: 'quit', my, opponent: o.opponent, turns: ui.turn } : { outcome: 'declined', opponent: o.opponent, turns: 0 });
+  if (o && o.onDone) o.onDone(r);
 }
 
 function finish(result) {
@@ -308,18 +317,28 @@ async function playerTurn(moveKey) {
   sp.hidden = false;
   $('battle-sentence').textContent = cue ? cue.en : '';
   $('battle-speak-status').textContent = '🔊 듣고 나서 따라 말해요…';
+  $('battle-speak-done').textContent = '⏭ 듣기 건너뛰기'; // 듣는 중 / 말하는 중에 버튼 뜻이 다름 (Codex #8)
   $('battle-msg').textContent = `${ui.my.ko}의 ${mv.emoji} ${mv.name}! 문장을 따라 말하면 공격!`;
   let result = null;
   try {
     result = await ui.o.speak(cue, {
       onInterim: (t) => { $('battle-speak-status').textContent = `🗣 ${t}`; },
-      onListening: () => { $('battle-speak-status').textContent = '🎤 지금 따라 말해요!'; },
+      onListening: () => { $('battle-speak-status').textContent = '🎤 지금 따라 말해요!'; $('battle-speak-done').textContent = '다 말했어요 ✓'; },
+      onLevel: (level, spokenMs) => { if (spokenMs > 300) $('battle-speak-status').textContent = '🗣 듣고 있어요…'; }, // 소리 길이 판정 기기에서도 반응 표시
       register: (stop) => { ui.speakStop = stop; },
     });
   } catch (e) { result = null; }
   ui.speakStop = null;
   if (!alive()) return;
   sp.hidden = true;
+  // 화면이 꺼지는 등으로 중단된 턴은 없던 것으로 — 데미지·턴 소모 없이 다시 고르기 (Codex #3)
+  if (result && result.method === 'interrupted') {
+    ui.turn--;
+    ui.busy = false;
+    $('battle-msg').textContent = '📵 잠깐 멈췄어요. 이 턴은 다시 해요 — 기술을 골라요';
+    renderActions();
+    return;
+  }
   const tier = speakTier(result);
   const dmg = damageFor(moveKey, result);
   const tierMsg = { star: '🌟 완벽해요!', pass: '🎯 잘했어요!', fail: '🔁 조금 아쉬워요', none: '😶 말소리가 없었어요' }[tier];

@@ -860,6 +860,37 @@ test('⚔️ 배틀: 문장 완료 때 추첨 → 다음 전환에서 열림(퍼
   assert.equal(run('state.battlePending'), null);
 });
 
+test('⚔️ Codex #3/#4/#6: 화면 꺼짐이면 배틀 턴 중단(interrupted), 마지막 문장 섀도잉 뒤에도 배틀, 배틀 중 연습 진입 무시', async () => {
+  const { run, els, ctx, battleCalls, puzzleCalls, video } = loadPlayer();
+  // #4 마지막 문장 섀도잉 완료 경로
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 1; state.idx = 4; state.puzzlePool = state.cues.slice(); state.shadowNext = "next"; state.battlePending = { id: 7, ko: "꼬부기", url: "z" }; afterShadowWait()');
+  assert.equal(battleCalls.length, 1, '마지막 문장에서도 배틀이 열림');
+  assert.equal(puzzleCalls.length, 0, '퍼즐은 안 열림');
+  assert.equal(run('state.battleOpen'), true);
+  assert.equal(els['view-player'].inert, true, '#6 뒤 화면 inert');
+  // #6 진행 중 배틀을 연습으로 덮어쓰지 않음
+  run('state.characters = [{ id: 25, ko: "피카츄", url: "x" }]; startBattlePractice()');
+  assert.equal(battleCalls.length, 1);
+  // #3 배틀 턴의 말하기 중 화면 꺼짐 → interrupted 로 끝나고 재생 상태 정리
+  let resolved = null;
+  const speakP = run('battleSpeak(state.cues[0], { register() {}, onInterim() {} })');
+  speakP.then((r) => { resolved = r; });
+  assert.equal(run('state.puzzlePlaying'), true, '문장 듣기 시작');
+  ctx.document.hidden = true;
+  run('onVisibilityChange()');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(resolved && resolved.method, 'interrupted');
+  assert.equal(run('state.puzzleCue'), null);
+  assert.equal(run('state.puzzlePlaying'), false);
+  assert.equal(run('state.battleSpeakStop'), null);
+  assert.equal(video.paused, true);
+  ctx.document.hidden = false;
+  // 배틀 끝나면 inert 해제
+  battleCalls[0].onDone({ outcome: 'declined', opponent: battleCalls[0].opponent, turns: 0 });
+  assert.equal(run('state.battleOpen'), false);
+  assert.equal(els['view-player'].inert, false);
+});
+
 test('👨‍👩‍👦 부모 모드는 저장되지 않음 — 설정 저장에도 settings에 안 들어감', () => {
   const { run, ctx } = loadPlayer();
   const saved = [];

@@ -1,7 +1,7 @@
 // ⚔️ 배틀 규칙 테스트: node --test tests/battle.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BATTLE, MOVES, DAMAGE, TYPE_OF, typeOf, movesOf, speakTier, damageFor, enemyDamage, shouldBattle, pickOpponent, eligibleMine } from '../js/battle.js';
+import { BATTLE, MOVES, DAMAGE, TYPE_OF, typeOf, movesOf, speakTier, damageFor, enemyDamage, shouldBattle, pickOpponent, eligibleMine, abortOutcome } from '../js/battle.js';
 import { ROSTER } from '../js/pokemon.js';
 import { battleWin, battleLoss, lossesOf, caughtCount, catchAttempt, consumeItem, addItem, itemCount } from '../js/xp.js';
 import { mergeStatRecord } from '../js/db.js';
@@ -67,6 +67,18 @@ test('프로필: 승리는 상대 획득, 패배 3번이면 한 마리 잃음(�
   assert.equal(consumeItem('potion'), false);
   addItem('potion', 1);
   assert.equal(consumeItem('potion'), true); assert.equal(itemCount('potion'), 0);
+});
+
+test('강제 닫힘 결과(Codex #1): 확정된 승패는 그대로, 싸우던 중이면 quit, 안 싸웠으면 declined', () => {
+  const opponent = { id: 7 };
+  const my = { id: 25 };
+  assert.equal(abortOutcome({ my, result: { outcome: 'win', my, opponent, turns: 3 }, turn: 3, opponent }).outcome, 'win', '결과 화면에서 닫아도 승리 보상 유지');
+  assert.equal(abortOutcome({ my, result: { outcome: 'lose', my, opponent, turns: 5 }, turn: 5, opponent }).outcome, 'lose');
+  const q = abortOutcome({ my, result: null, turn: 2, opponent });
+  assert.equal(q.outcome, 'quit'); assert.equal(q.my, my); assert.equal(q.turns, 2);
+  assert.equal(abortOutcome({ my: null, result: null, turn: 0, opponent }).outcome, 'declined');
+  assert.equal(abortOutcome({ my: null, result: { outcome: 'declined' }, turn: 0, opponent }).outcome, 'declined');
+  assert.equal(speakTier({ method: 'interrupted' }), 'none', '중단 결과는 데미지 없음 (턴은 battle.js에서 되돌림)');
 });
 
 test('daily 병합: battles는 큰 값', () => {

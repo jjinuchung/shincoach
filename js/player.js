@@ -64,6 +64,7 @@ const state = {
   battlePending: null, // ⚔️ 다음 문장으로 넘어갈 때 걸어올 트레이너의 포켓몬 { id, ko, url } (markDone에서 확률로 정해짐)
   battleOpen: false,   // ⚔️ 배틀 화면이 열려 있음 (키보드 무시)
   battleLastCue: null, // 배틀에서 방금 따라 말한 문장 (연달아 같은 문장 안 나오게)
+  battleSpeakStop: null, // 배틀 턴의 듣기·말하기를 밖에서 중단하는 함수 (화면 꺼짐 → 그 턴 무효)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -398,23 +399,35 @@ function battleSpeak(cue, hooks) {
     const finishWith = (r) => {
       if (done) return;
       done = true;
+      state.battleSpeakStop = null;
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
       if (!video.paused) video.pause();
       resolve(r);
     };
-    hooks.register((why) => {
+    const stop = (why) => {
+      if (why === 'hidden') { if (run) run.cancel(); finishWith({ method: 'interrupted' }); return; } // 화면 꺼짐 → 턴 무효
       if (why === 'cancel') { if (run) run.cancel(); else finishWith(null); return; }
       if (run) run.stop();
       else if (state.puzzlePlaying) { video.pause(); endPuzzlePlayback(); } // 아직 듣는 중이면 건너뛰고 바로 말하기
-    });
+    };
+    state.battleSpeakStop = stop;
+    hooks.register(stop);
     state.puzzleCue = cue; // onTick이 이 문장 끝에서 재생을 멈추게 (퍼즐과 같은 방식)
     playPuzzleSentence(cue, () => {
       if (done) return;
       if (hooks.onListening) hooks.onListening();
-      run = runSpeakCheck({ target: cue.en, durationSec: cue.end - cue.start, onInterim: hooks.onInterim });
+      run = runSpeakCheck({ target: cue.en, durationSec: cue.end - cue.start, onInterim: hooks.onInterim, onLevel: hooks.onLevel });
       run.promise.then(finishWith);
     });
   });
+}
+
+/** 배틀 열림/닫힘 표시: 키보드 단축키 차단 + 뒤 화면을 inert (Tab으로 뒤 버튼이 눌리지 않게, Codex #6) */
+function setBattleOpen(on) {
+  state.battleOpen = on;
+  if (!on) state.battleSpeakStop = null;
+  const view = $('view-player');
+  if (view) view.inert = on;
 }
 
 /** 배틀 열기 (상대는 state.battlePending). 끝나면 결과 반영 후 continueFn */
@@ -426,7 +439,7 @@ function startBattle(continueFn) {
   hidePlayerMessage();
   if (!video.paused) video.pause();
   track.markBattle(); // 거절해도 오늘 배틀 기회는 쓴 것
-  state.battleOpen = true;
+  setBattleOpen(true);
   openBattle({
     opponent,
     mine: myBattleMons(false),
@@ -435,7 +448,7 @@ function startBattle(continueFn) {
     nextCue: battleCue,
     speak: battleSpeak,
     onDone: (r) => {
-      state.battleOpen = false;
+      setBattleOpen(false);
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
       applyBattleResult(r);
       if (state.open) continueFn();
@@ -462,6 +475,7 @@ function applyBattleResult(r) {
 
 /** ⚙ 배틀 연습: 아무 상대와 결과 반영 없이 (파트너도 내보낼 수 있음) */
 function startBattlePractice() {
+  if (state.battleOpen) return; // 진행 중인 배틀을 연습으로 덮어쓰지 않음 (Codex #6)
   if (!state.characters.length) { showPlayerMessage('🎮 먼저 설정에서 포켓몬 캐릭터를 받아 주세요', 4000); return; }
   if (!state.open || state.idx < 0) { showPlayerMessage('▶ 문장을 하나 연 뒤에 해 보세요 (따라 말할 문장이 필요해요)', 4000); return; }
   const mine = myBattleMons(true);
@@ -470,10 +484,10 @@ function startBattlePractice() {
   if (!opponent) return;
   if (!video.paused) video.pause();
   cancelShadowWait();
-  state.battleOpen = true;
+  setBattleOpen(true);
   openBattle({
     opponent, mine, potions: potionList, usePotion: () => true, nextCue: battleCue, speak: battleSpeak, practice: true,
-    onDone: () => { state.battleOpen = false; state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null; },
+    onDone: () => { setBattleOpen(false); state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null; },
   });
 }
 
@@ -705,6 +719,7 @@ function onVisibilityChange() {
   const wasShadowWaiting = !!state.shadowTimer || !!state.speakRun;
   track.flush();
   cancelShadowWait();
+  if (state.battleSpeakStop) state.battleSpeakStop('hidden'); // ⚔️ 배틀 턴 중이면 그 턴을 무효로 (복귀하면 다시 고름)
   if (!video.paused) video.pause();
   if (wasShadowWaiting) showPlayerMessage('▶ 를 눌러 이어서 연습해요', 0);
   releaseMic(); // 백그라운드에서 마이크 표시등이 켜져 있지 않도록
@@ -792,8 +807,8 @@ function closeMedia() {
   cancelShadowWait();
   closePuzzle();
   closeCatch();
-  abortBattle(); // 배틀 중이었으면 패배 취급 (onDone에서 처리)
-  state.battleOpen = false;
+  abortBattle(); // 배틀 중이었으면 결과 반영/패배 취급 (onDone에서 처리)
+  setBattleOpen(false);
   state.battlePending = null;
   state.catchOpen = false;
   state.puzzleCue = null;
@@ -1146,7 +1161,11 @@ function afterShadowWait() {
   const next = state.shadowNext;
   cancelShadowWait();
   if (next === 'repeat') { replayCurrent(); return; }
-  if (state.idx >= state.cues.length - 1) { if (puzzleReady()) startPuzzle(() => {}); return; } // 마지막 문장
+  if (state.idx >= state.cues.length - 1) { // 마지막 문장: 배틀이 걸려 있으면 배틀, 아니면 퍼즐 (Codex #4)
+    if (state.battlePending) startBattle(() => {});
+    else if (puzzleReady()) startPuzzle(() => {});
+    return;
+  }
   goTo(state.idx + 1);
 }
 
