@@ -100,3 +100,19 @@ test('streakBonus: 10, 15, 20 … 최대 40', () => {
   assert.equal(streakBonus(30), 40);
   assert.equal(streakBonus(0), 10);
 });
+
+test('희귀도 비율: 흔함 > 보통 > 희귀 > 전설 (전설이 흔하면 특별하지 않다)', () => {
+  const count = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  for (const r of ROSTER) count[rarityOf(r.id)]++;
+  assert.equal(count[1] + count[2] + count[3] + count[4], ROSTER.length);
+  assert.ok(count[1] > count[2], `흔함 ${count[1]} > 보통 ${count[2]}`);
+  assert.ok(count[2] > count[3], `보통 ${count[2]} > 희귀 ${count[3]}`);
+  assert.ok(count[3] > count[4], `희귀 ${count[3]} > 전설 ${count[4]}`);
+  assert.ok(count[4] <= ROSTER.length * 0.12, `전설이 너무 많음: ${count[4]}/${ROSTER.length}`);
+});
+
+test('전설은 가장 상징적인 것들만 (준전설은 희귀로)', () => {
+  const legend = ROSTER.filter((r) => rarityOf(r.id) === 4).map((r) => r.id);
+  for (const id of [150, 151, 384, 493]) assert.ok(legend.includes(id), `${id}는 전설이어야`);
+  for (const id of [144, 145, 146, 380, 381]) assert.ok(!legend.includes(id), `${id}는 전설이 아니어야 (준전설)`);
+});
