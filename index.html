@@ -34,6 +34,7 @@
 
     <footer class="storage-info">
       <span id="storage-text">저장 공간 확인 중...</span>
+      <button id="btn-exit" class="btn btn-exit">🚪 종료</button>
     </footer>
   </section>
 
@@ -348,6 +349,20 @@
     <div class="loading-box">
       <div class="loading-spinner"></div>
       <div id="loading-text">불러오는 중...</div>
+    </div>
+  </div>
+
+  <!-- ===== 종료 인사 화면 (🚪 종료 → 여기서 한 번 더 확인) ===== -->
+  <div id="bye" class="bye" hidden>
+    <div class="bye-card">
+      <div class="bye-emoji">👋</div>
+      <h2 id="bye-title" class="bye-title">오늘도 잘했어요!</h2>
+      <p id="bye-summary" class="bye-summary"></p>
+      <p id="bye-hint" class="bye-hint">내일 또 만나요</p>
+      <div class="bye-actions">
+        <button id="bye-back" class="btn">← 더 할래요</button>
+        <button id="bye-quit" class="btn btn-primary">🚪 끝내기</button>
+      </div>
     </div>
   </div>
 

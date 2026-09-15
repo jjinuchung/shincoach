@@ -197,3 +197,16 @@ test('🌟 황금 볼은 하루 한 번만 — 앱을 껐다 켜거나 다른 �
   await second.run('open({ id: "y", title: "Y" })');
   assert.equal(second.run('reviewGoldenTaken()'), true, '영화를 바꿔가며 여러 번 받는 것을 막는다');
 });
+
+test('👋 종료 인사: 오늘 한 줄 요약 (한 것만 보여줌)', () => {
+  const { run } = loadTrack(stub());
+  const call = (daily) => run(`byeSummary(${JSON.stringify(daily)})`);
+
+  assert.equal(call(null), '', '기록이 없는 날 (인사말만 보여준다)');
+  assert.equal(call({ date: '2026-09-16', doneKeys: [] }), '', '열어만 본 날');
+  assert.equal(
+    call({ doneKeys: ['a', 'b', 'c'], reviewSentences: 2, puzzles: 1, seconds: 930 }),
+    '오늘 문장 3개 · 🔁 복습 2개 · 🧩 퍼즐 1개 · ⏱ 16분',
+  );
+  assert.equal(call({ doneKeys: ['a'], seconds: 20 }), '오늘 문장 1개', '1분이 안 되면 시간은 생략');
+});

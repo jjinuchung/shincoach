@@ -256,6 +256,23 @@ export function todayPuzzles() {
   return t.daily ? (t.daily.puzzles || 0) : 0;
 }
 
+/**
+ * 👋 종료 인사 화면에 보여줄 오늘 한 줄 요약. 오늘 한 게 없으면 빈 문자열.
+ * 라이브러리 화면에서는 track이 열려 있지 않으므로 daily 레코드를 직접 받는 순수 함수로 둔다.
+ */
+export function byeSummary(daily) {
+  if (!daily) return '';
+  const parts = [];
+  const done = (daily.doneKeys || []).length;
+  if (done) parts.push(`문장 ${done}개`);
+  if (daily.reviewSentences) parts.push(`🔁 복습 ${daily.reviewSentences}개`);
+  if (daily.puzzles) parts.push(`🧩 퍼즐 ${daily.puzzles}개`);
+  const min = Math.round((daily.seconds || 0) / 60);
+  if (min) parts.push(`⏱ ${min}분`);
+  if (!parts.length) return '';
+  return `오늘 ${parts.join(' · ')}`;
+}
+
 /** 오늘 목표 보너스를 이미 받았는지 / 받았다고 표시 (목표 수치를 바꿔도 하루 한 번만) */
 export function goalRewarded() {
   return !!(t.daily && t.daily.goalRewarded);

@@ -161,7 +161,46 @@ button { font-family: inherit; }
 .library-delete { color: var(--danger); background: transparent; font-size: 1.2rem; padding: 8px; }
 .library-empty { text-align: center; color: var(--muted); line-height: 1.8; margin-top: 60px; }
 .library-empty[hidden] { display: none; }
-.storage-info { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 10px; }
+.storage-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 10px 10px calc(10px + var(--safe-bottom));
+}
+/* 🚪 종료: 실수로 누르지 않도록 맨 아래·차분한 색 (누르면 인사 화면에서 한 번 더 확인) */
+.btn-exit { background: #eef0f7; color: var(--muted); font-size: 0.9rem; padding: 8px 14px; min-height: 40px; }
+
+/* ===== 종료 인사 화면 ===== */
+.bye {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: rgba(31, 35, 64, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 120;
+}
+.bye[hidden] { display: none; }
+.bye-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 26px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+}
+.bye-emoji { font-size: 3rem; line-height: 1; }
+.bye-title { margin: 10px 0 6px; font-size: 1.3rem; }
+.bye-summary { margin: 0 0 4px; color: var(--text); font-weight: 600; }
+.bye-hint { margin: 0 0 18px; color: var(--muted); font-size: 0.9rem; }
+.bye-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.bye-actions .btn { flex: 1; min-width: 120px; }
 
 /* ===== 대화상자 ===== */
 .dialog {
