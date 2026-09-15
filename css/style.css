@@ -1256,7 +1256,7 @@ button { font-family: inherit; }
 .stats-note { color: var(--muted); font-size: 0.88rem; margin-top: 4px; }
 
 /* 📖 단어 패널에서 그 단어만 다시 듣기 */
-.vocab-item.playable { cursor: pointer; border-style: solid; min-height: 40px; }
+.vocab-item.playable { cursor: pointer; border-style: solid; min-height: 48px; } /* 아이 손가락 기준 (Codex P3) */
 .vocab-item.playable::after { content: ' 🔊'; opacity: 0.75; font-size: 0.85em; }
 .vocab-item.playable:active { transform: scale(0.97); filter: brightness(0.95); }
 

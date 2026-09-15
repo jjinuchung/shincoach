@@ -5,7 +5,7 @@ import {
 import { parseSubtitle, mergeIntoSentences } from './srt.js';
 import { openPlayer } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
-import { reviewSummary, stageIcon, GRADUATED } from './review.js';
+import { reviewSummary, wordSummary, stageIcon, GRADUATED } from './review.js';
 import { reloadProfile } from './xp.js';
 
 const $ = (id) => document.getElementById(id);
@@ -224,9 +224,9 @@ export async function renderStats() {
   }
 
   // 4) 복습 단어장
-  const wordRv = reviewSummary(vocabViews, today); // 🔤 단어 복습 현황
-  const c4 = card(wordRv.dueCount || wordRv.graduated
-    ? `복습 단어장 — 아이가 찾아본 단어 (오늘 물어볼 단어 ${wordRv.dueCount}개 · 👑 ${wordRv.graduated}개 완성)`
+  const wordRv = wordSummary(vocabViews, today); // 🔤 출제와 같은 자격으로 센다 (Codex #7)
+  const c4 = card(wordRv.due || wordRv.graduated
+    ? `복습 단어장 — 아이가 찾아본 단어 (복습할 차례인 단어 ${wordRv.due}개 · 👑 ${wordRv.graduated}개 완성)`
     : '복습 단어장 — 아이가 찾아본 단어');
   const vv = vocabViews.filter((v) => v.taps > 0 || v.views > 1).sort((a, b) => (b.taps - a.taps) || (b.views - a.views) || (b.lastAt - a.lastAt)).slice(0, 40);
   if (!vv.length) c4.appendChild(el('p', 'stats-empty', '아직 단어 패널을 열어본 기록이 없어요'));

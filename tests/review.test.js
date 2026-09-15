@@ -5,7 +5,7 @@ import {
   addDays, daysBetween, nextDue, enroll, schedule, isDue, stageIcon,
   pickReviews, reviewSummary, roundReward,
   REVIEW_INTERVALS, GRADUATED, STAGES, DEFAULT_COUNT, REWARD,
-  pickWordReviews, quizChoices,
+  pickWordReviews, quizChoices, wordSummary, isWordDue,
 } from '../js/review.js';
 
 /** 테스트용 문장 기록 만들기 */
@@ -235,4 +235,30 @@ test('quizChoices: 뜻이 같은 다른 단어는 오답으로 쓰지 않는다 
 test('quizChoices: 다른 단어가 없으면 정답 하나만 (호출 쪽에서 문항을 버린다)', () => {
   const ch = quizChoices(word(), [], () => 0);
   assert.deepEqual(ch, ['용감한']);
+});
+
+test('🔤 [Codex #3] 표기만 다른 같은 뜻은 오답으로 쓰지 않는다', () => {
+  const a = { word: 'look out', meaning: '조심해!' };
+  const others = [
+    { word: 'be careful', meaning: '조심해' },   // 구두점만 다름 → 제외
+    { word: 'watch out', meaning: '조심해!' },   // 완전히 같음 → 제외
+    { word: 'slow', meaning: '느린' },
+  ];
+  const ch = quizChoices(a, others, () => 0);
+  assert.deepEqual(ch.sort(), ['느린', '조심해!']);
+});
+
+test('🔤 [Codex #7] 단어 현황은 출제와 같은 자격으로 센다', () => {
+  const today = '2026-09-15';
+  const list = [
+    word({ word: 'fresh', dueAt: '' }),                    // 처음 → 출제 대상
+    word({ word: 'now', dueAt: '2026-09-15' }),            // 오늘 → 출제 대상
+    word({ word: 'later', dueAt: '2026-09-20' }),          // 아직 → 아님
+    word({ word: 'once', views: 1, dueAt: '' }),           // 한 번만 봄 → 아님
+    word({ word: 'done', box: GRADUATED, dueAt: '' }),     // 👑
+  ];
+  assert.deepEqual(wordSummary(list, today), { due: 2, graduated: 1 });
+  assert.equal(pickWordReviews(list, today, 10).length, 2, '현황과 실제 후보 수가 같아야 함');
+  assert.equal(isWordDue(word({ dueAt: '' }), today), true);
+  assert.equal(isWordDue(word({ views: 1 }), today), false);
 });

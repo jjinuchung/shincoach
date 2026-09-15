@@ -65,22 +65,56 @@ export function tokenize(text) {
  * 공백 토큰 기준이라 srt.wordTimings 자리와 1:1 — 그 구간만 다시 들려줄 때 쓴다.
  * 단어장의 term은 기본형("walk")이라 문장의 "walking"과 다를 수 있어 stem으로 비교한다.
  */
+/** 토큰 하나를 비교용으로 정제 (tokenize와 달리 한 글자 "I", "a"도 남긴다 — Codex #4) */
+function cleanToken(t) {
+  return String(t).replace(/^[^A-Za-z']+|[^A-Za-z']+$/g, '').toLowerCase();
+}
+
+/** 문장을 공백으로 나누되 각 토큰의 문자 위치도 함께 (표현 매치 위치 → 토큰 자리 변환용) */
+function splitWithPos(text) {
+  const src = String(text).replace(/\n/g, ' ');
+  const out = [];
+  const re = /\S+/g;
+  let m = re.exec(src);
+  while (m) {
+    out.push({ raw: m[0], start: m.index, end: m.index + m[0].length });
+    m = re.exec(src);
+  }
+  return out;
+}
+
+/**
+ * 문장에서 이 **단어 하나**가 있는 공백 토큰 자리 → [i, i] (없으면 null).
+ * 단어장의 term은 기본형("walk")이라 문장의 "walking"과 다를 수 있어 stem으로 비교한다.
+ * 같은 단어가 여러 번 나오면 첫 번째 자리를 쓴다 (패널이 중복 단어를 하나로 합치므로).
+ */
 export function findTokenRange(text, term, known) {
-  const raws = String(text).replace(/\n/g, ' ').split(/\s+/).filter(Boolean);
-  const stems = raws.map((r) => {
-    const t = tokenize(r)[0];
-    return t ? stemWord(t, known) : '';
-  });
-  const parts = String(term).replace(/…/g, ' ').split(/\s+/)
-    .map((w) => w.replace(/^[^A-Za-z']+|[^A-Za-z']+$/g, '').toLowerCase())
-    .filter(Boolean)
-    .map((w) => stemWord(w, known));
-  if (!parts.length) return null;
-  const from = stems.indexOf(parts[0]);
-  if (from < 0) return null;
-  if (parts.length === 1) return [from, from];
-  const last = stems.lastIndexOf(parts[parts.length - 1]);
-  return [from, last > from ? last : from];
+  const toks = splitWithPos(text);
+  const want = stemWord(cleanToken(term), known);
+  if (!want) return null;
+  for (let i = 0; i < toks.length; i++) {
+    const c = cleanToken(toks[i].raw);
+    if (c && stemWord(c, known) === want) return [i, i];
+  }
+  return null;
+}
+
+/**
+ * 정규식이 찾은 **문자 구간**을 공백 토큰 자리로 바꾼다 (표현용).
+ * 표현은 "get up"처럼 같은 단어가 문장에 여러 번 나올 수 있어, 첫 단어와 마지막 단어를
+ * 따로 찾으면 엉뚱하게 문장 전체가 잡힌다 (Codex #2) — 실제 매치 구간을 그대로 쓴다.
+ */
+export function charRangeToTokens(text, from, to) {
+  const toks = splitWithPos(text);
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < toks.length; i++) {
+    if (toks[i].end > from && toks[i].start < to) {
+      if (first < 0) first = i;
+      last = i;
+    }
+  }
+  return first < 0 ? null : [first, last];
 }
 
 /** 표현 사전의 키("figure * out")를 정규식으로 */
@@ -133,7 +167,18 @@ export function createVocab(data) {
   }
 
   /** 문장에서 이 단어·표현의 공백 토큰 범위 (🔊 그 부분만 듣기용) */
-  function findRange(text, term) {
+  function findRange(text, term, kind) {
+    // 표현은 lookup이 쓴 것과 같은 정규식으로 실제 매치 구간을 찾는다.
+    // 첫 단어와 끝 단어를 따로 찾으면 "Get up and stand up."에서 문장 전체가 잡힌다 (Codex #2)
+    if (kind === 'phrase') {
+      const key = String(term).replace(/…/g, '*');
+      const p = phrases.find((x) => x.key === key);
+      if (!p) return null;
+      const src = String(text).replace(/\n/g, ' ');
+      const m = src.match(p.re);
+      if (!m || m.index === undefined) return null;
+      return charRangeToTokens(text, m.index, m.index + m[0].length);
+    }
     return findTokenRange(text, term, known);
   }
 

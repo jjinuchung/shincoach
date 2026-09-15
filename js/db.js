@@ -255,14 +255,24 @@ export async function bumpVocabViews(entries, tapped) {
   await txDone(tx);
 }
 
-/** 🔁 단어 복습 결과 저장 (box·dueAt·횟수) */
-export async function putVocabReview(word, patch) {
+/**
+ * 🔁 단어 복습 결과 저장.
+ * 미리 계산한 절대값(box·횟수)을 넘기면, 콘텐츠를 열 때 읽어둔 옛 값으로 최신 기록을
+ * 덮어쓴다 (두 창이 같은 quizzes를 읽으면 둘 다 +1 한 값을 쓴다 — Codex #6).
+ * 그래서 **트랜잭션 안에서 읽은 최신 기록**을 updater에 넘겨 거기서 계산하게 한다.
+ * @param {(cur:object) => object} updater 최신 기록 → 덮어쓸 필드
+ * @returns {Promise<object|null>} 저장된 기록 (없는 단어면 null)
+ */
+export async function updateVocabReview(word, updater) {
   const db = await openDb();
   const tx = db.transaction('vocabViews', 'readwrite');
   const store = tx.objectStore('vocabViews');
   const cur = await promisify(store.get(word));
-  if (cur) store.put({ ...cur, ...patch, reviewedAt: Date.now() });
+  if (!cur) { await txDone(tx); return null; }
+  const next = { ...cur, ...updater(cur), reviewedAt: Date.now() };
+  store.put(next);
   await txDone(tx);
+  return next;
 }
 
 export async function listVocabViews() {
@@ -397,7 +407,7 @@ export function mergeStatRecord(name, cur, rec) {
     }
   } else if (name === 'daily') {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
-    for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles', 'reviewSentences', 'reviewRounds', 'reviewSkips']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles', 'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips']) out[k] = maxOf(cur[k], rec[k]);
     out.goalRewarded = !!(cur.goalRewarded || rec.goalRewarded);
     out.hpMissed = !!(cur.hpMissed || rec.hpMissed);
     out.reviewGolden = !!(cur.reviewGolden || rec.reviewGolden); // 🌟 하루 1개 — 백업을 되돌려 다시 받는 것도 막는다

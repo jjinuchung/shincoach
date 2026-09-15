@@ -1,5 +1,5 @@
 // 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
-import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, putVocabReview } from './db.js';
+import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
@@ -496,19 +496,27 @@ function cueForStart(start) {
   return state.cues.find((c) => Math.round(c.start * 10) === key) || null;
 }
 
+/** 🔤 본 단어 기록을 다시 읽어둔다 (복습 문항을 만들기 직전에 — 오래된 캐시를 쓰지 않게, Codex #6) */
+function refreshVocabViews() {
+  return listVocabViews()
+    .then((v) => { state.vocabViews = v || []; })
+    .catch(() => { state.vocabViews = state.vocabViews || []; });
+}
+
 /** 이번 회차에 낼 복습 문장 (없으면 빈 배열) */
 function reviewItems() {
   const per = settings.reviewCount;
   if (!per) return []; // ⚙에서 끔
   const today = track.todayKey();
-  const remain = per - (track.todayReviewSentences() % per); // 중간에 그만뒀으면 남은 만큼만 채우면 완주
+  const remain = per - (track.todayReviewItems() % per); // 문장·단어를 함께 세야 회차 길이가 맞는다 (Codex #1)
 
-  // 🔤 단어 문항 (회차당 최대 1개) — 아이가 여러 번 본 단어의 뜻을 물어본다
+  // 🔤 단어 문항 (회차당 최대 1개) — 아이가 여러 번 본 단어의 뜻을 물어본다.
+  // 보기가 2개는 돼야 문제가 되므로, 만들어 본 뒤 실제 개수만큼만 문장 자리를 줄인다
   const words = remain > 1 ? pickWordReviews(state.vocabViews, today, MAX_WORD_ITEMS) : [];
   const wordItems = words.map((rec) => ({
     type: 'word', rec, word: rec.word, meaning: rec.meaning,
     choices: quizChoices(rec, state.vocabViews),
-  })).filter((it) => it.choices.length >= 2); // 보기가 2개는 돼야 문제가 된다
+  })).filter((it) => it.choices.length >= 2);
 
   // 지금 자막에 없는 기록을 먼저 걸러낸다 — 나중에 거르면 그런 기록이 상위를 차지했을 때
   // 뒤의 멀쩡한 문장까지 가려서 복습이 아예 안 뜬다 (Codex #7)
@@ -578,15 +586,25 @@ function startReview(items, practice) {
     },
     onWord: (item, passed) => {
       if (practice) return null;
-      const next = reviewSchedule(item.rec.box || 0, passed, track.todayKey());
+      const today = track.todayKey();
       const rec = item.rec;
-      rec.box = next.box;
-      rec.dueAt = next.dueAt;
-      rec.quizzes = (rec.quizzes || 0) + 1;
-      if (passed) rec.quizPass = (rec.quizPass || 0) + 1;
-      putVocabReview(rec.word, { box: rec.box, dueAt: rec.dueAt, quizzes: rec.quizzes, quizPass: rec.quizPass }).catch(() => {});
+      // 횟수·다음 날짜는 **저장 시점의 최신 기록**으로 계산한다 (Codex #6).
+      // 화면에는 지금 아는 값으로 단계를 먼저 보여주고, 저장 결과가 오면 메모리를 맞춘다.
+      const shown = reviewSchedule(rec.box || 0, passed, today);
+      updateVocabReview(rec.word, (cur) => {
+        const next = reviewSchedule(cur.box || 0, passed, today);
+        return {
+          box: next.box, dueAt: next.dueAt,
+          quizzes: (cur.quizzes || 0) + 1,
+          quizPass: (cur.quizPass || 0) + (passed ? 1 : 0),
+        };
+      }).then((saved) => {
+        if (!saved) return;
+        Object.assign(rec, { box: saved.box, dueAt: saved.dueAt, quizzes: saved.quizzes, quizPass: saved.quizPass });
+      }).catch(() => {});
+      track.reviewWord();
       if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
-      return { box: next.box, graduated: next.box >= REVIEW_GRADUATED };
+      return { box: shown.box, graduated: shown.box >= REVIEW_GRADUATED };
     },
     onFinished: () => (practice ? null : grantReviewRound()),
     onDone: (s) => {
@@ -603,14 +621,20 @@ function startReview(items, practice) {
 function startReviewNow() {
   if (state.reviewOpen) return;
   if (!state.open || !state.cues.length) return;
-  const items = track.statsList()
-    .filter((r) => r.done && cueForStart(r.start)) // 자막에 없는 기록을 먼저 제외 (Codex #7)
-    .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0))
-    .slice(0, Math.max(1, (settings.reviewCount || REVIEW_COUNT) - 1))
-    .map((rec) => ({ type: 'sentence', rec, cue: cueForStart(rec.start) }));
+  refreshVocabViews().then(() => { if (state.open && !state.reviewOpen) openPracticeReview(); });
+}
+
+function openPracticeReview() {
+  const per = settings.reviewCount || REVIEW_COUNT;
+  // 쓸 수 있는 단어 문항을 먼저 만들고, 그 수만큼만 문장 자리를 줄인다 (Codex #8)
   const w = pickWordReviews(state.vocabViews, track.todayKey(), MAX_WORD_ITEMS)
     .map((rec) => ({ type: 'word', rec, word: rec.word, meaning: rec.meaning, choices: quizChoices(rec, state.vocabViews) }))
     .filter((it) => it.choices.length >= 2);
+  const items = track.statsList()
+    .filter((r) => r.done && cueForStart(r.start)) // 자막에 없는 기록을 먼저 제외 (Codex #7)
+    .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0))
+    .slice(0, Math.max(1, per - w.length))
+    .map((rec) => ({ type: 'sentence', rec, cue: cueForStart(rec.start) }));
   items.push(...w);
   if (!items.length) { showPlayerMessage('🔁 아직 복습할 문장이 없어요 — 문장을 몇 개 끝내면 생겨요', 4000); return; }
   startReview(items, true);
@@ -849,7 +873,7 @@ function renderVocab() {
   list.innerHTML = '';
   for (const it of items) {
     // 🔊 문장 안에서 이 단어가 있는 자리를 찾으면 눌러서 그 부분만 다시 들을 수 있게
-    const range = state.vocab.findRange ? state.vocab.findRange(cue.en, it.term) : null;
+    const range = state.vocab.findRange ? state.vocab.findRange(cue.en, it.term, it.kind) : null;
     const el = document.createElement(range ? 'button' : 'span');
     if (range) el.type = 'button';
     el.className = `vocab-item ${it.kind}${range ? ' playable' : ''}`;
@@ -950,8 +974,8 @@ export async function openPlayer(id, opts = {}) {
     }
     goTo(startIdx, { play: false });
     // 🔤 단어 문항을 만들려면 본 단어 기록이 필요하다 — 읽고 나서 복습을 제안
-    listVocabViews().then((v) => { state.vocabViews = v || []; }).catch(() => { state.vocabViews = []; })
-      .then(() => { if (state.open) maybeReview(); });
+    const myItem = state.item;
+    refreshVocabViews().then(() => { if (state.open && state.item === myItem) maybeReview(); });
   };
   video.addEventListener('loadedmetadata', state.onMeta, { once: true });
 }
@@ -1823,7 +1847,10 @@ function updateChips() {
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
   if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen) return; // 퍼즐·잡기·배틀·복습 화면 중에는 플레이어 단축키 무시
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  // 버튼·요약·링크에 포커스가 있으면 그 요소의 기본 동작(Space/Enter로 누르기)을 살린다 (Codex #5)
+  const tag = e.target && e.target.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SUMMARY' || tag === 'A') return;
+  if (e.target && e.target.isContentEditable) return;
   switch (e.key) {
     case ' ': e.preventDefault(); onPlayButton(); break;
     case 'ArrowLeft': e.preventDefault(); step(-1); break;

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { stemWord, stripContraction, tokenize, createVocab, findTokenRange } from '../js/vocab.js';
+import { stemWord, stripContraction, tokenize, createVocab, findTokenRange, charRangeToTokens } from '../js/vocab.js';
 
 const read = (f) => JSON.parse(readFileSync(new URL('../vocab/' + f, import.meta.url), 'utf8'));
 const vocab = createVocab({ basic: read('basic.json'), words: read('words.json'), phrases: read('phrases.json') });
@@ -73,12 +73,37 @@ test('findTokenRange: 문장 속 단어의 공백 토큰 자리 (기본형 ↔ �
   assert.equal(findTokenRange(t, '', known), null);
 });
 
-test('findTokenRange: 표현은 첫 단어부터 마지막 단어까지', () => {
-  const known = new Set(['look', 'up', 'figure', 'out']);
-  assert.deepEqual(findTokenRange('Please look it up now.', 'look … up', known), [1, 3]);
-  assert.deepEqual(findTokenRange('Can you figure this out?', 'figure … out', known), [2, 4]);
-  // 마지막 단어가 없으면 첫 단어만
-  assert.deepEqual(findTokenRange('Just look at me.', 'look … up', known), [1, 1]);
+test('[Codex #2] 표현은 실제 매치 구간 — 첫/끝 단어를 따로 찾으면 문장 전체가 잡힌다', () => {
+  const v = createVocab({
+    basic: ['get', 'up', 'and', 'stand', 'a', 'i'],
+    words: { pick: '고르다', card: '카드' },
+    phrases: { 'get up': '일어나', 'pick * up': '집어 들다', 'i mean': '내 말은', 'a lot': '많이' },
+  });
+  assert.deepEqual(v.findRange('Get up and stand up.', 'get up', 'phrase'), [0, 1], '문장 전체가 아니라 앞의 get up');
+  assert.deepEqual(v.findRange('Pick a card, then pick it up and stand up.', 'pick … up', 'phrase'), [4, 6], '실제로 매치된 pick it up');
+  assert.equal(v.findRange('Just look at me.', 'get up', 'phrase'), null, '없으면 버튼을 만들지 않는다');
+});
+
+test('[Codex #4] 한 글자로 시작하는 표현도 자리를 찾는다 (i mean, a lot)', () => {
+  const v = createVocab({
+    basic: ['i', 'a', 'mean', 'lot'],
+    words: {},
+    phrases: { 'i mean': '내 말은', 'a lot': '많이' },
+  });
+  assert.deepEqual(v.findRange('I mean a lot.', 'i mean', 'phrase'), [0, 1]);
+  assert.deepEqual(v.findRange('I mean a lot.', 'a lot', 'phrase'), [2, 3]);
+});
+
+test('charRangeToTokens: 문자 구간 → 공백 토큰 자리', () => {
+  const t = 'Get up and stand up.';
+  assert.deepEqual(charRangeToTokens(t, 0, 6), [0, 1], '"Get up"');
+  assert.deepEqual(charRangeToTokens(t, 11, 20), [3, 4], '"stand up."');
+  assert.equal(charRangeToTokens(t, 100, 110), null, '범위 밖');
+});
+
+test('findTokenRange: 같은 단어가 여러 번 나오면 첫 자리 (패널이 중복 단어를 합치므로)', () => {
+  const known = new Set(['up']);
+  assert.deepEqual(findTokenRange('Get up and stand up.', 'up', known), [1, 1]);
 });
 
 test('findTokenRange 자리는 wordTimings 자리와 같은 규칙(공백 토큰)', () => {

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD } from '../js/review.js';
+import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD } from '../js/review.js';
 import { wordResults } from '../js/speak.js';
 import { wordTimings as realWordTimings } from '../js/srt.js';
 
@@ -60,7 +60,7 @@ function loadPlayer() {
   const battleCalls = [];
   const battleState = { roll: false, caught: {}, won: [], lost: [] };
   const reviewCalls = [];
-  const reviewState = { stats: [], sentences: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
+  const reviewState = { stats: [], sentences: 0, items: 0, words: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
   const missedLog = [];
   const vocabViewsStub = [];
   const vocabReviewLog = [];
@@ -83,8 +83,10 @@ function loadPlayer() {
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
     track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, hpMissedApplied: () => false, markHpMissed() {}, todayBattles: () => 0, markBattle() {}, MASTER_RATIO: 0.8, puzzle() {},
       // 🔁 복습 스텁: 문장 기록과 오늘 상태를 reviewState로 제어
-      statsList: () => reviewState.stats, review(cue, passed) { reviewState.reviewed.push({ start: cue.start, passed }); return { box: 1, graduated: false }; },
-      todayReviewSentences: () => reviewState.sentences, todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
+      statsList: () => reviewState.stats, review(cue, passed) { reviewState.reviewed.push({ start: cue.start, passed }); reviewState.items++; return { box: 1, graduated: false }; },
+      todayReviewSentences: () => reviewState.sentences, todayReviewItems: () => reviewState.items,
+      reviewWord() { reviewState.items++; reviewState.words++; },
+      todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
       reviewGoldenTaken: () => reviewState.golden, markReviewGolden() { reviewState.golden = true; },
       todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; },
       // 🎯 못 말한 단어 기록
@@ -127,9 +129,9 @@ function loadPlayer() {
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
     initReview() {}, abortReview() {}, isReviewOpen: () => false, openReview(o) { reviewCalls.push(o); },
-    pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, reviewSchedule,
+    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
-    listVocabViews: async () => vocabViewsStub, putVocabReview: async (w, patch) => { vocabReviewLog.push({ word: w, ...patch }); },
+    listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
     // 🎯 말하기 단어별 결과: 실제 모듈을 그대로 씀
@@ -1007,6 +1009,11 @@ test('🎮 부족한 캐릭터는 인터넷이 되면 자동으로 받고, 오�
 
 // ── 🔁 복습 연동 ──
 
+/** 단어 기록 스텁 심기 */
+function vocabStub(reviewState, list) {
+  reviewState.vocab = list;
+}
+
 /** 복습 대상 문장 기록 하나 만들기 */
 function due(start, patch = {}) {
   return { key: `x|${start * 10}`, itemId: 'x', start, en: 'Hello there.', ko: '안녕.', done: true, box: 0, dueAt: '2026-09-01', bestRatio: 0.5, speakSkipped: 0, lastAt: start, ...patch };
@@ -1095,7 +1102,7 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 🌟 황금 볼
 test('🔁 중간에 그만뒀으면 남은 문장만 채우면 완주 (1문장만 냄)', () => {
   const { run, reviewCalls, reviewState } = loadPlayer();
   reviewState.stats = [due(1), due(2), due(3), due(4)];
-  reviewState.sentences = 2; // 오늘 이미 2문장 했음 (3문장 회차 중)
+  reviewState.items = 2; // 오늘 이미 2문항 했음 (3문항 회차 중 — 문장이든 단어든)
   run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""},{start:4,end:5,en:"d",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
   assert.equal(reviewCalls[0].items.length, 1, '한 문장만 더 하면 완주');
 });
@@ -1120,10 +1127,11 @@ test('🔁 [Codex #7] 자막에 없는 기록이 우선순위 상위를 차지�
   assert.deepEqual(Array.from(reviewCalls[0].items).map((x) => x.cue.start), [1, 2]); // vm 배열 복사 후 비교
 });
 
-test('🔁 [Codex #9] ⚙ 연습 중에는 학습 시간이 쌓이지 않는다', () => {
+test('🔁 [Codex #9] ⚙ 연습 중에는 학습 시간이 쌓이지 않는다', async () => {
   const { run, reviewCalls, reviewState } = loadPlayer();
   reviewState.stats = [due(1, { lastAt: 5 })];
   run('state.cues = [{start:1,end:2,en:"a",ko:""}]; settings.reviewCount = 3; startReviewNow();');
+  await tick(); // 단어 목록을 다시 읽은 뒤에 열린다
   assert.equal(reviewCalls.length, 1);
   assert.equal(reviewCalls[0].practice, true);
   assert.equal(run('state.practiceOpen'), true, '연습 표시가 켜져야 시간·기록이 안 쌓임');
@@ -1237,4 +1245,22 @@ test('🎯 [Codex #5] 기록에는 화면 토큰이 아니라 실제로 못 말�
   run('video.currentTime = 2; onCueEnd()');
   run('skipShadowWait()'); await tick();
   assert.deepEqual(Array.from(missedLog[0]), ['known'], 'wellknown 같은 합성 단어가 아니라 실제 누락 단어'); // vm 배열이라 복사 후 비교
+});
+
+test('🔤 [Codex #1] 단어를 푼 회차도 문항 수에 세어 다음 회차가 짧아지지 않는다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3), due(4)];
+  vocabStub(reviewState, [{ word: 'brave', meaning: '용감한', views: 3, box: 0, dueAt: '' }, { word: 'x', meaning: '느린', views: 3 }]);
+  run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""},{start:4,end:5,en:"d",ko:""}]; settings.reviewCount = 3; state.reviewDone = false;');
+  run('state.vocabViews = ' + JSON.stringify([{ word: 'brave', meaning: '용감한', views: 3, box: 0, dueAt: '' }, { word: 'x', meaning: '느린', views: 3, box: 0, dueAt: '' }]) + '; maybeReview();');
+  const o = reviewCalls[0];
+  assert.equal(o.items.length, 3, '문장 2 + 단어 1');
+  assert.equal(Array.from(o.items).filter((it) => it.type === 'word').length, 1);
+
+  // 문장 2개 + 단어 1개를 끝내면 오늘 문항 수가 3이 되어야 한다
+  o.onSentence({ start: 1, en: 'a' }, true);
+  o.onSentence({ start: 2, en: 'b' }, true);
+  o.onWord(Array.from(o.items).find((it) => it.type === 'word'), true);
+  assert.equal(reviewState.items, 3, '단어도 회차 진행 수에 들어가야 함');
+  assert.equal(run('track.todayReviewItems() % settings.reviewCount'), 0, '다음 회차는 처음부터 3문항');
 });

@@ -54,6 +54,7 @@ function rollDailyIfNeeded() {
     t.daily.hpMissed = !!(t.daily.hpMissed || existing.hpMissed);
     t.daily.battles = (t.daily.battles || 0) + (existing.battles || 0);
     t.daily.reviewSentences = (t.daily.reviewSentences || 0) + (existing.reviewSentences || 0);
+    t.daily.reviewItems = (t.daily.reviewItems || 0) + (existing.reviewItems || 0);
     t.daily.reviewRounds = (t.daily.reviewRounds || 0) + (existing.reviewRounds || 0);
     t.daily.reviewGolden = !!(t.daily.reviewGolden || existing.reviewGolden);
     t.daily.reviewSkips = (t.daily.reviewSkips || 0) + (existing.reviewSkips || 0);
@@ -141,6 +142,7 @@ export function review(cue, passed) {
   }
   if (t.daily) {
     t.daily.reviewSentences = (t.daily.reviewSentences || 0) + 1;
+    t.daily.reviewItems = (t.daily.reviewItems || 0) + 1;
     t.dailyDirty = true;
   }
   return { box: r.box, dueAt: r.dueAt, graduated: r.box >= GRADUATED };
@@ -160,6 +162,21 @@ export function missedWords(cue, words) {
     const cur = Object.prototype.hasOwnProperty.call(r.missed, k) ? r.missed[k] : 0;
     r.missed[k] = (Number.isFinite(cur) ? cur : 0) + 1;
   }
+}
+
+/**
+ * 🔤 복습의 단어 문항을 하나 끝냈을 때 — 회차 진행 수만 센다.
+ * (문장 수와 따로 세지 않으면, 단어를 푼 회차는 다음번에 짧아지고 완주 보상이 또 나간다 — Codex #1)
+ */
+export function reviewWord() {
+  if (!t.daily) return;
+  t.daily.reviewItems = (t.daily.reviewItems || 0) + 1;
+  t.dailyDirty = true;
+}
+
+/** 오늘 복습에서 끝낸 문항 수 (문장 + 단어) */
+export function todayReviewItems() {
+  return t.daily ? (t.daily.reviewItems || 0) : 0;
 }
 
 /** 현재 콘텐츠의 문장 기록 전부 (복습 대상 고르기·현황 표시용) */

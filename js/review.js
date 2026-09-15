@@ -114,13 +114,27 @@ export const WORD_MIN_VIEWS = 2;
  * 문장과 같은 라이트너 규칙을 쓰되, 아직 복습에 들어오지 않은 단어(dueAt 없음)는
  * 여기서 바로 처음 출제한다 (단어는 "완료" 시점이 따로 없으므로).
  */
-export function pickWordReviews(records, today, count = MAX_WORD_ITEMS) {
-  const pool = (records || []).filter((r) => {
-    if (!r || !r.word || !r.meaning) return false;
-    if ((r.box || 0) >= GRADUATED) return false;
-    if ((r.views || 0) < WORD_MIN_VIEWS) return false;
-    return !r.dueAt || r.dueAt <= today; // 처음 보는 단어이거나, 때가 된 단어
+export function isWordDue(r, today) {
+  if (!r || !r.word || !r.meaning) return false;
+  if ((r.box || 0) >= GRADUATED) return false;
+  if ((r.views || 0) < WORD_MIN_VIEWS) return false;
+  return !r.dueAt || r.dueAt <= today; // 처음 보는 단어이거나, 때가 된 단어
+}
+
+/** 단어 복습 현황 — 출제와 같은 자격으로 센다 (📊가 실제 후보와 어긋나지 않게, Codex #7) */
+export function wordSummary(records, today) {
+  let due = 0;
+  let graduated = 0;
+  (records || []).forEach((r) => {
+    if (!r || !r.word) return;
+    if ((r.box || 0) >= GRADUATED) { graduated++; return; }
+    if (isWordDue(r, today)) due++;
   });
+  return { due, graduated };
+}
+
+export function pickWordReviews(records, today, count = MAX_WORD_ITEMS) {
+  const pool = (records || []).filter((r) => isWordDue(r, today));
   pool.sort((a, b) => {
     const boxA = a.box || 0;
     const boxB = b.box || 0;
@@ -138,7 +152,10 @@ export function pickWordReviews(records, today, count = MAX_WORD_ITEMS) {
  * 뜻이 같은 보기는 빼고(정답이 둘이 되지 않게), 모자라면 있는 만큼만.
  */
 export function quizChoices(answer, others, rng = Math.random) {
-  const seen = new Set([String(answer.meaning)]);
+  // "조심해!"와 "조심해"는 아이에게 같은 뜻이다 — 표기만 다른 보기를 오답으로 내면
+  // 정답을 알고도 틀렸다고 나온다 (Codex #3). 비교는 정규화해서, 화면에는 원문 그대로.
+  const key = (m) => String(m).replace(/[\s!?.,~…'"()\[\]]/g, '');
+  const seen = new Set([key(answer.meaning)]);
   const wrong = [];
   const pool = (others || []).filter((r) => r && r.meaning && r.word !== answer.word);
   // 섞어서 앞에서부터 (같은 뜻·같은 표기는 제외)
@@ -149,8 +166,9 @@ export function quizChoices(answer, others, rng = Math.random) {
   }
   for (const i of idx) {
     const m = String(pool[i].meaning);
-    if (seen.has(m)) continue;
-    seen.add(m);
+    const k = key(m);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
     wrong.push(m);
     if (wrong.length >= 3) break;
   }
