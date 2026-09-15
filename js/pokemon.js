@@ -198,9 +198,11 @@ async function anchorOf(blob) {
  * 명단 중 아직 없는 캐릭터를 인터넷에서 받아 저장. onProgress(done, total, name)
  * 반환: { ok: 받은 수, fail: 실패 수 } — 일부 실패해도 받은 것은 남고, 다시 누르면 없는 것만 이어서 받음
  */
-export async function downloadCharacters(onProgress) {
+export async function downloadCharacters(onProgress, limit) {
   const have = new Set((await loadCharacters()).map((c) => c.id));
-  const todo = ROSTER.filter((r) => !have.has(r.id));
+  // limit이 있으면 그만큼만 — 한 번에 수십 마리를 받다 느린 와이파이에서 끊기면
+  // 받은 것도 없이 끝나기 때문에, 자동 받기는 조금씩 나눠 받는다
+  const todo = ROSTER.filter((r) => !have.has(r.id)).slice(0, limit && limit > 0 ? limit : undefined);
   let ok = 0;
   let fail = 0;
   for (let i = 0; i < todo.length; i++) {

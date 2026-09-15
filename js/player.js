@@ -58,6 +58,7 @@ const state = {
   puzzleOnEnd: null,  // 퍼즐 다시 듣기가 끝났을 때 알릴 콜백 (정답 뒤 들려주기 → 닫기)
   characters: [],     // 🎮 기기에 받아둔 퍼즐 캐릭터 [{ id, ko, url }] (없으면 단어 조각만)
   charDownloading: false, // 캐릭터 받는 중 (자동·수동 중복 실행 방지)
+  charTimer: null,    // 부족한 캐릭터를 조금씩 계속 받아오는 타이머
   catchOpen: false,   // 🎯 잡기 화면이 열려 있음 (키보드 무시)
   streakBase: 0,      // 🔥 어제까지의 연속 학습일 (오늘 5문장 채우면 +1)
   streakToday: false, // 오늘 5문장을 채워 스트릭에 들어갔는지
@@ -587,6 +588,7 @@ function startReview(items, practice) {
   if (!video.paused) video.pause();
   const p = practice ? null : partnerInfo();
   const summary = reviewSummary(track.statsList(), track.todayKey());
+  const spot = rememberSpot(); // 복습은 다른 문장을 들려주므로 끝나고 제자리로
   setReviewOpen(true);
   state.practiceOpen = !!practice;
   openReview({
@@ -644,6 +646,7 @@ function startReview(items, practice) {
       setReviewOpen(false);
       state.practiceOpen = false;
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
+      restoreSpot(spot);
       if (!practice && !s.started && !s.done) track.markReviewSkip(); // 시작도 안 하고 닫음
       if (!practice) track.flush();
     },
@@ -673,6 +676,24 @@ function openPracticeReview() {
   startReview(items, true);
 }
 
+/**
+ * 지금 보고 있던 자리를 기억한다 — 퍼즐·복습·배틀은 다른 문장을 들려주므로 영상 위치가 바뀐다.
+ * 끝나고 제자리로 돌려놓지 않으면, 아이가 배틀에 나왔던 문장 위치에서 학습을 이어가게 된다.
+ */
+function rememberSpot() {
+  return { itemId: state.item ? state.item.id : null, idx: state.idx, time: video.currentTime };
+}
+
+/** 기억해 둔 자리로 되돌림 (그 사이 콘텐츠가 바뀌었으면 아무것도 안 함) */
+function restoreSpot(spot) {
+  if (!spot || !state.open || !state.item || state.item.id !== spot.itemId) return;
+  if (!state.cues[spot.idx]) return;
+  state.wordPlayUntil = 0;
+  if (state.idx !== spot.idx) { goTo(spot.idx, { play: false }); return; }
+  if (!video.paused) video.pause();
+  if (Number.isFinite(spot.time)) video.currentTime = spot.time;
+}
+
 /** ⚙ 배틀 연습: 아무 상대와 결과 반영 없이 (파트너도 내보낼 수 있음) */
 function startBattlePractice() {
   if (state.battleOpen) return; // 진행 중인 배틀을 연습으로 덮어쓰지 않음 (Codex #6)
@@ -686,9 +707,10 @@ function startBattlePractice() {
   cancelShadowWait();
   setBattleOpen(true);
   state.practiceOpen = true;
+  const spot = rememberSpot();
   openBattle({
     opponent, mine, potions: potionList, usePotion: () => true, nextCue: battleCue, speak: speakSentence, practice: true,
-    onDone: () => { setBattleOpen(false); state.practiceOpen = false; state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null; },
+    onDone: () => { setBattleOpen(false); state.practiceOpen = false; state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null; restoreSpot(spot); },
   });
 }
 
@@ -713,7 +735,8 @@ function startPuzzleNow() {
   const cue = pickPuzzle([state.cues[state.idx]]) || pickPuzzle(state.cues.slice(Math.max(0, state.idx - 10), state.idx));
   if (!cue) { showPlayerMessage('🧩 이 근처에는 퍼즐로 낼 문장(3~8단어)이 없어요', 4000); return; }
   state.practiceOpen = true;
-  showPuzzle(cue, () => { state.practiceOpen = false; });
+  const spot = rememberSpot();
+  showPuzzle(cue, () => { state.practiceOpen = false; restoreSpot(spot); });
 }
 
 /** 퍼즐 화면 열기 (재생 멈춤·따라 말하기 취소). 끝나면 onDone(result) */
@@ -739,8 +762,8 @@ function showPuzzle(cue, onDone) {
 // ───────────────────── 🎮 퍼즐 캐릭터 (⚙에서 한 번 받아 기기에 보관) ─────────────────────
 
 function initCharacters() {
-  loadCharacters().then((chars) => { state.characters = chars; updateCharStatus(); updatePartnerChip(); autoDownloadCharacters(); }).catch(() => {});
-  $('char-download').addEventListener('click', () => runCharacterDownload(true));
+  loadCharacters().then((chars) => { state.characters = chars; updateCharStatus(); updatePartnerChip(); autoDownloadCharacters(); startCharacterTopUp(); }).catch(() => {});
+  $('char-download').addEventListener('click', () => runCharacterDownload(true)); // 수동은 한 번에 전부
   // 인터넷이 다시 연결되면 부족한 캐릭터를 조용히 받아옴 (명단을 늘려도 부모가 신경 안 쓰게)
   window.addEventListener('online', autoDownloadCharacters);
   // 인터넷이 돌아오면 음성 인식을 바로 다시 시도 (끊긴 동안 소리 길이 판정으로 빠져 있었을 수 있음)
@@ -748,10 +771,24 @@ function initCharacters() {
 }
 
 /** 인터넷이 되고 부족한 캐릭터가 있으면 자동으로 받기 (앱 시작·온라인 전환 때 한 번씩 시도) */
+/** 자동 받기는 한 번에 이만큼만 (느린 와이파이에서 끊겨도 받은 만큼은 남는다) */
+const AUTO_CHAR_BATCH = 8;
+/** 부족하면 이 간격으로 계속 조금씩 받아옴 */
+const AUTO_CHAR_EVERY_MS = 3 * 60 * 1000;
+
 function autoDownloadCharacters() {
   if (state.charDownloading || navigator.onLine === false) return;
   if (state.characters.length >= ROSTER.length) return;
-  runCharacterDownload(false);
+  runCharacterDownload(false, AUTO_CHAR_BATCH);
+}
+
+/** 앱이 열려 있는 동안 부족한 캐릭터를 조금씩 계속 받아온다 (한 번 실패하면 끝나지 않게) */
+function startCharacterTopUp() {
+  if (state.charTimer) return;
+  state.charTimer = setInterval(() => {
+    if (state.characters.length >= ROSTER.length) { clearInterval(state.charTimer); state.charTimer = null; return; }
+    autoDownloadCharacters();
+  }, AUTO_CHAR_EVERY_MS);
 }
 
 function updateCharStatus(text) {
@@ -763,13 +800,13 @@ function updateCharStatus(text) {
 }
 
 /** 캐릭터 받기 (manual: ⚙ 버튼으로 눌렀는지 — 실패 안내를 보여줄지 결정) */
-async function runCharacterDownload(manual) {
+async function runCharacterDownload(manual, limit) {
   if (state.charDownloading) return;
   state.charDownloading = true;
   const btn = $('char-download');
   btn.disabled = true;
   try {
-    const r = await downloadCharacters((done, total, name) => updateCharStatus(`받는 중… ${done}/${total} ${name}`));
+    const r = await downloadCharacters((done, total, name) => updateCharStatus(`받는 중… ${done}/${total} ${name}`), limit);
     state.characters = await loadCharacters();
     updateCharStatus();
     if (r.fail) {

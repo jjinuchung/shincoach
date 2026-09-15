@@ -1361,3 +1361,61 @@ test('⚙ 말하기 결과 보는 시간은 1~5초로 제한된다', () => {
   run('settings.resultPause = undefined;');
   assert.equal(run('resultPauseMs()'), 3000, '값이 없으면 기본 3초');
 });
+
+// ── 연습·복습 뒤 영상 자리 되돌리기 ──
+
+test('⚔️ 배틀 연습이 끝나면 보던 자리로 돌아온다 (배틀 문장 위치가 아니라)', () => {
+  const { run, video, battleCalls, ctx } = loadPlayer();
+  ctx.battleState.caught = { 25: 1 };
+  run(`state.cues = [
+    {start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""},{start:20,end:22,en:"c",ko:""},
+    {start:30,end:32,en:"d",ko:""},{start:40,end:42,en:"e",ko:""}
+  ]; state.item = { id: "x" }; state.idx = -1;`);
+  run('goTo(4)');                      // 아이는 5번째 문장에서 학습 중
+  video.currentTime = 41;
+  run('state.characters = [{ id: 25, ko: "피카츄", url: "x" }]; startBattlePractice()');
+  assert.equal(battleCalls.length, 1);
+
+  // 배틀이 앞쪽 문장을 들려줘서 영상이 과거로 갔다고 치고
+  video.currentTime = 11;
+  run('state.idx = 1;');
+  battleCalls[0].onDone({ outcome: 'declined', opponent: battleCalls[0].opponent, turns: 0 });
+  assert.equal(run('state.idx'), 4, '원래 문장으로');
+  assert.equal(video.paused, true);
+});
+
+test('🧩 퍼즐 연습도 끝나면 보던 자리로', () => {
+  const { run, video, puzzleCalls } = loadPlayer();
+  run('state.cues = [{start:0,end:2,en:"one two three",ko:""},{start:10,end:12,en:"b",ko:""},{start:20,end:22,en:"c",ko:""}]; state.item = { id: "x" }; state.idx = -1;');
+  run('goTo(2)');
+  video.currentTime = 21;
+  run('startPuzzleNow()');
+  assert.equal(puzzleCalls.length, 1);
+  video.currentTime = 1; run('state.idx = 0;'); // 퍼즐이 앞 문장을 들려줌
+  puzzleCalls[0].opts.onClose({ solved: true, wrong: 0 });
+  assert.equal(run('state.idx'), 2, '원래 문장으로');
+});
+
+test('🔁 복습이 끝나도 보던 자리로 (이어보기 위치가 복습 문장으로 바뀌지 않게)', () => {
+  const { run, video, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3)];
+  run(`state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""},{start:50,end:52,en:"z",ko:""}];
+    settings.reviewCount = 3; state.item = { id: "x" }; state.idx = -1;`);
+  run('goTo(3)');                      // 이어보기: 마지막 문장
+  video.currentTime = 51;
+  run('state.reviewDone = false; maybeReview();');
+  assert.equal(reviewCalls.length, 1);
+  video.currentTime = 2; run('state.idx = 0;'); // 복습이 앞 문장들을 들려줌
+  reviewCalls[0].onDone({ started: true, done: 3, passed: 3, finished: true });
+  assert.equal(run('state.idx'), 3, '이어보던 문장으로');
+});
+
+test('자리 되돌리기: 그 사이 콘텐츠가 바뀌었으면 건드리지 않는다', () => {
+  const { run, video } = loadPlayer();
+  run('state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.item = { id: "A" }; state.idx = 1;');
+  const spot = run('rememberSpot()');
+  run('state.item = { id: "B" }; state.idx = 0;');
+  run(`restoreSpot(${JSON.stringify({ itemId: 'A', idx: 1, time: 11 })})`);
+  assert.equal(run('state.idx'), 0, '다른 콘텐츠면 그대로');
+  assert.equal(spot.itemId, 'A');
+});
