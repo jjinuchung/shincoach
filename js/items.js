@@ -32,7 +32,7 @@ export const GEAR = [
   { id: 'flower', emoji: '🌸', ko: '꽃', price: 30, pos: 'head' },
   { id: 'cap', emoji: '🧢', ko: '야구모자', price: 40, pos: 'head' },
   { id: 'tophat', emoji: '🎩', ko: '신사모자', price: 40, pos: 'head' },
-  { id: 'shades', emoji: '🕶️', ko: '선글라스', price: 50, pos: 'face' },
+  { id: 'shades', emoji: '🕶️', ko: '선글라스', price: 50, pos: 'head' }, // 눈 위치는 그림마다 달라 못 맞춘다 → 머리에 걸치는 쪽으로
   { id: 'star', emoji: '⭐', ko: '별', price: 60, pos: 'head' },
   { id: 'butterfly', emoji: '🦋', ko: '나비', price: 60, pos: 'head' },
   { id: 'grad', emoji: '🎓', ko: '학사모', price: 70, pos: 'head' },
@@ -132,6 +132,15 @@ export function setFigure(fig, url, look) {
     if (!g) { g = document.createElement('span'); fig.appendChild(g); }
     g.className = 'mon-gear ' + (gear.pos || 'head');
     g.textContent = gear.emoji;
+    // 그림에서 찾아둔 머리 꼭대기 위에 얹는다 (없으면 CSS 기본값 = 가운데 위)
+    const a = look && look.anchor;
+    if (a && Number.isFinite(a.x) && Number.isFinite(a.y)) {
+      g.style.left = `${Math.min(88, Math.max(12, a.x * 100))}%`;
+      g.style.top = `${a.y * 100 - 9}%`; // 머리 꼭대기에 살짝 걸치게
+    } else {
+      g.style.left = '';
+      g.style.top = '';
+    }
   } else if (g) g.remove();
   const tired = !!(look && look.hp === 0);
   fig.classList.toggle('tired', tired);

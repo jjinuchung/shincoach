@@ -105,10 +105,30 @@ export async function loadCharacters(force = false) {
   let recs = [];
   try { recs = await getCharacters(); } catch { recs = []; }
   const byId = new Map(ROSTER.map((r) => [r.id, r]));
-  cache = recs
-    .filter((r) => r.blob && byId.has(r.id))
-    .map((r) => ({ id: r.id, ko: byId.get(r.id).ko, en: byId.get(r.id).en, unlock: byId.get(r.id).unlock || 1, url: URL.createObjectURL(r.blob) }));
+  const usable = recs.filter((r) => r.blob && byId.has(r.id));
+  cache = usable.map((r) => ({
+    id: r.id, ko: byId.get(r.id).ko, en: byId.get(r.id).en, unlock: byId.get(r.id).unlock || 1,
+    url: URL.createObjectURL(r.blob), anchor: r.anchor || null,
+  }));
+  // 예전에 받아둔 그림에는 머리 위치가 없다 — 조용히 계산해 채운다 (다시 받을 필요 없음)
+  const missing = usable.filter((r) => !r.anchor);
+  if (missing.length) {
+    Promise.all(missing.map(async (r) => {
+      const anchor = await anchorOf(r.blob);
+      if (!anchor) return;
+      await putCharacter({ ...r, anchor }).catch(() => {});
+      const hit = cache && cache.find((c) => c.id === r.id);
+      if (hit) hit.anchor = anchor;
+    })).catch(() => {});
+  }
   return cache;
+}
+
+/** 그림에서 찾아둔 머리 위치 (장식을 얹을 자리). 아직 못 받았거나 계산 전이면 null */
+export function anchorFor(id) {
+  if (!cache) return null;
+  const c = cache.find((x) => x.id === id);
+  return (c && c.anchor) || null;
 }
 
 /** 아직 안 받은 캐릭터 수 */
@@ -118,19 +138,60 @@ export async function missingCount() {
 }
 
 /** 큰 원본 PNG를 STORE_SIZE 정사각형 PNG로 축소 (안 되면 원본 그대로) */
-async function shrink(blob) {
+/**
+ * 그림에서 "머리 꼭대기"를 찾는다 → { x, y } (그림 크기에 대한 0~1 비율).
+ *
+ * 포켓몬마다 캔버스 안에서 머리 위치가 제각각이라(라프라스는 왼쪽 위, 파이리는 가운데)
+ * 장식을 늘 가운데 위에 붙이면 엉뚱한 데 얹힌다. 위에서부터 처음 만나는 불투명 픽셀 줄을
+ * 찾고, 그 줄 근처의 가로 중심을 머리로 본다. 대부분의 포켓몬은 머리·귀·뿔이 가장 높다.
+ */
+export function headAnchor(ctx, size) {
+  let data;
+  try { data = ctx.getImageData(0, 0, size, size).data; } catch { return null; }
+  const A = 40; // 이 정도 불투명하면 그림의 일부
+  let topY = -1;
+  for (let y = 0; y < size && topY < 0; y++) {
+    for (let x = 0; x < size; x++) {
+      if (data[(y * size + x) * 4 + 3] > A) { topY = y; break; }
+    }
+  }
+  if (topY < 0) return null;
+  // 꼭대기에서 이만큼을 "머리"로 보고 가로 중심을 구한다.
+  // 너무 얇으면(6%) 피카츄처럼 귀 한쪽만 잡혀 모자가 귀에 얹히고, 너무 두꺼우면(25%) 몸통이 섞인다.
+  const band = Math.max(2, Math.round(size * 0.15));
+  let sum = 0;
+  let n = 0;
+  for (let y = topY; y < Math.min(size, topY + band); y++) {
+    for (let x = 0; x < size; x++) {
+      if (data[(y * size + x) * 4 + 3] > A) { sum += x; n++; }
+    }
+  }
+  if (!n) return null;
+  return { x: +((sum / n) / size).toFixed(3), y: +(topY / size).toFixed(3) };
+}
+
+/** 큰 원본 PNG → 축소 PNG + 머리 위치 */
+async function prepare(blob) {
   try {
     const bmp = await createImageBitmap(blob);
     const canvas = document.createElement('canvas');
     canvas.width = STORE_SIZE;
     canvas.height = STORE_SIZE;
-    canvas.getContext('2d').drawImage(bmp, 0, 0, STORE_SIZE, STORE_SIZE);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bmp, 0, 0, STORE_SIZE, STORE_SIZE);
     bmp.close();
+    const anchor = headAnchor(ctx, STORE_SIZE);
     const out = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    return out || blob;
+    return { blob: out || blob, anchor };
   } catch {
-    return blob;
+    return { blob, anchor: null };
   }
+}
+
+/** 이미 받아둔 그림에서 머리 위치만 뒤늦게 계산 (앱을 업데이트해도 다시 받지 않게) */
+async function anchorOf(blob) {
+  const r = await prepare(blob);
+  return r.anchor;
 }
 
 /**
@@ -148,8 +209,8 @@ export async function downloadCharacters(onProgress) {
     try {
       const res = await fetch(ART_URL(r.id), { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await shrink(await res.blob());
-      await putCharacter({ id: r.id, ko: r.ko, en: r.en, blob, savedAt: Date.now() });
+      const made = await prepare(await res.blob());
+      await putCharacter({ id: r.id, ko: r.ko, en: r.en, blob: made.blob, anchor: made.anchor, savedAt: Date.now() });
       ok++;
     } catch (e) {
       console.warn('캐릭터 받기 실패:', r.ko, e);

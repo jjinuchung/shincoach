@@ -8,7 +8,7 @@
 // 이 파일은 순수 로직만 담는다 (화면은 review.js).
 
 import { editDistance, STOP_WORDS } from './speak.js';
-import { splitWords } from './puzzle.js';
+import { splitWords, hasEchoedRun } from './puzzle.js';
 
 /** 받아쓰기로 낼 수 있는 문장 길이 (짧으면 빈칸이 절반, 길면 태블릿에서 넘침) */
 export const DICT_MIN_WORDS = 4;
@@ -113,6 +113,7 @@ export function makeDictation(cue, opts = {}) {
   if (!cue || !cue.en) return null;
   const words = splitWords(cue.en);
   if (words.length < DICT_MIN_WORDS || words.length > DICT_MAX_WORDS) return null;
+  if (hasEchoedRun(words)) return null; // 두 화자가 겹쳐 말한 자막은 빈칸을 뚫어도 의미가 없다
   const rng = opts.rng || Math.random;
   const want = blankCount(opts.box);
   // 후보를 넉넉히 뽑아두고, 오답을 못 만드는 자리는 건너뛴다

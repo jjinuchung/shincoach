@@ -3,6 +3,7 @@
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import { getProfile, applyProfileDelta } from './db.js';
 import { itemById, HP, GOLDEN } from './items.js';
+import { anchorFor } from './pokemon.js';
 
 // ── 경험치 ──
 export const XP = {
@@ -293,7 +294,8 @@ export function buyItem(id) {
 /** 포켓몬의 꾸밈·상태 → { gear, dye, hp } (없으면 null 필드, hp는 기본 100) */
 export function getLook(monId) {
   const m = profile.mons[monId] || {};
-  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId) };
+  // anchor = 그림에서 찾아둔 머리 위치. 장식을 포켓몬마다 제자리에 얹기 위해 함께 넘긴다
+  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId) };
 }
 
 // ── ❤️ HP · 🤝 파트너 · 🧪 물약 ──

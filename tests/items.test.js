@@ -75,7 +75,7 @@ test('프로필: 코인 획득·구매·가방', () => {
 });
 
 test('프로필: 장식 장착·교체·벗기 (가방 개수 보존)', () => {
-  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100 });
+  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null }); // anchor = 그림 머리 위치 (아직 안 받았으면 null)
   assert.equal(equipGear(25, 'crown'), false, '가방에 없음');
   assert.equal(equipGear(25, 'ribbon'), true);
   assert.equal(getLook(25).gear, 'ribbon');
@@ -103,7 +103,7 @@ test('프로필: 염색은 소모, 원래 색은 무료', () => {
   assert.equal(getLook(25).dye, null);
   assert.equal(itemCount('red'), 1, '원래 색으로는 공짜');
   assert.equal(applyDye(25, 'cap'), false, '장식은 염색 불가');
-  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100 });
+  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null }); // anchor = 그림 머리 위치 (아직 안 받았으면 null)
 });
 
 test('❤️ 파트너·HP·물약: 처음 잡은 포켓몬이 파트너, HP는 0~100, 물약은 가방에서 소모', () => {

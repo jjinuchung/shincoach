@@ -22,11 +22,32 @@ export function splitWords(en) {
   return out;
 }
 
+/**
+ * 두 화자가 겹쳐 말한 자막인지 — 같은 구절이 잇달아 반복되면 그렇게 본다.
+ * 예: "Yeah, But I'm her deputy. I'm her deputy." (두 사람이 동시에 같은 말)
+ * 이런 문장은 어느 쪽에 놓아도 맞아서 퍼즐로는 찍기 문제가 되고, 받아쓰기도 의미가 없다.
+ */
+export function hasEchoedRun(words, minRun = 2) {
+  const w = (words || []).map((x) => String(x).toLowerCase().replace(/[^a-z0-9']+/g, ''));
+  const n = w.length;
+  for (let len = minRun; len <= Math.floor(n / 2); len++) {
+    for (let i = 0; i + 2 * len <= n; i++) {
+      let same = true;
+      for (let k = 0; k < len; k++) {
+        if (!w[i + k] || w[i + k] !== w[i + len + k]) { same = false; break; }
+      }
+      if (same) return true;
+    }
+  }
+  return false;
+}
+
 /** 퍼즐로 낼 수 있는 문장인지: 단어 수 3~8, 서로 다른 단어가 2개 이상 (전부 같으면 섞어도 그대로) */
 export function isPuzzleable(cue, { min = PUZZLE_MIN_WORDS, max = PUZZLE_MAX_WORDS } = {}) {
   if (!cue || !cue.en) return false;
   const words = splitWords(cue.en);
   if (words.length < min || words.length > max) return false;
+  if (hasEchoedRun(words)) return false; // 두 화자가 겹쳐 말한 자막
   return new Set(words).size >= 2;
 }
 
