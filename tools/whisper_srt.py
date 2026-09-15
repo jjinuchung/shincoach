@@ -61,6 +61,13 @@ def main():
     ap.add_argument("--threads", type=int, default=4, help="CPU 스레드 수 (기본 4, 다른 서비스 배려)")
     args = ap.parse_args()
 
+    # 진행 로그에 é(Pokémon) 같은 글자가 섞이면 CP949 콘솔에서 UnicodeEncodeError로 죽는다 → UTF-8로 출력
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     media = Path(args.media)
     if not media.exists():
         sys.exit(f"파일 없음: {media}")
