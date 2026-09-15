@@ -103,7 +103,33 @@ export function openCatch(o) {
     btn.addEventListener('click', () => { unlock(); throwBall(c); });
     pick.appendChild(btn);
   }
+  renderGolden(o.goldenCount || 0);
   $('catch').hidden = false;
+}
+
+/** 🌟 황금 볼 토글 (가방에 있을 때만 보임). 켜고 포켓몬을 고르면 황금 볼로 던진다 */
+function renderGolden(count) {
+  const box = $('catch-golden');
+  if (!box) return;
+  ui.golden = false;
+  ui.goldenCount = count;
+  box.innerHTML = '';
+  box.hidden = count <= 0;
+  if (count <= 0) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn catch-golden-btn';
+  btn.textContent = `🌟 황금 볼로 던지기 (${count}개)`;
+  btn.setAttribute('aria-pressed', 'false');
+  btn.addEventListener('click', () => {
+    ui.golden = !ui.golden;
+    btn.classList.toggle('on', ui.golden);
+    btn.setAttribute('aria-pressed', ui.golden ? 'true' : 'false');
+    $('catch-msg').textContent = ui.golden
+      ? '🌟 황금 볼! 잡힐 확률이 훨씬 높아요 — 누구에게 던질까요?'
+      : '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!';
+  });
+  box.appendChild(btn);
 }
 
 export function closeCatch() {
@@ -204,7 +230,7 @@ async function throwBall(c) {
   ball.className = 'catch-ball drop';
   await sleep(500); if (!alive()) return;
 
-  const res = ui.attempt(c.id); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만
+  const res = ui.attempt(c.id, { golden: !!ui.golden }); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만
   const wobbles = res.caught ? 3 : 1 + Math.floor(Math.random() * 3);
   const msg = $('catch-msg');
   msg.textContent = '두근두근…';

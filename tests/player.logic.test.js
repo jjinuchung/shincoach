@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { pickReviews, reviewSummary, roundReward, REWARD } from '../js/review.js';
 
 function makeEl() {
   const listeners = {};
@@ -41,6 +42,8 @@ function loadPlayer() {
   const hpState = { partner: null, hp: {}, opened: null };
   const battleCalls = [];
   const battleState = { roll: false, caught: {}, won: [], lost: [] };
+  const reviewCalls = [];
+  const reviewState = { stats: [], sentences: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
@@ -58,7 +61,12 @@ function loadPlayer() {
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, hpMissedApplied: () => false, markHpMissed() {}, todayBattles: () => 0, markBattle() {}, MASTER_RATIO: 0.8, puzzle() {} },
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, hpMissedApplied: () => false, markHpMissed() {}, todayBattles: () => 0, markBattle() {}, MASTER_RATIO: 0.8, puzzle() {},
+      // 🔁 복습 스텁: 문장 기록과 오늘 상태를 reviewState로 제어
+      statsList: () => reviewState.stats, review(cue, passed) { reviewState.reviewed.push({ start: cue.start, passed }); return { box: 1, graduated: false }; },
+      todayReviewSentences: () => reviewState.sentences, todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
+      reviewGoldenTaken: () => reviewState.golden, markReviewGolden() { reviewState.golden = true; },
+      todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; } },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
     puzzleCalls,
     initPuzzle() {}, closePuzzle() {},
@@ -93,13 +101,17 @@ function loadPlayer() {
     pickOpponent: (list, caught) => list.find((m) => !caught[m.id]) || null, eligibleMine: (ids, partner, tired) => ids.filter((id) => id !== partner && !(tired && tired(id))),
     getProfileSnapshot: () => ({ caught: battleState.caught }), lossesOf: () => 0,
     battleWin: (id) => { battleState.won.push(id); return { first: true }; }, battleLoss: (id) => { battleState.lost.push(id); return { losses: 1, lost: false }; },
-    consumeItem: () => true, inventory: () => ({}), POTION: [],
+    consumeItem: () => true, inventory: () => ({}), POTION: [], GOLDEN: { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', mult: 2, kind: 'ball' },
+    // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
+    reviewCalls, reviewState,
+    initReview() {}, abortReview() {}, isReviewOpen: () => false, openReview(o) { reviewCalls.push(o); },
+    pickReviews, reviewSummary, roundReward, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {},
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -873,7 +885,7 @@ test('⚔️ Codex #3/#4/#6: 화면 꺼짐이면 배틀 턴 중단(interrupted),
   assert.equal(battleCalls.length, 1);
   // #3 배틀 턴의 말하기 중 화면 꺼짐 → interrupted 로 끝나고 재생 상태 정리
   let resolved = null;
-  const speakP = run('battleSpeak(state.cues[0], { register() {}, onInterim() {} })');
+  const speakP = run('speakSentence(state.cues[0], { register() {}, onInterim() {} })');
   speakP.then((r) => { resolved = r; });
   assert.equal(run('state.puzzlePlaying'), true, '문장 듣기 시작');
   ctx.document.hidden = true;
@@ -882,7 +894,7 @@ test('⚔️ Codex #3/#4/#6: 화면 꺼짐이면 배틀 턴 중단(interrupted),
   assert.equal(resolved && resolved.method, 'interrupted');
   assert.equal(run('state.puzzleCue'), null);
   assert.equal(run('state.puzzlePlaying'), false);
-  assert.equal(run('state.battleSpeakStop'), null);
+  assert.equal(run('state.sentenceSpeakStop'), null);
   assert.equal(video.paused, true);
   ctx.document.hidden = false;
   // 배틀 끝나면 inert 해제
@@ -965,4 +977,138 @@ test('🎮 부족한 캐릭터는 인터넷이 되면 자동으로 받고, 오�
   ctx.navigator.onLine = true;
   run('state.charDownloading = true; autoDownloadCharacters()'); await tick();
   assert.equal(calls, 1, '이미 받는 중이면 중복 실행 안 함');
+});
+
+// ── 🔁 복습 연동 ──
+
+/** 복습 대상 문장 기록 하나 만들기 */
+function due(start, patch = {}) {
+  return { key: `x|${start * 10}`, itemId: 'x', start, en: 'Hello there.', ko: '안녕.', done: true, box: 0, dueAt: '2026-09-01', bestRatio: 0.5, speakSkipped: 0, lastAt: start, ...patch };
+}
+
+test('🔁 콘텐츠를 열면 오늘 할 복습을 제안하고, 설정한 문장 수만큼만 낸다', () => {
+  const { run, els, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3), due(4), due(5)];
+  run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""},{start:4,end:5,en:"d",ko:""},{start:5,end:6,en:"e",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  assert.equal(reviewCalls.length, 1);
+  assert.equal(reviewCalls[0].items.length, 3, '기본 3문장');
+  assert.equal(run('state.reviewOpen'), true);
+  assert.equal(els['view-player'].inert, true, '뒤 화면은 눌리지 않게');
+});
+
+test('🔁 복습을 끄면·오늘 할 문장이 없으면·부모 모드면 안 뜬다', () => {
+  const setup = 'state.cues = [{start:1,end:2,en:"a",ko:""}];';
+  let p = loadPlayer();
+  p.reviewState.stats = [due(1)];
+  p.run(`${setup} settings.reviewCount = 0; state.reviewDone = false; maybeReview();`);
+  assert.equal(p.reviewCalls.length, 0, '⚙ 끔');
+
+  p = loadPlayer();
+  p.reviewState.stats = [due(1, { dueAt: '2027-01-01' })];
+  p.run(`${setup} settings.reviewCount = 3; state.reviewDone = false; maybeReview();`);
+  assert.equal(p.reviewCalls.length, 0, '아직 때가 안 됨');
+
+  p = loadPlayer();
+  p.reviewState.stats = [due(1)];
+  p.run(`${setup} settings.reviewCount = 3; state.parentMode = true; state.reviewDone = false; maybeReview();`);
+  assert.equal(p.reviewCalls.length, 0, '👨‍👩‍👦 부모 모드');
+});
+
+test('🔁 건너뛰기를 두 번 하면 그날은 더 묻지 않는다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1)];
+  reviewState.skips = 2;
+  run('state.cues = [{start:1,end:2,en:"a",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  assert.equal(reviewCalls.length, 0);
+});
+
+test('🔁 "나중에"로 닫으면 건너뛴 것으로 세고, 하다가 닫으면 안 센다', () => {
+  const { run, els, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3)];
+  run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  reviewCalls[0].onDone({ started: false, done: 0, passed: 0, finished: false });
+  assert.equal(reviewState.skips, 1);
+  assert.equal(run('state.reviewOpen'), false);
+  assert.equal(els['view-player'].inert, false, 'inert 해제');
+
+  run('state.reviewDone = false; maybeReview();');
+  reviewCalls[1].onDone({ started: true, done: 2, passed: 1, finished: false }); // 두 문장 하다가 닫음
+  assert.equal(reviewState.skips, 1, '하다 만 것은 건너뛴 게 아님');
+});
+
+test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 🌟 황금 볼 + ❤️ 회복 (하루 한 번)', () => {
+  const { run, reviewCalls, reviewState, xpLog, coinLog, itemLog, hpLog, hpState } = loadPlayer();
+  hpState.partner = 25;
+  hpState.hp[25] = 50;
+  reviewState.stats = [due(1), due(2), due(3)];
+  run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""}]; settings.reviewCount = 3; settings.hp = true; state.reviewDone = false; maybeReview();');
+  const o = reviewCalls[0];
+
+  o.onSentence({ start: 1, en: 'a' }, true);
+  o.onSentence({ start: 2, en: 'b' }, false);
+  assert.deepEqual(reviewState.reviewed, [{ start: 1, passed: true }, { start: 2, passed: false }]);
+  assert.equal(xpLog.length, 1, '통과한 문장만 XP');
+  assert.equal(coinLog.length, 1);
+
+  const given = o.onFinished();
+  assert.ok(given.golden > 0, '하루 첫 완주 → 황금 볼');
+  assert.ok(given.hp > 0);
+  assert.equal(reviewState.rounds, 1);
+  assert.equal(reviewState.golden, true);
+  assert.ok(itemLog.includes('goldenball'), '가방에 황금 볼');
+  assert.ok(hpLog.some((d) => d > 0), 'HP 회복');
+
+  // 같은 날 두 번째 회차: XP·코인은 주되 황금 볼·HP는 없음
+  const before = itemLog.length;
+  const again = o.onFinished();
+  assert.equal(again.golden, 0);
+  assert.equal(again.hp, 0);
+  assert.equal(itemLog.length, before, '황금 볼을 또 주지 않음');
+});
+
+test('🔁 중간에 그만뒀으면 남은 문장만 채우면 완주 (1문장만 냄)', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3), due(4)];
+  reviewState.sentences = 2; // 오늘 이미 2문장 했음 (3문장 회차 중)
+  run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""},{start:4,end:5,en:"d",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  assert.equal(reviewCalls[0].items.length, 1, '한 문장만 더 하면 완주');
+});
+
+test('🔁 기록에만 있고 지금 자막에 없는 문장은 건너뛴다 (문장 합치기를 바꾼 경우)', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(99)]; // 99초 문장은 지금 자막에 없음
+  run('state.cues = [{start:1,end:2,en:"a",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  assert.equal(reviewCalls[0].items.length, 1);
+  assert.equal(reviewCalls[0].items[0].cue.start, 1);
+});
+
+test('🔁 [Codex #7] 자막에 없는 기록이 우선순위 상위를 차지해도 뒤의 멀쩡한 문장이 나온다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  // 앞 3개는 "넘긴 문장"이라 우선순위가 가장 높지만 지금 자막에 없다
+  reviewState.stats = [
+    due(90, { speakSkipped: 2 }), due(91, { speakSkipped: 2 }), due(92, { speakSkipped: 2 }),
+    due(1), due(2),
+  ];
+  run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  assert.equal(reviewCalls.length, 1, '복습이 아예 안 뜨면 안 됨');
+  assert.deepEqual(reviewCalls[0].items.map((x) => x.cue.start), [1, 2]);
+});
+
+test('🔁 [Codex #9] ⚙ 연습 중에는 학습 시간이 쌓이지 않는다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1, { lastAt: 5 })];
+  run('state.cues = [{start:1,end:2,en:"a",ko:""}]; settings.reviewCount = 3; startReviewNow();');
+  assert.equal(reviewCalls.length, 1);
+  assert.equal(reviewCalls[0].practice, true);
+  assert.equal(run('state.practiceOpen'), true, '연습 표시가 켜져야 시간·기록이 안 쌓임');
+  reviewCalls[0].onDone({ started: true, done: 1, passed: 1, finished: true });
+  assert.equal(run('state.practiceOpen'), false, '끝나면 꺼짐');
+  assert.equal(reviewState.reviewed.length, 0, '연습은 복습 진도를 건드리지 않음');
+});
+
+test('🔁 복습 중에는 플레이어 단축키가 먹지 않는다', () => {
+  const { run } = loadPlayer();
+  run('state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = 0; state.reviewOpen = true;');
+  run('onKeyDown({ key: "ArrowRight", target: { tagName: "BODY" }, preventDefault() {} })');
+  assert.equal(run('state.idx'), 0);
 });

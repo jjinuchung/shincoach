@@ -349,22 +349,44 @@ const maxOf = (a, b) => Math.max(Number(a) || 0, Number(b) || 0);
  * 가져온 기록(rec)과 기기에 있는 기록(cur) 병합 — 오래된 백업이 최신 누적을 줄이지 않도록
  * 누적 수치는 큰 값, 시각은 최근 값, 날짜별 완료 문장은 합집합
  */
+/**
+ * 🔁 두 문장 기록 중 "최근에 복습한 쪽"의 복습 상태(box·dueAt)를 한 쌍으로 고른다.
+ * 둘 다 복습 이력이 없으면(옛 기록) 더 나아간 box 쪽, 그것도 같으면 늦은 dueAt 쪽.
+ */
+export function pickReviewState(a, b) {
+  const state = (r) => ({ box: r.box || 0, dueAt: r.dueAt || '' });
+  const ta = Number(a.reviewedAt) || 0;
+  const tb = Number(b.reviewedAt) || 0;
+  if (ta !== tb) return state(ta > tb ? a : b);
+  const boxA = a.box || 0;
+  const boxB = b.box || 0;
+  if (boxA !== boxB) return state(boxA > boxB ? a : b);
+  return state((a.dueAt || '') >= (b.dueAt || '') ? a : b);
+}
+
 export function mergeStatRecord(name, cur, rec) {
   if (!cur) return rec;
   const out = { ...cur, ...rec };
   if (name === 'sentenceStats') {
-    for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt', 'puzzles', 'puzzleSolved', 'puzzleWrong']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt', 'puzzles', 'puzzleSolved', 'puzzleWrong', 'reviews', 'reviewPass', 'reviewedAt']) out[k] = maxOf(cur[k], rec[k]);
     out.done = !!(cur.done || rec.done);
     out.lastRatio = (rec.lastAt || 0) >= (cur.lastAt || 0) ? (rec.lastRatio || 0) : (cur.lastRatio || 0);
+    // 🔁 복습 진도(box·dueAt)는 "가장 큰 값"이 아니라 **가장 최근에 복습한 쪽을 한 쌍으로** 가져온다.
+    // box는 틀리면 내려가는 값이라 max로 합치면, 어려워서 내일 다시 봐야 할 문장이 옛 백업 때문에
+    // 더 늦게 돌아온다 (Codex #6). reviewedAt이 없는 옛 기록끼리는 더 나아간 box 쪽을 쓴다.
+    const pick = pickReviewState(cur, rec);
+    out.box = pick.box;
+    out.dueAt = pick.dueAt;
   } else if (name === 'daily') {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
-    for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles', 'reviewSentences', 'reviewRounds', 'reviewSkips']) out[k] = maxOf(cur[k], rec[k]);
     out.goalRewarded = !!(cur.goalRewarded || rec.goalRewarded);
     out.hpMissed = !!(cur.hpMissed || rec.hpMissed);
+    out.reviewGolden = !!(cur.reviewGolden || rec.reviewGolden); // 🌟 하루 1개 — 백업을 되돌려 다시 받는 것도 막는다
   } else if (name === 'vocabViews') {
     for (const k of ['views', 'taps', 'lastAt']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'sessions') {
-    for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt', 'puzzles', 'puzzleSolved']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt', 'puzzles', 'puzzleSolved', 'reviews', 'reviewPass']) out[k] = maxOf(cur[k], rec[k]);
   } else if (name === 'profile') {
     for (const k of ['xp', 'throws', 'catches', 'coinsEarned', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
     out.caught = { ...(cur.caught || {}) };

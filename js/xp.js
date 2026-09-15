@@ -2,7 +2,7 @@
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import { getProfile, applyProfileDelta } from './db.js';
-import { itemById, HP } from './items.js';
+import { itemById, HP, GOLDEN } from './items.js';
 
 // ── 경험치 ──
 export const XP = {
@@ -90,10 +90,13 @@ export function rarityOf(id) {
   return rarityById[id] || 2;
 }
 
-/** 잡힐 확률 = 기본 확률 × (1 + 레벨×5%), 최대 90% */
-export function catchChance(rarity, level) {
+/**
+ * 잡힐 확률 = 기본 확률 × 볼 배율 × (1 + 레벨×5%), 최대 90%
+ * (🌟 황금 볼은 배율 2배 + 상한도 95% — 희귀·전설에서 티가 나야 "황금"이다)
+ */
+export function catchChance(rarity, level, mult = 1) {
   const base = (RARITY[rarity] || RARITY[2]).base;
-  return Math.min(0.9, base * (1 + 0.05 * Math.max(1, level)));
+  return Math.min(mult > 1 ? 0.95 : 0.9, base * mult * (1 + 0.05 * Math.max(1, level)));
 }
 
 export function rollCatch(chance, rng = Math.random) {
@@ -194,9 +197,11 @@ export function gainXp(amount) {
 }
 
 /** 몬스터볼 던지기 (기록됨) → { caught, chance, count(잡은 뒤 마릿수), first(처음 잡음), bonusXp } */
-export function catchAttempt(id, rng = Math.random) {
+export function catchAttempt(id, rng = Math.random, opts = {}) {
   const level = levelFromXp(profile.xp).level;
-  const chance = catchChance(rarityOf(id), level);
+  // 🌟 황금 볼: 가방에 있을 때만 쓰고 바로 소모 (확률 2배)
+  const golden = !!(opts.golden && consumeItem(GOLDEN.id));
+  const chance = catchChance(rarityOf(id), level, golden ? GOLDEN.mult : 1);
   const caught = rollCatch(chance, rng);
   profile.throws++;
   let first = false;
@@ -213,14 +218,14 @@ export function catchAttempt(id, rng = Math.random) {
     if (!profile.partner) { profile.partner = id; delta.partner = id; partnerSet = true; } // 🤝 처음 잡은 포켓몬이 자동으로 파트너
   }
   addDelta(delta);
-  return { caught, chance, count: profile.caught[id] || 0, first, bonusXp, partnerSet, info: getLevelInfo() };
+  return { caught, chance, count: profile.caught[id] || 0, first, bonusXp, partnerSet, golden, info: getLevelInfo() };
 }
 
 /** ⚙ 잡기 연습용: 기록하지 않고 판정만 (확률은 실제와 같음) */
-export function previewAttempt(id, rng = Math.random) {
+export function previewAttempt(id, rng = Math.random, opts = {}) {
   const level = levelFromXp(profile.xp).level;
-  const chance = catchChance(rarityOf(id), level);
-  return { caught: rollCatch(chance, rng), chance, count: profile.caught[id] || 0, first: false, bonusXp: 0, info: null };
+  const chance = catchChance(rarityOf(id), level, opts.golden ? GOLDEN.mult : 1);
+  return { caught: rollCatch(chance, rng), chance, count: profile.caught[id] || 0, first: false, bonusXp: 0, golden: !!opts.golden, info: null };
 }
 
 export function caughtCount(id) {
@@ -277,7 +282,8 @@ export function consumeItem(id) {
 /** 🛒 구매: 코인이 모자라면 false. 코인 차감과 가방 추가를 한 증분으로 */
 export function buyItem(id) {
   const it = itemById(id);
-  if (!it || (profile.coins || 0) < it.price) return false;
+  if (!it || it.price <= 0) return false; // 🌟 황금 볼은 파는 물건이 아님 (복습으로만)
+  if ((profile.coins || 0) < it.price) return false;
   profile.coins -= it.price;
   profile.items[id] = (profile.items[id] || 0) + 1;
   addDelta({ coins: -it.price, items: { [id]: 1 } });

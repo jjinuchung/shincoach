@@ -3,6 +3,7 @@
 import {
   sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, putDaily, bumpVocabViews,
 } from './db.js';
+import { enroll, schedule, GRADUATED } from './review.js';
 
 export const MASTER_RATIO = 0.8; // 발음 점수 80% 이상이면 ⭐ 정복
 
@@ -28,6 +29,8 @@ function emptyRecord(itemId, cue) {
     plays: 0, listens: 0, done: false, seconds: 0,
     speakAttempts: 0, speakPass: 0, speakFail: 0, speakSkipped: 0, bestRatio: 0, lastRatio: 0, lastAt: 0,
     puzzles: 0, puzzleSolved: 0, puzzleWrong: 0,
+    // 🔁 복습: box = 라이트너 단계, dueAt = 다음 복습 날짜('' 면 아직 복습 대상 아님)
+    box: 0, dueAt: '', reviews: 0, reviewPass: 0, reviewedAt: 0,
   };
 }
 
@@ -50,6 +53,10 @@ function rollDailyIfNeeded() {
     t.daily.goalRewarded = !!(t.daily.goalRewarded || existing.goalRewarded);
     t.daily.hpMissed = !!(t.daily.hpMissed || existing.hpMissed);
     t.daily.battles = (t.daily.battles || 0) + (existing.battles || 0);
+    t.daily.reviewSentences = (t.daily.reviewSentences || 0) + (existing.reviewSentences || 0);
+    t.daily.reviewRounds = (t.daily.reviewRounds || 0) + (existing.reviewRounds || 0);
+    t.daily.reviewGolden = !!(t.daily.reviewGolden || existing.reviewGolden);
+    t.daily.reviewSkips = (t.daily.reviewSkips || 0) + (existing.reviewSkips || 0);
     t.dailyDirty = true;
   }).catch(() => {});
 }
@@ -84,6 +91,7 @@ export async function open(item) {
     id: `${Date.now()}-${item.id}`, itemId: item.id, title: item.title,
     startedAt: Date.now(), endedAt: null, seconds: 0, sentences: 0, _keys: new Set(),
     firstIdx: null, lastIdx: null, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0,
+    reviews: 0, reviewPass: 0,
   };
   await ensureDaily();
   t.flushTimer = setInterval(() => { flush(); }, 5000);
@@ -111,7 +119,36 @@ export function listen(cue) {
 export function done(cue) {
   const r = rec(cue); if (!r) return;
   r.done = true;
+  // 🔁 처음 "한" 문장은 내일부터 복습 큐에 들어간다
+  // (이미 복습 중인 문장이나 👑 졸업한 문장의 진도는 건드리지 않음)
+  if (!r.dueAt && (r.box || 0) < GRADUATED) Object.assign(r, enroll(todayKey()));
   if (t.daily && !t.daily.doneKeys.includes(r.key)) { t.daily.doneKeys.push(r.key); t.dailyDirty = true; }
+}
+
+/**
+ * 🔁 복습 문장 하나를 끝냈을 때 (passed: 따라 말하기 통과 여부)
+ * 다음 복습 날짜를 다시 잡고, 오늘 복습한 문장 수를 센다.
+ */
+export function review(cue, passed) {
+  const r = rec(cue); if (!r) return null;
+  r.reviews = (r.reviews || 0) + 1;
+  if (passed) r.reviewPass = (r.reviewPass || 0) + 1;
+  Object.assign(r, schedule(r.box || 0, passed, todayKey()));
+  r.reviewedAt = Date.now(); // 백업 병합에서 "어느 쪽이 최신 복습인지" 판단하는 기준 (db.mergeStatRecord)
+  if (t.session) {
+    t.session.reviews = (t.session.reviews || 0) + 1;
+    if (passed) t.session.reviewPass = (t.session.reviewPass || 0) + 1;
+  }
+  if (t.daily) {
+    t.daily.reviewSentences = (t.daily.reviewSentences || 0) + 1;
+    t.dailyDirty = true;
+  }
+  return { box: r.box, dueAt: r.dueAt, graduated: r.box >= GRADUATED };
+}
+
+/** 현재 콘텐츠의 문장 기록 전부 (복습 대상 고르기·현황 표시용) */
+export function statsList() {
+  return [...t.stats.values()];
 }
 
 /** 말하기 확인 결과 */
@@ -203,6 +240,42 @@ export function todayBattles() {
 export function markBattle() {
   if (!t.daily) return;
   t.daily.battles = (t.daily.battles || 0) + 1;
+  t.dailyDirty = true;
+}
+
+/** 🔁 오늘 복습한 문장 수 / 완주한 회차 수 (모든 콘텐츠 합산) */
+export function todayReviewSentences() {
+  return t.daily ? (t.daily.reviewSentences || 0) : 0;
+}
+export function todayReviewRounds() {
+  return t.daily ? (t.daily.reviewRounds || 0) : 0;
+}
+export function markReviewRound() {
+  if (!t.daily) return;
+  t.daily.reviewRounds = (t.daily.reviewRounds || 0) + 1;
+  t.dailyDirty = true;
+}
+
+/** 🔁 오늘 복습 제안을 몇 번 건너뛰었는지 (너무 자주 묻지 않기 위해) */
+export function todayReviewSkips() {
+  return t.daily ? (t.daily.reviewSkips || 0) : 0;
+}
+export function markReviewSkip() {
+  if (!t.daily) return;
+  t.daily.reviewSkips = (t.daily.reviewSkips || 0) + 1;
+  t.dailyDirty = true;
+}
+
+/**
+ * 🌟 황금 몬스터볼을 오늘 이미 받았는지 / 받았다고 표시.
+ * daily(날짜 단위 전역)에 두어야 콘텐츠를 바꿔가며 여러 번 받는 것을 막는다.
+ */
+export function reviewGoldenTaken() {
+  return !!(t.daily && t.daily.reviewGolden);
+}
+export function markReviewGolden() {
+  if (!t.daily) return;
+  t.daily.reviewGolden = true;
   t.dailyDirty = true;
 }
 

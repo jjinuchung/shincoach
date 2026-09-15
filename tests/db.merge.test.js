@@ -1,7 +1,7 @@
 // 기록 가져오기 병합 규칙 테스트 (순수 함수)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeStatRecord } from '../js/db.js';
+import { mergeStatRecord, pickReviewState } from '../js/db.js';
 
 test('#6 sentenceStats: 오래된 백업이 최신 누적을 줄이지 않음', () => {
   const cur = { key: 'k', plays: 10, seconds: 100, speakPass: 3, bestRatio: 0.9, lastRatio: 0.9, lastAt: 200, done: true };
@@ -36,4 +36,72 @@ test('daily goalRewarded는 한쪽이라도 true면 true', () => {
   assert.equal(mergeStatRecord('daily', { date: 'd', doneKeys: [], goalRewarded: true }, { date: 'd', doneKeys: [] }).goalRewarded, true);
   assert.equal(mergeStatRecord('daily', { date: 'd', doneKeys: [] }, { date: 'd', doneKeys: [], goalRewarded: true }).goalRewarded, true);
   assert.equal(mergeStatRecord('daily', { date: 'd', doneKeys: [] }, { date: 'd', doneKeys: [] }).goalRewarded, false);
+});
+
+test('🔁 [Codex #6] 실패로 내려간 box를 옛 백업이 되돌리지 않는다', () => {
+  // 오늘 틀려서 box 3 → 2, 내일 다시 보기로 내려간 상태
+  const now = { key: 'k', box: 2, dueAt: '2026-09-16', reviewedAt: 2000, reviews: 3, reviewPass: 2 };
+  // 그저께 찍은 백업: 그때는 box 3, 9/20에 보기로 되어 있었다
+  const backup = { key: 'k', box: 3, dueAt: '2026-09-20', reviewedAt: 1000, reviews: 2, reviewPass: 2 };
+  const m = mergeStatRecord('sentenceStats', now, backup);
+  assert.equal(m.box, 2, '어려워하는 문장이 다시 box 3으로 올라가면 안 됨');
+  assert.equal(m.dueAt, '2026-09-16', '내일 다시 봐야 함 — 9/20으로 밀리면 안 됨');
+  assert.equal(m.reviews, 3, '누적 횟수는 큰 값');
+  assert.equal(m.reviewedAt, 2000);
+
+  // 반대로 백업 쪽이 더 최근 복습이면 그쪽 상태를 그대로
+  const m2 = mergeStatRecord('sentenceStats', backup, now);
+  assert.equal(m2.box, 2);
+  assert.equal(m2.dueAt, '2026-09-16');
+});
+
+test('🔁 [Codex #6] 복습 이력이 없는 옛 기록끼리는 더 나아간 box 쪽', () => {
+  const a = { key: 'k', box: 1, dueAt: '2026-09-17' };
+  const b = { key: 'k', box: 3, dueAt: '2026-09-22' };
+  assert.equal(mergeStatRecord('sentenceStats', a, b).box, 3);
+  assert.equal(mergeStatRecord('sentenceStats', a, b).dueAt, '2026-09-22');
+  // 한쪽만 복습 이력이 있으면 그쪽이 최신
+  const fresh = { key: 'k', box: 0, dueAt: '2026-09-16', reviewedAt: 5000 };
+  assert.equal(mergeStatRecord('sentenceStats', fresh, b).box, 0, '복습을 실제로 한 쪽이 이김');
+});
+
+test('🔁 복습 진도 병합: box는 더 나아간 쪽, dueAt은 그 box를 가진 쪽', () => {
+  // 태블릿에서 두 번 복습해 box 2, 백업은 box 1인 옛 기록 → 진도는 유지돼야 한다
+  const cur = { key: 'k', box: 2, dueAt: '2026-09-19', reviews: 2, reviewPass: 2 };
+  const old = { key: 'k', box: 1, dueAt: '2026-09-16', reviews: 1, reviewPass: 1 };
+  const m = mergeStatRecord('sentenceStats', cur, old);
+  assert.equal(m.box, 2);
+  assert.equal(m.dueAt, '2026-09-19', '옛 백업의 빠른 날짜가 진도를 되돌리면 안 됨');
+  assert.equal(m.reviews, 2);
+
+  // 반대 방향(백업 쪽이 더 나아간 경우)도 같은 규칙
+  const m2 = mergeStatRecord('sentenceStats', old, cur);
+  assert.equal(m2.box, 2);
+  assert.equal(m2.dueAt, '2026-09-19');
+});
+
+test('🔁 box가 같으면 더 최근에 복습한 쪽(나중 날짜)의 dueAt', () => {
+  const a = { key: 'k', box: 1, dueAt: '2026-09-16' };
+  const b = { key: 'k', box: 1, dueAt: '2026-09-20' };
+  assert.equal(mergeStatRecord('sentenceStats', a, b).dueAt, '2026-09-20');
+  assert.equal(mergeStatRecord('sentenceStats', b, a).dueAt, '2026-09-20');
+});
+
+test('🔁 아직 복습에 안 들어온 문장(dueAt 없음)과 병합해도 날짜가 생기지 않음', () => {
+  const none = { key: 'k', box: 0, dueAt: '' };
+  assert.equal(mergeStatRecord('sentenceStats', none, { key: 'k' }).dueAt, '');
+  assert.equal(mergeStatRecord('sentenceStats', none, { key: 'k', box: 0, dueAt: '2026-09-16' }).dueAt, '2026-09-16', '한쪽에만 있으면 그걸 씀');
+});
+
+test('🌟 황금 볼은 백업을 되돌려도 다시 못 받음 (한쪽이라도 받았으면 받은 것)', () => {
+  const taken = { date: 'd', doneKeys: [], reviewGolden: true, reviewRounds: 1, reviewSentences: 3 };
+  const fresh = { date: 'd', doneKeys: [] };
+  assert.equal(mergeStatRecord('daily', taken, fresh).reviewGolden, true);
+  assert.equal(mergeStatRecord('daily', fresh, taken).reviewGolden, true);
+  assert.equal(mergeStatRecord('daily', fresh, fresh).reviewGolden, false);
+  assert.equal(mergeStatRecord('daily', taken, fresh).reviewSentences, 3);
+});
+
+test('🔁 세션의 복습 횟수도 큰 값 유지', () => {
+  assert.equal(mergeStatRecord('sessions', { id: 's', reviews: 3, reviewPass: 2 }, { id: 's', reviews: 1, reviewPass: 1 }).reviews, 3);
 });

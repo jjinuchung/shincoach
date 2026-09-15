@@ -67,10 +67,14 @@ export const HP = {
   goalHeal: 20,      // 오늘 목표 달성 → 자동 회복
 };
 
+// 🌟 황금 몬스터볼: 잡힐 확률이 2배. 🔁 복습을 끝내야만 얻는다 (상점에서 못 사고 🎁 상자에서도 안 나옴)
+export const GOLDEN = { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', price: 0, mult: 2, kind: 'ball' };
+
 export const ITEMS = [
   ...GEAR.map((g) => ({ ...g, kind: 'gear' })),
   ...DYE.map((d) => ({ ...d, kind: 'dye' })),
   ...POTION.map((p) => ({ ...p, kind: 'potion' })),
+  GOLDEN,
 ];
 const byId = {};
 for (const it of ITEMS) byId[it.id] = it;
@@ -80,15 +84,18 @@ export function itemById(id) {
   return byId[id] || null;
 }
 
+/** 🎁 레벨업 선물 상자에서 나올 수 있는 것 (🌟 황금 볼은 복습으로만 얻는다) */
+const LOOT = ITEMS.filter((it) => it.kind !== 'ball');
+
 /** 🎁 레벨업 선물 상자: 아이템 중 하나를 고르게 뽑음 */
 export function lootBox(rng = Math.random) {
-  return ITEMS[Math.min(ITEMS.length - 1, Math.floor(rng() * ITEMS.length))].id;
+  return LOOT[Math.min(LOOT.length - 1, Math.floor(rng() * LOOT.length))].id;
 }
 
 /** 살 수 있는지 → { ok, short(부족한 코인) } */
 export function canBuy(id, coins) {
   const it = itemById(id);
-  if (!it) return { ok: false, short: 0 };
+  if (!it || it.price <= 0) return { ok: false, short: 0 }; // 🌟 황금 볼처럼 파는 물건이 아닌 것
   const short = Math.max(0, it.price - (coins || 0));
   return { ok: short === 0, short };
 }

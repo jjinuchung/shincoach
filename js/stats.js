@@ -5,6 +5,7 @@ import {
 import { parseSubtitle, mergeIntoSentences } from './srt.js';
 import { openPlayer } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
+import { reviewSummary, stageIcon, GRADUATED } from './review.js';
 import { reloadProfile } from './xp.js';
 
 const $ = (id) => document.getElementById(id);
@@ -48,7 +49,8 @@ export function weekSeries(dailyList, today = todayKey()) {
       date: key, label: ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()],
       seconds: rec ? rec.seconds : 0, sentences: rec ? rec.doneKeys.length : 0,
       speakAttempts: rec ? rec.speakAttempts : 0, speakPass: rec ? rec.speakPass : 0,
-      puzzles: rec ? rec.puzzles || 0 : 0, puzzleSolved: rec ? rec.puzzleSolved || 0 : 0, isToday: i === 0,
+      puzzles: rec ? rec.puzzles || 0 : 0, puzzleSolved: rec ? rec.puzzleSolved || 0 : 0,
+      reviewSentences: rec ? rec.reviewSentences || 0 : 0, reviewRounds: rec ? rec.reviewRounds || 0 : 0, isToday: i === 0,
     });
   }
   return out;
@@ -128,6 +130,8 @@ export async function renderStats() {
   const wPass = week.reduce((a, d) => a + d.speakPass, 0);
   const wPz = week.reduce((a, d) => a + d.puzzles, 0);
   const wPzOk = week.reduce((a, d) => a + d.puzzleSolved, 0);
+  const wRv = week.reduce((a, d) => a + d.reviewSentences, 0);
+  const rv = reviewSummary(records, today); // 🔁 복습 큐 현황 (전체 콘텐츠)
   const allSec = daily.reduce((a, d) => a + d.seconds, 0);
   const c1 = card('이번 주 (최근 7일)');
   const sum = el('div', 'stats-summary');
@@ -137,6 +141,8 @@ export async function renderStats() {
   sum.appendChild(kpi(`${wSent}문장`, '한 문장'));
   sum.appendChild(kpi(wAtt ? `${Math.round((wPass / wAtt) * 100)}%` : '-', `말하기 통과 (${wPass}/${wAtt})`));
   sum.appendChild(kpi(wPz ? `${Math.round((wPzOk / wPz) * 100)}%` : '-', `🧩 퍼즐 정답 (${wPzOk}/${wPz})`));
+  sum.appendChild(kpi(`${wRv}문장`, '🔁 복습한 문장'));
+  sum.appendChild(kpi(`${rv.dueCount}문장`, `🔁 오늘 복습할 것 (👑 ${rv.graduated} 완성)`));
   sum.appendChild(kpi(fmtDur(allSec), '전체 누적'));
   c1.appendChild(sum);
   const bars = el('div', 'stats-bars');
@@ -178,7 +184,8 @@ export async function renderStats() {
   const titleOf = new Map(items.map((it) => [it.id, it.title]));
   for (const r of hard) {
     const d = el('div', 'stats-hard');
-    d.appendChild(el('div', 'en', r.en));
+    // 🔁 복습 단계를 앞에 붙여 이 문장이 얼마나 자리 잡았는지 보이게 (🥚 처음 … 👑 완성)
+    d.appendChild(el('div', 'en', `${r.dueAt || (r.box || 0) >= GRADUATED ? `${stageIcon(r)} ` : ''}${r.en}`));
     if (r.ko) d.appendChild(el('div', 'ko', r.ko));
     const why = [];
     if (r.speakSkipped) why.push(`3번 미달로 통과 ${r.speakSkipped}회`);

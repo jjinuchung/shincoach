@@ -889,6 +889,8 @@ button { font-family: inherit; }
 
 /* ===== 꾸민 포켓몬 그림 (items.js makeFigure): <span.mon-figure><img>[<span.mon-gear>🎩]</span> ===== */
 .mon-figure { position: relative; display: inline-block; line-height: 0; }
+/* display를 정해 두면 브라우저 기본 [hidden]을 덮어써서 빈 칸이 남는다 */
+.mon-figure[hidden] { display: none; }
 .mon-figure img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
 /* ✨ 반짝반짝 염색: 무지개색으로 천천히 돌며 빛남 */
 .mon-figure img.shiny { animation: mon-shiny 3s linear infinite; }
@@ -1145,3 +1147,87 @@ button { font-family: inherit; }
   /* 전체 대사가 남는 높이를 채우도록 (details는 flex 자식 크기 계산이 불안정해서 vh로) */
   .script-list { max-height: calc(100vh - 470px); min-height: 180px; }
 }
+
+/* ===== 🔁 복습 (배운 문장을 며칠에 걸쳐 다시 만나기) ===== */
+.review {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: rgba(31, 35, 64, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  z-index: 63;
+}
+.review[hidden] { display: none; }
+.review-card {
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 560px;
+  max-height: 96vh;
+  overflow-y: auto;
+  padding: 16px 16px 14px;
+  display: flex;
+  flex-direction: column;
+}
+.review-title { font-weight: 800; font-size: 1.2rem; color: #0e7490; text-align: center; }
+.review-msg { font-weight: 700; font-size: 1.02rem; margin: 6px 0 10px; min-height: 1.4em; text-align: center; }
+.review-intro[hidden], .review-stage[hidden], .review-speak[hidden], .review-done[hidden] { display: none; }
+.review-intro { display: flex; flex-direction: column; align-items: center; }
+.review-partner-fig { width: 110px; height: 110px; }
+.review-reward { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 10px 0 6px; }
+.review-chip {
+  display: inline-block; padding: 6px 12px; border-radius: 999px;
+  background: #e0f2fe; color: #0c4a6e; font-weight: 700; font-size: 0.92rem;
+}
+.review-chip.gold { background: #fef3c7; color: #92400e; }
+.review-chip.hp { background: #fee2e2; color: #991b1b; }
+.review-chip.dim { background: #f1f5f9; color: var(--muted); font-weight: 600; }
+.review-note { color: var(--muted); font-size: 0.9rem; text-align: center; margin-top: 4px; }
+.review-intro-actions { display: flex; gap: 10px; margin-top: 14px; }
+
+.review-stage { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px 2px; }
+.review-head { display: flex; align-items: center; gap: 10px; width: 100%; justify-content: center; }
+.review-stage-icon { font-size: 36px; line-height: 1; transition: transform 0.3s; }
+.review-stage-icon.up { animation: review-up 0.7s ease; }
+@keyframes review-up {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.5) translateY(-8px); }
+  100% { transform: scale(1); }
+}
+.review-dots { display: flex; gap: 6px; }
+.review-dot { width: 10px; height: 10px; border-radius: 50%; background: #e2e8f0; display: inline-block; }
+.review-dot.done { background: #22c55e; }
+.review-dot.now { background: #0ea5e9; transform: scale(1.25); }
+.review-count { color: var(--muted); font-weight: 700; font-size: 0.86rem; }
+.review-ko { font-size: 1.14rem; font-weight: 700; text-align: center; color: var(--fg); }
+.review-en {
+  font-size: 1.24rem; font-weight: 800; text-align: center; color: #0f172a;
+  background: #f1f5f9; border-radius: 12px; padding: 8px 12px; width: 100%;
+}
+.review-en[hidden] { display: none; }
+.review-feedback { min-height: 1.5em; font-weight: 700; text-align: center; color: var(--muted); }
+.review-feedback.good { color: #15803d; }
+.review-feedback.bad { color: #b45309; }
+
+.review-speak { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 6px; }
+.review-speak-status { font-weight: 700; min-height: 1.4em; text-align: center; }
+
+.review-done { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
+.review-done-title { font-size: 1.4rem; font-weight: 800; color: #15803d; }
+.review-done-sub { font-weight: 700; }
+.review-done-reward { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 6px; }
+.review-done-note { color: var(--muted); font-size: 0.9rem; text-align: center; margin-top: 4px; }
+
+@media (max-width: 420px) {
+  .review-en { font-size: 1.1rem; }
+  .review-partner-fig { width: 84px; height: 84px; }
+}
+
+/* 🌟 황금 볼 토글 (잡기 화면) */
+.catch-golden { display: flex; justify-content: center; margin-top: 6px; }
+.catch-golden[hidden] { display: none; }
+.catch-golden-btn { border: 2px solid #fbbf24; background: #fffbeb; color: #92400e; font-weight: 800; }
+.catch-golden-btn.on { background: #fbbf24; color: #78350f; box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.3); }

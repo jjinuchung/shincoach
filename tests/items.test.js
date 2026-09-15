@@ -1,7 +1,7 @@
 // 🛒 아이템·코인 규칙 + 프로필의 가방/꾸미기 테스트: node --test tests/items.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, ITEMS, itemById, lootBox, canBuy } from '../js/items.js';
+import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, GOLDEN, ITEMS, itemById, lootBox, canBuy } from '../js/items.js';
 import {
   coins, gainCoins, itemCount, inventory, addItem, buyItem, getLook, equipGear, applyDye, getProfileSnapshot,
   getPartner, setPartner, hpOf, isTired, changeHp, usePotion, catchAttempt,
@@ -12,9 +12,11 @@ test('카탈로그: id가 겹치지 않고 가격은 양수, 장식은 head/face
   const ids = ITEMS.map((i) => i.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const it of ITEMS) {
-    assert.ok(it.price > 0, it.id);
     assert.ok(it.emoji && it.ko, it.id);
-    assert.ok(it.kind === 'gear' || it.kind === 'dye' || it.kind === 'potion');
+    assert.ok(it.kind === 'gear' || it.kind === 'dye' || it.kind === 'potion' || it.kind === 'ball');
+    // 🌟 황금 볼만 값이 없다 — 코인으로 못 사고 🔁 복습으로만 얻는다
+    if (it.kind === 'ball') assert.equal(it.price, 0, it.id);
+    else assert.ok(it.price > 0, it.id);
   }
   for (const p of POTION) assert.ok(p.heal > 0, p.id);
   assert.equal(itemById('potion').kind, 'potion');
@@ -39,10 +41,13 @@ test('코인 규칙: 퍼즐 5/3/2, 정답 공개 0, 스트릭 5×일 최대 50',
   assert.equal(streakCoins(0), 5);
 });
 
-test('lootBox: 항상 카탈로그 안의 아이템', () => {
-  assert.equal(lootBox(() => 0), ITEMS[0].id);
-  assert.equal(lootBox(() => 0.999999), ITEMS[ITEMS.length - 1].id);
+test('lootBox: 항상 카탈로그 안의 아이템 (🌟 황금 볼은 절대 안 나옴)', () => {
+  const loot = ITEMS.filter((i) => i.kind !== 'ball');
+  assert.equal(lootBox(() => 0), loot[0].id);
+  assert.equal(lootBox(() => 0.999999), loot[loot.length - 1].id);
   assert.ok(itemById(lootBox()));
+  for (let i = 0; i <= 20; i++) assert.notEqual(lootBox(() => i / 20), GOLDEN.id, '상자에서 황금 볼이 나오면 안 됨');
+  assert.equal(canBuy(GOLDEN.id, 9999).ok, false, '코인이 아무리 많아도 못 삼');
 });
 
 test('canBuy: 부족한 코인 계산', () => {

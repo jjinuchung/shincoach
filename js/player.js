@@ -10,10 +10,11 @@ import { runSpeakCheck, prepareMic, releaseMic, resetRecognition } from './speak
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory } from './xp.js';
-import { COIN, HP, POTION, puzzleCoins, streakCoins, lootBox, itemById, setFigure } from './items.js';
+import { COIN, HP, POTION, GOLDEN, puzzleCoins, streakCoins, lootBox, itemById, setFigure } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
+import { initReview, openReview, abortReview, isReviewOpen, pickReviews, reviewSummary, roundReward, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT } from './review.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
 
@@ -64,7 +65,10 @@ const state = {
   battlePending: null, // ⚔️ 다음 문장으로 넘어갈 때 걸어올 트레이너의 포켓몬 { id, ko, url } (markDone에서 확률로 정해짐)
   battleOpen: false,   // ⚔️ 배틀 화면이 열려 있음 (키보드 무시)
   battleLastCue: null, // 배틀에서 방금 따라 말한 문장 (연달아 같은 문장 안 나오게)
-  battleSpeakStop: null, // 배틀 턴의 듣기·말하기를 밖에서 중단하는 함수 (화면 꺼짐 → 그 턴 무효)
+  sentenceSpeakStop: null, // ⚔️ 배틀·🔁 복습에서 진행 중인 듣기·말하기를 밖에서 중단하는 함수 (화면 꺼짐 → 그 턴 무효)
+  reviewOpen: false,   // 🔁 복습 화면이 열려 있음 (키보드 무시)
+  practiceOpen: false, // ⚙ 연습 중 (퍼즐·복습·배틀·잡기) — 학습 시간·기록을 쌓지 않음
+  reviewDone: false,   // 이번에 연 콘텐츠에서 복습을 이미 제안했는지 (한 번 열 때 한 번만)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -136,6 +140,7 @@ export function initPlayer(ctx) {
   initCharacters();
   initCatch();
   initBattle();
+  initReview();
   initProfile().then(() => { updateLevelChip(); updatePartnerChip(); }).catch(() => {});
   $('level-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex()); });
   $('coin-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex({ shop: true })); });
@@ -145,7 +150,9 @@ export function initPlayer(ctx) {
   // 학습 시간: 재생 중이거나 따라 말하는 중·퍼즐 푸는 중이면 1초씩 누적 (부모 모드는 학습이 아니므로 제외 → 세션도 저장되지 않음)
   setInterval(() => {
     if (!state.open || state.parentMode) return;
-    const cue = state.cues[state.idx];
+    if (state.practiceOpen) return; // ⚙ 연습(퍼즐·복습·배틀·잡기)은 기록하지 않는다 (Codex #9)
+    // 퍼즐·복습·배틀이 들려주는 문장은 화면의 현재 문장이 아니므로 그 문장에 시간을 쌓는다
+    const cue = state.puzzleCue || state.cues[state.idx];
     if (cue && (!video.paused || state.speakRun || state.puzzleCue)) track.tick(cue, 1);
   }, 1000);
 }
@@ -282,7 +289,8 @@ function startPuzzle(continueFn) {
       state.catchOpen = true;
       openCatch({
         candidates: result.characters, xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
-        attempt: (id) => catchAttempt(id),
+        goldenCount: inventory()[GOLDEN.id] || 0,
+        attempt: (id, opts) => catchAttempt(id, Math.random, opts),
         onDone: () => { state.catchOpen = false; updateLevelChip(); updatePartnerChip(); continueFn(); },
       });
       return;
@@ -388,10 +396,10 @@ function battleCue() {
 }
 
 /**
- * 배틀 턴의 말하기: 문장을 들려준 뒤(퍼즐의 🔊 재생 메커니즘) 말하기 확인 → 결과.
+ * ⚔️ 배틀 턴·🔁 복습 공용: 문장을 들려준 뒤(퍼즐의 🔊 재생 메커니즘) 말하기 확인 → 결과.
  * hooks.register(stop) 로 "다 말했어요"/취소를 받음. stop('cancel')이면 결과 null
  */
-function battleSpeak(cue, hooks) {
+function speakSentence(cue, hooks) {
   return new Promise((resolve) => {
     if (!cue) { resolve(null); return; }
     let run = null;
@@ -399,7 +407,7 @@ function battleSpeak(cue, hooks) {
     const finishWith = (r) => {
       if (done) return;
       done = true;
-      state.battleSpeakStop = null;
+      state.sentenceSpeakStop = null;
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
       if (!video.paused) video.pause();
       resolve(r);
@@ -410,7 +418,7 @@ function battleSpeak(cue, hooks) {
       if (run) run.stop();
       else if (state.puzzlePlaying) { video.pause(); endPuzzlePlayback(); } // 아직 듣는 중이면 건너뛰고 바로 말하기
     };
-    state.battleSpeakStop = stop;
+    state.sentenceSpeakStop = stop;
     hooks.register(stop);
     state.puzzleCue = cue; // onTick이 이 문장 끝에서 재생을 멈추게 (퍼즐과 같은 방식)
     playPuzzleSentence(cue, () => {
@@ -425,7 +433,7 @@ function battleSpeak(cue, hooks) {
 /** 배틀 열림/닫힘 표시: 키보드 단축키 차단 + 뒤 화면을 inert (Tab으로 뒤 버튼이 눌리지 않게, Codex #6) */
 function setBattleOpen(on) {
   state.battleOpen = on;
-  if (!on) state.battleSpeakStop = null;
+  if (!on) state.sentenceSpeakStop = null;
   const view = $('view-player');
   if (view) view.inert = on;
 }
@@ -446,7 +454,7 @@ function startBattle(continueFn) {
     potions: potionList,
     usePotion: (id) => consumeItem(id),
     nextCue: battleCue,
-    speak: battleSpeak,
+    speak: speakSentence,
     onDone: (r) => {
       setBattleOpen(false);
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
@@ -473,6 +481,110 @@ function applyBattleResult(r) {
   updatePartnerChip();
 }
 
+// ───────────────────── 🔁 복습 (간격 반복) ─────────────────────
+
+/** 하루에 복습을 제안하는 최대 횟수 (건너뛰어도 계속 묻지 않게) */
+const REVIEW_MAX_SKIPS = 2;
+
+/** 문장 기록의 시작 시각으로 지금 화면의 cue 찾기 (문장 합치기 설정이 달라졌으면 없을 수 있음) */
+function cueForStart(start) {
+  const key = Math.round(start * 10);
+  return state.cues.find((c) => Math.round(c.start * 10) === key) || null;
+}
+
+/** 이번 회차에 낼 복습 문장 (없으면 빈 배열) */
+function reviewItems() {
+  const per = settings.reviewCount;
+  if (!per) return []; // ⚙에서 끔
+  const remain = per - (track.todayReviewSentences() % per); // 중간에 그만뒀으면 남은 만큼만 채우면 완주
+  // 지금 자막에 없는 기록을 먼저 걸러낸다 — 나중에 거르면 그런 기록이 상위를 차지했을 때
+  // 뒤의 멀쩡한 문장까지 가려서 복습이 아예 안 뜬다 (Codex #7)
+  const usable = track.statsList().filter((rec) => cueForStart(rec.start));
+  return pickReviews(usable, track.todayKey(), remain)
+    .map((rec) => ({ rec, cue: cueForStart(rec.start) }));
+}
+
+/** 복습 화면 열림/닫힘: 키보드 단축키 차단 + 뒤 화면 inert */
+function setReviewOpen(on) {
+  state.reviewOpen = on;
+  if (!on) state.sentenceSpeakStop = null;
+  const view = $('view-player');
+  if (view) view.inert = on;
+}
+
+/** 콘텐츠를 열었을 때 복습 제안 (부모 모드 제외, 하루 2번까지) */
+function maybeReview() {
+  if (state.parentMode || state.reviewDone) return;
+  state.reviewDone = true;
+  if (track.todayReviewSkips() >= REVIEW_MAX_SKIPS) return;
+  const items = reviewItems();
+  if (items.length) startReview(items, false);
+}
+
+/** 회차 완주 보상: ⚡·💰 + (하루 첫 완주만) 🌟 황금 볼·❤️ 회복 */
+function grantReviewRound() {
+  const reward = roundReward(track.reviewGoldenTaken());
+  track.markReviewRound();
+  awardXp(reward.xp);
+  awardCoins(reward.coin);
+  if (reward.golden) {
+    addItem(GOLDEN.id, reward.golden);
+    track.markReviewGolden();
+  }
+  if (reward.hp) hpHeal(reward.hp);
+  track.flush();
+  return reward;
+}
+
+/** 복습 회차 열기 (practice면 기록·보상 없음) */
+function startReview(items, practice) {
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  const p = practice ? null : partnerInfo();
+  const summary = reviewSummary(track.statsList(), track.todayKey());
+  setReviewOpen(true);
+  state.practiceOpen = !!practice;
+  openReview({
+    items,
+    practice,
+    reward: roundReward(track.reviewGoldenTaken()),
+    partner: p ? { url: p.url, ko: p.ko, look: getLook(p.id) } : null,
+    waiting: practice ? 0 : summary.waiting,
+    setFigure,
+    sfx,
+    unlock,
+    speak: speakSentence,
+    onSentence: (cue, passed) => {
+      if (practice) return null;
+      const info = track.review(cue, passed);
+      if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
+      return info;
+    },
+    onFinished: () => (practice ? null : grantReviewRound()),
+    onDone: (s) => {
+      setReviewOpen(false);
+      state.practiceOpen = false;
+      state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
+      if (!practice && !s.started && !s.done) track.markReviewSkip(); // 시작도 안 하고 닫음
+      if (!practice) track.flush();
+    },
+  });
+}
+
+/** ⚙ "지금 복습 해보기": 때가 안 됐어도 최근에 한 문장으로 연습 (기록·보상 없음) */
+function startReviewNow() {
+  if (state.reviewOpen) return;
+  if (!state.open || !state.cues.length) return;
+  const items = track.statsList()
+    .filter((r) => r.done && cueForStart(r.start)) // 자막에 없는 기록을 먼저 제외 (Codex #7)
+    .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0))
+    .slice(0, settings.reviewCount || REVIEW_COUNT)
+    .map((rec) => ({ rec, cue: cueForStart(rec.start) }));
+  if (!items.length) { showPlayerMessage('🔁 아직 복습할 문장이 없어요 — 문장을 몇 개 끝내면 생겨요', 4000); return; }
+  startReview(items, true);
+}
+
 /** ⚙ 배틀 연습: 아무 상대와 결과 반영 없이 (파트너도 내보낼 수 있음) */
 function startBattlePractice() {
   if (state.battleOpen) return; // 진행 중인 배틀을 연습으로 덮어쓰지 않음 (Codex #6)
@@ -485,9 +597,10 @@ function startBattlePractice() {
   if (!video.paused) video.pause();
   cancelShadowWait();
   setBattleOpen(true);
+  state.practiceOpen = true;
   openBattle({
-    opponent, mine, potions: potionList, usePotion: () => true, nextCue: battleCue, speak: battleSpeak, practice: true,
-    onDone: () => { setBattleOpen(false); state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null; },
+    opponent, mine, potions: potionList, usePotion: () => true, nextCue: battleCue, speak: speakSentence, practice: true,
+    onDone: () => { setBattleOpen(false); state.practiceOpen = false; state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null; },
   });
 }
 
@@ -497,10 +610,12 @@ function startCatchPractice() {
   if (!video.paused) video.pause();
   cancelShadowWait();
   state.catchOpen = true;
+  state.practiceOpen = true;
   openCatch({
     candidates: pickCharacters(unlockedCharacters(), 4), levelInfo: getLevelInfo(), practice: true,
-    attempt: (id) => previewAttempt(id),
-    onDone: () => { state.catchOpen = false; },
+    goldenCount: inventory()[GOLDEN.id] || 0,
+    attempt: (id, opts) => previewAttempt(id, Math.random, opts),
+    onDone: () => { state.catchOpen = false; state.practiceOpen = false; },
   });
 }
 
@@ -509,7 +624,8 @@ function startPuzzleNow() {
   if (!state.open || state.idx < 0) return;
   const cue = pickPuzzle([state.cues[state.idx]]) || pickPuzzle(state.cues.slice(Math.max(0, state.idx - 10), state.idx));
   if (!cue) { showPlayerMessage('🧩 이 근처에는 퍼즐로 낼 문장(3~8단어)이 없어요', 4000); return; }
-  showPuzzle(cue, () => {});
+  state.practiceOpen = true;
+  showPuzzle(cue, () => { state.practiceOpen = false; });
 }
 
 /** 퍼즐 화면 열기 (재생 멈춤·따라 말하기 취소). 끝나면 onDone(result) */
@@ -719,7 +835,7 @@ function onVisibilityChange() {
   const wasShadowWaiting = !!state.shadowTimer || !!state.speakRun;
   track.flush();
   cancelShadowWait();
-  if (state.battleSpeakStop) state.battleSpeakStop('hidden'); // ⚔️ 배틀 턴 중이면 그 턴을 무효로 (복귀하면 다시 고름)
+  if (state.sentenceSpeakStop) state.sentenceSpeakStop('hidden'); // ⚔️ 배틀 턴 중이면 그 턴을 무효로 (복귀하면 다시 고름)
   if (!video.paused) video.pause();
   if (wasShadowWaiting) showPlayerMessage('▶ 를 눌러 이어서 연습해요', 0);
   releaseMic(); // 백그라운드에서 마이크 표시등이 켜져 있지 않도록
@@ -748,6 +864,7 @@ export async function openPlayer(id, opts = {}) {
   state.repeatCount = 0;
   state.puzzlePool = [];
   state.journeyCelebrated = false;
+  state.reviewDone = false;
   state.battlePending = null;
   state.battleLastCue = null;
   cancelShadowWait();
@@ -789,6 +906,7 @@ export async function openPlayer(id, opts = {}) {
       startIdx = best;
     }
     goTo(startIdx, { play: false });
+    maybeReview(); // 🔁 오늘 복습할 문장이 있으면 먼저 제안
   };
   video.addEventListener('loadedmetadata', state.onMeta, { once: true });
 }
@@ -809,8 +927,11 @@ function closeMedia() {
   closeCatch();
   abortBattle(); // 배틀 중이었으면 결과 반영/패배 취급 (onDone에서 처리)
   setBattleOpen(false);
+  abortReview();
+  setReviewOpen(false);
   state.battlePending = null;
   state.catchOpen = false;
+  state.practiceOpen = false;
   state.puzzleCue = null;
   state.puzzlePlaying = false;
   state.puzzleOnEnd = null;
@@ -1556,7 +1677,7 @@ function updateChips() {
 
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
-  if (state.puzzleCue || state.catchOpen || state.battleOpen) return; // 퍼즐·잡기·배틀 화면 중에는 플레이어 단축키 무시
+  if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen) return; // 퍼즐·잡기·배틀·복습 화면 중에는 플레이어 단축키 무시
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   switch (e.key) {
     case ' ': e.preventDefault(); onPlayButton(); break;
@@ -1601,7 +1722,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true };
+  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true, reviewCount: REVIEW_COUNT };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -1619,6 +1740,7 @@ function initSettingsDialog() {
   $('set-listen-first').value = String(settings.listenFirst);
   $('set-goal').value = String(settings.dailyGoal);
   $('set-puzzle').value = String(settings.puzzleEvery);
+  $('set-review').value = String(settings.reviewCount);
   $('set-sfx').checked = settings.sfx;
   $('set-vibrate').checked = settings.vibrate;
   $('set-hp').checked = settings.hp;
@@ -1628,6 +1750,7 @@ function initSettingsDialog() {
   $('set-hide-en').checked = settings.hideEnWhileSpeaking;
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
+  $('set-review-try').addEventListener('click', () => { $('dlg-settings').close(); startReviewNow(); });
   $('set-catch-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startCatchPractice(); });
   $('set-battle-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startBattlePractice(); });
   $('form-settings').addEventListener('submit', (e) => {
@@ -1640,6 +1763,7 @@ function initSettingsDialog() {
     settings.dailyGoal = Number($('set-goal').value);
     updateGoalChip();
     settings.puzzleEvery = Number($('set-puzzle').value);
+    settings.reviewCount = Number($('set-review').value);
     if (settings.puzzleEvery === 0) state.puzzlePool = [];
     settings.sfx = $('set-sfx').checked;
     settings.vibrate = $('set-vibrate').checked;
