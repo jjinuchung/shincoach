@@ -76,7 +76,7 @@ function loadPlayer() {
     console, setTimeout, clearTimeout, setInterval() { return 0; }, clearInterval() {},
     requestAnimationFrame: () => 1, cancelAnimationFrame() {},
     performance: { now: () => Date.now() },
-    localStorage: { getItem: () => null, setItem() {} },
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     navigator: { onLine: true },
     document: { getElementById: $, addEventListener() {}, hidden: false, createElement: () => makeEl(), createTextNode: () => ({}) },
     window: { scrollTo() {}, addEventListener() {} },
@@ -364,7 +364,7 @@ test('말하기 확인: 통과 전엔 다음 문장으로 못 감, 이전은 됨
 
 test('말하기 확인: 문장 끝 → 마이크 대기 → 통과하면 다음으로', async () => {
   const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'speech', transcript: 'a', score: { matched: 1, total: 1, ratio: 1 } }]);
-  run('state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('settings.resultPause = 1; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
   run('goTo(0)');
   video.currentTime = 2; run('onCueEnd()');
   assert.ok(run('state.speakRun'), '말하기 확인 진행 중');
@@ -380,14 +380,14 @@ test('말하기 확인: 문장 끝 → 마이크 대기 → 통과하면 다음�
 test('말하기 확인: 미달이면 원문 다시 재생 후 재시도, 3번 미달 시 통과', async () => {
   const fail = { passed: false, method: 'energy', transcript: '', score: null };
   const { run, video } = loadPlayerWithSpeak([fail, fail, fail]);
-  run('state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('settings.resultPause = 1; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
   run('goTo(0)');
   for (let n = 1; n <= 2; n++) {
     video.currentTime = 2; run('onCueEnd()');
     run('skipShadowWait()'); await tick();
     assert.equal(run('state.speakFails'), n);
     assert.equal(run('state.speakPassed'), false);
-    await new Promise((r) => setTimeout(r, 2800)); // 원문 다시 재생 (못 말한 단어를 볼 시간 2.6초 뒤)
+    await new Promise((r) => setTimeout(r, 1300)); // 원문 다시 재생 (결과를 보는 시간 뒤)
     assert.equal(video.currentTime, 0, `${n}번째 미달 → 처음부터 다시`);
     assert.equal(video.paused, false);
   }
@@ -409,7 +409,7 @@ test('말하기 확인: 마이크 못 쓰면 확인 없이 진행', async () => 
 
 test('말하기 확인 + 반복 ∞: 통과 후엔 같은 문장 반복(섀도잉 대기 없이)', async () => {
   const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'energy', transcript: '', score: null }]);
-  run('state.repeatIdx = 3; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('settings.resultPause = 1; state.repeatIdx = 3; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
   run('goTo(0)');
   video.currentTime = 2; run('onCueEnd()');
   run('skipShadowWait()'); await tick();
@@ -425,7 +425,7 @@ test('말하기 확인 + 반복 ∞: 통과 후엔 같은 문장 반복(섀도�
 
 test('#1 연속 재생으로 자동 이동해도 다음 문장은 말하기 확인·듣기 먼저가 다시 걸림', async () => {
   const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'energy', transcript: '', score: null }]);
-  run('settings.listenFirst = 0; state.repeatIdx = 0; state.shadow = false; state.cues = [{start:0,end:2,en:"a",ko:""},{start:2.5,end:4,en:"b",ko:""}]; state.idx = -1;');
+  run('settings.resultPause = 1; settings.listenFirst = 0; state.repeatIdx = 0; state.shadow = false; state.cues = [{start:0,end:2,en:"a",ko:""},{start:2.5,end:4,en:"b",ko:""}]; state.idx = -1;');
   run('goTo(0)');
   video.currentTime = 2; run('onCueEnd()');       // 말하기 확인
   run('skipShadowWait()'); await tick();          // 통과
@@ -1326,4 +1326,38 @@ test('✍️ 받아쓰기 결과는 문장 복습과 같은 라이트너 규칙�
   assert.ok(dict, '받아쓰기가 만들어져야 함');
   o.onDictation(dict, true);
   assert.deepEqual(reviewState.reviewed.map((r) => r.passed), [true], 'track.review로 기록');
+});
+
+// ── ⚙ 설정 ──
+
+test('⚙ 따라 말하기 시간을 바꾸고 다시 열어도 선택이 유지된다', () => {
+  const { run, els } = loadPlayer();
+  // 2.0을 고르면 Number("2") = 2로 저장되고, 다시 열 때 String(2) = "2"로 복원된다.
+  // 옵션 value가 "2.0"이면 여기서 선택이 풀려 아무것도 안 고른 것처럼 보였다.
+  run('settings.shadowFactor = 2; initSettingsDialog();');
+  assert.equal(els['set-shadow-factor'].value, '2');
+  run('settings.shadowFactor = 1; initSettingsDialog();');
+  assert.equal(els['set-shadow-factor'].value, '1');
+  run('settings.shadowFactor = 1.5; initSettingsDialog();');
+  assert.equal(els['set-shadow-factor'].value, '1.5');
+});
+
+test('⚙ 기본값: 따라 말하기 시간 ×2.0, 말하기 결과 3초', () => {
+  const { run } = loadPlayer();
+  assert.equal(run('loadSettings().shadowFactor'), 2);
+  assert.equal(run('loadSettings().resultPause'), 3);
+});
+
+test('⚙ 말하기 결과 보는 시간은 1~5초로 제한된다', () => {
+  const { run } = loadPlayer();
+  run('settings.resultPause = 3;');
+  assert.equal(run('resultPauseMs()'), 3000);
+  run('settings.resultPause = 5;');
+  assert.equal(run('resultPauseMs()'), 5000);
+  run('settings.resultPause = 99;');
+  assert.equal(run('resultPauseMs()'), 5000, '위로 잘림');
+  run('settings.resultPause = 0;');
+  assert.equal(run('resultPauseMs()'), 1000, '아래로 잘림');
+  run('settings.resultPause = undefined;');
+  assert.equal(run('resultPauseMs()'), 3000, '값이 없으면 기본 3초');
 });

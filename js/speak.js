@@ -194,26 +194,39 @@ export function scoreTranscript(target, transcript) {
  */
 export function runSpeakCheck(opts) {
   const SR = SpeechRecognitionCtor();
+  // 막혀 있어도 잠시 뒤에는 다시 시도한다 — 와이파이가 순간 끊기거나 아이가 두 번 조용했던 것뿐일 수 있다
+  if (srBroken && srBrokenAt && Date.now() - srBrokenAt >= SR_RETRY_MS) resetRecognition();
   if (!srBroken && SR && navigator.onLine) return runWithRecognition(opts, SR);
   return runWithEnergy(opts, !SR ? 'unsupported' : !navigator.onLine ? 'offline' : srBrokenWhy);
 }
 
-// 이 세션에서 음성 인식이 안 되는 것으로 확인되면 에너지 방식으로 (다음 콘텐츠를 열 때 resetRecognition()으로 다시 시도)
+// 음성 인식이 안 되는 것으로 확인되면 그동안은 에너지 방식으로.
+// 다만 **영구가 아니다**: 일시적인 문제(와이파이 끊김, 아이가 조용했던 것, 인식 서버 지연)와
+// 구조적인 문제(기기가 인식을 못 씀)를 텍스트만으로 구분할 수 없어서,
+// 일정 시간이 지나면 다시 인식을 시도한다. 그렇지 않으면 한 번 빠진 뒤 앱을 껐다 켤 때까지
+// 계속 "말 길이로 판정"만 하게 된다 (실사용에서 실제로 그랬음).
 let srBroken = false;
 let srBrokenWhy = '';
+let srBrokenAt = 0;
 let srNoResultStreak = 0;
+/** 이만큼 지나면 인식을 다시 시도 */
+const SR_RETRY_MS = 3 * 60 * 1000;
+/** 오류 없이 결과만 없는 게 이만큼 이어지면 그때 폴백 (2번은 아이가 그냥 조용했던 경우가 많다) */
+const SR_NO_RESULT_LIMIT = 3;
 const SR_FATAL = { 'audio-capture': 1, 'not-allowed': 1, 'service-not-allowed': 1, network: 1, 'start-failed': 1 };
 
 /** 콘텐츠를 새로 열 때: 인식을 다시 시도해 봄 (인터넷이 돌아왔을 수 있음) */
 export function resetRecognition() {
   srBroken = false;
   srBrokenWhy = '';
+  srBrokenAt = 0;
   srNoResultStreak = 0;
 }
 
 /** 진단용: 지금 인식이 막힌 상태인지 */
 export function recognitionState() {
-  return { broken: srBroken, why: srBrokenWhy };
+  const retryInSec = srBroken && srBrokenAt ? Math.max(0, Math.ceil((SR_RETRY_MS - (Date.now() - srBrokenAt)) / 1000)) : 0;
+  return { broken: srBroken, why: srBrokenWhy, retryInSec };
 }
 
 function cancelledResult(spokenMs) {
@@ -264,7 +277,7 @@ function runWithRecognition(opts, SR) {
   function switchToEnergy(why) {
     if (finished) return handle;
     cleanup();
-    srBroken = true; srBrokenWhy = why;
+    srBroken = true; srBrokenWhy = why; srBrokenAt = Date.now();
     fallback = runWithEnergy(opts, why);
     fallback.promise.then(settle);
     return handle;
@@ -282,7 +295,7 @@ function runWithRecognition(opts, SR) {
     // 결과 없음: 말을 안 한 것(no-speech)이면 실패, 오류 없이 결과만 없는 게 두 번 이어지면 이 기기에선 인식이 안 되는 것으로 봄
     if (!srError || srError === 'aborted') srError = 'no-result';
     if (srError === 'no-result') srNoResultStreak++;
-    if (SR_FATAL[srError] || (srError === 'no-result' && srNoResultStreak >= 2)) { switchToEnergy(srError); return; }
+    if (SR_FATAL[srError] || (srError === 'no-result' && srNoResultStreak >= SR_NO_RESULT_LIMIT)) { switchToEnergy(srError); return; }
     settle({ passed: false, method: 'speech', transcript: '', score: null, spokenMs: Math.round(spokenMs), reason, srError });
   }
 

@@ -743,6 +743,8 @@ function initCharacters() {
   $('char-download').addEventListener('click', () => runCharacterDownload(true));
   // 인터넷이 다시 연결되면 부족한 캐릭터를 조용히 받아옴 (명단을 늘려도 부모가 신경 안 쓰게)
   window.addEventListener('online', autoDownloadCharacters);
+  // 인터넷이 돌아오면 음성 인식을 바로 다시 시도 (끊긴 동안 소리 길이 판정으로 빠져 있었을 수 있음)
+  window.addEventListener('online', () => { resetRecognition(); });
 }
 
 /** 인터넷이 되고 부족한 캐릭터가 있으면 자동으로 받기 (앱 시작·온라인 전환 때 한 번씩 시도) */
@@ -1517,6 +1519,12 @@ function playVocabWord(cue, range) {
   playWord(cue, range[0], range[1]);
 }
 
+/** 말하기 결과를 보여주는 시간 (⚙에서 1~5초, 기본 3초) */
+function resultPauseMs() {
+  const sec = Number(settings.resultPause);
+  return (Number.isFinite(sec) ? Math.min(5, Math.max(1, sec)) : 3) * 1000;
+}
+
 /** 결과 화면에서 "잠시 뒤 자동 진행" 타이머 — 단어를 누를 때마다 다시 센다 */
 function scheduleAfterResult(fn, ms) {
   state.resultDelay = () => {
@@ -1586,8 +1594,7 @@ function onSpeakResult(cue, result) {
       msg.textContent = '👍 잘했어요!';
       sub.textContent = srNote(result); // 인식 없이 소리 길이로만 통과했음을 부모가 알 수 있게
     }
-    const anyMiss = !!(result.score && result.score.matched < result.score.total);
-    scheduleAfterResult(afterShadowWait, anyMiss ? 2800 : 1400);
+    scheduleAfterResult(afterShadowWait, resultPauseMs());
     return;
   }
 
@@ -1599,7 +1606,7 @@ function onSpeakResult(cue, result) {
     msg.textContent = '👍 괜찮아요, 넘어갈게요';
     sub.textContent = result.transcript ? `들린 말: "${result.transcript}"` : '';
     renderSpeakWords(cue, result);
-    scheduleAfterResult(afterShadowWait, 2800);
+    scheduleAfterResult(afterShadowWait, resultPauseMs());
     return;
   }
   track.speak(cue, { passed: false, skipped: false, score: result.score });
@@ -1621,7 +1628,7 @@ function onSpeakResult(cue, result) {
     $('shadow-words').hidden = true;
     video.currentTime = cue.start;
     safePlay();
-  }, 2600); // 못 말한 단어를 발견할 정도의 시간 — 누르기 시작하면 타이머가 계속 미뤄진다
+  }, resultPauseMs()); // 누르기 시작하면 타이머가 계속 미뤄진다
 }
 
 // ───────────────────── 자막 렌더링 ─────────────────────
@@ -1927,7 +1934,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 1.5, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true, reviewCount: REVIEW_COUNT };
+  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true, reviewCount: REVIEW_COUNT };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -1941,7 +1948,8 @@ function saveSettings() {
 
 function initSettingsDialog() {
   $('set-merge').checked = settings.mergeSentences;
-  $('set-shadow-factor').value = String(settings.shadowFactor);
+  $('set-shadow-factor').value = String(Number(settings.shadowFactor)); // 옵션 value와 표기를 맞춘다 ("2.0"이면 선택이 안 됨)
+  $('set-result-pause').value = String(Number(settings.resultPause));
   $('set-listen-first').value = String(settings.listenFirst);
   $('set-goal').value = String(settings.dailyGoal);
   $('set-puzzle').value = String(settings.puzzleEvery);
@@ -1964,6 +1972,7 @@ function initSettingsDialog() {
     const mergeChanged = settings.mergeSentences !== $('set-merge').checked;
     settings.mergeSentences = $('set-merge').checked;
     settings.shadowFactor = Number($('set-shadow-factor').value);
+    settings.resultPause = Number($('set-result-pause').value);
     settings.listenFirst = Number($('set-listen-first').value);
     settings.dailyGoal = Number($('set-goal').value);
     updateGoalChip();

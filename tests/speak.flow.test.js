@@ -63,9 +63,14 @@ test('no-speech(말 안 함)는 실패이고 인식은 유지, 결과 없음이 
   recs[1].end();
   r = await h.promise;
   assert.equal(r.srError, 'no-result'); assert.equal(recognitionState().broken, false);
-  // ×2 → 이 문장부터 에너지 방식 (마이크 열림), 이후 문장도 에너지
+  // ×2 → 아직 유지 (아이가 두 번 조용했을 뿐일 수 있다)
   h = runSpeakCheck(opts());
   recs[2].end();
+  r = await h.promise;
+  assert.equal(recognitionState().broken, false, '2번으로는 폴백하지 않는다');
+  // ×3 → 이 문장부터 에너지 방식 (마이크 열림), 이후 문장도 에너지
+  h = runSpeakCheck(opts());
+  recs[3].end();
   await tick(30);
   assert.equal(recognitionState().broken, true);
   assert.ok(micOpens >= 1, '폴백에서 마이크를 엶');
@@ -127,4 +132,38 @@ test('cancel: 판정 없이 정리, stop: 마지막 결과를 기다렸다가 �
   h.stop(); // → rec.stop() → onend → 판정
   r = await h.promise;
   assert.equal(r.method, 'speech'); assert.equal(r.transcript, 'i love');
+});
+
+test('폴백은 영구가 아니다 — 시간이 지나면 인식을 다시 시도한다', async () => {
+  resetRecognition(); recs.length = 0; micOpens = 0;
+  // 결과 없음 3번 → 폴백
+  for (let i = 0; i < 3; i++) {
+    const h = runSpeakCheck(opts());
+    recs[i].end();
+    if (i < 2) await h.promise; else { await tick(30); h.stop(); await h.promise; }
+  }
+  assert.equal(recognitionState().broken, true, '폴백 상태');
+  assert.ok(recognitionState().retryInSec > 0, '언제 다시 시도하는지 알 수 있어야 함');
+
+  // 아직 시간이 안 됐으면 계속 에너지
+  const before = recs.length;
+  let h = runSpeakCheck(opts());
+  assert.equal(recs.length, before, '아직은 인식을 안 씀');
+  h.cancel(); await h.promise;
+
+  // 시간이 지난 것처럼 만들면 다시 인식 (앱을 껐다 켜지 않아도 복구)
+  const RETRY_MS = 3 * 60 * 1000;
+  const realNow = Date.now;
+  Date.now = () => realNow() + RETRY_MS + 1000;
+  try {
+    h = runSpeakCheck(opts());
+    assert.equal(recs.length, before + 1, '시간이 지나면 인식을 다시 시도');
+    assert.equal(recognitionState().broken, false);
+    recs[recs.length - 1].result('i love toys');
+    recs[recs.length - 1].end();
+    const r = await h.promise;
+    assert.equal(r.method, 'speech', '복구 후에는 다시 단어로 판정');
+  } finally {
+    Date.now = realNow;
+  }
 });
