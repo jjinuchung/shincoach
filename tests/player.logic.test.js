@@ -140,7 +140,7 @@ function loadPlayer() {
     // ⚔️ 배틀 스텁: 열린 배틀은 battleCalls에 기록, shouldBattle은 battleState.roll 로 제어
     battleCalls, battleState,
     initBattle() {}, abortBattle() {}, openBattle(o) { battleCalls.push(o); },
-    BATTLE: { chance: 0.03, maxPerDay: 1, minDoneToday: 5, hp: 100, winXp: 40, winCoins: 15, lossesToLose: 3 },
+    BATTLE: { chance: 0.04, maxPerDay: 1, minDoneToday: 5, hp: 100, winXp: 40, winCoins: 15, lossesToLose: 3 },
     shouldBattle: ({ todayDone, todayBattles }) => battleState.roll && todayDone >= 5 && todayBattles < 1,
     pickOpponent: (list, caught) => list.find((m) => !caught[m.id]) || null, eligibleMine: (ids, partner, tired) => ids.filter((id) => id !== partner && !(tired && tired(id))),
     getProfileSnapshot: () => ({ caught: battleState.caught }), lossesOf: () => 0,

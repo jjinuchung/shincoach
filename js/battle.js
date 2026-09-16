@@ -9,7 +9,7 @@ import { burstConfetti, josa } from './catch.js';
 
 // ── 규칙 ──
 export const BATTLE = {
-  chance: 0.03,      // 문장을 제대로 완료할 때마다 이 확률로 등장
+  chance: 0.04,      // 문장을 제대로 완료할 때마다 이 확률로 등장 (3% → 4%, 체감상 너무 안 만나서)
   maxPerDay: 1,      // 하루 최대
   minDoneToday: 5,   // 오늘 이만큼 완료해야 등장 (대충 넘기기로는 못 만남)
   hp: 100,           // 양쪽 배틀 HP (파트너 HP와 별개)
