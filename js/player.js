@@ -2368,7 +2368,7 @@ function initSettingsDialog() {
 // ───────────────────── 설정 비밀번호 ─────────────────────
 
 // 비밀번호는 평문 대신 SHA-256 해시로 보관 (코드가 공개 저장소에 있으므로)
-const SETTINGS_PIN_HASH = '4030c42b313a82b953d14f04a85ff9dd9739e49a97d90631b7fb3029cca1d6e1';
+const SETTINGS_PIN_HASH = 'e614c56a130dd5c63280ed4f4fce9a3aa8e9dc875840db6bdea32aaf29abc0cf';
 
 async function sha256Hex(text) {
   if (window.crypto && window.crypto.subtle && window.TextEncoder) {
@@ -2382,7 +2382,7 @@ async function checkPin(pin) {
   const h = await sha256Hex(pin);
   if (h !== null) return h === SETTINGS_PIN_HASH;
   // 해시를 못 만드는 환경에서는 간단한 변형 비교 (평문 노출 최소화)
-  return pin.split('').reverse().join('') === '5170';
+  return pin.split('').reverse().join('') === '7190';
 }
 
 let pinCallback = null;
