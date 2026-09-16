@@ -1,7 +1,7 @@
 // ⚔️ 배틀 규칙 테스트: node --test tests/battle.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BATTLE, MOVES, DAMAGE, TYPE_OF, typeOf, movesOf, speakTier, damageFor, enemyDamage, shouldBattle, pickOpponent, eligibleMine, abortOutcome } from '../js/battle.js';
+import { BATTLE, MOVES, DAMAGE, TYPE_OF, typeOf, movesOf, speakTier, damageFor, enemyDamage, shouldBattle, pickOpponent, eligibleMine, abortOutcome, formMult, FORM } from '../js/battle.js';
 import { ROSTER } from '../js/pokemon.js';
 import { battleWin, battleLoss, lossesOf, caughtCount, catchAttempt, consumeItem, addItem, itemCount } from '../js/xp.js';
 import { mergeStatRecord } from '../js/db.js';
@@ -93,4 +93,15 @@ test('명단 100마리 전부 배틀 타입이 있다 (없으면 전부 노말�
   for (const r of ROSTER) count[TYPE_OF[r.id]] = (count[TYPE_OF[r.id]] || 0) + 1;
   assert.ok(Object.keys(count).length >= 10, `타입 종류: ${Object.keys(count).length}`);
   assert.ok(Math.max(...Object.values(count)) <= ROSTER.length * 0.3, `한 타입이 너무 많음: ${JSON.stringify(count)}`);
+});
+
+test('⭐ 변신 배율: 메가는 배틀 내내 ×1.4, 거다이맥스는 3턴만 ×1.6', () => {
+  assert.equal(formMult(null, 0), 1, '변신 안 하면 그대로');
+  assert.equal(formMult('mega', 0), FORM.megaMult);
+  assert.equal(formMult('mega', 3), FORM.megaMult, '메가는 턴과 무관');
+  assert.equal(formMult('gmax', 3), FORM.gmaxMult);
+  assert.equal(formMult('gmax', 1), FORM.gmaxMult);
+  assert.equal(formMult('gmax', 0), 1, '거다이맥스는 3턴이 지나면 원래대로');
+  assert.ok(FORM.gmaxMult > FORM.megaMult, '거다이맥스가 더 세지만 짧다');
+  assert.equal(FORM.gmaxTurns, 3);
 });

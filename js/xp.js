@@ -2,7 +2,7 @@
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import { getProfile, applyProfileDelta } from './db.js';
-import { itemById, HP, GOLDEN } from './items.js';
+import { itemById, HP, GOLDEN, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS } from './items.js';
 import { anchorFor } from './pokemon.js';
 
 // ── 경험치 ──
@@ -146,6 +146,64 @@ export function decideRarity(id, ok) {
   if (ok) m.rarity = to;
   addDelta({ mons: { [id]: { rarityAsk: null, rarity: ok ? to : (m.rarity || null) } } });
   return ok ? to : null;
+}
+
+// ── ⭐ 메가진화 · 거다이맥스 ──
+// 메가진화: 🔑 키스톤(트레이너, 하나면 충분) + 💠 메가스톤(포켓몬에게 끼움, 빼면 가방으로 돌아옴)
+// 거다이맥스: 🍄 다이버섯 10개로 만든 🍲 다이스프를 먹인 포켓몬만 (한 번 먹으면 계속)
+
+/** 🔑 키스톤을 가지고 있는지 (메가진화의 전제) */
+export function hasKeystone() {
+  return itemCount(KEYSTONE.id) > 0;
+}
+
+/** 💠 이 포켓몬이 메가스톤을 끼고 있는지 */
+export function hasMegaStone(id) {
+  const m = profile.mons[id];
+  return !!(m && m.mega);
+}
+
+/** 🍲 이 포켓몬이 다이스프를 먹었는지 (거다이맥스 가능) */
+export function hasGmax(id) {
+  const m = profile.mons[id];
+  return !!(m && m.gmax);
+}
+
+/** 💠 메가스톤 끼우기 / 빼기 (가방에서 빠지고, 빼면 돌아온다 — 장식과 같은 규칙) */
+export function equipMega(id, on) {
+  const m = profile.mons[id] || (profile.mons[id] = {});
+  if (on) {
+    if (m.mega) return true;
+    if (itemCount(MEGASTONE.id) <= 0) return false;
+    m.mega = true;
+    profile.items[MEGASTONE.id] -= 1; // 메모리도 같이 (장식과 같은 방식)
+    addDelta({ items: { [MEGASTONE.id]: -1 }, mons: { [id]: { mega: true } } });
+    return true;
+  }
+  if (!m.mega) return true;
+  delete m.mega;
+  profile.items[MEGASTONE.id] = (profile.items[MEGASTONE.id] || 0) + 1;
+  addDelta({ items: { [MEGASTONE.id]: 1 }, mons: { [id]: { mega: false } } });
+  return true;
+}
+
+/** 🍄 다이버섯 얻기 (하루 상한은 부르는 쪽에서 — track이 날짜를 안다) */
+export function gainMushroom(n = 1) {
+  if (n <= 0) return itemCount(MUSHROOM.id);
+  addDelta({ items: { [MUSHROOM.id]: n } });
+  profile.items[MUSHROOM.id] = (profile.items[MUSHROOM.id] || 0) + n;
+  return itemCount(MUSHROOM.id);
+}
+
+/** 🍲 다이스프 만들어 먹이기 — 버섯 10개 소모, 그 포켓몬은 계속 거다이맥스할 수 있다 */
+export function makeSoup(id) {
+  if (itemCount(MUSHROOM.id) < SOUP_MUSHROOMS) return false;
+  const m = profile.mons[id] || (profile.mons[id] = {});
+  if (m.gmax) return false;
+  m.gmax = true;
+  profile.items[MUSHROOM.id] -= SOUP_MUSHROOMS;
+  addDelta({ items: { [MUSHROOM.id]: -SOUP_MUSHROOMS }, mons: { [id]: { gmax: true } } });
+  return true;
 }
 
 /** ⚙ 등급 초기화: 옮긴 것과 신청을 모두 없앰 (원래 등급으로) */

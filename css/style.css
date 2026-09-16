@@ -1439,3 +1439,12 @@ button { font-family: inherit; }
 .mon-figure.unknown img { filter: brightness(0); opacity: 0.35; }
 .stats-ask-bulk { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 10px; }
 .stats-ask-bulk .btn { flex: 1 1 140px; }
+
+/* ⭐ 메가진화·거다이맥스 미리보기 */
+.mon-form-preview { display: flex; justify-content: center; }
+.mon-form-preview .mon-figure[hidden] { display: none; }
+.mon-form-preview .mon-figure { width: 120px; height: 120px; }
+.battle-move.form { background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; }
+.battle-move.form .hint { color: #e9d5ff; }
+.catch-cand .own.mega { background: #ede9fe; color: #6d28d9; }
+.mon-figure.gmax { transform: scale(1.25); transition: transform 0.4s; }

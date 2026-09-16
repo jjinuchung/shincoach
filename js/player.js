@@ -8,9 +8,9 @@ import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
-import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity } from './xp.js';
-import { COIN, HP, POTION, GOLDEN, puzzleCoins, streakCoins, lootBox, itemById, setFigure } from './items.js';
+import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl } from './pokemon.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax } from './xp.js';
+import { COIN, HP, POTION, GOLDEN, puzzleCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
@@ -396,7 +396,16 @@ function myBattleMons(includePartner) {
   return ok.map((id) => {
     const r = ROSTER.find((m) => m.id === id);
     const c = state.characters.find((x) => x.id === id);
-    return { id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id) };
+    // ⭐ 변신: 메가는 🔑 키스톤 + 💠 메가스톤, 거다이맥스는 🍲 다이스프를 먹은 포켓몬만
+    const f = formsOf(id) || {};
+    const canMega = !!(f.mega && hasKeystone() && hasMegaStone(id));
+    const canGmax = !!(f.gmax && hasGmax(id));
+    return {
+      id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id),
+      canMega, canGmax,
+      megaUrl: canMega ? formUrl(id, 'mega') : null,
+      gmaxUrl: canGmax ? formUrl(id, 'gmax') : null,
+    };
   });
 }
 
@@ -492,6 +501,7 @@ function applyBattleResult(r) {
     awardXp(BATTLE.winXp);
     awardCoins(BATTLE.winCoins);
     showPlayerMessage(w.first ? `🎉 ${r.opponent.ko}${josaIga(r.opponent.ko)} 도감에 들어왔어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}` : `🎉 ${r.opponent.ko} 한 마리 더! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`, 5000);
+    setTimeout(() => dropMushroom('배틀에서 이겼어요'), 5200); // 🍄 승리 메시지 뒤에
   } else if (r.my) {
     const l = battleLoss(r.my.id, BATTLE.lossesToLose);
     if (l.lost) showPlayerMessage(`😢 ${r.my.ko}${josaIga(r.my.ko)} ${BATTLE.lossesToLose}번 져서 떠났어요…`, 6000);
@@ -756,6 +766,19 @@ function maybeReview() {
   if (items.length) startReview(items, false);
 }
 
+/**
+ * 🍄 다이버섯 하나 — 🔁 복습 완주 · ⚔️ 배틀 승리 · 🏁 여행 도착에서만 (하루 2개까지).
+ * 돈으로 못 사는 것이라야 🍲 다이스프(거다이맥스)가 "모아서 얻는 것"이 된다.
+ */
+function dropMushroom(why) {
+  if (state.parentMode) return;
+  if (track.todayMushrooms() >= MUSHROOM_PER_DAY) return;
+  const have = gainMushroom(1);
+  track.markMushroom();
+  track.flush();
+  showPlayerMessage(`🍄 다이버섯을 얻었어요! (${have}/${SOUP_MUSHROOMS}) — ${why}`, 4000);
+}
+
 /** 회차 완주 보상: ⚡·💰 + (하루 첫 완주만) 🌟 황금 볼·❤️ 회복 */
 function grantReviewRound() {
   const reward = roundReward(track.reviewGoldenTaken());
@@ -767,6 +790,7 @@ function grantReviewRound() {
     track.markReviewGolden();
   }
   if (reward.hp) hpHeal(reward.hp);
+  dropMushroom('복습을 끝까지 했어요'); // 🍄 거다이맥스 재료
   track.flush();
   return reward;
 }
@@ -2102,6 +2126,7 @@ function celebrateJourney(showOnly) {
   awardXp(XP.journey);
   awardCoins(COIN.journey);
   showPlayerMessage(`🏁 여행 끝! 끝까지 다 봤어요 ⚡+${XP.journey} 💰+${COIN.journey}`, 6000);
+  setTimeout(() => dropMushroom('여행을 끝까지 했어요'), 6200);
 }
 
 // ───────────────────── 전체 대사 목록 ─────────────────────

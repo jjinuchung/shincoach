@@ -263,6 +263,16 @@ export function todayDone() {
   return t.daily ? t.daily.doneKeys.length : 0;
 }
 
+/** 🍄 오늘 얻은 다이버섯 수 / 하나 얻었다고 기록 (하루 상한용) */
+export function todayMushrooms() {
+  return t.daily ? (t.daily.mushrooms || 0) : 0;
+}
+export function markMushroom() {
+  if (!t.daily) return;
+  t.daily.mushrooms = (t.daily.mushrooms || 0) + 1;
+  t.dailyDirty = true;
+}
+
 /** 오늘 공부한 시간(초) — ✍️ 에세이가 열리는 기준 */
 export function todaySeconds() {
   return t.daily ? (t.daily.seconds || 0) : 0;

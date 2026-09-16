@@ -114,6 +114,99 @@ export const ROSTER = [
 ];
 
 /** 이 레벨에서 열려 있는 명단 */
+/**
+ * ⭐ 변신 폼 — PokeAPI의 폼 그림 id (메가진화 / 거다이맥스).
+ * 명단 100마리 중 30마리가 변신할 수 있다. 그림은 필요할 때만 받는다(ensureForm).
+ * 라이츄·개굴닌자 메가는 최신작 자료라 아이가 아는 것과 다를 수 있다.
+ */
+export const FORMS = {
+  3: { mega: 10033, gmax: 10195 },   // 이상해꽃
+  6: { mega: 10034, gmax: 10196 },   // 리자몽
+  9: { mega: 10036, gmax: 10197 },   // 거북왕
+  12: { gmax: 10198 },               // 버터플
+  25: { gmax: 10199 },               // 피카츄
+  26: { mega: 10304 },               // 라이츄
+  52: { gmax: 10200 },               // 나옹
+  65: { mega: 10037 },               // 후딘
+  68: { gmax: 10201 },               // 괴력몬
+  94: { mega: 10038, gmax: 10202 },  // 팬텀
+  130: { mega: 10041 },              // 갸라도스
+  131: { gmax: 10204 },              // 라프라스
+  133: { gmax: 10205 },              // 이브이
+  142: { mega: 10042 },              // 프테라
+  143: { gmax: 10206 },              // 잠만보
+  149: { mega: 10281 },              // 망나뇽
+  150: { mega: 10043 },              // 뮤츠
+  212: { mega: 10046 },              // 핫삼
+  248: { mega: 10049 },              // 마기라스
+  257: { mega: 10050 },              // 번치코
+  260: { mega: 10064 },              // 대짱이
+  282: { mega: 10051 },              // 가디안
+  373: { mega: 10089 },              // 보만다
+  376: { mega: 10076 },              // 메타그로스
+  380: { mega: 10062 },              // 라티아스
+  381: { mega: 10063 },              // 라티오스
+  384: { mega: 10079 },              // 레쿠쟈
+  445: { mega: 10058 },              // 한카리아스
+  448: { mega: 10059 },              // 루카리오
+  658: { mega: 10294 },              // 개굴닌자
+};
+
+/** 이 포켓몬이 할 수 있는 변신 { mega?, gmax? } (없으면 null) */
+export function formsOf(id) {
+  return FORMS[id] || null;
+}
+
+const formUrls = new Map(); // 폼 그림 id → object URL (받아둔 것만)
+
+/** 받아둔 변신 그림 주소 (없으면 null) */
+export function formUrl(monId, kind) {
+  const f = FORMS[monId];
+  const fid = f && f[kind];
+  return fid ? (formUrls.get(fid) || null) : null;
+}
+
+/**
+ * 변신 그림을 확보한다. 100마리를 받을 때 폼까지 다 받으면 데이터가 두 배가 되므로,
+ * **메가스톤을 끼우거나 다이스프를 먹일 때** 그때 한 장만 받는다. 실패하면 null(원래 그림으로 보여줌).
+ */
+export async function ensureForm(monId, kind) {
+  const f = FORMS[monId];
+  const fid = f && f[kind];
+  if (!fid) return null;
+  if (formUrls.has(fid)) return formUrls.get(fid);
+  const saved = (await getCharacters().catch(() => [])).find((c) => c.id === fid && c.blob);
+  if (saved) {
+    const url = URL.createObjectURL(saved.blob);
+    formUrls.set(fid, url);
+    return url;
+  }
+  try {
+    const res = await fetch(ART_URL(fid), { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const made = await prepare(await res.blob());
+    await putCharacter({ id: fid, ko: `form:${monId}:${kind}`, en: '', blob: made.blob, anchor: made.anchor, savedAt: Date.now() });
+    const url = URL.createObjectURL(made.blob);
+    formUrls.set(fid, url);
+    return url;
+  } catch (e) {
+    console.warn('변신 그림 받기 실패:', monId, kind, e);
+    return null;
+  }
+}
+
+/** 앱을 열 때 이미 받아둔 변신 그림을 메모리에 올림 (오프라인에서도 보이게) */
+export async function loadForms() {
+  const known = new Set();
+  for (const f of Object.values(FORMS)) { if (f.mega) known.add(f.mega); if (f.gmax) known.add(f.gmax); }
+  const recs = await getCharacters().catch(() => []);
+  for (const r of recs) {
+    if (!r.blob || !known.has(r.id) || formUrls.has(r.id)) continue;
+    formUrls.set(r.id, URL.createObjectURL(r.blob));
+  }
+  return formUrls.size;
+}
+
 export function unlockedRoster(level) {
   return ROSTER.filter((r) => (r.unlock || 1) <= level);
 }

@@ -5,17 +5,20 @@ import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, GOLDEN, ITEMS, i
 import {
   coins, gainCoins, itemCount, inventory, addItem, buyItem, getLook, equipGear, applyDye, getProfileSnapshot,
   getPartner, setPartner, hpOf, isTired, changeHp, usePotion, catchAttempt, setGearPos,
+  hasKeystone, hasMegaStone, hasGmax, equipMega, gainMushroom, makeSoup,
 } from '../js/xp.js';
 import { mergeStatRecord } from '../js/db.js';
+import { FORMS } from '../js/pokemon.js';
+import { ROSTER } from '../js/pokemon.js';
 
 test('카탈로그: id가 겹치지 않고 가격은 양수, 장식은 head/face', () => {
   const ids = ITEMS.map((i) => i.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const it of ITEMS) {
     assert.ok(it.emoji && it.ko, it.id);
-    assert.ok(it.kind === 'gear' || it.kind === 'dye' || it.kind === 'potion' || it.kind === 'ball');
-    // 🌟 황금 볼만 값이 없다 — 코인으로 못 사고 🔁 복습으로만 얻는다
-    if (it.kind === 'ball') assert.equal(it.price, 0, it.id);
+    assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom'].includes(it.kind), it.id);
+    // 값이 없는 것 = 코인으로 못 사는 것: 🌟 황금 볼(복습으로만) · 🍄 다이버섯(학습으로만 모음)
+    if (it.kind === 'ball' || it.kind === 'mushroom') assert.equal(it.price, 0, it.id);
     else assert.ok(it.price > 0, it.id);
   }
   for (const p of POTION) assert.ok(p.heal > 0, p.id);
@@ -41,13 +44,15 @@ test('코인 규칙: 퍼즐 5/3/2, 정답 공개 0, 스트릭 5×일 최대 50',
   assert.equal(streakCoins(0), 5);
 });
 
-test('lootBox: 항상 카탈로그 안의 아이템 (🌟 황금 볼은 절대 안 나옴)', () => {
-  const loot = ITEMS.filter((i) => i.kind !== 'ball');
+test('lootBox: 귀한 것(🌟 황금 볼·⭐ 메가·🍄 버섯)은 상자에서 안 나온다', () => {
+  const loot = ITEMS.filter((i) => !['ball', 'mega', 'mushroom'].includes(i.kind));
   assert.equal(lootBox(() => 0), loot[0].id);
   assert.equal(lootBox(() => 0.999999), loot[loot.length - 1].id);
   assert.ok(itemById(lootBox()));
-  for (let i = 0; i <= 20; i++) assert.notEqual(lootBox(() => i / 20), GOLDEN.id, '상자에서 황금 볼이 나오면 안 됨');
+  const forbidden = new Set(ITEMS.filter((i) => ['ball', 'mega', 'mushroom'].includes(i.kind)).map((i) => i.id));
+  for (let i = 0; i <= 40; i++) assert.equal(forbidden.has(lootBox(() => i / 40)), false, '상자에서 나오면 안 되는 것');
   assert.equal(canBuy(GOLDEN.id, 9999).ok, false, '코인이 아무리 많아도 못 삼');
+  assert.equal(canBuy('mushroom', 9999).ok, false, '🍄 다이버섯도 돈으로 못 삼 (학습으로만)');
 });
 
 test('canBuy: 부족한 코인 계산', () => {
@@ -170,4 +175,53 @@ test('🎀 이상한 값은 저장하지 않는다', () => {
   assert.ok(getLook(9).gearPos);
   setGearPos(9, { x: NaN, y: 0.5 });
   assert.equal(getLook(9).gearPos, null, '숫자가 아니면 자동 위치로');
+});
+
+test('⭐ 메가진화: 🔑 키스톤 + 💠 메가스톤, 빼면 가방으로 돌아온다', () => {
+  gainCoins(2000);
+  assert.equal(hasKeystone(), false);
+  assert.equal(equipMega(94, true), false, '스톤이 없으면 못 끼운다');
+
+  buyItem('keystone');
+  buyItem('megastone');
+  assert.equal(hasKeystone(), true);
+  assert.equal(itemCount('megastone'), 1);
+
+  assert.equal(equipMega(94, true), true, '팬텀에게 끼움');
+  assert.equal(hasMegaStone(94), true);
+  assert.equal(itemCount('megastone'), 0, '가방에서 빠진다');
+
+  assert.equal(equipMega(94, false), true);
+  assert.equal(hasMegaStone(94), false);
+  assert.equal(itemCount('megastone'), 1, '빼면 돌아온다');
+});
+
+test('⭐ 거다이맥스: 🍄 다이버섯 10개로 🍲 다이스프 (돈으로는 못 삼)', () => {
+  gainCoins(5000);
+  assert.equal(buyItem('mushroom'), false, '다이버섯은 상점에서 못 산다');
+
+  gainMushroom(9);
+  assert.equal(makeSoup(25), false, '9개로는 못 만든다');
+  assert.equal(hasGmax(25), false);
+
+  gainMushroom(1);
+  assert.equal(makeSoup(25), true);
+  assert.equal(hasGmax(25), true, '피카츄가 거다이맥스할 수 있게 됨');
+  assert.equal(itemCount('mushroom'), 0, '버섯 10개를 썼다');
+  assert.equal(makeSoup(25), false, '이미 먹은 포켓몬에게 또 먹이지 않는다');
+});
+
+test('⭐ 변신 표: 30마리, 그림 id는 겹치지 않는다', () => {
+  const ids = Object.keys(FORMS).map(Number);
+  assert.equal(ids.length, 30);
+  const arts = [];
+  for (const id of ids) {
+    const f = FORMS[id];
+    assert.ok(f.mega || f.gmax, `${id}는 변신이 하나는 있어야 한다`);
+    if (f.mega) arts.push(f.mega);
+    if (f.gmax) arts.push(f.gmax);
+    assert.ok(ROSTER.some((m) => m.id === id), `${id}는 명단에 있어야 한다`);
+  }
+  assert.equal(new Set(arts).size, arts.length, '그림 id가 겹치면 안 됨');
+  assert.deepEqual(FORMS[94], { mega: 10038, gmax: 10202 }, '팬텀은 둘 다 된다');
 });

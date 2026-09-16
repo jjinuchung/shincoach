@@ -71,6 +71,8 @@ function loadPlayer() {
   const reviewCalls = [];
   const essayCalls = [];
   const essayState = { seconds: 0, done: false, saved: [] };
+  const mushroomState = { today: 0, gained: 0 };
+  const formState = { forms: {}, keystone: false, mega: {}, gmax: {} };
   const reviewState = { stats: [], sentences: 0, items: 0, words: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
   const missedLog = [];
   const vocabViewsStub = [];
@@ -101,6 +103,8 @@ function loadPlayer() {
       reviewGoldenTaken: () => reviewState.golden, markReviewGolden() { reviewState.golden = true; },
       todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; },
       // ✍️ 에세이: 오늘 공부 시간·완료 여부 (essayState로 테스트가 조작)
+      // 🍄 다이버섯: 하루 상한 확인용
+      todayMushrooms: () => mushroomState.today, markMushroom() { mushroomState.today++; },
       todaySeconds: () => essayState.seconds, essayDoneToday: () => essayState.done,
       markEssayWritten(entry) {
         const at = essayState.saved.findIndex((e) => e.id === entry.id);
@@ -130,6 +134,8 @@ function loadPlayer() {
     coinLog, itemLog,
     coins: () => coinLog.reduce((a, b) => a + b, 0), gainCoins: (n) => { if (n) coinLog.push(n); return { gained: n, coins: 0 }; },
     addItem: (id) => { itemLog.push(id); return true; }, getLook: () => ({ gear: null, dye: null }),
+    MUSHROOM_PER_DAY: 2, SOUP_MUSHROOMS: 10,
+    gainMushroom: (n) => { mushroomState.gained += n; return mushroomState.gained; },
     COIN: { done: 1, speak: 2, speakStar: 3, goal: 10, journey: 20 }, puzzleCoins: (r) => (r && r.solved ? [5, 3, 2][Math.min(r.wrong || 0, 2)] : 0),
     streakCoins: (n) => Math.min(50, 5 * n), lootBox: () => 'cap', itemById: (id) => ({ id, emoji: '🧢', ko: '야구모자' }),
     // ❤️ 파트너 HP 스텁: hpState를 테스트가 직접 조작 (partner=null이면 HP 기능 없음)
@@ -153,6 +159,11 @@ function loadPlayer() {
     essayCalls,
     initEssay() {}, abortEssay() {}, openEssay(o) { essayCalls.push(o); },
     pickEssayPrompts, essayReadSeconds, ESSAY_MINUTES: 30, ESSAY_COUNT: 3, ESSAY_REWARD, ESSAY_FINISH,
+    // ⭐ 변신(메가·거다이맥스) 스텁 — 규칙은 실제 모듈, 상태는 formState로 조작
+    formState,
+    formsOf: (id) => formState.forms[id] || null,
+    formUrl: (id, kind) => `url:${id}:${kind}`,
+    hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
     pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, makeDictation, VOCAB_KNOWN,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
@@ -164,7 +175,7 @@ function loadPlayer() {
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, essayCalls, essayState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {

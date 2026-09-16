@@ -130,6 +130,7 @@ async function main() {
   }
   // 👨‍👩‍👦 배포에 실려 온 아빠 교정문 반영 (실패해도 학습에는 영향 없음)
   syncCoachFixes().catch(() => {});
+  import('./pokemon.js').then((m) => m.loadForms()).catch(() => {}); // ⭐ 받아둔 변신 그림 (오프라인에서도 보이게)
   requestPersistentStorage();
   registerServiceWorker();
 }

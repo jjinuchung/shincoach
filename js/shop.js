@@ -1,8 +1,9 @@
 // 🛒 상점(💰 코인으로 🎀 장식·🎨 염색약·🧪 물약 사기) + 포켓몬 상세(❤️ HP·물약·🤝 파트너·장식 장착·염색) 모달
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
-import { GEAR, DYE, POTION, HP, itemById, canBuy, setFigure } from './items.js';
-import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos } from './xp.js';
+import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, itemById, canBuy, setFigure } from './items.js';
+import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup } from './xp.js';
+import { formsOf, formUrl, ensureForm } from './pokemon.js';
 import { sfx, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -64,6 +65,7 @@ function renderShop(msg, boughtId) {
   list.appendChild(shopSection('🎀 장식', '포켓몬 머리에 씌워요. 한 번 사면 계속 내 것 — 다른 포켓몬에게 옮길 수도 있어요', GEAR, boughtId));
   list.appendChild(shopSection('🎨 염색약', '포켓몬 색을 바꿔요. 한 번 쓰면 없어지고, 원래 색으로 돌아가는 건 공짜', DYE, boughtId));
   list.appendChild(shopSection('🧪 물약', '파트너 HP를 채워요. 퍼즐 정답을 그냥 보거나 따라 말하기를 넘기거나 하루 빠지면 HP가 깎여요', POTION, boughtId));
+  list.appendChild(shopSection('⭐ 메가진화', '🔑 키스톤은 한 번만 사면 계속 쓰고, 💠 메가스톤은 포켓몬에게 끼워요. 배틀에서 한 마리만 메가진화할 수 있어요 (🍄 거다이맥스는 살 수 없고 학습으로 모아요)', [KEYSTONE, MEGASTONE], boughtId));
 }
 
 function shopSection(title, sub, items, boughtId) {
@@ -219,6 +221,8 @@ function renderMon(msg, pop) {
   }
   if (!anyPotion) potBox.appendChild(el('span', 'mon-empty', hp >= HP.max ? 'HP가 가득해요' : '가방에 물약이 없어요 — 🛒 상점에서 사 보세요 (💰10)'));
   else if (hp >= HP.max) potBox.appendChild(el('span', 'mon-empty', 'HP가 가득해서 지금은 안 먹여도 돼요'));
+  renderForms();
+
   // ⭐ 등급: 아이가 생각하는 등급을 고르면 아빠에게 신청이 간다 (바로 바뀌지는 않는다)
   const asked = rarityAskOf(mon.id);
   $('mon-rarity-now').textContent = `${RARITY[r].stars} ${RARITY[r].label}`;
@@ -275,6 +279,71 @@ function renderMon(msg, pop) {
     }));
   }
   if (!anyDye) dyeBox.appendChild(el('span', 'mon-empty', '가방에 염색약이 없어요 — 🛒 상점에서 사 보세요'));
+}
+
+/**
+ * ⭐ 메가진화 · 거다이맥스.
+ * 원작 규칙 그대로: 메가는 🔑 키스톤 + 💠 메가스톤, 거다이맥스는 🍄 다이버섯으로 만든 🍲 다이스프.
+ * 잡은 포켓몬만 (변신은 내 포켓몬이 하는 것), 변신 그림은 여기서 처음 끼울 때 받아 온다.
+ */
+function renderForms() {
+  const sec = $('mon-form-section');
+  const forms = mon && mon.caught !== false ? formsOf(mon.id) : null;
+  if (!forms) { sec.hidden = true; return; }
+  sec.hidden = false;
+
+  const megaOn = hasMegaStone(mon.id);
+  const gmaxOn = hasGmax(mon.id);
+  const shrooms = itemCount(MUSHROOM.id);
+  $('mon-form-now').textContent = megaOn ? '💠 메가진화 준비 완료' : gmaxOn ? '🍲 거다이맥스 준비 완료' : '아직 변신할 수 없어요';
+
+  // 변신한 모습 미리보기 (받아둔 그림이 있을 때만)
+  const fig = $('mon-form-figure');
+  const shown = megaOn ? 'mega' : gmaxOn ? 'gmax' : null;
+  const url = shown ? formUrl(mon.id, shown) : null;
+  if (url) { setFigure(fig, url, null); fig.hidden = false; } else fig.hidden = true;
+
+  const box = $('mon-form');
+  box.innerHTML = '';
+  const notes = [];
+
+  if (forms.mega) {
+    if (!hasKeystone()) {
+      notes.push(`🔑 키스톤이 있어야 메가진화를 할 수 있어요 — 🛒 상점에서 ${KEYSTONE.price}코인`);
+    } else if (megaOn) {
+      box.appendChild(option('💠', '메가스톤 빼기', '가방으로 돌아와요', true, '', () => {
+        equipMega(mon.id, false);
+        change(true, '💠 메가스톤을 뺐어요');
+      }));
+    } else {
+      const n = itemCount(MEGASTONE.id);
+      const btn = option('💠', '메가스톤 끼우기', n ? `가방 ${n}개` : `🛒 상점 ${MEGASTONE.price}코인`, false, '', async () => {
+        if (!equipMega(mon.id, true)) { renderMon('💠 가방에 메가스톤이 없어요 — 🛒 상점에서 살 수 있어요'); return; }
+        await ensureForm(mon.id, 'mega').catch(() => null); // 그림은 처음 한 번만 받는다 (실패해도 변신은 됨)
+        change(true, `💠 ${mon.ko}${josaIga(mon.ko)} 메가진화할 수 있게 됐어요! 배틀에서 써 보세요`);
+      });
+      if (!n) btn.disabled = true;
+      box.appendChild(btn);
+    }
+  }
+
+  if (forms.gmax) {
+    if (gmaxOn) {
+      notes.push('🍲 다이스프를 먹어서 거다이맥스할 수 있어요');
+    } else {
+      const btn = option('🍲', '다이스프 먹이기', `🍄 ${shrooms}/${SOUP_MUSHROOMS}개`, false, '', async () => {
+        if (!makeSoup(mon.id)) { renderMon(`🍄 다이버섯이 ${SOUP_MUSHROOMS}개 있어야 해요 (지금 ${itemCount(MUSHROOM.id)}개)`); return; }
+        await ensureForm(mon.id, 'gmax').catch(() => null);
+        change(true, `🍲 ${mon.ko}${josaIga(mon.ko)} 거다이맥스할 수 있게 됐어요!`);
+      });
+      if (shrooms < SOUP_MUSHROOMS) btn.disabled = true;
+      box.appendChild(btn);
+      notes.push('🍄 다이버섯은 살 수 없어요 — 🔁 복습 완주, ⚔️ 배틀 승리, 🏁 여행 도착에서 나와요');
+    }
+  }
+
+  if (!box.children.length && !notes.length) notes.push('이 포켓몬은 변신할 수 없어요');
+  $('mon-form-msg').textContent = notes.join('  ·  ');
 }
 
 function option(emoji, name, sub, on, extraCls, onClick) {

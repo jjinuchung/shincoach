@@ -70,11 +70,25 @@ export const HP = {
 // 🌟 황금 몬스터볼: 잡힐 확률이 2배. 🔁 복습을 끝내야만 얻는다 (상점에서 못 사고 🎁 상자에서도 안 나옴)
 export const GOLDEN = { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', price: 0, mult: 2, kind: 'ball' };
 
+// ── ⭐ 메가진화 · 거다이맥스 (원작 규칙을 그대로) ──
+// 메가진화: 트레이너의 🔑 키스톤 + 포켓몬이 지니는 💠 메가스톤. 배틀에서만, 한 배틀에 한 마리.
+// 거다이맥스: 돈으로 못 산다. 🍄 다이버섯을 모아 🍲 다이스프를 만들어 먹인 포켓몬만 할 수 있다.
+export const KEYSTONE = { id: 'keystone', emoji: '🔑', ko: '키스톤', price: 600, kind: 'mega' };
+export const MEGASTONE = { id: 'megastone', emoji: '💠', ko: '메가스톤', price: 600, kind: 'mega' };
+export const MUSHROOM = { id: 'mushroom', emoji: '🍄', ko: '다이버섯', price: 0, kind: 'mushroom' };
+/** 🍲 다이스프 한 그릇에 드는 버섯 수 */
+export const SOUP_MUSHROOMS = 10;
+/** 🍄 다이버섯은 하루에 이만큼까지만 (몰아서 모으지 못하게) */
+export const MUSHROOM_PER_DAY = 2;
+
 export const ITEMS = [
   ...GEAR.map((g) => ({ ...g, kind: 'gear' })),
   ...DYE.map((d) => ({ ...d, kind: 'dye' })),
   ...POTION.map((p) => ({ ...p, kind: 'potion' })),
   GOLDEN,
+  KEYSTONE,
+  MEGASTONE,
+  MUSHROOM,
 ];
 const byId = {};
 for (const it of ITEMS) byId[it.id] = it;
@@ -84,8 +98,8 @@ export function itemById(id) {
   return byId[id] || null;
 }
 
-/** 🎁 레벨업 선물 상자에서 나올 수 있는 것 (🌟 황금 볼은 복습으로만 얻는다) */
-const LOOT = ITEMS.filter((it) => it.kind !== 'ball');
+/** 🎁 레벨업 선물 상자에서 나올 수 있는 것 (🌟 황금 볼·⭐ 메가 아이템·🍄 다이버섯은 제외 — 귀한 것이라 따로 모아야 한다) */
+const LOOT = ITEMS.filter((it) => it.kind !== 'ball' && it.kind !== 'mega' && it.kind !== 'mushroom');
 
 /** 🎁 레벨업 선물 상자: 아이템 중 하나를 고르게 뽑음 */
 export function lootBox(rng = Math.random) {

@@ -38,6 +38,20 @@ export const MOVES = {
   ground: { emoji: '🏔️', ko: '땅', strong: '지진', safe: '진흙뿌리기' },
   steel: { emoji: '⚙️', ko: '강철', strong: '아이언헤드', safe: '메탈크로' },
 };
+/** ⭐ 변신 효과 (배틀에서만) — 메가는 배틀 내내, 거다이맥스는 3턴 */
+export const FORM = {
+  megaMult: 1.4,   // 메가진화: 공격 데미지 ×1.4
+  gmaxMult: 1.6,   // 거다이맥스: ×1.6
+  gmaxTurns: 3,    // 거다이맥스는 3턴만 (원작처럼)
+};
+
+/** 이번 턴 내 공격에 곱할 배율 (변신 안 했으면 1) */
+export function formMult(form, turnsLeft) {
+  if (form === 'mega') return FORM.megaMult;
+  if (form === 'gmax' && turnsLeft > 0) return FORM.gmaxMult;
+  return 1;
+}
+
 export const DAMAGE = {
   strong: { star: 40, pass: 25, fail: 8, none: 0 },
   safe: { star: 28, pass: 22, fail: 15, none: 5 },
@@ -241,6 +255,8 @@ function showPick() {
     const t = MOVES[typeOf(c.id)];
     btn.appendChild(el('span', 'rr', `${t.emoji} ${t.ko}`));
     if (c.losses) btn.appendChild(el('span', 'own lose', `패배 ${c.losses}/${BATTLE.lossesToLose}`));
+    if (c.canMega) btn.appendChild(el('span', 'own mega', '💠 메가진화'));
+    else if (c.canGmax) btn.appendChild(el('span', 'own mega', '🍲 거다이맥스'));
     btn.addEventListener('click', () => startFight(c));
     pick.appendChild(btn);
   }
@@ -249,6 +265,8 @@ function showPick() {
 function startFight(c) {
   const o = ui.o;
   ui.my = c;
+  ui.form = null;        // ⭐ 이번 배틀에서 변신했는지 ('mega' | 'gmax')
+  ui.gmaxLeft = 0;       // 거다이맥스 남은 턴
   ui.myHp = BATTLE.hp;
   ui.enemyHp = BATTLE.hp;
   ui.turn = 0;
@@ -276,10 +294,50 @@ function renderHp() {
   $('battle-my-hpt').textContent = ui.myHp;
 }
 
+/** ⭐ 변신! (배틀당 한 번, 턴을 쓰지 않는다 — 원작처럼 "이번 턴에 변신하고 바로 공격") */
+function transform(kind) {
+  if (ui.form) return;
+  ui.form = kind;
+  ui.gmaxLeft = kind === 'gmax' ? FORM.gmaxTurns : 0;
+  const url = kind === 'mega' ? ui.my.megaUrl : ui.my.gmaxUrl;
+  const fig = $('battle-my-fig');
+  if (url) setFigure(fig, url, null);           // 변신한 모습 (꾸밈은 빼고 — 모습이 통째로 바뀐다)
+  fig.classList.toggle('gmax', kind === 'gmax'); // 거다이맥스는 거대하게
+  $('battle-msg').textContent = kind === 'mega'
+    ? `💠 ${ui.my.ko} 메가진화! 공격이 강해졌어요`
+    : `🍲 ${ui.my.ko} 거다이맥스! ${FORM.gmaxTurns}턴 동안 아주 강해져요`;
+  if (ui.o.sfx) ui.o.sfx.levelUp();
+  renderActions();
+}
+
+/** 거다이맥스 3턴이 끝나면 원래 모습으로 */
+function revertForm() {
+  ui.form = null;
+  const fig = $('battle-my-fig');
+  setFigure(fig, ui.my.url || '', ui.my.look);
+  fig.classList.remove('gmax');
+}
+
 function renderActions() {
   const box = $('battle-actions');
   box.innerHTML = '';
   box.hidden = false;
+  // ⭐ 아직 변신 안 했으면 변신 버튼을 맨 앞에
+  if (!ui.form) {
+    for (const [kind, ok, emoji, name, hint] of [
+      ['mega', ui.my.canMega, '💠', '메가진화!', `공격 ×${FORM.megaMult}`],
+      ['gmax', ui.my.canGmax, '🍲', '거다이맥스!', `${FORM.gmaxTurns}턴 동안 ×${FORM.gmaxMult}`],
+    ]) {
+      if (!ok) continue;
+      const btn = el('button', 'btn battle-move form');
+      btn.type = 'button';
+      btn.appendChild(el('span', 'em', emoji));
+      btn.appendChild(el('span', 'nm', name));
+      btn.appendChild(el('span', 'hint', hint));
+      btn.addEventListener('click', () => transform(kind));
+      box.appendChild(btn);
+    }
+  }
   for (const mv of movesOf(ui.my.id)) {
     const btn = el('button', 'btn battle-move');
     btn.type = 'button';
@@ -340,7 +398,12 @@ async function playerTurn(moveKey) {
     return;
   }
   const tier = speakTier(result);
-  const dmg = damageFor(moveKey, result);
+  const mult = formMult(ui.form, ui.gmaxLeft);
+  const dmg = Math.round(damageFor(moveKey, result) * mult);
+  if (ui.form === 'gmax' && ui.gmaxLeft > 0) {
+    ui.gmaxLeft--;
+    if (ui.gmaxLeft === 0) revertForm(); // 3턴이 지나면 원래 모습으로
+  }
   const tierMsg = { star: '🌟 완벽해요!', pass: '🎯 잘했어요!', fail: '🔁 조금 아쉬워요', none: '😶 말소리가 없었어요' }[tier];
   const heard = result && result.transcript ? ` "${result.transcript}"` : '';
   $('battle-msg').textContent = `${tierMsg}${heard} → ${mv.name} 데미지 ${dmg}`;
