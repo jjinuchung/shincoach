@@ -113,6 +113,8 @@ export async function openPokedex(opts) {
   card.appendChild(coinRow);
   main.appendChild(card);
 
+  main.appendChild(el('p', 'stats-note', '⭐ 등급이 이상하다고 생각되면 포켓몬을 눌러서 아빠에게 말할 수 있어요 (아직 못 잡은 포켓몬도요)'));
+
   if (chars.length === 0) {
     main.appendChild(el('p', 'stats-empty', '⚙ 설정에서 "포켓몬 캐릭터 받기"를 하면 그림이 보여요.'));
   }
@@ -140,7 +142,8 @@ export async function openPokedex(opts) {
       cell.appendChild(el('div', 'nm', n > 0 ? m.ko : '???'));
       if (n > 1) cell.appendChild(el('div', 'cnt', `×${n}`));
       if (n > 0 && getPartner() === m.id) cell.appendChild(el('div', 'partner', '🤝'));
-      if (n > 0) cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url }));
+      // 못 잡은 포켓몬도 누를 수 있다 — 등급은 **잡기 전에** 맞아야 의미가 있다 (전설이 흔함에 있으면 쉽게 잡힌다)
+      cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url, caught: n > 0 }));
       grid.appendChild(cell);
     }
     sec.appendChild(grid);

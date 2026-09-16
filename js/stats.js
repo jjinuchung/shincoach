@@ -337,6 +337,17 @@ export async function renderStats() {
   if (asks.length) {
     const cR = card(`⭐ 등급 바꿔달라는 신청 ${asks.length}개 — 진우가 보낸 것`);
     cR.appendChild(el('p', 'stats-note', '등급은 곧 잡기 확률이에요 (흔함 45% · 보통 30% · 희귀 15% · 전설 3%). 맞다고 생각되면 옮겨 주세요.'));
+    // 하나씩 누르고 화면을 다시 내리는 게 번거로워서 일괄 처리를 위에 둔다
+    const bulk = el('div', 'stats-ask-bulk');
+    const allYes = el('button', 'btn btn-primary', `✅ ${asks.length}개 전부 옮겨 주기`);
+    allYes.type = 'button';
+    allYes.addEventListener('click', () => { for (const a of asks) decideRarity(a.id, true); renderStats(); });
+    const allNo = el('button', 'btn', '전부 그대로 두기');
+    allNo.type = 'button';
+    allNo.addEventListener('click', () => { for (const a of asks) decideRarity(a.id, false); renderStats(); });
+    bulk.appendChild(allYes);
+    bulk.appendChild(allNo);
+    cR.appendChild(bulk);
     for (const a of asks) {
       const mon = ROSTER.find((m) => m.id === a.id);
       const row = el('div', 'stats-ask');

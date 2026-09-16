@@ -175,10 +175,21 @@ function renderMon(msg, pop) {
   const look = getLook(mon.id);
   const r = rarityOf(mon.id);
   const isPartner = getPartner() === mon.id;
-  $('mon-title').textContent = (isPartner ? '🤝 ' : '') + mon.ko;
-  $('mon-sub').textContent = `${RARITY[r].stars} ${RARITY[r].label} · 잡은 수 ×${caughtCount(mon.id)}` + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '');
+  const got = mon.caught !== false; // 아직 못 잡은 포켓몬은 등급만 손댈 수 있다
+  $('mon-title').textContent = got ? (isPartner ? '🤝 ' : '') + mon.ko : '???';
+  $('mon-sub').textContent = got
+    ? `${RARITY[r].stars} ${RARITY[r].label} · 잡은 수 ×${caughtCount(mon.id)}` + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '')
+    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요`;
   const fig = $('mon-figure');
-  setFigure(fig, mon.url || '', look);
+  setFigure(fig, mon.url || '', got ? look : null);
+  fig.classList.toggle('unknown', !got); // 실루엣 (도감과 같은 모습)
+  // 잡기 전에는 HP·장식·염색·파트너가 의미 없다 → 등급만 보여준다
+  $('mon-hp-section').hidden = !got;
+  for (const id of ['mon-gear', 'mon-dye']) {
+    const sec = $(id).closest('.mon-section');
+    if (sec) sec.hidden = !got;
+  }
+  $('mon-partner').hidden = !got;
   enableGearDrag();
   fig.classList.remove('pop');
   if (pop) { void fig.offsetWidth; fig.classList.add('pop'); }
