@@ -269,8 +269,10 @@ function checkMissedDay(dailyList, today) {
   const hadBefore = dailyList.some((d) => d.date < yesterday && learned(d));
   const yRec = dailyList.find((d) => d.date === yesterday);
   if (!hadBefore || learned(yRec)) return;
-  track.markHpMissed();
-  hpPenalty(HP.missedDay, '어제 학습을 안 했어요');
+  // 두 창이 같이 열려 있어도 벌은 한 번만 — 선점에 성공한 쪽에서만 깎는다
+  track.markHpMissed().then((won) => {
+    if (won) hpPenalty(HP.missedDay, '어제 학습을 안 했어요');
+  });
 }
 
 /** 받침에 따라 이/가 */
@@ -472,10 +474,17 @@ function startBattle(continueFn) {
   const opponent = state.battlePending;
   state.battlePending = null;
   if (!opponent) { continueFn(); return; }
+  // 거절해도 오늘 배틀 기회는 쓴 것. 다른 창이 이미 오늘 몫을 썼으면 등장하지 않는다
+  track.markBattle(BATTLE.maxPerDay).then((won) => {
+    if (!won || !state.open) { continueFn(); return; }
+    openBattleNow(opponent, continueFn);
+  });
+}
+
+function openBattleNow(opponent, continueFn) {
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
-  track.markBattle(); // 거절해도 오늘 배틀 기회는 쓴 것
   setBattleOpen(true);
   openBattle({
     opponent,
@@ -487,14 +496,14 @@ function startBattle(continueFn) {
     onDone: (r) => {
       setBattleOpen(false);
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
-      applyBattleResult(r);
+      applyBattleResult(r); // 저장은 비동기지만 학습 이어가기를 막지 않는다
       if (state.open) continueFn();
     },
   });
 }
 
 /** 배틀 결과 반영: 승 → 상대 획득 + ⚡💰, 패/도중 이탈 → 그 포켓몬 패배 +1 (3번이면 잃음) */
-function applyBattleResult(r) {
+async function applyBattleResult(r) {
   if (!r || r.outcome === 'declined') return;
   if (r.outcome === 'win') {
     const w = battleWin(r.opponent.id);
@@ -503,7 +512,8 @@ function applyBattleResult(r) {
     showPlayerMessage(w.first ? `🎉 ${r.opponent.ko}${josaIga(r.opponent.ko)} 도감에 들어왔어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}` : `🎉 ${r.opponent.ko} 한 마리 더! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`, 5000);
     setTimeout(() => dropMushroom('배틀에서 이겼어요'), 5200); // 🍄 승리 메시지 뒤에
   } else if (r.my) {
-    const l = battleLoss(r.my.id, BATTLE.lossesToLose);
+    // 패배 누적·판정은 저장소에서 (두 창이 각각 세면 두 마리를 잃는다)
+    const l = await battleLoss(r.my.id, BATTLE.lossesToLose);
     if (l.lost) showPlayerMessage(`😢 ${r.my.ko}${josaIga(r.my.ko)} ${BATTLE.lossesToLose}번 져서 떠났어요…`, 6000);
     else showPlayerMessage(`😢 졌어요. ${r.my.ko} 패배 ${l.losses}/${BATTLE.lossesToLose}`, 4500);
   }
@@ -673,8 +683,9 @@ function startEssay(practice, cont) {
       awardXp(ESSAY_REWARD.xp);
       awardCoins(ESSAY_REWARD.coin);
     },
-    onFinished: () => {
-      track.markEssayDone();
+    onFinished: async () => {
+      // 다른 창이 이미 오늘 몫을 끝냈으면 완주 보상은 없다 (글은 이미 문장마다 저장됨)
+      if (!await track.markEssayDone()) return null;
       awardXp(ESSAY_FINISH.xp);
       awardCoins(ESSAY_FINISH.coin);
       track.flush();
@@ -773,22 +784,24 @@ function maybeReview() {
 function dropMushroom(why) {
   if (state.parentMode) return;
   if (track.todayMushrooms() >= MUSHROOM_PER_DAY) return;
-  const have = gainMushroom(1);
-  track.markMushroom();
-  track.flush();
-  showPlayerMessage(`🍄 다이버섯을 얻었어요! (${have}/${SOUP_MUSHROOMS}) — ${why}`, 4000);
+  // 하루 몫은 트랜잭션 안에서 선점 — 두 창이 같이 열려도 상한을 넘지 않는다
+  track.markMushroom(MUSHROOM_PER_DAY).then((won) => {
+    if (!won) return;
+    const have = gainMushroom(1);
+    track.flush();
+    showPlayerMessage(`🍄 다이버섯을 얻었어요! (${have}/${SOUP_MUSHROOMS}) — ${why}`, 4000);
+  });
 }
 
 /** 회차 완주 보상: ⚡·💰 + (하루 첫 완주만) 🌟 황금 볼·❤️ 회복 */
-function grantReviewRound() {
-  const reward = roundReward(track.reviewGoldenTaken());
+async function grantReviewRound() {
   track.markReviewRound();
+  // 🌟 황금 볼은 하루 1개 — 트랜잭션 안에서 선점한 창만 받는다 (두 창을 열어도 2개가 안 나옴)
+  const golden = await track.markReviewGolden();
+  const reward = roundReward(!golden);
   awardXp(reward.xp);
   awardCoins(reward.coin);
-  if (reward.golden) {
-    addItem(GOLDEN.id, reward.golden);
-    track.markReviewGolden();
-  }
+  if (reward.golden) addItem(GOLDEN.id, reward.golden);
   if (reward.hp) hpHeal(reward.hp);
   dropMushroom('복습을 끝까지 했어요'); // 🍄 거다이맥스 재료
   track.flush();
@@ -1081,11 +1094,14 @@ function markDone(cue) {
     if (settings.dailyGoal > 0) {
       const left = settings.dailyGoal - after;
       if (left <= 0 && !track.goalRewarded()) { // 목표 수치를 바꿔도 하루 한 번만
-        track.markGoalRewarded();
-        awardXp(XP.goal);
-        awardCoins(COIN.goal);
-        const h = hpHeal(HP.goalHeal);
-        showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal} 💰+${COIN.goal}${h && h.to > h.from ? ` ❤️+${h.to - h.from}` : ''}`, 5000);
+        // 선점한 창에서만 지급 — 두 창을 열어 보너스를 두 번 받는 길을 막는다
+        track.markGoalRewarded().then((won) => {
+          if (!won) return;
+          awardXp(XP.goal);
+          awardCoins(COIN.goal);
+          const h = hpHeal(HP.goalHeal);
+          showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal} 💰+${COIN.goal}${h && h.to > h.from ? ` ❤️+${h.to - h.from}` : ''}`, 5000);
+        });
       } else if (left === 3 && !track.goalRewarded()) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal} 💰+${COIN.goal}!`, 3500);
     }
   }

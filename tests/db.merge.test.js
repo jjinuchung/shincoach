@@ -1,7 +1,7 @@
 // 기록 가져오기 병합 규칙 테스트 (순수 함수)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeStatRecord, pickReviewState } from '../js/db.js';
+import { mergeStatRecord, pickReviewState, emptyDaily, mergeDailyDelta } from '../js/db.js';
 
 test('#6 sentenceStats: 오래된 백업이 최신 누적을 줄이지 않음', () => {
   const cur = { key: 'k', plays: 10, seconds: 100, speakPass: 3, bestRatio: 0.9, lastRatio: 0.9, lastAt: 200, done: true };
@@ -104,4 +104,34 @@ test('🌟 황금 볼은 백업을 되돌려도 다시 못 받음 (한쪽이라�
 
 test('🔁 세션의 복습 횟수도 큰 값 유지', () => {
   assert.equal(mergeStatRecord('sessions', { id: 's', reviews: 3, reviewPass: 2 }, { id: 's', reviews: 1, reviewPass: 1 }).reviews, 3);
+});
+
+// ── 🪟 두 창 동시 실행: 오늘 기록 증분 합치기 (mergeDailyDelta) ──
+// 통째로 덮어쓰면 다른 창이 공부한 기록이 사라지므로, 저장은 "늘어난 만큼"만 더한다.
+
+test('🪟 증분 합치기: 수치는 더하고, 하루 한 번 플래그는 유지, 문장 key는 합집합', () => {
+  const cur = { ...emptyDaily('2026-09-17'), seconds: 100, puzzles: 2, doneKeys: ['a', 'b'], reviewGolden: true };
+  const out = mergeDailyDelta(cur, '2026-09-17', { seconds: 30, puzzles: 1, doneKeys: ['b', 'c'] });
+  assert.equal(out.seconds, 130, '다른 창이 쓴 100초 위에 30초를 더함');
+  assert.equal(out.puzzles, 3);
+  assert.deepEqual(out.doneKeys, ['a', 'b', 'c'], '같은 문장은 한 번만');
+  assert.equal(out.reviewGolden, true, '이미 받은 하루 한 번은 유지');
+});
+
+test('🪟 증분 합치기: 저장된 기록이 없어도 되고, 빈 증분은 값을 바꾸지 않는다', () => {
+  const fresh = mergeDailyDelta(null, '2026-09-17', { seconds: 5, doneKeys: ['a'] });
+  assert.equal(fresh.date, '2026-09-17');
+  assert.equal(fresh.seconds, 5);
+  assert.equal(fresh.goalRewarded, false, '플래그 기본값은 false');
+  const same = mergeDailyDelta(fresh, '2026-09-17', {});
+  assert.equal(same.seconds, 5);
+  assert.deepEqual(same.doneKeys, ['a']);
+});
+
+test('✍️ 증분 합치기: 다시 쓴 글은 갱신하되 아빠 교정(coachFix)은 지우지 않는다', () => {
+  const cur = { ...emptyDaily('2026-09-17'), essays: [{ id: 'e1', written: 'I go', coachFix: 'I went.', readAt: 0 }] };
+  const out = mergeDailyDelta(cur, '2026-09-17', { essays: [{ id: 'e1', written: 'I went' }, { id: 'e2', written: 'new' }] });
+  assert.equal(out.essays.length, 2, '새 글은 더해짐');
+  assert.equal(out.essays[0].written, 'I went', '고쳐 쓴 내용은 갱신');
+  assert.equal(out.essays[0].coachFix, 'I went.', '저장된 쪽에만 있던 아빠 교정은 남음');
 });

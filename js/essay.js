@@ -676,7 +676,7 @@ function nextPrompt() {
   showPrompt();
 }
 
-function showDone() {
+async function showDone() {
   if (ui.finished) return; // 두 번 불려도 보상 칩이 지워지지 않게
   ui.finished = true;
   $('essay-write').hidden = true;
@@ -688,7 +688,7 @@ function showDone() {
   let reward = null;
   if (!ui.o.practice && !ui.granted && ui.o.onFinished) {
     ui.granted = true;
-    reward = ui.o.onFinished();
+    reward = await ui.o.onFinished(); // 하루 한 번 선점 결과를 기다림 (다른 창이 먼저면 null)
   }
   $('essay-done-msg').textContent = ui.o.mode === 'coach'
     ? `아빠가 고쳐준 문장 ${ui.o.prompts.length}개를 다 읽었어요 👏`

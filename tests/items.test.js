@@ -61,15 +61,15 @@ test('canBuy: 부족한 코인 계산', () => {
   assert.deepEqual(canBuy('nope', 999), { ok: false, short: 0 });
 });
 
-test('프로필: 코인 획득·구매·가방', () => {
+test('프로필: 코인 획득·구매·가방', async () => {
   assert.equal(coins(), 0);
-  assert.equal(buyItem('ribbon'), false, '코인 없으면 못 삼');
+  assert.equal(await buyItem('ribbon'), false, '코인 없으면 못 삼');
   gainCoins(45);
   assert.equal(coins(), 45);
-  assert.equal(buyItem('ribbon'), true);
+  assert.equal(await buyItem('ribbon'), true);
   assert.equal(coins(), 15);
   assert.equal(itemCount('ribbon'), 1);
-  assert.equal(buyItem('crown'), false);
+  assert.equal(await buyItem('crown'), false);
   assert.equal(coins(), 15, '실패하면 코인 그대로');
   gainCoins(-10);
   assert.equal(coins(), 15, '음수는 무시');
@@ -177,38 +177,38 @@ test('🎀 이상한 값은 저장하지 않는다', () => {
   assert.equal(getLook(9).gearPos, null, '숫자가 아니면 자동 위치로');
 });
 
-test('⭐ 메가진화: 🔑 키스톤 + 💠 메가스톤, 빼면 가방으로 돌아온다', () => {
+test('⭐ 메가진화: 🔑 키스톤 + 💠 메가스톤, 빼면 가방으로 돌아온다', async () => {
   gainCoins(2000);
   assert.equal(hasKeystone(), false);
-  assert.equal(equipMega(94, true), false, '스톤이 없으면 못 끼운다');
+  assert.equal(await equipMega(94, true), false, '스톤이 없으면 못 끼운다');
 
-  buyItem('keystone');
-  buyItem('megastone');
+  await buyItem('keystone');
+  await buyItem('megastone');
   assert.equal(hasKeystone(), true);
   assert.equal(itemCount('megastone'), 1);
 
-  assert.equal(equipMega(94, true), true, '팬텀에게 끼움');
+  assert.equal(await equipMega(94, true), true, '팬텀에게 끼움');
   assert.equal(hasMegaStone(94), true);
   assert.equal(itemCount('megastone'), 0, '가방에서 빠진다');
 
-  assert.equal(equipMega(94, false), true);
+  assert.equal(await equipMega(94, false), true);
   assert.equal(hasMegaStone(94), false);
   assert.equal(itemCount('megastone'), 1, '빼면 돌아온다');
 });
 
-test('⭐ 거다이맥스: 🍄 다이버섯 10개로 🍲 다이스프 (돈으로는 못 삼)', () => {
+test('⭐ 거다이맥스: 🍄 다이버섯 10개로 🍲 다이스프 (돈으로는 못 삼)', async () => {
   gainCoins(5000);
-  assert.equal(buyItem('mushroom'), false, '다이버섯은 상점에서 못 산다');
+  assert.equal(await buyItem('mushroom'), false, '다이버섯은 상점에서 못 산다');
 
   gainMushroom(9);
-  assert.equal(makeSoup(25), false, '9개로는 못 만든다');
+  assert.equal(await makeSoup(25), false, '9개로는 못 만든다');
   assert.equal(hasGmax(25), false);
 
   gainMushroom(1);
-  assert.equal(makeSoup(25), true);
+  assert.equal(await makeSoup(25), true);
   assert.equal(hasGmax(25), true, '피카츄가 거다이맥스할 수 있게 됨');
   assert.equal(itemCount('mushroom'), 0, '버섯 10개를 썼다');
-  assert.equal(makeSoup(25), false, '이미 먹은 포켓몬에게 또 먹이지 않는다');
+  assert.equal(await makeSoup(25), false, '이미 먹은 포켓몬에게 또 먹이지 않는다');
 });
 
 test('⭐ 변신 표: 30마리, 그림 id는 겹치지 않는다', () => {
@@ -238,9 +238,9 @@ test('🔴 볼 등급: 슈퍼볼 1.5배 · 하이퍼볼 2배 · 마스터볼은 
   assert.equal(ballChance('없는볼', legendary, 1), base, '모르는 볼이면 몬스터볼로');
 });
 
-test('🔴 볼은 던지면 없어지고, 가방에 없으면 몬스터볼로 던진다', () => {
+test('🔴 볼은 던지면 없어지고, 가방에 없으면 몬스터볼로 던진다', async () => {
   gainCoins(3000);
-  buyItem('greatball');
+  await buyItem('greatball');
   assert.equal(itemCount('greatball'), 1);
 
   const r1 = catchAttempt(700, () => 0.99, { ball: 'greatball' }); // 확률과 무관하게 소모 확인
@@ -253,7 +253,7 @@ test('🔴 볼은 던지면 없어지고, 가방에 없으면 몬스터볼로 �
   const r3 = catchAttempt(151, () => 0.99, { ball: 'masterball' });
   assert.equal(r3.ball, 'pokeball', '안 산 마스터볼은 못 쓴다');
 
-  buyItem('masterball');
+  await buyItem('masterball');
   const r4 = catchAttempt(151, () => 0.99, { ball: 'masterball' });
   assert.equal(r4.ball, 'masterball');
   assert.equal(r4.caught, true, '마스터볼은 확률과 상관없이 잡힌다');

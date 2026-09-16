@@ -94,17 +94,20 @@ function loadPlayer() {
     loadVocab: async () => ({ lookup: () => [] }),
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded() {}, hpMissedApplied: () => false, markHpMissed() {}, todayBattles: () => 0, markBattle() {}, MASTER_RATIO: 0.8, puzzle() {},
+    // 하루 한 번(mark*)은 실제 코드에서 **트랜잭션 선점**이라 Promise<선점 성공 여부>를 준다 — 스텁도 같은 약속을 지킨다
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false, markHpMissed: async () => true, todayBattles: () => 0, markBattle: async () => true, MASTER_RATIO: 0.8, puzzle() {},
       // 🔁 복습 스텁: 문장 기록과 오늘 상태를 reviewState로 제어
       statsList: () => reviewState.stats, review(cue, passed) { reviewState.reviewed.push({ start: cue.start, passed }); reviewState.items++; return { box: 1, graduated: false }; },
       todayReviewSentences: () => reviewState.sentences, todayReviewItems: () => reviewState.items,
       reviewWord() { reviewState.items++; reviewState.words++; },
       todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
-      reviewGoldenTaken: () => reviewState.golden, markReviewGolden() { reviewState.golden = true; },
+      reviewGoldenTaken: () => reviewState.golden,
+      async markReviewGolden() { if (reviewState.golden) return false; reviewState.golden = true; return true; },
       todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; },
       // ✍️ 에세이: 오늘 공부 시간·완료 여부 (essayState로 테스트가 조작)
       // 🍄 다이버섯: 하루 상한 확인용
-      todayMushrooms: () => mushroomState.today, markMushroom() { mushroomState.today++; },
+      todayMushrooms: () => mushroomState.today,
+      async markMushroom(max) { if (max !== undefined && mushroomState.today >= max) return false; mushroomState.today++; return true; },
       todaySeconds: () => essayState.seconds, essayDoneToday: () => essayState.done,
       markEssayWritten(entry) {
         const at = essayState.saved.findIndex((e) => e.id === entry.id);
@@ -112,7 +115,7 @@ function loadPlayer() {
         essayState.saved.push(entry);
         return true;
       },
-      markEssayDone() { essayState.done = true; },
+      async markEssayDone() { if (essayState.done) return false; essayState.done = true; return true; },
       // 🎯 못 말한 단어 기록
       missedWords(cue, words) { missedLog.push(words.slice()); } },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
@@ -650,7 +653,7 @@ test('XP: 말하기 통과 +3, ⭐면 +5', async () => {
   assert.ok(xpLog.includes(3), '통과 +3');
 });
 
-test('🔥 스트릭·오늘 목표: 5번째 문장에 스트릭 보너스, 목표 달성에 +30', () => {
+test('🔥 스트릭·오늘 목표: 5번째 문장에 스트릭 보너스, 목표 달성에 +30', async () => {
   const { run, xpLog, ctx } = loadPlayer();
   const keys = new Set();
   ctx.track.done = (c) => keys.add(c.start);
@@ -665,24 +668,27 @@ test('🔥 스트릭·오늘 목표: 5번째 문장에 스트릭 보너스, 목�
   assert.equal(xpLog.length, 7, '같은 문장 반복은 XP 없음, 보너스는 한 번만');
   let rewarded = false;
   ctx.track.goalRewarded = () => rewarded;
-  ctx.track.markGoalRewarded = () => { rewarded = true; };
+  ctx.track.markGoalRewarded = async () => { if (rewarded) return false; rewarded = true; return true; };
   run('markDone(state.cues[6])');
+  await tick(); // 목표 보너스는 "하루 한 번"을 DB에서 선점한 뒤에 지급된다
   assert.deepEqual(xpLog.slice(7), [2, 30], '7번째 = 오늘 목표 달성 +30');
   // 목표를 올려도(7→8) 같은 날엔 다시 안 줌
   run('settings.dailyGoal = 8; markDone(state.cues[7])');
+  await tick();
   assert.deepEqual(xpLog.slice(9), [2], '목표 보너스는 하루 한 번');
 });
 
-test('💰 코인: 문장 +1, 스트릭 5×일, 목표 +10, 퍼즐 5/3/2(정답 공개 0) → 잡기 화면에 coinGain, 레벨업엔 🎁 아이템', () => {
+test('💰 코인: 문장 +1, 스트릭 5×일, 목표 +10, 퍼즐 5/3/2(정답 공개 0) → 잡기 화면에 coinGain, 레벨업엔 🎁 아이템', async () => {
   const { run, coinLog, itemLog, puzzleCalls, catchCalls, ctx, els } = loadPlayer();
   const keys = new Set();
   ctx.track.done = (c) => keys.add(c.start);
   ctx.track.todayDone = () => keys.size;
   let rewarded = false;
   ctx.track.goalRewarded = () => rewarded;
-  ctx.track.markGoalRewarded = () => { rewarded = true; };
+  ctx.track.markGoalRewarded = async () => { if (rewarded) return false; rewarded = true; return true; };
   run('settings.dailyGoal = 6; settings.puzzleEvery = 1; settings.listenFirst = 0; state.streakBase = 1; state.streakToday = false; state.streakDate = "2026-09-14"; state.cues = Array.from({length: 8}, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
   for (let i = 0; i < 6; i++) run(`markDone(state.cues[${i}])`);
+  await tick(); // 목표 보너스는 선점 뒤에 지급
   assert.deepEqual(coinLog, [1, 1, 1, 1, 1, 10, 1, 10], '5번째 문장에 2일 연속 스트릭 💰10, 6번째에 목표 💰10');
   assert.equal(els['coin-chip'].textContent, '💰 26', '칩에 잔액');
   run('goTo(1)');
@@ -770,11 +776,14 @@ test('❤️ HP: 정답 공개 −20, 말하기 넘김 −10, 목표 달성 +20,
   // 목표 달성(4문장) → +20
   let rewarded = false;
   ctx.track.goalRewarded = () => rewarded;
-  ctx.track.markGoalRewarded = () => { rewarded = true; };
+  ctx.track.markGoalRewarded = async () => { if (rewarded) return false; rewarded = true; return true; };
   run('settings.dailyGoal = 4; markDone(state.cues[3])');
+  await tick(); // 목표 보너스(❤️ 회복 포함)는 선점 뒤에 지급
   assert.equal(hpLog[hpLog.length - 1], 20, '목표 달성 회복');
   assert.equal(hpState.hp[25], 100);
   // 0이 되면 😴: 칩 표시, 퍼즐·잡기 후보에서 빠짐 (다른 캐릭터는 남음)
+  // (위 await 사이에 앱 시작 때의 loadCharacters()가 끝나 빈 명단으로 덮이므로 다시 넣어 준다)
+  run('state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }];');
   hpState.hp[25] = 10;
   run('markDone(state.cues[4]); goTo(4)');
   puzzleCalls[3].opts.onClose({ solved: false, wrong: 3, characters: [] });
@@ -829,17 +838,27 @@ test('❤️ 어제 학습을 안 했으면 콘텐츠를 열 때 한 번 −30 (
   ctx.track.todayKey = (dt) => key(dt || new Date());
   // 어제 안 함(기록 없음) + 그 전엔 학습한 적 있음 → −30
   run(`checkMissedDay([${JSON.stringify(d(before, 7))}], "${today}")`);
+  await tick(); // 벌은 "오늘 한 번"을 DB에서 선점한 뒤에 적용된다
   assert.deepEqual(hpLog, [-30]);
   // 어제 5문장 이상 했으면 없음
   run(`checkMissedDay([${JSON.stringify(d(before, 7))}, ${JSON.stringify(d(yest, 5))}], "${today}")`);
+  await tick();
   assert.deepEqual(hpLog, [-30]);
   // 처음 쓰는 아이(과거 학습일 없음)는 없음
   run(`checkMissedDay([${JSON.stringify(d(yest, 2))}], "${today}")`);
+  await tick();
   assert.deepEqual(hpLog, [-30]);
   // 오늘 이미 적용했으면 없음
   ctx.track.hpMissedApplied = () => true;
   run(`checkMissedDay([${JSON.stringify(d(before, 7))}], "${today}")`);
+  await tick();
   assert.deepEqual(hpLog, [-30]);
+  // 다른 창이 먼저 선점했으면(선점 실패) 벌이 두 번 가지 않는다
+  ctx.track.hpMissedApplied = () => false;
+  ctx.track.markHpMissed = async () => false;
+  run(`checkMissedDay([${JSON.stringify(d(before, 7))}], "${today}")`);
+  await tick();
+  assert.deepEqual(hpLog, [-30], '선점에 진 창은 깎지 않음');
 });
 
 test('🏁 여행 끝: 마지막 문장을 완료하면 연출 + ⚡50 💰20 (콘텐츠당 한 번, 세션당 연출 한 번), 부모 모드는 연출만', () => {
@@ -891,7 +910,7 @@ test('🗺️ 여행 길: 풍경은 콘텐츠 id로 고정, 진행에 따라 캐
   assert.ok(ahead > 0 && ahead < made.length, '앞쪽 풍경만 안개');
 });
 
-test('⚔️ 배틀: 문장 완료 때 추첨 → 다음 전환에서 열림(퍼즐보다 먼저) → 승/패 반영 → 이동 이어감. 부모 모드·HP 끔이면 없음', () => {
+test('⚔️ 배틀: 문장 완료 때 추첨 → 다음 전환에서 열림(퍼즐보다 먼저) → 승/패 반영 → 이동 이어감. 부모 모드·HP 끔이면 없음', async () => {
   const { run, els, video, puzzleCalls, battleCalls, battleState, xpLog, coinLog, ctx } = loadPlayer();
   const keys = new Set();
   ctx.track.done = (c) => keys.add(c.start);
@@ -905,6 +924,7 @@ test('⚔️ 배틀: 문장 완료 때 추첨 → 다음 전환에서 열림(퍼
   const pending = run('state.battlePending');
   assert.ok(pending && pending.id === 7, '못 잡은 꼬부기가 상대');
   run('goTo(6)');
+  await tick(); // 오늘 배틀 자리를 DB에서 선점한 뒤에 열린다
   assert.equal(battleCalls.length, 1, '전환 시 배틀 열림');
   assert.equal(puzzleCalls.length, 0, '퍼즐보다 먼저');
   assert.equal(run('state.battleOpen'), true);
@@ -922,12 +942,14 @@ test('⚔️ 배틀: 문장 완료 때 추첨 → 다음 전환에서 열림(퍼
   assert.equal(run('state.battleOpen'), false);
   // 패배 → battleLoss
   run('state.battlePending = { id: 7, ko: "꼬부기", url: "z" }; goTo(7)');
+  await tick();
   battleCalls[1].onDone({ outcome: 'lose', my: battleCalls[1].mine.find((m) => m.id === 4), opponent: battleCalls[1].opponent, turns: 5 });
   assert.deepEqual(battleState.lost, [4]);
   assert.equal(run('state.idx'), 7);
   // 파트너는 내보낼 수 없음
   ctx.getPartner = () => 25;
   run('state.battlePending = { id: 7, ko: "꼬부기", url: "z" }; state.idx = 0; goTo(1)');
+  await tick();
   assert.equal(battleCalls[2].mine.map((m) => m.id).join(','), '4');
   battleCalls[2].onDone({ outcome: 'declined', opponent: battleCalls[2].opponent, turns: 0 });
   assert.equal(run('state.idx'), 1, '거절해도 이동은 이어감');
@@ -940,6 +962,7 @@ test('⚔️ Codex #3/#4/#6: 화면 꺼짐이면 배틀 턴 중단(interrupted),
   const { run, els, ctx, battleCalls, puzzleCalls, video } = loadPlayer();
   // #4 마지막 문장 섀도잉 완료 경로
   run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 1; state.idx = 4; state.puzzlePool = state.cues.slice(); state.shadowNext = "next"; state.battlePending = { id: 7, ko: "꼬부기", url: "z" }; afterShadowWait()');
+  await tick(); // 배틀 자리 선점
   assert.equal(battleCalls.length, 1, '마지막 문장에서도 배틀이 열림');
   assert.equal(puzzleCalls.length, 0, '퍼즐은 안 열림');
   assert.equal(run('state.battleOpen'), true);
@@ -1105,7 +1128,7 @@ test('🔁 "나중에"로 닫으면 건너뛴 것으로 세고, 하다가 닫으
   assert.equal(reviewState.skips, 1, '하다 만 것은 건너뛴 게 아님');
 });
 
-test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 🌟 황금 볼 + ❤️ 회복 (하루 한 번)', () => {
+test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 🌟 황금 볼 + ❤️ 회복 (하루 한 번)', async () => {
   const { run, reviewCalls, reviewState, xpLog, coinLog, itemLog, hpLog, hpState } = loadPlayer();
   hpState.partner = 25;
   hpState.hp[25] = 50;
@@ -1119,7 +1142,7 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 🌟 황금 볼
   assert.equal(xpLog.length, 1, '통과한 문장만 XP');
   assert.equal(coinLog.length, 1);
 
-  const given = o.onFinished();
+  const given = await o.onFinished(); // 🌟 황금 볼은 DB에서 선점한 뒤에 정해진다
   assert.ok(given.golden > 0, '하루 첫 완주 → 황금 볼');
   assert.ok(given.hp > 0);
   assert.equal(reviewState.rounds, 1);
@@ -1129,7 +1152,7 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 🌟 황금 볼
 
   // 같은 날 두 번째 회차: XP·코인은 주되 황금 볼·HP는 없음
   const before = itemLog.length;
-  const again = o.onFinished();
+  const again = await o.onFinished();
   assert.equal(again.golden, 0);
   assert.equal(again.hp, 0);
   assert.equal(itemLog.length, before, '황금 볼을 또 주지 않음');
@@ -1448,7 +1471,7 @@ test('자리 되돌리기: 그 사이 콘텐츠가 바뀌었으면 건드리지 
   assert.equal(spot.itemId, 'A');
 });
 
-test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (하루 1번, 부모 모드 제외, 보상은 ⚡·💰)', () => {
+test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (하루 1번, 부모 모드 제외, 보상은 ⚡·💰)', async () => {
   const { run, essayCalls, essayState, xpLog, coinLog, video, ctx } = loadPlayer();
   const done = [];
   ctx.track.done = (c) => done.push(c);
@@ -1497,7 +1520,7 @@ test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (�
   assert.equal(essayState.saved.length, 1, '글은 덮어쓴다');
 
   // 전부 완성 → ⚡50 💰20 + 기록 저장
-  const reward = o.onFinished();
+  const reward = await o.onFinished(); // 완주 보상도 "하루 한 번"을 선점한 뒤에 정해진다
   assert.deepEqual(reward, { xp: 50, coin: 20 });
   assert.ok(xpLog.includes(50) && coinLog.includes(20));
   assert.equal(essayState.done, true, '오늘 썼다고 기록');

@@ -51,18 +51,18 @@ test('상대 고르기: 못 잡은 것 중, 흔할수록 자주. 내보낼 포�
   assert.deepEqual(eligibleMine([25, 4], null, null), [25, 4]);
 });
 
-test('프로필: 승리는 상대 획득, 패배 3번이면 한 마리 잃음(마릿수 −1), 배틀 물약은 가방에서만', () => {
+test('프로필: 승리는 상대 획득, 패배 3번이면 한 마리 잃음(마릿수 −1), 배틀 물약은 가방에서만', async () => {
   catchAttempt(4, () => 0);
   assert.equal(caughtCount(4), 1);
   assert.equal(battleWin(150).first, true); assert.equal(caughtCount(150), 1);
   assert.equal(battleWin(150).first, false); assert.equal(caughtCount(150), 2);
-  assert.deepEqual(battleLoss(4), { losses: 1, lost: false });
-  assert.deepEqual(battleLoss(4), { losses: 2, lost: false });
+  assert.deepEqual(await battleLoss(4), { losses: 1, lost: false });
+  assert.deepEqual(await battleLoss(4), { losses: 2, lost: false });
   assert.equal(lossesOf(4), 2);
-  assert.deepEqual(battleLoss(4), { losses: 0, lost: true }, '3번째 패배에 잃음');
+  assert.deepEqual(await battleLoss(4), { losses: 0, lost: true }, '3번째 패배에 잃음');
   assert.equal(caughtCount(4), 0, '한 마리뿐이었으니 도감에서 사라짐');
-  assert.deepEqual(battleLoss(150), { losses: 1, lost: false });
-  assert.deepEqual(battleLoss(150, 2), { losses: 0, lost: true }, '기준을 2로 주면 2번째에');
+  assert.deepEqual(await battleLoss(150), { losses: 1, lost: false });
+  assert.deepEqual(await battleLoss(150, 2), { losses: 0, lost: true }, '기준을 2로 주면 2번째에');
   assert.equal(caughtCount(150), 1, '2마리 중 1마리 남음');
   assert.equal(consumeItem('potion'), false);
   addItem('potion', 1);

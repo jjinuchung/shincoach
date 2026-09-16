@@ -94,9 +94,10 @@ function shopSection(title, sub, items, boughtId) {
   return sec;
 }
 
-function buy(id) {
+async function buy(id) {
   const it = itemById(id);
-  if (!it || !buyItem(id)) { renderShop('💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
+  // 살 수 있는지는 저장소에서 판정한다 (두 창에서 같은 코인으로 두 번 사지 못하게)
+  if (!it || !await buyItem(id)) { renderShop('💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
   unlock();
   sfx.ding();
   const hint = it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : it.kind === 'ball' ? '🎯 잡기 화면에서 고를 수 있어요' : it.kind === 'mega' ? '🎒 내 포켓몬을 눌러 끼워 주세요' : '❤️ 파트너를 눌러 먹여 주세요';
@@ -312,14 +313,14 @@ function renderForms() {
     if (!hasKeystone()) {
       notes.push(`🔑 키스톤이 있어야 메가진화를 할 수 있어요 — 🛒 상점에서 ${KEYSTONE.price}코인`);
     } else if (megaOn) {
-      box.appendChild(option('💠', '메가스톤 빼기', '가방으로 돌아와요', true, '', () => {
-        equipMega(mon.id, false);
+      box.appendChild(option('💠', '메가스톤 빼기', '가방으로 돌아와요', true, '', async () => {
+        await equipMega(mon.id, false);
         change(true, '💠 메가스톤을 뺐어요');
       }));
     } else {
       const n = itemCount(MEGASTONE.id);
       const btn = option('💠', '메가스톤 끼우기', n ? `가방 ${n}개` : `🛒 상점 ${MEGASTONE.price}코인`, false, '', async () => {
-        if (!equipMega(mon.id, true)) { renderMon('💠 가방에 메가스톤이 없어요 — 🛒 상점에서 살 수 있어요'); return; }
+        if (!await equipMega(mon.id, true)) { renderMon('💠 가방에 메가스톤이 없어요 — 🛒 상점에서 살 수 있어요'); return; }
         await ensureForm(mon.id, 'mega').catch(() => null); // 그림은 처음 한 번만 받는다 (실패해도 변신은 됨)
         change(true, `💠 ${mon.ko}${josaIga(mon.ko)} 메가진화할 수 있게 됐어요! 배틀에서 써 보세요`);
       });
@@ -333,7 +334,7 @@ function renderForms() {
       notes.push('🍲 다이스프를 먹어서 거다이맥스할 수 있어요');
     } else {
       const btn = option('🍲', '다이스프 먹이기', `🍄 ${shrooms}/${SOUP_MUSHROOMS}개`, false, '', async () => {
-        if (!makeSoup(mon.id)) { renderMon(`🍄 다이버섯이 ${SOUP_MUSHROOMS}개 있어야 해요 (지금 ${itemCount(MUSHROOM.id)}개)`); return; }
+        if (!await makeSoup(mon.id)) { renderMon(`🍄 다이버섯이 ${SOUP_MUSHROOMS}개 있어야 해요 (지금 ${itemCount(MUSHROOM.id)}개)`); return; }
         await ensureForm(mon.id, 'gmax').catch(() => null);
         change(true, `🍲 ${mon.ko}${josaIga(mon.ko)} 거다이맥스할 수 있게 됐어요!`);
       });

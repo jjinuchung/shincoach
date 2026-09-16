@@ -222,11 +222,122 @@ export async function getDaily(date) {
   return promisify(tx.objectStore('daily').get(date));
 }
 
+/**
+ * ⚠️ 통째로 덮어쓰기 — 앱 코드에서는 쓰지 말 것.
+ * 밖에서 읽어둔 사본을 그대로 저장하면 그 사이 **다른 창이 공부한 기록이 사라진다**.
+ * 수치는 `applyDailyDelta`, 하루 한 번은 `claimDailyFlag`/`claimDailyCount`를 쓴다.
+ * (백업 가져오기·시험용으로만 남겨 둠)
+ */
 export async function putDaily(rec) {
   const db = await openDb();
   const tx = db.transaction('daily', 'readwrite');
   tx.objectStore('daily').put(rec);
   await txDone(tx);
+}
+
+// ───────────────── 📅 오늘 기록: 증분 저장 + 하루 한 번 선점 ─────────────────
+// 홈 화면 앱과 Chrome 탭을 같이 열면 각 창이 daily 사본을 들고 있다가 통째로 덮어써서
+//  ① 공부한 초·문장 수가 사라지고 (나중에 저장한 창이 이김)
+//  ② "하루 한 번" 보상(🌟 황금 볼·✍️ 에세이·🎯 목표·❤️ HP 벌)을 양쪽이 다 받는다.
+// → 쓰기는 증분(applyDailyDelta), 하루 한 번은 **트랜잭션 안에서** 선점(claimDaily*)으로 판정한다.
+//   프로필의 applyProfileDelta와 같은 원리.
+
+const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles',
+  'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms'];
+const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
+
+/** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
+export function emptyDaily(date) {
+  const d = { date, doneKeys: [], essays: [] };
+  for (const k of DAILY_SUMS) d[k] = 0;
+  for (const k of DAILY_FLAGS) d[k] = false;
+  return d;
+}
+
+/**
+ * 저장된 오늘 기록 + 증분 → 저장할 기록 (순수 함수).
+ * 수치는 더하고, 플래그는 한 번 켜지면 유지, 문장 key는 합집합, ✍️ 글은 id로 갱신·추가.
+ */
+export function mergeDailyDelta(cur, date, delta) {
+  const out = { ...emptyDaily(date), ...(cur || {}), date };
+  out.doneKeys = [...(out.doneKeys || [])];
+  out.essays = [...(out.essays || [])];
+  const d = delta || {};
+  for (const k of DAILY_SUMS) out[k] = (Number(out[k]) || 0) + (Number(d[k]) || 0);
+  for (const k of DAILY_FLAGS) out[k] = !!(out[k] || d[k]);
+  for (const key of (d.doneKeys || [])) if (!out.doneKeys.includes(key)) out.doneKeys.push(key);
+  for (const e of (d.essays || [])) {
+    if (!e || !e.id) continue;
+    const at = out.essays.findIndex((x) => x && x.id === e.id);
+    // 다시 쓴 글은 갱신하되, 저장된 쪽에만 있는 것(아빠 교정 coachFix·readAt)은 남긴다
+    if (at >= 0) out.essays[at] = { ...out.essays[at], ...e };
+    else out.essays.push(e);
+  }
+  return out;
+}
+
+/** 증분만 더해서 저장 (한 트랜잭션에서 최신값 읽기 → 더하기 → 쓰기). 반환: 저장된 최신 기록 */
+export async function applyDailyDelta(date, delta) {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readwrite');
+  const store = tx.objectStore('daily');
+  const cur = await promisify(store.get(date));
+  const next = mergeDailyDelta(cur, date, delta);
+  store.put(next);
+  await txDone(tx);
+  return next;
+}
+
+/**
+ * "하루 한 번"을 선점한다 — 이미 켜져 있으면 won=false.
+ * 두 창이 동시에 불러도 보상은 **한 쪽만** 받는다 (판정이 트랜잭션 안에 있으므로).
+ * @returns {Promise<{won:boolean, daily:object}>}
+ */
+export async function claimDailyFlag(date, flag) {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readwrite');
+  const store = tx.objectStore('daily');
+  const cur = await promisify(store.get(date));
+  if (cur && cur[flag]) { await txDone(tx); return { won: false, daily: cur }; }
+  const next = mergeDailyDelta(cur, date, { [flag]: true });
+  store.put(next);
+  await txDone(tx);
+  return { won: true, daily: next };
+}
+
+/**
+ * "하루 N번"도 같은 방식 — 트랜잭션 안에서 세어 보고 자리가 있을 때만 +1.
+ * max를 안 주면 상한 없이 세기만 한다 (증분이 사라지지 않게).
+ * @returns {Promise<{won:boolean, count:number, daily:object}>}
+ */
+export async function claimDailyCount(date, field, max) {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readwrite');
+  const store = tx.objectStore('daily');
+  const cur = await promisify(store.get(date));
+  const have = (cur && Number(cur[field])) || 0;
+  if (max !== undefined && have >= max) { await txDone(tx); return { won: false, count: have, daily: cur || emptyDaily(date) }; }
+  const next = mergeDailyDelta(cur, date, { [field]: 1 });
+  store.put(next);
+  await txDone(tx);
+  return { won: true, count: next[field], daily: next };
+}
+
+/**
+ * 오늘 기록 하나를 트랜잭션 안에서 고쳐 쓴다 (읽기 → updater → 쓰기).
+ * 밖에서 읽어둔 사본으로 통째로 덮어쓰면 그 사이 아이가 공부한 기록이 날아간다.
+ * @param {(cur:object) => object|null} updater null을 주면 저장하지 않음
+ */
+async function editDaily(date, updater) {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readwrite');
+  const store = tx.objectStore('daily');
+  const cur = await promisify(store.get(date));
+  if (!cur) { await txDone(tx); return null; }
+  const next = updater({ ...cur, essays: (cur.essays || []).map((e) => ({ ...e })) });
+  if (next) store.put(next);
+  await txDone(tx);
+  return next;
 }
 
 export async function listDaily() {
@@ -257,18 +368,21 @@ export async function applyEssayFixes(fixes) {
   const byId = new Map(fixes.map((f) => [f.id, f.fixed]));
   const days = await listDaily();
   let n = 0;
-  for (const d of days) {
-    if (!Array.isArray(d.essays) || !d.essays.length) continue;
-    let touched = false;
-    for (const e of d.essays) {
-      if (!e || !e.id || !byId.has(e.id)) continue;
-      e.coachFix = byId.get(e.id);
-      e.fixedAt = Date.now();
-      e.readAt = 0;               // 아이가 아직 안 읽음
-      touched = true;
-      n++;
-    }
-    if (touched) await putDaily(d);
+  for (const day of days) {
+    if (!Array.isArray(day.essays) || !day.essays.some((e) => e && e.id && byId.has(e.id))) continue;
+    // 밖에서 읽어둔 사본을 그대로 쓰면 그 사이 아이가 공부한 기록을 덮어쓴다 → 트랜잭션 안에서 다시 읽고 고친다
+    let touched = 0;
+    await editDaily(day.date, (d) => {
+      for (const e of (d.essays || [])) {
+        if (!e || !e.id || !byId.has(e.id)) continue;
+        e.coachFix = byId.get(e.id);
+        e.fixedAt = Date.now();
+        e.readAt = 0;             // 아이가 아직 안 읽음
+        touched++;
+      }
+      return touched ? d : null;
+    });
+    n += touched;
   }
   return n;
 }
@@ -298,12 +412,17 @@ export async function syncCoachFixes(base = './coach/') {
 /** ✍️ 아이가 아빠 교정문을 읽었다고 표시 (한 번만 보여주기 위해) */
 export async function markEssayRead(id) {
   const days = await listDaily();
-  for (const d of days) {
-    const e = (d.essays || []).find((x) => x && x.id === id);
-    if (!e) continue;
-    e.readAt = Date.now();
-    await putDaily(d);
-    return true;
+  for (const day of days) {
+    if (!(day.essays || []).some((x) => x && x.id === id)) continue;
+    let ok = false;
+    await editDaily(day.date, (d) => {
+      const e = (d.essays || []).find((x) => x && x.id === id);
+      if (!e) return null;
+      e.readAt = Date.now();
+      ok = true;
+      return d;
+    });
+    if (ok) return true;
   }
   return false;
 }
@@ -416,6 +535,108 @@ export async function applyProfileDelta(delta) {
   return next;
 }
 
+/** 프로필 트랜잭션에서 쓸 빈 프로필 */
+function emptyProfile() {
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, updatedAt: 0 };
+}
+
+/**
+ * ❤️ 포켓몬 HP를 **트랜잭션 안에서** 더하고 0~max로 자른다.
+ * 밖에서 계산한 절대값(hp: 80)을 쓰면 두 창이 각각 100에서 −20·−10을 해 한쪽이 사라진다
+ * (실제로는 −30이 되어야 함). 🧪 물약도 같은 트랜잭션에서 소모해야 하나로 두 번 못 먹인다.
+ * @param {string} spendItem 함께 소모할 아이템 id (없으면 생략)
+ * @returns {Promise<{ok:boolean, from:number, to:number, profile:object}>}
+ */
+export async function applyHpChange(monId, by, max, spendItem) {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readwrite');
+  const store = tx.objectStore('profile');
+  const cur = (await promisify(store.get('me'))) || emptyProfile();
+  const next = { ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) } };
+  const m = next.mons[monId] || {};
+  const from = Math.max(0, Math.min(max, typeof m.hp === 'number' ? m.hp : max));
+  if (spendItem && (next.items[spendItem] || 0) < 1) { // 다른 창이 먼저 써 버림
+    await txDone(tx);
+    return { ok: false, from, to: from, profile: cur };
+  }
+  if (spendItem) {
+    const left = (next.items[spendItem] || 0) - 1;
+    if (left > 0) next.items[spendItem] = left; else delete next.items[spendItem];
+  }
+  const to = Math.max(0, Math.min(max, from + Math.round(by || 0)));
+  next.mons[monId] = { ...m, hp: to };
+  next.updatedAt = Date.now();
+  store.put(next);
+  await txDone(tx);
+  return { ok: true, from, to, profile: next };
+}
+
+/**
+ * ⚔️ 배틀 패배를 **트랜잭션 안에서** 누적한다.
+ * 밖에서 세면 두 창이 각각 "2 → 3이니 잃음"으로 판정해 **두 마리를 잃는다**.
+ * @returns {Promise<{losses:number, lost:boolean, profile:object}>}
+ */
+export async function applyBattleLoss(monId, lossesToLose) {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readwrite');
+  const store = tx.objectStore('profile');
+  const cur = (await promisify(store.get('me'))) || emptyProfile();
+  const next = { ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) } };
+  const m = next.mons[monId] || {};
+  const losses = (Number(m.losses) || 0) + 1;
+  const lost = losses >= lossesToLose;
+  if (lost) {
+    const n = (next.caught[monId] || 0) - 1;
+    if (n > 0) next.caught[monId] = n; else delete next.caught[monId];
+  }
+  next.mons[monId] = { ...m, losses: lost ? 0 : losses };
+  next.updatedAt = Date.now();
+  store.put(next);
+  await txDone(tx);
+  return { losses: lost ? 0 : losses, lost, profile: next };
+}
+
+/**
+ * 💰🎒 값을 치르고 물건을 받는다 — **치를 수 있는지 판정이 트랜잭션 안에** 있어야
+ * 두 창에서 같은 코인·재료로 두 번 사지 않는다 (1,200코인으로 마스터볼 두 개).
+ * @param {{coins?:number, items?:Object}} cost 치를 코인·재료 (모자라면 아무것도 안 함)
+ * @param {{items?:Object, mons?:Object}} gain 받을 것
+ * @returns {Promise<{ok:boolean, profile:object}>}
+ */
+export async function applyPurchase(cost, gain) {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readwrite');
+  const store = tx.objectStore('profile');
+  const cur = (await promisify(store.get('me'))) || emptyProfile();
+  const coins = Number(cur.coins) || 0;
+  const items = { ...(cur.items || {}) };
+  const need = Number((cost && cost.coins) || 0);
+  const needItems = (cost && cost.items) || {};
+  const short = coins < need || Object.keys(needItems).some((id) => (items[id] || 0) < needItems[id]);
+  if (short) { await txDone(tx); return { ok: false, profile: cur }; }
+
+  const next = { ...cur, caught: { ...(cur.caught || {}) }, items, mons: { ...(cur.mons || {}) } };
+  next.coins = coins - need;
+  for (const id of Object.keys(needItems)) {
+    const left = (items[id] || 0) - needItems[id];
+    if (left > 0) items[id] = left; else delete items[id];
+  }
+  for (const id of Object.keys((gain && gain.items) || {})) {
+    const n = (items[id] || 0) + gain.items[id];
+    if (n > 0) items[id] = n; else delete items[id];
+  }
+  for (const id of Object.keys((gain && gain.mons) || {})) next.mons[id] = { ...(next.mons[id] || {}), ...gain.mons[id] };
+  next.updatedAt = Date.now();
+  store.put(next);
+  await txDone(tx);
+  return { ok: true, profile: next };
+}
+
+/**
+ * ⚠️ 통째로 덮어쓰기 — 앱 코드에서는 쓰지 말 것 (putDaily와 같은 이유).
+ * 증분은 `applyProfileDelta`, ❤️ HP는 `applyHpChange`, ⚔️ 패배는 `applyBattleLoss`,
+ * 값을 치르는 것은 `applyPurchase`.
+ */
 export async function putProfile(rec) {
   const db = await openDb();
   const tx = db.transaction('profile', 'readwrite');

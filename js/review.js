@@ -472,7 +472,7 @@ async function settleDictation(item) {
   }
   if (ui.i >= o.items.length && !ui.granted) {
     ui.granted = true;
-    ui.reward = (o.onFinished && o.onFinished()) || null;
+    ui.reward = (o.onFinished && await o.onFinished()) || null;
   }
   await sleep(1500);
   if (!alive()) return;
@@ -542,7 +542,7 @@ async function pickChoice(btn, choice, item) {
   }
   if (ui.i >= o.items.length && !ui.granted) {
     ui.granted = true;
-    ui.reward = (o.onFinished && o.onFinished()) || null;
+    ui.reward = (o.onFinished && await o.onFinished()) || null;
   }
   await sleep(passed ? 1500 : 2400);
   if (!alive()) return;
@@ -628,7 +628,7 @@ async function settleSentence(cue, passed, result) {
   ui.i++;
   if (ui.i >= o.items.length && !ui.granted) {
     ui.granted = true;
-    ui.reward = (o.onFinished && o.onFinished()) || null;
+    ui.reward = (o.onFinished && await o.onFinished()) || null;
   }
 
   $('review-en').hidden = false; // 결과에서는 영어를 보여준다 (들린 말과 비교)

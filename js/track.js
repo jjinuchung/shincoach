@@ -1,7 +1,8 @@
 // 학습 기록 수집: 플레이어에서 일어나는 일(재생, 듣기, 말하기 결과, 시간, 단어 조회)을 문장별/세션별/일별로 누적
 // 메모리에 모았다가 5초마다·닫을 때 IndexedDB에 저장 (문장마다 쓰지 않도록)
 import {
-  sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, putDaily, bumpVocabViews,
+  sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, bumpVocabViews,
+  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyFlag, claimDailyCount,
 } from './db.js';
 import { enroll, schedule, GRADUATED } from './review.js';
 
@@ -18,10 +19,38 @@ const t = {
   stats: new Map(),   // key → record
   dirty: new Set(),   // 저장 대기 key
   session: null,
-  daily: null,
-  dailyDirty: false,
+  daily: null,        // 화면에 보여줄 오늘 기록 (저장된 값 + 아직 안 쓴 증분)
+  dailyDelta: null,   // 아직 저장하지 않은 증분 — 통째로 덮어쓰지 않으려고 이것만 더해 쓴다
   flushTimer: null,
 };
+
+/**
+ * 오늘 기록의 증분. 홈 화면 앱과 Chrome 탭을 같이 열면 각 창이 사본을 들고 있다가
+ * 통째로 덮어써서 서로의 공부 시간·문장 수가 사라졌다 → 늘어난 만큼만 모아서 더해 쓴다.
+ */
+function emptyDelta() {
+  return {
+    seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0,
+    reviewSentences: 0, reviewItems: 0, reviewRounds: 0, reviewSkips: 0,
+    doneKeys: [], essays: [],
+  };
+}
+
+function deltaEmpty(d) {
+  if (!d) return true;
+  for (const k of Object.keys(d)) {
+    const v = d[k];
+    if (Array.isArray(v) ? v.length : v) return false;
+  }
+  return true;
+}
+
+/** 오늘 기록의 수치 하나를 올림 (보기값 + 증분 둘 다) */
+function bump(field, n = 1) {
+  if (!t.daily || !n) return;
+  t.daily[field] = (Number(t.daily[field]) || 0) + n;
+  t.dailyDelta[field] = (Number(t.dailyDelta[field]) || 0) + n;
+}
 
 function emptyRecord(itemId, cue) {
   return {
@@ -34,33 +63,19 @@ function emptyRecord(itemId, cue) {
   };
 }
 
-/** 자정을 넘겼으면 어제 기록을 저장하고 오늘 기록으로 바꿈 (동기; 오늘 기록이 이미 있으면 뒤에서 합침) */
+/** 자정을 넘겼으면 어제 몫의 증분을 어제 날짜로 저장하고 오늘 기록으로 바꿈 (동기) */
 function rollDailyIfNeeded() {
   const key = todayKey();
   if (!t.daily || t.daily.date === key) return;
-  const old = t.daily;
-  putDaily(old).catch(() => {});
-  t.daily = { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0, goalRewarded: false };
-  t.dailyDirty = false;
+  const oldDate = t.daily.date;
+  const oldDelta = t.dailyDelta;
+  t.dailyDelta = emptyDelta();
+  if (!deltaEmpty(oldDelta)) applyDailyDelta(oldDate, oldDelta).catch(() => {});
+  t.daily = emptyDaily(key);
+  // 저장소에 오늘 기록이 이미 있으면(다른 창이 썼거나 아침에 한 번 열었음) 보기값을 그걸로 맞춤
   getDaily(key).then((existing) => {
     if (!existing || !t.daily || t.daily.date !== key) return;
-    t.daily.doneKeys = [...new Set([...existing.doneKeys, ...t.daily.doneKeys])];
-    t.daily.seconds += existing.seconds || 0;
-    t.daily.speakAttempts += existing.speakAttempts || 0;
-    t.daily.speakPass += existing.speakPass || 0;
-    t.daily.puzzles += existing.puzzles || 0;
-    t.daily.puzzleSolved += existing.puzzleSolved || 0;
-    t.daily.goalRewarded = !!(t.daily.goalRewarded || existing.goalRewarded);
-    t.daily.hpMissed = !!(t.daily.hpMissed || existing.hpMissed);
-    t.daily.battles = (t.daily.battles || 0) + (existing.battles || 0);
-    t.daily.reviewSentences = (t.daily.reviewSentences || 0) + (existing.reviewSentences || 0);
-    t.daily.reviewItems = (t.daily.reviewItems || 0) + (existing.reviewItems || 0);
-    t.daily.reviewRounds = (t.daily.reviewRounds || 0) + (existing.reviewRounds || 0);
-    t.daily.reviewGolden = !!(t.daily.reviewGolden || existing.reviewGolden);
-    t.daily.reviewSkips = (t.daily.reviewSkips || 0) + (existing.reviewSkips || 0);
-    t.daily.essayDone = !!(t.daily.essayDone || existing.essayDone);
-    t.daily.essays = [...(t.daily.essays || []), ...(existing.essays || [])];
-    t.dailyDirty = true;
+    t.daily = mergeDailyDelta(existing, key, t.dailyDelta);
   }).catch(() => {});
 }
 
@@ -78,10 +93,53 @@ function rec(cue) {
 async function ensureDaily() {
   const key = todayKey();
   if (t.daily && t.daily.date === key) return t.daily;
-  if (t.daily && t.dailyDirty) { await putDaily(t.daily).catch(() => {}); }
-  t.daily = (await getDaily(key).catch(() => null)) || { date: key, doneKeys: [], seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0, goalRewarded: false };
-  t.dailyDirty = false;
+  if (t.daily && !deltaEmpty(t.dailyDelta)) {
+    await applyDailyDelta(t.daily.date, t.dailyDelta).catch(() => {});
+  }
+  t.dailyDelta = emptyDelta();
+  t.daily = (await getDaily(key).catch(() => null)) || emptyDaily(key);
   return t.daily;
+}
+
+/**
+ * "하루 한 번"을 트랜잭션 안에서 선점한다 → 두 창이 동시에 불러도 보상은 한 쪽만.
+ * 저장소가 막히면 메모리로라도 하루 한 번을 지킨다 (보상을 두 번 주지 않는 쪽으로).
+ * @returns {Promise<boolean>} 이번에 내가 선점했는지
+ */
+async function claimFlag(flag) {
+  if (!t.daily) return false;
+  if (t.daily[flag]) return false;
+  await flush();                       // 보기값과 저장값을 먼저 맞춘다
+  const date = t.daily.date;
+  try {
+    const r = await claimDailyFlag(date, flag);
+    if (r.daily && t.daily && t.daily.date === date) t.daily = mergeDailyDelta(r.daily, date, t.dailyDelta);
+    return r.won;
+  } catch (e) {
+    if (t.daily[flag]) return false;
+    t.daily[flag] = true;
+    t.dailyDelta[flag] = true;
+    return true;
+  }
+}
+
+/** "하루 N번"도 같은 방식 — 자리가 있을 때만 +1 (max 없으면 세기만) */
+async function claimCount(field, max) {
+  if (!t.daily) return false;
+  if (max !== undefined && (t.daily[field] || 0) >= max) return false;
+  await flush();
+  const date = t.daily.date;
+  try {
+    const r = await claimDailyCount(date, field, max);
+    if (r.daily && t.daily && t.daily.date === date) t.daily = mergeDailyDelta(r.daily, date, t.dailyDelta);
+    return r.won;
+  } catch (e) {
+    const have = Number(t.daily[field]) || 0;
+    if (max !== undefined && have >= max) return false;
+    t.daily[field] = have + 1;
+    t.dailyDelta[field] = (Number(t.dailyDelta[field]) || 0) + 1;
+    return true;
+  }
 }
 
 /** 콘텐츠를 열 때: 기록 로드 + 세션 시작 */
@@ -125,7 +183,10 @@ export function done(cue) {
   // 🔁 처음 "한" 문장은 내일부터 복습 큐에 들어간다
   // (이미 복습 중인 문장이나 👑 졸업한 문장의 진도는 건드리지 않음)
   if (!r.dueAt && (r.box || 0) < GRADUATED) Object.assign(r, enroll(todayKey()));
-  if (t.daily && !t.daily.doneKeys.includes(r.key)) { t.daily.doneKeys.push(r.key); t.dailyDirty = true; }
+  if (t.daily && !t.daily.doneKeys.includes(r.key)) {
+    t.daily.doneKeys.push(r.key);
+    t.dailyDelta.doneKeys.push(r.key);
+  }
 }
 
 /**
@@ -142,11 +203,8 @@ export function review(cue, passed) {
     t.session.reviews = (t.session.reviews || 0) + 1;
     if (passed) t.session.reviewPass = (t.session.reviewPass || 0) + 1;
   }
-  if (t.daily) {
-    t.daily.reviewSentences = (t.daily.reviewSentences || 0) + 1;
-    t.daily.reviewItems = (t.daily.reviewItems || 0) + 1;
-    t.dailyDirty = true;
-  }
+  bump('reviewSentences');
+  bump('reviewItems');
   return { box: r.box, dueAt: r.dueAt, graduated: r.box >= GRADUATED };
 }
 
@@ -171,9 +229,7 @@ export function missedWords(cue, words) {
  * (문장 수와 따로 세지 않으면, 단어를 푼 회차는 다음번에 짧아지고 완주 보상이 또 나간다 — Codex #1)
  */
 export function reviewWord() {
-  if (!t.daily) return;
-  t.daily.reviewItems = (t.daily.reviewItems || 0) + 1;
-  t.dailyDirty = true;
+  bump('reviewItems');
 }
 
 /** 오늘 복습에서 끝낸 문항 수 (문장 + 단어) */
@@ -191,12 +247,12 @@ export function speak(cue, result) {
   const r = rec(cue); if (!r) return;
   r.speakAttempts++;
   if (t.session) t.session.speakAttempts++;
-  if (t.daily) { t.daily.speakAttempts++; t.dailyDirty = true; }
+  bump('speakAttempts');
   if (result.skipped) r.speakSkipped++;
   else if (result.passed) {
     r.speakPass++;
     if (t.session) t.session.speakPass++;
-    if (t.daily) t.daily.speakPass++;
+    bump('speakPass');
   } else r.speakFail++;
   if (result.score && result.score.total) {
     r.lastRatio = result.score.ratio;
@@ -222,11 +278,8 @@ export function puzzle(cue, result) {
   r.puzzleSolved = (r.puzzleSolved || 0) + (solved ? 1 : 0);
   r.puzzleWrong = (r.puzzleWrong || 0) + ((result && result.wrong) || 0);
   if (t.session) { t.session.puzzles++; if (solved) t.session.puzzleSolved++; }
-  if (t.daily) {
-    t.daily.puzzles = (t.daily.puzzles || 0) + 1;
-    t.daily.puzzleSolved = (t.daily.puzzleSolved || 0) + (solved ? 1 : 0);
-    t.dailyDirty = true;
-  }
+  bump('puzzles');
+  if (solved) bump('puzzleSolved');
 }
 
 /** 학습 시간 누적 (초) — 재생 중이거나 따라 말하는 중일 때 1초마다 호출 */
@@ -234,7 +287,7 @@ export function tick(cue, sec = 1) {
   const r = rec(cue); if (!r) return;
   r.seconds += sec;
   if (t.session) t.session.seconds += sec;
-  if (t.daily) { t.daily.seconds += sec; t.dailyDirty = true; }
+  bump('seconds', sec);
 }
 
 /** 단어 패널에 보인 단어 기록 (tapped: 아이가 직접 눌러 펼침) */
@@ -267,10 +320,9 @@ export function todayDone() {
 export function todayMushrooms() {
   return t.daily ? (t.daily.mushrooms || 0) : 0;
 }
-export function markMushroom() {
-  if (!t.daily) return;
-  t.daily.mushrooms = (t.daily.mushrooms || 0) + 1;
-  t.dailyDirty = true;
+/** @returns {Promise<boolean>} 오늘 몫이 남아 있어서 내가 받았는지 */
+export function markMushroom(max) {
+  return claimCount('mushrooms', max);
 }
 
 /** 오늘 공부한 시간(초) — ✍️ 에세이가 열리는 기준 */
@@ -290,18 +342,16 @@ export function essayDoneToday() {
 export function markEssayWritten(entry) {
   if (!t.daily || !entry) return false;
   t.daily.essays = t.daily.essays || [];
-  t.dailyDirty = true;
+  t.dailyDelta.essays.push(entry); // 글은 id로 합쳐 저장 (다른 창이 쓴 글도 남음)
   const at = t.daily.essays.findIndex((e) => e && e.id && e.id === entry.id);
   if (at >= 0) { t.daily.essays[at] = entry; return false; } // 다시 쓴 것 → 글은 갱신, 보상은 없음
   t.daily.essays.push(entry);
   return true;
 }
 
-/** ✍️ 오늘 몫을 전부 썼다고 기록 (완주 보상은 하루 1번) */
+/** ✍️ 오늘 몫을 전부 썼다고 기록 → 완주 보상은 하루 1번 (@returns 내가 선점했는지) */
 export function markEssayDone() {
-  if (!t.daily) return;
-  t.daily.essayDone = true;
-  t.dailyDirty = true;
+  return claimFlag('essayDone');
 }
 
 /** 오늘 푼 퍼즐 수 (모든 콘텐츠 합산) */
@@ -330,20 +380,17 @@ export function byeSummary(daily) {
 export function goalRewarded() {
   return !!(t.daily && t.daily.goalRewarded);
 }
+/** @returns {Promise<boolean>} 목표 보너스를 내가 선점했는지 */
 export function markGoalRewarded() {
-  if (!t.daily) return;
-  t.daily.goalRewarded = true;
-  t.dailyDirty = true;
+  return claimFlag('goalRewarded');
 }
 
-/** ⚔️ 오늘 배틀 횟수 / 배틀 했다고 표시 (하루 상한용) */
+/** ⚔️ 오늘 배틀 횟수 / 오늘 배틀 한 자리를 선점 (하루 상한) */
 export function todayBattles() {
   return t.daily ? (t.daily.battles || 0) : 0;
 }
-export function markBattle() {
-  if (!t.daily) return;
-  t.daily.battles = (t.daily.battles || 0) + 1;
-  t.dailyDirty = true;
+export function markBattle(max) {
+  return claimCount('battles', max);
 }
 
 /** 🔁 오늘 복습한 문장 수 / 완주한 회차 수 (모든 콘텐츠 합산) */
@@ -354,9 +401,7 @@ export function todayReviewRounds() {
   return t.daily ? (t.daily.reviewRounds || 0) : 0;
 }
 export function markReviewRound() {
-  if (!t.daily) return;
-  t.daily.reviewRounds = (t.daily.reviewRounds || 0) + 1;
-  t.dailyDirty = true;
+  bump('reviewRounds');
 }
 
 /** 🔁 오늘 복습 제안을 몇 번 건너뛰었는지 (너무 자주 묻지 않기 위해) */
@@ -364,9 +409,7 @@ export function todayReviewSkips() {
   return t.daily ? (t.daily.reviewSkips || 0) : 0;
 }
 export function markReviewSkip() {
-  if (!t.daily) return;
-  t.daily.reviewSkips = (t.daily.reviewSkips || 0) + 1;
-  t.dailyDirty = true;
+  bump('reviewSkips');
 }
 
 /**
@@ -376,20 +419,17 @@ export function markReviewSkip() {
 export function reviewGoldenTaken() {
   return !!(t.daily && t.daily.reviewGolden);
 }
+/** @returns {Promise<boolean>} 오늘 황금 볼을 내가 선점했는지 */
 export function markReviewGolden() {
-  if (!t.daily) return;
-  t.daily.reviewGolden = true;
-  t.dailyDirty = true;
+  return claimFlag('reviewGolden');
 }
 
-/** ❤️ "어제 학습 안 함" HP 감소를 오늘 이미 적용했는지 / 적용했다고 표시 (하루 한 번) */
+/** ❤️ "어제 학습 안 함" HP 감소를 오늘 이미 적용했는지 / 적용할 자리를 선점 (하루 한 번) */
 export function hpMissedApplied() {
   return !!(t.daily && t.daily.hpMissed);
 }
 export function markHpMissed() {
-  if (!t.daily) return;
-  t.daily.hpMissed = true;
-  t.dailyDirty = true;
+  return claimFlag('hpMissed');
 }
 
 /** 저장 대기 중인 것을 IndexedDB에 씀 */
@@ -399,8 +439,6 @@ export async function flush() {
   const keys = [...t.dirty];
   const recs = keys.map((k) => t.stats.get(k)).filter(Boolean);
   t.dirty = new Set();
-  const wasDailyDirty = t.dailyDirty;
-  t.dailyDirty = false;
   const jobs = [];
   if (recs.length) {
     // 실패하면 다시 대기 목록에 넣어 다음 flush에서 재시도
@@ -411,8 +449,25 @@ export async function flush() {
     delete s._keys;
     jobs.push(putSession(s));
   }
-  if (t.daily && wasDailyDirty) {
-    jobs.push(putDaily(t.daily).catch((e) => { t.dailyDirty = true; throw e; }));
+  // 오늘 기록은 **늘어난 만큼만** 더해 쓴다 — 다른 창이 쓴 공부 시간·문장이 지워지지 않게
+  if (t.daily && !deltaEmpty(t.dailyDelta)) {
+    const date = t.daily.date;
+    const sent = t.dailyDelta;
+    t.dailyDelta = emptyDelta();
+    jobs.push(applyDailyDelta(date, sent).then((saved) => {
+      // 저장 결과(다른 창 몫까지 합쳐진 값) + 그 사이 또 쌓인 증분 = 지금 보여줄 값
+      if (t.daily && t.daily.date === date) t.daily = mergeDailyDelta(saved, date, t.dailyDelta);
+    }, (e) => {
+      const again = t.dailyDelta;             // 실패하면 증분을 되돌려 다음 flush에서 재시도
+      t.dailyDelta = sent;
+      for (const k of Object.keys(again)) {
+        const v = again[k];
+        if (Array.isArray(v)) t.dailyDelta[k] = [...(t.dailyDelta[k] || []), ...v];
+        else if (typeof v === 'boolean') t.dailyDelta[k] = !!(t.dailyDelta[k] || v);
+        else t.dailyDelta[k] = (Number(t.dailyDelta[k]) || 0) + (Number(v) || 0);
+      }
+      throw e;
+    }));
   }
   const results = await Promise.all(jobs.map((p) => p.then(() => null, (e) => e)));
   const err = results.find(Boolean);
@@ -423,7 +478,7 @@ export async function flush() {
 /** 가져오기 뒤: 메모리의 오늘 기록을 버리고 저장소에서 다시 읽음 */
 export async function reloadDaily() {
   t.daily = null;
-  t.dailyDirty = false;
+  t.dailyDelta = emptyDelta();
   if (t.item) await ensureDaily();
 }
 

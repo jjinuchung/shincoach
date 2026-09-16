@@ -1,7 +1,7 @@
 // ⚡ 경험치·레벨·포켓몬 잡기 규칙 + 아이 프로필(IndexedDB 'profile' 스토어, 백업에 포함)
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
-import { getProfile, applyProfileDelta } from './db.js';
+import { getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase } from './db.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS } from './items.js';
 import { anchorFor } from './pokemon.js';
 
@@ -170,14 +170,16 @@ export function hasGmax(id) {
 }
 
 /** 💠 메가스톤 끼우기 / 빼기 (가방에서 빠지고, 빼면 돌아온다 — 장식과 같은 규칙) */
-export function equipMega(id, on) {
+export async function equipMega(id, on) {
   const m = profile.mons[id] || (profile.mons[id] = {});
   if (on) {
     if (m.mega) return true;
-    if (itemCount(MEGASTONE.id) <= 0) return false;
+    if (itemCount(MEGASTONE.id) <= 0) return false; // 빠른 거르기
+    // 💠 메가스톤 하나로 두 창에서 둘 다 끼우지 않게 트랜잭션 안에서 판정
+    const r = await runMonOp(() => applyPurchase({ items: { [MEGASTONE.id]: 1 } }, { mons: { [id]: { mega: true } } }));
+    if (r && !r.ok) return false;
     m.mega = true;
-    profile.items[MEGASTONE.id] -= 1; // 메모리도 같이 (장식과 같은 방식)
-    addDelta({ items: { [MEGASTONE.id]: -1 }, mons: { [id]: { mega: true } } });
+    if (!r) profile.items[MEGASTONE.id] -= 1; // 저장 실패 → 메모리로만
     return true;
   }
   if (!m.mega) return true;
@@ -196,13 +198,15 @@ export function gainMushroom(n = 1) {
 }
 
 /** 🍲 다이스프 만들어 먹이기 — 버섯 10개 소모, 그 포켓몬은 계속 거다이맥스할 수 있다 */
-export function makeSoup(id) {
-  if (itemCount(MUSHROOM.id) < SOUP_MUSHROOMS) return false;
+export async function makeSoup(id) {
+  if (itemCount(MUSHROOM.id) < SOUP_MUSHROOMS) return false; // 빠른 거르기
   const m = profile.mons[id] || (profile.mons[id] = {});
   if (m.gmax) return false;
+  // 🍄 열 개를 두 창에서 나눠 쓰지 못하게 트랜잭션 안에서 판정
+  const r = await runMonOp(() => applyPurchase({ items: { [MUSHROOM.id]: SOUP_MUSHROOMS } }, { mons: { [id]: { gmax: true } } }));
+  if (r && !r.ok) return false;
   m.gmax = true;
-  profile.items[MUSHROOM.id] -= SOUP_MUSHROOMS;
-  addDelta({ items: { [MUSHROOM.id]: -SOUP_MUSHROOMS }, mons: { [id]: { gmax: true } } });
+  if (!r) profile.items[MUSHROOM.id] -= SOUP_MUSHROOMS; // 저장 실패 → 메모리로만
   return true;
 }
 
@@ -293,6 +297,25 @@ export function flushProfile() {
     }
   });
   return flushChain;
+}
+
+/**
+ * 포켓몬별 상태(❤️ HP·⚔️ 패배)는 **트랜잭션 안에서** 계산해야 두 창이 서로를 덮어쓰지 않는다.
+ * 모아둔 증분을 먼저 쓰고(순서 보존) 원자 연산을 실행한 뒤, 메모리 프로필을 결과로 맞춘다.
+ */
+function runMonOp(op) {
+  const p = flushProfile().then(async () => {
+    try {
+      const r = await op();
+      if (r && r.profile) profile = fromStored(r.profile);
+      return r;
+    } catch (e) {
+      console.warn('포켓몬 상태 저장 실패:', e);
+      return null;
+    }
+  });
+  flushChain = p.then(() => {}, () => {}); // 뒤이은 저장이 이 연산 뒤에 오도록
+  return p;
 }
 
 export async function initProfile() {
@@ -421,13 +444,15 @@ export function consumeItem(id) {
 }
 
 /** 🛒 구매: 코인이 모자라면 false. 코인 차감과 가방 추가를 한 증분으로 */
-export function buyItem(id) {
+export async function buyItem(id) {
   const it = itemById(id);
   if (!it || it.price <= 0) return false; // 🌟 황금 볼은 파는 물건이 아님 (복습으로만)
-  if ((profile.coins || 0) < it.price) return false;
+  if ((profile.coins || 0) < it.price) return false; // 빠른 거르기 (진짜 판정은 트랜잭션 안에서)
+  const r = await runMonOp(() => applyPurchase({ coins: it.price }, { items: { [id]: 1 } }));
+  if (r) return r.ok;
+  // 저장이 안 되면 메모리로만 (다음 저장에서 맞춰짐)
   profile.coins -= it.price;
   profile.items[id] = (profile.items[id] || 0) + 1;
-  addDelta({ coins: -it.price, items: { [id]: 1 } });
   return true;
 }
 
@@ -479,18 +504,22 @@ export function isTired(monId) {
   return hpOf(monId) === 0;
 }
 
-/** HP 더하기/빼기 (0~max로 잘라 저장) → { from, to } */
+/**
+ * HP 더하기/빼기 (0~max로 잘라 저장) → { from, to }
+ * 화면에는 바로 보여 주고(메모리), 저장은 **바뀐 만큼**을 트랜잭션 안에서 더한다
+ * — 절대값으로 쓰면 두 창이 각각 −20·−10 한 것이 −10만 남는다.
+ */
 export function changeHp(monId, delta) {
   const from = hpOf(monId);
   const to = Math.max(0, Math.min(HP.max, from + Math.round(delta || 0)));
   if (to !== from) {
     profile.mons[monId] = { ...(profile.mons[monId] || {}), hp: to };
-    addDelta({ mons: { [monId]: { hp: to } } });
+    runMonOp(() => applyHpChange(monId, to - from, HP.max));
   }
   return { from, to };
 }
 
-/** 🧪 물약 먹이기 (가방에서 하나 소모) → { ok, from, to } */
+/** 🧪 물약 먹이기 (가방에서 하나 소모 — 소모와 회복이 한 트랜잭션) → { ok, from, to } */
 export function usePotion(monId, potionId) {
   const it = itemById(potionId);
   if (!it || it.kind !== 'potion' || (profile.items[potionId] || 0) < 1) return { ok: false, from: hpOf(monId), to: hpOf(monId) };
@@ -498,7 +527,7 @@ export function usePotion(monId, potionId) {
   const from = hpOf(monId);
   const to = Math.min(HP.max, from + it.heal);
   profile.mons[monId] = { ...(profile.mons[monId] || {}), hp: to };
-  addDelta({ items: { [potionId]: -1 }, mons: { [monId]: { hp: to } } });
+  runMonOp(() => applyHpChange(monId, it.heal, HP.max, potionId));
   return { ok: true, from, to };
 }
 
@@ -549,19 +578,24 @@ export function battleWin(opponentId) {
   return { first };
 }
 
-/** 배틀 패배: 그 포켓몬의 패배 +1, 정해진 횟수(lossesToLose)면 한 마리 잃고 패배 수 초기화 → { losses, lost } */
-export function battleLoss(monId, lossesToLose = 3) {
+/**
+ * 배틀 패배: 그 포켓몬의 패배 +1, 정해진 횟수(lossesToLose)면 한 마리 잃고 패배 수 초기화.
+ * **누적과 판정을 트랜잭션 안에서** 한다 — 밖에서 세면 두 창이 각각 "3이니 잃음"으로 판정해
+ * 두 마리를 잃거나, 반대로 패배 2가 1로 줄어든다.
+ * @returns {Promise<{losses:number, lost:boolean}>}
+ */
+export async function battleLoss(monId, lossesToLose = 3) {
+  const r = await runMonOp(() => applyBattleLoss(monId, lossesToLose));
+  if (r) return { losses: r.losses, lost: r.lost };
+  // 저장이 안 되면 메모리로만이라도 (다음에 다시 지면 저장소에서 다시 셈)
   const cur = lossesOf(monId) + 1;
-  if (cur >= lossesToLose) {
-    const n = Math.max(0, (profile.caught[monId] || 0) - 1);
+  const lost = cur >= lossesToLose;
+  if (lost) {
+    const n = (profile.caught[monId] || 0) - 1;
     if (n > 0) profile.caught[monId] = n; else delete profile.caught[monId];
-    profile.mons[monId] = { ...(profile.mons[monId] || {}), losses: 0 };
-    addDelta({ caught: { [monId]: -1 }, mons: { [monId]: { losses: 0 } } });
-    return { losses: 0, lost: true };
   }
-  profile.mons[monId] = { ...(profile.mons[monId] || {}), losses: cur };
-  addDelta({ mons: { [monId]: { losses: cur } } });
-  return { losses: cur, lost: false };
+  profile.mons[monId] = { ...(profile.mons[monId] || {}), losses: lost ? 0 : cur };
+  return { losses: lost ? 0 : cur, lost };
 }
 
 /** 백업 가져오기 뒤 다시 읽기 */
