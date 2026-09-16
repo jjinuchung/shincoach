@@ -5,7 +5,7 @@ import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, GOLDEN, ITEMS, i
 import {
   coins, gainCoins, itemCount, inventory, addItem, buyItem, getLook, equipGear, applyDye, getProfileSnapshot,
   getPartner, setPartner, hpOf, isTired, changeHp, usePotion, catchAttempt, setGearPos,
-  hasKeystone, hasMegaStone, hasGmax, equipMega, gainMushroom, makeSoup,
+  hasKeystone, hasMegaStone, hasGmax, equipMega, gainMushroom, makeSoup, ballChance, catchChance,
 } from '../js/xp.js';
 import { mergeStatRecord } from '../js/db.js';
 import { FORMS } from '../js/pokemon.js';
@@ -17,8 +17,8 @@ test('카탈로그: id가 겹치지 않고 가격은 양수, 장식은 head/face
   for (const it of ITEMS) {
     assert.ok(it.emoji && it.ko, it.id);
     assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom'].includes(it.kind), it.id);
-    // 값이 없는 것 = 코인으로 못 사는 것: 🌟 황금 볼(복습으로만) · 🍄 다이버섯(학습으로만 모음)
-    if (it.kind === 'ball' || it.kind === 'mushroom') assert.equal(it.price, 0, it.id);
+    // 값이 없는 것 = 코인으로 못 사는 것: 🔴 몬스터볼(무료) · 🌟 황금 볼(복습으로만) · 🍄 다이버섯(학습으로만)
+    if (it.id === 'pokeball' || it.id === 'goldenball' || it.kind === 'mushroom') assert.equal(it.price, 0, it.id);
     else assert.ok(it.price > 0, it.id);
   }
   for (const p of POTION) assert.ok(p.heal > 0, p.id);
@@ -224,4 +224,37 @@ test('⭐ 변신 표: 30마리, 그림 id는 겹치지 않는다', () => {
   }
   assert.equal(new Set(arts).size, arts.length, '그림 id가 겹치면 안 됨');
   assert.deepEqual(FORMS[94], { mega: 10038, gmax: 10202 }, '팬텀은 둘 다 된다');
+});
+
+test('🔴 볼 등급: 슈퍼볼 1.5배 · 하이퍼볼 2배 · 마스터볼은 반드시 잡힘', () => {
+  const legendary = 4; // 전설 (기본 3%)
+  const base = ballChance('pokeball', legendary, 1);
+  assert.ok(Math.abs(base - catchChance(legendary, 1)) < 1e-9, '몬스터볼은 지금까지와 같다');
+  assert.ok(ballChance('greatball', legendary, 1) > base, '슈퍼볼이 더 잘 잡힌다');
+  assert.ok(ballChance('ultraball', legendary, 1) > ballChance('greatball', legendary, 1), '하이퍼볼이 더 잘 잡힌다');
+  assert.equal(ballChance('masterball', legendary, 1), 1, '마스터볼은 반드시');
+  // 🌟 황금 볼은 하이퍼볼과 같은 2배지만 상한이 더 높다 (흔한 포켓몬에서 차이가 난다)
+  assert.ok(ballChance('goldenball', 1, 20) >= ballChance('ultraball', 1, 20));
+  assert.equal(ballChance('없는볼', legendary, 1), base, '모르는 볼이면 몬스터볼로');
+});
+
+test('🔴 볼은 던지면 없어지고, 가방에 없으면 몬스터볼로 던진다', () => {
+  gainCoins(3000);
+  buyItem('greatball');
+  assert.equal(itemCount('greatball'), 1);
+
+  const r1 = catchAttempt(700, () => 0.99, { ball: 'greatball' }); // 확률과 무관하게 소모 확인
+  assert.equal(r1.ball, 'greatball');
+  assert.equal(itemCount('greatball'), 0, '던지면 없어진다');
+
+  const r2 = catchAttempt(700, () => 0.99, { ball: 'greatball' });
+  assert.equal(r2.ball, 'pokeball', '가방에 없으면 그냥 몬스터볼');
+
+  const r3 = catchAttempt(151, () => 0.99, { ball: 'masterball' });
+  assert.equal(r3.ball, 'pokeball', '안 산 마스터볼은 못 쓴다');
+
+  buyItem('masterball');
+  const r4 = catchAttempt(151, () => 0.99, { ball: 'masterball' });
+  assert.equal(r4.ball, 'masterball');
+  assert.equal(r4.caught, true, '마스터볼은 확률과 상관없이 잡힌다');
 });

@@ -3,7 +3,7 @@
 import { rarityOf, RARITY, caughtCount, xpToReach } from './xp.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
-import { makeFigure, setFigure } from './items.js';
+import { makeFigure, setFigure, BALLS, POKEBALL } from './items.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,33 +103,40 @@ export function openCatch(o) {
     btn.addEventListener('click', () => { unlock(); throwBall(c); });
     pick.appendChild(btn);
   }
-  renderGolden(o.goldenCount || 0);
+  renderBalls(o.ballCounts || {});
   $('catch').hidden = false;
 }
 
-/** 🌟 황금 볼 토글 (가방에 있을 때만 보임). 켜고 포켓몬을 고르면 황금 볼로 던진다 */
-function renderGolden(count) {
+/**
+ * 🔴 어떤 볼로 던질까 — 몬스터볼은 언제나, 나머지는 가방에 있는 것만.
+ * 등급이 올라갈수록 잡기 쉬워진다(슈퍼볼 ×1.5, 하이퍼볼 ×2, 마스터볼은 반드시 잡음).
+ */
+function renderBalls(counts) {
   const box = $('catch-golden');
   if (!box) return;
-  ui.golden = false;
-  ui.goldenCount = count;
+  ui.ball = POKEBALL.id;
+  ui.ballCounts = counts || {};
   box.innerHTML = '';
-  box.hidden = count <= 0;
-  if (count <= 0) return;
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'btn catch-golden-btn';
-  btn.textContent = `🌟 황금 볼로 던지기 (${count}개)`;
-  btn.setAttribute('aria-pressed', 'false');
-  btn.addEventListener('click', () => {
-    ui.golden = !ui.golden;
-    btn.classList.toggle('on', ui.golden);
-    btn.setAttribute('aria-pressed', ui.golden ? 'true' : 'false');
-    $('catch-msg').textContent = ui.golden
-      ? '🌟 황금 볼! 잡힐 확률이 훨씬 높아요 — 누구에게 던질까요?'
-      : '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!';
-  });
-  box.appendChild(btn);
+  box.hidden = false;
+  const pick = (b, btn) => {
+    ui.ball = b.id;
+    for (const other of box.querySelectorAll('button')) other.classList.toggle('on', other === btn);
+    ui.golden = b.id === 'goldenball'; // 옛 이름을 쓰는 곳(연출)이 있어 같이 둔다
+    $('catch-msg').textContent = b.free
+      ? '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!'
+      : b.sure ? `${b.emoji} ${b.ko}! 반드시 잡혀요 — 누구에게 던질까요?`
+        : `${b.emoji} ${b.ko}! 잡힐 확률이 ${b.mult}배예요 — 누구에게 던질까요?`;
+  };
+  for (const b of BALLS) {
+    const n = b.free ? Infinity : (ui.ballCounts[b.id] || 0);
+    if (!b.free && n <= 0) continue; // 없는 볼은 안 보여준다
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn catch-ball-btn' + (b.id === POKEBALL.id ? ' on' : '');
+    btn.textContent = b.free ? `${b.emoji} ${b.ko}` : `${b.emoji} ${b.ko} ${n}개`;
+    btn.addEventListener('click', () => pick(b, btn));
+    box.appendChild(btn);
+  }
 }
 
 export function closeCatch() {
@@ -230,7 +237,7 @@ async function throwBall(c) {
   ball.className = 'catch-ball drop';
   await sleep(500); if (!alive()) return;
 
-  const res = ui.attempt(c.id, { golden: !!ui.golden }); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만
+  const res = ui.attempt(c.id, { ball: ui.ball }); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만
   const wobbles = res.caught ? 3 : 1 + Math.floor(Math.random() * 3);
   const msg = $('catch-msg');
   msg.textContent = '두근두근…';

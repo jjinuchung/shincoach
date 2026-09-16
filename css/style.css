@@ -1448,3 +1448,13 @@ button { font-family: inherit; }
 .battle-move.form .hint { color: #e9d5ff; }
 .catch-cand .own.mega { background: #ede9fe; color: #6d28d9; }
 .mon-figure.gmax { transform: scale(1.25); transition: transform 0.4s; }
+.catch-ball-btn {
+  padding: 8px 10px;
+  min-height: 40px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 4px 6px;
+  white-space: nowrap; /* "몬스터볼"이 두 줄로 쪼개지지 않게 */
+}
+.catch-ball-btn.on { background: var(--primary); color: #fff; }
+@media (max-width: 420px) { .catch-ball-btn { font-size: 0.78rem; padding: 8px 8px; } }

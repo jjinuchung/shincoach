@@ -1,7 +1,7 @@
 // 🛒 상점(💰 코인으로 🎀 장식·🎨 염색약·🧪 물약 사기) + 포켓몬 상세(❤️ HP·물약·🤝 파트너·장식 장착·염색) 모달
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
-import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, itemById, canBuy, setFigure } from './items.js';
+import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, itemById, canBuy, setFigure } from './items.js';
 import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup } from './xp.js';
 import { formsOf, formUrl, ensureForm } from './pokemon.js';
 import { sfx, unlock } from './sfx.js';
@@ -65,6 +65,7 @@ function renderShop(msg, boughtId) {
   list.appendChild(shopSection('🎀 장식', '포켓몬 머리에 씌워요. 한 번 사면 계속 내 것 — 다른 포켓몬에게 옮길 수도 있어요', GEAR, boughtId));
   list.appendChild(shopSection('🎨 염색약', '포켓몬 색을 바꿔요. 한 번 쓰면 없어지고, 원래 색으로 돌아가는 건 공짜', DYE, boughtId));
   list.appendChild(shopSection('🧪 물약', '파트너 HP를 채워요. 퍼즐 정답을 그냥 보거나 따라 말하기를 넘기거나 하루 빠지면 HP가 깎여요', POTION, boughtId));
+  list.appendChild(shopSection('🔴 몬스터볼', '등급이 올라갈수록 잡기 쉬워요. 던지면 없어져요 — 🔵 슈퍼볼 1.5배 · 🟡 하이퍼볼 2배 · 🟣 마스터볼은 반드시 잡혀요 (🌟 황금 볼은 🔁 복습으로만)', SHOP_BALLS, boughtId));
   list.appendChild(shopSection('⭐ 메가진화', '🔑 키스톤은 한 번만 사면 계속 쓰고, 💠 메가스톤은 포켓몬에게 끼워요. 배틀에서 한 마리만 메가진화할 수 있어요 (🍄 거다이맥스는 살 수 없고 학습으로 모아요)', [KEYSTONE, MEGASTONE], boughtId));
 }
 
@@ -98,7 +99,7 @@ function buy(id) {
   if (!it || !buyItem(id)) { renderShop('💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
   unlock();
   sfx.ding();
-  const hint = it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : '❤️ 파트너를 눌러 먹여 주세요';
+  const hint = it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : it.kind === 'ball' ? '🎯 잡기 화면에서 고를 수 있어요' : it.kind === 'mega' ? '🎒 내 포켓몬을 눌러 끼워 주세요' : '❤️ 파트너를 눌러 먹여 주세요';
   renderShop(`${it.emoji} ${it.ko}${josaEul(it.ko)} 샀어요! ${hint}`, id);
   notify(null);
 }

@@ -309,7 +309,7 @@ function startPuzzle(continueFn) {
       state.catchOpen = true;
       openCatch({
         candidates: result.characters, xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
-        goldenCount: inventory()[GOLDEN.id] || 0,
+        ballCounts: inventory(), // 🔴 가방에 있는 볼 (몬스터볼은 언제나 쓸 수 있다)
         attempt: (id, opts) => catchAttempt(id, Math.random, opts),
         onDone: () => { state.catchOpen = false; updateLevelChip(); updatePartnerChip(); continueFn(); },
       });
@@ -937,7 +937,7 @@ function startCatchPractice() {
   state.practiceOpen = true;
   openCatch({
     candidates: pickCharacters(unlockedCharacters(), 4), levelInfo: getLevelInfo(), practice: true,
-    goldenCount: inventory()[GOLDEN.id] || 0,
+    ballCounts: inventory(),
     attempt: (id, opts) => previewAttempt(id, Math.random, opts),
     onDone: () => { state.catchOpen = false; state.practiceOpen = false; },
   });

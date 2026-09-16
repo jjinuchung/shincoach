@@ -2,7 +2,7 @@
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import { getProfile, applyProfileDelta } from './db.js';
-import { itemById, HP, GOLDEN, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS } from './items.js';
+import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS } from './items.js';
 import { anchorFor } from './pokemon.js';
 
 // ── 경험치 ──
@@ -223,9 +223,17 @@ export function resetRarity() {
  * 잡힐 확률 = 기본 확률 × 볼 배율 × (1 + 레벨×5%), 최대 90%
  * (🌟 황금 볼은 배율 2배 + 상한도 95% — 희귀·전설에서 티가 나야 "황금"이다)
  */
-export function catchChance(rarity, level, mult = 1) {
+export function catchChance(rarity, level, mult = 1, cap = 0) {
   const base = (RARITY[rarity] || RARITY[2]).base;
-  return Math.min(mult > 1 ? 0.95 : 0.9, base * mult * (1 + 0.05 * Math.max(1, level)));
+  const limit = cap || (mult > 1 ? 0.95 : 0.9);
+  return Math.min(limit, base * mult * (1 + 0.05 * Math.max(1, level)));
+}
+
+/** 이 볼로 던졌을 때 잡힐 확률 (마스터볼은 반드시 잡는다) */
+export function ballChance(ballId, rarity, level) {
+  const b = itemById(ballId) || POKEBALL;
+  if (b.sure) return 1;
+  return catchChance(rarity, level, b.mult || 1, b.cap || 0);
 }
 
 export function rollCatch(chance, rng = Math.random) {
@@ -328,10 +336,13 @@ export function gainXp(amount) {
 /** 몬스터볼 던지기 (기록됨) → { caught, chance, count(잡은 뒤 마릿수), first(처음 잡음), bonusXp } */
 export function catchAttempt(id, rng = Math.random, opts = {}) {
   const level = levelFromXp(profile.xp).level;
-  // 🌟 황금 볼: 가방에 있을 때만 쓰고 바로 소모 (확률 2배)
-  const golden = !!(opts.golden && consumeItem(GOLDEN.id));
-  const chance = catchChance(rarityOf(id), level, golden ? GOLDEN.mult : 1);
+  // 🔴 어떤 볼로 던지는가 — 몬스터볼은 언제나 쓸 수 있고, 나머지는 가방에 있을 때만 쓰고 바로 소모한다
+  const wanted = opts.ball || (opts.golden ? GOLDEN.id : POKEBALL.id);
+  const ballItem = itemById(wanted) || POKEBALL;
+  const used = ballItem.free || consumeItem(ballItem.id) ? ballItem : POKEBALL; // 가방에 없으면 그냥 몬스터볼
+  const chance = ballChance(used.id, rarityOf(id), level);
   const caught = rollCatch(chance, rng);
+  const golden = used.id === GOLDEN.id;
   profile.throws++;
   let first = false;
   let bonusXp = 0;
@@ -347,14 +358,15 @@ export function catchAttempt(id, rng = Math.random, opts = {}) {
     if (!profile.partner) { profile.partner = id; delta.partner = id; partnerSet = true; } // 🤝 처음 잡은 포켓몬이 자동으로 파트너
   }
   addDelta(delta);
-  return { caught, chance, count: profile.caught[id] || 0, first, bonusXp, partnerSet, golden, info: getLevelInfo() };
+  return { caught, chance, count: profile.caught[id] || 0, first, bonusXp, partnerSet, golden, ball: used.id, info: getLevelInfo() };
 }
 
 /** ⚙ 잡기 연습용: 기록하지 않고 판정만 (확률은 실제와 같음) */
 export function previewAttempt(id, rng = Math.random, opts = {}) {
   const level = levelFromXp(profile.xp).level;
-  const chance = catchChance(rarityOf(id), level, opts.golden ? GOLDEN.mult : 1);
-  return { caught: rollCatch(chance, rng), chance, count: profile.caught[id] || 0, first: false, bonusXp: 0, golden: !!opts.golden, info: null };
+  const ball = opts.ball || (opts.golden ? GOLDEN.id : POKEBALL.id);
+  const chance = ballChance(ball, rarityOf(id), level);
+  return { caught: rollCatch(chance, rng), chance, count: profile.caught[id] || 0, first: false, bonusXp: 0, golden: ball === GOLDEN.id, ball, info: null };
 }
 
 export function caughtCount(id) {

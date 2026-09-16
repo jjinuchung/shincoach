@@ -67,8 +67,18 @@ export const HP = {
   goalHeal: 20,      // 오늘 목표 달성 → 자동 회복
 };
 
-// 🌟 황금 몬스터볼: 잡힐 확률이 2배. 🔁 복습을 끝내야만 얻는다 (상점에서 못 사고 🎁 상자에서도 안 나옴)
-export const GOLDEN = { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', price: 0, mult: 2, kind: 'ball' };
+// ── 🔴 몬스터볼: 등급이 올라갈수록 잡기 쉬워진다 (원작 그대로) ──
+// mult = 잡힐 확률 배율, cap = 확률 상한, sure = 반드시 잡음, free = 언제나 쓸 수 있음(가방에 없어도)
+export const POKEBALL = { id: 'pokeball', emoji: '🔴', ko: '몬스터볼', price: 0, mult: 1, kind: 'ball', free: true };
+export const GREATBALL = { id: 'greatball', emoji: '🔵', ko: '슈퍼볼', price: 25, mult: 1.5, kind: 'ball' };
+export const ULTRABALL = { id: 'ultraball', emoji: '🟡', ko: '하이퍼볼', price: 60, mult: 2, kind: 'ball' };
+export const MASTERBALL = { id: 'masterball', emoji: '🟣', ko: '마스터볼', price: 1200, kind: 'ball', sure: true };
+// 🌟 황금 몬스터볼: 하이퍼볼과 같은 2배지만 상한이 더 높다(95%). 🔁 복습을 끝내야만 얻는다 (상점에서 못 사고 🎁 상자에서도 안 나옴)
+export const GOLDEN = { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', price: 0, mult: 2, cap: 0.95, kind: 'ball' };
+/** 잡기 화면에 보여줄 볼 순서 (몬스터볼은 언제나 첫 번째) */
+export const BALLS = [POKEBALL, GREATBALL, ULTRABALL, GOLDEN, MASTERBALL];
+/** 상점에서 파는 볼 */
+export const SHOP_BALLS = [GREATBALL, ULTRABALL, MASTERBALL];
 
 // ── ⭐ 메가진화 · 거다이맥스 (원작 규칙을 그대로) ──
 // 메가진화: 트레이너의 🔑 키스톤 + 포켓몬이 지니는 💠 메가스톤. 배틀에서만, 한 배틀에 한 마리.
@@ -85,6 +95,10 @@ export const ITEMS = [
   ...GEAR.map((g) => ({ ...g, kind: 'gear' })),
   ...DYE.map((d) => ({ ...d, kind: 'dye' })),
   ...POTION.map((p) => ({ ...p, kind: 'potion' })),
+  POKEBALL,
+  GREATBALL,
+  ULTRABALL,
+  MASTERBALL,
   GOLDEN,
   KEYSTONE,
   MEGASTONE,
