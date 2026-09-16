@@ -55,6 +55,7 @@ const state = {
   shadowRaf: null,
   shadowNext: 'next', // 따라 말하기 뒤 동작: 'repeat' | 'next'
   speakPassed: false, // 말하기 확인: 현재 문장 통과 여부
+  rereadDone: false,  // 🎤 이 문장에서 "한 번 더 읽기"를 이미 했는지
   speakFails: 0,      // 말하기 확인: 현재 문장 실패 횟수 (3번이면 통과시킴)
   speakRun: null,     // 진행 중인 말하기 확인 { promise, stop }
   speakHideEn: 'none', // 따라 말하기 대기 중 영어 숨김 단계: 'full'(전부) | 'partial'(절반 힌트) | 'none' — 못 할수록 더 보여줌
@@ -1316,6 +1317,7 @@ function resetSentenceState() {
   state.enRevealed = settings.listenFirst === 0 || state.parentMode; // 듣기 먼저 모드면 새 문장은 영어 숨김으로 시작 (부모 모드는 항상 공개)
   state.speakPassed = false;
   state.speakFails = 0;
+  state.rereadDone = false;
 }
 
 function goTo(i, { play = true, force = false } = {}) {
@@ -1721,6 +1723,62 @@ function startSpeakWait(cue) {
   });
 }
 
+/**
+ * 🎤 한 번 더 정확히 읽기.
+ *
+ * 한 번 통과하고 바로 넘어가면 "어디를 못 말했는지" 본 것이 그냥 지나간다.
+ * 못 말한 단어가 표시된 문장을 **보면서** 한 번 더 읽게 해서, 아이가 그 자리를
+ * 스스로 고쳐 읽게 하는 단계. 판정은 하지만 XP·통과 횟수에는 넣지 않는다
+ * (연습 반복이지 시험이 아니다 — 통계가 부풀면 부모가 실력을 잘못 읽는다).
+ */
+function shouldReread(result) {
+  if (state.parentMode || state.rereadDone) return false;
+  if (settings.rereadMode === 'off') return false;
+  if (!result || result.method !== 'speech' || !result.score) return false; // 인식이 안 된 판정이면 보여줄 게 없다
+  if (settings.rereadMode === 'missed') return result.score.matched < result.score.total;
+  return true;
+}
+
+function startReread(cue) {
+  state.rereadDone = true;
+  const overlay = $('shadow-overlay');
+  const msg = $('shadow-msg');
+  const sub = $('shadow-sub');
+  const fill = $('shadow-ring-fill');
+  overlay.hidden = false;
+  overlay.classList.add('speaking');
+  setSpeakHide(false);            // 이번엔 영어를 보고 읽는 단계
+  msg.textContent = '🎤 이번엔 정확히 한 번 더!';
+  sub.textContent = cue.en;
+  fill.style.width = '0%';
+  // 단어 칩은 그대로 두되 누를 수 없게 — 인식 중에 영상 소리가 나면 마이크가 그걸 듣는다
+  for (const b of $('shadow-words').querySelectorAll('button')) b.disabled = true;
+
+  const run = runSpeakCheck({
+    target: cue.en,
+    durationSec: cue.end - cue.start,
+    onLevel: (level) => { fill.style.width = `${Math.round(level * 100)}%`; },
+    onInterim: (text) => { sub.textContent = `🗣 ${text}`; },
+  });
+  state.speakRun = run;
+  run.promise.then((result) => {
+    if (run.cancelled || state.speakRun !== run) return;
+    state.speakRun = null;
+    overlay.classList.remove('speaking');
+    const score = result && result.score;
+    if (score && score.total) {
+      track.rereadScore(cue, score); // 더 잘 읽었으면 ⭐ 기준(bestRatio)만 갱신
+      msg.textContent = score.ratio >= 0.8 ? '🌟 이번엔 완벽해요!' : `🎯 ${score.matched}/${score.total} 단어 맞음`;
+      sub.textContent = cue.en;
+      renderSpeakWords(cue, result); // 두 번째 결과로 다시 표시 (어디가 나아졌는지 보인다)
+    } else {
+      msg.textContent = '👍 읽어봤어요!';
+      sub.textContent = cue.en;
+    }
+    scheduleAfterResult(afterShadowWait, resultPauseMs());
+  });
+}
+
 /** 음성 인식 없이 판정됐을 때 그 이유를 짧게 (부모가 원인을 볼 수 있게, ⚙ 진단과 같은 오류명) */
 function srNote(result) {
   if (!result || result.method !== 'energy') return '';
@@ -1845,7 +1903,8 @@ function onSpeakResult(cue, result) {
       msg.textContent = '👍 잘했어요!';
       sub.textContent = srNote(result); // 인식 없이 소리 길이로만 통과했음을 부모가 알 수 있게
     }
-    scheduleAfterResult(afterShadowWait, resultPauseMs());
+    // 잘 말했어도 한 번 더 정확히 읽게 (틀린 자리를 보고 스스로 고쳐 읽는 단계)
+    scheduleAfterResult(shouldReread(result) ? () => startReread(cue) : afterShadowWait, resultPauseMs());
     return;
   }
 
@@ -1857,7 +1916,7 @@ function onSpeakResult(cue, result) {
     msg.textContent = '👍 괜찮아요, 넘어갈게요';
     sub.textContent = result.transcript ? `들린 말: "${result.transcript}"` : '';
     renderSpeakWords(cue, result);
-    scheduleAfterResult(afterShadowWait, resultPauseMs());
+    scheduleAfterResult(shouldReread(result) ? () => startReread(cue) : afterShadowWait, resultPauseMs());
     return;
   }
   track.speak(cue, { passed: false, skipped: false, score: result.score });
@@ -2185,7 +2244,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT };
+  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always' };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -2206,6 +2265,7 @@ function initSettingsDialog() {
   $('set-puzzle').value = String(settings.puzzleEvery);
   $('set-review').value = String(settings.reviewCount);
   $('set-essay').value = String(Number(settings.essayMinutes));
+  $('set-reread').value = String(settings.rereadMode);
   $('set-sfx').checked = settings.sfx;
   $('set-vibrate').checked = settings.vibrate;
   $('set-hp').checked = settings.hp;
@@ -2237,6 +2297,7 @@ function initSettingsDialog() {
     settings.puzzleEvery = Number($('set-puzzle').value);
     settings.reviewCount = Number($('set-review').value);
     settings.essayMinutes = Number($('set-essay').value);
+    settings.rereadMode = $('set-reread').value;
     if (settings.puzzleEvery === 0) state.puzzlePool = [];
     settings.sfx = $('set-sfx').checked;
     settings.vibrate = $('set-vibrate').checked;

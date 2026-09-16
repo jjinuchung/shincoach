@@ -381,7 +381,7 @@ test('말하기 확인: 통과 전엔 다음 문장으로 못 감, 이전은 됨
 
 test('말하기 확인: 문장 끝 → 마이크 대기 → 통과하면 다음으로', async () => {
   const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'speech', transcript: 'a', score: { matched: 1, total: 1, ratio: 1 } }]);
-  run('settings.resultPause = 1; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('settings.rereadMode = "off"; settings.resultPause = 1; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
   run('goTo(0)');
   video.currentTime = 2; run('onCueEnd()');
   assert.ok(run('state.speakRun'), '말하기 확인 진행 중');
@@ -397,7 +397,7 @@ test('말하기 확인: 문장 끝 → 마이크 대기 → 통과하면 다음�
 test('말하기 확인: 미달이면 원문 다시 재생 후 재시도, 3번 미달 시 통과', async () => {
   const fail = { passed: false, method: 'energy', transcript: '', score: null };
   const { run, video } = loadPlayerWithSpeak([fail, fail, fail]);
-  run('settings.resultPause = 1; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('settings.rereadMode = "off"; settings.resultPause = 1; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
   run('goTo(0)');
   for (let n = 1; n <= 2; n++) {
     video.currentTime = 2; run('onCueEnd()');
@@ -1541,4 +1541,44 @@ test('✍️ 에세이: 콘텐츠를 닫는 중이면 이어가기(goTo)를 하�
   essayCalls[0].onDone({ started: true, done: 0, finished: false });
   assert.equal(run('state.idx'), 0, '정리 중에는 문장을 옮기지 않는다');
   assert.equal(run('state.essayOpen'), false);
+});
+
+test('🎤 한 번 더 읽기: 통과해도 영어를 보여주며 다시 읽게 하고, 그 다음에 넘어간다', async () => {
+  const first = { passed: true, method: 'speech', transcript: 'a b', score: { matched: 1, total: 2, ratio: 0.5 } };
+  const second = { passed: true, method: 'speech', transcript: 'a b', score: { matched: 2, total: 2, ratio: 1 } };
+  const { run, els, xpLog, ctx } = loadPlayerWithSpeak([first, second]);
+  const reread = [];
+  ctx.track.rereadScore = (cue, score) => reread.push(score.ratio);
+  run('settings.rereadMode = "always"; settings.resultPause = 1; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a b",ko:""},{start:10,end:12,en:"c",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.equal(run('state.speakPassed'), true, '첫 판정은 통과');
+  const xpAfterFirst = xpLog.length;
+
+  await new Promise((r) => setTimeout(r, 1300)); // 결과를 본 뒤 → 한 번 더 읽기 시작
+  assert.ok(run('state.speakRun'), '두 번째 읽기가 시작됨');
+  assert.equal(run('state.rereadDone'), true);
+  assert.equal(els['shadow-msg'].textContent, '🎤 이번엔 정확히 한 번 더!');
+  assert.equal(els['shadow-sub'].textContent, 'a b', '영어 문장을 보여준다');
+  assert.equal(run('state.idx'), 0, '아직 다음 문장으로 안 감');
+
+  run('skipShadowWait()'); await tick();
+  assert.deepEqual(reread, [1], '더 잘 읽은 점수만 기록에 반영 (시도 횟수는 그대로)');
+  assert.equal(xpLog.length, xpAfterFirst, '두 번째 읽기에는 XP를 또 주지 않는다');
+
+  await new Promise((r) => setTimeout(r, 1300));
+  assert.equal(run('state.idx'), 1, '두 번째 읽기까지 끝나면 다음 문장');
+});
+
+test('🎤 한 번 더 읽기: 끔·부모 모드·인식 없는 판정에서는 안 나온다', async () => {
+  const energy = { passed: true, method: 'energy', transcript: '', score: null };
+  const { run } = loadPlayerWithSpeak([energy]);
+  run('settings.rereadMode = "always"; settings.resultPause = 1; state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a b",ko:""},{start:10,end:12,en:"c",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  await new Promise((r) => setTimeout(r, 1300));
+  assert.equal(run('state.idx'), 1, '소리 길이로만 판정됐으면 보여줄 게 없으니 바로 다음');
+  assert.equal(run('state.rereadDone'), false);
 });

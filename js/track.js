@@ -204,6 +204,16 @@ export function speak(cue, result) {
   }
 }
 
+/**
+ * 🎤 "한 번 더 정확히 읽기" 결과 — **연습 반복이라 시도·통과 횟수에는 넣지 않는다**.
+ * 더 잘 읽었으면 ⭐ 정복 기준(bestRatio)만 올려 준다.
+ */
+export function rereadScore(cue, score) {
+  const r = rec(cue); if (!r || !score || !score.total) return;
+  r.lastRatio = score.ratio;
+  if (score.ratio > r.bestRatio) r.bestRatio = score.ratio;
+}
+
 /** 🧩 문장 퍼즐 결과 (solved: 3번 안에 맞춤, wrong: 틀린 횟수). 옛 기록에는 필드가 없을 수 있어 || 0 */
 export function puzzle(cue, result) {
   const r = rec(cue); if (!r) return;
