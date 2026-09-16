@@ -153,6 +153,7 @@ function loadPlayer() {
     essayCalls,
     initEssay() {}, abortEssay() {}, openEssay(o) { essayCalls.push(o); },
     pickEssayPrompts, essayReadSeconds, ESSAY_MINUTES: 30, ESSAY_COUNT: 3, ESSAY_REWARD, ESSAY_FINISH,
+    COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
     pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, makeDictation, VOCAB_KNOWN,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },

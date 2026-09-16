@@ -236,6 +236,56 @@ export async function listDaily() {
   return all.sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
+/** ✍️ 날짜별로 흩어진 에세이를 한 줄로 (최신이 뒤). 부모 화면·아이 화면이 함께 쓴다 */
+export async function listEssays() {
+  const days = await listDaily();
+  const out = [];
+  for (const d of days) {
+    for (const e of (d.essays || [])) if (e && e.id) out.push({ ...e, date: d.date });
+  }
+  return out;
+}
+
+/**
+ * ✍️ 부모가 고쳐 준 문장을 해당 에세이에 붙인다.
+ * 며칠 전 글도 고쳐 줄 수 있으므로 날짜 기록을 훑어 id로 찾는다.
+ * @param {Array<{id:string, fixed:string}>} fixes
+ * @returns {Promise<number>} 실제로 붙은 문장 수
+ */
+export async function applyEssayFixes(fixes) {
+  if (!fixes || !fixes.length) return 0;
+  const byId = new Map(fixes.map((f) => [f.id, f.fixed]));
+  const days = await listDaily();
+  let n = 0;
+  for (const d of days) {
+    if (!Array.isArray(d.essays) || !d.essays.length) continue;
+    let touched = false;
+    for (const e of d.essays) {
+      if (!e || !e.id || !byId.has(e.id)) continue;
+      e.coachFix = byId.get(e.id);
+      e.fixedAt = Date.now();
+      e.readAt = 0;               // 아이가 아직 안 읽음
+      touched = true;
+      n++;
+    }
+    if (touched) await putDaily(d);
+  }
+  return n;
+}
+
+/** ✍️ 아이가 아빠 교정문을 읽었다고 표시 (한 번만 보여주기 위해) */
+export async function markEssayRead(id) {
+  const days = await listDaily();
+  for (const d of days) {
+    const e = (d.essays || []).find((x) => x && x.id === id);
+    if (!e) continue;
+    e.readAt = Date.now();
+    await putDaily(d);
+    return true;
+  }
+  return false;
+}
+
 /** 단어 조회 기록 누적 (views: 패널이 열린 채 보임, taps: 직접 눌러서 펼침) */
 export async function bumpVocabViews(entries, tapped) {
   if (!entries.length) return;

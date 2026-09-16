@@ -1,5 +1,5 @@
 // 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
-import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview } from './db.js';
+import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, listEssays, markEssayRead } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
@@ -20,6 +20,9 @@ import {
   DEFAULT_MINUTES as ESSAY_MINUTES, DEFAULT_COUNT as ESSAY_COUNT,
   REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH,
 } from './essay.js';
+
+/** 👨‍👩‍👦 한 번에 보여줄 아빠 교정문 수 (많이 쌓여도 아이가 지치지 않게) */
+const COACH_FIX_MAX = 3;
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
@@ -73,6 +76,7 @@ const state = {
   essayPending: false, // ✍️ 다음 문장으로 넘어갈 때 열 에세이 (오늘 학습 시간을 채우면 예약됨)
   essayOpen: false,    // ✍️ 에세이 화면이 열려 있음 (키보드 무시)
   essaySuggested: false, // 이번에 콘텐츠를 연 뒤로 한 번 제안했는지 (계속 묻지 않기)
+  coachFixDone: false, // 👨‍👩‍👦 아빠 교정문을 이번 콘텐츠에서 이미 보여줬는지
   battleOpen: false,   // ⚔️ 배틀 화면이 열려 있음 (키보드 무시)
   battleLastCue: null, // 배틀에서 방금 따라 말한 문장 (연달아 같은 문장 안 나오게)
   sentenceSpeakStop: null, // ⚔️ 배틀·🔁 복습에서 진행 중인 듣기·말하기를 밖에서 중단하는 함수 (화면 꺼짐 → 그 턴 무효)
@@ -677,6 +681,53 @@ function startEssay(practice, cont) {
   });
 }
 
+/**
+ * 👨‍👩‍👦 아빠가 고쳐 준 글 보여주기 (콘텐츠를 열 때 한 번, 복습 제안보다 먼저)
+ * @returns {Promise<boolean>} 열었으면 true
+ */
+async function maybeCoachFix() {
+  if (state.parentMode || state.coachFixDone || state.essayOpen || state.reviewOpen) return false;
+  state.coachFixDone = true;
+  let list = [];
+  try { list = await listEssays(); } catch (e) { return false; } // 기록을 못 읽어도 학습은 계속
+  const unread = list.filter((e) => e.coachFix && !e.readAt).slice(-COACH_FIX_MAX);
+  if (!unread.length || !state.open) return false;
+  startCoachFix(unread);
+  return true;
+}
+
+/** 아빠 교정문 회차: 쓰기 없이 "내 글 / 아빠 글"을 보고 소리 내어 읽는다 */
+function startCoachFix(entries) {
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  const spot = rememberSpot();
+  setEssayOpen(true);
+  openEssay({
+    mode: 'coach',
+    prompts: entries.map((e) => ({
+      id: e.id, written: e.written || '', coachFix: e.coachFix || '',
+      rec: {}, frame: { full: e.origin || '', keep: '', blankWords: 0 }, cue: null,
+    })),
+    reward: ESSAY_REWARD,
+    known: state.vocab ? state.vocab.known : new Set(),
+    sfx,
+    unlock,
+    speak: speakText,
+    onRead: (it) => {
+      markEssayRead(it.id).catch(() => {}); // 한 번 읽으면 다시 안 뜬다
+      awardXp(ESSAY_REWARD.xp);
+      awardCoins(ESSAY_REWARD.coin);
+    },
+    onDone: () => {
+      setEssayOpen(false);
+      state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
+      restoreSpot(spot);
+      track.flush();
+    },
+  });
+}
+
 /** ⚙ "지금 에세이 써보기": 시간이 안 찼어도 연습 (기록·보상 없음) */
 function startEssayNow() {
   if (state.essayOpen || state.reviewOpen) return;
@@ -1142,6 +1193,7 @@ export async function openPlayer(id, opts = {}) {
   state.reviewDone = false;
   state.essayPending = false;
   state.essaySuggested = false;
+  state.coachFixDone = false;
   state.battlePending = null;
   state.battleLastCue = null;
   cancelShadowWait();
@@ -1185,7 +1237,12 @@ export async function openPlayer(id, opts = {}) {
     goTo(startIdx, { play: false });
     // 🔤 단어 문항을 만들려면 본 단어 기록이 필요하다 — 읽고 나서 복습을 제안
     const myItem = state.item;
-    refreshVocabViews().then(() => { if (state.open && state.item === myItem) maybeReview(); });
+    // 👨‍👩‍👦 아빠가 고쳐 준 글이 있으면 그것부터, 없으면 🔁 복습 제안
+    refreshVocabViews().then(async () => {
+      if (!(state.open && state.item === myItem)) return;
+      const shown = await maybeCoachFix();
+      if (!shown && state.open && state.item === myItem) maybeReview();
+    });
   };
   video.addEventListener('loadedmetadata', state.onMeta, { once: true });
 }

@@ -1411,3 +1411,19 @@ button { font-family: inherit; }
 .stats-essay-mine { font-weight: 700; margin-top: 2px; }
 .stats-essay-fixed { color: #047857; font-weight: 700; margin-top: 2px; }
 .stats-essay-notes { color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+
+/* 👨‍👩‍👦 부모용 에세이 교정 도구 (📊 안) */
+.stats-coach { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+.stats-coach-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.stats-coach-row .btn { flex: 1 1 140px; }
+.stats-coach-box {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+.stats-essay-coach { color: #7c3aed; font-weight: 700; margin-top: 2px; }

@@ -273,6 +273,45 @@ function word1(s) {
   return String(s).split(' ')[0] || '';
 }
 
+/**
+ * 📋 부모에게 넘길 텍스트. 메신저를 거쳐도 살아남게 `[번호]` 한 줄 형식으로 고정한다.
+ * @param {Array<{id:string, origin:string, written:string}>} entries 아직 고쳐 주지 않은 글
+ * @returns {{text:string, ids:string[]}} ids는 번호 순서 — 붙여넣기 때 이 순서로 다시 붙인다
+ */
+export function exportText(entries) {
+  const list = (entries || []).filter((e) => e && e.written);
+  const lines = ['# 진우가 쓴 영어 문장 — 고쳐서 [번호] 줄로 돌려주세요', ''];
+  list.forEach((e, i) => {
+    lines.push(`[${i + 1}] 배운 문장: ${e.origin || ''}`);
+    lines.push(`    진우: ${e.written}`);
+    lines.push('');
+  });
+  return { text: lines.join('\n'), ids: list.map((e) => e.id) };
+}
+
+/**
+ * 부모가 붙여넣은 교정문 파싱. `[3] I want to ...` 형태의 줄만 읽는다.
+ * 사이에 다른 설명이 섞여 있어도(메신저에서 복사하면 흔하다) 번호 줄만 골라낸다.
+ * @param {string} text 붙여넣은 내용
+ * @param {string[]} ids exportText가 돌려준 순서
+ * @returns {Array<{id:string, fixed:string}>}
+ */
+export function parseFixes(text, ids) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const m = raw.match(/^\s*\[(\d{1,3})\]\s*(.+?)\s*$/);
+    if (!m) continue;
+    const n = Number(m[1]);
+    const id = (ids || [])[n - 1];
+    const fixed = m[2].replace(/^(배운 문장|진우)\s*:\s*/, '').trim();
+    if (!id || !fixed || seen.has(id)) continue;   // 번호가 범위 밖이거나 같은 번호가 두 번이면 무시
+    seen.add(id);
+    out.push({ id, fixed });
+  }
+  return out;
+}
+
 /** 보상만 받으려고 "a" 한 글자를 넣은 경우를 막는다 (실제로 쓰게 하려는 것) */
 export function tooShort(text) {
   return (String(text || '').match(/[a-z]/gi) || []).length < 3;
@@ -395,16 +434,23 @@ export function openEssay(o) {
   ui.finished = false;
   ui.speakStop = null;
 
-  $('essay-title').textContent = o.practice ? '✍️ 에세이 연습' : '✍️ 오늘의 에세이';
-  $('essay-msg').textContent = `배운 문장 ${o.prompts.length}개를 내 이야기로 바꿔 써요`;
+  const coach = o.mode === 'coach'; // 👨‍👩‍👦 아빠가 고쳐 준 글을 읽는 회차 (쓰기 단계 없음)
+  $('essay-title').textContent = coach ? '👨‍👩‍👦 아빠가 고쳐준 글' : (o.practice ? '✍️ 에세이 연습' : '✍️ 오늘의 에세이');
+  $('essay-msg').textContent = coach
+    ? `아빠가 고쳐준 문장 ${o.prompts.length}개를 읽어 봐요`
+    : `배운 문장 ${o.prompts.length}개를 내 이야기로 바꿔 써요`;
+  $('essay-start').textContent = coach ? '👀 보러 가기' : '✍️ 시작!';
+  $('essay-fixed-label').textContent = coach ? '👨‍👩‍👦 아빠가 고쳐준 글' : '✅ 신코치가 고친 글';
   const rw = $('essay-reward');
   rw.innerHTML = '';
   if (o.practice) rw.appendChild(el('span', 'review-chip', '연습이라 기록이 남지 않아요'));
   else {
     rw.appendChild(el('span', 'review-chip', `문장마다 ⚡+${REWARD.xp} 💰+${REWARD.coin}`));
-    rw.appendChild(el('span', 'review-chip gold', `다 쓰면 ⚡+${o.reward.xp} 💰+${o.reward.coin}`));
+    if (!coach) rw.appendChild(el('span', 'review-chip gold', `다 쓰면 ⚡+${o.reward.xp} 💰+${o.reward.coin}`));
   }
-  $('essay-note').textContent = '틀린 곳은 신코치가 고쳐 줄 거예요. 편하게 써 보세요!';
+  $('essay-note').textContent = coach
+    ? '내가 쓴 글을 아빠가 읽고 고쳐 줬어요. 소리 내어 읽어 볼까요?'
+    : '틀린 곳은 신코치가 고쳐 줄 거예요. 편하게 써 보세요!';
 
   $('essay-intro').hidden = false;
   $('essay-write').hidden = true;
@@ -457,6 +503,13 @@ function showPrompt() {
   $('essay-intro').hidden = true;
   $('essay-result').hidden = true;
   $('essay-speak').hidden = true;
+
+  // 👨‍👩‍👦 아빠 교정문은 이미 쓴 글이라 쓰기 단계를 건너뛰고 바로 두 칸으로 보여준다
+  if (ui.o.mode === 'coach') {
+    it.result = { raw: it.written || '', fixed: it.coachFix || '', notes: [] };
+    showResult(it);
+    return;
+  }
   $('essay-write').hidden = false;
 
   $('essay-origin-en').textContent = it.frame.full;
@@ -496,7 +549,9 @@ function showResult(it) {
 
   const notes = $('essay-notes');
   notes.innerHTML = '';
-  if (!it.result.notes.length) {
+  if (ui.o.mode === 'coach') {
+    // 아빠 교정문에는 규칙 설명이 없다 (무엇이 달라졌는지는 두 칸을 나란히 보면 된다)
+  } else if (!it.result.notes.length) {
     notes.appendChild(el('li', 'essay-note-ok', '고칠 곳이 없어요. 아주 잘 썼어요! 🎉'));
   } else {
     for (const n of it.result.notes) {
@@ -563,6 +618,12 @@ function nextPrompt() {
   if (!ui.open) return;
   stopReading();
   ui.busy = false;
+  // 👨‍👩‍👦 아빠 교정문은 "읽고 넘어갈 때" 한 번만 기록·보상한다
+  const cur = ui.o.prompts[ui.i];
+  if (ui.o.mode === 'coach' && cur && !cur.marked) {
+    cur.marked = true;
+    if (!ui.o.practice && ui.o.onRead) ui.o.onRead(cur);
+  }
   ui.i++;
   if (ui.i >= ui.o.prompts.length) { showDone(); return; }
   showPrompt();
@@ -582,9 +643,11 @@ function showDone() {
     ui.granted = true;
     reward = ui.o.onFinished();
   }
-  $('essay-done-msg').textContent = ui.o.practice
-    ? '연습 끝! 잘했어요 👏'
-    : `오늘의 에세이 완성! 문장 ${ui.o.prompts.length}개를 내 이야기로 바꿨어요 🎉`;
+  $('essay-done-msg').textContent = ui.o.mode === 'coach'
+    ? `아빠가 고쳐준 문장 ${ui.o.prompts.length}개를 다 읽었어요 👏`
+    : ui.o.practice
+      ? '연습 끝! 잘했어요 👏'
+      : `오늘의 에세이 완성! 문장 ${ui.o.prompts.length}개를 내 이야기로 바꿨어요 🎉`;
   const box = $('essay-done-reward');
   box.innerHTML = '';
   if (reward) box.appendChild(el('span', 'review-chip gold', `⚡+${reward.xp} 💰+${reward.coin}`));

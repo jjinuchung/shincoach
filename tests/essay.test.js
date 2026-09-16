@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { makeFrame, pickPrompts, correct, looksEnglish, tooShort, MIN_WORDS, MIN_BLANK_WORDS, MAX_BLANK_WORDS } from '../js/essay.js';
+import { makeFrame, pickPrompts, correct, looksEnglish, tooShort, exportText, parseFixes, MIN_WORDS, MIN_BLANK_WORDS, MAX_BLANK_WORDS } from '../js/essay.js';
 
 const words = JSON.parse(fs.readFileSync(new URL('../vocab/words.json', import.meta.url), 'utf8'));
 const basic = JSON.parse(fs.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8'));
@@ -148,4 +148,43 @@ test('교정: 3인칭 s는 자동으로 붙이지 않는다 (문맥 없이는 �
   assert.equal(correct('I watched', 'it go away', { known: KNOWN }).fixed, 'I watched it go away.');
   assert.equal(correct('I think', 'he read it yesterday', { known: KNOWN }).fixed, 'I think he read it yesterday.');
   // 진짜 3인칭 오류(he go)는 못 고치지만, 맞는 문장을 망치지 않는 쪽을 택한 것
+});
+
+test('👨‍👩‍👦 부모에게 넘기는 형식: [번호] 줄로 복사하고 그대로 되돌려 받는다', () => {
+  const entries = [
+    { id: 'a1', origin: 'I want to play with my friend today.', written: 'I want to play with my brother at a park' },
+    { id: 'b2', origin: "I can't believe I just caught a Gengar!", written: "I can't believe I just got a new bycicle" },
+  ];
+  const { text, ids } = exportText(entries);
+  assert.deepEqual(ids, ['a1', 'b2']);
+  assert.match(text, /\[1\] 배운 문장: I want to play/);
+  assert.match(text, /\[2\] 배운 문장: I can't believe/);
+
+  // 메신저를 거치며 설명이 섞여도 번호 줄만 읽는다
+  const reply = [
+    '아빠가 고쳤어 ㅎㅎ',
+    '[1] I want to play with my brother at the park.',
+    '',
+    '[2] I can\'t believe I just got a new bicycle!',
+    '[5] 번호가 범위 밖이라 무시돼야 함',
+  ].join('\n');
+  const fixes = parseFixes(reply, ids);
+  assert.equal(fixes.length, 2);
+  assert.deepEqual(fixes[0], { id: 'a1', fixed: 'I want to play with my brother at the park.' });
+  assert.deepEqual(fixes[1], { id: 'b2', fixed: "I can't believe I just got a new bicycle!" });
+});
+
+test('👨‍👩‍👦 되돌려 받기: 같은 번호가 두 번이면 처음 것만, 빈 줄·잡음은 무시', () => {
+  const ids = ['x', 'y'];
+  const fixes = parseFixes('[1] First one.\n[1] 두 번째로 온 같은 번호\n그냥 말\n[2]   \n[2] Second one.', ids);
+  assert.equal(fixes.length, 2);
+  assert.equal(fixes[0].fixed, 'First one.');
+  assert.equal(fixes[1].fixed, 'Second one.');
+});
+
+test('👨‍👩‍👦 복사 목록이 비어 있으면 빈 결과', () => {
+  const { text, ids } = exportText([]);
+  assert.deepEqual(ids, []);
+  assert.equal(parseFixes('[1] whatever', ids).length, 0, '붙일 곳이 없으면 무시');
+  assert.match(text, /진우가 쓴 영어 문장/);
 });

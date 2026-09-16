@@ -1,7 +1,9 @@
 // 📊 학습 기록 화면 (부모용): 이번 주 요약, 콘텐츠별 진행률, 어려워한 문장, 복습 단어장, 최근 세션, 내보내기/가져오기
 import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
+  applyEssayFixes,
 } from './db.js';
+import { exportText, parseFixes } from './essay.js';
 import { parseSubtitle, mergeIntoSentences } from './srt.js';
 import { openPlayer } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
@@ -109,6 +111,70 @@ function cueCountOf(item) {
   let cues = parseSubtitle(item.enText || '');
   if (mergeSentences) cues = mergeIntoSentences(cues);
   return cues.length;
+}
+
+/**
+ * 👨‍👩‍👦 부모용 도구: 아이 글을 복사해 나가고, 고쳐 온 글을 붙여넣어 앱에 되돌린다.
+ * 태블릿과 PC 사이에 서버가 없으므로 "글자를 복사해 옮기는" 길을 만들어 둔다.
+ */
+let coachMsg = ''; // 적용 뒤 화면을 다시 그리므로, 안내 문구를 넘겨 받아 새 화면에 보여준다
+
+function buildCoachTools(essayDays) {
+  const wrap = el('div', 'stats-coach');
+  // 아직 고쳐 주지 않은 글 (최신이 앞) — 복사 대상
+  const todo = [];
+  for (const d of essayDays) for (const e of d.essays) if (e && e.written && !e.coachFix) todo.push(e);
+
+  wrap.appendChild(el('p', 'stats-note', todo.length
+    ? `아직 고쳐 주지 않은 글이 ${todo.length}개 있어요. 복사해서 고친 뒤, 아래에 [번호] 줄로 붙여넣으면 진우 화면에 나옵니다.`
+    : '고쳐 주지 않은 글이 없어요. 새 글이 쌓이면 여기에서 복사할 수 있어요.'));
+
+  const row = el('div', 'stats-coach-row');
+  const copyBtn = el('button', 'btn', '📋 아이 글 복사');
+  copyBtn.type = 'button';
+  copyBtn.disabled = !todo.length;
+  const area = el('textarea', 'stats-coach-box');
+  area.placeholder = '여기에 고친 글을 붙여넣으세요 — 예)\n[1] I want to play with my brother at the park.\n[2] I can\'t believe I just got a new bicycle!';
+  area.rows = 5;
+  const applyBtn = el('button', 'btn btn-primary', '✍️ 고친 글 적용');
+  applyBtn.type = 'button';
+  const msg = el('p', 'stats-note', coachMsg);
+  coachMsg = '';
+
+  copyBtn.addEventListener('click', async () => {
+    const { text, ids } = exportText(todo);
+    try { localStorage.setItem('shincoach.essayExport', JSON.stringify(ids)); } catch { /* 무시 */ }
+    let copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); copied = true; }
+    } catch { /* 아래에서 직접 고르게 한다 */ }
+    if (!copied) { area.value = text; area.select(); }
+    msg.textContent = copied
+      ? `복사했어요 (${todo.length}문장). 카톡·메모에 붙여넣어 PC로 보내세요.`
+      : '복사가 막혀 있어요 — 아래 칸의 내용을 길게 눌러 복사하세요.';
+  });
+
+  applyBtn.addEventListener('click', async () => {
+    let ids = todo.map((e) => e.id);
+    try {
+      const saved = JSON.parse(localStorage.getItem('shincoach.essayExport') || 'null');
+      if (Array.isArray(saved) && saved.length) ids = saved; // 복사한 시점의 번호 순서를 그대로 쓴다
+    } catch { /* 저장된 순서가 없으면 지금 목록 순서 */ }
+    const fixes = parseFixes(area.value, ids);
+    if (!fixes.length) { msg.textContent = '[번호] 로 시작하는 줄을 못 찾았어요. 예: [1] I want to ...'; return; }
+    const n = await applyEssayFixes(fixes);
+    if (!n) { msg.textContent = '해당하는 글을 못 찾았어요 (번호가 바뀌었을 수 있어요).'; return; }
+    coachMsg = `${n}문장을 넣었어요. 진우가 앱을 열면 바로 보여요.`;
+    area.value = '';
+    renderStats();
+  });
+
+  row.appendChild(copyBtn);
+  row.appendChild(applyBtn);
+  wrap.appendChild(row);
+  wrap.appendChild(area);
+  wrap.appendChild(msg);
+  return wrap;
 }
 
 export async function renderStats() {
@@ -239,9 +305,13 @@ export async function renderStats() {
         box.appendChild(el('div', 'stats-essay-mine', `✍️ ${e.written || ''}`));
         if (e.fixed && e.fixed !== e.written) box.appendChild(el('div', 'stats-essay-fixed', `✅ ${e.fixed}`));
         if (Array.isArray(e.notes) && e.notes.length) box.appendChild(el('div', 'stats-essay-notes', e.notes.join(' · ')));
+        if (e.coachFix) {
+          box.appendChild(el('div', 'stats-essay-coach', `👨‍👩‍👦 ${e.coachFix}${e.readAt ? ' (읽음)' : ' (아직 안 읽음)'}`));
+        }
         cE.appendChild(box);
       }
     }
+    cE.appendChild(buildCoachTools(essayDays));
     main.appendChild(cE);
   }
 
