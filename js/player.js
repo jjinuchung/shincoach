@@ -1,5 +1,5 @@
 // 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
-import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, listEssays, markEssayRead } from './db.js';
+import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, listEssays, markEssayRead, syncCoachFixes } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
@@ -689,7 +689,10 @@ async function maybeCoachFix() {
   if (state.parentMode || state.coachFixDone || state.essayOpen || state.reviewOpen) return false;
   state.coachFixDone = true;
   let list = [];
-  try { list = await listEssays(); } catch (e) { return false; } // 기록을 못 읽어도 학습은 계속
+  try {
+    await syncCoachFixes();            // 배포로 온 교정문이 있으면 먼저 반영
+    list = await listEssays();
+  } catch (e) { return false; }        // 기록을 못 읽어도 학습은 계속
   const unread = list.filter((e) => e.coachFix && !e.readAt).slice(-COACH_FIX_MAX);
   if (!unread.length || !state.open) return false;
   startCoachFix(unread);

@@ -3,7 +3,7 @@ import { initLibrary } from './library.js';
 import { initPlayer, requirePin } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
-import { getDaily } from './db.js';
+import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
 
 const views = {
@@ -128,6 +128,8 @@ async function main() {
   } catch (err) {
     showError(`저장소를 열 수 없어요: ${err.message} (시크릿 모드이거나 저장 공간이 꺼져 있을 수 있어요)`);
   }
+  // 👨‍👩‍👦 배포에 실려 온 아빠 교정문 반영 (실패해도 학습에는 영향 없음)
+  syncCoachFixes().catch(() => {});
   requestPersistentStorage();
   registerServiceWorker();
 }

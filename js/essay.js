@@ -312,6 +312,53 @@ export function parseFixes(text, ids) {
   return out;
 }
 
+/**
+ * 문장을 비교용으로 다듬는다 (대소문자·구두점 차이는 무시).
+ * 아포스트로피는 **지운다** — 사진에서 옮겨 적을 때 can't / cant 가 가장 흔하게 갈린다.
+ */
+export function normalizeWritten(text) {
+  return String(text || '').toLowerCase()
+    .replace(/['’`]/g, '')
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * 배포에 실어 보낸 교정문(coach/fixes.json)을 아이가 쓴 글과 짝지어 준다.
+ *
+ * 사진에서 옮겨 적은 문장이라 완벽히 같지 않을 수 있으므로 세 단계로 찾는다:
+ * ① 다듬어서 똑같은 글 → ② 앞 4단어가 같은 글 → ③ 배운 문장(origin)이 같은 글.
+ * 못 찾으면 조용히 건너뛴다 (다른 기기이거나 지워진 기록일 수 있다).
+ *
+ * @param {Array<{id:string, written:string, origin:string, coachFix?:string}>} entries 앱에 쌓인 에세이
+ * @param {Array<{written?:string, origin?:string, fixed:string}>} fixes 배포로 온 교정문
+ * @returns {Array<{id:string, fixed:string}>} 아직 안 고쳐진 글에만
+ */
+export function matchFixes(entries, fixes) {
+  const open = (entries || []).filter((e) => e && e.id && !e.coachFix);
+  const used = new Set();
+  const out = [];
+  const head = (s, n = 4) => normalizeWritten(s).split(' ').slice(0, n).join(' ');
+
+  for (const f of (fixes || [])) {
+    if (!f || !f.fixed) continue;
+    const want = normalizeWritten(f.written);
+    const wantHead = head(f.written);
+    let hit = null;
+    if (want) hit = open.find((e) => !used.has(e.id) && normalizeWritten(e.written) === want);
+    if (!hit && wantHead) hit = open.find((e) => !used.has(e.id) && head(e.written) === wantHead);
+    if (!hit && f.origin) {
+      const wantOrigin = normalizeWritten(f.origin);
+      hit = open.find((e) => !used.has(e.id) && normalizeWritten(e.origin) === wantOrigin);
+    }
+    if (!hit) continue;
+    used.add(hit.id);
+    out.push({ id: hit.id, fixed: String(f.fixed).trim() });
+  }
+  return out;
+}
+
 /** 보상만 받으려고 "a" 한 글자를 넣은 경우를 막는다 (실제로 쓰게 하려는 것) */
 export function tooShort(text) {
   return (String(text || '').match(/[a-z]/gi) || []).length < 3;

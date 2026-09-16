@@ -273,6 +273,28 @@ export async function applyEssayFixes(fixes) {
   return n;
 }
 
+/**
+ * ✍️ 배포에 실려 온 교정문(coach/fixes.json)을 앱에 반영한다.
+ * 태블릿에 손으로 옮겨 적지 않아도 되게, 아빠 교정을 **앱 업데이트로** 전달하는 길.
+ * 이미 고쳐진 글은 건드리지 않으므로 여러 번 불려도 안전하다.
+ * @returns {Promise<number>} 새로 붙은 문장 수
+ */
+export async function syncCoachFixes(base = './coach/') {
+  let list = [];
+  try {
+    const res = await fetch(`${base}fixes.json`);
+    if (!res.ok) return 0;
+    list = await res.json();
+  } catch (e) {
+    return 0; // 파일이 없거나 오프라인 — 학습에는 영향 없음
+  }
+  if (!Array.isArray(list) || !list.length) return 0;
+  const { matchFixes } = await import('./essay.js');
+  const entries = await listEssays();
+  const fixes = matchFixes(entries, list);
+  return fixes.length ? applyEssayFixes(fixes) : 0;
+}
+
 /** ✍️ 아이가 아빠 교정문을 읽었다고 표시 (한 번만 보여주기 위해) */
 export async function markEssayRead(id) {
   const days = await listDaily();

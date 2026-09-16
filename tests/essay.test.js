@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { makeFrame, pickPrompts, correct, looksEnglish, tooShort, exportText, parseFixes, MIN_WORDS, MIN_BLANK_WORDS, MAX_BLANK_WORDS } from '../js/essay.js';
+import { makeFrame, pickPrompts, correct, looksEnglish, tooShort, exportText, parseFixes, matchFixes, MIN_WORDS, MIN_BLANK_WORDS, MAX_BLANK_WORDS } from '../js/essay.js';
 
 const words = JSON.parse(fs.readFileSync(new URL('../vocab/words.json', import.meta.url), 'utf8'));
 const basic = JSON.parse(fs.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8'));
@@ -187,4 +187,41 @@ test('👨‍👩‍👦 복사 목록이 비어 있으면 빈 결과', () => {
   assert.deepEqual(ids, []);
   assert.equal(parseFixes('[1] whatever', ids).length, 0, '붙일 곳이 없으면 무시');
   assert.match(text, /진우가 쓴 영어 문장/);
+});
+
+test('👨‍👩‍👦 배포로 온 교정문 짝맞추기: 다듬은 문장이 같으면 붙는다', () => {
+  const entries = [
+    { id: 'a', written: 'I want to play with my brother at a park', origin: 'I want to play with my friend today.' },
+    { id: 'b', written: "I can't believe I just got a new bycicle", origin: "I can't believe I just caught a Gengar!" },
+  ];
+  const fixes = [
+    { written: 'i want to play with my brother at a park.', fixed: 'I want to play with my brother at the park.' },
+    { written: "I cant believe I just got a new bycicle", fixed: "I can't believe I just got a new bicycle!" },
+  ];
+  assert.deepEqual(matchFixes(entries, fixes), [
+    { id: 'a', fixed: 'I want to play with my brother at the park.' },
+    { id: 'b', fixed: "I can't believe I just got a new bicycle!" },
+  ]);
+});
+
+test('👨‍👩‍👦 사진에서 조금 잘못 옮겨 적어도 앞 4단어로 찾는다', () => {
+  const entries = [{ id: 'a', written: 'I played soccer with Minjun yesterday', origin: 'X' }];
+  const fixes = [{ written: 'I played soccer with Minjoon yesterday at school', fixed: 'I played soccer with Minjun yesterday.' }];
+  assert.deepEqual(matchFixes(entries, fixes), [{ id: 'a', fixed: 'I played soccer with Minjun yesterday.' }]);
+});
+
+test('👨‍👩‍👦 이미 고쳐 준 글·짝이 없는 글은 건드리지 않는다 (여러 번 배포해도 안전)', () => {
+  const entries = [
+    { id: 'done', written: 'I like my dog', origin: 'X', coachFix: '이미 고침' },
+    { id: 'other', written: 'I go to school', origin: 'Y' },
+  ];
+  assert.deepEqual(matchFixes(entries, [{ written: 'I like my dog', fixed: '또 고침' }]), [], '이미 고친 글은 제외');
+  assert.deepEqual(matchFixes(entries, [{ written: 'zzz nothing matches here', fixed: 'x' }]), [], '짝이 없으면 조용히 넘어감');
+  assert.equal(matchFixes(entries, []).length, 0);
+});
+
+test('👨‍👩‍👦 written으로 못 찾으면 배운 문장(origin)으로 찾는다', () => {
+  const entries = [{ id: 'a', written: 'totally different text', origin: 'I want to play with my friend today.' }];
+  const fixes = [{ written: 'nope', origin: 'I want to play with my friend today.', fixed: 'I want to play with my cousin today.' }];
+  assert.deepEqual(matchFixes(entries, fixes), [{ id: 'a', fixed: 'I want to play with my cousin today.' }]);
 });
