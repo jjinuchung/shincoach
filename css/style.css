@@ -1427,3 +1427,4 @@ button { font-family: inherit; }
   resize: vertical;
 }
 .stats-essay-coach { color: #7c3aed; font-weight: 700; margin-top: 2px; }
+.stats-essay-no { display: inline-block; background: #7c3aed; color: #fff; font-weight: 800; font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; margin-bottom: 3px; }

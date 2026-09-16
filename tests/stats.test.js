@@ -1,7 +1,7 @@
 // 학습 기록 계산 로직 테스트: node --test tests/stats.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtDur, weekSeries, hardScore, hardSentences, contentSummary } from '../js/stats.js';
+import { fmtDur, weekSeries, hardScore, hardSentences, contentSummary, essayNumbers } from '../js/stats.js';
 import { todayKey } from '../js/track.js';
 
 test('fmtDur', () => {
@@ -61,4 +61,17 @@ test('contentSummary: 진행률·정복·시간·마지막 학습', () => {
   assert.equal(s[0].seconds, 55);
   assert.equal(s[0].lastAt, 200);
   assert.equal(s[1].pct, 0);
+});
+
+test('✍️ 에세이 번호는 오래된 글이 [1] — 새 글을 써도 이미 매긴 번호가 안 밀린다', () => {
+  const days = [
+    { date: '2026-09-16', essays: [{ id: 'new1', written: 'today one' }] },          // 오늘 새로 쓴 글
+    { date: '2026-09-14', essays: [{ id: 'old1', written: 'older one' }, { id: 'done', written: 'x', coachFix: '이미 고침' }] },
+    { date: '2026-09-15', essays: [{ id: 'mid1', written: 'middle one' }] },
+  ];
+  const no = essayNumbers(days);
+  assert.equal(no.get('old1'), 1, '가장 오래된 글이 1번');
+  assert.equal(no.get('mid1'), 2);
+  assert.equal(no.get('new1'), 3, '새 글은 뒤에 붙는다');
+  assert.equal(no.has('done'), false, '이미 고쳐 준 글에는 번호를 안 붙인다');
 });

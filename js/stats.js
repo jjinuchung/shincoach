@@ -119,15 +119,31 @@ function cueCountOf(item) {
  */
 let coachMsg = ''; // 적용 뒤 화면을 다시 그리므로, 안내 문구를 넘겨 받아 새 화면에 보여준다
 
+/**
+ * 아직 고쳐 주지 않은 글의 번호 (오래된 것이 [1]).
+ * **오래된 순**이라 새 글을 써도 이미 매긴 번호가 밀리지 않는다 —
+ * 화면을 사진 찍어 두고 나중에 붙여넣어도 번호가 맞는다.
+ * @returns {Map<string, number>} id → 번호
+ */
+export function essayNumbers(essayDays) {
+  const todo = collectTodo(essayDays);
+  return new Map(todo.map((e, i) => [e.id, i + 1]));
+}
+
+function collectTodo(essayDays) {
+  const days = [...(essayDays || [])].sort((a, b) => String(a.date).localeCompare(String(b.date))); // 오래된 날부터
+  const todo = [];
+  for (const d of days) for (const e of (d.essays || [])) if (e && e.id && e.written && !e.coachFix) todo.push(e);
+  return todo;
+}
+
 function buildCoachTools(essayDays) {
   const wrap = el('div', 'stats-coach');
-  // 아직 고쳐 주지 않은 글 (최신이 앞) — 복사 대상
-  const todo = [];
-  for (const d of essayDays) for (const e of d.essays) if (e && e.written && !e.coachFix) todo.push(e);
+  const todo = collectTodo(essayDays); // 번호 순서 = 화면에 보이는 [번호]와 같다
 
   wrap.appendChild(el('p', 'stats-note', todo.length
-    ? `아직 고쳐 주지 않은 글이 ${todo.length}개 있어요. 복사해서 고친 뒤, 아래에 [번호] 줄로 붙여넣으면 진우 화면에 나옵니다.`
-    : '고쳐 주지 않은 글이 없어요. 새 글이 쌓이면 여기에서 복사할 수 있어요.'));
+    ? `아직 고쳐 주지 않은 글이 ${todo.length}개 있어요. 복사하거나 이 화면을 사진으로 찍어 보낸 뒤, 고친 글을 아래에 [번호] 줄로 넣으면 진우 화면에 나옵니다.`
+    : '고쳐 주지 않은 글이 없어요. 새 글이 쌓이면 여기에 번호가 붙어요.'));
 
   const row = el('div', 'stats-coach-row');
   const copyBtn = el('button', 'btn', '📋 아이 글 복사');
@@ -142,8 +158,7 @@ function buildCoachTools(essayDays) {
   coachMsg = '';
 
   copyBtn.addEventListener('click', async () => {
-    const { text, ids } = exportText(todo);
-    try { localStorage.setItem('shincoach.essayExport', JSON.stringify(ids)); } catch { /* 무시 */ }
+    const { text } = exportText(todo); // 번호는 화면에 보이는 것과 같다 (오래된 글이 [1])
     let copied = false;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); copied = true; }
@@ -155,12 +170,8 @@ function buildCoachTools(essayDays) {
   });
 
   applyBtn.addEventListener('click', async () => {
-    let ids = todo.map((e) => e.id);
-    try {
-      const saved = JSON.parse(localStorage.getItem('shincoach.essayExport') || 'null');
-      if (Array.isArray(saved) && saved.length) ids = saved; // 복사한 시점의 번호 순서를 그대로 쓴다
-    } catch { /* 저장된 순서가 없으면 지금 목록 순서 */ }
-    const fixes = parseFixes(area.value, ids);
+    // 번호는 화면에 보이는 것과 같은 순서(오래된 글이 [1]) — 따로 저장해 둘 필요가 없다
+    const fixes = parseFixes(area.value, todo.map((e) => e.id));
     if (!fixes.length) { msg.textContent = '[번호] 로 시작하는 줄을 못 찾았어요. 예: [1] I want to ...'; return; }
     const n = await applyEssayFixes(fixes);
     if (!n) { msg.textContent = '해당하는 글을 못 찾았어요 (번호가 바뀌었을 수 있어요).'; return; }
@@ -297,10 +308,15 @@ export async function renderStats() {
   if (essayDays.length) {
     const total = essayDays.reduce((a, d) => a + d.essays.length, 0);
     const cE = card(`✍️ 에세이 — 배운 문장을 내 이야기로 (최근 ${essayDays.length}일 · ${total}문장)`);
+    // 아직 고쳐 주지 않은 글의 번호 — 화면에 그대로 보여 준다.
+    // 복사 없이 **사진만 찍어 보내도** 번호가 남으므로 [번호] 줄로 되돌려 받을 수 있다.
+    const todoNo = essayNumbers(essayDays);
     for (const d of essayDays) {
       cE.appendChild(el('p', 'stats-sub', d.date));
       for (const e of d.essays) {
         const box = el('div', 'stats-essay');
+        const no = todoNo.get(e.id);
+        if (no) box.appendChild(el('div', 'stats-essay-no', `[${no}] 고쳐 주세요`));
         box.appendChild(el('div', 'stats-essay-origin', `배운 문장: ${e.origin || ''}`));
         box.appendChild(el('div', 'stats-essay-mine', `✍️ ${e.written || ''}`));
         if (e.fixed && e.fixed !== e.written) box.appendChild(el('div', 'stats-essay-fixed', `✅ ${e.fixed}`));
