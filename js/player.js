@@ -15,6 +15,11 @@ import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
 import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT } from './review.js';
+import {
+  initEssay, openEssay, abortEssay, pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds,
+  DEFAULT_MINUTES as ESSAY_MINUTES, DEFAULT_COUNT as ESSAY_COUNT,
+  REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH,
+} from './essay.js';
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import * as track from './track.js';
@@ -65,6 +70,9 @@ const state = {
   streakDate: '',     // 위 두 값의 기준 날짜 (자정을 넘기면 다시 계산)
   journeyCelebrated: false, // 🏁 이번에 연 콘텐츠에서 도착 연출을 이미 했는지 (세션당 한 번)
   battlePending: null, // ⚔️ 다음 문장으로 넘어갈 때 걸어올 트레이너의 포켓몬 { id, ko, url } (markDone에서 확률로 정해짐)
+  essayPending: false, // ✍️ 다음 문장으로 넘어갈 때 열 에세이 (오늘 학습 시간을 채우면 예약됨)
+  essayOpen: false,    // ✍️ 에세이 화면이 열려 있음 (키보드 무시)
+  essaySuggested: false, // 이번에 콘텐츠를 연 뒤로 한 번 제안했는지 (계속 묻지 않기)
   battleOpen: false,   // ⚔️ 배틀 화면이 열려 있음 (키보드 무시)
   battleLastCue: null, // 배틀에서 방금 따라 말한 문장 (연달아 같은 문장 안 나오게)
   sentenceSpeakStop: null, // ⚔️ 배틀·🔁 복습에서 진행 중인 듣기·말하기를 밖에서 중단하는 함수 (화면 꺼짐 → 그 턴 무효)
@@ -147,6 +155,7 @@ export function initPlayer(ctx) {
   initCatch();
   initBattle();
   initReview();
+  initEssay();
   initProfile().then(() => { updateLevelChip(); updatePartnerChip(); }).catch(() => {});
   $('level-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex()); });
   $('coin-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex({ shop: true })); });
@@ -549,6 +558,132 @@ function withDictation(items) {
   return out;
 }
 
+// ───────────────────── ✍️ 에세이 (배운 문장을 내 이야기로) ─────────────────────
+
+/** 에세이 화면 열림/닫힘 */
+function setEssayOpen(on) {
+  state.essayOpen = on;
+  if (!on) state.sentenceSpeakStop = null;
+  const view = $('view-player');
+  if (view) view.inert = on;
+}
+
+/** 지금 자막에 있는 문장 중에서 바꿔 쓸 문장 고르기 */
+function essayPrompts() {
+  const count = settings.essayCount || ESSAY_COUNT;
+  return pickEssayPrompts(track.statsList(), count, { cueOf: (r) => !!cueForStart(r.start) })
+    .map((p) => ({ ...p, cue: cueForStart(p.rec.start) }));
+}
+
+/**
+ * 오늘 충분히 공부했으면 다음 전환에 에세이를 예약한다.
+ * 하루 1번, 부모 모드 제외, 한 번 제안하면 이 콘텐츠를 다시 열기 전까지 또 묻지 않는다.
+ */
+function maybeEssay() {
+  if (state.parentMode || state.essaySuggested || state.essayPending || state.essayOpen) return;
+  if (!settings.essayMinutes) return;                  // ⚙에서 끔
+  if (track.essayDoneToday()) return;
+  if (track.todaySeconds() < settings.essayMinutes * 60) return;
+  if (!essayPrompts().length) return;
+  state.essaySuggested = true;
+  state.essayPending = true;
+}
+
+/** 영상 없이 임의의 문장을 따라 말하기 (에세이로 만든 문장은 영상 소리가 없다) */
+function speakText(text, hooks) {
+  return new Promise((resolve) => {
+    if (!text) { resolve(null); return; }
+    let run = null;
+    let done = false;
+    const finishWith = (r) => {
+      if (done) return;
+      done = true;
+      state.sentenceSpeakStop = null;
+      resolve(r);
+    };
+    const stop = (why) => {
+      if (why === 'hidden') { if (run) run.cancel(); finishWith({ method: 'interrupted' }); return; } // 화면 꺼짐
+      if (why === 'cancel') { if (run) run.cancel(); else finishWith(null); return; }
+      if (run) run.stop();
+    };
+    state.sentenceSpeakStop = stop;
+    hooks.register(stop);
+    if (hooks.onListening) hooks.onListening();
+    run = runSpeakCheck({ target: text, durationSec: essayReadSeconds(text), onLevel: hooks.onLevel });
+    run.promise.then(finishWith);
+  });
+}
+
+/** 에세이 열기 (practice면 기록·보상 없음). 끝나면 보던 자리로 돌아가고 cont()를 이어감 */
+function startEssay(practice, cont) {
+  const prompts = essayPrompts();
+  if (!prompts.length) {
+    showPlayerMessage('✍️ 아직 쓸 문장이 없어요 — 문장을 몇 개 끝내면 생겨요', 4000);
+    if (cont) cont();
+    return;
+  }
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  const spot = rememberSpot(); // 원문을 들려주므로 영상 위치가 바뀐다
+  setEssayOpen(true);
+  state.practiceOpen = !!practice;
+  const myItem = state.item ? state.item.id : null;
+  openEssay({
+    prompts,
+    practice,
+    reward: ESSAY_FINISH,
+    known: state.vocab ? state.vocab.known : new Set(),
+    common: state.vocab ? state.vocab.basic : null,
+    sfx,
+    unlock,
+    speak: speakText,
+    // 🔊 배운 문장 다시 듣기 — 퍼즐과 같은 방식 (state.puzzleCue가 있어야 문장 끝에서 멈춘다)
+    onPlay: (cue) => {
+      if (!cue) return;
+      state.puzzleCue = cue;
+      playPuzzleSentence(cue, () => {});
+    },
+    // 문장을 쓰는 즉시 저장한다 — 중간에 그만둬도 글이 남고, 같은 문장으로 보상을 두 번 받지 않는다
+    onWritten: (it) => {
+      const id = `${it.rec.itemId || myItem || ''}|${Math.round((it.rec.start || 0) * 10)}`;
+      const first = track.markEssayWritten({
+        id,
+        origin: it.frame.full, keep: it.frame.keep,
+        written: it.result.raw, fixed: it.result.fixed,
+        notes: it.result.notes.map((n) => n.why),
+      });
+      track.flush();
+      if (!first) return;
+      awardXp(ESSAY_REWARD.xp);
+      awardCoins(ESSAY_REWARD.coin);
+    },
+    onFinished: () => {
+      track.markEssayDone();
+      awardXp(ESSAY_FINISH.xp);
+      awardCoins(ESSAY_FINISH.coin);
+      track.flush();
+      return ESSAY_FINISH;
+    },
+    onDone: () => {
+      setEssayOpen(false);
+      state.practiceOpen = false;
+      state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
+      restoreSpot(spot);
+      if (!practice) track.flush();
+      // 콘텐츠를 닫는 중이면 이어가지 않는다 — 정리 중에 goTo가 재생을 건드린다 (Codex #12)
+      if (cont && state.open && (state.item ? state.item.id : null) === myItem) cont();
+    },
+  });
+}
+
+/** ⚙ "지금 에세이 써보기": 시간이 안 찼어도 연습 (기록·보상 없음) */
+function startEssayNow() {
+  if (state.essayOpen || state.reviewOpen) return;
+  if (!state.open || !state.cues.length) return;
+  startEssay(true, null);
+}
+
 /** 복습 화면 열림/닫힘: 키보드 단축키 차단 + 뒤 화면 inert */
 function setReviewOpen(on) {
   state.reviewOpen = on;
@@ -853,6 +988,7 @@ function markDone(cue) {
     awardXp(XP.done); // 오늘 처음 완료한 문장 → 경험치
     awardCoins(COIN.done);
     maybeBattle(after); // ⚔️ 아주 가끔 트레이너가 걸어옴 (다음 문장으로 넘어갈 때 열림)
+    maybeEssay();       // ✍️ 오늘 공부 시간을 채웠으면 에세이 (다음 문장으로 넘어갈 때 열림)
     // 🔥 오늘 5문장을 채우면 연속 학습일에 들어가고 보너스 (연속일수록 큼)
     if (!state.streakToday && after >= STREAK_MIN_DONE) {
       state.streakToday = true;
@@ -1004,6 +1140,8 @@ export async function openPlayer(id, opts = {}) {
   state.puzzlePool = [];
   state.journeyCelebrated = false;
   state.reviewDone = false;
+  state.essayPending = false;
+  state.essaySuggested = false;
   state.battlePending = null;
   state.battleLastCue = null;
   cancelShadowWait();
@@ -1069,6 +1207,7 @@ function closeMedia() {
   abortBattle(); // 배틀 중이었으면 결과 반영/패배 취급 (onDone에서 처리)
   setBattleOpen(false);
   abortReview();
+  abortEssay();
   setReviewOpen(false);
   state.battlePending = null;
   state.catchOpen = false;
@@ -1134,6 +1273,12 @@ function goTo(i, { play = true, force = false } = {}) {
   // 🧩 앞으로 넘어갈 때 N문장이 차 있으면 먼저 퍼즐 → 끝나면 이 이동을 이어감 (퍼즐이 열리면서 모아둔 문장은 비워짐)
   if (!force && i > state.idx && puzzleReady()) {
     startPuzzle(() => goTo(i, { play }));
+    return;
+  }
+  // ✍️ 에세이가 걸려 있으면 (배틀·퍼즐 다음 순서로) 넘어가기 전에
+  if (!force && i > state.idx && state.essayPending) {
+    state.essayPending = false;
+    startEssay(false, () => goTo(i, { play, force: true }));
     return;
   }
   cancelShadowWait();
@@ -1344,6 +1489,7 @@ function onCueEnd() {
     video.pause();
     if (state.battlePending) startBattle(() => {});
     else if (puzzleReady()) startPuzzle(() => {});
+    else if (state.essayPending) { state.essayPending = false; startEssay(false, null); }
     return;
   }
 
@@ -1351,6 +1497,14 @@ function onCueEnd() {
   if (state.battlePending) {
     const nextIdx = state.idx + 1;
     startBattle(() => goTo(nextIdx, { force: true }));
+    return;
+  }
+
+  // ✍️ 에세이가 걸려 있으면 다음 문장으로 가기 전에
+  if (state.essayPending && !puzzleReady()) {
+    const nextIdx = state.idx + 1;
+    state.essayPending = false;
+    startEssay(false, () => goTo(nextIdx, { force: true }));
     return;
   }
 
@@ -1923,7 +2077,7 @@ function updateChips() {
 
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
-  if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen) return; // 퍼즐·잡기·배틀·복습 화면 중에는 플레이어 단축키 무시
+  if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen || state.essayOpen) return; // 퍼즐·잡기·배틀·복습·에세이 화면 중에는 플레이어 단축키 무시
   // 버튼·요약·링크에 포커스가 있으면 그 요소의 기본 동작(Space/Enter로 누르기)을 살린다 (Codex #5)
   const tag = e.target && e.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SUMMARY' || tag === 'A') return;
@@ -1971,7 +2125,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true, reviewCount: REVIEW_COUNT };
+  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -1991,6 +2145,7 @@ function initSettingsDialog() {
   $('set-goal').value = String(settings.dailyGoal);
   $('set-puzzle').value = String(settings.puzzleEvery);
   $('set-review').value = String(settings.reviewCount);
+  $('set-essay').value = String(Number(settings.essayMinutes));
   $('set-sfx').checked = settings.sfx;
   $('set-vibrate').checked = settings.vibrate;
   $('set-hp').checked = settings.hp;
@@ -2001,6 +2156,7 @@ function initSettingsDialog() {
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
   $('set-review-try').addEventListener('click', () => { $('dlg-settings').close(); startReviewNow(); });
+  $('set-essay-try').addEventListener('click', () => { $('dlg-settings').close(); startEssayNow(); });
   $('set-catch-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startCatchPractice(); });
   $('set-battle-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startBattlePractice(); });
   $('form-settings').addEventListener('submit', (e) => {
@@ -2015,6 +2171,7 @@ function initSettingsDialog() {
     updateGoalChip();
     settings.puzzleEvery = Number($('set-puzzle').value);
     settings.reviewCount = Number($('set-review').value);
+    settings.essayMinutes = Number($('set-essay').value);
     if (settings.puzzleEvery === 0) state.puzzlePool = [];
     settings.sfx = $('set-sfx').checked;
     settings.vibrate = $('set-vibrate').checked;

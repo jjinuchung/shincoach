@@ -411,6 +411,15 @@ export function mergeStatRecord(name, cur, rec) {
     out.goalRewarded = !!(cur.goalRewarded || rec.goalRewarded);
     out.hpMissed = !!(cur.hpMissed || rec.hpMissed);
     out.reviewGolden = !!(cur.reviewGolden || rec.reviewGolden); // 🌟 하루 1개 — 백업을 되돌려 다시 받는 것도 막는다
+    out.essayDone = !!(cur.essayDone || rec.essayDone);             // ✍️ 하루 1번 — 백업으로 되돌려 또 받는 것 방지
+    // 쓴 글은 지워지면 안 되므로 양쪽을 합친다 (같은 글은 한 번만)
+    const seen = new Set();
+    out.essays = [...(cur.essays || []), ...(rec.essays || [])].filter((e) => {
+      const k = (e && e.id) ? `id:${e.id}` : `${e && e.origin}|${e && e.written}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
   } else if (name === 'vocabViews') {
     for (const k of ['views', 'taps', 'lastAt', 'quizzes', 'quizPass', 'reviewedAt']) out[k] = maxOf(cur[k], rec[k]);
     // 🔁 복습 진도는 문장과 같은 규칙 — 최근에 복습한 쪽의 box·dueAt을 한 쌍으로

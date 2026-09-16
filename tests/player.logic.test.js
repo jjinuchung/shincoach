@@ -7,6 +7,7 @@ import vm from 'node:vm';
 import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD } from '../js/review.js';
 import { wordResults } from '../js/speak.js';
 import { makeDictation } from '../js/dictation.js';
+import { pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds, REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH } from '../js/essay.js';
 import fsNode from 'node:fs';
 
 // 받아쓰기 오답은 실제 사전에서 만들어지므로 테스트도 진짜 사전을 쓴다
@@ -68,6 +69,8 @@ function loadPlayer() {
   const battleCalls = [];
   const battleState = { roll: false, caught: {}, won: [], lost: [] };
   const reviewCalls = [];
+  const essayCalls = [];
+  const essayState = { seconds: 0, done: false, saved: [] };
   const reviewState = { stats: [], sentences: 0, items: 0, words: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
   const missedLog = [];
   const vocabViewsStub = [];
@@ -97,6 +100,15 @@ function loadPlayer() {
       todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
       reviewGoldenTaken: () => reviewState.golden, markReviewGolden() { reviewState.golden = true; },
       todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; },
+      // ✍️ 에세이: 오늘 공부 시간·완료 여부 (essayState로 테스트가 조작)
+      todaySeconds: () => essayState.seconds, essayDoneToday: () => essayState.done,
+      markEssayWritten(entry) {
+        const at = essayState.saved.findIndex((e) => e.id === entry.id);
+        if (at >= 0) { essayState.saved[at] = entry; return false; } // 같은 문장 재작성 → 보상 없음
+        essayState.saved.push(entry);
+        return true;
+      },
+      markEssayDone() { essayState.done = true; },
       // 🎯 못 말한 단어 기록
       missedWords(cue, words) { missedLog.push(words.slice()); } },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
@@ -137,6 +149,10 @@ function loadPlayer() {
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
     initReview() {}, abortReview() {}, isReviewOpen: () => false, openReview(o) { reviewCalls.push(o); },
+    // ✍️ 에세이 스텁: 열린 에세이는 essayCalls에 기록, 규칙(pickPrompts·correct)은 실제 모듈을 씀
+    essayCalls,
+    initEssay() {}, abortEssay() {}, openEssay(o) { essayCalls.push(o); },
+    pickEssayPrompts, essayReadSeconds, ESSAY_MINUTES: 30, ESSAY_COUNT: 3, ESSAY_REWARD, ESSAY_FINISH,
     pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, makeDictation, VOCAB_KNOWN,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
@@ -147,7 +163,7 @@ function loadPlayer() {
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, essayCalls, essayState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -1418,4 +1434,110 @@ test('자리 되돌리기: 그 사이 콘텐츠가 바뀌었으면 건드리지 
   run(`restoreSpot(${JSON.stringify({ itemId: 'A', idx: 1, time: 11 })})`);
   assert.equal(run('state.idx'), 0, '다른 콘텐츠면 그대로');
   assert.equal(spot.itemId, 'A');
+});
+
+test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (하루 1번, 부모 모드 제외, 보상은 ⚡·💰)', () => {
+  const { run, essayCalls, essayState, xpLog, coinLog, video, ctx } = loadPlayer();
+  const done = [];
+  ctx.track.done = (c) => done.push(c);
+  ctx.track.todayDone = () => done.length;
+  // 문장 기록: 바꿔 쓸 수 있는 문장 3개 (자막에도 있어야 고른다)
+  const cues = [
+    { start: 0, end: 3, en: "I can't believe I just caught a Gengar!", ko: '내가 팬텀을 잡다니!' },
+    { start: 10, end: 13, en: 'I want to play with my friend today.', ko: '오늘 친구와 놀고 싶어.' },
+    { start: 20, end: 23, en: 'We will go to the park after school.', ko: '방과 후에 공원에 갈 거야.' },
+    { start: 30, end: 33, en: 'a b c', ko: '' },
+  ];
+  ctx.track.statsList = () => cues.slice(0, 3).map((c) => ({ ...c, done: true, box: 1, lastAt: 1 }));
+  run(`settings.listenFirst = 0; settings.puzzleEvery = 0; settings.dailyGoal = 0; settings.essayMinutes = 30;
+       state.cues = ${JSON.stringify(cues)}; state.idx = 0;`);
+
+  // 30분을 안 채웠으면 예약되지 않는다
+  essayState.seconds = 20 * 60;
+  run('markDone(state.cues[0])');
+  assert.equal(run('state.essayPending'), false, '시간이 모자라면 없음');
+
+  essayState.seconds = 30 * 60;
+  run('markDone(state.cues[1])');
+  assert.equal(run('state.essayPending'), true, '시간을 채우면 예약');
+
+  run('goTo(2)');
+  assert.equal(essayCalls.length, 1, '전환 때 열림');
+  assert.equal(run('state.essayOpen'), true);
+  assert.equal(run('state.idx'), 0, '에세이가 끝날 때까지 이동하지 않음');
+  assert.equal(video.paused, true);
+
+  const o = essayCalls[0];
+  assert.equal(o.prompts.length, 3, '문장 3개');
+  assert.ok(o.prompts[0].cue, '원문을 들려줄 수 있게 cue가 붙는다');
+  assert.equal(typeof (o.known && o.known.has), 'function', '철자 교정용 단어 집합 전달 (vm realm이라 instanceof는 못 씀)');
+
+  // 문장 하나 완성 → 즉시 저장 + ⚡10 💰5
+  const wrote = { rec: o.prompts[0].rec, frame: o.prompts[0].frame, result: { raw: 'I got a new bike', fixed: 'I got a new bike.', notes: [{ why: '마침표' }] } };
+  o.onWritten(wrote);
+  assert.ok(xpLog.includes(10) && coinLog.includes(5), '문장마다 보상');
+  assert.equal(essayState.saved.length, 1, '완주 전에도 글이 저장된다 (중간에 그만둬도 안 사라짐)');
+
+  // 같은 문장을 다시 써도 보상은 한 번만 (Codex #2)
+  const xpBefore = xpLog.length;
+  o.onWritten(wrote);
+  assert.equal(xpLog.length, xpBefore, '같은 문장으로 보상을 두 번 받지 않는다');
+  assert.equal(essayState.saved.length, 1, '글은 덮어쓴다');
+
+  // 전부 완성 → ⚡50 💰20 + 기록 저장
+  const reward = o.onFinished();
+  assert.deepEqual(reward, { xp: 50, coin: 20 });
+  assert.ok(xpLog.includes(50) && coinLog.includes(20));
+  assert.equal(essayState.done, true, '오늘 썼다고 기록');
+  assert.equal(essayState.saved[0].fixed, 'I got a new bike.', '고친 글도 남긴다');
+
+  o.onDone({ started: true, done: 3, finished: true });
+  assert.equal(run('state.essayOpen'), false);
+  assert.equal(run('state.idx'), 2, '끝나면 원래 가려던 문장으로 이어감');
+
+  // 하루 1번 — 이미 썼으면 다시 예약되지 않는다
+  run('state.essaySuggested = false; markDone(state.cues[2])');
+  assert.equal(run('state.essayPending'), false);
+
+  // 부모 모드에서는 아예 없음
+  essayState.done = false;
+  run('state.essaySuggested = false; state.parentMode = true; markDone(state.cues[3])');
+  assert.equal(run('state.essayPending'), false, '👀 그냥 보기에서는 없음');
+});
+
+test('✍️ 에세이: ⚙에서 끄면 열리지 않고, 쓸 문장이 없어도 열리지 않는다', () => {
+  const { run, essayCalls, essayState, ctx } = loadPlayer();
+  ctx.track.done = () => {};
+  ctx.track.todayDone = () => 3;
+  ctx.track.statsList = () => [];
+  essayState.seconds = 60 * 60;
+  run('settings.listenFirst = 0; settings.puzzleEvery = 0; settings.dailyGoal = 0; settings.essayMinutes = 0; state.cues = [{start:0,end:2,en:"a b c",ko:""}]; state.idx = 0;');
+  run('markDone(state.cues[0])');
+  assert.equal(run('state.essayPending'), false, '끔이면 없음');
+
+  run('settings.essayMinutes = 30; state.essaySuggested = false; markDone(state.cues[0])');
+  assert.equal(run('state.essayPending'), false, '바꿔 쓸 문장이 없으면 없음');
+  assert.equal(essayCalls.length, 0);
+});
+
+test('✍️ 에세이: 콘텐츠를 닫는 중이면 이어가기(goTo)를 하지 않는다', () => {
+  const { run, essayCalls, essayState, ctx } = loadPlayer();
+  const done = [];
+  ctx.track.done = (c) => done.push(c);      // markDone은 "오늘 한 문장 수"가 늘어야 보상 단계로 간다
+  ctx.track.todayDone = () => done.length;
+  ctx.track.statsList = () => [
+    { start: 0, end: 3, en: 'I want to play with my friend today.', ko: '', done: true, box: 1, lastAt: 1 },
+  ];
+  essayState.seconds = 30 * 60;
+  run(`settings.listenFirst = 0; settings.puzzleEvery = 0; settings.dailyGoal = 0; settings.essayMinutes = 30;
+       state.cues = [{start:0,end:3,en:"I want to play with my friend today.",ko:""},{start:10,end:13,en:"a b c",ko:""}]; state.idx = 0;`);
+  run('markDone(state.cues[0])');
+  run('goTo(1)');
+  assert.equal(essayCalls.length, 1, '에세이가 열림');
+
+  // 콘텐츠가 닫히는 상황 (closeMedia → abortEssay → onDone)
+  run('state.open = false');
+  essayCalls[0].onDone({ started: true, done: 0, finished: false });
+  assert.equal(run('state.idx'), 0, '정리 중에는 문장을 옮기지 않는다');
+  assert.equal(run('state.essayOpen'), false);
 });

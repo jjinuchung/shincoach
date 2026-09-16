@@ -223,6 +223,28 @@ export async function renderStats() {
     main.appendChild(c3b);
   }
 
+  // 3c) ✍️ 에세이 — 아이가 직접 쓴 문장 (부모가 보라고 남긴다)
+  const essayDays = daily
+    .filter((d) => Array.isArray(d.essays) && d.essays.length)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 7);
+  if (essayDays.length) {
+    const total = essayDays.reduce((a, d) => a + d.essays.length, 0);
+    const cE = card(`✍️ 에세이 — 배운 문장을 내 이야기로 (최근 ${essayDays.length}일 · ${total}문장)`);
+    for (const d of essayDays) {
+      cE.appendChild(el('p', 'stats-sub', d.date));
+      for (const e of d.essays) {
+        const box = el('div', 'stats-essay');
+        box.appendChild(el('div', 'stats-essay-origin', `배운 문장: ${e.origin || ''}`));
+        box.appendChild(el('div', 'stats-essay-mine', `✍️ ${e.written || ''}`));
+        if (e.fixed && e.fixed !== e.written) box.appendChild(el('div', 'stats-essay-fixed', `✅ ${e.fixed}`));
+        if (Array.isArray(e.notes) && e.notes.length) box.appendChild(el('div', 'stats-essay-notes', e.notes.join(' · ')));
+        cE.appendChild(box);
+      }
+    }
+    main.appendChild(cE);
+  }
+
   // 4) 복습 단어장
   const wordRv = wordSummary(vocabViews, today); // 🔤 출제와 같은 자격으로 센다 (Codex #7)
   const c4 = card(wordRv.due || wordRv.graduated

@@ -58,6 +58,8 @@ function rollDailyIfNeeded() {
     t.daily.reviewRounds = (t.daily.reviewRounds || 0) + (existing.reviewRounds || 0);
     t.daily.reviewGolden = !!(t.daily.reviewGolden || existing.reviewGolden);
     t.daily.reviewSkips = (t.daily.reviewSkips || 0) + (existing.reviewSkips || 0);
+    t.daily.essayDone = !!(t.daily.essayDone || existing.essayDone);
+    t.daily.essays = [...(t.daily.essays || []), ...(existing.essays || [])];
     t.dailyDirty = true;
   }).catch(() => {});
 }
@@ -249,6 +251,37 @@ export function doneCount() {
 /** 오늘 한 문장 수 (모든 콘텐츠 합산) */
 export function todayDone() {
   return t.daily ? t.daily.doneKeys.length : 0;
+}
+
+/** 오늘 공부한 시간(초) — ✍️ 에세이가 열리는 기준 */
+export function todaySeconds() {
+  return t.daily ? (t.daily.seconds || 0) : 0;
+}
+
+/** ✍️ 오늘 에세이를 이미 썼는지 */
+export function essayDoneToday() {
+  return !!(t.daily && t.daily.essayDone);
+}
+
+/**
+ * ✍️ 문장 하나를 쓴 즉시 저장한다 — 중간에 그만둬도 아이 글이 사라지지 않게.
+ * @returns {boolean} 이 문장의 보상을 처음 주는지 (같은 문장을 다시 써도 보상은 한 번만)
+ */
+export function markEssayWritten(entry) {
+  if (!t.daily || !entry) return false;
+  t.daily.essays = t.daily.essays || [];
+  t.dailyDirty = true;
+  const at = t.daily.essays.findIndex((e) => e && e.id && e.id === entry.id);
+  if (at >= 0) { t.daily.essays[at] = entry; return false; } // 다시 쓴 것 → 글은 갱신, 보상은 없음
+  t.daily.essays.push(entry);
+  return true;
+}
+
+/** ✍️ 오늘 몫을 전부 썼다고 기록 (완주 보상은 하루 1번) */
+export function markEssayDone() {
+  if (!t.daily) return;
+  t.daily.essayDone = true;
+  t.dailyDirty = true;
 }
 
 /** 오늘 푼 퍼즐 수 (모든 콘텐츠 합산) */

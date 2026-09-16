@@ -1336,3 +1336,78 @@ button { font-family: inherit; }
 .mon-big .mon-gear { pointer-events: auto; cursor: grab; touch-action: none; }
 .mon-big .mon-gear.dragging { cursor: grabbing; filter: drop-shadow(0 0 6px #6366f1); }
 .mon-drag-hint { color: var(--muted); font-size: 0.88rem; text-align: center; margin-top: 4px; }
+
+/* ===== ✍️ 에세이 (배운 문장 → 내 이야기) ===== */
+.essay .review-title { color: #7c3aed; }
+.essay-write[hidden], .essay-result[hidden], .essay-speak[hidden] { display: none; }
+.essay-label { font-size: 0.82rem; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.essay-origin {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.essay-origin-en { font-size: 1.02rem; font-weight: 700; line-height: 1.45; }
+.essay-origin-ko { color: var(--muted); font-size: 0.92rem; margin-top: 3px; }
+.essay-origin-ko[hidden] { display: none; }
+.essay-listen { margin-top: 8px; padding: 6px 12px; min-height: 36px; font-size: 0.9rem; }
+.essay-frame {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: #faf5ff;
+  border: 2px solid #ddd6fe;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.essay-keep { font-size: 1.05rem; font-weight: 700; }
+.essay-input {
+  flex: 1 1 160px;
+  min-width: 140px;
+  min-height: 44px;
+  border: none;
+  border-bottom: 3px dashed #a78bfa;
+  background: transparent;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text);
+  padding: 4px 2px;
+}
+.essay-input:focus { outline: none; border-bottom-color: #7c3aed; background: #fff; }
+.essay-input::placeholder { color: #a5a9bd; font-weight: 500; font-size: 0.92rem; }
+.essay-warn { color: var(--danger); font-size: 0.9rem; font-weight: 700; min-height: 1.2em; margin: 6px 0; }
+.essay-submit { width: 100%; margin-top: 4px; }
+
+.essay-box { border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.essay-box.mine { background: #f8fafc; border: 1px solid var(--border); }
+.essay-box.coach { background: #ecfdf5; border: 2px solid #6ee7b7; }
+.essay-line { font-size: 1.05rem; font-weight: 700; line-height: 1.5; word-break: break-word; }
+.essay-notes { margin: 8px 0 0; padding-left: 18px; font-size: 0.9rem; line-height: 1.7; }
+.essay-notes li { margin-bottom: 2px; }
+.essay-from { color: var(--danger); text-decoration: line-through; }
+.essay-to { color: #047857; }
+.essay-why { color: var(--muted); font-size: 0.85rem; }
+.essay-note-ok { list-style: none; margin-left: -18px; color: #047857; font-weight: 700; }
+.essay-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.essay-actions .btn { flex: 1 1 100px; }
+
+.essay-speak { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 0; }
+.essay-speak .essay-line { text-align: center; }
+.essay-speak .shadow-ring { width: 100%; }
+
+@media (max-width: 480px) {
+  .essay-frame { flex-direction: column; align-items: stretch; }
+  /* 세로 배치에서는 flex-basis가 "높이"가 되어 입력칸이 160px로 늘어난다 */
+  .essay-input { flex: 0 0 auto; width: 100%; }
+}
+
+/* 📊 기록 화면의 ✍️ 에세이 */
+.stats-sub { font-weight: 700; color: var(--muted); font-size: 0.85rem; margin: 10px 0 4px; }
+.stats-essay { border-left: 3px solid #a78bfa; padding: 4px 0 4px 10px; margin-bottom: 8px; }
+.stats-essay-origin { color: var(--muted); font-size: 0.82rem; }
+.stats-essay-mine { font-weight: 700; margin-top: 2px; }
+.stats-essay-fixed { color: #047857; font-weight: 700; margin-top: 2px; }
+.stats-essay-notes { color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
