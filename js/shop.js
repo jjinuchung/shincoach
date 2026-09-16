@@ -2,7 +2,7 @@
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, itemById, canBuy, setFigure } from './items.js';
-import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos } from './xp.js';
+import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos } from './xp.js';
 import { sfx, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -208,6 +208,25 @@ function renderMon(msg, pop) {
   }
   if (!anyPotion) potBox.appendChild(el('span', 'mon-empty', hp >= HP.max ? 'HP가 가득해요' : '가방에 물약이 없어요 — 🛒 상점에서 사 보세요 (💰10)'));
   else if (hp >= HP.max) potBox.appendChild(el('span', 'mon-empty', 'HP가 가득해서 지금은 안 먹여도 돼요'));
+  // ⭐ 등급: 아이가 생각하는 등급을 고르면 아빠에게 신청이 간다 (바로 바뀌지는 않는다)
+  const asked = rarityAskOf(mon.id);
+  $('mon-rarity-now').textContent = `${RARITY[r].stars} ${RARITY[r].label}`;
+  const rb = $('mon-rarity');
+  rb.innerHTML = '';
+  for (let want = 1; want <= 4; want++) {
+    const info = RARITY[want];
+    const btn = option(info.stars, info.label, want === r ? '지금 등급' : (want === asked ? '보낸 신청' : ''), want === r || want === asked, '', () => {
+      const now = askRarity(mon.id, want);
+      renderMon(now
+        ? `⭐ "${mon.ko}은(는) ${RARITY[now].label} 같아요" 라고 아빠에게 보냈어요`
+        : '신청을 취소했어요');
+    });
+    rb.appendChild(btn);
+  }
+  $('mon-rarity-msg').textContent = asked
+    ? `⭐ ${RARITY[asked].label}(으)로 보내달라고 했어요 — 아빠가 보고 정해 줄 거예요`
+    : '등급이 이상하다고 생각하면 눌러서 아빠에게 알려 줄 수 있어요';
+
   const pb = $('mon-partner');
   pb.textContent = isPartner ? '🤝 지금 파트너예요' : '🤝 파트너로!';
   pb.disabled = isPartner;

@@ -1428,3 +1428,11 @@ button { font-family: inherit; }
 }
 .stats-essay-coach { color: #7c3aed; font-weight: 700; margin-top: 2px; }
 .stats-essay-no { display: inline-block; background: #7c3aed; color: #fff; font-weight: 800; font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; margin-bottom: 3px; }
+
+/* ⭐ 등급 신청 (📊 부모 화면) */
+.stats-ask { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.stats-ask:last-child { border-bottom: none; }
+.stats-ask-name { font-weight: 800; min-width: 80px; }
+.stats-ask-move { flex: 1 1 140px; color: var(--muted); font-weight: 700; font-size: 0.9rem; }
+.stats-ask-btns { display: flex; gap: 6px; }
+.stats-ask-btns .btn { padding: 8px 12px; min-height: 40px; font-size: 0.9rem; }

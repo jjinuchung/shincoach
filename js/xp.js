@@ -100,7 +100,65 @@ for (const r of Object.keys(RARITY_IDS)) for (const id of RARITY_IDS[r]) rarityB
 
 /** 포켓몬 id → 희귀도 1~4 (명단에 없으면 2) */
 export function rarityOf(id) {
-  return rarityById[id] || 2;
+  const fixed = profile.mons && profile.mons[id] && profile.mons[id].rarity;
+  return isRarity(fixed) ? fixed : (rarityById[id] || 2);
+}
+
+function isRarity(r) {
+  return Number.isInteger(r) && r >= 1 && r <= 4;
+}
+
+// ── ⭐ 등급 옮기기: 아이가 신청하고 부모가 📊에서 승인한다 ──
+// 등급은 곧 잡기 확률이라(흔함 45% … 전설 3%) 아이 마음대로 내리면 잡기의 긴장감이 사라진다.
+// 그래서 아이는 "이건 다른 등급 같아요"를 남기고, 부모가 보고 결정한다.
+
+/** 아이가 등급 신청 (같은 등급이면 신청을 지운다) */
+export function askRarity(id, rarity) {
+  if (!isRarity(rarity)) return null;
+  const m = profile.mons[id] || (profile.mons[id] = {});
+  if (rarity === rarityOf(id)) delete m.rarityAsk;
+  else m.rarityAsk = rarity;
+  addDelta({ mons: { [id]: { rarityAsk: m.rarityAsk || null } } });
+  return m.rarityAsk || null;
+}
+
+/** 이 포켓몬에 대해 아이가 신청해 둔 등급 (없으면 null) */
+export function rarityAskOf(id) {
+  const m = profile.mons && profile.mons[id];
+  return m && isRarity(m.rarityAsk) ? m.rarityAsk : null;
+}
+
+/** 지금 신청 중인 것 [{ id, from, to }] (부모 화면용) */
+export function listRarityAsks() {
+  const out = [];
+  for (const [id, m] of Object.entries(profile.mons || {})) {
+    if (m && isRarity(m.rarityAsk)) out.push({ id: Number(id), from: rarityOf(Number(id)), to: m.rarityAsk });
+  }
+  return out.sort((a, b) => a.id - b.id);
+}
+
+/** 부모가 결정: ok면 그 등급으로 옮기고, 아니면 신청만 지운다 */
+export function decideRarity(id, ok) {
+  const m = profile.mons[id];
+  if (!m || !isRarity(m.rarityAsk)) return null;
+  const to = m.rarityAsk;
+  delete m.rarityAsk;
+  if (ok) m.rarity = to;
+  addDelta({ mons: { [id]: { rarityAsk: null, rarity: ok ? to : (m.rarity || null) } } });
+  return ok ? to : null;
+}
+
+/** ⚙ 등급 초기화: 옮긴 것과 신청을 모두 없앰 (원래 등급으로) */
+export function resetRarity() {
+  let n = 0;
+  for (const [id, m] of Object.entries(profile.mons || {})) {
+    if (!m || (!isRarity(m.rarity) && !isRarity(m.rarityAsk))) continue;
+    delete m.rarity;
+    delete m.rarityAsk;
+    addDelta({ mons: { [id]: { rarity: null, rarityAsk: null } } });
+    n++;
+  }
+  return n;
 }
 
 /**

@@ -9,7 +9,7 @@ import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity } from './xp.js';
 import { COIN, HP, POTION, GOLDEN, puzzleCoins, streakCoins, lootBox, itemById, setFigure } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
@@ -2217,6 +2217,11 @@ function initSettingsDialog() {
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
   $('set-review-try').addEventListener('click', () => { $('dlg-settings').close(); startReviewNow(); });
   $('set-essay-try').addEventListener('click', () => { $('dlg-settings').close(); startEssayNow(); });
+  $('set-rarity-reset').addEventListener('click', () => {
+    const n = resetRarity();
+    $('dlg-settings').close();
+    showPlayerMessage(n ? `⭐ 포켓몬 ${n}마리의 등급을 원래대로 되돌렸어요` : '⭐ 옮긴 등급이 없어요', 4000);
+  });
   $('set-catch-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startCatchPractice(); });
   $('set-battle-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startBattlePractice(); });
   $('form-settings').addEventListener('submit', (e) => {

@@ -5,6 +5,7 @@ import {
   xpForLevel, levelFromXp, puzzleXp, rarityOf, RARITY_IDS, catchChance, rollCatch,
   gainXp, catchAttempt, previewAttempt, caughtCount, caughtKinds, getLevelInfo, XP,
   streakBefore, streakBonus, STREAK_MIN_DONE, xpToReach,
+  askRarity, rarityAskOf, listRarityAsks, decideRarity, resetRarity,
 } from '../js/xp.js';
 import { ROSTER } from '../js/pokemon.js';
 import { josa } from '../js/catch.js';
@@ -115,4 +116,42 @@ test('전설은 가장 상징적인 것들만 (준전설은 희귀로)', () => {
   const legend = ROSTER.filter((r) => rarityOf(r.id) === 4).map((r) => r.id);
   for (const id of [150, 151, 384, 493]) assert.ok(legend.includes(id), `${id}는 전설이어야`);
   for (const id of [144, 145, 146, 380, 381]) assert.ok(!legend.includes(id), `${id}는 전설이 아니어야 (준전설)`);
+});
+
+test('⭐ 등급 옮기기: 아이는 신청만, 부모가 정한다', () => {
+  const ID = 1; // 이상해씨 (기본 흔함)
+  assert.equal(rarityOf(ID), 1, '기본 등급');
+
+  // 아이가 "이건 희귀 같아요" 신청 → 등급은 아직 그대로
+  assert.equal(askRarity(ID, 3), 3);
+  assert.equal(rarityAskOf(ID), 3);
+  assert.equal(rarityOf(ID), 1, '신청만으로는 안 바뀐다 (잡기 확률이 곧 등급이라)');
+  assert.deepEqual(listRarityAsks(), [{ id: ID, from: 1, to: 3 }]);
+
+  // 부모가 거절 → 신청만 사라짐
+  assert.equal(decideRarity(ID, false), null);
+  assert.equal(rarityAskOf(ID), null);
+  assert.equal(rarityOf(ID), 1);
+
+  // 다시 신청 → 부모가 승인 → 그때 옮겨진다
+  askRarity(ID, 4);
+  assert.equal(decideRarity(ID, true), 4);
+  assert.equal(rarityOf(ID), 4, '승인하면 등급이 바뀐다');
+  assert.equal(catchChance(rarityOf(ID), 1) < 0.1, true, '전설이 되면 잡기가 어려워진다');
+
+  // 지금 등급과 같은 것을 고르면 신청 취소
+  assert.equal(askRarity(ID, 4), null);
+  assert.equal(listRarityAsks().length, 0);
+
+  // ⚙ 초기화 → 원래 등급으로
+  assert.equal(resetRarity() >= 1, true);
+  assert.equal(rarityOf(ID), 1, '초기화하면 명단의 기본 등급');
+});
+
+test('⭐ 잘못된 등급 값은 받지 않는다', () => {
+  assert.equal(askRarity(4, 0), null);
+  assert.equal(askRarity(4, 5), null);
+  assert.equal(askRarity(4, 2.5), null);
+  assert.equal(rarityAskOf(4), null);
+  assert.equal(decideRarity(4, true), null, '신청이 없으면 아무 일도 없다');
 });

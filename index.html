@@ -202,6 +202,12 @@
         <div class="mon-hpbar"><div id="mon-hp-fill" class="mon-hp-fill"></div></div>
         <div id="mon-potion" class="mon-options"></div>
       </div>
+      <!-- ⭐ 등급: 아이가 "이건 다른 등급 같아요"를 신청하고, 아빠가 📊에서 정한다 -->
+      <div class="mon-section">
+        <div class="mon-section-title">⭐ 등급 <span id="mon-rarity-now" class="mon-hp-text"></span></div>
+        <div id="mon-rarity" class="mon-options"></div>
+        <div id="mon-rarity-msg" class="mon-empty"></div>
+      </div>
       <div class="mon-section">
         <div class="mon-section-title">🎀 장식</div>
         <div id="mon-gear" class="mon-options"></div>
@@ -524,6 +530,10 @@
       </label>
       <div class="field-actions">
         <button type="button" id="set-essay-try" class="btn">✍️ 지금 에세이 써보기 <small>— 최근에 한 문장으로 바로 (기록 안 함)</small></button>
+      </div>
+
+      <div class="field-actions">
+        <button type="button" id="set-rarity-reset" class="btn">⭐ 포켓몬 등급 초기화 <small>— 진우가 옮긴 등급을 원래대로 되돌려요</small></button>
       </div>
 
       <div class="field">

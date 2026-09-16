@@ -8,7 +8,8 @@ import { parseSubtitle, mergeIntoSentences } from './srt.js';
 import { openPlayer } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, GRADUATED } from './review.js';
-import { reloadProfile } from './xp.js';
+import { reloadProfile, listRarityAsks, decideRarity, RARITY } from './xp.js';
+import { ROSTER } from './pokemon.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -329,6 +330,31 @@ export async function renderStats() {
     }
     cE.appendChild(buildCoachTools(essayDays));
     main.appendChild(cE);
+  }
+
+  // 3d) ⭐ 아이가 "등급이 이상해요" 하고 보낸 신청 (아이 화면에서는 바로 안 바뀐다)
+  const asks = listRarityAsks();
+  if (asks.length) {
+    const cR = card(`⭐ 등급 바꿔달라는 신청 ${asks.length}개 — 진우가 보낸 것`);
+    cR.appendChild(el('p', 'stats-note', '등급은 곧 잡기 확률이에요 (흔함 45% · 보통 30% · 희귀 15% · 전설 3%). 맞다고 생각되면 옮겨 주세요.'));
+    for (const a of asks) {
+      const mon = ROSTER.find((m) => m.id === a.id);
+      const row = el('div', 'stats-ask');
+      row.appendChild(el('div', 'stats-ask-name', `${mon ? mon.ko : '#' + a.id}`));
+      row.appendChild(el('div', 'stats-ask-move', `${RARITY[a.from].stars} ${RARITY[a.from].label}  →  ${RARITY[a.to].stars} ${RARITY[a.to].label}`));
+      const btns = el('div', 'stats-ask-btns');
+      const yes = el('button', 'btn btn-primary', '옮겨 주기');
+      yes.type = 'button';
+      yes.addEventListener('click', () => { decideRarity(a.id, true); renderStats(); });
+      const no = el('button', 'btn', '그대로 두기');
+      no.type = 'button';
+      no.addEventListener('click', () => { decideRarity(a.id, false); renderStats(); });
+      btns.appendChild(no);
+      btns.appendChild(yes);
+      row.appendChild(btns);
+      cR.appendChild(row);
+    }
+    main.appendChild(cR);
   }
 
   // 4) 복습 단어장
