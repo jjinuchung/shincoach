@@ -2,7 +2,9 @@
 // N문장을 진행할 때마다 플레이어가 openPuzzle()을 호출한다 (player.js).
 // 위쪽은 순수 로직(테스트 가능), 아래쪽은 화면(DOM). 모듈 로드 시점에는 DOM을 건드리지 않는다.
 
-export const PUZZLE_MIN_WORDS = 3; // 2단어는 너무 쉬움
+// 3~4단어는 "Use Fire Punch!" "Gengar, let's go!" 처럼 감탄·명령 조각이라 나열할 거리가 없다.
+// 자막을 세어 보니 5단어 이상만 써도 문장의 3분의 1이 남으므로(10문장에 3개꼴) 퍼즐이 마르지 않는다.
+export const PUZZLE_MIN_WORDS = 5;
 export const PUZZLE_MAX_WORDS = 8; // 9단어 이상은 태블릿 화면에 안 맞음
 export const PUZZLE_MAX_WRONG = 3; // 3번 틀리면 정답 공개
 
@@ -42,7 +44,7 @@ export function hasEchoedRun(words, minRun = 2) {
   return false;
 }
 
-/** 퍼즐로 낼 수 있는 문장인지: 단어 수 3~8, 서로 다른 단어가 2개 이상 (전부 같으면 섞어도 그대로) */
+/** 퍼즐로 낼 수 있는 문장인지: 단어 수 5~8, 서로 다른 단어가 2개 이상 (전부 같으면 섞어도 그대로) */
 export function isPuzzleable(cue, { min = PUZZLE_MIN_WORDS, max = PUZZLE_MAX_WORDS } = {}) {
   if (!cue || !cue.en) return false;
   const words = splitWords(cue.en);

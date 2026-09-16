@@ -7,7 +7,7 @@ import {
 import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults } from './speak.js';
-import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle } from './puzzle.js';
+import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl } from './pokemon.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax } from './xp.js';
 import { COIN, HP, POTION, GOLDEN, puzzleCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
@@ -960,7 +960,7 @@ function startCatchPractice() {
 function startPuzzleNow() {
   if (!state.open || state.idx < 0) return;
   const cue = pickPuzzle([state.cues[state.idx]]) || pickPuzzle(state.cues.slice(Math.max(0, state.idx - 10), state.idx));
-  if (!cue) { showPlayerMessage('🧩 이 근처에는 퍼즐로 낼 문장(3~8단어)이 없어요', 4000); return; }
+  if (!cue) { showPlayerMessage(`🧩 이 근처에는 퍼즐로 낼 문장(${PUZZLE_MIN_WORDS}~${PUZZLE_MAX_WORDS}단어)이 없어요`, 4000); return; }
   state.practiceOpen = true;
   const spot = rememberSpot();
   showPuzzle(cue, () => { state.practiceOpen = false; restoreSpot(spot); });

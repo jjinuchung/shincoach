@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  splitWords, isPuzzleable, shuffle, scrambleOrder, pickPuzzle, checkOrder, PUZZLE_MAX_WORDS,
+  splitWords, isPuzzleable, shuffle, scrambleOrder, pickPuzzle, checkOrder, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS,
 } from '../js/puzzle.js';
 
 /** 고정된 수열을 돌려주는 rng (테스트 재현용) */
@@ -23,16 +23,46 @@ test('splitWords: 구두점만 있는 조각은 앞 단어에 붙이고 맨 앞�
   assert.deepEqual(splitWords(''), []);
 });
 
-test('isPuzzleable: 3~8단어, 서로 다른 단어 2개 이상', () => {
+test('isPuzzleable: 5~8단어, 서로 다른 단어 2개 이상', () => {
   assert.equal(isPuzzleable({ en: 'Hi there' }), false, '2단어');
-  assert.equal(isPuzzleable({ en: 'Hi there Bob' }), true);
+  assert.equal(isPuzzleable({ en: 'a b c d e' }), true, '5단어');
   assert.equal(isPuzzleable({ en: 'a b c d e f g h' }), true, '8단어');
   assert.equal(isPuzzleable({ en: 'a b c d e f g h i' }), false, '9단어');
-  assert.equal(isPuzzleable({ en: 'no no no' }), false, '전부 같은 단어');
-  assert.equal(isPuzzleable({ en: 'No, no no!' }), true, '구두점이 다르면 다른 단어');
+  assert.equal(isPuzzleable({ en: 'no no no no no' }), false, '전부 같은 단어');
+  assert.equal(isPuzzleable({ en: 'No, I said no way!' }), true, '구두점·대소문자가 달라도 정상 문장은 낸다');
   assert.equal(isPuzzleable(null), false);
   assert.equal(isPuzzleable({ en: '' }), false);
+  assert.equal(PUZZLE_MIN_WORDS, 5);
   assert.equal(PUZZLE_MAX_WORDS, 8);
+});
+
+// 3~4단어짜리는 감탄·명령 조각이라 나열할 거리가 없다 (태블릿에서 실제로 나와서 뺐다)
+test('🧩 짧은 문장은 퍼즐로 안 낸다 (4단어 이하)', () => {
+  for (const en of [
+    'Use Fire Punch!',
+    "Gengar, let's go!",
+    'Oh yeah, Gengar!',
+    'Thank you, Gengar!',
+    'All right, Ice Punch!',
+    "What's this for?",
+  ]) {
+    assert.equal(isPuzzleable({ en }), false, en);
+  }
+  // 5단어부터는 그대로 나온다
+  for (const en of [
+    "I can't believe I did that.",
+    'You have to help me now.',
+    'Where do you think you are going?',
+  ]) {
+    assert.equal(isPuzzleable({ en }), true, en);
+  }
+});
+
+test('🧩 pickPuzzle은 짧은 문장만 있는 구간에서는 아무것도 안 고른다', () => {
+  const shortOnly = [{ en: 'Use Fire Punch!' }, { en: 'Oh yeah, Gengar!' }, { en: 'Go, Pikachu!' }];
+  assert.equal(pickPuzzle(shortOnly), null, '짧은 것만 있으면 퍼즐을 건너뛴다');
+  const mixed = [...shortOnly, { en: 'I really want to go home now.' }];
+  assert.equal(pickPuzzle(mixed).en, 'I really want to go home now.', '긴 문장만 고른다');
 });
 
 test('shuffle: 원본을 바꾸지 않고 같은 원소로 이루어진 순열', () => {
@@ -61,13 +91,14 @@ test('scrambleOrder: rng가 항상 같은 순서를 만들면 이웃을 바꿔�
 
 test('pickPuzzle: 낼 수 있는 문장만 고르고, 없으면 null', () => {
   const cues = [
-    { en: 'Hi.' }, // 1단어
-    { en: 'Come on, Woody!' },
+    { en: 'Hi.' },                                    // 1단어
+    { en: 'To infinity and beyond!' },                // 4단어 — 이제 후보 아님
+    { en: 'Come on, Woody, we have to go!' },
     { en: 'one two three four five six seven eight nine' }, // 9단어
-    { en: 'To infinity and beyond!' },
+    { en: 'You are my favorite deputy in town.' },
   ];
-  assert.equal(pickPuzzle(cues, () => 0), cues[1]);
-  assert.equal(pickPuzzle(cues, () => 0.99), cues[3]);
+  assert.equal(pickPuzzle(cues, () => 0), cues[2]);
+  assert.equal(pickPuzzle(cues, () => 0.99), cues[4]);
   assert.equal(pickPuzzle([{ en: 'Hi.' }]), null);
   assert.equal(pickPuzzle([]), null);
   assert.equal(pickPuzzle(null), null);
