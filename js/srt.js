@@ -260,3 +260,16 @@ export function findNearestCueIndex(cues, time) {
   }
   return cues.length - 1;
 }
+
+/**
+ * 그 영상에서 실제로 학습할 수 있는 문장 수.
+ * 플레이어와 **같은 규칙**을 써야 한다 — 합치기 설정을 무시하거나 영상 길이 밖의 큐를 세면
+ * 진행률의 분모가 화면에 보이는 문장 수와 달라진다 (조건을 영영 못 채우거나 거저 채워진다).
+ * @param {{merge?:boolean, duration?:number}} o merge = 문장 합치기 설정, duration = 영상 길이(초)
+ */
+export function countPlayableCues(enText, { merge = true, duration = 0 } = {}) {
+  let cues = parseSubtitle(enText || '');
+  if (merge) cues = mergeIntoSentences(cues);
+  if (duration > 0) cues = cues.filter((c) => c.start < duration); // 플레이어도 길이 밖은 버린다
+  return cues.length;
+}

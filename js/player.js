@@ -1284,10 +1284,12 @@ export async function openPlayer(id, opts = {}) {
   video.addEventListener('loadedmetadata', state.onMeta, { once: true });
 }
 
-function closePlayer() {
+async function closePlayer() {
   scheduleSave(true);
-  track.close();
-  flushProfile();
+  // 🎟️ 다음 영상 카드가 방금 공부한 것까지 반영되려면 **저장이 끝난 뒤에** 목록을 그려야 한다
+  // (마지막 문장을 끝내고 돌아왔는데 숫자가 그대로면 아이가 가장 크게 실망한다)
+  await track.close().catch(() => {});
+  await flushProfile().catch(() => {});
   updateGoalChip();
   closeMedia();
   showView('library');

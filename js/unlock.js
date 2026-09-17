@@ -60,17 +60,23 @@ export function findLocked(id) {
 
 /**
  * 조건 현황 (순수 계산).
- * @param {{coins:number, records:Array, totalCues:number, owned:Set|Array}} o
- *   records = 모든 문장 기록(db.getAllSentenceStats), totalCues = 가진 영상의 문장 수 합,
- *   owned = 이미 산 영상 id
- * @returns {{done:number, total:number, progress:number, reviewed:number, coins:number,
- *            items:Array<{key:string, label:string, have:number, need:number, ok:boolean, pct:number}>}}
+ *
+ * ⚠️ 분자와 분모는 **같은 집합**에서 나와야 한다. `deleteItem`은 문장 기록을 지우지 않으므로,
+ * 전체 기록을 그대로 세면 "지운 영화에서 한 문장"이 분자에 남고 분모에서만 빠진다
+ * → 어려운 영화를 지우는 것만으로 진행률 조건이 채워져 이 기능의 목적이 무효가 된다.
+ * itemIds를 주면 그 영상들의 기록만 센다.
+ *
+ * @param {{coins:number, records:Array, totalCues:number, price:number, itemIds:Array|Set}} o
+ *   records = 모든 문장 기록(db.getAllSentenceStats), totalCues = 지금 가진 영상의 문장 수 합,
+ *   itemIds = 지금 가진 영상 id (없으면 거르지 않음 — 테스트·옛 호출용)
  */
-export function unlockState({ coins = 0, records = [], totalCues = 0, price = 0 } = {}) {
+export function unlockState({ coins = 0, records = [], totalCues = 0, price = 0, itemIds = null } = {}) {
+  const only = itemIds ? new Set([...itemIds].map(String)) : null;
   let done = 0;
   let reviewed = 0;
   for (const r of records || []) {
     if (!r) continue;
+    if (only && !only.has(String(r.itemId))) continue; // 지운 영상의 기록은 세지 않는다
     if (r.done) done++;
     if ((r.reviewPass || 0) > 0) reviewed++; // 복습에서 한 번 이상 통과
   }

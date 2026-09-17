@@ -7,6 +7,7 @@ import {
 } from './db.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS } from './items.js';
 import { anchorFor } from './pokemon.js';
+import { findLocked } from './unlock.js';
 
 // ── 경험치 ──
 export const XP = {
@@ -462,12 +463,20 @@ export async function buyItem(id) {
 }
 
 /**
- * 🎟️ 다음 영상 교환권 사기 — 코인만 치른다 (진도·복습 조건은 화면에서 이미 확인).
- * 교환권은 가방에 들어가고, 아빠가 파일을 넣어 줄 때까지 남아 있다.
+ * 🎟️ 다음 영상 교환권 사기.
+ * 가격은 카탈로그에서 가져오고(호출부가 못 정함), 이미 가진 것은 거절하고,
+ * 학습 조건은 verify()로 **여기서 다시** 확인한다. 교환권은 가방에 들어가고
+ * 아빠가 파일을 넣어 줄 때까지 남아 있다.
+ * @param {() => Promise<boolean>} verify 지금도 조건을 채우는지 (저장소에서 새로 계산)
  */
-export async function buyTicket(contentId, price) {
-  if (!contentId || !(price > 0)) return false;
-  if ((profile.coins || 0) < price) return false; // 빠른 거르기
+export async function buyTicket(contentId, verify) {
+  const c = findLocked(contentId);
+  if (!c) return false;
+  const price = c.price;                                     // 가격은 카탈로그가 정한다 (호출부가 못 정함)
+  if (itemCount(`ticket_${contentId}`) > 0) return false;     // 이미 가진 교환권은 또 안 산다
+  if ((profile.coins || 0) < price) return false;            // 빠른 거르기
+  // 학습 조건은 **구매 경로 안에서** 다시 확인한다 — 화면의 버튼을 억지로 켜도 통과 못 한다
+  if (verify && !(await verify())) return false;
   const cost = { coins: price };
   const gain = { items: { [`ticket_${contentId}`]: 1 } };
   const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));

@@ -1,5 +1,5 @@
 // 앱 진입점: 화면 전환, 서비스워커 등록, 모듈 초기화
-import { initLibrary } from './library.js';
+import { initLibrary, refreshList } from './library.js';
 import { initPlayer, requirePin } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
@@ -19,6 +19,8 @@ export function showView(name) {
     el.hidden = key !== name;
   }
   window.scrollTo(0, 0);
+  // 목록으로 돌아올 때마다 다시 그린다 — 🎟️ 다음 영상 조건이 방금 한 공부를 반영해야 한다
+  if (name === 'library') refreshList().catch(() => {});
 }
 
 /** 전체 화면 로딩 표시 (영상 열기/저장처럼 수 초 이상 걸리는 작업용) */

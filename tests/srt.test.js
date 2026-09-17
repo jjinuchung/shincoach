@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import {
   parseTimestamp, formatTime, cleanText, parseSubtitle,
   mergeSubtitles, mergeIntoSentences, estimateWordTimings,
-  findCueIndex, findNearestCueIndex, parseKaraokeWords, wordTimings,
+  findCueIndex, findNearestCueIndex, parseKaraokeWords, wordTimings, countPlayableCues,
 } from '../js/srt.js';
 
 const en = readFileSync(new URL('../samples/sample.en.srt', import.meta.url), 'utf8');
@@ -198,4 +198,16 @@ test('parseSubtitle: VTT 노래방 태그가 있으면 cue.words, 텍스트는 �
   const merged2 = mergeIntoSentences(cues2);
   assert.equal(merged2.length, 1);
   assert.equal(merged2[0].words, undefined);
+});
+
+test('countPlayableCues: 플레이어와 같은 규칙 (합치기 설정 + 영상 길이 밖 제외)', () => {
+  const srt = [1, 2, 3, 4].map((i) => `${i}\n00:00:${String(i * 10).padStart(2, '0')},000 --> 00:00:${String(i * 10 + 3).padStart(2, '0')},000\nLine ${i} here.\n`).join('\n');
+  assert.equal(countPlayableCues(srt, { merge: false }), 4, '자막 줄 수');
+  assert.equal(countPlayableCues(srt, { merge: false, duration: 25 }), 2, '25초 뒤에 시작하는 큐(30·40초)는 뺀다');
+  assert.equal(countPlayableCues(srt, { merge: false, duration: 0 }), 4, '길이를 모르면 전부');
+  assert.equal(countPlayableCues('', { merge: true }), 0);
+  assert.equal(countPlayableCues(null), 0);
+  // 합치기를 켜면 줄어들 수 있다 (같은 문장이 여러 줄로 쪼개진 경우)
+  const split = '1\n00:00:00,000 --> 00:00:02,000\nI think\n\n2\n00:00:02,100 --> 00:00:04,000\nthat is fine.\n';
+  assert.ok(countPlayableCues(split, { merge: true }) <= countPlayableCues(split, { merge: false }));
 });

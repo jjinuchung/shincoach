@@ -660,6 +660,8 @@ export function mergeStatRecord(name, cur, rec) {
   if (name === 'sentenceStats') {
     for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt', 'puzzles', 'puzzleSolved', 'puzzleWrong', 'reviews', 'reviewPass', 'reviewedAt']) out[k] = maxOf(cur[k], rec[k]);
     out.done = !!(cur.done || rec.done);
+    // 🎤 오늘 말하기 보상을 받았다는 표시 — 옛 백업이 덮으면 같은 문장으로 코인을 또 받는다
+    out.speakPaidAt = (cur.speakPaidAt || '') >= (rec.speakPaidAt || '') ? (cur.speakPaidAt || '') : rec.speakPaidAt;
     out.lastRatio = (rec.lastAt || 0) >= (cur.lastAt || 0) ? (rec.lastRatio || 0) : (cur.lastRatio || 0);
     // 🔁 복습 진도(box·dueAt)는 "가장 큰 값"이 아니라 **가장 최근에 복습한 쪽을 한 쌍으로** 가져온다.
     // box는 틀리면 내려가는 값이라 max로 합치면, 어려워서 내일 다시 봐야 할 문장이 옛 백업 때문에

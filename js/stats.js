@@ -4,7 +4,7 @@ import {
   applyEssayFixes,
 } from './db.js';
 import { exportText, parseFixes } from './essay.js';
-import { parseSubtitle, mergeIntoSentences } from './srt.js';
+import { countPlayableCues } from './srt.js';
 import { openPlayer } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, GRADUATED } from './review.js';
@@ -108,11 +108,9 @@ function card(title) {
 }
 
 function cueCountOf(item) {
-  let mergeSentences = true;
-  try { mergeSentences = JSON.parse(localStorage.getItem('shincoach.settings') || '{}').mergeSentences !== false; } catch { /* 기본값 */ }
-  let cues = parseSubtitle(item.enText || '');
-  if (mergeSentences) cues = mergeIntoSentences(cues);
-  return cues.length;
+  let merge = true;
+  try { merge = JSON.parse(localStorage.getItem('shincoach.settings') || '{}').mergeSentences !== false; } catch { /* 기본값 */ }
+  return countPlayableCues(item.enText, { merge, duration: item.duration });
 }
 
 /**

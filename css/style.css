@@ -1506,6 +1506,7 @@ button { font-family: inherit; }
 .next-need .bar { grid-column: 1 / -1; height: 8px; border-radius: 99px; background: #e0e7ff; overflow: hidden; }
 .next-need .bar i { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
 .next-need.ok .bar i { background: #10b981; }
+.next-note { font-size: .82rem; color: var(--muted); margin: 0 0 8px; line-height: 1.35; }
 .next-buy { width: 100%; font-size: 1rem; font-weight: 800; }
 .next-buy:disabled { opacity: .6; }
 @media (max-width: 420px) {

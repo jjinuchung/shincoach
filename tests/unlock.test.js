@@ -96,3 +96,34 @@ test('🎟️ 예고에는 나오는 포켓몬과 대사 한 줄이 있다', () 
     assert.match(c.teaser, /[a-z]/i, `${c.id} 영어 대사여야 배울 문장이 된다`);
   }
 });
+
+// ── Codex 리뷰에서 나온 것들 (2026-09-17) ──
+
+test('🎟️ [P1] 지운 영상의 기록은 진행률에 안 센다 (지워서 조건을 채우지 못하게)', () => {
+  // 지금 가진 영상 A(100문장) + 이미 지운 영상 B에서 한 80문장
+  const now = Array.from({ length: 100 }, (_, i) => ({ key: `A|${i}`, itemId: 'A', done: false, reviewPass: 0 }));
+  const gone = Array.from({ length: 80 }, (_, i) => ({ key: `B|${i}`, itemId: 'B', done: true, reviewPass: 1 }));
+  const all = [...now, ...gone];
+
+  // 거르지 않으면 80/80 → 조건 충족 (이 기능의 목적이 무효가 된다)
+  const loose = unlockState({ coins: 9999, records: all, totalCues: 100, price: 1 });
+  assert.equal(loose.items[1].ok, true, '(거르지 않으면 지운 영상으로 채워진다)');
+
+  // 지금 가진 영상만 세면 0/80
+  const tight = unlockState({ coins: 9999, records: all, totalCues: 100, price: 1, itemIds: ['A'] });
+  assert.equal(tight.done, 0);
+  assert.equal(tight.items[1].ok, false, '지운 영상 기록으로는 안 채워진다');
+  assert.equal(tight.reviewed, 0, '복습 조건도 마찬가지');
+});
+
+test('🎟️ [P1] itemIds를 주면 분자와 분모가 같은 영상에서 나온다', () => {
+  const recs = [
+    { key: 'A|1', itemId: 'A', done: true, reviewPass: 1 },
+    { key: 'A|2', itemId: 'A', done: true, reviewPass: 0 },
+    { key: 'B|1', itemId: 'B', done: true, reviewPass: 1 },
+  ];
+  const s = unlockState({ coins: 0, records: recs, totalCues: 2, price: 0, itemIds: ['A'] });
+  assert.equal(s.done, 2, 'A의 문장만');
+  assert.equal(s.reviewed, 1);
+  assert.equal(s.total, 2);
+});

@@ -1,7 +1,7 @@
 // 라이브러리 화면: 콘텐츠 가져오기(mp4 + srt) / 목록 / 삭제 / 저장 공간 표시
 import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats } from './db.js';
-import { parseSubtitle, mergeIntoSentences } from './srt.js';
-import { LOCKED, unlockState, nextLocked, ticketId } from './unlock.js';
+import { parseSubtitle, countPlayableCues } from './srt.js';
+import { LOCKED, unlockState, nextLocked, ticketId, findLocked } from './unlock.js';
 import { coins, inventory, buyTicket, initProfile } from './xp.js';
 import { characterUrl, ensureCast, artUrl } from './pokemon.js';
 import { sfx, unlock as unlockAudio } from './sfx.js';
@@ -281,10 +281,7 @@ async function renderNextVideo(items) {
   const next = nextLocked(bought.map((c) => c.id));
   if (!next) { box.hidden = !waiting.length; return; }
 
-  const records = await getAllSentenceStats().catch(() => []);
-  let totalCues = 0;
-  for (const it of items) totalCues += mergeIntoSentences(parseSubtitle(it.enText || '')).length;
-  const st = unlockState({ coins: coins(), records, totalCues, price: next.price });
+  const st = await currentState(items, next.price);
   const card = lockedCard(next, st);
   box.appendChild(card);
   box.hidden = false;
@@ -304,6 +301,22 @@ function fillCast(root, c) {
     img.alt = m.ko;
     fig.replaceChild(img, fig.querySelector('.ph'));
   }
+}
+
+/** 지금 조건 현황을 저장소에서 새로 계산한다 (화면 표시와 구매 판정이 같은 값을 쓰게) */
+async function currentState(items, price) {
+  const records = await getAllSentenceStats().catch(() => []);
+  let totalCues = 0;
+  for (const it of items) totalCues += countPlayableCues(it.enText, { merge: mergeSetting(), duration: it.duration });
+  return unlockState({
+    coins: coins(), records, totalCues, price,
+    itemIds: items.map((it) => it.id), // 지운 영상의 기록은 빼고 센다
+  });
+}
+
+/** ⚙ 문장 합치기 설정 (플레이어와 같은 값을 써야 분모가 화면과 맞는다) */
+function mergeSetting() {
+  try { return JSON.parse(localStorage.getItem('shincoach.settings') || '{}').mergeSentences !== false; } catch { return true; }
 }
 
 function waitingCard(c) {
@@ -333,6 +346,7 @@ function lockedCard(c, st) {
       <p class="next-cast-label">이 포켓몬들이 나와요</p>
       <div class="next-cast"></div>
       <div class="next-needs"></div>
+      <p class="next-note">🎟️ 이건 <b>교환권</b>이에요. 바꾸면 아빠가 영상을 넣어 줘요.</p>
       <button class="btn next-buy"></button>
     </div>`;
   el.querySelector('.next-title').textContent = `${c.emoji} ${c.ko}`;
@@ -364,13 +378,22 @@ function lockedCard(c, st) {
   }
 
   const btn = el.querySelector('.next-buy');
-  btn.textContent = st.ready ? `🎟️ ${c.price.toLocaleString()}코인으로 바꾸기!` : '아직 못 바꿔요 — 조금만 더!';
+  btn.textContent = st.ready ? `🎟️ ${c.price.toLocaleString()}코인으로 교환권 받기!` : '아직 못 바꿔요 — 조금만 더!';
   btn.disabled = !st.ready;
   btn.classList.toggle('btn-primary', st.ready);
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     unlockAudio();
-    if (await buyTicket(c.id, c.price)) {
+    // 화면 상태만 믿지 않고 저장소에서 다시 판정한다 (버튼을 억지로 켜도 조건은 지켜진다).
+    // 판정은 buyTicket 안에서도 한 번 더 돈다 — 구매 경로를 직접 불러도 통과 못 하게
+    const ready = async () => (await currentState(await listItems(), c.price)).ready;
+    if (!await ready()) {
+      btn.disabled = false;
+      btn.textContent = '아직 조건이 안 됐어요';
+      await refreshList();
+      return;
+    }
+    if (await buyTicket(c.id, ready)) {
       sfx.levelUp();
       await refreshList();
     } else {
