@@ -336,7 +336,7 @@ function onDown(e) {
   ui.drag = {
     chip, id: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY,
     offX: e.clientX - r.left, offY: e.clientY - r.top, w: r.width, h: r.height,
-    moved: false, clone: null, drop: null, raf: 0, evalX: -1e9, evalY: -1e9,
+    moved: false, clone: null, drop: null, raf: 0, scrollRaf: 0, card: null, evalX: -1e9, evalY: -1e9,
   };
   document.addEventListener('pointermove', onMove);
   document.addEventListener('pointerup', onUp);
@@ -386,6 +386,30 @@ function onCancel(e) {
   afterChange();
 }
 
+// 가로 모드·큰 글자에서는 카드가 화면보다 길어서 정답 칸이 화면 밖에 있을 수 있다
+// (.puzzle-card는 overflow-y:auto). 조각에 touch-action:none이 걸려 있어 드래그 중에는
+// 손으로 스크롤할 수도 없으므로, 손가락이 가장자리에 오면 카드를 대신 밀어 준다.
+const EDGE_ZONE = 56;   // 위·아래 이 안에 손가락이 오면
+const EDGE_SPEED = 14;  // 한 프레임에 최대 이만큼 (px)
+
+function autoScroll(d) {
+  d.scrollRaf = 0;
+  if (ui.drag !== d) return;
+  const card = d.card; // 매 프레임 찾지 않도록 잡을 때 한 번만 (beginDrag)
+  if (card && card.scrollHeight > card.clientHeight + 1) {
+    const r = card.getBoundingClientRect();
+    let dy = 0;
+    if (d.y < r.top + EDGE_ZONE) dy = -EDGE_SPEED * Math.min(1, (r.top + EDGE_ZONE - d.y) / EDGE_ZONE);
+    else if (d.y > r.bottom - EDGE_ZONE) dy = EDGE_SPEED * Math.min(1, (d.y - (r.bottom - EDGE_ZONE)) / EDGE_ZONE);
+    if (dy) {
+      const before = card.scrollTop;
+      card.scrollTop = before + dy;
+      if (card.scrollTop !== before) { d.evalX = -1e9; updateDrop(d); } // 화면이 밀렸으니 자리표시 다시 계산
+    }
+  }
+  d.scrollRaf = requestAnimationFrame(() => autoScroll(d));
+}
+
 function beginDrag(d) {
   const clone = d.chip.cloneNode(true);
   clone.className = 'puzzle-chip puzzle-drag';
@@ -395,10 +419,13 @@ function beginDrag(d) {
   d.clone = clone;
   d.chip.classList.add('ghost');
   d.chip.classList.remove('bad');
+  d.card = $('puzzle').querySelector('.puzzle-card');
+  autoScroll(d);
 }
 
 function endDrag(d) {
   ui.dragEndAt = Date.now();
+  if (d.scrollRaf) { cancelAnimationFrame(d.scrollRaf); d.scrollRaf = 0; }
   if (d.clone) d.clone.remove();
   d.clone = null;
   if (d.drop) d.drop.remove();

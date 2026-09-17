@@ -211,6 +211,27 @@ import { checkBlank as dictCheck } from './dictation.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 화면이 다시 켜질 때까지 기다림 */
+function whenVisible() {
+  return new Promise((resolve) => {
+    const on = () => {
+      if (document.hidden) return;
+      document.removeEventListener('visibilitychange', on);
+      resolve();
+    };
+    document.addEventListener('visibilitychange', on);
+  });
+}
+
+/**
+ * 다음 문항으로 자동으로 넘어가기 전 대기 — **화면이 꺼져 있으면 돌아올 때까지 멈춘다**.
+ * 잠긴 태블릿에서 복습이 혼자 넘어가면 아이가 못 보고 지나치고, 소리도 주머니 속에서 난다.
+ * 🧩 퍼즐·🎯 잡기는 이미 같은 규칙(pendingAuto) — 복습만 빠져 있었다.
+ */
+function settle(ms) {
+  return sleep(ms).then(() => (document.hidden ? whenVisible() : undefined));
+}
 const ui = { open: false, run: 0, o: null, i: 0, fails: 0, passed: 0, started: false, granted: false, reward: null, busy: false, speakStop: null, blankAt: 0, dictWrong: 0 };
 
 function el(tag, cls, text) {
@@ -439,7 +460,7 @@ async function pickBlankChoice(btn, choice, item, blank) {
   fb.className = `review-feedback ${ok ? 'good' : 'bad'}`;
   fb.textContent = ok ? '🎯 맞았어요!' : `👍 괜찮아요 — 정답은 "${blank.answer}"`;
 
-  await sleep(ok ? 1000 : 1900);
+  await settle(ok ? 1000 : 1900);
   if (!alive()) return;
 
   ui.blankAt++;
@@ -474,7 +495,7 @@ async function settleDictation(item) {
     ui.granted = true;
     ui.reward = (o.onFinished && await o.onFinished()) || null;
   }
-  await sleep(1500);
+  await settle(1500);
   if (!alive()) return;
   $('review-stage-icon').classList.remove('up');
   $('review-dict').hidden = true;
@@ -544,7 +565,7 @@ async function pickChoice(btn, choice, item) {
     ui.granted = true;
     ui.reward = (o.onFinished && await o.onFinished()) || null;
   }
-  await sleep(passed ? 1500 : 2400);
+  await settle(passed ? 1500 : 2400);
   if (!alive()) return;
   $('review-stage-icon').classList.remove('up');
   box.hidden = true;
@@ -588,14 +609,16 @@ async function askSentence() {
       register: (stop) => { ui.speakStop = stop; },
     });
   } catch (e) { result = null; }
-  ui.speakStop = null;
+  // 내 회차가 아니면 speakStop을 건드리지 않는다 — 새 회차가 등록해 둔 것을 지우면
+  // 아이가 "다 말했어요 ✓"를 눌러도 아무 일도 안 일어난다 (essay.js는 이 순서로 되어 있다)
   if (!alive()) return;
+  ui.speakStop = null;
   sp.hidden = true;
 
   // 화면이 꺼져서 끊긴 문장은 없던 것으로 (복귀하면 같은 문장을 다시)
   if (result && result.method === 'interrupted') {
     $('review-feedback').textContent = '📵 잠깐 멈췄어요 — 이 문장을 다시 해요';
-    await sleep(1200);
+    await settle(1200);
     if (!alive()) return;
     await askSentence();
     return;
@@ -608,7 +631,7 @@ async function askSentence() {
     $('review-feedback').textContent = result && result.transcript
       ? `들린 말: "${result.transcript}" — 한 번 더!`
       : '잘 안 들렸어요 — 한 번 더!';
-    await sleep(1400);
+    await settle(1400);
     if (!alive()) return;
     await askSentence();
     return;
@@ -650,7 +673,7 @@ async function settleSentence(cue, passed, result) {
     fb.textContent = '👍 괜찮아요 — 내일 또 만나요';
     if (o.sfx) o.sfx.wrong();
   }
-  await sleep(passed ? 1600 : 1900);
+  await settle(passed ? 1600 : 1900);
   if (!alive()) return;
   $('review-stage-icon').classList.remove('up');
   await runNext();
