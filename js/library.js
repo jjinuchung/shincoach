@@ -1,6 +1,10 @@
 // 라이브러리 화면: 콘텐츠 가져오기(mp4 + srt) / 목록 / 삭제 / 저장 공간 표시
-import { addItem, listItems, deleteItem, storageEstimate } from './db.js';
-import { parseSubtitle } from './srt.js';
+import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats } from './db.js';
+import { parseSubtitle, mergeIntoSentences } from './srt.js';
+import { LOCKED, unlockState, nextLocked, ticketId } from './unlock.js';
+import { coins, inventory, buyTicket, initProfile } from './xp.js';
+import { characterUrl } from './pokemon.js';
+import { sfx, unlock as unlockAudio } from './sfx.js';
 import { parseSami, isSami, toSrt } from './sami.js';
 import { openPlayer } from './player.js';
 import { showLoading, hideLoading } from './app.js';
@@ -250,7 +254,97 @@ export async function refreshList() {
     list.appendChild(li);
   }
 
+  await renderNextVideo(items);
   updateStorageText();
+}
+
+// ───────────────────── 🎟️ 다음 영상 ─────────────────────
+
+/**
+ * 아직 태블릿에 없는 영상을 "예고편"처럼 보여주고, 조건을 채우면 아이가 직접 연다.
+ * 산다고 파일이 생기지는 않는다 — 아빠가 넣어 준다는 것을 화면에 분명히 적는다.
+ */
+async function renderNextVideo(items) {
+  const box = $('library-next');
+  if (!box) return;
+  box.innerHTML = '';
+
+  await initProfile().catch(() => {});
+  const bag = inventory();
+  const bought = LOCKED.filter((c) => (bag[ticketId(c.id)] || 0) > 0);
+
+  // 이미 산 것 중 아직 안 들어온 영상부터 (아이가 "샀는데 왜 없어?" 하지 않게)
+  const haveTitles = new Set(items.map((it) => String(it.title)));
+  const waiting = bought.filter((c) => !haveTitles.has(c.ko));
+  for (const c of waiting) box.appendChild(waitingCard(c));
+
+  const next = nextLocked(bought.map((c) => c.id));
+  if (!next) { box.hidden = !waiting.length; return; }
+
+  const records = await getAllSentenceStats().catch(() => []);
+  let totalCues = 0;
+  for (const it of items) totalCues += mergeIntoSentences(parseSubtitle(it.enText || '')).length;
+  const st = unlockState({ coins: coins(), records, totalCues, price: next.price });
+  box.appendChild(lockedCard(next, st));
+  box.hidden = false;
+}
+
+function waitingCard(c) {
+  const el = document.createElement('div');
+  el.className = 'next-card waiting';
+  el.innerHTML = `
+    <div class="next-poster">🎟️</div>
+    <div class="next-body">
+      <p class="next-title"></p>
+      <p class="next-msg">🎟️ 샀어요! <b>아빠에게 보여주세요</b> — 아빠가 영상을 넣어 주면 볼 수 있어요</p>
+    </div>`;
+  el.querySelector('.next-title').textContent = `${c.emoji} ${c.ko}`;
+  return el;
+}
+
+function lockedCard(c, st) {
+  const el = document.createElement('div');
+  el.className = 'next-card' + (st.ready ? ' ready' : '');
+  const url = characterUrl(c.poster);
+  el.innerHTML = `
+    <div class="next-poster">${url ? `<img src="${url}" alt="">` : c.emoji}</div>
+    <div class="next-body">
+      <p class="next-kicker">🎟️ 다음 영상</p>
+      <p class="next-title"></p>
+      <p class="next-blurb"></p>
+      <div class="next-needs"></div>
+      <button class="btn next-buy"></button>
+    </div>`;
+  el.querySelector('.next-title').textContent = `${c.emoji} ${c.ko}`;
+  el.querySelector('.next-blurb').textContent = `${c.blurb} · ${c.minutes}분 · ${c.sentences}문장`;
+
+  const needs = el.querySelector('.next-needs');
+  for (const it of st.items) {
+    const row = document.createElement('div');
+    row.className = 'next-need' + (it.ok ? ' ok' : '');
+    row.innerHTML = `<span class="l"></span><span class="v"></span><span class="bar"><i></i></span>`;
+    row.querySelector('.l').textContent = `${it.ok ? '✅' : '⬜'} ${it.label}`;
+    row.querySelector('.v').textContent = `${it.have.toLocaleString()} / ${it.need.toLocaleString()}`;
+    row.querySelector('.bar i').style.width = `${it.pct}%`;
+    needs.appendChild(row);
+  }
+
+  const btn = el.querySelector('.next-buy');
+  btn.textContent = st.ready ? `🎟️ ${c.price.toLocaleString()}코인으로 바꾸기!` : '아직 못 바꿔요 — 조금만 더!';
+  btn.disabled = !st.ready;
+  btn.classList.toggle('btn-primary', st.ready);
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    unlockAudio();
+    if (await buyTicket(c.id, c.price)) {
+      sfx.levelUp();
+      await refreshList();
+    } else {
+      btn.disabled = false;
+      btn.textContent = '코인이 조금 모자라요';
+    }
+  });
+  return el;
 }
 
 async function updateStorageText() {

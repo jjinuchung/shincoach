@@ -461,6 +461,19 @@ export async function buyItem(id) {
   return r.ok;
 }
 
+/**
+ * 🎟️ 다음 영상 교환권 사기 — 코인만 치른다 (진도·복습 조건은 화면에서 이미 확인).
+ * 교환권은 가방에 들어가고, 아빠가 파일을 넣어 줄 때까지 남아 있다.
+ */
+export async function buyTicket(contentId, price) {
+  if (!contentId || !(price > 0)) return false;
+  if ((profile.coins || 0) < price) return false; // 빠른 거르기
+  const cost = { coins: price };
+  const gain = { items: { [`ticket_${contentId}`]: 1 } };
+  const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
+  return r.ok;
+}
+
 /** 포켓몬의 꾸밈·상태 → { gear, dye, hp } (없으면 null 필드, hp는 기본 100) */
 export function getLook(monId) {
   const m = profile.mons[monId] || {};

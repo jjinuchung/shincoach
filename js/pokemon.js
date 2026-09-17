@@ -358,6 +358,15 @@ export async function downloadCharacters(onProgress, limit) {
 }
 
 /** 퍼즐 한 판에 쓸 캐릭터 n마리를 무작위로 (부족하면 있는 만큼) */
+/**
+ * 이미 받아 둔 그림의 주소 (없으면 null) — 표지처럼 한 마리만 쓰고 싶을 때.
+ * loadCharacters()를 먼저 부르지 않았으면 캐시가 비어 있으니 null이다 (호출부가 이모지로 대체).
+ */
+export function characterUrl(id) {
+  const c = (cache || []).find((x) => x.id === Number(id));
+  return c ? c.url : null;
+}
+
 export function pickCharacters(chars, n, rng = Math.random) {
   const a = (chars || []).slice();
   for (let i = a.length - 1; i > 0; i--) {

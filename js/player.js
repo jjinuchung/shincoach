@@ -1926,8 +1926,11 @@ function onSpeakResult(cue, result) {
     track.speak(cue, { passed: true, skipped: false, score: result.score });
     const star = !!(result.score && result.score.ratio >= track.MASTER_RATIO);
     if (star) markStar();
-    awardXp(star ? XP.speakStar : XP.speak);
-    awardCoins(star ? COIN.speakStar : COIN.speak);
+    // 보상은 하루에 문장당 한 번 (◀▶로 돌아와 다시 말해도 연습은 되지만 코인은 안 나온다)
+    if (track.claimSpeakReward(cue)) {
+      awardXp(star ? XP.speakStar : XP.speak);
+      awardCoins(star ? COIN.speakStar : COIN.speak);
+    }
     if (result.method === 'speech' && result.score) {
       msg.textContent = result.score.ratio >= 0.8 ? '🌟 완벽해요!' : '🎯 잘했어요!';
       sub.textContent = `${result.score.matched}/${result.score.total} 단어 맞음: "${result.transcript}"`;

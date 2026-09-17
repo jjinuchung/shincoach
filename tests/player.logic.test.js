@@ -95,7 +95,8 @@ function loadPlayer() {
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
     // 하루 한 번(mark*)은 실제 코드에서 **트랜잭션 선점**이라 Promise<선점 성공 여부>를 준다 — 스텁도 같은 약속을 지킨다
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false, markHpMissed: async () => true, todayBattles: () => 0, markBattle: async () => true, MASTER_RATIO: 0.8, puzzle() {},
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false,
+      claimSpeakReward: () => true, markHpMissed: async () => true, todayBattles: () => 0, markBattle: async () => true, MASTER_RATIO: 0.8, puzzle() {},
       // 🔁 복습 스텁: 문장 기록과 오늘 상태를 reviewState로 제어
       statsList: () => reviewState.stats, review(cue, passed) { reviewState.reviewed.push({ start: cue.start, passed }); reviewState.items++; return { box: 1, graduated: false }; },
       todayReviewSentences: () => reviewState.sentences, todayReviewItems: () => reviewState.items,

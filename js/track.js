@@ -226,6 +226,21 @@ export function statsList() {
 }
 
 /** 말하기 확인 결과 */
+/**
+ * 🎤 이 문장의 말하기 보상을 오늘 이미 줬는지 / 주는 것으로 표시.
+ * ◀▶로 문장을 옮겼다 돌아오면 말하기 확인이 다시 켜지므로(resetSentenceState),
+ * 막지 않으면 왔다 갔다 하며 코인을 무한히 벌 수 있다 — 문장 완료 코인과 같은 규칙으로.
+ * 되돌아가 다시 말하는 것 자체는 좋은 연습이라 막지 않고, **코인·XP만** 하루 한 번으로 둔다.
+ * @returns {boolean} 이번에 처음이면 true
+ */
+export function claimSpeakReward(cue) {
+  const r = rec(cue); if (!r) return false;
+  const today = todayKey();
+  if (r.speakPaidAt === today) return false;
+  r.speakPaidAt = today;
+  return true;
+}
+
 export function speak(cue, result) {
   const r = rec(cue); if (!r) return;
   r.speakAttempts++;

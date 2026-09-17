@@ -8,7 +8,8 @@ import { parseSubtitle, mergeIntoSentences } from './srt.js';
 import { openPlayer } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, GRADUATED } from './review.js';
-import { reloadProfile, listRarityAsks, decideRarity, RARITY } from './xp.js';
+import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory } from './xp.js';
+import { pendingTickets } from './unlock.js';
 import { ROSTER } from './pokemon.js';
 
 const $ = (id) => document.getElementById(id);
@@ -211,6 +212,20 @@ export async function renderStats() {
   const wRv = week.reduce((a, d) => a + d.reviewSentences, 0);
   const rv = reviewSummary(records, today); // 🔁 복습 큐 현황 (전체 콘텐츠)
   const allSec = daily.reduce((a, d) => a + d.seconds, 0);
+  // 0) 🎟️ 아이가 산 영상 — 아빠가 파일을 넣어 줘야 볼 수 있다 (제일 위에, 놓치지 않게)
+  const tickets = pendingTickets(inventory(), items).filter((t) => !t.delivered);
+  if (tickets.length) {
+    const c0 = card('🎟️ 넣어줘야 할 영상');
+    c0.appendChild(el('p', 'stats-note', '아이가 코인으로 바꿨어요. 영상 파일을 태블릿에 넣어 주면 볼 수 있어요 (제목을 아래와 똑같이 해 주세요).'));
+    for (const t of tickets) {
+      const row = el('div', 'stats-row');
+      row.appendChild(el('span', 'name', `${t.emoji} ${t.ko}`));
+      row.appendChild(el('span', 'meta', `${t.en} · ${t.minutes}분 · ${t.sentences}문장`));
+      c0.appendChild(row);
+    }
+    main.appendChild(c0);
+  }
+
   const c1 = card('이번 주 (최근 7일)');
   const sum = el('div', 'stats-summary');
   const kpi = (v, l) => { const k = el('div', 'stats-kpi'); k.appendChild(el('div', 'v', v)); k.appendChild(el('div', 'l', l)); return k; };
