@@ -1,6 +1,7 @@
 // 🧩 문장 퍼즐 순수 로직 테스트: node --test tests/puzzle.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   splitWords, isPuzzleable, shuffle, scrambleOrder, pickPuzzle, checkOrder, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS,
 } from '../js/puzzle.js';
@@ -109,4 +110,27 @@ test('checkOrder: 자리별 비교, 같은 단어가 여러 번 나와도 됨', 
   assert.deepEqual(checkOrder(['No,', 'no', 'no!'], answer), { correct: true, wrong: [false, false, false] });
   assert.deepEqual(checkOrder(['no', 'No,', 'no!'], answer), { correct: false, wrong: [true, true, false] });
   assert.equal(checkOrder(['No,', 'no'], answer).correct, false, '덜 놓음');
+});
+
+// 2026-09-17 진우 신고: 퍼즐에서 조각이 아무 반응도 안 해 앱을 껐다 켜야 했다.
+// 드래그 도중 화면이 꺼지거나 다른 앱으로 넘어가면 안드로이드는 pointerup을 안 준다 →
+// ui.drag가 남아 그 뒤 모든 터치가 무시됐다. 드래그는 DOM이 있어야 돌아가므로 여기서는
+// "빠져나갈 길이 코드에 있는지"를 지킨다 (동작 자체는 헤드리스 브라우저로 확인).
+test('🧩 드래그가 끼어도 빠져나갈 길이 있어야 한다 (앱을 껐다 켜지 않아도 되게)', async () => {
+  const src = await readFile(new URL('../js/puzzle.js', import.meta.url), 'utf8');
+
+  const onDown = src.slice(src.indexOf('function onDown('), src.indexOf('function unbindDrag('));
+  assert.ok(!/if \(ui\.locked \|\| ui\.drag\) return;/.test(onDown),
+    '남아 있는 드래그 때문에 새 터치를 통째로 무시하면 안 된다 — 아이가 앱을 껐다 켜야 했던 원인');
+  assert.ok(/if \(ui\.drag\) cancelDrag\(\);/.test(onDown),
+    '다음 터치가 앞선 드래그를 되돌리고 정상 동작해야 한다');
+
+  assert.ok(/function cancelDrag\(\)/.test(src), '드래그를 정리하는 공통 출구가 있어야 한다');
+  const cancel = src.slice(src.indexOf('function cancelDrag()'), src.indexOf('function onMove('));
+  for (const 정리 of ['ui.drag = null', 'unbindDrag()', 'd.raf', 'd.scrollRaf', 'endDrag(d)']) {
+    assert.ok(cancel.includes(정리), `cancelDrag가 ${정리} 까지 정리해야 한다`);
+  }
+
+  assert.ok(/document\.hidden\) cancelDrag\(\)/.test(src), '화면이 꺼지면 드래그를 끝내야 한다');
+  assert.ok(/addEventListener\('blur', cancelDrag\)/.test(src), '다른 앱으로 넘어가도 드래그를 끝내야 한다');
 });

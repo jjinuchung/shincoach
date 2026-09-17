@@ -118,11 +118,16 @@ export function initPuzzle() {
   $('puzzle-check').addEventListener('click', () => { unlock(); check(); });
   $('puzzle-continue').addEventListener('click', finish);
   document.addEventListener('visibilitychange', () => {
+    // 화면이 꺼지거나 다른 앱으로 넘어가면 손을 뗀 이벤트가 안 온다 → 드래그를 여기서 끝낸다
+    // (안 그러면 돌아왔을 때 조각이 하나도 안 눌린다)
+    if (document.hidden) cancelDrag();
     if (document.hidden || !ui.open || !ui.pendingAuto) return;
     ui.pendingAuto = false;
     clearTimeout(ui.timer);
     ui.timer = setTimeout(autoFinish, 1000);
   });
+  // 알림창이 내려오는 등 창이 포커스를 잃는 경우도 마찬가지 (화면은 켜져 있어 visibilitychange가 안 온다)
+  window.addEventListener('blur', cancelDrag);
 }
 
 /** 자동 종료(정답 뒤): 화면이 꺼져 있으면 보류 — 잠긴 태블릿에서 다음 문장이 재생되지 않게 */
@@ -267,13 +272,7 @@ export function closePuzzle() {
   ui.open = false;
   clearTimeout(ui.timer);
   ui.timer = null;
-  if (ui.drag) { // 드래그 중에 닫히면 리스너·자리표시·복제본까지 정리
-    const d = ui.drag;
-    ui.drag = null;
-    unbindDrag();
-    if (d.raf) cancelAnimationFrame(d.raf);
-    if (d.moved) endDrag(d);
-  }
+  cancelDrag(); // 드래그 중에 닫히면 리스너·자리표시·복제본까지 정리
   const root = $('puzzle');
   root.hidden = true;
   root.classList.remove('solved', 'shake');
@@ -329,7 +328,12 @@ function afterChange() {
 // 이동/놓기 이벤트는 document에서 받아 손가락이 조각 밖으로 나가도 계속 따라온다.
 
 function onDown(e) {
-  if (ui.locked || ui.drag) return;
+  if (ui.locked) return;
+  // ★ 앞선 드래그가 끝나지 못하고 남아 있으면 여기서 되돌리고, 이번 터치는 정상으로 받는다.
+  // 안드로이드에서는 드래그 도중 화면이 꺼지거나 알림·다른 앱으로 넘어가면 pointerup이 **아예 오지 않는다**.
+  // 그대로 두면 ui.drag가 남아 이 아래 모든 터치(탭·드래그)가 조용히 무시돼,
+  // 아이가 앱을 껐다 켜야만 퍼즐을 다시 할 수 있었다 (2026-09-17 진우 신고, 헤드리스로 재현).
+  if (ui.drag) cancelDrag();
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   const chip = e.currentTarget;
   const r = chip.getBoundingClientRect();
@@ -348,6 +352,21 @@ function unbindDrag() {
   document.removeEventListener('pointermove', onMove);
   document.removeEventListener('pointerup', onUp);
   document.removeEventListener('pointercancel', onCancel);
+}
+
+/**
+ * 진행 중인 드래그를 없던 일로 하고 흔적(복제본·자리표시·ghost·리스너·rAF)을 모두 정리한다.
+ * 조각 자체는 드래그 중에 DOM에서 옮기지 않으므로 원래 자리에 그대로 있다.
+ * 손을 뗀 이벤트를 못 받는 모든 경우(화면 꺼짐, 앱 전환, 퍼즐 닫힘, 다음 터치)의 공통 출구.
+ */
+function cancelDrag() {
+  const d = ui.drag;
+  if (!d) return;
+  ui.drag = null;
+  unbindDrag();
+  if (d.raf) { cancelAnimationFrame(d.raf); d.raf = 0; }
+  if (d.scrollRaf) { cancelAnimationFrame(d.scrollRaf); d.scrollRaf = 0; }
+  if (d.moved) endDrag(d);
 }
 
 function onMove(e) {

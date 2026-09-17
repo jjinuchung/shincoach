@@ -9,6 +9,7 @@ import { sfx, unlock } from './sfx.js';
 const $ = (id) => document.getElementById(id);
 let onChange = null; // (monId|null) 코인·꾸밈이 바뀌면 도감이 그 자리만 다시 그리도록
 let mon = null;      // 상세 모달에 열린 포켓몬 { id, ko, url }
+let gearDrag = null; // 🎀 끌고 있는 장식 { move, up, g } — 손 뗀 이벤트를 놓쳐도 정리할 수 있게 들고 있는다
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -28,6 +29,9 @@ export function initShop(ctx) {
     if (!mon) return;
     change(setPartner(mon.id), `🤝 ${mon.ko}${josaIga(mon.ko)} 파트너가 됐어요!`);
   });
+  // 화면이 꺼지거나 다른 앱으로 넘어가면 손 뗀 이벤트가 안 온다 → 끌고 있던 장식을 여기서 놓는다
+  document.addEventListener('visibilitychange', () => { if (document.hidden) endGearDrag(); });
+  window.addEventListener('blur', endGearDrag);
 }
 
 function notify(id) {
@@ -143,6 +147,10 @@ function enableGearDrag() {
 
   g.addEventListener('pointerdown', (e) => {
     if (!mon) return;
+    // 앞선 드래그가 끝나지 못하고 남아 있으면 먼저 정리한다.
+    // 화면이 꺼지거나 다른 앱으로 넘어가면 안드로이드는 pointerup을 안 준다 →
+    // 남은 리스너가 이후 모든 손가락 움직임을 장식에 따라붙게 만들고 스크롤도 막는다 (퍼즐과 같은 원인)
+    endGearDrag();
     e.preventDefault();
     e.stopPropagation();
     const rect = fig.getBoundingClientRect();
@@ -159,19 +167,28 @@ function enableGearDrag() {
     let last = put(e);
     const move = (ev) => { ev.preventDefault(); last = put(ev); };
     const up = () => {
-      document.removeEventListener('pointermove', move);
-      document.removeEventListener('pointerup', up);
-      document.removeEventListener('pointercancel', up);
-      g.classList.remove('dragging');
+      endGearDrag();
       setGearPos(mon.id, last);
       hint.textContent = '✅ 여기에 놓았어요 (다시 끌어서 바꿀 수 있어요)';
       if (onChange) onChange(mon.id);
     };
     // 포인터 캡처 대신 document 리스너 — 퍼즐에서 캡처가 풀리는 문제를 겪었다
+    gearDrag = { move, up, g };
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
     document.addEventListener('pointercancel', up);
   });
+}
+
+/** 끌고 있던 장식 정리 — 놓았을 때·화면이 꺼졌을 때·다음에 다시 잡을 때 모두 여기로 */
+function endGearDrag() {
+  const d = gearDrag;
+  if (!d) return;
+  gearDrag = null;
+  document.removeEventListener('pointermove', d.move);
+  document.removeEventListener('pointerup', d.up);
+  document.removeEventListener('pointercancel', d.up);
+  d.g.classList.remove('dragging');
 }
 
 function renderMon(msg, pop) {
