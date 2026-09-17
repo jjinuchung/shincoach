@@ -1300,6 +1300,8 @@ async function closePlayer() {
   // (마지막 문장을 끝내고 돌아왔는데 숫자가 그대로면 아이가 가장 크게 실망한다)
   await track.close().catch(() => {});
   await flushProfile().catch(() => {});
+  // 🛟 방금 공부한 것까지 사본에 남긴다 (기다리지 않는다 — 목록으로 돌아가는 게 먼저)
+  import('./backup.js').then((m) => m.saveMirror()).catch(() => {});
   updateGoalChip();
   closeMedia();
   showView('library');

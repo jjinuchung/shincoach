@@ -10,6 +10,7 @@ import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, GRADUATED } from './review.js';
 import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory } from './xp.js';
 import { pendingTickets } from './unlock.js';
+import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
 import { ROSTER } from './pokemon.js';
 
 const $ = (id) => document.getElementById(id);
@@ -210,6 +211,11 @@ export async function renderStats() {
   const wRv = week.reduce((a, d) => a + d.reviewSentences, 0);
   const rv = reviewSummary(records, today); // 🔁 복습 큐 현황 (전체 콘텐츠)
   const allSec = daily.reduce((a, d) => a + d.seconds, 0);
+
+  // 0) 🛟 기록이 비어 있는데 사본이 있으면 — 되돌릴지는 **부모가** 정한다 (아이 화면엔 안 뜬다)
+  renderRestoreOffer(main);
+  renderBackupReminder(main);
+
   // 0) 🎟️ 아이가 산 영상 — 아빠가 파일을 넣어 줘야 볼 수 있다 (제일 위에, 놓치지 않게)
   const tickets = pendingTickets(inventory(), items).filter((t) => !t.delivered);
   if (tickets.length) {
@@ -419,6 +425,56 @@ export async function renderStats() {
   main.appendChild(el('p', 'stats-empty', `기록은 이 기기 안에만 저장돼요. 위 "내보내기"로 파일 백업, "가져오기"로 다른 기기 기록 합치기. (${relDay(today, today)} 기준)`));
 }
 
+// ───────────────────── 🛟 기록 지키기 (부모 화면에서만) ─────────────────────
+
+/**
+ * 기록이 비어 있는데 기기 안 사본에는 남아 있을 때만 나온다.
+ * 자동으로 되돌리지 않는 이유: 사본이 낡았을 수도 있고, 되돌리는 건 부모가 알고 눌러야 한다.
+ */
+function renderRestoreOffer(main) {
+  const box = card('🛟 기록 되돌리기');
+  box.hidden = true;
+  main.appendChild(box);
+  restoreOffer().then((offer) => {
+    if (!offer) { box.remove(); return; }
+    const when = daysSince(offer.savedAt);
+    box.hidden = false;
+    box.appendChild(el('p', 'stats-note', `공부 기록이 비어 있어요. 기기 안에 남아 있는 사본으로 되돌릴 수 있어요 (${when === 0 ? '오늘' : `${when}일 전`} 저장됨).`));
+    box.appendChild(el('p', 'stats-row', offer.summary));
+    const btn = el('button', 'btn btn-primary', '🛟 이 사본으로 되돌리기');
+    btn.addEventListener('click', async () => {
+      if (!confirm(`사본으로 되돌릴까요?\n\n${offer.summary}\n\n지금 기록과 합쳐지며, 큰 값이 남습니다.`)) return;
+      btn.disabled = true;
+      try {
+        const n = await restoreFromMirror();
+        await reloadDaily();
+        await reloadProfile();
+        alert(`기록 ${n}건을 되돌렸어요`);
+        renderStats();
+      } catch (e) {
+        btn.disabled = false;
+        alert(`되돌리기 실패: ${e.message}`);
+      }
+    });
+    box.appendChild(btn);
+  }).catch(() => box.remove());
+}
+
+/** 진짜 백업은 파일이다 — 주 1회 아버님께만 알린다 (사이트 데이터를 지우면 기기 안 사본도 같이 사라진다) */
+function renderBackupReminder(main) {
+  const last = lastFileBackup();
+  if (!needsFileBackup(last)) return;
+  const d = daysSince(last);
+  const box = card('💾 파일로 백업할 때가 됐어요');
+  box.appendChild(el('p', 'stats-note', d === null
+    ? '아직 한 번도 파일로 백업하지 않았어요. 기기 안 사본은 사이트 데이터를 지우면 같이 사라져요 — 파일 하나를 받아 두면 안전해요.'
+    : `마지막 파일 백업이 ${d}일 전이에요. 파일 하나를 받아 두면 태블릿을 초기화해도 도감·코인이 안 사라져요.`));
+  const btn = el('button', 'btn btn-primary', '💾 지금 파일로 백업하기');
+  btn.addEventListener('click', () => { doExport(); box.remove(); });
+  box.appendChild(btn);
+  main.appendChild(box);
+}
+
 // ───────────────────── 내보내기 / 가져오기 ─────────────────────
 
 async function doExport() {
@@ -430,6 +486,7 @@ async function doExport() {
   a.download = `shincoach-기록-${todayKey().replace(/-/g, '')}.json`;
   document.body.appendChild(a);
   a.click();
+  markFileBackup(); // 주 1회 알림 기준 — 누른 시점을 기록
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
 }
 
