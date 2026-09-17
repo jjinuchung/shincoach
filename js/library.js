@@ -17,6 +17,10 @@ const BIG_FILE_BYTES = 1.9 * 1024 * 1024 * 1024;
 
 let showView;
 let opening = false;
+// 목록 그리기 요청 번호. 앱을 켤 때 showView('library')와 initLibrary가 각각 그리는 등
+// 두 번이 겹치면, 중간에 await가 있는 사이 둘 다 카드를 붙여 🎟️ 예고가 두 개로 보였다.
+// (2026-09-17 아버님 신고: "팬텀 광고 문구가 두 번"). 마지막 요청만 화면에 남긴다.
+let renderSeq = 0;
 
 export async function initLibrary(ctx) {
   showView = ctx.showView;
@@ -216,7 +220,9 @@ function formatDuration(sec) {
 }
 
 export async function refreshList() {
+  const seq = ++renderSeq;
   const items = await listItems();
+  if (seq !== renderSeq) return; // 더 최신 요청이 시작됐으면 이 결과는 버린다
   const list = $('library-list');
   list.innerHTML = '';
   $('library-empty').hidden = items.length > 0;
@@ -272,7 +278,7 @@ export async function refreshList() {
     list.appendChild(li);
   }
 
-  await renderNextVideo(items);
+  await renderNextVideo(items, seq);
   updateStorageText();
 }
 
@@ -282,12 +288,13 @@ export async function refreshList() {
  * 아직 태블릿에 없는 영상을 "예고편"처럼 보여주고, 조건을 채우면 아이가 직접 연다.
  * 산다고 파일이 생기지는 않는다 — 아빠가 넣어 준다는 것을 화면에 분명히 적는다.
  */
-async function renderNextVideo(items) {
+async function renderNextVideo(items, seq = renderSeq) {
   const box = $('library-next');
   if (!box) return;
   box.innerHTML = '';
 
   await initProfile().catch(() => {});
+  if (seq !== renderSeq) return; // 겹쳐 불린 옛 요청 — 카드를 붙이면 예고가 두 개가 된다
   const bag = inventory();
   const bought = LOCKED.filter((c) => (bag[ticketId(c.id)] || 0) > 0);
 
@@ -300,6 +307,7 @@ async function renderNextVideo(items) {
   if (!next) { box.hidden = !waiting.length; return; }
 
   const st = await currentState(items, next.price);
+  if (seq !== renderSeq) return;
   const card = lockedCard(next, st);
   box.appendChild(card);
   box.hidden = false;
