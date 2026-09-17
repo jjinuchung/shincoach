@@ -12,6 +12,8 @@ export const STOP_WORDS = new Set(['i', 'you', 'he', 'she', 'it', 'we', 'they', 
 
 let micStream = null;         // 마이크 스트림은 한 번 열면 재사용 (매번 권한 프롬프트 방지)
 let audioCtx = null;
+let micGen = 0;               // 마이크 요청 세대 — 기다리는 사이 releaseMic()이 불렸는지 가린다
+let micError = '';            // 직전 prepareMic 실패 이유
 
 function SpeechRecognitionCtor() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -19,19 +21,36 @@ function SpeechRecognitionCtor() {
 
 /** 마이크·소리분석 준비. 실패하면 null (권한 거부, 미지원) */
 export async function prepareMic() {
-  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return null;
+  micError = '';
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { micError = 'unsupported'; return null; }
   const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return null;
+  if (!AC) { micError = 'unsupported'; return null; }
   if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AC();
   if (audioCtx.resume) audioCtx.resume().catch(() => {});
   if (micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live')) return micStream;
+  const gen = ++micGen;
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // ★ 기다리는 사이 releaseMic()이 불렸다면(= 인식이 마이크를 넘겨받으려는 중) 이 스트림을 버린다.
+    // 그냥 micStream에 넣으면 **인식이 도는 동안 마이크가 열려 있게 되어**
+    // 안드로이드에서 인식이 소리를 못 받는다 (v33에서 확인한 바로 그 현상).
+    if (gen !== micGen) {
+      stream.getTracks().forEach((t) => t.stop());
+      micError = 'released';
+      return null;
+    }
+    micStream = stream;
     return micStream;
   } catch (err) {
     micStream = null;
+    micError = 'denied';
     return null;
   }
+}
+
+/** 직전 prepareMic 실패 이유 — 'unsupported' | 'denied' | 'released'(인식에 마이크를 넘기느라 취소됨) */
+export function micFailReason() {
+  return micError;
 }
 
 /** 진단용: prepareMic() 뒤의 AudioContext (실전과 같은 조건으로 분석기를 붙여 볼 때) */
@@ -41,6 +60,7 @@ export function getAudioContext() {
 
 /** 마이크 끄기 (학습 종료·백그라운드). 다음 prepareMic()에서 다시 연다 */
 export function releaseMic() {
+  micGen++; // 진행 중인 prepareMic() 요청을 무효화 (나중에 도착한 스트림이 인식을 막지 않게)
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
   micStream = null;
 }
@@ -213,6 +233,15 @@ let srBrokenAt = 0;
 let srFailStreak = 0;
 /** 이만큼 지나면 인식을 다시 시도 (학습 중이라 너무 길면 그 사이 계속 소리 길이로 판정된다) */
 const SR_RETRY_MS = 60 * 1000;
+/**
+ * 한 문장 안에서 인식을 다시 시작해 보는 횟수.
+ * 안드로이드 인식기는 continuous가 아니라 **말 시작 전 침묵(약 5초)이나 첫 쉼에서 스스로 끝난다**.
+ * 아이가 문장을 눈으로 한 번 읽고 숨을 고르는 사이 끝나 버리면, 정작 말할 때는 아무도 듣고 있지 않아
+ * "말소리를 못 들었어요 — 다시 한번!"이 뜬다 (2026-09-17 아버님 신고: 중간중간 인식을 못 함).
+ */
+const SR_RESTARTS = 2;
+/** 이 이유로 끝났을 때만 다시 듣는다 (권한·마이크 문제는 다시 해도 같다) */
+const SR_RESTARTABLE = { '': 1, 'no-speech': 1, aborted: 1, 'no-result': 1 };
 /** 실패가 이만큼 이어지면 그때 폴백 */
 const SR_FAIL_LIMIT = 3;
 /**
@@ -264,6 +293,8 @@ function runWithRecognition(opts, SR) {
   let stopTimer = null;
   let maxTimer = null;
   let fallback = null; // 인식이 못 쓰는 상태로 판명 → 에너지 방식 핸들
+  let restarts = 0;    // 같은 문장에서 다시 듣기 시도 횟수
+  let stopping = false; // "다 말했어요"를 눌렀거나 시간이 다 됨 → 더는 다시 듣지 않는다
   const started = performance.now();
 
   const promise = new Promise((resolve) => { resolveOuter = resolve; });
@@ -351,7 +382,34 @@ function runWithRecognition(opts, SR) {
     if (opts.onInterim && transcript) opts.onInterim(transcript);
   };
   rec.onerror = (e) => { srError = (e && e.error) || 'error'; };
-  rec.onend = () => { if (speechStart) { spokenMs += performance.now() - speechStart; speechStart = 0; } judge('speech-end'); };
+  rec.onend = () => {
+    if (speechStart) { spokenMs += performance.now() - speechStart; speechStart = 0; }
+    if (canRestart()) { restartListening(); return; }
+    judge('speech-end');
+  };
+
+  /** 아직 한 마디도 못 들었는데 인식이 먼저 끝났고, 시간이 남았으면 다시 듣는다 */
+  function canRestart() {
+    if (finished || fallback || stopping || !rec) return false;
+    if (transcript) return false;                 // 들은 게 있으면 그걸로 판정한다
+    if (restarts >= SR_RESTARTS) return false;
+    if (!SR_RESTARTABLE[srError]) return false;
+    return performance.now() - started < maxMs - 1200; // 남은 시간이 있을 때만
+  }
+
+  function restartListening() {
+    restarts++;
+    srError = '';
+    try {
+      rec.start();
+    } catch (e) {
+      // 방금 끝난 인식이 아직 정리 중이면 바로는 못 켠다 (안드로이드에서 흔함) → 잠깐 두고 한 번 더
+      setTimeout(() => {
+        if (finished || fallback || stopping || !rec) return;
+        try { rec.start(); } catch (e2) { judge('restart-failed'); }
+      }, 250);
+    }
+  }
 
   const handle = {
     promise,
@@ -359,6 +417,7 @@ function runWithRecognition(opts, SR) {
       if (finished) return;
       if (fallback) { fallback.stop(); return; }
       // "다 말했어요" 탭 → 인식을 멈추고 마지막 결과를 잠깐 기다림 (onend에서 판정). 안 오면 지금까지 것으로
+      stopping = true; // 여기서부터는 다시 듣지 않는다
       try { if (rec) rec.stop(); } catch (e) { /* 무시 */ }
       clearTimeout(stopTimer);
       stopTimer = setTimeout(() => judge('tap'), 1500);

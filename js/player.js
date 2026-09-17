@@ -6,7 +6,7 @@ import {
 } from './srt.js';
 import { loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
-import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults } from './speak.js';
+import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl } from './pokemon.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax } from './xp.js';
@@ -1460,7 +1460,11 @@ function onPlayButton() {
   if (settings.speakCheck && !state.speakUnavailable && !state.micPrepared && !state.parentMode) {
     state.micPrepared = true;
     prepareMic().then((stream) => {
-      if (!stream) { state.speakUnavailable = true; showPlayerMessage('🎤 마이크를 쓸 수 없어 말하기 확인 없이 진행해요', 4000); }
+      if (stream) return;
+      // 인식이 마이크를 넘겨받느라 취소된 것이면 기능을 끄면 안 된다 — 다음 재생 때 다시 준비한다
+      if (micFailReason() === 'released') { state.micPrepared = false; return; }
+      state.speakUnavailable = true;
+      showPlayerMessage('🎤 마이크를 쓸 수 없어 말하기 확인 없이 진행해요', 4000);
     });
   }
   if (video.paused) {

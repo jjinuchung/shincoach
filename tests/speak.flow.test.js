@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 // speak.js는 호출 시점에만 window/navigator를 보므로 import 전에 전역을 만들어 둠
 const recs = [];
 class FakeSR {
-  constructor() { this.started = false; recs.push(this); }
-  start() { this.started = true; }
+  constructor() { this.started = false; this.startCount = 0; recs.push(this); }
+  start() { this.started = true; this.startCount++; }
   stop() { if (this.onend) setTimeout(() => this.onend && this.onend(), 0); }
   abort() { this.aborted = true; }
   // 테스트 도우미
@@ -19,15 +19,29 @@ let micOk = true; // getUserMedia 성공 여부
 let micOpens = 0;
 globalThis.window = { webkitSpeechRecognition: FakeSR, AudioContext: class { constructor() { this.state = 'running'; } resume() { return Promise.resolve(); } createMediaStreamSource() { return { connect() {}, disconnect() {} }; } createAnalyser() { return { fftSize: 1024, getByteTimeDomainData(b) { b.fill(128); } }; } } };
 // Node 21+는 globalThis.navigator가 getter라 defineProperty로 덮어씀
-const fakeNav = { onLine: true, mediaDevices: { getUserMedia: async () => { micOpens++; if (!micOk) throw new Error('denied'); return { getAudioTracks: () => [{ readyState: 'live' }], getTracks: () => [{ stop() {} }] }; } } };
+let micDelay = 0;   // 권한 대기·기기 지연 흉내
+let micStopped = 0; // 받자마자 꺼진 스트림 수
+const fakeNav = { onLine: true, mediaDevices: { getUserMedia: async () => { micOpens++; if (micDelay) await new Promise((r) => setTimeout(r, micDelay)); if (!micOk) throw new Error('denied'); return { getAudioTracks: () => [{ readyState: 'live' }], getTracks: () => [{ stop() { micStopped++; } }] }; } } };
 Object.defineProperty(globalThis, 'navigator', { value: fakeNav, configurable: true, writable: true });
 globalThis.performance = globalThis.performance || { now: () => Date.now() };
 globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 5);
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
-const { runSpeakCheck, resetRecognition, recognitionState, releaseMic, speakLog } = await import('../js/speak.js');
+const { runSpeakCheck, resetRecognition, recognitionState, releaseMic, speakLog, prepareMic, micFailReason } = await import('../js/speak.js');
 const opts = () => ({ target: 'I love toys.', durationSec: 1.5 });
 const tick = (ms = 10) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * 아무것도 못 들은 채 인식이 끝나는 상황.
+ * 한 문장 안에서 2번 더 다시 듣기 때문에(SR_RESTARTS), 판정까지 가려면 3번 끝나야 한다.
+ */
+async function endEmpty(rec, err) {
+  for (let i = 0; i < 3; i++) {
+    if (err) rec.error(err);
+    rec.end();
+    await tick();
+  }
+}
 
 test('인식 우선: getUserMedia를 열지 않고 인식 결과로 판정', async () => {
   resetRecognition(); recs.length = 0; micOpens = 0;
@@ -54,23 +68,23 @@ test('인식 결과가 원문과 다르면 실패 (다시 말하기), 인식 자
 test('no-speech(말 안 함)는 실패이고 인식은 유지, 결과 없음이 3번 이어지면 에너지 방식으로 전환', async () => {
   resetRecognition(); recs.length = 0; micOpens = 0;
   let h = runSpeakCheck(opts());
-  recs[0].error('no-speech'); recs[0].end();
+  await endEmpty(recs[0], 'no-speech');
   let r = await h.promise;
   assert.equal(r.passed, false); assert.equal(r.method, 'speech'); assert.equal(r.srError, 'no-speech');
   assert.equal(recognitionState().broken, false);
   // 오류 없이 결과만 없음 ×1 → 아직 인식 유지
   h = runSpeakCheck(opts());
-  recs[1].end();
+  await endEmpty(recs[1]);
   r = await h.promise;
   assert.equal(r.srError, 'no-result'); assert.equal(recognitionState().broken, false);
   // ×2 → 아직 유지 (아이가 두 번 조용했을 뿐일 수 있다)
   h = runSpeakCheck(opts());
-  recs[2].end();
+  await endEmpty(recs[2]);
   r = await h.promise;
   assert.equal(recognitionState().broken, false, '2번으로는 폴백하지 않는다');
   // ×3 → 이 문장부터 에너지 방식 (마이크 열림), 이후 문장도 에너지
   h = runSpeakCheck(opts());
-  recs[3].end();
+  await endEmpty(recs[3]);
   await tick(30);
   assert.equal(recognitionState().broken, true);
   assert.ok(micOpens >= 1, '폴백에서 마이크를 엶');
@@ -190,14 +204,102 @@ test('아이가 조용한 문장이 이어져도(no-speech) 인식을 유지한�
   resetRecognition(); recs.length = 0;
   for (let i = 0; i < 4; i++) {
     const h = runSpeakCheck(opts());
-    recs[i].error('no-speech');
-    recs[i].end();
+    await endEmpty(recs[i], 'no-speech');
     const r = await h.promise;
     assert.equal(r.method, 'speech');
     assert.equal(r.srError, 'no-speech');
   }
   assert.equal(recognitionState().broken, false, '말을 안 한 것은 기기 문제가 아니다');
   assert.equal(recognitionState().failStreak, 0);
+});
+
+// 2026-09-17 아버님 신고: 아이가 따라 말하는데 중간중간 인식을 못 한다.
+// 안드로이드 인식기는 말 시작 전 침묵(약 5초)이나 첫 쉼에서 스스로 끝난다 —
+// 아이가 문장을 읽고 숨 고르는 사이 끝나면 정작 말할 때는 듣는 사람이 없다.
+test('🎤 아이가 말하기 전에 인식이 끝나면 같은 문장에서 다시 듣는다', async () => {
+  resetRecognition(); recs.length = 0;
+  const h = runSpeakCheck(opts());
+  const rec = recs[0];
+  assert.equal(rec.startCount, 1);
+
+  rec.error('no-speech'); rec.end(); await tick();
+  assert.equal(rec.startCount, 2, '아직 아무 말도 못 들었으니 다시 듣는다');
+  assert.equal(recs.length, 1, '새 인식기를 만들지 않고 같은 것을 다시 켠다');
+
+  // 이제 아이가 말한다 → 제대로 인식된다 (예전에는 이 말을 아무도 듣지 않았다)
+  rec.result('i love toys'); rec.end();
+  const r = await h.promise;
+  assert.equal(r.method, 'speech');
+  assert.equal(r.passed, true);
+  assert.equal(r.transcript, 'i love toys');
+});
+
+test('🎤 다시 듣기는 2번까지만 (무한정 붙잡고 있지 않는다)', async () => {
+  resetRecognition(); recs.length = 0;
+  const h = runSpeakCheck(opts());
+  const rec = recs[0];
+  await endEmpty(rec, 'no-speech');
+  assert.equal(rec.startCount, 3, '처음 1번 + 다시 듣기 2번');
+  const r = await h.promise;
+  assert.equal(r.srError, 'no-speech');
+  assert.equal(r.passed, false);
+});
+
+test('🎤 들은 말이 있으면 다시 듣지 않고 바로 판정한다', async () => {
+  resetRecognition(); recs.length = 0;
+  const h = runSpeakCheck(opts());
+  const rec = recs[0];
+  rec.result('banana'); rec.end();
+  const r = await h.promise;
+  assert.equal(rec.startCount, 1, '들은 게 있으면 그걸로 판정 (아이를 기다리게 하지 않는다)');
+  assert.equal(r.passed, false);
+  assert.equal(r.transcript, 'banana');
+});
+
+test('🎤 "다 말했어요"를 누른 뒤에는 다시 듣지 않는다', async () => {
+  resetRecognition(); recs.length = 0;
+  const h = runSpeakCheck(opts());
+  const rec = recs[0];
+  h.stop();
+  rec.end();
+  const r = await h.promise;
+  assert.equal(rec.startCount, 1);
+  assert.equal(r.method, 'speech');
+});
+
+test('🎤 권한·마이크 문제는 다시 들어도 같으므로 바로 넘어간다', async () => {
+  resetRecognition(); recs.length = 0;
+  const h = runSpeakCheck(opts());
+  const rec = recs[0];
+  rec.error('not-allowed'); rec.end();
+  await tick(30);
+  assert.equal(rec.startCount, 1, '다시 듣지 않는다');
+  assert.equal(recognitionState().broken, true);
+  h.stop();
+  const r = await h.promise;
+  assert.equal(r.srError, 'not-allowed');
+});
+
+// 권한 대기가 길면(아이가 "허용"을 늦게 누르거나 기기가 느릴 때) 그 사이 문장이 끝나
+// 인식이 시작되며 releaseMic()을 부른다. 늦게 도착한 스트림을 그대로 쓰면
+// **인식이 도는 동안 마이크가 열려 있어** 안드로이드에서 인식이 소리를 못 받는다.
+test('🎤 인식에 마이크를 넘기는 사이 늦게 도착한 스트림은 버린다', async () => {
+  releaseMic(); micOpens = 0; micStopped = 0; micDelay = 40;
+  const p = prepareMic();  // 권한 대기 중
+  releaseMic();            // 그 사이 인식이 시작되며 마이크를 놓음
+  const stream = await p;
+  micDelay = 0;
+  assert.equal(stream, null, '늦게 온 스트림은 쓰지 않는다');
+  assert.equal(micFailReason(), 'released', '거부가 아니라 "넘겨주느라 취소됨" — 말하기 확인을 꺼서는 안 된다');
+  assert.equal(micStopped, 1, '받자마자 꺼야 인식이 소리를 받는다');
+});
+
+test('🎤 평소에는 마이크가 정상으로 열린다 (위 방어가 막아서면 안 됨)', async () => {
+  releaseMic(); micOpens = 0;
+  const stream = await prepareMic();
+  assert.ok(stream, '평소에는 그대로 열림');
+  assert.equal(micFailReason(), '');
+  releaseMic();
 });
 
 test('말하기 기록이 남아 무엇 때문에 막혔는지 볼 수 있다', async () => {
