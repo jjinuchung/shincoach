@@ -9,6 +9,7 @@ import { initShop, openShop, openMon } from './shop.js';
 const $ = (id) => document.getElementById(id);
 let showView;
 let urlById = new Map(); // 포켓몬 id → 그림 객체 URL (열 때 채움)
+let openSeq = 0;         // 도감 그리기 요청 번호 (빠르게 두 번 누르면 두 번 그려지던 것 방지)
 
 export function initPokedex(ctx) {
   showView = ctx.showView;
@@ -68,13 +69,18 @@ function el(tag, cls, text) {
 
 /** 도감 열기. opts.shop = true 면 열자마자 🛒 상점도 띄움 (플레이어 코인 칩에서) */
 export async function openPokedex(opts) {
+  // 화면을 지운 뒤에 await가 있으므로, 아이가 🎒를 빠르게 두 번 누르면 도감이 두 번 그려진다
+  // (라이브러리 🎟️ 예고가 두 번 나온 것과 같은 원인 — 2026-09-17). 마지막 요청만 화면에 남긴다.
+  const seq = ++openSeq;
   const chars = await loadCharacters().catch(() => []);
+  if (seq !== openSeq) return;
   urlById = new Map(chars.map((c) => [c.id, c.url]));
   const info = getLevelInfo();
   const p = getProfileSnapshot();
   const main = $('pokedex-main');
   main.innerHTML = '';
   const daily = await listDaily().catch(() => []);
+  if (seq !== openSeq) return;
   const today = todayKey();
   const todayRec = daily.find((d) => d.date === today);
   const todayOk = (todayRec ? todayRec.doneKeys.length : todayDone()) >= STREAK_MIN_DONE;
