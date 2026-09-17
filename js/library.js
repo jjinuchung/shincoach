@@ -11,6 +11,10 @@ import { showLoading, hideLoading } from './app.js';
 
 const $ = (id) => document.getElementById(id);
 
+// 2GB(32비트 한계)를 넘는 영상은 코덱이 멀쩡해도 안드로이드 Chrome에서 안 열린다.
+// 경계에 바로 붙은 파일도 위험해서 조금 낮춰 잡는다.
+const BIG_FILE_BYTES = 1.9 * 1024 * 1024 * 1024;
+
 let showView;
 let opening = false;
 
@@ -174,7 +178,11 @@ async function onImportSubmit(e) {
     status.textContent = '영상 확인 중...';
     const probe = await probeVideo(videoFile);
     if (probe.status === 'error') {
-      status.textContent = '이 브라우저에서 열 수 없는 영상이에요. mp4(H.264) 파일로 변환해 주세요.';
+      // 파일이 2GB를 넘으면 코덱이 멀쩡해도 태블릿에서 열리지 않는다(안드로이드 Chrome은 32비트인 기기가 많다).
+      // "H.264로 변환하라"고만 하면 이미 H.264인 파일 앞에서 원인을 못 찾는다 (2026-09-17 모아나 2.24GB)
+      status.textContent = videoFile.size > BIG_FILE_BYTES
+        ? `영상이 너무 커요 (${formatBytes(videoFile.size)}). 태블릿 브라우저는 2GB가 넘는 영상을 열지 못해요 — 1GB 정도로 줄여서 넣어 주세요.`
+        : '이 브라우저에서 열 수 없는 영상이에요. mp4(H.264 + AAC) 파일로 변환해 주세요.';
       submit.disabled = false;
       return;
     }
