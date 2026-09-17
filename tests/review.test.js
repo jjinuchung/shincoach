@@ -129,16 +129,16 @@ test('reviewSummary: 오늘 할 것 / 기다리는 것 / 졸업', () => {
   assert.deepEqual(reviewSummary([], today), { dueCount: 0, waiting: 0, graduated: 0 });
 });
 
-test('roundReward: 🌟 황금 볼·❤️ 회복은 하루 첫 완주에만 (영상을 나갔다 들어와도 더 안 나옴)', () => {
+test('roundReward: 🌟 황금 볼만 하루 하나, ⚡·💰·❤️는 회차마다 (하루에 여러 번 하게 바뀜)', () => {
   const first = roundReward(false);
   assert.equal(first.golden, REWARD.golden);
   assert.equal(first.hp, REWARD.hp);
   assert.equal(first.first, true);
 
   const again = roundReward(true);
-  assert.equal(again.golden, 0, '두 번째 회차엔 황금 볼 없음');
-  assert.equal(again.hp, 0, 'HP 회복도 없음');
-  assert.equal(again.xp, REWARD.bonusXp, '다만 복습 자체를 막지는 않으므로 XP·코인은 준다');
+  assert.equal(again.golden, 0, '황금 볼은 하루 하나 — 복습에서만 나오는 특별한 것');
+  assert.equal(again.hp, REWARD.hp, '❤️ 회복은 매번 (두 번째부터 빈손이면 아이가 왜 또 하냐고 한다)');
+  assert.equal(again.xp, REWARD.bonusXp);
   assert.equal(again.coin, REWARD.bonusCoin);
   assert.equal(again.first, false);
 });

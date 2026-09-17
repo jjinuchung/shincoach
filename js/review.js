@@ -196,12 +196,14 @@ export function reviewSummary(records, today) {
 
 /**
  * 이번 회차에 줄 보상.
- * 🌟 황금 볼과 ❤️ 회복은 **하루 첫 완주에만** — 영상을 나갔다 들어오며 반복해도 더 안 나온다.
- * (2회차부터도 복습 자체는 막지 않고 ⚡·💰은 준다 — 더 하겠다는 아이를 막을 이유가 없다)
+ * 🌟 황금 볼만 **하루 한 개** — 복습에서만 나오는 특별한 것이라 여러 개면 의미가 없다.
+ * ⚡·💰·❤️ 회복은 회차마다 준다: 복습을 하루에 여러 번 하게 바꿨으므로(2026-09-18)
+ * 두 번째부터 빈손이면 아이가 "왜 또 해?"가 된다. 회복량은 회차당 15로 작고,
+ * 복습은 밀린 문장이 있을 때만 열리므로 무한정 회복되지는 않는다.
  */
 export function roundReward(alreadyRewardedToday) {
   if (alreadyRewardedToday) {
-    return { xp: REWARD.bonusXp, coin: REWARD.bonusCoin, hp: 0, golden: 0, first: false };
+    return { xp: REWARD.bonusXp, coin: REWARD.bonusCoin, hp: REWARD.hp, golden: 0, first: false };
   }
   return { xp: REWARD.bonusXp, coin: REWARD.bonusCoin, hp: REWARD.hp, golden: REWARD.golden, first: true };
 }

@@ -1105,12 +1105,86 @@ test('🔁 복습을 끄면·오늘 할 문장이 없으면·부모 모드면 �
   assert.equal(p.reviewCalls.length, 0, '👨‍👩‍👦 부모 모드');
 });
 
-test('🔁 건너뛰기를 두 번 하면 그날은 더 묻지 않는다', () => {
+test('🔁 하루에 정해진 횟수만큼 거절하면 그날은 더 묻지 않는다', () => {
   const { run, reviewCalls, reviewState } = loadPlayer();
   reviewState.stats = [due(1)];
-  reviewState.skips = 2;
+  reviewState.skips = 5;
   run('state.cues = [{start:1,end:2,en:"a",ko:""}]; settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
   assert.equal(reviewCalls.length, 0);
+});
+
+// 2026-09-18 아버님 지적: 영상을 열 때 한 번만 묻고, 거기서 "나중에"를 누르면
+// 영상을 닫았다 다시 열기 전까지 복습이 안 나왔다. 두 번 거절하면 그날은 끝이라 밀렸다.
+const cues5 = 'state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""},{start:4,end:5,en:"d",ko:""},{start:5,end:6,en:"e",ko:""}];';
+
+test('🔁 학습 중에도 확률로 복습을 제안한다 (문장을 끝낼 때마다)', () => {
+  const { run, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3)];
+  run(`${cues5} settings.reviewCount = 3; Math.random = () => 0.05;`); // 20% 안쪽 = 당첨
+  run('maybeReviewDuring();');
+  assert.equal(run('state.reviewPending'), true, '다음 전환에서 열리도록 걸어 둔다');
+});
+
+test('🔁 확률이 빗나가면·복습할 문장이 없으면 걸지 않는다', () => {
+  let p = loadPlayer();
+  p.reviewState.stats = [due(1)];
+  p.run(`${cues5} settings.reviewCount = 3; Math.random = () => 0.5; maybeReviewDuring();`);
+  assert.equal(p.run('state.reviewPending'), false, '80%는 그냥 지나간다');
+
+  p = loadPlayer();
+  p.reviewState.stats = [due(1, { dueAt: '2027-01-01' })]; // 아직 때가 아님
+  p.run(`${cues5} settings.reviewCount = 3; Math.random = () => 0.05; maybeReviewDuring();`);
+  assert.equal(p.run('state.reviewPending'), false, '복습할 게 없으면 조용히');
+});
+
+test('🔁 제안 직후에는 쿨다운 동안 다시 묻지 않는다 (연달아 뜨면 성가시다)', () => {
+  const { run, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3)];
+  run(`${cues5} settings.reviewCount = 3; Math.random = () => 0.05; state.reviewCooldown = 3;`);
+  for (let i = 0; i < 3; i++) run('maybeReviewDuring();');
+  assert.equal(run('state.reviewPending'), false, '쿨다운 중에는 당첨돼도 안 뜬다');
+  run('maybeReviewDuring();');
+  assert.equal(run('state.reviewPending'), true, '쿨다운이 풀리면 다시 기회가 온다');
+});
+
+test('🔁 배틀·에세이가 걸려 있으면 비켜 준다 (한 번에 하나만)', () => {
+  const { run, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3)];
+  run(`${cues5} settings.reviewCount = 3; Math.random = () => 0.05; state.battlePending = { id: 25 }; maybeReviewDuring();`);
+  assert.equal(run('state.reviewPending'), false, '배틀이 먼저');
+  run('state.battlePending = null; state.essayPending = true; maybeReviewDuring();');
+  assert.equal(run('state.reviewPending'), false, '에세이가 먼저');
+  run('state.essayPending = false; maybeReviewDuring();');
+  assert.equal(run('state.reviewPending'), true);
+});
+
+test('🔁 학습 중 복습은 넘어가기 전에 열리고, 끝나면 다음 문장으로 이어진다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3)];
+  run(`${cues5} settings.reviewCount = 3; state.idx = 1; state.reviewPending = true; goTo(2);`);
+  assert.equal(reviewCalls.length, 1, '다음 문장으로 가기 전에 복습이 열린다');
+  assert.equal(run('state.idx'), 1, '복습이 끝날 때까지는 안 넘어감');
+  assert.equal(run('state.reviewPending'), false, '한 번 열었으면 플래그를 내린다');
+
+  reviewCalls[0].onDone({ started: true, done: 3, passed: 3, finished: true });
+  assert.equal(run('state.idx'), 2, '복습이 끝나면 원래 가려던 문장으로 (제자리로 되돌아오지 않는다)');
+  assert.ok(run('state.reviewCooldown') > 0, '끝낸 뒤에도 쿨다운');
+});
+
+test('🔁 "나중에" 뒤에도 쿨다운만 지나면 다시 나온다 (아버님이 겪은 그 상황)', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3)];
+  // 영상을 열자마자 제안 → "나중에 할래"
+  run(`${cues5} settings.reviewCount = 3; state.reviewDone = false; maybeReview();`);
+  assert.equal(reviewCalls.length, 1);
+  reviewCalls[0].onDone({ started: false, done: 0, passed: 0, finished: false });
+  assert.equal(reviewState.skips, 1, '거절로 셈');
+  assert.ok(run('state.reviewCooldown') > 0, '바로 또 묻지 않도록 쿨다운');
+
+  // 쿨다운이 흐르는 동안은 안 묻다가, 지나면 학습 중에 다시 제안된다
+  run('Math.random = () => 0.05;');
+  for (let i = 0; i < 20; i++) run('maybeReviewDuring();');
+  assert.equal(run('state.reviewPending'), true, '같은 영상 안에서 다시 기회가 온다');
 });
 
 test('🔁 "나중에"로 닫으면 건너뛴 것으로 세고, 하다가 닫으면 안 센다', () => {
@@ -1127,7 +1201,7 @@ test('🔁 "나중에"로 닫으면 건너뛴 것으로 세고, 하다가 닫으
   assert.equal(reviewState.skips, 1, '하다 만 것은 건너뛴 게 아님');
 });
 
-test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 🌟 황금 볼 + ❤️ 회복 (하루 한 번)', async () => {
+test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 ❤️ 회복 (매번) + 🌟 황금 볼 (하루 한 번)', async () => {
   const { run, reviewCalls, reviewState, xpLog, coinLog, itemLog, hpLog, hpState } = loadPlayer();
   hpState.partner = 25;
   hpState.hp[25] = 50;
@@ -1149,12 +1223,16 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 🌟 황금 볼
   assert.ok(itemLog.includes('goldenball'), '가방에 황금 볼');
   assert.ok(hpLog.some((d) => d > 0), 'HP 회복');
 
-  // 같은 날 두 번째 회차: XP·코인은 주되 황금 볼·HP는 없음
+  // 같은 날 두 번째 회차: 황금 볼만 빠지고 ⚡·💰·❤️는 그대로 (하루에 여러 번 하게 바뀜)
   const before = itemLog.length;
+  const hpBefore = hpLog.length;
   const again = await o.onFinished();
-  assert.equal(again.golden, 0);
-  assert.equal(again.hp, 0);
+  assert.equal(again.golden, 0, '황금 볼은 하루 하나');
+  assert.equal(again.hp, REWARD.hp, '❤️ 회복은 매번');
+  assert.equal(again.xp, REWARD.bonusXp);
+  assert.equal(again.coin, REWARD.bonusCoin);
   assert.equal(itemLog.length, before, '황금 볼을 또 주지 않음');
+  assert.ok(hpLog.length > hpBefore, '회복은 실제로 한 번 더 들어간다');
 });
 
 test('🔁 중간에 그만뒀으면 남은 문장만 채우면 완주 (1문장만 냄)', () => {

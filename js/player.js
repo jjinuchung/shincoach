@@ -86,7 +86,9 @@ const state = {
   wordPlayUntil: 0,    // 🎯 단어 하나만 다시 듣는 중이면 그 끝 시각(초) — 여기까지 재생하고 멈춤
   wordPlayGuard: null, // 단어 재생이 어떤 이유로 끝나지 않을 때를 대비한 안전장치
   resultDelay: null,   // 결과 화면의 자동 진행 타이머를 다시 세는 함수 (단어를 누를 때마다). 반복 신호인 state.shadowNext와는 다른 것
-  reviewDone: false,   // 이번에 연 콘텐츠에서 복습을 이미 제안했는지 (한 번 열 때 한 번만)
+  reviewDone: false,   // 이번에 연 콘텐츠에서 "열 때 제안"을 했는지 (열 때는 한 번만)
+  reviewPending: false, // 🔁 다음 문장으로 넘어갈 때 열 복습이 걸려 있는지 (배틀·에세이와 같은 방식)
+  reviewCooldown: 0,   // 이만큼 문장은 복습을 안 물어봄 (제안 직후 연달아 뜨지 않게)
   vocabViews: [],      // 🔤 아이가 본 단어 기록 (복습 문항을 만들 때 씀. 콘텐츠를 열 때 한 번 읽음)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
@@ -528,8 +530,16 @@ async function applyBattleResult(r) {
 
 // ───────────────────── 🔁 복습 (간격 반복) ─────────────────────
 
-/** 하루에 복습을 제안하는 최대 횟수 (건너뛰어도 계속 묻지 않게) */
-const REVIEW_MAX_SKIPS = 2;
+// 복습은 영상을 열 때 한 번만 물어봤다. 그래서 그때 "나중에 할래"를 누르면
+// **영상을 닫았다 다시 열기 전까지 다시 나오지 않았고**, 두 번 거절하면 그날은 끝이라
+// 밀린 복습이 다음 날로 쌓였다 (2026-09-18 아버님 지적).
+// → 이제 학습 중에도 문장을 끝낼 때마다 확률로 물어본다. 거절해도 조금 뒤에 다시 온다.
+/** 문장을 끝낼 때마다 이 확률로 복습을 제안 */
+const REVIEW_CHANCE = 0.2;
+/** 제안한 뒤(거절하든 끝내든) 이만큼 문장은 다시 안 물어봄 — 20%가 연달아 뜨면 성가시다 */
+const REVIEW_COOLDOWN = 8;
+/** 하루에 거절할 수 있는 횟수 (이만큼 거절하면 오늘은 그만 물어본다) */
+const REVIEW_MAX_SKIPS = 5;
 
 /** 문장 기록의 시작 시각으로 지금 화면의 cue 찾기 (문장 합치기 설정이 달라졌으면 없을 수 있음) */
 function cueForStart(start) {
@@ -773,13 +783,28 @@ function setReviewOpen(on) {
   if (view) view.inert = on;
 }
 
-/** 콘텐츠를 열었을 때 복습 제안 (부모 모드 제외, 하루 2번까지) */
+/** 콘텐츠를 열었을 때 복습 제안 (부모 모드 제외) */
 function maybeReview() {
   if (state.parentMode || state.reviewDone) return;
   state.reviewDone = true;
   if (track.todayReviewSkips() >= REVIEW_MAX_SKIPS) return;
   const items = reviewItems();
   if (items.length) startReview(items, false);
+}
+
+/**
+ * 🔁 학습 중 복습 제안 — 문장을 끝낼 때마다 확률로 (다음 문장으로 넘어갈 때 열린다).
+ * 영상을 열 때 한 번 묻고 마는 구조에서는, 거절하면 다시 열기 전까지 기회가 없었다.
+ * 한 번에 하나만 열리도록 배틀·에세이가 걸려 있으면 비켜 준다.
+ */
+function maybeReviewDuring() {
+  if (state.reviewCooldown > 0) { state.reviewCooldown--; return; }
+  if (state.reviewPending || state.reviewOpen) return;
+  if (state.battlePending || state.essayPending) return; // 한 번에 하나만
+  if (track.todayReviewSkips() >= REVIEW_MAX_SKIPS) return;
+  if (Math.random() >= REVIEW_CHANCE) return;
+  if (!reviewItems().length) return; // 복습할 문장이 없으면 조용히 (확률을 뽑은 뒤에 확인 — 매 문장 훑지 않게)
+  state.reviewPending = true;
 }
 
 /**
@@ -810,8 +835,8 @@ async function grantReviewRound() {
   return reward;
 }
 
-/** 복습 회차 열기 (practice면 기록·보상 없음) */
-function startReview(items, practice) {
+/** 복습 회차 열기 (practice면 기록·보상 없음). after를 주면 끝난 뒤 제자리 대신 그걸 부른다 (학습 중 제안) */
+function startReview(items, practice, after) {
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
@@ -875,7 +900,8 @@ function startReview(items, practice) {
       setReviewOpen(false);
       state.practiceOpen = false;
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
-      restoreSpot(spot);
+      if (!practice) state.reviewCooldown = REVIEW_COOLDOWN; // 끝내든 거절하든 조금 뒤에 다시 물어본다
+      if (after) after(); else restoreSpot(spot);
       if (!practice && !s.started && !s.done) track.markReviewSkip(); // 시작도 안 하고 닫음
       if (!practice) track.flush();
     },
@@ -1083,6 +1109,7 @@ function markDone(cue) {
     awardCoins(COIN.done);
     maybeBattle(after); // ⚔️ 아주 가끔 트레이너가 걸어옴 (다음 문장으로 넘어갈 때 열림)
     maybeEssay();       // ✍️ 오늘 공부 시간을 채웠으면 에세이 (다음 문장으로 넘어갈 때 열림)
+    maybeReviewDuring(); // 🔁 복습도 학습 중에 (열 때 한 번만 묻던 것을 바꿈)
     // 🔥 오늘 5문장을 채우면 연속 학습일에 들어가고 보너스 (연속일수록 큼)
     if (!state.streakToday && after >= STREAK_MIN_DONE) {
       state.streakToday = true;
@@ -1238,6 +1265,8 @@ export async function openPlayer(id, opts = {}) {
   state.puzzlePool = [];
   state.journeyCelebrated = false;
   state.reviewDone = false;
+  state.reviewPending = false;
+  state.reviewCooldown = 0;
   state.essayPending = false;
   state.essaySuggested = false;
   state.coachFixDone = false;
@@ -1389,6 +1418,15 @@ function goTo(i, { play = true, force = false } = {}) {
     state.essayPending = false;
     startEssay(false, () => goTo(i, { play, force: true }));
     return;
+  }
+  // 🔁 복습이 걸려 있으면 맨 마지막 순서로 (따라 말하기 흐름은 이 goTo를 탄다)
+  if (!force && i > state.idx && state.reviewPending) {
+    state.reviewPending = false;
+    const items = reviewItems();
+    if (items.length) {
+      startReview(items, false, () => goTo(i, { play, force: true }));
+      return;
+    }
   }
   cancelShadowWait();
   state.idx = i;
@@ -1623,6 +1661,11 @@ function onCueEnd() {
     if (state.battlePending) startBattle(() => {});
     else if (puzzleReady()) startPuzzle(() => {});
     else if (state.essayPending) { state.essayPending = false; startEssay(false, null); }
+    else if (state.reviewPending) {
+      state.reviewPending = false;
+      const items = reviewItems();
+      if (items.length) startReview(items, false); // 끝났으니 제자리로 돌아오면 된다
+    }
     return;
   }
 
@@ -1646,6 +1689,17 @@ function onCueEnd() {
     const nextIdx = state.idx + 1;
     startPuzzle(() => goTo(nextIdx));
     return;
+  }
+
+  // 🔁 복습이 걸려 있으면 맨 마지막 순서로 (goTo와 같은 순서)
+  if (state.reviewPending) {
+    state.reviewPending = false;
+    const items = reviewItems();
+    if (items.length) {
+      const nextIdx = state.idx + 1;
+      startReview(items, false, () => goTo(nextIdx, { force: true }));
+      return;
+    }
   }
 
   advanceContinuous();
@@ -1718,6 +1772,11 @@ function afterShadowWait() {
   if (state.idx >= state.cues.length - 1) { // 마지막 문장: 배틀이 걸려 있으면 배틀, 아니면 퍼즐 (Codex #4)
     if (state.battlePending) startBattle(() => {});
     else if (puzzleReady()) startPuzzle(() => {});
+    else if (state.reviewPending) {
+      state.reviewPending = false;
+      const items = reviewItems();
+      if (items.length) startReview(items, false); // 끝났으니 제자리로 돌아오면 된다
+    }
     return;
   }
   goTo(state.idx + 1);
