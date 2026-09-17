@@ -50,7 +50,13 @@ export const LOCKED = [
  * 코인만이면 제일 쉬운 영상 한 편만 반복해도 모을 수 있어서, "기존 걸 다 본다"는 목적이 안 지켜진다.
  */
 export const NEED = {
-  progress: 0.8,      // 가진 영상 **전체 문장**의 80%를 완료
+  // 끝낸 문장 **누적 개수** (2026-09-18에 "가진 영상 전체의 80%" 비율에서 바꿈).
+  // 비율이면 영상을 넣을 때마다 목표가 멀어졌다: 태블릿에 5,527문장이 있어 80% = 4,422문장,
+  // 하루 40문장을 해도 막대가 0.9%씩 움직여 아버님 눈에 "진도가 안 는다"로 보였고,
+  // 새 영상 3편(214문장)을 넣으면 목표가 4,593으로 **더 멀어졌다**.
+  // 개수로 세면 ① 영상을 넣어도 목표가 그대로 ② 영상을 지워도 진도가 줄지 않는다
+  //   (그래서 "어려운 영화를 지워서 조건을 채우는" 옛 구멍도 원천적으로 없어진다).
+  doneSentences: 1000,
   reviewPassed: 60,   // 🔁 복습에서 한 번 이상 통과한 문장 60개 (배운 다음 날 이후에 다시 맞힌 것)
 };
 
@@ -58,56 +64,33 @@ export function findLocked(id) {
   return LOCKED.find((c) => c.id === id) || null;
 }
 
-/**
- * 진행률 조건에 쓸 입력 (순수 계산) — 분자·분모를 **같은 집합**에서 뽑는 한 곳.
- *
- * 저장이 깨져 못 읽는 영상(broken)은 문장 수를 셀 수 없어 분모가 0이 된다.
- * 분자(문장 기록)에서도 같이 빼지 않으면, 영상이 깨졌을 뿐인데 진행률이 저절로 올라가
- * 조건이 채워진다 (지운 영상과 똑같은 구멍 — 2026-09-17).
- *
- * @param {Array} items db.listItems() 결과
- * @param {(item)=>number} cueCountOf 영상 한 편의 문장 수
- */
-export function progressInputs(items = [], cueCountOf = () => 0) {
-  const usable = (items || []).filter((it) => it && !it.broken);
-  let totalCues = 0;
-  for (const it of usable) totalCues += cueCountOf(it) || 0;
-  return { itemIds: usable.map((it) => it.id), totalCues };
-}
 
 /**
  * 조건 현황 (순수 계산).
  *
- * ⚠️ 분자와 분모는 **같은 집합**에서 나와야 한다. `deleteItem`은 문장 기록을 지우지 않으므로,
- * 전체 기록을 그대로 세면 "지운 영화에서 한 문장"이 분자에 남고 분모에서만 빠진다
- * → 어려운 영화를 지우는 것만으로 진행률 조건이 채워져 이 기능의 목적이 무효가 된다.
- * itemIds를 주면 그 영상들의 기록만 센다.
+ * 문장 기록 **전부**를 센다 — 지운 영상의 기록도 포함한다. 아이가 실제로 배운 것이고,
+ * 개수로 세므로 지운다고 늘지 않는다(비율이던 시절의 "삭제로 조건 채우기" 구멍이 없다).
+ * 무엇보다 **진도가 뒤로 가지 않는다**: 영상을 지우거나 저장이 깨져도 숫자는 그대로다.
  *
- * @param {{coins:number, records:Array, totalCues:number, price:number, itemIds:Array|Set}} o
- *   records = 모든 문장 기록(db.getAllSentenceStats), totalCues = 지금 가진 영상의 문장 수 합,
- *   itemIds = 지금 가진 영상 id (없으면 거르지 않음 — 테스트·옛 호출용)
+ * @param {{coins:number, records:Array, price:number}} o
+ *   records = 모든 문장 기록 (db.getAllSentenceStats)
  */
-export function unlockState({ coins = 0, records = [], totalCues = 0, price = 0, itemIds = null } = {}) {
-  const only = itemIds ? new Set([...itemIds].map(String)) : null;
+export function unlockState({ coins = 0, records = [], price = 0 } = {}) {
   let done = 0;
   let reviewed = 0;
   for (const r of records || []) {
     if (!r) continue;
-    if (only && !only.has(String(r.itemId))) continue; // 지운 영상의 기록은 세지 않는다
     if (r.done) done++;
     if ((r.reviewPass || 0) > 0) reviewed++; // 복습에서 한 번 이상 통과
   }
-  const total = Math.max(0, Math.round(totalCues));
-  const needDone = Math.ceil(total * NEED.progress);
   const pctOf = (have, need) => (need <= 0 ? 100 : Math.min(100, Math.round((have / need) * 100)));
   const items = [
     { key: 'coins', label: '💰 코인', have: Math.max(0, Math.floor(coins)), need: price },
-    { key: 'progress', label: '📼 영상 문장', have: done, need: needDone },
+    { key: 'progress', label: '📼 배운 문장', have: done, need: NEED.doneSentences },
     { key: 'review', label: '🔁 복습 통과 문장', have: reviewed, need: NEED.reviewPassed },
   ].map((it) => ({ ...it, ok: it.have >= it.need, pct: pctOf(it.have, it.need) }));
   return {
-    done, total, reviewed, coins,
-    progress: total ? done / total : 0,
+    done, reviewed, coins,
     items,
     ready: items.every((it) => it.ok),
   };

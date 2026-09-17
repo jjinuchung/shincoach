@@ -1,56 +1,69 @@
 // 🎟️ 다음 영상 교환권 규칙 테스트: node --test tests/unlock.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LOCKED, NEED, unlockState, progressInputs, nextLocked, pendingTickets, ticketId, findLocked } from '../js/unlock.js';
+import { LOCKED, NEED, unlockState, nextLocked, pendingTickets, ticketId, findLocked } from '../js/unlock.js';
 
 const recs = (done, reviewed) => [
   ...Array.from({ length: done }, (_, i) => ({ key: `d${i}`, done: true, reviewPass: i < reviewed ? 1 : 0 })),
 ];
 
-test('🎟️ 조건 셋: 코인 · 전체 문장 80% · 복습 통과 60개', () => {
-  const s = unlockState({ coins: 4000, records: recs(800, 60), totalCues: 1000, price: 4000 });
-  assert.equal(s.total, 1000);
-  assert.equal(s.done, 800);
+test('🎟️ 조건 셋: 코인 · 끝낸 문장 개수 · 복습 통과 60개', () => {
+  const s = unlockState({ coins: 4000, records: recs(NEED.doneSentences, 60), price: 4000 });
+  assert.equal(s.done, NEED.doneSentences);
   assert.equal(s.reviewed, 60);
   assert.deepEqual(s.items.map((i) => i.ok), [true, true, true]);
   assert.equal(s.ready, true, '셋 다 채우면 살 수 있다');
 });
 
 test('🎟️ 하나라도 모자라면 못 산다 (코인만으로는 안 됨)', () => {
-  // 코인은 넘치는데 진도가 모자람 — "쉬운 영상만 반복해 코인만 모으는 길"을 막는 부분
-  const rich = unlockState({ coins: 99999, records: recs(300, 60), totalCues: 1000, price: 4000 });
+  // 코인은 넘치는데 배운 문장이 모자람 — "쉬운 영상만 반복해 코인만 모으는 길"을 막는 부분
+  const rich = unlockState({ coins: 99999, records: recs(300, 60), price: 4000 });
   assert.equal(rich.ready, false);
   assert.deepEqual(rich.items.map((i) => i.ok), [true, false, true]);
-  assert.equal(rich.items[1].need, 800, '1000문장이면 800개 필요');
+  assert.equal(rich.items[1].need, NEED.doneSentences);
 
-  // 진도는 다 했는데 복습을 안 함
-  const lazy = unlockState({ coins: 99999, records: recs(1000, 10), totalCues: 1000, price: 4000 });
+  // 문장은 다 했는데 복습을 안 함
+  const lazy = unlockState({ coins: 99999, records: recs(NEED.doneSentences, 10), price: 4000 });
   assert.equal(lazy.ready, false);
   assert.equal(lazy.items[2].have, 10);
   assert.equal(lazy.items[2].need, NEED.reviewPassed);
 
   // 다 했는데 코인이 모자람
-  const broke = unlockState({ coins: 100, records: recs(900, 80), totalCues: 1000, price: 4000 });
+  const broke = unlockState({ coins: 100, records: recs(NEED.doneSentences, 80), price: 4000 });
   assert.equal(broke.ready, false);
   assert.deepEqual(broke.items.map((i) => i.ok), [false, true, true]);
 });
 
-test('🎟️ 진행률은 올림 — 1문장 모자라도 못 산다', () => {
-  const s = unlockState({ coins: 4000, records: recs(799, 60), totalCues: 1000, price: 4000 });
-  assert.equal(s.items[1].need, 800);
+test('🎟️ 한 문장만 모자라도 못 산다', () => {
+  const s = unlockState({ coins: 4000, records: recs(NEED.doneSentences - 1, 60), price: 4000 });
   assert.equal(s.items[1].ok, false);
+  assert.equal(s.items[1].have, NEED.doneSentences - 1);
 });
 
-test('🎟️ 영상이 하나도 없으면 진도 조건은 0개 (조건이 막지 않는다)', () => {
-  const s = unlockState({ coins: 4000, records: [], totalCues: 0, price: 4000 });
-  assert.equal(s.items[1].need, 0);
-  assert.equal(s.items[1].ok, true);
-  assert.equal(s.items[1].pct, 100);
-  assert.equal(s.items[2].ok, false, '복습 조건은 그대로 남는다');
+// 2026-09-18: 전에는 "가진 영상 전체의 80%"라, 태블릿에 5,527문장이 있으면 4,422문장이 필요했다.
+// 하루 40문장을 해도 막대가 0.9%씩 움직여 "진도가 안 는다"로 보였고, **영상을 넣으면 목표가 더 멀어졌다**.
+test('🎟️ 영상을 넣거나 지워도 진도는 그대로다 (아이가 한 만큼만 센다)', () => {
+  const records = recs(400, 60);
+  const before = unlockState({ coins: 4000, records, price: 4000 });
+  // 새 영상 3편(214문장)을 넣은 상황 — 예전 규칙이면 목표가 171문장 더 멀어졌다
+  const after = unlockState({ coins: 4000, records, price: 4000 });
+  assert.equal(after.items[1].need, before.items[1].need, '목표가 안 밀린다');
+  assert.equal(after.items[1].have, before.items[1].have);
+
+  // 어려운 영화를 지워도 숫자가 줄지 않고, 늘지도 않는다 (예전 "삭제로 조건 채우기" 구멍이 없다)
+  const deleted = unlockState({ coins: 4000, records, price: 4000 });
+  assert.equal(deleted.items[1].have, 400, '지운 영상의 기록도 아이가 배운 것이라 그대로 센다');
+});
+
+test('🎟️ 아직 아무것도 안 했으면 진도 0 (조건이 열려 있지 않다)', () => {
+  const s = unlockState({ coins: 4000, records: [], price: 4000 });
+  assert.equal(s.items[1].have, 0);
+  assert.equal(s.items[1].ok, false, '문장을 배워야 열린다');
+  assert.equal(s.items[2].ok, false, '복습 조건도 그대로 남는다');
 });
 
 test('🎟️ 진행 막대(pct)는 0~100으로 자른다', () => {
-  const s = unlockState({ coins: 999999, records: recs(1000, 500), totalCues: 100, price: 10 });
+  const s = unlockState({ coins: 999999, records: recs(2000, 500), price: 10 });
   for (const it of s.items) assert.ok(it.pct >= 0 && it.pct <= 100, `${it.key} = ${it.pct}`);
 });
 
@@ -97,57 +110,22 @@ test('🎟️ 예고에는 나오는 포켓몬과 대사 한 줄이 있다', () 
   }
 });
 
-// ── Codex 리뷰에서 나온 것들 (2026-09-17) ──
-
-test('🎟️ [P1] 지운 영상의 기록은 진행률에 안 센다 (지워서 조건을 채우지 못하게)', () => {
-  // 지금 가진 영상 A(100문장) + 이미 지운 영상 B에서 한 80문장
-  const now = Array.from({ length: 100 }, (_, i) => ({ key: `A|${i}`, itemId: 'A', done: false, reviewPass: 0 }));
+// ── 옛 규칙(비율) 시절의 구멍들이 왜 없어졌는지 ──
+// 2026-09-17에는 "가진 영상 전체의 80%"라 분자·분모를 같은 집합에서 뽑아야 했다.
+// 그때 Codex가 찾은 구멍: `deleteItem`이 문장 기록을 안 지우므로 **어려운 영화를 지우면**
+// 그 기록이 분자에 남고 분모에서만 빠져 진행률이 저절로 채워졌다.
+// 2026-09-18에 개수로 바꾸면서 분모 자체가 없어져 이 구멍은 구조적으로 사라졌다.
+test('🎟️ 영상을 지워도 조건이 저절로 채워지지 않는다 (옛 구멍이 다시 생기지 않게)', () => {
   const gone = Array.from({ length: 80 }, (_, i) => ({ key: `B|${i}`, itemId: 'B', done: true, reviewPass: 1 }));
-  const all = [...now, ...gone];
-
-  // 거르지 않으면 80/80 → 조건 충족 (이 기능의 목적이 무효가 된다)
-  const loose = unlockState({ coins: 9999, records: all, totalCues: 100, price: 1 });
-  assert.equal(loose.items[1].ok, true, '(거르지 않으면 지운 영상으로 채워진다)');
-
-  // 지금 가진 영상만 세면 0/80
-  const tight = unlockState({ coins: 9999, records: all, totalCues: 100, price: 1, itemIds: ['A'] });
-  assert.equal(tight.done, 0);
-  assert.equal(tight.items[1].ok, false, '지운 영상 기록으로는 안 채워진다');
-  assert.equal(tight.reviewed, 0, '복습 조건도 마찬가지');
+  const st = unlockState({ coins: 9999, records: gone, price: 1 });
+  assert.equal(st.done, 80, '배운 문장 수는 그대로 (지운다고 늘지 않는다)');
+  assert.equal(st.items[1].ok, false, `80문장으로는 ${NEED.doneSentences}문장 조건을 못 채운다`);
+  assert.equal(st.items[1].need, NEED.doneSentences, '목표는 영상과 무관한 고정 숫자');
 });
 
-test('🎟️ [P1] itemIds를 주면 분자와 분모가 같은 영상에서 나온다', () => {
-  const recs = [
-    { key: 'A|1', itemId: 'A', done: true, reviewPass: 1 },
-    { key: 'A|2', itemId: 'A', done: true, reviewPass: 0 },
-    { key: 'B|1', itemId: 'B', done: true, reviewPass: 1 },
-  ];
-  const s = unlockState({ coins: 0, records: recs, totalCues: 2, price: 0, itemIds: ['A'] });
-  assert.equal(s.done, 2, 'A의 문장만');
-  assert.equal(s.reviewed, 1);
-  assert.equal(s.total, 2);
-});
-
-// ── 저장이 깨진 영상 (2026-09-17 태블릿: 자막 곁 파일 유실) ──
-test('🎟️ 저장이 깨진 영상은 분자·분모 양쪽에서 빠진다', () => {
-  const items = [
-    { id: 'A', enText: 'a' },
-    { id: 'B', broken: true, enText: '' }, // 못 읽는 영상 — 문장 수를 셀 수 없다
-  ];
-  const { itemIds, totalCues } = progressInputs(items, (it) => (it.id === 'A' ? 100 : 0));
-  assert.deepEqual(itemIds, ['A'], '깨진 영상 id가 들어가면 그 기록이 분자에 남는다');
-  assert.equal(totalCues, 100);
-
-  // B의 옛 기록 80건 + A는 하나도 안 끝냄 → 깨졌다고 진도가 올라가면 안 된다
-  const records = Array.from({ length: 80 }, (_, i) => ({ key: `B|${i}`, itemId: 'B', done: true, reviewPass: 1 }));
-  const st = unlockState({ coins: 9999, records, totalCues, price: 1, itemIds });
-  assert.equal(st.done, 0, '깨진 영상의 기록은 세지 않는다');
-  assert.equal(st.items[1].ok, false, '영상이 깨진 것만으로 조건이 채워지면 안 된다');
-});
-
-test('🎟️ progressInputs: 멀쩡한 영상만 문장 수를 더한다', () => {
-  const items = [{ id: 'A' }, { id: 'B', broken: true }, { id: 'C' }, null];
-  const { itemIds, totalCues } = progressInputs(items, () => 50);
-  assert.deepEqual(itemIds, ['A', 'C']);
-  assert.equal(totalCues, 100, '깨진 영상 몫 50은 안 더한다');
+test('🎟️ 조건 수치는 아이가 며칠이면 닿는 크기여야 한다', () => {
+  // 하루 40문장이면 25일. 비율이던 시절에는 4,422문장(3~4개월)이라 막대가 하루 0.9%씩 움직였다.
+  assert.ok(NEED.doneSentences >= 300 && NEED.doneSentences <= 2000, `문장 목표 ${NEED.doneSentences}`);
+  assert.ok(NEED.reviewPassed >= 20 && NEED.reviewPassed <= 200, `복습 목표 ${NEED.reviewPassed}`);
+  assert.equal(NEED.progress, undefined, '비율 규칙은 없앴다 (영상을 넣으면 목표가 멀어졌다)');
 });
