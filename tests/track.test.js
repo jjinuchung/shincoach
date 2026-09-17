@@ -278,7 +278,7 @@ test('🪟 하루 한 번 보상(🌟 황금 볼·🎯 목표·✍️ 에세이�
   }
 });
 
-test('🪟 하루 상한(⚔️ 배틀 1번·🍄 다이버섯 2개)도 두 창을 합쳐 센다', async () => {
+test('🪟 하루 상한(여기선 1번·2개를 넘겨 확인)도 두 창을 합쳐 센다', async () => {
   const s = stub();
   const a = loadTrack(s);
   const b = loadTrack(s);

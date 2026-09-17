@@ -35,12 +35,14 @@ test('말하기 결과 → 등급 → 데미지: 강한 기술은 잘 말할수�
   assert.equal(enemyDamage(() => 0), BATTLE.enemyMin); assert.equal(enemyDamage(() => 0.999), BATTLE.enemyMax);
 });
 
-test('등장 조건: 오늘 5문장 이상·하루 1번·확률 8%', () => {
+test('등장 조건: 오늘 5문장 이상·하루 최대 3번·확률 8%', () => {
   assert.equal(shouldBattle({ todayDone: 4, todayBattles: 0, rng: () => 0 }), false, '5문장 전엔 없음');
-  assert.equal(shouldBattle({ todayDone: 5, todayBattles: 1, rng: () => 0 }), false, '하루 1번');
+  assert.equal(shouldBattle({ todayDone: 5, todayBattles: BATTLE.maxPerDay, rng: () => 0 }), false, '하루 최대까지만');
+  assert.equal(shouldBattle({ todayDone: 5, todayBattles: BATTLE.maxPerDay - 1, rng: () => 0 }), true, '아직 남았으면 나온다');
   assert.equal(shouldBattle({ todayDone: 5, todayBattles: 0, rng: () => BATTLE.chance - 0.001 }), true);
   assert.equal(shouldBattle({ todayDone: 5, todayBattles: 0, rng: () => BATTLE.chance + 0.001 }), false);
   assert.equal(BATTLE.chance, 0.08, '하루 30문장이면 4%에서는 셋 중 하루는 한 번도 못 만났다 (진우 신고)');
+  assert.equal(BATTLE.maxPerDay, 3, '1번이면 아침에 만나고 나면 그날은 끝이라 오후 공부가 밋밋했다');
 });
 
 test('상대 고르기: 못 잡은 것 중, 흔할수록 자주. 내보낼 포켓몬: 파트너·😴 제외', () => {
