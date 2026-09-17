@@ -81,3 +81,18 @@ test('🎟️ 목록은 id가 겹치지 않고 값이 온전하다', () => {
     assert.ok(c.minutes > 0 && c.sentences > 0, c.id);
   }
 });
+
+// 표지는 실제 장면 캡처가 아니라 "나오는 포켓몬" — 저작물을 저장소에 두지 않으려는 것이라 규칙으로 고정
+test('🎟️ 예고에는 나오는 포켓몬과 대사 한 줄이 있다', () => {
+  for (const c of LOCKED) {
+    assert.ok(Array.isArray(c.cast) && c.cast.length >= 3, `${c.id} 포켓몬 3마리 이상`);
+    assert.equal(new Set(c.cast.map((m) => m.id)).size, c.cast.length, `${c.id} 겹침 없음`);
+    for (const m of c.cast) {
+      assert.ok(Number.isInteger(m.id) && m.id > 0, `${c.id} 그림 id`);
+      assert.match(m.ko, /^[가-힣]+$/, `${c.id} 한국어 이름 (PokeAPI 공식명)`);
+    }
+    assert.ok(c.cast.some((m) => m.id === c.poster), `${c.id} 표지는 나오는 포켓몬 중 하나`);
+    assert.ok(c.teaser && c.teaser.length <= 60, `${c.id} 대사 한 줄`);
+    assert.match(c.teaser, /[a-z]/i, `${c.id} 영어 대사여야 배울 문장이 된다`);
+  }
+});

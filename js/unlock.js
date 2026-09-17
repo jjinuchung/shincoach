@@ -12,18 +12,36 @@ export const ticketId = (id) => `${TICKET_PREFIX}${id}`;
 
 /**
  * 살 수 있는 영상 목록. 새 콘텐츠를 만들면 여기에 한 줄 더한다.
- * poster = 표지로 쓸 포켓몬 id (이미 받아 둔 그림을 쓰므로 새 파일이 필요 없다)
+ *
+ * 표지는 **실제 장면 캡처가 아니라 그 영상에 나오는 포켓몬 그림**이다.
+ * 애니 장면을 저장소에 커밋하면 "닌텐도 저작물은 공개 저장소에 두지 않는다"는
+ * 이 프로젝트의 원칙이 깨진다 (GitHub Pages 무료는 Public 저장소만 된다).
+ * 포켓몬 그림은 지금도 PokeAPI에서 받아 기기에만 두므로 새 파일이 늘지 않고,
+ * 수집이 목표인 아이에게는 "얘네가 나온다"가 장면 사진보다 직접적이다.
+ *
+ * cast  = 그 영상에 나오는 포켓몬 id (한국어 이름은 PokeAPI로 대조함)
+ * teaser = 영상에 실제로 나오는 대사 한 줄 (사면 배우게 될 문장)
  */
 export const LOCKED = [
   {
     id: 'gengar', ko: '팬텀 대소동', en: 'Gengar to the Max',
     poster: 94, emoji: '👻', minutes: 15, sentences: 180, price: 4000,
     blurb: '팬텀이 거다이맥스로 변신해서 싸워요',
+    cast: [
+      { id: 94, ko: '팬텀' }, { id: 861, ko: '오롱털' },
+      { id: 26, ko: '라이츄' }, { id: 356, ko: '미라몽' },
+    ],
+    teaser: 'Gengar, Shadow Ball, now!',
   },
   {
     id: 'ash_battles', ko: '지우와 피카츄 명장면', en: "Ash & Pikachu's Epic Battle Moments",
     poster: 25, emoji: '⚡', minutes: 8, sentences: 86, price: 4000,
     blurb: '지우와 피카츄의 가장 멋진 배틀만 모았어요',
+    cast: [
+      { id: 25, ko: '피카츄' }, { id: 214, ko: '헤라크로스' },
+      { id: 262, ko: '그라에나' }, { id: 101, ko: '붐볼' },
+    ],
+    teaser: 'Pikachu, use Iron Tail!',
   },
 ];
 

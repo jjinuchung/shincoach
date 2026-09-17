@@ -195,6 +195,53 @@ export async function ensureForm(monId, kind) {
   }
 }
 
+// ── 🎟️ 예고 포스터용 그림 ──
+// 아직 못 잡은·명단에 없는 포켓몬도 보여줘야 하므로 따로 둔다.
+// 저장 방식은 캐릭터·변신 그림과 같다 — **PokeAPI에서 한 번 받아 기기에만** (저장소에 파일을 두지 않는다).
+const artUrls = new Map();
+
+/** 받아둔 포스터 그림 주소 (없으면 null) */
+export function artUrl(id) {
+  return artUrls.get(Number(id)) || null;
+}
+
+/** 포스터 그림 한 장 확보. 실패하면 null (호출부가 이모지로 대체) */
+export async function ensureArt(id) {
+  const key = Number(id);
+  if (!key) return null;
+  if (artUrls.has(key)) return artUrls.get(key);
+  const saved = (await getCharacters().catch(() => [])).find((c) => c.id === key && c.blob);
+  if (saved) {
+    const url = URL.createObjectURL(saved.blob);
+    artUrls.set(key, url);
+    return url;
+  }
+  try {
+    const res = await fetch(ART_URL(key), { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const made = await prepare(await res.blob());
+    // 명단(ROSTER)에 없는 id는 loadCharacters가 걸러내므로 도감·퍼즐에는 안 나온다
+    await putCharacter({ id: key, ko: byKo(key), en: '', blob: made.blob, anchor: made.anchor, savedAt: Date.now() });
+    const url = URL.createObjectURL(made.blob);
+    artUrls.set(key, url);
+    return url;
+  } catch (e) {
+    console.warn('포스터 그림 받기 실패:', key, e);
+    return null;
+  }
+}
+
+function byKo(id) {
+  const r = ROSTER.find((x) => x.id === id);
+  return r ? r.ko : `art:${id}`;
+}
+
+/** 여러 장을 한꺼번에 (실패한 건 조용히 건너뜀) */
+export async function ensureCast(ids = []) {
+  await Promise.all(ids.map((id) => ensureArt(id).catch(() => null)));
+  return ids.map((id) => ({ id: Number(id), url: artUrl(id) })).filter((c) => c.url);
+}
+
 /** 앱을 열 때 이미 받아둔 변신 그림을 메모리에 올림 (오프라인에서도 보이게) */
 export async function loadForms() {
   const known = new Set();

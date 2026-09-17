@@ -1480,6 +1480,25 @@ button { font-family: inherit; }
 .next-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 2px; }
 .next-blurb { font-size: .9rem; color: var(--muted); margin: 0 0 10px; }
 .next-msg { font-size: .95rem; margin: 4px 0 0; color: #92400e; }
+.next-teaser {
+  font-size: 1rem; font-weight: 700; font-style: italic; color: #4338ca;
+  background: #fff; border-left: 4px solid var(--primary);
+  border-radius: 0 10px 10px 0; padding: 6px 10px; margin: 0 0 10px;
+}
+.next-teaser[hidden] { display: none; }
+.next-cast-label { font-size: .8rem; font-weight: 800; color: var(--muted); margin: 0 0 4px; }
+.next-cast { display: flex; gap: 6px; margin-bottom: 10px; }
+.next-cast-mon {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: #fff; border-radius: 10px; padding: 4px 2px;
+}
+.next-cast-mon img { width: 100%; max-width: 54px; height: 46px; object-fit: contain; }
+.next-cast-mon .ph { font-size: 28px; line-height: 46px; opacity: .35; }
+.next-cast-mon .n {
+  font-size: .7rem; font-weight: 700; color: var(--muted);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 .next-needs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .next-need { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: .9rem; font-weight: 700; }
 .next-need.ok { color: #047857; }

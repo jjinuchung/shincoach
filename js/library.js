@@ -3,7 +3,7 @@ import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats } 
 import { parseSubtitle, mergeIntoSentences } from './srt.js';
 import { LOCKED, unlockState, nextLocked, ticketId } from './unlock.js';
 import { coins, inventory, buyTicket, initProfile } from './xp.js';
-import { characterUrl } from './pokemon.js';
+import { characterUrl, ensureCast, artUrl } from './pokemon.js';
 import { sfx, unlock as unlockAudio } from './sfx.js';
 import { parseSami, isSami, toSrt } from './sami.js';
 import { openPlayer } from './player.js';
@@ -285,8 +285,25 @@ async function renderNextVideo(items) {
   let totalCues = 0;
   for (const it of items) totalCues += mergeIntoSentences(parseSubtitle(it.enText || '')).length;
   const st = unlockState({ coins: coins(), records, totalCues, price: next.price });
-  box.appendChild(lockedCard(next, st));
+  const card = lockedCard(next, st);
+  box.appendChild(card);
   box.hidden = false;
+  // 나오는 포켓몬 그림은 없으면 받아 온다 (인터넷이 없으면 이모지로 남는다)
+  ensureCast((next.cast || []).map((c) => c.id)).then(() => fillCast(card, next)).catch(() => {});
+}
+
+/** 받아 온 그림을 자리에 끼운다 (아직 없으면 ❔ 그대로) */
+function fillCast(root, c) {
+  for (const m of (c.cast || [])) {
+    const fig = root.querySelector(`.next-cast-mon[data-id="${m.id}"]`);
+    if (!fig || fig.querySelector('img')) continue;
+    const url = artUrl(m.id) || characterUrl(m.id);
+    if (!url) continue;
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = m.ko;
+    fig.replaceChild(img, fig.querySelector('.ph'));
+  }
 }
 
 function waitingCard(c) {
@@ -312,11 +329,28 @@ function lockedCard(c, st) {
       <p class="next-kicker">🎟️ 다음 영상</p>
       <p class="next-title"></p>
       <p class="next-blurb"></p>
+      <p class="next-teaser"></p>
+      <p class="next-cast-label">이 포켓몬들이 나와요</p>
+      <div class="next-cast"></div>
       <div class="next-needs"></div>
       <button class="btn next-buy"></button>
     </div>`;
   el.querySelector('.next-title').textContent = `${c.emoji} ${c.ko}`;
   el.querySelector('.next-blurb').textContent = `${c.blurb} · ${c.minutes}분 · ${c.sentences}문장`;
+  const tz = el.querySelector('.next-teaser');
+  tz.textContent = c.teaser ? `“${c.teaser}”` : '';
+  tz.hidden = !c.teaser;
+
+  const cast = el.querySelector('.next-cast');
+  for (const m of (c.cast || [])) {
+    const fig = document.createElement('span');
+    fig.className = 'next-cast-mon';
+    fig.dataset.id = String(m.id);
+    fig.innerHTML = `<span class="ph">❔</span><span class="n"></span>`;
+    fig.querySelector('.n').textContent = m.ko;
+    cast.appendChild(fig);
+  }
+  fillCast(el, c);
 
   const needs = el.querySelector('.next-needs');
   for (const it of st.items) {
