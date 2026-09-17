@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { makeFrame, pickPrompts, correct, looksEnglish, tooShort, exportText, parseFixes, matchFixes, MIN_WORDS, MIN_BLANK_WORDS, MAX_BLANK_WORDS } from '../js/essay.js';
+import { makeFrame, pickPrompts, correct, looksEnglish, tooShort, exportText, parseFixes, matchFixes, isMultiSentence, MIN_WORDS, MIN_BLANK_WORDS, MAX_BLANK_WORDS } from '../js/essay.js';
 
 const words = JSON.parse(fs.readFileSync(new URL('../vocab/words.json', import.meta.url), 'utf8'));
 const basic = JSON.parse(fs.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8'));
@@ -12,29 +12,30 @@ const BASIC = new Set(basic);
 const rec = (en, extra = {}) => ({ done: true, en, ko: '', box: 1, lastAt: 1, ...extra });
 
 test('틀 만들기: 자연스러운 자리에서 끊고 뒷부분을 비운다', () => {
-  const f = makeFrame("I can't believe I just caught a Gengar!");
+  const f = makeFrame("I can't believe I just caught a Gengar in the tall grass!");
   assert.ok(f, '만들어져야 한다');
-  assert.equal(f.keep, "I can't believe I just", 'just 뒤에서 끊는다');
-  assert.equal(f.rest, 'caught a Gengar!');
-  assert.ok(f.blankWords >= 2);
+  assert.equal(f.keep, "I can't believe I just", 'just 뒤에서 끊는다 (빈칸이 범위 가운데에 가장 가까운 자리)');
+  assert.equal(f.rest, 'caught a Gengar in the tall grass!');
+  assert.ok(f.blankWords >= MIN_BLANK_WORDS);
 });
 
 test('틀 만들기: 너무 짧거나 긴 문장은 쓰지 않는다', () => {
   assert.equal(makeFrame('Gengar!'), null);
   assert.equal(makeFrame('Use Fire Punch!'), null, `${MIN_WORDS}단어 미만`);
-  assert.equal(makeFrame('a '.repeat(20)), null, '너무 김');
+  assert.equal(makeFrame("I know, right? She's adorable."), null, '5단어 — 채울 게 2단어뿐이라 에세이가 안 된다');
+  assert.equal(makeFrame('a '.repeat(25)), null, '너무 김');
 });
 
 test('틀 만들기: 고정 부분 끝의 쉼표는 떼어 낸다', () => {
-  const f = makeFrame('The two of us will trail behind and help them out.');
+  const f = makeFrame('The two of us will trail behind them and help everyone out.');
   assert.ok(f);
   assert.ok(!/[,.!?]$/.test(f.keep), `고정 부분이 부호로 끝나면 안 된다: "${f.keep}"`);
 });
 
 test('문장 고르기: 명령문보다 "내 이야기"로 바꾸기 쉬운 문장을 앞에 둔다', () => {
   const list = [
-    rec('Dodge it with Quick Attack right now!'),
-    rec("I can't believe I just caught a Gengar!"),
+    rec('Dodge it with Quick Attack right now before it hits you!'),
+    rec("I can't believe I just caught a Gengar in the tall grass!"),
   ];
   const picked = pickPrompts(list, 2);
   assert.equal(picked.length, 2);
@@ -43,9 +44,9 @@ test('문장 고르기: 명령문보다 "내 이야기"로 바꾸기 쉬운 문�
 
 test('문장 고르기: 자막에 없는 옛 기록과 두 화자가 겹친 줄은 뺀다', () => {
   const list = [
-    rec("I'm her deputy. I'm her deputy. Yes!"),        // 겹쳐 말한 줄
-    rec('I think I know what that means today.', { gone: true }),
-    rec('We will go to the park after school.'),
+    rec("I'm her deputy, I'm her deputy, and that is really that."), // 겹쳐 말한 줄
+    rec('I think I know exactly what that means for us today.', { gone: true }),
+    rec('We will go to the park after school with my friends.'),
   ];
   const picked = pickPrompts(list, 5, { cueOf: (r) => !r.gone });
   assert.equal(picked.length, 1);
@@ -120,20 +121,40 @@ test('한글로 쓰면 영어로 쓰자고 알려준다', () => {
   assert.equal(looksEnglish('   '), false);
 });
 
-test('틀: 빈칸은 언제나 2~5단어 (긴 문장이면 고정 부분을 길게 둔다)', () => {
+test(`틀: 빈칸은 언제나 ${MIN_BLANK_WORDS}~${MAX_BLANK_WORDS}단어 (긴 문장이면 고정 부분을 길게 둔다)`, () => {
   const sentences = [
-    'I want to play with my friend today.',
+    'I want to play with my best friend at the playground today.',
     'I want to go to the park with all of my friends after school.',
-    'We will go to the park after school.',
-    "I can't believe I just caught a Gengar!",
-    'The two of us will trail behind and help them out.',
+    'We will go to the park after school and play soccer together.',
+    "I can't believe I just caught a Gengar in the tall grass!",
+    'The two of us will trail behind them and help everyone out.',
   ];
   for (const en of sentences) {
     const f = makeFrame(en);
     assert.ok(f, `틀이 만들어져야 한다: ${en}`);
     assert.ok(f.blankWords >= MIN_BLANK_WORDS && f.blankWords <= MAX_BLANK_WORDS,
-      `빈칸 ${f.blankWords}단어 — 2~5여야 한다: "${f.keep} ___"`);
+      `빈칸 ${f.blankWords}단어 — ${MIN_BLANK_WORDS}~${MAX_BLANK_WORDS}여야 한다: "${f.keep} ___"`);
   }
+});
+
+// 아버님이 실제 결과를 보고 지적한 두 가지 (2026-09-17)
+test('✍️ 짧은 문장은 안 낸다 — 채울 게 2단어뿐이면 에세이가 아니다', () => {
+  for (const en of [
+    "I know, right? She's adorable.",              // 5단어 → 진우가 2단어만 씀
+    'My entire SD card flashed before my eyes.',   // 8단어
+    'Use Fire Punch!',
+  ]) {
+    assert.equal(makeFrame(en), null, en);
+  }
+});
+
+test('✍️ 감탄사 여러 개가 합쳐진 자막 큐는 안 낸다', () => {
+  // 9단어라 길이로는 안 걸리지만 네 문장이라, 틀이 "It's really me! Yes!"가 되어 버린다
+  assert.equal(isMultiSentence("It's really me! Yes! My goodness. You look great."), true);
+  assert.equal(makeFrame("It's really me! Yes! My goodness. You look great and happy!"), null, '길어도 여러 문장이면 제외');
+  assert.equal(isMultiSentence('I want to go to the park with my friends today.'), false, '한 문장은 통과');
+  assert.equal(isMultiSentence('I wanna talk to you, device. Please, call me "Lily."'), true, '닫는 따옴표 뒤도 문장 끝');
+  assert.equal(isMultiSentence("I can't believe it happened to me on my birthday!"), false, '문장 안의 아포스트로피는 무관');
 });
 
 test('보상만 노린 한 글자 답은 막는다', () => {

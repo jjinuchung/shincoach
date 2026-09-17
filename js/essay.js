@@ -13,10 +13,24 @@ export const DEFAULT_COUNT = 3;      // 한 번에 쓸 문장 수
 export const REWARD = { xp: 10, coin: 5 };        // 문장 하나 완성
 export const FINISH_REWARD = { xp: 50, coin: 20 }; // 전부 완성 (하루 1번)
 
-export const MIN_WORDS = 5;          // 너무 짧은 문장은 바꿔 쓸 게 없다
-export const MAX_WORDS = 14;         // 너무 길면 초4에게 부담
-export const MIN_BLANK_WORDS = 2;    // 아이가 채울 부분은 최소 2단어
-export const MAX_BLANK_WORDS = 5;    // 최대 5단어 (더 길면 타이핑이 부담)
+// 5단어짜리("I know, right? She's adorable.")를 내면 아이가 채울 게 2단어뿐이라
+// 에세이가 아니라 빈칸 채우기가 된다 (아버님이 실제 결과를 보고 지적).
+export const MIN_WORDS = 10;         // 10단어는 돼야 내 이야기로 바꿀 거리가 생긴다
+export const MAX_WORDS = 18;         // 너무 길면 초4에게 부담
+// 문장만 길게 하고 채울 양을 묶어 두면 고정 부분만 길어질 뿐이다 → 같이 올린다
+export const MIN_BLANK_WORDS = 4;    // 아이가 채울 부분은 최소 4단어
+export const MAX_BLANK_WORDS = 8;    // 최대 8단어 (초4가 태블릿으로 칠 수 있는 선)
+
+/**
+ * 짧은 말 여러 개가 한 자막 큐로 합쳐진 것인지.
+ * "It's really me! Yes! My goodness. You look great." 는 9단어라 길이로는 안 걸리지만
+ * 네 문장이라, 틀이 "It's really me! Yes!"(감탄사)가 되고 나머지를 비우게 된다.
+ * 내 이야기로 바꿔 쓸 **한 문장**이어야 한다.
+ */
+export function isMultiSentence(text) {
+  // 닫는 따옴표·괄호가 뒤에 붙어도 문장 끝이다 (`call me "Lily."`)
+  return (String(text || '').match(/[.!?]+["'’”)\]]*(?=\s|$)/g) || []).length > 1;
+}
 
 /** 이 단어 **뒤에서** 끊으면 틀이 자연스럽다 ("I can't believe I just ___") */
 const SPLIT_AFTER = new Set([
@@ -68,20 +82,26 @@ const VOWEL_EXCEPT = new Set(['hour', 'honest', 'honor']);
 export function makeFrame(text) {
   const words = String(text || '').replace(/\n/g, ' ').trim().split(/\s+/).filter(Boolean);
   if (words.length < MIN_WORDS || words.length > MAX_WORDS) return null;
+  if (isMultiSentence(text)) return null; // 감탄사 여러 개가 합쳐진 큐 (길이로는 안 걸린다)
 
-  // 아이가 채울 부분은 **항상 2~5단어**로 (초4가 태블릿에서 영어를 치는 양).
-  // 고정 부분에 상한을 두면 긴 문장에서 빈칸이 8단어까지 늘어난다 (Codex #11)
+  // 채울 부분은 **항상 MIN~MAX 단어** 안에 들어오게 (고정 부분 길이로 조절).
+  // 고정 부분에만 상한을 두면 긴 문장에서 빈칸이 끝없이 늘어난다 (Codex #11)
   const maxKeep = words.length - MIN_BLANK_WORDS;
   const minKeep = Math.max(2, words.length - MAX_BLANK_WORDS);
   if (maxKeep < minKeep) return null;
 
-  // 그 범위 안에서 자연스러운 자리를 찾는다 ("I can't believe I just ___")
+  // 그 범위 안에서 자연스러운 자리를 찾는다 ("I can't believe I just ___").
+  // 끝에서부터 훑으면 늘 빈칸이 최소가 되어 아이가 딱 MIN_BLANK_WORDS만 쓴다 →
+  // 빈칸이 범위 **가운데**에 가장 가까운 자리를 고른다.
+  const mid = (MIN_BLANK_WORDS + MAX_BLANK_WORDS) / 2;
   let keepN = 0;
-  for (let i = maxKeep; i >= minKeep; i--) {
-    const w = core(words[i - 1]).toLowerCase();
-    if (SPLIT_AFTER.has(w)) { keepN = i; break; }
+  let best = Infinity;
+  for (let i = minKeep; i <= maxKeep; i++) {
+    if (!SPLIT_AFTER.has(core(words[i - 1]).toLowerCase())) continue;
+    const gap = Math.abs((words.length - i) - mid);
+    if (gap < best) { best = gap; keepN = i; }
   }
-  if (!keepN) keepN = Math.max(minKeep, Math.min(maxKeep, words.length - 4));
+  if (!keepN) keepN = Math.max(minKeep, Math.min(maxKeep, words.length - Math.round(mid)));
 
   const keep = words.slice(0, keepN).join(' ').replace(/[,.!?;:]+$/, '');
   if (!keep || !/[a-z]/i.test(keep)) return null;
@@ -109,7 +129,7 @@ function scoreFrame(r, frame) {
   const first = core(String(r.en).trim().split(/\s+/)[0] || '').toLowerCase();
   if (PERSONAL_START.has(first)) s += 3;
   s += Math.min(2, r.box || 0);                                  // 잘 아는 문장일수록 응용하기 쉽다
-  if (frame.blankWords >= 2 && frame.blankWords <= 5) s += 2;    // 채울 양이 적당한 것
+  if (frame.blankWords >= MIN_BLANK_WORDS && frame.blankWords <= MAX_BLANK_WORDS) s += 2; // 채울 양이 적당한 것
   if (r.speakPass > 0) s += 1;                                   // 말해 본 적 있는 문장
   return s;
 }

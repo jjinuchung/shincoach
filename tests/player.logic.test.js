@@ -1476,9 +1476,9 @@ test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (�
   ctx.track.todayDone = () => done.length;
   // 문장 기록: 바꿔 쓸 수 있는 문장 3개 (자막에도 있어야 고른다)
   const cues = [
-    { start: 0, end: 3, en: "I can't believe I just caught a Gengar!", ko: '내가 팬텀을 잡다니!' },
-    { start: 10, end: 13, en: 'I want to play with my friend today.', ko: '오늘 친구와 놀고 싶어.' },
-    { start: 20, end: 23, en: 'We will go to the park after school.', ko: '방과 후에 공원에 갈 거야.' },
+    { start: 0, end: 3, en: "I can't believe I just caught a Gengar in the tall grass!", ko: '내가 팬텀을 잡다니!' },
+    { start: 10, end: 13, en: 'I want to play with my best friend at the playground today.', ko: '오늘 친구와 놀고 싶어.' },
+    { start: 20, end: 23, en: 'We will go to the park after school and play soccer.', ko: '방과 후에 공원에 갈 거야.' },
     { start: 30, end: 33, en: 'a b c', ko: '' },
   ];
   ctx.track.statsList = () => cues.slice(0, 3).map((c) => ({ ...c, done: true, box: 1, lastAt: 1 }));
@@ -1559,11 +1559,11 @@ test('✍️ 에세이: 콘텐츠를 닫는 중이면 이어가기(goTo)를 하�
   ctx.track.done = (c) => done.push(c);      // markDone은 "오늘 한 문장 수"가 늘어야 보상 단계로 간다
   ctx.track.todayDone = () => done.length;
   ctx.track.statsList = () => [
-    { start: 0, end: 3, en: 'I want to play with my friend today.', ko: '', done: true, box: 1, lastAt: 1 },
+    { start: 0, end: 3, en: 'I want to play with my best friend at the playground today.', ko: '', done: true, box: 1, lastAt: 1 },
   ];
   essayState.seconds = 30 * 60;
   run(`settings.listenFirst = 0; settings.puzzleEvery = 0; settings.dailyGoal = 0; settings.essayMinutes = 30;
-       state.cues = [{start:0,end:3,en:"I want to play with my friend today.",ko:""},{start:10,end:13,en:"a b c",ko:""}]; state.idx = 0;`);
+       state.cues = [{start:0,end:3,en:"I want to play with my best friend at the playground today.",ko:""},{start:10,end:13,en:"a b c",ko:""}]; state.idx = 0;`);
   run('markDone(state.cues[0])');
   run('goTo(1)');
   assert.equal(essayCalls.length, 1, '에세이가 열림');
