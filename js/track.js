@@ -2,7 +2,7 @@
 // 메모리에 모았다가 5초마다·닫을 때 IndexedDB에 저장 (문장마다 쓰지 않도록)
 import {
   sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, bumpVocabViews,
-  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyFlag, claimDailyCount,
+  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount,
 } from './db.js';
 import { enroll, schedule, GRADUATED } from './review.js';
 
@@ -27,18 +27,17 @@ const t = {
 /**
  * 오늘 기록의 증분. 홈 화면 앱과 Chrome 탭을 같이 열면 각 창이 사본을 들고 있다가
  * 통째로 덮어써서 서로의 공부 시간·문장 수가 사라졌다 → 늘어난 만큼만 모아서 더해 쓴다.
+ * 수치는 bump가 `(Number(x) || 0) + n`으로 더하므로 0을 미리 깔지 않는다 — 깔아 두면
+ * db.js의 DAILY_SUMS를 베낀 두 번째 목록이 되어 조용히 어긋난다 (실제로 어긋나 있었다).
  */
 function emptyDelta() {
-  return {
-    seconds: 0, speakAttempts: 0, speakPass: 0, puzzles: 0, puzzleSolved: 0,
-    reviewSentences: 0, reviewItems: 0, reviewRounds: 0, reviewSkips: 0,
-    doneKeys: [], essays: [],
-  };
+  return { doneKeys: [], essays: [] };
 }
 
 function deltaEmpty(d) {
   if (!d) return true;
   for (const k of Object.keys(d)) {
+    if (k === 'date') continue; // 저장 실패로 되돌린 증분에는 날짜가 붙어 있다
     const v = d[k];
     if (Array.isArray(v) ? v.length : v) return false;
   }
@@ -73,10 +72,7 @@ function rollDailyIfNeeded() {
   if (!deltaEmpty(oldDelta)) applyDailyDelta(oldDate, oldDelta).catch(() => {});
   t.daily = emptyDaily(key);
   // 저장소에 오늘 기록이 이미 있으면(다른 창이 썼거나 아침에 한 번 열었음) 보기값을 그걸로 맞춤
-  getDaily(key).then((existing) => {
-    if (!existing || !t.daily || t.daily.date !== key) return;
-    t.daily = mergeDailyDelta(existing, key, t.dailyDelta);
-  }).catch(() => {});
+  getDaily(key).then((existing) => adoptSaved(key, existing)).catch(() => {});
 }
 
 function rec(cue) {
@@ -101,43 +97,30 @@ async function ensureDaily() {
   return t.daily;
 }
 
+/** 저장 결과를 보기값으로 채택 (그 사이 자정을 넘겼으면 버린다) */
+function adoptSaved(date, saved) {
+  if (!saved || !t.daily || t.daily.date !== date) return;
+  t.daily = mergeDailyDelta(saved, date, t.dailyDelta);
+}
+
 /**
- * "하루 한 번"을 트랜잭션 안에서 선점한다 → 두 창이 동시에 불러도 보상은 한 쪽만.
- * 저장소가 막히면 메모리로라도 하루 한 번을 지킨다 (보상을 두 번 주지 않는 쪽으로).
+ * "하루 N번"을 트랜잭션 안에서 선점한다 → 두 창이 동시에 불러도 보상은 한 쪽만.
+ * 하루 한 번짜리(플래그)는 max 1로 부르면 된다 — 저장될 때 boolean으로 돌아오고 Number(true)는 1이다.
+ * 저장소가 막히면 메모리로라도 상한을 지킨다 (보상을 두 번 주지 않는 쪽으로).
  * @returns {Promise<boolean>} 이번에 내가 선점했는지
  */
-async function claimFlag(flag) {
+async function claim(field, max) {
   if (!t.daily) return false;
-  if (t.daily[flag]) return false;
+  if (max !== undefined && (Number(t.daily[field]) || 0) >= max) return false;
   await flush();                       // 보기값과 저장값을 먼저 맞춘다
   const date = t.daily.date;
   try {
-    const r = await claimDailyFlag(date, flag);
-    if (r.daily && t.daily && t.daily.date === date) t.daily = mergeDailyDelta(r.daily, date, t.dailyDelta);
-    return r.won;
-  } catch (e) {
-    if (t.daily[flag]) return false;
-    t.daily[flag] = true;
-    t.dailyDelta[flag] = true;
-    return true;
-  }
-}
-
-/** "하루 N번"도 같은 방식 — 자리가 있을 때만 +1 (max 없으면 세기만) */
-async function claimCount(field, max) {
-  if (!t.daily) return false;
-  if (max !== undefined && (t.daily[field] || 0) >= max) return false;
-  await flush();
-  const date = t.daily.date;
-  try {
     const r = await claimDailyCount(date, field, max);
-    if (r.daily && t.daily && t.daily.date === date) t.daily = mergeDailyDelta(r.daily, date, t.dailyDelta);
+    adoptSaved(date, r.daily);
     return r.won;
   } catch (e) {
-    const have = Number(t.daily[field]) || 0;
-    if (max !== undefined && have >= max) return false;
-    t.daily[field] = have + 1;
-    t.dailyDelta[field] = (Number(t.dailyDelta[field]) || 0) + 1;
+    if (max !== undefined && (Number(t.daily[field]) || 0) >= max) return false;
+    bump(field);
     return true;
   }
 }
@@ -322,7 +305,7 @@ export function todayMushrooms() {
 }
 /** @returns {Promise<boolean>} 오늘 몫이 남아 있어서 내가 받았는지 */
 export function markMushroom(max) {
-  return claimCount('mushrooms', max);
+  return claim('mushrooms', max);
 }
 
 /** 오늘 공부한 시간(초) — ✍️ 에세이가 열리는 기준 */
@@ -344,14 +327,15 @@ export function markEssayWritten(entry) {
   t.daily.essays = t.daily.essays || [];
   t.dailyDelta.essays.push(entry); // 글은 id로 합쳐 저장 (다른 창이 쓴 글도 남음)
   const at = t.daily.essays.findIndex((e) => e && e.id && e.id === entry.id);
-  if (at >= 0) { t.daily.essays[at] = entry; return false; } // 다시 쓴 것 → 글은 갱신, 보상은 없음
+  // 저장소는 { ...옛것, ...새것 }으로 합치므로 화면 사본도 같게 (아니면 아빠 교정이 화면에서만 사라진다)
+  if (at >= 0) { t.daily.essays[at] = { ...t.daily.essays[at], ...entry }; return false; } // 다시 쓴 것 → 글은 갱신, 보상은 없음
   t.daily.essays.push(entry);
   return true;
 }
 
 /** ✍️ 오늘 몫을 전부 썼다고 기록 → 완주 보상은 하루 1번 (@returns 내가 선점했는지) */
 export function markEssayDone() {
-  return claimFlag('essayDone');
+  return claim('essayDone', 1);
 }
 
 /** 오늘 푼 퍼즐 수 (모든 콘텐츠 합산) */
@@ -382,7 +366,7 @@ export function goalRewarded() {
 }
 /** @returns {Promise<boolean>} 목표 보너스를 내가 선점했는지 */
 export function markGoalRewarded() {
-  return claimFlag('goalRewarded');
+  return claim('goalRewarded', 1);
 }
 
 /** ⚔️ 오늘 배틀 횟수 / 오늘 배틀 한 자리를 선점 (하루 상한) */
@@ -390,7 +374,7 @@ export function todayBattles() {
   return t.daily ? (t.daily.battles || 0) : 0;
 }
 export function markBattle(max) {
-  return claimCount('battles', max);
+  return claim('battles', max);
 }
 
 /** 🔁 오늘 복습한 문장 수 / 완주한 회차 수 (모든 콘텐츠 합산) */
@@ -421,7 +405,7 @@ export function reviewGoldenTaken() {
 }
 /** @returns {Promise<boolean>} 오늘 황금 볼을 내가 선점했는지 */
 export function markReviewGolden() {
-  return claimFlag('reviewGolden');
+  return claim('reviewGolden', 1);
 }
 
 /** ❤️ "어제 학습 안 함" HP 감소를 오늘 이미 적용했는지 / 적용할 자리를 선점 (하루 한 번) */
@@ -429,7 +413,7 @@ export function hpMissedApplied() {
   return !!(t.daily && t.daily.hpMissed);
 }
 export function markHpMissed() {
-  return claimFlag('hpMissed');
+  return claim('hpMissed', 1);
 }
 
 /** 저장 대기 중인 것을 IndexedDB에 씀 */
@@ -454,20 +438,16 @@ export async function flush() {
     const date = t.daily.date;
     const sent = t.dailyDelta;
     t.dailyDelta = emptyDelta();
-    jobs.push(applyDailyDelta(date, sent).then((saved) => {
+    jobs.push(applyDailyDelta(date, sent).then(
       // 저장 결과(다른 창 몫까지 합쳐진 값) + 그 사이 또 쌓인 증분 = 지금 보여줄 값
-      if (t.daily && t.daily.date === date) t.daily = mergeDailyDelta(saved, date, t.dailyDelta);
-    }, (e) => {
-      const again = t.dailyDelta;             // 실패하면 증분을 되돌려 다음 flush에서 재시도
-      t.dailyDelta = sent;
-      for (const k of Object.keys(again)) {
-        const v = again[k];
-        if (Array.isArray(v)) t.dailyDelta[k] = [...(t.dailyDelta[k] || []), ...v];
-        else if (typeof v === 'boolean') t.dailyDelta[k] = !!(t.dailyDelta[k] || v);
-        else t.dailyDelta[k] = (Number(t.dailyDelta[k]) || 0) + (Number(v) || 0);
-      }
-      throw e;
-    }));
+      (saved) => adoptSaved(date, saved),
+      (e) => {
+        // 실패하면 보낸 증분에 그 사이 쌓인 것을 합쳐 되돌린다 (다음 flush에서 재시도).
+        // 합치는 규칙은 저장할 때와 같은 것을 써야 한다 — 손으로 다시 짜면 doneKeys 중복·essays 중복이 생긴다
+        t.dailyDelta = mergeDailyDelta(sent, date, t.dailyDelta);
+        throw e;
+      },
+    ));
   }
   const results = await Promise.all(jobs.map((p) => p.then(() => null, (e) => e)));
   const err = results.find(Boolean);

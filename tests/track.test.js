@@ -26,7 +26,6 @@ function loadTrack(dbStub) {
 function stub() {
   const store = { sent: [], days: new Map(), sessions: [], fail: false, dailyFail: false };
   const get = (date) => store.days.get(date) || null;
-  Object.defineProperty(store, 'daily', { get: () => [...store.days.values()].pop() || null });
   return {
     store,
     sentenceKey: (id, s) => `${id}|${Math.round(s * 10)}`,
@@ -42,13 +41,6 @@ function stub() {
       const next = mergeDailyDelta(get(date), date, delta);
       store.days.set(date, next);
       return next;
-    },
-    claimDailyFlag: async (date, flag) => {
-      const cur = get(date);
-      if (cur && cur[flag]) return { won: false, daily: cur };
-      const next = mergeDailyDelta(cur, date, { [flag]: true });
-      store.days.set(date, next);
-      return { won: true, daily: next };
     },
     claimDailyCount: async (date, field, max) => {
       const cur = get(date);
@@ -210,8 +202,9 @@ test('🔁 오늘 복습한 문장 수·회차가 daily에 쌓이고 세션에�
   const sess = s.store.sessions[0];
   assert.equal(sess.reviews, 2, '세션에 복습 문장 수');
   assert.equal(sess.reviewPass, 1, '그중 통과한 수');
-  assert.equal(s.store.daily.reviewSentences, 2);
-  assert.equal(s.store.daily.reviewRounds, 1);
+  const today = s.store.days.get(run('todayKey()'));
+  assert.equal(today.reviewSentences, 2);
+  assert.equal(today.reviewRounds, 1);
 });
 
 test('🌟 황금 볼은 하루 한 번만 — 앱을 껐다 켜거나 다른 영화를 열어도 그대로', async () => {

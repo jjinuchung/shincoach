@@ -1,7 +1,10 @@
 // ⚡ 경험치·레벨·포켓몬 잡기 규칙 + 아이 프로필(IndexedDB 'profile' 스토어, 백업에 포함)
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
-import { getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase } from './db.js';
+import {
+  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase,
+  hpChangeRule, battleLossRule, purchaseRule,
+} from './db.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS } from './items.js';
 import { anchorFor } from './pokemon.js';
 
@@ -176,11 +179,10 @@ export async function equipMega(id, on) {
     if (m.mega) return true;
     if (itemCount(MEGASTONE.id) <= 0) return false; // 빠른 거르기
     // 💠 메가스톤 하나로 두 창에서 둘 다 끼우지 않게 트랜잭션 안에서 판정
-    const r = await runMonOp(() => applyPurchase({ items: { [MEGASTONE.id]: 1 } }, { mons: { [id]: { mega: true } } }));
-    if (r && !r.ok) return false;
-    m.mega = true;
-    if (!r) profile.items[MEGASTONE.id] -= 1; // 저장 실패 → 메모리로만
-    return true;
+    const cost = { items: { [MEGASTONE.id]: 1 } };
+    const gain = { mons: { [id]: { mega: true } } };
+    const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
+    return r.ok;
   }
   if (!m.mega) return true;
   delete m.mega;
@@ -203,11 +205,10 @@ export async function makeSoup(id) {
   const m = profile.mons[id] || (profile.mons[id] = {});
   if (m.gmax) return false;
   // 🍄 열 개를 두 창에서 나눠 쓰지 못하게 트랜잭션 안에서 판정
-  const r = await runMonOp(() => applyPurchase({ items: { [MUSHROOM.id]: SOUP_MUSHROOMS } }, { mons: { [id]: { gmax: true } } }));
-  if (r && !r.ok) return false;
-  m.gmax = true;
-  if (!r) profile.items[MUSHROOM.id] -= SOUP_MUSHROOMS; // 저장 실패 → 메모리로만
-  return true;
+  const cost = { items: { [MUSHROOM.id]: SOUP_MUSHROOMS } };
+  const gain = { mons: { [id]: { gmax: true } } };
+  const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
+  return r.ok;
 }
 
 /** ⚙ 등급 초기화: 옮긴 것과 신청을 모두 없앰 (원래 등급으로) */
@@ -300,18 +301,24 @@ export function flushProfile() {
 }
 
 /**
- * 포켓몬별 상태(❤️ HP·⚔️ 패배)는 **트랜잭션 안에서** 계산해야 두 창이 서로를 덮어쓰지 않는다.
- * 모아둔 증분을 먼저 쓰고(순서 보존) 원자 연산을 실행한 뒤, 메모리 프로필을 결과로 맞춘다.
+ * 프로필 연산 하나(❤️ HP·⚔️ 패배·💰 구매)를 **저장소에서 판정해** 실행한다.
+ * 두 창이 서로를 덮어쓰지 않으려면 판정이 트랜잭션 안에 있어야 한다.
+ * 모아둔 증분을 먼저 쓰고(순서 보존) 연산을 실행한 뒤, 메모리 프로필을 결과로 맞춘다.
+ *
+ * 저장이 안 되면(오프라인·저장소 오류) **같은 순수 규칙을 메모리 프로필에** 돌려 이어간다.
+ * 폴백을 손으로 따로 짜면 저장될 때와 규칙이 갈라진다 (실제로 usePotion이 그래서 어긋나 있었다).
+ * @param {() => Promise<object>} op       저장소 연산 (db.apply*)
+ * @param {((p:object) => object)|null} fallback 같은 일을 하는 순수 규칙. 메모리에 이미 반영했으면 null
  */
-function runMonOp(op) {
+function runProfileOp(op, fallback) {
   const p = flushProfile().then(async () => {
     try {
       const r = await op();
       if (r && r.profile) profile = fromStored(r.profile);
       return r;
     } catch (e) {
-      console.warn('포켓몬 상태 저장 실패:', e);
-      return null;
+      console.warn('프로필 저장 실패 (메모리로만 이어감):', e);
+      return fallback ? fallback(profile) : { ok: true };
     }
   });
   flushChain = p.then(() => {}, () => {}); // 뒤이은 저장이 이 연산 뒤에 오도록
@@ -448,12 +455,10 @@ export async function buyItem(id) {
   const it = itemById(id);
   if (!it || it.price <= 0) return false; // 🌟 황금 볼은 파는 물건이 아님 (복습으로만)
   if ((profile.coins || 0) < it.price) return false; // 빠른 거르기 (진짜 판정은 트랜잭션 안에서)
-  const r = await runMonOp(() => applyPurchase({ coins: it.price }, { items: { [id]: 1 } }));
-  if (r) return r.ok;
-  // 저장이 안 되면 메모리로만 (다음 저장에서 맞춰짐)
-  profile.coins -= it.price;
-  profile.items[id] = (profile.items[id] || 0) + 1;
-  return true;
+  const cost = { coins: it.price };
+  const gain = { items: { [id]: 1 } };
+  const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
+  return r.ok;
 }
 
 /** 포켓몬의 꾸밈·상태 → { gear, dye, hp } (없으면 null 필드, hp는 기본 100) */
@@ -510,25 +515,18 @@ export function isTired(monId) {
  * — 절대값으로 쓰면 두 창이 각각 −20·−10 한 것이 −10만 남는다.
  */
 export function changeHp(monId, delta) {
-  const from = hpOf(monId);
-  const to = Math.max(0, Math.min(HP.max, from + Math.round(delta || 0)));
-  if (to !== from) {
-    profile.mons[monId] = { ...(profile.mons[monId] || {}), hp: to };
-    runMonOp(() => applyHpChange(monId, to - from, HP.max));
-  }
-  return { from, to };
+  const r = hpChangeRule(profile, monId, delta, HP.max); // 메모리에 먼저 (화면에 바로 보여 준다)
+  if (r.to !== r.from) runProfileOp(() => applyHpChange(monId, r.to - r.from, HP.max), null);
+  return { from: r.from, to: r.to };
 }
 
 /** 🧪 물약 먹이기 (가방에서 하나 소모 — 소모와 회복이 한 트랜잭션) → { ok, from, to } */
 export function usePotion(monId, potionId) {
   const it = itemById(potionId);
-  if (!it || it.kind !== 'potion' || (profile.items[potionId] || 0) < 1) return { ok: false, from: hpOf(monId), to: hpOf(monId) };
-  profile.items[potionId] -= 1;
-  const from = hpOf(monId);
-  const to = Math.min(HP.max, from + it.heal);
-  profile.mons[monId] = { ...(profile.mons[monId] || {}), hp: to };
-  runMonOp(() => applyHpChange(monId, it.heal, HP.max, potionId));
-  return { ok: true, from, to };
+  if (!it || it.kind !== 'potion') return { ok: false, from: hpOf(monId), to: hpOf(monId) };
+  const r = hpChangeRule(profile, monId, it.heal, HP.max, potionId); // 소모·회복을 한 규칙으로 (메모리)
+  if (r.ok) runProfileOp(() => applyHpChange(monId, it.heal, HP.max, potionId), null);
+  return r;
 }
 
 /** 🎀 장식 장착(gearId) / 벗기(null). 이전 장식은 가방으로, 새 장식은 가방에서. 가방에 없으면 false */
@@ -585,17 +583,11 @@ export function battleWin(opponentId) {
  * @returns {Promise<{losses:number, lost:boolean}>}
  */
 export async function battleLoss(monId, lossesToLose = 3) {
-  const r = await runMonOp(() => applyBattleLoss(monId, lossesToLose));
-  if (r) return { losses: r.losses, lost: r.lost };
-  // 저장이 안 되면 메모리로만이라도 (다음에 다시 지면 저장소에서 다시 셈)
-  const cur = lossesOf(monId) + 1;
-  const lost = cur >= lossesToLose;
-  if (lost) {
-    const n = (profile.caught[monId] || 0) - 1;
-    if (n > 0) profile.caught[monId] = n; else delete profile.caught[monId];
-  }
-  profile.mons[monId] = { ...(profile.mons[monId] || {}), losses: lost ? 0 : cur };
-  return { losses: lost ? 0 : cur, lost };
+  const r = await runProfileOp(
+    () => applyBattleLoss(monId, lossesToLose),
+    (pf) => battleLossRule(pf, monId, lossesToLose),
+  );
+  return { losses: r.losses, lost: r.lost };
 }
 
 /** 백업 가져오기 뒤 다시 읽기 */

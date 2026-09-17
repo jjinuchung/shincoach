@@ -261,6 +261,15 @@ function hpHeal(amount) {
   return r;
 }
 
+/** 🎯 오늘 목표 보너스 — 선점한 창에서만 지급 (두 창을 열어 두 번 받는 길을 막는다) */
+async function grantGoalBonus() {
+  if (!await track.markGoalRewarded()) return;
+  awardXp(XP.goal);
+  awardCoins(COIN.goal);
+  const h = hpHeal(HP.goalHeal);
+  showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal} 💰+${COIN.goal}${h && h.to > h.from ? ` ❤️+${h.to - h.from}` : ''}`, 5000);
+}
+
 /** 어제 학습을 안 했으면(5문장 미만) 오늘 처음 열 때 한 번 HP 감소. 앱을 처음 쓰는 아이(과거 학습일이 없음)는 제외 */
 function checkMissedDay(dailyList, today) {
   if (!settings.hp || state.parentMode || !getPartner() || track.hpMissedApplied()) return;
@@ -270,9 +279,11 @@ function checkMissedDay(dailyList, today) {
   const yRec = dailyList.find((d) => d.date === yesterday);
   if (!hadBefore || learned(yRec)) return;
   // 두 창이 같이 열려 있어도 벌은 한 번만 — 선점에 성공한 쪽에서만 깎는다
-  track.markHpMissed().then((won) => {
-    if (won) hpPenalty(HP.missedDay, '어제 학습을 안 했어요');
-  });
+  applyMissedDayPenalty();
+}
+
+async function applyMissedDayPenalty() {
+  if (await track.markHpMissed()) hpPenalty(HP.missedDay, '어제 학습을 안 했어요');
 }
 
 /** 받침에 따라 이/가 */
@@ -470,18 +481,11 @@ function setBattleOpen(on) {
 }
 
 /** 배틀 열기 (상대는 state.battlePending). 끝나면 결과 반영 후 continueFn */
-function startBattle(continueFn) {
+async function startBattle(continueFn) {
   const opponent = state.battlePending;
   state.battlePending = null;
-  if (!opponent) { continueFn(); return; }
   // 거절해도 오늘 배틀 기회는 쓴 것. 다른 창이 이미 오늘 몫을 썼으면 등장하지 않는다
-  track.markBattle(BATTLE.maxPerDay).then((won) => {
-    if (!won || !state.open) { continueFn(); return; }
-    openBattleNow(opponent, continueFn);
-  });
-}
-
-function openBattleNow(opponent, continueFn) {
+  if (!opponent || !await track.markBattle(BATTLE.maxPerDay) || !state.open) { continueFn(); return; }
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
@@ -731,7 +735,7 @@ function startCoachFix(entries) {
   openEssay({
     mode: 'coach',
     prompts: entries.map((e) => ({
-      id: e.id, written: e.written || '', coachFix: e.coachFix || '',
+      id: e.id, date: e.date, written: e.written || '', coachFix: e.coachFix || '',
       rec: {}, frame: { full: e.origin || '', keep: '', blankWords: 0 }, cue: null,
     })),
     reward: ESSAY_REWARD,
@@ -740,7 +744,7 @@ function startCoachFix(entries) {
     unlock,
     speak: speakText,
     onRead: (it) => {
-      markEssayRead(it.id).catch(() => {}); // 한 번 읽으면 다시 안 뜬다
+      markEssayRead(it.id, it.date).catch(() => {}); // 한 번 읽으면 다시 안 뜬다 (날짜를 주면 그 날만 연다)
       awardXp(ESSAY_REWARD.xp);
       awardCoins(ESSAY_REWARD.coin);
     },
@@ -781,16 +785,13 @@ function maybeReview() {
  * 🍄 다이버섯 하나 — 🔁 복습 완주 · ⚔️ 배틀 승리 · 🏁 여행 도착에서만 (하루 2개까지).
  * 돈으로 못 사는 것이라야 🍲 다이스프(거다이맥스)가 "모아서 얻는 것"이 된다.
  */
-function dropMushroom(why) {
+async function dropMushroom(why) {
   if (state.parentMode) return;
-  if (track.todayMushrooms() >= MUSHROOM_PER_DAY) return;
   // 하루 몫은 트랜잭션 안에서 선점 — 두 창이 같이 열려도 상한을 넘지 않는다
-  track.markMushroom(MUSHROOM_PER_DAY).then((won) => {
-    if (!won) return;
-    const have = gainMushroom(1);
-    track.flush();
-    showPlayerMessage(`🍄 다이버섯을 얻었어요! (${have}/${SOUP_MUSHROOMS}) — ${why}`, 4000);
-  });
+  if (!await track.markMushroom(MUSHROOM_PER_DAY)) return;
+  const have = gainMushroom(1);
+  track.flush();
+  showPlayerMessage(`🍄 다이버섯을 얻었어요! (${have}/${SOUP_MUSHROOMS}) — ${why}`, 4000);
 }
 
 /** 회차 완주 보상: ⚡·💰 + (하루 첫 완주만) 🌟 황금 볼·❤️ 회복 */
@@ -1093,16 +1094,8 @@ function markDone(cue) {
     updateGoalChip();
     if (settings.dailyGoal > 0) {
       const left = settings.dailyGoal - after;
-      if (left <= 0 && !track.goalRewarded()) { // 목표 수치를 바꿔도 하루 한 번만
-        // 선점한 창에서만 지급 — 두 창을 열어 보너스를 두 번 받는 길을 막는다
-        track.markGoalRewarded().then((won) => {
-          if (!won) return;
-          awardXp(XP.goal);
-          awardCoins(COIN.goal);
-          const h = hpHeal(HP.goalHeal);
-          showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal} 💰+${COIN.goal}${h && h.to > h.from ? ` ❤️+${h.to - h.from}` : ''}`, 5000);
-        });
-      } else if (left === 3 && !track.goalRewarded()) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal} 💰+${COIN.goal}!`, 3500);
+      if (left <= 0 && !track.goalRewarded()) grantGoalBonus(); // 목표 수치를 바꿔도 하루 한 번만
+      else if (left === 3 && !track.goalRewarded()) showPlayerMessage(`3문장만 더 하면 목표 보너스 ⚡+${XP.goal} 💰+${COIN.goal}!`, 3500);
     }
   }
   // 🧩 퍼즐 후보로 모아둠 (같은 문장을 반복해도 한 번만)

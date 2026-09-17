@@ -124,7 +124,7 @@ function loadPlayer() {
     openPuzzle(cue, opts) { puzzleCalls.push({ cue, opts }); },
     pickPuzzle: (cues) => (cues.length ? cues[0] : null),
     // pokemon.js 스텁
-    loadCharacters: async () => [], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [{ id: 25, ko: '피카츄' }, { id: 4, ko: '파이리' }], pickCharacters: (a, n) => (a || []).slice(0, n), isUnlocked: () => true, unlockCountAt: () => 0,
+    loadCharacters: async () => [{ id: 25, ko: '피카츄', url: 'x' }, { id: 4, ko: '파이리', url: 'y' }], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [{ id: 25, ko: '피카츄' }, { id: 4, ko: '파이리' }], pickCharacters: (a, n) => (a || []).slice(0, n), isUnlocked: () => true, unlockCountAt: () => 0,
     // xp.js / catch.js 스텁: XP 획득과 잡기 화면 호출을 기록
     xpLog, catchCalls,
     initProfile: async () => ({}), getLevelInfo: () => ({ level: 1, into: 0, need: 100, xp: 0 }),
@@ -782,8 +782,6 @@ test('❤️ HP: 정답 공개 −20, 말하기 넘김 −10, 목표 달성 +20,
   assert.equal(hpLog[hpLog.length - 1], 20, '목표 달성 회복');
   assert.equal(hpState.hp[25], 100);
   // 0이 되면 😴: 칩 표시, 퍼즐·잡기 후보에서 빠짐 (다른 캐릭터는 남음)
-  // (위 await 사이에 앱 시작 때의 loadCharacters()가 끝나 빈 명단으로 덮이므로 다시 넣어 준다)
-  run('state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }];');
   hpState.hp[25] = 10;
   run('markDone(state.cues[4]); goTo(4)');
   puzzleCalls[3].opts.onClose({ solved: false, wrong: 3, characters: [] });

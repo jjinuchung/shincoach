@@ -1,7 +1,10 @@
 // 기록 가져오기 병합 규칙 테스트 (순수 함수)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeStatRecord, pickReviewState, emptyDaily, mergeDailyDelta } from '../js/db.js';
+import {
+  mergeStatRecord, pickReviewState, emptyDaily, mergeDailyDelta,
+  cloneProfile, mergeProfileDelta, hpChangeRule, battleLossRule, purchaseRule,
+} from '../js/db.js';
 
 test('#6 sentenceStats: 오래된 백업이 최신 누적을 줄이지 않음', () => {
   const cur = { key: 'k', plays: 10, seconds: 100, speakPass: 3, bestRatio: 0.9, lastRatio: 0.9, lastAt: 200, done: true };
@@ -134,4 +137,83 @@ test('✍️ 증분 합치기: 다시 쓴 글은 갱신하되 아빠 교정(coac
   assert.equal(out.essays.length, 2, '새 글은 더해짐');
   assert.equal(out.essays[0].written, 'I went', '고쳐 쓴 내용은 갱신');
   assert.equal(out.essays[0].coachFix, 'I went.', '저장된 쪽에만 있던 아빠 교정은 남음');
+});
+
+// ── ⚡ 프로필 규칙 (순수 함수) ──
+// 예전에는 이 규칙들이 IndexedDB 트랜잭션 안에 있어서, node 테스트는 indexedDB가 없어
+// 조용히 메모리 폴백으로 새고 **태블릿에서 실제로 도는 경로에는 테스트가 하나도 없었다**.
+
+test('⚡ mergeProfileDelta: 수치는 더하고, 0 이하 개수는 지우고, mons는 필드만 덮어씀', () => {
+  const p = cloneProfile({ xp: 10, coins: 50, caught: { 25: 2 }, items: { ribbon: 1 }, mons: { 25: { gear: 'cap', hp: 80 } } });
+  mergeProfileDelta(p, { xp: 5, coins: -20, caught: { 25: -1, 4: 1 }, items: { ribbon: -1 }, mons: { 25: { dye: 'red' } } });
+  assert.equal(p.xp, 15);
+  assert.equal(p.coins, 30);
+  assert.deepEqual(p.caught, { 25: 1, 4: 1 });
+  assert.deepEqual(p.items, {}, '0개가 되면 가방에서 지운다');
+  assert.deepEqual(p.mons[25], { gear: 'cap', hp: 80, dye: 'red' }, '주지 않은 필드는 그대로');
+  mergeProfileDelta(p, { coins: -999 });
+  assert.equal(p.coins, 0, '코인은 음수로 안 내려감');
+});
+
+test('❤️ hpChangeRule: 바뀐 만큼 더하고 0~max로 자름', () => {
+  const p = cloneProfile({ mons: { 25: { hp: 100 } } });
+  assert.deepEqual(hpChangeRule(p, 25, -20, 100), { ok: true, from: 100, to: 80 });
+  assert.deepEqual(hpChangeRule(p, 25, -10, 100), { ok: true, from: 80, to: 70 }, '두 창이 각각 깎으면 −30 (한쪽만 남으면 안 됨)');
+  assert.equal(hpChangeRule(p, 25, -999, 100).to, 0, '0 아래로 안 내려감');
+  assert.equal(hpChangeRule(p, 25, 999, 100).to, 100, 'max 위로 안 올라감');
+  assert.equal(hpChangeRule(p, 4, -10, 100).from, 100, '기록이 없으면 가득한 상태에서 시작');
+});
+
+test('🧪 hpChangeRule: 물약 하나로 두 번 못 먹인다 (소모와 회복이 한 판정)', () => {
+  const p = cloneProfile({ mons: { 25: { hp: 40 } }, items: { potion: 1 } });
+  assert.deepEqual(hpChangeRule(p, 25, 20, 100, 'potion'), { ok: true, from: 40, to: 60 });
+  assert.deepEqual(p.items, {}, '물약 소모됨');
+  const second = hpChangeRule(p, 25, 20, 100, 'potion');
+  assert.equal(second.ok, false, '물약이 없으면 실패');
+  assert.equal(p.mons[25].hp, 60, '실패하면 HP도 안 오름');
+});
+
+test('⚔️ battleLossRule: 누적과 "3번이면 잃음" 판정이 한 번에 (두 마리를 잃지 않게)', () => {
+  const p = cloneProfile({ caught: { 4: 2 }, mons: {} });
+  assert.deepEqual(battleLossRule(p, 4, 3), { losses: 1, lost: false });
+  assert.deepEqual(battleLossRule(p, 4, 3), { losses: 2, lost: false });
+  assert.equal(p.caught[4], 2, '아직 안 잃음');
+  assert.deepEqual(battleLossRule(p, 4, 3), { losses: 0, lost: true }, '3번째에 잃고 0으로');
+  assert.equal(p.caught[4], 1, '마릿수 −1');
+  // 마지막 한 마리를 잃으면 도감에서 빠진다
+  battleLossRule(p, 4, 3); battleLossRule(p, 4, 3);
+  assert.equal(battleLossRule(p, 4, 3).lost, true);
+  assert.equal(p.caught[4], undefined);
+});
+
+test('💰 purchaseRule: 모자라면 아무것도 안 하고, 되면 치른 만큼만 빠진다', () => {
+  const p = cloneProfile({ coins: 100, items: { mushroom: 10 } });
+  assert.deepEqual(purchaseRule(p, { coins: 150 }, { items: { crown: 1 } }), { ok: false }, '코인 부족');
+  assert.equal(p.coins, 100, '실패하면 그대로');
+  assert.deepEqual(p.items, { mushroom: 10 });
+
+  assert.deepEqual(purchaseRule(p, { coins: 60 }, { items: { crown: 1 } }), { ok: true });
+  assert.equal(p.coins, 40);
+  assert.equal(p.items.crown, 1);
+  // 두 번째는 못 산다 → 두 창에서 같은 코인으로 두 개를 못 산다
+  assert.equal(purchaseRule(p, { coins: 60 }, { items: { crown: 1 } }).ok, false);
+  assert.equal(p.items.crown, 1, '실패하면 물건도 안 늘어남');
+
+  // 🍄 재료로 치르기 (다이스프)
+  assert.deepEqual(purchaseRule(p, { items: { mushroom: 10 } }, { mons: { 25: { gmax: true } } }), { ok: true });
+  assert.equal(p.items.mushroom, undefined, '10개 다 씀');
+  assert.equal(p.mons[25].gmax, true);
+  assert.equal(purchaseRule(p, { items: { mushroom: 10 } }, { mons: { 4: { gmax: true } } }).ok, false, '재료 부족');
+  assert.equal(p.mons[4], undefined);
+});
+
+test('⚡ cloneProfile: 원본을 건드리지 않는다 (규칙이 복사본만 고치게)', () => {
+  const src = { xp: 5, caught: { 25: 1 }, items: {}, mons: { 25: { hp: 50 } } };
+  const p = cloneProfile(src);
+  mergeProfileDelta(p, { xp: 10, caught: { 25: 1 } });
+  hpChangeRule(p, 25, -20, 100);
+  assert.equal(src.xp, 5);
+  assert.equal(src.caught[25], 1);
+  assert.equal(src.mons[25].hp, 50);
+  assert.equal(cloneProfile(null).xp, 0, '없으면 빈 프로필');
 });
