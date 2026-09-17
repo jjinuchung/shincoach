@@ -88,7 +88,7 @@ export function contentSummary(items, records, cueCountOf) {
     const attempts = rs.reduce((a, r) => a + (r.speakAttempts || 0), 0);
     const pass = rs.reduce((a, r) => a + (r.speakPass || 0), 0);
     const lastAt = rs.reduce((a, r) => Math.max(a, r.lastAt || 0), 0);
-    return { id: it.id, title: it.title, total, done, mastered, seconds, attempts, pass, lastAt, pct: total ? Math.round((done / total) * 100) : 0 };
+    return { id: it.id, title: it.title, broken: !!it.broken, total, done, mastered, seconds, attempts, pass, lastAt, pct: total ? Math.round((done / total) * 100) : 0 };
   });
 }
 
@@ -258,7 +258,9 @@ export async function renderStats() {
     const wrap = el('div', 'stats-item');
     const row = el('div', 'stats-row');
     row.appendChild(el('span', 'name', s.title));
-    row.appendChild(el('span', 'meta', `${s.pct}% · ${s.done}/${s.total}문장 · ⭐${s.mastered}`));
+    row.appendChild(el('span', 'meta', s.broken
+      ? '⚠️ 저장이 깨졌어요 — 다시 가져와 주세요 (기록은 남아 있어요)'
+      : `${s.pct}% · ${s.done}/${s.total}문장 · ⭐${s.mastered}`));
     wrap.appendChild(row);
     const pg = el('div', 'stats-progress');
     const pf = el('div', 'fill'); pf.style.width = `${s.pct}%`; pg.appendChild(pf);

@@ -146,6 +146,7 @@ export function initPlayer(ctx) {
     // 4 = MEDIA_ERR_SRC_NOT_SUPPORTED (이 기기에서 못 여는 형식), 3 = 디코딩 오류
     const why = code === 4 ? '이 기기에서 재생할 수 없는 영상 형식이에요' : '영상을 재생하는 중 문제가 생겼어요';
     showPlayerMessage(`😢 ${why}`);
+    warnIfVideoFileGone(); // 파일이 사라진 경우도 똑같이 "형식 오류"로 보인다 → 확인해서 제대로 안내
   });
 
   // 홈 화면 이동/화면 꺼짐 → 학습 일시정지 (백그라운드에서 rAF/타이머가 멈춰 문장 상태가 어긋나는 것 방지)
@@ -1211,10 +1212,19 @@ function onVisibilityChange() {
 
 /** 콘텐츠 열기. opts.startTime(초)을 주면 그 시각의 문장에서 시작 (학습 기록에서 이동) */
 export async function openPlayer(id, opts = {}) {
-  const item = await getItem(id);
+  // 저장이 깨진 영상(자막 곁 파일 유실)은 읽는 것 자체가 실패한다 — 📊에서 문장을 탭해 들어올 수도 있으므로 여기서 막는다
+  let item = null;
+  try {
+    item = await getItem(id);
+  } catch (err) {
+    console.warn('영상 정보를 읽지 못했어요:', id, err);
+    alert('이 영상은 저장이 깨져서 열 수 없어요.\n🎬 목록에서 🗑로 지운 다음 다시 가져와 주세요.\n(공부한 기록·코인·포켓몬은 그대로 있어요)');
+    return;
+  }
   if (!item) return;
-  const blob = await getVideoBlob(id);
+  const blob = await getVideoBlob(id).catch(() => null);
   if (!blob) { alert('영상 파일을 찾을 수 없어요.'); return; }
+  state.videoBlob = blob; // 재생이 실패했을 때 "파일이 사라진 것"인지 확인하는 용도
 
   closeMedia();
   state.open = true;
@@ -1408,6 +1418,26 @@ function safePlay() {
 }
 
 /** 영상 위에 안내 문구 표시. ms=0이면 재생 시작까지 유지 */
+/**
+ * 영상이 재생되지 않을 때, 그게 "형식 문제"가 아니라 **파일이 사라진 것**인지 확인한다.
+ * 저장 공간이 정리되면서 IndexedDB의 영상 파일만 없어져도 브라우저는 그냥 형식 오류(code 4)로 알려 준다.
+ * 몇 바이트만 읽어 보면 구분된다 (없으면 NotFoundError). FileReader를 쓰는 이유는 구형 태블릿 호환.
+ */
+function warnIfVideoFileGone() {
+  const blob = state.videoBlob;
+  if (!blob) return;
+  const fr = new FileReader();
+  fr.onerror = () => {
+    console.warn('영상 파일이 사라졌어요:', fr.error);
+    showPlayerMessage('😢 영상 파일이 사라졌어요 — 🎬 목록에서 🗑로 지우고 다시 가져와 주세요 (공부한 기록은 그대로예요)', 8000);
+  };
+  try {
+    fr.readAsArrayBuffer(blob.slice(0, 16));
+  } catch (err) {
+    console.warn('영상 파일 확인 실패:', err);
+  }
+}
+
 function showPlayerMessage(text, ms = 3000) {
   const el = $('player-msg');
   el.textContent = text;

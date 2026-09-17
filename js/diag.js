@@ -64,6 +64,7 @@ export function renderDiag() {
     ['이번 학습의 인식 상태', recognitionState().broken ? `막힘 (${recognitionState().why}) → 소리 길이로 판정 중, ${recognitionState().retryInSec}초 뒤 자동 재시도` : `사용 중 (연속 실패 ${recognitionState().failStreak}/3)`, recognitionState().broken ? '⚠️' : '✅'],
     ['최근 말하기 기록', recentSpeakSummary(), '🧾'],
     ['설치 앱으로 실행', window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? '예' : '아니오(브라우저 탭)', ''],
+    ['영구 저장 / 저장 공간', '확인 중…', '💾'],
   ];
   ul.innerHTML = '';
   for (const r of rows) {
@@ -71,6 +72,33 @@ export function renderDiag() {
     li.textContent = `${r[2]} ${r[0]}: ${r[1]}`;
     ul.appendChild(li);
   }
+  fillStorageRow(ul.lastChild); // 비동기라 자리를 먼저 만들어 두고 채운다
+}
+
+/**
+ * 브라우저가 저장한 영상을 함부로 지울 수 있는 상태인지 + 남은 공간.
+ * 2026-09-17 태블릿에서 영상의 곁 파일이 사라져 목록이 통째로 안 열렸다 —
+ * "공간이 모자란 건지"를 부모가 기기에서 바로 볼 수 있어야 원인을 안다.
+ */
+async function fillStorageRow(li) {
+  if (!li) return;
+  const gb = (n) => `${(n / 1024 / 1024 / 1024).toFixed(1)}GB`;
+  let persisted = null;
+  let space = '';
+  try {
+    if (navigator.storage && navigator.storage.persisted) persisted = await navigator.storage.persisted();
+  } catch { /* 지원 안 하는 기기 */ }
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      if (est && est.quota) space = ` · 쓴 공간 ${gb(est.usage || 0)} / 추정 여유 ${gb(Math.max(0, est.quota - (est.usage || 0)))}`;
+    }
+  } catch { /* 지원 안 하는 기기 */ }
+  const mark = persisted === true ? '✅' : persisted === false ? '⚠️' : '❓';
+  const what = persisted === true ? '허용됨 (브라우저가 함부로 못 지움)'
+    : persisted === false ? '거부됨 — 공간이 부족하면 영상이 지워질 수 있어요'
+      : '알 수 없음';
+  li.textContent = `${mark} 영구 저장: ${what}${space}`;
 }
 
 /** 마이크 3초 테스트: 최대 음량 측정 + 녹음 크기 (어디서 막히는지 단계별 표시) */

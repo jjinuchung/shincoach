@@ -1,7 +1,7 @@
 // 🎟️ 다음 영상 교환권 규칙 테스트: node --test tests/unlock.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LOCKED, NEED, unlockState, nextLocked, pendingTickets, ticketId, findLocked } from '../js/unlock.js';
+import { LOCKED, NEED, unlockState, progressInputs, nextLocked, pendingTickets, ticketId, findLocked } from '../js/unlock.js';
 
 const recs = (done, reviewed) => [
   ...Array.from({ length: done }, (_, i) => ({ key: `d${i}`, done: true, reviewPass: i < reviewed ? 1 : 0 })),
@@ -126,4 +126,28 @@ test('🎟️ [P1] itemIds를 주면 분자와 분모가 같은 영상에서 나
   assert.equal(s.done, 2, 'A의 문장만');
   assert.equal(s.reviewed, 1);
   assert.equal(s.total, 2);
+});
+
+// ── 저장이 깨진 영상 (2026-09-17 태블릿: 자막 곁 파일 유실) ──
+test('🎟️ 저장이 깨진 영상은 분자·분모 양쪽에서 빠진다', () => {
+  const items = [
+    { id: 'A', enText: 'a' },
+    { id: 'B', broken: true, enText: '' }, // 못 읽는 영상 — 문장 수를 셀 수 없다
+  ];
+  const { itemIds, totalCues } = progressInputs(items, (it) => (it.id === 'A' ? 100 : 0));
+  assert.deepEqual(itemIds, ['A'], '깨진 영상 id가 들어가면 그 기록이 분자에 남는다');
+  assert.equal(totalCues, 100);
+
+  // B의 옛 기록 80건 + A는 하나도 안 끝냄 → 깨졌다고 진도가 올라가면 안 된다
+  const records = Array.from({ length: 80 }, (_, i) => ({ key: `B|${i}`, itemId: 'B', done: true, reviewPass: 1 }));
+  const st = unlockState({ coins: 9999, records, totalCues, price: 1, itemIds });
+  assert.equal(st.done, 0, '깨진 영상의 기록은 세지 않는다');
+  assert.equal(st.items[1].ok, false, '영상이 깨진 것만으로 조건이 채워지면 안 된다');
+});
+
+test('🎟️ progressInputs: 멀쩡한 영상만 문장 수를 더한다', () => {
+  const items = [{ id: 'A' }, { id: 'B', broken: true }, { id: 'C' }, null];
+  const { itemIds, totalCues } = progressInputs(items, () => 50);
+  assert.deepEqual(itemIds, ['A', 'C']);
+  assert.equal(totalCues, 100, '깨진 영상 몫 50은 안 더한다');
 });

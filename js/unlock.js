@@ -59,6 +59,23 @@ export function findLocked(id) {
 }
 
 /**
+ * 진행률 조건에 쓸 입력 (순수 계산) — 분자·분모를 **같은 집합**에서 뽑는 한 곳.
+ *
+ * 저장이 깨져 못 읽는 영상(broken)은 문장 수를 셀 수 없어 분모가 0이 된다.
+ * 분자(문장 기록)에서도 같이 빼지 않으면, 영상이 깨졌을 뿐인데 진행률이 저절로 올라가
+ * 조건이 채워진다 (지운 영상과 똑같은 구멍 — 2026-09-17).
+ *
+ * @param {Array} items db.listItems() 결과
+ * @param {(item)=>number} cueCountOf 영상 한 편의 문장 수
+ */
+export function progressInputs(items = [], cueCountOf = () => 0) {
+  const usable = (items || []).filter((it) => it && !it.broken);
+  let totalCues = 0;
+  for (const it of usable) totalCues += cueCountOf(it) || 0;
+  return { itemIds: usable.map((it) => it.id), totalCues };
+}
+
+/**
  * 조건 현황 (순수 계산).
  *
  * ⚠️ 분자와 분모는 **같은 집합**에서 나와야 한다. `deleteItem`은 문장 기록을 지우지 않으므로,

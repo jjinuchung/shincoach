@@ -128,7 +128,12 @@ async function main() {
   try {
     await initLibrary({ showView });
   } catch (err) {
-    showError(`저장소를 열 수 없어요: ${err.message} (시크릿 모드이거나 저장 공간이 꺼져 있을 수 있어요)`);
+    // 저장이 깨진 경우와 저장소 자체를 못 여는 경우는 아이·부모가 할 일이 다르다
+    const msg = String((err && err.message) || err);
+    const lost = (err && err.name === 'NotReadableError') || /missing file|irrecoverable/i.test(msg);
+    showError(lost
+      ? `영상 저장이 깨졌어요 — 깨진 영상을 🗑로 지우고 다시 가져와 주세요. 공부 기록·코인·포켓몬은 그대로 있어요 (${msg})`
+      : `저장소를 열 수 없어요: ${msg} (시크릿 모드이거나 저장 공간이 꺼져 있을 수 있어요)`);
   }
   // 👨‍👩‍👦 배포에 실려 온 아빠 교정문 반영 (실패해도 학습에는 영향 없음)
   syncCoachFixes().catch(() => {});

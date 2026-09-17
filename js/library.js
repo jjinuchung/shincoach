@@ -1,7 +1,7 @@
 // 라이브러리 화면: 콘텐츠 가져오기(mp4 + srt) / 목록 / 삭제 / 저장 공간 표시
 import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats } from './db.js';
 import { parseSubtitle, countPlayableCues } from './srt.js';
-import { LOCKED, unlockState, nextLocked, ticketId, findLocked } from './unlock.js';
+import { LOCKED, unlockState, progressInputs, nextLocked, ticketId, findLocked } from './unlock.js';
 import { coins, inventory, buyTicket, initProfile } from './xp.js';
 import { characterUrl, ensureCast, artUrl } from './pokemon.js';
 import { sfx, unlock as unlockAudio } from './sfx.js';
@@ -218,12 +218,17 @@ export async function refreshList() {
     li.className = 'library-item';
     li.dataset.id = item.id;
 
-    const thumb = item.thumb
-      ? `<img class="library-thumb" src="${item.thumb}" alt="">`
-      : `<div class="library-thumb">🎬</div>`;
-    const cueCount = parseSubtitle(item.enText).length;
-    const meta = [formatDuration(item.duration), `${cueCount}문장`, formatBytes(item.videoSize), item.koText ? '영·한' : '영어만'].filter(Boolean).join(' · ');
+    const thumb = item.broken
+      ? `<div class="library-thumb">⚠️</div>`
+      : item.thumb
+        ? `<img class="library-thumb" src="${item.thumb}" alt="">`
+        : `<div class="library-thumb">🎬</div>`;
+    const cueCount = item.broken ? 0 : parseSubtitle(item.enText).length;
+    const meta = item.broken
+      ? '저장이 깨졌어요 — 🗑로 지우고 다시 가져와 주세요 (공부한 기록은 그대로 있어요)'
+      : [formatDuration(item.duration), `${cueCount}문장`, formatBytes(item.videoSize), item.koText ? '영·한' : '영어만'].filter(Boolean).join(' · ');
 
+    if (item.broken) li.classList.add('broken');
     li.innerHTML = `
       ${thumb}
       <div class="library-info">
@@ -236,6 +241,11 @@ export async function refreshList() {
 
     li.addEventListener('click', async (e) => {
       if (e.target.closest('.library-delete')) return;
+      // 깨진 영상은 열 수 없다 — 열려고 하면 플레이어까지 같은 오류로 죽는다
+      if (item.broken) {
+        alert('이 영상은 저장이 깨져서 열 수 없어요.\n🗑로 지운 다음 다시 가져와 주세요.\n(공부한 기록·코인·포켓몬은 그대로 있어요)');
+        return;
+      }
       if (opening) return; // 큰 영상은 몇 초 걸리므로 중복 탭 방지
       opening = true;
       showLoading('영상 불러오는 중...');
@@ -306,12 +316,10 @@ function fillCast(root, c) {
 /** 지금 조건 현황을 저장소에서 새로 계산한다 (화면 표시와 구매 판정이 같은 값을 쓰게) */
 async function currentState(items, price) {
   const records = await getAllSentenceStats().catch(() => []);
-  let totalCues = 0;
-  for (const it of items) totalCues += countPlayableCues(it.enText, { merge: mergeSetting(), duration: it.duration });
-  return unlockState({
-    coins: coins(), records, totalCues, price,
-    itemIds: items.map((it) => it.id), // 지운 영상의 기록은 빼고 센다
-  });
+  // 지운 영상·깨진 영상의 기록은 빼고 센다 (분자·분모를 같은 집합에서 — progressInputs 참조)
+  const { itemIds, totalCues } = progressInputs(items,
+    (it) => countPlayableCues(it.enText, { merge: mergeSetting(), duration: it.duration }));
+  return unlockState({ coins: coins(), records, totalCues, price, itemIds });
 }
 
 /** ⚙ 문장 합치기 설정 (플레이어와 같은 값을 써야 분모가 화면과 맞는다) */

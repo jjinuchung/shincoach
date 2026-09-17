@@ -1,6 +1,7 @@
 // 기록 가져오기 병합 규칙 테스트 (순수 함수)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   mergeStatRecord, pickReviewState, emptyDaily, mergeDailyDelta,
   cloneProfile, mergeProfileDelta, hpChangeRule, battleLossRule, purchaseRule,
@@ -205,6 +206,17 @@ test('💰 purchaseRule: 모자라면 아무것도 안 하고, 되면 치른 만
   assert.equal(p.mons[25].gmax, true);
   assert.equal(purchaseRule(p, { items: { mushroom: 10 } }, { mons: { 4: { gmax: true } } }).ok, false, '재료 부족');
   assert.equal(p.mons[4], undefined);
+});
+
+// 2026-09-17 태블릿: 영상 한 편의 자막 곁 파일이 사라지자 items.getAll이 통째로 실패해
+// 목록을 못 그리고 앱이 "저장소를 열 수 없어요"로 멈췄다. 같은 코드가 다시 들어오면 여기서 깨진다.
+test('🗂 목록은 getAll로 읽지 않는다 — 한 건 깨져도 나머지는 보여야 한다', async () => {
+  const src = await readFile(new URL('../js/db.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('export async function listItems'), src.indexOf('async function titlesFromSessions'));
+  assert.ok(body.includes('getAllKeys'), '키를 먼저 읽고');
+  assert.ok(body.includes('.get(id)'), '한 건씩 읽어야 한다');
+  assert.ok(!/objectStore\('items'\)\.getAll\(\)/.test(body), "items.getAll()을 쓰면 한 건만 깨져도 목록 전체가 날아간다");
+  assert.ok(body.includes('broken: true'), '깨진 레코드는 표시해서 돌려줘야 한다');
 });
 
 test('⚡ cloneProfile: 원본을 건드리지 않는다 (규칙이 복사본만 고치게)', () => {

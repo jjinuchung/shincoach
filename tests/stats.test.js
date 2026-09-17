@@ -61,6 +61,17 @@ test('contentSummary: 진행률·정복·시간·마지막 학습', () => {
   assert.equal(s[0].seconds, 55);
   assert.equal(s[0].lastAt, 200);
   assert.equal(s[1].pct, 0);
+  assert.equal(s[0].broken, false, '멀쩡한 영상은 깨짐 표시가 없다');
+});
+
+test('contentSummary: 저장이 깨진 영상은 📊에도 표시된다 (부모가 알아야 다시 넣어 준다)', () => {
+  const items = [{ id: 'x', title: '젠가', broken: true }];
+  const recs = [{ itemId: 'x', done: true, bestRatio: 0.9, seconds: 30, speakAttempts: 1, speakPass: 1, lastAt: 10 }];
+  const s = contentSummary(items, recs, () => 0); // 못 읽으니 문장 수는 0
+  assert.equal(s[0].broken, true);
+  assert.equal(s[0].title, '젠가', '제목은 세션 기록에서 되찾아 온 것을 그대로 쓴다');
+  assert.equal(s[0].done, 1, '공부한 기록 자체는 남아 있다');
+  assert.equal(s[0].pct, 0, '문장 수가 0이면 0%로 (나누기 오류 없이)');
 });
 
 test('✍️ 에세이 번호는 오래된 글이 [1] — 새 글을 써도 이미 매긴 번호가 안 밀린다', () => {

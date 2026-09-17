@@ -115,12 +115,50 @@ export async function addItem({ title, videoFile, enText, koText = '', duration 
   return id;
 }
 
-/** 전체 목록 (최신순, Blob 제외) */
+/**
+ * 전체 목록 (최신순, Blob 제외)
+ *
+ * ★ getAll을 쓰지 말 것 — 레코드 하나만 깨져도 요청 전체가 실패한다.
+ * Chrome은 64KB가 넘는 값을 IndexedDB 옆 파일로 빼 두는데(items 레코드는 자막 전문이 들어 있어 거의 항상 넘는다),
+ * 그 파일이 사라지면 NotReadableError "Data lost due to missing file"이 난다.
+ * 2026-09-17 태블릿에서 영상 한 편이 이렇게 깨졌을 뿐인데 목록을 통째로 못 그려 앱이 멈췄다.
+ * → 키를 먼저 읽고 한 건씩 각자 트랜잭션으로 읽는다. 깨진 것만 { broken: true }로 표시하고 나머지는 정상 동작.
+ */
 export async function listItems() {
   const db = await openDb();
-  const tx = db.transaction('items', 'readonly');
-  const all = await promisify(tx.objectStore('items').getAll());
-  return all.sort((a, b) => b.createdAt - a.createdAt);
+  const keys = await promisify(db.transaction('items', 'readonly').objectStore('items').getAllKeys());
+  const out = [];
+  let broken = false;
+  for (const id of keys) {
+    try {
+      const item = await promisify(db.transaction('items', 'readonly').objectStore('items').get(id));
+      if (item) out.push(item);
+    } catch (err) {
+      console.warn('영상 정보를 읽지 못했어요:', id, err);
+      broken = true;
+      out.push({
+        id, broken: true, errorName: (err && err.name) || '',
+        title: '', enText: '', koText: '', thumb: '', duration: 0, videoSize: 0, lastCue: 0, createdAt: 0,
+      });
+    }
+  }
+  // 깨진 영상은 제목도 못 읽는다 → 세션 기록에서 되찾아 아이가 어느 영상인지 알게 한다
+  if (broken) {
+    const titles = await titlesFromSessions().catch(() => new Map());
+    for (const it of out) if (it.broken) it.title = titles.get(String(it.id)) || '(제목을 읽지 못했어요)';
+  }
+  return out.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** 세션 기록에 남은 itemId → 제목 (깨진 영상의 이름을 되찾는 용도) */
+async function titlesFromSessions() {
+  const db = await openDb();
+  const all = await promisify(db.transaction('sessions', 'readonly').objectStore('sessions').getAll());
+  const map = new Map();
+  for (const s of all.sort((a, b) => a.startedAt - b.startedAt)) {
+    if (s && s.itemId && s.title) map.set(String(s.itemId), s.title);
+  }
+  return map;
 }
 
 export async function getItem(id) {

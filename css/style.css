@@ -143,6 +143,9 @@ button { font-family: inherit; }
   cursor: pointer;
 }
 .library-item:active { transform: scale(0.98); }
+/* 저장이 깨져 못 여는 영상 — 눌러도 안 열리니 한눈에 다르게 보이게 */
+.library-item.broken { opacity: 0.75; border: 2px dashed #e39b3c; }
+.library-item.broken .library-meta { color: #b26a12; font-weight: 700; }
 .library-thumb {
   width: 96px;
   height: 64px;
