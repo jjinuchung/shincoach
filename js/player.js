@@ -4,7 +4,7 @@ import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
 } from './srt.js';
-import { loadVocab } from './vocab.js';
+import { isSpeakable, loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
@@ -128,6 +128,9 @@ export function initPlayer(ctx) {
 
   $('btn-back').addEventListener('click', closePlayer);
   $('btn-play').addEventListener('click', onPlayButton);
+  // ⏭ 이건 넘길래 — 발음이 너무 어렵거나 영어가 아닌 대사일 때. 벌은 없고 보상도 없다
+  // (상이 안 나오는 것 자체가 "그래도 해 보자"는 이유가 된다. 벌까지 주면 아이가 스트레스만 받는다)
+  $('shadow-skip').addEventListener('click', (e) => { e.stopPropagation(); skipSpeaking(); });
   $('btn-prev').addEventListener('click', () => step(-1));
   $('btn-next').addEventListener('click', () => step(1));
   $('btn-repeat').addEventListener('click', cycleRepeat);
@@ -1409,7 +1412,21 @@ function markMicUnavailable(why) {
 function speakGateBlocks(targetIdx) {
   if (!settings.speakCheck || speakOff() || state.parentMode) return false;
   if (state.idx < 0 || state.speakPassed) return false;
-  return targetIdx > state.idx;
+  if (targetIdx <= state.idx) return false;
+  // ★ 이미 끝낸 문장(영어 자막이 풀린 곳)으로는 자유롭게 간다.
+  // 예전에는 앞으로 가는 걸 무조건 막아서, 실수로 지난 자막을 눌러 되돌아가면
+  // **이미 따라 말한 문장을 처음부터 다시** 해야 제자리로 올 수 있었다 (2026-09-18 아버님).
+  if (isDoneCue(targetIdx)) return false;
+  // 지금 문장도 영어가 아니면(따라 말할 수 없는 줄이면) 막을 이유가 없다
+  return speakableCue(state.cues[state.idx]);
+}
+
+/** 그 문장을 오늘까지 한 번이라도 끝냈는가 (영어 자막이 공개된 문장) */
+function isDoneCue(i) {
+  const cue = state.cues[i];
+  if (!cue) return false;
+  const rec = track.statFor(cue);
+  return !!(rec && rec.done);
 }
 
 /** 새 문장에 들어갈 때 문장별 상태 초기화 (goTo와 연속 재생 자동 이동 모두 여기를 거침) */
@@ -1655,7 +1672,7 @@ function onCueEnd() {
     markScriptRevealed();
     markDone(cue); // N번 다 들었으면 "한 문장"으로 인정 (반복 끔이면 이 뒤로 markDone을 거치지 않으므로)
     updateChips();
-    if (state.shadow || speakCheckActive()) { // 섀도잉/말하기 확인이면 바로 따라 말하기 (영어 보면서) → 반복 설정대로 이어감
+    if (state.shadow || speakCheckActive(cue)) { // 섀도잉/말하기 확인이면 바로 따라 말하기 (영어 보면서) → 반복 설정대로 이어감
       video.pause();
       startShadowWait(cue, { repeat: repeatMax > 0 });
       return;
@@ -1669,7 +1686,7 @@ function onCueEnd() {
   const repeatLeft = repeatMax > 0 && state.repeatCount < repeatMax - 1;
 
   // 섀도잉/말하기 확인: 매 재생이 끝날 때마다 멈추고 따라 말할 시간 → 반복이 남았으면 같은 문장, 아니면 다음 문장
-  if (state.shadow || speakCheckActive()) {
+  if (state.shadow || speakCheckActive(cue)) {
     video.pause();
     startShadowWait(cue, { repeat: repeatLeft });
     return;
@@ -1760,16 +1777,30 @@ function replayCurrent() {
 /**
  * 따라 말하기 대기. 끝나면(또는 탭하면) opts.repeat 이면 같은 문장 다시, 아니면 다음 문장
  */
-/** 말하기 확인을 실제로 수행할 상황인지 (설정 켬 + 마이크 가능 + 아직 통과 전) */
-function speakCheckActive() {
-  return settings.speakCheck && !speakOff() && !state.speakPassed;
+/**
+ * 이 문장을 따라 말하라고 시킬 수 있는가.
+ *
+ * 미니언즈어("Bello! Poopaye!")나 포켓몬 이름 외침("Gengar!")은 영어가 아니라서
+ * 아이가 아무리 잘 따라 해도 인식기가 못 알아듣고 "틀렸다"만 나온다.
+ * 발음하기도 어렵고 배울 것도 없는데 계속 다시 하라고 하니 아이가 지친다 (2026-09-18 아버님).
+ * 미니언즈 자막 1,408줄 중 12%, 토이스토리5는 2%만 해당한다 (실제 자막으로 재 봄).
+ */
+function speakableCue(cue) {
+  if (!cue || !cue.en) return false;
+  if (!state.vocab || !state.vocab.known || !state.vocab.known.size) return true; // 단어장을 못 읽었으면 평소대로
+  return isSpeakable(cue.en, state.vocab);
+}
+
+/** 말하기 확인을 실제로 수행할 상황인지 (설정 켬 + 마이크 가능 + 아직 통과 전 + 영어 문장) */
+function speakCheckActive(cue) {
+  return settings.speakCheck && !speakOff() && !state.speakPassed && speakableCue(cue);
 }
 
 function startShadowWait(cue, opts = {}) {
   if (state.shadowTimer || state.speakRun) return; // rAF와 ended가 동시에 호출해도 하나만
   state.shadowNext = opts.repeat ? 'repeat' : 'next';
   setSpeakHide(true); // 따라 말하는 동안은 영어를 가림 (결과가 나오거나 대기가 끝나면 다시 보임)
-  if (speakCheckActive()) { startSpeakWait(cue); return; }
+  if (speakCheckActive(cue)) { startSpeakWait(cue); return; }
   const dur = Math.max(1.5, (cue.end - cue.start) * settings.shadowFactor + 0.5) * 1000;
   const overlay = $('shadow-overlay');
   const fill = $('shadow-ring-fill');
@@ -1837,6 +1868,26 @@ function setSpeakHide(on) {
   applySubVisibility();
 }
 
+/**
+ * ⏭ 따라 말하기를 건너뛴다 (아이가 직접 누름).
+ * HP는 깎지 않는다 — 벌을 주면 미니언즈어처럼 못 따라 하는 줄에서 아이만 손해를 본다.
+ * 대신 ⚡·💰도 안 나오고 기록에는 "넘김"으로 남아 📊에서 부모가 본다.
+ */
+function skipSpeaking() {
+  const cue = state.cues[state.idx];
+  if (!cue || !state.speakRun) return;
+  const run = state.speakRun;
+  state.speakRun = null;
+  run.cancelled = true;
+  run.cancel();
+  $('shadow-skip').hidden = true;
+  $('shadow-overlay').classList.remove('speaking');
+  state.speakPassed = true;
+  track.speak(cue, { passed: false, skipped: true, score: null });
+  showPlayerMessage('⏭ 이 문장은 넘어갈게요', 2000);
+  afterShadowWait();
+}
+
 function skipShadowWait() {
   if (state.speakRun) { state.speakRun.stop(); return; } // 탭 = "다 말했어요" → 바로 판정
   if (!state.shadowTimer) return;
@@ -1854,6 +1905,7 @@ function startSpeakWait(cue) {
   overlay.hidden = false;
   overlay.classList.add('speaking');
   msg.textContent = '🎤 따라 말해보세요!';
+  $('shadow-skip').hidden = false; // ⏭ 어려우면 바로 넘어갈 수 있게 (세 번 틀릴 때까지 기다리지 않아도 된다)
   // 못 한 횟수에 따라 힌트 단계 안내 (영어 숨김 설정이 켜져 있을 때: 절반 힌트 → 전부 보임)
   if (state.speakFails === 0) sub.textContent = '';
   else if (settings.hideEnWhileSpeaking && state.speakFails === 1) sub.textContent = `다시 한번! 빈칸은 기억해서 말해봐요 (${state.speakFails + 1}/3)`;
@@ -2030,6 +2082,7 @@ function renderSpeakWords(cue, result) {
 }
 
 function onSpeakResult(cue, result) {
+  $('shadow-skip').hidden = true;
   const msg = $('shadow-msg');
   const sub = $('shadow-sub');
   const fill = $('shadow-ring-fill');

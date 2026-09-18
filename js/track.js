@@ -225,6 +225,16 @@ export function statsList() {
   return [...t.stats.values()];
 }
 
+/**
+ * 이 문장의 기록을 **있으면만** 돌려준다 (없으면 null — rec()과 달리 새로 만들지 않는다).
+ * 화면을 그리며 "이 문장을 이미 끝냈나"를 물어볼 때 쓴다. rec()을 쓰면 묻기만 해도
+ * 빈 기록이 생겨 저장 대상이 늘어난다.
+ */
+export function statFor(cue) {
+  if (!t.item || !cue) return null;
+  return t.stats.get(sentenceKey(t.item.id, cue.start)) || null;
+}
+
 /** 말하기 확인 결과 */
 /**
  * 🎤 이 문장의 말하기 보상을 오늘 이미 줬는지 / 주는 것으로 표시.

@@ -132,6 +132,13 @@ export function createVocab(data) {
   const words = data.words || {};
   const phrases = Object.entries(data.phrases || {}).map(([k, v]) => ({ key: k, re: phraseRegex(k), meaning: v }));
   const known = new Set([...basic, ...Object.keys(words)]);
+  // 뜻에 "(스페인어)" "(미니언 말)" 처럼 외국어 표시가 붙은 낱말 — 단어 패널에는 필요하지만
+  // **영어 문장인지 판단할 때는 영어로 세면 안 된다** (미니언즈는 이런 말이 잔뜩 나온다)
+  const foreign = new Set(
+    Object.entries(words)
+      .filter(([, v]) => FOREIGN_TAG.test(String(v)))
+      .map(([k]) => k)
+  );
 
   function meaningOf(stem) {
     let m = words[stem];
@@ -182,7 +189,49 @@ export function createVocab(data) {
     return findTokenRange(text, term, known);
   }
 
-  return { lookup, findRange, known, basic, size: Object.keys(words).length };
+  return { lookup, findRange, known, basic, foreign, size: Object.keys(words).length };
+}
+
+/** 영어답게 생긴 꼬리 — 사전에 없어도 영어 단어로 본다 (thankfully, intervened, amazing…) */
+const EMPTY_SET = new Set();
+const ENGLISH_TAIL = /(ly|ed|ing|tion|sion|ness|ment|ful|less|able|ible|est|er)$/;
+/** 단어장 뜻에 붙은 "영어가 아니다" 표시 */
+const FOREIGN_TAG = /미니언 말|일본어|이탈리아어|스페인어|프랑스어|독일어|중국어|외국어/;
+
+/**
+ * 따라 말하기를 시킬 만한 **영어 문장**인가.
+ *
+ * 미니언즈어("Bello! Poopaye!", "Eh, bup, bup, bup")나 포켓몬 울음소리처럼 영어가 아닌 줄은
+ * 아이가 아무리 잘 따라 해도 인식기가 영어로 못 알아들어 "틀렸다"만 나온다.
+ * 발음하기도 어렵고 배울 것도 없는데 계속 다시 하라고 하니 아이가 지친다 (2026-09-18 아버님).
+ *
+ * 판단: 사전에 있거나 영어답게 생긴 단어의 비율. 고유명사(문장 중간의 대문자 낱말 — James, Henry)는
+ * 사전에 없는 게 당연하므로 **아예 세지 않는다**. 그러지 않으면 "James and Henry!" 같은
+ * 멀쩡한 영어가 걸러진다.
+ *
+ * @param {string} text 영어 자막 한 줄
+ * @param {Set<string>} known 아는 단어 집합 (createVocab().known)
+ * @param {number} min 이 비율보다 낮으면 영어가 아닌 것으로 본다
+ */
+export function isSpeakable(text, vocab, min = 0.4) {
+  const known = vocab && vocab.known ? vocab.known : vocab;
+  const foreign = (vocab && vocab.foreign) || EMPTY_SET;
+  const raw = String(text || '').replace(/[♪♫]/g, ' ').split(/\s+/).filter(Boolean);
+  let counted = 0;
+  let english = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const tok = raw[i];
+    const w = tok.toLowerCase().replace(/[^a-z']/g, '');
+    if (!w) continue; // 문장부호·다른 문자만 있는 조각
+    // 문장 맨 앞이 아닌 대문자 낱말 = 이름 → 세지 않는다 (사전에 없는 게 당연하다)
+    const midSentenceName = i > 0 && /^[A-Z]/.test(tok) && !/^[.!?]$/.test(raw[i - 1].slice(-1));
+    if (midSentenceName) continue;
+    counted++;
+    if (foreign.has(w)) continue; // 외국어로 적어 둔 낱말은 영어로 세지 않는다
+    if ((known && (known.has ? known.has(w) : false)) || stemWord(w, known) !== w || ENGLISH_TAIL.test(w)) english++;
+  }
+  if (!counted) return false;          // 셀 단어가 없으면 따라 말할 것도 없다
+  return english / counted >= min;
 }
 
 /** 브라우저에서 vocab/*.json 로드 (실패해도 앱은 동작해야 하므로 빈 단어장 반환) */

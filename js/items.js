@@ -71,7 +71,7 @@ export const HP = {
 // mult = 잡힐 확률 배율, cap = 확률 상한, sure = 반드시 잡음, free = 언제나 쓸 수 있음(가방에 없어도)
 export const POKEBALL = { id: 'pokeball', emoji: '🔴', ko: '몬스터볼', price: 0, mult: 1, kind: 'ball', free: true };
 export const GREATBALL = { id: 'greatball', emoji: '🔵', ko: '슈퍼볼', price: 25, mult: 1.5, kind: 'ball' };
-export const ULTRABALL = { id: 'ultraball', emoji: '🟡', ko: '하이퍼볼', price: 60, mult: 2, kind: 'ball' };
+export const ULTRABALL = { id: 'ultraball', emoji: '🟡', ko: '하이퍼볼', price: 600, mult: 2, kind: 'ball' };
 export const MASTERBALL = { id: 'masterball', emoji: '🟣', ko: '마스터볼', price: 1200, kind: 'ball', sure: true };
 // 🌟 황금 몬스터볼: 하이퍼볼과 같은 2배지만 상한이 더 높다(95%). 🔁 복습을 끝내야만 얻는다 (상점에서 못 사고 🎁 상자에서도 안 나옴)
 export const GOLDEN = { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', price: 0, mult: 2, cap: 0.95, kind: 'ball' };

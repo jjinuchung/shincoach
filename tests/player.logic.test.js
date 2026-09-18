@@ -16,6 +16,13 @@ const VOCAB_KNOWN = new Set([
   ...JSON.parse(fsNode.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8')),
 ]);
 import { wordTimings as realWordTimings } from '../js/srt.js';
+import { isSpeakable as realIsSpeakable, createVocab as realCreateVocab } from '../js/vocab.js';
+// 외국어 표시(미니언 말·스페인어…)까지 있어야 제대로 판정된다 → 진짜 단어장을 쓴다
+const REAL_VOCAB = realCreateVocab({
+  basic: JSON.parse(fsNode.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8')),
+  words: JSON.parse(fsNode.readFileSync(new URL('../vocab/words.json', import.meta.url), 'utf8')),
+  phrases: {},
+});
 
 /**
  * 클릭이 부모(shadow-overlay)까지 전파되는 것을 모사한다.
@@ -91,14 +98,17 @@ function loadPlayer() {
     parseSubtitle: () => [], mergeSubtitles: (a) => a, mergeIntoSentences: (a) => a,
     wordTimings: () => [], findCueIndex: (cues, t) => cues.findIndex((c) => t >= c.start && t < c.end),
     getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null, listDaily: async () => [],
-    loadVocab: async () => ({ lookup: () => [] }),
+    loadVocab: async () => ({ lookup: () => [] }), isSpeakable: realIsSpeakable,
     initDiag() {}, renderDiag() {},
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
     // 하루 한 번(mark*)은 실제 코드에서 **트랜잭션 선점**이라 Promise<선점 성공 여부>를 준다 — 스텁도 같은 약속을 지킨다
     track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false,
       claimSpeakReward: () => true, markHpMissed: async () => true, todayBattles: () => 0, markBattle: async () => true, MASTER_RATIO: 0.8, puzzle() {},
       // 🔁 복습 스텁: 문장 기록과 오늘 상태를 reviewState로 제어
-      statsList: () => reviewState.stats, review(cue, passed) { reviewState.reviewed.push({ start: cue.start, passed }); reviewState.items++; return { box: 1, graduated: false }; },
+      statsList: () => reviewState.stats,
+      // 이 문장을 이미 끝냈는지 (없으면 null) — 끝낸 문장으로는 자유롭게 이동할 수 있어야 한다
+      statFor: (cue) => (reviewState.stats || []).find((r) => r.start === cue.start) || null,
+      review(cue, passed) { reviewState.reviewed.push({ start: cue.start, passed }); reviewState.items++; return { box: 1, graduated: false }; },
       todayReviewSentences: () => reviewState.sentences, todayReviewItems: () => reviewState.items,
       reviewWord() { reviewState.items++; reviewState.words++; },
       todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
@@ -169,7 +179,7 @@ function loadPlayer() {
     formUrl: (id, kind) => `url:${id}:${kind}`,
     hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
-    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, makeDictation, VOCAB_KNOWN,
+    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, makeDictation, VOCAB_KNOWN, REAL_VOCAB,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
     // sfx.js 스텁
@@ -392,6 +402,46 @@ test('말하기 확인: 통과 전엔 다음 문장으로 못 감, 이전은 됨
   assert.match(els['player-msg'].textContent, /따라 말해야/);
   run('goTo(0)');            // 뒤로는 허용
   assert.equal(run('state.idx'), 0);
+});
+
+// 2026-09-18 아버님: 실수로 지난 자막을 눌러 되돌아가면, 이미 따라 말한 문장을 **또** 해야
+// 제자리로 올 수 있어서 아이가 스트레스를 받는다. 이미 끝낸 문장까지는 자유롭게 오갈 수 있어야 한다.
+test('🔓 이미 끝낸 문장으로는 자유롭게 간다 (되돌아갔다가 제자리로)', () => {
+  const { run, els, reviewState } = loadPlayerWithSpeak([]);
+  // 0·1·2번 문장은 이미 끝냈고(영어 공개), 3번은 아직
+  reviewState.stats = [{ start: 0, done: true }, { start: 10, done: true }, { start: 20, done: true }];
+  run('state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""},{start:20,end:22,en:"c",ko:""},{start:30,end:32,en:"d",ko:""}]; state.idx = -1;');
+  run('goTo(2)');
+  assert.equal(run('state.idx'), 2);
+  run('goTo(0)');                        // 실수로 지난 자막 터치
+  assert.equal(run('state.idx'), 0);
+  els['player-msg'].textContent = '';
+  run('goTo(2)');                        // 제자리로 — 이미 한 곳이니 막히면 안 된다
+  assert.equal(run('state.idx'), 2, '이미 끝낸 문장으로는 다시 갈 수 있어야 한다');
+  assert.equal(els['player-msg'].textContent, '', '"따라 말해야" 안내가 뜨면 안 된다');
+  run('goTo(3)');                        // 아직 안 한 문장은 그대로 막힌다
+  assert.equal(run('state.idx'), 2);
+  assert.match(els['player-msg'].textContent, /따라 말해야/);
+});
+
+// 미니언즈어("Bello! Poopaye!")·포켓몬 이름 외침("Gengar!")은 영어가 아니라
+// 아무리 잘 따라 해도 "틀렸다"만 나온다 → 아예 안 시킨다
+test('🗣 영어가 아닌 대사는 따라 말하라고 하지 않는다', () => {
+  const { run } = loadPlayerWithSpeak([]);
+  run('state.vocab = REAL_VOCAB;');
+  assert.equal(run('speakableCue({ en: "I really want to go there today" })'), true, '보통 영어 문장');
+  assert.equal(run('speakableCue({ en: "But thankfully Ed intervened," })'), true, '사전에 없어도 영어답게 생긴 말');
+  assert.equal(run('speakableCue({ en: "James and Henry!" })'), true, '이름이 섞여도 영어');
+  assert.equal(run('speakableCue({ en: "Bello! Poopaye!" })'), false, '미니언즈어');
+  assert.equal(run('speakableCue({ en: "Eh, bup, bup, bup, bup." })'), false, '미니언즈어');
+  assert.equal(run('speakableCue({ en: "Gengar!" })'), false, '포켓몬 이름 외침');
+  assert.equal(run('speakableCue({ en: "♪ ♪" })'), false, '가사 없는 음악 표시');
+});
+
+test('🗣 단어장을 못 읽었으면 평소대로 시킨다 (기능이 조용히 꺼지지 않게)', () => {
+  const { run } = loadPlayerWithSpeak([]);
+  run('state.vocab = null;');
+  assert.equal(run('speakableCue({ en: "Bello! Poopaye!" })'), true, '판단할 근거가 없으면 막지 않는다');
 });
 
 test('말하기 확인: 문장 끝 → 마이크 대기 → 통과하면 다음으로', async () => {

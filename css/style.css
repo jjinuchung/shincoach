@@ -308,6 +308,16 @@ button { font-family: inherit; }
 .shadow-ring-fill { height: 100%; width: 100%; background: #fff; transition: width 0.1s linear; }
 .shadow-sub { font-size: 1rem; font-weight: 600; opacity: 0.95; text-align: center; padding: 0 16px; min-height: 1.3em; }
 .shadow-overlay.speaking { background: rgba(220, 38, 38, 0.82); }
+/* ⏭ 이건 넘길래 — 화면을 탭하면 "다 말했어요"라 버튼은 눈에 띄되 작게 (실수로 누르지 않게 아래쪽에) */
+.shadow-skip {
+  margin-top: 10px;
+  padding: 8px 18px;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+.shadow-skip:active { background: rgba(255, 255, 255, 0.35); }
 .shadow-overlay.speaking .shadow-ring-fill { background: #fde047; transition: width 0.05s linear; }
 
 .progress-row { display: flex; align-items: center; gap: 10px; }
