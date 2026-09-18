@@ -1,6 +1,7 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
 import { rarityOf, RARITY, caughtCount, xpToReach } from './xp.js';
+import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { makeFigure, setFigure, BALLS, POKEBALL } from './items.js';
@@ -53,6 +54,7 @@ export function josa(word, withBatchim, without) {
  * @param {() => void} [o.onDone] 닫힐 때
  */
 export function openCatch(o) {
+  bgm.play(); // 🎵 이어서
   closeCatch();
   ui.open = true;
   ui.run++;
@@ -140,6 +142,7 @@ function renderBalls(counts) {
 }
 
 export function closeCatch() {
+  bgm.stop();
   if (!ui.open) return;
   ui.open = false;
   ui.run++;

@@ -25,6 +25,7 @@ import {
 const COACH_FIX_MAX = 3;
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
+import { setBgmEnabled } from './bgm.js';
 import * as track from './track.js';
 
 const $ = (id) => document.getElementById(id);
@@ -2406,7 +2407,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always' };
+  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always' };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
   } catch {
@@ -2429,9 +2430,11 @@ function initSettingsDialog() {
   $('set-essay').value = String(Number(settings.essayMinutes));
   $('set-reread').value = String(settings.rereadMode);
   $('set-sfx').checked = settings.sfx;
+  $('set-bgm').checked = settings.bgm;
   $('set-vibrate').checked = settings.vibrate;
   $('set-hp').checked = settings.hp;
   setSfxEnabled(settings.sfx);
+  setBgmEnabled(settings.bgm);
   setVibrateEnabled(settings.vibrate);
   $('set-speak').checked = settings.speakCheck;
   $('set-hide-en').checked = settings.hideEnWhileSpeaking;
@@ -2462,6 +2465,7 @@ function initSettingsDialog() {
     settings.rereadMode = $('set-reread').value;
     if (settings.puzzleEvery === 0) state.puzzlePool = [];
     settings.sfx = $('set-sfx').checked;
+    settings.bgm = $('set-bgm').checked;
     settings.vibrate = $('set-vibrate').checked;
     settings.hp = $('set-hp').checked;
     setSfxEnabled(settings.sfx);

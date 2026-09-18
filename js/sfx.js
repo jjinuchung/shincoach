@@ -25,6 +25,15 @@ function ac() {
   return ctx;
 }
 
+/**
+ * 🎵 배경음악(bgm.js)이 같은 오디오 컨텍스트를 쓰도록 내준다.
+ * 안드로이드는 컨텍스트를 여러 개 만들면 소리가 안 나는 기기가 있어 하나를 나눠 쓴다.
+ * 효과음 설정과는 별개로 돌아가야 하므로 soundOn 여부는 보지 않는다 (BGM은 자기 설정이 따로 있다).
+ */
+export function audioContext() {
+  return ctx && ctx.state !== 'closed' ? ctx : null;
+}
+
 /** 단순 음: 주파수(시작→끝), 파형, 길이, 세기 */
 function tone(c, { freq, freqEnd, type = 'sine', at = 0, dur = 0.15, gain = 0.18 }) {
   const o = c.createOscillator();

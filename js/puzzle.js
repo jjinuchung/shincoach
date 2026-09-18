@@ -9,6 +9,7 @@ export const PUZZLE_MAX_WORDS = 8; // 9단어 이상은 태블릿 화면에 안 
 export const PUZZLE_MAX_WRONG = 3; // 3번 틀리면 정답 공개
 
 import { sfx, unlock } from './sfx.js';
+import * as bgm from './bgm.js';
 import { makeFigure } from './items.js';
 
 const hasLetter = (s) => /[A-Za-z0-9À-ɏ]/.test(s); // 영문·숫자·라틴 확장(é 등)
@@ -146,6 +147,7 @@ export function isPuzzleOpen() {
  * characters: [{ id, ko, url, look }] — 단어 수 이상 있으면 캐릭터가 단어를 말풍선에 들고 있는 모양으로 (없으면 단어 조각만). look = 장식·염색 (xp.getLook)
  */
 export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
+  bgm.play(); // 🎵 지난 이벤트에서 끊긴 자리부터 이어서
   closePuzzle();
   ui.open = true;
   ui.cue = cue;
@@ -269,6 +271,7 @@ function clearGapsIfDone() {
 /** 결과 전달 없이 닫기 (플레이어를 닫을 때 등) */
 export function closePuzzle() {
   if (!ui.open) return;
+  bgm.stop();
   ui.open = false;
   clearTimeout(ui.timer);
   ui.timer = null;

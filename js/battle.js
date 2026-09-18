@@ -3,6 +3,7 @@
 // 이기면 상대 포켓몬을 얻고, 지면 그 포켓몬의 패배 수가 +1 (3번 지면 잃음 — xp.js battleLoss). 참가는 선택.
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 화면(DOM)
 import { rarityOf, RARITY } from './xp.js';
+import * as bgm from './bgm.js';
 import { POTION, itemById, makeFigure, setFigure } from './items.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
@@ -178,6 +179,7 @@ export function isBattleOpen() {
  * @param {(result:{outcome:'win'|'lose'|'declined'|'quit', my?:object, opponent:object, turns:number}) => void} o.onDone
  */
 export function openBattle(o) {
+  bgm.play(); // 🎵 이어서
   closeBattle();
   ui.open = true;
   ui.run++;
@@ -206,6 +208,7 @@ export function openBattle(o) {
 }
 
 export function closeBattle() {
+  bgm.stop();
   if (!ui.open) return;
   ui.open = false;
   ui.run++;

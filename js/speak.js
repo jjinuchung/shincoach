@@ -214,11 +214,27 @@ export function scoreTranscript(target, transcript) {
  *   Result: { passed, method: 'speech'|'energy'|'none'|'cancelled', transcript, score, spokenMs, reason, srError }
  *   srError: 음성 인식을 못 쓴 이유 — 'unsupported'(브라우저 미지원) | 'offline' | 'start-failed' | 브라우저 오류명(audio-capture·network·not-allowed·no-speech…) | 'no-result'(오류 없이 결과만 없음)
  */
+/** 마이크를 쓰기 시작/끝났음을 알린다 — 🎵 배경음악이 이때 멈췄다 이어서 난다 (음악이 마이크에 들어가면 인식률이 떨어진다) */
+function micSignal(name) {
+  try {
+    if (typeof window !== 'undefined' && window.dispatchEvent) window.dispatchEvent(new CustomEvent(`shincoach:${name}`));
+  } catch { /* 신호를 못 보내도 판정은 계속된다 */ }
+}
+
 export function runSpeakCheck(opts) {
   const SR = SpeechRecognitionCtor();
   // 막혀 있어도 잠시 뒤에는 다시 시도한다 — 와이파이가 순간 끊기거나 아이가 두 번 조용했던 것뿐일 수 있다
   if (srBroken && srBrokenAt && Date.now() - srBrokenAt >= SR_RETRY_MS) resetRecognition();
-  if (!srBroken && SR && navigator.onLine) return runWithRecognition(opts, SR);
+  micSignal('micstart');
+  const handle = (!srBroken && SR && navigator.onLine)
+    ? runWithRecognition(opts, SR)
+    : energyWithReason(opts, SR);
+  // 어떤 길로 끝나든(통과·실패·취소·오류) 마이크가 끝났다는 것은 한 번만 알린다
+  handle.promise.then(() => micSignal('micend'), () => micSignal('micend'));
+  return handle;
+}
+
+function energyWithReason(opts, SR) {
   const why = !SR ? 'unsupported' : !navigator.onLine ? 'offline' : srBrokenWhy;
   logAttempt({ method: 'energy', ok: false, srError: why });
   return runWithEnergy(opts, why);
