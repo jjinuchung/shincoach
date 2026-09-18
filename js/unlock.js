@@ -25,7 +25,7 @@ export const ticketId = (id) => `${TICKET_PREFIX}${id}`;
 export const LOCKED = [
   {
     id: 'gengar', ko: '팬텀 대소동', en: 'Gengar to the Max',
-    poster: 94, emoji: '👻', minutes: 15, sentences: 180, price: 4000,
+    poster: 94, emoji: '👻', minutes: 15, sentences: 180, price: 2000,
     blurb: '팬텀이 거다이맥스로 변신해서 싸워요',
     cast: [
       { id: 94, ko: '팬텀' }, { id: 861, ko: '오롱털' },
@@ -35,7 +35,7 @@ export const LOCKED = [
   },
   {
     id: 'ash_battles', ko: '지우와 피카츄 명장면', en: "Ash & Pikachu's Epic Battle Moments",
-    poster: 25, emoji: '⚡', minutes: 8, sentences: 86, price: 4000,
+    poster: 25, emoji: '⚡', minutes: 8, sentences: 86, price: 2000,
     blurb: '지우와 피카츄의 가장 멋진 배틀만 모았어요',
     cast: [
       { id: 25, ko: '피카츄' }, { id: 214, ko: '헤라크로스' },
