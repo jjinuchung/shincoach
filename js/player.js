@@ -59,7 +59,7 @@ const state = {
   speakFails: 0,      // 말하기 확인: 현재 문장 실패 횟수 (3번이면 통과시킴)
   speakRun: null,     // 진행 중인 말하기 확인 { promise, stop }
   speakHideEn: 'none', // 따라 말하기 대기 중 영어 숨김 단계: 'full'(전부) | 'partial'(절반 힌트) | 'none' — 못 할수록 더 보여줌
-  speakUnavailable: false, // 마이크 못 쓰면 확인 없이 진행
+  speakUnavailableAt: 0, // 🎤 마이크를 못 쓴다고 본 시각 (0이면 정상) — 영구가 아니라 잠시 뒤 다시 시도
   micPrepared: false,
   puzzlePool: [],     // 🧩 마지막 퍼즐 이후 "한" 문장들 (중복 없이) → N개 차면 그중 하나로 퍼즐
   puzzleCue: null,    // 퍼즐이 열려 있는 동안 그 문장 (열려 있으면 재생 루프/키보드가 플레이어 상태를 건드리지 않음)
@@ -1265,6 +1265,7 @@ export async function openPlayer(id, opts = {}) {
   state.puzzlePool = [];
   state.journeyCelebrated = false;
   state.reviewDone = false;
+  state.speakUnavailableAt = 0; // 영상을 새로 열면 마이크를 다시 시도한다
   state.reviewPending = false;
   state.reviewCooldown = 0;
   state.essayPending = false;
@@ -1379,9 +1380,33 @@ function buildCues(item) {
 // ───────────────────── 이동/재생 ─────────────────────
 
 /** i번째 문장으로 이동 */
+/**
+ * 🎤 지금 마이크를 못 쓰는 상태인가.
+ *
+ * ★ 한 번 실패했다고 **세션 내내 꺼 두면 안 된다**. 예전에는 boolean 하나를 켜고 끄는 데가 없어서,
+ * 다른 앱이 마이크를 잠깐 잡았거나 화면이 꺼지던 참이었을 뿐인데도 그 뒤로 말하기 확인이 영영 사라졌고,
+ * 아이는 **앱을 껐다 켜야** 다시 됐다 (2026-09-18 신고: "잘 되다가 어느 순간부터 안 돼요").
+ * 시각을 적어 두고 잠시 뒤 다시 시도한다.
+ */
+const MIC_RETRY_MS = 3 * 60 * 1000;
+
+function speakOff() {
+  if (!state.speakUnavailableAt) return false;
+  if (Date.now() - state.speakUnavailableAt < MIC_RETRY_MS) return true;
+  state.speakUnavailableAt = 0; // 시간이 지났으면 다시 해 본다
+  state.micPrepared = false;    // 마이크도 다시 준비
+  return false;
+}
+
+/** 마이크를 못 썼다고 표시 (잠시 뒤 자동으로 다시 시도한다) */
+function markMicUnavailable(why) {
+  state.speakUnavailableAt = Date.now();
+  console.warn('🎤 마이크를 쓸 수 없어요 — 잠시 뒤 다시 시도합니다:', why || '');
+}
+
 /** 말하기 확인이 켜져 있고 아직 통과 못 했으면 앞으로 못 넘어감 */
 function speakGateBlocks(targetIdx) {
-  if (!settings.speakCheck || state.speakUnavailable || state.parentMode) return false;
+  if (!settings.speakCheck || speakOff() || state.parentMode) return false;
   if (state.idx < 0 || state.speakPassed) return false;
   return targetIdx > state.idx;
 }
@@ -1495,14 +1520,14 @@ function onPlayButton() {
   unlock(); // 첫 터치에서 효과음 오디오 준비
   if (state.shadowTimer || state.speakRun) { skipShadowWait(); return; }
   // 첫 재생(사용자 터치) 때 마이크 권한을 미리 받아 둠 (부모 모드는 말하기 확인이 없으니 안 물어봄)
-  if (settings.speakCheck && !state.speakUnavailable && !state.micPrepared && !state.parentMode) {
+  if (settings.speakCheck && !speakOff() && !state.micPrepared && !state.parentMode) {
     state.micPrepared = true;
     prepareMic().then((stream) => {
       if (stream) return;
       // 인식이 마이크를 넘겨받느라 취소된 것이면 기능을 끄면 안 된다 — 다음 재생 때 다시 준비한다
       if (micFailReason() === 'released') { state.micPrepared = false; return; }
-      state.speakUnavailable = true;
-      showPlayerMessage('🎤 마이크를 쓸 수 없어 말하기 확인 없이 진행해요', 4000);
+      markMicUnavailable(micFailReason());
+      showPlayerMessage('🎤 마이크를 쓸 수 없어 잠깐 말하기 확인 없이 진행해요', 4000);
     });
   }
   if (video.paused) {
@@ -1736,7 +1761,7 @@ function replayCurrent() {
  */
 /** 말하기 확인을 실제로 수행할 상황인지 (설정 켬 + 마이크 가능 + 아직 통과 전) */
 function speakCheckActive() {
-  return settings.speakCheck && !state.speakUnavailable && !state.speakPassed;
+  return settings.speakCheck && !speakOff() && !state.speakPassed;
 }
 
 function startShadowWait(cue, opts = {}) {
@@ -2011,9 +2036,12 @@ function onSpeakResult(cue, result) {
   setSpeakHide(false); // 결과를 볼 때는 영어를 다시 보여줌 (들린 말과 비교)
 
   if (result.method === 'none') {
-    state.speakUnavailable = true;
+    // 'released'는 인식이 마이크를 넘겨받느라 취소된 것 — 고장이 아니므로 기능을 끄지 않는다
+    if (result.micReason !== 'released') {
+      markMicUnavailable(result.micReason || result.reason);
+      showPlayerMessage('🎤 마이크를 쓸 수 없어 잠깐 말하기 확인 없이 진행해요', 4000);
+    }
     state.speakPassed = true;
-    showPlayerMessage('🎤 마이크를 쓸 수 없어 말하기 확인 없이 진행해요', 4000);
     afterShadowWait();
     return;
   }

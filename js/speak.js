@@ -61,8 +61,10 @@ export function getAudioContext() {
 /** 마이크 끄기 (학습 종료·백그라운드). 다음 prepareMic()에서 다시 연다 */
 export function releaseMic() {
   micGen++; // 진행 중인 prepareMic() 요청을 무효화 (나중에 도착한 스트림이 인식을 막지 않게)
+  const had = !!micStream;
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
   micStream = null;
+  return had; // 실제로 열려 있던 마이크를 놓았는지 (인식을 바로 시작하면 안 되는 경우)
 }
 
 /**
@@ -305,7 +307,8 @@ function runWithRecognition(opts, SR) {
     resolveOuter(result);
   }
 
-  releaseMic(); // ★ 마이크를 인식 엔진에 넘김 (스트림을 잡고 있으면 안드로이드에서 인식이 소리를 못 받음)
+  // ★ 마이크를 인식 엔진에 넘김 (스트림을 잡고 있으면 안드로이드에서 인식이 소리를 못 받음)
+  const hadMic = releaseMic();
 
   let rec = null;
   try {
@@ -430,15 +433,23 @@ function runWithRecognition(opts, SR) {
     },
   };
 
-  try {
-    rec.start();
-  } catch (e) {
-    // 앞 문장의 인식이 아직 정리되지 않았을 때 자주 난다 (안드로이드) — 이번 문장만 소리 길이로
-    srFailStreak++;
-    logAttempt({ method: 'speech', ok: false, srError: 'start-failed', streak: srFailStreak });
-    return useEnergy('start-failed', srFailStreak >= SR_FAIL_LIMIT);
+  function begin() {
+    if (finished || fallback) return;
+    try {
+      rec.start();
+    } catch (e) {
+      // 앞 문장의 인식이 아직 정리되지 않았을 때 자주 난다 (안드로이드) — 이번 문장만 소리 길이로
+      srFailStreak++;
+      logAttempt({ method: 'speech', ok: false, srError: 'start-failed', streak: srFailStreak });
+      useEnergy('start-failed', srFailStreak >= SR_FAIL_LIMIT);
+    }
   }
-  maxTimer = setTimeout(() => { if (!finished && !fallback) handle.stop(); }, maxMs);
+  // 방금까지 마이크가 열려 있었다면(= 앞 문장을 소리 길이로 판정했다) 기기가 마이크를 놓아줄 틈을 준다.
+  // 바로 인식을 켜면 안드로이드가 아직 마이크를 안 놓아 소리를 못 받고, 그게 세 번 이어지면
+  // 다시 소리 길이 판정으로 빠진다 → 그 뒤로는 계속 마이크를 열어 두는 쪽만 돌아 **영영 인식이 안 된다**.
+  const startDelay = hadMic ? 300 : 0;
+  if (startDelay) setTimeout(begin, startDelay); else begin();
+  maxTimer = setTimeout(() => { if (!finished && !fallback) handle.stop(); }, maxMs + startDelay);
   void started;
   return handle;
 }
@@ -478,7 +489,9 @@ function runWithEnergy(opts, srError) {
   (async () => {
     const stream = await prepareMic();
     if (cancelled || finished) { settle(cancelledResult(0)); return; }
-    if (!stream) { settle({ passed: true, method: 'none', transcript: '', score: null, spokenMs: 0, reason: 'mic-unavailable', srError }); return; }
+    // micReason을 실어 보낸다 — 'released'(인식이 마이크를 넘겨받느라 취소됨)는 고장이 아니라서
+    // 이걸로 말하기 확인을 꺼 버리면 안 된다
+    if (!stream) { settle({ passed: true, method: 'none', transcript: '', score: null, spokenMs: 0, reason: 'mic-unavailable', srError, micReason: micFailReason() }); return; }
 
     // ── 소리 에너지 추적 ──
     let src; let analyser;

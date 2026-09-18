@@ -435,8 +435,47 @@ test('말하기 확인: 마이크 못 쓰면 확인 없이 진행', async () => 
   run('goTo(0)');
   video.currentTime = 2; run('onCueEnd()');
   run('skipShadowWait()'); await tick();
-  assert.equal(run('state.speakUnavailable'), true);
+  assert.ok(run('state.speakUnavailableAt') > 0, '마이크를 못 쓴 시각을 적어 둔다');
+  assert.equal(run('speakOff()'), true, '지금은 말하기 확인을 쉰다');
   assert.equal(run('state.idx'), 1, '바로 다음 문장');
+});
+
+// 2026-09-18 신고: "평소엔 잘 되다가 어느 순간부터 인식이 안 되고, 앱을 껐다 켜면 다시 된다"
+// 원인: 마이크를 한 번 못 쓰면 speakUnavailable이 켜진 채 **꺼 주는 데가 없었다**.
+// 다른 앱이 마이크를 잠깐 잡거나 화면이 꺼지던 참이었을 뿐인데 그 뒤로 말하기 확인이 영영 사라졌다.
+test('🎤 마이크를 한 번 못 써도 잠시 뒤 스스로 다시 시도한다 (앱을 껐다 켜지 않아도)', async () => {
+  const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'none', transcript: '', score: null }]);
+  run('state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.equal(run('speakOff()'), true);
+
+  // 3분이 지난 것처럼 시각을 되돌린다
+  run('state.speakUnavailableAt = Date.now() - (MIC_RETRY_MS + 1000);');
+  assert.equal(run('speakOff()'), false, '시간이 지나면 다시 시도한다');
+  assert.equal(run('state.speakUnavailableAt'), 0, '표시가 지워진다');
+  assert.equal(run('state.micPrepared'), false, '마이크도 다시 준비한다');
+});
+
+test('🎤 영상을 새로 열면 마이크를 다시 시도한다', () => {
+  const { run } = loadPlayerWithSpeak([]);
+  run('state.speakUnavailableAt = Date.now();');
+  assert.equal(run('speakOff()'), true);
+  run('state.speakUnavailableAt = 0;'); // openPlayer가 하는 일 (같은 줄)
+  assert.equal(run('speakOff()'), false);
+});
+
+// 인식이 마이크를 넘겨받느라 취소된 것('released')은 고장이 아니다 —
+// 이걸로 기능을 꺼 버리면 화면이 꺼질 때마다 말하기 확인이 사라진다 (v75에서 생길 뻔한 구멍)
+test('🎤 인식에 마이크를 넘긴 경우는 고장으로 치지 않는다', async () => {
+  const { run, video } = loadPlayerWithSpeak([{ passed: true, method: 'none', transcript: '', score: null, micReason: 'released' }]);
+  run('state.repeatIdx = 0; state.cues = [{start:0,end:2,en:"a",ko:""},{start:10,end:12,en:"b",ko:""}]; state.idx = -1;');
+  run('goTo(0)');
+  video.currentTime = 2; run('onCueEnd()');
+  run('skipShadowWait()'); await tick();
+  assert.equal(run('state.speakUnavailableAt'), 0, '말하기 확인을 끄지 않는다');
+  assert.equal(run('speakOff()'), false);
 });
 
 test('말하기 확인 + 반복 ∞: 통과 후엔 같은 문장 반복(섀도잉 대기 없이)', async () => {

@@ -316,3 +316,41 @@ test('말하기 기록이 남아 무엇 때문에 막혔는지 볼 수 있다', 
   assert.equal(log[log.length - 1].srError, 'network');
   assert.ok(log.every((e) => typeof e.at === 'number'));
 });
+
+// 2026-09-18: "잘 되다가 어느 순간부터 인식이 안 되고, 앱을 껐다 켜면 된다"의 또 다른 경로.
+// 소리 길이 판정(에너지)은 마이크를 열어 둔 채 끝난다. 그 직후 인식을 바로 켜면 안드로이드가
+// 아직 마이크를 안 놓아 소리를 못 받고, 세 번 이어지면 다시 에너지로 빠져 **영영 돌아오지 못한다**.
+test('🎤 소리 길이 판정 뒤에는 마이크를 놓아줄 틈을 두고 인식을 켠다', async () => {
+  resetRecognition(); recs.length = 0; micOpens = 0;
+  releaseMic();
+
+  // ① 에너지 방식으로 한 문장 (마이크가 열린 채 끝난다)
+  navigator.onLine = false;
+  let h = runSpeakCheck(opts());
+  await tick(30);
+  h.stop();
+  await h.promise;
+  assert.ok(micOpens >= 1, '에너지 판정은 마이크를 연다');
+
+  // ② 다음 문장은 인식 — 마이크를 놓자마자 시작하지 않는다
+  navigator.onLine = true;
+  h = runSpeakCheck(opts());
+  assert.equal(recs.length, 1, '인식기는 만들어 두고');
+  assert.equal(recs[0].startCount, 0, '바로 start 하지 않는다 (기기가 마이크를 놓을 틈)');
+  await tick(400);
+  assert.equal(recs[0].startCount, 1, '잠깐 뒤에 시작한다');
+
+  recs[0].result('i love toys'); recs[0].end();
+  const r = await h.promise;
+  assert.equal(r.method, 'speech', '에너지 뒤에도 인식으로 돌아온다');
+  assert.equal(r.passed, true);
+});
+
+test('🎤 마이크가 열려 있지 않았으면 기다리지 않고 바로 시작한다 (평소 속도 그대로)', async () => {
+  resetRecognition(); recs.length = 0;
+  releaseMic();
+  const h = runSpeakCheck(opts());
+  assert.equal(recs[0].startCount, 1, '지체 없이 시작');
+  recs[0].result('i love toys'); recs[0].end();
+  await h.promise;
+});
