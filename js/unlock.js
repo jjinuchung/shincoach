@@ -57,7 +57,7 @@ export const NEED = {
   // 개수로 세면 ① 영상을 넣어도 목표가 그대로 ② 영상을 지워도 진도가 줄지 않는다
   //   (그래서 "어려운 영화를 지워서 조건을 채우는" 옛 구멍도 원천적으로 없어진다).
   doneSentences: 1000,
-  reviewPassed: 60,   // 🔁 복습에서 한 번 이상 통과한 문장 60개 (배운 다음 날 이후에 다시 맞힌 것)
+  reviewPassed: 50,   // 🔁 복습에서 한 번 이상 통과한 문장 50개 (배운 다음 날 이후에 다시 맞힌 것)
 };
 
 export function findLocked(id) {

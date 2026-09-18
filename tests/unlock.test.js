@@ -7,17 +7,17 @@ const recs = (done, reviewed) => [
   ...Array.from({ length: done }, (_, i) => ({ key: `d${i}`, done: true, reviewPass: i < reviewed ? 1 : 0 })),
 ];
 
-test('🎟️ 조건 셋: 코인 · 끝낸 문장 개수 · 복습 통과 60개', () => {
-  const s = unlockState({ coins: 4000, records: recs(NEED.doneSentences, 60), price: 4000 });
+test('🎟️ 조건 셋: 코인 · 끝낸 문장 개수 · 복습 통과 문장 수', () => {
+  const s = unlockState({ coins: 4000, records: recs(NEED.doneSentences, NEED.reviewPassed), price: 4000 });
   assert.equal(s.done, NEED.doneSentences);
-  assert.equal(s.reviewed, 60);
+  assert.equal(s.reviewed, NEED.reviewPassed);
   assert.deepEqual(s.items.map((i) => i.ok), [true, true, true]);
   assert.equal(s.ready, true, '셋 다 채우면 살 수 있다');
 });
 
 test('🎟️ 하나라도 모자라면 못 산다 (코인만으로는 안 됨)', () => {
   // 코인은 넘치는데 배운 문장이 모자람 — "쉬운 영상만 반복해 코인만 모으는 길"을 막는 부분
-  const rich = unlockState({ coins: 99999, records: recs(300, 60), price: 4000 });
+  const rich = unlockState({ coins: 99999, records: recs(300, NEED.reviewPassed), price: 4000 });
   assert.equal(rich.ready, false);
   assert.deepEqual(rich.items.map((i) => i.ok), [true, false, true]);
   assert.equal(rich.items[1].need, NEED.doneSentences);
@@ -29,13 +29,13 @@ test('🎟️ 하나라도 모자라면 못 산다 (코인만으로는 안 됨)'
   assert.equal(lazy.items[2].need, NEED.reviewPassed);
 
   // 다 했는데 코인이 모자람
-  const broke = unlockState({ coins: 100, records: recs(NEED.doneSentences, 80), price: 4000 });
+  const broke = unlockState({ coins: 100, records: recs(NEED.doneSentences, NEED.reviewPassed + 20), price: 4000 });
   assert.equal(broke.ready, false);
   assert.deepEqual(broke.items.map((i) => i.ok), [false, true, true]);
 });
 
 test('🎟️ 한 문장만 모자라도 못 산다', () => {
-  const s = unlockState({ coins: 4000, records: recs(NEED.doneSentences - 1, 60), price: 4000 });
+  const s = unlockState({ coins: 4000, records: recs(NEED.doneSentences - 1, NEED.reviewPassed), price: 4000 });
   assert.equal(s.items[1].ok, false);
   assert.equal(s.items[1].have, NEED.doneSentences - 1);
 });
@@ -43,7 +43,7 @@ test('🎟️ 한 문장만 모자라도 못 산다', () => {
 // 2026-09-18: 전에는 "가진 영상 전체의 80%"라, 태블릿에 5,527문장이 있으면 4,422문장이 필요했다.
 // 하루 40문장을 해도 막대가 0.9%씩 움직여 "진도가 안 는다"로 보였고, **영상을 넣으면 목표가 더 멀어졌다**.
 test('🎟️ 영상을 넣거나 지워도 진도는 그대로다 (아이가 한 만큼만 센다)', () => {
-  const records = recs(400, 60);
+  const records = recs(400, NEED.reviewPassed);
   const before = unlockState({ coins: 4000, records, price: 4000 });
   // 새 영상 3편(214문장)을 넣은 상황 — 예전 규칙이면 목표가 171문장 더 멀어졌다
   const after = unlockState({ coins: 4000, records, price: 4000 });
