@@ -539,9 +539,9 @@ async function applyBattleResult(r) {
 // 밀린 복습이 다음 날로 쌓였다 (2026-09-18 아버님 지적).
 // → 이제 학습 중에도 문장을 끝낼 때마다 확률로 물어본다. 거절해도 조금 뒤에 다시 온다.
 /** 문장을 끝낼 때마다 이 확률로 복습을 제안 */
-const REVIEW_CHANCE = 0.2;
-/** 제안한 뒤(거절하든 끝내든) 이만큼 문장은 다시 안 물어봄 — 20%가 연달아 뜨면 성가시다 */
-const REVIEW_COOLDOWN = 8;
+const REVIEW_CHANCE = 0.3;
+/** 제안한 뒤(거절하든 끝내든) 이만큼 문장은 다시 안 물어봄 — 30%가 연달아 뜨면 성가시다 */
+const REVIEW_COOLDOWN = 7;
 /** 하루에 거절할 수 있는 횟수 (이만큼 거절하면 오늘은 그만 물어본다) */
 const REVIEW_MAX_SKIPS = 5;
 
