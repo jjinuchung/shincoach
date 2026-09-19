@@ -67,20 +67,21 @@ test('🎟️ 진행 막대(pct)는 0~100으로 자른다', () => {
   for (const it of s.items) assert.ok(it.pct >= 0 && it.pct <= 100, `${it.key} = ${it.pct}`);
 });
 
-test('🎟️ 다음에 보여줄 영상: 이미 산 건 빼고 싼 것부터', () => {
-  assert.equal(nextLocked([]).id, LOCKED.slice().sort((a, b) => a.price - b.price)[0].id);
+test('🎟️ 다음에 보여줄 영상: 이미 산 건 뺀다', () => {
+  assert.equal(nextLocked([]).id, LOCKED[0].id);
   const rest = nextLocked([LOCKED[0].id]);
   assert.notEqual(rest.id, LOCKED[0].id);
   assert.equal(nextLocked(LOCKED.map((c) => c.id)), null, '다 사면 없음');
 });
 
 test('🎟️ 아빠가 아직 안 넣어 준 영상을 📊에 알린다', () => {
-  const inv = { [ticketId('gengar')]: 1 };
+  const first = LOCKED[0];
+  const inv = { [ticketId(first.id)]: 1 };
   const before = pendingTickets(inv, []);
   assert.equal(before.length, 1);
   assert.equal(before[0].delivered, false, '아직 태블릿에 없음');
 
-  const after = pendingTickets(inv, [{ title: findLocked('gengar').ko }]);
+  const after = pendingTickets(inv, [{ title: first.ko }]);
   assert.equal(after[0].delivered, true, '제목이 같은 영상이 들어오면 완료');
   assert.equal(pendingTickets({}, []).length, 0, '산 게 없으면 알림 없음');
 });
@@ -179,7 +180,8 @@ test('🎟️ 다음 영상은 목록에 적은 순서대로 하나만 보여 �
 test('🎟️ 이미 넣어 준 영상은 광고하지 않는다', () => {
   // ash_battles(지우와 피카츄 명장면)는 아버님이 그냥 넣어 주신 영상인데 목록에 남아 있어서
   // 팬텀을 산 뒤 "다음 영상"으로 떴다 — 아버님은 무엇을 넣어야 할지 알 수 없었다
-  assert.equal(findLocked('ash_battles'), null, '이미 준 영상은 목록에서 뺀다');
+  assert.equal(findLocked('ash_battles'), null, '그냥 넣어 준 영상은 목록에서 뺀다');
+  assert.equal(findLocked('gengar'), null, '배달까지 끝난 영상도 뺀다 (안 그러면 대기 카드가 안 사라진다)');
   for (const id of ['iconic', 'wild2', 'prime_suspect']) {
     assert.ok(findLocked(id), `${id}는 살 수 있어야 한다`);
   }
@@ -190,4 +192,13 @@ test('🎟️ 제목이 서로 달라야 배달 판정이 엉키지 않는다', 
   // 하나를 넣어 준 순간 다른 하나도 "들어왔다"가 된다
   const titles = LOCKED.map((c) => c.ko);
   assert.equal(new Set(titles).size, titles.length, `제목 겹침: ${titles.join(' / ')}`);
+});
+
+test('🎟️ 목록에서 뺀 영상은 교환권이 남아 있어도 화면에 안 나온다', () => {
+  // 2026-09-19: 팬텀을 아빠가 넣어 준 뒤에도 "🎟️ 샀어요! 아빠에게 보여주세요"가 계속 떠 있었다.
+  // 배달 판정이 제목 일치라, 넣어 줄 때 제목이 한 글자라도 다르면 영영 안 사라진다.
+  // 그래서 배달이 끝난 영상은 목록에서 뺀다 — 가방에 교환권이 남아도 보여 주는 곳이 없어진다.
+  const inv = { [ticketId('gengar')]: 1, [ticketId('ash_battles')]: 1 };
+  assert.deepEqual(pendingTickets(inv, []), [], '📊 알림에도 안 뜬다');
+  assert.equal(nextLocked(['gengar']).id, LOCKED[0].id, '다음 광고는 목록 맨 앞 그대로');
 });

@@ -28,20 +28,12 @@ export const ticketId = (id) => `${TICKET_PREFIX}${id}`;
  * cast  = 그 영상에 나오는 포켓몬 id (한국어 이름은 PokeAPI로 대조함)
  * teaser = 영상에 실제로 나오는 대사 한 줄 (사면 배우게 될 문장)
  */
+// ★ **아빠가 영상을 넣어 준 것은 이 목록에서 뺀다.**
+//   목록에 있는 한 "🎟️ 샀어요! 아빠에게 보여주세요" 대기 카드와 📊 알림이 계속 남는다
+//   (배달 판정이 제목 일치라, 넣어 준 제목이 한 글자라도 다르면 영영 안 사라진다).
+//   뺀 뒤에는 가방의 교환권을 보여 주는 곳이 없으므로 화면에서 깨끗이 사라진다.
+//   빠진 영상들: gengar(팬텀 대소동, 2026-09-19 배달) · ash_battles(지우와 피카츄 명장면, 그냥 넣어 준 것)
 export const LOCKED = [
-  {
-    // 2026-09-19 배달 완료 (진우가 처음으로 벌어서 산 영상).
-    // 목록에 남겨 두는 이유: 산 교환권은 nextLocked에서 제외되고, 📊 배달 확인(pendingTickets)이
-    // 이 줄을 보고 판단한다. 지우면 "샀는데 사라진" 상태가 된다.
-    id: 'gengar', ko: '팬텀 대소동', en: 'Gengar to the Max',
-    poster: 94, emoji: '👻', minutes: 15, sentences: 180, price: 2000,
-    blurb: '팬텀이 거다이맥스로 변신해서 싸워요',
-    cast: [
-      { id: 94, ko: '팬텀' }, { id: 861, ko: '오롱털' },
-      { id: 26, ko: '라이츄' }, { id: 356, ko: '미라몽' },
-    ],
-    teaser: 'Gengar, Shadow Ball, now!',
-  },
   {
     id: 'iconic', ko: '지우와 피카츄 최고의 순간', en: "Ash & Pikachu's Iconic Moments",
     poster: 25, emoji: '⚡', minutes: 10, sentences: 103, price: 2000,
