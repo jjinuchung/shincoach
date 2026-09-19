@@ -1,7 +1,7 @@
 // 📁 가져오기 파일 분류 테스트: node --test tests/importfiles.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyFiles, suggestTitle, langOf, isVideoFile, isSubtitleFile, describePick, belongsTo } from '../js/importfiles.js';
+import { classifyFiles, suggestTitle, langOf, isVideoFile, isSubtitleFile, describePick, belongsTo, listVideos } from '../js/importfiles.js';
 import { LOCKED } from '../js/unlock.js';
 
 /** File 흉내 (이름·크기·MIME만 본다) */
@@ -162,4 +162,39 @@ test('📁 폴더에 영상이 없으면 영상 자리가 빈 채로 알려 준�
   assert.equal(r.en.name, 'a.en.srt');
   const rows = describePick(r);
   assert.equal(rows.find((x) => x.label === '영상').ok, false);
+});
+
+// ── 📁 영상을 한 폴더에 몰아 둔 경우 (2026-09-20, 아버님 보관 방식) ──
+// 아버님은 영상을 한 폴더에 몰아서 보관한다. 그래서 폴더를 고르면 여러 편이 들어오는데,
+// 아이에게는 🎟️ 교환권으로 한 편씩 줘야 하므로 **무엇을 넣을지 아버님이 골라야** 한다.
+
+test('📁 폴더에 여러 편이면 목록으로 (큰 것부터)', () => {
+  const files = [
+    f('small.mp4', 100, 'video/mp4'), f('big.mp4', 9e8, 'video/mp4'), f('mid.mp4', 5e8, 'video/mp4'),
+    f('big.en.srt'), f('small.en.srt'),
+  ];
+  const vids = listVideos(files);
+  assert.deepEqual(vids.map((v) => v.name), ['big.mp4', 'mid.mp4', 'small.mp4']);
+  assert.equal(listVideos([f('a.srt')]).length, 0);
+  assert.equal(listVideos(null).length, 0);
+});
+
+test('📁 ★ 고른 영상으로 짝을 맞춘다 (가장 큰 편이 아니어도)', () => {
+  const files = [];
+  for (const [b, sz] of [['toystory5', 4e9], ['wild2', 3e8], ['iconic', 9e8]]) {
+    files.push(f(`${b}.mp4`, sz, 'video/mp4'), f(`${b}.en.srt`), f(`${b}.ko.srt`));
+  }
+  const r = classifyFiles(files, { videoName: 'wild2.mp4' });
+  assert.equal(r.video.name, 'wild2.mp4');
+  assert.equal(r.en.name, 'wild2.en.srt');
+  assert.equal(r.ko.name, 'wild2.ko.srt', '다른 편 자막이 섞이면 안 된다');
+
+  // 지정이 없으면 예전처럼 가장 큰 것
+  assert.equal(classifyFiles(files).video.name, 'toystory5.mp4');
+});
+
+test('📁 없는 영상을 지정하면 가장 큰 것으로 돌아간다 (목록이 바뀐 뒤)', () => {
+  const files = [f('a.mp4', 1e8, 'video/mp4'), f('a.en.srt')];
+  const r = classifyFiles(files, { videoName: 'zzz.mp4' });
+  assert.equal(r.video.name, 'a.mp4');
 });

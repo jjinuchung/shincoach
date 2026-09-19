@@ -2,7 +2,7 @@
 import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats } from './db.js';
 import { parseSubtitle } from './srt.js';
 import { LOCKED, unlockState, nextLocked, ticketId, findLocked, totalsFrom } from './unlock.js';
-import { classifyFiles, suggestTitle, describePick } from './importfiles.js';
+import { classifyFiles, suggestTitle, describePick, listVideos } from './importfiles.js';
 import { coins, inventory, buyTicket, initProfile, unlockBase, ensureUnlockBase } from './xp.js';
 import { characterUrl, ensureCast, artUrl } from './pokemon.js';
 import { sfx, unlock as unlockAudio } from './sfx.js';
@@ -23,23 +23,93 @@ let opening = false;
 // (2026-09-17 아버님 신고: "팬텀 광고 문구가 두 번"). 마지막 요청만 화면에 남긴다.
 let renderSeq = 0;
 
-/** 📁 이번에 고른 파일들 (영상·영어 자막·한글 자막). 대화상자를 열 때마다 비운다 */
+/** 📁 지금까지 고른 파일 전부 (여러 번 나눠 골라도 합쳐진다) */
+let allFiles = [];
+/** 그중 아버님이 넣기로 고른 영상의 파일 이름 (한 편만) */
+let chosenVideo = '';
+/** 역할별로 나눈 결과 */
 let picked = { video: null, en: null, ko: null, ignored: [] };
 
 function resetPick() {
+  allFiles = [];
+  chosenVideo = '';
   picked = { video: null, en: null, ko: null, ignored: [] };
   const t = $('imp-title');
   if (t) t.dataset.auto = '';
+  renderVideos();
   renderPick();
 }
 
+/**
+ * 고른 파일을 **더한다** (갈아치우지 않는다).
+ * 태블릿에서 여러 개를 길게 눌러 고르기가 번거로우므로, 영상 따로 자막 따로 골라도 합쳐지게 한다.
+ */
+function addFiles(files) {
+  const byName = new Map(allFiles.map((f) => [f.name, f]));
+  for (const f of Array.from(files || [])) byName.set(f.name, f);
+  allFiles = [...byName.values()];
+  const vids = listVideos(allFiles);
+  if (vids.length === 1) chosenVideo = vids[0].name;           // 한 편뿐이면 고를 것도 없다
+  else if (!vids.some((v) => v.name === chosenVideo)) chosenVideo = ''; // 고른 게 사라졌으면 다시
+  applyPick();
+}
+
+function applyPick() {
+  // 영상이 여러 편인데 아직 안 골랐으면 **아무것도 확정하지 않는다** —
+  // "골라 주세요"라고 물어 놓고 가장 큰 영상이 이미 잡혀 있으면 아버님이 헷갈린다
+  const needChoice = listVideos(allFiles).length > 1 && !chosenVideo;
+  picked = needChoice
+    ? { video: null, en: null, ko: null, ignored: [] }
+    : classifyFiles(allFiles, { videoName: chosenVideo });
+  renderVideos();
+  renderPick(needChoice);
+  if (needChoice) return;
+  const t = $('imp-title');
+  if (picked.video && (!t.value.trim() || t.dataset.auto === '1')) {
+    t.value = suggestTitle(picked.video.name);
+    t.dataset.auto = '1';
+  }
+}
+
+/** 영상이 여러 편이면 목록을 보여 준다 — 아버님은 영상을 한 폴더에 몰아서 보관한다 */
+function renderVideos() {
+  const box = $('imp-videos-box');
+  const list = $('imp-videos');
+  if (!box || !list) return;
+  const vids = listVideos(allFiles);
+  box.hidden = vids.length < 2;
+  list.innerHTML = '';
+  if (vids.length < 2) return;
+  for (const v of vids) {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'imp-video' + (v.name === chosenVideo ? ' on' : '');
+    const name = document.createElement('b');
+    name.textContent = `🎬 ${suggestTitle(v.name)}`;
+    const sub = document.createElement('span');
+    sub.textContent = `${v.name} · ${formatBytes(v.size || 0)}`;
+    btn.appendChild(name);
+    btn.appendChild(sub);
+    btn.addEventListener('click', () => {
+      chosenVideo = v.name;
+      const t = $('imp-title');
+      if (t) { t.value = ''; t.dataset.auto = '1'; } // 다른 편을 고르면 제목도 그 편으로
+      applyPick();
+    });
+    li.appendChild(btn);
+    list.appendChild(li);
+  }
+}
+
 /** 무엇이 무엇으로 잡혔는지 보여 준다 — 빠진 게 있으면 바로 눈에 띄게 */
-function renderPick() {
+function renderPick(waiting) {
   const box = $('imp-picked');
   const swap = $('imp-swap');
   if (!box) return;
   const rows = describePick(picked);
-  const any = rows.some((r) => r.ok);
+  // waiting = 넣을 영상을 아직 고르는 중 → 결과 목록은 숨긴다 (고른 뒤에 나타난다)
+  const any = !waiting && rows.some((r) => r.ok);
   box.innerHTML = '';
   box.hidden = !any;
   if (any) {
@@ -68,7 +138,7 @@ function renderPick() {
       box.appendChild(li);
     }
   }
-  if (swap) swap.hidden = !(picked.en && picked.ko);
+  if (swap) swap.hidden = waiting || !(picked.en && picked.ko);
 }
 
 export async function initLibrary(ctx) {
@@ -82,16 +152,11 @@ export async function initLibrary(ctx) {
   });
   $('imp-cancel').addEventListener('click', () => $('dlg-import').close());
   $('form-import').addEventListener('submit', onImportSubmit);
-  // 📁 고른 것을 이름으로 나눈다 — 폴더를 통째로 골라도, 파일을 직접 골라도 같은 처리
+  // 📁 고른 것을 이름으로 나눈다 — 폴더를 통째로 골라도, 파일을 직접 골라도 같은 처리.
+  // 여러 번 나눠 골라도 합쳐지므로 한 번에 다 집지 않아도 된다
   const onPicked = (e) => {
-    picked = classifyFiles(e.target.files);
-    renderPick();
-    // 제목은 파일 이름에서 채운다. 아버님이 직접 고친 제목은 덮지 않는다
-    const t = $('imp-title');
-    if (picked.video && (!t.value.trim() || t.dataset.auto === '1')) {
-      t.value = suggestTitle(picked.video.name);
-      t.dataset.auto = '1';
-    }
+    addFiles(e.target.files);
+    e.target.value = ''; // 같은 파일을 다시 골라도 change가 오도록
   };
   $('imp-files').addEventListener('change', onPicked);
   $('imp-folder').addEventListener('change', onPicked);

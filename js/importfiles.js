@@ -73,14 +73,29 @@ export function belongsTo(subName, videoBase) {
   return b.startsWith(videoBase) && /[._\-\s]/.test(b.charAt(videoBase.length));
 }
 
-export function classifyFiles(files) {
+/**
+ * 고른 것 중 영상만 (큰 것부터).
+ *
+ * 아버님은 영상을 **한 폴더에 몰아서** 보관한다. 그래서 폴더를 고르면 여러 편이 한꺼번에
+ * 들어오는데, 그중 무엇을 넣을지는 **아버님이 골라야 한다** — 아이에게 🎟️ 교환권으로
+ * 하나씩 주는 것이 이 앱의 규칙이라 여러 편을 한 번에 넣으면 안 된다.
+ */
+export function listVideos(files) {
+  return Array.from(files || []).filter(isVideoFile).sort((a, b) => (b.size || 0) - (a.size || 0));
+}
+
+/**
+ * @param {File[]|FileList} files
+ * @param {{videoName?:string}} opt videoName을 주면 그 영상으로 고정 (여러 편 중 아버님이 고른 것)
+ */
+export function classifyFiles(files, opt = {}) {
   const list = Array.from(files || []).filter(Boolean);
   const videos = list.filter(isVideoFile);
   const subs = list.filter(isSubtitleFile);
-  const others = list.filter((f) => !isVideoFile(f) && !isSubtitleFile(f));
 
-  // 영상이 여러 개면 가장 큰 것 (자르다 만 조각보다 본편일 가능성이 높다)
-  const video = videos.slice().sort((a, b) => (b.size || 0) - (a.size || 0))[0] || null;
+  // 지정이 있으면 그 영상, 없으면 가장 큰 것 (자르다 만 조각보다 본편일 가능성이 높다)
+  const wanted = opt.videoName ? videos.find((f) => f.name === opt.videoName) : null;
+  const video = wanted || videos.slice().sort((a, b) => (b.size || 0) - (a.size || 0))[0] || null;
   const vbase = video ? baseOf(video.name).toLowerCase() : '';
 
   // ★ 영상과 이름이 맞는 자막을 먼저 쓴다. 폴더를 통째로 골라 여러 편이 섞여도 짝이 안 어긋난다
