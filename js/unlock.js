@@ -13,6 +13,12 @@ export const ticketId = (id) => `${TICKET_PREFIX}${id}`;
 /**
  * 살 수 있는 영상 목록. 새 콘텐츠를 만들면 여기에 한 줄 더한다.
  *
+ * ★ **순서가 곧 등장 순서다** — 위에서부터 하나씩만 광고로 보여 준다 (nextLocked).
+ *   하나를 교환해야 다음 것이 보인다. 한꺼번에 다 보여 주면 "다음 목표 하나"가 흐려진다.
+ *
+ * ★ `ko`는 **아빠가 영상을 넣을 때 입력하는 제목과 글자까지 같아야** 배달로 인정된다
+ *   (library의 가져오기 → 제목 칸, 판정은 pendingTickets).
+ *
  * 표지는 **실제 장면 캡처가 아니라 그 영상에 나오는 포켓몬 그림**이다.
  * 애니 장면을 저장소에 커밋하면 "닌텐도 저작물은 공개 저장소에 두지 않는다"는
  * 이 프로젝트의 원칙이 깨진다 (GitHub Pages 무료는 Public 저장소만 된다).
@@ -24,6 +30,9 @@ export const ticketId = (id) => `${TICKET_PREFIX}${id}`;
  */
 export const LOCKED = [
   {
+    // 2026-09-19 배달 완료 (진우가 처음으로 벌어서 산 영상).
+    // 목록에 남겨 두는 이유: 산 교환권은 nextLocked에서 제외되고, 📊 배달 확인(pendingTickets)이
+    // 이 줄을 보고 판단한다. 지우면 "샀는데 사라진" 상태가 된다.
     id: 'gengar', ko: '팬텀 대소동', en: 'Gengar to the Max',
     poster: 94, emoji: '👻', minutes: 15, sentences: 180, price: 2000,
     blurb: '팬텀이 거다이맥스로 변신해서 싸워요',
@@ -34,14 +43,35 @@ export const LOCKED = [
     teaser: 'Gengar, Shadow Ball, now!',
   },
   {
-    id: 'ash_battles', ko: '지우와 피카츄 명장면', en: "Ash & Pikachu's Epic Battle Moments",
-    poster: 25, emoji: '⚡', minutes: 8, sentences: 86, price: 2000,
-    blurb: '지우와 피카츄의 가장 멋진 배틀만 모았어요',
+    id: 'iconic', ko: '지우와 피카츄 최고의 순간', en: "Ash & Pikachu's Iconic Moments",
+    poster: 25, emoji: '⚡', minutes: 10, sentences: 103, price: 2000,
+    blurb: '10만볼트부터 1000만볼트까지, 지우와 피카츄의 명장면',
     cast: [
-      { id: 25, ko: '피카츄' }, { id: 214, ko: '헤라크로스' },
-      { id: 262, ko: '그라에나' }, { id: 101, ko: '붐볼' },
+      { id: 25, ko: '피카츄' }, { id: 448, ko: '루카리오' },
+      { id: 727, ko: '어흥염' }, { id: 887, ko: '드래펄트' },
     ],
-    teaser: 'Pikachu, use Iron Tail!',
+    teaser: 'Pikachu, use Ten Million Volt Thunderbolt!',
+  },
+  {
+    id: 'wild2', ko: '야생의 포켓몬 2', en: 'Wild Pokemon 2',
+    poster: 382, emoji: '🌊', minutes: 9, sentences: 46, price: 2000,
+    blurb: '전설의 포켓몬 가이오가가 바다에서 나타나요',
+    cast: [
+      { id: 382, ko: '가이오가' }, { id: 184, ko: '마릴리' },
+      { id: 892, ko: '우라오스' }, { id: 282, ko: '가디안' },
+    ],
+    teaser: "Kyogre, we're over here! This way!",
+  },
+  {
+    id: 'prime_suspect', ko: '피카츄가 유력 용의자', en: 'Pikachu Is the Prime Suspect',
+    poster: 25, emoji: '🔍', minutes: 4, sentences: 65, price: 2000,
+    blurb: '피카츄가 전기 도둑으로 붙잡혔어요 — 누명을 벗겨 주세요',
+    // 자막에는 피카츄만 이름이 나온다 — 나머지 둘은 영상 프레임을 직접 보고 확인했다
+    // (흥나숭은 경찰서 장면, 가디는 제니 경관 옆. PokeAPI로 한국어 공식명 대조)
+    cast: [
+      { id: 25, ko: '피카츄' }, { id: 810, ko: '흥나숭' }, { id: 58, ko: '가디' },
+    ],
+    teaser: 'What are you arresting Pikachu for?',
   },
 ];
 
@@ -64,18 +94,11 @@ export function findLocked(id) {
   return LOCKED.find((c) => c.id === id) || null;
 }
 
-
 /**
- * 조건 현황 (순수 계산).
- *
- * 문장 기록 **전부**를 센다 — 지운 영상의 기록도 포함한다. 아이가 실제로 배운 것이고,
- * 개수로 세므로 지운다고 늘지 않는다(비율이던 시절의 "삭제로 조건 채우기" 구멍이 없다).
- * 무엇보다 **진도가 뒤로 가지 않는다**: 영상을 지우거나 저장이 깨져도 숫자는 그대로다.
- *
- * @param {{coins:number, records:Array, price:number}} o
- *   records = 모든 문장 기록 (db.getAllSentenceStats)
+ * 지금까지 쌓인 누적치 (기준선을 만들 때도, 현황을 셀 때도 이 한 함수를 쓴다).
+ * @param {Array} records 모든 문장 기록 (db.getAllSentenceStats)
  */
-export function unlockState({ coins = 0, records = [], price = 0 } = {}) {
+export function totalsFrom(records = []) {
   let done = 0;
   let reviewed = 0;
   for (const r of records || []) {
@@ -83,23 +106,59 @@ export function unlockState({ coins = 0, records = [], price = 0 } = {}) {
     if (r.done) done++;
     if ((r.reviewPass || 0) > 0) reviewed++; // 복습에서 한 번 이상 통과
   }
+  return { done, reviewed };
+}
+
+/** 저장된 기준선을 안전한 숫자 쌍으로 (없으면 0부터) */
+export function normalizeBase(base) {
+  const n = (v) => Math.max(0, Math.floor(Number(v) || 0));
+  return { done: n(base && base.done), reviewed: n(base && base.reviewed) };
+}
+
+/**
+ * 조건 현황 (순수 계산).
+ *
+ * ★ **기준선(base) 이후에 쌓인 것만 센다** (2026-09-19).
+ *   전에는 누적 전체를 세서, 교환권을 하나 사고 나면 다음 영상의 조건이 **이미 꽉 차 있었다**.
+ *   아이 입장에선 "사자마자 다음 것도 다 채워져 있다" → 목표가 사라진다.
+ *   그래서 교환권을 살 때 그 시점의 누적치를 기준선으로 박아 두고, 다음 영상은 0부터 다시 센다.
+ *
+ * 문장 기록 **전부**를 센다 — 지운 영상의 기록도 포함한다. 아이가 실제로 배운 것이고,
+ * 개수로 세므로 지운다고 늘지 않는다(비율이던 시절의 "삭제로 조건 채우기" 구멍이 없다).
+ * 백업을 되돌려 누적이 기준선보다 작아지면 음수가 되지 않게 0으로 막는다.
+ *
+ * @param {{coins:number, records:Array, price:number, base:Object}} o
+ *   records = 모든 문장 기록 (db.getAllSentenceStats)
+ *   base    = 직전 교환권을 산 시점의 누적치 (profile.unlockBase)
+ */
+export function unlockState({ coins = 0, records = [], price = 0, base = null } = {}) {
+  const total = totalsFrom(records);
+  const b = normalizeBase(base);
+  // 라벨의 "(교환권 이후)"는 실제로 기준선이 잡혀 있을 때만 — 아직 하나도 안 산 아이에겐 그냥 누적이다
+  const since = (b.done || b.reviewed) ? ' (교환권 이후)' : '';
+  const done = Math.max(0, total.done - b.done);
+  const reviewed = Math.max(0, total.reviewed - b.reviewed);
   const pctOf = (have, need) => (need <= 0 ? 100 : Math.min(100, Math.round((have / need) * 100)));
   const items = [
     { key: 'coins', label: '💰 코인', have: Math.max(0, Math.floor(coins)), need: price },
-    { key: 'progress', label: '📼 배운 문장', have: done, need: NEED.doneSentences },
-    { key: 'review', label: '🔁 복습 통과 문장', have: reviewed, need: NEED.reviewPassed },
+    { key: 'progress', label: `📼 배운 문장${since}`, have: done, need: NEED.doneSentences },
+    { key: 'review', label: `🔁 복습 통과 문장${since}`, have: reviewed, need: NEED.reviewPassed },
   ].map((it) => ({ ...it, ok: it.have >= it.need, pct: pctOf(it.have, it.need) }));
   return {
     done, reviewed, coins,
+    total, base: b,
     items,
     ready: items.every((it) => it.ok),
   };
 }
 
-/** 아직 못 산 영상 중 다음으로 보여줄 것 (가진 것 제외, 싼 것부터) */
+/**
+ * 아직 못 산 영상 중 다음으로 보여줄 것 (가진 것 제외, **목록에 적은 순서대로**).
+ * 값싼 것부터가 아니라 적은 순서인 이유: 아빠가 "이걸 먼저 보여 주고 싶다"를 정할 수 있어야 한다.
+ */
 export function nextLocked(ownedIds = []) {
   const owned = new Set([...ownedIds].map(String));
-  return LOCKED.filter((c) => !owned.has(c.id)).sort((a, b) => a.price - b.price)[0] || null;
+  return LOCKED.find((c) => !owned.has(c.id)) || null;
 }
 
 /** 아이가 샀지만 아직 아빠가 파일을 안 넣은 것 (📊에 알림) */

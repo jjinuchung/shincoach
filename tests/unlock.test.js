@@ -129,3 +129,65 @@ test('🎟️ 조건 수치는 아이가 며칠이면 닿는 크기여야 한다
   assert.ok(NEED.reviewPassed >= 20 && NEED.reviewPassed <= 200, `복습 목표 ${NEED.reviewPassed}`);
   assert.equal(NEED.progress, undefined, '비율 규칙은 없앴다 (영상을 넣으면 목표가 멀어졌다)');
 });
+
+// ── 🎟️ 기준선: 교환권을 산 뒤에는 0부터 다시 (2026-09-19) ──
+// 전에는 누적 전체를 세서, 팬텀을 사자마자 다음 영상 조건이 **이미 꽉 차 있었다**.
+// 아버님 신고: "방금 교환권을 샀는데 다음 영상의 배운 문장·복습 통과 문장이 이미 차 있다."
+test('🎟️ 기준선 이후에 쌓은 것만 센다 (산 뒤에는 다시 0부터)', () => {
+  const total = recs(NEED.doneSentences + 120, NEED.reviewPassed + 8);
+  const base = { done: NEED.doneSentences, reviewed: NEED.reviewPassed };
+
+  const before = unlockState({ coins: 9999, records: total, price: 1 });
+  assert.equal(before.ready, true, '기준선이 없으면 누적 전체 — 옛 동작');
+
+  const after = unlockState({ coins: 9999, records: total, price: 1, base });
+  assert.equal(after.done, 120, '기준선을 뺀 만큼만');
+  assert.equal(after.reviewed, 8);
+  assert.equal(after.ready, false, '다음 영상은 처음부터 다시 벌어야 한다');
+  assert.deepEqual(after.total, { done: NEED.doneSentences + 120, reviewed: NEED.reviewPassed + 8 }, '누적 자체는 그대로 볼 수 있다');
+});
+
+test('🎟️ 기준선이 지금 누적보다 커도 음수가 안 된다 (백업을 되돌린 경우)', () => {
+  const st = unlockState({ coins: 0, records: recs(10, 2), price: 1, base: { done: 500, reviewed: 50 } });
+  assert.equal(st.done, 0);
+  assert.equal(st.reviewed, 0);
+  assert.equal(st.items[1].pct, 0, '막대가 뒤로 가거나 이상해지지 않는다');
+});
+
+test('🎟️ 기준선이 잡혀 있으면 라벨로 알려 준다 (아직 안 산 아이에겐 안 붙음)', () => {
+  const fresh = unlockState({ coins: 0, records: recs(5, 1), price: 1, base: { done: 0, reviewed: 0 } });
+  assert.ok(!fresh.items[1].label.includes('교환권 이후'), '0 기준선은 그냥 누적이다');
+  const after = unlockState({ coins: 0, records: recs(5, 1), price: 1, base: { done: 3, reviewed: 1 } });
+  assert.ok(after.items[1].label.includes('교환권 이후'));
+});
+
+// ── 🎟️ 광고는 하나씩, 적은 순서대로 (2026-09-19) ──
+test('🎟️ 다음 영상은 목록에 적은 순서대로 하나만 보여 준다', () => {
+  const first = nextLocked([]);
+  const second = nextLocked([first.id]);
+  const third = nextLocked([first.id, second.id]);
+  assert.equal(first.id, LOCKED[0].id);
+  assert.equal(second.id, LOCKED[1].id, '하나를 사야 다음 것이 보인다');
+  assert.notEqual(third.id, second.id);
+  // 값이 같아도(전부 2,000코인) 순서가 흔들리면 안 된다 — 아빠가 보여 줄 차례를 정한다
+  assert.deepEqual(
+    [first.id, second.id, third.id],
+    LOCKED.slice(0, 3).map((c) => c.id),
+  );
+});
+
+test('🎟️ 이미 넣어 준 영상은 광고하지 않는다', () => {
+  // ash_battles(지우와 피카츄 명장면)는 아버님이 그냥 넣어 주신 영상인데 목록에 남아 있어서
+  // 팬텀을 산 뒤 "다음 영상"으로 떴다 — 아버님은 무엇을 넣어야 할지 알 수 없었다
+  assert.equal(findLocked('ash_battles'), null, '이미 준 영상은 목록에서 뺀다');
+  for (const id of ['iconic', 'wild2', 'prime_suspect']) {
+    assert.ok(findLocked(id), `${id}는 살 수 있어야 한다`);
+  }
+});
+
+test('🎟️ 제목이 서로 달라야 배달 판정이 엉키지 않는다', () => {
+  // 배달 판정은 제목이 같은지로 본다(pendingTickets) → 두 영상의 ko가 같으면
+  // 하나를 넣어 준 순간 다른 하나도 "들어왔다"가 된다
+  const titles = LOCKED.map((c) => c.ko);
+  assert.equal(new Set(titles).size, titles.length, `제목 겹침: ${titles.join(' / ')}`);
+});

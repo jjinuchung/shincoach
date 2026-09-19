@@ -1,8 +1,8 @@
 // 라이브러리 화면: 콘텐츠 가져오기(mp4 + srt) / 목록 / 삭제 / 저장 공간 표시
 import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats } from './db.js';
 import { parseSubtitle } from './srt.js';
-import { LOCKED, unlockState, nextLocked, ticketId, findLocked } from './unlock.js';
-import { coins, inventory, buyTicket, initProfile } from './xp.js';
+import { LOCKED, unlockState, nextLocked, ticketId, findLocked, totalsFrom } from './unlock.js';
+import { coins, inventory, buyTicket, initProfile, unlockBase, ensureUnlockBase } from './xp.js';
 import { characterUrl, ensureCast, artUrl } from './pokemon.js';
 import { sfx, unlock as unlockAudio } from './sfx.js';
 import { parseSami, isSami, toSrt } from './sami.js';
@@ -335,7 +335,17 @@ function fillCast(root, c) {
  */
 async function currentState(price) {
   const records = await getAllSentenceStats().catch(() => []);
-  return unlockState({ coins: coins(), records, price });
+  const total = totalsFrom(records);
+  // 🎟️ 기준선이 아직 없으면 여기서 한 번 잡는다 (claim은 "없을 때만" 쓰므로 여러 번 불러도 안전).
+  //  - 이미 교환권을 산 아이: **지금 누적치**가 기준선 → 그 뒤로 쌓은 것만 다음 영상 조건에 센다.
+  //    (진우는 팬텀을 사자마자 다음 영상 조건이 꽉 차 있었다 — 그때까지 배운 것이 그대로 더해져서)
+  //  - 아직 하나도 안 산 아이: 0부터 (처음부터 세는 게 맞다)
+  if (!unlockBase()) {
+    const bag = inventory();
+    const bought = LOCKED.some((c) => (bag[ticketId(c.id)] || 0) > 0);
+    await ensureUnlockBase(bought ? total : { done: 0, reviewed: 0 }).catch(() => {});
+  }
+  return unlockState({ coins: coins(), records, price, base: unlockBase() });
 }
 
 function waitingCard(c) {
@@ -406,13 +416,15 @@ function lockedCard(c, st) {
     // 화면 상태만 믿지 않고 저장소에서 다시 판정한다 (버튼을 억지로 켜도 조건은 지켜진다).
     // 판정은 buyTicket 안에서도 한 번 더 돈다 — 구매 경로를 직접 불러도 통과 못 하게
     const ready = async () => (await currentState(c.price)).ready;
-    if (!await ready()) {
+    const fresh = await currentState(c.price);
+    if (!fresh.ready) {
       btn.disabled = false;
       btn.textContent = '아직 조건이 안 됐어요';
       await refreshList();
       return;
     }
-    if (await buyTicket(c.id, ready)) {
+    // 🎟️ 산 시점의 누적치를 기준선으로 넘긴다 → 다음 영상 조건이 0부터 시작한다
+    if (await buyTicket(c.id, ready, fresh.total)) {
       sfx.levelUp();
       await refreshList();
     } else {

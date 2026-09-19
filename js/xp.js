@@ -2,8 +2,8 @@
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import {
-  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase,
-  hpChangeRule, battleLossRule, purchaseRule,
+  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase,
+  hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase,
 } from './db.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS } from './items.js';
 import { anchorFor } from './pokemon.js';
@@ -429,6 +429,23 @@ export function itemCount(id) {
 }
 
 /** 가방: { 아이템id: 개수 } (0개는 뺌) */
+/** 🎟️ 직전 교환권을 산 시점의 학습 누적치 (없으면 null — 아직 기준선을 안 잡음) */
+export function unlockBase() {
+  return profile.unlockBase || null;
+}
+
+/**
+ * 🎟️ 기준선이 없을 때 한 번만 박는다 (있으면 아무 일도 안 함).
+ * 교환권 기능 전부터 쓰던 아이용 — 자세한 이유는 db.claimUnlockBase 주석.
+ */
+export function ensureUnlockBase(base) {
+  if (profile.unlockBase) return Promise.resolve(false);
+  return runProfileOp(() => claimUnlockBase(base), (pf) => {
+    if (!pf.unlockBase) pf.unlockBase = normalizeUnlockBase(base);
+    return { ok: true };
+  }).then((r) => !!(r && r.ok));
+}
+
 export function inventory() {
   const out = {};
   for (const id of Object.keys(profile.items)) if (profile.items[id] > 0) out[id] = profile.items[id];
@@ -469,7 +486,7 @@ export async function buyItem(id) {
  * 아빠가 파일을 넣어 줄 때까지 남아 있다.
  * @param {() => Promise<boolean>} verify 지금도 조건을 채우는지 (저장소에서 새로 계산)
  */
-export async function buyTicket(contentId, verify) {
+export async function buyTicket(contentId, verify, base) {
   const c = findLocked(contentId);
   if (!c) return false;
   const price = c.price;                                     // 가격은 카탈로그가 정한다 (호출부가 못 정함)
@@ -478,7 +495,9 @@ export async function buyTicket(contentId, verify) {
   // 학습 조건은 **구매 경로 안에서** 다시 확인한다 — 화면의 버튼을 억지로 켜도 통과 못 한다
   if (verify && !(await verify())) return false;
   const cost = { coins: price };
-  const gain = { items: { [`ticket_${contentId}`]: 1 } };
+  // 🎟️ 지금 누적치를 기준선으로 함께 넘긴다 → 다음 영상 조건은 0부터 다시 센다.
+  // 코인을 못 치르면 purchaseRule이 기준선도 안 건드린다 (한 트랜잭션이라 갈라지지 않는다)
+  const gain = { items: { [`ticket_${contentId}`]: 1 }, unlockBase: base || null };
   const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
   return r.ok;
 }

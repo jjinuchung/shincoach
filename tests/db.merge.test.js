@@ -229,3 +229,46 @@ test('⚡ cloneProfile: 원본을 건드리지 않는다 (규칙이 복사본만
   assert.equal(src.mons[25].hp, 50);
   assert.equal(cloneProfile(null).xp, 0, '없으면 빈 프로필');
 });
+
+// ── 🎟️ 교환권 기준선 (2026-09-19) ──
+// 산 시점의 학습 누적치를 프로필에 박아 두고, 다음 영상 조건은 거기서부터 센다.
+// 코인 차감과 같은 트랜잭션이라야 "샀는데 기준선은 그대로"(=조건이 또 꽉 참)가 안 생긴다.
+test('🎟️ 교환권을 사면 기준선이 그 시점 누적치로 박힌다', () => {
+  const p = cloneProfile({ coins: 2000, items: {} });
+  const r = purchaseRule(p, { coins: 2000 }, { items: { ticket_iconic: 1 }, unlockBase: { done: 1240, reviewed: 63 } });
+  assert.equal(r.ok, true);
+  assert.equal(p.coins, 0);
+  assert.equal(p.items.ticket_iconic, 1);
+  assert.deepEqual(p.unlockBase, { done: 1240, reviewed: 63 });
+});
+
+test('🎟️ 못 사면 기준선도 안 건드린다 (코인과 한 묶음)', () => {
+  const p = cloneProfile({ coins: 100, items: {}, unlockBase: { done: 10, reviewed: 2 } });
+  const r = purchaseRule(p, { coins: 2000 }, { items: { ticket_iconic: 1 }, unlockBase: { done: 999, reviewed: 99 } });
+  assert.equal(r.ok, false);
+  assert.equal(p.coins, 100, '코인 그대로');
+  assert.deepEqual(p.unlockBase, { done: 10, reviewed: 2 }, '기준선도 그대로 — 안 그러면 조건이 공짜로 초기화된다');
+});
+
+test('🎟️ 기준선 없는 구매(다른 상점 물건)는 기준선을 지우지 않는다', () => {
+  const p = cloneProfile({ coins: 500, items: {}, unlockBase: { done: 30, reviewed: 4 } });
+  purchaseRule(p, { coins: 60 }, { items: { ball_super: 1 } });
+  assert.deepEqual(p.unlockBase, { done: 30, reviewed: 4 });
+});
+
+test('🎟️ 이상한 기준선 값은 숫자로 다듬어 저장한다', () => {
+  const p = cloneProfile({ coins: 2000, items: {} });
+  purchaseRule(p, { coins: 2000 }, { items: { ticket_wild2: 1 }, unlockBase: { done: -5, reviewed: '12.7' } });
+  assert.deepEqual(p.unlockBase, { done: 0, reviewed: 12 });
+});
+
+test('🎟️ 백업 병합: 기준선은 가방(교환권)과 같은 쪽에서 가져온다', () => {
+  // 갈라지면 "교환권은 있는데 조건은 안 줄어든" 상태가 된다
+  const cur = { id: 'me', updatedAt: 200, coins: 50, items: { ticket_iconic: 1 }, unlockBase: { done: 1200, reviewed: 60 } };
+  const old = { id: 'me', updatedAt: 100, coins: 9999, items: {}, unlockBase: null };
+  assert.deepEqual(mergeStatRecord('profile', cur, old).unlockBase, { done: 1200, reviewed: 60 }, '최근 쪽');
+  assert.deepEqual(mergeStatRecord('profile', old, cur).unlockBase, { done: 1200, reviewed: 60 }, '순서가 바뀌어도 최근 쪽');
+  // 교환권 기능 이전의 옛 백업(이 값이 아예 없음)이 최근이면 null — 앱이 열릴 때 다시 잡는다
+  const older = { id: 'me', updatedAt: 300, coins: 10, items: {} };
+  assert.equal(mergeStatRecord('profile', cur, older).unlockBase, null);
+});

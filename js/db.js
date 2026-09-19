@@ -537,7 +537,9 @@ export async function getProfile() {
 
 /** 프로필 기본값 */
 export function emptyProfile() {
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, updatedAt: 0 };
+  // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
+  // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
@@ -630,7 +632,31 @@ export function purchaseRule(profile, cost, gain) {
   for (const id of Object.keys(needItems)) addCount(profile.items, id, -needItems[id]);
   for (const id of Object.keys((gain && gain.items) || {})) addCount(profile.items, id, gain.items[id]);
   for (const id of Object.keys((gain && gain.mons) || {})) profile.mons[id] = { ...(profile.mons[id] || {}), ...gain.mons[id] };
+  // 🎟️ 교환권을 살 때는 그 시점의 학습 누적치를 기준선으로 박아 둔다 — 다음 영상은 여기서부터 다시 센다.
+  // **살 수 있었을 때만** 바뀐다 (코인이 모자라 위에서 돌아가면 기준선도 그대로)
+  if (gain && gain.unlockBase) profile.unlockBase = normalizeUnlockBase(gain.unlockBase);
   return { ok: true };
+}
+
+/** 기준선을 안전한 숫자 쌍으로 (저장 전에 한 번, 읽을 때 또 한 번 — unlock.normalizeBase와 같은 규칙) */
+export function normalizeUnlockBase(base) {
+  const n = (v) => Math.max(0, Math.floor(Number(v) || 0));
+  return { done: n(base && base.done), reviewed: n(base && base.reviewed) };
+}
+
+/**
+ * 🎟️ 기준선이 **아직 없을 때만** 박는다 (있으면 그대로 두고 ok:false).
+ *
+ * 교환권 기능이 생기기 전부터 쓰던 아이에게 필요하다: 진우는 이미 팬텀을 샀는데 기준선이 없어서
+ * 다음 영상 조건이 처음부터 꽉 차 있었다. 앱을 열 때 지금 누적치로 한 번 박아 주면
+ * "팬텀 이후에 쌓은 것"부터 세게 된다. 두 창이 같이 열려도 트랜잭션 안에서 판정하므로 한 번만 잡힌다.
+ */
+export function claimUnlockBase(base) {
+  return mutateProfile((p) => {
+    if (p.unlockBase) return { ok: false };
+    p.unlockBase = normalizeUnlockBase(base);
+    return { ok: true };
+  });
 }
 
 // ── 프로필 쓰기 (규칙을 트랜잭션 안에서 돌린다) ──
@@ -748,6 +774,9 @@ export function mergeStatRecord(name, cur, rec) {
     out.items = { ...(latest.items || {}) };
     out.mons = { ...(latest.mons || {}) };
     out.partner = latest.partner || null;
+    // 🎟️ 기준선은 가방(교환권)과 짝이다 — 둘이 갈라지면 "샀는데 조건이 안 줄었다"가 된다.
+    // 그래서 items와 같은 쪽(최근에 저장된 프로필)에서 가져온다. 옛 백업엔 이 값이 없다(그럼 null)
+    out.unlockBase = latest.unlockBase || null;
   }
   return out;
 }
