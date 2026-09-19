@@ -13,5 +13,20 @@
     "origin": "It's really me! Yes! My goodness. You look great.",
     "written": "It's really me! Yes! My musical instrument in my hand.",
     "fixed": "It's really me! Yes! My musical instrument is in my hand."
+  },
+  {
+    "origin": "You said your kid's device was on The Pond like me, right?",
+    "written": "You said your kid's device was on The spce like me right?",
+    "fixed": "You said your kid's device was on The Space like me, right?"
+  },
+  {
+    "origin": "It's the quickest way for her to connect with the girls.",
+    "written": "It's the quickest way for he connect with the boys.",
+    "fixed": "It's the quickest way for him to connect with the boys."
+  },
+  {
+    "origin": "I need to bring her up to speed fast, starting with Turtle Tag.",
+    "written": "I need to bring her up to grade up,startig with a math.",
+    "fixed": "I need to bring her grades up, starting with math."
   }
 ]
