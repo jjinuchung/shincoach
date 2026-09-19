@@ -5,8 +5,14 @@
 //   iconic.mp4 · iconic.en.srt · iconic.ko.srt
 // 한 번에 다 고르게 하고 이름으로 나누면 세 번이 한 번이 된다.
 //
-// 브라우저는 고른 파일 밖의 폴더를 들여다볼 수 없다(보안). 그래서 "영상만 고르면 자막이 딸려오는"
-// 방식은 불가능하고, **한 번의 선택에서 여러 개를 집는** 것이 할 수 있는 최선이다.
+// 브라우저는 고른 파일 밖의 폴더를 들여다볼 수 없다(보안). 그래서 "mp4 하나만 고르면 자막이
+// 딸려오는" 방식은 만들 수 없다. 대신 **폴더를 통째로 고르면** 그 안의 파일이 전부 들어온다
+// (`webkitdirectory`). 안드로이드 Chrome은 147부터 폴더 고르기를 지원하고 태블릿은 152다.
+// 태블릿에서 파일 여러 개를 길게 눌러 고르는 것보다 폴더 하나를 탭하는 쪽이 훨씬 쉽다.
+//
+// ★ 폴더를 고르면 다른 편의 자막·작업 파일까지 같이 들어온다
+//   (260918 폴더에는 iconic·wild2·prime_suspect가 다 있고 whisper 초안·로그도 섞여 있다).
+//   그래서 **영상 파일 이름과 짝이 맞는 자막을 먼저** 쓴다 — 아버님이 늘 같은 이름으로 만들어 두므로.
 
 import { LOCKED } from './unlock.js';
 
@@ -59,33 +65,44 @@ export function langOf(name) {
  * @param {File[]|FileList} files
  * @returns {{video:File|null, en:File|null, ko:File|null, ignored:File[]}}
  */
-export function classifyFiles(files) {
-  const list = Array.from(files || []);
-  const out = { video: null, en: null, ko: null, ignored: [] };
-  const unlabeled = [];
+export function belongsTo(subName, videoBase) {
+  if (!videoBase) return false;
+  const b = baseOf(subName).toLowerCase();
+  if (b === videoBase) return true;
+  // 경계를 봐야 한다 — 'iconic'으로 'iconic2.en.srt'까지 끌어오면 안 된다
+  return b.startsWith(videoBase) && /[._\-\s]/.test(b.charAt(videoBase.length));
+}
 
-  for (const f of list) {
-    if (!f) continue;
-    if (isVideoFile(f)) {
-      // 영상이 여러 개면 가장 큰 것 (자르다 만 조각보다 본편일 가능성이 높다)
-      if (!out.video || (f.size || 0) > (out.video.size || 0)) {
-        if (out.video) out.ignored.push(out.video);
-        out.video = f;
-      } else out.ignored.push(f);
-      continue;
-    }
-    if (!isSubtitleFile(f)) { out.ignored.push(f); continue; }
+export function classifyFiles(files) {
+  const list = Array.from(files || []).filter(Boolean);
+  const videos = list.filter(isVideoFile);
+  const subs = list.filter(isSubtitleFile);
+  const others = list.filter((f) => !isVideoFile(f) && !isSubtitleFile(f));
+
+  // 영상이 여러 개면 가장 큰 것 (자르다 만 조각보다 본편일 가능성이 높다)
+  const video = videos.slice().sort((a, b) => (b.size || 0) - (a.size || 0))[0] || null;
+  const vbase = video ? baseOf(video.name).toLowerCase() : '';
+
+  // ★ 영상과 이름이 맞는 자막을 먼저 쓴다. 폴더를 통째로 골라 여러 편이 섞여도 짝이 안 어긋난다
+  const mine = subs.filter((f) => belongsTo(f.name, vbase));
+  const pool = mine.length ? mine : subs;
+
+  const out = { video, en: null, ko: null, ignored: [] };
+  const unlabeled = [];
+  for (const f of pool) {
     const lang = langOf(f.name);
     if (lang === 'en' && !out.en) out.en = f;
     else if (lang === 'ko' && !out.ko) out.ko = f;
     else unlabeled.push(f);
   }
-
+  // 언어 표시가 없는 자막도 버리지 않는다 (영어가 필수라 영어부터 채운다)
   for (const f of unlabeled) {
     if (!out.en) out.en = f;
     else if (!out.ko) out.ko = f;
-    else out.ignored.push(f);
   }
+
+  const used = new Set([video, out.en, out.ko].filter(Boolean));
+  for (const f of list) if (!used.has(f)) out.ignored.push(f);
   return out;
 }
 

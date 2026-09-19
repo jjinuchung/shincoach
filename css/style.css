@@ -1699,3 +1699,7 @@ button { font-family: inherit; }
 .imp-pick.ok span { color: #065f46; }
 .imp-pick.miss { border-color: var(--danger); background: #fef2f2; }
 .imp-pick.miss span { color: #991b1b; font-weight: 700; }
+
+/* 📁 가져오기: 폴더 / 파일 고르기 버튼 두 개 */
+.imp-pickers { display: flex; gap: 8px; flex-wrap: wrap; }
+.imp-picker { flex: 1 1 auto; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; }

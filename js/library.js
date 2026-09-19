@@ -55,11 +55,15 @@ function renderPick() {
       box.appendChild(li);
     }
     if (picked.ignored.length) {
+      // 폴더를 통째로 고르면 작업 파일·다른 편까지 수십 개가 들어온다 → 개수만 알리고 두 개만 보여 준다
       const li = document.createElement('li');
       li.className = 'imp-pick';
-      li.innerHTML = '<b>⚠️ 안 쓴 파일</b>';
+      const head = document.createElement('b');
+      head.textContent = `⚠️ 안 쓴 파일 ${picked.ignored.length}개`;
       const name = document.createElement('span');
-      name.textContent = picked.ignored.map((f) => f.name).join(', ');
+      const names = picked.ignored.slice(0, 2).map((f) => f.name).join(', ');
+      name.textContent = picked.ignored.length > 2 ? `${names} …` : names;
+      li.appendChild(head);
       li.appendChild(name);
       box.appendChild(li);
     }
@@ -78,8 +82,8 @@ export async function initLibrary(ctx) {
   });
   $('imp-cancel').addEventListener('click', () => $('dlg-import').close());
   $('form-import').addEventListener('submit', onImportSubmit);
-  // 📁 한 번에 고른 파일을 이름으로 나눈다 (영상·영어 자막·한글 자막)
-  $('imp-files').addEventListener('change', (e) => {
+  // 📁 고른 것을 이름으로 나눈다 — 폴더를 통째로 골라도, 파일을 직접 골라도 같은 처리
+  const onPicked = (e) => {
     picked = classifyFiles(e.target.files);
     renderPick();
     // 제목은 파일 이름에서 채운다. 아버님이 직접 고친 제목은 덮지 않는다
@@ -88,7 +92,9 @@ export async function initLibrary(ctx) {
       t.value = suggestTitle(picked.video.name);
       t.dataset.auto = '1';
     }
-  });
+  };
+  $('imp-files').addEventListener('change', onPicked);
+  $('imp-folder').addEventListener('change', onPicked);
   $('imp-title').addEventListener('input', (e) => { e.target.dataset.auto = ''; });
   // 이름에 언어 표시가 없어 거꾸로 잡혔을 때 (아버님이 한 번 누르면 바뀐다)
   $('imp-swap').addEventListener('click', () => {

@@ -45,11 +45,17 @@
     <form id="form-import" method="dialog">
       <h2>영상 가져오기</h2>
 
-      <!-- 영상과 자막을 한 번에 고른다 — 이름 규칙(iconic.mp4 / iconic.en.srt / iconic.ko.srt)으로 자동 분류 -->
-      <label class="field">
-        <span class="field-label">파일 고르기 <small>— 영상과 자막을 <b>한꺼번에</b> 선택하세요 (같은 폴더에서 여러 개)</small></span>
-        <input type="file" id="imp-files" accept="video/*,.srt,.vtt,.smi,.sami,.ass" multiple required>
-      </label>
+      <!-- 폴더를 통째로 고르면 그 안에서 영상·자막을 이름으로 알아서 찾는다.
+           태블릿에서 파일 여러 개를 길게 눌러 고르는 것보다 폴더 하나를 탭하는 쪽이 쉽다. -->
+      <div class="field">
+        <span class="field-label">파일 고르기 <small>— 영상이 들어 있는 <b>폴더를 고르면</b> 자막까지 알아서 찾아요</small></span>
+        <div class="imp-pickers">
+          <label class="btn btn-primary imp-picker" for="imp-folder">📁 폴더 통째로 고르기</label>
+          <input type="file" id="imp-folder" webkitdirectory multiple hidden>
+          <label class="btn imp-picker" for="imp-files">📄 파일 직접 고르기</label>
+          <input type="file" id="imp-files" accept="video/*,.srt,.vtt,.smi,.sami,.ass" multiple hidden>
+        </div>
+      </div>
 
       <ul id="imp-picked" class="imp-picked" hidden></ul>
       <div class="field-actions">
