@@ -2,6 +2,7 @@
 import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats } from './db.js';
 import { parseSubtitle } from './srt.js';
 import { LOCKED, unlockState, nextLocked, ticketId, findLocked, totalsFrom } from './unlock.js';
+import { classifyFiles, suggestTitle, describePick } from './importfiles.js';
 import { coins, inventory, buyTicket, initProfile, unlockBase, ensureUnlockBase } from './xp.js';
 import { characterUrl, ensureCast, artUrl } from './pokemon.js';
 import { sfx, unlock as unlockAudio } from './sfx.js';
@@ -22,16 +23,80 @@ let opening = false;
 // (2026-09-17 아버님 신고: "팬텀 광고 문구가 두 번"). 마지막 요청만 화면에 남긴다.
 let renderSeq = 0;
 
+/** 📁 이번에 고른 파일들 (영상·영어 자막·한글 자막). 대화상자를 열 때마다 비운다 */
+let picked = { video: null, en: null, ko: null, ignored: [] };
+
+function resetPick() {
+  picked = { video: null, en: null, ko: null, ignored: [] };
+  const t = $('imp-title');
+  if (t) t.dataset.auto = '';
+  renderPick();
+}
+
+/** 무엇이 무엇으로 잡혔는지 보여 준다 — 빠진 게 있으면 바로 눈에 띄게 */
+function renderPick() {
+  const box = $('imp-picked');
+  const swap = $('imp-swap');
+  if (!box) return;
+  const rows = describePick(picked);
+  const any = rows.some((r) => r.ok);
+  box.innerHTML = '';
+  box.hidden = !any;
+  if (any) {
+    for (const r of rows) {
+      const li = document.createElement('li');
+      li.className = 'imp-pick' + (r.ok ? ' ok' : (r.need ? ' miss' : ''));
+      const head = document.createElement('b');
+      head.textContent = `${r.icon} ${r.label}`;
+      const name = document.createElement('span');
+      name.textContent = r.ok ? r.name : (r.need ? '아직 없어요' : '없음 (괜찮아요)');
+      li.appendChild(head);
+      li.appendChild(name);
+      box.appendChild(li);
+    }
+    if (picked.ignored.length) {
+      const li = document.createElement('li');
+      li.className = 'imp-pick';
+      li.innerHTML = '<b>⚠️ 안 쓴 파일</b>';
+      const name = document.createElement('span');
+      name.textContent = picked.ignored.map((f) => f.name).join(', ');
+      li.appendChild(name);
+      box.appendChild(li);
+    }
+  }
+  if (swap) swap.hidden = !(picked.en && picked.ko);
+}
+
 export async function initLibrary(ctx) {
   showView = ctx.showView;
 
   $('btn-import').addEventListener('click', () => {
     $('form-import').reset();
+    resetPick();
     $('imp-status').textContent = '';
     $('dlg-import').showModal();
   });
   $('imp-cancel').addEventListener('click', () => $('dlg-import').close());
   $('form-import').addEventListener('submit', onImportSubmit);
+  // 📁 한 번에 고른 파일을 이름으로 나눈다 (영상·영어 자막·한글 자막)
+  $('imp-files').addEventListener('change', (e) => {
+    picked = classifyFiles(e.target.files);
+    renderPick();
+    // 제목은 파일 이름에서 채운다. 아버님이 직접 고친 제목은 덮지 않는다
+    const t = $('imp-title');
+    if (picked.video && (!t.value.trim() || t.dataset.auto === '1')) {
+      t.value = suggestTitle(picked.video.name);
+      t.dataset.auto = '1';
+    }
+  });
+  $('imp-title').addEventListener('input', (e) => { e.target.dataset.auto = ''; });
+  // 이름에 언어 표시가 없어 거꾸로 잡혔을 때 (아버님이 한 번 누르면 바뀐다)
+  $('imp-swap').addEventListener('click', () => {
+    const en = picked.en;
+    picked.en = picked.ko;
+    picked.ko = en;
+    renderPick();
+  });
 
   await refreshList();
 }
@@ -139,12 +204,18 @@ async function onImportSubmit(e) {
   const status = $('imp-status');
   const submit = $('imp-submit');
   const title = $('imp-title').value.trim();
-  const videoFile = $('imp-video').files[0];
-  const enFile = $('imp-sub-en').files[0];
-  const koFile = $('imp-sub-ko').files[0];
+  const videoFile = picked.video;
+  const enFile = picked.en;
+  const koFile = picked.ko;
 
-  if (!title || !videoFile || !enFile) {
-    status.textContent = '제목, 영상, 영어 자막은 꼭 필요해요.';
+  if (!videoFile || !enFile) {
+    status.textContent = !videoFile
+      ? '영상 파일이 없어요. 영상과 자막을 함께 골라 주세요.'
+      : '영어 자막이 없어요. 영상과 자막을 함께 골라 주세요.';
+    return;
+  }
+  if (!title) {
+    status.textContent = '제목을 적어 주세요.';
     return;
   }
 
@@ -196,6 +267,7 @@ async function onImportSubmit(e) {
     await addItem({ title, videoFile, enText, koText, duration: probe.duration, thumb: probe.thumb });
 
     $('form-import').reset(); // 선택한 File 참조 해제
+    resetPick();
     $('dlg-import').close();
     await refreshList();
   } catch (err) {

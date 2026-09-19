@@ -1679,3 +1679,23 @@ button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .catch-cand .mon-figure > img { animation: none; }
 }
+
+/* 📁 가져오기: 한 번에 고른 파일이 무엇으로 잡혔는지 */
+.imp-picked { list-style: none; margin: 8px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.imp-picked[hidden] { display: none; }
+.imp-pick {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: #f9fafb;
+  font-size: 0.95rem;
+}
+.imp-pick b { flex: 0 0 auto; }
+.imp-pick span { color: var(--muted); overflow-wrap: anywhere; }
+.imp-pick.ok { border-color: var(--ok); background: #ecfdf5; }
+.imp-pick.ok span { color: #065f46; }
+.imp-pick.miss { border-color: var(--danger); background: #fef2f2; }
+.imp-pick.miss span { color: #991b1b; font-weight: 700; }
