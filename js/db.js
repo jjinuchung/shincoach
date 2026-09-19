@@ -276,7 +276,7 @@ export async function getDaily(date) {
 //   프로필의 applyProfileDelta와 같은 원리.
 
 const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles',
-  'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms'];
+  'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms', 'matches'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
@@ -508,12 +508,12 @@ export async function markVocabMatched(words, at = Date.now()) {
   let n = 0;
   for (const w of list) {
     const cur = await promisify(store.get(w));
-    if (!cur) continue;
+    if (!cur || cur.matchedAt) continue; // 이미 다른 창이 가져간 묶음 → 보상도 그쪽 몫
     store.put({ ...cur, matchedAt: at });
     n++;
   }
   await txDone(tx);
-  return n;
+  return n; // 0이면 이번 판은 다른 창이 먼저 끝낸 것 (보상을 두 번 주지 않는다)
 }
 
 export async function listVocabViews() {

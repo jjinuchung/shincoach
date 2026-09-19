@@ -109,6 +109,9 @@ const ui = {
   wrong: 0,
   locked: false,
   onDone: null,
+  mons: [],       // 무대에 세운 포켓몬 (늦게 도착한 그림으로 다시 그릴 때 씀)
+  token: 0,       // 판 번호 — 늦게 온 그림이 다음 판을 건드리지 못하게
+  reward: null,   // [{xp, coin} × 3] 틀린 횟수 단계별 보상 (화면에 보여 주려고 받는다)
 };
 
 export function isMatchOpen() {
@@ -120,8 +123,15 @@ function setMsg(text) {
   if (el) el.textContent = text;
 }
 
+/**
+ * 맞힌 쌍마다 다른 색을 준다 (2026-09-19).
+ * 다섯 줄이 가운데서 교차하면 전부 같은 초록일 때 어느 선이 어디로 가는지 눈으로 못 따라간다.
+ * 맞았다는 표시는 칸 색(초록)이 이미 하고 있으므로, 선 색은 **구분**에만 쓴다.
+ */
+const LINE_COLORS = ['#10b981', '#3b82f6', '#a855f7', '#f59e0b', '#ec4899'];
+
 /** 두 칸을 잇는 선 하나 (보드 기준 좌표) */
-function drawLine(leftEl, rightEl, cls) {
+function drawLine(leftEl, rightEl, cls, colorIdx) {
   const svg = $('match-lines');
   const board = $('match-board');
   if (!svg || !board) return null;
@@ -134,6 +144,9 @@ function drawLine(leftEl, rightEl, cls) {
   line.setAttribute('x2', String(r.left - b.left));
   line.setAttribute('y2', String(r.top - b.top + r.height / 2));
   line.setAttribute('class', `match-line ${cls}`);
+  if (cls === 'ok' && Number.isInteger(colorIdx)) {
+    line.style.stroke = LINE_COLORS[colorIdx % LINE_COLORS.length];
+  }
   svg.appendChild(line);
   return line;
 }
@@ -143,12 +156,12 @@ function redrawLines() {
   const svg = $('match-lines');
   if (!svg || !ui.open) return;
   svg.innerHTML = '';
-  for (const it of ui.items) {
-    if (!it._ok) continue;
+  ui.items.forEach((it, i) => {
+    if (!it._ok) return;
     const l = $('match-left').querySelector(`[data-word="${CSS.escape(it.word)}"]`);
     const r = $('match-right').querySelector(`[data-word="${CSS.escape(it.word)}"]`);
-    if (l && r) drawLine(l, r, 'ok');
-  }
+    if (l && r) drawLine(l, r, 'ok', i);
+  });
 }
 
 function clearPick() {
@@ -181,7 +194,7 @@ function onPick(side, word, el) {
     if (it) it._ok = true;
     leftEl.classList.add('ok');
     rightEl.classList.add('ok');
-    drawLine(leftEl, rightEl, 'ok');
+    drawLine(leftEl, rightEl, 'ok', ui.items.findIndex((x) => x.word === word));
     ui.solved++;
     sfx.ding();
     if (ui.solved >= ui.items.length) finish();
@@ -207,6 +220,16 @@ function finish() {
   ui.locked = true;
   const step = rewardStep(ui.wrong);
   setMsg(step === 0 ? '🎉 한 번도 안 틀렸어요! 대단해요!' : (step === 1 ? '잘했어요! 거의 다 맞혔어요' : '다 맞혔어요! 다음엔 더 빨리!'));
+  // ★ 보상을 **여기서** 보여 준다 (2026-09-19). 전에는 게임을 닫은 뒤 플레이어 쪽
+  //   알림으로만 알렸는데, 아이는 "경험치 얘기가 없다"고 했다 — 받은 걸 받은 자리에서 봐야 한다
+  const box = $('match-reward');
+  if (box) {
+    const r = ui.reward ? ui.reward[Math.min(step, ui.reward.length - 1)] : null;
+    if (r) {
+      box.textContent = `⚡ +${r.xp}   💰 +${r.coin}` + (step === 0 ? '   (한 번에 다 맞춘 보너스!)' : '');
+      box.hidden = false;
+    }
+  }
   const root = $('match');
   if (root) root.classList.add('solved');
   sfx.success();
@@ -224,28 +247,47 @@ function makeCell(side, item, label) {
   return el;
 }
 
-/** 무대에서 춤추는 포켓몬들 (움직이는 도트 그림이 있는 것만, 없으면 무대는 비워 둔다) */
-function fillStage(monIds) {
+/**
+ * 무대에서 춤추는 포켓몬들.
+ *
+ * ★ 움직이는 도트 그림이 아직 없으면 **평소 일러스트로라도 춤추게** 한다 (2026-09-19).
+ *   처음에는 도트 그림이 있는 것만 세웠더니, 태블릿에서 첫 판에 무대가 통째로 비었다
+ *   (그림을 받는 데 시간이 걸리고 와이파이가 없으면 아예 못 받는다). 아이에게는
+ *   "포켓몬이 안 나온다"로 보인다 — 빈 무대보다 CSS로 흔들리는 일러스트가 낫다.
+ */
+function fillStage(mons) {
   const stage = $('match-stage');
   if (!stage) return;
+  const list = (mons || []).filter((m) => m && (m.anim || m.art)).slice(0, 4);
   stage.innerHTML = '';
-  const urlsFound = (monIds || []).map((id) => ({ id, url: animUrl(id) })).filter((m) => m.url).slice(0, 4);
-  stage.hidden = urlsFound.length === 0;
-  urlsFound.forEach((m, i) => {
+  stage.hidden = list.length === 0;
+  list.forEach((m, i) => {
     const img = document.createElement('img');
-    img.className = 'match-dancer';
-    img.src = m.url;
-    img.alt = '';
+    const moving = !!m.anim;
+    img.className = moving ? 'match-dancer' : 'match-dancer still';
+    img.src = moving ? m.anim : m.art;
+    img.alt = m.ko || '';
     img.style.animationDelay = `${(i * 0.18).toFixed(2)}s`;
     stage.appendChild(img);
   });
 }
 
 /**
- * 게임 열기.
- * @param {{items:Array, monIds:number[], onDone:(r:{wrong:number, words:string[]})=>void}} o
+ * 그림이 늦게 도착했을 때 무대만 다시 그린다 (게임은 건드리지 않는다).
+ * 판이 이미 닫혔으면 아무 일도 안 한다 — 늦게 온 응답이 다음 판을 바꾸지 못하게.
  */
-export function openMatch({ items, monIds = [], onDone = null } = {}) {
+export function refreshStage(mons, token) {
+  if (!ui.open || token !== ui.token) return;
+  ui.mons = mons;
+  fillStage(mons);
+}
+
+/**
+ * 게임 열기.
+ * @param {{items:Array, mons:Array<{id,anim,art,ko}>, reward:Array<{xp,coin}>, onDone:Function}} o
+ * @returns {number} 판 번호 (늦게 받은 그림을 refreshStage에 넘길 때 쓴다)
+ */
+export function openMatch({ items, mons = [], reward = null, onDone = null } = {}) {
   closeMatch();
   bgm.play(); // 🎵 지난 이벤트에서 끊긴 자리부터 이어서
   ui.open = true;
@@ -255,6 +297,9 @@ export function openMatch({ items, monIds = [], onDone = null } = {}) {
   ui.wrong = 0;
   ui.locked = false;
   ui.onDone = onDone;
+  ui.mons = mons;
+  ui.reward = reward;
+  ui.token += 1;
 
   const left = $('match-left');
   const right = $('match-right');
@@ -267,13 +312,16 @@ export function openMatch({ items, monIds = [], onDone = null } = {}) {
   for (const it of ui.items) left.appendChild(makeCell('left', it, it.word));
   for (const it of shuffle(ui.items)) right.appendChild(makeCell('right', it, it.meaning));
 
-  fillStage(monIds);
+  fillStage(mons);
+  const box = $('match-reward');
+  if (box) { box.hidden = true; box.textContent = ''; }
   const btn = $('match-continue');
   if (btn) btn.hidden = true;
   const root = $('match');
   root.classList.remove('solved');
   root.hidden = false;
   window.addEventListener('resize', redrawLines);
+  return ui.token;
 }
 
 export function closeMatch() {

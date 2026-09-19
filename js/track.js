@@ -402,6 +402,14 @@ export function markBattle(max) {
   return claim('battles', max);
 }
 
+/** 🔤 오늘 단어 이어 주기를 몇 판 했는지 / 한 판 선점 (하루 상한) */
+export function todayMatches() {
+  return t.daily ? (t.daily.matches || 0) : 0;
+}
+export function markMatch(max) {
+  return claim('matches', max);
+}
+
 /** 🔁 오늘 복습한 문장 수 / 완주한 회차 수 (모든 콘텐츠 합산) */
 export function todayReviewSentences() {
   return t.daily ? (t.daily.reviewSentences || 0) : 0;

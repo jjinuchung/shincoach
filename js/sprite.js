@@ -17,8 +17,10 @@ const ANIM_URL = (id) => `https://raw.githubusercontent.com/PokeAPI/sprites/mast
 /** characters 스토어에서 쓰는 키 (숫자 id와 안 겹치게) */
 export const animKey = (id) => `anim${Number(id)}`;
 
-const urls = new Map();   // id → objectURL
-const missing = new Set(); // 받아 봤지만 없던 id (계속 다시 시도하지 않게)
+const urls = new Map();    // id → objectURL
+const failedAt = new Map(); // id → 마지막으로 실패한 시각 (와이파이가 끊겼을 수도 있으므로 영구 포기는 안 한다)
+/** 실패한 id를 다시 시도하기까지 (v70·v80 교훈: 모듈 전역 상태는 스스로 풀려야 한다) */
+const RETRY_AFTER_MS = 5 * 60 * 1000;
 
 /** 받아둔 움직이는 그림 주소 (없으면 null) */
 export function animUrl(id) {
@@ -42,17 +44,23 @@ export async function loadAnims() {
 
 /**
  * 움직이는 그림 한 장 확보. 없거나 인터넷이 없으면 null (호출부가 일러스트로 대체).
- * 한 번 없다고 나온 id는 다시 안 받는다.
+ * 실패해도 영구 포기는 안 한다 — RETRY_AFTER_MS 뒤에 다시 시도한다.
  */
 export async function ensureAnim(id) {
   const key = Number(id);
-  if (!key || missing.has(key)) return null;
+  if (!key) return null;
   if (urls.has(key)) return urls.get(key);
+  // 실패 기록이 있어도 시간이 지났으면 다시 시도한다 — 와이파이가 잠깐 끊긴 것을
+  // "이 포켓몬은 그림이 없다"로 굳히면 앱을 껐다 켤 때까지 무대가 빈 채로 남는다
+  const failed = failedAt.get(key);
+  if (failed && Date.now() - failed < RETRY_AFTER_MS) return null;
 
+  // 저장된 것부터 본다 — 다른 창이 받아 뒀을 수도 있다
   const saved = (await getCharacters().catch(() => [])).find((c) => c.id === animKey(key) && c.blob);
   if (saved) {
     const url = URL.createObjectURL(saved.blob);
     urls.set(key, url);
+    failedAt.delete(key);
     return url;
   }
   try {
@@ -62,9 +70,10 @@ export async function ensureAnim(id) {
     await putCharacter({ id: animKey(key), ko: '', en: '', blob, anchor: null, savedAt: Date.now() });
     const url = URL.createObjectURL(blob);
     urls.set(key, url);
+    failedAt.delete(key);
     return url;
   } catch (e) {
-    missing.add(key);
+    failedAt.set(key, Date.now());
     console.warn('움직이는 그림 받기 실패:', key, e);
     return null;
   }

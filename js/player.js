@@ -23,8 +23,8 @@ import {
 
 /** 👨‍👩‍👦 한 번에 보여줄 아빠 교정문 수 (많이 쌓여도 아이가 지치지 않게) */
 const COACH_FIX_MAX = 3;
-import { initMatch, openMatch, closeMatch, pickMatchRound, shuffle as shuffleMons } from './match.js';
-import { ensureAnims, loadAnims } from './sprite.js';
+import { initMatch, openMatch, closeMatch, refreshStage, pickMatchRound, shuffle as shuffleMons } from './match.js';
+import { ensureAnims, loadAnims, animUrl } from './sprite.js';
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import { setBgmEnabled } from './bgm.js';
@@ -93,7 +93,8 @@ const state = {
   reviewPending: false, // 🔁 다음 문장으로 넘어갈 때 열 복습이 걸려 있는지 (배틀·에세이와 같은 방식)
   reviewCooldown: 0,   // 이만큼 문장은 복습을 안 물어봄 (제안 직후 연달아 뜨지 않게)
   vocabViews: [],      // 🔤 아이가 본 단어 기록 (복습 문항을 만들 때 씀. 콘텐츠를 열 때 한 번 읽음)
-  matchPending: null,  // 🔤 다음 문장으로 넘어갈 때 열 단어 이어 주기 ({ items, consumed })
+  matchPending: null,  // 🔤 다음 문장으로 넘어갈 때 열 단어 이어 주기 ({ items, consumed, mons })
+  matchCooldown: 0,    // 🔤 한 판 뒤 이만큼 문장은 안 나옴 (연달아 뜨면 학습이 끊긴다)
   matchOpen: false,    // 🔤 단어 이어 주기가 열려 있음 (키보드 무시)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
@@ -819,25 +820,55 @@ function maybeReviewDuring() {
 
 // ───────────────────── 🔤 단어 이어 주기 ─────────────────────
 
+/** 🔤 한 판 뒤 이만큼 문장은 안 나옴 (쌓인 단어가 많으면 매 문장 열려 버린다) */
+const MATCH_COOLDOWN = 20;
+/** 🔤 하루 최대 판 수 */
+const MATCH_MAX_PER_DAY = 3;
+
 /**
  * 아이가 **새로 본 단어가 20개 모이면** 한 판 걸어 둔다 (다음 문장으로 넘어갈 때 열린다).
  * 🧩 퍼즐·⚔️ 배틀과 같은 자리를 쓰되 맨 마지막 순서 — 한 번에 하나만 열린다.
+ *
+ * ★ 쿨다운과 하루 상한이 **둘 다** 필요하다 (2026-09-19 아버님 신고: "2~3장면마다 뜬다").
+ *   단어장에 이미 수백 개가 쌓여 있으면 20개를 써도 재고가 남아 **매 문장 조건을 통과한다**.
+ *   "새 단어 20개"만으로는 간격이 전혀 보장되지 않는다.
+ *
+ * ★ 단어 기록은 track이 IndexedDB에 **직접** 쓴다 — `state.vocabViews`는 콘텐츠를 열 때 떠 온
+ *   사본이라 오래됐다. 읽어서 다시 판단하지 않으면, 19개로 시작한 세션은 아무리 새 단어를 봐도
+ *   그날 내내 게임이 안 열린다 (Codex 지적).
  */
 function maybeMatch() {
   if (state.parentMode || state.matchPending || state.matchOpen) return;
   if (state.battlePending || state.essayPending || state.reviewPending) return; // 한 번에 하나만
-  const round = pickMatchRound(state.vocabViews, { foreign: state.vocab && state.vocab.foreign });
-  if (!round) return;
-  state.matchPending = round;
-  // 무대에 세울 포켓몬의 **움직이는** 그림을 미리 받아 둔다 (못 받으면 무대만 비고 게임은 그대로)
-  ensureAnims(stageMonIds()).catch(() => {});
+  if (state.matchCooldown > 0) { state.matchCooldown--; return; }
+  if (track.todayMatches() >= MATCH_MAX_PER_DAY) return;
+  const myItem = state.item;
+  refreshVocabViews().then(() => {
+    // 읽는 사이에 콘텐츠가 닫혔거나 다른 이벤트가 걸렸으면 없던 일로
+    if (!state.open || state.item !== myItem) return;
+    if (state.matchPending || state.matchOpen) return;
+    if (state.battlePending || state.essayPending || state.reviewPending) return;
+    const round = pickMatchRound(state.vocabViews, { foreign: state.vocab && state.vocab.foreign });
+    if (!round) return;
+    round.mons = stageMons();
+    state.matchPending = round;
+    // 무대에 세울 **움직이는** 그림을 미리 받아 둔다 (못 받으면 평소 일러스트로 대신 춤춘다)
+    ensureAnims(round.mons.map((m) => m.id)).catch(() => {});
+  }).catch(() => { /* 저장소가 막히면 이번 문장은 건너뛴다 */ });
 }
 
-/** 무대에서 춤출 포켓몬 — 아이가 잡은 것 중에서 (아직 하나도 없으면 피카츄) */
-function stageMonIds() {
+/**
+ * 무대에서 춤출 포켓몬 — 아이가 잡은 것 중에서 (아직 하나도 없으면 피카츄).
+ * 움직이는 도트 그림과 평소 일러스트를 **둘 다** 실어 보낸다: 도트를 아직 못 받았으면
+ * 일러스트로라도 춤춰야 무대가 비지 않는다 (아버님 신고: "포켓몬이 나오지도 않는다").
+ */
+function stageMons() {
   const caught = Object.keys(getProfileSnapshot().caught || {}).map(Number).filter((id) => id > 0);
   const pool = caught.length ? caught : [25];
-  return shuffleMons(pool).slice(0, 3);
+  return shuffleMons(pool).slice(0, 3).map((id) => {
+    const ch = (state.characters || []).find((c) => c.id === id);
+    return { id, ko: ch ? ch.ko : '', art: (ch && ch.url) || '', anim: animUrl(id) };
+  });
 }
 
 /**
@@ -853,20 +884,39 @@ function startMatch(continueFn) {
   if (!video.paused) video.pause();
   const spot = rememberSpot();
   setMatchOpen(true);
-  openMatch({
+  // 그새 그림을 받았을 수도 있으니 지금 값으로 다시 채운다
+  const mons = (round.mons || stageMons()).map((m) => ({ ...m, anim: animUrl(m.id) }));
+  const token = openMatch({
     items: round.items,
-    monIds: stageMonIds(),
+    mons,
+    // 보상을 게임 화면에서 바로 보여 준다 (아이가 "경험치 얘기가 없다"고 했다)
+    reward: XP.match.map((xp, i) => ({ xp, coin: COIN.match[i] })),
     onDone: (result) => {
       setMatchOpen(false);
-      const xp = awardXp(matchXp(result.wrong));
-      const coin = awardCoins(matchCoins(result.wrong));
+      state.matchCooldown = MATCH_COOLDOWN; // 끝나면 한동안 안 나온다
+      // 묶음을 실제로 선점한 창만 보상을 준다 (두 창을 같이 열어도 한 번만)
       markVocabMatched(round.consumed)
-        .then(() => refreshVocabViews())
-        .catch(() => { /* 저장이 안 되면 다음에 또 나올 뿐 */ });
-      showPlayerMessage(`🔤 단어를 다 이었어요! ⚡+${xp} 💰+${coin}`, 3500);
+        .then((n) => {
+          refreshVocabViews();
+          if (!n) return; // 다른 창이 먼저 끝낸 판
+          track.markMatch(MATCH_MAX_PER_DAY);
+          grantMatchReward(result.wrong);
+        })
+        .catch(() => { grantMatchReward(result.wrong); }); // 저장이 막혀도 아이 잘못은 아니다
       if (continueFn) continueFn(); else restoreSpot(spot);
     },
   });
+  // 늦게 도착한 그림은 **무대만** 다시 그린다 (게임 진행은 건드리지 않는다)
+  ensureAnims(mons.map((m) => m.id))
+    .then(() => refreshStage(mons.map((m) => ({ ...m, anim: animUrl(m.id) })), token))
+    .catch(() => {});
+}
+
+/** 🔤 보상 지급 + 알림 (awardXp는 객체를 돌려준다 — .gained를 써야 숫자가 나온다) */
+function grantMatchReward(wrong) {
+  const xp = awardXp(matchXp(wrong)).gained;
+  const coin = awardCoins(matchCoins(wrong));
+  showPlayerMessage(`🔤 단어를 다 이었어요! ⚡+${xp} 💰+${coin}`, 3500);
 }
 
 function setMatchOpen(on) {
@@ -1337,6 +1387,7 @@ export async function openPlayer(id, opts = {}) {
   state.speakUnavailableAt = 0; // 영상을 새로 열면 마이크를 다시 시도한다
   state.matchPending = null;
   state.matchOpen = false;
+  state.matchCooldown = 0;
   state.reviewPending = false;
   state.reviewCooldown = 0;
   state.essayPending = false;
