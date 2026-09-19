@@ -8,6 +8,9 @@ import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, 
 import { wordResults } from '../js/speak.js';
 import { makeDictation } from '../js/dictation.js';
 import { pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds, REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH } from '../js/essay.js';
+import { pickMatchRound, shuffle as shuffleMons, PAIRS as MATCH_PAIRS, NEED_NEW as MATCH_NEED } from '../js/match.js';
+import { matchXp } from '../js/xp.js';
+import { matchCoins } from '../js/items.js';
 import fsNode from 'node:fs';
 
 // 받아쓰기 오답은 실제 사전에서 만들어지므로 테스트도 진짜 사전을 쓴다
@@ -77,6 +80,8 @@ function loadPlayer() {
   const battleState = { roll: false, caught: {}, won: [], lost: [] };
   const reviewCalls = [];
   const essayCalls = [];
+  const matchCalls = [];
+  const matchState = { marked: [] };
   const essayState = { seconds: 0, done: false, saved: [] };
   const mushroomState = { today: 0, gained: 0 };
   const formState = { forms: {}, keystone: false, mega: {}, gmax: {} };
@@ -169,6 +174,12 @@ function loadPlayer() {
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
     initReview() {}, abortReview() {}, isReviewOpen: () => false, openReview(o) { reviewCalls.push(o); },
+    // 🔤 단어 이어 주기 스텁: 열린 판은 matchCalls에 기록 (규칙 pickMatchRound·보상은 실제 모듈)
+    matchCalls, matchState,
+    initMatch() {}, closeMatch() {}, openMatch(o) { matchCalls.push(o); },
+    pickMatchRound, shuffleMons, matchXp, matchCoins,
+    async markVocabMatched(words) { matchState.marked.push(...words); return words.length; },
+    async ensureAnims() { return []; }, async loadAnims() { return 0; },
     // ✍️ 에세이 스텁: 열린 에세이는 essayCalls에 기록, 규칙(pickPrompts·correct)은 실제 모듈을 씀
     essayCalls,
     initEssay() {}, abortEssay() {}, openEssay(o) { essayCalls.push(o); },
@@ -189,7 +200,7 @@ function loadPlayer() {
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, matchCalls, matchState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -1781,4 +1792,82 @@ test('🎤 한 번 더 읽기: 끔·부모 모드·인식 없는 판정에서는
   await new Promise((r) => setTimeout(r, 1300));
   assert.equal(run('state.idx'), 1, '소리 길이로만 판정됐으면 보여줄 게 없으니 바로 다음');
   assert.equal(run('state.rereadDone'), false);
+});
+
+// ───────────────────── 🔤 단어 이어 주기 (2026-09-19) ─────────────────────
+// 규칙(몇 개 모이면 여는지·무엇을 내는지)은 match.test.js에서 본다.
+// 여기서는 **학습 흐름에 제대로 걸리는지**만 본다 — 규칙이 맞아도 배선이 빠지면 영영 안 열린다
+// (에세이 v50에서 실제로 겪었다: 규칙 테스트는 통과했는데 화면에서 버튼이 죽어 있었다).
+
+/** 게임에 쓸 수 있는 단어장 기록 n개 */
+function vocabList(n, extra = {}) {
+  const letter = (i) => String.fromCharCode(97 + Math.floor(i / 26)) + String.fromCharCode(97 + (i % 26));
+  return Array.from({ length: n }, (_, i) => ({ word: `zz${letter(i)}`, meaning: `뜻${i}`, views: 3, ...extra }));
+}
+
+test('🔤 새 단어가 20개 모이면 문장을 끝낼 때 한 판이 걸린다', () => {
+  const { run } = loadPlayer();
+  run(`${cues5} state.vocabViews = ${JSON.stringify(vocabList(19))}; maybeMatch();`);
+  assert.equal(run('state.matchPending'), null, '19개로는 안 걸린다');
+
+  run(`state.vocabViews = ${JSON.stringify(vocabList(20))}; maybeMatch();`);
+  assert.ok(run('state.matchPending'), '20개면 걸린다');
+  assert.equal(run('state.matchPending.items.length'), MATCH_PAIRS);
+  assert.equal(run('state.matchPending.consumed.length'), MATCH_NEED);
+});
+
+test('🔤 한 번에 하나만 — 배틀·에세이·복습이 걸려 있으면 비켜 준다', () => {
+  const { run } = loadPlayer();
+  const list = JSON.stringify(vocabList(20));
+  run(`${cues5} state.vocabViews = ${list}; state.battlePending = { id: 25 }; maybeMatch();`);
+  assert.equal(run('state.matchPending'), null, '배틀이 먼저');
+  run('state.battlePending = null; state.essayPending = true; maybeMatch();');
+  assert.equal(run('state.matchPending'), null, '에세이가 먼저');
+  run('state.essayPending = false; state.reviewPending = true; maybeMatch();');
+  assert.equal(run('state.matchPending'), null, '복습이 먼저');
+  run('state.reviewPending = false; maybeMatch();');
+  assert.ok(run('state.matchPending'), '아무것도 없으면 걸린다');
+});
+
+test('🔤 👨‍👩‍👦 부모 모드에서는 안 나온다', () => {
+  const { run } = loadPlayer();
+  run(`${cues5} state.parentMode = true; state.vocabViews = ${JSON.stringify(vocabList(20))}; maybeMatch();`);
+  assert.equal(run('state.matchPending'), null);
+});
+
+test('🔤 넘어가기 전에 열리고, 끝나면 원래 가려던 문장으로 이어진다', () => {
+  const { run, matchCalls, matchState, xpLog, coinLog } = loadPlayer();
+  run(`${cues5} state.vocabViews = ${JSON.stringify(vocabList(20))}; state.idx = 1; maybeMatch(); goTo(2);`);
+  assert.equal(matchCalls.length, 1, '다음 문장으로 가기 전에 열린다');
+  assert.equal(run('state.idx'), 1, '끝날 때까지는 안 넘어감');
+  assert.equal(run('state.matchPending'), null, '한 번 열었으면 플래그를 내린다');
+  assert.equal(run('state.matchOpen'), true, '열려 있는 동안은 플레이어 단축키를 막는다');
+
+  const xpBefore = xpLog.length;
+  matchCalls[0].onDone({ wrong: 0, words: matchCalls[0].items.map((it) => it.word) });
+  assert.equal(run('state.idx'), 2, '끝나면 원래 가려던 문장으로');
+  assert.equal(run('state.matchOpen'), false);
+  assert.equal(xpLog[xpBefore], matchXp(0), '한 번도 안 틀리면 가장 많은 경험치');
+  assert.equal(coinLog[coinLog.length - 1], matchCoins(0));
+  assert.equal(matchState.marked.length, MATCH_NEED, '이번 묶음 20개를 다 썼다고 표시 → 다음 판은 새 단어를 기다린다');
+});
+
+test('🔤 많이 틀리면 보상이 적다', () => {
+  const { run, matchCalls, xpLog } = loadPlayer();
+  run(`${cues5} state.vocabViews = ${JSON.stringify(vocabList(20))}; state.idx = 1; maybeMatch(); goTo(2);`);
+  const before = xpLog.length;
+  matchCalls[0].onDone({ wrong: 4, words: [] });
+  assert.equal(xpLog[before], matchXp(4));
+  assert.ok(matchXp(4) < matchXp(0), '한 번에 맞춘 쪽이 더 많이 받는다');
+});
+
+test('🔤 콘텐츠를 닫으면 걸려 있던 판도 접힌다 (보상 없이)', () => {
+  const { run, xpLog } = loadPlayer();
+  run(`${cues5} state.vocabViews = ${JSON.stringify(vocabList(20))}; maybeMatch();`);
+  assert.ok(run('state.matchPending'));
+  const before = xpLog.length;
+  run('closeMedia();');
+  assert.equal(run('state.matchPending'), null);
+  assert.equal(run('state.matchOpen'), false);
+  assert.equal(xpLog.length, before, '끝낸 게 아니므로 보상 없음');
 });

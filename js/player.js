@@ -1,5 +1,5 @@
 // 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
-import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, listEssays, markEssayRead, syncCoachFixes } from './db.js';
+import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, markVocabMatched, listEssays, markEssayRead, syncCoachFixes } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
@@ -9,8 +9,8 @@ import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax } from './xp.js';
-import { COIN, HP, POTION, GOLDEN, puzzleCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax } from './xp.js';
+import { COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
@@ -23,6 +23,8 @@ import {
 
 /** 👨‍👩‍👦 한 번에 보여줄 아빠 교정문 수 (많이 쌓여도 아이가 지치지 않게) */
 const COACH_FIX_MAX = 3;
+import { initMatch, openMatch, closeMatch, pickMatchRound, shuffle as shuffleMons } from './match.js';
+import { ensureAnims, loadAnims } from './sprite.js';
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import { setBgmEnabled } from './bgm.js';
@@ -91,6 +93,8 @@ const state = {
   reviewPending: false, // 🔁 다음 문장으로 넘어갈 때 열 복습이 걸려 있는지 (배틀·에세이와 같은 방식)
   reviewCooldown: 0,   // 이만큼 문장은 복습을 안 물어봄 (제안 직후 연달아 뜨지 않게)
   vocabViews: [],      // 🔤 아이가 본 단어 기록 (복습 문항을 만들 때 씀. 콘텐츠를 열 때 한 번 읽음)
+  matchPending: null,  // 🔤 다음 문장으로 넘어갈 때 열 단어 이어 주기 ({ items, consumed })
+  matchOpen: false,    // 🔤 단어 이어 주기가 열려 있음 (키보드 무시)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -168,6 +172,8 @@ export function initPlayer(ctx) {
   initBattle();
   initReview();
   initEssay();
+  initMatch();
+  loadAnims().catch(() => {}); // 🕺 받아둔 움직이는 그림을 메모리에 (오프라인에서도 무대가 산다)
   initProfile().then(() => { updateLevelChip(); updatePartnerChip(); }).catch(() => {});
   $('level-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex()); });
   $('coin-chip').addEventListener('click', () => { closePlayer(); import('./pokedex.js').then((m) => m.openPokedex({ shop: true })); });
@@ -811,6 +817,64 @@ function maybeReviewDuring() {
   state.reviewPending = true;
 }
 
+// ───────────────────── 🔤 단어 이어 주기 ─────────────────────
+
+/**
+ * 아이가 **새로 본 단어가 20개 모이면** 한 판 걸어 둔다 (다음 문장으로 넘어갈 때 열린다).
+ * 🧩 퍼즐·⚔️ 배틀과 같은 자리를 쓰되 맨 마지막 순서 — 한 번에 하나만 열린다.
+ */
+function maybeMatch() {
+  if (state.parentMode || state.matchPending || state.matchOpen) return;
+  if (state.battlePending || state.essayPending || state.reviewPending) return; // 한 번에 하나만
+  const round = pickMatchRound(state.vocabViews, { foreign: state.vocab && state.vocab.foreign });
+  if (!round) return;
+  state.matchPending = round;
+  // 무대에 세울 포켓몬의 **움직이는** 그림을 미리 받아 둔다 (못 받으면 무대만 비고 게임은 그대로)
+  ensureAnims(stageMonIds()).catch(() => {});
+}
+
+/** 무대에서 춤출 포켓몬 — 아이가 잡은 것 중에서 (아직 하나도 없으면 피카츄) */
+function stageMonIds() {
+  const caught = Object.keys(getProfileSnapshot().caught || {}).map(Number).filter((id) => id > 0);
+  const pool = caught.length ? caught : [25];
+  return shuffleMons(pool).slice(0, 3);
+}
+
+/**
+ * 단어 이어 주기 열기. 끝나면 보상을 주고 이번 묶음을 "썼다"고 표시한 뒤 원래 하려던 이동을 이어감.
+ * 표시를 해야 다음 판이 **새 단어 20개**를 다시 기다린다 (안 하면 매 문장마다 열린다).
+ */
+function startMatch(continueFn) {
+  const round = state.matchPending;
+  state.matchPending = null;
+  if (!round) { if (continueFn) continueFn(); return; }
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  const spot = rememberSpot();
+  setMatchOpen(true);
+  openMatch({
+    items: round.items,
+    monIds: stageMonIds(),
+    onDone: (result) => {
+      setMatchOpen(false);
+      const xp = awardXp(matchXp(result.wrong));
+      const coin = awardCoins(matchCoins(result.wrong));
+      markVocabMatched(round.consumed)
+        .then(() => refreshVocabViews())
+        .catch(() => { /* 저장이 안 되면 다음에 또 나올 뿐 */ });
+      showPlayerMessage(`🔤 단어를 다 이었어요! ⚡+${xp} 💰+${coin}`, 3500);
+      if (continueFn) continueFn(); else restoreSpot(spot);
+    },
+  });
+}
+
+function setMatchOpen(on) {
+  state.matchOpen = on;
+  const view = $('view-player');
+  if (view) view.inert = on;
+}
+
 /**
  * 🍄 다이버섯 하나 — 🔁 복습 완주 · ⚔️ 배틀 승리 · 🏁 여행 도착에서만 (하루 2개까지).
  * 돈으로 못 사는 것이라야 🍲 다이스프(거다이맥스)가 "모아서 얻는 것"이 된다.
@@ -1114,6 +1178,7 @@ function markDone(cue) {
     maybeBattle(after); // ⚔️ 아주 가끔 트레이너가 걸어옴 (다음 문장으로 넘어갈 때 열림)
     maybeEssay();       // ✍️ 오늘 공부 시간을 채웠으면 에세이 (다음 문장으로 넘어갈 때 열림)
     maybeReviewDuring(); // 🔁 복습도 학습 중에 (열 때 한 번만 묻던 것을 바꿈)
+    maybeMatch();       // 🔤 새 단어가 20개 모였으면 단어 이어 주기 (맨 마지막 순서)
     // 🔥 오늘 5문장을 채우면 연속 학습일에 들어가고 보너스 (연속일수록 큼)
     if (!state.streakToday && after >= STREAK_MIN_DONE) {
       state.streakToday = true;
@@ -1270,6 +1335,8 @@ export async function openPlayer(id, opts = {}) {
   state.journeyCelebrated = false;
   state.reviewDone = false;
   state.speakUnavailableAt = 0; // 영상을 새로 열면 마이크를 다시 시도한다
+  state.matchPending = null;
+  state.matchOpen = false;
   state.reviewPending = false;
   state.reviewCooldown = 0;
   state.essayPending = false;
@@ -1350,7 +1417,10 @@ function closeMedia() {
   setBattleOpen(false);
   abortReview();
   abortEssay();
+  closeMatch();      // 🔤 단어 잇기 중에 콘텐츠를 닫으면 그냥 접는다 (보상 없음 — 끝낸 게 아니다)
   setReviewOpen(false);
+  setMatchOpen(false);
+  state.matchPending = null;
   state.battlePending = null;
   state.catchOpen = false;
   state.practiceOpen = false;
@@ -1470,6 +1540,11 @@ function goTo(i, { play = true, force = false } = {}) {
       startReview(items, false, () => goTo(i, { play, force: true }));
       return;
     }
+  }
+  // 🔤 단어 이어 주기 (복습 다음 순서 — 한 전환에 하나만 열린다)
+  if (!force && i > state.idx && state.matchPending) {
+    startMatch(() => goTo(i, { play, force: true }));
+    return;
   }
   cancelShadowWait();
   state.idx = i;
@@ -1709,6 +1784,7 @@ function onCueEnd() {
       const items = reviewItems();
       if (items.length) startReview(items, false); // 끝났으니 제자리로 돌아오면 된다
     }
+    else if (state.matchPending) startMatch(null); // 🔤 끝났으니 제자리로 돌아오면 된다
     return;
   }
 
@@ -1743,6 +1819,13 @@ function onCueEnd() {
       startReview(items, false, () => goTo(nextIdx, { force: true }));
       return;
     }
+  }
+
+  // 🔤 단어 이어 주기 (복습 다음)
+  if (state.matchPending) {
+    const nextIdx = state.idx + 1;
+    startMatch(() => goTo(nextIdx, { force: true }));
+    return;
   }
 
   advanceContinuous();
@@ -1834,6 +1917,7 @@ function afterShadowWait() {
       const items = reviewItems();
       if (items.length) startReview(items, false); // 끝났으니 제자리로 돌아오면 된다
     }
+    else if (state.matchPending) startMatch(null); // 🔤 끝났으니 제자리로 돌아오면 된다
     return;
   }
   goTo(state.idx + 1);
@@ -2412,7 +2496,7 @@ function updateChips() {
 
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
-  if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen || state.essayOpen) return; // 퍼즐·잡기·배틀·복습·에세이 화면 중에는 플레이어 단축키 무시
+  if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen || state.essayOpen || state.matchOpen) return; // 퍼즐·잡기·배틀·복습·에세이·단어 잇기 화면 중에는 플레이어 단축키 무시
   // 버튼·요약·링크에 포커스가 있으면 그 요소의 기본 동작(Space/Enter로 누르기)을 살린다 (Codex #5)
   const tag = e.target && e.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SUMMARY' || tag === 'A') return;

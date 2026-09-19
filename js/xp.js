@@ -12,6 +12,7 @@ import { findLocked } from './unlock.js';
 // ── 경험치 ──
 export const XP = {
   puzzle: [30, 20, 10], // 퍼즐 정답: 틀린 횟수 0/1/2번
+  match: [30, 20, 10],  // 🔤 단어 이어 주기: 틀린 횟수 0번 / 1~2번 / 3번 이상 (다섯 쌍이라 계단을 넓게)
   puzzleRevealed: 3,    // 3번 틀려 정답 공개
   done: 2,              // 문장 하나 완료 (하루에 문장당 한 번)
   speak: 3,             // 말하기 통과
@@ -70,6 +71,12 @@ export function levelFromXp(totalXp) {
 export function puzzleXp(result) {
   if (!result || !result.solved) return XP.puzzleRevealed;
   return XP.puzzle[Math.min(result.wrong || 0, XP.puzzle.length - 1)];
+}
+
+/** 🔤 단어 이어 주기 결과 → 경험치 (한 번에 다 맞추면 가장 많이) */
+export function matchXp(wrong) {
+  const w = Math.max(0, Math.floor(Number(wrong) || 0));
+  return XP.match[w === 0 ? 0 : (w <= 2 ? 1 : 2)];
 }
 
 // ── 희귀도 ──

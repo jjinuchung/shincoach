@@ -314,6 +314,24 @@
     </div>
   </div>
 
+  <!-- ===== 🔤 단어 이어 주기 (새 단어가 20개 모이면 다섯 쌍을 잇는 게임) ===== -->
+  <div id="match" class="match" hidden>
+    <div class="match-card">
+      <div class="match-title">🔤 단어 이어 주기</div>
+      <div id="match-msg" class="match-msg">같은 뜻끼리 이어 주세요!</div>
+      <div id="match-board" class="match-board">
+        <!-- 선은 칸 위에 겹쳐 그린다 (칸을 못 누르게 막으면 안 되므로 pointer-events:none) -->
+        <svg id="match-lines" class="match-lines" aria-hidden="true"></svg>
+        <div id="match-left" class="match-col" aria-label="영어 단어"></div>
+        <div id="match-right" class="match-col" aria-label="한글 뜻"></div>
+      </div>
+      <div id="match-stage" class="match-stage" aria-hidden="true" hidden></div>
+      <div class="match-actions">
+        <button type="button" id="match-continue" class="btn btn-primary" hidden>계속하기 ▶</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== 🔁 복습 (배운 문장을 며칠에 걸쳐 다시 만나기) ===== -->
   <div id="review" class="review" hidden>
     <div class="review-card">

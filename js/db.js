@@ -494,6 +494,28 @@ export async function updateVocabReview(word, updater) {
   return next;
 }
 
+/**
+ * 🔤 단어 이어 주기에 쓴 단어들을 "썼다"고 표시 (한 트랜잭션에 모아서).
+ * 이 표시가 있어야 다음 판은 **새 단어가 또 20개 모일 때까지** 안 열린다.
+ * 한 건씩 updateVocabReview를 부르면 트랜잭션이 20번 열려 느리고, 중간에 끊기면 반만 표시된다.
+ */
+export async function markVocabMatched(words, at = Date.now()) {
+  const list = [...new Set((words || []).filter(Boolean))];
+  if (!list.length) return 0;
+  const db = await openDb();
+  const tx = db.transaction('vocabViews', 'readwrite');
+  const store = tx.objectStore('vocabViews');
+  let n = 0;
+  for (const w of list) {
+    const cur = await promisify(store.get(w));
+    if (!cur) continue;
+    store.put({ ...cur, matchedAt: at });
+    n++;
+  }
+  await txDone(tx);
+  return n;
+}
+
 export async function listVocabViews() {
   const db = await openDb();
   const tx = db.transaction('vocabViews', 'readonly');

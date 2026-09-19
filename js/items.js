@@ -8,12 +8,19 @@ export const COIN = {
   speak: 2,             // 말하기 통과
   speakStar: 3,         // 말하기 ⭐(80%↑) 통과
   puzzle: [5, 3, 2],    // 퍼즐 정답: 틀린 횟수 0/1/2번
+  match: [5, 3, 2],     // 🔤 단어 이어 주기: 틀린 횟수 0번 / 1~2번 / 3번 이상
   puzzleRevealed: 0,    // 3번 틀려 정답 공개 → 코인 없음 (XP는 조금 줌)
   goal: 10,             // 오늘의 목표 달성
   streakPerDay: 5,      // 🔥 연속 학습일 × 5
   streakMax: 50,        // 스트릭 코인 상한 (10일)
   journey: 20,          // 🏁 콘텐츠 마지막 문장까지 도착 (콘텐츠당 한 번)
 };
+
+/** 🔤 단어 이어 주기 결과 → 코인 (경험치와 같은 계단) */
+export function matchCoins(wrong) {
+  const w = Math.max(0, Math.floor(Number(wrong) || 0));
+  return COIN.match[w === 0 ? 0 : (w <= 2 ? 1 : 2)];
+}
 
 /** 퍼즐 결과 → 코인 */
 export function puzzleCoins(result) {
@@ -176,6 +183,7 @@ export function setFigure(fig, url, look) {
     }
   } else if (g) g.remove();
   const tired = !!(look && look.hp === 0);
+  // 😴 쉬는 중은 CSS가 옆으로 누인 채 숨 쉬게 한다 (.mon-figure.tired img)
   fig.classList.toggle('tired', tired);
   let z = fig.querySelector('.mon-zzz');
   if (tired) {
