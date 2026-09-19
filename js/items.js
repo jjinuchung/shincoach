@@ -56,6 +56,10 @@ export const DYE = [
   { id: 'purple', emoji: '🟣', ko: '보라', price: 50, filter: 'sepia(1) hue-rotate(230deg) saturate(3) brightness(0.9)' },
   { id: 'pink', emoji: '💗', ko: '분홍', price: 50, filter: 'sepia(1) hue-rotate(290deg) saturate(3)' },
   { id: 'gold', emoji: '🟡', ko: '금색', price: 50, filter: 'sepia(1) saturate(4) contrast(1.2) brightness(1.05)' },
+  // 까망은 hue-rotate로는 안 된다 (색을 돌리는 것이지 어둡게 하는 게 아니다) → 회색조 + 밝기.
+  // 실제 일러스트 넷(피카츄·이브이·꼬부기·리자몽)으로 비교해서 고름: 더 어두우면 눈·윤곽이 사라져
+  // 누군지 모를 실루엣이 되고, 더 밝으면 "까망"이 아니라 진회색이 된다 (진우 요청, 2026-09-19)
+  { id: 'black', emoji: '🖤', ko: '까망', price: 50, filter: 'grayscale(1) brightness(0.4) contrast(1.5)' },
   { id: 'shiny', emoji: '✨', ko: '반짝반짝', price: 150, filter: '', cls: 'shiny' }, // 무지개로 반짝이는 색 (CSS 애니메이션)
 ];
 

@@ -30,6 +30,13 @@ test('카탈로그: id가 겹치지 않고 가격은 양수, 장식은 head/face
   assert.equal(itemById('red').kind, 'dye');
   assert.equal(itemById('nope'), null);
   assert.ok(DYE.find((d) => d.id === 'shiny').cls === 'shiny');
+  // 염색약은 CSS filter나 전용 클래스 중 하나로 색을 바꾼다 — 둘 다 없으면 사도 아무 일이 안 일어난다
+  for (const d of DYE) assert.ok(d.filter || d.cls, `${d.id}: 색을 바꿀 방법이 없다`);
+  // 🖤 까망 (진우 요청): hue-rotate로는 안 되고 밝기를 낮춰야 한다
+  const black = DYE.find((d) => d.id === 'black');
+  assert.ok(black, '까망 염색약');
+  assert.match(black.filter, /brightness\(0?\.[1-5]\d*\)/, '밝기를 낮춰야 까맣다');
+  assert.equal(itemById('black').kind, 'dye');
 });
 
 test('코인 규칙: 퍼즐 5/3/2, 정답 공개 0, 스트릭 5×일 최대 50', () => {
