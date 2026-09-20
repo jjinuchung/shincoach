@@ -81,6 +81,17 @@ export const TYPE_OF = {
   95: 'rock', 248: 'rock', 246: 'rock', 142: 'rock',
   104: 'ground', 383: 'ground', 645: 'ground',
   483: 'steel', 212: 'steel', 376: 'steel',
+  // 2026-09-20 추가 60마리 — 기술표에 벌레·독·비행이 없어 첫 타입이 그쪽이면 가까운 것으로 (캐터피·구구→노말, 헤라크로스→격투, 음뱃→드래곤, 누니머기→얼음)
+  10: 'normal', 16: 'normal', 132: 'normal', 161: 'normal', 216: 'normal', 241: 'normal', 263: 'normal', 399: 'normal', 427: 'normal', 506: 'normal', 572: 'normal', 661: 'normal', 831: 'normal', 915: 'normal',
+  81: 'electric', 311: 'electric', 312: 'electric', 403: 'electric', 417: 'electric', 587: 'electric', 702: 'electric', 777: 'electric', 835: 'electric', 877: 'electric', 921: 'electric', 940: 'electric',
+  60: 'water', 79: 'water', 183: 'water', 258: 'water', 418: 'water', 501: 'water',
+  255: 'fire', 390: 'fire', 653: 'fire', 725: 'fire', 813: 'fire', 909: 'fire',
+  252: 'grass', 722: 'grass', 761: 'grass',
+  74: 'rock', 185: 'rock', 744: 'rock',
+  214: 'fighting', 674: 'fighting', 759: 'fighting',
+  228: 'dark', 359: 'dark', 570: 'dark',
+  443: 'dragon', 714: 'dragon', 885: 'dragon',
+  607: 'ghost', 613: 'ice', 872: 'ice', 679: 'steel', 926: 'fairy', 957: 'fairy', 50: 'ground',
 };
 
 export function typeOf(id) {

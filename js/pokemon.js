@@ -4,8 +4,9 @@
 import { getCharacters, putCharacter } from './db.js';
 
 /**
- * 명단: 처음 40마리(Lv1) + 레벨 마일스톤에서 열리는 20마리씩(Lv5·10·15). unlock 없으면 1.
- * 여기에 추가하면 ⚙ "받기"가 없는 것만 받아옴
+ * 명단: 처음 40마리(Lv1) + 레벨 마일스톤에서 열리는 20마리씩(Lv5·10·15) + 2026-09-20에 더한 60마리(Lv1). unlock 없으면 1.
+ * 여기에 추가하면 ⚙ "받기"가 없는 것만 받아옴. ★ 늘릴 때 battle.TYPE_OF(타입)·xp.RARITY_IDS(등급)도 같이 — 빠지면 조용히 노말·보통이 된다
+ * 이름·타입·등급은 tools/roster_candidates.mjs(PokeAPI)로 받은 것만 쓴다 (기억으로 쓰면 틀린다)
  */
 export const ROSTER = [
   { id: 25, ko: '피카츄', en: 'Pikachu' },
@@ -112,6 +113,78 @@ export const ROSTER = [
   { id: 646, ko: '큐레무', en: 'Kyurem', unlock: 15 },
   { id: 800, ko: '네크로즈마', en: 'Necrozma', unlock: 15 },
   { id: 890, ko: '무한다이노', en: 'Eternatus', unlock: 15 },
+
+  // ── 2026-09-20 진우가 흔함·보통을 거의 다 잡아서 60마리 추가 (아버님 요청). 1~9세대 고르게, 전설 없음.
+  //    등급은 PokeAPI 포획률로 — ≥120 흔함(42) · 45~119 보통(16, 스타터·아공이류) · <45 희귀(메타몽·앱솔). 전부 Lv1부터
+  // 1세대
+  { id: 10, ko: '캐터피', en: 'Caterpie' },
+  { id: 16, ko: '구구', en: 'Pidgey' },
+  { id: 50, ko: '디그다', en: 'Diglett' },
+  { id: 60, ko: '발챙이', en: 'Poliwag' },
+  { id: 74, ko: '꼬마돌', en: 'Geodude' },
+  { id: 79, ko: '야돈', en: 'Slowpoke' },
+  { id: 81, ko: '코일', en: 'Magnemite' },
+  { id: 132, ko: '메타몽', en: 'Ditto' },
+  // 2세대
+  { id: 161, ko: '꼬리선', en: 'Sentret' },
+  { id: 183, ko: '마릴', en: 'Marill' },
+  { id: 185, ko: '꼬지모', en: 'Sudowoodo' },
+  { id: 214, ko: '헤라크로스', en: 'Heracross' },
+  { id: 216, ko: '깜지곰', en: 'Teddiursa' },
+  { id: 228, ko: '델빌', en: 'Houndour' },
+  { id: 241, ko: '밀탱크', en: 'Miltank' },
+  // 3세대
+  { id: 252, ko: '나무지기', en: 'Treecko' },
+  { id: 255, ko: '아차모', en: 'Torchic' },
+  { id: 258, ko: '물짱이', en: 'Mudkip' },
+  { id: 263, ko: '지그제구리', en: 'Zigzagoon' },
+  { id: 311, ko: '플러시', en: 'Plusle' },
+  { id: 312, ko: '마이농', en: 'Minun' },
+  { id: 359, ko: '앱솔', en: 'Absol' },
+  // 4세대
+  { id: 390, ko: '불꽃숭이', en: 'Chimchar' },
+  { id: 399, ko: '비버니', en: 'Bidoof' },
+  { id: 403, ko: '꼬링크', en: 'Shinx' },
+  { id: 417, ko: '파치리스', en: 'Pachirisu' },
+  { id: 418, ko: '브이젤', en: 'Buizel' },
+  { id: 427, ko: '이어롤', en: 'Buneary' },
+  { id: 443, ko: '딥상어동', en: 'Gible' },
+  // 5세대
+  { id: 501, ko: '수댕이', en: 'Oshawott' },
+  { id: 506, ko: '요테리', en: 'Lillipup' },
+  { id: 570, ko: '조로아', en: 'Zorua' },
+  { id: 572, ko: '치라미', en: 'Minccino' },
+  { id: 587, ko: '에몽가', en: 'Emolga' },
+  { id: 607, ko: '불켜미', en: 'Litwick' },
+  { id: 613, ko: '코고미', en: 'Cubchoo' },
+  // 6세대
+  { id: 653, ko: '푸호꼬', en: 'Fennekin' },
+  { id: 661, ko: '화살꼬빈', en: 'Fletchling' },
+  { id: 674, ko: '판짱', en: 'Pancham' },
+  { id: 679, ko: '단칼빙', en: 'Honedge' },
+  { id: 702, ko: '데덴네', en: 'Dedenne' },
+  { id: 714, ko: '음뱃', en: 'Noibat' },
+  // 7세대
+  { id: 722, ko: '나몰빼미', en: 'Rowlet' },
+  { id: 725, ko: '냐오불', en: 'Litten' },
+  { id: 744, ko: '암멍이', en: 'Rockruff' },
+  { id: 759, ko: '포곰곰', en: 'Stufful' },
+  { id: 761, ko: '달콤아', en: 'Bounsweet' },
+  { id: 777, ko: '토게데마루', en: 'Togedemaru' },
+  // 8세대
+  { id: 813, ko: '염버니', en: 'Scorbunny' },
+  { id: 831, ko: '우르', en: 'Wooloo' },
+  { id: 835, ko: '멍파치', en: 'Yamper' },
+  { id: 872, ko: '누니머기', en: 'Snom' },
+  { id: 877, ko: '모르페코', en: 'Morpeko' },
+  { id: 885, ko: '드라꼰', en: 'Dreepy' },
+  // 9세대
+  { id: 909, ko: '뜨아거', en: 'Fuecoco' },
+  { id: 915, ko: '맛보돈', en: 'Lechonk' },
+  { id: 921, ko: '빠모', en: 'Pawmi' },
+  { id: 926, ko: '쫀도기', en: 'Fidough' },
+  { id: 940, ko: '찌리비', en: 'Wattrel' },
+  { id: 957, ko: '어리짱', en: 'Tinkatink' },
 ];
 
 /** 이 레벨에서 열려 있는 명단 */
