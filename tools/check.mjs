@@ -33,12 +33,13 @@ for (const f of readdirSync('vocab').filter((f) => f.endsWith('.json'))) {
     console.error(`JSON 오류: vocab/${f}: ${e.message}`);
   }
 }
-// 🔢 사람이 쓴 수학 내용 — 배포로 실려 가므로 형식(정답·오답·자리표시)을 여기서 잡는다
-for (const f of ['coach/math/fraction.json', 'coach/fixes.json']) {
+// 🔢 사람이 쓴 수학 내용 — 배포로 실려 가므로 형식(정답·오답·자리표시)을 여기서 잡는다. 줄기마다 검사 모듈이 다르다
+const MATH_CHECK = { 'coach/math/fraction.json': '../js/mathgen.js', 'coach/math/negative.json': '../js/mathneg.js' };
+for (const f of [...Object.keys(MATH_CHECK), 'coach/fixes.json']) {
   try {
     const data = JSON.parse(readFileSync(f, 'utf8'));
-    if (f.includes('/math/')) {
-      const { checkContent } = await import('../js/mathgen.js');
+    if (MATH_CHECK[f]) {
+      const { checkContent } = await import(MATH_CHECK[f]);
       for (const msg of checkContent(data)) { bad++; console.error(`내용 오류: ${f}: ${msg}`); }
     }
   } catch (e) {

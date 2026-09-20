@@ -78,12 +78,93 @@ export function barsSvg(list, o = {}) {
   return `<svg class="frac-fig" viewBox="0 0 ${w} ${H}" width="${w}" height="${H}" role="img" aria-label="막대 비교 ${label}"><g shape-rendering="crispEdges">${g}</g></svg>`;
 }
 
+// ───────────────────── 🔢 음수 줄기: 수직선 ─────────────────────
+// 음수는 "0보다 왼쪽(아래)"을 눈으로 봐야 잡힌다. 가로 수직선이 기본, 세로(vline)는 온도계·땅 아래 같은 위아래 모델용.
+// 점(dots)은 정수가 아니어도 된다 (−1.5, −0.5) — 유리수 개념에서 쓴다.
+
+const TICK_W = 26; // 눈금 한 칸 너비(px) — 폰 폭에서 −6..6까지 넉넉히 들어간다
+const LINE_STROKE = 'currentColor';
+
 /**
- * 그림 지시문 → SVG. 사람이 쓴 글 안에 `[bar 7/8]` `[pizza 3/4]` `[bars 1/2 1/3]` `[bar 3/8+2/8]` 로 적는다.
+ * 수직선 — lo..hi 눈금, dots에 점. 0 눈금은 굵게 해 "가운데"가 보이게 한다.
+ * @param {number} lo  @param {number} hi  @param {{dots?:number[], vertical?:boolean}} [o]
+ */
+export function lineSvg(lo, hi, o = {}) {
+  lo = Math.trunc(lo); hi = Math.trunc(hi);
+  if (hi <= lo) return '';
+  const n = hi - lo;
+  const dots = (o.dots || []).filter((v) => Number.isFinite(v) && v >= lo && v <= hi);
+  const pad = 18;
+  const len = n * TICK_W;
+  const pos = (v) => pad + (v - lo) * TICK_W;
+  if (o.vertical) {
+    // 세로: 위가 큰 수 (온도계·층수). 라벨은 오른쪽에
+    const W = 70; const H = len + pad * 2;
+    const y = (v) => pad + (hi - v) * TICK_W;
+    let g = `<line x1="24" y1="${pad}" x2="24" y2="${pad + len}" stroke="${LINE_STROKE}" stroke-width="1.5"/>`;
+    for (let v = lo; v <= hi; v++) {
+      const zero = v === 0;
+      g += `<line x1="${zero ? 16 : 19}" y1="${y(v)}" x2="${zero ? 32 : 29}" y2="${y(v)}" stroke="${LINE_STROKE}" stroke-width="${zero ? 2.5 : 1.2}"/>`;
+      g += `<text x="38" y="${y(v) + 4}" font-size="11" fill="currentColor" font-weight="${zero ? 700 : 400}">${v}</text>`;
+    }
+    for (const v of dots) g += `<circle cx="24" cy="${y(v).toFixed(1)}" r="6" fill="${FILL}" stroke="currentColor" stroke-width="1"/>`;
+    return `<svg class="frac-fig line-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="세로 수직선 ${lo}부터 ${hi}${dots.length ? ', 점 ' + dots.join(', ') : ''}">${g}</svg>`;
+  }
+  const W = len + pad * 2; const H = 44; const yLine = 18;
+  let g = `<line x1="${pad - 8}" y1="${yLine}" x2="${pad + len + 8}" y2="${yLine}" stroke="${LINE_STROKE}" stroke-width="1.5"/>`;
+  g += `<path d="M ${pad + len + 8} ${yLine} l -6 -4 v 8 z" fill="currentColor"/>`; // 오른쪽 화살촉: 이쪽이 커진다
+  for (let v = lo; v <= hi; v++) {
+    const zero = v === 0;
+    g += `<line x1="${pos(v)}" y1="${zero ? yLine - 8 : yLine - 5}" x2="${pos(v)}" y2="${zero ? yLine + 8 : yLine + 5}" stroke="${LINE_STROKE}" stroke-width="${zero ? 2.5 : 1.2}"/>`;
+    g += `<text x="${pos(v)}" y="${yLine + 20}" font-size="11" text-anchor="middle" fill="currentColor" font-weight="${zero ? 700 : 400}">${v}</text>`;
+  }
+  for (const v of dots) g += `<circle cx="${pos(v).toFixed(1)}" cy="${yLine}" r="6" fill="${FILL}" stroke="currentColor" stroke-width="1"/>`;
+  return `<svg class="frac-fig line-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="수직선 ${lo}부터 ${hi}${dots.length ? ', 점 ' + dots.join(', ') : ''}">${g}</svg>`;
+}
+
+/**
+ * 걷기 — start에서 delta만큼 걸어 도착. 덧셈을 "수직선에서 걷기"로 보여 준다 (음수 덧셈·뺄셈의 핵심 그림).
+ * 범위는 0·출발·도착을 모두 품고 양쪽 한 칸 여유. 출발은 속 빈 점, 도착은 칠한 점, 사이는 굽은 화살표.
+ */
+export function walkSvg(start, delta) {
+  start = Math.trunc(start); delta = Math.trunc(delta);
+  if (!delta) return lineSvg(start - 3, start + 3, { dots: [start] });
+  const end = start + delta;
+  const lo = Math.min(0, start, end) - 1; const hi = Math.max(0, start, end) + 1;
+  const n = hi - lo; const pad = 18; const len = n * TICK_W;
+  const pos = (v) => pad + (v - lo) * TICK_W;
+  const W = len + pad * 2; const H = 62; const yLine = 36;
+  let g = `<line x1="${pad - 8}" y1="${yLine}" x2="${pad + len + 8}" y2="${yLine}" stroke="${LINE_STROKE}" stroke-width="1.5"/>`;
+  g += `<path d="M ${pad + len + 8} ${yLine} l -6 -4 v 8 z" fill="currentColor"/>`;
+  for (let v = lo; v <= hi; v++) {
+    const zero = v === 0;
+    g += `<line x1="${pos(v)}" y1="${zero ? yLine - 8 : yLine - 5}" x2="${pos(v)}" y2="${zero ? yLine + 8 : yLine + 5}" stroke="${LINE_STROKE}" stroke-width="${zero ? 2.5 : 1.2}"/>`;
+    g += `<text x="${pos(v)}" y="${yLine + 20}" font-size="11" text-anchor="middle" fill="currentColor" font-weight="${zero ? 700 : 400}">${v}</text>`;
+  }
+  // 굽은 화살표: 출발 위에서 떠서 도착 위로 내려앉는다. 방향이 왼쪽이면 화살촉도 왼쪽
+  const x0 = pos(start); const x1 = pos(end); const lift = Math.min(22, 8 + Math.abs(delta) * 2);
+  const dir = delta > 0 ? 1 : -1;
+  g += `<path d="M ${x0} ${yLine - 8} Q ${(x0 + x1) / 2} ${yLine - 8 - lift} ${x1} ${yLine - 8}" fill="none" stroke="${FILL2}" stroke-width="2.2"/>`;
+  g += `<path d="M ${x1} ${yLine - 8} l ${-7 * dir} -5 l ${2 * dir} 5 l ${-2 * dir} 5 z" fill="${FILL2}"/>`;
+  g += `<text x="${(x0 + x1) / 2}" y="${yLine - 12 - lift}" font-size="11" text-anchor="middle" fill="${FILL2}" font-weight="700">${delta > 0 ? '+' : ''}${delta}</text>`;
+  g += `<circle cx="${x0}" cy="${yLine}" r="6" fill="var(--frac-empty, #fff)" stroke="${FILL}" stroke-width="2"/>`;
+  g += `<circle cx="${x1}" cy="${yLine}" r="6" fill="${FILL}" stroke="currentColor" stroke-width="1"/>`;
+  return `<svg class="frac-fig line-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${start}에서 ${delta > 0 ? '오른쪽' : '왼쪽'}으로 ${Math.abs(delta)}칸 걸어 ${end}">${g}</svg>`;
+}
+
+/** 지시문 안의 수 목록 "-3,2,-1.5" → 숫자 배열 (−(U+2212)도 받아 준다 — 글에는 진짜 마이너스를 쓰니까) */
+function nums(s) {
+  return String(s || '').replace(/−/g, '-').split(/[,\s]+/).filter(Boolean).map(Number).filter((v) => Number.isFinite(v));
+}
+
+/**
+ * 그림 지시문 → SVG. 사람이 쓴 글 안에 적는다:
+ *   분수: `[bar 7/8]` `[pizza 3/4]` `[bars 1/2 1/3]` `[bar 3/8+2/8]`
+ *   음수: `[line -5..5]` `[line -6..6 @-5,-3]`(점) `[vline -6..6 @-5]`(세로) `[walk 2 -3]`(2에서 왼쪽 3칸)
  * 모르는 지시문은 빈 글자 (글이 깨지지 않게).
  */
 export function figureSvg(spec) {
-  const s = String(spec || '').trim();
+  const s = String(spec || '').trim().replace(/−/g, '-');
   let m;
   if ((m = /^bar (\d+)\/(\d+)\+(\d+)\/\2$/.exec(s))) return barSvg(+m[2], +m[1], { n2: +m[3] });
   if ((m = /^bar (\d+)\/(\d+)$/.exec(s))) return barSvg(+m[2], +m[1]);
@@ -92,10 +173,12 @@ export function figureSvg(spec) {
     const list = m[1].trim().split(/\s+/).map((t) => { const [n, d] = t.split('/').map(Number); return { n, d }; });
     return barsSvg(list);
   }
+  if ((m = /^(line|vline) (-?\d+)\.\.(-?\d+)(?: @([-\d.,\s]+))?$/.exec(s))) return lineSvg(+m[2], +m[3], { dots: nums(m[4]), vertical: m[1] === 'vline' });
+  if ((m = /^walk (-?\d+) ([-+]?\d+)$/.exec(s))) return walkSvg(+m[1], +m[2]);
   return '';
 }
 
-/** 글 속 `[bar 7/8]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
+/** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
