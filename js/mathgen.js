@@ -85,13 +85,25 @@ function castOf(r, opts) {
   let rest = pool.filter((n) => n !== mon);
   if (!rest.length) rest = (world === 'pokemon' ? DEFAULT_CAST : WORLDS[world].cast).filter((n) => n !== mon);
   const mon2 = rest.length ? pick(r, rest) : mon;
-  return { me: (opts && opts.me) || '진우', mon, mon2, world };
+  // recent: 화면이 넘기는 "방금 나온 이야기 틀" — 같은 개념을 다시 풀 때 같은 이야기가 또 나오지 않게 (2026-09-20 아버님: "피자 얘기가 너무 반복")
+  return { me: (opts && opts.me) || '진우', mon, mon2, world, recent: (opts && opts.recent) || [], key: '' };
 }
 
-/** 세계에 맞는 이야기 틀 고르기 — 그 세계 틀이 없으면 포켓몬 틀로 */
+/**
+ * 세계에 맞는 이야기 틀 고르기 — 그 세계 틀이 없으면 포켓몬 틀로.
+ * `c.recent`에 있는 틀은 피한다 (다 최근 것이면 전부에서). 고른 틀은 `c.key`에 남겨 화면이 다음 편에 recent로 넘긴다.
+ */
 function worldPick(r, c, pools) {
   const list = (c && pools[c.world] && pools[c.world].length) ? pools[c.world] : pools.pokemon;
-  return pick(r, list);
+  const fresh = list.filter((t) => !(c && c.recent && c.recent.includes(tplKey(t))));
+  const t = pick(r, fresh.length ? fresh : list);
+  if (c) c.key = tplKey(t);
+  return t;
+}
+
+/** 이야기 틀의 이름표 — 숫자를 지운 글. 틀은 숫자가 끼워진 뒤에 오므로 "피자 4조각"과 "피자 5조각"이 같은 틀로 잡혀야 한다 */
+export function tplKey(t) {
+  return String(t || '').replace(/\d+/g, '#');
 }
 
 // ───────────────────── 씨앗 난수 (같은 씨앗이면 같은 문제 — 테스트가 가능해진다) ─────────────────────
@@ -218,7 +230,6 @@ export const FRACTION = [
     calc(r, c) {
       const d = pick(r, [3, 4, 5, 6, 8]);
       const n = int(r, 1, d - 1);
-      const which = int(r, 0, 3);
       const pools = {
         pokemon: [
           `{me/이/가} {mon/과/와} 피자를 똑같이 ${d}조각으로 나눴어요. {mon/이/가} ${n}조각을 먹었어요. {mon/이/가} 먹은 피자는 전체의 얼마일까요?`,
@@ -242,14 +253,14 @@ export const FRACTION = [
           `카카모라 ${d}마리가 쫓아왔는데 ${n}마리가 카누에 올라탔어요. 올라탄 카카모라는 전체의 얼마일까요?`,
         ],
       };
-      const story = c.world === 'pokemon' ? pools.pokemon[which] : worldPick(r, c, pools);
+      const story = worldPick(r, c, pools); // 포켓몬 틀 넷도 여기서 — 방금 나온 이야기(피자…)는 피한다
       // 이 개념은 분수 "모양"을 묻는 것이라 약분하지 않고 쓴 그대로 보여 준다 (3/1을 3으로 바꾸면 오개념이 안 보인다)
       // 그림: 피자 이야기는 원, 나머지는 막대 — 그림을 분수로 읽는 것이 이 개념의 알맹이다
       return ask(this.id, 'calc', fill(story, c), choices(r, `${n}/${d}`, [
         { text: `${d}/${n}`, tag: '위아래를 바꿔 씀' },
         { text: `${n}/${d - n}`, tag: '남은 조각을 분모로 씀' },
         { text: `${d - n}/${d}`, tag: '먹은 것과 남은 것을 헷갈림' },
-      ]), { figure: (c.world === 'pokemon' && which === 0) || /케이크|피자/.test(story) ? pizzaSvg(d, n) : barSvg(d, n) });
+      ]), { figure: /케이크|피자/.test(story) ? pizzaSvg(d, n) : barSvg(d, n) });
     },
     misread(r, c) {
       const d = pick(r, [4, 6, 8]);
@@ -753,15 +764,17 @@ export function makeQuestion(conceptId, kind, seed, opts) {
   const r = rng(seed);
   const cast = castOf(r, opts);
   const extra = (opts && opts.content && opts.content[conceptId]) || null;
+  // 방금 나온 문항은 피한다 — 사람이 쓴 문항은 개수가 유한해서, 다시 풀 때 같은 게 또 나오면 답을 외운다
+  const avoid = (pool, keyOf) => { const fresh = pool.filter((x) => !cast.recent.includes(tplKey(keyOf(x)))); return fresh.length ? fresh : pool; };
   if (kind === 'why') {
     // 사람이 쓴 것(coach/math/fraction.json)이 있으면 그쪽 — 코드 안의 것은 파일을 못 받았을 때의 예비
-    const pool = (extra && Array.isArray(extra.why) && extra.why.length) ? extra.why : c.why;
+    const pool = avoid((extra && Array.isArray(extra.why) && extra.why.length) ? extra.why : c.why, (w) => w.q);
     const w = pool[Math.floor(r() * pool.length)];
     const chs = shuffle(r, [
       { text: fill(w.ok, cast), ok: true },
       ...w.no.map((t) => ({ text: fill(t, cast), ok: false, tag: '개념을 다르게 이해함' })),
     ]);
-    return ask(c.id, 'why', fill(w.q, cast), chs, { hint: '왜 그런지 생각해 보세요' });
+    return { ...ask(c.id, 'why', fill(w.q, cast), chs, { hint: '왜 그런지 생각해 보세요' }), key: tplKey(w.q) };
   }
   if (kind === 'special') {
     // ⭐ 사람이 쓴 특별 문제 — 이야기가 풍부한 대신 개수가 유한하다. 없으면 null (화면은 건너뛴다)
@@ -772,15 +785,16 @@ export function makeQuestion(conceptId, kind, seed, opts) {
     if (!pool.length) return null;
     // 세계 비율을 특별 문제에도 — 출연진과 같은 세계의 문제가 있으면 그것을 우선
     const sameWorld = pool.filter((s) => (s.world || 'pokemon') === cast.world);
-    const from = sameWorld.length ? sameWorld : pool;
+    const from = avoid(sameWorld.length ? sameWorld : pool, (x) => x.q);
     const s = from[Math.floor(r() * from.length)];
     const chs = shuffle(r, [
       { text: fill(s.ok, cast), ok: true },
       ...(s.no || []).map((w) => ({ text: fill(w.text, cast), ok: false, tag: w.tag || '오개념' })),
     ]);
-    return ask(c.id, 'special', fill(s.q, cast), chs, { expr: s.expr || '', hint: '연습장에 풀고 답을 골라요', figure: s.figure ? figureSvg(s.figure) : '' });
+    return { ...ask(c.id, 'special', fill(s.q, cast), chs, { expr: s.expr || '', hint: '연습장에 풀고 답을 골라요', figure: s.figure ? figureSvg(s.figure) : '' }), key: tplKey(s.q) };
   }
-  return kind === 'misread' ? c.misread(r, cast) : c.calc(r, cast);
+  const q = kind === 'misread' ? c.misread(r, cast) : c.calc(r, cast);
+  return q ? { ...q, key: cast.key || '' } : q; // 계산 문항은 worldPick이 고른 이야기 틀이 key
 }
 
 /**

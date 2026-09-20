@@ -3,13 +3,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ROSTER, pickCharacters, unlockedRoster, isUnlocked, nextUnlockLevel, unlockCountAt, headAnchor } from '../js/pokemon.js';
 
-test('ROSTER: 100마리(처음 40 + Lv5·10·15에 20씩), id 중복 없음, 한글·영문 이름 있음', () => {
-  assert.equal(ROSTER.length, 100);
-  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 100);
+test('ROSTER: 101마리(처음 40 + Lv5·10·15에 20씩 + 자마젠타), id 중복 없음, 한글·영문 이름 있음', () => {
+  assert.equal(ROSTER.length, 101);
+  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 101);
   assert.equal(unlockedRoster(1).length, 40);
   assert.equal(unlockedRoster(5).length, 60);
   assert.equal(unlockedRoster(14).length, 80);
-  assert.equal(unlockedRoster(15).length, 100);
+  assert.equal(unlockedRoster(15).length, 101);
+  assert.equal(ROSTER.find((r) => r.id === 889).ko, '자마젠타', '진우 요청 — 자시안의 짝');
   assert.equal(isUnlocked(25, 1), true, '피카츄는 처음부터');
   assert.equal(isUnlocked(129, 4), false, '잉어킹은 Lv5');
   assert.equal(isUnlocked(129, 5), true);
@@ -27,7 +28,7 @@ test('pickCharacters: n마리를 겹치지 않게, 부족하면 있는 만큼, �
   const picked = pickCharacters(chars, 8, () => 0.5);
   assert.equal(picked.length, 8);
   assert.equal(new Set(picked.map((c) => c.id)).size, 8, '중복 없음');
-  assert.equal(chars.length, 100, '원본 유지');
+  assert.equal(chars.length, 101, '원본 유지');
   assert.equal(pickCharacters(chars.slice(0, 3), 8).length, 3, '부족하면 있는 만큼');
   assert.deepEqual(pickCharacters([], 5), []);
   assert.deepEqual(pickCharacters(null, 5), []);

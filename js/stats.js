@@ -3,7 +3,7 @@ import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
   applyEssayFixes, getMath,
 } from './db.js';
-import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf } from './mathprog.js';
+import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText } from './mathprog.js';
 import { exportText, parseFixes } from './essay.js';
 import { countPlayableCues } from './srt.js';
 import { openPlayer } from './player.js';
@@ -13,6 +13,7 @@ import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory } from '
 import { pendingTickets } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
 import { ROSTER } from './pokemon.js';
+import { visibleView } from './pokedex.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -444,6 +445,57 @@ export async function renderStats() {
       cM.appendChild(box);
       cM.appendChild(el('p', 'stats-note', '"분모끼리 더함"처럼 이름이 붙은 것이 진짜 오개념이에요. "틀린 줄 모름"·"오개념을 못 짚음"은 어디가 틀렸는지 못 찾은 것이고, "계산 실수"는 방법은 맞는데 셈만 틀린 거예요.'));
     }
+    // 개념별로 — 어디서 자꾸 틀리다 언제 나아졌나 (아버님 요청 2026-09-20: 통계로 남겨 뒀다가 Claude에게 보여 주려고)
+    const report = conceptReport(math);
+    if (report.length) {
+      cM.appendChild(el('p', 'stats-sub', '개념별 — 최근 편 결과(오래된 → 최근) · 얼굴별 정답 · 이 개념에서 헷갈린 것'));
+      const tbl = el('table', 'stats-table math-report');
+      const thead = el('thead'); const trh = el('tr');
+      for (const h of ['개념', '통과/실패', '최근', '①②③⭐', '헷갈림']) trh.appendChild(el('th', '', h));
+      thead.appendChild(trh); tbl.appendChild(thead);
+      const tb = el('tbody');
+      for (const r of report) {
+        const tr = el('tr');
+        tr.appendChild(el('td', '', `${r.done ? (r.box >= 5 ? '👑 ' : '✅ ') : ''}${r.name}`));
+        tr.appendChild(el('td', 'num', `${r.passes}/${r.fails}`));
+        const trail = el('td', 'trail');
+        for (const t of r.trail) {
+          const dot = el('span', t.pass ? 'dot ok' : 'dot no', t.pass ? '✔' : `${t.ok}`);
+          dot.title = `${t.d} ${t.ok}/${t.n}`;
+          trail.appendChild(dot);
+        }
+        tr.appendChild(trail);
+        tr.appendChild(el('td', 'kinds', r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(' · ')));
+        tr.appendChild(el('td', 'miss', r.miss.map((x) => `${x.tag}×${x.n}`).join(', ')));
+        tb.appendChild(tr);
+      }
+      tbl.appendChild(tb);
+      const wrap = el('div', 'stats-table-wrap');
+      wrap.appendChild(tbl);
+      cM.appendChild(wrap);
+      const weak = report.filter((r) => r.weak && r.weak.rate < 0.6).map((r) => `${r.name}의 ${r.weak.label}(${r.weak.ok}/${r.weak.n})`);
+      if (weak.length) cM.appendChild(el('p', 'stats-note', `약한 얼굴: ${weak.join(' · ')} — ①은 계산, ②는 남의 오류 찾기, ③은 왜 그런지, ⭐는 이야기 문제예요.`));
+    }
+    // 📋 Claude에게 보여 줄 글 — 폰에서 복사해 대화창에 붙인다 (내보내기 JSON은 크고 사람이 못 읽는다)
+    const copyRow = el('div', 'stats-actions');
+    const copyBtn = el('button', 'btn', '📋 수학 기록 복사 (Claude에게 붙여 넣기)');
+    copyBtn.type = 'button';
+    copyBtn.addEventListener('click', async () => {
+      const text = mathReportText(math, today);
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = '✅ 복사했어요 — 대화창에 붙여 넣으세요';
+      } catch {
+        // 클립보드가 막힌 브라우저 — 글을 그대로 보여 주고 길게 눌러 복사하게
+        const ta = el('textarea', 'stats-copy-fallback');
+        ta.value = text; ta.readOnly = true; ta.rows = 8;
+        copyRow.appendChild(ta); ta.select();
+        copyBtn.textContent = '아래 글을 길게 눌러 복사하세요';
+      }
+      setTimeout(() => { copyBtn.textContent = '📋 수학 기록 복사 (Claude에게 붙여 넣기)'; }, 4000);
+    });
+    copyRow.appendChild(copyBtn);
+    cM.appendChild(copyRow);
     main.appendChild(cM);
   }
 
@@ -600,11 +652,17 @@ function doImport(file) {
   fr.readAsText(file);
 }
 
+let backTo = 'home'; // 📊를 연 화면 — 뒤로 가면 거기로 (홈·영어·수학 어디서든 연다, 2026-09-20)
+
 export function initStats({ showView, requirePin }) {
-  $('btn-stats').addEventListener('click', () => {
-    requirePin(() => { showView('stats'); renderStats(); });
-  });
-  $('btn-stats-back').addEventListener('click', () => showView('home')); // 📊도 🏠 홈에서 연다
+  // 홈·영어·수학 상단의 📊 전부 — 어느 화면에서 열었는지 기억해 두고 거기로 돌아간다
+  for (const b of document.querySelectorAll('[data-open="stats"]')) {
+    b.addEventListener('click', () => {
+      const from = visibleView();
+      requirePin(() => { backTo = from; showView('stats'); renderStats(); });
+    });
+  }
+  $('btn-stats-back').addEventListener('click', () => showView(backTo));
   $('btn-stats-export').addEventListener('click', doExport);
   $('stats-import-file').addEventListener('change', (e) => {
     const f = e.target.files && e.target.files[0];

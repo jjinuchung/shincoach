@@ -21,8 +21,8 @@
   <section id="view-home" class="view">
     <header class="topbar">
       <h1 class="topbar-title">🏫 신코치</h1>
-      <button id="btn-pokedex" class="btn btn-icon" aria-label="내 포켓몬">🎒</button>
-      <button id="btn-stats" class="btn btn-icon" aria-label="학습 기록">📊</button>
+      <button id="btn-pokedex" class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
+      <button id="btn-stats" class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
     </header>
 
     <main class="home-main">
@@ -43,6 +43,9 @@
       <button id="btn-math-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
       <h1 class="topbar-title">🔢 신코치 수학</h1>
       <span id="math-chip" class="level-chip math-chip">Lv.1</span>
+      <!-- 🎒·📊는 홈에만 있었는데 아이가 매번 홈으로 나가야 해서 불편해했다 (2026-09-20) → 과목 화면에도. 돌아오면 이 화면으로 -->
+      <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
+      <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
     </header>
     <main id="math-main" class="math-main"></main>
   </section>
@@ -52,7 +55,9 @@
     <header class="topbar">
       <button id="btn-library-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
       <h1 class="topbar-title">🎬 신코치 영어</h1>
-      <button id="btn-import" class="btn btn-primary">＋ 영상 가져오기</button>
+      <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
+      <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
+      <button id="btn-import" class="btn btn-primary">＋ <span class="hide-narrow">영상 </span>가져오기</button>
     </header>
 
     <main class="library-main">

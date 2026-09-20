@@ -307,6 +307,8 @@ button { font-family: inherit; }
 .math-story-body p { margin: 0 0 12px; line-height: 1.75; font-size: 1.02rem; }
 .math-story-body p.fig-only { margin: 4px 0 14px; }
 .math-idea { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 10px 12px; margin: 6px 0 4px; line-height: 1.6; }
+.math-idea.big { font-size: 1.08rem; padding: 14px; margin-bottom: 10px; } /* 🤔 되짚기 카드 — 핵심 한 줄이 주인공 */
+.math-story .btn + .btn { margin-top: 8px; }
 
 /* 사다리 */
 .math-strand h2 { font-size: 1.15rem; }
@@ -1235,6 +1237,7 @@ button { font-family: inherit; }
   .partner-chip { padding: 2px 7px 2px 3px; font-size: 0.82rem; }
   .partner-chip .partner-face { width: 26px; height: 26px; }
   .topbar { gap: 6px; }
+  .hide-narrow { display: none; } /* 🎒·📊가 들어오면서 제목이 밀려 '＋ 영상 가져오기'를 '＋ 가져오기'로 */
 }
 
 /* ===== 모달 (🛒 상점 · 포켓몬 상세) ===== */
@@ -1492,6 +1495,22 @@ button { font-family: inherit; }
 .stats-missed-chip .n { color: #b45309; font-weight: 700; }
 .stats-missed-chip.done { background: #ecfdf5; color: #065f46; } /* 🔢 사다리에서 배운 개념 */
 .stats-note { color: var(--muted); font-size: 0.88rem; margin-top: 4px; }
+
+/* 🔢 개념별 보고 표 — 폰에서는 옆으로 밀어 본다 (표만 넓어도 화면은 안 흔들리게) */
+.stats-table-wrap { overflow-x: auto; margin: 6px 0; }
+.math-report { border-collapse: collapse; font-size: 0.88rem; min-width: 520px; width: 100%; }
+.math-report th, .math-report td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line, #e5e7eb); vertical-align: top; }
+.math-report th { color: var(--muted); font-weight: 600; font-size: 0.8rem; white-space: nowrap; }
+.math-report td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.math-report td.trail { white-space: nowrap; }
+.math-report .dot { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.75rem; font-weight: 700; margin-right: 3px; }
+.math-report .dot.ok { background: #d1fae5; color: #065f46; }
+.math-report .dot.no { background: #fee2e2; color: #991b1b; }
+.math-report td:first-child { min-width: 9em; }
+.math-report td.kinds { color: var(--muted); min-width: 11em; }
+.math-report td.miss { color: #92400e; }
+.stats-actions { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.stats-copy-fallback { width: 100%; font-size: 0.8rem; font-family: ui-monospace, monospace; }
 
 /* 📖 단어 패널에서 그 단어만 다시 듣기 */
 .vocab-item.playable { cursor: pointer; border-style: solid; min-height: 48px; } /* 아이 손가락 기준 (Codex P3) */

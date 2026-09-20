@@ -17,6 +17,17 @@ test('타입: 명단 60마리 전부 타입이 있고 기술 2개(강한/확실�
   assert.equal(typeOf(25), 'electric'); assert.equal(typeOf(99999), 'normal');
 });
 
+test('⚔️ 전용 기술: 자시안 거수참·자마젠타 거수탄이 강한 기술 자리에, 확실한 기술은 타입 것 그대로 (진우 요청)', () => {
+  const z = movesOf(888);
+  assert.equal(z[0].name, '거수참'); assert.equal(z[0].emoji, '⚔️');
+  assert.equal(z[1].name, MOVES.fairy.safe, '자시안은 페어리');
+  const m = movesOf(889);
+  assert.equal(m[0].name, '거수탄'); assert.equal(m[0].emoji, '🛡️');
+  assert.equal(typeOf(889), 'fighting'); assert.equal(m[1].name, MOVES.fighting.safe);
+  assert.equal(movesOf(25)[0].name, MOVES.electric.strong, '전용 기술이 없으면 타입 기술');
+  assert.ok(ROSTER.some((r) => r.id === 889 && r.unlock === 15), '자마젠타는 자시안과 같은 Lv15 명단');
+});
+
 test('말하기 결과 → 등급 → 데미지: 강한 기술은 잘 말할수록 크고, 확실한 기술은 고름', () => {
   const star = { passed: true, method: 'speech', score: { ratio: 0.9 }, transcript: 'x' };
   const pass = { passed: true, method: 'speech', score: { ratio: 0.5 }, transcript: 'x' };

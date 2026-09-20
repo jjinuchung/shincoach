@@ -101,6 +101,7 @@ export const ROSTER = [
   { id: 644, ko: '제크로무', en: 'Zekrom', unlock: 15 },
   { id: 716, ko: '제르네아스', en: 'Xerneas', unlock: 15 },
   { id: 888, ko: '자시안', en: 'Zacian', unlock: 15 },
+  { id: 889, ko: '자마젠타', en: 'Zamazenta', unlock: 15 }, // 진우 요청 (2026-09-20) — 자시안의 짝, PokeAPI 889 확인
   { id: 373, ko: '보만다', en: 'Salamence', unlock: 15 },
   { id: 376, ko: '메타그로스', en: 'Metagross', unlock: 15 },
   { id: 380, ko: '라티아스', en: 'Latias', unlock: 15 },

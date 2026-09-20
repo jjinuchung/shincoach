@@ -604,12 +604,20 @@ async function mutateProfile(rule) {
 const MATH_ID = 'math';
 
 export function emptyMath() {
-  return { id: MATH_ID, concepts: {}, placed: {}, miss: {}, rounds: 0, updatedAt: 0 };
+  return { id: MATH_ID, concepts: {}, placed: {}, miss: {}, rounds: 0, log: [], updatedAt: 0 };
+}
+
+/** 개념 기록 복사 — kinds(얼굴별 [정답, 문항])·miss(개념별 오개념)는 안쪽 객체라 따로 복사한다 */
+function cloneConcept(v) {
+  const out = { ...v };
+  if (v.kinds) { out.kinds = {}; for (const [k, a] of Object.entries(v.kinds)) out.kinds[k] = Array.isArray(a) ? [...a] : a; }
+  if (v.miss) out.miss = { ...v.miss };
+  return out;
 }
 
 function cloneMath(m) {
-  const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) } };
-  for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = { ...v };
+  const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])] };
+  for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
   return out;
 }
 
@@ -646,10 +654,18 @@ export function mergeMath(cur, rec) {
   const out = cloneMath(cur || emptyMath());
   for (const [k, v] of Object.entries((rec && rec.concepts) || {})) {
     const mine = out.concepts[k];
-    if (!mine) { out.concepts[k] = { ...v }; continue; }
+    if (!mine) { out.concepts[k] = cloneConcept(v); continue; }
     const later = (Number(v.lastAt) || 0) > (Number(mine.lastAt) || 0) ? v : mine;
     // 일정은 배운 기록에서만 — 한쪽만 done이면 그쪽, 둘 다면 최근 것
     const sched = (mine.done && !v.done) ? mine : (!mine.done && v.done) ? v : later;
+    // 얼굴별 누적·개념별 오개념은 큰 값 (오래된 백업이 최신 누적을 줄이지 않게)
+    const kinds = {};
+    for (const src of [mine.kinds, v.kinds]) for (const [kk, a] of Object.entries(src || {})) {
+      const cur = kinds[kk] || [0, 0];
+      kinds[kk] = [Math.max(cur[0], Number(a && a[0]) || 0), Math.max(cur[1], Number(a && a[1]) || 0)];
+    }
+    const miss = {};
+    for (const src of [mine.miss, v.miss]) for (const [t, n] of Object.entries(src || {})) miss[t] = Math.max(Number(miss[t]) || 0, Number(n) || 0);
     out.concepts[k] = {
       ...later,
       done: !!(mine.done || v.done),
@@ -658,12 +674,19 @@ export function mergeMath(cur, rec) {
       passes: Math.max(Number(mine.passes) || 0, Number(v.passes) || 0),
       fails: Math.max(Number(mine.fails) || 0, Number(v.fails) || 0),
       lastAt: Math.max(Number(mine.lastAt) || 0, Number(v.lastAt) || 0),
+      ...(Object.keys(kinds).length ? { kinds } : {}),
+      ...(Object.keys(miss).length ? { miss } : {}),
     };
     if (!sched.placed) delete out.concepts[k].placed;
   }
   for (const [k, v] of Object.entries((rec && rec.placed) || {})) out.placed[k] = out.placed[k] || v;
   for (const [k, v] of Object.entries((rec && rec.miss) || {})) out.miss[k] = Math.max(Number(out.miss[k]) || 0, Number(v) || 0);
   out.rounds = Math.max(Number(out.rounds) || 0, Number(rec && rec.rounds) || 0);
+  // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편
+  const seen = new Set(out.log.map((e) => e && e.t));
+  for (const e of (Array.isArray(rec && rec.log) ? rec.log : [])) if (e && e.t && !seen.has(e.t)) { seen.add(e.t); out.log.push(e); }
+  out.log.sort((a, b) => (a.t || 0) - (b.t || 0));
+  if (out.log.length > 400) out.log.splice(0, out.log.length - 400);
   out.updatedAt = Math.max(Number(out.updatedAt) || 0, Number(rec && rec.updatedAt) || 0);
   return out;
 }

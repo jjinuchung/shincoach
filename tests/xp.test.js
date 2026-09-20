@@ -33,10 +33,10 @@ test('puzzleXp: 틀린 횟수 0/1/2 → 30/20/10, 정답 공개 → 3', () => {
   assert.equal(puzzleXp(null), 3);
 });
 
-test('희귀도: 명단 100마리 전부 등급이 있고 겹치지 않음', () => {
+test('희귀도: 명단 101마리 전부 등급이 있고 겹치지 않음', () => {
   const all = Object.values(RARITY_IDS).flat();
-  assert.equal(all.length, 100);
-  assert.equal(new Set(all).size, 100, '겹침 없음');
+  assert.equal(all.length, 101);
+  assert.equal(new Set(all).size, 101, '겹침 없음');
   assert.deepEqual(new Set(all), new Set(ROSTER.map((r) => r.id)));
   assert.equal(rarityOf(25), 2, '피카츄 보통');
   assert.equal(rarityOf(150), 4, '뮤츠 전설');

@@ -76,7 +76,7 @@ export const TYPE_OF = {
   131: 'ice', 144: 'ice', 220: 'ice', 646: 'ice',
   149: 'dragon', 384: 'dragon', 445: 'dragon', 147: 'dragon', 148: 'dragon', 373: 'dragon', 380: 'dragon', 381: 'dragon', 887: 'dragon', 890: 'dragon',
   150: 'psychic', 151: 'psychic', 196: 'psychic', 249: 'psychic', 282: 'psychic', 280: 'psychic', 63: 'psychic', 65: 'psychic', 386: 'psychic', 800: 'psychic',
-  448: 'fighting', 68: 'fighting', 447: 'fighting', 66: 'fighting',
+  448: 'fighting', 68: 'fighting', 447: 'fighting', 66: 'fighting', 889: 'fighting',
   197: 'dark',
   95: 'rock', 248: 'rock', 246: 'rock', 142: 'rock',
   104: 'ground', 383: 'ground', 645: 'ground',
@@ -87,11 +87,22 @@ export function typeOf(id) {
   return TYPE_OF[id] || 'normal';
 }
 
-/** 포켓몬의 기술 2개 → [{ key:'strong'|'safe', name, emoji }] */
+/**
+ * ⚔️ 전용 기술 — 그 포켓몬만 쓰는 강한 기술이 타입 공용 기술을 대신한다 (진우 요청, 2026-09-20).
+ * 이름은 PokeAPI 한국어명으로 확인한 것만 (거수참 = behemoth-blade 781, 거수탄 = behemoth-bash 782 — 둘 다 강철 기술).
+ * 데미지 표는 그대로다 — 이름과 이모지만 그 포켓몬 것이 된다.
+ */
+export const SIGNATURE = {
+  888: { strong: '거수참', emoji: '⚔️' }, // 자시안 — 검
+  889: { strong: '거수탄', emoji: '🛡️' }, // 자마젠타 — 방패
+};
+
+/** 포켓몬의 기술 2개 → [{ key:'strong'|'safe', name, emoji }]. 전용 기술이 있으면 강한 기술 자리에 */
 export function movesOf(id) {
   const m = MOVES[typeOf(id)] || MOVES.normal;
+  const sig = SIGNATURE[id];
   return [
-    { key: 'strong', name: m.strong, emoji: m.emoji, hint: '잘 말하면 세게!' },
+    { key: 'strong', name: sig ? sig.strong : m.strong, emoji: sig ? sig.emoji : m.emoji, hint: '잘 말하면 세게!' },
     { key: 'safe', name: m.safe, emoji: m.emoji, hint: '꾸준히' },
   ];
 }

@@ -10,11 +10,23 @@ const $ = (id) => document.getElementById(id);
 let showView;
 let urlById = new Map(); // 포켓몬 id → 그림 객체 URL (열 때 채움)
 let openSeq = 0;         // 도감 그리기 요청 번호 (빠르게 두 번 누르면 두 번 그려지던 것 방지)
+let backTo = 'home';     // 🎒를 연 화면 — 뒤로 가면 거기로 (홈·영어·수학 어디서든 연다, 2026-09-20)
+
+/**
+ * 지금 보이는 화면 이름. 🎒·📊·플레이어 위에서 열린 거면 홈으로 (거기로 "돌아가기"는 말이 안 된다).
+ * 플레이어의 레벨 칩은 closePlayer() 뒤에 여니까 그때는 영어 목록이 보이는 상태다.
+ */
+export function visibleView() {
+  const v = document.querySelector('.view:not([hidden])');
+  const name = v ? v.id.replace(/^view-/, '') : 'home';
+  return ['pokedex', 'stats', 'player'].includes(name) ? 'home' : name;
+}
 
 export function initPokedex(ctx) {
   showView = ctx.showView;
-  $('btn-pokedex').addEventListener('click', () => openPokedex());
-  $('btn-pokedex-back').addEventListener('click', () => showView('home')); // 🎒는 🏠 홈에서 열므로 홈으로 돌아간다
+  // 홈·영어·수학 상단의 🎒 전부 — 버튼마다 따로 배선하면 하나를 빠뜨린다
+  for (const b of document.querySelectorAll('[data-open="pokedex"]')) b.addEventListener('click', () => openPokedex());
+  $('btn-pokedex-back').addEventListener('click', () => showView(backTo));
   $('pokedex-shop').addEventListener('click', openShop);
   initShop({ onChange: refreshAfterChange });
 }
@@ -69,6 +81,7 @@ function el(tag, cls, text) {
 
 /** 도감 열기. opts.shop = true 면 열자마자 🛒 상점도 띄움 (플레이어 코인 칩에서) */
 export async function openPokedex(opts) {
+  backTo = visibleView(); // 열기 전에 잡는다 — 그려지는 사이에 화면이 바뀌면 안 되니까
   // 화면을 지운 뒤에 await가 있으므로, 아이가 🎒를 빠르게 두 번 누르면 도감이 두 번 그려진다
   // (라이브러리 🎟️ 예고가 두 번 나온 것과 같은 원인 — 2026-09-17). 마지막 요청만 화면에 남긴다.
   const seq = ++openSeq;

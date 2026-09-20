@@ -26,7 +26,9 @@ const ui = {
   opts: null,           // makeRound에 넘길 출연진·세계
   round: null,          // 진행 중인 한 편 { id, mode:'learn'|'review'|'diag', qs, at, correct, missTags, answered }
   run: 0,               // 화면을 지우고 await 하는 함수의 요청 번호 (겹쳐 그리기 방지)
+  recent: {},           // 개념별로 방금 나온 이야기 틀·문항 (같은 개념을 다시 풀 때 같은 이야기가 또 나오지 않게)
 };
+const RECENT_KEEP = 10; // 두 편 반 분량 — 틀이 4개뿐인 개념도 한 바퀴는 돈다
 
 // ───────────────────── 분수를 세로로 ─────────────────────
 
@@ -143,6 +145,16 @@ function clearMain() {
 
 /** 진입 — 진단 전이면 진단, 아니면 사다리 */
 export async function renderMath() {
+  // 🎒·📊를 보고 돌아온 것이면 풀던 편을 이어서 (2026-09-20: 과목 화면에도 🎒·📊를 두면서 필요해졌다).
+  // 답을 고른 뒤였으면 다음 문항으로 — 같은 문항을 다시 그리면 두 번 답해 두 번 세어진다.
+  const r = ui.round;
+  if (r && !r.saving) {
+    ui.run++;
+    if (r.phase === 'story') renderStory(r.id, r.seed);
+    else if (r.answered) { r.at += 1; if (r.at < r.qs.length) renderQuestion(); else finishRound(); }
+    else renderQuestion();
+    return;
+  }
   const run = ++ui.run;
   const m = main();
   if (!m) return;
@@ -226,12 +238,48 @@ function renderLadder(state) {
 /**
  * @param {'learn'|'review'|'practice'} mode learn: 처음 배움(📖 먼저) / review: 오늘 복습 / practice: 이미 아는 것 다시 풀기(보상 작게)
  */
-function startRound(id, mode) {
+/**
+ * @param {'learn'|'review'|'practice'} mode
+ * @param {{again?:boolean}} [o] again: 방금 틀려서 한 번 더 — 📖 이야기를 통째로 다시 보이지 않고 되짚기 카드로
+ */
+function startRound(id, mode, o = {}) {
   const seed = (Date.now() % 1000000) | 0;
-  const qs = makeRound(id, seed, ui.opts);
-  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed };
-  if (mode === 'learn') renderStory(id, seed);
+  const recent = ui.recent[id] || [];
+  const qs = makeRound(id, seed, { ...ui.opts, recent });
+  ui.recent[id] = [...recent, ...qs.map((q) => q.key).filter(Boolean)].slice(-RECENT_KEEP);
+  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, phase: mode === 'learn' && !o.again ? 'story' : 'q' };
+  if (o.again) renderRetry(id, o.missed || []);
+  else if (mode === 'learn') renderStory(id, seed);
   else renderQuestion();
+}
+
+/**
+ * 🤔 되짚기 — 틀려서 다시 할 때. 같은 📖를 통째로 또 읽히면 "피자 얘기만 반복"이 된다(아버님, 2026-09-20).
+ * 핵심 한 줄(idea)과 방금 헷갈린 것만 보여 주고 바로 문제로. 이야기는 원하면 다시 읽는다.
+ */
+function renderRetry(id, missed) {
+  const m = clearMain();
+  const c = FRACTION.find((x) => x.id === id);
+  const card = el('section', 'math-card math-story');
+  card.appendChild(el('div', 'math-eyebrow', `🤔 한 번 더 · ${nameOf(id)}`));
+  card.appendChild(el('h2', '', '이것만 기억하고 다시 해 봐요'));
+  if (c && c.idea) {
+    const idea = el('p', 'math-idea big');
+    idea.appendChild(document.createTextNode('💡 '));
+    idea.appendChild(richNode(c.idea));
+    card.appendChild(idea);
+  }
+  if (missed.length) card.appendChild(el('p', 'math-tags', `방금 헷갈린 것: ${missed.join(' · ')}`));
+  card.appendChild(el('p', 'math-p muted', '이번엔 다른 이야기로 물어볼게요.'));
+  const go = el('button', 'btn btn-primary btn-big-wide', '문제 다시 풀기 →');
+  go.type = 'button';
+  go.addEventListener('click', () => { if (ui.round) ui.round.phase = 'q'; renderQuestion(); });
+  card.appendChild(go);
+  const read = el('button', 'btn btn-big-wide', '📖 이야기 다시 읽기');
+  read.type = 'button';
+  read.addEventListener('click', () => { if (ui.round) { ui.round.phase = 'story'; renderStory(id, ui.round.seed); } });
+  card.appendChild(read);
+  m.appendChild(card);
 }
 
 function renderStory(id, seed) {
@@ -250,7 +298,7 @@ function renderStory(id, seed) {
   }
   const b = el('button', 'btn btn-primary btn-big-wide', '문제 풀어 볼게요 →');
   b.type = 'button';
-  b.addEventListener('click', () => renderQuestion());
+  b.addEventListener('click', () => { if (ui.round) ui.round.phase = 'q'; renderQuestion(); });
   card.appendChild(b);
   m.appendChild(card);
 }
@@ -323,7 +371,7 @@ function answer(i, list, card) {
     p.appendChild(richNode(q.choices[okIdx].text));
     fb.appendChild(p);
   }
-  r.answers.push({ concept: q.concept, correct: !!ch.ok });
+  r.answers.push({ concept: q.concept, correct: !!ch.ok, kind: q.kind, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }) }); // 얼굴·오개념까지 — 📒 일지용
   const next = el('button', 'btn btn-primary btn-big-wide', r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
   next.addEventListener('click', () => { r.at += 1; if (r.at < r.qs.length) renderQuestion(); else finishRound(); });
@@ -355,7 +403,8 @@ async function finishRound() {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, 'fraction', r.missTags); });
     } else {
-      state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags }, today); });
+      const qs = r.answers.map((a) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}) }));
+      state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today); });
     }
   } catch (err) {
     r.saving = false;
@@ -426,9 +475,9 @@ async function finishRound() {
 
   const row = el('div', 'math-actions');
   if (!all) {
-    const again = el('button', 'btn btn-primary btn-big-wide', '📖 다시 읽고 한 번 더');
+    const again = el('button', 'btn btn-primary btn-big-wide', '🤔 한 번 더');
     again.type = 'button';
-    again.addEventListener('click', () => startRound(r.id, r.mode === 'review' ? 'review' : 'learn'));
+    again.addEventListener('click', () => startRound(r.id, r.mode === 'review' ? 'review' : 'learn', { again: true, missed: shown }));
     row.appendChild(again);
   }
   const back = el('button', all ? 'btn btn-primary btn-big-wide' : 'btn btn-big-wide', '사다리로');

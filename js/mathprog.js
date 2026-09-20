@@ -100,7 +100,22 @@ export function applyPlacement(m, answers, today, strand = 'fraction', missTags 
   }
   // 진단에서 고른 오개념도 부모 화면에 쌓는다 (Codex 리뷰 #8 — 버려지고 있었다)
   for (const t of (missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
+  const ok = (answers || []).filter((a) => a && a.correct).length;
+  pushLog(m, { d: today, t: Date.now(), id: 'diag', mode: 'diag', ok, n: (answers || []).length,
+    qs: (answers || []).map((a) => ({ k: 'calc', c: a.concept, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}) })) });
   return { startId, knownIds };
+}
+
+/**
+ * 📒 회차 일지 — 한 편마다 한 줄. 아버님이 나중에 "어디서 자꾸 틀리다 언제 나아졌나"를 보려고 (2026-09-20 요청).
+ * { d: 날짜, t: 시각, id: 개념|'diag', mode, ok, n, qs: [{ k: 얼굴, ok: 0|1, tag?: 오개념, c?: 진단 개념 }] }
+ * 최근 LOG_MAX편만 — 한 줄이 200B 안팎이라 400편이면 80KB. 개념별 누적(kinds·miss)은 따로 있어 잘려도 요약은 남는다.
+ */
+export const LOG_MAX = 400;
+function pushLog(m, entry) {
+  m.log = Array.isArray(m.log) ? m.log : [];
+  m.log.push(entry);
+  if (m.log.length > LOG_MAX) m.log.splice(0, m.log.length - LOG_MAX);
 }
 
 /**
@@ -112,7 +127,8 @@ export function applyPlacement(m, answers, today, strand = 'fraction', missTags 
  *   먼저 끝낸 창이 dueAt을 미루면 늦은 창은 자동으로 practice가 된다.
  * @param {object} m 복사본
  * @param {string} id 개념
- * @param {{correct:number, total:number, missTags:string[]}} r
+ * @param {{correct:number, total:number, missTags:string[], qs?:Array<{k:string, ok:0|1, tag?:string}>, mode?:string}} r
+ *   qs: 문항별 결과(얼굴·정오·고른 오개념) — 개념별 누적(kinds·miss)과 일지(log)에 남는다
  * @returns {{passed:boolean, first:boolean, crowned:boolean, review:boolean, practice:boolean}}
  */
 export function applyRound(m, id, r, today) {
@@ -135,9 +151,20 @@ export function applyRound(m, id, r, today) {
   if (passed) rec.passes = (rec.passes || 0) + 1; else rec.fails = (rec.fails || 0) + 1;
   rec.lastAt = Date.now();
   delete rec.placed;
+  // 얼굴별(①②③⭐) 누적과 개념별 오개념 — "이 개념에서 어느 얼굴이 약한가"를 보려고
+  rec.kinds = rec.kinds || {};
+  rec.miss = rec.miss || {};
+  for (const q of (r.qs || [])) {
+    if (!q || !q.k) continue;
+    const kk = rec.kinds[q.k] || [0, 0];
+    rec.kinds[q.k] = [kk[0] + (q.ok ? 1 : 0), kk[1] + 1];
+    if (q.tag) rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1;
+  }
   m.concepts[id] = rec;
   for (const t of (r.missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
   m.rounds = (m.rounds || 0) + 1;
+  const mode = practice ? 'practice' : review ? 'review' : (r.mode || 'learn');
+  pushLog(m, { d: today, t: Date.now(), id, mode, ok: r.correct, n: r.total, qs: (r.qs || []).map((q) => ({ k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}) })) });
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
   return { passed, first: !wasDone && passed, crowned, review, practice };
 }
@@ -172,5 +199,50 @@ export function mathSummary(m) {
   const done = rows.filter((r) => r.state === 'done').length;
   const crowned = rows.filter((r) => r.crowned).length;
   const miss = Object.entries((m && m.miss) || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([tag, n]) => ({ tag, n }));
-  return { total: rows.length, done, crowned, rounds: (m && m.rounds) || 0, miss };
+  return { total: rows.length, done, crowned, rounds: (m && m.rounds) || 0, miss, logged: ((m && m.log) || []).length };
+}
+
+export const KIND_SHORT = { calc: '①계산', misread: '②오개념', why: '③왜', special: '⭐특별' };
+
+/**
+ * 📊 개념별 보고 — 한 편이라도 푼 개념만. 부모가 "어디서 자꾸 틀리다 언제 나아졌나"를 보는 자리.
+ *   trail: 최근 편의 통과 여부(오래된 → 최근), weak: 정답률이 제일 낮은 얼굴(2문항 이상), miss: 이 개념의 오개념 TOP3
+ */
+export function conceptReport(m, limit = 8) {
+  const log = (m && Array.isArray(m.log)) ? m.log : [];
+  return Object.entries((m && m.concepts) || {}).map(([id, rec]) => {
+    const mine = log.filter((e) => e.id === id);
+    const trail = mine.slice(-limit).map((e) => ({ d: e.d, ok: e.ok, n: e.n, pass: e.n > 0 && e.ok === e.n, mode: e.mode }));
+    const kinds = Object.entries(rec.kinds || {}).map(([k, v]) => ({ k, label: KIND_SHORT[k] || k, ok: v[0], n: v[1], rate: v[1] ? v[0] / v[1] : 1 }));
+    const weak = kinds.filter((x) => x.n >= 2).sort((a, b) => a.rate - b.rate)[0] || null;
+    const miss = Object.entries(rec.miss || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag, n]) => ({ tag, n }));
+    const rounds = (rec.passes || 0) + (rec.fails || 0);
+    // 진단으로만 "안다"가 된 개념(passes 1은 진단의 것)은 한 편도 안 푼 것이라 표에 안 올린다 — 복습에서 풀면 일지가 생겨 올라온다
+    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length };
+  }).filter((r) => r.trail.length || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt);
+}
+
+/**
+ * 📋 아빠가 Claude에게 붙여 넣을 글 — 개념별 요약 + 최근 일지. JSON보다 짧고 사람이 읽을 수 있다.
+ * (내보내기 JSON에도 math 레코드가 통째로 들어가지만, 폰에서 대화창에 붙이기엔 이게 낫다)
+ */
+export function mathReportText(m, today) {
+  const s = mathSummary(m);
+  const lines = [`🔢 신코치 수학 기록 (${today}) — 개념 ${s.done}/${s.total} 배움 · 👑 ${s.crowned} · 지금까지 ${s.rounds}편`];
+  for (const r of conceptReport(m, 12)) {
+    const trail = r.trail.map((t) => (t.pass ? '✔' : `✘${t.ok}/${t.n}`)).join(' ');
+    const kinds = r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(', ');
+    const miss = r.miss.map((x) => `${x.tag}×${x.n}`).join(', ');
+    lines.push(`- ${r.name}${r.done ? (r.box >= GRADUATED ? ' 👑' : ' ✅') : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}`);
+  }
+  if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
+  const log = ((m && m.log) || []).slice(-30);
+  if (log.length) {
+    lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
+    for (const e of log) {
+      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
+      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : nameOf(e.id)} ${e.mode || ''} ${e.ok}/${e.n} ${qs}`);
+    }
+  }
+  return lines.join('\n');
 }
