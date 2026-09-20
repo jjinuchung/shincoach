@@ -4,6 +4,7 @@ import { initPlayer, requirePin } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
 import { initHome, renderHome } from './home.js';
+import { initMath, renderMath } from './math.js';
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
 
@@ -13,9 +14,10 @@ const views = {
   player: document.getElementById('view-player'),
   stats: document.getElementById('view-stats'),
   pokedex: document.getElementById('view-pokedex'),
+  math: document.getElementById('view-math'),
 };
 
-/** 화면 전환 (home | library | player | stats | pokedex) */
+/** 화면 전환 (home | library | player | stats | pokedex | math) */
 export function showView(name) {
   for (const [key, el] of Object.entries(views)) {
     el.hidden = key !== name;
@@ -25,6 +27,8 @@ export function showView(name) {
   if (name === 'library') refreshList().catch(() => {});
   // 🏠 과목 카드도 다시 그린다 — 그 사이에 마스코트 그림을 받아 왔을 수 있다
   if (name === 'home') renderHome(showView).catch(() => {});
+  // 🔢 수학은 들어올 때마다 진도를 다시 읽어 그린다 (사다리·오늘 복습이 최신이어야 한다)
+  if (name === 'math') renderMath().catch(() => {});
 }
 
 /** 전체 화면 로딩 표시 (영상 열기/저장처럼 수 초 이상 걸리는 작업용) */
@@ -127,6 +131,7 @@ async function main() {
   initStats({ showView, requirePin });
   initPokedex({ showView });
   initHome({ showView });
+  initMath({ showView });
   initExit();
   showView('home'); // 🏠 과목 고르기부터 (영어는 카드를 눌러 들어간다)
   window.__appReady = true; // index.html의 시작 감시 타이머 해제

@@ -28,11 +28,11 @@ export const SUBJECTS = [
     key: 'math',
     title: 'Math',
     ko: '수학',
-    desc: '아빠랑 만드는 중이에요',
+    desc: '분수부터 차근차근',
     emoji: '🔢',
     mascot: 65,   // 후딘 — IQ 5000, 계산이 특기
-    view: null,
-    ready: false,
+    view: 'math',
+    ready: true,
   },
 ];
 

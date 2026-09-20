@@ -108,7 +108,7 @@ function card(title) {
   return c;
 }
 
-function cueCountOf(item) {
+export function cueCountOf(item) {
   let merge = true;
   try { merge = JSON.parse(localStorage.getItem('shincoach.settings') || '{}').mergeSentences !== false; } catch { /* 기본값 */ }
   return countPlayableCues(item.enText, { merge, duration: item.duration });

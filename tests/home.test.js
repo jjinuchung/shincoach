@@ -10,7 +10,8 @@ test('과목 카드: 영어는 바로 들어가고, 수학은 아직 준비 중'
   assert.ok(eng && math, '두 과목이 있다');
   assert.equal(eng.ready, true);
   assert.equal(eng.view, 'library', '영어는 기존 라이브러리 화면 그대로');
-  assert.equal(math.ready, false, '수학은 만드는 중 — 눌러도 학습으로 안 간다');
+  assert.equal(math.ready, true, '수학도 들어간다 (1차: 분수 줄기)');
+  assert.equal(math.view, 'math');
 });
 
 test('마스코트는 명단에 있는 포켓몬이어야 한다 (없으면 그림도 이름도 못 찾는다)', () => {
@@ -37,8 +38,10 @@ test('subjectTarget: 준비된 과목은 화면 이름, 아닌 과목은 안내 
   assert.equal(eng.hint, '');
 
   const math = subjectTarget(SUBJECTS.find((s) => s.key === 'math'));
-  assert.equal(math.view, null, '준비 중인 과목은 화면 전환을 안 한다');
-  assert.match(math.hint, /수학/);
+  assert.equal(math.view, 'math');
+  const soon = subjectTarget({ ready: false, view: null, emoji: '🔬', ko: '과학' });
+  assert.equal(soon.view, null, '준비 중인 과목은 화면 전환을 안 한다');
+  assert.match(soon.hint, /과학/);
 
   assert.deepEqual(subjectTarget(null), { view: null, hint: '' });
   assert.equal(subjectTarget({ ready: true, view: null }).view, null, 'ready여도 화면이 없으면 안 간다');

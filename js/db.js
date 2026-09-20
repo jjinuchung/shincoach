@@ -276,7 +276,8 @@ export async function getDaily(date) {
 //   프로필의 applyProfileDelta와 같은 원리.
 
 const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles',
-  'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms', 'matches'];
+  'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms', 'matches',
+  'mathQ', 'mathOk', 'mathRounds', 'mathSeconds']; // 🔢 수학: 푼 문항·정답·회차·시간
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
@@ -595,6 +596,61 @@ async function mutateProfile(rule) {
   return { ...out, profile: next };
 }
 
+// ── 🔢 수학 진도 ──
+// `profile` 스토어에 id 'math' 레코드 하나로 둔다 (스키마를 안 올린다 — v68 이후 불변).
+// 개념마다 { box, dueAt, passes, fails, lastAt } — 영어 문장 복습과 같은 라이트너 규칙.
+// 백업 병합은 mergeStatRecord의 'math' 가지에서 따로 한다 ('me' 규칙을 태우면 concepts가 날아간다).
+
+const MATH_ID = 'math';
+
+export function emptyMath() {
+  return { id: MATH_ID, concepts: {}, placed: {}, miss: {}, rounds: 0, updatedAt: 0 };
+}
+
+function cloneMath(m) {
+  const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) } };
+  for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = { ...v };
+  return out;
+}
+
+export async function getMath() {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readonly');
+  return (await promisify(tx.objectStore('profile').get(MATH_ID))) || emptyMath();
+}
+
+/**
+ * 수학 진도를 한 트랜잭션에서 읽고-고치고-쓴다 (두 창이 열려 있어도 서로 덮어쓰지 않게).
+ * @param {(m:object) => object|void} rule 복사본을 고치는 순수 함수
+ */
+export async function updateMath(rule) {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readwrite');
+  const store = tx.objectStore('profile');
+  const cur = (await promisify(store.get(MATH_ID))) || emptyMath();
+  const next = cloneMath(cur);
+  rule(next);
+  next.id = MATH_ID;
+  next.updatedAt = Date.now();
+  store.put(next);
+  await txDone(tx);
+  return next;
+}
+
+/** 🔢 두 수학 진도 병합 — 개념은 최근에 푼 쪽의 상태, 오개념 횟수·회차는 큰 값, 진단 여부는 OR */
+export function mergeMath(cur, rec) {
+  const out = cloneMath(cur || emptyMath());
+  for (const [k, v] of Object.entries((rec && rec.concepts) || {})) {
+    const mine = out.concepts[k];
+    out.concepts[k] = (!mine || (Number(v.lastAt) || 0) > (Number(mine.lastAt) || 0)) ? { ...v } : mine;
+  }
+  for (const [k, v] of Object.entries((rec && rec.placed) || {})) out.placed[k] = out.placed[k] || v;
+  for (const [k, v] of Object.entries((rec && rec.miss) || {})) out.miss[k] = Math.max(Number(out.miss[k]) || 0, Number(v) || 0);
+  out.rounds = Math.max(Number(out.rounds) || 0, Number(rec && rec.rounds) || 0);
+  out.updatedAt = Math.max(Number(out.updatedAt) || 0, Number(rec && rec.updatedAt) || 0);
+  return out;
+}
+
 /** ⚡ 증분 더하기 규칙 (수치는 더하고, mons는 필드 덮어쓰기, partner는 정해진 값으로) */
 export function mergeProfileDelta(profile, delta) {
   const d = delta || {};
@@ -786,6 +842,8 @@ export function mergeStatRecord(name, cur, rec) {
     out.dueAt = pv.dueAt;
   } else if (name === 'sessions') {
     for (const k of ['seconds', 'sentences', 'speakAttempts', 'speakPass', 'endedAt', 'puzzles', 'puzzleSolved', 'reviews', 'reviewPass']) out[k] = maxOf(cur[k], rec[k]);
+  } else if (name === 'profile' && (rec.id === MATH_ID || cur.id === MATH_ID)) {
+    return mergeMath(cur, rec); // 🔢 수학 진도는 'me' 규칙과 모양이 다르다
   } else if (name === 'profile') {
     for (const k of ['xp', 'throws', 'catches', 'coinsEarned', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
     out.caught = { ...(cur.caught || {}) };
