@@ -138,6 +138,51 @@ function collectTodo(essayDays) {
   return todo;
 }
 
+/**
+ * ✍️ 날짜별 에세이를 "아직 고쳐 줄 글" / "이미 고쳐 준 글" 한쪽만 남겨 돌려준다.
+ * 날짜 묶음은 그대로 두고 그 안의 글만 고르며, 남는 글이 없는 날은 버린다.
+ * @param {Array<{date:string, essays:Array}>} essayDays 날짜별 에세이
+ * @param {boolean} fixed true = 고쳐 준 글만, false = 아직 안 고쳐 준 글만
+ */
+export function splitEssayDays(essayDays, fixed) {
+  const out = [];
+  for (const d of (essayDays || [])) {
+    const essays = (d.essays || []).filter((e) => e && e.id && e.written && (fixed ? !!e.coachFix : !e.coachFix));
+    if (essays.length) out.push({ date: d.date, essays });
+  }
+  return out;
+}
+
+/** 날짜 묶음 안의 글 수 */
+export function countEssays(essayDays) {
+  return (essayDays || []).reduce((a, d) => a + ((d && d.essays) ? d.essays.length : 0), 0);
+}
+
+/** 며칠 전인지 한 마디로 — '오늘' / '어제' / 'N일 전' */
+export function agoLabel(dateKey, today) {
+  if (!dateKey || !today) return '';
+  if (dateKey === today) return '오늘';
+  const [y, m, d] = String(dateKey).split('-').map(Number);
+  const [ty, tm, td] = String(today).split('-').map(Number);
+  const diff = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86400000);
+  if (!Number.isFinite(diff) || diff <= 0) return '오늘';
+  return diff === 1 ? '어제' : `${diff}일 전`;
+}
+
+/** 에세이 한 편 — 두 덩어리(📮 고쳐 주세요 / ✅ 이미 고쳐 준 글)가 같은 모양을 쓴다 */
+function essayBox(e, no) {
+  const box = el('div', 'stats-essay');
+  if (no) box.appendChild(el('div', 'stats-essay-no', `[${no}] 고쳐 주세요`));
+  box.appendChild(el('div', 'stats-essay-origin', `배운 문장: ${e.origin || ''}`));
+  box.appendChild(el('div', 'stats-essay-mine', `✍️ ${e.written || ''}`));
+  if (e.fixed && e.fixed !== e.written) box.appendChild(el('div', 'stats-essay-fixed', `✅ ${e.fixed}`));
+  if (Array.isArray(e.notes) && e.notes.length) box.appendChild(el('div', 'stats-essay-notes', e.notes.join(' · ')));
+  if (e.coachFix) {
+    box.appendChild(el('div', 'stats-essay-coach', `👨‍👩‍👦 ${e.coachFix}${e.readAt ? ' (읽음)' : ' (아직 안 읽음)'}`));
+  }
+  return box;
+}
+
 function buildCoachTools(essayDays) {
   const wrap = el('div', 'stats-coach');
   const todo = collectTodo(essayDays); // 번호 순서 = 화면에 보이는 [번호]와 같다
@@ -323,33 +368,49 @@ export async function renderStats() {
   }
 
   // 3c) ✍️ 에세이 — 아이가 직접 쓴 문장 (부모가 보라고 남긴다)
+  //   오랜만에 열었을 때 "어디부터 고쳐 줘야 하지"로 헤매지 않도록 두 덩어리로 나눈다:
+  //   📮 고쳐 줄 글은 맨 위에 모아서(사진 한 장에 담기게), 이미 고쳐 준 글은 접어 둔다.
   const essayDays = daily
     .filter((d) => Array.isArray(d.essays) && d.essays.length)
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-    .slice(0, 7);
-  if (essayDays.length) {
-    const total = essayDays.reduce((a, d) => a + d.essays.length, 0);
-    const cE = card(`✍️ 에세이 — 배운 문장을 내 이야기로 (최근 ${essayDays.length}일 · ${total}문장)`);
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  // 📮는 **오래된 날부터** — 번호가 오래된 글이 [1]이라 최신부터 그리면 [2][3][1] 순으로 보인다.
+  //    고쳐 주는 순서도 묵은 글이 먼저다.
+  const todoDays = splitEssayDays(essayDays, false).slice().reverse();
+  // ★ 안 고쳐 준 글에는 날짜 제한을 두지 않는다 — 7일로 자르면 오랜만에 여신 날
+  //   묵은 글이 화면에서 통째로 사라져 영영 고쳐 줄 수 없다. 자르는 건 끝난 글만.
+  const doneDays = splitEssayDays(essayDays, true).slice(0, 7);
+  if (todoDays.length || doneDays.length) {
+    const todoCount = countEssays(todoDays);
+    const doneCount = countEssays(doneDays);
+    const cE = card(todoCount
+      ? `✍️ 에세이 — 📮 고쳐 줄 글 ${todoCount}개`
+      : '✍️ 에세이 — 다 고쳐 줬어요');
+    // "언제 것까지 해 줬더라"에 직접 답하는 한 줄
+    const lastDay = essayDays.find((d) => d.essays.some((e) => e && e.coachFix));
+    cE.appendChild(el('p', 'stats-sub', lastDay
+      ? `마지막으로 고쳐 준 글: ${lastDay.date} (${agoLabel(lastDay.date, today)})`
+      : '아직 고쳐 준 글이 없어요'));
+
     // 아직 고쳐 주지 않은 글의 번호 — 화면에 그대로 보여 준다.
     // 복사 없이 **사진만 찍어 보내도** 번호가 남으므로 [번호] 줄로 되돌려 받을 수 있다.
-    const todoNo = essayNumbers(essayDays);
-    for (const d of essayDays) {
-      cE.appendChild(el('p', 'stats-sub', d.date));
-      for (const e of d.essays) {
-        const box = el('div', 'stats-essay');
-        const no = todoNo.get(e.id);
-        if (no) box.appendChild(el('div', 'stats-essay-no', `[${no}] 고쳐 주세요`));
-        box.appendChild(el('div', 'stats-essay-origin', `배운 문장: ${e.origin || ''}`));
-        box.appendChild(el('div', 'stats-essay-mine', `✍️ ${e.written || ''}`));
-        if (e.fixed && e.fixed !== e.written) box.appendChild(el('div', 'stats-essay-fixed', `✅ ${e.fixed}`));
-        if (Array.isArray(e.notes) && e.notes.length) box.appendChild(el('div', 'stats-essay-notes', e.notes.join(' · ')));
-        if (e.coachFix) {
-          box.appendChild(el('div', 'stats-essay-coach', `👨‍👩‍👦 ${e.coachFix}${e.readAt ? ' (읽음)' : ' (아직 안 읽음)'}`));
-        }
-        cE.appendChild(box);
+    const todoNo = essayNumbers(todoDays);
+    if (todoCount) {
+      cE.appendChild(el('h3', 'stats-essay-head', '📮 여기까지만 사진으로 찍어 보내시면 돼요'));
+      for (const d of todoDays) {
+        cE.appendChild(el('p', 'stats-sub', d.date));
+        for (const e of d.essays) cE.appendChild(essayBox(e, todoNo.get(e.id)));
       }
     }
-    cE.appendChild(buildCoachTools(essayDays));
+    if (doneCount) {
+      const det = el('details', 'stats-essay-done');
+      det.appendChild(el('summary', '', `✅ 이미 고쳐 준 글 ${doneCount}개 — 눌러서 보기`));
+      for (const d of doneDays) {
+        det.appendChild(el('p', 'stats-sub', d.date));
+        for (const e of d.essays) det.appendChild(essayBox(e, 0));
+      }
+      cE.appendChild(det);
+    }
+    cE.appendChild(buildCoachTools(todoDays));
     main.appendChild(cE);
   }
 

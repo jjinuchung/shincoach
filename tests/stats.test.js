@@ -1,7 +1,7 @@
 // 학습 기록 계산 로직 테스트: node --test tests/stats.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtDur, weekSeries, hardScore, hardSentences, contentSummary, essayNumbers } from '../js/stats.js';
+import { fmtDur, weekSeries, hardScore, hardSentences, contentSummary, essayNumbers, splitEssayDays, countEssays, agoLabel } from '../js/stats.js';
 import { todayKey } from '../js/track.js';
 
 test('fmtDur', () => {
@@ -85,4 +85,43 @@ test('✍️ 에세이 번호는 오래된 글이 [1] — 새 글을 써도 이�
   assert.equal(no.get('mid1'), 2);
   assert.equal(no.get('new1'), 3, '새 글은 뒤에 붙는다');
   assert.equal(no.has('done'), false, '이미 고쳐 준 글에는 번호를 안 붙인다');
+});
+
+test('✍️ 📮 고쳐 줄 글과 ✅ 고쳐 준 글을 나눈다 (남는 글 없는 날은 버린다)', () => {
+  const days = [
+    { date: '2026-09-16', essays: [{ id: 'a', written: 'one' }, { id: 'b', written: 'two', coachFix: '고침' }] },
+    { date: '2026-09-15', essays: [{ id: 'c', written: 'three', coachFix: '고침' }] },  // 전부 고쳐 준 날
+    { date: '2026-09-14', essays: [{ id: 'd', written: 'four' }] },                      // 전부 안 고친 날
+    { date: '2026-09-13', essays: [{ id: 'e' }] },                                       // 쓴 글이 없으면 양쪽 다 아님
+  ];
+  const todo = splitEssayDays(days, false);
+  const done = splitEssayDays(days, true);
+  assert.deepEqual(todo.map((d) => d.date), ['2026-09-16', '2026-09-14'], '안 고친 글이 있는 날만');
+  assert.deepEqual(todo[0].essays.map((e) => e.id), ['a'], '같은 날에서도 안 고친 글만 골라낸다');
+  assert.deepEqual(done.map((d) => d.date), ['2026-09-16', '2026-09-15']);
+  assert.equal(countEssays(todo), 2);
+  assert.equal(countEssays(done), 2);
+  assert.equal(countEssays([]), 0);
+});
+
+test('✍️ 나눈 뒤에도 번호는 그대로 (📮 덩어리만 넘겨도 오래된 글이 [1])', () => {
+  const days = [
+    { date: '2026-09-16', essays: [{ id: 'new1', written: 'today one' }] },
+    { date: '2026-09-14', essays: [{ id: 'old1', written: 'older one' }, { id: 'done', written: 'x', coachFix: '이미 고침' }] },
+    { date: '2026-09-15', essays: [{ id: 'mid1', written: 'middle one' }] },
+  ];
+  const no = essayNumbers(splitEssayDays(days, false));
+  assert.equal(no.get('old1'), 1);
+  assert.equal(no.get('mid1'), 2);
+  assert.equal(no.get('new1'), 3);
+  assert.equal(no.size, 3, '고쳐 준 글은 번호에서 빠진 채로 유지');
+});
+
+test('✍️ 며칠 전인지 한 마디로', () => {
+  assert.equal(agoLabel('2026-09-20', '2026-09-20'), '오늘');
+  assert.equal(agoLabel('2026-09-19', '2026-09-20'), '어제');
+  assert.equal(agoLabel('2026-09-17', '2026-09-20'), '3일 전');
+  assert.equal(agoLabel('2026-08-31', '2026-09-20'), '20일 전', '달을 넘어가도 맞는다');
+  assert.equal(agoLabel('', '2026-09-20'), '');
+  assert.equal(agoLabel('2026-09-21', '2026-09-20'), '오늘', '앞선 날짜는 오늘로 본다 (기기 시계가 밀릴 수 있다)');
 });

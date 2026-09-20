@@ -1425,6 +1425,14 @@ button { font-family: inherit; }
 
 /* 📊 기록 화면의 ✍️ 에세이 */
 .stats-sub { font-weight: 700; color: var(--muted); font-size: 0.85rem; margin: 10px 0 4px; }
+/* 📮 고쳐 줄 글 머리 — 여기부터 사진을 찍으면 된다는 표시 */
+.stats-essay-head { margin: 12px 0 2px; font-size: 0.95rem; font-weight: 800; color: #6d28d9; }
+/* ✅ 이미 고쳐 준 글은 접어 둔다 (평소엔 안 보이게, 확인하고 싶을 때만 펼침) */
+.stats-essay-done { margin-top: 14px; border-top: 1px dashed #d1d5db; padding-top: 6px; }
+.stats-essay-done > summary { cursor: pointer; font-weight: 700; color: var(--muted); padding: 8px 0; list-style: none; }
+.stats-essay-done > summary::-webkit-details-marker { display: none; }
+.stats-essay-done > summary::before { content: '▸ '; }
+.stats-essay-done[open] > summary::before { content: '▾ '; }
 .stats-essay { border-left: 3px solid #a78bfa; padding: 4px 0 4px 10px; margin-bottom: 8px; }
 .stats-essay-origin { color: var(--muted); font-size: 0.82rem; }
 .stats-essay-mine { font-weight: 700; margin-top: 2px; }
