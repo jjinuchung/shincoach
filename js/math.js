@@ -331,22 +331,61 @@ function answer(i, list, card) {
   next.focus();
 }
 
+/**
+ * 한 편 끝 — 저장 → 보상 → 결과 화면 → (처음 통과면) 🎯 잡기.
+ *
+ * ★ 저장이 끝나기 전에는 `ui.round`를 비우지 않는다 (Codex 리뷰 #10: 저장이 실패하면 "기록하는 중…"에 갇혔다).
+ *   실패하면 "다시 저장" 버튼으로 같은 결과를 다시 넣는다. 보상은 저장이 된 뒤에만 준다.
+ * ★ await 뒤마다 `ui.run`을 본다 (Codex 리뷰 #5: 저장 중에 ←로 나갔다 들어오면 옛 결과가 새 화면을 덮고,
+ *   후보를 받는 사이에 나가면 🎯 잡기가 홈이나 영어 위에 떴다). 진도·보상은 이미 저장됐으니 그리기만 건너뛴다.
+ */
 async function finishRound() {
   const r = ui.round;
-  if (!r) return;
-  ui.round = null;
+  if (!r || r.saving) return;
+  const run = ui.run;
   const today = todayKey();
   const m = clearMain();
   m.appendChild(el('p', 'math-loading', '기록하는 중…'));
+  r.saving = true;
+
+  let state = null;
+  let placed = null;
+  let result = null;
+  try {
+    if (r.mode === 'diag') {
+      state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, 'fraction', r.missTags); });
+    } else {
+      state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags }, today); });
+    }
+  } catch (err) {
+    r.saving = false;
+    if (run !== ui.run) return;
+    clearMain();
+    const card = el('section', 'math-card');
+    card.appendChild(el('h2', '', '앗, 기록을 저장하지 못했어요'));
+    card.appendChild(el('p', 'math-p', `푼 건 그대로 있어요. 한 번 더 눌러 주세요. (${String((err && err.message) || err)})`));
+    const retry = el('button', 'btn btn-primary btn-big-wide', '💾 다시 저장');
+    retry.type = 'button';
+    retry.addEventListener('click', () => finishRound());
+    card.appendChild(retry);
+    m.appendChild(card);
+    return;
+  }
+  ui.round = null; // 저장이 됐으니 이제 비운다
+
+  // 보상은 화면과 상관없이 지급 (나가 있어도 번 것은 번 것)
+  const rw = r.mode === 'diag'
+    ? { xp: r.correct * REWARD.diag.xp, coin: r.correct * REWARD.diag.coin, catchOnce: false }
+    : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
+  const g = gainXp(rw.xp);
+  const c = gainCoins(rw.coin).gained;
+  applyDailyDelta(today, r.mode === 'diag' ? { mathQ: r.qs.length, mathOk: r.correct } : { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});
+  updateChip();
+  if (g.leveledUp) sfx.levelUp();
+  if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다 — 그리지 않는다
+  clearMain(); // await 뒤에 한 번 더 비운다 — "기록하는 중…"이 결과 위에 남지 않게
 
   if (r.mode === 'diag') {
-    let placed = null;
-    const state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today); });
-    const xp = gainXp(r.correct * REWARD.diag.xp).gained;
-    const coin = gainCoins(r.correct * REWARD.diag.coin).gained;
-    applyDailyDelta(today, { mathQ: r.qs.length, mathOk: r.correct }).catch(() => {});
-    updateChip();
-    clearMain(); // await 뒤에 한 번 더 비운다 — "기록하는 중…"이 결과 위에 남지 않게
     const card = el('section', 'math-card');
     card.appendChild(el('h2', '', `📏 ${r.qs.length}개 중 ${r.correct}개 맞았어요`));
     card.appendChild(el('p', 'math-p', placed && placed.knownIds.length
@@ -355,7 +394,7 @@ async function finishRound() {
     const startP = el('p', 'math-p big');
     startP.textContent = `여기서 시작! → ${nameOf(placed ? placed.startId : FRACTION[0].id)}`;
     card.appendChild(startP);
-    card.appendChild(el('p', 'math-reward', `⚡+${xp} 💰+${coin}`));
+    card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}`));
     const b = el('button', 'btn btn-primary btn-big-wide', '사다리 보기');
     b.type = 'button';
     b.addEventListener('click', () => renderLadder(state));
@@ -364,26 +403,19 @@ async function finishRound() {
     return;
   }
 
-  // learn / review / practice
-  let result = null;
-  const state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags }, today); });
-  // practice(이미 아는 것을 자유롭게 다시 풂)는 라이트너를 건드리되 보상은 정답 수만큼만
-  const rw = r.mode === 'practice' ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } : roundReward(result, r.correct);
-  const g = gainXp(rw.xp);
-  const c = gainCoins(rw.coin).gained;
-  applyDailyDelta(today, { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});
-  updateChip();
-  if (g.leveledUp) sfx.levelUp();
-  clearMain(); // await 뒤에 한 번 더 비운다
-
   const card = el('section', 'math-card math-result');
   const all = result.passed;
-  card.appendChild(el('h2', '', all ? (result.crowned ? '👑 이해 완료!' : result.first ? '🎉 이 개념, 이제 알아요!' : '✅ 다시 확인해도 맞았어요!') : `${r.qs.length}개 중 ${r.correct}개 맞았어요`));
+  card.appendChild(el('h2', '', all
+    ? (result.crowned ? '👑 이해 완료!' : result.first ? '🎉 이 개념, 이제 알아요!' : result.practice ? '✅ 다 맞았어요!' : '✅ 다시 확인해도 맞았어요!')
+    : `${r.qs.length}개 중 ${r.correct}개 맞았어요`));
   card.appendChild(el('p', 'math-p', all
     ? (result.crowned ? `${nameOf(r.id)} — 다섯 번 확인을 다 통과했어요. 정말 이해한 거예요.`
       : result.first ? '내일 한 번 더 물어볼게요. 며칠 뒤에도 맞으면 👑!'
-        : '다음 확인은 며칠 뒤예요.')
-    : '아직 조금 헷갈리나 봐요. 이야기를 다시 읽고 한 번 더 해 봐요 — 틀린 게 있으면 "안다"가 안 돼요.'));
+        : result.practice ? '연습이라 👑 확인은 안 올라가요 — 다음 확인 날에 다시 물어볼게요.'
+          : '다음 확인은 며칠 뒤예요.')
+    : (result.practice
+      ? '연습이라 기록은 그대로예요. 이야기를 다시 읽어 봐요.'
+      : '아직 조금 헷갈리나 봐요. 이야기를 다시 읽고 한 번 더 해 봐요 — 틀린 게 있으면 "안다"가 안 돼요.')));
   const shown = kidTags(r.missTags);
   if (shown.length) {
     const tags = el('p', 'math-tags');
@@ -409,6 +441,7 @@ async function finishRound() {
   // 🎯 처음 통과한 개념은 몬스터볼 한 번 — 영어 퍼즐 정답과 같은 보상 경로
   if (rw.catchOnce) {
     const candidates = await catchCandidates(4);
+    if (run !== ui.run) return; // 후보를 받는 사이에 나갔다 — 다른 화면 위에 띄우지 않는다
     if (candidates.length) {
       openCatch({
         candidates, xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,

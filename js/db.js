@@ -637,12 +637,29 @@ export async function updateMath(rule) {
   return next;
 }
 
-/** 🔢 두 수학 진도 병합 — 개념은 최근에 푼 쪽의 상태, 오개념 횟수·회차는 큰 값, 진단 여부는 OR */
+/**
+ * 🔢 두 수학 진도 병합 — 오개념 횟수·회차는 큰 값, 진단 여부는 OR.
+ * 개념은 통째로 고르지 않는다 (Codex 리뷰 #7: 다른 기기의 늦은 실패가 앞선 통과를 지우고 사다리를 다시 잠갔다):
+ *   done = OR · passes/fails = 큰 값 · lastAt = 큰 값 · 복습 일정(box·dueAt)은 **배운(done) 쪽 중 최근** 것
+ */
 export function mergeMath(cur, rec) {
   const out = cloneMath(cur || emptyMath());
   for (const [k, v] of Object.entries((rec && rec.concepts) || {})) {
     const mine = out.concepts[k];
-    out.concepts[k] = (!mine || (Number(v.lastAt) || 0) > (Number(mine.lastAt) || 0)) ? { ...v } : mine;
+    if (!mine) { out.concepts[k] = { ...v }; continue; }
+    const later = (Number(v.lastAt) || 0) > (Number(mine.lastAt) || 0) ? v : mine;
+    // 일정은 배운 기록에서만 — 한쪽만 done이면 그쪽, 둘 다면 최근 것
+    const sched = (mine.done && !v.done) ? mine : (!mine.done && v.done) ? v : later;
+    out.concepts[k] = {
+      ...later,
+      done: !!(mine.done || v.done),
+      box: sched.box || 0,
+      dueAt: sched.dueAt || '',
+      passes: Math.max(Number(mine.passes) || 0, Number(v.passes) || 0),
+      fails: Math.max(Number(mine.fails) || 0, Number(v.fails) || 0),
+      lastAt: Math.max(Number(mine.lastAt) || 0, Number(v.lastAt) || 0),
+    };
+    if (!sched.placed) delete out.concepts[k].placed;
   }
   for (const [k, v] of Object.entries((rec && rec.placed) || {})) out.placed[k] = out.placed[k] || v;
   for (const [k, v] of Object.entries((rec && rec.miss) || {})) out.miss[k] = Math.max(Number(out.miss[k]) || 0, Number(v) || 0);
@@ -821,7 +838,9 @@ export function mergeStatRecord(name, cur, rec) {
     }
   } else if (name === 'daily') {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
-    for (const k of ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles', 'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms']) out[k] = maxOf(cur[k], rec[k]);
+    // 누적 수치는 DAILY_SUMS 그대로 — 목록을 따로 들고 있으면 새 필드(🔤 matches·🔢 math*)가 빠져
+    // 옛 백업이 오늘 수치를 덮어쓴다 (Codex 리뷰 #6: 20문항 위에 4문항 백업을 넣으니 4가 됐다)
+    for (const k of DAILY_SUMS) out[k] = maxOf(cur[k], rec[k]);
     out.goalRewarded = !!(cur.goalRewarded || rec.goalRewarded);
     out.hpMissed = !!(cur.hpMissed || rec.hpMissed);
     out.reviewGolden = !!(cur.reviewGolden || rec.reviewGolden); // 🌟 하루 1개 — 백업을 되돌려 다시 받는 것도 막는다

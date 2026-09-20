@@ -80,8 +80,11 @@ function castOf(r, opts) {
   if (world === 'pokemon') pool = (opts && opts.names && opts.names.length) ? opts.names : DEFAULT_CAST;
   else pool = (opts.worlds[world] && opts.worlds[world].length) ? opts.worlds[world] : WORLDS[world].cast;
   const mon = pick(r, pool);
-  let mon2 = pick(r, pool);
-  for (let i = 0; i < 8 && mon2 === mon && pool.length > 1; i++) mon2 = pick(r, pool);
+  // 둘째 출연은 첫째를 뺀 풀에서 — 잡은 포켓몬이 한 마리뿐이면 기본 출연진으로 채운다
+  // (Codex 리뷰 #9: 같은 이름 둘이면 "리자몽의 열매는 리자몽의 몇 배?" 같은 문제가 나온다)
+  let rest = pool.filter((n) => n !== mon);
+  if (!rest.length) rest = (world === 'pokemon' ? DEFAULT_CAST : WORLDS[world].cast).filter((n) => n !== mon);
+  const mon2 = rest.length ? pick(r, rest) : mon;
   return { me: (opts && opts.me) || '진우', mon, mon2, world };
 }
 
@@ -161,18 +164,35 @@ function nearMiss(answer, k) {
   return fr(tn, td);
 }
 
-/** 보기 네 개 만들기 — 정답 하나 + 오개념 오답. 같은 글자는 하나로 (정답이 두 번 나오면 안 된다) */
+/**
+ * 보기 글자의 값 — "5/6" · "3" · "2 3/8" → {n, d}. 수가 아니면 null.
+ * 보기끼리 **값**으로 비교하려고 쓴다: `3/6 − 2/6`의 오답 "6/36"(곱셈으로 풂)은 글자는 달라도 정답 1/6과 같은 값이라
+ * 그걸 고른 아이는 맞은 것이다 (Codex 리뷰 #2 — 글자만 비교하면 맞은 답을 틀렸다고 하고 오개념까지 기록한다)
+ */
+export function valueOf(text) {
+  const s = String(text || '').trim();
+  let m;
+  if ((m = /^(\d+) (\d+)\/(\d+)$/.exec(s))) return { n: Number(m[1]) * Number(m[3]) + Number(m[2]), d: Number(m[3]) };
+  if ((m = /^(\d+)\/(\d+)$/.exec(s))) return { n: Number(m[1]), d: Number(m[2]) };
+  if ((m = /^(\d+)$/.exec(s))) return { n: Number(m[1]), d: 1 };
+  return null;
+}
+const sameValue = (a, b) => !!(a && b && a.d && b.d && a.n * b.d === b.n * a.d);
+
+/** 보기 네 개 만들기 — 정답 하나 + 오개념 오답. 글자가 같거나 **값이 같으면** 하나로 (정답이 두 번 나오면 안 된다) */
 function choices(r, answer, wrongs) {
   const seen = new Set([answer]);
+  const vals = [valueOf(answer)];
   const list = [{ text: answer, ok: true }];
+  const dup = (t) => { const v = valueOf(t); return seen.has(t) || (v && vals.some((x) => sameValue(x, v))); };
+  const add = (t, tag) => { seen.add(t); vals.push(valueOf(t)); list.push({ text: t, ok: false, tag }); };
   for (const w of wrongs) {
-    if (!w || !w.text || seen.has(w.text) || list.length >= 4) continue;
-    seen.add(w.text);
-    list.push({ text: w.text, ok: false, tag: w.tag });
+    if (!w || !w.text || dup(w.text) || list.length >= 4) continue;
+    add(w.text, w.tag);
   }
   for (let k = 0; list.length < 4 && k < 20; k++) {
     const alt = nearMiss(answer, k);
-    if (alt && !seen.has(alt)) { seen.add(alt); list.push({ text: alt, ok: false, tag: '계산 실수' }); }
+    if (alt && !dup(alt)) add(alt, '계산 실수');
   }
   return shuffle(r, list);
 }
@@ -433,19 +453,19 @@ export const FRACTION = [
       const L = lcm(a, b);
       const story = worldPick(r, c, {
         pokemon: [
-          `{mon/이/가} 나무열매 1/${a}개, {mon2/이/가} 1/${b}개를 먹었어요. 누가 더 먹었는지 비교하려면 분모를 얼마로 맞춰야 할까요?`,
-          `{me/이/가} 피자 1/${a}판, {mon/이/가} 1/${b}판을 먹었어요. 둘을 더하려면 먼저 분모를 얼마로 통분해야 할까요?`,
+          `{mon/이/가} 나무열매 1/${a}개, {mon2/이/가} 1/${b}개를 먹었어요. 누가 더 먹었는지 비교하려면 분모를 **가장 작은** 얼마로 맞춰야 할까요?`,
+          `{me/이/가} 피자 1/${a}판, {mon/이/가} 1/${b}판을 먹었어요. 둘을 더하려면 먼저 분모를 **가장 작은** 얼마로 통분해야 할까요?`,
         ],
-        toystory: [`제시는 1/${a}시간, 버즈는 1/${b}시간 보니와 놀았어요. 누가 더 오래 놀았는지 비교하려면 분모를 얼마로 맞춰야 할까요?`],
-        minions: [`{mon/이/가} 바나나 1/${a}개, {mon2/이/가} 1/${b}개를 먹었어요. 누가 더 먹었는지 비교하려면 분모를 얼마로 맞춰야 할까요?`],
-        moana: [`모아나는 하루의 1/${a}, 마우이는 1/${b}만큼 노를 저었어요. 누가 더 저었는지 비교하려면 분모를 얼마로 맞춰야 할까요?`],
+        toystory: [`제시는 1/${a}시간, 버즈는 1/${b}시간 보니와 놀았어요. 누가 더 오래 놀았는지 비교하려면 분모를 **가장 작은** 얼마로 맞춰야 할까요?`],
+        minions: [`{mon/이/가} 바나나 1/${a}개, {mon2/이/가} 1/${b}개를 먹었어요. 누가 더 먹었는지 비교하려면 분모를 **가장 작은** 얼마로 맞춰야 할까요?`],
+        moana: [`모아나는 하루의 1/${a}, 마우이는 1/${b}만큼 노를 저었어요. 누가 더 저었는지 비교하려면 분모를 **가장 작은** 얼마로 맞춰야 할까요?`],
       });
       return ask(this.id, 'calc', fill(story, c), choices(r, String(L), [
         { text: String(a + b), tag: '분모끼리 더함' },
         { text: String(a * b), tag: '최소공배수가 아닌 곱' },
         { text: String(L * 2), tag: '최소가 아닌 공배수' },
         { text: String(Math.max(a, b)), tag: '큰 분모를 그냥 씀' },
-      ]), { expr: `1/${a} 과 1/${b} → 통분한 분모는?`, figure: barsSvg([{ n: 1, d: a }, { n: 1, d: b }]) });
+      ]), { expr: `1/${a} 과 1/${b} → 가장 작은 공통 분모는?`, figure: barsSvg([{ n: 1, d: a }, { n: 1, d: b }]) });
     },
     misread(r, c) {
       const d = pick(r, [6, 8, 10]);
@@ -561,7 +581,7 @@ export const FRACTION = [
 
   {
     id: 'frac.mul', grade: 5, name: '분수 × 분수', needs: ['frac.mulnat'],
-    idea: '1/2 × 1/3 은 **반의 1/3**이에요. 조각을 또 나누는 거라 분모끼리, 분자끼리 곱해요. 통분은 안 해요.',
+    idea: '1/2 × 1/3 은 **반의 1/3**이에요. 조각을 또 나누는 거라 분모끼리, 분자끼리 곱해요. 통분은 안 해도 돼요 (해도 답은 같지만 손만 더 가요).',
     calc(r, c) {
       const d1 = pick(r, [2, 3, 4, 5]);
       const d2 = pick(r, [3, 4, 5, 6]);
@@ -588,25 +608,27 @@ export const FRACTION = [
         ],
       });
       return ask(this.id, 'calc', fill(story, c), choices(r, fr(n1 * n2, d1 * d2), [
-        { text: fr(n1 * (L / d1) * n2 * (L / d2), L), tag: '통분해서 곱함' },
+        { text: fr(n1 * (L / d1) * n2 * (L / d2), L), tag: '통분한 뒤 분모를 한 번만 씀' },
         { text: fr(n1 * n2, d1 + d2), tag: '분모끼리 더함' },
         { text: fr(n1 + n2, d1 + d2), tag: '전부 더함' },
         { text: fr(n1 * n2, L), tag: '분모를 최소공배수로' },
       ]), { expr: `${n1}/${d1} × ${n2}/${d2}` });
     },
     misread(r, c) {
+      // 통분 자체는 틀린 게 아니다 (해도 답은 같다). 틀린 건 통분한 뒤 **분모를 한 번만 쓰는 것** — 그 계산을 보여 준다
       const d1 = pick(r, [2, 3]);
       const d2 = pick(r, [4, 5]);
       const L = lcm(d1, d2);
-      return ask(this.id, 'misread', fill(`{mon/이/가} 1/${d1} × 1/${d2} 를 풀려고 먼저 분모 ${L}${numJosa(L, '으로', '로')} 통분했어요. {me/아/야}, 무엇이 틀렸을까?`, c), choices(r, '곱셈에서는 통분하지 않아요 — 그냥 분모끼리 곱해요', [
+      const a = L / d1; const b = L / d2; // 1/d1 = a/L, 1/d2 = b/L
+      return ask(this.id, 'misread', fill(`{mon/이/가} 1/${d1} × 1/${d2} 를 풀려고 분모 ${L}${numJosa(L, '으로', '로')} 통분해서 ${a}/${L} × ${b}/${L} 로 만든 뒤, 분자만 곱해서 ${a * b}/${L} 라고 했어요. {me/아/야}, 무엇이 틀렸을까?`, c), choices(r, `분모끼리도 곱해야 해요 — ${L} × ${L}로. (통분은 안 해도 되지만 틀린 건 아니에요)`, [
         { text: '통분한 분모가 틀렸어요', tag: '오개념을 못 짚음' },
-        { text: '분자를 안 곱했어요', tag: '오개념을 못 짚음' },
-        { text: '틀린 곳이 없어요', tag: '통분이 필요하다고 생각' },
+        { text: '분자를 곱하면 안 돼요', tag: '오개념을 못 짚음' },
+        { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
       ]));
     },
     why: [
       { q: '피자 1/2 × 1/3 이 1/2보다 **작아지는** 이유는?', ok: '반쪽의 1/3만 가져온 거라서', no: ['곱하면 항상 커지는데 잘못 계산한 것', '분모가 커져서 그냥 작아 보이는 것', '1보다 작은 수는 곱하면 항상 0에 가까워서'] },
-      { q: '덧셈은 통분하는데 곱셈은 왜 안 하나요?', ok: '더할 때는 조각 크기를 맞춰야 하지만, 곱셈은 조각을 또 나누는 것이라서', no: ['곱셈이 더 쉬운 계산이라서', '곱셈은 약분으로 대신하니까', '통분하면 답이 커져서'] },
+      { q: '덧셈은 통분해야 하는데 곱셈은 왜 통분이 필요 없나요?', ok: '더할 때는 조각 크기를 맞춰야 하지만, 곱셈은 조각을 또 나누는 것이라서 (해도 답은 같아요)', no: ['곱셈이 더 쉬운 계산이라서', '곱셈은 약분으로 대신하니까', '통분하면 답이 커져서'] },
     ],
   },
 

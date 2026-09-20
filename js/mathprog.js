@@ -88,24 +88,32 @@ export function needsPlacement(m, strand = 'fraction') {
  * @param {object} m 복사본 (updateMath 안에서)
  * @param {Array<{concept:string, correct:boolean}>} answers
  */
-export function applyPlacement(m, answers, today, strand = 'fraction') {
+export function applyPlacement(m, answers, today, strand = 'fraction', missTags = []) {
   const { startId, knownIds } = placeFrom(answers);
   m.placed = m.placed || {};
   m.placed[strand] = today;
   m.concepts = m.concepts || {};
+  m.miss = m.miss || {};
   for (const id of knownIds) {
     if (m.concepts[id] && m.concepts[id].done) continue; // 이미 배운 것은 그대로
     m.concepts[id] = { done: true, box: 1, dueAt: addDays(today, PLACED_RECHECK_DAYS), passes: 1, fails: 0, lastAt: Date.now(), placed: true };
   }
+  // 진단에서 고른 오개념도 부모 화면에 쌓는다 (Codex 리뷰 #8 — 버려지고 있었다)
+  for (const t of (missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
   return { startId, knownIds };
 }
 
 /**
  * 개념 한 편의 결과 반영.
+ *
+ * ★ 이미 아는 개념은 **오늘 복습 차례(dueAt ≤ today)일 때만** 라이트너가 움직인다. 차례가 아닌데 또 풀면
+ *   `practice` — 기록·오개념은 남기되 box·dueAt은 그대로. 안 그러면 같은 날 여섯 번 풀어 👑을 받을 수 있고
+ *   (Codex 리뷰 #1), 두 창이 같은 복습을 두 번 끝내면 두 번 올라간다. 판정은 저장소에서 읽은 rec로 하므로
+ *   먼저 끝낸 창이 dueAt을 미루면 늦은 창은 자동으로 practice가 된다.
  * @param {object} m 복사본
  * @param {string} id 개념
  * @param {{correct:number, total:number, missTags:string[]}} r
- * @returns {{passed:boolean, first:boolean, crowned:boolean, review:boolean}}
+ * @returns {{passed:boolean, first:boolean, crowned:boolean, review:boolean, practice:boolean}}
  */
 export function applyRound(m, id, r, today) {
   m.concepts = m.concepts || {};
@@ -115,28 +123,31 @@ export function applyRound(m, id, r, today) {
   const wasDone = !!rec.done;
   const wasCrowned = wasDone && (rec.box || 0) >= GRADUATED;
   let review = false;
+  let practice = false;
   if (!wasDone) {
-    if (passed) { rec.done = true; Object.assign(rec, enroll(today)); rec.passes = (rec.passes || 0) + 1; }
-    else rec.fails = (rec.fails || 0) + 1;
-  } else {
+    if (passed) { rec.done = true; Object.assign(rec, enroll(today)); }
+  } else if (isDue(rec, today)) {
     review = true;
     Object.assign(rec, schedule(rec.box || 0, passed, today));
-    if (passed) rec.passes = (rec.passes || 0) + 1; else rec.fails = (rec.fails || 0) + 1;
+  } else {
+    practice = true; // 차례가 아닌 연습 — 일정은 안 건드린다
   }
+  if (passed) rec.passes = (rec.passes || 0) + 1; else rec.fails = (rec.fails || 0) + 1;
   rec.lastAt = Date.now();
   delete rec.placed;
   m.concepts[id] = rec;
   for (const t of (r.missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
   m.rounds = (m.rounds || 0) + 1;
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
-  return { passed, first: !wasDone && passed, crowned, review };
+  return { passed, first: !wasDone && passed, crowned, review, practice };
 }
 
-/** 한 편의 보상 계산 (지급은 화면이 한다) */
+/** 한 편의 보상 계산 (지급은 화면이 한다). 차례가 아닌 연습(practice)은 정답 수만큼만 */
 export function roundReward(result, correct) {
   let xp = correct * REWARD.q.xp;
   let coin = correct * REWARD.q.coin;
   let catchOnce = false;
+  if (result.practice) return { xp, coin, catchOnce };
   if (result.first) { xp += REWARD.firstPass.xp; coin += REWARD.firstPass.coin; catchOnce = true; }
   else if (result.review && result.passed) { xp += REWARD.reviewPass.xp; coin += REWARD.reviewPass.coin; }
   if (result.crowned) { xp += REWARD.crown.xp; coin += REWARD.crown.coin; }

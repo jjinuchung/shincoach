@@ -1,8 +1,9 @@
 // 📊 학습 기록 화면 (부모용): 이번 주 요약, 콘텐츠별 진행률, 어려워한 문장, 복습 단어장, 최근 세션, 내보내기/가져오기
 import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
-  applyEssayFixes,
+  applyEssayFixes, getMath,
 } from './db.js';
+import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf } from './mathprog.js';
 import { exportText, parseFixes } from './essay.js';
 import { countPlayableCues } from './srt.js';
 import { openPlayer } from './player.js';
@@ -238,8 +239,8 @@ export async function renderStats() {
   const main = $('stats-main');
   main.innerHTML = '';
   main.appendChild(el('p', 'stats-empty', '불러오는 중…'));
-  const [items, records, sessions, daily, vocabViews] = await Promise.all([
-    listItems(), getAllSentenceStats(), listSessions(30), listDaily(), listVocabViews(),
+  const [items, records, sessions, daily, vocabViews, math] = await Promise.all([
+    listItems(), getAllSentenceStats(), listSessions(30), listDaily(), listVocabViews(), getMath().catch(() => null),
   ]);
   main.innerHTML = '';
   const today = todayKey();
@@ -412,6 +413,38 @@ export async function renderStats() {
     }
     cE.appendChild(buildCoachTools(todoDays));
     main.appendChild(cE);
+  }
+
+  // 3e) 🔢 수학 — 분수 줄기 진도와 헷갈리는 오개념 (오답마다 붙은 이름표가 쌓인 것 — Codex 리뷰 #8)
+  const ms = mathSummary(math);
+  if (ms.rounds > 0 || ms.done > 0) {
+    const cM = card(`🔢 수학 — 분수 줄기 ${ms.done}/${ms.total} 개념 · 👑 ${ms.crowned}`);
+    const weekMath = daily.filter((d) => week.some((w) => w.date === d.date));
+    const q = weekMath.reduce((a, d) => a + (Number(d.mathQ) || 0), 0);
+    const ok = weekMath.reduce((a, d) => a + (Number(d.mathOk) || 0), 0);
+    cM.appendChild(el('p', 'stats-sub', `이번 주 ${q}문항 중 ${ok}개 정답 · 지금까지 ${ms.rounds}편`));
+    const rows = mathLadderOf(math, today);
+    const lad = el('div', 'stats-missed');
+    for (const r of rows) {
+      const chip = el('span', 'stats-missed-chip' + (r.state === 'done' ? ' done' : ''));
+      chip.appendChild(el('b', '', `${r.icon} ${r.name}`));
+      if (r.due) chip.appendChild(el('span', 'n', ' 오늘 확인'));
+      lad.appendChild(chip);
+    }
+    cM.appendChild(lad);
+    if (ms.miss.length) {
+      cM.appendChild(el('p', 'stats-sub', '헷갈리는 오개념 — 오답을 고를 때마다 쌓인 것'));
+      const box = el('div', 'stats-missed');
+      for (const m of ms.miss) {
+        const chip = el('span', 'stats-missed-chip');
+        chip.appendChild(el('b', '', m.tag));
+        chip.appendChild(el('span', 'n', ` ${m.n}회`));
+        box.appendChild(chip);
+      }
+      cM.appendChild(box);
+      cM.appendChild(el('p', 'stats-note', '"분모끼리 더함"처럼 이름이 붙은 것이 진짜 오개념이에요. "틀린 줄 모름"·"오개념을 못 짚음"은 어디가 틀렸는지 못 찾은 것이고, "계산 실수"는 방법은 맞는데 셈만 틀린 거예요.'));
+    }
+    main.appendChild(cM);
   }
 
   // 3d) ⭐ 아이가 "등급이 이상해요" 하고 보낸 신청 (아이 화면에서는 바로 안 바뀐다)

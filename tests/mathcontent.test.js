@@ -40,7 +40,8 @@ function evalExpr(expr) {
   if ((m = /^(\S+) → 약분$/.exec(expr))) return parseFrac(m[1]);
   if ((m = /^(\S+) → 대분수$/.exec(expr))) return parseFrac(m[1]);
   if ((m = /^(\d+ \d+\/\d+) → 가분수$/.exec(expr))) return parseFrac(m[1]);
-  if ((m = /^1\/(\d+) 과 1\/(\d+) → 통분한 분모는\?$/.exec(expr))) return { n: lcm(+m[1], +m[2]), d: 1 };
+  // "가장 작은"이 문구에 있어야 최소공배수만 정답이 된다 (24도 공통 분모다 — Codex 리뷰 #3)
+  if ((m = /^1\/(\d+) 과 1\/(\d+) → 가장 작은 공통 분모는\?$/.exec(expr))) return { n: lcm(+m[1], +m[2]), d: 1 };
   return null;
 }
 
