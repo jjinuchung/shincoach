@@ -177,6 +177,102 @@ button { font-family: inherit; }
 /* 🚪 종료: 실수로 누르지 않도록 맨 아래·차분한 색 (누르면 인사 화면에서 한 번 더 확인) */
 .btn-exit { background: #eef0f7; color: var(--muted); font-size: 0.9rem; padding: 8px 14px; min-height: 40px; }
 
+/* ===== 🏠 과목 고르기 (시작 화면) ===== */
+.home-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 18px 14px;
+  gap: 16px;
+}
+.home-ask {
+  margin: 0;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+/* 폰 세로는 한 줄에 하나, 태블릿 가로는 나란히 두 장 */
+.home-cards {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  width: 100%;
+  max-width: 760px;
+}
+.home-card { display: flex; }
+.home-card-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 3px solid transparent;
+  border-radius: 22px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding: 18px 14px 20px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.home-card-btn:active { transform: scale(0.97); }
+.home-card-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.home-card-title { font-size: 1.5rem; font-weight: 800; }
+.home-card-desc { font-size: 0.92rem; color: var(--muted); }
+
+/* 마스코트 자리 — 그림을 아직 안 받았으면 이모지가 대신 들어온다 */
+.home-card-mon {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 118px;
+  width: 118px;
+}
+.home-card-mon img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+  animation: home-mon-breathe 2.6s ease-in-out infinite;
+}
+.home-card-mon.no-img { font-size: 4rem; align-items: center; }
+@keyframes home-mon-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.03); }
+}
+
+/* 과목별 색 — 아이가 글자를 안 읽어도 색으로 구별한다 */
+.home-card:nth-child(1) .home-card-btn { border-color: #a5b4fc; background: linear-gradient(180deg, #eef2ff 0%, #ffffff 55%); }
+.home-card:nth-child(2) .home-card-btn { border-color: #fcd34d; background: linear-gradient(180deg, #fffbeb 0%, #ffffff 55%); }
+
+/* 아직 만드는 중인 과목 — 눌리기는 하되 "준비 중"이 보이게 */
+.home-card.soon .home-card-btn { opacity: 0.75; }
+.home-card.soon .home-card-mon img { filter: grayscale(0.55); }
+
+.home-hint {
+  margin: 0 auto;
+  max-width: 760px;
+  text-align: center;
+  background: #fff7ed;
+  border: 2px solid #fcd34d;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 700;
+  color: #92400e;
+}
+.home-foot { font-size: 0.8rem; }
+
+@media (min-width: 620px) {
+  .home-cards { grid-template-columns: 1fr 1fr; gap: 18px; }
+  .home-card-mon { height: 150px; width: 150px; }
+}
+
 /* ===== 종료 인사 화면 ===== */
 .bye {
   position: fixed;

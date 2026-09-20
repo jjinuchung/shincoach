@@ -571,7 +571,7 @@ export function initStats({ showView, requirePin }) {
   $('btn-stats').addEventListener('click', () => {
     requirePin(() => { showView('stats'); renderStats(); });
   });
-  $('btn-stats-back').addEventListener('click', () => showView('library'));
+  $('btn-stats-back').addEventListener('click', () => showView('home')); // 📊도 🏠 홈에서 연다
   $('btn-stats-export').addEventListener('click', doExport);
   $('stats-import-file').addEventListener('change', (e) => {
     const f = e.target.files && e.target.files[0];

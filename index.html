@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#4f46e5">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>신코치 - 영어 섀도잉</title>
+  <title>신코치 - 영어·수학 학습</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -15,12 +15,33 @@
 <body>
   <div id="error-banner" class="error-banner" hidden></div>
 
-  <!-- ===== 라이브러리 화면 ===== -->
-  <section id="view-library" class="view">
+  <!-- ===== 🏠 과목 고르기 (시작 화면) =====
+       영어와 수학을 한 앱에 두되 입구에서 갈라 놓는다 — 도감·코인·레벨은 함께 쓰고
+       학습 화면만 과목별로 나뉜다. 🎒·📊·🚪는 과목 공통이라 여기에 둔다. -->
+  <section id="view-home" class="view">
     <header class="topbar">
-      <h1 class="topbar-title">🎬 신코치 영어</h1>
+      <h1 class="topbar-title">🏫 신코치</h1>
       <button id="btn-pokedex" class="btn btn-icon" aria-label="내 포켓몬">🎒</button>
       <button id="btn-stats" class="btn btn-icon" aria-label="학습 기록">📊</button>
+    </header>
+
+    <main class="home-main">
+      <p class="home-ask">오늘은 무엇을 공부할까?</p>
+      <ul id="home-subjects" class="home-cards"></ul>
+      <p id="home-hint" class="home-hint" hidden></p>
+    </main>
+
+    <footer class="storage-info">
+      <span class="home-foot">진우의 학습앱</span>
+      <button id="btn-exit" class="btn btn-exit">🚪 종료</button>
+    </footer>
+  </section>
+
+  <!-- ===== 라이브러리 화면 (🎤 English) ===== -->
+  <section id="view-library" class="view" hidden>
+    <header class="topbar">
+      <button id="btn-library-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
+      <h1 class="topbar-title">🎬 신코치 영어</h1>
       <button id="btn-import" class="btn btn-primary">＋ 영상 가져오기</button>
     </header>
 
@@ -36,7 +57,6 @@
 
     <footer class="storage-info">
       <span id="storage-text">저장 공간 확인 중...</span>
-      <button id="btn-exit" class="btn btn-exit">🚪 종료</button>
     </footer>
   </section>
 

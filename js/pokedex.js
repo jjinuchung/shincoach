@@ -14,7 +14,7 @@ let openSeq = 0;         // 도감 그리기 요청 번호 (빠르게 두 번 �
 export function initPokedex(ctx) {
   showView = ctx.showView;
   $('btn-pokedex').addEventListener('click', () => openPokedex());
-  $('btn-pokedex-back').addEventListener('click', () => showView('library'));
+  $('btn-pokedex-back').addEventListener('click', () => showView('home')); // 🎒는 🏠 홈에서 열므로 홈으로 돌아간다
   $('pokedex-shop').addEventListener('click', openShop);
   initShop({ onChange: refreshAfterChange });
 }
