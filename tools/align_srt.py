@@ -96,20 +96,25 @@ def main():
         if not mine:
             continue
         # 시작 위치: 커서부터 window 안에서 앞 단어들이 가장 잘 맞는 자리
+        # ~줄(울음소리 등)은 커서 바로 근처에만 있다 — 멀리서 같은 단어를 찾아 붙으면 뒤 문장이 통째로 밀린다 (2026-09-22 beary_icy: ~Beartic!이 40단어 뒤 진짜 Beartic에 붙었다)
+        window = min(args.window, 6) if skip else args.window
         best_pos, best = cursor, -1
-        for pos in range(cursor, min(cursor + args.window, len(rec))):
+        for pos in range(cursor, min(cursor + window, len(rec))):
             sc = score_at(rec, pos, mine)
             if sc > best:
                 best, best_pos = sc, pos
             if sc == min(3, len(mine)):
                 break
+        if cursor >= len(rec):  # 인식 단어를 다 썼는데 문장이 남았다 — 앞에서 ~줄이 단어를 너무 많이 먹었거나 인식이 빠진 것
+            print(f"[warn] {idx}행부터는 인식 단어가 남지 않아 마지막 단어 시각에 붙인다: {text[:40]}")
+            best_pos = len(rec) - 1
         start_i = best_pos
         end_i = min(start_i + len(mine) - 1, len(rec) - 1)
         # 끝 위치 보정: 마지막 단어가 주변에 있으면 거기까지
         last = mine[-1]
         for d in range(-3, 4):
             j = end_i + d
-            if 0 <= j < len(rec) and rec[j][0] == last:
+            if start_i <= j < len(rec) and rec[j][0] == last:  # 시작보다 앞의 같은 단어(앞 줄의 return!)를 잡으면 한 단어짜리가 된다
                 end_i = j
                 break
         if end_i < start_i:
@@ -144,4 +149,5 @@ def main():
         print("모든 줄이 인식 단어에 맞춰졌다")
 
 
-main()
+if __name__ == "__main__":
+    main()
