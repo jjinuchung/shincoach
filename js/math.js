@@ -8,6 +8,7 @@ import { FRACTION, makeRound, makeQuestion, diagnosticSet, conceptStory, WORLDS 
 import { renderFigures, barSvg } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
+  dueNotes, countNotes, applyNotesRound,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { todayKey } from './track.js';
@@ -210,6 +211,17 @@ function renderLadder(state) {
     b.addEventListener('click', () => startRound(due[0], 'review'));
     head.appendChild(b);
   }
+  // 🤔 오답 노트 회차 — 어제 이전에 틀린 유형만 (개념 일정과 따로). 오늘 틀린 건 그 개념을 다시 열면 끼어 든다
+  const notesDue = dueNotes(state, today);
+  if (notesDue.length) {
+    const nb = el('button', 'btn btn-big-wide math-notes-btn', `🤔 틀렸던 유형 ${notesDue.length}개 다시 풀기 — 이번엔 맞혀서 지워요`);
+    nb.type = 'button';
+    nb.addEventListener('click', () => startNotesRound(notesDue));
+    head.appendChild(nb);
+  } else {
+    const nc = countNotes(state, today);
+    if (nc.all) head.appendChild(el('p', 'math-note', `🤔 오늘 틀린 유형 ${nc.all}개는 내일부터 다시 풀 수 있어요.`));
+  }
   m.appendChild(head);
 
   const list = el('ul', 'math-ladder');
@@ -257,6 +269,27 @@ function startRound(id, mode, o = {}) {
   if (o.again) renderRetry(id, o.wrong || []);
   else if (mode === 'learn') renderStory(id, seed);
   else renderQuestion();
+}
+
+/**
+ * 🤔 오답 노트 회차 — 노트마다 그 유형 한 문제(계산은 숫자만 다른 쌍둥이, ③⭐는 같은 문항). 개념 통과·👑은 안 건드린다.
+ * 맞히면 노트에서 지워지고, 틀리면 내일 이후에 다시 나온다.
+ */
+function startNotesRound(list) {
+  const base = (Date.now() % 1000000) | 0;
+  const qs = [];
+  const ids = [];
+  list.forEach((x, i) => {
+    let q = null;
+    for (let t = 0; t < 6 && !q; t++) q = makeQuestion(x.id, x.note.k, base + i * 101 + t * 7919, { ...ui.opts, want: x.note.key });
+    if (!q) return;
+    q.fromNote = true;
+    if (q.key !== x.note.key) q.key = x.note.key; // 같은 틀을 못 찾았어도(내용이 바뀐 경우) 노트는 이 key로 정리한다
+    qs.push(q); ids.push(x.id);
+  });
+  if (!qs.length) { renderLadder(ui.state); return; }
+  ui.round = { id: null, mode: 'notes', qs, ids, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
+  renderQuestion();
 }
 
 /**
@@ -338,7 +371,7 @@ function renderQuestion(restore = false) {
   const card = el('section', 'math-card math-q');
 
   const top = el('div', 'math-q-top');
-  top.appendChild(el('span', 'math-eyebrow', r.mode === 'diag' ? `📏 진단 ${r.at + 1} / ${r.qs.length}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
+  top.appendChild(el('span', 'math-eyebrow', r.mode === 'diag' ? `📏 진단 ${r.at + 1} / ${r.qs.length}` : r.mode === 'notes' ? `🤔 오답 노트 ${r.at + 1} / ${r.qs.length} · ${nameOf(q.concept)}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
   top.appendChild(el('span', 'math-kind', KIND_LABEL[q.kind] || ''));
   card.appendChild(top);
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
@@ -627,6 +660,9 @@ async function finishRound() {
   try {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, 'fraction', r.missTags); });
+    } else if (r.mode === 'notes') {
+      const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }) }));
+      state = await updateMath((s) => { result = applyNotesRound(s, qs, today); });
     } else {
       const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}) }));
       state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today); });
@@ -651,7 +687,9 @@ async function finishRound() {
   // 보상은 화면과 상관없이 지급 (나가 있어도 번 것은 번 것)
   const rw = r.mode === 'diag'
     ? { xp: r.correct * REWARD.diag.xp, coin: r.correct * REWARD.diag.coin, catchOnce: false }
-    : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
+    : r.mode === 'notes'
+      ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } // 🤔 노트 회차: 문항 정답만, 잡기 없음 (연습)
+      : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
   rw.xp += (r.fixed || 0) * REWARD.fix.xp; // 🔁 쌍둥이로 바로 고친 문항 (통과 여부와 무관)
   const g = gainXp(rw.xp);
   const c = gainCoins(rw.coin).gained;
@@ -672,6 +710,22 @@ async function finishRound() {
     card.appendChild(startP);
     card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}`));
     const b = el('button', 'btn btn-primary btn-big-wide', '사다리 보기');
+    b.type = 'button';
+    b.addEventListener('click', () => renderLadder(state));
+    card.appendChild(b);
+    m.appendChild(card);
+    return;
+  }
+
+  if (r.mode === 'notes') {
+    const card = el('section', 'math-card math-result');
+    const left = countNotes(state, today).all;
+    card.appendChild(el('h2', '', result.ok === result.total ? '🤔 → 😄 틀렸던 유형을 다 고쳤어요!' : `🤔 ${result.total}개 중 ${result.ok}개를 고쳤어요`));
+    card.appendChild(el('p', 'math-p', result.ok === result.total
+      ? (left ? `남은 노트 ${left}개는 내일 이후에 나와요.` : '오답 노트가 비었어요. 다음에 틀린 것이 있으면 다시 쌓여요.')
+      : `못 고친 ${result.total - result.ok}개는 내일 이후에 다시 나와요. 풀이를 한 번 더 읽어 봐요.`));
+    card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}`));
+    const b = el('button', 'btn btn-primary btn-big-wide', '사다리로');
     b.type = 'button';
     b.addEventListener('click', () => renderLadder(state));
     card.appendChild(b);

@@ -200,6 +200,60 @@ export function nextNote(m, id) {
   return notes.length ? notes[notes.length - 1] : null;
 }
 
+/** 🤔 오답 노트 회차에 한 번에 내는 문항 수 */
+export const NOTES_ROUND = 4;
+
+/**
+ * 🤔 오답 노트 회차에 낼 것 — **어제 이전에** 틀린 유형만 (같은 날은 그 개념을 다시 열 때 이미 한 번 끼어 든다).
+ * 개념이 👑이거나 복습 차례가 아니어도 나온다 — 노트는 개념 일정과 따로 돈다. 오래된 것부터, 최대 NOTES_ROUND개.
+ * @returns {Array<{id:string, note:object}>}
+ */
+export function dueNotes(m, today, limit = NOTES_ROUND) {
+  const out = [];
+  for (const [id, rec] of Object.entries((m && m.concepts) || {})) {
+    for (const n of (rec && Array.isArray(rec.notes) ? rec.notes : [])) if (n && n.key && n.d && n.d < today) out.push({ id, note: n });
+  }
+  return out.sort((a, b) => (a.note.t || 0) - (b.note.t || 0)).slice(0, limit);
+}
+
+/** 모든 개념의 노트 수 (사다리 버튼·📊용). due: 어제 이전 것만 */
+export function countNotes(m, today) {
+  let all = 0; let due = 0;
+  for (const rec of Object.values((m && m.concepts) || {})) {
+    for (const n of (rec && Array.isArray(rec.notes) ? rec.notes : [])) { all++; if (n && n.d && today && n.d < today) due++; }
+  }
+  return { all, due };
+}
+
+/**
+ * 🤔 오답 노트 회차 결과 반영 — 개념의 통과·라이트너는 건드리지 않는다 (연습). 맞히면 노트에서 지우고,
+ * 틀리면 날짜를 오늘로 밀어 내일 이후에 다시 나오게 한다. 얼굴별 누적·오개념은 그 개념에 쌓이고, 일지에는 'notes' 한 줄.
+ * @param {Array<{id:string, key:string, k:string, ok:0|1, tag?:string, fx?:0|1}>} qs
+ */
+export function applyNotesRound(m, qs, today) {
+  m.concepts = m.concepts || {};
+  m.miss = m.miss || {};
+  let ok = 0;
+  for (const q of (qs || [])) {
+    if (!q || !q.id) continue;
+    const rec = m.concepts[q.id];
+    if (!rec) continue;
+    rec.kinds = rec.kinds || {};
+    rec.miss = rec.miss || {};
+    rec.notes = Array.isArray(rec.notes) ? rec.notes : [];
+    if (q.k) { const kk = rec.kinds[q.k] || [0, 0]; rec.kinds[q.k] = [kk[0] + (q.ok ? 1 : 0), kk[1] + 1]; }
+    if (q.ok) { ok++; rec.notes = rec.notes.filter((n) => n.key !== q.key); }
+    else {
+      if (q.tag) { rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1; m.miss[q.tag] = (m.miss[q.tag] || 0) + 1; }
+      const n = rec.notes.find((x) => x.key === q.key);
+      if (n) { n.d = today; n.t = Date.now(); n.again = (n.again || 0) + 1; if (q.tag) n.tag = q.tag; if (q.fx !== undefined) n.fx = q.fx ? 1 : 0; }
+    }
+  }
+  pushLog(m, { d: today, t: Date.now(), id: 'notes', mode: 'notes', ok, n: (qs || []).length,
+    qs: (qs || []).map((q) => ({ k: q.k, c: q.id, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) })) });
+  return { ok, total: (qs || []).length };
+}
+
 /** 아이에게 보여 주지 않는 진단용 이름표 — 부모 화면(📊)에는 그대로 쌓인다 */
 export const META_TAGS = new Set(['오개념을 못 짚음', '틀린 줄 모름', '개념을 다르게 이해함', '계산 실수', '엉뚱한 수', '오개념']);
 export function kidTags(tags) {
@@ -238,9 +292,10 @@ export function conceptReport(m, limit = 8) {
     const rounds = (rec.passes || 0) + (rec.fails || 0);
     const fixed = mine.reduce((a, e) => a + (e.qs || []).filter((q) => q.fx === 1).length, 0); // 🔁 틀렸다가 쌍둥이로 바로 고친 문항 수
     // 진단으로만 "안다"가 된 개념(passes 1은 진단의 것)은 한 편도 안 푼 것이라 표에 안 올린다 — 복습에서 풀면 일지가 생겨 올라온다
-    const notes = Array.isArray(rec.notes) ? rec.notes.length : 0;
-    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, notes, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length };
-  }).filter((r) => r.trail.length || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt);
+    const noteList = (Array.isArray(rec.notes) ? rec.notes : []).map((n) => ({ k: n.k, label: KIND_SHORT[n.k] || n.k || '', tag: n.tag || '', d: n.d || '', again: n.again || 0, fx: n.fx }));
+    const notes = noteList.length;
+    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, notes, noteList, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length };
+  }).filter((r) => r.trail.length || r.notes || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt); // 🤔 노트만 있는 개념(진단으로 안 것)도 표에 — 못 고친 유형을 보여 줘야 한다
 }
 
 /**
@@ -262,7 +317,7 @@ export function mathReportText(m, today) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
       const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
-      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : nameOf(e.id)} ${e.mode || ''} ${e.ok}/${e.n} ${qs}`);
+      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : nameOf(e.id)} ${e.mode || ''} ${e.ok}/${e.n} ${qs}`);
     }
   }
   return lines.join('\n');

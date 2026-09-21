@@ -475,6 +475,19 @@ export async function renderStats() {
       cM.appendChild(wrap);
       const weak = report.filter((r) => r.weak && r.weak.rate < 0.6).map((r) => `${r.name}의 ${r.weak.label}(${r.weak.ok}/${r.weak.n})`);
       if (weak.length) cM.appendChild(el('p', 'stats-note', `약한 얼굴: ${weak.join(' · ')} — ①은 계산, ②는 남의 오류 찾기, ③은 왜 그런지, ⭐는 이야기 문제예요.`));
+      // 🤔 아직 못 고친 유형 — 틀린 뒤 처음에 맞힌 적이 없는 것. 내일부터 오답 노트 회차에 나온다
+      const open = report.flatMap((r) => (r.noteList || []).map((n) => ({ ...n, name: r.name })));
+      if (open.length) {
+        cM.appendChild(el('p', 'stats-sub', `🤔 아직 못 고친 유형 ${open.length}개 — 틀린 뒤 처음에 맞힌 적이 없는 것 (내일부터 다시 나와요)`));
+        const box = el('div', 'stats-missed');
+        for (const n of open) {
+          const chip = el('span', 'stats-missed-chip');
+          chip.appendChild(el('b', '', `${n.name} ${n.label}`));
+          chip.appendChild(el('span', 'n', ` ${n.tag ? n.tag + ' · ' : ''}${n.d.slice(5)}${n.again ? ` · 또 틀림 ${n.again}` : ''}${n.fx === 1 ? ' · 바로 고침' : ''}`));
+          box.appendChild(chip);
+        }
+        cM.appendChild(box);
+      }
     }
     // 📋 Claude에게 보여 줄 글 — 폰에서 복사해 대화창에 붙인다 (내보내기 JSON은 크고 사람이 못 읽는다)
     const copyRow = el('div', 'stats-actions');

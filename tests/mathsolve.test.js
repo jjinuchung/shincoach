@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { FRACTION, makeQuestion, makeRound, valueOf, tplKey } from '../js/mathgen.js';
-import { applyRound, conceptReport, mathReportText, REWARD, nextNote, NOTES_MAX } from '../js/mathprog.js';
+import { applyRound, conceptReport, mathReportText, REWARD, nextNote, NOTES_MAX, dueNotes, countNotes, applyNotesRound, NOTES_ROUND } from '../js/mathprog.js';
 import { emptyMath, mergeMath } from '../js/db.js';
 import { makeSnapshot, snapshotHas, snapshotSummary } from '../js/backup.js';
 
@@ -207,4 +207,37 @@ test('[Codex #3] 자동 사본에 수학 진도가 들어간다 — 개념이 �
   assert.equal(snapshotHas(onlyMath), true);
   // 빈 수학 레코드는 안 담는다 (사본을 작게)
   assert.equal(makeSnapshot({ profile: { id: 'me', xp: 1 }, math: emptyMath() }).profile.length, 1);
+});
+
+test('2차-B: 🤔 오답 노트 회차 — 어제 이전 것만 오래된 순으로 최대 4개, 개념 일정과 무관 (👑이어도 나온다)', () => {
+  const m = emptyMath();
+  const Y = '2026-09-20'; const T2 = '2026-09-21';
+  applyRound(m, 'frac.add', { correct: 3, total: 4, missTags: [], qs: [{ k: 'calc', ok: 0, key: 'A' }] }, Y);
+  applyRound(m, 'frac.mul', { correct: 3, total: 4, missTags: [], qs: [{ k: 'why', ok: 0, key: 'B', tag: '개념을 다르게 이해함' }] }, Y);
+  applyRound(m, 'frac.div', { correct: 3, total: 4, missTags: [], qs: [{ k: 'calc', ok: 0, key: 'C' }] }, T2); // 오늘 틀린 것
+  m.concepts['frac.add'].notes[0].t = 1; m.concepts['frac.mul'].notes[0].t = 2;
+  m.concepts['frac.mul'].box = 5; // 👑이어도
+  const due = dueNotes(m, T2);
+  assert.deepEqual(due.map((x) => [x.id, x.note.key]), [['frac.add', 'A'], ['frac.mul', 'B']], '오늘 틀린 C는 아직');
+  assert.deepEqual(countNotes(m, T2), { all: 3, due: 2 });
+  assert.equal(NOTES_ROUND, 4);
+  // 회차 결과: A 맞힘 → 지움, B 틀림 → 오늘 날짜로 밀려 내일 이후
+  const res = applyNotesRound(m, [{ id: 'frac.add', key: 'A', k: 'calc', ok: 1 }, { id: 'frac.mul', key: 'B', k: 'why', ok: 0, tag: '개념을 다르게 이해함', fx: 0 }], T2);
+  assert.deepEqual(res, { ok: 1, total: 2 });
+  assert.equal(m.concepts['frac.add'].notes.length, 0);
+  const b = m.concepts['frac.mul'].notes[0];
+  assert.equal(b.d, T2); assert.equal(b.again, 1); assert.equal(b.fx, 0);
+  assert.deepEqual(dueNotes(m, T2), [], '오늘 밀린 것은 오늘 다시 안 나온다');
+  assert.equal(dueNotes(m, '2026-09-22').length, 2, '내일이면 B와 C');
+  // 개념 통과·라이트너는 그대로, 얼굴별 누적·오개념은 쌓임
+  assert.equal(m.concepts['frac.mul'].box, 5);
+  assert.deepEqual(m.concepts['frac.add'].kinds.calc, [1, 2]);
+  assert.equal(m.concepts['frac.mul'].miss['개념을 다르게 이해함'], 2);
+  // 일지 한 줄 + 보고서
+  const last = m.log[m.log.length - 1];
+  assert.equal(last.id, 'notes'); assert.equal(last.ok, 1); assert.equal(last.qs[1].c, 'frac.mul');
+  const txt = mathReportText(m, T2);
+  assert.ok(txt.includes('🤔오답노트 notes 1/2'), txt);
+  const rep = conceptReport(m).find((r) => r.id === 'frac.mul');
+  assert.deepEqual(rep.noteList.map((n) => [n.label, n.again]), [['③왜', 1]]);
 });
