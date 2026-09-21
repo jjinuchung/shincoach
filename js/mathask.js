@@ -27,9 +27,14 @@ const touch = (ask) => { ask.u = Math.max(Date.now(), (Number(ask.u) || 0) + 1);
 /** 문항과 답 기록에서 질문 문맥을 만든다 — 아빠가 받는 알맹이 */
 export function askContext(q, a) {
   const okCh = (q && q.choices || []).find((c) => c && c.ok) || {};
+  // 아이가 이미 본 설명(규칙·풀이 단계)도 담는다 — 답하는 사람이 같은 말을 되풀이하지 않게 (Codex 4차 #11)
+  const sv = (q && q.solve) || {};
+  const steps = (Array.isArray(sv.steps) ? sv.steps : []).map((x) => typeof x === 'string' ? x : (x && (x.text || x.t)) || '').filter(Boolean);
+  const seen = [sv.rule ? `규칙: ${sv.rule}` : '', ...steps].filter(Boolean).join(' / ').slice(0, 400);
   return {
     concept: q.concept, k: q.kind || 'calc', key: q.key || '', q: String(q.q || ''), expr: String(q.expr || ''),
     my: String((a && a.chosen) || ''), ans: String(okCh.text || ''), tag: String((a && a.tag) || ''), w: String((a && a.w) || ''),
+    choices: (q && q.choices || []).map((c) => String((c && c.text) || '')), seen,
   };
 }
 
@@ -38,9 +43,9 @@ export function askedToday(m, today) {
   return list(m).filter((x) => x && x.d === today).length;
 }
 
-/** 같은 유형(key)을 이미 물어봤고 아직 안 끝났나 */
-export function pendingAskFor(m, key) {
-  return key ? list(m).find((x) => x && x.key === key && !['fixed', 'closed'].includes(x.status)) || null : null;
+/** 같은 개념의 같은 유형(key)을 이미 물어봤고 아직 안 끝났나 — key만 보면 분수 ②('misread' 고정)가 개념을 넘어 겹친다 (Codex 4차 #3) */
+export function pendingAskFor(m, concept, key) {
+  return key ? list(m).find((x) => x && x.concept === concept && x.key === key && !['fixed', 'closed'].includes(x.status)) || null : null;
 }
 
 /**
@@ -48,7 +53,7 @@ export function pendingAskFor(m, key) {
  * @returns {{ok:true, ask:object} | {ok:false, reason:'dup'|'limit'}}
  */
 export function addAsk(m, ctx, today, kid = '') {
-  if (pendingAskFor(m, ctx.key)) return { ok: false, reason: 'dup' };
+  if (pendingAskFor(m, ctx.concept, ctx.key)) return { ok: false, reason: 'dup' };
   if (askedToday(m, today) >= ASK_DAILY_MAX) return { ok: false, reason: 'limit' };
   m.asks = list(m).slice();
   m.askSeq = (Number(m.askSeq) || 0) + 1;
@@ -59,10 +64,12 @@ export function addAsk(m, ctx, today, kid = '') {
   return { ok: true, ask };
 }
 
+/** 끝난 것(fixed·closed)만 오래된 순으로 정리한다 — 미해결은 아무리 많아도 지우지 않는다 (지우면 번호로 온 답장이 갈 곳을 잃는다, Codex 4차 #4) */
 function trimAsks(m) {
-  if (m.asks.length <= ASKS_MAX) return;
-  const doneFirst = [...m.asks].sort((a, b) => (['fixed', 'closed'].includes(a.status) ? 0 : 1) - (['fixed', 'closed'].includes(b.status) ? 0 : 1) || a.t - b.t);
-  const drop = new Set(doneFirst.slice(0, m.asks.length - ASKS_MAX).map((x) => x.id));
+  const over = m.asks.length - ASKS_MAX;
+  if (over <= 0) return;
+  const done = m.asks.filter((x) => ['fixed', 'closed'].includes(x.status)).sort((a, b) => a.t - b.t);
+  const drop = new Set(done.slice(0, over).map((x) => x.id));
   m.asks = m.asks.filter((x) => !drop.has(x.id));
 }
 
@@ -88,8 +95,9 @@ export function applyReply(m, no, text) {
   const body = String(text || '').trim();
   if (!ask || !body || ['fixed', 'closed'].includes(ask.status)) return false;
   ask.replies = Array.isArray(ask.replies) ? ask.replies : [];
-  const last = ask.replies[ask.replies.length - 1];
-  if (last && last.text === body) return false;
+  // 이력 전체와 비교 — 배포 답장 A 뒤에 붙여넣기 B가 오고 다시 수학을 열면 JSON의 A가 또 오는데, 마지막만 보면 [A, B, A]가 된다 (Codex 4차 #1)
+  const same = (x) => String(x || '').replace(/\s+/g, ' ').trim();
+  if (ask.replies.some((r) => same(r.text) === same(body))) return false;
   const t = touch(ask);
   ask.replies.push({ t, text: body });
   ask.status = 'answered';
@@ -104,10 +112,18 @@ export function markAskRead(m, id) {
   return true;
 }
 
-/** 😄 이해했어요 / 😶 아직 모르겠어요(한마디와 함께 다시 아빠에게) */
-export function decideAsk(m, id, understood, kid = '') {
+/**
+ * 😄 이해했어요 / 😶 아직 모르겠어요(한마디와 함께 다시 아빠에게).
+ * answered에서, 그리고 understood에서도 😶는 된다 — 이해했다고 했다가 문제를 틀리고 답장을 다시 보면 되물을 수 있어야 한다 (Codex 4차 #2).
+ * seenT: 화면이 보여 준 마지막 답장의 시각 — 그 사이 다른 창에서 새 답장이 붙었으면 'stale'을 돌려주고 아무것도 안 바꾼다 (#5)
+ * @returns {true|false|'stale'}
+ */
+export function decideAsk(m, id, understood, kid = '', seenT = undefined) {
   const ask = list(m).find((x) => x && x.id === id);
-  if (!ask || ask.status !== 'answered') return false;
+  if (!ask) return false;
+  if (!(ask.status === 'answered' || (!understood && ask.status === 'understood'))) return false;
+  const lastT = (ask.replies && ask.replies.length) ? ask.replies[ask.replies.length - 1].t : 0;
+  if (seenT !== undefined && lastT !== seenT) return 'stale';
   const t = touch(ask);
   if (understood) ask.status = 'understood';
   else { ask.status = 'again'; ask.again = Array.isArray(ask.again) ? ask.again : []; ask.again.push({ t, kid: String(kid || '').trim().slice(0, 200) }); }
@@ -119,7 +135,7 @@ export function decideAsk(m, id, understood, kid = '') {
  * 이해한 뒤 같은 틀의 문제를 풀어 본 결과. 맞히면 fixed + 그 유형의 🤔 노트를 지운다(답장으로 고친 것). 틀리면 understood 그대로 — 다시 해 볼 수 있다.
  * 일지에 'ask' 한 줄 (📊 활동에 센다).
  */
-export function applyAskTry(m, id, ok, today) {
+export function applyAskTry(m, id, ok, today, { sameKey = true } = {}) {
   const ask = list(m).find((x) => x && x.id === id);
   if (!ask || !['understood', 'fixed'].includes(ask.status)) return { ok: false };
   const t = touch(ask);
@@ -130,11 +146,14 @@ export function applyAskTry(m, id, ok, today) {
     ask.status = 'fixed';
     ask.tryOk = 1;
     fixed = true;
+    // 같은 틀을 맞혔을 때만 그 유형의 🤔 노트를 지운다 — 틀이 바뀌어 다른 문제로 확인했으면 원래 유형을 고쳤다고 볼 수 없다 (Codex 4차 #7).
+    // 지운 표시(cleared)는 노트가 지금 없어도 남긴다 — 옛 백업에서 되살아나지 않게 (#8)
     const rec = m.concepts && m.concepts[ask.concept];
-    if (rec && Array.isArray(rec.notes) && ask.key && rec.notes.some((n) => n.key === ask.key)) {
-      rec.notes = rec.notes.filter((n) => n.key !== ask.key);
+    if (sameKey && rec && ask.key) {
+      rec.notes = (Array.isArray(rec.notes) ? rec.notes : []).filter((n) => n.key !== ask.key);
       markCleared(rec, ask.key);
     }
+    ask.sameKey = sameKey ? 1 : 0;
   }
   m.log = Array.isArray(m.log) ? m.log : [];
   m.log.push({ d: today, t, id: 'ask', mode: 'ask', ok: ok ? 1 : 0, n: 1, qs: [{ k: ask.k, ok: ok ? 1 : 0, c: ask.concept, no: ask.no }] });
@@ -163,13 +182,15 @@ export function askSummary(m) {
  */
 export function asksText(m, today) {
   const open = openAsks(m);
-  const lines = [`❓ 진우의 수학 질문 ${open.length}개 (${today}) — 답은 \`💬번호\`로 시작하는 줄 뒤에 써 주세요. 여러 줄 가능, 그림은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5 5] 처럼.`, '아이 눈높이(초4)로, 답을 바로 말하지 말고 왜 그런지부터. 아빠 이름으로 나갑니다.', ''];
+  const lines = [`❓ 진우의 수학 질문 ${open.length}개 (${today}) — 답은 \`💬번호\`로 시작하는 줄 뒤에 써 주세요. 여러 줄 가능, 그림은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] 처럼.`, '아이 눈높이(초4)로, 답을 바로 말하지 말고 왜 그런지부터. 아빠 이름으로 나갑니다.', ''];
   for (const a of open) {
     lines.push(`❓${a.no} ${nameOf(a.concept)} · ${KIND_SHORT[a.k] || a.k} · ${a.d}`);
     lines.push(`문제: ${a.q}`);
     if (a.expr) lines.push(`식: ${a.expr}`);
     lines.push(`진우 답: ${a.my || '(없음)'} ❌${a.tag ? ` (오개념: ${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · 진우: ${WHY_LABEL[a.w]}` : ''}`);
     lines.push(`정답: ${a.ans}`);
+    if (Array.isArray(a.choices) && a.choices.length) lines.push(`보기: ${a.choices.map((c, i) => `${['①', '②', '③', '④'][i] || i + 1} ${c}${c === a.ans ? ' ✔' : c === a.my ? ' ❌' : ''}`).join(' · ')}`);
+    if (a.seen) lines.push(`앱이 이미 보여 준 설명: ${a.seen}`);
     if (a.kid) lines.push(`진우 말: "${a.kid}"`);
     (a.replies || []).forEach((r, i) => {
       lines.push(`아빠 답장 ${i + 1}: ${r.text.replace(/\n+/g, ' / ')}`);
@@ -187,11 +208,18 @@ export function asksText(m, today) {
  */
 export function parseReplies(text) {
   const out = new Map();
+  const bad = [];
   let cur = null;
+  // 카톡·메모를 거치면 전각 숫자(１２)·전각 콜론(：)이 섞인다 — 머리 줄만 정규화 (Codex 4차 #10)
+  const norm = (s) => s.replace(/[０-９]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0xFF10 + 48)).replace(/：/g, ':');
   for (const raw of String(text || '').split(/\r?\n/)) {
-    const m = /^\s*💬\s*(\d+)\s*[:.）)\-—]?\s*(.*)$/.exec(raw);
+    const head = norm(raw);
+    const m = /^\s*💬\s*(\d+)\s*[:.）)\-—]?\s*(.*)$/.exec(head);
     if (m) { cur = { no: Number(m[1]), lines: [m[2]] }; out.set(cur.no, cur); continue; }
+    if (/^\s*💬/.test(head)) { cur = null; bad.push(raw.trim()); continue; } // 번호를 못 읽은 💬 줄 — 앞 답장에 섞이지 않게 끊는다
     if (cur) cur.lines.push(raw);
   }
-  return [...out.values()].map((b) => ({ no: b.no, text: b.lines.join('\n').trim() })).filter((b) => b.text);
+  const list = [...out.values()].map((b) => ({ no: b.no, text: b.lines.join('\n').trim() })).filter((b) => b.text);
+  if (bad.length) list.bad = bad; // 화면이 "번호를 못 읽은 줄이 있어요"로 알린다
+  return list;
 }

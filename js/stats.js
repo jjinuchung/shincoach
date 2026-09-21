@@ -567,6 +567,7 @@ export async function renderStats() {
     });
     applyBtn.addEventListener('click', async () => {
       const blocks = parseReplies(area.value);
+      if (blocks.bad && blocks.bad.length) { msg.textContent = `번호를 못 읽은 💬 줄이 있어요: "${blocks.bad[0].slice(0, 30)}" — 💬12 처럼 번호를 붙여 주세요.`; return; }
       if (!blocks.length) { msg.textContent = '💬번호 로 시작하는 줄을 못 찾았어요. 예: 💬12 분모는 …'; return; }
       let n = 0;
       await updateMath((m) => { for (const b of blocks) if (applyReply(m, b.no, b.text)) n++; });
@@ -580,7 +581,7 @@ export async function renderStats() {
     cA.appendChild(row);
     cA.appendChild(area);
     cA.appendChild(msg);
-    cA.appendChild(el('p', 'stats-note', '답은 아빠 이름으로 나가요. [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5 5] 같은 그림 지시문을 쓰면 그림으로 보여요. 배포(coach/math/replies.json)로 보내도 돼요 — Claude에게 부탁하면 됩니다.'));
+    cA.appendChild(el('p', 'stats-note', '답은 아빠 이름으로 나가요. [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] 같은 그림 지시문을 쓰면 그림으로 보여요. 배포(coach/math/replies.json)로 보내도 돼요 — Claude에게 부탁하면 됩니다.'));
     main.appendChild(cA);
   }
 

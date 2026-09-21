@@ -15,7 +15,7 @@ const known = () => { const m = emptyMath(); applyRound(m, 'frac.common', { corr
 
 test('askContext: 문항+답에서 아빠가 받을 문맥(개념·얼굴·틀·문제·식·내 답·정답·오개념·이유)을 만든다', () => {
   const c = askContext(Q, A);
-  assert.deepEqual(c, { concept: 'frac.common', k: 'why', key: Q.key, q: Q.q, expr: '3/4 + 1/6', my: '분모끼리 더하면 돼요', ans: '분모가 달라서 크기를 맞춰야 해요', tag: '분모끼리 더함', w: 'u' });
+  assert.deepEqual(c, { concept: 'frac.common', k: 'why', key: Q.key, q: Q.q, expr: '3/4 + 1/6', my: '분모끼리 더하면 돼요', ans: '분모가 달라서 크기를 맞춰야 해요', tag: '분모끼리 더함', w: 'u', choices: ['분모가 달라서 크기를 맞춰야 해요', '분모끼리 더하면 돼요'], seen: '' });
 });
 
 test('addAsk: 번호는 askSeq로 고정, 하루 3개, 같은 유형은 끝날 때까지 하나만', () => {
@@ -24,7 +24,8 @@ test('addAsk: 번호는 askSeq로 고정, 하루 3개, 같은 유형은 끝날 �
   assert.equal(r1.ok, true); assert.equal(r1.ask.no, 1); assert.equal(r1.ask.status, 'asked'); assert.equal(r1.ask.kid, '왜 분모는 안 더해요?');
   assert.equal(askedToday(m, T), 1);
   assert.deepEqual(addAsk(m, askContext(Q, A), T), { ok: false, reason: 'dup' }, '같은 틀은 아빠 답이 올 때까지 하나');
-  assert.ok(pendingAskFor(m, Q.key));
+  assert.ok(pendingAskFor(m, Q.concept, Q.key));
+  assert.equal(pendingAskFor(m, 'frac.mean', Q.key), null, '다른 개념의 같은 틀은 별개 (분수 ②는 key가 misread 하나)');
   addAsk(m, { ...askContext(Q, A), key: 'K2' }, T);
   addAsk(m, { ...askContext(Q, A), key: 'K3' }, T);
   assert.deepEqual(addAsk(m, { ...askContext(Q, A), key: 'K4' }, T), { ok: false, reason: 'limit' }, `하루 ${ASK_DAILY_MAX}개`);
@@ -148,4 +149,108 @@ test(`오래된 질문 정리: ${ASKS_MAX}개를 넘으면 끝난 것(fixed·clo
   }
   assert.equal(m.asks.length, ASKS_MAX);
   assert.equal(m.asks.filter((x) => x.status === 'fixed').length, 3, '끝난 것 두 개가 먼저 나갔다');
+});
+
+// ───── Codex 4차 리뷰 회귀 (2026-09-22) ─────
+
+test('Codex #1: 배포 답장 A → 붙여넣기 B → 수학 재진입(A 재수신) 해도 [A, B]로 남고 상태도 안 되돌아간다', () => {
+  const m = known();
+  const { ask } = addAsk(m, askContext(Q, A), T);
+  assert.equal(applyReply(m, 1, 'deployed A'), true);
+  assert.equal(applyReply(m, 1, 'pasted B'), true);
+  decideAsk(m, ask.id, false, 'again');
+  assert.equal(ask.status, 'again');
+  assert.equal(applyReply(m, 1, 'deployed A'), false, '이력에 있는 글은 다시 안 붙는다');
+  assert.equal(applyReply(m, 1, '  deployed   A '), false, '공백 차이도 같은 글');
+  assert.deepEqual(ask.replies.map((r) => r.text), ['deployed A', 'pasted B']);
+  assert.equal(ask.status, 'again', '옛 답장이 상태를 되돌리지 않는다');
+});
+
+test('Codex #2: 이해했다가 문제를 틀린 뒤 😶 아직 모르겠어요 → again으로 간다 (fixed·closed는 여전히 안 됨)', () => {
+  const m = known();
+  const { ask } = addAsk(m, askContext(Q, A), T);
+  applyReply(m, 1, 'A');
+  decideAsk(m, ask.id, true);
+  applyAskTry(m, ask.id, false, T);
+  assert.equal(decideAsk(m, ask.id, false, '조각이 뭐예요'), true);
+  assert.equal(ask.status, 'again');
+  assert.deepEqual(ask.again.map((x) => x.kid), ['조각이 뭐예요']);
+  assert.equal(decideAsk(m, ask.id, true), false, 'again에서 😄는 없다 (답장을 기다린다)');
+  applyReply(m, 1, 'B'); decideAsk(m, ask.id, true); applyAskTry(m, ask.id, true, T);
+  assert.equal(ask.status, 'fixed');
+  assert.equal(decideAsk(m, ask.id, false, 'x'), false, 'fixed면 되물음 없음');
+});
+
+test('Codex #5: 화면이 본 답장 시각(seenT)과 다르면 stale — 다른 창의 새 답장을 안 읽고 처리하지 않는다', () => {
+  const m = known();
+  const { ask } = addAsk(m, askContext(Q, A), T);
+  applyReply(m, 1, 'A');
+  const seenT = ask.replies[0].t;
+  applyReply(m, 1, 'B'); // 다른 창에서
+  assert.equal(decideAsk(m, ask.id, true, '', seenT), 'stale');
+  assert.equal(ask.status, 'answered', '아무것도 안 바꿨다');
+  assert.equal(decideAsk(m, ask.id, true, '', ask.replies[1].t), true, '최신을 보고 정하면 된다');
+});
+
+test('Codex #3: 서로 다른 개념의 같은 틀(misread)은 각각 물을 수 있다', () => {
+  const m = known();
+  m.concepts['frac.mean'] = { done: true, box: 1, dueAt: T, passes: 1, fails: 0, lastAt: 1 };
+  assert.equal(addAsk(m, { ...askContext(Q, A), concept: 'frac.common', key: 'misread' }, T).ok, true);
+  assert.equal(addAsk(m, { ...askContext(Q, A), concept: 'frac.mean', key: 'misread' }, T).ok, true, '다른 개념');
+  assert.deepEqual(addAsk(m, { ...askContext(Q, A), concept: 'frac.mean', key: 'misread' }, T), { ok: false, reason: 'dup' }, '같은 개념은 하나');
+});
+
+test('Codex #4: 40개 제한은 끝난 것만 지운다 — 미해결 41개면 하나도 안 지운다', () => {
+  const m = known();
+  for (let i = 0; i < ASKS_MAX + 1; i++) addAsk(m, { ...askContext(Q, A), key: `K${i}` }, `2026-01-${String(1 + Math.floor(i / 3)).padStart(2, '0')}`);
+  assert.equal(m.asks.length, ASKS_MAX + 1, '미해결은 보존');
+  assert.equal(applyReply(m, 1, '늦은 답장'), true, '1번 질문이 남아 있어 답장이 붙는다');
+});
+
+test('Codex #7·#8: 틀이 바뀌어 다른 문제로 확인하면 fixed는 되지만 노트·같은 틀 표시는 안 하고, 같은 틀이면 노트가 없어도 cleared를 남긴다', () => {
+  const m = known();
+  const { ask } = addAsk(m, askContext(Q, A), T);
+  applyReply(m, 1, 'A'); decideAsk(m, ask.id, true);
+  const r = applyAskTry(m, ask.id, true, T, { sameKey: false });
+  assert.deepEqual(r, { ok: true, fixed: true });
+  assert.equal(ask.sameKey, 0);
+  assert.equal(m.concepts['frac.common'].notes.length, 1, '원래 유형의 노트는 그대로');
+  assert.equal(m.concepts['frac.common'].cleared, undefined);
+  // 같은 틀인데 노트가 이미 없는 경우 — cleared는 남는다
+  const m2 = known();
+  const a2 = addAsk(m2, askContext(Q, A), T).ask;
+  m2.concepts['frac.common'].notes = [];
+  applyReply(m2, 1, 'A'); decideAsk(m2, a2.id, true);
+  applyAskTry(m2, a2.id, true, T);
+  assert.ok(m2.concepts['frac.common'].cleared[Q.key] > 0, '옛 백업의 노트가 되살아나지 않게');
+});
+
+test('Codex #6: 같은 시각의 다른 답장은 병합에서 둘 다 남는다', () => {
+  const a = known();
+  const { ask } = addAsk(a, askContext(Q, A), T);
+  const b = JSON.parse(JSON.stringify(a));
+  const real = Date.now;
+  try { Date.now = () => 5000; applyReply(a, 1, 'A'); applyReply(b, 1, 'B'); } finally { Date.now = real; }
+  assert.equal(a.asks[0].replies[0].t, b.asks[0].replies[0].t, '같은 밀리초');
+  for (const merged of [mergeMath(a, b), mergeMath(b, a)]) assert.deepEqual(merged.asks[0].replies.map((r) => r.text).sort(), ['A', 'B']);
+  assert.ok(ask);
+});
+
+test('Codex #10: 전각 숫자·전각 콜론 머리 줄도 읽고, 번호 없는 💬 줄은 앞 답장에 섞이지 않고 bad로 알린다', () => {
+  const r = parseReplies('💬1 A\n💬２ B\n💬 ３： C');
+  assert.deepEqual(r.map((x) => [x.no, x.text]), [[1, 'A'], [2, 'B'], [3, 'C']]);
+  const r2 = parseReplies('💬1 A\n💬 (번호 없음) 이건 어디로?\n딸린 줄\n💬2 B');
+  assert.deepEqual(r2.map((x) => [x.no, x.text]), [[1, 'A'], [2, 'B']], '번호 없는 블록의 줄이 1번에 붙지 않는다');
+  assert.deepEqual(r2.bad, ['💬 (번호 없음) 이건 어디로?']);
+  assert.equal(parseReplies('💬1 A').bad, undefined);
+});
+
+test('Codex #11: 복사문에 보기 목록(✔/❌ 표시)과 아이가 본 설명이 들어간다', () => {
+  const m = known();
+  const q = { ...Q, solve: { rule: '분모가 다르면 크기를 맞춘다', steps: ['① 12로 통분', { text: '② 더한다' }] } };
+  addAsk(m, askContext(q, A), T);
+  const txt = asksText(m, T);
+  assert.ok(txt.includes('보기: ① 분모가 달라서 크기를 맞춰야 해요 ✔ · ② 분모끼리 더하면 돼요 ❌'), txt);
+  assert.ok(txt.includes('앱이 이미 보여 준 설명: 규칙: 분모가 다르면 크기를 맞춘다 / ① 12로 통분 / ② 더한다'), txt);
+  assert.ok(txt.includes('[line -5..5]'), '수직선 문법 안내가 맞다');
 });

@@ -838,7 +838,7 @@ function askOffer(q, a) {
   if (!r || light(r) || !a || a.correct || a.w === 's' || !(a.w === 'u' || q.fromNote) || !q.key) return null;
   if (a.asked) return el('p', 'math-ask-sent', `📮 아빠에게 보냈어요 (❓${a.asked}) — 답장이 오면 📬로 알려 줄게요`);
   const box = el('div', 'math-ask');
-  box.appendChild(el('p', 'math-ask-lead', q.fromNote ? '❓ 또 틀렸네요 — 이 문제를 아빠에게 물어볼래요? 문제는 앱이 그대로 보내요.' : '❓ 잘 몰랐다면 아빠에게 물어볼래요? 문제는 앱이 그대로 보내요.'));
+  box.appendChild(el('p', 'math-ask-lead', q.fromNote ? '❓ 아직 헷갈리면 아빠에게 물어볼까요? 문제는 앱이 그대로 보내요.' : '❓ 잘 몰랐다면 아빠에게 물어볼래요? 문제는 앱이 그대로 보내요.'));
   const b = el('button', 'btn math-ask-btn', '❓ 아빠에게 물어보기');
   b.type = 'button';
   b.addEventListener('click', () => { box.replaceWith(askForm(askContext(q, a), (res) => { if (res.ok) a.asked = res.ask.no; })); });
@@ -884,7 +884,7 @@ function askForm(ctx, onSent) {
 function askOfferForRound(r, state, today) {
   if (!r || light(r) || r.mode === 'notes') return null;
   if (askedToday(state, today) >= ASK_DAILY_MAX) return null;
-  const wrongs = r.answers.map((a, i) => ({ a, q: r.qs[i] })).filter((x) => x.a && !x.a.correct && x.a.w !== 's' && !x.a.asked && x.q && x.q.key && !pendingAskFor(state, x.q.key));
+  const wrongs = r.answers.map((a, i) => ({ a, q: r.qs[i] })).filter((x) => x.a && !x.a.correct && x.a.w !== 's' && !x.a.asked && x.q && x.q.key && !pendingAskFor(state, x.q.concept, x.q.key));
   if (!wrongs.length) return null;
   const box = el('div', 'math-ask');
   box.appendChild(el('p', 'math-ask-lead', '❓ 아빠에게 물어볼 게 있어요? 틀린 문제를 골라요 — 문제는 앱이 그대로 보내요.'));
@@ -913,14 +913,17 @@ async function syncMathReplies(state) {
 }
 
 /** 📬 답장 화면 — 문맥(문제·내 답·정답·내 한마디) + 💬 아빠 답장(그림 지시문 가능) → 😄 이해했어요 / 😶 아직 모르겠어요 */
-async function renderReply(ask) {
+async function renderReply(ask, note = '') {
   ui.daily = null;
   const run = ++ui.run;
   try { ui.state = await updateMath((s) => { markAskRead(s, ask.id); }); } catch { /* 읽음 표시는 다음에 */ }
   if (run !== ui.run) return;
+  ask = ((ui.state && ui.state.asks) || []).find((x) => x && x.id === ask.id) || ask; // 다른 창에서 답장이 더 붙었을 수 있다 — 최신으로 (Codex 4차 #5)
+  const seenT = (ask.replies && ask.replies.length) ? ask.replies[ask.replies.length - 1].t : 0;
   const m = clearMain();
   const card = el('section', 'math-card math-reply');
   card.appendChild(el('div', 'math-eyebrow', `📬 아빠의 답장 · ❓${ask.no} · ${nameOf(ask.concept)}`));
+  if (note) card.appendChild(el('p', 'math-ask-sent', note));
   const ctx = el('div', 'math-reply-ctx');
   const qt = el('p', 'math-qt'); qt.appendChild(richNode(ask.q)); ctx.appendChild(qt);
   if (ask.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(ask.expr)); ctx.appendChild(ex); }
@@ -946,18 +949,34 @@ async function renderReply(ask) {
   no.type = 'button';
   yes.addEventListener('click', async () => {
     yes.disabled = true; no.disabled = true;
-    try { ui.state = await updateMath((s) => { decideAsk(s, ask.id, true); }); }
+    let res = false;
+    try { ui.state = await updateMath((s) => { res = decideAsk(s, ask.id, true, '', seenT); }); }
     catch (err) { yes.disabled = false; no.disabled = false; card.appendChild(el('p', 'math-note', `저장을 못 했어요 — 한 번 더 (${String((err && err.message) || err)})`)); return; }
+    if (res === 'stale') { renderReply(ask, '📬 그 사이에 아빠가 답장을 더 보냈어요 — 이것도 읽어 봐요'); return; }
+    if (!res) { nextReplyOrLadder(); return; } // 이미 정해진 질문(다른 창에서) — 조용히 다음으로
     row.replaceWith(askTryOffer(ask));
   });
-  no.addEventListener('click', () => { row.replaceWith(againForm(ask)); });
-  row.appendChild(yes); row.appendChild(no);
+  no.addEventListener('click', () => { row.replaceWith(againForm(ask, seenT)); });
+  if (ask.status === 'understood') {
+    // 이미 "이해했어요"라고 한 뒤 다시 온 것(문제를 틀리고 "📬 답장 다시 보기") — 😄 대신 🔁 풀어보기, 😶는 되물음으로 (Codex 4차 #2)
+    const again = el('button', 'btn btn-primary btn-big-wide', '🔁 다시 풀어보기');
+    again.type = 'button';
+    again.addEventListener('click', () => startAskTry(ask));
+    row.appendChild(again); row.appendChild(no);
+  } else if (ask.status === 'answered') {
+    row.appendChild(yes); row.appendChild(no);
+  } else {
+    const back = el('button', 'btn btn-primary btn-big-wide', '사다리로'); // fixed·again·closed — 읽기만
+    back.type = 'button';
+    back.addEventListener('click', () => renderLadder(ui.state));
+    row.appendChild(back);
+  }
   card.appendChild(row);
   m.appendChild(card);
 }
 
 /** 😶 아직 모르겠어요 — 한마디(선택)와 함께 다시 아빠에게 */
-function againForm(ask) {
+function againForm(ask, seenT = undefined) {
   const box = el('div', 'math-ask math-ask-form');
   box.appendChild(el('p', 'math-ask-lead', '어디가 모르겠어요? 한마디 덧붙일래요? 안 써도 돼요.'));
   const ta = el('textarea', 'math-ask-input');
@@ -968,8 +987,12 @@ function againForm(ask) {
   send.type = 'button';
   send.addEventListener('click', async () => {
     send.disabled = true;
-    try { ui.state = await updateMath((s) => { decideAsk(s, ask.id, false, ta.value); }); }
+    let res = false;
+    try { ui.state = await updateMath((s) => { res = decideAsk(s, ask.id, false, ta.value, seenT); }); }
     catch (err) { send.disabled = false; box.appendChild(el('p', 'math-note', `저장을 못 했어요 — 한 번 더 (${String((err && err.message) || err)})`)); return; }
+    // 전이가 실제로 됐을 때만 "보냈어요" — 안 됐는데 보냈다고 하면 아이의 메모가 조용히 사라진다 (Codex 4차 #2)
+    if (res === 'stale') { renderReply(ask, '📬 그 사이에 아빠가 답장을 더 보냈어요 — 이것도 읽어 봐요'); return; }
+    if (!res) { box.replaceWith(afterReplyRow('이 질문은 벌써 끝났어요 — 새로 물어보려면 문제에서 ❓를 눌러요.')); return; }
     box.replaceWith(afterReplyRow('📮 아빠에게 다시 보냈어요. 답장이 오면 📬로 알려 줄게요.'));
   });
   row.appendChild(send);
@@ -1021,10 +1044,11 @@ function startAskTry(ask) {
     any = any || c;
     if (c.key === ask.key) q = c;
   }
-  q = q || any; // 그 틀이 이제 없으면 같은 얼굴의 아무 문제로
+  const sameKey = !!q; // 그 틀이 이제 없으면(내용이 바뀌어) 같은 얼굴의 아무 문제로 — 맞혀도 원래 유형의 노트·보너스는 안 준다 (Codex 4차 #7)
+  q = q || any;
   if (!q) { renderLadder(ui.state); return; }
   ui.daily = null;
-  ui.round = { id: null, mode: 'ask', qs: [q], ids: [ask.concept], askId: ask.id, askNo: ask.no, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
+  ui.round = { id: null, mode: 'ask', qs: [q], ids: [ask.concept], askId: ask.id, askNo: ask.no, askSameKey: sameKey, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
   renderQuestion();
 }
 
@@ -1313,7 +1337,7 @@ async function finishRound() {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, ui.stem, r.missTags); });
     } else if (r.mode === 'ask') {
-      state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today); });
+      state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false }); });
     } else if (r.mode === 'notes' || r.mode === 'mix') {
       const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i].fromNote ? { note: true } : {}), ...extraQ(a) }));
       state = await updateMath((s) => {
@@ -1351,7 +1375,7 @@ async function finishRound() {
   const rw = r.mode === 'diag'
     ? { xp: r.correct * REWARD.diag.xp, coin: r.correct * REWARD.diag.coin, catchOnce: false }
     : r.mode === 'ask'
-      ? (result && result.fixed ? { xp: ASK_REWARD.xp, coin: ASK_REWARD.coin, catchOnce: false } : { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false }) // ❓ 답장 뒤 처음 맞히면 보상, 이미 고친 뒤 또 풀면 문항 정답만
+      ? (result && result.fixed && r.askSameKey !== false ? { xp: ASK_REWARD.xp, coin: ASK_REWARD.coin, catchOnce: false } : { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false }) // ❓ 답장 뒤 같은 틀을 처음 맞히면 보상, 틀이 바뀌었거나 이미 고친 뒤면 문항 정답만
     : r.mode === 'notes' || r.mode === 'mix'
       ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } // 🤔 노트 회차·🎲 섞어 풀기: 문항 정답만, 잡기 없음 (연습)
       : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
@@ -1389,7 +1413,9 @@ async function finishRound() {
     const card = el('section', 'math-card math-result');
     const fixed = !!(result && result.fixed);
     card.appendChild(el('h2', '', fixed ? '🎉 아빠 답장으로 고쳤어요!' : r.correct ? '✅ 맞았어요!' : '아직 헷갈리네요'));
-    card.appendChild(el('p', 'math-p', fixed ? `❓${r.askNo} 유형을 이제 알아요 — 🤔 노트에서도 지웠어요.` : r.correct ? '이미 고친 유형이라 문항 정답만 받아요.' : '답장을 한 번 더 읽어 볼까요? 다시 풀어 볼 수도 있어요 — 틀려도 기록엔 안 남아요.'));
+    card.appendChild(el('p', 'math-p', fixed
+      ? (r.askSameKey === false ? `❓${r.askNo}의 문제 틀이 바뀌어 비슷한 문제로 확인했어요 — 잘했어요!` : `❓${r.askNo} 유형을 이제 알아요 — 🤔 노트에서도 지웠어요.`)
+      : r.correct ? '이미 고친 유형이라 문항 정답만 받아요.' : '답장을 한 번 더 읽어 볼까요? 다시 풀어 볼 수도 있어요 — 틀려도 개념 진도는 내려가지 않아요.'));
     card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
     const row = el('div', 'math-actions');
     if (!r.correct) {

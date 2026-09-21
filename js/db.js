@@ -635,7 +635,8 @@ function cloneAsk(a) {
 export function mergeAsks(cur, rec) {
   const byId = new Map();
   for (const x of (Array.isArray(cur && cur.asks) ? cur.asks : [])) if (x && x.id) byId.set(x.id, cloneAsk(x));
-  const uni = (a, b) => { const seen = new Map(); for (const r of [...(a || []), ...(b || [])]) if (r && !seen.has(r.t)) seen.set(r.t, { ...r }); return [...seen.values()].sort((p, q) => p.t - q.t); };
+  // 시각+본문으로 합친다 — 같은 백업에서 갈라진 두 기기가 같은 밀리초에 다른 답장을 붙이면 시각만으로는 하나가 사라진다 (Codex 4차 #6)
+  const uni = (a, b) => { const seen = new Map(); for (const r of [...(a || []), ...(b || [])]) { if (!r) continue; const k = `${r.t}|${r.text || r.kid || ''}`; if (!seen.has(k)) seen.set(k, { ...r }); } return [...seen.values()].sort((p, q) => p.t - q.t); };
   for (const x of (Array.isArray(rec && rec.asks) ? rec.asks : [])) {
     if (!x || !x.id) continue;
     const mine = byId.get(x.id);

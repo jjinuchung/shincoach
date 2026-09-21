@@ -47,13 +47,14 @@ for (const f of [...Object.keys(MATH_CHECK), 'coach/fixes.json']) {
     console.error(`JSON 오류: ${f}: ${e.message}`);
   }
 }
+const { figureSvg } = await import('../js/mathdraw.js');
 // ❓ 아빠 답장(coach/math/replies.json) — [{ no, text }], 그림 지시문은 앱이 아는 것만 (모르면 글자 그대로 아이 화면에 찍힌다)
 try {
   const rep = JSON.parse(readFileSync('coach/math/replies.json', 'utf8'));
   if (!Array.isArray(rep)) { bad++; console.error('내용 오류: coach/math/replies.json: 배열이 아님'); }
   else rep.forEach((e, i) => {
     if (!e || !Number.isInteger(e.no) || e.no <= 0 || typeof e.text !== 'string' || !e.text.trim()) { bad++; console.error(`내용 오류: coach/math/replies.json[${i}]: { no: 양의 정수, text: 글 } 이어야 함`); return; }
-    for (const m of e.text.matchAll(/\[([a-z]+) [^\]]*\]/g)) if (!['bar', 'pizza', 'bars', 'line', 'vline', 'walk'].includes(m[1])) { bad++; console.error(`내용 오류: coach/math/replies.json[${i}] (💬${e.no}): 모르는 그림 지시문 [${m[1]} …]`); }
+    for (const m of e.text.matchAll(/\[([a-z]+) [^\]]*\]/g)) if (!figureSvg(m[0].slice(1, -1)).startsWith('<svg')) { bad++; console.error(`내용 오류: coach/math/replies.json[${i}] (💬${e.no}): 그림 지시문을 못 그림 ${m[0]} — 문법은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5]`); }
   });
 } catch (e) { bad++; console.error(`JSON 오류: coach/math/replies.json: ${e.message}`); }
 if (bad) {
