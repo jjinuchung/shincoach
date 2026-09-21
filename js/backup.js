@@ -11,7 +11,7 @@
 // ※ 사본은 "없는 것보다 나은 것"이다. 사이트 데이터를 통째로 지우면 이것도 같이 사라지므로
 //    파일 백업을 대신하지 못한다. 그래서 ③이 함께 있다.
 
-import { getAllSentenceStats, listDaily, getProfile, importStats } from './db.js';
+import { getAllSentenceStats, listDaily, getProfile, getMath, importStats } from './db.js';
 
 const KEY = 'shincoach.backup';
 const FILE_KEY = 'shincoach.lastFileBackup';
@@ -44,13 +44,15 @@ export function slimStats(records = []) {
 }
 
 /** 사본 한 덩이 — 📊의 "가져오기"가 먹는 형식 그대로라 복구에 그 규칙(mergeStatRecord)을 그대로 쓴다 */
-export function makeSnapshot({ profile = null, daily = [], sentenceStats = [] } = {}, now = new Date()) {
+export function makeSnapshot({ profile = null, math = null, daily = [], sentenceStats = [] } = {}, now = new Date()) {
+  // 🔢 수학 진도(profile 스토어의 'math' 레코드)도 담는다 — 개념·복습 일정·일지는 다시 만들 수 없다 (Codex 2026-09-21 #3)
+  const hasMath = math && Object.keys(math.concepts || {}).length;
   return {
     app: 'shincoach',
     version: 1,
     kind: 'auto',
     exportedAt: now.toISOString(),
-    profile: profile ? [profile] : [],
+    profile: [profile, hasMath ? math : null].filter(Boolean),
     daily: daily || [],
     sentenceStats: slimStats(sentenceStats),
   };
@@ -66,14 +68,16 @@ export function isEmptyNow({ profile = null, sentenceStats = [] } = {}) {
 /** 사본에 되살릴 만한 것이 들어 있는가 */
 export function snapshotHas(snap) {
   if (!snap || snap.app !== 'shincoach') return false;
-  const p = (snap.profile || [])[0] || {};
-  return !!((snap.sentenceStats || []).length || p.xp || p.coins || Object.keys(p.caught || {}).length);
+  const p = (snap.profile || []).find((r) => r && r.id !== 'math') || {};
+  const m = (snap.profile || []).find((r) => r && r.id === 'math') || {};
+  return !!((snap.sentenceStats || []).length || p.xp || p.coins || Object.keys(p.caught || {}).length || Object.keys(m.concepts || {}).length);
 }
 
 /** 부모가 "무엇을 되돌리는지" 알고 누르도록 한 줄로 */
 export function snapshotSummary(snap) {
   if (!snapshotHas(snap)) return '';
-  const p = (snap.profile || [])[0] || {};
+  const p = (snap.profile || []).find((r) => r && r.id !== 'math') || {};
+  const m = (snap.profile || []).find((r) => r && r.id === 'math') || {};
   const mons = Object.values(p.caught || {}).reduce((a, n) => a + (Number(n) || 0), 0);
   const days = (snap.daily || []).filter((d) => d && (d.seconds || 0) > 0).length;
   const parts = [
@@ -83,6 +87,8 @@ export function snapshotSummary(snap) {
     `📚 공부한 날 ${days}일`,
     `✍️ 문장 ${(snap.sentenceStats || []).length}개`,
   ];
+  const mc = Object.keys(m.concepts || {}).length;
+  if (mc) parts.push(`🔢 수학 개념 ${mc}개`);
   return parts.join(' · ');
 }
 
@@ -116,20 +122,22 @@ export function readMirror() {
  */
 export async function saveMirror(now = new Date()) {
   let profile = null;
+  let math = null;
   let daily = [];
   let sentenceStats = [];
   try {
-    [profile, daily, sentenceStats] = await Promise.all([
+    [profile, math, daily, sentenceStats] = await Promise.all([
       getProfile().catch(() => null),
+      getMath().catch(() => null),
       listDaily().catch(() => []),
       getAllSentenceStats().catch(() => []),
     ]);
   } catch {
     return false;
   }
-  if (isEmptyNow({ profile, sentenceStats })) return false;
+  if (isEmptyNow({ profile, sentenceStats }) && !(math && Object.keys(math.concepts || {}).length)) return false;
 
-  const snap = makeSnapshot({ profile, daily, sentenceStats }, now);
+  const snap = makeSnapshot({ profile, math, daily, sentenceStats }, now);
   try {
     localStorage.setItem(KEY, JSON.stringify(snap));
     return true;

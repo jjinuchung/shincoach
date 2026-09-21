@@ -151,9 +151,9 @@ export async function renderMath() {
   if (r && !r.saving) {
     ui.run++;
     if (r.phase === 'story') renderStory(r.id, r.seed);
-    else if (r.twin) { if (r.twin.answered) advance(); else renderTwin(); }
-    else if (r.answered) advance();
-    else renderQuestion();
+    else if (r.phase === 'retry') renderRetry(r.id, r.wrong || []);
+    else if (r.twin) renderTwin(true);
+    else renderQuestion(r.answered); // 답한 뒤였으면 풀이·버튼까지 그대로 (채점은 안 한다)
     return;
   }
   const run = ++ui.run;
@@ -248,7 +248,7 @@ function startRound(id, mode, o = {}) {
   const recent = ui.recent[id] || [];
   const qs = makeRound(id, seed, { ...ui.opts, recent });
   ui.recent[id] = [...recent, ...qs.map((q) => q.key).filter(Boolean)].slice(-RECENT_KEEP);
-  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, phase: mode === 'learn' && !o.again ? 'story' : 'q' };
+  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, phase: o.again ? 'retry' : mode === 'learn' ? 'story' : 'q', wrong: o.again ? (o.wrong || []) : [] };
   if (o.again) renderRetry(id, o.wrong || []);
   else if (mode === 'learn') renderStory(id, seed);
   else renderQuestion();
@@ -319,13 +319,17 @@ function renderStory(id, seed) {
 
 const KIND_LABEL = { calc: '① 계산', misread: '② 누가 틀렸을까', why: '③ 왜 그럴까', special: '⭐ 특별 문제' };
 
-function renderQuestion() {
+/**
+ * 문항 그리기. `restore`면 이미 답한 문항을 채점 없이 다시 그린다 — 🎒·📊를 보고 돌아왔을 때
+ * 풀이 카드와 쌍둥이 버튼이 그대로 있어야 한다 (Codex 2026-09-21 #4: 전에는 바로 다음 문항으로 넘어가 풀이를 건너뛰었다).
+ */
+function renderQuestion(restore = false) {
   const r = ui.round;
   if (!r) return;
   if (/[?&]nosw=1/.test(location.search)) window.__mathRound = r; // 헤드리스 검증용 (개발 모드에서만)
   const m = clearMain();
   const q = r.qs[r.at];
-  r.answered = false;
+  if (!restore) { r.answered = false; r.chosenIdx = -1; }
   const card = el('section', 'math-card math-q');
 
   const top = el('div', 'math-q-top');
@@ -355,12 +359,25 @@ function renderQuestion() {
   card.appendChild(list);
   card.appendChild(el('div', 'math-feedback'));
   m.appendChild(card);
+  if (restore && r.answered && r.chosenIdx >= 0) paintAnswer(r.chosenIdx, list, card, true);
 }
 
+/** 답을 고름 — 채점(한 번만)하고 그린다 */
 function answer(i, list, card) {
   const r = ui.round;
   if (!r || r.answered) return; // 두 번 누르면 두 번 세지 않는다
   r.answered = true;
+  r.chosenIdx = i;
+  const q = r.qs[r.at];
+  const ch = q.choices[i];
+  if (ch.ok) { r.correct++; sfx.success(); } else { sfx.wrong(); if (ch.tag) r.missTags.push(ch.tag); }
+  r.answers.push({ concept: q.concept, correct: !!ch.ok, kind: q.kind, chosen: ch.text, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }) }); // 얼굴·오개념까지 — 📒 일지용
+  paintAnswer(i, list, card, false);
+}
+
+/** 답한 뒤의 화면 — 보기 표시·피드백·풀이 카드·다음 버튼. 채점은 하지 않는다 (복원에도 쓴다) */
+function paintAnswer(i, list, card, restoring) {
+  const r = ui.round;
   const q = r.qs[r.at];
   const ch = q.choices[i];
   const okIdx = q.choices.findIndex((x) => x.ok);
@@ -372,9 +389,8 @@ function answer(i, list, card) {
   }
   const fb = card.querySelector('.math-feedback');
   fb.innerHTML = '';
+  let scrollTo = null;
   if (ch.ok) {
-    r.correct++;
-    sfx.success();
     fb.appendChild(el('p', 'math-fb ok', ['맞았어요! 🎉', '정확해요! ⭐', '바로 그거예요! 👍'][r.at % 3]));
     // 맞혀도 풀이는 접어 두고 볼 수 있게 — "왜 맞았는지"도 개념이다
     if (q.solve) {
@@ -384,21 +400,25 @@ function answer(i, list, card) {
       fb.appendChild(t);
     }
   } else {
-    sfx.wrong();
-    if (ch.tag) r.missTags.push(ch.tag);
     const p = el('p', 'math-fb no');
     const showTag = ch.tag && !META_TAGS.has(ch.tag);
     p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : '아쉬워요.'));
     fb.appendChild(p);
-    fb.appendChild(solveCard(q, ch)); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (진우, 2026-09-21)
+    scrollTo = solveCard(q, ch); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (진우, 2026-09-21)
+    fb.appendChild(scrollTo);
   }
-  r.answers.push({ concept: q.concept, correct: !!ch.ok, kind: q.kind, chosen: ch.text, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }) }); // 얼굴·오개념까지 — 📒 일지용
   const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && r.mode !== 'diag' && q.key;
   const next = el('button', 'btn btn-primary btn-big-wide', canTwin ? '알겠어요, 비슷한 문제 하나 더 →' : r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
   next.addEventListener('click', () => { if (canTwin) startTwin(); else advance(); });
   fb.appendChild(next);
-  next.focus();
+  // 포커스가 버튼으로 가면서 화면이 풀이 아래로 밀리면 아이가 풀이를 못 본다 (Codex #10) — 풀이 카드 머리를 보이게
+  focusQuiet(next);
+  if (scrollTo && !restoring) scrollTo.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+function focusQuiet(elm) {
+  try { elm.focus({ preventScroll: true }); } catch { elm.focus(); }
 }
 
 /** 다음 문항으로 (쌍둥이가 있었으면 지운다) */
@@ -484,14 +504,21 @@ function startTwin() {
   const r = ui.round;
   if (!r) return;
   const q = r.qs[r.at];
-  const seed = ((Date.now() % 1000000) | 0) + 17;
-  const tq = makeQuestion(q.concept, q.kind, seed, { ...ui.opts, want: q.key });
+  const base = ((Date.now() % 1000000) | 0) + 17;
+  let tq = null;
+  // 새 씨앗이 새 숫자를 보장하지 않는다 (Codex #6) — 같은 문장이면 다른 씨앗으로 다시, 그래도 같으면 그냥 낸다
+  for (let i = 0; i < 8; i++) {
+    const cand = makeQuestion(q.concept, q.kind, base + i * 7919, { ...ui.opts, want: q.key });
+    if (!cand) break;
+    tq = cand;
+    if (cand.q !== q.q || cand.expr !== q.expr) break;
+  }
   if (!tq) { advance(); return; }
-  r.twin = { q: tq, of: r.at, answered: false };
+  r.twin = { q: tq, of: r.at, answered: false, chosenIdx: -1 };
   renderTwin();
 }
 
-function renderTwin() {
+function renderTwin(restore = false) {
   const r = ui.round;
   if (!r || !r.twin) return;
   const t = r.twin;
@@ -518,13 +545,26 @@ function renderTwin() {
   card.appendChild(list);
   card.appendChild(el('div', 'math-feedback'));
   m.appendChild(card);
+  if (restore && t.answered && t.chosenIdx >= 0) paintTwin(t.chosenIdx, list, card, true);
 }
 
+/** 쌍둥이 답 — 채점(한 번만)하고 그린다. 편의 정답 수(r.correct)는 안 건드린다 */
 function answerTwin(i, list, card) {
   const r = ui.round;
   if (!r || !r.twin || r.twin.answered) return;
   const t = r.twin;
   t.answered = true;
+  t.chosenIdx = i;
+  const ch = t.q.choices[i];
+  const a = r.answers[t.of];
+  if (a) a.fixed = !!ch.ok;
+  if (ch.ok) { r.fixed = (r.fixed || 0) + 1; sfx.success(); } else { sfx.wrong(); if (ch.tag) r.missTags.push(ch.tag); }
+  paintTwin(i, list, card, false);
+}
+
+function paintTwin(i, list, card, restoring) {
+  const r = ui.round;
+  const t = r.twin;
   const q = t.q;
   const ch = q.choices[i];
   const okIdx = q.choices.findIndex((x) => x.ok);
@@ -534,25 +574,22 @@ function answerTwin(i, list, card) {
     if (k === okIdx) b.classList.add('ok');
     if (k === i && !ch.ok) b.classList.add('no');
   }
-  const a = r.answers[t.of];
-  if (a) a.fixed = !!ch.ok;
   const fb = card.querySelector('.math-feedback');
   fb.innerHTML = '';
+  let scrollTo = null;
   if (ch.ok) {
-    r.fixed = (r.fixed || 0) + 1;
-    sfx.success();
     fb.appendChild(el('p', 'math-fb ok', `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp}`));
   } else {
-    sfx.wrong();
-    if (ch.tag) r.missTags.push(ch.tag);
     fb.appendChild(el('p', 'math-fb no', '아직 헷갈리나 봐요. 풀이를 한 번 더 읽어요.'));
-    fb.appendChild(solveCard(q, ch));
+    scrollTo = solveCard(q, ch);
+    fb.appendChild(scrollTo);
   }
   const next = el('button', 'btn btn-primary btn-big-wide', t.of + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
   next.addEventListener('click', () => { r.at = t.of; advance(); });
   fb.appendChild(next);
-  next.focus();
+  focusQuiet(next);
+  if (scrollTo && !restoring) scrollTo.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 /**
