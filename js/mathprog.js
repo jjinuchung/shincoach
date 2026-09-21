@@ -63,6 +63,7 @@ export function ladderOf(m, today) {
       left: Math.max(0, GRADUATED - box), // 👑까지 남은 확인 횟수
       crowned: !!rec && rec.done && box >= GRADUATED,
       due: !!rec && rec.done && isDue(rec, today),
+      notes: rec && Array.isArray(rec.notes) ? rec.notes.length : 0, // 🤔 다시 볼 유형 수
       icon: rec && rec.done ? STAGES[Math.min(box, STAGES.length - 1)] : (row.state === 'now' ? '▶' : row.state === 'open' ? '○' : '🔒'),
     };
   });
@@ -113,6 +114,8 @@ export function applyPlacement(m, answers, today, strand = 'fraction', missTags 
  * 최근 LOG_MAX편만 — 한 줄이 200B 안팎이라 400편이면 80KB. 개념별 누적(kinds·miss)은 따로 있어 잘려도 요약은 남는다.
  */
 export const LOG_MAX = 400;
+/** 🤔 개념마다 남겨 두는 오답 노트 수 — 유형(틀)별로 하나씩이라 12면 넉넉하다 */
+export const NOTES_MAX = 12;
 function pushLog(m, entry) {
   m.log = Array.isArray(m.log) ? m.log : [];
   m.log.push(entry);
@@ -155,12 +158,20 @@ export function applyRound(m, id, r, today) {
   // 얼굴별(①②③⭐) 누적과 개념별 오개념 — "이 개념에서 어느 얼굴이 약한가"를 보려고
   rec.kinds = rec.kinds || {};
   rec.miss = rec.miss || {};
+  rec.notes = Array.isArray(rec.notes) ? rec.notes : [];
   for (const q of (r.qs || [])) {
     if (!q || !q.k) continue;
     const kk = rec.kinds[q.k] || [0, 0];
     rec.kinds[q.k] = [kk[0] + (q.ok ? 1 : 0), kk[1] + 1];
     if (q.tag) rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1;
+    // 🤔 오답 노트 — 틀린 문항의 틀(key)을 적어 두고, 다음 편에서 그 유형을 한 문제 다시 낸다.
+    //    처음에 맞히면(ok) 노트에서 지운다 — 쌍둥이로 고친 것(fx)은 "바로 고침"으로만 표시하고 남겨 둔다 (며칠 뒤에도 맞아야 진짜)
+    if (q.key) {
+      rec.notes = rec.notes.filter((n) => n.key !== q.key);
+      if (!q.ok) rec.notes.push({ k: q.k, key: q.key, d: today, t: Date.now(), ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) });
+    }
   }
+  if (rec.notes.length > NOTES_MAX) rec.notes.splice(0, rec.notes.length - NOTES_MAX);
   m.concepts[id] = rec;
   for (const t of (r.missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
   m.rounds = (m.rounds || 0) + 1;
@@ -180,6 +191,13 @@ export function roundReward(result, correct) {
   else if (result.review && result.passed) { xp += REWARD.reviewPass.xp; coin += REWARD.reviewPass.coin; }
   if (result.crowned) { xp += REWARD.crown.xp; coin += REWARD.crown.coin; }
   return { xp, coin, catchOnce };
+}
+
+/** 🤔 다음 편에서 다시 낼 오답 노트 하나 (가장 최근 것). 없으면 null */
+export function nextNote(m, id) {
+  const rec = m && m.concepts && m.concepts[id];
+  const notes = rec && Array.isArray(rec.notes) ? rec.notes : [];
+  return notes.length ? notes[notes.length - 1] : null;
 }
 
 /** 아이에게 보여 주지 않는 진단용 이름표 — 부모 화면(📊)에는 그대로 쌓인다 */
@@ -220,7 +238,8 @@ export function conceptReport(m, limit = 8) {
     const rounds = (rec.passes || 0) + (rec.fails || 0);
     const fixed = mine.reduce((a, e) => a + (e.qs || []).filter((q) => q.fx === 1).length, 0); // 🔁 틀렸다가 쌍둥이로 바로 고친 문항 수
     // 진단으로만 "안다"가 된 개념(passes 1은 진단의 것)은 한 편도 안 푼 것이라 표에 안 올린다 — 복습에서 풀면 일지가 생겨 올라온다
-    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length };
+    const notes = Array.isArray(rec.notes) ? rec.notes.length : 0;
+    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, notes, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length };
   }).filter((r) => r.trail.length || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt);
 }
 
@@ -235,7 +254,7 @@ export function mathReportText(m, today) {
     const trail = r.trail.map((t) => (t.pass ? '✔' : `✘${t.ok}/${t.n}`)).join(' ');
     const kinds = r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(', ');
     const miss = r.miss.map((x) => `${x.tag}×${x.n}`).join(', ');
-    lines.push(`- ${r.name}${r.done ? (r.box >= GRADUATED ? ' 👑' : ' ✅') : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}`);
+    lines.push(`- ${r.name}${r.done ? (r.box >= GRADUATED ? ' 👑' : ' ✅') : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`);
   }
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
   const log = ((m && m.log) || []).slice(-30);

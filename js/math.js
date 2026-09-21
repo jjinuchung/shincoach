@@ -7,7 +7,7 @@
 import { FRACTION, makeRound, makeQuestion, diagnosticSet, conceptStory, WORLDS } from './mathgen.js';
 import { renderFigures, barSvg } from './mathdraw.js';
 import {
-  needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS,
+  needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { todayKey } from './track.js';
@@ -27,6 +27,7 @@ const ui = {
   round: null,          // 진행 중인 한 편 { id, mode:'learn'|'review'|'diag', qs, at, correct, missTags, answered }
   run: 0,               // 화면을 지우고 await 하는 함수의 요청 번호 (겹쳐 그리기 방지)
   recent: {},           // 개념별로 방금 나온 이야기 틀·문항 (같은 개념을 다시 풀 때 같은 이야기가 또 나오지 않게)
+  state: null,          // 마지막으로 읽은 수학 진도 (🤔 오답 노트를 다음 편에 끼우려고)
 };
 const RECENT_KEEP = 10; // 두 편 반 분량 — 틀이 4개뿐인 개념도 한 바퀴는 돈다
 
@@ -164,6 +165,7 @@ export async function renderMath() {
   const [state] = await Promise.all([getMath(), buildOpts()]);
   if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다
   updateChip();
+  ui.state = state;
   if (needsPlacement(state)) renderDiagIntro();
   else renderLadder(state);
 }
@@ -223,7 +225,7 @@ function renderLadder(state) {
         : r.due ? '오늘 다시 확인하기'
           : r.state === 'done' ? `알아요 (${r.left}번 더 확인하면 👑)`
             : r.state === 'now' ? '지금 배울 차례' : '배울 수 있어요';
-    body.appendChild(el('span', 'math-rung-sub', `초${r.grade} · ${sub}`));
+    body.appendChild(el('span', 'math-rung-sub', `초${r.grade} · ${sub}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`));
     btn.appendChild(body);
     if (r.state === 'locked') btn.disabled = true;
     else btn.addEventListener('click', () => startRound(r.id, r.state === 'done' ? (r.due ? 'review' : 'practice') : 'learn'));
@@ -246,7 +248,10 @@ function renderLadder(state) {
 function startRound(id, mode, o = {}) {
   const seed = (Date.now() % 1000000) | 0;
   const recent = ui.recent[id] || [];
-  const qs = makeRound(id, seed, { ...ui.opts, recent });
+  // 🤔 오답 노트: 지난번에 틀린 유형이 있으면 그 유형을 한 문제 끼운다 (want) — 맞히면 노트에서 지워진다
+  const note = nextNote(ui.state, id);
+  const qs = makeRound(id, seed, { ...ui.opts, recent, ...(note && note.key ? { want: note.key } : {}) });
+  if (note) for (const q of qs) if (q.key === note.key) q.fromNote = true;
   ui.recent[id] = [...recent, ...qs.map((q) => q.key).filter(Boolean)].slice(-RECENT_KEEP);
   ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, phase: o.again ? 'retry' : mode === 'learn' ? 'story' : 'q', wrong: o.again ? (o.wrong || []) : [] };
   if (o.again) renderRetry(id, o.wrong || []);
@@ -336,6 +341,7 @@ function renderQuestion(restore = false) {
   top.appendChild(el('span', 'math-eyebrow', r.mode === 'diag' ? `📏 진단 ${r.at + 1} / ${r.qs.length}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
   top.appendChild(el('span', 'math-kind', KIND_LABEL[q.kind] || ''));
   card.appendChild(top);
+  if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
 
   const qt = el('p', 'math-qt');
   qt.appendChild(richNode(q.q));
@@ -451,7 +457,7 @@ function solveCard(q, ch) {
   if (!ch.ok) {
     const why = s.why[ch.tag] || s.whyAny || (ch.tag && !META_TAGS.has(ch.tag) ? `이 답은 "${ch.tag}" 실수예요.` : '');
     if (why) {
-      card.appendChild(el('div', 'math-solve-h', '1️⃣ 왜 틀렸나'));
+      card.appendChild(el('div', 'math-solve-h', s.steps.length ? '1️⃣ 왜 틀렸나' : '📖 왜 틀렸나'));
       const p = el('p', 'math-solve-p'); p.appendChild(richNode(why)); card.appendChild(p);
     }
     // 내 답과 정답을 막대로 나란히 — 글보다 먼저 눈에 들어온다 (분수 모양 답이고 너무 크지 않을 때만)
@@ -464,15 +470,21 @@ function solveCard(q, ch) {
         card.appendChild(row);
       }
     }
+  } else if (!s.steps.length && s.whyAny) {
+    // ③ 왜 그런가 — 맞혔어도 "왜"를 읽을 수 있게 (사람이 쓴 풀이는 단계가 없고 이유 한 덩이다)
+    card.appendChild(el('div', 'math-solve-h', '📖 왜 그런가'));
+    const p = el('p', 'math-solve-p'); p.appendChild(richNode(s.whyAny)); card.appendChild(p);
   }
-  card.appendChild(el('div', 'math-solve-h', ch.ok ? '📖 이렇게 풀어요' : '2️⃣ 이렇게 풀어요'));
-  const ol = el('ol', 'math-solve-steps');
-  for (const st of s.steps) { const li = el('li'); li.appendChild(richNode(st)); ol.appendChild(li); }
-  card.appendChild(ol);
+  if (s.steps.length) {
+    card.appendChild(el('div', 'math-solve-h', ch.ok ? '📖 이렇게 풀어요' : '2️⃣ 이렇게 풀어요'));
+    const ol = el('ol', 'math-solve-steps');
+    for (const st of s.steps) { const li = el('li'); li.appendChild(richNode(st)); ol.appendChild(li); }
+    card.appendChild(ol);
+  }
   if (s.figure) card.appendChild(svgBox(s.figure, 'math-fig'));
   const rule = s.rule || (c && c.idea) || '';
   if (rule) {
-    card.appendChild(el('div', 'math-solve-h', ch.ok ? '💡 기억할 것' : '3️⃣ 다음에 기억할 것'));
+    card.appendChild(el('div', 'math-solve-h', (ch.ok || !s.steps.length) ? '💡 기억할 것' : '3️⃣ 다음에 기억할 것'));
     const p = el('p', 'math-solve-p rule'); p.appendChild(richNode(rule)); card.appendChild(p);
   }
   return card;
@@ -616,7 +628,7 @@ async function finishRound() {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, 'fraction', r.missTags); });
     } else {
-      const qs = r.answers.map((a) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }) }));
+      const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}) }));
       state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today); });
     }
   } catch (err) {
@@ -634,6 +646,7 @@ async function finishRound() {
     return;
   }
   ui.round = null; // 저장이 됐으니 이제 비운다
+  ui.state = state; // 🤔 오답 노트가 바뀌었을 수 있다
 
   // 보상은 화면과 상관없이 지급 (나가 있어도 번 것은 번 것)
   const rw = r.mode === 'diag'

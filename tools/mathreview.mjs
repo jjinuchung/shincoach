@@ -41,6 +41,24 @@ function choicesHtml(chs) {
   return `<ol class="ch">${chs.map((c) => `<li class="${c.ok ? 'ok' : 'no'}"><span class="mark">${c.ok ? '✔' : ''}</span><span class="txt">${rich(c.text)}</span>${c.tag ? `<span class="tag">${esc(c.tag)}</span>` : ''}</li>`).join('')}</ol>`;
 }
 
+/** 📖 풀이 — 틀린 직후 아이가 보는 카드와 같은 내용 (2차: ③⭐도 사람이 쓴 풀이가 붙는다) */
+function solveHtml(ref, q) {
+  const s = q.solve;
+  if (!s) return '';
+  const whys = q.choices.filter((c) => !c.ok).map((c) => {
+    const w = s.why[c.tag] || s.whyAny;
+    return w ? `<li><span class="tagname">${esc(c.tag || '')}</span> ${rich(w)}</li>` : '';
+  }).join('');
+  return `<details class="solve" id="${esc(ref)}-📖">
+    <summary>📖 풀이 <code>${esc(ref)}-📖</code></summary>
+    ${s.whyAny && !s.steps.length ? `<p class="why">${rich(s.whyAny)}</p>` : ''}
+    ${s.steps.length ? `<ol class="steps">${s.steps.map((st) => `<li>${rich(st)}</li>`).join('')}</ol>` : ''}
+    ${s.figure ? `<div class="fig">${s.figure}</div>` : ''}
+    ${whys ? `<div class="whys-h">오답을 고르면</div><ul class="whys">${whys}</ul>` : ''}
+    ${s.rule ? `<p class="rule">💡 ${rich(s.rule)}</p>` : ''}
+  </details>`;
+}
+
 function qHtml(ref, q, label) {
   const w = q.world || worldOf(q);
   return `<article class="q w-${w}" id="${esc(ref)}">
@@ -49,6 +67,7 @@ function qHtml(ref, q, label) {
     ${q.figure ? `<div class="fig">${q.figure}</div>` : ''}
     ${q.expr ? `<p class="expr">${rich(q.expr)}</p>` : ''}
     ${choicesHtml(q.choices)}
+    ${solveHtml(ref, q)}
   </article>`;
 }
 
@@ -58,15 +77,10 @@ const sections = FRACTION.map((c, i) => {
   const v = content[c.id] || {};
   const st = conceptStory(c.id, 11 + i, opts);
   const whys = (v.why || []).map((w, k) => {
-    const q = { q: w.q, expr: '', choices: [{ text: w.ok, ok: true }, ...w.no.map((t) => ({ text: t, ok: false }))] };
+    // 그 문항 하나만 든 content로 만들면 그 문항이 나온다 (이름 끼우기·풀이는 앱과 같은 코드로)
+    const q = makeQuestion(c.id, 'why', 700 + i * 100 + k, { ...opts, content: { [c.id]: { why: [w] } } });
     // 검수용이라 정답을 첫 줄에 고정해 둔다 (앱에서는 섞인다)
-    const cast = { me: '진우', mon: NAMES[(i + k) % NAMES.length], mon2: NAMES[(i + k + 3) % NAMES.length] };
-    const fill = (s) => String(s).replace(/\{(me|mon|mon2)(?:\/([^/}]+)\/([^}]+))?\}/g, (_, who, a, b) => {
-      const n = cast[who]; if (a === undefined) return n;
-      const ch = n.slice(-1); const code = ch.charCodeAt(0) - 0xAC00;
-      const bat = code >= 0 && code <= 11171 && code % 28 !== 0; return n + (bat ? a : b);
-    });
-    q.q = fill(q.q); q.choices.forEach((x) => { x.text = fill(x.text); });
+    q.choices = [...q.choices.filter((x) => x.ok), ...q.choices.filter((x) => !x.ok)];
     return qHtml(`${letter}${no}-③${k + 1}`, q, '③ 왜 그런가');
   }).join('');
   const specials = (v.special || []).map((s, k) => {
@@ -186,6 +200,16 @@ body.hide-ans .ch .mark,body.hide-ans .ch .tag{visibility:hidden}
 .fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
 .fr .d{padding:0 3px}
 .mx{display:inline-flex;align-items:center;gap:2px;vertical-align:middle}
+.solve{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
+.solve summary{cursor:pointer;font-weight:700;font-size:.88rem;color:var(--primary)}
+.solve .why{margin:6px 0}
+.solve .steps{margin:6px 0;padding-left:0;list-style:none;display:grid;gap:4px}
+.solve .steps li{background:var(--no-soft);border-radius:8px;padding:5px 9px}
+.solve .whys-h{font-size:.78rem;color:var(--muted);margin-top:8px}
+.solve .whys{margin:4px 0;padding-left:0;list-style:none;display:grid;gap:4px;font-size:.9rem}
+.solve .tagname{font-size:.74rem;color:var(--tag);background:var(--accent-soft);border-radius:999px;padding:1px 8px;margin-right:4px;white-space:nowrap}
+.solve .rule{margin:8px 0 0;font-weight:700;background:var(--story);border:1px solid var(--story-line);border-radius:8px;padding:6px 10px}
+body.hide-ans .solve{display:none}
 .toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none}
 .toggle input{width:18px;height:18px;accent-color:var(--primary)}
 .how li{margin:3px 0}
@@ -195,7 +219,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
 <div class="wrap">
   <div class="top">
     <h1>🔢 분수 줄기 — 내용 검수</h1>
-    <p class="sub">신코치 수학 1차 · 개념 10개 · 제가 쓴 글과 코드가 만드는 문제를 이름 끼운 그대로</p>
+    <p class="sub">신코치 수학 · 개념 10개 · 제가 쓴 글과 코드가 만드는 문제 + 📖 풀이(2차)를 이름 끼운 그대로</p>
     <div class="nav">${nav}</div>
   </div>
 
@@ -214,6 +238,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
         <li><b>③ 왜 그런가</b> — 보기 넷 중 정답이 하나뿐인지, 오답이 너무 티 나지 않는지</li>
         <li><b>⭐ 특별 문제</b> — 진우가 좋아할 만한 상황인지 (계산은 기계가 검산했습니다)</li>
         <li><b>①②</b> — 코드가 숫자를 바꿔 무한히 내는 것의 표본. 문장 틀이 어색하면 알려 주세요</li>
+        <li><b>📖 풀이</b> (2026-09-21 2차) — 문항마다 접혀 있어요. 틀린 직후 진우가 보는 카드와 같은 내용: 왜 그런가 · 이렇게 풀어요 · 오답을 고르면 한 마디 · 기억할 것. 번호는 <code>A6-⭐3-📖</code></li>
         <li><b>세계관</b> — 포켓몬 70%, 진우가 끝까지 본 영상(토이스토리5·미니언즈·모아나) 30%. 문제마다 오른쪽 위에 세계 표시</li>
         <li><b>그림</b> — 분수의 뜻·같은 분모·통분·가분수에는 막대·피자 그림이 붙습니다 (곱셈·나눗셈은 답을 흘려서 안 붙임)</li>
       </ul>

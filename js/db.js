@@ -612,6 +612,7 @@ function cloneConcept(v) {
   const out = { ...v };
   if (v.kinds) { out.kinds = {}; for (const [k, a] of Object.entries(v.kinds)) out.kinds[k] = Array.isArray(a) ? [...a] : a; }
   if (v.miss) out.miss = { ...v.miss };
+  if (Array.isArray(v.notes)) out.notes = v.notes.map((n) => ({ ...n }));
   return out;
 }
 
@@ -666,6 +667,14 @@ export function mergeMath(cur, rec) {
     }
     const miss = {};
     for (const src of [mine.miss, v.miss]) for (const [t, n] of Object.entries(src || {})) miss[t] = Math.max(Number(miss[t]) || 0, Number(n) || 0);
+    // 🤔 오답 노트는 유형(key)별로 최근 것 하나 — 최근 12개
+    const byKey = new Map();
+    for (const src of [mine.notes, v.notes]) for (const n of (Array.isArray(src) ? src : [])) {
+      if (!n || !n.key) continue;
+      const cur = byKey.get(n.key);
+      if (!cur || (Number(n.t) || 0) > (Number(cur.t) || 0)) byKey.set(n.key, { ...n });
+    }
+    const notes = [...byKey.values()].sort((a, b) => (a.t || 0) - (b.t || 0)).slice(-12);
     out.concepts[k] = {
       ...later,
       done: !!(mine.done || v.done),
@@ -676,6 +685,7 @@ export function mergeMath(cur, rec) {
       lastAt: Math.max(Number(mine.lastAt) || 0, Number(v.lastAt) || 0),
       ...(Object.keys(kinds).length ? { kinds } : {}),
       ...(Object.keys(miss).length ? { miss } : {}),
+      ...(notes.length ? { notes } : {}),
     };
     if (!sched.placed) delete out.concepts[k].placed;
   }

@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { FRACTION, makeQuestion, makeRound, valueOf, tplKey } from '../js/mathgen.js';
-import { applyRound, conceptReport, mathReportText, REWARD } from '../js/mathprog.js';
-import { emptyMath } from '../js/db.js';
+import { applyRound, conceptReport, mathReportText, REWARD, nextNote, NOTES_MAX } from '../js/mathprog.js';
+import { emptyMath, mergeMath } from '../js/db.js';
 import { makeSnapshot, snapshotHas, snapshotSummary } from '../js/backup.js';
 
 const content = JSON.parse(readFileSync(new URL('../coach/math/fraction.json', import.meta.url), 'utf8'));
@@ -42,13 +42,57 @@ test('풀이의 숫자는 그 문제의 숫자다 — 정답이 단계 마지막
   }
 });
 
-test('사람이 쓴 ③⭐ 문항은 아직 풀이가 없다 (2차) — solve는 null, 화면은 정답 + 개념 한 줄로 간다', () => {
-  for (const c of FRACTION) {
-    const w = makeQuestion(c.id, 'why', 3, opts);
-    assert.equal(w.solve, null);
-    const sp = makeQuestion(c.id, 'special', 3, opts);
-    if (sp) assert.equal(sp.solve, null);
+test('2차: 사람이 쓴 ③⭐ 문항도 풀이가 있다 — ③은 "왜 그런가" 한 덩이, ⭐는 단계 2줄↑ + 오답마다 왜', () => {
+  for (const c of FRACTION) for (let s = 1; s <= 40; s++) {
+    const w = makeQuestion(c.id, 'why', s, opts);
+    assert.ok(w.solve && w.solve.whyAny && !w.solve.steps.length, `${c.id} ③ #${s}`);
+    assert.ok(!/\{(me|mon)/.test(w.solve.whyAny), '자리표시가 채워졌다');
+    assert.equal(w.solve.rule, c.idea);
+    const sp = makeQuestion(c.id, 'special', s, opts);
+    if (!sp) continue;
+    assert.ok(sp.solve && sp.solve.steps.length >= 2, `${c.id} ⭐ #${s}`);
+    for (const ch of sp.choices) if (!ch.ok) assert.ok(sp.solve.why[ch.tag], `${c.id} ⭐: 오답 "${ch.tag}"에 풀이 없음`);
+    if (sp.solve.figure) assert.ok(sp.solve.figure.startsWith('<svg'));
   }
+});
+
+test('2차: 🤔 오답 노트 — 틀린 유형(key)이 개념에 남고, 처음에 맞히면 지워지며, 다음 편에 want로 그 유형이 끼어 든다', () => {
+  const m = emptyMath();
+  const q1 = makeQuestion('frac.add', 'calc', 4, opts);
+  const w1 = makeQuestion('frac.add', 'why', 4, opts);
+  applyRound(m, 'frac.add', { correct: 2, total: 4, missTags: ['분모끼리 더함'], qs: [
+    { k: 'calc', ok: 0, tag: '분모끼리 더함', key: q1.key, fx: 1 }, { k: 'misread', ok: 1, key: 'misread' }, { k: 'why', ok: 0, tag: '개념을 다르게 이해함', key: w1.key }, { k: 'special', ok: 1 },
+  ] }, T);
+  const rec = m.concepts['frac.add'];
+  assert.equal(rec.notes.length, 2);
+  assert.deepEqual(rec.notes.map((n) => n.key), [q1.key, w1.key]);
+  assert.equal(rec.notes[0].fx, 1, '쌍둥이로 고친 것도 노트에는 남는다 (며칠 뒤에도 맞아야 진짜)');
+  assert.equal(m.log[0].qs[0].key, undefined, '일지에는 key를 안 남긴다 (크기)');
+  assert.equal(nextNote(m, 'frac.add').key, w1.key, '가장 최근 것');
+  // 다음 편: want로 그 유형이 끼어 든다 — ③ 문항이면 같은 문항이 그대로 다시
+  const round = makeRound('frac.add', 77, { ...opts, want: w1.key });
+  assert.ok(round.some((q) => q.key === w1.key), '노트의 ③ 문항이 다시 나온다');
+  const round2 = makeRound('frac.add', 78, { ...opts, want: q1.key });
+  assert.ok(round2.some((q) => q.kind === 'calc' && q.key === q1.key), '노트의 계산 틀이 다시 나온다');
+  // 처음에 맞히면 지워진다
+  applyRound(m, 'frac.add', { correct: 4, total: 4, missTags: [], qs: [{ k: 'why', ok: 1, key: w1.key }, { k: 'calc', ok: 1, key: q1.key }] }, T);
+  assert.equal(rec.notes.length, 0);
+  assert.equal(nextNote(m, 'frac.add'), null);
+  // 같은 유형을 또 틀리면 하나로 (겹치지 않게), 최대 NOTES_MAX
+  for (let i = 0; i < 30; i++) applyRound(m, 'frac.add', { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: 0, key: `틀 ${i % 15}` }] }, T);
+  assert.equal(rec.notes.length, NOTES_MAX);
+  assert.equal(new Set(rec.notes.map((n) => n.key)).size, NOTES_MAX);
+  assert.equal(conceptReport(m).find((r) => r.id === 'frac.add').notes, NOTES_MAX);
+  assert.ok(mathReportText(m, T).includes(`🤔 다시 볼 유형 ${NOTES_MAX}`));
+});
+
+test('2차: 두 기기 병합에서 오답 노트는 유형별로 최근 것 하나, 최대 12', () => {
+  const a = emptyMath(); const b = emptyMath();
+  applyRound(a, 'frac.same', { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: 0, key: 'X' }] }, T);
+  applyRound(b, 'frac.same', { correct: 0, total: 2, missTags: [], qs: [{ k: 'calc', ok: 0, key: 'X' }, { k: 'why', ok: 0, key: 'Y' }] }, T);
+  a.concepts['frac.same'].notes[0].t = 1; b.concepts['frac.same'].notes[0].t = 2; b.concepts['frac.same'].notes[1].t = 3;
+  const m = mergeMath(a, b);
+  assert.deepEqual(m.concepts['frac.same'].notes.map((n) => [n.key, n.t]), [['X', 2], ['Y', 3]]);
 });
 
 test('🔁 쌍둥이: want를 주면 같은 이야기 틀(숫자만 다른) 문제가 나온다 — 방금 틀린 유형을 바로 다시', () => {

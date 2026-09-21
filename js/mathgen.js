@@ -1011,15 +1011,20 @@ export function makeQuestion(conceptId, kind, seed, opts) {
   const extra = (opts && opts.content && opts.content[conceptId]) || null;
   // 방금 나온 문항은 피한다 — 사람이 쓴 문항은 개수가 유한해서, 다시 풀 때 같은 게 또 나오면 답을 외운다
   const avoid = (pool, keyOf) => { const fresh = pool.filter((x) => !cast.recent.includes(tplKey(keyOf(x)))); return fresh.length ? fresh : pool; };
+  // 🤔 오답 노트의 문항을 다시 낼 때(want) — 사람이 쓴 문항은 글이 곧 열쇠라 tplKey(q)로 찾는다
+  const wanted = (pool, keyOf) => (cast.want ? pool.find((x) => tplKey(keyOf(x)) === cast.want) : null);
   if (kind === 'why') {
     // 사람이 쓴 것(coach/math/fraction.json)이 있으면 그쪽 — 코드 안의 것은 파일을 못 받았을 때의 예비
-    const pool = avoid((extra && Array.isArray(extra.why) && extra.why.length) ? extra.why : c.why, (w) => w.q);
-    const w = pool[Math.floor(r() * pool.length)];
+    const all = (extra && Array.isArray(extra.why) && extra.why.length) ? extra.why : c.why;
+    const pool = avoid(all, (w) => w.q);
+    const w = wanted(all, (x) => x.q) || pool[Math.floor(r() * pool.length)];
     const chs = shuffle(r, [
       { text: fill(w.ok, cast), ok: true },
       ...w.no.map((t) => ({ text: fill(t, cast), ok: false, tag: '개념을 다르게 이해함' })),
     ]);
-    return { ...ask(c.id, 'why', fill(w.q, cast), chs, { hint: '왜 그런지 생각해 보세요' }), key: tplKey(w.q) };
+    // 사람이 쓴 풀이(explain: 왜 정답인가 + 끌리는 오답은 왜 아닌가) — 2차(2026-09-21). 단계는 없고 "왜 그런가" 한 덩이
+    const ex = w.explain && w.explain.text ? solve([], { whyAny: fill(w.explain.text, cast), figure: w.explain.figure ? figureSvg(String(w.explain.figure).replace(/^\[|\]$/g, '')) : '', rule: c.idea }) : null;
+    return { ...ask(c.id, 'why', fill(w.q, cast), chs, { hint: '왜 그런지 생각해 보세요', solve: ex }), key: tplKey(w.q) };
   }
   if (kind === 'special') {
     // ⭐ 사람이 쓴 특별 문제 — 이야기가 풍부한 대신 개수가 유한하다. 없으면 null (화면은 건너뛴다)
@@ -1031,12 +1036,18 @@ export function makeQuestion(conceptId, kind, seed, opts) {
     // 세계 비율을 특별 문제에도 — 출연진과 같은 세계의 문제가 있으면 그것을 우선
     const sameWorld = pool.filter((s) => (s.world || 'pokemon') === cast.world);
     const from = avoid(sameWorld.length ? sameWorld : pool, (x) => x.q);
-    const s = from[Math.floor(r() * from.length)];
+    const s = wanted(pool, (x) => x.q) || from[Math.floor(r() * from.length)];
     const chs = shuffle(r, [
       { text: fill(s.ok, cast), ok: true },
       ...(s.no || []).map((w) => ({ text: fill(w.text, cast), ok: false, tag: w.tag || '오개념' })),
     ]);
-    return { ...ask(c.id, 'special', fill(s.q, cast), chs, { expr: s.expr || '', hint: '연습장에 풀고 답을 골라요', figure: s.figure ? figureSvg(s.figure) : '' }), key: tplKey(s.q) };
+    // 사람이 쓴 풀이 — 이 문제의 숫자로 쓴 단계 + 오개념별 한 마디 (2차)
+    const e = s.explain;
+    const ex = e && Array.isArray(e.steps) && e.steps.length ? solve(e.steps.map((t) => fill(t, cast)), {
+      why: Object.fromEntries(Object.entries(e.why || {}).map(([k, v]) => [k, fill(v, cast)])),
+      figure: e.figure ? figureSvg(String(e.figure).replace(/^\[|\]$/g, '')) : '', compare: true, rule: c.idea,
+    }) : null;
+    return { ...ask(c.id, 'special', fill(s.q, cast), chs, { expr: s.expr || '', hint: '연습장에 풀고 답을 골라요', figure: s.figure ? figureSvg(s.figure) : '', solve: ex }), key: tplKey(s.q) };
   }
   const q = kind === 'misread' ? c.misread(r, cast) : c.calc(r, cast);
   return q ? { ...q, key: cast.key || (kind === 'misread' ? 'misread' : '') } : q; // 계산 문항은 worldPick이 고른 이야기 틀이 key, ② 오개념 문항은 틀이 하나라 고정 key(쌍둥이용)
@@ -1092,6 +1103,20 @@ export function checkContent(content) {
       if (s.world && !WORLDS[s.world]) bad.push(`${id}.special[${i}]: 모르는 세계 ${s.world}`);
     }
     if (v.story && (!v.story.text || !v.story.title)) bad.push(`${id}.story: title·text 필요`);
+    // 풀이(explain, 2차): ③은 text, ⭐는 steps(2줄↑) + 오답마다 why. 그림 지시문은 그려져야 한다
+    for (const [i, w] of (v.why || []).entries()) {
+      if (!w.explain) { bad.push(`${id}.why[${i}]: 풀이(explain.text) 없음`); continue; }
+      if (!w.explain.text) bad.push(`${id}.why[${i}]: explain.text 필요`);
+      if (w.explain.figure && !figureSvg(String(w.explain.figure).replace(/^\[|\]$/g, ''))) bad.push(`${id}.why[${i}]: 못 그리는 풀이 그림 ${w.explain.figure}`);
+    }
+    for (const [i, sp] of (v.special || []).entries()) {
+      const e = sp.explain;
+      if (!e) { bad.push(`${id}.special[${i}]: 풀이(explain) 없음`); continue; }
+      if (!Array.isArray(e.steps) || e.steps.length < 2) bad.push(`${id}.special[${i}]: explain.steps 2줄 이상`);
+      for (const w of (sp.no || [])) if (w && w.tag && !(e.why || {})[w.tag]) bad.push(`${id}.special[${i}]: 오답 "${w.tag}"에 풀이 없음`);
+      for (const t of Object.keys(e.why || {})) if (!(sp.no || []).some((w) => w && w.tag === t)) bad.push(`${id}.special[${i}]: 풀이의 이름표 "${t}"가 보기에 없음`);
+      if (e.figure && !figureSvg(String(e.figure).replace(/^\[|\]$/g, ''))) bad.push(`${id}.special[${i}]: 못 그리는 풀이 그림 ${e.figure}`);
+    }
     for (const txt of [v.story && v.story.text, ...(v.why || []).map((w) => w.q), ...(v.special || []).map((s) => s.q)]) {
       const leak = String(txt || '').match(/\{[^}]*\}/g) || [];
       for (const l of leak) if (!/^\{(me|mon|mon2)(\/[^/}]+\/[^}]+)?\}$/.test(l)) bad.push(`${id}: 잘못된 자리표시 ${l}`);
