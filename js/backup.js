@@ -46,7 +46,7 @@ export function slimStats(records = []) {
 /** 사본 한 덩이 — 📊의 "가져오기"가 먹는 형식 그대로라 복구에 그 규칙(mergeStatRecord)을 그대로 쓴다 */
 export function makeSnapshot({ profile = null, math = null, daily = [], sentenceStats = [] } = {}, now = new Date()) {
   // 🔢 수학 진도(profile 스토어의 'math' 레코드)도 담는다 — 개념·복습 일정·일지는 다시 만들 수 없다 (Codex 2026-09-21 #3)
-  const hasMath = math && Object.keys(math.concepts || {}).length;
+  const hasMath = math && (Object.keys(math.concepts || {}).length || Object.keys(math.placed || {}).length || (Array.isArray(math.log) && math.log.length));
   return {
     app: 'shincoach',
     version: 1,
@@ -135,7 +135,7 @@ export async function saveMirror(now = new Date()) {
   } catch {
     return false;
   }
-  if (isEmptyNow({ profile, sentenceStats }) && !(math && Object.keys(math.concepts || {}).length)) return false;
+  if (isEmptyNow({ profile, sentenceStats }) && !(math && (Object.keys(math.concepts || {}).length || Object.keys(math.placed || {}).length))) return false;
 
   const snap = makeSnapshot({ profile, math, daily, sentenceStats }, now);
   try {

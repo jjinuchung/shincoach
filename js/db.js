@@ -613,6 +613,7 @@ function cloneConcept(v) {
   if (v.kinds) { out.kinds = {}; for (const [k, a] of Object.entries(v.kinds)) out.kinds[k] = Array.isArray(a) ? [...a] : a; }
   if (v.miss) out.miss = { ...v.miss };
   if (Array.isArray(v.notes)) out.notes = v.notes.map((n) => ({ ...n }));
+  if (v.cleared) out.cleared = { ...v.cleared };
   return out;
 }
 
@@ -668,9 +669,13 @@ export function mergeMath(cur, rec) {
     const miss = {};
     for (const src of [mine.miss, v.miss]) for (const [t, n] of Object.entries(src || {})) miss[t] = Math.max(Number(miss[t]) || 0, Number(n) || 0);
     // 🤔 오답 노트는 유형(key)별로 최근 것 하나 — 최근 12개
+    // 지운 표시(cleared)는 큰 값 — 옛 백업의 노트가 그 뒤에 지운 것이면 되살리지 않는다 (Codex 2차 #3)
+    const cleared = {};
+    for (const src of [mine.cleared, v.cleared]) for (const [k, t] of Object.entries(src || {})) cleared[k] = Math.max(Number(cleared[k]) || 0, Number(t) || 0);
     const byKey = new Map();
     for (const src of [mine.notes, v.notes]) for (const n of (Array.isArray(src) ? src : [])) {
       if (!n || !n.key) continue;
+      if ((Number(cleared[n.key]) || 0) >= (Number(n.t) || 0)) continue; // 지운 뒤의 기록이 아니면 버린다 (같은 밀리초면 지운 쪽으로)
       const cur = byKey.get(n.key);
       if (!cur || (Number(n.t) || 0) > (Number(cur.t) || 0)) byKey.set(n.key, { ...n });
     }
@@ -686,6 +691,7 @@ export function mergeMath(cur, rec) {
       ...(Object.keys(kinds).length ? { kinds } : {}),
       ...(Object.keys(miss).length ? { miss } : {}),
       ...(notes.length ? { notes } : {}),
+      ...(Object.keys(cleared).length ? { cleared } : {}),
     };
     if (!sched.placed) delete out.concepts[k].placed;
   }

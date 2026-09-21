@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { FRACTION, makeQuestion, makeRound, valueOf, tplKey } from '../js/mathgen.js';
-import { applyRound, conceptReport, mathReportText, REWARD, nextNote, NOTES_MAX, dueNotes, countNotes, applyNotesRound, NOTES_ROUND } from '../js/mathprog.js';
+import { FRACTION, makeQuestion, makeRound, valueOf, tplKey, checkContent } from '../js/mathgen.js';
+import { applyRound, conceptReport, mathReportText, REWARD, nextNote, NOTES_MAX, dueNotes, countNotes, applyNotesRound, NOTES_ROUND, markCleared } from '../js/mathprog.js';
 import { emptyMath, mergeMath } from '../js/db.js';
 import { makeSnapshot, snapshotHas, snapshotSummary } from '../js/backup.js';
 
@@ -240,4 +240,97 @@ test('2차-B: 🤔 오답 노트 회차 — 어제 이전 것만 오래된 순�
   assert.ok(txt.includes('🤔오답노트 notes 1/2'), txt);
   const rep = conceptReport(m).find((r) => r.id === 'frac.mul');
   assert.deepEqual(rep.noteList.map((n) => [n.label, n.again]), [['③왜', 1]]);
+});
+
+// ── Codex 2차 리뷰 (2026-09-21) 반영
+
+test('[Codex2 #1] 사람이 쓴 ③⭐: 정답과 값이 같은 오답이 없다 — checkContent가 잡는다 (4/2 = 2, 6/8+6/8 = 3/4+3/4)', () => {
+  assert.deepEqual(checkContent(content), []);
+  const bad = JSON.parse(JSON.stringify(content));
+  bad['frac.div'].why[2].no[0] = '4/2 — 앞을 뒤집음';
+  assert.ok(checkContent(bad).some((m) => m.includes('정답과 같은 값')), '4/2는 정답 2와 같은 값');
+  const bad2 = JSON.parse(JSON.stringify(content));
+  bad2['frac.mul'].special[0].no[0].text = '6/12';
+  assert.ok(checkContent(bad2).some((m) => m.includes('정답과 같은 값')), '6/12는 정답 1/2과 같은 값');
+  // 0/0 같은 "값이 아닌 것"은 넘어간다 (분모 0)
+  const zero = JSON.parse(JSON.stringify(content));
+  assert.ok(zero['frac.same'].why[4].no.includes('0/0'));
+  assert.deepEqual(checkContent(zero), []);
+});
+
+test('[Codex2 #5] ⭐ 오답 값이 이름표의 계산과 맞는다 — 통분 뒤 분모 한 번(3/5×1/3 → 3), 더하기(1/4×3 → 4/4)', () => {
+  const a = content['frac.mul'].special[3];
+  assert.equal(a.no.find((n) => n.tag === '통분한 뒤 분모를 한 번만 씀').text, '3');
+  const b = content['frac.mulnat'].special[3];
+  assert.equal(b.no.find((n) => n.tag === '곱하지 않고 더함').text, '4/4');
+  // 생성기 규칙과 같은 검산: ⭐ '곱하지 않고 더함'은 (n+k)/d, '분모에도 곱함'은 nk/dk
+  for (const sp of content['frac.mulnat'].special) {
+    const m = /^(\d+)\/(\d+) × (\d+)$/.exec(sp.expr);
+    if (!m) continue;
+    const [n, d, k] = m.slice(1).map(Number);
+    const add = sp.no.find((x) => x.tag === '곱하지 않고 더함');
+    if (add) { const v = valueOf(add.text); assert.ok(v && v.n * d === (n + k) * v.d, `${sp.expr}: 더하기 오답 ${add.text}`); }
+    const both = sp.no.find((x) => x.tag === '분모에도 곱함');
+    if (both) assert.equal(both.text, `${n * k}/${d * k}`, `${sp.expr}: 분모에도 곱함`);
+  }
+});
+
+test('[Codex2 #3] 옛 백업을 가져와도 이미 고친 노트가 되살아나지 않는다 (cleared 표시)', () => {
+  const m = emptyMath();
+  applyRound(m, 'frac.same', { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: 0, key: 'X' }] }, '2026-09-20');
+  const backup = JSON.parse(JSON.stringify(m)); // 틀린 직후의 백업
+  applyNotesRound(m, [{ id: 'frac.same', key: 'X', k: 'calc', ok: 1 }], T); // 다음 날 고침
+  assert.equal(m.concepts['frac.same'].notes.length, 0);
+  assert.ok(m.concepts['frac.same'].cleared.X > 0);
+  const merged = mergeMath(m, backup);
+  assert.deepEqual(merged.concepts['frac.same'].notes || [], [], '백업의 옛 노트가 되살아나면 안 된다');
+  // 지운 뒤에 **또** 틀린 것은 산다 (시각이 지운 시각보다 뒤)
+  const later = JSON.parse(JSON.stringify(m));
+  later.concepts['frac.same'].notes = [{ k: 'calc', key: 'X', d: T, t: Date.now() + 1000 }];
+  assert.equal(mergeMath(m, later).concepts['frac.same'].notes.length, 1);
+  // 처음에 맞혀 지운 것도 표시된다 (applyRound)
+  const m2 = emptyMath();
+  applyRound(m2, 'frac.add', { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: 0, key: 'Y' }] }, T);
+  applyRound(m2, 'frac.add', { correct: 1, total: 1, missTags: [], qs: [{ k: 'calc', ok: 1, key: 'Y' }] }, T);
+  assert.ok(m2.concepts['frac.add'].cleared.Y > 0);
+  // cleared는 최근 NOTES_MAX개만
+  const rec = { cleared: {} };
+  for (let i = 0; i < NOTES_MAX + 5; i++) markCleared(rec, 'k' + i);
+  assert.equal(Object.keys(rec.cleared).length, NOTES_MAX);
+});
+
+test('[Codex2 #7] want는 그 얼굴(kind)의 문항에만 — ③ 키를 꽂아도 계산 문항은 더하기·빼기를 평소대로 낸다', () => {
+  const w = makeQuestion('frac.same', 'why', 3, opts);
+  let minus = 0;
+  for (let s = 1; s <= 60; s++) {
+    const round = makeRound('frac.same', s, { ...opts, want: { k: 'why', key: w.key } });
+    assert.equal(round[2].key, w.key, '③은 꽂힌다');
+    if (round[0].expr.includes('−')) minus++;
+  }
+  assert.ok(minus > 5, `빼기 문항이 나온다 (${minus}/60)`);
+  // 글자 want(옛 방식)는 모든 얼굴에 통한다 — 테스트·검수 도구 호환
+  const q = makeQuestion('frac.add', 'calc', 3, opts);
+  assert.equal(makeQuestion('frac.add', 'calc', 9, { ...opts, want: q.key }).key, q.key);
+  assert.equal(makeQuestion('frac.add', 'calc', 9, { ...opts, want: { k: 'why', key: q.key } }).key === q.key, false, '얼굴이 다르면 안 꽂힌다');
+});
+
+test('[Codex2 #8/#9] 노트 회차의 바로 고침이 개념 보고에 세고, 다시 틀리면 again이 유지된다', () => {
+  const m = emptyMath();
+  applyRound(m, 'frac.add', { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: 0, key: 'X' }] }, '2026-09-20');
+  applyNotesRound(m, [{ id: 'frac.add', key: 'X', k: 'calc', ok: 0, fx: 1 }], T);
+  assert.equal(conceptReport(m).find((r) => r.id === 'frac.add').fixed, 1, '노트 회차의 fx도 그 개념 것');
+  assert.equal(m.concepts['frac.add'].notes[0].again, 1);
+  applyRound(m, 'frac.add', { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: 0, key: 'X' }] }, T); // 평소 편에서 또 틀림
+  assert.equal(m.concepts['frac.add'].notes[0].again, 1, '편에서 다시 틀려도 again은 남는다');
+  // 진단으로만 안 개념도 노트 회차 활동이 있으면 표에 남는다
+  const m2 = emptyMath();
+  m2.concepts['frac.mul'] = { done: true, box: 1, dueAt: '2026-09-25', passes: 1, fails: 0, lastAt: 1, placed: true, notes: [{ k: 'calc', key: 'Z', d: '2026-09-20', t: 1 }] };
+  applyNotesRound(m2, [{ id: 'frac.mul', key: 'Z', k: 'calc', ok: 1 }], T);
+  assert.ok(conceptReport(m2).some((r) => r.id === 'frac.mul'), '노트를 고친 뒤에도 사라지지 않는다');
+});
+
+test('[Codex2 #3 후속] 자동 사본: 개념이 없어도 진단·일지가 있으면 math를 담는다', () => {
+  const m = { ...emptyMath(), placed: { fraction: T }, log: [{ d: T, t: 1, id: 'diag', mode: 'diag', ok: 5, n: 5, qs: [] }] };
+  assert.equal(makeSnapshot({ profile: { id: 'me', xp: 1 }, math: m }).profile.length, 2);
+  assert.equal(makeSnapshot({ profile: { id: 'me', xp: 1 }, math: emptyMath() }).profile.length, 1);
 });

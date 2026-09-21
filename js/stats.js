@@ -478,7 +478,8 @@ export async function renderStats() {
       // 🤔 아직 못 고친 유형 — 틀린 뒤 처음에 맞힌 적이 없는 것. 내일부터 오답 노트 회차에 나온다
       const open = report.flatMap((r) => (r.noteList || []).map((n) => ({ ...n, name: r.name })));
       if (open.length) {
-        cM.appendChild(el('p', 'stats-sub', `🤔 아직 못 고친 유형 ${open.length}개 — 틀린 뒤 처음에 맞힌 적이 없는 것 (내일부터 다시 나와요)`));
+        const dueN = open.filter((n) => n.d && n.d < today).length;
+        cM.appendChild(el('p', 'stats-sub', `🤔 아직 못 고친 유형 ${open.length}개 — 틀린 뒤 처음에 맞힌 적이 없는 것 (${dueN ? `${dueN}개는 지금 🤔 버튼으로 풀 수 있고, ` : ''}오늘 틀린 것은 내일부터)`));
         const box = el('div', 'stats-missed');
         for (const n of open) {
           const chip = el('span', 'stats-missed-chip');

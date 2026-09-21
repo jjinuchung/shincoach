@@ -116,6 +116,16 @@ export function applyPlacement(m, answers, today, strand = 'fraction', missTags 
 export const LOG_MAX = 400;
 /** 🤔 개념마다 남겨 두는 오답 노트 수 — 유형(틀)별로 하나씩이라 12면 넉넉하다 */
 export const NOTES_MAX = 12;
+/**
+ * 지운 노트의 시각 — 옛 백업을 가져와도(mergeMath) 이미 고친 유형이 되살아나지 않게 (Codex 2차 #3).
+ * { key: 지운 시각 }, 최근 NOTES_MAX개만
+ */
+export function markCleared(rec, key) {
+  rec.cleared = rec.cleared || {};
+  rec.cleared[key] = Date.now();
+  const keys = Object.keys(rec.cleared);
+  if (keys.length > NOTES_MAX) for (const k of keys.sort((a, b) => rec.cleared[a] - rec.cleared[b]).slice(0, keys.length - NOTES_MAX)) delete rec.cleared[k];
+}
 function pushLog(m, entry) {
   m.log = Array.isArray(m.log) ? m.log : [];
   m.log.push(entry);
@@ -167,8 +177,10 @@ export function applyRound(m, id, r, today) {
     // 🤔 오답 노트 — 틀린 문항의 틀(key)을 적어 두고, 다음 편에서 그 유형을 한 문제 다시 낸다.
     //    처음에 맞히면(ok) 노트에서 지운다 — 쌍둥이로 고친 것(fx)은 "바로 고침"으로만 표시하고 남겨 둔다 (며칠 뒤에도 맞아야 진짜)
     if (q.key) {
+      const prev = rec.notes.find((n) => n.key === q.key);
       rec.notes = rec.notes.filter((n) => n.key !== q.key);
-      if (!q.ok) rec.notes.push({ k: q.k, key: q.key, d: today, t: Date.now(), ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) });
+      if (!q.ok) rec.notes.push({ k: q.k, key: q.key, d: today, t: Date.now(), ...(prev && prev.again ? { again: prev.again } : {}), ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) });
+      else if (prev) markCleared(rec, q.key);
     }
   }
   if (rec.notes.length > NOTES_MAX) rec.notes.splice(0, rec.notes.length - NOTES_MAX);
@@ -242,7 +254,7 @@ export function applyNotesRound(m, qs, today) {
     rec.miss = rec.miss || {};
     rec.notes = Array.isArray(rec.notes) ? rec.notes : [];
     if (q.k) { const kk = rec.kinds[q.k] || [0, 0]; rec.kinds[q.k] = [kk[0] + (q.ok ? 1 : 0), kk[1] + 1]; }
-    if (q.ok) { ok++; rec.notes = rec.notes.filter((n) => n.key !== q.key); }
+    if (q.ok) { ok++; rec.notes = rec.notes.filter((n) => n.key !== q.key); markCleared(rec, q.key); }
     else {
       if (q.tag) { rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1; m.miss[q.tag] = (m.miss[q.tag] || 0) + 1; }
       const n = rec.notes.find((x) => x.key === q.key);
@@ -285,16 +297,18 @@ export function conceptReport(m, limit = 8) {
   const log = (m && Array.isArray(m.log)) ? m.log : [];
   return Object.entries((m && m.concepts) || {}).map(([id, rec]) => {
     const mine = log.filter((e) => e.id === id);
+    // 🤔 노트 회차(id 'notes')의 이 개념 문항들 — 편의 통과/실패 흔적(trail)에는 안 넣고, 바로 고침·활동에만 센다
+    const noteQs = log.filter((e) => e.id === 'notes').flatMap((e) => (e.qs || []).filter((q) => q.c === id));
     const trail = mine.slice(-limit).map((e) => ({ d: e.d, ok: e.ok, n: e.n, pass: e.n > 0 && e.ok === e.n, mode: e.mode }));
     const kinds = Object.entries(rec.kinds || {}).map(([k, v]) => ({ k, label: KIND_SHORT[k] || k, ok: v[0], n: v[1], rate: v[1] ? v[0] / v[1] : 1 }));
     const weak = kinds.filter((x) => x.n >= 2).sort((a, b) => a.rate - b.rate)[0] || null;
     const miss = Object.entries(rec.miss || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag, n]) => ({ tag, n }));
     const rounds = (rec.passes || 0) + (rec.fails || 0);
-    const fixed = mine.reduce((a, e) => a + (e.qs || []).filter((q) => q.fx === 1).length, 0); // 🔁 틀렸다가 쌍둥이로 바로 고친 문항 수
+    const fixed = mine.reduce((a, e) => a + (e.qs || []).filter((q) => q.fx === 1).length, 0) + noteQs.filter((q) => q.fx === 1).length; // 🔁 틀렸다가 쌍둥이로 바로 고친 문항 수 (남아 있는 일지 안에서)
     // 진단으로만 "안다"가 된 개념(passes 1은 진단의 것)은 한 편도 안 푼 것이라 표에 안 올린다 — 복습에서 풀면 일지가 생겨 올라온다
     const noteList = (Array.isArray(rec.notes) ? rec.notes : []).map((n) => ({ k: n.k, label: KIND_SHORT[n.k] || n.k || '', tag: n.tag || '', d: n.d || '', again: n.again || 0, fx: n.fx }));
     const notes = noteList.length;
-    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, notes, noteList, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length };
+    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, notes, noteList, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length && !noteQs.length };
   }).filter((r) => r.trail.length || r.notes || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt); // 🤔 노트만 있는 개념(진단으로 안 것)도 표에 — 못 고친 유형을 보여 줘야 한다
 }
 

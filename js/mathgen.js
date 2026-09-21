@@ -86,8 +86,10 @@ function castOf(r, opts) {
   if (!rest.length) rest = (world === 'pokemon' ? DEFAULT_CAST : WORLDS[world].cast).filter((n) => n !== mon);
   const mon2 = rest.length ? pick(r, rest) : mon;
   // recent: 화면이 넘기는 "방금 나온 이야기 틀" — 같은 개념을 다시 풀 때 같은 이야기가 또 나오지 않게 (2026-09-20 아버님: "피자 얘기가 너무 반복")
-  // want: 이 이야기 틀로 (🔁 쌍둥이 문제 — 방금 틀린 문제와 같은 틀, 숫자만 다르게)
-  return { me: (opts && opts.me) || '진우', mon, mon2, world, recent: (opts && opts.recent) || [], want: (opts && opts.want) || '', key: '' };
+  // want: 이 이야기 틀로 (🔁 쌍둥이·🤔 오답 노트 — 같은 틀, 숫자만 다르게). {k, key}면 그 얼굴(kind)의 문항에만 —
+  //       한 편(makeRound)의 다른 얼굴까지 끌려가면 안 된다 (Codex 2차 #7: ③ 키가 계산 문항의 더하기/빼기까지 정해 버렸다)
+  const w = opts && opts.want;
+  return { me: (opts && opts.me) || '진우', mon, mon2, world, recent: (opts && opts.recent) || [], want: (w && typeof w === 'object') ? (w.key || '') : (w || ''), wantKind: (w && typeof w === 'object') ? (w.k || '') : '', key: '' };
 }
 
 /**
@@ -1008,6 +1010,7 @@ export function makeQuestion(conceptId, kind, seed, opts) {
   if (!c) return null;
   const r = rng(seed);
   const cast = castOf(r, opts);
+  if (cast.wantKind && cast.wantKind !== kind) cast.want = ''; // 다른 얼굴의 want는 이 문항에 안 쓴다
   const extra = (opts && opts.content && opts.content[conceptId]) || null;
   // 방금 나온 문항은 피한다 — 사람이 쓴 문항은 개수가 유한해서, 다시 풀 때 같은 게 또 나오면 답을 외운다
   const avoid = (pool, keyOf) => { const fresh = pool.filter((x) => !cast.recent.includes(tplKey(keyOf(x)))); return fresh.length ? fresh : pool; };
@@ -1089,9 +1092,13 @@ export function checkContent(content) {
   for (const [id, v] of Object.entries(content)) {
     if (id === '_') continue;
     if (!conceptById(id)) { bad.push(`${id}: 없는 개념`); continue; }
+    // 정답과 **값**이 같은 오답은 정답이 둘인 문항이다 (Codex 2차 #1: "4/2 — 앞을 뒤집음"이 정답 2와 같았다). 앞의 수 부분만 본다
+    const headVal = (t) => { const v = valueOf(String(t || '').split(' — ')[0].trim()); return v && v.d > 0 ? v : null; };
+    const sameVal = (a, b) => !!(a && b && a.n * b.d === b.n * a.d);
     for (const [i, w] of (v.why || []).entries()) {
       if (!w.q || !w.ok || !Array.isArray(w.no) || w.no.length !== 3) bad.push(`${id}.why[${i}]: q·ok·no(3개) 필요`);
       else if (w.no.includes(w.ok)) bad.push(`${id}.why[${i}]: 오답에 정답이 있음`);
+      else for (const t of w.no) if (sameVal(headVal(w.ok), headVal(t))) bad.push(`${id}.why[${i}]: 오답 "${t}"가 정답과 같은 값`);
     }
     for (const [i, s] of (v.special || []).entries()) {
       if (!s.q || !s.ok || !Array.isArray(s.no) || s.no.length !== 3) { bad.push(`${id}.special[${i}]: q·ok·no(3개) 필요`); continue; }
@@ -1099,6 +1106,7 @@ export function checkContent(content) {
       if (texts.some((t) => !t)) bad.push(`${id}.special[${i}]: 오답 text 없음`);
       if (texts.includes(s.ok)) bad.push(`${id}.special[${i}]: 오답에 정답이 있음`);
       if (new Set(texts).size !== 3) bad.push(`${id}.special[${i}]: 오답이 겹침`);
+      for (const t of texts) if (sameVal(headVal(s.ok), headVal(t))) bad.push(`${id}.special[${i}]: 오답 "${t}"가 정답과 같은 값`);
       if (s.no.some((w) => w && !w.tag)) bad.push(`${id}.special[${i}]: 오답에 오개념 이름(tag) 없음`);
       if (s.world && !WORLDS[s.world]) bad.push(`${id}.special[${i}]: 모르는 세계 ${s.world}`);
     }

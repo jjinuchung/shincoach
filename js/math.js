@@ -155,6 +155,7 @@ export async function renderMath() {
     if (r.phase === 'story') renderStory(r.id, r.seed);
     else if (r.phase === 'retry') renderRetry(r.id, r.wrong || []);
     else if (r.twin) renderTwin(true);
+    else if (r.at >= r.qs.length) finishRound(); // 다 풀고 저장이 실패한 상태 — 다시 저장 (Codex 2차 #2: 문항 없는 자리를 그리다 죽었다)
     else renderQuestion(r.answered); // 답한 뒤였으면 풀이·버튼까지 그대로 (채점은 안 한다)
     return;
   }
@@ -262,7 +263,7 @@ function startRound(id, mode, o = {}) {
   const recent = ui.recent[id] || [];
   // 🤔 오답 노트: 지난번에 틀린 유형이 있으면 그 유형을 한 문제 끼운다 (want) — 맞히면 노트에서 지워진다
   const note = nextNote(ui.state, id);
-  const qs = makeRound(id, seed, { ...ui.opts, recent, ...(note && note.key ? { want: note.key } : {}) });
+  const qs = makeRound(id, seed, { ...ui.opts, recent, ...(note && note.key ? { want: { k: note.k, key: note.key } } : {}) });
   if (note) for (const q of qs) if (q.key === note.key) q.fromNote = true;
   ui.recent[id] = [...recent, ...qs.map((q) => q.key).filter(Boolean)].slice(-RECENT_KEEP);
   ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, phase: o.again ? 'retry' : mode === 'learn' ? 'story' : 'q', wrong: o.again ? (o.wrong || []) : [] };
@@ -279,14 +280,19 @@ function startNotesRound(list) {
   const base = (Date.now() % 1000000) | 0;
   const qs = [];
   const ids = [];
+  const stale = [];
   list.forEach((x, i) => {
     let q = null;
-    for (let t = 0; t < 6 && !q; t++) q = makeQuestion(x.id, x.note.k, base + i * 101 + t * 7919, { ...ui.opts, want: x.note.key });
-    if (!q) return;
+    for (let t = 0; t < 6 && !q; t++) q = makeQuestion(x.id, x.note.k, base + i * 101 + t * 7919, { ...ui.opts, want: { k: x.note.k, key: x.note.key } });
+    // 그 틀이 이제 없다(내용을 고쳐서) — 엉뚱한 문제를 맞히고 "고쳤다"가 되면 안 되니 노트를 지운다 (Codex 2차 #4)
+    if (!q || q.key !== x.note.key) { stale.push(x); return; }
     q.fromNote = true;
-    if (q.key !== x.note.key) q.key = x.note.key; // 같은 틀을 못 찾았어도(내용이 바뀐 경우) 노트는 이 key로 정리한다
     qs.push(q); ids.push(x.id);
   });
+  if (stale.length) {
+    updateMath((m) => { for (const x of stale) { const rec = m.concepts && m.concepts[x.id]; if (rec && Array.isArray(rec.notes)) rec.notes = rec.notes.filter((n) => n.key !== x.note.key); } })
+      .then((m) => { ui.state = m; }).catch(() => {});
+  }
   if (!qs.length) { renderLadder(ui.state); return; }
   ui.round = { id: null, mode: 'notes', qs, ids, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
   renderQuestion();
@@ -553,14 +559,19 @@ function startTwin() {
   let tq = null;
   // 새 씨앗이 새 숫자를 보장하지 않는다 (Codex #6) — 같은 문장이면 다른 씨앗으로 다시, 그래도 같으면 그냥 낸다
   for (let i = 0; i < 8; i++) {
-    const cand = makeQuestion(q.concept, q.kind, base + i * 7919, { ...ui.opts, want: q.key });
+    const cand = makeQuestion(q.concept, q.kind, base + i * 7919, { ...ui.opts, want: { k: q.kind, key: q.key } });
     if (!cand) break;
     tq = cand;
-    if (cand.q !== q.q || cand.expr !== q.expr) break;
+    if (numSig(cand) !== numSig(q)) break; // 이름만 바뀌고 숫자가 같으면 쌍둥이가 아니다 (Codex 2차 — #6 후속)
   }
   if (!tq) { advance(); return; }
   r.twin = { q: tq, of: r.at, answered: false, chosenIdx: -1 };
   renderTwin();
+}
+
+/** 문항의 숫자 서명 — 식이 있으면 식, 없으면 글 속 숫자들 (이름이 바뀌어도 같으면 같은 문제) */
+function numSig(q) {
+  return q.expr ? String(q.expr) : (String(q.q).match(/\d+/g) || []).join(',');
 }
 
 function renderTwin(restore = false) {
@@ -623,7 +634,7 @@ function paintTwin(i, list, card, restoring) {
   fb.innerHTML = '';
   let scrollTo = null;
   if (ch.ok) {
-    fb.appendChild(el('p', 'math-fb ok', `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp}`));
+    fb.appendChild(el('p', 'math-fb ok', `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`));
   } else {
     fb.appendChild(el('p', 'math-fb no', '아직 헷갈리나 봐요. 풀이를 한 번 더 읽어요.'));
     scrollTo = solveCard(q, ch);
@@ -719,11 +730,10 @@ async function finishRound() {
 
   if (r.mode === 'notes') {
     const card = el('section', 'math-card math-result');
-    const left = countNotes(state, today).all;
+    const nc = countNotes(state, today);
     card.appendChild(el('h2', '', result.ok === result.total ? '🤔 → 😄 틀렸던 유형을 다 고쳤어요!' : `🤔 ${result.total}개 중 ${result.ok}개를 고쳤어요`));
-    card.appendChild(el('p', 'math-p', result.ok === result.total
-      ? (left ? `남은 노트 ${left}개는 내일 이후에 나와요.` : '오답 노트가 비었어요. 다음에 틀린 것이 있으면 다시 쌓여요.')
-      : `못 고친 ${result.total - result.ok}개는 내일 이후에 다시 나와요. 풀이를 한 번 더 읽어 봐요.`));
+    const tail = nc.due ? `아직 ${nc.due}개 더 있어요 — 사다리에서 이어서 풀 수 있어요.` : nc.all ? `남은 ${nc.all}개는 내일 이후에 나와요.` : '오답 노트가 비었어요. 다음에 틀린 것이 있으면 다시 쌓여요.';
+    card.appendChild(el('p', 'math-p', result.ok === result.total ? tail : `못 고친 ${result.total - result.ok}개는 내일 이후에 다시 나와요. 풀이를 한 번 더 읽어 봐요. ${tail}`));
     card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}`));
     const b = el('button', 'btn btn-primary btn-big-wide', '사다리로');
     b.type = 'button';
