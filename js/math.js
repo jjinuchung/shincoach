@@ -4,8 +4,8 @@
 // 영어 화면은 한 줄도 건드리지 않는다 — 🏠 홈에서 갈라져 들어오고 ←로 홈으로 나간다.
 // 보상(⚡💰🎯)은 영어와 같은 xp.js·catch.js를 그대로 쓴다 — 도감·코인이 한 몸이라야 "수학을 해서 마스터볼을 산다"가 된다.
 
-import { FRACTION, makeRound, diagnosticSet, conceptStory, WORLDS } from './mathgen.js';
-import { renderFigures } from './mathdraw.js';
+import { FRACTION, makeRound, makeQuestion, diagnosticSet, conceptStory, WORLDS } from './mathgen.js';
+import { renderFigures, barSvg } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS,
 } from './mathprog.js';
@@ -151,7 +151,8 @@ export async function renderMath() {
   if (r && !r.saving) {
     ui.run++;
     if (r.phase === 'story') renderStory(r.id, r.seed);
-    else if (r.answered) { r.at += 1; if (r.at < r.qs.length) renderQuestion(); else finishRound(); }
+    else if (r.twin) { if (r.twin.answered) advance(); else renderTwin(); }
+    else if (r.answered) advance();
     else renderQuestion();
     return;
   }
@@ -248,7 +249,7 @@ function startRound(id, mode, o = {}) {
   const qs = makeRound(id, seed, { ...ui.opts, recent });
   ui.recent[id] = [...recent, ...qs.map((q) => q.key).filter(Boolean)].slice(-RECENT_KEEP);
   ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, phase: mode === 'learn' && !o.again ? 'story' : 'q' };
-  if (o.again) renderRetry(id, o.missed || []);
+  if (o.again) renderRetry(id, o.wrong || []);
   else if (mode === 'learn') renderStory(id, seed);
   else renderQuestion();
 }
@@ -257,19 +258,32 @@ function startRound(id, mode, o = {}) {
  * 🤔 되짚기 — 틀려서 다시 할 때. 같은 📖를 통째로 또 읽히면 "피자 얘기만 반복"이 된다(아버님, 2026-09-20).
  * 핵심 한 줄(idea)과 방금 헷갈린 것만 보여 주고 바로 문제로. 이야기는 원하면 다시 읽는다.
  */
-function renderRetry(id, missed) {
+function renderRetry(id, wrong) {
   const m = clearMain();
   const c = FRACTION.find((x) => x.id === id);
   const card = el('section', 'math-card math-story');
   card.appendChild(el('div', 'math-eyebrow', `🤔 한 번 더 · ${nameOf(id)}`));
-  card.appendChild(el('h2', '', '이것만 기억하고 다시 해 봐요'));
+  card.appendChild(el('h2', '', wrong.length ? '방금 틀린 문제를 다시 봐요' : '이것만 기억하고 다시 해 봐요'));
   if (c && c.idea) {
     const idea = el('p', 'math-idea big');
     idea.appendChild(document.createTextNode('💡 '));
     idea.appendChild(richNode(c.idea));
     card.appendChild(idea);
   }
-  if (missed.length) card.appendChild(el('p', 'math-tags', `방금 헷갈린 것: ${missed.join(' · ')}`));
+  // 📖 오답 노트 — 틀린 문제마다 문제·내 답·풀이를 접어서 (진우: "왜 틀렸는지 한 문장 말고")
+  for (const w of wrong) {
+    const det = document.createElement('details');
+    det.className = 'math-wrongnote';
+    const sum = document.createElement('summary');
+    sum.appendChild(el('span', 'k', KIND_LABEL[w.q.kind] || ''));
+    const qt = el('span', 'qt'); qt.appendChild(richNode(w.q.q.length > 60 ? w.q.q.slice(0, 60) + '…' : w.q.q)); sum.appendChild(qt);
+    det.appendChild(sum);
+    const body = el('div', 'body');
+    if (w.q.expr) { const ex = el('p', 'math-expr small'); ex.appendChild(richNode(w.q.expr)); body.appendChild(ex); }
+    body.appendChild(solveCard(w.q, w.chosen));
+    det.appendChild(body);
+    card.appendChild(det);
+  }
   card.appendChild(el('p', 'math-p muted', '이번엔 다른 이야기로 물어볼게요.'));
   const go = el('button', 'btn btn-primary btn-big-wide', '문제 다시 풀기 →');
   go.type = 'button';
@@ -362,19 +376,181 @@ function answer(i, list, card) {
     r.correct++;
     sfx.success();
     fb.appendChild(el('p', 'math-fb ok', ['맞았어요! 🎉', '정확해요! ⭐', '바로 그거예요! 👍'][r.at % 3]));
+    // 맞혀도 풀이는 접어 두고 볼 수 있게 — "왜 맞았는지"도 개념이다
+    if (q.solve) {
+      const t = el('button', 'btn math-solve-toggle', '📖 풀이 보기');
+      t.type = 'button';
+      t.addEventListener('click', () => { t.replaceWith(solveCard(q, ch)); });
+      fb.appendChild(t);
+    }
   } else {
     sfx.wrong();
     if (ch.tag) r.missTags.push(ch.tag);
     const p = el('p', 'math-fb no');
     const showTag = ch.tag && !META_TAGS.has(ch.tag);
-    p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요. 정답: ` : '아쉬워요. 정답: '));
-    p.appendChild(richNode(q.choices[okIdx].text));
+    p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : '아쉬워요.'));
     fb.appendChild(p);
+    fb.appendChild(solveCard(q, ch)); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (진우, 2026-09-21)
   }
-  r.answers.push({ concept: q.concept, correct: !!ch.ok, kind: q.kind, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }) }); // 얼굴·오개념까지 — 📒 일지용
-  const next = el('button', 'btn btn-primary btn-big-wide', r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
+  r.answers.push({ concept: q.concept, correct: !!ch.ok, kind: q.kind, chosen: ch.text, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }) }); // 얼굴·오개념까지 — 📒 일지용
+  const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && r.mode !== 'diag' && q.key;
+  const next = el('button', 'btn btn-primary btn-big-wide', canTwin ? '알겠어요, 비슷한 문제 하나 더 →' : r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
-  next.addEventListener('click', () => { r.at += 1; if (r.at < r.qs.length) renderQuestion(); else finishRound(); });
+  next.addEventListener('click', () => { if (canTwin) startTwin(); else advance(); });
+  fb.appendChild(next);
+  next.focus();
+}
+
+/** 다음 문항으로 (쌍둥이가 있었으면 지운다) */
+function advance() {
+  const r = ui.round;
+  if (!r) return;
+  r.twin = null;
+  r.at += 1;
+  if (r.at < r.qs.length) renderQuestion(); else finishRound();
+}
+
+/**
+ * 📖 풀이 카드 — 보기 아래에 펼쳐진다.
+ *   ❌ 내 답 / ✔ 정답 → 1️⃣ 왜 틀렸나(이 오개념을 이 숫자로) + 내 답·정답 막대 비교 → 2️⃣ 이렇게 풀어요 + 정답 그림 → 3️⃣ 다음에 기억할 것
+ * 사람이 쓴 ③⭐ 문항은 아직 풀이가 없어 정답과 개념 한 줄만 (2차에서 채운다).
+ */
+function solveCard(q, ch) {
+  const card = el('div', 'math-solve');
+  const okCh = q.choices.find((x) => x.ok) || { text: '' };
+  const head = el('div', 'math-solve-head');
+  if (!ch.ok) { const mine = el('span', 'mine'); mine.appendChild(document.createTextNode('❌ 내 답: ')); mine.appendChild(richNode(ch.text)); head.appendChild(mine); }
+  const ans = el('span', 'ans'); ans.appendChild(document.createTextNode('✔ 정답: ')); ans.appendChild(richNode(okCh.text)); head.appendChild(ans);
+  card.appendChild(head);
+  const s = q.solve;
+  const c = FRACTION.find((x) => x.id === q.concept);
+  if (!s) {
+    if (c && c.idea) { const p = el('p', 'math-solve-p'); p.appendChild(document.createTextNode('💡 ')); p.appendChild(richNode(c.idea)); card.appendChild(p); }
+    return card;
+  }
+  if (!ch.ok) {
+    const why = s.why[ch.tag] || s.whyAny || (ch.tag && !META_TAGS.has(ch.tag) ? `이 답은 "${ch.tag}" 실수예요.` : '');
+    if (why) {
+      card.appendChild(el('div', 'math-solve-h', '1️⃣ 왜 틀렸나'));
+      const p = el('p', 'math-solve-p'); p.appendChild(richNode(why)); card.appendChild(p);
+    }
+    // 내 답과 정답을 막대로 나란히 — 글보다 먼저 눈에 들어온다 (분수 모양 답이고 너무 크지 않을 때만)
+    if (s.compare) {
+      const a = fracOf(ch.text); const b = fracOf(okCh.text);
+      if (a && b && a.d <= 12 && b.d <= 12 && a.n / a.d <= 3 && b.n / b.d <= 3) {
+        const row = el('div', 'math-compare');
+        row.appendChild(compareBox('내 답', ch.text, barSvg(a.d, a.n), 'no'));
+        row.appendChild(compareBox('정답', okCh.text, barSvg(b.d, b.n), 'ok'));
+        card.appendChild(row);
+      }
+    }
+  }
+  card.appendChild(el('div', 'math-solve-h', ch.ok ? '📖 이렇게 풀어요' : '2️⃣ 이렇게 풀어요'));
+  const ol = el('ol', 'math-solve-steps');
+  for (const st of s.steps) { const li = el('li'); li.appendChild(richNode(st)); ol.appendChild(li); }
+  card.appendChild(ol);
+  if (s.figure) card.appendChild(svgBox(s.figure, 'math-fig'));
+  const rule = s.rule || (c && c.idea) || '';
+  if (rule) {
+    card.appendChild(el('div', 'math-solve-h', ch.ok ? '💡 기억할 것' : '3️⃣ 다음에 기억할 것'));
+    const p = el('p', 'math-solve-p rule'); p.appendChild(richNode(rule)); card.appendChild(p);
+  }
+  return card;
+}
+
+/** "5/6" · "3" · "1 2/3" → {n, d} (대분수는 가분수로). 아니면 null */
+function fracOf(text) {
+  const s = String(text || '').trim();
+  let m;
+  if ((m = /^(\d+) (\d+)\/(\d+)$/.exec(s))) return { n: Number(m[1]) * Number(m[3]) + Number(m[2]), d: Number(m[3]) };
+  if ((m = /^(\d+)\/(\d+)$/.exec(s))) return { n: Number(m[1]), d: Number(m[2]) };
+  if ((m = /^(\d+)$/.exec(s))) return { n: Number(m[1]), d: 1 };
+  return null;
+}
+
+function compareBox(label, text, svg, cls) {
+  const box = el('div', `math-compare-box ${cls}`);
+  const cap = el('div', 'cap'); cap.appendChild(document.createTextNode(`${label} `)); cap.appendChild(richNode(text)); box.appendChild(cap);
+  box.appendChild(svgBox(svg, 'math-fig'));
+  return box;
+}
+
+/**
+ * 🔁 쌍둥이 문제 — 풀이를 읽은 직후 같은 틀에 숫자만 다른 문제 하나. 읽기만 하면 "알 것 같은" 느낌으로 끝나서,
+ * 바로 풀어 봐야 진짜 잡혔는지 그 자리에서 드러난다. 편의 통과 여부는 안 바뀐다("틀린 게 있으면 안다가 아니다") —
+ * 맞히면 ⚡ 조금과 일지에 "바로 고침"(fx)만 남는다.
+ */
+function startTwin() {
+  const r = ui.round;
+  if (!r) return;
+  const q = r.qs[r.at];
+  const seed = ((Date.now() % 1000000) | 0) + 17;
+  const tq = makeQuestion(q.concept, q.kind, seed, { ...ui.opts, want: q.key });
+  if (!tq) { advance(); return; }
+  r.twin = { q: tq, of: r.at, answered: false };
+  renderTwin();
+}
+
+function renderTwin() {
+  const r = ui.round;
+  if (!r || !r.twin) return;
+  const t = r.twin;
+  const q = t.q;
+  const m = clearMain();
+  const card = el('section', 'math-card math-q math-twin');
+  const top = el('div', 'math-q-top');
+  top.appendChild(el('span', 'math-eyebrow', `🔁 비슷한 문제 · ${nameOf(q.concept)}`));
+  top.appendChild(el('span', 'math-kind', '이번엔 맞혀 봐요'));
+  card.appendChild(top);
+  const qt = el('p', 'math-qt'); qt.appendChild(richNode(q.q)); card.appendChild(qt);
+  if (q.figure) card.appendChild(svgBox(q.figure));
+  if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }
+  const list = el('div', 'math-choices');
+  q.choices.forEach((ch, i) => {
+    const b = el('button', 'math-choice');
+    b.type = 'button';
+    b.dataset.i = String(i);
+    b.appendChild(el('span', 'math-choice-no', ['①', '②', '③', '④'][i]));
+    const tx = el('span', 'math-choice-text'); tx.appendChild(richNode(ch.text)); b.appendChild(tx);
+    b.addEventListener('click', () => answerTwin(i, list, card));
+    list.appendChild(b);
+  });
+  card.appendChild(list);
+  card.appendChild(el('div', 'math-feedback'));
+  m.appendChild(card);
+}
+
+function answerTwin(i, list, card) {
+  const r = ui.round;
+  if (!r || !r.twin || r.twin.answered) return;
+  const t = r.twin;
+  t.answered = true;
+  const q = t.q;
+  const ch = q.choices[i];
+  const okIdx = q.choices.findIndex((x) => x.ok);
+  for (const b of list.querySelectorAll('.math-choice')) {
+    b.disabled = true;
+    const k = Number(b.dataset.i);
+    if (k === okIdx) b.classList.add('ok');
+    if (k === i && !ch.ok) b.classList.add('no');
+  }
+  const a = r.answers[t.of];
+  if (a) a.fixed = !!ch.ok;
+  const fb = card.querySelector('.math-feedback');
+  fb.innerHTML = '';
+  if (ch.ok) {
+    r.fixed = (r.fixed || 0) + 1;
+    sfx.success();
+    fb.appendChild(el('p', 'math-fb ok', `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp}`));
+  } else {
+    sfx.wrong();
+    if (ch.tag) r.missTags.push(ch.tag);
+    fb.appendChild(el('p', 'math-fb no', '아직 헷갈리나 봐요. 풀이를 한 번 더 읽어요.'));
+    fb.appendChild(solveCard(q, ch));
+  }
+  const next = el('button', 'btn btn-primary btn-big-wide', t.of + 1 < r.qs.length ? '다음 →' : '결과 보기');
+  next.type = 'button';
+  next.addEventListener('click', () => { r.at = t.of; advance(); });
   fb.appendChild(next);
   next.focus();
 }
@@ -403,7 +579,7 @@ async function finishRound() {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, 'fraction', r.missTags); });
     } else {
-      const qs = r.answers.map((a) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}) }));
+      const qs = r.answers.map((a) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }) }));
       state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today); });
     }
   } catch (err) {
@@ -426,6 +602,7 @@ async function finishRound() {
   const rw = r.mode === 'diag'
     ? { xp: r.correct * REWARD.diag.xp, coin: r.correct * REWARD.diag.coin, catchOnce: false }
     : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
+  rw.xp += (r.fixed || 0) * REWARD.fix.xp; // 🔁 쌍둥이로 바로 고친 문항 (통과 여부와 무관)
   const g = gainXp(rw.xp);
   const c = gainCoins(rw.coin).gained;
   applyDailyDelta(today, r.mode === 'diag' ? { mathQ: r.qs.length, mathOk: r.correct } : { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});
@@ -477,7 +654,8 @@ async function finishRound() {
   if (!all) {
     const again = el('button', 'btn btn-primary btn-big-wide', '🤔 한 번 더');
     again.type = 'button';
-    again.addEventListener('click', () => startRound(r.id, r.mode === 'review' ? 'review' : 'learn', { again: true, missed: shown }));
+    const wrong = r.answers.map((a, i) => ({ a, q: r.qs[i] })).filter((x) => x.a && !x.a.correct && x.q).map((x) => ({ q: x.q, chosen: x.q.choices.find((ch) => ch.text === x.a.chosen) || { text: x.a.chosen || '', ok: false, tag: x.a.tag } }));
+    again.addEventListener('click', () => startRound(r.id, r.mode === 'review' ? 'review' : 'learn', { again: true, wrong }));
     row.appendChild(again);
   }
   const back = el('button', all ? 'btn btn-primary btn-big-wide' : 'btn btn-big-wide', '사다리로');

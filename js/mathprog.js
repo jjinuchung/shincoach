@@ -15,6 +15,7 @@ export const REWARD = {
   reviewPass: { xp: 25, coin: 8 }, // 복습에서 다 맞힘
   crown: { xp: 60, coin: 20 },     // 👑 이해 완료 (라이트너 졸업)
   diag: { xp: 2, coin: 1 },        // 진단 문항 정답
+  fix: { xp: 1, coin: 0 },         // 🔁 틀린 뒤 풀이를 읽고 쌍둥이 문제를 맞힘 (편의 통과 여부는 안 바뀐다)
 };
 
 /** 진단 결과로 "아는 것"으로 친 개념의 첫 복습까지 며칠 — 진단은 한 문제뿐이라 곧 다시 확인한다 */
@@ -164,7 +165,7 @@ export function applyRound(m, id, r, today) {
   for (const t of (r.missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
   m.rounds = (m.rounds || 0) + 1;
   const mode = practice ? 'practice' : review ? 'review' : (r.mode || 'learn');
-  pushLog(m, { d: today, t: Date.now(), id, mode, ok: r.correct, n: r.total, qs: (r.qs || []).map((q) => ({ k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}) })) });
+  pushLog(m, { d: today, t: Date.now(), id, mode, ok: r.correct, n: r.total, qs: (r.qs || []).map((q) => ({ k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) })) });
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
   return { passed, first: !wasDone && passed, crowned, review, practice };
 }
@@ -217,8 +218,9 @@ export function conceptReport(m, limit = 8) {
     const weak = kinds.filter((x) => x.n >= 2).sort((a, b) => a.rate - b.rate)[0] || null;
     const miss = Object.entries(rec.miss || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag, n]) => ({ tag, n }));
     const rounds = (rec.passes || 0) + (rec.fails || 0);
+    const fixed = mine.reduce((a, e) => a + (e.qs || []).filter((q) => q.fx === 1).length, 0); // 🔁 틀렸다가 쌍둥이로 바로 고친 문항 수
     // 진단으로만 "안다"가 된 개념(passes 1은 진단의 것)은 한 편도 안 푼 것이라 표에 안 올린다 — 복습에서 풀면 일지가 생겨 올라온다
-    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length };
+    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length };
   }).filter((r) => r.trail.length || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt);
 }
 
@@ -233,14 +235,14 @@ export function mathReportText(m, today) {
     const trail = r.trail.map((t) => (t.pass ? '✔' : `✘${t.ok}/${t.n}`)).join(' ');
     const kinds = r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(', ');
     const miss = r.miss.map((x) => `${x.tag}×${x.n}`).join(', ');
-    lines.push(`- ${r.name}${r.done ? (r.box >= GRADUATED ? ' 👑' : ' ✅') : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}`);
+    lines.push(`- ${r.name}${r.done ? (r.box >= GRADUATED ? ' 👑' : ' ✅') : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}`);
   }
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
   const log = ((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
-      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
+      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
       lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : nameOf(e.id)} ${e.mode || ''} ${e.ok}/${e.n} ${qs}`);
     }
   }

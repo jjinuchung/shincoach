@@ -86,15 +86,22 @@ function castOf(r, opts) {
   if (!rest.length) rest = (world === 'pokemon' ? DEFAULT_CAST : WORLDS[world].cast).filter((n) => n !== mon);
   const mon2 = rest.length ? pick(r, rest) : mon;
   // recent: 화면이 넘기는 "방금 나온 이야기 틀" — 같은 개념을 다시 풀 때 같은 이야기가 또 나오지 않게 (2026-09-20 아버님: "피자 얘기가 너무 반복")
-  return { me: (opts && opts.me) || '진우', mon, mon2, world, recent: (opts && opts.recent) || [], key: '' };
+  // want: 이 이야기 틀로 (🔁 쌍둥이 문제 — 방금 틀린 문제와 같은 틀, 숫자만 다르게)
+  return { me: (opts && opts.me) || '진우', mon, mon2, world, recent: (opts && opts.recent) || [], want: (opts && opts.want) || '', key: '' };
 }
 
 /**
  * 세계에 맞는 이야기 틀 고르기 — 그 세계 틀이 없으면 포켓몬 틀로.
- * `c.recent`에 있는 틀은 피한다 (다 최근 것이면 전부에서). 고른 틀은 `c.key`에 남겨 화면이 다음 편에 recent로 넘긴다.
+ * `c.want`가 있으면 그 틀로(쌍둥이). 아니면 `c.recent`에 있는 틀은 피한다 (다 최근 것이면 전부에서).
+ * 고른 틀은 `c.key`에 남겨 화면이 다음 편에 recent로 넘긴다.
  */
 function worldPick(r, c, pools) {
-  const list = (c && pools[c.world] && pools[c.world].length) ? pools[c.world] : pools.pokemon;
+  const all = Object.values(pools).flat();
+  let list = (c && pools[c.world] && pools[c.world].length) ? pools[c.world] : pools.pokemon;
+  if (c && c.want) {
+    const same = all.filter((t) => tplKey(t) === c.want);
+    if (same.length) { const t = same[0]; c.key = tplKey(t); return t; }
+  }
   const fresh = list.filter((t) => !(c && c.recent && c.recent.includes(tplKey(t))));
   const t = pick(r, fresh.length ? fresh : list);
   if (c) c.key = tplKey(t);
@@ -103,7 +110,9 @@ function worldPick(r, c, pools) {
 
 /** 이야기 틀의 이름표 — 숫자를 지운 글. 틀은 숫자가 끼워진 뒤에 오므로 "피자 4조각"과 "피자 5조각"이 같은 틀로 잡혀야 한다 */
 export function tplKey(t) {
-  return String(t || '').replace(/\d+/g, '#');
+  // 숫자 뒤 조사는 숫자를 따라 바뀐다(3을/2를, 6과/5와) — 같은 틀이 다른 키가 되지 않게 한 모양으로
+  return String(t || '').replace(/\d+/g, '#')
+    .replace(/#(을|를)/g, '#을').replace(/#(이|가)/g, '#이').replace(/#(은|는)/g, '#은').replace(/#(과|와)/g, '#과').replace(/#(으로|로)/g, '#로');
 }
 
 // ───────────────────── 씨앗 난수 (같은 씨앗이면 같은 문제 — 테스트가 가능해진다) ─────────────────────
@@ -215,7 +224,19 @@ function choices(r, answer, wrongs) {
  * 이야기만 있으면 식을 찾아 읽어야 하고, 식만 있으면 재미가 없다.
  */
 function ask(concept, kind, q, chs, o = {}) {
-  return { concept, kind, q, expr: o.expr || '', hint: o.hint || '', figure: o.figure || '', choices: chs };
+  return { concept, kind, q, expr: o.expr || '', hint: o.hint || '', figure: o.figure || '', choices: chs, solve: o.solve || null };
+}
+
+/**
+ * 📖 풀이 — 틀린 직후 보기 아래에 펼쳐지는 카드의 재료 (2026-09-21, 진우: "왜 틀렸는지 한 문장 말고 그림이랑 풀이를").
+ *   steps: 이렇게 풀어요 (2~4줄, 이 문제의 숫자로)
+ *   why:   오개념 이름표 → 왜 그 실수인가 (이 문제의 숫자로). 없으면 whyAny
+ *   whyAny: 어느 오답이든 같은 설명 (② 오개념 문항처럼 "포켓몬이 무엇을 잘못했나"가 하나일 때)
+ *   figure: 정답 그림 (SVG). compare: 내 답과 정답을 막대로 나란히 그려도 되는 문항인가 (분수 모양 답)
+ *   rule:  다음에 기억할 것 한 줄
+ */
+function solve(steps, o = {}) {
+  return { steps, why: o.why || {}, whyAny: o.whyAny || '', figure: o.figure || '', compare: !!o.compare, rule: o.rule || '' };
 }
 
 // ───────────────────── 개념 사다리 (A. 분수 줄기) ─────────────────────
@@ -256,11 +277,24 @@ export const FRACTION = [
       const story = worldPick(r, c, pools); // 포켓몬 틀 넷도 여기서 — 방금 나온 이야기(피자…)는 피한다
       // 이 개념은 분수 "모양"을 묻는 것이라 약분하지 않고 쓴 그대로 보여 준다 (3/1을 3으로 바꾸면 오개념이 안 보인다)
       // 그림: 피자 이야기는 원, 나머지는 막대 — 그림을 분수로 읽는 것이 이 개념의 알맹이다
+      const fig = /케이크|피자/.test(story) ? pizzaSvg(d, n) : barSvg(d, n);
       return ask(this.id, 'calc', fill(story, c), choices(r, `${n}/${d}`, [
         { text: `${d}/${n}`, tag: '위아래를 바꿔 씀' },
         { text: `${n}/${d - n}`, tag: '남은 조각을 분모로 씀' },
         { text: `${d - n}/${d}`, tag: '먹은 것과 남은 것을 헷갈림' },
-      ]), { figure: /케이크|피자/.test(story) ? pizzaSvg(d, n) : barSvg(d, n) });
+      ]), { figure: fig, solve: solve([
+        `① 전체를 똑같이 ${d}조각으로 나눴어요 → 아래(분모)는 ${d}`,
+        `② 그중 ${n}조각 → 위(분자)는 ${n}`,
+        `③ 답: ${n}/${d}`,
+      ], {
+        why: {
+          '위아래를 바꿔 씀': `${d}/${n}${numJosa(n, '은', '는')} "${n}조각으로 나눈 것 중 ${d}조각"이라는 뜻이에요. 아래가 전체 조각 수(${d}), 위가 그중 몇 개(${n})예요.`,
+          '남은 조각을 분모로 씀': `아래(분모)는 남은 조각이 아니라 **전체** 조각 수예요. 전체는 ${d}조각이니까 분모는 ${d}.`,
+          '먹은 것과 남은 것을 헷갈림': `${d - n}/${d}${numJosa(d, '은', '는')} **남은** 조각이에요. 문제는 ${n}조각 쪽을 물었어요 — 그림에서 칠해진 칸을 세어 봐요.`,
+          '계산 실수': `조각 수를 다시 세어 봐요. 전체 ${d}칸, 그중 ${n}칸.`,
+        },
+        figure: fig, compare: true, rule: '아래 = 몇 조각으로 나눴나, 위 = 그중 몇 개.',
+      }) });
     },
     misread(r, c) {
       const d = pick(r, [4, 6, 8]);
@@ -268,7 +302,13 @@ export const FRACTION = [
         { text: '조각 수를 잘못 셌어요', tag: '오개념을 못 짚음' },
         { text: '더하기를 빼먹었어요', tag: '오개념을 못 짚음' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① "${d}조각으로 나눈 것 중 1조각" → 나눈 조각 수 ${d}${numJosa(d, '은', '는')} 아래, 그중 1은 위`,
+        `② 바르게 쓰면 1/${d}`,
+      ], {
+        whyAny: fill(`{mon/이/가} 위아래를 바꿔 썼어요. ${d}/1${numJosa(1, '은', '는')} "1조각으로 나눈 것 중 ${d}조각"이라는 뜻이라 말이 안 돼요.`, c),
+        figure: barSvg(d, 1), rule: '아래 = 몇 조각으로 나눴나, 위 = 그중 몇 개.',
+      }) });
     },
     why: [
       { q: '분모(아래 숫자)는 무엇을 말하나요?', ok: '전체를 몇 조각으로 똑같이 나눴는지', no: ['먹은 조각이 몇 개인지', '남은 조각이 몇 개인지', '조각이 얼마나 큰지'] },
@@ -283,7 +323,8 @@ export const FRACTION = [
       const d = pick(r, [5, 6, 7, 8, 9, 10]);
       const a = int(r, 1, d - 2);
       const b = int(r, 1, d - a - 1);
-      const plus = r() < 0.6;
+      // 🔁 쌍둥이(c.want)면 방금 것과 같은 셈(더하기/빼기)이어야 한다 — 빼기 틀은 전부 "남은 …"으로 끝난다
+      const plus = c.want ? !/남은/.test(c.want) : r() < 0.6;
       const [x, y] = plus ? [a, b] : [a + b, b];
       const ansN = plus ? a + b : a;
       const story = plus ? worldPick(r, c, {
@@ -323,12 +364,27 @@ export const FRACTION = [
         ],
       });
       // 답은 약분하지 않는다 — 이 단계는 "분모 그대로, 분자만"을 보는 자리다 (약분은 다음 개념)
+      const op = plus ? '+' : '−';
       return ask(this.id, 'calc', fill(story, c), choices(r, `${ansN}/${d}`, [
         plus ? { text: `${ansN}/${d + d}`, tag: '분모끼리도 더함' } : { text: `${x + y}/${d}`, tag: '빼지 않고 더함' },
         { text: `${x}/${d}`, tag: '한쪽만 씀' },
         { text: `${x * y}/${d * d}`, tag: '곱셈으로 풂' },
         { text: `${ansN}/${d * 2}`, tag: '분모를 두 배로' },
-      ]), { expr: `${x}/${d} ${plus ? '+' : '−'} ${y}/${d}`, hint: '연습장에 풀고 답을 골라요', figure: plus ? barSvg(d, x, { n2: y }) : barSvg(d, x) });
+      ]), { expr: `${x}/${d} ${op} ${y}/${d}`, hint: '연습장에 풀고 답을 골라요', figure: plus ? barSvg(d, x, { n2: y }) : barSvg(d, x), solve: solve([
+        `① 분모가 같아요(${d}) → 조각 크기가 같아서 개수만 세면 돼요`,
+        `② 분자만 ${plus ? '더해요' : '빼요'}: ${x} ${op} ${y} = ${ansN}`,
+        `③ 분모는 그대로 → 답: ${ansN}/${d}`,
+      ], {
+        why: {
+          '분모끼리도 더함': `분모를 더하면 조각이 ${d}칸에서 ${d + d}칸으로 바뀌어요. 조각 크기가 달라지면 안 돼요 — 분모는 ${d} 그대로.`,
+          '빼지 않고 더함': `"남은"을 물었으니 빼야 해요. ${x} − ${y} = ${ansN}.`,
+          '한쪽만 씀': `한쪽 수만 썼어요. 두 분자를 ${plus ? '더해야' : '빼야'} 해요: ${x} ${op} ${y} = ${ansN}.`,
+          '곱셈으로 풂': `곱셈이 아니라 ${plus ? '덧셈' : '뺄셈'}이에요. 조각 개수를 ${plus ? '합치는' : '덜어내는'} 거예요.`,
+          '분모를 두 배로': `분모는 조각 크기예요. ${plus ? '더해도' : '빼도'} 조각 크기는 ${d}칸 그대로예요.`,
+          '계산 실수': `${x} ${op} ${y}${numJosa(y, '을', '를')} 다시 해 봐요: ${ansN}. 분모는 ${d} 그대로.`,
+        },
+        figure: plus ? barSvg(d, x, { n2: y }) : barSvg(d, ansN), compare: true, rule: '같은 분모면 분자만 더하거나 뺀다. 분모는 그대로.',
+      }) });
     },
     misread(r, c) {
       const d = pick(r, [5, 7, 9]);
@@ -338,7 +394,13 @@ export const FRACTION = [
         { text: '분자를 안 더했어요', tag: '오개념을 못 짚음' },
         { text: '약분을 안 했어요', tag: '오개념을 못 짚음' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① 분모가 같아요(${d}) → 조각 크기가 같아요`,
+        `② 분자만 더해요: ${a} + ${b} = ${a + b} → ${a + b}/${d}`,
+      ], {
+        whyAny: fill(`{mon/이/가} 분모끼리 더해서 조각이 ${d}칸에서 ${d + d}칸이 됐어요. 분모는 그대로 ${d}여야 해요.`, c),
+        figure: barSvg(d, a, { n2: b }), rule: '같은 분모면 분자만 더하거나 뺀다. 분모는 그대로.',
+      }) });
     },
     why: [
       { q: '같은 분모끼리 더할 때 분모는 왜 그대로 두나요?', ok: '조각의 크기가 그대로라서 — 개수만 늘어난 거예요', no: ['분모는 원래 안 더하는 규칙이라서', '더하면 숫자가 너무 커져서', '분자가 더 중요해서'] },
@@ -354,7 +416,7 @@ export const FRACTION = [
       const w = int(r, 2, 4); // 1이면 "분모에도 곱함"이 정답과 같아져 오개념이 안 보인다
       const n = coprime(r, d);
       const imp = w * d + n;
-      const toMixed = r() < 0.5;
+      const toMixed = c.want ? /대분수/.test(c.want) : r() < 0.5; // 🔁 쌍둥이면 같은 방향(대분수로/가분수로)
       if (toMixed) {
         const story = worldPick(r, c, {
           pokemon: [
@@ -370,7 +432,20 @@ export const FRACTION = [
           { text: mixedText(w, n, d + 1), tag: '분모를 바꿔 버림' },
           { text: mixedText(w + 1, n, d), tag: '한 판을 더 셈' },
           { text: mixedText(w - 1, n, d), tag: '한 판을 덜 셈' },
-        ]), { expr: `${imp}/${d} → 대분수`, figure: barSvg(d, imp) });
+        ]), { expr: `${imp}/${d} → 대분수`, figure: barSvg(d, imp), solve: solve([
+          `① 한 판은 ${d}조각 → ${imp}조각 안에 한 판이 몇 번? ${imp} ÷ ${d} = ${w}, 나머지 ${n}`,
+          `② 판 수 ${w}${numJosa(w, '은', '는')} 앞에, 남은 ${n}조각은 분수로: ${w} ${n}/${d}`,
+          `③ 답: ${mixedText(w, n, d)} (그림에서 꽉 찬 줄이 ${w}개, 남은 칸이 ${n}개)`,
+        ], {
+          why: {
+            '자연수와 분자를 바꿔 씀': `앞의 큰 수는 **몇 판**(${w}), 분자는 **남은 조각**(${n})이에요. 두 자리가 바뀌었어요.`,
+            '분모를 바꿔 버림': `한 판이 ${d}조각이라는 건 안 변해요. 분모 ${d}${numJosa(d, '은', '는')} 그대로.`,
+            '한 판을 더 셈': `${imp}조각에 ${d}조각짜리 판은 ${w}개예요 (${w} × ${d} = ${w * d}, 남는 건 ${n}). ${w + 1}판이면 ${(w + 1) * d}조각이라 너무 많아요.`,
+            '한 판을 덜 셈': `${w - 1}판이면 ${(w - 1) * d}조각이고 남은 조각이 ${n + d}개 — 아직 한 판(${d}조각)이 더 들어 있어요.`,
+            '계산 실수': `${imp} ÷ ${d}${numJosa(d, '을', '를')} 다시 해 봐요: ${w} 판, 나머지 ${n}.`,
+          },
+          figure: barSvg(d, imp), compare: true, rule: '한 판 = 분모만큼의 조각. 판 수를 앞에, 남은 조각을 분수로.',
+        }) });
       }
       const story = worldPick(r, c, {
         pokemon: [
@@ -387,7 +462,20 @@ export const FRACTION = [
         { text: `${w * n}/${d}`, tag: '자연수에 분자를 곱함' },
         { text: `${imp}/${d * w}`, tag: '분모에도 곱함' },
         { text: `${w * d}/${d}`, tag: '분자를 안 더함' },
-      ]), { expr: `${mixedText(w, n, d)} → 가분수` });
+      ]), { expr: `${mixedText(w, n, d)} → 가분수`, solve: solve([
+        `① 한 판은 ${d}조각 → ${w}판은 ${w} × ${d} = ${w * d}조각`,
+        `② 남은 ${n}조각을 더해요: ${w * d} + ${n} = ${imp}`,
+        `③ 답: ${imp}/${d}`,
+      ], {
+        why: {
+          '자연수를 곱하지 않고 더함': `${w}${numJosa(w, '은', '는')} 조각이 아니라 **판**이에요. 판을 조각으로 바꾸려면 ${d}${numJosa(d, '을', '를')} 곱해야 해요: ${w} × ${d} = ${w * d}.`,
+          '자연수에 분자를 곱함': `${w} × ${n}이 아니라 ${w} × ${d}예요 — 한 판이 ${d}조각이니까요.`,
+          '분모에도 곱함': `분모는 "한 판이 몇 조각"이라 안 변해요. ${d} 그대로.`,
+          '분자를 안 더함': `${w}판은 ${w * d}조각이고, 남은 ${n}조각도 더해야 해요: ${w * d} + ${n} = ${imp}.`,
+          '계산 실수': `${w} × ${d} + ${n}${numJosa(n, '을', '를')} 다시 해 봐요: ${imp}.`,
+        },
+        figure: barSvg(d, imp), compare: true, rule: '판 수 × 한 판의 조각 수 + 남은 조각 = 조각 전부.',
+      }) });
     },
     misread(r, c) {
       const d = pick(r, [4, 5, 6]);
@@ -397,7 +485,13 @@ export const FRACTION = [
         { text: '분모를 안 바꿨어요', tag: '오개념을 못 짚음' },
         { text: '약분을 안 했어요', tag: '오개념을 못 짚음' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① ${w}판은 ${w} × ${d} = ${w * d}조각`,
+        `② ${w * d} + ${n} = ${w * d + n} → ${w * d + n}/${d}`,
+      ], {
+        whyAny: fill(`${w}${numJosa(w, '은', '는')} 판 수라 조각으로 바꾸려면 ${d}${numJosa(d, '을', '를')} 곱해야 하는데, {mon/이/가} 그냥 더해서 ${w + n}/${d}${numJosa(d, '이', '가')} 됐어요.`, c),
+        figure: barSvg(d, w * d + n), rule: '판 수 × 한 판의 조각 수 + 남은 조각 = 조각 전부.',
+      }) });
     },
     why: [
       { q: '피자 2와 1/3판을 가분수로 바꿀 때 2 × 3 을 하는 이유는?', ok: '한 판이 3조각이니 두 판은 6조각이라서', no: ['분모와 자연수는 항상 곱하는 규칙이라서', '3이 더 큰 수라서', '분자를 크게 만들어야 해서'] },
@@ -433,12 +527,25 @@ export const FRACTION = [
         ],
       });
       // 문제의 분수와 오답은 약분하지 않고 그대로 (약분을 묻는 문제에서 오답을 약분해 주면 안 된다)
+      const kJ = numJosa(k, '으로', '로');
       return ask(this.id, 'calc', fill(story, c), choices(r, fracText(base.n, base.d), [
         { text: `${base.n}/${d}`, tag: '분자만 나눔' },
         { text: `${n}/${base.d}`, tag: '분모만 나눔' },
         { text: `${n - 1}/${d - 1}`, tag: '나누지 않고 뺌' },
         { text: `${base.n + 1}/${base.d + 1}`, tag: '계산 실수' },
-      ]), { expr: `${n}/${d} → 약분` });
+      ]), { expr: `${n}/${d} → 약분`, solve: solve([
+        `① ${n}${numJosa(n, '과', '와')} ${d}${numJosa(d, '을', '를')} **둘 다** 나눌 수 있는 수를 찾아요: ${k}`,
+        `② 위아래를 똑같이 ${k}${kJ} 나눠요: ${n} ÷ ${k} = ${base.n}, ${d} ÷ ${k} = ${base.d}`,
+        `③ 답: ${base.n}/${base.d} — 조각을 크게 합쳤을 뿐, 양은 그대로예요`,
+      ], {
+        why: {
+          '분자만 나눔': `위만 나누면 양이 줄어들어요 — ${base.n}/${d}${numJosa(d, '은', '는')} ${n}/${d}보다 작아요. 위아래를 **똑같이** ${k}${kJ} 나눠야 양이 그대로예요.`,
+          '분모만 나눔': `아래만 나누면 조각이 커져서 양이 늘어나요. 위아래를 똑같이 ${k}${kJ} 나눠요.`,
+          '나누지 않고 뺌': `약분은 빼기가 아니라 **나누기**예요. ${n} − 1, ${d} − 1을 하면 양이 달라져요.`,
+          '계산 실수': `${n} ÷ ${k}, ${d} ÷ ${k}${numJosa(k, '을', '를')} 다시 해 봐요: ${base.n}, ${base.d}.`,
+        },
+        figure: barsSvg([{ n, d }, { n: base.n, d: base.d }]), compare: true, rule: '위아래를 같은 수로 나누면 양은 그대로.',
+      }) });
     },
     misread(r, c) {
       const k = int(r, 2, 4);
@@ -448,7 +555,13 @@ export const FRACTION = [
         { text: '분모만 나눴어요', tag: '오개념을 못 짚음' },
         { text: '더 나눌 수 있는데 멈췄어요', tag: '오개념을 못 짚음' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① ${n}${numJosa(n, '과', '와')} ${d}${numJosa(d, '을', '를')} 둘 다 ${k}${numJosa(k, '으로', '로')} 나눌 수 있어요`,
+        `② ${n} ÷ ${k} = 2, ${d} ÷ ${k} = 3 → 2/3`,
+      ], {
+        whyAny: fill(`{mon/이/가} 분자만 ${k}${numJosa(k, '으로', '로')} 나누고 분모 ${d}${numJosa(d, '은', '는')} 그대로 뒀어요. 그러면 양이 줄어요 — 위아래를 똑같이 나눠야 해요.`, c),
+        figure: barsSvg([{ n, d }, { n: 2, d: 3 }]), rule: '위아래를 같은 수로 나누면 양은 그대로.',
+      }) });
     },
     why: [
       { q: '약분할 때 위아래를 **같은 수로** 나누는 이유는?', ok: '조각 수와 나눈 수가 같은 비율로 줄어야 양이 그대로라서', no: ['분수는 항상 작게 만들어야 해서', '분모가 작으면 계산이 쉬워서', '규칙이 그렇게 정해져 있어서'] },
@@ -471,12 +584,27 @@ export const FRACTION = [
         minions: [`{mon/이/가} 바나나 1/${a}개, {mon2/이/가} 1/${b}개를 먹었어요. 누가 더 먹었는지 비교하려면 분모를 **가장 작은** 얼마로 맞춰야 할까요?`],
         moana: [`모아나는 하루의 1/${a}, 마우이는 1/${b}만큼 노를 저었어요. 누가 더 저었는지 비교하려면 분모를 **가장 작은** 얼마로 맞춰야 할까요?`],
       });
+      const mul = (x) => [1, 2, 3, 4].map((i) => x * i).join(', ');
+      const big = Math.max(a, b); const small = Math.min(a, b);
       return ask(this.id, 'calc', fill(story, c), choices(r, String(L), [
         { text: String(a + b), tag: '분모끼리 더함' },
         { text: String(a * b), tag: '최소공배수가 아닌 곱' },
         { text: String(L * 2), tag: '최소가 아닌 공배수' },
         { text: String(Math.max(a, b)), tag: '큰 분모를 그냥 씀' },
-      ]), { expr: `1/${a} 과 1/${b} → 가장 작은 공통 분모는?`, figure: barsSvg([{ n: 1, d: a }, { n: 1, d: b }]) });
+      ]), { expr: `1/${a} 과 1/${b} → 가장 작은 공통 분모는?`, figure: barsSvg([{ n: 1, d: a }, { n: 1, d: b }]), solve: solve([
+        `① ${a}의 배수: ${mul(a)}…  ${b}의 배수: ${mul(b)}…`,
+        `② 둘 다에 있는 **가장 작은** 수: ${L}`,
+        `③ 답: ${L} → 1/${a} = ${L / a}/${L}, 1/${b} = ${L / b}/${L} (이제 조각 크기가 같아요)`,
+      ], {
+        why: {
+          '분모끼리 더함': `${a} + ${b} = ${a + b}${numJosa(a + b, '은', '는')} ${a}${numJosa(a, '과', '와')} ${b} 둘 다의 배수가 아니에요. 공통 분모는 **둘 다로 나누어떨어지는 수**여야 해요.`,
+          '최소공배수가 아닌 곱': `${a * b}도 공통 분모는 되지만 **가장 작은** 건 ${L}이에요. 큰 수로 통분하면 계산만 커져요.`,
+          '최소가 아닌 공배수': `${L * 2}도 되지만 문제는 **가장 작은** 공통 분모를 물었어요 — ${L}.`,
+          '큰 분모를 그냥 씀': `${big}${numJosa(big, '은', '는')} ${small}${numJosa(small, '으로', '로')} 나누어떨어지지 않아요. 둘 다의 배수여야 해요.`,
+          '계산 실수': `${a}의 배수와 ${b}의 배수를 다시 써 봐요. 처음으로 겹치는 수가 ${L}.`,
+        },
+        figure: barsSvg([{ n: L / a, d: L }, { n: L / b, d: L }]), rule: '공통 분모 = 두 분모의 최소공배수.',
+      }) });
     },
     misread(r, c) {
       const d = pick(r, [6, 8, 10]);
@@ -485,7 +613,13 @@ export const FRACTION = [
         { text: '분모를 잘못 골랐어요', tag: '오개념을 못 짚음' },
         { text: '약분을 먼저 해야 해요', tag: '오개념을 못 짚음' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① 분모 2를 ${d}${numJosa(d, '으로', '로')} 만들려면 ${half}${numJosa(half, '을', '를')} 곱한 거예요`,
+        `② 분자에도 똑같이 ${half}${numJosa(half, '을', '를')} 곱해요: 1 × ${half} = ${half} → ${half}/${d}`,
+      ], {
+        whyAny: fill(`{mon/이/가} 분모에만 ${half}${numJosa(half, '을', '를')} 곱하고 분자는 그대로 둬서 양이 줄었어요. 1/${d}${numJosa(d, '은', '는')} 1/2보다 훨씬 작아요.`, c),
+        figure: barsSvg([{ n: 1, d: 2 }, { n: half, d }]), rule: '통분: 분모에 곱한 만큼 분자에도 곱한다.',
+      }) });
     },
     why: [
       { q: '통분은 왜 하나요?', ok: '조각의 크기를 같게 만들어 셀 수 있게 하려고', no: ['숫자를 크게 만들려고', '분모를 없애려고', '약분을 쉽게 하려고'] },
@@ -521,20 +655,42 @@ export const FRACTION = [
           `푸아가 코코넛 ${n1}/${d1}개, 헤이헤이가 ${n2}/${d2}개를 먹었어요. 둘이 먹은 코코넛은 모두?`,
         ],
       });
+      const m1 = n1 * (L / d1); const m2 = n2 * (L / d2);
+      const LJ = numJosa(L, '으로', '로');
       return ask(this.id, 'calc', fill(story, c), choices(r, fr(sum, L), [
         { text: fr(n1 + n2, d1 + d2), tag: '분모끼리 더함' },   // ★ 가장 흔한 오개념
         { text: fr(n1 + n2, L), tag: '통분 없이 분자만 더함' },
         { text: fr(n1 * n2, L), tag: '분자를 곱함' },
         { text: fr(n1 * (L / d1) + n2, L), tag: '한쪽만 통분함' },
-      ]), { expr: `${n1}/${d1} + ${n2}/${d2}`, hint: '연습장에 통분부터 해 보세요' });
+      ]), { expr: `${n1}/${d1} + ${n2}/${d2}`, hint: '연습장에 통분부터 해 보세요', solve: solve([
+        `① 분모가 달라요(${d1}, ${d2}) → 조각 크기가 달라서 바로 못 더해요`,
+        `② 통분: 분모를 ${L}${LJ}. ${n1}/${d1} = ${m1}/${L}, ${n2}/${d2} = ${m2}/${L}`,
+        `③ 분자만 더해요: ${m1} + ${m2} = ${sum} → ${sum}/${L}${fr(sum, L) !== `${sum}/${L}` ? ` = ${fr(sum, L)} (약분)` : ''}`,
+      ], {
+        why: {
+          '분모끼리 더함': `조각 크기가 다른데 그냥 더했어요. ${d1}칸짜리와 ${d2}칸짜리는 크기가 달라서 먼저 ${L}칸으로 맞춰야 해요.`,
+          '통분 없이 분자만 더함': `분모를 ${L}${LJ} 바꿨으면 분자도 같이 바꿔야 해요: ${n1} → ${m1}, ${n2} → ${m2}.`,
+          '분자를 곱함': `더하기 문제예요. 곱하면 안 돼요. 통분한 뒤 분자를 **더해요**: ${m1} + ${m2}.`,
+          '한쪽만 통분함': `한쪽만 ${L}칸으로 바꾸고 다른 쪽은 그대로 뒀어요. 둘 다 바꿔야 해요: ${m1}/${L}${numJosa(L, '과', '와')} ${m2}/${L}.`,
+          '계산 실수': `${m1} + ${m2}${numJosa(m2, '을', '를')} 다시 해 봐요: ${sum}.`,
+        },
+        figure: barsSvg([{ n: m1, d: L }, { n: m2, d: L }]), compare: true, rule: '분모가 다르면 통분 먼저, 그다음 분자만 더한다.',
+      }) });
     },
     misread(r, c) {
       const [d1, d2] = pick(r, [[2, 3], [3, 4], [2, 5]]);
+      const L = lcm(d1, d2);
       return ask(this.id, 'misread', fill(`{mon/이/가} 1/${d1} + 1/${d2} = 2/${d1 + d2} 라고 했어요. {me/아/야}, 무엇이 틀렸을까?`, c), choices(r, '분모끼리 더했어요 — 조각 크기를 먼저 맞춰야 해요', [
         { text: '분자를 안 더했어요', tag: '오개념을 못 짚음' },
         { text: '약분을 안 했어요', tag: '오개념을 못 짚음' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① 통분: 분모 ${L} → ${L / d1}/${L} + ${L / d2}/${L}`,
+        `② 분자만 더해요: ${L / d1} + ${L / d2} = ${L / d1 + L / d2} → ${L / d1 + L / d2}/${L}`,
+      ], {
+        whyAny: fill(`조각 크기가 다른데 {mon/이/가} 분모끼리 더했어요. 2/${d1 + d2}${numJosa(d1 + d2, '은', '는')} 1/${d1}보다도 작아요 — 더했는데 작아지면 이상하죠? 먼저 ${L}칸으로 맞춰야 해요.`, c),
+        figure: barsSvg([{ n: L / d1, d: L }, { n: L / d2, d: L }]), rule: '분모가 다르면 통분 먼저, 그다음 분자만 더한다.',
+      }) });
     },
     why: [
       { q: '1/2 + 1/3 이 2/5 가 **아닌** 이유를 가장 잘 말한 것은?', ok: '반쪽에 1/3을 더하면 반보다 커야 하는데 2/5는 반보다 작아서', no: ['분모를 곱해야 하니까', '분자를 곱해야 하니까', '대분수로 바꿔야 하니까'] },
@@ -568,12 +724,26 @@ export const FRACTION = [
           `헤이헤이는 하루에 코코넛을 ${n}/${d}개 먹어요. ${k}일 동안 먹는 코코넛은 모두 얼마일까요?`,
         ],
       });
-      return ask(this.id, 'calc', fill(story, c), choices(r, fr(n * k, d), [
+      const ans = fr(n * k, d);
+      return ask(this.id, 'calc', fill(story, c), choices(r, ans, [
         { text: `${n * k}/${d * k}`, tag: '분모에도 곱함' },       // ★ 가장 흔한 오개념 — 약분하면 원래 수라 그대로 보여 준다
         { text: fr(n, d * k), tag: '분모에만 곱함' },
         { text: fr(n + k, d), tag: '곱하지 않고 더함' },
         { text: fr(n * k, d + k), tag: '분모에 더함' },
-      ]), { expr: `${n}/${d} × ${k}` });
+      ]), { expr: `${n}/${d} × ${k}`, solve: solve([
+        `① ${n}/${d} × ${k}${numJosa(k, '은', '는')} ${n}/${d}${numJosa(n, '을', '를')} ${k}번 더한 거예요`,
+        `② 조각 크기(분모 ${d})는 그대로, 개수(분자)만 ${k}배: ${n} × ${k} = ${n * k}`,
+        `③ 답: ${n * k}/${d}${ans !== `${n * k}/${d}` ? ` = ${ans} (약분)` : ''}`,
+      ], {
+        why: {
+          '분모에도 곱함': `분모에도 곱하면 ${n * k}/${d * k}인데, 약분하면 다시 ${n}/${d}예요 — 하나도 안 늘어난 거예요. 조각 크기는 그대로, 개수만 늘어요.`,
+          '분모에만 곱함': `분모에 곱하면 조각이 더 잘게 쪼개져서 오히려 **작아져요**. 곱해야 할 건 분자예요.`,
+          '곱하지 않고 더함': `${k}번이니까 ${k}${numJosa(k, '을', '를')} **곱해요**. 더하면 한 번 더 한 것밖에 안 돼요.`,
+          '분모에 더함': `분모는 조각 크기라 건드리지 않아요. 분자에 ${k}${numJosa(k, '을', '를')} 곱해요: ${n} × ${k} = ${n * k}.`,
+          '계산 실수': `${n} × ${k}${numJosa(k, '을', '를')} 다시 해 봐요: ${n * k}.`,
+        },
+        figure: n * k <= d * 4 ? barSvg(d, n * k) : '', compare: true, rule: '분수 × 자연수: 분자에만 곱한다.',
+      }) });
     },
     misread(r, c) {
       const d = pick(r, [3, 5, 7]);
@@ -582,7 +752,13 @@ export const FRACTION = [
         { text: '분자에 안 곱했어요', tag: '오개념을 못 짚음' },
         { text: '더해야 하는데 곱했어요', tag: '오개념을 못 짚음' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① 2/${d} × ${k}${numJosa(k, '은', '는')} 2/${d}${numJosa(2, '을', '를')} ${k}번 더한 것`,
+        `② 분자만 ${k}배: 2 × ${k} = ${2 * k} → ${2 * k}/${d}`,
+      ], {
+        whyAny: fill(`{mon/이/가} 분모에도 ${k}${numJosa(k, '을', '를')} 곱했어요. ${2 * k}/${d * k}${numJosa(d * k, '은', '는')} 약분하면 다시 2/${d} — 하나도 안 늘어난 거예요.`, c),
+        figure: barSvg(d, 2 * k), rule: '분수 × 자연수: 분자에만 곱한다.',
+      }) });
     },
     why: [
       { q: '2/3 × 4 에서 분모 3이 그대로인 이유는?', ok: '조각의 크기는 안 변하고 개수만 네 배가 되니까', no: ['3이 4보다 작아서', '분모는 곱하지 않는 규칙이라서', '약분할 거라서'] },
@@ -618,12 +794,26 @@ export const FRACTION = [
           `모아나가 코코넛 ${n1}/${d1}개를 가지고 있어요. 그중 ${n2}/${d2}${numJosa(n2, '을', '를')} 마우이에게 줬어요. 마우이가 받은 코코넛은 한 개의 얼마일까요?`,
         ],
       });
-      return ask(this.id, 'calc', fill(story, c), choices(r, fr(n1 * n2, d1 * d2), [
+      const ans = fr(n1 * n2, d1 * d2);
+      return ask(this.id, 'calc', fill(story, c), choices(r, ans, [
         { text: fr(n1 * (L / d1) * n2 * (L / d2), L), tag: '통분한 뒤 분모를 한 번만 씀' },
         { text: fr(n1 * n2, d1 + d2), tag: '분모끼리 더함' },
         { text: fr(n1 + n2, d1 + d2), tag: '전부 더함' },
         { text: fr(n1 * n2, L), tag: '분모를 최소공배수로' },
-      ]), { expr: `${n1}/${d1} × ${n2}/${d2}` });
+      ]), { expr: `${n1}/${d1} × ${n2}/${d2}`, solve: solve([
+        `① "${n1}/${d1}의 ${n2}/${d2}"는 조각을 **또 나누는** 거예요 → 곱셈`,
+        `② 위끼리 곱하고, 아래끼리 곱해요: ${n1} × ${n2} = ${n1 * n2}, ${d1} × ${d2} = ${d1 * d2}`,
+        `③ 답: ${n1 * n2}/${d1 * d2}${ans !== `${n1 * n2}/${d1 * d2}` ? ` = ${ans} (약분)` : ''}`,
+      ], {
+        why: {
+          '통분한 뒤 분모를 한 번만 씀': `통분은 해도 괜찮지만, 곱셈이면 분모도 곱해야 해요(${L} × ${L}). 분모를 한 번만 쓰면 답이 커져요.`,
+          '분모끼리 더함': `곱셈에서는 분모끼리 **곱해요**: ${d1} × ${d2} = ${d1 * d2}.`,
+          '전부 더함': `곱셈 문제예요. "…의 ${n2}/${d2}"는 곱하기예요. 더하면 오히려 커져요.`,
+          '분모를 최소공배수로': `곱셈은 통분이 필요 없어요. 분모끼리 그냥 곱해요: ${d1} × ${d2} = ${d1 * d2}.`,
+          '계산 실수': `${n1} × ${n2}, ${d1} × ${d2}${numJosa(d2, '을', '를')} 다시 해 봐요: ${n1 * n2}, ${d1 * d2}.`,
+        },
+        compare: true, rule: '분수 × 분수: 위끼리, 아래끼리 곱한다. 통분 필요 없음.',
+      }) });
     },
     misread(r, c) {
       // 통분 자체는 틀린 게 아니다 (해도 답은 같다). 틀린 건 통분한 뒤 **분모를 한 번만 쓰는 것** — 그 계산을 보여 준다
@@ -635,7 +825,13 @@ export const FRACTION = [
         { text: '통분한 분모가 틀렸어요', tag: '오개념을 못 짚음' },
         { text: '분자를 곱하면 안 돼요', tag: '오개념을 못 짚음' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① 통분한 채로 곱해도 돼요: 위끼리 ${a} × ${b} = ${a * b}, 아래끼리 ${L} × ${L} = ${L * L}`,
+        `② ${a * b}/${L * L} = 1/${d1 * d2} — 통분 안 하고 1/${d1} × 1/${d2} = 1/${d1 * d2} 해도 같아요`,
+      ], {
+        whyAny: fill(`통분까지는 괜찮아요. 하지만 곱셈이면 분모도 곱해야 하는데(${L} × ${L}) {mon/이/가} 분모를 한 번만 써서 답이 커졌어요.`, c),
+        rule: '분수 × 분수: 위끼리, 아래끼리 곱한다. 통분 필요 없음.',
+      }) });
     },
     why: [
       { q: '피자 1/2 × 1/3 이 1/2보다 **작아지는** 이유는?', ok: '반쪽의 1/3만 가져온 거라서', no: ['곱하면 항상 커지는데 잘못 계산한 것', '분모가 커져서 그냥 작아 보이는 것', '1보다 작은 수는 곱하면 항상 0에 가까워서'] },
@@ -669,21 +865,46 @@ export const FRACTION = [
           `모아나가 물 ${n}/${d}통을 ${k}일 동안 똑같이 나눠 마셔요. 하루에 마시는 물은?`,
         ],
       });
+      const kJ = numJosa(k, '으로', '로');
       return ask(this.id, 'calc', fill(story, c), choices(r, fr(n, d * k), [
         { text: fr(n * k, d), tag: '나누지 않고 곱함' },
         { text: fr(n, d + k), tag: '분모에 더함' },
         { text: fr(Math.max(1, Math.round(n / k)), d), tag: '분자를 억지로 나눔' },
         { text: fr(n * k, d * k), tag: '위아래 다 곱함' },
-      ]), { expr: `${n}/${d} ÷ ${k}` });
+      ]), { expr: `${n}/${d} ÷ ${k}`, solve: solve([
+        `① ${n}/${d}${numJosa(n, '을', '를')} ${k}${kJ} 똑같이 나눠요 → 한 몫은 더 **작아져야** 해요`,
+        `② 조각을 ${k}배 잘게 쪼개요 = 분모에 ${k}${numJosa(k, '을', '를')} 곱해요: ${d} × ${k} = ${d * k}`,
+        `③ 답: ${n}/${d * k}`,
+      ], {
+        why: {
+          '나누지 않고 곱함': `나누면 한 몫은 **작아져야** 해요. ${n * k}/${d}${numJosa(d, '은', '는')} 오히려 커졌어요.`,
+          '분모에 더함': `분모에 더하는 게 아니라 **곱해요**: ${d} × ${k} = ${d * k}.`,
+          '분자를 억지로 나눔': `${n}${numJosa(n, '은', '는')} ${k}${kJ} 나누어떨어지지 않아요. 그럴 땐 분모에 ${k}${numJosa(k, '을', '를')} 곱하면 돼요.`,
+          '위아래 다 곱함': `위아래에 같은 수를 곱하면 양이 그대로예요 — 나눈 게 아니에요. 분모에만 곱해요.`,
+          '계산 실수': `${d} × ${k}${numJosa(k, '을', '를')} 다시 해 봐요: ${d * k}.`,
+        },
+        figure: barsSvg([{ n, d }, { n, d: d * k }]), compare: true, rule: '분수 ÷ 자연수: 분모에 곱한다 (= × 1/자연수).',
+      }) });
     },
     misread(r, c) {
       const d = pick(r, [5, 7, 9]);
       const k = int(r, 2, 4);
-      return ask(this.id, 'misread', fill(`{mon/이/가} 3/${d} ÷ ${k} 를 풀 때 분자 3을 ${k}${numJosa(k, '으로', '로')} 나누려다 막혔어요. {me/아/야}, 어떻게 하면 될까?`, c), choices(r, `분모에 ${k}${numJosa(k, '을', '를')} 곱하면 돼요 (3/${d * k})`, [
+      const kJ = numJosa(k, '으로', '로');
+      return ask(this.id, 'misread', fill(`{mon/이/가} 3/${d} ÷ ${k} 를 풀 때 분자 3을 ${k}${kJ} 나누려다 막혔어요. {me/아/야}, 어떻게 하면 될까?`, c), choices(r, `분모에 ${k}${numJosa(k, '을', '를')} 곱하면 돼요 (3/${d * k})`, [
         { text: `분자에 ${k}${numJosa(k, '을', '를')} 곱해요`, tag: '곱셈으로 착각' },
         { text: '나누어떨어질 때까지 통분해요', tag: '통분으로 착각' },
         { text: '나눌 수 없는 문제예요', tag: '나눗셈이 안 된다고 생각' },
-      ]));
+      ]), { solve: solve([
+        `① 3/${d} ÷ ${k}: 분자 3을 ${k}${kJ} 못 나누면 분모에 ${k}${numJosa(k, '을', '를')} 곱해요`,
+        `② ${d} × ${k} = ${d * k} → 3/${d * k} (조각이 ${k}배 잘게 쪼개진 것)`,
+      ], {
+        why: {
+          '곱셈으로 착각': `분자에 곱하면 커져요. 나누는 거니까 작아져야 해요.`,
+          '통분으로 착각': `통분은 더하기·빼기 때 하는 거예요. 나눗셈은 분모에 곱하면 끝이에요.`,
+          '나눗셈이 안 된다고 생각': `분자가 안 나누어떨어져도 돼요 — 분모에 ${k}${numJosa(k, '을', '를')} 곱하면 항상 나눌 수 있어요.`,
+        },
+        figure: barsSvg([{ n: 3, d }, { n: 3, d: d * k }]), rule: '분수 ÷ 자연수: 분모에 곱한다.',
+      }) });
     },
     why: [
       { q: '2/3 ÷ 4 에서 분모가 커지는 이유는?', ok: '조각을 넷으로 더 잘게 쪼갠 것이라서', no: ['나눗셈은 항상 분모를 키우는 규칙이라서', '4가 3보다 커서', '분자를 못 나눠서'] },
@@ -720,12 +941,26 @@ export const FRACTION = [
           `테 피티까지 남은 길 ${n1}/${d1}${numJosa(n1, '을', '를')} 하루에 ${n2}/${d2}씩 가면 며칠이 걸릴까요?`,
         ],
       });
-      return ask(this.id, 'calc', fill(story, c), choices(r, fr(n1 * d2, d1 * n2), [
+      const ans = fr(n1 * d2, d1 * n2);
+      return ask(this.id, 'calc', fill(story, c), choices(r, ans, [
         { text: fr(n1 * n2, d1 * d2), tag: '뒤집지 않고 곱함' },          // ★
         { text: fr(d1 * n2, n1 * d2), tag: '앞 분수를 뒤집음' },          // ★
         { text: fr(d1 * d2, n1 * n2), tag: '둘 다 뒤집음' },
         { text: fr(n1 * d2, d1 + n2), tag: '분모를 더함' },
-      ]), { expr: `${n1}/${d1} ÷ ${n2}/${d2}`, hint: '연습장에 뒤집어 곱해 보세요' });
+      ]), { expr: `${n1}/${d1} ÷ ${n2}/${d2}`, hint: '연습장에 뒤집어 곱해 보세요', solve: solve([
+        `① ÷ ${n2}/${d2}${numJosa(n2, '은', '는')} × ${d2}/${n2}${numJosa(d2, '과', '와')} 같아요 — **뒤의 분수**를 뒤집어요`,
+        `② ${n1}/${d1} × ${d2}/${n2} = ${n1 * d2}/${d1 * n2} (위끼리, 아래끼리 곱해요)`,
+        `③ 답: ${ans}${ans !== `${n1 * d2}/${d1 * n2}` ? ` (${n1 * d2}/${d1 * n2}${numJosa(n1 * d2, '을', '를')} 약분)` : ''}`,
+      ], {
+        why: {
+          '뒤집지 않고 곱함': `나눗셈은 뒤의 분수를 **뒤집어서** 곱해요. 그냥 곱하면 곱셈 답(${fr(n1 * n2, d1 * d2)})이 나와요.`,
+          '앞 분수를 뒤집음': `뒤집는 건 나누는 수, 즉 **뒤의 분수**(${n2}/${d2} → ${d2}/${n2})예요. 앞의 ${n1}/${d1}${numJosa(n1, '은', '는')} 그대로.`,
+          '둘 다 뒤집음': `뒤의 분수 **하나만** 뒤집어요. 둘 다 뒤집으면 답이 거꾸로 돼요.`,
+          '분모를 더함': `나눗셈에 더하기는 없어요. 뒤집어서 위끼리·아래끼리 곱해요.`,
+          '계산 실수': `${n1} × ${d2}, ${d1} × ${n2}${numJosa(n2, '을', '를')} 다시 해 봐요: ${n1 * d2}, ${d1 * n2}.`,
+        },
+        compare: true, rule: '÷ 분수 = × 뒤집은 분수. 뒤의 것만 뒤집는다.',
+      }) });
     },
     misread(r, c) {
       const d1 = pick(r, [2, 3]);
@@ -735,7 +970,17 @@ export const FRACTION = [
         { text: '둘 다 뒤집어야 해요', tag: '둘 다 뒤집기' },
         { text: '뒤집지 말고 그냥 곱해야 해요', tag: '뒤집지 않기' },
         { text: '틀린 곳이 없어요', tag: '틀린 줄 모름' },
-      ]));
+      ]), { solve: solve([
+        `① 뒤집는 건 뒤의 분수: ${n2}/${d2} → ${d2}/${n2}`,
+        `② 1/${d1} × ${d2}/${n2} = ${fr(d2, d1 * n2)}`,
+      ], {
+        why: {
+          '둘 다 뒤집기': `하나만 뒤집어요. 둘 다 뒤집으면 답이 거꾸로 돼요.`,
+          '뒤집지 않기': `뒤집지 않으면 곱셈이 돼요. 나눗셈은 뒤의 분수를 뒤집어 곱해요.`,
+        },
+        whyAny: fill(`{mon/이/가} **앞의** 분수를 뒤집었어요. 뒤집는 건 나누는 수, 즉 뒤의 분수예요.`, c),
+        rule: '÷ 분수 = × 뒤집은 분수. 뒤의 것만 뒤집는다.',
+      }) });
     },
     why: [
       { q: '피자 1판 ÷ 1/4 = 4 인 이유를 가장 잘 말한 것은?', ok: '한 판에 1/4짜리 조각이 네 개 들어가니까', no: ['1과 4를 곱했으니까', '나누면 항상 커지니까', '분모가 4라서'] },
@@ -794,7 +1039,7 @@ export function makeQuestion(conceptId, kind, seed, opts) {
     return { ...ask(c.id, 'special', fill(s.q, cast), chs, { expr: s.expr || '', hint: '연습장에 풀고 답을 골라요', figure: s.figure ? figureSvg(s.figure) : '' }), key: tplKey(s.q) };
   }
   const q = kind === 'misread' ? c.misread(r, cast) : c.calc(r, cast);
-  return q ? { ...q, key: cast.key || '' } : q; // 계산 문항은 worldPick이 고른 이야기 틀이 key
+  return q ? { ...q, key: cast.key || (kind === 'misread' ? 'misread' : '') } : q; // 계산 문항은 worldPick이 고른 이야기 틀이 key, ② 오개념 문항은 틀이 하나라 고정 key(쌍둥이용)
 }
 
 /**
