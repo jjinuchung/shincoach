@@ -340,6 +340,32 @@ button { font-family: inherit; }
 .math-daily-btn:not(.btn-primary) { background: #fefce8; color: #854d0e; border: 2px solid #fde047; }
 .math-daily-sub { margin: 6px 0 10px; }
 .math-mix-concept { color: var(--muted); font-size: 0.9rem; font-weight: 700; margin: 0 0 6px; } /* 🎲 답한 뒤에야 알려 주는 개념 이름 */
+/* ❓ 아빠에게 묻기 — 제안 블록·보내기 폼·보냈다는 줄 */
+.math-ask { background: #f0f9ff; border: 2px solid #bae6fd; border-radius: 12px; padding: 10px 12px; margin: 10px 0; display: grid; gap: 8px; }
+.math-ask-lead { margin: 0; font-weight: 700; color: #0c4a6e; font-size: 0.95rem; }
+.math-ask-btn { background: #fff; color: #0369a1; border: 2px solid #7dd3fc; text-align: left; }
+.math-ask-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 1rem; padding: 8px 10px; border: 2px solid #bae6fd; border-radius: 10px; resize: vertical; }
+.math-ask-sent { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 10px; padding: 8px 10px; font-weight: 700; margin: 8px 0; }
+.math-reply-btn { background: #fef3c7; color: #78350f; border: 2px solid #fcd34d; margin-top: 4px; }
+.math-reply-btn.btn-primary { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+.math-ask-try-btn { background: #ecfdf5; color: #065f46; border: 2px solid #6ee7b7; margin-top: 8px; }
+/* 📬 답장 화면 */
+.math-reply-ctx { background: #f8fafc; border-radius: 12px; padding: 10px 12px; margin: 8px 0 12px; }
+.math-reply-ctx .math-qt { margin-bottom: 6px; }
+.math-reply-my { margin: 4px 0; color: #b91c1c; font-weight: 700; }
+.math-reply-ans { margin: 4px 0; color: #15803d; font-weight: 700; }
+.math-reply-kid { margin: 6px 0; color: #0c4a6e; font-weight: 700; }
+.math-reply-body { background: #fffbeb; border: 2px solid #fde68a; border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
+.math-reply-body .math-solve-h { color: #92400e; }
+/* 📊 아빠 쪽 질문함 */
+.stats-ask-item { background: #f8fafc; border-radius: 10px; padding: 8px 10px; margin: 6px 0; font-size: 0.92rem; }
+.stats-ask-item b { display: block; margin-bottom: 2px; }
+.stats-ask-item .st { color: #0369a1; font-weight: 700; }
+.stats-ask-item .st.wait { color: #b45309; }
+.stats-ask-item .st.done { color: #15803d; }
+.stats-ask-item details { margin-top: 4px; }
+.stats-ask-item summary { cursor: pointer; color: var(--muted); }
+.stats-ask-item .reply { background: #fffbeb; border-radius: 8px; padding: 6px 8px; margin: 4px 0; white-space: pre-wrap; }
 .math-daily-list { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 6px; font-size: 1.02rem; }
 .math-daily-list li { background: #f8fafc; border-radius: 10px; padding: 8px 12px; }
 .math-note-badge { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 10px; padding: 6px 10px; font-size: 0.9rem; font-weight: 700; margin: 0 0 10px; } /* 🤔 오답 노트에서 다시 낸 문항 */

@@ -620,7 +620,37 @@ function cloneConcept(v) {
 function cloneMath(m) {
   const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])] };
   for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
+  if (Array.isArray(m.asks)) out.asks = m.asks.map(cloneAsk); // ❓ 질문은 안쪽에 답장 배열이 있어 따로 복사
   return out;
+}
+function cloneAsk(a) {
+  return { ...a, replies: (a.replies || []).map((r) => ({ ...r })), again: (a.again || []).map((r) => ({ ...r })) };
+}
+
+/**
+ * ❓ 질문 병합 — id로 합치고, 같은 질문은 u(마지막 바뀐 시각)가 늦은 쪽의 상태를, 답장·되물음은 시각으로 합집합.
+ * 번호(askSeq)는 큰 값. (두 기기가 같은 번호를 다른 질문에 줬으면 번호가 겹칠 수 있는데, 한 태블릿이라 두지 않는다)
+ * @returns {{asks:Array, askSeq:number}}
+ */
+export function mergeAsks(cur, rec) {
+  const byId = new Map();
+  for (const x of (Array.isArray(cur && cur.asks) ? cur.asks : [])) if (x && x.id) byId.set(x.id, cloneAsk(x));
+  const uni = (a, b) => { const seen = new Map(); for (const r of [...(a || []), ...(b || [])]) if (r && !seen.has(r.t)) seen.set(r.t, { ...r }); return [...seen.values()].sort((p, q) => p.t - q.t); };
+  for (const x of (Array.isArray(rec && rec.asks) ? rec.asks : [])) {
+    if (!x || !x.id) continue;
+    const mine = byId.get(x.id);
+    if (!mine) { byId.set(x.id, cloneAsk(x)); continue; }
+    // 늦게 바뀐 쪽 — 시각이 같으면 진행이 더 된 쪽 (asked < answered < again < understood < fixed < closed)
+    const RANK = { asked: 0, answered: 1, again: 2, understood: 3, fixed: 4, closed: 5 };
+    const ux = Number(x.u) || 0; const um = Number(mine.u) || 0;
+    const later = (ux > um || (ux === um && (RANK[x.status] || 0) > (RANK[mine.status] || 0))) ? x : mine;
+    const merged = { ...later, replies: uni(mine.replies, x.replies), again: uni(mine.again, x.again), tries: Math.max(Number(mine.tries) || 0, Number(x.tries) || 0) };
+    const readAt = Math.max(Number(mine.readAt) || 0, Number(x.readAt) || 0);
+    if (readAt) merged.readAt = readAt; else delete merged.readAt;
+    byId.set(x.id, merged);
+  }
+  const asks = [...byId.values()].sort((a, b) => a.t - b.t);
+  return { asks, askSeq: Math.max(Number(cur && cur.askSeq) || 0, Number(rec && rec.askSeq) || 0, ...asks.map((a) => Number(a.no) || 0)) };
 }
 
 export async function getMath() {
@@ -705,6 +735,12 @@ export function mergeMath(cur, rec) {
   for (const [k, v] of Object.entries((rec && rec.placed) || {})) out.placed[k] = out.placed[k] || v;
   for (const [k, v] of Object.entries((rec && rec.miss) || {})) out.miss[k] = Math.max(Number(out.miss[k]) || 0, Number(v) || 0);
   out.rounds = Math.max(Number(out.rounds) || 0, Number(rec && rec.rounds) || 0);
+  // ❓ 질문 왕복 — 합집합 (다시 만들 수 없는 기록)
+  if ((rec && Array.isArray(rec.asks) && rec.asks.length) || (Array.isArray(out.asks) && out.asks.length)) {
+    const ma = mergeAsks(out, rec);
+    out.asks = ma.asks;
+    out.askSeq = ma.askSeq;
+  }
   // ☀️ 오늘의 수학 완주 기록은 늦은 날짜 쪽, 같은 날이면 큰 횟수 — 옛 백업이 오늘 완주를 지우지 않게
   const dl = rec && rec.daily && rec.daily.d ? rec.daily : null;
   if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0 };

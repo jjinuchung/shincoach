@@ -117,8 +117,11 @@ export async function renderHome(showView) {
     hint.hidden = false;
   };
 
+  // 📬 아빠의 답장이 와 있으면 수학 카드에 먼저 알린다 (읽어야 ☀️가 열린다)
+  let unread = 0;
+  try { const { getMath } = await import('./db.js'); const { unreadAsks } = await import('./mathask.js'); unread = unreadAsks(await getMath()).length; } catch { unread = 0; }
   const frag = document.createDocumentFragment();
-  for (const s of SUBJECTS) frag.appendChild(cardEl(s, pickMascot(s.mascot, chars), pick));
+  for (const s of SUBJECTS) frag.appendChild(cardEl(s.key === 'math' && unread ? { ...s, desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : s, pickMascot(s.mascot, chars), pick));
   list.innerHTML = '';
   list.appendChild(frag);
   hint.hidden = true;

@@ -1,9 +1,10 @@
 // 📊 학습 기록 화면 (부모용): 이번 주 요약, 콘텐츠별 진행률, 어려워한 문장, 복습 단어장, 최근 세션, 내보내기/가져오기
 import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
-  applyEssayFixes, getMath,
+  applyEssayFixes, getMath, updateMath,
 } from './db.js';
-import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText } from './mathprog.js';
+import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, KIND_SHORT, WHY_LABEL } from './mathprog.js';
+import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes } from './essay.js';
 import { countPlayableCues } from './srt.js';
 import { openPlayer } from './player.js';
@@ -121,6 +122,7 @@ export function cueCountOf(item) {
  * 태블릿과 PC 사이에 서버가 없으므로 "글자를 복사해 옮기는" 길을 만들어 둔다.
  */
 let coachMsg = ''; // 적용 뒤 화면을 다시 그리므로, 안내 문구를 넘겨 받아 새 화면에 보여준다
+let askMsg = '';   // ❓ 질문함도 같은 방식
 
 /**
  * 아직 고쳐 주지 않은 글의 번호 (오래된 것이 [1]).
@@ -515,6 +517,71 @@ export async function renderStats() {
     copyRow.appendChild(copyBtn);
     cM.appendChild(copyRow);
     main.appendChild(cM);
+  }
+
+  // 3f) ❓ 진우의 수학 질문 — 아빠가 답할 차례인 것과 진행 중인 것 (2026-09-21 아버님 제안: 모르는 걸 메모로 → 아빠+Claude 답 → 앱에 → 확인 → 문제 → 보상)
+  const askList = activeAsks(math);
+  const askSum = askSummary(math);
+  if (askList.length || askSum.total) {
+    const open = openAsks(math);
+    const cA = card(`❓ 진우의 수학 질문 — 답할 차례 ${open.length}개`);
+    cA.appendChild(el('p', 'stats-note', `기다리는 중 ${askSum.asked} · 다시 물음 ${askSum.again} · 답장 옴(아직 안 읽음) ${askSum.answered} · 이해함 ${askSum.understood} · 문제까지 고침 ${askSum.fixed} · 닫음 ${askSum.closed}`));
+    for (const a of askList) {
+      const it = el('div', 'stats-ask-item');
+      it.appendChild(el('b', '', `❓${a.no} ${mathNameOf(a.concept)} · ${KIND_SHORT[a.k] || a.k} · ${a.d}`));
+      it.appendChild(el('span', `st${ASK_OPEN.has(a.status) ? ' wait' : a.status === 'understood' ? ' done' : ''}`, STATUS_LABEL[a.status] || a.status));
+      const det = el('details');
+      det.appendChild(el('summary', '', '문제 · 진우 답 · 답장 보기'));
+      det.appendChild(el('p', '', `문제: ${a.q}${a.expr ? ` · 식: ${a.expr}` : ''}`));
+      det.appendChild(el('p', '', `진우 답: ${a.my || '(없음)'} ❌${a.tag ? ` (${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · ${WHY_LABEL[a.w]}` : ''} · 정답: ${a.ans}`));
+      if (a.kid) det.appendChild(el('p', '', `진우 말: "${a.kid}"`));
+      (a.replies || []).forEach((rp, i) => {
+        det.appendChild(el('div', 'reply', `💬 답장 ${i + 1}: ${rp.text}`));
+        const ag = (a.again || [])[i];
+        if (ag) det.appendChild(el('p', '', `→ 진우: 아직 모르겠어요${ag.kid ? ` — "${ag.kid}"` : ''}`));
+      });
+      const closeB = el('button', 'btn btn-small', '닫기 — 답 없이 끝내기 (만나서 설명했을 때)');
+      closeB.type = 'button';
+      closeB.addEventListener('click', async () => { await updateMath((m) => { closeAsk(m, a.id); }); askMsg = `❓${a.no}을 닫았어요.`; renderStats(); });
+      det.appendChild(closeB);
+      it.appendChild(det);
+      cA.appendChild(it);
+    }
+    const row = el('div', 'stats-coach-row');
+    const copyBtn = el('button', 'btn', '📋 질문 복사 (Claude에게 붙여 넣기)');
+    copyBtn.type = 'button';
+    copyBtn.disabled = !open.length;
+    const area = el('textarea', 'stats-coach-box');
+    area.placeholder = '여기에 답을 붙여넣으세요 — 예)\n💬12 분모는 조각의 크기예요. 3/4은 4조각 중 3개…\n[bars 3/4 1/6]\n💬13 …';
+    area.rows = 5;
+    const applyBtn = el('button', 'btn btn-primary', '💬 답장 적용');
+    applyBtn.type = 'button';
+    const msg = el('p', 'stats-note', askMsg);
+    askMsg = '';
+    copyBtn.addEventListener('click', async () => {
+      const text = asksText(math, today);
+      let copied = false;
+      try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); copied = true; } } catch { /* 아래에서 직접 고르게 한다 */ }
+      if (!copied) { area.value = text; area.select(); }
+      msg.textContent = copied ? `복사했어요 (질문 ${open.length}개). Claude 대화창에 붙여 넣고, 온 답을 아래 칸에 넣으세요.` : '복사가 막혀 있어요 — 아래 칸의 내용을 길게 눌러 복사하세요.';
+    });
+    applyBtn.addEventListener('click', async () => {
+      const blocks = parseReplies(area.value);
+      if (!blocks.length) { msg.textContent = '💬번호 로 시작하는 줄을 못 찾았어요. 예: 💬12 분모는 …'; return; }
+      let n = 0;
+      await updateMath((m) => { for (const b of blocks) if (applyReply(m, b.no, b.text)) n++; });
+      if (!n) { msg.textContent = '해당하는 질문을 못 찾았어요 (번호가 다르거나 이미 끝난 질문이에요).'; return; }
+      askMsg = `${n}개 답장을 넣었어요. 진우가 수학을 열면 📬로 먼저 보여요.`;
+      area.value = '';
+      renderStats();
+    });
+    row.appendChild(copyBtn);
+    row.appendChild(applyBtn);
+    cA.appendChild(row);
+    cA.appendChild(area);
+    cA.appendChild(msg);
+    cA.appendChild(el('p', 'stats-note', '답은 아빠 이름으로 나가요. [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5 5] 같은 그림 지시문을 쓰면 그림으로 보여요. 배포(coach/math/replies.json)로 보내도 돼요 — Claude에게 부탁하면 됩니다.'));
+    main.appendChild(cA);
   }
 
   // 3d) ⭐ 아이가 "등급이 이상해요" 하고 보낸 신청 (아이 화면에서는 바로 안 바뀐다)
