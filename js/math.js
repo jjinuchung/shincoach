@@ -1,14 +1,15 @@
-// 🔢 수학 화면 — 줄기(분수) → 📏 진단 → 사다리 → 개념 한 편(📖 → ①②③⭐ → 보상)
+// 🔢 수학 화면 — 줄기 고르기(분수·음수) → 📏 진단 → 사다리 → 개념 한 편(📖 이야기 또는 📚 배움 → ①②③⭐ → 보상)
 //
-// 규칙은 mathgen.js(문제)·mathprog.js(진도)에 있고 여기는 그리기와 배선만 한다.
+// 규칙은 mathgen.js·mathneg.js(문제)·mathprog.js(진도)에 있고 여기는 그리기와 배선만 한다.
+// 줄기는 mathprog.STEMS에서 온다 — 화면은 `S()`(지금 줄기)와 `G()`(그 생성기)만 부르고 줄기 이름을 직접 알지 않는다.
 // 영어 화면은 한 줄도 건드리지 않는다 — 🏠 홈에서 갈라져 들어오고 ←로 홈으로 나간다.
 // 보상(⚡💰🎯)은 영어와 같은 xp.js·catch.js를 그대로 쓴다 — 도감·코인이 한 몸이라야 "수학을 해서 마스터볼을 산다"가 된다.
 
-import { FRACTION, makeRound, makeQuestion, diagnosticSet, conceptStory, WORLDS } from './mathgen.js';
-import { renderFigures, barSvg } from './mathdraw.js';
+import { WORLDS, rng, shuffle, josa } from './mathgen.js';
+import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
-  dueNotes, countNotes, applyNotesRound,
+  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { todayKey } from './track.js';
@@ -23,14 +24,23 @@ const $ = (id) => document.getElementById(id);
 // 화면 상태 — 전역 boolean/Set은 두지 않는다 ("껐다 켜면 낫는다" 병의 뿌리). 한 편의 상태는 round 객체 하나에 담고 끝나면 null
 const ui = {
   showView: null,
-  content: null,        // coach/math/fraction.json (한 번 받아 둠)
-  opts: null,           // makeRound에 넘길 출연진·세계
+  stem: null,           // 지금 고른 줄기 key ('fraction'·'negative') — 없으면 줄기 고르기 화면
+  contents: {},         // 줄기별 사람이 쓴 내용 (coach/math/*.json, 한 번 받아 둠)
+  opts: null,           // makeRound에 넘길 출연진·세계 (content는 줄기별로 optsFor가 끼운다)
   round: null,          // 진행 중인 한 편 { id, mode:'learn'|'review'|'diag', qs, at, correct, missTags, answered }
   run: 0,               // 화면을 지우고 await 하는 함수의 요청 번호 (겹쳐 그리기 방지)
   recent: {},           // 개념별로 방금 나온 이야기 틀·문항 (같은 개념을 다시 풀 때 같은 이야기가 또 나오지 않게)
   state: null,          // 마지막으로 읽은 수학 진도 (🤔 오답 노트를 다음 편에 끼우려고)
 };
 const RECENT_KEEP = 10; // 두 편 반 분량 — 틀이 4개뿐인 개념도 한 바퀴는 돈다
+const STEM_KEY = 'shincoach.mathStem'; // 마지막에 고른 줄기 (이 기기 편의용 — 없어도 고르기 화면이 나올 뿐)
+
+/** 지금 줄기 / 그 생성기 / 개념 */
+const S = () => STEMS[ui.stem] || STEMS.fraction;
+const G = () => S().gen;
+const conceptOf = (id) => { const s = stemOf(id); return s ? s.list.find((c) => c.id === id) || null : null; };
+/** 출연진·세계 + 그 줄기의 사람이 쓴 내용 — 🤔 오답 노트 회차는 줄기를 섞을 수 있어 개념마다 따로 끼운다 */
+const optsFor = (stemKey) => ({ ...(ui.opts || {}), content: ui.contents[stemKey || ui.stem] || {} });
 
 // ───────────────────── 분수를 세로로 ─────────────────────
 
@@ -75,7 +85,7 @@ function svgBox(svg, cls) {
   return box;
 }
 
-/** 이야기 본문: 문단 나누기 + [bar 7/8] 그림 + 세로 분수 */
+/** 이야기 본문: 문단 나누기(빈 줄) + 줄 바꿈(한 줄 — 규칙표처럼 줄이 뜻인 글) + [bar 7/8] 그림 + 세로 분수 */
 function storyBody(text) {
   const wrap = el('div', 'math-story-body');
   for (const para of String(text || '').split(/\n\n+/)) {
@@ -85,7 +95,10 @@ function storyBody(text) {
     for (const seg of segs) {
       if (!seg) continue;
       if (/^\[[a-z]+ [^\]]+\]$/.test(seg)) p.appendChild(svgBox(renderFigures(seg), 'math-fig inline'));
-      else { p.appendChild(richNode(seg)); if (seg.trim()) onlyFig = false; }
+      else {
+        seg.split('\n').forEach((line, i) => { if (i) p.appendChild(el('br')); p.appendChild(richNode(line)); });
+        if (seg.trim()) onlyFig = false;
+      }
     }
     if (onlyFig) p.className = 'fig-only';
     wrap.appendChild(p);
@@ -95,26 +108,35 @@ function storyBody(text) {
 
 // ───────────────────── 준비: 내용·출연진·본 영상 ─────────────────────
 
-async function loadContent() {
-  if (ui.content) return ui.content;
+/** 줄기의 사람이 쓴 내용 — 한 번 받아 둔다. 못 받으면 {} (오프라인 첫 실행 — 코드 안의 예비 문항으로 간다) */
+async function loadContent(stemKey) {
+  if (ui.contents[stemKey]) return ui.contents[stemKey];
   try {
-    const res = await fetch('./coach/math/fraction.json');
-    ui.content = res.ok ? await res.json() : {};
-  } catch { ui.content = {}; } // 오프라인 첫 실행 — 코드 안의 예비 문항으로 간다
-  return ui.content;
+    const res = await fetch(STEMS[stemKey].file);
+    ui.contents[stemKey] = res.ok ? await res.json() : {};
+  } catch { ui.contents[stemKey] = {}; }
+  return ui.contents[stemKey];
 }
 
-/** 출연진: 진우가 잡은 포켓몬 이름 + 끝까지 본 영상 세계 */
+/** 출연진: 진우가 잡은 포켓몬 이름 + 끝까지 본 영상 세계 (+ 모든 줄기의 내용을 받아 둔다 — 🤔 노트 회차가 줄기를 섞는다) */
 async function buildOpts() {
-  const content = await loadContent();
+  await Promise.all(STEM_ORDER.map(loadContent));
   const names = ROSTER.filter((r) => caughtCount(r.id) > 0).map((r) => r.ko);
   let worlds = { pokemon: [] };
   try {
     const [items, records] = await Promise.all([listItems(), getAllSentenceStats()]);
     worlds = seenWorlds(contentSummary(items.filter((it) => !it.broken), records, cueCountOf));
   } catch { /* 영상 기록을 못 읽어도 포켓몬 세계로 간다 */ }
-  ui.opts = { content, names, worlds, me: '진우' };
+  ui.opts = { names, worlds, me: '진우' };
   return ui.opts;
+}
+
+/** 마지막에 고른 줄기 — 이 기기 편의용. 못 읽어도 고르기 화면으로 갈 뿐 */
+function savedStem() {
+  try { const k = localStorage.getItem(STEM_KEY); return STEMS[k] ? k : null; } catch { return null; }
+}
+function rememberStem(k) {
+  try { localStorage.setItem(STEM_KEY, k); } catch { /* 사생활 모드 등 — 무시 */ }
 }
 
 /** 🎯 잡기 후보 — 영어 퍼즐과 같은 규칙 (레벨에 열린 것, 😴 쉬는 중 제외) */
@@ -153,6 +175,7 @@ export async function renderMath() {
   if (r && !r.saving) {
     ui.run++;
     if (r.phase === 'story') renderStory(r.id, r.seed);
+    else if (r.phase === 'lesson') renderLesson(r.id, r.seed, r.page || 0);
     else if (r.phase === 'retry') renderRetry(r.id, r.wrong || []);
     else if (r.twin) renderTwin(true);
     else if (r.at >= r.qs.length) finishRound(); // 다 풀고 저장이 실패한 상태 — 다시 저장 (Codex 2차 #2: 문항 없는 자리를 그리다 죽었다)
@@ -168,8 +191,38 @@ export async function renderMath() {
   if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다
   updateChip();
   ui.state = state;
-  if (needsPlacement(state)) renderDiagIntro();
+  if (!ui.stem) ui.stem = savedStem();
+  if (!ui.stem) { renderStemPicker(state); return; }
+  if (needsPlacement(state, ui.stem)) renderDiagIntro();
   else renderLadder(state);
+}
+
+// ── 🌳 줄기 고르기
+
+function renderStemPicker(state) {
+  const m = clearMain();
+  const card = el('section', 'math-card');
+  card.appendChild(el('h2', '', '🌳 어떤 줄기를 할까?'));
+  card.appendChild(el('p', 'math-p muted', '줄기 하나가 개념 사다리 하나예요. 하던 줄기를 이어서 해도 되고, 새 줄기를 시작해도 돼요.'));
+  const list = el('div', 'math-stems');
+  for (const key of STEM_ORDER) {
+    const st = STEMS[key];
+    const rows = ladderOf(state, todayKey(), key);
+    const done = rows.filter((r) => r.state === 'done').length;
+    const crown = rows.filter((r) => r.crowned).length;
+    const started = !needsPlacement(state, key);
+    const b = el('button', 'math-stem-btn');
+    b.type = 'button';
+    b.appendChild(el('span', 'math-stem-code', st.code));
+    const body = el('span', 'math-stem-body');
+    body.appendChild(el('span', 'math-stem-name', `${st.label} · ${st.range}`));
+    body.appendChild(el('span', 'math-stem-sub', started ? `개념 ${rows.length}개 중 ${done}개를 알아요 · 👑 ${crown}` : (st.lesson ? '처음 배우는 줄기 — 한 장씩 배우고 문제를 풀어요' : '📏 진단 5문제로 시작해요')));
+    b.appendChild(body);
+    b.addEventListener('click', () => { ui.stem = key; rememberStem(key); if (needsPlacement(state, key)) renderDiagIntro(); else renderLadder(state); });
+    list.appendChild(b);
+  }
+  card.appendChild(list);
+  m.appendChild(card);
 }
 
 // ── 📏 진단
@@ -177,19 +230,24 @@ export async function renderMath() {
 function renderDiagIntro() {
   const m = clearMain();
   const card = el('section', 'math-card');
+  card.appendChild(el('div', 'math-eyebrow', `${S().code}. ${S().label} · ${S().range}`));
   card.appendChild(el('h2', '', '📏 어디서부터 할까?'));
-  card.appendChild(el('p', 'math-p', '분수 문제 5개를 먼저 풀어 볼게요. 어려운 게 나와도 괜찮아요 — 진우가 어디까지 아는지 보려는 거예요.'));
+  card.appendChild(el('p', 'math-p', S().intro));
   card.appendChild(el('p', 'math-p muted', '연습장에 풀고 답만 고르면 돼요.'));
   const b = el('button', 'btn btn-primary btn-big-wide', '시작!');
   b.type = 'button';
   b.addEventListener('click', () => startDiag());
   card.appendChild(b);
+  const sw = el('button', 'btn btn-big-wide', '🌳 다른 줄기 고르기');
+  sw.type = 'button';
+  sw.addEventListener('click', () => renderStemPicker(ui.state));
+  card.appendChild(sw);
   m.appendChild(card);
 }
 
 function startDiag() {
   const seed = (Date.now() % 1000000) | 0;
-  ui.round = { id: null, mode: 'diag', qs: diagnosticSet(seed, 5, ui.opts), at: 0, correct: 0, missTags: [], answers: [], answered: false };
+  ui.round = { id: null, mode: 'diag', qs: G().diagnosticSet(seed, 5, optsFor()), at: 0, correct: 0, missTags: [], answers: [], answered: false };
   renderQuestion();
 }
 
@@ -198,11 +256,17 @@ function startDiag() {
 function renderLadder(state) {
   const m = clearMain();
   const today = todayKey();
-  const rows = ladderOf(state, today);
-  const due = dueIds(state, today);
+  const rows = ladderOf(state, today, ui.stem);
+  const due = dueIds(state, today, ui.stem);
 
   const head = el('section', 'math-card math-strand');
-  head.appendChild(el('div', 'math-eyebrow', 'A. 분수 줄기 · 초4 → 초6'));
+  const eye = el('div', 'math-eyebrow math-eyebrow-row');
+  eye.appendChild(el('span', '', `${S().code}. ${S().label} · ${S().range}`));
+  const sw = el('button', 'btn btn-small math-stem-switch', '🌳 다른 줄기');
+  sw.type = 'button';
+  sw.addEventListener('click', () => renderStemPicker(state));
+  eye.appendChild(sw);
+  head.appendChild(eye);
   const doneN = rows.filter((r) => r.state === 'done').length;
   const crownN = rows.filter((r) => r.crowned).length;
   head.appendChild(el('h2', '', `개념 ${rows.length}개 중 ${doneN}개를 알아요 · 👑 ${crownN}`));
@@ -212,8 +276,8 @@ function renderLadder(state) {
     b.addEventListener('click', () => startRound(due[0], 'review'));
     head.appendChild(b);
   }
-  // 🤔 오답 노트 회차 — 어제 이전에 틀린 유형만 (개념 일정과 따로). 오늘 틀린 건 그 개념을 다시 열면 끼어 든다
-  const notesDue = dueNotes(state, today);
+  // 🤔 오답 노트 회차 — 어제 이전에 틀린 유형만 (개념 일정과 따로). 오늘 틀린 건 그 개념을 다시 열면 끼어 든다. 이 줄기의 것만
+  const notesDue = dueNotes(state, today).filter((x) => { const s = stemOf(x.id); return s && s.key === ui.stem; });
   if (notesDue.length) {
     const nb = el('button', 'btn btn-big-wide math-notes-btn', `🤔 틀렸던 유형 ${notesDue.length}개 다시 풀기 — 이번엔 맞혀서 지워요`);
     nb.type = 'button';
@@ -238,7 +302,7 @@ function renderLadder(state) {
         : r.due ? '오늘 다시 확인하기'
           : r.state === 'done' ? `알아요 (${r.left}번 더 확인하면 👑)`
             : r.state === 'now' ? '지금 배울 차례' : '배울 수 있어요';
-    body.appendChild(el('span', 'math-rung-sub', `초${r.grade} · ${sub}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`));
+    body.appendChild(el('span', 'math-rung-sub', `${gradeLabel(r.grade)} · ${sub}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`));
     btn.appendChild(body);
     if (r.state === 'locked') btn.disabled = true;
     else btn.addEventListener('click', () => startRound(r.id, r.state === 'done' ? (r.due ? 'review' : 'practice') : 'learn'));
@@ -263,12 +327,14 @@ function startRound(id, mode, o = {}) {
   const recent = ui.recent[id] || [];
   // 🤔 오답 노트: 지난번에 틀린 유형이 있으면 그 유형을 한 문제 끼운다 (want) — 맞히면 노트에서 지워진다
   const note = nextNote(ui.state, id);
-  const qs = makeRound(id, seed, { ...ui.opts, recent, ...(note && note.key ? { want: { k: note.k, key: note.key } } : {}) });
+  const qs = G().makeRound(id, seed, { ...optsFor(), recent, ...(note && note.key ? { want: { k: note.k, key: note.key } } : {}) });
   if (note) for (const q of qs) if (q.key === note.key) q.fromNote = true;
   ui.recent[id] = [...recent, ...qs.map((q) => q.key).filter(Boolean)].slice(-RECENT_KEEP);
-  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, phase: o.again ? 'retry' : mode === 'learn' ? 'story' : 'q', wrong: o.again ? (o.wrong || []) : [] };
+  // 처음 배우는 줄기(S().lesson)는 📖 이야기 대신 📚 단계식 배움 — 한 장씩 확인하며 간다
+  const first = S().lesson ? 'lesson' : 'story';
+  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, page: 0, phase: o.again ? 'retry' : mode === 'learn' ? first : 'q', wrong: o.again ? (o.wrong || []) : [] };
   if (o.again) renderRetry(id, o.wrong || []);
-  else if (mode === 'learn') renderStory(id, seed);
+  else if (mode === 'learn') { if (S().lesson) renderLesson(id, seed, 0); else renderStory(id, seed); }
   else renderQuestion();
 }
 
@@ -283,7 +349,8 @@ function startNotesRound(list) {
   const stale = [];
   list.forEach((x, i) => {
     let q = null;
-    for (let t = 0; t < 6 && !q; t++) q = makeQuestion(x.id, x.note.k, base + i * 101 + t * 7919, { ...ui.opts, want: { k: x.note.k, key: x.note.key } });
+    const sx = stemOf(x.id);
+    for (let t = 0; sx && t < 6 && !q; t++) q = sx.gen.makeQuestion(x.id, x.note.k, base + i * 101 + t * 7919, { ...optsFor(sx.key), want: { k: x.note.k, key: x.note.key } });
     // 그 틀이 이제 없다(내용을 고쳐서) — 엉뚱한 문제를 맞히고 "고쳤다"가 되면 안 되니 노트를 지운다 (Codex 2차 #4)
     if (!q || q.key !== x.note.key) { stale.push(x); return; }
     q.fromNote = true;
@@ -304,7 +371,7 @@ function startNotesRound(list) {
  */
 function renderRetry(id, wrong) {
   const m = clearMain();
-  const c = FRACTION.find((x) => x.id === id);
+  const c = conceptOf(id);
   const card = el('section', 'math-card math-story');
   card.appendChild(el('div', 'math-eyebrow', `🤔 한 번 더 · ${nameOf(id)}`));
   card.appendChild(el('h2', '', wrong.length ? '방금 틀린 문제를 다시 봐요' : '이것만 기억하고 다시 해 봐요'));
@@ -333,21 +400,23 @@ function renderRetry(id, wrong) {
   go.type = 'button';
   go.addEventListener('click', () => { if (ui.round) ui.round.phase = 'q'; renderQuestion(); });
   card.appendChild(go);
-  const read = el('button', 'btn btn-big-wide', '📖 이야기 다시 읽기');
+  const read = el('button', 'btn btn-big-wide', S().lesson ? '📚 다시 배우기' : '📖 이야기 다시 읽기');
   read.type = 'button';
-  read.addEventListener('click', () => { if (ui.round) { ui.round.phase = 'story'; renderStory(id, ui.round.seed); } });
+  read.addEventListener('click', () => { if (!ui.round) return; if (S().lesson) { ui.round.phase = 'lesson'; ui.round.page = 0; renderLesson(id, ui.round.seed, 0); } else { ui.round.phase = 'story'; renderStory(id, ui.round.seed); } });
   card.appendChild(read);
   m.appendChild(card);
 }
 
 function renderStory(id, seed) {
   const m = clearMain();
-  const st = conceptStory(id, seed, ui.opts);
-  const c = FRACTION.find((x) => x.id === id);
+  const st = G().conceptStory(id, seed, optsFor());
+  const c = conceptOf(id);
   const card = el('section', 'math-card math-story');
-  card.appendChild(el('div', 'math-eyebrow', `📖 개념 이야기 · 초${c ? c.grade : ''} ${nameOf(id)}`));
+  card.appendChild(el('div', 'math-eyebrow', `📖 개념 이야기 · ${c ? gradeLabel(c.grade) : ''} ${nameOf(id)}`));
   card.appendChild(el('h2', '', st.title));
   card.appendChild(storyBody(st.text));
+  // ✋ 해 보기 — 그림을 읽는 것이 개념인 자리(분수의 뜻·같은 분모)에는 읽기 전에 손으로 만든다: 막대를 탭해서 n/d 칠하기
+  if (SHADE_IDS.has(id)) card.appendChild(shadeActivity(seed));
   if (c && c.idea) {
     const idea = el('p', 'math-idea');
     idea.appendChild(document.createTextNode('💡 '));
@@ -361,7 +430,175 @@ function renderStory(id, seed) {
   m.appendChild(card);
 }
 
+const SHADE_IDS = new Set(['frac.mean', 'frac.same']);
+/** 🟦 "3/8만큼 칠해 봐요" — 확인은 칸 수로. 통과 여부는 편에 영향 없음 (배움 활동). 씨앗으로 같은 편이면 같은 분수 */
+function shadeActivity(seed) {
+  const r = rng(seed + 7);
+  const d = [4, 5, 6, 8][Math.floor(r() * 4)];
+  const n = 1 + Math.floor(r() * (d - 1));
+  const box = el('div', 'math-lesson-check');
+  box.appendChild(el('div', 'math-solve-h', '✋ 해 보기'));
+  const qt = el('p', 'math-qt'); qt.appendChild(richNode(`막대를 눌러서 ${n}/${d}만큼 칠해 봐요.`)); box.appendChild(qt);
+  const w = shadeWidget({ d });
+  box.appendChild(w.el);
+  const fb = el('div', 'math-feedback');
+  const ok = el('button', 'btn btn-accent btn-big-wide', '다 칠했어요!');
+  ok.type = 'button';
+  ok.addEventListener('click', () => {
+    fb.innerHTML = '';
+    if (w.count() === n) { w.lock(); ok.disabled = true; sfx.success(); const p = el('p', 'math-fb ok'); p.appendChild(richNode(`맞아요! ${d}칸 중 ${n}칸 — 그게 바로 ${n}/${d}예요 🎉`)); fb.appendChild(p); }
+    else { sfx.wrong(); const p = el('p', 'math-fb no'); p.appendChild(richNode(`지금은 ${d}칸 중 ${w.count()}칸이에요. ${n}/${d}은 ${d}칸 중 **${n}칸**이에요.`)); fb.appendChild(p); }
+  });
+  box.appendChild(ok);
+  box.appendChild(fb);
+  return box;
+}
+
+// ── 📚 단계식 배움 (처음 배우는 줄기 — 음수)
+
+/**
+ * 한 장 = 설명(say) + ✋ 확인(check). 확인은 고르기(ok/no) 또는 **끌어 보기**(walk: [출발, 이동] — 수직선 위 말을 답 자리로 옮긴다).
+ * 확인을 맞혀야 다음 장이 열린다 (틀리면 why를 보고 다시 — 채점이 아니라 배움이다). 마지막 장에 📏 한 줄 요약 → 문항으로.
+ * 상태는 ui.round.page 하나 — 🎒·📊 다녀오면 그 장을 다시 그린다(확인은 다시 한다).
+ * 구체(만지기) → 그림 → 기호: 글로 "왼쪽으로 5칸"을 읽는 것과 손가락으로 말을 5칸 끄는 것은 다르다 (2026-09-21, 만지는 그림 1차).
+ */
+function renderLesson(id, seed, page) {
+  const r = ui.round;
+  const L = G().lessonOf ? G().lessonOf(id, seed, optsFor()) : null;
+  if (!L || !L.pages.length) { if (r) r.phase = 'q'; renderQuestion(); return; }
+  page = Math.max(0, Math.min(L.pages.length - 1, page | 0));
+  if (r) { r.phase = 'lesson'; r.page = page; }
+  if (/[?&]nosw=1/.test(location.search)) { window.__mathLesson = L; window.__mathRound = r; } // 헤드리스 검증용 (개발 모드에서만)
+  const m = clearMain();
+  const c = conceptOf(id);
+  const n = L.pages.length; const p = L.pages[page];
+  const card = el('section', 'math-card math-story math-lesson');
+  const top = el('div', 'math-q-top');
+  top.appendChild(el('span', 'math-eyebrow', `📚 배우기 · ${c ? gradeLabel(c.grade) : ''} ${nameOf(id)}`));
+  top.appendChild(el('span', 'math-kind', `${page + 1} / ${n}`));
+  card.appendChild(top);
+  const dots = el('div', 'math-lesson-dots');
+  for (let i = 0; i < n; i++) dots.appendChild(el('span', 'dot' + (i < page ? ' done' : i === page ? ' now' : '')));
+  card.appendChild(dots);
+  if (page === 0) card.appendChild(el('h2', '', L.title));
+  card.appendChild(storyBody(p.say));
+
+  const next = el('button', 'btn btn-primary btn-big-wide', page + 1 < n ? '다음 장 →' : '문제 풀어 볼게요 →');
+  next.type = 'button';
+  next.addEventListener('click', () => {
+    if (page + 1 < n) renderLesson(id, seed, page + 1);
+    else { if (ui.round) ui.round.phase = 'q'; renderQuestion(); }
+  });
+  if (p.check) {
+    next.disabled = true;
+    card.appendChild(checkBlock(p.check, seed + page * 31, () => { next.disabled = false; focusQuiet(next); }));
+  }
+  if (page + 1 === n) {
+    const rule = el('p', 'math-idea big');
+    rule.appendChild(document.createTextNode('📏 한 줄로: '));
+    rule.appendChild(richNode(L.rule));
+    card.appendChild(rule);
+  }
+  card.appendChild(next);
+  if (page > 0) {
+    const back = el('button', 'btn btn-big-wide', '← 앞 장');
+    back.type = 'button';
+    back.addEventListener('click', () => renderLesson(id, seed, page - 1));
+    card.appendChild(back);
+  }
+  m.appendChild(card);
+}
+
+const fmtInt = (v) => String(v).replace('-', '−');
+
+/** ✋ 확인 — 고르기 또는 끌어 보기. 맞히면 onPass(). 틀리면 why를 보여 주고 다시 해 본다 */
+function checkBlock(check, seed, onPass) {
+  const box = el('div', 'math-lesson-check');
+  box.appendChild(el('div', 'math-solve-h', '✋ 확인해 봐요'));
+  const qt = el('p', 'math-qt'); qt.appendChild(richNode(check.q)); box.appendChild(qt);
+  const fb = el('div', 'math-feedback');
+  let passed = false;
+  const pass = (msg) => { passed = true; fb.innerHTML = ''; fb.appendChild(el('p', 'math-fb ok', msg)); sfx.success(); onPass(); };
+  const fail = () => { fb.innerHTML = ''; const p = el('p', 'math-fb no'); p.appendChild(richNode(`아직이에요 — ${check.why || '다시 생각해 봐요.'}`)); fb.appendChild(p); sfx.wrong(); };
+  if (Array.isArray(check.walk) && check.walk.length === 2) {
+    // 🚶 끌어 보기: 말을 답 자리로. 정답은 출발 + 이동 (사람이 쓴 ok와 같은지는 checkContent가 본다)
+    const [start, delta] = check.walk.map(Number); const end = start + delta; const [lo, hi] = walkRange(start, end);
+    const w = walkWidget({ start, lo, hi });
+    box.appendChild(el('p', 'math-hint', '✏️ 말을 손가락으로 끌거나, 눈금을 누르거나, ◀▶로 옮겨요'));
+    box.appendChild(w.el);
+    const ok = el('button', 'btn btn-accent btn-big-wide', '여기예요!');
+    ok.type = 'button';
+    ok.addEventListener('click', () => {
+      if (passed) return;
+      if (w.get() === end) { w.lock(); ok.disabled = true; pass(`맞아요! ${fmtInt(start)}에서 ${delta > 0 ? '오른쪽' : '왼쪽'}으로 ${Math.abs(delta)}칸 → ${fmtInt(end)} 🎉`); }
+      else fail();
+    });
+    box.appendChild(ok);
+  } else {
+    const list = el('div', 'math-choices');
+    const opts = shuffle(rng(seed), [{ text: check.ok, ok: true }, ...(check.no || []).map((t) => ({ text: t, ok: false }))]);
+    opts.forEach((ch, i) => {
+      const b = el('button', 'math-choice');
+      b.type = 'button';
+      b.appendChild(el('span', 'math-choice-no', ['①', '②', '③', '④'][i]));
+      const t = el('span', 'math-choice-text'); t.appendChild(richNode(ch.text)); b.appendChild(t);
+      b.addEventListener('click', () => {
+        if (passed) return;
+        if (ch.ok) { b.classList.add('ok'); for (const x of list.querySelectorAll('.math-choice')) x.disabled = true; pass('맞아요! 👍'); }
+        else { b.classList.add('no'); b.disabled = true; fail(); }
+      });
+      list.appendChild(b);
+    });
+    box.appendChild(list);
+  }
+  box.appendChild(fb);
+  return box;
+}
+
 const KIND_LABEL = { calc: '① 계산', misread: '② 누가 틀렸을까', why: '③ 왜 그럴까', special: '⭐ 특별 문제' };
+
+// ── 🎯 감 잡기 · 🙈 틀린 이유 (③, 2026-09-21)
+//
+// 감 잡기: 식이 있는 문항은 계산하기 전에 "답이 어느 쪽일까"를 먼저 고른다 — 음수는 부호(음수/0/양수), 분수는 크기(1/2 미만·1/2~1·1 초과).
+//   답을 미리 알려 주지 않는다(고른 뒤 "이제 계산해 봐요"만) — 알려 주면 보기 절반이 지워져 계산 문항이 쉬워진다. 맞았는지는 답한 뒤에 같이 보여 준다.
+//   수 감각을 만들고, 나중에 "감은 맞는데 계산이 틀리는지 / 감부터 틀리는지"를 📊에서 가른다.
+// 틀린 이유: 틀린 직후 아이가 "실수로 눌렀어요 / 헷갈렸어요 / 잘 몰랐어요"를 고른다. 실수는 오개념·오답 노트에 안 쌓인다(mathprog).
+//   아이가 자기 상태를 말하는 것(메타인지) 자체가 공부다. 진단(diag)에서는 둘 다 안 묻는다 — 처음 보는 개념이라 뜻이 없다.
+const SENSE = {
+  sign: { title: '답은 어느 쪽일까요?', options: ['음수 (0보다 작아요)', '0', '양수 (0보다 커요)'], nouns: ['음수', '0', '양수'], bucket: (v) => (v < 0 ? 0 : v === 0 ? 1 : 2) },
+  size: { title: '답은 얼마쯤일까요?', options: ['1/2보다 작아요', '1/2과 1 사이', '1보다 커요'], nouns: ['1/2보다 작은 수', '1/2과 1 사이의 수', '1보다 큰 수'], bucket: (v) => (v < 0.5 ? 0 : v < 1 ? 1 : 2) },
+};
+const WHY = [['s', '🙈 실수로 눌렀어요'], ['c', '🤔 헷갈렸어요'], ['u', '😶 잘 몰랐어요']];
+
+/** 이 문항의 감 잡기 — { kind, ok(정답 칸), options, title } 또는 null (식이 없거나, 경계값이거나, 진단) */
+function senseOf(q) {
+  if (!q || !q.expr || (ui.round && ui.round.mode === 'diag')) return null;
+  const okCh = q.choices.find((x) => x.ok);
+  const val = G().valueOf ? G().valueOf(okCh && okCh.text) : null;
+  if (!val || !val.d) return null;
+  const v = val.n / val.d;
+  const kind = S().key === 'negative' ? 'sign' : 'size';
+  if (kind === 'size' && (v === 0.5 || v === 1 || v <= 0)) return null; // 경계에 걸리면 감 잡기가 함정이 된다
+  const def = SENSE[kind];
+  return { kind, ok: def.bucket(v), options: def.options, nouns: def.nouns, title: def.title };
+}
+
+/** 🎯 감 잡기 블록 — 고르면 r.senses[at]에 두고 문항을 다시 그린다(보기가 열린다) */
+function senseBlock(sense, onPick) {
+  const box = el('div', 'math-sense');
+  box.appendChild(el('div', 'math-solve-h', `🎯 감 잡기 — 계산하기 전에, ${sense.title}`));
+  const row = el('div', 'math-sense-row');
+  sense.options.forEach((t, i) => {
+    const b = el('button', 'btn math-sense-btn');
+    b.type = 'button';
+    b.appendChild(richNode(t));
+    b.addEventListener('click', () => onPick(i));
+    row.appendChild(b);
+  });
+  box.appendChild(row);
+  box.appendChild(el('p', 'math-hint', '✏️ 대충 짐작만 해도 돼요. 고르면 보기가 열려요.'));
+  return box;
+}
 
 /**
  * 문항 그리기. `restore`면 이미 답한 문항을 채점 없이 다시 그린다 — 🎒·📊를 보고 돌아왔을 때
@@ -387,6 +624,18 @@ function renderQuestion(restore = false) {
   card.appendChild(qt);
   if (q.figure) card.appendChild(svgBox(q.figure));
   if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }
+
+  // 🎯 감 잡기 — 아직 안 골랐으면 보기 대신 감 잡기부터 (답한 뒤 복원이면 건너뛴다)
+  const sense = senseOf(q);
+  r.senses = r.senses || {};
+  if (sense && r.senses[r.at] === undefined && !(restore && r.answered)) {
+    card.appendChild(senseBlock(sense, (i) => { r.senses[r.at] = i; renderQuestion(true); }));
+    m.appendChild(card);
+    return;
+  }
+  if (sense && r.senses[r.at] !== undefined) {
+    const s = el('p', 'math-sense-picked'); s.appendChild(document.createTextNode('🎯 감 잡기: ')); s.appendChild(richNode(sense.options[r.senses[r.at]])); s.appendChild(document.createTextNode(' — 이제 정확히 계산해 봐요')); card.appendChild(s);
+  }
   if (q.hint) card.appendChild(el('p', 'math-hint', `✏️ ${q.hint}`));
 
   const list = el('div', 'math-choices');
@@ -416,8 +665,41 @@ function answer(i, list, card) {
   const q = r.qs[r.at];
   const ch = q.choices[i];
   if (ch.ok) { r.correct++; sfx.success(); } else { sfx.wrong(); if (ch.tag) r.missTags.push(ch.tag); }
-  r.answers.push({ concept: q.concept, correct: !!ch.ok, kind: q.kind, chosen: ch.text, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }) }); // 얼굴·오개념까지 — 📒 일지용
+  const sense = senseOf(q);
+  const picked = r.senses && r.senses[r.at];
+  r.answers.push({
+    concept: q.concept, correct: !!ch.ok, kind: q.kind, chosen: ch.text, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }), // 얼굴·오개념까지 — 📒 일지용
+    ...(sense && picked !== undefined ? { sn: picked === sense.ok ? 1 : 0 } : {}), // 🎯 감 잡기가 맞았나
+  });
   paintAnswer(i, list, card, false);
+}
+
+/** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
+const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}) });
+
+/** 🙈 틀린 이유 고르기 — 고를 때까지 다음 버튼이 잠긴다. 실수면 이 문항의 오개념 이름표를 거둔다 */
+function whyBlock(a, next, onDone) {
+  const box = el('div', 'math-why');
+  box.appendChild(el('div', 'math-solve-h', '🙈 왜 틀렸을까요? 솔직하게 골라요 — 실수면 노트에 안 남겨요'));
+  const row = el('div', 'math-why-row');
+  for (const [code, label] of WHY) {
+    const b = el('button', 'btn math-why-btn', label);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      a.w = code;
+      if (code === 's' && a.tag) { const r = ui.round; const k = r.missTags.lastIndexOf(a.tag); if (k >= 0) r.missTags.splice(k, 1); }
+      box.replaceWith(whyPicked(a));
+      next.disabled = false;
+      onDone && onDone();
+    });
+    row.appendChild(b);
+  }
+  box.appendChild(row);
+  return box;
+}
+const WHY_SAID = { s: '🙈 실수라고 했어요 — 오답 노트에는 안 남겨요. 비슷한 문제로 바로 확인해 봐요.', c: '🤔 헷갈렸다고 했어요 — 풀이를 읽고 비슷한 문제로 확인해요.', u: '😶 잘 몰랐다고 했어요 — 괜찮아요, 풀이를 천천히 읽어요.' };
+function whyPicked(a) {
+  return el('p', 'math-why-picked', WHY_SAID[a.w] || '');
 }
 
 /** 답한 뒤의 화면 — 보기 표시·피드백·풀이 카드·다음 버튼. 채점은 하지 않는다 (복원에도 쓴다) */
@@ -435,6 +717,8 @@ function paintAnswer(i, list, card, restoring) {
   const fb = card.querySelector('.math-feedback');
   fb.innerHTML = '';
   let scrollTo = null;
+  const a = r.answers[r.at] || {}; // 이 문항의 답 기록 (감 잡기·이유가 여기 붙는다)
+  const sense = senseOf(q);
   if (ch.ok) {
     fb.appendChild(el('p', 'math-fb ok', ['맞았어요! 🎉', '정확해요! ⭐', '바로 그거예요! 👍'][r.at % 3]));
     // 맞혀도 풀이는 접어 두고 볼 수 있게 — "왜 맞았는지"도 개념이다
@@ -452,10 +736,24 @@ function paintAnswer(i, list, card, restoring) {
     scrollTo = solveCard(q, ch); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (진우, 2026-09-21)
     fb.appendChild(scrollTo);
   }
+  // 🎯 감 잡기 결과 — 답을 본 뒤에야 알려 준다
+  if (sense && a.sn !== undefined) {
+    const s = el('p', `math-sense-verdict ${a.sn ? 'ok' : 'no'}`);
+    const noun = sense.nouns[sense.ok];
+    s.appendChild(document.createTextNode(a.sn ? '🎯 감 잡기도 맞았어요 — 답은 ' : `🎯 감 잡기는 "${sense.options[r.senses[r.at]]}"라고 했는데, 답은 `));
+    s.appendChild(richNode(noun));
+    s.appendChild(document.createTextNode(a.sn ? '' : `${noun === '0' ? '이었어요' : josa(noun, '이었어요', '였어요')}. 계산 전에 어느 쪽일지 한 번 더 생각해요.`));
+    fb.appendChild(s);
+  }
   const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && r.mode !== 'diag' && q.key;
   const next = el('button', 'btn btn-primary btn-big-wide', canTwin ? '알겠어요, 비슷한 문제 하나 더 →' : r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
   next.addEventListener('click', () => { if (canTwin) startTwin(); else advance(); });
+  // 🙈 틀린 이유 — 고를 때까지 다음이 잠긴다 (진단 제외). 복원이면 고른 것을 보여 준다
+  if (!ch.ok && r.mode !== 'diag') {
+    if (a.w) fb.appendChild(whyPicked(a));
+    else { next.disabled = true; fb.appendChild(whyBlock(a, next)); }
+  }
   fb.appendChild(next);
   // 포커스가 버튼으로 가면서 화면이 풀이 아래로 밀리면 아이가 풀이를 못 본다 (Codex #10) — 풀이 카드 머리를 보이게
   focusQuiet(next);
@@ -488,7 +786,7 @@ function solveCard(q, ch) {
   const ans = el('span', 'ans'); ans.appendChild(document.createTextNode('✔ 정답: ')); ans.appendChild(richNode(okCh.text)); head.appendChild(ans);
   card.appendChild(head);
   const s = q.solve;
-  const c = FRACTION.find((x) => x.id === q.concept);
+  const c = conceptOf(q.concept);
   if (!s) {
     if (c && c.idea) { const p = el('p', 'math-solve-p'); p.appendChild(document.createTextNode('💡 ')); p.appendChild(richNode(c.idea)); card.appendChild(p); }
     return card;
@@ -509,6 +807,11 @@ function solveCard(q, ch) {
         card.appendChild(row);
       }
     }
+    // 정수 답(음수 줄기) — 내 답과 정답을 한 수직선에: 부호 실수가 "0의 어느 쪽으로 갔나"로 보인다
+    if (s.numline) {
+      const svg = compareLineSvg(intOf(ch.text), intOf(okCh.text));
+      if (svg) card.appendChild(svgBox(svg, 'math-fig math-numline'));
+    }
   } else if (!s.steps.length && s.whyAny) {
     // ③ 왜 그런가 — 맞혔어도 "왜"를 읽을 수 있게 (사람이 쓴 풀이는 단계가 없고 이유 한 덩이다)
     card.appendChild(el('div', 'math-solve-h', '📖 왜 그런가'));
@@ -527,6 +830,12 @@ function solveCard(q, ch) {
     const p = el('p', 'math-solve-p rule'); p.appendChild(richNode(rule)); card.appendChild(p);
   }
   return card;
+}
+
+/** "−5" · "-5" · "+5" · "(−5)" · "5" → 정수. 아니면 NaN (compareLineSvg가 안 그린다) */
+function intOf(text) {
+  const s = String(text || '').trim().replace(/[−–]/g, '-').replace(/[()\s]/g, '');
+  return /^[+-]?\d+$/.test(s) ? Number(s) : NaN;
 }
 
 /** "5/6" · "3" · "1 2/3" → {n, d} (대분수는 가분수로). 아니면 null */
@@ -559,7 +868,7 @@ function startTwin() {
   let tq = null;
   // 새 씨앗이 새 숫자를 보장하지 않는다 (Codex #6) — 같은 문장이면 다른 씨앗으로 다시, 그래도 같으면 그냥 낸다
   for (let i = 0; i < 8; i++) {
-    const cand = makeQuestion(q.concept, q.kind, base + i * 7919, { ...ui.opts, want: { k: q.kind, key: q.key } });
+    const cand = G().makeQuestion(q.concept, q.kind, base + i * 7919, { ...optsFor(), want: { k: q.kind, key: q.key } });
     if (!cand) break;
     tq = cand;
     if (numSig(cand) !== numSig(q)) break; // 이름만 바뀌고 숫자가 같으면 쌍둥이가 아니다 (Codex 2차 — #6 후속)
@@ -670,12 +979,12 @@ async function finishRound() {
   let result = null;
   try {
     if (r.mode === 'diag') {
-      state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, 'fraction', r.missTags); });
+      state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, ui.stem, r.missTags); });
     } else if (r.mode === 'notes') {
-      const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }) }));
+      const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...extraQ(a) }));
       state = await updateMath((s) => { result = applyNotesRound(s, qs, today); });
     } else {
-      const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}) }));
+      const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
       state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today); });
     }
   } catch (err) {
@@ -717,7 +1026,7 @@ async function finishRound() {
       ? `${placed.knownIds.length}개 개념은 벌써 아는 것 같아요 — 며칠 뒤에 한 번씩 다시 확인할게요.`
       : '처음부터 차근차근 가요.'));
     const startP = el('p', 'math-p big');
-    startP.textContent = `여기서 시작! → ${nameOf(placed ? placed.startId : FRACTION[0].id)}`;
+    startP.textContent = `여기서 시작! → ${nameOf(placed ? placed.startId : S().list[0].id)}`;
     card.appendChild(startP);
     card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}`));
     const b = el('button', 'btn btn-primary btn-big-wide', '사다리 보기');

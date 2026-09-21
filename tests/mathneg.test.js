@@ -87,7 +87,7 @@ test('수직선 그림: 눈금·0 굵게·점, 세로, 걷기 화살표', () => 
   const w = walkSvg(2, -3);
   assert.ok(w.includes('2에서 왼쪽으로 3칸 걸어 -1'));
   assert.equal((w.match(/<circle /g) || []).length, 2, '출발·도착 점');
-  assert.ok(w.includes('>-3<'), '화살표 위 −3 표시');
+  assert.ok(w.includes('>−3<'), '화살표 위 −3 표시 (진짜 마이너스)');
   assert.ok(walkSvg(-5, 3).includes('-5에서 오른쪽으로 3칸 걸어 -2'));
   assert.ok(walkSvg(0, 0).includes('점 0'), '안 걸으면 점만');
   // 유리수 점 (정수가 아닌 자리)

@@ -6,7 +6,28 @@
 //  "정말로 이해한 게 맞는지 검증하고 또 검증"(아버님)이 곧 이 라이트너다 — 그날 맞힌 것은 "안다"이지 "이해 완료"가 아니다.
 
 import { schedule, isDue, enroll, addDays, GRADUATED, STAGES } from './review.js';
-import { FRACTION, ladder, placeFrom } from './mathgen.js';
+import * as fractionGen from './mathgen.js';
+import * as negativeGen from './mathneg.js';
+
+/**
+ * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
+ *   list: 개념 배열 · gen: makeQuestion/makeRound/diagnosticSet/placeFrom/ladder 를 가진 모듈 · file: 사람이 쓴 내용
+ *   lesson: true면 처음 배울 때 📖 이야기 대신 단계식 배움(gen.lessonOf)으로 — 처음 배우는 줄기 (아버님 결정 2026-09-20)
+ * 개념 id는 줄기 접두사('frac.'·'neg.')로 갈라져 저장소(m.concepts)는 하나를 같이 쓴다.
+ */
+export const STEMS = {
+  fraction: { key: 'fraction', code: 'A', label: '분수 줄기', range: '초4 → 초6', list: fractionGen.FRACTION, gen: fractionGen, file: './coach/math/fraction.json', lesson: false, intro: '분수 문제 5개를 먼저 풀어 볼게요. 어려운 게 나와도 괜찮아요 — 진우가 어디까지 아는지 보려는 거예요.' },
+  negative: { key: 'negative', code: 'E', label: '음수 줄기', range: '중1', list: negativeGen.NEGATIVE, gen: negativeGen, file: './coach/math/negative.json', lesson: true, intro: '음수 문제 5개를 먼저 풀어 볼게요. 처음 보는 거면 못 풀어도 돼요 — 그러면 첫 개념부터 차근차근 배워요.' },
+};
+export const STEM_ORDER = ['fraction', 'negative'];
+/** 개념 id → 줄기 (없으면 null) */
+export function stemOf(id) {
+  return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
+}
+/** 학년 표시 — 7은 중1 (mathneg.gradeLabel과 같은 규칙) */
+export function gradeLabel(g) {
+  return g >= 7 ? `중${g - 6}` : `초${g}`;
+}
 
 /** 보상 — 영어 쪽 규모에 맞춤 (문장 완료 +2, 퍼즐 정답 30, 복습 회차 30) */
 export const REWARD = {
@@ -51,10 +72,11 @@ export function doneIds(m) {
   return Object.entries((m && m.concepts) || {}).filter(([, v]) => v && v.done).map(([k]) => k);
 }
 
-/** 사다리 상태 + 각 개념의 복습 정보 */
-export function ladderOf(m, today) {
+/** 사다리 상태 + 각 개념의 복습 정보 (줄기별 — 기본은 분수) */
+export function ladderOf(m, today, stem = 'fraction') {
   const done = doneIds(m);
-  return ladder(done).map((row) => {
+  const S = STEMS[stem] || STEMS.fraction;
+  return S.gen.ladder(done).map((row) => {
     const rec = (m && m.concepts && m.concepts[row.id]) || null;
     const box = rec ? (rec.box || 0) : 0;
     return {
@@ -70,13 +92,13 @@ export function ladderOf(m, today) {
 }
 
 /** 오늘 다시 확인할(복습) 개념 id들 — 사다리 순서대로 */
-export function dueIds(m, today) {
-  return ladderOf(m, today).filter((r) => r.due).map((r) => r.id);
+export function dueIds(m, today, stem = 'fraction') {
+  return ladderOf(m, today, stem).filter((r) => r.due).map((r) => r.id);
 }
 
 /** 지금 배울 개념 (사다리의 ▶). 다 끝났으면 null */
-export function nowId(m) {
-  const row = ladderOf(m, '0000-00-00').find((r) => r.state === 'now');
+export function nowId(m, stem = 'fraction') {
+  const row = ladderOf(m, '0000-00-00', stem).find((r) => r.state === 'now');
   return row ? row.id : null;
 }
 
@@ -91,7 +113,7 @@ export function needsPlacement(m, strand = 'fraction') {
  * @param {Array<{concept:string, correct:boolean}>} answers
  */
 export function applyPlacement(m, answers, today, strand = 'fraction', missTags = []) {
-  const { startId, knownIds } = placeFrom(answers);
+  const { startId, knownIds } = (STEMS[strand] || STEMS.fraction).gen.placeFrom(answers);
   m.placed = m.placed || {};
   m.placed[strand] = today;
   m.concepts = m.concepts || {};
@@ -131,6 +153,14 @@ function pushLog(m, entry) {
   m.log.push(entry);
   if (m.log.length > LOG_MAX) m.log.splice(0, m.log.length - LOG_MAX);
 }
+/**
+ * 일지의 문항 한 줄 — { k 얼굴, ok, tag? 오개념, fx? 쌍둥이로 고침, sn? 🎯 감 잡기(1 맞음/0 틀림), w? 틀린 이유('s' 실수 / 'c' 헷갈림 / 'u' 몰랐음) }
+ * (2026-09-21 ③: 계산 전에 "답이 양수일까 음수일까 / 1/2보다 클까"를 고르는 감 잡기와, 틀린 뒤 아이가 고르는 이유)
+ */
+function logQ(q) {
+  return { k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }), ...(q.sn === undefined ? {} : { sn: q.sn ? 1 : 0 }), ...(q.w ? { w: q.w } : {}) };
+}
+export const WHY_LABEL = { s: '실수', c: '헷갈림', u: '몰랐음' };
 
 /**
  * 개념 한 편의 결과 반영.
@@ -173,13 +203,16 @@ export function applyRound(m, id, r, today) {
     if (!q || !q.k) continue;
     const kk = rec.kinds[q.k] || [0, 0];
     rec.kinds[q.k] = [kk[0] + (q.ok ? 1 : 0), kk[1] + 1];
-    if (q.tag) rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1;
+    // 🙈 아이가 '실수로 눌렀어요'라고 한 오답(w:'s')은 오개념도 노트도 아니다 — 정답률(kinds)에만 남는다 (2026-09-21 ③ 틀린 이유 고르기)
+    const slip = q.w === 's' && !q.ok;
+    if (q.tag && !slip) rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1;
     // 🤔 오답 노트 — 틀린 문항의 틀(key)을 적어 두고, 다음 편에서 그 유형을 한 문제 다시 낸다.
     //    처음에 맞히면(ok) 노트에서 지운다 — 쌍둥이로 고친 것(fx)은 "바로 고침"으로만 표시하고 남겨 둔다 (며칠 뒤에도 맞아야 진짜)
     if (q.key) {
       const prev = rec.notes.find((n) => n.key === q.key);
       rec.notes = rec.notes.filter((n) => n.key !== q.key);
-      if (!q.ok) rec.notes.push({ k: q.k, key: q.key, d: today, t: Date.now(), ...(prev && prev.again ? { again: prev.again } : {}), ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) });
+      if (!q.ok && !slip) rec.notes.push({ k: q.k, key: q.key, d: today, t: Date.now(), ...(prev && prev.again ? { again: prev.again } : {}), ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) });
+      else if (!q.ok && prev) rec.notes.push(prev); // 실수라고 했으면 있던 노트만 그대로 둔다
       else if (prev) markCleared(rec, q.key);
     }
   }
@@ -188,7 +221,7 @@ export function applyRound(m, id, r, today) {
   for (const t of (r.missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
   m.rounds = (m.rounds || 0) + 1;
   const mode = practice ? 'practice' : review ? 'review' : (r.mode || 'learn');
-  pushLog(m, { d: today, t: Date.now(), id, mode, ok: r.correct, n: r.total, qs: (r.qs || []).map((q) => ({ k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) })) });
+  pushLog(m, { d: today, t: Date.now(), id, mode, ok: r.correct, n: r.total, qs: (r.qs || []).map(logQ) });
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
   return { passed, first: !wasDone && passed, crowned, review, practice };
 }
@@ -255,6 +288,7 @@ export function applyNotesRound(m, qs, today) {
     rec.notes = Array.isArray(rec.notes) ? rec.notes : [];
     if (q.k) { const kk = rec.kinds[q.k] || [0, 0]; rec.kinds[q.k] = [kk[0] + (q.ok ? 1 : 0), kk[1] + 1]; }
     if (q.ok) { ok++; rec.notes = rec.notes.filter((n) => n.key !== q.key); markCleared(rec, q.key); }
+    else if (q.w === 's') { /* 🙈 실수 — 노트는 그대로, 오개념도 안 쌓는다 */ }
     else {
       if (q.tag) { rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1; m.miss[q.tag] = (m.miss[q.tag] || 0) + 1; }
       const n = rec.notes.find((x) => x.key === q.key);
@@ -262,7 +296,7 @@ export function applyNotesRound(m, qs, today) {
     }
   }
   pushLog(m, { d: today, t: Date.now(), id: 'notes', mode: 'notes', ok, n: (qs || []).length,
-    qs: (qs || []).map((q) => ({ k: q.k, c: q.id, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) })) });
+    qs: (qs || []).map((q) => ({ ...logQ(q), c: q.id })) });
   return { ok, total: (qs || []).length };
 }
 
@@ -272,19 +306,23 @@ export function kidTags(tags) {
   return [...new Set((tags || []).filter((t) => t && !META_TAGS.has(t)))];
 }
 
-/** 개념 이름 (id → 이름). 없으면 id 그대로 */
+/** 개념 이름 (id → 이름, 어느 줄기든). 없으면 id 그대로 */
 export function nameOf(id) {
-  const c = FRACTION.find((x) => x.id === id);
+  const s = stemOf(id);
+  const c = s && s.list.find((x) => x.id === id);
   return c ? c.name : id;
 }
 
-/** 📊용 요약 — 배운 개념 수·👑 수·헷갈리는 오개념 TOP */
+/** 📊용 요약 — 배운 개념 수·👑 수·헷갈리는 오개념 TOP. total/done/crowned는 모든 줄기 합, stems에 줄기별 */
 export function mathSummary(m) {
-  const rows = ladderOf(m, '9999-12-31');
-  const done = rows.filter((r) => r.state === 'done').length;
-  const crowned = rows.filter((r) => r.crowned).length;
+  const stems = STEM_ORDER.map((key) => {
+    const rows = ladderOf(m, '9999-12-31', key);
+    const S = STEMS[key];
+    return { key, code: S.code, label: S.label, total: rows.length, done: rows.filter((r) => r.state === 'done').length, crowned: rows.filter((r) => r.crowned).length, started: !!(m && m.placed && m.placed[key]) };
+  });
+  const sum = (k) => stems.reduce((a, s) => a + s[k], 0);
   const miss = Object.entries((m && m.miss) || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([tag, n]) => ({ tag, n }));
-  return { total: rows.length, done, crowned, rounds: (m && m.rounds) || 0, miss, logged: ((m && m.log) || []).length };
+  return { total: sum('total'), done: sum('done'), crowned: sum('crowned'), stems, rounds: (m && m.rounds) || 0, miss, logged: ((m && m.log) || []).length };
 }
 
 export const KIND_SHORT = { calc: '①계산', misread: '②오개념', why: '③왜', special: '⭐특별' };
@@ -305,10 +343,14 @@ export function conceptReport(m, limit = 8) {
     const miss = Object.entries(rec.miss || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag, n]) => ({ tag, n }));
     const rounds = (rec.passes || 0) + (rec.fails || 0);
     const fixed = mine.reduce((a, e) => a + (e.qs || []).filter((q) => q.fx === 1).length, 0) + noteQs.filter((q) => q.fx === 1).length; // 🔁 틀렸다가 쌍둥이로 바로 고친 문항 수 (남아 있는 일지 안에서)
+    // 🎯 감 잡기 정답률 · 🙈 틀린 이유 — 아이가 스스로 고른 것 (③, 2026-09-21)
+    const allQ = [...mine.flatMap((e) => e.qs || []), ...noteQs];
+    const senseN = allQ.filter((q) => q.sn !== undefined).length; const senseOk = allQ.filter((q) => q.sn === 1).length;
+    const why = { s: 0, c: 0, u: 0 }; for (const q of allQ) if (q.w && why[q.w] !== undefined) why[q.w]++;
     // 진단으로만 "안다"가 된 개념(passes 1은 진단의 것)은 한 편도 안 푼 것이라 표에 안 올린다 — 복습에서 풀면 일지가 생겨 올라온다
     const noteList = (Array.isArray(rec.notes) ? rec.notes : []).map((n) => ({ k: n.k, label: KIND_SHORT[n.k] || n.k || '', tag: n.tag || '', d: n.d || '', again: n.again || 0, fx: n.fx }));
     const notes = noteList.length;
-    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, notes, noteList, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length && !noteQs.length };
+    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, sense: [senseOk, senseN], why, notes, noteList, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length && !noteQs.length };
   }).filter((r) => r.trail.length || r.notes || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt); // 🤔 노트만 있는 개념(진단으로 안 것)도 표에 — 못 고친 유형을 보여 줘야 한다
 }
 
@@ -323,14 +365,14 @@ export function mathReportText(m, today) {
     const trail = r.trail.map((t) => (t.pass ? '✔' : `✘${t.ok}/${t.n}`)).join(' ');
     const kinds = r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(', ');
     const miss = r.miss.map((x) => `${x.tag}×${x.n}`).join(', ');
-    lines.push(`- ${r.name}${r.done ? (r.box >= GRADUATED ? ' 👑' : ' ✅') : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`);
+    lines.push(`- ${r.name}${r.done ? (r.box >= GRADUATED ? ' 👑' : ' ✅') : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}${r.sense[1] ? ` · 감 잡기 ${r.sense[0]}/${r.sense[1]}` : ''}${(r.why.s + r.why.c + r.why.u) ? ` · 틀린 이유: 실수 ${r.why.s}·헷갈림 ${r.why.c}·몰랐음 ${r.why.u}` : ''}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`);
   }
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
   const log = ((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
-      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
+      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
       lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : nameOf(e.id)} ${e.mode || ''} ${e.ok}/${e.n} ${qs}`);
     }
   }

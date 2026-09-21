@@ -1,4 +1,4 @@
-// 🔢 분수 그림 — 숫자에서 SVG 문자열을 만든다 (순수 함수, DOM 없음)
+// 🔢 수학 그림 — 숫자에서 SVG 문자열을 만든다 (순수 함수) + 만지는 부품(맨 아래, 화면에서 부를 때만 DOM)
 //
 // "8칸 중 7칸"을 글로만 읽는 것과 칠해진 막대를 보는 것은 다르다 (아버님 요청).
 // 늘 그리지는 않는다 — **그림이 개념을 말해 주는 자리**에만: 분수의 뜻, 같은 분모, 가분수, 통분(같은 양을 다르게 나눔).
@@ -84,6 +84,7 @@ export function barsSvg(list, o = {}) {
 
 const TICK_W = 26; // 눈금 한 칸 너비(px) — 폰 폭에서 −6..6까지 넉넉히 들어간다
 const LINE_STROKE = 'currentColor';
+const lab = (v) => String(v).replace('-', '−'); // 눈금 라벨 — 글(−5)과 같은 진짜 마이너스로 (aria-label은 ASCII 그대로)
 
 /**
  * 수직선 — lo..hi 눈금, dots에 점. 0 눈금은 굵게 해 "가운데"가 보이게 한다.
@@ -105,21 +106,37 @@ export function lineSvg(lo, hi, o = {}) {
     for (let v = lo; v <= hi; v++) {
       const zero = v === 0;
       g += `<line x1="${zero ? 16 : 19}" y1="${y(v)}" x2="${zero ? 32 : 29}" y2="${y(v)}" stroke="${LINE_STROKE}" stroke-width="${zero ? 2.5 : 1.2}"/>`;
-      g += `<text x="38" y="${y(v) + 4}" font-size="11" fill="currentColor" font-weight="${zero ? 700 : 400}">${v}</text>`;
+      g += `<text x="38" y="${y(v) + 4}" font-size="11" fill="currentColor" font-weight="${zero ? 700 : 400}">${lab(v)}</text>`;
     }
     for (const v of dots) g += `<circle cx="24" cy="${y(v).toFixed(1)}" r="6" fill="${FILL}" stroke="currentColor" stroke-width="1"/>`;
     return `<svg class="frac-fig line-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="세로 수직선 ${lo}부터 ${hi}${dots.length ? ', 점 ' + dots.join(', ') : ''}">${g}</svg>`;
   }
-  const W = len + pad * 2; const H = 44; const yLine = 18;
+  // marks: 이름표 붙은 색 점 — 풀이 카드의 "❌ 내 답 / ✔ 정답" (o.marks = [{ v, fill, label }])
+  const marks = (o.marks || []).filter((k) => k && Number.isFinite(k.v) && k.v >= lo && k.v <= hi);
+  const W = len + pad * 2; const H = marks.length ? 62 : 44; const yLine = marks.length ? 36 : 18;
   let g = `<line x1="${pad - 8}" y1="${yLine}" x2="${pad + len + 8}" y2="${yLine}" stroke="${LINE_STROKE}" stroke-width="1.5"/>`;
   g += `<path d="M ${pad + len + 8} ${yLine} l -6 -4 v 8 z" fill="currentColor"/>`; // 오른쪽 화살촉: 이쪽이 커진다
   for (let v = lo; v <= hi; v++) {
     const zero = v === 0;
     g += `<line x1="${pos(v)}" y1="${zero ? yLine - 8 : yLine - 5}" x2="${pos(v)}" y2="${zero ? yLine + 8 : yLine + 5}" stroke="${LINE_STROKE}" stroke-width="${zero ? 2.5 : 1.2}"/>`;
-    g += `<text x="${pos(v)}" y="${yLine + 20}" font-size="11" text-anchor="middle" fill="currentColor" font-weight="${zero ? 700 : 400}">${v}</text>`;
+    g += `<text x="${pos(v)}" y="${yLine + 20}" font-size="11" text-anchor="middle" fill="currentColor" font-weight="${zero ? 700 : 400}">${lab(v)}</text>`;
   }
   for (const v of dots) g += `<circle cx="${pos(v).toFixed(1)}" cy="${yLine}" r="6" fill="${FILL}" stroke="currentColor" stroke-width="1"/>`;
-  return `<svg class="frac-fig line-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="수직선 ${lo}부터 ${hi}${dots.length ? ', 점 ' + dots.join(', ') : ''}">${g}</svg>`;
+  marks.forEach((k, i) => {
+    // 같은 자리에 둘이 오면 이름표만 위아래로 비켜 준다
+    const same = marks.some((m2, j) => j < i && m2.v === k.v);
+    g += `<circle cx="${pos(k.v).toFixed(1)}" cy="${yLine}" r="${same ? 4 : 7}" fill="${k.fill || FILL}" stroke="currentColor" stroke-width="1"/>`;
+    if (k.label) g += `<text x="${pos(k.v).toFixed(1)}" y="${yLine - 12 - (same ? 14 : 0)}" font-size="11" text-anchor="middle" fill="${k.fill || FILL}" font-weight="700">${k.label}</text>`;
+  });
+  return `<svg class="frac-fig line-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="수직선 ${lo}부터 ${hi}${dots.length ? ', 점 ' + dots.join(', ') : ''}${marks.map((k) => `, ${k.label || ''} ${k.v}`).join('')}">${g}</svg>`;
+}
+
+/** 내 답·정답을 한 수직선에 — 풀이 카드용 (정수 답일 때). 두 값과 0을 품고 양쪽 한 칸 여유, 너무 넓으면 안 그린다(빈 글자) */
+export function compareLineSvg(mine, ok) {
+  if (!Number.isInteger(mine) || !Number.isInteger(ok)) return '';
+  const lo = Math.min(0, mine, ok) - 1; const hi = Math.max(0, mine, ok) + 1;
+  if (hi - lo > 16) return '';
+  return lineSvg(lo, hi, { marks: [{ v: mine, fill: 'var(--no, #dc2626)', label: '내 답' }, { v: ok, fill: 'var(--ok, #16a34a)', label: '정답' }] });
 }
 
 /**
@@ -139,14 +156,14 @@ export function walkSvg(start, delta) {
   for (let v = lo; v <= hi; v++) {
     const zero = v === 0;
     g += `<line x1="${pos(v)}" y1="${zero ? yLine - 8 : yLine - 5}" x2="${pos(v)}" y2="${zero ? yLine + 8 : yLine + 5}" stroke="${LINE_STROKE}" stroke-width="${zero ? 2.5 : 1.2}"/>`;
-    g += `<text x="${pos(v)}" y="${yLine + 20}" font-size="11" text-anchor="middle" fill="currentColor" font-weight="${zero ? 700 : 400}">${v}</text>`;
+    g += `<text x="${pos(v)}" y="${yLine + 20}" font-size="11" text-anchor="middle" fill="currentColor" font-weight="${zero ? 700 : 400}">${lab(v)}</text>`;
   }
   // 굽은 화살표: 출발 위에서 떠서 도착 위로 내려앉는다. 방향이 왼쪽이면 화살촉도 왼쪽
   const x0 = pos(start); const x1 = pos(end); const lift = Math.min(22, 8 + Math.abs(delta) * 2);
   const dir = delta > 0 ? 1 : -1;
   g += `<path d="M ${x0} ${yLine - 8} Q ${(x0 + x1) / 2} ${yLine - 8 - lift} ${x1} ${yLine - 8}" fill="none" stroke="${FILL2}" stroke-width="2.2"/>`;
   g += `<path d="M ${x1} ${yLine - 8} l ${-7 * dir} -5 l ${2 * dir} 5 l ${-2 * dir} 5 z" fill="${FILL2}"/>`;
-  g += `<text x="${(x0 + x1) / 2}" y="${yLine - 12 - lift}" font-size="11" text-anchor="middle" fill="${FILL2}" font-weight="700">${delta > 0 ? '+' : ''}${delta}</text>`;
+  g += `<text x="${(x0 + x1) / 2}" y="${yLine - 12 - lift}" font-size="11" text-anchor="middle" fill="${FILL2}" font-weight="700">${delta > 0 ? '+' : '−'}${Math.abs(delta)}</text>`;
   g += `<circle cx="${x0}" cy="${yLine}" r="6" fill="var(--frac-empty, #fff)" stroke="${FILL}" stroke-width="2"/>`;
   g += `<circle cx="${x1}" cy="${yLine}" r="6" fill="${FILL}" stroke="currentColor" stroke-width="1"/>`;
   return `<svg class="frac-fig line-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${start}에서 ${delta > 0 ? '오른쪽' : '왼쪽'}으로 ${Math.abs(delta)}칸 걸어 ${end}">${g}</svg>`;
@@ -181,4 +198,157 @@ export function figureSvg(spec) {
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
   return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+}
+
+// ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────
+//
+// 구체(만지기) → 그림 → 기호 — 앱에 그림과 기호만 있고 "만지기"가 없었다. 펜은 없지만 탭·드래그는 된다.
+// 이 부품들은 DOM을 만들므로 **화면에서 부를 때만** document를 쓴다 (모듈을 불러오는 것만으로는 안 건드린다 → node 테스트 OK).
+// 기하는 정적 그림(lineSvg·walkSvg)과 같은 자(lineGeom)를 쓴다 — 아이가 본 그림과 만지는 그림이 같은 눈금이어야 한다.
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** 수직선 자 — lo..hi를 그릴 때 값 ↔ x좌표 (순수 함수) */
+export function lineGeom(lo, hi) {
+  lo = Math.trunc(lo); hi = Math.trunc(hi);
+  const pad = 18; const len = Math.max(1, hi - lo) * TICK_W; const W = len + pad * 2;
+  return {
+    lo, hi, pad, tick: TICK_W, W, len,
+    pos: (v) => pad + (v - lo) * TICK_W,
+    /** x좌표(viewBox 기준) → 가장 가까운 눈금 값 (범위 밖은 끝에 붙인다) */
+    valueAt: (x) => Math.min(hi, Math.max(lo, Math.round((x - pad) / TICK_W) + lo)),
+  };
+}
+
+/** 걷기 위젯의 범위 — 출발·도착·0을 품고 양쪽 두 칸 여유 (도착이 끝에 붙어 있으면 답이 보인다). 폰 폭 안에서 ±9 */
+export function walkRange(start, end) {
+  const lo = Math.max(-9, Math.min(0, start, end) - 2); const hi = Math.min(9, Math.max(0, start, end) + 2);
+  return [Math.min(lo, hi - 4), Math.max(hi, lo + 4)];
+}
+
+function svgEl(tag, attrs = {}) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  return e;
+}
+
+/**
+ * 🚶 끌어서 걷기 — 수직선 위의 말(토큰)을 손가락으로 끌거나 눈금을 탭하거나 ◀▶로 옮긴다.
+ * 출발에서 지금 자리까지 굽은 화살표와 "+3"/"−5"가 따라다닌다 → 더하기·빼기가 "걷기"로 보인다.
+ *   walkWidget({ start: 3, lo: -4, hi: 6, onChange(v) })
+ *   .el (붙일 요소) · .get() 지금 자리 · .set(v) 옮기기 · .lock() 더 못 움직이게(확인 뒤)
+ */
+export function walkWidget({ start, lo, hi, onChange, label }) {
+  start = Math.trunc(start);
+  const g = lineGeom(lo, hi);
+  const H = 70; const yLine = 44;
+  const wrap = document.createElement('div');
+  wrap.className = 'math-walk';
+  const svg = svgEl('svg', { class: 'frac-fig line-fig walk-fig', viewBox: `0 0 ${g.W} ${H}`, width: g.W, height: H, role: 'img' });
+  svg.appendChild(svgEl('line', { x1: g.pad - 8, y1: yLine, x2: g.pad + g.len + 8, y2: yLine, stroke: 'currentColor', 'stroke-width': 1.5 }));
+  svg.appendChild(svgEl('path', { d: `M ${g.pad + g.len + 8} ${yLine} l -6 -4 v 8 z`, fill: 'currentColor' }));
+  for (let v = g.lo; v <= g.hi; v++) {
+    const zero = v === 0;
+    svg.appendChild(svgEl('line', { x1: g.pos(v), y1: zero ? yLine - 8 : yLine - 5, x2: g.pos(v), y2: zero ? yLine + 8 : yLine + 5, stroke: 'currentColor', 'stroke-width': zero ? 2.5 : 1.2 }));
+    const t = svgEl('text', { x: g.pos(v), y: yLine + 20, 'font-size': 11, 'text-anchor': 'middle', fill: 'currentColor', 'font-weight': zero ? 700 : 400 });
+    t.textContent = String(v).replace('-', '−');
+    svg.appendChild(t);
+    // 눈금마다 넓은 투명 손잡이 — 손가락으로 탭하면 그 자리로
+    const hit = svgEl('rect', { x: g.pos(v) - TICK_W / 2, y: yLine - 22, width: TICK_W, height: 44, fill: 'transparent', 'data-v': v });
+    hit.style.cursor = 'pointer';
+    svg.appendChild(hit);
+  }
+  const arrow = svgEl('path', { d: '', fill: 'none', stroke: FILL2, 'stroke-width': 2.2 });
+  const head = svgEl('path', { d: '', fill: FILL2 });
+  const delta = svgEl('text', { x: 0, y: 0, 'font-size': 12, 'text-anchor': 'middle', fill: FILL2, 'font-weight': 700 });
+  const home = svgEl('circle', { cx: g.pos(start), cy: yLine, r: 6, fill: 'var(--frac-empty, #fff)', stroke: FILL, 'stroke-width': 2 });
+  const token = svgEl('circle', { cx: g.pos(start), cy: yLine, r: 11, fill: FILL, stroke: 'currentColor', 'stroke-width': 1.5, class: 'walk-token' });
+  token.style.cursor = 'grab';
+  svg.appendChild(arrow); svg.appendChild(head); svg.appendChild(delta); svg.appendChild(home); svg.appendChild(token);
+  wrap.appendChild(svg);
+
+  const row = document.createElement('div');
+  row.className = 'math-walk-row';
+  const left = document.createElement('button'); left.type = 'button'; left.className = 'btn math-walk-btn'; left.textContent = '◀ 왼쪽으로 한 칸';
+  const read = document.createElement('span'); read.className = 'math-walk-read';
+  const right = document.createElement('button'); right.type = 'button'; right.className = 'btn math-walk-btn'; right.textContent = '오른쪽으로 한 칸 ▶';
+  row.appendChild(left); row.appendChild(read); row.appendChild(right);
+  wrap.appendChild(row);
+
+  let pos = start; let locked = false;
+  const fmt = (v) => String(v).replace('-', '−');
+  function paint() {
+    token.setAttribute('cx', g.pos(pos));
+    const d = pos - start;
+    if (!d) { arrow.setAttribute('d', ''); head.setAttribute('d', ''); delta.textContent = ''; }
+    else {
+      const x0 = g.pos(start); const x1 = g.pos(pos); const lift = Math.min(22, 8 + Math.abs(d) * 2); const dir = d > 0 ? 1 : -1;
+      arrow.setAttribute('d', `M ${x0} ${yLine - 12} Q ${(x0 + x1) / 2} ${yLine - 12 - lift} ${x1} ${yLine - 12}`);
+      head.setAttribute('d', `M ${x1} ${yLine - 12} l ${-7 * dir} -5 l ${2 * dir} 5 l ${-2 * dir} 5 z`);
+      delta.setAttribute('x', (x0 + x1) / 2); delta.setAttribute('y', yLine - 16 - lift);
+      delta.textContent = (d > 0 ? '+' : '−') + Math.abs(d);
+    }
+    read.textContent = `${label ? label + ' ' : ''}지금 자리: ${fmt(pos)}` + (d ? ` (${fmt(start)}에서 ${d > 0 ? '오른쪽' : '왼쪽'}으로 ${Math.abs(d)}칸)` : ` (출발)`);
+    svg.setAttribute('aria-label', `수직선 ${fmt(g.lo)}부터 ${fmt(g.hi)}, 말은 ${fmt(pos)}에`);
+    left.disabled = locked || pos <= g.lo; right.disabled = locked || pos >= g.hi;
+  }
+  function set(v, quiet) {
+    v = Math.min(g.hi, Math.max(g.lo, Math.trunc(v)));
+    if (v === pos) return;
+    pos = v; paint();
+    if (!quiet && onChange) onChange(pos);
+  }
+  left.addEventListener('click', () => { if (!locked) set(pos - 1); });
+  right.addEventListener('click', () => { if (!locked) set(pos + 1); });
+  // 탭: 눈금 손잡이(rect)의 data-v로. 드래그: 포인터 캡처는 svg에 (토큰을 옮겨도 캡처가 안 끊긴다 — 퍼즐 v24 교훈)
+  const xOf = (ev) => { const r = svg.getBoundingClientRect(); return (ev.clientX - r.left) * (g.W / (r.width || g.W)); };
+  let dragging = false;
+  svg.addEventListener('pointerdown', (ev) => {
+    if (locked) return;
+    const v = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-v');
+    if (ev.target === token) { dragging = true; try { svg.setPointerCapture(ev.pointerId); } catch { /* 캡처가 안 되는 브라우저 — 탭·버튼은 된다 */ } token.style.cursor = 'grabbing'; ev.preventDefault(); }
+    else if (v !== null && v !== undefined && v !== '') set(Number(v));
+  });
+  svg.addEventListener('pointermove', (ev) => { if (dragging && !locked) set(g.valueAt(xOf(ev))); });
+  const stop = () => { if (dragging) { dragging = false; token.style.cursor = 'grab'; } };
+  svg.addEventListener('pointerup', stop); svg.addEventListener('pointercancel', stop);
+  paint();
+  return { el: wrap, get: () => pos, set: (v) => set(v, true), lock: () => { locked = true; token.style.cursor = 'default'; paint(); }, start };
+}
+
+/**
+ * 🟦 탭해서 칠하기 — d칸 막대, 칸을 탭하면 칠해지고 다시 탭하면 지워진다. "3/8을 칠해 봐요".
+ *   shadeWidget({ d: 8, onChange(count) }) → .el · .count() · .set(k) 앞에서부터 k칸 · .lock()
+ */
+export function shadeWidget({ d, onChange }) {
+  d = Math.max(1, Math.trunc(d));
+  const w = 240; const h = 40; const cw = w / d;
+  const wrap = document.createElement('div');
+  wrap.className = 'math-shade';
+  const svg = svgEl('svg', { class: 'frac-fig shade-fig', viewBox: `0 0 ${w + 4} ${h + 4}`, width: w + 4, height: h + 4, role: 'img' });
+  const cells = [];
+  const on = new Array(d).fill(false);
+  for (let i = 0; i < d; i++) {
+    const c = svgEl('rect', { x: 2 + i * cw, y: 2, width: cw, height: h, fill: EMPTY, stroke: 'currentColor', 'stroke-width': 1.2, 'data-i': i });
+    c.style.cursor = 'pointer';
+    svg.appendChild(c); cells.push(c);
+  }
+  wrap.appendChild(svg);
+  const read = document.createElement('div'); read.className = 'math-shade-read'; wrap.appendChild(read);
+  let locked = false;
+  const count = () => on.filter(Boolean).length;
+  function paint() {
+    cells.forEach((c, i) => c.setAttribute('fill', on[i] ? FILL : EMPTY));
+    read.textContent = `${d}칸 중 ${count()}칸 칠했어요`;
+    svg.setAttribute('aria-label', `막대 ${d}칸 중 ${count()}칸 칠함`);
+  }
+  svg.addEventListener('pointerdown', (ev) => {
+    if (locked) return;
+    const i = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-i');
+    if (i === null || i === undefined || i === '') return;
+    on[Number(i)] = !on[Number(i)]; paint();
+    if (onChange) onChange(count());
+  });
+  paint();
+  return { el: wrap, count, set: (k) => { for (let i = 0; i < d; i++) on[i] = i < k; paint(); }, lock: () => { locked = true; cells.forEach((c) => { c.style.cursor = 'default'; }); } };
 }

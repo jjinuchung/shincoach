@@ -392,6 +392,53 @@ button { font-family: inherit; }
 .math-tags { color: #92400e; background: #fff7ed; border-radius: 12px; padding: 8px 12px; font-size: 0.92rem; }
 .math-actions { display: grid; gap: 8px; }
 
+/* 🌳 줄기 고르기 · 사다리 머리의 줄기 바꾸기 */
+.math-stems { display: grid; gap: 10px; margin-top: 8px; }
+.math-stem-btn {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 76px; padding: 12px 14px; text-align: left;
+  background: #f5f7ff; border: 2px solid #e5e7eb; border-radius: 16px; cursor: pointer; font: inherit; color: inherit;
+}
+.math-stem-btn:active { transform: scale(0.98); }
+.math-stem-code { flex: 0 0 44px; height: 44px; border-radius: 12px; background: var(--primary); color: #fff; font-weight: 900; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; }
+.math-stem-body { display: flex; flex-direction: column; gap: 3px; }
+.math-stem-name { font-weight: 800; font-size: 1.05rem; }
+.math-stem-sub { color: var(--muted); font-size: 0.85rem; }
+.math-eyebrow-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.math-stem-switch { font-size: 0.8rem; padding: 4px 10px; min-height: 30px; }
+
+/* 📚 단계식 배움 (음수) */
+.math-lesson-dots { display: flex; gap: 6px; margin: 2px 0 12px; }
+.math-lesson-dots .dot { width: 10px; height: 10px; border-radius: 50%; background: #e5e7eb; }
+.math-lesson-dots .dot.done { background: var(--primary); opacity: 0.45; }
+.math-lesson-dots .dot.now { background: var(--primary); transform: scale(1.25); }
+.math-lesson-check { margin: 14px 0 6px; padding: 12px; border-radius: 14px; background: #f8fafc; border: 1px dashed #cbd5e1; }
+.math-lesson-check .math-qt { font-size: 1.08rem; margin: 6px 0 10px; }
+.math-lesson .math-idea.big { margin-top: 12px; }
+
+/* 🚶 끌어서 걷기 · 🟦 탭해서 칠하기 */
+.math-walk { margin: 6px 0 8px; color: var(--text); --frac-fill: var(--primary); --frac-fill2: var(--accent); --frac-empty: #ffffff; }
+.math-walk svg { max-width: 100%; height: auto; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+.math-walk .walk-token { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25)); }
+.math-walk-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.math-walk-btn { min-height: 44px; font-size: 0.9rem; padding: 6px 10px; }
+.math-walk-read { font-weight: 800; color: var(--primary); font-size: 0.95rem; text-align: center; flex: 1 1 100%; order: 3; }
+.math-shade { margin: 6px 0 8px; --frac-fill: var(--primary); --frac-empty: #ffffff; }
+.math-shade svg { max-width: 100%; height: auto; display: block; touch-action: manipulation; }
+.math-shade-read { font-weight: 800; color: var(--primary); margin-top: 6px; }
+.math-numline { margin-top: 6px; }
+
+/* 🎯 감 잡기 · 🙈 틀린 이유 */
+.math-sense { margin: 12px 0 6px; padding: 12px; border-radius: 14px; background: #f0fdf4; border: 1px dashed #86efac; }
+.math-sense-row, .math-why-row { display: grid; gap: 8px; margin-top: 8px; }
+.math-sense-btn, .math-why-btn { min-height: 50px; font-size: 1.02rem; font-weight: 700; background: #fff; border: 2px solid #d1fae5; }
+.math-why-btn { border-color: #fde68a; }
+.math-sense-picked { color: #047857; font-weight: 700; font-size: 0.92rem; margin: 6px 0; }
+.math-sense-verdict { font-size: 0.95rem; font-weight: 700; margin: 6px 0; line-height: 1.6; }
+.math-sense-verdict.ok { color: #047857; }
+.math-sense-verdict.no { color: #b45309; }
+.math-why { margin: 10px 0 4px; padding: 12px; border-radius: 14px; background: #fffbeb; border: 1px dashed #fcd34d; }
+.math-why-picked { color: #92400e; background: #fffbeb; border-radius: 12px; padding: 8px 12px; font-size: 0.92rem; font-weight: 700; margin: 8px 0; line-height: 1.6; }
+
 /* ===== 종료 인사 화면 ===== */
 .bye {
   position: fixed;

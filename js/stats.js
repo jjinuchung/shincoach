@@ -419,20 +419,24 @@ export async function renderStats() {
   // 3e) 🔢 수학 — 분수 줄기 진도와 헷갈리는 오개념 (오답마다 붙은 이름표가 쌓인 것 — Codex 리뷰 #8)
   const ms = mathSummary(math);
   if (ms.rounds > 0 || ms.done > 0) {
-    const cM = card(`🔢 수학 — 분수 줄기 ${ms.done}/${ms.total} 개념 · 👑 ${ms.crowned}`);
+    const cM = card(`🔢 수학 — 개념 ${ms.done}/${ms.total} · 👑 ${ms.crowned}`);
     const weekMath = daily.filter((d) => week.some((w) => w.date === d.date));
     const q = weekMath.reduce((a, d) => a + (Number(d.mathQ) || 0), 0);
     const ok = weekMath.reduce((a, d) => a + (Number(d.mathOk) || 0), 0);
     cM.appendChild(el('p', 'stats-sub', `이번 주 ${q}문항 중 ${ok}개 정답 · 지금까지 ${ms.rounds}편`));
-    const rows = mathLadderOf(math, today);
-    const lad = el('div', 'stats-missed');
-    for (const r of rows) {
-      const chip = el('span', 'stats-missed-chip' + (r.state === 'done' ? ' done' : ''));
-      chip.appendChild(el('b', '', `${r.icon} ${r.name}`));
-      if (r.due) chip.appendChild(el('span', 'n', ' 오늘 확인'));
-      lad.appendChild(chip);
+    // 줄기마다 사다리 — 시작한 줄기(진단을 한 것)만 (2026-09-21: 분수 + 음수)
+    for (const st of ms.stems.filter((s) => s.started)) {
+      cM.appendChild(el('p', 'stats-sub', `${st.code}. ${st.label} — ${st.done}/${st.total} · 👑 ${st.crowned}`));
+      const rows = mathLadderOf(math, today, st.key);
+      const lad = el('div', 'stats-missed');
+      for (const r of rows) {
+        const chip = el('span', 'stats-missed-chip' + (r.state === 'done' ? ' done' : ''));
+        chip.appendChild(el('b', '', `${r.icon} ${r.name}`));
+        if (r.due) chip.appendChild(el('span', 'n', ' 오늘 확인'));
+        lad.appendChild(chip);
+      }
+      cM.appendChild(lad);
     }
-    cM.appendChild(lad);
     if (ms.miss.length) {
       cM.appendChild(el('p', 'stats-sub', '헷갈리는 오개념 — 오답을 고를 때마다 쌓인 것'));
       const box = el('div', 'stats-missed');

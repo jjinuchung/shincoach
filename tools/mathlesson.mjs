@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { NEGATIVE, gradeLabel } from '../js/mathneg.js';
 import { fill } from '../js/mathgen.js';
-import { renderFigures } from '../js/mathdraw.js';
+import { renderFigures, figureSvg } from '../js/mathdraw.js';
 
 const out = process.argv[2] || 'coach/math/review-neg.html';
 const content = JSON.parse(readFileSync('coach/math/negative.json', 'utf8'));
@@ -38,9 +38,12 @@ const sections = NEGATIVE.map((c, i) => {
     let check = '';
     if (s.check) {
       const ch = [{ text: s.check.ok, ok: true }, ...s.check.no.map((t) => ({ text: t, ok: false }))];
+      // 🚶 끌어 보기 확인 — 앱에서는 보기 대신 수직선 위의 말을 답 자리로 끈다 (걷기 그림으로 답을 보여 준다)
+      const walk = Array.isArray(s.check.walk) ? `<p class="walk-note">🚶 <b>끌어 보기</b> — 앱에서는 보기 대신 수직선의 말을 ${s.check.walk[0]}에서 답 자리(${s.check.walk[0] + s.check.walk[1]})로 끌어요</p>${figureSvg(`walk ${s.check.walk[0]} ${s.check.walk[1]}`)}` : '';
       check = `<div class="check" id="${ref}✓">
         <div class="ref"><span class="lbl">확인 질문</span><code>${ref}✓</code></div>
         <p class="qt">${rich(f(s.check.q))}</p>
+        ${walk}
         <ol class="ch">${ch.map((x) => `<li class="${x.ok ? 'ok' : 'no'}"><span class="mark">${x.ok ? '✔' : ''}</span><span class="txt">${rich(f(x.text))}</span></li>`).join('')}</ol>
         <p class="why"><span class="why-lbl">틀리면</span>${rich(f(s.check.why))}</p>
       </div>`;
@@ -164,6 +167,7 @@ h1,h2,h3{font-family:"Gowun Dodum","Noto Sans KR",sans-serif;text-wrap:balance;m
 .ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
 .ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
 .why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.walk-note{margin:6px 0 4px;font-size:.88rem;color:var(--muted)}
 .why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
 body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
 body.hide-ans .ch .mark,body.hide-ans .why{visibility:hidden}

@@ -70,9 +70,10 @@ export const POKEMON_SHARE = 0.7;
 
 /**
  * 출연진 뽑기 — 세계를 먼저 정하고(포켓몬 70% / 본 영상 30%), 그 세계에서 서로 다른 둘.
+ * 줄기마다 같은 규칙이라 내보낸다 (mathneg.js가 쓴다).
  * @returns {{me:string, mon:string, mon2:string, world:string}}
  */
-function castOf(r, opts) {
+export function castOf(r, opts) {
   const others = Object.keys((opts && opts.worlds) || {}).filter((w) => w !== 'pokemon' && WORLDS[w]);
   let world = 'pokemon';
   if (others.length && r() >= POKEMON_SHARE) world = pick(r, others);
@@ -97,7 +98,7 @@ function castOf(r, opts) {
  * `c.want`가 있으면 그 틀로(쌍둥이). 아니면 `c.recent`에 있는 틀은 피한다 (다 최근 것이면 전부에서).
  * 고른 틀은 `c.key`에 남겨 화면이 다음 편에 recent로 넘긴다.
  */
-function worldPick(r, c, pools) {
+export function worldPick(r, c, pools) {
   const all = Object.values(pools).flat();
   let list = (c && pools[c.world] && pools[c.world].length) ? pools[c.world] : pools.pokemon;
   if (c && c.want) {
@@ -130,8 +131,8 @@ export function rng(seed) {
   };
 }
 
-const int = (r, lo, hi) => lo + Math.floor(r() * (hi - lo + 1));
-const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
+export const int = (r, lo, hi) => lo + Math.floor(r() * (hi - lo + 1));
+export const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
 /** 분모 d와 서로소인 분자 — 약분을 묻는 개념이 아닌 곳에서 3/6 같은 수가 나오면 산만하다 */
 const coprime = (r, d) => { let n = int(r, 1, d - 1); for (let i = 0; i < 20 && gcd(n, d) !== 1; i++) n = int(r, 1, d - 1); return n; };
 
@@ -225,7 +226,7 @@ function choices(r, answer, wrongs) {
  * `q`는 이야기 문장, `expr`은 그 아래 크게 보여 줄 식(계산 문항만). 화면이 둘을 따로 그린다 —
  * 이야기만 있으면 식을 찾아 읽어야 하고, 식만 있으면 재미가 없다.
  */
-function ask(concept, kind, q, chs, o = {}) {
+export function ask(concept, kind, q, chs, o = {}) {
   return { concept, kind, q, expr: o.expr || '', hint: o.hint || '', figure: o.figure || '', choices: chs, solve: o.solve || null };
 }
 
@@ -236,9 +237,10 @@ function ask(concept, kind, q, chs, o = {}) {
  *   whyAny: 어느 오답이든 같은 설명 (② 오개념 문항처럼 "포켓몬이 무엇을 잘못했나"가 하나일 때)
  *   figure: 정답 그림 (SVG). compare: 내 답과 정답을 막대로 나란히 그려도 되는 문항인가 (분수 모양 답)
  *   rule:  다음에 기억할 것 한 줄
+ *   numline: 내 답과 정답을 **수직선에 점 두 개**로 나란히 그려도 되는 문항인가 (음수 줄기 — 정수 답)
  */
-function solve(steps, o = {}) {
-  return { steps, why: o.why || {}, whyAny: o.whyAny || '', figure: o.figure || '', compare: !!o.compare, rule: o.rule || '' };
+export function solve(steps, o = {}) {
+  return { steps, why: o.why || {}, whyAny: o.whyAny || '', figure: o.figure || '', compare: !!o.compare, numline: !!o.numline, rule: o.rule || '' };
 }
 
 // ───────────────────── 개념 사다리 (A. 분수 줄기) ─────────────────────
@@ -1011,14 +1013,25 @@ export function makeQuestion(conceptId, kind, seed, opts) {
   const r = rng(seed);
   const cast = castOf(r, opts);
   if (cast.wantKind && cast.wantKind !== kind) cast.want = ''; // 다른 얼굴의 want는 이 문항에 안 쓴다
-  const extra = (opts && opts.content && opts.content[conceptId]) || null;
+  if (kind === 'why' || kind === 'special') return humanQuestion(c, kind, r, cast, opts);
+  const q = kind === 'misread' ? c.misread(r, cast) : c.calc(r, cast);
+  return q ? { ...q, key: cast.key || (kind === 'misread' ? 'misread' : '') } : q; // 계산 문항은 worldPick이 고른 이야기 틀이 key, ② 오개념 문항은 틀이 하나라 고정 key(쌍둥이용)
+}
+
+/**
+ * 사람이 쓴 문항 하나 — ③ why(coach/math/*.json의 why, 없으면 코드 안의 예비) · ⭐ special(파일에만).
+ * 줄기마다 같은 규칙이라 mathneg.js도 이걸 쓴다. ⭐가 없으면 null (화면은 건너뛴다).
+ */
+export function humanQuestion(c, kind, r, cast, opts) {
+  const extra = (opts && opts.content && opts.content[c.id]) || null;
   // 방금 나온 문항은 피한다 — 사람이 쓴 문항은 개수가 유한해서, 다시 풀 때 같은 게 또 나오면 답을 외운다
   const avoid = (pool, keyOf) => { const fresh = pool.filter((x) => !cast.recent.includes(tplKey(keyOf(x)))); return fresh.length ? fresh : pool; };
   // 🤔 오답 노트의 문항을 다시 낼 때(want) — 사람이 쓴 문항은 글이 곧 열쇠라 tplKey(q)로 찾는다
   const wanted = (pool, keyOf) => (cast.want ? pool.find((x) => tplKey(keyOf(x)) === cast.want) : null);
   if (kind === 'why') {
     // 사람이 쓴 것(coach/math/fraction.json)이 있으면 그쪽 — 코드 안의 것은 파일을 못 받았을 때의 예비
-    const all = (extra && Array.isArray(extra.why) && extra.why.length) ? extra.why : c.why;
+    const all = (extra && Array.isArray(extra.why) && extra.why.length) ? extra.why : (c.why || []);
+    if (!all.length) return null;
     const pool = avoid(all, (w) => w.q);
     const w = wanted(all, (x) => x.q) || pool[Math.floor(r() * pool.length)];
     const chs = shuffle(r, [
@@ -1052,8 +1065,7 @@ export function makeQuestion(conceptId, kind, seed, opts) {
     }) : null;
     return { ...ask(c.id, 'special', fill(s.q, cast), chs, { expr: s.expr || '', hint: '연습장에 풀고 답을 골라요', figure: s.figure ? figureSvg(s.figure) : '', solve: ex }), key: tplKey(s.q) };
   }
-  const q = kind === 'misread' ? c.misread(r, cast) : c.calc(r, cast);
-  return q ? { ...q, key: cast.key || (kind === 'misread' ? 'misread' : '') } : q; // 계산 문항은 worldPick이 고른 이야기 틀이 key, ② 오개념 문항은 틀이 하나라 고정 key(쌍둥이용)
+  return null;
 }
 
 /**
@@ -1092,8 +1104,19 @@ export function checkContent(content) {
   for (const [id, v] of Object.entries(content)) {
     if (id === '_') continue;
     if (!conceptById(id)) { bad.push(`${id}: 없는 개념`); continue; }
+    checkHuman(id, v, bad, valueOf);
+  }
+  return bad;
+}
+
+/**
+ * 사람이 쓴 ③ why · ⭐ special · 📖 story · 풀이(explain)의 형식 검사 — 줄기 공통 (mathneg.js는 부호 있는 valueOf를 넘긴다).
+ * 찾은 문제는 `bad`에 밀어 넣는다.
+ */
+export function checkHuman(id, v, bad, valueFn) {
+  {
     // 정답과 **값**이 같은 오답은 정답이 둘인 문항이다 (Codex 2차 #1: "4/2 — 앞을 뒤집음"이 정답 2와 같았다). 앞의 수 부분만 본다
-    const headVal = (t) => { const v = valueOf(String(t || '').split(' — ')[0].trim()); return v && v.d > 0 ? v : null; };
+    const headVal = (t) => { const v = valueFn(String(t || '').split(' — ')[0].trim()); return v && v.d > 0 ? v : null; };
     const sameVal = (a, b) => !!(a && b && a.n * b.d === b.n * a.d);
     for (const [i, w] of (v.why || []).entries()) {
       if (!w.q || !w.ok || !Array.isArray(w.no) || w.no.length !== 3) bad.push(`${id}.why[${i}]: q·ok·no(3개) 필요`);
@@ -1136,7 +1159,6 @@ export function checkContent(content) {
       if (s.figure && !figureSvg(s.figure)) bad.push(`${id}.special[${i}]: 못 그리는 그림 ${s.figure}`);
     }
   }
-  return bad;
 }
 
 // ───────────────────── 📏 시작점 진단 ─────────────────────
@@ -1147,13 +1169,18 @@ export function checkContent(content) {
  * 선행한 아이에게 초4 분수 덧셈을 처음부터 시키면 지루해서 앱을 떠난다.
  */
 export function diagnosticSet(seed, n = 5, opts) {
-  const step = (FRACTION.length - 1) / (n - 1);
+  return diagnosticOf(FRACTION, makeQuestion, seed, n, opts);
+}
+
+/** 진단 문제 뽑기의 공통 부분 — 줄기(list)와 그 줄기의 makeQuestion을 받는다 (mathneg.js도 쓴다) */
+export function diagnosticOf(list, makeQ, seed, n, opts) {
+  const step = (list.length - 1) / (n - 1);
   const picked = [];
   for (let i = 0; i < n; i++) {
     const idx = Math.round(i * step);
     if (!picked.includes(idx)) picked.push(idx);
   }
-  return picked.map((idx, i) => makeQuestion(FRACTION[idx].id, 'calc', seed + i * 104729, opts));
+  return picked.map((idx, i) => makeQ(list[idx].id, 'calc', seed + i * 104729, opts));
 }
 
 /**
@@ -1163,7 +1190,10 @@ export function diagnosticSet(seed, n = 5, opts) {
  * @returns {{startId:string, knownIds:string[]}} 시작 개념과 "이미 아는 것"으로 칠 개념들
  */
 export function placeFrom(answers) {
-  const order = FRACTION.map((c) => c.id);
+  return placeFromOf(FRACTION, answers);
+}
+export function placeFromOf(ladderList, answers) {
+  const order = ladderList.map((c) => c.id);
   const list = (answers || []).filter((a) => a && order.includes(a.concept));
   const firstWrong = list.find((a) => !a.correct);
   if (!firstWrong) {
@@ -1176,9 +1206,12 @@ export function placeFrom(answers) {
 
 /** 사다리 상태 — 👑 이해완료 / ▶ 지금 / 🔒 아직 (앞 개념을 마쳐야 열린다) */
 export function ladder(doneIds) {
+  return ladderOf(FRACTION, doneIds);
+}
+export function ladderOf(list, doneIds) {
   const done = new Set(doneIds || []);
   let openFound = false;
-  return FRACTION.map((c) => {
+  return list.map((c) => {
     const ready = (c.needs || []).every((id) => done.has(id));
     let state;
     if (done.has(c.id)) state = 'done';
