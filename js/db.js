@@ -658,8 +658,13 @@ export function mergeMath(cur, rec) {
     const mine = out.concepts[k];
     if (!mine) { out.concepts[k] = cloneConcept(v); continue; }
     const later = (Number(v.lastAt) || 0) > (Number(mine.lastAt) || 0) ? v : mine;
-    // 일정은 배운 기록에서만 — 한쪽만 done이면 그쪽, 둘 다면 최근 것
-    const sched = (mine.done && !v.done) ? mine : (!mine.done && v.done) ? v : later;
+    // 일정(box·dueAt)은 배운 기록에서만 — 한쪽만 done이면 그쪽, 둘 다면 **일정이 바뀐 시각(schedAt)** 이 최근인 쪽.
+    // lastAt으로 고르면 옛 상태의 기기에서 연습·섞어 풀기만 해도(일정은 그대로, lastAt만 올라감) 👑이 되돌아간다 (Codex 3차 #1).
+    // schedAt이 없는 옛 기록은 lastAt으로 대신한다
+    const schedTime = (x) => Number(x.schedAt) || Number(x.lastAt) || 0;
+    const sv = schedTime(v); const sm = schedTime(mine);
+    const laterSched = (sv > sm || (sv === sm && (Number(v.lastAt) || 0) > (Number(mine.lastAt) || 0))) ? v : mine; // 같은 시각이면 활동이 늦은 쪽
+    const sched = (mine.done && !v.done) ? mine : (!mine.done && v.done) ? v : laterSched;
     // 얼굴별 누적·개념별 오개념은 큰 값 (오래된 백업이 최신 누적을 줄이지 않게)
     const kinds = {};
     for (const src of [mine.kinds, v.kinds]) for (const [kk, a] of Object.entries(src || {})) {
@@ -685,6 +690,7 @@ export function mergeMath(cur, rec) {
       done: !!(mine.done || v.done),
       box: sched.box || 0,
       dueAt: sched.dueAt || '',
+      ...(sched.schedAt ? { schedAt: Number(sched.schedAt) } : {}),
       passes: Math.max(Number(mine.passes) || 0, Number(v.passes) || 0),
       fails: Math.max(Number(mine.fails) || 0, Number(v.fails) || 0),
       lastAt: Math.max(Number(mine.lastAt) || 0, Number(v.lastAt) || 0),
@@ -694,10 +700,14 @@ export function mergeMath(cur, rec) {
       ...(Object.keys(cleared).length ? { cleared } : {}),
     };
     if (!sched.placed) delete out.concepts[k].placed;
+    if (!sched.schedAt) delete out.concepts[k].schedAt; // 일정을 준 쪽에 시각이 없으면 다른 쪽 시각을 달고 있으면 안 된다
   }
   for (const [k, v] of Object.entries((rec && rec.placed) || {})) out.placed[k] = out.placed[k] || v;
   for (const [k, v] of Object.entries((rec && rec.miss) || {})) out.miss[k] = Math.max(Number(out.miss[k]) || 0, Number(v) || 0);
   out.rounds = Math.max(Number(out.rounds) || 0, Number(rec && rec.rounds) || 0);
+  // ☀️ 오늘의 수학 완주 기록은 늦은 날짜 쪽, 같은 날이면 큰 횟수 — 옛 백업이 오늘 완주를 지우지 않게
+  const dl = rec && rec.daily && rec.daily.d ? rec.daily : null;
+  if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0 };
   // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편
   const seen = new Set(out.log.map((e) => e && e.t));
   for (const e of (Array.isArray(rec && rec.log) ? rec.log : [])) if (e && e.t && !seen.has(e.t)) { seen.add(e.t); out.log.push(e); }

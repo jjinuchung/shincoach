@@ -9,7 +9,7 @@ import { WORLDS, rng, shuffle, josa } from './mathgen.js';
 import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
-  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel,
+  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { todayKey } from './track.js';
@@ -27,7 +27,8 @@ const ui = {
   stem: null,           // 지금 고른 줄기 key ('fraction'·'negative') — 없으면 줄기 고르기 화면
   contents: {},         // 줄기별 사람이 쓴 내용 (coach/math/*.json, 한 번 받아 둠)
   opts: null,           // makeRound에 넘길 출연진·세계 (content는 줄기별로 optsFor가 끼운다)
-  round: null,          // 진행 중인 한 편 { id, mode:'learn'|'review'|'diag', qs, at, correct, missTags, answered }
+  round: null,          // 진행 중인 한 편 { id, mode:'learn'|'review'|'diag'|'notes'|'mix', qs, at, correct, missTags, answered }
+  daily: null,          // ☀️ 오늘의 수학 흐름 { plan, step:'round'|'mix', roundInfo } — 개념 편 → 🎲 섞어 풀기. 사다리로 나가면 null
   run: 0,               // 화면을 지우고 await 하는 함수의 요청 번호 (겹쳐 그리기 방지)
   recent: {},           // 개념별로 방금 나온 이야기 틀·문항 (같은 개념을 다시 풀 때 같은 이야기가 또 나오지 않게)
   state: null,          // 마지막으로 읽은 수학 진도 (🤔 오답 노트를 다음 편에 끼우려고)
@@ -172,7 +173,14 @@ export async function renderMath() {
   // 🎒·📊를 보고 돌아온 것이면 풀던 편을 이어서 (2026-09-20: 과목 화면에도 🎒·📊를 두면서 필요해졌다).
   // 답을 고른 뒤였으면 다음 문항으로 — 같은 문항을 다시 그리면 두 번 답해 두 번 세어진다.
   const r = ui.round;
-  if (r && !r.saving) {
+  // 저장 중에 🎒를 다녀온 것이면 — 기다린다. 사다리 로딩으로 내려가면 run이 바뀌어 저장을 끝낸 finishRound가 결과·☀️ 다음 단계를
+  // 못 그리고, renderLadder가 ui.daily를 지운다 (Codex 3차 #2). run은 그대로 두어 finishRound가 이어서 그린다
+  if (r && r.saving) {
+    const m = main();
+    if (m) { m.innerHTML = ''; m.appendChild(el('p', 'math-loading', '기록하는 중…')); }
+    return;
+  }
+  if (r) {
     ui.run++;
     if (r.phase === 'story') renderStory(r.id, r.seed);
     else if (r.phase === 'lesson') renderLesson(r.id, r.seed, r.page || 0);
@@ -182,6 +190,8 @@ export async function renderMath() {
     else renderQuestion(r.answered); // 답한 뒤였으면 풀이·버튼까지 그대로 (채점은 안 한다)
     return;
   }
+  // ☀️ 개념 편 결과 카드에서 🎒(🎯 잡은 걸 보러)를 다녀온 것이면 — 섞어 풀기가 남아 있으니 사다리 대신 거기로
+  if (ui.daily && ui.daily.step === 'round' && ui.daily.roundInfo && ui.daily.plan.mix.length) { ui.run++; startMixRound(); return; }
   const run = ++ui.run;
   const m = main();
   if (!m) return;
@@ -255,6 +265,7 @@ function startDiag() {
 
 function renderLadder(state) {
   const m = clearMain();
+  ui.daily = null; // 사다리로 나오면 ☀️ 흐름은 끝
   const today = todayKey();
   const rows = ladderOf(state, today, ui.stem);
   const due = dueIds(state, today, ui.stem);
@@ -270,6 +281,19 @@ function renderLadder(state) {
   const doneN = rows.filter((r) => r.state === 'done').length;
   const crownN = rows.filter((r) => r.crowned).length;
   head.appendChild(el('h2', '', `개념 ${rows.length}개 중 ${doneN}개를 알아요 · 👑 ${crownN}`));
+  // ☀️ 오늘의 수학 — 버튼 하나로 오늘 할 것: 개념 편 하나(복습 차례 우선) → 🎲 섞어 풀기. 아이가 쉬운 것만 고르지 않게 맨 위에 (2026-09-21 ④)
+  const preview = dailyPlan(state, today, ui.stem, 0);
+  if (preview.roundId || preview.mix.length) {
+    const dn = dailyDone(state, today);
+    const db = el('button', `btn btn-big-wide math-daily-btn${dn ? '' : ' btn-primary'}`, dn ? `☀️ 오늘의 수학 완주 ✅ — 한 번 더 할래요?` : '☀️ 오늘의 수학 — 한 번에 다 하기');
+    db.type = 'button';
+    db.addEventListener('click', () => startDaily());
+    head.appendChild(db);
+    const parts = [];
+    if (preview.roundId) parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${nameOf(preview.roundId)}`);
+    if (preview.mix.length) parts.push(`🎲 배운 것 섞어 풀기 ${preview.mix.length}문제`);
+    head.appendChild(el('p', 'math-note math-daily-sub', parts.join(' → ')));
+  }
   if (due.length) {
     const b = el('button', 'btn btn-accent btn-big-wide', `🔁 오늘 다시 확인할 개념 ${due.length}개 — 정말 아는지 볼까?`);
     b.type = 'button';
@@ -363,6 +387,81 @@ function startNotesRound(list) {
   if (!qs.length) { renderLadder(ui.state); return; }
   ui.round = { id: null, mode: 'notes', qs, ids, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
   renderQuestion();
+}
+
+/**
+ * ☀️ 오늘의 수학 — 개념 편 하나(🔁 복습 차례가 있으면 그것, 없으면 ▶ 새 개념) → 🎲 섞어 풀기(아는 개념 3개 × 1문항 + 🤔 노트 1문항).
+ * 흐름은 ui.daily에, 편은 평소처럼 ui.round에 — 🎒 다녀와도 편이 복원되고 흐름도 남는다. 사다리로 나가면 흐름은 끝.
+ */
+function startDaily() {
+  const today = todayKey();
+  const seed = (Date.now() % 1000000) | 0;
+  const plan = dailyPlan(ui.state, today, ui.stem, seed);
+  ui.daily = { plan, step: plan.roundId ? 'round' : 'mix', roundInfo: null };
+  if (plan.roundId) startRound(plan.roundId, plan.roundMode);
+  else startMixRound();
+}
+
+/**
+ * 🎲 섞어 풀기 — 계획의 개념마다 약한 얼굴 순서로 문항 하나(첫 성공), 🤔 노트는 그 유형(want). 개념이 뒤섞인 편이라
+ * 노트 회차와 같은 모양(ids)이다. 연습이라 통과·👑은 안 건드린다 — 결과 반영은 applyMixRound.
+ */
+function startMixRound() {
+  const d = ui.daily;
+  if (!d) { renderLadder(ui.state); return; }
+  d.step = 'mix';
+  const base = (Date.now() % 1000000) | 0;
+  const qs = [];
+  const ids = [];
+  // 🤔 노트 문항의 틀은 같은 개념의 일반 문항이 피한다 — 같은 틀이 한 편에 두 번 나오면 하나 맞히고 하나 틀렸을 때 노트가 꼬인다 (Codex 3차 #3)
+  const noteKeys = {};
+  for (const x of d.plan.mix) if (x.note && x.note.key) (noteKeys[x.id] = noteKeys[x.id] || []).push(x.note.key);
+  d.plan.mix.forEach((x, i) => {
+    const sx = stemOf(x.id);
+    if (!sx) return;
+    const recent = ui.recent[x.id] || [];
+    let q = null;
+    if (x.note) {
+      for (let t = 0; t < 6 && !q; t++) {
+        const c = sx.gen.makeQuestion(x.id, x.note.k, base + i * 101 + t * 7919, { ...optsFor(sx.key), want: { k: x.note.k, key: x.note.key } });
+        if (c && c.key === x.note.key) q = c;
+      }
+      if (!q) return; // 그 틀이 이제 없다 — 🤔 노트 회차가 정리한다
+      q.fromNote = true;
+    } else {
+      const avoid = [...recent, ...(noteKeys[x.id] || [])];
+      for (const k of x.kinds) { q = sx.gen.makeQuestion(x.id, k, base + i * 101, { ...optsFor(sx.key), recent: avoid }); if (q) break; }
+      if (!q) return;
+    }
+    ui.recent[x.id] = [...recent, q.key].filter(Boolean).slice(-RECENT_KEEP);
+    qs.push(q); ids.push(x.id);
+  });
+  // 문항이 하나도 안 만들어져도(있을 일이 거의 없다) 빈 편으로 같은 finishRound를 탄다 — 완주 기록·보상·저장 실패 재시도가 한 경로 (Codex 3차 #7)
+  ui.round = { id: null, mode: 'mix', qs, ids, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
+  if (!qs.length) { finishRound(); return; }
+  renderQuestion();
+}
+
+/** ☀️ 완주 카드 — 개념 편 결과 + 🎲 섞어 풀기 결과 + 보상(첫 완주 보너스) */
+function renderDailyDone(state, { g, c, daily, result }) {
+  const m = clearMain();
+  const d = ui.daily;
+  const info = d && d.roundInfo;
+  const card = el('section', 'math-card math-result math-daily-done');
+  card.appendChild(el('h2', '', '☀️ 오늘의 수학 끝!'));
+  const ul = el('ul', 'math-daily-list');
+  if (info) ul.appendChild(el('li', '', `${info.mode === 'review' ? '🔁' : '▶'} ${nameOf(info.id)} — ${info.passed ? '✅ 다 맞았어요' : `${info.correct}/${info.total} 맞았어요`}`));
+  if (result && result.total) ul.appendChild(el('li', '', `🎲 섞어 풀기 — ${result.total}개 중 ${result.ok}개 맞았어요${result.ok < result.total ? ' · 헷갈린 유형은 🤔 노트에 남겨 다음에 다시 풀어요' : ''}`));
+  card.appendChild(ul);
+  card.appendChild(el('p', 'math-p', daily && daily.first
+    ? '오늘 할 것을 다 했어요. 내일도 ☀️ 하나면 돼요.'
+    : '오늘은 벌써 완주했던 거라 보너스는 없어요 — 그래도 푼 만큼은 쌓였어요.'));
+  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+  const b = el('button', 'btn btn-primary btn-big-wide', '사다리로');
+  b.type = 'button';
+  b.addEventListener('click', () => renderLadder(state));
+  card.appendChild(b);
+  m.appendChild(card);
 }
 
 /**
@@ -614,7 +713,7 @@ function renderQuestion(restore = false) {
   const card = el('section', 'math-card math-q');
 
   const top = el('div', 'math-q-top');
-  top.appendChild(el('span', 'math-eyebrow', r.mode === 'diag' ? `📏 진단 ${r.at + 1} / ${r.qs.length}` : r.mode === 'notes' ? `🤔 오답 노트 ${r.at + 1} / ${r.qs.length} · ${nameOf(q.concept)}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
+  top.appendChild(el('span', 'math-eyebrow', r.mode === 'diag' ? `📏 진단 ${r.at + 1} / ${r.qs.length}` : r.mode === 'notes' ? `🤔 오답 노트 ${r.at + 1} / ${r.qs.length} · ${nameOf(q.concept)}` : r.mode === 'mix' ? `🎲 섞어 풀기 ${r.at + 1} / ${r.qs.length}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
   top.appendChild(el('span', 'math-kind', KIND_LABEL[q.kind] || ''));
   card.appendChild(top);
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
@@ -719,6 +818,8 @@ function paintAnswer(i, list, card, restoring) {
   let scrollTo = null;
   const a = r.answers[r.at] || {}; // 이 문항의 답 기록 (감 잡기·이유가 여기 붙는다)
   const sense = senseOf(q);
+  // 🎲 섞어 풀기는 답하기 전엔 개념 이름을 숨긴다("어떤 개념인지 알아내기"가 목적) — 답한 뒤에 알려 준다 (Codex 3차 #8)
+  if (r.mode === 'mix') fb.appendChild(el('p', 'math-mix-concept', `📚 ${nameOf(q.concept)} 문제였어요`));
   if (ch.ok) {
     fb.appendChild(el('p', 'math-fb ok', ['맞았어요! 🎉', '정확해요! ⭐', '바로 그거예요! 👍'][r.at % 3]));
     // 맞혀도 풀이는 접어 두고 볼 수 있게 — "왜 맞았는지"도 개념이다
@@ -977,15 +1078,25 @@ async function finishRound() {
   let state = null;
   let placed = null;
   let result = null;
+  let daily = null; // ☀️ 이 편이 오늘의 수학의 마지막이면 완주 기록 (같은 트랜잭션 — 두 창이 같이 끝내도 첫 창만 보너스)
+  const d = ui.daily;
+  // 한 ☀️ 흐름에서 완주는 한 번만 적는다 — 섞어 풀기가 없는 날 "🤔 한 번 더"를 거듭해도 완주 횟수가 늘지 않게 (Codex 3차 #4)
+  const lastOfDaily = !!d && !d.marked && (r.mode === 'mix' || (d.step === 'round' && !d.plan.mix.length));
   try {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, ui.stem, r.missTags); });
-    } else if (r.mode === 'notes') {
-      const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...extraQ(a) }));
-      state = await updateMath((s) => { result = applyNotesRound(s, qs, today); });
+    } else if (r.mode === 'notes' || r.mode === 'mix') {
+      const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i].fromNote ? { note: true } : {}), ...extraQ(a) }));
+      state = await updateMath((s) => {
+        result = r.mode === 'mix' ? applyMixRound(s, qs, today) : applyNotesRound(s, qs, today);
+        if (lastOfDaily) daily = markDaily(s, today);
+      });
     } else {
       const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
-      state = await updateMath((s) => { result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today); });
+      state = await updateMath((s) => {
+        result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today);
+        if (lastOfDaily) daily = markDaily(s, today);
+      });
     }
   } catch (err) {
     r.saving = false;
@@ -1003,14 +1114,18 @@ async function finishRound() {
   }
   ui.round = null; // 저장이 됐으니 이제 비운다
   ui.state = state; // 🤔 오답 노트가 바뀌었을 수 있다
+  // ☀️ 흐름의 다음 단계는 화면을 그리든 말든 저장 성공 직후에 정한다 — 🎒에 가 있어도 돌아오면 섞어 풀기로 이어진다 (Codex 3차 #2)
+  if (d && lastOfDaily) d.marked = true;
+  if (d && d.step === 'round' && result) d.roundInfo = { id: r.id, mode: r.mode, passed: result.passed, correct: r.correct, total: r.qs.length };
 
   // 보상은 화면과 상관없이 지급 (나가 있어도 번 것은 번 것)
   const rw = r.mode === 'diag'
     ? { xp: r.correct * REWARD.diag.xp, coin: r.correct * REWARD.diag.coin, catchOnce: false }
-    : r.mode === 'notes'
-      ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } // 🤔 노트 회차: 문항 정답만, 잡기 없음 (연습)
+    : r.mode === 'notes' || r.mode === 'mix'
+      ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } // 🤔 노트 회차·🎲 섞어 풀기: 문항 정답만, 잡기 없음 (연습)
       : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
   rw.xp += (r.fixed || 0) * REWARD.fix.xp; // 🔁 쌍둥이로 바로 고친 문항 (통과 여부와 무관)
+  if (daily && daily.first) { rw.xp += REWARD.daily.xp; rw.coin += REWARD.daily.coin; } // ☀️ 하루 첫 완주 보너스
   const g = gainXp(rw.xp);
   const c = gainCoins(rw.coin).gained;
   applyDailyDelta(today, r.mode === 'diag' ? { mathQ: r.qs.length, mathOk: r.correct } : { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});
@@ -1036,6 +1151,8 @@ async function finishRound() {
     m.appendChild(card);
     return;
   }
+
+  if (r.mode === 'mix') { renderDailyDone(state, { g, c, daily, result }); return; }
 
   if (r.mode === 'notes') {
     const card = el('section', 'math-card math-result');
@@ -1071,7 +1188,10 @@ async function finishRound() {
     tags.textContent = `🤔 이번에 헷갈린 것: ${shown.join(' · ')}`;
     card.appendChild(tags);
   }
-  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.catchOnce ? ' 🎯 몬스터볼 1개!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+  // ☀️ 오늘의 수학의 개념 편이면 — 섞어 풀기가 남았으면 "다음 →", 없으면 여기가 완주
+  const inDaily = !!d && d.step === 'round';
+  if (lastOfDaily) card.appendChild(el('p', 'math-p big', daily && daily.first ? '☀️ 오늘의 수학 끝! 내일도 ☀️ 하나면 돼요.' : '☀️ 오늘의 수학 끝!'));
+  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.catchOnce ? ' 🎯 몬스터볼 1개!' : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
 
   const row = el('div', 'math-actions');
   if (!all) {
@@ -1081,16 +1201,26 @@ async function finishRound() {
     again.addEventListener('click', () => startRound(r.id, r.mode === 'review' ? 'review' : 'learn', { again: true, wrong }));
     row.appendChild(again);
   }
-  const back = el('button', all ? 'btn btn-primary btn-big-wide' : 'btn btn-big-wide', '사다리로');
-  back.type = 'button';
-  back.addEventListener('click', () => renderLadder(state));
-  row.appendChild(back);
+  let dailyNext = null;
+  if (inDaily && !lastOfDaily) {
+    dailyNext = el('button', 'btn btn-primary btn-big-wide math-daily-next', `다음 → 🎲 배운 것 섞어 풀기 ${d.plan.mix.length}문제`);
+    dailyNext.type = 'button';
+    dailyNext.disabled = !!rw.catchOnce; // 🎯 후보를 받는 동안은 잠근다 — 섞어 풀기 위에 잡기가 뒤늦게 뜨지 않게 (Codex 3차 B)
+    dailyNext.addEventListener('click', () => startMixRound());
+    row.appendChild(dailyNext);
+  } else {
+    const back = el('button', all ? 'btn btn-primary btn-big-wide' : 'btn btn-big-wide', '사다리로');
+    back.type = 'button';
+    back.addEventListener('click', () => renderLadder(state));
+    row.appendChild(back);
+  }
   card.appendChild(row);
   m.appendChild(card);
 
   // 🎯 처음 통과한 개념은 몬스터볼 한 번 — 영어 퍼즐 정답과 같은 보상 경로
   if (rw.catchOnce) {
     const candidates = await catchCandidates(4);
+    if (dailyNext) dailyNext.disabled = false;
     if (run !== ui.run) return; // 후보를 받는 사이에 나갔다 — 다른 화면 위에 띄우지 않는다
     if (candidates.length) {
       openCatch({
@@ -1108,7 +1238,7 @@ async function finishRound() {
 export function initMath({ showView }) {
   ui.showView = showView;
   const back = $('btn-math-back');
-  if (back) back.addEventListener('click', () => { ui.round = null; ui.run++; showView('home'); });
+  if (back) back.addEventListener('click', () => { ui.round = null; ui.daily = null; ui.run++; showView('home'); });
 }
 
 /** 홈에서 진우가 본 영상 세계를 미리 알고 싶을 때 (표시용) */
