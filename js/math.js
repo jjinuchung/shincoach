@@ -9,7 +9,7 @@ import { WORLDS, rng, shuffle, josa } from './mathgen.js';
 import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
-  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound,
+  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, pendingThrows,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -157,11 +157,21 @@ async function catchPool() {
     return forSubject(chars, 'math').filter((c) => isUnlocked(c.id, level) && !isTired(c.id)).map((c) => ({ ...c, look: getLook(c.id) }));
   };
   let pool = await read();
-  // 수학 그림이 아직 4마리도 없으면(새 명단을 넣은 첫날) 몇 마리 받아서라도 던지게 — 번 잡기를 그림이 없다고 삼키지 않는다
+  // 수학 그림이 아직 4마리도 없으면(새 명단을 넣은 첫날) 몇 마리 받아서라도 던지게 — 번 잡기를 그림이 없다고 삼키지 않는다.
+  // 8초 안에 못 받으면 있는 만큼으로(0이면 미룬 던지기로 남아 사다리에서 다시) — 느린 와이파이가 "다음 →"를 붙들지 않게 (Codex 5차 #5)
   if (pool.length < 4 && navigator.onLine !== false) {
-    try { await downloadCharacters(null, 6, 'math'); pool = await read(); } catch { /* 오프라인·실패 — 있는 만큼으로 */ }
+    try {
+      await Promise.race([downloadCharacters(null, 6, 'math'), new Promise((res) => setTimeout(res, 8000))]);
+      pool = await read();
+    } catch { /* 오프라인·실패 — 있는 만큼으로 */ }
   }
   return pool;
+}
+
+/** 수학 화면이 지금 보이나 — 🎒·📊는 ui.run을 안 올리므로 모달을 띄우기 전에 직접 본다 (Codex 5차 #3) */
+function mathVisible() {
+  const v = $('view-math');
+  return !!v && !v.hidden;
 }
 
 const MATH_CHAR_BATCH = 8;
@@ -176,20 +186,26 @@ function topUpMathCharacters() {
  * 🎯 몬스터볼을 n번 — 한 번 끝나면(onDone) 다음 후보 4마리로 다시. 화면을 떠났으면(run 바뀜) 그만.
  * 개념 편 통과 + ☀️ 첫 완주가 한 카드에 겹치면 2번이 된다.
  */
-async function runCatches(n, { g, c, run, before }) {
+async function runCatches(n, { g, c, run, before, onAll }) {
   if (n <= 0) return;
   const pool = await catchPool();
   if (typeof before === 'function') before();
-  if (run !== ui.run) return; // 후보를 받는 사이에 나갔다 — 다른 화면 위에 띄우지 않는다
+  // 나가 있으면(다른 화면·🎒) 안 띄운다 — 던질 기회는 레코드(m.pend)에 남아 사다리의 "🎯 남은 몬스터볼"로 다시 온다
+  if (run !== ui.run || !mathVisible()) return;
+  if (!pool.length) return; // 그림이 하나도 없다(오프라인 첫날) — 역시 레코드에 남는다
   let left = n;
-  const one = () => {
+  const one = async () => {
+    // 던지기 하나를 **먼저** 레코드에서 뺀다(트랜잭션) — 두 창이 같은 기회를 두 번 던지지 못하게. 없으면 끝
+    let taken = false;
+    try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; }
+    if (!taken) { if (typeof onAll === 'function' && run === ui.run) onAll(); return; } // 남은 게 없다 — 사다리를 새로 그린다
+    if (run !== ui.run || !mathVisible()) return;
     const candidates = pickCharacters(pool, 4);
-    if (!candidates.length) return;
     openCatch({
-      candidates, subject: 'math', xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
+      candidates, subject: 'math', xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
       ballCounts: inventory(),
       attempt: (id, opts) => catchAttempt(id, Math.random, opts),
-      onDone: () => { updateChip(); left--; if (left > 0 && run === ui.run) one(); },
+      onDone: () => { updateChip(); left--; if (left > 0) one(); else if (typeof onAll === 'function' && run === ui.run && mathVisible()) onAll(); },
     });
   };
   one();
@@ -198,7 +214,7 @@ async function runCatches(n, { g, c, run, before }) {
 /**
  * 🎟️ 다음 영상 교환권까지 — 영어 문장 + 🔢 수학이 같은 막대(2026-09-22). 아이가 목표로 삼은 그 영상이 수학으로도 가까워지는 걸 보여 준다.
  * @param {object|null} state 수학 레코드(tot)
- * @param {number} earned 이번 편이 보탠 점수 (0이면 안 적음)
+ * @param {{progress?:number, review?:number}|null} earned 이번 편이 보탠 점수 (없으면 안 적음)
  * @returns {Promise<HTMLElement|null>} 광고 중인 영상이 없으면 null
  */
 async function ticketNote(state, earned) {
@@ -211,7 +227,9 @@ async function ticketNote(state, earned) {
     const p = st.items.find((i) => i.key === 'progress');
     const rv = st.items.find((i) => i.key === 'review');
     const line = el('p', 'math-note math-ticket');
-    line.textContent = `🎟️ 다음 영상 「${next.ko}」까지 — 📼+🔢 ${p.have.toLocaleString()}/${p.need.toLocaleString()} · 🔁 ${rv.have}/${rv.need}${earned > 0 ? ` (이번 수학 +${earned})` : ' · 수학도 채워요'}`;
+    const e = earned || {};
+    const got = [e.progress > 0 ? `📼+${e.progress}` : '', e.review > 0 ? `🔁+${e.review}` : ''].filter(Boolean).join(' ');
+    line.textContent = `🎟️ 다음 영상 「${next.ko}」까지 — 📼+🔢 ${p.have.toLocaleString()}/${p.need.toLocaleString()} · 🔁 ${rv.have}/${rv.need}${got ? ` (이번 수학 ${got})` : ' · 수학도 채워요'}`;
     return line;
   } catch { return null; }
 }
@@ -358,6 +376,14 @@ function renderLadder(state) {
     ab.addEventListener('click', () => renderReply(unread[0]));
     head.appendChild(ab);
   }
+  // 🎯 미룬 던지기 — 후보 그림을 받는 사이 나갔거나 그림이 없었던 몬스터볼 (레코드 pend). 던질 때마다 하나씩 빠진다
+  const pend = pendingThrows(state);
+  if (pend > 0) {
+    const pb = el('button', 'btn btn-accent btn-big-wide math-pend-btn', `🎯 받은 몬스터볼 ${pend}개가 남았어요 — 던지기`);
+    pb.type = 'button';
+    pb.addEventListener('click', () => { pb.disabled = true; runCatches(pend, { g: null, c: 0, run: ui.run, before: () => { pb.disabled = false; }, onAll: () => { if (ui.state) renderLadder(ui.state); } }); });
+    head.appendChild(pb);
+  }
   // ☀️ 오늘의 수학 — 버튼 하나로 오늘 할 것: 개념 편 하나(복습 차례 우선) → 🎲 섞어 풀기. 아이가 쉬운 것만 고르지 않게 맨 위에 (2026-09-21 ④)
   const preview = dailyPlan(state, today, ui.stem, 0);
   if (preview.roundId || preview.mix.length) {
@@ -374,7 +400,7 @@ function renderLadder(state) {
     // ✨ 오늘의 보너스 — 홈 카드와 같은 것. 완주했으면 받았다고, 아니면 완주하면 준다고
     const bonus = dailyBonus(today);
     head.appendChild(el('p', `math-note math-daily-bonus${dn ? ' got' : ''}`, dn ? `✅ 오늘의 보너스 ${bonusText(bonus)} 받았어요` : `✨ 오늘의 보너스 ${bonusText(bonus)} — ☀️ 완주하면 받아요`));
-    ticketNote(state, 0).then((t) => { if (t && head.isConnected) head.appendChild(t); }); // 🎟️ 다음 영상까지 — 수학도 같은 막대를 채운다
+    ticketNote(state, null).then((t) => { if (t && head.isConnected) head.appendChild(t); }); // 🎟️ 다음 영상까지 — 수학도 같은 막대를 채운다
   }
   // ❓ 아빠 답을 기다리는 질문 · 😄 이해했는데 아직 안 풀어 본 문제
   const waiting = openAsks(state).length;
@@ -547,7 +573,7 @@ function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0
   card.appendChild(ul);
   card.appendChild(el('p', 'math-p', daily && daily.first
     ? '오늘 할 것을 다 했어요. 내일도 ☀️ 하나면 돼요.'
-    : '오늘은 벌써 완주했던 거라 보너스는 없어요 — 그래도 푼 만큼은 쌓였어요.'));
+    : gold ? '오늘 두 번째 완주 — 이번엔 섞어 풀기를 다 맞혔네요!' : '오늘은 벌써 완주했던 거라 완주 보너스는 없어요 — 그래도 푼 만큼은 쌓였어요.'));
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${catches ? ` 🎯 몬스터볼 ${catches}개!` : ''}${gold ? ' 🌟 황금 몬스터볼 +1!' : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (gold) card.appendChild(el('p', 'math-p', '🌟 섞어 풀기를 다 맞혀서 황금 몬스터볼! 잡힐 확률이 2배 — 🎯 잡기에서 써 봐요'));
   if (bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(bonus)} 받았어요!`));
@@ -1403,6 +1429,8 @@ async function finishRound() {
   let state = null;
   let placed = null;
   let result = null;
+  let tally = { ok: 0, rev: 0 }; // 🎟️ 이번 편이 실제로 더한 몫 (tallyRound가 돌려줌)
+  let catches = 0;              // 🎯 이번 편이 준 몬스터볼 (roundCatches, 레코드 pend에 적힘)
   let daily = null; // ☀️ 이 편이 오늘의 수학의 마지막이면 완주 기록 (같은 트랜잭션 — 두 창이 같이 끝내도 첫 창만 보너스)
   const d = ui.daily;
   // 한 ☀️ 흐름에서 완주는 한 번만 적는다 — 섞어 풀기가 없는 날 "🤔 한 번 더"를 거듭해도 완주 횟수가 늘지 않게 (Codex 3차 #4)
@@ -1411,21 +1439,25 @@ async function finishRound() {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, ui.stem, r.missTags); });
     } else if (r.mode === 'ask') {
-      state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false }); tallyRound(s, { mode: r.mode, correct: r.correct }); });
+      state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false }); tally = tallyRound(s, { mode: r.mode, correct: r.correct, result }); });
     } else if (r.mode === 'notes' || r.mode === 'mix') {
       const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i].fromNote ? { note: true } : {}), ...extraQ(a) }));
       state = await updateMath((s) => {
         result = r.mode === 'mix' ? applyMixRound(s, qs, today) : applyNotesRound(s, qs, today);
         // 🌟 섞어 풀기를 전부 맞히면 황금볼 — 하루 1개, 판정은 같은 트랜잭션(두 창·재시도 멱등)
         if (lastOfDaily) daily = markDaily(s, today, r.mode === 'mix' ? { perfect: !!result && result.total > 0 && result.ok === result.total } : undefined);
-        tallyRound(s, { mode: r.mode, correct: r.correct }); // 🎟️ 교환권 누적 (같은 트랜잭션)
+        tally = tallyRound(s, { mode: r.mode, correct: r.correct, dailyFirst: !!(daily && daily.first) }); // 🎟️ 교환권 누적 (같은 트랜잭션)
+        catches = roundCatches({ mode: r.mode, result, inDaily: false, dailyFirst: !!(daily && daily.first) }); // 🎯 자격도 같은 트랜잭션 — 미룬 던지기로 적어 둔다
+        addPending(s, catches);
       });
     } else {
       const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
       state = await updateMath((s) => {
         result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today);
         if (lastOfDaily) daily = markDaily(s, today);
-        tallyRound(s, { mode: r.mode, correct: r.correct, result }); // 🎟️ 교환권 누적 (같은 트랜잭션)
+        tally = tallyRound(s, { mode: r.mode, correct: r.correct, result }); // 🎟️ 교환권 누적 (같은 트랜잭션)
+        catches = roundCatches({ mode: r.mode, result, inDaily: !!d && d.step === 'round', dailyFirst: !!(daily && daily.first) }); // 🎯 자격 (mathprog 순수 규칙)
+        addPending(s, catches);
       });
     }
   } catch (err) {
@@ -1459,10 +1491,8 @@ async function finishRound() {
   rw.xp += (r.fixed || 0) * REWARD.fix.xp; // 🔁 쌍둥이로 바로 고친 문항 (통과 여부와 무관)
   if (daily && daily.first) { rw.xp += REWARD.daily.xp; rw.coin += REWARD.daily.coin; } // ☀️ 하루 첫 완주 보너스
   // 🎯 수학 잡기 (2026-09-22, 아버님 결정): ☀️ 안의 개념 편을 다 맞히면 1번(처음이든 복습이든), ☀️ 하루 첫 완주에 1번 — 좋은 날 2번.
-  // 영어는 퍼즐마다(하루 4번쯤) 던지는데 수학은 첫 통과 때만이라 아이가 영어만 골랐다. 연습 편·진단·노트 회차는 그대로 없음.
-  rw.catches = rw.catchOnce ? 1 : 0;
-  if (d && d.step === 'round' && r.mode !== 'mix' && result && result.passed && !result.practice) rw.catches = Math.max(rw.catches, 1);
-  if (daily && daily.first) rw.catches += 1;
+  // 영어는 퍼즐마다(하루 4번쯤) 던지는데 수학은 첫 통과 때만이라 아이가 영어만 골랐다. 자격은 트랜잭션 안(mathprog.roundCatches)에서 정해 레코드에 적혔다
+  rw.catches = catches;
   rw.gold = !!(daily && daily.gold);
   if (rw.gold) addItem(GOLDEN.id, 1);
   // ✨ 오늘의 보너스 — 하루 첫 완주에만(daily.first는 트랜잭션 판정이라 두 창·재시도에도 한 번). 홈 카드가 미리 보여 준 바로 그것
@@ -1473,8 +1503,8 @@ async function finishRound() {
     if (gv.coin) rw.coin += gv.coin;
     if (gv.item) addItem(gv.item, gv.n || 1);
   }
-  // 🎟️ 이번 편이 교환권 막대에 보탠 몫 (진단 제외) — 카드에 "오늘 수학 +N"으로
-  rw.ticket = r.mode === 'diag' ? 0 : r.correct * MATH_PTS.ok + (daily && daily.first ? MATH_PTS.daily : 0) + (result && result.review && result.passed && !result.practice ? MATH_PTS.rev : 0);
+  // 🎟️ 이번 편이 교환권 막대에 보탠 몫 — tallyRound가 실제로 더한 것 × 환산 (막대가 둘이라 따로: 📼 진행 · 🔁 복습)
+  rw.ticket = { progress: tally.ok * MATH_PTS.ok + (daily && daily.first ? MATH_PTS.daily : 0), review: tally.rev * MATH_PTS.rev };
   const g = gainXp(rw.xp);
   const c = gainCoins(rw.coin).gained;
   applyDailyDelta(today, r.mode === 'diag' || r.mode === 'ask' ? { mathQ: r.qs.length, mathOk: r.correct } : { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});

@@ -331,8 +331,8 @@ function startPuzzle(continueFn) {
     const g = awardXp(puzzleXp(result));
     const c = awardCoins(puzzleCoins(result));
     if (!result.solved) hpPenalty(HP.revealed, '퍼즐 정답을 봤어요');
-    // 정답이면 퍼즐에 나온 포켓몬 중 한 마리에게 몬스터볼 던지기 (캐릭터가 없으면 그냥 이어감)
-    // 🔢 수학 전용 포켓몬은 퍼즐에 놀러 올 수는 있어도 여기서 잡히진 않는다 — 영어 것만 남기고, 모자라면 영어 풀에서 채운다
+    // 정답이면 몬스터볼 던지기 — 후보는 퍼즐에 나온 영어 포켓몬(캐릭터가 없었으면 그냥 이어감)
+    // 🔢 수학 전용 포켓몬은 퍼즐에 놀러 올 수는 있어도 여기서 잡히진 않는다 — 영어 것만 남기고, 2마리가 안 되면 영어 풀에서 채운다(그래서 퍼즐에 없던 얼굴이 후보에 올 수 있다)
     const candidates = result.characters && result.characters.length ? englishCandidates(result.characters) : [];
     if (result.solved && candidates.length) {
       state.catchOpen = true;

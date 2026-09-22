@@ -426,14 +426,64 @@ export function bumpTot(m, key, n = 1) {
 
 /**
  * 한 편이 끝난 뒤 누적에 더한다 — 진단은 안 센다(배운 게 아니라 잰 것).
+ * ★ 반복으로 채워지는 길을 전부 막는다 (Codex 5차 #4 — 일부러 3/4로 틀리는 편을 다섯 번 돌리면 30점이 났다):
+ *   · 개념 편(learn/review)은 **통과한 편만**, 연습 편은 0 — 통과 뒤엔 같은 개념이 연습이 되고 복습은 일정대로만 오므로 유한
+ *   · 🎲 섞어 풀기는 **하루 첫 완주의 것만** (두 번째 ☀️는 0)
+ *   · ❓ 답장 풀어보기는 **처음 고친 때만** (fixed)
+ *   · 🤔 노트 회차는 그대로(틀린 건 내일로 밀려 오늘 다시 안 나옴 — 자체로 유한)
+ * 영어의 📼가 문장마다 한 번(done)인 것과 같은 성질이 되게.
  * @param {object} m
- * @param {{mode:string, correct:number, result?:{passed?:boolean, review?:boolean, practice?:boolean}}} r
+ * @param {{mode:string, correct:number, result?:object, dailyFirst?:boolean}} r result = applyRound/applyAskTry의 결과
+ * @returns {{ok:number, rev:number}} 이번 편이 실제로 더한 몫 (화면 표시용)
  */
-export function tallyRound(m, { mode, correct, result }) {
-  if (mode === 'diag') return m.tot || { ok: 0, daily: 0, rev: 0 };
-  if (correct > 0) bumpTot(m, 'ok', correct);
-  if (result && result.review && result.passed && !result.practice) bumpTot(m, 'rev', 1);
-  return m.tot;
+export function tallyRound(m, { mode, correct, result, dailyFirst }) {
+  let ok = 0;
+  let rev = 0;
+  if (mode === 'learn' || mode === 'review') {
+    if (result && result.passed && !result.practice) { ok = correct; if (result.review) rev = 1; }
+  } else if (mode === 'mix') {
+    if (dailyFirst) ok = correct;
+  } else if (mode === 'ask') {
+    if (result && result.fixed) ok = correct;
+  } else if (mode === 'notes') {
+    ok = correct;
+  }
+  if (ok > 0) bumpTot(m, 'ok', ok);
+  if (rev > 0) bumpTot(m, 'rev', rev);
+  return { ok, rev };
+}
+
+// ── 🎯 잡기 자격 (Codex 5차 #2·#6 — 화면(math.js)에 있던 규칙을 순수 함수로, 미룬 던지기는 레코드에) ──
+/**
+ * 이 편이 주는 몬스터볼 횟수 — 아버님 결정(2026-09-22): 개념 처음 통과 1 / ☀️ 안의 개념 편 통과(복습 포함) 1 / ☀️ 하루 첫 완주 +1.
+ * @param {{mode:string, result?:object, inDaily?:boolean, dailyFirst?:boolean}} o inDaily = ☀️ 흐름의 개념 편
+ */
+export function roundCatches({ mode, result, inDaily, dailyFirst }) {
+  let n = 0;
+  if ((mode === 'learn' || mode === 'review') && result && !result.practice) {
+    if (result.first) n = 1;
+    if (inDaily && result.passed) n = Math.max(n, 1);
+  }
+  if (dailyFirst) n += 1;
+  return n;
+}
+
+/**
+ * 미룬 던지기 — 번 몬스터볼은 화면과 상관없이 레코드에 적어 두고(m.pend), 던질 때마다 하나씩 뺀다.
+ * 그림이 없거나(오프라인 첫날) 후보를 받는 사이 🎒로 나가도 잡기가 사라지지 않는다 (Codex 5차 #2). 트랜잭션 안에서 부른다.
+ */
+export function addPending(m, n) {
+  if (n > 0) m.pend = (Number(m.pend) || 0) + n;
+  return Number(m.pend) || 0;
+}
+export function takePending(m) {
+  const p = Number(m.pend) || 0;
+  if (p <= 0) return false;
+  m.pend = p - 1;
+  return true;
+}
+export function pendingThrows(m) {
+  return Math.max(0, Number(m && m.pend) || 0);
 }
 
 /**

@@ -84,7 +84,7 @@ export const POKEBALL = { id: 'pokeball', emoji: '🔴', ko: '몬스터볼', pri
 export const GREATBALL = { id: 'greatball', emoji: '🔵', ko: '슈퍼볼', price: 25, mult: 1.5, kind: 'ball' };
 export const ULTRABALL = { id: 'ultraball', emoji: '🟡', ko: '하이퍼볼', price: 600, mult: 2, kind: 'ball' };
 export const MASTERBALL = { id: 'masterball', emoji: '🟣', ko: '마스터볼', price: 1200, kind: 'ball', sure: true };
-// 🌟 황금 몬스터볼: 하이퍼볼과 같은 2배지만 상한이 더 높다(95%). 🔁 복습을 끝내야만 얻는다 (상점에서 못 사고 🎁 상자에서도 안 나옴)
+// 🌟 황금 몬스터볼: 하이퍼볼과 같은 2배지만 상한이 더 높다(95%). 학습으로만 얻는다 — 🔁 영어 복습 완주(하루 1), 🔢 섞어 풀기 전부 정답(하루 1), ✨ 오늘의 보너스. (상점에서 못 사고 🎁 상자에서도 안 나옴)
 export const GOLDEN = { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', price: 0, mult: 2, cap: 0.95, kind: 'ball' };
 /** 잡기 화면에 보여줄 볼 순서 (몬스터볼은 언제나 첫 번째) */
 export const BALLS = [POKEBALL, GREATBALL, ULTRABALL, GOLDEN, MASTERBALL];

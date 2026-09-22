@@ -748,6 +748,8 @@ export function mergeMath(cur, rec) {
   const goldToday = !!(dl && out.daily && out.daily.d === dl.d && (out.daily.gold || dl.gold));
   if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0, ...(dl.gold ? { gold: true } : {}) };
   if (goldToday && out.daily && out.daily.d === dl.d) out.daily = { ...out.daily, gold: true }; // cloneMath는 daily를 얕게 복사하므로 입력을 건드리지 않게 새 객체로
+  // 🎯 미룬 던지기(pend)는 큰 쪽 — 옛 백업이 아직 안 던진 몬스터볼을 지우지 않게 (두 기기에서 같은 걸 두 번 던질 수는 있어도 잃는 것보다 낫다)
+  if (rec && rec.pend !== undefined) out.pend = Math.max(Number(out.pend) || 0, Number(rec.pend) || 0);
   // 🎟️ 누적 카운터(정답·완주·복습 통과)는 단조 증가라 키마다 max — 옛 백업이 진도를 되돌리지 않게
   if (rec && rec.tot) {
     out.tot = out.tot || { ok: 0, daily: 0, rev: 0 };
