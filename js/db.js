@@ -618,7 +618,7 @@ function cloneConcept(v) {
 }
 
 function cloneMath(m) {
-  const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])] };
+  const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])], ...(m.tot ? { tot: { ...m.tot } } : {}) };
   for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
   if (Array.isArray(m.asks)) out.asks = m.asks.map(cloneAsk); // ❓ 질문은 안쪽에 답장 배열이 있어 따로 복사
   return out;
@@ -748,6 +748,11 @@ export function mergeMath(cur, rec) {
   const goldToday = !!(dl && out.daily && out.daily.d === dl.d && (out.daily.gold || dl.gold));
   if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0, ...(dl.gold ? { gold: true } : {}) };
   if (goldToday && out.daily && out.daily.d === dl.d) out.daily = { ...out.daily, gold: true }; // cloneMath는 daily를 얕게 복사하므로 입력을 건드리지 않게 새 객체로
+  // 🎟️ 누적 카운터(정답·완주·복습 통과)는 단조 증가라 키마다 max — 옛 백업이 진도를 되돌리지 않게
+  if (rec && rec.tot) {
+    out.tot = out.tot || { ok: 0, daily: 0, rev: 0 };
+    for (const k of ['ok', 'daily', 'rev']) out.tot[k] = Math.max(Number(out.tot[k]) || 0, Number(rec.tot[k]) || 0);
+  }
   // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편
   const seen = new Set(out.log.map((e) => e && e.t));
   for (const e of (Array.isArray(rec && rec.log) ? rec.log : [])) if (e && e.t && !seen.has(e.t)) { seen.add(e.t); out.log.push(e); }
@@ -825,7 +830,8 @@ export function purchaseRule(profile, cost, gain) {
 /** 기준선을 안전한 숫자 쌍으로 (저장 전에 한 번, 읽을 때 또 한 번 — unlock.normalizeBase와 같은 규칙) */
 export function normalizeUnlockBase(base) {
   const n = (v) => Math.max(0, Math.floor(Number(v) || 0));
-  return { done: n(base && base.done), reviewed: n(base && base.reviewed) };
+  // 🔢 수학 몫(2026-09-22)도 기준선에 — 옛 기준선엔 없으니 0
+  return { done: n(base && base.done), reviewed: n(base && base.reviewed), mathOk: n(base && base.mathOk), mathDaily: n(base && base.mathDaily), mathRev: n(base && base.mathRev) };
 }
 
 /**

@@ -71,6 +71,12 @@ export const LOCKED = [
  * 코인 말고 더 채워야 하는 조건.
  * 코인만이면 제일 쉬운 영상 한 편만 반복해도 모을 수 있어서, "기존 걸 다 본다"는 목적이 안 지켜진다.
  */
+/**
+ * 🔢 수학 환산 (2026-09-22, 아버님 결정): 정답 1문항 = 문장 2개 몫, ☀️ 하루 첫 완주 = 20, 🔁 복습 편 통과 1 = 복습 문장 5개 몫.
+ * 하루 수학(8문항 + 완주) ≈ 36 ≈ 영어 40문장 — 두 과목이 같은 막대를 채운다. "아이가 목표로 삼은 그 영상"을 수학으로도 당길 수 있게.
+ */
+export const MATH_PTS = { ok: 2, daily: 20, rev: 5 };
+
 export const NEED = {
   // 끝낸 문장 **누적 개수** (2026-09-18에 "가진 영상 전체의 80%" 비율에서 바꿈).
   // 비율이면 영상을 넣을 때마다 목표가 멀어졌다: 태블릿에 5,527문장이 있어 80% = 4,422문장,
@@ -90,7 +96,7 @@ export function findLocked(id) {
  * 지금까지 쌓인 누적치 (기준선을 만들 때도, 현황을 셀 때도 이 한 함수를 쓴다).
  * @param {Array} records 모든 문장 기록 (db.getAllSentenceStats)
  */
-export function totalsFrom(records = []) {
+export function totalsFrom(records = [], mathTot = null) {
   let done = 0;
   let reviewed = 0;
   for (const r of records || []) {
@@ -98,13 +104,22 @@ export function totalsFrom(records = []) {
     if (r.done) done++;
     if ((r.reviewPass || 0) > 0) reviewed++; // 복습에서 한 번 이상 통과
   }
-  return { done, reviewed };
+  const n = (v) => Math.max(0, Math.floor(Number(v) || 0));
+  // 🔢 수학 누적(math 레코드 tot) — 없으면 0. 기준선도 같은 모양으로 저장된다
+  return { done, reviewed, mathOk: n(mathTot && mathTot.ok), mathDaily: n(mathTot && mathTot.daily), mathRev: n(mathTot && mathTot.rev) };
 }
 
-/** 저장된 기준선을 안전한 숫자 쌍으로 (없으면 0부터) */
+/** 저장된 기준선을 안전한 숫자로 (없으면 0부터) — 옛 기준선엔 수학 칸이 없으니 0 */
 export function normalizeBase(base) {
   const n = (v) => Math.max(0, Math.floor(Number(v) || 0));
-  return { done: n(base && base.done), reviewed: n(base && base.reviewed) };
+  return { done: n(base && base.done), reviewed: n(base && base.reviewed), mathOk: n(base && base.mathOk), mathDaily: n(base && base.mathDaily), mathRev: n(base && base.mathRev) };
+}
+
+/** 🔢 수학 누적 → 교환권 점수 (기준선 이후만). 막대 둘에 각각 더해진다 */
+export function mathPoints(total, base) {
+  const b = normalizeBase(base);
+  const d = (k) => Math.max(0, (Number(total && total[k]) || 0) - b[k]);
+  return { progress: d('mathOk') * MATH_PTS.ok + d('mathDaily') * MATH_PTS.daily, review: d('mathRev') * MATH_PTS.rev };
 }
 
 /**
@@ -123,21 +138,22 @@ export function normalizeBase(base) {
  *   records = 모든 문장 기록 (db.getAllSentenceStats)
  *   base    = 직전 교환권을 산 시점의 누적치 (profile.unlockBase)
  */
-export function unlockState({ coins = 0, records = [], price = 0, base = null } = {}) {
-  const total = totalsFrom(records);
+export function unlockState({ coins = 0, records = [], price = 0, base = null, math = null } = {}) {
+  const total = totalsFrom(records, math);
   const b = normalizeBase(base);
   // 라벨의 "(교환권 이후)"는 실제로 기준선이 잡혀 있을 때만 — 아직 하나도 안 산 아이에겐 그냥 누적이다
-  const since = (b.done || b.reviewed) ? ' (교환권 이후)' : '';
+  const since = (b.done || b.reviewed || b.mathOk || b.mathDaily || b.mathRev) ? ' (교환권 이후)' : '';
   const done = Math.max(0, total.done - b.done);
   const reviewed = Math.max(0, total.reviewed - b.reviewed);
+  const mp = mathPoints(total, b); // 🔢 수학 몫 — 같은 막대에 더한다
   const pctOf = (have, need) => (need <= 0 ? 100 : Math.min(100, Math.round((have / need) * 100)));
   const items = [
     { key: 'coins', label: '💰 코인', have: Math.max(0, Math.floor(coins)), need: price },
-    { key: 'progress', label: `📼 배운 문장${since}`, have: done, need: NEED.doneSentences },
-    { key: 'review', label: `🔁 복습 통과 문장${since}`, have: reviewed, need: NEED.reviewPassed },
+    { key: 'progress', label: `📼 배운 문장 + 🔢 수학${since}`, have: done + mp.progress, need: NEED.doneSentences, detail: `📼 영어 ${done.toLocaleString()} · 🔢 수학 ${mp.progress.toLocaleString()}` },
+    { key: 'review', label: `🔁 복습 통과 + 🔢 수학 복습${since}`, have: reviewed + mp.review, need: NEED.reviewPassed, detail: `🔁 영어 ${reviewed.toLocaleString()} · 🔢 수학 ${mp.review.toLocaleString()}` },
   ].map((it) => ({ ...it, ok: it.have >= it.need, pct: pctOf(it.have, it.need) }));
   return {
-    done, reviewed, coins,
+    done, reviewed, coins, math: mp,
     total, base: b,
     items,
     ready: items.every((it) => it.ok),

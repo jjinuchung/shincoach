@@ -239,7 +239,13 @@ test('🎟️ 교환권을 사면 기준선이 그 시점 누적치로 박힌다
   assert.equal(r.ok, true);
   assert.equal(p.coins, 0);
   assert.equal(p.items.ticket_iconic, 1);
-  assert.deepEqual(p.unlockBase, { done: 1240, reviewed: 63 });
+  assert.deepEqual(p.unlockBase, { done: 1240, reviewed: 63, mathOk: 0, mathDaily: 0, mathRev: 0 }, '수학 칸은 없으면 0 (2026-09-22)');
+});
+
+test('🎟️ 기준선에 🔢 수학 몫도 같이 박힌다', () => {
+  const p = cloneProfile({ coins: 2000, items: {} });
+  purchaseRule(p, { coins: 2000 }, { items: { ticket_iconic: 1 }, unlockBase: { done: 1240, reviewed: 63, mathOk: 210, mathDaily: 9, mathRev: 4 } });
+  assert.deepEqual(p.unlockBase, { done: 1240, reviewed: 63, mathOk: 210, mathDaily: 9, mathRev: 4 });
 });
 
 test('🎟️ 못 사면 기준선도 안 건드린다 (코인과 한 묶음)', () => {
@@ -259,7 +265,7 @@ test('🎟️ 기준선 없는 구매(다른 상점 물건)는 기준선을 지�
 test('🎟️ 이상한 기준선 값은 숫자로 다듬어 저장한다', () => {
   const p = cloneProfile({ coins: 2000, items: {} });
   purchaseRule(p, { coins: 2000 }, { items: { ticket_wild2: 1 }, unlockBase: { done: -5, reviewed: '12.7' } });
-  assert.deepEqual(p.unlockBase, { done: 0, reviewed: 12 });
+  assert.deepEqual(p.unlockBase, { done: 0, reviewed: 12, mathOk: 0, mathDaily: 0, mathRev: 0 });
 });
 
 test('🎟️ 백업 병합: 기준선은 가방(교환권)과 같은 쪽에서 가져온다', () => {

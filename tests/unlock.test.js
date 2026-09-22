@@ -1,7 +1,7 @@
 // 🎟️ 다음 영상 교환권 규칙 테스트: node --test tests/unlock.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LOCKED, NEED, unlockState, nextLocked, pendingTickets, ticketId, findLocked } from '../js/unlock.js';
+import { LOCKED, NEED, unlockState, nextLocked, pendingTickets, ticketId, findLocked, MATH_PTS, mathPoints } from '../js/unlock.js';
 
 const recs = (done, reviewed) => [
   ...Array.from({ length: done }, (_, i) => ({ key: `d${i}`, done: true, reviewPass: i < reviewed ? 1 : 0 })),
@@ -145,7 +145,41 @@ test('🎟️ 기준선 이후에 쌓은 것만 센다 (산 뒤에는 다시 0�
   assert.equal(after.done, 120, '기준선을 뺀 만큼만');
   assert.equal(after.reviewed, 8);
   assert.equal(after.ready, false, '다음 영상은 처음부터 다시 벌어야 한다');
-  assert.deepEqual(after.total, { done: NEED.doneSentences + 120, reviewed: NEED.reviewPassed + 8 }, '누적 자체는 그대로 볼 수 있다');
+  assert.deepEqual(after.total, { done: NEED.doneSentences + 120, reviewed: NEED.reviewPassed + 8, mathOk: 0, mathDaily: 0, mathRev: 0 }, '누적 자체는 그대로 볼 수 있다 (수학 칸은 0)');
+});
+
+// ── 🔢 수학도 같은 막대를 채운다 (2026-09-22, 아버님: "아이가 목표로 삼은 그 영상을 수학으로도") ──
+test('🔢 수학 환산: 정답 1 = 2, ☀️ 완주 = 20, 복습 편 통과 = 복습 5 — 영어 문장과 같은 막대에 더해진다', () => {
+  assert.deepEqual(MATH_PTS, { ok: 2, daily: 20, rev: 5 });
+  const math = { ok: 8, daily: 1, rev: 1 }; // 하루치 수학
+  const st = unlockState({ coins: 0, records: recs(100, 10), price: 1, math });
+  assert.equal(st.math.progress, 8 * 2 + 20, '하루 수학 ≈ 36 ≈ 영어 40문장');
+  assert.equal(st.math.review, 5);
+  assert.equal(st.items[1].have, 100 + 36);
+  assert.equal(st.items[2].have, 10 + 5);
+  assert.ok(st.items[1].label.startsWith('📼 배운 문장 + 🔢 수학'));
+  assert.equal(st.items[1].detail, '📼 영어 100 · 🔢 수학 36');
+  assert.equal(st.items[2].detail, '🔁 영어 10 · 🔢 수학 5');
+  assert.deepEqual(st.total, { done: 100, reviewed: 10, mathOk: 8, mathDaily: 1, mathRev: 1 });
+  // 수학 없이도 옛 모양 그대로
+  const none = unlockState({ coins: 0, records: recs(100, 10), price: 1 });
+  assert.deepEqual(none.math, { progress: 0, review: 0 });
+  assert.equal(none.items[1].have, 100);
+});
+
+test('🔢 수학만으로도 교환권 조건이 찬다 · 기준선 이후의 수학만 센다 · 옛 기준선(수학 칸 없음)은 0', () => {
+  const need = NEED.doneSentences;
+  const onlyMath = unlockState({ coins: 9999, records: [], price: 1, math: { ok: need / 2, daily: 0, rev: NEED.reviewPassed / 5 } });
+  assert.equal(onlyMath.ready, true, '영어 0문장이어도 수학으로 채울 수 있다');
+  const base = { done: 0, reviewed: 0, mathOk: 400, mathDaily: 10, mathRev: 5 };
+  const after = unlockState({ coins: 0, records: [], price: 1, base, math: { ok: 408, daily: 11, rev: 6 } });
+  assert.deepEqual(after.math, { progress: 8 * 2 + 20, review: 5 }, '산 뒤에 한 것만');
+  assert.ok(after.items[1].label.includes('교환권 이후'), '수학 기준선만 있어도 "교환권 이후"');
+  const oldBase = unlockState({ coins: 0, records: [], price: 1, base: { done: 30, reviewed: 2 }, math: { ok: 5, daily: 1, rev: 0 } });
+  assert.equal(oldBase.math.progress, 30, '옛 기준선엔 수학 칸이 없으니 0부터');
+  const rolled = unlockState({ coins: 0, records: [], price: 1, base, math: { ok: 100, daily: 1, rev: 0 } });
+  assert.deepEqual(rolled.math, { progress: 0, review: 0 }, '백업을 되돌려 누적이 기준선보다 작아도 음수가 안 된다');
+  assert.deepEqual(mathPoints({ mathOk: 3, mathDaily: 1, mathRev: 2 }, null), { progress: 26, review: 10 });
 });
 
 test('🎟️ 기준선이 지금 누적보다 커도 음수가 안 된다 (백업을 되돌린 경우)', () => {

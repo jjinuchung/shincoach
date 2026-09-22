@@ -9,12 +9,13 @@ import { WORLDS, rng, shuffle, josa } from './mathgen.js';
 import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
-  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone,
+  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
 import { todayKey } from './track.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem } from './xp.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase } from './xp.js';
+import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
 import { GOLDEN } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters } from './pokemon.js';
@@ -194,6 +195,27 @@ async function runCatches(n, { g, c, run, before }) {
   one();
 }
 
+/**
+ * 🎟️ 다음 영상 교환권까지 — 영어 문장 + 🔢 수학이 같은 막대(2026-09-22). 아이가 목표로 삼은 그 영상이 수학으로도 가까워지는 걸 보여 준다.
+ * @param {object|null} state 수학 레코드(tot)
+ * @param {number} earned 이번 편이 보탠 점수 (0이면 안 적음)
+ * @returns {Promise<HTMLElement|null>} 광고 중인 영상이 없으면 null
+ */
+async function ticketNote(state, earned) {
+  try {
+    const bag = inventory();
+    const next = nextLocked(LOCKED.filter((c) => (bag[ticketId(c.id)] || 0) > 0).map((c) => c.id));
+    if (!next) return null;
+    const records = await getAllSentenceStats().catch(() => []);
+    const st = unlockState({ coins: coins(), records, price: next.price, base: unlockBase(), math: (state && state.tot) || null });
+    const p = st.items.find((i) => i.key === 'progress');
+    const rv = st.items.find((i) => i.key === 'review');
+    const line = el('p', 'math-note math-ticket');
+    line.textContent = `🎟️ 다음 영상 「${next.ko}」까지 — 📼+🔢 ${p.have.toLocaleString()}/${p.need.toLocaleString()} · 🔁 ${rv.have}/${rv.need}${earned > 0 ? ` (이번 수학 +${earned})` : ' · 수학도 채워요'}`;
+    return line;
+  } catch { return null; }
+}
+
 function updateChip() {
   const chip = $('math-chip');
   if (!chip) return;
@@ -352,6 +374,7 @@ function renderLadder(state) {
     // ✨ 오늘의 보너스 — 홈 카드와 같은 것. 완주했으면 받았다고, 아니면 완주하면 준다고
     const bonus = dailyBonus(today);
     head.appendChild(el('p', `math-note math-daily-bonus${dn ? ' got' : ''}`, dn ? `✅ 오늘의 보너스 ${bonusText(bonus)} 받았어요` : `✨ 오늘의 보너스 ${bonusText(bonus)} — ☀️ 완주하면 받아요`));
+    ticketNote(state, 0).then((t) => { if (t && head.isConnected) head.appendChild(t); }); // 🎟️ 다음 영상까지 — 수학도 같은 막대를 채운다
   }
   // ❓ 아빠 답을 기다리는 질문 · 😄 이해했는데 아직 안 풀어 본 문제
   const waiting = openAsks(state).length;
@@ -512,7 +535,7 @@ function startMixRound() {
 }
 
 /** ☀️ 완주 카드 — 개념 편 결과 + 🎲 섞어 풀기 결과 + 보상(첫 완주 보너스) */
-function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0, gold = false, bonus = null }) {
+function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0, gold = false, bonus = null, ticket = 0 }) {
   const m = clearMain();
   const d = ui.daily;
   const info = d && d.roundInfo;
@@ -528,6 +551,7 @@ function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${catches ? ` 🎯 몬스터볼 ${catches}개!` : ''}${gold ? ' 🌟 황금 몬스터볼 +1!' : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (gold) card.appendChild(el('p', 'math-p', '🌟 섞어 풀기를 다 맞혀서 황금 몬스터볼! 잡힐 확률이 2배 — 🎯 잡기에서 써 봐요'));
   if (bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(bonus)} 받았어요!`));
+  ticketNote(state, ticket).then((t) => { if (t && card.isConnected) card.appendChild(t); }); // 🎟️ 다음 영상까지 (수학도 채운다)
   if (offer) card.appendChild(offer); // ❓ 섞어 풀기에서 틀린 문제를 아빠에게
   const b = el('button', 'btn btn-primary btn-big-wide', '사다리로');
   b.type = 'button';
@@ -1387,19 +1411,21 @@ async function finishRound() {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, ui.stem, r.missTags); });
     } else if (r.mode === 'ask') {
-      state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false }); });
+      state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false }); tallyRound(s, { mode: r.mode, correct: r.correct }); });
     } else if (r.mode === 'notes' || r.mode === 'mix') {
       const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i].fromNote ? { note: true } : {}), ...extraQ(a) }));
       state = await updateMath((s) => {
         result = r.mode === 'mix' ? applyMixRound(s, qs, today) : applyNotesRound(s, qs, today);
         // 🌟 섞어 풀기를 전부 맞히면 황금볼 — 하루 1개, 판정은 같은 트랜잭션(두 창·재시도 멱등)
         if (lastOfDaily) daily = markDaily(s, today, r.mode === 'mix' ? { perfect: !!result && result.total > 0 && result.ok === result.total } : undefined);
+        tallyRound(s, { mode: r.mode, correct: r.correct }); // 🎟️ 교환권 누적 (같은 트랜잭션)
       });
     } else {
       const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
       state = await updateMath((s) => {
         result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today);
         if (lastOfDaily) daily = markDaily(s, today);
+        tallyRound(s, { mode: r.mode, correct: r.correct, result }); // 🎟️ 교환권 누적 (같은 트랜잭션)
       });
     }
   } catch (err) {
@@ -1447,6 +1473,8 @@ async function finishRound() {
     if (gv.coin) rw.coin += gv.coin;
     if (gv.item) addItem(gv.item, gv.n || 1);
   }
+  // 🎟️ 이번 편이 교환권 막대에 보탠 몫 (진단 제외) — 카드에 "오늘 수학 +N"으로
+  rw.ticket = r.mode === 'diag' ? 0 : r.correct * MATH_PTS.ok + (daily && daily.first ? MATH_PTS.daily : 0) + (result && result.review && result.passed && !result.practice ? MATH_PTS.rev : 0);
   const g = gainXp(rw.xp);
   const c = gainCoins(rw.coin).gained;
   applyDailyDelta(today, r.mode === 'diag' || r.mode === 'ask' ? { mathQ: r.qs.length, mathOk: r.correct } : { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});
@@ -1474,7 +1502,7 @@ async function finishRound() {
   }
 
   if (r.mode === 'mix') {
-    renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today), catches: rw.catches, gold: rw.gold, bonus: rw.bonus });
+    renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today), catches: rw.catches, gold: rw.gold, bonus: rw.bonus, ticket: rw.ticket });
     runCatches(rw.catches, { g, c, run });
     return;
   }
@@ -1540,6 +1568,7 @@ async function finishRound() {
   if (lastOfDaily) card.appendChild(el('p', 'math-p big', daily && daily.first ? '☀️ 오늘의 수학 끝! 내일도 ☀️ 하나면 돼요.' : '☀️ 오늘의 수학 끝!'));
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (rw.bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(rw.bonus)} 받았어요!`));
+  ticketNote(state, rw.ticket).then((t) => { if (t && card.isConnected) card.appendChild(t); }); // 🎟️ 다음 영상까지 (수학도 채운다)
   const offer = askOfferForRound(r, state, today); // ❓ 틀린 문제를 아빠에게
   if (offer) card.appendChild(offer);
 

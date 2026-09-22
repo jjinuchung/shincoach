@@ -1,5 +1,5 @@
 // 라이브러리 화면: 콘텐츠 가져오기(mp4 + srt) / 목록 / 삭제 / 저장 공간 표시
-import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats } from './db.js';
+import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats, getMath } from './db.js';
 import { parseSubtitle } from './srt.js';
 import { LOCKED, unlockState, nextLocked, ticketId, findLocked, totalsFrom } from './unlock.js';
 import { classifyFiles, suggestTitle, describePick, listVideos } from './importfiles.js';
@@ -478,7 +478,10 @@ function fillCast(root, c) {
  */
 async function currentState(price) {
   const records = await getAllSentenceStats().catch(() => []);
-  const total = totalsFrom(records);
+  // 🔢 수학 누적(정답·완주·복습 통과)도 같은 막대를 채운다 (2026-09-22) — 못 읽으면 영어만으로
+  let mathTot = null;
+  try { const m = await getMath(); mathTot = (m && m.tot) || null; } catch { mathTot = null; }
+  const total = totalsFrom(records, mathTot);
   // 🎟️ 기준선이 아직 없으면 여기서 한 번 잡는다 (claim은 "없을 때만" 쓰므로 여러 번 불러도 안전).
   //  - 이미 교환권을 산 아이: **지금 누적치**가 기준선 → 그 뒤로 쌓은 것만 다음 영상 조건에 센다.
   //    (진우는 팬텀을 사자마자 다음 영상 조건이 꽉 차 있었다 — 그때까지 배운 것이 그대로 더해져서)
@@ -488,7 +491,7 @@ async function currentState(price) {
     const bought = LOCKED.some((c) => (bag[ticketId(c.id)] || 0) > 0);
     await ensureUnlockBase(bought ? total : { done: 0, reviewed: 0 }).catch(() => {});
   }
-  return unlockState({ coins: coins(), records, price, base: unlockBase() });
+  return unlockState({ coins: coins(), records, price, base: unlockBase(), math: mathTot });
 }
 
 function waitingCard(c) {
@@ -546,6 +549,7 @@ function lockedCard(c, st) {
     row.querySelector('.l').textContent = `${it.ok ? '✅' : '⬜'} ${it.label}`;
     row.querySelector('.v').textContent = `${it.have.toLocaleString()} / ${it.need.toLocaleString()}`;
     row.querySelector('.bar i').style.width = `${it.pct}%`;
+    if (it.detail) { const d = document.createElement('span'); d.className = 'd'; d.textContent = it.detail; row.appendChild(d); } // 📼 영어 · 🔢 수학 몫
     needs.appendChild(row);
   }
 

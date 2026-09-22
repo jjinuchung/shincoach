@@ -415,6 +415,27 @@ export function applyMixRound(m, qs, today) {
  * m.daily = { d: 날짜, n: 그날 완주 횟수 }
  * @returns {{first:boolean, n:number}}
  */
+// ── 🎟️ 교환권용 누적 카운터 (2026-09-22, 아버님: "수학 진행도 교환권을 채우게") ──
+// m.tot = { ok: 정답 문항(진단 제외), daily: ☀️ 하루 첫 완주 횟수, rev: 🔁 복습 편 통과(연습 제외) } — 단조 증가, 병합은 max.
+// 환산(unlock.MATH_PTS)은 여기서 모른다 — 여기는 세기만. 저장 트랜잭션 안(math.js finishRound의 updateMath 안)에서 부른다.
+export function bumpTot(m, key, n = 1) {
+  m.tot = m.tot || { ok: 0, daily: 0, rev: 0 };
+  m.tot[key] = (Number(m.tot[key]) || 0) + n;
+  return m.tot;
+}
+
+/**
+ * 한 편이 끝난 뒤 누적에 더한다 — 진단은 안 센다(배운 게 아니라 잰 것).
+ * @param {object} m
+ * @param {{mode:string, correct:number, result?:{passed?:boolean, review?:boolean, practice?:boolean}}} r
+ */
+export function tallyRound(m, { mode, correct, result }) {
+  if (mode === 'diag') return m.tot || { ok: 0, daily: 0, rev: 0 };
+  if (correct > 0) bumpTot(m, 'ok', correct);
+  if (result && result.review && result.passed && !result.practice) bumpTot(m, 'rev', 1);
+  return m.tot;
+}
+
 /**
  * ☀️ 완주 기록 (저장 트랜잭션 안에서 부른다 — 두 창이 같이 끝내도 첫 창만 first).
  * @param {{perfect?:boolean}} [opts] perfect = 🎲 섞어 풀기를 전부 맞힘 → 🌟 황금볼은 **하루 1개**(m.daily.gold) — 틀린 뒤 다시 ☀️ 해서 다 맞혀도 받는다(그게 학습)
@@ -426,6 +447,7 @@ export function markDaily(m, today, opts) {
   const hadGold = same && !!m.daily.gold;
   m.daily = { d: today, n, ...(hadGold ? { gold: true } : {}) };
   const out = { first: n === 1, n };
+  if (n === 1) bumpTot(m, 'daily', 1); // 🎟️ 하루 첫 완주만 — "한 번 더"로 교환권을 채우진 못한다
   if (opts && opts.perfect !== undefined) {
     out.gold = !!opts.perfect && !hadGold;
     if (out.gold) m.daily.gold = true;

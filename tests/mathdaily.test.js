@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  dailyPlan, weakKinds, applyMixRound, markDaily, dailyDone, applyRound, applyNotesRound, MIX_CONCEPTS, KINDS, REWARD, dueNotes, conceptReport, mathReportText,
+  dailyPlan, weakKinds, applyMixRound, markDaily, dailyDone, applyRound, applyNotesRound, MIX_CONCEPTS, KINDS, REWARD, dueNotes, conceptReport, mathReportText, tallyRound, bumpTot,
 } from '../js/mathprog.js';
 import { emptyMath, mergeMath } from '../js/db.js';
 import { rng } from '../js/mathgen.js';
@@ -205,6 +205,33 @@ test('🛟 백업 병합: 🌟 황금볼 표시는 같은 날이면 어느 쪽�
   const c = emptyMath(); markDaily(c, Y, { perfect: true });
   assert.deepEqual(mergeMath(c, b).daily, { d: T, n: 2 }, '어제 받은 황금볼은 오늘 기록에 안 붙는다');
   assert.deepEqual(mergeMath(b, c).daily, { d: T, n: 2 });
+});
+
+test('🎟️ 누적 카운터 tot: 정답(진단 제외)·복습 편 통과(연습 제외)·☀️ 하루 첫 완주만 — 단조 증가, 병합은 키마다 max, 입력은 안 건드린다', () => {
+  const m = emptyMath();
+  assert.equal(m.tot, undefined, '처음엔 없다 (옛 레코드와 같은 모양)');
+  tallyRound(m, { mode: 'diag', correct: 5 });
+  assert.equal(m.tot, undefined, '진단은 안 센다');
+  tallyRound(m, { mode: 'learn', correct: 3, result: { passed: false, review: false, practice: false } });
+  assert.deepEqual(m.tot, { ok: 3, daily: 0, rev: 0 });
+  tallyRound(m, { mode: 'review', correct: 4, result: { passed: true, review: true, practice: false } });
+  assert.deepEqual(m.tot, { ok: 7, daily: 0, rev: 1 }, '복습 통과 +1');
+  tallyRound(m, { mode: 'review', correct: 4, result: { passed: true, review: true, practice: true } });
+  assert.deepEqual(m.tot, { ok: 11, daily: 0, rev: 1 }, '연습 편은 정답만 세고 복습 통과는 안 센다');
+  tallyRound(m, { mode: 'mix', correct: 2 });
+  tallyRound(m, { mode: 'ask', correct: 0 });
+  assert.deepEqual(m.tot, { ok: 13, daily: 0, rev: 1 });
+  markDaily(m, T); markDaily(m, T); markDaily(m, '2026-09-22');
+  assert.deepEqual(m.tot, { ok: 13, daily: 2, rev: 1 }, '하루 첫 완주만 — "한 번 더"는 안 센다');
+  assert.deepEqual(bumpTot({}, 'ok', 2), { ok: 2, daily: 0, rev: 0 });
+  // 병합: 키마다 max (옛 백업이 진도를 되돌리지 않게), 입력 객체는 그대로
+  const a = emptyMath(); a.tot = { ok: 10, daily: 1, rev: 0 };
+  const b = emptyMath(); b.tot = { ok: 4, daily: 2, rev: 3 };
+  assert.deepEqual(mergeMath(a, b).tot, { ok: 10, daily: 2, rev: 3 });
+  assert.deepEqual(mergeMath(b, a).tot, { ok: 10, daily: 2, rev: 3 });
+  assert.deepEqual(a.tot, { ok: 10, daily: 1, rev: 0 }, '입력 그대로');
+  assert.deepEqual(mergeMath(emptyMath(), b).tot, { ok: 4, daily: 2, rev: 3 }, '한쪽만 있어도');
+  assert.equal(mergeMath(emptyMath(), emptyMath()).tot, undefined, '둘 다 없으면 안 만든다');
 });
 
 test('🛟 백업 병합: 완주 기록은 늦은 날짜 쪽, 같은 날이면 큰 횟수', () => {

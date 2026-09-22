@@ -1901,6 +1901,8 @@ button { font-family: inherit; }
 .next-need { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: .9rem; font-weight: 700; }
 .next-need.ok { color: #047857; }
 .next-need .v { color: var(--muted); font-variant-numeric: tabular-nums; }
+.next-need .d { grid-column: 1 / -1; font-size: .78rem; font-weight: 600; color: var(--muted); } /* 📼 영어 · 🔢 수학 몫 */
+.math-ticket { color: #4338ca; font-weight: 700; }
 .next-need .bar { grid-column: 1 / -1; height: 8px; border-radius: 99px; background: #e0e7ff; overflow: hidden; }
 .next-need .bar i { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
 .next-need.ok .bar i { background: #10b981; }
