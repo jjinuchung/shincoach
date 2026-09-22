@@ -2,8 +2,9 @@
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, itemById, canBuy, priceText, setFigure } from './items.js';
-import { inventory, coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup } from './xp.js';
-import { formsOf, formUrl, ensureForm, subjectOf } from './pokemon.js';
+import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup } from './xp.js';
+import { formsOf, formUrl, ensureForm, subjectOf, ROSTER, forSubject } from './pokemon.js';
+import { pickHatch, eggProgress } from './egg.js';
 import { sfx, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -88,7 +89,12 @@ function shopSection(title, sub, items, boughtId) {
     const n = itemCount(it.id);
     if (n > 0) btn.appendChild(el('span', 'own', `가방에 ${n}개`));
     const { ok, short, shortStones } = canBuy(it.id, coins(), inventory());
-    if (!ok) {
+    const brooding = it.kind === 'egg' ? eggFor(it.subject) : null; // 🥚 품는 알이 있으면 부화할 때까지 또 못 산다
+    if (brooding) {
+      btn.disabled = true;
+      const pg = eggProgress(brooding);
+      btn.appendChild(el('span', 'own', `품는 중 ${pg.done}/${pg.need}일`));
+    } else if (!ok) {
       btn.disabled = true;
       const parts = [short > 0 ? `💰${short}` : '', ...(shortStones || []).map((s) => `${s.emoji}${s.n}`)].filter(Boolean);
       btn.appendChild(el('span', 'short', `${parts.join(' + ')} 더 모으면`));
@@ -102,6 +108,17 @@ function shopSection(title, sub, items, boughtId) {
 
 async function buy(id) {
   const it = itemById(id);
+  if (it && it.kind === 'egg') {
+    // 🥚 알: 부화할 종을 **살 때** 정해 저장한다 (그 과목 희귀 이상, 못 잡은 것 먼저) — 재시도·복구로 바뀌지 않게
+    const monId = pickHatch(forSubject(ROSTER, it.subject), rarityOf, getProfileSnapshot().caught);
+    const r = await buyEgg(it, monId);
+    if (!r.ok) { renderShop(r.why === 'active' ? '🥚 이미 품는 알이 있어요 — 부화하면 또 살 수 있어요' : '💰 코인이나 🧤 스톤이 조금 모자라요. 배우고 다시 와요!'); return; }
+    unlock();
+    sfx.ding();
+    renderShop(`🥚 ${it.ko}${josaEul(it.ko)} 샀어요! ${it.hint}`, id);
+    notify(null);
+    return;
+  }
   // 살 수 있는지는 저장소에서 판정한다 (두 창에서 같은 코인으로 두 번 사지 못하게)
   if (!it || !await buyItem(id)) { renderShop(it && it.stones ? '💰 코인이나 🧤 스톤이 조금 모자라요. 배우고 다시 와요!' : '💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
   unlock();

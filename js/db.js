@@ -1,6 +1,7 @@
 // IndexedDB 저장소: 영상(Blob) + 자막 텍스트 + 진행 상태
 // items 스토어: 메타데이터(제목, 자막, 진행) / blobs 스토어: 영상 Blob (목록 조회 시 무거운 Blob을 안 읽기 위해 분리)
 
+import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -562,13 +563,13 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) } };
+  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })) };
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -865,6 +866,31 @@ export async function applyProfileDelta(delta) {
   return r.profile;
 }
 
+/**
+ * 🥚 알 사기 — 코인+스톤을 치르고(purchaseRule) 알 레코드를 붙인다. 그 과목에 품는 알이 있으면 안 판다. 한 트랜잭션
+ * @param {{coins:number, items:Object}} cost
+ * @param {object} egg egg.newEgg(...)
+ */
+export function buyEggRule(profile, cost, egg) {
+  if (!egg || !egg.subject) return { ok: false };
+  if (activeEgg(profile, egg.subject)) return { ok: false, why: 'active' };
+  const r = purchaseRule(profile, cost, {});
+  if (!r.ok) return r;
+  profile.eggs = [...(profile.eggs || []), egg];
+  return { ok: true };
+}
+export function applyBuyEgg(cost, egg) {
+  return mutateProfile((p) => buyEggRule(p, cost, egg));
+}
+/** 🥚 완주한 날을 알에 적고, 5일이 차면 부화(도감 등록)까지 한 트랜잭션 → { ok, ticked, hatched, egg, profile } */
+export function applyEggDay(subject, dateKey) {
+  return mutateProfile((p) => eggRule(p, subject, dateKey));
+}
+/** 🐣 부화 알림을 보여 줬다 */
+export function applyEggSeen(eggId) {
+  return mutateProfile((p) => eggSeenRule(p, eggId));
+}
+
 /** ❤️ HP 바꾸기 (+🧪 물약 소모) → { ok, from, to, profile } */
 export function applyHpChange(monId, by, max, spendItem) {
   return mutateProfile((p) => hpChangeRule(p, monId, by, max, spendItem));
@@ -973,6 +999,7 @@ export function mergeStatRecord(name, cur, rec) {
     out.items = { ...(latest.items || {}) };
     out.mons = { ...(latest.mons || {}) };
     out.partner = latest.partner || null;
+    out.eggs = (latest.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })); // 🥚 알은 코인·가방과 한 묶음(산 것) — 같은 쪽에서
     // 🎟️ 기준선은 가방(교환권)과 짝이다 — 둘이 갈라지면 "샀는데 조건이 안 줄었다"가 된다.
     // 그래서 items와 같은 쪽(최근에 저장된 프로필)에서 가져온다. 옛 백업엔 이 값이 없다(그럼 null)
     out.unlockBase = latest.unlockBase || null;

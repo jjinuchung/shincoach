@@ -2,10 +2,11 @@
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import {
-  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase,
+  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase, applyBuyEgg, applyEggDay, applyEggSeen,
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase,
 } from './db.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES } from './items.js';
+import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { anchorFor } from './pokemon.js';
 import { findLocked } from './unlock.js';
 
@@ -270,7 +271,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -302,7 +303,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) } };
+  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -368,7 +369,38 @@ function ensurePartner() {
 }
 
 export function getProfileSnapshot() {
-  return { ...profile, caught: { ...profile.caught }, items: { ...profile.items }, mons: { ...profile.mons } };
+  return { ...profile, caught: { ...profile.caught }, items: { ...profile.items }, mons: { ...profile.mons }, eggs: (profile.eggs || []).map((e) => ({ ...e })) };
+}
+
+// ── 🥚 알 (egg.js 규칙, 저장은 db 트랜잭션) ──
+/** 지금 품는 알 (없으면 null) */
+export function eggFor(subject) {
+  return activeEgg(profile, subject);
+}
+/** 🥚 알 사기 — 부화할 종은 여기서 정해 저장한다. @returns {Promise<{ok:boolean, why?:string}>} */
+export async function buyEgg(item, monId) {
+  if (!item || item.kind !== 'egg' || !monId) return { ok: false };
+  if (activeEgg(profile, item.subject)) return { ok: false, why: 'active' };
+  const cost = costOf(item);
+  if ((profile.coins || 0) < cost.coins) return { ok: false };
+  for (const sid of Object.keys(cost.items)) if ((profile.items[sid] || 0) < cost.items[sid]) return { ok: false };
+  const egg = newEgg(item.subject, monId, Date.now(), item.id);
+  const r = await runProfileOp(() => applyBuyEgg(cost, egg), () => ({ ok: false }));
+  return { ok: !!(r && r.ok), why: r && r.why };
+}
+/** 🥚 완주한 날 적기 (+부화) — 품는 알이 없으면 {ok:false}. @returns {Promise<{ok:boolean, ticked?:boolean, hatched?:boolean, egg?:object}>} */
+export async function tickEgg(subject, dateKey) {
+  if (!activeEgg(profile, subject)) return { ok: false };
+  const r = await runProfileOp(() => applyEggDay(subject, dateKey), () => ({ ok: false }));
+  return r || { ok: false };
+}
+/** 🐣 아직 안 보여 준 부화 */
+export function hatchedUnseen() {
+  return unseenHatched(profile);
+}
+export async function markEggSeen(eggId) {
+  const r = await runProfileOp(() => applyEggSeen(eggId), () => ({ ok: false }));
+  return !!(r && r.ok);
 }
 
 export function getLevelInfo() {

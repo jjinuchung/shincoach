@@ -1289,6 +1289,16 @@ button { font-family: inherit; }
 .pokedex-cell.unknown .subj { opacity: 1; }
 .pokedex-subjects { margin-top: 4px; }
 /* 🧭 레이더 — 잡기 화면의 버튼과 레이더가 부른 후보 표시 */
+/* 🐣 부화 화면 */
+.hatch { z-index: 63; }
+.hatch-card { text-align: center; align-items: center; }
+.hatch-title { margin: 0 0 6px; font-size: 1.4rem; }
+.hatch-stage { display: flex; justify-content: center; align-items: center; min-height: 140px; }
+.hatch-stage .hatch-mon { width: 140px; height: 140px; animation: home-mon-breathe 2.2s ease-in-out infinite; }
+.hatch-emoji { font-size: 5rem; }
+.hatch-text { font-size: 1.05rem; font-weight: 700; margin: 8px 0 12px; }
+.pokedex-gauntlet .egg { padding: 4px 10px; border-radius: 999px; background: #ecfdf5; color: #065f46; font-weight: 700; font-size: 0.9rem; }
+.math-egg { font-weight: 700; color: #065f46; }
 .catch-radar { text-align: center; margin: 4px 0 8px; }
 .catch-radar-btn { font-weight: 800; background: #fef3c7; border-color: #f59e0b; color: #92400e; }
 .catch-cand { position: relative; }

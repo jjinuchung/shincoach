@@ -4,6 +4,8 @@ import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streak
 import { listDaily } from './db.js';
 import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES } from './items.js';
+import { eggSummary } from './egg.js';
+import { showHatchIfAny } from './hatch.js';
 import { initShop, openShop, openMon } from './shop.js';
 
 const $ = (id) => document.getElementById(id);
@@ -132,7 +134,9 @@ export async function openPokedex(opts) {
     gl.appendChild(el('span', 'stone' + (n > 0 ? ' have' : ''), `${s.emoji} ${s.ko} ${n}`));
   }
   for (const f of FUTURE_STONES) gl.appendChild(el('span', 'stone locked', `🔒 ${f.emoji} ${f.ko}`));
+  for (const e of eggSummary(p)) gl.appendChild(el('span', 'egg', `🥚 ${e.subject === 'math' ? '수학' : '영어'} 알 ${e.done}/${e.need}일`)); // 품는 알 — 그 과목을 완주한 날 수
   card.appendChild(gl);
+  showHatchIfAny(); // 🐣 다른 화면에서 부화했는데 아직 못 본 것
   card.appendChild(el('div', 'pokedex-stats', '스톤은 배워야만 생겨요 — 🔷 개념 통과·👑 / 🔶 복습 완주·에세이. 🛒 상점 🧤 칸에서 코인과 같이 써요'));
   // 💰 코인·🎒 가방·🛒 상점
   const coinRow = el('div', 'pokedex-coins');

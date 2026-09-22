@@ -16,7 +16,7 @@ test('카탈로그: id가 겹치지 않고 가격은 양수, 장식은 head/face
   assert.equal(new Set(ids).size, ids.length);
   for (const it of ITEMS) {
     assert.ok(it.emoji && it.ko, it.id);
-    assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool'].includes(it.kind), it.id);
+    assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool', 'egg'].includes(it.kind), it.id);
     // 값이 없는 것 = 코인으로 못 사는 것: 🔴 몬스터볼(무료) · 🌟 황금 볼(복습으로만) · 🍄 다이버섯(학습으로만) · 🧤 스톤(학습으로만)
     if (it.id === 'pokeball' || it.id === 'goldenball' || it.kind === 'mushroom' || it.kind === 'stone') assert.equal(it.price, 0, it.id);
     else assert.ok(it.price > 0, it.id);
@@ -51,12 +51,12 @@ test('코인 규칙: 퍼즐 5/3/2, 정답 공개 0, 스트릭 5×일 최대 50',
   assert.equal(streakCoins(0), 5);
 });
 
-test('lootBox: 귀한 것(🌟 황금 볼·⭐ 메가·🍄 버섯·🧤 스톤·스톤 상점 물건)은 상자에서 안 나온다', () => {
-  const loot = ITEMS.filter((i) => !['ball', 'mega', 'mushroom', 'stone', 'tool'].includes(i.kind));
+test('lootBox: 귀한 것(🌟 황금 볼·⭐ 메가·🍄 버섯·🧤 스톤·스톤이 드는 물건)은 상자에서 안 나온다', () => {
+  const loot = ITEMS.filter((i) => !['ball', 'mega', 'mushroom', 'stone'].includes(i.kind) && !i.stones);
   assert.equal(lootBox(() => 0), loot[0].id);
   assert.equal(lootBox(() => 0.999999), loot[loot.length - 1].id);
   assert.ok(itemById(lootBox()));
-  const forbidden = new Set(ITEMS.filter((i) => ['ball', 'mega', 'mushroom', 'stone', 'tool'].includes(i.kind)).map((i) => i.id));
+  const forbidden = new Set(ITEMS.filter((i) => ['ball', 'mega', 'mushroom', 'stone'].includes(i.kind) || i.stones).map((i) => i.id));
   for (let i = 0; i <= 40; i++) assert.equal(forbidden.has(lootBox(() => i / 40)), false, '상자에서 나오면 안 되는 것');
   assert.equal(canBuy(GOLDEN.id, 9999).ok, false, '코인이 아무리 많아도 못 삼');
   assert.equal(canBuy('mushroom', 9999).ok, false, '🍄 다이버섯도 돈으로 못 삼 (학습으로만)');

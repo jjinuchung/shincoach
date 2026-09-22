@@ -9,7 +9,8 @@ import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg } from './xp.js';
+import { showHatchIfAny } from './hatch.js';
 import { STONE_ENGLISH, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
@@ -282,6 +283,14 @@ async function grantGoalBonus() {
   awardCoins(COIN.goal);
   const h = hpHeal(HP.goalHeal);
   showPlayerMessage(`🎉 오늘 목표 ${settings.dailyGoal}문장 달성! ⚡+${XP.goal} 💰+${COIN.goal}${h && h.to > h.from ? ` ❤️+${h.to - h.from}` : ''}`, 5000);
+  // 🥚 영어 알 — 오늘 목표 달성이 하루치 (markGoalRewarded가 하루 한 번을 선점했으니 여기도 한 번). 5일이면 부화 → 🐣
+  try {
+    const e = await tickEgg('english', track.todayKey());
+    if (e && e.ok) {
+      if (e.hatched) setTimeout(() => showHatchIfAny(), 1200);
+      else showPlayerMessage(`🥚 영어 알 ${(e.egg.days || []).length}/5일 — 목표를 채운 날이 쌓여요`, 4000);
+    }
+  } catch { /* 알이 없거나 저장 실패 — 다음 완주에 */ }
 }
 
 /** 어제 학습을 안 했으면(5문장 미만) 오늘 처음 열 때 한 번 HP 감소. 앱을 처음 쓰는 아이(과거 학습일이 없음)는 제외 */

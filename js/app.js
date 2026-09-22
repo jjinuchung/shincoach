@@ -3,6 +3,7 @@ import { initLibrary, refreshList } from './library.js';
 import { initPlayer, requirePin } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
+import { initHatch } from './hatch.js';
 import { initHome, renderHome } from './home.js';
 import { initMath, renderMath } from './math.js';
 import { getDaily, syncCoachFixes } from './db.js';
@@ -130,6 +131,7 @@ async function main() {
   initPlayer({ showView });
   initStats({ showView, requirePin });
   initPokedex({ showView });
+  initHatch();
   initHome({ showView });
   initMath({ showView });
   initExit();

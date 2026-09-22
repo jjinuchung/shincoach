@@ -18,6 +18,9 @@ import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, 
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
 import { GOLDEN, STONE_MATH, RADAR } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
+import { eggFor, tickEgg } from './xp.js';
+import { eggProgress } from './egg.js';
+import { showHatchIfAny } from './hatch.js';
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { contentSummary, cueCountOf } from './stats.js';
@@ -390,6 +393,7 @@ function startDiag() {
 function renderLadder(state) {
   const m = clearMain();
   ui.daily = null; // 사다리로 나오면 ☀️ 흐름은 끝
+  showHatchIfAny(); // 🐣 다른 화면(영어)에서 부화했는데 아직 못 본 것
   const today = todayKey();
   const rows = ladderOf(state, today, ui.stem);
   const due = dueIds(state, today, ui.stem);
@@ -438,6 +442,8 @@ function renderLadder(state) {
     const bonus = dailyBonus(today);
     head.appendChild(el('p', `math-note math-daily-bonus${dn ? ' got' : ''}`, dn ? `✅ 오늘의 보너스 ${bonusText(bonus)} 받았어요` : `✨ 오늘의 보너스 ${bonusText(bonus)} — ☀️ 완주하면 받아요`));
     ticketNote(state, null).then((t) => { if (t && head.isConnected) head.appendChild(t); }); // 🎟️ 다음 영상까지 — 수학도 같은 막대를 채운다
+    const egg = eggFor('math');
+    if (egg) { const pg = eggProgress(egg); head.appendChild(el('p', 'math-note math-egg', `🥚 수학 알 ${pg.done}/${pg.need}일 — ☀️ 완주한 날마다 하루씩 (${pg.need - pg.done}일 더)`)); }
   }
   // ❓ 아빠 답을 기다리는 질문 · 😄 이해했는데 아직 안 풀어 본 문제
   const waiting = openAsks(state).length;
@@ -598,7 +604,7 @@ function startMixRound() {
 }
 
 /** ☀️ 완주 카드 — 개념 편 결과 + 🎲 섞어 풀기 결과 + 보상(첫 완주 보너스) */
-function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0, gold = false, bonus = null, ticket = 0 }) {
+function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0, gold = false, bonus = null, ticket = 0, egg = null }) {
   const m = clearMain();
   const d = ui.daily;
   const info = d && d.roundInfo;
@@ -614,6 +620,7 @@ function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${catches ? ` 🎯 몬스터볼 ${catches}개!` : ''}${gold ? ' 🌟 황금 몬스터볼 +1!' : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (gold) card.appendChild(el('p', 'math-p', '🌟 섞어 풀기를 다 맞혀서 황금 몬스터볼! 잡힐 확률이 2배 — 🎯 잡기에서 써 봐요'));
   if (bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(bonus)} 받았어요!`));
+  if (egg && egg.ok) card.appendChild(el('p', 'math-note math-egg', egg.hatched ? '🐣 수학 알이 부화했어요!' : `🥚 수학 알 ${eggProgress(egg.egg).done}/${eggProgress(egg.egg).need}일 — 완주한 날이 쌓여요`));
   ticketNote(state, ticket).then((t) => { if (t && card.isConnected) card.appendChild(t); }); // 🎟️ 다음 영상까지 (수학도 채운다)
   if (offer) card.appendChild(offer); // ❓ 섞어 풀기에서 틀린 문제를 아빠에게
   const b = el('button', 'btn btn-primary btn-big-wide', '사다리로');
@@ -1535,6 +1542,8 @@ async function finishRound() {
   // 🔷 수학스톤 — "제대로 배웠나"에서만 (mathprog.stoneReward). 코인처럼 트랜잭션 결과(result)에 따라 준다
   rw.stone = stoneReward({ mode: r.mode, result });
   if (rw.stone) addItem(STONE_MATH.id, rw.stone);
+  // 🥚 수학 알 — 하루 첫 완주가 하루치. 5일이 차면 그 트랜잭션에서 부화(도감 등록)까지; 화면은 결과 카드 뒤에 (showHatchIfAny)
+  if (daily && daily.first) { try { rw.egg = await tickEgg('math', today); } catch { rw.egg = null; } }
   // ✨ 오늘의 보너스 — 하루 첫 완주에만(daily.first는 트랜잭션 판정이라 두 창·재시도에도 한 번). 홈 카드가 미리 보여 준 바로 그것
   rw.bonus = daily && daily.first ? dailyBonus(today) : null;
   if (rw.bonus) {
@@ -1572,8 +1581,9 @@ async function finishRound() {
   }
 
   if (r.mode === 'mix') {
-    renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today), catches: rw.catches, gold: rw.gold, bonus: rw.bonus, ticket: rw.ticket });
-    runCatches(rw.catches, { g, c, run });
+    renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today), catches: rw.catches, gold: rw.gold, bonus: rw.bonus, ticket: rw.ticket, egg: rw.egg });
+    runCatches(rw.catches, { g, c, run, onAll: () => showHatchIfAny() });
+    if (!rw.catches) showHatchIfAny();
     return;
   }
 
@@ -1638,6 +1648,7 @@ async function finishRound() {
   if (lastOfDaily) card.appendChild(el('p', 'math-p big', daily && daily.first ? '☀️ 오늘의 수학 끝! 내일도 ☀️ 하나면 돼요.' : '☀️ 오늘의 수학 끝!'));
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.stone ? ` 🔷 수학스톤 +${rw.stone}` : ''}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (rw.bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(rw.bonus)} 받았어요!`));
+  if (rw.egg && rw.egg.ok) card.appendChild(el('p', 'math-note math-egg', rw.egg.hatched ? '🐣 수학 알이 부화했어요!' : `🥚 수학 알 ${eggProgress(rw.egg.egg).done}/${eggProgress(rw.egg.egg).need}일 — 완주한 날이 쌓여요`));
   ticketNote(state, rw.ticket).then((t) => { if (t && card.isConnected) card.appendChild(t); }); // 🎟️ 다음 영상까지 (수학도 채운다)
   const offer = askOfferForRound(r, state, today); // ❓ 틀린 문제를 아빠에게
   if (offer) card.appendChild(offer);
@@ -1666,9 +1677,10 @@ async function finishRound() {
   card.appendChild(row);
   m.appendChild(card);
 
-  // 🎯 몬스터볼 — 영어 퍼즐 정답과 같은 보상 경로(후보만 🔢 수학 포켓몬). 2번이면 한 번 끝난 뒤 이어서. 끝나야 "다음 → 🎲"가 열린다
-  runCatches(rw.catches, { g, c, run, onAll: () => { if (dailyNext) dailyNext.disabled = false; } });
+  // 🎯 몬스터볼 — 영어 퍼즐 정답과 같은 보상 경로(후보만 🔢 수학 포켓몬). 2번이면 한 번 끝난 뒤 이어서. 끝나야 "다음 → 🎲"가 열린다. 그 뒤 🐣
+  runCatches(rw.catches, { g, c, run, onAll: () => { if (dailyNext) dailyNext.disabled = false; showHatchIfAny(); } });
   if (dailyNext && !rw.catches) dailyNext.disabled = false;
+  if (!rw.catches) showHatchIfAny();
 }
 
 // ───────────────────── 배선 ─────────────────────

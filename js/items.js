@@ -114,7 +114,10 @@ export function stoneOf(subject) {
 // ── 🧤 스톤 상점: 코인 + 스톤 ──
 // 🧭 레이더: 다음 🔢 수학 잡기에서 후보 4마리 중 한 마리가 **희귀 이상**으로 확정 (쓰면 없어진다)
 export const RADAR = { id: 'radar', emoji: '🧭', ko: '레이더', price: 100, stones: { stone_math: 1 }, kind: 'tool', hint: '🔢 수학 잡기 화면에서 "🧭 레이더 쓰기"를 누르면 희귀 이상 포켓몬이 한 마리 나와요' };
-export const STONE_SHOP = [RADAR];
+// 🥚 알: 사고 나서 **그 과목을 5일 완주**해야 부화 → 그 과목의 희귀 이상 포켓몬 한 마리가 도감에 (던지기 없이 확정). 과목마다 품는 알은 하나
+export const EGG_MATH = { id: 'egg_math', emoji: '🥚', ko: '수학 알', price: 200, stones: { stone_math: 2 }, kind: 'egg', subject: 'math', hint: '☀️ 오늘의 수학을 5일 완주하면 부화해요 — 🎒에서 며칠 남았는지 보여요' };
+export const EGG_ENGLISH = { id: 'egg_english', emoji: '🥚', ko: '영어 알', price: 200, stones: { stone_english: 2 }, kind: 'egg', subject: 'english', hint: '🎤 오늘의 목표 문장을 5일 채우면 부화해요 — 🎒에서 며칠 남았는지 보여요' };
+export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH];
 
 /** 값 — 코인과 재료(스톤)를 한 묶음으로 (purchaseRule이 둘 다 한 트랜잭션에서 판정) */
 export function costOf(it) {
@@ -140,6 +143,8 @@ export const ITEMS = [
   MUSHROOM,
   ...STONES,
   RADAR,
+  EGG_MATH,
+  EGG_ENGLISH,
 ];
 const byId = {};
 for (const it of ITEMS) byId[it.id] = it;
