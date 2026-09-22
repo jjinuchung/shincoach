@@ -16,6 +16,7 @@ import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, apply
 import { todayKey } from './track.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem } from './xp.js';
 import { GOLDEN } from './items.js';
+import { dailyBonus, bonusText } from './mathbonus.js';
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { contentSummary, cueCountOf } from './stats.js';
@@ -348,6 +349,9 @@ function renderLadder(state) {
     if (preview.roundId) parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${nameOf(preview.roundId)}`);
     if (preview.mix.length) parts.push(`🎲 배운 것 섞어 풀기 ${preview.mix.length}문제`);
     head.appendChild(el('p', 'math-note math-daily-sub', unread.length ? `📬 답장을 읽으면 열려요 · ${parts.join(' → ')}` : parts.join(' → ')));
+    // ✨ 오늘의 보너스 — 홈 카드와 같은 것. 완주했으면 받았다고, 아니면 완주하면 준다고
+    const bonus = dailyBonus(today);
+    head.appendChild(el('p', `math-note math-daily-bonus${dn ? ' got' : ''}`, dn ? `✅ 오늘의 보너스 ${bonusText(bonus)} 받았어요` : `✨ 오늘의 보너스 ${bonusText(bonus)} — ☀️ 완주하면 받아요`));
   }
   // ❓ 아빠 답을 기다리는 질문 · 😄 이해했는데 아직 안 풀어 본 문제
   const waiting = openAsks(state).length;
@@ -508,7 +512,7 @@ function startMixRound() {
 }
 
 /** ☀️ 완주 카드 — 개념 편 결과 + 🎲 섞어 풀기 결과 + 보상(첫 완주 보너스) */
-function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0, gold = false }) {
+function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0, gold = false, bonus = null }) {
   const m = clearMain();
   const d = ui.daily;
   const info = d && d.roundInfo;
@@ -523,6 +527,7 @@ function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0
     : '오늘은 벌써 완주했던 거라 보너스는 없어요 — 그래도 푼 만큼은 쌓였어요.'));
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${catches ? ` 🎯 몬스터볼 ${catches}개!` : ''}${gold ? ' 🌟 황금 몬스터볼 +1!' : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (gold) card.appendChild(el('p', 'math-p', '🌟 섞어 풀기를 다 맞혀서 황금 몬스터볼! 잡힐 확률이 2배 — 🎯 잡기에서 써 봐요'));
+  if (bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(bonus)} 받았어요!`));
   if (offer) card.appendChild(offer); // ❓ 섞어 풀기에서 틀린 문제를 아빠에게
   const b = el('button', 'btn btn-primary btn-big-wide', '사다리로');
   b.type = 'button';
@@ -1434,6 +1439,14 @@ async function finishRound() {
   if (daily && daily.first) rw.catches += 1;
   rw.gold = !!(daily && daily.gold);
   if (rw.gold) addItem(GOLDEN.id, 1);
+  // ✨ 오늘의 보너스 — 하루 첫 완주에만(daily.first는 트랜잭션 판정이라 두 창·재시도에도 한 번). 홈 카드가 미리 보여 준 바로 그것
+  rw.bonus = daily && daily.first ? dailyBonus(today) : null;
+  if (rw.bonus) {
+    const gv = rw.bonus.give;
+    if (gv.xp) rw.xp += gv.xp;
+    if (gv.coin) rw.coin += gv.coin;
+    if (gv.item) addItem(gv.item, gv.n || 1);
+  }
   const g = gainXp(rw.xp);
   const c = gainCoins(rw.coin).gained;
   applyDailyDelta(today, r.mode === 'diag' || r.mode === 'ask' ? { mathQ: r.qs.length, mathOk: r.correct } : { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});
@@ -1461,7 +1474,7 @@ async function finishRound() {
   }
 
   if (r.mode === 'mix') {
-    renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today), catches: rw.catches, gold: rw.gold });
+    renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today), catches: rw.catches, gold: rw.gold, bonus: rw.bonus });
     runCatches(rw.catches, { g, c, run });
     return;
   }
@@ -1526,6 +1539,7 @@ async function finishRound() {
   const inDaily = !!d && d.step === 'round';
   if (lastOfDaily) card.appendChild(el('p', 'math-p big', daily && daily.first ? '☀️ 오늘의 수학 끝! 내일도 ☀️ 하나면 돼요.' : '☀️ 오늘의 수학 끝!'));
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+  if (rw.bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(rw.bonus)} 받았어요!`));
   const offer = askOfferForRound(r, state, today); // ❓ 틀린 문제를 아빠에게
   if (offer) card.appendChild(offer);
 

@@ -251,6 +251,60 @@ button { font-family: inherit; }
 .home-card:nth-child(1) .home-card-btn { border-color: #a5b4fc; background: linear-gradient(180deg, #eef2ff 0%, #ffffff 55%); }
 .home-card:nth-child(2) .home-card-btn { border-color: #fcd34d; background: linear-gradient(180deg, #fffbeb 0%, #ffffff 55%); }
 
+/* ✨ 오늘의 보너스 (수학 카드) — 아직 안 받은 날은 카드가 반짝인다 (아버님 2026-09-22: 아이가 반짝이는 걸 좋아함).
+   움직이는 건 opacity·transform만 — 구형 태블릿에서 box-shadow를 계속 그리면 버벅인다 */
+.home-card-btn { position: relative; overflow: hidden; }
+.home-card-bonus {
+  margin-top: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+.home-card-bonus.got { background: #ecfdf5; color: #065f46; font-weight: 700; }
+.home-card-bonus-tip { font-size: 0.8rem; color: var(--muted); }
+.home-card.sparkle .home-card-btn { border-color: #f59e0b; box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.28), var(--shadow); }
+.home-card.sparkle .home-card-btn::before {
+  /* 비스듬한 빛줄기가 왼쪽에서 오른쪽으로 지나간다 */
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -60%;
+  width: 40%;
+  height: 140%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.85) 50%, rgba(255, 255, 255, 0) 100%);
+  transform: skewX(-12deg) translateX(0);
+  animation: home-shine 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes home-shine {
+  0% { transform: skewX(-12deg) translateX(0); opacity: 0; }
+  12% { opacity: 1; }
+  45% { transform: skewX(-12deg) translateX(420%); opacity: 1; }
+  55%, 100% { transform: skewX(-12deg) translateX(420%); opacity: 0; }
+}
+.home-card .spark {
+  position: absolute;
+  font-style: normal;
+  font-size: 1.3rem;
+  opacity: 0;
+  pointer-events: none;
+  animation: home-twinkle 2.4s ease-in-out infinite;
+}
+.home-card .spark.s1 { top: 10px; left: 14px; animation-delay: 0s; }
+.home-card .spark.s2 { top: 18px; right: 18px; animation-delay: 0.6s; font-size: 1rem; }
+.home-card .spark.s3 { bottom: 46px; left: 22px; animation-delay: 1.2s; font-size: 1rem; }
+.home-card .spark.s4 { bottom: 14px; right: 14px; animation-delay: 1.8s; }
+@keyframes home-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(20deg); }
+}
+.math-daily-bonus { font-weight: 700; color: #92400e; }
+.math-daily-bonus.got { color: #065f46; font-weight: 600; }
+.math-bonus-got { font-weight: 800; color: #92400e; background: #fef3c7; border-radius: 12px; padding: 8px 12px; }
+
 /* 아직 만드는 중인 과목 — 눌리기는 하되 "준비 중"이 보이게 */
 .home-card.soon .home-card-btn { opacity: 0.75; }
 .home-card.soon .home-card-mon img { filter: grayscale(0.55); }

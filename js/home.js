@@ -5,6 +5,9 @@
 // 학습 화면만 여기서 갈라진다. 새 과목이 생기면 SUBJECTS에 한 줄을 더한다.
 
 import { ROSTER, loadCharacters } from './pokemon.js';
+import { dailyBonus, bonusText } from './mathbonus.js';
+import { dailyDone } from './mathprog.js';
+import { todayKey } from './track.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -94,9 +97,36 @@ function cardEl(subject, mascot, onPick) {
   btn.appendChild(stage);
   btn.appendChild(name);
   btn.appendChild(sub);
+  // ✨ 오늘의 보너스 칩 (수학 카드) — 아직 안 받았으면 카드가 반짝이고, 받았으면 차분하게 "받았어요"
+  if (subject.bonus) {
+    const chip = document.createElement('span');
+    chip.className = 'home-card-bonus' + (subject.bonus.got ? ' got' : '');
+    chip.textContent = subject.bonus.got ? `✅ 오늘의 보너스 ${subject.bonus.text} 받았어요` : `✨ 오늘의 보너스 ${subject.bonus.text}`;
+    btn.appendChild(chip);
+    if (!subject.bonus.got) {
+      li.classList.add('sparkle');
+      const tip = document.createElement('span');
+      tip.className = 'home-card-bonus-tip';
+      tip.textContent = '☀️ 오늘의 수학 완주하면 받아요';
+      btn.appendChild(tip);
+      for (let i = 0; i < 4; i++) { const sp = document.createElement('i'); sp.className = `spark s${i + 1}`; sp.textContent = '✨'; sp.setAttribute('aria-hidden', 'true'); btn.appendChild(sp); }
+    }
+  }
   btn.addEventListener('click', () => onPick(subject));
   li.appendChild(btn);
   return li;
+}
+
+/**
+ * 수학 카드에 얹을 오늘의 보너스 — {text, got}. 기록을 못 읽어도 카드는 떠야 하므로 실패하면 null.
+ * @param {object|null} m 수학 레코드 (db.getMath)
+ * @param {string} today track.todayKey()
+ */
+export function mathBonusFor(m, today) {
+  try {
+    const b = dailyBonus(today);
+    return { text: bonusText(b), got: dailyDone(m, today) > 0 };
+  } catch { return null; }
 }
 
 /**
@@ -117,11 +147,17 @@ export async function renderHome(showView) {
     hint.hidden = false;
   };
 
-  // 📬 아빠의 답장이 와 있으면 수학 카드에 먼저 알린다 (읽어야 ☀️가 열린다)
+  // 📬 아빠의 답장이 와 있으면 수학 카드에 먼저 알린다 (읽어야 ☀️가 열린다) · ✨ 오늘의 보너스도 수학 카드에
   let unread = 0;
-  try { const { getMath } = await import('./db.js'); const { unreadAsks } = await import('./mathask.js'); unread = unreadAsks(await getMath()).length; } catch { unread = 0; }
+  let bonus = null;
+  try {
+    const { getMath } = await import('./db.js'); const { unreadAsks } = await import('./mathask.js');
+    const m = await getMath();
+    unread = unreadAsks(m).length;
+    bonus = mathBonusFor(m, todayKey());
+  } catch { unread = 0; }
   const frag = document.createDocumentFragment();
-  for (const s of SUBJECTS) frag.appendChild(cardEl(s.key === 'math' && unread ? { ...s, desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : s, pickMascot(s.mascot, chars), pick));
+  for (const s of SUBJECTS) frag.appendChild(cardEl(s.key === 'math' ? { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) } : s, pickMascot(s.mascot, chars), pick));
   list.innerHTML = '';
   list.appendChild(frag);
   hint.hidden = true;
