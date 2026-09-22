@@ -278,3 +278,12 @@ test('🎟️ 백업 병합: 기준선은 가방(교환권)과 같은 쪽에서 
   const older = { id: 'me', updatedAt: 300, coins: 10, items: {} };
   assert.equal(mergeStatRecord('profile', cur, older).unlockBase, null);
 });
+
+test('🔶 daily.reviewStoneKeys — 증분은 합집합(중복 없이), 백업 병합도 합집합', () => {
+  const a = mergeDailyDelta(null, '2026-09-22', { reviewStoneKeys: ['r1'] });
+  const b = mergeDailyDelta(a, '2026-09-22', { reviewStoneKeys: ['r1', 'r2'] });
+  assert.deepEqual(b.reviewStoneKeys, ['r1', 'r2']);
+  const other = { ...mergeDailyDelta(null, '2026-09-22', {}), reviewStoneKeys: ['r3'] };
+  assert.deepEqual(mergeStatRecord('daily', b, other).reviewStoneKeys.sort(), ['r1', 'r2', 'r3']);
+  assert.deepEqual(mergeStatRecord('daily', other, b).reviewStoneKeys.sort(), ['r1', 'r2', 'r3']);
+});

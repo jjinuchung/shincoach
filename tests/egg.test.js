@@ -95,3 +95,29 @@ test('🛟 백업 병합·복사: 알은 코인·가방과 같은 쪽(최근 프
   c.eggs[0].days.push(T(3));
   assert.equal(cur.eggs[0].days.length, 2, '복사본을 바꿔도 원본 그대로');
 });
+
+test('🛟 백업 병합 (Codex 7차 #5): 같은 알은 날짜 합집합·부화·본 것이 되돌아가지 않는다 — "부화한" 쪽이 오래된 저장이어도 늦은 "4일째" 백업이 두 번 부화시키지 못한다 · 다른 쪽에만 있는 부화한 알(묘비)은 남기고, 안 부화한 낯선 알은 안 가져온다(이중 지출)', () => {
+  const egg = newEgg('math', 244, 1, 'egg_math');
+  const A = { ...emptyProfile(), updatedAt: 100, caught: { 244: 1 }, eggs: [{ ...egg, days: [T(1), T(2), T(3), T(4), T(5)], hatchedAt: 900, seen: true }] };
+  const B = { ...emptyProfile(), updatedAt: 200, coins: 50, eggs: [{ ...egg, days: [T(1), T(2), T(3), T(4)] }] };
+  for (const [x, y] of [[A, B], [B, A]]) {
+    const m = mergeStatRecord('profile', x, y);
+    assert.equal(m.eggs.length, 1);
+    assert.equal(m.eggs[0].days.length, 5, '날짜 합집합');
+    assert.equal(m.eggs[0].hatchedAt, 900, '부화는 되돌아가지 않는다');
+    assert.equal(m.eggs[0].seen, true);
+    assert.equal(m.caught[244], 1, '소유는 max');
+    assert.equal(eggRule(m, 'math', T(6)).ok, false, '품는 알이 아니므로 다시 부화하지 않는다');
+  }
+  // 묘비: 최근 쪽엔 없는 부화한 알은 남긴다 / 최근 쪽엔 없는 안 부화한 알은 안 가져온다
+  const hatchedOnly = { ...emptyProfile(), updatedAt: 100, eggs: [{ ...newEgg('english', 150, 2, 'egg_english'), days: [T(1), T(2), T(3), T(4), T(5)], hatchedAt: 950 }, { ...newEgg('math', 244, 3, 'egg_math'), days: [T(1)] }] };
+  const latest = { ...emptyProfile(), updatedAt: 300, eggs: [] };
+  const m2 = mergeStatRecord('profile', latest, hatchedOnly);
+  assert.deepEqual(m2.eggs.map((e) => e.subject), ['english'], '부화한 영어 알(묘비)만');
+  assert.equal(activeEgg(m2, 'math'), null, '낯선 안 부화한 수학 알은 안 가져온다 — 산 것은 코인과 한 묶음');
+  // 🌈 이로치는 영구 — 어느 쪽에 있든 남는다
+  const withShiny = { ...emptyProfile(), updatedAt: 100, mons: { 25: { shiny: true, gear: 'cap' } } };
+  const later = { ...emptyProfile(), updatedAt: 200, mons: { 25: { gear: 'ribbon' } } };
+  assert.deepEqual(mergeStatRecord('profile', later, withShiny).mons[25], { gear: 'ribbon', shiny: true }, '꾸밈은 최근 쪽, 이로치는 OR');
+  assert.equal(mergeStatRecord('profile', withShiny, later).mons[25].shiny, true);
+});

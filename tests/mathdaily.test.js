@@ -223,8 +223,9 @@ test('🎟️ 누적 카운터 tot — 반복으로 채워지는 길이 없다 (
   assert.deepEqual(tallyRound(m, { mode: 'mix', correct: 3, dailyFirst: false }), { ok: 0, rev: 0 }, '두 번째 ☀️의 섞어 풀기는 0');
   assert.deepEqual(tallyRound(m, { mode: 'ask', correct: 1, result: { ok: true, fixed: true } }), { ok: 1, rev: 0 }, '❓ 처음 고친 때');
   assert.deepEqual(tallyRound(m, { mode: 'ask', correct: 1, result: { ok: true, fixed: false } }), { ok: 0, rev: 0 }, '이미 고친 걸 다른 창에서 또 내도 0');
-  assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2 }), { ok: 2, rev: 0 }, '노트 회차(옛 결과 모양)는 정답 수');
+  assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2, result: { ok: 2, total: 2, resolved: 2 } }), { ok: 2, rev: 0 }, '노트 회차는 실제로 지운 노트 수');
   assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2, result: { ok: 2, total: 2, resolved: 0 } }), { ok: 0, rev: 0 }, '실제로 지운 노트가 없으면(재제출·다른 창) 0 (Codex 6차 #1)');
+  assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2 }), { ok: 0, rev: 0 }, 'result 없이 부르면 0 — 관대한 폴백이 재제출을 다시 세게 했다 (Codex 7차 #1)');
   assert.deepEqual(m.tot, { ok: 14, daily: 0, rev: 1 });
   markDaily(m, T); markDaily(m, T); markDaily(m, '2026-09-22');
   assert.deepEqual(m.tot, { ok: 14, daily: 2, rev: 1 }, '하루 첫 완주만 — "한 번 더"는 안 센다');
@@ -269,40 +270,55 @@ test('🔷 수학스톤 자격 stoneReward — 개념 편 통과 1 · 👑 +2 ·
   assert.equal(stoneReward({ mode: 'diag', result: null }), 0);
 });
 
-test('🎯 미룬 던지기 — 번 수·쓴 수(throws)로 적고 하나씩 쓴다, 없으면 false, 되돌리기, 병합은 키마다 max → 옛 백업을 되돌려도 쓴 던지기가 안 되살아난다 (Codex 5차 #2·6차 #5)', () => {
+test('🎯 미룬 던지기 — 번·뺀·돌려준 수(throws) 셋 다 단조 증가: 하나씩 쓰고, 못 띄웠으면 돌려주고(refunded), 병합은 키마다 max → 옛 백업을 되돌려도 쓴 던지기가 안 되살아나고 돌려준 것도 안 사라진다 (Codex 5차 #2·6차 #5·7차 #4)', () => {
   const m = emptyMath();
   assert.equal(pendingThrows(m), 0);
   assert.equal(pendingThrows(null), 0);
   assert.equal(addPending(m, 2), 2);
   assert.equal(addPending(m, 0), 2, '0은 안 더한다');
   assert.equal(pendingThrows(m), 2);
-  assert.deepEqual(m.throws, { earned: 2, used: 0 });
+  assert.deepEqual(m.throws, { earned: 2, used: 0, refunded: 0 });
   assert.equal(takePending(m), true);
   assert.equal(takePending(m), true);
   assert.equal(takePending(m), false, '다 썼다');
   assert.equal(pendingThrows(m), 0);
-  assert.deepEqual(m.throws, { earned: 2, used: 2 });
-  assert.equal(giveBackPending(m), 1, '뺀 뒤 화면을 못 띄웠으면 되돌린다');
+  assert.deepEqual(m.throws, { earned: 2, used: 2, refunded: 0 });
+  assert.equal(giveBackPending(m), 1, '뺀 뒤 화면을 못 띄웠으면 돌려준다 — refunded+1 (used는 안 내린다)');
+  assert.deepEqual(m.throws, { earned: 2, used: 2, refunded: 1 });
   assert.equal(takePending(m), true);
-  // ★ 옛 백업 복구: 두 개 벌고 둘 다 쓴 뒤, "두 개 벌고 안 쓴" 백업을 합쳐도 0 (Codex 6차 #5 — pend 잔액을 max로 합치면 2개가 돌아왔다)
+  assert.deepEqual(m.throws, { earned: 2, used: 3, refunded: 1 });
+  giveBackPending(m); giveBackPending(m); giveBackPending(m); giveBackPending(m);
+  assert.ok(m.throws.refunded <= m.throws.used, '뺀 수보다 많이 돌려주진 않는다');
+  // ★ 돌려준 것이 병합에서 안 사라진다 (7차 #4: used−1로 돌려주면 돌려주기 전 스냅샷과 합칠 때 max가 지웠다)
+  const a = emptyMath(); addPending(a, 1); takePending(a);           // 스냅샷: 하나 뺌
+  const b = emptyMath(); addPending(b, 1); takePending(b); giveBackPending(b); // 그 뒤 돌려줌
+  assert.equal(pendingThrows(mergeMath(a, b)), 1, '돌려준 하나가 남는다');
+  assert.equal(pendingThrows(mergeMath(b, a)), 1);
+  // ★ 옛 백업 복구: 두 개 벌고 둘 다 쓴 뒤, "두 개 벌고 안 쓴" 백업을 합쳐도 0
   const spent = emptyMath(); addPending(spent, 2); takePending(spent); takePending(spent);
   const backup = emptyMath(); addPending(backup, 2);
   assert.equal(pendingThrows(mergeMath(spent, backup)), 0);
   assert.equal(pendingThrows(mergeMath(backup, spent)), 0);
-  assert.deepEqual(mergeMath(spent, backup).throws, { earned: 2, used: 2 });
+  assert.deepEqual(mergeMath(spent, backup).throws, { earned: 2, used: 2, refunded: 0 });
   // 아직 안 쓴 던지기는 백업이 지우지 않는다
-  const a = emptyMath(); addPending(a, 3);
-  const b = emptyMath(); addPending(b, 1);
-  assert.equal(pendingThrows(mergeMath(a, b)), 3);
-  assert.equal(pendingThrows(mergeMath(b, a)), 3);
+  const c = emptyMath(); addPending(c, 3);
+  const d = emptyMath(); addPending(d, 1);
+  assert.equal(pendingThrows(mergeMath(c, d)), 3);
+  assert.equal(pendingThrows(mergeMath(d, c)), 3);
   assert.equal(mergeMath(emptyMath(), emptyMath()).throws, undefined, '없으면 안 만든다');
-  assert.deepEqual(a.throws, { earned: 3, used: 0 }, '입력 그대로');
-  // v112의 pend(잔액)는 처음 만질 때 earned로 접힌다 · 병합도 읽는다
+  assert.deepEqual(c.throws, { earned: 3, used: 0, refunded: 0 }, '입력 그대로');
+  // v112의 pend(잔액)는 처음 만질 때 earned로 접힌다 · ★ 병합은 양쪽을 먼저 접고 합친다 — pend가 남아 두 번 접히지 않게 (7차 #3)
   const old = { ...emptyMath(), pend: 2 };
   assert.equal(pendingThrows(old), 2);
   assert.equal(takePending(old), true);
-  assert.deepEqual(old.throws, { earned: 2, used: 1 }); assert.equal(old.pend, undefined);
-  assert.equal(pendingThrows(mergeMath(emptyMath(), { ...emptyMath(), pend: 1 })), 1);
+  assert.deepEqual(old.throws, { earned: 2, used: 1, refunded: 0 }); assert.equal(old.pend, undefined);
+  const migrated = { ...emptyMath(), pend: 2 }; takePending(migrated); takePending(migrated); // 접고 둘 다 씀
+  const legacy = { ...emptyMath(), pend: 2 };                                               // 옛 백업(아직 잔액 모양)
+  const mg = mergeMath(migrated, legacy);
+  assert.equal(pendingThrows(mg), 0, '옛 잔액 백업을 합쳐도 쓴 던지기가 안 돌아온다');
+  assert.equal(mg.pend, undefined, '병합 결과엔 pend가 남지 않는다');
+  assert.equal(pendingThrows(mergeMath(legacy, migrated)), 0);
+  assert.equal(pendingThrows(mergeMath(emptyMath(), { ...emptyMath(), pend: 1 })), 1, '옛 잔액만 있으면 그대로 1');
 });
 
 test('🛟 백업 병합: 완주 기록은 늦은 날짜 쪽, 같은 날이면 큰 횟수', () => {

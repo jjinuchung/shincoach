@@ -972,7 +972,7 @@ async function grantReviewRound() {
   awardCoins(reward.coin);
   if (reward.golden) addItem(GOLDEN.id, reward.golden);
   // 🔶 영어스톤 — "제대로 배웠나": 회차의 문장·단어·받아쓰기를 **전부 통과**했을 때만, 하루 2개까지 트랜잭션 선점 (두 창이 같은 회차를 끝내도 한쪽만, Codex 6차 #6)
-  reward.stone = reward.stone && state.reviewFails === 0 && await track.claimReviewStone() ? reward.stone : 0;
+  reward.stone = reward.stone && state.reviewFails === 0 && await track.claimReviewStone(state.reviewKey || '') ? reward.stone : 0;
   if (reward.stone) addItem(STONE_ENGLISH.id, reward.stone);
   if (reward.hp) hpHeal(reward.hp);
   dropMushroom('복습을 끝까지 했어요'); // 🍄 거다이맥스 재료
@@ -986,6 +986,7 @@ function startReview(items, practice, after) {
   hidePlayerMessage();
   if (!video.paused) video.pause();
   state.reviewFails = 0; // 🔶 이 회차에서 못 넘긴 문항 수 — 0이어야 영어스톤
+  state.reviewKey = (items || []).map((it) => String((it && it.rec && it.rec.key) || (it && it.cue && it.cue.en) || (it && it.word) || '')).sort().join('|'); // 회차의 정체 — 같은 묶음은 스톤 한 번
   const p = practice ? null : partnerInfo();
   const summary = reviewSummary(track.statsList(), track.todayKey());
   const spot = rememberSpot(); // 복습은 다른 문장을 들려주므로 끝나고 제자리로

@@ -390,7 +390,7 @@ export async function buyEgg(item, monId) {
 }
 /** 🥚 완주한 날 적기 (+부화) — 품는 알이 없으면 {ok:false}. @returns {Promise<{ok:boolean, ticked?:boolean, hatched?:boolean, egg?:object}>} */
 export async function tickEgg(subject, dateKey) {
-  if (!activeEgg(profile, subject)) return { ok: false };
+  // 메모리의 "알 없음"을 믿지 않는다 — 다른 창에서 산 알을 이 창은 모를 수 있다 (Codex 7차 #2). 없으면 eggRule이 싸게 ok:false
   const r = await runProfileOp(() => applyEggDay(subject, dateKey), () => ({ ok: false }));
   return r || { ok: false };
 }

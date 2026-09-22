@@ -119,7 +119,7 @@ function loadPlayer() {
       todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
       reviewGoldenTaken: () => reviewState.golden,
       async markReviewGolden() { if (reviewState.golden) return false; reviewState.golden = true; return true; },
-      async claimReviewStone() { reviewState.stones = (reviewState.stones || 0) + 1; return reviewState.stones <= 2; }, // 🔶 하루 2개 (트랜잭션 선점 흉내)
+      async claimReviewStone(key) { reviewState.stoneKeys = reviewState.stoneKeys || []; if (reviewState.stoneKeys.includes(key) || reviewState.stoneKeys.length >= 2) return false; reviewState.stoneKeys.push(key); return true; }, // 🔶 회차당 한 번·하루 2회차 (트랜잭션 선점 흉내)
       todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; },
       // ✍️ 에세이: 오늘 공부 시간·완료 여부 (essayState로 테스트가 조작)
       // 🍄 다이버섯: 하루 상한 확인용
@@ -1338,7 +1338,7 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 ❤️ 회복 (
   // 같은 날 두 번째 회차: 황금 볼만 빠지고 ⚡·💰·❤️는 그대로 (하루에 여러 번 하게 바뀜)
   const before = itemLog.length;
   const hpBefore = hpLog.length;
-  run('state.reviewFails = 0;'); // 이번엔 전부 통과한 회차라고 치자
+  run('state.reviewFails = 0; state.reviewKey = "r2";'); // 이번엔 전부 통과한 다른 회차라고 치자
   const again = await o.onFinished();
   assert.equal(again.golden, 0, '황금 볼은 하루 하나');
   assert.equal(again.hp, REWARD.hp, '❤️ 회복은 매번');
@@ -1346,12 +1346,16 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 ❤️ 회복 (
   assert.equal(again.coin, REWARD.bonusCoin);
   assert.equal(itemLog.slice(before).filter((x) => x === 'goldenball').length, 0, '황금 볼을 또 주지 않음');
   assert.equal(itemLog.slice(before).filter((x) => x === 'stone_english').length, 1, '🔶 전부 통과한 회차 → 영어스톤 1 (하루 2개까지, 트랜잭션 선점)');
-  run('state.reviewFails = 0;');
-  await o.onFinished(); // 2개째
+  run('state.reviewFails = 0; state.reviewKey = "r2";');
+  const b1 = itemLog.length;
+  await o.onFinished(); // 같은 회차(r2)를 다른 창이 또 끝냈다
+  assert.equal(itemLog.slice(b1).filter((x) => x === 'stone_english').length, 0, '같은 회차는 한 번만 (Codex 7차 #6)');
+  run('state.reviewFails = 0; state.reviewKey = "r3";');
+  await o.onFinished(); // 2회차째
   const b2 = itemLog.length;
-  run('state.reviewFails = 0;');
-  await o.onFinished(); // 3개째는 하루 상한
-  assert.equal(itemLog.slice(b2).filter((x) => x === 'stone_english').length, 0, '하루 2개까지 — 밀린 문장이 많아도 양으로 못 늘린다');
+  run('state.reviewFails = 0; state.reviewKey = "r4";');
+  await o.onFinished(); // 3회차째는 하루 상한
+  assert.equal(itemLog.slice(b2).filter((x) => x === 'stone_english').length, 0, '하루 2회차까지 — 밀린 문장이 많아도 양으로 못 늘린다');
   assert.ok(hpLog.length > hpBefore, '회복은 실제로 한 번 더 들어간다');
 });
 

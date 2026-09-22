@@ -2,8 +2,7 @@
 // 메모리에 모았다가 5초마다·닫을 때 IndexedDB에 저장 (문장마다 쓰지 않도록)
 import {
   sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, bumpVocabViews,
-  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount,
-} from './db.js';
+  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey } from './db.js';
 import { enroll, schedule, GRADUATED } from './review.js';
 
 export const MASTER_RATIO = 0.8; // 발음 점수 80% 이상이면 ⭐ 정복
@@ -440,9 +439,25 @@ export function reviewGoldenTaken() {
 export function markReviewGolden() {
   return claim('reviewGolden', 1);
 }
-/** 🔶 영어스톤 — 복습 회차를 전부 통과했을 때, 하루 2개까지 (두 창이 같은 회차를 끝내도 한쪽만). @returns {Promise<boolean>} */
-export function claimReviewStone() {
-  return claim('reviewStones', 2);
+/**
+ * 🔶 영어스톤 — 복습 회차를 전부 통과했을 때, **그 회차(문장 묶음)당 한 번**, 하루 2회차까지 (두 창이 같은 회차를 끝내도 한쪽만, Codex 7차 #6).
+ * @param {string} roundKey 회차의 문장 열쇠 묶음
+ * @returns {Promise<boolean>}
+ */
+export async function claimReviewStone(roundKey) {
+  if (!t.daily) return false;
+  await flush();
+  const date = t.daily.date;
+  try {
+    const r = await claimDailyKey(date, 'reviewStoneKeys', String(roundKey || ''), 2);
+    adoptSaved(date, r.daily);
+    return r.won;
+  } catch (e) {
+    const have = Array.isArray(t.daily.reviewStoneKeys) ? t.daily.reviewStoneKeys : [];
+    if (have.includes(roundKey) || have.length >= 2) return false;
+    t.daily.reviewStoneKeys = [...have, roundKey];
+    return true;
+  }
 }
 
 /** ❤️ "어제 학습 안 함" HP 감소를 오늘 이미 적용했는지 / 적용할 자리를 선점 (하루 한 번) */

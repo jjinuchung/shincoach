@@ -115,7 +115,7 @@ async function buy(id) {
     if (!r.ok) { renderShop(r.why === 'active' ? '🥚 이미 품는 알이 있어요 — 부화하면 또 살 수 있어요' : '💰 코인이나 🧤 스톤이 조금 모자라요. 배우고 다시 와요!'); return; }
     unlock();
     sfx.ding();
-    renderShop(`🥚 ${it.ko}${josaEul(it.ko)} 샀어요! ${it.hint}`, id);
+    renderShop(`🥚 ${it.ko}${josaEul(it.ko)} 샀어요! ${it.hint} (산 뒤에 완주한 날부터 세요 — 오늘 벌써 완주했으면 내일부터)`, id);
     notify(null);
     return;
   }

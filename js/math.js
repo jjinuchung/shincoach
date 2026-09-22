@@ -228,25 +228,30 @@ async function runCatches(n, { g, c, run, onAll }) {
   if (!pool.length) { finish(); return; } // 그림이 하나도 없다(오프라인 첫날) — 역시 레코드에 남는다
   let left = n;
   const one = async () => {
-    if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
-    // 던지기 하나를 **먼저** 레코드에서 뺀다(트랜잭션) — 두 창이 같은 기회를 두 번 던지지 못하게. 없으면 끝
-    let taken = false;
-    try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; }
-    if (!taken) { finish(); return; } // 남은 게 없다 — 사다리를 새로 그린다
-    if (run !== ui.run || !mathVisible()) {
-      // 뺀 사이에 나갔다 — 되돌려 준다 (Codex 6차 #4: 빼고 나서 화면을 보면 그 사이 나간 던지기가 사라졌다)
-      try { ui.state = await updateMath((m) => { giveBackPending(m); }); } catch { /* 다음 병합에서 max로 잡힌다 */ }
+    try {
+      if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
+      // 던지기 하나를 **먼저** 레코드에서 뺀다(트랜잭션) — 두 창이 같은 기회를 두 번 던지지 못하게. 없으면 끝
+      let taken = false;
+      try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; }
+      if (!taken) { finish(); return; } // 남은 게 없다 — 사다리를 새로 그린다
+      if (run !== ui.run || !mathVisible()) {
+        // 뺀 사이에 나갔다 — 돌려준다 (refunded+1, 단조 카운터라 병합에도 남는다)
+        try { ui.state = await updateMath((m) => { giveBackPending(m); }); } catch { /* 저장 실패 — 이 한 번은 잃는다 */ }
+        ui.catching = false;
+        return;
+      }
+      const candidates = pickCharacters(pool, 4);
+      openCatch({
+        candidates, subject: 'math', xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
+        ballCounts: inventory(),
+        radar: itemCount(RADAR.id) > 0 ? { count: itemCount(RADAR.id), use: (cur) => useRadar(pool, cur) } : null, // 🧭 아이가 눌러야 쓴다
+        attempt: (id, opts) => catchAttempt(id, Math.random, opts),
+        onDone: () => { updateChip(); left--; if (left > 0) one(); else finish(); },
+      });
+    } catch (e) {
+      console.warn('잡기 흐름 오류:', e); // 예외로 ui.catching이 true에 갇히지 않게 (Codex 7차 #9)
       ui.catching = false;
-      return;
     }
-    const candidates = pickCharacters(pool, 4);
-    openCatch({
-      candidates, subject: 'math', xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
-      ballCounts: inventory(),
-      radar: itemCount(RADAR.id) > 0 ? { count: itemCount(RADAR.id), use: (cur) => useRadar(pool, cur) } : null, // 🧭 아이가 눌러야 쓴다
-      attempt: (id, opts) => catchAttempt(id, Math.random, opts),
-      onDone: () => { updateChip(); left--; if (left > 0) one(); else finish(); },
-    });
   };
   one();
 }
@@ -1490,7 +1495,7 @@ async function finishRound() {
         result = r.mode === 'mix' ? applyMixRound(s, qs, today) : applyNotesRound(s, qs, today);
         // 🌟 섞어 풀기를 전부 맞히면 황금볼 — 하루 1개, 판정은 같은 트랜잭션(두 창·재시도 멱등)
         if (lastOfDaily) daily = markDaily(s, today, r.mode === 'mix' ? { perfect: !!result && result.total > 0 && result.ok === result.total } : undefined);
-        tally = tallyRound(s, { mode: r.mode, correct: r.correct, dailyFirst: !!(daily && daily.first) }); // 🎟️ 교환권 누적 (같은 트랜잭션)
+        tally = tallyRound(s, { mode: r.mode, correct: r.correct, result, dailyFirst: !!(daily && daily.first) }); // 🎟️ 교환권 누적 (같은 트랜잭션) — notes는 result.resolved만
         catches = roundCatches({ mode: r.mode, result, inDaily: false, dailyFirst: !!(daily && daily.first) }); // 🎯 자격도 같은 트랜잭션 — 미룬 던지기로 적어 둔다
         addPending(s, catches);
       });

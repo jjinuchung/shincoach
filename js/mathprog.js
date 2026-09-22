@@ -447,7 +447,7 @@ export function tallyRound(m, { mode, correct, result, dailyFirst }) {
   } else if (mode === 'ask') {
     if (result && result.fixed) ok = correct;
   } else if (mode === 'notes') {
-    ok = result && result.resolved !== undefined ? result.resolved : correct; // 실제로 지운 노트만 (두 창·재제출 방지)
+    ok = result ? (Number(result.resolved) || 0) : 0; // 실제로 지운 노트만 — result 없이 부르면 0 (Codex 7차 #1: 관대한 폴백이 재제출을 다시 세게 했다)
   }
   if (ok > 0) bumpTot(m, 'ok', ok);
   if (rev > 0) bumpTot(m, 'rev', rev);
@@ -489,34 +489,40 @@ export function roundCatches({ mode, result, inDaily, dailyFirst }) {
  *   옛 백업을 되돌려도 이미 쓴 던지기가 되살아나지 않는다 (Codex 6차 #5: pend를 max로 합치면 2개 쓴 뒤 복구에 2개가 돌아왔다).
  *   v112(몇 시간)의 pend는 처음 만질 때 earned로 접는다.
  */
+// 세 카운터 전부 단조 증가 — earned(번 수)·used(뺀 수)·refunded(뺐다가 못 띄워 돌려준 수). 남은 던지기 = earned − used + refunded.
+// 되돌리기를 used−1로 하면 병합(max)이 되돌리기를 지운다(Codex 7차 #4) → refunded를 따로 올린다
+export function normThrows(m) {
+  const t = (m && m.throws && typeof m.throws === 'object') ? m.throws : {};
+  const out = { earned: Number(t.earned) || 0, used: Number(t.used) || 0, refunded: Number(t.refunded) || 0 };
+  if (m && m.pend) out.earned += Math.max(0, Number(m.pend) || 0); // v112의 잔액(pend)은 번 수로 접는다
+  return out;
+}
 function throwsOf(m) {
-  if (!m.throws || typeof m.throws !== 'object') m.throws = { earned: 0, used: 0 };
-  m.throws.earned = Number(m.throws.earned) || 0;
-  m.throws.used = Number(m.throws.used) || 0;
-  if (m.pend) { m.throws.earned += Math.max(0, Number(m.pend) || 0); delete m.pend; }
+  m.throws = normThrows(m);
+  delete m.pend;
   return m.throws;
 }
 export function addPending(m, n) {
   const t = throwsOf(m);
   if (n > 0) t.earned += n;
-  return t.earned - t.used;
+  return t.earned - t.used + t.refunded;
 }
 export function takePending(m) {
   const t = throwsOf(m);
-  if (t.earned - t.used <= 0) return false;
+  if (t.earned - t.used + t.refunded <= 0) return false;
   t.used += 1;
   return true;
 }
-/** 던지기를 뺐는데 화면을 못 띄웠다(그 사이 나감) → 되돌린다. 병합이 used를 max로 보므로 드물게 안 돌아올 수 있다 — 잃는 것보다 낫다 */
+/** 던지기를 뺐는데 화면을 못 띄웠다(그 사이 나감) → 돌려준다 (refunded+1, 뺀 수보다 많이 돌려주진 않는다) */
 export function giveBackPending(m) {
   const t = throwsOf(m);
-  if (t.used > 0) t.used -= 1;
-  return t.earned - t.used;
+  if (t.refunded < t.used) t.refunded += 1;
+  return t.earned - t.used + t.refunded;
 }
 export function pendingThrows(m) {
   if (!m) return 0;
-  const t = (m.throws && typeof m.throws === 'object') ? m.throws : { earned: 0, used: 0 };
-  return Math.max(0, (Number(t.earned) || 0) + Math.max(0, Number(m.pend) || 0) - (Number(t.used) || 0));
+  const t = normThrows(m);
+  return Math.max(0, t.earned - t.used + t.refunded);
 }
 
 /**

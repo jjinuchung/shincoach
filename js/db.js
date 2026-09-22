@@ -2,6 +2,7 @@
 // items 스토어: 메타데이터(제목, 자막, 진행) / blobs 스토어: 영상 Blob (목록 조회 시 무거운 Blob을 안 읽기 위해 분리)
 
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
+import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -280,6 +281,7 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms', 'matches', 'reviewStones', // 🔶 영어스톤 — 복습 회차(전부 통과) 하루 2개까지, 트랜잭션 선점
   'mathQ', 'mathOk', 'mathRounds', 'mathSeconds']; // 🔢 수학: 푼 문항·정답·회차·시간
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
+const DAILY_LISTS = ['reviewStoneKeys']; // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {
@@ -301,6 +303,7 @@ export function mergeDailyDelta(cur, date, delta) {
   for (const k of DAILY_SUMS) out[k] = (Number(out[k]) || 0) + (Number(d[k]) || 0);
   for (const k of DAILY_FLAGS) out[k] = !!(out[k] || d[k]);
   for (const key of (d.doneKeys || [])) if (!out.doneKeys.includes(key)) out.doneKeys.push(key);
+  for (const k of DAILY_LISTS) { out[k] = [...(out[k] || [])]; for (const key of (d[k] || [])) if (!out[k].includes(key)) out[k].push(key); }
   for (const e of (d.essays || [])) {
     if (!e || !e.id) continue;
     const at = out.essays.findIndex((x) => x && x.id === e.id);
@@ -342,6 +345,23 @@ export async function claimDailyCount(date, field, max) {
   store.put(next);
   await txDone(tx);
   return { won: true, count: next[field], daily: next };
+}
+
+/**
+ * "이 열쇠는 오늘 한 번, 열쇠 종류는 하루 max개" — 트랜잭션 선점 (🔶 영어스톤: 같은 복습 회차를 두 창이 끝내도 한쪽만, 하루 2회차까지).
+ * @returns {Promise<{won:boolean, daily:object}>}
+ */
+export async function claimDailyKey(date, field, key, max) {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readwrite');
+  const store = tx.objectStore('daily');
+  const cur = await promisify(store.get(date));
+  const have = (cur && Array.isArray(cur[field])) ? cur[field] : [];
+  if (have.includes(key) || (max !== undefined && have.length >= max)) { await txDone(tx); return { won: false, daily: cur || emptyDaily(date) }; }
+  const next = mergeDailyDelta(cur, date, { [field]: [key] });
+  store.put(next);
+  await txDone(tx);
+  return { won: true, daily: next };
 }
 
 /**
@@ -749,11 +769,14 @@ export function mergeMath(cur, rec) {
   const goldToday = !!(dl && out.daily && out.daily.d === dl.d && (out.daily.gold || dl.gold));
   if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0, ...(dl.gold ? { gold: true } : {}) };
   if (goldToday && out.daily && out.daily.d === dl.d) out.daily = { ...out.daily, gold: true }; // cloneMath는 daily를 얕게 복사하므로 입력을 건드리지 않게 새 객체로
-  // 🎯 던지기 번 수·쓴 수는 단조 증가 → 키마다 max (옛 백업을 되돌려도 쓴 던지기가 되살아나지 않는다, Codex 6차 #5). v112의 pend도 max
-  if (rec && rec.throws) {
-    out.throws = { earned: Math.max(Number(out.throws && out.throws.earned) || 0, Number(rec.throws.earned) || 0), used: Math.max(Number(out.throws && out.throws.used) || 0, Number(rec.throws.used) || 0) };
-  } else if (out.throws) out.throws = { ...out.throws };
-  if (rec && rec.pend !== undefined) out.pend = Math.max(Number(out.pend) || 0, Number(rec.pend) || 0);
+  // 🎯 던지기 카운터(earned·used·refunded)는 단조 증가 → 키마다 max (옛 백업을 되돌려도 쓴 던지기가 되살아나지 않는다, Codex 6차 #5).
+  // 양쪽을 먼저 정규화(v112의 pend를 earned로 접기)한 뒤 합친다 — pend를 남겨 두면 나중에 또 접혀 두 번 더해진다 (Codex 7차 #3)
+  if ((rec && (rec.throws || rec.pend !== undefined)) || out.throws || out.pend !== undefined) {
+    const a = normThrows(out);
+    const b = normThrows(rec || {});
+    out.throws = { earned: Math.max(a.earned, b.earned), used: Math.max(a.used, b.used), refunded: Math.max(a.refunded, b.refunded) };
+    delete out.pend;
+  }
   // 🎟️ 누적 카운터(정답·완주·복습 통과)는 단조 증가라 키마다 max — 옛 백업이 진도를 되돌리지 않게
   if (rec && rec.tot) {
     out.tot = out.tot || { ok: 0, daily: 0, rev: 0 };
@@ -964,6 +987,7 @@ export function mergeStatRecord(name, cur, rec) {
     }
   } else if (name === 'daily') {
     out.doneKeys = [...new Set([...(cur.doneKeys || []), ...(rec.doneKeys || [])])];
+    for (const k of DAILY_LISTS) out[k] = [...new Set([...(cur[k] || []), ...(rec[k] || [])])];
     // 누적 수치는 DAILY_SUMS 그대로 — 목록을 따로 들고 있으면 새 필드(🔤 matches·🔢 math*)가 빠져
     // 옛 백업이 오늘 수치를 덮어쓴다 (Codex 리뷰 #6: 20문항 위에 4문항 백업을 넣으니 4가 됐다)
     for (const k of DAILY_SUMS) out[k] = maxOf(cur[k], rec[k]);
@@ -999,7 +1023,17 @@ export function mergeStatRecord(name, cur, rec) {
     out.items = { ...(latest.items || {}) };
     out.mons = { ...(latest.mons || {}) };
     out.partner = latest.partner || null;
-    out.eggs = (latest.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })); // 🥚 알은 코인·가방과 한 묶음(산 것) — 같은 쪽에서
+    // 🥚 알: 산 것은 코인·가방과 한 묶음이라 최근 쪽 목록을 바탕으로 하되, **같은 알**은 진행을 합친다(날짜 합집합·부화·본 것은 한 번 됐으면 계속) —
+    // 늦게 저장된 "4일째" 백업이 "부화한" 기록을 되돌려 두 번 부화시키지 않게 (Codex 7차 #5). 다른 쪽에만 있는 부화한 알(묘비)도 남긴다
+    const older = latest === cur ? rec : cur;
+    out.eggs = (latest.eggs || []).map((e) => {
+      const o = (older.eggs || []).find((x) => x && e && x.id === e.id);
+      const days = [...new Set([...((e && e.days) || []), ...((o && o.days) || [])])];
+      return { ...e, days, hatchedAt: Math.max(Number(e && e.hatchedAt) || 0, Number(o && o.hatchedAt) || 0), seen: !!((e && e.seen) || (o && o.seen)) };
+    });
+    for (const o of (older.eggs || [])) if (o && o.hatchedAt && !out.eggs.some((e) => e && e.id === o.id)) out.eggs.push({ ...o, days: [...(o.days || [])] });
+    // 🌈 이로치는 영구 — 어느 쪽에 있든 남긴다 (mons는 최근 쪽을 통째로 쓰므로 여기서 OR)
+    for (const id of Object.keys(older.mons || {})) if (older.mons[id] && older.mons[id].shiny && !(out.mons[id] && out.mons[id].shiny)) out.mons[id] = { ...(out.mons[id] || {}), shiny: true };
     // 🎟️ 기준선은 가방(교환권)과 짝이다 — 둘이 갈라지면 "샀는데 조건이 안 줄었다"가 된다.
     // 그래서 items와 같은 쪽(최근에 저장된 프로필)에서 가져온다. 옛 백업엔 이 값이 없다(그럼 null)
     out.unlockBase = latest.unlockBase || null;

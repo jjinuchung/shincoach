@@ -42,6 +42,10 @@ let showing = false;
  * 🐣 아직 안 보여 준 부화가 있으면 하나 보여 주고 "봤다"고 적는다 (소유는 이미 트랜잭션에서 끝났다 — 이 화면은 축하만).
  * 그림은 있으면 받아 오고(ensureCast), 못 받으면 🐣로. 한 번에 하나, 열려 있으면 다음 기회에.
  */
+/** 다른 모달(잡기·상점·포켓몬 팝업·배틀·퍼즐·복습·에세이·단어)이 열려 있나 — 그 위에 겹치지 않는다 */
+function anyModalOpen() {
+  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match'].some((id) => { const e = $(id); return e && !e.hidden; });
+}
 export async function showHatchIfAny() {
   const box = $('hatch');
   if (!box || !box.hidden || showing) return false;
@@ -53,8 +57,9 @@ export async function showHatchIfAny() {
     const r = ROSTER.find((x) => x.id === egg.monId);
     let url = null;
     try { const got = await Promise.race([ensureCast([egg.monId]), new Promise((res) => setTimeout(() => res([]), 8000))]); url = got && got[0] ? got[0].url : null; } catch { url = null; }
-    await markEggSeen(egg.id); // 먼저 적는다 — 두 번 보여 주지 않게
-    openHatch({ ko: r ? r.ko : '포켓몬', url, subject: egg.subject });
+    if (anyModalOpen()) return false; // 그 사이 다른 게 열렸다 — 다음 기회에 (봤다고 적지 않는다)
+    // "봤다"는 아이가 좋아!를 눌렀을 때 적는다 — 그림을 못 받거나 화면이 안 떴는데 봤다고 남지 않게 (Codex 7차 #7). 두 창이 같이 보여 주는 건 괜찮다
+    openHatch({ ko: r ? r.ko : '포켓몬', url, subject: egg.subject, onDone: () => { markEggSeen(egg.id).catch(() => {}); } });
     return true;
   } finally { showing = false; }
 }

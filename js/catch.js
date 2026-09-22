@@ -95,10 +95,15 @@ export function openCatch(o) {
       rb.className = 'btn catch-radar-btn';
       rb.textContent = `🧭 레이더 쓰기 (${o.radar.count}개) — 희귀 이상 한 마리 부르기`;
       rb.addEventListener('click', async () => {
+        const run = ui.run; // 이 잡기 화면의 것인지 — 던진 뒤·다음 잡기 위에 옛 후보를 다시 그리지 않게 (Codex 7차 #4)
         rb.disabled = true;
         rb.textContent = '🧭 레이더 작동 중…';
-        const r = await o.radar.use(ui.candidates);
-        if (!ui.open) return;
+        const cands = Array.from($('catch-pick').querySelectorAll('button'));
+        for (const b of cands) b.disabled = true; // 레이더가 도는 동안은 던질 수 없다
+        let r = null;
+        try { r = await o.radar.use(ui.candidates); } catch { r = null; }
+        if (!ui.open || run !== ui.run || $('catch-pick').hidden) return; // 그 사이 던졌거나 닫혔다 — 아무것도 안 바꾼다
+        for (const b of cands) b.disabled = false;
         if (!r) { rb.textContent = '🧭 레이더를 못 썼어요 — 그림을 못 받았어요 (레이더는 그대로예요)'; return; }
         renderPick(r.candidates, r.pickId);
         $('catch-msg').textContent = `${r.note} · 누구에게 던질까요?`;
