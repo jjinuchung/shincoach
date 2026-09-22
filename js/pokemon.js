@@ -440,7 +440,7 @@ export function shinyUrl(id) {
 
 /** 앱을 열 때 받아 둔 이로치 그림을 메모리에 올림 (오프라인에서도 보이게) */
 export async function loadShiny() {
-  const recs = await getCharacters().catch(() => []);
+  const recs = await readAllOnce();
   for (const r of recs) {
     if (!r || r.variant !== 'shiny' || !r.blob || !r.monId || shinyUrls.has(r.monId)) continue;
     shinyUrls.set(Number(r.monId), URL.createObjectURL(r.blob));
@@ -521,10 +521,20 @@ export async function ensureCast(ids = []) {
 }
 
 /** 앱을 열 때 이미 받아둔 변신 그림을 메모리에 올림 (오프라인에서도 보이게) */
+// 시작 때 loadCharacters·loadForms·loadShiny가 같은 스토어를 세 번 통째로 읽지 않게 — 2초 안의 호출은 한 번의 읽기를 나눠 쓴다 (Codex 8차)
+let recsOnce = null;
+function readAllOnce() {
+  if (!recsOnce) {
+    recsOnce = getCharacters().catch(() => []);
+    recsOnce.then(() => setTimeout(() => { recsOnce = null; }, 2000), () => { recsOnce = null; });
+  }
+  return recsOnce;
+}
+
 export async function loadForms() {
   const known = new Set();
   for (const f of Object.values(FORMS)) { if (f.mega) known.add(f.mega); if (f.gmax) known.add(f.gmax); }
-  const recs = await getCharacters().catch(() => []);
+  const recs = await readAllOnce();
   for (const r of recs) {
     if (!r.blob || !known.has(r.id) || formUrls.has(r.id)) continue;
     formUrls.set(r.id, URL.createObjectURL(r.blob));
@@ -587,7 +597,7 @@ let cache = null; // 로드된 캐릭터 [{ id, ko, en, url }] — 객체 URL은
 export async function loadCharacters(force = false) {
   if (cache && !force) return cache;
   let recs = [];
-  try { recs = await getCharacters(); } catch { recs = []; }
+  try { recs = force ? await getCharacters() : await readAllOnce(); } catch { recs = []; }
   const byId = new Map(ROSTER.map((r) => [r.id, r]));
   const usable = recs.filter((r) => r.blob && byId.has(r.id));
   cache = usable.map((r) => ({

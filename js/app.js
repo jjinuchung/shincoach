@@ -135,6 +135,8 @@ async function main() {
   initHome({ showView });
   initMath({ showView });
   initExit();
+  // 🌈⭐ 받아둔 이로치·변신 그림을 **홈을 그리기 전에** 올린다 — 나중에 올리면 이미 그린 화면은 안 바뀐다 (Codex 8차 #3). 실패해도 계속
+  try { const pk = await import('./pokemon.js'); await Promise.all([pk.loadShiny().catch(() => 0), pk.loadForms().catch(() => 0)]); } catch { /* 그림 없이 */ }
   showView('home'); // 🏠 과목 고르기부터 (영어는 카드를 눌러 들어간다)
   window.__appReady = true; // index.html의 시작 감시 타이머 해제
   try {
@@ -151,8 +153,12 @@ async function main() {
   syncCoachFixes().catch(() => {});
   // 🛟 기록 사본 남기기 (도감·코인이 사라지는 일을 막는 마지막 보루 — 실패해도 조용히)
   import('./backup.js').then((m) => m.saveMirror()).catch(() => {});
-  import('./pokemon.js').then((m) => m.loadForms()).catch(() => {}); // ⭐ 받아둔 변신 그림 (오프라인에서도 보이게)
-  import('./pokemon.js').then((m) => m.loadShiny()).catch(() => {}); // 🌈 받아둔 이로치 그림
+  // 👀 다른 창(홈 화면 앱 ↔ Chrome 탭)에서 산 것·이로치로 만든 것을 이 창이 앞으로 올 때 받아들인다 (Codex 8차 #5)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    import('./xp.js').then((x) => x.reloadProfile()).catch(() => {});
+    import('./pokemon.js').then((m) => Promise.all([m.loadShiny(), m.loadForms()])).catch(() => {});
+  });
   requestPersistentStorage();
   registerServiceWorker();
 }

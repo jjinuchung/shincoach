@@ -225,6 +225,17 @@ function endGearDrag() {
   d.g.classList.remove('dragging');
 }
 
+const shinyRetry = new Set(); // 받는 중인 포켓몬 id (겹쳐 받지 않게)
+async function retryShinyArt(id) {
+  if (shinyRetry.has(id)) return;
+  shinyRetry.add(id);
+  try {
+    const url = await ensureShiny(id);
+    if (url && mon && mon.id === id) renderMon('✨ 이로치 색 그림을 받았어요!');
+    if (url) notify(id); // 도감 칸도 새로 (다른 화면은 다음에 그릴 때 getLook이 알아서)
+  } catch { /* 다음에 열 때 또 */ } finally { shinyRetry.delete(id); }
+}
+
 function renderMon(msg, pop) {
   if (!mon) return;
   const look = getLook(mon.id);
@@ -304,7 +315,9 @@ function renderMon(msg, pop) {
     const n = itemCount(SHINY_STONE.id);
     sb.hidden = !got || (!look.shiny && n < 1);
     sb.disabled = !!look.shiny;
-    sb.textContent = look.shiny ? '✨ 이로치예요' : `🌈 이로치로! (이로치의 스톤 ${n}개)`;
+    sb.textContent = look.shiny ? (look.shinyUrl ? '✨ 이로치예요' : '✨ 이로치예요 — 색 그림을 받는 중…') : `🌈 이로치로! (스톤 1개 쓰기 · 영원히 · ${n}개 있음)`;
+    // 이로치인데 그림이 아직 없다(처음 받기 실패·다른 창에서 만듦) → 열 때마다 다시 받아 본다 (Codex 8차 #2)
+    if (look.shiny && !look.shinyUrl && got) retryShinyArt(mon.id);
   }
 
   // 🎀 장식: [없음] [지금 쓰는 것] [가방에 있는 것들]
@@ -324,9 +337,13 @@ function renderMon(msg, pop) {
   }
   if (!anyGear) gearBox.appendChild(el('span', 'mon-empty', '가방에 장식이 없어요 — 🛒 상점에서 사 보세요'));
 
-  // 🎨 염색: [원래 색] [지금 색] [가방에 있는 염색약]
+  // 🎨 염색: [원래 색] [지금 색] [가방에 있는 염색약] — 🌈 이로치면 못 쓴다 (제 색이 볼거리, 염색약만 없어지는 일이 없게)
   const dyeBox = $('mon-dye');
   dyeBox.innerHTML = '';
+  if (look.shiny) {
+    dyeBox.appendChild(el('span', 'mon-empty', '✨ 이로치는 제 색 그대로예요 — 염색약은 다른 포켓몬에게 써요'));
+    return; // 염색 칸이 renderMon의 마지막이다
+  }
   dyeBox.appendChild(option('⚪', '원래 색', '공짜', !look.dye, 'none', () => change(applyDye(mon.id, null), '원래 색으로 돌아왔어요')));
   let anyDye = false;
   for (const d of DYE) {

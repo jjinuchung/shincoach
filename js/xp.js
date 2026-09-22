@@ -674,6 +674,7 @@ export function equipGear(monId, gearId) {
 /** 🎨 염색(dyeId, 염색약 한 개 소모) / 원래 색으로(null, 무료). 염색약이 없으면 false */
 export function applyDye(monId, dyeId) {
   if (getLook(monId).dye === (dyeId || null)) return true;
+  if (dyeId && isShiny(monId)) return false; // 🌈 이로치는 제 색이 볼거리 — 염색 필터를 끄므로 염색약만 없어진다 (Codex 8차 #1)
   const items = {};
   if (dyeId) {
     const it = itemById(dyeId);

@@ -221,25 +221,23 @@ async function runCatches(n, { g, c, run, onAll }) {
   if (n <= 0) return;
   if (ui.catching) return; // 한 번에 하나의 잡기 흐름만 — 버튼을 연타해도 둘이 같이 돌며 던지기를 둘 다 쓰지 않게 (Codex 6차 #3)
   ui.catching = true;
+  // 정리는 한 곳 — 예외·나감·끝남 전부 여기로: catching 내리고, 보이면 사다리·"다음 →" 버튼을 되살린다 (Codex 8차 #6)
   const finish = () => { ui.catching = false; if (typeof onAll === 'function' && run === ui.run && mathVisible()) onAll(); };
-  const pool = await catchPool();
+  const giveBack = async () => { try { ui.state = await updateMath((m) => { giveBackPending(m); }); } catch { /* 저장 실패 — 이 한 번은 잃는다 */ } };
+  let pool = [];
+  try { pool = await catchPool(); } catch (e) { console.warn('후보 준비 실패:', e); pool = []; }
   // 나가 있으면(다른 화면·🎒) 안 띄운다 — 던질 기회는 레코드에 남아 사다리의 "🎯 받은 몬스터볼"로 다시 온다
   if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
   if (!pool.length) { finish(); return; } // 그림이 하나도 없다(오프라인 첫날) — 역시 레코드에 남는다
   let left = n;
   const one = async () => {
+    let taken = false;
     try {
       if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
       // 던지기 하나를 **먼저** 레코드에서 뺀다(트랜잭션) — 두 창이 같은 기회를 두 번 던지지 못하게. 없으면 끝
-      let taken = false;
       try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; }
       if (!taken) { finish(); return; } // 남은 게 없다 — 사다리를 새로 그린다
-      if (run !== ui.run || !mathVisible()) {
-        // 뺀 사이에 나갔다 — 돌려준다 (refunded+1, 단조 카운터라 병합에도 남는다)
-        try { ui.state = await updateMath((m) => { giveBackPending(m); }); } catch { /* 저장 실패 — 이 한 번은 잃는다 */ }
-        ui.catching = false;
-        return;
-      }
+      if (run !== ui.run || !mathVisible()) { await giveBack(); ui.catching = false; return; } // 뺀 사이에 나갔다 — 돌려준다
       const candidates = pickCharacters(pool, 4);
       openCatch({
         candidates, subject: 'math', xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
@@ -249,8 +247,9 @@ async function runCatches(n, { g, c, run, onAll }) {
         onDone: () => { updateChip(); left--; if (left > 0) one(); else finish(); },
       });
     } catch (e) {
-      console.warn('잡기 흐름 오류:', e); // 예외로 ui.catching이 true에 갇히지 않게 (Codex 7차 #9)
-      ui.catching = false;
+      console.warn('잡기 흐름 오류:', e);
+      if (taken) await giveBack(); // 뺐는데 화면을 못 띄웠다 — 돌려준다
+      finish();
     }
   };
   one();

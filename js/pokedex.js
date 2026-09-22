@@ -101,7 +101,7 @@ export async function openPokedex(opts) {
   const todayOk = (todayRec ? todayRec.doneKeys.length : todayDone()) >= STREAK_MIN_DONE;
   const streak = streakBefore(daily, today) + (todayOk ? 1 : 0);
   const nextLv = nextUnlockLevel(info.level);
-  const unlocked = ROSTER.filter((m) => (m.unlock || 1) <= info.level);
+  const unlocked = ROSTER.filter((m) => (m.unlock || 1) <= info.level || p.caught[m.id] > 0); // 🥚 알로 얻은 잠긴 레벨의 포켓몬도 내 것 (Codex 8차 #7)
 
   $('pokedex-level').textContent = `Lv.${info.level}`;
 
@@ -191,7 +191,7 @@ export async function openPokedex(opts) {
   // 아직 안 열린 포켓몬: 레벨별로 잠금 표시 (실루엣만, 이름 없음)
   const lockedLevels = [...new Set(ROSTER.map((m) => m.unlock || 1))].filter((u) => u > info.level).sort((a, b) => a - b);
   for (const lv of lockedLevels) {
-    const list = ROSTER.filter((m) => (m.unlock || 1) === lv);
+    const list = ROSTER.filter((m) => (m.unlock || 1) === lv && !(p.caught[m.id] > 0));
     const sec = el('div', 'stats-card locked');
     sec.appendChild(el('h2', '', `🔒 Lv.${lv}에 열려요 (${list.length}마리)`));
     const grid = el('div', 'pokedex-grid');
