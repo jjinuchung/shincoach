@@ -1230,6 +1230,10 @@ button { font-family: inherit; }
 .pokedex-cell .nm { font-size: 0.8rem; font-weight: 700; margin-top: 2px; }
 .pokedex-cell.unknown .nm { color: var(--muted); }
 .pokedex-cell .cnt { position: absolute; top: 4px; right: 6px; background: var(--accent); color: #fff; border-radius: 999px; font-size: 0.7rem; font-weight: 800; padding: 1px 6px; }
+/* 🔢 수학에서만 잡히는 포켓몬 표시 — 도감은 하나, 잡히는 곳만 다르다 */
+.pokedex-cell .subj { position: absolute; top: 4px; left: 6px; font-size: 0.8rem; line-height: 1; opacity: 0.9; }
+.pokedex-cell.unknown .subj { opacity: 1; }
+.pokedex-subjects { margin-top: 4px; }
 .pokedex-noimg { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #c7d2fe; font-weight: 800; }
 .pokedex-coins { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 10px; }
 .pokedex-coins .amt { font-weight: 800; color: #b45309; font-size: 1.05rem; }
@@ -1337,7 +1341,7 @@ button { font-family: inherit; }
 @keyframes zzz-float { 0%, 100% { transform: translateY(0); opacity: 0.8; } 50% { transform: translateY(-5px); opacity: 1; } }
 .pokedex-cell .mon-zzz { font-size: 18px; }
 .puzzle-char .mon-zzz { font-size: 20px; }
-.pokedex-cell .partner { position: absolute; top: 4px; left: 6px; font-size: 0.9rem; }
+.pokedex-cell .partner { position: absolute; top: 26px; left: 6px; font-size: 0.9rem; } /* 🔢 배지(top 4px) 아래 */
 /* 상세 모달 HP 바 */
 .mon-hp-text { font-weight: 700; color: #b91c1c; font-size: 0.9rem; margin-left: 6px; }
 .mon-hp-text.tired { color: #64748b; }

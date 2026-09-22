@@ -4,9 +4,14 @@
 import { getCharacters, putCharacter } from './db.js';
 
 /**
- * 명단: 처음 40마리(Lv1) + 레벨 마일스톤에서 열리는 20마리씩(Lv5·10·15) + 2026-09-20에 더한 60마리(Lv1). unlock 없으면 1.
+ * 명단: 처음 40마리(Lv1) + 레벨 마일스톤에서 열리는 20마리씩(Lv5·10·15) + 2026-09-20에 더한 60마리(Lv1)
+ *       + 2026-09-22 🔢 수학 전용 150마리(`subject: 'math'`, Lv1). unlock 없으면 1.
  * 여기에 추가하면 ⚙ "받기"가 없는 것만 받아옴. ★ 늘릴 때 battle.TYPE_OF(타입)·xp.RARITY_IDS(등급)도 같이 — 빠지면 조용히 노말·보통이 된다
- * 이름·타입·등급은 tools/roster_candidates.mjs(PokeAPI)로 받은 것만 쓴다 (기억으로 쓰면 틀린다)
+ * 이름·타입·등급은 tools/roster_candidates.mjs·tools/math_roster.mjs(PokeAPI)로 받은 것만 쓴다 (기억으로 쓰면 틀린다)
+ *
+ * subject — 🎯 **어디서 잡히나**만 가른다: 없으면 영어(퍼즐 정답 뒤 잡기), 'math'면 수학(☀️ 완주·개념 편 통과 뒤 잡기).
+ * 도감·파트너·배틀·꾸미기·상점·레벨·코인은 과목이 한 몸이다 (아버님 2026-09-22: "모으는 곳은 한 곳이어야 재미가 안 반감된다").
+ * 왜 새 150을 더했나: 아이가 영어(쉬움·🎯 하루 4회)만 골라서, 수학에서만 만나는 얼굴이 있어야 수학으로 간다.
  */
 export const ROSTER = [
   { id: 25, ko: '피카츄', en: 'Pikachu' },
@@ -185,6 +190,158 @@ export const ROSTER = [
   { id: 926, ko: '쫀도기', en: 'Fidough' },
   { id: 940, ko: '찌리비', en: 'Wattrel' },
   { id: 957, ko: '어리짱', en: 'Tinkatink' },
+  // ── 🔢 수학 전용 150마리 (2026-09-22, 아버님 결정: 기존 161은 그대로, 새 얼굴을 수학에서만 잡히게 — 흔함 60 · 보통 45 · 희귀 30 · 전설 15) ──
+  // 이름·등급·타입은 tools/math_roster.mjs(PokeAPI 종 1..1025 캐시)로 받은 것만. 도감·파트너·배틀·꾸미기는 영어와 한 몸(subject는 🎯 잡기 후보에만 쓴다)
+  { id: 17, ko: '피죤', en: 'Pidgeotto', subject: 'math' }, // 흔함 g1
+  { id: 20, ko: '레트라', en: 'Raticate', subject: 'math' }, // 흔함 g1
+  { id: 21, ko: '깨비참', en: 'Spearow', subject: 'math' }, // 흔함 g1
+  { id: 27, ko: '모래두지', en: 'Sandshrew', subject: 'math' }, // 흔함 g1
+  { id: 41, ko: '주뱃', en: 'Zubat', subject: 'math' }, // 흔함 g1
+  { id: 43, ko: '뚜벅쵸', en: 'Oddish', subject: 'math' }, // 흔함 g1
+  { id: 56, ko: '망키', en: 'Mankey', subject: 'math' }, // 흔함 g1
+  { id: 77, ko: '포니타', en: 'Ponyta', subject: 'math' }, // 흔함 g1
+  { id: 96, ko: '슬리프', en: 'Drowzee', subject: 'math' }, // 흔함 g1
+  { id: 100, ko: '찌리리공', en: 'Voltorb', subject: 'math' }, // 흔함 g1
+  { id: 111, ko: '뿔카노', en: 'Rhyhorn', subject: 'math' }, // 흔함 g1
+  { id: 120, ko: '별가사리', en: 'Staryu', subject: 'math' }, // 흔함 g1
+  { id: 163, ko: '부우부', en: 'Hoothoot', subject: 'math' }, // 흔함 g2
+  { id: 170, ko: '초라기', en: 'Chinchou', subject: 'math' }, // 흔함 g2
+  { id: 191, ko: '해너츠', en: 'Sunkern', subject: 'math' }, // 흔함 g2
+  { id: 201, ko: '안농', en: 'Unown', subject: 'math' }, // 흔함 g2
+  { id: 204, ko: '피콘', en: 'Pineco', subject: 'math' }, // 흔함 g2
+  { id: 206, ko: '노고치', en: 'Dunsparce', subject: 'math' }, // 흔함 g2
+  { id: 209, ko: '블루', en: 'Snubbull', subject: 'math' }, // 흔함 g2
+  { id: 231, ko: '코코리', en: 'Phanpy', subject: 'math' }, // 흔함 g2
+  { id: 261, ko: '포챠나', en: 'Poochyena', subject: 'math' }, // 흔함 g3
+  { id: 262, ko: '그라에나', en: 'Mightyena', subject: 'math' }, // 흔함 g3
+  { id: 276, ko: '테일로', en: 'Taillow', subject: 'math' }, // 흔함 g3
+  { id: 287, ko: '게을로', en: 'Slakoth', subject: 'math' }, // 흔함 g3
+  { id: 293, ko: '소곤룡', en: 'Whismur', subject: 'math' }, // 흔함 g3
+  { id: 300, ko: '에나비', en: 'Skitty', subject: 'math' }, // 흔함 g3
+  { id: 304, ko: '가보리', en: 'Aron', subject: 'math' }, // 흔함 g3
+  { id: 320, ko: '고래왕자', en: 'Wailmer', subject: 'math' }, // 흔함 g3
+  { id: 328, ko: '톱치', en: 'Trapinch', subject: 'math' }, // 흔함 g3
+  { id: 361, ko: '눈꼬마', en: 'Snorunt', subject: 'math' }, // 흔함 g3
+  { id: 396, ko: '찌르꼬', en: 'Starly', subject: 'math' }, // 흔함 g4
+  { id: 404, ko: '럭시오', en: 'Luxio', subject: 'math' }, // 흔함 g4
+  { id: 415, ko: '세꿀버리', en: 'Combee', subject: 'math' }, // 흔함 g4
+  { id: 420, ko: '체리버', en: 'Cherubi', subject: 'math' }, // 흔함 g4
+  { id: 431, ko: '나옹마', en: 'Glameow', subject: 'math' }, // 흔함 g4
+  { id: 449, ko: '히포포타스', en: 'Hippopotas', subject: 'math' }, // 흔함 g4
+  { id: 453, ko: '삐딱구리', en: 'Croagunk', subject: 'math' }, // 흔함 g4
+  { id: 507, ko: '하데리어', en: 'Herdier', subject: 'math' }, // 흔함 g5
+  { id: 509, ko: '쌔비냥', en: 'Purrloin', subject: 'math' }, // 흔함 g5
+  { id: 519, ko: '콩둘기', en: 'Pidove', subject: 'math' }, // 흔함 g5
+  { id: 551, ko: '깜눈크', en: 'Sandile', subject: 'math' }, // 흔함 g5
+  { id: 580, ko: '꼬지보리', en: 'Ducklett', subject: 'math' }, // 흔함 g5
+  { id: 595, ko: '파쪼옥', en: 'Joltik', subject: 'math' }, // 흔함 g5
+  { id: 627, ko: '수리둥보', en: 'Rufflet', subject: 'math' }, // 흔함 g5
+  { id: 659, ko: '파르빗', en: 'Bunnelby', subject: 'math' }, // 흔함 g6
+  { id: 662, ko: '불화살빈', en: 'Fletchinder', subject: 'math' }, // 흔함 g6
+  { id: 667, ko: '레오꼬', en: 'Litleo', subject: 'math' }, // 흔함 g6
+  { id: 677, ko: '냐스퍼', en: 'Espurr', subject: 'math' }, // 흔함 g6
+  { id: 710, ko: '호바귀', en: 'Pumpkaboo', subject: 'math' }, // 흔함 g6
+  { id: 731, ko: '콕코구리', en: 'Pikipek', subject: 'math' }, // 흔함 g7
+  { id: 736, ko: '턱지충이', en: 'Grubbin', subject: 'math' }, // 흔함 g7
+  { id: 742, ko: '에블리', en: 'Cutiefly', subject: 'math' }, // 흔함 g7
+  { id: 749, ko: '머드나기', en: 'Mudbray', subject: 'math' }, // 흔함 g7
+  { id: 819, ko: '탐리스', en: 'Skwovet', subject: 'math' }, // 흔함 g8
+  { id: 827, ko: '훔처우', en: 'Nickit', subject: 'math' }, // 흔함 g8
+  { id: 833, ko: '깨물부기', en: 'Chewtle', subject: 'math' }, // 흔함 g8
+  { id: 856, ko: '몸지브림', en: 'Hatenna', subject: 'math' }, // 흔함 g8
+  { id: 924, ko: '두리쥐', en: 'Tandemaus', subject: 'math' }, // 흔함 g9
+  { id: 938, ko: '빈나두', en: 'Tadbulb', subject: 'math' }, // 흔함 g9
+  { id: 967, ko: '모토마', en: 'Cyclizar', subject: 'math' }, // 흔함 g9
+  { id: 38, ko: '나인테일', en: 'Ninetales', subject: 'math' }, // 보통 g1
+  { id: 55, ko: '골덕', en: 'Golduck', subject: 'math' }, // 보통 g1
+  { id: 64, ko: '윤겔라', en: 'Kadabra', subject: 'math' }, // 보통 g1
+  { id: 93, ko: '고우스트', en: 'Haunter', subject: 'math' }, // 보통 g1
+  { id: 105, ko: '텅구리', en: 'Marowak', subject: 'math' }, // 보통 g1
+  { id: 115, ko: '캥카', en: 'Kangaskhan', subject: 'math' }, // 보통 g1
+  { id: 127, ko: '쁘사이저', en: 'Pinsir', subject: 'math' }, // 보통 g1
+  { id: 128, ko: '켄타로스', en: 'Tauros', subject: 'math' }, // 보통 g1
+  { id: 156, ko: '마그케인', en: 'Quilava', subject: 'math' }, // 보통 g2
+  { id: 159, ko: '엘리게이', en: 'Croconaw', subject: 'math' }, // 보통 g2
+  { id: 169, ko: '크로뱃', en: 'Crobat', subject: 'math' }, // 보통 g2
+  { id: 184, ko: '마릴리', en: 'Azumarill', subject: 'math' }, // 보통 g2
+  { id: 199, ko: '야도킹', en: 'Slowking', subject: 'math' }, // 보통 g2
+  { id: 229, ko: '헬가', en: 'Houndoom', subject: 'math' }, // 보통 g2
+  { id: 247, ko: '데기라스', en: 'Pupitar', subject: 'math' }, // 보통 g2
+  { id: 256, ko: '영치코', en: 'Combusken', subject: 'math' }, // 보통 g3
+  { id: 259, ko: '늪짱이', en: 'Marshtomp', subject: 'math' }, // 보통 g3
+  { id: 319, ko: '샤크니아', en: 'Sharpedo', subject: 'math' }, // 보통 g3
+  { id: 350, ko: '밀로틱', en: 'Milotic', subject: 'math' }, // 보통 g3
+  { id: 371, ko: '아공이', en: 'Bagon', subject: 'math' }, // 보통 g3
+  { id: 372, ko: '쉘곤', en: 'Shelgon', subject: 'math' }, // 보통 g3
+  { id: 387, ko: '모부기', en: 'Turtwig', subject: 'math' }, // 보통 g4
+  { id: 391, ko: '파이숭이', en: 'Monferno', subject: 'math' }, // 보통 g4
+  { id: 394, ko: '팽태자', en: 'Prinplup', subject: 'math' }, // 보통 g4
+  { id: 444, ko: '한바이트', en: 'Gabite', subject: 'math' }, // 보통 g4
+  { id: 461, ko: '포푸니라', en: 'Weavile', subject: 'math' }, // 보통 g4
+  { id: 470, ko: '리피아', en: 'Leafeon', subject: 'math' }, // 보통 g4
+  { id: 471, ko: '글레이시아', en: 'Glaceon', subject: 'math' }, // 보통 g4
+  { id: 498, ko: '뚜꾸리', en: 'Tepig', subject: 'math' }, // 보통 g5
+  { id: 571, ko: '조로아크', en: 'Zoroark', subject: 'math' }, // 보통 g5
+  { id: 614, ko: '툰베어', en: 'Beartic', subject: 'math' }, // 보통 g5
+  { id: 625, ko: '절각참', en: 'Bisharp', subject: 'math' }, // 보통 g5
+  { id: 634, ko: '디헤드', en: 'Zweilous', subject: 'math' }, // 보통 g5
+  { id: 656, ko: '개구마르', en: 'Froakie', subject: 'math' }, // 보통 g6
+  { id: 657, ko: '개굴반장', en: 'Frogadier', subject: 'math' }, // 보통 g6
+  { id: 697, ko: '견고라스', en: 'Tyrantrum', subject: 'math' }, // 보통 g6
+  { id: 701, ko: '루차불', en: 'Hawlucha', subject: 'math' }, // 보통 g6
+  { id: 728, ko: '누리공', en: 'Popplio', subject: 'math' }, // 보통 g7
+  { id: 745, ko: '루가루암', en: 'Lycanroc', subject: 'math' }, // 보통 g7
+  { id: 776, ko: '폭거북스', en: 'Turtonator', subject: 'math' }, // 보통 g7
+  { id: 816, ko: '울머기', en: 'Sobble', subject: 'math' }, // 보통 g8
+  { id: 849, ko: '스트린더', en: 'Toxtricity', subject: 'math' }, // 보통 g8
+  { id: 884, ko: '두랄루돈', en: 'Duraludon', subject: 'math' }, // 보통 g8
+  { id: 912, ko: '꾸왁스', en: 'Quaxly', subject: 'math' }, // 보통 g9
+  { id: 1000, ko: '타부자고', en: 'Gholdengo', subject: 'math' }, // 보통 g9
+  { id: 34, ko: '니드킹', en: 'Nidoking', subject: 'math' }, // 희귀 g1
+  { id: 36, ko: '픽시', en: 'Clefable', subject: 'math' }, // 희귀 g1
+  { id: 76, ko: '딱구리', en: 'Golem', subject: 'math' }, // 희귀 g1
+  { id: 157, ko: '블레이범', en: 'Typhlosion', subject: 'math' }, // 희귀 g2
+  { id: 160, ko: '장크로다일', en: 'Feraligatr', subject: 'math' }, // 희귀 g2
+  { id: 181, ko: '전룡', en: 'Ampharos', subject: 'math' }, // 희귀 g2
+  { id: 208, ko: '강철톤', en: 'Steelix', subject: 'math' }, // 희귀 g2
+  { id: 254, ko: '나무킹', en: 'Sceptile', subject: 'math' }, // 희귀 g3
+  { id: 306, ko: '보스로라', en: 'Aggron', subject: 'math' }, // 희귀 g3
+  { id: 330, ko: '플라이곤', en: 'Flygon', subject: 'math' }, // 희귀 g3
+  { id: 375, ko: '메탕구', en: 'Metang', subject: 'math' }, // 희귀 g3
+  { id: 392, ko: '초염몽', en: 'Infernape', subject: 'math' }, // 희귀 g4
+  { id: 395, ko: '엠페르트', en: 'Empoleon', subject: 'math' }, // 희귀 g4
+  { id: 405, ko: '렌트라', en: 'Luxray', subject: 'math' }, // 희귀 g4
+  { id: 468, ko: '토게키스', en: 'Togekiss', subject: 'math' }, // 희귀 g4
+  { id: 500, ko: '염무왕', en: 'Emboar', subject: 'math' }, // 희귀 g5
+  { id: 503, ko: '대검귀', en: 'Samurott', subject: 'math' }, // 희귀 g5
+  { id: 612, ko: '액스라이즈', en: 'Haxorus', subject: 'math' }, // 희귀 g5
+  { id: 635, ko: '삼삼드래', en: 'Hydreigon', subject: 'math' }, // 희귀 g5
+  { id: 655, ko: '마폭시', en: 'Delphox', subject: 'math' }, // 희귀 g6
+  { id: 681, ko: '킬가르도', en: 'Aegislash', subject: 'math' }, // 희귀 g6
+  { id: 706, ko: '미끄래곤', en: 'Goodra', subject: 'math' }, // 희귀 g6
+  { id: 727, ko: '어흥염', en: 'Incineroar', subject: 'math' }, // 희귀 g7
+  { id: 730, ko: '누리레느', en: 'Primarina', subject: 'math' }, // 희귀 g7
+  { id: 815, ko: '에이스번', en: 'Cinderace', subject: 'math' }, // 희귀 g8
+  { id: 818, ko: '인텔리레온', en: 'Inteleon', subject: 'math' }, // 희귀 g8
+  { id: 823, ko: '아머까오', en: 'Corviknight', subject: 'math' }, // 희귀 g8
+  { id: 908, ko: '마스카나', en: 'Meowscarada', subject: 'math' }, // 희귀 g9
+  { id: 914, ko: '웨이니발', en: 'Quaquaval', subject: 'math' }, // 희귀 g9
+  { id: 998, ko: '드닐레이브', en: 'Baxcalibur', subject: 'math' }, // 희귀 g9
+  { id: 243, ko: '라이코', en: 'Raikou', subject: 'math' }, // 전설 g2
+  { id: 244, ko: '앤테이', en: 'Entei', subject: 'math' }, // 전설 g2
+  { id: 245, ko: '스이쿤', en: 'Suicune', subject: 'math' }, // 전설 g2
+  { id: 379, ko: '레지스틸', en: 'Registeel', subject: 'math' }, // 전설 g3
+  { id: 385, ko: '지라치', en: 'Jirachi', subject: 'math' }, // 전설 g3
+  { id: 491, ko: '다크라이', en: 'Darkrai', subject: 'math' }, // 전설 g4
+  { id: 492, ko: '쉐이미', en: 'Shaymin', subject: 'math' }, // 전설 g4
+  { id: 494, ko: '비크티니', en: 'Victini', subject: 'math' }, // 전설 g5
+  { id: 717, ko: '이벨타르', en: 'Yveltal', subject: 'math' }, // 전설 g6
+  { id: 791, ko: '솔가레오', en: 'Solgaleo', subject: 'math' }, // 전설 g7
+  { id: 792, ko: '루나아라', en: 'Lunala', subject: 'math' }, // 전설 g7
+  { id: 807, ko: '제라오라', en: 'Zeraora', subject: 'math' }, // 전설 g7
+  { id: 893, ko: '자루도', en: 'Zarude', subject: 'math' }, // 전설 g8
+  { id: 1007, ko: '코라이돈', en: 'Koraidon', subject: 'math' }, // 전설 g9
+  { id: 1008, ko: '미라이돈', en: 'Miraidon', subject: 'math' }, // 전설 g9
 ];
 
 /** 이 레벨에서 열려 있는 명단 */
@@ -332,6 +489,32 @@ export function unlockedRoster(level) {
   return ROSTER.filter((r) => (r.unlock || 1) <= level);
 }
 
+const subjectById = new Map(ROSTER.map((r) => [r.id, r.subject === 'math' ? 'math' : 'english']));
+
+/** 이 포켓몬은 어느 과목에서 잡히나 — 'math' | 'english' (명단에 없으면 영어) */
+export function subjectOf(id) {
+  return subjectById.get(id) || 'english';
+}
+
+/**
+ * 🎯 잡기 후보 풀 — 그 과목에서 잡히는 것만 (subject 없으면 전체: ⚙ 연습·⚔️ 배틀 상대).
+ * 목록은 "기기에 그림이 있는 캐릭터" 배열(loadCharacters)이든 명단이든 id만 있으면 된다.
+ */
+export function forSubject(list, subject) {
+  if (!subject) return (list || []).slice();
+  return (list || []).filter((c) => c && subjectOf(c.id) === subject);
+}
+
+/**
+ * 🧩 퍼즐에 단어를 들고 나올 캐릭터 — 영어 것 + **이미 잡은** 수학 포켓몬 (잡은 뒤에는 어디든 놀러 온다).
+ * 잡기 후보는 따로 forSubject(…, 'english')로 거른다 — 수학 포켓몬이 영어에서 또 잡히면 "수학에서만"이 무너진다.
+ * @param {Array<{id:number}>} list 열린 캐릭터
+ * @param {(id:number) => boolean} caught 잡았나
+ */
+export function forPuzzle(list, caught) {
+  return (list || []).filter((c) => c && (subjectOf(c.id) === 'english' || (typeof caught === 'function' && caught(c.id))));
+}
+
 export function isUnlocked(id, level) {
   const r = ROSTER.find((m) => m.id === id);
   return !!r && (r.unlock || 1) <= level;
@@ -452,11 +635,12 @@ async function anchorOf(blob) {
  * 명단 중 아직 없는 캐릭터를 인터넷에서 받아 저장. onProgress(done, total, name)
  * 반환: { ok: 받은 수, fail: 실패 수 } — 일부 실패해도 받은 것은 남고, 다시 누르면 없는 것만 이어서 받음
  */
-export async function downloadCharacters(onProgress, limit) {
+export async function downloadCharacters(onProgress, limit, subject) {
   const have = new Set((await loadCharacters()).map((c) => c.id));
   // limit이 있으면 그만큼만 — 한 번에 수십 마리를 받다 느린 와이파이에서 끊기면
-  // 받은 것도 없이 끝나기 때문에, 자동 받기는 조금씩 나눠 받는다
-  const todo = ROSTER.filter((r) => !have.has(r.id)).slice(0, limit && limit > 0 ? limit : undefined);
+  // 받은 것도 없이 끝나기 때문에, 자동 받기는 조금씩 나눠 받는다.
+  // subject('math')를 주면 그 과목 것부터 — 명단 뒤쪽의 수학 150마리가 영어 다음에 오므로, 수학 화면은 제 것을 먼저 받는다
+  const todo = forSubject(ROSTER, subject).filter((r) => !have.has(r.id)).slice(0, limit && limit > 0 ? limit : undefined);
   let ok = 0;
   let fail = 0;
   for (let i = 0; i < todo.length; i++) {

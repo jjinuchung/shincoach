@@ -92,6 +92,22 @@ export const TYPE_OF = {
   228: 'dark', 359: 'dark', 570: 'dark',
   443: 'dragon', 714: 'dragon', 885: 'dragon',
   607: 'ghost', 613: 'ice', 872: 'ice', 679: 'steel', 926: 'fairy', 957: 'fairy', 50: 'ground',
+  // 🔢 수학 전용 150마리 (2026-09-22) — 첫 타입이 기술표에 없으면(벌레·독·비행) 두 번째 타입, 그것도 없으면 노말 (tools/math_roster.mjs)
+  243: 'electric', 807: 'electric', 1008: 'electric', 181: 'electric', 405: 'electric', 849: 'electric', 100: 'electric', 404: 'electric', 595: 'electric', 938: 'electric',
+  244: 'fire', 157: 'fire', 392: 'fire', 500: 'fire', 655: 'fire', 727: 'fire', 815: 'fire', 38: 'fire', 156: 'fire', 256: 'fire', 391: 'fire', 498: 'fire', 776: 'fire', 77: 'fire', 662: 'fire', 667: 'fire',
+  245: 'water', 160: 'water', 395: 'water', 503: 'water', 730: 'water', 818: 'water', 914: 'water', 55: 'water', 159: 'water', 184: 'water', 199: 'water', 259: 'water', 319: 'water', 350: 'water', 394: 'water', 656: 'water', 657: 'water', 728: 'water', 816: 'water', 912: 'water', 120: 'water', 170: 'water', 320: 'water', 580: 'water', 833: 'water',
+  492: 'grass', 254: 'grass', 908: 'grass', 387: 'grass', 470: 'grass', 43: 'grass', 191: 'grass', 420: 'grass',
+  36: 'fairy', 468: 'fairy', 209: 'fairy', 742: 'fairy',
+  115: 'normal', 128: 'normal', 127: 'normal', 169: 'normal', 17: 'normal', 20: 'normal', 21: 'normal', 41: 'normal', 163: 'normal', 204: 'normal', 206: 'normal', 276: 'normal', 287: 'normal', 293: 'normal', 300: 'normal', 396: 'normal', 415: 'normal', 431: 'normal', 507: 'normal', 519: 'normal', 627: 'normal', 659: 'normal', 731: 'normal', 736: 'normal', 819: 'normal', 924: 'normal',
+  93: 'ghost', 710: 'ghost',
+  471: 'ice', 614: 'ice', 361: 'ice',
+  612: 'dragon', 706: 'dragon', 998: 'dragon', 371: 'dragon', 372: 'dragon', 444: 'dragon', 967: 'dragon',
+  494: 'psychic', 791: 'psychic', 792: 'psychic', 64: 'psychic', 96: 'psychic', 201: 'psychic', 677: 'psychic', 856: 'psychic',
+  1007: 'fighting', 701: 'fighting', 56: 'fighting', 453: 'fighting',
+  491: 'dark', 717: 'dark', 893: 'dark', 635: 'dark', 229: 'dark', 461: 'dark', 571: 'dark', 625: 'dark', 634: 'dark', 261: 'dark', 262: 'dark', 509: 'dark', 827: 'dark',
+  76: 'rock', 247: 'rock', 697: 'rock', 745: 'rock',
+  34: 'ground', 330: 'ground', 105: 'ground', 27: 'ground', 111: 'ground', 231: 'ground', 328: 'ground', 449: 'ground', 551: 'ground', 749: 'ground',
+  379: 'steel', 385: 'steel', 208: 'steel', 306: 'steel', 375: 'steel', 681: 'steel', 823: 'steel', 884: 'steel', 1000: 'steel', 304: 'steel',
 };
 
 export function typeOf(id) {

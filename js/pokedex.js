@@ -1,5 +1,5 @@
 // 🎒 내 포켓몬(도감) 화면: 레벨·경험치·💰 코인, 잡은 포켓몬(그림·마릿수, 누르면 장식·염색), 못 잡은 포켓몬(검은 실루엣 + ???), 🛒 상점
-import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt } from './pokemon.js';
+import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf } from './pokemon.js';
 import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
 import { listDaily } from './db.js';
 import { todayKey, todayDone } from './track.js';
@@ -115,6 +115,11 @@ export async function openPokedex(opts) {
   bar.appendChild(fill);
   card.appendChild(bar);
   card.appendChild(el('div', 'pokedex-stats', `잡은 포켓몬 ${caughtKinds()}/${unlocked.length}마리 · 몬스터볼 ${p.throws}번 던져서 ${p.catches}번 성공 · 총 경험치 ${p.xp}`));
+  // 🎤/🔢 어디서 잡히는 포켓몬인지 — 도감은 하나, 잡히는 곳만 다르다 (2026-09-22)
+  const bySubj = (subj) => unlocked.filter((m) => subjectOf(m.id) === subj);
+  const en = bySubj('english');
+  const ma = bySubj('math');
+  card.appendChild(el('div', 'pokedex-stats pokedex-subjects', `🎤 영어 퍼즐에서 잡아요 ${en.filter((m) => p.caught[m.id] > 0).length}/${en.length} · 🔢 수학에서 잡아요 ${ma.filter((m) => p.caught[m.id] > 0).length}/${ma.length}`));
   const hint = el('div', 'pokedex-hint');
   hint.appendChild(el('span', 'streak', streak > 0 ? `🔥 ${streak}일 연속 학습 중` : `🔥 하루 ${STREAK_MIN_DONE}문장 이상 하면 연속 학습이 시작돼요`));
   if (nextLv) hint.appendChild(el('span', 'unlock', `🔒 Lv.${nextLv}에 새 포켓몬 ${unlockCountAt(nextLv)}마리 — ⚡${xpToReach(nextLv) - p.xp} 남음`));
@@ -160,6 +165,7 @@ export async function openPokedex(opts) {
       }
       cell.appendChild(el('div', 'nm', n > 0 ? m.ko : '???'));
       if (n > 1) cell.appendChild(el('div', 'cnt', `×${n}`));
+      if (subjectOf(m.id) === 'math') cell.appendChild(el('div', 'subj', '🔢')); // 수학에서만 잡히는 얼굴 — 못 잡은 칸에도 붙어 "수학 가면 있다"가 보인다
       if (n > 0 && getPartner() === m.id) cell.appendChild(el('div', 'partner', '🤝'));
       // 못 잡은 포켓몬도 누를 수 있다 — 등급은 **잡기 전에** 맞아야 의미가 있다 (전설이 흔함에 있으면 쉽게 잡힌다)
       cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url, caught: n > 0 }));

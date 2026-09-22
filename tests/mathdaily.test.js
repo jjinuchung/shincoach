@@ -184,6 +184,29 @@ test('☀️ 완주 기록 — 하루 첫 완주만 first, 두 번째부터 n만
   assert.ok(REWARD.daily.xp < REWARD.reviewPass.xp, '완주 보너스는 복습 통과보다 작다 — 누르기만으로 큰 보상이 되지 않게');
 });
 
+test('🌟 황금볼: 섞어 풀기 전부 정답(perfect)이면 하루 1개 — 두 번째 ☀️에서 다 맞혀도 다시 안 줌, 틀린 첫 완주 뒤 두 번째에 다 맞히면 줌, 다음 날 리셋', () => {
+  const m = emptyMath();
+  assert.deepEqual(markDaily(m, T, { perfect: false }), { first: true, n: 1, gold: false }, '첫 완주지만 틀림 → 없음');
+  assert.equal(m.daily.gold, undefined);
+  assert.deepEqual(markDaily(m, T, { perfect: true }), { first: false, n: 2, gold: true }, '두 번째 ☀️에서 다 맞힘 → 황금볼 (틀린 뒤 다시가 학습)');
+  assert.equal(m.daily.gold, true);
+  assert.deepEqual(markDaily(m, T, { perfect: true }), { first: false, n: 3, gold: false }, '하루 1개');
+  assert.equal(m.daily.gold, true, '표시는 남는다');
+  assert.deepEqual(markDaily(m, T), { first: false, n: 4 }, 'perfect를 안 물으면(개념 편만 있는 날) gold 필드 없음');
+  assert.equal(m.daily.gold, true, '안 물어도 오늘 받은 표시는 지워지지 않는다');
+  assert.deepEqual(markDaily(m, '2026-09-22', { perfect: true }), { first: true, n: 1, gold: true }, '다음 날 다시');
+});
+
+test('🛟 백업 병합: 🌟 황금볼 표시는 같은 날이면 어느 쪽이 받았든 남는다 (옛 백업이 두 번 주지 않게)', () => {
+  const a = emptyMath(); markDaily(a, T, { perfect: true });
+  const b = emptyMath(); markDaily(b, T); markDaily(b, T);
+  assert.deepEqual(mergeMath(a, b).daily, { d: T, n: 2, gold: true }, '횟수는 큰 쪽, 황금볼은 합집합');
+  assert.deepEqual(mergeMath(b, a).daily, { d: T, n: 2, gold: true });
+  const c = emptyMath(); markDaily(c, Y, { perfect: true });
+  assert.deepEqual(mergeMath(c, b).daily, { d: T, n: 2 }, '어제 받은 황금볼은 오늘 기록에 안 붙는다');
+  assert.deepEqual(mergeMath(b, c).daily, { d: T, n: 2 });
+});
+
 test('🛟 백업 병합: 완주 기록은 늦은 날짜 쪽, 같은 날이면 큰 횟수', () => {
   const a = emptyMath(); markDaily(a, T);
   const b = emptyMath(); markDaily(b, Y); markDaily(b, Y);

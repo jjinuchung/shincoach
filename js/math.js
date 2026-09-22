@@ -14,8 +14,9 @@ import {
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
 import { todayKey } from './track.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory } from './xp.js';
-import { ROSTER, loadCharacters, isUnlocked, pickCharacters } from './pokemon.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem } from './xp.js';
+import { GOLDEN } from './items.js';
+import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { contentSummary, cueCountOf } from './stats.js';
 import { sfx } from './sfx.js';
@@ -27,6 +28,7 @@ const ui = {
   showView: null,
   stem: null,           // 지금 고른 줄기 key ('fraction'·'negative') — 없으면 줄기 고르기 화면
   contents: {},         // 줄기별 사람이 쓴 내용 (coach/math/*.json, 한 번 받아 둠)
+  charBusy: false,      // 🔢 수학 포켓몬 그림을 받는 중 (topUpMathCharacters 중복 방지)
   opts: null,           // makeRound에 넘길 출연진·세계 (content는 줄기별로 optsFor가 끼운다)
   round: null,          // 진행 중인 한 편 { id, mode:'learn'|'review'|'diag'|'notes'|'mix', qs, at, correct, missTags, answered }
   daily: null,          // ☀️ 오늘의 수학 흐름 { plan, step:'round'|'mix', roundInfo } — 개념 편 → 🎲 섞어 풀기. 사다리로 나가면 null
@@ -141,13 +143,54 @@ function rememberStem(k) {
   try { localStorage.setItem(STEM_KEY, k); } catch { /* 사생활 모드 등 — 무시 */ }
 }
 
-/** 🎯 잡기 후보 — 영어 퍼즐과 같은 규칙 (레벨에 열린 것, 😴 쉬는 중 제외) */
-async function catchCandidates(n = 4) {
-  let chars = [];
-  try { chars = await loadCharacters(); } catch { chars = []; }
-  const level = getLevelInfo().level;
-  const pool = chars.filter((c) => isUnlocked(c.id, level) && !isTired(c.id)).map((c) => ({ ...c, look: getLook(c.id) }));
-  return pickCharacters(pool, n);
+/**
+ * 🎯 잡기 후보 풀 — **🔢 수학 전용 포켓몬만**(pokemon.js subject 'math'), 레벨에 열린 것, 😴 쉬는 중 제외.
+ * 영어 것은 영어 퍼즐에서만 잡힌다 — "수학에서만 만나는 얼굴"이 아이를 수학으로 끄는 힘이다 (2026-09-22).
+ */
+async function catchPool() {
+  const read = async () => {
+    let chars = [];
+    try { chars = await loadCharacters(); } catch { chars = []; }
+    const level = getLevelInfo().level;
+    return forSubject(chars, 'math').filter((c) => isUnlocked(c.id, level) && !isTired(c.id)).map((c) => ({ ...c, look: getLook(c.id) }));
+  };
+  let pool = await read();
+  // 수학 그림이 아직 4마리도 없으면(새 명단을 넣은 첫날) 몇 마리 받아서라도 던지게 — 번 잡기를 그림이 없다고 삼키지 않는다
+  if (pool.length < 4 && navigator.onLine !== false) {
+    try { await downloadCharacters(null, 6, 'math'); pool = await read(); } catch { /* 오프라인·실패 — 있는 만큼으로 */ }
+  }
+  return pool;
+}
+
+const MATH_CHAR_BATCH = 8;
+/** 수학 화면에 들어올 때마다 🔢 수학 포켓몬 그림을 조금씩 먼저 받아 둔다 (영어의 3분마다 8마리 자동 받기는 명단 순서라 수학 것이 맨 뒤) */
+function topUpMathCharacters() {
+  if (ui.charBusy || navigator.onLine === false) return;
+  ui.charBusy = true;
+  downloadCharacters(null, MATH_CHAR_BATCH, 'math').catch(() => {}).then(() => { ui.charBusy = false; });
+}
+
+/**
+ * 🎯 몬스터볼을 n번 — 한 번 끝나면(onDone) 다음 후보 4마리로 다시. 화면을 떠났으면(run 바뀜) 그만.
+ * 개념 편 통과 + ☀️ 첫 완주가 한 카드에 겹치면 2번이 된다.
+ */
+async function runCatches(n, { g, c, run, before }) {
+  if (n <= 0) return;
+  const pool = await catchPool();
+  if (typeof before === 'function') before();
+  if (run !== ui.run) return; // 후보를 받는 사이에 나갔다 — 다른 화면 위에 띄우지 않는다
+  let left = n;
+  const one = () => {
+    const candidates = pickCharacters(pool, 4);
+    if (!candidates.length) return;
+    openCatch({
+      candidates, subject: 'math', xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
+      ballCounts: inventory(),
+      attempt: (id, opts) => catchAttempt(id, Math.random, opts),
+      onDone: () => { updateChip(); left--; if (left > 0 && run === ui.run) one(); },
+    });
+  };
+  one();
 }
 
 function updateChip() {
@@ -171,6 +214,7 @@ function clearMain() {
 
 /** 진입 — 진단 전이면 진단, 아니면 사다리 */
 export async function renderMath() {
+  topUpMathCharacters();
   // 🎒·📊를 보고 돌아온 것이면 풀던 편을 이어서 (2026-09-20: 과목 화면에도 🎒·📊를 두면서 필요해졌다).
   // 답을 고른 뒤였으면 다음 문항으로 — 같은 문항을 다시 그리면 두 번 답해 두 번 세어진다.
   const r = ui.round;
@@ -464,7 +508,7 @@ function startMixRound() {
 }
 
 /** ☀️ 완주 카드 — 개념 편 결과 + 🎲 섞어 풀기 결과 + 보상(첫 완주 보너스) */
-function renderDailyDone(state, { g, c, daily, result, offer = null }) {
+function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0, gold = false }) {
   const m = clearMain();
   const d = ui.daily;
   const info = d && d.roundInfo;
@@ -477,7 +521,8 @@ function renderDailyDone(state, { g, c, daily, result, offer = null }) {
   card.appendChild(el('p', 'math-p', daily && daily.first
     ? '오늘 할 것을 다 했어요. 내일도 ☀️ 하나면 돼요.'
     : '오늘은 벌써 완주했던 거라 보너스는 없어요 — 그래도 푼 만큼은 쌓였어요.'));
-  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${catches ? ` 🎯 몬스터볼 ${catches}개!` : ''}${gold ? ' 🌟 황금 몬스터볼 +1!' : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+  if (gold) card.appendChild(el('p', 'math-p', '🌟 섞어 풀기를 다 맞혀서 황금 몬스터볼! 잡힐 확률이 2배 — 🎯 잡기에서 써 봐요'));
   if (offer) card.appendChild(offer); // ❓ 섞어 풀기에서 틀린 문제를 아빠에게
   const b = el('button', 'btn btn-primary btn-big-wide', '사다리로');
   b.type = 'button';
@@ -1342,7 +1387,8 @@ async function finishRound() {
       const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i].fromNote ? { note: true } : {}), ...extraQ(a) }));
       state = await updateMath((s) => {
         result = r.mode === 'mix' ? applyMixRound(s, qs, today) : applyNotesRound(s, qs, today);
-        if (lastOfDaily) daily = markDaily(s, today);
+        // 🌟 섞어 풀기를 전부 맞히면 황금볼 — 하루 1개, 판정은 같은 트랜잭션(두 창·재시도 멱등)
+        if (lastOfDaily) daily = markDaily(s, today, r.mode === 'mix' ? { perfect: !!result && result.total > 0 && result.ok === result.total } : undefined);
       });
     } else {
       const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
@@ -1381,6 +1427,13 @@ async function finishRound() {
       : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
   rw.xp += (r.fixed || 0) * REWARD.fix.xp; // 🔁 쌍둥이로 바로 고친 문항 (통과 여부와 무관)
   if (daily && daily.first) { rw.xp += REWARD.daily.xp; rw.coin += REWARD.daily.coin; } // ☀️ 하루 첫 완주 보너스
+  // 🎯 수학 잡기 (2026-09-22, 아버님 결정): ☀️ 안의 개념 편을 다 맞히면 1번(처음이든 복습이든), ☀️ 하루 첫 완주에 1번 — 좋은 날 2번.
+  // 영어는 퍼즐마다(하루 4번쯤) 던지는데 수학은 첫 통과 때만이라 아이가 영어만 골랐다. 연습 편·진단·노트 회차는 그대로 없음.
+  rw.catches = rw.catchOnce ? 1 : 0;
+  if (d && d.step === 'round' && r.mode !== 'mix' && result && result.passed && !result.practice) rw.catches = Math.max(rw.catches, 1);
+  if (daily && daily.first) rw.catches += 1;
+  rw.gold = !!(daily && daily.gold);
+  if (rw.gold) addItem(GOLDEN.id, 1);
   const g = gainXp(rw.xp);
   const c = gainCoins(rw.coin).gained;
   applyDailyDelta(today, r.mode === 'diag' || r.mode === 'ask' ? { mathQ: r.qs.length, mathOk: r.correct } : { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});
@@ -1407,7 +1460,11 @@ async function finishRound() {
     return;
   }
 
-  if (r.mode === 'mix') { renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today) }); return; }
+  if (r.mode === 'mix') {
+    renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today), catches: rw.catches, gold: rw.gold });
+    runCatches(rw.catches, { g, c, run });
+    return;
+  }
 
   if (r.mode === 'ask') {
     const card = el('section', 'math-card math-result');
@@ -1468,7 +1525,7 @@ async function finishRound() {
   // ☀️ 오늘의 수학의 개념 편이면 — 섞어 풀기가 남았으면 "다음 →", 없으면 여기가 완주
   const inDaily = !!d && d.step === 'round';
   if (lastOfDaily) card.appendChild(el('p', 'math-p big', daily && daily.first ? '☀️ 오늘의 수학 끝! 내일도 ☀️ 하나면 돼요.' : '☀️ 오늘의 수학 끝!'));
-  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.catchOnce ? ' 🎯 몬스터볼 1개!' : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   const offer = askOfferForRound(r, state, today); // ❓ 틀린 문제를 아빠에게
   if (offer) card.appendChild(offer);
 
@@ -1484,7 +1541,7 @@ async function finishRound() {
   if (inDaily && !lastOfDaily) {
     dailyNext = el('button', 'btn btn-primary btn-big-wide math-daily-next', `다음 → 🎲 배운 것 섞어 풀기 ${d.plan.mix.length}문제`);
     dailyNext.type = 'button';
-    dailyNext.disabled = !!rw.catchOnce; // 🎯 후보를 받는 동안은 잠근다 — 섞어 풀기 위에 잡기가 뒤늦게 뜨지 않게 (Codex 3차 B)
+    dailyNext.disabled = rw.catches > 0; // 🎯 후보를 받는 동안은 잠근다 — 섞어 풀기 위에 잡기가 뒤늦게 뜨지 않게 (Codex 3차 B)
     dailyNext.addEventListener('click', () => startMixRound());
     row.appendChild(dailyNext);
   } else {
@@ -1496,20 +1553,8 @@ async function finishRound() {
   card.appendChild(row);
   m.appendChild(card);
 
-  // 🎯 처음 통과한 개념은 몬스터볼 한 번 — 영어 퍼즐 정답과 같은 보상 경로
-  if (rw.catchOnce) {
-    const candidates = await catchCandidates(4);
-    if (dailyNext) dailyNext.disabled = false;
-    if (run !== ui.run) return; // 후보를 받는 사이에 나갔다 — 다른 화면 위에 띄우지 않는다
-    if (candidates.length) {
-      openCatch({
-        candidates, xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
-        ballCounts: inventory(),
-        attempt: (id, opts) => catchAttempt(id, Math.random, opts),
-        onDone: () => updateChip(),
-      });
-    }
-  }
+  // 🎯 몬스터볼 — 영어 퍼즐 정답과 같은 보상 경로(후보만 🔢 수학 포켓몬). 2번이면 한 번 끝난 뒤 이어서
+  runCatches(rw.catches, { g, c, run, before: () => { if (dailyNext) dailyNext.disabled = false; } });
 }
 
 // ───────────────────── 배선 ─────────────────────

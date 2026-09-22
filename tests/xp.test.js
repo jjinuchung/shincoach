@@ -33,10 +33,14 @@ test('puzzleXp: 틀린 횟수 0/1/2 → 30/20/10, 정답 공개 → 3', () => {
   assert.equal(puzzleXp(null), 3);
 });
 
-test('희귀도: 명단 161마리 전부 등급이 있고 겹치지 않음', () => {
+test('희귀도: 명단 311마리 전부 등급이 있고 겹치지 않음 — 🔢 수학 150은 흔함 60·보통 45·희귀 30·전설 15 (4:3:2:1, 아버님 2026-09-22)', () => {
   const all = Object.values(RARITY_IDS).flat();
-  assert.equal(all.length, 161);
-  assert.equal(new Set(all).size, 161, '겹침 없음');
+  assert.equal(all.length, 311);
+  assert.equal(new Set(all).size, 311, '겹침 없음');
+  const math = new Set(ROSTER.filter((r) => r.subject === 'math').map((r) => r.id));
+  const cnt = [1, 2, 3, 4].map((r) => RARITY_IDS[r].filter((id) => math.has(id)).length);
+  assert.deepEqual(cnt, [60, 45, 30, 15]);
+  assert.equal(rarityOf(244), 4, '앤테이 전설'); assert.equal(rarityOf(157), 3, '블레이범 희귀'); assert.equal(rarityOf(64), 2, '윤겔라 보통'); assert.equal(rarityOf(77), 1, '포니타 흔함');
   assert.deepEqual(new Set(all), new Set(ROSTER.map((r) => r.id)));
   assert.equal(rarityOf(25), 2, '피카츄 보통');
   assert.equal(rarityOf(150), 4, '뮤츠 전설');

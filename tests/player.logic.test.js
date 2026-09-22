@@ -144,6 +144,8 @@ function loadPlayer() {
     pickPuzzle: (cues) => (cues.length ? cues[0] : null),
     // pokemon.js 스텁
     loadCharacters: async () => [{ id: 25, ko: '피카츄', url: 'x' }, { id: 4, ko: '파이리', url: 'y' }], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [{ id: 25, ko: '피카츄' }, { id: 4, ko: '파이리' }], pickCharacters: (a, n) => (a || []).slice(0, n), isUnlocked: () => true, unlockCountAt: () => 0,
+    // 과목 가르기(2026-09-22): 스텁 명단은 전부 영어 — forSubject('english')는 그대로, forPuzzle도 그대로
+    forSubject: (a, subj) => (!subj || subj === 'english' ? (a || []).slice() : []), forPuzzle: (a) => (a || []).slice(), caughtCount: () => 0,
     // xp.js / catch.js 스텁: XP 획득과 잡기 화면 호출을 기록
     xpLog, catchCalls,
     initProfile: async () => ({}), getLevelInfo: () => ({ level: 1, into: 0, need: 100, xp: 0 }),

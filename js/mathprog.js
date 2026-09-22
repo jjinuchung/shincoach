@@ -415,10 +415,22 @@ export function applyMixRound(m, qs, today) {
  * m.daily = { d: 날짜, n: 그날 완주 횟수 }
  * @returns {{first:boolean, n:number}}
  */
-export function markDaily(m, today) {
-  const n = (m.daily && m.daily.d === today) ? (Number(m.daily.n) || 0) + 1 : 1;
-  m.daily = { d: today, n };
-  return { first: n === 1, n };
+/**
+ * ☀️ 완주 기록 (저장 트랜잭션 안에서 부른다 — 두 창이 같이 끝내도 첫 창만 first).
+ * @param {{perfect?:boolean}} [opts] perfect = 🎲 섞어 풀기를 전부 맞힘 → 🌟 황금볼은 **하루 1개**(m.daily.gold) — 틀린 뒤 다시 ☀️ 해서 다 맞혀도 받는다(그게 학습)
+ * @returns {{first:boolean, n:number, gold?:boolean}} gold는 perfect를 물었을 때만 — 이번에 새로 받는지
+ */
+export function markDaily(m, today, opts) {
+  const same = !!(m.daily && m.daily.d === today);
+  const n = same ? (Number(m.daily.n) || 0) + 1 : 1;
+  const hadGold = same && !!m.daily.gold;
+  m.daily = { d: today, n, ...(hadGold ? { gold: true } : {}) };
+  const out = { first: n === 1, n };
+  if (opts && opts.perfect !== undefined) {
+    out.gold = !!opts.perfect && !hadGold;
+    if (out.gold) m.daily.gold = true;
+  }
+  return out;
 }
 
 /** 오늘 ☀️를 몇 번 완주했나 (0이면 아직) */

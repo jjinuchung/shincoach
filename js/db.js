@@ -744,7 +744,10 @@ export function mergeMath(cur, rec) {
   }
   // ☀️ 오늘의 수학 완주 기록은 늦은 날짜 쪽, 같은 날이면 큰 횟수 — 옛 백업이 오늘 완주를 지우지 않게
   const dl = rec && rec.daily && rec.daily.d ? rec.daily : null;
-  if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0 };
+  // 🌟 황금볼(하루 1개)은 같은 날이면 어느 쪽이 받았든 "받은 것" — 옛 백업이 오늘 받은 황금볼을 두 번 주지 않게
+  const goldToday = !!(dl && out.daily && out.daily.d === dl.d && (out.daily.gold || dl.gold));
+  if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0, ...(dl.gold ? { gold: true } : {}) };
+  if (goldToday && out.daily && out.daily.d === dl.d) out.daily = { ...out.daily, gold: true }; // cloneMath는 daily를 얕게 복사하므로 입력을 건드리지 않게 새 객체로
   // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편
   const seen = new Set(out.log.map((e) => e && e.t));
   for (const e of (Array.isArray(rec && rec.log) ? rec.log : [])) if (e && e.t && !seen.has(e.t)) { seen.add(e.t); out.log.push(e); }

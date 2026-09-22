@@ -3,7 +3,7 @@
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, itemById, canBuy, setFigure } from './items.js';
 import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup } from './xp.js';
-import { formsOf, formUrl, ensureForm } from './pokemon.js';
+import { formsOf, formUrl, ensureForm, subjectOf } from './pokemon.js';
 import { sfx, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -200,7 +200,7 @@ function renderMon(msg, pop) {
   $('mon-title').textContent = got ? (isPartner ? '🤝 ' : '') + mon.ko : '???';
   $('mon-sub').textContent = got
     ? `${RARITY[r].stars} ${RARITY[r].label} · 잡은 수 ×${caughtCount(mon.id)}` + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '')
-    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요`;
+    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${subjectOf(mon.id) === 'math' ? ' · 🔢 수학에서 만나요' : ' · 🎤 영어 퍼즐에서 만나요'}`;
   const fig = $('mon-figure');
   setFigure(fig, mon.url || '', got ? look : null);
   fig.classList.toggle('unknown', !got); // 실루엣 (도감과 같은 모습)

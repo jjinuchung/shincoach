@@ -8,8 +8,8 @@ import { isSpeakable, loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
-import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax } from './xp.js';
+import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle } from './pokemon.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount } from './xp.js';
 import { COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
@@ -332,10 +332,12 @@ function startPuzzle(continueFn) {
     const c = awardCoins(puzzleCoins(result));
     if (!result.solved) hpPenalty(HP.revealed, '퍼즐 정답을 봤어요');
     // 정답이면 퍼즐에 나온 포켓몬 중 한 마리에게 몬스터볼 던지기 (캐릭터가 없으면 그냥 이어감)
-    if (result.solved && result.characters && result.characters.length) {
+    // 🔢 수학 전용 포켓몬은 퍼즐에 놀러 올 수는 있어도 여기서 잡히진 않는다 — 영어 것만 남기고, 모자라면 영어 풀에서 채운다
+    const candidates = result.characters && result.characters.length ? englishCandidates(result.characters) : [];
+    if (result.solved && candidates.length) {
       state.catchOpen = true;
       openCatch({
-        candidates: result.characters, xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
+        candidates, xpGain: g.gained, coinGain: c, levelInfo: g.info, levelUp: g.leveledUp ? g.to : 0,
         ballCounts: inventory(), // 🔴 가방에 있는 볼 (몬스터볼은 언제나 쓸 수 있다)
         attempt: (id, opts) => catchAttempt(id, Math.random, opts),
         onDone: () => { state.catchOpen = false; updateLevelChip(); updatePartnerChip(); continueFn(); },
@@ -395,6 +397,18 @@ function awardCoins(amount) {
 function unlockedCharacters() {
   const level = getLevelInfo().level;
   return state.characters.filter((c) => isUnlocked(c.id, level) && !(settings.hp && isTired(c.id))).map((c) => ({ ...c, look: getLook(c.id) }));
+}
+
+/** 🎯 영어 잡기 후보: 퍼즐에 나온 것 중 영어 포켓몬, 2마리가 안 되면 영어 풀에서 채운다 (수학 포켓몬은 수학에서만 잡힌다) */
+function englishCandidates(shown) {
+  const out = forSubject(shown || [], 'english');
+  if (out.length >= 2) return out;
+  const have = new Set(out.map((c) => c.id));
+  for (const c of pickCharacters(forSubject(unlockedCharacters(), 'english'), 4)) {
+    if (out.length >= 4) break;
+    if (!have.has(c.id)) { have.add(c.id); out.push(c); }
+  }
+  return out;
 }
 
 // ───────────────────── ⚔️ 배틀 ─────────────────────
@@ -1120,7 +1134,7 @@ function showPuzzle(cue, onDone) {
   state.puzzleCue = cue;
   state.puzzlePlaying = false;
   openPuzzle(cue, {
-    characters: unlockedCharacters(),
+    characters: forPuzzle(unlockedCharacters(), (id) => caughtCount(id) > 0), // 영어 것 + 이미 잡은 수학 포켓몬
     onPlay: (onEnd) => playPuzzleSentence(cue, onEnd),
     onClose: (result) => {
       state.puzzleCue = null;
