@@ -119,6 +119,7 @@ function loadPlayer() {
       todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
       reviewGoldenTaken: () => reviewState.golden,
       async markReviewGolden() { if (reviewState.golden) return false; reviewState.golden = true; return true; },
+      async claimReviewStone() { reviewState.stones = (reviewState.stones || 0) + 1; return reviewState.stones <= 2; }, // 🔶 하루 2개 (트랜잭션 선점 흉내)
       todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; },
       // ✍️ 에세이: 오늘 공부 시간·완료 여부 (essayState로 테스트가 조작)
       // 🍄 다이버섯: 하루 상한 확인용
@@ -1331,19 +1332,26 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 ❤️ 회복 (
   assert.equal(reviewState.rounds, 1);
   assert.equal(reviewState.golden, true);
   assert.ok(itemLog.includes('goldenball'), '가방에 황금 볼');
-  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 1, '🔶 영어스톤 — 회차 완주마다 1 (2026-09-22 🧤)');
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 0, '🔶 영어스톤은 회차를 **전부** 통과해야 — 한 문장 못 넘겼으니 없음 (Codex 6차 #6)');
   assert.ok(hpLog.some((d) => d > 0), 'HP 회복');
 
   // 같은 날 두 번째 회차: 황금 볼만 빠지고 ⚡·💰·❤️는 그대로 (하루에 여러 번 하게 바뀜)
   const before = itemLog.length;
   const hpBefore = hpLog.length;
+  run('state.reviewFails = 0;'); // 이번엔 전부 통과한 회차라고 치자
   const again = await o.onFinished();
   assert.equal(again.golden, 0, '황금 볼은 하루 하나');
   assert.equal(again.hp, REWARD.hp, '❤️ 회복은 매번');
   assert.equal(again.xp, REWARD.bonusXp);
   assert.equal(again.coin, REWARD.bonusCoin);
   assert.equal(itemLog.slice(before).filter((x) => x === 'goldenball').length, 0, '황금 볼을 또 주지 않음');
-  assert.equal(itemLog.slice(before).filter((x) => x === 'stone_english').length, 1, '🔶 영어스톤은 두 번째 회차도 1');
+  assert.equal(itemLog.slice(before).filter((x) => x === 'stone_english').length, 1, '🔶 전부 통과한 회차 → 영어스톤 1 (하루 2개까지, 트랜잭션 선점)');
+  run('state.reviewFails = 0;');
+  await o.onFinished(); // 2개째
+  const b2 = itemLog.length;
+  run('state.reviewFails = 0;');
+  await o.onFinished(); // 3개째는 하루 상한
+  assert.equal(itemLog.slice(b2).filter((x) => x === 'stone_english').length, 0, '하루 2개까지 — 밀린 문장이 많아도 양으로 못 늘린다');
   assert.ok(hpLog.length > hpBefore, '회복은 실제로 한 번 더 들어간다');
 });
 

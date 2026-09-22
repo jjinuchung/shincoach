@@ -106,7 +106,7 @@ async function buy(id) {
   if (!it || !await buyItem(id)) { renderShop(it && it.stones ? '💰 코인이나 🧤 스톤이 조금 모자라요. 배우고 다시 와요!' : '💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
   unlock();
   sfx.ding();
-  const hint = it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : it.kind === 'ball' ? '🎯 잡기 화면에서 고를 수 있어요' : it.kind === 'mega' ? '🎒 내 포켓몬을 눌러 끼워 주세요' : it.kind === 'tool' ? '🔢 다음 수학 잡기에서 저절로 작동해요' : '❤️ 파트너를 눌러 먹여 주세요';
+  const hint = it.hint || (it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : it.kind === 'ball' ? '🎯 잡기 화면에서 고를 수 있어요' : it.kind === 'mega' ? '🎒 내 포켓몬을 눌러 끼워 주세요' : '❤️ 파트너를 눌러 먹여 주세요'); // 물건마다 카탈로그의 hint가 우선
   renderShop(`${it.emoji} ${it.ko}${josaEul(it.ko)} 샀어요! ${hint}`, id);
   notify(null);
 }

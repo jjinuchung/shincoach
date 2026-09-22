@@ -223,8 +223,11 @@ test('2차-B: 🤔 오답 노트 회차 — 어제 이전 것만 오래된 순�
   assert.equal(NOTES_ROUND, 4);
   // 회차 결과: A 맞힘 → 지움, B 틀림 → 오늘 날짜로 밀려 내일 이후
   const res = applyNotesRound(m, [{ id: 'frac.add', key: 'A', k: 'calc', ok: 1 }, { id: 'frac.mul', key: 'B', k: 'why', ok: 0, tag: '개념을 다르게 이해함', fx: 0 }], T2);
-  assert.deepEqual(res, { ok: 1, total: 2 });
+  assert.deepEqual(res, { ok: 1, total: 2, resolved: 1 }, 'resolved = 이 트랜잭션에서 실제로 지운 노트 수 (Codex 6차 #1)');
   assert.equal(m.concepts['frac.add'].notes.length, 0);
+  // 같은 편을 또 내면(다른 창·재제출) 맞혀도 지울 노트가 없다 → resolved 0 → 스톤·교환권 0 (사본에서)
+  const again = applyNotesRound(JSON.parse(JSON.stringify(m)), [{ id: 'frac.add', key: 'A', k: 'calc', ok: 1 }], T2);
+  assert.deepEqual(again, { ok: 1, total: 1, resolved: 0 });
   const b = m.concepts['frac.mul'].notes[0];
   assert.equal(b.d, T2); assert.equal(b.again, 1); assert.equal(b.fx, 0);
   assert.deepEqual(dueNotes(m, T2), [], '오늘 밀린 것은 오늘 다시 안 나온다');

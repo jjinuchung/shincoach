@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  dailyPlan, weakKinds, applyMixRound, markDaily, dailyDone, applyRound, applyNotesRound, MIX_CONCEPTS, KINDS, REWARD, dueNotes, conceptReport, mathReportText, tallyRound, bumpTot, roundCatches, addPending, takePending, pendingThrows, stoneReward,
+  dailyPlan, weakKinds, applyMixRound, markDaily, dailyDone, applyRound, applyNotesRound, MIX_CONCEPTS, KINDS, REWARD, dueNotes, conceptReport, mathReportText, tallyRound, bumpTot, roundCatches, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
 } from '../js/mathprog.js';
 import { emptyMath, mergeMath } from '../js/db.js';
 import { rng } from '../js/mathgen.js';
@@ -223,7 +223,8 @@ test('🎟️ 누적 카운터 tot — 반복으로 채워지는 길이 없다 (
   assert.deepEqual(tallyRound(m, { mode: 'mix', correct: 3, dailyFirst: false }), { ok: 0, rev: 0 }, '두 번째 ☀️의 섞어 풀기는 0');
   assert.deepEqual(tallyRound(m, { mode: 'ask', correct: 1, result: { ok: true, fixed: true } }), { ok: 1, rev: 0 }, '❓ 처음 고친 때');
   assert.deepEqual(tallyRound(m, { mode: 'ask', correct: 1, result: { ok: true, fixed: false } }), { ok: 0, rev: 0 }, '이미 고친 걸 다른 창에서 또 내도 0');
-  assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2 }), { ok: 2, rev: 0 }, '노트 회차는 그대로(틀린 건 내일로 밀려 오늘 다시 안 나온다)');
+  assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2 }), { ok: 2, rev: 0 }, '노트 회차(옛 결과 모양)는 정답 수');
+  assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2, result: { ok: 2, total: 2, resolved: 0 } }), { ok: 0, rev: 0 }, '실제로 지운 노트가 없으면(재제출·다른 창) 0 (Codex 6차 #1)');
   assert.deepEqual(m.tot, { ok: 14, daily: 0, rev: 1 });
   markDaily(m, T); markDaily(m, T); markDaily(m, '2026-09-22');
   assert.deepEqual(m.tot, { ok: 14, daily: 2, rev: 1 }, '하루 첫 완주만 — "한 번 더"는 안 센다');
@@ -259,31 +260,49 @@ test('🔷 수학스톤 자격 stoneReward — 개념 편 통과 1 · 👑 +2 ·
   assert.equal(stoneReward({ mode: 'review', result: { passed: true, review: true, practice: false, crowned: true } }), 3, '👑 이해 완료면 +2');
   assert.equal(stoneReward({ mode: 'learn', result: { passed: false, practice: false } }), 0, '못 넘기면 0');
   assert.equal(stoneReward({ mode: 'review', result: { passed: true, practice: true } }), 0, '연습 편 0 — 반복으로 못 늘린다');
-  assert.equal(stoneReward({ mode: 'notes', result: { ok: 2, total: 2 } }), 1);
-  assert.equal(stoneReward({ mode: 'notes', result: { ok: 1, total: 2 } }), 0, '하나라도 못 고치면 0');
+  assert.equal(stoneReward({ mode: 'notes', result: { ok: 2, total: 2, resolved: 2 } }), 1);
+  assert.equal(stoneReward({ mode: 'notes', result: { ok: 2, total: 2, resolved: 0 } }), 0, '지운 노트가 없으면(재제출) 0');
+  assert.equal(stoneReward({ mode: 'notes', result: { ok: 1, total: 2, resolved: 1 } }), 0, '하나라도 못 고치면 0');
   assert.equal(stoneReward({ mode: 'ask', result: { ok: true, fixed: true } }), 1);
   assert.equal(stoneReward({ mode: 'ask', result: { ok: true, fixed: false } }), 0, '이미 고친 걸 또 내면 0');
   assert.equal(stoneReward({ mode: 'mix', result: { ok: 3, total: 3 } }), 0, '섞어 풀기는 연습');
   assert.equal(stoneReward({ mode: 'diag', result: null }), 0);
 });
 
-test('🎯 미룬 던지기 pend — 레코드에 적고 하나씩 뺀다, 없으면 false, 병합은 큰 쪽 (Codex 5차 #2: 그림이 없거나 🎒로 나가도 잡기가 안 사라진다)', () => {
+test('🎯 미룬 던지기 — 번 수·쓴 수(throws)로 적고 하나씩 쓴다, 없으면 false, 되돌리기, 병합은 키마다 max → 옛 백업을 되돌려도 쓴 던지기가 안 되살아난다 (Codex 5차 #2·6차 #5)', () => {
   const m = emptyMath();
   assert.equal(pendingThrows(m), 0);
   assert.equal(pendingThrows(null), 0);
   assert.equal(addPending(m, 2), 2);
   assert.equal(addPending(m, 0), 2, '0은 안 더한다');
   assert.equal(pendingThrows(m), 2);
+  assert.deepEqual(m.throws, { earned: 2, used: 0 });
   assert.equal(takePending(m), true);
   assert.equal(takePending(m), true);
   assert.equal(takePending(m), false, '다 썼다');
   assert.equal(pendingThrows(m), 0);
+  assert.deepEqual(m.throws, { earned: 2, used: 2 });
+  assert.equal(giveBackPending(m), 1, '뺀 뒤 화면을 못 띄웠으면 되돌린다');
+  assert.equal(takePending(m), true);
+  // ★ 옛 백업 복구: 두 개 벌고 둘 다 쓴 뒤, "두 개 벌고 안 쓴" 백업을 합쳐도 0 (Codex 6차 #5 — pend 잔액을 max로 합치면 2개가 돌아왔다)
+  const spent = emptyMath(); addPending(spent, 2); takePending(spent); takePending(spent);
+  const backup = emptyMath(); addPending(backup, 2);
+  assert.equal(pendingThrows(mergeMath(spent, backup)), 0);
+  assert.equal(pendingThrows(mergeMath(backup, spent)), 0);
+  assert.deepEqual(mergeMath(spent, backup).throws, { earned: 2, used: 2 });
+  // 아직 안 쓴 던지기는 백업이 지우지 않는다
   const a = emptyMath(); addPending(a, 3);
   const b = emptyMath(); addPending(b, 1);
-  assert.equal(mergeMath(a, b).pend, 3);
-  assert.equal(mergeMath(b, a).pend, 3);
-  assert.equal(mergeMath(emptyMath(), emptyMath()).pend, undefined, '없으면 안 만든다');
-  assert.equal(a.pend, 3, '입력 그대로');
+  assert.equal(pendingThrows(mergeMath(a, b)), 3);
+  assert.equal(pendingThrows(mergeMath(b, a)), 3);
+  assert.equal(mergeMath(emptyMath(), emptyMath()).throws, undefined, '없으면 안 만든다');
+  assert.deepEqual(a.throws, { earned: 3, used: 0 }, '입력 그대로');
+  // v112의 pend(잔액)는 처음 만질 때 earned로 접힌다 · 병합도 읽는다
+  const old = { ...emptyMath(), pend: 2 };
+  assert.equal(pendingThrows(old), 2);
+  assert.equal(takePending(old), true);
+  assert.deepEqual(old.throws, { earned: 2, used: 1 }); assert.equal(old.pend, undefined);
+  assert.equal(pendingThrows(mergeMath(emptyMath(), { ...emptyMath(), pend: 1 })), 1);
 });
 
 test('🛟 백업 병합: 완주 기록은 늦은 날짜 쪽, 같은 날이면 큰 횟수', () => {

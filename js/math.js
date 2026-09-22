@@ -9,12 +9,12 @@ import { WORLDS, rng, shuffle, josa } from './mathgen.js';
 import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
-  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, pendingThrows, stoneReward,
+  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
 import { todayKey } from './track.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, consumeItem, rarityOf } from './xp.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
 import { GOLDEN, STONE_MATH, RADAR } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
@@ -31,6 +31,7 @@ const ui = {
   stem: null,           // 지금 고른 줄기 key ('fraction'·'negative') — 없으면 줄기 고르기 화면
   contents: {},         // 줄기별 사람이 쓴 내용 (coach/math/*.json, 한 번 받아 둠)
   charBusy: false,      // 🔢 수학 포켓몬 그림을 받는 중 (topUpMathCharacters 중복 방지)
+  catching: false,      // 🎯 잡기 흐름이 도는 중 (runCatches 하나만)
   opts: null,           // makeRound에 넘길 출연진·세계 (content는 줄기별로 optsFor가 끼운다)
   round: null,          // 진행 중인 한 편 { id, mode:'learn'|'review'|'diag'|'notes'|'mix', qs, at, correct, missTags, answered }
   daily: null,          // ☀️ 오늘의 수학 흐름 { plan, step:'round'|'mix', roundInfo } — 개념 편 → 🎲 섞어 풀기. 사다리로 나가면 null
@@ -169,15 +170,16 @@ async function catchPool() {
 }
 
 /**
- * 🧭 레이더 — 가방에 있으면 이번 잡기에서 하나 쓰고, 후보 4마리 중 한 마리를 **희귀 이상**으로 바꾼다.
- * 받아 둔 그림 중에 희귀 이상이 없으면 명단(수학·희귀 이상·😴 아님)에서 하나를 즉석에서 받아 온다(못 받으면 레이더는 안 쓴다).
- * @returns {Promise<{candidates:Array, note:string}|null>} null이면 레이더 없음
+ * 🧭 레이더 — 잡기 화면에서 **아이가 눌러야** 쓴다 (Codex 6차 #7: 저절로 쓰면 이미 희귀가 있어도 없어지고, 어느 게 레이더 것인지 안 보인다).
+ * 쓰면 후보 4마리 중 한 마리를 **희귀 이상**으로 바꾸고 🧭 표시. 받아 둔 그림 중에 희귀 이상이 없으면 명단(수학·희귀 이상·😴 아님)에서
+ * 하나를 즉석에서 받아 온다. 소모는 프로필 트랜잭션(useItem — 두 창이 같은 하나를 둘 다 쓰지 못한다), 그림을 못 받으면 되돌려 준다.
+ * @returns {Promise<{candidates:Array, pickId:number, note:string}|null>} null이면 못 씀
  */
-async function applyRadar(pool, candidates) {
-  if (itemCount(RADAR.id) < 1) return null;
+async function useRadar(pool, candidates) {
+  if (!(await useItem(RADAR.id))) return null;
   const level = getLevelInfo().level;
   const rare = (c) => rarityOf(c.id) >= 3;
-  let star = pool.filter(rare);
+  const star = pool.filter(rare);
   let pick = star.length ? pickCharacters(star, 1)[0] : null;
   if (!pick) {
     const ids = forSubject(ROSTER, 'math').filter((r) => rare(r) && isUnlocked(r.id, level) && !isTired(r.id)).map((r) => r.id);
@@ -187,13 +189,12 @@ async function applyRadar(pool, candidates) {
       if (got && got.length) { const r = ROSTER.find((x) => x.id === id); pick = { id, ko: r ? r.ko : '', url: got[0].url, look: getLook(id) }; }
     } catch { pick = null; }
   }
-  if (!pick) return null;
-  if (!consumeItem(RADAR.id)) return null; // 두 창이 같은 레이더를 쓰지 않게 — 가방에서 빠져야 작동
+  if (!pick) { addItem(RADAR.id, 1); return null; } // 그림을 못 받았다 — 레이더는 돌려준다
   const out = candidates.filter((c) => c.id !== pick.id).slice(0, 3);
   out.splice(Math.floor(Math.random() * (out.length + 1)), 0, pick);
-  return { candidates: out, note: `🧭 레이더 작동! ${RARITY_STARS(rarityOf(pick.id))} 이상 포켓몬이 한 마리 나타났어요` };
+  const rr = RARITY[rarityOf(pick.id)];
+  return { candidates: out, pickId: pick.id, note: `🧭 레이더! ${rr.stars} ${rr.label} ${pick.ko}${josa(pick.ko, '이', '가')} 나타났어요` };
 }
-const RARITY_STARS = (r) => (r >= 4 ? '⭐⭐⭐⭐ 전설' : '⭐⭐⭐ 희귀');
 
 /** 수학 화면이 지금 보이나 — 🎒·📊는 ui.run을 안 올리므로 모달을 띄우기 전에 직접 본다 (Codex 5차 #3) */
 function mathVisible() {
@@ -213,30 +214,35 @@ function topUpMathCharacters() {
  * 🎯 몬스터볼을 n번 — 한 번 끝나면(onDone) 다음 후보 4마리로 다시. 화면을 떠났으면(run 바뀜) 그만.
  * 개념 편 통과 + ☀️ 첫 완주가 한 카드에 겹치면 2번이 된다.
  */
-async function runCatches(n, { g, c, run, before, onAll }) {
+async function runCatches(n, { g, c, run, onAll }) {
   if (n <= 0) return;
+  if (ui.catching) return; // 한 번에 하나의 잡기 흐름만 — 버튼을 연타해도 둘이 같이 돌며 던지기를 둘 다 쓰지 않게 (Codex 6차 #3)
+  ui.catching = true;
+  const finish = () => { ui.catching = false; if (typeof onAll === 'function' && run === ui.run && mathVisible()) onAll(); };
   const pool = await catchPool();
-  if (typeof before === 'function') before();
-  // 나가 있으면(다른 화면·🎒) 안 띄운다 — 던질 기회는 레코드(m.pend)에 남아 사다리의 "🎯 남은 몬스터볼"로 다시 온다
-  if (run !== ui.run || !mathVisible()) return;
-  if (!pool.length) return; // 그림이 하나도 없다(오프라인 첫날) — 역시 레코드에 남는다
+  // 나가 있으면(다른 화면·🎒) 안 띄운다 — 던질 기회는 레코드에 남아 사다리의 "🎯 받은 몬스터볼"로 다시 온다
+  if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
+  if (!pool.length) { finish(); return; } // 그림이 하나도 없다(오프라인 첫날) — 역시 레코드에 남는다
   let left = n;
   const one = async () => {
+    if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
     // 던지기 하나를 **먼저** 레코드에서 뺀다(트랜잭션) — 두 창이 같은 기회를 두 번 던지지 못하게. 없으면 끝
     let taken = false;
     try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; }
-    if (!taken) { if (typeof onAll === 'function' && run === ui.run) onAll(); return; } // 남은 게 없다 — 사다리를 새로 그린다
-    if (run !== ui.run || !mathVisible()) return;
-    let candidates = pickCharacters(pool, 4);
-    let note = '';
-    const radar = await applyRadar(pool, candidates); // 🧭 가방에 있으면 자동으로 쓴다
-    if (radar) { candidates = radar.candidates; note = radar.note; }
-    if (run !== ui.run || !mathVisible()) return;
+    if (!taken) { finish(); return; } // 남은 게 없다 — 사다리를 새로 그린다
+    if (run !== ui.run || !mathVisible()) {
+      // 뺀 사이에 나갔다 — 되돌려 준다 (Codex 6차 #4: 빼고 나서 화면을 보면 그 사이 나간 던지기가 사라졌다)
+      try { ui.state = await updateMath((m) => { giveBackPending(m); }); } catch { /* 다음 병합에서 max로 잡힌다 */ }
+      ui.catching = false;
+      return;
+    }
+    const candidates = pickCharacters(pool, 4);
     openCatch({
-      candidates, subject: 'math', note, xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
+      candidates, subject: 'math', xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
       ballCounts: inventory(),
+      radar: itemCount(RADAR.id) > 0 ? { count: itemCount(RADAR.id), use: (cur) => useRadar(pool, cur) } : null, // 🧭 아이가 눌러야 쓴다
       attempt: (id, opts) => catchAttempt(id, Math.random, opts),
-      onDone: () => { updateChip(); left--; if (left > 0) one(); else if (typeof onAll === 'function' && run === ui.run && mathVisible()) onAll(); },
+      onDone: () => { updateChip(); left--; if (left > 0) one(); else finish(); },
     });
   };
   one();
@@ -412,7 +418,7 @@ function renderLadder(state) {
   if (pend > 0) {
     const pb = el('button', 'btn btn-accent btn-big-wide math-pend-btn', `🎯 받은 몬스터볼 ${pend}개가 남았어요 — 던지기`);
     pb.type = 'button';
-    pb.addEventListener('click', () => { pb.disabled = true; runCatches(pend, { g: null, c: 0, run: ui.run, before: () => { pb.disabled = false; }, onAll: () => { if (ui.state) renderLadder(ui.state); } }); });
+    pb.addEventListener('click', () => { pb.disabled = true; runCatches(pend, { g: null, c: 0, run: ui.run, onAll: () => { if (ui.state) renderLadder(ui.state); } }); }); // 끝나면 사다리를 새로 그린다 (버튼은 그때까지 잠금)
     head.appendChild(pb);
   }
   // ☀️ 오늘의 수학 — 버튼 하나로 오늘 할 것: 개념 편 하나(복습 차례 우선) → 🎲 섞어 풀기. 아이가 쉬운 것만 고르지 않게 맨 위에 (2026-09-21 ④)
@@ -1660,8 +1666,9 @@ async function finishRound() {
   card.appendChild(row);
   m.appendChild(card);
 
-  // 🎯 몬스터볼 — 영어 퍼즐 정답과 같은 보상 경로(후보만 🔢 수학 포켓몬). 2번이면 한 번 끝난 뒤 이어서
-  runCatches(rw.catches, { g, c, run, before: () => { if (dailyNext) dailyNext.disabled = false; } });
+  // 🎯 몬스터볼 — 영어 퍼즐 정답과 같은 보상 경로(후보만 🔢 수학 포켓몬). 2번이면 한 번 끝난 뒤 이어서. 끝나야 "다음 → 🎲"가 열린다
+  runCatches(rw.catches, { g, c, run, onAll: () => { if (dailyNext) dailyNext.disabled = false; } });
+  if (dailyNext && !rw.catches) dailyNext.disabled = false;
 }
 
 // ───────────────────── 배선 ─────────────────────

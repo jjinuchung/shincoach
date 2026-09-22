@@ -113,7 +113,7 @@ export function stoneOf(subject) {
 
 // ── 🧤 스톤 상점: 코인 + 스톤 ──
 // 🧭 레이더: 다음 🔢 수학 잡기에서 후보 4마리 중 한 마리가 **희귀 이상**으로 확정 (쓰면 없어진다)
-export const RADAR = { id: 'radar', emoji: '🧭', ko: '레이더', price: 100, stones: { stone_math: 1 }, kind: 'tool' };
+export const RADAR = { id: 'radar', emoji: '🧭', ko: '레이더', price: 100, stones: { stone_math: 1 }, kind: 'tool', hint: '🔢 수학 잡기 화면에서 "🧭 레이더 쓰기"를 누르면 희귀 이상 포켓몬이 한 마리 나와요' };
 export const STONE_SHOP = [RADAR];
 
 /** 값 — 코인과 재료(스톤)를 한 묶음으로 (purchaseRule이 둘 다 한 트랜잭션에서 판정) */
@@ -150,7 +150,7 @@ export function itemById(id) {
 }
 
 /** 🎁 레벨업 선물 상자에서 나올 수 있는 것 (🌟 황금 볼·⭐ 메가 아이템·🍄 다이버섯·🧤 스톤·스톤 상점 물건은 제외 — 귀한 것이라 따로 모아야 한다) */
-const LOOT = ITEMS.filter((it) => it.kind !== 'ball' && it.kind !== 'mega' && it.kind !== 'mushroom' && it.kind !== 'stone' && it.kind !== 'tool');
+const LOOT = ITEMS.filter((it) => it.kind !== 'ball' && it.kind !== 'mega' && it.kind !== 'mushroom' && it.kind !== 'stone' && !it.stones); // 스톤이 드는 물건은 종류를 불문하고 제외
 
 /** 🎁 레벨업 선물 상자: 아이템 중 하나를 고르게 뽑음 */
 export function lootBox(rng = Math.random) {

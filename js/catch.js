@@ -9,7 +9,7 @@ import { makeFigure, setFigure, BALLS, POKEBALL } from './items.js';
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const ui = { open: false, run: 0, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, coinGain: 0, pendingAuto: false };
+const ui = { open: false, run: 0, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, coinGain: 0, pendingAuto: false, candidates: [] }; // candidates = 지금 화면의 후보 (🧭 레이더가 바꿔 그린다)
 
 export function initCatch() {
   $('catch-continue').addEventListener('click', finish);
@@ -52,7 +52,8 @@ export function josa(word, withBatchim, without) {
  * @param {(id:number) => {caught:boolean, chance:number, count:number, first:boolean, bonusXp:number, info:object}} o.attempt 던지기 판정
  * @param {boolean} [o.practice] 연습 모드 표시
  * @param {'math'} [o.subject] 🔢 수학에서 연 잡기 — 후보가 수학 전용 포켓몬이라는 걸 아이에게 알린다
- * @param {string} [o.note] 머리글에 덧붙일 한 줄 (🧭 레이더 작동 등)
+ * @param {string} [o.note] 머리글에 덧붙일 한 줄
+ * @param {{count:number, use:(cur:Array)=>Promise<{candidates:Array, pickId:number, note:string}|null>}} [o.radar] 🧭 레이더가 가방에 있으면 — 아이가 누르면 use()가 후보를 바꿔 준다
  * @param {() => void} [o.onDone] 닫힐 때
  */
 export function openCatch(o) {
@@ -82,15 +83,47 @@ export function openCatch(o) {
   mon.className = 'catch-mon mon-figure';
   $('catch-fx').textContent = '';
 
+  renderPick(o.candidates, 0);
+  // 🧭 레이더 — 가방에 있을 때만 버튼. 누르면 하나 쓰고 후보 한 마리가 희귀 이상으로 (어느 것인지 🧭 배지)
+  const rbox = $('catch-radar');
+  if (rbox) {
+    rbox.innerHTML = '';
+    rbox.hidden = !(o.radar && o.radar.count > 0);
+    if (o.radar && o.radar.count > 0) {
+      const rb = document.createElement('button');
+      rb.type = 'button';
+      rb.className = 'btn catch-radar-btn';
+      rb.textContent = `🧭 레이더 쓰기 (${o.radar.count}개) — 희귀 이상 한 마리 부르기`;
+      rb.addEventListener('click', async () => {
+        rb.disabled = true;
+        rb.textContent = '🧭 레이더 작동 중…';
+        const r = await o.radar.use(ui.candidates);
+        if (!ui.open) return;
+        if (!r) { rb.textContent = '🧭 레이더를 못 썼어요 — 그림을 못 받았어요 (레이더는 그대로예요)'; return; }
+        renderPick(r.candidates, r.pickId);
+        $('catch-msg').textContent = `${r.note} · 누구에게 던질까요?`;
+        rbox.hidden = true;
+      });
+      rbox.appendChild(rb);
+    }
+  }
+  renderBalls(o.ballCounts || {});
+  $('catch').hidden = false;
+}
+
+/** 후보 목록 그리기 — pickId가 있으면 그 칸에 🧭 배지 */
+function renderPick(candidates, pickId) {
   const pick = $('catch-pick');
   pick.innerHTML = '';
   pick.hidden = false;
-  for (const c of o.candidates) {
+  ui.candidates = candidates.slice();
+  for (const c of candidates) {
     const r = rarityOf(c.id);
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'catch-cand';
+    btn.className = 'catch-cand' + (pickId && c.id === pickId ? ' radar' : '');
     btn.appendChild(makeFigure(c.url, c.ko, c.look));
+    if (pickId && c.id === pickId) { const badge = document.createElement('span'); badge.className = 'radar-badge'; badge.textContent = '🧭'; btn.appendChild(badge); }
     const nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = c.ko;
@@ -109,8 +142,6 @@ export function openCatch(o) {
     btn.addEventListener('click', () => { unlock(); throwBall(c); });
     pick.appendChild(btn);
   }
-  renderBalls(o.ballCounts || {});
-  $('catch').hidden = false;
 }
 
 /**

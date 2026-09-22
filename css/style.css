@@ -1288,6 +1288,12 @@ button { font-family: inherit; }
 .pokedex-cell .subj { position: absolute; top: 4px; left: 6px; font-size: 0.8rem; line-height: 1; opacity: 0.9; }
 .pokedex-cell.unknown .subj { opacity: 1; }
 .pokedex-subjects { margin-top: 4px; }
+/* 🧭 레이더 — 잡기 화면의 버튼과 레이더가 부른 후보 표시 */
+.catch-radar { text-align: center; margin: 4px 0 8px; }
+.catch-radar-btn { font-weight: 800; background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+.catch-cand { position: relative; }
+.catch-cand.radar { outline: 3px solid #f59e0b; outline-offset: -3px; background: #fffbeb; }
+.catch-cand .radar-badge { position: absolute; top: 4px; left: 6px; font-size: 1.1rem; }
 /* 🧤 건틀릿 — 과목 스톤 칸 (아직 없는 과목은 🔒) */
 .pokedex-gauntlet { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
 .pokedex-gauntlet .ttl { font-weight: 800; margin-right: 2px; }

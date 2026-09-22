@@ -488,6 +488,18 @@ export function addItem(id, n = 1) {
   return true;
 }
 
+/**
+ * 가방에서 하나를 **트랜잭션 안에서** 쓴다 — 두 창이 같은 하나를 둘 다 쓰지 못한다 (🧭 레이더처럼 하나로 큰 효과가 나는 것, Codex 6차 #2).
+ * consumeItem은 메모리 판정 뒤 증분이라 두 창이 둘 다 true가 된다. 저장 실패 시 폴백 없이 false.
+ * @returns {Promise<boolean>}
+ */
+export async function useItem(id) {
+  if (!itemById(id) || (profile.items[id] || 0) < 1) return false;
+  const cost = { items: { [id]: 1 } };
+  const r = await runProfileOp(() => applyPurchase(cost, {}), () => ({ ok: false }));
+  return !!(r && r.ok);
+}
+
 /** 가방에서 하나 소모 (⚔️ 배틀 물약처럼 포켓몬 HP와 무관하게 쓰는 경우). 없으면 false */
 export function consumeItem(id) {
   if ((profile.items[id] || 0) < 1) return false;

@@ -962,7 +962,9 @@ async function grantReviewRound() {
   awardXp(reward.xp);
   awardCoins(reward.coin);
   if (reward.golden) addItem(GOLDEN.id, reward.golden);
-  if (reward.stone) addItem(STONE_ENGLISH.id, reward.stone); // 🔶 영어스톤 — 회차 완주마다
+  // 🔶 영어스톤 — "제대로 배웠나": 회차의 문장·단어·받아쓰기를 **전부 통과**했을 때만, 하루 2개까지 트랜잭션 선점 (두 창이 같은 회차를 끝내도 한쪽만, Codex 6차 #6)
+  reward.stone = reward.stone && state.reviewFails === 0 && await track.claimReviewStone() ? reward.stone : 0;
+  if (reward.stone) addItem(STONE_ENGLISH.id, reward.stone);
   if (reward.hp) hpHeal(reward.hp);
   dropMushroom('복습을 끝까지 했어요'); // 🍄 거다이맥스 재료
   track.flush();
@@ -974,6 +976,7 @@ function startReview(items, practice, after) {
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
+  state.reviewFails = 0; // 🔶 이 회차에서 못 넘긴 문항 수 — 0이어야 영어스톤
   const p = practice ? null : partnerInfo();
   const summary = reviewSummary(track.statsList(), track.todayKey());
   const spot = rememberSpot(); // 복습은 다른 문장을 들려주므로 끝나고 제자리로
@@ -990,6 +993,7 @@ function startReview(items, practice, after) {
     unlock,
     speak: speakSentence,
     onSentence: (cue, passed) => {
+      if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
       if (practice) return null;
       const info = track.review(cue, passed);
       if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
@@ -1002,12 +1006,14 @@ function startReview(items, practice, after) {
       playPuzzleSentence(cue, () => {});
     },
     onDictation: (item, passed) => {
+      if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
       if (practice) return null;
       const info = track.review(item.cue, passed); // 받아쓰기도 문장 복습이므로 같은 라이트너 규칙
       if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
       return info;
     },
     onWord: (item, passed) => {
+      if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
       if (practice) return null;
       const today = track.todayKey();
       const rec = item.rec;

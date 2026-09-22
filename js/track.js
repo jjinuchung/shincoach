@@ -440,6 +440,10 @@ export function reviewGoldenTaken() {
 export function markReviewGolden() {
   return claim('reviewGolden', 1);
 }
+/** 🔶 영어스톤 — 복습 회차를 전부 통과했을 때, 하루 2개까지 (두 창이 같은 회차를 끝내도 한쪽만). @returns {Promise<boolean>} */
+export function claimReviewStone() {
+  return claim('reviewStones', 2);
+}
 
 /** ❤️ "어제 학습 안 함" HP 감소를 오늘 이미 적용했는지 / 적용할 자리를 선점 (하루 한 번) */
 export function hpMissedApplied() {

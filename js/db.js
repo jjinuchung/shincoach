@@ -276,7 +276,7 @@ export async function getDaily(date) {
 //   프로필의 applyProfileDelta와 같은 원리.
 
 const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles',
-  'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms', 'matches',
+  'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms', 'matches', 'reviewStones', // 🔶 영어스톤 — 복습 회차(전부 통과) 하루 2개까지, 트랜잭션 선점
   'mathQ', 'mathOk', 'mathRounds', 'mathSeconds']; // 🔢 수학: 푼 문항·정답·회차·시간
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 
@@ -748,7 +748,10 @@ export function mergeMath(cur, rec) {
   const goldToday = !!(dl && out.daily && out.daily.d === dl.d && (out.daily.gold || dl.gold));
   if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0, ...(dl.gold ? { gold: true } : {}) };
   if (goldToday && out.daily && out.daily.d === dl.d) out.daily = { ...out.daily, gold: true }; // cloneMath는 daily를 얕게 복사하므로 입력을 건드리지 않게 새 객체로
-  // 🎯 미룬 던지기(pend)는 큰 쪽 — 옛 백업이 아직 안 던진 몬스터볼을 지우지 않게 (두 기기에서 같은 걸 두 번 던질 수는 있어도 잃는 것보다 낫다)
+  // 🎯 던지기 번 수·쓴 수는 단조 증가 → 키마다 max (옛 백업을 되돌려도 쓴 던지기가 되살아나지 않는다, Codex 6차 #5). v112의 pend도 max
+  if (rec && rec.throws) {
+    out.throws = { earned: Math.max(Number(out.throws && out.throws.earned) || 0, Number(rec.throws.earned) || 0), used: Math.max(Number(out.throws && out.throws.used) || 0, Number(rec.throws.used) || 0) };
+  } else if (out.throws) out.throws = { ...out.throws };
   if (rec && rec.pend !== undefined) out.pend = Math.max(Number(out.pend) || 0, Number(rec.pend) || 0);
   // 🎟️ 누적 카운터(정답·완주·복습 통과)는 단조 증가라 키마다 max — 옛 백업이 진도를 되돌리지 않게
   if (rec && rec.tot) {
