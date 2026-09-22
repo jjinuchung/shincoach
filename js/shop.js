@@ -1,8 +1,8 @@
 // 🛒 상점(💰 코인으로 🎀 장식·🎨 염색약·🧪 물약 사기) + 포켓몬 상세(❤️ HP·물약·🤝 파트너·장식 장착·염색) 모달
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
-import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, itemById, canBuy, setFigure } from './items.js';
-import { coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup } from './xp.js';
+import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, itemById, canBuy, priceText, setFigure } from './items.js';
+import { inventory, coins, itemCount, buyItem, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup } from './xp.js';
 import { formsOf, formUrl, ensureForm, subjectOf } from './pokemon.js';
 import { sfx, unlock } from './sfx.js';
 
@@ -62,10 +62,11 @@ export function isShopOpen() {
 }
 
 function renderShop(msg, boughtId) {
-  $('shop-coins').textContent = `💰 ${coins()}`;
+  $('shop-coins').textContent = `💰 ${coins()} · ${STONES.map((s) => `${s.emoji}${itemCount(s.id)}`).join(' ')}`;
   $('shop-msg').textContent = msg || '';
   const list = $('shop-list');
   list.innerHTML = '';
+  list.appendChild(shopSection('🧤 스톤 상점', '코인 + 스톤으로만 살 수 있어요. 🔷 수학스톤은 수학 개념을 통과하면, 🔶 영어스톤은 복습을 끝내면 생겨요 — 🧭 레이더: 다음 수학 잡기에 희귀 이상 포켓몬이 한 마리 나와요', STONE_SHOP, boughtId));
   list.appendChild(shopSection('🎀 장식', '포켓몬 머리에 씌워요. 한 번 사면 계속 내 것 — 다른 포켓몬에게 옮길 수도 있어요', GEAR, boughtId));
   list.appendChild(shopSection('🎨 염색약', '포켓몬 색을 바꿔요. 한 번 쓰면 없어지고, 원래 색으로 돌아가는 건 공짜', DYE, boughtId));
   list.appendChild(shopSection('🧪 물약', '파트너 HP를 채워요. 퍼즐 정답을 그냥 보거나 따라 말하기를 넘기거나 하루 빠지면 HP가 깎여요', POTION, boughtId));
@@ -83,13 +84,14 @@ function shopSection(title, sub, items, boughtId) {
     btn.type = 'button';
     btn.appendChild(el('span', 'em', it.emoji));
     btn.appendChild(el('span', 'nm', it.ko));
-    btn.appendChild(el('span', 'pr', `💰${it.price}`));
+    btn.appendChild(el('span', 'pr', priceText(it)));
     const n = itemCount(it.id);
     if (n > 0) btn.appendChild(el('span', 'own', `가방에 ${n}개`));
-    const { ok, short } = canBuy(it.id, coins());
+    const { ok, short, shortStones } = canBuy(it.id, coins(), inventory());
     if (!ok) {
       btn.disabled = true;
-      btn.appendChild(el('span', 'short', `💰${short} 더 모으면`));
+      const parts = [short > 0 ? `💰${short}` : '', ...(shortStones || []).map((s) => `${s.emoji}${s.n}`)].filter(Boolean);
+      btn.appendChild(el('span', 'short', `${parts.join(' + ')} 더 모으면`));
     }
     btn.addEventListener('click', () => buy(it.id));
     grid.appendChild(btn);
@@ -101,10 +103,10 @@ function shopSection(title, sub, items, boughtId) {
 async function buy(id) {
   const it = itemById(id);
   // 살 수 있는지는 저장소에서 판정한다 (두 창에서 같은 코인으로 두 번 사지 못하게)
-  if (!it || !await buyItem(id)) { renderShop('💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
+  if (!it || !await buyItem(id)) { renderShop(it && it.stones ? '💰 코인이나 🧤 스톤이 조금 모자라요. 배우고 다시 와요!' : '💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
   unlock();
   sfx.ding();
-  const hint = it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : it.kind === 'ball' ? '🎯 잡기 화면에서 고를 수 있어요' : it.kind === 'mega' ? '🎒 내 포켓몬을 눌러 끼워 주세요' : '❤️ 파트너를 눌러 먹여 주세요';
+  const hint = it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : it.kind === 'ball' ? '🎯 잡기 화면에서 고를 수 있어요' : it.kind === 'mega' ? '🎒 내 포켓몬을 눌러 끼워 주세요' : it.kind === 'tool' ? '🔢 다음 수학 잡기에서 저절로 작동해요' : '❤️ 파트너를 눌러 먹여 주세요';
   renderShop(`${it.emoji} ${it.ko}${josaEul(it.ko)} 샀어요! ${hint}`, id);
   notify(null);
 }

@@ -97,6 +97,30 @@ export const SHOP_BALLS = [GREATBALL, ULTRABALL, MASTERBALL];
 export const KEYSTONE = { id: 'keystone', emoji: '🔑', ko: '키스톤', price: 600, kind: 'mega' };
 export const MEGASTONE = { id: 'megastone', emoji: '💠', ko: '메가스톤', price: 600, kind: 'mega' };
 export const MUSHROOM = { id: 'mushroom', emoji: '🍄', ko: '다이버섯', price: 0, kind: 'mushroom' };
+// ── 🧤 과목 스톤 (2026-09-22, 아버님 아이디어 "인피니티 스톤") ──
+// 코인은 "얼마나 많이 했나"(문장·문항 수)로 쌓이지만 스톤은 **"제대로 배웠나"**(통과·👑·복습 완주)에서만 나온다.
+// 상점에서 못 사고 🎁 상자에서도 안 나온다. 새 아이템은 코인 + 스톤을 같이 내야 산다 → "코인은 있는데 스톤이 없어서 못 산다"가
+// 수학으로 가게 하는 힘. 과목이 늘면(과학·국어…) 스톤도 늘고, 건틀릿(🎒)에 🔒 칸으로 미리 보인다.
+// 가방 아이템으로 두는 이유: purchaseRule의 cost.items(재료)·백업 병합·두 창 안전이 그대로 된다 (새 저장 구조 없음)
+export const STONE_MATH = { id: 'stone_math', emoji: '🔷', ko: '수학스톤', subject: 'math', price: 0, kind: 'stone' };
+export const STONE_ENGLISH = { id: 'stone_english', emoji: '🔶', ko: '영어스톤', subject: 'english', price: 0, kind: 'stone' };
+export const STONES = [STONE_MATH, STONE_ENGLISH];
+/** 아직 없는 과목의 자리 — 건틀릿에 🔒로만 보인다 */
+export const FUTURE_STONES = [{ emoji: '🟩', ko: '???' }, { emoji: '🟪', ko: '???' }];
+export function stoneOf(subject) {
+  return STONES.find((s) => s.subject === subject) || null;
+}
+
+// ── 🧤 스톤 상점: 코인 + 스톤 ──
+// 🧭 레이더: 다음 🔢 수학 잡기에서 후보 4마리 중 한 마리가 **희귀 이상**으로 확정 (쓰면 없어진다)
+export const RADAR = { id: 'radar', emoji: '🧭', ko: '레이더', price: 100, stones: { stone_math: 1 }, kind: 'tool' };
+export const STONE_SHOP = [RADAR];
+
+/** 값 — 코인과 재료(스톤)를 한 묶음으로 (purchaseRule이 둘 다 한 트랜잭션에서 판정) */
+export function costOf(it) {
+  return { coins: (it && it.price) || 0, items: { ...((it && it.stones) || {}) } };
+}
+
 /** 🍲 다이스프 한 그릇에 드는 버섯 수 */
 export const SOUP_MUSHROOMS = 10;
 /** 🍄 다이버섯은 하루에 이만큼까지만 (몰아서 모으지 못하게) */
@@ -114,6 +138,8 @@ export const ITEMS = [
   KEYSTONE,
   MEGASTONE,
   MUSHROOM,
+  ...STONES,
+  RADAR,
 ];
 const byId = {};
 for (const it of ITEMS) byId[it.id] = it;
@@ -123,20 +149,35 @@ export function itemById(id) {
   return byId[id] || null;
 }
 
-/** 🎁 레벨업 선물 상자에서 나올 수 있는 것 (🌟 황금 볼·⭐ 메가 아이템·🍄 다이버섯은 제외 — 귀한 것이라 따로 모아야 한다) */
-const LOOT = ITEMS.filter((it) => it.kind !== 'ball' && it.kind !== 'mega' && it.kind !== 'mushroom');
+/** 🎁 레벨업 선물 상자에서 나올 수 있는 것 (🌟 황금 볼·⭐ 메가 아이템·🍄 다이버섯·🧤 스톤·스톤 상점 물건은 제외 — 귀한 것이라 따로 모아야 한다) */
+const LOOT = ITEMS.filter((it) => it.kind !== 'ball' && it.kind !== 'mega' && it.kind !== 'mushroom' && it.kind !== 'stone' && it.kind !== 'tool');
 
 /** 🎁 레벨업 선물 상자: 아이템 중 하나를 고르게 뽑음 */
 export function lootBox(rng = Math.random) {
   return LOOT[Math.min(LOOT.length - 1, Math.floor(rng() * LOOT.length))].id;
 }
 
-/** 살 수 있는지 → { ok, short(부족한 코인) } */
-export function canBuy(id, coins) {
+/**
+ * 살 수 있는지 → { ok, short(부족한 코인), shortStones: [{id, emoji, ko, n}] }
+ * @param {Object} [bag] 가방 { 아이템id: 개수 } — 스톤이 드는 물건이면 필요
+ */
+export function canBuy(id, coins, bag) {
   const it = itemById(id);
-  if (!it || it.price <= 0) return { ok: false, short: 0 }; // 🌟 황금 볼처럼 파는 물건이 아닌 것
+  if (!it || it.price <= 0) return { ok: false, short: 0, shortStones: [] }; // 🌟 황금 볼·스톤처럼 파는 물건이 아닌 것
   const short = Math.max(0, it.price - (coins || 0));
-  return { ok: short === 0, short };
+  const shortStones = [];
+  for (const sid of Object.keys(it.stones || {})) {
+    const need = it.stones[sid] - ((bag && bag[sid]) || 0);
+    if (need > 0) { const st = itemById(sid); shortStones.push({ id: sid, emoji: st ? st.emoji : '', ko: st ? st.ko : sid, n: need }); }
+  }
+  return { ok: short === 0 && !shortStones.length, short, shortStones };
+}
+
+/** 값 표시 — "💰100 + 🔷1" */
+export function priceText(it) {
+  const parts = [`💰${it.price}`];
+  for (const sid of Object.keys(it.stones || {})) { const st = itemById(sid); parts.push(`${st ? st.emoji : ''}${it.stones[sid]}`); }
+  return parts.join(' + ');
 }
 
 // ── DOM 헬퍼: 꾸민 포켓몬 그림 ──

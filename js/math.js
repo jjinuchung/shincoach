@@ -9,16 +9,16 @@ import { WORLDS, rng, shuffle, josa } from './mathgen.js';
 import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
-  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, pendingThrows,
+  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, pendingThrows, stoneReward,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
 import { todayKey } from './track.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase } from './xp.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, consumeItem, rarityOf } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
-import { GOLDEN } from './items.js';
+import { GOLDEN, STONE_MATH, RADAR } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
-import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters } from './pokemon.js';
+import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { contentSummary, cueCountOf } from './stats.js';
 import { sfx } from './sfx.js';
@@ -168,6 +168,33 @@ async function catchPool() {
   return pool;
 }
 
+/**
+ * 🧭 레이더 — 가방에 있으면 이번 잡기에서 하나 쓰고, 후보 4마리 중 한 마리를 **희귀 이상**으로 바꾼다.
+ * 받아 둔 그림 중에 희귀 이상이 없으면 명단(수학·희귀 이상·😴 아님)에서 하나를 즉석에서 받아 온다(못 받으면 레이더는 안 쓴다).
+ * @returns {Promise<{candidates:Array, note:string}|null>} null이면 레이더 없음
+ */
+async function applyRadar(pool, candidates) {
+  if (itemCount(RADAR.id) < 1) return null;
+  const level = getLevelInfo().level;
+  const rare = (c) => rarityOf(c.id) >= 3;
+  let star = pool.filter(rare);
+  let pick = star.length ? pickCharacters(star, 1)[0] : null;
+  if (!pick) {
+    const ids = forSubject(ROSTER, 'math').filter((r) => rare(r) && isUnlocked(r.id, level) && !isTired(r.id)).map((r) => r.id);
+    const id = ids.length ? ids[Math.floor(Math.random() * ids.length)] : 0;
+    try {
+      const got = id ? await Promise.race([ensureCast([id]), new Promise((res) => setTimeout(() => res([]), 8000))]) : [];
+      if (got && got.length) { const r = ROSTER.find((x) => x.id === id); pick = { id, ko: r ? r.ko : '', url: got[0].url, look: getLook(id) }; }
+    } catch { pick = null; }
+  }
+  if (!pick) return null;
+  if (!consumeItem(RADAR.id)) return null; // 두 창이 같은 레이더를 쓰지 않게 — 가방에서 빠져야 작동
+  const out = candidates.filter((c) => c.id !== pick.id).slice(0, 3);
+  out.splice(Math.floor(Math.random() * (out.length + 1)), 0, pick);
+  return { candidates: out, note: `🧭 레이더 작동! ${RARITY_STARS(rarityOf(pick.id))} 이상 포켓몬이 한 마리 나타났어요` };
+}
+const RARITY_STARS = (r) => (r >= 4 ? '⭐⭐⭐⭐ 전설' : '⭐⭐⭐ 희귀');
+
 /** 수학 화면이 지금 보이나 — 🎒·📊는 ui.run을 안 올리므로 모달을 띄우기 전에 직접 본다 (Codex 5차 #3) */
 function mathVisible() {
   const v = $('view-math');
@@ -200,9 +227,13 @@ async function runCatches(n, { g, c, run, before, onAll }) {
     try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; }
     if (!taken) { if (typeof onAll === 'function' && run === ui.run) onAll(); return; } // 남은 게 없다 — 사다리를 새로 그린다
     if (run !== ui.run || !mathVisible()) return;
-    const candidates = pickCharacters(pool, 4);
+    let candidates = pickCharacters(pool, 4);
+    let note = '';
+    const radar = await applyRadar(pool, candidates); // 🧭 가방에 있으면 자동으로 쓴다
+    if (radar) { candidates = radar.candidates; note = radar.note; }
+    if (run !== ui.run || !mathVisible()) return;
     openCatch({
-      candidates, subject: 'math', xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
+      candidates, subject: 'math', note, xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
       ballCounts: inventory(),
       attempt: (id, opts) => catchAttempt(id, Math.random, opts),
       onDone: () => { updateChip(); left--; if (left > 0) one(); else if (typeof onAll === 'function' && run === ui.run && mathVisible()) onAll(); },
@@ -238,7 +269,7 @@ function updateChip() {
   const chip = $('math-chip');
   if (!chip) return;
   const i = getLevelInfo();
-  chip.textContent = `Lv.${i.level} ⚡${i.into}/${i.need} · 💰 ${coins()}`;
+  chip.textContent = `Lv.${i.level} ⚡${i.into}/${i.need} · 💰 ${coins()} · 🔷 ${itemCount(STONE_MATH.id)}`;
 }
 
 // ───────────────────── 화면들 ─────────────────────
@@ -1495,6 +1526,9 @@ async function finishRound() {
   rw.catches = catches;
   rw.gold = !!(daily && daily.gold);
   if (rw.gold) addItem(GOLDEN.id, 1);
+  // 🔷 수학스톤 — "제대로 배웠나"에서만 (mathprog.stoneReward). 코인처럼 트랜잭션 결과(result)에 따라 준다
+  rw.stone = stoneReward({ mode: r.mode, result });
+  if (rw.stone) addItem(STONE_MATH.id, rw.stone);
   // ✨ 오늘의 보너스 — 하루 첫 완주에만(daily.first는 트랜잭션 판정이라 두 창·재시도에도 한 번). 홈 카드가 미리 보여 준 바로 그것
   rw.bonus = daily && daily.first ? dailyBonus(today) : null;
   if (rw.bonus) {
@@ -1544,7 +1578,7 @@ async function finishRound() {
     card.appendChild(el('p', 'math-p', fixed
       ? (r.askSameKey === false ? `❓${r.askNo}의 문제 틀이 바뀌어 비슷한 문제로 확인했어요 — 잘했어요!` : `❓${r.askNo} 유형을 이제 알아요 — 🤔 노트에서도 지웠어요.`)
       : r.correct ? '이미 고친 유형이라 문항 정답만 받아요.' : '답장을 한 번 더 읽어 볼까요? 다시 풀어 볼 수도 있어요 — 틀려도 개념 진도는 내려가지 않아요.'));
-    card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+    card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.stone ? ` 🔷 수학스톤 +${rw.stone}` : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
     const row = el('div', 'math-actions');
     if (!r.correct) {
       const ask = ((state && state.asks) || []).find((x) => x && x.id === r.askId);
@@ -1565,7 +1599,7 @@ async function finishRound() {
     card.appendChild(el('h2', '', result.ok === result.total ? '🤔 → 😄 틀렸던 유형을 다 고쳤어요!' : `🤔 ${result.total}개 중 ${result.ok}개를 고쳤어요`));
     const tail = nc.due ? `아직 ${nc.due}개 더 있어요 — 사다리에서 이어서 풀 수 있어요.` : nc.all ? `남은 ${nc.all}개는 내일 이후에 나와요.` : '오답 노트가 비었어요. 다음에 틀린 것이 있으면 다시 쌓여요.';
     card.appendChild(el('p', 'math-p', result.ok === result.total ? tail : `못 고친 ${result.total - result.ok}개는 내일 이후에 다시 나와요. 풀이를 한 번 더 읽어 봐요. ${tail}`));
-    card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}`));
+    card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.stone ? ` 🔷 수학스톤 +${rw.stone}` : ''}`));
     const b = el('button', 'btn btn-primary btn-big-wide', '사다리로');
     b.type = 'button';
     b.addEventListener('click', () => renderLadder(state));
@@ -1596,7 +1630,7 @@ async function finishRound() {
   // ☀️ 오늘의 수학의 개념 편이면 — 섞어 풀기가 남았으면 "다음 →", 없으면 여기가 완주
   const inDaily = !!d && d.step === 'round';
   if (lastOfDaily) card.appendChild(el('p', 'math-p big', daily && daily.first ? '☀️ 오늘의 수학 끝! 내일도 ☀️ 하나면 돼요.' : '☀️ 오늘의 수학 끝!'));
-  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.stone ? ` 🔷 수학스톤 +${rw.stone}` : ''}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (rw.bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(rw.bonus)} 받았어요!`));
   ticketNote(state, rw.ticket).then((t) => { if (t && card.isConnected) card.appendChild(t); }); // 🎟️ 다음 영상까지 (수학도 채운다)
   const offer = askOfferForRound(r, state, today); // ❓ 틀린 문제를 아빠에게

@@ -453,6 +453,19 @@ export function tallyRound(m, { mode, correct, result, dailyFirst }) {
   return { ok, rev };
 }
 
+// ── 🔷 수학스톤 자격 (2026-09-22, 아버님 "인피니티 스톤") — "제대로 배웠나"에서만: 양(문항 수)이 아니라 질 ──
+/**
+ * 이 편이 주는 수학스톤 — 개념 편 통과(연습 제외) 1 · 👑 이해 완료 +2 · 🤔 노트 회차 전부 고침 1 · ❓ 답장으로 처음 고침 1.
+ * 섞어 풀기·진단은 없음. 반복으로 늘어나는 길이 없다(통과 뒤 같은 개념은 연습, 복습은 일정대로, 노트는 내일로, ❓는 한 번).
+ */
+export function stoneReward({ mode, result }) {
+  let n = 0;
+  if ((mode === 'learn' || mode === 'review') && result && result.passed && !result.practice) { n = 1; if (result.crowned) n += 2; }
+  else if (mode === 'notes' && result && result.total > 0 && result.ok === result.total) n = 1;
+  else if (mode === 'ask' && result && result.fixed) n = 1;
+  return n;
+}
+
 // ── 🎯 잡기 자격 (Codex 5차 #2·#6 — 화면(math.js)에 있던 규칙을 순수 함수로, 미룬 던지기는 레코드에) ──
 /**
  * 이 편이 주는 몬스터볼 횟수 — 아버님 결정(2026-09-22): 개념 처음 통과 1 / ☀️ 안의 개념 편 통과(복습 포함) 1 / ☀️ 하루 첫 완주 +1.

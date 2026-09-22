@@ -3,7 +3,7 @@ import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf } fro
 import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
 import { listDaily } from './db.js';
 import { todayKey, todayDone } from './track.js';
-import { makeFigure, setFigure, itemById } from './items.js';
+import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES } from './items.js';
 import { initShop, openShop, openMon } from './shop.js';
 
 const $ = (id) => document.getElementById(id);
@@ -124,6 +124,16 @@ export async function openPokedex(opts) {
   hint.appendChild(el('span', 'streak', streak > 0 ? `🔥 ${streak}일 연속 학습 중` : `🔥 하루 ${STREAK_MIN_DONE}문장 이상 하면 연속 학습이 시작돼요`));
   if (nextLv) hint.appendChild(el('span', 'unlock', `🔒 Lv.${nextLv}에 새 포켓몬 ${unlockCountAt(nextLv)}마리 — ⚡${xpToReach(nextLv) - p.xp} 남음`));
   card.appendChild(hint);
+  // 🧤 건틀릿 — 과목 스톤 (2026-09-22): 배워야만 생기고, 상점의 🧤 칸에서 코인과 같이 쓴다. 아직 없는 과목은 🔒 자리만
+  const gl = el('div', 'pokedex-gauntlet');
+  gl.appendChild(el('span', 'ttl', '🧤 스톤'));
+  for (const s of STONES) {
+    const n = p.items && p.items[s.id] ? p.items[s.id] : 0;
+    gl.appendChild(el('span', 'stone' + (n > 0 ? ' have' : ''), `${s.emoji} ${s.ko} ${n}`));
+  }
+  for (const f of FUTURE_STONES) gl.appendChild(el('span', 'stone locked', `🔒 ${f.emoji} ${f.ko}`));
+  card.appendChild(gl);
+  card.appendChild(el('div', 'pokedex-stats', '스톤은 배워야만 생겨요 — 🔷 개념 통과·👑 / 🔶 복습 완주·에세이. 🛒 상점 🧤 칸에서 코인과 같이 써요'));
   // 💰 코인·🎒 가방·🛒 상점
   const coinRow = el('div', 'pokedex-coins');
   const coinLeft = el('div');

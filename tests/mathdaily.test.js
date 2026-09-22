@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  dailyPlan, weakKinds, applyMixRound, markDaily, dailyDone, applyRound, applyNotesRound, MIX_CONCEPTS, KINDS, REWARD, dueNotes, conceptReport, mathReportText, tallyRound, bumpTot, roundCatches, addPending, takePending, pendingThrows,
+  dailyPlan, weakKinds, applyMixRound, markDaily, dailyDone, applyRound, applyNotesRound, MIX_CONCEPTS, KINDS, REWARD, dueNotes, conceptReport, mathReportText, tallyRound, bumpTot, roundCatches, addPending, takePending, pendingThrows, stoneReward,
 } from '../js/mathprog.js';
 import { emptyMath, mergeMath } from '../js/db.js';
 import { rng } from '../js/mathgen.js';
@@ -251,6 +251,20 @@ test('🎯 잡기 자격 roundCatches — 처음 통과 1 · ☀️ 안 개념 �
   assert.equal(roundCatches({ mode: 'notes', result: { ok: 2, total: 2 } }), 0);
   assert.equal(roundCatches({ mode: 'ask', result: { fixed: true } }), 0);
   assert.equal(roundCatches({ mode: 'diag' }), 0);
+});
+
+test('🔷 수학스톤 자격 stoneReward — 개념 편 통과 1 · 👑 +2 · 노트 전부 고침 1 · ❓ 처음 고침 1 · 연습·섞어·진단·실패 0 (2026-09-22 🧤: "제대로 배웠나"에서만)', () => {
+  assert.equal(stoneReward({ mode: 'learn', result: { passed: true, first: true, practice: false } }), 1);
+  assert.equal(stoneReward({ mode: 'review', result: { passed: true, review: true, practice: false } }), 1);
+  assert.equal(stoneReward({ mode: 'review', result: { passed: true, review: true, practice: false, crowned: true } }), 3, '👑 이해 완료면 +2');
+  assert.equal(stoneReward({ mode: 'learn', result: { passed: false, practice: false } }), 0, '못 넘기면 0');
+  assert.equal(stoneReward({ mode: 'review', result: { passed: true, practice: true } }), 0, '연습 편 0 — 반복으로 못 늘린다');
+  assert.equal(stoneReward({ mode: 'notes', result: { ok: 2, total: 2 } }), 1);
+  assert.equal(stoneReward({ mode: 'notes', result: { ok: 1, total: 2 } }), 0, '하나라도 못 고치면 0');
+  assert.equal(stoneReward({ mode: 'ask', result: { ok: true, fixed: true } }), 1);
+  assert.equal(stoneReward({ mode: 'ask', result: { ok: true, fixed: false } }), 0, '이미 고친 걸 또 내면 0');
+  assert.equal(stoneReward({ mode: 'mix', result: { ok: 3, total: 3 } }), 0, '섞어 풀기는 연습');
+  assert.equal(stoneReward({ mode: 'diag', result: null }), 0);
 });
 
 test('🎯 미룬 던지기 pend — 레코드에 적고 하나씩 뺀다, 없으면 false, 병합은 큰 쪽 (Codex 5차 #2: 그림이 없거나 🎒로 나가도 잡기가 안 사라진다)', () => {

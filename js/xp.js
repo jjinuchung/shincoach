@@ -5,7 +5,7 @@ import {
   getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase,
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase,
 } from './db.js';
-import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS } from './items.js';
+import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES } from './items.js';
 import { anchorFor } from './pokemon.js';
 import { findLocked } from './unlock.js';
 
@@ -449,6 +449,13 @@ export function itemCount(id) {
   return profile.items[id] || 0;
 }
 
+/** 🧤 스톤 개수 — { math: n, english: m } (가방의 stone_* 아이템) */
+export function stones() {
+  const out = {};
+  for (const s of STONES) out[s.subject] = profile.items[s.id] || 0;
+  return out;
+}
+
 /** 가방: { 아이템id: 개수 } (0개는 뺌) */
 /** 🎟️ 직전 교환권을 산 시점의 학습 누적치 (없으면 null — 아직 기준선을 안 잡음) */
 export function unlockBase() {
@@ -489,12 +496,13 @@ export function consumeItem(id) {
   return true;
 }
 
-/** 🛒 구매: 코인이 모자라면 false. 코인 차감과 가방 추가를 한 증분으로 */
+/** 🛒 구매: 코인(과 스톤)이 모자라면 false. 차감과 가방 추가를 한 증분으로 */
 export async function buyItem(id) {
   const it = itemById(id);
-  if (!it || it.price <= 0) return false; // 🌟 황금 볼은 파는 물건이 아님 (복습으로만)
-  if ((profile.coins || 0) < it.price) return false; // 빠른 거르기 (진짜 판정은 트랜잭션 안에서)
-  const cost = { coins: it.price };
+  if (!it || it.price <= 0) return false; // 🌟 황금 볼·🧤 스톤은 파는 물건이 아님 (학습으로만)
+  const cost = costOf(it); // 🧤 스톤이 드는 물건은 코인 + 스톤 (purchaseRule이 둘 다 한 트랜잭션에서 판정)
+  if ((profile.coins || 0) < cost.coins) return false; // 빠른 거르기 (진짜 판정은 트랜잭션 안에서)
+  for (const sid of Object.keys(cost.items)) if ((profile.items[sid] || 0) < cost.items[sid]) return false;
   const gain = { items: { [id]: 1 } };
   const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
   return r.ok;

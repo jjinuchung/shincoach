@@ -23,6 +23,7 @@ export const REWARD = {
   bonusCoin: 10,
   hp: 15,         // 파트너 HP 회복 (물약 없이 회복하는 유일한 공짜 수단)
   golden: 1,      // 🌟 황금 몬스터볼 — 하루 1개만, 복습에서만 나온다
+  stone: 1,       // 🔶 영어스톤 — 회차 완주마다 (복습은 밀린 문장이 있을 때만 열려 유한)
 };
 /** 말하기를 몇 번 미달하면 넘어가는지 (복습은 짧게 끝나야 하므로 평소 3번보다 적게) */
 export const MAX_FAILS = 2;
@@ -203,9 +204,9 @@ export function reviewSummary(records, today) {
  */
 export function roundReward(alreadyRewardedToday) {
   if (alreadyRewardedToday) {
-    return { xp: REWARD.bonusXp, coin: REWARD.bonusCoin, hp: REWARD.hp, golden: 0, first: false };
+    return { xp: REWARD.bonusXp, coin: REWARD.bonusCoin, hp: REWARD.hp, golden: 0, first: false, stone: REWARD.stone };
   }
-  return { xp: REWARD.bonusXp, coin: REWARD.bonusCoin, hp: REWARD.hp, golden: REWARD.golden, first: true };
+  return { xp: REWARD.bonusXp, coin: REWARD.bonusCoin, hp: REWARD.hp, golden: REWARD.golden, first: true, stone: REWARD.stone };
 }
 
 // ── 화면 ──

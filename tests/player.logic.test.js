@@ -176,6 +176,7 @@ function loadPlayer() {
     getProfileSnapshot: () => ({ caught: battleState.caught }), lossesOf: () => 0,
     battleWin: (id) => { battleState.won.push(id); return { first: true }; }, battleLoss: (id) => { battleState.lost.push(id); return { losses: 1, lost: false }; },
     consumeItem: () => true, inventory: () => ({}), POTION: [], GOLDEN: { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', mult: 2, kind: 'ball' },
+    STONE_ENGLISH: { id: 'stone_english', emoji: '🔶', ko: '영어스톤', subject: 'english', kind: 'stone' }, // 🧤 스톤 (2026-09-22)
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
     initReview() {}, abortReview() {}, isReviewOpen: () => false, openReview(o) { reviewCalls.push(o); },
@@ -1330,6 +1331,7 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 ❤️ 회복 (
   assert.equal(reviewState.rounds, 1);
   assert.equal(reviewState.golden, true);
   assert.ok(itemLog.includes('goldenball'), '가방에 황금 볼');
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 1, '🔶 영어스톤 — 회차 완주마다 1 (2026-09-22 🧤)');
   assert.ok(hpLog.some((d) => d > 0), 'HP 회복');
 
   // 같은 날 두 번째 회차: 황금 볼만 빠지고 ⚡·💰·❤️는 그대로 (하루에 여러 번 하게 바뀜)
@@ -1340,7 +1342,8 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 ❤️ 회복 (
   assert.equal(again.hp, REWARD.hp, '❤️ 회복은 매번');
   assert.equal(again.xp, REWARD.bonusXp);
   assert.equal(again.coin, REWARD.bonusCoin);
-  assert.equal(itemLog.length, before, '황금 볼을 또 주지 않음');
+  assert.equal(itemLog.slice(before).filter((x) => x === 'goldenball').length, 0, '황금 볼을 또 주지 않음');
+  assert.equal(itemLog.slice(before).filter((x) => x === 'stone_english').length, 1, '🔶 영어스톤은 두 번째 회차도 1');
   assert.ok(hpLog.length > hpBefore, '회복은 실제로 한 번 더 들어간다');
 });
 
@@ -1658,7 +1661,7 @@ test('자리 되돌리기: 그 사이 콘텐츠가 바뀌었으면 건드리지 
 });
 
 test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (하루 1번, 부모 모드 제외, 보상은 ⚡·💰)', async () => {
-  const { run, essayCalls, essayState, xpLog, coinLog, video, ctx } = loadPlayer();
+  const { run, essayCalls, essayState, xpLog, coinLog, itemLog, video, ctx } = loadPlayer();
   const done = [];
   ctx.track.done = (c) => done.push(c);
   ctx.track.todayDone = () => done.length;
@@ -1709,6 +1712,7 @@ test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (�
   const reward = await o.onFinished(); // 완주 보상도 "하루 한 번"을 선점한 뒤에 정해진다
   assert.deepEqual(reward, { xp: 50, coin: 20 });
   assert.ok(xpLog.includes(50) && coinLog.includes(20));
+  assert.ok(itemLog.includes('stone_english'), '🔶 영어스톤 +1 (에세이 완주, 하루 1번)');
   assert.equal(essayState.done, true, '오늘 썼다고 기록');
   assert.equal(essayState.saved[0].fixed, 'I got a new bike.', '고친 글도 남긴다');
 

@@ -135,7 +135,9 @@ test('roundReward: 🌟 황금 볼만 하루 하나, ⚡·💰·❤️는 회차
   assert.equal(first.hp, REWARD.hp);
   assert.equal(first.first, true);
 
+  assert.equal(first.stone, 1, '🔶 영어스톤 — 회차 완주마다 (2026-09-22 🧤)');
   const again = roundReward(true);
+  assert.equal(again.stone, 1, '두 번째 회차도 스톤은 준다 (복습은 밀린 문장이 있을 때만 열려 유한)');
   assert.equal(again.golden, 0, '황금 볼은 하루 하나 — 복습에서만 나오는 특별한 것');
   assert.equal(again.hp, REWARD.hp, '❤️ 회복은 매번 (두 번째부터 빈손이면 아이가 왜 또 하냐고 한다)');
   assert.equal(again.xp, REWARD.bonusXp);

@@ -1,7 +1,7 @@
 // 🛒 아이템·코인 규칙 + 프로필의 가방/꾸미기 테스트: node --test tests/items.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, GOLDEN, ITEMS, itemById, lootBox, canBuy } from '../js/items.js';
+import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, GOLDEN, ITEMS, itemById, lootBox, canBuy, STONES, FUTURE_STONES, RADAR, STONE_SHOP, stoneOf, costOf, priceText } from '../js/items.js';
 import {
   coins, gainCoins, itemCount, inventory, addItem, buyItem, getLook, equipGear, applyDye, getProfileSnapshot,
   getPartner, setPartner, hpOf, isTired, changeHp, usePotion, catchAttempt, setGearPos,
@@ -16,9 +16,9 @@ test('카탈로그: id가 겹치지 않고 가격은 양수, 장식은 head/face
   assert.equal(new Set(ids).size, ids.length);
   for (const it of ITEMS) {
     assert.ok(it.emoji && it.ko, it.id);
-    assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom'].includes(it.kind), it.id);
-    // 값이 없는 것 = 코인으로 못 사는 것: 🔴 몬스터볼(무료) · 🌟 황금 볼(복습으로만) · 🍄 다이버섯(학습으로만)
-    if (it.id === 'pokeball' || it.id === 'goldenball' || it.kind === 'mushroom') assert.equal(it.price, 0, it.id);
+    assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool'].includes(it.kind), it.id);
+    // 값이 없는 것 = 코인으로 못 사는 것: 🔴 몬스터볼(무료) · 🌟 황금 볼(복습으로만) · 🍄 다이버섯(학습으로만) · 🧤 스톤(학습으로만)
+    if (it.id === 'pokeball' || it.id === 'goldenball' || it.kind === 'mushroom' || it.kind === 'stone') assert.equal(it.price, 0, it.id);
     else assert.ok(it.price > 0, it.id);
   }
   for (const p of POTION) assert.ok(p.heal > 0, p.id);
@@ -51,21 +51,36 @@ test('코인 규칙: 퍼즐 5/3/2, 정답 공개 0, 스트릭 5×일 최대 50',
   assert.equal(streakCoins(0), 5);
 });
 
-test('lootBox: 귀한 것(🌟 황금 볼·⭐ 메가·🍄 버섯)은 상자에서 안 나온다', () => {
-  const loot = ITEMS.filter((i) => !['ball', 'mega', 'mushroom'].includes(i.kind));
+test('lootBox: 귀한 것(🌟 황금 볼·⭐ 메가·🍄 버섯·🧤 스톤·스톤 상점 물건)은 상자에서 안 나온다', () => {
+  const loot = ITEMS.filter((i) => !['ball', 'mega', 'mushroom', 'stone', 'tool'].includes(i.kind));
   assert.equal(lootBox(() => 0), loot[0].id);
   assert.equal(lootBox(() => 0.999999), loot[loot.length - 1].id);
   assert.ok(itemById(lootBox()));
-  const forbidden = new Set(ITEMS.filter((i) => ['ball', 'mega', 'mushroom'].includes(i.kind)).map((i) => i.id));
+  const forbidden = new Set(ITEMS.filter((i) => ['ball', 'mega', 'mushroom', 'stone', 'tool'].includes(i.kind)).map((i) => i.id));
   for (let i = 0; i <= 40; i++) assert.equal(forbidden.has(lootBox(() => i / 40)), false, '상자에서 나오면 안 되는 것');
   assert.equal(canBuy(GOLDEN.id, 9999).ok, false, '코인이 아무리 많아도 못 삼');
   assert.equal(canBuy('mushroom', 9999).ok, false, '🍄 다이버섯도 돈으로 못 삼 (학습으로만)');
 });
 
 test('canBuy: 부족한 코인 계산', () => {
-  assert.deepEqual(canBuy('ribbon', 30), { ok: true, short: 0 });
-  assert.deepEqual(canBuy('ribbon', 12), { ok: false, short: 18 });
-  assert.deepEqual(canBuy('nope', 999), { ok: false, short: 0 });
+  assert.deepEqual(canBuy('ribbon', 30), { ok: true, short: 0, shortStones: [] });
+  assert.deepEqual(canBuy('ribbon', 12), { ok: false, short: 18, shortStones: [] });
+  assert.deepEqual(canBuy('nope', 999), { ok: false, short: 0, shortStones: [] });
+});
+
+test('🧤 스톤 상점: 레이더는 💰100 + 🔷1 — 스톤이 없으면 코인이 많아도 못 사고, 스톤은 돈으로 못 산다 (2026-09-22 아버님 "인피니티 스톤")', () => {
+  assert.deepEqual(STONES.map((s) => s.id), ['stone_math', 'stone_english']);
+  assert.equal(stoneOf('math').emoji, '🔷'); assert.equal(stoneOf('english').emoji, '🔶'); assert.equal(stoneOf('science'), null);
+  assert.ok(FUTURE_STONES.length >= 1, '다음 과목 자리(🔒)가 건틀릿에 보인다');
+  assert.deepEqual(costOf(RADAR), { coins: 100, items: { stone_math: 1 } });
+  assert.deepEqual(costOf(itemById('ribbon')), { coins: 30, items: {} }, '스톤 없는 물건은 코인만');
+  assert.equal(priceText(RADAR), '💰100 + 🔷1');
+  assert.equal(priceText(itemById('ribbon')), '💰30');
+  assert.deepEqual(canBuy('radar', 9999, {}), { ok: false, short: 0, shortStones: [{ id: 'stone_math', emoji: '🔷', ko: '수학스톤', n: 1 }] }, '코인이 아무리 많아도 스톤 없이는 못 산다');
+  assert.deepEqual(canBuy('radar', 50, { stone_math: 2 }), { ok: false, short: 50, shortStones: [] });
+  assert.deepEqual(canBuy('radar', 100, { stone_math: 1 }), { ok: true, short: 0, shortStones: [] });
+  assert.equal(canBuy('stone_math', 9999, {}).ok, false, '스톤은 파는 물건이 아니다');
+  assert.ok(STONE_SHOP.every((it) => it.stones && Object.keys(it.stones).length), '스톤 상점 물건은 전부 스톤이 든다');
 });
 
 test('프로필: 코인 획득·구매·가방', async () => {

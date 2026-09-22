@@ -10,7 +10,7 @@ import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, m
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle } from './pokemon.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount } from './xp.js';
-import { COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
+import { STONE_ENGLISH, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
@@ -728,6 +728,7 @@ function startEssay(practice, cont) {
       if (!await track.markEssayDone()) return null;
       awardXp(ESSAY_FINISH.xp);
       awardCoins(ESSAY_FINISH.coin);
+      addItem(STONE_ENGLISH.id, 1); // 🔶 영어스톤 — 에세이 완주(하루 1번, markEssayDone이 선점)
       track.flush();
       return ESSAY_FINISH;
     },
@@ -961,6 +962,7 @@ async function grantReviewRound() {
   awardXp(reward.xp);
   awardCoins(reward.coin);
   if (reward.golden) addItem(GOLDEN.id, reward.golden);
+  if (reward.stone) addItem(STONE_ENGLISH.id, reward.stone); // 🔶 영어스톤 — 회차 완주마다
   if (reward.hp) hpHeal(reward.hp);
   dropMushroom('복습을 끝까지 했어요'); // 🍄 거다이맥스 재료
   track.flush();
