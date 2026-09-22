@@ -909,6 +909,23 @@ export function applyBuyEgg(cost, egg) {
 export function applyEggDay(subject, dateKey) {
   return mutateProfile((p) => eggRule(p, subject, dateKey));
 }
+/**
+ * 🌈 이로치의 스톤 쓰기 — 잡은 포켓몬이고 아직 이로치가 아닐 때, 스톤 하나를 쓰고 mons[id].shiny = true를 **한 트랜잭션**에서 (영구)
+ * @returns {{ok:boolean, why?:string}} why: 'caught' | 'already' | 'item'
+ */
+export function shinyRule(profile, monId, itemId = 'shiny_stone') {
+  const id = Number(monId);
+  if (!id || !((profile.caught || {})[id] > 0)) return { ok: false, why: 'caught' };
+  if (profile.mons && profile.mons[id] && profile.mons[id].shiny) return { ok: false, why: 'already' };
+  const r = purchaseRule(profile, { items: { [itemId]: 1 } }, {});
+  if (!r.ok) return { ok: false, why: 'item' };
+  profile.mons[id] = { ...(profile.mons[id] || {}), shiny: true };
+  return { ok: true };
+}
+export function applyShiny(monId, itemId) {
+  return mutateProfile((p) => shinyRule(p, monId, itemId));
+}
+
 /** 🐣 부화 알림을 보여 줬다 */
 export function applyEggSeen(eggId) {
   return mutateProfile((p) => eggSeenRule(p, eggId));

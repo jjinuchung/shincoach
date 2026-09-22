@@ -6,6 +6,7 @@
 
 import { ROSTER, loadCharacters } from './pokemon.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
+import { getLook } from './xp.js';
 import { dailyDone } from './mathprog.js';
 import { todayKey } from './track.js';
 
@@ -48,12 +49,13 @@ export const SUBJECTS = [
  * @param {Array<{id:number, url:string}>} characters 기기에 받아둔 캐릭터
  * @returns {{url:string, ko:string}|null}
  */
-export function pickMascot(mascotId, characters) {
+export function pickMascot(mascotId, characters, shinyUrlOf) {
   if (!mascotId) return null;
   const hit = (characters || []).find((c) => c && c.id === mascotId && c.url);
   if (!hit) return null;
   const known = ROSTER.find((r) => r.id === mascotId);
-  return { url: hit.url, ko: known ? known.ko : '' };
+  const shiny = typeof shinyUrlOf === 'function' ? shinyUrlOf(mascotId) : null; // 🌈 그 마스코트를 이로치로 만들었으면 홈에서도 (하나뿐인 <img> 직접 생성 자리)
+  return { url: shiny || hit.url, ko: known ? known.ko : '' };
 }
 
 /** 카드를 누르면 어디로 가는가 — 화면 이름, 또는 아직 없으면 안내 문구 */
@@ -76,7 +78,7 @@ function cardEl(subject, mascot, onPick) {
   stage.className = 'home-card-mon';
   if (mascot) {
     const img = document.createElement('img');
-    img.src = mascot.url;
+    img.src = mascot.url; // pickMascot이 이로치면 이미 그 그림
     img.alt = mascot.ko;
     img.draggable = false;
     stage.appendChild(img);
@@ -157,7 +159,8 @@ export async function renderHome(showView) {
     bonus = mathBonusFor(m, todayKey());
   } catch { unread = 0; }
   const frag = document.createDocumentFragment();
-  for (const s of SUBJECTS) frag.appendChild(cardEl(s.key === 'math' ? { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) } : s, pickMascot(s.mascot, chars), pick));
+  const shinyOf = (id) => { const l = getLook(id); return l && l.shinyUrl ? l.shinyUrl : null; };
+  for (const s of SUBJECTS) frag.appendChild(cardEl(s.key === 'math' ? { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) } : s, pickMascot(s.mascot, chars, shinyOf), pick));
   list.innerHTML = '';
   list.appendChild(frag);
   hint.hidden = true;

@@ -152,6 +152,7 @@ async function main() {
   // 🛟 기록 사본 남기기 (도감·코인이 사라지는 일을 막는 마지막 보루 — 실패해도 조용히)
   import('./backup.js').then((m) => m.saveMirror()).catch(() => {});
   import('./pokemon.js').then((m) => m.loadForms()).catch(() => {}); // ⭐ 받아둔 변신 그림 (오프라인에서도 보이게)
+  import('./pokemon.js').then((m) => m.loadShiny()).catch(() => {}); // 🌈 받아둔 이로치 그림
   requestPersistentStorage();
   registerServiceWorker();
 }

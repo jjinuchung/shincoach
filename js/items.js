@@ -117,7 +117,10 @@ export const RADAR = { id: 'radar', emoji: '🧭', ko: '레이더', price: 100, 
 // 🥚 알: 사고 나서 **그 과목을 5일 완주**해야 부화 → 그 과목의 희귀 이상 포켓몬 한 마리가 도감에 (던지기 없이 확정). 과목마다 품는 알은 하나
 export const EGG_MATH = { id: 'egg_math', emoji: '🥚', ko: '수학 알', price: 200, stones: { stone_math: 2 }, kind: 'egg', subject: 'math', hint: '☀️ 오늘의 수학을 5일 완주하면 부화해요 — 🎒에서 며칠 남았는지 보여요' };
 export const EGG_ENGLISH = { id: 'egg_english', emoji: '🥚', ko: '영어 알', price: 200, stones: { stone_english: 2 }, kind: 'egg', subject: 'english', hint: '🎤 오늘의 목표 문장을 5일 채우면 부화해요 — 🎒에서 며칠 남았는지 보여요' };
-export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH];
+// 🌈 이로치의 스톤: 잡은 포켓몬 한 마리를 **색이 다른 모습(이로치)** 으로 — 영원히, 어디서나(도감·잡기·퍼즐·배틀·파트너). 두 과목 스톤이 다 든다(인피니티)
+// id를 'shiny'로 하면 안 된다 — 'shiny'는 이미 ✨ 반짝 염색약 id (Codex 6차)
+export const SHINY_STONE = { id: 'shiny_stone', emoji: '🌈', ko: '이로치의 스톤', price: 500, stones: { stone_math: 3, stone_english: 3 }, kind: 'tool', hint: '🎒 잡은 포켓몬을 눌러 "🌈 이로치로!"를 누르면 색이 다른 모습이 돼요 — 영원히' };
+export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH, SHINY_STONE];
 
 /** 값 — 코인과 재료(스톤)를 한 묶음으로 (purchaseRule이 둘 다 한 트랜잭션에서 판정) */
 export function costOf(it) {
@@ -145,6 +148,7 @@ export const ITEMS = [
   RADAR,
   EGG_MATH,
   EGG_ENGLISH,
+  SHINY_STONE,
 ];
 const byId = {};
 for (const it of ITEMS) byId[it.id] = it;
@@ -204,13 +208,21 @@ export function makeFigure(url, alt, look, cls) {
 /** 이미 있는 figure의 그림·꾸밈 갱신 (잡기 무대처럼 요소를 재사용하는 곳). url이 undefined면 그림은 그대로 */
 export function setFigure(fig, url, look) {
   const img = fig.querySelector('img');
-  if (url !== undefined) {
-    if (img.getAttribute('src') !== url) img.src = url;
-    img.hidden = !url; // 그림을 아직 못 받았으면 깨진 아이콘 대신 빈 자리
+  // 🌈 이로치: look.shinyUrl(받아 둔 이로치 그림)이 있으면 그것을 — 변신 그림처럼 url을 통째로 주는 곳(배틀 메가·거다이맥스)은 look이 null이라 그대로 (변신 > 이로치 > 일반)
+  const src = look && look.shinyUrl ? look.shinyUrl : url;
+  if (src !== undefined) {
+    if (img.getAttribute('src') !== src) img.src = src;
+    img.hidden = !src; // 그림을 아직 못 받았으면 깨진 아이콘 대신 빈 자리
   }
-  const dye = look && look.dye ? byId[look.dye] : null;
+  // 이로치면 염색 필터는 끈다 — 이로치는 제 색이 볼거리 (염색약은 가방·기록에 그대로 남는다)
+  const dye = look && look.dye && !look.shiny ? byId[look.dye] : null;
   img.style.filter = dye && dye.filter ? dye.filter : '';
   if (dye && dye.cls) img.classList.add(dye.cls); else img.classList.remove('shiny');
+  // ✨ 이로치 배지 — 그림을 아직 못 받아 일반 모습이어도 "이로치"라는 건 보이게
+  let sb = fig.querySelector('.mon-shiny');
+  if (look && look.shiny) {
+    if (!sb) { sb = document.createElement('span'); sb.className = 'mon-shiny'; sb.textContent = '✨'; fig.appendChild(sb); }
+  } else if (sb) sb.remove();
   const gear = look && look.gear ? byId[look.gear] : null;
   let g = fig.querySelector('.mon-gear');
   if (gear) {

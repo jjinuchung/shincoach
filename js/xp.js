@@ -2,12 +2,12 @@
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import {
-  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase, applyBuyEgg, applyEggDay, applyEggSeen,
+  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase, applyBuyEgg, applyEggDay, applyEggSeen, applyShiny,
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase,
 } from './db.js';
-import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES } from './items.js';
+import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { anchorFor } from './pokemon.js';
+import { anchorFor, shinyUrl } from './pokemon.js';
 import { findLocked } from './unlock.js';
 
 // ── 경험치 ──
@@ -579,7 +579,19 @@ export async function buyTicket(contentId, verify, base) {
 export function getLook(monId) {
   const m = profile.mons[monId] || {};
   // anchor = 그림에서 자동으로 찾은 머리 위치 / gearPos = 아이가 직접 끌어다 놓은 자리(있으면 우선)
-  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId), gearPos: m.gearPos || null };
+  // shiny = 🌈 이로치(영구) · shinyUrl = 받아 둔 이로치 그림(없으면 null → 일반 그림 + ✨ 배지)
+  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId), gearPos: m.gearPos || null, shiny: !!m.shiny, shinyUrl: m.shiny ? shinyUrl(monId) : null };
+}
+
+/** 🌈 이로치의 스톤 쓰기 — 트랜잭션(스톤 소모 + shiny 표시 한 번에). @returns {Promise<{ok:boolean, why?:string}>} */
+export async function useShinyStone(monId) {
+  if ((profile.items[SHINY_STONE.id] || 0) < 1) return { ok: false, why: 'item' };
+  const r = await runProfileOp(() => applyShiny(monId, SHINY_STONE.id), () => ({ ok: false, why: 'save' }));
+  return { ok: !!(r && r.ok), why: r && r.why };
+}
+export function isShiny(monId) {
+  const m = profile.mons[monId];
+  return !!(m && m.shiny);
 }
 
 /**

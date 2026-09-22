@@ -426,6 +426,53 @@ export async function ensureForm(monId, kind) {
   }
 }
 
+// ── 🌈 이로치 그림 (2026-09-22 4c) ──
+// PokeAPI의 이로치 공식 일러스트를 변신 그림과 같은 방식으로 받아 기기에만 둔다. 같은 characters 스토어에 **문자열 키 "25:shiny"** 로 —
+// 숫자 id(일반 그림)를 덮어쓰지 않고 새 스토어도 필요 없다 (Codex 7차 설계). loadCharacters는 명단 숫자 id만 보므로 섞이지 않는다.
+const SHINY_URL = (id) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/${id}.png`;
+const shinyKey = (id) => `${Number(id)}:shiny`;
+const shinyUrls = new Map(); // monId → object URL (받아 둔 것만)
+
+/** 받아 둔 이로치 그림 주소 (없으면 null) — 동기·캐시만. 받는 건 ensureShiny */
+export function shinyUrl(id) {
+  return shinyUrls.get(Number(id)) || null;
+}
+
+/** 앱을 열 때 받아 둔 이로치 그림을 메모리에 올림 (오프라인에서도 보이게) */
+export async function loadShiny() {
+  const recs = await getCharacters().catch(() => []);
+  for (const r of recs) {
+    if (!r || r.variant !== 'shiny' || !r.blob || !r.monId || shinyUrls.has(r.monId)) continue;
+    shinyUrls.set(Number(r.monId), URL.createObjectURL(r.blob));
+  }
+  return shinyUrls.size;
+}
+
+/** 이로치 그림을 확보한다 — 스톤을 쓴 그 한 마리만, 그때 받는다. 실패하면 null (일반 그림으로 보이고 ✨ 배지만) */
+export async function ensureShiny(id) {
+  const key = Number(id);
+  if (!key) return null;
+  if (shinyUrls.has(key)) return shinyUrls.get(key);
+  const saved = (await getCharacters().catch(() => [])).find((c) => c && c.id === shinyKey(key) && c.blob);
+  if (saved) {
+    const url = URL.createObjectURL(saved.blob);
+    shinyUrls.set(key, url);
+    return url;
+  }
+  try {
+    const res = await fetch(SHINY_URL(key), { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const made = await prepare(await res.blob());
+    await putCharacter({ id: shinyKey(key), monId: key, variant: 'shiny', ko: `shiny:${key}`, en: '', blob: made.blob, anchor: made.anchor, savedAt: Date.now() });
+    const url = URL.createObjectURL(made.blob);
+    shinyUrls.set(key, url);
+    return url;
+  } catch (e) {
+    console.warn('이로치 그림 받기 실패:', key, e);
+    return null;
+  }
+}
+
 // ── 🎟️ 예고 포스터용 그림 ──
 // 아직 못 잡은·명단에 없는 포켓몬도 보여줘야 하므로 따로 둔다.
 // 저장 방식은 캐릭터·변신 그림과 같다 — **PokeAPI에서 한 번 받아 기기에만** (저장소에 파일을 두지 않는다).

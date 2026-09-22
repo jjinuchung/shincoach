@@ -1,9 +1,9 @@
 // 🛒 상점(💰 코인으로 🎀 장식·🎨 염색약·🧪 물약 사기) + 포켓몬 상세(❤️ HP·물약·🤝 파트너·장식 장착·염색) 모달
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
-import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, itemById, canBuy, priceText, setFigure } from './items.js';
-import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup } from './xp.js';
-import { formsOf, formUrl, ensureForm, subjectOf, ROSTER, forSubject } from './pokemon.js';
+import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, SHINY_STONE, itemById, canBuy, priceText, setFigure } from './items.js';
+import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
+import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
 import { sfx, unlock } from './sfx.js';
 
@@ -29,6 +29,21 @@ export function initShop(ctx) {
   $('mon-partner').addEventListener('click', () => {
     if (!mon) return;
     change(setPartner(mon.id), `🤝 ${mon.ko}${josaIga(mon.ko)} 파트너가 됐어요!`);
+  });
+  const sb = $('mon-shiny');
+  if (sb) sb.addEventListener('click', async () => {
+    if (!mon || mon.caught === false) return;
+    sb.disabled = true;
+    const id = mon.id;
+    const r = await useShinyStone(id); // 트랜잭션: 스톤 하나 + shiny 표시 (두 창이 같은 스톤을 둘 다 못 쓴다)
+    if (!mon || mon.id !== id) return;
+    if (!r.ok) { renderMon(r.why === 'already' ? '✨ 이미 이로치예요' : r.why === 'item' ? '🌈 이로치의 스톤이 없어요 — 🛒 스톤 상점에서' : '저장을 못 했어요 — 한 번 더'); return; }
+    renderMon('🌈 이로치가 됐어요! 그림을 받아 오는 중…', true);
+    notify(id);
+    await Promise.race([ensureShiny(id), new Promise((res) => setTimeout(res, 8000))]); // 그림은 지금 받는다 (못 받으면 일반 그림 + ✨)
+    if (!mon || mon.id !== id) return;
+    renderMon(`✨ ${mon.ko}${josaIga(mon.ko)} 이로치가 됐어요! 도감·잡기·퍼즐·배틀 어디서나 이 모습이에요`, true);
+    notify(id);
   });
   // 화면이 꺼지거나 다른 앱으로 넘어가면 손 뗀 이벤트가 안 온다 → 끌고 있던 장식을 여기서 놓는다
   document.addEventListener('visibilitychange', () => { if (document.hidden) endGearDrag(); });
@@ -283,6 +298,14 @@ function renderMon(msg, pop) {
   const pb = $('mon-partner');
   pb.textContent = isPartner ? '🤝 지금 파트너예요' : '🤝 파트너로!';
   pb.disabled = isPartner;
+  // 🌈 이로치의 스톤 — 가방에 있고 아직 이로치가 아니면 버튼, 이미 이로치면 표시만
+  const sb = $('mon-shiny');
+  if (sb) {
+    const n = itemCount(SHINY_STONE.id);
+    sb.hidden = !got || (!look.shiny && n < 1);
+    sb.disabled = !!look.shiny;
+    sb.textContent = look.shiny ? '✨ 이로치예요' : `🌈 이로치로! (이로치의 스톤 ${n}개)`;
+  }
 
   // 🎀 장식: [없음] [지금 쓰는 것] [가방에 있는 것들]
   const gearBox = $('mon-gear');

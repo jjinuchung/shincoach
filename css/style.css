@@ -1289,6 +1289,11 @@ button { font-family: inherit; }
 .pokedex-cell.unknown .subj { opacity: 1; }
 .pokedex-subjects { margin-top: 4px; }
 /* 🧭 레이더 — 잡기 화면의 버튼과 레이더가 부른 후보 표시 */
+/* 🌈 이로치 — 그림 위 ✨ 배지 (그림을 아직 못 받아도 보인다) */
+.mon-figure .mon-shiny { position: absolute; top: -4px; right: -4px; font-size: 0.9em; line-height: 1; pointer-events: none; text-shadow: 0 0 4px #fff; }
+.pokedex-cell .mon-shiny, .catch-cand .mon-shiny { font-size: 1rem; }
+.mon-shiny-btn { background: linear-gradient(90deg, #fecaca, #fde68a, #bbf7d0, #bfdbfe, #e9d5ff); background-color: #fde68a; border-color: #a78bfa; font-weight: 800; }
+.mon-shiny-btn:disabled { opacity: 0.9; }
 /* 🐣 부화 화면 */
 .hatch { z-index: 63; }
 .hatch-card { text-align: center; align-items: center; }

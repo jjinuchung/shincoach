@@ -1,7 +1,7 @@
 // 🐣 부화 화면 — 🥚 알이 5일을 채워 부화했을 때 한 번 보여 준다 (소유는 이미 트랜잭션에서 도감에 들어갔다 — 이 화면은 축하만)
 import { makeFigure } from './items.js';
 import { sfx } from './sfx.js';
-import { hatchedUnseen, markEggSeen } from './xp.js';
+import { hatchedUnseen, markEggSeen, getLook } from './xp.js';
 import { ROSTER, ensureCast } from './pokemon.js';
 
 const $ = (id) => document.getElementById(id);
@@ -16,7 +16,7 @@ export function openHatch(o) {
   onDone = o.onDone || null;
   const stage = $('hatch-stage');
   stage.innerHTML = '';
-  if (o.url) stage.appendChild(makeFigure(o.url, o.ko, null, 'hatch-mon'));
+  if (o.url) stage.appendChild(makeFigure(o.url, o.ko, o.look || null, 'hatch-mon'));
   else { const em = document.createElement('div'); em.className = 'hatch-emoji'; em.textContent = '🐣'; stage.appendChild(em); }
   $('hatch-title').textContent = `🐣 ${o.subject === 'math' ? '수학' : '영어'} 알이 부화했어요!`;
   $('hatch-text').textContent = `${o.ko}${josa(o.ko, '이', '가')} 태어났어요 — 도감에 들어갔어요. 잘 배운 5일의 선물이에요!`;
@@ -59,7 +59,7 @@ export async function showHatchIfAny() {
     try { const got = await Promise.race([ensureCast([egg.monId]), new Promise((res) => setTimeout(() => res([]), 8000))]); url = got && got[0] ? got[0].url : null; } catch { url = null; }
     if (anyModalOpen()) return false; // 그 사이 다른 게 열렸다 — 다음 기회에 (봤다고 적지 않는다)
     // "봤다"는 아이가 좋아!를 눌렀을 때 적는다 — 그림을 못 받거나 화면이 안 떴는데 봤다고 남지 않게 (Codex 7차 #7). 두 창이 같이 보여 주는 건 괜찮다
-    openHatch({ ko: r ? r.ko : '포켓몬', url, subject: egg.subject, onDone: () => { markEggSeen(egg.id).catch(() => {}); } });
+    openHatch({ ko: r ? r.ko : '포켓몬', url, subject: egg.subject, look: getLook(egg.monId), onDone: () => { markEggSeen(egg.id).catch(() => {}); } });
     return true;
   } finally { showing = false; }
 }

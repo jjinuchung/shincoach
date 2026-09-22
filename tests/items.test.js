@@ -1,13 +1,13 @@
 // 🛒 아이템·코인 규칙 + 프로필의 가방/꾸미기 테스트: node --test tests/items.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, GOLDEN, ITEMS, itemById, lootBox, canBuy, STONES, FUTURE_STONES, RADAR, STONE_SHOP, stoneOf, costOf, priceText } from '../js/items.js';
+import { COIN, puzzleCoins, streakCoins, GEAR, DYE, POTION, HP, GOLDEN, ITEMS, itemById, lootBox, canBuy, STONES, FUTURE_STONES, RADAR, STONE_SHOP, stoneOf, costOf, priceText, SHINY_STONE } from '../js/items.js';
 import {
   coins, gainCoins, itemCount, inventory, addItem, buyItem, getLook, equipGear, applyDye, getProfileSnapshot,
   getPartner, setPartner, hpOf, isTired, changeHp, usePotion, catchAttempt, setGearPos,
   hasKeystone, hasMegaStone, hasGmax, equipMega, gainMushroom, makeSoup, ballChance, catchChance,
 } from '../js/xp.js';
-import { mergeStatRecord } from '../js/db.js';
+import { mergeStatRecord, shinyRule, cloneProfile } from '../js/db.js';
 import { FORMS } from '../js/pokemon.js';
 import { ROSTER } from '../js/pokemon.js';
 
@@ -102,7 +102,7 @@ test('프로필: 코인 획득·구매·가방', async () => {
 });
 
 test('프로필: 장식 장착·교체·벗기 (가방 개수 보존)', () => {
-  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리
+  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null, shiny: false, shinyUrl: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리, shiny = 🌈 이로치
   assert.equal(equipGear(25, 'crown'), false, '가방에 없음');
   assert.equal(equipGear(25, 'ribbon'), true);
   assert.equal(getLook(25).gear, 'ribbon');
@@ -130,7 +130,7 @@ test('프로필: 염색은 소모, 원래 색은 무료', () => {
   assert.equal(getLook(25).dye, null);
   assert.equal(itemCount('red'), 1, '원래 색으로는 공짜');
   assert.equal(applyDye(25, 'cap'), false, '장식은 염색 불가');
-  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리
+  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null, shiny: false, shinyUrl: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리, shiny = 🌈 이로치
 });
 
 test('❤️ 파트너·HP·물약: 처음 잡은 포켓몬이 파트너, HP는 0~100, 물약은 가방에서 소모', () => {
@@ -279,4 +279,19 @@ test('🔴 볼은 던지면 없어지고, 가방에 없으면 몬스터볼로 �
   const r4 = catchAttempt(151, () => 0.99, { ball: 'masterball' });
   assert.equal(r4.ball, 'masterball');
   assert.equal(r4.caught, true, '마스터볼은 확률과 상관없이 잡힌다');
+});
+
+test('🌈 이로치의 스톤: 🔷3 🔶3 💰500, 스톤 상점에만 · shinyRule은 잡은 포켓몬·아직 아닐 때·스톤 있을 때만 한 트랜잭션에서 (스톤 소모 + shiny) · getLook에 shiny (2026-09-22 4c)', () => {
+  assert.deepEqual(costOf(SHINY_STONE), { coins: 500, items: { stone_math: 3, stone_english: 3 } });
+  assert.equal(SHINY_STONE.id, 'shiny_stone', "'shiny'는 염색약 id라 겹치면 안 된다");
+  assert.ok(itemById('shiny') && itemById('shiny').kind === 'dye', '염색약 shiny는 그대로');
+  assert.ok(STONE_SHOP.includes(SHINY_STONE));
+  const p = cloneProfile({ coins: 0, caught: { 25: 1 }, items: { shiny_stone: 1 }, mons: { 25: { gear: 'cap' } } });
+  assert.deepEqual(shinyRule(p, 4), { ok: false, why: 'caught' }, '안 잡은 포켓몬');
+  assert.deepEqual(shinyRule(p, 25), { ok: true });
+  assert.deepEqual(p.mons[25], { gear: 'cap', shiny: true }, '꾸밈은 그대로, shiny만 얹는다');
+  assert.equal(p.items.shiny_stone, undefined, '스톤 하나 소모(0이면 지워짐)');
+  assert.deepEqual(shinyRule(p, 25), { ok: false, why: 'already' });
+  p.caught[4] = 1;
+  assert.deepEqual(shinyRule(p, 4), { ok: false, why: 'item' }, '스톤이 없다');
 });
