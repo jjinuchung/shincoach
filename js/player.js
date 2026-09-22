@@ -1062,11 +1062,23 @@ function startReview(items, practice, after) {
   });
 }
 
-/** ⚙ "지금 복습 해보기": 때가 안 됐어도 최근에 한 문장으로 연습 (기록·보상 없음) */
-function startReviewNow() {
+/**
+ * 🔁 복습을 지금 연다.
+ *  - real=false — ⚙ "지금 복습 해보기": 때가 안 됐어도 최근에 한 문장으로 **연습** (기록·보상 없음)
+ *  - real=true  — 🔁 오늘의 복습으로 이 영상을 열었을 때: 오늘 차례인 문장으로 **진짜** 회차.
+ *    아이가 직접 고른 것이므로 30% 확률·하루 거절 횟수를 묻지 않는다.
+ */
+function startReviewNow(real = false) {
   if (state.reviewOpen) return;
   if (!state.open || !state.cues.length) return;
-  refreshVocabViews().then(() => { if (state.open && !state.reviewOpen) openPracticeReview(); });
+  refreshVocabViews().then(() => {
+    if (!(state.open && !state.reviewOpen)) return;
+    if (!real) { openPracticeReview(); return; }
+    state.reviewDone = true; // 열자마자 또 제안하지 않게
+    const items = reviewItems();
+    if (items.length) startReview(items, false);
+    else showPlayerMessage('🔁 오늘 이 영상에서 복습할 문장은 다 끝냈어요 — 새 문장을 배우면 내일 또 나와요', 4500);
+  });
 }
 
 function openPracticeReview() {
@@ -1475,6 +1487,8 @@ export async function openPlayer(id, opts = {}) {
     // 👨‍👩‍👦 아빠가 고쳐 준 글이 있으면 그것부터, 없으면 🔁 복습 제안
     refreshVocabViews().then(async () => {
       if (!(state.open && state.item === myItem)) return;
+      // 🔁 "오늘의 복습"으로 들어온 것 — 아이가 직접 고른 것이므로 확률·거절 횟수를 묻지 않고 바로 연다
+      if (opts.review) { startReviewNow(true); return; }
       const shown = await maybeCoachFix();
       if (!shown && state.open && state.item === myItem) maybeReview();
     });
@@ -2632,11 +2646,18 @@ function releaseWakeLock() {
 
 function loadSettings() {
   const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always' };
-  try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem('shincoach.settings') || '{}') };
-  } catch {
-    return defaults;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('shincoach.settings') || '{}') || {}; } catch { saved = {}; }
+  const s = { ...defaults, ...saved };
+  // 🔁 복습 회차를 3 → 5문항으로 **한 번만** 올린다 (2026-09-23).
+  // ⚙ 설정은 기기별 localStorage라, 기본값만 바꾸면 이미 저장된 태블릿에는 아무 일도 안 일어난다.
+  // 그렇다고 매번 덮으면 아버님이 3으로 되돌려도 다시 5가 되므로, 올렸다는 표시를 남기고 한 번만.
+  if (!s.reviewBumped) {
+    if (s.reviewCount === 3) s.reviewCount = 5;
+    s.reviewBumped = true;
+    try { localStorage.setItem('shincoach.settings', JSON.stringify(s)); } catch { /* 무시 */ }
   }
+  return s;
 }
 
 function saveSettings() {

@@ -9,6 +9,8 @@ import { sfx, unlock as unlockAudio } from './sfx.js';
 import { parseSami, isSami, toSrt } from './sami.js';
 import { openPlayer } from './player.js';
 import { showLoading, hideLoading } from './app.js';
+import { pickDueItem } from './review.js';
+import { todayKey } from './track.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -421,8 +423,60 @@ export async function refreshList() {
     list.appendChild(li);
   }
 
-  await renderNextVideo(items, seq);
+  // 📼 전체 문장 기록은 한 번만 읽어 🔁 복습 버튼과 🎟️ 다음 영상 카드가 나눠 쓴다
+  // (태블릿에는 5천 건이 넘게 쌓여 있어서 화면을 그릴 때마다 두 번 읽으면 눈에 띄게 느리다)
+  const records = await getAllSentenceStats().catch(() => []);
+  if (seq !== renderSeq) return;
+  await renderTodayReview(items, records);
+  await renderNextVideo(items, records, seq);
   updateStorageText();
+}
+
+// ───────────────────── 🔁 오늘의 복습 ─────────────────────
+
+/**
+ * 밀린 복습이 있는 영상을 골라 "바로 시작" 버튼을 목록 맨 위에 놓는다 (2026-09-23).
+ *
+ * 왜: 복습 후보는 **지금 열어 놓은 영상의 문장만**이라, 새 영상을 열면 그날 복습이 한 번도 안 뜨고
+ * 밀린 문장은 옛 영상에 갇혔다 (진우: "복습이 자주 안 나와요"). 아이가 어느 영상에 밀려 있는지
+ * 알 방법이 없었으므로, 앱이 골라서 열어 준다.
+ */
+async function renderTodayReview(items, records) {
+  const box = $('library-review');
+  if (!box) return;
+  box.innerHTML = '';
+  box.hidden = true;
+  const usable = (items || []).filter((it) => it && !it.broken);
+  if (!usable.length) return;
+
+  const pick = pickDueItem(records || [], todayKey(), usable.map((it) => it.id));
+  if (!pick) return;
+  const item = usable.find((it) => String(it.id) === String(pick.itemId));
+  if (!item) return;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn library-review-btn';
+  btn.innerHTML = `
+    <span class="lrv-icon">🔁</span>
+    <span class="lrv-body">
+      <span class="lrv-title">오늘의 복습 ${pick.due}문장</span>
+      <span class="lrv-sub"></span>
+    </span>`;
+  btn.querySelector('.lrv-sub').textContent = `「${item.title}」에서 기다리고 있어요`;
+  btn.addEventListener('click', async () => {
+    if (opening) return; // 큰 영상은 몇 초 걸리므로 중복 탭 방지
+    opening = true;
+    showLoading('복습 준비 중...');
+    try {
+      await openPlayer(item.id, { review: true });
+    } finally {
+      hideLoading();
+      opening = false;
+    }
+  });
+  box.appendChild(btn);
+  box.hidden = false;
 }
 
 // ───────────────────── 🎟️ 다음 영상 ─────────────────────
@@ -431,7 +485,7 @@ export async function refreshList() {
  * 아직 태블릿에 없는 영상을 "예고편"처럼 보여주고, 조건을 채우면 아이가 직접 연다.
  * 산다고 파일이 생기지는 않는다 — 아빠가 넣어 준다는 것을 화면에 분명히 적는다.
  */
-async function renderNextVideo(items, seq = renderSeq) {
+async function renderNextVideo(items, records, seq = renderSeq) {
   const box = $('library-next');
   if (!box) return;
   box.innerHTML = '';
@@ -449,7 +503,7 @@ async function renderNextVideo(items, seq = renderSeq) {
   const next = nextLocked(bought.map((c) => c.id));
   if (!next) { box.hidden = !waiting.length; return; }
 
-  const st = await currentState(next.price);
+  const st = await currentState(next.price, records);
   if (seq !== renderSeq) return;
   const card = lockedCard(next, st);
   box.appendChild(card);
@@ -476,8 +530,9 @@ function fillCast(root, c) {
  * 지금 조건 현황을 저장소에서 새로 계산한다 (화면 표시와 구매 판정이 같은 값을 쓰게).
  * 조건이 비율이 아니라 **끝낸 문장 개수**라 영상 목록은 필요 없다 — 영상을 넣거나 지워도 진도가 안 흔들린다.
  */
-async function currentState(price) {
-  const records = await getAllSentenceStats().catch(() => []);
+async function currentState(price, known) {
+  // known을 주면 그걸 쓴다 (목록을 그릴 때 한 번 읽은 것). 구매 판정처럼 최신이어야 하는 자리는 안 주고 새로 읽는다
+  const records = known || await getAllSentenceStats().catch(() => []);
   // 🔢 수학 누적(정답·완주·복습 통과)도 같은 막대를 채운다 (2026-09-22) — 못 읽으면 영어만으로
   let mathTot = null;
   try { const m = await getMath(); mathTot = (m && m.tot) || null; } catch { mathTot = null; }

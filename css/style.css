@@ -264,6 +264,16 @@ button { font-family: inherit; }
   font-weight: 800;
 }
 .home-card-bonus.got { background: #ecfdf5; color: #065f46; font-weight: 700; }
+/* 🔁 밀린 복습 칩 (영어 카드) — 보너스 칩과 같은 모양, 색만 다르게 */
+.home-card-review {
+  margin-top: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
 .home-card-bonus-tip { font-size: 0.8rem; color: var(--muted); }
 .home-card.sparkle .home-card-btn { border-color: #f59e0b; box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.28), var(--shadow); }
 .home-card.sparkle .home-card-btn::before {
@@ -1886,6 +1896,19 @@ button { font-family: inherit; }
 
 
 /* ───────── 🎟️ 다음 영상 (아직 태블릿에 없는 것) ───────── */
+/* 🔁 오늘의 복습 — 영상 목록 맨 위. 밀린 복습이 있을 때만 보인다 */
+.library-review { margin-bottom: 14px; }
+.library-review-btn {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  padding: 16px 18px; border-radius: 18px;
+  border: 3px solid #38bdf8; background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+  color: #0c4a6e;
+}
+.library-review-btn .lrv-icon { font-size: 2rem; line-height: 1; }
+.library-review-btn .lrv-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.library-review-btn .lrv-title { font-size: 1.15rem; font-weight: 800; }
+.library-review-btn .lrv-sub { font-size: 0.9rem; color: #0369a1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .library-next { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
 .next-card {
   display: flex; gap: 14px; align-items: flex-start;

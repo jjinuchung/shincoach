@@ -13,8 +13,15 @@ export const REVIEW_INTERVALS = [1, 2, 4, 7, 14];
 export const GRADUATED = REVIEW_INTERVALS.length; // 5
 /** 문장 성장 단계 아이콘 (box 0~5) */
 export const STAGES = ['🥚', '🐣', '🐥', '⭐', '🏅', '👑'];
-/** 한 회차에 낼 문장 수 (⚙에서 조절, 기본 3 — 짧아야 아이가 시작한다) */
-export const DEFAULT_COUNT = 3;
+/**
+ * 한 회차에 낼 문장 수 (⚙에서 조절).
+ *
+ * 3이었다가 **5로 올렸다** (2026-09-23). 짧아야 아이가 시작하는 건 맞지만,
+ * 3문항 중 🔤 단어가 하나 섞이면 문장은 2개뿐이라 하루에 3~4문장밖에 복습이 안 됐고,
+ * 🎟️ 교환권의 "🔁 복습 통과 50문장"이 18일 걸렸다 (진우 신고: "복습이 자주 안 나와요").
+ * 5로 올리면 같은 조건이 9일이 된다 — 회차 수는 그대로라 "자주 뜬다"는 성가심은 안 는다.
+ */
+export const DEFAULT_COUNT = 5;
 /** 복습 보상 */
 export const REWARD = {
   xp: 8,          // 문장 하나 통과
@@ -193,6 +200,46 @@ export function reviewSummary(records, today) {
     else waiting++;
   });
   return { dueCount, waiting, graduated };
+}
+
+/**
+ * 🔁 콘텐츠별 "오늘 복습할 문장 수" — **모든 영상의 기록**에서 센다.
+ *
+ * 왜 필요한가 (2026-09-23, 진우 신고 "복습이 자주 안 나와요"):
+ * 복습 후보는 **지금 열어 놓은 영상의 문장만**이다 (track.statsList ← getSentenceStats(itemId)).
+ * 그래서 새 영상을 열면 그날은 복습이 한 번도 안 뜨고, 밀린 문장은 옛 영상 안에 갇힌다.
+ * 포켓몬 영상을 자꾸 넣어 줄수록 복습이 마르는 구조였다.
+ * → 목록·홈에서 "어느 영상에 몇 개가 밀려 있는지" 보여 주고 그 영상을 열어 주기 위한 계산.
+ *
+ * @param {Array} records 모든 문장 기록 (db.getAllSentenceStats)
+ * @param {string} today
+ * @returns {Array<{itemId:*, due:number, oldest:string}>} 많이 밀린 순 → 오래 밀린 순
+ */
+export function dueByItem(records, today) {
+  const map = new Map();
+  for (const r of records || []) {
+    if (!isDue(r, today)) continue;
+    if (r.itemId === undefined || r.itemId === null) continue;
+    const cur = map.get(r.itemId) || { itemId: r.itemId, due: 0, oldest: r.dueAt };
+    cur.due++;
+    if (r.dueAt < cur.oldest) cur.oldest = r.dueAt;
+    map.set(r.itemId, cur);
+  }
+  return [...map.values()].sort((a, b) => b.due - a.due || (a.oldest < b.oldest ? -1 : a.oldest > b.oldest ? 1 : 0));
+}
+
+/**
+ * 오늘 복습을 시작할 영상 하나 — **기기에 아직 있는 영상만** 고른다.
+ * 지운 영상의 문장 기록도 남아 있으므로(교환권 조건이 그 기록을 세기 때문에 일부러 남긴다),
+ * 거르지 않으면 열 수 없는 영상을 권하게 된다.
+ *
+ * @param {Array} records 모든 문장 기록
+ * @param {string} today
+ * @param {Array} itemIds 지금 기기에 있는 콘텐츠 id 목록
+ */
+export function pickDueItem(records, today, itemIds = []) {
+  const have = new Set((itemIds || []).map(String));
+  return dueByItem(records, today).find((d) => have.has(String(d.itemId))) || null;
 }
 
 /**

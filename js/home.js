@@ -99,6 +99,13 @@ function cardEl(subject, mascot, onPick) {
   btn.appendChild(stage);
   btn.appendChild(name);
   btn.appendChild(sub);
+  // 🔁 밀린 복습 칩 (영어 카드) — 복습은 영상 안에 숨어 있어서 아이가 있는 줄을 몰랐다 (2026-09-23)
+  if (subject.reviewDue > 0) {
+    const chip = document.createElement('span');
+    chip.className = 'home-card-review';
+    chip.textContent = `🔁 복습 ${subject.reviewDue}문장이 기다려요`;
+    btn.appendChild(chip);
+  }
   // ✨ 오늘의 보너스 칩 (수학 카드) — 아직 안 받았으면 카드가 반짝이고, 받았으면 차분하게 "받았어요"
   if (subject.bonus) {
     const chip = document.createElement('span');
@@ -158,9 +165,18 @@ export async function renderHome(showView) {
     unread = unreadAsks(m).length;
     bonus = mathBonusFor(m, todayKey());
   } catch { unread = 0; }
+  // 🔁 영어 카드에 "복습 N문장이 기다려요" — 밀린 문장이 있는 영상이 기기에 있을 때만
+  let reviewDue = 0;
+  try {
+    const { getAllSentenceStats, listItems } = await import('./db.js');
+    const { pickDueItem } = await import('./review.js');
+    const [records, items] = await Promise.all([getAllSentenceStats(), listItems()]);
+    const pickDue = pickDueItem(records, todayKey(), (items || []).filter((it) => it && !it.broken).map((it) => it.id));
+    reviewDue = pickDue ? pickDue.due : 0;
+  } catch { reviewDue = 0; }
   const frag = document.createDocumentFragment();
   const shinyOf = (id) => { const l = getLook(id); return l && l.shinyUrl ? l.shinyUrl : null; };
-  for (const s of SUBJECTS) frag.appendChild(cardEl(s.key === 'math' ? { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) } : s, pickMascot(s.mascot, chars, shinyOf), pick));
+  for (const s of SUBJECTS) frag.appendChild(cardEl(s.key === 'math' ? { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) } : { ...s, reviewDue }, pickMascot(s.mascot, chars, shinyOf), pick));
   list.innerHTML = '';
   list.appendChild(frag);
   hint.hidden = true;

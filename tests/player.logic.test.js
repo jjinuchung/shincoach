@@ -202,7 +202,7 @@ function loadPlayer() {
     hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
     pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, makeDictation, VOCAB_KNOWN, REAL_VOCAB,
-    REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 3, REVIEW_COUNT: 3,
+    REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 5, REVIEW_COUNT: 5,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
     // sfx.js 스텁
     sfx: { whoosh() {}, hit() {}, tick() {}, success() {}, fail() {}, levelUp() {}, ding() {}, wrong() {} }, unlock() {}, setSfxEnabled() {}, setVibrateEnabled() {}, setBgmEnabled() {},

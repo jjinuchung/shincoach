@@ -6,6 +6,7 @@ import {
   pickReviews, reviewSummary, roundReward,
   REVIEW_INTERVALS, GRADUATED, STAGES, DEFAULT_COUNT, REWARD,
   pickWordReviews, quizChoices, wordSummary, isWordDue,
+  dueByItem, pickDueItem,
 } from '../js/review.js';
 
 /** 테스트용 문장 기록 만들기 */
@@ -155,8 +156,8 @@ test('stageIcon: box 0~5 → 🥚🐣🐥⭐🏅👑', () => {
   assert.equal(stageIcon({ box: 99 }), '👑', '범위를 벗어나도 안전');
 });
 
-test('기본값: 한 회차 3문장 (짧아야 아이가 시작한다)', () => {
-  assert.equal(DEFAULT_COUNT, 3);
+test('기본값: 한 회차 5문장 (2026-09-23에 3에서 올림 — 교환권 50문장이 너무 멀었다)', () => {
+  assert.equal(DEFAULT_COUNT, 5);
 });
 
 test('시나리오: 매일 맞히면 1→2→4→7→14일로 벌어지고 5번 만에 졸업', () => {
@@ -263,4 +264,67 @@ test('🔤 [Codex #7] 단어 현황은 출제와 같은 자격으로 센다', ()
   assert.equal(pickWordReviews(list, today, 10).length, 2, '현황과 실제 후보 수가 같아야 함');
   assert.equal(isWordDue(word({ dueAt: '' }), today), true);
   assert.equal(isWordDue(word({ views: 1 }), today), false);
+});
+
+// ── 🔁 어느 영상에 복습이 밀려 있나 (2026-09-23) ──
+// 복습 후보는 "지금 열어 놓은 영상의 문장"만이라, 새 영상을 열면 그날 복습이 한 번도 안 떴다.
+// 목록·홈이 밀린 영상을 골라 열어 주기 위한 계산.
+
+/** 콘텐츠 id를 지정한 기록 */
+function at(itemId, patch = {}) {
+  return rec({ itemId, key: `${itemId}|${patch.start || 0}`, ...patch });
+}
+
+test('dueByItem: 영상별로 오늘 차례인 문장을 센다 — 많이 밀린 순, 같으면 오래 밀린 순', () => {
+  const today = '2026-09-23';
+  const list = [
+    at('a', { start: 1, box: 0, dueAt: '2026-09-22' }),
+    at('a', { start: 2, box: 0, dueAt: '2026-09-20' }),
+    at('b', { start: 1, box: 1, dueAt: '2026-09-23' }),
+    at('b', { start: 2, box: 1, dueAt: '2026-09-23' }),
+    at('b', { start: 3, box: 1, dueAt: '2026-09-21' }),
+    at('c', { start: 1, box: 0, dueAt: '2026-09-25' }),        // 아직 아님
+    at('d', { start: 1, box: GRADUATED, dueAt: '' }),          // 👑 졸업
+  ];
+  const got = dueByItem(list, today);
+  assert.deepEqual(got.map((x) => [x.itemId, x.due]), [['b', 3], ['a', 2]], '밀린 게 없는 영상은 아예 안 나온다');
+  assert.equal(got[0].oldest, '2026-09-21', '그 영상에서 가장 오래 밀린 날짜');
+});
+
+test('dueByItem: 밀린 수가 같으면 더 오래 기다린 영상이 먼저', () => {
+  const today = '2026-09-23';
+  const list = [
+    at('new', { start: 1, dueAt: '2026-09-23' }),
+    at('old', { start: 1, dueAt: '2026-09-10' }),
+  ];
+  assert.deepEqual(dueByItem(list, today).map((x) => x.itemId), ['old', 'new']);
+});
+
+test('pickDueItem: 기기에 아직 있는 영상만 고른다 (지운 영상의 기록은 남아 있다)', () => {
+  const today = '2026-09-23';
+  const list = [
+    at('deleted', { start: 1, dueAt: '2026-09-01' }),
+    at('deleted', { start: 2, dueAt: '2026-09-01' }),
+    at('kept', { start: 1, dueAt: '2026-09-22' }),
+  ];
+  const pick = pickDueItem(list, today, ['kept']);
+  assert.equal(pick.itemId, 'kept', '지운 영상을 권하면 열 수가 없다');
+  assert.equal(pick.due, 1);
+  assert.equal(pickDueItem(list, today, []), null, '열 수 있는 영상이 없으면 버튼을 안 띄운다');
+  assert.equal(pickDueItem([], today, ['kept']), null);
+});
+
+test('pickDueItem: 숫자 id와 문자열 id를 같은 것으로 본다 (IndexedDB 키는 숫자)', () => {
+  const today = '2026-09-23';
+  const list = [at(7, { start: 1, dueAt: '2026-09-22' })];
+  assert.equal(pickDueItem(list, today, ['7']).itemId, 7);
+  assert.equal(pickDueItem(list, today, [7]).itemId, 7);
+});
+
+test('dueByItem: itemId가 없는 옛 기록은 건너뛴다 (터지지 않아야 한다)', () => {
+  const today = '2026-09-23';
+  const broken = { ...rec({ start: 1, dueAt: '2026-09-22' }) };
+  delete broken.itemId;
+  assert.deepEqual(dueByItem([broken], today), []);
+  assert.deepEqual(dueByItem(null, today), []);
 });
