@@ -180,12 +180,21 @@ test('★ ② 오개념 문항: 보여 주는 "틀린 계산"이 정말 틀린 �
     for (let s = 1; s <= 120; s++) {
       const q = makeQuestion(c.id, 'misread', s * 7717, OPTS);
       if (!q || !q.expr) continue;
-      const m = /\*\*(.+?)\s*=\s*([\d./−-]+)\*\*/.exec(q.q);
+      // 중간 줄이 붙은 것도 있다: "28 − 9 + 8 = 28 − 17 = 11" → 첫 조각이 식, 마지막이 보여 준 값
+      const m = /\*\*(.+?)\*\*/.exec(q.q);
       assert.ok(m, `${c.id} seed ${s}: "식 = 값" 이 문항에 안 보인다`);
-      const shown = valueOf(m[2]);
-      const right = toNum(evalExpr(m[1]));
+      const parts = m[1].split('=').map((x) => x.trim());
+      assert.ok(parts.length >= 2, `${c.id} seed ${s}: 등식이 아니다 — ${m[1]}`);
+      const shown = valueOf(parts[parts.length - 1]);
+      const right = toNum(evalExpr(parts[0]));
       assert.ok(Math.abs(shown - right) > 1e-9,
-        `${c.id} seed ${s}: 틀렸다고 보여 준 ${m[1]} = ${m[2]} 가 사실 정답이다`);
+        `${c.id} seed ${s}: 틀렸다고 보여 준 ${m[1]} 가 사실 정답이다`);
+      // 중간 줄이 있으면 그 줄도 보여 준 값과 맞아야 한다 (아이가 실제로 한 계산이어야 한다)
+      if (parts.length >= 3) {
+        const mid = toNum(evalExpr(parts[1]));
+        assert.ok(Math.abs(mid - shown) < 1e-9,
+          `${c.id} seed ${s}: 중간 줄 ${parts[1]} 이 보여 준 값 ${parts[2]} 과 다르다`);
+      }
       assert.ok(/^misread:/.test(q.key || ''), `${c.id} seed ${s}: 갈래 열쇠(misread:…)가 있어야 쌍둥이가 같은 유형으로 온다`);
     }
   }
@@ -260,8 +269,9 @@ test('개념을 못 찾으면 조용히 null (화면이 죽지 않게)', () => {
 });
 
 test('초5 자연수 칸은 보기가 전부 자연수 (17.67 같은 답은 아이가 내지 않는다)', () => {
+  // ★ seed 폭이 곧 잡는 힘이다 — 200개로는 못 찾은 음수를 Codex가 10,000개에서 찾았다 (9차 #3)
   for (const c of MIXED.filter((x) => x.grade === 5)) {
-    for (let s = 1; s <= 200; s++) {
+    for (let s = 1; s <= 4000; s++) {
       const q = makeQuestion(c.id, 'calc', s * 65537, OPTS);
       if (!q) continue;
       for (const ch of q.choices) {
@@ -269,6 +279,57 @@ test('초5 자연수 칸은 보기가 전부 자연수 (17.67 같은 답은 아�
         if (v === null) continue;
         assert.ok(Number.isInteger(v), `${c.id} seed ${s}: 보기 ${ch.text} 가 자연수가 아니다 (식 ${q.expr})`);
         assert.ok(v >= 0, `${c.id} seed ${s}: 보기 ${ch.text} 가 음수다 (아직 음수를 안 배웠다)`);
+      }
+    }
+  }
+});
+
+test('★ 어떤 칸에서도 음수가 안 보인다 — 정답·오답·② 문항이 보여 주는 값까지 (개념당 4,000 seed)', () => {
+  for (const c of MIXED) {
+    for (let s = 1; s <= 4000; s++) {
+      const q = makeQuestion(c.id, 'calc', s * 40503, OPTS);
+      if (q) {
+        for (const ch of q.choices) {
+          const v = valueOf(ch.text);
+          if (v === null) continue;
+          assert.ok(v >= 0, `${c.id}/calc seed ${s}: 보기 ${ch.text} 가 음수 (식 ${q.expr})`);
+        }
+      }
+      const m = makeQuestion(c.id, 'misread', s * 40503, OPTS);
+      if (!m) continue;
+      // ② 문항이 "이렇게 풀었어요"로 보여 주는 값도 음수면 안 된다
+      const shown = /=\s*(−?-?[\d./]+)\*\*/.exec(m.q);
+      if (shown) {
+        const v = valueOf(shown[1]);
+        assert.ok(v === null || v >= 0, `${c.id}/misread seed ${s}: 보여 주는 값 ${shown[1]} 이 음수`);
+      }
+    }
+  }
+});
+
+test('★ ② 문항: 그 오류를 설명하는 보기가 정답 하나뿐이다 (같은 값을 내는 설명이 둘이면 정답이 둘)', () => {
+  // Codex 9차 #4 — "28 − 9 + 8 = 11" 만 보여 주면 "9+8을 먼저"와 "더하기를 빼기로"가 둘 다 맞다.
+  // 이제 중간 줄(28 − 17)을 함께 보여 주므로 무엇을 먼저 했는지가 하나로 정해진다.
+  for (const c of MIXED) {
+    for (let s = 1; s <= 300; s++) {
+      const m = makeQuestion(c.id, 'misread', s * 22307, OPTS);
+      if (!m) continue;
+      const bad = m.choices.filter((x) => !x.ok).map((x) => x.text);
+      assert.ok(!bad.some((t) => /더하기를 빼기로/.test(t)),
+        `${c.id} seed ${s}: "더하기를 빼기로"는 같은 값을 설명할 수 있어 정답이 둘이 된다`);
+    }
+  }
+});
+
+test('★ 풀이 순서가 식과 맞는다 (괄호가 있으면 괄호부터라고 적혀 있어야 한다)', () => {
+  for (const c of MIXED) {
+    for (let s = 1; s <= 300; s++) {
+      const q = makeQuestion(c.id, 'calc', s * 991, OPTS);
+      if (!q || !q.solve) continue;
+      const first = String(q.solve.steps[0] || '');
+      if (/[(){]/.test(q.expr)) {
+        assert.ok(/괄호|안을 먼저|소괄호/.test(first),
+          `${c.id} seed ${s}: 식 "${q.expr}" 에 괄호가 있는데 풀이 첫 줄이 "${first}"`);
       }
     }
   }

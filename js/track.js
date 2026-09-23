@@ -108,7 +108,12 @@ function adoptSaved(date, saved) {
  * 저장소가 막히면 메모리로라도 상한을 지킨다 (보상을 두 번 주지 않는 쪽으로).
  * @returns {Promise<boolean>} 이번에 내가 선점했는지
  */
-async function claim(field, max) {
+/**
+ * 하루 상한이 있는 것을 트랜잭션으로 선점한다.
+ * ★ strict면 저장이 실패했을 때 **메모리로 성공 처리하지 않는다** — ⚔️ 배틀처럼 두 과목(영어·수학)이
+ *   같은 칸을 나눠 쓰는 것은 폴백이 상한을 넘게 한다 (Codex 9차 #9). 아직 시작 전이라 버려도 잃는 게 없다.
+ */
+async function claim(field, max, strict = false) {
   if (!t.daily) return false;
   if (max !== undefined && (Number(t.daily[field]) || 0) >= max) return false;
   await flush();                       // 보기값과 저장값을 먼저 맞춘다
@@ -118,6 +123,7 @@ async function claim(field, max) {
     adoptSaved(date, r.daily);
     return r.won;
   } catch (e) {
+    if (strict) return false; // 저장이 안 됐으면 못 쓴 것으로 — 상한을 넘기느니 한 번 덜 나오는 쪽
     if (max !== undefined && (Number(t.daily[field]) || 0) >= max) return false;
     bump(field);
     return true;
@@ -398,7 +404,7 @@ export function todayBattles() {
   return t.daily ? (t.daily.battles || 0) : 0;
 }
 export function markBattle(max) {
-  return claim('battles', max);
+  return claim('battles', max, true); // 🔢 수학과 같은 칸을 쓴다 — 실패하면 안 쓴 것으로 (Codex 9차 #9)
 }
 
 /** 🔤 오늘 단어 이어 주기를 몇 판 했는지 / 한 판 선점 (하루 상한) */

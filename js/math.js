@@ -407,6 +407,7 @@ function startDiag() {
 function renderLadder(state) {
   const m = clearMain();
   ui.daily = null; // 사다리로 나오면 ☀️ 흐름은 끝
+  ui.battlePending = null; // 걸어 둔 배틀도 버린다 — 편 밖에서 갑자기 열리면 아이가 당황한다 (Codex 9차 #1)
   showHatchIfAny(); // 🐣 다른 화면(영어)에서 부화했는데 아직 못 본 것
   const today = todayKey();
   const rows = ladderOf(state, today, ui.stem);
@@ -1279,11 +1280,19 @@ function focusQuiet(elm) {
 /** 다음 문항으로 (쌍둥이가 있었으면 지운다). ⚔️ 걸어 둔 배틀이 있으면 여기서 먼저 연다 */
 function advance() {
   const r = ui.round;
-  if (!r) return;
+  if (!r || r.moving) return; // 연타 방지 — 배틀 트랜잭션을 기다리는 사이 두 번 누르면 at이 두 번 올라 문항을 건너뛴다 (Codex 9차 #1)
+  r.moving = true;
   r.twin = null;
   r.at += 1;
-  const go = () => { if (!ui.round) return; if (ui.round.at < ui.round.qs.length) renderQuestion(); else finishRound(); };
-  if (ui.battlePending) { startMathBattle(go); return; }
+  const last = r.at >= r.qs.length;
+  const go = () => {
+    if (ui.round === r) r.moving = false;
+    if (!ui.round) return;
+    if (ui.round.at < ui.round.qs.length) renderQuestion(); else finishRound();
+  };
+  // ⚔️ 배틀은 **저장이 끝난 뒤에**. 마지막 문항에서 배틀을 먼저 열면, 일일 횟수 트랜잭션을 기다리는 사이
+  // 아이가 홈으로 나갔을 때 ui.round가 지워져 **다 푼 편의 기록·보상이 통째로 사라진다** (Codex 9차 #1).
+  if (ui.battlePending && !last) { startMathBattle(go); return; }
   go();
 }
 // ───────────────────── ✨ 응원 포켓몬 ─────────────────────
@@ -1371,6 +1380,12 @@ function mathToast(text) {
   setTimeout(() => { box.remove(); }, 5000);
 }
 
+/** 지금 수학 화면이 화면에 없는가 (배틀·응원을 띄우면 안 되는 상태) */
+function mathHidden() {
+  const v = document.getElementById('view-math');
+  return !v || v.hidden;
+}
+
 /** ⚔️ 배틀 준비 — 오늘 몫과 포켓몬 그림을 읽어 둔다 (등장 판정은 문항마다 동기로 돌아야 한다) */
 function prepareBattle() {
   loadTodayCounts().catch(() => {});
@@ -1454,6 +1469,7 @@ function battleQuestion(seed) {
 function battleQuiz(box, hooks) {
   return new Promise((resolve) => {
     let done = false;
+    let picked = false; // 답을 이미 골랐나 (표시 대기 중 ⏭ 잠금용)
     const finish = (r) => { if (done) return; done = true; resolve(r); };
     // 배틀이 닫히면(화면 꺼짐·뒤로) 이 턴은 없던 것으로 — 약속이 안 풀리면 배틀이 멈춘다
     if (hooks && hooks.register) hooks.register(() => finish({ correct: false, skipped: false, interrupted: true }));
@@ -1464,14 +1480,18 @@ function battleQuiz(box, hooks) {
     const qt = el('div', 'battle-quiz-q');
     qt.appendChild(richNode(q.q));
     box.appendChild(qt);
+    const skip = el('button', 'btn battle-quiz-skip', '⏭ 모르겠어요');
+    skip.type = 'button';
     const list = el('div', 'battle-quiz-choices');
     q.choices.forEach((ch) => {
       const b = el('button', 'btn battle-quiz-choice');
       b.type = 'button';
       b.appendChild(richNode(ch.text));
       b.addEventListener('click', () => {
-        if (done) return;
+        if (done || picked) return;
+        picked = true; // 답을 고른 순간 skip 까지 잠근다 — 정답 표시 350ms 사이에 ⏭를 누르면 판정이 뒤집혔다 (Codex 9차 #6)
         [...list.children].forEach((x) => { x.disabled = true; });
+        skip.disabled = true;
         b.classList.add(ch.ok ? 'ok' : 'no');
         if (!ch.ok) { const right = q.choices.findIndex((c) => c.ok); if (right >= 0) list.children[right].classList.add('ok'); }
         setTimeout(() => finish({ correct: !!ch.ok, skipped: false, interrupted: false }), ch.ok ? 350 : 900);
@@ -1479,10 +1499,8 @@ function battleQuiz(box, hooks) {
       list.appendChild(b);
     });
     box.appendChild(list);
-    const skip = el('button', 'btn battle-quiz-skip', '⏭ 모르겠어요');
-    skip.type = 'button';
     skip.addEventListener('click', () => {
-      if (done) return;
+      if (done || picked) return;
       [...list.children].forEach((x) => { x.disabled = true; });
       finish({ correct: false, skipped: true, interrupted: false });
     });
@@ -1495,10 +1513,11 @@ async function startMathBattle(after) {
   const opponent = ui.battlePending;
   ui.battlePending = null;
   const today = todayKey();
+  const run = ui.run; // 트랜잭션을 기다리는 사이 아이가 홈·사다리로 나갔으면 열지 않는다 (Codex 9차 #1)
   // 거절해도 오늘 배틀 기회는 쓴 것. 다른 창(또는 영어 쪽)이 이미 오늘 몫을 다 썼으면 등장하지 않는다
   let won = false;
   try { won = (await claimDailyCount(today, 'battles', BATTLE.maxPerDay)).won; } catch { won = false; }
-  if (!opponent || !won) { after(); return; }
+  if (!opponent || !won || run !== ui.run || mathHidden()) { after(); return; }
   ui.today.battles += 1;
   ui.battleOpen = true;
   openBattle({
@@ -1826,6 +1845,8 @@ async function finishRound() {
   if (g.leveledUp) sfx.levelUp();
   if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다 — 그리지 않는다
   clearMain(); // await 뒤에 한 번 더 비운다 — "기록하는 중…"이 결과 위에 남지 않게
+  // ⚔️ 마지막 문항에서 걸린 배틀은 **저장이 끝난 지금** 연다 (결과 카드를 그린 뒤 열리면 카드를 덮으므로 여기서)
+  if (ui.battlePending) { const after = () => {}; startMathBattle(after); }
 
   if (r.mode === 'diag') {
     const card = el('section', 'math-card');

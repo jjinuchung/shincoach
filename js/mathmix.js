@@ -188,13 +188,16 @@ export const MIXED = [
       });
     },
     misread(r, c) {
-      const a = int(r, 15, 40); const b = int(r, 4, 9); const d = int(r, 2, 8);
+      const b = int(r, 4, 9); const d = int(r, 2, 8);
+      const a = int(r, b + d + 3, 40); // 보여 주는 틀린 값도 음수가 아니게 (Codex 9차 #3)
       const expr = `${a} − ${b} + ${d}`;
       const bad = a - (b + d);
-      const q = `{mon/이/가} 이렇게 풀었어요.\n\n**${expr} = ${bad}**\n\n어디가 틀렸을까요?`;
+      // **중간 줄을 함께 보여 준다** — 값만 보여 주면 "더하기를 빼기로 했어요"도 같은 값을 설명해
+      // 정답이 둘이 된다 (Codex 9차 #4). 중간 줄이 있으면 무엇을 먼저 했는지가 하나로 정해진다
+      const q = `{mon/이/가} 이렇게 풀었어요.\n\n**${expr} = ${a} − ${b + d} = ${bad}**\n\n어디가 틀렸을까요?`;
       const chs = choices(r, `${b} + ${d} 를 먼저 했어요`, [
         { text: `${a} − ${b} 를 먼저 했어요`, tag: '바르게 푼 것을 고름' },
-        { text: '더하기를 빼기로 했어요', tag: '엉뚱한 지적' },
+        { text: '괄호를 빠뜨렸어요', tag: '엉뚱한 지적' },
         { text: '숫자를 잘못 봤어요', tag: '엉뚱한 지적' },
       ]);
       return misreadAsk(this, r, c, 'left', fill(q, c), chs, {
@@ -398,7 +401,8 @@ export const MIXED = [
       });
     },
     misread(r, c) {
-      const a = int(r, 8, 20); const b = int(r, 2, 6); const k = int(r, 2, 5);
+      const b = int(r, 2, 6); const k = int(r, 2, 5);
+      const a = b * k + int(r, 2, 12); // 괄호를 무시한 값 a − b×k 도 음수가 아니게
       const expr = `(${a} − ${b}) × ${k}`;
       const bad = a - b * k;
       const q = `{mon/이/가} 이렇게 풀었어요.\n\n**${expr} = ${bad}**\n\n어디가 틀렸을까요?`;
@@ -490,7 +494,9 @@ export const MIXED = [
     calc(r, c) {
       const dv = pick(r, [2, 3, 4, 5]); const p = int(r, 1, dv - 1); const qn = dv - p; // p + qn = dv
       const big = dv * int(r, 3, 8);
-      const b = int(r, 2, 5); const k = int(r, 2, 5); const sub = int(r, 1, 9);
+      const b = int(r, 2, 5); const k = int(r, 2, 5);
+      // sub 는 그때까지 쌓인 값(big÷dv + b×k)보다 작게 — 아니면 정답이 음수가 된다 (Codex 9차 #3)
+      const sub = int(r, 1, Math.max(1, big / dv + b * k - 1));
       const base = dv * b + int(r, 5, 30); // 정답 base − dv×b 가 음수가 안 되게
       const fams = [
         // big ÷ (p + qn) + b × k − sub
@@ -531,14 +537,16 @@ export const MIXED = [
       });
     },
     misread(r, c) {
-      const b = int(r, 2, 5); const k = int(r, 2, 5); const a = b * k + int(r, 5, 20); const add = int(r, 2, 9);
+      const b = int(r, 2, 5); const k = int(r, 2, 5); const add = int(r, 2, 9);
+      const a = b * k + add + int(r, 2, 20); // 보여 주는 틀린 값도 음수가 아니게
       const expr = `${a} − ${b} × ${k} + ${add}`;
       const bad = a - (b * k + add);
-      const q = `{mon/이/가} 이렇게 풀었어요.\n\n**${expr} = ${bad}**\n\n어디가 틀렸을까요?`;
-      const chs = choices(r, `${b} × ${k} 와 ${add} 를 먼저 합쳤어요`, [
+      // 중간 줄을 보여 줘 실수를 하나로 특정한다 ("더하기를 빼기로"도 같은 값을 설명했다 — Codex 9차 #4)
+      const q = `{mon/이/가} 이렇게 풀었어요.\n\n**${expr} = ${a} − ${b * k + add} = ${bad}**\n\n어디가 틀렸을까요?`;
+      const chs = choices(r, `${b * k} 와 ${add} 를 먼저 합쳤어요`, [
         { text: `${b} × ${k} 를 먼저 했어요`, tag: '바르게 푼 것을 고름' },
-        { text: '더하기를 빼기로 했어요', tag: '엉뚱한 지적' },
         { text: '괄호를 무시했어요', tag: '엉뚱한 지적' },
+        { text: '숫자를 잘못 봤어요', tag: '엉뚱한 지적' },
       ]);
       return misreadAsk(this, r, c, 'left', fill(q, c), chs, {
         expr,
@@ -568,14 +576,16 @@ export const MIXED = [
       const ansB = reduce(sum.n * k, sum.d);
       const badB = reduce(n1 * d2 + n2 * k * d, d * d2); // 괄호 무시: 뒤 분수만 곱함
       const fams = [
-        { expr: `${n1}/${d} + ${n2}/${d2} × ${k}`, ans: fracText(ansA.n, ansA.d), bad: fracText(badA.n, badA.d), tag: TAGS.left, pools: {
+        { expr: `${n1}/${d} + ${n2}/${d2} × ${k}`, ans: fracText(ansA.n, ansA.d), bad: fracText(badA.n, badA.d), tag: TAGS.left,
+          steps: ['곱셈 먼저 (통분하지 않아요)', '그다음 덧셈 — 여기서 통분'], pools: {
           pokemon: [
             `${n1}/${d} + ${n2}/${d2} × ${k} 를 계산하면?`,
             `{me/이/가} 피자 ${n1}/${d}판을 먹고, ${n2}/${d2}판씩 ${k}번 더 먹었어요. 모두 얼마일까요?`,
           ],
           toystory: [`보니가 케이크 ${n1}/${d}판을 먹고 ${n2}/${d2}판씩 ${k}번 더 먹었어요. 모두 얼마일까요?`],
         } },
-        { expr: `(${n1}/${d} + ${n2}/${d2}) × ${k}`, ans: fracText(ansB.n, ansB.d), bad: fracText(badB.n, badB.d), tag: TAGS.paren, pools: {
+        { expr: `(${n1}/${d} + ${n2}/${d2}) × ${k}`, ans: fracText(ansB.n, ansB.d), bad: fracText(badB.n, badB.d), tag: TAGS.paren,
+          steps: ['괄호 안을 먼저 — 통분해서 더하기', '그다음 곱셈 (통분하지 않아요)'], pools: {
           pokemon: [
             `(${n1}/${d} + ${n2}/${d2}) × ${k} 를 계산하면?`,
             `{me/이/가} 한 번에 ${n1}/${d}판과 ${n2}/${d2}판을 먹기를 ${k}번 했어요. 모두 얼마일까요?`,
@@ -588,7 +598,7 @@ export const MIXED = [
       const chs = choices(r, f.ans, [{ text: f.bad, tag: f.tag }]);
       return ask(this.id, 'calc', fill(story, c), chs, {
         expr: f.expr,
-        solve: solve([step(0, '곱셈 먼저 (통분하지 않아요)'), step(1, '그다음 덧셈 — 여기서 통분'), step(2, `답은 ${f.ans}`)], {
+        solve: solve([...f.steps.map((t, i) => step(i, t)), step(f.steps.length, `답은 ${f.ans}`)], {
           why: {
             [TAGS.left]: '분수여도 곱셈이 먼저예요. 앞에서부터 더하면 안 돼요.',
             [TAGS.paren]: '괄호 안을 먼저 하나로 만든 뒤에 곱해요.',
@@ -624,10 +634,14 @@ export const MIXED = [
     id: 'mix.dec', grade: 6, name: '소수·분수가 섞인 혼합 계산', needs: ['mix.frac'],
     idea: '소수도 규칙은 같아요. 분수와 소수가 함께 나오면 **한쪽 모양으로 맞춰서** 계산해요.',
     calc(r, c) {
-      const half = pick(r, [5, 25, 75]);          // 0.5 · 0.25 · 0.75
-      const dec = half / 100;
+      // 0.5 · 0.25 · 0.75 — 전에 [5,25,75]로 적어 0.05가 나왔다 (Codex 9차 #3)
+      const dec = pick(r, [0.5, 0.25, 0.75]);
       const k = pick(r, [2, 4, 8]);
-      const a = int(r, 2, 12);
+      // a 는 빼는 양(dec×k)보다 크게 — 아직 음수를 안 배웠다
+      const a = Math.ceil(dec * k) + int(r, 1, 9);
+      // "− 1/2" 가족은 dec 를 0.5로 고정 — 0.25×(k−0.5) 는 소수 세 자리(0.375)가 되어
+      // 오답을 반올림해야 하고, 그러면 "뒤부터 계산" 이름표가 실제 값과 어긋난다 (Codex 9차 #5)
+      const decHalf = 0.5;
       const round2 = (v) => Math.round(v * 100) / 100;
       const fams = [
         // a − dec × k
@@ -647,12 +661,12 @@ export const MIXED = [
           toystory: [`우디가 ${dec}kg짜리 ${k}개와 ${a}kg을 함께 들었어요. 모두 몇 kg일까요?`],
         } },
         // dec × k − 1/2  (소수와 분수가 함께)
-        { expr: `${dec} × ${k} − 1/2`, ans: round2(dec * k - 0.5), bad: round2(dec * (k - 0.5)), tag: TAGS.right, pools: {
+        { expr: `${decHalf} × ${k} − 1/2`, ans: round2(decHalf * k - 0.5), bad: round2(decHalf * (k - 0.5)), tag: TAGS.right, pools: {
           pokemon: [
-            `${dec} × ${k} − 1/2 를 계산하면? (답은 소수로)`,
-            `{me/이/가} ${dec}리터씩 ${k}병을 모으고 1/2리터를 썼어요. 남은 건 몇 리터일까요?`,
+            `${decHalf} × ${k} − 1/2 를 계산하면? (답은 소수로)`,
+            `{me/이/가} ${decHalf}리터씩 ${k}병을 모으고 1/2리터를 썼어요. 남은 건 몇 리터일까요?`,
           ],
-          toystory: [`보니가 ${dec}컵씩 ${k}번 담고 1/2컵을 썼어요. 남은 건 몇 컵일까요?`],
+          toystory: [`보니가 ${decHalf}컵씩 ${k}번 담고 1/2컵을 썼어요. 남은 건 몇 컵일까요?`],
         } },
       ];
       const f = pickFamily(r, c, fams);
@@ -671,7 +685,8 @@ export const MIXED = [
     },
     misread(r, c) {
       const dec = pick(r, [0.5, 0.25, 0.75]);
-      const k = pick(r, [2, 4]); const a = int(r, 2, 9);
+      const k = pick(r, [2, 4]);
+      const a = Math.ceil(dec * k) + int(r, 1, 7); // 보여 주는 값이 음수가 되지 않게
       const bad = Math.round((a - dec) * k * 100) / 100;
       const expr = `${a} − ${dec} × ${k}`;
       const q = `{mon/이/가} 이렇게 풀었어요.\n\n**${expr} = ${bad}**\n\n어디가 틀렸을까요?`;

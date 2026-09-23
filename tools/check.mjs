@@ -34,7 +34,7 @@ for (const f of readdirSync('vocab').filter((f) => f.endsWith('.json'))) {
   }
 }
 // 🔢 사람이 쓴 수학 내용 — 배포로 실려 가므로 형식(정답·오답·자리표시)을 여기서 잡는다. 줄기마다 검사 모듈이 다르다
-const MATH_CHECK = { 'coach/math/fraction.json': '../js/mathgen.js', 'coach/math/negative.json': '../js/mathneg.js' };
+const MATH_CHECK = { 'coach/math/fraction.json': '../js/mathgen.js', 'coach/math/negative.json': '../js/mathneg.js', 'coach/math/mixed.json': '../js/mathmix.js' };
 for (const f of [...Object.keys(MATH_CHECK), 'coach/fixes.json']) {
   try {
     const data = JSON.parse(readFileSync(f, 'utf8'));
