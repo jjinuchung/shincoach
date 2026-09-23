@@ -15,7 +15,7 @@
 //   (음수 줄기 Codex 리뷰의 교훈 — 그때 이게 없어서 6/36을 놓칠 뻔했다).
 
 import { figureSvg } from './mathdraw.js';
-import { rng, shuffle, fill, tplKey, castOf, worldPick, ask, solve, int, pick, humanQuestion, checkHuman, diagnosticOf, placeFromOf, ladderOf, gcd } from './mathgen.js';
+import { rng, shuffle, fill, tplKey, castOf, worldPick, ask, solve, int, pick, pickFamily, humanQuestion, checkHuman, diagnosticOf, placeFromOf, ladderOf, gcd } from './mathgen.js';
 
 /** 학년 표시 — 이 줄기는 초5·초6뿐이지만 다른 줄기와 같은 규칙을 쓴다 */
 export function gradeLabel(g) {
@@ -92,25 +92,6 @@ function choices(r, answer, wrongs) {
   return shuffle(r, list);
 }
 
-/**
- * 이야기 가족 고르기 — 한 개념에 셈이 다른 틀 묶음이 여럿일 때.
- * 🔁 쌍둥이·🤔 오답 노트(c.want)는 **같은 가족**이어야 같은 셈이 나온다 → want가 든 가족을 먼저.
- * (음수 줄기와 같은 규칙 — 거기서 Codex가 잡아 준 recent 회피까지 그대로)
- */
-function pickFamily(r, c, fams) {
-  if (c && c.want) {
-    const f = fams.find((x) => Object.values(x.pools).flat().some((t) => tplKey(t) === c.want));
-    if (f) return f;
-  }
-  if (c && c.recent && c.recent.length) {
-    const fresh = fams.filter((f) => {
-      const list = (f.pools[c.world] && f.pools[c.world].length) ? f.pools[c.world] : f.pools.pokemon;
-      return list.some((t) => !c.recent.includes(tplKey(t)));
-    });
-    if (fresh.length) return pick(r, fresh);
-  }
-  return pick(r, fams);
-}
 
 /** ② 오개념 문항의 갈래 — 갈래마다 key('misread:갈래'). 갈래가 하나면 쌍둥이가 다른 유형으로 돌아온다 */
 function misreadAsk(c, r, cast, branch, q, chs, o) {

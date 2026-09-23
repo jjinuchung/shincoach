@@ -226,6 +226,29 @@ function choices(r, answer, wrongs) {
  * `q`는 이야기 문장, `expr`은 그 아래 크게 보여 줄 식(계산 문항만). 화면이 둘을 따로 그린다 —
  * 이야기만 있으면 식을 찾아 읽어야 하고, 식만 있으면 재미가 없다.
  */
+/**
+ * 이야기 가족 고르기 — 한 개념에 셈이 다른 틀 묶음(예: a − b×k / (a−b)×k)이 여럿일 때.
+ * 🔁 쌍둥이·🤔 오답 노트(c.want)는 **같은 가족**이어야 같은 셈이 나온다 → want가 든 가족을 먼저 찾는다.
+ * recent 회피는 가족을 고른 **뒤** worldPick이 하므로, 그 세계의 틀이 하나뿐인 가족을 고르면 방금 것이 또 나온다
+ * → 아직 안 나온 틀이 남은 가족을 먼저. 전부 소진했을 때만 반복을 허용 (음수 줄기 Codex #7).
+ *
+ * 2026-09-24: mathneg·mathmix 가 똑같이 갖고 있던 것을 여기로 모았다 (Codex 9차 F).
+ */
+export function pickFamily(r, c, fams) {
+  if (c && c.want) {
+    const f = fams.find((x) => Object.values(x.pools).flat().some((t) => tplKey(t) === c.want));
+    if (f) return f;
+  }
+  if (c && c.recent && c.recent.length) {
+    const fresh = fams.filter((f) => {
+      const list = (f.pools[c.world] && f.pools[c.world].length) ? f.pools[c.world] : f.pools.pokemon;
+      return list.some((t) => !c.recent.includes(tplKey(t)));
+    });
+    if (fresh.length) return pick(r, fresh);
+  }
+  return pick(r, fams);
+}
+
 export function ask(concept, kind, q, chs, o = {}) {
   return { concept, kind, q, expr: o.expr || '', hint: o.hint || '', figure: o.figure || '', choices: chs, solve: o.solve || null };
 }

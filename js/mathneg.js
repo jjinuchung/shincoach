@@ -21,7 +21,7 @@
 //   ★ 보기는 **값**으로 겹침을 본다 — "+5"와 "5", "−4/2"와 "−2"는 같은 수다. 글자만 보면 정답이 둘인 문항이 나간다 (분수 v96·v103의 교훈).
 
 import { figureSvg, lineSvg, walkSvg } from './mathdraw.js';
-import { rng, shuffle, fill, numJosa, tplKey, castOf, worldPick, ask, solve, int, pick, humanQuestion, checkHuman, diagnosticOf, placeFromOf, ladderOf, gcd } from './mathgen.js';
+import { rng, shuffle, fill, numJosa, tplKey, castOf, worldPick, ask, solve, int, pick, pickFamily, humanQuestion, checkHuman, diagnosticOf, placeFromOf, ladderOf, gcd } from './mathgen.js';
 
 /** 학년 표시 — 7은 중1. 분수 줄기는 4·5·6(초)이라 숫자로 통일하고 표시만 바꾼다 */
 export function gradeLabel(g) {
@@ -110,26 +110,6 @@ function choices(r, answer, wrongs) {
   return shuffle(r, list);
 }
 
-/**
- * 이야기 가족 고르기 — 한 개념에 셈이 다른 틀 묶음(예: 3 + (−5) / (−3) + 5 / (−3) + (−5))이 여럿일 때.
- * 🔁 쌍둥이·🤔 오답 노트(c.want)는 **같은 가족**이어야 같은 셈이 나온다 → want가 든 가족을 먼저 찾는다.
- */
-function pickFamily(r, c, fams) {
-  if (c && c.want) {
-    const f = fams.find((x) => Object.values(x.pools).flat().some((t) => tplKey(t) === c.want));
-    if (f) return f;
-  }
-  // recent 회피는 가족을 고른 **뒤** worldPick이 하므로, 그 세계의 틀이 하나뿐인 가족을 고르면 방금 것이 또 나온다 (Codex #7)
-  // → 이 세계에 아직 안 나온 틀이 남은 가족을 먼저 고른다. 전부 소진했을 때만 반복을 허용
-  if (c && c.recent && c.recent.length) {
-    const fresh = fams.filter((f) => {
-      const list = (f.pools[c.world] && f.pools[c.world].length) ? f.pools[c.world] : f.pools.pokemon;
-      return list.some((t) => !c.recent.includes(tplKey(t)));
-    });
-    if (fresh.length) return pick(r, fresh);
-  }
-  return pick(r, fams);
-}
 
 /**
  * ② 오개념 문항의 갈래 고르기 — 갈래마다 key('misread:갈래')를 남긴다.

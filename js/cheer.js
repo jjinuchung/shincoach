@@ -15,8 +15,12 @@ export const CHANCE = 0.18;
 export const CHANCE_AFTER_WRONG = 0.5;
 /** 한 번 지나간 뒤 이만큼 문항은 안 나온다 */
 export const COOLDOWN = 3;
-/** 하루 최대 (이만큼 보면 그날은 그만 — 반가움이 사라진다) */
-export const MAX_PER_DAY = 8;
+/**
+ * 한 번 켠 동안 최대 (이만큼 보면 그만 — 반가움이 사라진다).
+ * ★ **하루가 아니라 세션 기준**이다 (2026-09-24, Codex 9차 #10): 횟수는 메모리에만 있어 새로고침하면 0이 된다.
+ * 응원은 장식이라 저장(트랜잭션 claim) 비용을 치를 값이 아니라고 보고, 이름을 실제 동작에 맞췄다.
+ */
+export const MAX_PER_SESSION = 8;
 /** 걸어가는 시간(ms) — 너무 빠르면 못 읽고, 느리면 거슬린다 */
 export const WALK_MS = 5200;
 
@@ -48,11 +52,11 @@ export const LINES_WRONG = [
 
 /**
  * 지금 응원이 지나갈 차례인가 (순수).
- * @param {{wrong:boolean, cooldown:number, todayCount:number, rng?:function}} o
+ * @param {{wrong:boolean, cooldown:number, todayCount:number, rng?:function}} o todayCount = 이 창을 켠 뒤 본 횟수
  */
 export function shouldCheer({ wrong = false, cooldown = 0, todayCount = 0, rng = Math.random } = {}) {
   if (cooldown > 0) return false;
-  if (todayCount >= MAX_PER_DAY) return false;
+  if (todayCount >= MAX_PER_SESSION) return false;
   return rng() < (wrong ? CHANCE_AFTER_WRONG : CHANCE);
 }
 

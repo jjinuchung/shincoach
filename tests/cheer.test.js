@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   shouldCheer, pickCheerer, pickLine, pickSide,
-  CHANCE, CHANCE_AFTER_WRONG, COOLDOWN, MAX_PER_DAY, LINES, LINES_WRONG,
+  CHANCE, CHANCE_AFTER_WRONG, COOLDOWN, MAX_PER_SESSION, LINES, LINES_WRONG,
 } from '../js/cheer.js';
 
 const always = () => 0;      // 확률을 항상 통과
@@ -17,13 +17,13 @@ test('shouldCheer: 틀린 직후가 더 자주 (지겹고 속상할 때가 제�
   assert.equal(shouldCheer({ wrong: true, rng: between }), true);
 });
 
-test('shouldCheer: 쿨다운 중·하루 상한이면 안 나온다', () => {
+test('shouldCheer: 쿨다운 중·상한에 닿으면 안 나온다', () => {
   assert.equal(shouldCheer({ cooldown: 1, rng: always }), false, '쿨다운 중');
-  assert.equal(shouldCheer({ todayCount: MAX_PER_DAY, rng: always }), false, '하루 상한');
-  assert.equal(shouldCheer({ todayCount: MAX_PER_DAY - 1, rng: always }), true);
+  assert.equal(shouldCheer({ todayCount: MAX_PER_SESSION, rng: always }), false, '한 번 켠 동안의 상한');
+  assert.equal(shouldCheer({ todayCount: MAX_PER_SESSION - 1, rng: always }), true);
   assert.equal(shouldCheer({ rng: never }), false, '확률이 빗나감');
   assert.equal(shouldCheer({ rng: always }), true);
-  assert.ok(COOLDOWN >= 1 && MAX_PER_DAY >= 1);
+  assert.ok(COOLDOWN >= 1 && MAX_PER_SESSION >= 1);
 });
 
 test('pickCheerer: 그림이 있는 잡은 포켓몬만 (그림이 없으면 빈 자리가 걸어간다)', () => {
@@ -77,4 +77,12 @@ test('문구: 한글과 영어가 짝으로 있고, 빈 것이 없다', () => {
 test('pickSide: 양쪽에서 들어온다', () => {
   assert.equal(pickSide(() => 0.1), 'left');
   assert.equal(pickSide(() => 0.9), 'right');
+});
+
+// ── Codex 9차 #10 — 상한은 "하루"가 아니라 "한 번 켠 동안"이다 ──
+test('상한 이름이 실제 동작과 맞는다 (메모리에만 있으니 세션 기준)', () => {
+  // 이름이 MAX_PER_DAY 였을 때는 새로고침하면 초기화되는데도 "하루"라고 적혀 있었다.
+  // 응원은 장식이라 저장(트랜잭션 claim) 비용을 치르지 않기로 하고 이름을 맞췄다.
+  assert.equal(typeof MAX_PER_SESSION, 'number');
+  assert.ok(MAX_PER_SESSION >= 4 && MAX_PER_SESSION <= 20, '한 세션에 너무 적거나 많지 않게');
 });

@@ -24,7 +24,7 @@ import { showHatchIfAny } from './hatch.js';
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
-import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN, MAX_PER_DAY } from './cheer.js';
+import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN } from './cheer.js';
 import { contentSummary, cueCountOf } from './stats.js';
 import { sfx } from './sfx.js';
 
@@ -222,6 +222,27 @@ function topUpMathCharacters() {
   downloadCharacters(null, MATH_CHAR_BATCH, 'math').catch(() => {}).then(() => { ui.charBusy = false; });
 }
 
+// 🎯 돌려주지 못한 던지기 (Codex 9차 #2) — `takePending`으로 뺐는데 화면을 못 띄웠고, 돌려주는 저장까지
+// 실패하면 그 기회는 영영 사라졌다. 저장이 될 때까지 **기기에 빚으로 적어 두고** 수학에 들어올 때 갚는다.
+// 레코드 쪽 `giveBackPending`이 "뺀 수보다 많이 돌려주지 않는다"를 지키므로 두 번 갚아도 안전하다.
+const OWED_KEY = 'shincoach.math.owedThrows';
+function owedThrows() {
+  try { return Math.max(0, Math.floor(Number(localStorage.getItem(OWED_KEY)) || 0)); } catch { return 0; }
+}
+function setOwedThrows(n) {
+  try { if (n > 0) localStorage.setItem(OWED_KEY, String(n)); else localStorage.removeItem(OWED_KEY); } catch { /* 무시 */ }
+}
+/** 밀린 환불을 갚는다 — 수학 화면에 들어올 때 가장 먼저 (실패하면 빚을 남기고 다음에) */
+async function settleOwedThrows() {
+  let owed = owedThrows();
+  while (owed > 0) {
+    try { ui.state = await updateMath((mm) => { giveBackPending(mm); }); }
+    catch { return; }
+    owed -= 1;
+    setOwedThrows(owed);
+  }
+}
+
 /**
  * 🎯 몬스터볼을 n번 — 한 번 끝나면(onDone) 다음 후보 4마리로 다시. 화면을 떠났으면(run 바뀜) 그만.
  * 개념 편 통과 + ☀️ 첫 완주가 한 카드에 겹치면 2번이 된다.
@@ -232,7 +253,10 @@ async function runCatches(n, { g, c, run, onAll }) {
   ui.catching = true;
   // 정리는 한 곳 — 예외·나감·끝남 전부 여기로: catching 내리고, 보이면 사다리·"다음 →" 버튼을 되살린다 (Codex 8차 #6)
   const finish = () => { ui.catching = false; if (typeof onAll === 'function' && run === ui.run && mathVisible()) onAll(); };
-  const giveBack = async () => { try { ui.state = await updateMath((m) => { giveBackPending(m); }); } catch { /* 저장 실패 — 이 한 번은 잃는다 */ } };
+  const giveBack = async () => {
+    try { ui.state = await updateMath((m) => { giveBackPending(m); }); }
+    catch { setOwedThrows(owedThrows() + 1); } // 저장 실패 — 빚으로 적어 두고 다음에 갚는다 (Codex 9차 #2)
+  };
   let pool = [];
   try { pool = await catchPool(); } catch (e) { console.warn('후보 준비 실패:', e); pool = []; }
   // 나가 있으면(다른 화면·🎒) 안 띄운다 — 던질 기회는 레코드에 남아 사다리의 "🎯 받은 몬스터볼"로 다시 온다
@@ -1309,7 +1333,7 @@ function maybeCheer(wrong) {
   if (ui.cheer.d !== today) ui.cheer = { cd: 0, n: 0, d: today, last: '', timer: ui.cheer.timer };
   if (ui.cheer.cd > 0) { ui.cheer.cd--; return; }
   if (ui.battlePending || ui.battleOpen || ui.catching) return; // 큰 화면이 열릴 참이면 비켜 준다
-  if (!shouldCheer({ wrong, cooldown: 0, todayCount: ui.cheer.n })) return;
+  if (!shouldCheer({ wrong, cooldown: 0, todayCount: ui.cheer.n })) return; // n은 이 창을 켠 뒤 본 수 (장식이라 저장하지 않는다)
   const mon = pickCheerer(myCheerMons(), getPartner());
   if (!mon) return; // 아직 잡은 포켓몬이 없거나 그림을 못 받았다
   runCheer(mon, wrong);
@@ -1331,29 +1355,38 @@ function runCheer(mon, wrong) {
   const box = $('cheer');
   if (!box) return;
   const line = pickLine(wrong, ui.cheer.last);
-  ui.cheer.last = line.ko;
-  ui.cheer.cd = COOLDOWN;
-  ui.cheer.n += 1;
+  const show = () => {
+    if (mathHidden()) return; // 그 사이 화면을 나갔다
+    const side = pickSide();
+    box.classList.remove('go-left', 'go-right');
+    void box.offsetWidth; // 애니메이션을 처음부터 다시 돌리려면 한 번 끊어야 한다
+    box.style.setProperty('--cheer-ms', `${WALK_MS}ms`);
+    box.classList.add(side === 'left' ? 'go-right' : 'go-left'); // 왼쪽에서 들어오면 오른쪽으로 간다
+    box.hidden = false;
+    clearTimeout(ui.cheer.timer);
+    ui.cheer.timer = setTimeout(() => {
+      box.hidden = true;
+      box.classList.remove('go-left', 'go-right');
+    }, WALK_MS + 100);
+  };
 
   box.querySelector('.cheer-ko').textContent = line.ko;
   box.querySelector('.cheer-en').textContent = line.en;
   setFigure(box.querySelector('.cheer-mon'), mon.url, mon.look);
-  // 그림 주소가 죽어 있으면(받다 만 것·다른 창이 지운 것) **빈 네모가 걸어간다** — 그럴 땐 아예 띄우지 않는다
+  // 그림 주소가 죽어 있으면(받다 만 것·다른 창이 지운 것) **빈 네모가 걸어간다** — 그럴 땐 아예 띄우지 않는다.
+  // 횟수·쿨다운은 **실제로 뜬 뒤에만** 센다 — 전에는 즉시 감지한 실패만 되돌려, 감지 시점에 따라 값이 달라졌다 (Codex 9차 #10)
   const img = box.querySelector('.cheer-mon img');
+  const walk = () => {
+    ui.cheer.last = line.ko;
+    ui.cheer.cd = COOLDOWN;
+    ui.cheer.n += 1;
+    show();
+  };
   img.onerror = () => { box.hidden = true; box.classList.remove('go-left', 'go-right'); };
-  if (img.complete && img.naturalWidth === 0) { ui.cheer.cd = 0; ui.cheer.n -= 1; return; }
-  const side = pickSide();
-  box.classList.remove('go-left', 'go-right');
-  void box.offsetWidth; // 애니메이션을 처음부터 다시 돌리려면 한 번 끊어야 한다
-  box.style.setProperty('--cheer-ms', `${WALK_MS}ms`);
-  box.classList.add(side === 'left' ? 'go-right' : 'go-left'); // 왼쪽에서 들어오면 오른쪽으로 간다
-  box.hidden = false;
-
-  clearTimeout(ui.cheer.timer);
-  ui.cheer.timer = setTimeout(() => {
-    box.hidden = true;
-    box.classList.remove('go-left', 'go-right');
-  }, WALK_MS + 100);
+  if (img.complete) { if (img.naturalWidth === 0) return; walk(); return; }
+  img.onload = () => { if (ui.cheer.pendingLine === line.ko) walk(); };
+  ui.cheer.pendingLine = line.ko;
+  return;
 }
 
 /** 화면을 떠날 때는 지우고 간다 (수학 밖에서 지나가면 엉뚱하다) */
@@ -1388,6 +1421,7 @@ function mathHidden() {
 
 /** ⚔️ 배틀 준비 — 오늘 몫과 포켓몬 그림을 읽어 둔다 (등장 판정은 문항마다 동기로 돌아야 한다) */
 function prepareBattle() {
+  settleOwedThrows().catch(() => {}); // 🎯 밀린 환불부터 (Codex 9차 #2)
   loadTodayCounts().catch(() => {});
   loadCharacters().then((c) => { ui.chars = c || []; }).catch(() => { ui.chars = ui.chars || []; });
 }

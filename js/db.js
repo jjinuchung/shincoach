@@ -951,7 +951,10 @@ export async function exportStats() {
   const db = await openDb();
   const tx = db.transaction(['items', ...STAT_STORES], 'readonly');
   const items = (await promisify(tx.objectStore('items').getAll())).map((it) => ({
+    // noReview = 📊에서 부모가 고른 "🔁 복습에 쓰기" — 아이가 만든 기록이 아니라 **부모의 선택**이라
+    // 기기를 옮기거나 되돌릴 때 같이 가야 한다 (Codex 9차 #8)
     id: it.id, title: it.title, duration: it.duration, lastCue: it.lastCue, createdAt: it.createdAt,
+    ...(typeof it.noReview === 'boolean' ? { noReview: it.noReview } : {}),
   }));
   const out = { app: 'shincoach', version: 1, exportedAt: new Date().toISOString(), items };
   for (const name of STAT_STORES) out[name] = await promisify(tx.objectStore(name).getAll());
@@ -1062,7 +1065,7 @@ export function mergeStatRecord(name, cur, rec) {
 export async function importStats(data) {
   if (!data || data.app !== 'shincoach') throw new Error('신코치 기록 파일이 아니에요');
   const db = await openDb();
-  const tx = db.transaction(STAT_STORES, 'readwrite');
+  const tx = db.transaction([...STAT_STORES, 'items'], 'readwrite');
   let n = 0;
   for (const name of STAT_STORES) {
     const store = tx.objectStore(name);
@@ -1070,6 +1073,20 @@ export async function importStats(data) {
       if (!rec || rec[store.keyPath] === undefined) continue;
       const cur = await promisify(store.get(rec[store.keyPath]));
       store.put(mergeStatRecord(name, cur, rec));
+      n++;
+    }
+  }
+  // 🚫 "복습에 쓰기"는 **부모가 고른 값**이라 되돌릴 때 같이 온다 (영상 자체는 복원하지 않는다 — 파일이 없다).
+  // 기기를 옮기면 같은 영상도 id가 새로 생기므로 **제목으로도** 찾는다 (Codex 9차 #8)
+  const flags = (data.items || []).filter((it) => it && typeof it.noReview === 'boolean');
+  if (flags.length) {
+    const store = tx.objectStore('items');
+    const all = await promisify(store.getAll());
+    for (const want of flags) {
+      const hit = all.find((it) => String(it.id) === String(want.id))
+        || all.find((it) => String(it.title || '') === String(want.title || '') && want.title);
+      if (!hit || hit.noReview === want.noReview) continue;
+      store.put({ ...hit, noReview: want.noReview, updatedAt: Date.now() });
       n++;
     }
   }

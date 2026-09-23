@@ -590,7 +590,14 @@ function refreshVocabViews() {
 
 /** ⚙에 정한 한 회차 문항 수 (🎬 목록의 🔁 버튼이 "지금 몇 문장"을 적을 때 쓴다) */
 export function reviewRoundSize() {
-  return Math.max(1, Number(settings.reviewCount) || REVIEW_COUNT);
+  const n = Number(settings.reviewCount);
+  if (n === 0) return 0; // ⚙에서 껐다 — 홈·목록도 복습을 권하지 않아야 한다 (Codex 9차 E)
+  return Math.max(1, n || REVIEW_COUNT);
+}
+
+/** 📊에서 "복습에 쓰기"를 바꿨을 때 — 열려 있는 영상에도 바로 반영한다 (다시 열기 전까지 옛 값을 보던 것, Codex 9차 #8) */
+export function applyItemPatch(id, patch) {
+  if (state.item && String(state.item.id) === String(id)) Object.assign(state.item, patch || {});
 }
 
 /** 이번 회차에 낼 복습 문장 (없으면 빈 배열) */
@@ -906,6 +913,13 @@ function stageMons() {
   });
 }
 
+/** 무대에 올릴 모습 — 🌈 이로치면 도트 GIF 대신 정지 그림 (GIF는 일반 색이라 다른 포켓몬처럼 보인다) */
+function withAnim(m) {
+  const look = getLook(m.id);
+  if (look && look.shiny) return { ...m, art: look.shinyUrl || m.art, anim: null };
+  return { ...m, anim: animUrl(m.id) };
+}
+
 /**
  * 단어 이어 주기 열기. 끝나면 보상을 주고 이번 묶음을 "썼다"고 표시한 뒤 원래 하려던 이동을 이어감.
  * 표시를 해야 다음 판이 **새 단어 20개**를 다시 기다린다 (안 하면 매 문장마다 열린다).
@@ -919,8 +933,9 @@ function startMatch(continueFn) {
   if (!video.paused) video.pause();
   const spot = rememberSpot();
   setMatchOpen(true);
-  // 그새 그림을 받았을 수도 있으니 지금 값으로 다시 채운다
-  const mons = (round.mons || stageMons()).map((m) => ({ ...m, anim: animUrl(m.id) }));
+  // 그새 그림을 받았을 수도 있으니 지금 값으로 다시 채운다.
+  // ★ 🌈 이로치는 anim(도트 GIF)이 일반 색이라 **정지 그림**을 유지해야 한다 — 전에는 여기서 다시 덮어썼다 (Codex 9차 #7)
+  const mons = (round.mons || stageMons()).map(withAnim);
   const token = openMatch({
     items: round.items,
     mons,
@@ -943,7 +958,7 @@ function startMatch(continueFn) {
   });
   // 늦게 도착한 그림은 **무대만** 다시 그린다 (게임 진행은 건드리지 않는다)
   ensureAnims(mons.map((m) => m.id))
-    .then(() => refreshStage(mons.map((m) => ({ ...m, anim: animUrl(m.id) })), token))
+    .then(() => refreshStage(mons.map(withAnim), token))
     .catch(() => {});
 }
 

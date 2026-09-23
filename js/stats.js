@@ -7,7 +7,7 @@ import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptRep
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes } from './essay.js';
 import { countPlayableCues } from './srt.js';
-import { openPlayer } from './player.js';
+import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED } from './review.js';
 import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory } from './xp.js';
@@ -131,6 +131,8 @@ function reviewToggle(item) {
     box.disabled = true;
     try {
       await updateItem(item.id, { noReview: !on });
+      item.noReview = !on;
+      applyItemPatch(item.id, { noReview: !on }); // 열려 있는 영상에도 바로 (다시 열기 전까지 옛 값을 보던 것, Codex 9차 #8)
       text.textContent = on ? '🔁 복습에 쓰기' : '🚫 복습에서 뺐어요';
     } catch {
       box.checked = !on; // 저장이 안 됐으면 화면도 되돌린다 (거짓으로 바뀐 척하지 않게)
