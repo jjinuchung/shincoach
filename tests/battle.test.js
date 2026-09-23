@@ -1,7 +1,7 @@
 // ⚔️ 배틀 규칙 테스트: node --test tests/battle.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BATTLE, MOVES, DAMAGE, TYPE_OF, typeOf, movesOf, speakTier, damageFor, enemyDamage, shouldBattle, pickOpponent, eligibleMine, abortOutcome, formMult, FORM } from '../js/battle.js';
+import { BATTLE, MOVES, DAMAGE, TYPE_OF, typeOf, movesOf, speakTier, damageFor, damageForTier, quizTier, enemyDamage, shouldBattle, pickOpponent, eligibleMine, abortOutcome, formMult, FORM } from '../js/battle.js';
 import { ROSTER } from '../js/pokemon.js';
 import { battleWin, battleLoss, lossesOf, caughtCount, catchAttempt, consumeItem, addItem, itemCount } from '../js/xp.js';
 import { mergeStatRecord } from '../js/db.js';
@@ -118,4 +118,40 @@ test('⭐ 변신 배율: 메가는 배틀 내내 ×1.4, 거다이맥스는 3턴�
   assert.equal(formMult('gmax', 0), 1, '거다이맥스는 3턴이 지나면 원래대로');
   assert.ok(FORM.gmaxMult > FORM.megaMult, '거다이맥스가 더 세지만 짧다');
   assert.equal(FORM.gmaxTurns, 3);
+});
+
+// ── 🔢 수학 배틀의 턴 등급 (2026-09-23, 진우 "수학에서는 배틀이 안 나와요") ──
+// 영어는 발음 일치율로 등급을 매기지만 수학은 정답 여부로. 시간 제한은 두지 않는다 —
+// 수학에 초시계를 붙이면 아는 문제도 틀린다. 대신 연속 정답에 🌟.
+
+test('quizTier: 정답 🎯 · 연속 2번째부터 🌟 · 오답 🔁 · 안 풀면 😶', () => {
+  assert.equal(quizTier({ correct: true, streak: 1 }), 'pass');
+  assert.equal(quizTier({ correct: true, streak: 2 }), 'star', '연속 2번째부터 더 세게');
+  assert.equal(quizTier({ correct: true, streak: 5 }), 'star');
+  assert.equal(quizTier({ correct: false, streak: 0 }), 'fail');
+  assert.equal(quizTier({ correct: false, skipped: true, streak: 0 }), 'none', '모르겠어요');
+  assert.equal(quizTier({ correct: true, skipped: true, streak: 3 }), 'none', '건너뛰면 맞아도 공격 없음');
+  assert.equal(quizTier({}), 'fail', '값이 없으면 안 맞힌 것');
+  assert.equal(quizTier(), 'fail');
+});
+
+test('damageForTier: 말하기와 수학이 같은 데미지 표를 쓴다', () => {
+  for (const key of ['strong', 'safe']) {
+    for (const tier of ['star', 'pass', 'fail', 'none']) {
+      assert.equal(damageForTier(key, tier), DAMAGE[key][tier], `${key}/${tier}`);
+    }
+  }
+  // 말하기 쪽 damageFor와 같은 값이어야 한다 (한 표를 두 곳에서 쓰므로)
+  const star = { passed: true, method: 'speech', score: { ratio: 0.9 } };
+  assert.equal(damageFor('strong', star), damageForTier('strong', 'star'));
+  assert.equal(damageForTier('없는기술', 'pass'), DAMAGE.safe.pass, '모르는 기술은 안전한 쪽');
+});
+
+test('수학 배틀도 영어와 같은 확률·하루 횟수를 쓴다 (shouldBattle 그대로)', () => {
+  const always = () => 0;   // 항상 당첨
+  const never = () => 0.99; // 항상 빗나감
+  assert.equal(shouldBattle({ todayDone: 5, todayBattles: 0, rng: always }), true);
+  assert.equal(shouldBattle({ todayDone: 4, todayBattles: 0, rng: always }), false, '오늘 5문항은 풀어야');
+  assert.equal(shouldBattle({ todayDone: 50, todayBattles: BATTLE.maxPerDay, rng: always }), false, '하루 상한');
+  assert.equal(shouldBattle({ todayDone: 50, todayBattles: 0, rng: never }), false);
 });

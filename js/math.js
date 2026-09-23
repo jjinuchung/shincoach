@@ -11,18 +11,19 @@ import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
 } from './mathprog.js';
-import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats } from './db.js';
+import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
 import { todayKey } from './track.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY } from './xp.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
-import { GOLDEN, STONE_MATH, RADAR } from './items.js';
+import { GOLDEN, STONE_MATH, RADAR, POTION } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg } from './xp.js';
 import { eggProgress } from './egg.js';
 import { showHatchIfAny } from './hatch.js';
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast } from './pokemon.js';
 import { openCatch } from './catch.js';
+import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { contentSummary, cueCountOf } from './stats.js';
 import { sfx } from './sfx.js';
 
@@ -41,6 +42,12 @@ const ui = {
   run: 0,               // 화면을 지우고 await 하는 함수의 요청 번호 (겹쳐 그리기 방지)
   recent: {},           // 개념별로 방금 나온 이야기 틀·문항 (같은 개념을 다시 풀 때 같은 이야기가 또 나오지 않게)
   state: null,          // 마지막으로 읽은 수학 진도 (🤔 오답 노트를 다음 편에 끼우려고)
+  // ⚔️ 배틀 (2026-09-23, 진우 요청 "수학에서는 배틀이 안 나와요") — 영어와 같은 확률·같은 규칙.
+  // 다른 점은 턴뿐이다: 문장 따라 말하기 대신 **문제 풀기**.
+  battlePending: null,  // 다음 문항으로 넘어갈 때 열 상대 (영어의 state.battlePending과 같은 방식)
+  battleOpen: false,
+  today: { d: '', q: 0, battles: 0 }, // 오늘 푼 문항 수·배틀 수 (등장 판정용, 화면을 열 때 저장소에서 읽는다)
+  chars: [],            // 기기에 받아 둔 포켓몬 그림 (⚔️ 상대·내 편을 고를 때 동기로 필요하다 — 화면을 열 때 한 번 읽는다)
 };
 const RECENT_KEEP = 10; // 두 편 반 분량 — 틀이 4개뿐인 개념도 한 바퀴는 돈다
 const STEM_KEY = 'shincoach.mathStem'; // 마지막에 고른 줄기 (이 기기 편의용 — 없어도 고르기 화면이 나올 뿐)
@@ -300,6 +307,7 @@ function clearMain() {
 /** 진입 — 진단 전이면 진단, 아니면 사다리 */
 export async function renderMath() {
   topUpMathCharacters();
+  prepareBattle(); // ⚔️ 오늘 몫·그림을 읽어 둔다 (배틀 등장 판정은 문항마다 동기로 돈다)
   // 🎒·📊를 보고 돌아온 것이면 풀던 편을 이어서 (2026-09-20: 과목 화면에도 🎒·📊를 두면서 필요해졌다).
   // 답을 고른 뒤였으면 다음 문항으로 — 같은 문항을 다시 그리면 두 번 답해 두 번 세어진다.
   const r = ui.round;
@@ -944,6 +952,7 @@ function answer(i, list, card) {
     ...(sense && picked !== undefined ? { sn: picked === sense.ok ? 1 : 0 } : {}), // 🎯 감 잡기가 맞았나
   });
   paintAnswer(i, list, card, false);
+  maybeBattle(); // ⚔️ 아주 가끔 트레이너가 걸어온다 (다음 문항으로 넘어갈 때 열린다)
 }
 
 /** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
@@ -1264,14 +1273,195 @@ function focusQuiet(elm) {
   try { elm.focus({ preventScroll: true }); } catch { elm.focus(); }
 }
 
-/** 다음 문항으로 (쌍둥이가 있었으면 지운다) */
+/** 다음 문항으로 (쌍둥이가 있었으면 지운다). ⚔️ 걸어 둔 배틀이 있으면 여기서 먼저 연다 */
 function advance() {
   const r = ui.round;
   if (!r) return;
   r.twin = null;
   r.at += 1;
-  if (r.at < r.qs.length) renderQuestion(); else finishRound();
+  const go = () => { if (!ui.round) return; if (ui.round.at < ui.round.qs.length) renderQuestion(); else finishRound(); };
+  if (ui.battlePending) { startMathBattle(go); return; }
+  go();
 }
+// ───────────────────── ⚔️ 배틀 (수학) ─────────────────────
+//
+// 진우: "수학에서는 배틀이 안 나와요" (2026-09-23). 맞는 말이었다 — maybeBattle이 player.js(영어)에만 있었다.
+// 등장 확률·하루 횟수·상대 고르기·보상·패배 규칙은 **영어와 똑같이** battle.js의 것을 그대로 쓴다.
+// 다른 것은 턴 하나뿐이다: 문장 따라 말하기 대신 **문제 풀기** (battle.quizTurn).
+//
+// 하루 횟수는 영어와 **함께** 센다 — 같은 daily 레코드의 battles 칸을 트랜잭션으로 선점하므로
+// (claimDailyCount) 두 과목을 합쳐 하루 BATTLE.maxPerDay번이고, 두 창이 동시에 열어도 한쪽만 된다.
+
+/** 잠깐 떴다 사라지는 알림 (배틀 결과처럼 화면을 다시 그려도 남아야 하는 것) */
+function mathToast(text) {
+  const box = el('div', 'math-toast', text);
+  document.body.appendChild(box);
+  setTimeout(() => { box.classList.add('out'); }, 4200);
+  setTimeout(() => { box.remove(); }, 5000);
+}
+
+/** ⚔️ 배틀 준비 — 오늘 몫과 포켓몬 그림을 읽어 둔다 (등장 판정은 문항마다 동기로 돌아야 한다) */
+function prepareBattle() {
+  loadTodayCounts().catch(() => {});
+  loadCharacters().then((c) => { ui.chars = c || []; }).catch(() => { ui.chars = ui.chars || []; });
+}
+
+/** 오늘 푼 문항 수·배틀 수를 저장소에서 읽어 둔다 (수학 화면에 들어올 때 한 번) */
+async function loadTodayCounts() {
+  const today = todayKey();
+  try {
+    const d = await getDaily(today);
+    ui.today = { d: today, q: (d && Number(d.mathQ)) || 0, battles: (d && Number(d.battles)) || 0 };
+  } catch { ui.today = { d: today, q: 0, battles: 0 }; }
+}
+
+/** 문항 하나를 풀 때마다 — 오늘 몫을 세고, 확률이 맞으면 다음 전환에서 열 상대를 걸어 둔다 */
+function maybeBattle() {
+  const today = todayKey();
+  if (ui.today.d !== today) ui.today = { d: today, q: 0, battles: 0 }; // 자정을 넘김
+  ui.today.q += 1;
+  if (ui.battlePending || ui.battleOpen) return;
+  // 📏 진단은 "어디까지 아는지" 재는 자리다 — 도중에 트레이너가 끼어들면 흐름이 끊긴다 (문항 수는 그대로 센다)
+  if (ui.round && ui.round.mode === 'diag') return;
+  if (!shouldBattle({ todayDone: ui.today.q, todayBattles: ui.today.battles })) return;
+  const opponent = pickBattleOpponent();
+  if (!opponent || !myBattleMons().length) return;
+  ui.battlePending = opponent;
+}
+
+/** 상대: 지금 레벨에서 열린 명단 중 아직 못 잡은 포켓몬 (영어와 같은 규칙 — 수학 포켓몬도 여기 섞여 있다) */
+function pickBattleOpponent() {
+  const level = getLevelInfo().level;
+  const caught = getProfileSnapshot().caught;
+  const chars = (ui.chars || []).filter((c) => c && isUnlocked(c.id, level));
+  return pickOpponent(chars, caught);
+}
+
+/** 내가 내보낼 수 있는 포켓몬: 잡은 것 중 파트너·😴 제외 (수학 화면에는 ⭐ 변신을 안 붙인다 — 영어 쪽 장치) */
+function myBattleMons() {
+  const caught = getProfileSnapshot().caught;
+  const ids = Object.keys(caught).filter((k) => caught[k] > 0).map(Number);
+  const ok = eligibleMine(ids, getPartner(), (id) => isTired(id));
+  return ok.map((id) => {
+    const r = ROSTER.find((m) => m.id === id);
+    const c = (ui.chars || []).find((x) => x.id === id);
+    return { id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), canMega: false, canGmax: false };
+  });
+}
+
+/** 가방의 물약 목록 (영어와 같은 것) */
+function mathPotions() {
+  const inv = inventory();
+  return POTION.filter((x) => inv[x.id] > 0).map((x) => ({ id: x.id, n: inv[x.id] }));
+}
+
+/**
+ * ⚔️ 배틀 턴에 낼 문제 — 아는 개념에서 하나. **기록하지 않는다**(연습과 같은 성격):
+ * 얼굴별 누적·오개념·🤔 노트·교환권을 건드리지 않는다. 영어 배틀이 문장 기록을 안 남기는 것과 같다.
+ */
+function battleQuestion(seed) {
+  const st = ui.state;
+  const today = todayKey();
+  const rows = ladderOf(st, today, ui.stem);
+  const known = rows.filter((x) => x.state === 'done');
+  const pool = known.length ? known : rows.filter((x) => x.state === 'now');
+  if (!pool.length) return null;
+  const sx = stemOf(pool[seed % pool.length].id);
+  const id = pool[seed % pool.length].id;
+  if (!sx) return null;
+  for (let t = 0; t < 6; t++) {
+    const q = sx.gen.makeQuestion(id, 'calc', seed + t * 7919, { ...optsFor(sx.key), recent: ui.recent[id] || [] });
+    if (q) return q;
+  }
+  return null;
+}
+
+/**
+ * 배틀의 한 턴을 그린다 — battle.js가 자리를 주고, 문제·보기·판정은 여기서.
+ * @returns {Promise<{correct:boolean, skipped:boolean, interrupted:boolean}>}
+ */
+function battleQuiz(box, hooks) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (r) => { if (done) return; done = true; resolve(r); };
+    // 배틀이 닫히면(화면 꺼짐·뒤로) 이 턴은 없던 것으로 — 약속이 안 풀리면 배틀이 멈춘다
+    if (hooks && hooks.register) hooks.register(() => finish({ correct: false, skipped: false, interrupted: true }));
+
+    const q = battleQuestion((Date.now() % 1000000) | 0);
+    if (!q) { finish({ correct: false, skipped: true, interrupted: false }); return; }
+    box.appendChild(el('div', 'battle-quiz-label', `🔢 ${nameOf(q.concept)}`));
+    const qt = el('div', 'battle-quiz-q');
+    qt.appendChild(richNode(q.q));
+    box.appendChild(qt);
+    const list = el('div', 'battle-quiz-choices');
+    q.choices.forEach((ch) => {
+      const b = el('button', 'btn battle-quiz-choice');
+      b.type = 'button';
+      b.appendChild(richNode(ch.text));
+      b.addEventListener('click', () => {
+        if (done) return;
+        [...list.children].forEach((x) => { x.disabled = true; });
+        b.classList.add(ch.ok ? 'ok' : 'no');
+        if (!ch.ok) { const right = q.choices.findIndex((c) => c.ok); if (right >= 0) list.children[right].classList.add('ok'); }
+        setTimeout(() => finish({ correct: !!ch.ok, skipped: false, interrupted: false }), ch.ok ? 350 : 900);
+      });
+      list.appendChild(b);
+    });
+    box.appendChild(list);
+    const skip = el('button', 'btn battle-quiz-skip', '⏭ 모르겠어요');
+    skip.type = 'button';
+    skip.addEventListener('click', () => {
+      if (done) return;
+      [...list.children].forEach((x) => { x.disabled = true; });
+      finish({ correct: false, skipped: true, interrupted: false });
+    });
+    box.appendChild(skip);
+  });
+}
+
+/** 걸어 둔 배틀을 연다. 끝나면 after() — 영어의 startBattle과 같은 모양 */
+async function startMathBattle(after) {
+  const opponent = ui.battlePending;
+  ui.battlePending = null;
+  const today = todayKey();
+  // 거절해도 오늘 배틀 기회는 쓴 것. 다른 창(또는 영어 쪽)이 이미 오늘 몫을 다 썼으면 등장하지 않는다
+  let won = false;
+  try { won = (await claimDailyCount(today, 'battles', BATTLE.maxPerDay)).won; } catch { won = false; }
+  if (!opponent || !won) { after(); return; }
+  ui.today.battles += 1;
+  ui.battleOpen = true;
+  openBattle({
+    opponent,
+    mine: myBattleMons(),
+    potions: mathPotions,
+    usePotion: (id) => consumeItem(id),
+    quiz: battleQuiz,
+    onDone: (r) => {
+      ui.battleOpen = false;
+      applyMathBattleResult(r);
+      after();
+    },
+  });
+}
+
+/** 배틀 결과: 승 → 상대 획득 + ⚡💰, 패 → 그 포켓몬 패배 +1 (영어와 같은 규칙·같은 함수) */
+async function applyMathBattleResult(r) {
+  if (!r || r.outcome === 'declined') return;
+  if (r.outcome === 'win') {
+    const w = battleWin(r.opponent.id);
+    gainXp(BATTLE.winXp);
+    gainCoins(BATTLE.winCoins);
+    updateChip();
+    mathToast(w.first
+      ? `🎉 ${r.opponent.ko}${josa(r.opponent.ko, '이', '가')} 도감에 들어왔어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`
+      : `🎉 ${r.opponent.ko} 한 마리 더! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`);
+  } else if (r.my) {
+    const l = await battleLoss(r.my.id, BATTLE.lossesToLose).catch(() => null);
+    if (l && l.lost) mathToast(`😢 ${r.my.ko}${josa(r.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요…`);
+    else if (l) mathToast(`😢 졌어요. ${r.my.ko} 패배 ${l.losses}/${BATTLE.lossesToLose}`);
+  }
+}
+
 
 /**
  * 📖 풀이 카드 — 보기 아래에 펼쳐진다.

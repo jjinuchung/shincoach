@@ -143,9 +143,28 @@ export function speakTier(result) {
   return 'pass';
 }
 
-export function damageFor(moveKey, result) {
+/**
+ * 🔢 수학 턴의 등급 — 말하기 대신 **문제를 맞혔는가**로 정한다 (2026-09-23, 진우 요청 "수학에도 배틀").
+ *
+ * 시간 제한은 두지 않는다: 수학에 초시계를 붙이면 아는 문제도 틀린다.
+ * 대신 **연속으로 맞히면** 🌟 — 기세를 주되 틀렸다고 벌하지는 않는다 (영어의 발음 일치 80%↑ 자리).
+ *
+ * @param {{correct:boolean, skipped:boolean, streak:number}} o streak = 이번 배틀에서 연속으로 맞힌 횟수(이 문항 포함)
+ */
+export function quizTier({ correct = false, skipped = false, streak = 0 } = {}) {
+  if (skipped) return 'none';
+  if (!correct) return 'fail';
+  return streak >= 2 ? 'star' : 'pass';
+}
+
+/** 등급 → 데미지 (말하기·수학 공통) */
+export function damageForTier(moveKey, tier) {
   const t = DAMAGE[moveKey] || DAMAGE.safe;
-  return t[speakTier(result)];
+  return t[tier];
+}
+
+export function damageFor(moveKey, result) {
+  return damageForTier(moveKey, speakTier(result));
 }
 
 export function enemyDamage(rng = Math.random) {
@@ -227,6 +246,7 @@ export function openBattle(o) {
   ui.busy = false;
   ui.result = null;
   ui.speakStop = null;
+  ui.streak = 0; // 🔢 수학 턴의 연속 정답 (🌟 판정)
   const trainer = TRAINERS[Math.floor(Math.random() * TRAINERS.length)];
   $('battle-title').textContent = o.practice ? '⚔️ 배틀 연습' : '⚔️ 배틀!';
   $('battle-trainer').textContent = trainer;
@@ -238,6 +258,8 @@ export function openBattle(o) {
   $('battle-pick').hidden = true;
   $('battle-stage').hidden = true;
   $('battle-speak').hidden = true;
+  const qz = $('battle-quiz');
+  if (qz) { qz.hidden = true; qz.innerHTML = ''; }
   $('battle-actions').hidden = true;
   $('battle-result').textContent = '';
   $('battle-continue').hidden = true;
@@ -408,8 +430,66 @@ function renderActions() {
   }
 }
 
+/**
+ * 🔢 수학 턴: 기술 선택 → 문제 풀기 → 데미지.
+ * 문항은 math.js가 그린다 (문제 생성기·그림·분수 표기가 전부 거기 있다) — 여기서는 자리와 등급만 맡는다.
+ */
+async function quizTurn(moveKey) {
+  if (!ui.open || ui.busy) return;
+  const run = ui.run;
+  const alive = () => ui.open && ui.run === run;
+  ui.busy = true;
+  ui.turn++;
+  $('battle-actions').hidden = true;
+  const mv = movesOf(ui.my.id).find((m) => m.key === moveKey);
+  const box = $('battle-quiz');
+  box.hidden = false;
+  box.innerHTML = '';
+  $('battle-msg').textContent = `${ui.my.ko}의 ${mv.emoji} ${mv.name}! 문제를 맞히면 공격!`;
+  let res = null;
+  try { res = await ui.o.quiz(box, { register: (stop) => { ui.speakStop = stop; } }); }
+  catch (e) { res = null; }
+  ui.speakStop = null;
+  if (!alive()) return;
+  box.hidden = true;
+  box.innerHTML = '';
+  // 화면이 꺼지는 등으로 중단된 턴은 없던 것으로 — 데미지·턴 소모 없이 다시 고르기 (말하기 턴과 같은 규칙)
+  if (res && res.interrupted) {
+    ui.turn--;
+    ui.busy = false;
+    $('battle-msg').textContent = '📵 잠깐 멈췄어요. 이 턴은 다시 해요 — 기술을 골라요';
+    renderActions();
+    return;
+  }
+  const correct = !!(res && res.correct);
+  ui.streak = correct ? (ui.streak || 0) + 1 : 0;
+  const tier = quizTier({ correct, skipped: !!(res && res.skipped), streak: ui.streak });
+  const mult = formMult(ui.form, ui.gmaxLeft);
+  const dmg = Math.round(damageForTier(moveKey, tier) * mult);
+  if (ui.form === 'gmax' && ui.gmaxLeft > 0) {
+    ui.gmaxLeft--;
+    if (ui.gmaxLeft === 0) revertForm();
+  }
+  const tierMsg = { star: `🌟 ${ui.streak}연속 정답!`, pass: '🎯 정답!', fail: '🔁 아쉬워요', none: '😶 안 풀었어요' }[tier];
+  $('battle-msg').textContent = `${tierMsg} → ${mv.name} 데미지 ${dmg}`;
+  if (dmg > 0) {
+    ui.enemyHp = Math.max(0, ui.enemyHp - dmg);
+    hitFx('enemy', dmg, tier === 'star');
+    sfx.hit(); vibrate(30);
+  } else { sfx.wrong(); }
+  renderHp();
+  await sleep(1300); if (!alive()) return;
+  if (ui.enemyHp <= 0) { endFight('win'); return; }
+  await enemyTurn(); if (!alive()) return;
+  ui.busy = false;
+  if (ui.myHp <= 0) { endFight('lose'); return; }
+  if (ui.turn >= BATTLE.maxTurns) { endFight(ui.enemyHp <= ui.myHp ? 'win' : 'lose'); return; }
+  renderActions();
+}
+
 /** 내 턴: 기술 선택 → 문장 따라 말하기 → 데미지 */
 async function playerTurn(moveKey) {
+  if (ui.o && ui.o.quiz) { await quizTurn(moveKey); return; } // 🔢 수학 배틀은 문제 풀기 턴
   if (!ui.open || ui.busy) return;
   const run = ui.run;
   const alive = () => ui.open && ui.run === run;
