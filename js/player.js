@@ -15,7 +15,7 @@ import { STONE_ENGLISH, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, strea
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
-import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT } from './review.js';
+import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT } from './review.js';
 import {
   initEssay, openEssay, abortEssay, pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds,
   DEFAULT_MINUTES as ESSAY_MINUTES, DEFAULT_COUNT as ESSAY_COUNT,
@@ -588,10 +588,18 @@ function refreshVocabViews() {
     .catch(() => { state.vocabViews = state.vocabViews || []; });
 }
 
+/** ⚙에 정한 한 회차 문항 수 (🎬 목록의 🔁 버튼이 "지금 몇 문장"을 적을 때 쓴다) */
+export function reviewRoundSize() {
+  return Math.max(1, Number(settings.reviewCount) || REVIEW_COUNT);
+}
+
 /** 이번 회차에 낼 복습 문장 (없으면 빈 배열) */
 function reviewItems() {
   const per = settings.reviewCount;
   if (!per) return []; // ⚙에서 끔
+  // 🚫 복습에 안 쓰는 콘텐츠(미니언즈처럼 미니언즈어·비명이 대부분)는 제안도 하지 않는다.
+  // "빼 둔 것이 확실할 때만" 막는다 — 콘텐츠를 모르는 상태까지 막으면 다른 이유로 복습이 사라진다
+  if (state.item && !reviewable(state.item)) return [];
   const today = track.todayKey();
   const remain = per - (track.todayReviewItems() % per); // 문장·단어를 함께 세야 회차 길이가 맞는다 (Codex #1)
 

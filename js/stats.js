@@ -1,7 +1,7 @@
 // 📊 학습 기록 화면 (부모용): 이번 주 요약, 콘텐츠별 진행률, 어려워한 문장, 복습 단어장, 최근 세션, 내보내기/가져오기
 import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
-  applyEssayFixes, getMath, updateMath,
+  applyEssayFixes, getMath, updateMath, updateItem,
 } from './db.js';
 import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, KIND_SHORT, WHY_LABEL } from './mathprog.js';
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
@@ -9,7 +9,7 @@ import { exportText, parseFixes } from './essay.js';
 import { countPlayableCues } from './srt.js';
 import { openPlayer } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
-import { reviewSummary, wordSummary, stageIcon, GRADUATED } from './review.js';
+import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED } from './review.js';
 import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory } from './xp.js';
 import { pendingTickets } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
@@ -109,6 +109,37 @@ function card(title) {
   const c = el('section', 'stats-card');
   c.appendChild(el('h2', '', title));
   return c;
+}
+
+/**
+ * 🔁 "복습에 쓰기" 스위치 (콘텐츠마다, 부모 화면에만 있다).
+ *
+ * 왜 (2026-09-23 아버님): 미니언즈는 자막 대부분이 미니언즈어와 비명이라 따라 말할 것도 배울 것도 없는데
+ * 듣기만 해도 복습 큐에 들어가 **천 개 넘게** 쌓였고, 밀린 게 제일 많은 영상을 고르는 🔁 버튼이 늘 그걸 열었다.
+ * 제목으로 정한 기본값(review.NO_REVIEW_TITLES)이 있고, 여기서 고르면 그 값이 우선한다.
+ */
+function reviewToggle(item) {
+  const row = el('label', 'stats-review-toggle');
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = reviewable(item);
+  const text = el('span', '', '🔁 복습에 쓰기');
+  row.appendChild(box);
+  row.appendChild(text);
+  box.addEventListener('change', async () => {
+    const on = box.checked;
+    box.disabled = true;
+    try {
+      await updateItem(item.id, { noReview: !on });
+      text.textContent = on ? '🔁 복습에 쓰기' : '🚫 복습에서 뺐어요';
+    } catch {
+      box.checked = !on; // 저장이 안 됐으면 화면도 되돌린다 (거짓으로 바뀐 척하지 않게)
+      text.textContent = '⚠️ 저장하지 못했어요';
+    } finally {
+      box.disabled = false;
+    }
+  });
+  return row;
 }
 
 export function cueCountOf(item) {
@@ -258,7 +289,9 @@ export async function renderStats() {
   const wPz = week.reduce((a, d) => a + d.puzzles, 0);
   const wPzOk = week.reduce((a, d) => a + d.puzzleSolved, 0);
   const wRv = week.reduce((a, d) => a + d.reviewSentences, 0);
-  const rv = reviewSummary(records, today); // 🔁 복습 큐 현황 (전체 콘텐츠)
+  // 🔁 복습 큐 현황 — **복습에 쓰는 콘텐츠만** (미니언즈를 빼면 아이 화면과 숫자가 맞는다)
+  const revIds = new Set(items.filter((it) => reviewable(it)).map((it) => String(it.id)));
+  const rv = reviewSummary(records.filter((r) => revIds.has(String(r.itemId))), today);
   const allSec = daily.reduce((a, d) => a + d.seconds, 0);
 
   // 0) 🛟 기록이 비어 있는데 사본이 있으면 — 되돌릴지는 **부모가** 정한다 (아이 화면엔 안 뜬다)
@@ -321,6 +354,8 @@ export async function renderStats() {
     const pf = el('div', 'fill'); pf.style.width = `${s.pct}%`; pg.appendChild(pf);
     wrap.appendChild(pg);
     wrap.appendChild(el('div', 'meta', `${fmtDur(s.seconds)} · 말하기 ${s.attempts ? Math.round((s.pass / s.attempts) * 100) + '%' : '-'} · 마지막: ${s.lastAt ? fmtDate(s.lastAt) : '-'}`));
+    // 🔁 이 영상을 복습에 쓸지 (미니언즈처럼 미니언즈어·비명이 대부분인 것은 빼 둔다)
+    if (!s.broken) wrap.appendChild(reviewToggle(items.find((it) => it.id === s.id)));
     c2.appendChild(wrap);
   }
   main.appendChild(c2);

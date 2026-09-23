@@ -1909,6 +1909,10 @@ button { font-family: inherit; }
 .library-review-btn .lrv-title { font-size: 1.15rem; font-weight: 800; }
 .library-review-btn .lrv-sub { font-size: 0.9rem; color: #0369a1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* 📊 콘텐츠마다 "🔁 복습에 쓰기" 스위치 (부모 화면) */
+.stats-review-toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+.stats-review-toggle input { width: 18px; height: 18px; }
+
 .library-next { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
 .next-card {
   display: flex; gap: 14px; align-items: flex-start;

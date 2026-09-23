@@ -203,6 +203,28 @@ export function reviewSummary(records, today) {
 }
 
 /**
+ * 🔁 복습에 안 쓸 콘텐츠의 **기본값** (제목으로 판단).
+ *
+ * 왜 (2026-09-23, 아버님): 미니언즈는 자막 대부분이 미니언즈어와 비명("Bello!", "Aaah!")이라
+ * 따라 말할 것도 배울 것도 없는데, 아이가 듣기만 해도 문장이 복습 큐에 들어가 **천 개 넘게** 쌓였다.
+ * 밀린 게 제일 많은 영상을 고르는 🔁 버튼이 그래서 늘 미니언즈를 열었다.
+ *
+ * 제목으로 정하는 이유: ⚙·📊는 기기별이라 아버님이 태블릿을 직접 만져야 하는데, 낮에는 출근하신다.
+ * 📊에서 콘텐츠마다 켜고 끌 수 있고(`item.noReview`), 고른 값이 이 기본값보다 우선한다.
+ */
+export const NO_REVIEW_TITLES = [/미니언/];
+
+/**
+ * 이 콘텐츠를 🔁 복습에 쓰는가.
+ * @param {{title?:string, noReview?:boolean}} item 콘텐츠 (db.listItems의 한 줄)
+ */
+export function reviewable(item) {
+  if (!item) return false;
+  if (typeof item.noReview === 'boolean') return !item.noReview; // 📊에서 부모가 고른 값이 우선
+  return !NO_REVIEW_TITLES.some((re) => re.test(String(item.title || '')));
+}
+
+/**
  * 🔁 콘텐츠별 "오늘 복습할 문장 수" — **모든 영상의 기록**에서 센다.
  *
  * 왜 필요한가 (2026-09-23, 진우 신고 "복습이 자주 안 나와요"):

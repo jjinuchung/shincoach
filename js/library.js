@@ -7,9 +7,9 @@ import { coins, inventory, buyTicket, initProfile, unlockBase, ensureUnlockBase 
 import { characterUrl, ensureCast, artUrl } from './pokemon.js';
 import { sfx, unlock as unlockAudio } from './sfx.js';
 import { parseSami, isSami, toSrt } from './sami.js';
-import { openPlayer } from './player.js';
+import { openPlayer, reviewRoundSize } from './player.js';
 import { showLoading, hideLoading } from './app.js';
-import { pickDueItem } from './review.js';
+import { pickDueItem, reviewable } from './review.js';
 import { todayKey } from './track.js';
 
 const $ = (id) => document.getElementById(id);
@@ -446,7 +446,8 @@ async function renderTodayReview(items, records) {
   if (!box) return;
   box.innerHTML = '';
   box.hidden = true;
-  const usable = (items || []).filter((it) => it && !it.broken);
+  // 🚫 복습에 안 쓰는 콘텐츠는 뺀다 (미니언즈처럼 미니언즈어·비명이 대부분인 것 — 📊에서 켜고 끈다)
+  const usable = (items || []).filter((it) => it && !it.broken && reviewable(it));
   if (!usable.length) return;
 
   const pick = pickDueItem(records || [], todayKey(), usable.map((it) => it.id));
@@ -454,13 +455,16 @@ async function renderTodayReview(items, records) {
   const item = usable.find((it) => String(it.id) === String(pick.itemId));
   if (!item) return;
 
+  // 아이에게는 **지금 풀 문항 수**를 보여 준다. 밀린 전체(미니언즈는 천 개가 넘었다)를 적으면
+  // 끝이 안 보이는 숙제가 된다 — 밀린 수는 📊에서 아버님만 본다
+  const now = Math.min(pick.due, reviewRoundSize());
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn library-review-btn';
   btn.innerHTML = `
     <span class="lrv-icon">🔁</span>
     <span class="lrv-body">
-      <span class="lrv-title">오늘의 복습 ${pick.due}문장</span>
+      <span class="lrv-title">오늘의 복습 ${now}문장</span>
       <span class="lrv-sub"></span>
     </span>`;
   btn.querySelector('.lrv-sub').textContent = `「${item.title}」에서 기다리고 있어요`;

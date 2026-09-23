@@ -6,7 +6,7 @@ import {
   pickReviews, reviewSummary, roundReward,
   REVIEW_INTERVALS, GRADUATED, STAGES, DEFAULT_COUNT, REWARD,
   pickWordReviews, quizChoices, wordSummary, isWordDue,
-  dueByItem, pickDueItem,
+  dueByItem, pickDueItem, reviewable, NO_REVIEW_TITLES,
 } from '../js/review.js';
 
 /** 테스트용 문장 기록 만들기 */
@@ -327,4 +327,40 @@ test('dueByItem: itemId가 없는 옛 기록은 건너뛴다 (터지지 않아�
   delete broken.itemId;
   assert.deepEqual(dueByItem([broken], today), []);
   assert.deepEqual(dueByItem(null, today), []);
+});
+
+// ── 🚫 복습에 안 쓰는 콘텐츠 (2026-09-23, 아버님: "미니언즈는 좀 빼줘") ──
+// 미니언즈는 자막 대부분이 미니언즈어와 비명이라 배울 것이 없는데 천 개 넘게 복습 큐에 쌓였다.
+
+test('reviewable: 제목에 미니언이 들어가면 기본으로 뺀다', () => {
+  assert.equal(reviewable({ title: '미니언즈와 몬스터즈' }), false);
+  assert.equal(reviewable({ title: '미니언즈' }), false);
+  assert.equal(reviewable({ title: '모아나' }), true);
+  assert.equal(reviewable({ title: '지우와 피카츄 최고의 순간' }), true);
+  assert.equal(reviewable({ title: '' }), true, '제목이 없어도 기본은 쓴다');
+  assert.equal(reviewable(null), false, '콘텐츠가 없으면 고를 수 없다');
+  assert.ok(NO_REVIEW_TITLES.length >= 1);
+});
+
+test('reviewable: 📊에서 부모가 고른 값이 제목 기본값보다 우선한다', () => {
+  assert.equal(reviewable({ title: '미니언즈', noReview: false }), true, '다시 쓰기로 켤 수 있다');
+  assert.equal(reviewable({ title: '모아나', noReview: true }), false, '다른 영상도 뺄 수 있다');
+  assert.equal(reviewable({ title: '모아나', noReview: undefined }), true, '안 고른 것은 기본값');
+});
+
+test('pickDueItem: 뺀 콘텐츠는 후보 목록에서 빠지므로 그다음으로 밀린 영상이 열린다', () => {
+  const today = '2026-09-23';
+  const items = [{ id: 'min', title: '미니언즈' }, { id: 'ash', title: '지우와 피카츄' }];
+  const list = [
+    ...Array.from({ length: 1043 }, (_, i) => at('min', { start: i, dueAt: '2026-09-01' })),
+    at('ash', { start: 1, dueAt: '2026-09-22' }),
+    at('ash', { start: 2, dueAt: '2026-09-22' }),
+  ];
+  // 거르지 않으면 천 개짜리 미니언즈가 늘 뽑힌다
+  assert.equal(pickDueItem(list, today, items.map((it) => it.id)).itemId, 'min');
+  // 거르면 그다음
+  const ids = items.filter(reviewable).map((it) => it.id);
+  const pick = pickDueItem(list, today, ids);
+  assert.equal(pick.itemId, 'ash');
+  assert.equal(pick.due, 2);
 });

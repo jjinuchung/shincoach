@@ -169,10 +169,14 @@ export async function renderHome(showView) {
   let reviewDue = 0;
   try {
     const { getAllSentenceStats, listItems } = await import('./db.js');
-    const { pickDueItem } = await import('./review.js');
+    const { pickDueItem, reviewable } = await import('./review.js');
     const [records, items] = await Promise.all([getAllSentenceStats(), listItems()]);
-    const pickDue = pickDueItem(records, todayKey(), (items || []).filter((it) => it && !it.broken).map((it) => it.id));
-    reviewDue = pickDue ? pickDue.due : 0;
+    // 🚫 복습에 안 쓰는 콘텐츠는 뺀다 (목록의 🔁 버튼과 같은 기준이어야 숫자가 어긋나지 않는다)
+    const ids = (items || []).filter((it) => it && !it.broken && reviewable(it)).map((it) => it.id);
+    const { reviewRoundSize } = await import('./player.js');
+    const pickDue = pickDueItem(records, todayKey(), ids);
+    // 밀린 전체가 아니라 **지금 풀 문항 수** (목록 버튼과 같은 숫자여야 한다)
+    reviewDue = pickDue ? Math.min(pickDue.due, reviewRoundSize()) : 0;
   } catch { reviewDue = 0; }
   const frag = document.createDocumentFragment();
   const shinyOf = (id) => { const l = getLook(id); return l && l.shinyUrl ? l.shinyUrl : null; };

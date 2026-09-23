@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD } from '../js/review.js';
+import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD } from '../js/review.js';
 import { wordResults } from '../js/speak.js';
 import { makeDictation } from '../js/dictation.js';
 import { pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds, REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH } from '../js/essay.js';
@@ -201,7 +201,7 @@ function loadPlayer() {
     formUrl: (id, kind) => `url:${id}:${kind}`,
     hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
-    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, makeDictation, VOCAB_KNOWN, REAL_VOCAB,
+    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, reviewable, makeDictation, VOCAB_KNOWN, REAL_VOCAB,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 5, REVIEW_COUNT: 5,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
     // sfx.js 스텁
@@ -1227,6 +1227,20 @@ test('🔁 하루에 정해진 횟수만큼 거절하면 그날은 더 묻지 �
 // 2026-09-18 아버님 지적: 영상을 열 때 한 번만 묻고, 거기서 "나중에"를 누르면
 // 영상을 닫았다 다시 열기 전까지 복습이 안 나왔다. 두 번 거절하면 그날은 끝이라 밀렸다.
 const cues5 = 'state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""},{start:4,end:5,en:"d",ko:""},{start:5,end:6,en:"e",ko:""}];';
+
+test('🚫 복습에서 뺀 콘텐츠(미니언즈)를 열면 복습이 아예 안 뜬다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3)];
+  const cues = 'state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""}]; settings.reviewCount = 3;';
+  run(`${cues} state.item = { id: "min", title: "미니언즈와 몬스터즈" }; state.reviewDone = false; maybeReview();`);
+  assert.equal(reviewCalls.length, 0, '제목으로 기본 제외');
+
+  run(`${cues} state.item = { id: "min", title: "미니언즈와 몬스터즈", noReview: false }; state.reviewDone = false; maybeReview();`);
+  assert.equal(reviewCalls.length, 1, '📊에서 다시 켜면 나온다');
+
+  run(`${cues} state.item = { id: "moana", title: "모아나", noReview: true }; state.reviewDone = false; maybeReview();`);
+  assert.equal(reviewCalls.length, 1, '📊에서 뺀 다른 영상도 안 나온다');
+});
 
 test('🔁 학습 중에도 확률로 복습을 제안한다 (문장을 끝낼 때마다)', () => {
   const { run, reviewState } = loadPlayer();
