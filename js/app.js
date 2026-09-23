@@ -5,7 +5,7 @@ import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
 import { initHatch } from './hatch.js';
 import { initHome, renderHome } from './home.js';
-import { initMath, renderMath } from './math.js';
+import { initMath, renderMath, stopCheer } from './math.js';
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
 
@@ -30,6 +30,7 @@ export function showView(name) {
   if (name === 'home') renderHome(showView).catch(() => {});
   // 🔢 수학은 들어올 때마다 진도를 다시 읽어 그린다 (사다리·오늘 복습이 최신이어야 한다)
   if (name === 'math') renderMath().catch(() => {});
+  else stopCheer(); // ✨ 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)
 }
 
 /** 전체 화면 로딩 표시 (영상 열기/저장처럼 수 초 이상 걸리는 작업용) */

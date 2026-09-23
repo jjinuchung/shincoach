@@ -1,0 +1,801 @@
+<title>혼합계산 줄기 검수</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#f5f7ff; --card:#ffffff; --ink:#1f2340; --muted:#6b7280; --line:#e3e6f3;
+  --primary:#4f46e5; --primary-soft:#eef2ff; --accent:#f59e0b; --accent-soft:#fff7ed;
+  --ok:#0f9f6e; --ok-soft:#ecfdf5; --no-soft:#f8f9fc;
+  --dad:#fff8ec; --dad-line:#f3c27a; --dad-ink:#7c4a03;
+  --frac-fill:#4f46e5; --frac-fill2:#f59e0b; --frac-empty:#ffffff;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  --frac-fill:#9b9cf8; --frac-fill2:#fbbf24; --frac-empty:#1d2040;
+}}
+:root[data-theme="dark"]{
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  --frac-fill:#9b9cf8; --frac-fill2:#fbbf24; --frac-empty:#1d2040;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;font-size:15px;line-height:1.65;margin:0;padding-block:0 60px;padding-inline:16px}
+h1,h2,h3{font-family:"Gowun Dodum","Noto Sans KR",sans-serif;text-wrap:balance;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top h1{font-size:1.35rem}
+.top .sub{color:var(--muted);font-size:.9rem;margin:2px 0 8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.nav a{flex:0 0 auto;font-size:.8rem;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.nav a b{color:var(--primary);margin-right:3px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--primary);outline:none}
+.intro{display:grid;grid-template-columns:1fr;gap:12px;margin-block:16px}
+@media(min-width:760px){.intro{grid-template-columns:1.2fr 1fr}}
+.intro .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.intro .box.dadbox{background:var(--dad);border-color:var(--dad-line)}
+.intro h3{font-size:1rem;margin-bottom:6px}
+.intro p{margin:4px 0;font-size:.92rem}
+.intro .stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.92rem}
+.intro .stats b{font-size:1.25rem;color:var(--primary);font-variant-numeric:tabular-nums}
+.how li{margin:3px 0}
+.concept{margin-block:36px 0;scroll-margin-top:110px}
+.ch-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.ch-no{font-family:"Gowun Dodum",sans-serif;font-size:1.6rem;font-weight:700;color:var(--primary);background:var(--primary-soft);border-radius:12px;min-width:56px;height:56px;display:grid;place-items:center}
+.grade{font-size:.75rem;letter-spacing:.06em;color:var(--muted)}
+.ch-head h2{font-size:1.4rem}
+.idea{color:var(--muted);margin:2px 0 0;font-size:.95rem;max-width:65ch}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+@media(min-width:900px){.cols{grid-template-columns:1.35fr 1fr}}
+.col-title{margin:0 0 10px;font-size:.95rem}
+.col-title small{color:var(--muted);font-weight:400;margin-left:6px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.step{display:flex;gap:10px;scroll-margin-top:110px}
+.step-no{flex:0 0 30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;font-weight:700;display:grid;place-items:center;font-size:.9rem;margin-top:12px}
+.step-body{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.say{max-width:65ch}
+.say p{margin:0 0 10px}
+.say p:last-child{margin-bottom:0}
+.check{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;scroll-margin-top:110px}
+.qt{margin:0 0 6px;font-weight:500}
+.ch{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ch li{display:flex;align-items:center;gap:8px;border-radius:9px;padding:6px 10px;background:var(--no-soft);border:1px solid transparent}
+.ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
+.ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
+.why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.walk-note{margin:6px 0 4px;font-size:.88rem;color:var(--muted)}
+.why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
+body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
+body.hide-ans .ch .mark,body.hide-ans .why{visibility:hidden}
+.rule{margin-top:12px;background:var(--primary-soft);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.rule p{margin:2px 0 0;font-weight:700;font-size:1.05rem}
+.dad{background:var(--dad);border:1px solid var(--dad-line);border-radius:14px;padding:14px 16px;position:sticky;top:104px;scroll-margin-top:110px;color:var(--ink)}
+.dad h3{font-size:1.05rem;margin:4px 0 10px;color:var(--dad-ink)}
+.dad h4{margin:12px 0 4px;font-size:.9rem;color:var(--dad-ink)}
+.dad-say{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.dad-say li,.traps li{display:flex;gap:8px;align-items:flex-start;scroll-margin-top:110px}
+.dad-do,.dad-pass{margin:0;font-size:.95rem}
+.traps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.traps .kid{font-weight:500}
+.traps .dadsay{color:var(--muted);font-size:.92rem}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.ref .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.03em}
+.ref code,code.mini{font-size:.78rem;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+code.mini{flex:0 0 auto;margin-top:2px}
+.dad .ref code,.dad code.mini{color:var(--dad-ink);background:rgba(243,194,122,.28)}
+.fig{margin:6px 0 8px;color:var(--ink);display:inline-block;max-width:100%;overflow-x:auto}
+.fig svg{max-width:100%;height:auto;display:block}
+div.fig{display:block}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 2px;font-variant-numeric:tabular-nums}
+.fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
+.fr .d{padding:0 3px}
+.mx{display:inline-flex;align-items:center;gap:2px;vertical-align:middle}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none;margin-top:8px}
+.toggle input{width:18px;height:18px;accent-color:var(--primary)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (max-width:899px){.dad{position:static}}
+</style>
+<div class="wrap">
+  <div class="top">
+    <h1>🔢 혼합계산 줄기 — 배움 원고 검수</h1>
+    <p class="sub">신코치 수학 3차 · 초5 「자연수의 혼합 계산」 + 초6 분수·소수 · 개념 8개 · 진우가 직접 만들어 달라고 한 줄기</p>
+    <div class="nav"><a href="#B1"><b>B1</b> 덧셈과 뺄셈만 섞인 식</a><a href="#B2"><b>B2</b> 곱셈과 나눗셈만 섞인 식</a><a href="#B3"><b>B3</b> 곱셈·나눗셈을 먼저</a><a href="#B4"><b>B4</b> 괄호 ( ) 안을 먼저</a><a href="#B5"><b>B5</b> 중괄호 { } 까지</a><a href="#B6"><b>B6</b> 네 가지가 모두 섞인 식</a><a href="#B7"><b>B7</b> 분수가 섞인 혼합 계산</a><a href="#B8"><b>B8</b> 소수·분수가 섞인 혼합 계산</a></div>
+  </div>
+
+  <div class="intro">
+    <div class="box">
+      <h3>무엇을 봐 주시면 되나</h3>
+      <div class="stats">
+        <span><b>8</b> 개념</span>
+        <span><b>35</b> 📘 배움 장</span>
+        <span><b>29</b> 확인 질문</span>
+        <span><b>3</b> 그림</span>
+        <span><b>17</b> 헷갈리는 자리</span>
+      </div>
+      <ul class="how">
+        <li><b>📘 배움</b> — 진우가 앱에서 읽는 것. <b>한 장 = 한 화면</b>, 짧은 설명 → 확인 질문 하나 → 다음 장. 확인 질문에 답해야 다음 장이 열립니다. 초4가 혼자 읽고 잡히는지, 한 장이 너무 길지 않은지, 확인 질문이 너무 쉽거나 어렵지 않은지 봐 주세요</li>
+        <li><b>📏 한 줄로</b> — 배움 끝과 사다리 카드에 붙는 요약</li>
+        <li><b>👨 아빠 카드</b> — 저녁 10분에 아버님이 처음 소개할 때 쓰는 반 장. 실제로 집에서 할 수 있는 활동인지, 말투가 아버님 말투에 맞는지</li>
+        <li><b>그림</b> — 혼합계산은 그림보다 <b>계산 순서(① ② ③)</b>를 줄 바꿔 보여 주는 쪽이 중요해서, 그림은 분수 편(B7·B8)에만 붙였습니다</li>
+        <li><b>①②③⭐ 문제</b>는 이 검수 뒤에 만듭니다 (배움이 굳어야 문제의 오개념 보기를 정할 수 있어서). 오개념 후보는 <b>왼쪽부터 계산·괄호 무시·나눗셈을 뒤로 미룸</b> 셋을 축으로 잡을 생각입니다</li>
+      </ul>
+      <p>고칠 곳은 번호로 가리켜 주시면 됩니다 — 예) <code>B3-1 묶음 비유가 어렵다</code>, <code>B4-2✓ 오답이 너무 쉽다</code>, <code>B7-👨함정1 이렇게 안 틀릴 것 같다</code></p>
+      <label class="toggle"><input type="checkbox" id="ans" checked> 정답·틀렸을 때 한 마디 보이기 (끄면 진우가 보는 모양)</label>
+    </div>
+    <div class="box dadbox">
+      <h3>👨 아빠 카드는 왜 있나</h3>
+      <p>혼합계산은 <b>규칙이 전부</b>인 단원입니다. 규칙을 외우기만 하면 조금 복잡해지는 순간 무너지고, "왜 곱셈이 먼저인가"를 한 번 납득하면 오래갑니다. 그 납득을 만드는 자리가 아빠 카드입니다.</p>
+      <p>그래서 학원 선생님이 하는 일 중 <b>"처음 소개"만 아빠가</b>, 반복·검증·며칠 뒤 복습은 앱이 합니다. 카드는 개념 하나에 10분 — 말할 거리 셋, 같이 해 볼 것 하나, 진우가 낼 법한 오개념과 그때 할 말, 통과 기준.</p>
+      <p>아빠가 못 한 날에도 앱의 📘 배움만으로 갈 수 있게 썼지만, 카드가 먼저 가면 훨씬 잘 붙습니다.</p>
+      <p style="margin-top:10px"><b>예시 출연진</b>: 앱에서는 진우가 도감에서 잡은 포켓몬이 들어갑니다. 이 페이지는 피카츄·리자몽·개굴닌자·루카리오 등을 예시로 끼웠습니다.</p>
+    </div>
+  </div>
+
+  <section class="concept" id="B1">
+    <header class="ch-head">
+      <div class="ch-no">B1</div>
+      <div>
+        <div class="grade">초5 · 첫 개념</div>
+        <h2>덧셈과 뺄셈만 섞인 식</h2>
+        <p class="idea">덧셈과 뺄셈만 있으면 앞에서부터 차례로 계산해요. 순서를 바꾸면 답이 달라져요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 한 장씩 넘기며 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="B1-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>B1-1</code></div>
+        <div class="say"><p>피카츄가 몬스터볼을 세고 있어요.</p><p>가방에 <strong>12개</strong> 있었는데, <strong>5개를 더 받고</strong>, <strong>3개를 썼어요</strong>. 지금 몇 개일까요?</p><p>식으로 쓰면 <strong>12 + 5 − 3</strong>.</p></div>
+        <div class="check" id="B1-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B1-1✓</code></div>
+        <p class="qt">12 + 5 − 3 을 계산하면?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">14</span></li><li class="no"><span class="mark"></span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>일이 일어난 순서대로예요. 12에 5를 더해 17, 거기서 3을 빼서 14.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B1-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>B1-2</code></div>
+        <div class="say"><p>덧셈과 뺄셈만 있는 식은 <strong>앞에서부터 차례로</strong> 계산해요.</p><p>12 + 5 − 3<br>① 12 + 5 = <strong>17</strong><br>② 17 − 3 = <strong>14</strong></p><p>뒤에 있는 뺄셈을 먼저 하면 안 돼요. 5 − 3 = 2를 먼저 하면 12 + 2 = 14… 어? 이번엔 답이 같네요.</p></div>
+        <div class="check" id="B1-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B1-2✓</code></div>
+        <p class="qt">그럼 20 − 8 + 5 는 얼마일까요? 앞에서부터 차례로!</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">17</span></li><li class="no"><span class="mark"></span><span class="txt">7</span></li><li class="no"><span class="mark"></span><span class="txt">23</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 20 − 8 = 12 ② 12 + 5 = 17. 뒤의 8 + 5 = 13을 먼저 하면 20 − 13 = 7이 되어 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B1-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>B1-3</code></div>
+        <div class="say"><p>방금 <strong>20 − 8 + 5</strong> 에서 답이 갈렸어요.</p><p>앞에서부터: 20 − 8 = 12 → 12 + 5 = <strong>17</strong> ✅<br>뒤부터: 8 + 5 = 13 → 20 − 13 = <strong>7</strong> ❌</p><p><strong>순서가 다르면 답이 달라져요.</strong> 그래서 약속이 필요해요 — 덧셈·뺄셈만 있으면 <strong>왼쪽부터</strong>.</p></div>
+        <div class="check" id="B1-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B1-3✓</code></div>
+        <p class="qt">30 − 10 − 7 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">13</span></li><li class="no"><span class="mark"></span><span class="txt">27</span></li><li class="no"><span class="mark"></span><span class="txt">17</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 30 − 10 = 20 ② 20 − 7 = 13. 뒤의 10 − 7 = 3을 먼저 하면 27이 되어 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B1-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>B1-4</code></div>
+        <div class="say"><p>왜 왼쪽부터일까요? <strong>일이 일어난 순서</strong>이기 때문이에요.</p><p>진우가 코인이 30개 있었는데 → 10개를 쓰고 → 7개를 더 썼어요.<br>30 − 10 − 7</p><p>&quot;쓴 걸 먼저 합쳐도 되지 않나?&quot; 하고 10 + 7 = 17을 먼저 빼도 13이 나와요. 하지만 <strong>부호를 바꿔 묶는 건 나중에 배우는 방법</strong>이에요. 지금은 왼쪽부터가 언제나 맞아요.</p></div>
+        
+      </div>
+    </li></ol>
+        <div class="rule" id="B1-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>B1-📏</code></div><p>덧셈과 뺄셈만 있으면 앞에서부터 차례로.</p></div>
+      </div>
+      <aside class="dad" id="B1-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>B1-👨</code></div>
+    <h3>덧셈·뺄셈만 섞인 식은 왼쪽부터 차례로 계산한다는 것. 그리고 '순서를 바꾸면 답이 달라진다'는 감각.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="B1-👨말1"><code class="mini">말1</code>장 볼 때 — &quot;5천 원 있었는데 2천 원 쓰고 3천 원 더 받았어. 지금 얼마야?&quot; 식으로 말한 순서대로 세게 하기</li><li id="B1-👨말2"><code class="mini">말2</code>&quot;20 − 8 + 5를 뒤부터 하면 7이 나와. 왜 17이 맞을까?&quot; 하고 물어보기 (순서 약속이 왜 필요한지)</li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">영수증 하나를 놓고 '얼마 있었고 → 얼마 쓰고 → 얼마 남았나'를 한 줄 식으로 써 보게 하기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="B1-👨함정1"><code class="mini">함정1</code><div><div class="kid">&quot;20 − 8 + 5&quot;에서 8 + 5를 먼저 해서 7이라고 한다</div><div class="dadsay">→ &quot;앞에서부터야. 20에서 8을 먼저 빼면?&quot; 하고 첫 단계만 짚어 주세요.</div></div></li><li id="B1-👨함정2"><code class="mini">함정2</code><div><div class="kid">&quot;순서 바꿔도 답 똑같잖아&quot;라고 한다 (12 + 5 − 3처럼 우연히 같은 경우를 봄)</div><div class="dadsay">→ &quot;20 − 8 + 5로 해 볼래? 17이랑 7, 다르지?&quot; 하고 달라지는 예를 보여 주세요.</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;덧셈이랑 뺄셈만 있으면 왼쪽부터 차례로 해요&quot;라고 말하고, 20 − 8 + 5 = 17을 풀면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="B2">
+    <header class="ch-head">
+      <div class="ch-no">B2</div>
+      <div>
+        <div class="grade">초5 · B1 다음</div>
+        <h2>곱셈과 나눗셈만 섞인 식</h2>
+        <p class="idea">곱셈과 나눗셈도 같은 급이라 앞에서부터 차례로. &quot;곱셈이 나눗셈보다 먼저&quot;는 틀린 말이에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 한 장씩 넘기며 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="B2-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>B2-1</code></div>
+        <div class="say"><p>이번엔 곱셈과 나눗셈이에요.</p><p>리자몽이 사탕 <strong>24개</strong>를 <strong>3명</strong>에게 똑같이 나눠 주고, 각자 받은 것을 <strong>2배</strong>로 늘려 줬어요.</p><p>식으로 쓰면 <strong>24 ÷ 3 × 2</strong>.</p></div>
+        <div class="check" id="B2-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B2-1✓</code></div>
+        <p class="qt">24 ÷ 3 × 2 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">16</span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">48</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 24 ÷ 3 = 8 ② 8 × 2 = 16. 뒤의 3 × 2 = 6을 먼저 하면 24 ÷ 6 = 4가 되어 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B2-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>B2-2</code></div>
+        <div class="say"><p>곱셈과 나눗셈만 있는 식도 <strong>앞에서부터 차례로</strong>예요.</p><p>24 ÷ 3 × 2<br>① 24 ÷ 3 = <strong>8</strong><br>② 8 × 2 = <strong>16</strong></p><p>&quot;곱셈이 나눗셈보다 세다&quot;는 말은 <strong>없어요</strong>. 둘은 같은 급이라 왼쪽부터.</p></div>
+        <div class="check" id="B2-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B2-2✓</code></div>
+        <p class="qt">6 × 4 ÷ 8 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 6 × 4 = 24 ② 24 ÷ 8 = 3. 뒤의 4 ÷ 8을 먼저 하려 하면 계산이 이상해져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B2-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>B2-3</code></div>
+        <div class="say"><p>여기서도 순서를 바꾸면 답이 달라져요.</p><p><strong>24 ÷ 3 × 2</strong><br>왼쪽부터: 8 × 2 = <strong>16</strong> ✅<br>뒤부터: 24 ÷ 6 = <strong>4</strong> ❌</p><p>덧셈·뺄셈과 똑같은 약속이에요. <strong>같은 급끼리는 왼쪽부터.</strong></p></div>
+        <div class="check" id="B2-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B2-3✓</code></div>
+        <p class="qt">100 ÷ 5 ÷ 2 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt">40</span></li><li class="no"><span class="mark"></span><span class="txt">50</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 100 ÷ 5 = 20 ② 20 ÷ 2 = 10. 뒤의 5 ÷ 2를 먼저 하면 안 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B2-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>B2-4</code></div>
+        <div class="say"><p>정리하면 지금까지 두 가지예요.</p><p>· 덧셈·뺄셈만 → 왼쪽부터<br>· 곱셈·나눗셈만 → 왼쪽부터</p><p><strong>같은 급끼리는 왼쪽부터.</strong> 다음 장부터는 이 둘이 <strong>한 식에 섞이면</strong> 어떻게 되는지 배워요.</p></div>
+        
+      </div>
+    </li></ol>
+        <div class="rule" id="B2-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>B2-📏</code></div><p>곱셈과 나눗셈만 있으면 앞에서부터 차례로.</p></div>
+      </div>
+      <aside class="dad" id="B2-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>B2-👨</code></div>
+    <h3>곱셈·나눗셈도 같은 급이라 왼쪽부터라는 것. '곱셈이 나눗셈보다 먼저'라는 오해를 미리 막는 자리.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="B2-👨말1"><code class="mini">말1</code>&quot;24 ÷ 3 × 2를 4라고 하면 뭘 먼저 한 걸까?&quot; — 아이가 스스로 '3 × 2를 먼저 했네'를 찾게</li><li id="B2-👨말2"><code class="mini">말2</code>피자 나누기 — &quot;24조각을 3명이 나누고, 각자 2배 더 받으면?&quot; 말한 순서대로</li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">계산기로 24 ÷ 3 × 2를 그대로 눌러 보게 하기 (계산기도 왼쪽부터 한다는 걸 확인).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="B2-👨함정1"><code class="mini">함정1</code><div><div class="kid">&quot;곱셈이 나눗셈보다 세다&quot;고 생각해 24 ÷ 3 × 2를 4라고 한다</div><div class="dadsay">→ &quot;곱셈이랑 나눗셈은 같은 급이야. 누가 더 세지 않아 — 왼쪽부터.&quot;</div></div></li><li id="B2-👨함정2"><code class="mini">함정2</code><div><div class="kid">나눗셈이 나오면 무조건 뒤로 미룬다</div><div class="dadsay">→ &quot;6 × 4 ÷ 8에서 뭐가 먼저야?&quot; 하고 왼쪽부터임을 확인하게 하세요.</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;곱셈이랑 나눗셈도 같은 급이라 왼쪽부터&quot;라고 말하고 24 ÷ 3 × 2 = 16을 풀면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="B3">
+    <header class="ch-head">
+      <div class="ch-no">B3</div>
+      <div>
+        <div class="grade">초5 · B2 다음</div>
+        <h2>곱셈·나눗셈을 먼저</h2>
+        <p class="idea">덧셈·뺄셈과 섞이면 곱셈·나눗셈을 먼저 해요. 곱셈은 이미 하나로 묶인 덩어리이기 때문이에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 한 장씩 넘기며 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="B3-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>B3-1</code></div>
+        <div class="say"><p>이제 섞여요.</p><p>진우가 몬스터볼 <strong>20개</strong>를 가지고 있었는데, <strong>3개짜리 묶음 4개</strong>를 썼어요. 남은 건?</p><p>식으로 쓰면 <strong>20 − 3 × 4</strong>.</p><p>여기서 3 × 4는 <strong>&quot;쓴 개수&quot;</strong> 하나예요. 먼저 얼마를 썼는지 알아야 뺄 수 있어요.</p></div>
+        <div class="check" id="B3-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B3-1✓</code></div>
+        <p class="qt">20 − 3 × 4 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8</span></li><li class="no"><span class="mark"></span><span class="txt">68</span></li><li class="no"><span class="mark"></span><span class="txt">12</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 3 × 4 = 12(쓴 개수) ② 20 − 12 = 8. 왼쪽부터 20 − 3 = 17을 먼저 하면 17 × 4 = 68이 되어 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B3-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>B3-2</code></div>
+        <div class="say"><p><strong>곱셈·나눗셈을 먼저, 덧셈·뺄셈을 나중에.</strong></p><p>20 − 3 × 4<br>① 3 × 4 = <strong>12</strong><br>② 20 − 12 = <strong>8</strong></p><p>왜냐하면 3 × 4는 <strong>하나로 묶인 덩어리</strong>이기 때문이에요. &quot;3개씩 4묶음&quot;은 한 덩어리예요.</p></div>
+        <div class="check" id="B3-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B3-2✓</code></div>
+        <p class="qt">5 + 6 × 2 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">17</span></li><li class="no"><span class="mark"></span><span class="txt">22</span></li><li class="no"><span class="mark"></span><span class="txt">13</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 6 × 2 = 12 ② 5 + 12 = 17. 왼쪽부터 5 + 6 = 11을 먼저 하면 22가 되어 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B3-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>B3-3</code></div>
+        <div class="say"><p>나눗셈도 똑같이 먼저예요.</p><p><strong>18 + 12 ÷ 3</strong><br>① 12 ÷ 3 = <strong>4</strong><br>② 18 + 4 = <strong>22</strong></p><p>곱셈과 나눗셈은 <strong>같은 급</strong>이라 둘 사이에서는 왼쪽부터. 덧셈·뺄셈보다는 <strong>둘 다 먼저</strong>.</p></div>
+        <div class="check" id="B3-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B3-3✓</code></div>
+        <p class="qt">30 − 16 ÷ 4 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">26</span></li><li class="no"><span class="mark"></span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt">14</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 16 ÷ 4 = 4 ② 30 − 4 = 26. 왼쪽부터 30 − 16 = 14를 먼저 하면 14 ÷ 4가 되어 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B3-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>B3-4</code></div>
+        <div class="say"><p>여러 개가 섞여도 규칙은 하나예요.</p><p><strong>8 + 3 × 5 − 6 ÷ 2</strong><br>① 곱셈·나눗셈 먼저: 3 × 5 = <strong>15</strong>, 6 ÷ 2 = <strong>3</strong><br>② 남은 식: 8 + 15 − 3<br>③ 왼쪽부터: 23 − 3 = <strong>20</strong></p><p>곱셈·나눗셈을 <strong>한꺼번에 먼저</strong> 처리하고, 남은 덧셈·뺄셈을 왼쪽부터 하면 돼요.</p></div>
+        <div class="check" id="B3-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B3-4✓</code></div>
+        <p class="qt">10 + 2 × 3 − 4 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">32</span></li><li class="no"><span class="mark"></span><span class="txt">24</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 2 × 3 = 6 ② 10 + 6 − 4 → 16 − 4 = 12.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B3-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>B3-5</code></div>
+        <div class="say"><p>왜 곱셈·나눗셈이 먼저일까요?</p><p>곱셈은 <strong>같은 수를 여러 번 더한 것</strong>이에요. 3 × 4 = 3 + 3 + 3 + 3.</p><p>20 − 3 × 4 는 사실 <strong>20 − (3 + 3 + 3 + 3)</strong> 이에요. 이미 하나로 묶여 있던 거예요. 그래서 먼저 풀어 줘야 해요.</p></div>
+        
+      </div>
+    </li></ol>
+        <div class="rule" id="B3-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>B3-📏</code></div><p>곱셈·나눗셈을 먼저, 덧셈·뺄셈은 나중에.</p></div>
+      </div>
+      <aside class="dad" id="B3-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>B3-👨</code></div>
+    <h3>곱셈·나눗셈이 덧셈·뺄셈보다 먼저인 이유(하나로 묶인 덩어리)를 말로 설명할 수 있는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="B3-👨말1"><code class="mini">말1</code>장 보기 — &quot;1,000원짜리 3개랑 500원짜리 하나. 5천 원 내면 거스름돈은?&quot; → 5000 − 1000 × 3 − 500</li><li id="B3-👨말2"><code class="mini">말2</code>&quot;20 − 3 × 4를 68이라고 하면 뭘 먼저 한 걸까?&quot; — 아이가 스스로 찾게 (제일 흔한 실수)</li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">영수증을 보며 '단가 × 개수'가 한 덩어리라는 걸 손가락으로 묶어 보이기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="B3-👨함정1"><code class="mini">함정1</code><div><div class="kid">20 − 3 × 4를 왼쪽부터 해서 68이라고 한다 (가장 흔한 실수)</div><div class="dadsay">→ &quot;3 × 4가 뭐야? 쓴 개수지. 얼마 썼는지 먼저 알아야 뺄 수 있잖아.&quot;</div></div></li><li id="B3-👨함정2"><code class="mini">함정2</code><div><div class="kid">곱셈만 먼저인 줄 알고 나눗셈은 뒤로 미룬다</div><div class="dadsay">→ &quot;나눗셈도 같이 먼저야. 곱셈이랑 나눗셈은 한 팀.&quot;</div></div></li><li id="B3-👨함정3"><code class="mini">함정3</code><div><div class="kid">곱셈·나눗셈이 여러 개일 때 하나만 처리하고 순서가 꼬인다</div><div class="dadsay">→ &quot;곱셈·나눗셈은 한꺼번에 다 먼저 해 놓고, 남은 걸 왼쪽부터.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;곱셈·나눗셈이 먼저고, 곱셈은 이미 묶여 있는 거라서&quot;라고 이유까지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="B4">
+    <header class="ch-head">
+      <div class="ch-no">B4</div>
+      <div>
+        <div class="grade">초5 · B3 다음</div>
+        <h2>괄호 ( ) 안을 먼저</h2>
+        <p class="idea">먼저 하고 싶은 곳을 괄호로 묶어요. 괄호가 1등, 그다음 곱셈·나눗셈, 마지막이 덧셈·뺄셈.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 한 장씩 넘기며 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="B4-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>B4-1</code></div>
+        <div class="say"><p>이번엔 순서를 <strong>바꾸고 싶을 때</strong>예요.</p><p>루카리오가 사탕을 샀어요. <strong>500원짜리와 300원짜리</strong>를 각각 <strong>4개씩</strong>. 모두 얼마일까요?</p><p>한 세트가 500 + 300 = 800원이고, 그게 4세트예요.</p><p>그런데 <strong>500 + 300 × 4</strong> 라고 쓰면? 곱셈이 먼저라 300 × 4 = 1200 → 1700원. <strong>틀렸어요.</strong></p></div>
+        <div class="check" id="B4-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B4-1✓</code></div>
+        <p class="qt">그럼 '(500 + 300)을 먼저 하고 4배'를 하려면 어떻게 써야 할까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">(500 + 300) × 4</span></li><li class="no"><span class="mark"></span><span class="txt">500 + 300 × 4</span></li><li class="no"><span class="mark"></span><span class="txt">500 × 4 + 300</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>먼저 하고 싶은 것을 <strong>괄호 ( )</strong> 로 묶어요. 괄호 안이 1등이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B4-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>B4-2</code></div>
+        <div class="say"><p><strong>괄호 ( ) 안을 가장 먼저</strong> 계산해요.</p><p>(500 + 300) × 4<br>① 괄호 안: 500 + 300 = <strong>800</strong><br>② 800 × 4 = <strong>3200</strong></p><p>괄호는 &quot;여기부터 해!&quot; 하는 <strong>표시</strong>예요. 곱셈·나눗셈보다도 먼저.</p></div>
+        <div class="check" id="B4-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B4-2✓</code></div>
+        <p class="qt">(12 − 4) × 5 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">40</span></li><li class="no"><span class="mark"></span><span class="txt">-8</span></li><li class="no"><span class="mark"></span><span class="txt">32</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 12 − 4 = 8 ② 8 × 5 = 40. 괄호를 무시하고 4 × 5 = 20을 먼저 하면 12 − 20이 되어 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B4-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>B4-3</code></div>
+        <div class="say"><p>같은 숫자라도 괄호가 있느냐 없느냐로 <strong>답이 완전히 달라져요</strong>.</p><p><strong>24 − 3 × 4 = 12</strong> → 24 − 12 = <strong>12</strong><br><strong>(24 − 3) × 4 = 21 × 4</strong> = <strong>84</strong></p><p>괄호 하나로 12와 84. 그래서 문제를 읽을 때 <strong>괄호부터 찾는 버릇</strong>을 들여요.</p></div>
+        <div class="check" id="B4-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B4-3✓</code></div>
+        <p class="qt">(6 + 2) ÷ 4 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">6.5</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 6 + 2 = 8 ② 8 ÷ 4 = 2. 괄호를 무시하면 6 + 0.5 = 6.5가 되어 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B4-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>B4-4</code></div>
+        <div class="say"><p>괄호가 있어도 <strong>괄호 밖은 원래 규칙</strong> 그대로예요.</p><p><strong>5 × (3 + 2) − 7</strong><br>① 괄호 안: 3 + 2 = <strong>5</strong><br>② 곱셈: 5 × 5 = <strong>25</strong><br>③ 뺄셈: 25 − 7 = <strong>18</strong></p><p>순서: <strong>괄호 → 곱셈·나눗셈 → 덧셈·뺄셈.</strong></p></div>
+        <div class="check" id="B4-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B4-4✓</code></div>
+        <p class="qt">20 ÷ (2 + 3) + 6 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt">16</span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 2 + 3 = 5 ② 20 ÷ 5 = 4 ③ 4 + 6 = 10.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="B4-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>B4-📏</code></div><p>괄호 ( ) 안을 가장 먼저. 그다음 곱셈·나눗셈, 마지막에 덧셈·뺄셈.</p></div>
+      </div>
+      <aside class="dad" id="B4-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>B4-👨</code></div>
+    <h3>괄호가 '순서를 바꾸는 표시'라는 것. 같은 숫자라도 괄호로 답이 달라진다는 경험.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="B4-👨말1"><code class="mini">말1</code>&quot;24 − 3 × 4 랑 (24 − 3) × 4 는 답이 얼마나 다를까?&quot; 하고 둘 다 풀어 보게 (12 vs 84)</li><li id="B4-👨말2"><code class="mini">말2</code>물건 살 때 — &quot;이거랑 저거 한 세트로 3세트 사면?&quot; → (a + b) × 3 으로 쓰게</li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">숫자 24, 3, 4와 기호 −, ×, 괄호를 종이 조각에 써서, 괄호 위치를 옮겨 가며 답이 어떻게 변하는지 보기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="B4-👨함정1"><code class="mini">함정1</code><div><div class="kid">괄호를 보고도 곱셈부터 한다 ((12 − 4) × 5에서 4 × 5를 먼저)</div><div class="dadsay">→ &quot;괄호가 1등이야. 곱셈보다도 먼저.&quot; 손으로 괄호를 가려 주세요.</div></div></li><li id="B4-👨함정2"><code class="mini">함정2</code><div><div class="kid">괄호가 없는데 있는 것처럼 푼다 (500 + 300 × 4를 3200이라고)</div><div class="dadsay">→ &quot;괄호가 있어? 없지? 그럼 곱셈부터.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">24 − 3 × 4 = 12 와 (24 − 3) × 4 = 84 를 둘 다 풀고 &quot;괄호 때문에 달라져요&quot;라고 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="B5">
+    <header class="ch-head">
+      <div class="ch-no">B5</div>
+      <div>
+        <div class="grade">초5 · B4 다음</div>
+        <h2>중괄호 { } 까지</h2>
+        <p class="idea">괄호가 겹치면 안쪽부터 — 소괄호 다음 중괄호. 괄호 안에서도 곱셈·나눗셈이 먼저예요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 한 장씩 넘기며 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="B5-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>B5-1</code></div>
+        <div class="say"><p>괄호 안에 <strong>또 괄호</strong>가 필요할 때가 있어요.</p><p>진우가 문제를 만들었어요. &quot;(5 + 3)을 2배 한 것에서 4를 빼고, 그걸 다시 3배 하면?&quot;</p><p>괄호를 두 번 쓰면 헷갈려서, 바깥쪽은 <strong>중괄호 { }</strong> 를 써요.</p><p><strong>{ (5 + 3) × 2 − 4 } × 3</strong></p></div>
+        <div class="check" id="B5-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B5-1✓</code></div>
+        <p class="qt">괄호가 겹칠 때 어느 것을 먼저 계산할까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">소괄호 ( ) 를 먼저</span></li><li class="no"><span class="mark"></span><span class="txt">중괄호 { } 를 먼저</span></li><li class="no"><span class="mark"></span><span class="txt">왼쪽에 있는 것부터</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><strong>안쪽부터</strong> 풀어요. 소괄호가 안쪽이니까 소괄호 → 중괄호 순서예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B5-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>B5-2</code></div>
+        <div class="say"><p><strong>{ (5 + 3) × 2 − 4 } × 3</strong></p><p>① 소괄호: 5 + 3 = <strong>8</strong><br>② 중괄호 안: 8 × 2 = 16, 16 − 4 = <strong>12</strong><br>③ 남은 계산: 12 × 3 = <strong>36</strong></p><p>안쪽 괄호부터 하나씩 벗겨 내면 돼요. 양파 껍질처럼요.</p></div>
+        <div class="check" id="B5-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B5-2✓</code></div>
+        <p class="qt">{ (10 − 4) ÷ 2 } + 7 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt">13</span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 10 − 4 = 6 ② 6 ÷ 2 = 3 ③ 3 + 7 = 10.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B5-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>B5-3</code></div>
+        <div class="say"><p>중괄호 <strong>안에서도</strong> 원래 규칙을 지켜요.</p><p><strong>{ 4 + 2 × (7 − 4) } ÷ 5</strong><br>① 소괄호: 7 − 4 = <strong>3</strong><br>② 중괄호 안 — 곱셈 먼저: 2 × 3 = <strong>6</strong>, 그다음 4 + 6 = <strong>10</strong><br>③ 10 ÷ 5 = <strong>2</strong></p><p>괄호 안이라고 왼쪽부터가 아니에요. <strong>안에서도 곱셈·나눗셈이 먼저.</strong></p></div>
+        <div class="check" id="B5-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B5-3✓</code></div>
+        <p class="qt">{ 3 × (2 + 2) − 2 } × 2 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">20</span></li><li class="no"><span class="mark"></span><span class="txt">16</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 2 + 2 = 4 ② 3 × 4 = 12, 12 − 2 = 10 ③ 10 × 2 = 20.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B5-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>B5-4</code></div>
+        <div class="say"><p>전체 순서를 한 줄로 외워요.</p><p><strong>① 소괄호 ( ) → ② 중괄호 { } → ③ 곱셈·나눗셈 → ④ 덧셈·뺄셈</strong></p><p>그리고 같은 급끼리는 언제나 <strong>왼쪽부터</strong>.</p><p>이게 혼합 계산의 전부예요. 나머지는 연습이에요.</p></div>
+        
+      </div>
+    </li></ol>
+        <div class="rule" id="B5-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>B5-📏</code></div><p>괄호는 안쪽부터 — 소괄호 ( ) 다음 중괄호 { }. 괄호 안에서도 곱셈·나눗셈이 먼저.</p></div>
+      </div>
+      <aside class="dad" id="B5-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>B5-👨</code></div>
+    <h3>괄호가 겹치면 안쪽부터라는 것. 괄호 안에서도 사칙 순서가 그대로라는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="B5-👨말1"><code class="mini">말1</code>&quot;양파 껍질처럼 안쪽부터 벗겨&quot; — 손으로 안쪽 괄호를 가리키며</li><li id="B5-👨말2"><code class="mini">말2</code>아이가 만든 문제를 아빠가 풀어 보기 (역할 바꾸기 — 아이가 채점)</li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">아이에게 중괄호가 들어간 문제를 하나 만들어 보라고 하고, 아빠가 풀어서 채점받기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="B5-👨함정1"><code class="mini">함정1</code><div><div class="kid">중괄호를 먼저 푼다 (바깥쪽부터)</div><div class="dadsay">→ &quot;양파 껍질처럼 안쪽부터. 소괄호가 안에 있잖아.&quot;</div></div></li><li id="B5-👨함정2"><code class="mini">함정2</code><div><div class="kid">괄호 안에서는 왼쪽부터인 줄 안다 ({ 4 + 2 × 3 }에서 4 + 2를 먼저)</div><div class="dadsay">→ &quot;괄호 안에서도 규칙은 똑같아. 안에서도 곱셈이 먼저.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">{ (10 − 4) ÷ 2 } + 7 = 10 을 풀고 &quot;안쪽 괄호부터요&quot;라고 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="B6">
+    <header class="ch-head">
+      <div class="ch-no">B6</div>
+      <div>
+        <div class="grade">초5 · B5 다음</div>
+        <h2>네 가지가 모두 섞인 식</h2>
+        <p class="idea">긴 식도 규칙은 같아요. 한 줄에 한 단계만 고치며 줄여 가요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 한 장씩 넘기며 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="B6-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>B6-1</code></div>
+        <div class="say"><p>이제 네 가지가 모두 나오는 식이에요. 무서워 보이지만 <strong>규칙은 그대로</strong>예요.</p><p><strong>36 ÷ (2 + 4) + 5 × 3 − 8</strong></p><p>먼저 무엇부터 할까요? 괄호를 찾아요.</p></div>
+        <div class="check" id="B6-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B6-1✓</code></div>
+        <p class="qt">이 식에서 가장 먼저 계산할 것은?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">(2 + 4)</span></li><li class="no"><span class="mark"></span><span class="txt">36 ÷ 2</span></li><li class="no"><span class="mark"></span><span class="txt">5 × 3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>괄호가 1등이에요. 2 + 4 = 6을 먼저.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B6-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>B6-2</code></div>
+        <div class="say"><p><strong>36 ÷ (2 + 4) + 5 × 3 − 8</strong></p><p>① 괄호: 2 + 4 = <strong>6</strong><br>② 곱셈·나눗셈 (왼쪽부터): 36 ÷ 6 = <strong>6</strong>, 5 × 3 = <strong>15</strong><br>③ 남은 식: 6 + 15 − 8<br>④ 왼쪽부터: 21 − 8 = <strong>13</strong></p><p>한 번에 하나씩만 고치면 돼요. <strong>줄을 바꿔 가며</strong> 쓰는 게 실수를 줄여요.</p></div>
+        <div class="check" id="B6-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B6-2✓</code></div>
+        <p class="qt">40 ÷ 5 + 3 × (6 − 2) 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">20</span></li><li class="no"><span class="mark"></span><span class="txt">44</span></li><li class="no"><span class="mark"></span><span class="txt">56</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 6 − 2 = 4 ② 40 ÷ 5 = 8, 3 × 4 = 12 ③ 8 + 12 = 20.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B6-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>B6-3</code></div>
+        <div class="say"><p>실수를 줄이는 방법 세 가지예요.</p><p><strong>①</strong> 먼저 할 곳에 <strong>동그라미</strong>를 친다<br><strong>②</strong> 한 줄에 <strong>한 단계만</strong> 고치고 나머지는 그대로 베껴 쓴다<br><strong>③</strong> 다 풀고 나서 <strong>되돌아보기</strong> — 곱셈·나눗셈을 빠뜨리지 않았나?</p><p>한꺼번에 여러 개를 고치면 거의 틀려요.</p></div>
+        <div class="check" id="B6-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B6-3✓</code></div>
+        <p class="qt">50 − { (3 + 5) × 4 } ÷ 2 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">34</span></li><li class="no"><span class="mark"></span><span class="txt">84</span></li><li class="no"><span class="mark"></span><span class="txt">16</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 3 + 5 = 8 ② 8 × 4 = 32 ③ 32 ÷ 2 = 16 ④ 50 − 16 = 34.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B6-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>B6-4</code></div>
+        <div class="say"><p>문장으로 된 문제도 똑같아요. <strong>식을 먼저 세우고</strong> 계산해요.</p><p>&quot;잠만보가 코인 100개를 가지고 있었어요. 30개짜리 물약을 2개 사고, 남은 코인을 4명이 똑같이 나눴어요. 한 명이 몇 개씩?&quot;</p><p>식: <strong>(100 − 30 × 2) ÷ 4</strong><br>① 30 × 2 = 60 ② 100 − 60 = 40 ③ 40 ÷ 4 = <strong>10개</strong></p></div>
+        <div class="check" id="B6-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B6-4✓</code></div>
+        <p class="qt">'남은 것을 나눈다'를 식으로 쓸 때 괄호가 필요한 이유는?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">먼저 남은 것을 구해야 하니까</span></li><li class="no"><span class="mark"></span><span class="txt">나눗셈이 제일 세니까</span></li><li class="no"><span class="mark"></span><span class="txt">괄호는 없어도 되니까</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>괄호가 없으면 60 ÷ 4가 먼저 되어 버려요. '남은 코인'이 한 덩어리라 묶어 줘야 해요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="B6-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>B6-📏</code></div><p>괄호 → 곱셈·나눗셈 → 덧셈·뺄셈. 같은 급은 왼쪽부터. 한 줄에 한 단계만.</p></div>
+      </div>
+      <aside class="dad" id="B6-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>B6-👨</code></div>
+    <h3>긴 식도 '한 번에 한 단계'로 줄여 가는 습관. 문장제를 식 하나로 세우는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="B6-👨말1"><code class="mini">말1</code>&quot;어디에 동그라미 칠래?&quot; 하고 첫 단계만 물어보기 (전부 풀게 하지 말고)</li><li id="B6-👨말2"><code class="mini">말2</code>생활 문제로 — &quot;용돈 1만 원, 2천 원짜리 3개 사고 남은 걸 둘이 나누면?&quot; → (10000 − 2000 × 3) ÷ 2</li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">아이가 푼 풀이를 보고 '줄마다 한 군데만 바뀌었는지' 같이 확인하기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="B6-👨함정1"><code class="mini">함정1</code><div><div class="kid">긴 식을 보고 한 줄에 여러 곳을 한꺼번에 고치다 틀린다</div><div class="dadsay">→ &quot;한 줄에 한 군데만. 나머지는 그대로 베껴 써.&quot;</div></div></li><li id="B6-👨함정2"><code class="mini">함정2</code><div><div class="kid">문장제에서 괄호를 빼먹는다 (&quot;남은 것을 나눈다&quot;를 100 − 30 × 2 ÷ 4로)</div><div class="dadsay">→ &quot;남은 게 한 덩어리지? 그럼 묶어 줘야지.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">50 − { (3 + 5) × 4 } ÷ 2 = 34 를 한 줄에 한 단계씩 써서 풀면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="B7">
+    <header class="ch-head">
+      <div class="ch-no">B7</div>
+      <div>
+        <div class="grade">초6 · B6 다음</div>
+        <h2>분수가 섞인 혼합 계산</h2>
+        <p class="idea">숫자가 분수여도 순서는 그대로. 통분은 더하고 뺄 때만 해요 (곱셈은 통분하지 않아요).</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 한 장씩 넘기며 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="B7-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>B7-1</code></div>
+        <div class="say"><p>이제 숫자가 <strong>분수</strong>여도 규칙은 똑같아요.</p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 18" width="160" height="18" role="img" aria-label="막대 2칸 중 1/2"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="80.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="80.0" y="0" width="80.0" height="18" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p><strong><span class="fr"><span class="n">1</span><span class="d">2</span></span> + <span class="fr"><span class="n">1</span><span class="d">4</span></span> × 2</strong></p><p>어떤 걸 먼저 할까요? 분수라고 달라지지 않아요 — <strong>곱셈이 먼저</strong>예요.</p></div>
+        <div class="check" id="B7-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B7-1✓</code></div>
+        <p class="qt"><span class="fr"><span class="n">1</span><span class="d">2</span></span> + <span class="fr"><span class="n">1</span><span class="d">4</span></span> × 2 를 계산할 때 가장 먼저 할 것은?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span> × 2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span> + <span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">통분부터</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>곱셈이 덧셈보다 먼저예요. 분수여도 순서 규칙은 그대로.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B7-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>B7-2</code></div>
+        <div class="say"><p><strong><span class="fr"><span class="n">1</span><span class="d">2</span></span> + <span class="fr"><span class="n">1</span><span class="d">4</span></span> × 2</strong><br>① <span class="fr"><span class="n">1</span><span class="d">4</span></span> × 2 = <strong><span class="fr"><span class="n">1</span><span class="d">2</span></span></strong><br>② <span class="fr"><span class="n">1</span><span class="d">2</span></span> + <span class="fr"><span class="n">1</span><span class="d">2</span></span> = <strong>1</strong></p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 38" width="160" height="38" role="img" aria-label="막대 비교 1/2 과 1/2"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="80.0" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="80.0" y="0" width="80.0" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="0.0" y="22" width="80.0" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="80.0" y="22" width="80.0" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>분수의 곱셈·나눗셈을 먼저 하고, 그다음 덧셈·뺄셈을 할 때 <strong>통분</strong>해요. 통분은 더하거나 뺄 때만 필요해요.</p></div>
+        <div class="check" id="B7-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B7-2✓</code></div>
+        <p class="qt"><span class="fr"><span class="n">3</span><span class="d">4</span></span> − <span class="fr"><span class="n">1</span><span class="d">2</span></span> × <span class="fr"><span class="n">1</span><span class="d">2</span></span> 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">8</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① <span class="fr"><span class="n">1</span><span class="d">2</span></span> × <span class="fr"><span class="n">1</span><span class="d">2</span></span> = <span class="fr"><span class="n">1</span><span class="d">4</span></span> ② <span class="fr"><span class="n">3</span><span class="d">4</span></span> − <span class="fr"><span class="n">1</span><span class="d">4</span></span> = <span class="fr"><span class="n">2</span><span class="d">4</span></span> = <span class="fr"><span class="n">1</span><span class="d">2</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B7-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>B7-3</code></div>
+        <div class="say"><p>분수의 나눗셈은 <strong>뒤집어 곱하기</strong>예요. 그것도 곱셈·나눗셈 차례에 함께 해요.</p><p><strong><span class="fr"><span class="n">1</span><span class="d">3</span></span> + <span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ 2</strong><br>① <span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ 2 = <span class="fr"><span class="n">2</span><span class="d">3</span></span> × <span class="fr"><span class="n">1</span><span class="d">2</span></span> = <strong><span class="fr"><span class="n">1</span><span class="d">3</span></span></strong><br>② <span class="fr"><span class="n">1</span><span class="d">3</span></span> + <span class="fr"><span class="n">1</span><span class="d">3</span></span> = <strong><span class="fr"><span class="n">2</span><span class="d">3</span></span></strong></p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 18" width="160" height="18" role="img" aria-label="막대 3칸 중 2/3"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="53.3" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="53.3" y="0" width="53.3" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="106.7" y="0" width="53.3" height="18" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div></div>
+        <div class="check" id="B7-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B7-3✓</code></div>
+        <p class="qt"><span class="fr"><span class="n">5</span><span class="d">6</span></span> − <span class="fr"><span class="n">1</span><span class="d">2</span></span> ÷ 3 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">3</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">9</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">3</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① <span class="fr"><span class="n">1</span><span class="d">2</span></span> ÷ 3 = <span class="fr"><span class="n">1</span><span class="d">6</span></span> ② <span class="fr"><span class="n">5</span><span class="d">6</span></span> − <span class="fr"><span class="n">1</span><span class="d">6</span></span> = <span class="fr"><span class="n">4</span><span class="d">6</span></span> = <span class="fr"><span class="n">2</span><span class="d">3</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B7-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>B7-4</code></div>
+        <div class="say"><p>괄호도 똑같아요. <strong>안을 먼저.</strong></p><p><strong>(<span class="fr"><span class="n">1</span><span class="d">2</span></span> + <span class="fr"><span class="n">1</span><span class="d">4</span></span>) × 4</strong><br>① 괄호 안: <span class="fr"><span class="n">1</span><span class="d">2</span></span> + <span class="fr"><span class="n">1</span><span class="d">4</span></span> = <span class="fr"><span class="n">2</span><span class="d">4</span></span> + <span class="fr"><span class="n">1</span><span class="d">4</span></span> = <strong><span class="fr"><span class="n">3</span><span class="d">4</span></span></strong><br>② <span class="fr"><span class="n">3</span><span class="d">4</span></span> × 4 = <strong>3</strong></p><p>괄호가 없었다면? <span class="fr"><span class="n">1</span><span class="d">4</span></span> × 4 = 1을 먼저 해서 <span class="fr"><span class="n">1</span><span class="d">2</span></span> + 1 = 1과 <span class="fr"><span class="n">1</span><span class="d">2</span></span>. <strong>답이 달라요.</strong></p></div>
+        <div class="check" id="B7-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B7-4✓</code></div>
+        <p class="qt">(<span class="fr"><span class="n">2</span><span class="d">3</span></span> − <span class="fr"><span class="n">1</span><span class="d">6</span></span>) × 6 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① <span class="fr"><span class="n">2</span><span class="d">3</span></span> − <span class="fr"><span class="n">1</span><span class="d">6</span></span> = <span class="fr"><span class="n">4</span><span class="d">6</span></span> − <span class="fr"><span class="n">1</span><span class="d">6</span></span> = <span class="fr"><span class="n">3</span><span class="d">6</span></span> = <span class="fr"><span class="n">1</span><span class="d">2</span></span> ② <span class="fr"><span class="n">1</span><span class="d">2</span></span> × 6 = 3.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B7-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>B7-5</code></div>
+        <div class="say"><p>분수 혼합 계산에서 아이들이 제일 많이 하는 실수 두 가지예요.</p><p><strong>①</strong> 곱셈인데 통분을 해 버린다 → 곱셈은 <strong>통분하지 않아요</strong>. 분자끼리, 분모끼리.<br><strong>②</strong> 순서를 무시하고 앞에서부터 푼다 → 분수여도 <strong>곱셈·나눗셈이 먼저</strong>.</p><p>숫자가 분수로 바뀌었을 뿐, 규칙은 하나도 안 변했어요.</p></div>
+        
+      </div>
+    </li></ol>
+        <div class="rule" id="B7-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>B7-📏</code></div><p>분수여도 순서는 그대로 — 괄호 → 곱셈·나눗셈 → 덧셈·뺄셈. 통분은 더하고 뺄 때만.</p></div>
+      </div>
+      <aside class="dad" id="B7-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>B7-👨</code></div>
+    <h3>'숫자가 분수여도 순서 규칙은 같다'는 것. 통분이 필요한 자리(덧셈·뺄셈)와 아닌 자리(곱셈)를 가르는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="B7-👨말1"><code class="mini">말1</code>&quot;이 식에서 통분이 필요한 곳은 어디야?&quot; 하고 짚게 하기</li><li id="B7-👨말2"><code class="mini">말2</code>피자로 — &quot;반 판이랑, 4분의 1판씩 2조각. 다 합치면 한 판이네?&quot;</li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">분수 줄기에서 분수 곱셈·나눗셈을 아직 안 배웠으면 이 칸은 잠깐 미루기 (앱이 막지는 않음).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="B7-👨함정1"><code class="mini">함정1</code><div><div class="kid">분수 곱셈인데 통분부터 한다</div><div class="dadsay">→ &quot;통분은 더하고 뺄 때만이야. 곱셈은 분자끼리 분모끼리.&quot;</div></div></li><li id="B7-👨함정2"><code class="mini">함정2</code><div><div class="kid">분수가 나오면 순서 규칙을 잊고 앞에서부터 푼다</div><div class="dadsay">→ &quot;숫자만 분수로 바뀐 거야. 순서는 똑같아.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><span class="fr"><span class="n">3</span><span class="d">4</span></span> − <span class="fr"><span class="n">1</span><span class="d">2</span></span> × <span class="fr"><span class="n">1</span><span class="d">2</span></span> = <span class="fr"><span class="n">1</span><span class="d">2</span></span> 을 풀고 &quot;곱셈 먼저, 통분은 뺄 때&quot;라고 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="B8">
+    <header class="ch-head">
+      <div class="ch-no">B8</div>
+      <div>
+        <div class="grade">초6 · B7 다음</div>
+        <h2>소수·분수가 섞인 혼합 계산</h2>
+        <p class="idea">소수도 규칙은 같아요. 분수와 소수가 함께 나오면 한쪽 모양으로 맞춰서 계산해요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 한 장씩 넘기며 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="B8-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>B8-1</code></div>
+        <div class="say"><p>마지막은 <strong>소수</strong>예요. 역시 규칙은 그대로.</p><p><strong>2.5 + 1.5 × 2</strong><br>① 1.5 × 2 = <strong>3</strong><br>② 2.5 + 3 = <strong>5.5</strong></p><p>소수점만 조심하면 돼요. 더하고 뺄 때는 <strong>소수점 자리를 맞춰서</strong> 세로로 쓰면 실수가 줄어요.</p></div>
+        <div class="check" id="B8-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B8-1✓</code></div>
+        <p class="qt">10 − 2.5 × 3 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.5</span></li><li class="no"><span class="mark"></span><span class="txt">22.5</span></li><li class="no"><span class="mark"></span><span class="txt">7.5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 2.5 × 3 = 7.5 ② 10 − 7.5 = 2.5.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B8-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>B8-2</code></div>
+        <div class="say"><p>소수의 나눗셈도 곱셈과 같은 급이에요.</p><p><strong>4.8 ÷ 2 + 1.6</strong><br>① 4.8 ÷ 2 = <strong>2.4</strong><br>② 2.4 + 1.6 = <strong>4</strong></p><p>괄호가 있으면 물론 괄호가 먼저예요.<br><strong>(3.2 + 0.8) ÷ 2</strong> → ① 4 ② <strong>2</strong></p></div>
+        <div class="check" id="B8-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B8-2✓</code></div>
+        <p class="qt">(1.5 + 2.5) × 3 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">9</span></li><li class="no"><span class="mark"></span><span class="txt">8.5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 1.5 + 2.5 = 4 ② 4 × 3 = 12. 괄호를 무시하면 2.5 × 3 = 7.5를 먼저 하게 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B8-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>B8-3</code></div>
+        <div class="say"><p>분수와 소수가 <strong>함께</strong> 나오면, 한쪽으로 <strong>모양을 맞춰요</strong>.</p><p><strong>0.5 + <span class="fr"><span class="n">1</span><span class="d">4</span></span></strong><br>· 소수로: <span class="fr"><span class="n">1</span><span class="d">4</span></span> = 0.25 → 0.5 + 0.25 = <strong>0.75</strong><br>· 분수로: 0.5 = <span class="fr"><span class="n">1</span><span class="d">2</span></span> → <span class="fr"><span class="n">1</span><span class="d">2</span></span> + <span class="fr"><span class="n">1</span><span class="d">4</span></span> = <strong><span class="fr"><span class="n">3</span><span class="d">4</span></span></strong></p><p>0.75와 <span class="fr"><span class="n">3</span><span class="d">4</span></span>는 같은 수예요. 답을 어느 모양으로 쓸지는 문제가 알려 줘요.</p></div>
+        <div class="check" id="B8-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B8-3✓</code></div>
+        <p class="qt"><span class="fr"><span class="n">1</span><span class="d">2</span></span> × 4 + 0.5 는 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.5</span></li><li class="no"><span class="mark"></span><span class="txt">4.5</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① <span class="fr"><span class="n">1</span><span class="d">2</span></span> × 4 = 2 ② 2 + 0.5 = 2.5.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B8-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>B8-4</code></div>
+        <div class="say"><p>외우기 쉬운 소수 ↔ 분수 몇 개예요.</p><p>· 0.5 = <strong><span class="fr"><span class="n">1</span><span class="d">2</span></span></strong><br>· 0.25 = <strong><span class="fr"><span class="n">1</span><span class="d">4</span></span></strong><br>· 0.75 = <strong><span class="fr"><span class="n">3</span><span class="d">4</span></span></strong><br>· 0.2 = <strong><span class="fr"><span class="n">1</span><span class="d">5</span></span></strong><br>· 0.1 = <strong><span class="fr"><span class="n">1</span><span class="d">10</span></span></strong></p><p>이것만 알아도 섞인 식이 훨씬 빨라져요.</p></div>
+        <div class="check" id="B8-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>B8-4✓</code></div>
+        <p class="qt">0.25 × 8 − <span class="fr"><span class="n">1</span><span class="d">2</span></span> 은 얼마일까요?</p>
+        
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1.5</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">1</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>① 0.25 × 8 = 2 ② 2 − 0.5 = 1.5.</p>
+      </div>
+      </div>
+    </li><li class="step" id="B8-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>B8-5</code></div>
+        <div class="say"><p>여기까지가 혼합 계산이에요. 처음부터 끝까지 규칙은 <strong>딱 하나</strong>였어요.</p><p><strong>① 괄호 (안쪽부터) → ② 곱셈·나눗셈 → ③ 덧셈·뺄셈</strong><br><strong>같은 급은 왼쪽부터.</strong></p><p>자연수든 분수든 소수든 <strong>똑같아요</strong>. 숫자 모양만 바뀐 거예요.</p></div>
+        
+      </div>
+    </li></ol>
+        <div class="rule" id="B8-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>B8-📏</code></div><p>소수·분수가 섞여도 순서는 그대로. 섞여 나오면 한쪽 모양으로 맞춘다.</p></div>
+      </div>
+      <aside class="dad" id="B8-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>B8-👨</code></div>
+    <h3>숫자 모양(자연수·분수·소수)이 달라도 계산 순서는 하나라는 것. 자주 쓰는 소수↔분수 변환.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="B8-👨말1"><code class="mini">말1</code>마트에서 — &quot;1.5리터 두 개랑 0.5리터 하나면 모두 몇 리터?&quot;</li><li id="B8-👨말2"><code class="mini">말2</code>&quot;0.25가 분수로 뭐였지?&quot; 하고 가끔 툭 물어보기 (외워 두면 계산이 빨라짐)</li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">자주 쓰는 변환 5개(0.5·0.25·0.75·0.2·0.1)를 냉장고에 붙여 두기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="B8-👨함정1"><code class="mini">함정1</code><div><div class="kid">소수점 자리를 안 맞춰 더한다</div><div class="dadsay">→ &quot;세로로 쓸 때 소수점끼리 딱 맞춰.&quot;</div></div></li><li id="B8-👨함정2"><code class="mini">함정2</code><div><div class="kid">분수와 소수가 섞이면 어느 쪽으로 맞출지 몰라 멈춘다</div><div class="dadsay">→ &quot;둘 중 편한 쪽으로 바꿔. 0.5는 <span class="fr"><span class="n">1</span><span class="d">2</span></span>이잖아.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">0.25 × 8 − <span class="fr"><span class="n">1</span><span class="d">2</span></span> = 1.5 를 풀고, 0.5·0.25·0.75를 분수로 바로 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+
+  <footer>신코치 🔢 수학 · 혼합계산 줄기 배움 원고 · 2026-09-23</footer>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('ans');
+  function apply(){document.body.classList.toggle('hide-ans',!cb.checked);}
+  cb.addEventListener('change',apply);
+  try{var v=localStorage.getItem('neg-review-ans');if(v==='0'){cb.checked=false;}}catch(e){}
+  cb.addEventListener('change',function(){try{localStorage.setItem('neg-review-ans',cb.checked?'1':'0');}catch(e){}});
+  apply();
+})();
+</script>

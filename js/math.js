@@ -16,7 +16,7 @@ import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, apply
 import { todayKey } from './track.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
-import { GOLDEN, STONE_MATH, RADAR, POTION } from './items.js';
+import { GOLDEN, STONE_MATH, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg } from './xp.js';
 import { eggProgress } from './egg.js';
@@ -24,6 +24,7 @@ import { showHatchIfAny } from './hatch.js';
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
+import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN, MAX_PER_DAY } from './cheer.js';
 import { contentSummary, cueCountOf } from './stats.js';
 import { sfx } from './sfx.js';
 
@@ -48,6 +49,7 @@ const ui = {
   battleOpen: false,
   today: { d: '', q: 0, battles: 0 }, // 오늘 푼 문항 수·배틀 수 (등장 판정용, 화면을 열 때 저장소에서 읽는다)
   chars: [],            // 기기에 받아 둔 포켓몬 그림 (⚔️ 상대·내 편을 고를 때 동기로 필요하다 — 화면을 열 때 한 번 읽는다)
+  cheer: { cd: 0, n: 0, d: '', last: '', timer: 0 }, // ✨ 응원 포켓몬 — 쿨다운·오늘 본 횟수·방금 한 말
 };
 const RECENT_KEEP = 10; // 두 편 반 분량 — 틀이 4개뿐인 개념도 한 바퀴는 돈다
 const STEM_KEY = 'shincoach.mathStem'; // 마지막에 고른 줄기 (이 기기 편의용 — 없어도 고르기 화면이 나올 뿐)
@@ -953,6 +955,7 @@ function answer(i, list, card) {
   });
   paintAnswer(i, list, card, false);
   maybeBattle(); // ⚔️ 아주 가끔 트레이너가 걸어온다 (다음 문항으로 넘어갈 때 열린다)
+  maybeCheer(!ch.ok); // ✨ 포켓몬이 지나가며 응원 (틀린 직후에 더 자주)
 }
 
 /** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
@@ -1283,6 +1286,70 @@ function advance() {
   if (ui.battlePending) { startMathBattle(go); return; }
   go();
 }
+// ───────────────────── ✨ 응원 포켓몬 ─────────────────────
+//
+// 아버님 아이디어(2026-09-23): "수학은 약간 어렵고 지겨울 수도 있으니, 갑자기 화면 밖에서
+// 아이가 얻은 포켓몬이 나타나 '힘내라~ 넌 할 수 있어!' 하고 지나갔으면 좋겠다."
+//
+// 규칙은 cheer.js(순수)에, 여기서는 그리기만. **아이 조작을 막지 않는 것**이 첫째라
+// pointer-events:none 으로 탭이 통과하고, 화면 아래쪽으로만 지나가 보기·다음 버튼을 안 가린다.
+
+/** 문항을 끝낼 때마다 — 확률이 맞으면 포켓몬 하나가 지나간다 */
+function maybeCheer(wrong) {
+  const today = todayKey();
+  if (ui.cheer.d !== today) ui.cheer = { cd: 0, n: 0, d: today, last: '', timer: ui.cheer.timer };
+  if (ui.cheer.cd > 0) { ui.cheer.cd--; return; }
+  if (ui.battlePending || ui.battleOpen || ui.catching) return; // 큰 화면이 열릴 참이면 비켜 준다
+  if (!shouldCheer({ wrong, cooldown: 0, todayCount: ui.cheer.n })) return;
+  const mon = pickCheerer(myCheerMons(), getPartner());
+  if (!mon) return; // 아직 잡은 포켓몬이 없거나 그림을 못 받았다
+  runCheer(mon, wrong);
+}
+
+/** 응원하러 나올 수 있는 포켓몬: 잡은 것 중 그림이 있는 것 (😴 지친 애도 응원은 한다) */
+function myCheerMons() {
+  const caught = getProfileSnapshot().caught;
+  return Object.keys(caught).filter((k) => caught[k] > 0).map(Number).map((id) => {
+    const r = ROSTER.find((m) => m.id === id);
+    const c = (ui.chars || []).find((x) => x.id === id);
+    const look = getLook(id);
+    return { id, ko: r ? r.ko : String(id), url: (look && look.shinyUrl) || (c ? c.url : ''), look };
+  }).filter((m) => m.url);
+}
+
+/** 한 번 지나가게 한다 */
+function runCheer(mon, wrong) {
+  const box = $('cheer');
+  if (!box) return;
+  const line = pickLine(wrong, ui.cheer.last);
+  ui.cheer.last = line.ko;
+  ui.cheer.cd = COOLDOWN;
+  ui.cheer.n += 1;
+
+  box.querySelector('.cheer-ko').textContent = line.ko;
+  box.querySelector('.cheer-en').textContent = line.en;
+  setFigure(box.querySelector('.cheer-mon'), mon.url, mon.look);
+  const side = pickSide();
+  box.classList.remove('go-left', 'go-right');
+  void box.offsetWidth; // 애니메이션을 처음부터 다시 돌리려면 한 번 끊어야 한다
+  box.style.setProperty('--cheer-ms', `${WALK_MS}ms`);
+  box.classList.add(side === 'left' ? 'go-right' : 'go-left'); // 왼쪽에서 들어오면 오른쪽으로 간다
+  box.hidden = false;
+
+  clearTimeout(ui.cheer.timer);
+  ui.cheer.timer = setTimeout(() => {
+    box.hidden = true;
+    box.classList.remove('go-left', 'go-right');
+  }, WALK_MS + 100);
+}
+
+/** 화면을 떠날 때는 지우고 간다 (수학 밖에서 지나가면 엉뚱하다) */
+export function stopCheer() {
+  const box = $('cheer');
+  clearTimeout(ui.cheer.timer);
+  if (box) { box.hidden = true; box.classList.remove('go-left', 'go-right'); }
+}
+
 // ───────────────────── ⚔️ 배틀 (수학) ─────────────────────
 //
 // 진우: "수학에서는 배틀이 안 나와요" (2026-09-23). 맞는 말이었다 — maybeBattle이 player.js(영어)에만 있었다.
