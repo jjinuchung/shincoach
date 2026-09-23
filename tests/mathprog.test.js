@@ -7,6 +7,7 @@ import {
 } from '../js/mathprog.js';
 import { emptyMath, mergeMath } from '../js/db.js';
 import { FRACTION, diagnosticSet } from '../js/mathgen.js';
+import { MIXED } from '../js/mathmix.js';
 import { GRADUATED } from '../js/review.js';
 
 const T = '2026-09-20';
@@ -140,11 +141,11 @@ test('요약: 배운 수·👑 수·헷갈리는 오개념', () => {
   applyRound(m, 'frac.mean', { correct: 2, total: 4, missTags: ['분모끼리 더함', '분모끼리 더함'] }, T);
   applyRound(m, 'frac.mean', { correct: 4, total: 4, missTags: [] }, T);
   const s = mathSummary(m);
-  // 줄기가 둘(분수·음수)이 되면서 total은 두 줄기의 합, 줄기별은 stems에 (2026-09-21)
-  assert.equal(s.total, FRACTION.length + 9);
+  // 줄기가 셋(분수·혼합계산·음수)이 되면서 total은 세 줄기의 합, 줄기별은 stems에
+  assert.equal(s.total, FRACTION.length + MIXED.length + 9);
   assert.equal(s.done, 1);
   assert.equal(s.crowned, 0);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.total, x.done]), [['fraction', FRACTION.length, 1], ['negative', 9, 0]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.total, x.done]), [['fraction', FRACTION.length, 1], ['mixed', MIXED.length, 0], ['negative', 9, 0]]);
   assert.deepEqual(s.miss[0], { tag: '분모끼리 더함', n: 2 });
   assert.equal(nameOf('frac.add'), '분모가 다른 분수의 덧셈·뺄셈');
   assert.equal(nameOf('zzz'), 'zzz');

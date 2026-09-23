@@ -10,18 +10,22 @@ import { lessonOf, checkContent } from '../js/mathneg.js';
 const content = JSON.parse(readFileSync(new URL('../coach/math/negative.json', import.meta.url), 'utf8'));
 const T = '2026-09-21';
 
-test('STEMS: 분수·음수 두 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
-  assert.deepEqual(STEM_ORDER, ['fraction', 'negative']);
+test('STEMS: 분수·혼합계산·음수 세 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
+  assert.deepEqual(STEM_ORDER, ['fraction', 'mixed', 'negative']);
   for (const key of STEM_ORDER) {
     const s = STEMS[key];
     assert.equal(s.key, key);
     for (const fn of ['makeQuestion', 'makeRound', 'diagnosticSet', 'placeFrom', 'ladder']) assert.equal(typeof s.gen[fn], 'function', `${key}.gen.${fn}`);
-    assert.ok(s.list.length >= 9 && s.file && s.code && s.label && s.intro);
+    assert.ok(s.list.length >= 8 && s.file && s.code && s.label && s.intro);
   }
   assert.equal(STEMS.fraction.lesson, false);
   assert.equal(STEMS.negative.lesson, true, '음수는 처음 배우는 줄기 — 📚 배움');
+  assert.equal(STEMS.mixed.lesson, true, '혼합계산도 처음 배우는 줄기 — 📚 배움');
   assert.equal(typeof STEMS.negative.gen.lessonOf, 'function');
+  assert.equal(typeof STEMS.mixed.gen.lessonOf, 'function');
   assert.equal(stemOf('neg.add').key, 'negative');
+  assert.equal(stemOf('mix.order').key, 'mixed');
+  assert.equal(nameOf('mix.paren'), '괄호 ( ) 안을 먼저');
   assert.equal(stemOf('frac.add').key, 'fraction');
   assert.equal(stemOf('없는.것'), null);
   assert.equal(nameOf('neg.sub'), '음수가 있는 뺄셈');
@@ -42,7 +46,7 @@ test('줄기별 사다리·진단: 음수 줄기의 진단은 음수 사다리�
   assert.equal(ladderOf(m, T, 'fraction').filter((r) => r.state === 'done').length, 0);
   assert.deepEqual(dueIds(m, '2026-09-30', 'negative'), ['neg.mean', 'neg.line', 'neg.add', 'neg.sub']);
   const s = mathSummary(m);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['negative', 4, true]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['mixed', 0, false], ['negative', 4, true]]);
   assert.equal(s.done, 4);
 });
 

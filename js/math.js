@@ -1329,6 +1329,10 @@ function runCheer(mon, wrong) {
   box.querySelector('.cheer-ko').textContent = line.ko;
   box.querySelector('.cheer-en').textContent = line.en;
   setFigure(box.querySelector('.cheer-mon'), mon.url, mon.look);
+  // 그림 주소가 죽어 있으면(받다 만 것·다른 창이 지운 것) **빈 네모가 걸어간다** — 그럴 땐 아예 띄우지 않는다
+  const img = box.querySelector('.cheer-mon img');
+  img.onerror = () => { box.hidden = true; box.classList.remove('go-left', 'go-right'); };
+  if (img.complete && img.naturalWidth === 0) { ui.cheer.cd = 0; ui.cheer.n -= 1; return; }
   const side = pickSide();
   box.classList.remove('go-left', 'go-right');
   void box.offsetWidth; // 애니메이션을 처음부터 다시 돌리려면 한 번 끊어야 한다
