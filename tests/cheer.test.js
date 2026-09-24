@@ -86,3 +86,22 @@ test('상한 이름이 실제 동작과 맞는다 (메모리에만 있으니 세
   assert.equal(typeof MAX_PER_SESSION, 'number');
   assert.ok(MAX_PER_SESSION >= 4 && MAX_PER_SESSION <= 20, '한 세션에 너무 적거나 많지 않게');
 });
+
+// ── ✨ 응원은 수학에서만 (2026-09-24, 아버님: "영어학습에서는 제외해줘") ──
+// 말로 "없습니다"라고 하는 대신 코드로 고정한다 — 나중에 누가 영어 쪽에 붙이면 여기서 걸린다.
+test('응원은 수학 화면에서만 — 영어(player.js)에는 부르는 코드가 없다', async () => {
+  const fs = await import('node:fs');
+  const files = fs.readdirSync('js').filter((f) => f.endsWith('.js') && f !== 'cheer.js');
+  const importers = files.filter((f) => /from '\.\/cheer\.js'/.test(fs.readFileSync(`js/${f}`, 'utf8')));
+  assert.deepEqual(importers, ['math.js'], `cheer.js 를 가져다 쓰는 파일은 math.js 하나여야 한다 (지금: ${importers.join(', ')})`);
+
+  const player = fs.readFileSync('js/player.js', 'utf8');
+  assert.ok(!/cheer/i.test(player), '영어 플레이어(player.js)에는 cheer 가 한 글자도 없어야 한다');
+
+  // 수학 밖으로 나가면 지우는 길이 실제로 연결돼 있어야 한다
+  const app = fs.readFileSync('js/app.js', 'utf8');
+  assert.ok(/stopCheer\(\)/.test(app), 'app.js 가 화면을 옮길 때 stopCheer() 를 불러야 한다');
+  const math = fs.readFileSync('js/math.js', 'utf8');
+  assert.ok(/export function stopCheer/.test(math), 'math.js 가 stopCheer 를 내보내야 한다');
+  assert.ok(/mathHidden\(\)/.test(math), '늦게 도착한 그림이 다른 화면에서 뜨지 않게 mathHidden() 가드가 있어야 한다');
+});
