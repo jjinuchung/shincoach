@@ -9,7 +9,7 @@ import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle } from './pokemon.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { STONE_ENGLISH, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
@@ -441,7 +441,8 @@ function pickBattleOpponent() {
 /** 내가 내보낼 수 있는 포켓몬: 잡은 것 중 파트너·😴 제외, 그림·꾸밈·패배 수 포함 */
 function myBattleMons(includePartner) {
   const caught = getProfileSnapshot().caught;
-  const ids = Object.keys(caught).filter((k) => caught[k] > 0).map(Number);
+  // 🧬 다 진화시켜 보낸 종은 못 내보낸다 — 도감 누적이 아니라 **지금 데리고 있는 수**로 고른다
+  const ids = Object.keys(caught).filter((k) => haveCount(k) > 0).map(Number);
   const ok = eligibleMine(ids, includePartner ? null : getPartner(), (id) => settings.hp && isTired(id));
   return ok.map((id) => {
     const r = ROSTER.find((m) => m.id === id);
@@ -451,7 +452,7 @@ function myBattleMons(includePartner) {
     const canMega = !!(f.mega && hasKeystone() && hasMegaStone(id));
     const canGmax = !!(f.gmax && hasGmax(id));
     return {
-      id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id),
+      id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), lv: monLv(id),
       canMega, canGmax,
       megaUrl: canMega ? formUrl(id, 'mega') : null,
       gmaxUrl: canGmax ? formUrl(id, 'gmax') : null,
@@ -902,7 +903,8 @@ function maybeMatch() {
  * 일러스트로라도 춤춰야 무대가 비지 않는다 (아버님 신고: "포켓몬이 나오지도 않는다").
  */
 function stageMons() {
-  const caught = Object.keys(getProfileSnapshot().caught || {}).map(Number).filter((id) => id > 0);
+  // 🧬 진화로 보낸 모습은 무대에 안 세운다 (Codex 10차 #4)
+  const caught = Object.keys(getProfileSnapshot().caught || {}).map(Number).filter((id) => id > 0 && haveCount(id) > 0);
   const pool = caught.length ? caught : [25];
   return shuffleMons(pool).slice(0, 3).map((id) => {
     const ch = (state.characters || []).find((c) => c.id === id);

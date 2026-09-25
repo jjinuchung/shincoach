@@ -101,22 +101,22 @@ test('프로필: 코인 획득·구매·가방', async () => {
   assert.equal(getProfileSnapshot().coinsEarned, 45);
 });
 
-test('프로필: 장식 장착·교체·벗기 (가방 개수 보존)', () => {
+test('프로필: 장식 장착·교체·벗기 (가방 개수 보존) — 이제 한 트랜잭션이라 await', async () => {
   assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null, shiny: false, shinyUrl: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리, shiny = 🌈 이로치
-  assert.equal(equipGear(25, 'crown'), false, '가방에 없음');
-  assert.equal(equipGear(25, 'ribbon'), true);
+  assert.equal(await equipGear(25, 'crown'), false, '가방에 없음');
+  assert.equal(await equipGear(25, 'ribbon'), true);
   assert.equal(getLook(25).gear, 'ribbon');
   assert.equal(itemCount('ribbon'), 0, '장착하면 가방에서 빠짐');
-  assert.equal(equipGear(1, 'ribbon'), false, '이미 다른 포켓몬이 씀');
+  assert.equal(await equipGear(1, 'ribbon'), false, '이미 다른 포켓몬이 씀');
   addItem('cap');
-  assert.equal(equipGear(25, 'cap'), true, '교체');
+  assert.equal(await equipGear(25, 'cap'), true, '교체');
   assert.equal(getLook(25).gear, 'cap');
   assert.equal(itemCount('ribbon'), 1, '이전 장식은 가방으로');
   assert.equal(itemCount('cap'), 0);
-  assert.equal(equipGear(25, null), true, '벗기');
+  assert.equal(await equipGear(25, null), true, '벗기');
   assert.equal(getLook(25).gear, null);
   assert.equal(itemCount('cap'), 1);
-  assert.equal(equipGear(25, 'red'), false, '염색약은 장착 불가');
+  assert.equal(await equipGear(25, 'red'), false, '염색약은 장착 불가');
 });
 
 test('프로필: 염색은 소모, 원래 색은 무료', () => {
@@ -133,15 +133,15 @@ test('프로필: 염색은 소모, 원래 색은 무료', () => {
   assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null, shiny: false, shinyUrl: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리, shiny = 🌈 이로치
 });
 
-test('❤️ 파트너·HP·물약: 처음 잡은 포켓몬이 파트너, HP는 0~100, 물약은 가방에서 소모', () => {
+test('❤️ 파트너·HP·물약: 처음 잡은 포켓몬이 파트너, HP는 0~100, 물약은 가방에서 소모', async () => {
   assert.equal(getPartner(), null);
-  assert.equal(setPartner(25), false, '안 잡은 포켓몬은 파트너 불가');
+  assert.equal(await setPartner(25), false, '안 잡은 포켓몬은 파트너 불가');
   const c = catchAttempt(25, () => 0);
   assert.equal(c.caught, true); assert.equal(c.partnerSet, true);
   assert.equal(getPartner(), 25);
   const c2 = catchAttempt(4, () => 0);
   assert.equal(c2.partnerSet, false, '이미 파트너가 있으면 그대로');
-  assert.equal(setPartner(4), true);
+  assert.equal(await setPartner(4), true);
   assert.equal(getPartner(), 4);
   assert.equal(hpOf(4), 100, '기록 없으면 가득');
   assert.equal(getLook(4).hp, 100);

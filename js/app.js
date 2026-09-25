@@ -4,6 +4,7 @@ import { initPlayer, requirePin } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
 import { initHatch } from './hatch.js';
+import { initEvolveShow } from './evolveshow.js';
 import { initHome, renderHome } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
 import { getDaily, syncCoachFixes } from './db.js';
@@ -133,6 +134,7 @@ async function main() {
   initStats({ showView, requirePin });
   initPokedex({ showView });
   initHatch();
+  initEvolveShow();
   initHome({ showView });
   initMath({ showView });
   initExit();

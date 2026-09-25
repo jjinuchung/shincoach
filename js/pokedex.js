@@ -5,6 +5,7 @@ import { listDaily } from './db.js';
 import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES } from './items.js';
 import { eggSummary } from './egg.js';
+import { haveOf, lvOf } from './evolve.js';
 import { showHatchIfAny } from './hatch.js';
 import { initShop, openShop, openMon } from './shop.js';
 
@@ -166,7 +167,9 @@ export async function openPokedex(opts) {
     sec.appendChild(el('h2', '', `${RARITY[r].stars} ${RARITY[r].label} (${got}/${list.length})`));
     const grid = el('div', 'pokedex-grid');
     for (const m of list) {
-      const n = p.caught[m.id] || 0;
+      const n = p.caught[m.id] || 0;                 // 도감에 적힌 누적 (🧬 진화로 보내도 줄지 않는다)
+      const have = haveOf(n, p.mons[m.id]);          // 지금 데리고 있는 수
+      const lv = lvOf(p.mons[m.id]);
       const cell = el('div', 'pokedex-cell' + (n > 0 ? ' got' : ' unknown'));
       const url = urlById.get(m.id);
       if (url) {
@@ -178,7 +181,10 @@ export async function openPokedex(opts) {
         cell.appendChild(el('div', 'pokedex-noimg', '?'));
       }
       cell.appendChild(el('div', 'nm', n > 0 ? m.ko : '???'));
-      if (n > 1) cell.appendChild(el('div', 'cnt', `×${n}`));
+      if (have > 1) cell.appendChild(el('div', 'cnt', `×${have}`));
+      // 🧬 다 진화시켜 지금은 없는 모습 — 도감 칸은 남고 "보냈다"는 것만 보여 준다
+      else if (n > 0 && have === 0) cell.appendChild(el('div', 'cnt evolved', '🧬'));
+      if (n > 0 && lv > 1) cell.appendChild(el('div', 'lv', `Lv${lv}`));
       if (subjectOf(m.id) === 'math') cell.appendChild(el('div', 'subj', '🔢')); // 수학에서만 잡히는 얼굴 — 못 잡은 칸에도 붙어 "수학 가면 있다"가 보인다
       if (n > 0 && getPartner() === m.id) cell.appendChild(el('div', 'partner', '🤝'));
       // 못 잡은 포켓몬도 누를 수 있다 — 등급은 **잡기 전에** 맞아야 의미가 있다 (전설이 흔함에 있으면 쉽게 잡힌다)

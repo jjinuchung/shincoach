@@ -2,9 +2,11 @@
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, SHINY_STONE, itemById, canBuy, priceText, setFigure } from './items.js';
-import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
-import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject } from './pokemon.js';
+import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
+import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
+import { costBetween } from './evolve.js';
+import { showEvolve } from './evolveshow.js';
 import { sfx, unlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -28,7 +30,7 @@ export function initShop(ctx) {
   $('mon-to-shop').addEventListener('click', () => { closeMon(); openShop(); });
   $('mon-partner').addEventListener('click', () => {
     if (!mon) return;
-    change(setPartner(mon.id), `🤝 ${mon.ko}${josaIga(mon.ko)} 파트너가 됐어요!`);
+    setPartner(mon.id).then((ok) => change(ok, `🤝 ${mon.ko}${josaIga(mon.ko)} 파트너가 됐어요!`));
   });
   const sb = $('mon-shiny');
   if (sb) sb.addEventListener('click', async () => {
@@ -244,18 +246,23 @@ function renderMon(msg, pop) {
   const got = mon.caught !== false; // 아직 못 잡은 포켓몬은 등급만 손댈 수 있다
   $('mon-title').textContent = got ? (isPartner ? '🤝 ' : '') + mon.ko : '???';
   $('mon-sub').textContent = got
-    ? `${RARITY[r].stars} ${RARITY[r].label} · 잡은 수 ×${caughtCount(mon.id)}` + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '')
+    ? `${RARITY[r].stars} ${RARITY[r].label} · Lv${monLv(mon.id)} · ${haveCount(mon.id) > 0 ? `데리고 있어요 ×${haveCount(mon.id)}` : '🧬 진화로 보냈어요'}`
+      + (caughtCount(mon.id) > haveCount(mon.id) ? ` (도감 ×${caughtCount(mon.id)})` : '')
+      + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '')
     : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${subjectOf(mon.id) === 'math' ? ' · 🔢 수학에서 만나요' : ' · 🎤 영어 퍼즐에서 만나요'}`;
   const fig = $('mon-figure');
   setFigure(fig, mon.url || '', got ? look : null);
   fig.classList.toggle('unknown', !got); // 실루엣 (도감과 같은 모습)
-  // 잡기 전에는 HP·장식·염색·파트너가 의미 없다 → 등급만 보여준다
-  $('mon-hp-section').hidden = !got;
+  // 잡기 전에는 HP·장식·염색·파트너가 의미 없다 → 등급만 보여준다.
+  // 🧬 진화로 다 보낸 모습도 마찬가지다 — 도감 칸은 남지만 **지금 없는 포켓몬**이라 꾸미거나 파트너로 삼을 수 없다
+  // (Codex 10차 #4: 안 막으면 사라진 종에 🌈 500코인을 태우거나 파트너로 지정할 수 있다)
+  const here = got && haveCount(mon.id) > 0;
+  $('mon-hp-section').hidden = !here;
   for (const id of ['mon-gear', 'mon-dye']) {
     const sec = $(id).closest('.mon-section');
-    if (sec) sec.hidden = !got;
+    if (sec) sec.hidden = !here;
   }
-  $('mon-partner').hidden = !got;
+  $('mon-partner').hidden = !here;
   enableGearDrag();
   fig.classList.remove('pop');
   if (pop) { void fig.offsetWidth; fig.classList.add('pop'); }
@@ -285,6 +292,7 @@ function renderMon(msg, pop) {
   }
   if (!anyPotion) potBox.appendChild(el('span', 'mon-empty', hp >= HP.max ? 'HP가 가득해요' : '가방에 물약이 없어요 — 🛒 상점에서 사 보세요 (💰10)'));
   else if (hp >= HP.max) potBox.appendChild(el('span', 'mon-empty', 'HP가 가득해서 지금은 안 먹여도 돼요'));
+  renderGrow();
   renderForms();
 
   // ⭐ 등급: 아이가 생각하는 등급을 고르면 아빠에게 신청이 간다 (바로 바뀌지는 않는다)
@@ -313,7 +321,8 @@ function renderMon(msg, pop) {
   const sb = $('mon-shiny');
   if (sb) {
     const n = itemCount(SHINY_STONE.id);
-    sb.hidden = !got || (!look.shiny && n < 1);
+    // 🧬 진화로 보낸 모습에는 쓸 수 없다 (이미 이로치면 '이로치예요' 표시는 남긴다)
+    sb.hidden = !got || (!look.shiny && (n < 1 || !here));
     sb.disabled = !!look.shiny;
     sb.textContent = look.shiny ? (look.shinyUrl ? '✨ 이로치예요' : '✨ 이로치예요 — 색 그림을 받는 중…') : `🌈 이로치로! (스톤 1개 쓰기 · 영원히 · ${n}개 있음)`;
     // 이로치인데 그림이 아직 없다(처음 받기 실패·다른 창에서 만듦) → 열 때마다 다시 받아 본다 (Codex 8차 #2)
@@ -323,7 +332,7 @@ function renderMon(msg, pop) {
   // 🎀 장식: [없음] [지금 쓰는 것] [가방에 있는 것들]
   const gearBox = $('mon-gear');
   gearBox.innerHTML = '';
-  gearBox.appendChild(option('🚫', '없음', '', !look.gear, 'none', () => { setGearPos(mon.id, null); change(equipGear(mon.id, null), '장식을 벗었어요'); }));
+  gearBox.appendChild(option('🚫', '없음', '', !look.gear, 'none', () => { setGearPos(mon.id, null); equipGear(mon.id, null).then((ok) => change(ok, '장식을 벗었어요')); }));
   let anyGear = false;
   for (const g of GEAR) {
     const n = itemCount(g.id);
@@ -332,7 +341,7 @@ function renderMon(msg, pop) {
     anyGear = true;
     gearBox.appendChild(option(g.emoji, g.ko, on ? '쓰는 중' : `가방 ${n}개`, on, '', () => {
       if (on) return;
-      change(equipGear(mon.id, g.id), `${g.emoji} ${g.ko}${josaEul(g.ko)} 씌웠어요!`);
+      equipGear(mon.id, g.id).then((ok) => change(ok, `${g.emoji} ${g.ko}${josaEul(g.ko)} 씌웠어요!`));
     }));
   }
   if (!anyGear) gearBox.appendChild(el('span', 'mon-empty', '가방에 장식이 없어요 — 🛒 상점에서 사 보세요'));
@@ -364,6 +373,142 @@ function renderMon(msg, pop) {
  * 원작 규칙 그대로: 메가는 🔑 키스톤 + 💠 메가스톤, 거다이맥스는 🍄 다이버섯으로 만든 🍲 다이스프.
  * 잡은 포켓몬만 (변신은 내 포켓몬이 하는 것), 변신 그림은 여기서 처음 끼울 때 받아 온다.
  */
+
+/**
+ * 🧬 레벨업 · 진화 — 🔷🔶 스톤과 💰 코인으로 키우고, 정해진 레벨이 되면 진화한다.
+ *
+ * 수학 포켓몬은 🔷 수학스톤, 영어 포켓몬은 🔶 영어스톤으로만 큰다. 진화하면서 과목이 바뀌는 37마리는
+ * 그다음부터 다른 스톤이 필요하다 — 최종 진화까지 가려면 두 과목을 다 해야 한다 (아버님 결정).
+ */
+function renderGrow() {
+  const sec = $('mon-grow-section');
+  const got = mon && mon.caught !== false;
+  sec.hidden = !got;
+  if (!got) return;
+
+  const g = growInfo(mon.id);
+  const stone = itemById(g.stone);
+  const em = stone ? stone.emoji : '🔷';
+  const subject = subjectOf(mon.id) === 'math' ? '🔢 수학' : '🎤 영어';
+
+  $('mon-lv-text').textContent = `Lv${g.lv}${g.lv >= g.max ? ' · 만렙!' : ` / ${g.max}`}`;
+  $('mon-lv-fill').style.width = `${Math.round((g.lv / g.max) * 100)}%`;
+
+  // ⬆️ 레벨업 버튼 하나 (값은 다음 한 칸 것)
+  const box = $('mon-grow');
+  box.innerHTML = '';
+  if (g.next) {
+    const btn = option('⬆️', `Lv${g.next.toLv}로`, `${em}${g.next.stones} · 💰${g.next.coins}`, false, 'mon-grow-btn', () => doLevelUp());
+    btn.disabled = !g.canLevel || busy;
+    box.appendChild(btn);
+  }
+  const msg = $('mon-grow-msg');
+  if (g.why === 'none') msg.textContent = '지금 데리고 있는 포켓몬이 없어요 (진화로 보냈어요)';
+  else if (g.why === 'evolve') msg.textContent = `🧬 Lv${g.cap}까지 키웠어요 — 진화해야 더 클 수 있어요!`;
+  else if (!g.next) msg.textContent = '🏆 더 올릴 수 없어요 — 가장 높은 레벨이에요!';
+  else if (g.why === 'stone') msg.textContent = `${em} ${stone ? stone.ko : '스톤'}이 ${g.next.stones - g.stones}개 더 있어야 해요 — ${subject}를 하면 받아요 (지금 ${g.stones}개)`;
+  else if (g.why === 'coins') msg.textContent = `💰 코인이 ${g.next.coins - g.coins} 더 있어야 해요 (지금 ${g.coins})`;
+  else msg.textContent = `${em} ${stone ? stone.ko : '스톤'} ${g.stones}개 있어요 · ${subject}를 하면 더 받아요`;
+
+  // 🧬 진화
+  const eb = $('mon-evo');
+  const emsg = $('mon-evo-msg');
+  eb.innerHTML = '';
+  emsg.textContent = '';
+  if (!g.evo.length) { emsg.textContent = ''; return; }
+
+  if (!g.ready) {
+    const need = g.evoAt - g.lv;
+    const left = costBetween(g.lv, g.evoAt);
+    emsg.textContent = g.have < 1
+      ? '🧬 진화하려면 한 마리를 데리고 있어야 해요'
+      : `🧬 Lv${g.evoAt}에서 진화할 수 있어요 — ${need}번 더 올리면 돼요 (${em}${left.stones} · 💰${left.coins})`;
+    return;
+  }
+
+  const myR = rarityOf(mon.id);
+  for (const e of g.evo) {
+    const to = ROSTER.find((r) => r.id === e.to);
+    if (!to) continue;
+    const toR = rarityOf(e.to);
+    // ⭐ 등급이 내려가는 진화가 있다(윤겔라 ⭐⭐ → 후딘 ⭐, 이브이 → 이브이 진화들). 누르기 전에 보여 준다 (아버님 결정)
+    const rar = toR === myR ? RARITY[toR].stars : `${RARITY[myR].stars}→${RARITY[toR].stars}`;
+    const sub = [rar, e.orig ? `원래는 ${e.orig}` : ''].filter(Boolean).join(' · ');
+    const btn = option('🧬', to.ko, sub, false, 'mon-evo-btn' + (toR < myR ? ' evo-down' : ''), () => doEvolve(e.to));
+    btn.disabled = busy;
+    eb.appendChild(btn);
+  }
+  // ⭐ 변신(메가·거다이맥스)은 진화형에 없을 수 있다 — 투자한 것이 묶여 버리니 미리 알려 준다
+  const lostForm = formsOf(mon.id) && (hasMegaStone(mon.id) || hasGmax(mon.id)) && g.evo.every((e) => !formsOf(e.to));
+  if (lostForm) eb.appendChild(el('p', 'mon-empty warn', '⚠️ 진화하면 ⭐ 변신(메가·거다이맥스)은 쓸 수 없어요 — 지금 모습에만 있는 힘이에요'));
+  emsg.textContent = g.evo.length > 1
+    ? '🧬 진화할 모습을 골라요 — 한 번 고르면 되돌릴 수 없어요'
+    : '🧬 진화할 수 있어요! (데리고 있는 한 마리가 진화해요)';
+}
+
+let busy = false; // ⬆️🧬 저장이 끝나기 전에 또 누르지 않게 (두 번 치르는 것을 막는다)
+
+async function doLevelUp() {
+  if (!mon || busy) return;
+  busy = true;
+  renderGrow();
+  const id = mon.id;
+  let r;
+  try {
+    r = await levelUpMon(id);
+  } finally {
+    busy = false; // ★ 저장 중 다른 포켓몬을 열어도 그 팝업이 잠긴 채 남지 않게 (Codex 10차 #6)
+  }
+  if (r && r.ok) notify(id); // 저장은 끝났다 — 지금 어떤 팝업이 열려 있든 도감·칩은 갱신한다
+  if (!mon) return;
+  if (mon.id !== id) { renderMon(''); return; } // 다른 포켓몬을 열었다면 그 화면만 다시 그린다
+  if (r && r.ok) {
+    sfx.ding();
+    unlock();
+    const g = growInfo(id);
+    renderMon(g.ready ? `⬆️ Lv${r.to}! 🧬 이제 진화할 수 있어요!` : `⬆️ Lv${r.from} → Lv${r.to}!`, true);
+  } else {
+    const why = r && r.why;
+    renderMon(why === 'cost' ? '앗, 스톤이나 코인이 모자라요'
+      : why === 'max' ? '이미 가장 높은 레벨이에요'
+      : why === 'evolve' ? '🧬 진화해야 더 클 수 있어요'
+      : why === 'caught' ? '지금 데리고 있는 포켓몬이 없어요'
+      : '지금은 올릴 수 없어요');
+  }
+}
+
+async function doEvolve(toId) {
+  if (!mon || busy) return;
+  const from = mon.id;
+  const fromKo = mon.ko;
+  const fromUrl = mon.url;
+  const to = ROSTER.find((r) => r.id === toId);
+  if (!to) return;
+  busy = true;
+  renderGrow();
+  let r;
+  try {
+    r = await evolveMon(from, toId);
+  } finally {
+    busy = false;
+  }
+  if (!r || !r.ok) {
+    if (mon && mon.id === from) {
+      renderMon(r && r.why === 'level' ? '아직 레벨이 모자라요' : r && r.why === 'none' ? '데리고 있는 포켓몬이 없어요' : '지금은 진화할 수 없어요');
+    }
+    return;
+  }
+  notify(null); // 도감 전체가 바뀐다 (한 마리가 옮겨 갔다) — 팝업을 닫았어도 갱신한다
+  // ✨ 연출 — 끝날 때까지 기다렸다가 팝업을 **새 모습**으로 (꼬부기 창에 어니부기 값이 보이면 이상하다)
+  await showEvolve({
+    from: { id: from, ko: fromKo, url: fromUrl },
+    to: { id: to.id, ko: to.ko },
+    look: getLook(to.id),
+    first: r.first, partnerMoved: r.partnerMoved, gearBack: r.gearBack,
+  });
+  if (mon) openMon({ id: to.id, ko: to.ko, url: characterUrl(to.id) || '', caught: true });
+}
+
 function renderForms() {
   const sec = $('mon-form-section');
   const forms = mon && mon.caught !== false ? formsOf(mon.id) : null;

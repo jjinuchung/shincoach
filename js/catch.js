@@ -1,6 +1,6 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
-import { rarityOf, RARITY, caughtCount, xpToReach } from './xp.js';
+import { rarityOf, RARITY, caughtCount, haveCount, xpToReach } from './xp.js';
 import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
@@ -137,7 +137,7 @@ function renderPick(candidates, pickId) {
     rr.className = 'rr';
     rr.textContent = `${RARITY[r].stars} ${RARITY[r].label}`;
     btn.appendChild(rr);
-    const n = caughtCount(c.id);
+    const n = haveCount(c.id); // 🧬 도감 누적이 아니라 **지금 데리고 있는 수** (Codex 10차 #10)
     if (n > 0) {
       const own = document.createElement('span');
       own.className = 'own';

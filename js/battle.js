@@ -9,6 +9,8 @@ import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
 
 // ── 규칙 ──
+import { lvMult } from './evolve.js'; // 🧬 포켓몬 레벨 배수 (evolve.js는 아무것도 import하지 않는다 — 순환 없음)
+
 export const BATTLE = {
   // 문장을 제대로 완료할 때마다 이 확률로 등장 (3% → 4% → 8%).
   // 4%에서는 하루 30문장이면 **셋 중 하루는 한 번도 못 만났다**(0.96^26 = 35%). 진우가 하루 종일 못 만난 날이 그것.
@@ -57,6 +59,15 @@ export function formMult(form, turnsLeft) {
   if (form === 'mega') return FORM.megaMult;
   if (form === 'gmax' && turnsLeft > 0) return FORM.gmaxMult;
   return 1;
+}
+
+/**
+ * ⚔️ 이번 턴 내 공격에 곱할 배율 전부 — ⭐ 변신 × 🧬 레벨.
+ * 레벨은 한 칸에 +3%라 만렙(Lv12)이어도 ×1.33으로, 메가진화(×1.4) 하나보다 작다.
+ * 상대(야생)에는 레벨이 없다 — 키운 보람이 공격력으로만 돌아온다.
+ */
+export function attackMult(form, turnsLeft, lv) {
+  return formMult(form, turnsLeft) * lvMult(lv);
 }
 
 export const DAMAGE = {
@@ -323,6 +334,7 @@ function showPick() {
     btn.appendChild(el('span', 'nm', c.ko));
     const t = MOVES[typeOf(c.id)];
     btn.appendChild(el('span', 'rr', `${t.emoji} ${t.ko}`));
+    if (c.lv > 1) btn.appendChild(el('span', 'own lv', `Lv${c.lv} · 공격 ×${lvMult(c.lv).toFixed(2)}`));
     if (c.losses) btn.appendChild(el('span', 'own lose', `패배 ${c.losses}/${BATTLE.lossesToLose}`));
     if (c.canMega) btn.appendChild(el('span', 'own mega', '💠 메가진화'));
     else if (c.canGmax) btn.appendChild(el('span', 'own mega', '🍲 거다이맥스'));
@@ -464,7 +476,7 @@ async function quizTurn(moveKey) {
   const correct = !!(res && res.correct);
   ui.streak = correct ? (ui.streak || 0) + 1 : 0;
   const tier = quizTier({ correct, skipped: !!(res && res.skipped), streak: ui.streak });
-  const mult = formMult(ui.form, ui.gmaxLeft);
+  const mult = attackMult(ui.form, ui.gmaxLeft, ui.my && ui.my.lv);
   const dmg = Math.round(damageForTier(moveKey, tier) * mult);
   if (ui.form === 'gmax' && ui.gmaxLeft > 0) {
     ui.gmaxLeft--;
@@ -525,7 +537,7 @@ async function playerTurn(moveKey) {
     return;
   }
   const tier = speakTier(result);
-  const mult = formMult(ui.form, ui.gmaxLeft);
+  const mult = attackMult(ui.form, ui.gmaxLeft, ui.my && ui.my.lv);
   const dmg = Math.round(damageFor(moveKey, result) * mult);
   if (ui.form === 'gmax' && ui.gmaxLeft > 0) {
     ui.gmaxLeft--;

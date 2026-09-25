@@ -10,10 +10,11 @@ import { countPlayableCues } from './srt.js';
 import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED } from './review.js';
-import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory } from './xp.js';
+import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot } from './xp.js';
 import { pendingTickets } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
 import { ROSTER } from './pokemon.js';
+import { lvOf } from './evolve.js';
 import { visibleView } from './pokedex.js';
 
 const $ = (id) => document.getElementById(id);
@@ -103,6 +104,35 @@ function el(tag, cls, text) {
   if (cls) e.className = cls;
   if (text !== undefined) e.textContent = text;
   return e;
+}
+
+
+/**
+ * 🧬 키운 포켓몬 요약 (순수) — 레벨을 올렸거나 진화시킨 것만.
+ * 스톤은 "질"에서만 나오므로(개념 편 통과·👑·복습 회차 완주·에세이) 여기 쌓인 레벨은 곧 꾸준히 한 양이다.
+ * @param {object} profile getProfileSnapshot()
+ * @returns {{list:Array<{id:number,ko:string,lv:number,evo:number}>, stones:number, evolved:number}}
+ */
+export function growReport(profile) {
+  const mons = (profile && profile.mons) || {};
+  const list = [];
+  let evolved = 0;
+  // ★ 쓴 스톤은 레벨에서 역산하면 **부풀려진다** — 진화하면 꼬부기(Lv5)와 어니부기(Lv5) 기록이 둘 다 남아
+  //   4개짜리가 8개로 잡힌다(전체 체인이면 14 → 32, Codex 10차 #8이 재현). 레벨업할 때 센 값을 그대로 쓴다.
+  const stones = Math.max(0, Math.floor(Number(profile && profile.stonesSpent) || 0));
+  for (const key of Object.keys(mons)) {
+    const m = mons[key] || {};
+    const id = Number(key);
+    const lv = lvOf(m);
+    const evo = Math.max(0, Math.floor(Number(m.evo) || 0));
+    evolved += evo;
+    if (lv > 1 || evo > 0) {
+      const r = ROSTER.find((x) => x.id === id);
+      list.push({ id, ko: r ? r.ko : String(id), lv, evo });
+    }
+  }
+  list.sort((a, b) => b.lv - a.lv || b.evo - a.evo || a.id - b.id);
+  return { list, stones, evolved };
 }
 
 function card(title) {
@@ -406,6 +436,26 @@ export async function renderStats() {
     c3b.appendChild(box);
     c3b.appendChild(el('p', 'stats-note', '지금까지 음성 인식에 안 잡힌 누적 횟수예요(지금 발음이 나쁘다는 뜻은 아닙니다). 많이 나온 단어일수록 위에 오니, 같은 소리(th, r/l, 과거형 -ed)가 모이면 같이 연습해 보세요.'));
     main.appendChild(c3b);
+  }
+
+
+  // 3d) 🧬 키운 포켓몬 — 스톤은 "질"에서만 나오므로(개념 편 통과·👑·복습 완주·에세이)
+  //     여기 쌓인 레벨은 곧 "공부를 꾸준히 한 양"이다. 부모가 보는 지표로 삼을 만하다.
+  const grown = growReport(getProfileSnapshot());
+  if (grown && (grown.list.length || grown.evolved)) {
+    const c3d = card('🧬 키운 포켓몬');
+    const line = el('p', 'stats-note', `레벨업에 쓴 🔷🔶 스톤 ${grown.stones}개 · 진화 ${grown.evolved}번`);
+    c3d.appendChild(line);
+    const box = el('div', 'stats-missed');
+    for (const g of grown.list.slice(0, 12)) {
+      const chip = el('span', 'stats-missed-chip');
+      chip.appendChild(el('b', '', g.ko));
+      chip.appendChild(el('span', 'n', ` Lv${g.lv}${g.evo ? ` · 진화 ${g.evo}` : ''}`));
+      box.appendChild(chip);
+    }
+    c3d.appendChild(box);
+    c3d.appendChild(el('p', 'stats-note', '스톤은 문제를 맞히는 것만으로는 안 나옵니다 — 개념 편을 통과하거나(🔷) 복습 회차를 다 맞히거나 에세이를 쓸 때(🔶) 하나씩 나와요. 레벨이 높다는 건 그만큼 꾸준히 했다는 뜻이에요.'));
+    main.appendChild(c3d);
   }
 
   // 3c) ✍️ 에세이 — 아이가 직접 쓴 문장 (부모가 보라고 남긴다)

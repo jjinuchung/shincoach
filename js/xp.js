@@ -3,11 +3,13 @@
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import {
   getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase, applyBuyEgg, applyEggDay, applyEggSeen, applyShiny,
-  hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase,
+  applyLevelUp, applyEvolve, applyGear, applyPartner,
+  hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase, gearRule,
 } from './db.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { anchorFor, shinyUrl } from './pokemon.js';
+import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, MAX_LV } from './evolve.js';
+import { anchorFor, shinyUrl, subjectOf } from './pokemon.js';
 import { findLocked } from './unlock.js';
 
 // ── 경험치 ──
@@ -360,10 +362,15 @@ export async function initProfile() {
 
 /** 🤝 파트너가 없는데 잡은 포켓몬이 있으면(파트너 기능 이전에 잡은 아이) 가장 많이 잡은 포켓몬을 파트너로 */
 function ensurePartner() {
+  // 🧬 진화로 보냈거나 백업 병합으로 어긋난 파트너는 고쳐 준다 — 없는 포켓몬이 파트너로 남으면
+  //    ❤️ HP 칩·배틀 후보가 계속 엉킨다 (Codex 10차 #4)
+  if (profile.partner && haveCount(profile.partner) < 1) {
+    profile.partner = null;
+  }
   if (profile.partner) return;
-  const ids = Object.keys(profile.caught).filter((k) => profile.caught[k] > 0);
+  const ids = Object.keys(profile.caught).filter((k) => haveCount(k) > 0); // 🧬 진화로 내보낸 것은 뺀다
   if (!ids.length) return;
-  const best = ids.reduce((a, b) => (profile.caught[b] > profile.caught[a] ? b : a));
+  const best = ids.reduce((a, b) => (haveCount(b) > haveCount(a) ? b : a));
   profile.partner = Number(best);
   addDelta({ partner: profile.partner });
 }
@@ -453,8 +460,19 @@ export function previewAttempt(id, rng = Math.random, opts = {}) {
   return { caught: rollCatch(chance, rng), chance, count: profile.caught[id] || 0, first: false, bonusXp: 0, golden: ball === GOLDEN.id, ball, info: null };
 }
 
+/** 도감에 적힌 누적 마릿수 (🧬 진화로 내보낸 것도 포함 — 도감은 줄지 않는다) */
 export function caughtCount(id) {
   return profile.caught[id] || 0;
+}
+
+/** 📊 레벨업에 실제로 쓴 🔷🔶 스톤 누적 (레벨에서 역산하면 물려받은 레벨을 두 번 센다) */
+export function stonesSpent() {
+  return Math.max(0, Math.floor(Number(profile.stonesSpent) || 0));
+}
+
+/** 지금 데리고 있는 마릿수 (누적 − 🧬 진화로 내보낸 수) */
+export function haveCount(id) {
+  return haveOf(profile.caught[id], profile.mons[id]);
 }
 
 /** 서로 다른 포켓몬 몇 마리 잡았는지 */
@@ -589,6 +607,69 @@ export async function useShinyStone(monId) {
   const r = await runProfileOp(() => applyShiny(monId, SHINY_STONE.id), () => ({ ok: false, why: 'save' }));
   return { ok: !!(r && r.ok), why: r && r.why };
 }
+// ── 🧬 레벨업 · 진화 ──
+// ★ `level`·`getLevelInfo`는 **아이의 레벨**(잡기 확률·포켓몬 해금)이다. 포켓몬 한 마리의 레벨은 여기 `monLv` 쪽 —
+//   두 개를 섞으면 "아이가 레벨업했는데 꼬부기가 진화"하는 식으로 조용히 어긋난다.
+
+/** 이 포켓몬의 지금 레벨 (Lv1~MAX_LV) */
+export function monLv(id) {
+  return lvOf(profile.mons[id]);
+}
+
+/** 이 포켓몬을 키우는 데 쓰는 스톤 id (🔢 수학 포켓몬은 🔷, 나머지는 🔶 — 진화로 과목이 바뀌면 스톤도 바뀐다) */
+export function growStone(id) {
+  return stoneIdFor(subjectOf(id));
+}
+
+/**
+ * 🎒 도감 화면이 필요한 것 한 뭉치 →
+ * { lv, max, have, next, stone, stones, coins, canLevel, why, evoAt, evo, ready }
+ *  - next: 다음 한 칸의 값 { toLv, stones, coins } (만렙이면 null)
+ *  - why:  못 올리는 까닭 'max' | 'none'(한 마리도 없음) | 'stone' | 'coins'
+ *  - ready: 지금 진화할 수 있는가 (갈래 고르기는 화면이 한다)
+ */
+export function growInfo(id) {
+  const lv = monLv(id);
+  const have = haveCount(id);
+  const next = nextCost(lv, id); // 진화하는 종은 진화 레벨에서 멈춘다
+  const stone = growStone(id);
+  const stones = profile.items[stone] || 0;
+  const at = evoAt(id);
+  // 까닭의 순서: **데리고 있지 않은 것**이 가장 중요한 정보다 (진화로 다 보낸 모습에 "진화해야 더 큰다"는 엉뚱하다)
+  let why = null;
+  if (have < 1) why = 'none';
+  else if (!next) why = capReason(id, lv) || 'max'; // 'max'(만렙) | 'evolve'(진화해야 더 큰다)
+  else if (stones < next.stones) why = 'stone';
+  else if ((profile.coins || 0) < next.coins) why = 'coins';
+  return {
+    lv, max: MAX_LV, cap: levelCapOf(id), have, next, stone, stones, coins: profile.coins || 0,
+    canLevel: !why, why,
+    evoAt: at, evo: evoOf(id),
+    ready: at !== null && lv >= at && have > 0,
+  };
+}
+
+/** ⬆️ 레벨업 — 값은 트랜잭션 안에서 다시 계산한다 (다른 창이 먼저 올렸으면 값이 다르다) */
+export async function levelUpMon(id) {
+  const r = await runProfileOp(() => applyLevelUp(id, growStone(id)), () => ({ ok: false, why: 'save' }));
+  return r && r.ok ? { ok: true, from: r.from, to: r.to, cost: r.cost } : { ok: false, why: (r && r.why) || 'save' };
+}
+
+/**
+ * 🧬 진화 — 갈래가 하나면 toId를 안 줘도 된다 (이브이만 골라야 한다).
+ * @returns {Promise<{ok:boolean, why?:string, to?:number, lv?:number, first?:boolean, gearBack?:string|null, partnerMoved?:boolean}>}
+ */
+export async function evolveMon(fromId, toId) {
+  const to = toId === undefined || toId === null ? soleEvo(fromId) : Number(toId);
+  if (!to) return { ok: false, why: 'to' };
+  const check = canEvolve(fromId, monLv(fromId), haveCount(fromId), to);
+  if (!check.ok) return check;
+  const r = await runProfileOp(() => applyEvolve(fromId, to, HP.max), () => ({ ok: false, why: 'save' }));
+  return r && r.ok
+    ? { ok: true, to, lv: r.lv, first: r.first, last: r.last, gearBack: r.gearBack, partnerMoved: r.partnerMoved }
+    : { ok: false, why: (r && r.why) || 'save' };
+}
+
 export function isShiny(monId) {
   const m = profile.mons[monId];
   return !!(m && m.shiny);
@@ -616,11 +697,14 @@ export function getPartner() {
   return profile.partner || null;
 }
 
-/** 파트너 지정 (잡은 포켓몬만) */
-export function setPartner(monId) {
-  if (!profile.caught[monId]) return false;
-  profile.partner = monId;
-  addDelta({ partner: monId });
+/**
+ * 🤝 파트너 지정 — **데리고 있는** 포켓몬만, 판정은 트랜잭션 안에서 (Codex 10차 #4).
+ * 메모리로 정하면 진화가 옮겨 놓은 파트너를 옛 창이 되돌린다.
+ */
+export async function setPartner(monId) {
+  if (haveCount(monId) < 1) return false;
+  profile.partner = Number(monId);                  // 화면에 바로 (❤️ 칩)
+  await runProfileOp(() => applyPartner(monId), null); // 저장은 트랜잭션 — 보유 0이면 거기서 거부된다
   return true;
 }
 
@@ -655,19 +739,20 @@ export function usePotion(monId, potionId) {
   return r;
 }
 
-/** 🎀 장식 장착(gearId) / 벗기(null). 이전 장식은 가방으로, 새 장식은 가방에서. 가방에 없으면 false */
-export function equipGear(monId, gearId) {
-  const cur = getLook(monId).gear;
-  if (cur === (gearId || null)) return true;
+/**
+ * 🎀 장식 장착(gearId) / 벗기(null) — 이전 장식은 가방으로, 새 장식은 가방에서. **한 트랜잭션**.
+ *
+ * ★ 메모리에서 "지금 낀 것"을 읽어 환불하면 두 창에서 장식이 복제된다(Codex 10차 #1):
+ *   창 A에서 진화해 왕관이 이미 가방으로 돌아갔는데, 아직 낀 줄 아는 창 B가 벗기면 왕관이 하나 더 생긴다.
+ */
+export async function equipGear(monId, gearId) {
   if (gearId) {
     const it = itemById(gearId);
-    if (!it || it.kind !== 'gear' || (profile.items[gearId] || 0) < 1) return false;
+    if (!it || it.kind !== 'gear') return false;
   }
-  const items = {};
-  if (cur) { profile.items[cur] = (profile.items[cur] || 0) + 1; items[cur] = 1; }
-  if (gearId) { profile.items[gearId] -= 1; items[gearId] = (items[gearId] || 0) - 1; }
-  profile.mons[monId] = { ...(profile.mons[monId] || {}), gear: gearId || null };
-  addDelta({ items, mons: { [monId]: { gear: gearId || null } } });
+  const mem = gearRule(profile, monId, gearId); // 메모리에 먼저 (화면이 바로 바뀐다)
+  if (!mem.ok) return false;
+  await runProfileOp(() => applyGear(monId, gearId), null); // 저장은 **저장된 기록** 기준으로 다시 판정 → 복제 없음
   return true;
 }
 

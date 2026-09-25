@@ -1312,6 +1312,51 @@ button { font-family: inherit; }
 .hatch-stage .hatch-mon { width: 140px; height: 140px; animation: home-mon-breathe 2.2s ease-in-out infinite; }
 .hatch-emoji { font-size: 5rem; }
 .hatch-text { font-size: 1.05rem; font-weight: 700; margin: 8px 0 12px; }
+
+/* ── 🧬 레벨업 · 진화 ── */
+/* ⬆️ 레벨 막대 (❤️ HP 막대와 같은 모양, 색만 다르게 — 아이가 둘을 헷갈리지 않게) */
+.mon-lvbar { height: 10px; border-radius: 999px; background: #e8eaf2; overflow: hidden; margin: 4px 0 8px; }
+.mon-lv-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7b8cff, #b06cff); transition: width .25s ease; }
+.mon-grow-btn .em { font-size: 1.2rem; }
+.mon-evo { margin-top: 6px; }
+.mon-evo-btn { border-color: #b06cff; }
+.mon-evo-btn.evo-down .cnt { color: #b45309; } /* ⭐ 등급이 내려가는 진화 — 누르기 전에 보이게 */
+.mon-empty.warn { color: #b45309; font-weight: 700; }
+.mon-evo-btn:not(:disabled) { animation: evo-ready 1.6s ease-in-out infinite; }
+@keyframes evo-ready {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+/* ✨ 진화 연출 */
+.evolve { z-index: 64; }
+.evolve-stage { display: flex; justify-content: center; align-items: center; min-height: 160px; }
+.evolve-mon { width: 150px; height: 150px; }
+/* 하얀 실루엣 — 켜고 끄기만 하고 애니메이션 중엔 값이 안 바뀐다 (구형 태블릿) */
+/* 연출 동안 카드를 어둡게 — 흰 실루엣이 흰 배경에 묻히면 "사라진 것처럼" 보인다 (원작도 어두운 화면이다) */
+.evolve.evolving .hatch-card { background: #241a3d; transition: background .35s ease; }
+.evolve.evolving .hatch-title, .evolve.evolving .hatch-text { color: #fff; }
+.evolve-mon.silhouette img { filter: brightness(0) invert(1); }
+.evolve-mon.pulse { animation-name: evo-pulse; animation-timing-function: ease-in-out; animation-iteration-count: 1; }
+@keyframes evo-pulse {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.22); }
+  100% { transform: scale(.88); }
+}
+.evolve-mon.reveal { animation: evo-reveal .5s ease-out; }
+@keyframes evo-reveal {
+  0% { transform: scale(.88); opacity: .6; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.evolve-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.evolve-flash.on { animation: evo-flash .45s ease-out; }
+@keyframes evo-flash {
+  0% { opacity: 0; }
+  15% { opacity: .95; }
+  100% { opacity: 0; }
+}
+
 .pokedex-gauntlet .egg { padding: 4px 10px; border-radius: 999px; background: #ecfdf5; color: #065f46; font-weight: 700; font-size: 0.9rem; }
 .math-egg { font-weight: 700; color: #065f46; }
 .catch-radar { text-align: center; margin: 4px 0 8px; }
@@ -1433,6 +1478,9 @@ button { font-family: inherit; }
 .pokedex-cell .mon-zzz { font-size: 18px; }
 .puzzle-char .mon-zzz { font-size: 20px; }
 .pokedex-cell .partner { position: absolute; top: 26px; left: 6px; font-size: 0.9rem; } /* 🔢 배지(top 4px) 아래 */
+/* 🧬 레벨 배지 — 오른쪽 아래 (마릿수 ×N은 오른쪽 위라 안 겹친다) */
+.pokedex-cell .lv { position: absolute; bottom: 4px; right: 6px; background: #6b5bd6; color: #fff; border-radius: 999px; font-size: 0.65rem; font-weight: 800; padding: 1px 5px; }
+.pokedex-cell .cnt.evolved { background: #b06cff; } /* 다 진화시켜 지금은 없는 모습 */
 /* 상세 모달 HP 바 */
 .mon-hp-text { font-weight: 700; color: #b91c1c; font-size: 0.9rem; margin-left: 6px; }
 .mon-hp-text.tired { color: #64748b; }
@@ -1882,6 +1930,7 @@ button { font-family: inherit; }
 .battle-move.form { background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; }
 .battle-move.form .hint { color: #e9d5ff; }
 .catch-cand .own.mega { background: #ede9fe; color: #6d28d9; }
+.catch-cand .own.lv { background: #eef0ff; color: #4338ca; border-radius: 999px; padding: 0 5px; } /* 🧬 키운 레벨 — 공격이 얼마나 세지는지 */
 .mon-figure.gmax { transform: scale(1.25); transition: transform 0.4s; }
 .catch-ball-btn {
   padding: 8px 10px;

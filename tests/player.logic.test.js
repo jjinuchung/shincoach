@@ -175,6 +175,8 @@ function loadPlayer() {
     shouldBattle: ({ todayDone, todayBattles }) => battleState.roll && todayDone >= 5 && todayBattles < 1,
     pickOpponent: (list, caught) => list.find((m) => !caught[m.id]) || null, eligibleMine: (ids, partner, tired) => ids.filter((id) => id !== partner && !(tired && tired(id))),
     getProfileSnapshot: () => ({ caught: battleState.caught }), lossesOf: () => 0,
+    // 🧬 레벨업·진화 (2026-09-25): 배틀 후보는 **보유**(도감 누적 − 진화로 내보낸 수)로 고른다
+    haveCount: (id) => battleState.caught[id] || 0, monLv: () => 1,
     battleWin: (id) => { battleState.won.push(id); return { first: true }; }, battleLoss: (id) => { battleState.lost.push(id); return { losses: 1, lost: false }; },
     consumeItem: () => true, inventory: () => ({}), POTION: [], GOLDEN: { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', mult: 2, kind: 'ball' },
     STONE_ENGLISH: { id: 'stone_english', emoji: '🔶', ko: '영어스톤', subject: 'english', kind: 'stone' }, // 🧤 스톤 (2026-09-22)

@@ -42,9 +42,9 @@ let showing = false;
  * 🐣 아직 안 보여 준 부화가 있으면 하나 보여 주고 "봤다"고 적는다 (소유는 이미 트랜잭션에서 끝났다 — 이 화면은 축하만).
  * 그림은 있으면 받아 오고(ensureCast), 못 받으면 🐣로. 한 번에 하나, 열려 있으면 다음 기회에.
  */
-/** 다른 모달(잡기·상점·포켓몬 팝업·배틀·퍼즐·복습·에세이·단어)이 열려 있나 — 그 위에 겹치지 않는다 */
+/** 다른 모달(잡기·상점·포켓몬 팝업·배틀·퍼즐·복습·에세이·단어·🧬 진화 연출)이 열려 있나 — 그 위에 겹치지 않는다 */
 function anyModalOpen() {
-  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match'].some((id) => { const e = $(id); return e && !e.hidden; });
+  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve'].some((id) => { const e = $(id); return e && !e.hidden; });
 }
 export async function showHatchIfAny() {
   const box = $('hatch');

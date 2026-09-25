@@ -18,7 +18,7 @@ import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, 
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
 import { GOLDEN, STONE_MATH, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
-import { eggFor, tickEgg } from './xp.js';
+import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
 import { eggProgress } from './egg.js';
 import { showHatchIfAny } from './hatch.js';
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast } from './pokemon.js';
@@ -1342,7 +1342,8 @@ function maybeCheer(wrong) {
 /** 응원하러 나올 수 있는 포켓몬: 잡은 것 중 그림이 있는 것 (😴 지친 애도 응원은 한다) */
 function myCheerMons() {
   const caught = getProfileSnapshot().caught;
-  return Object.keys(caught).filter((k) => caught[k] > 0).map(Number).map((id) => {
+  // 🧬 진화로 보낸 모습은 응원하러 오지 않는다 — 도감에만 남은 포켓몬이 걸어 다니면 이상하다 (Codex 10차 #4)
+  return Object.keys(caught).filter((k) => haveCount(k) > 0).map(Number).map((id) => {
     const r = ROSTER.find((m) => m.id === id);
     const c = (ui.chars || []).find((x) => x.id === id);
     const look = getLook(id);
@@ -1460,12 +1461,13 @@ function pickBattleOpponent() {
 /** 내가 내보낼 수 있는 포켓몬: 잡은 것 중 파트너·😴 제외 (수학 화면에는 ⭐ 변신을 안 붙인다 — 영어 쪽 장치) */
 function myBattleMons() {
   const caught = getProfileSnapshot().caught;
-  const ids = Object.keys(caught).filter((k) => caught[k] > 0).map(Number);
+  // 🧬 다 진화시켜 보낸 종은 못 내보낸다 — 도감 누적이 아니라 **지금 데리고 있는 수**로 고른다
+  const ids = Object.keys(caught).filter((k) => haveCount(k) > 0).map(Number);
   const ok = eligibleMine(ids, getPartner(), (id) => isTired(id));
   return ok.map((id) => {
     const r = ROSTER.find((m) => m.id === id);
     const c = (ui.chars || []).find((x) => x.id === id);
-    return { id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), canMega: false, canGmax: false };
+    return { id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), lv: monLv(id), canMega: false, canGmax: false };
   });
 }
 

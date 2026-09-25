@@ -257,6 +257,15 @@
         <div class="mon-hpbar"><div id="mon-hp-fill" class="mon-hp-fill"></div></div>
         <div id="mon-potion" class="mon-options"></div>
       </div>
+      <!-- 🧬 레벨업 · 진화: 🔷🔶 스톤으로 키우고, 정해진 레벨이 되면 진화한다 -->
+      <div class="mon-section" id="mon-grow-section" hidden>
+        <div class="mon-section-title">⬆️ 레벨 <span id="mon-lv-text" class="mon-hp-text"></span></div>
+        <div class="mon-lvbar"><div id="mon-lv-fill" class="mon-lv-fill"></div></div>
+        <div id="mon-grow" class="mon-options"></div>
+        <div id="mon-grow-msg" class="mon-empty"></div>
+        <div id="mon-evo" class="mon-options mon-evo"></div>
+        <div id="mon-evo-msg" class="mon-empty"></div>
+      </div>
       <!-- ⭐ 메가진화 · 거다이맥스: 배틀에서 변신 (원작처럼 돌·스프가 있어야 한다) -->
       <div class="mon-section" id="mon-form-section" hidden>
         <div class="mon-section-title">⭐ 변신 <span id="mon-form-now" class="mon-hp-text"></span></div>
@@ -285,6 +294,19 @@
         <button type="button" id="mon-to-shop" class="btn">🛒 상점 가기</button>
       </div>
     </div>
+  </div>
+
+  <!-- ===== 🧬 진화 연출 (원작처럼 하얀 실루엣 → 번쩍 → 새 모습) ===== -->
+  <div id="evolve" class="catch evolve" hidden>
+    <div class="catch-card hatch-card">
+      <h2 id="evolve-title" class="hatch-title"></h2>
+      <div class="evolve-stage"><span id="evolve-fig" class="mon-figure evolve-mon"><img alt="" draggable="false"></span></div>
+      <p id="evolve-text" class="hatch-text"></p>
+      <div class="catch-actions">
+        <button type="button" id="evolve-ok" class="btn btn-primary btn-big-wide" hidden>좋아! 🎒 도감에서 볼게요</button>
+      </div>
+    </div>
+    <div id="evolve-flash" class="evolve-flash"></div>
   </div>
 
   <!-- ===== 🐣 알 부화 (🥚 알을 5일 채웠을 때 한 번) ===== -->

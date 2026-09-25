@@ -3,6 +3,7 @@
 
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
+import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -583,7 +584,7 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
@@ -827,6 +828,9 @@ export function hpChangeRule(profile, monId, by, max, spendItem) {
  */
 export function battleLossRule(profile, monId, lossesToLose) {
   const m = profile.mons[monId] || {};
+  // 🧬 다른 창에서 진화로 이미 내보냈다면(보유 0) 패배를 적용하지 않는다.
+  //    그냥 빼면 `caught`가 0이 돼 **도감 칸이 사라지고**, 그다음에 잡은 한 마리가 evo에 삼켜진다 (Codex 10차 #2가 재현)
+  if (haveOf((profile.caught || {})[monId], m) < 1) return { losses: Number(m.losses) || 0, lost: false, stale: true };
   const losses = (Number(m.losses) || 0) + 1;
   const lost = losses >= lossesToLose;
   if (lost) addCount(profile.caught, monId, -1);
@@ -915,7 +919,8 @@ export function applyEggDay(subject, dateKey) {
  */
 export function shinyRule(profile, monId, itemId = 'shiny_stone') {
   const id = Number(monId);
-  if (!id || !((profile.caught || {})[id] > 0)) return { ok: false, why: 'caught' };
+  // 🧬 진화로 다 보낸 종에는 쓸 수 없다 — 도감에만 남은 모습에 500코인을 태우면 아이가 억울하다 (Codex 10차 #4)
+  if (!id || haveOf((profile.caught || {})[id], profile.mons[id]) < 1) return { ok: false, why: 'caught' };
   if (profile.mons && profile.mons[id] && profile.mons[id].shiny) return { ok: false, why: 'already' };
   const r = purchaseRule(profile, { items: { [itemId]: 1 } }, {});
   if (!r.ok) return { ok: false, why: 'item' };
@@ -924,6 +929,82 @@ export function shinyRule(profile, monId, itemId = 'shiny_stone') {
 }
 export function applyShiny(monId, itemId) {
   return mutateProfile((p) => shinyRule(p, monId, itemId));
+}
+
+/**
+ * ⬆️ 레벨업 — 🔷🔶 스톤과 💰 코인을 치르고 `mons[id].lv`를 한 칸 올린다. **한 트랜잭션**.
+ *
+ * ★ 값은 **여기서** 계산한다(밖에서 받지 않는다). 두 창을 같이 열면 다른 창이 먼저 올려 레벨이 달라져 있고,
+ *   그때 밖에서 계산한 값은 낡은 것이다 — Lv5 값(스톤 1)으로 Lv6를 사게 된다.
+ * @param {string} stoneId 이 포켓몬을 키우는 스톤 (과목은 종마다 고정이라 밖에서 줘도 낡지 않는다)
+ * @returns {{ok:boolean, why?:string, from?:number, to?:number, cost?:object}} why: 'caught' | 'max' | 'cost'
+ */
+export function levelUpRule(profile, monId, stoneId) {
+  const id = Number(monId);
+  const m = profile.mons[id] || {};
+  if (!id || haveOf((profile.caught || {})[id], m) < 1) return { ok: false, why: 'caught' }; // 데리고 있어야 키운다 (전부 진화시켰으면 못 올림)
+  const from = lvOf(m);
+  const next = nextCost(from, id); // 진화하는 종은 진화 레벨에서 멈춘다
+  if (!next) return { ok: false, why: capReason(id, from) || 'max' };
+  const cost = { coins: next.coins, items: { [stoneId]: next.stones } };
+  if (!purchaseRule(profile, cost, {}).ok) return { ok: false, why: 'cost', from, cost };
+  profile.mons[id] = { ...m, lv: next.toLv };
+  // 📊 부모 화면이 "실제로 쓴 스톤"을 보여 줄 수 있게 여기서 센다 — 레벨에서 역산하면 진화로 물려받은 레벨을
+  //    두 번 세어 부풀려진다(꼬부기 Lv5 + 어니부기 Lv5 = 8개로 보고, 실제는 4개. Codex 10차 #8)
+  profile.stonesSpent = (Number(profile.stonesSpent) || 0) + next.stones;
+  return { ok: true, from, to: next.toLv, cost };
+}
+export function applyLevelUp(monId, stoneId) {
+  return mutateProfile((p) => levelUpRule(p, monId, stoneId));
+}
+
+/**
+ * 🧬 진화 — 잡은 마릿수 **한 마리**를 진화형으로 옮긴다. **한 트랜잭션**.
+ *
+ * 진화 자체는 공짜다(값은 레벨업에서 이미 치렀다). 대신 마릿수를 하나 쓴다 —
+ * 레벨이 종 단위라 이게 없으면 "Lv5로 올려 둔 꼬부기를 잡을 때마다 공짜로 어니부기"가 된다.
+ *
+ * 따라가는 것: 레벨(진화형이 이미 높으면 그대로) · 🌈 이로치 · 🤝 파트너(마지막 한 마리였을 때)
+ * 안 따라가는 것: 🎀 장식(마지막 한 마리였으면 가방으로 돌려준다) · ⚔️ 패배 누적 · ❤️ HP(가득 차서 시작)
+ * @returns {{ok:boolean, why?:string, lv?:number, first?:boolean, gearBack?:string|null, partnerMoved?:boolean}}
+ */
+export function evolveRule(profile, fromId, toId, hpMax = 100) {
+  const from = Number(fromId);
+  const to = Number(toId);
+  const m = profile.mons[from] || {};
+  const have = haveOf((profile.caught || {})[from], m);
+  const lv = lvOf(m);
+  const can = canEvolve(from, lv, have, to);
+  if (!can.ok) return { ok: false, why: can.why };
+
+  const t = profile.mons[to] || {};
+  // "도감에 새로 등록"은 **누적 기록**으로 본다 — 보유로 보면 한 번 내보낸 종이 다시 "새로 등록!"이 된다 (Codex 10차 #10)
+  const first = !(((profile.caught || {})[to] || 0) > 0);
+  const last = have === 1; // 방금 마지막 한 마리를 보냈나
+
+  // ★ caught를 줄이지 않고 **내보낸 수**를 센다 — 백업 병합이 caught를 max로 합치므로
+  //   직접 줄이면 옛 백업을 되돌릴 때 내보낸 한 마리가 되살아나 복제된다 (evolve.haveOf 주석)
+  addCount(profile.caught, to, 1);
+  profile.mons[to] = {
+    ...t,
+    lv: Math.max(lvOf(t), lv), // 진화형이 이미 더 높으면 그대로 (성장을 되돌리지 않는다)
+    hp: hpMax,
+    losses: 0,
+    ...(m.shiny ? { shiny: true } : {}), // 🌈 이로치는 그 종의 색 — 진화해도 이로치다
+  };
+
+  const next = { ...m, evo: (Number(m.evo) || 0) + 1 };
+  let gearBack = null;
+  if (last && m.gear) { addCount(profile.items, m.gear, 1); gearBack = m.gear; next.gear = null; } // 남은 애가 없으면 장식은 가방으로
+  profile.mons[from] = next;
+
+  let partnerMoved = false;
+  if (last && Number(profile.partner) === from) { profile.partner = to; partnerMoved = true; } // 파트너가 떠나 버리지 않게
+
+  return { ok: true, from, to, lv: profile.mons[to].lv, first, last, gearBack, partnerMoved };
+}
+export function applyEvolve(fromId, toId, hpMax) {
+  return mutateProfile((p) => evolveRule(p, fromId, toId, hpMax));
 }
 
 /** 🐣 부화 알림을 보여 줬다 */
@@ -939,6 +1020,44 @@ export function applyHpChange(monId, by, max, spendItem) {
 /** ⚔️ 배틀 패배 누적 → { losses, lost, profile } */
 export function applyBattleLoss(monId, lossesToLose) {
   return mutateProfile((p) => battleLossRule(p, monId, lossesToLose));
+}
+
+/**
+ * 🎀 장식 장착(gearId) / 벗기(null) — **한 트랜잭션**.
+ *
+ * ★ 메모리에서 "지금 낀 것"을 읽어 환불하면 두 창에서 장식이 복제된다 (Codex 10차 #1이 재현):
+ *   창 A에서 진화해 왕관이 가방으로 돌아간 뒤, 아직 왕관을 낀 줄 아는 창 B가 벗기면 왕관이 하나 더 생긴다.
+ *   지금 낀 것·환불·새로 끼울 것을 **저장된 기록에서** 판정한다.
+ * @returns {{ok:boolean, why?:string, gear:string|null}} why: 'item'(가방에 없음)
+ */
+export function gearRule(profile, monId, gearId) {
+  const id = Number(monId);
+  const m = profile.mons[id] || {};
+  const cur = m.gear || null;
+  const next = gearId || null;
+  if (cur === next) return { ok: true, gear: cur };            // 이미 그 상태 (두 번째 창의 같은 요청)
+  if (next && (profile.items[next] || 0) < 1) return { ok: false, why: 'item', gear: cur };
+  if (cur) addCount(profile.items, cur, 1);                    // 저장된 기록에 실제로 끼워져 있을 때만 돌려준다
+  if (next) addCount(profile.items, next, -1);
+  profile.mons[id] = { ...m, gear: next };
+  return { ok: true, gear: next };
+}
+export function applyGear(monId, gearId) {
+  return mutateProfile((p) => gearRule(p, monId, gearId));
+}
+
+/**
+ * 🤝 파트너 정하기 — **한 트랜잭션**이고 **데리고 있는** 포켓몬만 (Codex 10차 #4).
+ * 메모리로 정하면 진화가 옮겨 놓은 파트너를 옛 창이 되돌린다.
+ */
+export function partnerRule(profile, monId) {
+  const id = Number(monId);
+  if (haveOf((profile.caught || {})[id], profile.mons[id]) < 1) return { ok: false, why: 'have', partner: profile.partner || null };
+  profile.partner = id;
+  return { ok: true, partner: id };
+}
+export function applyPartner(monId) {
+  return mutateProfile((p) => partnerRule(p, monId));
 }
 
 /** 💰🎒 사기 → { ok, profile } */
@@ -1034,7 +1153,8 @@ export function mergeStatRecord(name, cur, rec) {
   } else if (name === 'profile' && (rec.id === MATH_ID || cur.id === MATH_ID)) {
     return mergeMath(cur, rec); // 🔢 수학 진도는 'me' 규칙과 모양이 다르다
   } else if (name === 'profile') {
-    for (const k of ['xp', 'throws', 'catches', 'coinsEarned', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
+    // ⬆️ stonesSpent는 단조 카운터 — 옛 백업이 쓴 스톤 기록을 되돌리지 않게 max (Codex 10차 #8)
+    for (const k of ['xp', 'throws', 'catches', 'coinsEarned', 'stonesSpent', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
     out.caught = { ...(cur.caught || {}) };
     for (const id of Object.keys(rec.caught || {})) out.caught[id] = maxOf(out.caught[id], rec.caught[id]);
     // 💰 코인·🎒 가방·꾸밈은 구매·장착으로 줄어드는 값이라 큰 값이 아니라 "최근에 저장된 쪽"을 통째로 씀
@@ -1052,8 +1172,21 @@ export function mergeStatRecord(name, cur, rec) {
       return { ...e, days, hatchedAt: Math.max(Number(e && e.hatchedAt) || 0, Number(o && o.hatchedAt) || 0), seen: !!((e && e.seen) || (o && o.seen)) };
     });
     for (const o of (older.eggs || [])) if (o && o.hatchedAt && !out.eggs.some((e) => e && e.id === o.id)) out.eggs.push({ ...o, days: [...(o.days || [])] });
-    // 🌈 이로치는 영구 — 어느 쪽에 있든 남긴다 (mons는 최근 쪽을 통째로 쓰므로 여기서 OR)
-    for (const id of Object.keys(older.mons || {})) if (older.mons[id] && older.mons[id].shiny && !(out.mons[id] && out.mons[id].shiny)) out.mons[id] = { ...(out.mons[id] || {}), shiny: true };
+    // mons는 최근 쪽을 통째로 쓰지만, **되돌아가면 안 되는 것**은 여기서 살린다:
+    //  🌈 이로치는 영구(OR) · ⬆️ 레벨은 스톤을 이미 쓴 결과(max) · 🧬 내보낸 마릿수는 단조 카운터(max —
+    //  이게 max가 아니면 옛 백업이 진화를 되돌려 꼬부기가 어니부기와 함께 복제된다)
+    for (const id of Object.keys(older.mons || {})) {
+      const o = older.mons[id];
+      if (!o) continue;
+      const cur = out.mons[id] || {};
+      const patch = {};
+      if (o.shiny && !cur.shiny) patch.shiny = true;
+      const lv = Math.max(Number(o.lv) || 0, Number(cur.lv) || 0);
+      if (lv && lv !== (Number(cur.lv) || 0)) patch.lv = lv;
+      const evo = Math.max(Number(o.evo) || 0, Number(cur.evo) || 0);
+      if (evo && evo !== (Number(cur.evo) || 0)) patch.evo = evo;
+      if (Object.keys(patch).length) out.mons[id] = { ...cur, ...patch };
+    }
     // 🎟️ 기준선은 가방(교환권)과 짝이다 — 둘이 갈라지면 "샀는데 조건이 안 줄었다"가 된다.
     // 그래서 items와 같은 쪽(최근에 저장된 프로필)에서 가져온다. 옛 백업엔 이 값이 없다(그럼 null)
     out.unlockBase = latest.unlockBase || null;
@@ -1061,6 +1194,14 @@ export function mergeStatRecord(name, cur, rec) {
   return out;
 }
 
+/**
+ * ★ 병합이 지켜 주는 범위 (Codex 10차 #3):
+ *   이 병합은 **같은 줄기**를 합치는 것이다 — 한 기기의 두 창, 또는 옛 백업을 그 후손 기기에 되돌리는 경우.
+ *   그때는 단조 카운터(throws·evo·stonesSpent·tot)와 max/OR 규칙으로 답이 맞는다.
+ *   **갈라진 줄기**(같은 백업을 두 기기에 넣고 각자 다르게 진화시킨 뒤 둘을 합치는 것)는 범위 밖이다:
+ *   이브이 한 마리가 샤미드와 쥬피썬더 둘로 늘어난다. 고치려면 조작마다 고유 id가 필요한데,
+ *   집에서 태블릿 하나로 쓰는 앱에는 과한 구조다. 백업은 "한 기기의 안전망"으로만 쓴다.
+ */
 /** 기록 가져오기 (mergeStatRecord 규칙으로 병합). 반환: 처리한 레코드 수 */
 export async function importStats(data) {
   if (!data || data.app !== 'shincoach') throw new Error('신코치 기록 파일이 아니에요');
