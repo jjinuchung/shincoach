@@ -7,6 +7,7 @@ import * as bgm from './bgm.js';
 import { POTION, itemById, makeFigure, setFigure } from './items.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
+import { ensureForm } from './pokemon.js'; // ⭐ 변신 그림 (없으면 배틀에서 그 자리에 받는다)
 
 // ── 규칙 ──
 import { lvMult } from './evolve.js'; // 🧬 포켓몬 레벨 배수 (evolve.js는 아무것도 import하지 않는다 — 순환 없음)
@@ -376,19 +377,47 @@ function renderHp() {
 }
 
 /** ⭐ 변신! (배틀당 한 번, 턴을 쓰지 않는다 — 원작처럼 "이번 턴에 변신하고 바로 공격") */
-function transform(kind) {
+/**
+ * ⭐ 메가진화 · 거다이맥스.
+ *
+ * ★ 아이가 기대하는 건 **모습이 바뀌는 것**이다 (진우 신고 2026-09-25: "아이템을 썼는데 아무 변화가 없었어요").
+ *   예전에는 받아 둔 그림이 없으면 `if (url)`에서 조용히 넘어가 **메시지만 뜨고 그림은 그대로**였다.
+ *   변신 그림을 받는 곳이 "💠 메가스톤을 끼우는 그 순간" 한 번뿐이라, 그때 인터넷이 잠깐 안 되면 영영 없었다
+ *   (🌈 이로치에서 Codex 8차가 잡았던 것과 같은 문제 — 그때 메가는 같이 안 고쳤다).
+ *   이제 ① 없으면 그 자리에서 받아 보고 ② 끝내 못 받아도 **번쩍하며 커지는 연출은 반드시** 한다.
+ */
+async function transform(kind) {
   if (ui.form) return;
   ui.form = kind;
   ui.gmaxLeft = kind === 'gmax' ? FORM.gmaxTurns : 0;
-  const url = kind === 'mega' ? ui.my.megaUrl : ui.my.gmaxUrl;
   const fig = $('battle-my-fig');
-  if (url) setFigure(fig, url, null);           // 변신한 모습 (꾸밈은 빼고 — 모습이 통째로 바뀐다)
+  const my = ui.my;
+  const run = ui.run;
+
+  $('battle-msg').textContent = kind === 'mega' ? `💠 ${my.ko}, 메가진화!` : `🍲 ${my.ko}, 거다이맥스!`;
+  try { if (ui.o.sfx) ui.o.sfx.levelUp(); } catch { /* 소리는 없어도 */ }
+  fig.classList.add('morphing');                 // 번쩍 + 커졌다 작아졌다 (그림이 없어도 이건 보인다)
+  // ★ 여기서 무엇이 터져도 변신은 끝나야 한다 — 중간에 멈추면 포켓몬이 흐릿한 채로 남는다
+  try { renderActions(); } catch (e) { console.warn('변신 뒤 기술 버튼 그리기 실패:', e); }
+
+  let url = kind === 'mega' ? my.megaUrl : my.gmaxUrl;
+  if (!url) {
+    // 받아 둔 그림이 없다 → 지금 받아 본다 (3초만 기다린다. 배틀 중이라 오래 못 세운다)
+    url = await Promise.race([
+      ensureForm(my.id, kind).catch(() => null),
+      new Promise((res) => setTimeout(() => res(null), 3000)),
+    ]).catch(() => null);
+    if (url) { if (kind === 'mega') my.megaUrl = url; else my.gmaxUrl = url; }
+  }
+  if (ui.run !== run || ui.form !== kind) return; // 그 사이 배틀이 끝났거나 다시 시작됐다
+
+  if (url) setFigure(fig, url, null);            // 변신한 모습 (꾸밈은 빼고 — 모습이 통째로 바뀐다)
   fig.classList.toggle('gmax', kind === 'gmax'); // 거다이맥스는 거대하게
+  fig.classList.add('formed');                   // 변신 중에는 빛나는 테두리 (그림을 못 받아도 달라 보인다)
+  setTimeout(() => fig.classList.remove('morphing'), 900);
   $('battle-msg').textContent = kind === 'mega'
-    ? `💠 ${ui.my.ko} 메가진화! 공격이 강해졌어요`
-    : `🍲 ${ui.my.ko} 거다이맥스! ${FORM.gmaxTurns}턴 동안 아주 강해져요`;
-  if (ui.o.sfx) ui.o.sfx.levelUp();
-  renderActions();
+    ? `💠 ${my.ko} 메가진화! 공격이 강해졌어요${url ? '' : ' (모습 그림을 아직 못 받았어요)'}`
+    : `🍲 ${my.ko} 거다이맥스! ${FORM.gmaxTurns}턴 동안 아주 강해져요${url ? '' : ' (모습 그림을 아직 못 받았어요)'}`;
 }
 
 /** 거다이맥스 3턴이 끝나면 원래 모습으로 */
@@ -396,7 +425,7 @@ function revertForm() {
   ui.form = null;
   const fig = $('battle-my-fig');
   setFigure(fig, ui.my.url || '', ui.my.look);
-  fig.classList.remove('gmax');
+  fig.classList.remove('gmax', 'formed', 'morphing');
 }
 
 function renderActions() {

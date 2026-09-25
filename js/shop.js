@@ -238,6 +238,22 @@ async function retryShinyArt(id) {
   } catch { /* 다음에 열 때 또 */ } finally { shinyRetry.delete(id); }
 }
 
+/**
+ * ⭐ 변신 그림 다시 받기 — 끼울 때 한 번만 받으므로 그때 인터넷이 안 되면 영영 없었다.
+ * 그 상태로 배틀에서 변신하면 **모습이 안 바뀌어** 아이가 "아무 일도 안 일어났다"고 느낀다
+ * (진우 신고 2026-09-25). 🌈 이로치와 같은 방식으로, 팝업을 열 때마다 없는 것을 다시 받아 본다.
+ */
+const formRetry = new Set();
+async function retryFormArt(id, kind) {
+  const key = `${id}:${kind}`;
+  if (formRetry.has(key)) return;
+  formRetry.add(key);
+  try {
+    const url = await ensureForm(id, kind);
+    if (url && mon && mon.id === id) renderMon(kind === 'mega' ? '💠 메가진화 모습 그림을 받았어요!' : '🍲 거다이맥스 모습 그림을 받았어요!');
+  } catch { /* 다음에 열 때 또 */ } finally { formRetry.delete(key); }
+}
+
 function renderMon(msg, pop) {
   if (!mon) return;
   const look = getLook(mon.id);
@@ -525,6 +541,8 @@ function renderForms() {
   const shown = megaOn ? 'mega' : gmaxOn ? 'gmax' : null;
   const url = shown ? formUrl(mon.id, shown) : null;
   if (url) { setFigure(fig, url, null); fig.hidden = false; } else fig.hidden = true;
+  // 끼워는 뒀는데 그림이 없다(끼울 때 인터넷이 안 됐다) → 지금 다시 받아 본다. 안 그러면 배틀에서 모습이 안 바뀐다
+  if (shown && !url) retryFormArt(mon.id, shown);
 
   const box = $('mon-form');
   box.innerHTML = '';
@@ -542,8 +560,9 @@ function renderForms() {
       const n = itemCount(MEGASTONE.id);
       const btn = option('💠', '메가스톤 끼우기', n ? `가방 ${n}개` : `🛒 상점 ${MEGASTONE.price}코인`, false, '', async () => {
         if (!await equipMega(mon.id, true)) { renderMon('💠 가방에 메가스톤이 없어요 — 🛒 상점에서 살 수 있어요'); return; }
-        await ensureForm(mon.id, 'mega').catch(() => null); // 그림은 처음 한 번만 받는다 (실패해도 변신은 됨)
-        change(true, `💠 ${mon.ko}${josaIga(mon.ko)} 메가진화할 수 있게 됐어요! 배틀에서 써 보세요`);
+        const art = await ensureForm(mon.id, 'mega').catch(() => null);
+        change(true, `💠 ${mon.ko}${josaIga(mon.ko)} 메가진화할 수 있게 됐어요! 배틀에서 써 보세요`
+          + (art ? '' : ' (모습 그림은 인터넷이 될 때 받을게요)'));
       });
       if (!n) btn.disabled = true;
       box.appendChild(btn);
@@ -556,8 +575,9 @@ function renderForms() {
     } else {
       const btn = option('🍲', '다이스프 먹이기', `🍄 ${shrooms}/${SOUP_MUSHROOMS}개`, false, '', async () => {
         if (!await makeSoup(mon.id)) { renderMon(`🍄 다이버섯이 ${SOUP_MUSHROOMS}개 있어야 해요 (지금 ${itemCount(MUSHROOM.id)}개)`); return; }
-        await ensureForm(mon.id, 'gmax').catch(() => null);
-        change(true, `🍲 ${mon.ko}${josaIga(mon.ko)} 거다이맥스할 수 있게 됐어요!`);
+        const art = await ensureForm(mon.id, 'gmax').catch(() => null);
+        change(true, `🍲 ${mon.ko}${josaIga(mon.ko)} 거다이맥스할 수 있게 됐어요!`
+          + (art ? '' : ' (모습 그림은 인터넷이 될 때 받을게요)'));
       });
       if (shrooms < SOUP_MUSHROOMS) btn.disabled = true;
       box.appendChild(btn);
