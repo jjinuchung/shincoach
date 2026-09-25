@@ -1,3 +1,10 @@
+/* ★ hidden 속성은 **무조건** 숨긴다 (2026-09-25, 진우 신고로 발견).
+   HTML의 `hidden`은 브라우저 기본 스타일(`[hidden]{display:none}`)이라 특이도가 같은 작성자 CSS에
+   조용히 진다 — `.cheer { display:flex }` 하나 때문에 ✨ 응원 박스가 **어느 화면에서나 빈 네모로**
+   화면 왼쪽 아래에 떠 있었다(hidden 속성은 붙어 있는데 66×88로 그려짐).
+   숨기는 자리마다 `.xxx[hidden]` 규칙을 하나씩 적어 주는 건 언젠가 또 빠뜨린다 → 여기서 한 번에 막는다. */
+[hidden] { display: none !important; }
+
 /* ===== 기본 ===== */
 :root {
   --bg: #f5f7ff;
