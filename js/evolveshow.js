@@ -6,6 +6,7 @@
 import { setFigure } from './items.js';
 import { sfx } from './sfx.js';
 import { ensureCast, artUrl } from './pokemon.js';
+import { showDot } from './hatch.js'; // 🕺 큰 그림 아래 움직이는 도트 (같은 규칙을 한 곳에서)
 
 const $ = (id) => document.getElementById(id);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -47,6 +48,8 @@ function close() {
   if (!box) return;
   box.hidden = true;
   box.classList.remove('evolving');
+  const d = $('evolve-dot');
+  if (d) d.hidden = true;
   running = false;
   busy = false;
   const f = onDone; onDone = null;
@@ -77,6 +80,8 @@ export async function showEvolve(o) {
     text.textContent = `${o.from.ko}${iga(o.from.ko)} 이상해요!`;
     // ★ 연출 동안 카드를 어둡게 — 실루엣이 흰색이라 흰 배경에서는 포켓몬이 **사라진 것처럼** 보인다
     box.classList.add('evolving');
+    const d0 = $('evolve-dot');
+    if (d0) d0.hidden = true; // 연출 중에는 숨긴다 (실루엣만 보여야 한다)
     box.hidden = false;
 
     // 진화형 그림은 없을 수도 있다(아직 안 받았거나 오프라인) — 연출을 시작해 두고 그 사이에 받아 온다.
@@ -119,6 +124,7 @@ export async function showEvolve(o) {
     fig.classList.add('reveal');
     try { sfx.levelUp(); } catch { /* 소리는 없어도 */ }
 
+    showDot($('evolve-dot'), o.to.id); // 🕺 새 모습이 움직인다
     title.textContent = '🧬 축하해요!';
     const bits = [`${o.from.ko}${iga(o.from.ko)} ${o.to.ko}${euro(o.to.ko)} 진화했어요!`];
     if (o.first) bits.push('🎒 도감에 새로 등록됐어요!');

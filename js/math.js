@@ -25,6 +25,7 @@ import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloa
 import { openCatch } from './catch.js';
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN } from './cheer.js';
+import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
 import { contentSummary, cueCountOf } from './stats.js';
 import { sfx } from './sfx.js';
 
@@ -216,6 +217,19 @@ function mathVisible() {
 
 const MATH_CHAR_BATCH = 8;
 /** 수학 화면에 들어올 때마다 🔢 수학 포켓몬 그림을 조금씩 먼저 받아 둔다 (영어의 3분마다 8마리 자동 받기는 명단 순서라 수학 것이 맨 뒤) */
+/**
+ * 🕺 ✨ 응원 포켓몬의 움직이는 도트를 몇 마리씩 미리 받는다.
+ * 없으면 정지 그림이 미끄러지듯 지나가 "걸어간다"가 안 된다. 한 장 43KB라 조금씩 받아도 금방 찬다.
+ */
+let cheerDotBusy = false;
+function topUpCheerDots(n = 6) {
+  if (cheerDotBusy) return;
+  const need = myCheerMons().filter((m) => !m.dot && !(m.look && m.look.shinyUrl)).slice(0, n).map((m) => m.id);
+  if (!need.length) return;
+  cheerDotBusy = true;
+  ensureAnims(need).catch(() => {}).finally(() => { cheerDotBusy = false; });
+}
+
 function topUpMathCharacters() {
   if (ui.charBusy || navigator.onLine === false) return;
   ui.charBusy = true;
@@ -333,6 +347,7 @@ function clearMain() {
 /** 진입 — 진단 전이면 진단, 아니면 사다리 */
 export async function renderMath() {
   topUpMathCharacters();
+  topUpCheerDots(); // 🕺 ✨ 응원이 걸어 다니려면 도트 그림이 있어야 한다 (몇 마리씩 미리)
   prepareBattle(); // ⚔️ 오늘 몫·그림을 읽어 둔다 (배틀 등장 판정은 문항마다 동기로 돈다)
   // 🎒·📊를 보고 돌아온 것이면 풀던 편을 이어서 (2026-09-20: 과목 화면에도 🎒·📊를 두면서 필요해졌다).
   // 답을 고른 뒤였으면 다음 문항으로 — 같은 문항을 다시 그리면 두 번 답해 두 번 세어진다.
@@ -1347,8 +1362,11 @@ function myCheerMons() {
     const r = ROSTER.find((m) => m.id === id);
     const c = (ui.chars || []).find((x) => x.id === id);
     const look = getLook(id);
-    return { id, ko: r ? r.ko : String(id), url: (look && look.shinyUrl) || (c ? c.url : ''), look };
-  }).filter((m) => m.url);
+    // 🕺 움직이는 도트가 있으면 그걸로 걷는다 (정지 그림이 미끄러지면 "걸어간다"가 안 된다).
+    //    🌈 이로치는 일러스트 그대로 — 도트엔 이로치 그림이 없고, 그 색이 볼거리다
+    const shiny = look && look.shinyUrl;
+    return { id, ko: r ? r.ko : String(id), url: shiny || (c ? c.url : ''), dot: shiny ? null : animUrl(id), look };
+  }).filter((m) => m.url || m.dot);
 }
 
 /** 한 번 지나가게 한다 */
@@ -1373,7 +1391,9 @@ function runCheer(mon, wrong) {
 
   box.querySelector('.cheer-ko').textContent = line.ko;
   box.querySelector('.cheer-en').textContent = line.en;
-  setFigure(box.querySelector('.cheer-mon'), mon.url, mon.look);
+  const face = box.querySelector('.cheer-mon');
+  face.classList.toggle('dot', !!mon.dot);
+  setFigure(face, mon.dot || mon.url, mon.dot ? null : mon.look);
   // 그림 주소가 죽어 있으면(받다 만 것·다른 창이 지운 것) **빈 네모가 걸어간다** — 그럴 땐 아예 띄우지 않는다.
   // 횟수·쿨다운은 **실제로 뜬 뒤에만** 센다 — 전에는 즉시 감지한 실패만 되돌려, 감지 시점에 따라 값이 달라졌다 (Codex 9차 #10)
   const img = box.querySelector('.cheer-mon img');

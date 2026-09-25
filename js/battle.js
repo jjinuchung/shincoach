@@ -635,6 +635,8 @@ async function enemyTurn() {
 
 function hitFx(side, dmg, big) {
   lunge(side); // 때린 쪽이 먼저 튀어나간다
+  const bar = $(side === 'enemy' ? 'battle-enemy-hp' : 'battle-my-hp').parentElement;
+  if (bar) { bar.classList.remove('shake'); void bar.offsetWidth; bar.classList.add('shake'); }
   const fig = $(side === 'enemy' ? 'battle-enemy-fig' : 'battle-my-fig');
   fig.classList.remove('hit');
   void fig.offsetWidth;

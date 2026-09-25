@@ -5,6 +5,7 @@ import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { makeFigure, setFigure, BALLS, POKEBALL } from './items.js';
+import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -84,6 +85,12 @@ export function openCatch(o) {
   $('catch-fx').textContent = '';
 
   renderPick(o.candidates, 0);
+  // 🕺 도트를 아직 안 받았으면 받아서 다시 그린다 (후보는 서너 마리뿐이라 금방 온다)
+  const needDots = (o.candidates || []).filter((c) => !animUrl(c.id)).map((c) => c.id);
+  if (needDots.length) {
+    const run = ui.run;
+    ensureAnims(needDots).then(() => { if (ui.open && ui.run === run) renderPick(ui.candidates, 0); }).catch(() => {});
+  }
   // 🧭 레이더 — 가방에 있을 때만 버튼. 누르면 하나 쓰고 후보 한 마리가 희귀 이상으로 (어느 것인지 🧭 배지)
   const rbox = $('catch-radar');
   if (rbox) {
@@ -127,7 +134,11 @@ function renderPick(candidates, pickId) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'catch-cand' + (pickId && c.id === pickId ? ' radar' : '');
-    btn.appendChild(makeFigure(c.url, c.ko, c.look));
+    // 🕺 후보는 움직이는 도트로 (작게 여럿 늘어서는 자리라 도트가 제격이다). 없으면 평소 일러스트
+    const dot = animUrl(c.id);
+    const face = makeFigure(dot || c.url, c.ko, dot ? null : c.look);
+    if (dot) face.classList.add('dot');
+    btn.appendChild(face);
     if (pickId && c.id === pickId) { const badge = document.createElement('span'); badge.className = 'radar-badge'; badge.textContent = '🧭'; btn.appendChild(badge); }
     const nm = document.createElement('span');
     nm.className = 'nm';

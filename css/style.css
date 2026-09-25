@@ -1235,6 +1235,13 @@ button { font-family: inherit; }
 .battle-hpbar { height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin: 4px 0 2px; }
 .battle-hp { height: 100%; width: 100%; background: linear-gradient(90deg, #4ade80, #22c55e); transition: width 0.5s; }
 .battle-hp.low { background: linear-gradient(90deg, #fbbf24, #ef4444); }
+/* ❤️ HP가 깎이면 바가 한 번 떨린다 — 숫자만 바뀌면 "맞았다"가 안 느껴진다 */
+.battle-hpbar.shake { animation: hp-shake .4s ease; }
+@keyframes hp-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+}
 .battle-info .hpt { font-size: 0.8rem; color: var(--muted); font-weight: 700; }
 .battle-vs { text-align: center; font-weight: 900; color: #c7d2fe; font-size: 0.9rem; letter-spacing: 0.2em; }
 .battle-dmg { position: absolute; top: 0; left: 50%; transform: translateX(-50%); color: #dc2626; font-weight: 900; font-size: 1.3rem; animation: battle-dmg 1.2s ease-out forwards; pointer-events: none; text-shadow: 0 1px 0 #fff; }
@@ -1958,6 +1965,7 @@ button { font-family: inherit; }
 .battle-move.form .hint { color: #e9d5ff; }
 .catch-cand .own.mega { background: #ede9fe; color: #6d28d9; }
 .catch-cand .own.lv { background: #eef0ff; color: #4338ca; border-radius: 999px; padding: 0 5px; } /* 🧬 키운 레벨 — 공격이 얼마나 세지는지 */
+.catch-cand .mon-figure.dot img { image-rendering: pixelated; } /* 🕺 잡기 후보의 움직이는 도트 */
 .mon-figure.gmax { transform: scale(1.25); transition: transform 0.4s; }
 /* ⭐ 변신(메가진화·거다이맥스) — 아이가 기대하는 건 "모습이 바뀌는 것"이다.
    그림을 못 받았을 때도 **반드시 눈에 보이게** 한다 (진우 신고 2026-09-25). 구형 태블릿을 생각해 transform·opacity만 */
@@ -2287,6 +2295,8 @@ button { font-family: inherit; }
 @keyframes cheer-right { from { transform: translateX(-30vw); } to { transform: translateX(105vw); } }
 @keyframes cheer-left { from { transform: translateX(105vw); } to { transform: translateX(-30vw); } }
 .cheer-mon { width: 66px; height: 66px; }
+.cheer-mon.dot { width: 76px; height: 76px; }
+.cheer-mon.dot img { image-rendering: pixelated; } /* 🕺 걷는 도트 — 흐리게 늘리지 않는다 */
 .cheer-mon img { width: 100%; height: 100%; object-fit: contain; animation: cheer-hop 0.5s ease-in-out infinite; }
 .cheer.go-left .cheer-mon img { transform: scaleX(-1); } /* 가는 쪽을 보게 */
 @keyframes cheer-hop { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
