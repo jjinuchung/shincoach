@@ -8,6 +8,7 @@ import { POTION, itemById, makeFigure, setFigure } from './items.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
 import { ensureForm } from './pokemon.js'; // ⭐ 변신 그림 (없으면 배틀에서 그 자리에 받는다)
+import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림 (5세대 스프라이트)
 
 // ── 규칙 ──
 import { lvMult } from './evolve.js'; // 🧬 포켓몬 레벨 배수 (evolve.js는 아무것도 import하지 않는다 — 순환 없음)
@@ -355,12 +356,14 @@ function startFight(c) {
   $('battle-pick').hidden = true;
   const stage = $('battle-stage');
   stage.hidden = false;
-  setFigure($('battle-enemy-fig'), o.opponent.url || '', null);
   $('battle-enemy-name').textContent = o.opponent.ko;
-  setFigure($('battle-my-fig'), c.url || '', c.look);
   $('battle-my-name').textContent = c.ko;
   $('battle-enemy-fig').className = 'mon-figure battle-fig';
   $('battle-my-fig').className = 'mon-figure battle-fig';
+  showBattleMon($('battle-enemy-fig'), o.opponent, null);
+  showBattleMon($('battle-my-fig'), c, c.look);
+  fetchDot($('battle-enemy-fig'), o.opponent, null);
+  fetchDot($('battle-my-fig'), c, c.look);
   renderHp();
   $('battle-msg').textContent = `${c.ko}, 가자! 기술을 골라요`;
   sfx.whoosh();
@@ -411,7 +414,7 @@ async function transform(kind) {
   }
   if (ui.run !== run || ui.form !== kind) return; // 그 사이 배틀이 끝났거나 다시 시작됐다
 
-  if (url) setFigure(fig, url, null);            // 변신한 모습 (꾸밈은 빼고 — 모습이 통째로 바뀐다)
+  if (url) { fig.classList.remove('dot'); setFigure(fig, url, null); } // 변신한 모습 (일러스트 — 5세대 도트엔 메가가 없다)
   fig.classList.toggle('gmax', kind === 'gmax'); // 거다이맥스는 거대하게
   fig.classList.add('formed');                   // 변신 중에는 빛나는 테두리 (그림을 못 받아도 달라 보인다)
   setTimeout(() => fig.classList.remove('morphing'), 900);
@@ -424,8 +427,8 @@ async function transform(kind) {
 function revertForm() {
   ui.form = null;
   const fig = $('battle-my-fig');
-  setFigure(fig, ui.my.url || '', ui.my.look);
   fig.classList.remove('gmax', 'formed', 'morphing');
+  showBattleMon(fig, ui.my, ui.my.look); // 도트로 돌아온다
 }
 
 function renderActions() {
@@ -631,6 +634,7 @@ async function enemyTurn() {
 }
 
 function hitFx(side, dmg, big) {
+  lunge(side); // 때린 쪽이 먼저 튀어나간다
   const fig = $(side === 'enemy' ? 'battle-enemy-fig' : 'battle-my-fig');
   fig.classList.remove('hit');
   void fig.offsetWidth;
@@ -641,6 +645,42 @@ function hitFx(side, dmg, big) {
   setTimeout(() => fx.remove(), 1200);
 }
 
+/**
+ * 🕺 배틀에 세울 그림 — **움직이는 도트**가 있으면 그걸로, 없으면 평소 일러스트.
+ *
+ * 아버님: "정적인 이미지만 많고 역동감이 없다"(2026-09-25). 배틀은 두 마리가 마주 보고 싸우는 자리인데
+ * 그림이 완전히 정지해 있었다. 명단 311마리 중 289마리에 5세대 도트 애니메이션이 있다(한 장 43KB).
+ * 🎀 장식·🎨 염색은 도트에 얹지 않는다 — 비율이 달라 자리가 안 맞는다 (🔤 무대와 같은 규칙).
+ */
+function showBattleMon(fig, mon, look) {
+  const dot = animUrl(mon.id);
+  fig.classList.toggle('dot', !!dot);
+  setFigure(fig, dot || mon.url || '', dot ? null : look);
+}
+
+/** 도트를 아직 안 받았으면 받아서 바꿔 끼운다 (배틀을 세우지 않는다 — 오면 그때 바뀐다) */
+function fetchDot(fig, mon, look) {
+  if (animUrl(mon.id)) return;
+  const run = ui.run;
+  ensureAnim(mon.id).then((u) => {
+    if (u && ui.open && ui.run === run && !ui.form) showBattleMon(fig, mon, look); // 변신 중이면 건드리지 않는다
+  }).catch(() => {});
+}
+
+/**
+ * ⚔️ 때리는 순간 — 맞는 쪽은 흔들리고, **때린 쪽은 앞으로 돌진**한다.
+ * 돌진이 없으면 "누가 때렸는지"가 안 보여서 숫자만 뜨는 화면이 된다.
+ */
+function lunge(side) {
+  const fig = $(side === 'enemy' ? 'battle-my-fig' : 'battle-enemy-fig'); // 맞는 쪽의 반대가 때린 쪽
+  if (!fig) return;
+  const cls = side === 'enemy' ? 'lunge-up' : 'lunge-down';
+  fig.classList.remove('lunge-up', 'lunge-down');
+  void fig.offsetWidth;
+  fig.classList.add(cls);
+  setTimeout(() => fig.classList.remove(cls), 450);
+}
+
 function endFight(outcome) {
   const o = ui.o;
   ui.busy = true;
@@ -648,6 +688,7 @@ function endFight(outcome) {
   const res = $('battle-result');
   if (outcome === 'win') {
     $('battle-enemy-fig').classList.add('down');
+    $('battle-my-fig').classList.add('win-jump'); // 🏆 이겼으면 폴짝
     $('battle-msg').textContent = '🏆 이겼다!';
     res.textContent = o.practice ? `(연습) ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려왔을 거예요` : `🎉 ${o.opponent.ko}${josa(o.opponent.ko, '이', '가')} 우리 편이 됐어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`;
     sfx.success(); vibrate([40, 60, 40, 60, 160]); burstConfetti();

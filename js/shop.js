@@ -5,6 +5,7 @@ import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, S
 import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
 import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
+import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림
 import { costBetween } from './evolve.js';
 import { showEvolve } from './evolveshow.js';
 import { sfx, unlock } from './sfx.js';
@@ -243,6 +244,17 @@ async function retryShinyArt(id) {
  * 그 상태로 배틀에서 변신하면 **모습이 안 바뀌어** 아이가 "아무 일도 안 일어났다"고 느낀다
  * (진우 신고 2026-09-25). 🌈 이로치와 같은 방식으로, 팝업을 열 때마다 없는 것을 다시 받아 본다.
  */
+const dotRetry = new Set();
+/** 🕺 움직이는 도트를 아직 안 받았으면 받아서 다시 그린다 (없으면 그냥 안 보인다 — 조용히) */
+function fetchDot(id) {
+  if (dotRetry.has(id)) return;
+  dotRetry.add(id);
+  ensureAnim(id)
+    .then((u) => { if (u && mon && mon.id === id) renderMon(''); })
+    .catch(() => {})
+    .finally(() => dotRetry.delete(id));
+}
+
 const formRetry = new Set();
 async function retryFormArt(id, kind) {
   const key = `${id}:${kind}`;
@@ -279,6 +291,14 @@ function renderMon(msg, pop) {
     if (sec) sec.hidden = !here;
   }
   $('mon-partner').hidden = !here;
+  // 🕺 크게 볼 때는 움직이는 도트도 같이 (도감 칸 311개를 전부 움직이면 구형 태블릿이 버겁다 — 아버님 결정)
+  const dot = $('mon-dot');
+  if (dot) {
+    const u = got ? animUrl(mon.id) : null;
+    dot.hidden = !u;
+    if (u && dot.getAttribute('src') !== u) dot.src = u;
+    if (got && !u) fetchDot(mon.id);
+  }
   enableGearDrag();
   fig.classList.remove('pop');
   if (pop) { void fig.offsetWidth; fig.classList.add('pop'); }

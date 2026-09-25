@@ -1206,6 +1206,30 @@ button { font-family: inherit; }
 .battle-fig.hit { animation: battle-hit 0.45s ease; }
 @keyframes battle-hit { 0%, 100% { transform: translateX(0); filter: none; } 30% { transform: translateX(-8px); filter: brightness(1.6) saturate(0.4); } 60% { transform: translateX(8px); } }
 .battle-fig.down { opacity: 0.35; filter: grayscale(1); transform: rotate(70deg) translateY(20%); }
+/* 🕺 배틀의 움직이는 도트 그림 (5세대 스프라이트) — 흐리게 늘리면 지저분하므로 픽셀 그대로 */
+.battle-fig.dot img { image-rendering: pixelated; }
+.battle-fig.dot { width: 104px; height: 104px; }
+/* ⚔️ 때린 쪽이 앞으로 튀어나간다 (상대는 위, 나는 아래에 있다) */
+.battle-fig.lunge-up { animation: lunge-up .45s ease-out; }
+.battle-fig.lunge-down { animation: lunge-down .45s ease-out; }
+@keyframes lunge-up {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(-26px) scale(1.06); }
+  100% { transform: translateY(0); }
+}
+@keyframes lunge-down {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(26px) scale(1.06); }
+  100% { transform: translateY(0); }
+}
+/* 🏆 이겼으면 폴짝폴짝 */
+.battle-fig.win-jump { animation: win-jump .6s ease-in-out 3; }
+@keyframes win-jump {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-18px); }
+  55% { transform: translateY(0); }
+  70% { transform: translateY(-8px); }
+}
 .battle-info { min-width: 150px; }
 .battle-info .nm { font-weight: 800; }
 .battle-hpbar { height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin: 4px 0 2px; }
@@ -1556,6 +1580,9 @@ button { font-family: inherit; }
 .mon-hero { display: flex; flex-direction: column; align-items: center; }
 .mon-big { width: 160px; height: 160px; }
 .mon-big .mon-gear { font-size: 52px; }
+/* 🕺 팝업에서 크게 볼 때 옆에 세우는 움직이는 도트 (도감 칸은 지금대로 일러스트) */
+.mon-dot { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; animation: mon-dance 1.1s ease-in-out infinite; transform-origin: 50% 100%; margin: -6px auto 2px; display: block; }
+.mon-dot[hidden] { display: none; }
 .mon-sub { color: var(--muted); font-size: 0.9rem; font-weight: 600; margin-top: 6px; text-align: center; }
 .mon-section { margin-top: 8px; }
 .mon-section-title { font-weight: 800; margin-bottom: 2px; }
