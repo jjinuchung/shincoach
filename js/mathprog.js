@@ -41,6 +41,11 @@ export const REWARD = {
   diag: { xp: 2, coin: 1 },        // 진단 문항 정답
   fix: { xp: 1, coin: 0 },         // 🔁 틀린 뒤 풀이를 읽고 쌍둥이 문제를 맞힘 (편의 통과 여부는 안 바뀐다)
   daily: { xp: 20, coin: 6 },      // ☀️ 오늘의 수학 완주 — 하루 첫 번만. 복습 통과보다 작게 (누르기만으로 큰 보상이 되지 않게, 아버님 결정 2026-09-21)
+  // 💎 스페셜 (2026-09-26) — 한 문제가 여러 걸음이라 문항 값을 개념 편보다 높게.
+  // 🏅 배지 하나를 채우면 보너스 + 🔷 수학스톤 1, 여덟 개를 다 모으면 🏆 챔피언 보상 한 번
+  special: { xp: 8, coin: 3 },
+  badge: { xp: 50, coin: 20, stone: 1 },
+  gym: { xp: 200, coin: 300, stone: 3, ball: 'masterball' },
 };
 
 /** 진단 결과로 "아는 것"으로 친 개념의 첫 복습까지 며칠 — 진단은 한 문제뿐이라 곧 다시 확인한다 */
@@ -449,6 +454,11 @@ export function tallyRound(m, { mode, correct, result, dailyFirst }) {
     if (dailyFirst) ok = correct;
   } else if (mode === 'ask') {
     if (result && result.fixed) ok = correct;
+  } else if (mode === 'special') {
+    // 💎 스페셜은 **교환권에 더하지 않는다** — 아이가 원할 때 몇 번이든 풀 수 있어서,
+    //    정답마다 점수를 주면 "🎟️ 농사"가 된다(Codex 5차가 편 반복에서 잡았던 것과 같은 구멍).
+    //    값어치는 🏅 배지와 ⚡·💰로 충분하다
+    ok = 0;
   } else if (mode === 'notes') {
     ok = result ? (Number(result.resolved) || 0) : 0; // 실제로 지운 노트만 — result 없이 부르면 0 (Codex 7차 #1: 관대한 폴백이 재제출을 다시 세게 했다)
   }
@@ -550,6 +560,87 @@ export function markDaily(m, today, opts) {
 /** 오늘 ☀️를 몇 번 완주했나 (0이면 아직) */
 export function dailyDone(m, today) {
   return (m && m.daily && m.daily.d === today) ? (Number(m.daily.n) || 0) : 0;
+}
+
+// ── 💎 스페셜 문제 · 🏅 체육관 배지 (2026-09-26, 아버님 "새로운 보상과 함께") ──
+//
+// 문제집에서 뽑은 여덟 얼굴(js/mathspecial.js)을 각각 여러 번 통과하면 그 얼굴의 🏅 배지를 얻고,
+// 여덟 개를 다 모으면 🏆 챔피언 보상이 한 번 나온다. 원작 관동 8배지 그대로다.
+//
+// ★ 통과 횟수는 **단조 증가**만 한다(줄어드는 길이 없다) → 백업 병합은 키마다 max면 답이 맞는다.
+//   🏆 보상을 받았는지도 0/1 단조 — 옛 백업을 되돌려도 두 번 받지 못한다.
+
+/** 💎 스페셜 레코드가 없으면 만들어 준다 */
+function spOf(m) {
+  m.sp = m.sp || {};
+  m.sp.pass = m.sp.pass || {};
+  return m.sp;
+}
+
+/**
+ * 💎 스페셜 한 회차를 기록한다 — 맞힌 얼굴의 통과 횟수 +1.
+ * @param {object} m 수학 레코드
+ * @param {Array<{kind:string, ok:boolean, tag?:string}>} qs 푼 문항 (kind = 얼굴 id)
+ * @param {string} today
+ * @param {number} need 배지 하나에 필요한 통과 횟수
+ * @returns {{ok:number, total:number, got:string[]}} got = 이번에 **새로** 받은 배지들
+ */
+export function applySpecialRound(m, qs, today, need = 3) {
+  const sp = spOf(m);
+  m.miss = m.miss || {};
+  const list = (qs || []).filter((q) => q && q.kind);
+  let ok = 0;
+  const got = [];
+  for (const q of list) {
+    if (!q.ok) {
+      // 틀린 것은 📊 진단에만 쌓는다 (아이가 "실수"라고 한 것은 빼는 규칙은 개념 편과 같다)
+      if (q.tag && !(q.w === 's')) m.miss[q.tag] = (m.miss[q.tag] || 0) + 1;
+      continue;
+    }
+    ok++;
+    const before = Number(sp.pass[q.kind]) || 0;
+    sp.pass[q.kind] = before + 1;
+    if (before < need && before + 1 >= need) got.push(q.kind); // 이번에 배지가 찼다
+  }
+  sp.rounds = (Number(sp.rounds) || 0) + 1;
+  if (list.length) {
+    pushLog(m, { d: today, t: Date.now(), id: 'special', mode: 'special', ok, n: list.length, qs: list.map((q) => ({ k: q.kind, ok: !!q.ok, ...(q.tag ? { tag: q.tag } : {}) })) });
+  }
+  return { ok, total: list.length, got };
+}
+
+/** 🏅 지금까지 받은 배지들 (통과 횟수가 need 이상인 얼굴) */
+export function badgesOf(m, need = 3) {
+  const pass = (m && m.sp && m.sp.pass) || {};
+  return Object.keys(pass).filter((k) => (Number(pass[k]) || 0) >= need);
+}
+
+/** 🏅 얼굴별 통과 횟수 (화면에 "2/3"을 보여 줄 때) */
+export function spPass(m, kindId) {
+  return Math.max(0, Number((m && m.sp && m.sp.pass && m.sp.pass[kindId]) || 0));
+}
+
+/** 💎 스페셜을 몇 회차 했나 */
+export function spRounds(m) {
+  return Math.max(0, Number((m && m.sp && m.sp.rounds) || 0));
+}
+
+/**
+ * 🏆 여덟 배지를 다 모았을 때의 보상을 **한 번만** 준다 (트랜잭션 안에서 부른다).
+ * @returns {boolean} 이번에 받았으면 true
+ */
+export function claimGym(m, kindIds, need = 3) {
+  const sp = spOf(m);
+  if (sp.gym) return false;                       // 이미 받았다 (단조 — 옛 백업을 되돌려도 두 번은 없다)
+  const got = badgesOf(m, need);
+  if (!kindIds.every((k) => got.includes(k))) return false;
+  sp.gym = 1;
+  return true;
+}
+
+/** 🏆 챔피언 보상을 이미 받았나 */
+export function gymClaimed(m) {
+  return !!(m && m.sp && m.sp.gym);
 }
 
 /** 아이에게 보여 주지 않는 진단용 이름표 — 부모 화면(📊)에는 그대로 쌓인다 */

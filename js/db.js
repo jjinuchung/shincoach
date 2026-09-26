@@ -639,8 +639,11 @@ function cloneConcept(v) {
   return out;
 }
 
-function cloneMath(m) {
-  const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])], ...(m.tot ? { tot: { ...m.tot } } : {}) };
+/** 🔢 수학 레코드 복사 — 규칙이 마음껏 고쳐도 원본이 안 바뀌게 (테스트에서도 쓴다) */
+export function cloneMath(m) {
+  // ★ sp(💎 스페셜)도 안쪽 pass 맵까지 새 객체로 — 얕게 복사하면 규칙이 **입력을 변형**한다
+  //   (Codex가 daily에서 잡았던 것과 같은 함정)
+  const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])], ...(m.tot ? { tot: { ...m.tot } } : {}), ...(m.sp ? { sp: { ...m.sp, pass: { ...(m.sp.pass || {}) } } } : {}) };
   for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
   if (Array.isArray(m.asks)) out.asks = m.asks.map(cloneAsk); // ❓ 질문은 안쪽에 답장 배열이 있어 따로 복사
   return out;
@@ -782,6 +785,19 @@ export function mergeMath(cur, rec) {
   if (rec && rec.tot) {
     out.tot = out.tot || { ok: 0, daily: 0, rev: 0 };
     for (const k of ['ok', 'daily', 'rev']) out.tot[k] = Math.max(Number(out.tot[k]) || 0, Number(rec.tot[k]) || 0);
+  }
+  // 💎 스페셜 통과 횟수·회차·🏆 보상 수령은 전부 **단조 증가** → 키마다 max.
+  //    옛 백업을 되돌려도 받은 🏅 배지가 사라지지 않고, 🏆 챔피언 보상을 두 번 받지도 않는다
+  if ((rec && rec.sp) || out.sp) {
+    const a = (out.sp && out.sp.pass) || {};
+    const b = (rec && rec.sp && rec.sp.pass) || {};
+    const pass = {};
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) pass[k] = Math.max(Number(a[k]) || 0, Number(b[k]) || 0);
+    out.sp = {
+      pass,
+      rounds: Math.max(Number(out.sp && out.sp.rounds) || 0, Number(rec && rec.sp && rec.sp.rounds) || 0),
+      gym: (out.sp && out.sp.gym) || (rec && rec.sp && rec.sp.gym) ? 1 : 0,
+    };
   }
   // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편
   const seen = new Set(out.log.map((e) => e && e.t));

@@ -10,13 +10,16 @@ import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidg
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
+  applySpecialRound, badgesOf, spPass, claimGym, gymClaimed,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
 import { todayKey } from './track.js';
+// 💎 스페셜 문제 — 문제집에서 뽑은 여덟 얼굴 (2026-09-26)
+import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKindOf, makeSpecialRound } from './mathspecial.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
-import { GOLDEN, STONE_MATH, RADAR, POTION, setFigure } from './items.js';
+import { GOLDEN, STONE_MATH, STONE_ENGLISH, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
 import { eggProgress } from './egg.js';
@@ -60,6 +63,7 @@ const S = () => STEMS[ui.stem] || STEMS.fraction;
 const G = () => S().gen;
 const conceptOf = (id) => { const s = stemOf(id); return s ? s.list.find((c) => c.id === id) || null : null; };
 /** 출연진·세계 + 그 줄기의 사람이 쓴 내용 — 🤔 오답 노트 회차는 줄기를 섞을 수 있어 개념마다 따로 끼운다 */
+const SPECIAL_N = 3; // 💎 스페셜 한 회차 문항 수 (한 문제가 길어서 셋이면 충분하다)
 const optsFor = (stemKey) => ({ ...(ui.opts || {}), content: ui.contents[stemKey || ui.stem] || {} });
 
 // ───────────────────── 분수를 세로로 ─────────────────────
@@ -533,6 +537,25 @@ function renderLadder(state) {
     const nc = countNotes(state, today);
     if (nc.all) head.appendChild(el('p', 'math-note', `🤔 오늘 틀린 유형 ${nc.all}개는 내일부터 다시 풀 수 있어요.`));
   }
+  // 💎 스페셜 문제 — 문제집에서 뽑은 "한 번 더 생각하는" 문제. 아이가 원할 때 누른다 (아버님 결정 2026-09-26)
+  {
+    const sb = el('button', 'btn btn-big-wide math-special-btn', `💎 스페셜 문제 ${SPECIAL_N}개 — 한 번 더 생각해서 🏅 배지 모으기`);
+    sb.type = 'button';
+    sb.addEventListener('click', () => startSpecial());
+    head.appendChild(sb);
+    head.appendChild(el('p', 'math-note math-special-note', specialNote(state)));
+    // 🏅 모은 배지 줄 — 받은 것은 색, 아직인 것은 흐리게 (몇 번 남았는지도)
+    const bar = el('div', 'math-badges');
+    const got = badgesOf(state, BADGE_NEED);
+    for (const k of SP_KINDS) {
+      const has = got.includes(k.id);
+      const chip = el('span', `math-badge${has ? ' on' : ''}`, `${k.badge} ${k.ko}`);
+      chip.title = has ? `${k.gym} — 받았어요` : `${k.gym} — ${spPass(state, k.id)}/${BADGE_NEED}`;
+      if (!has) chip.appendChild(el('b', 'n', ` ${spPass(state, k.id)}/${BADGE_NEED}`));
+      bar.appendChild(chip);
+    }
+    head.appendChild(bar);
+  }
   m.appendChild(head);
 
   const list = el('ul', 'math-ladder');
@@ -588,6 +611,34 @@ function startRound(id, mode, o = {}) {
  * 🤔 오답 노트 회차 — 노트마다 그 유형 한 문제(계산은 숫자만 다른 쌍둥이, ③⭐는 같은 문항). 개념 통과·👑은 안 건드린다.
  * 맞히면 노트에서 지워지고, 틀리면 내일 이후에 다시 나온다.
  */
+/**
+ * 💎 스페셜 문제 — 문제집에서 뽑은 여덟 얼굴(js/mathspecial.js) 중 세 문제.
+ * 아직 🏅 배지를 못 받은 얼굴을 먼저 낸다(prefer) — 여덟 개를 골고루 모으게.
+ */
+function startSpecial() {
+  const state = ui.state;
+  const need = BADGE_NEED;
+  const got = badgesOf(state, need);
+  const prefer = SP_KIND_IDS.filter((id) => !got.includes(id));
+  const base = (Date.now() % 1000000) | 0;
+  const qs = makeSpecialRound(base, SPECIAL_N, { cast: (ui.opts && ui.opts.cast) || [], prefer });
+  if (!qs.length) { renderLadder(state); return; }
+  ui.round = {
+    id: null, mode: 'special', qs, ids: qs.map(() => null), at: 0, correct: 0,
+    missTags: [], answers: [], answered: false, seed: base, phase: 'q',
+  };
+  renderQuestion();
+}
+
+/** 💎 사다리 버튼에 쓸 한 줄 — 배지 몇 개를 모았나 */
+function specialNote(state) {
+  const got = badgesOf(state, BADGE_NEED);
+  if (got.length >= SP_KIND_IDS.length) return `🏆 배지 여덟 개를 다 모았어요! 또 풀어도 좋아요`;
+  const next = SP_KINDS.find((k) => !got.includes(k.id));
+  const have = next ? spPass(state, next.id) : 0;
+  return `🏅 배지 ${got.length}/${SP_KIND_IDS.length}` + (next ? ` · 다음 ${next.badge} ${next.ko} ${have}/${BADGE_NEED}` : '');
+}
+
 function startNotesRound(list) {
   const base = (Date.now() % 1000000) | 0;
   const qs = [];
@@ -902,6 +953,9 @@ const light = (r) => !!r && (r.mode === 'diag' || r.mode === 'ask');
 
 function senseOf(q) {
   if (!q || !q.expr || light(ui.round)) return null;
+  // 💎 스페셜은 "답이 얼마쯤일까"가 아니라 "어떻게 풀까"가 문제다 — 감 잡기를 붙이면 군더더기가 되고,
+  //    답이 자연수인 얼굴(조건에 맞는 수의 합 = 21 같은)에서는 아예 말이 안 된다
+  if (ui.round && ui.round.mode === 'special') return null;
   const okCh = q.choices.find((x) => x.ok);
   const val = G().valueOf ? G().valueOf(okCh && okCh.text) : null;
   if (!val || !val.d) return null;
@@ -943,7 +997,8 @@ function renderQuestion(restore = false) {
   const card = el('section', 'math-card math-q');
 
   const top = el('div', 'math-q-top');
-  top.appendChild(el('span', 'math-eyebrow', r.mode === 'diag' ? `📏 진단 ${r.at + 1} / ${r.qs.length}` : r.mode === 'notes' ? `🤔 오답 노트 ${r.at + 1} / ${r.qs.length} · ${nameOf(q.concept)}` : r.mode === 'mix' ? `🎲 섞어 풀기 ${r.at + 1} / ${r.qs.length}` : r.mode === 'ask' ? `❓ 답장 뒤 풀어보기 · ${nameOf(q.concept)}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
+  top.appendChild(el('span', 'math-eyebrow', r.mode === 'diag' ? `📏 진단 ${r.at + 1} / ${r.qs.length}` : r.mode === 'notes' ? `🤔 오답 노트 ${r.at + 1} / ${r.qs.length} · ${nameOf(q.concept)}` : r.mode === 'special' ? `💎 스페셜 ${r.at + 1} / ${r.qs.length} · ${(spKindOf(String(q.kind).replace('special-', '')) || {}).ko || ''}`
+    : r.mode === 'mix' ? `🎲 섞어 풀기 ${r.at + 1} / ${r.qs.length}` : r.mode === 'ask' ? `❓ 답장 뒤 풀어보기 · ${nameOf(q.concept)}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
   top.appendChild(el('span', 'math-kind', KIND_LABEL[q.kind] || ''));
   card.appendChild(top);
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
@@ -1831,6 +1886,14 @@ async function finishRound() {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, ui.stem, r.missTags); });
     } else if (r.mode === 'ask') {
       state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false }); tally = tallyRound(s, { mode: r.mode, correct: r.correct, result }); });
+    } else if (r.mode === 'special') {
+      // 💎 맞힌 얼굴의 통과 횟수 +1 → 🏅 배지, 여덟 개면 🏆 챔피언 보상까지 **한 트랜잭션**에서
+      const qs = r.answers.map((a, i) => ({ kind: String(r.qs[i].kind).replace('special-', ''), ok: !!a.correct, ...(a.tag ? { tag: a.tag } : {}), ...(a.why ? { w: a.why } : {}) }));
+      state = await updateMath((s2) => {
+        result = applySpecialRound(s2, qs, today, BADGE_NEED);
+        result.gym = claimGym(s2, SP_KIND_IDS, BADGE_NEED); // 여덟 개를 방금 채웠나 (한 번만)
+        tally = tallyRound(s2, { mode: 'special', correct: r.correct, result });
+      });
     } else if (r.mode === 'notes' || r.mode === 'mix') {
       const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i].fromNote ? { note: true } : {}), ...extraQ(a) }));
       state = await updateMath((s) => {
@@ -1876,6 +1939,8 @@ async function finishRound() {
     ? { xp: r.correct * REWARD.diag.xp, coin: r.correct * REWARD.diag.coin, catchOnce: false }
     : r.mode === 'ask'
       ? (result && result.fixed && r.askSameKey !== false ? { xp: ASK_REWARD.xp, coin: ASK_REWARD.coin, catchOnce: false } : { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false }) // ❓ 답장 뒤 같은 틀을 처음 맞히면 보상, 틀이 바뀌었거나 이미 고친 뒤면 문항 정답만
+    : r.mode === 'special'
+      ? { xp: r.correct * REWARD.special.xp, coin: r.correct * REWARD.special.coin, catchOnce: false } // 💎 한 문제가 여러 걸음이라 문항 값이 높다
     : r.mode === 'notes' || r.mode === 'mix'
       ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } // 🤔 노트 회차·🎲 섞어 풀기: 문항 정답만, 잡기 없음 (연습)
       : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
@@ -1888,6 +1953,22 @@ async function finishRound() {
   if (rw.gold) addItem(GOLDEN.id, 1);
   // 🔷 수학스톤 — "제대로 배웠나"에서만 (mathprog.stoneReward). 코인처럼 트랜잭션 결과(result)에 따라 준다
   rw.stone = stoneReward({ mode: r.mode, result });
+  // 🏅 이번에 채운 배지 — 한 얼굴을 BADGE_NEED번 맞힌 값 (트랜잭션 안에서 정해져 왔다)
+  if (result && Array.isArray(result.got) && result.got.length) {
+    rw.badges = result.got.slice();
+    rw.xp += result.got.length * REWARD.badge.xp;
+    rw.coin += result.got.length * REWARD.badge.coin;
+    rw.stone = (rw.stone || 0) + result.got.length * REWARD.badge.stone;
+  }
+  // 🏆 여덟 배지를 다 모았다 — claimGym이 트랜잭션에서 딱 한 번만 참을 준다
+  if (result && result.gym) {
+    rw.gym = true;
+    rw.xp += REWARD.gym.xp;
+    rw.coin += REWARD.gym.coin;
+    addItem(REWARD.gym.ball, 1);
+    addItem(STONE_ENGLISH.id, REWARD.gym.stone);
+    rw.stone = (rw.stone || 0) + REWARD.gym.stone;
+  }
   if (rw.stone) addItem(STONE_MATH.id, rw.stone);
   // 🥚 수학 알 — 하루 첫 완주가 하루치. 5일이 차면 그 트랜잭션에서 부화(도감 등록)까지; 화면은 결과 카드 뒤에 (showHatchIfAny)
   if (daily && daily.first) { try { rw.egg = await tickEgg('math', today); } catch { rw.egg = null; } }
@@ -1933,6 +2014,44 @@ async function finishRound() {
     renderDailyDone(state, { g, c, daily, result, offer: askOfferForRound(r, state, today), catches: rw.catches, gold: rw.gold, bonus: rw.bonus, ticket: rw.ticket, egg: rw.egg });
     runCatches(rw.catches, { g, c, run, onAll: () => showHatchIfAny() });
     if (!rw.catches) showHatchIfAny();
+    return;
+  }
+
+  // 💎 스페셜 결과 — 🏅 배지를 채웠으면 그게 주인공이다
+  if (r.mode === 'special') {
+    const card = el('section', 'math-card math-result');
+    const newBadges = (rw.badges || []).map((id) => spKindOf(id)).filter(Boolean);
+    card.appendChild(el('h2', '', rw.gym ? '🏆 여덟 배지를 다 모았어요!' : newBadges.length ? `🏅 ${newBadges.map((k) => k.gym).join('·')} 획득!` : `💎 스페셜 ${r.correct} / ${r.qs.length}`));
+    if (rw.gym) {
+      card.appendChild(el('p', 'math-p big', '체육관 여덟 곳을 모두 이겼어요 — 이제 챔피언이에요!'));
+      card.appendChild(el('p', 'math-p', `🟣 마스터볼 1개 · 🔷 수학스톤 ${REWARD.gym.stone}개 · 🔶 영어스톤 ${REWARD.gym.stone}개를 받았어요.`));
+    } else if (newBadges.length) {
+      card.appendChild(el('p', 'math-p', newBadges.map((k) => `${k.badge} ${k.ko}를 ${BADGE_NEED}번 해냈어요`).join(' · ')));
+    } else {
+      card.appendChild(el('p', 'math-p', r.correct === r.qs.length ? '한 번 더 생각해서 다 맞혔어요!' : '어려운 문제들이에요 — 풀이를 보면 다음엔 보여요.'));
+    }
+    // 🏅 지금까지 모은 배지 줄
+    const got = badgesOf(state, BADGE_NEED);
+    const bar = el('div', 'math-badges');
+    for (const k of SP_KINDS) {
+      const has = got.includes(k.id);
+      const chip = el('span', `math-badge${has ? ' on' : ''}${(rw.badges || []).includes(k.id) ? ' just' : ''}`, `${k.badge} ${k.ko}`);
+      if (!has) chip.appendChild(el('b', 'n', ` ${spPass(state, k.id)}/${BADGE_NEED}`));
+      bar.appendChild(chip);
+    }
+    card.appendChild(bar);
+    card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.stone ? ` 🔷 수학스톤 +${rw.stone}` : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+    const row = el('div', 'math-actions');
+    const again = el('button', 'btn btn-big-wide', '💎 한 번 더');
+    again.type = 'button';
+    again.addEventListener('click', () => startSpecial());
+    row.appendChild(again);
+    const back = el('button', 'btn btn-primary btn-big-wide', '사다리로');
+    back.type = 'button';
+    back.addEventListener('click', () => renderLadder(state));
+    row.appendChild(back);
+    card.appendChild(row);
+    m.appendChild(card);
     return;
   }
 

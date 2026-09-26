@@ -402,7 +402,7 @@ button { font-family: inherit; }
 .math-q-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
 .math-kind { font-size: 0.8rem; color: var(--primary); background: #eef2ff; border-radius: 999px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
 .math-qt { font-size: 1.12rem; line-height: 1.75; margin: 6px 0 8px; font-weight: 500; }
-.math-expr { font-size: 1.7rem; font-weight: 800; text-align: center; margin: 12px 0; letter-spacing: 0.02em; }
+.math-expr { font-size: 1.7rem; font-weight: 800; text-align: center; margin: 12px 0; letter-spacing: 0.02em; white-space: pre-line; } /* 💎 스페셜의 여러 줄 식(㉠㉡㉢㉣)이 한 줄로 붙지 않게 */
 .math-expr .fr { font-size: 1.5rem; margin: 0 6px; }
 .math-hint { color: var(--muted); font-size: 0.85rem; margin: 0 0 10px; }
 .math-notes-btn { background: #fff7ed; color: #9a3412; border: 2px solid #fdba74; margin-top: 8px; }
@@ -1972,6 +1972,19 @@ button { font-family: inherit; }
 .battle-move.form .hint { color: #e9d5ff; }
 .catch-cand .own.mega { background: #ede9fe; color: #6d28d9; }
 .catch-cand .own.lv { background: #eef0ff; color: #4338ca; border-radius: 999px; padding: 0 5px; } /* 🧬 키운 레벨 — 공격이 얼마나 세지는지 */
+/* 💎 스페셜 문제 · 🏅 체육관 배지 (2026-09-26) */
+.math-special-btn { background: linear-gradient(135deg, #6d28d9, #9333ea); color: #fff; border-color: #6d28d9; }
+.math-special-note { color: #6b21a8; font-weight: 700; }
+.math-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 2px; }
+.math-badge { font-size: .76rem; font-weight: 700; border-radius: 999px; padding: 3px 9px;
+              background: #f3f4f6; color: #9ca3af; border: 1.5px solid #e5e7eb; }
+.math-badge.on { background: #fef3c7; color: #92400e; border-color: #f59e0b; }
+.math-badge.just { animation: badge-pop .7s ease-out 2; }
+.math-badge .n { font-weight: 800; opacity: .85; }
+@keyframes badge-pop {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.14); }
+}
 .catch-cand .mon-figure.dot img { image-rendering: pixelated; } /* 🕺 잡기 후보의 움직이는 도트 */
 .mon-figure.gmax { transform: scale(1.25); transition: transform 0.4s; }
 /* ⭐ 변신(메가진화·거다이맥스) — 아이가 기대하는 건 "모습이 바뀌는 것"이다.

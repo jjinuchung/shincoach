@@ -6,6 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { KINDS, KIND_IDS, BADGE_NEED, kindOf, makeSpecial, makeSpecialRound, say } from '../js/mathspecial.js';
+import { KIND_IDS as SP_KIND_IDS } from '../js/mathspecial.js';
+import { applySpecialRound, badgesOf, spPass, spRounds, claimGym, gymClaimed, tallyRound } from '../js/mathprog.js';
+import { cloneMath as cloneProfileMath, mergeMath } from '../js/db.js';
 
 /** 분수 글("4 2/10", "3/5", "2") → 값. 테스트 전용 파서 (생성기와 무관) */
 function val(t) {
@@ -207,4 +210,80 @@ test('💎 say: 분자 총합을 대분수 글로 (자연수·진분수도)', ()
   assert.equal(say(40, 10), '4');
   assert.equal(say(7, 10), '7/10');
   assert.equal(say(10, 10), '1');
+});
+
+// ── 🏅 체육관 배지 (진도 레코드) ──
+
+const M = () => ({ concepts: {}, miss: {}, log: [] });
+const T = '2026-09-26';
+
+test('🏅 맞힌 얼굴만 통과 횟수가 오르고, 다 차면 그때 배지가 나온다', () => {
+  const m = M();
+  let r = applySpecialRound(m, [{ kind: 'reverse', ok: true }, { kind: 'cards', ok: false, tag: '두 장만 더함' }], T, 3);
+  assert.deepEqual(r, { ok: 1, total: 2, got: [] });
+  assert.equal(spPass(m, 'reverse'), 1);
+  assert.equal(spPass(m, 'cards'), 0, '틀린 것은 안 오른다');
+  assert.equal(m.miss['두 장만 더함'], 1, '틀린 까닭은 📊에 쌓인다');
+
+  applySpecialRound(m, [{ kind: 'reverse', ok: true }], T, 3);
+  r = applySpecialRound(m, [{ kind: 'reverse', ok: true }], T, 3);
+  assert.deepEqual(r.got, ['reverse'], '세 번째에 배지');
+  assert.deepEqual(badgesOf(m, 3), ['reverse']);
+
+  r = applySpecialRound(m, [{ kind: 'reverse', ok: true }], T, 3);
+  assert.deepEqual(r.got, [], '이미 받은 배지를 또 주지 않는다');
+  assert.equal(spPass(m, 'reverse'), 4, '통과 횟수는 계속 오른다');
+  assert.equal(spRounds(m), 4, '회차는 네 번 돌렸다');
+});
+
+test('🏅 "실수"라고 한 것은 📊 오개념에 안 쌓인다 (개념 편과 같은 규칙)', () => {
+  const m = M();
+  applySpecialRound(m, [{ kind: 'cards', ok: false, tag: '두 장만 더함', w: 's' }], T, 3);
+  assert.equal(m.miss['두 장만 더함'], undefined);
+});
+
+test('🏆 여덟 배지를 다 모으면 **한 번만** 보상', () => {
+  const m = M();
+  for (const id of SP_KIND_IDS) for (let i = 0; i < 3; i++) applySpecialRound(m, [{ kind: id, ok: true }], T, 3);
+  assert.equal(badgesOf(m, 3).length, 8);
+  assert.equal(claimGym(m, SP_KIND_IDS, 3), true);
+  assert.equal(claimGym(m, SP_KIND_IDS, 3), false, '두 번째는 없다');
+  assert.equal(gymClaimed(m), true);
+});
+
+test('🏆 하나라도 모자라면 보상이 안 나온다', () => {
+  const m = M();
+  for (const id of SP_KIND_IDS.slice(0, 7)) for (let i = 0; i < 3; i++) applySpecialRound(m, [{ kind: id, ok: true }], T, 3);
+  assert.equal(badgesOf(m, 3).length, 7);
+  assert.equal(claimGym(m, SP_KIND_IDS, 3), false);
+  assert.equal(gymClaimed(m), false);
+});
+
+test('💾 백업 병합: 통과 횟수는 max, 🏆 수령은 OR (옛 백업이 배지를 지우지 않는다)', () => {
+  const now = { ...M(), sp: { pass: { reverse: 5, cards: 1 }, rounds: 6, gym: 1 }, updatedAt: 200 };
+  const old = { ...M(), sp: { pass: { reverse: 2, cards: 3, findok: 1 }, rounds: 3, gym: 0 }, updatedAt: 100 };
+  for (const [a, b, who] of [[now, old, '최근이 먼저'], [old, now, '옛것이 먼저']]) {
+    const m = mergeMath(a, b);
+    assert.equal(m.sp.pass.reverse, 5, `${who}`);
+    assert.equal(m.sp.pass.cards, 3, `${who}: 한쪽에만 큰 값`);
+    assert.equal(m.sp.pass.findok, 1, `${who}: 한쪽에만 있는 얼굴`);
+    assert.equal(m.sp.rounds, 6, `${who}`);
+    assert.equal(m.sp.gym, 1, `${who}: 받은 적이 있으면 받은 것`);
+  }
+});
+
+test('💾 cloneMath는 입력을 건드리지 않는다 (규칙이 원본을 바꾸면 두 창이 엉킨다)', () => {
+  const src = { ...M(), sp: { pass: { reverse: 2 }, rounds: 1, gym: 0 } };
+  const copy = cloneProfileMath(src);
+  applySpecialRound(copy, [{ kind: 'reverse', ok: true }], T, 3);
+  assert.equal(src.sp.pass.reverse, 2, '원본이 그대로여야 한다');
+  assert.equal(copy.sp.pass.reverse, 3);
+});
+
+test('🎟️ 스페셜은 교환권에 더하지 않는다 (몇 번이든 풀 수 있어 농사가 된다)', () => {
+  const m = M();
+  const r = applySpecialRound(m, [{ kind: 'reverse', ok: true }, { kind: 'cards', ok: true }, { kind: 'findok', ok: false }], T, 3);
+  const t = tallyRound(m, { mode: 'special', correct: 2, result: r });
+  assert.equal(t.ok, 0);
+  assert.equal(m.tot, undefined, '누적을 건드리지 않는다');
 });
