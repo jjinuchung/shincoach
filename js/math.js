@@ -291,7 +291,14 @@ async function runCatches(n, { g, c, run, onAll }) {
         ballCounts: inventory(),
         radar: itemCount(RADAR.id) > 0 ? { count: itemCount(RADAR.id), use: (cur) => useRadar(pool, cur) } : null, // 🧭 아이가 눌러야 쓴다
         attempt: (id, opts) => catchAttempt(id, Math.random, opts),
-        onDone: () => { updateChip(); left--; if (left > 0) one(); else finish(); },
+        // ★ 한 번도 안 던지고 닫았으면 기회를 **돌려준다** — 던지기는 화면을 띄우기 전에 이미 뺐다.
+        //    (진우: "볼을 던졌는데 아무 일도 안 일어나고 낭비만 했어요")
+        onDone: (r) => {
+          updateChip();
+          if (r && r.threw === false) { giveBack().catch(() => {}); finish(); return; }
+          left--;
+          if (left > 0) one(); else finish();
+        },
       });
     } catch (e) {
       console.warn('잡기 흐름 오류:', e);

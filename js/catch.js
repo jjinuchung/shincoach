@@ -10,7 +10,7 @@ import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const ui = { open: false, run: 0, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, coinGain: 0, pendingAuto: false, candidates: [] }; // candidates = 지금 화면의 후보 (🧭 레이더가 바꿔 그린다)
+const ui = { open: false, run: 0, threw: false, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, coinGain: 0, pendingAuto: false, candidates: [] }; // candidates = 지금 화면의 후보 (🧭 레이더가 바꿔 그린다)
 
 export function initCatch() {
   $('catch-continue').addEventListener('click', finish);
@@ -85,11 +85,15 @@ export function openCatch(o) {
   $('catch-fx').textContent = '';
 
   renderPick(o.candidates, 0);
-  // 🕺 도트를 아직 안 받았으면 받아서 다시 그린다 (후보는 서너 마리뿐이라 금방 온다)
+  // 🕺 도트를 아직 안 받았으면 받아서 **그림만** 바꿔 끼운다.
+  // ★ 여기서 renderPick을 다시 부르면 안 된다 — 후보 버튼을 통째로 새로 만들기 때문에,
+  //   아이가 포켓몬을 누르려던 바로 그 순간 버튼이 사라져 **탭이 씹힌다**.
+  //   수학은 잡기 화면을 띄우기 **전에** 던지기를 차감하므로, 그대로 닫으면 던질 기회만 날아간다
+  //   (진우: "볼을 던졌는데 아무 일도 안 일어나고 낭비만 했어요" — v130에서 제가 만든 회귀).
   const needDots = (o.candidates || []).filter((c) => !animUrl(c.id)).map((c) => c.id);
   if (needDots.length) {
     const run = ui.run;
-    ensureAnims(needDots).then(() => { if (ui.open && ui.run === run) renderPick(ui.candidates, 0); }).catch(() => {});
+    ensureAnims(needDots).then(() => { if (ui.open && ui.run === run) swapDots(); }).catch(() => {});
   }
   // 🧭 레이더 — 가방에 있을 때만 버튼. 누르면 하나 쓰고 후보 한 마리가 희귀 이상으로 (어느 것인지 🧭 배지)
   const rbox = $('catch-radar');
@@ -134,6 +138,7 @@ function renderPick(candidates, pickId) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'catch-cand' + (pickId && c.id === pickId ? ' radar' : '');
+    btn.dataset.id = String(c.id);
     // 🕺 후보는 움직이는 도트로 (작게 여럿 늘어서는 자리라 도트가 제격이다). 없으면 평소 일러스트
     const dot = animUrl(c.id);
     const face = makeFigure(dot || c.url, c.ko, dot ? null : c.look);
@@ -164,6 +169,28 @@ function renderPick(candidates, pickId) {
  * 🔴 어떤 볼로 던질까 — 몬스터볼은 언제나, 나머지는 가방에 있는 것만.
  * 등급이 올라갈수록 잡기 쉬워진다(슈퍼볼 ×1.5, 하이퍼볼 ×2, 마스터볼은 반드시 잡음).
  */
+/**
+ * 🕺 받아 온 도트 그림을 **이미 있는 버튼 안에서** 갈아 끼운다 (DOM을 새로 만들지 않는다).
+ * 버튼을 다시 만들면 그 순간 누르던 탭이 사라진다 — 아이에겐 "눌렀는데 아무 일도 안 일어남"이다.
+ */
+function swapDots() {
+  const pick = $('catch-pick');
+  if (!pick) return;
+  for (const btn of pick.querySelectorAll('.catch-cand')) {
+    const id = Number(btn.dataset.id);
+    const dot = id ? animUrl(id) : null;
+    if (!dot) continue;
+    const face = btn.querySelector('.mon-figure');
+    const img = face && face.querySelector('img');
+    if (!img || img.getAttribute('src') === dot) continue;
+    img.src = dot;
+    img.style.filter = '';         // 도트엔 🎨 염색을 씌우지 않는다 (일러스트 기준으로 맞춘 필터다)
+    face.classList.add('dot');
+    const gear = face.querySelector('.mon-gear');
+    if (gear) gear.remove();       // 🎀 장식도 뺀다 — 도트는 비율이 달라 자리가 안 맞는다
+  }
+}
+
 function renderBalls(counts) {
   const box = $('catch-golden');
   if (!box) return;
@@ -202,13 +229,15 @@ export function closeCatch() {
   $('catch').hidden = true;
   ui.onDone = null;
   ui.attempt = null;
+  ui.threw = false;
 }
 
 function finish() {
   if (!ui.open) return;
   const cb = ui.onDone;
+  const threw = ui.threw;
   closeCatch();
-  if (cb) cb();
+  if (cb) cb({ threw: !!threw }); // 한 번도 안 던지고 닫았으면 부르는 쪽이 기회를 돌려줄 수 있다
 }
 
 function renderHeader(xpGain, info, levelUp) {
@@ -258,6 +287,7 @@ export function burstConfetti(count = 70) {
 /** 볼 던지기 연출 → 판정 → 결과 */
 async function throwBall(c) {
   if (!ui.open || !ui.attempt) return;
+  ui.threw = true; // 던졌다 — 그냥 닫은 것과 구분한다 (수학은 던질 기회를 미리 차감해 둔다)
   const run = ++ui.run;
   const alive = () => ui.open && ui.run === run;
   $('catch-pick').hidden = true;
