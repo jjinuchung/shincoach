@@ -342,6 +342,18 @@ export const ROSTER = [
   { id: 893, ko: '자루도', en: 'Zarude', subject: 'math' }, // 전설 g8
   { id: 1007, ko: '코라이돈', en: 'Koraidon', subject: 'math' }, // 전설 g9
   { id: 1008, ko: '미라이돈', en: 'Miraidon', subject: 'math' }, // 전설 g9
+  // 🌌 울트라비스트 (2026-09-27) — 🕳 울트라홀이 열려야 수학 잡기에 나온다. ⚪ 비스트볼이 있어야 제대로 잡힌다
+  { id: 793, ko: '텅비드', en: 'Nihilego', subject: 'math' },
+  { id: 794, ko: '매시붕', en: 'Buzzwole', subject: 'math' },
+  { id: 795, ko: '페로코체', en: 'Pheromosa', subject: 'math' },
+  { id: 796, ko: '전수목', en: 'Xurkitree', subject: 'math' },
+  { id: 797, ko: '철화구야', en: 'Celesteela', subject: 'math' },
+  { id: 798, ko: '종이신도', en: 'Kartana', subject: 'math' },
+  { id: 799, ko: '악식킹', en: 'Guzzlord', subject: 'math' },
+  { id: 803, ko: '베베놈', en: 'Poipole', subject: 'math' },
+  { id: 804, ko: '아고용', en: 'Naganadel', subject: 'math' },
+  { id: 805, ko: '차곡차곡', en: 'Stakataka', subject: 'math' },
+  { id: 806, ko: '두파팡', en: 'Blacephalon', subject: 'math' },
 ];
 
 /** 이 레벨에서 열려 있는 명단 */
@@ -350,6 +362,32 @@ export const ROSTER = [
  * 명단 100마리 중 30마리가 변신할 수 있다. 그림은 필요할 때만 받는다(ensureForm).
  * 라이츄·개굴닌자 메가는 최신작 자료라 아이가 아는 것과 다를 수 있다.
  */
+/**
+ * 🌌 울트라비스트 — 울트라홀을 통해 이차원(울트라스페이스)에서 넘어온 존재들 (2026-09-27, 진우 요청).
+ *
+ * 원작 설정을 그대로 옮긴다: ① 🕳 울트라홀이 열려야 만나고 ② 보통 볼은 거의 안 통하며(×0.1)
+ * ⚪ 비스트볼이 있어야 제대로 잡히고 ③ 전설과 달리 **몇 번이든 다시 만날 수 있다**.
+ * 전부 🔢 수학에서만 (아버님 결정) — 울트라홀은 🏆 💎 스페셜 여덟 배지를 모아야 열린다.
+ * 이름·타입은 PokeAPI에서 받은 것만 썼다 (기억으로 쓰면 틀린다 — 전수목을 "데쓰번"으로 잘못 알고 있었다).
+ */
+export const ULTRA_BEASTS = [793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806];
+const ubSet = new Set(ULTRA_BEASTS);
+
+/** 이 포켓몬이 🌌 울트라비스트인가 (네크로즈마는 원작에선 UB 취급이지만 명단에선 전설로 둔다) */
+export function isUltraBeast(id) {
+  return ubSet.has(Number(id));
+}
+
+/**
+ * 🕳 울트라홀 게이트 — 홀이 열리기 전에는 🌌 울트라비스트가 잡기 후보에 아예 없다.
+ * (열리는 조건은 🏆 💎 스페셜 여덟 배지 — mathprog.gymClaimed)
+ * @param {Array<{id:number}>} list 후보
+ * @param {boolean} holeOpen 울트라홀이 열렸나
+ */
+export function forHole(list, holeOpen) {
+  return holeOpen ? (list || []).slice() : (list || []).filter((c) => c && !isUltraBeast(c.id));
+}
+
 export const FORMS = {
   3: { mega: 10033, gmax: 10195 },   // 이상해꽃
   6: { mega: 10034, gmax: 10196 },   // 리자몽

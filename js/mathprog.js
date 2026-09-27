@@ -45,7 +45,7 @@ export const REWARD = {
   // 🏅 배지 하나를 채우면 보너스 + 🔷 수학스톤 1, 여덟 개를 다 모으면 🏆 챔피언 보상 한 번
   special: { xp: 8, coin: 3 },
   badge: { xp: 50, coin: 20, stone: 1 },
-  gym: { xp: 200, coin: 300, stone: 3, ball: 'masterball' },
+  gym: { xp: 200, coin: 300, stone: 3, ball: 'masterball', beast: 1 }, // 🕳 울트라홀이 열린다 → ⚪ 비스트볼 하나를 함께 (첫 만남용)
 };
 
 /** 진단 결과로 "아는 것"으로 친 개념의 첫 복습까지 며칠 — 진단은 한 문제뿐이라 곧 다시 확인한다 */

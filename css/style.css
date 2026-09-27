@@ -1981,6 +1981,12 @@ button { font-family: inherit; }
 .math-badge.on { background: #fef3c7; color: #92400e; border-color: #f59e0b; }
 .math-badge.just { animation: badge-pop .7s ease-out 2; }
 .math-badge .n { font-weight: 800; opacity: .85; }
+/* 🌌 울트라비스트 (2026-09-27) — 다른 차원에서 온 존재라 보라빛으로 구분 */
+.pokedex-cell .subj.ub { font-size: 0.9rem; }
+.catch-cand .ub-badge { position: absolute; top: 4px; left: 6px; font-size: 1rem; }
+.math-ultra { background: linear-gradient(135deg, #2e1065, #4c1d95); color: #fff; border-radius: 14px; padding: 12px 14px; margin-top: 10px; }
+.math-ultra-title { margin: 0 0 4px; font-size: 1.1rem; font-weight: 800; }
+.math-ultra .math-p { color: #ede9fe; margin: 0; }
 @keyframes badge-pop {
   0%, 100% { transform: scale(1); }
   40% { transform: scale(1.14); }

@@ -88,6 +88,7 @@ export const MASTERBALL = { id: 'masterball', emoji: '🟣', ko: '마스터볼',
 export const GOLDEN = { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', price: 0, mult: 2, cap: 0.95, kind: 'ball' };
 /** 잡기 화면에 보여줄 볼 순서 (몬스터볼은 언제나 첫 번째) */
 export const BALLS = [POKEBALL, GREATBALL, ULTRABALL, GOLDEN, MASTERBALL];
+// ⚪ 비스트볼은 아래(스톤 아이템 구역)에서 정의되므로 거기서 BALLS에 더한다 — 볼 고르기에 안 나오면 살 수는 있어도 못 던진다
 /** 상점에서 파는 볼 */
 export const SHOP_BALLS = [GREATBALL, ULTRABALL, MASTERBALL];
 
@@ -119,8 +120,17 @@ export const EGG_MATH = { id: 'egg_math', emoji: '🥚', ko: '수학 알', price
 export const EGG_ENGLISH = { id: 'egg_english', emoji: '🥚', ko: '영어 알', price: 200, stones: { stone_english: 2 }, kind: 'egg', subject: 'english', hint: '🎤 오늘의 목표 문장을 5일 채우면 부화해요 — 🎒에서 며칠 남았는지 보여요' };
 // 🌈 이로치의 스톤: 잡은 포켓몬 한 마리를 **색이 다른 모습(이로치)** 으로 — 영원히, 어디서나(도감·잡기·퍼즐·배틀·파트너). 두 과목 스톤이 다 든다(인피니티)
 // id를 'shiny'로 하면 안 된다 — 'shiny'는 이미 ✨ 반짝 염색약 id (Codex 6차)
+/**
+ * 🌌 ⚪ 비스트볼 — 울트라비스트를 잡는 전용 볼 (2026-09-27, 진우 요청).
+ * 원작 그대로: 울트라비스트에게는 아주 잘 들고(×5), 보통 볼은 울트라비스트에게 거의 안 통한다(xp.UB_PENALTY).
+ * 일반 포켓몬에게는 그냥 몬스터볼과 같다 — 원작은 오히려 불리하지만, 아이가 실수로 하나 날리면 억울하다.
+ */
+export const BEASTBALL = { id: 'beastball', emoji: '⚪', ko: '비스트볼', price: 300, stones: { stone_math: 2 }, mult: 1, ub: 5, cap: 0.9, kind: 'ball', hint: '🌌 울트라비스트에게만 아주 잘 들어요 — 보통 몬스터볼로는 거의 못 잡아요' };
+
+BALLS.push(BEASTBALL); // 🌌 울트라비스트를 잡으려면 잡기 화면의 볼 고르기에 나와야 한다
+
 export const SHINY_STONE = { id: 'shiny_stone', emoji: '🌈', ko: '이로치의 스톤', price: 500, stones: { stone_math: 3, stone_english: 3 }, kind: 'tool', hint: '🎒 잡은 포켓몬을 눌러 "🌈 이로치로!"를 누르면 색이 다른 모습이 돼요 — 영원히' };
-export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH, SHINY_STONE];
+export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH, SHINY_STONE, BEASTBALL];
 
 /** 값 — 코인과 재료(스톤)를 한 묶음으로 (purchaseRule이 둘 다 한 트랜잭션에서 판정) */
 export function costOf(it) {
@@ -149,6 +159,7 @@ export const ITEMS = [
   EGG_MATH,
   EGG_ENGLISH,
   SHINY_STONE,
+  BEASTBALL,
 ];
 const byId = {};
 for (const it of ITEMS) byId[it.id] = it;

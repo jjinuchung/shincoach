@@ -11,9 +11,9 @@ import { battleLossRule, cloneProfile, emptyProfile, evolveRule, gearRule, level
 const ids = new Set(ROSTER.map((r) => r.id));
 const links = Object.entries(EVO).flatMap(([from, list]) => list.map((e) => ({ from: Number(from), ...e })));
 
-test('🧬 진화표: 66링크·59종, 양쪽이 모두 명단에 있다 (도감에 자리가 없으면 갈 곳이 없다)', () => {
-  assert.equal(links.length, 66);
-  assert.equal(Object.keys(EVO).length, 59);
+test('🧬 진화표: 67링크·60종(🌌 베베놈→아고용 포함), 양쪽이 모두 명단에 있다', () => {
+  assert.equal(links.length, 67);
+  assert.equal(Object.keys(EVO).length, 60);
   for (const l of links) {
     assert.ok(ids.has(l.from), `진화 전 ${l.from}이 명단에 없다`);
     assert.ok(ids.has(l.to), `진화 후 ${l.to}이 명단에 없다`);
@@ -83,7 +83,7 @@ test('🧬 원작 조건(orig)은 모든 링크에 있다 — 진우가 아는 �
 
 test('🧬 진화하면 과목이 바뀌는 37쌍 (아버님 결정: 원작대로) — 그다음부터 다른 스톤이 필요하다', () => {
   const crossed = links.filter((l) => subjectOf(l.from) !== subjectOf(l.to));
-  assert.equal(crossed.length, 37);
+  assert.equal(crossed.length, 37, '🌌 베베놈→아고용은 둘 다 수학이라 갈리지 않는다');
   // 고라파덕(영어) → 골덕(수학)
   assert.equal(subjectOf(54), 'english');
   assert.equal(subjectOf(55), 'math');

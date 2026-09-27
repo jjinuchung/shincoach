@@ -6,8 +6,10 @@ import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { makeFigure, setFigure, BALLS, POKEBALL } from './items.js';
 import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
+import { isUltraBeast } from './pokemon.js'; // 🌌 울트라비스트 — ⚪ 비스트볼이 있어야 제대로 잡힌다
 
 const $ = (id) => document.getElementById(id);
+const BEASTBALL_ID = 'beastball';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const ui = { open: false, run: 0, threw: false, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, coinGain: 0, pendingAuto: false, candidates: [] }; // candidates = 지금 화면의 후보 (🧭 레이더가 바꿔 그린다)
@@ -85,6 +87,13 @@ export function openCatch(o) {
   $('catch-fx').textContent = '';
 
   renderPick(o.candidates, 0);
+  // 🌌 울트라비스트가 후보에 있으면 **던지기 전에** 알려 준다 — 몬스터볼로 던지면 거의 못 잡고 기회만 쓴다
+  if ((o.candidates || []).some((c) => isUltraBeast(c.id))) {
+    const has = (o.ballCounts || {})[BEASTBALL_ID] > 0;
+    $('catch-msg').textContent = has
+      ? '🌌 울트라비스트가 나타났다! ⚪ 비스트볼로 던져야 잡혀요'
+      : '🌌 울트라비스트가 나타났다! ⚪ 비스트볼이 있어야 잡을 수 있어요 (🛒 상점)';
+  }
   // 🕺 도트를 아직 안 받았으면 받아서 **그림만** 바꿔 끼운다.
   // ★ 여기서 renderPick을 다시 부르면 안 된다 — 후보 버튼을 통째로 새로 만들기 때문에,
   //   아이가 포켓몬을 누르려던 바로 그 순간 버튼이 사라져 **탭이 씹힌다**.
@@ -145,6 +154,8 @@ function renderPick(candidates, pickId) {
     if (dot) face.classList.add('dot');
     btn.appendChild(face);
     if (pickId && c.id === pickId) { const badge = document.createElement('span'); badge.className = 'radar-badge'; badge.textContent = '🧭'; btn.appendChild(badge); }
+    // 🌌 울트라비스트 — 다른 차원에서 온 것이라 보통 볼이 거의 안 통한다. 던지기 전에 보이게
+    if (isUltraBeast(c.id)) { const ub = document.createElement('span'); ub.className = 'ub-badge'; ub.textContent = '🌌'; ub.title = '울트라비스트 — ⚪ 비스트볼이 있어야 잡혀요'; btn.appendChild(ub); }
     const nm = document.createElement('span');
     nm.className = 'nm';
     nm.textContent = c.ko;

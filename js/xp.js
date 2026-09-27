@@ -9,7 +9,7 @@ import {
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, MAX_LV } from './evolve.js';
-import { anchorFor, shinyUrl, subjectOf } from './pokemon.js';
+import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
 import { findLocked } from './unlock.js';
 
 // ── 경험치 ──
@@ -118,7 +118,10 @@ export const RARITY_IDS = {
       144, 145, 146, 251, 483, 484, 487, 643, 644, 716,
       132, 359, // 2026-09-20 추가분 중 포획률 45 미만 — 메타몽(35)·앱솔(30)
       // 🔢 수학 전용 (2026-09-22) 포획률 <45 또는 3단계 최종형(스타터·600족) 30
-      34, 36, 76, 157, 160, 181, 208, 254, 330, 306, 375, 392, 395, 405, 468, 500, 503, 635, 612, 655, 681, 706, 727, 730, 815, 818, 823, 908, 914, 998],
+      34, 36, 76, 157, 160, 181, 208, 254, 330, 306, 375, 392, 395, 405, 468, 500, 503, 635, 612, 655, 681, 706, 727, 730, 815, 818, 823, 908, 914, 998,
+      // 🌌 울트라비스트 11 (2026-09-27) — 원작에서도 전설이 아니다(is_legendary: false). 귀하지만 전설 자리는 비워 둔다.
+      //    특별함은 등급이 아니라 **잡는 방식**으로 낸다: 🕳 울트라홀이 열려야 만나고 ⚪ 비스트볼이 있어야 잡힌다
+      793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806],
   4: [150, 151, 384, 249, 250, 382, 383, 493, // 가장 상징적인 8마리만 전설
       // 🔢 수학 전용 (2026-09-22) 전설·환상 15 — 수학에서만 만나는 전설이 있어야 도감이 수학으로 끈다
       243, 244, 245, 379, 385, 491, 492, 494, 717, 791, 792, 807, 893, 1007, 1008],
@@ -259,11 +262,21 @@ export function catchChance(rarity, level, mult = 1, cap = 0) {
   return Math.min(limit, base * mult * (1 + 0.05 * Math.max(1, level)));
 }
 
-/** 이 볼로 던졌을 때 잡힐 확률 (마스터볼은 반드시 잡는다) */
-export function ballChance(ballId, rarity, level) {
+/**
+ * 🌌 울트라비스트에게 보통 볼을 던졌을 때의 배수 — 원작 그대로 "거의 안 통한다"(약 0.1배).
+ * ⚪ 비스트볼(it.ub)만 제대로 든다. 이게 울트라비스트를 특별하게 만드는 장치다 (등급이 아니라 **잡는 방식**)
+ */
+export const UB_PENALTY = 0.1;
+
+/**
+ * 이 볼로 던졌을 때 잡힐 확률 (마스터볼은 반드시 잡는다).
+ * @param {boolean} [isUB] 🌌 울트라비스트인가 — 보통 볼은 ×0.1, ⚪ 비스트볼은 ×5
+ */
+export function ballChance(ballId, rarity, level, isUB = false) {
   const b = itemById(ballId) || POKEBALL;
-  if (b.sure) return 1;
-  return catchChance(rarity, level, b.mult || 1, b.cap || 0);
+  if (b.sure) return 1; // 🟣 마스터볼은 울트라비스트도 확실히 잡는다 (원작도 그렇다)
+  const mult = (b.mult || 1) * (isUB ? (b.ub || UB_PENALTY) : 1);
+  return catchChance(rarity, level, mult, b.cap || 0);
 }
 
 export function rollCatch(chance, rng = Math.random) {
@@ -431,7 +444,7 @@ export function catchAttempt(id, rng = Math.random, opts = {}) {
   const wanted = opts.ball || (opts.golden ? GOLDEN.id : POKEBALL.id);
   const ballItem = itemById(wanted) || POKEBALL;
   const used = ballItem.free || consumeItem(ballItem.id) ? ballItem : POKEBALL; // 가방에 없으면 그냥 몬스터볼
-  const chance = ballChance(used.id, rarityOf(id), level);
+  const chance = ballChance(used.id, rarityOf(id), level, isUltraBeast(id)); // 🌌 울트라비스트는 ⚪ 비스트볼이라야 제대로 든다
   const caught = rollCatch(chance, rng);
   const golden = used.id === GOLDEN.id;
   profile.throws++;
@@ -456,7 +469,7 @@ export function catchAttempt(id, rng = Math.random, opts = {}) {
 export function previewAttempt(id, rng = Math.random, opts = {}) {
   const level = levelFromXp(profile.xp).level;
   const ball = opts.ball || (opts.golden ? GOLDEN.id : POKEBALL.id);
-  const chance = ballChance(ball, rarityOf(id), level);
+  const chance = ballChance(ball, rarityOf(id), level, isUltraBeast(id));
   return { caught: rollCatch(chance, rng), chance, count: profile.caught[id] || 0, first: false, bonusXp: 0, golden: ball === GOLDEN.id, ball, info: null };
 }
 

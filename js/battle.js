@@ -121,6 +121,8 @@ export const TYPE_OF = {
   76: 'rock', 247: 'rock', 697: 'rock', 745: 'rock',
   34: 'ground', 330: 'ground', 105: 'ground', 27: 'ground', 111: 'ground', 231: 'ground', 328: 'ground', 449: 'ground', 551: 'ground', 749: 'ground',
   379: 'steel', 385: 'steel', 208: 'steel', 306: 'steel', 375: 'steel', 681: 'steel', 823: 'steel', 884: 'steel', 1000: 'steel', 304: 'steel',
+  // 🌌 울트라비스트 (2026-09-27) — 벌레·독·비행은 기술표에 없어 둘째 타입으로 (베베놈은 독 단일이라 노말)
+  793: 'rock', 794: 'fighting', 795: 'fighting', 796: 'electric', 797: 'steel', 798: 'grass', 799: 'dark', 803: 'normal', 804: 'dragon', 805: 'rock', 806: 'fire',
 };
 
 export function typeOf(id) {

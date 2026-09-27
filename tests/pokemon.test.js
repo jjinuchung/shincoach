@@ -3,14 +3,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ROSTER, pickCharacters, unlockedRoster, isUnlocked, nextUnlockLevel, unlockCountAt, headAnchor, subjectOf, forSubject, forPuzzle } from '../js/pokemon.js';
 
-test('ROSTER: 311마리(영어 161 = 처음 40 + Lv5·10·15에 20씩 + 자마젠타 + 2026-09-20 흔함·보통 60 / 🔢 수학 전용 150), id 중복 없음, 한글·영문 이름 있음', () => {
-  assert.equal(ROSTER.length, 311);
-  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 311);
-  assert.equal(ROSTER.filter((r) => r.subject === 'math').length, 150, '수학 전용 150 (2026-09-22)');
-  assert.equal(unlockedRoster(1).length, 250, '처음 40 + 추가 60 + 수학 150은 바로 잡을 수 있게');
-  assert.equal(unlockedRoster(5).length, 270);
-  assert.equal(unlockedRoster(14).length, 290);
-  assert.equal(unlockedRoster(15).length, 311);
+test('ROSTER: 322마리(영어 161 / 🔢 수학 전용 161 = 150 + 🌌 울트라비스트 11), id 중복 없음, 한글·영문 이름 있음', () => {
+  assert.equal(ROSTER.length, 322);
+  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 322);
+  assert.equal(ROSTER.filter((r) => r.subject === 'math').length, 161, '수학 전용 150 + 🌌 울트라비스트 11 (2026-09-27)');
+  assert.equal(unlockedRoster(1).length, 261, '처음 40 + 추가 60 + 수학 161은 바로 잡을 수 있게 (🌌는 울트라홀이 따로 막는다)');
+  assert.equal(unlockedRoster(5).length, 281);
+  assert.equal(unlockedRoster(14).length, 301);
+  assert.equal(unlockedRoster(15).length, 322);
   assert.equal(ROSTER.find((r) => r.id === 889).ko, '자마젠타', '진우 요청 — 자시안의 짝');
   assert.equal(isUnlocked(25, 1), true, '피카츄는 처음부터');
   assert.equal(isUnlocked(129, 4), false, '잉어킹은 Lv5');
@@ -29,16 +29,16 @@ test('pickCharacters: n마리를 겹치지 않게, 부족하면 있는 만큼, �
   const picked = pickCharacters(chars, 8, () => 0.5);
   assert.equal(picked.length, 8);
   assert.equal(new Set(picked.map((c) => c.id)).size, 8, '중복 없음');
-  assert.equal(chars.length, 311, '원본 유지');
+  assert.equal(chars.length, 322, '원본 유지');
   assert.equal(pickCharacters(chars.slice(0, 3), 8).length, 3, '부족하면 있는 만큼');
   assert.deepEqual(pickCharacters([], 5), []);
   assert.deepEqual(pickCharacters(null, 5), []);
 });
 
-test('🔢 과목 가르기: subject는 잡히는 곳만 — 영어 161·수학 150, forSubject는 그 과목만, forPuzzle은 영어 + 잡은 수학', () => {
+test('🔢 과목 가르기: subject는 잡히는 곳만 — 영어 161·수학 161, forSubject는 그 과목만, forPuzzle은 영어 + 잡은 수학', () => {
   const en = ROSTER.filter((r) => subjectOf(r.id) === 'english');
   const ma = ROSTER.filter((r) => subjectOf(r.id) === 'math');
-  assert.equal(en.length, 161); assert.equal(ma.length, 150);
+  assert.equal(en.length, 161); assert.equal(ma.length, 161);
   assert.equal(subjectOf(25), 'english', '피카츄는 영어');
   assert.equal(subjectOf(244), 'math', '앤테이는 수학');
   assert.equal(subjectOf(99999), 'english', '모르면 영어');

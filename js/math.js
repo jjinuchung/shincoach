@@ -19,12 +19,12 @@ import { todayKey } from './track.js';
 import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKindOf, makeSpecialRound } from './mathspecial.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
-import { GOLDEN, STONE_MATH, STONE_ENGLISH, RADAR, POTION, setFigure } from './items.js';
+import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
 import { eggProgress } from './egg.js';
 import { showHatchIfAny } from './hatch.js';
-import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast } from './pokemon.js';
+import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN } from './cheer.js';
@@ -172,7 +172,9 @@ async function catchPool() {
     let chars = [];
     try { chars = await loadCharacters(); } catch { chars = []; }
     const level = getLevelInfo().level;
-    return forSubject(chars, 'math').filter((c) => isUnlocked(c.id, level) && !isTired(c.id)).map((c) => ({ ...c, look: getLook(c.id) }));
+    // 🌌 울트라비스트는 🕳 울트라홀이 열려야(= 🏆 💎 여덟 배지) 나타난다 — 원작도 챔피언 이후 컨텐츠다
+    const pool = forHole(forSubject(chars, 'math'), gymClaimed(ui.state));
+    return pool.filter((c) => isUnlocked(c.id, level) && !isTired(c.id)).map((c) => ({ ...c, look: getLook(c.id) }));
   };
   let pool = await read();
   // 수학 그림이 아직 4마리도 없으면(새 명단을 넣은 첫날) 몇 마리 받아서라도 던지게 — 번 잡기를 그림이 없다고 삼키지 않는다.
@@ -1966,6 +1968,7 @@ async function finishRound() {
     rw.xp += REWARD.gym.xp;
     rw.coin += REWARD.gym.coin;
     addItem(REWARD.gym.ball, 1);
+    if (REWARD.gym.beast) addItem(BEASTBALL.id, REWARD.gym.beast); // 🕳 울트라홀이 열렸으니 ⚪ 비스트볼도 하나
     addItem(STONE_ENGLISH.id, REWARD.gym.stone);
     rw.stone = (rw.stone || 0) + REWARD.gym.stone;
   }
@@ -2024,7 +2027,12 @@ async function finishRound() {
     card.appendChild(el('h2', '', rw.gym ? '🏆 여덟 배지를 다 모았어요!' : newBadges.length ? `🏅 ${newBadges.map((k) => k.gym).join('·')} 획득!` : `💎 스페셜 ${r.correct} / ${r.qs.length}`));
     if (rw.gym) {
       card.appendChild(el('p', 'math-p big', '체육관 여덟 곳을 모두 이겼어요 — 이제 챔피언이에요!'));
-      card.appendChild(el('p', 'math-p', `🟣 마스터볼 1개 · 🔷 수학스톤 ${REWARD.gym.stone}개 · 🔶 영어스톤 ${REWARD.gym.stone}개를 받았어요.`));
+      card.appendChild(el('p', 'math-p', `🟣 마스터볼 1개 · ⚪ 비스트볼 ${REWARD.gym.beast}개 · 🔷 수학스톤 ${REWARD.gym.stone}개 · 🔶 영어스톤 ${REWARD.gym.stone}개를 받았어요.`));
+      // 🕳 울트라홀 — 챔피언이 되어야 열리는 문 (원작도 그렇다)
+      const hole = el('div', 'math-ultra');
+      hole.appendChild(el('p', 'math-ultra-title', '🕳 울트라홀이 열렸어요!'));
+      hole.appendChild(el('p', 'math-p', '다른 차원에서 온 🌌 울트라비스트를 이제 🔢 수학 잡기에서 만날 수 있어요. 보통 몬스터볼로는 거의 안 잡히니 ⚪ 비스트볼로 던져야 해요 (🛒 상점에서 🔷2 + 💰300).'));
+      card.appendChild(hole);
     } else if (newBadges.length) {
       card.appendChild(el('p', 'math-p', newBadges.map((k) => `${k.badge} ${k.ko}를 ${BADGE_NEED}번 해냈어요`).join(' · ')));
     } else {

@@ -1,5 +1,5 @@
 // 🎒 내 포켓몬(도감) 화면: 레벨·경험치·💰 코인, 잡은 포켓몬(그림·마릿수, 누르면 장식·염색), 못 잡은 포켓몬(검은 실루엣 + ???), 🛒 상점
-import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf } from './pokemon.js';
+import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf, isUltraBeast } from './pokemon.js';
 import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
 import { listDaily } from './db.js';
 import { todayKey, todayDone } from './track.js';
@@ -185,7 +185,9 @@ export async function openPokedex(opts) {
       // 🧬 다 진화시켜 지금은 없는 모습 — 도감 칸은 남고 "보냈다"는 것만 보여 준다
       else if (n > 0 && have === 0) cell.appendChild(el('div', 'cnt evolved', '🧬'));
       if (n > 0 && lv > 1) cell.appendChild(el('div', 'lv', `Lv${lv}`));
-      if (subjectOf(m.id) === 'math') cell.appendChild(el('div', 'subj', '🔢')); // 수학에서만 잡히는 얼굴 — 못 잡은 칸에도 붙어 "수학 가면 있다"가 보인다
+      // 🌌 울트라비스트는 🕳 울트라홀이 열려야 만난다 — 🔢 대신 🌌를 달아 "다른 차원에서 온 것"을 표시
+      if (isUltraBeast(m.id)) cell.appendChild(el('div', 'subj ub', '🌌'));
+      else if (subjectOf(m.id) === 'math') cell.appendChild(el('div', 'subj', '🔢')); // 수학에서만 잡히는 얼굴 — 못 잡은 칸에도 붙어 "수학 가면 있다"가 보인다
       if (n > 0 && getPartner() === m.id) cell.appendChild(el('div', 'partner', '🤝'));
       // 못 잡은 포켓몬도 누를 수 있다 — 등급은 **잡기 전에** 맞아야 의미가 있다 (전설이 흔함에 있으면 쉽게 잡힌다)
       cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url, caught: n > 0 }));
