@@ -1983,6 +1983,9 @@ button { font-family: inherit; }
 .math-badge .n { font-weight: 800; opacity: .85; }
 /* 🌌 울트라비스트 (2026-09-27) — 다른 차원에서 온 존재라 보라빛으로 구분 */
 .pokedex-cell .subj.ub { font-size: 0.9rem; }
+.pokedex-ub { border: 2px solid #6d28d9; background: linear-gradient(180deg, #faf5ff, #fff); }
+.pokedex-ub h2 { color: #5b21b6; }
+.pokedex-ub-note { margin: 2px 0 8px; font-size: .85rem; color: #6b21a8; font-weight: 700; }
 .catch-cand .ub-badge { position: absolute; top: 4px; left: 6px; font-size: 1rem; }
 .math-ultra { background: linear-gradient(135deg, #2e1065, #4c1d95); color: #fff; border-radius: 14px; padding: 12px 14px; margin-top: 10px; }
 .math-ultra-title { margin: 0 0 4px; font-size: 1.1rem; font-weight: 800; }

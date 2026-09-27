@@ -33,13 +33,13 @@ test('puzzleXp: 틀린 횟수 0/1/2 → 30/20/10, 정답 공개 → 3', () => {
   assert.equal(puzzleXp(null), 3);
 });
 
-test('희귀도: 명단 322마리 전부 등급이 있고 겹치지 않음 — 🔢 수학 161은 흔함 60·보통 45·희귀 41(🌌 11 포함)·전설 15', () => {
+test('희귀도: 명단 322마리 전부 등급이 있고 겹치지 않음 — 🔢 수학 161은 흔함 60·보통 45·희귀 30·전설 15·🌌 11', () => {
   const all = Object.values(RARITY_IDS).flat();
   assert.equal(all.length, 322);
   assert.equal(new Set(all).size, 322, '겹침 없음');
   const math = new Set(ROSTER.filter((r) => r.subject === 'math').map((r) => r.id));
-  const cnt = [1, 2, 3, 4].map((r) => RARITY_IDS[r].filter((id) => math.has(id)).length);
-  assert.deepEqual(cnt, [60, 45, 41, 15], '🌌 울트라비스트 11은 희귀 — 원작에서도 전설이 아니다');
+  const cnt = [1, 2, 3, 4, 5].map((r) => RARITY_IDS[r].filter((id) => math.has(id)).length);
+  assert.deepEqual(cnt, [60, 45, 30, 15, 11], '🌌 울트라비스트 11은 ⭐ 밖의 제 등급');
   assert.equal(rarityOf(244), 4, '앤테이 전설'); assert.equal(rarityOf(157), 3, '블레이범 희귀'); assert.equal(rarityOf(64), 2, '윤겔라 보통'); assert.equal(rarityOf(77), 1, '포니타 흔함');
   assert.deepEqual(new Set(all), new Set(ROSTER.map((r) => r.id)));
   assert.equal(rarityOf(25), 2, '피카츄 보통');
@@ -106,10 +106,11 @@ test('streakBonus: 10, 15, 20 … 최대 40', () => {
   assert.equal(streakBonus(0), 10);
 });
 
-test('희귀도 비율: 흔함 > 보통 > 희귀 > 전설 (전설이 흔하면 특별하지 않다)', () => {
-  const count = { 1: 0, 2: 0, 3: 0, 4: 0 };
+test('희귀도 비율: 흔함 > 보통 > 희귀 > 전설 (전설이 흔하면 특별하지 않다) · 🌌는 별 밖의 제 등급', () => {
+  const count = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   for (const r of ROSTER) count[rarityOf(r.id)]++;
-  assert.equal(count[1] + count[2] + count[3] + count[4], ROSTER.length);
+  assert.equal(count[5], 11, '🌌 울트라비스트는 ⭐ 등급에 섞이지 않는다');
+  assert.equal(count[1] + count[2] + count[3] + count[4] + count[5], ROSTER.length);
   assert.ok(count[1] > count[2], `흔함 ${count[1]} > 보통 ${count[2]}`);
   assert.ok(count[2] > count[3], `보통 ${count[2]} > 희귀 ${count[3]}`);
   assert.ok(count[3] > count[4], `희귀 ${count[3]} > 전설 ${count[4]}`);

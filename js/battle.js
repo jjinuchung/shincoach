@@ -7,7 +7,7 @@ import * as bgm from './bgm.js';
 import { POTION, itemById, makeFigure, setFigure } from './items.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
-import { ensureForm } from './pokemon.js'; // ⭐ 변신 그림 (없으면 배틀에서 그 자리에 받는다)
+import { ensureForm, isUltraBeast } from './pokemon.js'; // ⭐ 변신 그림 · 🌌 울트라비스트는 상대로 안 나온다
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림 (5세대 스프라이트)
 
 // ── 규칙 ──
@@ -202,6 +202,9 @@ export function pickOpponent(unlocked, caught, rng = Math.random) {
   const pool = [];
   for (const m of unlocked) {
     if (caught[m.id] > 0) continue;
+    // 🌌 울트라비스트는 배틀 상대가 되지 않는다 — 이기면 그냥 얻게 되어 ⚪ 비스트볼 규칙이 무너진다
+    //    (영어 배틀에서도 나오던 구멍, Codex 11차 #3)
+    if (isUltraBeast(m.id)) continue;
     const w = [0, 6, 4, 2, 1][rarityOf(m.id)] || 2; // 흔함 6 : 보통 4 : 희귀 2 : 전설 1
     for (let i = 0; i < w; i++) pool.push(m);
   }

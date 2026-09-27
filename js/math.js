@@ -10,14 +10,14 @@ import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidg
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
-  applySpecialRound, badgesOf, spPass, claimGym, gymClaimed,
+  applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
 import { todayKey } from './track.js';
 // 💎 스페셜 문제 — 문제집에서 뽑은 여덟 얼굴 (2026-09-26)
-import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKindOf, makeSpecialRound } from './mathspecial.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem } from './xp.js';
+import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKindOf, makeSpecial, makeSpecialRound } from './mathspecial.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
@@ -201,7 +201,10 @@ async function useRadar(pool, candidates) {
   const star = pool.filter(rare);
   let pick = star.length ? pickCharacters(star, 1)[0] : null;
   if (!pick) {
-    const ids = forSubject(ROSTER, 'math').filter((r) => rare(r) && isUnlocked(r.id, level) && !isTired(r.id)).map((r) => r.id);
+    // 🌌 울트라홀이 닫혀 있으면 여기서도 안 나온다 — 받아 둔 희귀가 없을 때 명단에서 직접 고르는 이 길에
+    //    게이트가 없어서 챔피언 전에도 울트라비스트가 불려 나왔다 (Codex 11차 #4)
+    const ids = forHole(forSubject(ROSTER, 'math'), gymClaimed(ui.state))
+      .filter((r) => rare(r) && isUnlocked(r.id, level) && !isTired(r.id)).map((r) => r.id);
     const id = ids.length ? ids[Math.floor(Math.random() * ids.length)] : 0;
     try {
       const got = id ? await Promise.race([ensureCast([id]), new Promise((res) => setTimeout(() => res([]), 8000))]) : [];
@@ -1298,9 +1301,22 @@ function nextReplyOrLadder() {
 
 /** 🔁 답장 뒤 풀어보기 — 같은 틀(want) 한 문제. 감 잡기·이유·쌍둥이 없는 가벼운 편(mode 'ask') */
 function startAskTry(ask) {
+  const base = (Date.now() % 1000000) | 0;
+  // 💎 스페셜 문항으로 물었으면 줄기가 없다 — 같은 얼굴로 새 문제를 만들어 준다.
+  //    (전에는 stemOf('special')이 없어 버튼을 눌러도 사다리로 튕겼다, Codex 11차 #6)
+  if (ask.concept === 'special') {
+    const face = String(ask.k || '').replace('special-', '');
+    let sq = null;
+    for (let t = 0; t < 8 && !sq; t++) sq = makeSpecial(face, base + t * 7919, { cast: (ui.opts && ui.opts.cast) || [] });
+    if (!sq) { renderLadder(ui.state); return; }
+    ui.daily = null;
+    // 스페셜은 씨앗마다 숫자가 달라 "같은 틀"이 글자 그대로 오지는 않는다 — 같은 **얼굴**이면 인정한다
+    ui.round = { id: null, mode: 'ask', qs: [sq], ids: ['special'], askId: ask.id, askNo: ask.no, askSameKey: sq.key === ask.key, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
+    renderQuestion();
+    return;
+  }
   const sx = stemOf(ask.concept);
   if (!sx) { renderLadder(ui.state); return; }
-  const base = (Date.now() % 1000000) | 0;
   let q = null; let any = null;
   for (let t = 0; t < 8 && !q; t++) {
     const c = sx.gen.makeQuestion(ask.concept, ask.k, base + t * 7919, { ...optsFor(sx.key), want: { k: ask.k, key: ask.key } });
@@ -1878,6 +1894,8 @@ async function finishRound() {
   let placed = null;
   let result = null;
   let tally = { ok: 0, rev: 0 }; // 🎟️ 이번 편이 실제로 더한 몫 (tallyRound가 돌려줌)
+  let spReward = null;          // 💎 스페셜 보상 — **트랜잭션 안에서 이미 지급**됐다 (화면 표시용)
+  let spLevel = null;           // 그때의 레벨 변화
   let catches = 0;              // 🎯 이번 편이 준 몬스터볼 (roundCatches, 레코드 pend에 적힘)
   let daily = null; // ☀️ 이 편이 오늘의 수학의 마지막이면 완주 기록 (같은 트랜잭션 — 두 창이 같이 끝내도 첫 창만 보너스)
   const d = ui.daily;
@@ -1889,13 +1907,22 @@ async function finishRound() {
     } else if (r.mode === 'ask') {
       state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false }); tally = tallyRound(s, { mode: r.mode, correct: r.correct, result }); });
     } else if (r.mode === 'special') {
-      // 💎 맞힌 얼굴의 통과 횟수 +1 → 🏅 배지, 여덟 개면 🏆 챔피언 보상까지 **한 트랜잭션**에서
-      const qs = r.answers.map((a, i) => ({ kind: String(r.qs[i].kind).replace('special-', ''), ok: !!a.correct, ...(a.tag ? { tag: a.tag } : {}), ...(a.why ? { w: a.why } : {}) }));
-      state = await updateMath((s2) => {
-        result = applySpecialRound(s2, qs, today, BADGE_NEED);
-        result.gym = claimGym(s2, SP_KIND_IDS, BADGE_NEED); // 여덟 개를 방금 채웠나 (한 번만)
-        tally = tallyRound(s2, { mode: 'special', correct: r.correct, result });
+      // 💎 맞힌 얼굴의 통과 횟수 +1 → 🏅 배지, 여덟 개면 🏆 챔피언.
+      // ★ 진도와 **보상 지급이 한 트랜잭션**이다 — 따로 하면 배지만 남고 마스터볼·코인이 날아가는데,
+      //   🏆는 한 번뿐이라 되찾을 길이 없다 (Codex 11차 #1)
+      // ★ 아이가 고른 "틀린 이유"는 a.w에 있다 — extraQ가 그걸 옮긴다 (a.why는 없는 필드였다, Codex 11차 #5)
+      const qs = r.answers.map((a, i) => ({ kind: String(r.qs[i].kind).replace('special-', ''), ok: !!a.correct, ...(a.tag ? { tag: a.tag } : {}), ...extraQ(a) }));
+      const c = await commitSpecialRound((s2) => {
+        const res = applySpecialRound(s2, qs, today, BADGE_NEED);
+        res.gym = claimGym(s2, SP_KIND_IDS, BADGE_NEED); // 여덟 개를 방금 채웠나 (한 번만)
+        tallyRound(s2, { mode: 'special', correct: r.correct, result: res }); // 💎는 🎟️에 더하지 않는다(농사 방지) — 일지만
+        return { result: res, reward: specialReward({ correct: r.correct, result: res }) };
       });
+      if (!c.ok) throw new Error('스페셜 기록을 저장하지 못했어요');
+      result = c.result;
+      state = c.math;
+      spReward = c.reward;       // 이미 프로필에 들어갔다 — 화면은 보여 주기만 한다
+      spLevel = c.level;
     } else if (r.mode === 'notes' || r.mode === 'mix') {
       const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i].fromNote ? { note: true } : {}), ...extraQ(a) }));
       state = await updateMath((s) => {
@@ -1942,7 +1969,8 @@ async function finishRound() {
     : r.mode === 'ask'
       ? (result && result.fixed && r.askSameKey !== false ? { xp: ASK_REWARD.xp, coin: ASK_REWARD.coin, catchOnce: false } : { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false }) // ❓ 답장 뒤 같은 틀을 처음 맞히면 보상, 틀이 바뀌었거나 이미 고친 뒤면 문항 정답만
     : r.mode === 'special'
-      ? { xp: r.correct * REWARD.special.xp, coin: r.correct * REWARD.special.coin, catchOnce: false } // 💎 한 문제가 여러 걸음이라 문항 값이 높다
+      // 💎 보상은 **저장 트랜잭션 안에서 이미 지급**됐다 (Codex 11차 #1). 여기서는 보여 주기만 한다
+      ? { xp: (spReward && spReward.xp) || 0, coin: (spReward && spReward.coin) || 0, catchOnce: false, paid: true }
     : r.mode === 'notes' || r.mode === 'mix'
       ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } // 🤔 노트 회차·🎲 섞어 풀기: 문항 정답만, 잡기 없음 (연습)
       : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
@@ -1954,25 +1982,17 @@ async function finishRound() {
   rw.gold = !!(daily && daily.gold);
   if (rw.gold) addItem(GOLDEN.id, 1);
   // 🔷 수학스톤 — "제대로 배웠나"에서만 (mathprog.stoneReward). 코인처럼 트랜잭션 결과(result)에 따라 준다
-  rw.stone = stoneReward({ mode: r.mode, result });
-  // 🏅 이번에 채운 배지 — 한 얼굴을 BADGE_NEED번 맞힌 값 (트랜잭션 안에서 정해져 왔다)
-  if (result && Array.isArray(result.got) && result.got.length) {
-    rw.badges = result.got.slice();
-    rw.xp += result.got.length * REWARD.badge.xp;
-    rw.coin += result.got.length * REWARD.badge.coin;
-    rw.stone = (rw.stone || 0) + result.got.length * REWARD.badge.stone;
+  if (rw.paid) {
+    // 💎 스페셜 — 🏅 배지·🏆 챔피언 보상까지 **저장 트랜잭션에서 이미 지급**됐다.
+    //   여기서는 화면에 보여 줄 값만 옮긴다 (한 번 더 addItem 하면 두 배가 된다, Codex 11차 #1)
+    rw.badges = (spReward && spReward.badges) || [];
+    rw.gym = !!(spReward && spReward.gym);
+    rw.stone = (spReward && spReward.stone) || 0;
+  } else {
+    // 🔷 수학스톤 — "제대로 배웠나"에서만 (mathprog.stoneReward). 코인처럼 트랜잭션 결과(result)에 따라 준다
+    rw.stone = stoneReward({ mode: r.mode, result });
+    if (rw.stone) addItem(STONE_MATH.id, rw.stone);
   }
-  // 🏆 여덟 배지를 다 모았다 — claimGym이 트랜잭션에서 딱 한 번만 참을 준다
-  if (result && result.gym) {
-    rw.gym = true;
-    rw.xp += REWARD.gym.xp;
-    rw.coin += REWARD.gym.coin;
-    addItem(REWARD.gym.ball, 1);
-    if (REWARD.gym.beast) addItem(BEASTBALL.id, REWARD.gym.beast); // 🕳 울트라홀이 열렸으니 ⚪ 비스트볼도 하나
-    addItem(STONE_ENGLISH.id, REWARD.gym.stone);
-    rw.stone = (rw.stone || 0) + REWARD.gym.stone;
-  }
-  if (rw.stone) addItem(STONE_MATH.id, rw.stone);
   // 🥚 수학 알 — 하루 첫 완주가 하루치. 5일이 차면 그 트랜잭션에서 부화(도감 등록)까지; 화면은 결과 카드 뒤에 (showHatchIfAny)
   if (daily && daily.first) { try { rw.egg = await tickEgg('math', today); } catch { rw.egg = null; } }
   // ✨ 오늘의 보너스 — 하루 첫 완주에만(daily.first는 트랜잭션 판정이라 두 창·재시도에도 한 번). 홈 카드가 미리 보여 준 바로 그것
@@ -1985,8 +2005,9 @@ async function finishRound() {
   }
   // 🎟️ 이번 편이 교환권 막대에 보탠 몫 — tallyRound가 실제로 더한 것 × 환산 (막대가 둘이라 따로: 📼 진행 · 🔁 복습)
   rw.ticket = { progress: tally.ok * MATH_PTS.ok + (daily && daily.first ? MATH_PTS.daily : 0), review: tally.rev * MATH_PTS.rev };
-  const g = gainXp(rw.xp);
-  const c = gainCoins(rw.coin).gained;
+  // ★ rw.paid = 저장 트랜잭션에서 이미 준 보상 — 여기서 또 주면 **두 배**가 된다 (💎 스페셜)
+  const g = rw.paid ? { gained: rw.xp, leveledUp: !!(spLevel && spLevel.leveledUp), to: spLevel && spLevel.to, info: getLevelInfo() } : gainXp(rw.xp);
+  const c = rw.paid ? rw.coin : gainCoins(rw.coin).gained;
   applyDailyDelta(today, r.mode === 'diag' || r.mode === 'ask' ? { mathQ: r.qs.length, mathOk: r.correct } : { mathQ: r.qs.length, mathOk: r.correct, mathRounds: 1 }).catch(() => {});
   updateChip();
   if (g.leveledUp) sfx.levelUp();

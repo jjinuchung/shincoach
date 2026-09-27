@@ -3,7 +3,7 @@
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import {
   getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase, applyBuyEgg, applyEggDay, applyEggSeen, applyShiny,
-  applyLevelUp, applyEvolve, applyGear, applyPartner,
+  applyLevelUp, applyEvolve, applyGear, applyPartner, updateMathAndProfile, mergeProfileDelta,
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase, gearRule,
 } from './db.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE } from './items.js';
@@ -89,7 +89,16 @@ export const RARITY = [
   { stars: '⭐⭐', label: '보통', base: 0.30 },
   { stars: '⭐⭐⭐', label: '희귀', base: 0.15 },
   { stars: '⭐⭐⭐⭐', label: '전설', base: 0.03 },
+  // 🌌 울트라비스트 — 별이 아니라 **따로 선 등급**이다 (아버님 2026-09-27: "울트라비스트만 따로 관리").
+  // 다른 차원에서 온 존재라 ⭐ 체계 밖에 둔다. base는 희귀와 같지만 실제 확률은 ⚪ 비스트볼이 정한다
+  // (보통 볼 ×0.1 = 2.6% / 비스트볼 ×5 = 90%, xp.ballChance)
+  { stars: '🌌', label: '울트라비스트', base: 0.15, ub: true },
 ];
+
+/** 🌌 울트라비스트 등급 번호 — "희귀 이상"류 규칙이 이 등급을 빨아들이지 않게 이름으로 쓴다 */
+export const RARITY_UB = 5;
+/** ⭐ 별로 매기는 보통 등급인가 (아이가 등급을 신청할 수 있는 범위) */
+export const STAR_RARITIES = [1, 2, 3, 4];
 // 명단(pokemon.js ROSTER) 확장 시 여기도 추가. 등급 없으면 보통(2)
 // 등급은 "잡기 어려움" — 아래로 갈수록 적어야 한다 (흔함 36 > 보통 32 > 희귀 24 > 전설 8).
 // 전설을 26마리나 두면 전설이 흔해져서 특별하지 않다 (아버님 지적) → 상징적인 8마리만 남기고
@@ -119,9 +128,9 @@ export const RARITY_IDS = {
       132, 359, // 2026-09-20 추가분 중 포획률 45 미만 — 메타몽(35)·앱솔(30)
       // 🔢 수학 전용 (2026-09-22) 포획률 <45 또는 3단계 최종형(스타터·600족) 30
       34, 36, 76, 157, 160, 181, 208, 254, 330, 306, 375, 392, 395, 405, 468, 500, 503, 635, 612, 655, 681, 706, 727, 730, 815, 818, 823, 908, 914, 998,
-      // 🌌 울트라비스트 11 (2026-09-27) — 원작에서도 전설이 아니다(is_legendary: false). 귀하지만 전설 자리는 비워 둔다.
-      //    특별함은 등급이 아니라 **잡는 방식**으로 낸다: 🕳 울트라홀이 열려야 만나고 ⚪ 비스트볼이 있어야 잡힌다
-      793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806],
+],
+  // 🌌 울트라비스트 11 (2026-09-27) — ⭐ 등급 밖의 제 등급. 원작에서도 전설이 아니다(is_legendary: false)
+  5: [793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806],
   4: [150, 151, 384, 249, 250, 382, 383, 493, // 가장 상징적인 8마리만 전설
       // 🔢 수학 전용 (2026-09-22) 전설·환상 15 — 수학에서만 만나는 전설이 있어야 도감이 수학으로 끈다
       243, 244, 245, 379, 385, 491, 492, 494, 717, 791, 792, 807, 893, 1007, 1008],
@@ -620,6 +629,34 @@ export async function useShinyStone(monId) {
   const r = await runProfileOp(() => applyShiny(monId, SHINY_STONE.id), () => ({ ok: false, why: 'save' }));
   return { ok: !!(r && r.ok), why: r && r.why };
 }
+/**
+ * 💎 스페셜 한 회차 — 진도 기록과 **보상 지급을 한 트랜잭션**에서 끝낸다 (Codex 11차 #1).
+ *
+ * 따로 하면 🏅 배지·🏆 플래그만 저장되고 마스터볼·코인이 날아간다. 🏆는 한 번뿐이라 되찾을 길이 없다.
+ * @param {(m:object) => {result:object, reward:{xp:number, coin:number, items:Object}}} rule
+ *        수학 레코드를 고치고 **그 결과로 정해진 보상**을 돌려주는 순수 함수
+ * @returns {Promise<{ok:boolean, result?:object, reward?:object, level?:object, math?:object}>}
+ */
+export async function commitSpecialRound(rule) {
+  await flushProfile(); // 밀려 있던 증분을 먼저 (그래야 트랜잭션이 최신 프로필을 읽는다)
+  try {
+    const r = await updateMathAndProfile((m, p) => {
+      const { result, reward } = rule(m) || {};
+      const rw = reward || { xp: 0, coin: 0, items: {} };
+      const before = levelFromXp(p.xp || 0).level;
+      // 보상을 **같은 트랜잭션에서** 프로필에 적는다 (증분 규칙을 그대로 쓴다)
+      mergeProfileDelta(p, { xp: rw.xp || 0, coins: rw.coin || 0, coinsEarned: rw.coin || 0, items: rw.items || {} });
+      const after = levelFromXp(p.xp || 0).level;
+      return { result, reward: rw, level: { from: before, to: after, leveledUp: after > before } };
+    });
+    profile = fromStored(r.profile); // 저장된 값을 메모리에 (다시 더하지 않는다 — 이미 들어 있다)
+    return { ok: true, ...r.out, math: r.math };
+  } catch (e) {
+    console.warn('💎 스페셜 저장 실패:', e);
+    return { ok: false, why: 'save' };
+  }
+}
+
 // ── 🧬 레벨업 · 진화 ──
 // ★ `level`·`getLevelInfo`는 **아이의 레벨**(잡기 확률·포켓몬 해금)이다. 포켓몬 한 마리의 레벨은 여기 `monLv` 쪽 —
 //   두 개를 섞으면 "아이가 레벨업했는데 꼬부기가 진화"하는 식으로 조용히 어긋난다.

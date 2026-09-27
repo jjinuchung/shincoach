@@ -638,6 +638,36 @@ export function claimGym(m, kindIds, need = 3) {
   return true;
 }
 
+/** 💎 스페셜 보상에 쓰는 아이템 id — items.js와 같아야 한다 (테스트로 고정) */
+export const SP_ITEM = { stoneMath: 'stone_math', stoneEnglish: 'stone_english', beastBall: 'beastball' };
+
+/**
+ * 💎 한 회차가 주는 보상을 **순수하게** 계산한다 (문항 정답 + 🏅 배지 + 🏆 챔피언).
+ *
+ * ★ 순수 함수인 까닭: 진도를 적는 트랜잭션 **안에서** 프로필에 바로 적기 위해서다.
+ *   따로 적으면 배지는 저장됐는데 마스터볼·코인이 날아가고, 🏆는 한 번뿐이라 **되찾을 길이 없다**
+ *   (Codex 11차 #1). 화면은 여기서 나온 값을 보여 주기만 한다.
+ * @param {{correct:number, result:{got?:string[], gym?:boolean}}} o
+ * @returns {{xp:number, coin:number, items:Object, badges:string[], gym:boolean, stone:number}}
+ */
+export function specialReward({ correct = 0, result } = {}) {
+  const badges = (result && Array.isArray(result.got) ? result.got : []).slice();
+  const gym = !!(result && result.gym);
+  const stone = badges.length * REWARD.badge.stone + (gym ? REWARD.gym.stone : 0);
+  const items = {};
+  if (stone) items[SP_ITEM.stoneMath] = stone;
+  if (gym) {
+    items[REWARD.gym.ball] = 1;
+    if (REWARD.gym.beast) items[SP_ITEM.beastBall] = REWARD.gym.beast;
+    items[SP_ITEM.stoneEnglish] = REWARD.gym.stone;
+  }
+  return {
+    xp: correct * REWARD.special.xp + badges.length * REWARD.badge.xp + (gym ? REWARD.gym.xp : 0),
+    coin: correct * REWARD.special.coin + badges.length * REWARD.badge.coin + (gym ? REWARD.gym.coin : 0),
+    items, badges, gym, stone,
+  };
+}
+
 /** 🏆 챔피언 보상을 이미 받았나 */
 export function gymClaimed(m) {
   return !!(m && m.sp && m.sp.gym);

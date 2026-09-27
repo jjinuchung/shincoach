@@ -704,6 +704,35 @@ export async function updateMath(rule) {
 }
 
 /**
+ * 🔢+⚡ 수학 진도와 아이 프로필을 **한 트랜잭션**에서 함께 고친다.
+ *
+ * ★ 왜 필요한가: 둘은 같은 `profile` 스토어에 있는데 지금까지 따로 썼다. 💎 스페셜처럼
+ *   "진도에 적으면서 그 자리에서 보상을 주는" 곳에서는 그러면 안 된다 — 진도(🏅 배지·🏆 플래그)만
+ *   저장되고 프로필 쓰기가 실패하면 **마스터볼·비스트볼·코인이 날아가고, 🏆는 한 번뿐이라 되찾을 수 없다**
+ *   (Codex 11차 #1). 한 트랜잭션이면 둘 다 되거나 둘 다 안 된다.
+ * @param {(m:object, p:object) => object} rule 수학 레코드와 프로필을 고치고 결과를 돌려주는 순수 함수
+ * @returns {Promise<{out:object, math:object, profile:object}>}
+ */
+export async function updateMathAndProfile(rule) {
+  const db = await openDb();
+  const tx = db.transaction('profile', 'readwrite');
+  const store = tx.objectStore('profile');
+  const curMath = (await promisify(store.get(MATH_ID))) || emptyMath();
+  const curMe = (await promisify(store.get('me'))) || emptyProfile();
+  const m = cloneMath(curMath);
+  const p = cloneProfile(curMe);
+  const out = rule(m, p) || {};
+  m.id = MATH_ID;
+  m.updatedAt = Date.now();
+  p.id = 'me';
+  p.updatedAt = Date.now();
+  store.put(m);
+  store.put(p);
+  await txDone(tx);
+  return { out, math: m, profile: p };
+}
+
+/**
  * 🔢 두 수학 진도 병합 — 오개념 횟수·회차는 큰 값, 진단 여부는 OR.
  * 개념은 통째로 고르지 않는다 (Codex 리뷰 #7: 다른 기기의 늦은 실패가 앞선 통과를 지우고 사다리를 다시 잠갔다):
  *   done = OR · passes/fails = 큰 값 · lastAt = 큰 값 · 복습 일정(box·dueAt)은 **배운(done) 쪽 중 최근** 것

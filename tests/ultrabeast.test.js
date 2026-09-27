@@ -2,10 +2,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ROSTER, ULTRA_BEASTS, isUltraBeast, forSubject, forHole } from '../js/pokemon.js';
-import { ballChance, rarityOf, UB_PENALTY } from '../js/xp.js';
+import { ballChance, rarityOf, RARITY, RARITY_UB, STAR_RARITIES, UB_PENALTY } from '../js/xp.js';
 import { BEASTBALL, STONE_SHOP, SHOP_BALLS, BALLS, ITEMS, costOf, lootBox, itemById } from '../js/items.js';
 import { TYPE_OF } from '../js/battle.js';
-import { REWARD } from '../js/mathprog.js';
+import { REWARD, specialReward } from '../js/mathprog.js';
+import { pickHatch } from '../js/egg.js';
+import { pickOpponent } from '../js/battle.js';
 
 test('🌌 울트라비스트 11마리가 명단에 있고, 전부 🔢 수학 전용이다 (아버님 결정)', () => {
   assert.equal(ULTRA_BEASTS.length, 11);
@@ -25,8 +27,14 @@ test('🌌 울트라비스트 11마리가 명단에 있고, 전부 🔢 수학 �
   assert.equal(ROSTER.find((r) => r.id === 806).ko, '두파팡');
 });
 
-test('🌌 울트라비스트는 전설이 아니라 희귀 — 특별함은 등급이 아니라 **잡는 방식**에서 온다', () => {
-  for (const id of ULTRA_BEASTS) assert.equal(rarityOf(id), 3, `${id}`);
+test('🌌 울트라비스트는 ⭐ 밖의 **제 등급** (아버님 2026-09-27: "따로 관리")', () => {
+  for (const id of ULTRA_BEASTS) assert.equal(rarityOf(id), RARITY_UB, `${id}`);
+  assert.equal(RARITY[RARITY_UB].label, '울트라비스트');
+  assert.equal(RARITY[RARITY_UB].stars, '🌌', '별이 아니라 제 표시');
+  assert.equal(RARITY[RARITY_UB].ub, true);
+  assert.equal(STAR_RARITIES.includes(RARITY_UB), false, '아이가 등급 옮기기로 건드릴 수 없어야 한다');
+  // 울트라비스트가 아닌 포켓몬은 이 등급에 없다
+  for (let id = 1; id <= 1010; id++) if (rarityOf(id) === RARITY_UB) assert.ok(isUltraBeast(id), `${id}`);
 });
 
 test('⚪ 비스트볼: 울트라비스트에게만 잘 들고, 보통 볼은 거의 안 통한다 (원작 그대로)', () => {
@@ -82,4 +90,46 @@ test('⚪ 비스트볼이 잡기 화면의 볼 고르기에 나온다 (없으면
   assert.ok(BALLS.some((b) => b.id === 'beastball'), 'BALLS 목록에 있어야 한다');
   assert.equal(BALLS.filter((b) => b.id === 'beastball').length, 1, '두 번 들어가면 안 된다');
   assert.equal(SHOP_BALLS.some((b) => b.id === 'beastball'), false, '💰 상점이 아니라 🧤 스톤 상점에서만 산다');
+});
+
+test('🥚 알에서 🌌 울트라비스트는 **절대** 안 나온다 (울트라홀이 열린 뒤에도)', () => {
+  const math = forHole(forSubject(ROSTER, 'math'), false);
+  for (const id of ULTRA_BEASTS) assert.equal(math.some((r) => r.id === id), false, `${id}`);
+  // 가장 뒤쪽을 고르는 rng로도 울트라비스트가 안 나온다 (Codex가 806을 뽑아낸 그 방법)
+  const got = pickHatch(math, rarityOf, {}, () => 0.999999);
+  assert.equal(isUltraBeast(got), false, `알에서 ${got}가 나왔다`);
+  assert.ok(rarityOf(got) >= 3, '그래도 희귀 이상은 나온다');
+  // 게이트를 안 씌우면 실제로 새 나간다 — 이 검사가 그걸 지킨다
+  const leaky = pickHatch(forSubject(ROSTER, 'math'), rarityOf, {}, () => 0.999999);
+  assert.ok(isUltraBeast(leaky), '전제가 바뀌었으면 이 테스트를 다시 봐야 한다');
+});
+
+test('⚔️ 🌌 울트라비스트는 배틀 상대가 되지 않는다 (이기면 그냥 얻어지므로)', () => {
+  for (let i = 0; i < 300; i++) {
+    const o = pickOpponent(ROSTER, {}, () => i / 300);
+    if (o) assert.equal(isUltraBeast(o.id), false, `${o.id}가 상대로 나왔다`);
+  }
+  // 울트라비스트만 남겨 두면 상대가 아예 없다 (영어 배틀에서도 같은 함수를 쓴다)
+  const onlyUB = ROSTER.filter((r) => isUltraBeast(r.id));
+  assert.equal(pickOpponent(onlyUB, {}, () => 0.5), null);
+});
+
+test('💎 보상 계산(순수): 문항 + 🏅 배지 + 🏆 챔피언 — 저장 트랜잭션 안에서 쓰는 값', () => {
+  const plain = specialReward({ correct: 3, result: { got: [], gym: false } });
+  assert.deepEqual(plain, { xp: 24, coin: 9, items: {}, badges: [], gym: false, stone: 0 });
+
+  const badge = specialReward({ correct: 2, result: { got: ['reverse'], gym: false } });
+  assert.equal(badge.xp, 2 * 8 + 50);
+  assert.equal(badge.items.stone_math, 1);
+
+  const champ = specialReward({ correct: 3, result: { got: ['pattern'], gym: true } });
+  assert.equal(champ.gym, true);
+  assert.equal(champ.items.masterball, 1, '🟣 마스터볼');
+  assert.equal(champ.items.beastball, 1, '⚪ 비스트볼 — 울트라홀이 열리니 첫 만남용');
+  assert.equal(champ.items.stone_english, 3);
+  assert.equal(champ.items.stone_math, 1 + 3, '배지 몫 + 🏆 몫');
+  // 아이템 id가 items.js와 같아야 한다 (다르면 조용히 아무것도 안 들어간다)
+  for (const id of Object.keys(champ.items)) assert.ok(itemById(id), `${id}가 카탈로그에 없다`);
+  // 아무것도 안 했으면 아무것도 안 준다
+  assert.deepEqual(specialReward({}), { xp: 0, coin: 0, items: {}, badges: [], gym: false, stone: 0 });
 });

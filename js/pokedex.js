@@ -1,10 +1,11 @@
 // 🎒 내 포켓몬(도감) 화면: 레벨·경험치·💰 코인, 잡은 포켓몬(그림·마릿수, 누르면 장식·염색), 못 잡은 포켓몬(검은 실루엣 + ???), 🛒 상점
 import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf, isUltraBeast } from './pokemon.js';
-import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
-import { listDaily } from './db.js';
+import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, RARITY_UB, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
+import { listDaily, getMath } from './db.js';
 import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES } from './items.js';
 import { eggSummary } from './egg.js';
+import { gymClaimed } from './mathprog.js'; // 🕳 울트라홀 = 💎 스페셜 여덟 배지
 import { haveOf, lvOf } from './evolve.js';
 import { showHatchIfAny } from './hatch.js';
 import { initShop, openShop, openMon } from './shop.js';
@@ -97,6 +98,9 @@ export async function openPokedex(opts) {
   main.innerHTML = '';
   const daily = await listDaily().catch(() => []);
   if (seq !== openSeq) return;
+  // 🕳 울트라홀이 열렸나 — 🌌 구역에 "왜 아직 못 만나는지"를 적기 위해 (💎 배지 여덟 개)
+  const hole = gymClaimed(await getMath().catch(() => null));
+  if (seq !== openSeq) return;
   const today = todayKey();
   const todayRec = daily.find((d) => d.date === today);
   const todayOk = (todayRec ? todayRec.doneKeys.length : todayDone()) >= STREAK_MIN_DONE;
@@ -158,13 +162,18 @@ export async function openPokedex(opts) {
     main.appendChild(el('p', 'stats-empty', '⚙ 설정에서 "포켓몬 캐릭터 받기"를 하면 그림이 보여요.'));
   }
 
-  // 희귀도별 도감 (지금 레벨에서 열린 것만)
-  for (let r = 1; r <= 4; r++) {
+  // 희귀도별 도감 (지금 레벨에서 열린 것만). 🌌 울트라비스트는 ⭐ 밖의 제 등급이라 맨 아래 따로 선다
+  for (let r = 1; r <= RARITY_UB; r++) {
     const list = unlocked.filter((m) => rarityOf(m.id) === r);
     if (!list.length) continue;
-    const sec = el('div', 'stats-card');
+    const ub = r === RARITY_UB;
+    const sec = el('div', 'stats-card' + (ub ? ' pokedex-ub' : ''));
     const got = list.filter((m) => p.caught[m.id] > 0).length;
     sec.appendChild(el('h2', '', `${RARITY[r].stars} ${RARITY[r].label} (${got}/${list.length})`));
+    // 🕳 울트라홀이 아직이면 왜 못 만나는지 알려 준다 — 아이가 "이건 뭐지?" 하고 묻는 자리다
+    if (ub) sec.appendChild(el('p', 'pokedex-ub-note', hole
+      ? '🕳 울트라홀이 열렸어요! 🔢 수학 잡기에서 만날 수 있어요 — ⚪ 비스트볼로 던져야 잡혀요'
+      : '🕳 다른 차원에서 온 포켓몬들이에요. 💎 스페셜 문제로 🏅 배지 여덟 개를 모으면 울트라홀이 열려요'));
     const grid = el('div', 'pokedex-grid');
     for (const m of list) {
       const n = p.caught[m.id] || 0;                 // 도감에 적힌 누적 (🧬 진화로 보내도 줄지 않는다)
