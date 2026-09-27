@@ -11,7 +11,8 @@ const DB_VERSION = 4;
 //  sentenceStats: 문장별 누적 { key: "<itemId>|<start×10>", itemId, start, en, ko, plays, listens, done, seconds,
 //                 speakAttempts, speakPass, speakFail, speakSkipped, bestRatio, lastRatio, lastAt, puzzles, puzzleSolved, puzzleWrong }
 //  sessions:      앱을 열고 닫은 단위 { id, itemId, title, startedAt, endedAt, seconds, sentences, firstIdx, lastIdx, speakAttempts, speakPass, puzzles, puzzleSolved }
-//  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved, goalRewarded, hpMissed }
+//  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved, goalRewarded, hpMissed,
+//                          mathTime/enTime(⏳ 과목 화면에 머문 초), mathBonus/enBonus(🔒 부모가 더 준 초) }
 //  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
 // characters (v3): 🎮 퍼즐 캐릭터 그림 { id, ko, en, blob, savedAt } — 인터넷에서 받아 기기에만 보관 (백업에 포함 안 함)
 //  profile (v4):  ⚡ 아이 프로필 { id: 'me', xp, caught: { 포켓몬id: 마릿수 }, throws, catches,
@@ -280,7 +281,11 @@ export async function getDaily(date) {
 
 const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleSolved', 'battles',
   'reviewSentences', 'reviewItems', 'reviewRounds', 'reviewSkips', 'mushrooms', 'matches', 'reviewStones', // 🔶 영어스톤 — 복습 회차(전부 통과) 하루 2개까지, 트랜잭션 선점
-  'mathQ', 'mathOk', 'mathRounds', 'mathSeconds']; // 🔢 수학: 푼 문항·정답·회차·시간
+  'mathQ', 'mathOk', 'mathRounds', // 🔢 수학: 푼 문항·정답·회차
+  // ⏳ 하루 과목별 시간 제한 (2026-09-27) — 과목 화면에 머문 초(…Time)와 부모가 더 준 초(…Bonus).
+  // ★ DAILY_SUMS라 백업 병합이 **maxOf**다 — 옛 백업을 되돌려 오늘 쓴 시간을 지우는 길이 막힌다.
+  //   (예전 `mathSeconds`는 이름만 있고 아무도 쓰지 않아 여기서 뺐다 — mathTime과 헷갈린다)
+  'mathTime', 'mathBonus', 'enTime', 'enBonus'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 const DAILY_LISTS = ['reviewStoneKeys']; // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 

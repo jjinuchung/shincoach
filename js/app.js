@@ -1,6 +1,6 @@
 // 앱 진입점: 화면 전환, 서비스워커 등록, 모듈 초기화
 import { initLibrary, refreshList } from './library.js';
-import { initPlayer, requirePin } from './player.js';
+import { initPlayer, requirePin, timeLimitConf } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
 import { initHatch } from './hatch.js';
@@ -9,6 +9,8 @@ import { initHome, renderHome } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
+import { initTimeLimit, setSubject, flushTime } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
+import { initTimeUp, refreshChips } from './timeup.js';
 
 const views = {
   home: document.getElementById('view-home'),
@@ -19,12 +21,21 @@ const views = {
   math: document.getElementById('view-math'),
 };
 
+/** 지금 화면이 어느 과목의 시간을 쓰는가 — 🎒 도감·📊 기록·🏠 홈은 **안 센다** (아버님 결정 2026-09-27) */
+function subjectOfView(name) {
+  if (name === 'math') return 'math';
+  if (name === 'library' || name === 'player') return 'english';
+  return null;
+}
+
 /** 화면 전환 (home | library | player | stats | pokedex | math) */
 export function showView(name) {
   for (const [key, el] of Object.entries(views)) {
     el.hidden = key !== name;
   }
   window.scrollTo(0, 0);
+  setSubject(subjectOfView(name)); // ⏳ 과목이 바뀌면 그 전 과목의 초를 저장하고 시계를 옮긴다
+  refreshChips();
   // 목록으로 돌아올 때마다 다시 그린다 — 🎟️ 다음 영상 조건이 방금 한 공부를 반영해야 한다
   if (name === 'library') refreshList().catch(() => {});
   // 🏠 과목 카드도 다시 그린다 — 그 사이에 마스코트 그림을 받아 왔을 수 있다
@@ -77,6 +88,7 @@ function initExit() {
     quit.disabled = true;
     hint.textContent = '저장하는 중...';
     try { await flushTrack(); } catch { /* 저장에 실패해도 종료는 막지 않음 */ }
+    try { await flushTime(); } catch { /* ⏳ 모아 둔 초도 같이 */ }
     window.close();
     setTimeout(() => {
       quit.hidden = true;
@@ -137,6 +149,7 @@ async function main() {
   initEvolveShow();
   initHome({ showView });
   initMath({ showView });
+  initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
   initExit();
   // 🌈⭐ 받아둔 이로치·변신 그림을 **홈을 그리기 전에** 올린다 — 나중에 올리면 이미 그린 화면은 안 바뀐다 (Codex 8차 #3). 실패해도 계속
   try { const pk = await import('./pokemon.js'); await Promise.all([pk.loadShiny().catch(() => 0), pk.loadForms().catch(() => 0)]); } catch { /* 그림 없이 */ }
@@ -162,6 +175,8 @@ async function main() {
     import('./xp.js').then((x) => x.reloadProfile()).catch(() => {});
     import('./pokemon.js').then((m) => Promise.all([m.loadShiny(), m.loadForms()])).catch(() => {});
   });
+  // ⏳ 하루 시간 제한 시계 — ⚙ 설정을 읽어 가고, 1초마다 칩을 갱신한다 (실패해도 학습은 계속)
+  initTimeLimit({ conf: timeLimitConf, onTick: refreshChips }).catch(() => {});
   requestPersistentStorage();
   registerServiceWorker();
 }

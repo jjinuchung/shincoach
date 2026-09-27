@@ -105,6 +105,10 @@ function loadPlayer() {
     getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null, listDaily: async () => [],
     loadVocab: async () => ({ lookup: () => [] }), isSpeakable: realIsSpeakable,
     initDiag() {}, renderDiag() {},
+    // ⏳ timelimit.js 스텁 — player.js는 기본값과 ⚙ 설정 표시에만 쓴다
+    TIME_MIN: { weekday: 60, weekend: 120 },
+    statusOf: () => ({ used: 0, limit: 3600, bonus: 0, total: 3600, left: 3600, locked: false, warn: false, off: false }),
+    fmtUsed: (sec) => `${Math.floor((Number(sec) || 0) / 60)}분`, todayDaily: () => null,
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
     // 하루 한 번(mark*)은 실제 코드에서 **트랜잭션 선점**이라 Promise<선점 성공 여부>를 준다 — 스텁도 같은 약속을 지킨다
     track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false,

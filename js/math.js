@@ -24,6 +24,8 @@ import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
 import { eggProgress } from './egg.js';
 import { showHatchIfAny } from './hatch.js';
+// ⏳ 하루 시간 제한 — **새로 시작하는 자리에만** 관문을 단다. 풀던 회차는 끝까지 간다 (아버님 결정 2026-09-27)
+import { guardStart } from './timeup.js';
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
@@ -442,7 +444,7 @@ function renderDiagIntro() {
   card.appendChild(el('p', 'math-p muted', '연습장에 풀고 답만 고르면 돼요.'));
   const b = el('button', 'btn btn-primary btn-big-wide', '시작!');
   b.type = 'button';
-  b.addEventListener('click', () => startDiag());
+  b.addEventListener('click', () => guardStart('math', () => startDiag()));
   card.appendChild(b);
   const sw = el('button', 'btn btn-big-wide', '🌳 다른 줄기 고르기');
   sw.type = 'button';
@@ -502,7 +504,7 @@ function renderLadder(state) {
     const db = el('button', `btn btn-big-wide math-daily-btn${dn || unread.length ? '' : ' btn-primary'}`, dn ? `☀️ 오늘의 수학 완주 ✅ — 한 번 더 할래요?` : '☀️ 오늘의 수학 — 한 번에 다 하기');
     db.type = 'button';
     if (unread.length) db.disabled = true; // 📬를 읽으면 열린다
-    db.addEventListener('click', () => startDaily());
+    db.addEventListener('click', () => guardStart('math', () => startDaily()));
     head.appendChild(db);
     const parts = [];
     if (preview.roundId) parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${nameOf(preview.roundId)}`);
@@ -521,14 +523,14 @@ function renderLadder(state) {
   if (tryable.length) {
     const tb = el('button', 'btn btn-big-wide math-ask-try-btn', `🔁 아빠 답장 문제 풀어보기 ${tryable.length}개 — 맞히면 ⚡${ASK_REWARD.xp}`);
     tb.type = 'button';
-    tb.addEventListener('click', () => startAskTry(tryable[0]));
+    tb.addEventListener('click', () => guardStart('math', () => startAskTry(tryable[0])));
     head.appendChild(tb);
   }
   if (waiting) head.appendChild(el('p', 'math-note', `❓ 아빠 답을 기다리는 질문 ${waiting}개`));
   if (due.length) {
     const b = el('button', 'btn btn-accent btn-big-wide', `🔁 오늘 다시 확인할 개념 ${due.length}개 — 정말 아는지 볼까?`);
     b.type = 'button';
-    b.addEventListener('click', () => startRound(due[0], 'review'));
+    b.addEventListener('click', () => guardStart('math', () => startRound(due[0], 'review')));
     head.appendChild(b);
   }
   // 🤔 오답 노트 회차 — 어제 이전에 틀린 유형만 (개념 일정과 따로). 오늘 틀린 건 그 개념을 다시 열면 끼어 든다. 이 줄기의 것만
@@ -536,7 +538,7 @@ function renderLadder(state) {
   if (notesDue.length) {
     const nb = el('button', 'btn btn-big-wide math-notes-btn', `🤔 틀렸던 유형 ${notesDue.length}개 다시 풀기 — 이번엔 맞혀서 지워요`);
     nb.type = 'button';
-    nb.addEventListener('click', () => startNotesRound(notesDue));
+    nb.addEventListener('click', () => guardStart('math', () => startNotesRound(notesDue)));
     head.appendChild(nb);
   } else {
     const nc = countNotes(state, today);
@@ -546,7 +548,7 @@ function renderLadder(state) {
   {
     const sb = el('button', 'btn btn-big-wide math-special-btn', `💎 스페셜 문제 ${SPECIAL_N}개 — 한 번 더 생각해서 🏅 배지 모으기`);
     sb.type = 'button';
-    sb.addEventListener('click', () => startSpecial());
+    sb.addEventListener('click', () => guardStart('math', () => startSpecial()));
     head.appendChild(sb);
     head.appendChild(el('p', 'math-note math-special-note', specialNote(state)));
     // 🏅 모은 배지 줄 — 받은 것은 색, 아직인 것은 흐리게 (몇 번 남았는지도)
@@ -579,7 +581,7 @@ function renderLadder(state) {
     body.appendChild(el('span', 'math-rung-sub', `${gradeLabel(r.grade)} · ${sub}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`));
     btn.appendChild(body);
     if (r.state === 'locked') btn.disabled = true;
-    else btn.addEventListener('click', () => startRound(r.id, r.state === 'done' ? (r.due ? 'review' : 'practice') : 'learn'));
+    else btn.addEventListener('click', () => guardStart('math', () => startRound(r.id, r.state === 'done' ? (r.due ? 'review' : 'practice') : 'learn')));
     li.appendChild(btn);
     list.appendChild(li);
   }
@@ -1228,7 +1230,7 @@ async function renderReply(ask, note = '') {
     // 이미 "이해했어요"라고 한 뒤 다시 온 것(문제를 틀리고 "📬 답장 다시 보기") — 😄 대신 🔁 풀어보기, 😶는 되물음으로 (Codex 4차 #2)
     const again = el('button', 'btn btn-primary btn-big-wide', '🔁 다시 풀어보기');
     again.type = 'button';
-    again.addEventListener('click', () => startAskTry(ask));
+    again.addEventListener('click', () => guardStart('math', () => startAskTry(ask)));
     row.appendChild(again); row.appendChild(no);
   } else if (ask.status === 'answered') {
     row.appendChild(yes); row.appendChild(no);
@@ -1274,7 +1276,7 @@ function askTryOffer(ask) {
   const row = el('div', 'math-actions');
   const go = el('button', 'btn btn-primary btn-big-wide', '🔁 풀어보기');
   go.type = 'button';
-  go.addEventListener('click', () => startAskTry(ask));
+  go.addEventListener('click', () => guardStart('math', () => startAskTry(ask)));
   const later = el('button', 'btn btn-big-wide', '나중에');
   later.type = 'button';
   later.addEventListener('click', () => nextReplyOrLadder());
@@ -2073,7 +2075,7 @@ async function finishRound() {
     const row = el('div', 'math-actions');
     const again = el('button', 'btn btn-big-wide', '💎 한 번 더');
     again.type = 'button';
-    again.addEventListener('click', () => startSpecial());
+    again.addEventListener('click', () => guardStart('math', () => startSpecial()));
     row.appendChild(again);
     const back = el('button', 'btn btn-primary btn-big-wide', '사다리로');
     back.type = 'button';
@@ -2155,7 +2157,7 @@ async function finishRound() {
     const again = el('button', 'btn btn-primary btn-big-wide', '🤔 한 번 더');
     again.type = 'button';
     const wrong = r.answers.map((a, i) => ({ a, q: r.qs[i] })).filter((x) => x.a && !x.a.correct && x.q).map((x) => ({ q: x.q, chosen: x.q.choices.find((ch) => ch.text === x.a.chosen) || { text: x.a.chosen || '', ok: false, tag: x.a.tag } }));
-    again.addEventListener('click', () => startRound(r.id, r.mode === 'review' ? 'review' : 'learn', { again: true, wrong }));
+    again.addEventListener('click', () => guardStart('math', () => startRound(r.id, r.mode === 'review' ? 'review' : 'learn', { again: true, wrong })));
     row.appendChild(again);
   }
   let dailyNext = null;

@@ -28,6 +28,7 @@ import { initMatch, openMatch, closeMatch, refreshStage, pickMatchRound, shuffle
 import { ensureAnims, loadAnims, animUrl } from './sprite.js';
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
+import { DEFAULT_MIN as TIME_MIN, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
 import { setBgmEnabled } from './bgm.js';
 import * as track from './track.js';
 
@@ -2670,7 +2671,9 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always' };
+  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always',
+    // ⏳ 하루 과목별 시간 제한 (2026-09-27, 아버님) — 켜짐이 기본. 지워도 이 값으로 돌아올 뿐 시간이 늘지 않는다
+    timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend };
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('shincoach.settings') || '{}') || {}; } catch { saved = {}; }
   const s = { ...defaults, ...saved };
@@ -2687,6 +2690,43 @@ function loadSettings() {
 
 function saveSettings() {
   try { localStorage.setItem('shincoach.settings', JSON.stringify(settings)); } catch { /* 무시 */ }
+}
+
+/**
+ * ⏳ 시계(timelimit.js)가 읽어 가는 ⚙ 설정 — app.js가 끼워 준다.
+ * ★ 제한값은 기기별 localStorage다. 아이가 지워도 **기본값(평일 60·주말 120)** 으로 돌아올 뿐 시간이 늘지 않는다.
+ * ★ 👨‍👩‍👦 부모 모드(그냥 보기)에서는 세지 않는다 — 아버님이 같이 보신 30분이 아이 시간에서 깎이면 억울하다.
+ *   (부모 모드는 ⚙ 설정 → 🔒 비밀번호로만 켜진다 — 아이가 이걸로 시간을 늘릴 수는 없다)
+ */
+export function timeLimitConf() {
+  return {
+    off: settings.timeLimit === false || state.parentMode === true,
+    min: { weekday: Number(settings.timeWeekday), weekend: Number(settings.timeWeekend) },
+  };
+}
+
+/** ⏳ 분 입력 — 0~600만 받고, 비었거나 이상하면 기본값 */
+function clampMin(v, fallback) {
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.min(600, n);
+}
+
+/** ⏳ ⚙ 설정 아래 "오늘 얼마나 했는지" 한 줄 — 부모가 제일 먼저 보고 싶은 것 */
+function renderTimeToday() {
+  const p = $('set-time-today');
+  if (!p) return;
+  const d = todayDaily();
+  const t = new Date();
+  const key = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  const min = { weekday: clampMin($('set-time-weekday').value, TIME_MIN.weekday), weekend: clampMin($('set-time-weekend').value, TIME_MIN.weekend) };
+  const parts = [];
+  for (const [s, ko] of [['math', '🔢 수학'], ['english', '🎤 영어']]) {
+    const st = statusOf(d, s, key, min);
+    const extra = st.bonus ? ` (+${Math.round(st.bonus / 60)}분 더 줌)` : '';
+    parts.push(`${ko} ${fmtUsed(st.used)} / ${fmtUsed(st.total)}${extra}`);
+  }
+  p.textContent = `오늘 — ${parts.join(' · ')}`;
 }
 
 function initSettingsDialog() {
@@ -2742,6 +2782,10 @@ function initSettingsDialog() {
     setVibrateEnabled(settings.vibrate);
     settings.speakCheck = $('set-speak').checked;
     settings.hideEnWhileSpeaking = $('set-hide-en').checked;
+    // ⏳ 시간 제한 — 0분도 뜻이 있어서(오늘은 쉬는 날) 0은 그대로 두고, 비었거나 이상한 값만 기본값으로
+    settings.timeLimit = $('set-timelimit').checked;
+    settings.timeWeekday = clampMin($('set-time-weekday').value, TIME_MIN.weekday);
+    settings.timeWeekend = clampMin($('set-time-weekend').value, TIME_MIN.weekend);
     if (!settings.hideEnWhileSpeaking) state.speakHideEn = 'none'; // 끄면 대기 중이던 숨김도 해제
     if (settings.listenFirst === 0) state.enRevealed = true;
     applySubVisibility();
@@ -2795,7 +2839,16 @@ export function requirePin(onOk) {
 }
 
 function openSettings() {
-  requirePin(() => { renderDiag(); $('set-parent').checked = state.parentMode; $('dlg-settings').showModal(); });
+  requirePin(() => {
+    renderDiag();
+    $('set-parent').checked = state.parentMode;
+    // ⏳ 여는 순간의 값으로 — initSettingsDialog는 앱 시작 때 한 번뿐이라 "오늘"이 0분으로 굳는다
+    $('set-timelimit').checked = settings.timeLimit !== false;
+    $('set-time-weekday').value = String(Number(settings.timeWeekday));
+    $('set-time-weekend').value = String(Number(settings.timeWeekend));
+    renderTimeToday();
+    $('dlg-settings').showModal();
+  });
 }
 
 function initPinDialog() {

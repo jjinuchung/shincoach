@@ -2352,3 +2352,32 @@ button { font-family: inherit; }
   .cheer.go-right, .cheer.go-left { animation-duration: 1ms; }
   .cheer-mon img { animation: none; }
 }
+
+/* ── ⏳ 하루 과목별 시간 제한 (2026-09-27, 아버님: "평일 1시간·주말 2시간, 넘으면 부모 허락") ── */
+/* 남은 시간 칩 — 위쪽 막대에. 10분 남으면 주황, 다 쓰면 빨강 */
+.time-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #eef1f8; color: #4a5068; border-radius: 999px;
+  padding: 4px 10px; font-size: .82rem; font-weight: 800; white-space: nowrap;
+}
+.time-chip.warn { background: #ffe9cc; color: #8a4b00; animation: time-warn 1.6s ease-in-out infinite; }
+.time-chip.over { background: #ffd9d9; color: #9b1c1c; }
+@keyframes time-warn { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .time-chip.warn { animation: none; } }
+
+/* 잠금 화면 */
+.timeup-card { text-align: center; align-items: center; }
+.timeup-emoji { font-size: 4rem; line-height: 1; }
+.timeup-sub { font-size: .9rem; color: #5b5570; margin: 2px 0 12px; }
+.timeup-actions { flex-direction: column; gap: 8px; align-items: stretch; }
+.timeup-grant { margin-top: 12px; background: #f2edff; border: 2px solid #b9a6f5; border-radius: 14px; padding: 12px; }
+.timeup-grant-head { font-size: .95rem; font-weight: 800; color: #4a2f9c; margin-bottom: 8px; }
+.timeup-grant-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.timeup-grant-btns .btn { flex: 1 1 28%; min-width: 88px; }
+
+/* ⚙ 설정의 시간 제한 묶음 */
+.set-group { border: 1px solid #dfe3ee; border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; }
+.set-group > legend { padding: 0 6px; }
+.field-inline { display: flex; flex-direction: row; align-items: center; gap: 10px; margin: 8px 0 0; }
+.field-inline input[type="number"] { width: 92px; }
+.field-note { font-size: .85rem; color: #5b5570; margin: 8px 0 0; }

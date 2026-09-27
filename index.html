@@ -43,6 +43,8 @@
       <button id="btn-math-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
       <h1 class="topbar-title">🔢 신코치 수학</h1>
       <span id="math-chip" class="level-chip math-chip">Lv.1</span>
+      <!-- ⏳ 오늘 남은 시간 (2026-09-27) -->
+      <span id="time-chip-math" class="time-chip" hidden></span>
       <!-- 🎒·📊는 홈에만 있었는데 아이가 매번 홈으로 나가야 해서 불편해했다 (2026-09-20) → 과목 화면에도. 돌아오면 이 화면으로 -->
       <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
@@ -61,6 +63,7 @@
     <header class="topbar">
       <button id="btn-library-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
       <h1 class="topbar-title">🎬 신코치 영어</h1>
+      <span id="time-chip-library" class="time-chip" hidden></span>
       <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
       <button id="btn-import" class="btn btn-primary">＋ <span class="hide-narrow">영상 </span>가져오기</button>
@@ -132,6 +135,7 @@
       <h1 id="player-title" class="topbar-title"></h1>
       <button id="parent-chip" class="parent-chip" aria-label="학습 모드로 돌아가기" hidden>👀 그냥 보기 ✕</button>
       <button id="partner-chip" class="partner-chip" aria-label="파트너 포켓몬" hidden><span class="mon-figure partner-face"><img alt="" draggable="false"></span><span id="partner-hp">❤️ 100</span></button>
+      <span id="time-chip-player" class="time-chip" hidden></span>
       <span id="goal-chip" class="goal-chip" hidden></span>
       <button id="level-chip" class="level-chip" aria-label="내 포켓몬" hidden>Lv.1</button>
       <button id="coin-chip" class="coin-chip" aria-label="상점" hidden>💰 0</button>
@@ -321,6 +325,25 @@
       <div id="hatch-grow" class="hatch-grow" hidden></div>
       <div class="catch-actions">
         <button type="button" id="hatch-ok" class="btn btn-primary btn-big-wide">좋아! 🎒 도감에서 볼게요</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ⏳ 오늘 시간이 끝났어요 (과목마다 평일 1시간·주말 2시간, 2026-09-27) ===== -->
+  <div id="timeup" class="catch timeup" hidden>
+    <div class="catch-card timeup-card">
+      <div class="timeup-emoji">⏳</div>
+      <h2 id="timeup-title" class="hatch-title"></h2>
+      <p id="timeup-text" class="hatch-text"></p>
+      <p id="timeup-sub" class="timeup-sub"></p>
+      <div class="catch-actions timeup-actions">
+        <button type="button" id="timeup-ok" class="btn btn-primary btn-big-wide">알겠어요 👋</button>
+        <button type="button" id="timeup-ask" class="btn btn-ghost">🔒 아빠에게 부탁하기</button>
+      </div>
+      <!-- 🔒 비밀번호를 맞힌 뒤에만 보인다 -->
+      <div id="timeup-grant" class="timeup-grant" hidden>
+        <div class="timeup-grant-head">🔒 오늘 <span id="timeup-grant-subject"></span>에 시간을 더 줄까요?</div>
+        <div id="timeup-grant-btns" class="timeup-grant-btns"></div>
       </div>
     </div>
   </div>
@@ -586,6 +609,23 @@
         <input type="checkbox" id="set-parent">
         <span class="field-label">👨‍👩‍👦 부모 모드 — 그냥 보기 <small>— 반복·듣기 먼저·따라 말하기·퍼즐 없이 끝까지 이어서 재생. 학습 기록·경험치는 쌓이지 않고, 앱을 다시 열면 꺼져요</small></span>
       </label>
+
+      <fieldset class="field set-group">
+        <legend class="field-label">⏳ 하루 시간 제한 <small>— 과목마다. 넘으면 부모님 비밀번호로만 더 할 수 있어요</small></legend>
+        <label class="field-row">
+          <input type="checkbox" id="set-timelimit">
+          <span class="field-label">시간 제한 켜기</span>
+        </label>
+        <label class="field field-inline">
+          <span class="field-label">평일 (분)</span>
+          <input type="number" id="set-time-weekday" min="0" max="600" step="10" inputmode="numeric">
+        </label>
+        <label class="field field-inline">
+          <span class="field-label">주말 (분)</span>
+          <input type="number" id="set-time-weekend" min="0" max="600" step="10" inputmode="numeric">
+        </label>
+        <p id="set-time-today" class="field-note"></p>
+      </fieldset>
 
       <label class="field field-row">
         <input type="checkbox" id="set-merge">
