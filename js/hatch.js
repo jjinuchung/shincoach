@@ -4,6 +4,7 @@ import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 �
 import { sfx } from './sfx.js';
 import { hatchedUnseen, markEggSeen, getLook } from './xp.js';
 import { ROSTER, ensureCast } from './pokemon.js';
+import { pathTo } from './evolve.js'; // 🧬 "자라면 무엇이 되나"
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,7 +21,7 @@ export function showDot(el, monId) {
 let onDone = null;
 
 /**
- * @param {{id?:number, ko:string, url?:string|null, subject:'math'|'english', onDone?:()=>void}} o url이 없으면(그림을 못 받음) 🥚 이모지로
+ * @param {{id?:number, target?:number, ko:string, url?:string|null, subject:'math'|'english', onDone?:()=>void}} o url이 없으면(그림을 못 받음) 🥚 이모지로
  */
 export function openHatch(o) {
   const box = $('hatch');
@@ -33,8 +34,34 @@ export function openHatch(o) {
   showDot($('hatch-dot'), o.id); // 🕺 갓 태어난 모습이 움직인다
   $('hatch-title').textContent = `🐣 ${o.subject === 'math' ? '수학' : '영어'} 알이 부화했어요!`;
   $('hatch-text').textContent = `${o.ko}${josa(o.ko, '이', '가')} 태어났어요 — 도감에 들어갔어요. 잘 배운 5일의 선물이에요!`;
+  // 🧬 알은 원작대로 **시작형**으로 부화한다. 그래서 "자라면 무엇이 되는지"를 여기서 알려 준다 —
+  //    안 알려 주면 아이에겐 그냥 작은 포켓몬이 나온 것이 된다 (진우 지적 2026-09-27)
+  showGrow($('hatch-grow'), o.id, o.target);
   box.hidden = false;
   try { sfx.levelUp(); } catch { /* 소리는 없어도 */ }
+}
+
+/** 🧬 "자라면 → 염무왕" 줄 — 시작형과 목표가 같으면(진화가 없는 종) 감춘다 */
+function showGrow(el, monId, targetId) {
+  if (!el) return;
+  const steps = pathTo(monId, targetId);
+  el.hidden = !steps.length;
+  el.textContent = '';
+  if (!steps.length) return;
+  const goal = nameOf(targetId);
+  const head = document.createElement('div');
+  head.className = 'hatch-grow-head';
+  head.textContent = `🧬 자라면 ${goal}${josa(goal, '이', '가')} 돼요!`;
+  el.appendChild(head);
+  const how = document.createElement('div');
+  how.className = 'hatch-grow-how';
+  how.textContent = steps.map((s) => `Lv${s.at}에 ${nameOf(s.to)}`).join(' · ');
+  el.appendChild(how);
+}
+
+function nameOf(id) {
+  const r = ROSTER.find((x) => x.id === Number(id));
+  return r ? r.ko : '포켓몬';
 }
 
 export function closeHatch() {
@@ -43,6 +70,8 @@ export function closeHatch() {
   box.hidden = true;
   const d = $('hatch-dot');
   if (d) d.hidden = true;
+  const g = $('hatch-grow');
+  if (g) { g.hidden = true; g.textContent = ''; }
   const f = onDone; onDone = null;
   if (typeof f === 'function') f();
 }
@@ -74,7 +103,8 @@ export async function showHatchIfAny() {
     try { const got = await Promise.race([ensureCast([egg.monId]), new Promise((res) => setTimeout(() => res([]), 8000))]); url = got && got[0] ? got[0].url : null; } catch { url = null; }
     if (anyModalOpen()) return false; // 그 사이 다른 게 열렸다 — 다음 기회에 (봤다고 적지 않는다)
     // "봤다"는 아이가 좋아!를 눌렀을 때 적는다 — 그림을 못 받거나 화면이 안 떴는데 봤다고 남지 않게 (Codex 7차 #7). 두 창이 같이 보여 주는 건 괜찮다
-    openHatch({ id: egg.monId, ko: r ? r.ko : '포켓몬', url, subject: egg.subject, look: getLook(egg.monId), onDone: () => { markEggSeen(egg.id).catch(() => {}); } });
+    // target은 v137부터 적힌다 — 그 전에 산 알은 목표가 없으니 monId와 같게 보고 "자라면" 줄을 감춘다
+    openHatch({ id: egg.monId, target: Number(egg.target) || egg.monId, ko: r ? r.ko : '포켓몬', url, subject: egg.subject, look: getLook(egg.monId), onDone: () => { markEggSeen(egg.id).catch(() => {}); } });
     return true;
   } finally { showing = false; }
 }

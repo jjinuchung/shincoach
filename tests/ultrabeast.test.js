@@ -96,12 +96,13 @@ test('🥚 알에서 🌌 울트라비스트는 **절대** 안 나온다 (울트
   const math = forHole(forSubject(ROSTER, 'math'), false);
   for (const id of ULTRA_BEASTS) assert.equal(math.some((r) => r.id === id), false, `${id}`);
   // 가장 뒤쪽을 고르는 rng로도 울트라비스트가 안 나온다 (Codex가 806을 뽑아낸 그 방법)
-  const got = pickHatch(math, rarityOf, {}, () => 0.999999);
-  assert.equal(isUltraBeast(got), false, `알에서 ${got}가 나왔다`);
-  assert.ok(rarityOf(got) >= 3, '그래도 희귀 이상은 나온다');
-  // 게이트를 안 씌우면 실제로 새 나간다 — 이 검사가 그걸 지킨다
-  const leaky = pickHatch(forSubject(ROSTER, 'math'), rarityOf, {}, () => 0.999999);
-  assert.ok(isUltraBeast(leaky), '전제가 바뀌었으면 이 테스트를 다시 봐야 한다');
+  const got = pickHatch(math, rarityOf, {}, { rng: () => 0.999999 });
+  assert.equal(isUltraBeast(got.id) || isUltraBeast(got.target), false, `알에서 ${got.id}가 나왔다`);
+  assert.equal(rarityOf(got.target), 3, '목표는 희귀');
+  // ★ 2026-09-27부터 **두 겹**으로 막힌다: ① 부르는 쪽의 forHole ② 목표 등급이 희귀(3)뿐이라 🌌(5)는 애초에 안 걸린다.
+  //   게이트를 안 씌워도 이제는 안 새지만, 게이트를 지우면 안 된다 — 등급 규칙이 바뀌면 다시 샌다
+  const nogate = pickHatch(forSubject(ROSTER, 'math'), rarityOf, {}, { rng: () => 0.999999 });
+  assert.equal(isUltraBeast(nogate.target), false, '등급 규칙이 두 번째 자물쇠다');
 });
 
 test('⚔️ 🌌 울트라비스트는 배틀 상대가 되지 않는다 (이기면 그냥 얻어지므로)', () => {

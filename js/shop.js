@@ -3,10 +3,10 @@
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, SHINY_STONE, itemById, canBuy, priceText, setFigure } from './items.js';
 import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
-import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole } from './pokemon.js';
+import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림
-import { costBetween } from './evolve.js';
+import { costBetween, baseOf } from './evolve.js';
 import { showEvolve } from './evolveshow.js';
 import { sfx, unlock } from './sfx.js';
 
@@ -127,11 +127,12 @@ function shopSection(title, sub, items, boughtId) {
 async function buy(id) {
   const it = itemById(id);
   if (it && it.kind === 'egg') {
-    // 🥚 알: 부화할 종을 **살 때** 정해 저장한다 (그 과목 희귀 이상, 못 잡은 것 먼저) — 재시도·복구로 바뀌지 않게
+    // 🥚 알: 목표(희귀)와 부화할 시작형을 **살 때** 정해 저장한다 — 재시도·복구로 바뀌지 않게
+    // 🐣 알은 **시작형**으로 부화한다 (원작대로 — 진우 지적 2026-09-27) · 전설은 목표에서 뺀다 (원작에서 알을 낳지 않는다)
     // 🌌 울트라비스트는 알에서 **절대** 안 나온다 — 울트라홀이 열린 뒤에도. ⚪ 비스트볼로 잡는 것이
     //    울트라비스트의 전부인데, 알이 공짜로 주면 그 규칙이 통째로 무의미해진다 (Codex 11차 #2)
-    const monId = pickHatch(forHole(forSubject(ROSTER, it.subject), false), rarityOf, getProfileSnapshot().caught);
-    const r = await buyEgg(it, monId);
+    const pick = pickHatch(forHole(forSubject(ROSTER, it.subject), false), rarityOf, getProfileSnapshot().caught, { baseOf, isLegendary, isTrueBase });
+    const r = await buyEgg(it, pick);
     if (!r.ok) { renderShop(r.why === 'active' ? '🥚 이미 품는 알이 있어요 — 부화하면 또 살 수 있어요' : '💰 코인이나 🧤 스톤이 조금 모자라요. 배우고 다시 와요!'); return; }
     unlock();
     sfx.ding();

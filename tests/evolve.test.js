@@ -11,9 +11,9 @@ import { battleLossRule, cloneProfile, emptyProfile, evolveRule, gearRule, level
 const ids = new Set(ROSTER.map((r) => r.id));
 const links = Object.entries(EVO).flatMap(([from, list]) => list.map((e) => ({ from: Number(from), ...e })));
 
-test('🧬 진화표: 67링크·60종(🌌 베베놈→아고용 포함), 양쪽이 모두 명단에 있다', () => {
-  assert.equal(links.length, 67);
-  assert.equal(Object.keys(EVO).length, 60);
+test('🧬 진화표: 107링크·100종, 양쪽이 모두 명단에 있다', () => {
+  assert.equal(links.length, 107, '🧬 줄기 중간 20을 채워 66 → 107 (2026-09-27)');
+  assert.equal(Object.keys(EVO).length, 100);
   for (const l of links) {
     assert.ok(ids.has(l.from), `진화 전 ${l.from}이 명단에 없다`);
     assert.ok(ids.has(l.to), `진화 후 ${l.to}이 명단에 없다`);
@@ -81,9 +81,9 @@ test('🧬 원작 조건(orig)은 모든 링크에 있다 — 진우가 아는 �
   assert.equal(evoTo(7, 8).orig, 'Lv16');
 });
 
-test('🧬 진화하면 과목이 바뀌는 37쌍 (아버님 결정: 원작대로) — 그다음부터 다른 스톤이 필요하다', () => {
+test('🧬 진화하면 과목이 바뀌는 46쌍 (아버님 결정: 원작대로) — 그다음부터 다른 스톤이 필요하다', () => {
   const crossed = links.filter((l) => subjectOf(l.from) !== subjectOf(l.to));
-  assert.equal(crossed.length, 37, '🌌 베베놈→아고용은 둘 다 수학이라 갈리지 않는다');
+  assert.equal(crossed.length, 46, '줄기 중간은 시작형과 같은 과목이라, 갈리는 자리는 마지막 진화 한 곳뿐이다');
   // 고라파덕(영어) → 골덕(수학)
   assert.equal(subjectOf(54), 'english');
   assert.equal(subjectOf(55), 'math');
@@ -91,7 +91,7 @@ test('🧬 진화하면 과목이 바뀌는 37쌍 (아버님 결정: 원작대�
   assert.equal(stoneIdFor(subjectOf(55)), 'stone_math');
 });
 
-test('🧬 진화로 얻는 66마리도 등급·타입이 채워져 있다 (빠지면 조용히 보통·노말이 된다)', () => {
+test('🧬 진화로 얻는 종도 등급·타입이 채워져 있다 (빠지면 조용히 보통·노말이 된다)', () => {
   for (const l of links) {
     assert.ok(TYPE_OF[l.to], `${l.to}에 타입이 없다`);
     assert.ok(TYPE_OF[l.from], `${l.from}에 타입이 없다`);

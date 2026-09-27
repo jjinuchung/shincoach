@@ -123,6 +123,10 @@ export const TYPE_OF = {
   379: 'steel', 385: 'steel', 208: 'steel', 306: 'steel', 375: 'steel', 681: 'steel', 823: 'steel', 884: 'steel', 1000: 'steel', 304: 'steel',
   // 🌌 울트라비스트 (2026-09-27) — 벌레·독·비행은 기술표에 없어 둘째 타입으로 (베베놈은 독 단일이라 노말)
   793: 'rock', 794: 'fighting', 795: 'fighting', 796: 'electric', 797: 'steel', 798: 'grass', 799: 'dark', 803: 'normal', 804: 'dragon', 805: 'rock', 806: 'fire',
+  // 🧬 줄기를 잇는 중간 단계 20 (2026-09-27) — 타입은 PokeAPI 그대로, 기술표에 없는 벌레·독·비행은 앞뒤와 같은 타입으로
+  67: 'fighting', 11: 'normal', 42: 'normal', 281: 'psychic', 886: 'dragon', 75: 'rock', 180: 'electric',
+  253: 'grass', 305: 'steel', 680: 'steel', 329: 'ground', 176: 'fairy',
+  499: 'fire', 654: 'fire', 726: 'fire', 814: 'fire', 502: 'water', 729: 'water', 817: 'water', 913: 'water',
 };
 
 export function typeOf(id) {

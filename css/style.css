@@ -1350,6 +1350,10 @@ button { font-family: inherit; }
 .hatch-stage .hatch-mon { width: 140px; height: 140px; animation: home-mon-breathe 2.2s ease-in-out infinite; }
 .hatch-emoji { font-size: 5rem; }
 .hatch-text { font-size: 1.05rem; font-weight: 700; margin: 8px 0 12px; }
+/* 🧬 "자라면 염무왕이 돼요" — 알은 원작대로 시작형으로 부화하므로, 목표를 여기서 알려 준다 (2026-09-27) */
+.hatch-grow { background: #f2edff; border: 2px solid #b9a6f5; border-radius: 14px; padding: 10px 12px; margin: 0 0 12px; }
+.hatch-grow-head { font-size: 1.05rem; font-weight: 800; color: #4a2f9c; }
+.hatch-grow-how { font-size: .9rem; color: #5b5570; margin-top: 4px; }
 
 /* ── 🧬 레벨업 · 진화 ── */
 /* ⬆️ 레벨 막대 (❤️ HP 막대와 같은 모양, 색만 다르게 — 아이가 둘을 헷갈리지 않게) */
