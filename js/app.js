@@ -11,6 +11,7 @@ import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
 import { initTimeLimit, setSubject, flushTime } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
 import { initTimeUp, refreshChips } from './timeup.js';
+import { initTaken, openTakeTool, showTakenNoticeIfAny } from './taken.js'; // 🔒 부모가 포켓몬 데려가기
 
 const views = {
   home: document.getElementById('view-home'),
@@ -142,7 +143,7 @@ window.addEventListener('unhandledrejection', (e) => showError(`오류: ${(e.rea
 
 async function main() {
   // 버튼 연결을 가장 먼저 — 뒤의 어떤 단계가 실패해도 UI는 동작해야 함
-  initPlayer({ showView });
+  initPlayer({ showView, onTakeTool: openTakeTool });
   initStats({ showView, requirePin });
   initPokedex({ showView });
   initHatch();
@@ -150,11 +151,14 @@ async function main() {
   initHome({ showView });
   initMath({ showView });
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
+  initTaken({ requirePin });  // 🔒 포켓몬 데려가기 (부모) + "아빠가 데려갔어요" 알림 (아이)
   initExit();
   // 🌈⭐ 받아둔 이로치·변신 그림을 **홈을 그리기 전에** 올린다 — 나중에 올리면 이미 그린 화면은 안 바뀐다 (Codex 8차 #3). 실패해도 계속
   try { const pk = await import('./pokemon.js'); await Promise.all([pk.loadShiny().catch(() => 0), pk.loadForms().catch(() => 0)]); } catch { /* 그림 없이 */ }
   showView('home'); // 🏠 과목 고르기부터 (영어는 카드를 눌러 들어간다)
   window.__appReady = true; // index.html의 시작 감시 타이머 해제
+  // 🔒 아빠가 데려간 포켓몬이 있으면 한 번 알려 준다 — 조용히 사라지면 앱이 고장 난 줄 안다
+  showTakenNoticeIfAny().catch(() => {});
   try {
     await initLibrary({ showView });
   } catch (err) {

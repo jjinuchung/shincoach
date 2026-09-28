@@ -963,6 +963,53 @@ export async function applyProfileDelta(delta) {
 }
 
 /**
+ * 🔒 부모가 포켓몬을 데려간다 (2026-09-28, 아버님: "부모 암호로 삭제 — 완전 삭제는 아니고 나중에 또 구할 수 있게").
+ *
+ * ★★ `caught`를 **줄이지 않는다.** 백업 병합이 caught를 max로 합치므로, 줄이면 옛 백업이 복원되는 순간
+ *    벌이 통째로 없던 일이 된다(🧬 진화에서 겪은 것과 같은 함정). 대신 단조 카운터 `mons[id].taken`을 올린다.
+ *    · 보유 = caught − evo − taken  → 🤝 파트너·⚔️ 배틀·🎀 꾸미기에서 자동으로 빠진다(전부 haveOf를 본다)
+ *    · 도감 칸은 남는다 (잡았던 적 있음)
+ *    · 다시 잡으면 caught가 늘어 보유가 돌아온다 — **영구 삭제가 아니다**
+ * @returns {{ok:boolean, took:number, left:number}}
+ */
+export function takeMonRule(profile, monId, n = 1) {
+  const id = Number(monId);
+  const m = (profile.mons || {})[id] || {};
+  const have = haveOf((profile.caught || {})[id], m);
+  const took = Math.min(have, Math.max(0, Math.floor(Number(n) || 0)));
+  if (!id || took <= 0) return { ok: false, took: 0, left: have };
+  profile.mons = profile.mons || {};
+  profile.mons[id] = { ...m, taken: (Number(m.taken) || 0) + took };
+  const left = haveOf((profile.caught || {})[id], profile.mons[id]);
+  // 🤝 데려간 것이 파트너였고 한 마리도 안 남았으면 파트너를 비운다 — 보유 0인 파트너는 ❤️ HP·배틀에서 어긋난다
+  if (left < 1 && Number(profile.partner) === id) profile.partner = null;
+  return { ok: true, took, left };
+}
+
+/** 🔒 여러 마리를 **한 트랜잭션에서** — 두 창이 겹쳐도 한 번만 빠진다 */
+export async function applyTakeMons(ids) {
+  return mutateProfile((p) => {
+    const results = (ids || []).map((id) => ({ id: Number(id), ...takeMonRule(p, id, 1) }));
+    return { ok: results.some((r) => r.ok), results };
+  });
+}
+
+/** 🔒 "아빠가 데려갔어요"를 아이에게 보여 줬다고 적는다 (알림을 두 번 띄우지 않게). takenSeen도 단조 */
+export function takenSeenRule(profile) {
+  let n = 0;
+  for (const id of Object.keys(profile.mons || {})) {
+    const m = profile.mons[id];
+    const t = Math.max(0, Math.floor(Number(m && m.taken) || 0));
+    const s = Math.max(0, Math.floor(Number(m && m.takenSeen) || 0));
+    if (t > s) { profile.mons[id] = { ...m, takenSeen: t }; n += 1; }
+  }
+  return { ok: n > 0, n };
+}
+export async function applyTakenSeen() {
+  return mutateProfile((p) => takenSeenRule(p));
+}
+
+/**
  * 🥚 알 사기 — 코인+스톤을 치르고(purchaseRule) 알 레코드를 붙인다. 그 과목에 품는 알이 있으면 안 판다. 한 트랜잭션
  * @param {{coins:number, items:Object}} cost
  * @param {object} egg egg.newEgg(...)
@@ -1254,6 +1301,12 @@ export function mergeStatRecord(name, cur, rec) {
       if (lv && lv !== (Number(cur.lv) || 0)) patch.lv = lv;
       const evo = Math.max(Number(o.evo) || 0, Number(cur.evo) || 0);
       if (evo && evo !== (Number(cur.evo) || 0)) patch.evo = evo;
+      // 🔒 부모가 데려간 수·알려 준 수도 단조 카운터 (2026-09-28) — max가 아니면
+      //    옛 백업을 되돌리는 것만으로 벌이 없던 일이 된다 (evo와 똑같은 함정)
+      const taken = Math.max(Number(o.taken) || 0, Number(cur.taken) || 0);
+      if (taken && taken !== (Number(cur.taken) || 0)) patch.taken = taken;
+      const seen = Math.max(Number(o.takenSeen) || 0, Number(cur.takenSeen) || 0);
+      if (seen && seen !== (Number(cur.takenSeen) || 0)) patch.takenSeen = seen;
       if (Object.keys(patch).length) out.mons[id] = { ...cur, ...patch };
     }
     // 🎟️ 기준선은 가방(교환권)과 짝이다 — 둘이 갈라지면 "샀는데 조건이 안 줄었다"가 된다.

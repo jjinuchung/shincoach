@@ -329,6 +329,31 @@
     </div>
   </div>
 
+  <!-- ===== 🔒 부모가 포켓몬 데려가기 (⚙ 설정 → 비밀번호, 2026-09-28) ===== -->
+  <div id="take" class="catch take" hidden>
+    <div class="catch-card take-card">
+      <div class="take-head">
+        <h2 class="take-title">🔒 포켓몬 데려가기</h2>
+        <button type="button" id="take-close" class="btn btn-icon" aria-label="닫기">✕</button>
+      </div>
+      <div id="take-main" class="take-main"></div>
+      <div id="take-bar" class="take-bar"></div>
+    </div>
+  </div>
+
+  <!-- ===== 🔒 아빠가 데려갔어요 (아이에게 한 번 알려 준다) ===== -->
+  <div id="taken" class="catch taken" hidden>
+    <div class="catch-card taken-card">
+      <div class="taken-lock">🔒</div>
+      <h2 id="taken-title" class="hatch-title"></h2>
+      <div id="taken-stage" class="taken-stage"></div>
+      <p id="taken-text" class="hatch-text"></p>
+      <div class="catch-actions">
+        <button type="button" id="taken-ok" class="btn btn-primary btn-big-wide">알겠어요</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== ⏳ 오늘 시간이 끝났어요 (과목마다 평일 1시간·주말 2시간, 2026-09-27) ===== -->
   <div id="timeup" class="catch timeup" hidden>
     <div class="catch-card timeup-card">
@@ -707,6 +732,7 @@
 
       <div class="field-actions">
         <button type="button" id="set-rarity-reset" class="btn">⭐ 포켓몬 등급 초기화 <small>— 진우가 옮긴 등급을 원래대로 되돌려요</small></button>
+        <button type="button" id="set-take" class="btn">🔒 포켓몬 데려가기 <small>— 벌로 보유에서 빼요. 도감 칸은 남고, 다시 잡으면 돌아와요</small></button>
       </div>
 
       <div class="field">

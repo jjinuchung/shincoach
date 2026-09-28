@@ -109,6 +109,9 @@ function loadPlayer() {
     TIME_MIN: { weekday: 60, weekend: 120 },
     statusOf: () => ({ used: 0, limit: 3600, bonus: 0, total: 3600, left: 3600, locked: false, warn: false, off: false }),
     fmtUsed: (sec) => `${Math.floor((Number(sec) || 0) / 60)}분`, todayDaily: () => null,
+    // 🕳 울트라홀 게이트 스텁 (2026-09-28) — 테스트 명단엔 울트라비스트가 없으니 걸러도 그대로다
+    forHole: (list) => (list || []).slice(), isUltraBeast: () => false,
+    gymClaimed: () => false, getMath: async () => ({}),
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
     // 하루 한 번(mark*)은 실제 코드에서 **트랜잭션 선점**이라 Promise<선점 성공 여부>를 준다 — 스텁도 같은 약속을 지킨다
     track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false,

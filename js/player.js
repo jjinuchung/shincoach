@@ -1,5 +1,5 @@
 // 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
-import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, markVocabMatched, listEssays, markEssayRead, syncCoachFixes } from './db.js';
+import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, markVocabMatched, listEssays, markEssayRead, syncCoachFixes, getMath } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
@@ -8,7 +8,9 @@ import { isSpeakable, loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
-import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle } from './pokemon.js';
+import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle, forHole, isUltraBeast } from './pokemon.js';
+// 🕳 울트라홀은 하나다 — 💎 스페셜 배지 8개(수학)로 열리고, 그 뒤에 영어 쪽 울트라비스트도 나온다 (아버님 결정 2026-09-28)
+import { gymClaimed } from './mathprog.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { STONE_ENGLISH, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
@@ -128,10 +130,15 @@ function savePrefs() {
 
 // ───────────────────── 초기화 ─────────────────────
 
+let onTakeTool = null;
+
 export function initPlayer(ctx) {
   showView = ctx.showView;
+  // 🔒 "포켓몬 데려가기" 화면을 여는 함수 — app.js가 끼워 준다 (player.js ↔ taken.js 고리 방지)
+  onTakeTool = typeof ctx.onTakeTool === 'function' ? ctx.onTakeTool : null;
   video = $('video');
   loadPrefs();
+  refreshHole(); // 🕳 울트라홀 상태를 읽어 둔다 (실패해도 닫힌 채로 — 새어 나가지 않는 쪽)
 
   $('btn-back').addEventListener('click', closePlayer);
   $('btn-play').addEventListener('click', onPlayButton);
@@ -409,12 +416,27 @@ function unlockedCharacters() {
   return state.characters.filter((c) => isUnlocked(c.id, level) && !(settings.hp && isTired(c.id))).map((c) => ({ ...c, look: getLook(c.id) }));
 }
 
-/** 🎯 영어 잡기 후보: 퍼즐에 나온 것 중 영어 포켓몬, 2마리가 안 되면 영어 풀에서 채운다 (수학 포켓몬은 수학에서만 잡힌다) */
+/**
+ * 🕳 울트라홀이 열렸나 — 💎 스페셜 배지 여덟 개(수학)로 **한 번 열리면 계속 열려 있다**(sp.gym은 단조).
+ *
+ * ★ 영어 화면은 수학 진도를 들고 있지 않아 읽어서 캐시해 둔다. 기본값은 **닫힘** — 못 읽었을 때
+ *   울트라비스트가 새어 나오는 쪽이 아니라 안 나오는 쪽으로 틀리게 한다.
+ *   (게이트를 수학에만 걸어 뒀다가 알·배틀·레이더로 샌 적이 있다 — 거는 자리를 전부 세는 것이 먼저다)
+ */
+let holeOpen = false;
+async function refreshHole() {
+  try { holeOpen = gymClaimed(await getMath()); } catch { /* 못 읽으면 닫힌 채로 둔다 */ }
+}
+
+/**
+ * 🎯 영어 잡기 후보: 퍼즐에 나온 것 중 영어 포켓몬, 2마리가 안 되면 영어 풀에서 채운다 (수학 포켓몬은 수학에서만 잡힌다).
+ * 🌌 울트라비스트는 🕳 울트라홀이 열려야 후보에 들어온다 — 열리기 전엔 아예 없다.
+ */
 function englishCandidates(shown) {
-  const out = forSubject(shown || [], 'english');
+  const out = forHole(forSubject(shown || [], 'english'), holeOpen);
   if (out.length >= 2) return out;
   const have = new Set(out.map((c) => c.id));
-  for (const c of pickCharacters(forSubject(unlockedCharacters(), 'english'), 4)) {
+  for (const c of pickCharacters(forHole(forSubject(unlockedCharacters(), 'english'), holeOpen), 4)) {
     if (out.length >= 4) break;
     if (!have.has(c.id)) { have.add(c.id); out.push(c); }
   }
@@ -1194,7 +1216,10 @@ function showPuzzle(cue, onDone) {
   state.puzzleCue = cue;
   state.puzzlePlaying = false;
   openPuzzle(cue, {
-    characters: forPuzzle(unlockedCharacters(), (id) => caughtCount(id) > 0), // 영어 것 + 이미 잡은 수학 포켓몬
+    // 영어 것 + 이미 잡은 수학 포켓몬. 🌌 울트라비스트는 🕳 울트라홀이 열리기 전엔 퍼즐에도 안 나온다
+    // (이미 잡은 것은 어디든 놀러 온다 — 잡았다는 건 홀이 열렸었다는 뜻이다)
+    characters: forPuzzle(unlockedCharacters(), (id) => caughtCount(id) > 0)
+      .filter((c) => holeOpen || !isUltraBeast(c.id) || caughtCount(c.id) > 0),
     onPlay: (onEnd) => playPuzzleSentence(cue, onEnd),
     onClose: (result) => {
       state.puzzleCue = null;
@@ -1432,6 +1457,7 @@ function onVisibilityChange() {
 
 /** 콘텐츠 열기. opts.startTime(초)을 주면 그 시각의 문장에서 시작 (학습 기록에서 이동) */
 export async function openPlayer(id, opts = {}) {
+  refreshHole(); // 🕳 그 사이 수학에서 여덟 배지를 모았을 수 있다 (한 번 열리면 계속 열려 있다)
   // 저장이 깨진 영상(자막 곁 파일 유실)은 읽는 것 자체가 실패한다 — 📊에서 문장을 탭해 들어올 수도 있으므로 여기서 막는다
   let item = null;
   try {
@@ -2752,6 +2778,8 @@ function initSettingsDialog() {
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
   $('set-review-try').addEventListener('click', () => { $('dlg-settings').close(); startReviewNow(); });
   $('set-essay-try').addEventListener('click', () => { $('dlg-settings').close(); startEssayNow(); });
+  // 🔒 포켓몬 데려가기 — 이미 비밀번호를 지나 설정에 들어왔지만, 되돌릴 수 없는 일이라 taken.js에서 한 번 더 묻는다
+  $('set-take').addEventListener('click', () => { $('dlg-settings').close(); if (onTakeTool) onTakeTool(); });
   $('set-rarity-reset').addEventListener('click', () => {
     const n = resetRarity();
     $('dlg-settings').close();

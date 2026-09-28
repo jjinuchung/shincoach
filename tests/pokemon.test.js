@@ -3,11 +3,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ROSTER, pickCharacters, unlockedRoster, isUnlocked, nextUnlockLevel, unlockCountAt, headAnchor, subjectOf, forSubject, forPuzzle } from '../js/pokemon.js';
 
-test('ROSTER: 342마리(영어 174 / 🔢 수학 전용 168), id 중복 없음, 한글·영문 이름 있음', () => {
+test('ROSTER: 342마리(영어 177 / 🔢 수학 전용 165), id 중복 없음, 한글·영문 이름 있음', () => {
   assert.equal(ROSTER.length, 342);
   assert.equal(new Set(ROSTER.map((r) => r.id)).size, 342);
-  assert.equal(ROSTER.filter((r) => r.subject === 'math').length, 168, '수학 150 + 🌌 11 + 🧬 줄기 중간 7 (2026-09-27)');
-  assert.equal(unlockedRoster(1).length, 281, '처음 40 + 추가 60 + 수학 168 + 중간 13은 바로 (🌌는 울트라홀이 따로 막는다)');
+  assert.equal(ROSTER.filter((r) => r.subject === 'math').length, 165, '수학 150 + 🌌 8 + 🧬 줄기 중간 7 (🌌 셋은 2026-09-28 영어로)');
+  assert.equal(unlockedRoster(1).length, 281, '처음 40 + 추가 60 + 수학 165 + 🌌 영어 3 + 중간 13은 바로 (🌌는 울트라홀이 따로 막는다)');
   assert.equal(unlockedRoster(5).length, 301);
   assert.equal(unlockedRoster(14).length, 321);
   assert.equal(unlockedRoster(15).length, 342);
@@ -35,10 +35,10 @@ test('pickCharacters: n마리를 겹치지 않게, 부족하면 있는 만큼, �
   assert.deepEqual(pickCharacters(null, 5), []);
 });
 
-test('🔢 과목 가르기: subject는 잡히는 곳만 — 영어 174·수학 168, forSubject는 그 과목만, forPuzzle은 영어 + 잡은 수학', () => {
+test('🔢 과목 가르기: subject는 잡히는 곳만 — 영어 177·수학 165, forSubject는 그 과목만, forPuzzle은 영어 + 잡은 수학', () => {
   const en = ROSTER.filter((r) => subjectOf(r.id) === 'english');
   const ma = ROSTER.filter((r) => subjectOf(r.id) === 'math');
-  assert.equal(en.length, 174); assert.equal(ma.length, 168);
+  assert.equal(en.length, 177); assert.equal(ma.length, 165);
   assert.equal(subjectOf(25), 'english', '피카츄는 영어');
   assert.equal(subjectOf(244), 'math', '앤테이는 수학');
   assert.equal(subjectOf(99999), 'english', '모르면 영어');

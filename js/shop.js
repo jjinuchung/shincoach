@@ -2,7 +2,7 @@
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, SHINY_STONE, itemById, canBuy, priceText, setFigure } from './items.js';
-import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
+import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
 import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림
@@ -277,7 +277,8 @@ function renderMon(msg, pop) {
   const got = mon.caught !== false; // 아직 못 잡은 포켓몬은 등급만 손댈 수 있다
   $('mon-title').textContent = got ? (isPartner ? '🤝 ' : '') + mon.ko : '???';
   $('mon-sub').textContent = got
-    ? `${RARITY[r].stars} ${RARITY[r].label} · Lv${monLv(mon.id)} · ${haveCount(mon.id) > 0 ? `데리고 있어요 ×${haveCount(mon.id)}` : '🧬 진화로 보냈어요'}`
+    // 🔒 보유가 0인 까닭이 둘이다 — 진화로 보냈거나, 아빠가 데려갔거나. 아이가 헷갈리지 않게 갈라서 적는다
+    ? `${RARITY[r].stars} ${RARITY[r].label} · Lv${monLv(mon.id)} · ${haveCount(mon.id) > 0 ? `데리고 있어요 ×${haveCount(mon.id)}` : (takenCount(mon.id) > 0 ? '🔒 아빠가 데려갔어요 — 다시 잡으면 돌아와요' : '🧬 진화로 보냈어요')}`
       + (caughtCount(mon.id) > haveCount(mon.id) ? ` (도감 ×${caughtCount(mon.id)})` : '')
       + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '')
     : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${subjectOf(mon.id) === 'math' ? ' · 🔢 수학에서 만나요' : ' · 🎤 영어 퍼즐에서 만나요'}`;
@@ -442,7 +443,7 @@ function renderGrow() {
     box.appendChild(btn);
   }
   const msg = $('mon-grow-msg');
-  if (g.why === 'none') msg.textContent = '지금 데리고 있는 포켓몬이 없어요 (진화로 보냈어요)';
+  if (g.why === 'none') msg.textContent = takenCount(mon.id) > 0 ? '지금 데리고 있는 포켓몬이 없어요 (🔒 아빠가 데려갔어요 — 다시 잡으면 돌아와요)' : '지금 데리고 있는 포켓몬이 없어요 (진화로 보냈어요)';
   else if (g.why === 'evolve') msg.textContent = `🧬 Lv${g.cap}까지 키웠어요 — 진화해야 더 클 수 있어요!`;
   else if (!g.next) msg.textContent = '🏆 더 올릴 수 없어요 — 가장 높은 레벨이에요!';
   else if (g.why === 'stone') msg.textContent = `${em} ${stone ? stone.ko : '스톤'}이 ${g.next.stones - g.stones}개 더 있어야 해요 — ${subject}를 하면 받아요 (지금 ${g.stones}개)`;

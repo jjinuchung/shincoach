@@ -1,6 +1,7 @@
 // 🌌 울트라비스트: node --test tests/ultrabeast.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { ROSTER, ULTRA_BEASTS, isUltraBeast, forSubject, forHole } from '../js/pokemon.js';
 import { ballChance, rarityOf, RARITY, RARITY_UB, STAR_RARITIES, UB_PENALTY } from '../js/xp.js';
 import { BEASTBALL, STONE_SHOP, SHOP_BALLS, BALLS, ITEMS, costOf, lootBox, itemById } from '../js/items.js';
@@ -9,12 +10,16 @@ import { REWARD, specialReward } from '../js/mathprog.js';
 import { pickHatch } from '../js/egg.js';
 import { pickOpponent } from '../js/battle.js';
 
-test('🌌 울트라비스트 11마리가 명단에 있고, 전부 🔢 수학 전용이다 (아버님 결정)', () => {
+/** 2026-09-28 아버님: "3마리만 랜덤으로 골라서 영어에서" — tools/picks_260928.mjs(씨앗 20260928)가 뽑은 셋 */
+const UB_ENGLISH = [793, 794, 796]; // 텅비드 · 매시붕 · 전수목
+
+test('🌌 울트라비스트 11마리 — 8마리는 🔢 수학, 무작위로 뽑은 3마리는 🎤 영어 (아버님 결정 2026-09-28)', () => {
   assert.equal(ULTRA_BEASTS.length, 11);
   for (const id of ULTRA_BEASTS) {
     const r = ROSTER.find((x) => x.id === id);
     assert.ok(r, `${id}가 명단에 없다`);
-    assert.equal(r.subject, 'math', `${r.ko}는 수학 전용이어야 한다`);
+    const want = UB_ENGLISH.includes(id) ? undefined : 'math';
+    assert.equal(r.subject, want, `${r.ko}는 ${want ? '수학' : '영어'}여야 한다`);
     assert.ok(r.ko && r.en, `${id}: 한글·영문 이름`);
     assert.ok(TYPE_OF[id], `${r.ko}: 타입이 없으면 조용히 노말이 된다`);
     assert.ok(isUltraBeast(id));
@@ -67,11 +72,30 @@ test('🏆 여덟 배지 보상에 ⚪ 비스트볼이 들어 있다 (울트라�
   assert.equal(REWARD.gym.ball, 'masterball');
 });
 
-test('🌌 수학 명단에 섞여 있어 forSubject로 함께 나온다 (울트라홀 게이트는 화면에서)', () => {
-  const math = forSubject(ROSTER, 'math').map((r) => r.id);
-  for (const id of ULTRA_BEASTS) assert.ok(math.includes(id), `${id}`);
-  const eng = forSubject(ROSTER, 'english').map((r) => r.id);
-  for (const id of ULTRA_BEASTS) assert.equal(eng.includes(id), false, `${id}는 영어에 나오면 안 된다`);
+test('🌌 과목 명단: 수학 8 · 영어 3 — 서로 겹치지 않는다 (울트라홀 게이트는 화면에서)', () => {
+  const math = forSubject(ROSTER, 'math').map((r) => r.id).filter(isUltraBeast);
+  const eng = forSubject(ROSTER, 'english').map((r) => r.id).filter(isUltraBeast);
+  assert.equal(math.length, 8);
+  assert.deepEqual([...eng].sort((a, b) => a - b), UB_ENGLISH, '영어 셋은 뽑힌 그대로');
+  for (const id of eng) assert.equal(math.includes(id), false, `${id}가 두 과목에 다 있다`);
+  // 🧬 베베놈 → 아고용은 이번 뽑기에선 둘 다 수학에 남았다 (갈려도 괜찮다고 정했지만 안 갈렸다)
+  assert.ok(math.includes(803) && math.includes(804));
+});
+
+test('★ 🕳 울트라홀은 **하나** — 영어 쪽도 같은 게이트를 지난다 (아버님 결정 2026-09-28)', () => {
+  const eng = forSubject(ROSTER, 'english');
+  // 닫혀 있으면 영어 후보에 🌌가 하나도 없다
+  assert.equal(forHole(eng, false).some((c) => isUltraBeast(c.id)), false, '홀이 닫혔는데 영어에서 🌌가 나온다');
+  // 열리면 딱 그 셋
+  assert.deepEqual(forHole(eng, true).filter((c) => isUltraBeast(c.id)).map((c) => c.id).sort((a, b) => a - b), UB_ENGLISH);
+
+  // ★ 영어 화면(player.js)에서 🌌가 나올 수 있는 길은 **셋** — 셋 다 게이트를 지나야 한다.
+  //   게이트를 수학에만 걸었다가 알·배틀·레이더로 샌 적이 있다 (거는 자리를 전부 세는 것이 먼저다)
+  const src = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
+  const cand = src.slice(src.indexOf('function englishCandidates'), src.indexOf('// ───────────────────── ⚔️ 배틀'));
+  assert.equal((cand.match(/forHole\(forSubject\(/g) || []).length, 2, '잡기 후보 두 곳(퍼즐에 나온 것·채우기) 모두 forHole을 지나야 한다');
+  assert.ok(/forPuzzle\([\s\S]{0,120}\)\s*\.filter\(\(c\) => holeOpen \|\| !isUltraBeast\(c\.id\)/.test(src), '퍼즐 등장도 막아야 한다');
+  assert.ok(/let holeOpen = false;/.test(src), '못 읽으면 **닫힌 쪽**이 기본값이어야 한다');
 });
 
 test('🕳 울트라홀 게이트: 열리기 전에는 후보에 아예 없다', () => {
@@ -95,6 +119,13 @@ test('⚪ 비스트볼이 잡기 화면의 볼 고르기에 나온다 (없으면
 test('🥚 알에서 🌌 울트라비스트는 **절대** 안 나온다 (울트라홀이 열린 뒤에도)', () => {
   const math = forHole(forSubject(ROSTER, 'math'), false);
   for (const id of ULTRA_BEASTS) assert.equal(math.some((r) => r.id === id), false, `${id}`);
+  // 🎤 영어 알도 같다 — 2026-09-28부터 영어에도 🌌가 셋 있다 (shop.js는 두 과목 모두 forHole(…, false))
+  const eng = forHole(forSubject(ROSTER, 'english'), false);
+  for (const id of ULTRA_BEASTS) assert.equal(eng.some((r) => r.id === id), false, `영어 알: ${id}`);
+  for (let i = 0; i < 200; i++) {
+    const e = pickHatch(eng, rarityOf, {}, { rng: () => i / 200 });
+    assert.equal(isUltraBeast(e.id) || isUltraBeast(e.target), false, `영어 알에서 ${e.id}가 나왔다`);
+  }
   // 가장 뒤쪽을 고르는 rng로도 울트라비스트가 안 나온다 (Codex가 806을 뽑아낸 그 방법)
   const got = pickHatch(math, rarityOf, {}, { rng: () => 0.999999 });
   assert.equal(isUltraBeast(got.id) || isUltraBeast(got.target), false, `알에서 ${got.id}가 나왔다`);

@@ -153,7 +153,20 @@ export function stoneIdFor(subject) {
 export function haveOf(caughtN, mon) {
   const got = Math.max(0, Math.floor(Number(caughtN) || 0));
   const out = Math.max(0, Math.floor(Number(mon && mon.evo) || 0));
-  return Math.max(0, got - out);
+  // 🔒 부모가 데려간 수도 같은 이유로 단조 카운터다 (2026-09-28). `caught`를 줄이면 백업을 되돌릴 때
+  //    벌이 통째로 없던 일이 된다. 다시 잡으면 caught가 늘어 보유가 돌아온다 — 영구 삭제가 아니다
+  const gone = Math.max(0, Math.floor(Number(mon && mon.taken) || 0));
+  return Math.max(0, got - out - gone);
+}
+
+/** 🔒 부모가 데려간 마릿수 (도감 칸은 남고 보유만 빠진다) */
+export function takenOf(mon) {
+  return Math.max(0, Math.floor(Number(mon && mon.taken) || 0));
+}
+
+/** 🔒 아직 아이에게 안 알려 준 "데려감"이 있나 — taken이 takenSeen보다 크면 알림을 띄운다 */
+export function takenUnseen(mon) {
+  return Math.max(0, takenOf(mon) - Math.max(0, Math.floor(Number(mon && mon.takenSeen) || 0)));
 }
 
 /** mons[id] 레코드 → 지금 레벨 (기록이 없으면 1) */

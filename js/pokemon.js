@@ -366,11 +366,14 @@ export const ROSTER = [
   { id: 814, ko: '래비풋', en: 'Raboot' }, // 보통 · 염버니→래비풋→에이스번
   { id: 817, ko: '누겔레온', en: 'Drizzile', subject: 'math' }, // 보통 · 울머기→누겔레온→인텔리레온
   { id: 913, ko: '아꾸왁', en: 'Quaxwell', subject: 'math' }, // 보통 · 꾸왁스→아꾸왁→웨이니발
-  // 🌌 울트라비스트 (2026-09-27) — 🕳 울트라홀이 열려야 수학 잡기에 나온다. ⚪ 비스트볼이 있어야 제대로 잡힌다
-  { id: 793, ko: '텅비드', en: 'Nihilego', subject: 'math' },
-  { id: 794, ko: '매시붕', en: 'Buzzwole', subject: 'math' },
+  // 🌌 울트라비스트 (2026-09-27) — 🕳 울트라홀이 열려야 잡기에 나온다. ⚪ 비스트볼이 있어야 제대로 잡힌다
+  // 2026-09-28 아버님: "3마리만 랜덤으로 골라서 영어에서 나올 수 있도록" → tools/picks_260928.mjs(씨앗 20260928)가
+  //   텅비드·매시붕·전수목을 뽑았다. 이 셋은 **영어**(subject 없음), 나머지 8마리는 수학.
+  //   울트라홀은 **하나**다 — 💎 스페셜 배지 여덟 개(수학)로 열리면 두 과목 모두에서 나온다 (아버님 결정)
+  { id: 793, ko: '텅비드', en: 'Nihilego' },
+  { id: 794, ko: '매시붕', en: 'Buzzwole' },
   { id: 795, ko: '페로코체', en: 'Pheromosa', subject: 'math' },
-  { id: 796, ko: '전수목', en: 'Xurkitree', subject: 'math' },
+  { id: 796, ko: '전수목', en: 'Xurkitree' },
   { id: 797, ko: '철화구야', en: 'Celesteela', subject: 'math' },
   { id: 798, ko: '종이신도', en: 'Kartana', subject: 'math' },
   { id: 799, ko: '악식킹', en: 'Guzzlord', subject: 'math' },

@@ -2471,3 +2471,37 @@ button { font-family: inherit; }
 .chal-bonus { font-weight: 800; color: #4a2f9c; background: #f2edff; border-radius: 12px; padding: 10px; }
 .chal-bonus-big { background: #fff3cd; color: #7a5b00; }
 .time-chip.paused { background: #e7f0ff; color: #2b5ea8; }
+
+/* ── 🔒 부모가 포켓몬 데려가기 (2026-09-28) ── */
+.take-card { max-width: 560px; width: 100%; max-height: 86vh; display: flex; flex-direction: column; gap: 10px; }
+.take-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.take-title { margin: 0; font-size: 1.15rem; }
+.take-main { overflow-y: auto; flex: 1 1 auto; display: flex; flex-direction: column; gap: 14px; }
+.take-lede { font-size: .9rem; color: #5b5570; margin: 0; }
+.take-msg { background: #e9f7ee; border: 1.5px solid #6fbf8b; border-radius: 10px; padding: 9px 11px; font-weight: 700; color: #17603a; margin: 0; }
+.take-empty { color: #8b8598; }
+.take-sec { display: flex; flex-direction: column; gap: 7px; }
+.take-sec-head { margin: 0; font-size: .92rem; color: #4a5068; }
+.take-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.take-mon { display: inline-flex; align-items: center; gap: 4px; padding: 7px 11px; border-radius: 999px;
+  border: 1.5px solid #dcd8e6; background: #fff; font-size: .9rem; font-weight: 600; color: #2c2a35; cursor: pointer; }
+.take-mon.on { background: #a3234c; border-color: #a3234c; color: #fff; }
+.take-mon-n { font-size: .78rem; opacity: .75; }
+.take-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between;
+  border-top: 1px solid #e6e1ec; padding-top: 10px; }
+.take-count { font-size: .86rem; color: #5b5570; flex: 1 1 160px; }
+.take-go:disabled { opacity: .45; }
+.take-confirm { display: flex; flex-direction: column; gap: 10px; }
+.take-confirm-list { margin: 0; padding-left: 20px; font-weight: 700; }
+.take-warn { background: #fff3cd; border-radius: 10px; padding: 9px 11px; color: #7a5b00; margin: 0; font-size: .9rem; }
+.take-confirm-row { display: flex; gap: 8px; }
+.take-confirm-row .btn { flex: 1 1 auto; }
+
+/* 🔒 아빠가 데려갔어요 (아이 알림) */
+.taken-card { text-align: center; align-items: center; }
+.taken-lock { font-size: 3rem; line-height: 1; }
+.taken-stage { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+.taken-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 74px; }
+.taken-img { width: 64px; height: 64px; object-fit: contain; filter: grayscale(1) opacity(.55); }
+.taken-emoji { font-size: 2.4rem; opacity: .5; }
+.taken-name { font-size: .78rem; font-weight: 700; color: #5b5570; }

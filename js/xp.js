@@ -5,10 +5,11 @@ import {
   getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase, applyBuyEgg, applyEggDay, applyEggSeen, applyShiny,
   applyLevelUp, applyEvolve, applyGear, applyPartner, updateMathAndProfile, mergeProfileDelta,
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase, gearRule,
+  applyTakeMons, applyTakenSeen, // 🔒 부모가 데려가기 (2026-09-28)
 } from './db.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, MAX_LV } from './evolve.js';
+import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
 import { findLocked } from './unlock.js';
 
@@ -503,9 +504,48 @@ export function stonesSpent() {
   return Math.max(0, Math.floor(Number(profile.stonesSpent) || 0));
 }
 
-/** 지금 데리고 있는 마릿수 (누적 − 🧬 진화로 내보낸 수) */
+/** 지금 데리고 있는 마릿수 (누적 − 🧬 진화로 내보낸 수 − 🔒 부모가 데려간 수) */
 export function haveCount(id) {
   return haveOf(profile.caught[id], profile.mons[id]);
+}
+
+/** 🔒 부모가 데려간 마릿수 */
+export function takenCount(id) {
+  return takenOf(profile.mons[id]);
+}
+
+/** 🔒 지금 데리고 있는 종 목록 — 부모 화면이 "무엇을 데려갈 수 있나"를 그릴 때 (id 오름차순) */
+export function ownedIds() {
+  return Object.keys(profile.caught)
+    .map(Number)
+    .filter((id) => haveOf(profile.caught[id], profile.mons[id]) > 0)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * 🔒 부모가 포켓몬을 데려간다 — 도감 칸은 남고 보유만 빠진다. 다시 잡으면 돌아온다.
+ * @param {number[]} ids
+ * @returns {Promise<{ok:boolean, results:Array}>}
+ */
+export async function takeMons(ids) {
+  await flushProfile();                       // 밀려 있던 증분을 먼저 (트랜잭션이 최신 프로필을 읽게)
+  const r = await applyTakeMons(ids);
+  if (r && r.profile) profile = fromStored(r.profile);
+  return { ok: !!(r && r.ok), results: (r && r.results) || [] };
+}
+
+/** 🔒 아이에게 아직 안 알려 준 "데려감" → [{ id, n }] */
+export function unseenTaken() {
+  return Object.keys(profile.mons || {})
+    .map((id) => ({ id: Number(id), n: takenUnseen(profile.mons[id]) }))
+    .filter((x) => x.n > 0);
+}
+
+/** 🔒 알림을 보여 줬다고 적는다 */
+export async function markTakenSeen() {
+  const r = await applyTakenSeen();
+  if (r && r.profile) profile = fromStored(r.profile);
+  return !!(r && r.ok);
 }
 
 /** 서로 다른 포켓몬 몇 마리 잡았는지 */
