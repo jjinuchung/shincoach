@@ -17,7 +17,10 @@ import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, apply
 import { todayKey } from './track.js';
 // 💎 스페셜 문제 — 문제집에서 뽑은 여덟 얼굴 (2026-09-26)
 import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKindOf, makeSpecial, makeSpecialRound } from './mathspecial.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound } from './xp.js';
+// 🎯 도전 문제 — 문제집에 있는 그 문제 그대로 (2026-09-28)
+import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, chalReward, setNote as chalNote, solvedCount, setCleared } from './mathchal.js';
+import { figureEl, inputEl } from './chalview.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
@@ -26,6 +29,7 @@ import { eggProgress } from './egg.js';
 import { showHatchIfAny } from './hatch.js';
 // ⏳ 하루 시간 제한 — **새로 시작하는 자리에만** 관문을 단다. 풀던 회차는 끝까지 간다 (아버님 결정 2026-09-27)
 import { guardStart } from './timeup.js';
+import { setExempt } from './timelimit.js'; // ⏳ 도전 문제 동안은 시간을 안 센다
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
@@ -38,6 +42,8 @@ const $ = (id) => document.getElementById(id);
 
 // 화면 상태 — 전역 boolean/Set은 두지 않는다 ("껐다 켜면 낫는다" 병의 뿌리). 한 편의 상태는 round 객체 하나에 담고 끝나면 null
 const ui = {
+  chal: null,           // 🎯 지금 푸는 도전 문제 회차
+  chalData: undefined,  // 문제집 자료 (undefined = 아직 안 받음 · null = 못 받음)
   showView: null,
   stem: null,           // 지금 고른 줄기 key ('fraction'·'negative') — 없으면 줄기 고르기 화면
   contents: {},         // 줄기별 사람이 쓴 내용 (coach/math/*.json, 한 번 받아 둠)
@@ -430,6 +436,7 @@ function renderStemPicker(state) {
     list.appendChild(b);
   }
   card.appendChild(list);
+  addChalButtons(card);   // 🎯 줄기를 아직 안 골랐어도 문제집 숙제는 할 수 있어야 한다
   m.appendChild(card);
 }
 
@@ -544,6 +551,8 @@ function renderLadder(state) {
     const nc = countNotes(state, today);
     if (nc.all) head.appendChild(el('p', 'math-note', `🤔 오늘 틀린 유형 ${nc.all}개는 내일부터 다시 풀 수 있어요.`));
   }
+  addChalButtons(head);
+
   // 💎 스페셜 문제 — 문제집에서 뽑은 "한 번 더 생각하는" 문제. 아이가 원할 때 누른다 (아버님 결정 2026-09-26)
   {
     const sb = el('button', 'btn btn-big-wide math-special-btn', `💎 스페셜 문제 ${SPECIAL_N}개 — 한 번 더 생각해서 🏅 배지 모으기`);
@@ -618,6 +627,199 @@ function startRound(id, mode, o = {}) {
  * 🤔 오답 노트 회차 — 노트마다 그 유형 한 문제(계산은 숫자만 다른 쌍둥이, ③⭐는 같은 문항). 개념 통과·👑은 안 건드린다.
  * 맞히면 노트에서 지워지고, 틀리면 내일 이후에 다시 나온다.
  */
+
+// ───────────────────── 🎯 도전 문제 (2026-09-28, 엄마 요청) ─────────────────────
+// 문제집에 있는 **그 문제**를 그대로 푼다. 줄기·개념 진도와 상관없이 언제든 열린다.
+// ⏳ 하루 시간 제한에는 **안 들어간다** — 문제집 숙제라 제한 밖(아버님 결정)
+
+/** 문제집 자료 — 한 번 받아 두고 계속 쓴다 (못 받으면 버튼을 안 보여 준다) */
+async function loadChal() {
+  if (ui.chalData !== undefined) return ui.chalData;
+  try {
+    const res = await fetch('./coach/math/challenge.json');
+    ui.chalData = res.ok ? await res.json() : null;
+  } catch { ui.chalData = null; }
+  return ui.chalData;
+}
+
+/**
+ * 🎯 도전 문제 버튼 — **줄기 고르기 화면과 사다리 둘 다**에 붙인다.
+ * 아버님: "어떤 과정과 상관없이" — 줄기를 아직 안 골랐어도 문제집 숙제는 할 수 있어야 한다.
+ * 자료를 못 받으면(오프라인 첫 실행 등) 아무것도 안 그린다 — 눌러도 안 열리는 버튼보다 낫다.
+ */
+function addChalButtons(box) {
+  const slot = el('div', 'math-chal-slot');
+  box.appendChild(slot);
+  loadChal().then((data) => {
+    if (!data || !slot.isConnected) return;   // 그 사이 화면이 바뀌었으면 그만 (id 대신 이 자리를 직접 본다)
+    slot.innerHTML = '';
+    for (const set of setsOf(data)) {
+      const cleared = setCleared(ui.state, set);
+      const b = el('button', `btn btn-big-wide math-chal-btn${cleared ? ' is-done' : ''}`, `🎯 도전 문제 — ${set.emoji || ''} ${set.unit}`);
+      b.type = 'button';
+      b.addEventListener('click', () => startChal(set));   // ⏳ 제한 밖이라 guardStart를 지나지 않는다
+      slot.appendChild(b);
+      slot.appendChild(el('p', 'math-note math-chal-note', `${set.level} · ${set.pages} · ${chalNote(ui.state, set)}`));
+    }
+  }).catch(() => {});
+}
+
+function startChal(set) {
+  const items = nextItems(set, ui.state, CHAL_N);
+  if (!items.length) { renderLadder(ui.state); return; }
+  ui.chal = { set, items, at: 0, answers: [], results: [], phase: 'q' };
+  setExempt(true);   // ⏳ 도전 문제를 푸는 동안은 시간을 안 센다
+  renderChalQ();
+}
+
+/** 도전 문제를 닫을 때는 **반드시** 시간 재기를 되돌린다 (안 그러면 수학 시간이 영영 안 센다) */
+function endChal() {
+  ui.chal = null;
+  setExempt(false);
+}
+
+function renderChalQ() {
+  const c = ui.chal;
+  if (!c) { renderLadder(ui.state); return; }
+  const item = c.items[c.at];
+  const m = clearMain();
+
+  const card = el('section', 'math-card math-q chal-q');
+  const eye = el('div', 'math-eyebrow');
+  eye.textContent = `🎯 도전 문제 · ${c.set.unit} · ${c.at + 1} / ${c.items.length}`;
+  card.appendChild(eye);
+
+  const head = el('div', 'chal-head');
+  head.appendChild(el('span', 'chal-no', `${item.no}`));
+  if (item.badge) head.appendChild(el('span', 'chal-badge', item.badge));
+  head.appendChild(el('span', 'chal-book', `${c.set.pages}`));
+  card.appendChild(head);
+
+  card.appendChild(el('p', 'math-qtext chal-qtext', item.q));
+
+  const fig = figureEl(item.fig);
+  if (fig) card.appendChild(fig);
+
+  // 답칸 (문제에 따라 하나 또는 둘)
+  const ins = [];
+  const done = el('button', 'btn btn-primary btn-big-wide chal-ok', '확인');
+  done.type = 'button';
+  const refresh = () => { done.disabled = !ins.every((x) => x.filled()); };
+  for (const p of item.parts) {
+    const w = inputEl(p, refresh);
+    ins.push(w);
+    card.appendChild(w.el);
+  }
+  if (item.write) card.appendChild(el('p', 'math-note chal-write', `✍️ ${item.write}`));
+
+  done.addEventListener('click', () => answerChal(ins.map((x) => x.value())));
+  card.appendChild(done);
+  refresh();
+
+  const out = el('button', 'btn chal-quit', '← 그만하고 사다리로');
+  out.type = 'button';
+  out.addEventListener('click', () => { endChal(); renderLadder(ui.state); });
+  card.appendChild(out);
+
+  m.appendChild(card);
+}
+
+function answerChal(given) {
+  const c = ui.chal;
+  if (!c || c.phase !== 'q') return;
+  const item = c.items[c.at];
+  const r = checkItem(item, given);
+  c.answers.push(given);
+  c.results.push({ no: item.no, ok: r.ok });
+  c.phase = 'a';
+  try { if (r.ok) sfx.ding(); else sfx.wrong(); } catch { /* 소리는 없어도 */ }
+
+  const m = clearMain();
+  const card = el('section', `math-card chal-a ${r.ok ? 'is-ok' : 'is-no'}`);
+  card.appendChild(el('div', 'chal-mark', r.ok ? '⭕' : '❌'));
+  card.appendChild(el('h2', 'chal-verdict', r.ok ? '맞았어요!' : '아쉬워요'));
+
+  // 정답 보여 주기 — 틀렸으면 꼭, 맞았어도 확인용으로 한 줄
+  const ansRow = el('div', 'chal-answer');
+  item.parts.forEach((p, i) => {
+    const want = Array.isArray(p.answer) ? p.answer.join(', ') : String(p.answer);
+    ansRow.appendChild(el('div', 'chal-answer-row', `${p.label ? p.label + ' ' : ''}답: ${want}${p.unit ? ' ' + p.unit : ''}`));
+  });
+  card.appendChild(ansRow);
+  card.appendChild(el('p', 'chal-why', item.why));
+
+  const next = el('button', 'btn btn-primary btn-big-wide', c.at + 1 < c.items.length ? '다음 문제 →' : '끝내기');
+  next.type = 'button';
+  next.addEventListener('click', () => {
+    if (c.at + 1 < c.items.length) { c.at += 1; c.phase = 'q'; renderChalQ(); }
+    else finishChal();
+  });
+  card.appendChild(next);
+  m.appendChild(card);
+}
+
+async function finishChal() {
+  const c = ui.chal;
+  if (!c) return;
+  const set = c.set;
+  const results = c.results;
+  const n = c.items.length;
+  const correct = results.filter((r) => r.ok).length;
+
+  const saved = await commitChalRound((s) => {
+    const result = applyChalRound(s, set.id, results, set);
+    const reward = chalReward({ fresh: result.fresh, n, firstClear: result.firstClear });
+    if (reward.throws) addPending(s, reward.throws);   // 🎯 던지기는 수학 진도 쪽 카운터
+    return { result, reward };
+  });
+  endChal();
+  if (!saved.ok) {
+    const m = clearMain();
+    const card = el('section', 'math-card');
+    card.appendChild(el('p', 'math-qtext', '저장이 안 됐어요 — 잠시 뒤 다시 해 볼까요?'));
+    const again = el('button', 'btn btn-primary btn-big-wide', '사다리로');
+    again.type = 'button';
+    again.addEventListener('click', () => renderLadder(ui.state));
+    card.appendChild(again);
+    m.appendChild(card);
+    return;
+  }
+  ui.state = saved.math;
+  const res = saved.result;
+  const rw = saved.reward;
+
+  const m = clearMain();
+  const card = el('section', 'math-card chal-done');
+  card.appendChild(el('h2', 'chal-verdict', `🎯 ${n}문제 중 ${correct}문제 맞았어요`));
+  card.appendChild(el('p', 'math-note', `${set.unit} — ${res.solved}/${res.total}문제를 풀었어요`));
+
+  if (rw.xp || rw.coin) {
+    const g = el('div', 'chal-reward');
+    g.appendChild(el('span', 'chal-reward-item', `⚡ ${rw.xp}`));
+    g.appendChild(el('span', 'chal-reward-item', `💰 ${rw.coin}`));
+    if (rw.stone) g.appendChild(el('span', 'chal-reward-item', `🔷 ${rw.stone}`));
+    if (rw.throws) g.appendChild(el('span', 'chal-reward-item', `🎯 ${rw.throws}번`));
+    card.appendChild(g);
+  } else {
+    card.appendChild(el('p', 'math-note', '이미 맞혔던 문제라 보상은 없어요 — 연습은 언제든 좋아요!'));
+  }
+  if (rw.round) card.appendChild(el('p', 'chal-bonus', `✨ ${n}문제를 모두 처음으로 맞혀서 보너스를 받았어요!`));
+  if (rw.set) card.appendChild(el('p', 'chal-bonus chal-bonus-big', `🏅 ${set.unit}을 다 풀었어요! 🌟 황금 몬스터볼을 받았어요`));
+  if (saved.level && saved.level.leveledUp) card.appendChild(el('p', 'chal-bonus', `🎉 Lv.${saved.level.to}이 되었어요!`));
+
+  const go = el('button', 'btn btn-primary btn-big-wide', '사다리로 →');
+  go.type = 'button';
+  go.addEventListener('click', () => renderLadder(ui.state));
+  card.appendChild(go);
+
+  const more = el('button', 'btn chal-quit', '🎯 계속 풀기');
+  more.type = 'button';
+  more.addEventListener('click', () => startChal(set));
+  card.appendChild(more);
+
+  m.appendChild(card);
+}
+
 /**
  * 💎 스페셜 문제 — 문제집에서 뽑은 여덟 얼굴(js/mathspecial.js) 중 세 문제.
  * 아직 🏅 배지를 못 받은 얼굴을 먼저 낸다(prefer) — 여덟 개를 골고루 모으게.

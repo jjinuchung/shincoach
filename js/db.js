@@ -649,6 +649,8 @@ export function cloneMath(m) {
   // ★ sp(💎 스페셜)도 안쪽 pass 맵까지 새 객체로 — 얕게 복사하면 규칙이 **입력을 변형**한다
   //   (Codex가 daily에서 잡았던 것과 같은 함정)
   const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])], ...(m.tot ? { tot: { ...m.tot } } : {}), ...(m.sp ? { sp: { ...m.sp, pass: { ...(m.sp.pass || {}) } } } : {}) };
+  // 🎯 도전 문제도 sp와 같은 이유로 안쪽 맵까지 새 객체로
+  if (m.chal) out.chal = { ...m.chal, ok: { ...(m.chal.ok || {}) }, tries: { ...(m.chal.tries || {}) }, done: { ...(m.chal.done || {}) } };
   for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
   if (Array.isArray(m.asks)) out.asks = m.asks.map(cloneAsk); // ❓ 질문은 안쪽에 답장 배열이 있어 따로 복사
   return out;
@@ -831,6 +833,23 @@ export function mergeMath(cur, rec) {
       pass,
       rounds: Math.max(Number(out.sp && out.sp.rounds) || 0, Number(rec && rec.sp && rec.sp.rounds) || 0),
       gym: (out.sp && out.sp.gym) || (rec && rec.sp && rec.sp.gym) ? 1 : 0,
+    };
+  }
+  // 🎯 도전 문제 진도도 전부 **단조 증가** → 키마다 max.
+  //    옛 백업을 되돌려도 푼 문제가 사라지지 않고, 🏅 단원 완주 보상을 두 번 받지도 않는다
+  if ((rec && rec.chal) || out.chal) {
+    const pick = (key) => {
+      const a = (out.chal && out.chal[key]) || {};
+      const b = (rec && rec.chal && rec.chal[key]) || {};
+      const o = {};
+      for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) o[k] = Math.max(Number(a[k]) || 0, Number(b[k]) || 0);
+      return o;
+    };
+    out.chal = {
+      ok: pick('ok'),
+      tries: pick('tries'),
+      done: pick('done'),
+      rounds: Math.max(Number(out.chal && out.chal.rounds) || 0, Number(rec && rec.chal && rec.chal.rounds) || 0),
     };
   }
   // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편

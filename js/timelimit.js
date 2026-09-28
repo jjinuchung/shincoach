@@ -146,6 +146,7 @@ const clock = {
   today: '',            // 지금 세고 있는 날짜
   daily: null,          // 오늘 기록 (저장할 때마다 갱신)
   timer: null,
+  exempt: false,        // 🎯 도전 문제처럼 **제한 밖**인 것을 푸는 동안 (아버님 결정 2026-09-28)
   onTick: null,         // 화면(칩·잠금)에 알리는 콜백
   conf: null,           // () => ({ off, min })
 };
@@ -184,6 +185,24 @@ export async function loadToday() {
   try { clock.daily = await getDaily(clock.today); } catch { clock.daily = null; }
   if (clock.onTick) clock.onTick();
   return clock.daily;
+}
+
+/**
+ * 🎯 도전 문제처럼 **제한에 안 들어가는** 것을 푸는 동안 켠다 (문제집 숙제는 제한 밖 — 아버님 결정 2026-09-28).
+ * ★ 켰으면 **반드시 끈다** — 안 끄면 수학 시간이 영영 안 세어져 제한이 통째로 무의미해진다.
+ */
+export function setExempt(on) {
+  const next = !!on;
+  if (clock.exempt === next) return;
+  flushTime().catch(() => {});   // 켜고 끌 때 모아 둔 초를 먼저 저장한다
+  clock.exempt = next;
+  clock.lastActive = now();
+  if (clock.onTick) clock.onTick();
+}
+
+/** 지금 제한 밖인가 */
+export function isExempt() {
+  return clock.exempt;
 }
 
 /** 아이가 무언가 눌렀다 — 2분 쉬어도 다시 센다 */
@@ -230,6 +249,7 @@ export function isLocked(subject) {
 function tick() {
   const s = clock.subject;
   if (!s) return;
+  if (clock.exempt) return;                                                // 🎯 도전 문제 — 제한 밖
   if (typeof document !== 'undefined' && document.hidden) return;          // 뒤로 갔다
   if (now() - clock.lastActive > IDLE_SEC * 1000) return;                  // 놓고 딴 데 갔다
   if (dayKey() !== clock.today) { loadToday().catch(() => {}); return; }   // 자정을 넘겼다

@@ -6,7 +6,7 @@ import {
   applyLevelUp, applyEvolve, applyGear, applyPartner, updateMathAndProfile, mergeProfileDelta,
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase, gearRule,
 } from './db.js';
-import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE } from './items.js';
+import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
@@ -664,6 +664,35 @@ export async function commitSpecialRound(rule) {
     return { ok: true, ...r.out, math: r.math };
   } catch (e) {
     console.warn('💎 스페셜 저장 실패:', e);
+    return { ok: false, why: 'save' };
+  }
+}
+
+/**
+ * 🎯 도전 문제 한 회차 — 진도와 보상을 **한 트랜잭션**에서 (2026-09-28).
+ * 💎 스페셜과 같은 모양이다: 기록만 커밋되고 보상이 날아가면 "푼 문제는 남았는데 보상이 없는"
+ * 상태가 영구히 남는다(처음 맞힌 표시는 한 번뿐이라 다시 받을 수 없다 — Codex 11차 P1).
+ * @param {(m:object)=>{result:object, reward:object}} rule cloneMath된 진도를 받아 결과와 보상을 돌려준다
+ */
+export async function commitChalRound(rule) {
+  await flushProfile();
+  try {
+    const r = await updateMathAndProfile((m, p) => {
+      const { result, reward } = rule(m) || {};
+      const rw = reward || { xp: 0, coin: 0, items: {}, stone: 0, throws: 0 };
+      const before = levelFromXp(p.xp || 0).level;
+      // 🔷 스톤은 가방(items)에 같이 실어 보낸다 — 따로 저장하면 그게 실패할 수 있다.
+      // ★ 🎯 던지기는 me 프로필이 아니라 **수학 진도**의 카운터(m.throws)라 rule 쪽에서 addPending으로 올린다
+      const items = { ...(rw.items || {}) };
+      if (rw.stone) items[STONE_MATH.id] = (items[STONE_MATH.id] || 0) + rw.stone;
+      mergeProfileDelta(p, { xp: rw.xp || 0, coins: rw.coin || 0, coinsEarned: rw.coin || 0, items });
+      const after = levelFromXp(p.xp || 0).level;
+      return { result, reward: rw, level: { from: before, to: after, leveledUp: after > before } };
+    });
+    profile = fromStored(r.profile);
+    return { ok: true, ...r.out, math: r.math };
+  } catch (e) {
+    console.warn('🎯 도전 문제 저장 실패:', e);
     return { ok: false, why: 'save' };
   }
 }

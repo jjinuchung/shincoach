@@ -3,7 +3,7 @@
 // 규칙은 timelimit.js(순수), 이 파일은 보여 주기만 한다.
 // ★ requirePin은 **주입받는다** — player.js를 직접 import하면 player.js ↔ timeup.js 고리가 생긴다.
 
-import { status, isLocked, grantMinutes, currentSubject, GRANT_MIN, KO, fmtLeft, fmtUsed } from './timelimit.js';
+import { status, isLocked, grantMinutes, currentSubject, isExempt, GRANT_MIN, KO, fmtLeft, fmtUsed } from './timelimit.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -39,9 +39,12 @@ export function refreshChips() {
     const st = status(c.subject);
     if (!st || st.off) { el.hidden = true; continue; }
     el.hidden = false;
-    el.classList.toggle('warn', !!st.warn);
-    el.classList.toggle('over', !!st.locked);
-    const text = st.locked ? '⏳ 오늘 끝' : `${st.warn ? '⏰' : '⏳'} ${fmtLeft(st.left)}`;
+    // 🎯 도전 문제처럼 제한 밖인 것을 푸는 동안은 멈춰 있다 — 그걸 칩에도 보여 준다(고장으로 오해하지 않게)
+    const paused = isExempt();
+    el.classList.toggle('warn', !!st.warn && !paused);
+    el.classList.toggle('over', !!st.locked && !paused);
+    el.classList.toggle('paused', paused);
+    const text = paused ? `⏸ ${fmtLeft(st.left)}` : (st.locked ? '⏳ 오늘 끝' : `${st.warn ? '⏰' : '⏳'} ${fmtLeft(st.left)}`);
     if (el.textContent !== text) el.textContent = text;
   }
 }
