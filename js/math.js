@@ -278,7 +278,7 @@ async function settleOwedThrows() {
  * 🎯 몬스터볼을 n번 — 한 번 끝나면(onDone) 다음 후보 4마리로 다시. 화면을 떠났으면(run 바뀜) 그만.
  * 개념 편 통과 + ☀️ 첫 완주가 한 카드에 겹치면 2번이 된다.
  */
-async function runCatches(n, { g, c, run, onAll }) {
+async function runCatches(n, { g, c, run, onAll, onStop }) {
   if (n <= 0) return;
   if (ui.catching) return; // 한 번에 하나의 잡기 흐름만 — 버튼을 연타해도 둘이 같이 돌며 던지기를 둘 다 쓰지 않게 (Codex 6차 #3)
   ui.catching = true;
@@ -292,7 +292,11 @@ async function runCatches(n, { g, c, run, onAll }) {
   try { pool = await catchPool(); } catch (e) { console.warn('후보 준비 실패:', e); pool = []; }
   // 나가 있으면(다른 화면·🎒) 안 띄운다 — 던질 기회는 레코드에 남아 사다리의 "🎯 받은 몬스터볼"로 다시 온다
   if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
-  if (!pool.length) { finish(); return; } // 그림이 하나도 없다(오프라인 첫날) — 역시 레코드에 남는다
+  if (!pool.length) { // 그림이 하나도 없다(오프라인 첫날·그림 저장소가 깨짐) — 역시 레코드에 남는다
+    if (typeof onStop === 'function') onStop('nopool'); // 조용히 끝내면 아이에겐 "눌러도 아무 일 없음"이다 (2026-09-29)
+    finish();
+    return;
+  }
   let left = n;
   const one = async () => {
     let taken = false;
@@ -501,8 +505,17 @@ function renderLadder(state) {
   if (pend > 0) {
     const pb = el('button', 'btn btn-accent btn-big-wide math-pend-btn', `🎯 받은 몬스터볼 ${pend}개가 남았어요 — 던지기`);
     pb.type = 'button';
-    pb.addEventListener('click', () => { pb.disabled = true; runCatches(pend, { g: null, c: 0, run: ui.run, onAll: () => { if (ui.state) renderLadder(ui.state); } }); }); // 끝나면 사다리를 새로 그린다 (버튼은 그때까지 잠금)
+    pb.addEventListener('click', () => {
+      pb.disabled = true;
+      pb.textContent = '🎯 포켓몬을 부르는 중…'; // 그림을 받느라 몇 초 걸릴 수 있다 — 눌렸다는 걸 먼저 보여 준다
+      runCatches(pend, {
+        g: null, c: 0, run: ui.run,
+        onStop: (why) => { if (why === 'nopool') ui.pendNote = '🎯 포켓몬 그림을 못 불러왔어요 — 인터넷이 되는 곳에서 잠시 뒤 다시 눌러 주세요 (몬스터볼은 그대로 있어요)'; },
+        onAll: () => { if (ui.state) renderLadder(ui.state); },
+      });
+    }); // 끝나면 사다리를 새로 그린다 (버튼은 그때까지 잠금)
     head.appendChild(pb);
+    if (ui.pendNote) { head.appendChild(el('p', 'math-note math-pend-note', ui.pendNote)); ui.pendNote = null; } // 한 번만 보여 준다
   }
   // ☀️ 오늘의 수학 — 버튼 하나로 오늘 할 것: 개념 편 하나(복습 차례 우선) → 🎲 섞어 풀기. 아이가 쉬운 것만 고르지 않게 맨 위에 (2026-09-21 ④)
   const preview = dailyPlan(state, today, ui.stem, 0);

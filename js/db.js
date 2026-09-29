@@ -552,10 +552,50 @@ export async function listVocabViews() {
 
 // ───────────────────── 🎮 캐릭터 그림 ─────────────────────
 
+/**
+ * 받아 둔 그림 전부 (🎨 일러스트 · 🕺 도트 · 🌈 이로치 · ⭐ 변신 — 전부 PokeAPI에서 받은 Blob 캐시).
+ * ★ getAll은 **한 장이라도** 곁 파일이 깨지면 통째로 실패한다 — v68 영상 목록과 같은 함정 (2026-09-29).
+ *   그러면 그림 목록이 0마리가 되어 🎯 잡기 후보가 없고, 수학 "받은 몬스터볼 — 던지기"가 눌러도 아무 일이 없었다
+ *   (껐다 켜도 같은 파일이 깨져 있으니 그대로). → 실패하면 한 장씩 읽고, 못 읽는 칸은 지운다.
+ *   전부 다시 받을 수 있는 캐시라 지워도 잃는 것이 없고, 지워 두면 "안 받은 것"으로 보여 자동 받기가 새로 받는다
+ */
 export async function getCharacters() {
   const db = await openDb();
-  const tx = db.transaction('characters', 'readonly');
-  return promisify(tx.objectStore('characters').getAll());
+  const store = (mode) => db.transaction('characters', mode).objectStore('characters');
+  try {
+    return await promisify(store('readonly').getAll());
+  } catch (err) {
+    console.warn('그림을 한꺼번에 못 읽었어요 — 한 장씩 읽어요:', err && err.name, err && err.message);
+  }
+  const keys = await promisify(store('readonly').getAllKeys());
+  const { records, broken } = await readEach(keys, (k) => promisify(store('readonly').get(k)));
+  if (broken.length) {
+    console.warn(`깨진 그림 ${broken.length}장을 지워요 (다시 받으면 돼요):`, broken);
+    for (const k of broken) {
+      try { const tx = db.transaction('characters', 'readwrite'); tx.objectStore('characters').delete(k); await txDone(tx); } catch { /* 다음에 또 건너뛴다 */ }
+    }
+  }
+  return records;
+}
+
+/**
+ * 키마다 따로 읽는다 — 하나가 실패해도 나머지는 살린다 (읽는 함수를 받는 순수 함수라 테스트할 수 있다).
+ * @param {Array} keys
+ * @param {(key:any) => Promise<any>} readOne
+ * @returns {Promise<{records:Array, broken:Array}>} broken = 읽다 실패한 키
+ */
+export async function readEach(keys, readOne) {
+  const records = [];
+  const broken = [];
+  for (const k of keys || []) {
+    try {
+      const r = await readOne(k);
+      if (r) records.push(r);
+    } catch {
+      broken.push(k);
+    }
+  }
+  return { records, broken };
 }
 
 export async function putCharacter(rec) {
