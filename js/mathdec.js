@@ -184,6 +184,18 @@ function textChoices(r, ok, wrongs) {
   return shuffle(r, list);
 }
 
+/**
+ * ② 오개념 문항의 갈래 고르기 — 🔁 쌍둥이·🤔 오답 노트가 요청한 갈래(c.want = 'misread:갈래')를 **먼저** 따른다.
+ * 무작위로만 고르면 노트가 다른 갈래를 받아 "그 틀이 이제 없다"로 보고 **노트를 지웠다** (Codex 12차 P1 — mathneg의 pickVariant와 같은 규칙).
+ * 요청이 없으면 방금 나온 갈래(c.recent)를 피한다.
+ */
+function branchOf(r, c, names) {
+  const want = c && c.want && c.want.startsWith('misread:') ? c.want.slice(8) : '';
+  if (names.includes(want)) return want;
+  const fresh = names.filter((n) => !(c && c.recent && c.recent.includes(`misread:${n}`)));
+  return pick(r, fresh.length ? fresh : names);
+}
+
 /** ② 오개념 문항 — 갈래마다 key('misread:갈래'). 갈래가 하나면 쌍둥이가 다른 유형으로 돌아온다 */
 function misreadAsk(id, branch, q, chs, o) {
   return { ...ask(id, 'misread', q, chs, o), key: `misread:${branch}` };
@@ -270,7 +282,8 @@ export const DECIMAL = [
       ];
 
       const fams = [
-        { ans: T({ u: N, p }), wr: [{ text: decText(N, p - 1), tag: TAGS.shift }, { text: decText(N, p + 1), tag: TAGS.shift }],
+        // 초4는 소수 셋째 자리까지 — 0.001의 오답을 넷째 자리(0.0556)로 만들지 않고 두 칸 위로 (Codex 12차 #6)
+        { ans: T({ u: N, p }), wr: [{ text: decText(N, p - 1), tag: TAGS.shift }, { text: decText(N, p === 3 ? 1 : p + 1), tag: TAGS.shift }],
           probe: { calc: `${unit} × ${N}` },
           steps: [`${unit}이 10개면 ${decText(10, p)}, 100개면 ${decText(100, p)}`, `${unit}이 ${N}개면 ${T({ u: N, p })}`], pools: {
             pokemon: [
@@ -329,7 +342,7 @@ export const DECIMAL = [
       const w = int(r, 1, 9);
       const digs = shuffle(r, [1, 2, 3, 4, 5, 6, 7, 8, 9].filter((d) => d !== w)).slice(0, 3);
       const num = T({ u: w * 1000 + digs[0] * 100 + digs[1] * 10 + digs[2], p: 3 });
-      if (r() < 0.6) {
+      if (branchOf(r, c, ['shift', 'zero']) === 'shift') {
         // 갈래 ① 자릿값 — 한 칸 큰 쪽으로 셈
         const k = int(r, 2, 3); const dg = digs[k - 1];
         const shown = decText(dg, k - 1); const right = decText(dg, k);
@@ -443,12 +456,13 @@ export const DECIMAL = [
     idea: '10배 하면 소수점이 **오른쪽으로 한 칸**, 1/10 하면 **왼쪽으로 한 칸** 옮겨요. 0을 붙이는 게 아니에요.',
     slip: '10(1/10)은 한 칸, 100(1/100)은 두 칸이에요. 소수점을 옮긴 칸 수를 다시 세어 봐요.',
     calc(r, c) {
-      const x = randD(r, 1, 9, pick(r, [1, 2]));
+      // ★ 초4는 소수 셋째 자리까지 — 답·오답 모두 넷째 자리가 나오지 않게 수의 자리를 고른다 (Codex 12차 #6: 16.18의 1/100 = 0.1618)
       const fac = pick(r, [10, 100]); const lg = fac === 10 ? 1 : 2;
-      // 늘 소수로 — 자연수(23)와 소수(2.3)가 섞이면 이야기 틀 이름(tplKey)이 갈려 🔁 쌍둥이가 같은 틀을 못 찾는다
-      const y = randD(r, 1, 30, pick(r, [1, 2]));
+      const x = randD(r, 1, 9, fac === 100 ? 1 : pick(r, [1, 2])); // 거꾸로 옮긴 오답(÷100)도 셋째 자리까지
+      // 늘 소수 한 자리로 — 자연수(23)와 소수(2.3)가 섞이면 이야기 틀 이름(tplKey)이 갈려 🔁 쌍둥이가 같은 틀을 못 찾는다
+      const y = randD(r, 1, 30, 1);
       const part = pick(r, [10, 100]); const lp = part === 10 ? 1 : 2;
-      const s = randD(r, 0, 9, 2);
+      const s = randD(r, 0, 9, 1); // 1/10을 구한 값 — 답(1/100)은 둘째 자리, 잘못 구한 수에서 다시 셈한 오답도 셋째 자리까지
       const fams = [
         { ans: decText(x.u * fac, x.p),
           wr: [{ text: decText(x.u, x.p + lg), tag: TAGS.reverse }, { text: `${T(x)}${'0'.repeat(lg)}`, tag: TAGS.padZero }, { text: decText(x.u * (fac === 10 ? 100 : 10), x.p), tag: TAGS.moves }],
@@ -497,7 +511,7 @@ export const DECIMAL = [
     },
     misread(r, c) {
       const x = randD(r, 1, 9, pick(r, [1, 2]));
-      if (r() < 0.5) {
+      if (branchOf(r, c, ['pad', 'reverse']) === 'pad') {
         const shown = `${T(x)}0`; const right = decText(x.u * 10, x.p);
         const q = showWork(`${T(x)}의 10배 = ${shown}`, '구했어요');
         const chs = textChoices(r, `0을 붙이면 크기가 그대로예요 — 소수점을 오른쪽으로 옮겨 ${ieyo(right)}`, [
@@ -581,10 +595,10 @@ export const DECIMAL = [
       return {
         ...ask(this.id, 'calc', fill(story, c), numChoices(r, f.ans, f.wr), {
           expr: f.expr,
-          solve: solve([step(0, '소수점끼리 맞춰 세로로 써요 (빈 자리는 0)'), step(1, '끝자리부터 더하고, 10이 넘으면 받아올림'), step(2, `답은 ${f.ans}`)], {
+          solve: solve([step(0, '소수점끼리 맞춰 세로로 써요 (빈 자리는 0)'), step(1, '끝자리부터 더하고, 합이 10 이상이면 받아올림'), step(2, `답은 ${f.ans}`)], {
             why: {
               [TAGS.alignEnd]: '오른쪽 끝을 맞췄어요. 소수는 **소수점끼리** 맞춰야 같은 자리끼리 더해져요.',
-              [TAGS.noCarry]: '10이 넘은 자리에서 받아올림을 안 했어요. 소수도 자연수처럼 받아올려요.',
+              [TAGS.noCarry]: '합이 10 이상인 자리에서 받아올림을 안 했어요. 딱 10이어도 받아올려요 — 소수도 자연수와 똑같아요.',
             },
             rule: '소수점끼리 맞추고, 빈 자리는 0으로.',
           }),
@@ -593,7 +607,7 @@ export const DECIMAL = [
       };
     },
     misread(r, c) {
-      if (r() < 0.55) {
+      if (branchOf(r, c, ['align', 'carry']) === 'align') {
         const a = randD(r, 1, 9, 2); const b = randD(r, 0, 0, 1);
         const shown = alignEnd(a, b, 1);
         const q = showWork(`${T(a)} + ${T(b)} = ${shown}`);
@@ -624,9 +638,9 @@ export const DECIMAL = [
       ]);
       return {
         ...misreadAsk(this.id, 'carry', fill(q, c), chs, {
-          solve: solve([step(0, '끝자리부터 더하고 10이 넘으면 앞자리로 1'), step(1, `${T(a)} + ${T(b)} = ${T({ u: a.u + b.u, p: 2 })}`)], {
-            whyAny: '10이 넘은 자리에서 받아올린 1을 앞자리에 더하지 않았어요.',
-            rule: '소수도 10이 넘으면 받아올림.',
+          solve: solve([step(0, '끝자리부터 더하고, 합이 10 이상이면 앞자리로 1'), step(1, `${T(a)} + ${T(b)} = ${T({ u: a.u + b.u, p: 2 })}`)], {
+            whyAny: '합이 10 이상인 자리에서 받아올린 1을 앞자리에 더하지 않았어요.',
+            rule: '소수도 10 이상이면 받아올림.',
           }),
         }),
         probe: { calc: `${T(a)} + ${T(b)}`, shown, bug: 'noCarry' },
@@ -690,7 +704,7 @@ export const DECIMAL = [
     },
     misread(r, c) {
       const sub = (x, y) => { const P = Math.max(x.p, y.p); return { u: at(x, P) - at(y, P), p: P }; };
-      if (r() < 0.6) {
+      if (branchOf(r, c, ['swap', 'align']) === 'swap') {
         let a = randD(r, 2, 9, 1); let b = randD(r, 0, 1, 2);
         for (let i = 0; i < 30 && swapSub(a, b) === T(sub(a, b)); i++) { a = randD(r, 2, 9, 1); b = randD(r, 0, 1, 2); }
         const shown = swapSub(a, b);
@@ -790,7 +804,8 @@ export const DECIMAL = [
       const [n, d] = pick(r, pairs);
       const P = { 2: 1, 4: 2, 5: 1, 8: 3 }[d];
       const right = decText(n * (P10[P] / d), P);
-      const denomBranch = r() < 0.5 && decText(d, 1) !== right;
+      // 목록의 짝은 모두 "분모를 소수점 뒤에"가 정답과 다른 값이다 (1/5 → 0.5 ≠ 0.2) — 두 갈래 다 늘 성립
+      const denomBranch = branchOf(r, c, ['denom', 'concat']) === 'denom';
       const shown = denomBranch ? decText(d, 1) : decText(Number(`${n}${d}`), 2);
       const q = showWork(`${n}/${d} = ${shown}`, '바꿨어요');
       const ok = denomBranch ? `분모를 소수점 뒤에 썼어요 — ${n}/${d} = ${right}` : `분자와 분모를 이어 썼어요 — ${n}/${d} = ${right}`;
@@ -856,7 +871,7 @@ export const DECIMAL = [
       const a = randD(r, 0, 9, pick(r, [1, 2]));
       const n = int(r, 2, 9);
       const right = decText(a.u * n, a.p);
-      const drop = r() < 0.5;
+      const drop = branchOf(r, c, ['drop', 'pos']) === 'drop';
       const shown = drop ? String(a.u * n) : decText(a.u * n, a.p + 1);
       const q = showWork(`${T(a)} × ${n} = ${shown}`);
       const chs = textChoices(r, drop ? `소수점을 빼먹었어요 — 답은 ${right}` : `소수점을 한 칸 더 옮겼어요 — 답은 ${right}`, [
@@ -910,7 +925,8 @@ export const DECIMAL = [
           solve: f.words
             ? solve([step(0, `${jn(T(m), '은', '는')} 1보다 작아요`), step(1, `${N}의 ${T(m)}배 → ${f.ans}`)], {
               why: {
-                [TAGS.mulBigger]: '곱하면 늘 커지는 건 자연수끼리일 때예요. **1보다 작은 수**를 곱하면 오히려 작아져요.',
+                // "자연수끼리면 늘 커진다"는 틀린 말이다 — 1을 곱하면 그대로 (Codex 12차 #8, 배움 원고와 맞춤)
+              [TAGS.mulBigger]: '1보다 큰 수를 곱하면 커지고, 1을 곱하면 그대로, **1보다 작은 수**를 곱하면 오히려 작아져요.',
                 '계산 실수': `처음 수와 같아지는 건 1을 곱할 때뿐이에요. ${jn(T(m), '은', '는')} 1보다 작아요.`,
               },
               rule: '1보다 작은 수를 곱하면 작아진다.',
@@ -1008,7 +1024,7 @@ export const DECIMAL = [
       };
     },
     misread(r, c) {
-      if (r() < 0.55) {
+      if (branchOf(r, c, ['zero', 'stop']) === 'zero') {
         const W = int(r, 1, 9); const x = int(r, 1, 9); const n = int(r, 2, 9);
         const q = { u: W * 100 + x, p: 2 };
         const a = decText(q.u * n, 2);
@@ -1099,7 +1115,7 @@ export const DECIMAL = [
           solve: f.words
             ? solve([step(0, `${N} 안에 ${jn(T(m), '이', '가')} 몇 번 들어갈까?`), step(1, `${jn(T(m), '은', '는')} 1보다 작으니 ${N}번보다 많이 들어가요 → ${f.ans}`)], {
               why: {
-                [TAGS.divSmaller]: '나누면 늘 작아지는 건 1보다 큰 수로 나눌 때예요. **1보다 작은 수**로 나누면 몫이 커져요.',
+                [TAGS.divSmaller]: '1보다 큰 수로 나누면 작아지고, 1로 나누면 그대로, **1보다 작은 수**로 나누면 몫이 커져요.',
                 '계산 실수': `몫이 처음 수와 같아지는 건 1로 나눌 때뿐이에요. ${jn(T(m), '은', '는')} 1보다 작아요.`,
               },
               rule: '1보다 작은 수로 나누면 커진다.',
@@ -1117,7 +1133,7 @@ export const DECIMAL = [
       };
     },
     misread(r, c) {
-      if (r() < 0.55) {
+      if (branchOf(r, c, ['one', 'moves']) === 'one') {
         const b = randD(r, 0, 0, 1); const q = int(r, 2, 12); // 0.x만 — 풀이가 "1보다 작으니 몫이 커야"라고 말한다
         const a = decText(b.u * q, 1);
         const shown = decText(q, 1);

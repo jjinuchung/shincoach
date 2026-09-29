@@ -453,6 +453,52 @@ test('★ 원고 확인 질문도 값으로 검산 — 식이 든 질문은 따�
   assert.ok(checked >= 18, `식이 든 확인 질문을 충분히 검산해야 한다 (${checked}개)`);
 });
 
+test('★ ② 갈래 요청: 🔁 쌍둥이·🤔 오답 노트가 요청한 갈래로 온다 (Codex 12차 P1 — 안 따르면 노트가 지워졌다)', () => {
+  let tried = 0;
+  for (const c of DECIMAL) {
+    const keys = new Set();
+    for (let s = 1; s <= 200; s++) keys.add(makeQuestion(c.id, 'misread', s * 37, OPTS).key);
+    for (const key of keys) {
+      for (let s = 1; s <= 200; s++) {
+        const q = makeQuestion(c.id, 'misread', s * 911, { ...OPTS, want: { k: 'misread', key } });
+        tried++;
+        assert.equal(q.key, key, `${c.id} seed ${s}: ${key}를 요청했는데 ${q.key}`);
+      }
+    }
+  }
+  assert.ok(tried >= 3000, `검사 ${tried}건`);
+});
+
+test('★ 초4 칸은 소수 셋째 자리까지 — 문제 글·보기 어디에도 넷째 자리가 없다 (Codex 12차 #6: 0.1618)', () => {
+  const G4 = DECIMAL.filter((c) => c.grade === 4);
+  assert.equal(G4.length, 5);
+  for (const c of G4) {
+    for (const kind of ['calc', 'misread']) {
+      for (let s = 1; s <= SEEDS; s++) {
+        const q = makeQuestion(c.id, kind, s * 1777, OPTS);
+        const texts = [q.q, q.expr, ...q.choices.map((x) => x.text)];
+        for (const t of texts) {
+          for (const m of String(t).matchAll(/\d+\.(\d+)/g)) {
+            assert.ok(m[1].length <= 3, `${c.id}/${kind} seed ${s}: 넷째 자리 "${m[0]}" — ${String(t).replace(/\n/g, ' ')}`);
+          }
+        }
+      }
+    }
+  }
+});
+
+test('받아올림은 "10 이상"에서 — "10이 넘으면"이라고 가르치지 않는다 (딱 10도 받아올린다, Codex 12차 #5)', () => {
+  for (const f of ['js/mathdec.js', 'coach/math/decimal.json']) {
+    assert.doesNotMatch(readFileSync(f, 'utf8'), /10이 넘으면|10이 넘은 자리/, f);
+  }
+});
+
+test('📦 오프라인: 모든 줄기의 원고 파일이 sw.js APP_SHELL에 있다 (Codex 12차 #2 — decimal.json이 빠져 있었다)', async () => {
+  const { STEMS } = await import('../js/mathprog.js');
+  const sw = readFileSync('sw.js', 'utf8');
+  for (const s of Object.values(STEMS)) assert.ok(sw.includes(`'${s.file}'`), `${s.key}: ${s.file}가 APP_SHELL에 없다`);
+});
+
 test('내용 검사(checkContent): 빈 파일은 10칸 모두 "내용 없음", 제대로 쓴 것은 통과, 값이 같은 보기는 잡는다', () => {
   assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 10);
   const good = {};

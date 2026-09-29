@@ -568,34 +568,71 @@ export async function getCharacters() {
     console.warn('그림을 한꺼번에 못 읽었어요 — 한 장씩 읽어요:', err && err.name, err && err.message);
   }
   const keys = await promisify(store('readonly').getAllKeys());
-  const { records, broken } = await readEach(keys, (k) => promisify(store('readonly').get(k)));
-  if (broken.length) {
-    console.warn(`깨진 그림 ${broken.length}장을 지워요 (다시 받으면 돼요):`, broken);
-    for (const k of broken) {
-      try { const tx = db.transaction('characters', 'readwrite'); tx.objectStore('characters').delete(k); await txDone(tx); } catch { /* 다음에 또 건너뛴다 */ }
-    }
+  const readOne = (k) => promisify(store('readonly').get(k));
+  const first = await readEach(keys, readOne);
+  // ★ 실패를 다 "깨짐"으로 보지 않는다 — 트랜잭션이 끊기는 등 **일시적인** 실패는 한 번 더 읽고, 지우지 않는다 (Codex 12차 #4)
+  const again = first.failed.filter((f) => !isCorruptReadError(f.error));
+  const second = again.length ? await readEach(again.map((f) => f.key), readOne) : { records: [], failed: [] };
+  const corrupt = [...first.failed, ...second.failed].filter((f) => isCorruptReadError(f.error)).map((f) => f.key);
+  if (corrupt.length) {
+    console.warn(`깨진 그림 ${corrupt.length}장을 지워요 (다시 받으면 돼요):`, corrupt);
+    for (const k of corrupt) await deleteIfStillBroken(db, k);
   }
-  return records;
+  return [...first.records, ...second.records];
+}
+
+/**
+ * 곁 파일이 사라진 **확실한 깨짐**인가 — 이것만 지운다. 크롬은 "Data lost due to missing file"(UnknownError)이나
+ * NotReadableError로 알린다. AbortError·TransactionInactiveError처럼 잠깐의 실패는 아니다 (Codex 12차 #4)
+ */
+export function isCorruptReadError(err) {
+  if (!err) return false;
+  const name = String(err.name || '');
+  const msg = String(err.message || '');
+  if (name === 'NotReadableError') return true;
+  return /missing file|data lost|not ?readable|could not read|file (?:not found|was deleted)/i.test(msg);
+}
+
+/**
+ * 한 쓰기 트랜잭션 안에서 **다시 읽어 보고** 여전히 깨져 있을 때만 지운다.
+ * 따로 읽고 나중에 지우면, 그 사이 새로 받아 덮어쓴 멀쩡한 그림까지 지운다 (Codex 12차 #3).
+ * 읽기 실패의 기본 동작(트랜잭션 중단)은 막아야 delete가 산다.
+ * @returns {Promise<boolean>} 지웠는가
+ */
+export function deleteIfStillBroken(db, key) {
+  return new Promise((resolve) => {
+    let tx;
+    try { tx = db.transaction('characters', 'readwrite'); } catch { resolve(false); return; }
+    const st = tx.objectStore('characters');
+    let deleted = false;
+    const req = st.get(key);
+    req.onerror = (e) => {
+      e.preventDefault();
+      if (isCorruptReadError(req.error)) { st.delete(key); deleted = true; }
+    };
+    tx.oncomplete = () => resolve(deleted);
+    tx.onabort = () => resolve(false);
+  });
 }
 
 /**
  * 키마다 따로 읽는다 — 하나가 실패해도 나머지는 살린다 (읽는 함수를 받는 순수 함수라 테스트할 수 있다).
  * @param {Array} keys
  * @param {(key:any) => Promise<any>} readOne
- * @returns {Promise<{records:Array, broken:Array}>} broken = 읽다 실패한 키
+ * @returns {Promise<{records:Array, failed:Array<{key:any, error:any}>}>} failed = 읽다 실패한 키와 그 까닭
  */
 export async function readEach(keys, readOne) {
   const records = [];
-  const broken = [];
+  const failed = [];
   for (const k of keys || []) {
     try {
       const r = await readOne(k);
       if (r) records.push(r);
-    } catch {
-      broken.push(k);
+    } catch (error) {
+      failed.push({ key: k, error });
     }
   }
-  return { records, broken };
+  return { records, failed };
 }
 
 export async function putCharacter(rec) {

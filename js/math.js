@@ -278,6 +278,14 @@ async function settleOwedThrows() {
  * 🎯 몬스터볼을 n번 — 한 번 끝나면(onDone) 다음 후보 4마리로 다시. 화면을 떠났으면(run 바뀜) 그만.
  * 개념 편 통과 + ☀️ 첫 완주가 한 카드에 겹치면 2번이 된다.
  */
+/** 🎯 받은 몬스터볼 버튼이 창을 못 띄운 까닭 → 사다리에 한 줄 (까닭마다 할 일이 다르다) */
+const PEND_NOTE = {
+  nopics: '🎯 포켓몬 그림을 못 불러왔어요 — 인터넷이 되는 곳에서 잠시 뒤 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
+  noavail: '🎯 지금은 만날 수 있는 포켓몬이 없어요 — 조금 뒤에 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
+  save: '🎯 기록이 잠깐 저장되지 않았어요 — 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
+  error: '🎯 잡기 화면을 열지 못했어요 — 다시 눌러 주세요 (몬스터볼은 돌려놨어요)',
+};
+
 async function runCatches(n, { g, c, run, onAll, onStop }) {
   if (n <= 0) return;
   if (ui.catching) return; // 한 번에 하나의 잡기 흐름만 — 버튼을 연타해도 둘이 같이 돌며 던지기를 둘 다 쓰지 않게 (Codex 6차 #3)
@@ -292,8 +300,13 @@ async function runCatches(n, { g, c, run, onAll, onStop }) {
   try { pool = await catchPool(); } catch (e) { console.warn('후보 준비 실패:', e); pool = []; }
   // 나가 있으면(다른 화면·🎒) 안 띄운다 — 던질 기회는 레코드에 남아 사다리의 "🎯 받은 몬스터볼"로 다시 온다
   if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
-  if (!pool.length) { // 그림이 하나도 없다(오프라인 첫날·그림 저장소가 깨짐) — 역시 레코드에 남는다
-    if (typeof onStop === 'function') onStop('nopool'); // 조용히 끝내면 아이에겐 "눌러도 아무 일 없음"이다 (2026-09-29)
+  const stop = (why) => { if (typeof onStop === 'function') onStop(why); }; // 조용히 끝내면 아이에겐 "눌러도 아무 일 없음"이다 (2026-09-29)
+  if (!pool.length) { // 후보가 없다 — 역시 레코드에 남는다
+    // 그림이 아예 없는 것(오프라인 첫날·그림 저장소가 깨짐)과, 그림은 있는데 지금 만날 포켓몬이 없는 것(😴 쉬는 중 등)은
+    // 할 일이 다르다 — 앞쪽만 "인터넷"을 권한다 (Codex 12차 #9)
+    let hasPics = false;
+    try { hasPics = forSubject(await loadCharacters(), 'math').length > 0; } catch { hasPics = false; }
+    stop(hasPics ? 'noavail' : 'nopics');
     finish();
     return;
   }
@@ -303,8 +316,10 @@ async function runCatches(n, { g, c, run, onAll, onStop }) {
     try {
       if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
       // 던지기 하나를 **먼저** 레코드에서 뺀다(트랜잭션) — 두 창이 같은 기회를 두 번 던지지 못하게. 없으면 끝
-      try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; }
-      if (!taken) { finish(); return; } // 남은 게 없다 — 사다리를 새로 그린다
+      let saveFailed = false;
+      try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; saveFailed = true; }
+      if (saveFailed) { stop('save'); finish(); return; } // 저장이 안 됐다 — 몬스터볼은 그대로, 이유를 보여 준다 (Codex 12차 #9)
+      if (!taken) { finish(); return; } // 남은 게 없다 — 사다리를 새로 그린다 (숫자가 바뀌어 보인다)
       if (run !== ui.run || !mathVisible()) { await giveBack(); ui.catching = false; return; } // 뺀 사이에 나갔다 — 돌려준다
       const candidates = pickCharacters(pool, 4);
       openCatch({
@@ -324,6 +339,7 @@ async function runCatches(n, { g, c, run, onAll, onStop }) {
     } catch (e) {
       console.warn('잡기 흐름 오류:', e);
       if (taken) await giveBack(); // 뺐는데 화면을 못 띄웠다 — 돌려준다
+      stop('error');
       finish();
     }
   };
@@ -511,7 +527,7 @@ function renderLadder(state) {
       pb.textContent = '🎯 포켓몬을 부르는 중…'; // 그림을 받느라 몇 초 걸릴 수 있다 — 눌렸다는 걸 먼저 보여 준다
       runCatches(pend, {
         g: null, c: 0, run: ui.run,
-        onStop: (why) => { if (why === 'nopool') ui.pendNote = '🎯 포켓몬 그림을 못 불러왔어요 — 인터넷이 되는 곳에서 잠시 뒤 다시 눌러 주세요 (몬스터볼은 그대로 있어요)'; },
+        onStop: (why) => { ui.pendNote = PEND_NOTE[why] || PEND_NOTE.error; },
         onAll: () => { if (ui.state) renderLadder(ui.state); },
       });
     }); // 끝나면 사다리를 새로 그린다 (버튼은 그때까지 잠금)
@@ -870,7 +886,8 @@ function startNotesRound(list) {
   list.forEach((x, i) => {
     let q = null;
     const sx = stemOf(x.id);
-    for (let t = 0; sx && t < 6 && !q; t++) q = sx.gen.makeQuestion(x.id, x.note.k, base + i * 101 + t * 7919, { ...optsFor(sx.key), want: { k: x.note.k, key: x.note.key } });
+    // 같은 틀이 나올 때까지 몇 번 더 — 첫 문제가 다른 갈래라고 곧바로 노트를 지우면 안 된다 (Codex 12차 P1)
+    for (let t = 0; sx && t < 6 && (!q || q.key !== x.note.key); t++) q = sx.gen.makeQuestion(x.id, x.note.k, base + i * 101 + t * 7919, { ...optsFor(sx.key), want: { k: x.note.k, key: x.note.key } });
     // 그 틀이 이제 없다(내용을 고쳐서) — 엉뚱한 문제를 맞히고 "고쳤다"가 되면 안 되니 노트를 지운다 (Codex 2차 #4)
     if (!q || q.key !== x.note.key) { stale.push(x); return; }
     q.fromNote = true;
