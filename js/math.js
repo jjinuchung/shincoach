@@ -434,7 +434,8 @@ function renderStemPicker(state) {
     b.appendChild(el('span', 'math-stem-code', st.code));
     const body = el('span', 'math-stem-body');
     body.appendChild(el('span', 'math-stem-name', `${st.label} · ${st.range}`));
-    body.appendChild(el('span', 'math-stem-sub', started ? `개념 ${rows.length}개 중 ${done}개를 알아요 · 👑 ${crown}` : (st.lesson ? '처음 배우는 줄기 — 한 장씩 배우고 문제를 풀어요' : '📏 진단 5문제로 시작해요')));
+    // 줄기가 제 소개(pick)를 가지면 그것 — 소수는 앞 다섯 칸이 학교 진도라 "처음 배우는 줄기"가 맞지 않다
+    body.appendChild(el('span', 'math-stem-sub', started ? `개념 ${rows.length}개 중 ${done}개를 알아요 · 👑 ${crown}` : (st.pick || (st.lesson ? '처음 배우는 줄기 — 한 장씩 배우고 문제를 풀어요' : '📏 진단 5문제로 시작해요'))));
     b.appendChild(body);
     b.addEventListener('click', () => { ui.stem = key; rememberStem(key); if (needsPlacement(state, key)) renderDiagIntro(); else renderLadder(state); });
     list.appendChild(b);
