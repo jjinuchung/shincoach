@@ -76,6 +76,9 @@ const optsFor = (stemKey) => ({ ...(ui.opts || {}), content: ui.contents[stemKey
 
 // ───────────────────── 분수를 세로로 ─────────────────────
 
+/** 여러 줄 문제 글을 한 줄 요약으로 (❓ 버튼·오답 노트 제목) — 곱셈식 두 줄이 "12 = 2 × 2 × 3 18 = …"로 붙지 않게 */
+const oneLine = (t) => String(t || '').replace(/\s*\n+\s*/g, ' · ');
+
 /** "2 3/8" → 2 와 세로 분수, "5/6" → 세로 분수, **굵게**. DOM으로 만든다 (innerHTML에 글을 넣지 않는다) */
 function richNode(text) {
   const frag = document.createDocumentFragment();
@@ -1004,7 +1007,8 @@ function renderRetry(id, wrong) {
     det.className = 'math-wrongnote';
     const sum = document.createElement('summary');
     sum.appendChild(el('span', 'k', KIND_LABEL[w.q.kind] || ''));
-    const qt = el('span', 'qt'); qt.appendChild(richNode(w.q.q.length > 60 ? w.q.q.slice(0, 60) + '…' : w.q.q)); sum.appendChild(qt);
+    const q1 = oneLine(w.q.q);
+    const qt = el('span', 'qt'); qt.appendChild(richNode(q1.length > 60 ? q1.slice(0, 60) + '…' : q1)); sum.appendChild(qt);
     det.appendChild(sum);
     const body = el('div', 'body');
     if (w.q.expr) { const ex = el('p', 'math-expr small'); ex.appendChild(richNode(w.q.expr)); body.appendChild(ex); }
@@ -1391,7 +1395,8 @@ function askOfferForRound(r, state, today) {
   const box = el('div', 'math-ask');
   box.appendChild(el('p', 'math-ask-lead', '❓ 아빠에게 물어볼 게 있어요? 틀린 문제를 골라요 — 문제는 앱이 그대로 보내요.'));
   for (const x of wrongs) {
-    const b = el('button', 'btn math-ask-btn', `❓ ${KIND_LABEL[x.q.kind] || ''} · ${String(x.q.q).slice(0, 26)}${String(x.q.q).length > 26 ? '…' : ''}`);
+    const q1 = oneLine(x.q.q);
+    const b = el('button', 'btn math-ask-btn', `❓ ${KIND_LABEL[x.q.kind] || ''} · ${q1.slice(0, 26)}${q1.length > 26 ? '…' : ''}`);
     b.type = 'button';
     b.addEventListener('click', () => { box.replaceWith(askForm(askContext(x.q, x.a), (res) => { if (res.ok) x.a.asked = res.ask.no; })); });
     box.appendChild(b);
