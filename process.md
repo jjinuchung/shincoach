@@ -599,3 +599,40 @@
 - [ ] 진우가 도전 문제 3단원을 푼 반응 → 난이도·보상 조정
 - [ ] 📊 부모 화면에 🏅 배지·도전 문제 진행 보이기
 - [ ] 소수 독립 줄기(앱에 없음) — 도전 문제의 8개 학습 요소가 그대로 사다리 칸
+
+## 2026-09-29 ~ 09-30 (v141~v142) — 🎯 던지기 버튼 먹통 · 🔢 C 소수 줄기 · 🔍 Codex 12차 · 🔢 F 비와 비율 1단계 · 🎬 쿵푸팬더4
+
+### 진행 내용
+- **🎯 "받은 몬스터볼 — 던지기"가 눌러도 아무 일 없음 (v141, 아버님 신고 · 껐다 켜도 같음)** — 전역 플래그가 아니었다. `db.getCharacters()`가 그림 저장소를 `getAll()` 한 번으로 읽어, 그림 한 장의 곁 파일이 깨지면 목록 전체가 0 → 잡기 후보 0 → 조용히 사다리로(헤드리스로 재현). v68 영상 목록과 같은 함정. getAllKeys + 한 장씩(`readEach`) + 깨진 칸 삭제, 후보가 없으면 사다리에 이유 한 줄
+- **🎬 쿵푸팬더4 태블릿용 (아버님 요청)** — 영어 자막만 쓰고 영상에 박힌 한글 자막은 **자르지 않고** 살림. 2560×1080 → 1600×676, 상한 ≈0.95GB → 902MB. ffmpeg 한 번(스레드 6·Idle 우선순위, 34분). `F:\per\mp3\kfp4\tablet\` (쿵푸팬더 4.mp4 + .en.srt)
+- **🔢 C 소수 줄기 (v141)** — 아버님 결정. 초4 자릿값·비교·10배와 1/10·덧셈·뺄셈 → 초5 분수↔소수·소수×자연수·소수×소수 → 초6 소수÷자연수·소수÷소수 (10칸). 오답 = 아이의 실제 틀린 계산 흉내(TAGS 27), 값은 정수 단위 `{u,p}`. 원고 `decimal.json`(배움 36·확인 35·아빠 카드 10), 검수 페이지(문제 예시 포함), 화면 연결(STEMS·STEM_ORDER 두 곳이면 나머지가 따라옴), 헤드리스로 진단→사다리→배움→풀이 카드→쌍둥이→결과까지
+- **🔍 Codex 12차 (v142)** — 5만·150만 seed에서 산수 오류 0. 9건 전부 반영: ② 갈래가 want를 무시해 🤔 노트를 지우던 것(P1) · decimal.json이 APP_SHELL에 없음 · 그림 복구의 일시적 실패 삭제·읽기-지우기 경쟁 · "10이 넘으면 받아올림" · 초4에 넷째 자리 · 0.45 그림이 0.4 · "×자연수는 늘 커진다" · 던지기 버튼 저장 실패·화면 오류 안내
+- **💬 아버님 질문 둘** — ① 영화를 돈 내고 받아 학습 자료로? → DRM이라 파일로는 불가, 유튜브 공식 채널 임베드 모드 추천(선택 대기) ② 다음 줄기 추천 → **F 비와 비율**(조건부: 약수와 배수)
+- **🔢 F 비와 비율 줄기 (v143)** — 초6 9칸(두 수 비교 → 비 → 비율 → 백분율 → 할인·확률·진하기 → 비의 성질 → 간단한 자연수의 비 → 비례식 → 비례배분). 문제 이야기를 진우의 게임으로(잡을 확률 %, 🛒 할인). 테스트가 **문제 글의 비 말투를 직접 읽어** 기준량을 정한다. 2만 seed 통과
+  - 원고 `ratio.json`(배움 33·확인 32·그림 7·아빠 카드 9) — 확인 질문 32개를 테스트가 **문제 글을 읽고 따로 풀어** 대조(못 읽으면 실패), 정답을 일부러 틀리게 바꿔 잡히는지 확인. 검수 페이지 https://claude.ai/artifact/Me5eUbjhT9wCRd35CTeGCD
+  - 화면 연결은 `STEMS.ratio`·`STEM_ORDER` 두 곳 + APP_SHELL에 ratio.json. 헤드리스로 고르기 → 진단 → 배움 → 풀이 카드 → 쌍둥이 → 통과 → ☀️ 완주 → 📊까지
+
+### 변경 파일
+- 신규: `js/mathdec.js` · `coach/math/decimal.json` · `coach/math/review-dec.html` · `tools/mathdecimal.mjs` · `tests/mathdec.test.js` · `tests/characters.test.js` · `js/mathrat.js` · `tests/mathrat.test.js` · `coach/math/ratio.json` · `coach/math/review-rat.html` · `tools/mathratio.mjs`
+- `js/db.js` — getCharacters 한 장씩·`isCorruptReadError`·`deleteIfStillBroken`(한 쓰기 트랜잭션에서 다시 읽고 지움)
+- `js/math.js` — runCatches `onStop`(nopics·noavail·save·error) · 줄기 부제 `st.pick` · startNotesRound가 같은 틀까지 더 만들어 봄
+- `js/mathprog.js` — STEMS.decimal(code C) · STEMS.ratio(code F) · STEM_ORDER A·B·C·E·F
+- `sw.js` v141 → v142 → v143 (mathdec.js·decimal.json · mathrat.js·ratio.json) · `tools/check.mjs` MATH_CHECK(decimal·ratio) · `tests/mathstem·mathprog.test.js`
+- 커밋: `47f5843` fix · `0ffe9e1` feat(v141) · `91fabcc` docs · `a17019c` fix(v142)
+
+### 결정사항 / 메모
+- **"껐다 켜도 안 된다" = 전역 플래그가 아니라 저장된 데이터 쪽** — 이 말 하나로 원인 후보가 갈렸다. 조용히 끝나는 길은 모두 화면에 이유를 보이게
+- **Blob 저장소에 `getAll()` 한 번은 위험** — 한 장이 깨지면 전부 실패. 일시적 실패와 확실한 깨짐을 가르고, 지우기는 한 트랜잭션에서 다시 읽고
+- **새 줄기의 함정은 산수가 아니라 연결부** — 🔁 쌍둥이 틀 열쇠(무작위 이름·수 모양·수 뒤 어미), ② 갈래 want, 원고 APP_SHELL, 검사 기준을 줄기마다(분수에만 걸려 있던 풀이 카드 검사). 메모 `stem-generator-pitfalls`
+- **2만 seed는 한 번은 돌린다** — 0.95+0.38 받아올림 버그는 1,500에서 안 나오고 2만에서만 나왔다
+- 커밋이 한 파일에 섞이면 hunk로 나눠 스테이징(`git apply --cached` + 특정 hunk를 뺀 패치)
+- Codex 파서·요청문은 `.context/`에 (git 제외)
+
+### TODO (다음 작업)
+- [ ] **🔢 F 비와 비율 4단계** — Codex 건설적 리뷰(새 세션) → 반영 · 원고 검수(번호로) · 태블릿에서 진우 반응
+- [ ] 태블릿: 🎯 던지기 버튼·🎒 도감 그림(원인 확정) · C 소수 줄기 진단 · 🎬 쿵푸팬더4 재생·싱크
+- [ ] 아버님 선택 대기: 콘텐츠 합법 경로(① 유튜브 임베드 모드 추천)
+- [ ] 소수 줄기 원고 검수(번호로) — https://claude.ai/artifact/8Y2pUVmgE8t9xMS6Xozooq
+- [ ] 🎯 도전 문제 5단원 꺾은선그래프 20문항 (07·12 그리기 방식 결정)
+- [ ] 아빠 카드를 📊 부모 화면에 (음수 때부터 남은 일)
+- [ ] mathmix.checkContent의 `bad.push(...checkHuman(...))` 잠복 버그 (③⭐ 넣는 순간 터짐)
