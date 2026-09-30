@@ -417,7 +417,7 @@ export const AREA = [
 
   {
     id: 'are.units', grade: 5, name: '넓이의 단위 m²·km²', needs: ['are.rect'],
-    idea: '1 m = 100 cm라서 1 m² = 100 cm × 100 cm = **10000 cm²**. 1 km = 1000 m라서 1 km² = **1000000 m²**. 넓이 단위는 길이 단위처럼 100배가 **아니에요** — 가로도 세로도 바뀌니까요.',
+    idea: '1 m = 100 cm라서 1 m² = 100 cm × 100 cm = **10000 cm²**. 1 km = 1000 m라서 1 km² = **1000000 m²**. 넓이 단위는 길이 단위처럼 100배가 **아니에요** — 재는 수가 가로도 세로도 바뀌니까요.',
     slip: '1 m²가 가로 100 cm, 세로 100 cm인 정사각형이라는 걸 떠올려 봐요.',
     calc(r, c) {
       const N = int(r, 2, 9); const M = int(r, 2, 9); const K = int(r, 2, 9);
@@ -425,7 +425,8 @@ export const AREA = [
       const fams = [
         { ans: String(N * 10000), wr: [{ text: String(N * 100), tag: TAGS.lengthFactor }, { text: String(N * 1000), tag: TAGS.zeros }, { text: String(N * 100000), tag: TAGS.zeros }],
           why: {
-            [TAGS.lengthFactor]: '1 m = 100 cm는 길이예요. 넓이는 가로도 세로도 100배 — 1 m² = 10000 cm².',
+            // 넓이 자체가 커지는 게 아니라 cm로 잰 수가 커진다 (Codex 16차 #3)
+            [TAGS.lengthFactor]: '1 m = 100 cm는 길이예요. cm로 재면 가로의 수도 세로의 수도 100배 — 1 m² = 10000 cm².',
             [TAGS.zeros]: '0의 개수를 세어 봐요: 1 m² = 10000 cm² (0이 4개).',
           },
           steps: ['1 m² = 100 cm × 100 cm = 10000 cm²', `${N} × 10000 = ${N * 10000} cm²`],
@@ -444,7 +445,7 @@ export const AREA = [
           pools: { pokemon: [`${M * 10000} cm²는 몇 m²일까요?`] } },
         { ans: String(K * 1000000), wr: [{ text: String(K * 1000), tag: TAGS.lengthFactor }, { text: String(K * 10000), tag: TAGS.zeros }],
           why: {
-            [TAGS.lengthFactor]: '1 km = 1000 m는 길이예요. 넓이는 가로도 세로도 1000배 — 1 km² = 1000000 m².',
+            [TAGS.lengthFactor]: '1 km = 1000 m는 길이예요. m로 재면 가로의 수도 세로의 수도 1000배 — 1 km² = 1000000 m².',
             [TAGS.zeros]: '0의 개수를 세어 봐요: 1 km² = 1000000 m² (0이 6개).',
           },
           steps: ['1 km² = 1000 m × 1000 m = 1000000 m²', `${K} × 1000000 = ${K * 1000000} m²`],
@@ -473,7 +474,7 @@ export const AREA = [
             { text: 'm²는 cm²로 바꿀 수 없어요', tag: OFF },
           ],
           steps: ['1 m² = 100 cm × 100 cm = 10000 cm²', `${N} × 10000 = ${N * 10000} cm²`],
-          whyAny: '길이처럼 100배만 했어요. 넓이는 가로도 세로도 100배라서 10000배예요.',
+          whyAny: '길이처럼 100배만 했어요. cm로 재면 가로의 수도 세로의 수도 100배라서 칸의 수는 10000배예요.',
           rule: '1 m² = 10000 cm².',
           probe: { conv: [N, 10000], shown: N * 100 },
         });
@@ -487,7 +488,7 @@ export const AREA = [
           { text: 'km²는 m²로 바꿀 수 없어요', tag: OFF },
         ],
         steps: ['1 km² = 1000 m × 1000 m = 1000000 m²', `${N} × 1000000 = ${N * 1000000} m²`],
-        whyAny: '길이처럼 1000배만 했어요. 넓이는 가로도 세로도 1000배라서 1000000배예요.',
+        whyAny: '길이처럼 1000배만 했어요. m로 재면 가로의 수도 세로의 수도 1000배라서 칸의 수는 1000000배예요.',
         rule: '1 km² = 1000000 m².',
         probe: { conv: [N, 1000000], shown: N * 1000 },
       });
@@ -557,7 +558,8 @@ export const AREA = [
       let b2 = int(r, 6, 16); const h2 = int(r, 3, 10); if ((b2 * h2) % 2) b2 += 1;
       const p1 = int(r, 1, Math.floor(b2 / 2)); let p2 = int(r, Math.ceil(b2 / 2) + 1, b2 - 1); if (p2 === p1) p2 = p1 + 1;
       const fams = [
-        { ans: String((T.b * T.h) / 2), wr: [{ text: String(T.b * T.h), tag: TAGS.noHalf }, (T.b * T.sl) % 2 ? { text: String(T.b * T.sl), tag: TAGS.slantAsHeight } : { text: String((T.b * T.sl) / 2), tag: TAGS.slantAsHeight }],
+        // 옆변을 높이로 쓴 값이 자연수가 아니면(17 × 13 ÷ 2) 그 오답은 뺀다 — 17 × 13을 내면 ÷ 2까지 빠뜨린 두 실수라 이름표가 반쪽이 된다 (Codex 16차 #1)
+        { ans: String((T.b * T.h) / 2), wr: [{ text: String(T.b * T.h), tag: TAGS.noHalf }, (T.b * T.sl) % 2 ? null : { text: String((T.b * T.sl) / 2), tag: TAGS.slantAsHeight }],
           why: {
             [TAGS.noHalf]: `${T.b} × ${jn(T.h, '은', '는')} 삼각형 두 개(평행사변형)의 넓이예요. ÷ 2를 해야 해요.`,
             [TAGS.slantAsHeight]: `${T.sl} cm는 비스듬한 옆변이에요. 높이는 꼭짓점에서 직각으로 내린 점선 ${jn(T.h, '이에요', '예요')}.`,
@@ -612,7 +614,8 @@ export const AREA = [
         { ans: String((R.d1 * R.d2) / 2), wr: [{ text: String(R.d1 * R.d2), tag: TAGS.noHalf }, { text: String(R.side * R.side), tag: TAGS.sideSquared }],
           why: {
             [TAGS.noHalf]: `${R.d1} × ${jn(R.d2, '은', '는')} 둘러싼 직사각형의 넓이예요. 마름모는 그 반이에요.`,
-            [TAGS.sideSquared]: '마름모는 정사각형이 아니라서 한 변 × 한 변이 아니에요. 두 대각선을 써요.',
+            // 정사각형도 마름모다 — "마름모는 정사각형이 아니다"로 일반화하지 않는다 (Codex 16차 #2). 생성기 마름모는 늘 대각선이 달라 정사각형이 아니다
+            [TAGS.sideSquared]: '이 마름모는 정사각형이 아니라서 한 변 × 한 변으로는 넓이가 안 나와요. 두 대각선을 써요.',
           },
           steps: [`둘러싼 직사각형: ${R.d1} × ${R.d2} = ${R.d1 * R.d2}`, `마름모는 그 반: ${R.d1} × ${R.d2} ÷ 2 = ${(R.d1 * R.d2) / 2}`],
           rule: '마름모의 넓이 = 대각선 × 대각선 ÷ 2.',

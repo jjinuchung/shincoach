@@ -148,6 +148,10 @@ test('그림: 도형 여덟 가지를 그리고 — 적힌 옆변 길이는 실�
   assert.equal(figText('[para 10 4 3]'), '(평행사변형 밑변 10 cm · 높이 4 cm · 옆변 5 cm)');
   assert.equal(figText('[rect 8x?6]'), '(직사각형 가로 8 cm · 세로 ? cm)');
   assert.equal(figText('[lshape 12 9 5 4 m]', true), '(그림)');
+  // 마름모는 그림에 보이는 한 변도 글로 — 숨긴 대각선이면 한 변도 숨긴다 (Codex 16차 #5)
+  assert.equal(figText('[rhom 16 12]'), '(마름모 대각선 16 cm · 12 cm · 한 변 10 cm)');
+  assert.equal(figText('[rhom 16 ?12]'), '(마름모 대각선 16 cm · ? cm)');
+  assert.equal(figText('[rhom 10 10]'), '(마름모 대각선 10 cm · 10 cm)', '한 변이 정수가 아니면 안 적는다');
 });
 
 test('사다리: 9칸, 모두 초5, needs가 바로 앞 칸', () => {
@@ -259,7 +263,8 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다', () => {
           case TAGS.noConvert: hit(x.f === 10000 && v === x.area); break;
           case TAGS.slantAsHeight:
             if (sh.kind === 'para') hit(v === sh.b * slant(sh.s, sh.h));
-            else hit(sh.kind === 'tri' && (v === sh.b * slant(sh.p, sh.h) || v === (sh.b * slant(sh.p, sh.h)) / 2));
+            // 삼각형은 "옆변을 높이로"만 틀린 값(밑변 × 옆변 ÷ 2)이어야 — 밑변 × 옆변은 ÷ 2까지 빠뜨린 두 실수라 이름표가 반쪽이 된다 (Codex 16차 #1)
+            else hit(sh.kind === 'tri' && v === (sh.b * slant(sh.p, sh.h)) / 2);
             break;
           case TAGS.halfWrong: hit(sh.kind === 'para' && v === x.area / 2); break;
           case TAGS.noHalf:
@@ -559,7 +564,7 @@ test('아직 안 배운 말을 앞 칸에서 쓰지 않는다 — 넓이·cm²�
   }
 });
 
-test('그림 이름표끼리 겹치지 않는다 — 생성기 문제·원고의 모든 도형 (ㄴ자 작은 홈 2 × 2·납작한 마름모에서 겹쳤다)', () => {
+test('그림 이름표: 서로 겹치지 않고 · 도형 외곽선을 가로지르지 않고 · 그림 밖으로 안 나간다 — 생성기 문제·원고의 모든 도형 (ㄴ자 2 × 2 · 마름모 80개 중 50개 · 좁은 삼각형 — Codex 16차 #4)', () => {
   // 글자 상자 어림: 한 글자 ≈ 글꼴 × 0.55, 기준선 위 글꼴 × 0.73·아래 × 0.2
   // 글꼴 크기는 그림에서 읽는다 — 크기가 바뀌어도 이름표를 못 찾아 빈 채로 통과하지 않게 (이름표 수도 센다)
   let labels = 0;
@@ -570,14 +575,46 @@ test('그림 이름표끼리 겹치지 않는다 — 생성기 문제·원고의
     return { t: m[5], x0, x1: x0 + w, y0: y - fs * 0.73, y1: y + fs * 0.2 };
   });
   const hit = (a, b) => a.x0 < b.x1 - 1 && b.x0 < a.x1 - 1 && a.y0 < b.y1 - 1 && b.y0 < a.y1 - 1;
-  const figs = new Set();
+  // 외곽선(<polygon>)의 변이 글자 상자 안을 지나는가 — 상자를 1px 줄여 스치는 것은 봐준다
+  const outline = (svg) => { const p = /<polygon points="([^"]+)"/.exec(svg)[1].trim().split(/\s+/).map((s) => s.split(',').map(Number)); return p.map((a, i) => [a, p[(i + 1) % p.length]]); };
+  function crosses([a, b], B) {
+    const x0 = B.x0 + 1; const x1 = B.x1 - 1; const y0 = B.y0 + 1; const y1 = B.y1 - 1;
+    let t0 = 0; let t1 = 1; const dx = b[0] - a[0]; const dy = b[1] - a[1];
+    for (const [p, q] of [[-dx, a[0] - x0], [dx, x1 - a[0]], [-dy, a[1] - y0], [dy, y1 - a[1]]]) {
+      if (p === 0) { if (q < 0) return false; continue; }
+      const r = q / p;
+      if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+    }
+    return true;
+  }
+  // Codex 16차가 찾은 자리 + 고치다 새로 걸린 납작한 평행사변형
+  const figs = new Set(['rhom 4 ?20', 'tri 6 10 3', 'rhom 16 12', 'para 14 3 13', 'lshape 14 12 2 2', 'rhom 18 ?4']);
   for (const c of AREA) for (let s = 1; s <= 600; s++) for (const kind of ['calc', 'misread']) for (const f of makeQuestion(c.id, kind, s * 409, OPTS).q.match(/\[[a-z]+ [^\]]+\]/g) || []) figs.add(f.slice(1, -1));
   for (const t of strings(CONTENT)) for (const f of t.match(/\[[a-z]+ [^\]]+\]/g) || []) figs.add(f.slice(1, -1));
   const bad = [];
   for (const f of figs) {
-    const B = boxes(figureSvg(f));
+    const svg = figureSvg(f);
+    const B = boxes(svg);
     for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) if (hit(B[i], B[j])) bad.push(`${f}: "${B[i].t}" ↔ "${B[j].t}"`);
+    if (/<polygon/.test(svg)) for (const b of B) if (outline(svg).some((e) => crosses(e, b))) bad.push(`${f}: "${b.t}"이 외곽선을 가로지름`);
+    const [, vw, vh] = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svg).map(Number);
+    for (const b of B) if (b.x0 < 0 || b.y0 < 0 || b.x1 > vw || b.y1 > vh) bad.push(`${f}: "${b.t}"이 그림 밖`);
   }
   assert.ok(figs.size > 500 && labels > 1500, `도형 ${figs.size}개 · 이름표 ${labels}개`);
   assert.deepEqual(bad.slice(0, 12), [], `${bad.length}건`);
+});
+
+test('🔍 Codex 16차: 말의 뜻 — 정사각형도 마름모 · 단위를 바꿔도 넓이는 그대로(수만 바뀐다) · 밑변을 바꿔 보는 아빠 카드', () => {
+  const kidText = (id, n = 300) => {
+    const out = [];
+    for (let s = 1; s <= n; s++) for (const kind of ['calc', 'misread']) { const q = makeQuestion(id, kind, s * 613, OPTS); out.push(q.q, ...q.choices.map((x) => x.text), ...q.solve.steps, q.solve.whyAny, q.solve.rule, ...Object.values(q.solve.why)); }
+    return out.join(' / ');
+  };
+  // #2 "마름모는 정사각형이 아니다"로 일반화하지 않는다
+  for (const t of [...strings(CONTENT['are.rhom']), kidText('are.rhom'), conceptById('are.rhom').idea]) assert.doesNotMatch(t, /(?<!이 )마름모는 정사각형이 아니/, t.slice(0, 120)); // "이 마름모는 …"은 그 그림 이야기라 괜찮다
+  assert.match(strings(CONTENT['are.rhom']).join(' '), /정사각형도[^.]*마름모/, '정사각형도 마름모라는 말이 있어야');
+  // #3 단위를 바꾸면 넓이가 커진다고 가르치지 않는다 — 커지는 것은 재는 수(칸의 수)
+  for (const t of [...strings(CONTENT['are.units']), kidText('are.units'), conceptById('are.units').idea]) assert.doesNotMatch(t, /넓이는 (가로도|왜 훨씬)|넓이가 (더 )?커/, t.slice(0, 120));
+  // #6 삼각형 아빠 카드: 다른 변을 밑변으로
+  assert.match(CONTENT['are.tri'].dad.do, /다른 변을 밑변/);
 });

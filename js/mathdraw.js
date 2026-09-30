@@ -262,13 +262,23 @@ const intLen = (a, b) => { const d = len(a, b); return Math.abs(d - Math.round(d
 
 /**
  * 도형 한 개 — 꼭짓점(단위 좌표, y는 위로) · 변 이름표 · 점선(높이·대각선, 주황) · 직각 표시 · 같은 변 눈금
- * @param {{pts:number[][], labels?:Array<{i:number, text:string}>, dashes?:Array<{a:number[], b:number[], text?:string, side?:'l'|'r'|'t', at?:number}>,
+ * @param {{pts:number[][], labels?:Array<{i:number, text:string}>, dashes?:Array<{a:number[], b:number[], text?:string, side?:'l'|'r'|'t'|'tr', at?:number, alts?:Array<{side:string, at?:number}>}>,
  *          marks?:number[][], ticks?:boolean, aria:string}} o
  */
 /** 도형 단위 1이 몇 px인지 — 가장 긴 쪽이 250px, 한 칸은 30px까지 (lshapeSvg가 이름표 자리를 정할 때도 쓴다) */
 const shapeScale = (span) => Math.min(30, 250 / Math.max(span, 1));
 /** 이름표 글자 폭 어림 (15px 글꼴: 숫자 ≈ 8px, "cm" ≈ 20px) */
 const labelW = (t) => String(t).length * 8.2;
+/** 선분이 상자 안을 지나는가 (리앙-바스키) — 점선 이름표 자리 고르기 */
+function segHitsBox([a, b], B) {
+  let t0 = 0; let t1 = 1; const dx = b[0] - a[0]; const dy = b[1] - a[1];
+  for (const [p, q] of [[-dx, a[0] - B.x0], [dx, B.x1 - a[0]], [-dy, a[1] - B.y0], [dy, B.y1 - a[1]]]) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const r = q / p;
+    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+  }
+  return true;
+}
 function polySvg(o) {
   const all = [...o.pts, ...(o.dashes || []).flatMap((d) => [d.a, d.b])];
   const xs = all.map((p) => p[0]); const ys = all.map((p) => p[1]);
@@ -284,22 +294,20 @@ function polySvg(o) {
   const f = (v) => v.toFixed(1);
   let g = `<polygon points="${o.pts.map((p) => `${f(X(p[0]))},${f(Y(p[1]))}`).join(' ')}" fill="${FILL}" fill-opacity="0.16" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>`;
   const text = (x, y, t, anchor = 'middle', color = 'currentColor') => `<text x="${f(x)}" y="${f(y)}" font-size="15" text-anchor="${anchor}" fill="${color}" font-weight="600">${esc(t)}</text>`;
-  for (const d of o.dashes || []) {
-    g += `<line x1="${f(X(d.a[0]))}" y1="${f(Y(d.a[1]))}" x2="${f(X(d.b[0]))}" y2="${f(Y(d.b[1]))}" stroke="${FILL2}" stroke-width="1.8" stroke-dasharray="5 4"/>`;
-    if (!d.text) continue;
-    const t = d.at === undefined ? 0.5 : d.at;
-    const mx = X(d.a[0] + (d.b[0] - d.a[0]) * t); const my = Y(d.a[1] + (d.b[1] - d.a[1]) * t);
-    if (d.side === 'l') g += text(mx - 6, my + 4, d.text, 'end', FILL2);
-    else if (d.side === 't') g += text(mx, my - 7, d.text, 'middle', FILL2);
-    else if (d.side === 'tr') g += text(mx + 6, my - 7, d.text, 'start', FILL2);
-    else g += text(mx + 6, my + 4, d.text, 'start', FILL2);
-  }
-  for (const m of o.marks || []) {
-    const x = X(m[0]); const y = Y(m[1]);
-    g += `<path d="M ${f(x)} ${f(y - 9)} h 9 v 9" fill="none" stroke="${FILL2}" stroke-width="1.4"/>`;
-  }
+  // 이름표 글자 상자 어림 (15px 글꼴: 기준선 위 11px · 아래 3px), grow만큼 넓혀 여유를 둔다
+  const boxAt = ([x, y, anchor], t, grow = 0) => {
+    const w = labelW(t); const x0 = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
+    return { x0: x0 - grow, x1: x0 + w + grow, y0: y - 11 - grow, y1: y + 3 + grow };
+  };
+  const P = (p) => [X(p[0]), Y(p[1])];
+  const outline = o.pts.map((p, i) => [P(p), P(o.pts[(i + 1) % o.pts.length])]);
+  const dashSegs = (o.dashes || []).map((d) => [P(d.a), P(d.b)]);
+  const overlap = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+  const busy = (o.marks || []).map((m) => { const [x, y] = P(m); return { x0: x - 1, x1: x + 10, y0: y - 10, y1: y + 1 }; }); // 직각 표시
+
+  // 변 이름표 — 변의 바깥쪽 (먼저 자리를 정해 두고, 점선 이름표가 이것을 피한다)
   const n = o.pts.length;
-  o.pts.forEach((a, i) => {
+  const sides = o.pts.map((a, i) => {
     const b = o.pts[(i + 1) % n];
     const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = Math.hypot(dx, dy) || 1;
     const nx = (ccw ? dy : -dy) / L2; const ny = (ccw ? -dx : dx) / L2; // 바깥쪽 (단위 좌표, y는 위로)
@@ -308,12 +316,54 @@ function polySvg(o) {
     const t = lb && lb.at !== undefined ? lb.at : 0.5;
     const off = lb && lb.off ? lb.off : Math.max(20, 8 + (Math.abs(nx) * labelW(lb ? lb.text : '')) / 2 + Math.abs(ny) * 8);
     const mx = X(a[0] + dx * t); const my = Y(a[1] + dy * t);
-    if (o.ticks) g += `<line x1="${f(mx - nx * 5)}" y1="${f(my + ny * 5)}" x2="${f(mx + nx * 5)}" y2="${f(my - ny * 5)}" stroke="currentColor" stroke-width="1.4"/>`;
-    if (lb) g += text(mx + nx * off, my - ny * off + 4, lb.text);
+    const at = lb ? [mx + nx * off, my - ny * off + 4, 'middle'] : null;
+    if (at) busy.push(boxAt(at, lb.text));
+    return { lb, nx, ny, mx, my, at };
   });
+
+  // 점선 이름표(높이·대각선) — 후보 자리(side·at, 그다음 alts)를 차례로 보고, 도형 변·다른 점선·직각 표시·다른 이름표·그림 밖에
+  // 가장 적게 걸리는 첫 자리 (Codex 16차 #4: 마름모 80개 중 50개에서 대각선 이름표가 변을 가로질렀다)
+  const dashAt = (d, side, at) => {
+    const t = at === undefined ? 0.5 : at;
+    const mx = X(d.a[0] + (d.b[0] - d.a[0]) * t); const my = Y(d.a[1] + (d.b[1] - d.a[1]) * t);
+    if (side === 'l') return [mx - 6, my + 4, 'end'];
+    if (side === 't') return [mx, my - 7, 'middle'];
+    if (side === 'tr') return [mx + 6, my - 7, 'start'];
+    return [mx + 6, my + 4, 'start'];
+  };
+  const dashText = (o.dashes || []).map((d, di) => {
+    if (!d.text) return '';
+    let best = null;
+    for (const c of [{ side: d.side, at: d.at }, ...(d.alts || [])]) {
+      const at = dashAt(d, c.side, c.at);
+      // 실제로 걸리는 것(여유 0)이 먼저, 2px 여유가 없는 것은 그다음 — 딱 맞게 들어가는 자리를 버리고 더 나쁜 자리로 가지 않게
+      const hits = (B) => [...outline, ...dashSegs.filter((_, j) => j !== di)].filter((s) => segHitsBox(s, B)).length
+        + busy.filter((q) => overlap(q, B)).length + (B.x0 < 0 || B.y0 < 0 || B.x1 > W || B.y1 > H ? 1 : 0);
+      const cost = hits(boxAt(at, d.text, -1)) * 10 + hits(boxAt(at, d.text, 2));
+      if (!best || cost < best.cost) best = { at, cost };
+      if (!cost) break;
+    }
+    busy.push(boxAt(best.at, d.text));
+    return text(best.at[0], best.at[1], d.text, best.at[2], FILL2);
+  });
+
+  (o.dashes || []).forEach((d, di) => {
+    g += `<line x1="${f(X(d.a[0]))}" y1="${f(Y(d.a[1]))}" x2="${f(X(d.b[0]))}" y2="${f(Y(d.b[1]))}" stroke="${FILL2}" stroke-width="1.8" stroke-dasharray="5 4"/>`;
+    g += dashText[di];
+  });
+  for (const m of o.marks || []) {
+    const x = X(m[0]); const y = Y(m[1]);
+    g += `<path d="M ${f(x)} ${f(y - 9)} h 9 v 9" fill="none" stroke="${FILL2}" stroke-width="1.4"/>`;
+  }
+  for (const s of sides) {
+    if (o.ticks) g += `<line x1="${f(s.mx - s.nx * 5)}" y1="${f(s.my + s.ny * 5)}" x2="${f(s.mx + s.nx * 5)}" y2="${f(s.my - s.ny * 5)}" stroke="currentColor" stroke-width="1.4"/>`;
+    if (s.lb) g += text(s.at[0], s.at[1], s.lb.text);
+  }
   return `<svg class="frac-fig shape-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria)}"><g>${g}</g></svg>`;
 }
 const ul = (v, u) => `${v} ${u}`; // 길이 이름표 "8 cm"
+/** 높이 점선(위 → 아래) 이름표 후보 — 오른쪽 가운데가 안 되면 왼쪽, 그다음은 아래쪽(밑변 쪽이 넓은 도형이 많다) */
+const HEIGHT_ALTS = [{ side: 'l', at: 0.5 }, { side: 'r', at: 0.7 }, { side: 'l', at: 0.7 }, { side: 'r', at: 0.85 }, { side: 'l', at: 0.85 }, { side: 'r', at: 0.3 }, { side: 'l', at: 0.3 }];
 
 /** 직사각형 — 가로 w · 세로 h (hideH면 세로 이름표를 "?"로: 넓이로 세로를 거꾸로 구하는 문항) */
 export function rectSvg(w, h, u = 'cm', hideH = false) {
@@ -332,7 +382,7 @@ export function paraSvg(b, h, s, u = 'cm') {
   const sl = intLen(pts[3], pts[0]);
   const labels = [{ i: 0, text: ul(b, u) }];
   if (s > 0 && sl !== null) labels.push({ i: 3, text: ul(sl, u) });
-  const dashes = s > 0 ? [{ a: [s, h], b: [s, 0], text: ul(h, u), side: 'r' }] : [];
+  const dashes = s > 0 ? [{ a: [s, h], b: [s, 0], text: ul(h, u), side: 'r', alts: HEIGHT_ALTS }] : [];
   if (!s) labels.push({ i: 3, text: ul(h, u) });
   return polySvg({ pts, labels, dashes, marks: [[s, 0]], aria: `평행사변형 밑변 ${b} ${u}, 높이 ${h} ${u}${s > 0 && sl !== null ? `, 옆변 ${sl} ${u}` : ''}` });
 }
@@ -342,9 +392,8 @@ export function triSvg(b, h, p, u = 'cm') {
   const sl = intLen(pts[2], pts[0]);
   const labels = [{ i: 0, text: ul(b, u) }];
   if (p > 0 && sl !== null) labels.push({ i: 2, text: ul(sl, u) });
-  // 높이 이름표는 점선 양옆 중 넓은 쪽에 — 꼭짓점이 오른쪽 끝 가까이면(6 12 5) 오른쪽 변이 "12 cm"를 가로질렀다
-  // 왼쪽에 둘 때는 아래쪽(at 0.7) — 삼각형은 밑변 쪽이 넓다
-  const dashes = p > 0 ? [b - p >= p ? { a: [p, h], b: [p, 0], text: ul(h, u), side: 'r' } : { a: [p, h], b: [p, 0], text: ul(h, u), side: 'l', at: 0.7 }] : [];
+  // 높이 이름표는 점선 오른쪽 가운데부터 — 꼭짓점이 오른쪽 끝 가까이면(6 12 5) 오른쪽 변이 "12 cm"를 가로질러 왼쪽·아래 후보로 간다
+  const dashes = p > 0 ? [{ a: [p, h], b: [p, 0], text: ul(h, u), side: 'r', alts: HEIGHT_ALTS }] : [];
   if (!p) labels.push({ i: 2, text: ul(h, u) });
   return polySvg({ pts, labels, dashes, marks: [[p, 0]], aria: `삼각형 밑변 ${b} ${u}, 높이 ${h} ${u}${p > 0 && sl !== null ? `, 옆변 ${sl} ${u}` : ''}` });
 }
@@ -353,11 +402,11 @@ export function rhomSvg(d1, d2, u = 'cm', hide2 = false) {
   const pts = [[0, d2 / 2], [d1 / 2, 0], [d1, d2 / 2], [d1 / 2, d2]];
   const sl = intLen(pts[0], pts[1]);
   const labels = sl !== null && !hide2 ? [{ i: 0, text: ul(sl, u) }] : [];
-  // 납작한 마름모(세로 반쪽이 40px 미만)는 세로 대각선 이름표가 가로 것과 겹쳤다(18 × ?4) → 위 꼭짓점 바깥 위로
-  const flat = (d2 / 2) * shapeScale(Math.max(d1, d2)) < 40;
+  // 가로 대각선: 가운데 오른쪽 위부터 → 조금 더 오른쪽 → 오른쪽 꼭짓점 바깥
+  // 세로 대각선: 위쪽 → 아래쪽(가운데 아래는 넓다) → 위 꼭짓점 바깥 위 (납작하거나 좁은 마름모)
   const dashes = [
-    { a: [0, d2 / 2], b: [d1, d2 / 2], text: ul(d1, u), side: 'tr', at: 0.5 }, // 가운데 오른쪽 위 — 세로 점선과 안 겹치게
-    { a: [d1 / 2, 0], b: [d1 / 2, d2], text: ul(hide2 ? '?' : d2, u), ...(flat ? { side: 't', at: 1 } : { side: 'r', at: 0.8 }) },
+    { a: [0, d2 / 2], b: [d1, d2 / 2], text: ul(d1, u), side: 'tr', at: 0.5, alts: [{ side: 'tr', at: 0.6 }, { side: 'tr', at: 0.7 }, { side: 'r', at: 1 }] },
+    { a: [d1 / 2, 0], b: [d1 / 2, d2], text: ul(hide2 ? '?' : d2, u), side: 'r', at: 0.8, alts: [{ side: 'r', at: 0.3 }, { side: 'r', at: 0.22 }, { side: 'r', at: 0.7 }, { side: 't', at: 1 }] },
   ];
   return polySvg({ pts, labels, dashes, marks: [[d1 / 2, d2 / 2]], aria: `마름모 대각선 ${d1} ${u}, ${hide2 ? '?' : d2} ${u}${sl !== null && !hide2 ? `, 한 변 ${sl} ${u}` : ''}` });
 }
@@ -368,7 +417,7 @@ export function trapSvg(a, b, h, s, u = 'cm') {
   const labels = [{ i: 0, text: ul(b, u) }, { i: 2, text: ul(a, u) }];
   if (s > 0 && sl !== null) labels.push({ i: 3, text: ul(sl, u) });
   if (!s) labels.push({ i: 3, text: ul(h, u) });
-  const dashes = s > 0 ? [{ a: [s, h], b: [s, 0], text: ul(h, u), side: 'r' }] : [];
+  const dashes = s > 0 ? [{ a: [s, h], b: [s, 0], text: ul(h, u), side: 'r', alts: HEIGHT_ALTS }] : [];
   return polySvg({ pts, labels, dashes, marks: [[s, 0]], aria: `사다리꼴 윗변 ${a} ${u}, 아랫변 ${b} ${u}, 높이 ${h} ${u}${s > 0 && sl !== null ? `, 옆변 ${sl} ${u}` : ''}` });
 }
 /** ㄴ자 모양 — W × H 직사각형에서 오른쪽 위 w × h를 떼어 냄. 여섯 변 모두 이름표 */
@@ -468,7 +517,8 @@ function shapeText(kind, arg) {
     case 'reg': return `변이 ${n[0]}개인 정다각형 · 한 변 ${n[1]} ${u}`;
     case 'para': return `평행사변형 밑변 ${n[0]} ${u} · 높이 ${n[1]} ${u}${n[2] ? side(n[2], n[1]) : ''}`;
     case 'tri': return `삼각형 밑변 ${n[0]} ${u} · 높이 ${n[1]} ${u}${n[2] ? side(n[2], n[1]) : ''}`;
-    case 'rhom': return `마름모 대각선 ${n[0]} ${u} · ${/\?/.test(v) ? '?' : n[1]} ${u}`;
+    // 그림에 보이는 한 변(정수일 때만)도 — 빠지면 아빠가 "한 변 × 한 변" 오답이 어디서 왔는지 모른다 (Codex 16차 #5)
+    case 'rhom': return `마름모 대각선 ${n[0]} ${u} · ${/\?/.test(v) ? '?' : n[1]} ${u}${/\?/.test(v) ? '' : side(n[0] / 2, n[1] / 2).replace('옆변', '한 변')}`;
     case 'trap': return `사다리꼴 윗변 ${n[0]} ${u} · 아랫변 ${n[1]} ${u} · 높이 ${n[2]} ${u}${n[3] ? side(n[3], n[2]) : ''}`;
     case 'lshape': return `ㄴ자 모양 가로 ${n[0]} ${u} · 세로 ${n[1]} ${u} · 오른쪽 위를 ${n[2]} ${u} × ${n[3]} ${u} 떼어 냄`;
     case 'grid': return `모눈 가로 ${n[0]}칸 · 세로 ${n[1]}칸${n[2] ? ` · 오른쪽 위 ${n[2]} × ${n[3]}칸 뺌` : ''}`;
