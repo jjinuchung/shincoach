@@ -7,6 +7,7 @@ import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptRep
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes } from './essay.js';
 import { countPlayableCues } from './srt.js';
+import { figText } from './mathdraw.js';
 import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED } from './review.js';
@@ -619,7 +620,7 @@ export async function renderStats() {
       it.appendChild(el('span', `st${ASK_OPEN.has(a.status) ? ' wait' : a.status === 'understood' ? ' done' : ''}`, STATUS_LABEL[a.status] || a.status));
       const det = el('details');
       det.appendChild(el('summary', '', '문제 · 진우 답 · 답장 보기'));
-      det.appendChild(el('p', 'q', `문제: ${a.q}${a.expr ? ` · 식: ${a.expr}` : ''}`)); // .q = 줄바꿈 살림 (곱셈식 두 줄·② — Codex 14차 #9)
+      det.appendChild(el('p', 'q', `문제: ${figText(a.q).replace(/\*\*/g, '')}${a.expr ? ` · 식: ${a.expr}` : ''}`)); // .q = 줄바꿈 살림 (곱셈식 두 줄·② — Codex 14차 #9) · 대응표·도형 배열은 글로, **굵게** 표시는 뺀다 (H 줄기)
       det.appendChild(el('p', '', `진우 답: ${a.my || '(없음)'} ❌${a.tag ? ` (${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · ${WHY_LABEL[a.w]}` : ''} · 정답: ${a.ans}`));
       if (a.kid) det.appendChild(el('p', '', `진우 말: "${a.kid}"`));
       (a.replies || []).forEach((rp, i) => {

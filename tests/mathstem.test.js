@@ -10,9 +10,12 @@ import { lessonOf, checkContent } from '../js/mathneg.js';
 const content = JSON.parse(readFileSync(new URL('../coach/math/negative.json', import.meta.url), 'utf8'));
 const T = '2026-09-21';
 
-test('STEMS: 분수·혼합계산·소수·음수·비와 비율·약수와 배수 여섯 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
-  assert.deepEqual(STEM_ORDER, ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor']);
-  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'B', 'C', 'E', 'F', 'G'], '글자 순서대로 (D는 문자와 식 몫으로 비워 둠)');
+test('STEMS: 분수·혼합계산·소수·음수·비와 비율·약수와 배수·규칙과 대응 일곱 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
+  assert.deepEqual(STEM_ORDER, ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond']);
+  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'B', 'C', 'E', 'F', 'G', 'H'], '글자 순서대로 (D는 문자와 식 몫으로 비워 둠)');
+  assert.equal(STEMS.correspond.lesson, true, '규칙과 대응도 📚 배움');
+  assert.equal(stemOf('cor.twostep').key, 'correspond');
+  assert.equal(nameOf('cor.table'), '대응표로 규칙 찾기');
   assert.equal(STEMS.factor.lesson, true, '약수와 배수도 📚 배움');
   assert.equal(stemOf('fac.lcm').key, 'factor');
   assert.equal(nameOf('fac.common'), '공약수와 최대공약수');
@@ -57,7 +60,7 @@ test('줄기별 사다리·진단: 음수 줄기의 진단은 음수 사다리�
   assert.equal(ladderOf(m, T, 'fraction').filter((r) => r.state === 'done').length, 0);
   assert.deepEqual(dueIds(m, '2026-09-30', 'negative'), ['neg.mean', 'neg.line', 'neg.add', 'neg.sub']);
   const s = mathSummary(m);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false]]);
   assert.equal(s.done, 4);
 });
 

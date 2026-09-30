@@ -169,6 +169,87 @@ export function walkSvg(start, delta) {
   return `<svg class="frac-fig line-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${start}에서 ${delta > 0 ? '오른쪽' : '왼쪽'}으로 ${Math.abs(delta)}칸 걸어 ${end}">${g}</svg>`;
 }
 
+// ───────────────────── 🔢 규칙과 대응 줄기: 대응표 · 도형 배열 ─────────────────────
+// 대응표는 **문제 글 안에** 지시문으로 적는다 — 🔁 쌍둥이 열쇠(tplKey)·❓ 아빠에게 묻기 복사문·테스트가 모두 글에서 표를 읽는다.
+
+const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+/** 글자 폭 어림 — 한글·□△는 넓게 */
+const textW = (t, size) => [...String(t)].reduce((w, ch) => w + (/[ㄱ-힝□△○☆]/.test(ch) ? size * 1.05 : size * 0.62), 0);
+
+/**
+ * 대응표 — 두 줄(이상). 첫 칸은 이름, 나머지는 값. '?'는 물어보는 칸(색칠).
+ * @param {Array<{label:string, vals:Array<number|string>}>} rows
+ */
+export function tableSvg(rows) {
+  const list = (rows || []).filter((r) => r && r.label && Array.isArray(r.vals) && r.vals.length);
+  if (list.length < 2) return '';
+  const n = list[0].vals.length;
+  if (list.some((r) => r.vals.length !== n) || n < 2 || n > 7) return '';
+  // 태블릿에서 아이가 읽는 크기 — 문제 글(1.1rem)보다 작지 않게 (헤드리스에서 □·△가 작아 보여 키움)
+  const LF = 15; const VF = 17; const rowH = 38;
+  const labelW = Math.round(Math.min(180, Math.max(48, ...list.map((r) => textW(r.label, LF) + 18))));
+  const cellW = Math.round(Math.max(46, ...list.flatMap((r) => r.vals.map((v) => textW(v, VF) + 20))));
+  const W = labelW + n * cellW; const H = list.length * rowH;
+  let g = '';
+  list.forEach((r, i) => {
+    const y = i * rowH;
+    g += `<rect x="0" y="${y}" width="${labelW}" height="${rowH}" fill="${EMPTY}" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/>`;
+    g += `<text x="${labelW / 2}" y="${y + rowH / 2 + 4}" font-size="${LF}" text-anchor="middle" fill="currentColor" font-weight="700">${esc(r.label)}</text>`;
+    r.vals.forEach((v, j) => {
+      const x = labelW + j * cellW; const ask = v === '?';
+      g += `<rect x="${x}" y="${y}" width="${cellW}" height="${rowH}" fill="${ask ? FILL2 : 'none'}" fill-opacity="${ask ? 0.35 : 1}" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/>`;
+      g += `<text x="${x + cellW / 2}" y="${y + rowH / 2 + 5}" font-size="${VF}" text-anchor="middle" fill="currentColor" font-weight="${ask ? 700 : 400}">${esc(v)}</text>`;
+    });
+  });
+  const label = list.map((r) => `${r.label} ${r.vals.join(', ')}`).join(' / ');
+  // 바깥 테두리 선의 반이 그림 밖으로 나가 잘리지 않게 사방 1px 여백
+  return `<svg class="frac-fig table-fig" viewBox="-1 -1 ${W + 2} ${H + 2}" width="${W + 2}" height="${H + 2}" role="img" aria-label="표: ${esc(label)}"><g shape-rendering="crispEdges">${g}</g></svg>`;
+}
+
+/**
+ * 도형 배열 — 1번째, 2번째… 모양의 블록 수 (늘어나는 수가 늘 같아야 한다).
+ * 늘어나는 수 d만큼의 기둥이 모양마다 하나씩 늘고, 처음에 남는 칸(첫째 − d)은 다른 색 기둥으로 —
+ * "처음에 남는 수 + 늘어나는 수 × 몇 번째"가 눈에 보인다 (3, 5, 7 → 1 + 2 × □).
+ * 첫째가 d보다 작으면(1, 3, 5) 첫 모양 전체를 다른 색 기둥으로 두고 d개 기둥을 (몇 번째 − 1)개 붙인다.
+ * @param {number[]} counts 2~5개
+ */
+export function stepsSvg(counts) {
+  const cs = (counts || []).map(Number);
+  if (cs.length < 2 || cs.length > 5 || cs.some((v) => !Number.isInteger(v) || v < 1 || v > 60)) return '';
+  const d = cs[1] - cs[0];
+  if (d < 1 || cs.some((v, i) => v !== cs[0] + i * d)) return '';
+  const extra = cs[0] - d; // 처음에 남는 칸
+  const base = extra >= 0 ? extra : cs[0];
+  if (d > 10 || base > 10) return '';
+  const T = 14; const colGap = 2; const figGap = 26; const pad = 6;
+  const maxH = Math.max(d, base) * T;
+  const top = pad; const bottom = top + maxH;
+  let x = pad; let g = '';
+  const column = (cx, k, fill) => {
+    for (let i = 0; i < k; i++) g += `<rect x="${cx}" y="${bottom - (i + 1) * T}" width="${T}" height="${T}" fill="${fill}" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/>`;
+  };
+  cs.forEach((_, i) => {
+    const k = i + 1; const x0 = x;
+    if (base > 0) { column(x, base, FILL2); x += T + colGap; }
+    const cols = extra >= 0 ? k : k - 1;
+    for (let j = 0; j < cols; j++) { column(x, d, FILL); x += T + colGap; }
+    const w = x - colGap - x0;
+    g += `<text x="${(x0 + w / 2).toFixed(1)}" y="${bottom + 16}" font-size="12" text-anchor="middle" fill="currentColor">${k}번째</text>`;
+    x += figGap - colGap;
+  });
+  const W = Math.round(x - figGap + colGap + pad); const H = bottom + 22;
+  return `<svg class="frac-fig steps-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="도형 배열: ${cs.map((v, i) => `${i + 1}번째 ${v}개`).join(', ')}"><g shape-rendering="crispEdges">${g}</g></svg>`;
+}
+
+/** `table 탁자 수(개):1,2,3 / 의자 수(개):4,8,?` → 줄 목록 (못 읽으면 null) */
+export function parseTable(arg) {
+  const rows = String(arg || '').split(/\s+\/\s+/).map((part) => {
+    const m = /^(.+?):\s*((?:\d+|\?)(?:\s*,\s*(?:\d+|\?))+)$/.exec(part.trim());
+    return m ? { label: m[1].trim(), vals: m[2].split(/\s*,\s*/).map((v) => (v === '?' ? '?' : Number(v))) } : null;
+  });
+  return rows.length >= 2 && rows.every(Boolean) ? rows : null;
+}
+
 /** 지시문 안의 수 목록 "-3,2,-1.5" → 숫자 배열 (−(U+2212)도 받아 준다 — 글에는 진짜 마이너스를 쓰니까) */
 function nums(s) {
   return String(s || '').replace(/−/g, '-').split(/[,\s]+/).filter(Boolean).map(Number).filter((v) => Number.isFinite(v));
@@ -192,12 +273,26 @@ export function figureSvg(spec) {
   }
   if ((m = /^(line|vline) (-?\d+)\.\.(-?\d+)(?: @([-\d.,\s]+))?$/.exec(s))) return lineSvg(+m[2], +m[3], { dots: nums(m[4]), vertical: m[1] === 'vline' });
   if ((m = /^walk (-?\d+) ([-+]?\d+)$/.exec(s))) return walkSvg(+m[1], +m[2]);
+  if ((m = /^steps ((?:\d+\s*){2,5})$/.exec(s))) return stepsSvg(m[1].trim().split(/\s+/).map(Number));
+  if ((m = /^table (.+)$/.exec(s))) { const rows = parseTable(m[1]); return rows ? tableSvg(rows) : ''; }
   return '';
+}
+
+/**
+ * 글 속 대응표·도형 배열 지시문을 **글로** 풀어 쓴다 — 그림을 못 그리는 자리(🤔 노트 제목·❓ 버튼 한 줄·📊 ❓ 펼친 문제)용.
+ *   [table 상자 수(개):1, 2, 3 / 몬스터볼 수(개):6, 12, ?] → (표: 상자 수(개) 1, 2, 3 ↔ 몬스터볼 수(개) 6, 12, ?)
+ *   [steps 3 5 7] → (블록 모양: 3개, 5개, 7개)
+ * short: 한 줄 요약(❓ 버튼 26자·🤔 노트 제목)용 — 표 내용이 글자 수를 다 먹어 문제가 안 보인다 → (표)·(블록 그림)
+ */
+export function figText(text, short = false) {
+  return String(text || '')
+    .replace(/\[table ([^\]]+)\]/g, (all, arg) => { const rows = parseTable(arg); return !rows ? all : short ? '(표)' : `(표: ${rows.map((r) => `${r.label} ${r.vals.join(', ')}`).join(' ↔ ')})`; })
+    .replace(/\[steps ([\d ]+)\]/g, (_, arg) => (short ? '(블록 그림)' : `(블록 모양: ${arg.trim().split(/\s+/).map((v) => `${v}개`).join(', ')})`));
 }
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────

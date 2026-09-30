@@ -375,6 +375,7 @@ button { font-family: inherit; }
 .math-fig { margin: 10px 0; color: var(--text); --frac-fill: var(--primary); --frac-fill2: var(--accent); --frac-empty: #eef0f7; }
 .math-fig svg { max-width: 100%; height: auto; display: block; }
 .math-fig.inline { display: inline-block; vertical-align: middle; margin: 4px 6px; }
+.math-fig.qfig { display: block; margin: 8px 0; overflow-x: auto; white-space: normal; } /* 문제 글 속 대응표·도형 배열 (H 줄기) — 글줄 사이에 블록으로 */
 .math-story-body p { margin: 0 0 12px; line-height: 1.75; font-size: 1.02rem; }
 .math-story-body p.fig-only { margin: 4px 0 14px; }
 .math-idea { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 10px 12px; margin: 6px 0 4px; line-height: 1.6; }

@@ -6,7 +6,7 @@
 // 보상(⚡💰🎯)은 영어와 같은 xp.js·catch.js를 그대로 쓴다 — 도감·코인이 한 몸이라야 "수학을 해서 마스터볼을 산다"가 된다.
 
 import { WORLDS, rng, shuffle, josa } from './mathgen.js';
-import { renderFigures, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
+import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
@@ -76,8 +76,32 @@ const optsFor = (stemKey) => ({ ...(ui.opts || {}), content: ui.contents[stemKey
 
 // ───────────────────── 분수를 세로로 ─────────────────────
 
-/** 여러 줄 문제 글을 한 줄 요약으로 (❓ 버튼·오답 노트 제목) — 곱셈식 두 줄이 "12 = 2 × 2 × 3 18 = …"로 붙지 않게 */
-const oneLine = (t) => String(t || '').replace(/\s*\n+\s*/g, ' · ');
+/** 여러 줄 문제 글을 한 줄 요약으로 (❓ 버튼·오답 노트 제목) — 곱셈식 두 줄이 "12 = 2 × 2 × 3 18 = …"로 붙지 않게, 대응표·도형 배열 그림은 글로 */
+// **굵게**는 뺀다 — 60자·26자로 자르면 반쪽 ** 가 글자로 보였다 (H 줄기 헤드리스, ② 문항은 모든 줄기가 굵은 줄을 쓴다)
+const oneLine = (t) => figText(t, true).replace(/\*\*/g, '').replace(/\s*\n+\s*/g, ' · ');
+
+/**
+ * 문제 글 — 글 속 그림 지시문([table …] 대응표 · [steps …] 도형 배열)은 그 자리에 그림으로, 나머지는 richNode.
+ * H 규칙과 대응 줄기(2026-09-30)부터 표가 **문제 글 안에** 있다 (🔁 쌍둥이 열쇠·❓ 복사문·테스트가 글에서 표를 읽는다).
+ * 그림 바로 앞뒤의 빈 줄은 그림 상자(블록)가 대신하므로 지운다 — 안 그러면 pre-line이 빈 줄을 두 번 그린다.
+ */
+function qtNode(text) {
+  const frag = document.createDocumentFragment();
+  const segs = String(text || '').split(/(\[[a-z]+ [^\]]+\])/g);
+  const isFig = (s) => /^\[[a-z]+ [^\]]+\]$/.test(s || '');
+  segs.forEach((seg, i) => {
+    if (!seg) return;
+    if (isFig(seg)) {
+      const svg = renderFigures(seg);
+      if (svg && svg !== seg) { frag.appendChild(svgBox(svg, 'math-fig qfig')); return; }
+    }
+    let t = seg;
+    if (isFig(segs[i - 1])) t = t.replace(/^\n+/, '');
+    if (isFig(segs[i + 1])) t = t.replace(/\n+$/, '');
+    if (t) frag.appendChild(richNode(t));
+  });
+  return frag;
+}
 
 /** "2 3/8" → 2 와 세로 분수, "5/6" → 세로 분수, **굵게**. DOM으로 만든다 (innerHTML에 글을 넣지 않는다) */
 function richNode(text) {
@@ -1136,7 +1160,7 @@ const fmtInt = (v) => String(v).replace('-', '−');
 function checkBlock(check, seed, onPass) {
   const box = el('div', 'math-lesson-check');
   box.appendChild(el('div', 'math-solve-h', '✋ 확인해 봐요'));
-  const qt = el('p', 'math-qt'); qt.appendChild(richNode(check.q)); box.appendChild(qt);
+  const qt = el('div', 'math-qt'); qt.appendChild(qtNode(check.q)); box.appendChild(qt);
   const fb = el('div', 'math-feedback');
   let passed = false;
   const pass = (msg) => { passed = true; fb.innerHTML = ''; fb.appendChild(el('p', 'math-fb ok', msg)); sfx.success(); onPass(); };
@@ -1247,8 +1271,8 @@ function renderQuestion(restore = false) {
   card.appendChild(top);
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
 
-  const qt = el('p', 'math-qt');
-  qt.appendChild(richNode(q.q));
+  const qt = el('div', 'math-qt');
+  qt.appendChild(qtNode(q.q));
   card.appendChild(qt);
   if (q.figure) card.appendChild(svgBox(q.figure));
   if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }
@@ -1432,7 +1456,7 @@ async function renderReply(ask, note = '') {
   card.appendChild(el('div', 'math-eyebrow', `📬 아빠의 답장 · ❓${ask.no} · ${nameOf(ask.concept)}`));
   if (note) card.appendChild(el('p', 'math-ask-sent', note));
   const ctx = el('div', 'math-reply-ctx');
-  const qt = el('p', 'math-qt'); qt.appendChild(richNode(ask.q)); ctx.appendChild(qt);
+  const qt = el('div', 'math-qt'); qt.appendChild(qtNode(ask.q)); ctx.appendChild(qt);
   if (ask.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(ask.expr)); ctx.appendChild(ex); }
   const my = el('p', 'math-reply-my'); my.appendChild(document.createTextNode('❌ 내 답: ')); my.appendChild(richNode(ask.my || '(없음)')); ctx.appendChild(my);
   const an = el('p', 'math-reply-ans'); an.appendChild(document.createTextNode('✔ 정답: ')); an.appendChild(richNode(ask.ans)); ctx.appendChild(an);
@@ -1854,7 +1878,7 @@ function battleQuiz(box, hooks) {
     if (!q) { finish({ correct: false, skipped: true, interrupted: false }); return; }
     box.appendChild(el('div', 'battle-quiz-label', `🔢 ${nameOf(q.concept)}`));
     const qt = el('div', 'battle-quiz-q');
-    qt.appendChild(richNode(q.q));
+    qt.appendChild(qtNode(q.q));
     box.appendChild(qt);
     const skip = el('button', 'btn battle-quiz-skip', '⏭ 모르겠어요');
     skip.type = 'button';
@@ -2050,7 +2074,7 @@ function renderTwin(restore = false) {
   top.appendChild(el('span', 'math-eyebrow', `🔁 비슷한 문제 · ${nameOf(q.concept)}`));
   top.appendChild(el('span', 'math-kind', '이번엔 맞혀 봐요'));
   card.appendChild(top);
-  const qt = el('p', 'math-qt'); qt.appendChild(richNode(q.q)); card.appendChild(qt);
+  const qt = el('div', 'math-qt'); qt.appendChild(qtNode(q.q)); card.appendChild(qt);
   if (q.figure) card.appendChild(svgBox(q.figure));
   if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }
   const list = el('div', 'math-choices');
