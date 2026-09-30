@@ -89,15 +89,17 @@ function qtNode(text) {
   const frag = document.createDocumentFragment();
   const segs = String(text || '').split(/(\[[a-z]+ [^\]]+\])/g);
   const isFig = (s) => /^\[[a-z]+ [^\]]+\]$/.test(s || '');
+  // 같은 줄 앞에 글이 있는 그림("㉮ [para 7 6 2]")은 글 옆에 — 블록으로 두면 ㉮만 한 줄 떨어져 그림과 따로 놀았다 (I 줄기 넓이 비교)
+  const inlineAt = (i) => isFig(segs[i]) && /\S[^\S\n]*$/.test(segs[i - 1] || '');
   segs.forEach((seg, i) => {
     if (!seg) return;
     if (isFig(seg)) {
       const svg = renderFigures(seg);
-      if (svg && svg !== seg) { frag.appendChild(svgBox(svg, 'math-fig qfig')); return; }
+      if (svg && svg !== seg) { frag.appendChild(svgBox(svg, inlineAt(i) ? 'math-fig inline' : 'math-fig qfig')); return; }
     }
     let t = seg;
-    if (isFig(segs[i - 1])) t = t.replace(/^\n+/, '');
-    if (isFig(segs[i + 1])) t = t.replace(/\n+$/, '');
+    if (isFig(segs[i - 1]) && !inlineAt(i - 1)) t = t.replace(/^\n+/, '');
+    if (isFig(segs[i + 1]) && !inlineAt(i + 1)) t = t.replace(/\n+$/, '');
     if (t) frag.appendChild(richNode(t));
   });
   return frag;

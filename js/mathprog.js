@@ -13,6 +13,7 @@ import * as decimalGen from './mathdec.js';
 import * as ratioGen from './mathrat.js';
 import * as factorGen from './mathfac.js';
 import * as correspondGen from './mathcor.js';
+import * as areaGen from './matharea.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -33,8 +34,10 @@ export const STEMS = {
   factor: { key: 'factor', code: 'G', label: '약수와 배수 줄기', range: '초5', list: factorGen.FACTOR, gen: factorGen, file: './coach/math/factor.json', lesson: true, intro: '약수와 배수 문제 5개를 먼저 풀어 볼게요. 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
   // H 규칙과 대응 — F 비례식·중1 정비례·D 문자와 식이 "두 양의 대응 관계를 식으로 쓴다"를 안다고 치는데 가르치는 칸이 없었다 (2026-09-30 아버님 "다음 줄기로 규칙과 대응"). 초4 규칙 찾기 2칸 + 초5 6칸
   correspond: { key: 'correspond', code: 'H', label: '규칙과 대응 줄기', range: '초4 → 초5', list: correspondGen.CORRESPOND, gen: correspondGen, file: './coach/math/correspond.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (초4 규칙 찾기부터)', intro: '규칙과 대응 문제 5개를 먼저 풀어 볼게요. 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // I 다각형의 둘레와 넓이 — 줄기 일곱 개가 전부 수·식이라 도형·측정 칸이 하나도 없었다 (2026-09-30 아버님 "「다각형의 둘레와 넓이」 줄기로 하자"). 초5 9칸
+  area: { key: 'area', code: 'I', label: '둘레와 넓이 줄기', range: '초5', list: areaGen.AREA, gen: areaGen, file: './coach/math/area.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (둘레부터)', intro: '둘레와 넓이 문제 5개를 먼저 풀어 볼게요. 그림을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
