@@ -267,8 +267,8 @@ const intLen = (a, b) => { const d = len(a, b); return Math.abs(d - Math.round(d
  */
 /** 도형 단위 1이 몇 px인지 — 가장 긴 쪽이 250px, 한 칸은 30px까지 (lshapeSvg가 이름표 자리를 정할 때도 쓴다) */
 const shapeScale = (span) => Math.min(30, 250 / Math.max(span, 1));
-/** 이름표 글자 폭 어림 (15px 글꼴: 숫자 ≈ 8px, "cm" ≈ 20px) */
-const labelW = (t) => String(t).length * 8.2;
+/** 이름표 글자 폭 어림 (15px 글꼴: 숫자·영문 ≈ 8px, 한글·ㄱ·㉮ ≈ 15px) */
+const labelW = (t) => [...String(t)].reduce((a, ch) => a + (/[ㄱ-ㅎ가-힣㉠-㉯°]/.test(ch) ? (ch === '°' ? 6 : 15) : 8.2), 0);
 /** 선분이 상자 안을 지나는가 (리앙-바스키) — 점선 이름표 자리 고르기 */
 function segHitsBox([a, b], B) {
   let t0 = 0; let t1 = 1; const dx = b[0] - a[0]; const dy = b[1] - a[1];
@@ -292,7 +292,16 @@ function polySvg(o) {
   o.pts.forEach((p, i) => { const q = o.pts[(i + 1) % o.pts.length]; sa += p[0] * q[1] - q[0] * p[1]; });
   const ccw = sa > 0;
   const f = (v) => v.toFixed(1);
-  let g = `<polygon points="${o.pts.map((p) => `${f(X(p[0]))},${f(Y(p[1]))}`).join(' ')}" fill="${FILL}" fill-opacity="0.16" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>`;
+  let g = '';
+  // 📐 모눈 — 꼭짓점이 모눈점인 도형(J 줄기): 평행·수직·같은 길이를 칸으로 셀 수 있게 도형 둘레 한 칸까지
+  if (o.grid) {
+    const gx = o.pts.map((p) => p[0]); const gy = o.pts.map((p) => p[1]);
+    const x0 = Math.floor(Math.min(...gx)) - 1; const x1 = Math.ceil(Math.max(...gx)) + 1;
+    const y0 = Math.floor(Math.min(...gy)) - 1; const y1 = Math.ceil(Math.max(...gy)) + 1;
+    for (let x = x0; x <= x1; x++) g += `<line x1="${f(X(x))}" y1="${f(Y(y0))}" x2="${f(X(x))}" y2="${f(Y(y1))}" stroke="currentColor" stroke-opacity="0.16" stroke-width="1"/>`;
+    for (let y = y0; y <= y1; y++) g += `<line x1="${f(X(x0))}" y1="${f(Y(y))}" x2="${f(X(x1))}" y2="${f(Y(y))}" stroke="currentColor" stroke-opacity="0.16" stroke-width="1"/>`;
+  }
+  g += `<polygon points="${o.pts.map((p) => `${f(X(p[0]))},${f(Y(p[1]))}`).join(' ')}" fill="${FILL}" fill-opacity="0.16" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>`;
   const text = (x, y, t, anchor = 'middle', color = 'currentColor') => `<text x="${f(x)}" y="${f(y)}" font-size="15" text-anchor="${anchor}" fill="${color}" font-weight="600">${esc(t)}</text>`;
   // 이름표 글자 상자 어림 (15px 글꼴: 기준선 위 11px · 아래 3px), grow만큼 넓혀 여유를 둔다
   const boxAt = ([x, y, anchor], t, grow = 0) => {
@@ -318,8 +327,40 @@ function polySvg(o) {
     const mx = X(a[0] + dx * t); const my = Y(a[1] + dy * t);
     const at = lb ? [mx + nx * off, my - ny * off + 4, 'middle'] : null;
     if (at) busy.push(boxAt(at, lb.text));
-    return { lb, nx, ny, mx, my, at };
+    return { lb, nx, ny, mx, my, at, dx, dy, L2 };
   });
+
+  // 📐 꼭짓점 이름(ㄱ ㄴ ㄷ …)은 도형 바깥, 각 표시(호·직각 네모)와 각도는 도형 안쪽 — J 줄기
+  const unit = (x, y) => { const d = Math.hypot(x, y) || 1; return [x / d, y / d]; };
+  const toUnit = (px, py) => [minX + (px - pad) / k, maxY - (py - pad) / k];
+  const insidePoly = ([x, y]) => { let c = false; for (let i = 0, j = n - 1; i < n; j = i++) { const [xi, yi] = o.pts[i]; const [xj, yj] = o.pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
+  const corner = (i) => {
+    const [cx, cy] = P(o.pts[i]); const [px, py] = P(o.pts[(i + n - 1) % n]); const [qx, qy] = P(o.pts[(i + 1) % n]);
+    const u = unit(px - cx, py - cy); const v = unit(qx - cx, qy - cy);
+    let b = unit(u[0] + v[0], u[1] + v[1]);
+    if (!insidePoly(toUnit(cx + b[0] * 4, cy + b[1] * 4))) b = [-b[0], -b[1]]; // 오목한 꼭짓점이면 반대가 안쪽
+    const th = Math.acos(Math.max(-1, Math.min(1, u[0] * v[0] + u[1] * v[1])));
+    return { cx, cy, u, v, b, th };
+  };
+  let extra = '';
+  for (const nm of o.names || []) {
+    // ㄱ·ㄴ 같은 자모는 같은 크기에서 숫자보다 작아 보인다 → 18px
+    const { cx, cy, b } = corner(nm.i);
+    const at = [cx - b[0] * 19, cy - b[1] * 19 + 6, 'middle'];
+    busy.push(boxAt(at, nm.text, 1));
+    extra += `<text x="${f(at[0])}" y="${f(at[1])}" font-size="18" text-anchor="middle" fill="currentColor" font-weight="700">${esc(nm.text)}</text>`;
+  }
+  for (const an of o.angles || []) {
+    const { cx, cy, u, v, b, th } = corner(an.i);
+    if (an.right) extra += `<path d="M ${f(cx + u[0] * 11)} ${f(cy + u[1] * 11)} L ${f(cx + (u[0] + v[0]) * 11)} ${f(cy + (u[1] + v[1]) * 11)} L ${f(cx + v[0] * 11)} ${f(cy + v[1] * 11)}" fill="none" stroke="${FILL2}" stroke-width="1.4"/>`;
+    else extra += `<path d="M ${f(cx + u[0] * 16)} ${f(cy + u[1] * 16)} A 16 16 0 0 ${u[0] * v[1] - u[1] * v[0] > 0 ? 1 : 0} ${f(cx + v[0] * 16)} ${f(cy + v[1] * 16)}" fill="none" stroke="${FILL2}" stroke-width="1.4"/>`;
+    if (!an.text) continue;
+    // 좁은 각·넓은 글자일수록 안쪽으로 더 — 글자 반폭 + 여유가 두 변 사이에 들어가게 ("100°"가 변에 닿았다)
+    const d = Math.min(80, Math.max(30, (labelW(an.text) / 2 + 9) / Math.sin(th / 2)));
+    const at = [cx + b[0] * d, cy + b[1] * d + 5, 'middle'];
+    busy.push(boxAt(at, an.text));
+    extra += text(at[0], at[1], an.text, 'middle', FILL2);
+  }
 
   // 점선 이름표(높이·대각선) — 후보 자리(side·at, 그다음 alts)를 차례로 보고, 도형 변·다른 점선·직각 표시·다른 이름표·그림 밖에
   // 가장 적게 걸리는 첫 자리 (Codex 16차 #4: 마름모 80개 중 50개에서 대각선 이름표가 변을 가로질렀다)
@@ -355,10 +396,16 @@ function polySvg(o) {
     const x = X(m[0]); const y = Y(m[1]);
     g += `<path d="M ${f(x)} ${f(y - 9)} h 9 v 9" fill="none" stroke="${FILL2}" stroke-width="1.4"/>`;
   }
-  for (const s of sides) {
-    if (o.ticks) g += `<line x1="${f(s.mx - s.nx * 5)}" y1="${f(s.my + s.ny * 5)}" x2="${f(s.mx + s.nx * 5)}" y2="${f(s.my - s.ny * 5)}" stroke="currentColor" stroke-width="1.4"/>`;
+  sides.forEach((s, i) => {
+    // 같은 변 눈금 — ticks면 모든 변에 하나씩, tickSides면 고른 변에 n개씩 (📐 이등변삼각형의 같은 두 변)
+    const tk = o.ticks ? 1 : ((o.tickSides || []).find((t) => t.i === i) || { n: 0 }).n;
+    for (let j = 0; j < tk; j++) {
+      const sh = (j - (tk - 1) / 2) * 5; const tx = s.mx + (s.dx / s.L2) * sh; const ty = s.my - (s.dy / s.L2) * sh; // 변을 따라 5px 간격
+      g += `<line x1="${f(tx - s.nx * 5)}" y1="${f(ty + s.ny * 5)}" x2="${f(tx + s.nx * 5)}" y2="${f(ty - s.ny * 5)}" stroke="currentColor" stroke-width="1.4"/>`;
+    }
     if (s.lb) g += text(s.at[0], s.at[1], s.lb.text);
-  }
+  });
+  g += extra;
   return `<svg class="frac-fig shape-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria)}"><g>${g}</g></svg>`;
 }
 const ul = (v, u) => `${v} ${u}`; // 길이 이름표 "8 cm"
@@ -450,6 +497,145 @@ export function gridSvg(W, H, w = 0, h = 0) {
   return `<svg class="frac-fig grid-fig" viewBox="0 0 ${Wp} ${Hp}" width="${Wp}" height="${Hp}" role="img" aria-label="모눈 ${cells}칸"><g shape-rendering="crispEdges">${g}</g></svg>`;
 }
 
+// ───────────────────── 📐 삼각형·사각형 줄기(J): 모눈 위 도형·직선, 세 변·세 각 삼각형, 네 각 사각형 ─────────────────────
+// 모눈 위 도형은 꼭짓점이 모눈점이다 — 평행·수직·같은 길이를 아이가 칸을 세어 확인할 수 있고, 그림이 거짓말하지 않는다.
+// 각도로 주는 삼각형·사각형은 그 각 그대로 그린다 (테스트가 그림의 꼭짓점에서 각을 다시 잰다).
+
+/** 꼭짓점 이름 */
+export const VNAMES = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ'];
+
+/** 모눈 위 다각형 — verts: [{name, x, y}] (이름은 없어도 된다) */
+export function gpolySvg(verts) {
+  const names = verts.map((v, i) => (v.name ? { i, text: v.name } : null)).filter(Boolean);
+  return polySvg({ pts: verts.map((v) => [v.x, v.y]), grid: true, names, aria: `모눈 위 도형 ${verts.map((v) => `${v.name || ''}(${v.x}, ${v.y})`).join(' ')}` });
+}
+
+/**
+ * 모눈 위 직선·선분 — items: [{label, x1, y1, x2, y2, len}] (모눈 한 칸 = 1 cm)
+ * 이름표는 선의 끝 바깥쪽에, len이면 선분 가운데 옆에 "㉠ 4 cm"처럼 이름과 길이를 함께 (길이는 정수일 때만)
+ */
+export function linesSvg(W, H, items) {
+  const C = Math.min(30, 300 / Math.max(W, H, 1)); const pad = 36;
+  const X = (x) => pad + x * C; const Y = (y) => pad + (H - y) * C;
+  const Wp = Math.round(W * C + pad * 2); const Hp = Math.round(H * C + pad * 2);
+  const f = (v) => v.toFixed(1);
+  let g = '';
+  for (let x = 0; x <= W; x++) g += `<line x1="${f(X(x))}" y1="${f(Y(0))}" x2="${f(X(x))}" y2="${f(Y(H))}" stroke="currentColor" stroke-opacity="0.16" stroke-width="1"/>`;
+  for (let y = 0; y <= H; y++) g += `<line x1="${f(X(0))}" y1="${f(Y(y))}" x2="${f(X(W))}" y2="${f(Y(y))}" stroke="currentColor" stroke-opacity="0.16" stroke-width="1"/>`;
+  let labels = '';
+  // 이름표는 후보 자리 중 그림 안에 들고 앞서 놓은 이름표와 안 겹치는 첫 자리 — 두 직선이 같은 점에서 끝나면 이름표가 겹쳤다
+  // 직선 이름(㉮)은 꼭짓점 이름(ㄱ·ㄴ)과 같은 18px — 15px 동그라미 글자는 태블릿에서 속 글자가 너무 작았다 (J 헤드리스)
+  const NAME_FS = 18;
+  const placed = [];
+  // 다른 직선도 피한다 — 한 직선의 끝이 다른 직선 위에 있으면 이름표가 그 직선에 얹혀 어느 선의 이름인지 헷갈렸다 (직선 그림의 1.4%)
+  const segs = items.map((it) => [[X(it.x1), Y(it.y1)], [X(it.x2), Y(it.y2)]]);
+  const boxOf = (x, y, s, fs = 15) => { const w = (labelW(s) * fs) / 15; return { x0: x - w / 2, x1: x + w / 2, y0: y - (fs * 16) / 15, y1: y + 3 }; };
+  const inside = (B) => B.x0 >= 0 && B.y0 >= 0 && B.x1 <= Wp && B.y1 <= Hp && !placed.some((q) => B.x0 < q.x1 && q.x0 < B.x1 && B.y0 < q.y1 && q.y0 < B.y1);
+  // 남의 선과는 여유 m px — 닿지만 않고 바짝 붙어도(끝이 남의 선 위, 두 선분이 엇갈리는 자리 옆) 어느 선 이름인지 헷갈린다. 제 선은 닿지만 않게
+  const free = (B, m, own) => inside(B) && !segs.some((sg, i) => segHitsBox(sg, i === own ? B : { x0: B.x0 - m, x1: B.x1 + m, y0: B.y0 - m, y1: B.y1 + m }));
+  const t = (x, y, s, color = 'currentColor', fs = 15) => `<text x="${f(x)}" y="${f(y)}" font-size="${fs}" text-anchor="middle" fill="${color}" font-weight="${fs === 15 ? 600 : 700}">${esc(s)}</text>`;
+  // 점과 선분 사이 거리
+  const pd = ([px, py], [[ax, ay], [bx, by]]) => {
+    const vx = bx - ax; const vy = by - ay; const u = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy || 1)));
+    return Math.hypot(px - ax - u * vx, py - ay - u * vy);
+  };
+  const put = (cands, s, color, fs, own) => {
+    // 이름표 가운데에서 제 선이 남의 어느 선보다 6px 이상 가까운 자리 — 여유만 두면 두 선에서 같은 거리(두 선이 만나는 끝 옆)에 앉았다
+    const mine = ([x, y]) => { const p = [x, y - fs * 0.265]; const d = pd(p, segs[own]); return segs.every((sg, i) => i === own || pd(p, sg) >= d + 6); }; // 글자 상자(기준선 위 0.73 · 아래 0.2)의 가운데
+    // 남의 선과 여유 14px(제 선까지의 거리보다 멀게) → 5px → 닿지만 않게, 각각 "제 선이 더 가까운" 자리부터
+    const ok = (m, near) => cands.find((c) => free(boxOf(c[0], c[1], s, fs), m, own) && (!near || mine(c)));
+    const at = ok(14, true) || ok(5, true) || ok(0, true) || ok(14) || ok(5) || ok(0) || cands.find(([x, y]) => inside(boxOf(x, y, s, fs))) || cands[0];
+    placed.push(boxOf(at[0], at[1], s, fs)); labels += t(at[0], at[1], s, color, fs);
+  };
+  items.forEach((it, own) => {
+    g += `<line x1="${f(X(it.x1))}" y1="${f(Y(it.y1))}" x2="${f(X(it.x2))}" y2="${f(Y(it.y2))}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`;
+    if (!it.label) return;
+    const dx = X(it.x2) - X(it.x1); const dy = Y(it.y2) - Y(it.y1); const L = Math.hypot(dx, dy) || 1;
+    if (it.len) {
+      // 선분: 가운데 옆에 "㉠ 4 cm" — 왼쪽(위)이 좁으면 오른쪽(아래), 그다음 조금 위·아래로
+      const d = Math.hypot(it.x2 - it.x1, it.y2 - it.y1); const r = Math.round(d);
+      const s = Math.abs(d - r) < 1e-9 ? `${it.label} ${r} cm` : it.label;
+      let nx = dy / L; let ny = -dx / L; if (nx > 0) { nx = -nx; ny = -ny; }
+      const off = 10 + labelW(s) / 2 * Math.abs(nx) + 8 * Math.abs(ny);
+      const cands = [];
+      for (const tt of [0.5, 0.3, 0.7]) for (const sg of [1, -1]) cands.push([X(it.x1) + (X(it.x2) - X(it.x1)) * tt + sg * nx * off, Y(it.y1) + (Y(it.y2) - Y(it.y1)) * tt + sg * ny * off + 5]);
+      put(cands, s, FILL2, 15, own);
+    } else {
+      // 직선: 끝 바깥쪽에 이름 — (x2, y2) 쪽이 막혔으면 (x1, y1) 쪽, 둘 다 막히면(끝이 남의 선 위) 끝에서 옆으로 조금 비킨 자리,
+      // 그래도 막히면(양 끝이 모두 남의 선 위 — 끝 근처는 어디든 두 선이 만나는 자리) 선 안쪽의 옆자리
+      const hw = (labelW(it.label) * NAME_FS) / 30;
+      const off = 10 + hw * Math.abs(dx / L) + 10 * Math.abs(dy / L);
+      const ends = [[X(it.x2) + (dx / L) * off, Y(it.y2) + (dy / L) * off + 6], [X(it.x1) - (dx / L) * off, Y(it.y1) - (dy / L) * off + 6]];
+      const side = ends.flatMap(([x, y]) => [1, -1].map((sg) => [x + sg * (-dy / L) * 16, y + sg * (dx / L) * 16]));
+      const po = 12 + hw * Math.abs(dy / L) + 10 * Math.abs(dx / L);
+      const along = [0.85, 0.15, 0.7, 0.3].flatMap((tt) => [1, -1].map((sg) => [X(it.x1) + dx * tt + sg * (-dy / L) * po, Y(it.y1) + dy * tt + sg * (dx / L) * po + 6]));
+      put([...ends, ...side, ...along], it.label, 'currentColor', NAME_FS, own);
+    }
+  });
+  return `<svg class="frac-fig shape-fig lines-fig" viewBox="0 0 ${Wp} ${Hp}" width="${Wp}" height="${Hp}" role="img" aria-label="모눈 위 직선 ${items.map((i) => i.label).filter(Boolean).join(' ')}"><g>${g}${labels}</g></svg>`;
+}
+
+/** 세 변으로 그린 삼각형 ㄱㄴㄷ — 변 ㄱㄴ = a(밑변), ㄴㄷ = b, ㄷㄱ = c. ask: 숨길 변 번호(0·1·2, "? cm"). 같은 변에는 눈금 */
+export function trisSvg(a, b, c, ask = -1) {
+  const x = (a * a + c * c - b * b) / (2 * a); const y = Math.sqrt(Math.max(0, c * c - x * x));
+  const pts = [[0, 0], [a, 0], [x, y]];
+  const len = [a, b, c];
+  const labels = len.map((v, i) => ({ i, text: ul(i === ask ? '?' : v, 'cm') }));
+  const tickSides = len.map((v, i) => ({ i, n: len.filter((w) => w === v).length > 1 ? 1 : 0 })).filter((t) => t.n);
+  return polySvg({ pts, labels, tickSides, names: VNAMES.slice(0, 3).map((t, i) => ({ i, text: t })), aria: `삼각형 세 변 ${len.map((v, i) => (i === ask ? '?' : v)).join(', ')} cm` });
+}
+
+/** 세 각으로 그린 삼각형 ㄱ(왼쪽 아래)·ㄴ(오른쪽 아래)·ㄷ — ang: [{v, mode:'val'|'ask'|'hide'}], iso면 변 ㄴㄷ·ㄷㄱ에 같은 변 눈금 */
+export function triaSvg(ang, iso = false) {
+  const [A, B, C] = ang.map((t) => (t.v * Math.PI) / 180);
+  const side = (10 * Math.sin(B)) / Math.sin(C); // 변 ㄱㄷ (사인 법칙)
+  const pts = [[0, 0], [10, 0], [side * Math.cos(A), side * Math.sin(A)]];
+  return polySvg({
+    pts, names: VNAMES.slice(0, 3).map((t, i) => ({ i, text: t })),
+    angles: angleMarks(ang), tickSides: iso ? [{ i: 1, n: 1 }, { i: 2, n: 1 }] : [],
+    aria: `삼각형 세 각 ${ang.map((t, i) => `${VNAMES[i]} ${t.mode === 'val' ? `${t.v}도` : t.mode === 'ask' ? '?' : '표시 없음'}`).join(', ')}`,
+  });
+}
+function angleMarks(ang) {
+  return ang.map((t, i) => (t.mode === 'hide' ? null : { i, text: t.mode === 'ask' ? '?' : `${t.v}°`, right: t.v === 90 && t.mode === 'val' })).filter(Boolean);
+}
+
+/**
+ * 네 각으로 그린 사각형 ㄱ(왼쪽 아래)·ㄴ(오른쪽 아래)·ㄷ(오른쪽 위)·ㄹ(왼쪽 위) — 변 ㄱㄴ = 10, 변 ㄹㄱ 길이 p를 몇 가지 대 보며
+ * 나머지 두 변이 알맞은 길이로 닫히는 모양을 찾는다. 평행사변형 각(ㄱ + ㄴ = 180°, ㄷ = ㄱ)이면 저절로 평행사변형, rh면 네 변을 같게(마름모).
+ * 못 닫으면 null
+ */
+function quadPts(A, B, C, D, rh) {
+  const rad = (d) => (d * Math.PI) / 180;
+  const d2 = [Math.cos(rad(180 - B)), Math.sin(rad(180 - B))]; const d3 = [Math.cos(rad(360 - B - C)), Math.sin(rad(360 - B - C))];
+  for (const p of rh ? [10] : [8, 7, 9, 6, 10, 5, 11, 12, 4, 13, 14, 3.5, 15]) {
+    const D4 = [p * Math.cos(rad(A)), p * Math.sin(rad(A))]; // 꼭짓점 ㄹ
+    // ㄴ + L2·d2 + L3·d3 = ㄹ  →  L2·d2 + L3·d3 = ㄹ − ㄴ
+    const rx = D4[0] - 10; const ry = D4[1];
+    const det = d2[0] * d3[1] - d3[0] * d2[1];
+    if (Math.abs(det) < 1e-9) continue;
+    const L2 = (rx * d3[1] - d3[0] * ry) / det; const L3 = (d2[0] * ry - rx * d2[1]) / det;
+    if (L2 < 3 || L3 < 3 || L2 > 28 || L3 > 28) continue;
+    if (rh && (Math.abs(L2 - 10) > 1e-6 || Math.abs(L3 - 10) > 1e-6)) return null;
+    return [[0, 0], [10, 0], [10 + L2 * d2[0], L2 * d2[1]], D4];
+  }
+  return null;
+}
+export function quadSvg(ang, rh = false) {
+  const pts = quadPts(...ang.map((t) => t.v), rh);
+  if (!pts) return '';
+  return polySvg({
+    pts, names: VNAMES.slice(0, 4).map((t, i) => ({ i, text: t })), angles: angleMarks(ang),
+    aria: `사각형 네 각 ${ang.map((t, i) => `${VNAMES[i]} ${t.mode === 'val' ? `${t.v}도` : t.mode === 'ask' ? '?' : '표시 없음'}`).join(', ')}`,
+  });
+}
+/** "65" 보임 · "?65" 묻는 각(? 로 보임) · "_65" 표시 없음 → {v, mode} */
+function angTokens(list, total) {
+  const out = list.map((s) => { const m = /^([?_]?)(\d{1,3})$/.exec(s); return m ? { v: +m[2], mode: m[1] === '?' ? 'ask' : m[1] === '_' ? 'hide' : 'val' } : null; });
+  if (out.some((t) => !t || t.v < 1 || t.v > 179) || out.reduce((a, t) => a + t.v, 0) !== total) return null;
+  return out;
+}
+
 /** 지시문 안의 수 목록 "-3,2,-1.5" → 숫자 배열 (−(U+2212)도 받아 준다 — 글에는 진짜 마이너스를 쓰니까) */
 function nums(s) {
   return String(s || '').replace(/−/g, '-').split(/[,\s]+/).filter(Boolean).map(Number).filter((v) => Number.isFinite(v));
@@ -490,6 +676,36 @@ export function figureSvg(spec) {
     if (w >= +m[1] || h >= +m[2]) return '';
     return gridSvg(+m[1], +m[2], w, h);
   }
+  // 📐 J 줄기 — 모눈 위 도형 `[gpoly ㄱ:0,0 ㄴ:6,0 ㄷ:7,3 ㄹ:1,3]`(좌표 0~12, 꼭짓점 3~8개)
+  if ((m = /^gpoly ((?:(?:[ㄱ-ㅎ]:)?\d+,\d+\s*){3,8})$/.exec(s))) {
+    const verts = m[1].trim().split(/\s+/).map((t) => { const q = /^(?:([ㄱ-ㅎ]):)?(\d+),(\d+)$/.exec(t); return { name: q[1] || '', x: +q[2], y: +q[3] }; });
+    if (verts.some((v) => v.x > 12 || v.y > 12)) return '';
+    return gpolySvg(verts);
+  }
+  // 모눈 위 직선 `[lines 10 7 ㉮:0,1,10,1 ㉯:3,0,3,7 ㉠:2,1,2,5=]` (= 이면 길이도)
+  if ((m = /^lines (\d+) (\d+) (.+)$/.exec(s)) && +m[1] >= 2 && +m[1] <= 12 && +m[2] >= 2 && +m[2] <= 12) {
+    const W = +m[1]; const H = +m[2];
+    const items = m[3].trim().split(/\s+/).map((t) => { const q = /^(?:([^:\s]+):)?(\d+),(\d+),(\d+),(\d+)(=?)$/.exec(t); return q ? { label: q[1] || '', x1: +q[2], y1: +q[3], x2: +q[4], y2: +q[5], len: q[6] === '=' } : null; });
+    if (items.some((it) => !it || it.x1 > W || it.x2 > W || it.y1 > H || it.y2 > H || (it.x1 === it.x2 && it.y1 === it.y2))) return '';
+    return linesSvg(W, H, items);
+  }
+  // 세 변 삼각형 `[tris 5 5 6]` · `[tris 7 ?7 4]`(? 변은 숨김) — 삼각형이 되는 길이만(1~30)
+  if ((m = /^tris (\??)(\d+) (\??)(\d+) (\??)(\d+)$/.exec(s))) {
+    const [a, b, c] = [+m[2], +m[4], +m[6]];
+    const asks = [m[1], m[3], m[5]].map((q, i) => (q ? i : -1)).filter((i) => i >= 0);
+    if (asks.length > 1 || [a, b, c].some((v) => v < 1 || v > 30) || a + b <= c || b + c <= a || c + a <= b) return '';
+    return trisSvg(a, b, c, asks.length ? asks[0] : -1);
+  }
+  // 세 각 삼각형 `[tria 50 60 ?70]` · 사각형 `[quad 65 _115 ?65 _115]` (각의 합 180° · 360°, `iso` 같은 변 눈금 · `rh` 마름모)
+  if ((m = /^tria (\S+) (\S+) (\S+)( iso)?$/.exec(s))) {
+    const ang = angTokens([m[1], m[2], m[3]], 180);
+    if (!ang || (m[4] && ang[0].v !== ang[1].v)) return '';
+    return triaSvg(ang, !!m[4]);
+  }
+  if ((m = /^quad (\S+) (\S+) (\S+) (\S+)( rh)?$/.exec(s))) {
+    const ang = angTokens([m[1], m[2], m[3], m[4]], 360);
+    return ang ? quadSvg(ang, !!m[5]) : '';
+  }
   return '';
 }
 
@@ -503,8 +719,10 @@ export function figText(text, short = false) {
   return String(text || '')
     .replace(/\[table ([^\]]+)\]/g, (all, arg) => { const rows = parseTable(arg); return !rows ? all : short ? '(표)' : `(표: ${rows.map((r) => `${r.label} ${r.vals.join(', ')}`).join(' ↔ ')})`; })
     .replace(/\[steps ([\d ]+)\]/g, (_, arg) => (short ? '(블록 그림)' : `(블록 모양: ${arg.trim().split(/\s+/).map((v) => `${v}개`).join(', ')})`))
-    .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; });
+    .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; });
 }
+/** 📐 각 지시문 글: "?65" → "?", "_65" → 빠짐 */
+const angText = (list) => list.map((s, i) => (s.startsWith('_') ? '' : `${VNAMES[i]} ${s.startsWith('?') ? '?' : `${s}°`}`)).filter(Boolean).join(' · ');
 /** 🔺 도형 지시문 → 글 (그림에 보이는 이름표만 — 숨긴 "?"는 그대로 ?) */
 function shapeText(kind, arg) {
   if (!figureSvg(`${kind} ${arg}`)) return null;
@@ -522,13 +740,18 @@ function shapeText(kind, arg) {
     case 'trap': return `사다리꼴 윗변 ${n[0]} ${u} · 아랫변 ${n[1]} ${u} · 높이 ${n[2]} ${u}${n[3] ? side(n[3], n[2]) : ''}`;
     case 'lshape': return `ㄴ자 모양 가로 ${n[0]} ${u} · 세로 ${n[1]} ${u} · 오른쪽 위를 ${n[2]} ${u} × ${n[3]} ${u} 떼어 냄`;
     case 'grid': return `모눈 가로 ${n[0]}칸 · 세로 ${n[1]}칸${n[2] ? ` · 오른쪽 위 ${n[2]} × ${n[3]}칸 뺌` : ''}`;
+    case 'gpoly': return `모눈 위 도형 — 꼭짓점 ${arg.trim().split(/\s+/).map((t) => { const q = /^(?:([ㄱ-ㅎ]):)?(\d+),(\d+)$/.exec(t); return `${q[1] || ''}(${q[2]}, ${q[3]})`; }).join(' · ')}`;
+    case 'lines': return `모눈 위 선 — ${arg.trim().split(/\s+/).slice(2).map((t) => { const q = /^(?:([^:\s]+):)?(\d+),(\d+),(\d+),(\d+)(=?)$/.exec(t); const d = Math.hypot(q[4] - q[2], q[5] - q[3]); const L = q[6] && Math.abs(d - Math.round(d)) < 1e-9 ? ` ${Math.round(d)} cm` : ''; return `${q[1] || '선'} (${q[2]}, ${q[3]})–(${q[4]}, ${q[5]})${L}`; }).join(' · ')}`;
+    case 'tris': return `삼각형 세 변 ${arg.trim().split(/\s+/).map((t) => (t.startsWith('?') ? '?' : t)).join(' cm · ')} cm`;
+    case 'tria': return `삼각형 세 각 ${angText(arg.replace(/ iso$/, '').trim().split(/\s+/))}${/ iso$/.test(arg) ? ' · 변 ㄴㄷ과 변 ㄷㄱ의 길이가 같음' : ''}`;
+    case 'quad': return `사각형 네 각 ${angText(arg.replace(/ rh$/, '').trim().split(/\s+/))}`;
     default: return null;
   }
 }
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────

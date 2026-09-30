@@ -669,7 +669,7 @@ export async function renderStats() {
     cA.appendChild(row);
     cA.appendChild(area);
     cA.appendChild(msg);
-    cA.appendChild(el('p', 'stats-note', '답은 아빠 이름으로 나가요. [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] 같은 그림 지시문을 쓰면 그림으로 보여요. 배포(coach/math/replies.json)로 보내도 돼요 — Claude에게 부탁하면 됩니다.'));
+    cA.appendChild(el('p', 'stats-note', '답은 아빠 이름으로 나가요. [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] 같은 그림 지시문을 쓰면 그림으로 보여요. 배포(coach/math/replies.json)로 보내도 돼요 — Claude에게 부탁하면 됩니다.'));
     main.appendChild(cA);
   }
 
