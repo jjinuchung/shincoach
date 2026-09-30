@@ -210,7 +210,9 @@ export function tableSvg(rows) {
  * 도형 배열 — 1번째, 2번째… 모양의 블록 수 (늘어나는 수가 늘 같아야 한다).
  * 늘어나는 수 d만큼의 기둥이 모양마다 하나씩 늘고, 처음에 남는 칸(첫째 − d)은 다른 색 기둥으로 —
  * "처음에 남는 수 + 늘어나는 수 × 몇 번째"가 눈에 보인다 (3, 5, 7 → 1 + 2 × □).
- * 첫째가 d보다 작으면(1, 3, 5) 첫 모양 전체를 다른 색 기둥으로 두고 d개 기둥을 (몇 번째 − 1)개 붙인다.
+ * 첫째가 d보다 작으면(2, 5, 8) 첫 모양은 **짧은 파란 기둥**으로 두고 d개 기둥을 (몇 번째 − 1)개 붙인다.
+ * ★ 주황은 언제나 "처음에 남는 수(더하는 수)"만 뜻한다 — 전에는 이 경우 첫 모양 전체를 주황으로 칠해서
+ *   H8에서 배운 "늘어나는 수 × 순서 + 주황"을 H2 그림에 쓰면 한 모양씩 어긋났다 (Codex 15차 #3)
  * @param {number[]} counts 2~5개
  */
 export function stepsSvg(counts) {
@@ -230,7 +232,7 @@ export function stepsSvg(counts) {
   };
   cs.forEach((_, i) => {
     const k = i + 1; const x0 = x;
-    if (base > 0) { column(x, base, FILL2); x += T + colGap; }
+    if (base > 0) { column(x, base, extra >= 0 ? FILL2 : FILL); x += T + colGap; }
     const cols = extra >= 0 ? k : k - 1;
     for (let j = 0; j < cols; j++) { column(x, d, FILL); x += T + colGap; }
     const w = x - colGap - x0;

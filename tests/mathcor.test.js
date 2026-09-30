@@ -367,7 +367,7 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다 — 값과 방
             else if (x.kind === 'sinv') hit(Math.abs(v - x.m) === 1);
             else hit(false);
             break;
-          case TAGS.noStart:
+          case TAGS.stepTimesPos:
             if (x.kind === 'nth') hit(v === x.n * x.d);
             else if (x.kind === 'snth') hit(v === x.n * x.d);
             else if (x.kind === 'sinv') hit(v === x.M / x.d);
@@ -730,4 +730,48 @@ test('🔁 쌍둥이는 같은 틀이되 글이 달라야 한다 — 원래 문�
       for (const [key, b] of Object.entries(byKey)) if (b.n >= 20) assert.ok(b.same / b.n <= 0.3, `${c.id}/${kind} "${key.slice(0, 60)}": 쌍둥이 ${b.same}/${b.n}가 원래 문제와 같은 글`);
     }
   }
+});
+
+test('🔍 Codex 15차: 이름표의 뜻 · 조건이 빠진 규칙 · 주황 블록의 뜻 · 넘겨 말하는 문장', () => {
+  const src = readFileSync('js/mathcor.js', 'utf8').replace(/\/\/.*$/gm, ''); // 왜 바꿨는지 적어 둔 옛 문장은 주석에 남는다
+  const content = readFileSync('coach/math/correspond.json', 'utf8');
+  // #1 "d × n" 오답은 처음 수만 빠뜨린 것(d × (n − 1))이 아니라 "늘어나는 수에 순서를 바로 곱함"
+  assert.equal(TAGS.stepTimesPos, '늘어나는 수에 순서를 바로 곱함');
+  let seen = 0;
+  for (const id of ['cor.numseq', 'cor.shapeseq']) {
+    for (let s = 1; s <= 600; s++) {
+      const q = makeQuestion(id, 'calc', s * 97, OPTS);
+      const ch = q.choices.find((c) => c.tag === TAGS.stepTimesPos);
+      const m = /(\d+)번째 (?:수는|날에는|모양에는)/.exec(q.q);
+      if (!ch || !m) continue;
+      seen++;
+      const n = +m[1]; const d = (readSteps(q.q) || { d: fitSeq(readSeq(q.q).filter((v) => v !== null)).d }).d;
+      assert.equal(Number(ch.text), d * n, `${id} seed ${s}`);
+      assert.notEqual(Number(ch.text), d * (n - 1), `${id} seed ${s}: 처음 수만 뺀 값과 같다`);
+      assert.match(q.solve.why[ch.tag], /바로 곱했어요/, `${id} seed ${s}: ${q.solve.why[ch.tag]}`);
+    }
+  }
+  assert.ok(seen > 100, `${seen}건`);
+  assert.doesNotMatch(src + content, /처음 수는 빼고|처음 \$\{s\}개는 빼고|처음 수 4를 빠뜨린|1번째의 3개를 빠뜨린|빠졌어요\.`/);
+  // #2 "함께 늘어나는 두 양은 차이가 그대로" — 탁자 1→2, 의자 4→8도 함께 는다. "같은 수만큼"이 조건
+  assert.doesNotMatch(src, /함께 늘어나는 두 양은/);
+  for (const kind of ['calc', 'misread']) {
+    for (let s = 1; s <= 200; s++) {
+      const q = makeQuestion('cor.life', kind, s * 53, OPTS);
+      if (/차이/.test(q.solve.rule) && /그대로/.test(q.solve.rule)) assert.match(q.solve.rule, /같은 수만큼/, q.solve.rule);
+    }
+  }
+  assert.match(CONTENT['cor.life'].lesson[2].say, /^\*\*똑같이\*\* 오르는 레벨은/);
+  // #3 주황은 "처음에 남는 수(1번째 − 늘어나는 수)"일 때만 — 1번째가 늘어나는 수보다 적으면 주황이 없다
+  const orange = (cs) => (stepsSvg(cs).match(/fill="var\(--frac-fill2/g) || []).length;
+  assert.equal(orange([3, 5, 7, 9]), 4);     // 모양마다 1개
+  assert.equal(orange([7, 10, 13]), 12);     // 모양마다 4개
+  assert.equal(orange([2, 5, 8, 11]), 0, '1번째(2)가 늘어나는 수(3)보다 적으면 주황 없이 짧은 파란 기둥');
+  assert.equal(orange([4, 8, 12, 16]), 0);
+  for (const t of strings(CONTENT)) if (/주황/.test(t)) for (const m of t.matchAll(/\[steps ([\d ]+)\]/g)) { const cs = m[1].trim().split(/\s+/).map(Number); assert.ok(cs[0] > cs[1] - cs[0], `주황을 말하는 장의 그림에 주황이 없다: ${m[0]}`); }
+  for (let s = 1; s <= 300; s++) for (const kind of ['calc', 'misread']) { const S = readSteps(makeQuestion('cor.twostep', kind, s * 61, OPTS).q); if (S) assert.ok(S.s > S.d, `두 번 셈 도형은 처음에 남는 수가 있어야: ${S.cs}`); }
+  assert.match(CONTENT['cor.twostep'].lesson[1].say, /처음에 남는 수 = 1번째 블록 수 − 늘어나는 수/);
+  assert.match(CONTENT['cor.twostep'].lesson[2].say, /적으면\*\*\(2, 5, 8 …\) 처음에 남는 수가 없어요/);
+  // #4 "차이가 커지면 더하는 규칙이 아니다"는 1, 3, 6, 10(더하는 수가 커짐)에서 거짓 — "같은 수를 (계속) 더하는"
+  assert.doesNotMatch(src + content, /(?<!같은 수를 (?:계속 )?)더하는 규칙(?:이|은) 아니/);
 });

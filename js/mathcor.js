@@ -123,7 +123,7 @@ export const TAGS = {
   mulForAdd: '더하는 규칙을 곱하기로 봄',        // 표 1 → 4를 보고 × 4 (실은 + 3)
   offByOne: '몇 번째를 한 칸 밀려 셈',           // 10번째 = 처음 수 + 늘어나는 수 × 10
   nextOnly: '바로 다음 것만 구함',
-  noStart: '처음 수를 빠뜨림',                    // 10번째 = 늘어나는 수 × 10
+  stepTimesPos: '늘어나는 수에 순서를 바로 곱함', // 10번째 = 늘어나는 수 × 10 — "처음 수를 빠뜨림"이면 × 9가 된다 (Codex 15차 #1)
   wrongDir: '커지는지 작아지는지 거꾸로 봄',
   countAsStep: '놓인 수를 늘어나는 수로 봄',      // 1번째 모양 5개 → "5개씩 늘어요"
   stepAsRule: '옆으로 늘어나는 수를 대응 규칙으로 봄', // ★ △가 4씩 커지니까 △ = □ + 4
@@ -221,10 +221,10 @@ export const CORRESPOND = [
       const ws = range(5, (i) => a2 + i * d2);
       const say = `${a2}부터 시작해서 ${d2}씩 커져요`;
       const fams = [
-        { ans: String(nth), wr: [{ text: String(a + n * d), tag: TAGS.offByOne }, { text: String(n * d), tag: TAGS.noStart }, { text: String(a + 4 * d), tag: TAGS.nextOnly }],
+        { ans: String(nth), wr: [{ text: String(a + n * d), tag: TAGS.offByOne }, { text: String(n * d), tag: TAGS.stepTimesPos }, { text: String(a + 4 * d), tag: TAGS.nextOnly }],
           why: {
             [TAGS.offByOne]: `1번째 수가 벌써 ${jn(a, '이에요', '예요')}. ${n}번째까지는 ${jn(d, '을', '를')} ${n - 1}번만 더해요.`,
-            [TAGS.noStart]: `${d} × ${n}에는 처음 수 ${jn(a, '이', '가')} 빠졌어요.`,
+            [TAGS.stepTimesPos]: `늘어나는 수 ${d}에 순서 ${jn(n, '을', '를')} 바로 곱했어요. 1번째가 ${jn(a, '이니까', '니까')} ${a}에서 ${jn(d, '을', '를')} ${n - 1}번 더해요.`,
             [TAGS.nextOnly]: `${jn(a + 4 * d, '은', '는')} 바로 다음 5번째 수예요. ${n}번째까지 더 가야 해요.`,
           },
           steps: [`이웃한 수의 차이: ${d}씩 커져요`, `1번째 ${a}에서 ${n}번째까지 ${jn(d, '을', '를')} ${n - 1}번 더해요`, `${a} + ${d} × ${n - 1} = ${nth}`],
@@ -235,7 +235,7 @@ export const CORRESPOND = [
           ] } },
         { ans: String(gNext), wr: [{ text: String(gs[3] + gd[0]), tag: TAGS.addForMul }, { text: String(gs[3] + gd[2]), tag: TAGS.growDiff }],
           why: {
-            [TAGS.addForMul]: `처음 차이 ${gd[0]}만 보고 더했어요. 차이가 ${ro(L(gd))} 커지니까 더하는 규칙이 아니라 ${k}씩 곱하는 규칙이에요.`,
+            [TAGS.addForMul]: `처음 차이 ${gd[0]}만 보고 더했어요. 차이가 ${ro(L(gd))} 커지니까 같은 수를 계속 더하는 규칙이 아니라 ${k}씩 곱하는 규칙이에요.`,
             [TAGS.growDiff]: `차이도 ${k}배씩 커져요 — 다음 차이는 ${jn(gd[2], '이', '가')} 아니라 ${jn(gNext - gs[3], '이에요', '예요')}.`,
           },
           steps: [`이웃한 수의 차이: ${L(gd)} — 차이가 점점 커져요`, `앞의 수에 ${jn(k, '을', '를')} 곱하면 다음 수: ${gs[0]} × ${k} = ${gs[1]}`, `${gs[3]} × ${k} = ${gNext}`],
@@ -287,7 +287,7 @@ export const CORRESPOND = [
         ok: `${jn(d, '을', '를')} ${n - 1}번만 더해요 — ${a} + ${d} × ${n - 1} = ${right}`,
         wr: [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-          { text: `처음 수는 빼고 ${d} × ${n} = ${jn(d * n, '이에요', '예요')}`, tag: TAGS.noStart },
+          { text: `늘어나는 수에 순서를 곱해서 ${d} × ${n} = ${jn(d * n, '이에요', '예요')}`, tag: TAGS.stepTimesPos },
           { text: `${n}번째 수는 늘어놓지 않아서 알 수 없어요`, tag: OFF },
         ],
         steps: [`1번째가 ${a} — ${n}번째까지 ${d}씩 ${n - 1}번 커져요`, `${a} + ${d} × ${n - 1} = ${right}`],
@@ -309,10 +309,10 @@ export const CORRESPOND = [
       const n = int(r, 7, 12); const nth = s + (n - 1) * d;
       const m = int(r, 6, 12); const M = s + (m - 1) * d;
       const fams = [
-        { ans: String(nth), wr: [{ text: String(s + n * d), tag: TAGS.offByOne }, { text: String(n * d), tag: TAGS.noStart }, { text: String(s + 4 * d), tag: TAGS.nextOnly }],
+        { ans: String(nth), wr: [{ text: String(s + n * d), tag: TAGS.offByOne }, { text: String(n * d), tag: TAGS.stepTimesPos }, { text: String(s + 4 * d), tag: TAGS.nextOnly }],
           why: {
             [TAGS.offByOne]: `1번째가 벌써 ${s}개예요. ${n}번째까지는 ${n - 1}번만 늘어요.`,
-            [TAGS.noStart]: `${d} × ${n}에는 1번째 모양의 ${s}개가 빠졌어요.`,
+            [TAGS.stepTimesPos]: `${d}개씩에 순서 ${jn(n, '을', '를')} 바로 곱했어요. 1번째가 ${s}개라서 ${s}개에서 ${d}개씩 ${n - 1}번 늘어요.`,
             [TAGS.nextOnly]: `${s + 4 * d}개는 바로 다음 5번째 모양이에요. ${n}번째까지 더 가야 해요.`,
           },
           steps: [`블록 수: ${L(cs)} — ${d}개씩 늘어요`, `1번째 ${s}개에서 ${n}번째까지 ${d}개씩 ${n - 1}번 늘어요`, `${s} + ${d} × ${n - 1} = ${nth}개`],
@@ -323,10 +323,10 @@ export const CORRESPOND = [
           steps: [`블록 수: ${s}개 → ${s + d}개 → ${s + 2 * d}개`, `${s + d} − ${s} = ${d} → ${d}개씩 늘어요`],
           rule: '늘어나는 수 = 이웃한 두 모양의 블록 수 차이.',
           pools: { pokemon: [`${head}모양이 하나씩 늘어날 때마다 블록은 몇 개씩 늘어날까요?`] } },
-        { ans: String(m), wr: [{ text: String(m - 1), tag: TAGS.offByOne }, { text: String(m + 1), tag: TAGS.offByOne }, M % d === 0 && M / d !== m ? { text: String(M / d), tag: TAGS.noStart } : null],
+        { ans: String(m), wr: [{ text: String(m - 1), tag: TAGS.offByOne }, { text: String(m + 1), tag: TAGS.offByOne }, M % d === 0 && M / d !== m ? { text: String(M / d), tag: TAGS.stepTimesPos } : null],
           why: {
             [TAGS.offByOne]: `${d}개씩 ${m - 1}번 늘었으니까 1번째에서 ${m - 1}번 더 간 ${m}번째예요.`,
-            [TAGS.noStart]: `${M} ÷ ${d}에는 1번째 모양의 ${s}개가 빠졌어요.`,
+            [TAGS.stepTimesPos]: `블록 수를 ${d} × 순서로 봤어요. 1번째가 ${s}개라서 먼저 ${s}개를 빼고, ${d}개씩 몇 번 늘었는지 세요.`,
           },
           steps: [`1번째 ${s}개에서 ${d}개씩 늘어요`, `${M} − ${s} = ${M - s}, ${M - s} ÷ ${d} = ${m - 1} → ${m - 1}번 늘었어요`, `1번째에서 ${m - 1}번 더 가면 ${m}번째`],
           rule: '늘어난 횟수 + 1 = 몇 번째.',
@@ -345,7 +345,7 @@ export const CORRESPOND = [
           ok: `1번째가 ${s}개라서 ${n - 1}번만 늘어요 — ${s} + ${d} × ${n - 1} = ${right}개`,
           wr: [
             { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-            { text: `처음 ${s}개는 빼고 ${d} × ${n} = ${d * n}개예요`, tag: TAGS.noStart },
+            { text: `${d}개씩 ${n}번이니까 ${d} × ${n} = ${d * n}개예요`, tag: TAGS.stepTimesPos },
             { text: '모양이 커질수록 늘어나는 블록 수도 커져요', tag: OFF },
           ],
           steps: [`블록 수: ${L(cs)} — ${d}개씩`, `${s} + ${d} × ${n - 1} = ${right}개`],
@@ -680,7 +680,7 @@ export const CORRESPOND = [
             [TAGS.swapDir]: `{mon2}의 레벨이 늘 ${cc} 높아요 — 빼지 않고 더해요.`,
           },
           steps: [`레벨이 똑같이 오르니까 차이는 늘 ${q} − ${p} = ${cc}`, `${N} + ${cc} = ${N + cc}`],
-          rule: '함께 늘어나는 두 양은 차이가 그대로다.',
+          rule: '두 양이 같은 수만큼 늘어나면 차이는 그대로다.',
           pools: { pokemon: [`{mon/과/와} {mon2/은/는} 늘 함께 배틀해서 레벨이 똑같이 올라요. 지금 {mon}의 레벨은 ${p}, {mon2}의 레벨은 ${q}인데, {mon}의 레벨이 ${jn(N, '이', '가')} 되면 {mon2}의 레벨은 얼마일까요?`] } },
         { ans: String(H - g), wr: [{ text: String(H + g), tag: TAGS.swapDir }, { text: String(H), tag: TAGS.sameCount }],
           why: {
@@ -723,7 +723,7 @@ export const CORRESPOND = [
           ],
           steps: [`둘 다 똑같이 ${N - p}씩 올라요 — 차이 ${jn(cc, '은', '는')} 그대로`, `${N} + ${cc} = ${N + cc}`],
           whyAny: `레벨은 배로 늘지 않고 둘 다 똑같이 올라요. 차이 ${jn(cc, '이', '가')} 그대로예요.`,
-          rule: '함께 늘어나는 두 양은 차이가 그대로다.',
+          rule: '두 양이 같은 수만큼 늘어나면 차이는 그대로다.',
           probe: { p, q, N, shown: q * t },
         });
       }
