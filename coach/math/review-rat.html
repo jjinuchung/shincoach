@@ -1,0 +1,978 @@
+<title>비와 비율 검수</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에 개념 바로가기, 개념마다 [배움 + 문제 예시 | 아빠 카드] 두 칸 (폰에서는 한 칸) — 혼합계산 검수 페이지와 같은 체계 */
+:root{
+  --bg:#f5f7ff; --card:#ffffff; --ink:#1f2340; --muted:#6b7280; --line:#e3e6f3;
+  --primary:#4f46e5; --primary-soft:#eef2ff; --accent:#f59e0b; --accent-soft:#fff7ed;
+  --ok:#0f9f6e; --ok-soft:#ecfdf5; --no-soft:#f8f9fc;
+  --dad:#fff8ec; --dad-line:#f3c27a; --dad-ink:#7c4a03;
+  --frac-fill:#4f46e5; --frac-fill2:#f59e0b; --frac-empty:#ffffff;
+  --font-display:"Gowun Dodum","Noto Sans KR",sans-serif;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  --frac-fill:#9b9cf8; --frac-fill2:#fbbf24; --frac-empty:#1d2040;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  --frac-fill:#9b9cf8; --frac-fill2:#fbbf24; --frac-empty:#1d2040;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;margin:0;padding-block:0 60px;padding-inline:16px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top h1{font-size:1.35rem}
+.top .sub{color:var(--muted);font-size:.9rem;margin:2px 0 8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.nav a{flex:0 0 auto;font-size:.8rem;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.nav a b{color:var(--primary);margin-right:3px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--primary);outline:none}
+.intro{display:grid;grid-template-columns:1fr;gap:12px;margin-block:16px}
+@media(min-width:760px){.intro{grid-template-columns:1.2fr 1fr}}
+.intro .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.intro .box.dadbox{background:var(--dad);border-color:var(--dad-line)}
+.intro h3{font-size:1rem;margin-bottom:6px}
+.intro p{margin:4px 0;font-size:.92rem}
+.intro .stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.92rem}
+.intro .stats b{font-size:1.25rem;color:var(--primary);font-variant-numeric:tabular-nums}
+.how{padding-left:20px}
+.how li{margin:3px 0}
+.ladder{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0 4px;padding:0;list-style:none}
+.ladder li{font-size:.85rem;background:var(--primary-soft);border-radius:8px;padding:5px 9px}
+.ladder li b{color:var(--primary);margin-right:4px}
+.ladder li small{color:var(--muted);margin-left:4px}
+.concept{margin-block:36px 0;scroll-margin-top:110px}
+.ch-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.ch-head > div:last-child{min-width:0}
+.ch-no{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--primary);background:var(--primary-soft);border-radius:12px;min-width:56px;height:56px;display:grid;place-items:center}
+.grade{font-size:.75rem;letter-spacing:.06em;color:var(--muted)}
+.ch-head h2{font-size:1.4rem}
+.idea{color:var(--muted);margin:2px 0 0;font-size:.95rem;max-width:65ch}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+.cols > *{min-width:0}
+@media(min-width:900px){.cols{grid-template-columns:1.35fr 1fr}}
+.col-title{margin:0 0 10px;font-size:.95rem}
+.col-title small{color:var(--muted);font-weight:400;margin-left:6px}
+.samples-title{margin-top:18px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.step{display:flex;gap:10px;scroll-margin-top:110px}
+.step-no{flex:0 0 30px;height:30px;border-radius:50%;background:var(--primary);color:var(--card);font-weight:700;display:grid;place-items:center;font-size:.9rem;margin-top:12px}
+.step-body{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.say{max-width:65ch}
+.say p{margin:0 0 10px}
+.say p:last-child{margin-bottom:0}
+.check{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;scroll-margin-top:110px}
+.qt{margin:0 0 6px;font-weight:500}
+.ch{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ch li{display:flex;align-items:center;gap:8px;border-radius:9px;padding:6px 10px;background:var(--no-soft);border:1px solid transparent}
+.ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
+.ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
+.ch .txt{flex:1;min-width:0}
+.ch .tag{font-size:.75rem;color:var(--muted);text-align:right}
+.why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
+.samples{display:grid;gap:10px}
+.sample{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.expr{font-size:1.15rem;font-weight:700;margin:4px 0 8px;font-variant-numeric:tabular-nums}
+body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
+body.hide-ans .ch .mark,body.hide-ans .why,body.hide-ans .ch .tag{visibility:hidden}
+.rule{margin-top:12px;background:var(--primary-soft);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.rule p{margin:2px 0 0;font-weight:700;font-size:1.05rem}
+.dad{background:var(--dad);border:1px solid var(--dad-line);border-radius:14px;padding:14px 16px;position:sticky;top:104px;scroll-margin-top:110px;color:var(--ink)}
+.dad h3{font-size:1.05rem;margin:4px 0 10px;color:var(--dad-ink)}
+.dad h4{margin:12px 0 4px;font-size:.9rem;color:var(--dad-ink)}
+.dad-say{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.dad-say li,.traps li{display:flex;gap:8px;align-items:flex-start;scroll-margin-top:110px}
+.dad-say li > span,.traps li > div{min-width:0}
+.dad-do,.dad-pass{margin:0;font-size:.95rem}
+.traps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.traps .kid{font-weight:500}
+.traps .dadsay{color:var(--muted);font-size:.92rem}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.ref .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.03em}
+.ref code,code.mini{font-size:.78rem;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+code.mini{flex:0 0 auto;margin-top:2px}
+.dad .ref code,.dad code.mini{color:var(--dad-ink);background:var(--accent-soft)}
+.fig{margin:6px 0 8px;color:var(--ink);display:inline-block;max-width:100%;overflow-x:auto}
+.fig svg{max-width:100%;height:auto;display:block}
+div.fig{display:block}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 2px;font-variant-numeric:tabular-nums}
+.fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
+.fr .d{padding:0 3px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none;margin-top:8px}
+.toggle input{width:18px;height:18px;accent-color:var(--primary)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (max-width:899px){.dad{position:static}}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  body{background:#fff;padding:0;font-size:13px}
+  .wrap{max-width:100%}
+  .top{position:static}
+  .dad{position:static;box-shadow:none;break-inside:auto}
+  .step,.sample,.check,.rule,.traps li,figure,svg{break-inside:avoid}
+}
+</style>
+<div class="wrap">
+  <div class="top">
+    <h1>🔢 비와 비율 줄기 — 배움 원고 검수</h1>
+    <p class="sub">신코치 수학 · 초6 1학기 「비와 비율」 → 2학기 「비례식과 비례배분」 · 개념 9개</p>
+    <div class="nav"><a href="#F1"><b>F1</b> 두 수 비교하기 (뺄셈과 나눗셈)</a><a href="#F2"><b>F2</b> 비 — 기준량과 비교량</a><a href="#F3"><b>F3</b> 비율 — 분수와 소수로</a><a href="#F4"><b>F4</b> 백분율</a><a href="#F5"><b>F5</b> 백분율 쓰기 — 할인·확률·진하기</a><a href="#F6"><b>F6</b> 비의 성질</a><a href="#F7"><b>F7</b> 간단한 자연수의 비로 나타내기</a><a href="#F8"><b>F8</b> 비례식</a><a href="#F9"><b>F9</b> 비례배분</a></div>
+  </div>
+
+  <div class="intro">
+    <div class="box">
+      <h3>무엇을 봐 주시면 되나</h3>
+      <div class="stats">
+        <span><b>9</b> 개념</span>
+        <span><b>33</b> 📘 배움 장</span>
+        <span><b>32</b> 확인 질문</span>
+        <span><b>19</b> 헷갈리는 자리</span>
+        <span><b>27</b> 🧪 문제 예시</span>
+      </div>
+      <ol class="ladder"><li><b>F1</b>두 수 비교하기 (뺄셈과 나눗셈)<small>초6</small></li><li><b>F2</b>비 — 기준량과 비교량<small>초6</small></li><li><b>F3</b>비율 — 분수와 소수로<small>초6</small></li><li><b>F4</b>백분율<small>초6</small></li><li><b>F5</b>백분율 쓰기 — 할인·확률·진하기<small>초6</small></li><li><b>F6</b>비의 성질<small>초6</small></li><li><b>F7</b>간단한 자연수의 비로 나타내기<small>초6</small></li><li><b>F8</b>비례식<small>초6</small></li><li><b>F9</b>비례배분<small>초6</small></li></ol>
+      <ul class="how">
+        <li><b>📘 배움</b> — 진우가 앱에서 읽는 것. <b>한 장 = 한 화면</b>, 짧은 설명 → 확인 질문 → 다음 장. 9칸 모두 초6 범위라 진우에게는 <b>처음 배우는 말</b>(기준량·비율·전항·외항…)이 많습니다. 새 말이 한 장에 너무 몰리지 않았는지, 초4가 혼자 읽고 잡히는지 봐 주세요</li>
+        <li><b>🧪 문제 예시</b> — 앱이 숫자를 바꿔 가며 끝없이 만드는 문제 중 몇 개입니다. 오답은 아무 숫자가 아니라 <b>아이가 실제로 하는 틀린 생각</b>으로 만들었습니다 (8000원을 20% 할인 → 7980원). 회색 글씨가 📊에 쌓이는 오개념 이름입니다</li>
+        <li><b>👨 아빠 카드</b> — 저녁 10분에 처음 소개할 때 쓰는 반 장. 집에서 실제로 할 수 있는 활동인지, 아버님 말투에 맞는지</li>
+        <li>확인 질문 32개의 정답은 테스트가 <b>문제 글을 따로 읽고 다시 풀어서</b> 맞는지, 오답이 사실 정답은 아닌지 확인했습니다</li>
+      </ul>
+      <p>고칠 곳은 번호로 가리켜 주시면 됩니다. 예) <code>F2-3 설명이 길다</code>, <code>F4-2✓ 오답이 너무 쉽다</code>, <code>F5-①a 이 오답은 안 나올 것 같다</code>, <code>F9-👨함정1</code></p>
+      <label class="toggle"><input type="checkbox" id="ans" checked> 정답·오개념 이름 보이기 (끄면 진우가 보는 모양)</label>
+    </div>
+    <div class="box dadbox">
+      <h3>👨 이 줄기에서 제일 중요한 한 가지</h3>
+      <p>이 단원의 실수는 거의 전부 <b>무엇이 기준인가</b>의 오해에서 나옵니다. "지우개 수에 대한 연필 수의 비"를 거꾸로 쓰고, 소금물의 진하기를 물로 나누고, 28개를 3 : 4로 나누며 4로 나눕니다. 셈은 쉬운데 <b>기준(나누는 수)</b>을 잘못 잡습니다.</p>
+      <p>그래서 F2(기준량·비교량)가 뒤의 모든 칸을 받칩니다. 비율 = 분수 = 소수 = 백분율이라 <b>분수·소수 줄기를 다시 쓰는</b> 단원이기도 합니다. 게임 속 잡힐 확률, 마트 할인처럼 <b>진우가 매일 보는 %</b>로 한 번 보여 주시면 오래갑니다.</p>
+      <p style="margin-top:10px"><b>예시 출연진</b>: 앱에서는 진우가 도감에서 잡은 포켓몬이 들어갑니다. 이 페이지는 피카츄·리자몽·개굴닌자·루카리오 등을 예시로 끼웠습니다.</p>
+    </div>
+  </div>
+
+  <section class="concept" id="F1">
+    <header class="ch-head">
+      <div class="ch-no">F1</div>
+      <div>
+        <div class="grade">초6 · 첫 개념</div>
+        <h2>두 수 비교하기 (뺄셈과 나눗셈)</h2>
+        <p class="idea">&quot;몇 개 더 많은가&quot;는 <strong>뺄셈</strong>, &quot;몇 배인가&quot;는 <strong>나눗셈</strong>으로 비교해요. 묶음이 늘어나도 늘 그대로인 건 나눗셈 비교예요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F1-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F1-1</code></div>
+        <div class="say"><p>피카츄가 몬스터볼 <strong>12개</strong>, 슈퍼볼 <strong>4개</strong>를 모았어요.</p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 38" width="160" height="38" role="img" aria-label="막대 비교 12/12 과 4/12"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="13.3" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="26.7" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="40.0" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="53.3" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="66.7" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="80.0" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="93.3" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="106.7" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="120.0" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="133.3" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="146.7" y="0" width="13.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="0.0" y="22" width="13.3" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="13.3" y="22" width="13.3" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="26.7" y="22" width="13.3" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="40.0" y="22" width="13.3" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="53.3" y="22" width="13.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="66.7" y="22" width="13.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="80.0" y="22" width="13.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="93.3" y="22" width="13.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="106.7" y="22" width="13.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="120.0" y="22" width="13.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="133.3" y="22" width="13.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="146.7" y="22" width="13.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>두 수를 비교하는 방법은 <strong>두 가지</strong>예요.</p><p>· <strong>뺄셈</strong>: 12 − 4 = 8 → 몬스터볼이 <strong>8개 더</strong> 많아요<br>· <strong>나눗셈</strong>: 12 ÷ 4 = 3 → 몬스터볼은 슈퍼볼의 <strong>3배</strong>예요</p></div>
+        <div class="check" id="F1-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F1-1✓</code></div>
+        <p class="qt">사과 15개, 배 5개가 있어요. 사과 수는 배 수의 몇 배일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3배</span></li><li class="no"><span class="mark"></span><span class="txt">10배</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">3</span></span>배</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>&quot;몇 배&quot;는 나눗셈이에요. 15 ÷ 5 = 3. 10은 15 − 5, &quot;몇 개 더 많은가&quot;의 답이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F1-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F1-2</code></div>
+        <div class="say"><p>한 모둠에 학생 <strong>6명</strong>, 책상 <strong>2개</strong>씩이에요. 모둠이 늘어나면?</p><p>· 모둠 1개: 학생 6, 책상 2 → 차 <strong>4</strong>, <strong>3배</strong><br>· 모둠 2개: 학생 12, 책상 4 → 차 <strong>8</strong>, <strong>3배</strong><br>· 모둠 3개: 학생 18, 책상 6 → 차 <strong>12</strong>, <strong>3배</strong></p><p>뺄셈으로 비교하면 차가 <strong>계속 변하고</strong>, 나눗셈으로 비교하면 <strong>늘 3배</strong>예요.</p></div>
+        <div class="check" id="F1-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F1-2✓</code></div>
+        <p class="qt">한 모둠에 학생 6명, 책상 2개씩이에요. 모둠이 5개면 학생은 책상보다 몇 명 더 많을까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">20명</span></li><li class="no"><span class="mark"></span><span class="txt">4명</span></li><li class="no"><span class="mark"></span><span class="txt">3명</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>모둠 5개면 학생 30명, 책상 10개 → 30 − 10 = 20명. 차는 모둠이 늘면 같이 커져요. 늘 그대로인 건 3배예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F1-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F1-3</code></div>
+        <div class="say"><p>문제의 <strong>말</strong>을 보면 뺄셈인지 나눗셈인지 알 수 있어요.</p><p>· &quot;몇 개 <strong>더</strong> 많아요?&quot; → <strong>뺄셈</strong><br>· &quot;몇 <strong>배</strong>예요?&quot; → <strong>나눗셈</strong></p><p>피카츄가 나무열매 24개, 포션 6개를 가졌어요.<br>· 나무열매가 몇 개 더 많아? → 24 − 6 = <strong>18개</strong><br>· 나무열매는 포션의 몇 배? → 24 ÷ 6 = <strong>4배</strong></p></div>
+        <div class="check" id="F1-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F1-3✓</code></div>
+        <p class="qt">진우는 피카츄카드 21장, 리자몽카드 7장을 가지고 있어요. 피카츄카드는 리자몽카드보다 몇 장 더 많을까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">14장</span></li><li class="no"><span class="mark"></span><span class="txt">3장</span></li><li class="no"><span class="mark"></span><span class="txt">28장</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>&quot;몇 장 더&quot;는 뺄셈이에요. 21 − 7 = 14. 3은 21 ÷ 7 — &quot;몇 배&quot;의 답이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="F1-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F1-📏</code></div><p>몇 개 더 → 뺄셈, 몇 배 → 나눗셈. 묶음이 늘어도 늘 그대로인 건 나눗셈 비교.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F1-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F1-①a</code></div>
+      <div class="say"><p>피카츄카드 21장, 리자몽카드 7장이 있어요. 피카츄카드 수는 리자몽카드 수의 몇 배일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">14</span><span class="tag">몇 배를 뺄셈으로 셈</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">3</span></span></span><span class="tag">기준량과 비교량을 뒤바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li></ol>
+    </div><div class="sample" id="F1-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F1-①b</code></div>
+      <div class="say"><p>한 모둠에 학생 20명, 책상 4개씩이에요. 모둠이 늘어나도 <strong>늘 그대로인</strong> 것은 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">학생이 늘 책상보다 16명 많아요</span><span class="tag">뺄셈 비교가 그대로라고 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">학생 수는 늘 책상 수의 5배예요</span></li><li class="no"><span class="mark"></span><span class="txt">모둠마다 둘 다 달라져서 알 수 없어요</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="F1-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F1-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>나무열매 20개는 포션 5개의 15배예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">15는 몇 개 더 많은지예요 — 몇 배는 20 ÷ 5 = 4배</span></li><li class="no"><span class="mark"></span><span class="txt">몇 배는 두 수를 더해서 구해요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">몇 배는 곱셈으로 구해야 해요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F1-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F1-👨</code></div>
+    <h3>두 양을 비교하는 두 방법 — 뺄셈(몇 개 더)과 나눗셈(몇 배). 비는 나눗셈 비교에서 나온다는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F1-👨말1"><code class="mini">말1</code><span>&quot;우유 1팩에 쿠키 3개씩이면, 우유 4팩엔 쿠키 몇 개야? 쿠키는 우유의 몇 배야?&quot; — 몇 팩이든 늘 3배</span></li><li id="F1-👨말2"><code class="mini">말2</code><span>&quot;몇 개 더?&quot;와 &quot;몇 배?&quot;를 번갈아 묻기 — 계산 전에 뺄셈인지 나눗셈인지 먼저 말하게</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">레고로 '바퀴 4개 + 차체 1개' 자동차를 1대, 2대, 3대 만들며 적어 보기. 차는 3 → 6 → 9로 변하고, 배는 늘 4배.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F1-👨함정1"><code class="mini">함정1</code><div><div class="kid">&quot;몇 배&quot;를 물었는데 뺄셈을 한다 (15와 5 → 10배)</div><div class="dadsay">→ &quot;5를 몇 번 더하면 15야? 그게 몇 배야.&quot;</div></div></li><li id="F1-👨함정2"><code class="mini">함정2</code><div><div class="kid">모둠이 늘어도 학생이 책상보다 늘 4명 많다고 한다</div><div class="dadsay">→ &quot;모둠 2개면 학생 12명, 책상 4개 — 몇 명 더 많아?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;몇 개 더&quot;와 &quot;몇 배&quot; 문제를 말만 보고 뺄셈·나눗셈으로 가르고, 모둠이 늘어도 늘 그대로인 비교가 무엇인지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="F2">
+    <header class="ch-head">
+      <div class="ch-no">F2</div>
+      <div>
+        <div class="grade">초6 · F1 다음</div>
+        <h2>비 — 기준량과 비교량</h2>
+        <p class="idea">&quot;지우개 수에 <strong>대한</strong> 연필 수의 비&quot;에서 기준은 <strong>지우개</strong>예요. 기준량을 <strong>뒤에</strong> 써서 연필 : 지우개. &quot;~에 대한&quot; 앞, &quot;대&quot; 뒤가 기준량이에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F2-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F2-1</code></div>
+        <div class="say"><p>두 수를 <strong>나눗셈으로</strong> 비교할 때 기호 <strong>:</strong> 를 써서 나타낸 것을 <strong>비</strong>라고 해요.</p><p>몬스터볼 3개, 슈퍼볼 5개 → <strong>3 : 5</strong></p><p>읽는 법은 네 가지 — 모두 같은 비예요.<br>· 3 대 5<br>· 3과 5의 비<br>· 5에 대한 3의 비<br>· 3의 5에 대한 비</p></div>
+        <div class="check" id="F2-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F2-1✓</code></div>
+        <p class="qt">7 : 4를 바르게 읽은 것은 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4에 대한 7의 비</span></li><li class="no"><span class="mark"></span><span class="txt">7에 대한 4의 비</span></li><li class="no"><span class="mark"></span><span class="txt">4 대 7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>&quot;~에 대한&quot; 앞의 4가 기준이고, 기준은 비의 뒤에 와요. 그래서 7 : 4 = 4에 대한 7의 비.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F2-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F2-2</code></div>
+        <div class="say"><p>비 <strong>3 : 5</strong>에서</p><p>· 기호 : 의 <strong>오른쪽</strong> 5 → <strong>기준량</strong> (기준이 되는 양)<br>· 기호 : 의 <strong>왼쪽</strong> 3 → <strong>비교량</strong> (기준과 비교하는 양)</p><p><strong>비교량 : 기준량</strong> — 기준은 늘 <strong>뒤</strong>에 와요.</p></div>
+        <div class="check" id="F2-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F2-2✓</code></div>
+        <p class="qt">8 : 3에서 기준량은 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li><li class="no"><span class="mark"></span><span class="txt">11</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>기호 : 의 오른쪽이 기준량이에요. 8은 비교량, 11은 두 수를 더한 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F2-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F2-3</code></div>
+        <div class="say"><p>문제에서 기준량 찾기 — <strong>&quot;~에 대한&quot;</strong> 앞이 기준량이에요.</p><p>리자몽이 연필 4개, 지우개 7개를 가졌어요.</p><p>· 지우개 수<strong>에 대한</strong> 연필 수의 비 → 기준은 <strong>지우개</strong> → <strong>4 : 7</strong><br>· 연필 수<strong>에 대한</strong> 지우개 수의 비 → 기준은 <strong>연필</strong> → <strong>7 : 4</strong></p><p>같은 두 수라도 <strong>무엇이 기준인가</strong>에 따라 비가 달라져요.</p></div>
+        <div class="check" id="F2-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F2-3✓</code></div>
+        <p class="qt">사과 9개, 배 2개가 있어요. 사과 수에 대한 배 수의 비는 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2 : 9</span></li><li class="no"><span class="mark"></span><span class="txt">9 : 2</span></li><li class="no"><span class="mark"></span><span class="txt">2 : 11</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>&quot;사과 수에 대한&quot; → 기준량은 사과 9개. 기준량을 뒤에 써서 배 : 사과 = 2 : 9.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F2-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>F2-4</code></div>
+        <div class="say"><p><strong>전체</strong>에 대한 비도 있어요.</p><p>리자몽이 몬스터볼을 <strong>10번</strong> 던져 <strong>3번</strong> 잡았어요.</p><p>· 던진 횟수에 대한 잡은 횟수의 비 → <strong>3 : 10</strong></p><p>기준량은 <strong>던진 횟수 전체</strong>(10)예요. 못 잡은 7번이 아니에요.</p></div>
+        <div class="check" id="F2-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F2-4✓</code></div>
+        <p class="qt">구슬 12개 중 빨간 구슬이 5개예요. 전체 구슬 수에 대한 빨간 구슬 수의 비는 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5 : 12</span></li><li class="no"><span class="mark"></span><span class="txt">5 : 7</span></li><li class="no"><span class="mark"></span><span class="txt">12 : 5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>기준량은 전체 12개예요. 5 : 7은 빨간 구슬과 나머지 구슬의 비예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="F2-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F2-📏</code></div><p>비교량 : 기준량. &quot;~에 대한&quot; 앞이 기준량이고, 기준은 뒤에 쓴다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F2-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F2-①a</code></div>
+      <div class="say"><p>7 : 12에서 <strong>기준량</strong>은 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">13</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">19</span><span class="tag">전체를 기준량으로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">7</span><span class="tag">기준량과 비교량을 뒤바꿈</span></li></ol>
+    </div><div class="sample" id="F2-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F2-①b</code></div>
+      <div class="say"><p>피카츄가 피카츄카드 7장, 리자몽카드 12장을 모았어요. 피카츄카드 수 대 리자몽카드 수를 고르세요.</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7 : 12</span></li><li class="no"><span class="mark"></span><span class="txt">7 : 19</span><span class="tag">전체를 기준량으로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">19 : 12</span><span class="tag">전체를 기준량으로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">12 : 7</span><span class="tag">기준량과 비교량을 뒤바꿈</span></li></ol>
+    </div><div class="sample" id="F2-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F2-②</code></div>
+      <div class="say"><p>피카츄가 이렇게 말했어요.</p><p><strong>나무열매 4개, 포션 12개 → 포션 수에 대한 나무열매 수의 비는 12 : 4예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">두 수를 더해서 기준량으로 써야 해요</span><span class="tag">오개념을 옳다고 함</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">기준량(포션 수)을 뒤에 써야 해요 — 4 : 12</span></li><li class="no"><span class="mark"></span><span class="txt">비는 큰 수를 앞에 써요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F2-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F2-👨</code></div>
+    <h3>비 a : b에서 뒤가 기준량 — &quot;~에 대한&quot; 말투에서 기준을 찾는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F2-👨말1"><code class="mini">말1</code><span>&quot;우리 집 컵 수에 대한 접시 수의 비는?&quot; — 직접 세어서 비로 말하게, 기준(뒤)이 무엇인지 먼저</span></li><li id="F2-👨말2"><code class="mini">말2</code><span>&quot;게임에서 10번 던져 3번 잡았으면, 던진 횟수에 대한 잡은 횟수의 비는?&quot; — 기준이 전체라는 것</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이에 &quot;~에 대한&quot; 문장을 5개 적고, 기준량에 동그라미 → 비의 뒤에 쓰기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F2-👨함정1"><code class="mini">함정1</code><div><div class="kid">&quot;지우개 수에 대한 연필 수의 비&quot;를 지우개 : 연필로 쓴다</div><div class="dadsay">→ &quot;'~에 대한' 앞이 기준이야. 기준은 앞에 써, 뒤에 써?&quot;</div></div></li><li id="F2-👨함정2"><code class="mini">함정2</code><div><div class="kid">12개 중 5개를 5 : 7로 쓴다 (나머지를 기준으로)</div><div class="dadsay">→ &quot;전체에 대한 비라고 했지. 전체가 몇 개야?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;~에 대한&quot; 문장 세 개를 비로 바르게 쓰고 기준량을 짚으면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="F3">
+    <header class="ch-head">
+      <div class="ch-no">F3</div>
+      <div>
+        <div class="grade">초6 · F2 다음</div>
+        <h2>비율 — 분수와 소수로</h2>
+        <p class="idea">비율 = <strong>비교량 ÷ 기준량</strong>. 3 : 5의 비율은 <span class="fr"><span class="n">3</span><span class="d">5</span></span> = 0.6이에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F3-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F3-1</code></div>
+        <div class="say"><p>기준량에 대한 비교량의 크기를 <strong>비율</strong>이라고 해요.</p><p><strong>비율 = 비교량 ÷ 기준량</strong></p><p>3 : 5 → 3 ÷ 5 = <strong><span class="fr"><span class="n">3</span><span class="d">5</span></span></strong> = <strong>0.6</strong></p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 18" width="160" height="18" role="img" aria-label="막대 5칸 중 3/5"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="32.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="32.0" y="0" width="32.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="64.0" y="0" width="32.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="96.0" y="0" width="32.0" height="18" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="128.0" y="0" width="32.0" height="18" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>기준량 5를 <strong>1로 볼 때</strong> 비교량이 얼마인지 나타낸 수예요.</p></div>
+        <div class="check" id="F3-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F3-1✓</code></div>
+        <p class="qt">2 : 5의 비율을 소수로 나타내면 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.4</span></li><li class="no"><span class="mark"></span><span class="txt">2.5</span></li><li class="no"><span class="mark"></span><span class="txt">0.25</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>비교량 ÷ 기준량 = 2 ÷ 5 = 0.4. 2.5는 거꾸로 나눈 것, 0.25는 두 수를 이어 쓴 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F3-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F3-2</code></div>
+        <div class="say"><p>비율은 <strong>분수</strong>로도, <strong>소수</strong>로도 나타내요.</p><p>· 7 : 20 → <span class="fr"><span class="n">7</span><span class="d">20</span></span> = <span class="fr"><span class="n">35</span><span class="d">100</span></span> = <strong>0.35</strong><br>· 4 : 25 → <span class="fr"><span class="n">4</span><span class="d">25</span></span> = <span class="fr"><span class="n">16</span><span class="d">100</span></span> = <strong>0.16</strong></p><p>분모를 <strong>100으로</strong> 만들면 소수로 바꾸기 쉬워요 — 소수 줄기에서 배운 방법이에요!</p></div>
+        <div class="check" id="F3-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F3-2✓</code></div>
+        <p class="qt">9 : 20의 비율을 소수로 나타내면 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.45</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">20</span><span class="d">9</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">0.9</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">9</span><span class="d">20</span></span> = <span class="fr"><span class="n">45</span><span class="d">100</span></span> = 0.45. <span class="fr"><span class="n">20</span><span class="d">9</span></span>는 거꾸로 나눈 것, 0.9는 분모를 10으로 잘못 본 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F3-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F3-3</code></div>
+        <div class="say"><p>비교량이 기준량보다 <strong>크면</strong> 비율이 <strong>1보다 커요</strong>.</p><p>· 5 : 4 → 5 ÷ 4 = <strong>1.25</strong><br>· 4 : 5 → 4 ÷ 5 = <strong>0.8</strong></p><p>기준량이 늘 <strong>나누는 수</strong>예요. 큰 수를 작은 수로 나누는 게 아니에요!</p></div>
+        <div class="check" id="F3-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F3-3✓</code></div>
+        <p class="qt">3 : 2의 비율을 소수로 나타내면 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1.5</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">3</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">3.2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>비교량 3 ÷ 기준량 2 = 1.5. 비교량이 더 크니까 1보다 커요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F3-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>F3-4</code></div>
+        <div class="say"><p>개굴닌자가 몬스터볼을 <strong>20번</strong> 던져 <strong>7번</strong> 잡았어요.</p><p>· 기준량 = 던진 횟수 <strong>20</strong><br>· 비교량 = 잡은 횟수 <strong>7</strong><br>· 비율 = <span class="fr"><span class="n">7</span><span class="d">20</span></span> = <strong>0.35</strong></p><p>슛 성공률, 야구 타율도 모두 비율이에요.</p></div>
+        <div class="check" id="F3-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F3-4✓</code></div>
+        <p class="qt">진우가 공을 25번 던져 골대에 10번 넣었어요. 던진 횟수에 대한 넣은 횟수의 비율을 소수로 나타내면 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.4</span></li><li class="no"><span class="mark"></span><span class="txt">2.5</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">7</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>넣은 횟수 ÷ 던진 횟수 = 10 ÷ 25 = 0.4. <span class="fr"><span class="n">2</span><span class="d">7</span></span>은 두 수를 더한 35로 나눈 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="F3-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F3-📏</code></div><p>비율 = 비교량 ÷ 기준량. 분수로도, 소수로도 나타낸다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F3-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F3-①a</code></div>
+      <div class="say"><p>9 : 8의 비율을 기약분수로 나타내면 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">9</span><span class="d">17</span></span></span><span class="tag">전체를 기준량으로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">9</span><span class="d">8</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">8</span><span class="d">9</span></span></span><span class="tag">기준량과 비교량을 뒤바꿈</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">5</span><span class="d">4</span></span></span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="F3-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F3-①b</code></div>
+      <div class="say"><p>1 : 4의 비율을 소수로 나타내면 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.25</span></li><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">기준량과 비교량을 뒤바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">0.26</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">0.2</span><span class="tag">전체를 기준량으로 봄</span></li></ol>
+    </div><div class="sample" id="F3-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F3-②</code></div>
+      <div class="say"><p>개굴닌자가 이렇게 말했어요.</p><p><strong>2 : 10의 비율은 5예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">비교량 ÷ 기준량이라 2 ÷ 10 = <span class="fr"><span class="n">1</span><span class="d">5</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">비율은 큰 수를 작은 수로 나눠요</span><span class="tag">오개념을 옳다고 함</span></li><li class="no"><span class="mark"></span><span class="txt">비율은 두 수를 더해서 구해요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F3-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F3-👨</code></div>
+    <h3>비를 수 하나(비율)로 — 비교량 ÷ 기준량, 그리고 분수·소수 둘 다로 나타내기.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F3-👨말1"><code class="mini">말1</code><span>&quot;슛 10번에 4번 넣은 사람이랑 20번에 7번 넣은 사람, 누가 더 잘 넣었어?&quot; — 비율로 바꾸면 비교가 돼요 (0.4 vs 0.35)</span></li><li id="F3-👨말2"><code class="mini">말2</code><span>&quot;잡힐 비율이 0.3이면 10번 던져서 몇 번쯤 잡힐까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이공 던지기: 10번, 20번 던져 들어간 횟수를 적고 비율을 소수로 — 누가 더 잘 넣었는지 비교.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F3-👨함정1"><code class="mini">함정1</code><div><div class="kid">3 : 5의 비율을 <span class="fr"><span class="n">5</span><span class="d">3</span></span>로 쓴다</div><div class="dadsay">→ &quot;비율은 기준량으로 나눠. 기준량이 어디 있어?&quot;</div></div></li><li id="F3-👨함정2"><code class="mini">함정2</code><div><div class="kid">3 : 2처럼 앞이 크면 비율을 <span class="fr"><span class="n">2</span><span class="d">3</span></span>로 쓴다 (작은 수를 위에)</div><div class="dadsay">→ &quot;비교량이 더 크면 비율이 1보다 커도 돼.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">7 : 20과 5 : 4의 비율을 분수와 소수로 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="F4">
+    <header class="ch-head">
+      <div class="ch-no">F4</div>
+      <div>
+        <div class="grade">초6 · F3 다음</div>
+        <h2>백분율</h2>
+        <p class="idea">기준량을 <strong>100</strong>으로 볼 때의 비율이 백분율(%)이에요. 비율에 <strong>100을 곱하고</strong> %를 붙여요 — 0.35 → 35%, <span class="fr"><span class="n">3</span><span class="d">4</span></span> → 75%.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F4-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F4-1</code></div>
+        <div class="say"><p>기준량을 <strong>100</strong>으로 볼 때의 비율을 <strong>백분율</strong>이라고 해요. 기호는 <strong>%</strong>(퍼센트).</p><p>100개 중 35개 → <strong>35%</strong></p><p>비율 0.35 = <span class="fr"><span class="n">35</span><span class="d">100</span></span> = <strong>35%</strong> — 비율에 <strong>100을 곱하고</strong> %를 붙여요.</p></div>
+        <div class="check" id="F4-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F4-1✓</code></div>
+        <p class="qt">0.35를 백분율로 나타내면 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">35%</span></li><li class="no"><span class="mark"></span><span class="txt">0.35%</span></li><li class="no"><span class="mark"></span><span class="txt">3.5%</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.35 × 100 = 35 → 35%. 0.35%는 100을 곱하지 않은 것, 3.5%는 10만 곱한 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F4-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F4-2</code></div>
+        <div class="say"><p>분수는 <strong>분모를 100으로</strong> 만들면 분자가 곧 %예요.</p><p>· <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <span class="fr"><span class="n">75</span><span class="d">100</span></span> = <strong>75%</strong><br>· <span class="fr"><span class="n">2</span><span class="d">5</span></span> = <span class="fr"><span class="n">40</span><span class="d">100</span></span> = <strong>40%</strong><br>· <span class="fr"><span class="n">1</span><span class="d">2</span></span> = <span class="fr"><span class="n">50</span><span class="d">100</span></span> = <strong>50%</strong></p><div class="fig"><svg class="frac-fig" viewBox="0 0 72 72" width="72" height="72" role="img" aria-label="피자 4조각 중 3조각"><path d="M 36 36 L 36.00 2.00 A 34 34 0 0 1 70.00 36.00 Z" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><path d="M 36 36 L 70.00 36.00 A 34 34 0 0 1 36.00 70.00 Z" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><path d="M 36 36 L 36.00 70.00 A 34 34 0 0 1 2.00 36.00 Z" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><path d="M 36 36 L 2.00 36.00 A 34 34 0 0 1 36.00 2.00 Z" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></svg></div><p><span class="fr"><span class="n">3</span><span class="d">4</span></span>을 3%라고 하면 안 돼요 — 분모가 100일 때만 분자가 %예요.</p></div>
+        <div class="check" id="F4-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F4-2✓</code></div>
+        <p class="qt"><span class="fr"><span class="n">3</span><span class="d">5</span></span>을 백분율로 나타내면 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">60%</span></li><li class="no"><span class="mark"></span><span class="txt">3%</span></li><li class="no"><span class="mark"></span><span class="txt">0.6%</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">3</span><span class="d">5</span></span> = <span class="fr"><span class="n">60</span><span class="d">100</span></span> = 60%. 3%는 분자를 그대로 쓴 것, 0.6%는 100을 곱하지 않은 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F4-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F4-3</code></div>
+        <div class="say"><p>거꾸로, 백분율을 <strong>100으로 나누면</strong> 비율이에요.</p><p>· 45% → 45 ÷ 100 = <strong>0.45</strong><br>· 8% → 8 ÷ 100 = <strong>0.08</strong></p><p><strong>100%는 전체</strong>, <strong>50%는 절반</strong>이에요.</p></div>
+        <div class="check" id="F4-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F4-3✓</code></div>
+        <p class="qt">8%를 소수로 나타내면 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.08</span></li><li class="no"><span class="mark"></span><span class="txt">0.8</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>8 ÷ 100 = 0.08. 0.8은 10으로만 나눈 것 — 그건 80%예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F4-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>F4-4</code></div>
+        <div class="say"><p>루카리오를 잡을 확률이 <strong>30%</strong>라면?</p><p>· 100번 던지면 <strong>30번쯤</strong> 잡혀요<br>· 10번 던지면 <strong>3번쯤</strong></p><p>%는 <strong>&quot;100개 중 몇 개&quot;</strong>예요. 게임 속 %도, 🛒 할인 %도 모두 같아요.</p></div>
+        <div class="check" id="F4-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F4-4✓</code></div>
+        <p class="qt">잡힐 확률 25%를 기약분수로 나타내면 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">25</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">5</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>25% = <span class="fr"><span class="n">25</span><span class="d">100</span></span> = <span class="fr"><span class="n">1</span><span class="d">4</span></span> (25로 약분). <span class="fr"><span class="n">1</span><span class="d">25</span></span>는 25를 분모로 쓴 것, <span class="fr"><span class="n">2</span><span class="d">5</span></span>는 숫자 2와 5를 이어 쓴 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="F4-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F4-📏</code></div><p>비율 × 100 = 백분율, 백분율 ÷ 100 = 비율.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F4-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F4-①a</code></div>
+      <div class="say"><p><span class="fr"><span class="n">2</span><span class="d">5</span></span>를 백분율로 나타내면 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">40%</span></li><li class="no"><span class="mark"></span><span class="txt">2%</span><span class="tag">분자를 그대로 백분율로 씀</span></li><li class="no"><span class="mark"></span><span class="txt">0.4%</span><span class="tag">100을 곱하지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">45%</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="F4-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F4-①b</code></div>
+      <div class="say"><p>73%를 소수로 나타내면 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">7.3</span><span class="tag">10만 곱하거나 나눔</span></li><li class="no"><span class="mark"></span><span class="txt">73</span><span class="tag">백분율을 그대로 수로 씀</span></li><li class="ok"><span class="mark">✔</span><span class="txt">0.73</span></li><li class="no"><span class="mark"></span><span class="txt">0.74</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="F4-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F4-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 바꿨어요.</p><p><strong><span class="fr"><span class="n">9</span><span class="d">25</span></span> = 9%</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">분수는 백분율로 바꿀 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">분모를 %로 써야 해요</span><span class="tag">오개념을 옳다고 함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">분모를 100으로 만들어야 해요 — <span class="fr"><span class="n">9</span><span class="d">25</span></span> = 36%</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 바꿨어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F4-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F4-👨</code></div>
+    <h3>백분율 = 기준량을 100으로 볼 때의 비율 — 비율에 100을 곱한다는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F4-👨말1"><code class="mini">말1</code><span>&quot;휴대폰 배터리 50%면 얼마나 남은 거야?&quot; — 절반. 25%, 75%도 물어보기</span></li><li id="F4-👨말2"><code class="mini">말2</code><span>&quot;시험 25문제 중 20개 맞히면 몇 %야?&quot; (80%)</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">마트 전단지·과자 봉지에서 %(할인, 성분)를 찾아 &quot;100개 중 몇 개&quot;로 바꿔 말하기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F4-👨함정1"><code class="mini">함정1</code><div><div class="kid">0.35를 0.35%라고 쓴다 (100을 안 곱함)</div><div class="dadsay">→ &quot;0.35는 100개 중 몇 개야? 35개지. 그게 35%야.&quot;</div></div></li><li id="F4-👨함정2"><code class="mini">함정2</code><div><div class="kid"><span class="fr"><span class="n">3</span><span class="d">4</span></span>을 3%라고 한다</div><div class="dadsay">→ &quot;분모가 100이야? 100으로 만들어 봐.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">0.35·<span class="fr"><span class="n">3</span><span class="d">4</span></span>·8%를 서로 바꾸고 &quot;100개 중 몇 개&quot;로 설명하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="F5">
+    <header class="ch-head">
+      <div class="ch-no">F5</div>
+      <div>
+        <div class="grade">초6 · F4 다음</div>
+        <h2>백분율 쓰기 — 할인·확률·진하기</h2>
+        <p class="idea">8000원의 20%는 8000 × <span class="fr"><span class="n">20</span><span class="d">100</span></span> = <strong>1600원</strong>. 20% 할인이면 1600원을 깎아 <strong>6400원</strong>에 팔아요. 20원을 깎는 게 아니에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F5-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F5-1</code></div>
+        <div class="say"><p><strong>8000원의 20%</strong>는 얼마일까요?</p><p>8000 × <span class="fr"><span class="n">20</span><span class="d">100</span></span> = <strong>1600원</strong></p><p>100원마다 20원씩 → 8000원엔 100원이 80개 → 20원 × 80 = 1600원</p><p><strong>전체 × 백분율/100</strong> 이에요.</p></div>
+        <div class="check" id="F5-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F5-1✓</code></div>
+        <p class="qt">5000원의 30%는 몇 원일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1500</span></li><li class="no"><span class="mark"></span><span class="txt">30</span></li><li class="no"><span class="mark"></span><span class="txt">4970</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>5000 × <span class="fr"><span class="n">30</span><span class="d">100</span></span> = 1500. 30%는 30원이 아니에요 — 5000원의 <span class="fr"><span class="n">30</span><span class="d">100</span></span>이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F5-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F5-2</code></div>
+        <div class="say"><p>🛒 <strong>8000원짜리를 20% 할인</strong>하면?</p><p>① 깎아 주는 돈: 8000 × <span class="fr"><span class="n">20</span><span class="d">100</span></span> = <strong>1600원</strong><br>② 파는 값: 8000 − 1600 = <strong>6400원</strong></p><p>문제가 <strong>깎아 주는 돈</strong>을 묻는지, <strong>파는 값</strong>을 묻는지 꼭 다시 읽어요. 20원을 빼서 7980원이 되는 게 아니에요!</p></div>
+        <div class="check" id="F5-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F5-2✓</code></div>
+        <p class="qt">🛒 10000원짜리 몬스터볼 세트를 30% 할인해요. 몇 원에 살 수 있을까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7000</span></li><li class="no"><span class="mark"></span><span class="txt">3000</span></li><li class="no"><span class="mark"></span><span class="txt">9970</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>깎는 돈 10000 × <span class="fr"><span class="n">30</span><span class="d">100</span></span> = 3000원, 파는 값 10000 − 3000 = 7000원. 3000원은 깎아 주는 돈이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F5-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F5-3</code></div>
+        <div class="say"><p>푸린을 잡을 확률이 <strong>40%</strong>예요. 몬스터볼을 <strong>20번</strong> 던지면 몇 번쯤 잡힐까요?</p><p>20 × <span class="fr"><span class="n">40</span><span class="d">100</span></span> = <strong>8번</strong></p><p>확률은 &quot;꼭 그만큼&quot;이 아니라 <strong>&quot;그쯤&quot;</strong>이에요. 운이 좋으면 더, 나쁘면 덜 잡혀요.</p></div>
+        <div class="check" id="F5-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F5-3✓</code></div>
+        <p class="qt">푸린을 잡을 확률이 30%예요. 몬스터볼을 50번 던지면 몇 번쯤 잡힐까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">15</span></li><li class="no"><span class="mark"></span><span class="txt">30</span></li><li class="no"><span class="mark"></span><span class="txt">35</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>50 × <span class="fr"><span class="n">30</span><span class="d">100</span></span> = 15번. 30은 %를 그대로 쓴 것, 35는 못 잡는 횟수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F5-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>F5-4</code></div>
+        <div class="say"><p>소금물의 <strong>진하기</strong>도 백분율이에요.</p><p>소금 <strong>20g</strong>을 물 <strong>80g</strong>에 녹이면<br>· 소금물 = 20 + 80 = <strong>100g</strong> ← 기준량<br>· 진하기 = <span class="fr"><span class="n">20</span><span class="d">100</span></span> = <strong>20%</strong></p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 18" width="160" height="18" role="img" aria-label="막대 10칸 중 2+8/10"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="16.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="16.0" y="0" width="16.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="32.0" y="0" width="16.0" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="48.0" y="0" width="16.0" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="64.0" y="0" width="16.0" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="80.0" y="0" width="16.0" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="96.0" y="0" width="16.0" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="112.0" y="0" width="16.0" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="128.0" y="0" width="16.0" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="144.0" y="0" width="16.0" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>기준량은 물이 아니라 <strong>소금물 전체</strong>예요. 20 ÷ 80으로 25%라고 하면 틀려요.</p></div>
+        <div class="check" id="F5-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F5-4✓</code></div>
+        <p class="qt">소금 30g을 물 170g에 녹였어요. 소금물의 진하기는 몇 %일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">15%</span></li><li class="no"><span class="mark"></span><span class="txt">30%</span></li><li class="no"><span class="mark"></span><span class="txt">85%</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>소금물 = 30 + 170 = 200g. 30 ÷ 200 × 100 = 15%. 30%는 소금 무게를 그대로 쓴 것, 85%는 물의 비율이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="F5-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F5-📏</code></div><p>전체 × 백분율/100. 할인은 깎는 돈과 파는 값을 구분하고, 진하기의 기준량은 소금물 전체.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F5-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F5-①a</code></div>
+      <div class="say"><p>소금 30g을 물 270g에 녹였어요. 소금물의 진하기는 몇 %일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10%</span></li><li class="no"><span class="mark"></span><span class="txt">15%</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">5%</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">30%</span><span class="tag">분자를 그대로 백분율로 씀</span></li></ol>
+    </div><div class="sample" id="F5-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F5-①b</code></div>
+      <div class="say"><p>피카츄가 몬스터볼을 40번 던져 9번 잡았어요. 잡은 비율은 몇 %일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">17.5%</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">9%</span><span class="tag">분자를 그대로 백분율로 씀</span></li><li class="no"><span class="mark"></span><span class="txt">27.5%</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">22.5%</span></li></ol>
+    </div><div class="sample" id="F5-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F5-②</code></div>
+      <div class="say"><p>루카리오가 이렇게 말했어요.</p><p><strong>8000원을 30% 할인한 값은 2400원이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">30%를 더해야 해요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">2400원은 깎아 주는 돈이에요 — 파는 값은 8000 − 2400 = 5600원</span></li><li class="no"><span class="mark"></span><span class="txt">30원을 빼야 해요</span><span class="tag">백분율을 그대로 뺌</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F5-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F5-👨</code></div>
+    <h3>백분율을 실제 양으로 — 전체 × %/100, 그리고 무엇이 기준량(전체)인지.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F5-👨말1"><code class="mini">말1</code><span>마트에서 &quot;이거 30% 할인이면 얼마야?&quot; — 10%(÷10)부터 구하고 세 번 더하게</span></li><li id="F5-👨말2"><code class="mini">말2</code><span>&quot;게임에서 잡힐 확률 30%면 10번 던져서 몇 번쯤 잡힐까? 꼭 3번일까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">영수증이나 전단지로 할인 계산 3개 — 깎는 돈과 파는 값을 둘 다 적기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F5-👨함정1"><code class="mini">함정1</code><div><div class="kid">8000원을 20% 할인하면 7980원이라고 한다</div><div class="dadsay">→ &quot;20%는 100원마다 20원이야. 8000원엔 100원이 몇 개야?&quot;</div></div></li><li id="F5-👨함정2"><code class="mini">함정2</code><div><div class="kid">깎아 주는 돈(1600원)을 파는 값이라고 답한다</div><div class="dadsay">→ &quot;그 돈을 내고 사는 거야, 깎아 주는 거야?&quot;</div></div></li><li id="F5-👨함정3"><code class="mini">함정3</code><div><div class="kid">진하기를 소금 ÷ 물로 구한다</div><div class="dadsay">→ &quot;진하기는 소금물 전체 중 소금이 얼마냐야. 소금물이 몇 g이야?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">10000원을 30% 할인한 값과 소금 20g + 물 80g의 진하기를 풀면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="F6">
+    <header class="ch-head">
+      <div class="ch-no">F6</div>
+      <div>
+        <div class="grade">초6 · F5 다음</div>
+        <h2>비의 성질</h2>
+        <p class="idea">비의 전항과 후항에 <strong>0이 아닌 같은 수를 곱하거나 나누어도</strong> 비율은 같아요 (2 : 3 = 8 : 12). <strong>더하면</strong> 달라져요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F6-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F6-1</code></div>
+        <div class="say"><p>비 <strong>2 : 3</strong>에서 앞의 2를 <strong>전항</strong>, 뒤의 3을 <strong>후항</strong>이라고 해요.</p><p>2 : 3의 전항과 후항에 <strong>2를 곱하면</strong> → <strong>4 : 6</strong></p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 38" width="160" height="38" role="img" aria-label="막대 비교 2/3 과 4/6"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="53.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="53.3" y="0" width="53.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="106.7" y="0" width="53.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="0.0" y="22" width="26.7" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="26.7" y="22" width="26.7" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="53.3" y="22" width="26.7" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="80.0" y="22" width="26.7" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="106.7" y="22" width="26.7" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="133.3" y="22" width="26.7" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>막대로 보면 칠한 길이가 똑같아요. <strong>비율이 같아요</strong> (<span class="fr"><span class="n">2</span><span class="d">3</span></span> = <span class="fr"><span class="n">4</span><span class="d">6</span></span>).</p></div>
+        <div class="check" id="F6-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F6-1✓</code></div>
+        <p class="qt">3 : 5의 전항과 후항에 4를 곱하면 어떤 비가 될까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">12 : 20</span></li><li class="no"><span class="mark"></span><span class="txt">7 : 9</span></li><li class="no"><span class="mark"></span><span class="txt">12 : 5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 항에 모두 4를 곱해요 → 12 : 20. 7 : 9는 4를 더한 것, 12 : 5는 전항에만 곱한 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F6-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F6-2</code></div>
+        <div class="say"><p>나누어도 돼요. <strong>12 : 18</strong>의 두 항을 <strong>6으로 나누면</strong> → <strong>2 : 3</strong></p><p>전항과 후항에 <strong>0이 아닌 같은 수</strong>를 곱하거나 나누면 비율은 그대로예요. 이것이 <strong>비의 성질</strong>이에요.</p></div>
+        <div class="check" id="F6-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F6-2✓</code></div>
+        <p class="qt">15 : 25 = 3 : □ — □에 알맞은 수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5</span></li><li class="no"><span class="mark"></span><span class="txt">13</span></li><li class="no"><span class="mark"></span><span class="txt">25</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>15 ÷ 5 = 3이니까 25도 5로 나눠요 → 5. 13은 12를 뺀 것, 25는 한쪽만 나눈 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F6-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F6-3</code></div>
+        <div class="say"><p><strong>더하면</strong> 어떻게 될까요?</p><p>2 : 3의 두 항에 <strong>2를 더하면</strong> → 4 : 5</p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 38" width="160" height="38" role="img" aria-label="막대 비교 2/3 과 4/5"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="53.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="53.3" y="0" width="53.3" height="16" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="106.7" y="0" width="53.3" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="0.0" y="22" width="32.0" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="32.0" y="22" width="32.0" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="64.0" y="22" width="32.0" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="96.0" y="22" width="32.0" height="16" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="128.0" y="22" width="32.0" height="16" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>칠한 길이가 <strong>달라요</strong>. 더하면 비율이 변해요. 비의 성질은 <strong>곱하기·나누기</strong>만!</p></div>
+        <div class="check" id="F6-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F6-3✓</code></div>
+        <p class="qt">2 : 7 = 6 : □ — □에 알맞은 수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">21</span></li><li class="no"><span class="mark"></span><span class="txt">11</span></li><li class="no"><span class="mark"></span><span class="txt">7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2 × 3 = 6이니까 7도 3배 → 21. 11은 4를 더한 것, 7은 후항을 그대로 둔 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="F6-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F6-📏</code></div><p>전항과 후항에 0이 아닌 같은 수를 곱하거나 나누어도 비율은 같다. 더하면 달라진다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F6-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F6-①a</code></div>
+      <div class="say"><p>3 : 6과 비율이 같은 비는 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">18 : 36</span></li><li class="no"><span class="mark"></span><span class="txt">6 : 3</span><span class="tag">기준량과 비교량을 뒤바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">9 : 12</span><span class="tag">같은 수를 더함</span></li><li class="no"><span class="mark"></span><span class="txt">18 : 6</span><span class="tag">한쪽에만 곱함</span></li></ol>
+    </div><div class="sample" id="F6-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F6-①b</code></div>
+      <div class="say"><p>8 : 5 = 24 : □ — □에 알맞은 수는?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">16</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">15</span></li><li class="no"><span class="mark"></span><span class="txt">5</span><span class="tag">한쪽에만 곱함</span></li><li class="no"><span class="mark"></span><span class="txt">21</span><span class="tag">같은 수를 더함</span></li></ol>
+    </div><div class="sample" id="F6-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F6-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>6 : 3 = 24 : 21 — 두 항에 18을 더했어요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">비는 바꿀 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">더하면 비율이 달라져요 — 곱해야 해요: 24 : 12</span></li><li class="no"><span class="mark"></span><span class="txt">전항에만 더해야 해요</span><span class="tag">한쪽에만 곱함</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F6-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F6-👨</code></div>
+    <h3>비의 성질 — 두 항에 같은 수를 곱하거나 나누면 비율이 같고, 더하면 달라진다는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F6-👨말1"><code class="mini">말1</code><span>&quot;주스 원액 1컵에 물 3컵이 맛있어. 원액을 2컵 넣으면 물은 몇 컵? 물을 4컵만 넣으면 맛이 같을까?&quot;</span></li><li id="F6-👨말2"><code class="mini">말2</code><span>&quot;레시피를 두 배로 만들 때 뭘 해?&quot; — 전부 2배</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">진짜로 해 보기: 주스 원액과 물을 1 : 3, 2 : 6, 2 : 4로 섞어 맛 비교 — 2 : 4만 더 진해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F6-👨함정1"><code class="mini">함정1</code><div><div class="kid">2 : 3 = 4 : 5라고 한다 (두 항에 2를 더함)</div><div class="dadsay">→ &quot;막대로 그려 봐. <span class="fr"><span class="n">2</span><span class="d">3</span></span>랑 <span class="fr"><span class="n">4</span><span class="d">5</span></span>가 같아?&quot;</div></div></li><li id="F6-👨함정2"><code class="mini">함정2</code><div><div class="kid">2 : 3 = 6 : 3이라고 한다 (전항에만 곱함)</div><div class="dadsay">→ &quot;앞에 3을 곱했으면 뒤에도?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">3 : 5 = 12 : □, 15 : 25 = 3 : □를 풀고 더하면 안 되는 이유를 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="F7">
+    <header class="ch-head">
+      <div class="ch-no">F7</div>
+      <div>
+        <div class="grade">초6 · F6 다음</div>
+        <h2>간단한 자연수의 비로 나타내기</h2>
+        <p class="idea">두 항을 <strong>최대공약수로 나누면</strong> 간단한 자연수의 비 (12 : 18 = 2 : 3). 소수는 10배, 분수는 분모의 공배수를 곱해 자연수로 먼저 만들어요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F7-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F7-1</code></div>
+        <div class="say"><p><strong>12 : 18</strong>을 간단하게 나타내 볼까요?</p><p>12와 18의 <strong>최대공약수는 6</strong><br>→ 두 항을 6으로 나누면 <strong>2 : 3</strong></p><p>2로만 나누면 6 : 9 — 아직 <strong>3으로 더</strong> 나눌 수 있어요. 끝까지 나눠야 <strong>가장 간단한</strong> 비예요.</p></div>
+        <div class="check" id="F7-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F7-1✓</code></div>
+        <p class="qt">24 : 36을 간단한 자연수의 비로 나타내면 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2 : 3</span></li><li class="no"><span class="mark"></span><span class="txt">12 : 18</span></li><li class="no"><span class="mark"></span><span class="txt">3 : 2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>24와 36의 최대공약수는 12 → 2 : 3. 12 : 18은 2로만 나눈 것이라 더 나눌 수 있어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F7-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F7-2</code></div>
+        <div class="say"><p>소수의 비는 먼저 <strong>10배</strong> 해서 자연수로 만들어요.</p><p><strong>0.6 : 0.9</strong><br>① 두 항에 10을 곱해요 → 6 : 9<br>② 최대공약수 3으로 나눠요 → <strong>2 : 3</strong></p><p>한 항에만 10을 곱하면(6 : 0.9) 안 돼요 — 두 항 <strong>똑같이</strong>!</p></div>
+        <div class="check" id="F7-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F7-2✓</code></div>
+        <p class="qt">0.4 : 1.2를 간단한 자연수의 비로 나타내면 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1 : 3</span></li><li class="no"><span class="mark"></span><span class="txt">4 : 12</span></li><li class="no"><span class="mark"></span><span class="txt">4 : 1.2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>10배 → 4 : 12 → 4로 나눠요 → 1 : 3. 4 : 12는 더 나눌 수 있고, 4 : 1.2는 한 항만 10배 한 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F7-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F7-3</code></div>
+        <div class="say"><p>분수의 비는 <strong>분모의 공배수</strong>를 두 항에 곱해요.</p><p><strong><span class="fr"><span class="n">1</span><span class="d">2</span></span> : <span class="fr"><span class="n">1</span><span class="d">3</span></span></strong><br>① 분모 2와 3의 공배수 <strong>6</strong>을 곱해요<br>② <span class="fr"><span class="n">1</span><span class="d">2</span></span> × 6 = 3, <span class="fr"><span class="n">1</span><span class="d">3</span></span> × 6 = 2 → <strong>3 : 2</strong></p><p>분모끼리 2 : 3이라고 쓰면 거꾸로예요 — <span class="fr"><span class="n">1</span><span class="d">2</span></span>이 <span class="fr"><span class="n">1</span><span class="d">3</span></span>보다 크잖아요!</p></div>
+        <div class="check" id="F7-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F7-3✓</code></div>
+        <p class="qt"><span class="fr"><span class="n">1</span><span class="d">4</span></span> : <span class="fr"><span class="n">1</span><span class="d">6</span></span>을 간단한 자연수의 비로 나타내면 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3 : 2</span></li><li class="no"><span class="mark"></span><span class="txt">4 : 6</span></li><li class="no"><span class="mark"></span><span class="txt">1 : 1</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>공배수 12를 곱하면 3 : 2. 4 : 6은 분모끼리 쓴 것, 1 : 1은 분자끼리 쓴 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F7-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>F7-4</code></div>
+        <div class="say"><p>소수와 분수가 섞여 있으면 <strong>한 가지로 맞춰요</strong>.</p><p><strong>0.5 : <span class="fr"><span class="n">3</span><span class="d">4</span></span></strong><br>① 0.5 = <span class="fr"><span class="n">1</span><span class="d">2</span></span> → <span class="fr"><span class="n">1</span><span class="d">2</span></span> : <span class="fr"><span class="n">3</span><span class="d">4</span></span><br>② 분모의 공배수 4를 곱해요 → <strong>2 : 3</strong></p><p><span class="fr"><span class="n">3</span><span class="d">4</span></span> = 0.75로 바꿔 0.5 : 0.75 → 50 : 75 → 2 : 3으로 해도 같은 답이에요.</p></div>
+        
+      </div>
+    </li></ol>
+        <div class="rule" id="F7-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F7-📏</code></div><p>자연수로 만들고(소수는 10배, 분수는 분모의 공배수), 최대공약수로 끝까지 나눈다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F7-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F7-①a</code></div>
+      <div class="say"><p><span class="fr"><span class="n">4</span><span class="d">5</span></span> : <span class="fr"><span class="n">1</span><span class="d">6</span></span>을 간단한 자연수의 비로 나타내면?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">24 : 5</span></li><li class="no"><span class="mark"></span><span class="txt">4 : 1</span><span class="tag">분자끼리 비로 씀</span></li><li class="no"><span class="mark"></span><span class="txt">5 : 6</span><span class="tag">분모끼리 비로 씀</span></li></ol>
+    </div><div class="sample" id="F7-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F7-①b</code></div>
+      <div class="say"><p><span class="fr"><span class="n">1</span><span class="d">3</span></span> : <span class="fr"><span class="n">4</span><span class="d">8</span></span>를 간단한 자연수의 비로 나타내면?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">1 : 4</span><span class="tag">분자끼리 비로 씀</span></li><li class="ok"><span class="mark">✔</span><span class="txt">2 : 3</span></li><li class="no"><span class="mark"></span><span class="txt">3 : 8</span><span class="tag">분모끼리 비로 씀</span></li></ol>
+    </div><div class="sample" id="F7-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F7-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong><span class="fr"><span class="n">1</span><span class="d">3</span></span> : <span class="fr"><span class="n">1</span><span class="d">5</span></span> = 3 : 5</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">분수는 비로 쓸 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">분자끼리 비로 써야 해요</span><span class="tag">오개념을 옳다고 함</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">분모끼리 비로 쓰면 안 돼요 — 두 항에 15를 곱하면 5 : 3</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F7-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F7-👨</code></div>
+    <h3>간단한 자연수의 비 — 소수·분수는 자연수로 먼저, 그다음 최대공약수로 끝까지.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F7-👨말1"><code class="mini">말1</code><span>&quot;12 : 18을 2로 나눴어? 더 나눌 수 있는지 한 번 더 봐&quot; — 끝까지 나누는 습관</span></li><li id="F7-👨말2"><code class="mini">말2</code><span>&quot;<span class="fr"><span class="n">1</span><span class="d">2</span></span> : <span class="fr"><span class="n">1</span><span class="d">3</span></span> — 피자 반 판이랑 <span class="fr"><span class="n">1</span><span class="d">3</span></span>판, 뭐가 더 많아? 그럼 비의 앞이 커야지&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">비 카드 5장(24 : 36, 0.6 : 0.9, <span class="fr"><span class="n">1</span><span class="d">2</span></span> : <span class="fr"><span class="n">1</span><span class="d">3</span></span> …)을 뒤집어 간단한 비로 바꾸기 — 먼저 푼 사람이 카드를 가져가요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F7-👨함정1"><code class="mini">함정1</code><div><div class="kid">12 : 18을 6 : 9에서 멈춘다</div><div class="dadsay">→ &quot;6이랑 9를 같이 나눌 수 있는 수가 또 있어?&quot;</div></div></li><li id="F7-👨함정2"><code class="mini">함정2</code><div><div class="kid"><span class="fr"><span class="n">1</span><span class="d">2</span></span> : <span class="fr"><span class="n">1</span><span class="d">3</span></span>을 2 : 3으로 쓴다 (분모끼리)</div><div class="dadsay">→ &quot;<span class="fr"><span class="n">1</span><span class="d">2</span></span>이 커, <span class="fr"><span class="n">1</span><span class="d">3</span></span>이 커? 큰 쪽이 앞인데 2 : 3이면 앞이 작잖아.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">24 : 36, 0.4 : 1.2, <span class="fr"><span class="n">1</span><span class="d">4</span></span> : <span class="fr"><span class="n">1</span><span class="d">6</span></span>을 간단한 자연수의 비로 바꾸면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="F8">
+    <header class="ch-head">
+      <div class="ch-no">F8</div>
+      <div>
+        <div class="grade">초6 · F7 다음</div>
+        <h2>비례식</h2>
+        <p class="idea">비율이 같은 두 비를 = 로 이은 식이 비례식이에요. <strong>외항의 곱 = 내항의 곱</strong> (3 : 4 = 9 : 12 → 3 × 12 = 4 × 9).</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F8-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F8-1</code></div>
+        <div class="say"><p>비율이 같은 두 비를 <strong>=</strong> 로 이은 식을 <strong>비례식</strong>이라고 해요.</p><p><strong>2 : 3 = 4 : 6</strong></p><p>· 바깥쪽 2와 6 → <strong>외항</strong><br>· 안쪽 3과 4 → <strong>내항</strong></p></div>
+        <div class="check" id="F8-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F8-1✓</code></div>
+        <p class="qt">3 : 5 = 9 : 15에서 외항은 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3과 15</span></li><li class="no"><span class="mark"></span><span class="txt">5와 9</span></li><li class="no"><span class="mark"></span><span class="txt">3과 5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>바깥쪽 두 수가 외항이에요. 5와 9는 안쪽 — 내항이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F8-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F8-2</code></div>
+        <div class="say"><p>비례식에는 신기한 성질이 있어요.</p><p><strong>2 : 3 = 4 : 6</strong><br>· 외항의 곱: 2 × 6 = <strong>12</strong><br>· 내항의 곱: 3 × 4 = <strong>12</strong></p><p><strong>외항의 곱 = 내항의 곱</strong> — 늘 같아요!</p></div>
+        <div class="check" id="F8-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F8-2✓</code></div>
+        <p class="qt">4 : 5 = 12 : □ — □에 알맞은 수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">15</span></li><li class="no"><span class="mark"></span><span class="txt">13</span></li><li class="no"><span class="mark"></span><span class="txt">9.6</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>4 × □ = 5 × 12 = 60 → □ = 15. 13은 차를 같게 맞춘 것, 9.6은 곱하는 짝을 바꾼 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F8-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F8-3</code></div>
+        <div class="say"><p><strong>6 : 4 = 9 : □</strong> 는 6에 몇을 곱해야 9가 될지 바로 안 보여요.</p><p>그럴 땐 <strong>외항의 곱 = 내항의 곱</strong>!<br>· 6 × □ = 4 × 9 = 36<br>· □ = 36 ÷ 6 = <strong>6</strong></p><p>확인: 6 : 4와 9 : 6은 둘 다 3 : 2 ✓</p></div>
+        <div class="check" id="F8-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F8-3✓</code></div>
+        <p class="qt">8 : 6 = 12 : □ — □에 알맞은 수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9</span></li><li class="no"><span class="mark"></span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt">16</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>8 × □ = 6 × 12 = 72 → □ = 9. 10은 차를 같게 맞춘 것(8 − 6 = 12 − 10), 16은 곱하는 짝을 바꾼 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F8-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>F8-4</code></div>
+        <div class="say"><p>뮤츠가 나무열매 <strong>3개</strong>를 먹을 때 개굴닌자는 <strong>5개</strong>를 먹어요. 뮤츠가 <strong>12개</strong>를 먹으면 개굴닌자는?</p><p><strong>3 : 5 = 12 : □</strong><br>· 3 × □ = 5 × 12 = 60<br>· □ = <strong>20개</strong></p><p>모르는 수를 □로 두고, 양쪽 비의 <strong>순서를 맞춰</strong> 비례식을 세워요.</p></div>
+        <div class="check" id="F8-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F8-4✓</code></div>
+        <p class="qt">사탕 4개에 500원이에요. 사탕 12개는 몇 원일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1500</span></li><li class="no"><span class="mark"></span><span class="txt">508</span></li><li class="no"><span class="mark"></span><span class="txt">6000</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>4 : 500 = 12 : □ → 4 × □ = 500 × 12 = 6000 → □ = 1500. 508은 차를 같게 맞춘 것, 6000은 4로 나누지 않은 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="F8-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F8-📏</code></div><p>외항의 곱 = 내항의 곱. 모르는 수는 □로 두고 순서를 맞춰 식을 세운다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F8-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F8-①a</code></div>
+      <div class="say"><p>개굴닌자가 사탕 6개를 먹을 때 피카츄는 15개를 먹어요. 개굴닌자가 16개를 먹으면 피카츄는 몇 개를 먹을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">32</span><span class="d">5</span></span></span><span class="tag">곱하는 짝을 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">25</span><span class="tag">차를 같게 맞춤</span></li><li class="no"><span class="mark"></span><span class="txt">41</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">40</span></li></ol>
+    </div><div class="sample" id="F8-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F8-①b</code></div>
+      <div class="say"><p>9 : 12 = 21 : □ — □에 알맞은 수는?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">28</span></li><li class="no"><span class="mark"></span><span class="txt">24</span><span class="tag">차를 같게 맞춤</span></li><li class="no"><span class="mark"></span><span class="txt">29</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">63</span><span class="d">4</span></span></span><span class="tag">곱하는 짝을 바꿈</span></li></ol>
+    </div><div class="sample" id="F8-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F8-②</code></div>
+      <div class="say"><p>루카리오가 이렇게 말했어요.</p><p><strong>4 : 10 = 18 : 24 — 두 수의 차가 같게 했어요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">두 수의 합이 같아야 해요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">비례식은 비율이 같아야 해요 — 4 × □ = 10 × 18 → □ = 45</span></li><li class="no"><span class="mark"></span><span class="txt">앞의 두 수를 곱해야 해요</span><span class="tag">곱하는 짝을 바꿈</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F8-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F8-👨</code></div>
+    <h3>비례식 — 외항의 곱 = 내항의 곱으로 모르는 수를 찾고, 이야기에서 식을 세우는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F8-👨말1"><code class="mini">말1</code><span>&quot;쿠키 3개에 1200원이면 7개는?&quot; — 비례식으로 세우게 (3 : 1200 = 7 : □ → 2800원)</span></li><li id="F8-👨말2"><code class="mini">말2</code><span>&quot;외항 곱이랑 내항 곱이 같은지 확인해 볼까?&quot; — 답을 확인하는 습관</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">레시피 늘리기: 팬케이크 2장에 우유 150mL라면 5장엔? 비례식으로 구해서(375mL) 직접 재 보기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F8-👨함정1"><code class="mini">함정1</code><div><div class="kid">6 : 4 = 9 : 7이라고 한다 (차를 같게 맞춤)</div><div class="dadsay">→ &quot;외항 곱 6 × 7이랑 내항 곱 4 × 9가 같아?&quot;</div></div></li><li id="F8-👨함정2"><code class="mini">함정2</code><div><div class="kid">이야기에서 순서를 섞어 3 : 5 = □ : 12로 세운다</div><div class="dadsay">→ &quot;앞에 누구 거, 뒤에 누구 거를 썼는지 양쪽이 같아야 해.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">8 : 6 = 12 : □와 쿠키 문제를 비례식으로 세워 풀면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="F9">
+    <header class="ch-head">
+      <div class="ch-no">F9</div>
+      <div>
+        <div class="grade">초6 · F8 다음</div>
+        <h2>비례배분</h2>
+        <p class="idea">전체를 3 : 4로 나누면 전체를 <strong>3 + 4 = 7</strong>로 보고 <span class="fr"><span class="n">3</span><span class="d">7</span></span>, <span class="fr"><span class="n">4</span><span class="d">7</span></span>씩 가져요. 28개면 12개와 16개.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="F9-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>F9-1</code></div>
+        <div class="say"><p>전체를 주어진 비로 나누는 것을 <strong>비례배분</strong>이라고 해요.</p><p>피카츄와 루카리오가 사탕 <strong>28개</strong>를 <strong>3 : 4</strong>로 나눠 가져요.</p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 18" width="160" height="18" role="img" aria-label="막대 7칸 중 3+4/7"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="22.9" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="22.9" y="0" width="22.9" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="45.7" y="0" width="22.9" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="68.6" y="0" width="22.9" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="91.4" y="0" width="22.9" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="114.3" y="0" width="22.9" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="137.1" y="0" width="22.9" height="18" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>전체를 <strong>3 + 4 = 7</strong>칸으로 봐요.<br>· 피카츄: 28 × <span class="fr"><span class="n">3</span><span class="d">7</span></span> = <strong>12개</strong><br>· 루카리오: 28 × <span class="fr"><span class="n">4</span><span class="d">7</span></span> = <strong>16개</strong></p></div>
+        <div class="check" id="F9-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F9-1✓</code></div>
+        <p class="qt">나무열매 30개를 2 : 3으로 나누면 앞사람은 몇 개를 가질까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">20</span></li><li class="no"><span class="mark"></span><span class="txt">15</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>전체를 2 + 3 = 5로 봐요. 30 × <span class="fr"><span class="n">2</span><span class="d">5</span></span> = 12. 20은 30 × <span class="fr"><span class="n">2</span><span class="d">3</span></span> — 합이 아니라 3으로 나눈 것, 15는 반씩 나눈 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F9-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>F9-2</code></div>
+        <div class="say"><p>나눈 뒤에는 <strong>두 몫을 더해</strong> 전체가 되는지 확인해요.</p><p>12 + 16 = <strong>28</strong> ✓</p><p>합(7)이 아니라 4로 나누면? 28 × <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <strong>21개</strong> — 그럼 남는 건 7개뿐이에요. 3 : 4면 뒷사람이 더 많아야 하는데 거꾸로예요. <strong>합으로</strong> 나눠야 해요.</p></div>
+        <div class="check" id="F9-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F9-2✓</code></div>
+        <p class="qt">코인 45개를 4 : 5로 나누면 뒷사람은 몇 개를 가질까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">25</span></li><li class="no"><span class="mark"></span><span class="txt">20</span></li><li class="no"><span class="mark"></span><span class="txt">9</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>45 × 5/(4 + 5) = 25. 20은 앞사람 몫, 9는 전체를 5로만 나눈 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="F9-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>F9-3</code></div>
+        <div class="say"><p>비례배분은 <strong>나눠 가질 때</strong> 늘 써요.</p><p>피카츄가 배틀에서 <strong>3번</strong>, 루카리오가 <strong>2번</strong> 이겼어요. 코인 <strong>500개</strong>를 이긴 횟수대로 나눠요.</p><p>3 : 2 → 전체를 <strong>5</strong>로 봐요<br>· 피카츄: 500 × <span class="fr"><span class="n">3</span><span class="d">5</span></span> = <strong>300개</strong><br>· 루카리오: 500 × <span class="fr"><span class="n">2</span><span class="d">5</span></span> = <strong>200개</strong></p><p>300 + 200 = 500 ✓</p></div>
+        <div class="check" id="F9-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>F9-3✓</code></div>
+        <p class="qt">진우가 스티커 36장을 친구와 5 : 4로 나눠 가져요. 진우는 몇 장을 가질까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">20</span></li><li class="no"><span class="mark"></span><span class="txt">16</span></li><li class="no"><span class="mark"></span><span class="txt">18</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>36 × 5/(5 + 4) = 20장. 16장은 친구 몫, 18장은 반씩 나눈 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="F9-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>F9-📏</code></div><p>전체 × (내 몫의 수 / 두 수의 합). 나눈 뒤 더해서 전체가 되는지 확인.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="F9-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>F9-①a</code></div>
+      <div class="say"><p>개굴닌자와 리자몽이 나무열매 16개를 1 : 7로 나눠 가져요. 리자몽은 몇 개를 가질까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">15</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">14</span></li><li class="no"><span class="mark"></span><span class="txt">2</span><span class="tag">다른 사람 몫을 셈</span></li><li class="no"><span class="mark"></span><span class="txt">112</span><span class="tag">전체를 합으로 나누지 않음</span></li></ol>
+    </div><div class="sample" id="F9-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>F9-①b</code></div>
+      <div class="say"><p>루카리오와 리자몽이 코인 156개를 6 : 7로 나눠 가져요. 리자몽은 몇 개를 가질까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">182</span><span class="tag">전체를 합으로 나누지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">85</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">84</span></li><li class="no"><span class="mark"></span><span class="txt">72</span><span class="tag">다른 사람 몫을 셈</span></li></ol>
+    </div><div class="sample" id="F9-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>F9-②</code></div>
+      <div class="say"><p>피카츄가 이렇게 말했어요.</p><p><strong>168개를 5 : 7로 나누면 앞사람은 168 × <span class="fr"><span class="n">5</span><span class="d">7</span></span> = 120개예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">전체를 5 + 7 = 12로 나눠야 해요 — 168 × <span class="fr"><span class="n">5</span><span class="d">12</span></span> = 70개</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">반씩 나눠야 해요</span><span class="tag">똑같이 반씩 나눔</span></li><li class="no"><span class="mark"></span><span class="txt">168을 5로 나눠야 해요</span><span class="tag">비의 수로 바로 나눔</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="F9-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>F9-👨</code></div>
+    <h3>비례배분 — 전체를 두 수의 합으로 나눠 몫을 정하는 것, 그리고 합으로 확인하는 습관.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="F9-👨말1"><code class="mini">말1</code><span>&quot;용돈 10000원을 저금 3, 쓰기 2로 나누면 각각 얼마야?&quot; (6000원·4000원)</span></li><li id="F9-👨말2"><code class="mini">말2</code><span>&quot;나눈 두 몫을 더하면 처음 수가 돼?&quot; — 확인하는 습관</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">과자 한 봉지를 세어서, 진우가 정한 비(예: 3 : 2)로 아빠와 직접 나눠 보기 — 계산한 수와 실제로 나눈 수가 같은지.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="F9-👨함정1"><code class="mini">함정1</code><div><div class="kid">28개를 3 : 4로 나누면서 28 × <span class="fr"><span class="n">3</span><span class="d">4</span></span> = 21로 계산한다</div><div class="dadsay">→ &quot;3 : 4면 전체가 몇 칸이야? 3칸이랑 4칸을 합쳐서.&quot;</div></div></li><li id="F9-👨함정2"><code class="mini">함정2</code><div><div class="kid">누구 몫을 묻는지 안 보고 먼저 나온 수를 답한다</div><div class="dadsay">→ &quot;문제가 누구 걸 물었어? 그 사람 칸이 몇 칸이야?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">사탕 28개를 3 : 4로, 코인 45개를 4 : 5로 나누고 합으로 확인하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+
+  <footer>신코치 🔢 수학 · 비와 비율 줄기 배움 원고 · 2026-09-30</footer>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('ans');
+  function apply(){document.body.classList.toggle('hide-ans',!cb.checked);}
+  try{var v=localStorage.getItem('rat-review-ans');if(v==='0'){cb.checked=false;}}catch(e){}
+  cb.addEventListener('change',function(){apply();try{localStorage.setItem('rat-review-ans',cb.checked?'1':'0');}catch(e){}});
+  apply();
+})();
+</script>
