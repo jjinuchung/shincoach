@@ -115,7 +115,8 @@ function checkOk(c, s, q) {
     assert.ok(eq(textVal(ok), val(p.calc)), `${where} — ${p.calc} = ${val(p.calc)}`);
     if (p.form === 'pct') assert.ok(/%$/.test(ok), `${where} — 백분율로 답해야`);
     if (p.form === 'dec') assert.ok(/^\d+(\.\d+)?$/.test(ok), `${where} — 소수로 답해야`);
-    if (p.form === 'frac') { const m = /^(\d+)\/(\d+)$/.exec(ok); assert.ok(!m || g(+m[1], +m[2]) === 1, `${where} — 기약분수`); }
+    // "기약분수로" 묻고 자연수(12 : 3 → 4)를 답으로 두지 않는다 — 분수 모양이어야 (Codex 13차 #7, 전에는 분수가 아니면 통과시켰다)
+    if (p.form === 'frac') { const m = /^(\d+)\/(\d+)$/.exec(ok); assert.ok(m && g(+m[1], +m[2]) === 1 && +m[2] > 1, `${where} — 기약분수 모양이어야`); }
   } else if (p.base) {
     assert.equal(ok, p.base.split(' : ')[1], where);
     assert.ok(q.q.includes(p.base), `${where} — 문제에 그 비가 없다`);
@@ -191,9 +192,10 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수의 값이다', ()
             else if (p.sameRatio) hitText(eq(ratioOf(ch.text)[0] / ratioOf(ch.text)[1], ratioOf(p.sameRatio)[1] / ratioOf(p.sameRatio)[0]));
             else hit(1 / v0);
             break;
-          case TAGS.whole:
-            if (p.phrase) { const [x, y] = ratioOf(ratioFromStory(q.q)); const w = ratioOf(ch.text); hitText((eq(w[0], x) && eq(w[1], x + y)) || (eq(w[0], x + y) && eq(w[1], y))); } else if (p.base) { const [x, y] = ratioOf(p.base); hit(x + y); } else hit(v0 / (1 + v0));
+          case TAGS.whole: // 기준량 자리(뒤)에 전체 — 7 : 11 → 7 : 18
+            if (p.phrase) { const [x, y] = ratioOf(ratioFromStory(q.q)); const w = ratioOf(ch.text); hitText(eq(w[0], x) && eq(w[1], x + y)); } else if (p.base) { const [x, y] = ratioOf(p.base); hit(x + y); } else hit(v0 / (1 + v0));
             break;
+          case TAGS.wholeCmp: { const [x, y] = ratioOf(ratioFromStory(q.q)); const w = ratioOf(ch.text); hitText(eq(w[0], x + y) && eq(w[1], y)); break; } // 비교량 자리(앞)에 전체 — 18 : 11 (Codex 13차 #3)
           case TAGS.noHundred: hit(v0 / 100); break;
           case TAGS.byTen: seen[ch.tag] = (seen[ch.tag] || 0) + 1; assert.ok(eq(v, v0 * 10) || eq(v, v0 / 10), where); break;
           case TAGS.pctNumerator: hit(n[0] / 100); break;
@@ -202,9 +204,11 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수의 값이다', ()
           case TAGS.pctAsWon: hit(/\(100/.test(p.calc) ? n[0] - n[2] : n[1]); break;
           case TAGS.misses: hit(n[0] - v0); break;
           case TAGS.baseWater: hit(n[0] / (n[1] - n[0])); break;
+          // 더함·뺌은 방향까지 본다 — 18 : 36 = 3 : □의 21(15를 뺌)에 "더함"이 붙어 있었다 (Codex 13차 #4)
           case TAGS.addSame:
-            if (p.sameRatio) { const [a, b] = ratioOf(p.sameRatio); const k = ratioOf(okText)[0] / a; hitText(ch.text === `${a + k} : ${b + k}`); } else if (/^\d+ × \d+ ÷ \d+$/.test(p.calc)) { const [x, y, z] = n; hit(x > v0 ? x - (z - y) : x + (y - z)); }
+            if (p.sameRatio) { const [a, b] = ratioOf(p.sameRatio); const k = ratioOf(okText)[0] / a; hitText(ch.text === `${a + k} : ${b + k}`); } else { const [x, y, z] = n; hitText(y > z && eq(v, x + (y - z))); } // 전항이 커졌다 → 후항에 같은 수를 더함
             break;
+          case TAGS.subSame: { const [x, y, z] = n; hitText(z > y && eq(v, x - (z - y))); break; } // 전항이 작아졌다 → 후항에서 같은 수를 뺌
           case TAGS.oneSide:
             if (p.sameRatio) { const [a, b] = ratioOf(p.sameRatio); const k = ratioOf(okText)[0] / a; hitText(ch.text === `${a * k} : ${b}`); } else hit(n[0]);
             break;
@@ -325,6 +329,27 @@ test('📏 진단·사다리·한 편·배움 예비', () => {
   }
   assert.equal(conceptById('rat.nope'), null);
   assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 9);
+});
+
+test('🔍 Codex 13차: ② 보기의 진단이 우연히 맞지 않는다 · 원고가 일반 규칙을 넘겨 말하지 않는다', () => {
+  for (let s = 1; s <= SEEDS; s++) {
+    // #2 비 ②: 보여 준 틀린 비는 앞이 크다 → "비는 큰 수를 앞에 써요"를 따르면 그 틀린 비가 된다 (우연히 맞는 고침이 아니다)
+    const q = makeQuestion('rat.ratio', 'misread', s * 613, OPTS);
+    const [x, y] = ratioOf(q.probe.shown);
+    assert.ok(x > y, `rat.ratio ② seed ${s}: 보여 준 ${q.probe.shown} — 정답이 "큰 수를 앞에"와 같아진다`);
+    // #1 할인 ②: 틀린 말 보기는 정말 틀린 값을 가리킨다 (원래 값 × 백분율 수 ≠ 파는 값)
+    const w = makeQuestion('rat.percentuse', 'misread', s * 613, { ...OPTS, want: { k: 'misread', key: 'misread:won' } });
+    assert.equal(w.key, 'misread:won');
+    assert.ok(!w.choices.some((c) => c.text === '할인은 곱하기로 해요'), `seed ${s}: 틀린 말이 아닌 보기가 남았다`);
+    const off = w.choices.find((c) => /^원래 값에 \d+[을를] 곱하면 파는 값이에요$/.test(c.text));
+    assert.ok(off && !off.ok, `seed ${s}: 분명히 틀린 곱셈 보기`);
+    const [P, rate] = /(\d+)원을 (\d+)% 할인하면/.exec(w.q).slice(1).map(Number);
+    assert.ok(P * rate !== (P * (100 - rate)) / 100, `seed ${s}: 원래 값 × ${rate}이 우연히 파는 값`);
+  }
+  // #5·#6: 원고·생성기의 규칙 문장
+  const src = readFileSync('coach/math/ratio.json', 'utf8') + readFileSync('js/mathrat.js', 'utf8');
+  assert.doesNotMatch(src, /소수는 10배|더하면 달라진다|더하면 비율이 변해요|\*\*더하면\*\* 달라져요/, '일반 규칙처럼 넘겨 말하는 문장');
+  assert.match(JSON.parse(readFileSync('coach/math/ratio.json', 'utf8'))['rat.simplest'].rule, /100/, '소수의 비 규칙이 100배(두 자리)를 품는다 — 0.5 : 0.75');
 });
 
 test('이야기에 없는 가족을 지어내지 않는다 — 진우에게는 동생이 없다 (수학 생성기·원고 전체)', async () => {

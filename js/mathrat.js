@@ -165,6 +165,7 @@ export const TAGS = {
   diffConst: '뺄셈 비교가 그대로라고 봄',
   swap: '기준량과 비교량을 뒤바꿈',
   whole: '전체를 기준량으로 봄',
+  wholeCmp: '전체를 비교량으로 씀',   // 7 : 11에서 18 : 11 — 기준량은 그대로, 비교량 자리에 합 (Codex 13차 #3)
   noHundred: '100을 곱하지 않음',
   pctAsNum: '백분율을 그대로 수로 씀',
   pctNumerator: '분자를 그대로 백분율로 씀',
@@ -174,7 +175,8 @@ export const TAGS = {
   misses: '못 잡는 횟수를 셈',
   baseWater: '기준량을 물로 봄',
   addSame: '같은 수를 더함',
-  oneSide: '한쪽에만 곱함',
+  subSame: '같은 수를 뺌',            // 18 : 36 = 3 : □에서 21 — 두 항에서 15를 뺌 (Codex 13차 #4)
+  oneSide: '한쪽에만 곱하거나 나눔',
   notLowest: '끝까지 나누지 않음',
   numerRatio: '분자끼리 비로 씀',
   denomRatio: '분모끼리 비로 씀',
@@ -305,7 +307,7 @@ export const RATIO = [
         `${P.a} 수와 ${P.b} 수의 비`,
       ]);
       const fams = [
-        { ans: R(a, b), wr: [{ text: R(b, a), tag: TAGS.swap }, { text: R(a, a + b), tag: TAGS.whole }, { text: R(a + b, b), tag: TAGS.whole }],
+        { ans: R(a, b), wr: [{ text: R(b, a), tag: TAGS.swap }, { text: R(a, a + b), tag: TAGS.whole }, { text: R(a + b, b), tag: TAGS.wholeCmp }],
           probe: { phrase: ph }, ratioText: true, steps: [`기준량은 ${P.b} 수(${b}), 비교량은 ${P.a} 수(${a})`, `비교량 : 기준량 → ${R(a, b)}`], pools: {
             pokemon: [
               `${have(P, a, b)}${josa(P.u, '이', '가')} 있어요. ${ph}는 어느 것일까요?`,
@@ -325,6 +327,7 @@ export const RATIO = [
             why: {
               [TAGS.swap]: '기준량과 비교량을 바꿔 썼어요. "~에 대한" 앞(또는 "대" 뒤)이 **기준량**이고, 기준량은 비의 **뒤**에 써요.',
               [TAGS.whole]: '둘을 더한 전체를 기준으로 잡았어요. 문제는 전체가 아니라 두 수끼리 비교하라고 했어요.',
+              [TAGS.wholeCmp]: `비교량 자리에 둘을 더한 전체를 썼어요. 비교량은 전체가 아니라 ${P.a} 수 하나예요.`,
             },
             rule: '비교량 : 기준량. "~에 대한" 앞이 기준량.',
           }),
@@ -336,6 +339,9 @@ export const RATIO = [
       const P = pairFor(r, c);
       let a = int(r, 2, 12); let b = int(r, 2, 12);
       if (a === b) b = a + int(r, 1, 3);
+      // 비교량 < 기준량만 — 8 : 2처럼 앞이 크면 "비는 큰 수를 앞에 써요"가 이 예에서만 우연히 맞는 고침이 된다
+      // (Codex 13차 #2, 절반쯤이 그랬다 · rat.value ②의 11 : 4와 같은 모양)
+      if (a > b) [a, b] = [b, a];
       const ph = `${P.b} 수에 대한 ${P.a} 수의 비`;
       const q = showWork(`${have(P, a, b)} → ${ph}는 ${jn(R(b, a), '이에요', '예요')}`);
       const chs = textChoices(r, `기준량(${P.b} 수)을 뒤에 써야 해요 — ${R(a, b)}`, [
@@ -365,6 +371,8 @@ export const RATIO = [
       let a = int(r, 1, b - 1);
       for (let i = 0; i < 20 && gcd(a, b) !== 1; i++) a = int(r, 1, b - 1);
       const b2 = int(r, 3, 12); let a2 = int(r, 1, 12); if (a2 === b2) a2 += 1;
+      // "기약분수로" 묻는데 12 : 3 = 4처럼 자연수가 답이면 안 된다 (Codex 13차 #7) — 한 칸 옮기면 나머지가 1이라 나누어떨어지지 않는다
+      if (a2 % b2 === 0) a2 += 1;
       const throws = pick(r, [10, 20, 25, 50]); const hit = int(r, 1, throws - 1);
       const fams = [
         { ans: fr(a2, b2), wr: [{ text: fr(b2, a2), tag: TAGS.swap }, { text: fr(a2, a2 + b2), tag: TAGS.whole }],
@@ -558,7 +566,8 @@ export const RATIO = [
         const chs = textChoices(r, `${rate}%는 ${rate}원이 아니라 ${off}원이에요 — ${sale}원에 팔아요`, [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
           { text: `${rate}원에 팔아요`, tag: TAGS.pctAsNum },
-          { text: '할인은 곱하기로 해요', tag: OFF },
+          // "할인은 곱하기로 해요"는 틀린 말이 아니었다(값 × 백분율이 빠진 단계) — 분명히 틀린 곱셈으로 (Codex 13차 #1)
+          { text: `원래 값에 ${jn(rate, '을', '를')} 곱하면 파는 값이에요`, tag: OFF },
         ]);
         return {
           ...misreadAsk(this.id, 'won', fill(q, c), chs, {
@@ -590,7 +599,8 @@ export const RATIO = [
 
   {
     id: 'rat.prop', grade: 6, name: '비의 성질', needs: ['rat.percentuse'],
-    idea: '비의 전항과 후항에 **0이 아닌 같은 수를 곱하거나 나누어도** 비율은 같아요 (2 : 3 = 8 : 12). **더하면** 달라져요.',
+    // 더하기를 "늘 비율이 바뀐다"고 단정하면 2 : 2(+3 → 5 : 5)에서 거짓 — "달라질 수 있어서 쓸 수 없다"로 (Codex 13차 #6)
+    idea: '비의 전항과 후항에 **0이 아닌 같은 수를 곱하거나 나누어도** 비율은 같아요 (2 : 3 = 8 : 12). 같은 수를 **더하면** 비율이 달라질 수 있어서 쓸 수 없어요.',
     slip: '전항에 곱한(나눈) 수를 후항에도 똑같이 곱해(나눠) 봐요.',
     calc(r, c) {
       const a = int(r, 1, 9); let b = int(r, 2, 9); if (a === b) b = a + 1;
@@ -600,7 +610,7 @@ export const RATIO = [
           probe: { calc: `${b} × ${a * k} ÷ ${a}` }, steps: [`${a} → ${a * k}: ${k}배`, `후항도 ${k}배 → ${b} × ${k} = ${b * k}`], pools: {
             pokemon: [`${R(a, b)} = ${a * k} : □ — □에 알맞은 수는?`],
           } },
-        { ans: String(b), wr: [{ text: b * k - (a * k - a) > 0 ? String(b * k - (a * k - a)) : '', tag: TAGS.addSame }, { text: String(b * k), tag: TAGS.oneSide }], // 뺀 값이 0 이하면 버린다 (음수 보기)
+        { ans: String(b), wr: [{ text: b * k - (a * k - a) > 0 ? String(b * k - (a * k - a)) : '', tag: TAGS.subSame }, { text: String(b * k), tag: TAGS.oneSide }], // 뺀 값이 0 이하면 버린다 (음수 보기)
           probe: { calc: `${b * k} × ${a} ÷ ${a * k}` }, steps: [`${a * k} → ${a}: ${ro(k)} 나눔`, `후항도 ${ro(k)} 나눔 → ${b * k} ÷ ${k} = ${b}`], pools: {
             pokemon: [`${R(a * k, b * k)} = ${a} : □ — □에 알맞은 수는?`],
           } },
@@ -615,11 +625,12 @@ export const RATIO = [
         ...ask(this.id, 'calc', fill(worldPick(r, c, f.pools), c), chs, {
           solve: solve(f.steps.map((t, i) => step(i, t)), {
             why: {
-              [TAGS.addSame]: '같은 수를 **더했어요**. 더하면 비율이 달라져요 — 곱하거나 나눠야 해요.',
+              [TAGS.addSame]: '같은 수를 **더했어요**. 이 문제에서는 비율이 달라져요 — 곱하거나 나눠야 해요.',
+              [TAGS.subSame]: '같은 수를 **뺐어요**. 이 문제에서는 비율이 달라져요 — 곱하거나 나눠야 해요.',
               [TAGS.oneSide]: '한쪽에만 곱했어요(나눴어요). 전항과 후항에 **똑같이** 해야 해요.',
               [TAGS.swap]: '전항과 후항의 순서를 바꾸면 다른 비예요.',
             },
-            rule: '두 항에 같은 수를 곱하거나 나눈다 — 더하지 않는다.',
+            rule: '두 항에 같은 수를 곱하거나 나눈다 — 더하거나 빼지 않는다.',
           }),
         }),
         probe: f.probe,
@@ -629,15 +640,15 @@ export const RATIO = [
       const a = int(r, 1, 6); let b = int(r, 2, 7); if (a === b) b = a + 1;
       const k = int(r, 2, 5); const add = a * k - a;
       const q = showWork(`${R(a, b)} = ${R(a * k, b + add)} — 두 항에 ${jn(add, '을', '를')} 더했어요`);
-      const chs = textChoices(r, `더하면 비율이 달라져요 — 곱해야 해요: ${R(a * k, b * k)}`, [
+      const chs = textChoices(r, `더했더니 비율이 달라졌어요 — 곱해야 해요: ${R(a * k, b * k)}`, [
         { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-        { text: '전항에만 더해야 해요', tag: TAGS.oneSide },
+        { text: '전항에만 곱해야 해요', tag: TAGS.oneSide }, // 이름표가 "한쪽에만 곱하거나 나눔"이라 "더해야"는 맞지 않았다
         { text: '비는 바꿀 수 없어요', tag: OFF },
       ]);
       return {
         ...misreadAsk(this.id, 'add', fill(q, c), chs, {
           solve: solve([step(0, `${a} → ${jn(a * k, '은', '는')} ${k}배`), step(1, `${b}도 ${k}배 → ${b * k}`)], {
-            whyAny: `더하면 비율이 달라져요. ${jn(`${a}/${b}`, '과', '와')} ${jn(`${a * k}/${b + add}`, '은', '는')} 같지 않아요.`,
+            whyAny: `더했더니 비율이 달라졌어요. ${jn(`${a}/${b}`, '과', '와')} ${jn(`${a * k}/${b + add}`, '은', '는')} 같지 않아요.`,
             rule: '두 항에 같은 수를 곱하거나 나눈다.',
           }),
         }),
@@ -648,7 +659,8 @@ export const RATIO = [
 
   {
     id: 'rat.simplest', grade: 6, name: '간단한 자연수의 비로 나타내기', needs: ['rat.prop'],
-    idea: '두 항을 **최대공약수로 나누면** 간단한 자연수의 비 (12 : 18 = 2 : 3). 소수는 10배, 분수는 분모의 공배수를 곱해 자연수로 먼저 만들어요.',
+    // 소수를 늘 10배 하라고 하면 0.5 : 0.75에 안 맞는다 — 자릿수에 맞춰 10·100배 (Codex 13차 #5). 생성기 문항은 소수 한 자리라 10배 그대로
+    idea: '두 항을 **최대공약수로 나누면** 간단한 자연수의 비 (12 : 18 = 2 : 3). 소수는 자릿수에 맞춰 10배·100배, 분수는 분모의 공배수를 곱해 자연수로 먼저 만들어요.',
     slip: '두 항을 더 나눌 수 있는지 (공약수가 남았는지) 다시 봐요.',
     calc(r, c) {
       let p = int(r, 1, 9); let q = int(r, 2, 9);
@@ -788,7 +800,7 @@ export const RATIO = [
       return {
         ...misreadAsk(this.id, 'diff', fill(q2, c), chs, {
           solve: solve([step(0, `${a} × □ = ${b} × ${cc}`), step(1, `□ = ${ans}`)], {
-            whyAny: '차를 같게 하면 비율이 달라져요. 외항의 곱과 내항의 곱이 같아야 해요.',
+            whyAny: '차를 같게 맞췄더니 비율이 달라졌어요. 외항의 곱과 내항의 곱이 같아야 해요.',
             rule: '외항의 곱 = 내항의 곱.',
           }),
         }),
