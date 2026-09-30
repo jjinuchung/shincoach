@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { textVal, unitOf, padSpec, readTyped, matchTyped, partsOf } from '../js/mathpad.js';
-import { STEMS, STEM_ORDER, applyRound, conceptReport, mathReportText } from '../js/mathprog.js';
+import { STEMS, STEM_ORDER, applyRound, applyPlacement, conceptReport, mathReportText } from '../js/mathprog.js';
 import { emptyMath } from '../js/db.js';
 import { askContext, addAsk, asksText } from '../js/mathask.js';
 
@@ -24,7 +24,9 @@ test('보기 글 → 값: 자연수·소수·음수·%·분수·대분수·비, 
   assert.deepEqual(textVal('20/32'), { form: 'frac', v: { n: 5, d: 8 }, reduced: false });
   assert.equal(textVal('5/8').reduced, true);
   assert.deepEqual(textVal('−1/2').v, { n: -1, d: 2 });
-  assert.deepEqual(textVal('2 1/6'), { form: 'mixed', v: { n: 13, d: 6 } });
+  assert.deepEqual(textVal('2 1/6'), { form: 'mixed', v: { n: 13, d: 6 }, proper: true });
+  assert.equal(textVal('0 17/4').proper, false, '자연수 부분 0');
+  assert.equal(textVal('3 5/4').proper, false, '분수 부분이 1 이상');
   assert.deepEqual(textVal('24 : 1.5'), { form: 'ratio', a: { n: 24, d: 1 }, b: { n: 3, d: 2 } });
   for (const s of ['직선 ㉰', '2 + (−6)', '1, 2, 3, 6', '3/0', '', '위아래를 바꿔 썼어요']) assert.equal(textVal(s), null, s);
 });
@@ -68,7 +70,7 @@ test('채점 규칙: 같은 값 · 꼴을 묻는 문제 · 약분 안내 · 오�
   assert.equal(r1.i, 0); assert.match(r1.note, /약분하면 5\/2/);
   assert.equal(matchTyped(q1, readTyped('frac', { n: '20', d: '32' }), s1).i, 1, '분모에도 곱함 — 오답 보기와 같은 글');
   assert.equal(matchTyped(q1, readTyped('frac', { n: '10', d: '64' }), s1).i, 3, '5/32와 같은 값이면 그 오답');
-  assert.deepEqual(matchTyped(q1, readTyped('num', { x: '7' }), s1), { i: -1, note: null }, '어느 보기도 아니면 짐작한 답');
+  assert.deepEqual(matchTyped(q1, readTyped('num', { x: '7' }), s1), { i: -1, note: null, reason: 'none' }, '어느 보기도 아니면 짐작한 답');
   // 꼴을 묻는 문제 — 값이 같아도 꼴이 다르면 틀림
   const q2 = Q('0.5를 기약분수로 나타내면 얼마일까요?', '1/2', '1/3', '1', '1/20');
   const s2 = padSpec(q2);
@@ -76,12 +78,25 @@ test('채점 규칙: 같은 값 · 꼴을 묻는 문제 · 약분 안내 · 오�
   assert.match(matchTyped(q2, readTyped('num', { x: '0.5' }), s2).note, /분수로 나타내야/);
   assert.equal(matchTyped(q2, readTyped('num', { x: '0.5' }), s2).i, -1);
   const r2 = matchTyped(q2, readTyped('frac', { n: '2', d: '4' }), s2);
-  assert.equal(r2.i, -1); assert.match(r2.note, /끝까지 약분/);
+  assert.equal(r2.i, -1); assert.match(r2.note, /끝까지 약분/); assert.equal(r2.reason, 'reduce');
+  // Codex 18차 #1: "약분해서 나타내면"도 약분·분수를 묻는 말 (생성기 frac.equal의 한 말투)
+  const q2b = STEMS.fraction.gen.makeQuestion('frac.equal', 'calc', 23757, OPTS);
+  assert.match(q2b.q, /약분해서 나타내면/);
+  const s2b = padSpec(q2b, 'fraction');
+  assert.equal(s2b.need, 'frac'); assert.equal(s2b.reduce, true);
+  const okb = partsOf(q2b.choices.find((c) => c.ok).text).p;
+  assert.equal(matchTyped(q2b, readTyped('frac', { n: String(okb.n * 2), d: String(okb.d * 2) }, s2b), s2b).i, -1, '약분 안 한 답은 틀림');
   const q3 = Q('피카츄가 피자를 35/8판 먹었어요. 몇 판하고 몇 조각일까요? (대분수로)', '4 3/8', '3 4/8', '5 3/8', '4 3/9');
   const s3 = padSpec(q3);
   assert.equal(s3.need, 'mixed'); assert.deepEqual(s3.modes, ['num', 'frac', 'mixed']);
   assert.equal(matchTyped(q3, readTyped('frac', { n: '35', d: '8' }), s3).i, -1, '대분수로 물었는데 가분수');
   assert.equal(matchTyped(q3, readTyped('mixed', { w: '4', n: '3', d: '8' }), s3).i, 0);
+  assert.equal(matchTyped(q3, readTyped('frac', { n: '35', d: '8' }), s3).reason, 'form', '꼴만 틀림 — 짐작이 아니다');
+  // Codex 18차 #2: 대분수 칸을 골랐다고 끝이 아니다 — 0 35/8 · 3 11/8은 값은 같아도 대분수가 아니다
+  for (const p of [{ w: '0', n: '35', d: '8' }, { w: '3', n: '11', d: '8' }]) {
+    const r = matchTyped(q3, readTyped('mixed', p, s3), s3);
+    assert.equal(r.i, -1, `${p.w} ${p.n}/${p.d}`); assert.equal(r.reason, 'form'); assert.match(r.note, /1보다 작아야/);
+  }
   // 백분율 — % 칸, 0.44%는 그 오답
   const q4 = Q('11/25을 백분율로 나타내면 얼마일까요?', '44%', '49%', '0.44%', '11%');
   const s4 = padSpec(q4);
@@ -130,7 +145,15 @@ test('★ 모든 줄기의 ① 계산: 정답을 치면 맞음 · 오답을 치�
           wrongTyped++;
         });
         // 어느 보기도 아닌 수 — 짐작한 답
-        if (okV.form !== 'ratio') assert.deepEqual(matchTyped(q, readTyped('num', { x: '98765' }, spec), spec), { i: -1, note: null }, where);
+        if (okV.form !== 'ratio') assert.deepEqual(matchTyped(q, readTyped('num', { x: '98765' }, spec), spec), { i: -1, note: null, reason: 'none' }, where);
+        // 꼴을 묻는 말은 문제 글에서 따로 읽어 대조 — padSpec을 믿고 넘어가면 못 알아본 말투("약분해서")를 못 잡는다 (Codex 18차 #1)
+        const qt = String(q.q);
+        if (/약분|기약분수|가장 간단한 분수/.test(qt)) { assert.equal(spec.need, 'frac', `${where}: 약분을 묻는데 need`); assert.equal(spec.reduce, true, `${where}: 약분을 묻는데 reduce`); }
+        if (/대분수로/.test(qt)) assert.equal(spec.need, 'mixed', where);
+        if (/가분수로/.test(qt)) assert.equal(spec.need, 'frac', where);
+        if (/소수로 나타내|답은 소수로/.test(qt)) assert.equal(spec.need, 'num', where);
+        // 분수 답에 "조각" 단위 — "몇 조각?"을 묻고 17/4를 답으로 받던 문장 (Codex 18차 #3)
+        assert.ok(!(okV.form !== 'num' && spec.unit === '조각'), `${where}: 분수 답인데 단위가 조각`);
         // 약분이 덜 된 정답 — 꼴을 묻지 않으면 맞음 + 안내, 약분을 묻는 문제면 틀림
         if (okV.form === 'frac' && okV.v.d !== 1 && +tOk.p.n < 500) {
           const tw = { ...tOk.p, n: String(+tOk.p.n * 2), d: String(+tOk.p.d * 2) }; // 정답 글의 수를 두 배로 (6/8 → 12/16)
@@ -185,4 +208,30 @@ test('기록: 직접 쓴 답(✍)·짐작한 값이 일지 · 📊 개념 표 ·
   assert.equal(ctx.pad, 1);
   addAsk(m, ctx, T, '');
   assert.match(asksText(m, T), /진우 답: 7\/12 \(✍️ 직접 씀\) ❌/);
+});
+
+test('기록 (Codex 18차 #4·#5·#6): 꼴·약분만 틀린 답은 짐작이 아니다 · 진단의 🤷도 "몰랐음"으로 · 최근 짐작 셋은 시간 순', () => {
+  const T = '2026-10-01';
+  // #5 진단 — 모르겠어요(w: 'u')와 꼴(pf)이 일반 편처럼 남는다
+  const md = emptyMath();
+  applyPlacement(md, [{ concept: 'frac.mean', correct: false, p: 1, w: 'u' }, { concept: 'frac.same', correct: false, p: 1, pf: 'form' }, { concept: 'frac.mixed', correct: false, p: 1, g: '98765' }], T, 'fraction', []);
+  assert.deepEqual(md.log[md.log.length - 1].qs, [
+    { k: 'calc', ok: 0, w: 'u', p: 1, c: 'frac.mean' },
+    { k: 'calc', ok: 0, p: 1, pf: 'form', c: 'frac.same' },
+    { k: 'calc', ok: 0, p: 1, g: '98765', c: 'frac.mixed' },
+  ]);
+  // #4 꼴만 틀림 — g 없이 pf, 📋에 ‹꼴이 다름›
+  const m = emptyMath();
+  applyRound(m, 'frac.mixed', { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: 0, p: 1, pf: 'form' }] }, T);
+  assert.deepEqual(m.log[m.log.length - 1].qs[0], { k: 'calc', ok: 0, p: 1, pf: 'form' });
+  assert.deepEqual(conceptReport(m).find((r) => r.id === 'frac.mixed').guesses, []);
+  assert.match(mathReportText(m, T), /①✍✘‹꼴이 다름›/);
+  // #6 최근 짐작 셋 — 개념 편과 🤔 노트가 섞여도 시간 순 (1 편 · 2 노트 · 3 · 4 · 5 편 → 3, 4, 5)
+  const mg = emptyMath();
+  const put = (g, notes) => {
+    applyRound(mg, 'frac.mul', { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: 0, p: 1, g }] }, T);
+    if (notes) { const e = mg.log[mg.log.length - 1]; e.id = 'notes'; e.qs = e.qs.map((q) => ({ ...q, c: 'frac.mul' })); }
+  };
+  put('1'); put('2', true); put('3'); put('4'); put('5');
+  assert.deepEqual(conceptReport(mg).find((r) => r.id === 'frac.mul').guesses, ['3', '4', '5']);
 });

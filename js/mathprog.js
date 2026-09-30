@@ -153,7 +153,8 @@ export function applyPlacement(m, answers, today, strand = 'fraction', missTags 
   for (const t of (missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
   const ok = (answers || []).filter((a) => a && a.correct).length;
   pushLog(m, { d: today, t: Date.now(), id: 'diag', mode: 'diag', ok, n: (answers || []).length,
-    qs: (answers || []).map((a) => ({ k: 'calc', c: a.concept, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: String(a.g).slice(0, 16) } : {}) })) }); // 🔢 진단도 숫자판 — 짐작한 값이 제일 궁금한 자리
+    // 🔢 진단도 숫자판 — 짐작한 값이 제일 궁금한 자리. 🤷 모르겠어요(w)·꼴(pf)도 일반 편과 같은 logQ로 (Codex 18차 #5 — w가 빠졌다)
+    qs: (answers || []).map((a) => ({ ...logQ({ k: 'calc', ok: a.correct, tag: a.tag, w: a.w, p: a.p, g: a.g, pf: a.pf }), c: a.concept })) });
   return { startId, knownIds };
 }
 
@@ -187,7 +188,9 @@ function pushLog(m, entry) {
 function logQ(q) {
   return { k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }), ...(q.sn === undefined ? {} : { sn: q.sn ? 1 : 0 }), ...(q.w ? { w: q.w } : {}),
     // 🔢 숫자판(2026-10-01) — p: 직접 쓴 답 · g: 어느 보기와도 다른 "짐작한 답"의 값 (오개념엔 안 넣고 부모가 보게)
-    ...(q.p ? { p: 1 } : {}), ...(q.g ? { g: String(q.g).slice(0, 16) } : {}) };
+    ...(q.p ? { p: 1 } : {}), ...(q.g ? { g: String(q.g).slice(0, 16) } : {}),
+    // pf: 값은 맞는데 꼴('form' — 대분수로·소수로를 물었는데 다른 꼴) · 약분('reduce')만 틀림 — 짐작이 아니다 (Codex 18차 #4)
+    ...(q.pf === 'form' || q.pf === 'reduce' ? { pf: q.pf } : {}) };
 }
 export const WHY_LABEL = { s: '실수', c: '헷갈림', u: '몰랐음' };
 
@@ -743,7 +746,9 @@ export function conceptReport(m, limit = 8) {
     // 🔢 숫자판으로 직접 쓴 답의 정답률과 짐작한 값(최근 셋) — 보기를 찍을 때와 견주어 볼 수 있게
     const padQ = allQ.filter((q) => q.p === 1);
     const pad = [padQ.filter((q) => q.ok === 1).length, padQ.length];
-    const guesses = padQ.filter((q) => q.g).map((q) => q.g).slice(-3);
+    // "최근" 짐작 셋은 일지를 시간 순으로 한 번 훑어서 — allQ는 개념 편 먼저·노트/섞어 나중이라 옛 노트가 새 것을 밀어냈다 (Codex 18차 #6)
+    const guesses = log.flatMap((e) => (e.id === id ? (e.qs || []) : (e.id === 'notes' || e.id === 'mix' || e.id === 'ask') ? (e.qs || []).filter((q) => q.c === id) : []))
+      .filter((q) => q.p === 1 && q.g).map((q) => q.g).slice(-3);
     // 진단으로만 "안다"가 된 개념(passes 1은 진단의 것)은 한 편도 안 푼 것이라 표에 안 올린다 — 복습에서 풀면 일지가 생겨 올라온다
     const noteList = (Array.isArray(rec.notes) ? rec.notes : []).map((n) => ({ k: n.k, label: KIND_SHORT[n.k] || n.k || '', tag: n.tag || '', d: n.d || '', again: n.again || 0, fx: n.fx }));
     const notes = noteList.length;
@@ -769,7 +774,7 @@ export function mathReportText(m, today) {
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
-      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
+      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
       lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? '🎲섞어풀기' : e.id === 'ask' ? '❓답장뒤풀기' : nameOf(e.id)} ${e.mode || ''} ${e.ok}/${e.n} ${qs}`);
     }
   }

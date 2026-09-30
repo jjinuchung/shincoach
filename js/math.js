@@ -1339,8 +1339,10 @@ function typedHooks(q, spec, go) {
   return {
     onSubmit: (typed) => {
       const res = matchTyped(q, typed, spec);
-      const i = res.i >= 0 ? res.i : extra(typed.text, 'guess');
-      go(i, { text: typed.text, note: res.note, guess: res.i < 0 });
+      // 값은 맞는데 꼴·약분만 틀린 답은 "짐작"이 아니다 — 틀림은 그대로, 기록은 pf(꼴/약분)로 (Codex 18차 #4)
+      const miss = res.i < 0 && (res.reason === 'form' || res.reason === 'reduce') ? res.reason : null;
+      const i = res.i >= 0 ? res.i : extra(typed.text, miss ? 'formMiss' : 'guess');
+      go(i, { text: typed.text, note: res.note, guess: res.i < 0 && !miss, form: miss });
     },
     onIdk: () => go(extra('모르겠어요', 'idk'), { text: '모르겠어요', note: null, idk: true }),
   };
@@ -1364,7 +1366,7 @@ function answer(i, list, card, typed = null) {
     concept: q.concept, correct: !!ch.ok, kind: q.kind, chosen: ch.text, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }), // 얼굴·오개념까지 — 📒 일지용
     ...(sense && picked !== undefined ? { sn: picked === sense.ok ? 1 : 0 } : {}), // 🎯 감 잡기가 맞았나
     // 🔢 직접 쓴 답 — 친 그대로 남기고(10/64를 5/32로 바꿔 적지 않는다), 짐작한 값은 g로, 모르겠어요는 "잘 몰랐어요"로
-    ...(typed ? { p: 1, chosen: typed.text, ...(typed.guess ? { g: typed.text } : {}), ...(typed.idk ? { w: 'u' } : {}), ...(typed.note ? { pn: typed.note } : {}) } : {}),
+    ...(typed ? { p: 1, chosen: typed.text, ...(typed.guess ? { g: typed.text } : {}), ...(typed.form ? { pf: typed.form } : {}), ...(typed.idk ? { w: 'u' } : {}), ...(typed.note ? { pn: typed.note } : {}) } : {}),
   });
   paintAnswer(i, list, card, false);
   maybeBattle(); // ⚔️ 아주 가끔 트레이너가 걸어온다 (다음 문항으로 넘어갈 때 열린다)
@@ -1372,7 +1374,7 @@ function answer(i, list, card, typed = null) {
 }
 
 /** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
-const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}) });
+const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}), ...(a.pf ? { pf: a.pf } : {}) });
 
 /** 🙈 틀린 이유 고르기 — 고를 때까지 다음 버튼이 잠긴다. 실수면 이 문항의 오개념 이름표를 거둔다 */
 function whyBlock(a, next, onDone) {

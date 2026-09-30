@@ -35,7 +35,7 @@ export function askContext(q, a) {
     concept: q.concept, k: q.kind || 'calc', key: q.key || '', q: String(q.q || ''), expr: String(q.expr || ''),
     my: String((a && a.chosen) || ''), ans: String(okCh.text || ''), tag: String((a && a.tag) || ''), w: String((a && a.w) || ''),
     // 🔢 숫자판으로 쓴 답은 보기에 없는 수일 수 있다 — 화면이 덧붙인 "짐작한 답"·"모르겠어요"는 보기 목록에서 뺀다
-    choices: (q && q.choices || []).filter((c) => c && !c.guess && !c.idk).map((c) => String(c.text || '')), seen,
+    choices: (q && q.choices || []).filter((c) => c && !c.guess && !c.idk && !c.formMiss).map((c) => String(c.text || '')), seen,
     ...(a && a.p ? { pad: 1 } : {}),
   };
 }

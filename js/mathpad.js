@@ -45,7 +45,8 @@ export function textVal(text) {
   if ((m = /^([+-]?)(\d+) (\d+)\/(\d+)$/.exec(s))) {
     if (+m[4] === 0) return null;
     const v = rat(+m[2] * +m[4] + +m[3], +m[4]);
-    return { form: 'mixed', v: m[1] === '-' ? rat(-v.n, v.d) : v };
+    // proper: 자연수 부분 1 이상 · 분수 부분 1보다 작음 — "대분수로"를 물었을 때 0 17/4·3 5/4를 맞음으로 치지 않게 (Codex 18차 #2)
+    return { form: 'mixed', v: m[1] === '-' ? rat(-v.n, v.d) : v, proper: +m[2] >= 1 && +m[3] > 0 && +m[3] < +m[4] };
   }
   if ((m = /^([+-]?)(\d+)\/(\d+)$/.exec(s))) {
     if (+m[3] === 0) return null;
@@ -98,8 +99,9 @@ export function padSpec(q, stemKey = '') {
   const text = `${q.q || ''}\n${q.expr || ''}`.replace(/\[[a-z]+ [^\]]*\]/g, ' '); // 그림 지시문의 수는 빼고
   const vals = q.choices.map((c) => textVal(c.text)).filter(Boolean);
   if (okV.form === 'ratio') return { modes: ['ratio'], start: 'ratio', unit: '', signed: false, need: 'ratio', reduce: false };
-  const need = /대분수로/.test(text) ? 'mixed' : /분수로|기약분수|약분하면/.test(text) ? 'frac' : /소수로|백분율로/.test(text) ? 'num' : null;
-  const reduce = /기약분수|약분하면|가장 간단한/.test(text);
+  // "약분해서 나타내면"을 못 알아봐 4/10·0.4가 맞음이 됐다 (Codex 18차 #1) — 약분하면·약분해서·약분하여 모두
+  const need = /대분수로/.test(text) ? 'mixed' : /분수로|기약분수|약분(하면|해서|하여)/.test(text) ? 'frac' : /소수로|백분율로/.test(text) ? 'num' : null;
+  const reduce = /기약분수|약분(하면|해서|하여)|가장 간단한/.test(text);
   const hasMixed = need === 'mixed' || /대분수|\d+ \d+\/\d+/.test(text) || vals.some((v) => v.form === 'mixed');
   const modes = hasMixed ? ['num', 'frac', 'mixed'] : ['num', 'frac'];
   // 처음 칸 — 보기 전체에서 가장 많은 꼴 (정답이 어느 것인지와 상관없게). 같으면 문제 글에 분수가 있을 때 분수
@@ -148,7 +150,9 @@ const norm = (t) => String(t).replace(/−/g, '-').replace(/\s*:\s*/g, ' : ').re
  * @param {{choices:Array<{text:string, ok?:boolean}>}} q
  * @param {{text:string, val:object}} typed readTyped의 결과
  * @param {{need?:string|null, reduce?:boolean}} spec padSpec의 결과
- * @returns {{i:number, note:string|null}} i = 보기 번호(-1이면 어느 보기도 아님) · note = 한 줄 안내
+ * @returns {{i:number, note:string|null, reason?:string}} i = 보기 번호(-1이면 어느 보기도 아님) · note = 한 줄 안내 ·
+ *   reason(i가 -1일 때): 'form' 값은 맞는데 꼴이 다름 · 'reduce' 약분이 덜 됨 · 'none' 어느 보기와도 다른 짐작한 답
+ *   (꼴·약분은 "짐작"이 아니다 — 값은 안다. 📊에 짐작으로 적히던 것, Codex 18차 #4)
  */
 export function matchTyped(q, typed, spec = {}) {
   const choices = q.choices || [];
@@ -158,10 +162,13 @@ export function matchTyped(q, typed, spec = {}) {
   const v = typed.val;
   // 꼴을 묻는 문제 — 값이 같아도 꼴이 다르면 틀림 (0.5를 "분수로" 물었는데 0.5라고 쓰면 안 된다)
   if (sameVal(v, okV) && spec.need && v.form !== spec.need) {
-    return { i: -1, note: `${FORM_NAME[spec.need]}로 나타내야 해요 — ${ok.text}` };
+    return { i: -1, note: `${FORM_NAME[spec.need]}로 나타내야 해요 — ${ok.text}`, reason: 'form' };
+  }
+  if (sameVal(v, okV) && spec.need === 'mixed' && v.form === 'mixed' && !v.proper) {
+    return { i: -1, note: `대분수는 앞의 자연수가 1 이상이고 분수 부분이 1보다 작아야 해요 — ${ok.text}`, reason: 'form' };
   }
   if (sameVal(v, okV) && spec.reduce && v.form === 'frac' && !v.reduced) {
-    return { i: -1, note: `끝까지 약분해야 해요 — ${ok.text}` };
+    return { i: -1, note: `끝까지 약분해야 해요 — ${ok.text}`, reason: 'reduce' };
   }
   const exact = choices.findIndex((c) => norm(c.text) === norm(typed.text));
   if (exact >= 0) return { i: exact, note: null };
@@ -173,7 +180,7 @@ export function matchTyped(q, typed, spec = {}) {
     return { i: okI, note };
   }
   const wrong = choices.findIndex((c) => !c.ok && sameVal(v, textVal(c.text)));
-  return { i: wrong, note: null };
+  return wrong >= 0 ? { i: wrong, note: null } : { i: -1, note: null, reason: 'none' };
 }
 
 /** 보기 글 → 그 꼴의 칸에 친 글자 (테스트·헤드리스 도우미가 "정답을 쳐 본다") */

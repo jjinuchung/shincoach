@@ -34,6 +34,7 @@ export function padBox(spec, { onSubmit, onIdk }) {
   let parts = { sign: '', x: '', w: '', n: '', d: '', a: '', b: '' };
   let focus = FIELDS[mode][0];
   let done = false;
+  const drafts = {}; // 칸 종류마다 쓰던 것 — [분수]에 17/4를 쓰다 [수]를 눌렀다 돌아오면 그대로 (Codex 18차 #7: 전엔 다 지워졌다)
 
   // 칸 바꾸기 — 한 가지뿐이면(비) 안 보인다
   const modeRow = el('div', 'math-pad-modes');
@@ -45,7 +46,8 @@ export function padBox(spec, { onSubmit, onIdk }) {
       b.dataset.mode = m;
       b.addEventListener('click', () => {
         if (done || mode === m) return;
-        mode = m; parts = { ...parts, x: '', w: '', n: '', d: '', a: '', b: '' }; focus = FIELDS[m][0];
+        drafts[mode] = Object.fromEntries(FIELDS[mode].map((f) => [f, parts[f]]));
+        mode = m; parts = { ...parts, x: '', w: '', n: '', d: '', a: '', b: '', ...(drafts[m] || {}) }; focus = FIELDS[m][0];
         paint();
       });
       modeRow.appendChild(b);
