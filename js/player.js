@@ -2699,7 +2699,9 @@ function releaseWakeLock() {
 function loadSettings() {
   const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always',
     // ⏳ 하루 과목별 시간 제한 (2026-09-27, 아버님) — 켜짐이 기본. 지워도 이 값으로 돌아올 뿐 시간이 늘지 않는다
-    timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend };
+    timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend,
+    // 🔢 수학 숫자판 (2026-10-01) — 켜짐이 기본. math.js가 같은 localStorage에서 읽는다
+    mathPad: true };
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('shincoach.settings') || '{}') || {}; } catch { saved = {}; }
   const s = { ...defaults, ...saved };
@@ -2814,6 +2816,7 @@ function initSettingsDialog() {
     settings.timeLimit = $('set-timelimit').checked;
     settings.timeWeekday = clampMin($('set-time-weekday').value, TIME_MIN.weekday);
     settings.timeWeekend = clampMin($('set-time-weekend').value, TIME_MIN.weekend);
+    settings.mathPad = $('set-mathpad').checked;
     if (!settings.hideEnWhileSpeaking) state.speakHideEn = 'none'; // 끄면 대기 중이던 숨김도 해제
     if (settings.listenFirst === 0) state.enRevealed = true;
     applySubVisibility();
@@ -2874,6 +2877,7 @@ function openSettings() {
     $('set-timelimit').checked = settings.timeLimit !== false;
     $('set-time-weekday').value = String(Number(settings.timeWeekday));
     $('set-time-weekend').value = String(Number(settings.timeWeekend));
+    $('set-mathpad').checked = settings.mathPad !== false;
     renderTimeToday();
     $('dlg-settings').showModal();
   });

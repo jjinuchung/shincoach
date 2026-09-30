@@ -559,7 +559,8 @@ export async function renderStats() {
           trail.appendChild(dot);
         }
         tr.appendChild(trail);
-        tr.appendChild(el('td', 'kinds', r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(' · ')));
+        // 🔢 숫자판으로 직접 쓴 답 — 보기를 찍을 때와 정답률이 다르면 찍고 있었던 것 (짐작한 값은 최근 셋)
+        tr.appendChild(el('td', 'kinds', `${r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(' · ')}${r.pad && r.pad[1] ? ` · ✍️ ${r.pad[0]}/${r.pad[1]}${r.guesses.length ? ` (짐작 ${r.guesses.join(', ')})` : ''}` : ''}`));
         tr.appendChild(el('td', 'miss', r.miss.map((x) => `${x.tag}×${x.n}`).join(', ')));
         tb.appendChild(tr);
       }
@@ -567,6 +568,7 @@ export async function renderStats() {
       const wrap = el('div', 'stats-table-wrap');
       wrap.appendChild(tbl);
       cM.appendChild(wrap);
+      if (report.some((r) => r.pad && r.pad[1])) cM.appendChild(el('p', 'stats-note', '✍️는 숫자판으로 직접 쓴 답(정답/전체)이에요 — 보기로 풀 때보다 많이 낮으면 보기를 찍고 있었던 거예요. "짐작"은 어느 보기와도 다른 값을 쓴 것이에요.'));
       const weak = report.filter((r) => r.weak && r.weak.rate < 0.6).map((r) => `${r.name}의 ${r.weak.label}(${r.weak.ok}/${r.weak.n})`);
       if (weak.length) cM.appendChild(el('p', 'stats-note', `약한 얼굴: ${weak.join(' · ')} — ①은 계산, ②는 남의 오류 찾기, ③은 왜 그런지, ⭐는 이야기 문제예요.`));
       // 🤔 아직 못 고친 유형 — 틀린 뒤 처음에 맞힌 적이 없는 것. 내일부터 오답 노트 회차에 나온다

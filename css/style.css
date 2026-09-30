@@ -455,6 +455,36 @@ button { font-family: inherit; }
 .math-choice.no { border-color: var(--danger); background: #fef2f2; }
 .math-choice-no { color: var(--muted); font-weight: 700; flex: 0 0 auto; }
 .math-choice-text { flex: 1; }
+/* 🔢 수학 숫자판 (2026-10-01) — 🎯 도전 문제 숫자판(.chal-pad)과 같은 계열, 분수 칸은 분자/분모 세로 */
+.math-choices.is-pad { display: block; }
+.math-pad { max-width: 420px; margin: 2px auto 0; text-align: center; }
+.math-pad-lead { margin: 2px 0 8px; color: var(--muted); font-weight: 700; }
+.math-pad-modes { display: flex; gap: 8px; justify-content: center; margin-bottom: 8px; }
+.math-pad-mode { min-width: 88px; padding: 10px 14px; font-size: 1.05rem; font-weight: 800; }
+.math-pad-mode.on { background: #6366f1; color: #fff; border-color: #6366f1; }
+.math-pad-show { display: flex; justify-content: center; min-height: 64px; margin: 6px 0 12px; }
+.math-pad-line { display: flex; align-items: center; gap: 8px; }
+.math-pad-frac { display: inline-flex; flex-direction: column; align-items: stretch; gap: 5px; }
+.math-pad-bar { display: block; height: 3px; background: #2d2f45; border-radius: 2px; }
+.math-pad-field { min-width: 96px; min-height: 54px; padding: 4px 12px; border: 2px solid #c9c6e4; border-radius: 12px; background: #fff; font: inherit; font-size: 1.6rem; font-weight: 800; color: #1e1b4b; cursor: pointer; }
+.math-pad-frac .math-pad-field { min-width: 80px; min-height: 46px; }
+.math-pad-field.is-focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, .25); }
+.math-pad-field.is-empty::after { content: "?"; color: #c6c2d6; }
+.math-pad-sign, .math-pad-colon, .math-pad-unit { font-size: 1.6rem; font-weight: 800; color: #4a5068; }
+.math-pad-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 320px; margin: 0 auto; }
+.math-pad-key { font-size: 1.4rem; font-weight: 800; padding: 14px 0; }
+.math-pad-key.is-del { background: #ffe9e9; }
+.math-pad-key.is-sign { font-size: 1.05rem; }
+.math-pad-key.is-sign.on { background: #6366f1; color: #fff; border-color: #6366f1; }
+.math-pad-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 12px; }
+.math-pad-ok:disabled { opacity: .45; }
+.math-pad-idk { color: var(--muted); }
+.math-pad-answered { font-size: 1.3rem; font-weight: 800; text-align: center; padding: 12px; border-radius: 14px; margin: 0; }
+.math-pad-answered.ok { background: #ecfdf5; color: #047857; border: 2px solid var(--ok); }
+.math-pad-answered.no { background: #fef2f2; color: #b91c1c; border: 2px solid var(--danger); }
+.math-pad-note { font-weight: 700; border-radius: 10px; padding: 8px 12px; margin: 4px 0 8px; }
+.math-pad-note.ok { background: #fffbe8; color: #7a5b00; }
+.math-pad-note.no { background: #fef2f2; color: #b91c1c; }
 .math-feedback { margin-top: 12px; }
 .math-fb { font-size: 1.05rem; font-weight: 700; margin: 4px 0 6px; line-height: 1.6; }
 .math-fb.ok { color: #047857; }

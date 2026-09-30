@@ -20,6 +20,8 @@ import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKin
 // 🎯 도전 문제 — 문제집에 있는 그 문제 그대로 (2026-09-28)
 import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, chalReward, setNote as chalNote, solvedCount, setCleared } from './mathchal.js';
 import { figureEl, inputEl } from './chalview.js';
+import { padSpec, matchTyped } from './mathpad.js';
+import { padBox, padAnswered } from './padview.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
@@ -1292,26 +1294,63 @@ function renderQuestion(restore = false) {
   }
   if (q.hint) card.appendChild(el('p', 'math-hint', `✏️ ${q.hint}`));
 
-  const list = el('div', 'math-choices');
-  q.choices.forEach((ch, i) => {
-    const b = el('button', 'math-choice');
-    b.type = 'button';
-    b.dataset.i = String(i);
-    b.appendChild(el('span', 'math-choice-no', ['①', '②', '③', '④'][i]));
-    const t = el('span', 'math-choice-text');
-    t.appendChild(richNode(ch.text));
-    b.appendChild(t);
-    b.addEventListener('click', () => answer(i, list, card));
-    list.appendChild(b);
-  });
+  // 🔢 수가 답인 ① 계산은 숫자판 — 친 답을 보기 번호로 바꿔 같은 채점 길(answer)로 보낸다
+  const spec = padFor(q);
+  const list = el('div', spec ? 'math-choices is-pad' : 'math-choices');
+  if (spec && !(restore && r.answered)) list.appendChild(padBox(spec, typedHooks(q, spec, (i, typed) => answer(i, list, card, typed))));
+  else if (!spec) {
+    q.choices.forEach((ch, i) => {
+      const b = el('button', 'math-choice');
+      b.type = 'button';
+      b.dataset.i = String(i);
+      b.appendChild(el('span', 'math-choice-no', ['①', '②', '③', '④'][i]));
+      const t = el('span', 'math-choice-text');
+      t.appendChild(richNode(ch.text));
+      b.appendChild(t);
+      b.addEventListener('click', () => answer(i, list, card));
+      list.appendChild(b);
+    });
+  }
   card.appendChild(list);
   card.appendChild(el('div', 'math-feedback'));
   m.appendChild(card);
   if (restore && r.answered && r.chosenIdx >= 0) paintAnswer(r.chosenIdx, list, card, true);
 }
 
-/** 답을 고름 — 채점(한 번만)하고 그린다 */
-function answer(i, list, card) {
+// ───────────────────── 🔢 숫자판 (2026-10-01, 아버님 "시작하자") ─────────────────────
+// 분수 ÷ 분수 ① 계산이 6/30(찍어도 나오는 25%보다 낮게)이고 오답이 9·9·8로 고르게 흩어졌다 = 보기를 찍고 있었다.
+// 수가 답인 ① 계산은 숫자판으로 직접 쓴다. 규칙은 mathpad.js(순수), 그리기는 padview.js — 여기서는 잇기만.
+
+/** ⚙ "🔢 수학 숫자판" — 기본 켬. 설정은 기기별 localStorage (player.js가 쓴다) */
+function padOn() {
+  try { return (JSON.parse(localStorage.getItem('shincoach.settings') || '{}') || {}).mathPad !== false; } catch { return true; }
+}
+/** 이 문항을 숫자판으로 받을까 — 💎 스페셜은 보기 그대로. 🤔 노트는 다른 줄기 문항이 섞일 수 있어 문항의 줄기로 */
+function padFor(q) {
+  if (!padOn() || !ui.round || ui.round.mode === 'special') return null;
+  return padSpec(q, (stemOf(q.concept) || S()).key);
+}
+/**
+ * 숫자판의 확인·모르겠어요 → 보기 번호. 어느 보기와도 다른 값("짐작한 답")·모르겠어요는 이름표 없는 보기로 덧붙여
+ * 같은 채점 길로 보낸다 (풀이 카드·틀린 이유·쌍둥이·❓가 그대로 돈다). ❓ 복사문의 보기 목록에서는 뺀다(mathask).
+ */
+function typedHooks(q, spec, go) {
+  const extra = (text, flag) => { q.choices.push({ text, ok: false, [flag]: true }); return q.choices.length - 1; };
+  return {
+    onSubmit: (typed) => {
+      const res = matchTyped(q, typed, spec);
+      const i = res.i >= 0 ? res.i : extra(typed.text, 'guess');
+      go(i, { text: typed.text, note: res.note, guess: res.i < 0 });
+    },
+    onIdk: () => go(extra('모르겠어요', 'idk'), { text: '모르겠어요', note: null, idk: true }),
+  };
+}
+
+/**
+ * 답을 고름 — 채점(한 번만)하고 그린다.
+ * typed: 🔢 숫자판으로 쓴 답 { text 친 그대로, note 한 줄 안내, guess 어느 보기와도 다름, idk 모르겠어요 } — 없으면 보기를 누른 것
+ */
+function answer(i, list, card, typed = null) {
   const r = ui.round;
   if (!r || r.answered) return; // 두 번 누르면 두 번 세지 않는다
   r.answered = true;
@@ -1324,6 +1363,8 @@ function answer(i, list, card) {
   r.answers.push({
     concept: q.concept, correct: !!ch.ok, kind: q.kind, chosen: ch.text, ...(ch.ok || !ch.tag ? {} : { tag: ch.tag }), // 얼굴·오개념까지 — 📒 일지용
     ...(sense && picked !== undefined ? { sn: picked === sense.ok ? 1 : 0 } : {}), // 🎯 감 잡기가 맞았나
+    // 🔢 직접 쓴 답 — 친 그대로 남기고(10/64를 5/32로 바꿔 적지 않는다), 짐작한 값은 g로, 모르겠어요는 "잘 몰랐어요"로
+    ...(typed ? { p: 1, chosen: typed.text, ...(typed.guess ? { g: typed.text } : {}), ...(typed.idk ? { w: 'u' } : {}), ...(typed.note ? { pn: typed.note } : {}) } : {}),
   });
   paintAnswer(i, list, card, false);
   maybeBattle(); // ⚔️ 아주 가끔 트레이너가 걸어온다 (다음 문항으로 넘어갈 때 열린다)
@@ -1331,7 +1372,7 @@ function answer(i, list, card) {
 }
 
 /** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
-const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}) });
+const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}) });
 
 /** 🙈 틀린 이유 고르기 — 고를 때까지 다음 버튼이 잠긴다. 실수면 이 문항의 오개념 이름표를 거둔다 */
 function whyBlock(a, next, onDone) {
@@ -1615,6 +1656,10 @@ function paintAnswer(i, list, card, restoring) {
   let scrollTo = null;
   const a = r.answers[r.at] || {}; // 이 문항의 답 기록 (감 잡기·이유가 여기 붙는다)
   const sense = senseOf(q);
+  // 🔢 숫자판으로 쓴 답 — 숫자판 자리에 "✍️ 내 답"만 남기고, 풀이 카드의 "내 답"도 친 그대로
+  const shown = a.p ? { ...ch, text: a.chosen || ch.text } : ch;
+  if (list.classList.contains('is-pad')) { list.innerHTML = ''; list.appendChild(padAnswered(shown.text, !!ch.ok, richNode)); }
+  if (a.pn) fb.appendChild(el('p', `math-pad-note ${ch.ok ? 'ok' : 'no'}`, a.pn)); // "약분하면 3/4" · "분수로 나타내야 해요"
   // 🎲 섞어 풀기는 답하기 전엔 개념 이름을 숨긴다("어떤 개념인지 알아내기"가 목적) — 답한 뒤에 알려 준다 (Codex 3차 #8)
   if (r.mode === 'mix') fb.appendChild(el('p', 'math-mix-concept', `📚 ${nameOf(q.concept)} 문제였어요`));
   if (ch.ok) {
@@ -1623,15 +1668,15 @@ function paintAnswer(i, list, card, restoring) {
     if (q.solve) {
       const t = el('button', 'btn math-solve-toggle', '📖 풀이 보기');
       t.type = 'button';
-      t.addEventListener('click', () => { t.replaceWith(solveCard(q, ch)); });
+      t.addEventListener('click', () => { t.replaceWith(solveCard(q, shown)); });
       fb.appendChild(t);
     }
   } else {
     const p = el('p', 'math-fb no');
     const showTag = ch.tag && !META_TAGS.has(ch.tag);
-    p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : '아쉬워요.'));
+    p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : ch.idk ? '괜찮아요 — 풀이를 천천히 읽어 봐요.' : '아쉬워요.'));
     fb.appendChild(p);
-    scrollTo = solveCard(q, ch); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (진우, 2026-09-21)
+    scrollTo = solveCard(q, shown); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (진우, 2026-09-21)
     fb.appendChild(scrollTo);
   }
   // 🎯 감 잡기 결과 — 답을 본 뒤에야 알려 준다
@@ -1973,8 +2018,10 @@ function solveCard(q, ch) {
     if (c && c.idea) { const p = el('p', 'math-solve-p'); p.appendChild(document.createTextNode('💡 ')); p.appendChild(richNode(c.idea)); card.appendChild(p); }
     return card;
   }
+  let hadWhy = false; // "왜 틀렸나"가 없으면(🤷 모르겠어요 · 짐작한 답) 번호를 1️⃣부터
   if (!ch.ok) {
     const why = s.why[ch.tag] || s.whyAny || (ch.tag && !META_TAGS.has(ch.tag) ? `이 답은 "${ch.tag}" 실수예요.` : '');
+    hadWhy = !!why;
     if (why) {
       card.appendChild(el('div', 'math-solve-h', s.steps.length ? '1️⃣ 왜 틀렸나' : '📖 왜 틀렸나'));
       const p = el('p', 'math-solve-p'); p.appendChild(richNode(why)); card.appendChild(p);
@@ -2000,7 +2047,7 @@ function solveCard(q, ch) {
     const p = el('p', 'math-solve-p'); p.appendChild(richNode(s.whyAny)); card.appendChild(p);
   }
   if (s.steps.length) {
-    card.appendChild(el('div', 'math-solve-h', ch.ok ? '📖 이렇게 풀어요' : '2️⃣ 이렇게 풀어요'));
+    card.appendChild(el('div', 'math-solve-h', ch.ok ? '📖 이렇게 풀어요' : hadWhy ? '2️⃣ 이렇게 풀어요' : '1️⃣ 이렇게 풀어요'));
     const ol = el('ol', 'math-solve-steps');
     for (const st of s.steps) { const li = el('li'); li.appendChild(richNode(st)); ol.appendChild(li); }
     card.appendChild(ol);
@@ -2008,7 +2055,7 @@ function solveCard(q, ch) {
   if (s.figure) card.appendChild(svgBox(s.figure, 'math-fig'));
   const rule = s.rule || (c && c.idea) || '';
   if (rule) {
-    card.appendChild(el('div', 'math-solve-h', (ch.ok || !s.steps.length) ? '💡 기억할 것' : '3️⃣ 다음에 기억할 것'));
+    card.appendChild(el('div', 'math-solve-h', (ch.ok || !s.steps.length) ? '💡 기억할 것' : hadWhy ? '3️⃣ 다음에 기억할 것' : '2️⃣ 다음에 기억할 것'));
     const p = el('p', 'math-solve-p rule'); p.appendChild(richNode(rule)); card.appendChild(p);
   }
   return card;
@@ -2079,16 +2126,20 @@ function renderTwin(restore = false) {
   const qt = el('div', 'math-qt'); qt.appendChild(qtNode(q.q)); card.appendChild(qt);
   if (q.figure) card.appendChild(svgBox(q.figure));
   if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }
-  const list = el('div', 'math-choices');
-  q.choices.forEach((ch, i) => {
-    const b = el('button', 'math-choice');
-    b.type = 'button';
-    b.dataset.i = String(i);
-    b.appendChild(el('span', 'math-choice-no', ['①', '②', '③', '④'][i]));
-    const tx = el('span', 'math-choice-text'); tx.appendChild(richNode(ch.text)); b.appendChild(tx);
-    b.addEventListener('click', () => answerTwin(i, list, card));
-    list.appendChild(b);
-  });
+  const spec = padFor(q); // 🔢 원래 문항을 숫자판으로 풀었으면 쌍둥이도 숫자판 (같은 틀이라 같은 판정)
+  const list = el('div', spec ? 'math-choices is-pad' : 'math-choices');
+  if (spec && !(restore && t.answered)) list.appendChild(padBox(spec, typedHooks(q, spec, (i, typed) => answerTwin(i, list, card, typed))));
+  else if (!spec) {
+    q.choices.forEach((ch, i) => {
+      const b = el('button', 'math-choice');
+      b.type = 'button';
+      b.dataset.i = String(i);
+      b.appendChild(el('span', 'math-choice-no', ['①', '②', '③', '④'][i]));
+      const tx = el('span', 'math-choice-text'); tx.appendChild(richNode(ch.text)); b.appendChild(tx);
+      b.addEventListener('click', () => answerTwin(i, list, card));
+      list.appendChild(b);
+    });
+  }
   card.appendChild(list);
   card.appendChild(el('div', 'math-feedback'));
   m.appendChild(card);
@@ -2096,12 +2147,13 @@ function renderTwin(restore = false) {
 }
 
 /** 쌍둥이 답 — 채점(한 번만)하고 그린다. 편의 정답 수(r.correct)는 안 건드린다 */
-function answerTwin(i, list, card) {
+function answerTwin(i, list, card, typed = null) {
   const r = ui.round;
   if (!r || !r.twin || r.twin.answered) return;
   const t = r.twin;
   t.answered = true;
   t.chosenIdx = i;
+  if (typed) t.typed = { text: typed.text, note: typed.note }; // 🔢 친 그대로 (다시 그릴 때도)
   const ch = t.q.choices[i];
   const a = r.answers[t.of];
   if (a) a.fixed = !!ch.ok;
@@ -2124,11 +2176,14 @@ function paintTwin(i, list, card, restoring) {
   const fb = card.querySelector('.math-feedback');
   fb.innerHTML = '';
   let scrollTo = null;
+  const shown = t.typed ? { ...ch, text: t.typed.text } : ch;
+  if (list.classList.contains('is-pad')) { list.innerHTML = ''; list.appendChild(padAnswered(shown.text, !!ch.ok, richNode)); }
+  if (t.typed && t.typed.note) fb.appendChild(el('p', `math-pad-note ${ch.ok ? 'ok' : 'no'}`, t.typed.note));
   if (ch.ok) {
     fb.appendChild(el('p', 'math-fb ok', `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`));
   } else {
     fb.appendChild(el('p', 'math-fb no', '아직 헷갈리나 봐요. 풀이를 한 번 더 읽어요.'));
-    scrollTo = solveCard(q, ch);
+    scrollTo = solveCard(q, shown);
     fb.appendChild(scrollTo);
   }
   const next = el('button', 'btn btn-primary btn-big-wide', t.of + 1 < r.qs.length ? '다음 →' : '결과 보기');

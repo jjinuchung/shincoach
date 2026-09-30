@@ -34,7 +34,9 @@ export function askContext(q, a) {
   return {
     concept: q.concept, k: q.kind || 'calc', key: q.key || '', q: String(q.q || ''), expr: String(q.expr || ''),
     my: String((a && a.chosen) || ''), ans: String(okCh.text || ''), tag: String((a && a.tag) || ''), w: String((a && a.w) || ''),
-    choices: (q && q.choices || []).map((c) => String((c && c.text) || '')), seen,
+    // 🔢 숫자판으로 쓴 답은 보기에 없는 수일 수 있다 — 화면이 덧붙인 "짐작한 답"·"모르겠어요"는 보기 목록에서 뺀다
+    choices: (q && q.choices || []).filter((c) => c && !c.guess && !c.idk).map((c) => String(c.text || '')), seen,
+    ...(a && a.p ? { pad: 1 } : {}),
   };
 }
 
@@ -187,7 +189,7 @@ export function asksText(m, today) {
     lines.push(`❓${a.no} ${nameOf(a.concept)} · ${KIND_SHORT[a.k] || a.k} · ${a.d}`);
     lines.push(`문제: ${a.q}`);
     if (a.expr) lines.push(`식: ${a.expr}`);
-    lines.push(`진우 답: ${a.my || '(없음)'} ❌${a.tag ? ` (오개념: ${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · 진우: ${WHY_LABEL[a.w]}` : ''}`);
+    lines.push(`진우 답: ${a.my || '(없음)'}${a.pad ? ' (✍️ 직접 씀)' : ''} ❌${a.tag ? ` (오개념: ${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · 진우: ${WHY_LABEL[a.w]}` : ''}`);
     lines.push(`정답: ${a.ans}`);
     if (Array.isArray(a.choices) && a.choices.length) lines.push(`보기: ${a.choices.map((c, i) => `${['①', '②', '③', '④'][i] || i + 1} ${c}${c === a.ans ? ' ✔' : c === a.my ? ' ❌' : ''}`).join(' · ')}`);
     if (a.seen) lines.push(`앱이 이미 보여 준 설명: ${a.seen}`);
