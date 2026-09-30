@@ -1,0 +1,865 @@
+<title>약수와 배수 검수</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에 개념 바로가기, 개념마다 [배움 + 문제 예시 | 아빠 카드] 두 칸 (폰에서는 한 칸) — 혼합계산 검수 페이지와 같은 체계 */
+:root{
+  --bg:#f5f7ff; --card:#ffffff; --ink:#1f2340; --muted:#6b7280; --line:#e3e6f3;
+  --primary:#4f46e5; --primary-soft:#eef2ff; --accent:#f59e0b; --accent-soft:#fff7ed;
+  --ok:#0f9f6e; --ok-soft:#ecfdf5; --no-soft:#f8f9fc;
+  --dad:#fff8ec; --dad-line:#f3c27a; --dad-ink:#7c4a03;
+  --frac-fill:#4f46e5; --frac-fill2:#f59e0b; --frac-empty:#ffffff;
+  --font-display:"Gowun Dodum","Noto Sans KR",sans-serif;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  --frac-fill:#9b9cf8; --frac-fill2:#fbbf24; --frac-empty:#1d2040;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  --frac-fill:#9b9cf8; --frac-fill2:#fbbf24; --frac-empty:#1d2040;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;margin:0;padding-block:0 60px;padding-inline:16px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top h1{font-size:1.35rem}
+.top .sub{color:var(--muted);font-size:.9rem;margin:2px 0 8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.nav a{flex:0 0 auto;font-size:.8rem;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.nav a b{color:var(--primary);margin-right:3px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--primary);outline:none}
+.intro{display:grid;grid-template-columns:1fr;gap:12px;margin-block:16px}
+@media(min-width:760px){.intro{grid-template-columns:1.2fr 1fr}}
+.intro .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.intro .box.dadbox{background:var(--dad);border-color:var(--dad-line)}
+.intro h3{font-size:1rem;margin-bottom:6px}
+.intro p{margin:4px 0;font-size:.92rem}
+.intro .stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.92rem}
+.intro .stats b{font-size:1.25rem;color:var(--primary);font-variant-numeric:tabular-nums}
+.how{padding-left:20px}
+.how li{margin:3px 0}
+.ladder{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0 4px;padding:0;list-style:none}
+.ladder li{font-size:.85rem;background:var(--primary-soft);border-radius:8px;padding:5px 9px}
+.ladder li b{color:var(--primary);margin-right:4px}
+.ladder li small{color:var(--muted);margin-left:4px}
+.concept{margin-block:36px 0;scroll-margin-top:110px}
+.ch-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.ch-head > div:last-child{min-width:0}
+.ch-no{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--primary);background:var(--primary-soft);border-radius:12px;min-width:56px;height:56px;display:grid;place-items:center}
+.grade{font-size:.75rem;letter-spacing:.06em;color:var(--muted)}
+.ch-head h2{font-size:1.4rem}
+.idea{color:var(--muted);margin:2px 0 0;font-size:.95rem;max-width:65ch}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+.cols > *{min-width:0}
+@media(min-width:900px){.cols{grid-template-columns:1.35fr 1fr}}
+.col-title{margin:0 0 10px;font-size:.95rem}
+.col-title small{color:var(--muted);font-weight:400;margin-left:6px}
+.samples-title{margin-top:18px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.step{display:flex;gap:10px;scroll-margin-top:110px}
+.step-no{flex:0 0 30px;height:30px;border-radius:50%;background:var(--primary);color:var(--card);font-weight:700;display:grid;place-items:center;font-size:.9rem;margin-top:12px}
+.step-body{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.say{max-width:65ch}
+.say p{margin:0 0 10px}
+.say p:last-child{margin-bottom:0}
+.check{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;scroll-margin-top:110px}
+.qt{margin:0 0 6px;font-weight:500}
+.ch{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ch li{display:flex;align-items:center;gap:8px;border-radius:9px;padding:6px 10px;background:var(--no-soft);border:1px solid transparent}
+.ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
+.ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
+.ch .txt{flex:1;min-width:0}
+.ch .tag{font-size:.75rem;color:var(--muted);text-align:right}
+.why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
+.samples{display:grid;gap:10px}
+.sample{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.expr{font-size:1.15rem;font-weight:700;margin:4px 0 8px;font-variant-numeric:tabular-nums}
+body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
+body.hide-ans .ch .mark,body.hide-ans .why,body.hide-ans .ch .tag{visibility:hidden}
+.rule{margin-top:12px;background:var(--primary-soft);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.rule p{margin:2px 0 0;font-weight:700;font-size:1.05rem}
+.dad{background:var(--dad);border:1px solid var(--dad-line);border-radius:14px;padding:14px 16px;position:sticky;top:104px;scroll-margin-top:110px;color:var(--ink)}
+.dad h3{font-size:1.05rem;margin:4px 0 10px;color:var(--dad-ink)}
+.dad h4{margin:12px 0 4px;font-size:.9rem;color:var(--dad-ink)}
+.dad-say{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.dad-say li,.traps li{display:flex;gap:8px;align-items:flex-start;scroll-margin-top:110px}
+.dad-say li > span,.traps li > div{min-width:0}
+.dad-do,.dad-pass{margin:0;font-size:.95rem}
+.traps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.traps .kid{font-weight:500}
+.traps .dadsay{color:var(--muted);font-size:.92rem}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.ref .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.03em}
+.ref code,code.mini{font-size:.78rem;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+code.mini{flex:0 0 auto;margin-top:2px}
+.dad .ref code,.dad code.mini{color:var(--dad-ink);background:var(--accent-soft)}
+.fig{margin:6px 0 8px;color:var(--ink);display:inline-block;max-width:100%;overflow-x:auto}
+.fig svg{max-width:100%;height:auto;display:block}
+div.fig{display:block}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 2px;font-variant-numeric:tabular-nums}
+.fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
+.fr .d{padding:0 3px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none;margin-top:8px}
+.toggle input{width:18px;height:18px;accent-color:var(--primary)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (max-width:899px){.dad{position:static}}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  body{background:#fff;padding:0;font-size:13px}
+  .wrap{max-width:100%}
+  .top{position:static}
+  .dad{position:static;box-shadow:none;break-inside:auto}
+  .step,.sample,.check,.rule,.traps li,figure,svg{break-inside:avoid}
+}
+</style>
+<div class="wrap">
+  <div class="top">
+    <h1>🔢 약수와 배수 줄기 — 배움 원고 검수</h1>
+    <p class="sub">신코치 수학 · 초5 1학기 「약수와 배수」 · 개념 8개</p>
+    <div class="nav"><a href="#G1"><b>G1</b> 약수</a><a href="#G2"><b>G2</b> 배수</a><a href="#G3"><b>G3</b> 약수와 배수의 관계</a><a href="#G4"><b>G4</b> 공약수와 최대공약수</a><a href="#G5"><b>G5</b> 최대공약수 구하기</a><a href="#G6"><b>G6</b> 공배수와 최소공배수</a><a href="#G7"><b>G7</b> 최소공배수 구하기</a><a href="#G8"><b>G8</b> 최대공약수·최소공배수 활용</a></div>
+  </div>
+
+  <div class="intro">
+    <div class="box">
+      <h3>무엇을 봐 주시면 되나</h3>
+      <div class="stats">
+        <span><b>8</b> 개념</span>
+        <span><b>27</b> 📘 배움 장</span>
+        <span><b>27</b> 확인 질문</span>
+        <span><b>16</b> 헷갈리는 자리</span>
+        <span><b>24</b> 🧪 문제 예시</span>
+      </div>
+      <ol class="ladder"><li><b>G1</b>약수<small>초5</small></li><li><b>G2</b>배수<small>초5</small></li><li><b>G3</b>약수와 배수의 관계<small>초5</small></li><li><b>G4</b>공약수와 최대공약수<small>초5</small></li><li><b>G5</b>최대공약수 구하기<small>초5</small></li><li><b>G6</b>공배수와 최소공배수<small>초5</small></li><li><b>G7</b>최소공배수 구하기<small>초5</small></li><li><b>G8</b>최대공약수·최소공배수 활용<small>초5</small></li></ol>
+      <ul class="how">
+        <li><b>📘 배움</b> — 진우가 앱에서 읽는 것. <b>한 장 = 한 화면</b>, 짧은 설명 → 확인 질문 → 다음 장. 8칸 모두 초5 범위이고, <b>공약수·최대공약수·공배수·최소공배수</b>처럼 이름이 비슷한 말이 연달아 나옵니다. 말이 헷갈리지 않게 한 칸에 하나씩 들어가는지, 초4가 혼자 읽고 잡히는지 봐 주세요</li>
+        <li><b>🧪 문제 예시</b> — 앱이 숫자를 바꿔 가며 끝없이 만드는 문제 중 몇 개입니다. 오답은 아무 숫자가 아니라 <b>아이가 실제로 하는 틀린 생각</b>으로 만들었습니다 (3의 배수 = 3, 13, 23 · 4와 6의 최소공배수 = 24). 회색 글씨가 📊에 쌓이는 오개념 이름입니다</li>
+        <li><b>👨 아빠 카드</b> — 저녁 10분에 처음 소개할 때 쓰는 반 장. 집에서 실제로 할 수 있는 활동인지, 아버님 말투에 맞는지</li>
+        <li>확인 질문 27개의 정답은 테스트가 <b>문제 글을 따로 읽고 다시 풀어서</b> 맞는지, 오답이 사실 정답은 아닌지 확인했습니다</li>
+      </ul>
+      <p>고칠 곳은 번호로 가리켜 주시면 됩니다. 예) <code>G2-3 설명이 길다</code>, <code>G4-2✓ 오답이 너무 쉽다</code>, <code>G5-①a 이 오답은 안 나올 것 같다</code>, <code>G8-👨함정1</code></p>
+      <label class="toggle"><input type="checkbox" id="ans" checked> 정답·오개념 이름 보이기 (끄면 진우가 보는 모양)</label>
+    </div>
+    <div class="box dadbox">
+      <h3>👨 이 줄기에서 제일 중요한 한 가지</h3>
+      <p>이 단원의 실수는 거의 전부 <b>약수(나누는 수)와 배수(곱해서 나온 수)를 뒤바꾸는 것</b>에서 나옵니다. 8의 배수를 1, 2, 4, 8로 쓰고, 최소공배수를 물었는데 최대공약수를 쓰고, 나눠 주기 문제에 최소공배수를 씁니다.</p>
+      <p>그래서 G1(약수)과 G3(곱셈식 하나로 보는 약수·배수)이 뒤의 모든 칸을 받칩니다. 이 줄기는 <b>분수의 약분·통분</b>과 <b>비와 비율의 간단한 비</b>를 받치는 줄기이기도 합니다. 바둑돌·달력처럼 <b>손으로 늘어놓는 것</b>으로 한 번 보여 주시면 오래갑니다.</p>
+      <p style="margin-top:10px"><b>예시 출연진</b>: 앱에서는 진우가 도감에서 잡은 포켓몬이 들어갑니다. 이 페이지는 피카츄·리자몽·개굴닌자·루카리오 등을 예시로 끼웠습니다.</p>
+    </div>
+  </div>
+
+  <section class="concept" id="G1">
+    <header class="ch-head">
+      <div class="ch-no">G1</div>
+      <div>
+        <div class="grade">초5 · 첫 개념</div>
+        <h2>약수</h2>
+        <p class="idea">어떤 수를 <strong>나누어떨어지게</strong> 하는 수가 약수예요. 12의 약수는 1, 2, 3, 4, 6, 12 — <strong>1과 자기 자신</strong>도 약수예요. 곱해서 12가 되는 짝(1 × 12, 2 × 6, 3 × 4)으로 찾으면 빠뜨리지 않아요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="G1-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>G1-1</code></div>
+        <div class="say"><p>사탕 <strong>12개</strong>를 친구들에게 <strong>남김없이 똑같이</strong> 나눠 주려면 몇 명이면 될까요?</p><p>· 1명 → 12개씩 ✓<br>· 2명 → 6개씩 ✓<br>· 3명 → 4개씩 ✓<br>· 4명 → 3개씩 ✓<br>· 5명 → 2개씩 주면 <strong>2개가 남아요</strong> ✗<br>· 6명 → 2개씩 ✓<br>· 12명 → 1개씩 ✓</p><p>12를 <strong>나누어떨어지게</strong> 하는 수를 12의 <strong>약수</strong>라고 해요.</p></div>
+        <div class="check" id="G1-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G1-1✓</code></div>
+        <p class="qt">15의 약수가 <strong>아닌</strong> 수는 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li><li class="no"><span class="mark"></span><span class="txt">15</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>15 ÷ 4 = 3 … 3 — 나누어떨어지지 않아요. 5와 15는 15를 나누어떨어지게 해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G1-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>G1-2</code></div>
+        <div class="say"><p>약수는 <strong>곱해서 그 수가 되는 짝</strong>으로 찾으면 빠뜨리지 않아요.</p><p><strong>18</strong> = 1 × 18 = 2 × 9 = 3 × 6</p><p>짝을 작은 수부터 늘어놓으면<br>→ <strong>1, 2, 3, 6, 9, 18</strong></p><p><strong>1과 자기 자신(18)</strong>도 약수예요.</p></div>
+        <div class="check" id="G1-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G1-2✓</code></div>
+        <p class="qt">20의 약수를 모두 구하면 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1, 2, 4, 5, 10, 20</span></li><li class="no"><span class="mark"></span><span class="txt">2, 4, 5, 10</span></li><li class="no"><span class="mark"></span><span class="txt">1, 2, 4, 10, 20</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>20 = 1 × 20 = 2 × 10 = 4 × 5. 짝을 모두 쓰면 1, 2, 4, 5, 10, 20이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G1-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>G1-3</code></div>
+        <div class="say"><p><strong>36</strong>의 약수를 짝으로 찾아볼까요?</p><p>1 × 36, 2 × 18, 3 × 12, 4 × 9, <strong>6 × 6</strong></p><p>6 × 6은 짝이 <strong>같은 수</strong>예요. 그래도 6은 약수예요 — <strong>한 번만</strong> 써요.<br>→ 1, 2, 3, 4, 6, 9, 12, 18, 36</p></div>
+        <div class="check" id="G1-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G1-3✓</code></div>
+        <p class="qt">16의 약수는 모두 몇 개일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5개</span></li><li class="no"><span class="mark"></span><span class="txt">4개</span></li><li class="no"><span class="mark"></span><span class="txt">6개</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>16 = 1 × 16 = 2 × 8 = 4 × 4. 약수는 1, 2, 4, 8, 16 — 4는 한 번만 세서 5개예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G1-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>G1-4</code></div>
+        <div class="say"><p>피카츄가 몬스터볼 <strong>24개</strong>를 상자에 남김없이 똑같이 나눠 담으려고 해요.</p><p>상자 수가 될 수 있는 수 = <strong>24의 약수</strong><br>→ 1, 2, 3, 4, 6, 8, 12, 24</p><p>상자가 7개면? 24 ÷ 7 = 3 … 3 — <strong>3개가 남아요</strong>.</p></div>
+        <div class="check" id="G1-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G1-4✓</code></div>
+        <p class="qt">몬스터볼 30개를 상자에 남김없이 똑같이 나눠 담을 때, 상자 수가 될 수 <strong>없는</strong> 것은 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li><li class="no"><span class="mark"></span><span class="txt">6</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>30 ÷ 4 = 7 … 2 — 2개가 남아요. 5와 6은 30의 약수라서 남김없이 나눠 담을 수 있어요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="G1-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>G1-📏</code></div><p>약수는 그 수를 나누어떨어지게 하는 수. 곱해서 그 수가 되는 짝으로 찾고, 1과 자기 자신도 쓴다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="G1-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>G1-①a</code></div>
+      <div class="say"><p>40의 약수는 모두 몇 개일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">약수 짝을 하나로 셈</span></li><li class="no"><span class="mark"></span><span class="txt">9</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">8</span></li><li class="no"><span class="mark"></span><span class="txt">6</span><span class="tag">1이나 자기 자신을 빠뜨림</span></li></ol>
+    </div><div class="sample" id="G1-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>G1-①b</code></div>
+      <div class="say"><p>다음 중 32의 약수가 <strong>아닌</strong> 수는 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">14</span></li><li class="no"><span class="mark"></span><span class="txt">16</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">2</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">32</span><span class="tag">1이나 자기 자신을 빠뜨림</span></li></ol>
+    </div><div class="sample" id="G1-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>G1-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>36의 약수는 1, 2, 3, 4, 9, 12, 18, 36이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">1과 36은 빼야 해요</span><span class="tag">1이나 자기 자신을 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt">6은 짝이 없어서 약수가 아니에요</span><span class="tag">짝이 같은 약수를 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">6 × 6 = 36이라서 6도 약수예요 — 1, 2, 3, 4, 6, 9, 12, 18, 36</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="G1-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>G1-👨</code></div>
+    <h3>약수 = 나누어떨어지게 하는 수, 그리고 짝으로 빠짐없이 찾는 법.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="G1-👨말1"><code class="mini">말1</code><span>&quot;사탕 12개를 몇 명이 나누면 남김없이 똑같이 가질까?&quot; — 바둑돌이나 레고로 직접 나눠 보기</span></li><li id="G1-👨말2"><code class="mini">말2</code><span>&quot;36을 곱셈으로 만들어 봐. 1 × 36 말고 또?&quot; — 짝 찾기 놀이</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">바둑돌 24개를 직사각형으로 늘어놓기 — 1줄, 2줄, 3줄, 4줄… 딱 맞게 되는 줄 수가 24의 약수예요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="G1-👨함정1"><code class="mini">함정1</code><div><div class="kid">약수에서 1이나 자기 자신을 빼먹는다</div><div class="dadsay">→ &quot;12를 1명이 다 가지면 남는 게 있어? 12명이 하나씩 가지면?&quot;</div></div></li><li id="G1-👨함정2"><code class="mini">함정2</code><div><div class="kid">36의 약수에서 6을 빼먹는다 (짝이 같은 수)</div><div class="dadsay">→ &quot;6 × 6 = 36이지? 6도 36을 나누어떨어지게 해.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">20과 36의 약수를 짝으로 모두 찾고, 1과 자기 자신을 빠뜨리지 않으면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="G2">
+    <header class="ch-head">
+      <div class="ch-no">G2</div>
+      <div>
+        <div class="grade">초5 · G1 다음</div>
+        <h2>배수</h2>
+        <p class="idea">어떤 수를 <strong>1배, 2배, 3배…</strong> 한 수가 배수예요. 4의 배수는 4, 8, 12, 16… — <strong>자기 자신</strong>부터 시작하고, 끝없이 있어요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="G2-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>G2-1</code></div>
+        <div class="say"><p>3을 <strong>1배, 2배, 3배…</strong> 한 수를 3의 <strong>배수</strong>라고 해요.</p><p>3 × 1 = <strong>3</strong>, 3 × 2 = <strong>6</strong>, 3 × 3 = <strong>9</strong>, 3 × 4 = <strong>12</strong> …</p><div class="fig"><svg class="frac-fig line-fig" viewBox="0 0 426 44" width="426" height="44" role="img" aria-label="수직선 0부터 15, 점 3, 6, 9, 12, 15"><line x1="10" y1="18" x2="416" y2="18" stroke="currentColor" stroke-width="1.5"/><path d="M 416 18 l -6 -4 v 8 z" fill="currentColor"/><line x1="18" y1="10" x2="18" y2="26" stroke="currentColor" stroke-width="2.5"/><text x="18" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="700">0</text><line x1="44" y1="13" x2="44" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="44" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">1</text><line x1="70" y1="13" x2="70" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="70" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">2</text><line x1="96" y1="13" x2="96" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="96" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">3</text><line x1="122" y1="13" x2="122" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="122" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">4</text><line x1="148" y1="13" x2="148" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="148" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">5</text><line x1="174" y1="13" x2="174" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="174" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">6</text><line x1="200" y1="13" x2="200" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="200" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">7</text><line x1="226" y1="13" x2="226" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="226" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">8</text><line x1="252" y1="13" x2="252" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="252" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">9</text><line x1="278" y1="13" x2="278" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="278" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">10</text><line x1="304" y1="13" x2="304" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="304" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">11</text><line x1="330" y1="13" x2="330" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="330" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">12</text><line x1="356" y1="13" x2="356" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="356" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">13</text><line x1="382" y1="13" x2="382" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="382" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">14</text><line x1="408" y1="13" x2="408" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="408" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">15</text><circle cx="96.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/><circle cx="174.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/><circle cx="252.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/><circle cx="330.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/><circle cx="408.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/></svg></div><p>수직선에서 <strong>3칸씩</strong> 뛰는 자리예요. 배수는 <strong>끝없이</strong> 있어요.</p></div>
+        <div class="check" id="G2-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G2-1✓</code></div>
+        <p class="qt">4의 배수를 작은 수부터 4개 쓰면 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4, 8, 12, 16</span></li><li class="no"><span class="mark"></span><span class="txt">8, 12, 16, 20</span></li><li class="no"><span class="mark"></span><span class="txt">1, 2, 4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>4 × 1 = 4부터 시작해요: 4, 8, 12, 16. 1, 2, 4는 4의 약수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G2-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>G2-2</code></div>
+        <div class="say"><p>헷갈리기 쉬운 두 가지!</p><p>① <strong>자기 자신도 배수</strong>예요 — 7 × 1 = 7<br>② 끝자리가 같다고 배수가 아니에요 — 3의 배수에 <strong>13</strong>은 없어요 (13 ÷ 3 = 4 … 1)</p><p>3의 배수: 3, 6, 9, 12, 15, 18, 21 …</p></div>
+        <div class="check" id="G2-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G2-2✓</code></div>
+        <p class="qt">다음 중 3의 배수는 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">21</span></li><li class="no"><span class="mark"></span><span class="txt">13</span></li><li class="no"><span class="mark"></span><span class="txt">23</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>21 = 3 × 7이라서 3의 배수예요. 13과 23은 끝자리만 3이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G2-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>G2-3</code></div>
+        <div class="say"><p><strong>6의 배수 중 5번째</strong> 수는?</p><p>6 × 1, 6 × 2, 6 × 3, 6 × 4, <strong>6 × 5</strong><br>→ <strong>30</strong></p><p>5번째 배수는 6에 <strong>5를 곱한</strong> 수예요. 6 + 5 = 11이 아니에요.</p></div>
+        <div class="check" id="G2-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G2-3✓</code></div>
+        <p class="qt">8의 배수 중에서 7번째로 작은 수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">56</span></li><li class="no"><span class="mark"></span><span class="txt">15</span></li><li class="no"><span class="mark"></span><span class="txt">64</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>8 × 7 = 56. 15는 8 + 7, 64는 8번째(8 × 8)예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G2-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>G2-4</code></div>
+        <div class="say"><p>리자몽이 하루에 몬스터볼을 <strong>5개</strong>씩 모아요.</p><p>1일 5개, 2일 10개, 3일 15개 …</p><p>모은 수는 언제나 <strong>5의 배수</strong>예요. 그래서 모은 수가 <strong>23개</strong>가 될 수는 없어요.</p></div>
+        <div class="check" id="G2-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G2-4✓</code></div>
+        <p class="qt">리자몽이 하루에 나무열매를 4개씩 모아요. 모은 나무열매 수가 될 수 있는 것은 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">28</span></li><li class="no"><span class="mark"></span><span class="txt">14</span></li><li class="no"><span class="mark"></span><span class="txt">30</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>28 = 4 × 7 — 7일 동안 모은 수예요. 14와 30은 4로 나누어떨어지지 않아요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="G2-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>G2-📏</code></div><p>배수는 그 수를 1배, 2배, 3배… 한 수. 자기 자신부터, 끝없이.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="G2-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>G2-①a</code></div>
+      <div class="say"><p>리자몽이 하루에 몬스터볼을 12개씩 모아요. 며칠 동안 모은 몬스터볼 수가 될 수 있는 것은 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">109</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">22</span><span class="tag">끝자리가 같은 수를 배수로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">108</span></li><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">약수를 배수로 봄</span></li></ol>
+    </div><div class="sample" id="G2-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>G2-①b</code></div>
+      <div class="say"><p>9의 배수를 작은 수부터 4개 쓰면 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9, 18, 27, 36</span></li><li class="no"><span class="mark"></span><span class="txt">1, 3, 9</span><span class="tag">약수를 배수로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">9, 19, 29, 39</span><span class="tag">끝자리가 같은 수를 배수로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">18, 27, 36, 45</span><span class="tag">자기 자신을 배수에서 뺌</span></li></ol>
+    </div><div class="sample" id="G2-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>G2-②</code></div>
+      <div class="say"><p>피카츄가 이렇게 말했어요.</p><p><strong>6의 배수는 1, 2, 3, 6이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">그건 6의 약수예요 — 배수는 6, 12, 18…</span></li><li class="no"><span class="mark"></span><span class="txt">6보다 작은 수만 배수예요</span><span class="tag">오개념을 옳다고 함</span></li><li class="no"><span class="mark"></span><span class="txt">1은 빼야 해요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="G2-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>G2-👨</code></div>
+    <h3>배수 = 1배, 2배, 3배… — 자기 자신부터 끝없이, 그리고 약수와 헷갈리지 않기.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="G2-👨말1"><code class="mini">말1</code><span>&quot;구구단 4단이 바로 4의 배수야&quot; — 구구단을 배수로 다시 읽기</span></li><li id="G2-👨말2"><code class="mini">말2</code><span>&quot;달력에서 7의 배수에 동그라미 쳐 볼까? 무슨 요일이야?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">달력 한 장에 3의 배수, 4의 배수를 다른 색으로 칠하기 — 두 색이 겹치는 날(12, 24)은 다음 칸(공배수)의 예고예요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="G2-👨함정1"><code class="mini">함정1</code><div><div class="kid">3의 배수에 13, 23을 넣는다 (끝자리)</div><div class="dadsay">→ &quot;13을 3으로 나누면 딱 떨어져?&quot;</div></div></li><li id="G2-👨함정2"><code class="mini">함정2</code><div><div class="kid">8의 배수를 1, 2, 4, 8로 쓴다 (약수와 헷갈림)</div><div class="dadsay">→ &quot;8의 배수가 8보다 작을 수 있어? 8 × 1이 제일 작아.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">4의 배수 5개를 쓰고, 23이 3의 배수가 아닌 이유를 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="G3">
+    <header class="ch-head">
+      <div class="ch-no">G3</div>
+      <div>
+        <div class="grade">초5 · G2 다음</div>
+        <h2>약수와 배수의 관계</h2>
+        <p class="idea">곱셈식 3 × 4 = 12에서 <strong>곱하는 수</strong> 3과 4는 12의 <strong>약수</strong>, <strong>곱해서 나온 수</strong> 12는 3과 4의 <strong>배수</strong>예요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="G3-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>G3-1</code></div>
+        <div class="say"><p>곱셈식 하나로 약수와 배수를 한꺼번에 알 수 있어요.</p><p><strong>3 × 4 = 12</strong></p><p>· 곱하는 수 3과 4 → 12의 <strong>약수</strong><br>· 곱해서 나온 12 → 3과 4의 <strong>배수</strong></p></div>
+        <div class="check" id="G3-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G3-1✓</code></div>
+        <p class="qt">곱셈식 5 × 6 = 30을 보고 바르게 말한 것은 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">30은 5의 배수예요</span></li><li class="no"><span class="mark"></span><span class="txt">30은 5의 약수예요</span></li><li class="no"><span class="mark"></span><span class="txt">5는 30의 배수예요</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>곱해서 나온 30이 배수, 곱하는 5가 약수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G3-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>G3-2</code></div>
+        <div class="say"><p>12 ÷ 3 = 4처럼 <strong>나누어떨어지면</strong> 두 수는 약수와 배수의 관계예요.</p><p>· 3은 12의 약수<br>· 12는 3의 배수</p><p><strong>큰 수가 작은 수로 나누어떨어지는지</strong>만 보면 돼요.</p></div>
+        <div class="check" id="G3-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G3-2✓</code></div>
+        <p class="qt">두 수가 약수와 배수의 관계인 것은 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6과 24</span></li><li class="no"><span class="mark"></span><span class="txt">6과 20</span></li><li class="no"><span class="mark"></span><span class="txt">8과 20</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>24 ÷ 6 = 4로 나누어떨어져요. 20 ÷ 6과 20 ÷ 8은 나누어떨어지지 않아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G3-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>G3-3</code></div>
+        <div class="say"><p><strong>6과 20</strong>은 둘 다 2로 나누어떨어져요. 그럼 약수와 배수의 관계일까요?</p><p>20 ÷ 6 = 3 … 2 — <strong>나누어떨어지지 않아요.</strong></p><p>둘 다 짝수라고, 같은 수로 나뉜다고 관계가 있는 게 아니에요. <strong>한 수가 다른 수를 나누어떨어지게</strong> 해야 해요.</p></div>
+        <div class="check" id="G3-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G3-3✓</code></div>
+        <p class="qt">9와 45는 약수와 배수의 관계일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">네 — 45는 9의 배수예요</span></li><li class="no"><span class="mark"></span><span class="txt">아니요 — 45는 홀수예요</span></li><li class="no"><span class="mark"></span><span class="txt">아니요 — 9가 45보다 작아요</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>45 ÷ 9 = 5로 나누어떨어져요. 그래서 9는 45의 약수, 45는 9의 배수예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="G3-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>G3-📏</code></div><p>곱셈식 □ × △ = ○에서 □와 △는 ○의 약수, ○는 □와 △의 배수. 큰 수가 작은 수로 나누어떨어지면 관계가 있다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="G3-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>G3-①a</code></div>
+      <div class="say"><p>두 수가 약수와 배수의 관계인 것은 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">8과 14</span><span class="tag">공약수만 있어도 관계가 있다고 봄</span></li><li class="no"><span class="mark"></span><span class="txt">20과 24</span><span class="tag">공약수만 있어도 관계가 있다고 봄</span></li><li class="no"><span class="mark"></span><span class="txt">6과 25</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">6과 24</span></li></ol>
+    </div><div class="sample" id="G3-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>G3-①b</code></div>
+      <div class="say"><p>두 수가 약수와 배수의 관계인 것은 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6과 12</span></li><li class="no"><span class="mark"></span><span class="txt">6과 13</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">30과 42</span><span class="tag">공약수만 있어도 관계가 있다고 봄</span></li><li class="no"><span class="mark"></span><span class="txt">9와 21</span><span class="tag">공약수만 있어도 관계가 있다고 봄</span></li></ol>
+    </div><div class="sample" id="G3-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>G3-②</code></div>
+      <div class="say"><p>개굴닌자가 이렇게 말했어요.</p><p><strong>5 × 9 = 45니까 45는 5의 약수예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">곱셈식으로는 알 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">45는 9의 약수예요</span><span class="tag">약수와 배수를 뒤바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">45는 5의 배수예요 — 5가 45의 약수</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="G3-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>G3-👨</code></div>
+    <h3>약수와 배수는 한 곱셈식의 두 얼굴 — 곱하는 수가 약수, 나온 수가 배수.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="G3-👨말1"><code class="mini">말1</code><span>&quot;3 × 4 = 12에서 약수는 누구고 배수는 누구야?&quot;</span></li><li id="G3-👨말2"><code class="mini">말2</code><span>&quot;6과 20은 둘 다 짝수인데, 약수와 배수 관계일까?&quot; — 나눠 보게</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">카드 두 장 뽑기 놀이: 두 수를 뽑아 큰 수를 작은 수로 나눠 보고, 나누어떨어지면 &quot;관계 있다!&quot;를 외치기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="G3-👨함정1"><code class="mini">함정1</code><div><div class="kid">&quot;12는 3의 약수&quot;처럼 거꾸로 말한다</div><div class="dadsay">→ &quot;12가 3을 나눌 수 있어? 약수는 나누는 쪽이야.&quot;</div></div></li><li id="G3-👨함정2"><code class="mini">함정2</code><div><div class="kid">둘 다 짝수면 관계가 있다고 한다 (6과 20)</div><div class="dadsay">→ &quot;20을 6으로 나눠 봐. 딱 떨어져?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">5 × 6 = 30으로 약수·배수 문장을 두 개 만들고, 6과 20이 관계가 없는 이유를 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="G4">
+    <header class="ch-head">
+      <div class="ch-no">G4</div>
+      <div>
+        <div class="grade">초5 · G3 다음</div>
+        <h2>공약수와 최대공약수</h2>
+        <p class="idea">두 수의 공통인 약수가 <strong>공약수</strong>, 그중 가장 큰 수가 <strong>최대공약수</strong>예요. 12와 18의 공약수 1, 2, 3, 6 → 최대공약수 6. 공약수는 <strong>최대공약수의 약수</strong>예요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="G4-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>G4-1</code></div>
+        <div class="say"><p><strong>12와 18</strong>의 약수를 나란히 써 볼까요?</p><p>· 12의 약수: <strong>1, 2, 3</strong>, 4, <strong>6</strong>, 12<br>· 18의 약수: <strong>1, 2, 3, 6</strong>, 9, 18</p><p>둘 다에 있는 <strong>1, 2, 3, 6</strong>이 12와 18의 <strong>공약수</strong>예요.</p></div>
+        <div class="check" id="G4-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G4-1✓</code></div>
+        <p class="qt">8과 12의 공약수를 모두 구하면 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1, 2, 4</span></li><li class="no"><span class="mark"></span><span class="txt">1, 2, 3, 4, 6, 8, 12</span></li><li class="no"><span class="mark"></span><span class="txt">2, 4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>8의 약수 1, 2, 4, 8과 12의 약수 1, 2, 3, 4, 6, 12에 모두 있는 수는 1, 2, 4예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G4-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>G4-2</code></div>
+        <div class="say"><p>공약수 중에서 <strong>가장 큰 수</strong>를 <strong>최대공약수</strong>라고 해요.</p><p>12와 18의 공약수 1, 2, 3, 6 → 최대공약수 <strong>6</strong></p><p>2나 3도 공약수지만 <strong>가장 큰</strong> 건 6이에요.</p></div>
+        <div class="check" id="G4-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G4-2✓</code></div>
+        <p class="qt">16과 24의 최대공약수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">48</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>공약수 1, 2, 4, 8 중 가장 큰 수는 8이에요. 2는 가장 작은 공약수(1 다음), 48은 두 수보다 커서 공약수가 될 수 없어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G4-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>G4-3</code></div>
+        <div class="say"><p>신기한 사실!</p><p>12와 18의 공약수 <strong>1, 2, 3, 6</strong> = 최대공약수 <strong>6의 약수</strong></p><p>최대공약수만 알면 공약수를 <strong>한 번에</strong> 구할 수 있어요.</p></div>
+        <div class="check" id="G4-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G4-3✓</code></div>
+        <p class="qt">두 수의 최대공약수가 10일 때, 두 수의 공약수를 모두 구하면 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1, 2, 5, 10</span></li><li class="no"><span class="mark"></span><span class="txt">1, 10</span></li><li class="no"><span class="mark"></span><span class="txt">10, 20, 30</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>공약수는 최대공약수 10의 약수예요: 1, 2, 5, 10. 10, 20, 30은 10의 배수예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="G4-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>G4-📏</code></div><p>공약수는 두 수에 공통인 약수, 최대공약수는 그중 가장 큰 수. 공약수는 최대공약수의 약수.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="G4-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>G4-①a</code></div>
+      <div class="say"><p>8과 12의 공약수를 모두 구하면 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">1, 2, 4, 8</span><span class="tag">한 수의 약수만 구함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">1, 2, 4</span></li><li class="no"><span class="mark"></span><span class="txt">1, 2, 3, 4, 6, 8, 12</span><span class="tag">두 수의 약수를 모두 모음</span></li><li class="no"><span class="mark"></span><span class="txt">2, 4</span><span class="tag">1이나 자기 자신을 빠뜨림</span></li></ol>
+    </div><div class="sample" id="G4-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>G4-①b</code></div>
+      <div class="say"><p>8과 40의 최대공약수가 8일 때, 두 수의 공약수를 모두 구하면 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">1, 8</span><span class="tag">약수 짝을 빠뜨림</span></li><li class="ok"><span class="mark">✔</span><span class="txt">1, 2, 4, 8</span></li><li class="no"><span class="mark"></span><span class="txt">2, 4, 8</span><span class="tag">1이나 자기 자신을 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt">8, 16, 24</span><span class="tag">배수를 약수로 봄</span></li></ol>
+    </div><div class="sample" id="G4-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>G4-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>24와 36의 최대공약수는 72예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">최대공약수는 두 수를 더해서 구해요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">최대공약수는 두 수보다 커야 해요</span><span class="tag">오개념을 옳다고 함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">72는 최소공배수예요 — 최대공약수는 12</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="G4-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>G4-👨</code></div>
+    <h3>공약수 = 둘 다의 약수, 최대공약수 = 그중 가장 큰 것, 그리고 공약수는 최대공약수의 약수라는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="G4-👨말1"><code class="mini">말1</code><span>&quot;12와 18을 둘 다 똑같이 나눌 수 있는 수는?&quot; — 약수를 나란히 써서 동그라미</span></li><li id="G4-👨말2"><code class="mini">말2</code><span>&quot;최대공약수가 6이면 공약수는 뭐야?&quot; — 6의 약수로 바로</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이 두 장에 두 수의 약수를 쓰고 나란히 놓기 — 둘 다에 있는 수에 스티커.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="G4-👨함정1"><code class="mini">함정1</code><div><div class="kid">공약수를 구하라는데 두 수의 약수를 다 쓴다</div><div class="dadsay">→ &quot;'공'은 '함께'야. 둘 다에 있어야 해.&quot;</div></div></li><li id="G4-👨함정2"><code class="mini">함정2</code><div><div class="kid">최대공약수로 가장 작은 공약수(2)를 고른다</div><div class="dadsay">→ &quot;'최대'는 가장 큰 거야. 2보다 큰 공약수는 없어?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">16과 24의 공약수와 최대공약수를 구하고, 공약수가 최대공약수의 약수인 걸 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="G5">
+    <header class="ch-head">
+      <div class="ch-no">G5</div>
+      <div>
+        <div class="grade">초5 · G4 다음</div>
+        <h2>최대공약수 구하기</h2>
+        <p class="idea">두 수를 <strong>공약수로 더 나눌 수 없을 때까지</strong> 나누고, <strong>왼쪽 수를 모두 곱해요</strong>. 곱셈식으로 나타내 <strong>둘 다에 들어 있는 곱</strong>을 찾아도 돼요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="G5-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>G5-1</code></div>
+        <div class="say"><p>곱셈식으로 최대공약수를 찾아요.</p><p><strong>18 = 2 × 3 × 3</strong><br><strong>24 = 2 × 2 × 2 × 3</strong></p><p>둘 다에 들어 있는 곱: <strong>2 × 3 = 6</strong><br>→ 최대공약수 <strong>6</strong></p></div>
+        <div class="check" id="G5-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G5-1✓</code></div>
+        <p class="qt">12 = 2 × 2 × 3, 30 = 2 × 3 × 5일 때, 12와 30의 최대공약수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">60</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>둘 다에 들어 있는 곱은 2 × 3 = 6이에요. 2는 하나만 찾은 것, 60은 모든 수를 한 번씩 곱한 거예요 (다음에 배울 최소공배수).</p>
+      </div>
+      </div>
+    </li><li class="step" id="G5-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>G5-2</code></div>
+        <div class="say"><p>두 수를 <strong>공약수로 계속</strong> 나누는 방법도 있어요.</p><p><strong>24와 36</strong><br>· 2로 나누면 → 12, 18<br>· 2로 나누면 → 6, 9<br>· 3으로 나누면 → 2, 3 (더 나눌 수 없어요)</p><p>나눈 수(<strong>왼쪽 수</strong>)를 모두 곱해요: 2 × 2 × 3 = <strong>12</strong></p></div>
+        <div class="check" id="G5-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G5-2✓</code></div>
+        <p class="qt">30과 45를 3으로 나누면 10, 15, 다시 5로 나누면 2, 3이 돼요. 최대공약수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">15</span></li><li class="no"><span class="mark"></span><span class="txt">6</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>왼쪽 수를 곱해요: 3 × 5 = 15. 6은 아래 수(2 × 3)를 곱한 것, 8은 왼쪽 수를 더한 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G5-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>G5-3</code></div>
+        <div class="say"><p>한 번 나누고 멈추면 안 돼요!</p><p>24와 36을 2로 나누면 12, 18 — 아직 <strong>2로, 3으로</strong> 더 나눌 수 있어요.</p><p><strong>더 나눌 수 없을 때까지</strong> 나눠야 최대공약수가 나와요.</p></div>
+        <div class="check" id="G5-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G5-3✓</code></div>
+        <p class="qt">20과 30을 2로 나누면 10과 15가 돼요. 최대공약수는 2일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">아니요 — 10과 15를 5로 더 나눌 수 있어서 최대공약수는 10이에요</span></li><li class="no"><span class="mark"></span><span class="txt">네 — 한 번 나눴으면 끝이에요</span></li><li class="no"><span class="mark"></span><span class="txt">네 — 2는 20과 30을 둘 다 나누어떨어지게 해요</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>10과 15는 5로 더 나눌 수 있어요. 2 × 5 = 10이 최대공약수예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="G5-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>G5-📏</code></div><p>공약수로 더 나눌 수 없을 때까지 나누고, 왼쪽 수를 모두 곱한다 (곱셈식이면 둘 다에 들어 있는 곱).</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="G5-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>G5-①a</code></div>
+      <div class="say"><p>12 = 2 × 2 × 3<br>27 = 3 × 3 × 3</p><p>곱셈식을 보고 12와 27의 최대공약수를 구하면 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt">2</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">108</span><span class="tag">최소공배수를 구함</span></li></ol>
+    </div><div class="sample" id="G5-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>G5-①b</code></div>
+      <div class="say"><p>18과 24를 공약수로 계속 나눴어요.</p><p>· 2로 나누면 → 9, 12<br>· 3으로 나누면 → 3, 4 (더 나눌 수 없어요)</p><p>최대공약수는 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">2</span><span class="tag">끝까지 나누지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">72</span><span class="tag">최소공배수를 구함</span></li><li class="no"><span class="mark"></span><span class="txt">12</span><span class="tag">아래 수를 곱함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">6</span></li></ol>
+    </div><div class="sample" id="G5-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>G5-②</code></div>
+      <div class="say"><p>40과 50을 공약수로 계속 나눴어요.</p><p>· 2로 나누면 → 20, 25<br>· 5로 나누면 → 4, 5 (더 나눌 수 없어요)</p><p>루카리오가 이렇게 말했어요.</p><p><strong>최대공약수는 아래 수를 곱한 20이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">최대공약수는 왼쪽 수를 곱해요 — 2 × 5 = 10</span></li><li class="no"><span class="mark"></span><span class="txt">왼쪽 수를 더해야 해요</span><span class="tag">왼쪽 수를 더함</span></li><li class="no"><span class="mark"></span><span class="txt">왼쪽 수와 아래 수를 모두 곱해야 해요</span><span class="tag">최소공배수를 구함</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="G5-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>G5-👨</code></div>
+    <h3>최대공약수를 빠르게 구하는 두 방법(곱셈식, 나눗셈 사다리)과 끝까지 나누는 습관.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="G5-👨말1"><code class="mini">말1</code><span>&quot;24를 작은 수들의 곱으로 쪼개 봐. 36도.&quot; — 겹치는 곱에 동그라미</span></li><li id="G5-👨말2"><code class="mini">말2</code><span>&quot;더 나눌 수 있는 수가 남았어?&quot; — 사다리 끝 확인</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이에 나눗셈 사다리 3문제(24와 36, 30과 45, 18과 42) — 왼쪽 수에 빨간 동그라미.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="G5-👨함정1"><code class="mini">함정1</code><div><div class="kid">사다리에서 아래 수(2, 3)를 곱한다</div><div class="dadsay">→ &quot;아래 수는 나누고 남은 거야. 나눈 수는 어디 적었어?&quot;</div></div></li><li id="G5-👨함정2"><code class="mini">함정2</code><div><div class="kid">한 번만 나누고 멈춘다</div><div class="dadsay">→ &quot;12랑 18을 또 나눌 수 있는 수가 있어?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">24와 36, 30과 45의 최대공약수를 사다리로 구하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="G6">
+    <header class="ch-head">
+      <div class="ch-no">G6</div>
+      <div>
+        <div class="grade">초5 · G5 다음</div>
+        <h2>공배수와 최소공배수</h2>
+        <p class="idea">두 수의 공통인 배수가 <strong>공배수</strong>, 그중 가장 작은 수가 <strong>최소공배수</strong>예요. 4와 6의 공배수 12, 24, 36… → 최소공배수 12. 공배수는 <strong>최소공배수의 배수</strong>예요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="G6-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>G6-1</code></div>
+        <div class="say"><p><strong>4의 배수</strong>(위)와 <strong>6의 배수</strong>(아래)를 수직선에 찍어 볼까요?</p><div class="fig"><svg class="frac-fig line-fig" viewBox="0 0 348 44" width="348" height="44" role="img" aria-label="수직선 0부터 12, 점 4, 8, 12"><line x1="10" y1="18" x2="338" y2="18" stroke="currentColor" stroke-width="1.5"/><path d="M 338 18 l -6 -4 v 8 z" fill="currentColor"/><line x1="18" y1="10" x2="18" y2="26" stroke="currentColor" stroke-width="2.5"/><text x="18" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="700">0</text><line x1="44" y1="13" x2="44" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="44" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">1</text><line x1="70" y1="13" x2="70" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="70" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">2</text><line x1="96" y1="13" x2="96" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="96" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">3</text><line x1="122" y1="13" x2="122" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="122" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">4</text><line x1="148" y1="13" x2="148" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="148" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">5</text><line x1="174" y1="13" x2="174" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="174" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">6</text><line x1="200" y1="13" x2="200" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="200" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">7</text><line x1="226" y1="13" x2="226" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="226" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">8</text><line x1="252" y1="13" x2="252" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="252" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">9</text><line x1="278" y1="13" x2="278" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="278" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">10</text><line x1="304" y1="13" x2="304" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="304" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">11</text><line x1="330" y1="13" x2="330" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="330" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">12</text><circle cx="122.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/><circle cx="226.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/><circle cx="330.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/></svg></div><div class="fig"><svg class="frac-fig line-fig" viewBox="0 0 348 44" width="348" height="44" role="img" aria-label="수직선 0부터 12, 점 6, 12"><line x1="10" y1="18" x2="338" y2="18" stroke="currentColor" stroke-width="1.5"/><path d="M 338 18 l -6 -4 v 8 z" fill="currentColor"/><line x1="18" y1="10" x2="18" y2="26" stroke="currentColor" stroke-width="2.5"/><text x="18" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="700">0</text><line x1="44" y1="13" x2="44" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="44" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">1</text><line x1="70" y1="13" x2="70" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="70" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">2</text><line x1="96" y1="13" x2="96" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="96" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">3</text><line x1="122" y1="13" x2="122" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="122" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">4</text><line x1="148" y1="13" x2="148" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="148" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">5</text><line x1="174" y1="13" x2="174" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="174" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">6</text><line x1="200" y1="13" x2="200" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="200" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">7</text><line x1="226" y1="13" x2="226" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="226" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">8</text><line x1="252" y1="13" x2="252" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="252" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">9</text><line x1="278" y1="13" x2="278" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="278" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">10</text><line x1="304" y1="13" x2="304" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="304" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">11</text><line x1="330" y1="13" x2="330" y2="23" stroke="currentColor" stroke-width="1.2"/><text x="330" y="38" font-size="11" text-anchor="middle" fill="currentColor" font-weight="400">12</text><circle cx="174.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/><circle cx="330.0" cy="18" r="6" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1"/></svg></div><p>둘 다 찍힌 <strong>12</strong>가 처음 만나는 곳이에요. 계속 가면 24, 36 …에서도 만나요.</p><p>이렇게 둘 다에 있는 <strong>12, 24, 36 …</strong>을 4와 6의 <strong>공배수</strong>라고 해요.</p></div>
+        <div class="check" id="G6-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G6-1✓</code></div>
+        <p class="qt">2와 3의 공배수를 작은 수부터 3개 쓰면 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6, 12, 18</span></li><li class="no"><span class="mark"></span><span class="txt">2, 4, 6</span></li><li class="no"><span class="mark"></span><span class="txt">3, 6, 9</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2의 배수와 3의 배수에 모두 있는 수: 6, 12, 18 … 2, 4, 6은 2의 배수만, 3, 6, 9는 3의 배수만 쓴 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G6-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>G6-2</code></div>
+        <div class="say"><p>공배수 중에서 <strong>가장 작은 수</strong>를 <strong>최소공배수</strong>라고 해요.</p><p>4와 6의 공배수 12, 24, 36 … → 최소공배수 <strong>12</strong></p><p>4 × 6 = 24도 공배수지만, <strong>가장 작은</strong> 건 12예요.</p></div>
+        <div class="check" id="G6-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G6-2✓</code></div>
+        <p class="qt">6과 8의 최소공배수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">24</span></li><li class="no"><span class="mark"></span><span class="txt">48</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>8의 배수 8, 16, 24 중 6으로도 나누어떨어지는 첫 수는 24예요. 48은 두 수의 곱, 2는 최대공약수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G6-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>G6-3</code></div>
+        <div class="say"><p>공배수는 <strong>최소공배수의 배수</strong>예요.</p><p>4와 6의 최소공배수 12 → 공배수 <strong>12, 24, 36, 48 …</strong></p><p>최소공배수만 알면 공배수를 <strong>끝없이</strong> 구할 수 있어요.</p></div>
+        <div class="check" id="G6-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G6-3✓</code></div>
+        <p class="qt">두 수의 최소공배수가 15일 때, 두 수의 공배수가 <strong>아닌</strong> 것은 어느 것일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">40</span></li><li class="no"><span class="mark"></span><span class="txt">30</span></li><li class="no"><span class="mark"></span><span class="txt">45</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>공배수는 15의 배수: 15, 30, 45, 60 … 40은 15로 나누어떨어지지 않아요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="G6-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>G6-📏</code></div><p>공배수는 두 수에 공통인 배수, 최소공배수는 그중 가장 작은 수. 공배수는 최소공배수의 배수.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="G6-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>G6-①a</code></div>
+      <div class="say"><p>6과 10의 최소공배수가 30일 때, 두 수의 공배수가 <strong>아닌</strong> 것은 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">42</span></li><li class="no"><span class="mark"></span><span class="txt">60</span><span class="tag">공배수가 최소공배수의 배수임을 모름</span></li><li class="no"><span class="mark"></span><span class="txt">120</span><span class="tag">공배수가 최소공배수의 배수임을 모름</span></li><li class="no"><span class="mark"></span><span class="txt">90</span><span class="tag">공배수가 최소공배수의 배수임을 모름</span></li></ol>
+    </div><div class="sample" id="G6-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>G6-①b</code></div>
+      <div class="say"><p>8과 20의 공배수를 작은 수부터 3개 쓰면 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">1, 2, 4</span><span class="tag">공약수를 구함</span></li><li class="no"><span class="mark"></span><span class="txt">8, 16, 24</span><span class="tag">한 수의 배수만 구함</span></li><li class="no"><span class="mark"></span><span class="txt">160, 320, 480</span><span class="tag">두 수의 곱을 최소공배수로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">40, 80, 120</span></li></ol>
+    </div><div class="sample" id="G6-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>G6-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>12와 20의 최소공배수는 12 × 20 = 240이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">최소공배수는 두 수를 더해서 구해요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt">240도 공배수지만 더 작은 60이 있어요</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">최소공배수는 4예요</span><span class="tag">최대공약수를 구함</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="G6-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>G6-👨</code></div>
+    <h3>공배수 = 둘 다의 배수, 최소공배수 = 그중 가장 작은 것 — 두 수의 곱이 늘 최소공배수는 아니라는 것.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="G6-👨말1"><code class="mini">말1</code><span>&quot;4단과 6단에 둘 다 나오는 수는?&quot; — 구구단 표에서 찾기</span></li><li id="G6-👨말2"><code class="mini">말2</code><span>&quot;4 × 6 = 24보다 작은 공배수가 있을까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">달력에 3의 배수·4의 배수를 다른 색으로 칠해 두 색이 겹치는 날 찾기 (12, 24).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="G6-👨함정1"><code class="mini">함정1</code><div><div class="kid">최소공배수를 늘 두 수의 곱으로 쓴다 (4와 6 → 24)</div><div class="dadsay">→ &quot;12도 4와 6으로 나누어떨어지지? 그게 더 작아.&quot;</div></div></li><li id="G6-👨함정2"><code class="mini">함정2</code><div><div class="kid">공배수를 구하라는데 한 수의 배수만 쓴다</div><div class="dadsay">→ &quot;8이 6의 배수야?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">6과 8의 최소공배수를 배수를 늘어놓아 구하고, 두 수의 곱과 다른 이유를 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="G7">
+    <header class="ch-head">
+      <div class="ch-no">G7</div>
+      <div>
+        <div class="grade">초5 · G6 다음</div>
+        <h2>최소공배수 구하기</h2>
+        <p class="idea">공약수로 끝까지 나눈 뒤 <strong>왼쪽 수와 아래 수를 모두 곱해요</strong>. 최소공배수 = 최대공약수 × 아래 수들이에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="G7-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>G7-1</code></div>
+        <div class="say"><p>최대공약수를 구한 <strong>나눗셈 사다리</strong>에서 최소공배수도 나와요.</p><p><strong>24와 36</strong><br>· 2로 나누면 → 12, 18<br>· 2로 나누면 → 6, 9<br>· 3으로 나누면 → 2, 3</p><p><strong>왼쪽 수와 아래 수를 모두</strong> 곱해요:<br>2 × 2 × 3 × 2 × 3 = <strong>72</strong></p></div>
+        <div class="check" id="G7-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G7-1✓</code></div>
+        <p class="qt">12와 18을 2로 나누면 6, 9, 다시 3으로 나누면 2, 3이 돼요. 최소공배수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">36</span></li><li class="no"><span class="mark"></span><span class="txt">6</span></li><li class="no"><span class="mark"></span><span class="txt">216</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>왼쪽 수와 아래 수를 모두 곱해요: 2 × 3 × 2 × 3 = 36. 6은 왼쪽 수만 곱한 최대공약수, 216은 12 × 18이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G7-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>G7-2</code></div>
+        <div class="say"><p>빠른 방법: <strong>최소공배수 = 최대공약수 × 아래 수</strong></p><p>24와 36: 최대공약수 12, 아래 수 2와 3<br>→ 12 × 2 × 3 = <strong>72</strong></p></div>
+        <div class="check" id="G7-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G7-2✓</code></div>
+        <p class="qt">최대공약수가 5이고, 사다리의 아래 수가 3과 4일 때 최소공배수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">60</span></li><li class="no"><span class="mark"></span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>5 × 3 × 4 = 60이에요. 12는 아래 수만 곱한 것, 5는 최대공약수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G7-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>G7-3</code></div>
+        <div class="say"><p>곱셈식으로도 구해요. <strong>겹치는 곱은 한 번만</strong> 곱해요.</p><p><strong>12 = 2 × 2 × 3</strong><br><strong>18 = 2 × 3 × 3</strong></p><p>겹치는 2 × 3은 한 번, 나머지 2와 3도 곱해요:<br>2 × 3 × 2 × 3 = <strong>36</strong></p></div>
+        <div class="check" id="G7-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G7-3✓</code></div>
+        <p class="qt">8 = 2 × 2 × 2, 12 = 2 × 2 × 3일 때, 8과 12의 최소공배수는 얼마일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">24</span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">96</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>겹치는 2 × 2는 한 번만: 2 × 2 × 2 × 3 = 24예요. 4는 최대공약수, 96은 8 × 12예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="G7-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>G7-📏</code></div><p>최소공배수 = 왼쪽 수 × 아래 수 (= 최대공약수 × 아래 수). 곱셈식이면 겹치는 곱은 한 번만.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="G7-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>G7-①a</code></div>
+      <div class="say"><p>18과 45를 공약수로 계속 나눴어요.</p><p>· 3으로 나누면 → 6, 15<br>· 3으로 나누면 → 2, 5 (더 나눌 수 없어요)</p><p>최소공배수는 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">10</span><span class="tag">아래 수를 곱함</span></li><li class="no"><span class="mark"></span><span class="txt">9</span><span class="tag">왼쪽 수만 곱함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">90</span></li><li class="no"><span class="mark"></span><span class="txt">810</span><span class="tag">두 수의 곱을 최소공배수로 봄</span></li></ol>
+    </div><div class="sample" id="G7-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>G7-①b</code></div>
+      <div class="say"><p>16과 28을 공약수로 계속 나눴어요.</p><p>· 2로 나누면 → 8, 14<br>· 2로 나누면 → 4, 7 (더 나눌 수 없어요)</p><p>최소공배수는 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">왼쪽 수만 곱함</span></li><li class="no"><span class="mark"></span><span class="txt">448</span><span class="tag">두 수의 곱을 최소공배수로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">112</span></li><li class="no"><span class="mark"></span><span class="txt">28</span><span class="tag">아래 수를 곱함</span></li></ol>
+    </div><div class="sample" id="G7-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>G7-②</code></div>
+      <div class="say"><p>18과 42를 공약수로 계속 나눴어요.</p><p>· 2로 나누면 → 9, 21<br>· 3으로 나누면 → 3, 7 (더 나눌 수 없어요)</p><p>리자몽이 이렇게 말했어요.</p><p><strong>최소공배수는 아래 수만 곱한 21이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">왼쪽 수와 아래 수를 모두 곱해요 — 2 × 3 × 3 × 7 = 126</span></li><li class="no"><span class="mark"></span><span class="txt">왼쪽 수만 곱해야 해요</span><span class="tag">왼쪽 수만 곱함</span></li><li class="no"><span class="mark"></span><span class="txt">두 수를 더해야 해요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="G7-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>G7-👨</code></div>
+    <h3>최소공배수를 사다리로 — 왼쪽과 아래를 모두 곱하기, 최대공약수와 헷갈리지 않기.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="G7-👨말1"><code class="mini">말1</code><span>&quot;최대공약수는 왼쪽만, 최소공배수는 왼쪽이랑 아래 다 — ㄱ자 모양으로 곱해&quot;</span></li><li id="G7-👨말2"><code class="mini">말2</code><span>&quot;두 수를 그냥 곱하면 왜 더 커질까?&quot; — 겹치는 곱을 두 번 곱해서</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">지난번 사다리 3문제(24와 36, 30과 45, 18과 42)를 다시 꺼내 이번엔 최소공배수까지 — 최대공약수 × 아래 수로 확인.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="G7-👨함정1"><code class="mini">함정1</code><div><div class="kid">사다리에서 왼쪽 수만 곱한다 (최대공약수가 나옴)</div><div class="dadsay">→ &quot;그건 최대공약수야. 최소공배수는 아래 수까지.&quot;</div></div></li><li id="G7-👨함정2"><code class="mini">함정2</code><div><div class="kid">두 수를 곱해서 답으로 쓴다 (12 × 18 = 216)</div><div class="dadsay">→ &quot;36도 12와 18로 나누어떨어지지? 더 작은 게 있으면 그게 최소야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">24와 36, 18과 42의 최소공배수를 사다리로 구하고 최대공약수 × 아래 수로 확인하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="G8">
+    <header class="ch-head">
+      <div class="ch-no">G8</div>
+      <div>
+        <div class="grade">초5 · G7 다음</div>
+        <h2>최대공약수·최소공배수 활용</h2>
+        <p class="idea"><strong>최대 몇 명에게 똑같이 나눠 줄까</strong>, <strong>가장 큰 정사각형</strong>은 최대공약수. <strong>다음에 함께 오는 날</strong>은 최소공배수예요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="G8-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>G8-1</code></div>
+        <div class="say"><p>뮤츠가 나무열매 <strong>12개</strong>와 포션 <strong>18개</strong>를 친구들에게 <strong>남김없이 똑같이</strong> 나눠 주려고 해요. 최대 몇 명에게 줄 수 있을까요?</p><p>· 친구 수는 12도, 18도 <strong>나누어떨어지게</strong> 해야 해요 → <strong>공약수</strong><br>· 가장 많은 친구 → <strong>최대공약수 6명</strong></p><p>한 명이 받는 것: 나무열매 12 ÷ 6 = <strong>2개</strong>, 포션 18 ÷ 6 = <strong>3개</strong></p></div>
+        <div class="check" id="G8-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G8-1✓</code></div>
+        <p class="qt">사탕 16개와 초콜릿 24개를 남김없이 똑같이 나눠 줄 때, 최대 몇 명에게 나눠 줄 수 있을까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8</span></li><li class="no"><span class="mark"></span><span class="txt">48</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>16과 24의 최대공약수는 8이에요. 2명에게도 나눠 줄 수 있지만 최대는 8명, 48명이면 사탕이 모자라요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G8-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>G8-2</code></div>
+        <div class="say"><p>뮤츠는 <strong>4일</strong>마다, 개굴닌자는 <strong>6일</strong>마다 체육관에 와요. 오늘 함께 왔다면 다음에 함께 오는 날은?</p><p>· 뮤츠: 4, 8, <strong>12</strong>, 16, 20, <strong>24</strong> …<br>· 개굴닌자: 6, <strong>12</strong>, 18, <strong>24</strong> …</p><p>함께 오는 날 = <strong>공배수</strong>, 가장 빠른 날 = <strong>최소공배수 12일 뒤</strong></p></div>
+        <div class="check" id="G8-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G8-2✓</code></div>
+        <p class="qt">버스 A는 6분마다, 버스 B는 10분마다 출발해요. 두 버스가 방금 함께 출발했다면, 다음에 함께 출발하는 것은 몇 분 뒤일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">30</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">60</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>6과 10의 최소공배수는 30이에요. 2분 뒤엔 둘 다 출발하지 않고, 60분 뒤는 두 번째로 함께 출발하는 때예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G8-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>G8-3</code></div>
+        <div class="say"><p>가로 <strong>12cm</strong>, 세로 <strong>18cm</strong> 종이를 <strong>남는 부분 없이</strong> 똑같은 정사각형으로 자르려고 해요. 가장 큰 정사각형의 한 변은?</p><p>· 한 변은 12도, 18도 나누어떨어지게 해야 해요 → <strong>공약수</strong><br>· 가장 큰 것 → <strong>최대공약수 6cm</strong></p></div>
+        <div class="check" id="G8-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G8-3✓</code></div>
+        <p class="qt">가로 20cm, 세로 28cm 종이를 남는 부분 없이 가장 큰 정사각형으로 자르면, 한 변은 몇 cm일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">140</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>20과 28의 최대공약수는 4예요. 2cm로도 자를 수 있지만 가장 큰 건 4cm, 140cm는 종이보다 커요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="G8-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>G8-4</code></div>
+        <div class="say"><p>문제의 <strong>말</strong>로 가려요.</p><p>· &quot;최대 몇 명에게 <strong>똑같이 나눠</strong>&quot;, &quot;<strong>가장 큰</strong> 정사각형으로 <strong>자르기</strong>&quot; → <strong>최대공약수</strong><br>· &quot;<strong>다음에 함께</strong>&quot;, &quot;<strong>동시에</strong> 출발&quot; → <strong>최소공배수</strong></p><p>한 번 더 확인: 최대공약수는 두 수보다 <strong>클 수 없고</strong>, 최소공배수는 두 수보다 <strong>작을 수 없어요</strong>.</p></div>
+        <div class="check" id="G8-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>G8-4✓</code></div>
+        <p class="qt">구슬 24개와 딱지 36장을 최대한 많은 친구에게 남김없이 똑같이 나눠 줄 때, 한 명이 받는 딱지는 몇 장일까요?</p>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3장</span></li><li class="no"><span class="mark"></span><span class="txt">12장</span></li><li class="no"><span class="mark"></span><span class="txt">2장</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>최대 12명에게 나눠 줘요(최대공약수). 딱지 36 ÷ 12 = 3장이에요. 12는 친구 수, 2는 한 명이 받는 구슬 수예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="G8-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>G8-📏</code></div><p>똑같이 나눠 주기·가장 큰 정사각형 → 최대공약수. 다음에 함께·동시에 → 최소공배수.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="G8-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>G8-①a</code></div>
+      <div class="say"><p>가로 27cm, 세로 45cm인 종이를 남는 부분 없이 똑같은 정사각형으로 자르려고 해요. 가장 큰 정사각형의 한 변은 몇 cm일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">135</span><span class="tag">최대공약수와 최소공배수를 바꿔 씀</span></li><li class="ok"><span class="mark">✔</span><span class="txt">9</span></li><li class="no"><span class="mark"></span><span class="txt">3</span><span class="tag">가장 작은 공약수를 고름</span></li><li class="no"><span class="mark"></span><span class="txt">10</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="G8-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>G8-①b</code></div>
+      <div class="say"><p>루카리오가 나무열매 18개와 포션 24개를 최대한 많은 친구에게 남김없이 똑같이 나눠 주려고 해요. 한 명이 받는 포션은 몇 개일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">6</span><span class="tag">묻는 것을 잘못 봄</span></li><li class="no"><span class="mark"></span><span class="txt">5</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">3</span><span class="tag">묻는 것을 잘못 봄</span></li></ol>
+    </div><div class="sample" id="G8-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>G8-②</code></div>
+      <div class="say"><p>루카리오가 이렇게 말했어요.</p><p><strong>나무열매 32개와 포션 40개를 똑같이 나눠 주면 최대 160명에게 줄 수 있어요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">두 수를 곱한 1280명이에요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">두 수를 더한 72명이에요</span><span class="tag">두 수를 더함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">나무열매가 32개뿐이라 160명에게는 못 줘요 — 최대공약수 8명</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="G8-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>G8-👨</code></div>
+    <h3>문장을 읽고 최대공약수 문제인지 최소공배수 문제인지 가르기 — 답의 크기로 확인하기.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="G8-👨말1"><code class="mini">말1</code><span>&quot;나눠 주는 거야, 다시 만나는 거야?&quot; — 계산 전에 먼저 말하게</span></li><li id="G8-👨말2"><code class="mini">말2</code><span>&quot;답이 12랑 18보다 커도 돼?&quot; — 나눠 주는 문제면 안 돼</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">간식 나누기: 과자 두 종류의 개수를 세어 최대 몇 명에게 똑같이 나눌지 구하고, 진짜로 나눠 보기.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="G8-👨함정1"><code class="mini">함정1</code><div><div class="kid">나눠 주기 문제에 최소공배수를 쓴다 (12와 18 → 36명)</div><div class="dadsay">→ &quot;36명이면 나무열매가 모자라지?&quot;</div></div></li><li id="G8-👨함정2"><code class="mini">함정2</code><div><div class="kid">한 명이 받는 개수를 물었는데 사람 수를 답한다</div><div class="dadsay">→ &quot;문제가 뭘 물었어? 사람 수야, 한 명이 받는 개수야?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">나눠 주기 문제와 함께 오는 날 문제를 하나씩 풀고, 왜 최대공약수·최소공배수인지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+
+  <footer>신코치 🔢 수학 · 약수와 배수 줄기 배움 원고 · 2026-09-30</footer>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('ans');
+  function apply(){document.body.classList.toggle('hide-ans',!cb.checked);}
+  try{var v=localStorage.getItem('fac-review-ans');if(v==='0'){cb.checked=false;}}catch(e){}
+  cb.addEventListener('change',function(){apply();try{localStorage.setItem('fac-review-ans',cb.checked?'1':'0');}catch(e){}});
+  apply();
+})();
+</script>

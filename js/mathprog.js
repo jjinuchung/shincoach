@@ -11,6 +11,7 @@ import * as negativeGen from './mathneg.js';
 import * as mixedGen from './mathmix.js';
 import * as decimalGen from './mathdec.js';
 import * as ratioGen from './mathrat.js';
+import * as factorGen from './mathfac.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -27,8 +28,10 @@ export const STEMS = {
   decimal: { key: 'decimal', code: 'C', label: '소수 줄기', range: '초4 → 초6', list: decimalGen.DECIMAL, gen: decimalGen, file: './coach/math/decimal.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (학교 소수 단원)', intro: '소수 문제 5개를 먼저 풀어 볼게요. 학교에서 배운 것도, 아직 안 배운 것도 있어요 — 어디부터 하면 될지 보려는 거예요.' },
   // F 비와 비율 — 비율 = 분수 = 소수 = 백분율이라 A·C를 다시 쓰며 굳힌다 · 문제 이야기는 진우의 게임(잡힐 확률 %, 🛒 할인) (2026-09-30 아버님 "진행 순서 제안대로"). 초6 9칸
   ratio: { key: 'ratio', code: 'F', label: '비와 비율 줄기', range: '초6', list: ratioGen.RATIO, gen: ratioGen, file: './coach/math/ratio.json', lesson: true, intro: '비와 비율 문제 5개를 먼저 풀어 볼게요. 처음 보는 말이 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // G 약수와 배수 — A 분수의 약분·통분과 F의 간단한 자연수의 비가 최대공약수·최소공배수를 안다고 치는데 가르치는 칸이 없었다 (2026-09-30). 초5 8칸
+  factor: { key: 'factor', code: 'G', label: '약수와 배수 줄기', range: '초5', list: factorGen.FACTOR, gen: factorGen, file: './coach/math/factor.json', lesson: true, intro: '약수와 배수 문제 5개를 먼저 풀어 볼게요. 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
