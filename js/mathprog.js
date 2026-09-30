@@ -518,6 +518,28 @@ export function roundCatches({ mode, result, inDaily, dailyFirst }) {
   return n;
 }
 
+// 🍀 어쩌다 나오는 몬스터볼 (2026-10-01, 아버님 결정) — 이미 아는 개념을 다시 풀어 통과하면(연습·사다리 복습)
+//   몬스터볼이 없었는데, "아예 안 나오게는 말고 20% 정도로 어쩌다가". 하루 max번까지만 —
+//   쉬운 개념만 되풀이해 볼을 캐는 길은 막는다(☀️ 개념 편·첫 통과가 여전히 주 경로).
+export const LUCKY = { chance: 0.2, max: 3 };
+
+/**
+ * 🍀 이 편이 어쩌다 나오는 볼을 받는가 — 트랜잭션 안에서 부른다(하루 횟수 m.luck = {d, n}을 올린다).
+ * 통과했는데 roundCatches가 준 개념 편 볼이 없을 때만. 주사위(roll)는 부르는 쪽이 트랜잭션 밖에서 한 번 굴린다(재시도에도 같은 값).
+ * @param {{mode:string, result?:object, inDaily?:boolean, roll:boolean, today:string}} o
+ * @returns {0|1}
+ */
+export function luckyCatch(m, { mode, result, inDaily, roll, today }) {
+  if (!roll || !today) return 0;
+  if (mode !== 'learn' && mode !== 'review') return 0;
+  if (!result || !result.passed) return 0;
+  if (roundCatches({ mode, result, inDaily }) > 0) return 0; // 처음 통과·☀️ 안 통과는 이미 1개
+  const used = m.luck && m.luck.d === today ? Number(m.luck.n) || 0 : 0;
+  if (used >= LUCKY.max) return 0;
+  m.luck = { d: today, n: used + 1 }; // 새 객체로 — cloneMath가 얕게 복사하므로 입력을 건드리지 않게
+  return 1;
+}
+
 /**
  * 미룬 던지기 — 번 몬스터볼은 화면과 상관없이 레코드에 적어 두고, 던질 때마다 하나씩 쓴다.
  * 그림이 없거나(오프라인 첫날) 후보를 받는 사이 🎒로 나가도 잡기가 사라지지 않는다 (Codex 5차 #2). 트랜잭션 안에서 부른다.

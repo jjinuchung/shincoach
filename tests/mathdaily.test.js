@@ -2,9 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  dailyPlan, weakKinds, applyMixRound, markDaily, dailyDone, applyRound, applyNotesRound, MIX_CONCEPTS, KINDS, REWARD, dueNotes, conceptReport, mathReportText, tallyRound, bumpTot, roundCatches, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
+  dailyPlan, weakKinds, applyMixRound, markDaily, dailyDone, applyRound, applyNotesRound, MIX_CONCEPTS, KINDS, REWARD, dueNotes, conceptReport, mathReportText, tallyRound, bumpTot, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
 } from '../js/mathprog.js';
-import { emptyMath, mergeMath } from '../js/db.js';
+import { emptyMath, mergeMath, cloneMath } from '../js/db.js';
 import { rng } from '../js/mathgen.js';
 
 const T = '2026-09-21';
@@ -253,6 +253,70 @@ test('🎯 잡기 자격 roundCatches — 처음 통과 1 · ☀️ 안 개념 �
   assert.equal(roundCatches({ mode: 'notes', result: { ok: 2, total: 2 } }), 0);
   assert.equal(roundCatches({ mode: 'ask', result: { fixed: true } }), 0);
   assert.equal(roundCatches({ mode: 'diag' }), 0);
+});
+
+test('🍀 어쩌다 나오는 몬스터볼 luckyCatch — 아는 개념을 다시 풀어 통과하면 20%, 하루 3번까지 (2026-10-01 아버님 "아예 안 나오게는 말고")', () => {
+  assert.equal(LUCKY.chance, 0.2);
+  assert.equal(LUCKY.max, 3);
+  // 진짜 applyRound로 연습 편·사다리 복습 편 결과를 만든다
+  const m = learned(1);                                   // frac.mean을 어제 배움, 복습 차례 아님
+  const practice = applyRound(m, ids[0], pass, T);
+  assert.equal(practice.practice, true);
+  assert.equal(roundCatches({ mode: 'learn', result: practice, inDaily: false }), 0, '연습 편은 원래 0');
+  const before = cloneMath(m);
+  assert.equal(luckyCatch(m, { mode: 'learn', result: practice, inDaily: false, roll: false, today: T }), 0, '주사위가 안 나오면 0');
+  assert.deepEqual(m, before, '안 나오면 하루 횟수도 안 쓴다');
+  assert.equal(luckyCatch(m, { mode: 'learn', result: practice, inDaily: false, roll: true, today: T }), 1, '연습 편 통과 + 주사위 = 1');
+  assert.deepEqual(m.luck, { d: T, n: 1 });
+
+  const r2 = learned(1);
+  r2.concepts[ids[0]].dueAt = T;                          // 오늘 복습 차례
+  const review = applyRound(r2, ids[0], pass, T);
+  assert.equal(review.review, true);
+  assert.equal(luckyCatch(r2, { mode: 'review', result: review, inDaily: false, roll: true, today: T }), 1, '사다리에서 한 복습 통과(원래 0)');
+  assert.equal(luckyCatch(emptyMath(), { mode: 'review', result: review, inDaily: true, roll: true, today: T }), 0, '☀️ 안 복습 통과는 이미 1개 — 겹쳐 주지 않는다');
+
+  const fresh = emptyMath();
+  const first = applyRound(fresh, ids[0], pass, T);
+  assert.equal(first.first, true);
+  assert.equal(luckyCatch(fresh, { mode: 'learn', result: first, inDaily: false, roll: true, today: T }), 0, '처음 통과는 이미 1개');
+
+  const f = learned(1);
+  const failed = applyRound(f, ids[0], { correct: 1, total: 4, missTags: [], qs: KINDS.map((k, i) => ({ k, ok: i ? 0 : 1 })) }, T);
+  assert.equal(failed.passed, false);
+  assert.equal(luckyCatch(f, { mode: 'learn', result: failed, inDaily: false, roll: true, today: T }), 0, '못 넘기면 없음');
+  for (const mode of ['mix', 'notes', 'ask', 'diag', 'special']) {
+    assert.equal(luckyCatch(emptyMath(), { mode, result: { passed: true, ok: 3, total: 3, fixed: true }, roll: true, today: T }), 0, `${mode}는 대상이 아니다`);
+  }
+
+  // 하루 3번까지 — 쉬운 개념만 되풀이해 캐는 길을 막는다. 다음 날은 다시
+  const c = learned(1);
+  let got = 0;
+  for (let i = 0; i < 10; i++) got += luckyCatch(c, { mode: 'learn', result: applyRound(c, ids[0], pass, T), inDaily: false, roll: true, today: T });
+  assert.equal(got, 3, '같은 날 열 번 다 나와도 3개');
+  assert.equal(luckyCatch(c, { mode: 'learn', result: applyRound(c, ids[0], pass, '2026-09-22'), inDaily: false, roll: true, today: '2026-09-22' }), 1, '다음 날은 다시');
+});
+
+test('🍀 하루 횟수 병합 — 늦은 날짜·같은 날이면 큰 횟수 (옛 백업으로 오늘 횟수를 되돌려 더 받지 않게)', () => {
+  const now = { ...emptyMath(), luck: { d: T, n: 3 } };
+  assert.deepEqual(mergeMath(now, { ...emptyMath(), luck: { d: T, n: 1 } }).luck, { d: T, n: 3 }, '같은 날 작은 횟수는 무시');
+  assert.deepEqual(mergeMath(now, { ...emptyMath(), luck: { d: Y, n: 0 } }).luck, { d: T, n: 3 }, '어제 백업은 무시');
+  assert.deepEqual(mergeMath({ ...emptyMath(), luck: { d: Y, n: 3 } }, { ...emptyMath(), luck: { d: T, n: 1 } }).luck, { d: T, n: 1 }, '늦은 날짜 쪽');
+  assert.deepEqual(mergeMath(emptyMath(), { ...emptyMath(), luck: { d: T, n: 2 } }).luck, { d: T, n: 2 }, '없던 쪽은 받는다');
+  const rec = { ...emptyMath(), luck: { d: T, n: 2 } };
+  mergeMath({ ...emptyMath(), luck: { d: T, n: 1 } }, rec);
+  assert.deepEqual(rec.luck, { d: T, n: 2 }, '입력을 변형하지 않는다');
+});
+
+test('🍀 화면 배선 — 주사위는 저장 트랜잭션 밖에서 한 번, luckyCatch 몫을 몬스터볼에 더한다', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../js/math.js', import.meta.url), 'utf8');
+  const i = src.indexOf('const roll = Math.random() < LUCKY.chance');
+  const j = src.indexOf('lucky = luckyCatch(s, { mode: r.mode, result, inDaily, roll, today })');
+  const k = src.indexOf('catches += lucky;');
+  const a = src.indexOf('addPending(s, catches);', k);
+  assert.ok(i > 0 && j > i && k > j && a > k, '굴리기 → updateMath 안 luckyCatch → catches에 더함 → addPending 순서');
+  assert.ok(src.slice(i, j).includes('await updateMath((s) => {'), '주사위는 updateMath 콜백 밖에서');
 });
 
 test('🔷 수학스톤 자격 stoneReward — 개념 편 통과 1 · 👑 +2 · 노트 전부 고침 1 · ❓ 처음 고침 1 · 연습·섞어·진단·실패 0 (2026-09-22 🧤: "제대로 배웠나"에서만)', () => {

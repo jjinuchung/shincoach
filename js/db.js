@@ -886,6 +886,9 @@ export function mergeMath(cur, rec) {
   const goldToday = !!(dl && out.daily && out.daily.d === dl.d && (out.daily.gold || dl.gold));
   if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0, ...(dl.gold ? { gold: true } : {}) };
   if (goldToday && out.daily && out.daily.d === dl.d) out.daily = { ...out.daily, gold: true }; // cloneMath는 daily를 얕게 복사하므로 입력을 건드리지 않게 새 객체로
+  // 🍀 어쩌다 나온 몬스터볼의 하루 횟수 — 늦은 날짜 쪽, 같은 날이면 큰 횟수 (옛 백업으로 오늘 횟수를 되돌려 더 받지 않게)
+  const lk = rec && rec.luck && rec.luck.d ? rec.luck : null;
+  if (lk && (!out.luck || !out.luck.d || lk.d > out.luck.d || (lk.d === out.luck.d && (Number(lk.n) || 0) > (Number(out.luck.n) || 0)))) out.luck = { d: lk.d, n: Number(lk.n) || 0 };
   // 🎯 던지기 카운터(earned·used·refunded)는 단조 증가 → 키마다 max (옛 백업을 되돌려도 쓴 던지기가 되살아나지 않는다, Codex 6차 #5).
   // 양쪽을 먼저 정규화(v112의 pend를 earned로 접기)한 뒤 합친다 — pend를 남겨 두면 나중에 또 접혀 두 번 더해진다 (Codex 7차 #3)
   if ((rec && (rec.throws || rec.pend !== undefined)) || out.throws || out.pend !== undefined) {

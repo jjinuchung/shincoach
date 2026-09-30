@@ -9,7 +9,7 @@ import { WORLDS, rng, shuffle, josa } from './mathgen.js';
 import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
-  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
+  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
   applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
@@ -2220,6 +2220,7 @@ async function finishRound() {
   let spReward = null;          // 💎 스페셜 보상 — **트랜잭션 안에서 이미 지급**됐다 (화면 표시용)
   let spLevel = null;           // 그때의 레벨 변화
   let catches = 0;              // 🎯 이번 편이 준 몬스터볼 (roundCatches, 레코드 pend에 적힘)
+  let lucky = 0;                // 🍀 그중 어쩌다 나온 몫 (luckyCatch)
   let daily = null; // ☀️ 이 편이 오늘의 수학의 마지막이면 완주 기록 (같은 트랜잭션 — 두 창이 같이 끝내도 첫 창만 보너스)
   const d = ui.daily;
   // 한 ☀️ 흐름에서 완주는 한 번만 적는다 — 섞어 풀기가 없는 날 "🤔 한 번 더"를 거듭해도 완주 횟수가 늘지 않게 (Codex 3차 #4)
@@ -2258,11 +2259,15 @@ async function finishRound() {
       });
     } else {
       const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
+      const roll = Math.random() < LUCKY.chance; // 🍀 트랜잭션 밖에서 한 번만 굴린다 — 저장을 다시 눌러도 같은 값
       state = await updateMath((s) => {
         result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today);
         if (lastOfDaily) daily = markDaily(s, today);
         tally = tallyRound(s, { mode: r.mode, correct: r.correct, result }); // 🎟️ 교환권 누적 (같은 트랜잭션)
-        catches = roundCatches({ mode: r.mode, result, inDaily: !!d && d.step === 'round', dailyFirst: !!(daily && daily.first) }); // 🎯 자격 (mathprog 순수 규칙)
+        const inDaily = !!d && d.step === 'round';
+        catches = roundCatches({ mode: r.mode, result, inDaily, dailyFirst: !!(daily && daily.first) }); // 🎯 자격 (mathprog 순수 규칙)
+        lucky = luckyCatch(s, { mode: r.mode, result, inDaily, roll, today }); // 🍀 이미 아는 개념이면 가끔 (하루 횟수도 같은 트랜잭션)
+        catches += lucky;
         addPending(s, catches);
       });
     }
@@ -2468,6 +2473,7 @@ async function finishRound() {
   if (lastOfDaily) card.appendChild(el('p', 'math-p big', daily && daily.first ? '☀️ 오늘의 수학 끝! 내일도 ☀️ 하나면 돼요.' : '☀️ 오늘의 수학 끝!'));
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.stone ? ` 🔷 수학스톤 +${rw.stone}` : ''}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (rw.bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(rw.bonus)} 받았어요!`));
+  if (lucky) card.appendChild(el('p', 'math-bonus-got', '🍀 운이 좋았어요! 아는 개념을 다시 풀었는데 몬스터볼이 나왔어요'));
   if (rw.egg && rw.egg.ok) card.appendChild(el('p', 'math-note math-egg', rw.egg.hatched ? '🐣 수학 알이 부화했어요!' : `🥚 수학 알 ${eggProgress(rw.egg.egg).done}/${eggProgress(rw.egg.egg).need}일 — 완주한 날이 쌓여요`));
   ticketNote(state, rw.ticket).then((t) => { if (t && card.isConnected) card.appendChild(t); }); // 🎟️ 다음 영상까지 (수학도 채운다)
   const offer = askOfferForRound(r, state, today); // ❓ 틀린 문제를 아빠에게
