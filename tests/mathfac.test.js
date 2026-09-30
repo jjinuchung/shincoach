@@ -393,6 +393,49 @@ test('📏 진단·사다리·한 편·배움 예비·내용 검사', () => {
   assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 8);
 });
 
+test('🔍 Codex 14차: 보기 문장의 뜻 · 문제 글의 조건 · 아직 안 배운 말 · 넘겨 말하는 규칙', () => {
+  for (let s = 1; s <= SEEDS; s++) {
+    // #1 배수 ② "12의 배수는 1, 2, 3, 4, 6, 12" — "1은 빼야 해요"는 맞는 지적이었다 → 남은 오답 말은 정말 틀렸다
+    const m = makeQuestion('fac.multiple', 'misread', s * 409, { ...OPTS, want: { k: 'misread', key: 'misread:divisor' } });
+    assert.ok(!m.choices.some((c) => c.text === '1은 빼야 해요'), `seed ${s}: 맞는 지적이 오답으로 남았다`);
+    for (const c of m.choices) {
+      const r = /^1만 빼면 모두 (\d+)의 배수예요$/.exec(c.text);
+      if (r) { const rest = nums(m.probe.shown).filter((x) => x !== 1); assert.ok(!c.ok && rest.some((x) => x % +r[1] !== 0), `seed ${s}: "${c.text}"이 사실 맞다`); }
+    }
+    // #2 함께 오는 날 ②에 기준 날("오늘 함께"), 나눠 주기 ②에 "남김없이"
+    const meet = makeQuestion('fac.use', 'misread', s * 409, { ...OPTS, want: { k: 'misread', key: 'misread:meet' } });
+    assert.match(meet.q, /오늘 함께/, `seed ${s}: 기준 날이 없다 — ${meet.q}`);
+    const share = makeQuestion('fac.use', 'misread', s * 409, { ...OPTS, want: { k: 'misread', key: 'misread:share' } });
+    assert.match(share.q, /남김없이/, `seed ${s}: ${share.q}`);
+    // #8 G4·G5(공약수·최대공약수 구하기)는 G6보다 앞 — 아이가 보는 글에 "공배수"가 없다 (📊 이름표는 부모용이라 뺀다)
+    for (const id of ['fac.common', 'fac.gcd']) {
+      for (const kind of ['calc', 'misread']) {
+        const q = makeQuestion(id, kind, s * 409, OPTS);
+        const kidText = [q.q, ...q.choices.map((c) => c.text), ...q.solve.steps, q.solve.whyAny, q.solve.rule, ...Object.values(q.solve.why)].join(' ');
+        assert.doesNotMatch(kidText, /공배수/, `${id}/${kind} seed ${s}: 아직 안 배운 말 — ${kidText.slice(0, 200)}`);
+      }
+    }
+    // #5 곱셈식 문항의 규칙은 "더 쪼갤 수 없을 때까지" (24 = 4 × 6, 36 = 6 × 6에서 멈추면 6이 나온다)
+    for (const id of ['fac.gcd', 'fac.lcm']) {
+      const q = makeQuestion(id, 'calc', s * 409, OPTS);
+      if (/^\d+ = \d+ × \d+ × \d+$/m.test(q.q)) assert.match(q.solve.rule, /더 쪼갤 수 없을 때까지/, `${id} seed ${s}: ${q.solve.rule}`);
+    }
+  }
+  // #3·#4·#7 넘겨 말하는 문장 — 가장 작은 공약수는 언제나 1, "공약수가 있으면"은 1 때문에 늘 참, 12로 한 번에 나누면 한 번으로 끝난다
+  // 주석은 뺀다 — 왜 바꿨는지 적어 둔 옛 문장이 주석에 남아 있다
+  const src = readFileSync('js/mathfac.js', 'utf8').replace(/\/\/.*$/gm, '') + readFileSync('coach/math/factor.json', 'utf8');
+  assert.doesNotMatch(src, /가장 작은 공약수|\(공약수가 있으면\)|한 번 나누고 멈추면 안/);
+  const cm = makeQuestion('fac.cm', 'misread', 1, { ...OPTS, want: { k: 'misread', key: 'misread:prod' } });
+  assert.match(cm.solve.rule, /1보다 큰 공약수/);
+  // #6 최대공약수 칸 배움: 사다리가 먼저, 곱셈식은 마지막 장 "다른 방법" (2022 교육과정은 곱셈식을 초등 평가에서 뺀다)
+  const gcdPages = JSON.parse(readFileSync('coach/math/factor.json', 'utf8'))['fac.gcd'].lesson;
+  assert.match(gcdPages[0].say, /공약수로 계속/);
+  assert.match(gcdPages[gcdPages.length - 1].say, /다른 방법[\s\S]*더 쪼갤 수 없을 때까지/);
+  // #9 📊 ❓ 펼친 문제 글도 줄바꿈을 살린다
+  assert.match(readFileSync('js/stats.js', 'utf8'), /el\('p', 'q', `문제: /);
+  assert.match(readFileSync('css/style.css', 'utf8'), /\.stats-ask-item \.q \{ white-space: pre-line; \}/);
+});
+
 // ── 사람이 쓴 원고 (coach/math/factor.json) ──
 const CONTENT = JSON.parse(readFileSync('coach/math/factor.json', 'utf8'));
 

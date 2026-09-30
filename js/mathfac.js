@@ -151,7 +151,7 @@ export const TAGS = {
   commonAsRel: '공약수만 있어도 관계가 있다고 봄',
   allDiv: '두 수의 약수를 모두 모음',
   oneSideDiv: '한 수의 약수만 구함',
-  smallCommon: '가장 작은 공약수를 고름',
+  smallCommon: '1 다음으로 작은 공약수를 고름', // 가장 작은 공약수는 언제나 1이다 — 18과 27에서 3에 "가장 작은"은 틀린 이름 (Codex 14차 #3)
   notGreatest: '가장 큰 공약수가 아님',
   lcmForGcd: '최소공배수를 구함',
   bottomProd: '아래 수를 곱함',
@@ -387,7 +387,8 @@ export const FACTOR = [
       const chs = textChoices(r, `그건 ${k}의 약수예요 — 배수는 ${L(firstMultiples(k, 3))}…`, [
         { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
         { text: `${k}보다 작은 수만 배수예요`, tag: MIS_OK },
-        { text: '1은 빼야 해요', tag: OFF },
+        // "1은 빼야 해요"는 맞는 지적이었다(1은 배수가 아니다) — 분명히 틀린 말로 (Codex 14차 #1)
+        { text: `1만 빼면 모두 ${k}의 배수예요`, tag: OFF },
       ]);
       return {
         ...misreadAsk(this.id, 'divisor', fill(q, c), chs, {
@@ -508,7 +509,8 @@ export const FACTOR = [
               [TAGS.missEnds]: '1은 어떤 수든 나누어떨어지게 해요 — 1도 공약수예요.',
               [TAGS.smallCommon]: `${p}도 공약수지만, 가장 큰 공약수는 ${jn(g, '이에요', '예요')}.`,
               [TAGS.notGreatest]: `${g / p}도 공약수지만, 가장 큰 공약수는 ${jn(g, '이에요', '예요')}.`,
-              [TAGS.lcmForGcd]: `${jn(Lm, '은', '는')} 최소공배수예요. 최대공약수는 두 수를 나누는 수라 두 수보다 클 수 없어요.`,
+              // 최소공배수는 G6에서 처음 배운다 — 여기선 이미 배운 말로 (Codex 14차 #8)
+              [TAGS.lcmForGcd]: `${jn(Lm, '은', '는')} ${a}보다 커서 ${a}의 약수가 될 수 없어요. 최대공약수는 두 수를 나누는 수예요.`,
               [TAGS.missPair]: `${g}의 약수를 다 찾지 않았어요: ${L(cds)}.`,
               [TAGS.multAsDiv]: `그건 ${g}의 배수예요. 공약수는 ${g}의 **약수**예요.`,
             },
@@ -526,7 +528,7 @@ export const FACTOR = [
         const chs = textChoices(r, `${g}도 둘 다 나누어떨어져요 — 가장 큰 공약수는 ${g}`, [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
           { text: '최대공약수는 두 수를 곱해서 구해요', tag: OFF },
-          { text: '최대공약수는 언제나 1이에요', tag: TAGS.smallCommon },
+          { text: '최대공약수는 언제나 1이에요', tag: TAGS.notGreatest }, // 1은 가장 작은 공약수 — "1 다음으로 작은"이 아니다
         ]);
         return {
           ...misreadAsk(this.id, 'notgreatest', fill(q, c), chs, {
@@ -538,17 +540,18 @@ export const FACTOR = [
           probe: { gcd: [a, b], shown: String(p) },
         };
       }
+      // 최소공배수는 G6에서 처음 배운다 — 고친 말은 이미 배운 말(약수·공약수)로 (Codex 14차 #8)
       const q = showWork(`${jn(a, '과', '와')} ${b}의 최대공약수는 ${jn(Lm, '이에요', '예요')}`);
-      const chs = textChoices(r, `${jn(Lm, '은', '는')} 최소공배수예요 — 최대공약수는 ${g}`, [
+      const chs = textChoices(r, `${jn(Lm, '은', '는')} ${a}보다 커서 ${a}의 약수가 될 수 없어요 — 가장 큰 공약수는 ${g}`, [
         { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
         { text: '최대공약수는 두 수보다 커야 해요', tag: MIS_OK },
         { text: '최대공약수는 두 수를 더해서 구해요', tag: OFF },
       ]);
       return {
         ...misreadAsk(this.id, 'lcm', fill(q, c), chs, {
-          solve: solve([step(0, `${jn(Lm, '은', '는')} ${jn(a, '과', '와')} ${b}의 배수 — 최소공배수`), step(1, `두 수를 나누는 가장 큰 수 → ${g}`)], {
-            whyAny: `최대공약수와 최소공배수를 바꿨어요. 최대공약수는 두 수를 **나누는** 수라 두 수보다 클 수 없어요.`,
-            rule: '최대공약수 ≤ 두 수 ≤ 최소공배수.',
+          solve: solve([step(0, `${jn(Lm, '은', '는')} ${a}보다 커서 ${jn(a, '을', '를')} 나누어떨어지게 할 수 없어요`), step(1, `두 수를 나누는 가장 큰 수 → ${g}`)], {
+            whyAny: '최대공약수는 두 수를 **나누는** 공약수라 두 수보다 클 수 없어요.',
+            rule: '최대공약수는 두 수보다 클 수 없다.',
           }),
         }),
         probe: { gcd: [a, b], shown: String(Lm) },
@@ -558,7 +561,7 @@ export const FACTOR = [
 
   {
     id: 'fac.gcd', grade: 5, name: '최대공약수 구하기', needs: ['fac.common'],
-    idea: '두 수를 **공약수로 더 나눌 수 없을 때까지** 나누고, **왼쪽 수를 모두 곱해요**. 곱셈식으로 나타내 **둘 다에 들어 있는 곱**을 찾아도 돼요.',
+    idea: '두 수를 **공약수로 더 나눌 수 없을 때까지** 나누고, **왼쪽 수를 모두 곱해요**. **더 쪼갤 수 없을 때까지 쪼갠** 곱셈식에서 **둘 다에 들어 있는 곱**을 찾아도 돼요.',
     slip: '끝까지 나눴는지, 왼쪽 수를 곱했는지 봐요.',
     calc(r, c) {
       const S = ladderPair(r, 90);
@@ -570,7 +573,7 @@ export const FACTOR = [
         { ans: String(S.g), wr: [{ text: String(S.m * S.n), tag: TAGS.bottomProd }, { text: String(S.L), tag: TAGS.lcmForGcd }, { text: String(S.p), tag: TAGS.stopEarly }, { text: String(S.p + S.q), tag: TAGS.addLeft }],
           why: {
             [TAGS.bottomProd]: `아래 수 ${jn(S.m, '과', '와')} ${jn(S.n, '은', '는')} 나누고 남은 수예요. 최대공약수는 **왼쪽** 수를 곱해요.`,
-            [TAGS.lcmForGcd]: `${jn(S.L, '은', '는')} 왼쪽과 아래를 모두 곱한 최소공배수예요. 최대공약수는 왼쪽 수만 곱해요.`,
+            [TAGS.lcmForGcd]: `왼쪽과 아래를 모두 곱한 ${jn(S.L, '은', '는')} 두 수보다 커요. 최대공약수는 왼쪽 수만 곱해요.`,
             [TAGS.stopEarly]: `${ro(S.p)} 나눈 다음에도 ${ro(S.q)} 한 번 더 나눴어요. 나눈 수를 **모두** 곱해요.`,
             [TAGS.addLeft]: `왼쪽 수는 **곱해요**: ${S.p} × ${S.q} = ${S.g}.`,
           },
@@ -579,16 +582,17 @@ export const FACTOR = [
           } },
         { ans: String(g2), wr: [{ text: String(lcm(fa, fb)), tag: TAGS.lcmForGcd }, { text: String(smallestPrime(g2)), tag: TAGS.smallCommon }],
           why: {
-            [TAGS.lcmForGcd]: `${jn(lcm(fa, fb), '은', '는')} 최소공배수예요. 최대공약수는 둘 다에 **들어 있는** 곱만 곱해요.`,
+            [TAGS.lcmForGcd]: `${jn(lcm(fa, fb), '은', '는')} 모든 곱을 곱한 수라 두 수보다 커요. 최대공약수는 둘 다에 **들어 있는** 곱만 곱해요.`,
             [TAGS.smallCommon]: `${jn(smallestPrime(g2), '은', '는')} 둘 다에 들어 있는 수 하나일 뿐이에요. 겹치는 곱을 **모두** 곱해요.`,
           },
-          rule: '곱셈식이면 둘 다에 들어 있는 곱을 모두 곱한다.', // 사다리 규칙이 곱셈식 문항에 뜨지 않게 (헤드리스가 잡음)
+          // 사다리 규칙이 곱셈식 문항에 뜨지 않게 (헤드리스가 잡음) · "더 쪼갤 수 없을 때까지"가 빠지면 24 = 4 × 6, 36 = 6 × 6에서 6이 나온다 (Codex 14차 #5)
+          rule: '더 쪼갤 수 없을 때까지 쪼갠 곱셈식에서, 둘 다에 들어 있는 곱을 모두 곱한다.',
           steps: [`${fa} = ${times(factorsOf(fa))}, ${fb} = ${times(factorsOf(fb))}`, `둘 다에 들어 있는 곱: ${cf.length > 1 ? `${times(cf)} = ${g2}` : String(g2)}`], pools: {
             pokemon: [`${factorLines(fa, fb)}\n\n곱셈식을 보고 ${jn(fa, '과', '와')} ${fb}의 최대공약수를 구하면 얼마일까요?`],
           } },
         { ans: String(N.g), wr: [{ text: String(N.L), tag: TAGS.lcmForGcd }, { text: String(pN), tag: TAGS.smallCommon }, { text: String(N.g / pN), tag: TAGS.notGreatest }],
           why: {
-            [TAGS.lcmForGcd]: `${jn(N.L, '은', '는')} 최소공배수예요. 최대공약수는 두 수보다 클 수 없어요.`,
+            [TAGS.lcmForGcd]: `${jn(N.L, '은', '는')} 두 수보다 커서 공약수가 될 수 없어요.`,
             [TAGS.smallCommon]: `${pN}도 공약수지만, 가장 큰 공약수는 ${jn(N.g, '이에요', '예요')}.`,
             [TAGS.notGreatest]: `${N.g / pN}도 공약수지만, 끝까지 나누면 ${N.g}까지 나와요.`,
           },
@@ -702,8 +706,9 @@ export const FACTOR = [
         return {
           ...misreadAsk(this.id, 'prod', fill(q, c), chs, {
             solve: solve([step(0, `${b}의 배수: ${L(firstMultiples(b, Lm / b))}`), step(1, `${a}의 배수이기도 한 가장 작은 수 → ${Lm}`)], {
-              whyAny: `두 수의 곱은 공배수이긴 하지만, 두 수에 공약수(${g})가 있으면 가장 작지 않아요.`,
-              rule: '최소공배수 ≠ 두 수의 곱 (공약수가 있으면).',
+              // "공약수가 있으면"은 거짓 — 1은 언제나 공약수라 3과 4(곱 12 = 최소공배수)에서 틀린다 (Codex 14차 #4)
+              whyAny: `두 수의 곱은 공배수이긴 하지만, 1보다 큰 공약수(${g})가 있으면 가장 작지 않아요.`,
+              rule: '1보다 큰 공약수가 있으면 최소공배수는 두 수의 곱보다 작다.',
             }),
           }),
           probe: { lcm: [a, b], shown: String(ab) },
@@ -755,7 +760,7 @@ export const FACTOR = [
             [TAGS.gcdForLcm]: `${jn(gf, '은', '는')} 둘 다에 들어 있는 곱 — 최대공약수예요. 최소공배수는 겹치지 않는 곱까지 모두 곱해요.`,
             [TAGS.prodAsLcm]: `두 곱셈식을 통째로 곱하면 겹치는 곱을 두 번 곱해요. 겹치는 곱은 한 번만.`,
           },
-          rule: '곱셈식이면 겹치는 곱은 한 번만, 나머지 곱까지 모두 곱한다.',
+          rule: '더 쪼갤 수 없을 때까지 쪼갠 곱셈식에서, 겹치는 곱은 한 번만 곱하고 나머지 곱도 모두 곱한다.',
           steps: [`${fa} = ${times(factorsOf(fa))}, ${fb} = ${times(factorsOf(fb))}`, `겹치는 곱은 한 번만: ${times(uf)} = ${Lf}`], pools: {
             pokemon: [`${factorLines(fa, fb)}\n\n곱셈식을 보고 ${jn(fa, '과', '와')} ${fb}의 최소공배수를 구하면 얼마일까요?`],
           } },
@@ -871,7 +876,7 @@ export const FACTOR = [
     misread(r, c) {
       if (branchOf(r, c, ['share', 'meet']) === 'share') {
         const G = gcdPair(r, [4, 6, 8, 9, 10, 12], 48, [2, 5]);
-        const q = showWork(`나무열매 ${G.a}개와 포션 ${G.b}개를 똑같이 나눠 주면 최대 ${G.L}명에게 줄 수 있어요`);
+        const q = showWork(`나무열매 ${G.a}개와 포션 ${G.b}개를 남김없이 똑같이 나눠 주면 최대 ${G.L}명에게 줄 수 있어요`);
         const chs = textChoices(r, `나무열매가 ${G.a}개뿐이라 ${G.L}명에게는 못 줘요 — 최대공약수 ${G.g}명`, [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
           { text: `두 수를 더한 ${G.a + G.b}명이에요`, tag: TAGS.addBoth },
@@ -888,7 +893,8 @@ export const FACTOR = [
         };
       }
       const D = gcdPair(r, [2, 3, 4], 20, [2, 5]);
-      const q = showWork(`${D.a}일마다, ${D.b}일마다 오면 다음에 함께 오는 날은 ${D.g}일 뒤예요`);
+      // "오늘 함께 왔다면"이 없으면 12일 전·16일 전에 왔던 둘이 4일 뒤에 함께 올 수도 있다 — 기준 날을 글에 (Codex 14차 #2)
+      const q = showWork(`오늘 함께 온 둘이 ${D.a}일마다, ${D.b}일마다 온다면 다음에 함께 오는 날은 ${D.g}일 뒤예요`);
       const chs = textChoices(r, `${D.g}일 뒤에는 둘 다 안 와요 — 최소공배수 ${D.L}일 뒤`, [
         { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
         { text: `두 수를 더한 ${D.a + D.b}일 뒤예요`, tag: TAGS.addBoth },

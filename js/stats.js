@@ -619,7 +619,7 @@ export async function renderStats() {
       it.appendChild(el('span', `st${ASK_OPEN.has(a.status) ? ' wait' : a.status === 'understood' ? ' done' : ''}`, STATUS_LABEL[a.status] || a.status));
       const det = el('details');
       det.appendChild(el('summary', '', '문제 · 진우 답 · 답장 보기'));
-      det.appendChild(el('p', '', `문제: ${a.q}${a.expr ? ` · 식: ${a.expr}` : ''}`));
+      det.appendChild(el('p', 'q', `문제: ${a.q}${a.expr ? ` · 식: ${a.expr}` : ''}`)); // .q = 줄바꿈 살림 (곱셈식 두 줄·② — Codex 14차 #9)
       det.appendChild(el('p', '', `진우 답: ${a.my || '(없음)'} ❌${a.tag ? ` (${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · ${WHY_LABEL[a.w]}` : ''} · 정답: ${a.ans}`));
       if (a.kid) det.appendChild(el('p', '', `진우 말: "${a.kid}"`));
       (a.replies || []).forEach((rp, i) => {

@@ -437,6 +437,7 @@ button { font-family: inherit; }
 .stats-ask-item details { margin-top: 4px; }
 .stats-ask-item summary { cursor: pointer; color: var(--muted); }
 .stats-ask-item .reply { background: #fffbeb; border-radius: 8px; padding: 6px 8px; margin: 4px 0; white-space: pre-wrap; }
+.stats-ask-item .q { white-space: pre-line; } /* 📊 ❓ 펼친 문제 글 — .math-qt와 같은 이유 (Codex 14차 #9) */
 .math-daily-list { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 6px; font-size: 1.02rem; }
 .math-daily-list li { background: #f8fafc; border-radius: 10px; padding: 8px 12px; }
 .math-note-badge { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 10px; padding: 6px 10px; font-size: 0.9rem; font-weight: 700; margin: 0 0 10px; } /* 🤔 오답 노트에서 다시 낸 문항 */
