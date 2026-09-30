@@ -119,11 +119,13 @@ export const TAGS = {
   isoApex: '같은 두 각 대신 다른 한 각을 구함',
   oneAcute: '예각이 하나만 있어도 예각삼각형이라고 봄',
   rightAsObtuse: '직각을 둔각으로 봄',
+  obtuseAsRight: '둔각을 직각으로 봄',
   wrongBiggest: '가장 큰 각을 잘못 봄',
   trapOnlyOne: '사다리꼴은 평행한 변이 한 쌍뿐이라고 봄',
   oneAsTwo: '평행한 변이 한 쌍이어도 평행사변형이라고 봄',
   missParallel: '평행한 변을 못 찾음',
   oppAsAdj: '마주 보는 각을 180°에서 뺌',
+  oppFrom360: '마주 보는 각을 360°에서 뺌',
   adjSame: '이웃한 각도 크기가 같다고 봄',
   rhomRight: '마름모는 네 각이 직각이라고 봄',
   sidesAsSquare: '네 변만 같으면 정사각형이라고 봄',
@@ -141,6 +143,7 @@ export const TAGS = {
   diagWithSides: '이웃한 꼭짓점을 이은 선분도 대각선으로 셈',
   diagOneVertex: '한 꼭짓점에서 그은 대각선만 셈',
   triAs360: '삼각형의 세 각의 합을 360°로 봄',
+  quadAs180: '사각형의 네 각의 합을 180°로 봄',
   addNotSub: '아는 각을 더하기만 함',
   missOne: '아는 각 하나를 빼지 않음',
   noHalfBase: '두 밑각으로 나누지 않음',
@@ -173,7 +176,7 @@ const CIRC = ['㉮', '㉯', '㉰', '㉱'];
 const SEGN = ['㉠', '㉡', '㉢'];
 
 /** 사각형 — 모눈 위 꼭짓점 네 개 (반시계), 종류마다 모양을 고른다. 좌표는 0~12 */
-function quadOf(r, type) {
+function quadOf(r, type, tilt = false) { // tilt: 정사각형을 기울어진 것만 (기울기를 두고 말하는 문항)
   let pts;
   if (type === 'trap') { // 평행한 변이 딱 한 쌍 (아랫변 ∥ 윗변, 길이가 달라 옆변끼리는 안 평행)
     const b = int(r, 6, 10); const a = int(r, 2, b - 3); const h = int(r, 2, 5); const s = int(r, 0, b - a);
@@ -192,7 +195,7 @@ function quadOf(r, type) {
       pts = [[b * m, 0], [b * m + a, b], [b * m + a - b * m, b + a * m], [0, a * m]];
     }
   } else if (type === 'square') { // 정사각형 — 모눈을 따르거나 기울어진 것
-    if (r() < 0.4) { const s = int(r, 3, 6); pts = [[0, 0], [s, 0], [s, s], [0, s]]; } else {
+    if (!tilt && r() < 0.4) { const s = int(r, 3, 6); pts = [[0, 0], [s, 0], [s, s], [0, s]]; } else {
       const [a, b] = pick(r, [[2, 1], [3, 1], [3, 2], [4, 1], [1, 2]]);
       pts = [[b, 0], [a + b, b], [a, a + b], [0, a]];
     }
@@ -337,7 +340,7 @@ export const SHAPE = [
         { words: true, ans: `직선 ${lp}`, wr: [{ text: `직선 ${ls}`, tag: TAGS.meetAsPerp }, { text: `직선 ${lf}`, tag: S.fourthTag }],
           why: {
             [TAGS.meetAsPerp]: `직선 ${ls}도 직선 ㉮와 만나지만, 만나서 이루는 각이 직각이 아니에요.`,
-            [S.fourthTag]: S.tilted ? `직선 ${lf}는 세로로 서 있지만 직선 ㉮가 기울어져 있어서 둘이 이루는 각은 직각이 아니에요.` : `직선 ${lf}는 직선 ㉮와 이 그림 안에서 만나지 않아요. 수직은 직각으로 만나야 해요.`,
+            [S.fourthTag]: S.tilted ? `직선 ${lf}는 세로로 서 있지만 직선 ㉮가 기울어져 있어서 둘이 이루는 각은 직각이 아니에요.` : `직선 ${lf}는 직선 ㉮와 아무리 늘여도 만나지 않아요. 수직은 직각으로 만나야 해요.`,
           },
           steps: ['수직 = 두 직선이 만나서 이루는 각이 직각', `직각으로 만나는 것은 직선 ${lp}`],
           rule: '두 직선이 만나서 이루는 각이 직각이면 서로 수직이다.',
@@ -597,7 +600,7 @@ export const SHAPE = [
           ok: `세 각이 모두 예각이어야 예각삼각형 — ${big}°가 둔각이라 둔각삼각형이에요`,
           wr: [
             { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-            { text: `${big}°는 직각이라서 직각삼각형이에요`, tag: TAGS.rightAsObtuse },
+            { text: `${big}°는 직각이라서 직각삼각형이에요`, tag: TAGS.obtuseAsRight }, // 둔각을 직각으로 — 거꾸로(rightAsObtuse)가 아니다 (Codex 17차 #2)
             { text: '삼각형은 각으로 나눌 수 없어요', tag: OFF },
           ],
           steps: [`가장 큰 각: ${big}°`, `${big}°는 둔각 → 둔각삼각형`],
@@ -683,7 +686,7 @@ export const SHAPE = [
         ok: `각 ㄷ은 각 ㄱ과 마주 보는 각 — 크기가 같아서 ${a}°`,
         wr: [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-          { text: `각 ㄷ은 360° − ${a}° = ${360 - a}°예요`, tag: TAGS.oppAsAdj },
+          { text: `각 ㄷ은 360° − ${a}° = ${360 - a}°예요`, tag: TAGS.oppFrom360 },
           { text: '평행사변형의 각은 알 수 없어요', tag: OFF },
         ],
         steps: ['각 ㄷ은 각 ㄱ과 마주 보는 각', `마주 보는 각은 크기가 같아요 → ${a}°`],
@@ -699,7 +702,8 @@ export const SHAPE = [
     slip: '모눈으로 네 변의 길이가 같은지, 네 각이 직각인지 따로 확인해 봐요.',
     calc(r, c) {
       const type = pick(r, ['rhom', 'square', 'rect']);
-      const P = quadOf(r, type);
+      // 정사각형 오답은 셋 다 "기울어져서 정사각형이 아니다"라 반듯한 정사각형에 내면 말이 안 맞았다(36%) — 기울어진 것만 (Codex 17차 #6)
+      const P = quadOf(r, type, true);
       const M = '마름모'; const R = '직사각형'; const S = '정사각형';
       const EQ = '네 변의 길이가 모두 같아요'; const RT = '네 각이 모두 직각이에요';
       const ok = type === 'rhom' ? BUTNOT(M, S) : type === 'square' ? IS(S) : IS(R);
@@ -729,7 +733,7 @@ export const SHAPE = [
     },
     misread(r, c) {
       if (branchOf(r, c, ['tilt', 'right']) === 'tilt') {
-        let P = quadOf(r, 'square'); for (let k = 0; k < 10 && P[0][1] === P[1][1]; k++) P = quadOf(r, 'square'); // 기울어진 정사각형
+        const P = quadOf(r, 'square', true); // 기울어진 정사각형 (다시 뽑기 열 번은 드물게 반듯한 것이 남을 수 있었다)
         return finishMis(this.id, 'tilt', r, c, {
           q: `모눈 위에 그린 사각형이에요.\n\n${gp(P)}\n\n${showWork('기울어져 있으니까 정사각형이 아니라 마름모예요')}`,
           ok: '네 변이 같고 네 각이 모두 직각 — 돌려 놓아도 정사각형이에요',
@@ -749,7 +753,7 @@ export const SHAPE = [
         ok: '마름모는 네 변이 같은 사각형 — 이 마름모의 각은 직각이 아니에요',
         wr: [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-          { text: '네 각이 직각이니까 정사각형이에요', tag: TAGS.sidesAsSquare },
+          { text: '네 각이 직각이니까 정사각형이에요', tag: TAGS.rhomRight }, // 보여 준 말(마름모는 네 각이 직각)을 믿고 이어 간 것
           { text: '마름모는 변의 길이가 모두 달라요', tag: OFF },
         ],
         steps: ['마름모 = 네 변의 길이가 모두 같은 사각형', '각이 직각이어야 한다는 조건은 없어요'],
@@ -881,13 +885,15 @@ export const SHAPE = [
     },
     misread(r, c) {
       if (branchOf(r, c, ['diag', 'reg']) === 'diag') {
-        const Rg = pickFor(r, c, [5, 6, 7, 8], (k, w) => w.includes(REGN[k])); const s = int(r, 2, 9);
+        // 오각형은 뺀다 — "바른 대각선 + 변"(5 + 5)이 보여 준 틀린 값(5 × 2)과 같은 10이 된다
+        const Rg = pickFor(r, c, [6, 7, 8], (k, w) => w.includes(REGN[k])); const s = int(r, 2, 9);
         return finishMis(this.id, 'diag', r, c, {
           q: `${REGN[Rg]} 모양 배지예요.\n\n[reg ${Rg} ${s}]\n\n${showWork(`꼭짓점마다 대각선이 ${Rg - 3}개씩이니까 ${Rg} × ${Rg - 3} = ${Rg * (Rg - 3)}개예요`)}`,
           ok: `한 대각선을 양 끝에서 두 번 셌어요 — ${Rg * (Rg - 3)} ÷ 2 = ${(Rg * (Rg - 3)) / 2}개`,
           wr: [
             { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-            { text: `변도 더해서 ${Rg * (Rg - 3) + Rg}개예요`, tag: TAGS.diagWithSides },
+            // 두 번 센 값(보여 준 말)에 변을 더하면 실수가 둘 — 바른 대각선에 변만 더한 값 (Codex 16차 #1과 같은 모양, 17차 ② 이름표 검사가 잡음)
+            { text: `변도 더해서 ${(Rg * (Rg - 3)) / 2 + Rg}개예요`, tag: TAGS.diagWithSides },
             { text: '대각선은 한 꼭짓점에서만 그어요', tag: OFF },
           ],
           steps: [`${Rg} × ${Rg - 3} = ${Rg * (Rg - 3)} (한 대각선을 두 번 셈)`, `${Rg * (Rg - 3)} ÷ 2 = ${(Rg * (Rg - 3)) / 2}개`],
@@ -904,7 +910,7 @@ export const SHAPE = [
           { text: '네 변의 길이가 달라서 정다각형이 아니에요', tag: TAGS.wrongReason },
           { text: '사각형은 다각형이 아니에요', tag: OFF },
         ],
-        steps: ['정다각형 = 변의 길이도, 각의 크기도 모두 같은 다각형', '마름모는 변은 같지만 각이 달라요 → 정다각형이 아니에요'],
+        steps: ['정다각형 = 변의 길이도, 각의 크기도 모두 같은 다각형', '이 마름모는 변은 같지만 각이 달라요 → 정다각형이 아니에요'],
         whyAny: '변의 길이만 같다고 정다각형이 아니에요. 각의 크기도 모두 같아야 해요.',
         rule: '정다각형 = 변의 길이도, 각의 크기도 모두 같은 다각형.',
       });
@@ -976,7 +982,8 @@ export const SHAPE = [
           ok: `각 ㄷ의 ${q[2]}°도 빼야 해요 — 360° − ${q[0]}° − ${q[1]}° − ${q[2]}° = ${d}°`,
           wr: [
             { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-            { text: `사각형은 180°에서 빼야 해요 — ${180 - q[0]}°`, tag: TAGS.triAs360 },
+            // "180° − 첫째 각"은 180°와 빠뜨림 두 실수가 섞인 값이었다 — 실수 하나만, 수 없이 (Codex 17차 #2)
+            { text: '사각형도 삼각형처럼 180°에서 빼야 해요', tag: TAGS.quadAs180 },
             { text: '이 사각형의 각은 알 수 없어요', tag: OFF },
           ],
           steps: ['사각형의 네 각의 합은 360°', `360° − ${q[0]}° − ${q[1]}° − ${q[2]}° = ${d}°`],

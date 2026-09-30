@@ -210,7 +210,11 @@ test('그림: J 지시문 다섯 가지를 그리고 — 그린 각·변이 글�
   // 글로 풀어 쓰기
   assert.equal(figText('[tria 50 60 ?70]'), '(삼각형 세 각 ㄱ 50° · ㄴ 60° · ㄷ ?)');
   assert.equal(figText('[quad 65 _115 ?65 _115]'), '(사각형 네 각 ㄱ 65° · ㄷ ?)');
-  assert.equal(figText('[tris 7 ?7 4]'), '(삼각형 세 변 7 cm · ? cm · 4 cm)');
+  // 같은 변(그림의 눈금)이 글에도 — 없으면 [tris 8 ?8 6]의 ?가 8인지 6인지 모른다 (Codex 17차 #4)
+  assert.equal(figText('[tris 7 ?7 4]'), '(삼각형 ㄱㄴㄷ — 변 ㄱㄴ 7 cm · 변 ㄴㄷ ? cm · 변 ㄷㄱ 4 cm · 변 ㄱㄴ과 변 ㄴㄷ의 길이가 같음)');
+  assert.equal(figText('[tris 6 8 ?8]'), '(삼각형 ㄱㄴㄷ — 변 ㄱㄴ 6 cm · 변 ㄴㄷ 8 cm · 변 ㄷㄱ ? cm · 변 ㄴㄷ과 변 ㄷㄱ의 길이가 같음)');
+  assert.equal(figText('[tris 5 5 5]'), '(삼각형 ㄱㄴㄷ — 변 ㄱㄴ 5 cm · 변 ㄴㄷ 5 cm · 변 ㄷㄱ 5 cm · 세 변의 길이가 모두 같음)');
+  assert.equal(figText('[tris 5 6 7]'), '(삼각형 ㄱㄴㄷ — 변 ㄱㄴ 5 cm · 변 ㄴㄷ 6 cm · 변 ㄷㄱ 7 cm)');
   assert.equal(figText('[gpoly ㄱ:0,0 ㄴ:6,0 ㄷ:7,3 ㄹ:1,3]', true), '(그림)');
 });
 
@@ -349,10 +353,12 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다', () => {
   // ② 문항에만 쓰는 이름표(없으면 ①에서 20번↑)
   for (const tag of Object.values(TAGS)) assert.ok((seen[tag] || 0) >= 20 || MISREAD_ONLY.includes(tag), `"${tag}" 오답을 충분히 검사해야 한다 (${seen[tag] || 0}건)`);
 });
-const MISREAD_ONLY = [];
+// ②에서만 나오는 이름표 — ② 검사(아래)가 뜻을 본다
+const MISREAD_ONLY = [TAGS.obtuseAsRight, TAGS.oppFrom360, TAGS.quadAs180];
 
-test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답은 맞다 · 진단 보기가 우연히 맞지 않다 · 갈래 열쇠', () => {
+test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답은 맞다 · 진단 보기가 우연히 맞지 않다 · 오답 이름표의 뜻 · 갈래 열쇠', () => {
   const branches = {};
+  const misSeen = {};
   for (const c of SHAPE) {
     for (let s = 1; s <= SEEDS; s++) {
       const q = makeQuestion(c.id, 'misread', s * 7717, OPTS);
@@ -414,8 +420,46 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답
         assert.ok(k2 in claims, `${where}: 이 ② 모양을 모른다`);
         assert.equal(claims[k2], false, `${where}: 보여 준 말이 사실 맞다`);
       }
+      // ② 오답의 이름표도 그 말의 뜻대로 — ①만 검사해서 "115°는 직각이라서"가 "직각을 둔각으로 봄"(거꾸로)으로 적히고 있었다 (Codex 17차 #2)
+      const pr4 = f.verts ? props(f.verts.map((u) => u.p)) : null;
+      const P4 = f.verts ? f.verts.map((u) => u.p) : null;
+      for (const w of wrongs) {
+        if (w.tag === '엉뚱한 지적') continue;
+        const t = w.text; const v = lastNum(t); const base = f.items && lineOf('㉮');
+        const named = (re) => { const mm = re.exec(t); return mm ? lineOf(mm[1]) : null; };
+        let good = null;
+        switch (w.tag) {
+          case TAGS.obtuseAsRight: { const mm = /^(\d+)°는 직각이라서/.exec(t); good = !!mm && +mm[1] > 90 && measured(f.raw).some((a) => Math.round(a) === +mm[1]); break; }
+          case TAGS.oneAcute: { const A = measured(f.raw); good = triType(A) !== '예각삼각형' && A.filter((a) => a < 89.95).length >= 2 && t.endsWith('예각삼각형이에요'); break; }
+          case TAGS.quadAs180: good = f.kind === 'quad' && t.includes('180°') && !t.includes('360°'); break;
+          case TAGS.triAs360: { const i = f.mode.indexOf('ask'); const kn = measured(f.raw).filter((_, j) => j !== i).map(Math.round); good = f.kind === 'tria' && t.startsWith('삼각형은 360°') && v === 360 - kn[0] - kn[1]; break; }
+          case TAGS.missEqual: { const pr = triProps(f.sides); good = pr.eq >= 1 && (t.includes('이등변삼각형도') || (pr.eq === 3 && t.includes('정삼각형도 아니에요'))); break; }
+          case TAGS.slantAsDist: good = f.items.some((it) => it.len && dot(dirL(it), [1, 0]) !== 0 && Math.abs(Math.hypot(...dirL(it)) - v) < EPS); break;
+          case TAGS.perpAsPara: { const mm = /^직선 (\S)와 직선 (\S)가/.exec(t); good = !!mm && dot(dirL(lineOf(mm[1])), dirL(lineOf(mm[2]))) === 0; break; }
+          case TAGS.apartAsPerp: { const l = named(/^직선 (\S)가 수선/); good = !!l && cross(dirL(l), dirL(base)) === 0; break; }
+          case TAGS.uprightAsPerp: { const l = named(/^직선 (\S)가 수선/); good = !!l && l.a[0] === l.b[0] && dot(dirL(l), dirL(base)) !== 0; break; }
+          case TAGS.meetAsPerp: { const l = named(/^직선 (\S)도 직선 ㉮와 만나니까/); good = !!l && cross(dirL(l), dirL(base)) !== 0 && dot(dirL(l), dirL(base)) !== 0; break; }
+          case TAGS.diagWithSides: good = v === (f.n * (f.n - 1)) / 2; break;
+          case TAGS.wrongReason: good = pr4.allEq && t.includes('변의 길이가 달라서'); break;
+          case TAGS.trapOnlyOne: good = pr4.pairs === 2 && t.includes('사다리꼴도 아니에요'); break;
+          case TAGS.squareNotRhom: good = pr4.names.정사각형 && t.includes('마름모도 아니에요'); break;
+          case TAGS.rhomRight: good = pr4.names.마름모 && !pr4.allRight && t.startsWith('네 각이 직각'); break;
+          case TAGS.tiltNotSquare: good = pr4.names.정사각형 && !P4.some((u, i) => u[1] === P4[(i + 1) % 4][1]) && t.includes('정사각형이 아니에요'); break;
+          case TAGS.missParallel: good = pr4.pairs === 2 && t.includes('평행사변형은 아니에요'); break;
+          case TAGS.oppFrom360: good = t.includes('360°') && v === 360 - Math.round(measured(f.raw)[f.mode.indexOf('val')]); break;
+          default: good = null;
+        }
+        // 보여 준 말이 셈식인데 "고친" 오답의 수가 그 셈의 답과 같으면 "맞게 말했어요"와 헷갈린다 (오각형 대각선: 5 + 5 = 5 × 2)
+        // (J2 "가장 긴 선분이 거리예요 — 10 cm"처럼 같은 오개념을 이유로 말하는 보기는 셈이 아니라 그대로 둔다)
+        const said = /(?:[=—] |^)(\d+)(?: ?cm|°|개)?(?:예요)?$|(\d+)(?:개|°|cm)예요$/.exec(t); // 오답이 말하는 "답" (— 21개 · = 28 · 21개예요)
+        if (said && /[×÷−+=]/.test(shown)) assert.notEqual(+(said[1] || said[2]), lastNum(shown), `${where}: ② 오답 "${t}"의 답이 보여 준 셈의 답과 같다`);
+        assert.notEqual(good, null, `${where}: ② 이름표 "${w.tag}"의 검사가 없다`);
+        assert.ok(good, `${where}: ② 오답 "${t}"이 이름표 "${w.tag}"와 안 맞는다`);
+        misSeen[w.tag] = (misSeen[w.tag] || 0) + 1;
+      }
     }
   }
+  for (const tag of MISREAD_ONLY) assert.ok((misSeen[tag] || 0) >= 100, `② 이름표 "${tag}"가 드물다 (${misSeen[tag] || 0})`);
   for (const [k, n] of Object.entries(branches)) assert.ok(n >= 100, `${k} 갈래가 드물다 (${n})`);
   assert.equal(Object.keys(branches).length, 18, Object.keys(branches).join(', '));
 });
@@ -684,4 +728,45 @@ test('원고도 아직 안 배운 말을 앞 칸에서 쓰지 않는다 (평행 
   for (const [i, c] of SHAPE.entries()) {
     for (const [re, id] of LATER) if (at(id) > i) for (const t of strings(CONTENT[c.id])) assert.doesNotMatch(t, re, `${c.id} 원고: ${t.slice(0, 120)}`);
   }
+});
+
+test('말과 그림이 맞다 — "만나지 않아요"는 정말 평행 · 마름모·직사각형이 정다각형이 아니라는 말은 정사각형을 빼고 · "기울어진 정사각형"은 기울어진 그림 (Codex 17차 #1·#3·#6)', () => {
+  const dirL = (it) => sub(it.b, it.a);
+  // ① "직선 ㉱는 직선 ㉮와 만나지 않아요" — 늘이면 만나는 두 직선이었다(J2가 바로잡는 오개념을 J1이 가르침)
+  const neverMeet = (text, figs, where) => {
+    for (const mm of plain(text).matchAll(/직선 (\S)(?:는|은|도) [^.]*?직선 (\S)(?:와|과) [^.]*?만나지 않/g)) {
+      const f = figs.find((g) => g.kind === 'lines' && g.items.some((it) => it.label === mm[1]) && g.items.some((it) => it.label === mm[2]));
+      assert.ok(f, `${where}: "${mm[0]}"의 직선이 그림에 없다`);
+      const [a, b] = [mm[1], mm[2]].map((l) => f.items.find((it) => it.label === l));
+      assert.equal(cross(dirL(a), dirL(b)), 0, `${where}: "${mm[0]}" — 두 직선은 늘이면 만난다`);
+    }
+  };
+  // ② 정사각형도 마름모·직사각형이고 정다각형이다 — "마름모는 … 정다각형이 아니"는 "이 마름모"·"정사각형이 아닌 마름모"로만
+  const regClaim = (text, where) => {
+    for (const mm of plain(text).matchAll(/(\S+ )?(마름모|직사각형)(?:은|는) [^.\n]*?정다각형이 아니/g)) assert.ok(/^(이|아닌) $/.test(mm[1] || ''), `${where}: "${mm[0]}" — 정사각형까지 빼 버린다`);
+  };
+  let claims = 0;
+  for (const c of SHAPE) {
+    for (const [pi, p] of (CONTENT[c.id].lesson || []).entries()) {
+      const figs = readFig(`${p.say} ${p.check ? p.check.q : ''}`);
+      for (const t of strings(p)) { neverMeet(t, figs, `${c.id} 배움 ${pi + 1}`); regClaim(t, `${c.id} 배움 ${pi + 1}`); if (/만나지 않|정다각형이 아니/.test(t)) claims++; }
+    }
+    for (const t of strings(CONTENT[c.id].dad || {})) regClaim(t, `${c.id} 아빠 카드`);
+    regClaim(`${c.idea || ''} ${c.slip || ''}`, `${c.id} idea`);
+    for (let s = 1; s <= 400; s++) {
+      for (const kind of ['calc', 'misread']) {
+        const q = makeQuestion(c.id, kind, s * 211, OPTS);
+        const where = `${c.id} ${kind} seed ${s}`;
+        const figs = readFig(q.q);
+        for (const t of [...strings(q.solve), ...q.choices.map((x) => x.text)]) { neverMeet(t, figs, where); regClaim(t, where); if (/만나지 않|정다각형이 아니/.test(t)) claims++; }
+        // ③ 반듯한 정사각형에 "기울어져 있어서 정사각형이 아니에요" · "기울어져 있을 뿐" 풀이가 붙었다(36%)
+        const tiltTalk = q.choices.some((x) => x.tag === TAGS.tiltNotSquare) || strings(q.solve).some((t) => /기울어져 있을 뿐/.test(t));
+        if (tiltTalk && figs[0] && figs[0].kind === 'gpoly') {
+          const P = figs[0].verts.map((u) => u.p);
+          assert.ok(props(P).names.정사각형 && !P.some((u, i) => u[1] === P[(i + 1) % P.length][1]), `${where}: 반듯한 도형에 기울기 이야기 — ${q.q.replace(/\n/g, ' ')}`);
+        }
+      }
+    }
+  }
+  assert.ok(claims >= 200, `검사한 말 ${claims}개`);
 });

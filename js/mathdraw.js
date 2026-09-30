@@ -742,7 +742,13 @@ function shapeText(kind, arg) {
     case 'grid': return `모눈 가로 ${n[0]}칸 · 세로 ${n[1]}칸${n[2] ? ` · 오른쪽 위 ${n[2]} × ${n[3]}칸 뺌` : ''}`;
     case 'gpoly': return `모눈 위 도형 — 꼭짓점 ${arg.trim().split(/\s+/).map((t) => { const q = /^(?:([ㄱ-ㅎ]):)?(\d+),(\d+)$/.exec(t); return `${q[1] || ''}(${q[2]}, ${q[3]})`; }).join(' · ')}`;
     case 'lines': return `모눈 위 선 — ${arg.trim().split(/\s+/).slice(2).map((t) => { const q = /^(?:([^:\s]+):)?(\d+),(\d+),(\d+),(\d+)(=?)$/.exec(t); const d = Math.hypot(q[4] - q[2], q[5] - q[3]); const L = q[6] && Math.abs(d - Math.round(d)) < 1e-9 ? ` ${Math.round(d)} cm` : ''; return `${q[1] || '선'} (${q[2]}, ${q[3]})–(${q[4]}, ${q[5]})${L}`; }).join(' · ')}`;
-    case 'tris': return `삼각형 세 변 ${arg.trim().split(/\s+/).map((t) => (t.startsWith('?') ? '?' : t)).join(' cm · ')} cm`;
+    // 어느 두 변이 같은지(그림의 눈금)도 — 빠지면 "? 변"이 어느 변과 같은지 몰라 답이 둘이 된다 (Codex 17차 #4)
+    case 'tris': {
+      const t = arg.trim().split(/\s+/); const v = t.map((x) => x.replace('?', '')); const nm = ['ㄱㄴ', 'ㄴㄷ', 'ㄷㄱ'];
+      const pair = [[0, 1], [1, 2], [0, 2]].find(([i, j]) => v[i] === v[j]);
+      const eq = v[0] === v[1] && v[1] === v[2] ? ' · 세 변의 길이가 모두 같음' : pair ? ` · 변 ${nm[pair[0]]}과 변 ${nm[pair[1]]}의 길이가 같음` : '';
+      return `삼각형 ㄱㄴㄷ — ${t.map((x, i) => `변 ${nm[i]} ${x.startsWith('?') ? '?' : x} cm`).join(' · ')}${eq}`;
+    }
     case 'tria': return `삼각형 세 각 ${angText(arg.replace(/ iso$/, '').trim().split(/\s+/))}${/ iso$/.test(arg) ? ' · 변 ㄴㄷ과 변 ㄷㄱ의 길이가 같음' : ''}`;
     case 'quad': return `사각형 네 각 ${angText(arg.replace(/ rh$/, '').trim().split(/\s+/))}`;
     default: return null;
