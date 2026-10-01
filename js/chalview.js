@@ -5,6 +5,12 @@
 //   ② 문제집처럼 쓰는 답칸 — 숫자판·고르기·여러 개 고르기·순서 놓기 (찍어서 맞힐 수 없게)
 //
 // 규칙(mathchal.js)과 떨어져 있다 — 이 파일은 DOM만 만들고 채점은 하지 않는다.
+//
+// 5단원 꺾은선그래프(2026-10-01)에서 더한 것: 그래프 그림(`chart`·`charts` — 📊 K 줄기와 같은 [lgraph] 그림),
+// 표(`table`), 그림 여럿(배열), 그리고 **점 여러 개 찍기 답칸**(`plot` — 07·12 "꺾은선그래프로 나타내 보세요").
+import { figureSvg, parseChart, chartGeom, lgraphSvg } from './mathdraw.js';
+
+const SVGNS = 'http://www.w3.org/2000/svg';
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -139,10 +145,52 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
-/** 문제의 그림 하나 (없으면 null) */
+/** 꺾은선그래프 하나 — 제목 + 그림 (📊 K 줄기와 같은 그림, 우리 코드가 만든 SVG만 innerHTML로) */
+function chartBox(spec, title) {
+  const box = el('div', 'chal-chart math-fig');
+  if (title) box.appendChild(el('div', 'chal-chart-title', title));
+  const g = el('div', 'chal-chart-svg');
+  g.innerHTML = figureSvg(spec);
+  box.appendChild(g);
+  return box;
+}
+function chartEl(f) {
+  const box = el('div', 'chal-fig chal-charts');
+  box.appendChild(chartBox(f.spec, f.title));
+  return box;
+}
+/** 그래프 두 개를 나란히 (해 뜨는 시각 · 해 지는 시각) */
+function chartsEl(f) {
+  const box = el('div', 'chal-fig chal-charts is-two');
+  for (const c of f.list || []) box.appendChild(chartBox(c.spec, c.title));
+  return box;
+}
+/** 표 — 첫 칸이 항목 이름 (요일 / 우유의 양) */
+function tableEl(f) {
+  const box = el('div', 'chal-fig chal-table-wrap');
+  if (f.title) box.appendChild(el('div', 'chal-chart-title', f.title));
+  const t = el('table', 'chal-table');
+  for (const [ri, row] of (f.rows || []).entries()) {
+    const tr = el('tr');
+    row.forEach((c, ci) => tr.appendChild(el(ci === 0 || ri === 0 ? 'th' : 'td', '', c)));
+    t.appendChild(tr);
+  }
+  box.appendChild(t);
+  return box;
+}
+
+/** 문제의 그림 하나 (없으면 null). 배열이면 차례로 (표 + 그래프) */
 export function figureEl(fig) {
+  if (Array.isArray(fig)) {
+    const box = el('div', 'chal-figs');
+    for (const f of fig) { const e = figureEl(f); if (e) box.appendChild(e); }
+    return box.children.length ? box : null;
+  }
   if (!fig || !fig.kind) return null;
   switch (fig.kind) {
+    case 'chart': return chartEl(fig);
+    case 'charts': return chartsEl(fig);
+    case 'table': return tableEl(fig);
     case 'numline': return numlineEl(fig);
     case 'flow': return flowEl(fig);
     case 'machine': return machineEl(fig);
@@ -175,7 +223,97 @@ export function inputEl(part, onChange = () => {}) {
   if (kind === 'choice') return choiceInput(part, wrap, onChange);
   if (kind === 'many') return manyInput(part, wrap, onChange);
   if (kind === 'order') return orderInput(part, wrap, onChange);
+  if (kind === 'plot') return plotInput(part, wrap, onChange);
   return { el: wrap, value: () => null, clear() {}, filled: () => false };
+}
+
+/**
+ * ✍️ 점 여러 개 찍기 — 빈 꺾은선그래프에서 날마다 점을 찍는다 (5단원 07·12 "꺾은선그래프로 나타내 보세요").
+ * part.chart: 정답이 든 그래프 지시문(`lgraph 0.1x5 L 월:0.6 …`) — 눈금은 같게, 값은 모두 숨겨 빈 그래프로 그린다.
+ * 누른 곳의 가로 위치 → 어느 날, 세로 위치 → 가장 가까운 눈금선(📊 점 찍기 판과 같은 자 chartGeom). 찍은 점끼리는 선분으로 잇는다.
+ * ▲▼는 마지막에 고른 날의 점을 한 칸씩. 값은 화면에 쓰지 않는다 — 눈금을 읽어 찍는 게 이 문제다.
+ */
+function plotInput(part, wrap, onChange) {
+  const kind = String(part.chart || '').split(' ')[0];
+  const full = kind === 'lgraph' ? parseChart(kind, part.chart.slice(kind.length + 1)) : null;
+  if (!full) return { el: wrap, value: () => null, clear() {}, filled: () => false };
+  const vals = full.items.map((x) => x.v).filter((v) => v !== null);
+  const blank = { ...full, top: Math.max(...vals), items: full.items.map((x) => ({ label: x.label, v: null })) };
+  const G = chartGeom(blank);
+  const n = blank.items.length;
+  const cells = new Array(n).fill(null);
+  let sel = 0;
+
+  wrap.appendChild(el('div', 'chal-in-hint', '날마다 알맞은 자리를 눌러 점을 찍어요 — 찍은 점은 선으로 이어져요'));
+  const fig = el('div', 'chal-chart math-fig chal-plot');
+  if (part.title) fig.appendChild(el('div', 'chal-chart-title', part.title));
+  const g = el('div', 'chal-chart-svg');
+  g.innerHTML = lgraphSvg(blank);
+  fig.appendChild(g);
+  wrap.appendChild(fig);
+  const svg = g.querySelector('svg');
+  for (const t of [...svg.querySelectorAll('text')]) if (t.textContent === '?') t.remove(); // 빈 그래프 — ? 다섯 개는 소음
+  svg.classList.add('is-drawable');
+  const mk = (tag, a) => { const e = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(a)) e.setAttribute(k, String(v)); return e; };
+  const colHi = mk('rect', { class: 'plot-col', x: 0, y: G.yOfCells(G.cells) - 6, width: G.colW, height: G.y0 + G.wave - G.yOfCells(G.cells) + 6, rx: 6 });
+  svg.insertBefore(colHi, svg.firstChild);
+  const layer = mk('g', { class: 'plot-layer' });
+  svg.appendChild(layer);
+
+  const say = el('div', 'chal-plot-say');
+  wrap.appendChild(say);
+  const nudge = el('div', 'chal-plot-nudge');
+  const up = el('button', 'btn chal-plot-step', '▲ 한 칸 위로');
+  const down = el('button', 'btn chal-plot-step', '▼ 한 칸 아래로');
+  for (const [b, d] of [[up, 1], [down, -1]]) {
+    b.type = 'button';
+    b.addEventListener('click', () => { const k = cells[sel] === null ? 0 : cells[sel] + d; cells[sel] = Math.min(G.cells, Math.max(0, k)); paint(); });
+    nudge.appendChild(b);
+  }
+  wrap.appendChild(nudge);
+
+  const at = (e) => {
+    const m = svg.getScreenCTM();
+    if (!m) return null;
+    const p = svg.createSVGPoint();
+    p.x = e.clientX; p.y = e.clientY;
+    const q = p.matrixTransform(m.inverse());
+    let i = 0; for (let j = 1; j < n; j++) if (Math.abs(G.x(j) - q.x) < Math.abs(G.x(i) - q.x)) i = j;
+    return { i, k: G.cellsOf(q.y) };
+  };
+  let drag = false;
+  svg.addEventListener('pointerdown', (e) => {
+    const h = at(e);
+    if (!h) return;
+    drag = true;
+    try { svg.setPointerCapture(e.pointerId); } catch { /* 캡처를 못 해도 누른 자리는 정한다 */ }
+    sel = h.i; cells[sel] = h.k; paint();
+    e.preventDefault();
+  });
+  svg.addEventListener('pointermove', (e) => { if (!drag) return; const h = at(e); if (h) { cells[sel] = h.k; paint(); } }); // 끄는 동안은 처음 고른 날 그대로
+  const stop = () => { drag = false; };
+  svg.addEventListener('pointerup', stop);
+  svg.addEventListener('pointercancel', stop);
+
+  function paint() {
+    layer.innerHTML = '';
+    colHi.setAttribute('x', G.x(sel) - G.colW / 2);
+    const pts = cells.map((k, i) => (k === null ? null : [G.x(i), G.yOfCells(k)]));
+    for (let i = 0; i + 1 < n; i++) if (pts[i] && pts[i + 1]) layer.appendChild(mk('line', { class: 'plot-seg', x1: pts[i][0], y1: pts[i][1], x2: pts[i + 1][0], y2: pts[i + 1][1] }));
+    pts.forEach((p, i) => { if (p) layer.appendChild(mk('circle', { class: `plot-dot${i === sel ? ' is-sel' : ''}`, cx: p[0], cy: p[1], r: 6.5 })); });
+    const done = cells.filter((k) => k !== null).length;
+    say.textContent = `${blank.items[sel].label} 고르는 중 · 점 ${done} / ${n}개 찍었어요`;
+    up.disabled = cells[sel] !== null && cells[sel] >= G.cells;
+    down.disabled = cells[sel] === null || cells[sel] <= 0;
+    onChange();
+  }
+  paint();
+  return {
+    el: wrap,
+    value: () => cells.map((k) => (k === null ? null : G.valueOfCells(k))),
+    clear() { cells.fill(null); sel = 0; paint(); },
+    filled: () => cells.every((k) => k !== null),
+  };
 }
 
 function numInput(part, wrap, onChange) {
@@ -235,7 +373,7 @@ function choiceInput(part, wrap, onChange) {
 function manyInput(part, wrap, onChange) {
   const chosen = new Set();
   wrap.appendChild(el('div', 'chal-in-hint', '맞는 것을 모두 눌러요'));
-  const box = el('div', 'chal-choices');
+  const box = el('div', `chal-choices${(part.choices || []).some((c) => String(c).length > 6) ? ' is-tall' : ''}`); // 5단원 14번 같은 긴 문장은 한 줄에 하나씩
   for (const c of part.choices || []) {
     const b = el('button', 'btn chal-choice', c);
     b.type = 'button';

@@ -7,6 +7,7 @@ import {
   solved, solvedCount, setCleared, setClaimed, nextItems, nextNo, applyChalRound, chalReward, setNote,
 } from '../js/mathchal.js';
 import { cloneMath, emptyMath, mergeStatRecord } from '../js/db.js';
+import { figureSvg, parseChart, chartGeom } from '../js/mathdraw.js';
 
 const DATA = JSON.parse(fs.readFileSync(new URL('../coach/math/challenge.json', import.meta.url), 'utf8'));
 const U3 = setOf(DATA, 'u3');
@@ -18,14 +19,14 @@ const num = (n, i = 0) => Number(ans(n, i));
 
 test('🎯 자료: 3단원 20문제, 번호가 1~20으로 빠짐·겹침 없음', () => {
   assert.equal(DATA.book, '만점왕 수학 플러스 4-2');
-  assert.equal(setsOf(DATA).length, 1, '지금은 3단원만 (5단원 꺾은선그래프는 다음에)');
+  assert.deepEqual(setsOf(DATA).map((s) => s.id), ['u3', 'u5'], '3단원 소수 · 5단원 꺾은선그래프 (2026-10-01)');
   assert.equal(U3.items.length, 20);
   assert.deepEqual(U3.items.map((it) => it.no), Array.from({ length: 20 }, (_, i) => i + 1));
   assert.ok(U3.unit.includes('소수') && U3.pages);
 });
 
-test('🎯 자료: 모든 칸이 쓸 수 있는 모양인가 (입력 방식·답·보기)', () => {
-  for (const it of U3.items) {
+test('🎯 자료: 모든 칸이 쓸 수 있는 모양인가 (입력 방식·답·보기) — 두 단원 모두', () => {
+  for (const it of setsOf(DATA).flatMap((s) => s.items)) {
     assert.ok(it.q && it.q.length > 5, `${it.no}번 문제 글이 없다`);
     assert.ok(it.why && it.why.length > 10, `${it.no}번 풀이가 없다 — 틀렸을 때 보여 줄 말이 없다`);
     assert.ok(Array.isArray(it.parts) && it.parts.length >= 1, `${it.no}번 답 칸이 없다`);
@@ -48,6 +49,19 @@ test('🎯 자료: 모든 칸이 쓸 수 있는 모양인가 (입력 방식·답
         assert.equal(p.answer.length, p.choices.length, `${it.no}번: 순서 답의 개수가 보기와 다르다`);
         assert.deepEqual([...p.answer].sort(), [...p.choices].sort(), `${it.no}번: 순서 답이 보기의 재배열이 아니다`);
       }
+      if (p.input === 'plot') {
+        // 빈 그래프는 정답 그래프의 눈금 그대로 — 답은 그 그래프의 값과 같아야 (다르면 맞게 찍어도 틀린다)
+        const sp = parseChart('lgraph', String(p.chart).replace(/^lgraph /, ''));
+        assert.ok(sp && figureSvg(p.chart), `${it.no}번: 못 그리는 그래프 ${p.chart}`);
+        assert.deepEqual(sp.items.map((x) => x.v), p.answer.map(Number), `${it.no}번: 답과 그래프 값이 다르다`);
+        assert.ok(p.title, `${it.no}번: 그래프 제목이 없다`);
+      }
+    }
+    // 그림은 모두 그려진다 (그래프 지시문·표)
+    for (const f of [].concat(it.fig || [])) {
+      if (f.kind === 'chart') assert.ok(figureSvg(f.spec), `${it.no}번: 못 그리는 그래프 ${f.spec}`);
+      if (f.kind === 'charts') for (const c of f.list) assert.ok(figureSvg(c.spec), `${it.no}번: 못 그리는 그래프 ${c.spec}`);
+      if (f.kind === 'table') assert.ok(f.rows.length >= 2 && f.rows.every((r) => r.length === f.rows[0].length), `${it.no}번: 표의 칸 수가 줄마다 다르다`);
     }
   }
 });
@@ -310,4 +324,175 @@ test('★ ⏳ 도전 문제를 켜면 반드시 끄는 자리가 있어야 한�
   // 끄는 곳(endChal)을 나가는 모든 길이 지나가는지 — 저장 실패·그만두기·끝내기
   assert.ok(/function endChal\(\)/.test(math), 'endChal이 없다');
   assert.ok((math.match(/endChal\(\)/g) || []).length >= 3, '나가는 길마다 endChal을 부르지 않는다');
+});
+
+// ───────────────────── ★ 5단원 꺾은선그래프 — 처음부터 다시 풀어 대조 (2026-10-01) ─────────────────────
+// 문제집 숫자를 여기 **다시 적는다**(「정답과 풀이」 51~52쪽 + 풀이에 없는 점은 사진을 픽셀로 잰 값).
+// ① 자료의 그래프 지시문이 이 숫자와 같은지 ② 이 숫자로 **계산한 답**이 자료의 답과 같은지 본다.
+const U5 = setOf(DATA, 'u5');
+const no5 = (n) => U5.items.find((it) => it.no === n);
+const ans5 = (n, i = 0) => no5(n).parts[i].answer;
+const BOOK = {
+  ice: { '6월': 180, '7월': 280, '8월': 320, '9월': 260, '10월': 80 },          // 판매량(개), 눈금 한 칸 20
+  milk: { 월: 0.6, 화: 0.7, 수: 1.1, 목: 0.5, 금: 0.4 },                       // L
+  tour: { '2020년': 370, '2021년': 630, '2022년': 510, '2023년': 470, '2024년': 590 }, // 만 명
+  rise: { '5일': '6:59', '10일': '6:55', '15일': '6:51', '20일': '6:47' },   // 오전
+  set: { '5일': '4:59', '10일': '5:01', '15일': '5:04', '20일': '5:06' },    // 오후
+  play: { 월: 270, 화: 290, 목: 330, 금: 360 },                              // 명 (수요일은 찢어짐)
+  school: { '2020년': 295, '2021년': 305, '2022년': 280, '2023년': 270, '2024년': 300 }, // 명, 260부터
+  skiIn: { '11월': 20, '12월': 27, '1월': 29, '2월': 23 },                    // 만 명
+  skiWon: { '11월': 72, '12월': 84, '1월': 80, '2월': 72 },                   // 억 원
+};
+const toMin = (t) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+/** 자료의 그래프 지시문 → {이름: 값} (시각은 분으로) */
+const chartVals = (spec) => Object.fromEntries(parseChart('lgraph', spec.replace(/^lgraph /, '')).items.map((x) => [x.label, x.v]));
+const figsOf = (n) => [].concat(no5(n).fig || []).flatMap((f) => (f.kind === 'charts' ? f.list : f.kind === 'chart' ? [f] : []));
+const keysVals = (o) => Object.entries(o);
+const argmax = (o) => keysVals(o).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+const argmin = (o) => keysVals(o).reduce((a, b) => (b[1] < a[1] ? b : a))[0];
+
+test('🎯 5단원: 20문제 1~20 · 그래프 지시문의 값이 문제집 숫자와 같다 (옮겨 적기 검사)', () => {
+  assert.equal(U5.items.length, 20);
+  assert.deepEqual(U5.items.map((it) => it.no), Array.from({ length: 20 }, (_, i) => i + 1));
+  assert.ok(U5.unit.includes('꺾은선그래프') && U5.pages === '127~129쪽');
+  for (const n of [1, 2, 3, 4, 5]) assert.deepEqual(chartVals(figsOf(n)[0].spec), BOOK.ice, `${n}번`);
+  for (const n of [8, 9]) assert.deepEqual(chartVals(figsOf(n)[0].spec), BOOK.milk, `${n}번`);
+  for (const n of [13, 14, 15]) {
+    const [r, s] = figsOf(n).map((f) => chartVals(f.spec));
+    assert.deepEqual(r, Object.fromEntries(keysVals(BOOK.rise).map(([k, v]) => [k, toMin(v)])), `${n}번 해 뜨는 시각`);
+    assert.deepEqual(s, Object.fromEntries(keysVals(BOOK.set).map(([k, v]) => [k, toMin(v)])), `${n}번 해 지는 시각`);
+  }
+  for (const n of [16, 17]) assert.deepEqual(chartVals(figsOf(n)[0].spec), { ...BOOK.play, 수: null }, `${n}번 — 수요일은 찢어져 ?`);
+  assert.deepEqual(chartVals(figsOf(18)[0].spec), BOOK.school);
+  for (const n of [19, 20]) {
+    const [a, b] = figsOf(n).map((f) => chartVals(f.spec));
+    assert.deepEqual(a, BOOK.skiIn, `${n}번 입장객`); assert.deepEqual(b, BOOK.skiWon, `${n}번 매출액`);
+  }
+  // 표 — 06~09 우유, 10~12 관광객
+  const milkT = [].concat(no5(6).fig)[0].rows; assert.deepEqual(milkT[1].slice(1).map(Number), Object.values(BOOK.milk));
+  const tourT = [].concat(no5(10).fig)[0].rows; assert.deepEqual(tourT[1].slice(1).map((t) => Number(t.replace('만', ''))), Object.values(BOOK.tour));
+  // 07·12 그리기의 답 = 표의 값
+  assert.deepEqual(ans5(7), Object.values(BOOK.milk));
+  assert.deepEqual(ans5(12), Object.values(BOOK.tour));
+});
+
+test('★ 🎯 5단원 검산 01~10 — 문제집 숫자로 다시 푼 답 = 자료의 답', () => {
+  assert.deepEqual([ans5(1, 0), ans5(1, 1)], ['월', '판매량']);
+  // 02 눈금 한 칸: 0과 100 사이 5칸
+  assert.equal(Number(ans5(2)), 100 / 5);
+  assert.equal(Number(ans5(3)), BOOK.ice['7월']);
+  // 04 변화가 가장 큰 때 — 이웃한 두 달의 차가 가장 큰 곳 하나
+  const months = Object.keys(BOOK.ice); const v = Object.values(BOOK.ice);
+  const d = v.slice(1).map((x, i) => Math.abs(x - v[i])); const big = d.indexOf(Math.max(...d));
+  assert.equal(d.filter((x) => x === d[big]).length, 1, '변화가 가장 큰 때가 둘이면 문제가 안 된다');
+  assert.deepEqual([Number(ans5(4, 0)), Number(ans5(4, 1))], [parseInt(months[big], 10), parseInt(months[big + 1], 10)]);
+  assert.equal(Number(ans5(5)), Math.max(...v) - Math.min(...v));
+  // 06 세로 눈금 한 칸: 0.1·0.2·0.5·1 L 중 모든 값이 눈금선 위에 오는 것 (가장 큰 것)
+  const m = Object.values(BOOK.milk);
+  const fits = [0.1, 0.2, 0.5, 1].filter((s) => m.every((x) => Math.abs(Math.round(x / s) - x / s) < 1e-9));
+  assert.equal(Number(ans5(6)), Math.max(...fits));
+  // 08 전날보다 가장 많이 줄어든 요일
+  const days = Object.keys(BOOK.milk); const dd = m.slice(1).map((x, i) => x - m[i]);
+  assert.equal(ans5(8), `${days[dd.indexOf(Math.min(...dd)) + 1]}요일`);
+  // 09 바르게 설명한 것 — 가장 많이 마신 날이 화요일인가 · 늘다가 주는가
+  const top = argmax(BOOK.milk); const ti = days.indexOf(top);
+  const upThenDown = m.slice(0, ti + 1).every((x, i) => !i || x > m[i - 1]) && m.slice(ti).every((x, i) => !i || x < m[ti + i - 1]);
+  const truth = { '우유를 가장 많이 마신 날은 화요일입니다.': top === '화', '마신 우유의 양이 늘어났다가 줄어들고 있습니다.': upThenDown };
+  assert.deepEqual([...ans5(9)].sort(), Object.keys(truth).filter((k) => truth[k]).sort());
+  assert.deepEqual(no5(9).parts[0].choices.sort(), Object.keys(truth).sort());
+  // 10 물결선: 350만·400만·450만 중 가장 작은 값(370만)보다 크지 않은 가장 큰 것
+  const lo = Math.min(...Object.values(BOOK.tour));
+  assert.equal(ans5(10), `${Math.max(...[350, 400, 450].filter((x) => x <= lo))}만 명`);
+});
+
+test('★ 🎯 5단원 검산 11~20 — 문제집 숫자로 다시 푼 답 = 자료의 답 · 18번은 그린 그래프에서 칸을 센다', () => {
+  // 11 세로 눈금 한 칸: 350만부터 모든 값이 떨어지는 가장 큰 간격 (최대공약수)
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  assert.equal(Number(ans5(11)), Object.values(BOOK.tour).map((x) => x - 350).reduce(gcd));
+  // 13 빨라짐/늦어짐
+  const r = Object.values(BOOK.rise).map(toMin); const s = Object.values(BOOK.set).map(toMin);
+  const dir = (a) => (a.every((x, i) => !i || x < a[i - 1]) ? '점점 빨라지고 있습니다.' : a.every((x, i) => !i || x > a[i - 1]) ? '점점 늦어지고 있습니다.' : '변하지 않습니다.');
+  assert.deepEqual([ans5(13, 0), ans5(13, 1)], [dir(r), dir(s)]);
+  // 14 옳지 않은 것 — 다섯 문장을 따로 판정
+  const dr = r.slice(1).map((x, i) => Math.abs(x - r[i]));
+  const days = Object.keys(BOOK.rise);
+  const st14 = [
+    Math.max(...r) - Math.min(...r) > Math.max(...s) - Math.min(...s),                       // ① 해 뜨는 쪽 변화가 더 크다
+    parseChart('lgraph', figsOf(14)[0].spec.replace(/^lgraph /, '')).step === 1 && parseChart('lgraph', figsOf(14)[1].spec.replace(/^lgraph /, '')).step === 1, // ② 한 칸 1분
+    days[s.indexOf(Math.max(...s))] === '5일',                                                // ③ 해 지는 시각이 가장 늦은 때는 5일
+    dr.filter((x) => x === Math.max(...dr)).length === 1 && dr.indexOf(Math.max(...dr)) === 1, // ④ 변화가 가장 큰 때는 10일과 15일 사이(하나뿐)
+    s[days.indexOf('15일')] === toMin('5:04'),                                                // ⑤ 오후 5시 4분일 때는 15일
+  ];
+  const wrong = no5(14).parts[0].choices.filter((_, i) => !st14[i]);
+  assert.deepEqual([...ans5(14)].sort(), wrong.sort());
+  // 15 25일 해 뜨는 시각: 같은 만큼씩 빨라진다
+  assert.ok(dr.every((x) => x === dr[0]), '해 뜨는 시각이 같은 만큼씩 변해야 짐작할 수 있다');
+  const t25 = r[r.length - 1] - dr[0];
+  assert.deepEqual([Number(ans5(15, 0)), Number(ans5(15, 1))], [Math.floor(t25 / 60), t25 % 60]);
+  // 16 수요일 = 합 − 나머지 · 17 (금 − 목) ÷ 5
+  assert.equal(Number(ans5(16)), 1620 - Object.values(BOOK.play).reduce((a, b) => a + b, 0));
+  assert.equal(Number(ans5(17)), (BOOK.play.금 - BOOK.play.목) / 5);
+  // 18 — 눈금에 수가 없는 그래프: **그린 SVG에서** 점이 260에서 몇 칸 위인지 재서, 305명인 해의 칸으로 한 칸을 알아낸다
+  const spec18 = figsOf(18)[0].spec; const sp = parseChart('lgraph', spec18.replace(/^lgraph /, '')); const G = chartGeom(sp);
+  const svg = figureSvg(spec18);
+  const labels = [...svg.matchAll(/text-anchor="end" fill="currentColor">([^<]+)</g)].map((x) => x[1]);
+  assert.deepEqual(labels.filter((t) => /^\d/.test(t)), ['260', '0'], '18번 그래프는 260(과 물결선 아래 0) 말고는 눈금에 수가 없어야 — 눈금 한 칸을 알아내는 문제');
+  const cy = [...svg.matchAll(/<circle class="pt" data-i="(\d+)" cx="[\d.]+" cy="([\d.]+)"/g)].map((x) => [Number(x[1]), Number(x[2])]);
+  const cellsAt = Object.fromEntries(cy.map(([i, y]) => [sp.items[i].label, Math.round((G.y0 - y) / G.ch)]));
+  const topYear = argmax(cellsAt); // 점이 가장 높은 해 = 학생 수가 가장 많던 때
+  const per = (305 - 260) / cellsAt[topYear];
+  assert.ok(Number.isInteger(per), `한 칸이 정수가 아니다 (${per})`);
+  assert.equal(Number(ans5(18)), 260 + per * cellsAt['2024년']);
+  // 19 입장객이 가장 적은 달의 매출액 · 20 입장객은 늘고 매출은 준 달 → 줄어든 만큼
+  const low = argmin(BOOK.skiIn);
+  assert.deepEqual([Number(ans5(19, 0)), Number(ans5(19, 1))], [parseInt(low, 10), BOOK.skiWon[low]]);
+  const mo = Object.keys(BOOK.skiIn);
+  const hit = mo.filter((k, i) => i && BOOK.skiIn[k] > BOOK.skiIn[mo[i - 1]] && BOOK.skiWon[k] < BOOK.skiWon[mo[i - 1]]);
+  assert.equal(hit.length, 1, '그런 달이 하나여야');
+  const prev = mo[mo.indexOf(hit[0]) - 1];
+  assert.deepEqual([Number(ans5(20, 0)), Number(ans5(20, 1))], [parseInt(hit[0], 10), BOOK.skiWon[prev] - BOOK.skiWon[hit[0]]]);
+});
+
+test('🎯 5단원: 그래프 그림 — 시각 눈금(6:45~7:00)·띄어쓴 단위(만 명) · 그린 점을 재면 지시문 값', () => {
+  const [rise, set] = figsOf(13).map((f) => f.spec);
+  const labs = (spec) => [...figureSvg(spec).matchAll(/text-anchor="end" fill="currentColor">([^<]+)</g)].map((x) => x[1]);
+  assert.deepEqual(labs(rise), ['6:45', '6:50', '6:55', '7:00', '(시각)', '0']);
+  assert.deepEqual(labs(set), ['4:55', '5:00', '5:05', '5:10', '(시각)', '0']);
+  assert.ok(labs(figsOf(19)[0].spec).includes('(만 명)'));
+  // 모든 그래프: 점·막대가 눈금선 위, 값 = 지시문 (시각은 분)
+  for (const it of U5.items) {
+    for (const f of figsOf(it.no)) {
+      const sp = parseChart('lgraph', f.spec.replace(/^lgraph /, '')); const G = chartGeom(sp);
+      for (const [, i, y] of figureSvg(f.spec).matchAll(/<circle class="pt" data-i="(\d+)" cx="[\d.]+" cy="([\d.]+)"/g)) {
+        const k = (G.y0 - Number(y)) / G.ch;
+        assert.ok(Math.abs(k - Math.round(k)) < 1e-6, `${it.no}번 ${f.spec}: 점이 눈금선 위가 아니다`);
+        assert.ok(Math.abs(G.valueOfCells(Math.round(k)) - sp.items[Number(i)].v) < 1e-9, `${it.no}번 ${f.spec}: 점 ${i}의 값이 다르다`);
+      }
+    }
+  }
+});
+
+test('🎯 점 여러 개 찍기(plot) 채점 — 모든 날이 제자리여야 · 하나라도 빠지거나 틀리면 틀림 · 그린 칸 → 값은 같은 자', () => {
+  const p = no5(7).parts[0];
+  assert.equal(checkPart(p, [0.6, 0.7, 1.1, 0.5, 0.4]), true);
+  assert.equal(checkPart(p, ['0.6', '0.7', '1.1', '0.5', '0.4']), true);
+  assert.equal(checkPart(p, [0.6, 0.7, 1.1, 0.5, 0.5]), false, '하나 틀림');
+  assert.equal(checkPart(p, [0.6, 0.7, 1.1, 0.5, null]), false, '하나 안 찍음');
+  assert.equal(checkPart(p, [0.6, 0.7, 1.1, 0.5]), false);
+  assert.equal(checkPart(p, null), false);
+  // 판(chalview)은 칸 → chartGeom.valueOfCells로 값을 낸다 — 정답 칸을 찍으면 정답 값
+  for (const n of [7, 12]) {
+    const q = no5(n).parts[0];
+    const full = parseChart('lgraph', q.chart.replace(/^lgraph /, ''));
+    const G = chartGeom({ ...full, top: Math.max(...q.answer), items: full.items.map((x) => ({ label: x.label, v: null })) });
+    const drawn = q.answer.map((v) => G.valueOfCells(Math.round((v - full.base) / full.step)));
+    assert.equal(checkPart(q, drawn), true, `${n}번: 정답 칸을 찍으면 맞아야`);
+  }
+});
+
+test('🎯 회차를 저장하면 맨 위 칩(Lv·⚡·💰·🔷)을 다시 그린다 — 안 그리면 도전 문제를 푸는 내내 옛 숫자 (2026-10-01 헤드리스)', () => {
+  const math = fs.readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
+  const i = math.indexOf('const saved = await commitChalRound(');
+  const j = math.indexOf('ui.state = saved.math;', i);
+  assert.ok(i > 0 && j > i && /^\s*updateChip\(\);/.test(math.slice(j + 'ui.state = saved.math;'.length)), 'finishChal: ui.state = saved.math 바로 뒤에 updateChip()');
 });

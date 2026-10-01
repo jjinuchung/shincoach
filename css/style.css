@@ -2454,6 +2454,28 @@ button { font-family: inherit; }
 
 /* 그림 */
 .chal-fig { margin: 10px 0 14px; color: #2c2a35; }
+/* 5단원 꺾은선그래프 — 묶음 안내 · 그래프(📊 K와 같은 그림) · 표 · 점 여러 개 찍기 */
+.chal-lead { margin: 0 0 6px; color: #6b6880; font-size: .92rem; line-height: 1.5; }
+.chal-figs { display: grid; gap: 4px; }
+.chal-charts { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.chal-chart { margin: 0; text-align: center; flex: 1 1 260px; max-width: 460px; min-width: 0; }
+.chal-charts.is-two .chal-chart { max-width: 340px; }
+.chal-chart-title { font-weight: 800; font-size: .95rem; margin-bottom: 2px; }
+.chal-chart-svg svg { width: 100%; height: auto; display: block; margin: 0 auto; }
+.chal-table-wrap { text-align: center; overflow-x: auto; }
+.chal-table { border-collapse: collapse; margin: 4px auto 0; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.chal-table th, .chal-table td { border: 1.5px solid #c9c6e4; padding: 7px 10px; text-align: center; }
+.chal-table th { background: #f1f0fb; font-weight: 800; }
+.chal-plot { max-width: 480px; margin: 0 auto; }
+.chal-plot svg.is-drawable { touch-action: none; cursor: pointer; }
+.chal-plot .plot-col { fill: #6366f1; fill-opacity: .07; stroke: #6366f1; stroke-opacity: .35; stroke-dasharray: 5 4; }
+.chal-plot .plot-seg { stroke: var(--frac-fill2, #f59e0b); stroke-width: 2.5; }
+.chal-plot .plot-dot { fill: var(--frac-fill2, #f59e0b); stroke: currentColor; stroke-width: 1.5; }
+.chal-plot .plot-dot.is-sel { stroke-width: 3; }
+.chal-plot-say { text-align: center; font-weight: 800; margin: 4px 0 8px; color: #1e1b4b; }
+.chal-plot-nudge { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.chal-plot-step { min-width: 136px; padding: 12px 14px; font-size: 1.05rem; font-weight: 800; }
+.chal-answer .chal-chart { margin: 6px auto 0; }
 .chal-numline svg { width: 100%; max-width: 340px; height: auto; display: block; margin: 0 auto; }
 .chal-flow { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
 .chal-flow-box { min-width: 62px; padding: 10px 8px; border: 2px solid #d9a441; border-radius: 8px; background: #fdf4dd; font-weight: 800; text-align: center; }

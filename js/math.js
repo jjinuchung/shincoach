@@ -767,6 +767,7 @@ function renderChalQ() {
   head.appendChild(el('span', 'chal-book', `${c.set.pages}`));
   card.appendChild(head);
 
+  if (item.lead) card.appendChild(el('p', 'chal-lead', item.lead)); // [01~05] 어느 가게에서 … — 문제집의 묶음 안내
   card.appendChild(el('p', 'math-qtext chal-qtext', item.q));
 
   const fig = figureEl(item.fig);
@@ -814,6 +815,8 @@ function answerChal(given) {
   // 정답 보여 주기 — 틀렸으면 꼭, 맞았어도 확인용으로 한 줄
   const ansRow = el('div', 'chal-answer');
   item.parts.forEach((p, i) => {
+    // ✍️ 꺾은선그래프로 나타내기 — 답은 글(0.6, 0.7, …)이 아니라 정답 그래프로
+    if (p.input === 'plot') { ansRow.appendChild(el('div', 'chal-answer-row', '답: 이렇게 찍고 이어요')); const g = figureEl({ kind: 'chart', title: p.title, spec: p.chart }); if (g) ansRow.appendChild(g); return; }
     const want = Array.isArray(p.answer) ? p.answer.join(', ') : String(p.answer);
     ansRow.appendChild(el('div', 'chal-answer-row', `${p.label ? p.label + ' ' : ''}답: ${want}${p.unit ? ' ' + p.unit : ''}`));
   });
@@ -857,6 +860,7 @@ async function finishChal() {
     return;
   }
   ui.state = saved.math;
+  updateChip(); // 맨 위 Lv·⚡·💰·🔷 — 저장은 됐는데 칩을 안 다시 그려 도전 문제를 푸는 내내 옛 숫자였다 (2026-10-01 헤드리스)
   const res = saved.result;
   const rw = saved.reward;
 

@@ -28,7 +28,7 @@ export const REWARD = {
 };
 
 /** 답 입력 방식 */
-export const INPUTS = ['num', 'choice', 'many', 'order'];
+export const INPUTS = ['num', 'choice', 'many', 'order', 'plot'];
 
 /** 문제 키 — 단원과 번호로 (백업 병합이 키마다 max라 이름이 바뀌면 진도가 끊긴다) */
 export function qid(setId, no) {
@@ -81,6 +81,12 @@ export function checkPart(part, given) {
     const want = (Array.isArray(part.answer) ? part.answer : []).map(String);
     const got = (Array.isArray(given) ? given : []).map(String);
     return want.length === got.length && want.every((x, i) => x === got[i]);
+  }
+  if (kind === 'plot') {
+    // ✍️ 점 여러 개 — 모든 날의 점이 제자리여야 (하나라도 빠지거나 틀리면 틀림, 문제집도 그렇다)
+    const want = (Array.isArray(part.answer) ? part.answer : []).map(numOf);
+    const got = (Array.isArray(given) ? given : []).map(numOf);
+    return want.length > 0 && want.length === got.length && want.every((a, i) => Number.isFinite(a) && Number.isFinite(got[i]) && Math.abs(a - got[i]) < 1e-9);
   }
   return false;
 }

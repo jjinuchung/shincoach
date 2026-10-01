@@ -671,18 +671,35 @@ export function parseChart(kind, arg) {
   const st = parseStep(t[0]);
   const unit = t[1];
   if (!st || !unit || /[:~]/.test(unit) || /^\d/.test(unit)) return null;
-  let i = 2; let base = 0; let baseDec = 0;
-  if (kind === 'lgraph' && /^~\d+(\.\d+)?$/.test(t[2] || '')) { base = Number(t[2].slice(1)); baseDec = (t[2].split('.')[1] || '').length; i = 3; }
-  const items = t.slice(i).map((x) => { const m = /^([^:\s]+):(\d+(?:\.\d+)?|\?)$/.exec(x); return m ? { label: m[1], v: m[2] === '?' ? null : Number(m[2]), dec: m[2] === '?' ? 0 : (m[2].split('.')[1] || '').length } : null; });
+  // 🎯 도전 문제 5단원(2026-10-01)에서 더한 것 셋 — K 생성기는 쓰지 않는다:
+  //   · 시각 눈금 `5일:6:59` · `~6:45` — 값은 분으로 바꿔 셈하고 이름은 6:59로 (해 뜨는 시각 그래프)
+  //   · `!` — 맨 아래(물결선 위 첫 눈금) 말고는 눈금에 수를 안 적는다 (눈금 한 칸을 스스로 알아내는 문제)
+  //   · 단위 속 `_`는 빈칸 (`만_명` → "만 명")
+  const clock = /^(\d{1,2}):(\d{2})$/;
+  const valOf = (s) => { const c = clock.exec(s); return c ? { v: Number(c[1]) * 60 + Number(c[2]), dec: 0, time: true } : { v: Number(s), dec: (s.split('.')[1] || '').length, time: false }; };
+  let i = 2; let base = 0; let baseDec = 0; let baseTime = null; let hide = false;
+  if (kind === 'lgraph' && /^~(\d+(\.\d+)?|\d{1,2}:\d{2})$/.test(t[2] || '')) { const b = valOf(t[2].slice(1)); base = b.v; baseDec = b.dec; baseTime = b.time; i = 3; }
+  if (t[i] === '!') { hide = true; i += 1; }
+  const items = t.slice(i).map((x) => { const m = /^([^:\s]+):(\d+(?:\.\d+)?|\d{1,2}:\d{2}|\?)$/.exec(x); if (!m) return null; if (m[2] === '?') return { label: m[1], v: null, dec: 0, time: null }; return { label: m[1], ...valOf(m[2]) }; });
   if (items.length < 2 || items.length > 7 || items.some((x) => !x) || !items.some((x) => x.v !== null)) return null;
+  // 시각과 수를 섞지 않는다 — 물결선 첫 눈금까지 같은 꼴
+  const kinds = new Set([...items.filter((x) => x.v !== null).map((x) => x.time), ...(baseTime === null ? [] : [baseTime])]);
+  if (kinds.size > 1) return null;
+  const time = kinds.has(true);
   const dec = Math.max(st.dec, baseDec, ...items.map((x) => x.dec));
-  if (dec > 2) return null;
+  if (dec > 2 || (time && st.dec)) return null;
   const S = 10 ** dec; const sc = (v) => Math.round(v * S);
   const ss = sc(st.step); const sb = sc(base);
   for (const x of items) if (x.v !== null && (sc(x.v) < sb || (sc(x.v) - sb) % ss !== 0)) return null; // 눈금선 위에만
-  if (sb % ss !== 0) return null; // 물결선 위 첫 눈금도 눈금 한 칸의 배수
-  return { kind, step: st.step, lab: st.lab, dec, unit, base, items: items.map(({ label, v }) => ({ label, v })) };
+  // (물결선 위 첫 눈금이 눈금 한 칸의 배수일 필요는 없다 — 문제집 12번이 350만부터 한 칸 20만. 값은 위에서 첫 눈금부터 칸으로 떨어지는지 봤다)
+  return { kind, step: st.step, lab: st.lab, dec, unit: unit.replace(/_/g, ' '), base, items: items.map(({ label, v }) => ({ label, v })), ...(time ? { time: true } : {}), ...(hide ? { hide: true } : {}) };
 }
+/** 분 → "6:59" (시각 눈금) */
+const clockText = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+/** 그래프의 값 하나를 글로 — 시각 눈금이면 6:59, 아니면 수 */
+const chartVal = (spec, v) => (v === null ? '?' : spec.time ? clockText(v) : fmtNum(v, spec.dec));
+/** 눈금 한 칸을 글로 — 시각 눈금이면 "1분" */
+const chartStep = (spec) => (spec.time ? `${spec.step}분` : withUnit(fmtNum(spec.step, spec.dec), spec.unit));
 
 /**
  * 📏 그래프의 자 — 막대·꺾은선 그림과 점 찍기 위젯이 같이 쓴다 (순수 함수).
@@ -692,15 +709,18 @@ export function parseChart(kind, arg) {
 export function chartGeom(spec) {
   if (!spec) return null;
   const S = 10 ** spec.dec; const st = Math.round(spec.step * S); const b = Math.round((spec.base || 0) * S);
-  const known = spec.items.filter((x) => x.v !== null).map((x) => Math.round(x.v * S));
+  // top: 값을 다 숨긴 빈 그래프(🎯 점 찍기 문제)도 같은 높이로 그리려고 — 이 값까지는 들어가게
+  const known = [...spec.items.filter((x) => x.v !== null).map((x) => x.v), ...(spec.top !== undefined ? [spec.top] : [])].map((v) => Math.round(v * S));
+  if (!known.length) return null;
   const maxC = Math.ceil((Math.max(...known) - b) / st);
   let cells = Math.max(4, maxC + 1);
   cells = Math.ceil(cells / spec.lab) * spec.lab;
-  if (cells > 16) return null;
+  // K 생성기는 16칸 이하로 낸다(테스트). 🎯 도전 문제 5단원 01~05(0~320개, 한 칸 20)는 문제집 그대로 17칸이 필요해 20까지
+  if (cells > 20) return null;
   const n = spec.items.length;
   const ch = Math.max(13, Math.min(26, Math.floor(220 / cells)));
-  const fmt = (k) => fmtNum((b + k * st) / S, spec.dec);
-  const ylabs = []; for (let k = 0; k <= cells; k += spec.lab) ylabs.push(k);
+  const fmt = (k) => (spec.time ? clockText((b + k * st) / S) : fmtNum((b + k * st) / S, spec.dec));
+  const ylabs = []; for (let k = 0; k <= cells; k += spec.lab) if (!spec.hide || k === 0) ylabs.push(k);
   const left = Math.ceil(Math.max(...ylabs.map((k) => textW(fmt(k), 13)), textW(`(${spec.unit})`, 13) - 6) + 16);
   const colW = Math.max(56, Math.ceil(Math.max(...spec.items.map((x) => textW(x.label, 14))) + 18));
   const top = 34; const wave = b > 0 ? 24 : 0;
@@ -725,7 +745,7 @@ function chartFrame(G, spec) {
   for (let k = 0; k <= G.cells; k++) {
     const y = G.yOfCells(k); const named = k % G.lab === 0;
     g += `<line x1="${G.left}" y1="${y}" x2="${G.W - 10}" y2="${y}" stroke="currentColor" stroke-opacity="${named ? 0.5 : 0.2}" stroke-width="1"/>`;
-    if (named) g += `<text x="${G.left - 7}" y="${y + 4.5}" font-size="13" text-anchor="end" fill="currentColor">${G.fmt(k)}</text>`;
+    if (named && (!spec.hide || k === 0)) g += `<text x="${G.left - 7}" y="${y + 4.5}" font-size="13" text-anchor="end" fill="currentColor">${G.fmt(k)}</text>`;
   }
   g += `<text x="${G.left - 4}" y="${G.top - 14}" font-size="13" text-anchor="end" fill="currentColor">(${esc(spec.unit)})</text>`;
   g += `<line x1="${G.left}" y1="${G.top - 8}" x2="${G.left}" y2="${G.y0 + G.wave}" stroke="currentColor" stroke-width="1.5"/>`;
@@ -741,7 +761,7 @@ function chartFrame(G, spec) {
   return g;
 }
 
-const chartAria = (name, spec) => `${name}: 눈금 한 칸 ${withUnit(fmtNum(spec.step, spec.dec), spec.unit)}${spec.base ? `, ${spec.base}부터(물결선)` : ''}, ${spec.items.map((x) => `${x.label} ${x.v === null ? '?' : x.v}`).join(', ')}`;
+const chartAria = (name, spec) => `${name}: 눈금 한 칸 ${chartStep(spec)}${spec.base ? `, ${chartVal(spec, spec.base)}부터(물결선)` : ''}, ${spec.items.map((x) => `${x.label} ${chartVal(spec, x.v)}`).join(', ')}`;
 
 /** 막대그래프 — `[bgraph 2x5 명 사과:12 배:20]` */
 export function bgraphSvg(spec) {
@@ -840,7 +860,7 @@ function chartText(kind, arg) {
   }
   const sp = parseChart(kind, arg);
   if (!sp || !chartGeom(sp)) return null;
-  return `${kind === 'bgraph' ? '막대그래프' : '꺾은선그래프'}: 눈금 한 칸 ${withUnit(fmtNum(sp.step, sp.dec), sp.unit)}${sp.base ? ` · ${sp.base}부터(물결선)` : ''} · ${sp.items.map((x) => `${x.label} ${x.v === null ? '?' : x.v}`).join(' · ')}`;
+  return `${kind === 'bgraph' ? '막대그래프' : '꺾은선그래프'}: 눈금 한 칸 ${chartStep(sp)}${sp.base ? ` · ${chartVal(sp, sp.base)}부터(물결선)` : ''} · ${sp.items.map((x) => `${x.label} ${chartVal(sp, x.v)}`).join(' · ')}`;
 }
 
 /** 지시문 안의 수 목록 "-3,2,-1.5" → 숫자 배열 (−(U+2212)도 받아 준다 — 글에는 진짜 마이너스를 쓰니까) */
