@@ -376,6 +376,10 @@ button { font-family: inherit; }
 .math-fig svg { max-width: 100%; height: auto; display: block; }
 .math-fig.inline { display: inline-block; vertical-align: middle; margin: 4px 6px; }
 .math-fig.qfig { display: block; margin: 8px 0; overflow-x: auto; white-space: normal; } /* 문제 글 속 대응표·도형 배열 (H 줄기) — 글줄 사이에 블록으로 */
+/* 📊 K 그래프 — 그린 크기(270~330px) 그대로면 태블릿에서 눈금 글자가 13px로 본문보다 작고 점 찍기 판을 누르기 어렵다. 400px까지 키운다 (원그래프는 둥글어서 320px) */
+.math-fig svg.chart-fig { width: 100%; max-width: 400px; }
+.math-fig svg.chart-fig[aria-label^="원그래프"] { max-width: 320px; }
+.math-story-body p.fig-only > .math-fig.inline:has(svg.chart-fig) { display: block; margin: 4px 0; } /* 📚 배움 글의 그래프도 확인 질문 속 그래프와 같은 크기로 */
 .math-story-body p { margin: 0 0 12px; line-height: 1.75; font-size: 1.02rem; }
 .math-story-body p.fig-only { margin: 4px 0 14px; }
 .math-idea { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 10px 12px; margin: 6px 0 4px; line-height: 1.6; }
@@ -485,6 +489,27 @@ button { font-family: inherit; }
 .math-pad-note { font-weight: 700; border-radius: 10px; padding: 8px 12px; margin: 4px 0 8px; }
 .math-pad-note.ok { background: #fffbe8; color: #7a5b00; }
 .math-pad-note.no { background: #fef2f2; color: #b91c1c; }
+/* ✍️ 점 찍기 판 (📊 K 줄기 그리기 문항) — 그래프는 figureSvg 그대로, 그 위 층만 우리가 그린다 */
+.math-draw { max-width: 460px; margin: 2px auto 0; text-align: center; }
+.math-draw-fig { display: flex; justify-content: center; margin: 4px 0 6px; }
+.math-draw-fig svg.is-drawable { touch-action: none; cursor: pointer; }
+.math-draw-fig .draw-col { fill: #6366f1; fill-opacity: .07; stroke: #6366f1; stroke-opacity: .35; stroke-dasharray: 5 4; }
+.math-draw-fig svg:not(.is-drawable) .draw-col { display: none; }
+.math-draw-fig .draw-bar { fill: var(--frac-fill2, #f59e0b); fill-opacity: .85; stroke: currentColor; stroke-opacity: .6; }
+.math-draw-fig .draw-dot { fill: var(--frac-fill2, #f59e0b); stroke: currentColor; stroke-width: 1.5; }
+.math-draw-fig .draw-seg { stroke: var(--frac-fill2, #f59e0b); stroke-width: 2.5; stroke-dasharray: 6 4; }
+.math-draw-fig .is-ok .draw-bar, .math-draw-fig .is-ok .draw-dot { fill: var(--ok); }
+.math-draw-fig .is-ok .draw-seg { stroke: var(--ok); }
+.math-draw-fig .is-no .draw-bar, .math-draw-fig .is-no .draw-dot { fill: var(--danger); }
+.math-draw-fig .is-no .draw-seg { stroke: var(--danger); }
+.math-draw-fig .is-right .draw-bar, .math-draw-fig .is-right .draw-dot { fill: none; stroke: var(--ok); stroke-width: 2.5; stroke-dasharray: 6 4; stroke-opacity: 1; }
+.math-draw-fig .is-right .draw-seg { stroke: var(--ok); stroke-opacity: .7; }
+.math-draw-say { font-size: 1.25rem; font-weight: 800; color: #1e1b4b; margin: 2px 0 8px; }
+.math-draw-say.is-empty { color: #a8a4c4; font-weight: 700; font-size: 1.05rem; }
+.math-draw-nudge { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.math-draw-step { min-width: 136px; padding: 12px 14px; font-size: 1.05rem; font-weight: 800; }
+.math-draw-right { margin: 6px 0 0; font-weight: 700; color: #047857; }
+.math-draw.is-answered .math-pad-answered { margin-top: 4px; }
 .math-feedback { margin-top: 12px; }
 .math-fb { font-size: 1.05rem; font-weight: 700; margin: 4px 0 6px; line-height: 1.6; }
 .math-fb.ok { color: #047857; }

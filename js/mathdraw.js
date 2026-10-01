@@ -636,6 +636,213 @@ function angTokens(list, total) {
   return out;
 }
 
+// ───────────────────── 📊 K 자료와 그래프 줄기: 막대·꺾은선·띠·원그래프 (2026-10-01) ─────────────────────
+// 문제 글 속 지시문으로 적는다 (🔁 열쇠·❓ 복사문·테스트가 글에서 그래프를 읽는다):
+//   [bgraph 2x5 명 사과:12 배:20 포도:? 귤:8]  막대그래프 — 눈금 한 칸 2, 이름 붙은 눈금은 5칸마다(0·10·20), 단위 명, ?는 안 그린 막대
+//   [lgraph 5 kg ~25 1월:30 2월:35 3월:?]      꺾은선그래프 — ~25: 0부터 25까지를 물결선으로 줄임, ?는 안 찍은 점
+//   [band 봄:30 여름:25 가을:35 겨울:?]          띠그래프 (백분율, 합 100 — ?는 나머지)
+//   [pie 봄:30 여름:25 가을:35 겨울:10]          원그래프
+// ★ 눈금 계산은 chartGeom 하나 — 점 찍기 위젯(화면)도 같은 자를 쓴다 (아이가 본 그림과 만지는 그림이 같은 눈금이어야 한다).
+// ★ 값은 **눈금선 위에만** — 테스트가 SVG에서 막대 높이·점 위치를 재서 값으로 되돌린다(그림이 거짓말하면 읽기를 가르칠 수 없다).
+// ★ 소수 눈금(0.1 L)은 정수로 바꿔 셈한다 (떠돌이 소수 오차 없이). 띠·원그래프는 칸마다 10% 이상(이름표가 칸 안에 들어간다).
+
+const CHART_FILLS = ['var(--chart-1, #6366f1)', 'var(--chart-2, #f59e0b)', 'var(--chart-3, #10b981)', 'var(--chart-4, #ec4899)', 'var(--chart-5, #0ea5e9)', 'var(--chart-6, #a855f7)'];
+/** 수 → 글 (소수 dec자리까지, 끝 0은 뗀다: 1.0 → 1) */
+const fmtNum = (v, dec) => String(Number(Number(v).toFixed(dec)));
+/** 수 + 단위 — 영문 단위(kg·L·cm)는 띄우고 한글 단위(명·개)는 붙인다 */
+const withUnit = (v, u) => `${v}${/^[A-Za-z]/.test(u) ? ' ' : ''}${u}`;
+
+/** "2x5" · "0.1x5" · "5" → {step, lab, dec} (lab = 이름 붙은 눈금 사이 칸 수) */
+function parseStep(t) {
+  const m = /^(\d+(?:\.\d+)?)(?:x(\d+))?$/.exec(t || '');
+  if (!m) return null;
+  const step = Number(m[1]); const lab = m[2] ? Number(m[2]) : 1;
+  if (!(step > 0) || lab < 1 || lab > 10) return null;
+  return { step, lab, dec: (m[1].split('.')[1] || '').length };
+}
+
+/**
+ * 그래프 지시문 → 자료 (못 읽거나 말이 안 되면 null). 화면의 점 찍기 위젯도 이것으로 읽는다.
+ * @param {'bgraph'|'lgraph'} kind
+ * @returns {null | {kind, step, lab, dec, unit, base, items:Array<{label:string, v:number|null}>}}
+ */
+export function parseChart(kind, arg) {
+  const t = String(arg || '').trim().split(/\s+/);
+  const st = parseStep(t[0]);
+  const unit = t[1];
+  if (!st || !unit || /[:~]/.test(unit) || /^\d/.test(unit)) return null;
+  let i = 2; let base = 0; let baseDec = 0;
+  if (kind === 'lgraph' && /^~\d+(\.\d+)?$/.test(t[2] || '')) { base = Number(t[2].slice(1)); baseDec = (t[2].split('.')[1] || '').length; i = 3; }
+  const items = t.slice(i).map((x) => { const m = /^([^:\s]+):(\d+(?:\.\d+)?|\?)$/.exec(x); return m ? { label: m[1], v: m[2] === '?' ? null : Number(m[2]), dec: m[2] === '?' ? 0 : (m[2].split('.')[1] || '').length } : null; });
+  if (items.length < 2 || items.length > 7 || items.some((x) => !x) || !items.some((x) => x.v !== null)) return null;
+  const dec = Math.max(st.dec, baseDec, ...items.map((x) => x.dec));
+  if (dec > 2) return null;
+  const S = 10 ** dec; const sc = (v) => Math.round(v * S);
+  const ss = sc(st.step); const sb = sc(base);
+  for (const x of items) if (x.v !== null && (sc(x.v) < sb || (sc(x.v) - sb) % ss !== 0)) return null; // 눈금선 위에만
+  if (sb % ss !== 0) return null; // 물결선 위 첫 눈금도 눈금 한 칸의 배수
+  return { kind, step: st.step, lab: st.lab, dec, unit, base, items: items.map(({ label, v }) => ({ label, v })) };
+}
+
+/**
+ * 📏 그래프의 자 — 막대·꺾은선 그림과 점 찍기 위젯이 같이 쓴다 (순수 함수).
+ * 칸 수는 가장 큰 값보다 한 칸 이상 위까지, 꼭대기 눈금에 이름이 붙게(lab의 배수). 16칸을 넘으면 null.
+ * 값은 S배 한 정수(소수 오차 없이) — y(sv)·cellsOf(y)·valueOfCells(k)
+ */
+export function chartGeom(spec) {
+  if (!spec) return null;
+  const S = 10 ** spec.dec; const st = Math.round(spec.step * S); const b = Math.round((spec.base || 0) * S);
+  const known = spec.items.filter((x) => x.v !== null).map((x) => Math.round(x.v * S));
+  const maxC = Math.ceil((Math.max(...known) - b) / st);
+  let cells = Math.max(4, maxC + 1);
+  cells = Math.ceil(cells / spec.lab) * spec.lab;
+  if (cells > 16) return null;
+  const n = spec.items.length;
+  const ch = Math.max(13, Math.min(26, Math.floor(220 / cells)));
+  const fmt = (k) => fmtNum((b + k * st) / S, spec.dec);
+  const ylabs = []; for (let k = 0; k <= cells; k += spec.lab) ylabs.push(k);
+  const left = Math.ceil(Math.max(...ylabs.map((k) => textW(fmt(k), 13)), textW(`(${spec.unit})`, 13) - 6) + 16);
+  const colW = Math.max(56, Math.ceil(Math.max(...spec.items.map((x) => textW(x.label, 14))) + 18));
+  const top = 34; const wave = b > 0 ? 24 : 0;
+  const y0 = top + cells * ch;
+  return {
+    S, st, b, cells, ch, lab: spec.lab, left, top, colW, wave, y0, n, fmt, ylabs,
+    W: left + n * colW + 12,
+    H: y0 + wave + 36,
+    x: (i) => left + colW * (i + 0.5),
+    /** S배 한 값 → y */
+    y: (sv) => y0 - ((sv - b) / st) * ch,
+    yOfCells: (k) => y0 - k * ch,
+    /** y → 가장 가까운 눈금 칸 (0~cells) */
+    cellsOf: (y) => Math.min(cells, Math.max(0, Math.round((y0 - y) / ch))),
+    valueOfCells: (k) => Number(fmtNum((b + k * st) / S, spec.dec)),
+  };
+}
+
+/** 그래프 틀 — 눈금선·눈금 이름·세로축·물결선·단위·가로 이름 */
+function chartFrame(G, spec) {
+  let g = '';
+  for (let k = 0; k <= G.cells; k++) {
+    const y = G.yOfCells(k); const named = k % G.lab === 0;
+    g += `<line x1="${G.left}" y1="${y}" x2="${G.W - 10}" y2="${y}" stroke="currentColor" stroke-opacity="${named ? 0.5 : 0.2}" stroke-width="1"/>`;
+    if (named) g += `<text x="${G.left - 7}" y="${y + 4.5}" font-size="13" text-anchor="end" fill="currentColor">${G.fmt(k)}</text>`;
+  }
+  g += `<text x="${G.left - 4}" y="${G.top - 14}" font-size="13" text-anchor="end" fill="currentColor">(${esc(spec.unit)})</text>`;
+  g += `<line x1="${G.left}" y1="${G.top - 8}" x2="${G.left}" y2="${G.y0 + G.wave}" stroke="currentColor" stroke-width="1.5"/>`;
+  if (G.wave) {
+    // 물결선(≈) — 0부터 첫 눈금까지 줄였다는 표시. 축을 끊고 물결 두 줄, 맨 아래에 0
+    const ya = G.y0 + 7; const x0 = G.left - 9;
+    g += `<rect x="${G.left - 3}" y="${ya - 3}" width="6" height="12" fill="var(--card, #fff)"/>`;
+    for (const dy of [0, 6]) g += `<path d="M ${x0} ${ya + dy} q 4.5 -5 9 0 t 9 0" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
+    g += `<text x="${G.left - 7}" y="${G.y0 + G.wave + 4.5}" font-size="13" text-anchor="end" fill="currentColor">0</text>`;
+  }
+  g += `<line x1="${G.left}" y1="${G.y0 + G.wave}" x2="${G.W - 10}" y2="${G.y0 + G.wave}" stroke="currentColor" stroke-width="1.5"/>`;
+  spec.items.forEach((x, i) => { g += `<text x="${G.x(i)}" y="${G.y0 + G.wave + 22}" font-size="14" text-anchor="middle" fill="currentColor">${esc(x.label)}</text>`; });
+  return g;
+}
+
+const chartAria = (name, spec) => `${name}: 눈금 한 칸 ${withUnit(fmtNum(spec.step, spec.dec), spec.unit)}${spec.base ? `, ${spec.base}부터(물결선)` : ''}, ${spec.items.map((x) => `${x.label} ${x.v === null ? '?' : x.v}`).join(', ')}`;
+
+/** 막대그래프 — `[bgraph 2x5 명 사과:12 배:20]` */
+export function bgraphSvg(spec) {
+  const G = chartGeom(spec);
+  if (!G) return '';
+  let g = chartFrame(G, spec);
+  const bw = Math.round(G.colW * 0.5);
+  spec.items.forEach((x, i) => {
+    if (x.v === null) { g += `<text x="${G.x(i)}" y="${G.y0 - 8}" font-size="17" font-weight="700" text-anchor="middle" fill="${FILL2}">?</text>`; return; }
+    const y = G.y(Math.round(x.v * G.S));
+    g += `<rect class="bar" data-i="${i}" x="${G.x(i) - bw / 2}" y="${y}" width="${bw}" height="${G.y0 - y}" fill="${FILL}" fill-opacity="0.75" stroke="currentColor" stroke-opacity="0.6" stroke-width="1"/>`;
+  });
+  return `<svg class="frac-fig chart-fig" viewBox="0 0 ${G.W} ${G.H}" width="${G.W}" height="${G.H}" role="img" aria-label="${esc(chartAria('막대그래프', spec))}">${g}</svg>`;
+}
+
+/** 꺾은선그래프 — `[lgraph 5 kg ~25 1월:30 2월:35]` (이웃한 두 점이 다 있을 때만 잇는다) */
+export function lgraphSvg(spec) {
+  const G = chartGeom(spec);
+  if (!G) return '';
+  let g = chartFrame(G, spec);
+  const pts = spec.items.map((x, i) => (x.v === null ? null : [G.x(i), G.y(Math.round(x.v * G.S))]));
+  for (let i = 0; i + 1 < pts.length; i++) if (pts[i] && pts[i + 1]) g += `<line class="seg" x1="${pts[i][0]}" y1="${pts[i][1]}" x2="${pts[i + 1][0]}" y2="${pts[i + 1][1]}" stroke="${FILL}" stroke-width="2.5"/>`;
+  pts.forEach((p, i) => {
+    if (p) g += `<circle class="pt" data-i="${i}" cx="${p[0]}" cy="${p[1]}" r="4.5" fill="${FILL}" stroke="currentColor" stroke-width="1"/>`;
+    else g += `<text x="${G.x(i)}" y="${G.y0 - 8}" font-size="17" font-weight="700" text-anchor="middle" fill="${FILL2}">?</text>`;
+  });
+  return `<svg class="frac-fig chart-fig" viewBox="0 0 ${G.W} ${G.H}" width="${G.W}" height="${G.H}" role="img" aria-label="${esc(chartAria('꺾은선그래프', spec))}">${g}</svg>`;
+}
+
+/** 띠·원그래프 지시문 → [{label, v}] — 합 100(?는 나머지, 하나까지), 칸마다 10% 이상. 아니면 null */
+export function parsePct(arg) {
+  const items = String(arg || '').trim().split(/\s+/).map((x) => { const m = /^([^:\s]+):(\d+|\?)$/.exec(x); return m ? { label: m[1], v: m[2] === '?' ? null : Number(m[2]), ask: m[2] === '?' } : null; });
+  if (items.length < 2 || items.length > 6 || items.some((x) => !x)) return null;
+  const asks = items.filter((x) => x.ask).length;
+  const sum = items.reduce((a, x) => a + (x.v || 0), 0);
+  if (asks > 1 || (asks === 0 && sum !== 100) || (asks === 1 && sum >= 100)) return null;
+  for (const x of items) if (x.ask) x.v = 100 - sum;
+  if (items.some((x) => x.v < 10)) return null;
+  return items;
+}
+
+/** 띠그래프 — 전체 400px = 100%, 10%마다 눈금 */
+export function bandSvg(items) {
+  if (!items) return '';
+  const pad = 14; const W = 400; const top = 6; const h = 44;
+  let g = ''; let x = pad;
+  items.forEach((it, i) => {
+    const w = (it.v / 100) * W;
+    g += `<rect class="seg" data-i="${i}" x="${x.toFixed(1)}" y="${top}" width="${w.toFixed(1)}" height="${h}" fill="${CHART_FILLS[i % CHART_FILLS.length]}" fill-opacity="0.35" stroke="currentColor" stroke-opacity="0.7" stroke-width="1"/>`;
+    g += `<text x="${(x + w / 2).toFixed(1)}" y="${top + 19}" font-size="13" text-anchor="middle" fill="currentColor" font-weight="700">${esc(it.label)}</text>`;
+    g += `<text x="${(x + w / 2).toFixed(1)}" y="${top + 36}" font-size="13" text-anchor="middle" fill="currentColor">${it.ask ? '?' : it.v}%</text>`;
+    x += w;
+  });
+  const yr = top + h + 6;
+  g += `<line x1="${pad}" y1="${yr}" x2="${pad + W}" y2="${yr}" stroke="currentColor" stroke-width="1"/>`;
+  for (let p = 0; p <= 100; p += 10) {
+    const tx = pad + (p / 100) * W;
+    g += `<line x1="${tx}" y1="${yr}" x2="${tx}" y2="${yr + 5}" stroke="currentColor" stroke-width="1"/>`;
+    g += `<text x="${tx}" y="${yr + 18}" font-size="11" text-anchor="middle" fill="currentColor">${p}</text>`;
+  }
+  const H = yr + 24; const Wt = W + pad * 2;
+  return `<svg class="frac-fig chart-fig" viewBox="0 0 ${Wt} ${H}" width="${Wt}" height="${H}" role="img" aria-label="${esc(`띠그래프: ${items.map((x) => `${x.label} ${x.ask ? '?' : x.v}%`).join(', ')}`)}">${g}</svg>`;
+}
+
+/** 원그래프 — 12시 방향에서 시계 방향으로, 둘레에 10%마다 눈금 */
+export function pieSvg(items) {
+  if (!items) return '';
+  // 이름 두 줄이 조각 경계선에 안 걸리게 — 반지름 100, 이름 자리는 0.62R부터 바깥쪽으로 시험해 고른다
+  // (좁은 10% 조각은 바깥이 넓다. 테스트가 경계선이 이름을 지나가는지 잰다)
+  const R = 100; const C = R + 14; const size = C * 2;
+  let g = ''; let acc = 0;
+  const at = (p, r) => { const a = (p / 100) * Math.PI * 2 - Math.PI / 2; return [C + r * Math.cos(a), C + r * Math.sin(a)]; };
+  items.forEach((it, i) => {
+    const [x0, y0] = at(acc, R); const [x1, y1] = at(acc + it.v, R);
+    const big = it.v > 50 ? 1 : 0;
+    g += `<path class="seg" data-i="${i}" d="M ${C} ${C} L ${x0.toFixed(2)} ${y0.toFixed(2)} A ${R} ${R} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z" fill="${CHART_FILLS[i % CHART_FILLS.length]}" fill-opacity="0.35" stroke="currentColor" stroke-opacity="0.7" stroke-width="1"/>`;
+    const bw = Math.max(textW(it.label, 13), textW(`${it.ask ? '?' : it.v}%`, 13)) + 2;
+    const boxAt = ([cx, cy]) => ({ x0: cx - bw / 2, x1: cx + bw / 2, y0: cy - 2 - 13 * 0.8, y1: cy + 14 + 13 * 0.2 });
+    const rays = [[[C, C], [x0, y0]], [[C, C], [x1, y1]]];
+    const fits = (B) => !rays.some((s) => segHitsBox(s, B)) && [[B.x0, B.y0], [B.x1, B.y0], [B.x0, B.y1], [B.x1, B.y1]].every(([x, y]) => Math.hypot(x - C, y - C) < R - 2);
+    const cands = [0.62, 0.68, 0.74, 0.8, 0.56].map((k) => at(acc + it.v / 2, R * k));
+    const [lx, ly] = cands.find((p) => fits(boxAt(p))) || cands[0];
+    g += `<text x="${lx.toFixed(1)}" y="${(ly - 2).toFixed(1)}" font-size="13" text-anchor="middle" fill="currentColor" font-weight="700">${esc(it.label)}</text>`;
+    g += `<text x="${lx.toFixed(1)}" y="${(ly + 14).toFixed(1)}" font-size="13" text-anchor="middle" fill="currentColor">${it.ask ? '?' : it.v}%</text>`;
+    acc += it.v;
+  });
+  for (let p = 0; p < 100; p += 10) { const [ax, ay] = at(p, R); const [bx, by] = at(p, R + 6); g += `<line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" stroke="currentColor" stroke-width="1"/>`; }
+  return `<svg class="frac-fig chart-fig" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${esc(`원그래프: ${items.map((x) => `${x.label} ${x.ask ? '?' : x.v}%`).join(', ')}`)}">${g}</svg>`;
+}
+
+/** 📊 그래프 지시문 → 글 (그림을 못 그리는 자리: ❓ 복사문·📊·🤔 노트 제목) */
+function chartText(kind, arg) {
+  if (kind === 'band' || kind === 'pie') {
+    const it = parsePct(arg);
+    return it ? `${kind === 'band' ? '띠그래프' : '원그래프'}: ${it.map((x) => `${x.label} ${x.ask ? '?' : x.v}%`).join(' · ')}` : null;
+  }
+  const sp = parseChart(kind, arg);
+  if (!sp || !chartGeom(sp)) return null;
+  return `${kind === 'bgraph' ? '막대그래프' : '꺾은선그래프'}: 눈금 한 칸 ${withUnit(fmtNum(sp.step, sp.dec), sp.unit)}${sp.base ? ` · ${sp.base}부터(물결선)` : ''} · ${sp.items.map((x) => `${x.label} ${x.v === null ? '?' : x.v}`).join(' · ')}`;
+}
+
 /** 지시문 안의 수 목록 "-3,2,-1.5" → 숫자 배열 (−(U+2212)도 받아 준다 — 글에는 진짜 마이너스를 쓰니까) */
 function nums(s) {
   return String(s || '').replace(/−/g, '-').split(/[,\s]+/).filter(Boolean).map(Number).filter((v) => Number.isFinite(v));
@@ -706,6 +913,15 @@ export function figureSvg(spec) {
     const ang = angTokens([m[1], m[2], m[3], m[4]], 360);
     return ang ? quadSvg(ang, !!m[5]) : '';
   }
+  // 📊 K 줄기 — 막대·꺾은선·띠·원그래프
+  if ((m = /^(bgraph|lgraph) (.+)$/.exec(s))) {
+    const sp = parseChart(m[1], m[2]);
+    return sp ? (m[1] === 'bgraph' ? bgraphSvg(sp) : lgraphSvg(sp)) : '';
+  }
+  if ((m = /^(band|pie) (.+)$/.exec(s))) {
+    const it = parsePct(m[2]);
+    return it ? (m[1] === 'band' ? bandSvg(it) : pieSvg(it)) : '';
+  }
   return '';
 }
 
@@ -719,7 +935,8 @@ export function figText(text, short = false) {
   return String(text || '')
     .replace(/\[table ([^\]]+)\]/g, (all, arg) => { const rows = parseTable(arg); return !rows ? all : short ? '(표)' : `(표: ${rows.map((r) => `${r.label} ${r.vals.join(', ')}`).join(' ↔ ')})`; })
     .replace(/\[steps ([\d ]+)\]/g, (_, arg) => (short ? '(블록 그림)' : `(블록 모양: ${arg.trim().split(/\s+/).map((v) => `${v}개`).join(', ')})`))
-    .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; });
+    .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
+    .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
 }
 /** 📐 각 지시문 글: "?65" → "?", "_65" → 빠짐 */
 const angText = (list) => list.map((s, i) => (s.startsWith('_') ? '' : `${VNAMES[i]} ${s.startsWith('?') ? '?' : `${s}°`}`)).filter(Boolean).join(' · ');
@@ -757,7 +974,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────

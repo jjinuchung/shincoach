@@ -22,6 +22,7 @@ import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, chalRe
 import { figureEl, inputEl } from './chalview.js';
 import { padSpec, matchTyped } from './mathpad.js';
 import { padBox, padAnswered } from './padview.js';
+import { drawBox, drawAnswered, canDraw } from './drawview.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound } from './xp.js';
 import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
@@ -1285,8 +1286,11 @@ function renderQuestion(restore = false) {
   card.appendChild(top);
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
 
+  // 🔢 수가 답인 ① 계산은 숫자판, ✍️ 그리기 문항은 점 찍기 판 (판이 그래프를 그리므로 글에서는 뺀다)
+  const spec = padFor(q);
+  const draw = drawFor(q, spec);
   const qt = el('div', 'math-qt');
-  qt.appendChild(qtNode(q.q));
+  qt.appendChild(qtNode(qTextOf(q, draw)));
   card.appendChild(qt);
   if (q.figure) card.appendChild(svgBox(q.figure));
   if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }
@@ -1304,10 +1308,9 @@ function renderQuestion(restore = false) {
   }
   if (q.hint) card.appendChild(el('p', 'math-hint', `✏️ ${q.hint}`));
 
-  // 🔢 수가 답인 ① 계산은 숫자판 — 친 답을 보기 번호로 바꿔 같은 채점 길(answer)로 보낸다
-  const spec = padFor(q);
-  const list = el('div', spec ? 'math-choices is-pad' : 'math-choices');
-  if (spec && !(restore && r.answered)) list.appendChild(padBox(spec, typedHooks(q, spec, (i, typed) => answer(i, list, card, typed))));
+  // 친 답·그린 칸 수를 보기 번호로 바꿔 같은 채점 길(answer)로 보낸다
+  const list = el('div', spec ? `math-choices is-pad${draw ? ' is-draw' : ''}` : 'math-choices');
+  if (spec && !(restore && r.answered)) list.appendChild(typedBox(q, spec, draw, (i, typed) => answer(i, list, card, typed)));
   else if (!spec) {
     q.choices.forEach((ch, i) => {
       const b = el('button', 'math-choice');
@@ -1339,6 +1342,23 @@ function padOn() {
 function padFor(q) {
   if (!padOn() || !ui.round || ui.round.mode === 'special') return null;
   return padSpec(q, (stemOf(q.concept) || S()).key);
+}
+/**
+ * ✍️ 그리기 문항(📊 K2 막대·K5 점, 문항의 `draw`)이면 숫자판 대신 점 찍기 판 — 숫자판이 켜져 있을 때만(⚙ 같은 스위치).
+ * 판이 그래프를 다시 그리므로 문제 글에서는 그 그래프를 뺀다(두 번 보이면 어느 쪽을 만지는지 헷갈린다).
+ */
+function drawFor(q, spec) {
+  return spec && q.draw && canDraw(q.draw) ? q.draw : null;
+}
+const qTextOf = (q, draw) => (draw ? String(q.q).split(`[${draw.fig}]`).join('').replace(/\n{3,}/g, '\n') : q.q); // 그래프가 있던 빈 줄 두 개는 한 줄로
+/** 숫자판/점 찍기 판 한 벌 — 같은 채점 길 */
+const typedBox = (q, spec, draw, go) => { const h = typedHooks(q, spec, go); return (draw && drawBox(draw, h)) || padBox(spec, h); };
+/** 답한 뒤 판 자리 — 숫자판은 "✍️ 내 답", 점 찍기 판은 그린 그래프 그대로 */
+function typedAnswered(list, q, text, ok) {
+  list.innerHTML = '';
+  if (!list.classList.contains('is-draw')) { list.appendChild(padAnswered(text, ok, richNode)); return; }
+  const okT = (q.choices.find((x) => x.ok) || {}).text;
+  list.appendChild(drawAnswered(q.draw, text, ok, /^\d+$/.test(String(okT)) ? Number(okT) : null));
 }
 /**
  * 숫자판의 확인·모르겠어요 → 보기 번호. 어느 보기와도 다른 값("짐작한 답")·모르겠어요는 이름표 없는 보기로 덧붙여
@@ -1670,7 +1690,7 @@ function paintAnswer(i, list, card, restoring) {
   const sense = senseOf(q);
   // 🔢 숫자판으로 쓴 답 — 숫자판 자리에 "✍️ 내 답"만 남기고, 풀이 카드의 "내 답"도 친 그대로
   const shown = a.p ? { ...ch, text: a.chosen || ch.text } : ch;
-  if (list.classList.contains('is-pad')) { list.innerHTML = ''; list.appendChild(padAnswered(shown.text, !!ch.ok, richNode)); }
+  if (list.classList.contains('is-pad')) typedAnswered(list, q, shown.text, !!ch.ok);
   if (a.pn) fb.appendChild(el('p', `math-pad-note ${ch.ok ? 'ok' : 'no'}`, a.pn)); // "약분하면 3/4" · "분수로 나타내야 해요"
   // 🎲 섞어 풀기는 답하기 전엔 개념 이름을 숨긴다("어떤 개념인지 알아내기"가 목적) — 답한 뒤에 알려 준다 (Codex 3차 #8)
   if (r.mode === 'mix') fb.appendChild(el('p', 'math-mix-concept', `📚 ${nameOf(q.concept)} 문제였어요`));
@@ -2135,12 +2155,13 @@ function renderTwin(restore = false) {
   top.appendChild(el('span', 'math-eyebrow', `🔁 비슷한 문제 · ${nameOf(q.concept)}`));
   top.appendChild(el('span', 'math-kind', '이번엔 맞혀 봐요'));
   card.appendChild(top);
-  const qt = el('div', 'math-qt'); qt.appendChild(qtNode(q.q)); card.appendChild(qt);
+  const spec = padFor(q); // 🔢 원래 문항을 숫자판으로 풀었으면 쌍둥이도 숫자판 (같은 틀이라 같은 판정) — ✍️ 그리기도 그대로
+  const draw = drawFor(q, spec);
+  const qt = el('div', 'math-qt'); qt.appendChild(qtNode(qTextOf(q, draw))); card.appendChild(qt);
   if (q.figure) card.appendChild(svgBox(q.figure));
   if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }
-  const spec = padFor(q); // 🔢 원래 문항을 숫자판으로 풀었으면 쌍둥이도 숫자판 (같은 틀이라 같은 판정)
-  const list = el('div', spec ? 'math-choices is-pad' : 'math-choices');
-  if (spec && !(restore && t.answered)) list.appendChild(padBox(spec, typedHooks(q, spec, (i, typed) => answerTwin(i, list, card, typed))));
+  const list = el('div', spec ? `math-choices is-pad${draw ? ' is-draw' : ''}` : 'math-choices');
+  if (spec && !(restore && t.answered)) list.appendChild(typedBox(q, spec, draw, (i, typed) => answerTwin(i, list, card, typed)));
   else if (!spec) {
     q.choices.forEach((ch, i) => {
       const b = el('button', 'math-choice');
@@ -2189,7 +2210,7 @@ function paintTwin(i, list, card, restoring) {
   fb.innerHTML = '';
   let scrollTo = null;
   const shown = t.typed ? { ...ch, text: t.typed.text } : ch;
-  if (list.classList.contains('is-pad')) { list.innerHTML = ''; list.appendChild(padAnswered(shown.text, !!ch.ok, richNode)); }
+  if (list.classList.contains('is-pad')) typedAnswered(list, q, shown.text, !!ch.ok);
   if (t.typed && t.typed.note) fb.appendChild(el('p', `math-pad-note ${ch.ok ? 'ok' : 'no'}`, t.typed.note));
   if (ch.ok) {
     fb.appendChild(el('p', 'math-fb ok', `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`));

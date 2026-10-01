@@ -15,6 +15,7 @@ import * as factorGen from './mathfac.js';
 import * as correspondGen from './mathcor.js';
 import * as areaGen from './matharea.js';
 import * as shapeGen from './mathshape.js';
+import * as dataGen from './mathdata.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -39,8 +40,10 @@ export const STEMS = {
   area: { key: 'area', code: 'I', label: '둘레와 넓이 줄기', range: '초5', list: areaGen.AREA, gen: areaGen, file: './coach/math/area.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (둘레부터)', intro: '둘레와 넓이 문제 5개를 먼저 풀어 볼게요. 그림을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
   // J 삼각형·사각형 — 도형 성질 칸이 없었고, I가 평행사변형·사다리꼴·마름모 이름과 포함관계를 안다고 친다 (2026-09-30 아버님 "새 줄기로 가자" → J). 초4-2 = 지금 학기, 9칸
   shape: { key: 'shape', code: 'J', label: '삼각형·사각형 줄기', range: '초4', list: shapeGen.SHAPE, gen: shapeGen, file: './coach/math/shape.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (수직과 평행부터 — 학교 4-2 도형)', intro: '삼각형·사각형 문제 5개를 먼저 풀어 볼게요. 그림을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // K 자료와 그래프 — 교과 영역 넷 중 자료와 가능성이 0칸이었다 · 지금 학기 4-2 5단원 꺾은선그래프 · 🎯 도전 문제 5단원과 그래프 그림을 같이 쓴다 (2026-10-01 아버님 "설계 가자"). 초4 → 초6 9칸
+  data: { key: 'data', code: 'K', label: '자료와 그래프 줄기', range: '초4 → 초6', list: dataGen.DATA, gen: dataGen, file: './coach/math/data.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (막대그래프부터 — 학교 4-2 꺾은선그래프)', intro: '그래프 문제 5개를 먼저 풀어 볼게요. 눈금을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
