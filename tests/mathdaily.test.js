@@ -6,6 +6,7 @@ import {
 } from '../js/mathprog.js';
 import { emptyMath, mergeMath, cloneMath } from '../js/db.js';
 import { rng } from '../js/mathgen.js';
+import { readFileSync } from 'node:fs';
 
 const T = '2026-09-21';
 const Y = '2026-09-20';
@@ -263,11 +264,14 @@ test('🍀 어쩌다 나오는 몬스터볼 luckyCatch — 아는 개념을 다�
   const m = learned(1);                                   // frac.mean을 어제 배움, 복습 차례 아님
   const practice = applyRound(m, ids[0], pass, T);
   assert.equal(practice.practice, true);
-  assert.equal(roundCatches({ mode: 'learn', result: practice, inDaily: false }), 0, '연습 편은 원래 0');
+  // ★ 화면이 실제로 넘기는 값으로 — 사다리의 아는 칸은 startRound(id, 'practice')다. 전엔 테스트가 'learn'을 넣어
+  //   luckyCatch가 'practice'를 안 받는 것을 놓쳤다 (🍀가 실제로는 한 번도 안 나옴, Codex 19차 #3)
+  assert.match(readFileSync('js/math.js', 'utf8'), /startRound\(r\.id, r\.state === 'done' \? \(r\.due \? 'review' : 'practice'\) : 'learn'\)/);
+  assert.equal(roundCatches({ mode: 'practice', result: practice, inDaily: false }), 0, '연습 편은 원래 0');
   const before = cloneMath(m);
-  assert.equal(luckyCatch(m, { mode: 'learn', result: practice, inDaily: false, roll: false, today: T }), 0, '주사위가 안 나오면 0');
+  assert.equal(luckyCatch(m, { mode: 'practice', result: practice, inDaily: false, roll: false, today: T }), 0, '주사위가 안 나오면 0');
   assert.deepEqual(m, before, '안 나오면 하루 횟수도 안 쓴다');
-  assert.equal(luckyCatch(m, { mode: 'learn', result: practice, inDaily: false, roll: true, today: T }), 1, '연습 편 통과 + 주사위 = 1');
+  assert.equal(luckyCatch(m, { mode: 'practice', result: practice, inDaily: false, roll: true, today: T }), 1, '연습 편 통과 + 주사위 = 1');
   assert.deepEqual(m.luck, { d: T, n: 1 });
 
   const r2 = learned(1);
@@ -285,7 +289,7 @@ test('🍀 어쩌다 나오는 몬스터볼 luckyCatch — 아는 개념을 다�
   const f = learned(1);
   const failed = applyRound(f, ids[0], { correct: 1, total: 4, missTags: [], qs: KINDS.map((k, i) => ({ k, ok: i ? 0 : 1 })) }, T);
   assert.equal(failed.passed, false);
-  assert.equal(luckyCatch(f, { mode: 'learn', result: failed, inDaily: false, roll: true, today: T }), 0, '못 넘기면 없음');
+  assert.equal(luckyCatch(f, { mode: 'practice', result: failed, inDaily: false, roll: true, today: T }), 0, '못 넘기면 없음');
   for (const mode of ['mix', 'notes', 'ask', 'diag', 'special']) {
     assert.equal(luckyCatch(emptyMath(), { mode, result: { passed: true, ok: 3, total: 3, fixed: true }, roll: true, today: T }), 0, `${mode}는 대상이 아니다`);
   }
@@ -293,9 +297,13 @@ test('🍀 어쩌다 나오는 몬스터볼 luckyCatch — 아는 개념을 다�
   // 하루 3번까지 — 쉬운 개념만 되풀이해 캐는 길을 막는다. 다음 날은 다시
   const c = learned(1);
   let got = 0;
-  for (let i = 0; i < 10; i++) got += luckyCatch(c, { mode: 'learn', result: applyRound(c, ids[0], pass, T), inDaily: false, roll: true, today: T });
+  for (let i = 0; i < 10; i++) got += luckyCatch(c, { mode: 'practice', result: applyRound(c, ids[0], pass, T), inDaily: false, roll: true, today: T });
   assert.equal(got, 3, '같은 날 열 번 다 나와도 3개');
-  assert.equal(luckyCatch(c, { mode: 'learn', result: applyRound(c, ids[0], pass, '2026-09-22'), inDaily: false, roll: true, today: '2026-09-22' }), 1, '다음 날은 다시');
+  assert.equal(luckyCatch(c, { mode: 'practice', result: applyRound(c, ids[0], pass, '2026-09-22'), inDaily: false, roll: true, today: '2026-09-22' }), 1, '다음 날은 다시');
+  // 💾 다시 저장은 finishRound를 다시 부른다 — 주사위는 편(r)에 붙여 한 번만 (Codex 19차 #4)
+  const src = readFileSync('js/math.js', 'utf8');
+  assert.match(src, /if \(r\.luckyRoll === undefined\) r\.luckyRoll = Math\.random\(\) < LUCKY\.chance;\s*const roll = r\.luckyRoll;/);
+  assert.doesNotMatch(src, /const roll = Math\.random\(\)/);
 });
 
 test('🍀 하루 횟수 병합 — 늦은 날짜·같은 날이면 큰 횟수 (옛 백업으로 오늘 횟수를 되돌려 더 받지 않게)', () => {
@@ -312,7 +320,7 @@ test('🍀 하루 횟수 병합 — 늦은 날짜·같은 날이면 큰 횟수 (
 test('🍀 화면 배선 — 주사위는 저장 트랜잭션 밖에서 한 번, luckyCatch 몫을 몬스터볼에 더한다', async () => {
   const { readFile } = await import('node:fs/promises');
   const src = await readFile(new URL('../js/math.js', import.meta.url), 'utf8');
-  const i = src.indexOf('const roll = Math.random() < LUCKY.chance');
+  const i = src.indexOf('r.luckyRoll = Math.random() < LUCKY.chance'); // 편(r)에 붙여 한 번만 (Codex 19차 #4)
   const j = src.indexOf('lucky = luckyCatch(s, { mode: r.mode, result, inDaily, roll, today })');
   const k = src.indexOf('catches += lucky;');
   const a = src.indexOf('addPending(s, catches);', k);

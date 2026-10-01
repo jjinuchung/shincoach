@@ -903,7 +903,9 @@ export const DATA = [
         ok: `모두 더해 자료의 수로 나눠요 — ${sum(vals)} ÷ ${n} = ${nu(mean, T.unit)}`,
         wr: [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-          { text: '가운데에 있는 값 하나가 평균이에요', tag: MIS_OK },
+          // "가운데에 있는 값 하나가 평균"은 이 자료에서 참일 때가 있었다(16% — 32·28·22·14·14의 가운데 22 = 평균, Codex 19차 #1).
+          // (가장 큰 값 + 가장 작은 값) ÷ 2는 위에서 평균과 다르게 뽑았으니 이 자료에서도 늘 틀린 말이다
+          { text: '(가장 큰 값 + 가장 작은 값) ÷ 2는 언제나 평균과 같아요', tag: MIS_OK },
           { text: `평균은 모두 더한 ${nuj(sum(vals), T.unit, '이에요', '예요')}`, tag: TAGS.sumOnly },
         ],
         steps: [`모두 더하기: ${vals.join(' + ')} = ${sum(vals)}`, `${sum(vals)} ÷ ${n} = ${mean}`],
@@ -1033,9 +1035,10 @@ export const DATA = [
       const fams = [
         { words: true, ans: LV[S1.lv], wr: adj.map((i) => ({ text: LV[i], tag: chanceTag(S1.lv, i) })),
           why: {
-            [TAGS.likelyAsCertain]: '꼭 일어나는 것만 "확실하다"예요. 일어나지 않을 수도 있으면 "~일 것 같다"예요.',
+            // 규칙으로 읽혀도 참이게 — "일어나지 않을 수도 있으면 ~일 것 같다"는 반반·~아닐 것 같다까지 덮었다 (Codex 19차 #5)
+            [TAGS.likelyAsCertain]: '꼭 일어나는 것만 "확실하다"예요. 일어나지 않을 수도 있지만 일어날 때가 훨씬 많으면 "~일 것 같다"예요.',
             [TAGS.certainAsLikely]: '다른 것이 나올 수 없으면 "확실하다"예요.',
-            [TAGS.unlikelyAsImpossible]: '절대 안 일어나는 것만 "불가능하다"예요. 조금이라도 일어날 수 있으면 "~아닐 것 같다"예요.',
+            [TAGS.unlikelyAsImpossible]: '절대 안 일어나는 것만 "불가능하다"예요. 일어날 수는 있지만 안 일어날 때가 훨씬 많으면 "~아닐 것 같다"예요.',
             [TAGS.impossibleAsUnlikely]: '나올 수 있는 것이 하나도 없으면 "불가능하다"예요.',
             [TAGS.evenAsLikely]: '일어날 것과 안 일어날 것이 같은 만큼이면 "반반이다"예요.',
             [TAGS.leanAsEven]: '두 쪽의 수가 달라요 — 많은 쪽으로 기울어요.',

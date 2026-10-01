@@ -559,6 +559,12 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답
           if (c.id === 'dat.mean') {
             const list = /: (.+)\n/.exec(q.q)[1].split(' · ').map((x) => +/ (\d+)/.exec(x)[1]);
             const mean = list.reduce((a, b) => a + b, 0) / list.length; assert.notEqual(lastNum(shown), mean, where); assert.equal(lastNum(ok), mean, where);
+            // 오답 보기는 이 자료에서도 틀린 말이어야 — "가운데에 있는 값 하나가 평균"은 16%에서 참이었다 (Codex 19차 #1)
+            assert.ok(!q.choices.some((x) => /가운데에 있는 값/.test(x.text)), where);
+            if (q.key === 'misread:mid') {
+              const mr = (Math.max(...list) + Math.min(...list)) / 2;
+              assert.notEqual(mr, mean, `${where} — "(가장 큰 값 + 가장 작은 값) ÷ 2는 언제나 평균과 같아요"가 이 자료에선 참`);
+            }
           } else if (q.key === 'misread:total') { m = /(\d+)번 기록의 평균이 (\d+)번/.exec(q.q); assert.notEqual(lastNum(shown), +m[1] * +m[2], where); assert.equal(lastNum(ok), +m[1] * +m[2], where); }
           else if (q.key === 'misread:compare') { m = /가 모둠 (\d+)명은 모두 (\d+)개, 나 모둠 (\d+)명은 모두 (\d+)개/.exec(q.q); const winner = +m[2] / +m[1] > +m[4] / +m[3] ? '가 모둠' : '나 모둠'; assert.ok(shown.includes('가 모둠') && winner === '나 모둠' && ok.endsWith(`${winner}이 더 많아요`), where); }
           else if (q.key === 'misread:likely') { assert.ok(/확실/.test(shown) && /~일 것 같다/.test(ok), where); }
@@ -910,6 +916,15 @@ test('원고도 아직 안 배운 말을 앞 칸에서 쓰지 않는다 (꺾은�
     const i = IDX[c.id];
     for (const [re, from] of RULES) if (i < from) for (const t of strings(CONTENT[c.id])) assert.doesNotMatch(t.replace(/\[[a-z]+ [^\]]+\]/g, ''), re, `${c.id} 원고: ${t.slice(0, 120)}`);
   }
+  // 가능성 말은 규칙으로 읽어도 참 — "조금이라도 일어날 수 있으면 ~아닐 것 같다"는 9:1 빨강(~일 것 같다)까지 덮었다 (Codex 19차 #5)
+  const chanceTexts = [...strings(CONTENT['dat.chance'])];
+  for (let s = 1; s <= 300; s++) for (const kind of ['calc', 'misread']) { const q = makeQuestion('dat.chance', kind, s * 53, OPTS); chanceTexts.push(q.solve.whyAny, ...Object.values(q.solve.why)); }
+  for (const t of chanceTexts) {
+    assert.doesNotMatch(String(t), /조금이라도 일어날 수 있으면[^.]*아닐 것 같다/, `dat.chance: ${t}`);
+    assert.doesNotMatch(String(t), /일어나지 않을 수도 있으면[^.]*일 것 같다/, `dat.chance: ${t}`);
+  }
+  // 아빠 카드의 셈은 집에서 정말 되는 값으로 — 10개씩 던지기에 12개가 필요한 예(Codex 19차 #6)는 "못 올리는 이유"로만
+  assert.match(CONTENT['dat.meanuse'].dad.do, /3·4·5개\(평균 4, 합계 12\)면 4판의 합계가 5 × 4 = 20이라 다음 판에 8개/);
   // 이야기에 가족을 지어내지 않는다 (진우에게는 동생이 없다)
   assert.doesNotMatch(strings(CONTENT).join(' '), /동생|누나|언니|오빠|형이|형은|형의/);
 });

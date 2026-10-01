@@ -317,7 +317,9 @@ export function applyRound(m, id, r, today) {
   }
   if (passed) rec.passes = (rec.passes || 0) + 1; else rec.fails = (rec.fails || 0) + 1;
   rec.lastAt = Date.now();
-  delete rec.placed;
+  // 📏 진단 표시는 일정이 바뀌는 확인(복습)에서만 지운다 — 연습으로 지우면 진단의 box 1이 그대로 🐣가 되어
+  // 진단한 날 연습을 0/2로 틀려도 "안다"가 됐다 (Codex 19차 #2). 확인에서 틀리면 box 0 → 🥚로 돌아간다
+  if (review) delete rec.placed;
   for (const q of (r.qs || [])) recordQ(rec, q, today);
   m.concepts[id] = rec;
   for (const t of (r.missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
@@ -597,7 +599,8 @@ export const LUCKY = { chance: 0.2, max: 3 };
  */
 export function luckyCatch(m, { mode, result, inDaily, roll, today }) {
   if (!roll || !today) return 0;
-  if (mode !== 'learn' && mode !== 'review') return 0;
+  // 사다리에서 아는 칸을 다시 푸는 길은 'practice'다 — 빠져 있어서 🍀가 실제로는 한 번도 안 나왔다 (Codex 19차 #3)
+  if (mode !== 'learn' && mode !== 'review' && mode !== 'practice') return 0;
   if (!result || !result.passed) return 0;
   if (roundCatches({ mode, result, inDaily }) > 0) return 0; // 처음 통과·☀️ 안 통과는 이미 1개
   const used = m.luck && m.luck.d === today ? Number(m.luck.n) || 0 : 0;

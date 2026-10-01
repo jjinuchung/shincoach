@@ -2290,7 +2290,9 @@ async function finishRound() {
       });
     } else {
       const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
-      const roll = Math.random() < LUCKY.chance; // 🍀 트랜잭션 밖에서 한 번만 굴린다 — 저장을 다시 눌러도 같은 값
+      // 🍀 트랜잭션 밖에서 편마다 한 번만 굴린다 — 편(r)에 붙여 두어 💾 다시 저장(finishRound를 다시 부름)도 같은 값 (Codex 19차 #4)
+      if (r.luckyRoll === undefined) r.luckyRoll = Math.random() < LUCKY.chance;
+      const roll = r.luckyRoll;
       state = await updateMath((s) => {
         result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today);
         if (lastOfDaily) daily = markDaily(s, today);

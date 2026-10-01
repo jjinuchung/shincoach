@@ -8,6 +8,7 @@ import {
   applyRound, applyPlacement, ladderOf, dailyPlan, mathSummary, mathReportText, stageOf, LEARNING_MAX, REVIEW_MIN, widenRound, STEMS, STEM_ORDER,
 } from '../js/mathprog.js';
 import { emptyMath, cloneMath } from '../js/db.js';
+import { addDays } from '../js/review.js';
 
 const T = '2026-10-01';
 const T1 = '2026-10-02';
@@ -50,6 +51,14 @@ test('📏 진단으로 친 칸: 확인 전은 placed(🥚 2칸에 안 셈), 며
   assert.equal(rows.filter((r) => r.stage === 'placed').length, knownIds.length);
   assert.ok(rows.filter((r) => r.stage === 'placed').every((r) => r.icon === '📏'), '진단 칸은 🐣가 아니라 📏');
   assert.ok(rows.some((r) => r.state === 'now'), '진단 칸이 여럿이어도 새 칸은 안 잠긴다');
+  // 진단한 날·확인 차례 전에 연습해도 📏 그대로 — 틀려도 🐣가 되던 것 (Codex 19차 #2)
+  for (const [r, day] of [[fail, T], [pass, T], [pass, addDays(T, 1)]]) {
+    const p = cloneMath(m);
+    const res = applyRound(p, knownIds[0], r, day);
+    assert.equal(res.practice, true);
+    assert.equal(res.known, false, `연습(${r.correct}/${r.total}, ${day})으로는 안다가 되지 않는다`);
+    assert.equal(stageOf(p.concepts[knownIds[0]]), 'placed');
+  }
   const due = m.concepts[knownIds[0]].dueAt;
   const ok = cloneMath(m);
   assert.equal(applyRound(ok, knownIds[0], pass, due).known, true);
