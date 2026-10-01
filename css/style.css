@@ -511,6 +511,9 @@ button { font-family: inherit; }
 .math-draw-nudge { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .math-draw-step { min-width: 136px; padding: 12px 14px; font-size: 1.05rem; font-weight: 800; }
 .math-draw-right { margin: 6px 0 0; font-weight: 700; color: #047857; }
+/* 🪞 모눈 판 — ◀ ▲ ▼ ▶ 네 개가 한 줄에 */
+.math-draw-nudge.is-grid .math-draw-step { min-width: 64px; padding: 10px 12px; font-size: 1.3rem; }
+.math-draw.is-grid .math-draw-say { font-size: 1.1rem; }
 .math-draw.is-answered .math-pad-answered { margin-top: 4px; }
 .math-feedback { margin-top: 12px; }
 .math-fb { font-size: 1.05rem; font-weight: 700; margin: 4px 0 6px; line-height: 1.6; }

@@ -1340,9 +1340,10 @@ function renderQuestion(restore = false) {
   if (q.hint) card.appendChild(el('p', 'math-hint', `✏️ ${q.hint}`));
 
   // 친 답·그린 칸 수를 보기 번호로 바꿔 같은 채점 길(answer)로 보낸다
-  const list = el('div', spec ? `math-choices is-pad${draw ? ' is-draw' : ''}` : 'math-choices');
-  if (spec && !(restore && r.answered)) list.appendChild(typedBox(q, spec, draw, (i, typed) => answer(i, list, card, typed)));
-  else if (!spec) {
+  const typedOn = spec || draw; // 🪞 모눈 판은 숫자판 없이도 판
+  const list = el('div', typedOn ? `math-choices is-pad${draw ? ' is-draw' : ''}` : 'math-choices');
+  if (typedOn && !(restore && r.answered)) list.appendChild(typedBox(q, spec, draw, (i, typed) => answer(i, list, card, typed)));
+  else if (!typedOn) {
     q.choices.forEach((ch, i) => {
       const b = el('button', 'math-choice');
       b.type = 'button';
@@ -1379,9 +1380,16 @@ function padFor(q) {
  * 판이 그래프를 다시 그리므로 문제 글에서는 그 그래프를 뺀다(두 번 보이면 어느 쪽을 만지는지 헷갈린다).
  */
 function drawFor(q, spec) {
+  // 🪞 M 완성하기(모눈 판)는 답이 ㉠~㉣라 숫자판(spec)이 없다 — 같은 ⚙ 스위치·💎 스페셜 제외만 따른다
+  if (q.draw && q.draw.mode === 'grid') return padOn() && ui.round && ui.round.mode !== 'special' && canDraw(q.draw) ? q.draw : null;
   return spec && q.draw && canDraw(q.draw) ? q.draw : null;
 }
-const qTextOf = (q, draw) => (draw ? String(q.q).split(`[${draw.fig}]`).join('').replace(/\n{3,}/g, '\n') : q.q); // 그래프가 있던 빈 줄 두 개는 한 줄로
+const qTextOf = (q, draw) => {
+  if (!draw) return q.q;
+  // 🪞 모눈 판: 후보 점 ㉠~㉣가 있는 그림을 빼고(판이 반쪽만 다시 그린다) "어느 것일까요?" → "어디일까요?"
+  if (draw.mode === 'grid') return String(q.q).replace(/\[sym [^\]]+\]/g, (d) => (d.startsWith(`[${draw.fig} `) ? '' : d)).replace('어느 것일까요?', '어디일까요?').replace(/\n{3,}/g, '\n').trim();
+  return String(q.q).split(`[${draw.fig}]`).join('').replace(/\n{3,}/g, '\n'); // 그래프가 있던 빈 줄 두 개는 한 줄로
+};
 /** 숫자판/점 찍기 판 한 벌 — 같은 채점 길 */
 const typedBox = (q, spec, draw, go) => { const h = typedHooks(q, spec, go); return (draw && drawBox(draw, h)) || padBox(spec, h); };
 /** 답한 뒤 판 자리 — 숫자판은 "✍️ 내 답", 점 찍기 판은 그린 그래프 그대로 */
@@ -1399,7 +1407,8 @@ function typedHooks(q, spec, go) {
   const extra = (text, flag) => { q.choices.push({ text, ok: false, [flag]: true }); return q.choices.length - 1; };
   return {
     onSubmit: (typed) => {
-      const res = matchTyped(q, typed, spec);
+      // 🪞 모눈 판은 찍은 자리가 곧 보기 글자(후보 점 ㉡) — 어느 후보와도 다르면 "(8, 4)"라 짐작으로 간다
+      const res = spec ? matchTyped(q, typed, spec) : { i: q.choices.findIndex((c) => c.text === typed.text) };
       // 값은 맞는데 꼴·약분만 틀린 답은 "짐작"이 아니다 — 틀림은 그대로, 기록은 pf(꼴/약분)로 (Codex 18차 #4)
       const miss = res.i < 0 && (res.reason === 'form' || res.reason === 'reduce') ? res.reason : null;
       const i = res.i >= 0 ? res.i : extra(typed.text, miss ? 'formMiss' : 'guess');
@@ -2072,7 +2081,9 @@ function solveCard(q, ch) {
   const card = el('div', 'math-solve');
   const okCh = q.choices.find((x) => x.ok) || { text: '' };
   const head = el('div', 'math-solve-head');
-  if (!ch.ok) { const mine = el('span', 'mine'); mine.appendChild(document.createTextNode('❌ 내 답: ')); mine.appendChild(richNode(ch.text)); head.appendChild(mine); }
+  // 🪞 모눈 판에 후보가 아닌 자리를 찍으면 기록은 "(6, 2)"지만 아이에게 좌표는 낯설다 — 판 위의 빨간 점을 가리킨다
+  const mineText = q.draw && q.draw.mode === 'grid' && /^\(\d+, \d+\)$/.test(String(ch.text)) ? '빨간 점 자리' : ch.text;
+  if (!ch.ok) { const mine = el('span', 'mine'); mine.appendChild(document.createTextNode('❌ 내 답: ')); mine.appendChild(richNode(mineText)); head.appendChild(mine); }
   const ans = el('span', 'ans'); ans.appendChild(document.createTextNode('✔ 정답: ')); ans.appendChild(richNode(okCh.text)); head.appendChild(ans);
   card.appendChild(head);
   const s = q.solve;
@@ -2191,9 +2202,10 @@ function renderTwin(restore = false) {
   const qt = el('div', 'math-qt'); qt.appendChild(qtNode(qTextOf(q, draw))); card.appendChild(qt);
   if (q.figure) card.appendChild(svgBox(q.figure));
   if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }
-  const list = el('div', spec ? `math-choices is-pad${draw ? ' is-draw' : ''}` : 'math-choices');
-  if (spec && !(restore && t.answered)) list.appendChild(typedBox(q, spec, draw, (i, typed) => answerTwin(i, list, card, typed)));
-  else if (!spec) {
+  const typedOn = spec || draw;
+  const list = el('div', typedOn ? `math-choices is-pad${draw ? ' is-draw' : ''}` : 'math-choices');
+  if (typedOn && !(restore && t.answered)) list.appendChild(typedBox(q, spec, draw, (i, typed) => answerTwin(i, list, card, typed)));
+  else if (!typedOn) {
     q.choices.forEach((ch, i) => {
       const b = el('button', 'math-choice');
       b.type = 'button';

@@ -37,6 +37,8 @@ export function askContext(q, a) {
     // 🔢 숫자판으로 쓴 답은 보기에 없는 수일 수 있다 — 화면이 덧붙인 "짐작한 답"·"모르겠어요"는 보기 목록에서 뺀다
     choices: (q && q.choices || []).filter((c) => c && !c.guess && !c.idk && !c.formMiss).map((c) => String(c.text || '')), seen,
     ...(a && a.p ? { pad: 1 } : {}),
+    // 🪞 모눈 판에 찍은 답 — 보기는 아이가 못 본 후보 점이고, 후보가 아닌 자리는 "(6, 2)"로 온다
+    ...(a && a.p && q && q.draw && q.draw.mode === 'grid' ? { grid: 1 } : {}),
   };
 }
 
@@ -184,12 +186,12 @@ export function askSummary(m) {
  */
 export function asksText(m, today) {
   const open = openAsks(m);
-  const lines = [`❓ 진우의 수학 질문 ${open.length}개 (${today}) — 답은 \`💬번호\`로 시작하는 줄 뒤에 써 주세요. 여러 줄 가능, 그림은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] [bgraph 2x5 명 사과:12 배:6] [lgraph 1x5 kg ~25 1월:26 2월:28] [pie 봄:30 여름:25 가을:45] [range 10..20 13● 17○] 처럼.`, '아이 눈높이(초4)로, 답을 바로 말하지 말고 왜 그런지부터. 아빠 이름으로 나갑니다.', ''];
+  const lines = [`❓ 진우의 수학 질문 ${open.length}개 (${today}) — 답은 \`💬번호\`로 시작하는 줄 뒤에 써 주세요. 여러 줄 가능, 그림은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] [bgraph 2x5 명 사과:12 배:6] [lgraph 1x5 kg ~25 1월:26 2월:28] [pie 봄:30 여름:25 가을:45] [range 10..20 13● 17○] [sym x=5 ㄱ:5,4 ㄴ:2,2 ㄷ:5,0 ㄹ:8,2] 처럼.`, '아이 눈높이(초4)로, 답을 바로 말하지 말고 왜 그런지부터. 아빠 이름으로 나갑니다.', ''];
   for (const a of open) {
     lines.push(`❓${a.no} ${nameOf(a.concept)} · ${KIND_SHORT[a.k] || a.k} · ${a.d}`);
     lines.push(`문제: ${a.q}`);
     if (a.expr) lines.push(`식: ${a.expr}`);
-    lines.push(`진우 답: ${a.my || '(없음)'}${a.pad ? ' (✍️ 직접 씀)' : ''} ❌${a.tag ? ` (오개념: ${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · 진우: ${WHY_LABEL[a.w]}` : ''}`);
+    lines.push(`진우 답: ${a.my || '(없음)'}${a.grid ? ' (✍️ 모눈에 직접 찍음 — 보기의 ㉠~㉣는 진우가 못 본 후보 점)' : a.pad ? ' (✍️ 직접 씀)' : ''} ❌${a.tag ? ` (오개념: ${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · 진우: ${WHY_LABEL[a.w]}` : ''}`);
     lines.push(`정답: ${a.ans}`);
     if (Array.isArray(a.choices) && a.choices.length) lines.push(`보기: ${a.choices.map((c, i) => `${['①', '②', '③', '④'][i] || i + 1} ${c}${c === a.ans ? ' ✔' : c === a.my ? ' ❌' : ''}`).join(' · ')}`);
     if (a.seen) lines.push(`앱이 이미 보여 준 설명: ${a.seen}`);

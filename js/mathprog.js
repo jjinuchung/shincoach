@@ -17,6 +17,7 @@ import * as areaGen from './matharea.js';
 import * as shapeGen from './mathshape.js';
 import * as dataGen from './mathdata.js';
 import * as rangeGen from './mathrange.js';
+import * as symGen from './mathsym.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -45,8 +46,10 @@ export const STEMS = {
   data: { key: 'data', code: 'K', label: '자료와 그래프 줄기', range: '초4 → 초6', list: dataGen.DATA, gen: dataGen, file: './coach/math/data.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (막대그래프부터 — 학교 4-2 꺾은선그래프)', intro: '그래프 문제 5개를 먼저 풀어 볼게요. 눈금을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
   // L 수의 범위와 어림하기 — 4-2(지금 학기)·5-1(다음 학기) 단원은 줄기가 다 있고 5-2 1단원이 처음 빈 자리 · 경계 수 넣기/빼기·자리·5·두 번 반올림처럼 오개념이 뚜렷하다 (2026-10-01 아버님 "L로 가자"). 초5 9칸
   range: { key: 'range', code: 'L', label: '수의 범위와 어림하기 줄기', range: '초5', list: rangeGen.RANGE, gen: rangeGen, file: './coach/math/range.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (이상과 이하부터 — 학교 5-2 첫 단원)', intro: '수의 범위와 어림 문제 5개를 먼저 풀어 볼게요. 수직선을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // M 합동과 대칭 — 5-2에서 L 다음으로 빈 단원 · J의 모눈 도형을 그대로 쓰고 완성하기는 ✍️ 모눈 판에 직접 찍는다 (2026-10-01 아버님 "합동과 대칭 → 원의 넓이 → 직육면체·부피·겉넓이"). 초5 9칸
+  sym: { key: 'sym', code: 'M', label: '합동과 대칭 줄기', range: '초5', list: symGen.SYM, gen: symGen, file: './coach/math/sym.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (도형의 합동부터 — 학교 5-2 3단원)', intro: '합동과 대칭 문제 5개를 먼저 풀어 볼게요. 모눈 그림을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
