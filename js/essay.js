@@ -120,7 +120,7 @@ export function pickPrompts(records, count = DEFAULT_COUNT, opts = {}) {
     if (!frame) continue;
     cands.push({ rec: r, frame, score: scoreFrame(r, frame) });
   }
-  // 💖 내 문장(아이가 고른 것)이 먼저 — 고른 문장으로 내 이야기를 쓰는 게 제일 쓰고 싶다 (2026-10-02)
+  // 💖 내 문장(아이가 고른 것)이 먼저 — 고른 문장으로 내 이야기를 쓰는 게 제일 쓰고 싶다 (2026-10-01)
   cands.sort((a, b) => ((b.rec.fav ? 1 : 0) - (a.rec.fav ? 1 : 0)) || (b.score - a.score) || ((b.rec.lastAt || 0) - (a.rec.lastAt || 0)));
   return cands.slice(0, count).map(({ rec, frame }) => ({ rec, frame, cue: null }));
 }

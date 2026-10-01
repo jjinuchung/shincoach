@@ -139,6 +139,57 @@ export function compareLineSvg(mine, ok) {
   return lineSvg(lo, hi, { marks: [{ v: mine, fill: 'var(--no, #dc2626)', label: '내 답' }, { v: ok, fill: 'var(--ok, #16a34a)', label: '정답' }] });
 }
 
+// ───────────────────── 🔢 L 수의 범위: ●/○ 수직선 (2026-10-01) ─────────────────────
+// `[range 10..20 13● 17○]` — 13 이상 17 미만 (사이를 칠함) · `[range 120..150x5 130●>]` — 130 이상 (오른쪽으로 끝까지)
+// · `[range 10..20 <17○]` — 17 미만. ● = 그 수가 들어감(이상·이하), ○ = 안 들어감(초과·미만). 눈금은 step마다 하나, 4~14칸.
+
+/** `[range …]` 인자 → { lo, hi, step, marks: [{v, closed, dir}] } (말이 안 되면 null) */
+export function parseRange(arg) {
+  const m = /^(\d+)\.\.(\d+)(?:x(\d+))? ((?:<?\d+[●○]>?\s*){1,2})$/.exec(String(arg || '').trim());
+  if (!m) return null;
+  const lo = +m[1]; const hi = +m[2]; const step = m[3] ? +m[3] : 1;
+  const n = (hi - lo) / step;
+  if (!(hi > lo) || !Number.isInteger(n) || n < 4 || n > 14) return null;
+  const marks = m[4].trim().split(/\s+/).map((t) => { const q = /^(<?)(\d+)([●○])(>?)$/.exec(t); return q ? { v: +q[2], closed: q[3] === '●', dir: q[1] ? '<' : q[4] ? '>' : '' } : null; });
+  if (marks.some((k) => !k || k.v <= lo || k.v >= hi || (k.v - lo) % step)) return null;
+  if (marks.length === 1 && !marks[0].dir) return null;                                   // 점 하나면 어느 쪽인지 있어야
+  if (marks.length === 2 && (marks[0].dir || marks[1].dir || marks[0].v >= marks[1].v)) return null; // 둘이면 작은 수부터, 방향 없이
+  return { lo, hi, step, marks };
+}
+/** ●/○ 수직선 SVG — 칠한 범위는 두 점 사이, 또는 점에서 한쪽 끝(화살표)까지 */
+export function rangeSvg(spec) {
+  const { lo, hi, step, marks } = spec;
+  const n = (hi - lo) / step;
+  const TW = Math.min(30, Math.floor(340 / n)); const pad = 24;
+  const len = n * TW; const W = len + pad * 2; const H = 58; const y = 26;
+  const pos = (v) => pad + ((v - lo) / step) * TW;
+  let g = `<line x1="${pad - 12}" y1="${y}" x2="${pad + len + 12}" y2="${y}" stroke="${LINE_STROKE}" stroke-width="1.5"/>`;
+  g += `<path d="M ${pad + len + 12} ${y} l -6 -4 v 8 z" fill="currentColor"/>`;
+  for (let k = 0; k <= n; k++) {
+    const v = lo + k * step;
+    g += `<line x1="${pos(v)}" y1="${y - 5}" x2="${pos(v)}" y2="${y + 5}" stroke="${LINE_STROKE}" stroke-width="1.2"/>`;
+    g += `<text class="range-tick" x="${pos(v)}" y="${y + 22}" font-size="12" text-anchor="middle" fill="currentColor">${v}</text>`;
+  }
+  // 칠한 범위 — 점 둘이면 그 사이, 하나면 그 점에서 끝까지(화살표 쪽 끝을 넘겨 "계속"으로)
+  const [a, b] = marks;
+  const x1 = b ? pos(a.v) : a.dir === '<' ? pad - 12 : pos(a.v);
+  const x2 = b ? pos(b.v) : a.dir === '<' ? pos(a.v) : pad + len + 12;
+  g += `<line class="range-span" x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${FILL}" stroke-width="6" stroke-linecap="round" opacity="0.85"/>`;
+  if (!b) g += a.dir === '<' ? `<path d="M ${pad - 16} ${y} l 8 -6 v 12 z" fill="${FILL}"/>` : `<path d="M ${pad + len + 16} ${y} l -8 -6 v 12 z" fill="${FILL}"/>`;
+  for (const k of marks) {
+    g += `<circle class="range-dot ${k.closed ? 'closed' : 'open'}" data-v="${k.v}" cx="${pos(k.v)}" cy="${y}" r="7" fill="${k.closed ? FILL : '#fff'}" stroke="${FILL}" stroke-width="2.5"/>`;
+  }
+  // 보이는 크기는 1.3배 — 그린 크기(200~390px)면 태블릿에서 눈금 글자 12px·점 지름 14px로 작다 (헤드리스 800px).
+  // 📊 K처럼 CSS로 400px에 맞추면 칸이 적은 수직선(5칸 198px)만 두 배가 되어 그림마다 글자 크기가 달라진다. 폭이 좁으면 max-width로 줄어든다
+  return `<svg class="frac-fig range-fig" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.3)}" height="${Math.round(H * 1.3)}" role="img" aria-label="${rangeText(spec)}">${g}</svg>`;
+}
+/** ●/○ 수직선을 글로 — 이상·초과 같은 말은 쓰지 않는다(그걸 읽는 게 문제다) */
+export function rangeText(spec) {
+  const pts = spec.marks.map((k) => `${k.v}에 ${k.closed ? '●' : '○'}`).join(', ');
+  const span = spec.marks.length === 2 ? '사이를 칠함' : spec.marks[0].dir === '<' ? '왼쪽으로 칠함' : '오른쪽으로 칠함';
+  return `수직선 ${spec.lo}~${spec.hi}: ${pts} — ${span}`;
+}
+
 /**
  * 걷기 — start에서 delta만큼 걸어 도착. 덧셈을 "수직선에서 걷기"로 보여 준다 (음수 덧셈·뺄셈의 핵심 그림).
  * 범위는 0·출발·도착을 모두 품고 양쪽 한 칸 여유. 출발은 속 빈 점, 도착은 칠한 점, 사이는 굽은 화살표.
@@ -886,6 +937,7 @@ export function figureSvg(spec) {
   }
   if ((m = /^(line|vline) (-?\d+)\.\.(-?\d+)(?: @([-\d.,\s]+))?$/.exec(s))) return lineSvg(+m[2], +m[3], { dots: nums(m[4]), vertical: m[1] === 'vline' });
   if ((m = /^walk (-?\d+) ([-+]?\d+)$/.exec(s))) return walkSvg(+m[1], +m[2]);
+  if ((m = /^range (.+)$/.exec(s))) { const sp = parseRange(m[1]); return sp ? rangeSvg(sp) : ''; } // 🔢 L 수의 범위
   if ((m = /^steps ((?:\d+\s*){2,5})$/.exec(s))) return stepsSvg(m[1].trim().split(/\s+/).map(Number));
   if ((m = /^table (.+)$/.exec(s))) { const rows = parseTable(m[1]); return rows ? tableSvg(rows) : ''; }
   // 🔺 도형 — 끝에 단위(cm·m)를 붙일 수 있다. 수는 1~40, 모양이 말이 안 되면(밑변보다 큰 밀림 등) 빈 글자
@@ -955,6 +1007,7 @@ export function figText(text, short = false) {
   return String(text || '')
     .replace(/\[table ([^\]]+)\]/g, (all, arg) => { const rows = parseTable(arg); return !rows ? all : short ? '(표)' : `(표: ${rows.map((r) => `${r.label} ${r.vals.join(', ')}`).join(' ↔ ')})`; })
     .replace(/\[steps ([\d ]+)\]/g, (_, arg) => (short ? '(블록 그림)' : `(블록 모양: ${arg.trim().split(/\s+/).map((v) => `${v}개`).join(', ')})`))
+    .replace(/\[range ([^\]]+)\]/g, (all, arg) => { const sp = parseRange(arg); return !sp ? all : short ? '(수직선)' : `(${rangeText(sp)})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
 }
@@ -994,7 +1047,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────

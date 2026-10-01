@@ -241,7 +241,7 @@ export function statFor(cue) {
 }
 
 /**
- * 💖 내 문장 고르기/빼기 (2026-10-02). 켜고 끄는 값이라 백업 병합은 나중에 누른 쪽(favAt)을 한 쌍으로 가져온다 (db.mergeStatRecord).
+ * 💖 내 문장 고르기/빼기 (2026-10-01). 켜고 끄는 값이라 백업 병합은 나중에 누른 쪽(favAt)을 한 쌍으로 가져온다 (db.mergeStatRecord).
  * @returns {boolean} 바꾼 뒤 값
  */
 export function setFav(cue, on) {

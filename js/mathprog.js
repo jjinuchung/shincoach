@@ -16,6 +16,7 @@ import * as correspondGen from './mathcor.js';
 import * as areaGen from './matharea.js';
 import * as shapeGen from './mathshape.js';
 import * as dataGen from './mathdata.js';
+import * as rangeGen from './mathrange.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -42,8 +43,10 @@ export const STEMS = {
   shape: { key: 'shape', code: 'J', label: '삼각형·사각형 줄기', range: '초4', list: shapeGen.SHAPE, gen: shapeGen, file: './coach/math/shape.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (수직과 평행부터 — 학교 4-2 도형)', intro: '삼각형·사각형 문제 5개를 먼저 풀어 볼게요. 그림을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
   // K 자료와 그래프 — 교과 영역 넷 중 자료와 가능성이 0칸이었다 · 지금 학기 4-2 5단원 꺾은선그래프 · 🎯 도전 문제 5단원과 그래프 그림을 같이 쓴다 (2026-10-01 아버님 "설계 가자"). 초4 → 초6 9칸
   data: { key: 'data', code: 'K', label: '자료와 그래프 줄기', range: '초4 → 초6', list: dataGen.DATA, gen: dataGen, file: './coach/math/data.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (막대그래프부터 — 학교 4-2 꺾은선그래프)', intro: '그래프 문제 5개를 먼저 풀어 볼게요. 눈금을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // L 수의 범위와 어림하기 — 4-2(지금 학기)·5-1(다음 학기) 단원은 줄기가 다 있고 5-2 1단원이 처음 빈 자리 · 경계 수 넣기/빼기·자리·5·두 번 반올림처럼 오개념이 뚜렷하다 (2026-10-01 아버님 "L로 가자"). 초5 9칸
+  range: { key: 'range', code: 'L', label: '수의 범위와 어림하기 줄기', range: '초5', list: rangeGen.RANGE, gen: rangeGen, file: './coach/math/range.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (이상과 이하부터 — 학교 5-2 첫 단원)', intro: '수의 범위와 어림 문제 5개를 먼저 풀어 볼게요. 수직선을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
@@ -153,7 +156,7 @@ export function ladderOf(m, today, stem = 'fraction') {
   });
 }
 
-// ── ③ 복습 보상 안내 (2026-10-02, 아버님 "전부 진행") ──
+// ── ③ 복습 보상 안내 (2026-10-01, 아버님 "전부 진행") ──
 // 🔷 수학스톤은 배운 날 첫 통과와 **확인 차례(dueAt)의 통과**에서만 나온다(stoneReward). 차례가 아닌 날 다시 풀면 연습이라
 // ⚡💰뿐인데 아이 화면엔 그게 안 보여 "왜 이번엔 🔷가 없지?"가 된다 — 사다리 칸·연습 첫 화면·잠긴 날에 미리 말한다.
 /** 날 수 → "내일" / "N일 뒤" */

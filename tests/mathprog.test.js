@@ -15,6 +15,7 @@ import { CORRESPOND } from '../js/mathcor.js';
 import { AREA } from '../js/matharea.js';
 import { SHAPE } from '../js/mathshape.js';
 import { DATA } from '../js/mathdata.js';
+import { RANGE } from '../js/mathrange.js';
 import { GRADUATED } from '../js/review.js';
 
 const T = '2026-09-20';
@@ -148,11 +149,11 @@ test('요약: 배운 수·👑 수·헷갈리는 오개념', () => {
   applyRound(m, 'frac.mean', { correct: 2, total: 4, missTags: ['분모끼리 더함', '분모끼리 더함'] }, T);
   applyRound(m, 'frac.mean', { correct: 4, total: 4, missTags: [] }, T);
   const s = mathSummary(m);
-  // 줄기가 열(분수·혼합계산·소수·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프)이 되면서 total은 열 줄기의 합, 줄기별은 stems에
-  assert.equal(s.total, FRACTION.length + MIXED.length + DECIMAL.length + 9 + RATIO.length + FACTOR.length + CORRESPOND.length + AREA.length + SHAPE.length + DATA.length);
+  // 줄기가 열하나(분수·혼합계산·소수·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기)가 되면서 total은 열한 줄기의 합, 줄기별은 stems에
+  assert.equal(s.total, FRACTION.length + MIXED.length + DECIMAL.length + 9 + RATIO.length + FACTOR.length + CORRESPOND.length + AREA.length + SHAPE.length + DATA.length + RANGE.length);
   assert.equal(s.done, 1);
   assert.equal(s.crowned, 0);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.total, x.done]), [['fraction', FRACTION.length, 1], ['mixed', MIXED.length, 0], ['decimal', DECIMAL.length, 0], ['negative', 9, 0], ['ratio', RATIO.length, 0], ['factor', FACTOR.length, 0], ['correspond', CORRESPOND.length, 0], ['area', AREA.length, 0], ['shape', SHAPE.length, 0], ['data', DATA.length, 0]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.total, x.done]), [['fraction', FRACTION.length, 1], ['mixed', MIXED.length, 0], ['decimal', DECIMAL.length, 0], ['negative', 9, 0], ['ratio', RATIO.length, 0], ['factor', FACTOR.length, 0], ['correspond', CORRESPOND.length, 0], ['area', AREA.length, 0], ['shape', SHAPE.length, 0], ['data', DATA.length, 0], ['range', RANGE.length, 0]]);
   assert.deepEqual(s.miss[0], { tag: '분모끼리 더함', n: 2 });
   assert.equal(nameOf('frac.add'), '분모가 다른 분수의 덧셈·뺄셈');
   assert.equal(nameOf('zzz'), 'zzz');

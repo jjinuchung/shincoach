@@ -1,0 +1,982 @@
+<title>수의 범위와 어림 검수</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에 개념 바로가기, 개념마다 [배움 + 문제 예시 | 아빠 카드] 두 칸 (폰에서는 한 칸) — 혼합계산 검수 페이지와 같은 체계 */
+:root{
+  --bg:#f5f7ff; --card:#ffffff; --ink:#1f2340; --muted:#6b7280; --line:#e3e6f3;
+  --primary:#4f46e5; --primary-soft:#eef2ff; --accent:#f59e0b; --accent-soft:#fff7ed;
+  --ok:#0f9f6e; --ok-soft:#ecfdf5; --no-soft:#f8f9fc;
+  --dad:#fff8ec; --dad-line:#f3c27a; --dad-ink:#7c4a03;
+  --frac-fill:#4f46e5; --frac-fill2:#f59e0b; --frac-empty:#ffffff;
+  --font-display:"Gowun Dodum","Noto Sans KR",sans-serif;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  --frac-fill:#9b9cf8; --frac-fill2:#fbbf24; --frac-empty:#1d2040;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  --frac-fill:#9b9cf8; --frac-fill2:#fbbf24; --frac-empty:#1d2040;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;margin:0;padding-block:0 60px;padding-inline:16px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top h1{font-size:1.35rem}
+.top .sub{color:var(--muted);font-size:.9rem;margin:2px 0 8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.nav a{flex:0 0 auto;font-size:.8rem;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.nav a b{color:var(--primary);margin-right:3px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--primary);outline:none}
+.intro{display:grid;grid-template-columns:1fr;gap:12px;margin-block:16px}
+@media(min-width:760px){.intro{grid-template-columns:1.2fr 1fr}}
+.intro .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.intro .box.dadbox{background:var(--dad);border-color:var(--dad-line)}
+.intro h3{font-size:1rem;margin-bottom:6px}
+.intro p{margin:4px 0;font-size:.92rem}
+.intro .stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.92rem}
+.intro .stats b{font-size:1.25rem;color:var(--primary);font-variant-numeric:tabular-nums}
+.how{padding-left:20px}
+.how li{margin:3px 0}
+.ladder{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0 4px;padding:0;list-style:none}
+.ladder li{font-size:.85rem;background:var(--primary-soft);border-radius:8px;padding:5px 9px}
+.ladder li b{color:var(--primary);margin-right:4px}
+.ladder li small{color:var(--muted);margin-left:4px}
+.concept{margin-block:36px 0;scroll-margin-top:110px}
+.ch-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.ch-head > div:last-child{min-width:0}
+.ch-no{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--primary);background:var(--primary-soft);border-radius:12px;min-width:56px;height:56px;display:grid;place-items:center}
+.grade{font-size:.75rem;letter-spacing:.06em;color:var(--muted)}
+.ch-head h2{font-size:1.4rem}
+.idea{color:var(--muted);margin:2px 0 0;font-size:.95rem;max-width:65ch}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+.cols > *{min-width:0}
+@media(min-width:900px){.cols{grid-template-columns:1.35fr 1fr}}
+.col-title{margin:0 0 10px;font-size:.95rem}
+.col-title small{color:var(--muted);font-weight:400;margin-left:6px}
+.samples-title{margin-top:18px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.step{display:flex;gap:10px;scroll-margin-top:110px}
+.step-no{flex:0 0 30px;height:30px;border-radius:50%;background:var(--primary);color:var(--card);font-weight:700;display:grid;place-items:center;font-size:.9rem;margin-top:12px}
+.step-body{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.say{max-width:65ch}
+.say p{margin:0 0 10px}
+.say p:last-child{margin-bottom:0}
+.check{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;scroll-margin-top:110px}
+.qt{margin:0 0 6px;font-weight:500}
+.ch{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ch li{display:flex;align-items:center;gap:8px;border-radius:9px;padding:6px 10px;background:var(--no-soft);border:1px solid transparent}
+.ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
+.ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
+.ch .txt{flex:1;min-width:0}
+.ch .tag{font-size:.75rem;color:var(--muted);text-align:right}
+.why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
+.samples{display:grid;gap:10px}
+.sample{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.expr{font-size:1.15rem;font-weight:700;margin:4px 0 8px;font-variant-numeric:tabular-nums}
+body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
+body.hide-ans .ch .mark,body.hide-ans .why,body.hide-ans .ch .tag{visibility:hidden}
+.rule{margin-top:12px;background:var(--primary-soft);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.rule p{margin:2px 0 0;font-weight:700;font-size:1.05rem}
+.dad{background:var(--dad);border:1px solid var(--dad-line);border-radius:14px;padding:14px 16px;position:sticky;top:104px;scroll-margin-top:110px;color:var(--ink)}
+.dad h3{font-size:1.05rem;margin:4px 0 10px;color:var(--dad-ink)}
+.dad h4{margin:12px 0 4px;font-size:.9rem;color:var(--dad-ink)}
+.dad-say{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.dad-say li,.traps li{display:flex;gap:8px;align-items:flex-start;scroll-margin-top:110px}
+.dad-say li > span,.traps li > div{min-width:0}
+.dad-do,.dad-pass{margin:0;font-size:.95rem}
+.traps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.traps .kid{font-weight:500}
+.traps .dadsay{color:var(--muted);font-size:.92rem}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.ref .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.03em}
+.ref code,code.mini{font-size:.78rem;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+code.mini{flex:0 0 auto;margin-top:2px}
+.dad .ref code,.dad code.mini{color:var(--dad-ink);background:var(--accent-soft)}
+.fig{margin:6px 0 8px;color:var(--ink);display:inline-block;max-width:100%;overflow-x:auto}
+.fig svg{max-width:100%;height:auto;display:block}
+div.fig{display:block}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 2px;font-variant-numeric:tabular-nums}
+.fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
+.fr .d{padding:0 3px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none;margin-top:8px}
+.toggle input{width:18px;height:18px;accent-color:var(--primary)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (max-width:899px){.dad{position:static}}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  body{background:#fff;padding:0;font-size:13px}
+  .wrap{max-width:100%}
+  .top{position:static}
+  .dad{position:static;box-shadow:none;break-inside:auto}
+  .step,.sample,.check,.rule,.traps li,figure,svg{break-inside:avoid}
+}
+</style>
+<div class="wrap">
+  <div class="top">
+    <h1>🔢 수의 범위와 어림하기 줄기 — 배움 원고 검수</h1>
+    <p class="sub">신코치 수학 · 초5-2 1단원 「수의 범위와 어림하기」 · 개념 9개</p>
+    <div class="nav"><a href="#L1"><b>L1</b> 이상과 이하</a><a href="#L2"><b>L2</b> 초과와 미만</a><a href="#L3"><b>L3</b> 수의 범위를 수직선에</a><a href="#L4"><b>L4</b> 범위에 드는 수 세기</a><a href="#L5"><b>L5</b> 수의 범위 활용</a><a href="#L6"><b>L6</b> 올림</a><a href="#L7"><b>L7</b> 버림</a><a href="#L8"><b>L8</b> 반올림</a><a href="#L9"><b>L9</b> 어림하기 활용</a></div>
+  </div>
+
+  <div class="intro">
+    <div class="box">
+      <h3>무엇을 봐 주시면 되나</h3>
+      <div class="stats">
+        <span><b>9</b> 개념</span>
+        <span><b>33</b> 📘 배움 장</span>
+        <span><b>32</b> 확인 질문</span>
+        <span><b>8</b> 수직선</span>
+        <span><b>18</b> 헷갈리는 자리</span>
+        <span><b>27</b> 🧪 문제 예시</span>
+      </div>
+      <ol class="ladder"><li><b>L1</b>이상과 이하<small>초5</small></li><li><b>L2</b>초과와 미만<small>초5</small></li><li><b>L3</b>수의 범위를 수직선에<small>초5</small></li><li><b>L4</b>범위에 드는 수 세기<small>초5</small></li><li><b>L5</b>수의 범위 활용<small>초5</small></li><li><b>L6</b>올림<small>초5</small></li><li><b>L7</b>버림<small>초5</small></li><li><b>L8</b>반올림<small>초5</small></li><li><b>L9</b>어림하기 활용<small>초5</small></li></ol>
+      <ul class="how">
+        <li><b>📘 배움</b> — 진우가 앱에서 읽는 것. <b>한 장 = 한 화면</b>, 짧은 설명 → 확인 질문 → 다음 장. 모두 초5-2 1단원입니다. 새 말은 그 칸에서 처음 씁니다 — <b>이상·이하 L1</b>, <b>초과·미만 L2</b>, <b>올림·어림 L6</b>, <b>버림 L7</b>, <b>반올림 L8</b>부터(앞 칸은 테스트로 막았습니다)</li>
+        <li><b>🧪 문제 예시</b> — 앱이 숫자를 바꿔 가며 끝없이 만드는 문제 중 몇 개입니다. 오답은 <b>아이가 실제로 하는 틀린 생각</b>입니다 (이상인데 경계 수를 뺌 · 초과인데 넣음 · 큰 쪽·작은 쪽을 바꿈 · ●와 ○를 바꿔 봄 · 15 − 10만 하고 셈 · 올린 자리 아래를 0으로 안 바꿈 · 247 → 24처럼 지워 버림 · "~까지"를 "~에서"로 읽어 한 자리 위까지 · 5를 버림 · 2449 → 2450 → 2500처럼 두 번 반올림 · 버스 대수에 버림)</li>
+        <li><b>수직선</b> — 속이 찬 점 ●은 "그 수도 들어가요"(이상·이하), 속이 빈 점 ○는 "안 들어가요"(초과·미만). 테스트가 그려진 그림에서 점의 자리·모양·칠한 쪽을 직접 재서 지시문과 같은지 봤습니다. 아빠에게 보내는 ❓ 복사문에는 "13에 ●, 17에 ○ — 사이를 칠함"처럼 글로 갑니다(이상·미만은 쓰지 않습니다 — 그걸 읽는 게 문제라서)</li>
+        <li><b>🔢 숫자판</b> — 답이 수 하나인 ① 문제는 앱에서 숫자판으로 직접 씁니다. "모두 고르기"처럼 답이 여럿이거나 말·범위가 답이면 보기를 고릅니다</li>
+        <li><b>👨 아빠 카드</b> — 저녁 10분에 처음 소개할 때 쓰는 반 장. 줄자·숫자 카드·바둑돌·영수증·레고 봉지처럼 집에서 실제로 할 수 있는 활동인지, 아버님 말투에 맞는지</li>
+        <li>확인 질문 32개는 테스트가 <b>문제 글과 수직선 지시문을 따로 읽어</b> 다시 풀었습니다(어림은 자릿수 셈을 새로 짜서). 배움 글이 말하는 범위("10 이상 15 미만")도 그 장의 수직선과 같은지 하나씩 대조했습니다</li>
+      </ul>
+      <p>고칠 곳은 번호로 가리켜 주시면 됩니다. 예) <code>L2-3 설명이 길다</code>, <code>L4-2✓ 오답이 너무 쉽다</code>, <code>L8-①a 이 오답은 안 나올 것 같다</code>, <code>L9-👨함정1</code></p>
+      <label class="toggle"><input type="checkbox" id="ans" checked> 정답·오개념 이름 보이기 (끄면 진우가 보는 모양)</label>
+    </div>
+    <div class="box dadbox">
+      <h3>👨 이 줄기에서 제일 중요한 한 가지</h3>
+      <p>앞 다섯 칸은 전부 <b>경계에 있는 수 하나</b>의 문제입니다. "130 cm 이상"에 130 cm가 드는지, "13살 미만"에 13살이 드는지. 아이들은 큰 쪽·작은 쪽은 금방 알지만 경계 수를 자꾸 빼거나 넣습니다. 그래서 문제마다 <b>경계 수를 일부러 목록·표에 넣어 두었습니다</b> — 체급표의 몸무게도 늘 경계 값입니다.</p>
+      <p>뒤 네 칸은 <b>어느 자리를 보느냐</b>의 문제입니다. "십의 자리까지"를 "십의 자리에서"로 읽어 한 자리 위까지 어림하고, 반올림에서 끝자리부터 두 번 올립니다. "구하려는 자리에 밑줄을 긋고 바로 아래 숫자 하나에 동그라미" — 이것 하나면 거의 다 풀립니다.</p>
+      <p>L9에서는 계산이 아니라 <b>상황</b>으로 고릅니다. 버스는 모자라면 안 되니 올림, 봉지는 다 찬 것만 파니 버림. 마지막 ⭐(반올림해서 350이 되는 수의 범위)는 L1~L8을 모두 씁니다. v156 "안다" 기준이 처음부터 걸리는 줄기라 9칸 ≈ 적어도 닷새입니다.</p>
+      <p style="margin-top:10px"><b>예시 출연진</b>: 앱에서는 진우가 도감에서 잡은 포켓몬이 들어갑니다. 이 페이지는 피카츄·리자몽·개굴닌자·루카리오 등을 예시로 끼웠습니다.</p>
+    </div>
+  </div>
+
+  <section class="concept" id="L1">
+    <header class="ch-head">
+      <div class="ch-no">L1</div>
+      <div>
+        <div class="grade">초5 · 첫 개념</div>
+        <h2>이상과 이하</h2>
+        <p class="idea"><strong>10 이상</strong>인 수는 10과 같거나 큰 수, <strong>10 이하</strong>인 수는 10과 같거나 작은 수예요. 둘 다 <strong>10도 들어가요</strong> — 수직선에는 속이 찬 점 ●으로 나타내요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L1-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L1-1</code></div>
+        <div class="say"><p>피카츄가 놀이기구 앞에 섰어요. 안내판에 이렇게 적혀 있어요.</p><p><strong>키 130 cm 이상 탈 수 있어요</strong></p><p>키가 딱 130 cm인 친구는 탈 수 있을까요? — <strong>탈 수 있어요!</strong> 130 cm <strong>이상</strong>은 130 cm와 <strong>같거나</strong> 큰 키예요.</p></div>
+        <div class="check" id="L1-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L1-1✓</code></div>
+        <div class="qt"><p>키가 130 cm 이상인 사람만 탈 수 있어요. 탈 수 있는 키는 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">130 cm</span></li><li class="no"><span class="mark"></span><span class="txt">129 cm</span></li><li class="no"><span class="mark"></span><span class="txt">125 cm</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>130 cm 이상에는 딱 130 cm인 것도 들어가요. 129 cm와 125 cm는 130 cm보다 작아서 못 타요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L1-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L1-2</code></div>
+        <div class="say"><p><strong>10 이상</strong>인 수 = 10과 같거나 큰 수 → 10, 11, 12, …</p><p><strong>10 이하</strong>인 수 = 10과 같거나 작은 수 → 10, 9, 8, …</p><p>둘 다 <strong>10이 들어가요</strong>. 이상은 큰 쪽, 이하는 작은 쪽이에요.</p></div>
+        <div class="check" id="L1-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L1-2✓</code></div>
+        <div class="qt"><p>다음 수 중에서 20 이하인 수를 모두 고르면 어느 것일까요?</p><p><strong>18, 20, 23, 15</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">18, 20, 15</span></li><li class="no"><span class="mark"></span><span class="txt">18, 15</span></li><li class="no"><span class="mark"></span><span class="txt">20, 23</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>20 이하는 20과 같거나 작은 수예요. 20도 들어가고, 23은 20보다 커서 빠져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L1-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L1-3</code></div>
+        <div class="say"><p>수직선에서는 <strong>속이 찬 점 ●</strong>을 찍어요. 속이 찬 점은 &quot;그 수도 들어가요&quot;라는 뜻이에요.</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 348 58" width="452" height="75" role="img" aria-label="수직선 10~20: 14에 ● — 오른쪽으로 칠함"><line x1="12" y1="26" x2="336" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 336 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">10</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">11</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">12</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">13</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">14</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">15</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">16</text><line x1="234" y1="21" x2="234" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="234" y="48" font-size="12" text-anchor="middle" fill="currentColor">17</text><line x1="264" y1="21" x2="264" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="264" y="48" font-size="12" text-anchor="middle" fill="currentColor">18</text><line x1="294" y1="21" x2="294" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="294" y="48" font-size="12" text-anchor="middle" fill="currentColor">19</text><line x1="324" y1="21" x2="324" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="324" y="48" font-size="12" text-anchor="middle" fill="currentColor">20</text><line class="range-span" x1="144" y1="26" x2="336" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><path d="M 340 26 l -8 -6 v 12 z" fill="var(--frac-fill, #6366f1)"/><circle class="range-dot closed" data-v="14" cx="144" cy="26" r="7" fill="var(--frac-fill, #6366f1)" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div><p><strong>14 이상</strong>: 14에 속이 찬 점을 찍고 <strong>오른쪽(큰 쪽)</strong>으로 칠해요.</p></div>
+        <div class="check" id="L1-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L1-3✓</code></div>
+        <div class="qt"><p>수직선에 나타낸 수의 범위를 바르게 말한 것은 어느 것일까요?</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 348 58" width="452" height="75" role="img" aria-label="수직선 20~30: 25에 ● — 왼쪽으로 칠함"><line x1="12" y1="26" x2="336" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 336 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">20</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">21</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">22</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">23</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">24</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">25</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">26</text><line x1="234" y1="21" x2="234" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="234" y="48" font-size="12" text-anchor="middle" fill="currentColor">27</text><line x1="264" y1="21" x2="264" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="264" y="48" font-size="12" text-anchor="middle" fill="currentColor">28</text><line x1="294" y1="21" x2="294" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="294" y="48" font-size="12" text-anchor="middle" fill="currentColor">29</text><line x1="324" y1="21" x2="324" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="324" y="48" font-size="12" text-anchor="middle" fill="currentColor">30</text><line class="range-span" x1="12" y1="26" x2="174" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><path d="M 8 26 l 8 -6 v 12 z" fill="var(--frac-fill, #6366f1)"/><circle class="range-dot closed" data-v="25" cx="174" cy="26" r="7" fill="var(--frac-fill, #6366f1)" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">25 이하</span></li><li class="no"><span class="mark"></span><span class="txt">25 이상</span></li><li class="no"><span class="mark"></span><span class="txt">24 이하</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>25에 속이 찬 점이 있고 왼쪽(작은 쪽)으로 칠했어요 — 25와 같거나 작은 수, 25 이하예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L1-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>L1-4</code></div>
+        <div class="say"><p>15 이상인 자연수 중에서 가장 작은 수는 무엇일까요?</p><p>15 이상 → 15, 16, 17, …</p><p>가장 작은 수는 <strong>15</strong>예요. 16이라고 하면 <strong>15를 빠뜨린</strong> 거예요.</p></div>
+        <div class="check" id="L1-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L1-4✓</code></div>
+        <div class="qt"><p>30 이하인 자연수 중에서 가장 큰 수는 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">30</span></li><li class="no"><span class="mark"></span><span class="txt">29</span></li><li class="no"><span class="mark"></span><span class="txt">31</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>30 이하에는 30도 들어가요. 30 이하인 자연수 중에서 가장 큰 수는 30이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="L1-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L1-📏</code></div><p>이상·이하는 그 수도 들어간다. 이상은 큰 쪽, 이하는 작은 쪽 — 수직선에는 속이 찬 점 ●.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L1-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L1-①a</code></div>
+      <div class="say"><p>53 이하인 자연수 중에서 가장 큰 수는 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">52</span><span class="tag">경계 수를 뺌</span></li><li class="no"><span class="mark"></span><span class="txt">54</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">53</span></li><li class="no"><span class="mark"></span><span class="txt">55</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="L1-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L1-①b</code></div>
+      <div class="say"><p>다음 수 중에서 28 이상인 수를 모두 고르면 어느 것일까요?</p><p><strong>33, 34, 20, 28, 25, 27</strong></p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">33, 34, 28</span></li><li class="no"><span class="mark"></span><span class="txt">20, 25, 27</span><span class="tag">큰 쪽·작은 쪽과 경계를 다 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">33, 34</span><span class="tag">경계 수를 뺌</span></li><li class="no"><span class="mark"></span><span class="txt">20, 28, 25, 27</span><span class="tag">큰 쪽과 작은 쪽을 바꿈</span></li></ol>
+    </div><div class="sample" id="L1-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L1-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>39 이상인 수에 39는 들어가지 않아요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">39도 들어가요 — 39 이상은 39와 같거나 큰 수예요</span></li><li class="no"><span class="mark"></span><span class="txt">39 이상인 수는 39부터 48까지 10개뿐이에요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">39 이상은 39보다 작은 수예요</span><span class="tag">큰 쪽과 작은 쪽을 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L1-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L1-👨</code></div>
+    <h3>이상·이하에는 경계의 수도 들어간다는 것, 그리고 큰 쪽·작은 쪽.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L1-👨말1"><code class="mini">말1</code><span>&quot;엘리베이터에 '15명 이하'라고 쓰여 있으면 15명이 타도 될까?&quot;</span></li><li id="L1-👨말2"><code class="mini">말2</code><span>&quot;키가 딱 130 cm면 '130 cm 이상' 놀이기구를 탈 수 있을까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">줄자로 진우 키를 재고, 놀이공원 키 제한(110 cm 이상 · 120 cm 이상 · 130 cm 이상)을 종이에 써서 탈 수 있는 것에 동그라미를 쳐요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L1-👨함정1"><code class="mini">함정1</code><div><div class="kid">130 cm 이상에서 130 cm를 빼고 131 cm부터 생각한다</div><div class="dadsay">→ &quot;130 cm와 같은 키도 들어갈까? '같거나'를 넣어서 다시 말해 볼래?&quot;</div></div></li><li id="L1-👨함정2"><code class="mini">함정2</code><div><div class="kid">이상과 이하를 헷갈린다</div><div class="dadsay">→ &quot;이상은 위로(큰 쪽), 이하는 아래로(작은 쪽). 위 상(上), 아래 하(下)야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;25 이상&quot;과 &quot;25 이하&quot;에 드는 수를 세 개씩 말하고, 두 쪽 모두에 25를 넣으면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="L2">
+    <header class="ch-head">
+      <div class="ch-no">L2</div>
+      <div>
+        <div class="grade">초5 · L1 다음</div>
+        <h2>초과와 미만</h2>
+        <p class="idea"><strong>10 초과</strong>인 수는 10보다 큰 수, <strong>10 미만</strong>인 수는 10보다 작은 수예요. 둘 다 <strong>10은 안 들어가요</strong> — 수직선에는 속이 빈 점 ○으로 나타내요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L2-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L2-1</code></div>
+        <div class="say"><p>택배 회사 안내문이에요.</p><p><strong>무게가 5 kg 초과이면 요금을 더 내요</strong></p><p>딱 5 kg인 상자는? — <strong>더 내지 않아요!</strong> 5 kg <strong>초과</strong>는 5 kg보다 <strong>큰</strong> 무게예요. 딱 5 kg인 것은 들어가지 않아요.</p></div>
+        <div class="check" id="L2-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L2-1✓</code></div>
+        <div class="qt"><p>무게가 5 kg 초과이면 요금을 더 내요. 요금을 더 내는 상자는 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6 kg</span></li><li class="no"><span class="mark"></span><span class="txt">5 kg</span></li><li class="no"><span class="mark"></span><span class="txt">4 kg</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>5 kg 초과는 5 kg보다 무거운 것이에요. 딱 5 kg인 상자는 더 내지 않아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L2-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L2-2</code></div>
+        <div class="say"><p><strong>10 초과</strong>인 수 = 10보다 큰 수 → 11, 12, 13, …</p><p><strong>10 미만</strong>인 수 = 10보다 작은 수 → 9, 8, 7, …</p><p>둘 다 <strong>10은 안 들어가요</strong>. 이상·이하와 다른 점은 이것 하나예요.</p></div>
+        <div class="check" id="L2-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L2-2✓</code></div>
+        <div class="qt"><p>다음 수 중에서 20 미만인 수를 모두 고르면 어느 것일까요?</p><p><strong>18, 20, 23, 15</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">18, 15</span></li><li class="no"><span class="mark"></span><span class="txt">18, 20, 15</span></li><li class="no"><span class="mark"></span><span class="txt">20, 23</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>20 미만은 20보다 작은 수예요. 20은 들어가지 않아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L2-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L2-3</code></div>
+        <div class="say"><p>수직선에서는 <strong>속이 빈 점 ○</strong>을 찍어요. 속이 빈 점은 &quot;그 수는 안 들어가요&quot;라는 뜻이에요.</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 348 58" width="452" height="75" role="img" aria-label="수직선 10~20: 16에 ○ — 왼쪽으로 칠함"><line x1="12" y1="26" x2="336" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 336 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">10</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">11</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">12</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">13</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">14</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">15</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">16</text><line x1="234" y1="21" x2="234" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="234" y="48" font-size="12" text-anchor="middle" fill="currentColor">17</text><line x1="264" y1="21" x2="264" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="264" y="48" font-size="12" text-anchor="middle" fill="currentColor">18</text><line x1="294" y1="21" x2="294" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="294" y="48" font-size="12" text-anchor="middle" fill="currentColor">19</text><line x1="324" y1="21" x2="324" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="324" y="48" font-size="12" text-anchor="middle" fill="currentColor">20</text><line class="range-span" x1="12" y1="26" x2="204" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><path d="M 8 26 l 8 -6 v 12 z" fill="var(--frac-fill, #6366f1)"/><circle class="range-dot open" data-v="16" cx="204" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div><p><strong>16 미만</strong>: 16에 속이 빈 점을 찍고 <strong>왼쪽(작은 쪽)</strong>으로 칠해요.</p></div>
+        <div class="check" id="L2-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L2-3✓</code></div>
+        <div class="qt"><p>수직선에 나타낸 수의 범위를 바르게 말한 것은 어느 것일까요?</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 348 58" width="452" height="75" role="img" aria-label="수직선 30~40: 34에 ○ — 오른쪽으로 칠함"><line x1="12" y1="26" x2="336" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 336 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">30</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">31</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">32</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">33</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">34</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">35</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">36</text><line x1="234" y1="21" x2="234" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="234" y="48" font-size="12" text-anchor="middle" fill="currentColor">37</text><line x1="264" y1="21" x2="264" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="264" y="48" font-size="12" text-anchor="middle" fill="currentColor">38</text><line x1="294" y1="21" x2="294" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="294" y="48" font-size="12" text-anchor="middle" fill="currentColor">39</text><line x1="324" y1="21" x2="324" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="324" y="48" font-size="12" text-anchor="middle" fill="currentColor">40</text><line class="range-span" x1="144" y1="26" x2="336" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><path d="M 340 26 l -8 -6 v 12 z" fill="var(--frac-fill, #6366f1)"/><circle class="range-dot open" data-v="34" cx="144" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">34 초과</span></li><li class="no"><span class="mark"></span><span class="txt">34 이상</span></li><li class="no"><span class="mark"></span><span class="txt">34 미만</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>34에 속이 빈 점이 있어서 34는 안 들어가고, 오른쪽(큰 쪽)으로 칠했어요 — 34 초과예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L2-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>L2-4</code></div>
+        <div class="say"><p>이하와 미만은 무엇이 다를까요?</p><p>· 15 <strong>이하</strong>: 15, 14, 13, … (15가 들어가요 ●)<br>· 15 <strong>미만</strong>: 14, 13, 12, … (15는 안 들어가요 ○)</p><p>그래서 15 미만인 자연수 중에서 가장 큰 수는 <strong>14</strong>예요.</p></div>
+        <div class="check" id="L2-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L2-4✓</code></div>
+        <div class="qt"><p>40 초과인 자연수 중에서 가장 작은 수는 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">41</span></li><li class="no"><span class="mark"></span><span class="txt">40</span></li><li class="no"><span class="mark"></span><span class="txt">39</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>40 초과에는 40이 안 들어가요. 40보다 큰 자연수 중에서 가장 작은 수는 41이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="L2-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L2-📏</code></div><p>초과·미만은 그 수가 안 들어간다. 초과는 큰 쪽, 미만은 작은 쪽 — 수직선에는 속이 빈 점 ○.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L2-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L2-①a</code></div>
+      <div class="say"><p>어린이 수영장은 나이가 10살 미만인 어린이만 들어갈 수 있어요. 들어갈 수 있는 어린이를 모두 고르면 어느 것일까요?</p><p><strong>㉠ 10살 · ㉡ 11살 · ㉢ 9살 · ㉣ 8살</strong></p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">㉡</span><span class="tag">큰 쪽과 작은 쪽을 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">㉠, ㉢, ㉣</span><span class="tag">경계 수를 넣음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">㉢, ㉣</span></li></ol>
+    </div><div class="sample" id="L2-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L2-①b</code></div>
+      <div class="say"><p>택배는 무게가 20 kg 초과이면 요금을 더 내요. 요금을 더 내는 상자를 모두 고르면 어느 것일까요?</p><p><strong>㉠ 20 kg · ㉡ 15 kg · ㉢ 26 kg · ㉣ 19 kg</strong></p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">㉢</span></li><li class="no"><span class="mark"></span><span class="txt">㉡, ㉣</span><span class="tag">큰 쪽과 작은 쪽을 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">㉠, ㉢</span><span class="tag">경계 수를 넣음</span></li></ol>
+    </div><div class="sample" id="L2-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L2-②</code></div>
+      <div class="say"><p>피카츄가 이렇게 말했어요.</p><p><strong>38 미만인 수에 38도 들어가요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">38 미만은 38과 같거나 작은 수예요</span><span class="tag">경계 수를 넣음</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">38은 안 들어가요 — 38 미만은 38보다 작은 수예요</span></li><li class="no"><span class="mark"></span><span class="txt">38 미만인 수는 38부터 47까지 10개뿐이에요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L2-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L2-👨</code></div>
+    <h3>초과·미만에는 경계의 수가 안 들어간다는 것 — 이상·이하와 딱 하나 다른 점.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L2-👨말1"><code class="mini">말1</code><span>&quot;'10살 미만 무료'면 10살은 무료일까?&quot;</span></li><li id="L2-👨말2"><code class="mini">말2</code><span>&quot;5 초과인 수를 세 개 말해 봐. 5는 들어갈까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">숫자 카드 1~20을 늘어놓고 아빠가 &quot;12 이하&quot;, &quot;12 미만&quot;, &quot;12 이상&quot;, &quot;12 초과&quot;를 부르면 진우가 맞는 카드를 모아요. 12 카드가 어디로 가는지 매번 확인해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L2-👨함정1"><code class="mini">함정1</code><div><div class="kid">미만에도 그 수를 넣는다</div><div class="dadsay">→ &quot;10살 미만은 10번째 생일 전까지야. 10살 생일이 지나면?&quot;</div></div></li><li id="L2-👨함정2"><code class="mini">함정2</code><div><div class="kid">초과와 이상을 같은 말로 여긴다</div><div class="dadsay">→ &quot;5 이상과 5 초과에서 다른 수가 딱 하나 있어. 뭘까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">12 카드를 네 가지 말(이상·이하·초과·미만)에 맞게 바로 넣으면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="L3">
+    <header class="ch-head">
+      <div class="ch-no">L3</div>
+      <div>
+        <div class="grade">초5 · L2 다음</div>
+        <h2>수의 범위를 수직선에</h2>
+        <p class="idea"><strong>10 이상 15 미만</strong>처럼 두 조건을 합치면 그 사이의 수예요. 수직선에는 10에 ●, 15에 ○를 찍고 <strong>사이를 칠해요</strong>. 속이 찬 점 ●은 들어가고 속이 빈 점 ○는 안 들어가요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L3-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L3-1</code></div>
+        <div class="say"><p>두 조건을 함께 쓸 수 있어요.</p><p><strong>10 이상 15 미만</strong> = 10과 같거나 크고, 15보다 작은 수</p><p>→ 10, 11, 12, 13, 14 (10은 들어가고 15는 안 들어가요)</p></div>
+        <div class="check" id="L3-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L3-1✓</code></div>
+        <div class="qt"><p>다음 수 중에서 10 이상 15 미만인 수를 모두 고르면 어느 것일까요?</p><p><strong>9, 10, 12, 15, 16</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10, 12</span></li><li class="no"><span class="mark"></span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">10, 12, 15</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>10 이상이라 10은 들어가고, 15 미만이라 15는 빠져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L3-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L3-2</code></div>
+        <div class="say"><p>수직선에는 두 점을 찍고 <strong>사이를 칠해요</strong>.</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 348 58" width="452" height="75" role="img" aria-label="수직선 8~18: 10에 ●, 15에 ○ — 사이를 칠함"><line x1="12" y1="26" x2="336" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 336 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">8</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">9</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">10</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">11</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">12</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">13</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">14</text><line x1="234" y1="21" x2="234" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="234" y="48" font-size="12" text-anchor="middle" fill="currentColor">15</text><line x1="264" y1="21" x2="264" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="264" y="48" font-size="12" text-anchor="middle" fill="currentColor">16</text><line x1="294" y1="21" x2="294" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="294" y="48" font-size="12" text-anchor="middle" fill="currentColor">17</text><line x1="324" y1="21" x2="324" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="324" y="48" font-size="12" text-anchor="middle" fill="currentColor">18</text><line class="range-span" x1="84" y1="26" x2="234" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><circle class="range-dot closed" data-v="10" cx="84" cy="26" r="7" fill="var(--frac-fill, #6366f1)" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/><circle class="range-dot open" data-v="15" cx="234" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div><p>10에는 속이 찬 점(들어가요), 15에는 속이 빈 점(안 들어가요) → <strong>10 이상 15 미만</strong></p></div>
+        <div class="check" id="L3-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L3-2✓</code></div>
+        <div class="qt"><p>수직선에 나타낸 수의 범위를 바르게 말한 것은 어느 것일까요?</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 384 58" width="499" height="75" role="img" aria-label="수직선 20~32: 23에 ○, 29에 ● — 사이를 칠함"><line x1="12" y1="26" x2="372" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 372 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">20</text><line x1="52" y1="21" x2="52" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="52" y="48" font-size="12" text-anchor="middle" fill="currentColor">21</text><line x1="80" y1="21" x2="80" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="80" y="48" font-size="12" text-anchor="middle" fill="currentColor">22</text><line x1="108" y1="21" x2="108" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="108" y="48" font-size="12" text-anchor="middle" fill="currentColor">23</text><line x1="136" y1="21" x2="136" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="136" y="48" font-size="12" text-anchor="middle" fill="currentColor">24</text><line x1="164" y1="21" x2="164" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="164" y="48" font-size="12" text-anchor="middle" fill="currentColor">25</text><line x1="192" y1="21" x2="192" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="192" y="48" font-size="12" text-anchor="middle" fill="currentColor">26</text><line x1="220" y1="21" x2="220" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="220" y="48" font-size="12" text-anchor="middle" fill="currentColor">27</text><line x1="248" y1="21" x2="248" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="248" y="48" font-size="12" text-anchor="middle" fill="currentColor">28</text><line x1="276" y1="21" x2="276" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="276" y="48" font-size="12" text-anchor="middle" fill="currentColor">29</text><line x1="304" y1="21" x2="304" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="304" y="48" font-size="12" text-anchor="middle" fill="currentColor">30</text><line x1="332" y1="21" x2="332" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="332" y="48" font-size="12" text-anchor="middle" fill="currentColor">31</text><line x1="360" y1="21" x2="360" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="360" y="48" font-size="12" text-anchor="middle" fill="currentColor">32</text><line class="range-span" x1="108" y1="26" x2="276" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><circle class="range-dot open" data-v="23" cx="108" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/><circle class="range-dot closed" data-v="29" cx="276" cy="26" r="7" fill="var(--frac-fill, #6366f1)" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">23 초과 29 이하</span></li><li class="no"><span class="mark"></span><span class="txt">23 이상 29 이하</span></li><li class="no"><span class="mark"></span><span class="txt">23 초과 29 미만</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>23은 속이 빈 점이라 안 들어가고(초과), 29는 속이 찬 점이라 들어가요(이하).</p>
+      </div>
+      </div>
+    </li><li class="step" id="L3-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L3-3</code></div>
+        <div class="say"><p>거꾸로, 말을 보고 점을 찍어 볼까요?</p><p><strong>30 초과 35 이하</strong></p><p>· 30은 안 들어가요 → 속이 빈 점<br>· 35는 들어가요 → 속이 찬 점</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 348 58" width="452" height="75" role="img" aria-label="수직선 28~38: 30에 ○, 35에 ● — 사이를 칠함"><line x1="12" y1="26" x2="336" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 336 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">28</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">29</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">30</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">31</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">32</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">33</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">34</text><line x1="234" y1="21" x2="234" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="234" y="48" font-size="12" text-anchor="middle" fill="currentColor">35</text><line x1="264" y1="21" x2="264" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="264" y="48" font-size="12" text-anchor="middle" fill="currentColor">36</text><line x1="294" y1="21" x2="294" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="294" y="48" font-size="12" text-anchor="middle" fill="currentColor">37</text><line x1="324" y1="21" x2="324" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="324" y="48" font-size="12" text-anchor="middle" fill="currentColor">38</text><line class="range-span" x1="84" y1="26" x2="234" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><circle class="range-dot open" data-v="30" cx="84" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/><circle class="range-dot closed" data-v="35" cx="234" cy="26" r="7" fill="var(--frac-fill, #6366f1)" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div></div>
+        <div class="check" id="L3-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L3-3✓</code></div>
+        <div class="qt"><p>40 이상 46 미만인 수를 수직선에 나타내려고 해요. 40과 46에 어떤 점을 찍어야 할까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">40에 ●, 46에 ○</span></li><li class="no"><span class="mark"></span><span class="txt">40에 ○, 46에 ●</span></li><li class="no"><span class="mark"></span><span class="txt">40에 ●, 46에 ●</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>40 이상이라 40은 들어가요(●). 46 미만이라 46은 안 들어가요(○).</p>
+      </div>
+      </div>
+    </li><li class="step" id="L3-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>L3-4</code></div>
+        <div class="say"><p>개굴닌자가 키를 재러 왔어요. 키가 <strong>140 cm 이상 150 cm 미만</strong>인 사람은 별반이에요.</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 228 58" width="296" height="75" role="img" aria-label="수직선 130~160: 140에 ●, 150에 ○ — 사이를 칠함"><line x1="12" y1="26" x2="216" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 216 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">130</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">135</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">140</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">145</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">150</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">155</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">160</text><line class="range-span" x1="84" y1="26" x2="144" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><circle class="range-dot closed" data-v="140" cx="84" cy="26" r="7" fill="var(--frac-fill, #6366f1)" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/><circle class="range-dot open" data-v="150" cx="144" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div><p>딱 150 cm인 사람은 별반이 아니에요 — 150에 속이 빈 점이 있어요.</p></div>
+        
+      </div>
+    </li></ol>
+        <div class="rule" id="L3-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L3-📏</code></div><p>속이 찬 점 ●은 들어가고 속이 빈 점 ○는 안 들어간다 — 두 점 사이를 칠한다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L3-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L3-①a</code></div>
+      <div class="say"><p>다음 수 중에서 12 이상 20 이하인 수를 모두 고르면 어느 것일까요?</p><p><strong>12, 9, 22, 19, 20, 17</strong></p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">19, 20, 17</span><span class="tag">경계 수를 뺌</span></li><li class="ok"><span class="mark">✔</span><span class="txt">12, 19, 20, 17</span></li><li class="no"><span class="mark"></span><span class="txt">19, 17</span><span class="tag">양 끝 경계를 모두 잘못 봄</span></li><li class="no"><span class="mark"></span><span class="txt">12, 19, 17</span><span class="tag">경계 수를 뺌</span></li></ol>
+    </div><div class="sample" id="L3-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L3-①b</code></div>
+      <div class="say"><p>수직선에 나타낸 수의 범위를 바르게 말한 것은 어느 것일까요?</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 378 58" width="491" height="75" role="img" aria-label="수직선 17~28: 19에 ○, 26에 ○ — 사이를 칠함"><line x1="12" y1="26" x2="366" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 366 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">17</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">18</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">19</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">20</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">21</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">22</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">23</text><line x1="234" y1="21" x2="234" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="234" y="48" font-size="12" text-anchor="middle" fill="currentColor">24</text><line x1="264" y1="21" x2="264" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="264" y="48" font-size="12" text-anchor="middle" fill="currentColor">25</text><line x1="294" y1="21" x2="294" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="294" y="48" font-size="12" text-anchor="middle" fill="currentColor">26</text><line x1="324" y1="21" x2="324" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="324" y="48" font-size="12" text-anchor="middle" fill="currentColor">27</text><line x1="354" y1="21" x2="354" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="354" y="48" font-size="12" text-anchor="middle" fill="currentColor">28</text><line class="range-span" x1="84" y1="26" x2="294" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><circle class="range-dot open" data-v="19" cx="84" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/><circle class="range-dot open" data-v="26" cx="294" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">19 초과 26 미만</span></li><li class="no"><span class="mark"></span><span class="txt">19 이상 26 이하</span><span class="tag">●와 ○를 바꿔 봄</span></li><li class="no"><span class="mark"></span><span class="txt">19 이상 26 미만</span><span class="tag">●와 ○를 바꿔 봄</span></li><li class="no"><span class="mark"></span><span class="txt">19 초과 26 이하</span><span class="tag">●와 ○를 바꿔 봄</span></li></ol>
+    </div><div class="sample" id="L3-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L3-②</code></div>
+      <div class="say"><p>개굴닌자가 수직선을 보고 이렇게 말했어요.</p><div class="fig"><svg class="frac-fig range-fig" viewBox="0 0 318 58" width="413" height="75" role="img" aria-label="수직선 19~28: 22에 ○, 27에 ● — 사이를 칠함"><line x1="12" y1="26" x2="306" y2="26" stroke="currentColor" stroke-width="1.5"/><path d="M 306 26 l -6 -4 v 8 z" fill="currentColor"/><line x1="24" y1="21" x2="24" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="24" y="48" font-size="12" text-anchor="middle" fill="currentColor">19</text><line x1="54" y1="21" x2="54" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="54" y="48" font-size="12" text-anchor="middle" fill="currentColor">20</text><line x1="84" y1="21" x2="84" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="84" y="48" font-size="12" text-anchor="middle" fill="currentColor">21</text><line x1="114" y1="21" x2="114" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="114" y="48" font-size="12" text-anchor="middle" fill="currentColor">22</text><line x1="144" y1="21" x2="144" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="144" y="48" font-size="12" text-anchor="middle" fill="currentColor">23</text><line x1="174" y1="21" x2="174" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="174" y="48" font-size="12" text-anchor="middle" fill="currentColor">24</text><line x1="204" y1="21" x2="204" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="204" y="48" font-size="12" text-anchor="middle" fill="currentColor">25</text><line x1="234" y1="21" x2="234" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="234" y="48" font-size="12" text-anchor="middle" fill="currentColor">26</text><line x1="264" y1="21" x2="264" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="264" y="48" font-size="12" text-anchor="middle" fill="currentColor">27</text><line x1="294" y1="21" x2="294" y2="31" stroke="currentColor" stroke-width="1.2"/><text class="range-tick" x="294" y="48" font-size="12" text-anchor="middle" fill="currentColor">28</text><line class="range-span" x1="114" y1="26" x2="264" y2="26" stroke="var(--frac-fill, #6366f1)" stroke-width="6" stroke-linecap="round" opacity="0.85"/><circle class="range-dot open" data-v="22" cx="114" cy="26" r="7" fill="#fff" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/><circle class="range-dot closed" data-v="27" cx="264" cy="26" r="7" fill="var(--frac-fill, #6366f1)" stroke="var(--frac-fill, #6366f1)" stroke-width="2.5"/></svg></div><p><strong>이 수직선은 22 이상 27 이하예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">22에 찍힌 점은 ○ — 22는 안 들어가요. 22 초과 27 이하</span></li><li class="no"><span class="mark"></span><span class="txt">수직선은 왼쪽으로 갈수록 큰 수예요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">27의 점도 반대로 읽어야 해요 — 22 이상 27 미만</span><span class="tag">●와 ○를 바꿔 봄</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L3-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L3-👨</code></div>
+    <h3>두 조건을 합친 범위를 수직선에 ●·○로 나타내고 읽기.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L3-👨말1"><code class="mini">말1</code><span>&quot;10 이상 15 미만에 드는 수를 다 말해 봐. 10은? 15는?&quot;</span></li><li id="L3-👨말2"><code class="mini">말2</code><span>&quot;수직선에 30에는 빈 점, 35에는 찬 점이 있으면 뭐라고 읽어?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이에 수직선을 그리고 바둑돌(검은 돌 = 찬 점, 흰 돌 = 빈 점)로 &quot;20 초과 25 이하&quot;, &quot;12 이상 18 미만&quot;을 놓아 봐요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L3-👨함정1"><code class="mini">함정1</code><div><div class="kid">양 끝 점을 둘 다 같은 모양으로 찍는다</div><div class="dadsay">→ &quot;끝 수를 하나씩 따로 봐. 이 끝은 들어가? 저 끝은?&quot;</div></div></li><li id="L3-👨함정2"><code class="mini">함정2</code><div><div class="kid">찬 점을 보고 '초과'라고 읽는다</div><div class="dadsay">→ &quot;점이 꽉 차 있으면 그 수도 꽉 들어간다고 기억해.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">범위 세 개를 바둑돌로 바르게 놓고, 아빠가 놓은 수직선 두 개를 말로 바르게 읽으면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="L4">
+    <header class="ch-head">
+      <div class="ch-no">L4</div>
+      <div>
+        <div class="grade">초5 · L3 다음</div>
+        <h2>범위에 드는 수 세기</h2>
+        <p class="idea"><strong>10 이상 15 이하</strong>인 자연수는 10, 11, 12, 13, 14, 15 — 6개예요. 15 − 10 = 5만 하면 하나가 모자라요. <strong>양 끝이 들어가는지</strong>를 보고 세요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L4-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L4-1</code></div>
+        <div class="say"><p><strong>10 이상 15 이하</strong>인 자연수는 몇 개일까요?</p><p>10, 11, 12, 13, 14, 15 → <strong>6개</strong></p><p>15 − 10 = 5라고 하면 <strong>하나가 모자라요</strong>. 10도 15도 들어가니까요.</p></div>
+        <div class="check" id="L4-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L4-1✓</code></div>
+        <div class="qt"><p>20 이상 26 이하인 자연수는 모두 몇 개일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7개</span></li><li class="no"><span class="mark"></span><span class="txt">6개</span></li><li class="no"><span class="mark"></span><span class="txt">5개</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>20, 21, 22, 23, 24, 25, 26 — 20과 26도 들어가서 7개예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L4-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L4-2</code></div>
+        <div class="say"><p>양 끝이 들어가는지에 따라 개수가 달라져요. 10과 15로 볼까요?</p><p>· 10 이상 15 이하 → 10부터 15까지 → <strong>6개</strong><br>· 10 이상 15 미만 → 10부터 14까지 → <strong>5개</strong><br>· 10 초과 15 미만 → 11부터 14까지 → <strong>4개</strong></p></div>
+        <div class="check" id="L4-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L4-2✓</code></div>
+        <div class="qt"><p>30 초과 40 미만인 자연수는 모두 몇 개일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9개</span></li><li class="no"><span class="mark"></span><span class="txt">10개</span></li><li class="no"><span class="mark"></span><span class="txt">11개</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>30과 40은 둘 다 빠져요. 31부터 39까지 9개예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L4-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L4-3</code></div>
+        <div class="say"><p>헷갈리면 <strong>가장 작은 수와 가장 큰 수</strong>를 먼저 찾아요.</p><p>12 초과 20 이하 → 가장 작은 수 13, 가장 큰 수 20</p><p>→ 20 − 13 + 1 = <strong>8개</strong></p></div>
+        <div class="check" id="L4-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L4-3✓</code></div>
+        <div class="qt"><p>15 이상 23 미만인 자연수 중에서 가장 큰 수는 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">22</span></li><li class="no"><span class="mark"></span><span class="txt">23</span></li><li class="no"><span class="mark"></span><span class="txt">24</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>23 미만이라 23은 빠져요. 가장 큰 수는 22예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="L4-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L4-📏</code></div><p>양 끝이 들어가는지 보고 센다 — 가장 작은 수와 가장 큰 수를 찾고 (큰 수 − 작은 수) + 1.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L4-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L4-①a</code></div>
+      <div class="say"><p>55 이상 68 미만인 자연수는 모두 몇 개일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">15</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">12</span><span class="tag">양 끝을 모두 뺌</span></li><li class="no"><span class="mark"></span><span class="txt">14</span><span class="tag">양 끝을 모두 셈</span></li><li class="ok"><span class="mark">✔</span><span class="txt">13</span></li></ol>
+    </div><div class="sample" id="L4-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L4-①b</code></div>
+      <div class="say"><p>41 이상 65 이하인 자연수는 모두 몇 개일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">25</span></li><li class="no"><span class="mark"></span><span class="txt">23</span><span class="tag">양 끝을 모두 뺌</span></li><li class="no"><span class="mark"></span><span class="txt">26</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">24</span><span class="tag">두 수의 차만 셈</span></li></ol>
+    </div><div class="sample" id="L4-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L4-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>40 초과 47 미만인 자연수는 40, 41, …, 47로 8개예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">자연수 말고 소수도 세야 해요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">47 − 40 = 7, 7개예요</span><span class="tag">두 수의 차만 셈</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">40과 47은 안 들어가요 — 41부터 46까지 6개</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L4-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L4-👨</code></div>
+    <h3>범위에 드는 자연수를 셀 때 양 끝을 따로 확인하기 (차만 구하면 하나가 어긋난다).</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L4-👨말1"><code class="mini">말1</code><span>&quot;5 이상 9 이하인 수를 손가락으로 세어 봐. 9 − 5는 몇이야? 왜 다를까?&quot;</span></li><li id="L4-👨말2"><code class="mini">말2</code><span>&quot;아파트 3층 초과 7층 미만에는 몇 층이 있어?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">계단이나 줄 선 장난감으로 &quot;3번 이상 8번 이하&quot;를 직접 세어 보고, 8 − 3과 비교해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L4-👨함정1"><code class="mini">함정1</code><div><div class="kid">15 − 10 = 5처럼 차만 구한다</div><div class="dadsay">→ &quot;10부터 15까지 손가락으로 하나씩 세어 볼래?&quot;</div></div></li><li id="L4-👨함정2"><code class="mini">함정2</code><div><div class="kid">초과·미만인데 양 끝을 넣고 센다</div><div class="dadsay">→ &quot;30 초과면 30은 들어가? 가장 작은 수가 뭐야?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">이상·이하 / 초과·미만 / 섞인 것 세 가지를 가장 작은 수·가장 큰 수로 바르게 세면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="L5">
+    <header class="ch-head">
+      <div class="ch-no">L5</div>
+      <div>
+        <div class="grade">초5 · L4 다음</div>
+        <h2>수의 범위 활용</h2>
+        <p class="idea">체급표·요금표는 <strong>수의 범위</strong>로 칸을 나눠요. 경계에 있는 수(35 kg)는 &quot;35 kg 이하&quot; 칸에 들고 &quot;35 kg 초과&quot; 칸에는 안 들어요 — <strong>한 칸에만</strong> 들어가요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L5-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L5-1</code></div>
+        <div class="say"><p>태권도는 몸무게로 <strong>체급</strong>을 나눠요.</p><p>· 핀급: 32 kg 이하<br>· 플라이급: 32 kg 초과 35 kg 이하<br>· 밴텀급: 35 kg 초과 38 kg 이하</p><p>몸무게가 <strong>35 kg</strong>이면? &quot;35 kg 이하&quot;인 <strong>플라이급</strong>이에요. &quot;35 kg 초과&quot;에는 안 들어가요.</p></div>
+        <div class="check" id="L5-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L5-1✓</code></div>
+        <div class="qt"><p>태권도 체급표예요.</p><p>· 핀급: 32 kg 이하<br>· 플라이급: 32 kg 초과 35 kg 이하<br>· 밴텀급: 35 kg 초과 38 kg 이하<br>· 페더급: 38 kg 초과 41 kg 이하</p><p>푸린의 몸무게는 38 kg이에요. 푸린은 어느 체급일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">밴텀급</span></li><li class="no"><span class="mark"></span><span class="txt">페더급</span></li><li class="no"><span class="mark"></span><span class="txt">플라이급</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>38 kg은 &quot;38 kg 이하&quot;인 밴텀급에 들어가요. &quot;38 kg 초과&quot;인 페더급에는 안 들어가요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L5-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L5-2</code></div>
+        <div class="say"><p>경계에 있는 수는 <strong>딱 한 칸에만</strong> 들어가요.</p><p>표에서는 &quot;이하&quot;로 끝나는 칸과 &quot;초과&quot;로 시작하는 칸이 만나요. 경계의 수는 <strong>&quot;이하&quot;로 끝나는 칸</strong> 쪽이에요.</p></div>
+        <div class="check" id="L5-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L5-2✓</code></div>
+        <div class="qt"><p>편지 무게에 따른 우편 요금표예요.</p><p>· 25 g 이하: 400원<br>· 25 g 초과 50 g 이하: 500원<br>· 50 g 초과 100 g 이하: 700원</p><p>무게가 50 g인 편지를 보내려면 얼마를 내야 할까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">500원</span></li><li class="no"><span class="mark"></span><span class="txt">700원</span></li><li class="no"><span class="mark"></span><span class="txt">400원</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>50 g은 &quot;50 g 이하&quot;인 둘째 칸에 들어가요. &quot;50 g 초과&quot;에는 안 들어가요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L5-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L5-3</code></div>
+        <div class="say"><p>나이로 나누는 표도 있어요.</p><p>· 7살 미만: 무료<br>· 7살 이상 13살 미만: 어린이 요금<br>· 13살 이상: 어른 요금</p><p><strong>13살</strong>은 &quot;13살 미만&quot;에 안 들어가요 → <strong>어른 요금</strong>. 7살은 &quot;7살 이상&quot;이라 어린이 요금이에요.</p></div>
+        <div class="check" id="L5-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L5-3✓</code></div>
+        <div class="qt"><p>놀이공원 입장 요금표예요.</p><p>· 6살 미만: 무료<br>· 6살 이상 12살 미만: 어린이 요금<br>· 12살 이상: 어른 요금</p><p>푸린은 6살이에요. 어떤 요금을 내야 할까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">어린이 요금</span></li><li class="no"><span class="mark"></span><span class="txt">무료</span></li><li class="no"><span class="mark"></span><span class="txt">어른 요금</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>6살은 &quot;6살 미만&quot;에 안 들어가고 &quot;6살 이상&quot;에 들어가요 — 어린이 요금이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="L5-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L5-📏</code></div><p>경계의 수는 한 칸에만 든다 — 이상·이하인 칸에 들고, 초과·미만인 칸에는 안 든다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L5-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L5-①a</code></div>
+      <div class="say"><p>태권도 체급표예요.</p><p>· 핀급: 32 kg 이하<br>· 플라이급: 32 kg 초과 35 kg 이하<br>· 밴텀급: 35 kg 초과 38 kg 이하<br>· 페더급: 38 kg 초과 41 kg 이하</p><p>피카츄의 몸무게는 32 kg이에요. 피카츄는 어느 체급일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">밴텀급</span><span class="tag">표를 잘못 읽음</span></li><li class="no"><span class="mark"></span><span class="txt">페더급</span><span class="tag">표를 잘못 읽음</span></li><li class="no"><span class="mark"></span><span class="txt">플라이급</span><span class="tag">경계 수를 넣음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">핀급</span></li></ol>
+    </div><div class="sample" id="L5-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L5-①b</code></div>
+      <div class="say"><p>태권도 체급표예요.</p><p>· 핀급: 34 kg 이하<br>· 플라이급: 34 kg 초과 37 kg 이하<br>· 밴텀급: 37 kg 초과 40 kg 이하<br>· 페더급: 40 kg 초과 43 kg 이하</p><p>피카츄의 몸무게는 40 kg이에요. 피카츄는 어느 체급일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">페더급</span><span class="tag">경계 수를 넣음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">밴텀급</span></li><li class="no"><span class="mark"></span><span class="txt">핀급</span><span class="tag">표를 잘못 읽음</span></li><li class="no"><span class="mark"></span><span class="txt">플라이급</span><span class="tag">표를 잘못 읽음</span></li></ol>
+    </div><div class="sample" id="L5-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L5-②</code></div>
+      <div class="say"><p>루카리오가 이렇게 말했어요.</p><p><strong>몸무게 39 kg은 &quot;39 kg 초과 43 kg 이하&quot;인 밴텀급이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">39 kg은 어느 체급에도 안 들어가요</span><span class="tag">경계 수를 뺌</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">39 kg은 &quot;39 kg 초과&quot;에 안 들어가요 — &quot;35 kg 초과 39 kg 이하&quot;인 플라이급이에요</span></li><li class="no"><span class="mark"></span><span class="txt">체급은 키로 정해요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L5-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L5-👨</code></div>
+    <h3>표에서 경계의 수가 어느 칸에 드는지 바로 찾기.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L5-👨말1"><code class="mini">말1</code><span>&quot;버스 요금표에 '13살 이상 19살 미만: 청소년'이면 13살은? 19살은?&quot;</span></li><li id="L5-👨말2"><code class="mini">말2</code><span>&quot;택배 요금표에서 딱 2 kg은 어느 칸이야?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">실제 요금표(버스·영화관·택배)를 휴대폰으로 같이 찾아보고, 진우와 아빠의 나이·몸무게가 어느 칸인지 맞혀요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L5-👨함정1"><code class="mini">함정1</code><div><div class="kid">경계의 수를 두 칸에 다 넣는다</div><div class="dadsay">→ &quot;한 사람이 요금을 두 번 낼까? 딱 한 칸만 골라 봐.&quot;</div></div></li><li id="L5-👨함정2"><code class="mini">함정2</code><div><div class="kid">경계의 수를 '초과' 칸에 넣는다</div><div class="dadsay">→ &quot;35 kg 초과에 딱 35 kg이 들어가? 초과가 무슨 뜻이었지?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">요금표 두 개에서 경계 나이·무게 네 개를 모두 바른 칸에 넣으면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="L6">
+    <header class="ch-head">
+      <div class="ch-no">L6</div>
+      <div>
+        <div class="grade">초5 · L5 다음</div>
+        <h2>올림</h2>
+        <p class="idea"><strong>올림</strong>은 구하려는 자리 아래에 0이 아닌 수가 있으면 그 자리 숫자를 1 크게 하고, 아래 자리는 모두 0으로 해요. 243을 올림하여 십의 자리까지 나타내면 <strong>250</strong>. 이렇게 대강 나타내는 것을 <strong>어림</strong>한다고 해요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L6-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L6-1</code></div>
+        <div class="say"><p>잠만보가 과자값 <strong>2350원</strong>을 내려고 해요. 그런데 <strong>1000원짜리 지폐</strong>밖에 없어요.</p><p>1000원짜리 2장 = 2000원 → 모자라요<br>1000원짜리 3장 = <strong>3000원</strong> → 낼 수 있어요</p><p>이렇게 대강 나타내는 것을 <strong>어림</strong>한다고 해요. 모자라지 않게 위로 올려 나타내는 방법은 <strong>올림</strong>이에요.</p></div>
+        <div class="check" id="L6-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L6-1✓</code></div>
+        <div class="qt"><p>물건값 4120원을 1000원짜리 지폐로만 내려고 해요. 적어도 얼마를 내야 할까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5000원</span></li><li class="no"><span class="mark"></span><span class="txt">4000원</span></li><li class="no"><span class="mark"></span><span class="txt">4200원</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1000원짜리 4장이면 4000원이라 120원이 모자라요. 5장, 5000원을 내야 해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L6-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L6-2</code></div>
+        <div class="say"><p><strong>올림하여 십의 자리까지</strong> 나타내기</p><p>십의 자리 아래(일의 자리)에 0이 아닌 수가 있으면 <strong>십의 자리 숫자를 1 크게</strong> 하고, 일의 자리는 0으로 써요.</p><p>243 → <strong>250</strong><br>240 → 240 (일의 자리가 0이라 그대로)</p></div>
+        <div class="check" id="L6-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L6-2✓</code></div>
+        <div class="qt"><p>368을 올림하여 십의 자리까지 나타내면 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">370</span></li><li class="no"><span class="mark"></span><span class="txt">360</span></li><li class="no"><span class="mark"></span><span class="txt">378</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>일의 자리 8이 0이 아니라서 십의 자리 6을 7로, 일의 자리는 0으로 — 370이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L6-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L6-3</code></div>
+        <div class="say"><p>자리가 달라도 같아요. <strong>올림하여 백의 자리까지</strong>: 백의 자리 아래(십·일의 자리)에 0이 아닌 수가 있으면 백의 자리 숫자를 1 크게 해요.</p><p>4123 → <strong>4200</strong></p><p>백의 자리를 1 크게 한 뒤 아래를 <strong>0으로</strong> 바꾸는 것을 잊지 마세요 — 4223이 아니에요.</p></div>
+        <div class="check" id="L6-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L6-3✓</code></div>
+        <div class="qt"><p>5807을 올림하여 백의 자리까지 나타내면 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5900</span></li><li class="no"><span class="mark"></span><span class="txt">5800</span></li><li class="no"><span class="mark"></span><span class="txt">6000</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>백의 자리 아래 07이 0이 아니라서 백의 자리 8을 9로, 아래는 0으로 — 5900이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L6-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>L6-4</code></div>
+        <div class="say"><p>소수도 올림할 수 있어요.</p><p><strong>3.42를 올림하여 소수 첫째 자리까지</strong>: 소수 둘째 자리 2가 0이 아니라서 소수 첫째 자리 4를 5로 → <strong>3.5</strong></p></div>
+        <div class="check" id="L6-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L6-4✓</code></div>
+        <div class="qt"><p>2.71을 올림하여 소수 첫째 자리까지 나타내면 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.8</span></li><li class="no"><span class="mark"></span><span class="txt">2.7</span></li><li class="no"><span class="mark"></span><span class="txt">3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>소수 둘째 자리 1이 0이 아니라서 소수 첫째 자리 7을 8로 — 2.8이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="L6-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L6-📏</code></div><p>올림: 구하려는 자리 아래에 0이 아닌 수가 있으면 그 자리를 1 크게, 아래는 모두 0.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L6-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L6-①a</code></div>
+      <div class="say"><p>물건값 1386원을 1000원짜리 지폐로만 내려고 해요. 적어도 얼마를 내야 할까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">10000</span><span class="tag">한 자리 위까지 어림함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">2000</span></li><li class="no"><span class="mark"></span><span class="txt">1000</span><span class="tag">아래 자리를 올리지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">2386</span><span class="tag">올린 자리 아래를 0으로 안 바꿈</span></li></ol>
+    </div><div class="sample" id="L6-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L6-①b</code></div>
+      <div class="say"><p>11.38을 올림하여 일의 자리까지 나타내면 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">20</span><span class="tag">한 자리 위까지 어림함</span></li><li class="no"><span class="mark"></span><span class="txt">11</span><span class="tag">아래 자리를 올리지 않음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">11.4</span><span class="tag">한 자리 아래까지 어림함</span></li></ol>
+    </div><div class="sample" id="L6-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L6-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>6.126을 올림하여 소수 첫째 자리까지 나타내면 6.13이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">소수 첫째 자리까지니까 소수 둘째 자리부터 아래를 봐요 — 6.2</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">소수는 올림할 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">소수 첫째 자리 아래를 그냥 0으로 — 6.1</span><span class="tag">아래 자리를 올리지 않음</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L6-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L6-👨</code></div>
+    <h3>올림 = 그 자리 아래가 0이 아니면 그 자리를 1 크게 하고, 아래는 0으로.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L6-👨말1"><code class="mini">말1</code><span>&quot;편의점에서 2350원짜리를 1000원짜리로만 사려면 몇 장 내야 해?&quot;</span></li><li id="L6-👨말2"><code class="mini">말2</code><span>&quot;243을 십의 자리까지 올림하면? 일의 자리 3은 어떻게 돼?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">영수증이나 가격표 세 장으로 &quot;1000원짜리로만 내면 얼마?&quot; 놀이 — 진우가 종이 지폐를 세어 내요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L6-👨함정1"><code class="mini">함정1</code><div><div class="kid">243 → 253처럼 아래 자리를 그대로 둔다</div><div class="dadsay">→ &quot;올렸으면 그 아래는 0으로 깨끗하게. 250과 253 중에 십의 자리까지 나타낸 수는?&quot;</div></div></li><li id="L6-👨함정2"><code class="mini">함정2</code><div><div class="kid">240도 250으로 올린다</div><div class="dadsay">→ &quot;일의 자리가 0이면 올릴 게 없어. 240은 그대로야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">368(십의 자리)·5807(백의 자리)·2.71(소수 첫째 자리)을 올림하고 아래 자리를 0으로 쓰면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="L7">
+    <header class="ch-head">
+      <div class="ch-no">L7</div>
+      <div>
+        <div class="grade">초5 · L6 다음</div>
+        <h2>버림</h2>
+        <p class="idea"><strong>버림</strong>은 구하려는 자리 아래의 수를 모두 0으로 해요(버려요). 247을 버림하여 십의 자리까지 나타내면 <strong>240</strong>. 지운 자리에는 0을 써야 해요 — 24가 아니에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>3장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L7-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L7-1</code></div>
+        <div class="say"><p>귤 <strong>247개</strong>를 한 상자에 <strong>10개씩</strong> 담아 팔아요.</p><p>10개씩 24상자 = 240개 → 팔 수 있어요<br>남은 7개로는 한 상자가 안 차요</p><p>이렇게 아래 자리를 버려서 나타내는 것을 <strong>버림</strong>이라고 해요. 247을 버림하여 십의 자리까지 나타내면 <strong>240</strong>이에요.</p></div>
+        <div class="check" id="L7-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L7-1✓</code></div>
+        <div class="qt"><p>귤 586개를 한 상자에 10개씩 담아 팔려고 해요. 상자에 담아 팔 수 있는 귤은 최대 몇 개일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">580개</span></li><li class="no"><span class="mark"></span><span class="txt">590개</span></li><li class="no"><span class="mark"></span><span class="txt">58개</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>10개씩 58상자에 580개, 남은 6개는 한 상자가 안 차요 — 580개예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L7-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L7-2</code></div>
+        <div class="say"><p><strong>버림하여 백의 자리까지</strong>: 백의 자리 아래를 모두 0으로 써요.</p><p>3684 → <strong>3600</strong></p><p>지운 자리에는 꼭 <strong>0을 써요</strong>. 36이라고 쓰면 아주 작은 수가 돼요.</p></div>
+        <div class="check" id="L7-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L7-2✓</code></div>
+        <div class="qt"><p>7259를 버림하여 백의 자리까지 나타내면 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7200</span></li><li class="no"><span class="mark"></span><span class="txt">7300</span></li><li class="no"><span class="mark"></span><span class="txt">72</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>백의 자리 아래 59를 버려서 0으로 — 7200이에요. 72는 자리가 사라진 수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L7-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L7-3</code></div>
+        <div class="say"><p>소수도 같아요.</p><p><strong>5.87을 버림하여 소수 첫째 자리까지</strong> → 소수 둘째 자리를 버려서 <strong>5.8</strong></p><p>올림은 1 크게, 버림은 그대로 두고 아래만 0 — 둘을 헷갈리지 않게 해요.</p></div>
+        <div class="check" id="L7-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L7-3✓</code></div>
+        <div class="qt"><p>4.39를 버림하여 소수 첫째 자리까지 나타내면 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4.3</span></li><li class="no"><span class="mark"></span><span class="txt">4.4</span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>소수 둘째 자리 9를 버려서 4.3이에요. 버림은 크게 하지 않아요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="L7-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L7-📏</code></div><p>버림: 구하려는 자리 아래를 모두 0으로 — 크게 하지 않는다.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L7-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L7-①a</code></div>
+      <div class="say"><p>6.666을 버림하여 소수 둘째 자리까지 나타내면 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6.66</span></li><li class="no"><span class="mark"></span><span class="txt">6.67</span><span class="tag">버리지 않고 올림</span></li><li class="no"><span class="mark"></span><span class="txt">6.65</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">6.6</span><span class="tag">한 자리 위까지 어림함</span></li></ol>
+    </div><div class="sample" id="L7-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L7-①b</code></div>
+      <div class="say"><p>동전 5809원을 1000원짜리 지폐로 바꾸려고 해요. 지폐로 바꿀 수 있는 돈은 최대 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">5</span><span class="tag">아래 자리를 지워 버림</span></li><li class="ok"><span class="mark">✔</span><span class="txt">5000</span></li><li class="no"><span class="mark"></span><span class="txt">6000</span><span class="tag">버리지 않고 올림</span></li><li class="no"><span class="mark"></span><span class="txt">5800</span><span class="tag">한 자리 아래까지 어림함</span></li></ol>
+    </div><div class="sample" id="L7-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L7-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 말했어요.</p><p><strong>5562를 버림하여 백의 자리까지 나타내면 55예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">지운 자리에 0을 써야 해요 — 5500</span></li><li class="no"><span class="mark"></span><span class="txt">백의 자리를 1 크게 해야 해요 — 5600</span><span class="tag">버리지 않고 올림</span></li><li class="no"><span class="mark"></span><span class="txt">천의 자리까지 버려야 해요 — 5000</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L7-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L7-👨</code></div>
+    <h3>버림 = 그 자리 아래를 모두 0으로 (크게 하지 않고, 자리 수는 그대로).</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L7-👨말1"><code class="mini">말1</code><span>&quot;동전 3460원을 1000원짜리 지폐로 바꾸면 몇 장?&quot;</span></li><li id="L7-👨말2"><code class="mini">말2</code><span>&quot;247을 십의 자리까지 버림하면? 24라고 하면 몇 개가 된 거야?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">사탕이나 레고 37개를 10개씩 봉지에 담아 보고, 다 찬 봉지 수를 세요 — 남은 7개가 버린 것이에요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L7-👨함정1"><code class="mini">함정1</code><div><div class="kid">3684 → 36처럼 아래 자리를 지워 버린다</div><div class="dadsay">→ &quot;3684개가 36개가 됐어? 지운 자리에 0을 써 볼까?&quot;</div></div></li><li id="L7-👨함정2"><code class="mini">함정2</code><div><div class="kid">버림인데 올림처럼 1 크게 한다</div><div class="dadsay">→ &quot;버림은 버리는 거야 — 더 커질 수 있을까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">7259(백의 자리)·4.39(소수 첫째 자리)·586(십의 자리)을 버림하고 자리 수를 지키면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="L8">
+    <header class="ch-head">
+      <div class="ch-no">L8</div>
+      <div>
+        <div class="grade">초5 · L7 다음</div>
+        <h2>반올림</h2>
+        <p class="idea"><strong>반올림</strong>은 구하려는 자리 <strong>바로 아래 숫자</strong>만 봐요. 0, 1, 2, 3, 4면 버리고 5, 6, 7, 8, 9면 올려요. 245를 반올림하여 십의 자리까지 → 바로 아래 5라서 <strong>250</strong>.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L8-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L8-1</code></div>
+        <div class="say"><p><strong>반올림</strong>은 구하려는 자리 <strong>바로 아래 숫자 하나</strong>만 봐요.</p><p>· 0, 1, 2, 3, 4 → 버려요<br>· 5, 6, 7, 8, 9 → 올려요</p><p>243을 반올림하여 십의 자리까지 → 바로 아래 3 → 버려서 <strong>240</strong><br>247 → 바로 아래 7 → 올려서 <strong>250</strong></p></div>
+        <div class="check" id="L8-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L8-1✓</code></div>
+        <div class="qt"><p>362를 반올림하여 십의 자리까지 나타내면 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">360</span></li><li class="no"><span class="mark"></span><span class="txt">370</span></li><li class="no"><span class="mark"></span><span class="txt">300</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>십의 자리 바로 아래 숫자는 2 — 0~4라서 버려요. 360이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L8-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L8-2</code></div>
+        <div class="say"><p><strong>5는 올려요.</strong></p><p>245를 반올림하여 십의 자리까지 → 바로 아래 5 → <strong>250</strong></p><p>5가 딱 가운데라 헷갈리지만, 반올림에서 5는 올리는 쪽이에요.</p></div>
+        <div class="check" id="L8-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L8-2✓</code></div>
+        <div class="qt"><p>3.25를 반올림하여 소수 첫째 자리까지 나타내면 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3.3</span></li><li class="no"><span class="mark"></span><span class="txt">3.2</span></li><li class="no"><span class="mark"></span><span class="txt">3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>소수 첫째 자리 바로 아래 숫자가 5라서 올려요 — 3.3이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L8-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L8-3</code></div>
+        <div class="say"><p>반올림은 <strong>한 번만</strong> 해요.</p><p>2449를 반올림하여 백의 자리까지 → 백의 자리 바로 아래(십의 자리) 숫자는 <strong>4</strong> → 버려서 <strong>2400</strong></p><p>2449 → 2450 → 2500처럼 끝에서부터 두 번 반올림하면 안 돼요.</p></div>
+        <div class="check" id="L8-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L8-3✓</code></div>
+        <div class="qt"><p>6348을 반올림하여 백의 자리까지 나타내면 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6300</span></li><li class="no"><span class="mark"></span><span class="txt">6400</span></li><li class="no"><span class="mark"></span><span class="txt">6350</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>백의 자리 바로 아래 숫자는 4 — 버려요. 끝의 8은 보지 않아요. 6300이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L8-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>L8-4</code></div>
+        <div class="say"><p>뮤츠가 본 영화의 관객은 <strong>4780명</strong>이에요. &quot;약 몇천 명&quot;이라고 말하려면 반올림하여 천의 자리까지 나타내요.</p><p>천의 자리 바로 아래(백의 자리) 숫자 7 → 올려서 <strong>5000명</strong></p></div>
+        <div class="check" id="L8-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L8-4✓</code></div>
+        <div class="qt"><p>어느 영화관에 온 관객은 3460명이에요. 관객 수를 반올림하여 백의 자리까지 나타내면 몇 명일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3500명</span></li><li class="no"><span class="mark"></span><span class="txt">3400명</span></li><li class="no"><span class="mark"></span><span class="txt">3000명</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>백의 자리 바로 아래 숫자는 6 — 올려요. 3500명이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="L8-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L8-📏</code></div><p>반올림: 바로 아래 숫자 하나만 보고, 0~4면 버리고 5~9면 올린다 — 한 번만.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L8-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L8-①a</code></div>
+      <div class="say"><p>5477을 반올림하여 천의 자리까지 나타내면 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">10000</span><span class="tag">한 자리 위까지 어림함</span></li><li class="no"><span class="mark"></span><span class="txt">5500</span><span class="tag">한 자리 아래까지 어림함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">5000</span></li><li class="no"><span class="mark"></span><span class="txt">6000</span><span class="tag">버려야 하는데 올림</span></li></ol>
+    </div><div class="sample" id="L8-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L8-①b</code></div>
+      <div class="say"><p>어느 영화관에 온 관객은 4005명이에요. 관객 수를 반올림하여 천의 자리까지 나타내면 몇 명일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4000</span></li><li class="no"><span class="mark"></span><span class="txt">3000</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">5000</span><span class="tag">버려야 하는데 올림</span></li><li class="no"><span class="mark"></span><span class="txt">6000</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="L8-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L8-②</code></div>
+      <div class="say"><p>루카리오가 이렇게 말했어요.</p><p><strong>5.25를 반올림하여 소수 첫째 자리까지 나타내면 5는 버리니까 5.2예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">일의 자리까지 반올림해야 해요 — 5</span><span class="tag">한 자리 위까지 어림함</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">5부터는 올려요 — 5.3</span></li><li class="no"><span class="mark"></span><span class="txt">소수는 반올림할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L8-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L8-👨</code></div>
+    <h3>반올림 = 바로 아래 숫자 하나로 정한다 (0~4 버림, 5~9 올림, 5는 올림).</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L8-👨말1"><code class="mini">말1</code><span>&quot;키 136.5 cm를 반올림하여 일의 자리까지 나타내면?&quot;</span></li><li id="L8-👨말2"><code class="mini">말2</code><span>&quot;2449를 백의 자리까지 반올림하면 몇이야? 끝의 9부터 올리면 안 되는 이유는?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">주사위 두 개로 두 자리 수를 만들고 반올림하여 십의 자리까지 말해요. 일의 자리가 5인 수도 꼭 한 번 나오게 해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L8-👨함정1"><code class="mini">함정1</code><div><div class="kid">5를 버린다</div><div class="dadsay">→ &quot;5는 가운데지만 반올림에서는 올려. 0~4가 다섯 개, 5~9가 다섯 개야.&quot;</div></div></li><li id="L8-👨함정2"><code class="mini">함정2</code><div><div class="kid">끝자리부터 차례로 두 번 반올림한다</div><div class="dadsay">→ &quot;바로 아래 숫자 하나만 봐. 십의 자리가 4면 그다음 숫자는 상관없어.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">362·3.25·6348을 바로 아래 숫자 하나만 보고 반올림하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="L9">
+    <header class="ch-head">
+      <div class="ch-no">L9</div>
+      <div>
+        <div class="grade">초5 · L8 다음</div>
+        <h2>어림하기 활용</h2>
+        <p class="idea">어림하기는 <strong>상황에 맞게</strong> 골라요. 모두 타야 하는 버스는 모자라면 안 되니까 <strong>올림</strong>, 꽉 찬 봉지만 팔 수 있으면 <strong>버림</strong>, 대강 가까운 수로 말할 때는 <strong>반올림</strong>.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="L9-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>L9-1</code></div>
+        <div class="say"><p>어림 방법은 <strong>상황에 맞게</strong> 골라요.</p><p>학생 <strong>163명</strong>이 한 대에 40명씩 타는 버스를 타요.</p><p>40 × 4 = 160 → 4대면 <strong>3명이 남아요</strong></p><p>모두 타야 하니까 → <strong>올림</strong>해서 <strong>5대</strong></p></div>
+        <div class="check" id="L9-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L9-1✓</code></div>
+        <div class="qt"><p>버스 한 대에 30명씩 탈 수 있어요. 학생 125명이 모두 타려면 버스는 적어도 몇 대 있어야 할까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5대</span></li><li class="no"><span class="mark"></span><span class="txt">4대</span></li><li class="no"><span class="mark"></span><span class="txt">6대</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>30 × 4 = 120이라 4대면 5명이 남아요. 모두 타야 하니까 5대예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L9-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>L9-2</code></div>
+        <div class="say"><p>사탕 <strong>347개</strong>를 10개씩 봉지에 담아 팔아요.</p><p>10 × 34 = 340 → 34봉지, 7개가 남아요</p><p>7개로는 한 봉지가 <strong>안 차요</strong> → <strong>버림</strong>해서 <strong>34봉지</strong></p></div>
+        <div class="check" id="L9-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L9-2✓</code></div>
+        <div class="qt"><p>사탕 258개를 한 봉지에 10개씩 담아 팔려고 해요. 팔 수 있는 봉지는 최대 몇 봉지일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">25봉지</span></li><li class="no"><span class="mark"></span><span class="txt">26봉지</span></li><li class="no"><span class="mark"></span><span class="txt">24봉지</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>10 × 25 = 250이라 25봉지, 남은 8개로는 한 봉지가 안 차요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L9-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>L9-3</code></div>
+        <div class="say"><p>가장 가까운 수로 대강 말할 때는 <strong>반올림</strong>이에요.</p><p>· 모자라면 안 될 때(버스·낼 돈) → <strong>올림</strong><br>· 다 찬 것만 셀 때(봉지·바꿀 지폐) → <strong>버림</strong><br>· 가장 가깝게 말할 때(관객 수·인구) → <strong>반올림</strong></p></div>
+        <div class="check" id="L9-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L9-3✓</code></div>
+        <div class="qt"><p>동전 3720원을 1000원짜리 지폐로 바꿔요. 바꿀 수 있는 돈을 정하려면 어떤 어림 방법이 알맞을까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">버림</span></li><li class="no"><span class="mark"></span><span class="txt">올림</span></li><li class="no"><span class="mark"></span><span class="txt">반올림</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1000원짜리로 바꿀 수 있는 것은 다 찬 1000원뿐이에요 — 남은 720원은 못 바꿔요. 버림이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="L9-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>L9-4</code></div>
+        <div class="say"><p>⭐ 거꾸로 생각해 볼까요? 반올림하여 십의 자리까지 나타내면 <strong>350</strong>이 되는 자연수는?</p><p>345, 346, 347, 348, 349 — 5부터 올려서 350<br>350, 351, 352, 353, 354 — 4까지 버려서 350</p><p>→ 가장 작은 수 <strong>345</strong>, 가장 큰 수 <strong>354</strong>. 수의 범위로는 <strong>345 이상 355 미만</strong>이에요.</p></div>
+        <div class="check" id="L9-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>L9-4✓</code></div>
+        <div class="qt"><p>반올림하여 십의 자리까지 나타내면 620이 되는 자연수 중에서 가장 작은 수는 얼마일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">615</span></li><li class="no"><span class="mark"></span><span class="txt">620</span></li><li class="no"><span class="mark"></span><span class="txt">611</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>615는 바로 아래 숫자가 5라서 올려 620이 돼요. 614는 610이 돼요. 가장 작은 수는 615예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="L9-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>L9-📏</code></div><p>모자라면 안 되면 올림 · 다 찬 것만 세면 버림 · 가장 가깝게 말하면 반올림.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="L9-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>L9-①a</code></div>
+      <div class="say"><p>반올림하여 십의 자리까지 나타내면 540이 되는 수의 범위는 어느 것일까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">540 이상 550 미만</span><span class="tag">올림·버림의 범위로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">535 이상 545 미만</span></li><li class="no"><span class="mark"></span><span class="txt">535 이상 545 이하</span><span class="tag">경계 수를 넣음</span></li><li class="no"><span class="mark"></span><span class="txt">535 초과 545 미만</span><span class="tag">경계 수를 뺌</span></li></ol>
+    </div><div class="sample" id="L9-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>L9-①b</code></div>
+      <div class="say"><p>반올림하여 백의 자리까지 나타내면 4100이 되는 자연수 중에서 가장 작은 수는 얼마일까요?</p></div>
+      
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4050</span></li><li class="no"><span class="mark"></span><span class="txt">4100</span><span class="tag">어림한 수를 그대로 씀</span></li><li class="no"><span class="mark"></span><span class="txt">4001</span><span class="tag">올림·버림의 범위로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">4051</span><span class="tag">경계 수를 뺌</span></li></ol>
+    </div><div class="sample" id="L9-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>L9-②</code></div>
+      <div class="say"><p>피카츄가 이렇게 말했어요.</p><p><strong>사탕 829개를 10개씩 봉지에 담으면 올림해서 83봉지를 팔 수 있어요</strong></p><p>어디가 틀렸을까요?</p></div>
+      
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">83번째 봉지는 다 안 차요 — 버림해서 82봉지</span></li><li class="no"><span class="mark"></span><span class="txt">반올림해서 83봉지가 맞아요</span><span class="tag">알맞은 어림 방법을 모름</span></li><li class="no"><span class="mark"></span><span class="txt">봉지는 사탕 수만큼 있어야 해요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="L9-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>L9-👨</code></div>
+    <h3>어림 방법을 상황으로 고르기 — 모자라면 안 되면 올림, 다 찬 것만 세면 버림, 가깝게 말하면 반올림.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="L9-👨말1"><code class="mini">말1</code><span>&quot;우리 반 27명이 4명씩 자는 텐트에서 자려면 텐트가 몇 개 필요해?&quot;</span></li><li id="L9-👨말2"><code class="mini">말2</code><span>&quot;사탕 47개를 10개씩 포장하면 몇 봉지를 선물할 수 있어?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">가족 나들이 계획을 세워요 — 사람 수·차 좌석·간식 봉지를 정하면서 올림과 버림 중 무엇을 썼는지 말해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="L9-👨함정1"><code class="mini">함정1</code><div><div class="kid">버스 대수를 반올림한다</div><div class="dadsay">→ &quot;163명이면 4대에 160명. 남은 3명은 어떻게 가?&quot;</div></div></li><li id="L9-👨함정2"><code class="mini">함정2</code><div><div class="kid">덜 찬 봉지까지 센다</div><div class="dadsay">→ &quot;7개 든 봉지를 10개짜리라고 팔 수 있을까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">버스·봉지·관객 세 상황에서 올림·버림·반올림을 바로 고르고 이유를 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+
+  <footer>신코치 🔢 수학 · 수의 범위와 어림하기 줄기 배움 원고 ·2026-10-01</footer>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('ans');
+  function apply(){document.body.classList.toggle('hide-ans',!cb.checked);}
+  try{var v=localStorage.getItem('rng-review-ans');if(v==='0'){cb.checked=false;}}catch(e){}
+  cb.addEventListener('change',function(){apply();try{localStorage.setItem('rng-review-ans',cb.checked?'1':'0');}catch(e){}});
+  apply();
+})();
+</script>

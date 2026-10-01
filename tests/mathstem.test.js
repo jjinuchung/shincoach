@@ -10,9 +10,13 @@ import { lessonOf, checkContent } from '../js/mathneg.js';
 const content = JSON.parse(readFileSync(new URL('../coach/math/negative.json', import.meta.url), 'utf8'));
 const T = '2026-09-21';
 
-test('STEMS: 분수·혼합계산·소수·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프 열 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
-  assert.deepEqual(STEM_ORDER, ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data']);
-  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'B', 'C', 'E', 'F', 'G', 'H', 'I', 'J', 'K'], '글자 순서대로 (D는 문자와 식 몫으로 비워 둠)');
+test('STEMS: 분수·혼합계산·소수·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기 열한 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
+  assert.deepEqual(STEM_ORDER, ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range']);
+  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'B', 'C', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'], '글자 순서대로 (D는 문자와 식 몫으로 비워 둠)');
+  assert.equal(STEMS.range.lesson, true, '수의 범위와 어림하기도 📚 배움');
+  assert.equal(STEMS.range.file, './coach/math/range.json');
+  assert.equal(stemOf('rng.apply').key, 'range');
+  assert.equal(nameOf('rng.over'), '초과와 미만');
   assert.equal(STEMS.data.lesson, true, '자료와 그래프도 📚 배움');
   assert.equal(STEMS.data.file, './coach/math/data.json');
   assert.equal(stemOf('dat.meanuse').key, 'data');
@@ -71,7 +75,7 @@ test('줄기별 사다리·진단: 음수 줄기의 진단은 음수 사다리�
   assert.equal(ladderOf(m, T, 'fraction').filter((r) => r.state === 'done').length, 0);
   assert.deepEqual(dueIds(m, '2026-09-30', 'negative'), ['neg.mean', 'neg.line', 'neg.add', 'neg.sub']);
   const s = mathSummary(m);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false], ['area', 0, false], ['shape', 0, false], ['data', 0, false]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false], ['area', 0, false], ['shape', 0, false], ['data', 0, false], ['range', 0, false]]);
   assert.equal(s.done, 4);
 });
 

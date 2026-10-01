@@ -145,7 +145,7 @@ function loadPlayer() {
       // 🔤 단어 이어 주기 하루 판 수
       todayMatches: () => matchState.today,
       async markMatch() { matchState.today++; return true; },
-      // 💖 내 문장 (2026-10-02) — 기록은 reviewState.stats의 fav, 덤으로 푼 문장은 reviewState.favDone
+      // 💖 내 문장 (2026-10-01) — 기록은 reviewState.stats의 fav, 덤으로 푼 문장은 reviewState.favDone
       isFav: (cue) => !!((reviewState.stats || []).find((r) => r.start === cue.start) || {}).fav,
       setFav(cue, on) { const r = (reviewState.stats || []).find((x) => x.start === cue.start); if (r) r.fav = !!on; return !!on; },
       favPractice(cue) { (reviewState.favDone ||= []).push(cue.start); },
@@ -2027,7 +2027,7 @@ test('🔤 무대에는 움직이는 그림이 없어도 평소 일러스트를 
   for (const m of mons) assert.ok(m.art || m.anim, `${m.id}: 도트든 일러스트든 그림이 있어야 무대가 안 빈다`);
 });
 
-// ── 💖 내 문장 (2026-10-02) ──
+// ── 💖 내 문장 (2026-10-01) ──
 
 test('💖 복습: 차례가 아닌 고른 문장 하나가 덤으로 맨 앞에 — 연습이라 일정(track.review)·🔶 실패 수를 안 건드리고, 맞히면 문장 값 ⚡', async () => {
   const { run, reviewCalls, reviewState, xpLog } = loadPlayer();
