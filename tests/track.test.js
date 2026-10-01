@@ -307,3 +307,51 @@ test('🪟 저장이 실패하면 증분을 그대로 들고 있다가 다음에
   await run('flush()');
   assert.equal(s.store.days.get(run('todayKey()')).seconds, 10, '실패했던 7초까지 함께 저장');
 });
+
+test('💖 setFav/isFav/favPractice: 고르기는 favAt과 함께 저장 · 덤으로 푼 날만 적고 복습 일정·회차 수는 그대로', async () => {
+  const s = stub();
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  const cue = '({ start: 3, end: 4, en: "I like it." })';
+  assert.equal(run(`isFav(${cue})`), false);
+  assert.equal(run(`statFor(${cue})`), null, '묻기만 해서는 기록을 만들지 않는다');
+  run(`done(${cue})`);
+  const before = JSON.parse(run(`JSON.stringify(statFor(${cue}))`));
+  assert.equal(run(`setFav(${cue}, true)`), true);
+  assert.equal(run(`isFav(${cue})`), true);
+  assert.ok(run(`statFor(${cue}).favAt`) > 0, '나중에 누른 쪽을 가리려고 favAt');
+  run(`favPractice(${cue})`);
+  const after = JSON.parse(run(`JSON.stringify(statFor(${cue}))`));
+  assert.equal(after.favDay, run('todayKey()'));
+  assert.deepEqual([after.box, after.dueAt, after.reviews || 0], [before.box, before.dueAt, before.reviews || 0], '덤은 복습 일정을 안 바꾼다');
+  assert.equal(run('todayReviewItems()'), 0, '회차 길이(reviewItems)에도 안 센다');
+  assert.equal(run(`setFav(${cue}, false)`), false);
+  assert.equal(run(`isFav(${cue})`), false);
+  await run('flush()');
+  const sent = s.store.sent.filter((r) => r.start === 3).pop();
+  assert.equal(sent.fav, false);
+  assert.ok(sent.favAt > 0, '뺀 것도 favAt째로 저장 — 옛 백업이 되살리지 못하게');
+});
+
+test('💖 claimFavExtra: 두 창(트랙 둘)이 같은 저장소를 쓰면 같은 덤 문장의 ⚡💰는 한 창만 · 다른 문장은 따로 (Codex 20차 #4)', async () => {
+  const s = stub();
+  // 실제 db.claimDailyKey와 같은 약속: 그날 기록의 목록에 열쇠가 없으면 넣고 won
+  s.claimDailyKey = async (date, field, key) => {
+    const cur = s.store.days.get(date) || null;
+    const have = (cur && Array.isArray(cur[field])) ? cur[field] : [];
+    if (have.includes(key)) return { won: false, daily: cur || emptyDaily(date) };
+    const next = mergeDailyDelta(cur, date, { [field]: [key] });
+    s.store.days.set(date, next);
+    return { won: true, daily: next };
+  };
+  const A = loadTrack(s);
+  const B = loadTrack(s);
+  await A.run('open({ id: "x", title: "X" })');
+  await B.run('open({ id: "x", title: "X" })');
+  const cue = '({ start: 3, end: 4, en: "I like it." })';
+  assert.equal(await A.run(`claimFavExtra(${cue})`), true, '창 A가 먼저');
+  assert.equal(await B.run(`claimFavExtra(${cue})`), false, '창 B는 같은 문장으로 또 못 받는다');
+  assert.equal(await A.run(`claimFavExtra(${cue})`), false, '같은 창에서 두 번도 안 된다');
+  assert.equal(await B.run('claimFavExtra({ start: 6, end: 7, en: "Me too." })'), true, '다른 문장은 따로');
+  assert.deepEqual(Array.from(s.store.days.get(A.run('todayKey()')).favExtraKeys), ['x|30', 'x|60']);
+});

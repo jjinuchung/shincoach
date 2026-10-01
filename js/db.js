@@ -287,7 +287,9 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   //   (예전 `mathSeconds`는 이름만 있고 아무도 쓰지 않아 여기서 뺐다 — mathTime과 헷갈린다)
   'mathTime', 'mathBonus', 'enTime', 'enBonus'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
-const DAILY_LISTS = ['reviewStoneKeys']; // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
+// 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
+// 💖 덤으로 풀어 ⚡💰를 받은 문장 — 두 창이 같은 덤을 내도 한 번 (Codex 20차 #4)
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys'];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {
@@ -1312,6 +1314,11 @@ export function mergeStatRecord(name, cur, rec) {
     const pick = pickReviewState(cur, rec);
     out.box = pick.box;
     out.dueAt = pick.dueAt;
+    // 💖 내 문장은 켜고 끄는 값이라 OR/max로 못 합친다 — 나중에 누른 쪽(favAt)을 한 쌍으로 (뺀 것이 옛 백업으로 되살아나지 않게)
+    const fa = Number(cur.favAt) || 0;
+    const fb = Number(rec.favAt) || 0;
+    if (fa || fb) { out.fav = !!(fb >= fa ? rec : cur).fav; out.favAt = Math.max(fa, fb); }
+    if (cur.favDay || rec.favDay) out.favDay = (cur.favDay || '') >= (rec.favDay || '') ? cur.favDay : rec.favDay; // 덤으로 푼 날은 늦은 날
     // 🎯 못 말한 단어 { 단어: 횟수 }는 단어마다 큰 값 (기기를 옮겨도 약점이 남게)
     if (cur.missed || rec.missed) {
       out.missed = { ...(cur.missed || {}) };

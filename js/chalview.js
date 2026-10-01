@@ -189,6 +189,7 @@ export function figureEl(fig) {
   if (!fig || !fig.kind) return null;
   switch (fig.kind) {
     case 'chart': return chartEl(fig);
+    case 'blankgraph': return blankGraphEl(fig);
     case 'charts': return chartsEl(fig);
     case 'table': return tableEl(fig);
     case 'numline': return numlineEl(fig);
@@ -233,12 +234,41 @@ export function inputEl(part, onChange = () => {}) {
  * 누른 곳의 가로 위치 → 어느 날, 세로 위치 → 가장 가까운 눈금선(📊 점 찍기 판과 같은 자 chartGeom). 찍은 점끼리는 선분으로 잇는다.
  * ▲▼는 마지막에 고른 날의 점을 한 칸씩. 값은 화면에 쓰지 않는다 — 눈금을 읽어 찍는 게 이 문제다.
  */
-function plotInput(part, wrap, onChange) {
-  const kind = String(part.chart || '').split(' ')[0];
-  const full = kind === 'lgraph' ? parseChart(kind, part.chart.slice(kind.length + 1)) : null;
-  if (!full) return { el: wrap, value: () => null, clear() {}, filled: () => false };
+/**
+ * 값 없는 빈 꺾은선그래프 — 07·12 점 찍기 판과 06·11 "눈금 한 칸은?"의 빈 그래프가 **같은 칸 수**가 되게 한 곳에서 만든다.
+ * hide: 맨 아래(물결선 위 첫 눈금) 말고는 눈금에 수를 안 적는다 — 문제집 128쪽 12번 빈 그래프처럼
+ */
+function blankChart(chart, hide = false) {
+  const kind = String(chart || '').split(' ')[0];
+  const full = kind === 'lgraph' ? parseChart(kind, String(chart).slice(kind.length + 1)) : null;
+  if (!full) return null;
   const vals = full.items.map((x) => x.v).filter((v) => v !== null);
-  const blank = { ...full, top: Math.max(...vals), items: full.items.map((x) => ({ label: x.label, v: null })) };
+  return { ...full, top: Math.max(...vals), items: full.items.map((x) => ({ label: x.label, v: null })), ...(hide ? { hide: true } : {}) };
+}
+/** 빈 그래프 SVG를 넣고 ? 다섯 개(값 자리)는 지운다 — 빈 그래프에서는 소음 */
+function putBlank(g, blank) {
+  g.innerHTML = lgraphSvg(blank);
+  const svg = g.querySelector('svg');
+  for (const t of [...svg.querySelectorAll('text')]) if (t.textContent === '?') t.remove();
+  return svg;
+}
+/** 06·11 그림 — 표 옆에 07·12와 같은 빈 그래프 (문제집에선 같은 쪽에 있어서 그 칸 수가 눈금 한 칸을 정한다, Codex 20차 #2) */
+function blankGraphEl(f) {
+  const blank = blankChart(f.chart, true);
+  if (!blank) return null;
+  const box = el('div', 'chal-fig chal-charts');
+  const fig = el('div', 'chal-chart math-fig');
+  if (f.title) fig.appendChild(el('div', 'chal-chart-title', f.title));
+  const g = el('div', 'chal-chart-svg');
+  putBlank(g, blank);
+  fig.appendChild(g);
+  box.appendChild(fig);
+  return box;
+}
+
+function plotInput(part, wrap, onChange) {
+  const blank = blankChart(part.chart);
+  if (!blank) return { el: wrap, value: () => null, clear() {}, filled: () => false };
   const G = chartGeom(blank);
   const n = blank.items.length;
   const cells = new Array(n).fill(null);
@@ -248,11 +278,9 @@ function plotInput(part, wrap, onChange) {
   const fig = el('div', 'chal-chart math-fig chal-plot');
   if (part.title) fig.appendChild(el('div', 'chal-chart-title', part.title));
   const g = el('div', 'chal-chart-svg');
-  g.innerHTML = lgraphSvg(blank);
   fig.appendChild(g);
   wrap.appendChild(fig);
-  const svg = g.querySelector('svg');
-  for (const t of [...svg.querySelectorAll('text')]) if (t.textContent === '?') t.remove(); // 빈 그래프 — ? 다섯 개는 소음
+  const svg = putBlank(g, blank);
   svg.classList.add('is-drawable');
   const mk = (tag, a) => { const e = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(a)) e.setAttribute(k, String(v)); return e; };
   const colHi = mk('rect', { class: 'plot-col', x: 0, y: G.yOfCells(G.cells) - 6, width: G.colW, height: G.y0 + G.wave - G.yOfCells(G.cells) + 6, rx: 6 });

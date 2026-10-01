@@ -37,10 +37,40 @@ export function slimStats(records = []) {
     if (r.reviewedAt) keep.reviewedAt = r.reviewedAt;
     if (r.reviewPass) keep.reviewPass = r.reviewPass;
     if (r.speakPass) keep.speakPass = r.speakPass;
+    // 💖 아이가 고른 문장 — 다시 만들 수 없다 (뺀 것도 favAt째로 남겨야 되살아나지 않는다).
+    // 고른 문장은 📊 목록에 글로 보이므로 영어·한글도 (몇 개 안 되어 사본이 크게 안 는다, Codex 20차 #3)
+    if (r.fav || r.favAt) {
+      keep.fav = !!r.fav;
+      if (r.favAt) keep.favAt = r.favAt;
+      if (r.favDay) keep.favDay = r.favDay;
+      if (r.fav && r.en) keep.en = r.en;
+      if (r.fav && r.ko) keep.ko = r.ko;
+    }
     // 아무 성과도 없는 문장은 담지 않는다 (사본을 작게)
-    if (Object.keys(keep).length > 2) out.push(keep);
+    if (Object.keys(keep).length <= 2) continue;
+    // 시작 시각 — 복구한 기록이 영상의 그 문장과 이어지는 열쇠다. 없으면 🔁 복습·💖가 그 문장을 못 찾아
+    // 되살린 복습 진도(box·dueAt)가 쓰이지 않았다 (Codex 20차 #3)
+    if (Number.isFinite(r.start)) keep.start = r.start;
+    out.push(keep);
   }
   return out;
+}
+
+/** 문장 열쇠 "<영상>|<시작×10>" → 시작 시각(초). 못 읽으면 null */
+export function startOfKey(key) {
+  const s = String(key || '');
+  const i = s.lastIndexOf('|');
+  const n = i >= 0 ? Number(s.slice(i + 1)) : NaN;
+  return i >= 0 && s.slice(i + 1) !== '' && Number.isFinite(n) ? n / 10 : null;
+}
+
+/** 옛 사본(시작 시각을 안 담던 때)의 문장에 열쇠로 시작 시각을 채운다 — 복구 직전에 */
+export function withStart(records = []) {
+  return (records || []).map((r) => {
+    if (!r || Number.isFinite(r.start)) return r;
+    const start = startOfKey(r.key);
+    return start === null ? r : { ...r, start };
+  });
 }
 
 /** 사본 한 덩이 — 📊의 "가져오기"가 먹는 형식 그대로라 복구에 그 규칙(mergeStatRecord)을 그대로 쓴다 */
@@ -167,7 +197,7 @@ export async function restoreOffer() {
 export async function restoreFromMirror() {
   const snap = readMirror();
   if (!snapshotHas(snap)) throw new Error('되돌릴 사본이 없어요');
-  return importStats(snap);
+  return importStats({ ...snap, sentenceStats: withStart(snap.sentenceStats) });
 }
 
 export function lastFileBackup() {

@@ -17,7 +17,7 @@ import { STONE_ENGLISH, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, strea
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
-import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT } from './review.js';
+import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT, pickFavExtra, FAV_ICON } from './review.js';
 import {
   initEssay, openEssay, abortEssay, pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds,
   DEFAULT_MINUTES as ESSAY_MINUTES, DEFAULT_COUNT as ESSAY_COUNT,
@@ -148,6 +148,7 @@ export function initPlayer(ctx) {
   $('btn-prev').addEventListener('click', () => step(-1));
   $('btn-next').addEventListener('click', () => step(1));
   $('btn-repeat').addEventListener('click', cycleRepeat);
+  $('btn-fav').addEventListener('click', () => toggleFav(state.idx)); // 💖 지금 문장을 내 문장으로
   $('btn-speed').addEventListener('click', cycleSpeed);
   $('btn-shadow').addEventListener('click', toggleShadow);
   $('btn-toggle-en').addEventListener('click', () => toggleSub('en'));
@@ -648,7 +649,10 @@ function reviewItems() {
   const sentences = pickReviews(usable, today, remain - wordItems.length)
     .map((rec) => ({ type: 'sentence', rec, cue: cueForStart(rec.start) }));
   if (!sentences.length) return []; // 문장이 없으면 단어만으로는 회차를 열지 않는다
-  return [...withDictation(sentences), ...wordItems]; // 단어는 마지막에 (말하기로 시작해야 흐름이 자연스럽다)
+  // 💖 차례가 아닌 내 문장 하나를 덤으로 맨 앞에 — 연습이라 복습 일정·회차 길이(reviewItems)는 안 바뀐다
+  const fav = pickFavExtra(usable, today, sentences.map((it) => it.rec.key));
+  const all = fav ? [{ type: 'sentence', rec: fav, cue: cueForStart(fav.start), extra: true }, ...sentences] : sentences;
+  return [...withDictation(all), ...wordItems]; // 단어는 마지막에 (말하기로 시작해야 흐름이 자연스럽다)
 }
 
 /**
@@ -659,7 +663,9 @@ function reviewItems() {
 function withDictation(items) {
   if (!state.vocab) return items;
   const pool = [...state.vocab.known];
-  const idx = items.findIndex((it) => (it.rec.box || 0) >= 1);
+  const ok = (it) => (it.rec.box || 0) >= 1;
+  let idx = items.findIndex((it) => it.rec.fav && ok(it)); // 💖 내 문장을 먼저 받아쓰기로
+  if (idx < 0) idx = items.findIndex(ok);
   if (idx < 0) return items;
   const it = items[idx];
   const made = makeDictation(it.cue, {
@@ -667,7 +673,7 @@ function withDictation(items) {
   });
   if (!made) return items;
   const out = items.slice();
-  out[idx] = { type: 'dictation', rec: it.rec, cue: it.cue, words: made.words, blanks: made.blanks };
+  out[idx] = { type: 'dictation', rec: it.rec, cue: it.cue, words: made.words, blanks: made.blanks, ...(it.extra ? { extra: true } : {}) };
   return out;
 }
 
@@ -1032,13 +1038,36 @@ async function grantReviewRound() {
   return reward;
 }
 
+/**
+ * 🔶 영어스톤 "같은 회차는 한 번"의 열쇠 — 차례인 문항만(종류:열쇠, 정렬).
+ * 💖 덤은 빼고, 받아쓰기·따라 말하기는 같은 문장으로 센다 — 덤이 끼거나 덤이 받아쓰기 자리를 가져가도 열쇠가 그대로 (Codex 20차 #5).
+ */
+function reviewKeyOf(items) {
+  return JSON.stringify((items || [])
+    .filter((it) => it && !it.extra)
+    .map((it) => `${it.type === 'word' ? 'word' : 'sentence'}:${(it.rec && it.rec.key) || (it.cue && it.cue.en) || it.word || ''}`)
+    .sort());
+}
+
+/**
+ * 💖 덤으로 나온 내 문장을 끝냈을 때 — 연습: 복습 일정(track.review)·회차 길이를 안 건드리고 오늘 날짜만 적는다.
+ * 🔶 영어스톤의 "전부 통과"에도 안 센다 (아이가 어려운 문장을 골라도 회차 보상을 잃지 않게). 맞히면 문장 하나 값 ⚡💰.
+ */
+function favExtraDone(cue, passed, practice) {
+  if (practice) return null;
+  track.favPractice(cue);
+  // ⚡💰는 오늘 이 문장으로 처음 받는 창만 — 두 창을 열면 같은 덤이 두 번 나올 수 있다 (Codex 20차 #4)
+  if (passed) track.claimFavExtra(cue).then((won) => { if (won) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); } }).catch(() => {});
+  return null;
+}
+
 /** 복습 회차 열기 (practice면 기록·보상 없음). after를 주면 끝난 뒤 제자리 대신 그걸 부른다 (학습 중 제안) */
 function startReview(items, practice, after) {
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
   state.reviewFails = 0; // 🔶 이 회차에서 못 넘긴 문항 수 — 0이어야 영어스톤
-  state.reviewKey = JSON.stringify((items || []).map((it) => `${(it && it.type) || 's'}:${(it && it.rec && it.rec.key) || (it && it.cue && it.cue.en) || (it && it.word) || ''}`).sort()); // 회차의 정체(종류:열쇠) — 같은 묶음은 스톤 한 번 (Codex 8차 #9)
+  state.reviewKey = reviewKeyOf(items); // 회차의 정체 — 같은 묶음은 스톤 한 번 (Codex 8차 #9)
   const p = practice ? null : partnerInfo();
   const summary = reviewSummary(track.statsList(), track.todayKey());
   const spot = rememberSpot(); // 복습은 다른 문장을 들려주므로 끝나고 제자리로
@@ -1054,7 +1083,8 @@ function startReview(items, practice, after) {
     sfx,
     unlock,
     speak: speakSentence,
-    onSentence: (cue, passed) => {
+    onSentence: (cue, passed, item) => {
+      if (item && item.extra) return favExtraDone(cue, passed, practice);
       if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
       if (practice) return null;
       const info = track.review(cue, passed);
@@ -1068,6 +1098,7 @@ function startReview(items, practice, after) {
       playPuzzleSentence(cue, () => {});
     },
     onDictation: (item, passed) => {
+      if (item && item.extra) return favExtraDone(item.cue, passed, practice);
       if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
       if (practice) return null;
       const info = track.review(item.cue, passed); // 받아쓰기도 문장 복습이므로 같은 라이트너 규칙
@@ -2576,12 +2607,54 @@ function renderScriptList() {
       ko.textContent = cue.ko;
       li.appendChild(ko);
     }
+    // 💖 줄마다 고르기 — 줄을 누르면 그 문장으로 가므로 버튼 클릭은 줄까지 올라가지 않게
+    const fav = document.createElement('button');
+    fav.type = 'button';
+    fav.className = 'script-fav';
+    fav.title = '내 문장';
+    paintFav(fav, track.isFav(cue));
+    fav.addEventListener('click', (e) => { e.stopPropagation(); toggleFav(i); });
+    li.appendChild(fav);
     li.addEventListener('click', () => goTo(i));
     ol.appendChild(li);
   });
 }
 
+// ───────────────────── 💖 내 문장 ─────────────────────
+
+/** 💖 버튼 하나 칠하기 — 고른 문장은 💖, 아니면 ♡ (Emoji 12 이하 태블릿에서도 보이는 글자) */
+function paintFav(btn, on) {
+  btn.dataset.state = on ? 'on' : 'off';
+  btn.textContent = on ? FAV_ICON : '♡';
+}
+
+/** 영상 화면 💖 칩 — 지금 문장 기준 (문장이 바뀔 때마다 highlightScript가 부른다) */
+function updateFavChip() {
+  const cue = state.cues[state.idx];
+  const b = $('btn-fav');
+  const on = !!cue && track.isFav(cue);
+  b.dataset.state = on ? 'on' : 'off';
+  b.textContent = `${on ? FAV_ICON : '♡'} 내 문장`;
+}
+
+/**
+ * 💖 i번 문장을 내 문장으로 고르기/빼기 — 고르는 것 자체에는 보상이 없다(눌러서 캐는 길이 없게).
+ * 고른 문장은 🔁 복습·✍️ 받아쓰기·에세이에 먼저 나온다. 👀 부모 모드는 아이 기록이 아니라 쉰다.
+ */
+function toggleFav(i) {
+  const cue = state.cues[i];
+  if (!cue) { showPlayerMessage('▶ 문장을 틀면 그 문장을 💖 담을 수 있어요', 2500); return; } // 영상을 열고 아직 안 튼 때(idx -1)
+  if (state.parentMode) { showPlayerMessage('👀 그냥 보기 중에는 💖 고르기가 쉬어요', 2500); return; }
+  const on = track.setFav(cue, !track.isFav(cue));
+  track.flush(); // 5초를 기다리지 않는다 — 고르고 바로 앱을 닫아도 남게
+  updateFavChip();
+  const mark = $('script-list').querySelector(`.script-item[data-idx="${i}"] .script-fav`);
+  if (mark) paintFav(mark, on);
+  showPlayerMessage(on ? `${FAV_ICON} 내 문장에 담았어요 — 복습·받아쓰기·에세이에 먼저 나와요` : '내 문장에서 뺐어요', 2500);
+}
+
 function highlightScript() {
+  updateFavChip();
   const ol = $('script-list');
   const prev = ol.querySelector('.script-item.active');
   if (prev) prev.classList.remove('active');

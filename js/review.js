@@ -91,13 +91,21 @@ export function stageIcon(rec) {
 }
 
 /**
+ * 💖 내 문장 (2026-10-02, 아버님 "전부 진행") — 아이가 영상 화면·📜 대사에서 고른 문장.
+ * ⭐는 이미 "발음 80% 정복" 표시(📜 목록·📊)라 같은 아이콘을 쓰면 두 뜻이 섞인다 → 💖.
+ * 기록은 문장 기록의 fav·favAt(나중에 누른 쪽이 이긴다)·favDay(덤으로 푼 날). 고르는 것 자체에는 보상이 없다.
+ */
+export const FAV_ICON = '💖';
+
+/**
  * 오늘 낼 복습 문장 고르기.
- * 우선순위: ① 그냥 넘긴 문장 ② box 낮은 것 ③ 발음 점수 낮은 것 ④ 오래 밀린 것 ⑤ 앞 문장
+ * 우선순위: ⓪ 💖 내 문장 ① 그냥 넘긴 문장 ② box 낮은 것 ③ 발음 점수 낮은 것 ④ 오래 밀린 것 ⑤ 앞 문장
  * (넘긴 문장 = 말하기 3번 미달로 통과된 적이 있는 문장 — 가장 안 되는 문장이므로 먼저 본다)
  */
 export function pickReviews(records, today, count = DEFAULT_COUNT) {
   const due = (records || []).filter((r) => isDue(r, today));
   const score = (r) => ({
+    fav: r.fav ? 0 : 1,
     skipped: (r.speakSkipped || 0) > 0 ? 0 : 1,
     box: r.box || 0,
     ratio: r.bestRatio || 0,
@@ -107,9 +115,28 @@ export function pickReviews(records, today, count = DEFAULT_COUNT) {
   due.sort((a, b) => {
     const x = score(a);
     const y = score(b);
-    return x.skipped - y.skipped || x.box - y.box || x.ratio - y.ratio || x.late - y.late || x.start - y.start;
+    return x.fav - y.fav || x.skipped - y.skipped || x.box - y.box || x.ratio - y.ratio || x.late - y.late || x.start - y.start;
   });
   return due.slice(0, Math.max(0, count));
+}
+
+/**
+ * 💖 차례가 아닌 내 문장 하나 — 복습 회차에 **덤으로** 붙인다. 덤은 연습이라 복습 일정(box·dueAt)·회차 길이를 안 바꾼다
+ * (안 그러면 고른 문장만 매일 올라가 👑이 된다). 끝낸(done) 문장만 · 이번 회차에 있는 것·오늘 차례인 것·오늘 이미 덤으로 푼 것은 빼고 ·
+ * 덤으로 푼 지 오래된 것부터 (여러 개 골랐으면 돌아가며 나온다).
+ * @param {string[]} takenKeys 이번 회차에 이미 든 문장 key
+ * @returns {object|null}
+ */
+export function pickFavExtra(records, today, takenKeys = []) {
+  const taken = new Set(takenKeys);
+  const pool = (records || []).filter((r) => r && r.fav && r.done && !taken.has(r.key) && !isDue(r, today) && r.favDay !== today);
+  pool.sort((a, b) => (a.favDay || '').localeCompare(b.favDay || '') || (a.lastAt || 0) - (b.lastAt || 0));
+  return pool[0] || null;
+}
+
+/** 💖 고른 문장 목록 (📊용) — 최근에 고른 것부터 */
+export function favList(records) {
+  return (records || []).filter((r) => r && r.fav).sort((a, b) => (b.favAt || 0) - (a.favAt || 0));
 }
 
 /** 한 회차에 단어 문항을 최대 몇 개 넣을지 (문장이 주, 단어는 보조) */
@@ -306,6 +333,12 @@ function settle(ms) {
 }
 const ui = { open: false, run: 0, o: null, i: 0, fails: 0, passed: 0, started: false, granted: false, reward: null, busy: false, speakStop: null, blankAt: 0, dictWrong: 0 };
 
+/** 문항 번호 뒤 💖 표시 — 고른 문장이면 "내 문장", 차례가 아닌데 덤으로 나왔으면 "덤" */
+function favTag(item) {
+  if (!item || !item.rec || !item.rec.fav) return '';
+  return item.extra ? ` · ${FAV_ICON} 내 문장 (덤)` : ` · ${FAV_ICON} 내 문장`;
+}
+
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -465,7 +498,7 @@ function askDictation() {
   stage.hidden = false;
   renderDots();
   $('review-stage-icon').textContent = stageIcon(item.rec);
-  $('review-count').textContent = `${ui.i + 1} / ${o.items.length}`;
+  $('review-count').textContent = `${ui.i + 1} / ${o.items.length}${favTag(item)}`;
   $('review-ko').textContent = '🔊 잘 듣고 빈칸을 채워요';
   $('review-en').hidden = true; // 문장은 아래 빈칸 줄로 보여준다
   $('review-feedback').textContent = '';
@@ -660,7 +693,7 @@ async function askSentence() {
   $('review-dict-listen').hidden = true;
   renderDots();
   $('review-stage-icon').textContent = stageIcon(rec);
-  $('review-count').textContent = `${ui.i + 1} / ${o.items.length}`;
+  $('review-count').textContent = `${ui.i + 1} / ${o.items.length}${favTag(o.items[ui.i])}`;
   $('review-ko').textContent = cue.ko || '';
   $('review-en').textContent = cue.en;
   $('review-en').hidden = ui.fails < MAX_FAILS; // 두 번 못 하면 글자를 보여준다
@@ -717,7 +750,7 @@ async function settleSentence(cue, passed, result) {
   const run = ui.run;
   const alive = () => ui.open && ui.run === run;
   const o = ui.o;
-  const info = o.onSentence ? o.onSentence(cue, passed) : null;
+  const info = o.onSentence ? o.onSentence(cue, passed, o.items[ui.i]) : null; // 셋째 = 문항 (💖 덤인지 알려고)
   // 문장 확정과 완주 보상은 결과 애니메이션보다 먼저 — 아이가 마지막 문장을 말한 직후
   // 앱을 닫아도 회차가 완주로 남고 보상을 잃지 않게 (Codex #4)
   ui.i++;

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   applyRound, applyPlacement, ladderOf, dailyPlan, mathSummary, mathReportText, stageOf, LEARNING_MAX, REVIEW_MIN, widenRound, STEMS, STEM_ORDER,
+  rungSub, practiceNote, waitNote, checkStones, stoneReward, LUCKY,
 } from '../js/mathprog.js';
 import { emptyMath, cloneMath } from '../js/db.js';
 import { addDays } from '../js/review.js';
@@ -158,4 +159,112 @@ test('🖥 화면 배선: 확인 편만 늘리고 · wait 칸은 못 누르고 �
   assert.match(src, /result\.first \? '🥚 오늘 배웠어요!' : result\.known \? '🐣 이제 알아요!'/);
   assert.ok(!src.includes('🎉 이 개념, 이제 알아요!'), '배운 날 "이제 알아요"라고 하지 않는다');
   assert.match(src, /preview\.waiting/, '☀️ 안내');
+});
+
+// ── ③ 복습 보상 안내 (2026-10-02) — 언제 확인하고 그때 🔷를 받는지, 연습은 ⚡💰만, 잠긴 날 할 것 ──
+const row = (m, id, day) => ladderOf(m, day).find((r) => r.id === id);
+
+test('③ 사다리 칸: 다음 확인까지 날 수(dueIn)와 그때 받는 🔷 — 🥚·🐣·📏·마지막 확인·👑', () => {
+  const m = emptyMath();
+  applyRound(m, F[0], pass, T);
+  assert.equal(row(m, F[0], T).dueIn, 1);
+  assert.match(rungSub(row(m, F[0], T)), /🥚 배우는 중 — 내일 확인하면 🐣 \+ 🔷$/);
+  assert.equal(row(m, F[0], T1).dueIn, 0);
+  assert.equal(rungSub(row(m, F[0], T1)), '🔁 오늘 확인! 통과하면 🐣 "안다" + 🔷');
+  applyRound(m, F[0], pass, T1); // 🐣 box 1 → 2일 뒤
+  assert.equal(rungSub(row(m, F[0], T1)), '알아요 · 🔁 2일 뒤 확인하면 🔷 (👑까지 4번)');
+  assert.equal(rungSub(row(m, F[0], addDays(T1, 2))), '🔁 오늘 확인! 통과하면 🔷');
+  // 마지막 확인(box 4)은 👑 + 🔷3
+  const last = cloneMath(m);
+  last.concepts[F[0]] = { ...last.concepts[F[0]], box: 4, dueAt: addDays(T1, 5) };
+  assert.equal(rungSub(row(last, F[0], T1)), '알아요 · 🔁 5일 뒤 마지막 확인 — 통과하면 👑 + 🔷3');
+  assert.equal(rungSub(row(last, F[0], addDays(T1, 5))), '🔁 오늘 마지막 확인! 통과하면 👑 + 🔷3');
+  last.concepts[F[0]] = { ...last.concepts[F[0]], box: 5, dueAt: '' };
+  assert.equal(row(last, F[0], T1).dueIn, null);
+  assert.equal(rungSub(row(last, F[0], T1)), '이해 완료!');
+  // 📏 진단 칸은 3일 뒤 확인하면 🐣
+  const p = emptyMath();
+  const { knownIds } = applyPlacement(p, F.slice(0, 5).map((id, i) => ({ concept: id, correct: i < 4 })), T);
+  assert.equal(rungSub(row(p, knownIds[0], T)), '📏 진단에서 맞힌 칸 — 3일 뒤 확인하면 🐣 + 🔷');
+  assert.equal(rungSub(row(p, knownIds[0], addDays(T, 3))), '🔁 오늘 확인! 통과하면 🐣 "안다" + 🔷');
+  // 잠긴 칸·못 배운 칸은 그대로
+  assert.equal(rungSub({ state: 'locked' }), '앞 개념을 먼저 알아야 열려요');
+  assert.equal(rungSub({ state: 'wait' }), `🥚 배우는 중인 칸 ${LEARNING_MAX}개를 먼저 확인하면 열려요`);
+  assert.equal(rungSub({ state: 'now' }), '지금 배울 차례');
+});
+
+test('③ 칸이 말한 🔷 수 = 확인을 통과했을 때 실제로 받는 🔷 (stoneReward) — box 0~4 전부', () => {
+  for (let box = 0; box < 5; box++) {
+    const m = emptyMath();
+    applyRound(m, F[0], pass, T);
+    m.concepts[F[0]] = { ...m.concepts[F[0]], box, dueAt: T1 };
+    const r = row(m, F[0], T1);
+    assert.equal(r.due, true);
+    const said = (rungSub(r).match(/🔷(\d*)/) || [])[1];
+    const result = applyRound(cloneMath(m), F[0], pass, T1);
+    assert.equal(result.review, true);
+    const got = stoneReward({ mode: 'review', result });
+    assert.equal(checkStones(r), got, `box ${box}`);
+    assert.equal(Number(said || 1), got, `box ${box}: 칸이 말한 🔷 = 받는 🔷`);
+  }
+});
+
+test('③ 연습 편 첫 줄: 연습으로 판정되는 칸에만(applyRound와 같은 조건) · 다음 확인 날 · 👑 · 🍀는 오늘 다 받았으면 빼기', () => {
+  const m = emptyMath();
+  assert.equal(practiceNote(undefined, T, null), null, '못 배운 칸 — 처음 배우기');
+  applyRound(m, F[0], pass, T);
+  assert.equal(practiceNote(m.concepts[F[0]], T, null), '연습이에요 — ⚡💰만 (🍀 가끔 몬스터볼). 🔷는 내일 확인 날에');
+  assert.equal(practiceNote(m.concepts[F[0]], T1, null), null, '확인 차례면 연습이 아니다');
+  assert.equal(practiceNote(m.concepts[F[0]], T, { d: T, n: LUCKY.max }), '연습이에요 — ⚡💰만. 🔷는 내일 확인 날에', '🍀를 오늘 다 받았으면 말하지 않는다');
+  assert.ok(practiceNote(m.concepts[F[0]], T, { d: '2026-09-30', n: LUCKY.max }).includes('🍀'), '어제 받은 건 상관없다');
+  applyRound(m, F[0], pass, T1);
+  assert.match(practiceNote(m.concepts[F[0]], T1, null), /🔷는 2일 뒤 확인 날에$/);
+  assert.equal(practiceNote({ ...m.concepts[F[0]], box: 5, dueAt: '' }, T1, null), '👑 이해 완료한 칸이라 연습이에요 — ⚡💰만 (🍀 가끔 몬스터볼)');
+  // 안내가 뜨는 칸 = applyRound가 연습으로 치는 칸 (날짜를 하루씩 옮기며)
+  for (let k = 0; k <= 4; k++) {
+    const day = addDays(T1, k);
+    const rec = m.concepts[F[0]];
+    assert.equal(practiceNote(rec, day, null) !== null, applyRound(cloneMath(m), F[0], pass, day).practice, day);
+  }
+});
+
+test('③ 잠긴 날 안내: 잠금이 없으면 없음 · 🥚 확인이 내일이면 "새 칸은 오늘 여기까지" · 오늘 확인할 🥚가 있으면 그걸 먼저', () => {
+  const m = emptyMath();
+  applyRound(m, F[0], pass, T);
+  assert.equal(waitNote(ladderOf(m, T)), null, '🥚 하나는 안 잠긴다');
+  applyRound(m, F[1], pass, T);
+  assert.equal(waitNote(ladderOf(m, T)), '🥚 새 칸은 오늘 여기까지 — 내일 🥚 칸 하나를 확인해서 통과하면 열려요. 그동안 🎯 도전 문제 · 💎 스페셜 · 🌳 다른 줄기');
+  assert.equal(waitNote(ladderOf(m, T1)), '🥚 오늘 확인할 🥚 칸이 있어요 — 🥚 칸 하나를 확인해서 통과하면 새 칸이 열려요');
+  applyRound(m, F[0], pass, T1);
+  assert.equal(waitNote(ladderOf(m, T1)), null, '하나를 확인하면 풀린다');
+});
+
+test('③ 잠긴 날 안내가 거짓말을 안 한다 — ☀️가 🐣 칸을 먼저 골라도 · 🥚가 셋이어도 (Codex 20차 #6)', () => {
+  // Codex 재현: 🐣 하나 + 🥚 둘, 셋 다 내일 확인 → 내일 ☀️는 🐣를 고른다. 안내는 "☀️에서"가 아니라 "🥚 칸 하나"
+  const m = emptyMath();
+  m.concepts[F[0]] = { done: true, box: 1, dueAt: T1, passes: 2, fails: 0, lastAt: 1, schedAt: 1 };
+  m.concepts[F[1]] = { done: true, box: 0, dueAt: T1, passes: 1, fails: 0, lastAt: 1, schedAt: 1 };
+  m.concepts[F[2]] = { done: true, box: 0, dueAt: T1, passes: 1, fails: 0, lastAt: 1, schedAt: 1 };
+  const note = waitNote(ladderOf(m, T));
+  assert.match(note, /내일 🥚 칸 하나를 확인해서 통과하면 열려요/);
+  assert.equal(dailyPlan(m, T1, 'fraction', 1).roundId, F[0], '내일 ☀️는 🐣 칸을 고른다 — 그래서 ☀️를 약속하면 안 된다');
+  const p = cloneMath(m); applyRound(p, F[0], pass, T1);
+  assert.equal(ladderOf(p, T1)[3].state, 'wait', '🐣를 확인해도 안 열린다');
+  const q = cloneMath(m); applyRound(q, F[1], pass, T1);
+  assert.equal(ladderOf(q, T1)[3].state, 'now', '🥚 하나를 확인하면 열린다 — 안내가 말한 대로');
+  // 🥚 셋(확인에서 틀려 되돌아온 칸 포함)이면 둘을 확인해야 열린다
+  const r = cloneMath(m); r.concepts[F[0]] = { ...r.concepts[F[0]], box: 0 };
+  assert.match(waitNote(ladderOf(r, T)), /🥚 칸 2개를 확인해서 통과하면 열려요/);
+  const r1 = cloneMath(r); applyRound(r1, F[0], pass, T1);
+  assert.equal(ladderOf(r1, T1)[3].state, 'wait', '하나만 확인하면 아직');
+  applyRound(r1, F[1], pass, T1);
+  assert.equal(ladderOf(r1, T1)[3].state, 'now', '둘을 확인하면 열린다');
+});
+
+test('③ 화면 배선: 칸 부제는 rungSub · 잠긴 날 안내는 사다리 위 · 연습 안내는 첫 문항에서 기록으로 판정', () => {
+  const src = fs.readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
+  assert.match(src, /'math-rung-sub', `\$\{gradeLabel\(r\.grade\)\} · \$\{rungSub\(r\)\}/);
+  assert.match(src, /const wn = waitNote\(rows\);\s*if \(wn\) m\.appendChild\(el\('p', 'math-wait-note', wn\)\);\s*const list = el\('ul', 'math-ladder'\);/);
+  assert.match(src, /\(r\.mode === 'practice' \|\| r\.mode === 'learn'\) && r\.at === 0\) \{\s*const pn = practiceNote\(ui\.state && ui\.state\.concepts && ui\.state\.concepts\[r\.id\], todayKey\(\), ui\.state && ui\.state\.luck\);/);
+  assert.ok(!src.includes("'오늘 다시 확인하기'"), '옛 부제 문구가 남지 않았다');
 });

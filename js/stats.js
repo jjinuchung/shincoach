@@ -10,7 +10,7 @@ import { countPlayableCues } from './srt.js';
 import { figText } from './mathdraw.js';
 import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
-import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED } from './review.js';
+import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED, favList, FAV_ICON } from './review.js';
 import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot } from './xp.js';
 import { pendingTickets } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
@@ -413,6 +413,23 @@ export async function renderStats() {
     c3.appendChild(d);
   }
   main.appendChild(c3);
+
+  // 3-0) 💖 진우가 고른 문장 — 아이가 마음에 들어 담은 문장 (복습·받아쓰기·에세이에 먼저 나온다). 누르면 그 문장으로
+  const favs = favList(records);
+  if (favs.length) {
+    const cF = card(`${FAV_ICON} 진우가 고른 문장 ${favs.length}개 — 누르면 그 문장으로 이동`);
+    for (const r of favs.slice(0, 20)) {
+      const d = el('div', 'stats-hard');
+      d.appendChild(el('div', 'en', `${r.dueAt || (r.box || 0) >= GRADUATED ? `${stageIcon(r)} ` : ''}${r.en}`));
+      if (r.ko) d.appendChild(el('div', 'ko', r.ko));
+      d.appendChild(el('div', 'why', `${titleOf.get(r.itemId) || ''}${r.favAt ? ` · ${fmtDate(r.favAt)}에 고름` : ''}`));
+      d.addEventListener('click', () => openPlayer(r.itemId, { startTime: r.start }));
+      cF.appendChild(d);
+    }
+    if (favs.length > 20) cF.appendChild(el('p', 'stats-note', `최근 20개만 보여요 (전체 ${favs.length}개)`));
+    cF.appendChild(el('p', 'stats-note', '고르기에는 보상이 없어요. 고른 문장은 🔁 복습 회차에 하루 한 번 덤으로 나오고(일정은 그대로), 받아쓰기·에세이 빈칸에도 먼저 써요.'));
+    main.appendChild(cF);
+  }
 
   // 3-1) 🎯 자주 놓치는 단어 — 따라 말하기에서 반복해서 안 나온 단어
   const missCount = Object.create(null); // 'constructor' 같은 단어가 상속 속성에 걸리지 않게

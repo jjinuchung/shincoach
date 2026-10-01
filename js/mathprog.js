@@ -5,7 +5,7 @@
 //  - box·dueAt: 영어 문장 복습과 같은 라이트너(1·2·4·7·14일). box가 GRADUATED(5)에 닿으면 👑 이해 완료
 //  "정말로 이해한 게 맞는지 검증하고 또 검증"(아버님)이 곧 이 라이트너다 — 그날 맞힌 것은 "안다"이지 "이해 완료"가 아니다.
 
-import { schedule, isDue, enroll, addDays, GRADUATED, STAGES } from './review.js';
+import { schedule, isDue, enroll, addDays, daysBetween, GRADUATED, STAGES } from './review.js';
 import * as fractionGen from './mathgen.js';
 import * as negativeGen from './mathneg.js';
 import * as mixedGen from './mathmix.js';
@@ -144,11 +144,75 @@ export function ladderOf(m, today, stem = 'fraction') {
       left: Math.max(0, GRADUATED - box), // 👑까지 남은 확인 횟수
       crowned: !!rec && rec.done && box >= GRADUATED,
       due: !!rec && rec.done && isDue(rec, today),
+      // 다음 확인까지 며칠 (오늘이면 0, 👑·못 배움은 null) — 사다리 칸이 "🔁 3일 뒤 확인하면 🔷"라고 말한다 (③)
+      dueIn: rec && rec.done && rec.dueAt && box < GRADUATED ? Math.max(0, daysBetween(today, rec.dueAt)) : null,
       notes: rec && Array.isArray(rec.notes) ? rec.notes.length : 0, // 🤔 다시 볼 유형 수
       // 📏 진단으로 친 칸은 box 1로 시작해 🐣로 보였다 — 확인 전이라 📏로
       icon: stage === 'placed' ? '📏' : rec && rec.done ? STAGES[Math.min(box, STAGES.length - 1)] : (state === 'now' ? '▶' : state === 'open' ? '○' : '🔒'),
     };
   });
+}
+
+// ── ③ 복습 보상 안내 (2026-10-02, 아버님 "전부 진행") ──
+// 🔷 수학스톤은 배운 날 첫 통과와 **확인 차례(dueAt)의 통과**에서만 나온다(stoneReward). 차례가 아닌 날 다시 풀면 연습이라
+// ⚡💰뿐인데 아이 화면엔 그게 안 보여 "왜 이번엔 🔷가 없지?"가 된다 — 사다리 칸·연습 첫 화면·잠긴 날에 미리 말한다.
+/** 날 수 → "내일" / "N일 뒤" */
+function whenText(n) {
+  return n <= 1 ? '내일' : `${n}일 뒤`;
+}
+
+/** 이 칸을 확인 차례에 통과하면 받는 🔷 — 지급 규칙(stoneReward)에 그대로 물어본다. 👑이 되는 마지막 확인은 +2 */
+export function checkStones(row) {
+  return stoneReward({ mode: 'review', result: { passed: true, crowned: !!row && row.left === 1 } });
+}
+const stonesText = (row) => { const n = checkStones(row); return `🔷${n > 1 ? n : ''}`; };
+
+/** 사다리 칸 부제 (학년 뒤) — 언제 확인하고, 그때 무엇을 받는지 */
+export function rungSub(r) {
+  if (r.state === 'locked') return '앞 개념을 먼저 알아야 열려요';
+  if (r.state === 'wait') return `🥚 배우는 중인 칸 ${LEARNING_MAX}개를 먼저 확인하면 열려요`;
+  if (r.crowned) return '이해 완료!';
+  const fresh = r.stage === 'learning' || r.stage === 'placed'; // 확인을 통과하면 🐣 "안다"가 되는 칸
+  const st = stonesText(r);
+  if (r.due) {
+    if (fresh) return `🔁 오늘 확인! 통과하면 🐣 "안다" + ${st}`;
+    return r.left === 1 ? `🔁 오늘 마지막 확인! 통과하면 👑 + ${st}` : `🔁 오늘 확인! 통과하면 ${st}`;
+  }
+  const when = r.dueIn ? whenText(r.dueIn) : '며칠 뒤';
+  if (r.stage === 'learning') return `🥚 배우는 중 — ${when} 확인하면 🐣 + ${st}`;
+  if (r.stage === 'placed') return `📏 진단에서 맞힌 칸 — ${when} 확인하면 🐣 + ${st}`;
+  if (r.state === 'done') return r.left === 1 ? `알아요 · 🔁 ${when} 마지막 확인 — 통과하면 👑 + ${st}` : `알아요 · 🔁 ${when} 확인하면 ${st} (👑까지 ${r.left}번)`;
+  return r.state === 'now' ? '지금 배울 차례' : '배울 수 있어요';
+}
+
+/**
+ * 연습 편 첫 화면 한 줄 — 확인 차례가 아닌 아는 칸을 다시 풀 때만(applyRound가 practice로 판정하는 것과 같은 조건). 막지 않고 알리기만.
+ * 🍀는 오늘 LUCKY.max번을 다 받았으면 말하지 않는다.
+ * @returns {string|null}
+ */
+export function practiceNote(rec, today, luck) {
+  if (!rec || !rec.done || isDue(rec, today)) return null;
+  const clover = luck && luck.d === today && (Number(luck.n) || 0) >= LUCKY.max ? '' : ' (🍀 가끔 몬스터볼)';
+  if ((rec.box || 0) >= GRADUATED) return `👑 이해 완료한 칸이라 연습이에요 — ⚡💰만${clover}`;
+  const n = rec.dueAt ? Math.max(1, daysBetween(today, rec.dueAt)) : 1;
+  return `연습이에요 — ⚡💰만${clover}. 🔷는 ${whenText(n)} 확인 날에`;
+}
+
+/**
+ * 🥚 2칸 잠금이 걸린 날 사다리 위 안내 (잠금이 없으면 null). 🥚 칸 하나가 오늘 확인 차례면 오늘 풀 수 있다고 말한다.
+ * @param {Array} rows ladderOf 결과
+ */
+export function waitNote(rows) {
+  if (!(rows || []).some((r) => r.state === 'wait')) return null;
+  const eggs = rows.filter((r) => r.stage === 'learning');
+  // 몇 칸을 확인해야 열리나 — 🥚가 LEARNING_MAX보다 적어져야 한다. 확인에서 틀리면 🥚가 셋이 될 수 있어 "하나 확인하면"이 아니다.
+  // "☀️에서"라고 하지 않는다 — ☀️는 한 칸만 확인하고, 🐣 칸이 먼저 뽑히기도 한다 (Codex 20차 #6)
+  const need = Math.max(1, eggs.length - (LEARNING_MAX - 1));
+  const which = need === 1 ? '🥚 칸 하나' : `🥚 칸 ${need}개`;
+  if (eggs.some((r) => r.due)) return `🥚 오늘 확인할 🥚 칸이 있어요 — ${which}를 확인해서 통과하면 새 칸이 열려요`;
+  const n = eggs.length ? Math.min(...eggs.map((r) => r.dueIn || 1)) : 1;
+  // "새 칸은" — 오늘 할 다른 확인(🐣·👑)이 남아 있을 수 있어 "오늘은 여기까지"만 쓰면 다 끝난 줄 안다
+  return `🥚 새 칸은 오늘 여기까지 — ${whenText(n)} ${which}를 확인해서 통과하면 열려요. 그동안 🎯 도전 문제 · 💎 스페셜 · 🌳 다른 줄기`;
 }
 
 /** 🔁 확인 편 문항 수 — 일곱 줄기는 한 편이 ①②뿐이라 확인이 두 문제였다(② 4지선다는 찍어도 25%). 난이도는 그대로, 증거를 두 배로 */

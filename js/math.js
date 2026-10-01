@@ -10,7 +10,7 @@ import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, 
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
-  applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, LEARNING_MAX, widenRound,
+  applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, widenRound, rungSub, practiceNote, waitNote, LEARNING_MAX,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -427,6 +427,8 @@ export async function renderMath() {
   prepareBattle(); // ⚔️ 오늘 몫·그림을 읽어 둔다 (배틀 등장 판정은 문항마다 동기로 돈다)
   // 🎒·📊를 보고 돌아온 것이면 풀던 편을 이어서 (2026-09-20: 과목 화면에도 🎒·📊를 두면서 필요해졌다).
   // 답을 고른 뒤였으면 다음 문항으로 — 같은 문항을 다시 그리면 두 번 답해 두 번 세어진다.
+  // 🎯 도전 문제를 풀다 🎒·📊를 다녀온 것이면 — 풀던 문제로 (사다리로 떨어지면 이어 풀 길이 없고 ⏳ 예외도 켜진 채였다, Codex 20차 #1)
+  if (ui.chal) { ui.run++; resumeChal(); return; }
   const r = ui.round;
   // 저장 중에 🎒를 다녀온 것이면 — 기다린다. 사다리 로딩으로 내려가면 run이 바뀌어 저장을 끝낸 finishRound가 결과·☀️ 다음 단계를
   // 못 그리고, renderLadder가 ui.daily를 지운다 (Codex 3차 #2). run은 그대로 두어 finishRound가 이어서 그린다
@@ -524,6 +526,7 @@ function startDiag() {
 function renderLadder(state) {
   const m = clearMain();
   ui.daily = null; // 사다리로 나오면 ☀️ 흐름은 끝
+  if (ui.chal) endChal(); // 🎯 도전 문제도 — 사다리로 나오는 길은 전부 여기를 지난다 (⏳ 예외 끄기)
   ui.battlePending = null; // 걸어 둔 배틀도 버린다 — 편 밖에서 갑자기 열리면 아이가 당황한다 (Codex 9차 #1)
   showHatchIfAny(); // 🐣 다른 화면(영어)에서 부화했는데 아직 못 본 것
   const today = todayKey();
@@ -577,7 +580,7 @@ function renderLadder(state) {
     head.appendChild(db);
     const parts = [];
     if (preview.roundId) parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${nameOf(preview.roundId)}`);
-    else if (preview.waiting) parts.push('🥚 오늘 배운 건 다음 날 확인해요 — 그때 새 칸이 열려요');
+    else if (preview.waiting) parts.push('🥚 오늘 배운 건 다음 날 확인해요'); // "그때 새 칸이 열려요"는 🥚가 셋이면 거짓이다 — 잠금 안내는 사다리 위 배너가 (Codex 20차 #6)
     if (preview.mix.length) parts.push(`🎲 배운 것 섞어 풀기 ${preview.mix.length}문제`);
     head.appendChild(el('p', 'math-note math-daily-sub', unread.length ? `📬 답장을 읽으면 열려요 · ${parts.join(' → ')}` : parts.join(' → ')));
     // ✨ 오늘의 보너스 — 홈 카드와 같은 것. 완주했으면 받았다고, 아니면 완주하면 준다고
@@ -637,6 +640,10 @@ function renderLadder(state) {
   }
   m.appendChild(head);
 
+  // 🥚 2칸 잠금이 걸린 날 — 새 칸이 왜 안 열리는지, 그동안 무엇을 할 수 있는지 (③)
+  const wn = waitNote(rows);
+  if (wn) m.appendChild(el('p', 'math-wait-note', wn));
+
   const list = el('ul', 'math-ladder');
   for (const r of rows) {
     const li = el('li', `math-rung ${r.state}${r.due ? ' due' : ''}${r.crowned ? ' crowned' : ''}`);
@@ -645,16 +652,8 @@ function renderLadder(state) {
     btn.appendChild(el('span', 'math-rung-icon', r.icon));
     const body = el('span', 'math-rung-body');
     body.appendChild(el('span', 'math-rung-name', r.name));
-    // 🥚 배우는 중 → 🐣 안다 (2026-10-01 ②): 배운 날 통과는 🥚, 다음 날 이후 확인을 통과해야 🐣
-    const sub = r.state === 'locked' ? '앞 개념을 먼저 알아야 열려요'
-      : r.state === 'wait' ? `🥚 배우는 중인 칸 ${LEARNING_MAX}개를 먼저 확인하면 열려요`
-        : r.crowned ? '이해 완료!'
-          : r.due ? (r.stage === 'learning' ? '오늘 확인하면 🐣 "안다"!' : '오늘 다시 확인하기')
-            : r.stage === 'learning' ? '🥚 배우는 중 — 다음 날 확인해요'
-              : r.stage === 'placed' ? '📏 진단에서 맞힌 칸 — 며칠 뒤 확인해요'
-                : r.state === 'done' ? `알아요 (${r.left}번 더 확인하면 👑)`
-                  : r.state === 'now' ? '지금 배울 차례' : '배울 수 있어요';
-    body.appendChild(el('span', 'math-rung-sub', `${gradeLabel(r.grade)} · ${sub}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`));
+    // 🥚 배우는 중 → 🐣 안다 (2026-10-01 ②) + 언제 확인하고 그때 🔷를 받는지 (③) — 문구 규칙은 mathprog.rungSub
+    body.appendChild(el('span', 'math-rung-sub', `${gradeLabel(r.grade)} · ${rungSub(r)}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`));
     btn.appendChild(body);
     if (r.state === 'locked' || r.state === 'wait') btn.disabled = true;
     else btn.addEventListener('click', () => guardStart('math', () => startRound(r.id, r.state === 'done' ? (r.due ? 'review' : 'practice') : 'learn')));
@@ -797,6 +796,18 @@ function renderChalQ() {
   m.appendChild(card);
 }
 
+/**
+ * 🎒·📊에서 돌아왔을 때 — 답하기 전이면 그 문제를 다시(찍다 만 점은 다시 찍는다), 답한 뒤면 정답 화면을 **채점 없이** 다시.
+ * 저장 중이면 기다린다(끝나면 finishChal이 결과를 그린다).
+ */
+function resumeChal() {
+  const c = ui.chal;
+  if (!c) { renderLadder(ui.state); return; }
+  if (c.phase === 'saving') { const m = clearMain(); m.appendChild(el('p', 'math-loading', '기록하는 중…')); return; }
+  if (c.phase === 'a') renderChalA();
+  else renderChalQ();
+}
+
 function answerChal(given) {
   const c = ui.chal;
   if (!c || c.phase !== 'q') return;
@@ -806,6 +817,15 @@ function answerChal(given) {
   c.results.push({ no: item.no, ok: r.ok });
   c.phase = 'a';
   try { if (r.ok) sfx.ding(); else sfx.wrong(); } catch { /* 소리는 없어도 */ }
+  renderChalA();
+}
+
+/** 답한 뒤 화면 — 채점 결과는 c.results에서 읽는다 (돌아와서 다시 그려도 두 번 채점하지 않게) */
+function renderChalA() {
+  const c = ui.chal;
+  if (!c) { renderLadder(ui.state); return; }
+  const item = c.items[c.at];
+  const r = c.results[c.at] || { ok: false };
 
   const m = clearMain();
   const card = el('section', `math-card chal-a ${r.ok ? 'is-ok' : 'is-no'}`);
@@ -840,6 +860,8 @@ async function finishChal() {
   const results = c.results;
   const n = c.items.length;
   const correct = results.filter((r) => r.ok).length;
+  if (c.phase === 'saving') return; // 두 번 누름
+  c.phase = 'saving'; // 그 사이 🎒를 다녀오면 resumeChal이 "기록하는 중…"으로 기다린다
 
   const saved = await commitChalRound((s) => {
     const result = applyChalRound(s, set.id, results, set);
@@ -1289,6 +1311,11 @@ function renderQuestion(restore = false) {
   top.appendChild(el('span', 'math-kind', KIND_LABEL[q.kind] || ''));
   card.appendChild(top);
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
+  // 🔁 확인 차례가 아닌 아는 칸 = 연습 — 첫 문항에서 받는 것을 미리 말한다 (③, 막지는 않는다). '🤔 한 번 더'는 mode가 learn이라 기록으로 판정
+  if ((r.mode === 'practice' || r.mode === 'learn') && r.at === 0) {
+    const pn = practiceNote(ui.state && ui.state.concepts && ui.state.concepts[r.id], todayKey(), ui.state && ui.state.luck);
+    if (pn) card.appendChild(el('p', 'math-practice-note', pn));
+  }
 
   // 🔢 수가 답인 ① 계산은 숫자판, ✍️ 그리기 문항은 점 찍기 판 (판이 그래프를 그리므로 글에서는 뺀다)
   const spec = padFor(q);
@@ -2555,7 +2582,8 @@ async function finishRound() {
 export function initMath({ showView }) {
   ui.showView = showView;
   const back = $('btn-math-back');
-  if (back) back.addEventListener('click', () => { ui.round = null; ui.daily = null; ui.run++; showView('home'); });
+  // 🎯 도전 문제도 여기서 끝낸다 — 안 끄면 ⏳ 예외가 켜진 채 남아 수학 시간이 안 세어졌다 (Codex 20차 #1)
+  if (back) back.addEventListener('click', () => { ui.round = null; ui.daily = null; endChal(); ui.run++; showView('home'); });
 }
 
 /** 홈에서 진우가 본 영상 세계를 미리 알고 싶을 때 (표시용) */

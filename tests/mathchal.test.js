@@ -496,3 +496,37 @@ test('🎯 회차를 저장하면 맨 위 칩(Lv·⚡·💰·🔷)을 다시 그
   const j = math.indexOf('ui.state = saved.math;', i);
   assert.ok(i > 0 && j > i && /^\s*updateChip\(\);/.test(math.slice(j + 'ui.state = saved.math;'.length)), 'finishChal: ui.state = saved.math 바로 뒤에 updateChip()');
 });
+
+test('🎯 5단원 06·11 "눈금 한 칸은?": 07·12와 같은 빈 그래프가 같이 나오고, 그 칸 수에 들어맞는 눈금은 정답 하나뿐 (Codex 20차 #2)', () => {
+  for (const [q, p, book, cands] of [[6, 7, BOOK.milk, [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1]], [11, 12, BOOK.tour, [1, 2, 4, 5, 10, 20, 25, 40, 50, 100]]]) {
+    const figs = [].concat(no5(q).fig);
+    const bg = figs.find((f) => f.kind === 'blankgraph');
+    assert.ok(figs.some((f) => f.kind === 'table') && bg, `${q}번: 표 + 빈 그래프`);
+    const plot = no5(p).parts.find((x) => x.input === 'plot');
+    assert.equal(bg.chart, plot.chart, `${q}번 빈 그래프 = ${p}번 점 찍기 판 (같은 칸 수)`);
+    assert.deepEqual(chartVals(bg.chart), book);
+    // 화면이 그리는 빈 그래프와 같은 모양으로 칸 수를 잰다 (chalview.blankChart: top = 가장 큰 값)
+    const full = parseChart('lgraph', bg.chart.replace(/^lgraph /, ''));
+    const blank = { ...full, top: Math.max(...full.items.map((x) => x.v)), items: full.items.map((x) => ({ label: x.label, v: null })), hide: true };
+    const cells = chartGeom(blank).cells;
+    const K = 100; const sc = (v) => Math.round(v * K);
+    const fits = cands.filter((s) => Object.values(book).every((v) => (sc(v) - sc(full.base)) % sc(s) === 0 && (sc(v) - sc(full.base)) / sc(s) <= cells));
+    assert.deepEqual(fits.map(String), [no5(q).parts[0].answer], `${q}번: ${cells}칸에 들어맞는 눈금 ${fits}`);
+    assert.match(no5(q).why, new RegExp(`${cells}칸`), `${q}번 풀이가 빈 그래프 칸 수를 말한다`);
+  }
+  const view = fs.readFileSync(new URL('../js/chalview.js', import.meta.url), 'utf8');
+  assert.match(view, /case 'blankgraph': return blankGraphEl\(fig\);/);
+  assert.match(view, /function plotInput\(part, wrap, onChange\) \{\s*const blank = blankChart\(part\.chart\);/, '점 찍기 판도 같은 blankChart');
+  assert.match(view, /function blankGraphEl\(f\) \{\s*const blank = blankChart\(f\.chart, true\);/, '빈 그래프는 눈금 숫자를 숨긴다');
+});
+
+test('🎯 도전 문제 이어 풀기·⏳ 예외 끄기: 🎒·📊에서 돌아오면 풀던 문제로 · ← 뒤로와 사다리로 나가는 길은 endChal (Codex 20차 #1)', () => {
+  const math = fs.readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
+  assert.match(math, /if \(ui\.chal\) \{ ui\.run\+\+; resumeChal\(\); return; \}\s*const r = ui\.round;/, 'renderMath가 풀던 편보다 먼저 도전 문제를 이어 준다');
+  assert.match(math, /back\.addEventListener\('click', \(\) => \{ ui\.round = null; ui\.daily = null; endChal\(\);/, '← 뒤로(홈)도 예외를 끈다');
+  assert.match(math, /function renderLadder\(state\) \{[\s\S]{0,200}if \(ui\.chal\) endChal\(\);/, '사다리로 나오는 길은 전부 예외를 끈다');
+  assert.match(math, /function resumeChal\(\) \{[\s\S]{0,300}if \(c\.phase === 'a'\) renderChalA\(\);\s*else renderChalQ\(\);/, '답한 뒤면 정답 화면을 채점 없이');
+  assert.match(math, /function renderChalA\(\) \{[\s\S]{0,200}const r = c\.results\[c\.at\]/, '정답 화면은 저장된 채점 결과로');
+  assert.ok(!/function renderChalA\(\) \{[\s\S]{0,400}checkItem\(/.test(math), '다시 그릴 때 다시 채점하지 않는다');
+  assert.match(math, /c\.phase = 'saving';/, '저장 중 다녀와도 두 번 저장하지 않는다');
+});

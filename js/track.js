@@ -240,6 +240,50 @@ export function statFor(cue) {
   return t.stats.get(sentenceKey(t.item.id, cue.start)) || null;
 }
 
+/**
+ * 💖 내 문장 고르기/빼기 (2026-10-02). 켜고 끄는 값이라 백업 병합은 나중에 누른 쪽(favAt)을 한 쌍으로 가져온다 (db.mergeStatRecord).
+ * @returns {boolean} 바꾼 뒤 값
+ */
+export function setFav(cue, on) {
+  const r = rec(cue); if (!r) return false;
+  r.fav = !!on;
+  r.favAt = Date.now();
+  return r.fav;
+}
+
+/** 💖 이 문장을 골랐나 (기록을 새로 만들지 않는다 — 화면을 그리며 묻는 용도) */
+export function isFav(cue) {
+  const r = statFor(cue);
+  return !!(r && r.fav);
+}
+
+/** 💖 복습에 덤으로 나온 내 문장을 풀었다 — 오늘 또 덤으로 안 나오게 날짜만 (복습 일정·회차 길이는 그대로) */
+export function favPractice(cue) {
+  const r = rec(cue); if (!r) return;
+  r.favDay = todayKey();
+}
+
+/**
+ * 💖 덤 문장의 ⚡💰를 오늘 이 문장으로 받을 자리를 트랜잭션으로 선점 — 두 창이 같은 덤을 내도 한쪽만 (Codex 20차 #4).
+ * 저장이 막히면 메모리로 (한 창 안에서는 두 번 안 준다).
+ * @returns {Promise<boolean>}
+ */
+export async function claimFavExtra(cue) {
+  if (!t.daily || !t.item || !cue) return false;
+  const key = sentenceKey(t.item.id, cue.start);
+  const date = t.daily.date;
+  try {
+    const r = await claimDailyKey(date, 'favExtraKeys', key);
+    adoptSaved(date, r.daily);
+    return r.won;
+  } catch (e) {
+    const have = Array.isArray(t.daily.favExtraKeys) ? t.daily.favExtraKeys : [];
+    if (have.includes(key)) return false;
+    t.daily.favExtraKeys = [...have, key];
+    return true;
+  }
+}
+
 /** 말하기 확인 결과 */
 /**
  * 🎤 이 문장의 말하기 보상을 오늘 이미 줬는지 / 주는 것으로 표시.

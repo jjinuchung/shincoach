@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD } from '../js/review.js';
+import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD, pickFavExtra, FAV_ICON } from '../js/review.js';
 import { wordResults } from '../js/speak.js';
 import { makeDictation } from '../js/dictation.js';
 import { pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds, REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH } from '../js/essay.js';
@@ -144,7 +144,13 @@ function loadPlayer() {
       missedWords(cue, words) { missedLog.push(words.slice()); },
       // 🔤 단어 이어 주기 하루 판 수
       todayMatches: () => matchState.today,
-      async markMatch() { matchState.today++; return true; } },
+      async markMatch() { matchState.today++; return true; },
+      // 💖 내 문장 (2026-10-02) — 기록은 reviewState.stats의 fav, 덤으로 푼 문장은 reviewState.favDone
+      isFav: (cue) => !!((reviewState.stats || []).find((r) => r.start === cue.start) || {}).fav,
+      setFav(cue, on) { const r = (reviewState.stats || []).find((x) => x.start === cue.start); if (r) r.fav = !!on; return !!on; },
+      favPractice(cue) { (reviewState.favDone ||= []).push(cue.start); },
+      // 💖 덤 ⚡💰 선점 — 하루 한 문장 한 번 (두 창 흉내: reviewState.favClaimed를 테스트가 미리 채울 수 있다)
+      async claimFavExtra(cue) { const c = (reviewState.favClaimed ||= []); if (c.includes(cue.start)) return false; c.push(cue.start); return true; } },
     // puzzle.js 스텁: 열린 퍼즐을 puzzleCalls에 기록 (onClose를 테스트에서 직접 호출)
     puzzleCalls,
     initPuzzle() {}, closePuzzle() {},
@@ -210,7 +216,7 @@ function loadPlayer() {
     formUrl: (id, kind) => `url:${id}:${kind}`,
     hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
-    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, reviewable, makeDictation, VOCAB_KNOWN, REAL_VOCAB,
+    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, reviewable, makeDictation, VOCAB_KNOWN, REAL_VOCAB, pickFavExtra, FAV_ICON,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 5, REVIEW_COUNT: 5,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
     // sfx.js 스텁
@@ -2019,4 +2025,80 @@ test('🔤 무대에는 움직이는 그림이 없어도 평소 일러스트를 
   const mons = matchCalls[0].mons;
   assert.ok(Array.isArray(mons) && mons.length > 0, '무대에 세울 포켓몬이 전달된다');
   for (const m of mons) assert.ok(m.art || m.anim, `${m.id}: 도트든 일러스트든 그림이 있어야 무대가 안 빈다`);
+});
+
+// ── 💖 내 문장 (2026-10-02) ──
+
+test('💖 복습: 차례가 아닌 고른 문장 하나가 덤으로 맨 앞에 — 연습이라 일정(track.review)·🔶 실패 수를 안 건드리고, 맞히면 문장 값 ⚡', async () => {
+  const { run, reviewCalls, reviewState, xpLog } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3, { fav: true, dueAt: '2026-09-20', box: 2 }), due(4, { fav: true, dueAt: '2026-09-20', favDay: '2026-09-14' })];
+  run('state.cues = [1, 2, 3, 4].map((s) => ({ start: s, end: s + 0.5, en: "a" + s, ko: "" })); settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  assert.equal(reviewCalls.length, 1);
+  const o = reviewCalls[0];
+  assert.equal(o.items[0].extra, true, '덤은 맨 앞');
+  assert.equal(o.items[0].rec.start, 3);
+  assert.equal(o.items.filter((it) => it.extra).length, 1, '덤은 하나 — 오늘 이미 덤으로 푼 4는 빠진다');
+  assert.deepEqual(Array.from(o.items.slice(1), (it) => it.rec.start), [1, 2], '차례인 문장은 그대로 다 든다'); // vm 배열은 바깥 배열로 옮겨 비교
+  const xp0 = xpLog.length;
+  assert.equal(o.onSentence({ start: 3 }, false, o.items[0]), null);
+  assert.equal(run('state.reviewFails'), 0, '덤을 못 해도 🔶 "전부 통과"는 안 깨진다');
+  assert.equal(o.onSentence({ start: 3 }, true, o.items[0]), null, '덤은 단계 변화가 없다');
+  assert.deepEqual(reviewState.reviewed, [], '덤은 복습 일정(track.review)을 부르지 않는다');
+  assert.deepEqual(reviewState.favDone, [3, 3], '오늘 덤으로 풀었다고 적는다');
+  await tick();
+  assert.equal(xpLog.length - xp0, 1, '맞힌 한 번만 문장 값 (선점한 뒤에)');
+  o.onSentence({ start: 3 }, true, o.items[0]);
+  await tick();
+  assert.equal(xpLog.length - xp0, 1, '오늘 이 덤으로 이미 받았으면(다른 창 포함) 또 안 준다 (Codex 20차 #4)');
+  o.onSentence({ start: 1 }, false, o.items[1]);
+  assert.equal(run('state.reviewFails'), 1, '차례 문장은 그대로 센다');
+  assert.deepEqual(reviewState.reviewed, [{ start: 1, passed: false }]);
+});
+
+test('🔶 회차 열쇠: 💖 덤은 빼고 받아쓰기·따라 말하기는 같은 문장 — 덤이 끼어도 같은 묶음이면 같은 열쇠 (Codex 20차 #5)', () => {
+  const { run } = loadPlayer();
+  const k = (items) => run(`reviewKeyOf(${JSON.stringify(items)})`);
+  const s1 = { type: 'sentence', rec: { key: 'v|10' } };
+  const s2 = { type: 'sentence', rec: { key: 'v|20' } };
+  const d2 = { type: 'dictation', rec: { key: 'v|20' } };
+  const w = { type: 'word', rec: { key: 'apple' }, word: 'apple' };
+  const fav = { type: 'sentence', rec: { key: 'v|30', fav: true }, extra: true };
+  const favD = { type: 'dictation', rec: { key: 'v|30', fav: true }, extra: true };
+  const base = k([s1, d2, w]);
+  assert.equal(k([fav, s1, d2, w]), base, '덤이 끼어도 그대로');
+  assert.equal(k([favD, s1, s2, w]), base, '덤이 받아쓰기를 가져가도 그대로');
+  assert.equal(k([w, s2, s1]), base, '순서와 상관없다');
+  assert.notEqual(k([s1, w]), base, '다른 묶음은 다른 열쇠');
+  assert.notEqual(k([s1, s2, { type: 'word', rec: { key: 'v|20' }, word: 'v|20' }]), k([s1, s2, s2]), '단어와 문장은 갈린다');
+});
+
+test('💖 복습: 고른 문장이 없거나 다 차례 안이면 덤이 없다', () => {
+  let p = loadPlayer();
+  p.reviewState.stats = [due(1), due(2)];
+  p.run('state.cues = [1, 2].map((s) => ({ start: s, end: s + 0.5, en: "a" + s, ko: "" })); settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  assert.ok(!p.reviewCalls[0].items.some((it) => it.extra));
+  p = loadPlayer();
+  p.reviewState.stats = [due(1, { fav: true }), due(2)];
+  p.run('state.cues = [1, 2].map((s) => ({ start: s, end: s + 0.5, en: "a" + s, ko: "" })); settings.reviewCount = 3; state.reviewDone = false; maybeReview();');
+  const items = p.reviewCalls[0].items;
+  assert.ok(!items.some((it) => it.extra), '차례인 💖는 차례 문장으로 (덤 아님)');
+  assert.equal(items[0].rec.start, 1, '차례 안에서는 💖가 먼저');
+});
+
+test('💖 고르기: 지금 문장 칩이 💖로 · 다시 누르면 ♡ · 👀 부모 모드는 쉰다 · 보상 없음', () => {
+  const { run, els, reviewState, xpLog, coinLog } = loadPlayer();
+  reviewState.stats = [due(1), due(2)];
+  run('state.cues = [1, 2].map((s) => ({ start: s, end: s + 0.5, en: "a" + s, ko: "" })); state.idx = 0; highlightScript();');
+  assert.equal(els['btn-fav'].textContent, '♡ 내 문장');
+  run('toggleFav(0)');
+  assert.equal(reviewState.stats[0].fav, true);
+  assert.equal(els['btn-fav'].textContent, `${FAV_ICON} 내 문장`);
+  assert.equal(els['btn-fav'].dataset.state, 'on');
+  run('state.idx = 1; highlightScript();');
+  assert.equal(els['btn-fav'].textContent, '♡ 내 문장', '문장이 바뀌면 그 문장 기준');
+  run('toggleFav(0)');
+  assert.equal(reviewState.stats[0].fav, false);
+  run('state.parentMode = true; toggleFav(1)');
+  assert.equal(!!reviewState.stats[1].fav, false, '부모 모드는 아이 기록이 아니다');
+  assert.equal(xpLog.length + coinLog.length, 0, '고르기에는 보상이 없다');
 });
