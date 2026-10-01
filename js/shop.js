@@ -1,7 +1,7 @@
 // 🛒 상점(💰 코인으로 🎀 장식·🎨 염색약·🧪 물약 사기) + 포켓몬 상세(❤️ HP·물약·🤝 파트너·장식 장착·염색) 모달
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
-import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, SHINY_STONE, itemById, canBuy, priceText, setFigure } from './items.js';
+import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, SHINY_STONE, EXTENDERS, itemById, canBuy, priceText, setFigure } from './items.js';
 import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
 import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
@@ -86,6 +86,8 @@ function renderShop(msg, boughtId) {
   const list = $('shop-list');
   list.innerHTML = '';
   list.appendChild(shopSection('🧤 스톤 상점', '코인 + 스톤으로만 살 수 있어요. 🔷 수학스톤은 수학 개념을 통과하면, 🔶 영어스톤은 복습을 끝내면 생겨요 — 🧭 레이더: 다음 수학 잡기에 희귀 이상 포켓몬이 한 마리 나와요', STONE_SHOP, boughtId));
+  // ⏳ 시간 연장권 (2026-10-01, 진우 요청) — 스톤 상점 바로 밑에. 쓰는 곳은 잠금 화면·남은 시간 칩
+  list.appendChild(shopSection('⏳ 시간 연장권', '하루 공부 시간이 다 됐을 때 15분 더 할 수 있어요. 잠금 화면이나 ⏳ 남은 시간을 눌러서 써요 — 과목마다 하루에 쓸 수 있는 개수가 정해져 있어요. 🔷 수학스톤이 들어요', EXTENDERS, boughtId));
   list.appendChild(shopSection('🎀 장식', '포켓몬 머리에 씌워요. 한 번 사면 계속 내 것 — 다른 포켓몬에게 옮길 수도 있어요', GEAR, boughtId));
   list.appendChild(shopSection('🎨 염색약', '포켓몬 색을 바꿔요. 한 번 쓰면 없어지고, 원래 색으로 돌아가는 건 공짜', DYE, boughtId));
   list.appendChild(shopSection('🧪 물약', '파트너 HP를 채워요. 퍼즐 정답을 그냥 보거나 따라 말하기를 넘기거나 하루 빠지면 HP가 깎여요', POTION, boughtId));

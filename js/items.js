@@ -132,6 +132,21 @@ BALLS.push(BEASTBALL); // 🌌 울트라비스트를 잡으려면 잡기 화면�
 export const SHINY_STONE = { id: 'shiny_stone', emoji: '🌈', ko: '이로치의 스톤', price: 500, stones: { stone_math: 3, stone_english: 3 }, kind: 'tool', hint: '🎒 잡은 포켓몬을 눌러 "🌈 이로치로!"를 누르면 색이 다른 모습이 돼요 — 영원히' };
 export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH, SHINY_STONE, BEASTBALL];
 
+/**
+ * ⏳ 시간 연장권 (2026-10-01, 진우 요청 → 아버님 "이대로 진행"): 하루 시간 제한이 다 됐을 때 그 과목을 15분 더.
+ * · 값이 그 15분 동안 버는 코인보다 커야 한다 — 영어 15분 ≈ 💰60, 싸면 "연장해서 번 코인으로 또 연장"이 끝없이 돈다
+ * · 🔷 수학스톤이 든다 — 영어 시간도. 영상을 더 보고 싶으면 수학을 제대로 해야 한다 (순서 잠금이 아니라 보상으로 끄는 힘)
+ * · 과목마다 하루 쓸 수 있는 개수는 ⚙ 설정(부모, 기본 2) — 판정은 db.applyExtend 트랜잭션 안에서 (timelimit.extendPlan)
+ * · 산 것은 🎒에 남고 다른 날에도 쓴다. 효과는 쓴 날 하루만
+ */
+export const EXTEND_MATH = { id: 'extend_math', emoji: '⏳', ko: '수학 +15분', price: 100, stones: { stone_math: 1 }, kind: 'extend', subject: 'math', minutes: 15, hint: '🔢 수학 시간이 다 되면 잠금 화면에서 "⏳ 연장권 쓰기"를 눌러요 — 오늘 15분 더!' };
+export const EXTEND_ENGLISH = { id: 'extend_english', emoji: '⏳', ko: '영어 +15분', price: 150, stones: { stone_math: 1 }, kind: 'extend', subject: 'english', minutes: 15, hint: '🎤 영어 시간이 다 되면 잠금 화면에서 "⏳ 연장권 쓰기"를 눌러요 — 오늘 15분 더!' };
+export const EXTENDERS = [EXTEND_MATH, EXTEND_ENGLISH];
+/** 그 과목의 연장권 (없으면 null) */
+export function extenderOf(subject) {
+  return EXTENDERS.find((x) => x.subject === subject) || null;
+}
+
 /** 값 — 코인과 재료(스톤)를 한 묶음으로 (purchaseRule이 둘 다 한 트랜잭션에서 판정) */
 export function costOf(it) {
   return { coins: (it && it.price) || 0, items: { ...((it && it.stones) || {}) } };
@@ -160,6 +175,7 @@ export const ITEMS = [
   EGG_ENGLISH,
   SHINY_STONE,
   BEASTBALL,
+  ...EXTENDERS,
 ];
 const byId = {};
 for (const it of ITEMS) byId[it.id] = it;

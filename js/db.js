@@ -12,7 +12,7 @@ const DB_VERSION = 4;
 //                 speakAttempts, speakPass, speakFail, speakSkipped, bestRatio, lastRatio, lastAt, puzzles, puzzleSolved, puzzleWrong }
 //  sessions:      앱을 열고 닫은 단위 { id, itemId, title, startedAt, endedAt, seconds, sentences, firstIdx, lastIdx, speakAttempts, speakPass, puzzles, puzzleSolved }
 //  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved, goalRewarded, hpMissed,
-//                          mathTime/enTime(⏳ 과목 화면에 머문 초), mathBonus/enBonus(🔒 부모가 더 준 초) }
+//                          mathTime/enTime(⏳ 과목 화면에 머문 초), mathBonus/enBonus(🔒 부모가 더 준 초), mathExt/enExt(⏳ 쓴 연장권 수) }
 //  vocabViews:    아이가 단어 패널에서 본 단어 { word, meaning, kind, views, taps, lastAt, sentence }
 // characters (v3): 🎮 퍼즐 캐릭터 그림 { id, ko, en, blob, savedAt } — 인터넷에서 받아 기기에만 보관 (백업에 포함 안 함)
 //  profile (v4):  ⚡ 아이 프로필 { id: 'me', xp, caught: { 포켓몬id: 마릿수 }, throws, catches,
@@ -285,7 +285,9 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // ⏳ 하루 과목별 시간 제한 (2026-09-27) — 과목 화면에 머문 초(…Time)와 부모가 더 준 초(…Bonus).
   // ★ DAILY_SUMS라 백업 병합이 **maxOf**다 — 옛 백업을 되돌려 오늘 쓴 시간을 지우는 길이 막힌다.
   //   (예전 `mathSeconds`는 이름만 있고 아무도 쓰지 않아 여기서 뺐다 — mathTime과 헷갈린다)
-  'mathTime', 'mathBonus', 'enTime', 'enBonus'];
+  'mathTime', 'mathBonus', 'enTime', 'enBonus',
+  // ⏳ 오늘 쓴 시간 연장권 수 (2026-10-01) — 하루 한도 판정용. 병합이 maxOf라 옛 백업으로 한도를 되살리지 못한다
+  'mathExt', 'enExt'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 // 💖 덤으로 풀어 ⚡💰를 받은 문장 — 두 창이 같은 덤을 내도 한 번 (Codex 20차 #4)
@@ -353,6 +355,41 @@ export async function claimDailyCount(date, field, max) {
   store.put(next);
   await txDone(tx);
   return { won: true, count: next[field], daily: next };
+}
+
+/**
+ * ⏳ 시간 연장권 쓰기 규칙 (순수) — 가방에서 하나 빼고 오늘 기록의 그 과목 수(field)를 +1.
+ * 하루 한도(max)와 가방을 **같은 자리에서** 본다. 고친 프로필 복사본은 profile에 그대로 (호출부가 저장).
+ * @returns {{ok:boolean, why?:'cap'|'none', daily:object}}
+ */
+export function extendRule(profile, curDaily, date, field, itemId, max) {
+  const used = (curDaily && Number(curDaily[field])) || 0;
+  if (!(Number(max) > 0) || used >= Number(max)) return { ok: false, why: 'cap', daily: curDaily || emptyDaily(date) };
+  if ((Number(profile.items[itemId]) || 0) < 1) return { ok: false, why: 'none', daily: curDaily || emptyDaily(date) };
+  addCount(profile.items, itemId, -1);
+  return { ok: true, daily: mergeDailyDelta(curDaily, date, { [field]: 1 }) };
+}
+
+/**
+ * ⏳ 시간 연장권 쓰기 — `profile`(가방)과 `daily`(오늘 쓴 수)를 **한 트랜잭션에서**.
+ * 둘을 따로 쓰면 두 창이 같은 연장권 하나로 두 번 늘리거나, 가방에서는 빠졌는데 시간은 안 늘어난다.
+ * @returns {Promise<{ok:boolean, why?:string, profile:object, daily:object}>}
+ */
+export async function applyExtend(date, field, itemId, max) {
+  const db = await openDb();
+  const tx = db.transaction(['profile', 'daily'], 'readwrite');
+  const ps = tx.objectStore('profile');
+  const ds = tx.objectStore('daily');
+  const curP = (await promisify(ps.get('me'))) || emptyProfile();
+  const curD = await promisify(ds.get(date));
+  const next = cloneProfile(curP);
+  const r = extendRule(next, curD, date, field, itemId, max);
+  if (!r.ok) { await txDone(tx); return { ...r, profile: curP }; }
+  next.updatedAt = Date.now();
+  ps.put(next);
+  ds.put(r.daily);
+  await txDone(tx);
+  return { ...r, profile: next };
 }
 
 /**

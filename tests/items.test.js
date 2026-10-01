@@ -16,7 +16,7 @@ test('카탈로그: id가 겹치지 않고 가격은 양수, 장식은 head/face
   assert.equal(new Set(ids).size, ids.length);
   for (const it of ITEMS) {
     assert.ok(it.emoji && it.ko, it.id);
-    assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool', 'egg'].includes(it.kind), it.id);
+    assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool', 'egg', 'extend'].includes(it.kind), it.id); // extend = ⏳ 시간 연장권 (2026-10-01)
     // 값이 없는 것 = 코인으로 못 사는 것: 🔴 몬스터볼(무료) · 🌟 황금 볼(복습으로만) · 🍄 다이버섯(학습으로만) · 🧤 스톤(학습으로만)
     if (it.id === 'pokeball' || it.id === 'goldenball' || it.kind === 'mushroom' || it.kind === 'stone') assert.equal(it.price, 0, it.id);
     else assert.ok(it.price > 0, it.id);

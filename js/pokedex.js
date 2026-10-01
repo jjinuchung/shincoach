@@ -72,7 +72,8 @@ function renderCoins() {
 /** 🎒 가방 한 줄 요약: "🎩×1 🔴×2" */
 function bagText() {
   const inv = inventory();
-  const parts = Object.keys(inv).map((id) => itemById(id)).filter(Boolean).map((it) => `${it.emoji}×${inv[it.id]}`);
+  // ⏳ 연장권은 두 과목이 같은 ⏳라 과목 표시를 붙인다 (⏳🔢×1 ⏳🎤×2)
+  const parts = Object.keys(inv).map((id) => itemById(id)).filter(Boolean).map((it) => `${it.emoji}${it.kind === 'extend' ? (it.subject === 'math' ? '🔢' : '🎤') : ''}×${inv[it.id]}`);
   return parts.length ? `가방: ${parts.join(' ')}` : '가방이 비어 있어요';
 }
 

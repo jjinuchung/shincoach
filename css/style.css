@@ -2423,6 +2423,7 @@ button { font-family: inherit; }
   display: inline-flex; align-items: center; gap: 4px;
   background: #eef1f8; color: #4a5068; border-radius: 999px;
   padding: 4px 10px; font-size: .82rem; font-weight: 800; white-space: nowrap;
+  border: 0; font-family: inherit; line-height: inherit; cursor: pointer; /* ⏳ 누르면 남은 시간·연장권 창 (2026-10-01) */
 }
 .time-chip.warn { background: #ffe9cc; color: #8a4b00; animation: time-warn 1.6s ease-in-out infinite; }
 .time-chip.over { background: #ffd9d9; color: #9b1c1c; }
@@ -2438,6 +2439,9 @@ button { font-family: inherit; }
 .timeup-grant-head { font-size: .95rem; font-weight: 800; color: #4a2f9c; margin-bottom: 8px; }
 .timeup-grant-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .timeup-grant-btns .btn { flex: 1 1 28%; min-width: 88px; }
+/* ⏳ 시간 연장권 칸 (2026-10-01) — 아이가 직접 쓰는 것이라 부모 칸(보라)과 색을 가른다 */
+.timeup-extend { align-self: stretch; display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; background: #fff7e6; border: 2px solid #ffc861; border-radius: 14px; padding: 12px; }
+.timeup-extend-note { font-size: .9rem; color: #6b4a00; margin: 0; }
 
 /* ⚙ 설정의 시간 제한 묶음 */
 .set-group { border: 1px solid #dfe3ee; border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; }

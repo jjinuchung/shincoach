@@ -30,7 +30,7 @@ import { initMatch, openMatch, closeMatch, refreshStage, pickMatchRound, shuffle
 import { ensureAnims, loadAnims, animUrl } from './sprite.js';
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
-import { DEFAULT_MIN as TIME_MIN, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
+import { DEFAULT_MIN as TIME_MIN, EXTEND_MAX, EXTEND_MIN, extMaxOf, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
 import { setBgmEnabled } from './bgm.js';
 import * as track from './track.js';
 
@@ -2773,6 +2773,8 @@ function loadSettings() {
   const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always',
     // ⏳ 하루 과목별 시간 제한 (2026-09-27, 아버님) — 켜짐이 기본. 지워도 이 값으로 돌아올 뿐 시간이 늘지 않는다
     timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend,
+    // ⏳ 시간 연장권 — 과목마다 하루 최대 (2026-10-01, 아버님 "이대로 진행"). 0이면 아이가 못 쓴다
+    timeExtMax: EXTEND_MAX,
     // 🔢 수학 숫자판 (2026-10-01) — 켜짐이 기본. math.js가 같은 localStorage에서 읽는다
     mathPad: true };
   let saved = {};
@@ -2803,6 +2805,7 @@ export function timeLimitConf() {
   return {
     off: settings.timeLimit === false || state.parentMode === true,
     min: { weekday: Number(settings.timeWeekday), weekend: Number(settings.timeWeekend) },
+    extMax: extMaxOf(settings.timeExtMax),
   };
 }
 
@@ -2824,7 +2827,8 @@ function renderTimeToday() {
   const parts = [];
   for (const [s, ko] of [['math', '🔢 수학'], ['english', '🎤 영어']]) {
     const st = statusOf(d, s, key, min);
-    const extra = st.bonus ? ` (+${Math.round(st.bonus / 60)}분 더 줌)` : '';
+    const more = [st.bonus ? `+${Math.round(st.bonus / 60)}분 더 줌` : '', st.extN ? `⏳ 연장권 ${st.extN}개 +${st.extN * EXTEND_MIN}분` : ''].filter(Boolean);
+    const extra = more.length ? ` (${more.join(' · ')})` : '';
     parts.push(`${ko} ${fmtUsed(st.used)} / ${fmtUsed(st.total)}${extra}`);
   }
   p.textContent = `오늘 — ${parts.join(' · ')}`;
@@ -2889,6 +2893,7 @@ function initSettingsDialog() {
     settings.timeLimit = $('set-timelimit').checked;
     settings.timeWeekday = clampMin($('set-time-weekday').value, TIME_MIN.weekday);
     settings.timeWeekend = clampMin($('set-time-weekend').value, TIME_MIN.weekend);
+    settings.timeExtMax = extMaxOf($('set-time-ext').value);
     settings.mathPad = $('set-mathpad').checked;
     if (!settings.hideEnWhileSpeaking) state.speakHideEn = 'none'; // 끄면 대기 중이던 숨김도 해제
     if (settings.listenFirst === 0) state.enRevealed = true;
@@ -2950,6 +2955,7 @@ function openSettings() {
     $('set-timelimit').checked = settings.timeLimit !== false;
     $('set-time-weekday').value = String(Number(settings.timeWeekday));
     $('set-time-weekend').value = String(Number(settings.timeWeekend));
+    $('set-time-ext').value = String(extMaxOf(settings.timeExtMax));
     $('set-mathpad').checked = settings.mathPad !== false;
     renderTimeToday();
     $('dlg-settings').showModal();

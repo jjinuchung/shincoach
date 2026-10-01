@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import {
   SUBJECTS, DEFAULT_MIN, WARN_SEC, GRANT_MIN, IDLE_SEC, FIELD, KO,
   isWeekend, limitSec, usedSec, bonusSec, statusOf, tickDelta, grantDelta, fmtLeft, fmtUsed,
+  EXTEND_MIN, EXTEND_MAX, extCount, extMaxOf, extendPlan,
 } from '../js/timelimit.js';
-import { emptyDaily, mergeDailyDelta, mergeStatRecord } from '../js/db.js';
+import { emptyDaily, mergeDailyDelta, mergeStatRecord, extendRule, cloneProfile } from '../js/db.js';
+import { EXTEND_MATH, EXTEND_ENGLISH, EXTENDERS, extenderOf, itemById, lootBox, canBuy, ITEMS } from '../js/items.js';
 
 test('⏳ 아버님이 정한 값: 평일 1시간 · 주말 2시간 · 10분 전 미리 알림 · +10/20/30분 · 2분 쉬면 멈춤', () => {
   assert.deepEqual(DEFAULT_MIN, { weekday: 60, weekend: 120 });
@@ -134,8 +136,8 @@ test('⏳ usedSec·bonusSec은 깨진 값에도 0을 준다 (옛 기록엔 필�
   assert.equal(bonusSec({ mathBonus: NaN }, 'math'), 0);
   assert.equal(usedSec({ mathTime: 10 }, '없는과목'), 0);
   // 필드 이름이 바뀌면 바로 걸린다
-  assert.deepEqual(FIELD.math, { used: 'mathTime', bonus: 'mathBonus' });
-  assert.deepEqual(FIELD.english, { used: 'enTime', bonus: 'enBonus' });
+  assert.deepEqual(FIELD.math, { used: 'mathTime', bonus: 'mathBonus', ext: 'mathExt' });
+  assert.deepEqual(FIELD.english, { used: 'enTime', bonus: 'enBonus', ext: 'enExt' });
 });
 
 test('★ ⏳ 새 파일 두 개가 sw.js APP_SHELL에 있어야 한다 (빠지면 오프라인에서 앱이 죽는다)', async () => {
@@ -144,4 +146,110 @@ test('★ ⏳ 새 파일 두 개가 sw.js APP_SHELL에 있어야 한다 (빠지�
   for (const f of ['./js/timelimit.js', './js/timeup.js']) {
     assert.ok(sw.includes(`'${f}'`), `${f}이 APP_SHELL에 없다`);
   }
+});
+
+// ───────────────────── ⏳ 시간 연장권 (2026-10-01, 진우 요청 → 아버님 "이대로 진행") ─────────────────────
+
+test('⏳ 연장권 값: 15분 · 과목마다 하루 2개 · 수학 💰100+🔷1 · 영어 💰150+🔷1 (영어도 수학스톤)', () => {
+  assert.equal(EXTEND_MIN, 15);
+  assert.equal(EXTEND_MAX, 2);
+  assert.deepEqual([EXTEND_MATH.price, EXTEND_MATH.stones], [100, { stone_math: 1 }]);
+  assert.deepEqual([EXTEND_ENGLISH.price, EXTEND_ENGLISH.stones], [150, { stone_math: 1 }], '영상을 더 보려면 수학을 제대로 — 🔷');
+  assert.deepEqual(EXTENDERS.map((x) => [x.subject, x.minutes, x.kind]), [['math', 15, 'extend'], ['english', 15, 'extend']]);
+  assert.equal(extenderOf('math'), EXTEND_MATH);
+  assert.equal(extenderOf('english'), EXTEND_ENGLISH);
+  assert.equal(extenderOf('없는과목'), null);
+  // 카탈로그에 있어야 산다(itemById) · 🎁 상자에서는 안 나온다(스톤이 드는 물건) · 코인만으로는 못 산다
+  for (const it of EXTENDERS) {
+    assert.equal(itemById(it.id), it, `${it.id}이 ITEMS에 없다 — 상점에서 사도 가방에 안 들어간다`);
+    assert.equal(ITEMS.filter((x) => x.id === it.id).length, 1);
+    assert.equal(canBuy(it.id, 9999, {}).ok, false, '🔷 없이는 못 산다');
+    assert.equal(canBuy(it.id, it.price, { stone_math: 1 }).ok, true);
+  }
+  for (let i = 0; i < 400; i++) assert.ok(!lootBox(() => i / 400).startsWith('extend'), '🎁 상자에서 연장권이 나오면 시간을 공짜로 늘린다');
+});
+
+test('⏳ 쓴 연장권은 그 과목 제한 위에 15분씩 — 부모가 준 시간과 따로 더해진다', () => {
+  const d = { ...emptyDaily('2026-09-28'), mathTime: 3600, mathExt: 1 };
+  let st = statusOf(d, 'math', '2026-09-28');
+  assert.deepEqual([st.extN, st.ext, st.total, st.left, st.locked, st.warn], [1, 900, 4500, 900, false, false]);
+  st = statusOf({ ...d, mathBonus: 600, mathExt: 2 }, 'math', '2026-09-28');
+  assert.equal(st.total, 3600 + 600 + 1800, '부모 +10분 + 연장권 2개');
+  assert.equal(statusOf(d, 'english', '2026-09-28').extN, 0, '과목은 따로');
+  assert.equal(extCount({ enExt: 3 }, 'english'), 3);
+  assert.equal(extCount({ mathExt: -1 }, 'math'), 0);
+  assert.equal(extCount(null, 'math'), 0);
+});
+
+test('⏳ 연장권 버튼을 보일까 (extendPlan) — 꺼짐·부모가 0개·오늘 다 씀·가방에 없음·아직 이름·지금', () => {
+  const day = '2026-09-28';
+  const at = (sec, extra = {}) => statusOf({ ...emptyDaily(day), mathTime: sec, ...extra }, 'math', day);
+  const off = statusOf({ ...emptyDaily(day), mathTime: 9999 }, 'math', day, null, { off: true });
+  assert.equal(extendPlan(off, { have: 3, max: 2 }).why, 'off', '제한을 껐으면 칸째 숨긴다');
+  assert.equal(extendPlan(at(3600), { have: 3, max: 0 }).why, 'disabled', '부모가 0개로 → 못 쓴다');
+  assert.equal(extendPlan(at(4500, { mathExt: 1 }), { have: 3, max: 1 }).why, 'cap');
+  assert.deepEqual(extendPlan(at(5400, { mathExt: 2 }), { have: 3 }), { why: 'cap', can: false, room: 0 }, '기본 하루 2개');
+  assert.equal(extendPlan(at(3600), { have: 0, max: 2 }).why, 'none');
+  assert.equal(extendPlan(at(1200), { have: 2, max: 2 }).why, 'early', '40분 남았는데 쓰면 낭비');
+  assert.deepEqual(extendPlan(at(3600), { have: 1, max: 2 }), { why: 'ok', can: true, room: 2 }, '잠겼을 때');
+  assert.equal(extendPlan(at(3100), { have: 1, max: 2 }).why, 'ok', '10분 안 남았을 때도');
+  assert.equal(extendPlan(at(4500, { mathExt: 1 }), { have: 1, max: 2 }).room, 1);
+  assert.equal(extendPlan(null, { have: 1 }).why, 'off');
+  // ⚙ 값 — 0~3, 이상하면 기본 2
+  assert.deepEqual([extMaxOf(0), extMaxOf('1'), extMaxOf(3), extMaxOf(9), extMaxOf(-1), extMaxOf('x'), extMaxOf(undefined)], [0, 1, 3, 3, 2, 2, 2]);
+});
+
+test('★ ⏳ 연장권 쓰기 규칙 (extendRule) — 가방에서 하나 빼고 오늘 +1, 한도·가방을 같은 자리에서 본다', () => {
+  const day = '2026-09-28';
+  const p = cloneProfile({ items: { extend_math: 2, stone_math: 4 }, coins: 50 });
+  const before = { ...emptyDaily(day), mathTime: 3600, mathBonus: 600 };
+  const r1 = extendRule(p, before, day, 'mathExt', 'extend_math', 2);
+  assert.equal(r1.ok, true);
+  assert.equal(p.items.extend_math, 1, '가방에서 하나');
+  assert.deepEqual([r1.daily.mathExt, r1.daily.mathTime, r1.daily.mathBonus], [1, 3600, 600], '다른 기록은 그대로');
+  assert.equal(before.mathExt, 0, '읽은 기록을 고치지 않는다');
+  assert.deepEqual([p.coins, p.items.stone_math], [50, 4], '쓸 때는 코인·스톤이 안 든다 (살 때 냈다)');
+  const r2 = extendRule(p, r1.daily, day, 'mathExt', 'extend_math', 2);
+  assert.equal(r2.ok, true);
+  assert.equal(p.items.extend_math, undefined, '0개면 가방에서 지운다');
+  // 한도 — 가방에 또 있어도 오늘은 끝
+  p.items.extend_math = 5;
+  const r3 = extendRule(p, r2.daily, day, 'mathExt', 'extend_math', 2);
+  assert.deepEqual([r3.ok, r3.why, p.items.extend_math], [false, 'cap', 5], '한도에 걸리면 가방도 그대로');
+  assert.equal(extendRule(p, r2.daily, day, 'mathExt', 'extend_math', 0).why, 'cap', '부모가 0개로');
+  assert.equal(extendRule(p, r2.daily, day, 'enExt', 'extend_english', 2).why, 'none', '영어 연장권은 없다');
+  assert.equal(p.items.extend_math, 5);
+  // 기록이 없는 날 (오늘 처음)
+  const r4 = extendRule(cloneProfile({ items: { extend_english: 1 } }), undefined, day, 'enExt', 'extend_english', 2);
+  assert.deepEqual([r4.ok, r4.daily.enExt, r4.daily.date], [true, 1, day]);
+});
+
+test('★ ⏳ 쓴 연장권 수는 DAILY_SUMS — 옛 백업을 되돌려도 줄지 않는다 (한도가 되살아나지 않게)', () => {
+  const empty = emptyDaily('2026-09-28');
+  assert.equal(empty.mathExt, 0, 'mathExt가 emptyDaily에 없다 = DAILY_SUMS에 안 넣었다');
+  assert.equal(empty.enExt, 0);
+  const today = { ...empty, mathExt: 2, enExt: 1 };
+  const old = { ...empty };
+  assert.equal(mergeStatRecord('daily', today, old).mathExt, 2);
+  assert.equal(mergeStatRecord('daily', old, today).enExt, 1);
+});
+
+test('⏳ 연장권 배선 — 잠금 화면·칩·상점·⚙·📊가 같은 규칙을 쓴다', async () => {
+  const fs = await import('node:fs');
+  const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  const up = read('js/timeup.js');
+  assert.match(up, /openTimeUp\(subject, \{ retry: fn \}\)/, '잠금 때문에 못 한 것을 연장권 뒤 "계속하기"로');
+  assert.match(up, /useExtend\(s, clockDay\(\), FIELD\[s\]\.ext, extMax\(\)\)/, '한 트랜잭션 경로로만 쓴다');
+  assert.match(up, /adoptDaily\(r\.daily\)/, '쓴 뒤 칩·잠금이 바로 따라온다');
+  assert.equal((up.match(/extendPlan\(/g) || []).length, 2, '보여 줄 때·누를 때 둘 다 같은 판정');
+  const html = read('index.html');
+  for (const id of ['time-chip-math', 'time-chip-library', 'time-chip-player']) assert.match(html, new RegExp(`<button type="button" id="${id}"`), `${id}는 누를 수 있다`);
+  for (const id of ['timeup-extend', 'timeup-extend-btn', 'timeup-extend-note', 'timeup-shop', 'set-time-ext']) assert.ok(html.includes(`id="${id}"`), id);
+  assert.match(read('js/shop.js'), /shopSection\('⏳ 시간 연장권', [^\n]*EXTENDERS/);
+  const pl = read('js/player.js');
+  assert.match(pl, /extMax: extMaxOf\(settings\.timeExtMax\)/, '⚙ 값을 시계가 읽는다');
+  assert.match(pl, /settings\.timeExtMax = extMaxOf\(\$\('set-time-ext'\)\.value\)/);
+  assert.match(read('js/stats.js'), /td\.mathExt\], \['🎤 영어', td && td\.enExt\]/, '📊에 오늘 쓴 연장권');
+  const xp = read('js/xp.js');
+  assert.match(xp, /runProfileOp\(\(\) => applyExtend\(date, field, it\.id, max\), \(\) => \(\{ ok: false, why: 'save' \}\)\)/, '저장 실패면 시간을 안 늘린다');
 });

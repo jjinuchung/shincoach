@@ -6,8 +6,9 @@ import {
   applyLevelUp, applyEvolve, applyGear, applyPartner, updateMathAndProfile, mergeProfileDelta,
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase, gearRule,
   applyTakeMons, applyTakenSeen, // 🔒 부모가 데려가기 (2026-09-28)
+  applyExtend, // ⏳ 시간 연장권 (2026-10-01)
 } from './db.js';
-import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH } from './items.js';
+import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
@@ -621,6 +622,20 @@ export async function useItem(id) {
   const cost = { items: { [id]: 1 } };
   const r = await runProfileOp(() => applyPurchase(cost, {}), () => ({ ok: false }));
   return !!(r && r.ok);
+}
+
+/**
+ * ⏳ 시간 연장권 쓰기 — 가방에서 하나 빼고 오늘 그 과목 수(field)를 +1, **한 트랜잭션에서** (db.applyExtend).
+ * 저장이 안 되면 시간도 안 늘린다(메모리로만 늘리면 가방과 기록이 어긋난다).
+ * @param {'math'|'english'} subject · @param {string} date 시계의 날 · @param {string} field daily 필드 · @param {number} max 하루 최대
+ * @returns {Promise<{ok:boolean, why?:string, daily?:object}>}
+ */
+export async function useExtend(subject, date, field, max) {
+  const it = extenderOf(subject);
+  if (!it) return { ok: false, why: 'item' };
+  if ((profile.items[it.id] || 0) < 1) return { ok: false, why: 'none' };
+  const r = await runProfileOp(() => applyExtend(date, field, it.id, max), () => ({ ok: false, why: 'save' }));
+  return r || { ok: false, why: 'save' };
 }
 
 /** 가방에서 하나 소모 (⚔️ 배틀 물약처럼 포켓몬 HP와 무관하게 쓰는 경우). 없으면 false */

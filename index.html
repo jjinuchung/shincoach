@@ -44,7 +44,7 @@
       <h1 class="topbar-title">🔢 신코치 수학</h1>
       <span id="math-chip" class="level-chip math-chip">Lv.1</span>
       <!-- ⏳ 오늘 남은 시간 (2026-09-27) -->
-      <span id="time-chip-math" class="time-chip" hidden></span>
+      <button type="button" id="time-chip-math" class="time-chip" hidden></button>
       <!-- 🎒·📊는 홈에만 있었는데 아이가 매번 홈으로 나가야 해서 불편해했다 (2026-09-20) → 과목 화면에도. 돌아오면 이 화면으로 -->
       <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
@@ -63,7 +63,7 @@
     <header class="topbar">
       <button id="btn-library-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
       <h1 class="topbar-title">🎬 신코치 영어</h1>
-      <span id="time-chip-library" class="time-chip" hidden></span>
+      <button type="button" id="time-chip-library" class="time-chip" hidden></button>
       <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
       <button id="btn-import" class="btn btn-primary">＋ <span class="hide-narrow">영상 </span>가져오기</button>
@@ -135,7 +135,7 @@
       <h1 id="player-title" class="topbar-title"></h1>
       <button id="parent-chip" class="parent-chip" aria-label="학습 모드로 돌아가기" hidden>👀 그냥 보기 ✕</button>
       <button id="partner-chip" class="partner-chip" aria-label="파트너 포켓몬" hidden><span class="mon-figure partner-face"><img alt="" draggable="false"></span><span id="partner-hp">❤️ 100</span></button>
-      <span id="time-chip-player" class="time-chip" hidden></span>
+      <button type="button" id="time-chip-player" class="time-chip" hidden></button>
       <span id="goal-chip" class="goal-chip" hidden></span>
       <button id="level-chip" class="level-chip" aria-label="내 포켓몬" hidden>Lv.1</button>
       <button id="coin-chip" class="coin-chip" aria-label="상점" hidden>💰 0</button>
@@ -362,6 +362,12 @@
       <h2 id="timeup-title" class="hatch-title"></h2>
       <p id="timeup-text" class="hatch-text"></p>
       <p id="timeup-sub" class="timeup-sub"></p>
+      <!-- ⏳ 시간 연장권 (2026-10-01) — 아이가 🛒에서 산 것으로 15분 더. 잠겼거나 10분 안 남았을 때만 버튼 -->
+      <div id="timeup-extend" class="timeup-extend" hidden>
+        <button type="button" id="timeup-extend-btn" class="btn btn-accent btn-big-wide"></button>
+        <p id="timeup-extend-note" class="timeup-extend-note"></p>
+        <button type="button" id="timeup-shop" class="btn btn-ghost" hidden>🛒 상점에서 연장권 보기</button>
+      </div>
       <div class="catch-actions timeup-actions">
         <button type="button" id="timeup-ok" class="btn btn-primary btn-big-wide">알겠어요 👋</button>
         <button type="button" id="timeup-ask" class="btn btn-ghost">🔒 아빠에게 부탁하기</button>
@@ -637,7 +643,7 @@
       </label>
 
       <fieldset class="field set-group">
-        <legend class="field-label">⏳ 하루 시간 제한 <small>— 과목마다. 넘으면 부모님 비밀번호로만 더 할 수 있어요</small></legend>
+        <legend class="field-label">⏳ 하루 시간 제한 <small>— 과목마다. 넘으면 부모님 비밀번호나 아이가 산 ⏳ 연장권으로만 더 할 수 있어요</small></legend>
         <label class="field-row">
           <input type="checkbox" id="set-timelimit">
           <span class="field-label">시간 제한 켜기</span>
@@ -649,6 +655,15 @@
         <label class="field field-inline">
           <span class="field-label">주말 (분)</span>
           <input type="number" id="set-time-weekend" min="0" max="600" step="10" inputmode="numeric">
+        </label>
+        <label class="field field-inline">
+          <span class="field-label">⏳ 연장권 하루 최대 <small>— 과목마다. 아이가 🛒에서 산 것으로 15분씩</small></span>
+          <select id="set-time-ext">
+            <option value="0">0개 (못 씀)</option>
+            <option value="1">1개 (+15분)</option>
+            <option value="2">2개 (+30분)</option>
+            <option value="3">3개 (+45분)</option>
+          </select>
         </label>
         <p id="set-time-today" class="field-note"></p>
       </fieldset>

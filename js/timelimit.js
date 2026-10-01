@@ -37,10 +37,18 @@ export const IDLE_SEC = 120;
 /** 모아 두었다가 저장하는 주기(초) — 1초마다 IndexedDB를 두드리지 않게 */
 export const FLUSH_SEC = 15;
 
-/** daily 기록의 필드 이름 */
+/**
+ * ⏳ 시간 연장권 (2026-10-01, 진우 요청 → 아버님 "이대로 진행") — 아이가 🛒에서 산 것으로 그 과목을 15분 더.
+ * 과목마다 하루 EXTEND_MAX개가 기본(⚙ 설정에서 부모가 0~3, 0이면 못 쓴다). 부모가 주는 +10/20/30분은 이 한도와 따로다.
+ * 버튼은 잠겼거나 10분 안 남았을 때만 — 일찍 눌러 낭비하지 않게.
+ */
+export const EXTEND_MIN = 15;
+export const EXTEND_MAX = 2;
+
+/** daily 기록의 필드 이름 — ext는 오늘 그 과목에 쓴 ⏳ 연장권 수 (시간은 EXTEND_MIN × 수) */
 export const FIELD = {
-  math: { used: 'mathTime', bonus: 'mathBonus' },
-  english: { used: 'enTime', bonus: 'enBonus' },
+  math: { used: 'mathTime', bonus: 'mathBonus', ext: 'mathExt' },
+  english: { used: 'enTime', bonus: 'enBonus', ext: 'enExt' },
 };
 
 /** 과목 이름 (화면에 쓰는 말) */
@@ -83,8 +91,20 @@ export function bonusSec(daily, subject) {
   return f ? nz(daily && daily[f.bonus]) : 0;
 }
 
+/** 오늘 그 과목에 쓴 ⏳ 연장권 수 */
+export function extCount(daily, subject) {
+  const f = FIELD[subject];
+  return f ? nz(daily && daily[f.ext]) : 0;
+}
+
+/** ⚙ "연장권 하루 최대" — 0~3, 비었거나 이상하면 기본값 */
+export function extMaxOf(v) {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n >= 0 ? Math.min(3, n) : EXTEND_MAX;
+}
+
 /**
- * 지금 형편 → { used, limit, bonus, total, left, locked, warn }
+ * 지금 형편 → { used, limit, bonus, ext, extN, total, left, locked, warn }
  * @param {object} daily 오늘 기록
  * @param {'math'|'english'} subject
  * @param {string} dateKey "YYYY-MM-DD"
@@ -94,16 +114,37 @@ export function bonusSec(daily, subject) {
 export function statusOf(daily, subject, dateKey, min, o = {}) {
   const limit = limitSec(dateKey, min);
   const bonus = bonusSec(daily, subject);
-  const total = limit + bonus;
+  const extN = extCount(daily, subject);
+  const ext = extN * EXTEND_MIN * 60;
+  const total = limit + bonus + ext;
   const used = usedSec(daily, subject) + nz(o.extra);
   const left = Math.max(0, total - used);
   const off = !!o.off;
   return {
-    used, limit, bonus, total, left,
+    used, limit, bonus, ext, extN, total, left,
     locked: !off && left <= 0,
     warn: !off && left > 0 && left <= WARN_SEC,
     off,
   };
+}
+
+/**
+ * ⏳ 연장권을 지금 쓸 수 있나 → { why, can, room }
+ *   why: 'off'(제한 꺼짐) · 'disabled'(부모가 0개로) · 'cap'(오늘 다 씀) · 'none'(가방에 없음) · 'early'(아직 10분보다 많이 남음) · 'ok'
+ *   room: 오늘 더 쓸 수 있는 수
+ * 진짜 판정(가방·한도)은 db.applyExtend 트랜잭션이 다시 한다 — 이건 화면에 무엇을 보여 줄지
+ * @param {object} st statusOf 결과 · @param {{have:number, max:number}} o 가방에 있는 수 · 하루 최대
+ */
+export function extendPlan(st, o = {}) {
+  const max = extMaxOf(o.max);
+  const room = Math.max(0, max - ((st && st.extN) || 0));
+  const why = !st || st.off ? 'off'
+    : max <= 0 ? 'disabled'
+      : room <= 0 ? 'cap'
+        : nz(o.have) < 1 ? 'none'
+          : !(st.locked || st.warn) ? 'early'
+            : 'ok';
+  return { why, can: why === 'ok', room };
 }
 
 /** 1초(또는 n초) 흘렀다 → applyDailyDelta에 넣을 증분 */
@@ -289,4 +330,24 @@ export async function grantMinutes(subject, minutes) {
 /** 테스트·화면에서 쓰는 오늘 기록 (읽기 전용) */
 export function todayDaily() {
   return clock.daily;
+}
+
+/** 시계가 세고 있는 날 ("YYYY-MM-DD") — ⏳ 연장권을 이 날 기록에 적는다 */
+export function clockDay() {
+  return clock.today || dayKey();
+}
+
+/** ⚙ "연장권 하루 최대" (부모 설정, 기본 2) */
+export function extMax() {
+  return extMaxOf(confNow().extMax);
+}
+
+/**
+ * ⏳ 연장권처럼 **다른 경로로** 저장한 오늘 기록을 받아 둔다 — 칩·잠금이 바로 따라오게.
+ * 아직 저장 안 한 초(pending)는 그대로 두고 status가 더한다.
+ */
+export function adoptDaily(d) {
+  if (!d || d.date !== clock.today) return;
+  clock.daily = d;
+  if (clock.onTick) clock.onTick();
 }
