@@ -10,7 +10,7 @@ import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, 
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
-  applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward,
+  applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, LEARNING_MAX, widenRound,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -576,6 +576,7 @@ function renderLadder(state) {
     head.appendChild(db);
     const parts = [];
     if (preview.roundId) parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${nameOf(preview.roundId)}`);
+    else if (preview.waiting) parts.push('🥚 오늘 배운 건 다음 날 확인해요 — 그때 새 칸이 열려요');
     if (preview.mix.length) parts.push(`🎲 배운 것 섞어 풀기 ${preview.mix.length}문제`);
     head.appendChild(el('p', 'math-note math-daily-sub', unread.length ? `📬 답장을 읽으면 열려요 · ${parts.join(' → ')}` : parts.join(' → ')));
     // ✨ 오늘의 보너스 — 홈 카드와 같은 것. 완주했으면 받았다고, 아니면 완주하면 준다고
@@ -643,20 +644,24 @@ function renderLadder(state) {
     btn.appendChild(el('span', 'math-rung-icon', r.icon));
     const body = el('span', 'math-rung-body');
     body.appendChild(el('span', 'math-rung-name', r.name));
+    // 🥚 배우는 중 → 🐣 안다 (2026-10-01 ②): 배운 날 통과는 🥚, 다음 날 이후 확인을 통과해야 🐣
     const sub = r.state === 'locked' ? '앞 개념을 먼저 알아야 열려요'
-      : r.crowned ? '이해 완료!'
-        : r.due ? '오늘 다시 확인하기'
-          : r.state === 'done' ? `알아요 (${r.left}번 더 확인하면 👑)`
-            : r.state === 'now' ? '지금 배울 차례' : '배울 수 있어요';
+      : r.state === 'wait' ? `🥚 배우는 중인 칸 ${LEARNING_MAX}개를 먼저 확인하면 열려요`
+        : r.crowned ? '이해 완료!'
+          : r.due ? (r.stage === 'learning' ? '오늘 확인하면 🐣 "안다"!' : '오늘 다시 확인하기')
+            : r.stage === 'learning' ? '🥚 배우는 중 — 다음 날 확인해요'
+              : r.stage === 'placed' ? '📏 진단에서 맞힌 칸 — 며칠 뒤 확인해요'
+                : r.state === 'done' ? `알아요 (${r.left}번 더 확인하면 👑)`
+                  : r.state === 'now' ? '지금 배울 차례' : '배울 수 있어요';
     body.appendChild(el('span', 'math-rung-sub', `${gradeLabel(r.grade)} · ${sub}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`));
     btn.appendChild(body);
-    if (r.state === 'locked') btn.disabled = true;
+    if (r.state === 'locked' || r.state === 'wait') btn.disabled = true;
     else btn.addEventListener('click', () => guardStart('math', () => startRound(r.id, r.state === 'done' ? (r.due ? 'review' : 'practice') : 'learn')));
     li.appendChild(btn);
     list.appendChild(li);
   }
   m.appendChild(list);
-  m.appendChild(el('p', 'math-note', '👑는 며칠에 걸쳐 다섯 번 확인해야 받아요. 그날 맞힌 건 "안다"이고, 며칠 뒤에도 맞아야 "이해했다"예요.'));
+  m.appendChild(el('p', 'math-note', '🥚 배운 날 맞힌 칸은 "배우는 중"이에요. 다음 날 또 맞히면 🐣 "안다", 며칠에 걸쳐 다섯 번 맞히면 👑 "이해 완료"예요.'));
 }
 
 // ── 개념 한 편
@@ -673,8 +678,13 @@ function startRound(id, mode, o = {}) {
   const recent = ui.recent[id] || [];
   // 🤔 오답 노트: 지난번에 틀린 유형이 있으면 그 유형을 한 문제 끼운다 (want) — 맞히면 노트에서 지워진다
   const note = nextNote(ui.state, id);
-  const qs = G().makeRound(id, seed, { ...optsFor(), recent, ...(note && note.key ? { want: { k: note.k, key: note.key } } : {}) });
+  let qs = G().makeRound(id, seed, { ...optsFor(), recent, ...(note && note.key ? { want: { k: note.k, key: note.key } } : {}) });
   if (note) for (const q of qs) if (q.key === note.key) q.fromNote = true;
+  // 🔁 확인 편은 4문항까지 — 같은 개념·같은 수준, 다른 틀부터 (2026-10-01 ②: 일곱 줄기는 한 편이 ①②뿐이라 확인이 두 문제였다)
+  if (mode === 'review') {
+    const seen = [...recent, ...qs.map((q) => q.key).filter(Boolean)];
+    qs = widenRound(qs, (t) => G().makeRound(id, seed + t * 104729, { ...optsFor(), recent: seen }));
+  }
   ui.recent[id] = [...recent, ...qs.map((q) => q.key).filter(Boolean)].slice(-RECENT_KEEP);
   // 처음 배우는 줄기(S().lesson)는 📖 이야기 대신 📚 단계식 배움 — 한 장씩 확인하며 간다
   const first = S().lesson ? 'lesson' : 'story';
@@ -2452,13 +2462,17 @@ async function finishRound() {
   const card = el('section', 'math-card math-result');
   const all = result.passed;
   card.appendChild(el('h2', '', all
-    ? (result.crowned ? '👑 이해 완료!' : result.first ? '🎉 이 개념, 이제 알아요!' : result.practice ? '✅ 다 맞았어요!' : '✅ 다시 확인해도 맞았어요!')
+    ? (result.crowned ? '👑 이해 완료!' : result.first ? '🥚 오늘 배웠어요!' : result.known ? '🐣 이제 알아요!' : result.practice ? '✅ 다 맞았어요!' : '✅ 다시 확인해도 맞았어요!')
     : `${r.qs.length}개 중 ${r.correct}개 맞았어요`));
+  // 🥚가 다 차서 이 줄기의 새 칸이 잠겼나 (2026-10-01 ②) — 첫 통과 카드에서 미리 알려 준다
+  const sx = stemOf(r.id);
+  const waitNow = !!result.first && ladderOf(state, today, (sx && sx.key) || ui.stem).some((x) => x.state === 'wait');
   card.appendChild(el('p', 'math-p', all
     ? (result.crowned ? `${nameOf(r.id)} — 다섯 번 확인을 다 통과했어요. 정말 이해한 거예요.`
-      : result.first ? '내일 한 번 더 물어볼게요. 며칠 뒤에도 맞으면 👑!'
-        : result.practice ? '연습이라 👑 확인은 안 올라가요 — 다음 확인 날에 다시 물어볼게요.'
-          : '다음 확인은 며칠 뒤예요.')
+      : result.first ? `내일 한 번 더 맞히면 🐣 "안다"가 돼요. 며칠에 걸쳐 다섯 번 맞히면 👑!${waitNow ? ` 🥚가 ${LEARNING_MAX}개라 다음 칸은 확인한 뒤에 열려요.` : ''}`
+        : result.known ? '하루가 지나도 맞혔어요 — 이제 진짜 아는 거예요. 다음 확인은 며칠 뒤예요.'
+          : result.practice ? '연습이라 👑 확인은 안 올라가요 — 다음 확인 날에 다시 물어볼게요.'
+            : '다음 확인은 며칠 뒤예요.')
     : (result.practice
       ? '연습이라 기록은 그대로예요. 이야기를 다시 읽어 봐요.'
       : '아직 조금 헷갈리나 봐요. 이야기를 다시 읽고 한 번 더 해 봐요 — 틀린 게 있으면 "안다"가 안 돼요.')));

@@ -99,23 +99,81 @@ export function doneIds(m) {
   return Object.entries((m && m.concepts) || {}).filter(([, v]) => v && v.done).map(([k]) => k);
 }
 
+// ── 🥚 배우는 중 → 🐣 안다 (2026-10-01, 아버님 결정 ②) ──
+// 배운 날 첫 편을 다 맞힌 것은 배움 카드 바로 뒤 "따라 하기"라 이해의 증거가 아니다(📊 사진: 새 줄기 칸 전부 첫 편 2/2,
+// 줄기 하나를 20분에 끝냄). 그래서 배운 날 통과 = 🥚 배우는 중(box 0), 다음 날 이후 확인을 통과해야 🐣 안다(box ≥ 1).
+// 아이콘은 이미 STAGES(🥚 🐣 🐥 ⭐ 🏅 👑) 그대로다 — 이름만 맞춘다. 데이터는 안 바뀌고 box로 계산한다(옮기기 없음).
+// done은 그대로 "다음 칸이 열리는 조건"이고, 대신 한 줄기에 🥚가 LEARNING_MAX개면 새 칸을 잠근다(state 'wait').
+/** 한 줄기에 동시에 둘 수 있는 🥚 배우는 중 칸 — 이만큼 차면 다음 칸은 확인한 뒤에 열린다 (9칸 줄기 ≈ 최소 5일) */
+export const LEARNING_MAX = 2;
+
+/**
+ * 개념 하나의 단계.
+ * 'learning' 🥚 배운 날 통과·확인 전(또는 확인에서 틀려 다시 0) / 'placed' 📏 진단으로 친 칸(확인 전) /
+ * 'known' 🐣 다음 날 이후 확인을 통과 / 'crowned' 👑 / null 아직 못 배움
+ */
+export function stageOf(rec) {
+  if (!rec || !rec.done) return null;
+  const box = rec.box || 0;
+  if (box >= GRADUATED) return 'crowned';
+  if (rec.placed) return 'placed';
+  return box >= 1 ? 'known' : 'learning';
+}
+
 /** 사다리 상태 + 각 개념의 복습 정보 (줄기별 — 기본은 분수) */
 export function ladderOf(m, today, stem = 'fraction') {
   const done = doneIds(m);
   const S = STEMS[stem] || STEMS.fraction;
-  return S.gen.ladder(done).map((row) => {
-    const rec = (m && m.concepts && m.concepts[row.id]) || null;
+  const concepts = (m && m.concepts) || {};
+  const base = S.gen.ladder(done);
+  // 🥚가 LEARNING_MAX개면 새로 배울 칸(▶·○)을 잠근다 — 진단으로 친 칸(📏)은 세지 않는다
+  const full = base.filter((row) => stageOf(concepts[row.id]) === 'learning').length >= LEARNING_MAX;
+  return base.map((row) => {
+    const rec = concepts[row.id] || null;
     const box = rec ? (rec.box || 0) : 0;
+    const state = full && (row.state === 'now' || row.state === 'open') ? 'wait' : row.state;
+    const stage = stageOf(rec);
     return {
       ...row,
+      state,
+      stage,
       box,
       left: Math.max(0, GRADUATED - box), // 👑까지 남은 확인 횟수
       crowned: !!rec && rec.done && box >= GRADUATED,
       due: !!rec && rec.done && isDue(rec, today),
       notes: rec && Array.isArray(rec.notes) ? rec.notes.length : 0, // 🤔 다시 볼 유형 수
-      icon: rec && rec.done ? STAGES[Math.min(box, STAGES.length - 1)] : (row.state === 'now' ? '▶' : row.state === 'open' ? '○' : '🔒'),
+      // 📏 진단으로 친 칸은 box 1로 시작해 🐣로 보였다 — 확인 전이라 📏로
+      icon: stage === 'placed' ? '📏' : rec && rec.done ? STAGES[Math.min(box, STAGES.length - 1)] : (state === 'now' ? '▶' : state === 'open' ? '○' : '🔒'),
     };
   });
+}
+
+/** 🔁 확인 편 문항 수 — 일곱 줄기는 한 편이 ①②뿐이라 확인이 두 문제였다(② 4지선다는 찍어도 25%). 난이도는 그대로, 증거를 두 배로 */
+export const REVIEW_MIN = 4;
+
+/**
+ * 🔁 확인 편을 REVIEW_MIN문항까지 늘린다 (순수). 같은 개념·같은 수준에서 **다른 틀(key)** 부터, 모자라면 숫자만 다른 같은 틀.
+ * 이미 그만큼이면(분수 줄기 ①②③⭐) 그대로. 순서는 원래 편 뒤에 덧붙인다(① ② ① ②).
+ * @param {Array<{q:string, key?:string}>} qs 원래 편 (makeRound)
+ * @param {(t:number) => Array} more t번째 다른 씨앗의 편
+ */
+export function widenRound(qs, more, min = REVIEW_MIN) {
+  const out = [...(qs || [])];
+  const keys = new Set(out.map((q) => q && q.key).filter(Boolean));
+  const texts = new Set(out.map((q) => q && q.q));
+  for (let pass = 0; pass < 2 && out.length < min; pass++) { // 0: 다른 틀만 · 1: 같은 틀이라도 문제 글이 다르면
+    for (let t = 1; t <= 6 && out.length < min; t++) {
+      for (const q of more(t + pass * 6) || []) {
+        if (out.length >= min) break;
+        if (!q || texts.has(q.q)) continue;
+        if (pass === 0 && q.key && keys.has(q.key)) continue;
+        out.push(q);
+        texts.add(q.q);
+        if (q.key) keys.add(q.key);
+      }
+    }
+  }
+  return out;
 }
 
 /** 오늘 다시 확인할(복습) 개념 id들 — 사다리 순서대로 */
@@ -240,6 +298,7 @@ export function applyRound(m, id, r, today) {
   const passed = r.total > 0 && r.correct === r.total;
   const wasDone = !!rec.done;
   const wasCrowned = wasDone && (rec.box || 0) >= GRADUATED;
+  const wasStage = stageOf(rec);
   let review = false;
   let practice = false;
   // ★ 일정(box·dueAt)이 바뀔 때만 schedAt을 올린다 — 백업 병합(mergeMath)은 일정을 schedAt이 최신인 쪽에서 가져온다.
@@ -263,7 +322,9 @@ export function applyRound(m, id, r, today) {
   const mode = practice ? 'practice' : review ? 'review' : (r.mode || 'learn');
   pushLog(m, { d: today, t: Date.now(), id, mode, ok: r.correct, n: r.total, qs: (r.qs || []).map(logQ) });
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
-  return { passed, first: !wasDone && passed, crowned, review, practice };
+  // 🐣 방금 "안다"가 됐나 — 🥚 배우는 중·📏 진단으로 친 칸이 다음 날 이후 확인을 통과한 순간 (결과 카드가 축하한다)
+  const known = (wasStage === 'learning' || wasStage === 'placed') && stageOf(rec) === 'known';
+  return { passed, first: !wasDone && passed, crowned, review, practice, known };
 }
 
 /** 한 편의 보상 계산 (지급은 화면이 한다). 차례가 아닌 연습(practice)은 정답 수만큼만 */
@@ -410,7 +471,9 @@ export function dailyPlan(m, today, stem = 'fraction', seed = 0) {
   // 전부 받아서 줄기·개념 편 개념을 거른 뒤 가장 오래된 하나 — 개수 제한을 먼저 걸면 다른 줄기의 노트가 자리를 다 차지한다 (Codex 3차 #6)
   const note = dueNotes(m, today, Infinity).find((x) => x.id !== roundId && (stemOf(x.id) || {}).key === stemKey) || null;
   const mix = fractionGen.shuffle(r, [...known, ...(note ? [{ id: note.id, kinds: [note.note.k], note: note.note }] : [])]);
-  return { roundId, roundMode, mix };
+  // 🥚가 다 차서 새 칸이 잠겼다 — 화면이 "오늘 배운 건 내일 확인해요"라고 알린다
+  const waiting = !roundId && rows.some((x) => x.state === 'wait');
+  return { roundId, roundMode, mix, waiting };
 }
 
 /**
@@ -736,12 +799,17 @@ export function mathSummary(m) {
   const stems = STEM_ORDER.map((key) => {
     const rows = ladderOf(m, '9999-12-31', key);
     const S = STEMS[key];
-    return { key, code: S.code, label: S.label, total: rows.length, done: rows.filter((r) => r.state === 'done').length, crowned: rows.filter((r) => r.crowned).length, started: !!(m && m.placed && m.placed[key]) };
+    const n = (st) => rows.filter((r) => r.stage === st).length;
+    // done = 사다리가 열린 칸 전부. 그중 🐣 안다(👑 포함) · 🥚 배우는 중 · 📏 진단으로 친 칸 (2026-10-01 ②)
+    return { key, code: S.code, label: S.label, total: rows.length, done: rows.filter((r) => r.state === 'done').length, known: n('known') + n('crowned'), learning: n('learning'), placed: n('placed'), crowned: rows.filter((r) => r.crowned).length, started: !!(m && m.placed && m.placed[key]) };
   });
   const sum = (k) => stems.reduce((a, s) => a + s[k], 0);
   const miss = Object.entries((m && m.miss) || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([tag, n]) => ({ tag, n }));
-  return { total: sum('total'), done: sum('done'), crowned: sum('crowned'), stems, rounds: (m && m.rounds) || 0, miss, logged: ((m && m.log) || []).length };
+  return { total: sum('total'), done: sum('done'), known: sum('known'), learning: sum('learning'), placed: sum('placed'), crowned: sum('crowned'), stems, rounds: (m && m.rounds) || 0, miss, logged: ((m && m.log) || []).length };
 }
+
+/** 단계 표시 — 📊·📋에서 같은 글자 */
+export const STAGE_MARK = { learning: '🥚', placed: '📏', known: '🐣', crowned: '👑' };
 
 export const KIND_SHORT = { calc: '①계산', misread: '②오개념', why: '③왜', special: '⭐특별' };
 
@@ -774,7 +842,7 @@ export function conceptReport(m, limit = 8) {
     // 진단으로만 "안다"가 된 개념(passes 1은 진단의 것)은 한 편도 안 푼 것이라 표에 안 올린다 — 복습에서 풀면 일지가 생겨 올라온다
     const noteList = (Array.isArray(rec.notes) ? rec.notes : []).map((n) => ({ k: n.k, label: KIND_SHORT[n.k] || n.k || '', tag: n.tag || '', d: n.d || '', again: n.again || 0, fx: n.fx }));
     const notes = noteList.length;
-    return { id, name: nameOf(id), done: !!rec.done, box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, sense: [senseOk, senseN], why, pad, guesses, notes, noteList, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length && !noteQs.length };
+    return { id, name: nameOf(id), done: !!rec.done, stage: stageOf(rec), box: rec.box || 0, rounds, passes: rec.passes || 0, fails: rec.fails || 0, trail, kinds, weak, miss, fixed, sense: [senseOk, senseN], why, pad, guesses, notes, noteList, lastAt: rec.lastAt || 0, placedOnly: !!rec.placed && !mine.length && !noteQs.length };
   }).filter((r) => r.trail.length || r.notes || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt); // 🤔 노트만 있는 개념(진단으로 안 것)도 표에 — 못 고친 유형을 보여 줘야 한다
 }
 
@@ -784,12 +852,12 @@ export function conceptReport(m, limit = 8) {
  */
 export function mathReportText(m, today) {
   const s = mathSummary(m);
-  const lines = [`🔢 신코치 수학 기록 (${today}) — 개념 ${s.done}/${s.total} 배움 · 👑 ${s.crowned} · 지금까지 ${s.rounds}편`];
+  const lines = [`🔢 신코치 수학 기록 (${today}) — 개념 ${s.total}개 중 🐣 안다 ${s.known} · 🥚 배우는 중 ${s.learning} · 📏 진단으로 침 ${s.placed} · 👑 ${s.crowned} · 지금까지 ${s.rounds}편`];
   for (const r of conceptReport(m, 12)) {
     const trail = r.trail.map((t) => (t.pass ? '✔' : `✘${t.ok}/${t.n}`)).join(' ');
     const kinds = r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(', ');
     const miss = r.miss.map((x) => `${x.tag}×${x.n}`).join(', ');
-    lines.push(`- ${r.name}${r.done ? (r.box >= GRADUATED ? ' 👑' : ' ✅') : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}${r.sense[1] ? ` · 감 잡기 ${r.sense[0]}/${r.sense[1]}` : ''}${(r.why.s + r.why.c + r.why.u) ? ` · 틀린 이유: 실수 ${r.why.s}·헷갈림 ${r.why.c}·몰랐음 ${r.why.u}` : ''}${r.pad[1] ? ` · ✍️ 직접 쓴 답 ${r.pad[0]}/${r.pad[1]}${r.guesses.length ? ` (짐작: ${r.guesses.join(', ')})` : ''}` : ''}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`);
+    lines.push(`- ${r.name}${r.stage ? ` ${STAGE_MARK[r.stage]}` : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}${r.sense[1] ? ` · 감 잡기 ${r.sense[0]}/${r.sense[1]}` : ''}${(r.why.s + r.why.c + r.why.u) ? ` · 틀린 이유: 실수 ${r.why.s}·헷갈림 ${r.why.c}·몰랐음 ${r.why.u}` : ''}${r.pad[1] ? ` · ✍️ 직접 쓴 답 ${r.pad[0]}/${r.pad[1]}${r.guesses.length ? ` (짐작: ${r.guesses.join(', ')})` : ''}` : ''}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`);
   }
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
   const log = ((m && m.log) || []).slice(-30);

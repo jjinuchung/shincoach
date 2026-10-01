@@ -18,6 +18,7 @@ function learned(n, today = Y) {
     applyRound(m, ids[i], pass, today);
     m.concepts[ids[i]].lastAt = 1000 + i; // 오래된 순서를 고정
     m.concepts[ids[i]].dueAt = '2099-01-01'; // 복습 차례 아님
+    m.concepts[ids[i]].box = 1; // 🐣 다음 날 확인까지 통과한 "아는" 개념 (box 0은 🥚 배우는 중 — 둘이면 새 칸이 잠긴다, 2026-10-01 ②)
   }
   return m;
 }

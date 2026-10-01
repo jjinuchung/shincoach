@@ -3,7 +3,7 @@ import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
   applyEssayFixes, getMath, updateMath, updateItem,
 } from './db.js';
-import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, KIND_SHORT, WHY_LABEL } from './mathprog.js';
+import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, KIND_SHORT, WHY_LABEL, STAGE_MARK } from './mathprog.js';
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes } from './essay.js';
 import { countPlayableCues } from './srt.js';
@@ -509,14 +509,15 @@ export async function renderStats() {
   // 3e) 🔢 수학 — 분수 줄기 진도와 헷갈리는 오개념 (오답마다 붙은 이름표가 쌓인 것 — Codex 리뷰 #8)
   const ms = mathSummary(math);
   if (ms.rounds > 0 || ms.done > 0) {
-    const cM = card(`🔢 수학 — 개념 ${ms.done}/${ms.total} · 👑 ${ms.crowned}`);
+    // 🐣 안다 = 다음 날 이후 확인을 통과한 칸 · 🥚 배우는 중 = 배운 날만 맞힌 칸 · 📏 = 진단으로 친 칸 (2026-10-01 ②)
+    const cM = card(`🔢 수학 — 🐣 안다 ${ms.known} · 🥚 배우는 중 ${ms.learning} · 📏 진단 ${ms.placed} / 전체 ${ms.total} · 👑 ${ms.crowned}`);
     const weekMath = daily.filter((d) => week.some((w) => w.date === d.date));
     const q = weekMath.reduce((a, d) => a + (Number(d.mathQ) || 0), 0);
     const ok = weekMath.reduce((a, d) => a + (Number(d.mathOk) || 0), 0);
     cM.appendChild(el('p', 'stats-sub', `이번 주 ${q}문항 중 ${ok}개 정답 · 지금까지 ${ms.rounds}편`));
     // 줄기마다 사다리 — 시작한 줄기(진단을 한 것)만 (2026-09-21: 분수 + 음수)
     for (const st of ms.stems.filter((s) => s.started)) {
-      cM.appendChild(el('p', 'stats-sub', `${st.code}. ${st.label} — ${st.done}/${st.total} · 👑 ${st.crowned}`));
+      cM.appendChild(el('p', 'stats-sub', `${st.code}. ${st.label} — 🐣 ${st.known} · 🥚 ${st.learning}${st.placed ? ` · 📏 ${st.placed}` : ''} / ${st.total} · 👑 ${st.crowned}`));
       const rows = mathLadderOf(math, today, st.key);
       const lad = el('div', 'stats-missed');
       for (const r of rows) {
@@ -550,7 +551,7 @@ export async function renderStats() {
       const tb = el('tbody');
       for (const r of report) {
         const tr = el('tr');
-        tr.appendChild(el('td', '', `${r.done ? (r.box >= 5 ? '👑 ' : '✅ ') : ''}${r.name}`));
+        tr.appendChild(el('td', '', `${r.stage ? `${STAGE_MARK[r.stage]} ` : ''}${r.name}`));
         tr.appendChild(el('td', 'num', `${r.passes}/${r.fails}`));
         const trail = el('td', 'trail');
         for (const t of r.trail) {

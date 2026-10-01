@@ -72,7 +72,8 @@ test('📋 붙여 넣을 글: 개념별 한 줄 + 최근 일지, 개념 이름�
   applyRound(m, 'frac.add', round([1, 1, 1, 1]), T);
   const txt = mathReportText(m, T);
   assert.ok(txt.startsWith(`🔢 신코치 수학 기록 (${T})`));
-  assert.ok(txt.includes('분모가 다른 분수의 덧셈·뺄셈 ✅: 1통과/1실패 · ✘3/4 ✔'), txt);
+  assert.ok(txt.includes('분모가 다른 분수의 덧셈·뺄셈 🥚: 1통과/1실패 · ✘3/4 ✔'), txt); // 배운 날 통과 = 🥚 배우는 중 (2026-10-01 ②)
+  assert.ok(txt.split('\n')[0].includes('🐣 안다 0 · 🥚 배우는 중 1 · 📏 진단으로 침 0 · 👑 0'), txt.split('\n')[0]);
   assert.ok(txt.includes('①계산 1/2'), '얼굴별 정답');
   assert.ok(txt.includes('헷갈림: 분모끼리 더함×1'));
   assert.ok(txt.includes('최근 2편'));
