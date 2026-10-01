@@ -287,13 +287,27 @@ export function isLocked(subject) {
   return !!(st && st.locked);
 }
 
+/**
+ * 자정을 넘겼으면 날을 바꾼다 — 모아 둔 초는 **어제 기록에** 먼저 저장하고 오늘 기록을 읽는다.
+ * ★ 시계의 다른 조건(🎯 제한 밖·화면 꺼짐·쉼)보다 **먼저** 본다 — 도전 문제를 연 채 자정을 넘기면 날이 안 바뀌어
+ *   ⏳ 연장권이 어제 기록에 쓰였다 (가방에서는 빠지고 오늘은 안 늘어남, Codex 21차 #4)
+ */
+let rolling = null;
+export function ensureToday() {
+  if (dayKey() === clock.today) return Promise.resolve(clock.daily);
+  if (!rolling) {
+    rolling = flushTime().catch(() => {}).then(() => loadToday()).finally(() => { rolling = null; });
+  }
+  return rolling;
+}
+
 function tick() {
+  if (dayKey() !== clock.today) { ensureToday().catch(() => {}); return; } // 자정을 넘겼다 — 무엇보다 먼저
   const s = clock.subject;
   if (!s) return;
   if (clock.exempt) return;                                                // 🎯 도전 문제 — 제한 밖
   if (typeof document !== 'undefined' && document.hidden) return;          // 뒤로 갔다
   if (now() - clock.lastActive > IDLE_SEC * 1000) return;                  // 놓고 딴 데 갔다
-  if (dayKey() !== clock.today) { loadToday().catch(() => {}); return; }   // 자정을 넘겼다
   // 이미 다 썼으면 더 세지 않는다 — 잠금 화면에서 아이가 몇 번 눌러도 "오늘 한 시간"이 부풀지 않게.
   // 덕분에 부모가 +20분을 주면 딱 20분이 생긴다 (used가 제자리라 total−used = 20분)
   if (isLocked(s)) return;

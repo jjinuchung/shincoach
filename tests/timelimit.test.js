@@ -253,3 +253,28 @@ test('⏳ 연장권 배선 — 잠금 화면·칩·상점·⚙·📊가 같은 �
   const xp = read('js/xp.js');
   assert.match(xp, /runProfileOp\(\(\) => applyExtend\(date, field, it\.id, max\), \(\) => \(\{ ok: false, why: 'save' \}\)\)/, '저장 실패면 시간을 안 늘린다');
 });
+
+test('★ ⏳ 연장권 Codex 21차 — 자정 넘김·느린 저장 사이 다른 창·다른 창의 ⚙·영어 이어 열기', async () => {
+  const fs = await import('node:fs');
+  const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  // #4 시계는 날짜를 **가장 먼저** 본다 — 🎯 제한 밖·쉼·화면 꺼짐보다 앞에서 (안 그러면 어제 기록에 연장권이 쓰인다)
+  const tl = read('js/timelimit.js');
+  const tick = tl.slice(tl.indexOf('function tick() {'), tl.indexOf('/** 모아 둔 초를 저장한다'));
+  const iDay = tick.indexOf('dayKey() !== clock.today'); const iEx = tick.indexOf('if (clock.exempt) return;');
+  assert.ok(iDay > 0 && iEx > 0 && iDay < iEx, '자정 확인이 제한 밖(exempt)보다 먼저');
+  assert.match(tl, /rolling = flushTime\(\)\.catch\(\(\) => \{\}\)\.then\(\(\) => loadToday\(\)\)/, '모아 둔 초는 어제 기록에 먼저 저장하고 오늘을 읽는다');
+  // #4·#5 연장권 쓰기 — 날짜를 다시 확인하고, 이 창의 이어 할 것을 기다리기 **전에** 붙잡고, 이어 하기 전에 잠김을 다시 본다
+  const up = read('js/timeup.js');
+  const doEx = up.slice(up.indexOf('async function doExtend() {'), up.indexOf('export function closeTimeUp() {'));
+  assert.ok(doEx.indexOf('const retry = retryFn;') < doEx.indexOf('await ensureToday()'), '기다리기 전에 retry를 붙잡는다');
+  assert.ok(doEx.indexOf('await ensureToday()') < doEx.indexOf('useExtend('), '쓰기 전에 오늘 날짜로');
+  assert.match(doEx, /closeCb = retry \? \(\) => \{ if \(!isLocked\(s\)\) retry\(\); \} : null;/, '그 과목이 정말 풀렸을 때만 이어서');
+  assert.match(doEx, /const here = seq === openSeq && box && !box\.hidden;/, '그 사이 다른 창이 열렸으면 그 창은 건드리지 않는다');
+  assert.equal((up.match(/openSeq \+= 1;/g) || []).length, 2, '열 때·닫을 때 둘 다');
+  // #6 다른 창에서 바꾼 ⚙ 시간 제한·연장권 한도를 이 창도 따른다
+  assert.match(read('js/player.js'), /window\.addEventListener\('storage', \(e\) => \{[\s\S]{0,300}for \(const k of \['timeLimit', 'timeWeekday', 'timeWeekend', 'timeExtMax'\]\)/);
+  // #7 영어 영상·🔁 복습도 잠금 뒤 "계속하기"로 이어서 연다 — 이어 할 것 없이 부르는 곳이 남지 않았다
+  const lib = read('js/library.js');
+  assert.equal((lib.match(/guardStart\('english', \(\) => \{ open\(\)/g) || []).length, 2);
+  assert.doesNotMatch(lib, /guardStart\('english'\)/);
+});

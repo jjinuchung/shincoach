@@ -7,7 +7,7 @@
 
 import {
   status, isLocked, grantMinutes, currentSubject, isExempt, GRANT_MIN, KO, fmtLeft, fmtUsed,
-  extendPlan, extMax, clockDay, adoptDaily, FIELD, EXTEND_MIN, WARN_SEC,
+  extendPlan, extMax, clockDay, adoptDaily, ensureToday, FIELD, EXTEND_MIN, WARN_SEC,
 } from './timelimit.js';
 import { itemCount, useExtend } from './xp.js';
 import { extenderOf, priceText } from './items.js';
@@ -21,6 +21,7 @@ let closeCb = null;
 let grantSubject = null;
 let retryFn = null;     // 잠금 때문에 못 한 것 (guardStart의 fn) — 연장권을 쓰면 "계속하기"로 이어서 한다
 let extending = false;  // 연장권 저장 중 (두 번 눌러 두 개 쓰지 않게)
+let openSeq = 0;        // 창을 열고 닫을 때마다 +1 — 느린 저장이 끝났을 때 그 사이 다른 창이 열렸는지 본다
 
 /** 칩 세 개 (🔢 수학 / 🎬 목록 / ▶ 플레이어) */
 const CHIPS = [
@@ -89,6 +90,7 @@ export function openTimeUp(subject, o = {}) {
   const box = $('timeup');
   if (!box) return;
   const s = subject || currentSubject() || 'math';
+  openSeq += 1;
   grantSubject = s;
   closeCb = typeof o.onClose === 'function' ? o.onClose : null;
   retryFn = typeof o.retry === 'function' ? o.retry : null;
@@ -147,26 +149,38 @@ async function doExtend() {
   const s = grantSubject || currentSubject() || 'math';
   const it = extenderOf(s);
   if (!it || extending) return;
-  const st0 = status(s);
-  if (!extendPlan(st0, { have: itemCount(it.id), max: extMax() }).can) { renderExtend(s, st0); return; }
+  // 이 창의 과목·이어서 할 것을 지금 붙잡는다 — 저장을 기다리는 사이 창을 닫고 다른 과목 칸을 누르면
+  // 그 창의 retry가 들어와, 시간을 받지 못한(아직 잠긴) 과목이 "계속하기"로 시작됐다 (Codex 21차 #5)
+  const seq = openSeq;
+  const retry = retryFn;
   extending = true;
   $('timeup-extend-btn').disabled = true;
   let r = null;
   try {
-    r = await useExtend(s, clockDay(), FIELD[s].ext, extMax());
+    await ensureToday(); // 자정을 넘겼으면 오늘 기록으로 — 어제 기록에 쓰면 가방에서만 빠진다 (Codex 21차 #4)
+    const st0 = status(s);
+    if (extendPlan(st0, { have: itemCount(it.id), max: extMax() }).can) r = await useExtend(s, clockDay(), FIELD[s].ext, extMax());
   } finally {
     extending = false;
+  }
+  const box = $('timeup');
+  const here = seq === openSeq && box && !box.hidden;
+  if (r && r.ok) {
+    adoptDaily(r.daily);
+    refreshChips();
+    document.dispatchEvent(new CustomEvent('shincoach:profilechange', { detail: { id: null } })); // 🎒 가방 수가 바뀌었다
+  }
+  if (!here) { // 그 사이 다른 창이 열렸다 — 그 창의 연장권 칸만 새로 그린다 (그 창의 글·이어 할 것은 건드리지 않는다)
+    if (box && !box.hidden && grantSubject) renderExtend(grantSubject, status(grantSubject));
+    return;
   }
   if (!r || !r.ok) {
     renderExtend(s, status(s));
     if (r && r.why === 'save') $('timeup-extend-note').textContent = '앗, 저장을 못 했어요 — 한 번 더 눌러 봐요.';
     return;
   }
-  adoptDaily(r.daily);
-  refreshChips();
   unlock();
   sfx.ding();
-  document.dispatchEvent(new CustomEvent('shincoach:profilechange', { detail: { id: null } })); // 🎒 가방 수가 바뀌었다
   const st = status(s);
   $('timeup-title').textContent = `⏳ ${EXTEND_MIN}분 더!`;
   $('timeup-text').textContent = `오늘 ${KO[s]} ${fmtLeft(st ? st.left : EXTEND_MIN * 60)} 남았어요. 힘내요 💪`;
@@ -176,8 +190,8 @@ async function doExtend() {
   if (g) g.hidden = true;
   const ok = $('timeup-ok');
   if (ok) ok.textContent = '계속하기 ▶';
-  // 잠금 때문에 못 한 것(사다리 칸 누르기 등)을 "계속하기"로 이어서 — 다시 누를 필요 없게
-  closeCb = retryFn;
+  // 잠금 때문에 못 한 것(사다리 칸 누르기·영상 열기 등)을 "계속하기"로 이어서 — 그 과목이 정말 풀렸을 때만
+  closeCb = retry ? () => { if (!isLocked(s)) retry(); } : null;
   retryFn = null;
 }
 
@@ -185,6 +199,7 @@ export function closeTimeUp() {
   const box = $('timeup');
   if (!box || box.hidden) return;
   box.hidden = true;
+  openSeq += 1;
   const g = $('timeup-grant');
   if (g) g.hidden = true;
   retryFn = null;

@@ -25,7 +25,8 @@ const FLIP_E = { 이상: '초과', 초과: '이상', 이하: '미만', 미만: '
 const FLIP_D = { 이상: '이하', 이하: '이상', 초과: '미만', 미만: '초과' };
 const incl = (w) => w === '이상' || w === '이하';
 const nums = (t) => (String(t).match(/\d+(?:\.\d+)?/g) || []).map(Number);
-const boldList = (q) => { const m = /\*\*([\d, ]+)\*\*/.exec(q); return m ? m[1].split(', ').map(Number) : null; };
+// 소수도 읽는다 — 원고 L3 확인 "9, 10, 12, 14.5, 15" (Codex 21차 #3: 범위에는 소수도 든다)
+const boldList = (q) => { const m = /\*\*([\d., ]+)\*\*/.exec(q); return m ? m[1].split(', ').map(Number) : null; };
 
 /** 범위 글 읽기 — "10 이상 15 미만" · "130 cm 이상" · "9번 초과 22번 미만" */
 function readRange(t) {
@@ -100,6 +101,11 @@ function solveText(q) {
   }
   // 어림 방법 고르기
   if (/어떤 어림 방법이 알맞을까요/.test(q)) {
+    // 풀이가 "남는 사람·덜 찬 봉지·모자란 돈"을 말하므로 정말 남아야 한다 (Codex 21차 #1 — 360명 ÷ 40명, 350개 ÷ 10개)
+    let mm;
+    if ((mm = /학생 (\d+)명이 한 대에 (\d+)명씩/.exec(q))) assert.notEqual(+mm[1] % +mm[2], 0, `나누어떨어지면 버림해도 아무도 안 남는다: ${q}`);
+    if ((mm = /사탕 (\d+)개를 10개씩 봉지에/.exec(q))) assert.notEqual(+mm[1] % 10, 0, `나누어떨어지면 덜 찬 봉지가 없다: ${q}`);
+    if ((mm = /(?:물건값|동전) (\d+)원을 1000원짜리/.exec(q))) assert.notEqual(+mm[1] % 1000, 0, `1000원으로 딱 떨어지면 모자라지도 남지도 않는다: ${q}`);
     if (/버스를 빌려요/.test(q) || /지폐로만 내요/.test(q)) return '올림';
     if (/봉지 수를 세려면/.test(q) || /지폐로 바꿔요\. 바꿀 수 있는 돈/.test(q)) return '버림';
     if (/가장 가깝게 말하려면/.test(q)) return '반올림';
@@ -115,6 +121,11 @@ function solveText(q) {
   if ((m = /동전 (\d+)원을 1000원짜리 지폐로 바꾸려고 해요\. 지폐로 바꿀 수 있는 돈은 최대 얼마/.exec(q))) return aim(m[1], '버림', '천');
   if ((m = /귤 (\d+)개를 한 상자에 10개씩 담아 팔려고/.exec(q))) return aim(m[1], '버림', '십');
   if ((m = /관객은 (\d+)명이에요\. 관객 수를 반올림하여 (.+?까지)/.exec(q))) return aim(m[1], '반올림', readPlace(m[2]));
+  // 경계 경우 (Codex 21차 #8) — 이어지는 받아올림·이미 딱 떨어진 수
+  if ((m = /(?:학용품값|준비물값) (\d+)원을 100원짜리 동전으로만 내려고/.exec(q))) return aim(m[1], '올림', '백');
+  if ((m = /연필 (\d+)자루를 10자루씩 묶음으로 사려고/.exec(q))) return aim(m[1], '올림', '십');
+  if ((m = /줄넘기를 (\d+)번 했어요\. 반올림하여 (.+?까지)/.exec(q))) return aim(m[1], '반올림', readPlace(m[2]));
+  if ((m = /도서관 책이 (\d+)권이에요\. 반올림하여 (.+?까지)/.exec(q))) return aim(m[1], '반올림', readPlace(m[2]));
   // 어림 (글 그대로)
   if ((m = /^(\d+(?:\.\d+)?)[을를] (올림|버림|반올림)하여 (.+?까지) 나타내면/.exec(q))) return aim(m[1], m[2], readPlace(m[3]));
   // 범위에 드는 자연수 · 번호표
@@ -317,6 +328,9 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다 — 경계·�
       else if ((m = /동전 (\d+)원을 1000원짜리 지폐로 바꾸려고 해요\. 지폐로 바꿀 수 있는 돈/.exec(t))) [src, mode, place] = [m[1], '버림', '천'];
       else if ((m = /귤 (\d+)개를/.exec(t))) [src, mode, place] = [m[1], '버림', '십'];
       else if ((m = /관객은 (\d+)명이에요\. 관객 수를 반올림하여 (.+?까지)/.exec(t))) [src, mode, place] = [m[1], '반올림', readPlace(m[2])];
+      else if ((m = /(?:학용품값|준비물값) (\d+)원을 100원짜리/.exec(t))) [src, mode, place] = [m[1], '올림', '백'];
+      else if ((m = /연필 (\d+)자루를 10자루씩/.exec(t))) [src, mode, place] = [m[1], '올림', '십'];
+      else if ((m = /(?:줄넘기를 (\d+)번 했어요|도서관 책이 (\d+)권이에요)\. 반올림하여 (.+?까지)/.exec(t))) [src, mode, place] = [m[1] || m[2], '반올림', readPlace(m[3])];
       if (src) {
         const nd = nextDigit(src, place);
         if (tag === TAGS.downForUp) ok(mode === '올림' && w.text === aim(src, '버림', place));
@@ -329,6 +343,10 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다 — 경계·�
         else if (tag === TAGS.roundDownWrong) ok(mode === '반올림' && nd >= 6 && w.text === aim(src, '버림', place));
         else if (tag === TAGS.fiveDown) ok(mode === '반올림' && nd === 5 && w.text === aim(src, '버림', place));
         else if (tag === TAGS.doubleRound) ok(mode === '반올림' && w.text === aim(aim(src, '반올림', BELOW[place]), '반올림', place));
+        // 9 + 1 = 10에서 윗자리로 1을 안 올림 → 한 자리 위까지 버린 수 (그 자리 숫자가 정말 9이고, 정답은 정말 윗자리가 바뀐다)
+        else if (tag === TAGS.carryMiss) ok(Number((toMilli(src) / PL[place]) % 10n) === 9 && w.text === aim(src, '버림', ABOVE[place]) && aim(solveText(t), '버림', ABOVE[place]) !== w.text);
+        // 아래가 모두 0 — 올림해도 그대로인데 한 칸 올렸다
+        else if (tag === TAGS.zeroUp) ok(mode === '올림' && toMilli(src) % PL[place] === 0n && w.text === fromMilli(toMilli(src) + PL[place]));
         else ok(false, '모르는 이름표');
         continue;
       }
@@ -336,6 +354,28 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다 — 경계·�
     }
   }
   assert.ok(checked > 9 * SEEDS, `확인한 오답 ${checked}`);
+});
+
+test('★ 어림의 경계 경우가 나온다 — 이어지는 받아올림(2960 → 3000)·이미 딱 떨어진 수(4300 → 4300) (Codex 21차 #8)', () => {
+  let carry = 0; let exact = 0;
+  for (const { c, s, q } of every(['calc'], 400)) {
+    if (!['rng.up', 'rng.round'].includes(c.id)) continue;
+    const tags = q.choices.map((x) => x.tag);
+    if (tags.includes(TAGS.carryMiss)) {
+      carry++;
+      const ok = q.choices.find((x) => x.ok).text;
+      const miss = q.choices.find((x) => x.tag === TAGS.carryMiss).text;
+      assert.ok(Number(ok) > Number(miss), `${c.id} #${s}: 받아올림한 답이 더 커야 ${ok} vs ${miss}`);
+      assert.match(q.solve.steps.join(' '), /윗자리로 1을 올려요/, `${c.id} #${s}: 풀이가 받아올림을 말한다`);
+    }
+    if (tags.includes(TAGS.zeroUp)) {
+      exact++;
+      const ok = q.choices.find((x) => x.ok).text;
+      assert.ok(q.q.includes(`${ok}원을`), `${c.id} #${s}: 딱 떨어진 수는 그대로가 답 — ${q.q} → ${ok}`);
+      assert.ok(!q.choices.some((x) => x.tag === TAGS.noZero), '같은 값의 "아래를 0으로 안 바꿈"은 빠진다');
+    }
+  }
+  assert.ok(carry > 40 && exact > 10, `받아올림 ${carry} · 딱 떨어짐 ${exact}`);
 });
 
 test('★ ② 오개념 문항: 보여 준 것은 정말 틀렸다 · 고치는 말만 맞다 · 갈래 열쇠', () => {
@@ -432,6 +472,28 @@ test('★ 풀이 카드: 단계 2줄↑ · 기억할 것 · 오답마다 왜 · 
       assert.ok(sv.steps.join(' ').includes(ok), `${c.id} #${s}: 정답 "${ok}"이 풀이에 없다\n${sv.steps.join('\n')}`);
     }
   }
+});
+
+test('★ 어림 방법 고르기의 버스·사탕은 늘 남는다 — 씨앗 5,000개 (Codex 21차 #1: 360명 ÷ 40명 · 350개 ÷ 10개, 한 문항에 나와 600개로는 못 잡을 때가 있다)', () => {
+  let bus = 0; let pack = 0;
+  for (let s = 1; s <= 5000; s++) {
+    const t = makeQuestion('rng.apply', 'calc', s, OPTS).q;
+    let m;
+    if ((m = /학생 (\d+)명이 한 대에 (\d+)명씩/.exec(t))) { bus++; assert.notEqual(+m[1] % +m[2], 0, `#${s}: ${t}`); }
+    if ((m = /사탕 (\d+)개를 10개씩 봉지에/.exec(t))) { pack++; assert.notEqual(+m[1] % 10, 0, `#${s}: ${t}`); }
+  }
+  assert.ok(bus > 100 && pack > 100, `버스 ${bus} · 사탕 ${pack}`);
+});
+
+test('★ 기억할 것(rule)이 그 문제에서도 참이다 — L4 "차만 구하면 하나가 어긋난다"는 41 초과 60 이하(답 19 = 60 − 41)에서 거짓 (Codex 21차 #2)', () => {
+  let mixed = 0;
+  for (const { c, s, q } of every(['calc', 'misread'], 300)) {
+    if (c.id !== 'rng.count') continue;
+    assert.doesNotMatch(q.solve.rule, /어긋/, `rng.count #${s}: ${q.solve.rule}`);
+    if (/초과 \d+ 이하|이상 \d+ 미만/.test(q.q)) mixed++;
+  }
+  assert.ok(mixed > 20, `한쪽만 들어가는 범위도 나온다 (${mixed})`);
+  assert.doesNotMatch(conceptById('rng.count').rule, /어긋/);
 });
 
 test('★ 글 속 셈식은 맞다 (곱셈 먼저) — 문제·보기·풀이 전부', () => {

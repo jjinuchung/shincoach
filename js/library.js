@@ -407,15 +407,19 @@ export async function refreshList() {
         return;
       }
       if (opening) return; // 큰 영상은 몇 초 걸리므로 중복 탭 방지
-      if (!guardStart('english')) return; // ⏳ 오늘 영어 시간을 다 썼다
-      opening = true;
-      showLoading('영상 불러오는 중...');
-      try {
-        await openPlayer(item.id);
-      } finally {
-        hideLoading();
-        opening = false;
-      }
+      // ⏳ 오늘 영어 시간을 다 썼으면 잠금 — ⏳ 연장권을 쓰면 "계속하기"로 이 영상을 이어서 연다 (Codex 21차 #7)
+      const open = async () => {
+        if (opening) return;
+        opening = true;
+        showLoading('영상 불러오는 중...');
+        try {
+          await openPlayer(item.id);
+        } finally {
+          hideLoading();
+          opening = false;
+        }
+      };
+      guardStart('english', () => { open().catch((err) => console.warn('영상 열기 실패:', err)); });
     });
     li.querySelector('.library-delete').addEventListener('click', async () => {
       if (!confirm(`"${item.title}" 영상을 지울까요?`)) return;
@@ -472,15 +476,19 @@ async function renderTodayReview(items, records) {
   btn.querySelector('.lrv-sub').textContent = `「${item.title}」에서 기다리고 있어요`;
   btn.addEventListener('click', async () => {
     if (opening) return; // 큰 영상은 몇 초 걸리므로 중복 탭 방지
-    if (!guardStart('english')) return; // ⏳ 오늘 영어 시간을 다 썼다
-    opening = true;
-    showLoading('복습 준비 중...');
-    try {
-      await openPlayer(item.id, { review: true });
-    } finally {
-      hideLoading();
-      opening = false;
-    }
+    // ⏳ 잠겼으면 연장권 뒤 "계속하기"로 복습을 이어서 연다 (Codex 21차 #7)
+    const open = async () => {
+      if (opening) return;
+      opening = true;
+      showLoading('복습 준비 중...');
+      try {
+        await openPlayer(item.id, { review: true });
+      } finally {
+        hideLoading();
+        opening = false;
+      }
+    };
+    guardStart('english', () => { open().catch((err) => console.warn('영상 열기 실패:', err)); });
   });
   box.appendChild(btn);
   box.hidden = false;

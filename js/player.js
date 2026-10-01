@@ -139,6 +139,14 @@ export function initPlayer(ctx) {
   video = $('video');
   loadPrefs();
   refreshHole(); // 🕳 울트라홀 상태를 읽어 둔다 (실패해도 닫힌 채로 — 새어 나가지 않는 쪽)
+  // ⏳ 다른 창에서 부모가 ⚙ 시간 제한·연장권 한도를 바꾸면 이 창도 바로 따른다 (Codex 21차 #6 — 열려 있던 창은
+  // 옛 한도 2개로 계속 연장권을 썼다). storage 이벤트는 **다른 창**에서 바꿨을 때만 온다
+  window.addEventListener('storage', (e) => {
+    if (e.key !== 'shincoach.settings') return;
+    let s = {};
+    try { s = JSON.parse(e.newValue || '{}') || {}; } catch { return; }
+    for (const k of ['timeLimit', 'timeWeekday', 'timeWeekend', 'timeExtMax']) if (s[k] !== undefined) settings[k] = s[k];
+  });
 
   $('btn-back').addEventListener('click', closePlayer);
   $('btn-play').addEventListener('click', onPlayButton);

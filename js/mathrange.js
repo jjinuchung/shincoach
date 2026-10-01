@@ -177,6 +177,8 @@ export const TAGS = {
   wrongPlace: '한 자리 위까지 어림함',      // "~까지"를 "~에서"로
   lowPlace: '한 자리 아래까지 어림함',      // 천의 자리까지인데 백의 자리까지
   noZero: '올린 자리 아래를 0으로 안 바꿈',
+  carryMiss: '받아올림을 빠뜨림',           // 2960 → 2000 (9 + 1 = 10에서 윗자리로 1을 안 올림) — Codex 21차 #8
+  zeroUp: '아래가 모두 0인데도 올림',       // 4300을 올림하여 백의 자리까지 → 4400 (그대로 4300)
   dropDigits: '아래 자리를 지워 버림',      // 247 → 24
   roundUpWrong: '버려야 하는데 올림',       // 반올림: 바로 아래가 0~4
   roundDownWrong: '올려야 하는데 버림',     // 반올림: 바로 아래가 6~9
@@ -382,6 +384,72 @@ function pickDec(r, p, ok = () => true) {
   return null;
 }
 
+/**
+ * 경계 경우 (Codex 21차 #8 — 위의 두 고르기는 그 자리 숫자 9와 "이미 딱 떨어진 수"를 일부러 뺀다):
+ *   받아올림이 이어지는 수 — 그 자리 숫자가 9 (2960 → 3000, 397 → 400, 997 → 1000). 반올림이면 바로 아래가 5 이상
+ */
+function pickCarry(r, p, mode) {
+  const u = PLACE[p];
+  const digits = p === '십' ? 3 : 4;
+  for (let t = 0; t < 400; t++) {
+    const v = int(r, 10 ** (digits - 1) + 1, 10 ** digits - 1) * M;
+    if (digitAt(v, u) !== 9 || v % u === 0) continue;
+    if (mode === 'round' && digitAt(v, u / 10) < 5) continue;
+    return v;
+  }
+  return null;
+}
+/** 이미 그 자리까지 딱 떨어진 수 (4300 — 백의 자리 아래가 모두 0) — 올림해도 그대로 */
+function pickExact(r, p) {
+  const u = PLACE[p];
+  for (let t = 0; t < 400; t++) {
+    const k = int(r, 11, 99);
+    if (k % 10 === 0) continue; // 한 자리 위까지도 딱 떨어지면(4000) "백의 자리까지"가 뜻이 없어진다
+    return k * u;
+  }
+  return 43 * u;
+}
+/** 경계 경우 이야기 틀 — 틀 글이 다른 틀과 겹치지 않게(쌍둥이가 보통 문제로 빠지지 않게) 이야기마다 하나 */
+function boundaryStories(r, mode) {
+  const out = [];
+  const carry = (v, p, md, t) => {
+    const parts = roundParts(v, p, md);
+    const u = PLACE[p];
+    const ans = MODE[md].f(v, u);
+    const miss = downTo(v, PLACE[UP_PLACE[p]]);
+    const nd = digitAt(v, u / 10);
+    return {
+      t, ...parts,
+      wr: [{ text: fmt(miss), tag: TAGS.carryMiss }, ...parts.wr],
+      why: { ...parts.why, [TAGS.carryMiss]: `${pName(p)} 숫자 9에 1을 더하면 10이에요. 0을 쓰고 윗자리로 1을 올려야 해요 → ${fmt(ans)}.` },
+      steps: md === 'up'
+        ? [`${pName(p)} 아래에 0이 아닌 수가 있어요 → ${pName(p)} 숫자 9를 1 크게 하면 10`, `10이 되면 0을 쓰고 윗자리로 1을 올려요 → ${fmt(ans)}`]
+        : [`${pName(p)} 바로 아래 숫자를 봐요: ${nd} → 올려요`, `${pName(p)} 숫자 9가 10이 되어 0을 쓰고 윗자리로 1을 올려요 → ${fmt(ans)}`],
+      probe: { round: [fmt(v), md, p] },
+    };
+  };
+  if (mode === 'up') {
+    const v1 = pickCarry(r, '백', 'up'); const v2 = pickCarry(r, '십', 'up'); const v3 = pickExact(r, '백');
+    out.push(carry(v1, '백', 'up', `학용품값 ${v1 / M}원을 100원짜리 동전으로만 내려고 해요. 적어도 얼마를 내야 할까요?`));
+    out.push(carry(v2, '십', 'up', `연필 ${v2 / M}자루를 10자루씩 묶음으로 사려고 해요. 적어도 몇 자루를 사야 할까요?`));
+    const parts = roundParts(v3, '백', 'up');
+    out.push({
+      t: `준비물값 ${v3 / M}원을 100원짜리 동전으로만 내려고 해요. 적어도 얼마를 내야 할까요?`,
+      ...parts,
+      // 아래가 모두 0 — "올림이니 무조건 하나 올린다"(4400)가 이 칸의 오개념이다. 같은 값의 "올린 자리 아래를 0으로 안 바꿈"은 뺀다
+      wr: [{ text: fmt(v3 + PLACE['백']), tag: TAGS.zeroUp }, ...parts.wr.filter((w) => w.tag !== TAGS.noZero)],
+      why: { ...parts.why, [TAGS.zeroUp]: `백의 자리보다 아래가 모두 0이면 올릴 것이 없어요. 올림해도 그대로 → ${fmt(v3)}.` },
+      steps: ['백의 자리보다 아래 자리가 모두 0이에요', `올릴 것이 없어서 그대로 → ${fmt(v3)}`],
+      probe: { round: [fmt(v3), 'up', '백'] },
+    });
+  } else if (mode === 'round') {
+    const v1 = pickCarry(r, '십', 'round'); const v2 = pickCarry(r, '백', 'round');
+    out.push(carry(v1, '십', 'round', `줄넘기를 ${v1 / M}번 했어요. 반올림하여 십의 자리까지 나타내면 몇 번일까요?`));
+    out.push(carry(v2, '백', 'round', `도서관 책이 ${v2 / M}권이에요. 반올림하여 백의 자리까지 나타내면 몇 권일까요?`));
+  }
+  return out;
+}
+
 /** 올림·버림·반올림 한 문항의 정답·오답·풀이 */
 function roundParts(v, p, mode) {
   const u = PLACE[p];
@@ -453,6 +521,8 @@ function roundCalc(r, c, concept, mode) {
     return { t: `${jn(fmt(v), '을', '를')} ${W}하여 ${placeText(p)} 나타내면 얼마일까요?`, ...parts, probe: { round: [fmt(v), mode, p] } };
   })));
   fams.push(famOf(roundStories(r, mode)));
+  // 경계 경우 — 이어지는 받아올림(올림·반올림)·이미 딱 떨어진 수(올림). 버림은 받아올림이 없고, 결과가 0인 문제는 아이에게 어색해 뺀다
+  if (mode !== 'down') fams.push(famOf(boundaryStories(r, mode)));
   return calcAsk(r, c, concept, runFamily(r, c, fams));
 }
 /** 생활 속 올림·버림·반올림 — 이야기 틀마다 자리가 정해져 있다 */
@@ -707,7 +777,8 @@ export const RANGE = [
   {
     id: 'rng.count', grade: 5, name: '범위에 드는 수 세기', needs: ['rng.line'],
     idea: '**10 이상 15 이하**인 자연수는 10, 11, 12, 13, 14, 15 — 6개예요. 15 − 10 = 5만 하면 하나가 모자라요. **양 끝이 들어가는지**를 보고 세요.',
-    rule: '양 끝이 들어가는지 보고 센다 — 차만 구하면 하나가 어긋난다.',
+    // "차만 구하면 하나가 어긋난다"는 41 초과 60 이하(60 − 41 = 19, 답도 19)에서 거짓이었다 (Codex 21차 #2) — 원고와 같은 규칙으로
+    rule: '양 끝이 들어가는지 보고 센다 — 가장 작은 수와 가장 큰 수를 찾고 (큰 수 − 작은 수) + 1.',
     slip: '양 끝의 수를 직접 써 보고 세어 봐요.',
     calc(r, c) {
       const fams = [];
@@ -1112,11 +1183,15 @@ export const RANGE = [
       // 알맞은 어림 방법 고르기 — 상황마다 틀 하나 (수가 들어 있어 쌍둥이가 원래 글과 같아지지 않는다)
       fams.push(famOf(['bus', 'pack', 'pay', 'swap', 'crowd'].map((kind) => {
         const N = int(r, 120, 380); const k = pick(r, [20, 30, 40]);
+        // 풀이가 "남는 사람·덜 찬 봉지가 생겨요"라고 말하므로 **정말 남아야** 한다 — 360명 ÷ 40명은 9대로 딱 맞아
+        // 버림해도 아무도 안 남는다 (Codex 21차 #1). 나누어떨어지면 1~9를 더한다 (k ≥ 20이라 나머지가 1~9가 된다)
+        const nBus = N % k ? N : N + int(r, 1, 9);
+        const nPack = N % 10 ? N : N + int(r, 1, 9);
         const v = pickNat(r, '천') / M;
         const ok = { bus: '올림', pack: '버림', pay: '올림', swap: '버림', crowd: '반올림' }[kind];
         const sit = {
-          bus: `학생 ${N}명이 한 대에 ${k}명씩 타는 버스를 빌려요. 몇 대를 빌릴지 정하려면`,
-          pack: `사탕 ${N}개를 10개씩 봉지에 담아 팔아요. 팔 수 있는 봉지 수를 세려면`,
+          bus: `학생 ${nBus}명이 한 대에 ${k}명씩 타는 버스를 빌려요. 몇 대를 빌릴지 정하려면`,
+          pack: `사탕 ${nPack}개를 10개씩 봉지에 담아 팔아요. 팔 수 있는 봉지 수를 세려면`,
           pay: `물건값 ${v}원을 1000원짜리 지폐로만 내요. 낼 돈을 정하려면`,
           swap: `동전 ${v}원을 1000원짜리 지폐로 바꿔요. 바꿀 수 있는 돈을 정하려면`,
           crowd: `관객 ${v}명을 "약 몇천 명"이라고 가장 가깝게 말하려면`,
