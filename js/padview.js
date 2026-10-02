@@ -13,7 +13,8 @@ const FIELDS = { num: ['x'], frac: ['n', 'd'], mixed: ['w', 'n', 'd'], ratio: ['
 const FIELD_LABEL = { x: '답', n: '분자', d: '분모', w: '자연수', a: '앞', b: '뒤' };
 const DOT_OK = new Set(['x', 'a', 'b']); // 소수점을 칠 수 있는 칸
 const KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', '⌫'];
-const MAX = 7;
+// 칸 하나에 칠 수 있는 글자 수 (소수점 포함) — 7이면 원의 넓이 줄기의 오개념 값 118.3152(37.68 × 3.14)를 못 쳐서 "짐작"이 됐다 (Codex 23차 #2)
+const MAX = 8;
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);

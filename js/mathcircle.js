@@ -219,7 +219,8 @@ function calcAsk(r, c, concept, v) {
     ...ask(concept.id, 'calc', fill(v.t, c), chs, {
       solve: solve(v.steps.map((s, i) => step(i, s)), { why: v.why || {}, whyAny: v.whyAny || '', rule: v.rule || concept.rule }),
     }),
-    probe: v.probe || null,
+    // allWrong: 보기에서 겹쳐 빠지기 전의 오답 전부 — 테스트가 오답끼리 같은 값이 되는지 본다 (Codex 23차 #3: 굴렁쇠 2바퀴)
+    probe: v.probe ? { ...v.probe, allWrong: v.wr.map((w) => ({ text: String(w.text), tag: w.tag })) } : null,
   };
 }
 /** ② 문항 — m: { q, ok, wr, steps, whyAny, rule, probe } */
@@ -235,8 +236,6 @@ function misAsk(r, c, concept, branch, m) {
 
 /** 지름 d — 원주가 소수로 나오게 (50의 배수면 자연수가 되어 틀 글의 수 모양이 바뀐다) */
 const pickD = (r, lo, hi) => { let d = int(r, lo, hi); if (d % 50 === 0) d += 1; return d; };
-/** 반지름 r — 넓이가 소수로 나오게 (10의 배수면 자연수) */
-const pickR = (r, lo, hi) => { let x = int(r, lo, hi); if (x % 10 === 0) x += 1; return x; };
 
 // ───────────────────── 개념 사다리 (N. 원의 넓이 줄기) ─────────────────────
 
@@ -450,8 +449,8 @@ export const CIRCLE = [
       })()]));
       // 바퀴가 굴러간 거리
       fams.push(famOf([
-        (() => { const d = int(r, 3, 9) * 10; const n = int(r, 2, 5); return wheelOf(d, n, `지름이 ${d} cm인 굴렁쇠를 ${n}바퀴 굴렸어요. ${PI_NOTE}\n\n굴렁쇠가 굴러간 거리는 몇 cm일까요?`); })(),
-        (() => { const d = int(r, 3, 9) * 10; const n = int(r, 2, 5); return wheelOf(d, n, `{mon/이/가} 지름이 ${d} cm인 바퀴 자를 ${n}바퀴 굴려 복도의 길이를 재었어요. ${PI_NOTE}\n\n복도의 길이는 몇 cm일까요?`); })(),
+        (() => { const d = int(r, 3, 9) * 10; const n = int(r, 3, 5); return wheelOf(d, n, `지름이 ${d} cm인 굴렁쇠를 ${n}바퀴 굴렸어요. ${PI_NOTE}\n\n굴렁쇠가 굴러간 거리는 몇 cm일까요?`); })(),
+        (() => { const d = int(r, 3, 9) * 10; const n = int(r, 3, 5); return wheelOf(d, n, `{mon/이/가} 지름이 ${d} cm인 바퀴 자를 ${n}바퀴 굴려 복도의 길이를 재었어요. ${PI_NOTE}\n\n복도의 길이는 몇 cm일까요?`); })(),
       ]));
       return calcAsk(r, c, this, runFamily(r, c, fams));
     },
@@ -614,7 +613,7 @@ export const CIRCLE = [
 
   {
     id: 'cir.formula', grade: 6, name: '원의 넓이 구하는 방법', needs: ['cir.estimate'],
-    idea: '원을 잘게 잘라 엇갈려 붙이면 **직사각형에 가까워져요**. 조각의 호가 위아래로 반씩 나뉘어서 가로는 **원주의 반**(= 반지름 × 원주율), 세로는 **반지름**. 그래서 **원의 넓이 = 반지름 × 반지름 × 원주율**.',
+    idea: '원을 잘게 잘라 엇갈려 붙이면 **직사각형에 가까워져요**. 잘게 자를수록 가로는 **원주의 반**(= 반지름 × 원주율)에, 세로는 **반지름**에 가까워져요 — 조각의 호가 위아래로 반씩 나뉘거든요. 그래서 **원의 넓이 = 반지름 × 반지름 × 원주율**.',
     rule: '원의 넓이 = 반지름 × 반지름 × 원주율.',
     slip: '잘라 붙인 모양의 가로·세로가 원의 어디였는지 떠올려 봐요.',
     calc(r, c) {
@@ -624,7 +623,7 @@ export const CIRCLE = [
       fams.push(famOf([(() => {
         const R = int(r, 2, 20);
         return {
-          t: `${cut(R)}이 모양의 가로는 몇 cm일까요?`,
+          t: `${cut(R)}이 모양을 직사각형으로 생각하면 가로는 몇 cm일까요?`,
           ans: fmt(R * PI), wr: [{ text: fmt(circ(2 * R)), tag: TAGS.widthFull }, { text: String(R), tag: TAGS.widthR }, { text: String(2 * R), tag: TAGS.widthD }],
           steps: ['가로 = 원주의 반 (조각의 호가 위아래로 반씩 나뉘어요)', `원주 ${R} × 2 × 3.14 = ${fmt(circ(2 * R))}, 그 반은 ${fmt(circ(2 * R))} ÷ 2 = ${fmt(R * PI)}`],
           why: {
@@ -639,7 +638,7 @@ export const CIRCLE = [
       fams.push(famOf([(() => {
         const R = int(r, 2, 20);
         return {
-          t: `${cut(R)}이 모양의 세로는 몇 cm일까요?`,
+          t: `${cut(R)}이 모양을 직사각형으로 생각하면 세로는 몇 cm일까요?`,
           ans: String(R), wr: [{ text: String(2 * R), tag: TAGS.heightD }, { text: fmt(R * PI), tag: TAGS.swapWH }],
           steps: ['조각의 꼭짓점은 원의 중심, 호는 원 위 — 조각의 옆변은 반지름', `세로 = 반지름 = ${R}`],
           why: {
@@ -677,8 +676,8 @@ export const CIRCLE = [
       if (branchOf(r, c, ['width', 'dsq']) === 'width') {
         const R = int(r, 2, 20);
         return misAsk(r, c, this, 'width', {
-          q: `반지름이 ${R} cm인 원을 잘게 잘라 엇갈려 붙였어요. ${PI_NOTE}\n\n[circle slices r=${R}]\n\n${showWork(`잘라 붙인 모양의 가로는 원주와 같아서 ${R} × 2 × 3.14 = ${fmt(circ(2 * R))} cm예요`)}`,
-          ok: `원주의 반은 위, 나머지 반은 아래 — 가로는 ${R} × 3.14 = ${fmt(R * PI)} cm`,
+          q: `반지름이 ${R} cm인 원을 잘게 잘라 엇갈려 붙였어요. ${PI_NOTE}\n\n[circle slices r=${R}]\n\n${showWork(`잘라 붙인 모양을 직사각형으로 생각하면 가로는 원주와 같아서 ${R} × 2 × 3.14 = ${fmt(circ(2 * R))} cm예요`)}`,
+          ok: `원주의 반은 위, 나머지 반은 아래 — 직사각형으로 생각하면 가로는 ${R} × 3.14 = ${fmt(R * PI)} cm`,
           wr: [
             { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
             { text: `가로는 반지름과 같아서 ${R} cm예요`, tag: TAGS.widthR },
@@ -686,7 +685,7 @@ export const CIRCLE = [
           ],
           steps: ['조각의 호가 위아래로 반씩 나뉘어요', `가로 = 원주의 반 = ${fmt(circ(2 * R))} ÷ 2 = ${fmt(R * PI)} cm`],
           whyAny: '원주 전체가 가로가 되지 않아요. 조각의 호가 위아래로 반씩 나뉘어서 가로는 원주의 반이에요.',
-          rule: '잘라 붙인 모양: 가로 = 원주의 반, 세로 = 반지름.',
+          rule: '잘라 붙인 모양을 직사각형으로 생각하면: 가로 = 원주의 반, 세로 = 반지름.',
           probe: { r: R, ask: 'width', shown: circ(2 * R) },
         });
       }
@@ -700,7 +699,7 @@ export const CIRCLE = [
           { text: '원은 곡선이라서 넓이를 구할 수 없어요', tag: OFF },
         ],
         steps: ['원의 넓이 = 반지름 × 반지름 × 원주율', `${R} × ${R} × 3.14 = ${fmt(area(R))} cm²`],
-        whyAny: `${2 * R} cm는 지름이에요. 지름을 두 번 곱하면 원 밖 정사각형처럼 4배나 커져요.`,
+        whyAny: `${2 * R} cm는 지름이에요. 지름은 반지름의 2배라서, 지름을 두 번 곱하면 원의 넓이의 2 × 2 = 4배가 나와요.`,
         probe: { r: R, ask: 'area', shown: area(2 * R) },
       });
     },
@@ -744,7 +743,8 @@ export const CIRCLE = [
       ]));
       // 넓이 → 반지름
       fams.push(famOf([(() => {
-        const R = pickR(r, 3, 15); const A = area(R);
+        // 반지름 3~9만 — 530.66 ÷ 3.14 = 169 다음에 13 × 13을 떠올리기는 어렵다 (Codex 23차 #6). 10의 배수가 없어 넓이는 늘 소수
+        const R = int(r, 3, 9); const A = area(R);
         return {
           t: `넓이가 ${fmt(A)} cm²인 원이 있어요. ${PI_NOTE}\n\n[circle r=?]\n\n이 원의 반지름은 몇 cm일까요?`,
           ans: String(R), wr: [{ text: String(R * R), tag: TAGS.rrOnly }, { text: String(2 * R), tag: TAGS.dForR }],
@@ -879,7 +879,7 @@ export const CIRCLE = [
         const [R, s] = ringPick(r);
         const ok = area(R) - area(s);
         return misAsk(r, c, this, 'ring', {
-          q: `큰 원의 반지름은 ${R} cm, 작은 원의 반지름은 ${s} cm예요. ${PI_NOTE}\n\n[circle ring R=${R} r=${s}]\n\n${showWork(`반지름의 차 ${R} − ${s} = ${ro(R - s)} 원을 하나 구하면 ${R - s} × ${R - s} × 3.14 = ${fmt(area(R - s))} cm²예요`)}`,
+          q: `큰 원의 반지름은 ${R} cm, 작은 원의 반지름은 ${s} cm예요. ${PI_NOTE}\n\n[circle ring R=${R} r=${s}]\n\n${showWork(`고리 모양의 넓이는 반지름의 차 ${R} − ${s} = ${jn(R - s, '을', '를')} 반지름으로 하는 원의 넓이와 같아서 ${R - s} × ${R - s} × 3.14 = ${fmt(area(R - s))} cm²예요`)}`,
           ok: `큰 원에서 작은 원을 빼요 — ${R} × ${R} × 3.14 − ${s} × ${s} × 3.14 = ${fmt(ok)} cm²`,
           wr: [
             { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
@@ -1005,6 +1005,7 @@ function cToDiam(d, t) {
     probe: { C, ask: 'd' },
   };
 }
+/** 바퀴 n은 3~5 — 2바퀴면 "바퀴 수를 빠뜨림"(지름 × 3.14)과 "지름을 반으로 나눔"((지름 ÷ 2) × 3.14 × 2)이 같은 값 (Codex 23차 #3) */
 function wheelOf(d, n, t) {
   const C = circ(d);
   return {

@@ -13,7 +13,7 @@ import {
 } from '../js/mathcircle.js';
 import { figureSvg, figText, renderFigures, parseCircle } from '../js/mathdraw.js';
 import { tplKey } from '../js/mathgen.js';
-import { padSpec } from '../js/mathpad.js';
+import { padSpec, readTyped, matchTyped } from '../js/mathpad.js';
 
 const OPTS = { names: ['피카츄', '리자몽', '개굴닌자'], me: '진우', worlds: { pokemon: [], toystory: [], minions: [], moana: [] } };
 const SEEDS = Number(process.env.RNG_SEEDS) || 500;
@@ -97,8 +97,8 @@ function solveText(q) {
     if (/바르게 어림한 것/.test(L)) return { type: 'boxRange', ans: `${str(inner)} cm²보다 크고 ${str(outer)} cm²보다 작아요`, f: { d: D } };
   }
   // ── N5 잘라 붙이기 ──
-  if (/모양의 가로는 몇/.test(L)) { const R = I(r); return { type: 'width', ans: str(half(circD(R * 2n))), f: { r: R } }; }
-  if (/모양의 세로는 몇/.test(L)) { const R = I(r); return { type: 'height', ans: str(R), f: { r: R } }; }
+  if (/직사각형으로 생각하면 가로는 몇/.test(L)) { const R = I(r); return { type: 'width', ans: str(half(circD(R * 2n))), f: { r: R } }; }
+  if (/직사각형으로 생각하면 세로는 몇/.test(L)) { const R = I(r); return { type: 'height', ans: str(R), f: { r: R } }; }
   if (/넓이를 구하는 식/.test(L)) return { type: 'expr', ans: `${r} × ${r} × 3.14`, f: { r: +r } };
   // ── N2 원주와 원주율 ──
   if (/큰 원의 \(원주\) ÷ \(지름\)/.test(L)) {
@@ -290,6 +290,9 @@ test('★ ② 오개념 문항: 보여 준 것은 정말 틀렸다 · 고치는 
     const said = (/\*\*(.+?)\*\*/s.exec(t) || [])[1] || '';
     const at = (cond, msg) => assert.ok(cond, `${c.id} #${s} ${q.key} ${msg}\n${t}\n✔ ${ok}`);
     at(bad.some((x) => x.tag === '틀린 줄 모름'), '"맞게 말했어요" 보기');
+    // 보여 준 말이 무엇에 대한 말인지 분명해야 "맞게 말했어요"가 정말 틀린 보기다 (Codex 23차 #1: "반지름의 차로 원을 하나 구하면 12.56"은 그 원의 넓이로는 참)
+    at(/(넓이는|넓이도|둘레는|원주는|지름은|원주율은|원주율도|가로는|길이는)/.test(said), '보여 준 말이 무엇을 구한 말인지 없다');
+    if (q.key === 'misread:ring') at(said.startsWith('고리 모양의 넓이는'), '고리 넓이라고 말한다');
     const endsNum = (txt) => (txt.match(/([\d.]+)(?: ?(?:cm²|cm|배))?$/) || [])[1];
     let right; let shown;
     const br = q.key.slice(8);
@@ -738,4 +741,75 @@ test('화면 연결 (3단계): STEMS.circle(N)은 이 생성기·원고를 쓰�
   const stats = readFileSync(new URL('../js/stats.js', import.meta.url), 'utf8');
   for (const src of [ask, stats]) for (const ex of src.match(/\[circle [^\]]+\]/g) || ['없음']) assert.ok(figureSvg(ex.slice(1, -1)), `예시가 그려지지 않음: ${ex}`);
   assert.ok(ask.includes('[circle r=5]') && stats.includes('[circle r=5]'), '❓ 복사문·📊 답장 안내에 [circle] 예');
+});
+
+// ───────────────────── Codex 23차 회귀 ─────────────────────
+
+test('★ Codex 23차 #3: 오답끼리 같은 값이 되지 않는다 — 보기에서 겹쳐 빠지기 전 단계(probe.allWrong)에서 본다 · 빠진 오답도 이름표의 틀린 셈 그대로', () => {
+  let n = 0;
+  for (const { c, s, q } of every(['calc'])) {
+    const all = (q.probe && q.probe.allWrong) || [];
+    assert.ok(all.length >= 2, `${c.id} #${s}: allWrong 없음`);
+    const { type, f } = solveText(q.q);
+    const key = (t) => (valueOf(t) !== null ? `#${valueOf(t)}` : t);
+    const seen = new Map();
+    for (const w of all) {
+      assert.equal(w.text, TAGV[type][w.tag](f), `${c.id} #${s} (${type}): "${w.tag}" 값`);
+      const k = key(w.text);
+      assert.ok(!seen.has(k), `${c.id} #${s} (${type}): "${seen.get(k)}"와 "${w.tag}"가 같은 값 ${w.text}
+${q.q}`);
+      seen.set(k, w.tag);
+    }
+    n++;
+  }
+  assert.ok(n >= 7 * SEEDS);
+  // 굴렁쇠는 3바퀴부터 (2바퀴면 지름 × 3.14 = (지름 ÷ 2) × 3.14 × 2)
+  for (let s2 = 1; s2 <= 3000; s2++) {
+    const q = makeQuestion('cir.circum', 'calc', s2, OPTS);
+    const m = /(\d+)바퀴/.exec(q.q);
+    if (m) assert.ok(+m[1] >= 3, `#${s2}: ${m[1]}바퀴`);
+  }
+});
+
+test('★ Codex 23차 #2: 숫자판으로 모든 수 보기를 칠 수 있다 — 칸 글자 수(MAX) 안 · 8글자 오개념 값 118.3152를 치면 그 이름표로 잡힌다', () => {
+  const pv = readFileSync(new URL('../js/padview.js', import.meta.url), 'utf8');
+  const MAX = +/const MAX = (\d+);/.exec(pv)[1];
+  let long = 0;
+  for (const { c, s, q } of every(['calc'], 300)) {
+    const spec = padSpec(q, 'circle');
+    if (!spec) continue;
+    for (const ch of q.choices) {
+      if (valueOf(ch.text) === null) continue;
+      assert.ok(String(ch.text).length <= MAX, `${c.id} #${s}: "${ch.text}"는 ${String(ch.text).length}글자 > ${MAX}`);
+      if (String(ch.text).length === 8) long++;
+      // 친 값 → 보기 번호: 정답은 정답으로, 오답은 그 이름표로
+      const typed = readTyped('num', { x: String(ch.text) }, spec);
+      const hit = matchTyped(q, typed, spec);
+      assert.equal(q.choices[hit.i], ch, `${c.id} #${s}: "${ch.text}"를 쳐도 그 보기로 안 간다 (${JSON.stringify(hit)})`);
+    }
+  }
+  assert.ok(long > 50, `8글자 보기 ${long}개 (118.3152 같은 거꾸로 곱한 값)`);
+  const q25 = makeQuestion('cir.circum', 'calc', 25, OPTS);
+  const w = q25.choices.find((x) => x.tag === TAGS.invMul);
+  assert.ok(w && w.text.length === 8, `씨앗 25: ${q25.choices.map((x) => x.text)}`);
+});
+
+test('★ Codex 23차 #4·#5·#6: 지름을 두 번 곱한 풀이는 "원의 넓이의 4배" · 잘라 붙인 모양은 "직사각형으로 생각하면" · 넓이에서 반지름은 3~9', () => {
+  for (let s = 1; s <= 300; s++) {
+    const q = makeQuestion('cir.formula', 'misread', s, { ...OPTS, want: { k: 'misread', key: 'misread:dsq' } });
+    assert.doesNotMatch(q.solve.whyAny, /원 밖 정사각형/, `#${s}: ${q.solve.whyAny}`);
+    assert.match(q.solve.whyAny, /원의 넓이의 2 × 2 = 4배/);
+  }
+  for (const { s, q } of every(['calc', 'misread'], 300)) {
+    if (q.concept !== 'cir.formula' || !/slices/.test(q.q)) continue;
+    assert.ok(/직사각형으로 생각하면/.test(q.q), `#${s}: 잘라 붙인 모양을 딱 직사각형처럼 말한다
+${q.q}`);
+  }
+  for (let s = 1; s <= 3000; s++) {
+    const q = makeQuestion('cir.area', 'calc', s, OPTS);
+    const m = /넓이가 ([\d.]+) cm²인 원/.exec(q.q);
+    if (m) assert.ok(+q.choices.find((x) => x.ok).text <= 9, `#${s}: 반지름 ${q.choices.find((x) => x.ok).text}`);
+  }
+  const fm = CONTENT['cir.formula'];
+  assert.ok(fm.lesson[1].say.includes('가까워져요') && fm.lesson[1].check.q.includes('직사각형으로 생각하면'), '원고 N5-2도');
 });
