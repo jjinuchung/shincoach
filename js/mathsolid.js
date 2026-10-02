@@ -179,6 +179,7 @@ export const TAGS = {
   slantAsH: '모선을 높이로 봄',
   hAsSlant: '높이를 모선으로 봄',
   rAsSlant: '반지름을 모선으로 봄',
+  slantAsD: '모선이 될 빗변을 지름으로 봄',
   oneSlant: '모선이 하나뿐이라고 봄',
   twoSlant: '그림에 그린 모선만 셈',
   spinSide: '돌리는 축에 붙은 변과 다른 변을 바꿈',
@@ -190,6 +191,7 @@ export const TAGS = {
   halfDAsR: '반원의 지름을 구의 반지름으로 봄',
   dAsR: '지름을 반지름으로 봄',
   doubleD: '지름을 다시 두 배로 함',
+  rForD: '지름을 묻는데 반지름을 답함',
   oneRadius: '반지름이 하나뿐이라고 봄',
   radiusDiff: '반지름의 길이가 서로 다르다고 봄',
   viewTop: '위에서 본 모양을 답함',
@@ -368,7 +370,7 @@ export const SOLID = [
           { text: '각뿔의 옆면은 직사각형이에요', tag: TAGS.sideShapeSwap },
           { text: '각뿔에는 면이 없어요', tag: OFF },
         ],
-        steps: ['각뿔에서 다각형인 면은 밑에 놓인 1개뿐이에요', '나머지 면은 모두 삼각형인 옆면 → 밑면은 1개'],
+        steps: ['각뿔의 밑면은 밑에 놓인 다각형 1개예요', '나머지 면은 모두 삼각형인 옆면 → 밑면은 1개'],
         whyAny: '밑면이 2개인 것은 각기둥이에요. 각뿔의 밑면은 1개예요.',
         probe: { ask: 'bases', kind: 'pyramid' },
       });
@@ -566,7 +568,7 @@ export const SOLID = [
           const n = pick(r, [3, 4, 6]); const [a, , e] = pick(r, PYR_SETS[n]);
           const ans = n * a + n * e; const w1 = n * a; const w2 = a + e; const w3 = n * e;
           return {
-            t: `밑면이 정다각형인 각뿔이 있어요.\n\n[pyramid n=${n} a=${a} e=${e}]\n\n이 각뿔의 모든 모서리 길이의 합은 몇 cm일까요?`, ans: String(ans),
+            t: `밑면이 정다각형이고 옆 모서리의 길이가 모두 같은 각뿔이 있어요.\n\n[pyramid n=${n} a=${a} e=${e}]\n\n이 각뿔의 모든 모서리 길이의 합은 몇 cm일까요?`, ans: String(ans),
             wr: [{ text: String(w1), tag: TAGS.sumNoSide }, { text: String(w2), tag: TAGS.twoOnly }, { text: String(w3), tag: TAGS.sumNoBase }].filter((w) => allDiff(ans, +w.text)),
             steps: [`밑면의 모서리 ${a} cm가 ${n}개, 옆 모서리 ${e} cm가 ${n}개`, `${a} × ${n} = ${n * a}, ${e} × ${n} = ${n * e}`, `${n * a} + ${n * e} = ${ans}`],
             why: { [TAGS.sumNoSide]: '옆 모서리를 빠뜨렸어요.', [TAGS.twoOnly]: '적힌 두 모서리만 더했어요.', [TAGS.sumNoBase]: '밑면의 모서리를 빠뜨렸어요.' },
@@ -827,7 +829,7 @@ export const SOLID = [
       fams.push(famOf([
         (() => { const a = int(r, 2, 8); const b = intWhere(r, 3, 15, (v) => v !== 2 * a && v !== a && Math.max(v, a) <= 4 * Math.min(v, a)); return { t: `직사각형의 한 변을 축으로 한 바퀴 돌렸어요.\n\n[spin rect ${a} ${b}]\n\n만들어진 입체도형의 밑면의 지름은 몇 cm일까요?`, ans: String(2 * a), wr: [{ text: String(a), tag: TAGS.rAsD }, { text: String(b), tag: TAGS.spinSide }], steps: [`축에서 ${a} cm 떨어진 변이 돌아요 — 밑면의 반지름이 ${a} cm`, `지름 = ${a} × 2 = ${2 * a}`], why: { [TAGS.rAsD]: `${a} cm는 반지름이에요. 축의 양쪽으로 돌아서 지름은 2배예요.`, [TAGS.spinSide]: `${b} cm는 축에 붙은 변 — 높이예요.` }, probe: { ask: 'spinD', shape: 'rect', a, b } }; })(),
         (() => { const [a, b, cc] = pick(r, CONE_SETS); return { t: `직각삼각형의 직각을 낀 한 변을 축으로 한 바퀴 돌렸어요.\n\n[spin tri ${a} ${b} c=${cc}]\n\n만들어진 입체도형의 높이는 몇 cm일까요?`, ans: String(b), wr: [{ text: String(cc), tag: TAGS.slantAsH }, { text: String(a), tag: TAGS.spinSide }], steps: ['축에 붙은 변이 높이가 돼요', `→ ${b} cm (빗변 ${cc} cm는 모선)`], why: { [TAGS.slantAsH]: `${cc} cm는 빗변 — 모선이 돼요.`, [TAGS.spinSide]: `${a} cm는 밑면의 반지름이 되는 변이에요.` }, probe: { ask: 'spinH', shape: 'tri', a, b, c: cc } }; })(),
-        (() => { const [a, b, cc] = pick(r, CONE_SETS.filter(([x, y, z]) => allDiff(2 * x, x, y, z))); return { t: `직각삼각형의 직각을 낀 한 변을 축으로 한 바퀴 돌렸어요.\n\n[spin tri ${a} ${b} c=${cc}]\n\n만들어진 입체도형의 밑면의 지름은 몇 cm일까요?`, ans: String(2 * a), wr: [{ text: String(a), tag: TAGS.rAsD }, { text: String(b), tag: TAGS.spinSide }, { text: String(cc), tag: TAGS.rAsSlant }], steps: [`축에서 ${a} cm 떨어진 변 — 밑면의 반지름 ${a} cm`, `지름 = ${a} × 2 = ${2 * a}`], why: { [TAGS.rAsD]: `${a} cm는 반지름이에요.`, [TAGS.spinSide]: `${b} cm는 축에 붙은 변 — 높이예요.`, [TAGS.rAsSlant]: `${cc} cm는 모선이 되는 빗변이에요.` }, probe: { ask: 'spinD', shape: 'tri', a, b, c: cc } }; })(),
+        (() => { const [a, b, cc] = pick(r, CONE_SETS.filter(([x, y, z]) => allDiff(2 * x, x, y, z))); return { t: `직각삼각형의 직각을 낀 한 변을 축으로 한 바퀴 돌렸어요.\n\n[spin tri ${a} ${b} c=${cc}]\n\n만들어진 입체도형의 밑면의 지름은 몇 cm일까요?`, ans: String(2 * a), wr: [{ text: String(a), tag: TAGS.rAsD }, { text: String(b), tag: TAGS.spinSide }, { text: String(cc), tag: TAGS.slantAsD }], steps: [`축에서 ${a} cm 떨어진 변 — 밑면의 반지름 ${a} cm`, `지름 = ${a} × 2 = ${2 * a}`], why: { [TAGS.rAsD]: `${a} cm는 반지름이에요.`, [TAGS.spinSide]: `${b} cm는 축에 붙은 변 — 높이예요.`, [TAGS.slantAsD]: `${cc} cm는 빗변 — 돌리면 모선이 돼요. 지름이 아니에요.` }, probe: { ask: 'spinD', shape: 'tri', a, b, c: cc } }; })(),
       ]));
       fams.push(famOf([
         (() => { const a = int(r, 2, 8); const b = intWhere(r, 3, 15, (v) => v !== a && Math.max(v, a) <= 4 * Math.min(v, a)); return { t: `직사각형의 한 변을 축으로 한 바퀴 돌렸어요.\n\n[spin rect ${a} ${b}]\n\n만들어진 입체도형은 무엇일까요?`, text: true, ans: '원기둥', wr: [{ text: '원뿔', tag: TAGS.roundSwap }, { text: '사각기둥', tag: TAGS.roundPoly }], steps: ['직사각형을 한 바퀴 돌리면 위·아래가 합동인 원 — 기둥 모양', '→ 원기둥'], why: { [TAGS.roundSwap]: '원뿔은 직각삼각형을 돌려서 만들어요.', [TAGS.roundPoly]: '돌려 만든 입체도형의 밑면은 원이에요.' }, probe: { ask: 'spinKind', shape: 'rect' } }; })(),
@@ -892,7 +894,7 @@ export const SOLID = [
       // 반원 돌리기
       fams.push(famOf([
         (() => { const R = int(r, 2, 15); return { t: `반원의 지름을 축으로 한 바퀴 돌렸어요.\n\n[spin half ${2 * R}]\n\n만들어진 구의 반지름은 몇 cm일까요?`, ans: String(R), wr: [{ text: String(2 * R), tag: TAGS.halfDAsR }, { text: String(4 * R), tag: TAGS.doubleD }], steps: [`반원의 지름 ${2 * R} cm가 구의 지름이 돼요`, `반지름 = ${2 * R} ÷ 2 = ${R}`], why: { [TAGS.halfDAsR]: '반원의 지름은 구의 지름이에요. 반지름은 그 반이에요.', [TAGS.doubleD]: '지름을 두 배로 했어요.' }, probe: { ask: 'halfR', D: 2 * R } }; })(),
-        (() => { const R = int(r, 2, 15); return { t: `반원의 지름을 축으로 한 바퀴 돌렸어요.\n\n[spin half ${2 * R}]\n\n만들어진 구의 지름은 몇 cm일까요?`, ans: String(2 * R), wr: [{ text: String(R), tag: TAGS.dAsR }, { text: String(4 * R), tag: TAGS.doubleD }], steps: [`반원의 지름이 그대로 구의 지름 — ${2 * R} cm`], why: { [TAGS.dAsR]: '반지름이에요. 반원의 지름이 그대로 구의 지름이에요.', [TAGS.doubleD]: '반원의 지름을 두 배로 했어요. 그대로 구의 지름이에요.' }, probe: { ask: 'halfD', D: 2 * R } }; })(),
+        (() => { const R = int(r, 2, 15); return { t: `반원의 지름을 축으로 한 바퀴 돌렸어요.\n\n[spin half ${2 * R}]\n\n만들어진 구의 지름은 몇 cm일까요?`, ans: String(2 * R), wr: [{ text: String(R), tag: TAGS.rForD }, { text: String(4 * R), tag: TAGS.doubleD }], steps: [`반원의 지름이 그대로 구의 지름 — ${2 * R} cm`], why: { [TAGS.rForD]: '반지름이에요. 반원의 지름이 그대로 구의 지름이에요.', [TAGS.doubleD]: '반원의 지름을 두 배로 했어요. 그대로 구의 지름이에요.' }, probe: { ask: 'halfD', D: 2 * R } }; })(),
       ]));
       // 반지름의 수
       fams.push(famOf([(() => {
@@ -1069,8 +1071,8 @@ export const SOLID = [
       })()]));
       // 수로 찾기
       fams.push(famOf([
-        (() => { const n = int(r, 3, 10); return { t: `면이 ${n + 1}개, 꼭짓점이 ${n + 1}개, 모서리가 ${2 * n}개인 입체도형이 있어요.\n\n이 입체도형의 이름은 무엇일까요?`, text: true, ans: pyrName(n), wr: [{ text: pyrName(n + 1), tag: TAGS.condCount }, { text: prismName(n), tag: TAGS.kindSwap }, { text: pyrName(2 * n), tag: TAGS.byEdge }], steps: ['면과 꼭짓점의 수가 같으면 각뿔(□ + 1)', `모서리 ${2 * n} ÷ 2 = ${n} → ${pyrName(n)}`], why: { [TAGS.condCount]: '면의 수를 그대로 이름에 썼어요. 1을 빼요.', [TAGS.kindSwap]: '각기둥은 꼭짓점이 □ × 2라서 면의 수와 달라요.', [TAGS.byEdge]: '모서리의 수로 이름을 붙였어요.' }, probe: { ask: 'cond', kind: 'pyramid', n } }; })(),
-        (() => { const n = int(r, 3, 10); return { t: `면이 ${n + 2}개, 꼭짓점이 ${2 * n}개, 모서리가 ${3 * n}개인 입체도형이 있어요.\n\n이 입체도형의 이름은 무엇일까요?`, text: true, ans: prismName(n), wr: [{ text: prismName(n + 2), tag: TAGS.condCount }, { text: pyrName(n), tag: TAGS.kindSwap }, { text: prismName(2 * n), tag: TAGS.byVertex }], steps: ['꼭짓점이 짝수 개, 모서리가 3의 배수 → 각기둥', `모서리 ${3 * n} ÷ 3 = ${n} → ${prismName(n)}`], why: { [TAGS.condCount]: '면의 수를 그대로 이름에 썼어요. 2를 빼요.', [TAGS.kindSwap]: '각뿔은 면과 꼭짓점의 수가 같아요.', [TAGS.byVertex]: '꼭짓점의 수로 이름을 붙였어요.' }, probe: { ask: 'cond', kind: 'prism', n } }; })(),
+        (() => { const n = int(r, 3, 10); return { t: `면이 ${n + 1}개, 꼭짓점이 ${n + 1}개, 모서리가 ${2 * n}개인 입체도형이 있어요.\n\n이 입체도형은 각기둥이나 각뿔이에요.\n\n이 입체도형의 이름은 무엇일까요?`, text: true, ans: pyrName(n), wr: [{ text: pyrName(n + 1), tag: TAGS.condCount }, { text: prismName(n), tag: TAGS.kindSwap }, { text: pyrName(2 * n), tag: TAGS.byEdge }], steps: ['각기둥과 각뿔 중에서는 면과 꼭짓점의 수가 같으면 각뿔(둘 다 □ + 1)', `모서리 ${2 * n} ÷ 2 = ${n} → ${pyrName(n)}`], why: { [TAGS.condCount]: '면의 수를 그대로 이름에 썼어요. 1을 빼요.', [TAGS.kindSwap]: '각기둥은 꼭짓점이 □ × 2라서 면의 수와 달라요.', [TAGS.byEdge]: '모서리의 수로 이름을 붙였어요.' }, probe: { ask: 'cond', kind: 'pyramid', n } }; })(),
+        (() => { const n = int(r, 3, 10); return { t: `면이 ${n + 2}개, 꼭짓점이 ${2 * n}개, 모서리가 ${3 * n}개인 입체도형이 있어요.\n\n이 입체도형은 각기둥이나 각뿔이에요.\n\n이 입체도형의 이름은 무엇일까요?`, text: true, ans: prismName(n), wr: [{ text: prismName(n + 2), tag: TAGS.condCount }, { text: pyrName(n), tag: TAGS.kindSwap }, { text: prismName(2 * n), tag: TAGS.byVertex }], steps: [`면 ${n + 2}개, 꼭짓점 ${2 * n}개 — 수가 달라서 각기둥(각뿔은 둘이 같아요)`, `모서리 ${3 * n} ÷ 3 = ${n} → ${prismName(n)}`], why: { [TAGS.condCount]: '면의 수를 그대로 이름에 썼어요. 2를 빼요.', [TAGS.kindSwap]: '각뿔은 면과 꼭짓점의 수가 같아요.', [TAGS.byVertex]: '꼭짓점의 수로 이름을 붙였어요.' }, probe: { ask: 'cond', kind: 'prism', n } }; })(),
       ]));
       // 본 모양으로 찾기
       fams.push(famOf([
@@ -1130,7 +1132,7 @@ export const SOLID = [
         ok: `각뿔의 모서리는 밑면의 변의 수 × 2 — ${2 * n} ÷ 2 = ${n}, ${pyrName(n)}이에요`,
         wr: [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-          { text: `${2 * n} + 1 = ${jn(2 * n + 1, '이니까', '니까')} ${pyrName(2 * n + 1)}이에요`, tag: TAGS.condCount },
+          { text: `모서리가 ${2 * n}개니까 ${pyrName(2 * n)}이에요`, tag: TAGS.condCount },
           { text: '각뿔은 모서리로 알 수 없어요', tag: OFF },
         ],
         steps: ['÷ 3은 각기둥의 모서리 규칙이에요', `각뿔은 × 2 → ${2 * n} ÷ 2 = ${n} → ${pyrName(n)}`],

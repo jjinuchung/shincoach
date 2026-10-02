@@ -1929,17 +1929,25 @@ function polySolidSvg(sp) {
     // 높이 이름표 — 점선 오른쪽, 옆 모서리와 안 겹치는 높이에서
     const top = P[n]; const c0 = projS([0, 0, 0]).map((v) => v * s);
     const t = solLenText(sp.h, sp.unit);
-    // 높이 이름표는 점선 바로 옆에 — 멀리 밀면 옆 모서리 길이로 읽혔다(P 1단계 갤러리). 숨은 모서리(점선)는 바탕색 테두리로 읽히니 지나가도 되고, 보이는 모서리만 피한다
+    // 높이 이름표는 점선 바로 옆에 — 멀리 밀면 옆 모서리 길이로 읽혔다(P 1단계 갤러리).
+    // 먼저 숨은 모서리(점선)까지 피하고 높이 점선이 가장 가까운 자리를 찾는다 — 숨은 옆 모서리 위에 얹히면 "옆 모서리 = 높이"로 읽혔다(Codex 25차 #5, [pyramid n=4 a=8 h=7 e=9]의 7 cm).
+    // 그런 자리가 없을 때만 보이는 모서리만 피한다 (숨은 모서리는 바탕색 테두리로 읽히니)
     const visSegs = M.E.filter((e) => !e.hid).map((e) => [P[e.a], P[e.b]]);
+    const allSegs = M.E.map((e) => [P[e.a], P[e.b]]);
     let at = null;
-    for (const side of [1, -1, 0]) {
-      for (const f of [0.55, 0.65, 0.45, 0.75, 0.35, 0.82]) {
-        const mx = top[0] + (c0[0] - top[0]) * f; const my = top[1] + (c0[1] - top[1]) * f;
-        const cx = mx + side * (6 + labW(t) / 2);
-        const b = solBox(t, cx, my + 4.2);
-        // side 0 = 점선 위에 바로 얹는다 (가늘고 높은 각뿔은 옆에 자리가 없다)
-        if (visSegs.some(([p, q]) => boxHitsSeg(grow1(b), p, q)) || (side && boxHitsSeg(grow1(b), top, c0)) || taken.some((z) => boxHit(z, b))) continue;
-        at = { x: cx, y: my + 4.2, box: b }; break;
+    for (const strict of [true, false]) {
+      for (const side of [1, -1, 0]) {
+        // 엄격하게 찾을 때는 밑면 쪽(0.88·0.92)도 — 숨은 뒤 옆 모서리가 점선 위쪽 바로 옆을 지나는 납작한 사각뿔(16·14·18)
+        for (const f of strict ? [0.55, 0.65, 0.45, 0.75, 0.35, 0.82, 0.88, 0.92] : [0.55, 0.65, 0.45, 0.75, 0.35, 0.82]) {
+          const mx = top[0] + (c0[0] - top[0]) * f; const my = top[1] + (c0[1] - top[1]) * f;
+          const cx = mx + side * (6 + labW(t) / 2);
+          const b = solBox(t, cx, my + 4.2);
+          // side 0 = 점선 위에 바로 얹는다 (가늘고 높은 각뿔은 옆에 자리가 없다)
+          if ((strict ? allSegs : visSegs).some(([p, q]) => boxHitsSeg(grow1(b), p, q)) || (side && boxHitsSeg(grow1(b), top, c0)) || taken.some((z) => boxHit(z, b))) continue;
+          if (strict && allSegs.some((sg) => segDist(cx, my, sg) <= segDist(cx, my, [top, c0]) + 0.5)) continue;
+          at = { x: cx, y: my + 4.2, box: b }; break;
+        }
+        if (at) break;
       }
       if (at) break;
     }

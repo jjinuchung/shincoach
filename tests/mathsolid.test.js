@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  SOLID, TAGS, makeQuestion, makeRound, conceptById, ladder, placeFrom, diagnosticSet, lessonOf, checkContent, gradeLabel, valueOf,
+  SOLID, TAGS, makeQuestion, makeRound, conceptById, ladder, placeFrom, diagnosticSet, lessonOf, checkContent, gradeLabel, valueOf, _kit,
 } from '../js/mathsolid.js';
 import { figureSvg, figText, renderFigures } from '../js/mathdraw.js';
 import { tplKey } from '../js/mathgen.js';
@@ -82,6 +82,8 @@ function solveText(q) {
     return { type: 'sumInv', ans: String(a), f: { n, h, S } };
   }
   if ((m = /면이 (\d+)개, 꼭짓점이 (\d+)개, 모서리가 (\d+)개인 입체도형/.exec(q))) {
+    // 범위가 글에 있어야 "면 = 꼭짓점 → 각뿔"이 참이다 (Codex 25차 #1)
+    assert.match(q, /각기둥이나 각뿔이에요/, `${q}: 각기둥이나 각뿔이라는 범위가 없다`);
     const [Fc, V, E] = [+m[1], +m[2], +m[3]];
     let kind; let n;
     if (Fc === V) { kind = 'pyramid'; n = Fc - 1; } else { kind = 'prism'; n = E / 3; }
@@ -203,6 +205,8 @@ function solveText(q) {
     if (/각뿔의 꼭짓점은 몇 개/.test(L)) return { type: 'apex', ans: '1', f: { n } };
     if (/높이는 몇 cm/.test(L)) return { type: 'height', ans: String(A.h), f: { solid: kind, a: A.a, h: A.h, e: A.e } };
     if (/모든 모서리 길이의 합은 몇 cm/.test(L)) {
+      // 각뿔은 밑면이 정다각형이라는 것만으로 옆 모서리가 모두 같지 않다 — 전제를 글에 (Codex 25차 #4)
+      if (kind === 'pyramid') assert.match(q, /옆 모서리의 길이가 모두 같은/, `${q}: 옆 모서리가 모두 같다는 말이 없다`);
       const ans = kind === 'prism' ? 2 * n * A.a + n * A.h : n * A.a + n * A.e;
       return { type: 'edgeSum', ans: String(ans), f: { kind, n, a: A.a, h: A.h, e: A.e } };
     }
@@ -270,7 +274,7 @@ const TAGV = {
   cylD: { [TAGS.rAsD]: (f) => String(f.r), [TAGS.hAsD]: (f) => String(f.h) },
   coneL: { [TAGS.hAsSlant]: (f) => String(f.h), [TAGS.rAsSlant]: (f) => String(f.r) },
   slants: { [TAGS.oneSlant]: () => '1개뿐이에요', [TAGS.twoSlant]: () => '그림에 그린 2개뿐이에요' },
-  spinD: { [TAGS.rAsD]: (f) => String(f.a), [TAGS.spinSide]: (f) => String(f.b), [TAGS.rAsSlant]: (f) => String(f.c) },
+  spinD: { [TAGS.rAsD]: (f) => String(f.a), [TAGS.spinSide]: (f) => String(f.b), [TAGS.slantAsD]: (f) => String(f.c) },
   spinH: { [TAGS.slantAsH]: (f) => String(f.c), [TAGS.spinSide]: (f) => String(f.a) },
   spinKind: { [TAGS.roundSwap]: (f) => (f.sh === 'rect' ? '원뿔' : '원기둥'), [TAGS.roundPoly]: T((f, t) => /각(기둥|뿔)$/.test(t)) },
   cylVsPrism: { [TAGS.cylVertex]: T((f, t) => /원기둥에도 꼭짓점/.test(t)), [TAGS.oneBaseCyl]: T((f, t) => /원기둥은 밑면이 1개/.test(t)) },
@@ -278,7 +282,7 @@ const TAGV = {
   sphD: { [TAGS.rAsD]: (f) => String(f.R), [TAGS.doubleD]: (f) => String(4 * f.R) },
   sphR: { [TAGS.dAsR]: (f) => String(2 * f.R), [TAGS.doubleD]: (f) => String(4 * f.R) },
   halfR: { [TAGS.halfDAsR]: (f) => String(f.D), [TAGS.doubleD]: (f) => String(2 * f.D) },
-  halfD: { [TAGS.dAsR]: (f) => String(f.D / 2), [TAGS.doubleD]: (f) => String(2 * f.D) },
+  halfD: { [TAGS.rForD]: (f) => String(f.D / 2), [TAGS.doubleD]: (f) => String(2 * f.D) },
   radii: { [TAGS.oneRadius]: () => '1개뿐이에요', [TAGS.radiusDiff]: () => '셀 수 없이 많고, 길이가 모두 달라요' },
   view: {
     [TAGS.viewTop]: (f) => VIEWS[f.solid]['위'], [TAGS.viewFront]: (f) => VIEWS[f.solid]['앞'],
@@ -553,6 +557,11 @@ const BAD = [
   [/높이(는|가)? ?모선/, '높이와 모선은 다르다'],
   [/옆면의 가로(는|가)? ?(밑면의 )?지름과 같/, '옆면의 가로 = 밑면의 둘레'],
   [/원주율은 3\.14/, '원주율은 3.14가 아니다 — 3.14로 셈만 한다'],
+  // Codex 25차 #1~#3
+  [/(?<!중에서는 )면과 꼭짓점의 수가 같으면 각뿔/, '면 = 꼭짓점 → 각뿔은 "각기둥과 각뿔 중에서는"일 때만 (각기둥 위에 각뿔을 얹은 모양도 같다)'],
+  [/짝수 개.{0,10}3의 배수/, '꼭짓점 짝수·모서리 3의 배수 → 각기둥은 틀림 (삼각뿔: 4·6)'],
+  [/다각형인 면은 .{0,12}1개뿐/, '삼각형도 다각형 — 각뿔의 다각형인 면은 1개가 아니다'],
+  [/정다각형이 아니면 옆면의 가로가 (서로 )?달라/, '정다각형이 아니어도 변이 모두 같을 수 있다 (마름모)'],
 ];
 test('★ 참말에 틀린 일반화가 없다 — 직육면체 = 사각기둥 · 각뿔 밑면 1개 · 원기둥에 꼭짓점 없음 · 모선 셀 수 없이 많음 · 구는 늘 원', () => {
   const truths = (q) => [q.choices.find((x) => x.ok).text, ...(q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule] : [])].join('\n').replace(/\*\*/g, '');
@@ -680,7 +689,11 @@ test('🎨 각기둥·각뿔 그림: 따로 세운 몸과 꼭짓점 자리가 �
       const k = attr(b.raw, 'data-k'); const v = A[k]; at(b.t === (v === '?' ? '? cm' : `${v} cm`), `${k} 이름표 "${b.t}"`);
       if (k === 'h' && kind === 'pyramid') {
         const hl = linesOf(svg).find((l) => l.cls === 'sol-height');
-        at(hl && dist(b, [hl.x1, hl.y1], [hl.x2, hl.y2]) < 40, '높이 이름표가 점선에서 멀다');
+        const dh = hl ? dist(b, [hl.x1, hl.y1], [hl.x2, hl.y2]) : Infinity;
+        at(dh < 40, '높이 이름표가 점선에서 멀다');
+        // 어느 모서리(숨은 점선 포함)보다 높이 점선에 가깝다 — 숨은 옆 모서리 위에 얹히면 "옆 모서리 = 높이"로 읽힌다 (Codex 25차 #5: [pyramid n=4 a=16 h=14 e=18]의 14 cm가 숨은 모서리에서 0.7 px)
+        const closer = segs.filter((sg) => dist(b, sg.p, sg.q) <= dh + 0.5);
+        at(!closer.length, `높이 이름표가 높이 점선(${dh.toFixed(1)})보다 모서리 ${closer.map((sg) => `${sg.a}-${sg.b}${sg.hid ? '(점선)' : ''} ${dist(b, sg.p, sg.q).toFixed(1)}`).join(', ')}에 가깝다`);
         continue;
       }
       const near = segs.filter((sg) => !sg.hid).sort((x, y) => dist(b, x.p, x.q) - dist(b, y.p, y.q))[0];
@@ -1065,6 +1078,11 @@ function figClaims(f, t) {
     if (A.rt) {
       const w = String(A.rt).split(',').map(Number);
       each(/(?:세 변|가로도) (\d+) cm, (\d+) cm, (\d+) cm/g, (m) => [1, 2, 3].every((j) => +m[j] === w[j - 1]));
+      // 위쪽 삼각형의 두 변이 접으면 맞닿는 옆 직사각형 (옆면 줄은 고리 — 붙은 칸의 왼쪽·오른쪽 칸), 빗변은 가장 긴 변 (Codex 25차 제안)
+      each(/위쪽 삼각형의 왼쪽 변 (\d+) cm는 접으면 왼쪽 직사각형의 가로 (\d+) cm와, 빗변 (\d+) cm는 오른쪽 직사각형의 가로 (\d+) cm와 맞닿아요/g, (m) => {
+        const i = up[0]; const L = w[(i + 2) % 3]; const Rw = w[(i + 1) % 3];
+        return +m[1] === L && +m[2] === L && +m[3] === Rw && +m[4] === Rw && Rw === Math.max(...w);
+      });
       each(/높이 (\d+) cm/g, (m) => +m[1] === A.h);
     }
   }
@@ -1183,4 +1201,49 @@ test('화면 연결 (3단계): STEMS.solid(P)는 이 생성기·원고를 쓰고
   const stats = readFileSync(new URL('../js/stats.js', import.meta.url), 'utf8');
   for (const src of [ask, stats]) for (const ex of src.match(/\[(prism|cyl) [^\]]+\]/g) || ['없음']) assert.ok(figureSvg(ex.slice(1, -1)), `예시가 그려지지 않음: ${ex}`);
   assert.ok(ask.includes('[prism n=5]') && stats.includes('[prism n=5]') && ask.includes('[cyl r=3 h=7]') && stats.includes('[cyl r=3 h=7]'), '❓ 복사문·📊 답장 안내에 [prism]·[cyl] 예');
+});
+
+// ───────────────────── Codex 25차 ─────────────────────
+
+test('★ 각뿔 높이 이름표 전수 — 길이 세트(PYR_SETS) × 지시문 꼴 다섯 · 원고 그림: 이름표는 어느 모서리(숨은 점선 포함)보다 높이 점선에 가깝다 (Codex 25차 #5, 씨앗 없이)', () => {
+  const segD = (x, y, [p, q]) => { const vx = q[0] - p[0]; const vy = q[1] - p[1]; const t = Math.max(0, Math.min(1, ((x - p[0]) * vx + (y - p[1]) * vy) / (vx * vx + vy * vy || 1))); return Math.hypot(p[0] + vx * t - x, p[1] + vy * t - y); };
+  const dirs = new Set();
+  for (const [n, L] of Object.entries(_kit.PYR_SETS)) for (const [a, h, e] of L) for (const d of [`pyramid n=${n} a=${a} h=${h} e=${e}`, `pyramid n=${n} h=${h} e=${e}`, `pyramid n=${n} a=${a} h=${h}`, `pyramid n=${n} a=? h=${h} e=${e}`, `pyramid n=${n} a=${a} h=? e=${e}`]) dirs.add(d);
+  for (const m of JSON.stringify(CONTENT).matchAll(/\[(pyramid [^\]]*h=[^\]]*)\]/g)) dirs.add(m[1]);
+  let n = 0;
+  for (const d of dirs) {
+    const svg = figureSvg(d);
+    assert.ok(svg, `못 그림 ${d}`);
+    const lab = /<text[^>]*x="([-\d.]+)" y="([-\d.]+)"[^>]*data-k="h"/.exec(svg); const hl = linesOf(svg).find((l) => l.cls === 'sol-height');
+    assert.ok(lab && hl, `${d}: 높이 이름표·점선`);
+    const cx = +lab[1]; const cy = +lab[2] - 4.2;
+    const dh = segD(cx, cy, [[hl.x1, hl.y1], [hl.x2, hl.y2]]);
+    const E = linesOf(svg).filter((l) => l.cls === 'sol-e');
+    const closer = E.filter((l) => segD(cx, cy, [[l.x1, l.y1], [l.x2, l.y2]]) <= dh + 0.5);
+    assert.ok(!closer.length, `${d}: 높이 이름표가 높이 점선(${dh.toFixed(1)})보다 ${closer.map((l) => `${l.dashed ? '점선' : '실선'} 모서리 ${segD(cx, cy, [[l.x1, l.y1], [l.x2, l.y2]]).toFixed(1)}`).join(', ')}에 가깝다`);
+    n++;
+  }
+  assert.ok(n >= 55, `각뿔 높이 그림 ${n}`);
+});
+
+test('★ 이름표의 뜻 (Codex 25차 #6) — 돌린 삼각형 지름 문항의 빗변 오답 = "모선이 될 빗변을 지름으로 봄" · 반원 → 구의 지름 문항의 반 = "지름을 묻는데 반지름을 답함" · P9 ② "수를 그대로 씀" 보기는 정말 그대로 쓴 수', () => {
+  let a = 0; let b = 0; let c = 0;
+  for (let s = 1; s <= 400; s++) {
+    for (const q of [makeQuestion('sol.round', 'calc', s, OPTS), makeQuestion('sol.sphere', 'calc', s, OPTS)]) {
+      const { type, f } = solveText(q.q);
+      for (const w of q.choices.filter((x) => !x.ok && x.tag !== '계산 실수')) {
+        if (type === 'spinD' && +w.text === f.c) { assert.equal(w.tag, TAGS.slantAsD, `round #${s}: 빗변 ${w.text}`); a++; }
+        if (type === 'spinD') assert.notEqual(w.tag, TAGS.rAsSlant, `round #${s}: 지름 문항에 "반지름을 모선으로 봄"`);
+        if (type === 'halfD' && +w.text === f.D / 2) { assert.equal(w.tag, TAGS.rForD, `sphere #${s}: 반 ${w.text}`); b++; }
+        if (type === 'halfD') assert.notEqual(w.tag, TAGS.dAsR, `sphere #${s}: 지름 문항에 "지름을 반지름으로 봄"`);
+      }
+    }
+    const m = makeQuestion('sol.apply', 'misread', s, { ...OPTS, want: { k: 'misread', key: 'misread:cond' } });
+    if (m.key !== 'misread:cond') continue;
+    const E = +/모서리가 (\d+)개인 각뿔/.exec(m.q)[1];
+    const w = m.choices.find((x) => x.tag === TAGS.condCount);
+    assert.ok(w && w.text.includes(NAME.pyramid(E)) && !/[+−×÷]/.test(w.text), `apply ② #${s}: "수를 그대로 씀" 보기 "${w && w.text}"`);
+    c++;
+  }
+  assert.ok(a >= 20 && b >= 20 && c >= 100, `본 곳 ${a} · ${b} · ${c}`);
 });
