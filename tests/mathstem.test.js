@@ -10,13 +10,17 @@ import { lessonOf, checkContent } from '../js/mathneg.js';
 const content = JSON.parse(readFileSync(new URL('../coach/math/negative.json', import.meta.url), 'utf8'));
 const T = '2026-09-21';
 
-test('STEMS: 분수·혼합계산·소수·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기·합동과 대칭 열두 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
-  assert.deepEqual(STEM_ORDER, ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym']);
-  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'B', 'C', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'], '글자 순서대로 (D는 문자와 식 몫으로 비워 둠)');
+test('STEMS: 분수·혼합계산·소수·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기·합동과 대칭·원의 넓이 열세 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
+  assert.deepEqual(STEM_ORDER, ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle']);
+  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'B', 'C', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'], '글자 순서대로 (D는 문자와 식 몫으로 비워 둠)');
   assert.equal(STEMS.range.lesson, true, '수의 범위와 어림하기도 📚 배움');
   assert.equal(STEMS.range.file, './coach/math/range.json');
   assert.equal(stemOf('rng.apply').key, 'range');
   assert.equal(nameOf('rng.over'), '초과와 미만');
+  assert.equal(STEMS.circle.lesson, true, '원의 넓이도 📚 배움');
+  assert.equal(STEMS.circle.file, './coach/math/circle.json');
+  assert.equal(stemOf('cir.apply').key, 'circle');
+  assert.equal(nameOf('cir.ratio'), '원주와 원주율');
   assert.equal(STEMS.sym.lesson, true, '합동과 대칭도 📚 배움');
   assert.equal(STEMS.sym.file, './coach/math/sym.json');
   assert.equal(stemOf('sym.pointdraw').key, 'sym');
@@ -49,7 +53,7 @@ test('STEMS: 분수·혼합계산·소수·음수·비와 비율·약수와 배�
     const s = STEMS[key];
     assert.equal(s.key, key);
     for (const fn of ['makeQuestion', 'makeRound', 'diagnosticSet', 'placeFrom', 'ladder']) assert.equal(typeof s.gen[fn], 'function', `${key}.gen.${fn}`);
-    assert.ok(s.list.length >= 8 && s.file && s.code && s.label && s.intro);
+    assert.ok(s.list.length >= 7 && s.file && s.code && s.label && s.intro); // N 원의 넓이는 7칸 (교과서 11차시를 7칸으로)
   }
   assert.equal(STEMS.fraction.lesson, false);
   assert.equal(STEMS.negative.lesson, true, '음수는 처음 배우는 줄기 — 📚 배움');
@@ -79,7 +83,7 @@ test('줄기별 사다리·진단: 음수 줄기의 진단은 음수 사다리�
   assert.equal(ladderOf(m, T, 'fraction').filter((r) => r.state === 'done').length, 0);
   assert.deepEqual(dueIds(m, '2026-09-30', 'negative'), ['neg.mean', 'neg.line', 'neg.add', 'neg.sub']);
   const s = mathSummary(m);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false], ['area', 0, false], ['shape', 0, false], ['data', 0, false], ['range', 0, false], ['sym', 0, false]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false], ['area', 0, false], ['shape', 0, false], ['data', 0, false], ['range', 0, false], ['sym', 0, false], ['circle', 0, false]]);
   assert.equal(s.done, 4);
 });
 

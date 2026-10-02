@@ -1066,6 +1066,229 @@ export function symText(sp) {
   return `모눈 그림 — ${parts.join(' | ')}`;
 }
 
+// ───────────────────── 🔵 N 원의 넓이: 원·반원·고리·잘라 붙이기 (2026-10-02) ─────────────────────
+// `[circle r=5]` 원(중심 · 반지름) · `[circle d=10]` 지름 · `[circle r=5 d=?]` 둘 다 (물을 길이는 ?)
+// `[circle half d=10]` 반원 · `[circle quarter r=6]` 원의 4분의 1 · `[circle ring R=8 r=5]` 고리(중심이 같은 큰 원 − 작은 원)
+// `[circle sq d=10]` 정사각형 안에 꼭 맞는 원(모서리 색칠) · `[circle box d=10]` 원 안 정사각형 · 원 밖 정사각형
+// `[circle poly d=10]` 원 안 정육각형 · 원 밖 정사각형 · `[circle grid r=4]` 모눈(한 칸 1 cm²) 위 원 — 원 안 칸 · 걸친 칸
+// `[circle slices r=5]` 원을 16조각(n=8·32도)으로 잘라 엇갈려 붙인 모양 · `[circle row n=3 r=2]` 원 n개를 한 줄로 맞닿게
+// 끝에 단위(cm·m). 길이는 1~40 자연수. 그림은 **실제 비율** — 고리의 두 반지름, 정사각형 한 변 = 지름이 그림에서도 참이다.
+// ★ 테스트가 그린 SVG에서 반지름·변·조각을 다시 잰다 (class·data-*). 모눈 칸은 테스트가 따로 센다.
+
+const CIRCLE_KINDS = ['half', 'quarter', 'ring', 'sq', 'box', 'poly', 'grid', 'slices', 'row'];
+
+/** `[circle …]` 인자 → { kind, unit, r?, d?, R?, n? } (말이 안 되면 null) */
+export function parseCircle(arg) {
+  const t = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  const sp = { kind: 'full', unit: 'cm' };
+  if (t.length && /^(cm|m)$/.test(t[t.length - 1])) sp.unit = t.pop();
+  if (t.length && CIRCLE_KINDS.includes(t[0])) sp.kind = t.shift();
+  for (const tok of t) {
+    const q = /^(r|d|R|n)=(\d+|\?)$/.exec(tok);
+    if (!q || q[1] in sp) return null;
+    sp[q[1]] = q[2] === '?' ? '?' : +q[2];
+  }
+  const len = (v) => Number.isInteger(v) && v >= 1 && v <= 40;
+  const lenQ = (v) => v === '?' || len(v);
+  const keys = ['r', 'd', 'R', 'n'].filter((k) => k in sp).join('');
+  switch (sp.kind) {
+    case 'full':
+      if (!['r', 'd', 'rd'].includes(keys)) return null;
+      if (!keys.split('').every((k) => lenQ(sp[k]))) return null;
+      if (keys === 'rd' && (sp.r === '?' && sp.d === '?')) return null;
+      if (keys === 'rd' && sp.r !== '?' && sp.d !== '?' && sp.d !== 2 * sp.r) return null; // 지름 = 반지름 × 2 (그림이 거짓말하지 않게)
+      return sp;
+    case 'half': return (keys === 'r' || keys === 'd') && lenQ(sp[keys]) ? sp : null;
+    case 'quarter': return keys === 'r' && len(sp.r) ? sp : null;
+    case 'ring': return keys === 'rR' && len(sp.r) && len(sp.R) && sp.r < sp.R && sp.r * 4 >= sp.R ? sp : null;
+    case 'sq': case 'box': case 'poly': return keys === 'd' && len(sp.d) ? sp : null;
+    case 'grid': return keys === 'r' && Number.isInteger(sp.r) && sp.r >= 2 && sp.r <= 7 && sp.unit === 'cm' ? sp : null;
+    case 'slices':
+      if (keys === 'r' && len(sp.r)) { sp.n = 16; return sp; }
+      return keys === 'rn' && len(sp.r) && [8, 16, 32].includes(sp.n) ? sp : null;
+    case 'row': return keys === 'rn' && len(sp.r) && Number.isInteger(sp.n) && sp.n >= 2 && sp.n <= 5 ? sp : null;
+    default: return null;
+  }
+}
+
+/** 모눈 위 원(중심이 모눈점, 반지름 r칸) — 원 안에 꼭 들어간 칸 · 원에 조금이라도 걸친 칸(꼭 들어간 칸 포함) */
+export function circleCells(r) {
+  const cells = [];
+  for (let i = -r; i < r; i++) {
+    for (let j = -r; j < r; j++) {
+      const far = Math.max(i * i, (i + 1) * (i + 1)) + Math.max(j * j, (j + 1) * (j + 1));
+      const nx = i <= 0 && i + 1 >= 0 ? 0 : Math.min(i * i, (i + 1) * (i + 1));
+      const ny = j <= 0 && j + 1 >= 0 ? 0 : Math.min(j * j, (j + 1) * (j + 1));
+      if (far <= r * r) cells.push({ i, j, k: 'in' });
+      else if (nx + ny < r * r) cells.push({ i, j, k: 'edge' });
+    }
+  }
+  const inside = cells.filter((c) => c.k === 'in').length;
+  return { cells, inside, touch: cells.length };
+}
+
+const cf = (v) => v.toFixed(1);
+// 이름표 글자에 바탕색 테두리 — 고리의 "8 cm"는 어디에 두어도 작은 원의 선이 지나간다 (선 위에서도 읽히게)
+const cLab = (x, y, t) => `<text class="cir-lab" x="${cf(x)}" y="${cf(y)}" font-size="15" text-anchor="middle" fill="currentColor" font-weight="600" stroke="var(--card, #fff)" stroke-width="4" stroke-linejoin="round" paint-order="stroke">${esc(t)}</text>`;
+const cLen = (v, u) => `${v} ${u}`;
+const cDot = (x, y) => `<circle class="cir-o" cx="${cf(x)}" cy="${cf(y)}" r="3.5" fill="currentColor"/>`;
+const cSeg = (k, v, x1, y1, x2, y2, extra = '') => `<line class="cir-seg" data-k="${k}" data-v="${v}" x1="${cf(x1)}" y1="${cf(y1)}" x2="${cf(x2)}" y2="${cf(y2)}" stroke="currentColor" stroke-width="2.2"${extra}/>`;
+/** 원 한 바퀴 경로 (고리·모서리 색칠의 evenodd 구멍용) */
+const ringPath = (cx, cy, r) => `M ${cf(cx - r)} ${cf(cy)} a ${cf(r)} ${cf(r)} 0 1 0 ${cf(2 * r)} 0 a ${cf(r)} ${cf(r)} 0 1 0 ${cf(-2 * r)} 0 Z`;
+
+/** 🔵 그리기 — 종류마다 자리를 정해 둔다 (이름표 몇 개뿐이라 자리를 고정하고, 겹침은 테스트가 잰다) */
+export function circleSvg(sp) {
+  const u = sp.unit;
+  let W; let H; let g = '';
+  const k = sp.kind;
+  if (k === 'full') {
+    const R = 110; const pad = 34; const cx = pad + R; const cy = pad + R; W = 2 * R + 2 * pad; H = W;
+    const rv = 'r' in sp ? sp.r : sp.d === '?' ? '?' : sp.d / 2;
+    g += `<circle class="cir-c" data-r="${rv}" cx="${cf(cx)}" cy="${cf(cy)}" r="${R}" fill="${FILL}" fill-opacity="0.14" stroke="currentColor" stroke-width="2"/>`;
+    const both = 'r' in sp && 'd' in sp;
+    if ('d' in sp) {
+      g += cSeg('d', sp.d, cx - R, cy, cx + R, cy);
+      g += cLab(both ? cx - R / 2 : cx + R / 2, cy - 9, cLen(sp.d, u));
+    }
+    if ('r' in sp) {
+      if (both) {
+        // 지름이 가로로 있으니 반지름은 위 오른쪽(60°) — 이름표는 선의 오른쪽 아래로 비켜서
+        const ex = cx + R * Math.cos(Math.PI / 3); const ey = cy - R * Math.sin(Math.PI / 3);
+        g += cSeg('r', sp.r, cx, cy, ex, ey);
+        g += cLab((cx + ex) / 2 + 24 * Math.sin(Math.PI / 3), (cy + ey) / 2 + 24 * Math.cos(Math.PI / 3) + 5, cLen(sp.r, u));
+      } else {
+        g += cSeg('r', sp.r, cx, cy, cx + R, cy);
+        g += cLab(cx + R / 2, cy - 9, cLen(sp.r, u));
+      }
+    }
+    g += cDot(cx, cy);
+  } else if (k === 'half') {
+    const R = 120; const pad = 30; const cx = pad + R; const cy = pad + R; W = 2 * R + 2 * pad; H = R + pad + 40;
+    const rv = 'r' in sp ? sp.r : sp.d === '?' ? '?' : sp.d / 2;
+    g += `<path class="cir-half" data-r="${rv}" d="M ${cf(cx - R)} ${cf(cy)} A ${R} ${R} 0 0 1 ${cf(cx + R)} ${cf(cy)} Z" fill="${FILL}" fill-opacity="0.14" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`;
+    if ('d' in sp) {
+      g += cSeg('d', sp.d, cx - R, cy, cx + R, cy);
+      g += cLab(cx, cy + 24, cLen(sp.d, u));
+    } else {
+      g += cSeg('r', sp.r, cx, cy, cx, cy - R);
+      g += cLab(cx + 28, cy - R / 2 + 5, cLen(sp.r, u));
+      g += cDot(cx, cy);
+    }
+  } else if (k === 'quarter') {
+    const R = 190; const pad = 30; const ox = pad; const oy = pad + R; W = R + 2 * pad; H = R + pad + 40;
+    g += `<path class="cir-quarter" data-r="${sp.r}" d="M ${cf(ox)} ${cf(oy)} L ${cf(ox + R)} ${cf(oy)} A ${R} ${R} 0 0 0 ${cf(ox)} ${cf(oy - R)} Z" fill="${FILL}" fill-opacity="0.14" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`;
+    g += cSeg('r', sp.r, ox, oy, ox + R, oy);
+    g += `<path d="M ${cf(ox + 12)} ${cf(oy)} L ${cf(ox + 12)} ${cf(oy - 12)} L ${cf(ox)} ${cf(oy - 12)}" fill="none" stroke="${FILL2}" stroke-width="1.6"/>`;
+    g += cLab(ox + R / 2, oy + 24, cLen(sp.r, u));
+  } else if (k === 'ring') {
+    const Rp = 115; const rp = (Rp * sp.r) / sp.R; const pad = 34; const cx = pad + Rp; const cy = pad + Rp; W = 2 * Rp + 2 * pad; H = W;
+    g += `<path class="cir-ring" d="${ringPath(cx, cy, Rp)} ${ringPath(cx, cy, rp)}" fill="${FILL2}" fill-opacity="0.32" fill-rule="evenodd"/>`;
+    g += `<circle class="cir-c" data-k="R" data-r="${sp.R}" cx="${cf(cx)}" cy="${cf(cy)}" r="${cf(Rp)}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+    g += `<circle class="cir-c" data-k="r" data-r="${sp.r}" cx="${cf(cx)}" cy="${cf(cy)}" r="${cf(rp)}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+    // 큰 원의 반지름은 오른쪽으로, 작은 원의 반지름은 위로 — 이름표는 각자 선의 한가운데 (고리 폭으로 읽히지 않게)
+    g += cSeg('R', sp.R, cx, cy, cx + Rp, cy);
+    g += cLab(cx + Rp / 2, cy + 22, cLen(sp.R, u));
+    g += cSeg('r', sp.r, cx, cy, cx, cy - rp);
+    g += cLab(cx - 26, cy - rp / 2 + 5, cLen(sp.r, u));
+    g += cDot(cx, cy);
+  } else if (k === 'sq') {
+    const R = 110; const pad = 30; const cx = pad + R; const cy = pad + R; W = 2 * R + 2 * pad; H = 2 * R + pad + 40;
+    const sq = `M ${cf(cx - R)} ${cf(cy - R)} h ${2 * R} v ${2 * R} h ${-2 * R} Z`;
+    g += `<path class="cir-corner" d="${sq} ${ringPath(cx, cy, R)}" fill="${FILL2}" fill-opacity="0.38" fill-rule="evenodd"/>`;
+    g += `<rect class="cir-sq" data-d="${sp.d}" x="${cf(cx - R)}" y="${cf(cy - R)}" width="${2 * R}" height="${2 * R}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+    g += `<circle class="cir-c" data-r="${sp.d / 2}" cx="${cf(cx)}" cy="${cf(cy)}" r="${R}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+    g += cLab(cx, cy + R + 24, cLen(sp.d, u));
+  } else if (k === 'box' || k === 'poly') {
+    const R = 110; const pad = 30; const cx = pad + R; const cy = pad + R; W = 2 * R + 2 * pad; H = W;
+    g += `<rect class="cir-out" x="${cf(cx - R)}" y="${cf(cy - R)}" width="${2 * R}" height="${2 * R}" fill="none" stroke="${FILL}" stroke-width="2.2"/>`;
+    g += `<circle class="cir-c" data-r="${sp.d / 2}" cx="${cf(cx)}" cy="${cf(cy)}" r="${R}" fill="${FILL}" fill-opacity="0.1" stroke="currentColor" stroke-width="2"/>`;
+    const n = k === 'box' ? 4 : 6;
+    const pts = Array.from({ length: n }, (_, i) => [cx + R * Math.cos((2 * Math.PI * i) / n), cy - R * Math.sin((2 * Math.PI * i) / n)]);
+    g += `<polygon class="cir-in" data-n="${n}" points="${pts.map(([x, y]) => `${cf(x)},${cf(y)}`).join(' ')}" fill="${FILL2}" fill-opacity="0.16" stroke="${FILL2}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    g += cSeg('d', sp.d, cx - R, cy, cx + R, cy);
+    g += cLab(cx - R / 2, cy - 9, cLen(sp.d, u));
+    g += cDot(cx, cy);
+  } else if (k === 'grid') {
+    // 태블릿 헤드리스: 한 칸 26px이면 반지름 3 cm 그림이 228px로 작았다 → 반지름이 작으면 칸을 키운다 (전체 폭 360 이하)
+    const r = sp.r; const N = 2 * r + 2; const C = Math.min(34, Math.floor(340 / N)); const pad = 10;
+    const cx = pad + C * (r + 1); const cy = cx; W = N * C + 2 * pad; H = W;
+    const { cells, inside, touch } = circleCells(r);
+    for (const c of cells) {
+      g += `<rect class="cir-cell ${c.k}" data-i="${c.i}" data-j="${c.j}" x="${cf(cx + c.i * C)}" y="${cf(cy - (c.j + 1) * C)}" width="${C}" height="${C}" fill="${c.k === 'in' ? FILL2 : FILL}" fill-opacity="${c.k === 'in' ? 0.45 : 0.18}"/>`;
+    }
+    for (let i = 0; i <= N; i++) {
+      g += `<line x1="${pad + i * C}" y1="${pad}" x2="${pad + i * C}" y2="${pad + N * C}" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"/>`;
+      g += `<line x1="${pad}" y1="${pad + i * C}" x2="${pad + N * C}" y2="${pad + i * C}" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"/>`;
+    }
+    g = `<g class="cir-grid" data-r="${r}" data-c="${C}" data-in="${inside}" data-touch="${touch}">${g}</g>`;
+    g += `<circle class="cir-c" data-r="${r}" cx="${cf(cx)}" cy="${cf(cy)}" r="${r * C}" fill="none" stroke="currentColor" stroke-width="2.4"/>`;
+    g += cDot(cx, cy);
+  } else if (k === 'slices') {
+    // 위: 원(윗반 보라 · 아랫반 주황, 조각은 진하기를 번갈아) — 아래: 조각을 엇갈려 붙인 띠 (가로 ≈ 원주의 반 · 세로 = 반지름)
+    const n = sp.n; const R = 80; const th = (2 * Math.PI) / n; const s = R * Math.sin(th / 2); const h = R * Math.cos(th / 2);
+    const bandW = (n + 1) * s; const padL = 50; const padR = 20; const top = 20;
+    W = Math.round(padL + Math.max(bandW, 2 * R) + padR);
+    const ccx = padL + Math.max(bandW, 2 * R) / 2; const ccy = top + R;
+    for (let i = 0; i < n; i++) {
+      const a0 = i * th; const a1 = (i + 1) * th; const upper = i < n / 2;
+      const p0 = [ccx + R * Math.cos(a0), ccy - R * Math.sin(a0)]; const p1 = [ccx + R * Math.cos(a1), ccy - R * Math.sin(a1)];
+      g += `<path class="cir-slice" d="M ${cf(ccx)} ${cf(ccy)} L ${cf(p0[0])} ${cf(p0[1])} A ${R} ${R} 0 0 0 ${cf(p1[0])} ${cf(p1[1])} Z" fill="${upper ? FILL : FILL2}" fill-opacity="${i % 2 ? 0.2 : 0.38}"/>`;
+    }
+    g += `<circle class="cir-c" data-r="${sp.r}" cx="${cf(ccx)}" cy="${cf(ccy)}" r="${R}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+    g += cSeg('r', sp.r, ccx, ccy, ccx + R, ccy);
+    g += cLab(ccx + R / 2, ccy - 9, cLen(sp.r, u));
+    g += cDot(ccx, ccy);
+    // 화살표
+    const ay0 = ccy + R + 8; const ay1 = ay0 + 26;
+    g += `<path d="M ${cf(ccx)} ${cf(ay0)} V ${cf(ay1)} M ${cf(ccx - 7)} ${cf(ay1 - 8)} L ${cf(ccx)} ${cf(ay1)} L ${cf(ccx + 7)} ${cf(ay1 - 8)}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    // 띠: 윗반 조각은 꼭짓점이 아래(호가 위), 아랫반 조각은 꼭짓점이 위 — 이웃 조각과 옆변을 나눠 쓴다
+    const x0 = padL + (Math.max(bandW, 2 * R) - bandW) / 2 + s; const yb = ay1 + 8 + R;
+    for (let i = 0; i < n / 2; i++) {
+      const ax = x0 + 2 * s * i;
+      g += `<path class="cir-piece" data-up="0" d="M ${cf(ax)} ${cf(yb)} L ${cf(ax - s)} ${cf(yb - h)} A ${R} ${R} 0 0 1 ${cf(ax + s)} ${cf(yb - h)} Z" fill="${FILL}" fill-opacity="${i % 2 ? 0.2 : 0.38}" stroke="currentColor" stroke-opacity="0.35" stroke-width="1"/>`;
+      const bx = ax + s; const by = yb - h;
+      g += `<path class="cir-piece" data-up="1" d="M ${cf(bx)} ${cf(by)} L ${cf(bx + s)} ${cf(by + h)} A ${R} ${R} 0 0 1 ${cf(bx - s)} ${cf(by + h)} Z" fill="${FILL2}" fill-opacity="${i % 2 ? 0.38 : 0.2}" stroke="currentColor" stroke-opacity="0.35" stroke-width="1"/>`;
+    }
+    const bl = x0 - s; const br = x0 + n * s; const bt = yb - R; const bB = yb - h + R;
+    g += `<g class="cir-band" data-l="${cf(bl)}" data-rt="${cf(br)}" data-t="${cf(bt)}" data-b="${cf(bB)}"></g>`;
+    g += cLab((bl + br) / 2, bB + 22, '가로');
+    g += cLab(bl - 22, (bt + bB) / 2 + 5, '세로');
+    H = Math.round(bB + 36);
+  } else if (k === 'row') {
+    // 태블릿 헤드리스: 150px 안에 넣었더니 원이 작고(반지름 37px) 반지름 글자가 첫 원 테두리에 걸쳤다 → 폭 400까지 쓰고,
+    // 반지름 선은 첫 원의 중심에서 위로 세워 글자를 원 바로 위에 둔다
+    const n = sp.n; const rp = Math.min(56, Math.floor(170 / n)); const pad = 30; const cy = pad + 10 + rp; W = 2 * rp * n + 2 * pad; H = cy + rp + 56;
+    for (let i = 0; i < n; i++) {
+      g += `<circle class="cir-c" data-r="${sp.r}" cx="${cf(pad + rp + 2 * rp * i)}" cy="${cf(cy)}" r="${rp}" fill="${FILL}" fill-opacity="0.14" stroke="currentColor" stroke-width="2"/>`;
+      g += cDot(pad + rp + 2 * rp * i, cy);
+    }
+    g += cSeg('r', sp.r, pad + rp, cy, pad + rp, cy - rp);
+    g += cLab(pad + rp, cy - rp - 8, cLen(sp.r, u));
+    const by = cy + rp + 14;
+    g += `<path class="cir-total" d="M ${pad} ${cf(by - 6)} V ${cf(by)} H ${pad + 2 * rp * n} V ${cf(by - 6)}" fill="none" stroke="${FILL2}" stroke-width="2"/>`;
+    g += cLab(W / 2, by + 22, cLen('?', u));
+  }
+  return `<svg class="frac-fig shape-fig cir-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(circleText(sp))}"><g>${g}</g></svg>`;
+}
+
+/** 🔵 글로 — ❓ 복사문·노트 제목처럼 그림을 못 그리는 자리 */
+export function circleText(sp) {
+  const u = sp.unit; const L = (v) => (v === '?' ? '?' : `${v} ${u}`);
+  switch (sp.kind) {
+    case 'full': return `원 — ${['r' in sp ? `반지름 ${L(sp.r)}` : '', 'd' in sp ? `지름 ${L(sp.d)}` : ''].filter(Boolean).join(' · ')}`;
+    case 'half': return `반원 — ${'d' in sp ? `지름 ${L(sp.d)}` : `반지름 ${L(sp.r)}`}`;
+    case 'quarter': return `원의 4분의 1 — 반지름 ${L(sp.r)}`;
+    case 'ring': return `고리 모양 — 중심이 같은 두 원, 큰 원의 반지름 ${L(sp.R)} · 작은 원의 반지름 ${L(sp.r)}`;
+    case 'sq': return `한 변이 ${L(sp.d)}인 정사각형 안에 꼭 맞게 그린 원 — 원 밖 네 모서리 색칠`;
+    case 'box': return `지름 ${L(sp.d)}인 원 — 원 안에 꼭짓점이 닿는 정사각형과 원을 둘러싼 정사각형`;
+    case 'poly': return `지름 ${L(sp.d)}인 원 — 원 안에 꼭짓점이 닿는 정육각형과 원을 둘러싼 정사각형`;
+    case 'grid': { const c = circleCells(sp.r); return `모눈(한 칸 1 cm²) 위 반지름 ${sp.r} cm인 원 — 원 안에 꼭 들어간 칸 ${c.inside}칸 · 원에 걸친 칸까지 ${c.touch}칸`; }
+    case 'slices': return `반지름 ${L(sp.r)}인 원을 ${sp.n}조각으로 잘라 엇갈려 붙인 모양 (가로·세로)`;
+    case 'row': return `반지름 ${L(sp.r)}인 원 ${sp.n}개를 한 줄로 맞닿게 놓은 모양 — 전체 길이 ?`;
+    default: return '원';
+  }
+}
+
 export function figureSvg(spec) {
   const s = String(spec || '').trim().replace(/−/g, '-');
   let m;
@@ -1080,6 +1303,7 @@ export function figureSvg(spec) {
   if ((m = /^walk (-?\d+) ([-+]?\d+)$/.exec(s))) return walkSvg(+m[1], +m[2]);
   if ((m = /^range (.+)$/.exec(s))) { const sp = parseRange(m[1]); return sp ? rangeSvg(sp) : ''; } // 🔢 L 수의 범위
   if ((m = /^sym (.+)$/.exec(s))) { const sp = parseSym(m[1]); return sp ? symSvg(sp) : ''; } // 🪞 M 합동과 대칭
+  if ((m = /^circle (.+)$/.exec(s))) { const sp = parseCircle(m[1]); return sp ? circleSvg(sp) : ''; } // 🔵 N 원의 넓이
   if ((m = /^steps ((?:\d+\s*){2,5})$/.exec(s))) return stepsSvg(m[1].trim().split(/\s+/).map(Number));
   if ((m = /^table (.+)$/.exec(s))) { const rows = parseTable(m[1]); return rows ? tableSvg(rows) : ''; }
   // 🔺 도형 — 끝에 단위(cm·m)를 붙일 수 있다. 수는 1~40, 모양이 말이 안 되면(밑변보다 큰 밀림 등) 빈 글자
@@ -1151,6 +1375,7 @@ export function figText(text, short = false) {
     .replace(/\[steps ([\d ]+)\]/g, (_, arg) => (short ? '(블록 그림)' : `(블록 모양: ${arg.trim().split(/\s+/).map((v) => `${v}개`).join(', ')})`))
     .replace(/\[range ([^\]]+)\]/g, (all, arg) => { const sp = parseRange(arg); return !sp ? all : short ? '(수직선)' : `(${rangeText(sp)})`; })
     .replace(/\[sym ([^\]]+)\]/g, (all, arg) => { const sp = parseSym(arg); return !sp ? all : short ? '(그림)' : `(${symText(sp)})`; })
+    .replace(/\[circle ([^\]]+)\]/g, (all, arg) => { const sp = parseCircle(arg); return !sp ? all : short ? '(그림)' : `(${circleText(sp)})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
 }
@@ -1190,7 +1415,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────

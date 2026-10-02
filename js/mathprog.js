@@ -18,6 +18,7 @@ import * as shapeGen from './mathshape.js';
 import * as dataGen from './mathdata.js';
 import * as rangeGen from './mathrange.js';
 import * as symGen from './mathsym.js';
+import * as circleGen from './mathcircle.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -48,8 +49,10 @@ export const STEMS = {
   range: { key: 'range', code: 'L', label: '수의 범위와 어림하기 줄기', range: '초5', list: rangeGen.RANGE, gen: rangeGen, file: './coach/math/range.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (이상과 이하부터 — 학교 5-2 첫 단원)', intro: '수의 범위와 어림 문제 5개를 먼저 풀어 볼게요. 수직선을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
   // M 합동과 대칭 — 5-2에서 L 다음으로 빈 단원 · J의 모눈 도형을 그대로 쓰고 완성하기는 ✍️ 모눈 판에 직접 찍는다 (2026-10-01 아버님 "합동과 대칭 → 원의 넓이 → 직육면체·부피·겉넓이"). 초5 9칸
   sym: { key: 'sym', code: 'M', label: '합동과 대칭 줄기', range: '초5', list: symGen.SYM, gen: symGen, file: './coach/math/sym.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (도형의 합동부터 — 학교 5-2 3단원)', intro: '합동과 대칭 문제 5개를 먼저 풀어 볼게요. 모눈 그림을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // N 원의 넓이 — I 다각형 넓이 · M 다음 도형·측정의 남은 큰 칸, 6-2 5단원 「원의 둘레와 넓이」 11차시로 범위 확인 (2026-10-02 아버님 "이대로 진행하자"). 초6 7칸, N1은 초3 복습 · 3.14 곱셈이 많아 C 소수 줄기가 먼저면 편하다
+  circle: { key: 'circle', code: 'N', label: '원의 넓이 줄기', range: '초6', list: circleGen.CIRCLE, gen: circleGen, file: './coach/math/circle.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (원의 중심·반지름부터 — 학교 6-2 5단원 · C 소수 줄기를 먼저 하면 3.14 셈이 편해요)', intro: '원 문제 5개를 먼저 풀어 볼게요. 그림에서 반지름인지 지름인지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
