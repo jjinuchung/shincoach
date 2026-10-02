@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import {
   CUBOID, TAGS, makeQuestion, makeRound, conceptById, ladder, placeFrom, diagnosticSet, lessonOf, checkContent, gradeLabel, valueOf, _kit,
 } from '../js/mathcuboid.js';
-import { figureSvg, figText, renderFigures } from '../js/mathdraw.js';
+import { figureSvg, figText, renderFigures, parseNet } from '../js/mathdraw.js';
 import { tplKey } from '../js/mathgen.js';
 import { padSpec, readTyped, matchTyped } from '../js/mathpad.js';
 
@@ -258,9 +258,10 @@ function solveText(q) {
     assert.ok(ps.length >= 1, `만나는 점이 없다: ${q}`);
     return { type: 'meet', ans: ps.map((j) => `점 ${N.name(j)}`).join(', '), f: { N, i0, ps } };
   }
-  if (/선분 ㄱㄴ과 겹치는 선분/.test(L)) {
-    const N = nets[0]; const i0 = N.idx('ㄱ');
-    assert.equal(N.name((i0 + 1) % N.n), 'ㄴ', '선분 ㄱㄴ은 둘레의 한 선분');
+  // 생성기는 늘 선분 ㄱㄴ · 원고 O4 3장 확인은 같은 이름 그대로 선분 ㅅㅇ (Codex 24차 #4: 배움 글과 같은 전개도·같은 이름)
+  if ((m = /선분 ([ㄱ-ㅎ])([ㄱ-ㅎ])[과와] 겹치는 선분/.exec(L))) {
+    const N = nets[0]; const i0 = N.idx(m[1]);
+    assert.equal(N.name((i0 + 1) % N.n), m[2], `선분 ${m[1]}${m[2]}은 둘레의 한 선분 (시계 방향 이름 순서)`);
     const j = [...Array(N.n).keys()].find((x) => x !== i0 && N.segE(x) === N.segE(i0));
     return { type: 'seg', ans: `선분 ${N.name(j)}${N.name((j + 1) % N.n)}`, f: { N, i0, j } };
   }
@@ -912,6 +913,81 @@ test('🎨 [net] 전개도: 그린 칸·선분·이름이 따로 굴려 접은 �
   for (const bad of ['net', 'net .1../2345/.5..', 'net .1../2345', 'net 5 3 4 X..X/1234', 'net 5 3 4 1..2/3456 r=3', 'net .1../2345/.6.. lab=1', 'net .1../2345/.6.. s=14', 'net .1../2345/.6.. names names', 'net .1../2345/.6.. zz', 'net 5 3 4 .1../2345/.6.. r=3 lab=1,1']) assert.equal(figureSvg(bad), '', bad);
 });
 
+test('★ 전개도 11가지 × 점 이름 시작 14자리 전부 — 그리는 쪽 접기(세 축 옮기기)가 따로 굴려 접은 것과 만나는 점·겹치는 선분이 같다 (Codex 24차 제안: 씨앗 없이 다 덮는다)', () => {
+  const digits = (pat) => { let k = 0; return pat.replace(/X/g, () => String(++k)); };
+  let n = 0;
+  for (const pat of _kit.CUBE_NETS) {
+    const shape = digits(pat);
+    for (let s = 0; s < 14; s++) {
+      const arg = `${shape} names s=${s}`;
+      const L = parseNet(arg).L; const N = foldNet(arg);
+      assert.equal(L.pts.length, N.n, `${arg}: 둘레 점 수`);
+      // 이름으로 견준다 (자리 번호 매기는 법이 달라도 되게) — 이름 → 같은 꼭짓점에 오는 이름들
+      const meet = (vOf, name) => T_PT.slice(0, N.n).filter((b) => vOf(b) === vOf(name)).join('');
+      const drawV = (nm) => L.pts[(T_PT.indexOf(nm) + s) % N.n].v;
+      const rollV = (nm) => N.vOf(N.idx(nm));
+      for (const nm of T_PT.slice(0, N.n)) assert.equal(meet(drawV, nm), meet(rollV, nm), `${arg}: 점 ${nm}과 만나는 점`);
+      // 선분 — 이름 둘 → 겹치는 선분의 이름 둘
+      const segName = (i) => [T_PT[(i - s + N.n) % N.n], T_PT[(i + 1 - s + N.n) % N.n]].join('');
+      for (let i = 0; i < N.n; i++) {
+        const dj = L.segs.findIndex((g, k) => k !== i && g.e === L.segs[i].e);
+        const rj = [...Array(N.n).keys()].find((k) => k !== i && N.segE(k) === N.segE(i));
+        assert.equal(segName(dj), segName(rj), `${arg}: 선분 ${segName(i)}과 겹치는 선분`);
+      }
+      n++;
+    }
+  }
+  assert.equal(n, 11 * 14);
+});
+
+test('★ 겹치는 선분 풀이: 두 선분이 함께 쓰는 끝점은 "만난다"고 하지 않는다 · 풀이가 말하는 짝은 정말 접으면 만난다 (Codex 24차 #2: 씨앗 5 "점 ㄱ과 점 ㄱ")', () => {
+  let shared = 0; let apart = 0;
+  for (let s = 0; s < Math.max(SEEDS, 2000); s++) {
+    const q = makeQuestion('cub.net', 'calc', s, OPTS);
+    if (!/선분 ㄱㄴ과 겹치는 선분/.test(q.q)) continue;
+    const N = foldNet(/\[net ([^\]]+)\]/.exec(q.q)[1]);
+    const last = q.solve.steps[q.solve.steps.length - 1];
+    assert.ok(!/점 ([ㄱ-ㅎ])[과와] 점 \1(?![ㄱ-ㅎ])/.test(last), `#${s}: 같은 점끼리 만난다고 함 — ${last}`);
+    const sh = /점 ([ㄱ-ㅎ])은 두 선분이 함께 쓰는 점이에요\. 접으면 점 ([ㄱ-ㅎ])과 점 ([ㄱ-ㅎ])[이가] 만나요/.exec(last);
+    const pairs = sh ? [[sh[2], sh[3]]] : [...last.matchAll(/점 ([ㄱ-ㅎ])[과와] 점 ([ㄱ-ㅎ])/g)].map((m) => [m[1], m[2]]);
+    assert.ok(pairs.length >= 1, `#${s}: 짝을 못 읽음 — ${last}`);
+    for (const [a, b] of pairs) assert.equal(N.vOf(N.idx(a)), N.vOf(N.idx(b)), `#${s}: 점 ${a}과 점 ${b}은 접어도 안 만난다 — ${last}`);
+    if (sh) {
+      // 함께 쓰는 점은 ㄱ이나 ㄴ이고, 정답 선분의 끝점이기도 하다
+      assert.ok(['ㄱ', 'ㄴ'].includes(sh[1]), `#${s}: ${last}`);
+      assert.ok(q.choices.find((x) => x.ok).text.includes(sh[1]), `#${s}: 정답 선분이 점 ${sh[1]}을 안 쓴다`);
+      shared++;
+    } else apart++;
+  }
+  assert.ok(shared >= 5 && apart >= 5, `함께 쓰는 점 ${shared} · 떨어진 짝 ${apart} (검사가 빈 채 통과하지 않게)`);
+});
+
+test('★ 전개도를 글로: 길이 이름표와 ?가 어느 면의 어느 변인지 — 📊 아빠 화면이 이 글만 본다 (Codex 24차 #3: q=2·q=3이 같은 글이었다)', () => {
+  const a = figText('[net 7 3 4 .5../6134/...2 r=1 lab=6,7,11 q=2]'); const b = figText('[net 7 3 4 .5../6134/...2 r=1 lab=6,7,11 q=3]');
+  assert.notEqual(a, b);
+  let n = 0;
+  for (const { c, s, q } of every(['calc'], 300)) {
+    for (const m of q.q.matchAll(/\[net ([^\]]+)\]/g)) {
+      const N = foldNet(m[1]); if (!N.dims) continue;
+      const t = figText(m[0]);
+      // 테스트가 따로 놓은 칸으로 그 선분의 자리를 다시 찾는다
+      const sideOf = (i) => {
+        const p = N.pts[i]; const r = N.pts[(i + 1) % N.n];
+        for (const x of N.cells) {
+          const inX = (v) => v >= x.x && v <= x.x + x.w; const inY = (v) => v >= x.y && v <= x.y + x.h;
+          if (p[1] === r[1] && inX(p[0]) && inX(r[0])) { if (p[1] === x.y) return `면 ${T_FACE[x.d - 1]}의 위쪽 변`; if (p[1] === x.y + x.h) return `면 ${T_FACE[x.d - 1]}의 아래쪽 변`; }
+          if (p[0] === r[0] && inY(p[1]) && inY(r[1])) { if (p[0] === x.x) return `면 ${T_FACE[x.d - 1]}의 왼쪽 변`; if (p[0] === x.x + x.w) return `면 ${T_FACE[x.d - 1]}의 오른쪽 변`; }
+        }
+        return null;
+      };
+      for (const i of (N.opt.lab ? N.opt.lab.split(',').map(Number) : [])) assert.ok(t.includes(`${sideOf(i)} ${N.segLen(i)} ${N.unit}`), `${c.id} #${s}: 길이 이름표 ${i} — ${t}`);
+      if (N.opt.q !== undefined) assert.ok(t.includes(`? 표시 ${sideOf(+N.opt.q)}`), `${c.id} #${s}: ? 자리 — ${t}`);
+      n++;
+    }
+  }
+  assert.ok(n >= 50, `직육면체 전개도 글 ${n}`);
+});
+
 test('🎨 쌓기나무 둘을 견주는 그림은 같은 축척 — 한 글 안에서 쌓기나무 한 칸의 크기가 같다 (with=, 생성기·원고)', () => {
   const unitOf = (d) => {
     const svg = figureSvg(d.slice(1, -1));
@@ -928,6 +1004,9 @@ test('🎨 쌓기나무 둘을 견주는 그림은 같은 축척 — 한 글 안
     // SVG 좌표는 소수 첫째 자리로 반올림돼 적힌다 — 한 칸 크기 오차 0.1/개수까지
     assert.ok(u.every((x) => Math.abs(x - u[0]) < 0.06), `쌓기나무 크기가 다르다 ${u.map((x) => x.toFixed(2)).join(' · ')}\n${t}`);
     assert.ok(ds.every((d) => /with=/.test(d)), `견주는 그림에 with= 가 없다\n${t}`);
+    // 바깥 폭도 같아야 한다 — 폭이 다르면 좁은 화면에서 CSS max-width가 넓은 그림만 줄인다 (Codex 24차 #1: cub.unit 씨앗 28, 414px·292px → 17% 차이)
+    const ws = ds.map((d) => +/viewBox="0 0 (\d+)/.exec(figureSvg(d.slice(1, -1)))[1]);
+    assert.ok(ws.every((w) => w === ws[0]), `견주는 그림의 폭이 다르다 ${ws.join(' · ')}\n${t}`);
     pairs++;
   }
   assert.ok(pairs >= 10, `견주는 그림 ${pairs} (검사가 빈 채 통과하지 않게)`);
@@ -1111,6 +1190,9 @@ test('★ 원고의 그림: 모두 그려지고, 배움 글·확인 질문이 �
             at(new Set(vs).size === 1 && vs.length === [...Array(N.n).keys()].filter((j) => N.vOf(j) === vs[0]).length, `만나는 점 ${z[0]}`);
             claims++;
           }
+          // 두 점 짝 — "점 ㄴ과 점 ㄹ이 만나요" · "점 ㄱ은 점 ㅁ과, 점 ㄴ은 점 ㄹ과 만나니까" (Codex 24차 #4: 끝점을 하나씩 따라가는 글 — 처음엔 이 꼴을 못 읽어 틀린 짝이 지나갔다)
+          for (const z of text.matchAll(/점 ([ㄱ-ㅎ])[과와] 점 ([ㄱ-ㅎ])[이가] 만나/g)) { at(z[1] !== z[2] && N.vOf(N.idx(z[1])) === N.vOf(N.idx(z[2])), `만나는 두 점 ${z[0]}`); claims++; }
+          for (const z of text.matchAll(/점 ([ㄱ-ㅎ])[은는] 점 ([ㄱ-ㅎ])[과와][,\s]/g)) { at(z[1] !== z[2] && N.vOf(N.idx(z[1])) === N.vOf(N.idx(z[2])), `만나는 두 점 ${z[0]}`); claims++; }
           for (const z of text.matchAll(/선분 ([ㄱ-ㅎ]{2})[과와] 선분 ([ㄱ-ㅎ]{2})[이가] 겹쳐요/g)) {
             const segI = (nm) => [...Array(N.n).keys()].find((j) => sameSet([N.name(j), N.name((j + 1) % N.n)], [...nm]));
             at(N.segE(segI(z[1])) === N.segE(segI(z[2])), `겹치는 선분 ${z[0]}`);

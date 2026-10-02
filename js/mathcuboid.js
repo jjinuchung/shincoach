@@ -1412,7 +1412,11 @@ function segAsk(r, pat) {
   return {
     t: `정육면체의 전개도예요.\n\n[net ${spec}]\n\n전개도를 접었을 때 선분 ㄱㄴ과 겹치는 선분은 어느 것일까요?`,
     text: true, ans: segSay(pj.a, pj.b), wr,
-    steps: ['선분 ㄱㄴ의 양 끝 점 ㄱ·ㄴ과 각각 만나는 점을 찾아요', `점 ㄱ과 점 ${nm(meetA)}, 점 ㄴ과 점 ${jw(nm(meetB), '이', '가')} 만나요 → ${segSay(pj.a, pj.b)}`],
+    // 두 선분이 끝점 하나를 함께 쓰면 그 점은 "만나는" 게 아니라 원래 같은 점 — "점 ㄱ과 점 ㄱ이 만나요"가 되지 않게 (Codex 24차 #2)
+    steps: ['선분 ㄱㄴ의 양 끝 점 ㄱ·ㄴ과 각각 만나는 점을 찾아요',
+      meetA === s ? `점 ㄱ은 두 선분이 함께 쓰는 점이에요. 접으면 점 ㄴ과 점 ${jw(nm(meetB), '이', '가')} 만나요 → ${segSay(pj.a, pj.b)}`
+        : meetB === (s + 1) % n ? `점 ㄴ은 두 선분이 함께 쓰는 점이에요. 접으면 점 ㄱ과 점 ${jw(nm(meetA), '이', '가')} 만나요 → ${segSay(pj.a, pj.b)}`
+          : `점 ㄱ과 점 ${nm(meetA)}, 점 ㄴ과 점 ${jw(nm(meetB), '이', '가')} 만나요 → ${segSay(pj.a, pj.b)}`],
     why: {
       [TAGS.segShift]: '겹치는 선분의 바로 옆 선분이에요. 양 끝 점이 각각 어디와 만나는지 확인해요.',
       [TAGS.segOpp]: '같은 면의 맞은편 변은 접어도 선분 ㄱㄴ과 떨어져 있어요.',

@@ -1372,7 +1372,9 @@ export function cuboidSvg(sp) {
   const fit = ([a, b, c]) => Math.min(270 / (a + b * CUB_DX), 190 / (c + b * CUB_DY));
   const s = Math.min(fit(sp.cm), sp.with ? fit(sp.with) : Infinity);
   const padL = 70; const padT = 30; const padR = 74; const padB = 42;
-  const W = Math.round(padL + s * (A + B * CUB_DX) + padR); const H = Math.round(padT + s * (C + B * CUB_DY) + padB);
+  // with=면 바깥 폭도 두 그림 중 넓은 쪽에 맞춘다 — 폭이 다르면 좁은 화면에서 CSS(max-width 100%)가 넓은 그림만 줄여 축척이 다시 갈린다 (Codex 24차 #1). 남는 자리는 오른쪽 빈칸
+  const wOf = ([a, b]) => Math.round(padL + s * (a + b * CUB_DX) + padR);
+  const W = Math.max(wOf(sp.cm), sp.with ? wOf(sp.with) : 0); const H = Math.round(padT + s * (C + B * CUB_DY) + padB);
   const ox = padL; const oy = padT + s * (C + B * CUB_DY); // ㅇ(앞 왼쪽 아래)의 자리
   const P = (x, y, z) => [ox + s * (x + y * CUB_DX), oy - s * (z + y * CUB_DY)];
   const V = {};
@@ -1667,8 +1669,19 @@ export function netText(sp) {
     : sp.plain ? '정사각형 6개를 이어 붙인 모양' : '정육면체의 전개도';
   const parts = [`${what} — 줄마다 칸 [ ${rows} ]`];
   if (sp.names) parts.push(`둘레의 점 ㄱ~ㅎ (맨 위 왼쪽 점${sp.s ? `에서 시계 방향으로 ${sp.s}칸 간 점` : ''}이 ㄱ, 시계 방향)`);
-  if (sp.lab.length) parts.push(`길이 이름표 ${sp.lab.map((i) => `${lenStr(sp.L.segs[i].len)} ${sp.unit}`).join(' · ')}`);
-  if (sp.q >= 0) parts.push('? 표시 선분 하나');
+  // 길이·?가 어느 면의 어느 변인지까지 — 📊 아빠 화면 펼친 문제가 이 글만 보여 준다. 자리 없이 "? 표시 선분 하나"라 q=2(3 cm)·q=3(7 cm)이 같은 글이었다 (Codex 24차 #3)
+  const where = (i) => {
+    const g = sp.L.segs[i]; const p = sp.L.pts[g.a]; const q = sp.L.pts[g.b];
+    const on = (v, a, b) => v >= Math.min(a, b) - 1e-9 && v <= Math.max(a, b) + 1e-9;
+    for (const c of sp.L.cells) {
+      const side = p.y === q.y && on(p.x, c.x, c.x + c.w) && on(q.x, c.x, c.x + c.w) ? (p.y === c.y ? '위쪽' : p.y === c.y + c.h ? '아래쪽' : '')
+        : p.x === q.x && on(p.y, c.y, c.y + c.h) && on(q.y, c.y, c.y + c.h) ? (p.x === c.x ? '왼쪽' : p.x === c.x + c.w ? '오른쪽' : '') : '';
+      if (side) return sp.plain ? `${c.r + 1}째 줄 칸의 ${side} 변` : `면 ${NET_FACE[c.d - 1]}의 ${side} 변`;
+    }
+    return '';
+  };
+  if (sp.lab.length) parts.push(`길이 이름표 ${sp.lab.map((i) => `${where(i)} ${lenStr(sp.L.segs[i].len)} ${sp.unit}`.trim()).join(' · ')}`);
+  if (sp.q >= 0) parts.push(`? 표시 ${where(sp.q) || '선분 하나'}`);
   return parts.join(' · ');
 }
 
