@@ -103,7 +103,9 @@ function triDetermined(item) {
   if ((m = /^세 변의 길이 (\d+) cm, (\d+) cm, (\d+) cm$/.exec(item))) { const [a, b, c] = [+m[1], +m[2], +m[3]]; return a + b > c && b + c > a && a + c > b; }
   if (/^두 변의 길이 \d+ cm, \d+ cm와 그 사이에 있는 각 \d+°$/.test(item)) return true;
   if ((m = /^한 변의 길이 \d+ cm와 그 양 끝 각 (\d+)°, (\d+)°$/.exec(item))) return +m[1] + +m[2] < 180;
-  if (/^세 각의 크기 /.test(item) || /사이에 있지 않은 각/.test(item) || /^두 변의 길이 \d+ cm, \d+ cm$/.test(item)) return false;
+  if (/^세 각의 크기 /.test(item) || /^한 변의 길이 \d+ cm와 한 각 \d+°$/.test(item) || /^두 변의 길이 \d+ cm, \d+ cm$/.test(item)) return false;
+  // "두 변과 그 사이에 있지 않은 각"(SSA)은 경우에 따라 정해진다 — 보기로 나오면 안 된다 (Codex 22차 #1)
+  if (/사이에 있지 않은 각/.test(item)) throw new Error(`SSA 보기는 쓰지 않는다: ${item}`);
   throw new Error(`못 읽는 삼각형 정보: ${item}`);
 }
 /** 도형 종류 (그린 꼭짓점으로) */
@@ -142,7 +144,17 @@ function solveText(t) {
     assert.equal(oks.length, 1, `하나로 그릴 수 있는 것이 ${oks.length}개\n${t}`);
     return oks[0].k;
   }
-  if (/무엇을 더 알아야 할까요/.test(t)) return 'MORE';
+  // 두 변 사이에 있는 각 = 두 변이 만나는 꼭짓점 · 한 변의 양 끝 각 = 그 변의 두 끝 점 (ㄱㄴㄷ 순서로 적는다)
+  if ((m = /변 ([ㄱ-ㅎ]{2}) \d+ cm와 변 ([ㄱ-ㅎ]{2}) \d+ cm를 알아요\..*두 변 사이에 있는 각은 어느 것일까요/s.exec(t))) {
+    const v = [...m[1]].filter((x) => m[2].includes(x));
+    assert.equal(v.length, 1, '두 변이 한 꼭짓점에서 만나야 한다');
+    return `각 ${v[0]}`;
+  }
+  if ((m = /변 ([ㄱ-ㅎ])([ㄱ-ㅎ])의 양 끝 각은 어느 것일까요/.exec(t))) {
+    const [p, q] = [m[1], m[2]].sort((u, w) => 'ㄱㄴㄷ'.indexOf(u) - 'ㄱㄴㄷ'.indexOf(w));
+    return `각 ${p}과 각 ${q}`;
+  }
+  if (/무엇을 더 알아야 할까요/.test(t)) throw new Error(`"무엇을 더 알아야"는 SSA 때문에 뺐다: ${t}`);
   if (/대칭축은 모두 몇 개일까요/.test(t)) {
     const g = readGpoly(t);
     if (g) return `${axesCount(g)}`;
@@ -184,7 +196,7 @@ function solveText(t) {
     assert.ok(fig.axis.x !== undefined ? dy === 0 : dx === 0);
     return '90';
   }
-  if ((m = /대칭축의 한쪽에 있는 변의 길이를 모두 더하면 (\d+) cm예요/.exec(t))) return `${2 * +m[1]}`;
+  if ((m = /대칭축으로 나누면 한쪽 테두리의 길이가 (\d+) cm예요\(대칭축은 빼고 재요\)/.exec(t))) return `${2 * +m[1]}`;
   if ((m = /대칭의 중심까지의 거리가 (\d+) cm일 때, 점 (.)과 점 (.) 사이의 거리는/.exec(t))) return `${2 * +m[1]}`;
   if ((m = /두 점을 이은 선분이 (\d+) cm일 때, 점 (.)에서 대칭의 중심까지의 거리는/.exec(t))) return `${+m[1] / 2}`;
   if ((m = /^선대칭도형이 되도록 완성하려고 해요\. 점 (.)의 대응점은/.exec(t))) {
@@ -229,15 +241,18 @@ test('독립 도구 자체 점검 — 합동 대응·대칭축 개수·점대칭
   assert.equal(triDetermined('세 변의 길이 3 cm, 4 cm, 8 cm'), false, '삼각형이 안 되는 세 변');
 });
 
-test('사다리: 9칸, 모두 초5, needs가 바로 앞 칸 · 학년 표시', () => {
+test('사다리: 9칸, 초5 여덟 + 맨 뒤 ⭐ 중1 미리보기(합동인 삼각형), needs가 바로 앞 칸 · 학년 표시', () => {
   assert.equal(SYM.length, 9);
-  assert.deepEqual(IDS, ['sym.congr', 'sym.corr', 'sym.tri', 'sym.line', 'sym.lineprop', 'sym.linedraw', 'sym.point', 'sym.pointprop', 'sym.pointdraw']);
+  // 합동인 삼각형 그리기는 5-2 교과서에 없다(중1 「삼각형의 합동 조건」) — 맨 뒤 선택 칸, 선대칭 칸의 선수 조건이 아니다 (Codex 22차)
+  assert.deepEqual(IDS, ['sym.congr', 'sym.corr', 'sym.line', 'sym.lineprop', 'sym.linedraw', 'sym.point', 'sym.pointprop', 'sym.pointdraw', 'sym.tri']);
   SYM.forEach((c, i) => {
-    assert.equal(c.grade, 5);
+    assert.equal(c.grade, c.id === 'sym.tri' ? 7 : 5, c.id);
     assert.deepEqual(c.needs, i ? [SYM[i - 1].id] : []);
     assert.ok(c.idea && c.rule && c.slip && c.name, c.id);
   });
+  assert.match(conceptById('sym.tri').name, /^⭐ .*중1 미리보기/);
   assert.equal(gradeLabel(5), '초5');
+  assert.equal(gradeLabel(7), '중1');
 });
 
 test('★ 독립 검산: ① 정답이 문제 글·그림을 따로 읽어 푼 답과 같다 · 딱 하나만 맞다', () => {
@@ -245,14 +260,8 @@ test('★ 독립 검산: ① 정답이 문제 글·그림을 따로 읽어 푼 �
   for (const { c, s, q } of every(['calc'])) {
     assert.equal(q.choices.filter((x) => x.ok).length, 1, `${c.id} #${s}`);
     const want = solveText(q.q);
-    if (want === 'MORE') {
-      // 더 알아야 할 것 — 두 변(ㄱㄴ·ㄴㄷ): 사이의 각 ㄴ·나머지 변 ㄱㄷ / 변 ㄴㄷ과 각 ㄴ: 다른 끝 각 ㄷ·각 ㄴ을 끼는 변 ㄱㄴ (각 ㄱ도 되지만 보기에 없어야)
-      const ss = /변 ㄱㄴ \d+ cm와 변 ㄴㄷ/.test(q.q);
-      const good = ss ? ['각 ㄴ의 크기', '변 ㄱㄷ의 길이'] : ['각 ㄷ의 크기', '변 ㄱㄴ의 길이', '각 ㄱ의 크기'];
-      const ok = q.choices.find((x) => x.ok).text;
-      assert.ok(good.includes(ok), `${c.id} #${s}: ${ok}`);
-      for (const w of q.choices.filter((x) => !x.ok)) assert.ok(!good.includes(w.text), `${c.id} #${s}: 맞는 보기가 오답에 "${w.text}"`);
-    } else assert.ok(matches(q, want), `${c.id} #${s}: 정답 "${q.choices.find((x) => x.ok).text}" ≠ 따로 푼 답 "${want}"\n${q.q}`);
+    assert.ok(matches(q, want), `${c.id} #${s}: 정답 "${q.choices.find((x) => x.ok).text}" ≠ 따로 푼 답 "${want}"\n${q.q}`);
+    for (const w of q.choices.filter((x) => !x.ok)) assert.ok(!sameSide(w.text, want), `${c.id} #${s}: 오답 "${w.text}"이 맞는 답`);
     n++;
   }
   assert.ok(n >= 9 * SEEDS);
@@ -318,13 +327,18 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다 — 짝짓기�
       }
       if (/합동인 삼각형을 하나로 그릴 수 있는 것은/.test(t)) {
         const item = new RegExp(`^${w.text} (.+)$`, 'm').exec(t)[1];
-        const kind = /^세 각/.test(item) ? TAGS.threeAngles : /사이에 있지 않은/.test(item) ? TAGS.notIncluded : /^두 변의 길이 \d+ cm, \d+ cm$/.test(item) ? TAGS.twoOnly : null;
+        const kind = /^세 각/.test(item) ? TAGS.threeAngles : /^한 변의 길이 \d+ cm와 한 각/.test(item) ? TAGS.tooFew : /^두 변의 길이 \d+ cm, \d+ cm$/.test(item) ? TAGS.twoOnly : null;
         yes(tag === kind && !triDetermined(item));
         continue;
       }
-      if (/무엇을 더 알아야 할까요/.test(t)) {
-        if (tag === TAGS.notIncluded) yes(/각 ㄱ|각 ㄷ|변 ㄱㄷ/.test(w.text));
-        else yes((tag === TAGS.twoOnly && /변 ㄱㄴ \d+ cm와 변 ㄴㄷ/.test(t)) || (tag === TAGS.tooFew && /변 ㄴㄷ \d+ cm와 각 ㄴ/.test(t)), '(두 변 → 두 변만 · 변과 각 → 모자람)');
+      if ((m = /변 ([ㄱ-ㅎ]{2}) \d+ cm와 변 ([ㄱ-ㅎ]{2}) \d+ cm를 알아요/.exec(t))) {
+        const v = [...m[1]].find((x) => m[2].includes(x));
+        yes(tag === TAGS.wrongIncl && /^각 [ㄱ-ㅎ]$/.test(w.text) && w.text !== `각 ${v}`, '(두 변이 만나지 않는 꼭짓점의 각)');
+        continue;
+      }
+      if ((m = /변 ([ㄱ-ㅎ])([ㄱ-ㅎ])의 양 끝 각은/.exec(t))) {
+        const o = ['ㄱ', 'ㄴ', 'ㄷ'].find((x) => x !== m[1] && x !== m[2]);
+        yes(tag === TAGS.wrongEnds && w.text.includes(`각 ${o}`), '(맞은편 각을 끼움)');
         continue;
       }
       if (/대칭축은 모두 몇 개일까요/.test(t)) {
@@ -372,7 +386,7 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다 — 짝짓기�
         continue;
       }
       if (/이은 선분과 대칭축이 만나서 이루는 각/.test(t)) { yes(tag === TAGS.notRight && valueOf(w.text) !== 90); continue; }
-      if ((m = /대칭축의 한쪽에 있는 변의 길이를 모두 더하면 (\d+) cm/.exec(t))) { yes(tag === TAGS.halfPerim && valueOf(w.text) === +m[1]); continue; }
+      if ((m = /대칭축으로 나누면 한쪽 테두리의 길이가 (\d+) cm/.exec(t))) { yes(tag === TAGS.halfPerim && valueOf(w.text) === +m[1]); continue; }
       if ((m = /^선대칭도형이 되도록 완성하려고 해요\. 점 (.)의 대응점은/.exec(t))) {
         const half = fig.polys[0]; const p = byName(half, m[1]); const a = fig.axis; const cq = fig.cands.find((z) => z.k === w.text);
         const vert = a.x !== undefined;
@@ -413,7 +427,7 @@ test('★ ② 오개념 문항: 보여 준 말·찍은 점은 정말 틀렸다 �
       assert.notEqual(real, +m[5], `${c.id} #${s}: 이름 순서 짝의 길이가 우연히 맞다`);
       assert.ok(ok.endsWith(`${real} cm`));
     } else if ((m = /세 각이 (\d+)°, (\d+)°, (\d+)°인 삼각형은 하나로/.exec(t))) assert.equal(+m[1] + +m[2] + +m[3], 180, '세 각의 합이 180°여야 "합이 아니라서"가 엉뚱한 지적이 된다');
-    else if (/그 사이에 있지 않은 각/.test(t)) assert.ok(/사이에 있어야/.test(ok));
+    else if (/한 변의 길이 \d+ cm와 한 각 \d+°만 알면/.test(t)) assert.ok(/정해지지 않아요/.test(ok), '한 변과 한 각만으로는 언제나 모자란다');
     else if (/대각선으로 접어도 겹치니까 대칭축이 4개예요/.test(t)) assert.equal(axesCount(readGpoly(t)), 2, '정사각형이면 말이 맞아 버린다');
     else if (/가운데를 지나는 선으로 접으면 겹치니까 선대칭도형이에요/.test(t)) assert.equal(axesCount(readGpoly(t)), 0);
     else if ((m = /점 (.)과 점 (.)을 이은 선분이 (\d+) cm니까 점 (.)에서 대칭축까지도/.exec(t))) {
@@ -481,7 +495,7 @@ test('🔁 쌍둥이·🤔 노트: 요청한 틀로 온다 · 원래 문제와 �
 });
 
 test('아직 안 배운 말을 앞 칸에서 쓰지 않는다 — 대응점·대응변·대응각 M2 · 선대칭·대칭축 M4 · 점대칭·대칭의 중심 M7', () => {
-  const NEW = [['대응', 1], ['대칭', 3], ['선대칭', 3], ['대칭축', 3], ['점대칭', 6], ['대칭의 중심', 6]];
+  const NEW = [['대응', 1], ['대칭', 2], ['선대칭', 2], ['대칭축', 2], ['점대칭', 5], ['대칭의 중심', 5]];
   for (const { c, k, s, q } of every()) {
     const at = IDS.indexOf(c.id);
     const all = [allText(q), ...q.choices.map((x) => x.tag || '')].join('\n');
@@ -489,7 +503,7 @@ test('아직 안 배운 말을 앞 칸에서 쓰지 않는다 — 대응점·대
   }
   for (const [w, from] of NEW) for (const c of SYM.slice(0, from)) assert.ok(![c.idea, c.rule, c.slip, c.name].join(' ').includes(w), `${c.id}: "${w}"`);
   // 이름표 자체도 — 앞 칸에서 쓰는 이름표에 뒤 칸 말이 없게
-  assert.ok(!/대칭/.test([TAGS.turnNot, TAGS.scaleSame, TAGS.areaSame, TAGS.lookWrong, TAGS.nameOrder, TAGS.posSame, TAGS.pairWrong, TAGS.sumOne, TAGS.threeAngles, TAGS.notIncluded, TAGS.twoOnly, TAGS.tooFew].join(' ')));
+  assert.ok(!/대칭/.test([TAGS.turnNot, TAGS.scaleSame, TAGS.areaSame, TAGS.lookWrong, TAGS.nameOrder, TAGS.posSame, TAGS.pairWrong, TAGS.sumOne, TAGS.threeAngles, TAGS.wrongIncl, TAGS.wrongEnds, TAGS.twoOnly, TAGS.tooFew].join(' ')));
 });
 
 test('🎨 [sym] 그림: 그린 SVG에서 꼭짓점·축·중심·후보 점을 다시 재면 지시문과 같다 · 대칭 그림은 정말 대칭 · 이름표끼리 안 겹치고 그림 안에 · 폭 400 이하', () => {
@@ -582,9 +596,9 @@ test('✍️ 그리기 문항(M6·M9): draw.fig는 후보 점을 뺀 그림 · t
 test('📏 진단·사다리·한 편·배움 예비·내용 검사', () => {
   const d = diagnosticSet(7, 5, OPTS);
   assert.equal(d.length, 5);
-  assert.deepEqual(d.map((q) => q.concept), ['sym.congr', 'sym.tri', 'sym.lineprop', 'sym.point', 'sym.pointdraw']);
+  assert.deepEqual(d.map((q) => q.concept), ['sym.congr', 'sym.line', 'sym.linedraw', 'sym.pointprop', 'sym.tri']);
   const pf = placeFrom(d.map((q, i) => ({ concept: q.concept, correct: i < 2 })));
-  assert.equal(pf.startId, 'sym.lineprop');
+  assert.equal(pf.startId, 'sym.linedraw');
   const L0 = ladder([]);
   assert.equal(L0[0].state, 'now');
   assert.ok(L0.slice(1).every((r) => r.state === 'locked'));
@@ -621,14 +635,6 @@ function contentText(v) {
   return parts.map(fillC).join('\n');
 }
 const CHECKS = IDS.flatMap((id) => CONTENT[id].lesson.map((p, i) => ({ id, i, p })).filter((x) => x.p.check));
-/** 삼각형 ㄱㄴㄷ — 아는 것(변·각)만으로 하나로 정해지나: 세 변 · 두 변과 그 사이에 있는 각 · 한 변과 두 각(두 각을 알면 나머지 각도 안다) */
-function triFixed(parts) {
-  const S = parts.filter((x) => x.s).map((x) => x.s); const A = parts.filter((x) => x.a).map((x) => x.a);
-  if (S.length >= 3 || (S.length >= 1 && A.length >= 2)) return true;
-  if (S.length === 2 && A.length >= 1) { const shared = [...S[0]].find((v) => S[1].includes(v)); return A.includes(shared); }
-  return false;
-}
-const partOf = (t) => { let m; if ((m = /^각 (.)의 크기$/.exec(t))) return [{ a: m[1] }]; if ((m = /^변 (..)의 길이$/.exec(t))) return [{ s: m[1] }]; if (t === '더 몰라도 그릴 수 있어요') return []; throw new Error(`못 읽는 보기 ${t}`); };
 const DIR = /점 (.)에서 대칭의 중심까지 (왼|오른)쪽으로 (\d+)칸, (위|아래)로 (\d+)칸/;
 const isYes = /^(합동이에요|네) — /; const isNo = /^(합동이 아니에요|아니에요) — /;
 
@@ -652,15 +658,7 @@ test('★ 원고 확인 질문도 따로 풀어 대조 — 전부 읽히고, 정
     let want;
     if (/선대칭도형일까요\?/.test(q)) want = axesCount(readGpoly(q)) > 0 ? 'yes' : 'no';
     else if (/중심에서 어느 쪽으로 몇 칸 더/.test(q)) { const m = DIR.exec(q); want = `${m[2]}쪽으로 ${m[3]}칸, ${m[4]}로 ${m[5]}칸`; }
-    else if (/무엇을 더 알아야 할까요/.test(q)) {
-      // 글에 적힌 아는 것 + 보기 하나 → 하나로 정해지나 (정답만 정해지고, 아는 것만으로는 안 정해진다)
-      const known = [...q.matchAll(/(변|각) ([ㄱ-ㅎ]{1,2}) \d+(?: cm|°)/g)].map((z) => (z[1] === '변' ? { s: z[2] } : { a: z[2] }));
-      assert.ok(known.length === 2 && !triFixed(known), `${where}: 아는 것만으로 정해진다`);
-      assert.ok(triFixed([...known, ...partOf(ok)]), `${where}: 정답 "${ok}"으로도 안 정해진다`);
-      for (const x of no) assert.ok(!triFixed([...known, ...partOf(x)]), `${where}: 오답 "${x}"으로도 정해진다`);
-      n++;
-      continue;
-    } else want = solveText(q);
+    else want = solveText(q); // "무엇을 더 알아야?"는 SSA 때문에 뺐다 — 사이에 있는 각·양 끝 각 찾기로 (Codex 22차 #1)
     if (want === 'yes' || want === 'no') {
       assert.match(ok, want === 'yes' ? isYes : isNo, where);
       for (const x of no) assert.match(x, want === 'yes' ? isNo : isYes, `${where}: 오답 "${x}"`);
@@ -775,7 +773,7 @@ test('★ 원고의 [sym] 그림: 이름표끼리 안 겹치고 그림 안에 ·
 
 test('★ 원고의 조사·셈식·아직 안 배운 말 (배움 글·확인 질문·아빠 카드 전부)', () => {
   const BAT = new Set(['0', '1', '3', '6', '7', '8']);
-  const NEW = [['대응', 1], ['대칭', 3], ['선대칭', 3], ['대칭축', 3], ['점대칭', 6], ['대칭의 중심', 6]];
+  const NEW = [['대응', 1], ['대칭', 2], ['선대칭', 2], ['대칭축', 2], ['점대칭', 5], ['대칭의 중심', 5]];
   const ev = (expr) => Function(`return (${expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-')})`)();
   let exprs = 0;
   for (const id of IDS) {
@@ -854,7 +852,7 @@ test('✍️ 모눈 판 (3단계): 판에는 후보 점이 없고 범위는 답�
   for (const bad of [{ mode: 'grid', fig: 'sym open 0,0 2,0', target: [1, 1], cands: [{ k: '㉠', x: 1, y: 1 }, { k: '㉡', x: 2, y: 2 }] }, { mode: 'grid', fig: 'sym open x=5 ㄱ:5,7 ㄴ:2,5', target: [9, 9], cands: [{ k: '㉠', x: 8, y: 5 }, { k: '㉡', x: 7, y: 5 }] }]) assert.equal(canDraw(bad), false, JSON.stringify(bad));
   // 화면 배선 — 문항·🔁 쌍둥이 둘 다 모눈 판을 연다(숫자판 없이도), 찍은 글자로 보기를 찾는다, 문제 글에서는 후보 점 그림을 뺀다
   const src = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(q\.draw && q\.draw\.mode === 'grid'\) return padOn\(\) && ui\.round && ui\.round\.mode !== 'special' && canDraw\(q\.draw\)/);
+  assert.match(src, /if \(q\.draw && q\.draw\.mode === 'grid'\) return done !== 'choice' && \(done === 'typed' \|\| padOn\(\)\) && ui\.round && ui\.round\.mode !== 'special' && canDraw\(q\.draw\)/);
   assert.equal((src.match(/const typedOn = spec \|\| draw;/g) || []).length, 2, 'renderQuestion·renderTwin 둘 다');
   assert.equal((src.match(/if \(typedOn && !\(restore && [rt]\.answered\)\) list\.appendChild\(typedBox\(q, spec, draw,/g) || []).length, 2);
   assert.match(src, /const res = spec \? matchTyped\(q, typed, spec\) : \{ i: q\.choices\.findIndex\(\(c\) => c\.text === typed\.text\) \};/);
@@ -878,4 +876,42 @@ test('❓ 아빠에게 묻기: 모눈 판에 찍은 답은 "모눈에 직접 찍
   // 숫자판으로 쓴 답은 예전처럼
   const qn = makeQuestion('sym.lineprop', 'calc', 5, OPTS);
   assert.equal(askContext(qn, { chosen: '6', p: 1 }).grid, undefined);
+});
+
+// ───────────────────── Codex 22차 — 다시 생기지 않게 ─────────────────────
+
+test('★ Codex 22차: SSA("사이에 있지 않은 각")와 "○○만"·"평행사변형은 …" 같은 틀린 일반화가 아이에게 보이는 참말(정답·풀이·규칙·배움 글)에 없다', () => {
+  // 오답 보기·② 보여 준 말·아빠 카드의 "아이가 하는 말"은 틀린 말이 맞으니 빼고, 참이라고 내미는 글만 본다
+  const BAD = [
+    [/사이에 있지 않은 각/, 'SSA — 긴 변의 맞은편 각이나 둔각이면 하나로 정해진다'],
+    [/정사각형만/, '마름모·정팔각형이 반례'],
+    [/(?<!(이|다음|아닌|기울어진) )평행사변형은 /, '직사각형·마름모도 평행사변형(J) — "이 평행사변형은"·"직사각형도 마름모도 아닌 평행사변형은"으로'],
+    [/(?<!(이|다른|다음) )직사각형의 (대각선|대칭축)/, '정사각형도 직사각형 — "가로·세로가 다른 직사각형"으로'],
+    [/한쪽에 있는 변의 길이/, '축이 변을 가로지르면 뜻이 갈린다 — "한쪽 테두리"로'],
+  ];
+  // 굵게(**…**)는 떼고 본다 — "**평행사변형**은"이 검사를 빠져나갔다 (일부러 틀리게 해 보고 잡음)
+  const truths = (q) => [q.choices.find((x) => x.ok).text, ...(q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule] : [])].join('\n').replace(/\*\*/g, '');
+  for (const { c, k, s, q } of every(['calc', 'misread'], 300)) {
+    const t = truths(q);
+    for (const [re, why] of BAD) assert.ok(!re.test(t), `${c.id} ${k} #${s}: ${why}\n${t.match(new RegExp(`.*${re.source}.*`))?.[0]}`);
+    if (k === 'calc') for (const [re, why] of BAD.slice(0, 1)) assert.ok(!re.test(q.q), `${c.id} #${s}: 문제 글에 ${why}`);
+  }
+  for (const c of SYM) for (const [re, why] of BAD) assert.ok(!re.test([c.idea, c.rule, c.slip].join('\n')), `${c.id}: ${why}`);
+  for (const id of IDS) {
+    const v = CONTENT[id];
+    const said = [...v.lesson.flatMap((p) => [p.say, ...(p.check ? [p.check.q, p.check.ok, p.check.why] : [])]), v.rule, v.dad.goal, ...v.dad.say, v.dad.do, v.dad.pass, ...v.dad.traps.map((t) => t.dad)].map(fillC).join('\n').replace(/\*\*/g, '');
+    for (const [re, why] of BAD) assert.ok(!re.test(said), `${id} 원고: ${why}\n${said.match(new RegExp(`.*${re.source}.*`))?.[0]}`);
+  }
+});
+
+test('★ Codex 22차: 답한 문항은 답할 때 방식으로 복원 · 확인 전 찍어 둔 점은 판을 다시 그려도 남는다', () => {
+  const src = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
+  // 본 문항·🔁 쌍둥이 둘 다 — 답한 뒤 복원이면 답 기록(p / t.typed)으로 정하고, 그때만 ⚙ 숫자판 설정을 무시한다
+  assert.match(src, /const done = restore && r\.answered \? \(\(r\.answers\[r\.at\] \|\| \{\}\)\.p \? 'typed' : 'choice'\) : null;/);
+  assert.match(src, /const done = restore && t\.answered \? \(t\.typed \? 'typed' : 'choice'\) : null;/);
+  assert.equal((src.match(/const spec = padFor\(q, done\);/g) || []).length, 2);
+  assert.match(src, /function padFor\(q, done = null\) \{\r?\n  if \(done === 'choice' \|\| !ui\.round \|\| ui\.round\.mode === 'special'\) return null;\r?\n  if \(done !== 'typed' && !padOn\(\)\) return null;/);
+  const dv = readFileSync(new URL('../js/drawview.js', import.meta.url), 'utf8');
+  assert.match(dv, /let p = draw\.pending \? \{ x: draw\.pending\.x, y: draw\.pending\.y \} : null;/);
+  assert.match(dv, /draw\.pending = \{ x: p\.x, y: p\.y \};/);
 });

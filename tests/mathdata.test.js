@@ -738,7 +738,7 @@ test('✍️ 점 찍기 판(3단계): 그린 칸 수가 숫자판과 같은 채�
   }
   // 화면 배선 — 문항 화면·🔁 쌍둥이 화면 둘 다 판을 쓰고, 답한 뒤 그린 그래프를 남긴다 (한 곳만 걸면 쌍둥이가 보기로 샌다)
   const src = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
-  assert.equal((src.match(/const draw = drawFor\(q, spec\);/g) || []).length, 2, 'renderQuestion·renderTwin 둘 다');
+  assert.equal((src.match(/const draw = drawFor\(q, spec, done\);/g) || []).length, 2, 'renderQuestion·renderTwin 둘 다 (done = 답한 뒤 복원은 답할 때 방식, Codex 22차 #4)');
   assert.equal((src.match(/qtNode\(qTextOf\(q, draw\)\)/g) || []).length, 2);
   assert.equal((src.match(/typedBox\(q, spec, draw,/g) || []).length, 2);
   assert.equal((src.match(/if \(list\.classList\.contains\('is-pad'\)\) typedAnswered\(/g) || []).length, 2);

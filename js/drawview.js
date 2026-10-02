@@ -115,7 +115,8 @@ function gridBox(draw, { onSubmit, onIdk }) {
   const g = gridOf(draw);
   if (!g) return null;
   const { G, sp } = g;
-  let p = null;
+  // 확인 전에 찍어 둔 점 — 🎒·📊에 다녀와 판을 다시 그려도 그대로 (문항의 draw에 둔다, Codex 22차 #5)
+  let p = draw.pending ? { x: draw.pending.x, y: draw.pending.y } : null;
   let done = false;
 
   const wrap = el('div', 'math-draw is-grid');
@@ -162,6 +163,7 @@ function gridBox(draw, { onSubmit, onIdk }) {
 
   function set(q) {
     p = { x: Math.min(Math.min(G.x1, 14), Math.max(Math.max(G.x0, 0), q.x)), y: Math.min(Math.min(G.y1, 14), Math.max(Math.max(G.y0, 0), q.y)) };
+    draw.pending = { x: p.x, y: p.y };
     paint();
   }
   function gridAtEvent(e) {

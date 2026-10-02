@@ -1318,8 +1318,9 @@ function renderQuestion(restore = false) {
   }
 
   // 🔢 수가 답인 ① 계산은 숫자판, ✍️ 그리기 문항은 점 찍기 판 (판이 그래프를 그리므로 글에서는 뺀다)
-  const spec = padFor(q);
-  const draw = drawFor(q, spec);
+  const done = restore && r.answered ? ((r.answers[r.at] || {}).p ? 'typed' : 'choice') : null; // 답한 뒤 복원은 답할 때 방식으로
+  const spec = padFor(q, done);
+  const draw = drawFor(q, spec, done);
   const qt = el('div', 'math-qt');
   qt.appendChild(qtNode(qTextOf(q, draw)));
   card.appendChild(qt);
@@ -1370,18 +1371,23 @@ function renderQuestion(restore = false) {
 function padOn() {
   try { return (JSON.parse(localStorage.getItem('shincoach.settings') || '{}') || {}).mathPad !== false; } catch { return true; }
 }
-/** 이 문항을 숫자판으로 받을까 — 💎 스페셜은 보기 그대로. 🤔 노트는 다른 줄기 문항이 섞일 수 있어 문항의 줄기로 */
-function padFor(q) {
-  if (!padOn() || !ui.round || ui.round.mode === 'special') return null;
+/**
+ * 이 문항을 숫자판으로 받을까 — 💎 스페셜은 보기 그대로. 🤔 노트는 다른 줄기 문항이 섞일 수 있어 문항의 줄기로.
+ * done: 이미 답한 문항을 다시 그릴 때 그때 쓴 방식('typed' 판·숫자판 / 'choice' 보기) — 그사이 다른 창에서 ⚙ 숫자판을 바꿔도
+ * 답할 때 모양 그대로 그린다 (안 그러면 풀이 카드의 "빨간 점 자리"가 사라진 판을 가리켰다, Codex 22차 #4)
+ */
+function padFor(q, done = null) {
+  if (done === 'choice' || !ui.round || ui.round.mode === 'special') return null;
+  if (done !== 'typed' && !padOn()) return null;
   return padSpec(q, (stemOf(q.concept) || S()).key);
 }
 /**
  * ✍️ 그리기 문항(📊 K2 막대·K5 점, 문항의 `draw`)이면 숫자판 대신 점 찍기 판 — 숫자판이 켜져 있을 때만(⚙ 같은 스위치).
  * 판이 그래프를 다시 그리므로 문제 글에서는 그 그래프를 뺀다(두 번 보이면 어느 쪽을 만지는지 헷갈린다).
  */
-function drawFor(q, spec) {
-  // 🪞 M 완성하기(모눈 판)는 답이 ㉠~㉣라 숫자판(spec)이 없다 — 같은 ⚙ 스위치·💎 스페셜 제외만 따른다
-  if (q.draw && q.draw.mode === 'grid') return padOn() && ui.round && ui.round.mode !== 'special' && canDraw(q.draw) ? q.draw : null;
+function drawFor(q, spec, done = null) {
+  // 🪞 M 완성하기(모눈 판)는 답이 ㉠~㉣라 숫자판(spec)이 없다 — 같은 ⚙ 스위치·💎 스페셜 제외만 따른다 (답한 뒤면 그때 방식)
+  if (q.draw && q.draw.mode === 'grid') return done !== 'choice' && (done === 'typed' || padOn()) && ui.round && ui.round.mode !== 'special' && canDraw(q.draw) ? q.draw : null;
   return spec && q.draw && canDraw(q.draw) ? q.draw : null;
 }
 const qTextOf = (q, draw) => {
@@ -2197,8 +2203,9 @@ function renderTwin(restore = false) {
   top.appendChild(el('span', 'math-eyebrow', `🔁 비슷한 문제 · ${nameOf(q.concept)}`));
   top.appendChild(el('span', 'math-kind', '이번엔 맞혀 봐요'));
   card.appendChild(top);
-  const spec = padFor(q); // 🔢 원래 문항을 숫자판으로 풀었으면 쌍둥이도 숫자판 (같은 틀이라 같은 판정) — ✍️ 그리기도 그대로
-  const draw = drawFor(q, spec);
+  const done = restore && t.answered ? (t.typed ? 'typed' : 'choice') : null; // 답한 뒤 복원은 답할 때 방식으로 (Codex 22차 #4)
+  const spec = padFor(q, done); // 🔢 원래 문항을 숫자판으로 풀었으면 쌍둥이도 숫자판 (같은 틀이라 같은 판정) — ✍️ 그리기도 그대로
+  const draw = drawFor(q, spec, done);
   const qt = el('div', 'math-qt'); qt.appendChild(qtNode(qTextOf(q, draw))); card.appendChild(qt);
   if (q.figure) card.appendChild(svgBox(q.figure));
   if (q.expr) { const ex = el('p', 'math-expr'); ex.appendChild(richNode(q.expr)); card.appendChild(ex); }

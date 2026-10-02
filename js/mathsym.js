@@ -7,7 +7,7 @@
 // 오답은 아이가 실제로 하는 틀린 생각 흉내다:
 //   · 돌리거나 뒤집어 놓으면 합동이 아니다 · 모양만 같으면(크기가 달라도) 합동 · 넓이만 같으면 합동
 //   · 대응점을 **이름 순서대로**(ㄱ↔ㄹ, ㄴ↔ㅁ) 또는 **같은 자리**로 짝지음 — 돌려 놓은 그림에서
-//   · 세 각만 같아도 합동인 삼각형 · 두 변과 그 사이에 있지 않은 각으로도 하나로 정해진다
+//   · 세 각만·한 변과 한 각만으로도 합동인 삼각형이 하나로 정해진다 · 사이에 있는 각·양 끝 각을 잘못 찾음 (⭐ 중1 미리보기 칸)
 //   · 직사각형의 대각선을 대칭축으로 · 평행사변형을 선대칭도형으로 · 대칭축 개수를 덜/두 번 셈
 //   · 대응점까지의 거리를 반으로 안 나눔/두 배로 안 함 · 완성할 때 **밀어서** 옮김 · 축까지 거리를 두 배로
 //   · 선대칭이면 점대칭이다 · 점대칭을 선대칭처럼 **뒤집어** 그림
@@ -103,7 +103,8 @@ export const TAGS = {
   pairWrong: '짝을 잘못 지음',
   sumOne: '한 각만 뺌',                          // 180 − 한 각
   threeAngles: '세 각만 같아도 된다고 봄',
-  notIncluded: '사이에 있지 않은 각도 된다고 봄',
+  wrongIncl: '사이에 있는 각을 잘못 찾음',       // 두 변이 만나는 꼭짓점이 아닌 각
+  wrongEnds: '양 끝 각을 잘못 찾음',             // 변의 맞은편 각을 끼움
   twoOnly: '두 변만으로 된다고 봄',
   diagAxis: '대각선을 대칭축으로 봄',
   paraLine: '평행사변형을 선대칭으로 봄',
@@ -298,7 +299,7 @@ const LABELS = ['㉠', '㉡', '㉢', '㉣'];
 const onGrid = (p) => p.x >= 0 && p.y >= 0 && p.x <= 14 && p.y <= 14;
 const same = (a, b) => a.x === b.x && a.y === b.y;
 
-// ── 합동인 삼각형 그리기 (M3) ──
+// ── ⭐ 합동인 삼각형 그리기 (M9, 중1 미리보기) ──
 function threeAngles(r) {
   for (let t = 0; t < 100; t++) {
     const a = int(r, 3, 8) * 10; const b = int(r, 3, 8) * 10; const cc = 180 - a - b;
@@ -306,7 +307,10 @@ function threeAngles(r) {
   }
   return [40, 60, 80];
 }
-/** 보기 글 여섯 가지 — 정해지는 셋(세 변·두 변과 사이 각·한 변과 양 끝 각) + 안 되는 셋(세 각·사이에 있지 않은 각·두 변만) */
+/**
+ * 보기 글 여섯 가지 — 정해지는 셋(세 변·두 변과 사이 각·한 변과 양 끝 각) + 늘 모자란 셋(세 각·한 변과 한 각·두 변만).
+ * ★ "두 변과 그 사이에 있지 않은 각"(SSA)은 쓰지 않는다 — 긴 변의 맞은편 각이면 하나로 정해져 오답이 아니다 (Codex 22차 #1)
+ */
 function triItems(r) {
   let a = 0; let b = 0; let cc = 0;
   for (let t = 0; t < 100; t++) {
@@ -314,8 +318,8 @@ function triItems(r) {
     if (new Set([a, b, cc]).size === 3 && a + b > cc && b + cc > a && a + cc > b) break;
   }
   const two = () => { const x = int(r, 3, 9); let y = int(r, 3, 9); while (y === x) y = int(r, 3, 9); return [x, y]; };
-  const [s1, s2] = two(); const [u1, u2] = two(); const [w1, w2] = two();
-  const g = int(r, 3, 12) * 10; const gb = int(r, 3, 8) * 10;
+  const [s1, s2] = two(); const [w1, w2] = two();
+  const g = int(r, 3, 12) * 10; const u = int(r, 3, 9); const gb = int(r, 3, 12) * 10;
   const s3 = int(r, 3, 9); const p = int(r, 3, 8) * 10; let q = int(r, 3, 8) * 10; while (q === p) q = int(r, 3, 8) * 10;
   const [A1, A2, A3] = threeAngles(r);
   return {
@@ -323,7 +327,7 @@ function triItems(r) {
     sas: `두 변의 길이 ${s1} cm, ${s2} cm와 그 사이에 있는 각 ${g}°`,
     asa: `한 변의 길이 ${s3} cm와 그 양 끝 각 ${p}°, ${q}°`,
     aaa: `세 각의 크기 ${A1}°, ${A2}°, ${A3}°`,
-    ssa: `두 변의 길이 ${u1} cm, ${u2} cm와 그 사이에 있지 않은 각 ${gb}°`,
+    sa: `한 변의 길이 ${u} cm와 한 각 ${gb}°`,
     two: `두 변의 길이 ${w1} cm, ${w2} cm`,
   };
 }
@@ -360,14 +364,15 @@ const AX_STEP = {
   para: '어느 선으로 접어도 완전히 겹치지 않아요',
   isoTrap: '윗변과 아랫변의 가운데를 잇는 선 하나',
 };
+// ★ 그림 속 그 도형에 대한 말로 — "정사각형만 대각선도", "평행사변형은 선대칭이 아니다"는 마름모·직사각형(J에서 평행사변형에 포함)이 반례다 (Codex 22차 #2)
 const AX_WHY = {
-  [TAGS.diagAxis]: '대각선으로 접으면 안 겹쳐요 — 정사각형만 대각선도 대칭축이에요.',
-  [TAGS.paraLine]: '평행사변형은 어느 선으로 접어도 완전히 겹치지 않아요.',
+  [TAGS.diagAxis]: '대각선으로 접어 보면 모서리가 삐져나와요 — 이 도형은 대각선이 대칭축이 아니에요.',
+  [TAGS.paraLine]: '이 평행사변형은 어느 선으로 접어도 완전히 겹치지 않아요.',
   [TAGS.missDiag]: '정사각형은 대각선으로 접어도 겹쳐요 — 대각선 2개도 대칭축이에요.',
-  [TAGS.likeSquare]: '각이 직각이 아니면 정사각형과 달라요 — 마름모는 두 대각선만 대칭축이에요.',
-  [TAGS.likeRegular]: '세 변이 다 같지 않으면 대칭축은 하나예요.',
+  [TAGS.likeSquare]: '이 마름모는 네 각이 직각이 아니라서 정사각형과 달라요 — 두 대각선만 대칭축이에요.',
+  [TAGS.likeRegular]: '이 이등변삼각형은 세 변이 다 같지 않아서 대칭축이 하나예요.',
   [TAGS.likeRect]: '윗변과 아랫변의 길이가 달라 가로 가운데 선으로는 안 겹쳐요.',
-  [TAGS.halfCount]: '빠뜨린 대칭축이 있어요 — 꼭짓점을 지나는 선과 변의 가운데를 지나는 선을 모두 세요.',
+  [TAGS.halfCount]: '빠뜨린 대칭축이 있어요 — 가로·세로·대각선 방향으로 하나씩 접어 보며 모두 세요.',
   [TAGS.doubleCount]: '대칭축 하나는 선 하나예요 — 양 끝을 따로 세지 않아요.',
   [TAGS.lookWrong]: '도형을 그 선으로 접는다고 생각하고 하나씩 세어 봐요.',
 };
@@ -716,99 +721,9 @@ export const SYM = [
     },
   },
   {
-    id: 'sym.tri', grade: 5, name: '합동인 삼각형 그리기', needs: ['sym.corr'],
-    idea: '합동인 삼각형은 **세 변의 길이**, **두 변의 길이와 그 사이에 있는 각의 크기**, **한 변의 길이와 그 양 끝 각의 크기** 중 하나만 알면 그릴 수 있어요.',
-    rule: '세 변 · 두 변과 그 사이에 있는 각 · 한 변과 그 양 끝 각 — 이 중 하나면 하나로 정해진다. 세 각만으로는 안 된다.',
-    slip: '주어진 것만으로 삼각형이 하나로 정해지는지 — 크기나 모양이 다른 삼각형도 그려지는지 생각해 봐요.',
-    calc(r, c) {
-      const fams = [];
-      // 하나로 그릴 수 있는 것 고르기 — ㉠~㉣ 목록, 정답의 종류·자리마다 틀 하나
-      const LB = ['㉠', '㉡', '㉢', '㉣'];
-      const tagOf = { aaa: TAGS.threeAngles, ssa: TAGS.notIncluded, two: TAGS.twoOnly };
-      fams.push(famOf(['sss', 'sas', 'asa'].flatMap((ok) => [0, 1, 2, 3].map((at) => {
-        const it = triItems(r);
-        const order = ['aaa', 'ssa', 'two']; order.splice(at, 0, ok);
-        return {
-          t: `다음 중 합동인 삼각형을 하나로 그릴 수 있는 것은 어느 것일까요?\n\n${order.map((k, i) => `${LB[i]} ${it[k]}`).join('\n')}`,
-          text: true, ans: LB[at],
-          wr: order.map((k, i) => (k === ok ? null : { text: LB[i], tag: tagOf[k] })).filter(Boolean),
-          steps: [`${{ sss: '세 변의 길이를', sas: '두 변의 길이와 그 사이에 있는 각을', asa: '한 변의 길이와 그 양 끝 각을' }[ok]} 알면 삼각형이 하나로 정해져요`, `→ ${LB[at]}`],
-          why: {
-            [TAGS.threeAngles]: '세 각이 같아도 크기가 다른 삼각형을 여러 개 그릴 수 있어요.',
-            [TAGS.notIncluded]: '각이 두 변 사이에 있지 않으면 삼각형이 하나로 정해지지 않아요.',
-            [TAGS.twoOnly]: '두 변만으로는 사이의 각에 따라 모양이 달라져요.',
-          },
-          probe: { triPick: order },
-        };
-      }))));
-      // 무엇을 더 알아야 하나 — 아는 것(두 변 · 한 변과 한 끝 각)과 정답(각·변)마다 틀 하나
-      fams.push(famOf([['ss', 'ang'], ['ss', 'side'], ['sa', 'ang'], ['sa', 'side']].map(([known, ok]) => {
-        const a = int(r, 3, 9); let b = int(r, 3, 9); while (b === a) b = int(r, 3, 9);
-        const g = int(r, 3, 12) * 10;
-        const t = known === 'ss'
-          ? `삼각형 ㄱㄴㄷ에서 변 ㄱㄴ ${a} cm와 변 ㄴㄷ ${b} cm를 알아요. 합동인 삼각형을 하나로 그리려면 무엇을 더 알아야 할까요?`
-          : `삼각형 ㄱㄴㄷ에서 변 ㄴㄷ ${a} cm와 각 ㄴ ${g}°를 알아요. 합동인 삼각형을 하나로 그리려면 무엇을 더 알아야 할까요?`;
-        // 두 변 ㄱㄴ·ㄴㄷ → 그 사이의 각 ㄴ(또는 나머지 변 ㄱㄷ) · 변 ㄴㄷ과 끝 각 ㄴ → 다른 끝 각 ㄷ(또는 각 ㄴ을 끼는 변 ㄱㄴ)
-        // ★ 변 ㄴㄷ·각 ㄴ에 각 ㄱ을 더하면 세 각의 합으로 각 ㄷ이 나와 하나로 정해진다 — 그래서 각 ㄱ은 오답으로 쓰지 않는다
-        const ans = known === 'ss' ? (ok === 'ang' ? '각 ㄴ의 크기' : '변 ㄱㄷ의 길이') : (ok === 'ang' ? '각 ㄷ의 크기' : '변 ㄱㄴ의 길이');
-        const wr = known === 'ss'
-          ? [{ text: '각 ㄱ의 크기', tag: TAGS.notIncluded }, { text: '각 ㄷ의 크기', tag: TAGS.notIncluded }, { text: '더 몰라도 그릴 수 있어요', tag: TAGS.twoOnly }]
-          : [{ text: '변 ㄱㄷ의 길이', tag: TAGS.notIncluded }, { text: '더 몰라도 그릴 수 있어요', tag: TAGS.tooFew }];
-        return {
-          t, text: true, ans, wr,
-          steps: known === 'ss'
-            ? [ok === 'ang' ? '변 ㄱㄴ과 변 ㄴㄷ 사이에 있는 각은 각 ㄴ이에요' : '세 변의 길이를 알면 하나로 정해져요', ok === 'ang' ? '두 변과 그 사이에 있는 각 → 각 ㄴ의 크기' : '나머지 한 변 → 변 ㄱㄷ의 길이']
-            : [ok === 'ang' ? '변 ㄴㄷ의 양 끝 각은 각 ㄴ과 각 ㄷ이에요' : '각 ㄴ을 사이에 두는 두 변은 변 ㄱㄴ과 변 ㄴㄷ이에요', ok === 'ang' ? '한 변과 그 양 끝 각 → 각 ㄷ의 크기' : '두 변과 그 사이에 있는 각 → 변 ㄱㄴ의 길이'],
-          why: {
-            [TAGS.notIncluded]: known === 'ss' ? '각 ㄱ·각 ㄷ은 두 변 사이에 있는 각이 아니에요 — 사이에 있는 각은 각 ㄴ이에요.' : '변 ㄱㄷ을 더하면 각 ㄴ이 두 변 사이에 있지 않아요 — 하나로 정해지지 않아요.',
-            [TAGS.twoOnly]: '두 변만으로는 사이의 각에 따라 모양이 달라져요.',
-            [TAGS.tooFew]: '한 변과 한 각만으로는 삼각형이 하나로 정해지지 않아요.',
-          },
-          probe: { triMore: [known, ok] },
-        };
-      })));
-      return calcAsk(r, c, this, runFamily(r, c, fams));
-    },
-    misread(r, c) {
-      if (branchOf(r, c, ['angles', 'incl']) === 'angles') {
-        const [A1, A2, A3] = threeAngles(r);
-        const q = showWork(`세 각이 ${A1}°, ${A2}°, ${A3}°인 삼각형은 하나로 그릴 수 있어요`);
-        const chs = textChoices(r, '세 각이 같아도 크기가 다른 삼각형을 여러 개 그릴 수 있어요', [
-          { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-          { text: '세 각의 합이 180°가 아니라서 그릴 수 없어요', tag: OFF },
-          { text: '세 각이 모두 같아야 그릴 수 있어요', tag: OFF },
-        ]);
-        return {
-          ...misreadAsk(this.id, 'angles', fill(q, c), chs, {
-            solve: solve([step(0, `세 각이 ${A1}°, ${A2}°, ${A3}°인 삼각형은 작게도 크게도 그릴 수 있어요`), step(1, '크기가 하나로 정해지지 않아요 → 변의 길이가 하나는 있어야 해요')], {
-              whyAny: '세 각만으로는 크기가 정해지지 않아요.', rule: '세 각만으로는 합동인 삼각형을 하나로 그릴 수 없다.',
-            }),
-          }),
-          probe: { triClaim: 'aaa' },
-        };
-      }
-      const a = int(r, 3, 9); let b = int(r, 3, 9); while (b === a) b = int(r, 3, 9);
-      const g = int(r, 3, 8) * 10;
-      const q = showWork(`두 변 ${a} cm, ${b} cm와 그 사이에 있지 않은 각 ${g}°를 알면 합동인 삼각형을 하나로 그릴 수 있어요`);
-      const chs = textChoices(r, '각이 두 변 사이에 있어야 하나로 정해져요', [
-        { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-        { text: '세 변을 모두 알아야만 그릴 수 있어요', tag: OFF },
-        { text: `${g}°는 너무 작은 각이라 그릴 수 없어요`, tag: OFF },
-      ]);
-      return {
-        ...misreadAsk(this.id, 'incl', fill(q, c), chs, {
-          solve: solve([step(0, '두 변과 각으로 그릴 때는 각이 두 변 사이에 있어야 해요'), step(1, '사이에 있지 않은 각이면 삼각형이 하나로 정해지지 않아요')], {
-            whyAny: '두 변과 그 **사이에 있는** 각이어야 해요.', rule: '두 변과 그 사이에 있는 각.',
-          }),
-        }),
-        probe: { triClaim: 'ssa' },
-      };
-    },
-  },
-  {
-    id: 'sym.line', grade: 5, name: '선대칭도형과 대칭축', needs: ['sym.tri'],
+    id: 'sym.line', grade: 5, name: '선대칭도형과 대칭축', needs: ['sym.corr'],
     idea: '한 직선을 따라 접었을 때 **완전히 겹치는** 도형을 **선대칭도형**이라고 하고, 그 직선을 **대칭축**이라고 해요. 대칭축은 여러 개일 수도 있어요.',
-    rule: '접어서 완전히 겹치는 선이 대칭축 — 직사각형의 대각선은 아니다. 평행사변형은 선대칭도형이 아니다.',
+    rule: '접어서 완전히 겹치는 선이 대칭축 — 가로·세로가 다른 직사각형의 대각선은 아니다. 직사각형도 마름모도 아닌 평행사변형은 선대칭도형이 아니다.',
     slip: '도형을 그 선으로 접는다고 생각하고, 양쪽이 완전히 겹치는지 봐요.',
     calc(r, c) {
       const fams = [];
@@ -852,7 +767,7 @@ export const SYM = [
         return {
           ...misreadAsk(this.id, 'diag', fill(q, c), chs, {
             solve: solve([step(0, '대각선으로 접으면 두 삼각형이 엇갈려 겹치지 않아요'), step(1, '가로·세로 가운데를 지나는 선 2개만 대칭축이에요')], {
-              whyAny: '대각선으로 접어 보면 모서리가 삐져나와요 — 정사각형만 대각선도 대칭축이에요.', rule: '직사각형의 대칭축은 2개 — 대각선은 아니다.',
+              whyAny: '이 직사각형은 대각선으로 접어 보면 모서리가 삐져나와요 — 대각선은 대칭축이 아니에요.', rule: '가로·세로가 다른 직사각형의 대칭축은 2개 — 대각선은 아니다.',
             }),
           }),
           probe: { axes: 'rect', shown: 4 },
@@ -862,13 +777,13 @@ export const SYM = [
       const q = `{mon/이/가} 이 평행사변형을 보고 이렇게 말했어요.\n\n[gpoly ${named(verts)}]\n\n**가운데를 지나는 선으로 접으면 겹치니까 선대칭도형이에요**\n\n어디가 틀렸을까요?`;
       const chs = textChoices(r, '어느 선으로 접어도 완전히 겹치지 않아요 — 선대칭도형이 아니에요', [
         { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
-        { text: '평행사변형은 대칭축이 4개예요', tag: TAGS.diagAxis },
+        { text: '이 평행사변형은 대칭축이 4개예요', tag: TAGS.diagAxis },
         { text: '평행사변형은 접을 수 없는 도형이에요', tag: OFF },
       ]);
       return {
         ...misreadAsk(this.id, 'para', fill(q, c), chs, {
           solve: solve([step(0, '가로·세로·대각선 어느 선으로 접어도 양쪽이 엇갈려요'), step(1, '완전히 겹치는 선이 없어요 → 선대칭도형이 아니에요')], {
-            whyAny: '평행사변형은 접으면 비스듬한 변이 엇갈려 안 겹쳐요.', rule: '평행사변형은 선대칭도형이 아니다.',
+            whyAny: '이 평행사변형은 접으면 비스듬한 변이 엇갈려 안 겹쳐요.', rule: '직사각형도 마름모도 아닌 평행사변형은 선대칭도형이 아니다.',
           }),
         }),
         probe: { axes: 'para', shown: 1 },
@@ -927,14 +842,14 @@ export const SYM = [
           probe: { lineRight: true },
         };
       })));
-      // 둘레 — 대칭축 한쪽 변의 길이 합의 두 배
+      // 둘레 — 대칭축으로 나눈 한쪽 테두리의 두 배. "한쪽에 있는 변의 합"이라고 하면 축이 변을 가로지르는 도형(직사각형)에서 뜻이 갈린다 (Codex 22차 #3)
       fams.push(famOf([0].map(() => {
         const h = int(r, 7, 24);
         return {
-          t: `선대칭도형에서 대칭축의 한쪽에 있는 변의 길이를 모두 더하면 ${h} cm예요. 이 도형의 둘레는 몇 cm일까요?`,
+          t: `선대칭도형을 대칭축으로 나누면 한쪽 테두리의 길이가 ${h} cm예요(대칭축은 빼고 재요). 이 도형의 둘레는 몇 cm일까요?`,
           ans: `${2 * h} cm`, unit: ' cm', wr: [{ text: `${h} cm`, tag: TAGS.halfPerim }],
-          steps: ['대칭축의 양쪽은 대응변끼리 길이가 같아요', `${h} × 2 = ${2 * h} → ${2 * h} cm`],
-          why: { [TAGS.halfPerim]: `${h} cm는 한쪽만이에요. 반대쪽에도 같은 길이의 대응변이 있어요 → ${2 * h} cm.` },
+          steps: ['대칭축으로 접으면 양쪽 테두리가 완전히 겹쳐요 — 길이가 같아요', `${h} × 2 = ${2 * h} → ${2 * h} cm`],
+          why: { [TAGS.halfPerim]: `${h} cm는 한쪽 테두리만이에요. 반대쪽 테두리도 길이가 같아요 → ${2 * h} cm.` },
           probe: { linePerim: h },
         };
       })));
@@ -1101,7 +1016,7 @@ export const SYM = [
       ]);
       return {
         ...misreadAsk(this.id, 'rot', fill(q, c), chs, {
-          solve: solve([step(0, '점대칭도형은 대칭의 중심을 중심으로 180° 돌려요'), step(1, '90° 돌려 겹치는 것은 정사각형만의 성질이에요')], {
+          solve: solve([step(0, '점대칭도형은 대칭의 중심을 중심으로 180° 돌려요'), step(1, '90° 돌려도 겹치는 도형이 있지만, 점대칭인지는 언제나 180° 돌려서 봐요')], {
             whyAny: '점대칭은 언제나 180°예요.', rule: '점대칭 = 180° 돌려서 겹친다.',
           }),
         }),
@@ -1244,6 +1159,100 @@ export const SYM = [
           }),
         }),
         probe: { pointDraw: nm, star: [star.x, star.y] },
+      };
+    },
+  },
+  {
+    // ⭐ 중1 미리보기 (Codex 22차 · 2026-10-02 아버님 "이대로 진행"): 5-2 교과서(2015 개정 지도서 차시표)와 2022 성취기준에
+    // SSS·SAS·ASA가 없다 — 중1 「삼각형의 합동 조건」. 맨 뒤 선택 칸으로 옮기고, 선대칭 칸의 선수 조건에서 뺐다.
+    // ★ "두 변과 그 사이에 있지 않은 각"(SSA)은 오답으로 쓰지 않는다 — 긴 변의 맞은편 각이나 둔각이면 하나로 정해진다(Codex 22 #1).
+    //   그래서 "무엇을 더 알아야?" 대신 "사이에 있는 각은?"·"양 끝 각은?"을 찾게 하고, ㉠ 목록의 오답은 늘 모자란 것(세 각·두 변·한 변과 한 각)만.
+    id: 'sym.tri', grade: 7, name: '⭐ 합동인 삼각형 그리기 (중1 미리보기)', needs: ['sym.pointdraw'],
+    idea: '합동인 삼각형은 **세 변의 길이**, **두 변의 길이와 그 사이에 있는 각의 크기**, **한 변의 길이와 그 양 끝 각의 크기** 중 하나만 알면 그릴 수 있어요.',
+    rule: '세 변 · 두 변과 그 사이에 있는 각 · 한 변과 그 양 끝 각 — 이 중 하나면 하나로 정해진다. 세 각만으로는 안 된다.',
+    slip: '두 변이 만나는 꼭짓점, 한 변의 두 끝 점을 손가락으로 짚어 봐요.',
+    calc(r, c) {
+      const fams = [];
+      // 하나로 그릴 수 있는 것 고르기 — ㉠ 목록, 정답의 종류·자리마다 틀 하나 (오답은 늘 모자란 것)
+      const LB = ['㉠', '㉡', '㉢', '㉣'];
+      const tagOf = { aaa: TAGS.threeAngles, sa: TAGS.tooFew, two: TAGS.twoOnly };
+      fams.push(famOf(['sss', 'sas', 'asa'].flatMap((ok) => [0, 1, 2, 3].map((at) => {
+        const it = triItems(r);
+        const order = ['aaa', 'sa', 'two']; order.splice(at, 0, ok);
+        return {
+          t: `다음 중 합동인 삼각형을 하나로 그릴 수 있는 것은 어느 것일까요?\n\n${order.map((k, i) => `${LB[i]} ${it[k]}`).join('\n')}`,
+          text: true, ans: LB[at],
+          wr: order.map((k, i) => (k === ok ? null : { text: LB[i], tag: tagOf[k] })).filter(Boolean),
+          steps: [`${{ sss: '세 변의 길이를', sas: '두 변의 길이와 그 사이에 있는 각을', asa: '한 변의 길이와 그 양 끝 각을' }[ok]} 알면 삼각형이 하나로 정해져요`, `→ ${LB[at]}`],
+          why: {
+            [TAGS.threeAngles]: '세 각이 같아도 크기가 다른 삼각형을 여러 개 그릴 수 있어요.',
+            [TAGS.tooFew]: '한 변과 한 각만으로는 삼각형이 하나로 정해지지 않아요.',
+            [TAGS.twoOnly]: '두 변만으로는 사이의 각에 따라 모양이 달라져요.',
+          },
+          probe: { triPick: order },
+        };
+      }))));
+      // 두 변 사이에 있는 각 찾기 — 어느 두 변인지마다 틀 하나 (변 길이는 바뀌어 쌍둥이 글이 달라진다)
+      fams.push(famOf([['ㄱㄴ', 'ㄴㄷ', 'ㄴ'], ['ㄴㄷ', 'ㄷㄱ', 'ㄷ'], ['ㄷㄱ', 'ㄱㄴ', 'ㄱ']].map(([s1, s2, v]) => {
+        const a = int(r, 3, 9); let b = int(r, 3, 9); while (b === a) b = int(r, 3, 9);
+        return {
+          t: `삼각형 ㄱㄴㄷ의 변 ${s1} ${a} cm와 변 ${s2} ${b} cm를 알아요. 합동인 삼각형을 하나로 그리려면 두 변 사이에 있는 각의 크기를 알아야 해요. 두 변 사이에 있는 각은 어느 것일까요?`,
+          text: true, ans: `각 ${v}`,
+          wr: ['ㄱ', 'ㄴ', 'ㄷ'].filter((x) => x !== v).map((x) => ({ text: `각 ${x}`, tag: TAGS.wrongIncl })),
+          steps: [`변 ${jm(s1, '과')} 변 ${jm(s2, '은')} 점 ${v}에서 만나요`, `두 변 사이에 있는 각 → 각 ${v}`],
+          why: { [TAGS.wrongIncl]: `두 변이 만나는 꼭짓점의 각이에요 — 변 ${jm(s1, '과')} 변 ${jm(s2, '은')} 점 ${v}에서 만나요 → 각 ${v}.` },
+          probe: { triIncl: [s1, s2] },
+        };
+      })));
+      // 한 변의 양 끝 각 찾기 — 어느 변인지마다 틀 하나
+      const pair = (x, y) => { const [p, q] = [x, y].sort((u, w) => 'ㄱㄴㄷ'.indexOf(u) - 'ㄱㄴㄷ'.indexOf(w)); return `각 ${jm(p, '과')} 각 ${q}`; };
+      fams.push(famOf([['ㄱㄴ', 'ㄱ', 'ㄴ'], ['ㄴㄷ', 'ㄴ', 'ㄷ'], ['ㄷㄱ', 'ㄷ', 'ㄱ']].map(([s, e1, e2]) => {
+        const o = ['ㄱ', 'ㄴ', 'ㄷ'].find((x) => x !== e1 && x !== e2);
+        const len = int(r, 3, 9);
+        return {
+          t: `삼각형 ㄱㄴㄷ의 변 ${s} ${len} cm를 알아요. 합동인 삼각형을 하나로 그리려면 이 변의 양 끝 각의 크기도 알아야 해요. 변 ${jm(s, '의')} 양 끝 각은 어느 것일까요?`,
+          text: true, ans: pair(e1, e2),
+          wr: [{ text: pair(e1, o), tag: TAGS.wrongEnds }, { text: pair(e2, o), tag: TAGS.wrongEnds }],
+          steps: [`변 ${jm(s, '의')} 두 끝 점은 점 ${jm(e1, '과')} 점 ${jm(e2, '이에요')}`, `양 끝 각 → ${pair(e1, e2)}`],
+          why: { [TAGS.wrongEnds]: `양 끝 각은 그 변의 두 끝 점에 있는 각이에요 — 각 ${jm(o, '은')} 변 ${s}의 맞은편이에요 → ${pair(e1, e2)}.` },
+          probe: { triEnds: s },
+        };
+      })));
+      return calcAsk(r, c, this, runFamily(r, c, fams));
+    },
+    misread(r, c) {
+      if (branchOf(r, c, ['angles', 'side1']) === 'angles') {
+        const [A1, A2, A3] = threeAngles(r);
+        const q = showWork(`세 각이 ${A1}°, ${A2}°, ${A3}°인 삼각형은 하나로 그릴 수 있어요`);
+        const chs = textChoices(r, '세 각이 같아도 크기가 다른 삼각형을 여러 개 그릴 수 있어요', [
+          { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+          { text: '세 각의 합이 180°가 아니라서 그릴 수 없어요', tag: OFF },
+          { text: '세 각이 모두 같아야 그릴 수 있어요', tag: OFF },
+        ]);
+        return {
+          ...misreadAsk(this.id, 'angles', fill(q, c), chs, {
+            solve: solve([step(0, `세 각이 ${A1}°, ${A2}°, ${A3}°인 삼각형은 작게도 크게도 그릴 수 있어요`), step(1, '크기가 하나로 정해지지 않아요 → 변의 길이가 하나는 있어야 해요')], {
+              whyAny: '세 각만으로는 크기가 정해지지 않아요.', rule: '세 각만으로는 합동인 삼각형을 하나로 그릴 수 없다.',
+            }),
+          }),
+          probe: { triClaim: 'aaa' },
+        };
+      }
+      // 한 변과 한 각만 — 늘 모자란다 (SSA처럼 경우에 따라 정해지는 말은 쓰지 않는다)
+      const a = int(r, 3, 9); const g = int(r, 3, 12) * 10;
+      const q = showWork(`한 변의 길이 ${a} cm와 한 각 ${g}°만 알면 합동인 삼각형을 하나로 그릴 수 있어요`);
+      const chs = textChoices(r, '한 변과 한 각만으로는 모양이 정해지지 않아요 — 더 알아야 해요', [
+        { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+        { text: '세 변을 모두 알아야만 그릴 수 있어요', tag: OFF },
+        { text: `${g}°는 너무 큰 각이라 그릴 수 없어요`, tag: OFF },
+      ]);
+      return {
+        ...misreadAsk(this.id, 'side1', fill(q, c), chs, {
+          solve: solve([step(0, `${a} cm인 변 끝에 ${g}° 각을 그려도, 다른 변의 길이에 따라 삼각형이 여러 개 생겨요`), step(1, '각을 하나 더 알거나, 그 각을 사이에 두는 변을 하나 더 알아야 하나로 정해져요')], {
+            whyAny: '한 변과 한 각만으로는 삼각형이 하나로 정해지지 않아요.', rule: '세 변 · 두 변과 그 사이에 있는 각 · 한 변과 그 양 끝 각 중 하나가 있어야 한다.',
+          }),
+        }),
+        probe: { triClaim: 'sa' },
       };
     },
   },
