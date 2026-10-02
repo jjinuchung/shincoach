@@ -1289,6 +1289,397 @@ export function circleText(sp) {
   }
 }
 
+// ───────────────────── 🧊 O 직육면체: 겨냥도 · 전개도 (2026-10-02) ─────────────────────
+// `[cuboid 5 3 4]` 직육면체 겨냥도 — 가로(앞 아래 모서리) · 세로(오른쪽 뒤로 비스듬히 들어가는 모서리) · 높이(앞 왼쪽 모서리)
+//   길이 앞 `?`면 이름표 "? cm", `_`면 이름표 없음 · 길이 뒤 단위는 그 모서리만(`3m 200cm 150cm` — 그리는 비율은 cm로 맞춘다)
+//   `names` 꼭짓점 ㄱ~ㅇ(윗면 ㄱㄴㄷㄹ · 아랫면 ㅁㅂㅅㅇ · 앞면 ㄹㄷㅅㅇ, ㅁ이 보이지 않는 꼭짓점) · `cubes` 1 cm 쌓기나무 줄
+//   `shade=0|1|2` 윗면·앞면·오른쪽 옆면 색칠 · `miss=1,8` 그리지 않는 모서리(번호는 CUB_EDGES 순서) · 끝에 단위(cm·m)
+// `[net .1../2345/.6..]` 정육면체 전개도 — 칸 숫자 1~6이 면 ㉮~㉳ (숫자를 섞으면 면 이름이 다른 칸에)
+// `[net 5 3 4 .1../2345/.6.. r=2]` 직육면체 전개도 — 가로 세로 높이, r = 앞면(가로 × 높이)으로 놓는 칸
+//   `names` 둘레의 점 ㄱ~ㅎ(맨 위 왼쪽 점에서 시계 방향, `s=N`이면 N번째 점이 ㄱ) · `plain` 면 이름 없음
+//   `lab=0,4,7` 그 선분(둘레 순서)에 길이 · `q=9` 그 선분에 ? · `shade=2` 그 칸 색칠
+// ★ 테스트가 그린 SVG에서 다시 잰다 — 겨냥도는 평행한 모서리가 정말 평행하고 길이 비율이 맞는지, 점선이 숨은 꼭짓점의 세 모서리인지,
+//   전개도는 테스트가 **따로 굴려 접어** 마주 보는 면·만나는 점·겹치는 선분·칸 크기를 구한다.
+
+/** 꼭짓점 → (가로, 세로(안쪽), 높이) 0/1 — ㅁ(뒤 왼쪽 아래)이 보이지 않는 꼭짓점 */
+export const CUB_V = { 'ㄱ': [0, 1, 1], 'ㄴ': [1, 1, 1], 'ㄷ': [1, 0, 1], 'ㄹ': [0, 0, 1], 'ㅁ': [0, 1, 0], 'ㅂ': [1, 1, 0], 'ㅅ': [1, 0, 0], 'ㅇ': [0, 0, 0] };
+export const CUB_EDGES = ['ㄱㄴ', 'ㄴㄷ', 'ㄷㄹ', 'ㄹㄱ', 'ㅁㅂ', 'ㅂㅅ', 'ㅅㅇ', 'ㅇㅁ', 'ㄱㅁ', 'ㄴㅂ', 'ㄷㅅ', 'ㄹㅇ'];
+export const CUB_FACES = { top: 'ㄱㄴㄷㄹ', bottom: 'ㅁㅂㅅㅇ', front: 'ㄹㄷㅅㅇ', back: 'ㄱㄴㅂㅁ', left: 'ㄱㄹㅇㅁ', right: 'ㄴㄷㅅㅂ' };
+/** 색칠할 수 있는 면 (보이는 세 면) — shade=0·1·2 */
+export const CUB_SHADE = ['top', 'front', 'right'];
+const CUB_DX = 0.5 * Math.SQRT1_2; const CUB_DY = 0.5 * Math.SQRT1_2; // 안쪽 모서리: 45°, 실제 길이의 반
+const lenStr = (v) => String(Math.round(v * 100) / 100);
+/** 이름표 폭 어림 — 한글·자모·㉮는 15, 그 밖 8.2 (글꼴 15 기준) */
+const labW = (t) => [...String(t)].reduce((a, ch) => a + (/[ㄱ-ㅎ가-힣㉮-㉳]/.test(ch) ? 15 : 8.2), 0);
+const kLab = (cls, x, y, t, extra = '') => `<text class="${cls}" x="${cf(x)}" y="${cf(y)}" font-size="15" text-anchor="middle" fill="currentColor" font-weight="600" stroke="var(--card, #fff)" stroke-width="4" stroke-linejoin="round" paint-order="stroke"${extra}>${esc(t)}</text>`;
+/** 꼭짓점·점 이름(ㄱ~ㅎ)·면 이름(㉮~㉳) — 자모와 동그라미 글자는 같은 크기에서 숫자보다 작아 보여 18px 굵게 (I 줄기 polySvg와 같은 까닭, O 3단계 헤드리스) */
+const JAMO_FS = 18;
+const jLab = (cls, x, y, t, extra = '') => `<text class="${cls}" x="${cf(x)}" y="${cf(y)}" font-size="${JAMO_FS}" text-anchor="middle" fill="currentColor" font-weight="700" stroke="var(--card, #fff)" stroke-width="4" stroke-linejoin="round" paint-order="stroke"${extra}>${esc(t)}</text>`;
+
+/** 글자 상자를 선분이 지나가나 (상자는 1px 줄여서 — 스치는 것은 괜찮다) */
+function boxHitsSeg(b, p, q) {
+  const x0 = b.x0 + 1; const x1 = b.x1 - 1; const y0 = b.y0 + 1; const y1 = b.y1 - 1;
+  const inside = ([x, y]) => x > x0 && x < x1 && y > y0 && y < y1;
+  if (inside(p) || inside(q)) return true;
+  const cross = (a, b2, c, d) => {
+    const den = (b2[0] - a[0]) * (d[1] - c[1]) - (b2[1] - a[1]) * (d[0] - c[0]);
+    if (Math.abs(den) < 1e-9) return false;
+    const t = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0])) / den;
+    const u = ((c[0] - a[0]) * (b2[1] - a[1]) - (c[1] - a[1]) * (b2[0] - a[0])) / den;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+  };
+  const C = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+  return C.some((c, i) => cross(p, q, c, C[(i + 1) % 4]));
+}
+
+/** `[cuboid …]` 인자 → { len:[{v, show, unit}], cm:[가로, 세로, 높이](cm), unit, names, cubes, shade, miss, with } (말이 안 되면 null)
+ *  with=가로,세로,높이 — 쌓기나무 그림 둘을 견줄 때 상대 그림의 개수. 둘 중 작은 축척으로 그려 쌓기나무 크기가 같다 (O 3단계 헤드리스: ㉯의 쌓기나무가 1.6배 컸다) */
+export function parseCuboid(arg) {
+  const t = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  const sp = { unit: 'cm', len: [], names: false, cubes: false, shade: -1, miss: [], with: null };
+  if (t.length && /^(cm|m)$/.test(t[t.length - 1])) sp.unit = t.pop();
+  if (t.length < 3) return null;
+  for (const tok of t.slice(0, 3)) {
+    const m = /^([?_]?)(\d+(?:\.\d+)?)(cm|m)?$/.exec(tok);
+    if (!m || !(+m[2] > 0) || +m[2] > 1000) return null;
+    sp.len.push({ v: +m[2], show: m[1] === '?' ? '?' : m[1] === '_' ? '' : 'v', unit: m[3] || '' });
+  }
+  const seen = new Set();
+  for (const tok of t.slice(3)) {
+    const key = tok.split('=')[0];
+    if (seen.has(key)) return null;
+    seen.add(key);
+    let m;
+    if (tok === 'names') sp.names = true;
+    else if (tok === 'cubes') sp.cubes = true;
+    else if ((m = /^shade=([0-2])$/.exec(tok))) sp.shade = +m[1];
+    else if ((m = /^miss=(\d+(?:,\d+)*)$/.exec(tok))) {
+      sp.miss = m[1].split(',').map(Number);
+      if (sp.miss.some((i) => i > 11) || new Set(sp.miss).size !== sp.miss.length) return null;
+    } else if ((m = /^with=([1-8]),([1-8]),([1-8])$/.exec(tok))) sp.with = [+m[1], +m[2], +m[3]];
+    else return null;
+  }
+  sp.cm = sp.len.map((l) => l.v * ((l.unit || sp.unit) === 'm' ? 100 : 1));
+  if (Math.max(...sp.cm) / Math.min(...sp.cm) > 6) return null; // 너무 납작하면 겨냥도가 안 읽힌다
+  if (sp.cubes && (sp.unit !== 'cm' || sp.len.some((l) => l.unit || !Number.isInteger(l.v) || l.v > 8))) return null;
+  if (sp.with && !sp.cubes) return null;
+  return sp;
+}
+
+/** 🧊 겨냥도 그리기 — 앞면은 그대로, 안쪽은 45°로 반만큼. 보이는 세 면은 연하게 칠하고 ㅁ에서 만나는 세 모서리는 점선 */
+export function cuboidSvg(sp) {
+  const [A, B, C] = sp.cm;
+  const fit = ([a, b, c]) => Math.min(270 / (a + b * CUB_DX), 190 / (c + b * CUB_DY));
+  const s = Math.min(fit(sp.cm), sp.with ? fit(sp.with) : Infinity);
+  const padL = 70; const padT = 30; const padR = 74; const padB = 42;
+  const W = Math.round(padL + s * (A + B * CUB_DX) + padR); const H = Math.round(padT + s * (C + B * CUB_DY) + padB);
+  const ox = padL; const oy = padT + s * (C + B * CUB_DY); // ㅇ(앞 왼쪽 아래)의 자리
+  const P = (x, y, z) => [ox + s * (x + y * CUB_DX), oy - s * (z + y * CUB_DY)];
+  const V = {};
+  for (const [n, [x, y, z]] of Object.entries(CUB_V)) V[n] = P(x * A, y * B, z * C);
+  const pts = (names) => [...names].map((n) => `${cf(V[n][0])},${cf(V[n][1])}`).join(' ');
+  const mid = (a, b) => [(V[a][0] + V[b][0]) / 2, (V[a][1] + V[b][1]) / 2];
+  let g = '';
+  CUB_SHADE.forEach((f, i) => {
+    const sh = sp.shade === i;
+    g += `<polygon class="cub-f${sh ? ' shade' : ''}" data-f="${CUB_FACES[f]}" points="${pts(CUB_FACES[f])}" fill="${sh ? FILL2 : FILL}" fill-opacity="${sh ? 0.42 : f === 'front' ? 0.1 : 0.17}"/>`;
+  });
+  if (sp.cubes) {
+    const L = (f, a, b) => `<line class="cub-grid" data-f="${f}" x1="${cf(a[0])}" y1="${cf(a[1])}" x2="${cf(b[0])}" y2="${cf(b[1])}" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>`;
+    for (let i = 1; i < A; i++) { g += L('front', P(i, 0, 0), P(i, 0, C)); g += L('top', P(i, 0, C), P(i, B, C)); }
+    for (let k = 1; k < C; k++) { g += L('front', P(0, 0, k), P(A, 0, k)); g += L('right', P(A, 0, k), P(A, B, k)); }
+    for (let j = 1; j < B; j++) { g += L('top', P(0, j, C), P(A, j, C)); g += L('right', P(A, j, 0), P(A, j, C)); }
+  }
+  CUB_EDGES.forEach((e, i) => {
+    if (sp.miss.includes(i)) return;
+    const hid = e.includes('ㅁ');
+    // 쌓기나무는 꽉 찬 덩어리 — 교과서처럼 숨은 모서리 점선을 그리지 않는다 (점선이 칸 줄과 3~5px 옆에 겹쳐 두 줄로 보였다)
+    if (hid && sp.cubes) return;
+    const a = V[e[0]]; const b = V[e[1]];
+    g += `<line class="cub-e" data-i="${i}" data-e="${e}" data-hid="${hid ? 1 : 0}" x1="${cf(a[0])}" y1="${cf(a[1])}" x2="${cf(b[0])}" y2="${cf(b[1])}" stroke="currentColor" stroke-width="${hid ? 1.6 : 2.2}"${hid ? ' stroke-dasharray="6 4"' : ''} stroke-linecap="round"/>`;
+  });
+  for (const n of Object.keys(CUB_V)) g += `<circle class="cub-v" data-v="${n}" cx="${cf(V[n][0])}" cy="${cf(V[n][1])}" r="0"/>`;
+  // 길이 — 가로는 앞 아래 모서리 밑, 높이는 앞 왼쪽 모서리 왼쪽, 세로는 오른쪽 아래 비스듬한 모서리의 오른쪽 아래
+  const unitOf = (l) => l.unit || sp.unit;
+  const lenText = (l) => (l.show === '?' ? `? ${unitOf(l)}` : `${lenStr(l.v)} ${unitOf(l)}`);
+  const [la, lb, lc] = sp.len;
+  if (la.show) { const m = mid('ㅇ', 'ㅅ'); g += kLab('cub-lab cub-len', m[0], m[1] + 26, lenText(la), ' data-k="a"'); }
+  if (lc.show) { const m = mid('ㄹ', 'ㅇ'); const t = lenText(lc); g += kLab('cub-lab cub-len', m[0] - labW(t) / 2 - 12, m[1] + 5, t, ' data-k="c"'); }
+  if (lb.show) {
+    const m = mid('ㅅ', 'ㅂ'); const t = lenText(lb); const d = Math.SQRT1_2 * (labW(t) / 2 + 9) + 8;
+    g += kLab('cub-lab cub-len', m[0] + Math.SQRT1_2 * d, m[1] + Math.SQRT1_2 * d + 5, t, ' data-k="b"');
+  }
+  if (sp.names) {
+    // 꼭짓점 이름 — 후보 자리를 차례로 시험해 모서리 선을 지나지 않고 다른 글자와 안 겹치는 첫 자리에.
+    // 먼저 시험하는 쪽: 바깥 테두리의 여섯 꼭짓점은 그림 한가운데에서 바깥쪽, ㄷ은 앞면 안쪽, ㅁ은 점선 세 개 사이 빈 쪽(왼쪽 위).
+    // (헤드리스·테스트: 깊은 상자에서 앞면 안쪽 ㄷ 자리를 점선 ㄱㅁ이 지나갔다)
+    const segs = CUB_EDGES.filter((e, i) => !sp.miss.includes(i) && !(sp.cubes && e.includes('ㅁ'))).map((e) => [V[e[0]], V[e[1]]]);
+    const taken = labelBoxesOf(g);
+    const sil = ['ㄱ', 'ㄴ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㄹ'];
+    const cx = sil.reduce((a, n) => a + V[n][0], 0) / 6; const cy = sil.reduce((a, n) => a + V[n][1], 0) / 6;
+    const base = (n) => (n === 'ㄷ' ? Math.atan2(0.8, -0.6) : n === 'ㅁ' ? Math.atan2(-0.5, -0.86) : Math.atan2(V[n][1] - cy, V[n][0] - cx));
+    for (const n of [...sil, 'ㄷ', 'ㅁ']) {
+      const w = (labW(n) * JAMO_FS) / 15; const dy = JAMO_FS * 0.28; let best = null; // dy: 글자 가운데 → 바탕선
+      for (const k of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8]) {
+        for (const rr of [17, 20, 23]) {
+          const a = base(n) + (k * Math.PI) / 8; const x = V[n][0] + Math.cos(a) * rr; const yc = V[n][1] + Math.sin(a) * rr;
+          const b = { x0: x - w / 2, x1: x + w / 2, y0: yc + dy - JAMO_FS * 0.78, y1: yc + dy + JAMO_FS * 0.22 };
+          if (b.x0 < 0 || b.y0 < 0 || b.x1 > W || b.y1 > H) continue;
+          // 1px 넓혀서 — SVG에 반올림해 적은 좌표로 다시 재면 경계에 딱 걸리는 자리가 있다 (18px로 키운 뒤 깊은 상자 ㄷ)
+          if (segs.some(([p, q]) => boxHitsSeg({ x0: b.x0 - 1, x1: b.x1 + 1, y0: b.y0 - 1, y1: b.y1 + 1 }, p, q))) continue;
+          if (taken.some((z) => b.x0 < z.x1 && z.x0 < b.x1 && b.y0 < z.y1 && z.y0 < b.y1)) continue;
+          // 남의 꼭짓점에 더 가까우면 그 꼭짓점 이름으로 읽힌다 (깊은 상자 3·9·4에서 ㅁ이 ㄷ 옆에)
+          if (Object.keys(V).some((m) => m !== n && Math.hypot(V[m][0] - x, V[m][1] - yc) <= rr + 2)) continue;
+          best = { x, y: yc + dy, b };
+          break;
+        }
+        if (best) break;
+      }
+      if (!best) { const a = base(n); best = { x: V[n][0] + Math.cos(a) * 17, y: V[n][1] + Math.sin(a) * 17 + dy }; }
+      if (best.b) taken.push(best.b);
+      g += jLab('cub-lab cub-name', best.x, best.y, n, ` data-v="${n}"`);
+    }
+  }
+  return `<svg class="frac-fig shape-fig cub-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(cuboidText(sp))}"><g>${g}</g></svg>`;
+}
+
+/** 🧊 겨냥도를 글로 — ❓ 복사문·노트 제목처럼 그림을 못 그리는 자리 */
+export function cuboidText(sp) {
+  const unitOf = (l) => l.unit || sp.unit;
+  const L = (l) => (l.show === '?' ? `? ${unitOf(l)}` : `${lenStr(l.v)} ${unitOf(l)}`);
+  const cube = sp.cm[0] === sp.cm[1] && sp.cm[1] === sp.cm[2];
+  const shown = sp.len.map((l, i) => (l.show ? `${['가로', '세로', '높이'][i]} ${L(l)}` : '')).filter(Boolean);
+  const parts = [`${cube ? '정육면체' : '직육면체'} 그림`];
+  if (shown.length) parts.push(shown.join(' · '));
+  if (sp.names) parts.push('꼭짓점 ㄱ~ㅇ (윗면 ㄱㄴㄷㄹ · 아랫면 ㅁㅂㅅㅇ · 앞면 ㄹㄷㅅㅇ · ㅁ은 보이지 않는 꼭짓점)');
+  // 개수까지 — 📊 아빠 화면 펼친 문제가 이 글만 보여 준다 (O 3단계 헤드리스: 개수가 없어 무슨 그림인지 몰랐다). 아이에게 보이는 한 줄은 "(그림)"이라 답이 새지 않는다
+  if (sp.cubes) parts.push(`한 모서리가 1 cm인 쌓기나무로 쌓은 모양 (가로 ${sp.cm[0]}개 · 세로 ${sp.cm[1]}개 · ${sp.cm[2]}층)`);
+  if (sp.shade >= 0) parts.push(`${['윗면', '앞면', '오른쪽 옆면'][sp.shade]} 색칠`);
+  if (sp.miss.length) parts.push(`그리지 않은 모서리 ${sp.miss.length}개 (${sp.miss.map((i) => CUB_EDGES[i]).join('·')})`);
+  return `${parts.join(' — ')}${sp.cubes ? '' : ' (보이지 않는 모서리는 점선)'}`;
+}
+
+export const NET_FACE = ['㉮', '㉯', '㉰', '㉱', '㉲', '㉳'];
+export const NET_PT = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+const vNeg = (v) => v.map((x) => -x);
+const vKey = (v) => v.join(',');
+/** 접기 — 칸마다 세 축 [h 그림의 오른쪽, v 그림의 위쪽, n 접은 면의 바깥 법선]. 오른쪽 칸은 (h, v, n) → (−n, v, h) */
+const NET_MOVE = {
+  right: ([h, v, n]) => [vNeg(n), v, h],
+  left: ([h, v, n]) => [n, v, vNeg(h)],
+  up: ([h, v, n]) => [h, vNeg(n), v],
+  down: ([h, v, n]) => [h, n, vNeg(v)],
+};
+
+/** `[net …]` 인자 → { dims, rows, cells, names, plain, s, root, lab, q, shade, unit, L(접은 결과) } (말이 안 되면 null) */
+export function parseNet(arg) {
+  const t = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  const sp = { unit: 'cm', dims: null, rows: [], cells: [], names: false, plain: false, s: 0, root: 0, lab: [], q: -1, shade: 0 };
+  if (t.length && /^(cm|m)$/.test(t[t.length - 1])) sp.unit = t.pop();
+  if (t.length >= 4 && t.slice(0, 3).every((x) => /^\d+$/.test(x))) {
+    sp.dims = t.splice(0, 3).map(Number);
+    if (sp.dims.some((v) => v < 1 || v > 40)) return null;
+  }
+  const shape = t.shift();
+  if (!shape || !/^[.1-6]+(\/[.1-6]+)+$/.test(shape)) return null;
+  sp.rows = shape.split('/');
+  sp.rows.forEach((row, r) => [...row].forEach((ch, c) => { if (ch !== '.') sp.cells.push({ d: +ch, r, c }); }));
+  if (sp.cells.length !== 6 || new Set(sp.cells.map((x) => x.d)).size !== 6) return null;
+  const seen = new Set();
+  for (const tok of t) {
+    const key = tok.split('=')[0];
+    if (seen.has(key)) return null;
+    seen.add(key);
+    let m;
+    if (tok === 'names') sp.names = true;
+    else if (tok === 'plain') sp.plain = true;
+    else if ((m = /^s=(\d+)$/.exec(tok))) sp.s = +m[1];
+    else if ((m = /^r=([1-6])$/.exec(tok))) sp.root = +m[1];
+    else if ((m = /^lab=(\d+(?:,\d+)*)$/.exec(tok))) sp.lab = m[1].split(',').map(Number);
+    else if ((m = /^q=(\d+)$/.exec(tok))) sp.q = +m[1];
+    else if ((m = /^shade=([1-6])$/.exec(tok))) sp.shade = +m[1];
+    else return null;
+  }
+  const L = netLayout(sp);
+  if (!L) return null;
+  if (sp.dims && !L.valid) return null; // 직육면체 전개도는 접히는 것만
+  if ((sp.lab.length || sp.q >= 0) && !sp.dims) return null; // 길이 이름표는 직육면체 전개도에만
+  const n = L.pts.length;
+  if (sp.s >= n || sp.lab.some((i) => i >= n) || sp.q >= n || sp.lab.includes(sp.q) || new Set(sp.lab).size !== sp.lab.length) return null;
+  sp.L = L;
+  return sp;
+}
+
+/**
+ * 전개도 칸 → 접은 면(세 축)·크기·자리 · 둘레의 점(맨 위 왼쪽에서 시계 방향)과 선분 · 점이 접혀 가는 꼭짓점.
+ * valid: 접으면 정육면체(직육면체)가 되는가 — 칸이 나무 모양(2×2 덩어리 없음)이고 여섯 법선이 모두 다를 때.
+ * 직육면체는 칸 크기가 달라서, 붙어 있는 칸끼리 변 전체가 맞닿게 놓고 겹치거나 이음이 아닌 데서 닿으면 null.
+ */
+export function netLayout(sp) {
+  const cells = sp.cells.map((c) => ({ ...c }));
+  const at = new Map(cells.map((c) => [`${c.r},${c.c}`, c]));
+  const links = [];
+  for (const c of cells) {
+    const rt = at.get(`${c.r},${c.c + 1}`); const dn = at.get(`${c.r + 1},${c.c}`);
+    if (rt) links.push({ a: c, b: rt, dir: 'h' });
+    if (dn) links.push({ a: c, b: dn, dir: 'v' });
+  }
+  const root = (sp.root && cells.find((c) => c.d === sp.root)) || cells[0];
+  root.f = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]; // 앞면: 오른쪽 = 가로, 위쪽 = 높이, 바깥 = 앞
+  const order = [root]; const seen = new Set([root]);
+  for (let i = 0; i < order.length; i++) {
+    const c = order[i];
+    for (const [dr, dc, mv] of [[0, 1, 'right'], [0, -1, 'left'], [-1, 0, 'up'], [1, 0, 'down']]) {
+      const nb = at.get(`${c.r + dr},${c.c + dc}`);
+      if (!nb || seen.has(nb)) continue;
+      nb.f = NET_MOVE[mv](c.f); nb.parent = c; nb.mv = mv; seen.add(nb); order.push(nb);
+    }
+  }
+  if (order.length !== 6) return null; // 떨어진 칸
+  const valid = links.length === 5 && new Set(cells.map((c) => vKey(c.f[2]))).size === 6;
+  const dims = sp.dims || [1, 1, 1];
+  const axisLen = (v) => dims[v.findIndex((x) => x !== 0)];
+  for (const c of cells) { c.w = axisLen(c.f[0]); c.h = axisLen(c.f[1]); }
+  if (sp.dims) {
+    root.x = 0; root.y = 0;
+    for (const c of order.slice(1)) {
+      const p = c.parent;
+      if (c.mv === 'right') { c.x = p.x + p.w; c.y = p.y; } else if (c.mv === 'left') { c.x = p.x - c.w; c.y = p.y; } else if (c.mv === 'up') { c.x = p.x; c.y = p.y - c.h; } else { c.x = p.x; c.y = p.y + p.h; }
+    }
+    const mx = Math.min(...cells.map((c) => c.x)); const my = Math.min(...cells.map((c) => c.y));
+    for (const c of cells) { c.x -= mx; c.y -= my; }
+  } else for (const c of cells) { c.x = c.c; c.y = c.r; }
+  const E = 1e-9;
+  for (let i = 0; i < 6; i++) {
+    for (let j = i + 1; j < 6; j++) {
+      const a = cells[i]; const b = cells[j];
+      const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x); const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (ox > E && oy > E) return null; // 겹침
+      const linked = links.some((l) => (l.a === a && l.b === b) || (l.a === b && l.b === a));
+      if (!linked && ((Math.abs(ox) < E && oy > E) || (Math.abs(oy) < E && ox > E))) return null; // 이음이 아닌 데서 변이 닿음
+    }
+  }
+  // 둘레 — 칸의 변을 다른 칸의 귀퉁이에서 나눠, 한 번만 나오는 조각이 둘레
+  const pkey = (x, y) => `${Math.round(x * 1e6)},${Math.round(y * 1e6)}`;
+  const ptMap = new Map();
+  const corners = (c) => [[c.x, c.y, -1, 1], [c.x + c.w, c.y, 1, 1], [c.x + c.w, c.y + c.h, 1, -1], [c.x, c.y + c.h, -1, -1]]; // (x, y, h 쪽, v 쪽)
+  for (const c of cells) for (const [x, y] of corners(c)) { const k = pkey(x, y); if (!ptMap.has(k)) ptMap.set(k, { x, y, k, v: null }); }
+  const all = [...ptMap.values()];
+  const pieces = new Map();
+  for (const c of cells) {
+    const cs = corners(c);
+    for (let i = 0; i < 4; i++) {
+      const [x1, y1] = cs[i]; const [x2, y2] = cs[(i + 1) % 4];
+      const on = all.filter((p) => (Math.abs(x1 - x2) < E
+        ? Math.abs(p.x - x1) < E && p.y > Math.min(y1, y2) - E && p.y < Math.max(y1, y2) + E
+        : Math.abs(p.y - y1) < E && p.x > Math.min(x1, x2) - E && p.x < Math.max(x1, x2) + E));
+      on.sort((p, q) => (p.x - q.x) || (p.y - q.y));
+      for (let k = 0; k + 1 < on.length; k++) {
+        const key = [on[k].k, on[k + 1].k].sort().join('|');
+        const pc = pieces.get(key) || { a: on[k], b: on[k + 1], n: 0 };
+        pc.n += 1; pieces.set(key, pc);
+      }
+    }
+  }
+  const nbr = new Map();
+  for (const p of [...pieces.values()].filter((z) => z.n === 1)) {
+    for (const [u, w] of [[p.a, p.b], [p.b, p.a]]) { if (!nbr.has(u.k)) nbr.set(u.k, []); nbr.get(u.k).push(w); }
+  }
+  if ([...nbr.values()].some((l) => l.length !== 2)) return null;
+  const start = [...nbr.keys()].map((k) => ptMap.get(k)).sort((p, q) => (p.y - q.y) || (p.x - q.x))[0];
+  const pts = [start];
+  let prev = start; let cur = nbr.get(start.k).find((q) => Math.abs(q.y - start.y) < E && q.x > start.x);
+  if (!cur) return null;
+  while (cur !== start) {
+    pts.push(cur);
+    const nx = nbr.get(cur.k).find((q) => q !== prev);
+    prev = cur; cur = nx;
+    if (pts.length > 40) return null;
+  }
+  if (pts.length !== nbr.size) return null;
+  // 점 → 접은 꼭짓점 (부호 셋 "x,y,z") — 접히는 전개도만
+  if (valid) {
+    for (const c of cells) {
+      const [h, v, n] = c.f;
+      for (const [x, y, sh, sv] of corners(c)) {
+        const id = vKey(n.map((nz, i) => nz + sh * h[i] + sv * v[i]));
+        const p = ptMap.get(pkey(x, y));
+        if (p.v && p.v !== id) return null;
+        p.v = id;
+      }
+    }
+  }
+  const segs = pts.map((p, i) => {
+    const q = pts[(i + 1) % pts.length];
+    return { i, a: i, b: (i + 1) % pts.length, len: Math.hypot(q.x - p.x, q.y - p.y), e: valid ? [p.v, q.v].sort().join('|') : null };
+  });
+  return { cells, links, pts, segs, valid };
+}
+
+/** 🧊 전개도 그리기 — 칸은 연하게, 접히는 선은 점선, 둘레는 실선 */
+export function netSvg(sp) {
+  const { cells, links, pts, segs } = sp.L;
+  const totW = Math.max(...cells.map((c) => c.x + c.w)); const totH = Math.max(...cells.map((c) => c.y + c.h));
+  const lens = sp.lab.length > 0 || sp.q >= 0;
+  const pad = lens ? 48 : sp.names ? 32 : 14;
+  const u = Math.min(sp.dims ? 300 / totW : 64, sp.dims ? 250 / totH : 64, 330 / totW, 290 / totH);
+  const X = (x) => pad + x * u; const Y = (y) => pad + y * u;
+  const W = Math.round(2 * pad + totW * u); const H = Math.round(2 * pad + totH * u);
+  const n = pts.length;
+  const nameOf = (i) => NET_PT[(i - sp.s + n) % n] || '';
+  // 둘레 선분의 바깥쪽 — 시계 방향으로 돌면 안쪽이 오른쪽 (화면은 아래가 +y)
+  const outw = (i) => { const p = pts[i]; const q = pts[(i + 1) % n]; const L = Math.hypot(q.x - p.x, q.y - p.y); return [(q.y - p.y) / L, -(q.x - p.x) / L]; };
+  let g = '';
+  for (const c of cells) {
+    const sh = sp.shade === c.d;
+    g += `<rect class="net-c" data-d="${c.d}" x="${cf(X(c.x))}" y="${cf(Y(c.y))}" width="${cf(c.w * u)}" height="${cf(c.h * u)}" fill="${sh ? FILL2 : FILL}" fill-opacity="${sh ? 0.4 : 0.12}"/>`;
+  }
+  for (const l of links) {
+    const b = l.b;
+    const [x1, y1, x2, y2] = l.dir === 'h' ? [b.x, b.y, b.x, b.y + b.h] : [b.x, b.y, b.x + b.w, b.y];
+    g += `<line class="net-fold" data-a="${l.a.d}" data-b="${b.d}" x1="${cf(X(x1))}" y1="${cf(Y(y1))}" x2="${cf(X(x2))}" y2="${cf(Y(y2))}" stroke="currentColor" stroke-width="1.4" stroke-dasharray="5 4" stroke-opacity="0.8"/>`;
+  }
+  for (const sg of segs) {
+    const p = pts[sg.a]; const q = pts[sg.b];
+    g += `<line class="net-seg" data-i="${sg.i}" data-a="${nameOf(sg.a)}" data-b="${nameOf(sg.b)}" x1="${cf(X(p.x))}" y1="${cf(Y(p.y))}" x2="${cf(X(q.x))}" y2="${cf(Y(q.y))}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`;
+  }
+  if (!sp.plain) for (const c of cells) g += jLab('net-lab net-face', X(c.x + c.w / 2), Y(c.y + c.h / 2) + JAMO_FS * 0.28, NET_FACE[c.d - 1], ` data-d="${c.d}"`);
+  if (sp.names) {
+    pts.forEach((p, i) => {
+      const o1 = outw((i - 1 + n) % n); const o2 = outw(i);
+      let dx = o1[0] + o2[0]; let dy = o1[1] + o2[1]; const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+      g += jLab('net-lab net-name', X(p.x) + dx * 16, Y(p.y) + dy * 16 + JAMO_FS * 0.28, nameOf(i), ` data-i="${i}"`);
+    });
+  }
+  for (const i of [...sp.lab, ...(sp.q >= 0 ? [sp.q] : [])]) {
+    const sg = segs[i]; const p = pts[sg.a]; const q = pts[sg.b]; const [ox, oy] = outw(i);
+    const t = i === sp.q ? `? ${sp.unit}` : `${lenStr(sg.len)} ${sp.unit}`;
+    const off = Math.abs(ox) * (labW(t) / 2 + 8) + Math.abs(oy) * 14;
+    g += kLab('net-lab net-len', X((p.x + q.x) / 2) + ox * off, Y((p.y + q.y) / 2) + oy * off + 5, t, ` data-i="${i}"`);
+  }
+  return `<svg class="frac-fig shape-fig net-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(netText(sp))}" data-u="${u.toFixed(4)}" data-pad="${pad}"><g>${g}</g></svg>`;
+}
+
+/** 🧊 전개도를 글로 — 줄마다 칸 */
+export function netText(sp) {
+  const rows = sp.rows.map((row) => [...row].map((ch) => (ch === '.' ? '·' : sp.plain ? '■' : NET_FACE[+ch - 1])).join(' ')).join(' / ');
+  const what = sp.dims ? `가로 ${sp.dims[0]} ${sp.unit} · 세로 ${sp.dims[1]} ${sp.unit} · 높이 ${sp.dims[2]} ${sp.unit}인 직육면체의 전개도`
+    : sp.plain ? '정사각형 6개를 이어 붙인 모양' : '정육면체의 전개도';
+  const parts = [`${what} — 줄마다 칸 [ ${rows} ]`];
+  if (sp.names) parts.push(`둘레의 점 ㄱ~ㅎ (맨 위 왼쪽 점${sp.s ? `에서 시계 방향으로 ${sp.s}칸 간 점` : ''}이 ㄱ, 시계 방향)`);
+  if (sp.lab.length) parts.push(`길이 이름표 ${sp.lab.map((i) => `${lenStr(sp.L.segs[i].len)} ${sp.unit}`).join(' · ')}`);
+  if (sp.q >= 0) parts.push('? 표시 선분 하나');
+  return parts.join(' · ');
+}
+
+/** 그린 SVG의 글자 상자 (가운데 정렬 · 글꼴 크기는 그림에서) — 생성기가 이름표가 겹치지 않는 자리를 다시 고를 때 */
+export function labelBoxesOf(svg) {
+  return [...String(svg).matchAll(/<text class="[^"]*" x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="(\d+)"[^>]*>([^<]+)<\/text>/g)].map((z) => {
+    const fs = +z[3]; const w = (labW(z[4]) * fs) / 15;
+    return { t: z[4], x0: +z[1] - w / 2, x1: +z[1] + w / 2, y0: +z[2] - fs * 0.78, y1: +z[2] + fs * 0.22 };
+  });
+}
+
 export function figureSvg(spec) {
   const s = String(spec || '').trim().replace(/−/g, '-');
   let m;
@@ -1304,6 +1695,8 @@ export function figureSvg(spec) {
   if ((m = /^range (.+)$/.exec(s))) { const sp = parseRange(m[1]); return sp ? rangeSvg(sp) : ''; } // 🔢 L 수의 범위
   if ((m = /^sym (.+)$/.exec(s))) { const sp = parseSym(m[1]); return sp ? symSvg(sp) : ''; } // 🪞 M 합동과 대칭
   if ((m = /^circle (.+)$/.exec(s))) { const sp = parseCircle(m[1]); return sp ? circleSvg(sp) : ''; } // 🔵 N 원의 넓이
+  if ((m = /^cuboid (.+)$/.exec(s))) { const sp = parseCuboid(m[1]); return sp ? cuboidSvg(sp) : ''; } // 🧊 O 직육면체 겨냥도
+  if ((m = /^net (.+)$/.exec(s))) { const sp = parseNet(m[1]); return sp ? netSvg(sp) : ''; } // 🧊 O 전개도
   if ((m = /^steps ((?:\d+\s*){2,5})$/.exec(s))) return stepsSvg(m[1].trim().split(/\s+/).map(Number));
   if ((m = /^table (.+)$/.exec(s))) { const rows = parseTable(m[1]); return rows ? tableSvg(rows) : ''; }
   // 🔺 도형 — 끝에 단위(cm·m)를 붙일 수 있다. 수는 1~40, 모양이 말이 안 되면(밑변보다 큰 밀림 등) 빈 글자
@@ -1376,6 +1769,8 @@ export function figText(text, short = false) {
     .replace(/\[range ([^\]]+)\]/g, (all, arg) => { const sp = parseRange(arg); return !sp ? all : short ? '(수직선)' : `(${rangeText(sp)})`; })
     .replace(/\[sym ([^\]]+)\]/g, (all, arg) => { const sp = parseSym(arg); return !sp ? all : short ? '(그림)' : `(${symText(sp)})`; })
     .replace(/\[circle ([^\]]+)\]/g, (all, arg) => { const sp = parseCircle(arg); return !sp ? all : short ? '(그림)' : `(${circleText(sp)})`; })
+    .replace(/\[cuboid ([^\]]+)\]/g, (all, arg) => { const sp = parseCuboid(arg); return !sp ? all : short ? '(그림)' : `(${cuboidText(sp)})`; })
+    .replace(/\[net ([^\]]+)\]/g, (all, arg) => { const sp = parseNet(arg); return !sp ? all : short ? '(그림)' : `(${netText(sp)})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
 }
@@ -1415,7 +1810,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────

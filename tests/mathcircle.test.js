@@ -730,7 +730,7 @@ test('★ 원고의 조사·셈식·아직 안 배운 말·틀린 일반화 (배
 test('화면 연결 (3단계): STEMS.circle(N)은 이 생성기·원고를 쓰고, 앱 셸이 둘 다 들고 간다 · ❓ 복사문·📊 답장 안내에 [circle] 예 · 사다리 안내에 C 소수 줄기', async () => {
   const { STEMS, STEM_ORDER, stemOf } = await import('../js/mathprog.js');
   assert.equal(STEMS.circle.code, 'N');
-  assert.equal(STEM_ORDER[STEM_ORDER.length - 1], 'circle');
+  assert.equal(STEM_ORDER[STEM_ORDER.indexOf('sym') + 1], 'circle', 'M 합동과 대칭 바로 뒤 (맨 끝으로 고정하면 다음 줄기가 붙을 때마다 깨진다)');
   assert.equal(STEMS.circle.list, CIRCLE);
   assert.equal(STEMS.circle.gen.makeQuestion, makeQuestion);
   assert.ok(IDS.every((id) => stemOf(id) === STEMS.circle), '모든 칸이 N 줄기로 찾아진다');
