@@ -20,6 +20,7 @@ import * as rangeGen from './mathrange.js';
 import * as symGen from './mathsym.js';
 import * as circleGen from './mathcircle.js';
 import * as cuboidGen from './mathcuboid.js';
+import * as solidGen from './mathsolid.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -54,8 +55,10 @@ export const STEMS = {
   circle: { key: 'circle', code: 'N', label: '원의 넓이 줄기', range: '초6', list: circleGen.CIRCLE, gen: circleGen, file: './coach/math/circle.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (원의 중심·반지름부터 — 학교 6-2 5단원 · C 소수 줄기를 먼저 하면 3.14 셈이 편해요)', intro: '원 문제 5개를 먼저 풀어 볼게요. 그림에서 반지름인지 지름인지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
   // O 직육면체 → 부피·겉넓이 — N 다음 도형·측정의 마지막 큰 칸, 5-2 5단원 「직육면체」 + 6-1 6단원 「직육면체의 부피와 겉넓이」 지도서 흐름도로 범위 확인 (2026-10-02 아버님 "이대로 진행"). O1~O4 초5 · O5~O9 초6 · 겉넓이는 직사각형 넓이의 합이라 I 줄기가 먼저면 편하다
   cuboid: { key: 'cuboid', code: 'O', label: '직육면체 줄기', range: '초5 → 초6', list: cuboidGen.CUBOID, gen: cuboidGen, file: './coach/math/cuboid.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (직육면체와 정육면체부터 — 학교 5-2 5단원 · I 둘레와 넓이 줄기를 먼저 하면 겉넓이가 쉬워요)', intro: '직육면체 문제 5개를 먼저 풀어 볼게요. 그림의 점선(숨은 모서리)까지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // P 입체도형 — O 다음 초6에 남은 입체 칸, 6-1 2단원 「각기둥과 각뿔」 + 6-2 6단원 「원기둥, 원뿔, 구」 지도서 흐름도·2022 성취기준으로 범위 확인(각뿔·원뿔 전개도는 안 다룸) (2026-10-02 아버님 "P 입체도형 줄기 가보자"). 초6 9칸 · 직육면체 겨냥도·전개도와 원주율을 다시 쓴다
+  solid: { key: 'solid', code: 'P', label: '입체도형 줄기', range: '초6', list: solidGen.SOLID, gen: solidGen, file: './coach/math/solid.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (각기둥과 각뿔부터 — 학교 6-1 2단원 · O 직육면체 → N 원의 넓이 줄기를 먼저 하면 쉬워요)', intro: '입체도형 문제 5개를 먼저 풀어 볼게요. 그림의 점선(숨은 모서리)과 밑면을 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;

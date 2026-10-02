@@ -1685,6 +1685,745 @@ export function netText(sp) {
   return parts.join(' · ');
 }
 
+// ───────────────────── 🔷 P 입체도형: 각기둥·각뿔·원기둥·원뿔·구 · 돌리기 · 각기둥 전개도 · 원기둥 전개도 (2026-10-02) ─────────────────────
+// 각기둥·각뿔은 몸 좌표(x 가로, y 안쪽, z 위)를 화면 X = x + SX·y, Y = −z − SY·y로 옮긴다 — 앞·오른쪽·위에서 내려다본 평행 투영.
+//   보는 쪽 V = (SX, −1, SY): 바깥 법선 n이 n·V > 0인 면이 보이고, 두 면이 모두 안 보이는 모서리만 점선이다 (O 겨냥도와 같은 약속).
+//   정다각형 밑면은 옆면이 선 하나로 눕지 않게 — 모든 면의 |n̂·V̂| 중 가장 작은 값이 가장 큰 돌림각을 고른다.
+// 원기둥·원뿔·구는 SX = 0으로 그린다 — 밑면 원이 반듯한 타원(rx = R, ry = SY·R).
+// 길이는 실제 비율대로 — 밑면의 한 변·높이·옆 모서리(모선)가 함께 적히면 서로 맞아야 그려진다 (그림이 거짓말하지 않게).
+// 이름표는 후보 자리를 차례로 시험해 선·곡선·다른 이름표와 안 겹치는 첫 자리에 (O 겨냥도와 같은 방법).
+
+const SOL_SX = 0.3; const SOL_SY = 0.42;
+/** 보는 쪽 (테스트가 보이는 면을 따로 다시 계산한다) */
+export const SOL_VIEW = [SOL_SX, -1, SOL_SY];
+export const POLY_KO = { 3: '삼각형', 4: '사각형', 5: '오각형', 6: '육각형', 7: '칠각형', 8: '팔각형' };
+const sLen = (v) => v === '?' || (Number.isInteger(v) && v >= 1 && v <= 40);
+const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const solLenText = (v, u) => (v === '?' ? `? ${u}` : `${v} ${u}`);
+const solLab = (cls, x, y, t, extra = '') => kLab(cls, x, y, t, extra);
+
+/** 글자 상자 (kLab 15px — 바탕선 y) */
+const solBox = (t, x, y) => { const w = labW(t); return { x0: x - w / 2, x1: x + w / 2, y0: y - 11.7, y1: y + 3.3 }; };
+const boxHit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+const grow1 = (b) => ({ x0: b.x0 - 1, x1: b.x1 + 1, y0: b.y0 - 1, y1: b.y1 + 1 });
+/** 곡선(타원 둘레)의 점 — 상자 안에 들어오면 곡선이 글자를 지나간다 */
+function ellPts(cx, cy, rx, ry, a0 = 0, a1 = 2 * Math.PI, n = 96) {
+  const out = [];
+  for (let i = 0; i <= n; i++) { const t = a0 + ((a1 - a0) * i) / n; out.push([cx + rx * Math.cos(t), cy + ry * Math.sin(t)]); }
+  return out;
+}
+const ptsInBox = (pts, b) => pts.some(([x, y]) => x > b.x0 - 1 && x < b.x1 + 1 && y > b.y0 - 1 && y < b.y1 + 1);
+
+/**
+ * 이름표 자리 찾기 — (mx, my)에서 (ox, oy) 쪽으로 차츰 멀리, 옆으로 조금씩 비키며 선분·곡선 점·다른 이름표와 안 겹치는 첫 자리
+ * @returns {{x:number, y:number, box:object}}
+ */
+const segDist = (x, y, [p, q]) => { const vx = q[0] - p[0]; const vy = q[1] - p[1]; const t = Math.max(0, Math.min(1, ((x - p[0]) * vx + (y - p[1]) * vy) / (vx * vx + vy * vy || 1))); return Math.hypot(p[0] + vx * t - x, p[1] + vy * t - y); };
+function solPlace(t, mx, my, ox, oy, segs, curves, taken, dists = [8, 12, 16, 22, 30, 40, 52], own = null) {
+  const L = Math.hypot(ox, oy) || 1; ox /= L; oy /= L;
+  const w = labW(t); const half = Math.abs(ox) * (w / 2) + Math.abs(oy) * 7.5;
+  for (const d of dists) {
+    for (const sh of [0, 8, -8, 16, -16, 26, -26]) {
+      const cx = mx + ox * (d + half) - oy * sh; const cy = my + oy * (d + half) + ox * sh;
+      const y = cy + 4.2; const b = solBox(t, cx, y);
+      if (segs.some(([p, q]) => boxHitsSeg(grow1(b), p, q))) continue;
+      if (own && segs.some((sg) => sg !== own && segDist(cx, cy, sg) <= segDist(cx, cy, own) + 0.5)) continue;
+      if (curves.some((pts) => ptsInBox(pts, b))) continue;
+      if (taken.some((z) => boxHit(z, b))) continue;
+      taken.push(b);
+      return { x: cx, y, box: b };
+    }
+  }
+  const cx = mx + ox * (dists[dists.length - 1] + half); const y = my + oy * (dists[dists.length - 1] + half) + 4.2;
+  const b = solBox(t, cx, y); taken.push(b);
+  return { x: cx, y, box: b };
+}
+
+/** `[prism …]`·`[pyramid …]`·`[cyl …]`·`[cone …]`·`[sphere …]` 인자 → sp (말이 안 되면 null)
+ *  prism: n=3..8 · a=밑면의 한 변 · h=높이 · shade=b(밑면)|s(앞 옆면) · lie(옆으로 눕힘, n 3~6, 길이 없음)
+ *  pyramid: n · a · h(점선 높이) · e(옆 모서리) · shade · cyl: r|d · h · cone: r|d · h · l(모선) · sphere: r|d
+ *  값은 1~40 자연수나 ?(그림에 "? cm"). 끝에 단위 cm|m */
+export function parseSolid(kind, arg) {
+  const KEYS = { prism: ['n', 'a', 'h', 'shade', 'lie'], pyramid: ['n', 'a', 'h', 'e', 'shade'], cyl: ['r', 'd', 'h'], cone: ['r', 'd', 'h', 'l'], sphere: ['r', 'd'] }[kind];
+  if (!KEYS) return null;
+  const t = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  const sp = { kind, unit: 'cm', n: 0, shade: '', lie: false };
+  if (t.length && /^(cm|m)$/.test(t[t.length - 1])) sp.unit = t.pop();
+  const seen = new Set();
+  for (const tok of t) {
+    const q = /^([a-z]+)(?:=([bs?]|\d+))?$/.exec(tok);
+    if (!q || seen.has(q[1]) || !KEYS.includes(q[1])) return null;
+    seen.add(q[1]);
+    const k = q[1]; const raw = q[2];
+    if (k === 'lie') { if (raw !== undefined) return null; sp.lie = true; continue; }
+    if (k === 'shade') { if (raw !== 'b' && raw !== 's') return null; sp.shade = raw; continue; }
+    if (raw === undefined || raw === 'b' || raw === 's') return null;
+    const v = raw === '?' ? '?' : +raw;
+    if (k === 'n') { if (!Number.isInteger(v) || v < 3 || v > 8) return null; sp.n = v; continue; }
+    if (!sLen(v)) return null;
+    sp[k] = v;
+  }
+  if ('r' in sp && 'd' in sp) return null;
+  const D = {};
+  if (kind === 'prism' || kind === 'pyramid') {
+    if (!sp.n) return null;
+    if (sp.lie && (kind !== 'prism' || sp.n > 6 || 'a' in sp || 'h' in sp)) return null;
+    if (kind === 'pyramid' && sp.shade === 'b') return null; // 각뿔의 밑면은 위에서 안 보여 색칠이 안 보인다
+    const sn = Math.sin(Math.PI / sp.n);
+    let a = isNum(sp.a) ? sp.a : null; let h = isNum(sp.h) ? sp.h : null;
+    if (kind === 'pyramid' && isNum(sp.e)) {
+      const e = sp.e;
+      if (a !== null && h !== null) { const Rb = a / (2 * sn); if (Math.abs(e * e - (h * h + Rb * Rb)) > 1e-6 * e * e) return null; }
+      else if (h !== null) { if (e <= h) return null; a = 2 * sn * Math.sqrt(e * e - h * h); }
+      else { if (a === null) a = e * 0.6; const Rb = a / (2 * sn); if (e <= Rb) return null; h = Math.sqrt(e * e - Rb * Rb); }
+    }
+    if (a === null) a = h !== null ? h * 0.6 : 3;
+    if (h === null) h = (a / (2 * sn)) * (kind === 'prism' ? 2.2 : 2.4);
+    D.a = a; D.Rb = a / (2 * sn); D.H = h;
+    const ratio = D.H / (2 * D.Rb);
+    if (ratio < 0.3 || ratio > 3.2) return null;
+    D.e = Math.sqrt(D.H * D.H + D.Rb * D.Rb);
+  } else if (kind === 'cyl' || kind === 'cone') {
+    let r = isNum(sp.r) ? sp.r : isNum(sp.d) ? sp.d / 2 : null; let h = isNum(sp.h) ? sp.h : null;
+    if (kind === 'cone' && isNum(sp.l)) {
+      const l = sp.l;
+      if (r !== null && h !== null) { if (l * l !== r * r + h * h) return null; }
+      else if (r !== null) { if (l <= r) return null; h = Math.sqrt(l * l - r * r); }
+      else if (h !== null) { if (l <= h) return null; r = Math.sqrt(l * l - h * h); }
+      else { r = l * 0.6; h = l * 0.8; }
+    }
+    if (r === null) r = h !== null ? h * 0.5 : 3;
+    if (h === null) h = r * (kind === 'cyl' ? 2 : 2.2);
+    const ratio = h / r;
+    if (ratio < (kind === 'cyl' ? 0.4 : 0.6) || ratio > 3.6) return null;
+    D.r = r; D.H = h; D.l = Math.sqrt(r * r + h * h);
+  } else {
+    D.r = isNum(sp.r) ? sp.r : isNum(sp.d) ? sp.d / 2 : 3;
+  }
+  sp.draw = D;
+  return sp;
+}
+
+/** 각기둥·각뿔의 꼭짓점·면 — 몸 좌표. 면마다 바깥 법선 nrm, 종류 base|side */
+export function solidMesh(sp) {
+  const { n } = sp; const D = sp.draw;
+  const build = (phi0) => {
+    const V = []; const F = [];
+    if (sp.kind === 'prism' && sp.lie) {
+      // 옆으로 눕힘: 밑면은 x = 0, x = L, 한 옆면이 바닥에 평평하게 — 그다음 z축으로 phi0(음수)만큼 돌려 오른쪽 밑면이 앞을 보게
+      // (돌리지 않으면 밑면이 옆에서 보여 얇은 조각으로 그려졌다 — P 1단계 갤러리)
+      const apo = D.Rb * Math.cos(Math.PI / n); const cb = Math.cos(phi0); const sb = Math.sin(phi0);
+      for (const x of [0, D.H]) for (let i = 0; i < n; i++) { const a = -Math.PI / 2 - Math.PI / n + (2 * Math.PI * i) / n; const y = D.Rb * Math.cos(a); V.push([x * cb - y * sb, x * sb + y * cb, D.Rb * Math.sin(a) + apo]); }
+    } else {
+      for (let i = 0; i < n; i++) { const a = phi0 + (2 * Math.PI * i) / n; V.push([D.Rb * Math.cos(a), D.Rb * Math.sin(a), 0]); }
+      if (sp.kind === 'prism') for (let i = 0; i < n; i++) V.push([V[i][0], V[i][1], D.H]);
+      else V.push([0, 0, D.H]);
+    }
+    const ring = [...Array(n).keys()];
+    if (sp.kind === 'prism') {
+      F.push({ kind: 'base', idx: ring.slice().reverse() }, { kind: 'base', idx: ring.map((i) => n + i) });
+      for (let i = 0; i < n; i++) F.push({ kind: 'side', i, idx: [i, (i + 1) % n, n + ((i + 1) % n), n + i] });
+    } else {
+      F.push({ kind: 'base', idx: ring.slice().reverse() });
+      for (let i = 0; i < n; i++) F.push({ kind: 'side', i, idx: [i, (i + 1) % n, n] });
+    }
+    const C = V.reduce((s, p) => [s[0] + p[0] / V.length, s[1] + p[1] / V.length, s[2] + p[2] / V.length], [0, 0, 0]);
+    for (const f of F) {
+      let nx = 0; let ny = 0; let nz = 0;
+      f.idx.forEach((ia, k) => { const p = V[ia]; const q = V[f.idx[(k + 1) % f.idx.length]]; nx += (p[1] - q[1]) * (p[2] + q[2]); ny += (p[2] - q[2]) * (p[0] + q[0]); nz += (p[0] - q[0]) * (p[1] + q[1]); });
+      let nrm = [nx, ny, nz]; const L = Math.hypot(nx, ny, nz); nrm = nrm.map((v) => v / L);
+      const fc = f.idx.reduce((s, i) => [s[0] + V[i][0] / f.idx.length, s[1] + V[i][1] / f.idx.length, s[2] + V[i][2] / f.idx.length], [0, 0, 0]);
+      if (dot3(nrm, sub3(fc, C)) < 0) nrm = nrm.map((v) => -v);
+      f.nrm = nrm;
+    }
+    return { V, F };
+  };
+  const VL = Math.hypot(...SOL_VIEW);
+  const margin = (m) => Math.min(...m.F.map((f) => Math.abs(dot3(f.nrm, SOL_VIEW)) / VL));
+  // 각뿔에 높이 점선을 그리면 — 밑면 꼭짓점이 꼭대기 바로 아래(화면 x ≈ 0)에 오지 않게: 옆 모서리가 높이 점선과 한 줄로 겹쳤다 (P 1단계 갤러리)
+  const clear = (m) => sp.kind !== 'pyramid' || !('h' in sp) || m.V.slice(0, n).every((p) => Math.abs(projS(p)[0]) >= 0.22 * D.Rb);
+  const cands = sp.kind === 'prism' && sp.lie ? [...Array(13).keys()].map((j) => -0.25 - 0.05 * j) : [...Array(24).keys()].map((j) => (j * (2 * Math.PI / n)) / 24);
+  let best = null; let bm = -1;
+  for (const pass of [true, false]) {
+    for (const ph of cands) { const m = build(ph); if (pass && !clear(m)) continue; const v = margin(m); if (v > bm + 1e-9) { best = m; bm = v; best.phi = ph; } }
+    if (best) break;
+  }
+  for (const f of best.F) f.vis = dot3(f.nrm, SOL_VIEW) > 0;
+  const E = new Map();
+  best.F.forEach((f, fi) => f.idx.forEach((a, k) => { const b = f.idx[(k + 1) % f.idx.length]; const key = a < b ? `${a}-${b}` : `${b}-${a}`; if (!E.has(key)) E.set(key, { a: Math.min(a, b), b: Math.max(a, b), faces: [] }); E.get(key).faces.push(fi); }));
+  best.E = [...E.values()].map((e) => ({ ...e, hid: e.faces.every((fi) => !best.F[fi].vis) }));
+  return best;
+}
+
+const projS = (p) => [p[0] + SOL_SX * p[1], -p[2] - SOL_SY * p[1]];
+
+/** 다 그린 조각을 그림 틀에 맞춰 옮긴다 — 점·이름표 상자의 범위 + 여백 */
+function solFrame(cls, elems, pts, boxes, aria, data = '') {
+  const xs = [...pts.map((p) => p[0]), ...boxes.flatMap((b) => [b.x0, b.x1])];
+  const ys = [...pts.map((p) => p[1]), ...boxes.flatMap((b) => [b.y0, b.y1])];
+  const pad = 14;
+  const x0 = Math.floor(Math.min(...xs) - pad); const y0 = Math.floor(Math.min(...ys) - pad);
+  const W = Math.ceil(Math.max(...xs) + pad - x0); const H = Math.ceil(Math.max(...ys) + pad - y0);
+  // 좌표는 그대로 두고 viewBox 시작점을 옮긴다 — 테스트가 선·이름표·틀을 같은 좌표로 잰다
+  return `<svg class="frac-fig shape-fig ${cls}" viewBox="${x0} ${y0} ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(aria)}"${data}><g>${elems}</g></svg>`;
+}
+
+/** 🔷 각기둥·각뿔 그리기 */
+function polySolidSvg(sp) {
+  const M = solidMesh(sp); const D = sp.draw;
+  const P0 = M.V.map(projS);
+  const xs = P0.map((p) => p[0]); const ys = P0.map((p) => p[1]);
+  const s = Math.min(270 / (Math.max(...xs) - Math.min(...xs)), 220 / (Math.max(...ys) - Math.min(...ys)));
+  const P = P0.map(([x, y]) => [x * s, y * s]);
+  let g = '';
+  // 보이는 면만 칠한다 (앞에서 보이는 면 위에 겹쳐 칠하지 않게) · 색칠: 밑면(b) 또는 가장 앞쪽 옆면(s)
+  const front = M.F.filter((f) => f.kind === 'side').reduce((a, f) => (dot3(f.nrm, SOL_VIEW) > dot3(a.nrm, SOL_VIEW) ? f : a));
+  M.F.forEach((f, fi) => {
+    if (!f.vis) return;
+    const sh = (sp.shade === 'b' && f.kind === 'base') || (sp.shade === 's' && f === front);
+    g += `<polygon class="sol-f${sh ? ' shade' : ''}" data-f="${fi}" data-kind="${f.kind}" points="${f.idx.map((i) => `${cf(P[i][0])},${cf(P[i][1])}`).join(' ')}" fill="${sh ? FILL2 : FILL}" fill-opacity="${sh ? 0.42 : 0.14}"/>`;
+  });
+  for (const e of M.E) {
+    const a = P[e.a]; const b = P[e.b];
+    g += `<line class="sol-e" data-a="${e.a}" data-b="${e.b}" data-hid="${e.hid ? 1 : 0}" x1="${cf(a[0])}" y1="${cf(a[1])}" x2="${cf(b[0])}" y2="${cf(b[1])}" stroke="currentColor" stroke-width="${e.hid ? 1.6 : 2.2}"${e.hid ? ' stroke-dasharray="6 4"' : ''} stroke-linecap="round"/>`;
+  }
+  P.forEach((p, i) => { g += `<circle class="sol-v" data-i="${i}" cx="${cf(p[0])}" cy="${cf(p[1])}" r="0"/>`; });
+  const segs = M.E.map((e) => [P[e.a], P[e.b]]);
+  const taken = [];
+  const cen = P.reduce((acc, p) => [acc[0] + p[0] / P.length, acc[1] + p[1] / P.length], [0, 0]);
+  const outN = (a, b) => { const ex = b[0] - a[0]; const ey = b[1] - a[1]; let nx = -ey; let ny = ex; const mx = (a[0] + b[0]) / 2; const my = (a[1] + b[1]) / 2; if (nx * (mx - cen[0]) + ny * (my - cen[1]) < 0) { nx = -nx; ny = -ny; } return [nx, ny]; };
+  const labs = [];
+  const n = sp.n;
+  // 높이 점선 (각뿔) — 꼭짓점에서 밑면의 가운데로
+  if (sp.kind === 'pyramid' && 'h' in sp) {
+    const top = P[n]; const c0 = projS([0, 0, 0]).map((v) => v * s);
+    g += `<line class="sol-height" x1="${cf(top[0])}" y1="${cf(top[1])}" x2="${cf(c0[0])}" y2="${cf(c0[1])}" stroke="${FILL2}" stroke-width="2" stroke-dasharray="5 4"/>`;
+    g += `<circle class="sol-o" cx="${cf(c0[0])}" cy="${cf(c0[1])}" r="3" fill="currentColor"/>`;
+    segs.push([top, c0]);
+  }
+  if ('a' in sp) {
+    // 밑면의 한 변 — 보이는 밑면 모서리 중 화면에서 가장 아래
+    const cand = M.E.filter((e) => !e.hid && M.F[e.faces[0]].kind !== M.F[e.faces[1]].kind && e.faces.some((fi) => M.F[fi].kind === 'base'));
+    const e = cand.reduce((x, y) => ((P[y.a][1] + P[y.b][1]) > (P[x.a][1] + P[x.b][1]) ? y : x));
+    const [nx, ny] = outN(P[e.a], P[e.b]);
+    labs.push({ k: 'a', e, t: solLenText(sp.a, sp.unit), mx: (P[e.a][0] + P[e.b][0]) / 2, my: (P[e.a][1] + P[e.b][1]) / 2, nx, ny });
+  }
+  if (sp.kind === 'prism' && 'h' in sp) {
+    const cand = M.E.filter((e) => !e.hid && e.b === e.a + n);
+    const e = cand.reduce((x, y) => ((P[y.a][0] + P[y.b][0]) > (P[x.a][0] + P[x.b][0]) ? y : x));
+    labs.push({ k: 'h', e, t: solLenText(sp.h, sp.unit), mx: (P[e.a][0] + P[e.b][0]) / 2, my: (P[e.a][1] + P[e.b][1]) / 2, nx: 1, ny: 0 });
+  }
+  if (sp.kind === 'pyramid' && 'e' in sp) {
+    const cand = M.E.filter((e) => !e.hid && e.b === n);
+    const e = cand.reduce((x, y) => ((P[y.a][0] + P[y.b][0]) < (P[x.a][0] + P[x.b][0]) ? y : x));
+    const [nx, ny] = outN(P[e.a], P[e.b]);
+    labs.push({ k: 'e', e, t: solLenText(sp.e, sp.unit), mx: (P[e.a][0] + P[e.b][0]) / 2, my: (P[e.a][1] + P[e.b][1]) / 2, nx, ny });
+  }
+  for (const L of labs) {
+    const at = solPlace(L.t, L.mx, L.my, L.nx, L.ny, segs, [], taken);
+    g += solLab(`sol-lab sol-len`, at.x, at.y, L.t, ` data-k="${L.k}" data-e="${L.e.a}-${L.e.b}"`);
+  }
+  if (sp.kind === 'pyramid' && 'h' in sp) {
+    // 높이 이름표 — 점선 오른쪽, 옆 모서리와 안 겹치는 높이에서
+    const top = P[n]; const c0 = projS([0, 0, 0]).map((v) => v * s);
+    const t = solLenText(sp.h, sp.unit);
+    // 높이 이름표는 점선 바로 옆에 — 멀리 밀면 옆 모서리 길이로 읽혔다(P 1단계 갤러리). 숨은 모서리(점선)는 바탕색 테두리로 읽히니 지나가도 되고, 보이는 모서리만 피한다
+    const visSegs = M.E.filter((e) => !e.hid).map((e) => [P[e.a], P[e.b]]);
+    let at = null;
+    for (const side of [1, -1, 0]) {
+      for (const f of [0.55, 0.65, 0.45, 0.75, 0.35, 0.82]) {
+        const mx = top[0] + (c0[0] - top[0]) * f; const my = top[1] + (c0[1] - top[1]) * f;
+        const cx = mx + side * (6 + labW(t) / 2);
+        const b = solBox(t, cx, my + 4.2);
+        // side 0 = 점선 위에 바로 얹는다 (가늘고 높은 각뿔은 옆에 자리가 없다)
+        if (visSegs.some(([p, q]) => boxHitsSeg(grow1(b), p, q)) || (side && boxHitsSeg(grow1(b), top, c0)) || taken.some((z) => boxHit(z, b))) continue;
+        at = { x: cx, y: my + 4.2, box: b }; break;
+      }
+      if (at) break;
+    }
+    if (!at) at = solPlace(t, (top[0] + c0[0]) / 2, (top[1] + c0[1]) / 2, 1, 0, visSegs, [], [...taken], [6, 10, 14]);
+    taken.push(at.box);
+    g += solLab('sol-lab sol-len', at.x, at.y, t, ' data-k="h"');
+  }
+  // data-phi·data-sc: 테스트가 몸을 따로 다시 세워 보이는 면·점선을 다시 계산한다
+  return solFrame(`sol-fig sol-${sp.kind}`, g, P, taken, solidText(sp), ` data-n="${n}" data-phi="${M.phi.toFixed(6)}" data-sc="${s.toFixed(6)}" data-rb="${D.Rb.toFixed(6)}" data-hh="${D.H.toFixed(6)}"${sp.lie ? ' data-lie="1"' : ''}`);
+}
+
+/** 🔷 원기둥·원뿔·구 그리기 (화면 좌표로 바로 — 밑면 원은 rx = R, ry = SY·R인 타원) */
+function roundSolidSvg(sp) {
+  const D = sp.draw; const u = sp.unit;
+  const R = sp.kind === 'sphere' ? 100 : 90; const ry = SOL_SY * R;
+  let g = ''; const pts = []; const segs = []; const curves = []; const taken = [];
+  const ell = (cls, cx, cy, part, a0, a1, dashed, extra = '') => {
+    // a0 → a1 각도(화면 기준, y 아래가 +)로 호를 그린다
+    const p0 = [cx + R * Math.cos(a0), cy + ry * Math.sin(a0)]; const p1 = [cx + R * Math.cos(a1), cy + ry * Math.sin(a1)];
+    const large = Math.abs(a1 - a0) > Math.PI ? 1 : 0; const sweep = a1 > a0 ? 1 : 0;
+    curves.push(ellPts(cx, cy, R, ry, a0, a1, 64));
+    return `<path class="${cls}" data-part="${part}" data-cx="${cf(cx)}" data-cy="${cf(cy)}" data-rx="${cf(R)}" data-ry="${cf(ry)}" d="M ${cf(p0[0])} ${cf(p0[1])} A ${cf(R)} ${cf(ry)} 0 ${large} ${sweep} ${cf(p1[0])} ${cf(p1[1])}" fill="none" stroke="currentColor" stroke-width="${dashed ? 1.6 : 2.2}"${dashed ? ' stroke-dasharray="6 4"' : ''}${extra}/>`;
+  };
+  const line = (cls, a, b, dashed, extra = '', color = 'currentColor') => {
+    segs.push([a, b]);
+    return `<line class="${cls}" x1="${cf(a[0])}" y1="${cf(a[1])}" x2="${cf(b[0])}" y2="${cf(b[1])}" stroke="${color}" stroke-width="${dashed ? 1.8 : 2.2}"${dashed ? ' stroke-dasharray="5 4"' : ''} stroke-linecap="round"${extra}/>`;
+  };
+  const dot = (p) => `<circle class="sol-o" cx="${cf(p[0])}" cy="${cf(p[1])}" r="3" fill="currentColor"/>`;
+  const rKey = 'r' in sp ? 'r' : 'd' in sp ? 'd' : '';
+  const rText = rKey ? solLenText(sp[rKey], u) : '';
+  if (sp.kind === 'cyl') {
+    const Hp = R * (D.H / D.r);
+    pts.push([-R, -Hp - ry], [R, ry]);
+    g += `<path class="sol-side" d="M ${-R} ${cf(-Hp)} L ${-R} 0 A ${R} ${cf(ry)} 0 0 0 ${R} 0 L ${R} ${cf(-Hp)} A ${R} ${cf(ry)} 0 0 1 ${-R} ${cf(-Hp)} Z" fill="${FILL}" fill-opacity="0.12"/>`;
+    g += `<ellipse class="sol-ell" data-part="top" data-cx="0" data-cy="${cf(-Hp)}" data-rx="${R}" data-ry="${cf(ry)}" cx="0" cy="${cf(-Hp)}" rx="${R}" ry="${cf(ry)}" fill="${FILL}" fill-opacity="0.18" stroke="currentColor" stroke-width="2.2"/>`;
+    curves.push(ellPts(0, -Hp, R, ry));
+    g += ell('sol-ell', 0, 0, 'front', Math.PI, 0, false);
+    g += ell('sol-ell', 0, 0, 'back', 0, -Math.PI, true);
+    g += line('sol-gen', [-R, -Hp], [-R, 0], false) + line('sol-gen', [R, -Hp], [R, 0], false);
+    if (rKey) {
+      const c = [0, -Hp]; const a = rKey === 'd' ? [-R, -Hp] : c; const b = [R, -Hp];
+      g += line(`sol-${rKey}`, a, b, false, ` data-v="${sp[rKey]}"`);
+      g += dot(c);
+      let at = null;
+      for (const f of rKey === 'd' ? [0.5, 0.42, 0.58] : [0.5, 0.4, 0.6]) {
+        const mx = a[0] + (b[0] - a[0]) * f;
+        for (const dy of [8, 11, 14]) {
+          const bx = solBox(rText, mx, -Hp - dy);
+          if (segs.some(([p, q]) => boxHitsSeg(grow1(bx), p, q)) || curves.some((cv) => ptsInBox(cv, bx))) continue;
+          at = { x: mx, y: -Hp - dy, box: bx }; break;
+        }
+        if (at) break;
+      }
+      if (!at) at = solPlace(rText, R, -Hp, 1, 0, segs, curves, []);
+      taken.push(at.box);
+      g += solLab('sol-lab sol-len', at.x, at.y, rText, ` data-k="${rKey}"`);
+    }
+    if ('h' in sp) {
+      const t = solLenText(sp.h, u); const at = solPlace(t, R, -Hp / 2, 1, 0, segs, curves, taken);
+      g += solLab('sol-lab sol-len', at.x, at.y, t, ' data-k="h"');
+    }
+  } else if (sp.kind === 'cone') {
+    const Hp = R * (D.H / D.r);
+    const yt = -(ry * ry) / Hp; const xt = R * Math.sqrt(1 - (ry * ry) / (Hp * Hp));
+    const tL = Math.atan2(yt / ry, -xt / R); const tR = Math.atan2(yt / ry, xt / R); // 왼쪽·오른쪽 접점의 각 (둘 다 위쪽, 음수)
+    const apex = [0, -Hp];
+    pts.push([-R, -Hp], [R, ry]);
+    g += `<path class="sol-side" d="M ${cf(apex[0])} ${cf(apex[1])} L ${cf(-xt)} ${cf(yt)} A ${R} ${cf(ry)} 0 1 0 ${cf(xt)} ${cf(yt)} Z" fill="${FILL}" fill-opacity="0.14"/>`;
+    // 앞쪽 호(보임): 오른쪽 접점(tR) → 아래 → 왼쪽 접점(tL + 2π), 200°쯤이라 큰 호 · 뒤쪽 호(점선): 오른쪽 접점 → 위 → 왼쪽 접점, 작은 호
+    const ellAttr = `data-cx="0" data-cy="0" data-rx="${R}" data-ry="${cf(ry)}"`;
+    g += `<path class="sol-ell" data-part="front" ${ellAttr} d="M ${cf(xt)} ${cf(yt)} A ${R} ${cf(ry)} 0 1 1 ${cf(-xt)} ${cf(yt)}" fill="none" stroke="currentColor" stroke-width="2.2"/>`;
+    g += `<path class="sol-ell" data-part="back" ${ellAttr} d="M ${cf(xt)} ${cf(yt)} A ${R} ${cf(ry)} 0 0 0 ${cf(-xt)} ${cf(yt)}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="6 4"/>`;
+    curves.push(ellPts(0, 0, R, ry, tR, tL + 2 * Math.PI, 96), ellPts(0, 0, R, ry, tL, tR, 64));
+    g += line('sol-gen', apex, [-xt, yt], false, ' data-side="L"') + line('sol-gen', apex, [xt, yt], false, ' data-side="R"');
+    const c = [0, 0];
+    if ('h' in sp) g += line('sol-height', apex, c, true, '', FILL2);
+    if (rKey) g += line(`sol-${rKey}`, rKey === 'd' ? [-R, 0] : c, [R, 0], true, ` data-v="${sp[rKey]}"`);
+    if ('h' in sp || rKey) g += dot(c);
+    if ('l' in sp) {
+      const t = solLenText(sp.l, u); const mx = -xt / 2; const my = (apex[1] + yt) / 2;
+      const ex = -xt - apex[0]; const ey = yt - apex[1]; let nx = ey; let ny = -ex; if (nx > 0) { nx = -nx; ny = -ny; }
+      const at = solPlace(t, mx, my, nx, ny, segs, curves, taken);
+      g += solLab('sol-lab sol-len', at.x, at.y, t, ' data-k="l"');
+    }
+    if ('h' in sp) {
+      const t = solLenText(sp.h, u); let at = null;
+      for (const f of [0.6, 0.7, 0.5, 0.78, 0.42]) {
+        const my = apex[1] * (1 - f);
+        const bx = solBox(t, 7 + labW(t) / 2, my + 4.2);
+        if (segs.some(([p, q]) => boxHitsSeg(grow1(bx), p, q)) || curves.some((cv) => ptsInBox(cv, bx)) || taken.some((z) => boxHit(z, bx))) continue;
+        at = { x: 7 + labW(t) / 2, y: my + 4.2, box: bx }; break;
+      }
+      if (!at) at = solPlace(t, xt, -Hp / 2, 1, 0, segs, curves, []);
+      taken.push(at.box);
+      g += solLab('sol-lab sol-len', at.x, at.y, t, ' data-k="h"');
+    }
+    if (rKey) {
+      let at = null;
+      for (const f of [0.5, 0.4, 0.6]) {
+        const mx = rKey === 'd' ? (-R + 2 * R * f) : R * f;
+        for (const dy of [16, 19, 22]) {
+          const bx = solBox(rText, mx, dy);
+          if (segs.some(([p, q]) => boxHitsSeg(grow1(bx), p, q)) || curves.some((cv) => ptsInBox(cv, bx)) || taken.some((z) => boxHit(z, bx))) continue;
+          at = { x: mx, y: dy, box: bx }; break;
+        }
+        if (at) break;
+      }
+      if (!at) at = solPlace(rText, R * 0.5, ry, 0, 1, segs, curves, []);
+      taken.push(at.box);
+      g += solLab('sol-lab sol-len', at.x, at.y, rText, ` data-k="${rKey}"`);
+    }
+  } else {
+    pts.push([-R, -R], [R, R]);
+    g += `<circle class="sol-ball" cx="0" cy="0" r="${R}" fill="${FILL}" fill-opacity="0.14" stroke="currentColor" stroke-width="2.2"/>`;
+    curves.push(ellPts(0, 0, R, R));
+    g += ell('sol-ell', 0, 0, 'front', Math.PI, 0, false).replace('stroke-width="2.2"', 'stroke-width="1.4"');
+    g += ell('sol-ell', 0, 0, 'back', 0, -Math.PI, true);
+    const c = [0, 0];
+    if (rKey) {
+      const a = rKey === 'd' ? [-R, 0] : c;
+      g += line(`sol-${rKey}`, a, [R, 0], false, ` data-v="${sp[rKey]}"`);
+      let at = null;
+      for (const f of [0.5, 0.4, 0.6]) {
+        const mx = a[0] + (R - a[0]) * f;
+        for (const dy of [8, 11, 14]) {
+          const bx = solBox(rText, mx, -dy);
+          if (segs.some(([p, q]) => boxHitsSeg(grow1(bx), p, q)) || curves.some((cv) => ptsInBox(cv, bx))) continue;
+          at = { x: mx, y: -dy, box: bx }; break;
+        }
+        if (at) break;
+      }
+      if (!at) at = solPlace(rText, R, 0, 1, 0, segs, curves, []);
+      taken.push(at.box);
+      g += solLab('sol-lab sol-len', at.x, at.y, rText, ` data-k="${rKey}"`);
+    }
+    g += dot(c);
+  }
+  return solFrame(`sol-fig sol-${sp.kind}`, g, pts, taken, solidText(sp), ` data-R="${R}"`);
+}
+
+export function solidSvg(sp) {
+  return sp.kind === 'prism' || sp.kind === 'pyramid' ? polySolidSvg(sp) : roundSolidSvg(sp);
+}
+
+/** 🔷 입체도형을 글로 — 📊 아빠 화면 펼친 문제 · aria */
+export function solidText(sp) {
+  const u = sp.unit; const L = (k, name) => (k in sp ? `${name} ${solLenText(sp[k], u)}` : '');
+  const join = (...xs) => xs.filter(Boolean).join(' · ');
+  if (sp.kind === 'prism' || sp.kind === 'pyramid') {
+    const what = `정${POLY_KO[sp.n]}을 밑면으로 하는 ${sp.kind === 'prism' ? '각기둥' : '각뿔'} 그림${sp.lie ? '(옆으로 눕혀 놓음)' : ''}`;
+    const lens = join(L('a', '밑면의 한 변'), L('h', '높이'), L('e', '옆 모서리'));
+    const sh = sp.shade === 'b' ? (sp.kind === 'prism' ? '밑면 색칠' : '밑면 색칠') : sp.shade === 's' ? '앞쪽 옆면 하나 색칠' : '';
+    return `${[what, lens, sh].filter(Boolean).join(' — ')} (보이지 않는 모서리는 점선)`;
+  }
+  const rr = L('r', '밑면의 반지름') || L('d', '밑면의 지름');
+  if (sp.kind === 'cyl') return [`원기둥 그림`, join(rr, L('h', '높이'))].filter(Boolean).join(' — ');
+  if (sp.kind === 'cone') return [`원뿔 그림`, join(rr, L('h', '높이(점선)'), L('l', '모선'))].filter(Boolean).join(' — ');
+  return [`구 그림`, join(L('r', '반지름'), L('d', '지름'))].filter(Boolean).join(' — ');
+}
+
+/** `[spin rect a b]` 직사각형 · `[spin tri a b (c=빗변)]` 직각삼각형 · `[spin half d]` 반원 — 왼쪽 세로 선이 돌리는 축 (a 가로, b 축 쪽 길이) */
+export function parseSpin(arg) {
+  const t = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  const sp = { unit: 'cm' };
+  if (t.length && /^(cm|m)$/.test(t[t.length - 1])) sp.unit = t.pop();
+  const shape = t.shift();
+  const nums = []; let c = null;
+  for (const tok of t) {
+    let m;
+    if ((m = /^c=(\d+)$/.exec(tok))) { if (c !== null) return null; c = +m[1]; continue; }
+    if (!/^\d+$/.test(tok)) return null;
+    nums.push(+tok);
+  }
+  const ok = (v) => Number.isInteger(v) && v >= 1 && v <= 30;
+  if (shape === 'rect' || shape === 'tri') {
+    if (nums.length !== 2 || !nums.every(ok)) return null;
+    [sp.a, sp.b] = nums;
+    if (Math.max(sp.a, sp.b) > 4 * Math.min(sp.a, sp.b)) return null;
+    if (c !== null) { if (shape !== 'tri' || c * c !== sp.a * sp.a + sp.b * sp.b) return null; sp.c = c; }
+  } else if (shape === 'half') {
+    if (nums.length !== 1 || !ok(nums[0]) || c !== null) return null;
+    sp.d = nums[0];
+  } else return null;
+  sp.shape = shape;
+  return sp;
+}
+
+export function spinSvg(sp) {
+  const u = sp.unit; let g = ''; const pts = []; const segs = []; const taken = []; const curves = [];
+  let top; let bottom;
+  if (sp.shape === 'half') {
+    const R = 100;
+    pts.push([0, -R], [R, R]);
+    g += `<path class="spin-shape" data-shape="half" data-d="${sp.d}" d="M 0 ${-R} A ${R} ${R} 0 0 1 0 ${R} Z" fill="${FILL}" fill-opacity="0.18" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>`;
+    curves.push(ellPts(0, 0, R, R, -Math.PI / 2, Math.PI / 2, 64));
+    segs.push([[0, -R], [0, R]]);
+    top = -R; bottom = R;
+    const t = `${sp.d} ${u}`; const at = solPlace(t, 0, 0, -1, 0, segs, curves, taken, [12, 18, 24]);
+    g += solLab('sol-lab spin-len', at.x, at.y, t, ' data-k="d"');
+  } else {
+    const s = 190 / Math.max(sp.a, sp.b); const A = sp.a * s; const B = sp.b * s;
+    pts.push([0, -B], [A, 0]);
+    const poly = sp.shape === 'rect' ? [[0, 0], [A, 0], [A, -B], [0, -B]] : [[0, 0], [A, 0], [0, -B]];
+    g += `<polygon class="spin-shape" data-shape="${sp.shape}" data-a="${sp.a}" data-b="${sp.b}" points="${poly.map(([x, y]) => `${cf(x)},${cf(y)}`).join(' ')}" fill="${FILL}" fill-opacity="0.18" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>`;
+    poly.forEach((p, i) => segs.push([p, poly[(i + 1) % poly.length]]));
+    if (sp.shape === 'tri') g += `<path d="M 0 -11 L 11 -11 L 11 0" fill="none" stroke="${FILL2}" stroke-width="1.6"/>`;
+    top = -B; bottom = 0;
+    const ta = `${sp.a} ${u}`; const atA = solPlace(ta, A / 2, 0, 0, 1, segs, [], taken, [6, 10, 14]);
+    g += solLab('sol-lab spin-len', atA.x, atA.y, ta, ' data-k="a"');
+    const tb = `${sp.b} ${u}`;
+    const atB = sp.shape === 'rect' ? solPlace(tb, A, -B / 2, 1, 0, segs, [], taken, [6, 10, 14]) : solPlace(tb, 0, -B / 2, -1, 0, segs, [], taken, [12, 18, 24]);
+    g += solLab('sol-lab spin-len', atB.x, atB.y, tb, ' data-k="b"');
+    if (sp.c) {
+      const tc = `${sp.c} ${u}`; const at = solPlace(tc, A / 2, -B / 2, B, A, segs, [], taken);
+      g += solLab('sol-lab spin-len', at.x, at.y, tc, ' data-k="c"');
+    }
+  }
+  // 돌리는 축 (한 점 쇄선) + 위쪽에 도는 화살표
+  const y0 = top - 34; const y1 = bottom + 26;
+  g += `<line class="spin-axis" x1="0" y1="${cf(y0)}" x2="0" y2="${cf(y1)}" stroke="${FILL2}" stroke-width="2" stroke-dasharray="12 4 2 4"/>`;
+  const ay = top - 18;
+  g += `<path class="spin-arrow" d="M -26 ${cf(ay)} A 26 8 0 1 0 26 ${cf(ay)}" fill="none" stroke="${FILL2}" stroke-width="1.8"/>`;
+  g += `<path d="M 26 ${cf(ay)} l -7 -5 l 1 8 z" fill="${FILL2}"/>`;
+  pts.push([-30, y0], [30, y1]);
+  return solFrame('sol-fig spin-fig', g, pts, taken, spinText(sp), ` data-shape="${sp.shape}"`);
+}
+
+export function spinText(sp) {
+  const u = sp.unit;
+  if (sp.shape === 'rect') return `직사각형(돌리는 축에 붙은 변 ${sp.b} ${u} · 다른 변 ${sp.a} ${u})과 그 변을 따라 그은 돌리는 축`;
+  if (sp.shape === 'tri') return `직각삼각형(축에 붙은 변 ${sp.b} ${u} · 밑변 ${sp.a} ${u}${sp.c ? ` · 빗변 ${sp.c} ${u}` : ''})과 직각을 낀 변을 따라 그은 돌리는 축`;
+  return `반원(지름 ${sp.d} ${u})과 지름을 따라 그은 돌리는 축`;
+}
+
+/** `[pnet n=5 a=3 h=6 up=1 dn=3 (s=옆면 수) (q=base|end|w)]` 정다각형 밑면 · `[pnet rt=3,4,5 h=6 up=1 dn=0 (q=up0|up1|dn0|dn1)]` 직각삼각형 밑면
+ *  옆면 직사각형이 한 줄(왼쪽부터 0번), 밑면은 up 번 옆면 위·dn 번 옆면 아래. up·dn은 여러 개(쉼표)나 없음도 — 전개도가 아닌 그림
+ *  valid = 옆면 수 = 밑면의 변의 수 · 위·아래에 밑면 하나씩 */
+export function parsePnet(arg) {
+  const t = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  const sp = { unit: 'cm', up: [], dn: [], q: '' };
+  if (t.length && /^(cm|m)$/.test(t[t.length - 1])) sp.unit = t.pop();
+  const seen = new Set();
+  for (const tok of t) {
+    const m = /^([a-z]+)=(.+)$/.exec(tok);
+    if (!m || seen.has(m[1])) return null;
+    seen.add(m[1]);
+    const [, k, v] = m;
+    if (k === 'n' || k === 's') { if (!/^[3-9]$/.test(v)) return null; sp[k] = +v; }
+    else if (k === 'a' || k === 'h') { if (v === '?') sp[k] = '?'; else if (/^\d+$/.test(v) && sLen(+v)) sp[k] = +v; else return null; }
+    else if (k === 'rt') { if (!/^\d+,\d+,\d+$/.test(v)) return null; sp.rt = v.split(',').map(Number); }
+    else if (k === 'up' || k === 'dn') { if (!/^\d(,\d)*$/.test(v)) return null; sp[k] = v.split(',').map(Number); }
+    else if (k === 'q') { if (!/^(base|end|w|up0|up1|dn0|dn1)$/.test(v)) return null; sp.q = v; }
+    else return null;
+  }
+  if (sp.rt) {
+    if ('n' in sp || 's' in sp || 'a' in sp) return null;
+    const [x, y, z] = sp.rt;
+    if (!(x + y > z && y + z > x && x + z > y) || sp.rt.some((v) => v < 1 || v > 20)) return null;
+    sp.n = 3; sp.s = 3; sp.widths = sp.rt.slice();
+    if (/^(base|w)$/.test(sp.q)) return null;
+  } else {
+    if (!sp.n || sp.n > 8) return null;
+    if (!('s' in sp)) sp.s = sp.n;
+    if (sp.s < 3 || Math.abs(sp.s - sp.n) > 1) return null;
+    const a = isNum(sp.a) ? sp.a : 3;
+    sp.widths = Array(sp.s).fill(a);
+    if (/^(up|dn)/.test(sp.q)) return null;
+  }
+  if (new Set(sp.up).size !== sp.up.length || new Set(sp.dn).size !== sp.dn.length) return null;
+  if ([...sp.up, ...sp.dn].some((i) => i >= sp.s)) return null;
+  if (!sp.up.length && !sp.dn.length) return null;
+  const hd = isNum(sp.h) ? sp.h : Math.max(...sp.widths) * 1.5;
+  sp.hd = hd;
+  if (hd < 0.6 * Math.min(...sp.widths) || hd > 4 * Math.max(...sp.widths)) return null;
+  sp.L = pnetLayout(sp);
+  if (!sp.L) return null;
+  if (sp.q === 'base' && !sp.up.length) return null;
+  if (/^up/.test(sp.q) && sp.up.length !== 1) return null;
+  if (/^dn/.test(sp.q) && sp.dn.length !== 1) return null;
+  sp.valid = sp.s === sp.n && sp.up.length === 1 && sp.dn.length === 1;
+  return sp;
+}
+
+/** 전개도 자리 — 몸 단위(cm). 옆면 i: x0..x1, y 0..h (아래가 +). 밑면 다각형은 붙은 변 바깥쪽으로 */
+function pnetLayout(sp) {
+  const xs = [0]; sp.widths.forEach((w) => xs.push(xs[xs.length - 1] + w));
+  const rects = sp.widths.map((w, i) => ({ i, x0: xs[i], x1: xs[i + 1], y0: 0, y1: sp.hd }));
+  const bases = [];
+  const make = (i, side) => {
+    const r = rects[i]; const y = side === 'up' ? 0 : sp.hd; const sgn = side === 'up' ? -1 : 1;
+    let P;
+    if (sp.rt) {
+      const b = sp.widths[i]; const Lw = sp.widths[(i - 1 + sp.s) % sp.s]; const Rw = sp.widths[(i + 1) % sp.s];
+      const px = (Lw * Lw - Rw * Rw + b * b) / (2 * b); const py2 = Lw * Lw - px * px;
+      if (py2 <= 0) return null;
+      P = [[r.x0, y], [r.x1, y], [r.x0 + px, y + sgn * Math.sqrt(py2)]];
+    } else {
+      const n = sp.n; const a = r.x1 - r.x0; const Rb = a / (2 * Math.sin(Math.PI / n)); const apo = a / (2 * Math.tan(Math.PI / n));
+      const cx = (r.x0 + r.x1) / 2; const cy = y + sgn * apo;
+      const a0 = Math.atan2(y - cy, r.x0 - cx);
+      const step = (side === 'up' ? -1 : 1) * (2 * Math.PI / n);
+      P = [...Array(n).keys()].map((k) => [cx + Rb * Math.cos(a0 + step * k), cy + Rb * Math.sin(a0 + step * k)]);
+      // 첫 두 점이 붙은 변 (x0 → x1) 이 되게 방향 확인
+      if (Math.hypot(P[1][0] - r.x1, P[1][1] - y) > 1e-6) P = [P[0], ...P.slice(1).reverse()];
+    }
+    return { i, side, pts: P };
+  };
+  for (const i of sp.up) { const b = make(i, 'up'); if (!b) return null; bases.push(b); }
+  for (const i of sp.dn) { const b = make(i, 'dn'); if (!b) return null; bases.push(b); }
+  // 같은 쪽 밑면끼리 겹치면 못 그린다 (그림이 거짓말하지 않게)
+  for (const side of ['up', 'dn']) {
+    const bs = bases.filter((b) => b.side === side).map((b) => [Math.min(...b.pts.map((p) => p[0])), Math.max(...b.pts.map((p) => p[0]))]).sort((p, q) => p[0] - q[0]);
+    for (let k = 1; k < bs.length; k++) if (bs[k][0] < bs[k - 1][1] + 0.2) return null;
+  }
+  return { rects, bases, xs };
+}
+
+export function pnetSvg(sp) {
+  const L = sp.L; const u = sp.unit;
+  const allPts = [...L.rects.flatMap((r) => [[r.x0, r.y0], [r.x1, r.y1]]), ...L.bases.flatMap((b) => b.pts)];
+  const bw = Math.max(...allPts.map((p) => p[0])) - Math.min(...allPts.map((p) => p[0]));
+  const bh = Math.max(...allPts.map((p) => p[1])) - Math.min(...allPts.map((p) => p[1]));
+  const s = Math.min(300 / bw, 280 / bh, 40);
+  const S = ([x, y]) => [x * s, y * s];
+  let g = ''; const segs = []; const taken = []; const pts = allPts.map(S);
+  for (const r of L.rects) g += `<rect class="pnet-r" data-i="${r.i}" x="${cf(r.x0 * s)}" y="0" width="${cf((r.x1 - r.x0) * s)}" height="${cf(sp.hd * s)}" fill="${FILL}" fill-opacity="0.12"/>`;
+  for (const b of L.bases) g += `<polygon class="pnet-b" data-side="${b.side}" data-i="${b.i}" points="${b.pts.map((p) => S(p).map(cf).join(',')).join(' ')}" fill="${FILL2}" fill-opacity="0.22"/>`;
+  const seg = (cls, a, b, fold, extra = '') => {
+    const A = S(a); const B = S(b); segs.push([A, B]);
+    return `<line class="${cls}" x1="${cf(A[0])}" y1="${cf(A[1])}" x2="${cf(B[0])}" y2="${cf(B[1])}" stroke="currentColor" stroke-width="${fold ? 1.4 : 2.2}"${fold ? ' stroke-dasharray="5 4" stroke-opacity="0.8"' : ''} stroke-linecap="round"${extra}/>`;
+  };
+  // 옆면: 사이 변은 접는 선, 위·아래 변은 밑면이 붙으면 접는 선
+  L.rects.forEach((r) => {
+    const upB = sp.up.includes(r.i); const dnB = sp.dn.includes(r.i);
+    g += seg(upB ? 'pnet-fold' : 'pnet-cut', [r.x0, 0], [r.x1, 0], upB, ` data-k="top" data-i="${r.i}"`);
+    g += seg(dnB ? 'pnet-fold' : 'pnet-cut', [r.x0, sp.hd], [r.x1, sp.hd], dnB, ` data-k="bottom" data-i="${r.i}"`);
+    if (r.i > 0) g += seg('pnet-fold', [r.x0, 0], [r.x0, sp.hd], true, ` data-k="mid" data-i="${r.i}"`);
+  });
+  g += seg('pnet-cut', [0, 0], [0, sp.hd], false, ' data-k="end" data-i="L"');
+  const xe = L.xs[L.xs.length - 1];
+  g += seg('pnet-cut', [xe, 0], [xe, sp.hd], false, ' data-k="end" data-i="R"');
+  for (const b of L.bases) for (let k = 1; k < b.pts.length; k++) g += seg('pnet-cut', b.pts[k], b.pts[(k + 1) % b.pts.length], false, ` data-k="${b.side}${k}" data-i="${b.i}"`);
+  // 이름표
+  const cen = [xe * s / 2, sp.hd * s / 2];
+  const put = (t, a, b, k, out) => {
+    const A = S(a); const B = S(b); const mx = (A[0] + B[0]) / 2; const my = (A[1] + B[1]) / 2;
+    let ox; let oy;
+    if (out) [ox, oy] = out; else { const ex = B[0] - A[0]; const ey = B[1] - A[1]; ox = -ey; oy = ex; if (ox * (mx - cen[0]) + oy * (my - cen[1]) < 0) { ox = -ox; oy = -oy; } }
+    const own = segs.find(([p, q]) => (Math.hypot(p[0] - A[0], p[1] - A[1]) < 0.01 && Math.hypot(q[0] - B[0], q[1] - B[1]) < 0.01) || (Math.hypot(p[0] - B[0], p[1] - B[1]) < 0.01 && Math.hypot(q[0] - A[0], q[1] - A[1]) < 0.01));
+    const at = solPlace(t, mx, my, ox, oy, segs, [], taken, [4, 8, 12, 18, 26, 36], own);
+    g += solLab('sol-lab pnet-len', at.x, at.y, t, ` data-k="${k}"`);
+  };
+  // 밑면의 한 변(a) — 밑면이 안 붙은 옆면 위(없으면 아래) 변
+  const freeTop = L.rects.filter((r) => !sp.up.includes(r.i)); const freeBot = L.rects.filter((r) => !sp.dn.includes(r.i));
+  if ('a' in sp && !sp.rt) {
+    // 밑면 다각형이 가로로 덮지 않는 빈 변부터 (정팔각형처럼 넓은 밑면은 옆 옆면 위까지 덮어 이름표를 선이 지나갔다)
+    const span = (side) => L.bases.filter((b) => b.side === side).map((b) => [Math.min(...b.pts.map((z) => z[0])), Math.max(...b.pts.map((z) => z[0]))]);
+    const clear = (r, side) => span(side).every(([x0, x1]) => r.x1 <= x0 + 1e-9 || r.x0 >= x1 - 1e-9);
+    const cand = [...freeTop.map((r) => [r, 'up']), ...freeBot.map((r) => [r, 'dn'])];
+    const [r, side] = cand.find(([rr, sd]) => clear(rr, sd)) || cand[0];
+    const y = side === 'up' ? 0 : sp.hd;
+    put(solLenText(sp.a, u), [r.x0, y], [r.x1, y], 'a', [0, side === 'up' ? -1 : 1]);
+  }
+  if (sp.rt) {
+    // 직각삼각형 밑면: 옆면마다 가로 길이 (밑면이 안 붙은 쪽에)
+    L.rects.forEach((r) => {
+      const y = !sp.dn.includes(r.i) ? sp.hd : !sp.up.includes(r.i) ? 0 : null;
+      if (y !== null) put(`${sp.widths[r.i]} ${u}`, [r.x0, y], [r.x1, y], `w${r.i}`, [0, y ? 1 : -1]);
+    });
+  }
+  if ('h' in sp) put(solLenText(sp.h, u), [xe, 0], [xe, sp.hd], 'h', [1, 0]);
+  if (sp.q) {
+    const qt = `? ${u}`;
+    // 밑면 다각형의 변 — 이름표는 그 다각형의 가운데에서 먼 쪽으로 (옆면 줄 가운데를 기준으로 밀면 좁은 삼각형 안쪽으로 들어가 빗변 옆에 놓였다)
+    const awayFrom = (b, p, q) => { const cx = b.pts.reduce((a, z) => a + z[0], 0) / b.pts.length; const cy = b.pts.reduce((a, z) => a + z[1], 0) / b.pts.length; let nx = -(q[1] - p[1]); let ny = q[0] - p[0]; if (nx * ((p[0] + q[0]) / 2 - cx) + ny * ((p[1] + q[1]) / 2 - cy) < 0) { nx = -nx; ny = -ny; } return [nx, ny]; };
+    if (sp.q === 'end') put(qt, [0, 0], [0, sp.hd], 'q', [-1, 0]);
+    else if (sp.q === 'w') {
+      const r = freeBot.length ? freeBot[freeBot.length - 1] : freeTop[freeTop.length - 1]; const y = freeBot.length ? sp.hd : 0;
+      put(qt, [r.x0, y], [r.x1, y], 'q', [0, freeBot.length ? 1 : -1]);
+    } else if (sp.q === 'base') {
+      const b = L.bases.find((x) => x.side === 'up');
+      let best = 1;
+      for (let k = 1; k < b.pts.length; k++) { const m = (b.pts[k][1] + b.pts[(k + 1) % b.pts.length][1]) / 2; const mb = (b.pts[best][1] + b.pts[(best + 1) % b.pts.length][1]) / 2; if (m < mb - 1e-9) best = k; }
+      put(qt, b.pts[best], b.pts[(best + 1) % b.pts.length], 'q', awayFrom(b, b.pts[best], b.pts[(best + 1) % b.pts.length]));
+    } else {
+      const b = L.bases.find((x) => x.side === sp.q.slice(0, 2));
+      // up0/dn0 = 붙은 변의 왼쪽 끝에서 나온 변 (꼭짓점 2 → 0), up1/dn1 = 오른쪽 끝에서 나온 변 (1 → 2)
+      const [p, q] = sp.q.endsWith('0') ? [b.pts[2], b.pts[0]] : [b.pts[1], b.pts[2]];
+      put(qt, p, q, 'q', awayFrom(b, p, q));
+    }
+  }
+  return solFrame('pnet-fig', g, pts, taken, pnetText(sp), ` data-s="${s.toFixed(6)}" data-valid="${sp.valid ? 1 : 0}"`);
+}
+
+export function pnetText(sp) {
+  const u = sp.unit;
+  const baseName = sp.rt ? `직각삼각형(세 변 ${sp.rt.join(' cm · ')} cm)` : `정${POLY_KO[sp.n]}`;
+  const where = [...sp.up.map((i) => `${i + 1}번째 직사각형 위`), ...sp.dn.map((i) => `${i + 1}번째 직사각형 아래`)].join('·');
+  const parts = [`${baseName} ${sp.up.length + sp.dn.length}개와 직사각형 ${sp.s}개를 이은 그림 — 직사각형이 한 줄(왼쪽부터), ${baseName.replace(/\(.*\)/, '')}은 ${where}`];
+  const lens = [];
+  if ('a' in sp && !sp.rt) lens.push(`밑면의 한 변 ${solLenText(sp.a, u)}`);
+  if (sp.rt) lens.push(`직사각형 가로 왼쪽부터 ${sp.widths.join(' · ')} ${u}`);
+  if ('h' in sp) lens.push(`직사각형 세로(오른쪽 끝) ${solLenText(sp.h, u)}`);
+  if (sp.q) lens.push(`? 표시 ${{ base: '위쪽 다각형의 맨 위 변', end: '직사각형 줄의 왼쪽 끝 변', w: '직사각형 하나의 가로', up0: '위쪽 삼각형의 왼쪽 변', up1: '위쪽 삼각형의 오른쪽 변', dn0: '아래쪽 삼각형의 왼쪽 변', dn1: '아래쪽 삼각형의 오른쪽 변' }[sp.q]}`);
+  return [parts[0], lens.join(' · ')].filter(Boolean).join(' · ');
+}
+
+/** `[cnet r=3 h=5 (w=?|18.84) (same|diff|para)]` 원기둥 전개도 — 옆면 직사각형 가로 = 2 × 반지름 × 원주율로 그린다(같은 비율).
+ *  same: 원 둘이 모두 위 · diff: 아래 원이 작음 · para: 옆면이 평행사변형 — 셋 다 전개도가 아닌 그림 */
+export function parseCnet(arg) {
+  const t = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  const sp = { unit: 'cm', bad: '' };
+  if (t.length && /^(cm|m)$/.test(t[t.length - 1])) sp.unit = t.pop();
+  const seen = new Set();
+  for (const tok of t) {
+    let m;
+    if (/^(same|diff|para)$/.test(tok)) { if (sp.bad) return null; sp.bad = tok; continue; }
+    if (!(m = /^([a-z]+)=(.+)$/.exec(tok)) || seen.has(m[1])) return null;
+    seen.add(m[1]);
+    const [, k, v] = m;
+    if (k === 'r' || k === 'd' || k === 'h') { if (v === '?') sp[k] = '?'; else if (/^\d+$/.test(v) && +v >= 1 && +v <= 40) sp[k] = +v; else return null; }
+    else if (k === 'w') { if (v === '?') sp.w = '?'; else if (/^\d+(\.\d{1,2})?$/.test(v)) sp.w = v; else return null; }
+    else return null;
+  }
+  if ('r' in sp && 'd' in sp) return null;
+  const rN = isNum(sp.r) ? sp.r : isNum(sp.d) ? sp.d / 2 : isNum(+sp.w) && sp.w !== '?' ? +sp.w / (2 * 3.14) : 3;
+  const hN = isNum(sp.h) ? sp.h : rN * 2;
+  if (rN > 12 || hN / rN < 0.5 || hN / rN > 5) return null;
+  // 적힌 가로가 있으면 지름 × 3.14와 맞아야 한다 (반지름이 적혀 있을 때)
+  if (sp.w && sp.w !== '?' && (isNum(sp.r) || isNum(sp.d))) { const want = Math.round(2 * rN * 314) / 100; if (Math.abs(+sp.w - want) > 1e-9) return null; }
+  sp.rd = rN; sp.hd = hN;
+  sp.valid = !sp.bad;
+  return sp;
+}
+
+export function cnetSvg(sp) {
+  const u = sp.unit; const Wc = 2 * Math.PI * sp.rd;
+  const s = Math.min(320 / Wc, 170 / sp.hd, 56 / sp.rd);
+  const W = Wc * s; const Hh = sp.hd * s; const R = sp.rd * s; const R2 = sp.bad === 'diff' ? R * 0.6 : R;
+  const sk = sp.bad === 'para' ? Hh * 0.35 : 0;
+  let g = ''; const segs = []; const curves = []; const taken = [];
+  const quad = [[0, 0], [W, 0], [W + sk, Hh], [sk, Hh]];
+  g += `<polygon class="cnet-side" points="${quad.map((p) => p.map(cf).join(',')).join(' ')}" fill="${FILL}" fill-opacity="0.12" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>`;
+  quad.forEach((p, i) => segs.push([p, quad[(i + 1) % 4]]));
+  const circles = sp.bad === 'same' ? [[0.25 * W, -R, R], [0.75 * W, -R, R]] : [[0.3 * W, -R, R], [0.7 * W + sk, Hh + R2, R2]];
+  for (const [cx, cy, rr] of circles) {
+    g += `<circle class="cnet-c" data-r="${cf(rr / s)}" cx="${cf(cx)}" cy="${cf(cy)}" r="${cf(rr)}" fill="${FILL2}" fill-opacity="0.22" stroke="currentColor" stroke-width="2.2"/>`;
+    curves.push(ellPts(cx, cy, rr, rr));
+  }
+  const pts = [[0, -2 * R], [W + sk, Hh + 2 * R2], ...quad];
+  const [c0x, c0y] = circles[0];
+  const rKey = 'r' in sp ? 'r' : 'd' in sp ? 'd' : '';
+  if (rKey) {
+    const a = rKey === 'd' ? [c0x - R, c0y] : [c0x, c0y]; const b = [c0x + R, c0y];
+    segs.push([a, b]);
+    g += `<line class="cnet-${rKey}" x1="${cf(a[0])}" y1="${cf(a[1])}" x2="${cf(b[0])}" y2="${cf(b[1])}" stroke="currentColor" stroke-width="2"/>`;
+    g += `<circle class="sol-o" cx="${cf(c0x)}" cy="${cf(c0y)}" r="3" fill="currentColor"/>`;
+    const t = solLenText(sp[rKey], u); const at = solPlace(t, c0x + R, c0y, 1, 0, segs, curves, taken, [4, 8, 12]);
+    g += solLab('sol-lab cnet-len', at.x, at.y, t, ` data-k="${rKey}"`);
+  }
+  if ('h' in sp) {
+    const t = solLenText(sp.h, u); const at = solPlace(t, W + sk / 2, Hh / 2, 1, 0, segs, curves, taken, [4, 8, 12]);
+    g += solLab('sol-lab cnet-len', at.x, at.y, t, ' data-k="h"');
+  }
+  if (sp.w) {
+    const t = sp.w === '?' ? `? ${u}` : `${sp.w} ${u}`;
+    const at = sp.bad === 'same' ? solPlace(t, W / 2 + sk, Hh, 0, 1, segs, curves, taken, [4, 8, 12]) : solPlace(t, 0.78 * W, 0, 0, -1, segs, curves, taken, [4, 8, 12, 18]);
+    g += solLab('sol-lab cnet-len', at.x, at.y, t, ' data-k="w"');
+  }
+  return solFrame('cnet-fig', g, pts, taken, cnetText(sp), ` data-s="${s.toFixed(6)}" data-valid="${sp.valid ? 1 : 0}"`);
+}
+
+export function cnetText(sp) {
+  const u = sp.unit;
+  const side = sp.bad === 'para' ? '평행사변형' : '직사각형';
+  const where = sp.bad === 'same' ? '원 2개가 모두 위' : sp.bad === 'diff' ? '위에 원 하나·아래에 더 작은 원 하나' : '위·아래에 원 하나씩';
+  const lens = [];
+  if ('r' in sp) lens.push(`위쪽 원의 반지름 ${solLenText(sp.r, u)}`);
+  if ('d' in sp) lens.push(`위쪽 원의 지름 ${solLenText(sp.d, u)}`);
+  if (sp.w) lens.push(`${side}의 가로 ${sp.w === '?' ? `? ${u}` : `${sp.w} ${u}`}`);
+  if ('h' in sp) lens.push(`${side}의 세로 ${solLenText(sp.h, u)}`);
+  return [`원 2개와 ${side} 하나를 이은 그림 — ${where}`, lens.join(' · ')].filter(Boolean).join(' · ');
+}
+
 /** 그린 SVG의 글자 상자 (가운데 정렬 · 글꼴 크기는 그림에서) — 생성기가 이름표가 겹치지 않는 자리를 다시 고를 때 */
 export function labelBoxesOf(svg) {
   return [...String(svg).matchAll(/<text class="[^"]*" x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="(\d+)"[^>]*>([^<]+)<\/text>/g)].map((z) => {
@@ -1710,6 +2449,10 @@ export function figureSvg(spec) {
   if ((m = /^circle (.+)$/.exec(s))) { const sp = parseCircle(m[1]); return sp ? circleSvg(sp) : ''; } // 🔵 N 원의 넓이
   if ((m = /^cuboid (.+)$/.exec(s))) { const sp = parseCuboid(m[1]); return sp ? cuboidSvg(sp) : ''; } // 🧊 O 직육면체 겨냥도
   if ((m = /^net (.+)$/.exec(s))) { const sp = parseNet(m[1]); return sp ? netSvg(sp) : ''; } // 🧊 O 전개도
+  if ((m = /^(prism|pyramid|cyl|cone|sphere) (.+)$/.exec(s))) { const sp = parseSolid(m[1], m[2]); return sp ? solidSvg(sp) : ''; } // 🔷 P 입체도형
+  if ((m = /^spin (.+)$/.exec(s))) { const sp = parseSpin(m[1]); return sp ? spinSvg(sp) : ''; } // 🔷 P 돌리기
+  if ((m = /^pnet (.+)$/.exec(s))) { const sp = parsePnet(m[1]); return sp ? pnetSvg(sp) : ''; } // 🔷 P 각기둥 전개도
+  if ((m = /^cnet (.+)$/.exec(s))) { const sp = parseCnet(m[1]); return sp ? cnetSvg(sp) : ''; } // 🔷 P 원기둥 전개도
   if ((m = /^steps ((?:\d+\s*){2,5})$/.exec(s))) return stepsSvg(m[1].trim().split(/\s+/).map(Number));
   if ((m = /^table (.+)$/.exec(s))) { const rows = parseTable(m[1]); return rows ? tableSvg(rows) : ''; }
   // 🔺 도형 — 끝에 단위(cm·m)를 붙일 수 있다. 수는 1~40, 모양이 말이 안 되면(밑변보다 큰 밀림 등) 빈 글자
@@ -1784,6 +2527,10 @@ export function figText(text, short = false) {
     .replace(/\[circle ([^\]]+)\]/g, (all, arg) => { const sp = parseCircle(arg); return !sp ? all : short ? '(그림)' : `(${circleText(sp)})`; })
     .replace(/\[cuboid ([^\]]+)\]/g, (all, arg) => { const sp = parseCuboid(arg); return !sp ? all : short ? '(그림)' : `(${cuboidText(sp)})`; })
     .replace(/\[net ([^\]]+)\]/g, (all, arg) => { const sp = parseNet(arg); return !sp ? all : short ? '(그림)' : `(${netText(sp)})`; })
+    .replace(/\[(prism|pyramid|cyl|cone|sphere) ([^\]]+)\]/g, (all, kind, arg) => { const sp = parseSolid(kind, arg); return !sp ? all : short ? '(그림)' : `(${solidText(sp)})`; })
+    .replace(/\[spin ([^\]]+)\]/g, (all, arg) => { const sp = parseSpin(arg); return !sp ? all : short ? '(그림)' : `(${spinText(sp)})`; })
+    .replace(/\[pnet ([^\]]+)\]/g, (all, arg) => { const sp = parsePnet(arg); return !sp ? all : short ? '(그림)' : `(${pnetText(sp)})`; })
+    .replace(/\[cnet ([^\]]+)\]/g, (all, arg) => { const sp = parseCnet(arg); return !sp ? all : short ? '(그림)' : `(${cnetText(sp)})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
 }
@@ -1823,7 +2570,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────
