@@ -272,11 +272,11 @@ export const EXPR = [
       // 거리·시간
       fams.push(famOf([
         (() => { const v = int(r, 4, 9) * 10; return { t: `자동차가 한 시간에 ${v} km씩 x시간 동안 달렸어요.\n\n달린 거리는 몇 km인지 ${FORMULA}`, text: true, ans: `${v} × x`, wr: [{ text: `${v} ÷ x`, tag: TAGS.speedDiv }, { text: `${v} + x`, tag: TAGS.addForMul }], steps: [`한 시간에 ${v} km씩 x시간`, `${v} × x (km)`], why: { [TAGS.speedDiv]: `한 시간마다 ${v} km씩 늘어나요 — 곱해요.`, [TAGS.addForMul]: `x시간 동안 ${v} km가 x번 — 곱해요.` }, probe: { ask: 'dist', v } }; })(),
-        (() => { const v = int(r, 4, 9) * 10; return { t: `y km인 길을 한 시간에 ${v} km씩 가요.\n\n걸리는 시간은 몇 시간인지 ${FORMULA}`, text: true, ans: `y ÷ ${v}`, wr: [{ text: `y × ${v}`, tag: TAGS.timeMul }, { text: `${v} ÷ y`, tag: TAGS.divSwap }], steps: [`한 시간에 ${v} km씩 — y km에 ${v} km가 몇 번 들어가는지`, `y ÷ ${v} (시간)`], why: { [TAGS.timeMul]: '곱하면 시간이 거리보다 더 커져요. 나눠요.', [TAGS.divSwap]: `y km 안에 ${v} km가 몇 번 — y를 ${v}로 나눠요.` }, probe: { ask: 'time', v } }; })(),
+        (() => { const v = int(r, 4, 9) * 10; return { t: `y km인 길을 한 시간에 ${v} km씩 가요.\n\n걸리는 시간은 몇 시간인지 ${FORMULA}`, text: true, ans: `y ÷ ${v}`, wr: [{ text: `y × ${v}`, tag: TAGS.timeMul }, { text: `${v} ÷ y`, tag: TAGS.divSwap }], steps: [`한 시간에 ${v} km씩 — y km에 ${v} km가 몇 번 들어가는지`, `y ÷ ${v} (시간)`], why: { [TAGS.timeMul]: `y × ${v}은 한 시간에 ${v} km씩 y시간 동안 간 거리예요 — 걸리는 시간은 y km 안에 ${v} km가 몇 번 들어가는지 나눠요.`, [TAGS.divSwap]: `y km 안에 ${v} km가 몇 번 — y를 ${v}로 나눠요.` }, probe: { ask: 'time', v } }; })(),
       ]));
       // 백분율
       fams.push(famOf([
-        (() => { const p = pick(r, [10, 20, 30, 40, 60, 70, 80, 90]); return { t: `정가가 a원인 옷을 ${p} % 할인했어요.\n\n할인한 금액은 몇 원인지 ${FORMULA}`, text: true, ans: `a × ${p}/100`, wr: [{ text: `a × ${p}`, tag: TAGS.pctWhole }, { text: `a × 100/${p}`, tag: TAGS.pctFlip }], steps: [`${p} %는 ${p}/100`, `a원의 ${p} % → a × ${p}/100 (원)`], why: { [TAGS.pctWhole]: `${p} %는 ${p}/100이에요 — ${p}를 그대로 곱하면 정가보다 커져요.`, [TAGS.pctFlip]: `${p} %는 100분의 ${p} — ${p}/100이에요.` }, probe: { ask: 'pct', p }, rule: '백분율만큼은 정가 × (백분율 ÷ 100) — 백분율을 100으로 나눠 곱해요.' }; })(),
+        (() => { const p = pick(r, [10, 20, 30, 40, 60, 70, 80, 90]); return { t: `정가가 a원인 옷을 ${p} % 할인했어요.\n\n할인한 금액은 몇 원인지 ${FORMULA}`, text: true, ans: `a × ${p}/100`, wr: [{ text: `a × ${p}`, tag: TAGS.pctWhole }, { text: `a × 100/${p}`, tag: TAGS.pctFlip }], steps: [`${p} %는 ${p}/100`, `a원의 ${p} % → a × ${p}/100 (원)`], why: { [TAGS.pctWhole]: `${p}를 그대로 곱하면 정가보다 커져요 — ${p} %는 ${p}/100.`, [TAGS.pctFlip]: `${p} %는 100분의 ${p} — 분모가 100, 분자가 ${p}.` }, probe: { ask: 'pct', p }, rule: '백분율만큼은 정가 × (백분율 ÷ 100) — 백분율을 100으로 나눠 곱해요.' }; })(),
       ]));
       // 둘레·평균 (괄호)
       fams.push(famOf([
@@ -382,8 +382,8 @@ export const EXPR = [
       if (branchOf(r, c, ['flip', 'order']) === 'flip') {
         const n = int(r, 2, 9);
         return misAsk(r, c, this, 'flip', {
-          q: `나눗셈 기호 ÷를 생략하여 나타내요.\n\n${showWork(`x ÷ ${jn(n, '은', '는')} ${n}/x예요`)}`,
-          ok: `나누는 수 ${n}이 분모 — x/${n}이에요`.replace(`${n}이 분모`, `${jn(n, '이', '가')} 분모`),
+          q: `나눗셈 기호 ÷를 생략하여 나타내요.\n\n${showWork(`x ÷ ${n} = ${n}/x`)}`,
+          ok: `나누는 수 ${jn(n, '이', '가')} 분모 — x ÷ ${n} = x/${n}`,
           wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `${n}x예요 — ÷를 지우고 붙여 써요`, tag: TAGS.divAsMul }, { text: '나눗셈은 생략할 수 없어요', tag: OFF }],
           steps: [`나누는 수 ${jn(n, '이', '가')} 분모, 나뉘는 x가 분자`, `x ÷ ${n} = x/${n}`],
           whyAny: '분자와 분모가 뒤집혔어요. 나누는 수가 분모예요.',
@@ -391,8 +391,8 @@ export const EXPR = [
         });
       }
       return misAsk(r, c, this, 'order', {
-        q: `곱셈 기호와 나눗셈 기호를 생략하여 나타내요.\n\n${showWork('a ÷ b × c는 a/(bc)예요')}`,
-        ok: '앞에서부터 차례로 — a ÷ b × c는 ac/b예요',
+        q: `곱셈 기호와 나눗셈 기호를 생략하여 나타내요.\n\n${showWork('a ÷ b × c = a/(bc)')}`,
+        ok: '앞에서부터 차례로 — a ÷ b × c = ac/b',
         wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: 'abc예요 — 기호를 모두 지워요', tag: TAGS.divAsMul }, { text: '곱셈과 나눗셈은 섞어 쓸 수 없어요', tag: OFF }],
         steps: ['앞에서부터 a ÷ b = a/b', 'a/b × c = ac/b'],
         whyAny: 'b × c를 먼저 계산했어요. ×와 ÷는 앞에서부터 차례로 해요.',
@@ -445,7 +445,7 @@ export const EXPR = [
 
   {
     id: 'exp.terms', grade: 7, name: '다항식과 일차식', needs: ['exp.value'],
-    idea: '수나 문자의 곱으로 된 식 하나하나를 **항**이라고 해요. 수만 있는 항은 **상수항**, 문자 앞에 곱해진 수는 그 문자의 **계수**(부호까지)예요. 항이 하나뿐인 식은 **단항식**, 항이 여러 개인 식은 **다항식**이에요. 곱해진 문자의 개수를 그 항의 **차수**라고 하고, 차수가 가장 큰 항의 차수가 다항식의 차수예요. 차수가 1인 다항식이 **일차식**이에요 — x²이 있거나 분모에 문자가 있으면 일차식이 아니에요.',
+    idea: '수나 문자의 곱으로 된 식 하나하나를 **항**이라고 해요. 수만 있는 항은 **상수항**, 문자 앞에 곱해진 수는 그 문자의 **계수**(부호까지)예요. 항이 하나 이상인 식을 **다항식**이라고 하고, 그중 항이 하나뿐인 식을 **단항식**이라고 해요(단항식도 다항식). 곱해진 문자의 개수를 그 항의 **차수**라고 하고, 차수가 가장 큰 항의 차수가 다항식의 차수예요. 차수가 1인 다항식이 **일차식**이에요 — x²이 있거나 분모에 문자가 있으면 일차식이 아니에요.',
     rule: '계수는 부호까지 · 상수항도 항 · 차수가 1이면 일차식.',
     slip: '부호까지 읽었는지, 차수가 가장 큰 항을 봤는지 봐요.',
     calc(r, c) {
@@ -453,7 +453,7 @@ export const EXPR = [
       fams.push(famOf([
         (() => { const [a, b, k] = draw(() => [int(r, 2, 9), int(r, 2, 9), int(r, 1, 9)], ([a1, b1]) => a1 !== b1); return { t: `다음 다항식에서 y의 계수는 얼마일까요?\n\n**${a}x − ${b}y + ${k}**`, ans: num(-b), wr: [{ text: num(b), tag: TAGS.coefSign }, { text: num(a), tag: TAGS.otherCoef }], steps: [`${a}x − ${b}y + ${k} = ${a}x + (−${b})y + ${k}`, `y의 계수는 −${b}`], why: { [TAGS.coefSign]: '계수는 부호까지 — 앞의 −를 함께 읽어요.', [TAGS.otherCoef]: `${a}는 x의 계수예요.`.replace(`${a}는`, jn(a, '은', '는')) }, probe: { ask: 'coef' } }; })(),
         (() => { const [b, k] = draw(() => [int(r, 2, 9), int(r, 2, 9)], ([b1, k1]) => b1 !== k1); return { t: `다음 다항식에서 x의 계수는 얼마일까요?\n\n**x − ${b}y + ${k}**`, ans: '1', wr: [{ text: '0', tag: TAGS.oneAsZero }, { text: num(-b), tag: TAGS.otherCoef }], steps: ['x는 1 × x — 1을 쓰지 않은 것', 'x의 계수는 1'], why: { [TAGS.oneAsZero]: 'x = 1 × x — 계수는 0이 아니라 1이에요.', [TAGS.otherCoef]: `−${b}는 y의 계수예요.`.replace(`${b}는`, jn(b, '은', '는')) }, probe: { ask: 'coef' } }; })(),
-        (() => { const [n, b] = draw(() => [int(r, 2, 9), int(r, 1, 9)], ([n1, b1]) => n1 !== b1); return { t: `다음 다항식에서 x의 계수는 얼마일까요?\n\n**x/${n} − ${b}**`, ans: `1/${n}`, wr: [{ text: String(n), tag: TAGS.denomAsCoef }, { text: '1', tag: TAGS.denomDrop }], steps: [`x/${n} = 1/${n} × x`, `x의 계수는 1/${n}`], why: { [TAGS.denomAsCoef]: `${n}은 분모예요 — x에 곱한 수는 1/${n}이에요.`.replace(`${n}은`, jn(n, '은', '는')), [TAGS.denomDrop]: `x를 ${n}으로 나눈 것 — 1/${n} × x예요.`.replace(`${n}으로`, jn(n, '으로', '로')) }, probe: { ask: 'coef' } }; })(),
+        (() => { const [n, b] = draw(() => [int(r, 2, 9), int(r, 1, 9)], ([n1, b1]) => n1 !== b1); return { t: `다음 다항식에서 x의 계수는 얼마일까요?\n\n**x/${n} − ${b}**`, ans: `1/${n}`, wr: [{ text: String(n), tag: TAGS.denomAsCoef }, { text: '1', tag: TAGS.denomDrop }], steps: [`x/${n} = 1/${n} × x`, `x의 계수는 1/${n}`], why: { [TAGS.denomAsCoef]: `${n}은 분모예요 — x에 곱한 수가 계수라서 1/${n}.`.replace(`${n}은`, jn(n, '은', '는')), [TAGS.denomDrop]: `x를 ${n}으로 나눈 것 — 1/${n} × x예요.`.replace(`${n}으로`, jn(n, '으로', '로')) }, probe: { ask: 'coef' } }; })(),
       ]));
       fams.push(famOf([
         (() => { const [a, b] = draw(() => [int(r, 2, 9), int(r, 2, 9)], ([a1, b1]) => a1 !== b1); return { t: `다음 다항식의 상수항은 얼마일까요?\n\n**${a}x − ${b}**`, ans: num(-b), wr: [{ text: num(b), tag: TAGS.constSign }, { text: num(a), tag: TAGS.coefAsConst }], steps: [`${a}x − ${b} = ${a}x + (−${b})`, `수만 있는 항 −${b}가 상수항`], why: { [TAGS.constSign]: '상수항도 부호까지 — −를 함께 읽어요.', [TAGS.coefAsConst]: `${a}는 x의 계수예요. 상수항은 수만 있는 항이에요.`.replace(`${a}는`, jn(a, '은', '는')) }, probe: { ask: 'const' } }; })(),
@@ -560,7 +560,7 @@ export const EXPR = [
         return misAsk(r, c, this, 'const', {
           q: `식을 간단히 해요.\n\n${showWork(`${a}x + ${b} = ${a + b}x`)}`,
           ok: `${a}x와 ${jn(b, '은', '는')} 동류항이 아니라서 더 간단히 할 수 없어요`,
-          wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `${a}x + ${b} = ${jn(a + b, '이에요', '예요')}`, tag: TAGS.dropVar }, { text: '덧셈은 할 수 없어요', tag: OFF }],
+          wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `${a}x + ${b} = ${jn(a + b, '이에요', '예요')}`, tag: TAGS.dropVar }, { text: '문자가 들어간 식에는 + 기호를 쓸 수 없어요', tag: OFF }],
           steps: [`${a}x는 문자가 있는 항, ${jn(b, '은', '는')} 상수항`, '동류항이 아니라서 그대로 둬요'],
           whyAny: '상수항까지 x와 더했어요. 동류항끼리만 더해요.',
           probe: { ask: 'const', a, b },

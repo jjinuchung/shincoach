@@ -552,6 +552,7 @@ button { font-family: inherit; }
 .math-wrongnote summary .k { font-size: 0.78rem; background: #fee2e2; color: #991b1b; border-radius: 999px; padding: 2px 8px; flex: 0 0 auto; }
 .math-wrongnote summary .qt { font-weight: 500; font-size: 0.95rem; }
 .math-wrongnote .body { padding: 0 12px 10px; }
+.math-wrongnote .body .math-qt { font-size: 0.95rem; margin: 2px 0 8px; } /* 펼친 오답 노트의 문제 글 전체 (Codex 26차 #5) */
 .math-expr.small { font-size: 1.25rem; margin: 6px 0; }
 
 /* 결과 */

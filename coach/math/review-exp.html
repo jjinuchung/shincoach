@@ -219,7 +219,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
         <div class="ref"><span class="lbl">확인 질문</span><code>D1-4✓</code></div>
         <div class="qt"><p><i class="v">y</i> km인 길을 한 시간에 50 km씩 가요.</p><p>걸리는 시간은 몇 시간인지 식으로 나타내면 어느 것일까요?</p></div>
         <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><i class="v">y</i> ÷ 50</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">y</i> × 50</span></li><li class="no"><span class="mark"></span><span class="txt">50 ÷ <i class="v">y</i></span></li></ol>
-        <p class="why"><span class="why-lbl">틀리면</span><i class="v">y</i> km 안에 50 km가 몇 번 들어가는지 — <i class="v">y</i>를 50으로 나눠요. 곱하면 시간이 거리보다 커져요.</p>
+        <p class="why"><span class="why-lbl">틀리면</span><i class="v">y</i> km 안에 50 km가 몇 번 들어가는지 — <i class="v">y</i>를 50으로 나눠요. <i class="v">y</i> × 50은 한 시간에 50 km씩 <i class="v">y</i>시간 동안 간 거리예요 — 걸리는 시간이 아니에요.</p>
       </div>
       </div>
     </li><li class="step" id="D1-5">
@@ -441,8 +441,8 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
       <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n"><i class="v">ac</i></span><span class="d"><i class="v">b</i></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">abc</i></span><span class="tag">나눗셈을 곱셈으로 봄</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">bc</i></span></span></span><span class="tag">앞에서부터 하지 않고 ×를 먼저 함</span></li></ol>
     </div><div class="sample" id="D3-②">
       <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D3-②</code></div>
-      <div class="say"><p>곱셈 기호와 나눗셈 기호를 생략하여 나타내요.</p><p>개굴닌자가 이렇게 말했어요.</p><p><strong><i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i>는 <span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">bc</i></span></span>예요</strong></p><p>어디가 틀렸을까요?</p></div>
-      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">곱셈과 나눗셈은 섞어 쓸 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">abc</i>예요 — 기호를 모두 지워요</span><span class="tag">나눗셈을 곱셈으로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">앞에서부터 차례로 — <i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i>는 <span class="fr"><span class="n"><i class="v">ac</i></span><span class="d"><i class="v">b</i></span></span>예요</span></li></ol>
+      <div class="say"><p>곱셈 기호와 나눗셈 기호를 생략하여 나타내요.</p><p>개굴닌자가 이렇게 말했어요.</p><p><strong><i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i> = <span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">bc</i></span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">곱셈과 나눗셈은 섞어 쓸 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">abc</i>예요 — 기호를 모두 지워요</span><span class="tag">나눗셈을 곱셈으로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">앞에서부터 차례로 — <i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i> = <span class="fr"><span class="n"><i class="v">ac</i></span><span class="d"><i class="v">b</i></span></span></span></li></ol>
     </div></div>
       </div>
       <aside class="dad" id="D3-👨">
@@ -568,7 +568,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
       <div>
         <div class="grade">중1 · D4 다음</div>
         <h2>다항식과 일차식</h2>
-        <p class="idea">수나 문자의 곱으로 된 식 하나하나를 <strong>항</strong>이라고 해요. 수만 있는 항은 <strong>상수항</strong>, 문자 앞에 곱해진 수는 그 문자의 <strong>계수</strong>(부호까지)예요. 항이 하나뿐인 식은 <strong>단항식</strong>, 항이 여러 개인 식은 <strong>다항식</strong>이에요. 곱해진 문자의 개수를 그 항의 <strong>차수</strong>라고 하고, 차수가 가장 큰 항의 차수가 다항식의 차수예요. 차수가 1인 다항식이 <strong>일차식</strong>이에요 — <i class="v">x</i>²이 있거나 분모에 문자가 있으면 일차식이 아니에요.</p>
+        <p class="idea">수나 문자의 곱으로 된 식 하나하나를 <strong>항</strong>이라고 해요. 수만 있는 항은 <strong>상수항</strong>, 문자 앞에 곱해진 수는 그 문자의 <strong>계수</strong>(부호까지)예요. 항이 하나 이상인 식을 <strong>다항식</strong>이라고 하고, 그중 항이 하나뿐인 식을 <strong>단항식</strong>이라고 해요(단항식도 다항식). 곱해진 문자의 개수를 그 항의 <strong>차수</strong>라고 하고, 차수가 가장 큰 항의 차수가 다항식의 차수예요. 차수가 1인 다항식이 <strong>일차식</strong>이에요 — <i class="v">x</i>²이 있거나 분모에 문자가 있으면 일차식이 아니에요.</p>
       </div>
     </header>
     <div class="cols">
@@ -578,7 +578,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
       <div class="step-no">1</div>
       <div class="step-body">
         <div class="ref"><span class="lbl">1장</span><code>D5-1</code></div>
-        <div class="say"><p>3<i class="v">x</i> − 2<i class="v">y</i> + 5를 덧셈만으로 고쳐 쓰면</p><p>3<i class="v">x</i> − 2<i class="v">y</i> + 5 = 3<i class="v">x</i> + (−2<i class="v">y</i>) + 5</p><p>더해진 3<i class="v">x</i>, −2<i class="v">y</i>, 5 하나하나를 <strong>항</strong>이라고 해요. 수만 있는 항을 <strong>상수항</strong>이라고 해서, 3<i class="v">x</i> − 2<i class="v">y</i> + 5의 상수항은 5예요.</p><p>항이 여러 개인 식은 <strong>다항식</strong>, 4<i class="v">x</i>나 −7처럼 항이 하나뿐인 식은 <strong>단항식</strong>이에요.</p></div>
+        <div class="say"><p>3<i class="v">x</i> − 2<i class="v">y</i> + 5를 덧셈만으로 고쳐 쓰면</p><p>3<i class="v">x</i> − 2<i class="v">y</i> + 5 = 3<i class="v">x</i> + (−2<i class="v">y</i>) + 5</p><p>더해진 3<i class="v">x</i>, −2<i class="v">y</i>, 5 하나하나를 <strong>항</strong>이라고 해요. 수만 있는 항을 <strong>상수항</strong>이라고 해서, 3<i class="v">x</i> − 2<i class="v">y</i> + 5의 상수항은 5예요.</p><p>항이 하나 이상인 식을 <strong>다항식</strong>이라고 해요. 그중 4<i class="v">x</i>나 −7처럼 항이 하나뿐인 식은 <strong>단항식</strong>이에요 — 단항식도 다항식이에요.</p></div>
         <div class="check" id="D5-1✓">
         <div class="ref"><span class="lbl">확인 질문</span><code>D5-1✓</code></div>
         <div class="qt"><p>다음 다항식의 상수항은 얼마일까요?</p><p><strong>2<i class="v">x</i> + 7<i class="v">y</i> − 4</strong></p></div>
@@ -614,7 +614,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
       <div class="step-no">4</div>
       <div class="step-body">
         <div class="ref"><span class="lbl">4장</span><code>D5-4</code></div>
-        <div class="say"><p>차수가 1인 다항식을 <strong>일차식</strong>이라고 해요.</p><p>2<i class="v">x</i> + 3, −<i class="v">x</i> + 5, 4 − 3<i class="v">x</i>, 7<i class="v">a</i>는 모두 일차식이에요.</p><p><i class="v">x</i>² + 1과 2<i class="v">xy</i> − 1은 일차식이 아니에요 — <i class="v">x</i>²과 <i class="v">xy</i>는 차수가 2예요. 상수항뿐인 −6도 일차식이 아니에요 — 차수가 0이에요.</p></div>
+        <div class="say"><p>차수가 1인 다항식을 <strong>일차식</strong>이라고 해요.</p><p>2<i class="v">x</i> + 3, −<i class="v">x</i> + 5, 4 − 3<i class="v">x</i>, 7<i class="v">a</i>는 모두 일차식이에요. 7<i class="v">a</i>처럼 항이 하나뿐인 단항식도 차수가 1이면 일차식이에요.</p><p><i class="v">x</i>² + 1과 2<i class="v">xy</i> − 1은 일차식이 아니에요 — <i class="v">x</i>²과 <i class="v">xy</i>는 차수가 2예요. 상수항뿐인 −6도 일차식이 아니에요 — 차수가 0이에요.</p></div>
         <div class="check" id="D5-4✓">
         <div class="ref"><span class="lbl">확인 질문</span><code>D5-4✓</code></div>
         <div class="qt"><p>다음 중 일차식은 어느 것일까요?</p></div>
@@ -820,7 +820,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
       <div class="step-no">4</div>
       <div class="step-body">
         <div class="ref"><span class="lbl">4장</span><code>D7-4</code></div>
-        <div class="say"><p>동류항이 아닌 항은 더할 수 없어서 <strong>그대로</strong> 둬요.</p><p>3<i class="v">x</i> + 4 + 2<i class="v">x</i> = 3<i class="v">x</i> + 2<i class="v">x</i> + 4 = 5<i class="v">x</i> + 4</p><p>5<i class="v">x</i> + 4는 더 간단히 할 수 없어요. 4까지 <i class="v">x</i>와 더해 9<i class="v">x</i>로 쓰면 안 돼요 — 상수항은 <i class="v">x</i>와 동류항이 아니에요.</p></div>
+        <div class="say"><p>동류항이 아닌 항은 <strong>하나의 항으로 합칠 수 없어서</strong> 그대로 둬요.</p><p>3<i class="v">x</i> + 4 + 2<i class="v">x</i> = 3<i class="v">x</i> + 2<i class="v">x</i> + 4 = 5<i class="v">x</i> + 4</p><p>5<i class="v">x</i> + 4는 더 간단히 할 수 없어요. 4까지 <i class="v">x</i>와 더해 9<i class="v">x</i>로 쓰면 안 돼요 — 상수항은 <i class="v">x</i>와 동류항이 아니에요.</p></div>
         <div class="check" id="D7-4✓">
         <div class="ref"><span class="lbl">확인 질문</span><code>D7-4✓</code></div>
         <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>5<i class="v">x</i> + 2 + 3<i class="v">x</i></strong></p></div>
@@ -863,7 +863,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
     <h4>🗣 이렇게 말해 보세요</h4>
     <ol class="dad-say"><li id="D7-👨말1"><code class="mini">말1</code><span>&quot;사과 3개와 사과 5개는 합칠 수 있지? 사과 3개와 배 2개는? 3<i class="v">x</i>와 2<i class="v">y</i>도 마찬가지야.&quot;</span></li><li id="D7-👨말2"><code class="mini">말2</code><span>&quot;7<i class="v">x</i> − <i class="v">x</i>에서 <i class="v">x</i>를 빼면 <i class="v">x</i>가 다 없어질까? <i class="v">x</i>는 <i class="v">x</i>가 몇 개라는 뜻이었지?&quot;</span></li></ol>
     <h4>✋ 같이 해 보기</h4>
-    <p class="dad-do">바둑돌을 써요 — 흰 돌은 <i class="v">x</i>, 검은 돌은 1. '3<i class="v">x</i> + 4 + 2<i class="v">x</i>'만큼 돌을 놓고 같은 색끼리 모으면 흰 돌 5개, 검은 돌 4개 — 5<i class="v">x</i> + 4가 돼요. 흰 돌과 검은 돌은 섞어 셀 수 없다는 것을 손으로 보게 해요.</p>
+    <p class="dad-do">바둑돌을 써요 — 흰 돌은 <i class="v">x</i>, 검은 돌은 1. '3<i class="v">x</i> + 4 + 2<i class="v">x</i>'만큼 돌을 놓고 같은 색끼리 모으면 흰 돌 5개, 검은 돌 4개 — 5<i class="v">x</i> + 4가 돼요. 흰 돌과 검은 돌은 한 묶음으로 합쳐 셀 수 없다는 것을 손으로 보게 해요.</p>
     <h4>⚠️ 여기서 헷갈려요</h4>
     <ul class="traps"><li id="D7-👨함정1"><code class="mini">함정1</code><div><div class="kid">3<i class="v">x</i> + 2를 5<i class="v">x</i>라고 한다</div><div class="dadsay">→ &quot;흰 돌 3개와 검은 돌 2개를 모으면 흰 돌이 5개가 될까?&quot;</div></div></li><li id="D7-👨함정2"><code class="mini">함정2</code><div><div class="kid"><i class="v">x</i>와 <i class="v">x</i>²을 동류항이라고 해서 2<i class="v">x</i> + 3<i class="v">x</i>²을 5<i class="v">x</i>²으로 계산한다</div><div class="dadsay">→ &quot;<i class="v">x</i>²은 <i class="v">x</i> × <i class="v">x</i>야. 차수가 같은지부터 볼까?&quot;</div></div></li></ul>
     <h4>✅ 이걸 말하면 통과</h4>
@@ -1066,7 +1066,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
     </div>
   </section>
 
-  <footer>신코치 ✏️ 수학 · 문자와 식 줄기 배움 원고 · 2026-10-02</footer>
+  <footer>신코치 ✏️ 수학 · 문자와 식 줄기 배움 원고 · 2026-10-03</footer>
 </div>
 <script>
 (function(){

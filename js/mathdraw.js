@@ -2652,6 +2652,23 @@ export function richParts(text) {
   return out;
 }
 
+/**
+ * 한 줄 요약 자르기 (🤔 오답 노트 60자 · ❓ 버튼 26자) — 괄호·분수 중간에서 자르지 않는다.
+ * "a ÷ b × c는 a/(b…"처럼 잘리면 richParts가 분수를 못 알아봐 / 가 글자로 남는다 (Codex 26차 #5).
+ * 띄어 쓴 자리 중 괄호가 다 닫히고 앞뒤가 /가 아닌 곳까지 물러나고, 너무 짧아지면(반 아래) 그냥 자른다
+ */
+export function cutLine(s, n) {
+  const t = String(s || '');
+  if (t.length <= n) return t;
+  for (let p = n; p > n / 2; p--) {
+    if (t[p] !== ' ') continue;
+    const head = t.slice(0, p);
+    const open = (head.match(/\(/g) || []).length - (head.match(/\)/g) || []).length;
+    if (open === 0 && !head.endsWith('/') && t[p + 1] !== '/') return `${head.trimEnd()}…`;
+  }
+  return `${t.slice(0, n)}…`;
+}
+
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────
 //
 // 구체(만지기) → 그림 → 기호 — 앱에 그림과 기호만 있고 "만지기"가 없었다. 펜은 없지만 탭·드래그는 된다.

@@ -6,7 +6,7 @@
 // 보상(⚡💰🎯)은 영어와 같은 xp.js·catch.js를 그대로 쓴다 — 도감·코인이 한 몸이라야 "수학을 해서 마스터볼을 산다"가 된다.
 
 import { WORLDS, rng, shuffle, josa } from './mathgen.js';
-import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget, richParts } from './mathdraw.js';
+import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget, richParts, cutLine } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
@@ -1081,9 +1081,11 @@ function renderRetry(id, wrong) {
     const sum = document.createElement('summary');
     sum.appendChild(el('span', 'k', KIND_LABEL[w.q.kind] || ''));
     const q1 = oneLine(w.q.q);
-    const qt = el('span', 'qt'); qt.appendChild(richNode(q1.length > 60 ? q1.slice(0, 60) + '…' : q1)); sum.appendChild(qt);
+    const qt = el('span', 'qt'); qt.appendChild(richNode(cutLine(q1, 60))); sum.appendChild(qt);
     det.appendChild(sum);
     const body = el('div', 'body');
+    // 펼치면 문제 글 전체(그림 포함) — 식이 문제 글 속에 있는 줄기(D 등)는 q.expr가 비어 요약만으로는 문제를 다시 못 봤다 (Codex 26차 #5)
+    if (q1.length > 60 || /\[[a-z]+ /.test(w.q.q)) { const full = el('div', 'math-qt small'); full.appendChild(qtNode(w.q.q)); body.appendChild(full); }
     if (w.q.expr) { const ex = el('p', 'math-expr small'); ex.appendChild(richNode(w.q.expr)); body.appendChild(ex); }
     body.appendChild(solveCard(w.q, w.chosen));
     det.appendChild(body);
@@ -1549,7 +1551,7 @@ function askOfferForRound(r, state, today) {
   box.appendChild(el('p', 'math-ask-lead', '❓ 아빠에게 물어볼 게 있어요? 틀린 문제를 골라요 — 문제는 앱이 그대로 보내요.'));
   for (const x of wrongs) {
     const q1 = oneLine(x.q.q);
-    const b = el('button', 'btn math-ask-btn', `❓ ${KIND_LABEL[x.q.kind] || ''} · ${q1.slice(0, 26)}${q1.length > 26 ? '…' : ''}`);
+    const b = el('button', 'btn math-ask-btn', `❓ ${KIND_LABEL[x.q.kind] || ''} · ${cutLine(q1, 26)}`);
     b.type = 'button';
     b.addEventListener('click', () => { box.replaceWith(askForm(askContext(x.q, x.a), (res) => { if (res.ok) x.a.asked = res.ask.no; })); });
     box.appendChild(b);

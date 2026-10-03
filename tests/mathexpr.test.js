@@ -13,7 +13,7 @@ import {
   EXPR, TAGS, makeQuestion, makeRound, ladder, placeFrom, diagnosticSet, lessonOf, checkContent, gradeLabel, valueOf,
 } from '../js/mathexpr.js';
 import { tplKey } from '../js/mathgen.js';
-import { richParts } from '../js/mathdraw.js';
+import { richParts, cutLine, figText } from '../js/mathdraw.js';
 import { padSpec, readTyped, matchTyped, partsOf } from '../js/mathpad.js';
 
 const OPTS = { names: ['피카츄', '리자몽', '개굴닌자'], me: '진우', worlds: { pokemon: [], toystory: [], minions: [], moana: [] } };
@@ -372,8 +372,8 @@ function checkMisread(q) {
     case 'misread:speed': { m = /한 시간에 (\d+) km씩/.exec(q.q); const want = `${m[1]} × x`; assert.ok(!eqE(/거리는 (.+) km예요/.exec(shown)[1], want)); assert.ok(eqE(/니까 (.+) km예요/.exec(ok)[1], want), ok); break; }
     case 'misread:one': { m = /\(−1\) × ([a-z]) × ([a-z])는 (.+)예요/.exec(shown); assert.ok(!textbookForm(m[3])); const fix = /는 (.+)예요$/.exec(ok)[1]; assert.ok(textbookForm(fix) && eqE(fix, `−${m[1]}${m[2]}`), ok); break; }
     case 'misread:pow': if (q.concept === 'exp.mul') { m = /a × a × (\d+)[은는] (.+)예요/.exec(shown); assert.ok(!eqE(m[2], `a × a × ${m[1]}`)); const fix = last(ok); assert.ok(eqE(fix, `${m[1]}a²`) && textbookForm(fix), ok); } else if (q.concept === 'exp.value') { m = /x = −(\d+)일 때/.exec(q.q); const p = +m[1]; assert.notEqual(numOf(/= (−?\d+)(이에요|예요)$/.exec(shown)[1]), p * p); assert.ok(new RegExp(`= ${p * p}(이에요|예요)$`).test(ok), ok); } else { assert.ok(/동류항이 아니에요/.test(ok)); m = /(\d+)x \+ (\d+)x² = (.+)/.exec(shown); assert.ok(!eqE(m[3], `${m[1]}x + ${m[2]}x²`)); } break;
-    case 'misread:flip': { m = /x ÷ (\d+)[은는] (.+)예요/.exec(shown); assert.ok(!eqE(m[2], `x ÷ ${m[1]}`)); const fix = last(ok); assert.ok(eqE(fix, `x ÷ ${m[1]}`) && textbookForm(fix), ok); break; }
-    case 'misread:order': { assert.ok(!eqE('a/(bc)', 'a ÷ b × c')); const fix = /는 (.+)예요$/.exec(ok)[1]; assert.ok(eqE(fix, 'a ÷ b × c') && textbookForm(fix), ok); break; }
+    case 'misread:flip': { m = /^x ÷ (\d+) = (.+)$/.exec(shown); assert.ok(!eqE(m[2], `x ÷ ${m[1]}`)); const fix = last(ok); assert.ok(eqE(fix, `x ÷ ${m[1]}`) && textbookForm(fix), ok); break; }
+    case 'misread:order': { assert.equal(shown, 'a ÷ b × c = a/(bc)'); assert.ok(!eqE('a/(bc)', 'a ÷ b × c')); const fix = last(ok); assert.ok(eqE(fix, 'a ÷ b × c') && textbookForm(fix), ok); break; }
     case 'misread:paren': { m = /x = −(\d+)일 때, (\d+)x \+ (\d+)의 값/.exec(q.q); const want = evalExpr(`${m[2]}x + ${m[3]}`, { x: -m[1] }); const sv = numOf(/= (−?\d+)(이에요|예요)/.exec(shown)[1]); assert.notEqual(sv, want); assert.equal(numOf(/= (−?\d+)(이에요|예요)$/.exec(ok)[1]), want, ok); break; }
     case 'misread:coef': { m = /다항식 (\d+)x − (\d+)y/.exec(q.q); assert.ok(!new RegExp(`−${m[2]}`).test(shown)); assert.ok(new RegExp(`−${m[2]}(이에요|예요)$`).test(ok), ok); break; }
     case 'misread:linear': assert.match(shown, /x² \+ \d+도 일차식이에요/); assert.match(ok, /x².*일차식이 아니에요/); break;
@@ -509,6 +509,10 @@ const BAD = [
   [/상수항[도은는] 일차식/, '수만 있는 식은 일차식이 아니다'],
   [/−\([a-z] − (\d+)\) = −[a-z] − \1(?!\d)/, '괄호 앞 −는 모든 항의 부호를 바꾼다'],
   [/(?<![\d×(] *)([a-z]) × \1 = 2\1/, '같은 문자의 곱은 거듭제곱'],
+  // Codex 26차 #1·#2·#3
+  [/항이 (?:여러|두) 개(?: 이상)?인 식[은을이]? ?다항식/, '단항식도 다항식 — 다항식은 항이 하나 이상인 식'],
+  [/(?:더할|뺄|곱할|나눌|대입할|생략할|제곱할) 수 없/, '연산 자체를 "할 수 없다"고 하면 ②의 엉뚱한 보기("덧셈은 할 수 없어요")가 맞는 말이 된다 — "하나의 항으로 합칠 수 없다"처럼'],
+  [/시간이 거리보다/, '단위가 다른 양(시간·거리)을 크기로 비교하지 않는다'],
 ];
 test('★ 참말에 틀린 말이 없다 — 동류항·일차식·괄호 앞 −·거듭제곱', () => {
   const truths = (q) => [q.choices.find((x) => x.ok).text, ...(q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule] : [])].join('\n').replace(/\*\*/g, '');
@@ -856,4 +860,84 @@ test('🖋 앱(richNode)·D 검수 페이지(tools/mathexpr.mjs)가 같은 richP
   assert.match(tool, /import \{[^}]*richParts[^}]*\} from '\.\.\/js\/mathdraw\.js'/, '검수 페이지도 richParts');
   const css = readFileSync(new URL('../css/style.css', import.meta.url), 'utf8');
   assert.match(css, /\.mv \{[^}]*font-style: italic/);
+});
+
+// ───────────────────── Codex 26차 ─────────────────────
+
+const FRAC_JOSA = /\/(?:\d+|[a-z]+|\([^()]*\))(?:이에요|예요|이라서|라서|이니까|니까|이|가|은|는|을|를|와|과|도|으로|로|의|에)/;
+
+test('★ 생성 문항에도 분수 바로 뒤 조사가 없다 — 문제·보기·풀이·설명 (Codex 26차 #4: "6/x예요"는 "엑스분의 육"이라 이에요가 맞다)', () => {
+  for (const c of EXPR) for (const t of [c.idea, c.rule, c.slip]) assert.ok(!FRAC_JOSA.test(t), `${c.id}: ${t}`);
+  let n = 0;
+  for (const { c, k, s, q } of every()) {
+    for (const t of qTexts(q)) {
+      const m = FRAC_JOSA.exec(t);
+      assert.ok(!m, `${c.id} ${k} #${s}: "…${m && t.slice(Math.max(0, m.index - 20), m.index + m[0].length)}"`);
+      n += richParts(t).filter((p) => p.k === 'f').length;
+    }
+  }
+  assert.ok(n > 3 * SEEDS, `본 분수 ${n}`);
+});
+
+/** 보기 글에서 식 하나 — " — "·" = "·"은/는 " 으로 나눈 조각 중 이 파일의 계산기가 읽는 것 (보기는 앞에서부터, 고친 말은 끝에서부터) */
+function exprIn(t, fromEnd) {
+  const parts = String(t).replace(/^A = /, '').split(/ — | = |[은는] |니까 /).map((x) => x.replace(/(이에요|예요)$/, '').replace(/ ?(km|cm|원)$/, '').replace(/^A = /, '').trim()).filter(Boolean);
+  for (const x of fromEnd ? parts.reverse() : parts) { try { evalExpr(x, ENVS[0]); return x; } catch { /* 다음 조각 */ } }
+  return null;
+}
+
+test('★ ② 나머지 보기도 그 예에서 정말 틀린 말 — 오개념 보기의 식·값은 바른 답과 다르고, 엉뚱한 지적은 거짓 단정("…수 없어요")이며 배움 글·설명에 그 말이 없다 (Codex 26차 #2·F)', () => {
+  const truths = [...IDS.flatMap((id) => truthBlocks(CONTENT[id])), ...EXPR.flatMap((c) => [c.idea, c.rule, c.slip])].join('\n').replace(/\*\*/g, '');
+  let parsed = 0; let off = 0;
+  for (const { c, s, q } of every(['misread'], Math.max(SEEDS, 600))) {
+    const shown = (/\*\*(.+?)\*\*/.exec(q.q) || [])[1] || '';
+    const ok = q.choices.find((x) => x.ok).text;
+    const ref = exprIn(ok, true) || exprIn(shown.split(' = ')[0], true);
+    for (const w of q.choices.filter((x) => !x.ok && x.tag !== '틀린 줄 모름')) {
+      const at = `${c.id} #${s} ${q.key}: "${w.text}"`;
+      if (w.tag === '엉뚱한 지적') {
+        assert.match(w.text, /(수 없어요|아니에요|없어요)$/, `${at} — 엉뚱한 지적은 거짓 단정으로`);
+        assert.ok(!truths.includes(w.text.replace(/(어요|에요)$/, '')), `${at} — 배움 글·설명이 같은 말을 한다`);
+        off++; continue;
+      }
+      const e = exprIn(w.text, / = /.test(w.text)); // "6x + 1 = 7이에요"처럼 등식이면 끝 값이 그 보기의 말
+      if (!e || !ref) continue;
+      assert.ok(!eqE(e, ref), `${at} — 오개념 보기의 ${e}가 바른 답 ${ref}과 같다`);
+      parsed++;
+    }
+  }
+  assert.ok(parsed > 3000 && off > 5000, `대조한 오개념 보기 ${parsed} · 엉뚱한 지적 ${off}`);
+});
+
+test('🖋 한 줄 요약(🤔 오답 노트 60자·❓ 버튼 26자)은 괄호·분수 중간에서 자르지 않는다 · 펼친 오답 노트는 문제 글 전체 (Codex 26차 #5)', () => {
+  const app = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
+  assert.ok(app.includes("const oneLine = (t) => figText(t, true).replace(/\\*\\*/g, '').replace(/\\s*\\n+\\s*/g, ' · ');"), 'math.js의 oneLine이 이 테스트와 같은 꼴');
+  assert.match(app, /richNode\(cutLine\(q1, 60\)\)/);
+  assert.match(app, /cutLine\(q1, 26\)/);
+  assert.match(app, /qtNode\(w\.q\.q\)/, '펼친 오답 노트에 문제 글 전체');
+  const oneLine = (t) => figText(t, true).replace(/\*\*/g, '').replace(/\s*\n+\s*/g, ' · ');
+  const repro = cutLine(oneLine(makeQuestion('exp.div', 'misread', 1, OPTS).q), 60);
+  assert.ok(!/\/\(?[a-z]*…$/.test(repro), `Codex 재현 씨앗: ${repro}`);
+  let n = 0;
+  for (const { c, k, s, q } of every()) {
+    const line = oneLine(q.q);
+    for (const w of [60, 26]) {
+      const cut = cutLine(line, w);
+      const bal = (cut.match(/\(/g) || []).length - (cut.match(/\)/g) || []).length;
+      assert.ok(cut.length <= w + 1 && (line.length <= w || cut.length > w / 2), `${c.id} ${k} #${s}: 길이 ${cut.length}`);
+      assert.equal(bal, 0, `${c.id} ${k} #${s}: 괄호가 열린 채 잘림 "${cut}"`);
+      assert.ok(!richParts(cut).some((p) => p.k === 't' && p.s.includes('/')), `${c.id} ${k} #${s}: 분수가 잘림 "${cut}"`);
+      if (line.length > w) n++;
+    }
+  }
+  assert.ok(n > SEEDS, `잘린 요약 ${n}`);
+  assert.equal(cutLine('짧은 글', 60), '짧은 글');
+});
+
+test('📘 다항식 — 단항식도 다항식이다 (배움 글·설명), 7a는 단항식이면서 일차식 (Codex 26차 #1)', () => {
+  const d5 = truthBlocks(CONTENT['exp.terms']).join('\n');
+  assert.match(d5, /항이 하나 이상인 식을 다항식/);
+  assert.match(d5, /단항식도 다항식/);
+  assert.match(d5, /7a처럼 항이 하나뿐인 단항식도 차수가 1이면 일차식/);
+  assert.match(EXPR.find((c) => c.id === 'exp.terms').idea.replace(/\*\*/g, ''), /항이 하나 이상인 식을 다항식[^.]*단항식도 다항식/);
 });
