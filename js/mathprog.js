@@ -22,6 +22,7 @@ import * as circleGen from './mathcircle.js';
 import * as cuboidGen from './mathcuboid.js';
 import * as solidGen from './mathsolid.js';
 import * as exprGen from './mathexpr.js';
+import * as equGen from './mathequ.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -61,8 +62,11 @@ export const STEMS = {
   // D 문자와 식 — 처음부터 D 자리를 비워 둔 줄기, 중1 「문자의 사용과 식」 2022 성취기준 [9수02-01·02]로 범위 확인 (2026-10-03 아버님 "D 문자와 식 먼저 가고 다음에 일차방정식 가자").
   // 중1 9칸 · E 음수가 계수·대입에, H의 □·△ 식이 문자로 다시 나온다 · 수 답은 숫자판(± 늘 켬, mathpad.padSpec), 식 답은 보기 · 문자 분수는 세로로(mathdraw.richParts)
   expr: { key: 'expr', code: 'D', label: '문자와 식 줄기', range: '중1', list: exprGen.EXPR, gen: exprGen, file: './coach/math/expr.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (문자를 사용한 식부터 — 중1 · E 음수 줄기를 먼저 하면 쉬워요 · H 규칙과 대응의 □·△ 식이 문자로 바뀌어요)', intro: '문자와 식 문제 5개를 먼저 풀어 볼게요. 부호(−)와 괄호를 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // Q 일차방정식 — D 다음 칸, 중1 「일차방정식」 2022 성취기준 [9수02-03·04]로 범위 확인 (2026-10-03 아버님 "D 문자와 식 먼저 가고 다음에 일차방정식 가자").
+  // 중1 9칸 · D의 분배법칙·동류항·괄호 앞 −가 풀이에, H의 □ 구하기가 방정식으로 · 해는 숫자판(± 늘 켬, mathpad.padSpec), 등식·바꾼 식은 보기 · 저울 그림 [scale](Q3·Q4·Q6)
+  equation: { key: 'equation', code: 'Q', label: '일차방정식 줄기', range: '중1', list: equGen.EQU, gen: equGen, file: './coach/math/equation.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (등식과 방정식부터 — 중1 · D 문자와 식 줄기를 먼저 하면 쉬워요 · H 규칙과 대응의 □ 구하기가 방정식으로 바뀌어요)', intro: '일차방정식 문제 5개를 먼저 풀어 볼게요. 부호(−)와 괄호를 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;

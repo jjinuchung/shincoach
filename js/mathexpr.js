@@ -62,13 +62,13 @@ const JOSA = [['을', '를'], ['은', '는'], ['이', '가'], ['과', '와'], ['
 function jfix(text) {
   let s = String(text);
   for (const [wb, nb] of JOSA) {
-    const after = '(?=[\\s.,!?)—]|$)';
+    const after = '(?=[\\s.,!?)—*]|$)'; // ** 앞도 — ② 보여 준 말(굵게) 끝의 "27예요**" (Q 1단계에서 샘)
     s = s.replace(new RegExp(`(\\d)(${wb}|${nb})${after}`, 'g'), (_, d) => d + (BAT.has(d) ? wb : nb));
     s = s.replace(new RegExp(`([a-z])(${wb}|${nb})${after}`, 'g'), (_, ch) => ch + nb);
     s = s.replace(new RegExp(`(²)(${wb}|${nb})${after}`, 'g'), (_, ch) => ch + wb);
   }
   // (으)로 — ㄹ 받침(1·7·8)은 "로"
-  return s.replace(/(\d)(으로|로)(?=[\s.,]|$)/g, (_, d) => d + (['1', '7', '8'].includes(d) ? '로' : BAT.has(d) ? '으로' : '로'));
+  return s.replace(/(\d)(으로|로)(?=[\s.,*]|$)/g, (_, d) => d + (['1', '7', '8'].includes(d) ? '로' : BAT.has(d) ? '으로' : '로'));
 }
 
 // ───────────────────── 보기 ─────────────────────
@@ -770,4 +770,5 @@ export function checkContent(content) {
   return bad;
 }
 
-export const _kit = { famOf, runFamily, calcAsk, choices, textChoices, branchOf, showWork, step, jn, term, poly, lin, num, RIGHT_AS_WRONG, OFF };
+// Q 일차방정식 줄기(mathequ.js)도 같은 부품을 쓴다 — 한쪽으로만 불러온다(서로 불러오면 모듈 평가 순서 때문에 죽는다)
+export const _kit = { famOf, runFamily, calcAsk, misAsk, jfix, choices, textChoices, branchOf, showWork, step, jn, term, poly, lin, num, RIGHT_AS_WRONG, OFF };

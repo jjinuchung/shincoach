@@ -2461,6 +2461,7 @@ export function figureSvg(spec) {
   if ((m = /^spin (.+)$/.exec(s))) { const sp = parseSpin(m[1]); return sp ? spinSvg(sp) : ''; } // 🔷 P 돌리기
   if ((m = /^pnet (.+)$/.exec(s))) { const sp = parsePnet(m[1]); return sp ? pnetSvg(sp) : ''; } // 🔷 P 각기둥 전개도
   if ((m = /^cnet (.+)$/.exec(s))) { const sp = parseCnet(m[1]); return sp ? cnetSvg(sp) : ''; } // 🔷 P 원기둥 전개도
+  if ((m = /^scale (.+)$/.exec(s))) { const sp = parseScale(m[1]); return sp ? scaleSvg(sp) : ''; } // 🟰 Q 저울
   if ((m = /^steps ((?:\d+\s*){2,5})$/.exec(s))) return stepsSvg(m[1].trim().split(/\s+/).map(Number));
   if ((m = /^table (.+)$/.exec(s))) { const rows = parseTable(m[1]); return rows ? tableSvg(rows) : ''; }
   // 🔺 도형 — 끝에 단위(cm·m)를 붙일 수 있다. 수는 1~40, 모양이 말이 안 되면(밑변보다 큰 밀림 등) 빈 글자
@@ -2539,6 +2540,7 @@ export function figText(text, short = false) {
     .replace(/\[spin ([^\]]+)\]/g, (all, arg) => { const sp = parseSpin(arg); return !sp ? all : short ? '(그림)' : `(${spinText(sp)})`; })
     .replace(/\[pnet ([^\]]+)\]/g, (all, arg) => { const sp = parsePnet(arg); return !sp ? all : short ? '(그림)' : `(${pnetText(sp)})`; })
     .replace(/\[cnet ([^\]]+)\]/g, (all, arg) => { const sp = parseCnet(arg); return !sp ? all : short ? '(그림)' : `(${cnetText(sp)})`; })
+    .replace(/\[scale ([^\]]+)\]/g, (all, arg) => { const sp = parseScale(arg); return !sp ? all : short ? '(저울)' : `(${scaleText(sp)})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
 }
@@ -2578,7 +2580,74 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+}
+
+// ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
+//
+// `[scale 2x + 3 | 11]` — 왼쪽 접시에 x 상자 2개와 1 추 3개, 오른쪽 접시에 1 추 11개. 저울은 늘 수평(= 등식).
+// `[scale 2x + 3 | 11 take=3]` — 양쪽에서 1 추를 3개씩 덜어 낸 모습(흐리게 + ✕) — 등식의 성질.
+// x 상자 0~5개, 1 추 0~15개, 접시마다 하나 이상. 개수는 그림에서 세게 — 글자로 적지 않는다.
+// 테스트가 그린 그림에서 다시 셀 수 있게 접시마다 data-x·data-n·data-take, 물건마다 sc-x · sc-1 (· sc-take).
+
+/** 저울 한쪽 "2x + 3" · "x + 8" · "3x" · "11" → { x, n } (못 읽으면 null) */
+function parseScaleSide(t) {
+  const s = t.trim(); let m;
+  if ((m = /^(\d+)$/.exec(s))) return { x: 0, n: +m[1] };
+  if ((m = /^(\d*)x$/.exec(s))) return { x: m[1] ? +m[1] : 1, n: 0 };
+  if ((m = /^(\d*)x \+ (\d+)$/.exec(s))) return { x: m[1] ? +m[1] : 1, n: +m[2] };
+  return null;
+}
+/** `2x + 3 | 11 take=3` → { L, R, take } (못 읽거나 그릴 수 없으면 null) */
+export function parseScale(arg) {
+  const m = /^(.+?)\s*\|\s*(.+?)(?:\s+take=(\d+))?$/.exec(String(arg || '').trim());
+  if (!m) return null;
+  const L = parseScaleSide(m[1]); const R = parseScaleSide(m[2]); const take = m[3] ? +m[3] : 0;
+  if (!L || !R) return null;
+  const okPan = (p) => p.x >= 0 && p.x <= 5 && p.n >= 0 && p.n <= 15 && p.x + p.n >= 1;
+  if (!okPan(L) || !okPan(R) || take > Math.min(L.n, R.n)) return null;
+  return { L, R, take };
+}
+const scaleSide = (p) => [p.x ? `x ${p.x}개` : '', p.n ? `1 ${p.n}개` : ''].filter(Boolean).join('와 ');
+/** 📊·❓ 글용 */
+export function scaleText(sp) {
+  return `저울: 왼쪽 ${scaleSide(sp.L)} · 오른쪽 ${scaleSide(sp.R)}${sp.take ? ` · 양쪽에서 1을 ${sp.take}개씩 덜어 냄` : ''}`;
+}
+/** 저울 그림 — 막대는 수평, 접시마다 물건을 아래 줄부터 다섯 개씩 */
+export function scaleSvg(sp) {
+  const S = 28; const per = 5; const PW = 156; const W = 400; const cx = [102, 298];
+  const rowsOf = (p) => Math.max(1, Math.ceil((p.x + p.n) / per));
+  const rows = Math.max(rowsOf(sp.L), rowsOf(sp.R));
+  const beamY = 22; const plateY = beamY + 30 + rows * S; const baseY = plateY + 34; const H = baseY + 12;
+  let g = '';
+  g += `<path d="M200 ${beamY} L180 ${baseY} L220 ${baseY} Z" fill="${EMPTY}" stroke="currentColor" stroke-width="1.5"/>`;
+  g += `<rect x="160" y="${baseY}" width="80" height="8" rx="2" fill="currentColor" fill-opacity="0.35"/>`;
+  g += `<line x1="${cx[0]}" y1="${beamY}" x2="${cx[1]}" y2="${beamY}" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>`;
+  g += `<circle cx="200" cy="${beamY}" r="5" fill="currentColor"/>`;
+  [sp.L, sp.R].forEach((p, k) => {
+    const c = cx[k]; const x0 = c - PW / 2;
+    let pan = `<line x1="${c}" y1="${beamY}" x2="${x0 + 8}" y2="${plateY}" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.2"/>`;
+    pan += `<line x1="${c}" y1="${beamY}" x2="${x0 + PW - 8}" y2="${plateY}" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.2"/>`;
+    pan += `<path d="M${x0} ${plateY} L${x0 + PW} ${plateY} L${x0 + PW - 14} ${plateY + 10} L${x0 + 14} ${plateY + 10} Z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="1.2"/>`;
+    const items = [...Array(p.x).fill('x'), ...Array(p.n).fill('1')];
+    items.forEach((it, i) => {
+      const row = Math.floor(i / per); const col = i % per;
+      const inRow = Math.min(per, items.length - row * per);
+      const ix = c - (inRow * S) / 2 + col * S + S / 2; const iy = plateY - row * S - S / 2 - 1;
+      if (it === 'x') {
+        pan += `<rect class="sc-x" x="${ix - 12}" y="${iy - 12}" width="24" height="24" rx="3" fill="${FILL}" stroke="currentColor" stroke-width="1"/>`;
+        pan += `<text x="${ix}" y="${iy + 6}" font-size="18" font-style="italic" font-family="Times New Roman, Noto Serif, serif" text-anchor="middle" fill="#fff">x</text>`;
+      } else {
+        const taken = i >= items.length - sp.take; // 맨 위(마지막)부터 덜어 낸다
+        pan += `<g class="sc-1${taken ? ' sc-take' : ''}"${taken ? ' opacity="0.35"' : ''}><circle cx="${ix}" cy="${iy}" r="11" fill="${FILL2}" stroke="currentColor" stroke-width="1"/>`;
+        pan += `<text x="${ix}" y="${iy + 5}" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor">1</text></g>`;
+        if (taken) pan += `<path d="M${ix - 9} ${iy - 9} L${ix + 9} ${iy + 9} M${ix + 9} ${iy - 9} L${ix - 9} ${iy + 9}" stroke="currentColor" stroke-width="2"/>`;
+      }
+    });
+    g += `<g class="sc-pan" data-side="${k ? 'R' : 'L'}" data-x="${p.x}" data-n="${p.n}" data-take="${sp.take}">${pan}</g>`;
+  });
+  // 보이는 크기는 1.25배 — 그린 크기(400px)면 태블릿에서 추 지름 22px·숫자 14px로 본문 글자보다 작다 (헤드리스 800px, 3단계). 폰에서는 max-width:100%로 줄어든다
+  return `<svg class="frac-fig scale-fig" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${scaleText(sp)}">${g}</svg>`;
 }
 
 // ───────────────────── 글 속 식 — 분수·대분수·문자 (2026-10-03, D 문자와 식 3단계) ─────────────────────
