@@ -369,6 +369,8 @@ button { font-family: inherit; }
 .fr .n { border-bottom: 2px solid currentColor; padding: 0 4px; }
 .fr .d { padding: 0 4px; }
 .mx { display: inline-flex; align-items: center; gap: 3px; vertical-align: middle; }
+/* ✏️ 식의 문자 x·a — 교과서처럼 기울인 바탕체 (D 문자와 식 줄기, mathdraw.richParts가 a·b·c·x·y만 고른다) */
+.mv { font-family: "Times New Roman", "Noto Serif", "Noto Serif KR", serif; font-style: italic; font-size: 1.12em; padding: 0 .04em; }
 .mx .w { font-weight: 800; }
 
 /* 분수 그림 */

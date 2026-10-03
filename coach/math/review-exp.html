@@ -1,0 +1,1079 @@
+<title>문자와 식 줄기 검수</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에 개념 바로가기, 개념마다 [배움 + 문제 예시 | 아빠 카드] 두 칸 (폰에서는 한 칸) — 입체도형 검수 페이지와 같은 체계 */
+:root{
+  --bg:#f5f7ff; --card:#ffffff; --ink:#1f2340; --muted:#6b7280; --line:#e3e6f3;
+  --primary:#4f46e5; --primary-soft:#eef2ff; --accent:#f59e0b; --accent-soft:#fff7ed;
+  --ok:#0f9f6e; --ok-soft:#ecfdf5; --no-soft:#f8f9fc;
+  --dad:#fff8ec; --dad-line:#f3c27a; --dad-ink:#7c4a03;
+  --font-display:"Gowun Dodum","Noto Sans KR",sans-serif;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --font-math:"Times New Roman","Cambria Math",Georgia,serif;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;margin:0;padding-block:0 60px;padding-inline:16px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top h1{font-size:1.35rem}
+.top .sub{color:var(--muted);font-size:.9rem;margin:2px 0 8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.nav a{flex:0 0 auto;font-size:.8rem;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.nav a b{color:var(--primary);margin-right:3px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--primary);outline:none}
+.intro{display:grid;grid-template-columns:1fr;gap:12px;margin-block:16px}
+@media(min-width:760px){.intro{grid-template-columns:1.2fr 1fr}}
+.intro .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.intro .box.dadbox{background:var(--dad);border-color:var(--dad-line)}
+.intro h3{font-size:1rem;margin-bottom:6px}
+.intro p{margin:4px 0;font-size:.92rem}
+.intro .stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.92rem}
+.intro .stats b{font-size:1.25rem;color:var(--primary);font-variant-numeric:tabular-nums}
+.how{padding-left:20px}
+.how li{margin:3px 0}
+.ladder{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0 4px;padding:0;list-style:none}
+.ladder li{font-size:.85rem;background:var(--primary-soft);border-radius:8px;padding:5px 9px}
+.ladder li b{color:var(--primary);margin-right:4px}
+.ladder li small{color:var(--muted);margin-left:4px}
+.concept{margin-block:36px 0;scroll-margin-top:110px}
+.ch-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.ch-head > div:last-child{min-width:0}
+.ch-no{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--primary);background:var(--primary-soft);border-radius:12px;min-width:56px;height:56px;display:grid;place-items:center}
+.grade{font-size:.75rem;letter-spacing:.06em;color:var(--muted)}
+.ch-head h2{font-size:1.4rem}
+.idea{color:var(--muted);margin:2px 0 0;font-size:.95rem;max-width:65ch}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+.cols > *{min-width:0}
+@media(min-width:900px){.cols{grid-template-columns:1.35fr 1fr}}
+.col-title{margin:0 0 10px;font-size:.95rem}
+.col-title small{color:var(--muted);font-weight:400;margin-left:6px}
+.samples-title{margin-top:18px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.step{display:flex;gap:10px;scroll-margin-top:110px}
+.step-no{flex:0 0 30px;height:30px;border-radius:50%;background:var(--primary);color:var(--card);font-weight:700;display:grid;place-items:center;font-size:.9rem;margin-top:12px}
+.step-body{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.say{max-width:65ch}
+.say p{margin:0 0 10px}
+.say p:last-child{margin-bottom:0}
+.check{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;scroll-margin-top:110px}
+.qt{margin:0 0 6px;font-weight:500}
+.qt p{margin:0 0 6px}
+.ch{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ch li{display:flex;align-items:center;gap:8px;border-radius:9px;padding:6px 10px;background:var(--no-soft);border:1px solid transparent}
+.ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
+.ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
+.ch .txt{flex:1;min-width:0}
+.ch .tag{font-size:.75rem;color:var(--muted);text-align:right}
+.why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
+.samples{display:grid;gap:10px}
+.sample{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
+body.hide-ans .ch .mark,body.hide-ans .why,body.hide-ans .ch .tag{visibility:hidden}
+.rule{margin-top:12px;background:var(--primary-soft);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.rule p{margin:2px 0 0;font-weight:700;font-size:1.05rem}
+.dad{background:var(--dad);border:1px solid var(--dad-line);border-radius:14px;padding:14px 16px;position:sticky;top:104px;scroll-margin-top:110px;color:var(--ink)}
+.dad h3{font-size:1.05rem;margin:4px 0 10px;color:var(--dad-ink)}
+.dad h4{margin:12px 0 4px;font-size:.9rem;color:var(--dad-ink)}
+.dad-say{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.dad-say li,.traps li{display:flex;gap:8px;align-items:flex-start;scroll-margin-top:110px}
+.dad-say li > span,.traps li > div{min-width:0}
+.dad-do,.dad-pass{margin:0;font-size:.95rem}
+.traps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.traps .kid{font-weight:500}
+.traps .dadsay{color:var(--muted);font-size:.92rem}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.ref .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.03em}
+.ref code,code.mini{font-size:.78rem;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+code.mini{flex:0 0 auto;margin-top:2px}
+.dad .ref code,.dad code.mini{color:var(--dad-ink);background:var(--accent-soft)}
+/* 식: 문자는 기울여(교과서 표기), 나눗셈은 세로 분수 — 분수 막대가 괄호 노릇을 해서 괄호는 뗀다 */
+i.v{font-family:var(--font-math);font-style:italic;font-size:1.1em;padding:0 .04em}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.1;margin:0 2px;font-variant-numeric:tabular-nums}
+.fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
+.fr .d{padding:0 3px}
+.mx{display:inline-flex;align-items:center;gap:3px;vertical-align:middle}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none;margin-top:8px}
+.toggle input{width:18px;height:18px;accent-color:var(--primary)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (max-width:899px){.dad{position:static}}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  body{background:#fff;padding:0;font-size:13px}
+  .wrap{max-width:100%}
+  .top{position:static}
+  .dad{position:static;box-shadow:none;break-inside:auto}
+  .step,.sample,.check,.rule,.traps li,.fr{break-inside:avoid}
+}
+</style>
+<div class="wrap">
+  <div class="top">
+    <h1>✏️ 문자와 식 줄기 — 배움 원고 검수</h1>
+    <p class="sub">신코치 수학 · 중1 「문자의 사용과 식」 · 개념 9개</p>
+    <div class="nav"><a href="#D1"><b>D1</b> 문자를 사용한 식</a><a href="#D2"><b>D2</b> 곱셈 기호의 생략</a><a href="#D3"><b>D3</b> 나눗셈 기호의 생략</a><a href="#D4"><b>D4</b> 식의 값</a><a href="#D5"><b>D5</b> 다항식과 일차식</a><a href="#D6"><b>D6</b> 일차식과 수의 곱셈·나눗셈</a><a href="#D7"><b>D7</b> 동류항</a><a href="#D8"><b>D8</b> 일차식의 덧셈과 뺄셈</a><a href="#D9"><b>D9</b> ⭐ 문자와 식 활용</a></div>
+  </div>
+
+  <div class="intro">
+    <div class="box">
+      <h3>무엇을 봐 주시면 되나</h3>
+      <div class="stats">
+        <span><b>9</b> 개념</span>
+        <span><b>43</b> 📘 배움 장</span>
+        <span><b>43</b> 확인 질문</span>
+        <span><b>18</b> 헷갈리는 자리</span>
+        <span><b>27</b> 🧪 문제 예시</span>
+      </div>
+      <ol class="ladder"><li><b>D1</b>문자를 사용한 식<small>중1</small></li><li><b>D2</b>곱셈 기호의 생략<small>중1</small></li><li><b>D3</b>나눗셈 기호의 생략<small>중1</small></li><li><b>D4</b>식의 값<small>중1</small></li><li><b>D5</b>다항식과 일차식<small>중1</small></li><li><b>D6</b>일차식과 수의 곱셈·나눗셈<small>중1</small></li><li><b>D7</b>동류항<small>중1</small></li><li><b>D8</b>일차식의 덧셈과 뺄셈<small>중1</small></li><li><b>D9</b>⭐ 문자와 식 활용<small>중1</small></li></ol>
+      <ul class="how">
+        <li><b>📘 배움</b> — 진우가 앱에서 읽는 것. <b>한 장 = 한 화면</b>, 짧은 설명 → 확인 질문 → 다음 장. 범위는 2022 개정 성취기준 [9수02-01] 문자를 사용한 식·식의 값, [9수02-02] 일차식의 덧셈과 뺄셈이고 모두 중1입니다. 새 말은 그 칸에서 처음 씁니다 — <b>생략 D2</b>, <b>대입·식의 값 D4</b>, <b>항·상수항·계수·차수·다항식·단항식·일차식 D5</b>, <b>분배법칙 D6</b>, <b>동류항 D7</b>(앞 칸은 테스트로 막았습니다)</li>
+        <li><b>범위 밖</b> — 성취기준의 "지나치게 복잡한 계산은 다루지 않음"을 따라 계수는 −9~9 안쪽, 분수 계수는 D3·D5·D9의 간단한 것만, 소수 계수는 없습니다. 세제곱(a³)은 D2 배움 글에 한 줄만 나옵니다</li>
+        <li><b>표기</b> — D1은 x × 3처럼 기호를 그대로 쓰고, 곱셈 기호 생략은 D2부터입니다. 나눗셈은 교과서처럼 <b>세로 분수</b>로, 문자는 기울여 그립니다(앱 화면도 다음 단계에서 이렇게 바꿉니다). x/3은 "3분의 x"라고 읽어 끝소리가 분모가 아니라서, <b>분수 바로 뒤에는 조사를 붙이지 않았습니다</b></li>
+        <li><b>참이라고 내미는 말</b> — "x와 x²은 동류항이 아니다", "분모에 문자가 있으면 다항식이 아니다", "괄호 앞 −는 모든 항의 부호를 바꾼다", "문자는 보통 알파벳 순서로"만 씁니다. 거꾸로 된 말(a × a를 2a로, −(x − 3)을 −x − 3으로)은 오답 보기와 아이가 하는 말에만 있고, 참이라고 내미는 글에 나오면 테스트가 막습니다</li>
+        <li><b>🧪 문제 예시</b> — 앱이 숫자를 바꿔 가며 끝없이 만드는 문제 중 몇 개입니다. 오답은 <b>아이가 실제로 하는 틀린 생각</b>입니다 (곱할 것을 더함 · 빼는 순서를 바꿈 · 수를 문자 뒤에 · a × a를 2a로 · × (−3)을 빼기로 · ÷를 뒤집음 · 2x에 3을 넣어 23 · 음수를 괄호 없이 넣음 · (−3)²을 −9로 · 계수에서 부호를 뺌 · x²도 일차식 · 괄호 안 첫째 항에만 곱함 · 음수를 곱할 때 둘째 항 부호를 그대로 · 3x + 2 = 5x · 괄호 앞 −를 첫째 항에만 · 분자끼리·분모끼리 더함 · 거꾸로 할 때 또 뺌)</li>
+        <li><b>🔢 숫자판</b> — 답이 수 하나인 ① 문제(식의 값·계수·상수항·차수·성냥개비 수)는 앱에서 숫자판으로 직접 씁니다(−6, 1/4처럼 음수·분수도). 답이 식이면 보기를 고릅니다</li>
+        <li><b>👨 아빠 카드</b> — 저녁 10분에 처음 소개할 때 쓰는 반 장. 가격표 놀이·식 카드 뽑기·종이 피자·포켓몬 카드 대입·포스트잇 항 카드·종이컵과 바둑돌·부호 카드·이쑤시개 성냥개비처럼 집에서 실제로 할 수 있는 활동인지, 아버님 말투에 맞는지</li>
+        <li>확인 질문 43개는 테스트가 <b>문제 글을 따로 읽어</b> 다시 풀었고(식이 답이면 값과 꼴까지), 오답 보기 하나하나가 어느 틀린 생각에서 나왔는지도 대조했습니다. 배움 글·풀이·아빠 카드에 나오는 <b>"식 = 식" 96곳</b>은 문자에 여러 수를 넣어 정말 같은 식인지, "계수는 −3", "차수는 2", "일차식이에요", "동류항이 아니에요" 같은 말 13곳도 계산기로 다시 봤습니다</li>
+      </ul>
+      <p>고칠 곳은 번호로 가리켜 주시면 됩니다. 예) <code>D2-3 설명이 길다</code>, <code>D5-2✓ 오답이 너무 쉽다</code>, <code>D6-①a 이 오답은 안 나올 것 같다</code>, <code>D8-👨함정1</code></p>
+      <label class="toggle"><input type="checkbox" id="ans" checked> 정답·오개념 이름 보이기 (끄면 진우가 보는 모양)</label>
+    </div>
+    <div class="box dadbox">
+      <h3>👨 이 줄기에서 제일 중요한 한 가지</h3>
+      <p>이 줄기의 실수는 대부분 <b>부호와 괄호</b>에서 나옵니다. 음수를 대입할 때 괄호를 빼먹고(D4), 괄호 앞의 수나 −를 첫째 항에만 곱합니다(D6·D8). "괄호 안 식구 모두에게"를 입버릇처럼 말하게 해 주세요.</p>
+      <p>D1~D3은 계산이 아니라 <b>쓰는 약속</b>입니다. 3x는 "3 곱하기 x"라서 x가 2면 32가 아니라 6이라는 것 — 이 한 가지가 D4 식의 값까지 이어집니다. 약속은 외우기보다 "왜 32가 아니야?"를 말하게 하면 오래 갑니다.</p>
+      <p>E 음수 줄기를 먼저 하면 쉽습니다. H 규칙과 대응에서 □·△로 쓰던 식이 여기서 문자가 되고, 다음 줄기 일차방정식의 바탕이 됩니다.</p>
+      <p style="margin-top:10px"><b>예시 출연진</b>: 앱에서는 진우가 도감에서 잡은 포켓몬이 들어갑니다. 이 페이지는 피카츄·리자몽·개굴닌자·루카리오 등을 예시로 끼웠습니다.</p>
+    </div>
+  </div>
+
+  <section class="concept" id="D1">
+    <header class="ch-head">
+      <div class="ch-no">D1</div>
+      <div>
+        <div class="grade">중1 · 첫 개념</div>
+        <h2>문자를 사용한 식</h2>
+        <p class="idea">수 대신 <strong>문자</strong>(<i class="v">x</i>, <i class="v">y</i>, <i class="v">a</i>, <i class="v">b</i> …)를 써서 아직 모르는 수나 바뀌는 수를 나타낼 수 있어요. 한 개에 <i class="v">x</i>원인 지우개 3개는 <strong><i class="v">x</i> × 3</strong>원, 5000원을 내고 받는 거스름돈은 <strong>5000 − <i class="v">x</i> × 3</strong>원처럼 상황을 말 그대로 식으로 써요. 규칙과 대응에서 □·△로 쓰던 자리에 문자를 쓴 거예요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D1-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D1-1</code></div>
+        <div class="say"><p>피카츄가 상점에서 몬스터볼을 3개 사요. 한 개에 200원이면 200 × 3원, 한 개에 500원이면 500 × 3원이에요.</p><p>값이 바뀔 때마다 식을 새로 쓰지 말고, 한 개 값을 <strong><i class="v">x</i></strong>원이라고 해 봐요.</p><p><strong><i class="v">x</i> × 3</strong> (원)</p><p><i class="v">x</i> 자리에 200을 넣으면 200 × 3, 500을 넣으면 500 × 3이 돼요. 이렇게 아직 모르거나 바뀌는 수 대신 쓰는 <i class="v">x</i>, <i class="v">y</i>, <i class="v">a</i>, <i class="v">b</i> 같은 글자를 <strong>문자</strong>라고 해요.</p></div>
+        <div class="check" id="D1-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D1-1✓</code></div>
+        <div class="qt"><p>한 개에 <i class="v">x</i>원인 지우개를 4개 샀어요.</p><p>낸 돈은 모두 몇 원인지 식으로 나타내면 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><i class="v">x</i> × 4</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> + 4</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> ÷ 4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>한 개에 <i class="v">x</i>원씩 4개 — <i class="v">x</i>를 4번 더한 것과 같아서 곱해요. 더하면 4원만 늘고, 나누면 한 개 값보다 작아져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D1-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D1-2</code></div>
+        <div class="say"><p>말을 그대로 식으로 옮겨요.</p><p>· 한 봉지에 사탕이 6개씩, 봉지가 <i class="v">a</i>개 → <strong>6 × <i class="v">a</i></strong> (개)<br>· 구슬 <i class="v">x</i>개를 4명이 똑같이 나누어 가지면 한 명은 → <strong><i class="v">x</i> ÷ 4</strong> (개)</p><p><strong>몇 개씩 몇 묶음은 ×, 똑같이 나누면 ÷</strong>예요. 문자가 들어가도 셈은 수와 똑같이 해요.</p></div>
+        <div class="check" id="D1-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D1-2✓</code></div>
+        <div class="qt"><p>구슬 <i class="v">x</i>개를 5명이 똑같이 나누어 가지려고 해요.</p><p>한 명이 갖는 구슬은 몇 개인지 식으로 나타내면 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><i class="v">x</i> ÷ 5</span></li><li class="no"><span class="mark"></span><span class="txt">5 ÷ <i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> × 5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>구슬 <i class="v">x</i>개를 5묶음으로 똑같이 나누니까 <i class="v">x</i> ÷ 5예요. 5 ÷ <i class="v">x</i>는 나누는 순서가 거꾸로이고, 곱하면 나누기 전보다 많아져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D1-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D1-3</code></div>
+        <div class="say"><p>진우가 5000원을 내고 한 권에 <i class="v">a</i>원인 공책을 3권 샀어요.</p><p>공책 값은 <strong><i class="v">a</i> × 3</strong>원이고, 거스름돈은 낸 돈에서 공책 값을 빼요.</p><p><strong>5000 − <i class="v">a</i> × 3</strong> (원)</p><p>곱셈을 먼저 하니까 괄호가 없어도 돼요. 빼기는 순서가 중요해요 — <i class="v">a</i> × 3 − 5000으로 쓰면 공책 값에서 낸 돈을 뺀 거라서 거꾸로예요.</p></div>
+        <div class="check" id="D1-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D1-3✓</code></div>
+        <div class="qt"><p>진우가 10000원을 내고 한 권에 <i class="v">a</i>원인 공책을 4권 샀어요.</p><p>거스름돈은 몇 원인지 식으로 나타내면 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10000 − <i class="v">a</i> × 4</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">a</i> × 4 − 10000</span></li><li class="no"><span class="mark"></span><span class="txt">10000 − <i class="v">a</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>낸 돈 10000원에서 공책 4권 값 <i class="v">a</i> × 4원을 빼요. 10000 − <i class="v">a</i>는 공책을 1권만 산 셈이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D1-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D1-4</code></div>
+        <div class="say"><p>자동차가 한 시간에 60 km씩 달려요. 2시간이면 60 × 2 km, <i class="v">x</i>시간이면 <strong>60 × <i class="v">x</i></strong> km예요 — 거리는 시간이 늘수록 늘어나서 곱해요.</p><p>거꾸로 <i class="v">y</i> km를 한 시간에 60 km씩 가면 걸리는 시간은 <strong><i class="v">y</i> ÷ 60</strong>시간이에요. <i class="v">y</i> km 안에 60 km가 몇 번 들어가는지 나누어 보는 거예요.</p></div>
+        <div class="check" id="D1-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D1-4✓</code></div>
+        <div class="qt"><p><i class="v">y</i> km인 길을 한 시간에 50 km씩 가요.</p><p>걸리는 시간은 몇 시간인지 식으로 나타내면 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><i class="v">y</i> ÷ 50</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">y</i> × 50</span></li><li class="no"><span class="mark"></span><span class="txt">50 ÷ <i class="v">y</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><i class="v">y</i> km 안에 50 km가 몇 번 들어가는지 — <i class="v">y</i>를 50으로 나눠요. 곱하면 시간이 거리보다 커져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D1-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>D1-5</code></div>
+        <div class="say"><p>한꺼번에 계산해야 하는 것은 <strong>괄호</strong>로 묶어요.</p><p>· 가로가 <i class="v">x</i> cm, 세로가 5 cm인 직사각형의 둘레: 가로와 세로를 더한 것의 2배 → <strong>(<i class="v">x</i> + 5) × 2</strong> (cm)<br>· 두 수 <i class="v">a</i>와 <i class="v">b</i>의 평균: 더한 것 전체를 2로 나눔 → <strong>(<i class="v">a</i> + <i class="v">b</i>) ÷ 2</strong></p><p>괄호를 빠뜨려 <i class="v">x</i> + 5 × 2로 쓰면 5 × 2만 먼저 계산해 버려요. 백분율도 식으로 쓸 수 있어요 — <i class="v">a</i>원의 30 %는 <strong><i class="v">a</i> × <span class="fr"><span class="n">30</span><span class="d">100</span></span></strong>원이에요.</p></div>
+        <div class="check" id="D1-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D1-5✓</code></div>
+        <div class="qt"><p>가로가 <i class="v">x</i> cm, 세로가 7 cm인 직사각형이 있어요.</p><p>둘레는 몇 cm인지 식으로 나타내면 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">(<i class="v">x</i> + 7) × 2</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> + 7 × 2</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> × 7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>가로 하나와 세로 하나를 더한 <i class="v">x</i> + 7이 둘레의 반이에요. 그 전체를 2배 하니까 괄호로 묶어요. <i class="v">x</i> × 7은 넓이예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D1-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D1-📏</code></div><p>말을 그대로 식으로 — 몇 개씩 몇 묶음은 ×, 똑같이 나누면 ÷, 남은 것은 −, 한꺼번에 할 것은 괄호로.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D1-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D1-①a</code></div>
+      <div class="say"><p>진우가 5000원을 내고 한 권에 <i class="v">a</i>원인 공책을 2권 샀어요.</p><p>거스름돈은 몇 원인지 식으로 나타내면 어느 것일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">5000 − <i class="v">a</i></span><span class="tag">개수를 곱하지 않음</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">a</i> × 2 − 5000</span><span class="tag">빼는 순서를 바꿈</span></li><li class="ok"><span class="mark">✔</span><span class="txt">5000 − <i class="v">a</i> × 2</span></li></ol>
+    </div><div class="sample" id="D1-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D1-①b</code></div>
+      <div class="say"><p>정가가 <i class="v">a</i>원인 옷을 90 % 할인했어요.</p><p>할인한 금액은 몇 원인지 식으로 나타내면 어느 것일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><i class="v">a</i> × 90</span><span class="tag">백분율을 100으로 나누지 않음</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><i class="v">a</i> × <span class="fr"><span class="n">90</span><span class="d">100</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">a</i> × <span class="fr"><span class="n">100</span><span class="d">90</span></span></span><span class="tag">백분율을 뒤집어 씀</span></li></ol>
+    </div><div class="sample" id="D1-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D1-②</code></div>
+      <div class="say"><p>자동차가 한 시간에 60 km씩 <i class="v">x</i>시간 동안 달렸어요.</p><p>리자몽이 이렇게 말했어요.</p><p><strong>달린 거리는 60 ÷ <i class="v">x</i> km예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">거리는 식으로 나타낼 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> ÷ 60 km예요</span><span class="tag">나누는 순서를 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">한 시간에 60 km씩 <i class="v">x</i>시간이니까 60 × <i class="v">x</i> km예요</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D1-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D1-👨</code></div>
+    <h3>모르는 수나 바뀌는 수 대신 문자를 쓰고, 상황을 말 그대로 ×·÷·−·괄호로 옮긴다. 답이 수가 아니라 식이어도 된다는 것에 익숙해지기.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D1-👨말1"><code class="mini">말1</code><span>&quot;이 과자 한 봉지 값을 모른다고 치자. 그냥 <i class="v">x</i>원이라고 부르면 세 봉지는 얼마라고 말할 수 있을까?&quot;</span></li><li id="D1-👨말2"><code class="mini">말2</code><span>&quot;<i class="v">x</i> × 3원 — 이게 답이야. 수가 아니어도 식이 답이 될 수 있어.&quot;</span></li><li id="D1-👨말3"><code class="mini">말3</code><span>&quot;거스름돈은 무엇에서 무엇을 빼는 거지? 낸 돈이 먼저야, 과자 값이 먼저야?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">장난감 가격표나 마트 전단지로 놀이해요. 아빠가 &quot;이 과자 값을 <i class="v">x</i>원이라고 하자&quot; 하면 진우가 &quot;두 봉지는 <i class="v">x</i> × 2원&quot;, &quot;10000원을 내면 거스름돈은 10000 − <i class="v">x</i> × 2원&quot;처럼 식으로 말해요. 마지막에 가격표의 진짜 값을 <i class="v">x</i> 자리에 넣어 계산기로 맞는지 확인해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D1-👨함정1"><code class="mini">함정1</code><div><div class="kid">한 개에 <i class="v">x</i>원인 것 3개를 <i class="v">x</i> + 3이라고 쓴다</div><div class="dadsay">→ &quot;<i class="v">x</i>원짜리가 3번 있지? 같은 수를 여러 번 더하는 건 어떤 셈으로 바꿀 수 있었지?&quot;</div></div></li><li id="D1-👨함정2"><code class="mini">함정2</code><div><div class="kid">거스름돈을 <i class="v">a</i> × 3 − 5000이라고 쓴다</div><div class="dadsay">→ &quot;공책 값에서 낸 돈을 빼면 거스름돈이 될까? 지갑에서 나간 돈과 돌아온 돈을 말로 먼저 해 볼까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;한 개에 <i class="v">x</i>원인 지우개 4개를 사고 10000원을 냈을 때 거스름돈&quot;을 10000 − <i class="v">x</i> × 4라고 쓰고, 왜 그 순서인지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="D2">
+    <header class="ch-head">
+      <div class="ch-no">D2</div>
+      <div>
+        <div class="grade">중1 · D1 다음</div>
+        <h2>곱셈 기호의 생략</h2>
+        <p class="idea">곱셈 기호 ×는 <strong>생략</strong>할 수 있어요. 수는 문자 <strong>앞에</strong>(<i class="v">x</i> × 3 = 3<i class="v">x</i>), 문자는 보통 알파벳 순서로(<i class="v">b</i> × <i class="v">a</i> = <i class="v">ab</i>), <strong>1은 쓰지 않고</strong>(1 × <i class="v">a</i> = <i class="v">a</i>, (−1) × <i class="v">a</i> = −<i class="v">a</i>), 같은 문자의 곱은 <strong>거듭제곱</strong>으로(<i class="v">a</i> × <i class="v">a</i> = <i class="v">a</i>²) 써요. 괄호가 있는 식은 수를 괄호 앞에 써요((<i class="v">a</i> + <i class="v">b</i>) × 2 = 2(<i class="v">a</i> + <i class="v">b</i>)).</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D2-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D2-1</code></div>
+        <div class="say"><p>문자가 들어간 식에서는 곱셈 기호 ×를 <strong>생략</strong>할 수 있어요 — 지워서 간단히 쓰는 거예요. 이때 <strong>수는 문자 앞에</strong> 써요.</p><p><i class="v">x</i> × 3 = 3<i class="v">x</i></p><p><i class="v">a</i> × 5 × <i class="v">b</i> = 5<i class="v">ab</i></p><p>문자끼리는 보통 알파벳 순서로 써요(<i class="v">b</i> × <i class="v">a</i> = <i class="v">ab</i>). 3<i class="v">x</i>는 &quot;3 곱하기 <i class="v">x</i>&quot;라는 뜻이라서 <i class="v">x</i>가 2이면 3<i class="v">x</i>는 6이에요 — 32가 아니에요.</p></div>
+        <div class="check" id="D2-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D2-1✓</code></div>
+        <div class="qt"><p>곱셈 기호 ×를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">y</i> × 7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7<i class="v">y</i></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">y</i>7</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">y</i> + 7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>수는 문자 앞에 써요 — 7<i class="v">y</i>. ×를 지우는 것이지 +로 바꾸는 것이 아니에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D2-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D2-2</code></div>
+        <div class="say"><p><strong>1은 쓰지 않아요.</strong> 1 × <i class="v">a</i>는 그냥 <i class="v">a</i>예요.</p><p>1 × <i class="v">a</i> = <i class="v">a</i></p><p>(−1) × <i class="v">a</i> = −<i class="v">a</i></p><p>−1 × <i class="v">a</i>를 −1<i class="v">a</i>로 쓰지 않고 −<i class="v">a</i>로 써요. 1은 사라지지만 <strong>− 부호는 남아요</strong>.</p></div>
+        <div class="check" id="D2-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D2-2✓</code></div>
+        <div class="qt"><p>곱셈 기호 ×를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">b</i> × (−1) × <i class="v">a</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">−<i class="v">ab</i></span></li><li class="no"><span class="mark"></span><span class="txt">−1<i class="v">ab</i></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">ab</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1은 쓰지 않고 − 부호만 남겨요. 문자는 알파벳 순서로 <i class="v">ab</i> — 그래서 −<i class="v">ab</i>예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D2-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D2-3</code></div>
+        <div class="say"><p>같은 문자를 여러 번 곱하면 <strong>거듭제곱</strong>으로 써요. 오른쪽 위의 작은 수가 곱한 횟수예요.</p><p><i class="v">a</i> × <i class="v">a</i> = <i class="v">a</i>²</p><p><i class="v">a</i> × <i class="v">a</i> × <i class="v">a</i> = <i class="v">a</i>³</p><p>E 음수 줄기에서 본 (−2)²과 같은 꼴이에요. <i class="v">a</i>²을 2<i class="v">a</i>로 쓰면 안 돼요 — 2<i class="v">a</i>는 <i class="v">a</i> + <i class="v">a</i>예요.</p><p><i class="v">x</i> × <i class="v">y</i> × <i class="v">x</i> × 4 = 4<i class="v">x</i>²<i class="v">y</i></p></div>
+        <div class="check" id="D2-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D2-3✓</code></div>
+        <div class="qt"><p>곱셈 기호 ×를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">x</i> × 4 × <i class="v">x</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4<i class="v">x</i>²</span></li><li class="no"><span class="mark"></span><span class="txt">8<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">4<i class="v">x</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><i class="v">x</i> × <i class="v">x</i>는 <i class="v">x</i>를 두 번 곱한 것 — <i class="v">x</i>²이에요. 수 4를 앞에 써서 4<i class="v">x</i>². 8<i class="v">x</i>는 <i class="v">x</i> × <i class="v">x</i>를 2<i class="v">x</i>로 본 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D2-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D2-4</code></div>
+        <div class="say"><p>음수를 곱할 때도 수를 앞에 쓰고, 부호를 빠뜨리지 않아요.</p><p><i class="v">x</i> × (−3) = −3<i class="v">x</i></p><p>(−2) × <i class="v">a</i> × <i class="v">b</i> = −2<i class="v">ab</i></p><p>−3<i class="v">x</i>는 &quot;<i class="v">x</i>에서 3을 뺀다&quot;가 아니라 &quot;<i class="v">x</i>에 −3을 곱한다&quot;는 뜻이에요. <i class="v">x</i> − 3과 헷갈리지 않게 조심해요.</p></div>
+        <div class="check" id="D2-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D2-4✓</code></div>
+        <div class="qt"><p>곱셈 기호 ×를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">a</i> × (−6)</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">−6<i class="v">a</i></span></li><li class="no"><span class="mark"></span><span class="txt">6<i class="v">a</i></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">a</i> − 6</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>−6을 곱했으니까 − 부호를 그대로 앞에 — −6<i class="v">a</i>예요. <i class="v">a</i> − 6은 6을 뺀 거라서 다른 식이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D2-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>D2-5</code></div>
+        <div class="say"><p>괄호가 있는 식에 수를 곱할 때는 수를 <strong>괄호 앞에</strong> 쓰고, 괄호는 그대로 둬요.</p><p>(<i class="v">a</i> + <i class="v">b</i>) × 2 = 2(<i class="v">a</i> + <i class="v">b</i>)</p><p>2(<i class="v">a</i> + <i class="v">b</i>)는 <i class="v">a</i> + <i class="v">b</i> 전체를 2번 — 괄호를 지워서 2<i class="v">a</i> + <i class="v">b</i>로 쓰면 <i class="v">a</i>에만 2를 곱한 게 돼요.</p></div>
+        <div class="check" id="D2-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D2-5✓</code></div>
+        <div class="qt"><p>곱셈 기호 ×를 생략하여 나타내면 어느 것일까요?</p><p><strong>(<i class="v">a</i> + <i class="v">b</i>) × 7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7(<i class="v">a</i> + <i class="v">b</i>)</span></li><li class="no"><span class="mark"></span><span class="txt">7<i class="v">a</i> + <i class="v">b</i></span></li><li class="no"><span class="mark"></span><span class="txt">(<i class="v">a</i> + <i class="v">b</i>)7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>수 7은 괄호 앞에, 괄호는 그대로 — 7(<i class="v">a</i> + <i class="v">b</i>). 괄호를 지우면 7이 <i class="v">a</i>에만 곱해져요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D2-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D2-📏</code></div><p>수는 문자 앞에 · 1은 쓰지 않고 · 같은 문자의 곱은 거듭제곱으로 · 괄호에 곱하는 수는 괄호 앞에.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D2-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D2-①a</code></div>
+      <div class="say"><p>곱셈 기호 ×를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">x</i> × 9</strong></p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i>9</span><span class="tag">수를 문자 뒤에 씀</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> + 9</span><span class="tag">곱셈을 덧셈으로 봄</span></li></ol>
+    </div><div class="sample" id="D2-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D2-①b</code></div>
+      <div class="say"><p>곱셈 기호 ×를 생략하여 나타내면 어느 것일까요?</p><p><strong>7 × <i class="v">y</i> × <i class="v">x</i> × <i class="v">y</i></strong></p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7<i class="v">xy</i>²</span></li><li class="no"><span class="mark"></span><span class="txt">7<i class="v">yxy</i></span><span class="tag">기호만 지우고 순서를 그대로 둠</span></li><li class="no"><span class="mark"></span><span class="txt">14<i class="v">xy</i></span><span class="tag">같은 문자의 곱을 2배로 봄</span></li></ol>
+    </div><div class="sample" id="D2-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D2-②</code></div>
+      <div class="say"><p>곱셈 기호 ×를 생략하여 나타내요.</p><p>피카츄가 이렇게 말했어요.</p><p><strong><i class="v">a</i> × <i class="v">a</i> × 3은 6<i class="v">a</i>예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">같은 문자의 곱은 거듭제곱으로 — 3<i class="v">a</i>²이에요</span></li><li class="no"><span class="mark"></span><span class="txt">3<i class="v">a</i>예요 — 같은 문자는 한 번만 써요</span><span class="tag">같은 문자를 한 번만 씀</span></li><li class="no"><span class="mark"></span><span class="txt">같은 문자는 곱할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D2-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D2-👨</code></div>
+    <h3>곱셈 기호를 지우는 약속 네 가지 — 수는 앞에, 1은 안 씀(− 부호는 남김), 같은 문자는 거듭제곱, 괄호는 그대로 — 를 말로 설명할 수 있게.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D2-👨말1"><code class="mini">말1</code><span>&quot;3<i class="v">x</i>는 3 곱하기 <i class="v">x</i>야. <i class="v">x</i>가 2면 3<i class="v">x</i>는 얼마일까? 32일까, 6일까?&quot;</span></li><li id="D2-👨말2"><code class="mini">말2</code><span>&quot;<i class="v">a</i> × <i class="v">a</i>를 짧게 쓰면? <i class="v">a</i>를 두 번 곱했다는 표시가 필요하지.&quot;</span></li><li id="D2-👨말3"><code class="mini">말3</code><span>&quot;(−1) × <i class="v">a</i>에서 1은 없어지는데 −는 어떻게 될까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이에 '<i class="v">x</i> × 3', '<i class="v">b</i> × <i class="v">a</i>', '<i class="v">a</i> × <i class="v">a</i>', '(−1) × <i class="v">y</i>', '(<i class="v">a</i> + <i class="v">b</i>) × 2' 카드를 만들어 뒤집어 놓고 하나씩 뽑아요. 진우가 ×를 지운 꼴로 고쳐 쓰고, 아빠는 일부러 <i class="v">x</i>3, 2<i class="v">a</i>(<i class="v">a</i> × <i class="v">a</i>를 고친 것), −1<i class="v">y</i>처럼 틀리게 써서 진우가 바로잡게 해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D2-👨함정1"><code class="mini">함정1</code><div><div class="kid"><i class="v">x</i> × 3을 <i class="v">x</i>3으로 쓴다</div><div class="dadsay">→ &quot;수는 어디에 쓰기로 했지? 3<i class="v">x</i>, <i class="v">x</i>3 중에 어느 쪽이 약속이야?&quot;</div></div></li><li id="D2-👨함정2"><code class="mini">함정2</code><div><div class="kid"><i class="v">a</i> × <i class="v">a</i>를 2<i class="v">a</i>로 쓴다</div><div class="dadsay">→ &quot;2<i class="v">a</i>는 <i class="v">a</i> + <i class="v">a</i>야. <i class="v">a</i>를 두 번 곱한 건 <i class="v">a</i> 오른쪽 위에 작은 2를 붙여서 <i class="v">a</i>²이라고 써.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><i class="v">x</i> × <i class="v">y</i> × 5, (−1) × <i class="v">a</i> × <i class="v">b</i>, <i class="v">a</i> × <i class="v">a</i> × 3을 각각 5<i class="v">xy</i>, −<i class="v">ab</i>, 3<i class="v">a</i>²으로 쓰고, 왜 그렇게 쓰는지 하나씩 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="D3">
+    <header class="ch-head">
+      <div class="ch-no">D3</div>
+      <div>
+        <div class="grade">중1 · D2 다음</div>
+        <h2>나눗셈 기호의 생략</h2>
+        <p class="idea">나눗셈 기호 ÷는 <strong>분수</strong> 꼴로 생략해요 — 나누는 수가 분모예요(<i class="v">a</i> ÷ 3 = <span class="fr"><span class="n"><i class="v">a</i></span><span class="d">3</span></span>, <i class="v">a</i> ÷ <i class="v">b</i> = <span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">b</i></span></span>). 괄호가 있는 식은 괄호 안 전체가 분자예요((<i class="v">x</i> + 2) ÷ 3 = <span class="fr"><span class="n"><i class="v">x</i> + 2</span><span class="d">3</span></span>). ×와 ÷가 섞이면 <strong>앞에서부터</strong> 차례로 해요(<i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i> = <span class="fr"><span class="n"><i class="v">ac</i></span><span class="d"><i class="v">b</i></span></span>).</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D3-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D3-1</code></div>
+        <div class="say"><p>나눗셈 기호 ÷도 생략할 수 있어요 — <strong>분수</strong>로 써요. 초5에서 배운 대로 1 ÷ 3 = <span class="fr"><span class="n">1</span><span class="d">3</span></span> — 나눗셈을 분수로 쓰는 거예요.</p><p><i class="v">a</i> ÷ 3 = <span class="fr"><span class="n"><i class="v">a</i></span><span class="d">3</span></span></p><p><strong>나누는 수가 분모</strong>예요. 읽을 때는 &quot;3분의 <i class="v">a</i>&quot;라고 읽어요. 또 <i class="v">a</i> ÷ 3 = <i class="v">a</i> × <span class="fr"><span class="n">1</span><span class="d">3</span></span> = <span class="fr"><span class="n">1</span><span class="d">3</span></span><i class="v">a</i> — 그래서 <span class="fr"><span class="n">1</span><span class="d">3</span></span><i class="v">a</i>로 쓰기도 해요.</p></div>
+        <div class="check" id="D3-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D3-1✓</code></div>
+        <div class="qt"><p>나눗셈 기호 ÷를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">y</i> ÷ 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n"><i class="v">y</i></span><span class="d">5</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">5</span><span class="d"><i class="v">y</i></span></span></span></li><li class="no"><span class="mark"></span><span class="txt">5<i class="v">y</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>나누는 수 5가 분모, 나뉘는 <i class="v">y</i>가 분자 — <span class="fr"><span class="n"><i class="v">y</i></span><span class="d">5</span></span>. 5<i class="v">y</i>는 곱셈이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D3-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D3-2</code></div>
+        <div class="say"><p>문자로 나눌 때도 똑같아요. 나누는 문자가 분모예요.</p><p><i class="v">x</i> ÷ <i class="v">y</i> = <span class="fr"><span class="n"><i class="v">x</i></span><span class="d"><i class="v">y</i></span></span></p><p>음수로 나눌 때는 − 부호를 분수 앞에 써요.</p><p><i class="v">a</i> ÷ (−2) = −<span class="fr"><span class="n"><i class="v">a</i></span><span class="d">2</span></span></p><p>분자와 분모를 바꿔 쓰면 &quot;<i class="v">y</i>를 <i class="v">x</i>로 나눈 것&quot;이 되어 전혀 다른 식이 돼요.</p></div>
+        <div class="check" id="D3-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D3-2✓</code></div>
+        <div class="qt"><p>나눗셈 기호 ÷를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">b</i> ÷ <i class="v">a</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n"><i class="v">b</i></span><span class="d"><i class="v">a</i></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">b</i></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">ab</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>나누는 <i class="v">a</i>가 분모예요 — <span class="fr"><span class="n"><i class="v">b</i></span><span class="d"><i class="v">a</i></span></span>. 뒤집으면 <i class="v">a</i>를 <i class="v">b</i>로 나눈 식이 되고, <i class="v">ab</i>는 <i class="v">b</i> × <i class="v">a</i>라는 곱셈이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D3-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D3-3</code></div>
+        <div class="say"><p>괄호가 있는 식을 나누면 <strong>괄호 안 전체가 분자</strong>예요.</p><p>(<i class="v">x</i> + 2) ÷ 3 = <span class="fr"><span class="n"><i class="v">x</i> + 2</span><span class="d">3</span></span></p><p>분수 모양으로 쓰면 가로 막대가 괄호 노릇을 해서, 교과서에서는 괄호 없이 위에 <i class="v">x</i> + 2, 아래에 3을 써요. 괄호를 빼고 2만 3으로 나누면 다른 식이 되니 조심해요.</p></div>
+        <div class="check" id="D3-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D3-3✓</code></div>
+        <div class="qt"><p>나눗셈 기호 ÷를 생략하여 나타내면 어느 것일까요?</p><p><strong>(<i class="v">a</i> − 4) ÷ 7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n"><i class="v">a</i> − 4</span><span class="d">7</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">a</i> − <span class="fr"><span class="n">4</span><span class="d">7</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">7</span><span class="d"><i class="v">a</i> − 4</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><i class="v">a</i> − 4 전체를 7로 나눠요 — 분자는 <i class="v">a</i> − 4 전체예요. 괄호를 빼면 4만 7로 나눈 식이 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D3-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D3-4</code></div>
+        <div class="say"><p>×와 ÷가 섞여 있으면 <strong>앞에서부터 차례로</strong> 생략해요.</p><p><i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i> = <span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">b</i></span></span> × <i class="v">c</i> = <span class="fr"><span class="n"><i class="v">ac</i></span><span class="d"><i class="v">b</i></span></span></p><p><i class="v">a</i> × <i class="v">b</i> ÷ <i class="v">c</i> = <i class="v">ab</i> ÷ <i class="v">c</i> = <span class="fr"><span class="n"><i class="v">ab</i></span><span class="d"><i class="v">c</i></span></span></p><p>÷ 뒤의 <i class="v">b</i> × <i class="v">c</i>를 먼저 묶으면 다른 식이 돼요 — <i class="v">a</i> ÷ (<i class="v">b</i> × <i class="v">c</i>) = <span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">bc</i></span></span></p></div>
+        <div class="check" id="D3-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D3-4✓</code></div>
+        <div class="qt"><p>곱셈 기호와 나눗셈 기호를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">a</i> ÷ 4 × <i class="v">b</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n"><i class="v">ab</i></span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n"><i class="v">a</i></span><span class="d">4<i class="v">b</i></span></span></span></li><li class="no"><span class="mark"></span><span class="txt">4<i class="v">ab</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>앞에서부터 — <i class="v">a</i> ÷ 4 = <span class="fr"><span class="n"><i class="v">a</i></span><span class="d">4</span></span>, 그다음 × <i class="v">b</i> → <span class="fr"><span class="n"><i class="v">ab</i></span><span class="d">4</span></span>. 4 × <i class="v">b</i>를 먼저 하면 <i class="v">a</i>를 4<i class="v">b</i>로 나눈 다른 식이 되고, 4<i class="v">ab</i>는 ÷를 ×로 바꾼 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D3-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D3-📏</code></div><p>나누는 수가 분모 · 괄호 안은 통째로 분자 · ×와 ÷가 섞이면 앞에서부터.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D3-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D3-①a</code></div>
+      <div class="say"><p>곱셈 기호와 나눗셈 기호를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">x</i> ÷ 6 × <i class="v">y</i></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n"><i class="v">x</i></span><span class="d">6<i class="v">y</i></span></span></span><span class="tag">앞에서부터 하지 않고 ×를 먼저 함</span></li><li class="no"><span class="mark"></span><span class="txt">6<i class="v">xy</i></span><span class="tag">나눗셈을 곱셈으로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n"><i class="v">xy</i></span><span class="d">6</span></span></span></li></ol>
+    </div><div class="sample" id="D3-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D3-①b</code></div>
+      <div class="say"><p>곱셈 기호와 나눗셈 기호를 생략하여 나타내면 어느 것일까요?</p><p><strong><i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i></strong></p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n"><i class="v">ac</i></span><span class="d"><i class="v">b</i></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">abc</i></span><span class="tag">나눗셈을 곱셈으로 봄</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">bc</i></span></span></span><span class="tag">앞에서부터 하지 않고 ×를 먼저 함</span></li></ol>
+    </div><div class="sample" id="D3-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D3-②</code></div>
+      <div class="say"><p>곱셈 기호와 나눗셈 기호를 생략하여 나타내요.</p><p>개굴닌자가 이렇게 말했어요.</p><p><strong><i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i>는 <span class="fr"><span class="n"><i class="v">a</i></span><span class="d"><i class="v">bc</i></span></span>예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">곱셈과 나눗셈은 섞어 쓸 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">abc</i>예요 — 기호를 모두 지워요</span><span class="tag">나눗셈을 곱셈으로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">앞에서부터 차례로 — <i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i>는 <span class="fr"><span class="n"><i class="v">ac</i></span><span class="d"><i class="v">b</i></span></span>예요</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D3-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D3-👨</code></div>
+    <h3>÷를 분수로 바꿀 때 나누는 수가 분모라는 것, 그리고 ×·÷가 섞이면 앞에서부터라는 것 두 가지.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D3-👨말1"><code class="mini">말1</code><span>&quot;피자 <i class="v">a</i>판을 3명이 나누면 한 명은 얼마? 3분의 <i class="v">a</i> — 위에 <i class="v">a</i>, 아래에 3.&quot;</span></li><li id="D3-👨말2"><code class="mini">말2</code><span>&quot;(<i class="v">x</i> + 2) ÷ 3은 <i class="v">x</i> + 2를 통째로 나누는 거야. 위에 무엇을 써야 할까?&quot;</span></li><li id="D3-👨말3"><code class="mini">말3</code><span>&quot;<i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i>는 어디부터 할까? 혼합계산에서 ×와 ÷는 어떤 순서였지?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이 피자(동그라미)를 3조각으로 나눠 &quot;피자 <i class="v">a</i>판을 3명이 똑같이 나누면&quot; 하고 위에 <i class="v">a</i>, 아래에 3을 써서 세로 분수를 만들어 봐요. 그다음 '<i class="v">x</i> ÷ 5', '(<i class="v">a</i> + 1) ÷ 4', '<i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i>' 카드를 하나씩 분수 꼴로 바꾸고, 아빠가 일부러 분자와 분모를 바꿔 써서 진우가 고치게 해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D3-👨함정1"><code class="mini">함정1</code><div><div class="kid"><i class="v">x</i> ÷ 4를 '4분의 <i class="v">x</i>' 대신 '<i class="v">x</i>분의 4'로 쓴다</div><div class="dadsay">→ &quot;누가 누구를 나누지? 나누는 수 4는 위에 갈까, 아래에 갈까?&quot;</div></div></li><li id="D3-👨함정2"><code class="mini">함정2</code><div><div class="kid"><i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i>에서 <i class="v">b</i> × <i class="v">c</i>를 먼저 해 분모에 <i class="v">bc</i>를 쓴다</div><div class="dadsay">→ &quot;×와 ÷가 섞이면 앞에서부터야. <i class="v">a</i> ÷ <i class="v">b</i>를 먼저 하고, 그다음에 <i class="v">c</i>를 곱해 볼까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><i class="v">x</i> ÷ 6, (<i class="v">a</i> + 3) ÷ 2, <i class="v">a</i> ÷ <i class="v">b</i> × <i class="v">c</i>를 분수 꼴로 쓰고, 나누는 수가 왜 분모인지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="D4">
+    <header class="ch-head">
+      <div class="ch-no">D4</div>
+      <div>
+        <div class="grade">중1 · D3 다음</div>
+        <h2>식의 값</h2>
+        <p class="idea">문자에 수를 넣는 것을 <strong>대입</strong>, 대입해서 계산한 값을 <strong>식의 값</strong>이라고 해요. 생략된 곱셈 기호를 다시 살리고(2<i class="v">x</i> → 2 × <i class="v">x</i>), <strong>음수는 괄호에 넣어</strong> 대입해요. <i class="v">x</i> = −3이면 2<i class="v">x</i> = 2 × (−3) = −6, <i class="v">x</i>² = (−3)² = 9예요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D4-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D4-1</code></div>
+        <div class="say"><p>문자에 수를 넣는 것을 <strong>대입</strong>이라고 하고, 대입해서 계산한 값을 <strong>식의 값</strong>이라고 해요.</p><p><i class="v">x</i> = 4일 때 3<i class="v">x</i> + 2의 값은?</p><p>생략했던 곱셈 기호를 다시 살려요 — 3<i class="v">x</i> + 2 = 3 × <i class="v">x</i> + 2</p><p><i class="v">x</i> 자리에 4를 넣으면 3 × 4 + 2 = 14예요.</p></div>
+        <div class="check" id="D4-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D4-1✓</code></div>
+        <div class="qt"><p><i class="v">x</i> = 5일 때, 다음 식의 값은 얼마일까요?</p><p><strong>4<i class="v">x</i> − 3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">17</span></li><li class="no"><span class="mark"></span><span class="txt">42</span></li><li class="no"><span class="mark"></span><span class="txt">6</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>4<i class="v">x</i>는 4 × <i class="v">x</i> — 4 × 5 − 3 = 17이에요. 4와 5를 나란히 붙여 45로 보거나, 더해서 4 + 5로 보면 안 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D4-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D4-2</code></div>
+        <div class="say"><p>음수를 대입할 때는 꼭 <strong>괄호</strong>에 넣어요.</p><p><i class="v">x</i> = −2일 때 3<i class="v">x</i> + 7의 값:</p><p>3 × (−2) + 7 = −6 + 7 = 1</p><p>괄호 없이 3 − 2 + 7로 쓰면 곱셈이 빼기로 바뀌어 버려요. 부호를 빠뜨리고 2를 넣어도 틀려요.</p></div>
+        <div class="check" id="D4-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D4-2✓</code></div>
+        <div class="qt"><p><i class="v">x</i> = −3일 때, 다음 식의 값은 얼마일까요?</p><p><strong>2<i class="v">x</i> + 9</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li><li class="no"><span class="mark"></span><span class="txt">15</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>음수는 괄호에 넣어 2 × (−3) + 9 = −6 + 9 = 3. 8은 괄호 없이 2 − 3 + 9로, 15는 부호를 빠뜨리고 계산한 값이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D4-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D4-3</code></div>
+        <div class="say"><p>음수를 <strong>빼는</strong> 식은 더하기로 바꿔 계산해요.</p><p><i class="v">a</i> = 3, <i class="v">b</i> = −4일 때 2<i class="v">a</i> − <i class="v">b</i>의 값:</p><p>2 × 3 − (−4) = 6 + 4 = 10</p><p>− (−4)는 4를 더하는 것과 같아요. E 음수 줄기에서 배운 그대로예요.</p></div>
+        <div class="check" id="D4-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D4-3✓</code></div>
+        <div class="qt"><p><i class="v">a</i> = 4, <i class="v">b</i> = −3일 때, 다음 식의 값은 얼마일까요?</p><p><strong>2<i class="v">a</i> − <i class="v">b</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">11</span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li><li class="no"><span class="mark"></span><span class="txt">27</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2 × 4 − (−3) = 8 + 3 = 11. 5는 − (−3)을 그냥 3을 빼는 것으로 본 값이고, 27은 2와 4를 나란히 붙여 24로 본 값이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D4-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D4-4</code></div>
+        <div class="say"><p>제곱에 음수를 대입할 때도 괄호가 중요해요.</p><p><i class="v">x</i> = −3일 때 <i class="v">x</i>² = (−3)² = (−3) × (−3) = 9</p><p>괄호 없이 −3²으로 쓰면 3만 제곱해서 −9가 돼요. E 음수 줄기에서 (−2)²과 −2²이 달랐던 것과 같아요.</p></div>
+        <div class="check" id="D4-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D4-4✓</code></div>
+        <div class="qt"><p><i class="v">x</i> = −3일 때, 다음 식의 값은 얼마일까요?</p><p><strong>2<i class="v">x</i>²</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">18</span></li><li class="no"><span class="mark"></span><span class="txt">−18</span></li><li class="no"><span class="mark"></span><span class="txt">−12</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><i class="v">x</i>² = (−3)² = 9 — 그래서 2 × 9 = 18이에요. −18은 (−3)²을 음수로 본 값이고, −12는 <i class="v">x</i>²을 <i class="v">x</i> × 2처럼 2배로 본 값이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D4-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>D4-5</code></div>
+        <div class="say"><p>−가 제곱 앞에 붙은 식은 한 번 더 조심해요.</p><p><i class="v">a</i> = −3일 때 −<i class="v">a</i>²의 값:</p><p>−<i class="v">a</i>² = −(−3)² = −9</p><p>제곱을 먼저 해서 (−3)² = 9, 그다음 앞의 −를 붙여 −9예요. 제곱하기 전에 −끼리 곱해 버리면 틀려요.</p></div>
+        <div class="check" id="D4-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D4-5✓</code></div>
+        <div class="qt"><p><i class="v">a</i> = −5일 때, 다음 식의 값은 얼마일까요?</p><p><strong>−<i class="v">a</i>²</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">−25</span></li><li class="no"><span class="mark"></span><span class="txt">25</span></li><li class="no"><span class="mark"></span><span class="txt">10</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>제곱을 먼저 — (−5)² = 25, 앞의 −를 붙여 −25예요. 25는 (−5)²을 −25로 잘못 계산한 값이고, 10은 <i class="v">a</i>²을 <i class="v">a</i> × 2처럼 2배로 본 값이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D4-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D4-📏</code></div><p>곱셈 기호를 다시 살리고, 음수는 괄호에 넣어 대입 — 제곱은 괄호째로.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D4-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D4-①a</code></div>
+      <div class="say"><p><i class="v">a</i> = 9, <i class="v">b</i> = −4일 때, 다음 식의 값은 얼마일까요?</p><p><strong>5<i class="v">a</i> − <i class="v">b</i></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">41</span><span class="tag">음수를 빼는데 더하지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">63</span><span class="tag">곱하지 않고 수를 나란히 붙임</span></li><li class="no"><span class="mark"></span><span class="txt">50</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">49</span></li></ol>
+    </div><div class="sample" id="D4-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D4-①b</code></div>
+      <div class="say"><p><i class="v">x</i> = −6일 때, 다음 식의 값은 얼마일까요?</p><p><strong>2<i class="v">x</i>²</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">−24</span><span class="tag">같은 문자의 곱을 2배로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">73</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">−72</span><span class="tag">음수의 제곱을 음수로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">72</span></li></ol>
+    </div><div class="sample" id="D4-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D4-②</code></div>
+      <div class="say"><p><i class="v">x</i> = −5일 때, <i class="v">x</i>²의 값을 구해요.</p><p>리자몽이 이렇게 말했어요.</p><p><strong><i class="v">x</i>² = −5² = −25예요</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">음수는 제곱할 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">−5 × 2 = −10이에요</span><span class="tag">같은 문자의 곱을 2배로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">(−5)² = (−5) × (−5) = 25예요</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D4-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D4-👨</code></div>
+    <h3>대입할 때 ① 생략된 ×를 되살리고 ② 음수는 괄호에 넣는다. 이 두 가지만 지키면 식의 값은 계산 문제가 된다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D4-👨말1"><code class="mini">말1</code><span>&quot;3<i class="v">x</i>에 <i class="v">x</i> = 4를 넣으면 34일까, 12일까? 3<i class="v">x</i>가 원래 무슨 뜻이었지?&quot;</span></li><li id="D4-👨말2"><code class="mini">말2</code><span>&quot;<i class="v">x</i>가 −2면 3<i class="v">x</i>는 3 × (−2)야. 괄호를 빼먹으면 3 − 2가 돼 버리지.&quot;</span></li><li id="D4-👨말3"><code class="mini">말3</code><span>&quot;(−3)²하고 −3²은 뭐가 다를까? 제곱이 누구한테 붙어 있는지 봐.&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">포켓몬 카드 뒷면에 <i class="v">x</i>, <i class="v">a</i> 같은 문자를 쓰고, 앞면에 −3, 2, −1 같은 수를 써요. 카드를 뒤집어 나온 수를 '2<i class="v">x</i> + 5', '7 − 3<i class="v">a</i>', '<i class="v">x</i>²' 식에 넣어 계산해요. 음수가 나오면 반드시 괄호부터 그려 넣게 해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D4-👨함정1"><code class="mini">함정1</code><div><div class="kid"><i class="v">x</i> = −2일 때 3<i class="v">x</i> + 7을 3 − 2 + 7 = 8로 계산한다</div><div class="dadsay">→ &quot;3<i class="v">x</i>는 3 곱하기 <i class="v">x</i>였지? <i class="v">x</i> 자리에 (−2)를 괄호째 넣어 볼까?&quot;</div></div></li><li id="D4-👨함정2"><code class="mini">함정2</code><div><div class="kid"><i class="v">x</i> = −3일 때 <i class="v">x</i>²을 −9라고 한다</div><div class="dadsay">→ &quot;(−3) × (−3)을 직접 써 봐. 음수끼리 곱하면 부호가 어떻게 되지?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><i class="v">x</i> = −2일 때 3<i class="v">x</i> + 7, 5 − <i class="v">x</i>, <i class="v">x</i>²의 값을 괄호를 써서 1, 7, 4로 구하고, 왜 괄호가 필요한지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="D5">
+    <header class="ch-head">
+      <div class="ch-no">D5</div>
+      <div>
+        <div class="grade">중1 · D4 다음</div>
+        <h2>다항식과 일차식</h2>
+        <p class="idea">수나 문자의 곱으로 된 식 하나하나를 <strong>항</strong>이라고 해요. 수만 있는 항은 <strong>상수항</strong>, 문자 앞에 곱해진 수는 그 문자의 <strong>계수</strong>(부호까지)예요. 항이 하나뿐인 식은 <strong>단항식</strong>, 항이 여러 개인 식은 <strong>다항식</strong>이에요. 곱해진 문자의 개수를 그 항의 <strong>차수</strong>라고 하고, 차수가 가장 큰 항의 차수가 다항식의 차수예요. 차수가 1인 다항식이 <strong>일차식</strong>이에요 — <i class="v">x</i>²이 있거나 분모에 문자가 있으면 일차식이 아니에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D5-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D5-1</code></div>
+        <div class="say"><p>3<i class="v">x</i> − 2<i class="v">y</i> + 5를 덧셈만으로 고쳐 쓰면</p><p>3<i class="v">x</i> − 2<i class="v">y</i> + 5 = 3<i class="v">x</i> + (−2<i class="v">y</i>) + 5</p><p>더해진 3<i class="v">x</i>, −2<i class="v">y</i>, 5 하나하나를 <strong>항</strong>이라고 해요. 수만 있는 항을 <strong>상수항</strong>이라고 해서, 3<i class="v">x</i> − 2<i class="v">y</i> + 5의 상수항은 5예요.</p><p>항이 여러 개인 식은 <strong>다항식</strong>, 4<i class="v">x</i>나 −7처럼 항이 하나뿐인 식은 <strong>단항식</strong>이에요.</p></div>
+        <div class="check" id="D5-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D5-1✓</code></div>
+        <div class="qt"><p>다음 다항식의 상수항은 얼마일까요?</p><p><strong>2<i class="v">x</i> + 7<i class="v">y</i> − 4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">−4</span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2<i class="v">x</i> + 7<i class="v">y</i> − 4 = 2<i class="v">x</i> + 7<i class="v">y</i> + (−4) — 수만 있는 항은 −4예요. 상수항도 부호까지 읽어요. 2는 <i class="v">x</i>에 곱해진 수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D5-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D5-2</code></div>
+        <div class="say"><p>문자 앞에 곱해진 수를 그 문자의 <strong>계수</strong>라고 해요. 계수는 <strong>부호까지</strong> 읽어요.</p><p>5<i class="v">x</i> − 3<i class="v">y</i> + 1에서 <i class="v">x</i>의 계수는 5, <i class="v">y</i>의 계수는 −3이에요.</p><p>1은 쓰지 않았을 뿐 숨어 있어요. <i class="v">x</i> = 1 × <i class="v">x</i>라서 <i class="v">x</i>의 계수는 1이고, −<i class="v">y</i> = (−1) × <i class="v">y</i>라서 <i class="v">y</i>의 계수는 −1이에요.</p></div>
+        <div class="check" id="D5-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D5-2✓</code></div>
+        <div class="qt"><p>다음 다항식에서 <i class="v">y</i>의 계수는 얼마일까요?</p><p><strong>5<i class="v">x</i> − <i class="v">y</i> + 3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">−1</span></li><li class="no"><span class="mark"></span><span class="txt">1</span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>−<i class="v">y</i> = (−1) × <i class="v">y</i> — <i class="v">y</i>의 계수는 −1이에요. 앞의 −를 빼먹으면 1, 5는 <i class="v">x</i>의 계수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D5-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D5-3</code></div>
+        <div class="say"><p>한 항에서 <strong>문자가 곱해진 개수</strong>를 그 항의 <strong>차수</strong>라고 해요.</p><p>· 3<i class="v">x</i>는 <i class="v">x</i>가 1개 → 차수 1<br>· <i class="v">x</i>² = <i class="v">x</i> × <i class="v">x</i> → 차수 2<br>· 5<i class="v">xy</i> = 5 × <i class="v">x</i> × <i class="v">y</i> → 문자 2개라서 차수 2<br>· 상수항 4는 문자가 없어서 차수 0</p><p>다항식에서는 <strong>차수가 가장 큰 항의 차수</strong>가 그 다항식의 차수예요. 그래서 <i class="v">x</i>² − 3<i class="v">x</i> + 1의 차수는 2예요.</p></div>
+        <div class="check" id="D5-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D5-3✓</code></div>
+        <div class="qt"><p>다음 다항식의 차수는 얼마일까요?</p><p><strong>6<i class="v">x</i>² − <i class="v">x</i> + 2</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt">6</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>6<i class="v">x</i>²은 차수 2, −<i class="v">x</i>는 차수 1, 2는 차수 0 — 가장 큰 차수 2가 다항식의 차수예요. 3은 항의 개수, 6은 <i class="v">x</i>²에 곱해진 계수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D5-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D5-4</code></div>
+        <div class="say"><p>차수가 1인 다항식을 <strong>일차식</strong>이라고 해요.</p><p>2<i class="v">x</i> + 3, −<i class="v">x</i> + 5, 4 − 3<i class="v">x</i>, 7<i class="v">a</i>는 모두 일차식이에요.</p><p><i class="v">x</i>² + 1과 2<i class="v">xy</i> − 1은 일차식이 아니에요 — <i class="v">x</i>²과 <i class="v">xy</i>는 차수가 2예요. 상수항뿐인 −6도 일차식이 아니에요 — 차수가 0이에요.</p></div>
+        <div class="check" id="D5-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D5-4✓</code></div>
+        <div class="qt"><p>다음 중 일차식은 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4 − 3<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i>² + 2</span></li><li class="no"><span class="mark"></span><span class="txt">5<i class="v">xy</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>−3<i class="v">x</i>의 차수가 1이니까 4 − 3<i class="v">x</i>는 일차식이에요. <i class="v">x</i>² + 2와 5<i class="v">xy</i>는 차수가 2라서 일차식이 아니에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D5-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>D5-5</code></div>
+        <div class="say"><p>분수가 섞인 식도 계수를 읽을 수 있어요.</p><p><span class="fr"><span class="n"><i class="v">x</i></span><span class="d">3</span></span> = <span class="fr"><span class="n">1</span><span class="d">3</span></span> × <i class="v">x</i></p><p>그래서 <span class="fr"><span class="n"><i class="v">x</i></span><span class="d">3</span></span> + 2에서 <i class="v">x</i>의 계수는 <span class="fr"><span class="n">1</span><span class="d">3</span></span> — <span class="fr"><span class="n"><i class="v">x</i></span><span class="d">3</span></span> + 2는 일차식이에요.</p><p>하지만 <span class="fr"><span class="n">3</span><span class="d"><i class="v">x</i></span></span>처럼 <strong>분모에 문자</strong>가 있으면 다항식이 아니라서 일차식도 아니에요.</p></div>
+        <div class="check" id="D5-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D5-5✓</code></div>
+        <div class="qt"><p>다음 다항식에서 <i class="v">x</i>의 계수는 얼마일까요?</p><p><strong><span class="fr"><span class="n"><i class="v">x</i></span><span class="d">4</span></span> − 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">1</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n"><i class="v">x</i></span><span class="d">4</span></span> = <span class="fr"><span class="n">1</span><span class="d">4</span></span> × <i class="v">x</i> — <i class="v">x</i>에 곱해진 수가 계수예요. 4는 분모이고, 1은 분수를 빼고 본 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D5-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D5-📏</code></div><p>항은 덧셈으로 나눈 조각 · 계수는 부호까지 · 차수가 가장 큰 항이 다항식의 차수 · 차수가 1이면 일차식.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D5-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D5-①a</code></div>
+      <div class="say"><p>다음 다항식에서 <i class="v">y</i>의 계수는 얼마일까요?</p><p><strong>4<i class="v">x</i> − 5<i class="v">y</i> + 7</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">다른 문자의 계수를 답함</span></li><li class="no"><span class="mark"></span><span class="txt">−4</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">5</span><span class="tag">계수에서 부호를 뺌</span></li><li class="ok"><span class="mark">✔</span><span class="txt">−5</span></li></ol>
+    </div><div class="sample" id="D5-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D5-①b</code></div>
+      <div class="say"><p>다음 다항식의 상수항은 얼마일까요?</p><p><strong>6<i class="v">x</i> − 7</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">−6</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">7</span><span class="tag">상수항에서 부호를 뺌</span></li><li class="no"><span class="mark"></span><span class="txt">6</span><span class="tag">계수를 상수항으로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">−7</span></li></ol>
+    </div><div class="sample" id="D5-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D5-②</code></div>
+      <div class="say"><p>다항식 7<i class="v">x</i> − 6<i class="v">y</i>를 보고</p><p>루카리오가 이렇게 말했어요.</p><p><strong><i class="v">y</i>의 계수는 6이에요</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><i class="v">y</i>의 계수는 7이에요</span><span class="tag">다른 문자의 계수를 답함</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">계수는 부호까지 — <i class="v">y</i>의 계수는 −6이에요</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">y</i>에는 계수가 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D5-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D5-👨</code></div>
+    <h3>다항식을 항으로 나누어 읽고(부호까지), 계수·상수항·차수를 찾고, 일차식인지 가릴 수 있게.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D5-👨말1"><code class="mini">말1</code><span>&quot;3<i class="v">x</i> − 2<i class="v">y</i> + 5를 더하기만 있는 식으로 바꾸면? −2<i class="v">y</i>도 한 덩어리야.&quot;</span></li><li id="D5-👨말2"><code class="mini">말2</code><span>&quot;<i class="v">x</i> 앞에 아무 수도 없으면 계수가 0일까, 1일까? <i class="v">x</i>는 <i class="v">x</i>가 몇 개라는 뜻이지?&quot;</span></li><li id="D5-👨말3"><code class="mini">말3</code><span>&quot;<i class="v">x</i>² 하나만 있어도 일차식이 될 수 있을까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">포스트잇에 3<i class="v">x</i>, −2<i class="v">y</i>, 5, <i class="v">x</i>², −<i class="v">x</i>를 하나씩 써서 '항 카드'를 만들어요. 카드를 이어 붙여 다항식을 만들고, 진우가 카드마다 계수와 차수를 말해요. <i class="v">x</i>² 카드가 들어가면 일차식이 되는지, 빼면 되는지 바꿔 보며 확인해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D5-👨함정1"><code class="mini">함정1</code><div><div class="kid">5<i class="v">x</i> − 3<i class="v">y</i>에서 <i class="v">y</i>의 계수를 3이라고 한다</div><div class="dadsay">→ &quot;−3<i class="v">y</i>를 −3 × <i class="v">y</i>로 써 봐. <i class="v">y</i>에 곱해진 수가 뭐지?&quot;</div></div></li><li id="D5-👨함정2"><code class="mini">함정2</code><div><div class="kid"><i class="v">x</i>² − 2<i class="v">x</i> + 1을 항이 3개라서 삼차식이라고 한다</div><div class="dadsay">→ &quot;차수는 항의 개수가 아니라 문자를 몇 번 곱했는지야. 가장 많이 곱한 항을 찾아볼까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">4<i class="v">x</i>² − <i class="v">x</i> + 7을 보고 항 3개, <i class="v">x</i>의 계수 −1, 상수항 7, 차수 2를 말하고, 일차식이 아닌 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="D6">
+    <header class="ch-head">
+      <div class="ch-no">D6</div>
+      <div>
+        <div class="grade">중1 · D5 다음</div>
+        <h2>일차식과 수의 곱셈·나눗셈</h2>
+        <p class="idea">수를 곱할 때는 계수끼리 곱해요(3 × 2<i class="v">x</i> = 6<i class="v">x</i>). 괄호가 있으면 <strong>분배법칙</strong>으로 괄호 안 <strong>모든 항</strong>에 곱해요(2(3<i class="v">x</i> − 1) = 6<i class="v">x</i> − 2). 음수를 곱하면 모든 항의 부호가 바뀌어요(−3(<i class="v">x</i> − 2) = −3<i class="v">x</i> + 6). 나눌 때도 <strong>모든 항</strong>을 나눠요((6<i class="v">x</i> + 4) ÷ 2 = 3<i class="v">x</i> + 2).</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D6-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D6-1</code></div>
+        <div class="say"><p>단항식에 수를 곱할 때는 <strong>수끼리 곱하고</strong> 문자는 그대로 써요.</p><p>3 × 2<i class="v">x</i> = 3 × 2 × <i class="v">x</i> = 6<i class="v">x</i></p><p>(−4) × 5<i class="v">a</i> = −20<i class="v">a</i></p><p>3과 2를 더해 5<i class="v">x</i>로 하거나, 붙여서 32<i class="v">x</i>로 쓰면 안 돼요.</p></div>
+        <div class="check" id="D6-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D6-1✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>4 × 3<i class="v">x</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">12<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">7<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">43<i class="v">x</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>수끼리 곱해요 — 4 × 3 = 12 → 12<i class="v">x</i>. 7<i class="v">x</i>는 더한 것, 43<i class="v">x</i>는 두 수를 나란히 붙인 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D6-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D6-2</code></div>
+        <div class="say"><p>음수를 곱하면 부호가 바뀌어요.</p><p>5<i class="v">x</i> × (−2) = −10<i class="v">x</i></p><p>× (−2)를 &quot;2를 뺀다&quot;로 보면 5<i class="v">x</i> − 2라는 엉뚱한 식이 돼요. 곱셈은 곱셈 그대로 — 수끼리 곱하고 부호를 정해요.</p></div>
+        <div class="check" id="D6-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D6-2✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>6<i class="v">x</i> × (−3)</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">−18<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">18<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">6<i class="v">x</i> − 3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>6 × (−3) = −18 → −18<i class="v">x</i>. 18<i class="v">x</i>는 부호를 빠뜨린 것, 6<i class="v">x</i> − 3은 곱셈을 빼기로 본 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D6-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D6-3</code></div>
+        <div class="say"><p>괄호가 있는 일차식에 수를 곱할 때는 괄호 안 <strong>모든 항</strong>에 곱해요. 이것을 <strong>분배법칙</strong>이라고 해요.</p><p>2(<i class="v">x</i> + 3) = 2 × <i class="v">x</i> + 2 × 3 = 2<i class="v">x</i> + 6</p><p>사탕 봉지 2개에 각각 초콜릿 <i class="v">x</i>개와 젤리 3개가 들었다면, 초콜릿도 2배, 젤리도 2배예요. 첫째 항에만 곱해 2<i class="v">x</i> + 3으로 쓰면 젤리를 한 봉지 것만 센 셈이에요.</p></div>
+        <div class="check" id="D6-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D6-3✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>3(2<i class="v">x</i> − 5)</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6<i class="v">x</i> − 15</span></li><li class="no"><span class="mark"></span><span class="txt">6<i class="v">x</i> − 5</span></li><li class="no"><span class="mark"></span><span class="txt">5<i class="v">x</i> − 8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3 × 2<i class="v">x</i> = 6<i class="v">x</i>, 3 × (−5) = −15 → 6<i class="v">x</i> − 15. 6<i class="v">x</i> − 5는 둘째 항에 3을 안 곱한 것, 5<i class="v">x</i> − 8은 곱하지 않고 더한 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D6-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D6-4</code></div>
+        <div class="say"><p>괄호 앞에 <strong>음수</strong>가 있으면 괄호 안 모든 항의 부호가 바뀌어요.</p><p>−2(<i class="v">x</i> − 4) = (−2) × <i class="v">x</i> + (−2) × (−4) = −2<i class="v">x</i> + 8</p><p>둘째 항 (−2) × (−4)는 음수끼리 곱해서 +8이에요. 여기서 −8로 쓰는 실수가 가장 많아요.</p></div>
+        <div class="check" id="D6-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D6-4✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>−5(<i class="v">x</i> − 3)</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">−5<i class="v">x</i> + 15</span></li><li class="no"><span class="mark"></span><span class="txt">−5<i class="v">x</i> − 15</span></li><li class="no"><span class="mark"></span><span class="txt">−5<i class="v">x</i> − 3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>−5 × <i class="v">x</i> = −5<i class="v">x</i>, −5 × (−3) = 15 → −5<i class="v">x</i> + 15. −5<i class="v">x</i> − 15는 음수끼리 곱한 부호를, −5<i class="v">x</i> − 3은 둘째 항에 곱하는 것을 빠뜨렸어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D6-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>D6-5</code></div>
+        <div class="say"><p>일차식을 수로 나눌 때도 <strong>모든 항</strong>을 나눠요.</p><p>(6<i class="v">x</i> − 9) ÷ 3 = 6<i class="v">x</i> ÷ 3 − 9 ÷ 3 = 2<i class="v">x</i> − 3</p><p>÷ 3 대신 × <span class="fr"><span class="n">1</span><span class="d">3</span></span> — 이렇게 곱셈으로 바꿔 계산해도 돼요. 단항식이면 8<i class="v">x</i> ÷ 2 = 4<i class="v">x</i>처럼 수끼리 나눠요.</p></div>
+        <div class="check" id="D6-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D6-5✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>(10<i class="v">x</i> + 15) ÷ 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2<i class="v">x</i> + 3</span></li><li class="no"><span class="mark"></span><span class="txt">2<i class="v">x</i> + 15</span></li><li class="no"><span class="mark"></span><span class="txt">50<i class="v">x</i> + 75</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>10<i class="v">x</i> ÷ 5 = 2<i class="v">x</i>, 15 ÷ 5 = 3 → 2<i class="v">x</i> + 3. 2<i class="v">x</i> + 15는 둘째 항을 안 나눈 것, 50<i class="v">x</i> + 75는 나누지 않고 곱한 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D6-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D6-📏</code></div><p>괄호 안 모든 항에 곱하고, 모든 항을 나눠요 — 음수를 곱하면 모든 부호가 바뀌어요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D6-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D6-①a</code></div>
+      <div class="say"><p>계산하면 어느 것일까요?</p><p><strong>(12<i class="v">x</i> + 4) ÷ 4</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">48<i class="v">x</i> + 16</span><span class="tag">나눗셈을 곱셈으로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">3<i class="v">x</i> + 1</span></li><li class="no"><span class="mark"></span><span class="txt">3<i class="v">x</i> + 4</span><span class="tag">첫째 항만 나눔</span></li></ol>
+    </div><div class="sample" id="D6-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D6-①b</code></div>
+      <div class="say"><p>계산하면 어느 것일까요?</p><p><strong>4<i class="v">x</i> × (−2)</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">4<i class="v">x</i> − 2</span><span class="tag">음수를 곱하는 것을 빼기로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">8<i class="v">x</i></span><span class="tag">음수의 부호를 빠뜨림</span></li><li class="ok"><span class="mark">✔</span><span class="txt">−8<i class="v">x</i></span></li></ol>
+    </div><div class="sample" id="D6-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D6-②</code></div>
+      <div class="say"><p>일차식을 계산해요.</p><p>리자몽이 이렇게 말했어요.</p><p><strong>−4(<i class="v">x</i> − 7) = −4<i class="v">x</i> − 28</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">음수는 괄호 앞에 쓸 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">음수끼리 곱하면 양수 — −4<i class="v">x</i> + 28</span></li><li class="no"><span class="mark"></span><span class="txt">−4<i class="v">x</i> − 7</span><span class="tag">괄호 안의 첫째 항에만 곱함</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D6-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D6-👨</code></div>
+    <h3>분배법칙 — 괄호 앞의 수를 괄호 안 모든 항에 곱한다. 음수면 둘째 항의 부호까지 바뀐다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D6-👨말1"><code class="mini">말1</code><span>&quot;봉지 2개에 초콜릿 <i class="v">x</i>개와 젤리 3개씩 들었어. 젤리는 모두 몇 개지? 3개일까, 6개일까?&quot;</span></li><li id="D6-👨말2"><code class="mini">말2</code><span>&quot;−2를 <i class="v">x</i>에도 곱하고, −4에도 곱해야 해. (−2) × (−4)는 부호가 어떻게 될까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이컵 두 개에 바둑돌 흰 돌(<i class="v">x</i> 대신)과 검은 돌 3개를 똑같이 넣고, &quot;컵 2개 = 2(<i class="v">x</i> + 3)&quot;이라고 써요. 컵을 쏟아 흰 돌끼리, 검은 돌끼리 모으면 2<i class="v">x</i> + 6이 되는 것을 눈으로 봐요. 그다음 −2(<i class="v">x</i> − 4)를 종이에 쓰고 부호를 하나씩 정해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D6-👨함정1"><code class="mini">함정1</code><div><div class="kid">3(2<i class="v">x</i> − 5)를 6<i class="v">x</i> − 5로 계산한다</div><div class="dadsay">→ &quot;3을 2<i class="v">x</i>에만 곱했네. −5는 괄호 밖으로 도망갔을까? 괄호 안 식구 모두에게 곱해 줘야지.&quot;</div></div></li><li id="D6-👨함정2"><code class="mini">함정2</code><div><div class="kid">−2(<i class="v">x</i> − 4)를 −2<i class="v">x</i> − 8로 계산한다</div><div class="dadsay">→ &quot;(−2) × (−4)를 따로 써 볼까? 음수끼리 곱하면?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">4(<i class="v">x</i> − 2)와 −3(2<i class="v">x</i> − 1)을 4<i class="v">x</i> − 8, −6<i class="v">x</i> + 3으로 풀고, 둘째 항의 부호가 왜 그렇게 되는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="D7">
+    <header class="ch-head">
+      <div class="ch-no">D7</div>
+      <div>
+        <div class="grade">중1 · D6 다음</div>
+        <h2>동류항</h2>
+        <p class="idea">문자와 차수가 같은 항을 <strong>동류항</strong>이라고 해요(3<i class="v">x</i>와 −2<i class="v">x</i>). 상수항끼리도 동류항이에요. 동류항끼리만 계수를 더하거나 빼요(3<i class="v">x</i> + 2<i class="v">x</i> = 5<i class="v">x</i>, 3<i class="v">x</i> − <i class="v">x</i> = 2<i class="v">x</i>). 3<i class="v">x</i> + 2처럼 동류항이 아니면 더 간단히 할 수 없어요. <i class="v">x</i>와 <i class="v">x</i>²은 차수가 달라서 동류항이 아니에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D7-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D7-1</code></div>
+        <div class="say"><p><strong>문자와 차수가 모두 같은 항</strong>을 <strong>동류항</strong>이라고 해요.</p><p>· 3<i class="v">x</i>와 −5<i class="v">x</i>는 동류항이에요.<br>· 2<i class="v">x</i>와 2<i class="v">y</i>는 문자가 달라서 동류항이 아니에요.<br>· <i class="v">x</i>와 <i class="v">x</i>²은 차수가 달라서 동류항이 아니에요.<br>· 상수항끼리는 동류항이에요 — 4와 −7처럼.</p></div>
+        <div class="check" id="D7-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D7-1✓</code></div>
+        <div class="qt"><p>다음 중 <strong>4<i class="v">x</i></strong>와 동류항인 것은 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">−7<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">4<i class="v">x</i>²</span></li><li class="no"><span class="mark"></span><span class="txt">4<i class="v">y</i></span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>−7<i class="v">x</i>는 4<i class="v">x</i>와 문자도 <i class="v">x</i>, 차수도 1로 같아요. 4<i class="v">x</i>²은 차수가, 4<i class="v">y</i>는 문자가 달라요. 4는 문자가 없는 상수항이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D7-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D7-2</code></div>
+        <div class="say"><p>동류항끼리는 <strong>계수끼리 더해서</strong> 하나로 모을 수 있어요.</p><p>3<i class="v">x</i> + 5<i class="v">x</i> = (3 + 5)<i class="v">x</i> = 8<i class="v">x</i></p><p><i class="v">x</i>를 몬스터볼 한 상자라고 생각해 봐요. 3상자와 5상자를 합치면 8상자 — 상자는 상자 그대로예요. 더한다고 <i class="v">x</i>가 <i class="v">x</i>²이 되거나 사라지지 않아요.</p></div>
+        <div class="check" id="D7-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D7-2✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>2<i class="v">x</i> + 6<i class="v">x</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">8<i class="v">x</i>²</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>계수끼리 2 + 6 = 8 → 8<i class="v">x</i>. <i class="v">x</i>는 그대로 두고, <i class="v">x</i>²으로 바꾸거나 빠뜨리지 않아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D7-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D7-3</code></div>
+        <div class="say"><p><i class="v">x</i> 앞에 계수가 안 보이면 1이 숨어 있어요. <i class="v">x</i> = 1<i class="v">x</i>라서</p><p>7<i class="v">x</i> − <i class="v">x</i> = 7<i class="v">x</i> − 1<i class="v">x</i> = 6<i class="v">x</i></p><p><i class="v">x</i>를 빼면 <i class="v">x</i>가 다 사라진다고 생각해 7로 쓰면 안 돼요. 상자 7개에서 1개를 빼면 6개 남아요.</p></div>
+        <div class="check" id="D7-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D7-3✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>9<i class="v">x</i> − <i class="v">x</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">9</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><i class="v">x</i> = 1<i class="v">x</i> — 9 − 1 = 8이니까 8<i class="v">x</i>예요. 9는 <i class="v">x</i>가 통째로 사라진다고 본 것, 8은 <i class="v">x</i>를 빠뜨린 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D7-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D7-4</code></div>
+        <div class="say"><p>동류항이 아닌 항은 더할 수 없어서 <strong>그대로</strong> 둬요.</p><p>3<i class="v">x</i> + 4 + 2<i class="v">x</i> = 3<i class="v">x</i> + 2<i class="v">x</i> + 4 = 5<i class="v">x</i> + 4</p><p>5<i class="v">x</i> + 4는 더 간단히 할 수 없어요. 4까지 <i class="v">x</i>와 더해 9<i class="v">x</i>로 쓰면 안 돼요 — 상수항은 <i class="v">x</i>와 동류항이 아니에요.</p></div>
+        <div class="check" id="D7-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D7-4✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>5<i class="v">x</i> + 2 + 3<i class="v">x</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8<i class="v">x</i> + 2</span></li><li class="no"><span class="mark"></span><span class="txt">10<i class="v">x</i></span></li><li class="no"><span class="mark"></span><span class="txt">8<i class="v">x</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><i class="v">x</i>끼리 5<i class="v">x</i> + 3<i class="v">x</i> = 8<i class="v">x</i>, 상수항 2는 그대로 → 8<i class="v">x</i> + 2. 10<i class="v">x</i>는 2까지 <i class="v">x</i>와 더한 것, 8<i class="v">x</i>는 2를 빠뜨린 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D7-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>D7-5</code></div>
+        <div class="say"><p>빼기가 섞이면 각 항 <strong>앞의 부호까지</strong> 들고 다녀요.</p><p>6<i class="v">x</i> − 3 − 2<i class="v">x</i> + 7 = 6<i class="v">x</i> − 2<i class="v">x</i> − 3 + 7 = 4<i class="v">x</i> + 4</p><p><i class="v">x</i>끼리 6<i class="v">x</i> − 2<i class="v">x</i> = 4<i class="v">x</i>, 수끼리 −3 + 7 = 4예요. −2<i class="v">x</i>를 +2<i class="v">x</i>로 바꾸면 틀려요.</p></div>
+        <div class="check" id="D7-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D7-5✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>7<i class="v">x</i> − 2 − 4<i class="v">x</i> + 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3<i class="v">x</i> + 3</span></li><li class="no"><span class="mark"></span><span class="txt">11<i class="v">x</i> + 7</span></li><li class="no"><span class="mark"></span><span class="txt">6<i class="v">x</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><i class="v">x</i>끼리 7<i class="v">x</i> − 4<i class="v">x</i> = 3<i class="v">x</i>, 수끼리 −2 + 5 = 3 → 3<i class="v">x</i> + 3. 11<i class="v">x</i> + 7은 빼기를 더하기로, 6<i class="v">x</i>는 수까지 <i class="v">x</i>와 모은 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D7-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D7-📏</code></div><p>문자와 차수가 같아야 동류항 — 계수끼리만 더하고 빼고, 부호는 항과 함께.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D7-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D7-①a</code></div>
+      <div class="say"><p>계산하면 어느 것일까요?</p><p><strong>4<i class="v">x</i> − 7 − 2<i class="v">x</i> + 9</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">4<i class="v">x</i></span><span class="tag">상수항까지 문자와 더함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">2<i class="v">x</i> + 2</span></li><li class="no"><span class="mark"></span><span class="txt">6<i class="v">x</i> + 16</span><span class="tag">빼기를 더하기로 봄</span></li></ol>
+    </div><div class="sample" id="D7-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D7-①b</code></div>
+      <div class="say"><p>계산하면 어느 것일까요?</p><p><strong>8<i class="v">x</i> − 4 − 5<i class="v">x</i> + 8</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">7<i class="v">x</i></span><span class="tag">상수항까지 문자와 더함</span></li><li class="no"><span class="mark"></span><span class="txt">13<i class="v">x</i> + 12</span><span class="tag">빼기를 더하기로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">3<i class="v">x</i> + 4</span></li></ol>
+    </div><div class="sample" id="D7-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D7-②</code></div>
+      <div class="say"><p>식을 간단히 해요.</p><p>리자몽이 이렇게 말했어요.</p><p><strong>6<i class="v">x</i> + 8<i class="v">x</i>² = 14<i class="v">x</i>²</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i>²은 계산에 쓸 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><i class="v">x</i>와 <i class="v">x</i>²은 차수가 달라서 동류항이 아니에요 — 더 간단히 할 수 없어요</span></li><li class="no"><span class="mark"></span><span class="txt">14<i class="v">x</i>예요</span><span class="tag">차수가 달라도 동류항이라고 봄</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D7-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D7-👨</code></div>
+    <h3>동류항(문자와 차수가 같은 항)끼리만 계수를 더하고 빼며, 동류항이 아닌 항은 그대로 둔다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D7-👨말1"><code class="mini">말1</code><span>&quot;사과 3개와 사과 5개는 합칠 수 있지? 사과 3개와 배 2개는? 3<i class="v">x</i>와 2<i class="v">y</i>도 마찬가지야.&quot;</span></li><li id="D7-👨말2"><code class="mini">말2</code><span>&quot;7<i class="v">x</i> − <i class="v">x</i>에서 <i class="v">x</i>를 빼면 <i class="v">x</i>가 다 없어질까? <i class="v">x</i>는 <i class="v">x</i>가 몇 개라는 뜻이었지?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">바둑돌을 써요 — 흰 돌은 <i class="v">x</i>, 검은 돌은 1. '3<i class="v">x</i> + 4 + 2<i class="v">x</i>'만큼 돌을 놓고 같은 색끼리 모으면 흰 돌 5개, 검은 돌 4개 — 5<i class="v">x</i> + 4가 돼요. 흰 돌과 검은 돌은 섞어 셀 수 없다는 것을 손으로 보게 해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D7-👨함정1"><code class="mini">함정1</code><div><div class="kid">3<i class="v">x</i> + 2를 5<i class="v">x</i>라고 한다</div><div class="dadsay">→ &quot;흰 돌 3개와 검은 돌 2개를 모으면 흰 돌이 5개가 될까?&quot;</div></div></li><li id="D7-👨함정2"><code class="mini">함정2</code><div><div class="kid"><i class="v">x</i>와 <i class="v">x</i>²을 동류항이라고 해서 2<i class="v">x</i> + 3<i class="v">x</i>²을 5<i class="v">x</i>²으로 계산한다</div><div class="dadsay">→ &quot;<i class="v">x</i>²은 <i class="v">x</i> × <i class="v">x</i>야. 차수가 같은지부터 볼까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">4<i class="v">x</i> − 1 + 3<i class="v">x</i>와 2<i class="v">x</i> + 5 − <i class="v">x</i>를 7<i class="v">x</i> − 1, <i class="v">x</i> + 5로 간단히 하고, <i class="v">x</i>와 상수항을 왜 따로 모으는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="D8">
+    <header class="ch-head">
+      <div class="ch-no">D8</div>
+      <div>
+        <div class="grade">중1 · D7 다음</div>
+        <h2>일차식의 덧셈과 뺄셈</h2>
+        <p class="idea">일차식의 덧셈과 뺄셈은 <strong>괄호를 풀고 동류항끼리</strong> 모아 계산해요. 괄호 앞이 <strong>−</strong>이면 괄호 안 <strong>모든 항의 부호</strong>를 바꿔요(−(<i class="v">x</i> − 3) = −<i class="v">x</i> + 3). 괄호 앞에 수가 있으면 분배법칙으로 먼저 풀어요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D8-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D8-1</code></div>
+        <div class="say"><p>일차식끼리 더할 때는 <strong>괄호를 풀고 동류항끼리</strong> 모아요.</p><p>(2<i class="v">x</i> + 3) + (4<i class="v">x</i> − 1) = 2<i class="v">x</i> + 3 + 4<i class="v">x</i> − 1 = 6<i class="v">x</i> + 2</p><p>더하기 괄호는 그냥 풀면 돼요. 안의 부호는 그대로예요 — −1은 −1 그대로.</p></div>
+        <div class="check" id="D8-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D8-1✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>(3<i class="v">x</i> + 4) + (2<i class="v">x</i> − 6)</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5<i class="v">x</i> − 2</span></li><li class="no"><span class="mark"></span><span class="txt">5<i class="v">x</i> + 10</span></li><li class="no"><span class="mark"></span><span class="txt">3<i class="v">x</i></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>(3<i class="v">x</i> + 4) + (2<i class="v">x</i> − 6) = 3<i class="v">x</i> + 4 + 2<i class="v">x</i> − 6 — <i class="v">x</i>끼리 5<i class="v">x</i>, 수끼리 4 − 6 = −2 → 5<i class="v">x</i> − 2. 5<i class="v">x</i> + 10은 −6을 +6으로 바꾼 것, 3<i class="v">x</i>는 수까지 <i class="v">x</i>와 모은 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D8-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D8-2</code></div>
+        <div class="say"><p>괄호 앞에 <strong>−</strong>가 있으면 −1을 곱한 것과 같아서 괄호 안 <strong>모든 항의 부호가 바뀌어요</strong>.</p><p>−(<i class="v">x</i> − 3) = (−1) × <i class="v">x</i> + (−1) × (−3) = −<i class="v">x</i> + 3</p><p>첫째 항만 바꾸고 둘째 항을 그대로 두는 실수를 가장 많이 해요. −3도 +3으로 바뀌어요.</p></div>
+        <div class="check" id="D8-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D8-2✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>−(2<i class="v">x</i> − 7) + 5<i class="v">x</i></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3<i class="v">x</i> + 7</span></li><li class="no"><span class="mark"></span><span class="txt">3<i class="v">x</i> − 7</span></li><li class="no"><span class="mark"></span><span class="txt">7<i class="v">x</i> − 7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>−(2<i class="v">x</i> − 7) = −2<i class="v">x</i> + 7, 여기에 5<i class="v">x</i>를 더하면 3<i class="v">x</i> + 7. 3<i class="v">x</i> − 7은 −7의 부호를 안 바꾼 것, 7<i class="v">x</i> − 7은 괄호 앞 −를 빠뜨린 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D8-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D8-3</code></div>
+        <div class="say"><p>일차식끼리 뺄 때는 빼는 식에 괄호를 씌운 채로, 괄호 앞 −로 <strong>모든 부호를 바꾼 뒤</strong> 동류항끼리 모아요.</p><p>(5<i class="v">x</i> + 2) − (3<i class="v">x</i> − 4) = 5<i class="v">x</i> + 2 − 3<i class="v">x</i> + 4 = 2<i class="v">x</i> + 6</p><p>−(3<i class="v">x</i> − 4)는 −3<i class="v">x</i> + 4예요. −3<i class="v">x</i>만 바꾸고 −4를 그대로 두면 2<i class="v">x</i> − 2가 되어 틀려요.</p></div>
+        <div class="check" id="D8-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D8-3✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>(6<i class="v">x</i> + 1) − (2<i class="v">x</i> − 5)</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4<i class="v">x</i> + 6</span></li><li class="no"><span class="mark"></span><span class="txt">4<i class="v">x</i> − 4</span></li><li class="no"><span class="mark"></span><span class="txt">8<i class="v">x</i> − 4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>(6<i class="v">x</i> + 1) − (2<i class="v">x</i> − 5) = 6<i class="v">x</i> + 1 − 2<i class="v">x</i> + 5 = 4<i class="v">x</i> + 6. 4<i class="v">x</i> − 4는 −5의 부호를 안 바꾼 것, 8<i class="v">x</i> − 4는 빼기를 더하기로 한 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D8-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D8-4</code></div>
+        <div class="say"><p>괄호 앞에 수가 있으면 <strong>분배법칙으로 먼저 풀고</strong> 동류항끼리 모아요.</p><p>2(<i class="v">x</i> + 3) − 3(<i class="v">x</i> − 1) = 2<i class="v">x</i> + 6 − 3<i class="v">x</i> + 3 = −<i class="v">x</i> + 9</p><p>−3(<i class="v">x</i> − 1)에서 (−3) × (−1) = 3이라 +3이에요. <i class="v">x</i>의 계수는 2 − 3 = −1이니까 <i class="v">x</i> 앞에는 −만 써요.</p></div>
+        <div class="check" id="D8-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D8-4✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong>4(<i class="v">x</i> + 2) − 2(<i class="v">x</i> − 3)</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2<i class="v">x</i> + 14</span></li><li class="no"><span class="mark"></span><span class="txt">2<i class="v">x</i> + 2</span></li><li class="no"><span class="mark"></span><span class="txt">2<i class="v">x</i> + 5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>4<i class="v">x</i> + 8 − 2<i class="v">x</i> + 6 = 2<i class="v">x</i> + 14. 2<i class="v">x</i> + 2는 (−2) × (−3)을 −6으로 본 것, 2<i class="v">x</i> + 5는 괄호 안 둘째 항에 곱하는 것을 빠뜨린 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D8-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D8-📏</code></div><p>괄호를 풀고 동류항끼리 — 괄호 앞 −는 괄호 안 모든 항의 부호를 바꿔요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D8-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D8-①a</code></div>
+      <div class="say"><p>계산하면 어느 것일까요?</p><p><strong>(7<i class="v">x</i> + 3) − (6<i class="v">x</i> − 6)</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> − 3</span><span class="tag">괄호 앞 −를 첫째 항에만 적용함</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><i class="v">x</i> + 9</span></li><li class="no"><span class="mark"></span><span class="txt">13<i class="v">x</i> − 3</span><span class="tag">빼기를 더하기로 봄</span></li></ol>
+    </div><div class="sample" id="D8-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D8-①b</code></div>
+      <div class="say"><p>계산하면 어느 것일까요?</p><p><strong>4(<i class="v">x</i> + 4) − 6(<i class="v">x</i> − 4)</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">−2<i class="v">x</i> − 8</span><span class="tag">음수를 곱할 때 둘째 항의 부호를 그대로 둠</span></li><li class="no"><span class="mark"></span><span class="txt">−2<i class="v">x</i> + 8</span><span class="tag">괄호 안의 첫째 항에만 곱함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">−2<i class="v">x</i> + 40</span></li></ol>
+    </div><div class="sample" id="D8-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D8-②</code></div>
+      <div class="say"><p>일차식을 계산해요.</p><p>루카리오가 이렇게 말했어요.</p><p><strong>(3<i class="v">x</i> + 8) − (2<i class="v">x</i> − 1) = <i class="v">x</i> + 7</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">5<i class="v">x</i> + 7</span><span class="tag">빼기를 더하기로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">괄호끼리는 뺄 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">괄호 앞 −는 모든 항의 부호를 바꿔요 — <i class="v">x</i> + 9</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D8-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D8-👨</code></div>
+    <h3>괄호 앞의 −(또는 음수)를 괄호 안 모든 항에 나눠 주고, 동류항끼리 모아 간단히 한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D8-👨말1"><code class="mini">말1</code><span>&quot;−(<i class="v">x</i> − 3)은 (−1) × (<i class="v">x</i> − 3)이야. −1을 <i class="v">x</i>에도, −3에도 곱해 볼까?&quot;</span></li><li id="D8-👨말2"><code class="mini">말2</code><span>&quot;빼는 괄호를 풀 때 둘째 항 부호를 꼭 손가락으로 짚어 봐.&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">'+' 카드와 '−' 카드를 만들어 괄호 안 항마다 부호 카드를 붙여요. 괄호 앞 − 카드를 괄호 안으로 '들여보내면' 카드가 모두 뒤집힌다는 놀이를 해요. (5<i class="v">x</i> + 2) − (3<i class="v">x</i> − 4)를 카드로 풀고 2<i class="v">x</i> + 6이 나오는지 확인해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D8-👨함정1"><code class="mini">함정1</code><div><div class="kid">(5<i class="v">x</i> + 2) − (3<i class="v">x</i> − 4)를 2<i class="v">x</i> − 2로 계산한다</div><div class="dadsay">→ &quot;−(3<i class="v">x</i> − 4)에서 −4는 어떻게 바뀌지? 괄호 앞 −는 둘째 항한테도 가.&quot;</div></div></li><li id="D8-👨함정2"><code class="mini">함정2</code><div><div class="kid">−(<i class="v">x</i> − 3)을 −<i class="v">x</i> − 3으로 쓴다</div><div class="dadsay">→ &quot;(−1) × (−3)은 얼마지? 음수끼리 곱했잖아.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">(4<i class="v">x</i> − 1) − (<i class="v">x</i> − 5)와 3(<i class="v">x</i> + 2) − 2(<i class="v">x</i> − 1)을 3<i class="v">x</i> + 4, <i class="v">x</i> + 8로 풀고, 괄호 앞 −가 왜 둘째 항까지 바꾸는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="D9">
+    <header class="ch-head">
+      <div class="ch-no">D9</div>
+      <div>
+        <div class="grade">중1 · D8 다음</div>
+        <h2>⭐ 문자와 식 활용</h2>
+        <p class="idea">배운 것을 섞어요 — 도형의 둘레를 식으로 나타내고, 빼서 나온 식에서 거꾸로 <strong>어떤 식</strong>을 찾을 때는 더해요. 분수 꼴 일차식은 <strong>통분</strong>해서 분자끼리 계산해요(<span class="fr"><span class="n"><i class="v">x</i> + 1</span><span class="d">2</span></span> + <span class="fr"><span class="n"><i class="v">x</i></span><span class="d">3</span></span> = <span class="fr"><span class="n">3<i class="v">x</i> + 3 + 2<i class="v">x</i></span><span class="d">6</span></span> = <span class="fr"><span class="n">5<i class="v">x</i> + 3</span><span class="d">6</span></span>). 규칙을 식으로 세우면 큰 수도 바로 구해요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="D9-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>D9-1</code></div>
+        <div class="say"><p>도형의 둘레도 식으로 나타낼 수 있어요.</p><p>가로가 (<i class="v">x</i> + 3) cm, 세로가 5 cm인 직사각형의 둘레는 가로와 세로를 더해 2배 해요.</p><p>2 × (<i class="v">x</i> + 3 + 5) = 2(<i class="v">x</i> + 8) = 2<i class="v">x</i> + 16</p><p>가로 하나와 세로 하나만 더하면 둘레의 반이에요. 2를 <i class="v">x</i>에만 곱해 2<i class="v">x</i> + 8로 쓰는 것도 조심해요.</p></div>
+        <div class="check" id="D9-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D9-1✓</code></div>
+        <div class="qt"><p>가로가 (<i class="v">x</i> + 4) cm, 세로가 3 cm인 직사각형이 있어요.</p><p>둘레를 <i class="v">x</i>를 사용한 식으로 나타내면 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2<i class="v">x</i> + 14</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> + 7</span></li><li class="no"><span class="mark"></span><span class="txt">2<i class="v">x</i> + 7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2 × (<i class="v">x</i> + 4 + 3) = 2(<i class="v">x</i> + 7) = 2<i class="v">x</i> + 14. <i class="v">x</i> + 7은 둘레의 반이고, 2<i class="v">x</i> + 7은 2를 <i class="v">x</i>에만 곱한 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D9-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>D9-2</code></div>
+        <div class="say"><p>어떤 식에서 다른 식을 뺐더니 결과가 나왔다면, <strong>거꾸로 더해서</strong> 어떤 식을 찾아요.</p><p>A − (2<i class="v">x</i> + 1) = 3<i class="v">x</i> − 4이면</p><p>A = (3<i class="v">x</i> − 4) + (2<i class="v">x</i> + 1) = 5<i class="v">x</i> − 3</p><p>빼기를 되돌리는 것은 더하기예요. 거꾸로 할 때 또 빼면 엉뚱한 식이 나와요.</p></div>
+        <div class="check" id="D9-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D9-2✓</code></div>
+        <div class="qt"><p>어떤 식 A가 있어요.</p><p>A − (3<i class="v">x</i> − 2) = <i class="v">x</i> + 5일 때, A는 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4<i class="v">x</i> + 3</span></li><li class="no"><span class="mark"></span><span class="txt">−2<i class="v">x</i> + 7</span></li><li class="no"><span class="mark"></span><span class="txt">4<i class="v">x</i> + 7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>A = (<i class="v">x</i> + 5) + (3<i class="v">x</i> − 2) = 4<i class="v">x</i> + 3. −2<i class="v">x</i> + 7은 거꾸로 할 때 또 뺀 것, 4<i class="v">x</i> + 7은 −2의 부호를 바꾼 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D9-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>D9-3</code></div>
+        <div class="say"><p>분수 꼴 일차식은 분수의 덧셈처럼 <strong>통분</strong>해서 분자끼리 계산해요.</p><p><span class="fr"><span class="n"><i class="v">x</i> + 1</span><span class="d">2</span></span> + <span class="fr"><span class="n"><i class="v">x</i> − 1</span><span class="d">3</span></span> = <span class="fr"><span class="n">3(<i class="v">x</i> + 1) + 2(<i class="v">x</i> − 1)</span><span class="d">6</span></span> = <span class="fr"><span class="n">3<i class="v">x</i> + 3 + 2<i class="v">x</i> − 2</span><span class="d">6</span></span> = <span class="fr"><span class="n">5<i class="v">x</i> + 1</span><span class="d">6</span></span></p><p>분모 2와 3의 최소공배수 6으로 통분할 때 분자 <strong>전체</strong>에 3과 2를 곱해요. 분자끼리, 분모끼리 그냥 더하면 틀려요.</p></div>
+        <div class="check" id="D9-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D9-3✓</code></div>
+        <div class="qt"><p>계산하면 어느 것일까요?</p><p><strong><span class="fr"><span class="n"><i class="v">x</i> + 5</span><span class="d">2</span></span> + <span class="fr"><span class="n"><i class="v">x</i> − 3</span><span class="d">3</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">5<i class="v">x</i> + 9</span><span class="d">6</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2<i class="v">x</i> + 2</span><span class="d">5</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">5<i class="v">x</i> + 2</span><span class="d">6</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">3(<i class="v">x</i> + 5) + 2(<i class="v">x</i> − 3)</span><span class="d">6</span></span> = <span class="fr"><span class="n">3<i class="v">x</i> + 15 + 2<i class="v">x</i> − 6</span><span class="d">6</span></span> = <span class="fr"><span class="n">5<i class="v">x</i> + 9</span><span class="d">6</span></span>. 분모끼리 더하면 안 되고, 통분할 때는 분자 전체에 곱해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D9-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>D9-4</code></div>
+        <div class="say"><p>규칙을 식으로 세우면 큰 수도 바로 구해요.</p><p>성냥개비로 정사각형을 옆으로 이어 붙이면 1개에 4개, 하나 늘 때마다 3개씩 더 들어요. 맨 왼쪽 막대 1개를 먼저 세우고 정사각형마다 3개씩 붙인다고 생각하면, 정사각형 <i class="v">x</i>개에는 <strong>3<i class="v">x</i> + 1</strong>개가 필요해요.</p><p><i class="v">x</i> = 100일 때 3<i class="v">x</i> + 1 = 3 × 100 + 1 = 301</p><p>4개씩 <i class="v">x</i>번, 곧 4<i class="v">x</i>개로 세면 이어 붙여 함께 쓰는 막대까지 따로 센 셈이에요.</p></div>
+        <div class="check" id="D9-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D9-4✓</code></div>
+        <div class="qt"><p>성냥개비로 정사각형을 옆으로 이어 붙여요. 정사각형 1개에는 성냥개비 4개, 하나 늘 때마다 3개씩 더 들어요.</p><p>정사각형 12개를 만들려면 성냥개비가 몇 개 필요할까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">37개</span></li><li class="no"><span class="mark"></span><span class="txt">48개</span></li><li class="no"><span class="mark"></span><span class="txt">36개</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3<i class="v">x</i> + 1에 <i class="v">x</i> = 12를 넣으면 3 × 12 + 1 = 37이에요. 48개는 4개씩 따로 센 것, 36개는 맨 처음 1개를 빠뜨린 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="D9-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>D9-5</code></div>
+        <div class="say"><p>삼각형도 같은 방법으로 세요. 삼각형 1개에 성냥개비 3개, 하나 늘 때마다 2개씩 더 들어요.</p><p>맨 왼쪽 막대 1개에 삼각형마다 2개씩 — 삼각형 <i class="v">x</i>개에는 <strong>2<i class="v">x</i> + 1</strong>개예요.</p><p><i class="v">x</i> = 10일 때 2<i class="v">x</i> + 1 = 2 × 10 + 1 = 21</p><p>그림을 하나하나 세지 않아도 식에 수를 넣기만 하면 돼요.</p></div>
+        <div class="check" id="D9-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>D9-5✓</code></div>
+        <div class="qt"><p>성냥개비로 삼각형을 옆으로 이어 붙여요. 삼각형 1개에는 성냥개비 3개, 하나 늘 때마다 2개씩 더 들어요.</p><p>삼각형 15개를 만들려면 성냥개비가 몇 개 필요할까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">31개</span></li><li class="no"><span class="mark"></span><span class="txt">45개</span></li><li class="no"><span class="mark"></span><span class="txt">30개</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2<i class="v">x</i> + 1에 <i class="v">x</i> = 15를 넣으면 2 × 15 + 1 = 31이에요. 45개는 3개씩 따로 센 것, 30개는 맨 처음 1개를 빠뜨린 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="D9-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>D9-📏</code></div><p>도형·규칙은 식으로 · 거꾸로는 더해서 · 분수 꼴은 통분해서 분자 전체에.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="D9-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>D9-①a</code></div>
+      <div class="say"><p>성냥개비로 삼각형을 옆으로 이어 붙여요. 삼각형 1개에는 성냥개비 3개, 하나 늘 때마다 2개씩 더 들어요.</p><p>삼각형 12개를 만들려면 성냥개비가 몇 개 필요할까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">24</span><span class="tag">처음 하나를 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt">26</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">36</span><span class="tag">겹치는 것까지 따로 셈</span></li><li class="ok"><span class="mark">✔</span><span class="txt">25</span></li></ol>
+    </div><div class="sample" id="D9-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>D9-①b</code></div>
+      <div class="say"><p>가로가 (<i class="v">x</i> + 3) cm, 세로가 8 cm인 직사각형이 있어요.</p><p>둘레를 <i class="v">x</i>를 사용한 식으로 나타내면 어느 것일까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2<i class="v">x</i> + 22</span></li><li class="no"><span class="mark"></span><span class="txt">2<i class="v">x</i> + 11</span><span class="tag">괄호 안의 첫째 항에만 곱함</span></li><li class="no"><span class="mark"></span><span class="txt"><i class="v">x</i> + 11</span><span class="tag">둘레의 반만 셈</span></li></ol>
+    </div><div class="sample" id="D9-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>D9-②</code></div>
+      <div class="say"><p>어떤 식 A가 있어요. A − (9<i class="v">x</i> − 6) = 6<i class="v">x</i> + 8</p><p>피카츄가 이렇게 말했어요.</p><p><strong>A = 6<i class="v">x</i> + 8 − (9<i class="v">x</i> − 6) = −3<i class="v">x</i> + 14</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">뺀 것을 되돌리려면 더해요 — A = 15<i class="v">x</i> + 2</span></li><li class="no"><span class="mark"></span><span class="txt">A = 15<i class="v">x</i> + 14</span><span class="tag">괄호 앞 −를 첫째 항에만 적용함</span></li><li class="no"><span class="mark"></span><span class="txt">A는 구할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="D9-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>D9-👨</code></div>
+    <h3>배운 것을 섞어 쓰기 — 둘레·성냥개비 규칙을 식으로 세우고, 빼기를 거꾸로 되돌리고, 분수 꼴 일차식을 통분한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="D9-👨말1"><code class="mini">말1</code><span>&quot;정사각형 100개면 성냥개비를 하나하나 셀 수 있을까? 식이 있으면 바로 나와.&quot;</span></li><li id="D9-👨말2"><code class="mini">말2</code><span>&quot;A에서 무엇을 뺐더니 이게 나왔대. 원래 A로 돌아가려면 빼야 할까, 더해야 할까?&quot;</span></li><li id="D9-👨말3"><code class="mini">말3</code><span>&quot;분수 꼴 일차식 두 개를 더할 때도 분수 덧셈처럼 분모부터 맞춰야지.&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">이쑤시개나 면봉으로 정사각형을 1개, 2개, 3개 이어 붙이며 개수를 표에 적어요(4, 7, 10, …). 진우가 &quot;하나 늘 때마다 3개&quot;를 찾으면 3<i class="v">x</i> + 1을 같이 세우고, 정사각형 20개일 때를 식으로 먼저 구한 뒤 실제로 놓아 확인해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="D9-👨함정1"><code class="mini">함정1</code><div><div class="kid">A − (2<i class="v">x</i> + 1) = 3<i class="v">x</i> − 4에서 A를 (3<i class="v">x</i> − 4) − (2<i class="v">x</i> + 1)로 구한다</div><div class="dadsay">→ &quot;A에서 2<i class="v">x</i> + 1을 뺐더니 3<i class="v">x</i> − 4가 됐어. 뺀 것을 되돌리려면 다시 붙여 줘야지.&quot;</div></div></li><li id="D9-👨함정2"><code class="mini">함정2</code><div><div class="kid">분수 꼴 일차식 두 개를 더할 때 분자끼리, 분모끼리 더한다</div><div class="dadsay">→ &quot;분수 덧셈에서 분모끼리 더한 적 있었니? 분모 6으로 통분하고 분자 전체에 곱해 봐.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">정사각형 성냥개비 규칙을 3<i class="v">x</i> + 1로 세워 30개일 때 91개를 구하고, A − (<i class="v">x</i> + 2) = 2<i class="v">x</i> − 1에서 A = 3<i class="v">x</i> + 1을 찾으면 통과.</p>
+  </aside>
+    </div>
+  </section>
+
+  <footer>신코치 ✏️ 수학 · 문자와 식 줄기 배움 원고 · 2026-10-02</footer>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('ans');
+  function apply(){document.body.classList.toggle('hide-ans',!cb.checked);}
+  try{var v=localStorage.getItem('exp-review-ans');if(v==='0'){cb.checked=false;}}catch(e){}
+  cb.addEventListener('change',function(){apply();try{localStorage.setItem('exp-review-ans',cb.checked?'1':'0');}catch(e){}});
+  apply();
+})();
+</script>

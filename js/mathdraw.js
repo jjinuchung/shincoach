@@ -2581,6 +2581,77 @@ export function renderFigures(text) {
   return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
+// ───────────────────── 글 속 식 — 분수·대분수·문자 (2026-10-03, D 문자와 식 3단계) ─────────────────────
+//
+// 화면(math.js richNode)과 검수 페이지(tools/mathexpr.mjs)가 같이 쓴다 — 아이가 보는 것과 아빠가 검수하는 것이 같은 모양이어야 한다.
+// 수 분수 3/4·대분수 2 3/8은 예전 그대로, D 줄기의 문자 분수 x/3 · (x + 2)/3 · ac/b · a/(bc)도 세로로 (분수 막대가 괄호 노릇 → 바깥 괄호는 뗀다).
+// 문자는 변수로 쓰는 a·b·c·x·y만 기울인다 — cm·km·kg처럼 다른 글자가 섞인 낱말은 그대로 (단위가 기울면 안 된다).
+
+// 괄호째 분자·분모는 문자가 든 식만 — F 비례배분 풀이의 "45 × 5/(4 + 5)"는 예전처럼 한 줄로 둔다 (다른 줄기 화면은 바꾸지 않는다)
+const MATH_PAREN = /^\((?=[^)]*[abcxy])[0-9abcxy²³ +−×÷()]+\)$/;
+/** 보통 글 → 글·문자(기울임) 조각 */
+function varSplit(s) {
+  return String(s).split(/([A-Za-z]+)/).filter(Boolean).map((p) => ({ k: /^[abcxy]+$/.test(p) ? 'v' : 't', s: p }));
+}
+/** i의 괄호와 짝인 괄호 자리 (step −1: 닫는 괄호에서 거꾸로) */
+function pairOf(t, i, step) {
+  for (let d = 0, j = i; j >= 0 && j < t.length; j += step) {
+    if (t[j] === '(') d += step > 0 ? 1 : -1;
+    if (t[j] === ')') d += step > 0 ? -1 : 1;
+    if (d === 0) return j;
+  }
+  return -1;
+}
+/** t[i]의 "/"가 분수면 { start, end, part } */
+function fracAt(t, i) {
+  let s = i; let num;
+  if (t[i - 1] === ')') {
+    s = pairOf(t, i - 1, -1);
+    if (s < 0 || !MATH_PAREN.test(t.slice(s, i))) return null;
+    num = t.slice(s + 1, i - 1);
+  } else {
+    while (s > 0 && /[0-9abcxy²³]/.test(t[s - 1])) s--;
+    num = t.slice(s, i);
+    if (!num || /[A-Za-z]/.test(t[s - 1] || '')) return null;
+  }
+  let e = i + 1; let den;
+  if (t[e] === '(') {
+    e = pairOf(t, e, 1) + 1;
+    if (e <= 0 || !MATH_PAREN.test(t.slice(i + 1, e))) return null;
+    den = t.slice(i + 2, e - 1);
+  } else if (/\d/.test(t[e] || '')) {
+    while (e < t.length && /\d/.test(t[e])) e++;
+    den = t.slice(i + 1, e);
+  } else {
+    while (e < t.length && /[abcxy]/.test(t[e])) e++;
+    den = t.slice(i + 1, e);
+    if (/[A-Za-z]/.test(t[e] || '')) return null;
+  }
+  if (!den || t[s - 1] === '/' || t[e] === '/') return null;
+  // 대분수 "2 3/8" — 분자·분모가 수일 때만 (예전 richNode와 같은 규칙)
+  if (/^\d+$/.test(num) && /^\d+$/.test(den)) {
+    const m = /(?<![\d/])(\d+) $/.exec(t.slice(0, s));
+    if (m) return { start: s - m[0].length, end: e, part: { k: 'm', w: m[1], n: num, d: den } };
+  }
+  return { start: s, end: e, part: { k: 'f', n: varSplit(num), d: varSplit(den) } };
+}
+/**
+ * 글 → 조각 [{k:'t', s} 글 | {k:'v', s} 문자 | {k:'f', n:[조각], d:[조각]} 분수 | {k:'m', w, n, d} 대분수].
+ * **굵게**는 부르는 쪽이 먼저 나눈다.
+ */
+export function richParts(text) {
+  const t = String(text || ''); const out = []; let last = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] !== '/') continue;
+    const f = fracAt(t, i);
+    if (!f || f.start < last) continue;
+    out.push(...varSplit(t.slice(last, f.start)), f.part);
+    last = f.end; i = f.end - 1;
+  }
+  out.push(...varSplit(t.slice(last)));
+  return out;
+}
+
 // ───────────────────── 만지는 부품 (2026-09-21) ─────────────────────
 //
 // 구체(만지기) → 그림 → 기호 — 앱에 그림과 기호만 있고 "만지기"가 없었다. 펜은 없지만 탭·드래그는 된다.

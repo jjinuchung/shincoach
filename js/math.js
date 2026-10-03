@@ -6,7 +6,7 @@
 // 보상(⚡💰🎯)은 영어와 같은 xp.js·catch.js를 그대로 쓴다 — 도감·코인이 한 몸이라야 "수학을 해서 마스터볼을 산다"가 된다.
 
 import { WORLDS, rng, shuffle, josa } from './mathgen.js';
-import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget } from './mathdraw.js';
+import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget, richParts } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
@@ -108,24 +108,32 @@ function qtNode(text) {
   return frag;
 }
 
-/** "2 3/8" → 2 와 세로 분수, "5/6" → 세로 분수, **굵게**. DOM으로 만든다 (innerHTML에 글을 넣지 않는다) */
+/**
+ * "2 3/8" → 2 와 세로 분수, "5/6"·"x/3"·"(x + 2)/3" → 세로 분수, 문자 x·a → 기울임, **굵게**.
+ * 나누기는 mathdraw.richParts (검수 페이지와 같은 규칙). DOM으로 만든다 (innerHTML에 글을 넣지 않는다)
+ */
 function richNode(text) {
   const frag = document.createDocumentFragment();
-  const parts = String(text || '').split(/(\*\*[^*]+\*\*|(?<![\d/])\d+ \d+\/\d+(?![\d/])|(?<![\d/])\d+\/\d+(?![\d/]))/g);
-  for (const p of parts) {
+  for (const p of String(text || '').split(/(\*\*[^*]+\*\*)/g)) {
     if (!p) continue;
-    let m;
-    if ((m = /^\*\*([^*]+)\*\*$/.exec(p))) {
-      const b = document.createElement('strong'); b.appendChild(richNode(m[1])); frag.appendChild(b);
-    } else if ((m = /^(\d+) (\d+)\/(\d+)$/.exec(p))) {
-      const mx = el('span', 'mx'); mx.appendChild(el('span', 'w', m[1])); mx.appendChild(fracEl(m[2], m[3])); frag.appendChild(mx);
-    } else if ((m = /^(\d+)\/(\d+)$/.exec(p))) {
-      frag.appendChild(fracEl(m[1], m[2]));
-    } else {
-      frag.appendChild(document.createTextNode(p));
-    }
+    const m = /^\*\*([^*]+)\*\*$/.exec(p);
+    if (m) { const b = document.createElement('strong'); b.appendChild(richNode(m[1])); frag.appendChild(b); continue; }
+    for (const part of richParts(p)) frag.appendChild(partNode(part));
   }
   return frag;
+}
+
+function partNode(p) {
+  if (p.k === 'v') return el('i', 'mv', p.s);
+  if (p.k === 'm') { const mx = el('span', 'mx'); mx.appendChild(el('span', 'w', p.w)); mx.appendChild(fracEl(p.n, p.d)); return mx; }
+  if (p.k === 'f') {
+    const f = el('span', 'fr'); const n = el('span', 'n'); const d = el('span', 'd');
+    for (const x of p.n) n.appendChild(partNode(x));
+    for (const x of p.d) d.appendChild(partNode(x));
+    f.appendChild(n); f.appendChild(d);
+    return f;
+  }
+  return document.createTextNode(p.s);
 }
 
 function fracEl(n, d) {
