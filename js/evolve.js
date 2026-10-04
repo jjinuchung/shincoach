@@ -156,7 +156,17 @@ export function haveOf(caughtN, mon) {
   // 🔒 부모가 데려간 수도 같은 이유로 단조 카운터다 (2026-09-28). `caught`를 줄이면 백업을 되돌릴 때
   //    벌이 통째로 없던 일이 된다. 다시 잡으면 caught가 늘어 보유가 돌아온다 — 영구 삭제가 아니다
   const gone = Math.max(0, Math.floor(Number(mon && mon.taken) || 0));
-  return Math.max(0, got - out - gone);
+  return Math.max(0, got - out - gone - fusedOf(mon));
+}
+
+/**
+ * 🔀 퓨전에 들어가 있는 마릿수 (2026-10-04, 🏪 5일장). 넣은 수(fused)·분리해 돌려받은 수(unfused) 둘 다 단조 카운터 —
+ * 진화(evo)·데려감(taken)과 같은 까닭이다: 줄이는 값을 두면 옛 백업을 합칠 때 퓨전에 넣은 포켓몬이 되살아나 복제된다
+ */
+export function fusedOf(mon) {
+  const inN = Math.max(0, Math.floor(Number(mon && mon.fused) || 0));
+  const back = Math.max(0, Math.floor(Number(mon && mon.unfused) || 0));
+  return Math.max(0, inN - back);
 }
 
 /** 🔒 부모가 데려간 마릿수 (도감 칸은 남고 보유만 빠진다) */

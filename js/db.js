@@ -5,6 +5,7 @@ import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
 import { SHINY_USES, SHINY_CHARGE } from './items.js'; // 🌈 이로치 스톤 3회 — items.js는 아무것도 import하지 않는다 (순환 없음)
+import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -197,6 +198,24 @@ export async function getGiftPhoto(giftId) {
   const db = await openDb();
   const tx = db.transaction('blobs', 'readonly');
   const rec = await promisify(tx.objectStore('blobs').get(giftPhotoKey(giftId)));
+  return rec ? rec.blob : null;
+}
+
+/**
+ * 🔀 퓨전 그림 — 기기 안에서 만든 그림을 blobs 'fusion:<앞-뒤>'에 둔다 (이 기기만, 백업 밖 — 없으면 다시 만든다).
+ * 포켓몬 그림으로 만든 것이라 공개 저장소에 두지 않는다 (선물 사진과 같은 원칙)
+ */
+export const fusionArtKey = (fid) => `fusion:${fid}`;
+export async function putFusionArt(fid, blob) {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readwrite');
+  tx.objectStore('blobs').put({ id: fusionArtKey(fid), blob, at: Date.now() });
+  await txDone(tx);
+}
+export async function getFusionArt(fid) {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readonly');
+  const rec = await promisify(tx.objectStore('blobs').get(fusionArtKey(fid)));
   return rec ? rec.blob : null;
 }
 
@@ -734,13 +753,13 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) } };
+  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions) };
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -1236,6 +1255,73 @@ export function applyUnshiny(monId) {
 }
 
 /**
+ * 🔀 퓨전 (2026-10-04, 🏪 5일장) — 데리고 있는 두 마리(앞 a = 모양, 뒤 b = 색)를 하나로. **한 트랜잭션**:
+ * 장날인지 · 서로 다른 종인지 · 둘 다 데리고 있는지 · 스톤(🔷1 + 🔶1, 코인 없음)을 판정하고,
+ * 두 종의 fused(단조 카운터)를 1씩 올리고 fusions[a-b].made를 1 올린다. 종의 레벨·이로치·장식 기록은 그대로 남는다
+ * (분리하면 그 모습 그대로 돌아온다). 데리고 있던 마지막 파트너를 넣으면 파트너를 비운다 (데려감과 같다)
+ * @returns {{ok:boolean, why?:string, fid?:string, first?:boolean}} why: 'closed' | 'same' | 'have' | 'stones'
+ */
+export function fuseRule(profile, a, b, dateKey, now = Date.now()) {
+  const ia = Number(a), ib = Number(b);
+  if (!marketOpen(dateKey)) return { ok: false, why: 'closed' };
+  if (!ia || !ib || ia === ib) return { ok: false, why: 'same' };
+  profile.mons = profile.mons || {};
+  const caught = profile.caught || {};
+  if (haveOf(caught[ia], profile.mons[ia]) < 1 || haveOf(caught[ib], profile.mons[ib]) < 1) return { ok: false, why: 'have' };
+  if (!purchaseRule(profile, { items: { ...FUSION_COST } }, {}).ok) return { ok: false, why: 'stones' };
+  for (const id of [ia, ib]) {
+    const m = profile.mons[id] || {};
+    profile.mons[id] = { ...m, fused: (Number(m.fused) || 0) + 1 };
+    if (haveOf(caught[id], profile.mons[id]) < 1 && Number(profile.partner) === id) profile.partner = null;
+  }
+  const fid = fusionId(ia, ib);
+  profile.fusions = profile.fusions || {};
+  const f = profile.fusions[fid] || { a: ia, b: ib, made: 0, split: 0, at: now };
+  const first = !((Number(f.made) || 0) > 0);
+  profile.fusions[fid] = { ...f, a: ia, b: ib, made: (Number(f.made) || 0) + 1, at: Number(f.at) || now };
+  return { ok: true, fid, first };
+}
+export function applyFuse(a, b, dateKey) {
+  return mutateProfile((p) => fuseRule(p, a, b, dateKey));
+}
+
+/**
+ * 🔀 분리 — 장날에만, 가지고 있는 퓨전 하나를 두 마리로 되돌린다 (낸 스톤은 안 돌아온다).
+ * split·unfused도 단조 카운터. 퓨전 도감 칸은 남는다 (만든 적이 있다)
+ * @returns {{ok:boolean, why?:string, a?:number, b?:number}} why: 'closed' | 'none'
+ */
+export function unfuseRule(profile, fid, dateKey) {
+  if (!marketOpen(dateKey)) return { ok: false, why: 'closed' };
+  const ids = parseFusionId(fid);
+  const f = ids && profile.fusions && profile.fusions[fid];
+  if (!f || fusionHeld(f) < 1) return { ok: false, why: 'none' };
+  profile.fusions[fid] = { ...f, split: (Number(f.split) || 0) + 1 };
+  profile.mons = profile.mons || {};
+  for (const id of [ids.a, ids.b]) {
+    const m = profile.mons[id] || {};
+    profile.mons[id] = { ...m, unfused: (Number(m.unfused) || 0) + 1 };
+  }
+  return { ok: true, a: ids.a, b: ids.b };
+}
+export function applyUnfuse(fid, dateKey) {
+  return mutateProfile((p) => unfuseRule(p, fid, dateKey));
+}
+
+/** 🔀 퓨전 이름 바꾸기 — 언제든 (장날이 아니어도). 빈 이름이면 원래 이름(앞 두 글자 + 끝 한 글자)으로 */
+export function renameFusionRule(profile, fid, name, now = Date.now()) {
+  const f = profile.fusions && profile.fusions[fid];
+  if (!f || !((Number(f.made) || 0) > 0)) return { ok: false, why: 'none' };
+  const clean = cleanName(name);
+  const next = { ...f, nameAt: now };
+  if (clean) next.name = clean; else delete next.name;
+  profile.fusions[fid] = next;
+  return { ok: true, name: clean };
+}
+export function applyRenameFusion(fid, name) {
+  return mutateProfile((p) => renameFusionRule(p, fid, name));
+}
+
+/**
  * ⬆️ 레벨업 — 🔷🔶 스톤과 💰 코인을 치르고 `mons[id].lv`를 한 칸 올린다. **한 트랜잭션**.
  *
  * ★ 값은 **여기서** 계산한다(밖에서 받지 않는다). 두 창을 같이 열면 다른 창이 먼저 올려 레벨이 달라져 있고,
@@ -1503,6 +1589,11 @@ export function mergeStatRecord(name, cur, rec) {
       if (evo && evo !== (Number(cur.evo) || 0)) patch.evo = evo;
       // 🔒 부모가 데려간 수·알려 준 수도 단조 카운터 (2026-09-28) — max가 아니면
       //    옛 백업을 되돌리는 것만으로 벌이 없던 일이 된다 (evo와 똑같은 함정)
+      // 🔀 퓨전에 넣은 수·분리해 돌려받은 수도 단조 카운터 (2026-10-04) — max가 아니면 옛 백업이 퓨전에 넣은 포켓몬을 되살린다
+      for (const k of ['fused', 'unfused']) {
+        const v = Math.max(Number(o[k]) || 0, Number(cur[k]) || 0);
+        if (v && v !== (Number(cur[k]) || 0)) patch[k] = v;
+      }
       const taken = Math.max(Number(o.taken) || 0, Number(cur.taken) || 0);
       if (taken && taken !== (Number(cur.taken) || 0)) patch.taken = taken;
       const seen = Math.max(Number(o.takenSeen) || 0, Number(cur.takenSeen) || 0);
@@ -1514,6 +1605,8 @@ export function mergeStatRecord(name, cur, rec) {
     out.unlockBase = latest.unlockBase || null;
     // 🎁 아빠가 건넨 선물은 한 번 건넸으면 계속 건넨 것 (합집합) — 옛 백업이 "사 줘야 할 선물" 알림을 되살리지 않게
     out.giftsGiven = { ...(rec.giftsGiven || {}), ...(cur.giftsGiven || {}) };
+    // 🔀 퓨전 도감 — 만든 수·분리한 수는 max, 처음 만든 때는 이른 쪽, 이름은 나중에 고친 쪽 (fusion.mergeFusions)
+    out.fusions = mergeFusions(cur.fusions, rec.fusions);
   }
   return out;
 }

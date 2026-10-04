@@ -6,7 +6,10 @@ import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES, SHINY_STONE, shinyUsesLeft } from './items.js';
 import { eggSummary } from './egg.js';
 import { gymClaimed } from './mathprog.js'; // 🕳 울트라홀 = 💎 스페셜 여덟 배지
-import { haveOf, lvOf } from './evolve.js';
+import { haveOf, lvOf, fusedOf } from './evolve.js';
+import { initMarket, openMarket, fusionFigure, fusionName } from './marketview.js'; // 🏪 5일장 · 🔀 퓨전 (2026-10-04)
+import { marketOpen, nextMarket } from './fusion.js';
+import { fusionList } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { initShop, openShop, openMon } from './shop.js';
 
@@ -33,6 +36,12 @@ export function initPokedex(ctx) {
   $('btn-pokedex-back').addEventListener('click', () => showView(backTo));
   $('pokedex-shop').addEventListener('click', openShop);
   initShop({ onChange: refreshAfterChange });
+  initMarket();
+}
+
+/** 🏪 5일장 열기 — 닫으면 도감을 다시 그린다 (퓨전에 들어간 포켓몬 수·퓨전 도감이 바뀌었다). 돌아갈 화면은 그대로 */
+function goMarket() {
+  openMarket({ onClose: () => { if (!$('view-pokedex').hidden) openPokedex({ keepBack: true }); } });
 }
 
 /** 상점에서 사거나 포켓몬을 꾸민 뒤: 코인 표시와 그 포켓몬 자리만 다시 그림 (화면 전체를 다시 그리면 스크롤이 튐) */
@@ -90,7 +99,7 @@ function el(tag, cls, text) {
 
 /** 도감 열기. opts.shop = true 면 열자마자 🛒 상점도 띄움 (플레이어 코인 칩에서) */
 export async function openPokedex(opts) {
-  backTo = visibleView(); // 열기 전에 잡는다 — 그려지는 사이에 화면이 바뀌면 안 되니까
+  if (!(opts && opts.keepBack)) backTo = visibleView(); // 열기 전에 잡는다 (🏪 5일장에서 돌아와 다시 그릴 때는 그대로) — 그려지는 사이에 화면이 바뀌면 안 되니까
   // 화면을 지운 뒤에 await가 있으므로, 아이가 🎒를 빠르게 두 번 누르면 도감이 두 번 그려진다
   // (라이브러리 🎟️ 예고가 두 번 나온 것과 같은 원인 — 2026-09-17). 마지막 요청만 화면에 남긴다.
   const seq = ++openSeq;
@@ -159,7 +168,38 @@ export async function openPokedex(opts) {
   shopBtn.addEventListener('click', openShop);
   coinRow.appendChild(shopBtn);
   card.appendChild(coinRow);
+  // 🏪 5일장 — 5일마다 열린다. 장이 안 서는 날도 눌러서 다음 장날과 퓨전 도감을 볼 수 있다
+  const nx = nextMarket(today);
+  const mk = el('div', 'pokedex-coins pokedex-market' + (marketOpen(today) ? ' open' : ''));
+  const mkLeft = el('div');
+  mkLeft.appendChild(el('div', 'amt', marketOpen(today) ? '🏪 오늘은 5일장 날!' : '🏪 5일장'));
+  mkLeft.appendChild(el('div', 'pokedex-stats', marketOpen(today) ? '🔀 퓨전 가게에서 두 마리를 섞어 새 포켓몬을 만들어요' : nx ? `다음 장날 ${Number(nx.key.slice(5, 7))}월 ${Number(nx.key.slice(8))}일 (${nx.days === 1 ? '내일' : `${nx.days}일 뒤`})` : ''));
+  mk.appendChild(mkLeft);
+  const mkBtn = el('button', 'btn' + (marketOpen(today) ? ' btn-primary' : ''), marketOpen(today) ? '🏪 장 보러 가기' : '🏪 들어가 보기');
+  mkBtn.type = 'button';
+  mkBtn.addEventListener('click', goMarket);
+  mk.appendChild(mkBtn);
+  card.appendChild(mk);
   main.appendChild(card);
+
+  // 🔀 퓨전 도감 — 만든 적 있는 퓨전 (누르면 5일장에서 이름을 바꾸거나 장날에 나눈다)
+  const fz = fusionList();
+  if (fz.length) {
+    const sec = el('div', 'stats-card');
+    sec.appendChild(el('h2', '', `🔀 퓨전 도감 (${fz.length}종)`));
+    const grid = el('div', 'pokedex-grid');
+    for (const f of fz) {
+      const cell = el('div', 'pokedex-cell got fz-dex-cell');
+      cell.appendChild(fusionFigure(f.a, f.b, urlById, 'fz-art small'));
+      cell.appendChild(el('div', 'nm', fusionName(f)));
+      if (f.held > 1) cell.appendChild(el('div', 'cnt', `×${f.held}`));
+      else if (f.held === 0) cell.appendChild(el('div', 'cnt evolved', '나눔'));
+      cell.addEventListener('click', goMarket);
+      grid.appendChild(cell);
+    }
+    sec.appendChild(grid);
+    main.appendChild(sec);
+  }
 
   main.appendChild(el('p', 'stats-note', '⭐ 등급이 이상하다고 생각되면 포켓몬을 눌러서 아빠에게 말할 수 있어요 (아직 못 잡은 포켓몬도요)'));
 
@@ -197,7 +237,8 @@ export async function openPokedex(opts) {
       cell.appendChild(el('div', 'nm', n > 0 ? m.ko : '???'));
       if (have > 1) cell.appendChild(el('div', 'cnt', `×${have}`));
       // 🧬 다 진화시켜 지금은 없는 모습 — 도감 칸은 남고 "보냈다"는 것만 보여 준다
-      else if (n > 0 && have === 0) cell.appendChild(el('div', 'cnt evolved', '🧬'));
+      // 🔀 퓨전에 들어가 있으면 🔀 (5일장에서 나누면 돌아온다)
+      else if (n > 0 && have === 0) cell.appendChild(el('div', 'cnt evolved', fusedOf(p.mons[m.id]) > 0 ? '🔀' : '🧬'));
       if (n > 0 && lv > 1) cell.appendChild(el('div', 'lv', `Lv${lv}`));
       // 🌌 울트라비스트는 🕳 울트라홀이 열려야 만난다 — 🔢 대신 🌌를 달아 "다른 차원에서 온 것"을 표시
       if (isUltraBeast(m.id)) cell.appendChild(el('div', 'subj ub', '🌌'));

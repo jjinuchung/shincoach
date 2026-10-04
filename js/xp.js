@@ -8,10 +8,12 @@ import {
   applyTakeMons, applyTakenSeen, // 🔒 부모가 데려가기 (2026-09-28)
   applyExtend, // ⏳ 시간 연장권 (2026-10-01)
   applyUnshiny, // ⚪ 이로치 빼기 (2026-10-04)
+  applyFuse, applyUnfuse, applyRenameFusion, // 🔀 퓨전 (2026-10-04, 🏪 5일장)
 } from './db.js';
+import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, MAX_LV } from './evolve.js';
+import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
 import { findVoucher } from './unlock.js';
 
@@ -302,7 +304,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -334,7 +336,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) } };
+  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -511,6 +513,42 @@ export function stonesSpent() {
 /** 지금 데리고 있는 마릿수 (누적 − 🧬 진화로 내보낸 수 − 🔒 부모가 데려간 수) */
 export function haveCount(id) {
   return haveOf(profile.caught[id], profile.mons[id]);
+}
+
+/** 🔀 퓨전에 들어가 있는 마릿수 (분리하면 돌아온다) */
+export function fusedCount(id) {
+  return fusedOf(profile.mons[id]);
+}
+
+/**
+ * 🔀 퓨전 도감 — 만든 적 있는 퓨전 [{ fid, a, b, made, split, held, name, at }] (처음 만든 순)
+ * name은 아이가 지은 이름 (없으면 null — 화면이 앞 두 글자 + 끝 한 글자로 지어 보인다)
+ */
+export function fusionList() {
+  return Object.keys(profile.fusions || {}).map((fid) => {
+    const f = profile.fusions[fid] || {};
+    const ids = parseFusionId(fid);
+    return ids && (Number(f.made) || 0) > 0 ? { fid, a: ids.a, b: ids.b, made: Number(f.made) || 0, split: Number(f.split) || 0, held: fusionHeld(f), name: f.name || null, at: Number(f.at) || 0 } : null;
+  }).filter(Boolean).sort((x, y) => x.at - y.at || (x.fid < y.fid ? -1 : 1));
+}
+
+/** 🔀 섞기 — 한 트랜잭션 (장날·두 마리·스톤). 저장이 안 되면 못 한 것 */
+export async function fuseMons(a, b, dateKey) {
+  const r = await runProfileOp(() => applyFuse(a, b, dateKey), () => ({ ok: false, why: 'save' }));
+  if (r && r.ok) ensurePartner(); // 마지막 파트너를 넣었으면 다른 포켓몬이 파트너가 된다
+  return r || { ok: false, why: 'save' };
+}
+
+/** 🔀 분리 — 장날에만, 두 마리가 돌아온다 */
+export async function unfuseMon(fid, dateKey) {
+  const r = await runProfileOp(() => applyUnfuse(fid, dateKey), () => ({ ok: false, why: 'save' }));
+  return r || { ok: false, why: 'save' };
+}
+
+/** 🔀 이름 바꾸기 — 언제든 */
+export async function renameFusion(fid, name) {
+  const r = await runProfileOp(() => applyRenameFusion(fid, name), () => ({ ok: false, why: 'save' }));
+  return r || { ok: false, why: 'save' };
 }
 
 /** 🔒 부모가 데려간 마릿수 */
