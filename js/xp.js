@@ -151,7 +151,12 @@ for (const r of Object.keys(RARITY_IDS)) for (const id of RARITY_IDS[r]) rarityB
 
 /** 포켓몬 id → 희귀도 1~4 (명단에 없으면 2) */
 export function rarityOf(id) {
-  const fixed = profile.mons && profile.mons[id] && profile.mons[id].rarity;
+  return rarityIn(profile, id);
+}
+
+/** 그 프로필에서의 등급 — 부모가 옮긴 등급(mons[id].rarity)까지. 🤝 교환 판정은 저장된 프로필로 이것을 쓴다 (Codex 31차 #1) */
+export function rarityIn(pf, id) {
+  const fixed = pf && pf.mons && pf.mons[id] && pf.mons[id].rarity;
   return isRarity(fixed) ? fixed : (rarityById[id] || 2);
 }
 
@@ -568,10 +573,12 @@ const rosterSet = new Set(ROSTER_IDS);
  * 교환 판정에 쓰는 명단의 사실 — 등급(부모가 옮긴 등급 포함) · 과목 · 원작 전설·환상·🌌 아님 · 진우 레벨로 열렸나.
  * 게이트는 이 한 곳에서 만들어 상인이 가져올 것(offerFor)과 트랜잭션 판정(tradeRule) 둘 다 이것을 쓴다
  */
-function tradeCtx(art) {
-  const level = levelFromXp(profile.xp).level;
+// ★ 등급(부모가 옮긴 것)·레벨은 **넘겨받은 프로필**에서 읽는다 — 판정은 트랜잭션 안의 저장된 프로필로 만든다.
+//   창의 프로필로 만들면 다른 창에서 아빠가 등급을 옮긴 뒤에도 옛 등급으로 판정했다 (Codex 31차 #1)
+export function tradeCtx(pf, art) {
+  const level = levelFromXp(Number(pf && pf.xp) || 0).level;
   return {
-    rarity: (id) => rarityOf(Number(id)),
+    rarity: (id) => rarityIn(pf, Number(id)),
     subject: (id) => subjectOf(Number(id)),
     allowed: (id) => rosterSet.has(Number(id)) && !isLegendary(id) && !isUltraBeast(id),
     unlocked: (id) => isUnlocked(Number(id), level),
@@ -585,7 +592,7 @@ function tradeCtx(art) {
  * @param {Set<number>} [art] 기기에 그림이 있는 포켓몬 id (상인은 그림이 있는 것만 가져온다)
  */
 export function tradeOffers(dateKey, art) {
-  const ctx = tradeCtx(art);
+  const ctx = tradeCtx(profile, art);
   const done = tradesOn(profile.trades, dateKey);
   return Array.from({ length: TRADER_COUNT }, (_, slot) => ({ ...offerFor(profile, dateKey, slot, ROSTER_IDS, ctx), done: done[slot] || null }));
 }
@@ -597,7 +604,7 @@ export function tradedCount(id) {
 
 /** 🤝 바꾸기 — 한 트랜잭션 (장날·그 상인 오늘 한 번·2마리 이상·아직 없는 종·같은 등급·같은 과목). 저장이 안 되면 못 한 것 */
 export async function tradeMon(req) {
-  const r = await runProfileOp(() => applyTrade(req, tradeCtx()), () => ({ ok: false, why: 'save' }));
+  const r = await runProfileOp(() => applyTrade(req, (stored) => tradeCtx(stored)), () => ({ ok: false, why: 'save' }));
   if (r && r.ok) ensurePartner();
   return r || { ok: false, why: 'save' };
 }

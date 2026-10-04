@@ -14,12 +14,12 @@ import { haveOf } from './evolve.js';
 
 /** 상인 일곱 — 게임 트레이너 직업 이름 (실제 사람·가족 이름은 쓰지 않는다) */
 export const TRADERS = [
-  { id: 'youngster', emoji: '🧢', name: '반바지 꼬마' },
+  { id: 'youngster', emoji: '🧢', name: '반바지꼬마' }, // 게임 표기대로 붙여 쓴다 (Codex 31차 #7)
   { id: 'hiker', emoji: '⛰️', name: '등산가' },
   { id: 'fisher', emoji: '🎣', name: '낚시꾼' },
   { id: 'scientist', emoji: '🔬', name: '과학자' },
   { id: 'aroma', emoji: '🌸', name: '아로마 아가씨' },
-  { id: 'bugkid', emoji: '🐛', name: '곤충 채집 소년' },
+  { id: 'bugkid', emoji: '🐛', name: '곤충채집소년' }, // 포켓몬코리아 공식 표기
   { id: 'gentleman', emoji: '🎩', name: '신사' },
 ];
 
@@ -78,30 +78,44 @@ export function givesFor(profile, ids, tier, subject, ctx) {
 }
 
 /**
- * 그 장날·자리 상인이 가져온 것 — { slot, tier, who, get, subject, gives }.
+ * 그 장날·자리 상인이 가져온 것 — { slot, tier, who, get, subject, gives, why }.
  * 후보를 (장날, 자리, 종)으로 섞은 순서에서 진우가 바꿀 수 있는 과목의 첫 종을 고른다 (없으면 그냥 첫 종 — 보여 주되 못 바꾼다).
- * 같은 날 다시 열어도 같다. 그 종을 그 사이 잡았으면 다음 종으로 넘어간다. 그 등급을 다 모았으면 get = null
+ * 같은 날 다시 열어도 같다. 그 종을 그 사이 잡았으면 다음 종으로 넘어간다.
+ * 못 가져왔으면 get = null과 까닭 why (Codex 31차 #6 — 까닭마다 아이에게 하는 말이 다르다):
+ *   'all' 그 등급을 다 모았다 · 'level' 남은 것은 레벨이 더 올라야 열린다 · 'art' 남은 것의 그림이 이 기기에 없다
  * @param {object} profile
  * @param {string} dateKey
  * @param {number} slot
  * @param {number[]} ids 명단 id
- * @param {object} ctx rarity·subject·allowed·unlocked (+ art: 그림이 있는 id Set — 비었으면 거르지 않는다)
+ * @param {object} ctx rarity·subject·allowed·unlocked (+ art: 그림이 있는 id Set — 넘겼으면 **비어 있어도** 거른다)
  */
 export function offerFor(profile, dateKey, slot, ids, ctx) {
   const tier = TRADE_TIERS[slot];
   const who = tradersFor(dateKey)[slot];
-  const art = ctx.art && ctx.art.size ? ctx.art : null;
-  const pool = (ids || [])
-    .filter((id) => canGet(profile, id, tier, ctx) && (!art || art.has(Number(id))))
-    .map((id) => ({ id: Number(id), k: hash32(`${dateKey}|${slot}|${id}`) }))
+  // 그림 목록을 넘겼으면 비어 있어도 거른다 — 그림이 하나도 없는 기기에서 "?" 포켓몬을 가져와 바꿔 주었다 (Codex 31차 #2)
+  const art = ctx.art instanceof Set ? ctx.art : null;
+  const caught = profile.caught || {};
+  const base = (ids || []).map(Number).filter((id) => id && !((Number(caught[id]) || 0) > 0) && ctx.rarity(id) === tier && ctx.allowed(id));
+  const open = base.filter((id) => ctx.unlocked(id));
+  const pool = open
+    .filter((id) => !art || art.has(id))
+    .map((id) => ({ id, k: hash32(`${dateKey}|${slot}|${id}`) }))
     .sort((x, y) => x.k - y.k || x.id - y.id)
     .map((x) => x.id);
-  if (!pool.length) return { slot, tier, who, get: null, subject: null, gives: [] };
+  if (!pool.length) return { slot, tier, who, get: null, subject: null, gives: [], why: !base.length ? 'all' : !open.length ? 'level' : 'art' };
   const giveBy = new Map();
   const gives = (s) => { if (!giveBy.has(s)) giveBy.set(s, givesFor(profile, ids, tier, s, ctx)); return giveBy.get(s); };
   const get = pool.find((id) => gives(ctx.subject(id)).length > 0) ?? pool[0];
   const subject = ctx.subject(get);
   return { slot, tier, who, get, subject, gives: gives(subject) };
+}
+
+/**
+ * "한 번 더" 누른 것이 **같은 거래**인가 — 장날·자리·줄 것·받을 것이 모두 같고 아직 ms 안 (Codex 31차 #4).
+ * 받을 것을 빼고 보면, 그 사이 다른 창에서 상인 포켓몬을 잡아 상인이 다른 포켓몬을 가져왔을 때 한 번만 눌러도 바뀌었다
+ */
+export function sameDeal(arm, deal, now, ms = 5000) {
+  return !!arm && !!deal && arm.day === deal.day && arm.slot === deal.slot && arm.give === deal.give && arm.get === deal.get && now - arm.at < ms;
 }
 
 /**

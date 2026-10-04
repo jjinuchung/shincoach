@@ -5,6 +5,7 @@ import { ROSTER, loadCharacters } from './pokemon.js';
 import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList, tradeOffers, tradeMon, RARITY } from './xp.js';
 import { STONE_MATH, STONE_ENGLISH } from './items.js';
 import { getFusionArt, putFusionArt } from './db.js';
+import { sameDeal } from './trade.js';
 import { todayKey } from './track.js';
 import { sfx, unlock } from './sfx.js';
 import { burstConfetti } from './catch.js';
@@ -14,7 +15,7 @@ const KO = new Map(ROSTER.map((m) => [m.id, m.ko]));
 const ART = 240; // 퓨전 그림 크기 (시험작과 같다)
 
 const ui = { open: false, override: null, a: null, b: null, picking: null, busy: false, result: null, renaming: null, splitArm: null, urlById: new Map(), onClose: null,
-  trPick: null, trGive: {}, trArm: null }; // 🤝 trPick = 고르는 중인 상인 자리 · trGive = 자리마다 고른 내 포켓몬 · trArm = 한 번 누른 바꾸기
+  trPick: null, trGive: {}, trArm: null }; // 🤝 trPick = 고르는 중인 상인 자리 · trGive = 자리마다 고른 내 포켓몬 · trArm = 한 번 누른 바꾸기 {day, slot, give, get, at}
 const artUrls = new Map();  // fid → objectURL — 실제로 섞은 퓨전의 그림 (이 기기의 blobs에도 있다)
 const previews = new Map(); // fid → { url, blob } — 섞기 전 미리 보기, 최근 PREVIEW_MAX장만 (메모리만)
 const PREVIEW_MAX = 8;
@@ -376,9 +377,21 @@ function dexCard(open) {
 /** 🔀 나누기 — 두 번 눌러야 (다시 섞으려면 스톤이 또 든다) */
 function splitBtn(f) {
   const armed = ui.splitArm && ui.splitArm.fid === f.fid && Date.now() - ui.splitArm.at < 5000;
-  const b = el('button', 'btn fz-split' + (armed ? ' armed' : ''), armed ? '정말 나눌까요? 한 번 더!' : `🔀 나누기 (${KO.get(f.a)} + ${KO.get(f.b)})`);
+  const label = `🔀 나누기 (${KO.get(f.a)} + ${KO.get(f.b)})`;
+  const b = el('button', 'btn fz-split' + (armed ? ' armed' : ''), armed ? '정말 나눌까요? 한 번 더!' : label);
   b.type = 'button';
+  b.dataset.label = label;
   b.disabled = ui.busy;
+  // 5초가 지나 "한 번 더"가 풀리면 버튼도 원래대로 — 같은 퓨전 버튼이 어디에 몇 개 있든 (Codex 31차 #5, 교환 버튼과 같은 까닭)
+  if (armed) {
+    const arm = ui.splitArm;
+    setTimeout(() => {
+      if (ui.splitArm !== arm) return;
+      ui.splitArm = null;
+      for (const x of document.querySelectorAll('#market-body .fz-split.armed')) { x.classList.remove('armed'); x.textContent = x.dataset.label || x.textContent; }
+      if ($('market-msg').textContent.startsWith('🔀 한 번 더')) say('');
+    }, Math.max(0, 5000 - (Date.now() - arm.at)));
+  }
   b.addEventListener('click', async () => {
     if (ui.busy) return;
     if (!(ui.splitArm && ui.splitArm.fid === f.fid && Date.now() - ui.splitArm.at < 5000)) {
@@ -439,9 +452,13 @@ function traderBox(o) {
     box.appendChild(el('div', 'tr-say', '“고마워! 다음 장날에 또 와.”'));
     return box;
   }
-  if (!o.get) { // 이 등급에서 진우 도감에 없는 것(열린 것)을 못 찾았다
-    box.appendChild(el('div', 'tr-art', '🎒'));
-    box.appendChild(el('div', 'tr-say', `“네 도감에 없는 ${RARITY[o.tier].stars} 포켓몬을 못 찾았어. 다음 장날에 또 와!”`));
+  if (!o.get) { // 가져올 것이 없다 — 까닭마다 말이 다르다 (다음 장날을 기다려도 안 바뀌는 까닭이 있다, Codex 31차 #6)
+    const st = RARITY[o.tier].stars;
+    box.appendChild(el('div', 'tr-art', o.why === 'art' ? '🖼️' : '🎉'));
+    box.appendChild(el('div', 'tr-say', o.why === 'all' ? `“와, ${st} 포켓몬은 벌써 다 모았구나! 내가 줄 게 없어.”`
+      : o.why === 'level' ? `“지금 만날 수 있는 ${st} 포켓몬은 다 모았네! 레벨이 오르면 새 포켓몬을 데려올게.”`
+      : `“포켓몬 그림이 이 태블릿에 아직 없어서 못 데려왔어.”`));
+    if (o.why === 'art') box.appendChild(el('p', 'market-note', '아빠께: ⚙ 설정에서 "포켓몬 캐릭터 받기"를 하면 상인이 데려와요'));
     return box;
   }
 
@@ -451,7 +468,7 @@ function traderBox(o) {
   box.appendChild(el('div', 'tr-say', `“내 ${X} 줄게! 네 ${RARITY[o.tier].stars} 포켓몬 하나랑 바꿀래?”`));
   if (o.subject === 'math') box.appendChild(el('p', 'market-note', '🔢 수학 포켓몬이라 수학 포켓몬끼리만 바꿔요'));
   if (!o.gives.length) {
-    box.appendChild(el('p', 'market-note tr-cant', `${RARITY[o.tier].stars} ${o.subject === 'math' ? '수학 ' : ''}포켓몬을 두 마리 이상 데리고 있으면 바꿀 수 있어요`));
+    box.appendChild(el('p', 'market-note tr-cant', `${RARITY[o.tier].stars} ${o.subject === 'math' ? '수학' : '영어'} 포켓몬을 두 마리 이상 데리고 있으면 바꿀 수 있어요`)); // 영어 쪽도 과목을 말한다 (Codex 31차 #6)
     return box;
   }
 
@@ -492,9 +509,14 @@ function givePicker(o) {
   return wrap;
 }
 
+/** 이 거래 — 장날·자리·줄 것·받을 것 ("한 번 더"는 이것이 모두 같을 때만) */
+function dealOf(o, give) {
+  return { day: dayNow(), slot: o.slot, give, get: o.get };
+}
+
 /** 🤝 바꾸기 — 두 번 눌러야 (되돌릴 수 없다) */
 function tradeBtn(o, give) {
-  const armed = ui.trArm && ui.trArm.slot === o.slot && ui.trArm.give === give && Date.now() - ui.trArm.at < 5000;
+  const armed = sameDeal(ui.trArm, dealOf(o, give), Date.now()); // 받을 포켓몬까지 같아야 (상인이 다른 포켓몬을 가져왔으면 처음부터 — Codex 31차 #4)
   const X = nameOf(o.get), Y = nameOf(give);
   const b = el('button', 'btn btn-primary fz-go tr-go' + (armed ? ' armed' : ''), armed ? `정말 ${Y}${eul(Y)} 줄까요? 한 번 더!` : `🤝 ${Y} → ${X} 바꾸기`);
   b.type = 'button';
@@ -517,8 +539,8 @@ function tradeBtn(o, give) {
 async function doTrade(o, give) {
   if (ui.busy) return;
   const X = nameOf(o.get), Y = nameOf(give);
-  if (!(ui.trArm && ui.trArm.slot === o.slot && ui.trArm.give === give && Date.now() - ui.trArm.at < 5000)) {
-    ui.trArm = { slot: o.slot, give, at: Date.now() };
+  if (!sameDeal(ui.trArm, dealOf(o, give), Date.now())) {
+    ui.trArm = { ...dealOf(o, give), at: Date.now() };
     say(`🤝 한 번 더 누르면 ${Y}${eul(Y)} 주고 ${X}${eul(X)} 받아요 — 바꾸면 되돌릴 수 없어요`);
     render();
     return;

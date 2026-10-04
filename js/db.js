@@ -1348,8 +1348,9 @@ export function tradeRule(profile, req, ctx, now = Date.now()) {
   if (!profile.partner) profile.partner = get;
   return { ok: true, give, get, who };
 }
-export function applyTrade(req, ctx) {
-  return mutateProfile((p) => tradeRule(p, req, ctx));
+/** @param {(stored:object) => object} makeCtx 저장된 프로필로 판정 ctx를 만든다 (등급·레벨을 창의 프로필로 보면 낡았다 — Codex 31차 #1) */
+export function applyTrade(req, makeCtx) {
+  return mutateProfile((p) => tradeRule(p, req, makeCtx(p)));
 }
 
 /**

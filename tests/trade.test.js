@@ -8,12 +8,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TRADERS, TRADE_TIERS, TRADER_COUNT, tradersFor, slotOk, offerFor, tradeCheck, mergeTrades, copyTrades, tradesOn, hash32 } from '../js/trade.js';
+import { TRADERS, TRADE_TIERS, TRADER_COUNT, tradersFor, slotOk, offerFor, tradeCheck, mergeTrades, copyTrades, tradesOn, hash32, sameDeal, canGet } from '../js/trade.js';
 import { MARKET_ANCHOR, marketOpen, dayNum } from '../js/fusion.js';
 import { cloneProfile, emptyProfile, tradeRule, mergeStatRecord } from '../js/db.js';
 import { haveOf, tradedOf } from '../js/evolve.js';
 import { ROSTER, LEGENDARY, ULTRA_BEASTS, subjectOf } from '../js/pokemon.js';
-import { RARITY_IDS, levelFromXp, xpToReach } from '../js/xp.js';
+import { RARITY_IDS, levelFromXp, xpToReach, tradeCtx } from '../js/xp.js';
 
 const src = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const prof = (o) => cloneProfile({ ...emptyProfile(), ...o });
@@ -56,7 +56,7 @@ function marketDays(from, n) {
 test('🤝 상인: 일곱 중 장날마다 셋 · 같은 날이면 늘 같은 셋 · 날마다 바뀐다 · 자리마다 ⭐ · ⭐⭐ · ⭐⭐⭐', () => {
   assert.equal(TRADERS.length, 7);
   assert.equal(new Set(TRADERS.map((t) => t.id)).size, 7, '상인 id가 겹치지 않는다');
-  assert.deepEqual(TRADERS.map((t) => t.name), ['반바지 꼬마', '등산가', '낚시꾼', '과학자', '아로마 아가씨', '곤충 채집 소년', '신사'], '게임 직업 이름 — 사람·가족 이름이 아니다');
+  assert.deepEqual(TRADERS.map((t) => t.name), ['반바지꼬마', '등산가', '낚시꾼', '과학자', '아로마 아가씨', '곤충채집소년', '신사'], '게임 직업 이름 — 사람·가족 이름이 아니다 (반바지꼬마·곤충채집소년은 게임 표기대로 붙여 씀, Codex 31차 #7)');
   assert.deepEqual(TRADE_TIERS, [1, 2, 3], '전설(4)·🌌(5)은 다루지 않는다');
   assert.equal(TRADER_COUNT, 3);
   const sets = new Set();
@@ -96,15 +96,26 @@ test('🤝 상인이 가져오는 것: 그 등급 · 도감에 없는 종 · 레
     const o = offerFor(empty, day, slot, IDS, lv1);
     if (o.get) assert.equal(UNLOCK.get(o.get), 1, `레벨 1에 ${o.get}(Lv${UNLOCK.get(o.get)}에 열림)을 가져왔다`);
   }
-  // 그 등급을 다 모았으면 get = null — "다음 장날에 또 와"
+  // 못 가져오면 get = null과 까닭 (Codex 31차 #6 — 까닭마다 아이에게 하는 말이 다르다)
   const full = prof({ caught: Object.fromEntries(ofTier(1).map((id) => [id, 1])) });
-  assert.equal(offerFor(full, OPEN, 0, IDS, CTX).get, null);
+  assert.deepEqual([offerFor(full, OPEN, 0, IDS, CTX).get, offerFor(full, OPEN, 0, IDS, CTX).why], [null, 'all'], '그 등급을 다 모았다');
   assert.ok(offerFor(full, OPEN, 1, IDS, CTX).get, '다른 등급 상인은 그대로');
-  // 그림이 있는 것만 (기기에 그림이 있는 종 Set) — 비어 있으면 거르지 않는다
+  const openAll = prof({ caught: Object.fromEntries(ofTier(1).filter((id) => UNLOCK.get(id) === 1).map((id) => [id, 1])) });
+  assert.ok(ofTier(1).some((id) => UNLOCK.get(id) > 1), '⭐ 중 레벨이 올라야 열리는 종이 있다');
+  assert.deepEqual([offerFor(openAll, OPEN, 0, IDS, lv1).get, offerFor(openAll, OPEN, 0, IDS, lv1).why], [null, 'level'], '열린 것은 다 모았고 남은 것은 레벨 잠금');
+  assert.ok(offerFor(openAll, OPEN, 0, IDS, CTX).get, '레벨이 오르면 가져온다');
+  // 그림이 있는 것만 (기기에 그림이 있는 종 Set) — 넘겼으면 비어 있어도 거른다 (Codex 31차 #2)
   const art = new Set([25, 1, 4, 7]);
   const withArt = offerFor(empty, OPEN, 0, IDS, ctxAt(20, art));
   assert.ok(art.has(withArt.get), '⭐ 중 그림 있는 것');
-  assert.ok(offerFor(empty, OPEN, 0, IDS, ctxAt(20, new Set())).get, '그림 목록이 비면 거르지 않는다');
+  const noArt = offerFor(prof({ caught: { 1: 2 } }), OPEN, 0, IDS, ctxAt(20, new Set()));
+  assert.deepEqual([noArt.get, noArt.why, noArt.gives], [null, 'art', []], '그림이 하나도 없으면 아무것도 안 가져온다 (Codex 재현: 759를 가져왔다)');
+  const someArt = offerFor(full, OPEN, 0, IDS, ctxAt(20, new Set([25])));
+  // canGet(판정이 쓰는 것)도 도감에 있는 종은 아니다 — 판정의 'got' 앞 검사와 겹치는 안전장치
+  const someG = ofTier(1, 'english').find((id) => UNLOCK.get(id) === 1);
+  assert.equal(canGet(prof({}), someG, 1, CTX), true);
+  assert.equal(canGet(prof({ caught: { [someG]: 1 } }), someG, 1, CTX), false);
+  assert.equal(someArt.why, 'all', '다 모았으면 그림과 상관없이 "다 모았다"');
 });
 
 test('🤝 같은 날 다시 열어도 같은 포켓몬 — 그것을 잡으면 다음 것으로 · 상관없는 포켓몬을 잡아도 그대로', () => {
@@ -266,6 +277,8 @@ test('🎲 무작위 도감 2,000개 × 장날 6번: 화면에 보인 교환은 
         // 정말 없는지 따로 센다
         const left = IDS.filter((id) => rarity(id) === TRADE_TIERS[slot] && !LEG.has(id) && !UB.has(id) && (UNLOCK.get(id) || 99) <= level && !(caught[id] > 0));
         assert.deepEqual(left, [], `등급 ${TRADE_TIERS[slot]}에 아직 줄 수 있는 종이 있는데 get이 없다`);
+        const anyLeft = IDS.some((id) => rarity(id) === TRADE_TIERS[slot] && !LEG.has(id) && !UB.has(id) && !(caught[id] > 0));
+        assert.equal(o.why, anyLeft ? 'level' : 'all', '못 가져온 까닭');
         continue;
       }
       assert.ok(!(caught[o.get] > 0), '도감에 있는 종을 가져왔다');
@@ -297,12 +310,13 @@ test('🎲 무작위 도감 2,000개 × 장날 6번: 화면에 보인 교환은 
 test('🔌 화면·저장 연결: 게이트 한 곳(tradeCtx)을 상인과 판정이 같이 쓴다 · 저장 실패는 못 한 것 · 날짜는 누를 때마다 · 앱 셸', () => {
   const xp = src('js/xp.js');
   const ctxBody = xp.slice(xp.indexOf('function tradeCtx('), xp.indexOf('export function tradeOffers('));
-  for (const g of ['rarityOf(', 'subjectOf(', 'isLegendary(', 'isUltraBeast(', 'isUnlocked(', 'rosterSet.has(']) assert.ok(ctxBody.includes(g), `tradeCtx 게이트: ${g}`);
+  for (const g of ['rarityIn(pf', 'levelFromXp(Number(pf && pf.xp)', 'subjectOf(', 'isLegendary(', 'isUltraBeast(', 'isUnlocked(', 'rosterSet.has(']) assert.ok(ctxBody.includes(g), `tradeCtx 게이트: ${g}`);
+  assert.ok(!/rarityOf\(|profile\.xp/.test(ctxBody), 'tradeCtx는 창의 프로필을 직접 읽지 않는다 (넘겨받은 것만)');
   const offers = xp.slice(xp.indexOf('export function tradeOffers('), xp.indexOf('export function tradedCount('));
-  assert.ok(/const ctx = tradeCtx\(art\);/.test(offers) && /offerFor\(profile, dateKey, slot, ROSTER_IDS, ctx\)/.test(offers), '상인이 가져오는 것 = tradeCtx(그림 목록까지)');
+  assert.ok(/const ctx = tradeCtx\(profile, art\);/.test(offers) && /offerFor\(profile, dateKey, slot, ROSTER_IDS, ctx\)/.test(offers), '상인이 가져오는 것 = tradeCtx(그림 목록까지)');
   assert.equal((offers.match(/tradeCtx\(/g) || []).length, 1, 'tradeOffers 안의 게이트는 한 벌');
   const doIt = xp.slice(xp.indexOf('export async function tradeMon('), xp.indexOf('export async function tradeMon(') + 400);
-  assert.ok(/runProfileOp\(\(\) => applyTrade\(req, tradeCtx\(\)\), \(\) => \(\{ ok: false, why: 'save' \}\)\)/.test(doIt), '판정 = tradeCtx · 저장 실패면 못 한 것');
+  assert.ok(/runProfileOp\(\(\) => applyTrade\(req, \(stored\) => tradeCtx\(stored\)\), \(\) => \(\{ ok: false, why: 'save' \}\)\)/.test(doIt), '판정 = 저장된 프로필로 만든 tradeCtx · 저장 실패면 못 한 것');
   assert.ok(doIt.includes('ensurePartner()'));
   assert.ok(/trades: copyTrades\(p\.trades\)/.test(xp), 'fromStored가 교환 기록을 복사');
   assert.ok(/fusions: \{\}, trades: \{\}/.test(xp), 'EMPTY에 trades');
@@ -311,11 +325,12 @@ test('🔌 화면·저장 연결: 게이트 한 곳(tradeCtx)을 상인과 판�
   const db = src('js/db.js');
   assert.ok(/\['fused', 'unfused', 'fled', 'traded'\]/.test(db), '병합 max에 traded');
   assert.ok(/out\.trades = mergeTrades\(cur\.trades, rec\.trades\)/.test(db));
+  assert.ok(/mutateProfile\(\(p\) => tradeRule\(p, req, makeCtx\(p\)\)\)/.test(db), '트랜잭션 안의 저장된 프로필(p)로 ctx를 만든다 (Codex 31차 #1)');
   const mv = src('js/marketview.js');
   const dt = mv.slice(mv.indexOf('async function doTrade('), mv.indexOf('async function doFuse('));
   assert.ok(/const day = dayNow\(\);\s*\n\s*if \(!stillOpen\(day\)\)/.test(dt), '누를 때 오늘을 다시 읽는다');
   assert.ok(dt.includes('tradeMon({ day, slot: o.slot, give, get: o.get })'));
-  assert.ok(/Date\.now\(\) - ui\.trArm\.at < 5000/.test(dt), '두 번 눌러야');
+  assert.ok(/if \(!sameDeal\(ui\.trArm, dealOf\(o, give\), Date\.now\(\)\)\) \{[\s\S]*?return;\s*\}/.test(dt), '두 번 눌러야 (같은 거래·5초 안)');
   assert.ok(mv.includes('body.appendChild(tradeCard());'), '장날에 교환 상인 칸');
   const tb = mv.slice(mv.indexOf('function tradeBtn('), mv.indexOf('async function doTrade('));
   assert.ok(/if \(armed\) \{[\s\S]*setTimeout\([\s\S]*ui\.trArm = null;[\s\S]*b\.classList\.remove\('armed'\)/.test(tb), '"한 번 더"가 풀리면 버튼도 원래대로 (헤드리스가 잡음: 5초 뒤에도 "한 번 더!"로 보였다)');
@@ -323,4 +338,62 @@ test('🔌 화면·저장 연결: 게이트 한 곳(tradeCtx)을 상인과 판�
   // 레벨 함수가 그대로 있다 (tradeCtx가 쓴다)
   assert.equal(levelFromXp(0).level, 1);
   assert.equal(levelFromXp(xpToReach(5)).level, 5);
+});
+
+test('🔍 Codex 31차 #1 — 판정 ctx는 넘겨받은 (저장된) 프로필의 등급·레벨을 쓴다 · 창의 프로필이 아니다', () => {
+  const g1 = ofTier(1, 'english').filter((id) => UNLOCK.get(id) === 1);
+  const g2 = ofTier(2, 'english').filter((id) => UNLOCK.get(id) === 1);
+  // 아빠가 다른 창에서 이상해씨(⭐)를 ⭐⭐로 옮겼다 — 저장된 프로필에만 있다
+  const give = g1[0];
+  const stored = prof({ caught: { [give]: 2 }, mons: { [give]: { rarity: 2 } } });
+  assert.equal(tradeRule(cloneProfile(stored), { day: OPEN, slot: 0, give, get: g1[1] }, tradeCtx(stored)).why, 'offer', '옮긴 등급으로 판정 — ⭐ 상인에게 못 준다');
+  assert.equal(tradeRule(cloneProfile(stored), { day: OPEN, slot: 1, give, get: g2[1] }, tradeCtx(stored)).ok, true, '⭐⭐ 상인에게는 준다');
+  // 레벨도 넘겨받은 프로필의 xp로 — 다른 창에서 레벨이 올랐으면 새로 열린 종을 받을 수 있다
+  const locked = ofTier(1, 'english').find((id) => UNLOCK.get(id) === 5);
+  const low = prof({ caught: { [give]: 2 }, xp: 0 });
+  assert.equal(tradeRule(cloneProfile(low), { day: OPEN, slot: 0, give, get: locked }, tradeCtx(low)).why, 'offer', '레벨 1에 Lv5 종');
+  const high = prof({ caught: { [give]: 2 }, xp: xpToReach(5) });
+  assert.equal(tradeRule(cloneProfile(high), { day: OPEN, slot: 0, give, get: locked }, tradeCtx(high)).ok, true, 'Lv5가 된 프로필이면 받는다');
+  // 게이트는 그대로 — 원작 전설·🌌·명단 밖
+  const c = tradeCtx(high);
+  assert.equal(c.allowed(144) || c.allowed(ULTRA_BEASTS[0]) || c.allowed(99999), false);
+  assert.equal(c.subject(ofTier(1, 'math')[0]), 'math');
+});
+
+test('🔍 Codex 31차 #4 — "한 번 더"는 장날·자리·줄 것·받을 것이 모두 같을 때만 · 5초 안', () => {
+  const arm = { day: OPEN, slot: 0, give: 1, get: 759, at: 1000 };
+  assert.equal(sameDeal(arm, { day: OPEN, slot: 0, give: 1, get: 759 }, 5999), true);
+  assert.equal(sameDeal(arm, { day: OPEN, slot: 0, give: 1, get: 761 }, 2000), false, '상인이 다른 포켓몬을 가져왔으면 처음부터 (Codex 재현: 759 → 761)');
+  assert.equal(sameDeal(arm, { day: OPEN, slot: 0, give: 4, get: 759 }, 2000), false, '줄 것이 바뀌면');
+  assert.equal(sameDeal(arm, { day: OPEN, slot: 1, give: 1, get: 759 }, 2000), false, '다른 상인');
+  assert.equal(sameDeal(arm, { day: '2026-10-10', slot: 0, give: 1, get: 759 }, 2000), false, '다른 장날');
+  assert.equal(sameDeal(arm, { day: OPEN, slot: 0, give: 1, get: 759 }, 6000), false, '5초 지남');
+  assert.equal(sameDeal(null, { day: OPEN, slot: 0, give: 1, get: 759 }, 0), false);
+  // 실제로 상인이 바꾸는 경우: 가져오려던 종을 그 사이 잡으면 get이 바뀐다 → 같은 거래가 아니다
+  const p = prof({ caught: { 1: 2 } });
+  const a = offerFor(p, OPEN, 0, IDS, CTX);
+  const b = offerFor(prof({ caught: { 1: 2, [a.get]: 1 } }), OPEN, 0, IDS, CTX);
+  assert.notEqual(a.get, b.get);
+  assert.equal(sameDeal({ day: OPEN, slot: 0, give: 1, get: a.get, at: 0 }, { day: OPEN, slot: 0, give: 1, get: b.get }, 10), false);
+  // 화면: 버튼 모양과 두 번째 누르기 둘 다 같은 판정을 쓰고, 거래에 받을 것까지 담는다
+  const mv = src('js/marketview.js');
+  assert.ok(/function dealOf\(o, give\) \{\s*return \{ day: dayNow\(\), slot: o\.slot, give, get: o\.get \};/.test(mv));
+  const tb = mv.slice(mv.indexOf('function tradeBtn('), mv.indexOf('async function doTrade('));
+  const dt = mv.slice(mv.indexOf('async function doTrade('), mv.indexOf('async function doFuse('));
+  assert.ok(tb.includes('sameDeal(ui.trArm, dealOf(o, give), Date.now())'), '버튼 모양');
+  assert.ok(dt.includes('if (!sameDeal(ui.trArm, dealOf(o, give), Date.now())) {') && dt.includes('ui.trArm = { ...dealOf(o, give), at: Date.now() };'), '두 번째 누르기');
+  assert.ok(!/ui\.trArm\.slot === o\.slot/.test(mv), '옛 판정(자리·줄 것만)이 남아 있지 않다');
+});
+
+test('🔍 Codex 31차 #5·#6 — 나누기 버튼도 5초 뒤 원래대로 · 못 가져온 까닭마다 다른 말 · 줄 것 없을 때 과목을 말한다', () => {
+  const mv = src('js/marketview.js');
+  const sb = mv.slice(mv.indexOf('function splitBtn('), mv.indexOf('// ───────────── 🤝 교환 상인'));
+  assert.ok(/b\.dataset\.label = label;/.test(sb));
+  assert.ok(/if \(armed\) \{[\s\S]*setTimeout\([\s\S]*if \(ui\.splitArm !== arm\) return;[\s\S]*ui\.splitArm = null;[\s\S]*querySelectorAll\('#market-body \.fz-split\.armed'\)[\s\S]*x\.dataset\.label/.test(sb), '같은 퓨전 버튼이 어디 있든 모두 원래대로');
+  const box = mv.slice(mv.indexOf('function traderBox('), mv.indexOf('function givePicker('));
+  assert.ok(/o\.why === 'all' \?/.test(box) && /o\.why === 'level' \?/.test(box) && /o\.why === 'art'/.test(box), '까닭 셋');
+  assert.ok(box.includes('"포켓몬 캐릭터 받기"'), '그림이 없으면 아빠께 받는 곳을 알려 준다 (도감의 안내와 같은 말)');
+  assert.ok(src('js/pokedex.js').includes('"포켓몬 캐릭터 받기"'), '⚙의 그 이름이 아직 있다');
+  assert.ok(box.includes("${o.subject === 'math' ? '수학' : '영어'} 포켓몬을 두 마리 이상"), '영어 쪽도 과목을 말한다');
+  assert.ok(!/못 찾았어/.test(box), '옛 "못 찾았어"는 없다');
 });
