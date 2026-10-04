@@ -1,10 +1,11 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
-import { rarityOf, RARITY, caughtCount, haveCount, xpToReach } from './xp.js';
+import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory } from './xp.js';
 import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { makeFigure, setFigure, BALLS, POKEBALL } from './items.js';
+import { openShop, closeShop, isBallShopOpen } from './shop.js'; // 🛒 볼 사러 가기 — 잡기 화면 위에 볼 상점
 import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
 import { isUltraBeast } from './pokemon.js'; // 🌌 울트라비스트 — ⚪ 비스트볼이 있어야 제대로 잡힌다
 
@@ -12,10 +13,12 @@ const $ = (id) => document.getElementById(id);
 const BEASTBALL_ID = 'beastball';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const ui = { open: false, run: 0, threw: false, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, coinGain: 0, pendingAuto: false, candidates: [] }; // candidates = 지금 화면의 후보 (🧭 레이더가 바꿔 그린다)
+const ui = { open: false, run: 0, threw: false, onDone: null, attempt: null, timer: null, practice: false, xpGain: 0, coinGain: 0, pendingAuto: false, candidates: [], shop: false }; // candidates = 지금 화면의 후보 (🧭 레이더가 바꿔 그린다) · shop = 이 잡기 화면이 연 🛒 볼 상점이 떠 있다
 
 export function initCatch() {
   $('catch-continue').addEventListener('click', finish);
+  // 🛒 가방이 바뀌면(볼 상점이 아닌 곳에서 샀어도) 던지기 전이면 볼 줄을 다시 — 고르던 볼은 그대로
+  document.addEventListener('shincoach:profilechange', () => { if (ui.open) refreshBalls(ui.ball); });
   // 화면이 꺼진 동안 자동 종료가 밀려 있었으면, 돌아왔을 때 잠깐 보여주고 이어감
   document.addEventListener('visibilitychange', () => {
     if (document.hidden || !ui.open || !ui.pendingAuto) return;
@@ -92,7 +95,7 @@ export function openCatch(o) {
     const has = (o.ballCounts || {})[BEASTBALL_ID] > 0;
     $('catch-msg').textContent = has
       ? '🌌 울트라비스트가 나타났다! ⚪ 비스트볼로 던져야 잡혀요'
-      : '🌌 울트라비스트가 나타났다! ⚪ 비스트볼이 있어야 잡을 수 있어요 (🛒 상점)';
+      : `🌌 울트라비스트가 나타났다! ⚪ 비스트볼이 있어야 잡을 수 있어요 ${ui.practice ? '(🛒 상점)' : '— 아래 🛒 볼 사러 가기'}`;
   }
   // 🕺 도트를 아직 안 받았으면 받아서 **그림만** 바꿔 끼운다.
   // ★ 여기서 renderPick을 다시 부르면 안 된다 — 후보 버튼을 통째로 새로 만들기 때문에,
@@ -132,7 +135,7 @@ export function openCatch(o) {
       rbox.appendChild(rb);
     }
   }
-  renderBalls(o.ballCounts || {});
+  renderBalls(o.ballCounts || {}, POKEBALL.id);
   $('catch').hidden = false;
 }
 
@@ -202,32 +205,79 @@ function swapDots() {
   }
 }
 
-function renderBalls(counts) {
+/** 볼 줄을 다시 그릴 때 고른 볼을 지킬까 — 가방에 남아 있으면 그대로, 없으면 몬스터볼 */
+export function keepBall(counts, sel) {
+  const b = sel ? BALLS.find((x) => x.id === sel) : null;
+  return b && (b.free || ((counts || {})[b.id] || 0) > 0) ? b.id : POKEBALL.id;
+}
+
+/** 볼을 골랐을 때 한마디 — 몬스터볼은 없음 */
+export function ballTip(b) {
+  if (!b || b.free) return '';
+  if (b.sure) return '반드시 잡혀요';
+  if (b.ub) return '🌌 울트라비스트에게 아주 잘 들어요'; // ⚪ 비스트볼 — 보통 포켓몬에겐 몬스터볼과 같아 "1배"라고 하면 헷갈린다
+  return `잡힐 확률이 ${b.mult}배예요`;
+}
+
+/** 볼 줄 그리기 — sel이 가방에 남아 있으면 그 볼을 골라 둔 채로 (🛒 사고 돌아왔을 때·가방이 바뀌었을 때) */
+function renderBalls(counts, sel) {
   const box = $('catch-golden');
   if (!box) return;
-  ui.ball = POKEBALL.id;
   ui.ballCounts = counts || {};
+  ui.ball = keepBall(ui.ballCounts, sel);
+  ui.golden = ui.ball === 'goldenball'; // 옛 이름을 쓰는 곳(연출)이 있어 같이 둔다
   box.innerHTML = '';
   box.hidden = false;
-  const pick = (b, btn) => {
-    ui.ball = b.id;
-    for (const other of box.querySelectorAll('button')) other.classList.toggle('on', other === btn);
-    ui.golden = b.id === 'goldenball'; // 옛 이름을 쓰는 곳(연출)이 있어 같이 둔다
-    $('catch-msg').textContent = b.free
-      ? '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!'
-      : b.sure ? `${b.emoji} ${b.ko}! 반드시 잡혀요 — 누구에게 던질까요?`
-        : `${b.emoji} ${b.ko}! 잡힐 확률이 ${b.mult}배예요 — 누구에게 던질까요?`;
-  };
   for (const b of BALLS) {
     const n = b.free ? Infinity : (ui.ballCounts[b.id] || 0);
     if (!b.free && n <= 0) continue; // 없는 볼은 안 보여준다
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'btn catch-ball-btn' + (b.id === POKEBALL.id ? ' on' : '');
+    btn.className = 'btn catch-ball-btn' + (b.id === ui.ball ? ' on' : '');
+    btn.dataset.ball = b.id;
     btn.textContent = b.free ? `${b.emoji} ${b.ko}` : `${b.emoji} ${b.ko} ${n}개`;
-    btn.addEventListener('click', () => pick(b, btn));
+    btn.addEventListener('click', () => pickBall(b));
     box.appendChild(btn);
   }
+  // 🛒 볼 사러 가기 (2026-10-04, 진우 요청) — 던지기 전에만(throwBall이 숨긴다). ⚙ 잡기 연습은 볼이 안 줄어서 빼 둔다
+  if (!ui.practice) {
+    const sb = document.createElement('button');
+    sb.type = 'button';
+    sb.className = 'btn catch-ball-btn catch-shop-btn';
+    sb.textContent = '🛒 볼 사러 가기';
+    sb.addEventListener('click', openBallShop);
+    box.appendChild(sb);
+  }
+}
+
+/** 볼 고르기 — msg가 없으면 그 볼의 한마디 */
+function pickBall(b, msg) {
+  ui.ball = b.id;
+  ui.golden = b.id === 'goldenball';
+  for (const btn of $('catch-golden').querySelectorAll('button[data-ball]')) btn.classList.toggle('on', btn.dataset.ball === b.id);
+  $('catch-msg').textContent = msg || (b.free ? '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!' : `${b.emoji} ${b.ko}! ${ballTip(b)} — 누구에게 던질까요?`);
+}
+
+/** 가방에서 볼 수를 다시 읽어 볼 줄을 새로 — 던지기 전(후보가 보일 때)만. bought면 그 볼을 고르고 "샀어요" */
+function refreshBalls(sel, bought) {
+  if (!ui.open || $('catch-pick').hidden) return; // 던지는 중·던진 뒤에는 그대로 (결과가 이미 정해졌다)
+  renderBalls(inventory(), sel);
+  const b = bought && ui.ball === sel ? BALLS.find((x) => x.id === sel) : null;
+  if (b) pickBall(b, `🛒 ${b.emoji} ${b.ko}${josa(b.ko, '을', '를')} 샀어요! ${ballTip(b)} — 누구에게 던질까요?`);
+}
+
+/** 🛒 잡기 화면 위에 볼 상점 — 사면 닫히고 그 볼이 골라져 있다. 그냥 닫으면 잡기 화면 그대로 */
+function openBallShop() {
+  if (!ui.open || $('catch-pick').hidden) return;
+  unlock();
+  const run = ui.run;
+  const mine = () => ui.open && ui.run === run; // 그 사이 이 잡기 화면이 닫혔으면 손대지 않는다
+  ui.shop = true;
+  openShop({
+    balls: true,
+    onBought: (id) => { ui.shop = false; if (mine()) refreshBalls(id, true); },
+    onClose: () => { ui.shop = false; if (mine()) refreshBalls(ui.ball); },
+  });
 }
 
 export function closeCatch() {
@@ -235,6 +285,8 @@ export function closeCatch() {
   if (!ui.open) return;
   ui.open = false;
   ui.run++;
+  // 🛒 이 잡기 화면이 연 볼 상점이 아직 떠 있으면 같이 닫는다 (영상을 닫는 등) — 잡기가 없는데 "사면 돌아가요"가 남지 않게
+  if (ui.shop) { ui.shop = false; if (isBallShopOpen()) closeShop(); }
   clearTimeout(ui.timer);
   ui.timer = null;
   $('catch').hidden = true;
@@ -302,6 +354,8 @@ async function throwBall(c) {
   const run = ++ui.run;
   const alive = () => ui.open && ui.run === run;
   $('catch-pick').hidden = true;
+  const sb = $('catch-golden').querySelector('.catch-shop-btn');
+  if (sb) sb.hidden = true; // 🛒 던진 뒤에는 결과가 정해졌다 — 살 때가 아니다
   const stage = $('catch-stage');
   const mon = $('catch-mon');
   const ball = $('catch-ball');

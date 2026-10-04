@@ -1839,7 +1839,7 @@ button { font-family: inherit; }
 }
 
 /* 🌟 황금 볼 토글 (잡기 화면) */
-.catch-golden { display: flex; justify-content: center; margin-top: 6px; }
+.catch-golden { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 6px; } /* 볼 종류 + 🛒가 폰 폭을 넘으면 다음 줄로 */
 .catch-golden[hidden] { display: none; }
 .catch-golden-btn { border: 2px solid #fbbf24; background: #fffbeb; color: #92400e; font-weight: 800; }
 .catch-golden-btn.on { background: #fbbf24; color: #78350f; box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.3); }
@@ -2091,6 +2091,7 @@ button { font-family: inherit; }
   white-space: nowrap; /* "몬스터볼"이 두 줄로 쪼개지지 않게 */
 }
 .catch-ball-btn.on { background: var(--primary); color: #fff; }
+.catch-shop-btn { background: #ecfdf5; border: 2px dashed #10b981; color: #065f46; font-weight: 800; } /* 🛒 볼 사러 가기 — 볼이 아니라 가게라 모양을 달리 */
 @media (max-width: 420px) { .catch-ball-btn { font-size: 0.78rem; padding: 8px 8px; } }
 
 

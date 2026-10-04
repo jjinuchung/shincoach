@@ -128,6 +128,12 @@ export const EGG_ENGLISH = { id: 'egg_english', emoji: '🥚', ko: '영어 알',
 export const BEASTBALL = { id: 'beastball', emoji: '⚪', ko: '비스트볼', price: 300, stones: { stone_math: 2 }, mult: 1, ub: 5, cap: 0.9, kind: 'ball', hint: '🌌 울트라비스트에게만 아주 잘 들어요 — 보통 몬스터볼로는 거의 못 잡아요' };
 
 BALLS.push(BEASTBALL); // 🌌 울트라비스트를 잡으려면 잡기 화면의 볼 고르기에 나와야 한다
+/**
+ * 🛒 잡기 화면에서 바로 여는 볼 상점 (2026-10-04, 진우 요청 → 아버님 "이대로 진행하자").
+ * 잡고 싶은 포켓몬 앞에서 더 좋은 볼이 필요할 때 — 파는 볼 셋 + ⚪ 비스트볼(스톤 상점에도 그대로 있다).
+ * 사면 상점이 닫히고 잡기 화면에서 그 볼이 골라져 있다 (catch.js)
+ */
+export const CATCH_SHOP = [...SHOP_BALLS, BEASTBALL];
 
 export const SHINY_STONE = { id: 'shiny_stone', emoji: '🌈', ko: '이로치의 스톤', price: 500, stones: { stone_math: 3, stone_english: 3 }, kind: 'tool', hint: '🎒 잡은 포켓몬을 눌러 "🌈 이로치로!"를 누르면 색이 다른 모습이 돼요 — 영원히' };
 export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH, SHINY_STONE, BEASTBALL];

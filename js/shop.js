@@ -1,7 +1,7 @@
 // 🛒 상점(💰 코인으로 🎀 장식·🎨 염색약·🧪 물약 사기) + 포켓몬 상세(❤️ HP·물약·🤝 파트너·장식 장착·염색) 모달
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
-import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, STONE_SHOP, STONES, SHINY_STONE, EXTENDERS, itemById, canBuy, priceText, setFigure } from './items.js';
+import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, CATCH_SHOP, STONE_SHOP, STONES, SHINY_STONE, EXTENDERS, itemById, canBuy, priceText, setFigure } from './items.js';
 import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
 import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
@@ -67,17 +67,35 @@ function josaIga(word) {
 
 // ───────────────────── 🛒 상점 ─────────────────────
 
-export function openShop() {
+/**
+ * 🛒 볼 상점 — 잡기 화면에서 연 상점 (2026-10-04, 진우 요청). 있으면 볼만 보여 주고,
+ * 사면 상점이 닫히며 onBought(id) → 잡기 화면이 그 볼을 골라 둔다. 안 사고 닫으면 onClose()
+ * @type {{balls:true, onBought?:(id:string)=>void, onClose?:()=>void, busy?:boolean}|null}
+ */
+let ballCtx = null;
+
+/** 상점 열기 — opts.balls면 🛒 볼 상점 (잡기 화면에서). 다른 곳에서 열면 늘 전체 상점 */
+export function openShop(opts) {
+  ballCtx = opts && opts.balls ? opts : null;
+  $('shop-title').textContent = ballCtx ? '🛒 볼 상점' : '🛒 상점';
   renderShop('');
   $('shop').hidden = false;
 }
 
 export function closeShop() {
   $('shop').hidden = true;
+  const ctx = ballCtx;
+  ballCtx = null;
+  if (ctx && ctx.onClose) ctx.onClose();
 }
 
 export function isShopOpen() {
   return !$('shop').hidden || !$('mon').hidden;
+}
+
+/** 지금 열린 상점이 잡기 화면의 🛒 볼 상점인가 — 잡기 화면이 닫힐 때 같이 닫으려고 */
+export function isBallShopOpen() {
+  return !!ballCtx && !$('shop').hidden;
 }
 
 function renderShop(msg, boughtId) {
@@ -85,6 +103,10 @@ function renderShop(msg, boughtId) {
   $('shop-msg').textContent = msg || '';
   const list = $('shop-list');
   list.innerHTML = '';
+  if (ballCtx) {
+    list.appendChild(shopSection('🔴 몬스터볼', '사면 바로 잡기 화면으로 돌아가서 그 볼로 던져요 — 🔵 슈퍼볼 1.5배 · 🟡 하이퍼볼 2배 · 🟣 마스터볼은 반드시 잡혀요 · ⚪ 비스트볼은 🌌 울트라비스트에게만 잘 들어요', CATCH_SHOP, boughtId));
+    return;
+  }
   list.appendChild(shopSection('🧤 스톤 상점', '코인 + 스톤으로만 살 수 있어요. 🔷 수학스톤은 수학 개념을 통과하면, 🔶 영어스톤은 복습을 끝내면 생겨요 — 🧭 레이더: 다음 수학 잡기에 희귀 이상 포켓몬이 한 마리 나와요', STONE_SHOP, boughtId));
   // ⏳ 시간 연장권 (2026-10-01, 진우 요청) — 스톤 상점 바로 밑에. 쓰는 곳은 잠금 화면·남은 시간 칩
   list.appendChild(shopSection('⏳ 시간 연장권', '하루 공부 시간이 다 됐을 때 15분 더 할 수 있어요. 잠금 화면이나 ⏳ 남은 시간을 눌러서 써요 — 과목마다 하루에 쓸 수 있는 개수가 정해져 있어요. 🔷 수학스톤이 들어요', EXTENDERS, boughtId));
@@ -142,10 +164,24 @@ async function buy(id) {
     notify(null);
     return;
   }
+  // 🛒 볼 상점: 사면 상점이 바로 닫히므로, 저장이 끝나기 전에 또 누른 것은 산 줄도 모르고 또 낸다 → 하나씩만
+  const ctx = ballCtx;
+  if (ctx && ctx.busy) return;
+  if (ctx) ctx.busy = true;
   // 살 수 있는지는 저장소에서 판정한다 (두 창에서 같은 코인으로 두 번 사지 못하게)
-  if (!it || !await buyItem(id)) { renderShop(it && it.stones ? '💰 코인이나 🧤 스톤이 조금 모자라요. 배우고 다시 와요!' : '💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
+  let ok = false;
+  try { ok = !!it && await buyItem(id); } finally { if (ctx) ctx.busy = false; }
+  if (!ok) { renderShop(it && it.stones ? '💰 코인이나 🧤 스톤이 조금 모자라요. 배우고 다시 와요!' : '💰 코인이 조금 모자라요. 문장을 더 배우고 다시 와요!'); return; }
   unlock();
   sfx.ding();
+  if (ctx && ctx === ballCtx && it.kind === 'ball') {
+    // 산 볼을 들고 잡기 화면으로 — 거기서 그 볼이 골라져 있다
+    ballCtx = null;
+    $('shop').hidden = true;
+    notify(null);
+    if (ctx.onBought) ctx.onBought(id);
+    return;
+  }
   const hint = it.hint || (it.kind === 'gear' ? '🎒 내 포켓몬을 눌러 씌워 주세요' : it.kind === 'dye' ? '🎒 내 포켓몬을 눌러 색을 바꿔 주세요' : it.kind === 'ball' ? '🎯 잡기 화면에서 고를 수 있어요' : it.kind === 'mega' ? '🎒 내 포켓몬을 눌러 끼워 주세요' : '❤️ 파트너를 눌러 먹여 주세요'); // 물건마다 카탈로그의 hint가 우선
   renderShop(`${it.emoji} ${it.ko}${josaEul(it.ko)} 샀어요! ${hint}`, id);
   notify(null);
