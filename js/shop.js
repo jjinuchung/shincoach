@@ -24,8 +24,11 @@ function el(tag, cls, text) {
 
 export function initShop(ctx) {
   onChange = (ctx && ctx.onChange) || null;
-  $('shop-close').addEventListener('click', closeShop);
-  $('shop').addEventListener('click', (e) => { if (e.target === $('shop')) closeShop(); }); // 바깥을 누르면 닫힘
+  // 🛒 볼 상점에서 사는 중(저장 중)에는 아이가 닫지 못한다 — 닫히면 산 볼이 안 골라지고 "샀어요"도 안 보였다 (Codex 28차 #3).
+  //    저장이 끝나면 buy()가 알아서 닫고 잡기 화면으로 돌아간다
+  const userClose = () => { if (ballCtx && ballCtx.busy) return; closeShop(); };
+  $('shop-close').addEventListener('click', userClose);
+  $('shop').addEventListener('click', (e) => { if (e.target === $('shop')) userClose(); }); // 바깥을 누르면 닫힘
   $('mon-close').addEventListener('click', closeMon);
   $('mon').addEventListener('click', (e) => { if (e.target === $('mon')) closeMon(); });
   $('mon-to-shop').addEventListener('click', () => { closeMon(); openShop(); });
@@ -167,7 +170,7 @@ async function buy(id) {
   // 🛒 볼 상점: 사면 상점이 바로 닫히므로, 저장이 끝나기 전에 또 누른 것은 산 줄도 모르고 또 낸다 → 하나씩만
   const ctx = ballCtx;
   if (ctx && ctx.busy) return;
-  if (ctx) ctx.busy = true;
+  if (ctx) { ctx.busy = true; $('shop-msg').textContent = `🛒 ${it ? it.ko : ''} 사는 중…`; }
   // 살 수 있는지는 저장소에서 판정한다 (두 창에서 같은 코인으로 두 번 사지 못하게)
   let ok = false;
   try { ok = !!it && await buyItem(id); } finally { if (ctx) ctx.busy = false; }

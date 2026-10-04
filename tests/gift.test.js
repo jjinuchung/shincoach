@@ -137,3 +137,40 @@ test('🎁 화면 연결 — 영어 목록·수학 🎟️ 줄은 같은 줄(nex
   // 미리 보기 글: 영상 제목 뒤 조사 (받침 있으면 을)
   assert.match(lib, /const eulReul = /);
 });
+
+test('🎁 Codex 28차 #1 — 두 창에서 같은 교환권을 두 번 못 산다: 저장된 가방에 이미 있으면 거절(코인·기준선 그대로)', () => {
+  const base = totalsFrom(recs(3000, 160));
+  // 저장소 하나에 창 둘이 차례로 산다 — 둘 다 "아직 안 가졌다"고 본 화면에서 누른 것
+  const stored = cloneProfile({ coins: 4000, items: { [ticketId('iconic')]: 1 }, unlockBase: { done: 1, review: 1 } });
+  const gain = { items: { [ticketId('bell')]: 1 }, unlockBase: base, once: ticketId('bell') };
+  assert.equal(purchaseRule(stored, { coins: 2000 }, gain).ok, true, '창 A');
+  const before = JSON.stringify(stored.unlockBase);
+  const r = purchaseRule(stored, { coins: 2000 }, { ...gain, unlockBase: totalsFrom(recs(3500, 170)) });
+  assert.equal(r.ok, false, '창 B는 거절');
+  assert.equal(r.why, 'owned');
+  assert.equal(stored.coins, 2000, '코인은 한 번만');
+  assert.equal(stored.items[ticketId('bell')], 1, '교환권 한 장');
+  assert.equal(JSON.stringify(stored.unlockBase), before, '거절이면 기준선도 그대로');
+  // once가 없는 보통 물건(볼)은 여러 개 산다
+  const p = cloneProfile({ coins: 100, items: {} });
+  assert.equal(purchaseRule(p, { coins: 25 }, { items: { greatball: 1 } }).ok, true);
+  assert.equal(purchaseRule(p, { coins: 25 }, { items: { greatball: 1 } }).ok, true);
+  assert.equal(p.items.greatball, 2);
+  // 교환권 구매 경로가 once를 넘긴다 (영상·선물 모두)
+  assert.match(src('js/xp.js'), /unlockBase: base \|\| null, once: `ticket_\$\{contentId\}` \}/);
+});
+
+test('🎁 Codex 28차 #4·#5 — 다른 📊 창에서 먼저 건넸어도 성공 · 안 열리는 사진은 넣지 않고, 보일 때 깨지면 그림 → 이모지', () => {
+  const p = cloneProfile(emptyProfile());
+  giftGivenRule(p, 'bell', '2026-10-20');
+  const again = giftGivenRule(p, 'bell', '2026-11-01');
+  assert.deepEqual([again.ok, again.why], [false, 'already']);
+  assert.equal(p.giftsGiven.bell, '2026-10-20', '처음 건넨 날 그대로');
+  assert.match(src('js/xp.js'), /r\.ok \|\| r\.why === 'already'/, 'markGiven은 "이미 건넴"도 끝난 일로 — 📊 카드가 사라진다');
+  const gift = src('js/gift.js');
+  assert.match(gift, /if \(!\(await decodable\(f\)\)\) \{ say\([^)]*열 수 없어요/, '넣기 전에 열어 본다');
+  assert.ok(gift.indexOf('await decodable(f)') < gift.indexOf('await putGiftPhoto(g.id, f)'), '열어 본 뒤에 저장');
+  assert.match(gift, /addEventListener\('error', \(\) => \{ if \(img\.parentNode === box\) onFail\(\); \}, \{ once: true \}\)/, '안 열리면 한 단계 아래로 (바뀐 그림의 늦은 오류는 무시)');
+  assert.match(gift, /show\(u, g\.ko, showArt\)/, '사진 → 그림');
+  assert.match(gift, /show\(art, '', showEmoji\)/, '그림 → 이모지');
+});

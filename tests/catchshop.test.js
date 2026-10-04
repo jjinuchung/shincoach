@@ -88,7 +88,7 @@ test('🛒 잡기 화면 연결 — 버튼은 던지기 전에만·연습 빼고
   assert.match(rf, /renderBalls\(inventory\(\), sel\)/, '가방에서 다시 읽는다 (잡기 화면을 열 때의 수는 낡았다)');
   assert.match(rf, /샀어요!/);
   const tb = body(c, 'throwBall');
-  assert.match(tb, /catch-shop-btn[\s\S]{0,60}\.hidden = true/, '던지면 🛒 버튼을 숨긴다');
+  assert.match(tb, /\$\('catch-golden'\)\.hidden = true;/, '던지면 볼 줄과 🛒 버튼을 통째로 숨긴다');
   const cc = body(c, 'closeCatch');
   assert.match(cc, /if \(ui\.shop\) \{[^}]*isBallShopOpen\(\)\) closeShop\(\)/, '잡기 화면이 닫히면 그 볼 상점도 닫는다');
   assert.match(c, /addEventListener\('shincoach:profilechange', \(\) => \{ if \(ui\.open\) refreshBalls\(ui\.ball\); \}\)/, '다른 곳(⏳ 잠금 화면 상점)에서 사도 볼 줄이 맞는다');
@@ -110,4 +110,38 @@ test('🛒 상점 연결 — 볼 상점은 볼만, 사면 닫고 onBought, 한 �
   assert.match(bu, /if \(ctx && ctx === ballCtx && it\.kind === 'ball'\) \{[\s\S]*ballCtx = null;[\s\S]*\$\('shop'\)\.hidden = true;[\s\S]*ctx\.onBought\(id\)/, '사면 닫고 잡기 화면으로');
   assert.match(src('index.html'), /id="shop-title"/);
   assert.match(src('css/style.css'), /\.catch-golden \{[^}]*flex-wrap: wrap/, '볼 종류 + 🛒가 폰 폭을 넘으면 다음 줄로');
+});
+
+test('🛒 Codex 28차 #2 — 던질 때 고른 볼로 판정한다: 연출 중 볼 줄을 눌러도 다른 볼이 쓰이지 않는다', () => {
+  const tb = body(src('js/catch.js'), 'throwBall');
+  const grab = tb.indexOf('const ballId = ui.ball;');
+  assert.ok(grab > 0, '던지는 순간 고른 볼을 붙잡는다');
+  assert.ok(grab < tb.indexOf('await sleep('), '연출(기다림)보다 먼저');
+  assert.match(tb, /ui\.attempt\(c\.id, \{ ball: ballId \}\)/, '판정은 붙잡은 볼로');
+  assert.ok(!/ball: ui\.ball/.test(tb), '판정이 연출 뒤의 ui.ball을 읽지 않는다');
+  assert.match(body(src('js/catch.js'), 'pickBall'), /if \(!ui\.open \|\| \$\('catch-pick'\)\.hidden\) return;/, '던진 뒤에는 볼을 못 바꾼다 (불·말도 그대로)');
+});
+
+test('🛒 Codex 28차 #6 — 울트라비스트가 없는 잡기에서 비스트볼은 "몬스터볼과 확률이 같아요" (참말인지 확률로 확인)', async () => {
+  const { ballChance } = await import('../js/xp.js');
+  assert.match(ballTip(BEASTBALL, false), /울트라비스트가 없어서 몬스터볼과 확률이 같아요/);
+  assert.match(ballTip(BEASTBALL, true), /울트라비스트에게 아주 잘 들어요/);
+  assert.match(ballTip(BEASTBALL), /울트라비스트에게 아주 잘 들어요/, '후보를 모르면 원래 한마디');
+  assert.match(ballTip(itemById('greatball'), false), /1\.5배/, '다른 볼은 후보와 상관없다');
+  for (let r = 1; r <= 4; r++) for (let lv = 1; lv <= 60; lv++) {
+    assert.equal(ballChance('beastball', r, lv, false), ballChance('pokeball', r, lv, false), `등급 ${r}·Lv${lv}: 보통 포켓몬에겐 정말 같다`);
+  }
+  const c = src('js/catch.js');
+  assert.match(body(c, 'pickBall'), /ballTip\(b, candHasUb\(\)\)/);
+  assert.match(body(c, 'refreshBalls'), /ballTip\(b, candHasUb\(\)\)/);
+  assert.match(c, /const candHasUb = \(\) => ui\.candidates\.some\(\(c\) => isUltraBeast\(c\.id\)\);/, '🧭 레이더가 바꾼 후보까지 (ui.candidates)');
+});
+
+test('🛒 Codex 28차 #3 — 볼 상점에서 사는 중에는 ✕·바깥으로 못 닫는다 ("사는 중…", 끝나면 저절로 닫히고 그 볼이 골라짐)', () => {
+  const s = src('js/shop.js');
+  assert.match(s, /const userClose = \(\) => \{ if \(ballCtx && ballCtx\.busy\) return; closeShop\(\); \};/);
+  assert.match(s, /\$\('shop-close'\)\.addEventListener\('click', userClose\);/);
+  assert.match(s, /if \(e\.target === \$\('shop'\)\) userClose\(\);/);
+  assert.ok(!/addEventListener\('click', closeShop\)/.test(s), '✕가 바로 closeShop을 부르지 않는다');
+  assert.match(body(s, 'buy'), /ctx\.busy = true; \$\('shop-msg'\)\.textContent = `🛒 \$\{it \? it\.ko : ''\} 사는 중…`;/);
 });

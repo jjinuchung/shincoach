@@ -32,17 +32,36 @@ function forget(id) {
 export function giftPoster(g, cls = 'next-poster gift-photo') {
   const box = document.createElement('div');
   box.className = cls;
-  const show = (src, alt) => {
+  // 그림이 안 열리면(깨진 파일·태블릿이 못 읽는 형식) 한 단계 아래로: 사진 → 포켓몬 그림 → 이모지 (Codex 28차 #5)
+  const showEmoji = () => { box.textContent = g.emoji; box.classList.remove('has-photo'); };
+  const show = (src, alt, onFail) => {
     box.textContent = '';
     const img = document.createElement('img');
+    img.addEventListener('error', () => { if (img.parentNode === box) onFail(); }, { once: true });
     img.src = src;
     img.alt = alt;
     box.appendChild(img);
   };
   const art = characterUrl(g.poster);
-  if (art) show(art, ''); else box.textContent = g.emoji;
-  giftPhotoUrl(g.id).then((u) => { if (u) { show(u, g.ko); box.classList.add('has-photo'); } }).catch(() => {});
+  const showArt = () => { box.classList.remove('has-photo'); if (art) show(art, '', showEmoji); else showEmoji(); };
+  showArt();
+  giftPhotoUrl(g.id).then((u) => { if (u) { show(u, g.ko, showArt); box.classList.add('has-photo'); } }).catch(() => {});
   return box;
+}
+
+/** 이 기기에서 열리는 그림인가 — 넣기 전에 한 번 열어 본다 (HEIC처럼 image/*인데 태블릿이 못 읽는 것이 있다) */
+async function decodable(file) {
+  const u = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = u;
+    await img.decode();
+    return img.naturalWidth > 0;
+  } catch {
+    return false;
+  } finally {
+    URL.revokeObjectURL(u);
+  }
 }
 
 /** ⚙ 설정의 "🎁 선물 교환권 사진" — 고르면 이 기기에 저장, 지우면 그림으로 돌아간다 */
@@ -70,6 +89,8 @@ export function initGiftSettings() {
     input.value = '';
     if (!f) return;
     if (!/^image\//.test(f.type || '')) { say('사진 파일만 넣을 수 있어요'); return; }
+    // 안 열리는 사진은 넣지 않는다 — 넣으면 카드에 깨진 그림이 뜨고 ⚙엔 "들어 있어요"라고 나온다 (넣어 둔 사진은 그대로)
+    if (!(await decodable(f))) { say('이 사진은 이 태블릿에서 열 수 없어요 — JPG나 PNG 사진으로 골라 주세요 (갤럭시 카메라의 HEIC 사진은 안 열릴 수 있어요)'); return; }
     try {
       await putGiftPhoto(g.id, f);
       forget(g.id);

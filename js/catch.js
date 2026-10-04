@@ -211,13 +211,21 @@ export function keepBall(counts, sel) {
   return b && (b.free || ((counts || {})[b.id] || 0) > 0) ? b.id : POKEBALL.id;
 }
 
-/** 볼을 골랐을 때 한마디 — 몬스터볼은 없음 */
-export function ballTip(b) {
+/**
+ * 볼을 골랐을 때 한마디 — 몬스터볼은 없음.
+ * hasUb = 지금 후보에 🌌 울트라비스트가 있나 (false면 비스트볼은 몬스터볼과 같다고 말한다 — 사고 나서 좋아진 줄 알면 안 된다, Codex 28차 #6)
+ */
+export function ballTip(b, hasUb) {
   if (!b || b.free) return '';
   if (b.sure) return '반드시 잡혀요';
-  if (b.ub) return '🌌 울트라비스트에게 아주 잘 들어요'; // ⚪ 비스트볼 — 보통 포켓몬에겐 몬스터볼과 같아 "1배"라고 하면 헷갈린다
+  if (b.ub) return hasUb === false // ⚪ 비스트볼 — 보통 포켓몬에겐 몬스터볼과 같아 "1배"라고 하면 헷갈린다
+    ? '이번 후보에는 🌌 울트라비스트가 없어서 몬스터볼과 확률이 같아요'
+    : '🌌 울트라비스트에게 아주 잘 들어요';
   return `잡힐 확률이 ${b.mult}배예요`;
 }
+
+/** 지금 후보에 🌌 울트라비스트가 있나 (🧭 레이더가 후보를 바꾸면 ui.candidates도 바뀐다) */
+const candHasUb = () => ui.candidates.some((c) => isUltraBeast(c.id));
 
 /** 볼 줄 그리기 — sel이 가방에 남아 있으면 그 볼을 골라 둔 채로 (🛒 사고 돌아왔을 때·가방이 바뀌었을 때) */
 function renderBalls(counts, sel) {
@@ -250,12 +258,13 @@ function renderBalls(counts, sel) {
   }
 }
 
-/** 볼 고르기 — msg가 없으면 그 볼의 한마디 */
+/** 볼 고르기 — msg가 없으면 그 볼의 한마디. 던진 뒤에는 못 바꾼다 (판정이 고른 볼을 붙잡아 두지만, 불·말도 그대로 둔다) */
 function pickBall(b, msg) {
+  if (!ui.open || $('catch-pick').hidden) return;
   ui.ball = b.id;
   ui.golden = b.id === 'goldenball';
   for (const btn of $('catch-golden').querySelectorAll('button[data-ball]')) btn.classList.toggle('on', btn.dataset.ball === b.id);
-  $('catch-msg').textContent = msg || (b.free ? '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!' : `${b.emoji} ${b.ko}! ${ballTip(b)} — 누구에게 던질까요?`);
+  $('catch-msg').textContent = msg || (b.free ? '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!' : `${b.emoji} ${b.ko}! ${ballTip(b, candHasUb())} — 누구에게 던질까요?`);
 }
 
 /** 가방에서 볼 수를 다시 읽어 볼 줄을 새로 — 던지기 전(후보가 보일 때)만. bought면 그 볼을 고르고 "샀어요" */
@@ -263,7 +272,7 @@ function refreshBalls(sel, bought) {
   if (!ui.open || $('catch-pick').hidden) return; // 던지는 중·던진 뒤에는 그대로 (결과가 이미 정해졌다)
   renderBalls(inventory(), sel);
   const b = bought && ui.ball === sel ? BALLS.find((x) => x.id === sel) : null;
-  if (b) pickBall(b, `🛒 ${b.emoji} ${b.ko}${josa(b.ko, '을', '를')} 샀어요! ${ballTip(b)} — 누구에게 던질까요?`);
+  if (b) pickBall(b, `🛒 ${b.emoji} ${b.ko}${josa(b.ko, '을', '를')} 샀어요! ${ballTip(b, candHasUb())} — 누구에게 던질까요?`);
 }
 
 /** 🛒 잡기 화면 위에 볼 상점 — 사면 닫히고 그 볼이 골라져 있다. 그냥 닫으면 잡기 화면 그대로 */
@@ -353,9 +362,11 @@ async function throwBall(c) {
   ui.threw = true; // 던졌다 — 그냥 닫은 것과 구분한다 (수학은 던질 기회를 미리 차감해 둔다)
   const run = ++ui.run;
   const alive = () => ui.open && ui.run === run;
+  // 🔴 던지는 순간 고른 볼을 붙잡는다 — 판정은 연출 뒤(약 2초)라, 그 사이 볼 줄을 누르면 다른 볼이 쓰였다
+  //    (슈퍼볼로 던지고 마스터볼을 누르면 마스터볼이 사라짐, Codex 28차 #2). 볼 줄·🛒도 통째로 숨긴다
+  const ballId = ui.ball;
   $('catch-pick').hidden = true;
-  const sb = $('catch-golden').querySelector('.catch-shop-btn');
-  if (sb) sb.hidden = true; // 🛒 던진 뒤에는 결과가 정해졌다 — 살 때가 아니다
+  $('catch-golden').hidden = true;
   const stage = $('catch-stage');
   const mon = $('catch-mon');
   const ball = $('catch-ball');
@@ -386,7 +397,7 @@ async function throwBall(c) {
   ball.className = 'catch-ball drop';
   await sleep(500); if (!alive()) return;
 
-  const res = ui.attempt(c.id, { ball: ui.ball }); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만
+  const res = ui.attempt(c.id, { ball: ballId }); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만 (볼은 던질 때 고른 것)
   const wobbles = res.caught ? 3 : 1 + Math.floor(Math.random() * 3);
   const msg = $('catch-msg');
   msg.textContent = '두근두근…';

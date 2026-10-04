@@ -1061,6 +1061,9 @@ export function battleLossRule(profile, monId, lossesToLose) {
  * @param {{items?:Object, mons?:Object}} gain 받을 것
  */
 export function purchaseRule(profile, cost, gain) {
+  // 🎟️ 교환권처럼 하나만 갖는 물건(gain.once) — **저장된** 가방에 이미 있으면 거절한다.
+  // 화면의 판정은 그 창이 기억하는 옛 가방이라, 다른 창에서 먼저 산 교환권을 또 사 코인이 두 번 나갔다 (Codex 28차 #1)
+  if (gain && gain.once && (profile.items[gain.once] || 0) > 0) return { ok: false, why: 'owned' };
   const need = Number((cost && cost.coins) || 0);
   const needItems = (cost && cost.items) || {};
   const short = (Number(profile.coins) || 0) < need
@@ -1105,7 +1108,7 @@ export function claimUnlockBase(base) {
 export function giftGivenRule(profile, id, day) {
   if (!id) return { ok: false };
   profile.giftsGiven = { ...(profile.giftsGiven || {}) };
-  if (profile.giftsGiven[id]) return { ok: false };
+  if (profile.giftsGiven[id]) return { ok: false, why: 'already' }; // 다른 창에서 먼저 눌렀다 — 부르는 쪽은 "끝난 일"로 본다
   profile.giftsGiven[id] = String(day || '');
   return { ok: true };
 }

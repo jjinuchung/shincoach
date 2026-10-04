@@ -605,7 +605,8 @@ export function giftsGiven() {
 
 /** 🎁 선물을 건넸다고 표시 (📊, 비밀번호 뒤) — 한 번 표시하면 아이 화면의 "아빠에게 보여 주세요"와 📊 알림이 사라진다 */
 export function markGiven(id, day) {
-  return runProfileOp(() => markGiftGiven(id, day), (pf) => giftGivenRule(pf, id, day)).then((r) => !!(r && r.ok));
+  // 이미 건넨 것(다른 📊 창에서 먼저 누름)도 성공 — 안 그러면 그 창의 "사 줘야 할 선물" 카드가 안 사라진다 (Codex 28차 #4)
+  return runProfileOp(() => markGiftGiven(id, day), (pf) => giftGivenRule(pf, id, day)).then((r) => !!(r && (r.ok || r.why === 'already')));
 }
 
 export function inventory() {
@@ -686,7 +687,7 @@ export async function buyTicket(contentId, verify, base) {
   const cost = { coins: price };
   // 🎟️ 지금 누적치를 기준선으로 함께 넘긴다 → 다음 영상 조건은 0부터 다시 센다.
   // 코인을 못 치르면 purchaseRule이 기준선도 안 건드린다 (한 트랜잭션이라 갈라지지 않는다)
-  const gain = { items: { [`ticket_${contentId}`]: 1 }, unlockBase: base || null };
+  const gain = { items: { [`ticket_${contentId}`]: 1 }, unlockBase: base || null, once: `ticket_${contentId}` }; // once = 저장된 가방에 이미 있으면 거절 (두 창)
   const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
   return r.ok;
 }
