@@ -2,7 +2,7 @@
 // 프로필에는 💰 코인·🎒 가방(items)·포켓몬별 꾸밈(mons: gear·dye)도 들어 있음 (규칙·카탈로그는 items.js)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 프로필 저장/갱신
 import {
-  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase, applyBuyEgg, applyEggDay, applyEggSeen, applyShiny,
+  getProfile, applyProfileDelta, applyHpChange, applyBattleLoss, applyPurchase, claimUnlockBase, markGiftGiven, giftGivenRule, applyBuyEgg, applyEggDay, applyEggSeen, applyShiny,
   applyLevelUp, applyEvolve, applyGear, applyPartner, updateMathAndProfile, mergeProfileDelta,
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase, gearRule,
   applyTakeMons, applyTakenSeen, // 🔒 부모가 데려가기 (2026-09-28)
@@ -12,7 +12,7 @@ import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUS
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
-import { findLocked } from './unlock.js';
+import { findVoucher } from './unlock.js';
 
 // ── 경험치 ──
 export const XP = {
@@ -333,7 +333,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })) };
+  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) } };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -598,6 +598,16 @@ export function ensureUnlockBase(base) {
   }).then((r) => !!(r && r.ok));
 }
 
+/** 🎁 아빠가 건넨 선물 { id: 날짜 } */
+export function giftsGiven() {
+  return { ...(profile.giftsGiven || {}) };
+}
+
+/** 🎁 선물을 건넸다고 표시 (📊, 비밀번호 뒤) — 한 번 표시하면 아이 화면의 "아빠에게 보여 주세요"와 📊 알림이 사라진다 */
+export function markGiven(id, day) {
+  return runProfileOp(() => markGiftGiven(id, day), (pf) => giftGivenRule(pf, id, day)).then((r) => !!(r && r.ok));
+}
+
 export function inventory() {
   const out = {};
   for (const id of Object.keys(profile.items)) if (profile.items[id] > 0) out[id] = profile.items[id];
@@ -666,7 +676,7 @@ export async function buyItem(id) {
  * @param {() => Promise<boolean>} verify 지금도 조건을 채우는지 (저장소에서 새로 계산)
  */
 export async function buyTicket(contentId, verify, base) {
-  const c = findLocked(contentId);
+  const c = findVoucher(contentId); // 🎬 영상이든 🎁 선물이든 같은 줄의 교환권
   if (!c) return false;
   const price = c.price;                                     // 가격은 카탈로그가 정한다 (호출부가 못 정함)
   if (itemCount(`ticket_${contentId}`) > 0) return false;     // 이미 가진 교환권은 또 안 산다

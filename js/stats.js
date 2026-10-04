@@ -11,8 +11,8 @@ import { figText } from './mathdraw.js';
 import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED, favList, FAV_ICON } from './review.js';
-import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot } from './xp.js';
-import { pendingTickets } from './unlock.js';
+import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot, giftsGiven, markGiven } from './xp.js';
+import { pendingTickets, pendingGifts } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
 import { ROSTER } from './pokemon.js';
 import { lvOf } from './evolve.js';
@@ -344,6 +344,28 @@ export async function renderStats() {
       c0.appendChild(row);
     }
     main.appendChild(c0);
+  }
+
+  // 0) 🎁 아이가 받은 선물 교환권 — 아빠가 실제로 사서 건네준다 (2026-10-04, 🔔 피카츄 자전거 벨).
+  //    📊는 비밀번호 뒤라 아이는 "건네줬어요"를 못 누른다. 누르면 아이 화면의 "아빠에게 보여주세요"와 이 카드가 사라진다
+  const gifts = pendingGifts(inventory(), giftsGiven());
+  if (gifts.length) {
+    const cg = card('🎁 사 줘야 할 선물');
+    cg.appendChild(el('p', 'stats-note', '아이가 코인과 공부로 선물 교환권을 받았어요. 사서 건네준 뒤 "건네줬어요"를 눌러 주세요.'));
+    for (const g of gifts) {
+      const row = el('div', 'stats-row');
+      row.appendChild(el('span', 'name', `${g.emoji} ${g.ko}`));
+      const b = el('button', 'btn btn-primary stats-gift-given', '✅ 건네줬어요');
+      b.type = 'button';
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        if (await markGiven(g.id, todayKey())) { row.remove(); if (!cg.querySelector('.stats-gift-given')) cg.remove(); }
+        else b.disabled = false;
+      });
+      row.appendChild(b);
+      cg.appendChild(row);
+    }
+    main.appendChild(cg);
   }
 
   const c1 = card('이번 주 (최근 7일)');

@@ -2120,6 +2120,14 @@ button { font-family: inherit; }
 }
 .next-card.ready { border-style: solid; border-color: var(--primary); background: linear-gradient(135deg, #eef2ff, #e0e7ff); }
 .next-card.waiting { border-color: #fbbf24; background: #fffbeb; }
+/* 🎁 진짜 선물 교환권 (🔔 피카츄 자전거 벨, 2026-10-04) — 영상 카드와 달리 따뜻한 색, 사진은 크게 */
+.next-card.gift { background: linear-gradient(135deg, #fff7ed, #fef3c7); border-color: #fdba74; }
+.next-card.gift.ready { border-style: solid; border-color: #f97316; }
+.next-card.gift.waiting { border-style: solid; border-color: #fbbf24; }
+.next-card.gift .next-kicker { color: #c2410c; }
+.next-card.gift .next-poster { width: 120px; height: 120px; overflow: hidden; }
+.next-card.gift .next-poster.has-photo img { object-fit: cover; }
+.gift-needs { font-size: .9rem; font-weight: 700; color: #9a3412; margin: 8px 0 0; }
 .next-poster {
   width: 84px; height: 84px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -2156,6 +2164,7 @@ button { font-family: inherit; }
 .next-need .v { color: var(--muted); font-variant-numeric: tabular-nums; }
 .next-need .d { grid-column: 1 / -1; font-size: .78rem; font-weight: 600; color: var(--muted); } /* 📼 영어 · 🔢 수학 몫 */
 .math-ticket { color: #4338ca; font-weight: 700; }
+.math-gift-next { display: block; margin-top: 2px; color: #c2410c; } /* 🔒 그다음은 진짜 선물 (🎁 미리 보기) */
 .next-need .bar { grid-column: 1 / -1; height: 8px; border-radius: 99px; background: #e0e7ff; overflow: hidden; }
 .next-need .bar i { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
 .next-need.ok .bar i { background: #10b981; }
@@ -2165,6 +2174,7 @@ button { font-family: inherit; }
 @media (max-width: 420px) {
   .next-card { gap: 10px; padding: 12px; }
   .next-poster { width: 64px; height: 64px; font-size: 34px; }
+  .next-card.gift .next-poster { width: 88px; height: 88px; }
 }
 
 /* ===== 🔤 단어 이어 주기 ===== */

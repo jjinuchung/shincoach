@@ -1,9 +1,10 @@
 // 라이브러리 화면: 콘텐츠 가져오기(mp4 + srt) / 목록 / 삭제 / 저장 공간 표시
 import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats, getMath } from './db.js';
 import { parseSubtitle } from './srt.js';
-import { LOCKED, unlockState, nextLocked, ticketId, findLocked, totalsFrom } from './unlock.js';
+import { LOCKED, unlockState, totalsFrom, NEED, needOf, isGift, nextTarget, previewGift, ownedVoucherIds, pendingGifts } from './unlock.js';
+import { giftPoster } from './gift.js';
 import { classifyFiles, suggestTitle, describePick, listVideos } from './importfiles.js';
-import { coins, inventory, buyTicket, initProfile, unlockBase, ensureUnlockBase } from './xp.js';
+import { coins, inventory, buyTicket, initProfile, unlockBase, ensureUnlockBase, giftsGiven } from './xp.js';
 import { characterUrl, ensureCast, artUrl } from './pokemon.js';
 import { sfx, unlock as unlockAudio } from './sfx.js';
 import { parseSami, isSami, toSrt } from './sami.js';
@@ -508,23 +509,29 @@ async function renderNextVideo(items, records, seq = renderSeq) {
   await initProfile().catch(() => {});
   if (seq !== renderSeq) return; // 겹쳐 불린 옛 요청 — 카드를 붙이면 예고가 두 개가 된다
   const bag = inventory();
-  const bought = LOCKED.filter((c) => (bag[ticketId(c.id)] || 0) > 0);
+  const owned = ownedVoucherIds(bag); // 🎬 영상 + 🎁 선물 — 같은 줄에 선다 (unlock.voucherOrder)
+  const bought = LOCKED.filter((c) => owned.includes(c.id));
 
   // 이미 산 것 중 아직 안 들어온 영상부터 (아이가 "샀는데 왜 없어?" 하지 않게)
   const haveTitles = new Set(items.map((it) => String(it.title)));
   const waiting = bought.filter((c) => !haveTitles.has(c.ko));
   for (const c of waiting) box.appendChild(waitingCard(c));
+  // 🎁 받은 선물 중 아빠가 아직 안 건넨 것 (📊에서 "건네줬어요"를 누르면 사라진다)
+  for (const g of pendingGifts(bag, giftsGiven())) box.appendChild(giftWaitingCard(g));
 
-  const next = nextLocked(bought.map((c) => c.id));
-  if (!next) { box.hidden = !waiting.length; return; }
+  const next = nextTarget(owned);
+  if (!next) { box.hidden = !box.children.length; return; }
 
-  const st = await currentState(next.price, records);
+  const st = await currentState(next.price, records, needOf(next));
   if (seq !== renderSeq) return;
-  const card = lockedCard(next, st);
+  const card = isGift(next) ? giftCard(next, st) : lockedCard(next, st);
   box.appendChild(card);
+  // 🔒 그다음 선물 미리 보기 — 영상 교환권을 모으는 동안에도 "받으면 다음은 진짜 선물"이 보이게 (아버님: 빨리 끝내고 싶게)
+  const pv = previewGift(owned);
+  if (pv) box.appendChild(giftPreviewCard(pv, next));
   box.hidden = false;
   // 나오는 포켓몬 그림은 없으면 받아 온다 (인터넷이 없으면 이모지로 남는다)
-  ensureCast((next.cast || []).map((c) => c.id)).then(() => fillCast(card, next)).catch(() => {});
+  if (!isGift(next)) ensureCast((next.cast || []).map((c) => c.id)).then(() => fillCast(card, next)).catch(() => {});
 }
 
 /** 받아 온 그림을 자리에 끼운다 (아직 없으면 ❔ 그대로) */
@@ -545,7 +552,7 @@ function fillCast(root, c) {
  * 지금 조건 현황을 저장소에서 새로 계산한다 (화면 표시와 구매 판정이 같은 값을 쓰게).
  * 조건이 비율이 아니라 **끝낸 문장 개수**라 영상 목록은 필요 없다 — 영상을 넣거나 지워도 진도가 안 흔들린다.
  */
-async function currentState(price, known) {
+async function currentState(price, known, need = NEED) {
   // known을 주면 그걸 쓴다 (목록을 그릴 때 한 번 읽은 것). 구매 판정처럼 최신이어야 하는 자리는 안 주고 새로 읽는다
   const records = known || await getAllSentenceStats().catch(() => []);
   // 🔢 수학 누적(정답·완주·복습 통과)도 같은 막대를 채운다 (2026-09-22) — 못 읽으면 영어만으로
@@ -557,11 +564,10 @@ async function currentState(price, known) {
   //    (진우는 팬텀을 사자마자 다음 영상 조건이 꽉 차 있었다 — 그때까지 배운 것이 그대로 더해져서)
   //  - 아직 하나도 안 산 아이: 0부터 (처음부터 세는 게 맞다)
   if (!unlockBase()) {
-    const bag = inventory();
-    const bought = LOCKED.some((c) => (bag[ticketId(c.id)] || 0) > 0);
+    const bought = ownedVoucherIds(inventory()).length > 0;
     await ensureUnlockBase(bought ? total : { done: 0, reviewed: 0 }).catch(() => {});
   }
-  return unlockState({ coins: coins(), records, price, base: unlockBase(), math: mathTot });
+  return unlockState({ coins: coins(), records, price, base: unlockBase(), math: mathTot, need });
 }
 
 function waitingCard(c) {
@@ -610,8 +616,13 @@ function lockedCard(c, st) {
     cast.appendChild(fig);
   }
   fillCast(el, c);
+  fillNeeds(el.querySelector('.next-needs'), st);
+  wireBuy(el.querySelector('.next-buy'), c, st, '교환권 받기!');
+  return el;
+}
 
-  const needs = el.querySelector('.next-needs');
+/** 조건 막대 셋 (💰 · 📼+🔢 · 🔁) — 영상·선물 카드가 같이 쓴다 */
+function fillNeeds(needs, st) {
   for (const it of st.items) {
     const row = document.createElement('div');
     row.className = 'next-need' + (it.ok ? ' ok' : '');
@@ -622,9 +633,11 @@ function lockedCard(c, st) {
     if (it.detail) { const d = document.createElement('span'); d.className = 'd'; d.textContent = it.detail; row.appendChild(d); } // 📼 영어 · 🔢 수학 몫
     needs.appendChild(row);
   }
+}
 
-  const btn = el.querySelector('.next-buy');
-  btn.textContent = st.ready ? `🎟️ ${c.price.toLocaleString()}코인으로 교환권 받기!` : '아직 못 바꿔요 — 조금만 더!';
+/** 교환 버튼 — 조건은 그 교환권의 것(needOf: 🎁 선물은 따로)으로 저장소에서 다시 판정한다 */
+function wireBuy(btn, c, st, what) {
+  btn.textContent = st.ready ? `🎟️ ${c.price.toLocaleString()}코인으로 ${what}` : '아직 못 바꿔요 — 조금만 더!';
   btn.disabled = !st.ready;
   btn.classList.toggle('btn-primary', st.ready);
   btn.addEventListener('click', async () => {
@@ -632,15 +645,15 @@ function lockedCard(c, st) {
     unlockAudio();
     // 화면 상태만 믿지 않고 저장소에서 다시 판정한다 (버튼을 억지로 켜도 조건은 지켜진다).
     // 판정은 buyTicket 안에서도 한 번 더 돈다 — 구매 경로를 직접 불러도 통과 못 하게
-    const ready = async () => (await currentState(c.price)).ready;
-    const fresh = await currentState(c.price);
+    const ready = async () => (await currentState(c.price, null, needOf(c))).ready;
+    const fresh = await currentState(c.price, null, needOf(c));
     if (!fresh.ready) {
       btn.disabled = false;
       btn.textContent = '아직 조건이 안 됐어요';
       await refreshList();
       return;
     }
-    // 🎟️ 산 시점의 누적치를 기준선으로 넘긴다 → 다음 영상 조건이 0부터 시작한다
+    // 🎟️ 산 시점의 누적치를 기준선으로 넘긴다 → 다음 교환권 조건이 0부터 시작한다
     if (await buyTicket(c.id, ready, fresh.total)) {
       sfx.levelUp();
       await refreshList();
@@ -649,6 +662,67 @@ function lockedCard(c, st) {
       btn.textContent = '코인이 조금 모자라요';
     }
   });
+}
+
+/** 받침 있는 글자로 끝나면 '을', 아니면 '를' (영상 제목 뒤) */
+const eulReul = (word) => { const code = String(word).charCodeAt(String(word).length - 1) - 0xac00; return code >= 0 && code < 11172 && code % 28 ? '을' : '를'; };
+
+/** 🎁 지금 모으는 선물 — 사진 크게, "진짜 선물" */
+function giftCard(g, st) {
+  const el = document.createElement('div');
+  el.className = 'next-card gift' + (st.ready ? ' ready' : '');
+  el.appendChild(giftPoster(g));
+  const body = document.createElement('div');
+  body.className = 'next-body';
+  body.innerHTML = `
+    <p class="next-kicker">🎁 다음 선물 — 진짜 선물!</p>
+    <p class="next-title"></p>
+    <p class="next-blurb"></p>
+    <div class="next-needs"></div>
+    <p class="next-note">🎟️ 이건 <b>선물 교환권</b>이에요. 바꾸면 <b>아빠가 진짜로 사 줘요</b>.</p>
+    <button class="btn next-buy"></button>`;
+  body.querySelector('.next-title').textContent = `${g.emoji} ${g.ko}`;
+  body.querySelector('.next-blurb').textContent = g.blurb;
+  fillNeeds(body.querySelector('.next-needs'), st);
+  wireBuy(body.querySelector('.next-buy'), g, st, '선물 교환권 받기!');
+  el.appendChild(body);
+  return el;
+}
+
+/** 🔒 차례가 오기 전의 선물 — 지금 교환권을 받으면 모으기 시작한다는 것과 조건만 (막대는 아직 없다) */
+function giftPreviewCard(g, now) {
+  const el = document.createElement('div');
+  el.className = 'next-card gift preview';
+  el.appendChild(giftPoster(g));
+  const body = document.createElement('div');
+  body.className = 'next-body';
+  body.innerHTML = `
+    <p class="next-kicker">🔒 그다음은 진짜 선물! — 미리 보기</p>
+    <p class="next-title"></p>
+    <p class="next-blurb"></p>
+    <p class="next-msg"></p>
+    <p class="gift-needs"></p>`;
+  body.querySelector('.next-title').textContent = `${g.emoji} ${g.ko}`;
+  body.querySelector('.next-blurb').textContent = g.blurb;
+  body.querySelector('.next-msg').textContent = now
+    ? `🎬 지금 교환권 「${now.ko}」${eulReul(now.ko)} 받으면 그때부터 모으기 시작해요!`
+    : '🎬 지금 교환권을 받으면 그때부터 모으기 시작해요!';
+  const n = needOf(g);
+  body.querySelector('.gift-needs').textContent = `💰 ${g.price.toLocaleString()}코인 · 📼 배운 문장 + 🔢 수학 ${n.doneSentences.toLocaleString()} · 🔁 복습 ${n.reviewPassed.toLocaleString()}`;
+  el.appendChild(body);
+  return el;
+}
+
+/** 🎁 받은 선물 — 아빠가 사 주기 전까지 (📊에서 "건네줬어요"를 누르면 사라진다) */
+function giftWaitingCard(g) {
+  const el = document.createElement('div');
+  el.className = 'next-card gift waiting';
+  el.appendChild(giftPoster(g));
+  const body = document.createElement('div');
+  body.className = 'next-body';
+  body.innerHTML = `<p class="next-title"></p><p class="next-msg">🎟️ 선물 교환권을 받았어요! <b>아빠에게 보여주세요</b> — 아빠가 진짜로 사 줄 거예요</p>`;
+  body.querySelector('.next-title').textContent = `${g.emoji} ${g.ko}`;
+  el.appendChild(body);
   return el;
 }
 

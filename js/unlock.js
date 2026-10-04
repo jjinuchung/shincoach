@@ -88,6 +88,70 @@ export const NEED = {
   reviewPassed: 50,   // 🔁 복습에서 한 번 이상 통과한 문장 50개 (배운 다음 날 이후에 다시 맞힌 것)
 };
 
+/**
+ * 🎁 진짜 선물 교환권 (2026-10-04, 아버님: "자전거 벨도 교환권으로 — 얻으면 내가 사 준다").
+ * 영상 교환권과 같은 줄에 선다: `after` 영상 교환권을 받은 **다음** 차례가 된다 (그 순간이 출발선 — 기준선 방식 그대로).
+ * 다만 "빨리 끝내고 싶게" 차례가 오기 전부터 **미리 보기 카드**로 보인다 (previewGift).
+ *
+ * ★ 사진은 저장소에 넣지 않는다 — 피카츄 상품 사진이라 공개 저장소 원칙(위 LOCKED 주석)에 걸린다.
+ *   아빠가 ⚙ 설정에서 태블릿의 사진을 골라 넣는다 (db의 blobs 'gift:<id>', 기기에만). 없으면 포켓몬 그림 + 이모지.
+ * need  = 이 선물만의 조건 (없으면 영상과 같은 NEED)
+ * after = 이 영상 교환권 다음 차례 (그 영상을 LOCKED에서 뺐으면 = 이미 배달됨 → 맨 앞)
+ */
+export const GIFTS = [
+  {
+    id: 'bell', ko: '피카츄 자전거 벨', emoji: '🔔', poster: 25, price: 2000, after: 'iconic',
+    blurb: '자전거 손잡이에 다는 피카츄 벨 — 진짜 선물이에요! 교환권을 받으면 아빠가 사 줘요',
+    need: { doneSentences: 1800, reviewPassed: 100 },
+  },
+];
+
+export const isGift = (c) => !!c && GIFTS.some((g) => g.id === c.id);
+/** 그 교환권의 학습 조건 (선물은 따로, 영상은 NEED) */
+export const needOf = (c) => ({ ...NEED, ...((c && c.need) || {}) });
+
+/** 교환권이 서는 줄 — 영상 사이사이에 선물을 `after` 뒤로 끼운다 (after가 목록에 없으면 맨 앞) */
+export function voucherOrder(locked = LOCKED, gifts = GIFTS) {
+  const out = [];
+  const known = new Set(locked.map((c) => c.id));
+  for (const g of gifts) if (!known.has(g.after)) out.push(g);
+  for (const c of locked) {
+    out.push(c);
+    for (const g of gifts) if (g.after === c.id) out.push(g);
+  }
+  return out;
+}
+
+export function findVoucher(id) {
+  return voucherOrder().find((c) => c.id === id) || null;
+}
+
+/** 가방에서 가진 교환권 id (영상·선물 모두) */
+export function ownedVoucherIds(inventory = {}) {
+  return voucherOrder().filter((c) => (inventory[ticketId(c.id)] || 0) > 0).map((c) => c.id);
+}
+
+/** 지금 모으는 교환권 — 줄에서 아직 안 가진 첫 번째 (영상이든 선물이든) */
+export function nextTarget(ownedIds = []) {
+  const owned = new Set([...ownedIds].map(String));
+  return voucherOrder().find((c) => !owned.has(c.id)) || null;
+}
+
+/**
+ * 🔒 차례는 아직이지만 미리 보여 줄 선물 — 안 가졌고 지금 모으는 것도 아닌 첫 선물.
+ * 영상 교환권을 모으는 동안 "이걸 받으면 다음은 진짜 선물"이 보이게 (아버님: 빨리 끝내고 싶게)
+ */
+export function previewGift(ownedIds = []) {
+  const owned = new Set([...ownedIds].map(String));
+  const now = nextTarget(ownedIds);
+  return GIFTS.find((g) => !owned.has(g.id) && (!now || now.id !== g.id)) || null;
+}
+
+/** 아이가 받았지만 아빠가 아직 안 건넨 선물 (📊에 알림 · 아이 화면엔 "아빠에게 보여 주세요") */
+export function pendingGifts(inventory = {}, given = {}) {
+  return GIFTS.filter((g) => (inventory[ticketId(g.id)] || 0) > 0 && !(given && given[g.id]));
+}
+
 export function findLocked(id) {
   return LOCKED.find((c) => c.id === id) || null;
 }
@@ -137,8 +201,9 @@ export function mathPoints(total, base) {
  * @param {{coins:number, records:Array, price:number, base:Object}} o
  *   records = 모든 문장 기록 (db.getAllSentenceStats)
  *   base    = 직전 교환권을 산 시점의 누적치 (profile.unlockBase)
+ *   need    = 학습 조건 (🎁 선물은 needOf(c) — 기본은 영상의 NEED)
  */
-export function unlockState({ coins = 0, records = [], price = 0, base = null, math = null } = {}) {
+export function unlockState({ coins = 0, records = [], price = 0, base = null, math = null, need = NEED } = {}) {
   const total = totalsFrom(records, math);
   const b = normalizeBase(base);
   // 라벨의 "(교환권 이후)"는 실제로 기준선이 잡혀 있을 때만 — 아직 하나도 안 산 아이에겐 그냥 누적이다
@@ -149,8 +214,8 @@ export function unlockState({ coins = 0, records = [], price = 0, base = null, m
   const pctOf = (have, need) => (need <= 0 ? 100 : Math.min(100, Math.round((have / need) * 100)));
   const items = [
     { key: 'coins', label: '💰 코인', have: Math.max(0, Math.floor(coins)), need: price },
-    { key: 'progress', label: `📼 배운 문장 + 🔢 수학${since}`, have: done + mp.progress, need: NEED.doneSentences, detail: `📼 영어 ${done.toLocaleString()} · 🔢 수학 ${mp.progress.toLocaleString()}` },
-    { key: 'review', label: `🔁 복습 통과 + 🔢 수학 복습${since}`, have: reviewed + mp.review, need: NEED.reviewPassed, detail: `🔁 영어 ${reviewed.toLocaleString()} · 🔢 수학 ${mp.review.toLocaleString()}` },
+    { key: 'progress', label: `📼 배운 문장 + 🔢 수학${since}`, have: done + mp.progress, need: need.doneSentences, detail: `📼 영어 ${done.toLocaleString()} · 🔢 수학 ${mp.progress.toLocaleString()}` },
+    { key: 'review', label: `🔁 복습 통과 + 🔢 수학 복습${since}`, have: reviewed + mp.review, need: need.reviewPassed, detail: `🔁 영어 ${reviewed.toLocaleString()} · 🔢 수학 ${mp.review.toLocaleString()}` },
   ].map((it) => ({ ...it, ok: it.have >= it.need, pct: pctOf(it.have, it.need) }));
   return {
     done, reviewed, coins, math: mp,

@@ -24,7 +24,7 @@ import { padSpec, matchTyped } from './mathpad.js';
 import { padBox, padAnswered } from './padview.js';
 import { drawBox, drawAnswered, canDraw } from './drawview.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound } from './xp.js';
-import { LOCKED, nextLocked, ticketId, unlockState, MATH_PTS } from './unlock.js';
+import { unlockState, MATH_PTS, nextTarget, previewGift, ownedVoucherIds, needOf, isGift } from './unlock.js';
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
@@ -396,17 +396,21 @@ async function runCatches(n, { g, c, run, onAll, onStop }) {
  */
 async function ticketNote(state, earned) {
   try {
-    const bag = inventory();
-    const next = nextLocked(LOCKED.filter((c) => (bag[ticketId(c.id)] || 0) > 0).map((c) => c.id));
+    const owned = ownedVoucherIds(inventory()); // 🎬 영상 + 🎁 선물이 같은 줄
+    const next = nextTarget(owned);
     if (!next) return null;
     const records = await getAllSentenceStats().catch(() => []);
-    const st = unlockState({ coins: coins(), records, price: next.price, base: unlockBase(), math: (state && state.tot) || null });
+    const st = unlockState({ coins: coins(), records, price: next.price, base: unlockBase(), math: (state && state.tot) || null, need: needOf(next) });
     const p = st.items.find((i) => i.key === 'progress');
     const rv = st.items.find((i) => i.key === 'review');
     const line = el('p', 'math-note math-ticket');
     const e = earned || {};
     const got = [e.progress > 0 ? `📼+${e.progress}` : '', e.review > 0 ? `🔁+${e.review}` : ''].filter(Boolean).join(' ');
-    line.textContent = `🎟️ 다음 영상 「${next.ko}」까지 — 📼+🔢 ${p.have.toLocaleString()}/${p.need.toLocaleString()} · 🔁 ${rv.have}/${rv.need}${got ? ` (이번 수학 ${got})` : ' · 수학도 채워요'}`;
+    const what = isGift(next) ? `🎁 다음 선물 ${next.emoji} 「${next.ko}」` : `🎟️ 다음 영상 「${next.ko}」`;
+    line.textContent = `${what}까지 — 📼+🔢 ${p.have.toLocaleString()}/${p.need.toLocaleString()} · 🔁 ${rv.have}/${rv.need}${got ? ` (이번 수학 ${got})` : ' · 수학도 채워요'}`;
+    // 🔒 그다음 진짜 선물도 한 줄 — 영상 교환권을 받으면 모으기 시작한다는 것 (아버님: 빨리 끝내고 싶게)
+    const pv = previewGift(owned);
+    if (pv) line.appendChild(el('span', 'math-gift-next', `🔒 그다음은 진짜 선물 ${pv.emoji} ${pv.ko}! 이 교환권을 받으면 모으기 시작해요`));
     return line;
   } catch { return null; }
 }

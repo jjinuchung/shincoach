@@ -178,6 +178,34 @@ export async function getVideoBlob(id) {
   return rec ? rec.blob : null;
 }
 
+/**
+ * 🎁 선물 사진 — 아빠가 ⚙에서 태블릿의 사진을 골라 넣는다 (2026-10-04, 🔔 피카츄 자전거 벨).
+ * 상품 사진이라 공개 저장소에 두지 않고 **이 기기의 blobs에만** 둔다 ('gift:<id>' — 영상 id와 겹치지 않음).
+ * blobs는 id로만 넣고 꺼내고 지우므로(영상 지우기도 그 영상 id만) 다른 경로가 건드리지 않는다. 백업에는 안 들어간다
+ */
+export const giftPhotoKey = (giftId) => `gift:${giftId}`;
+
+export async function putGiftPhoto(giftId, blob) {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readwrite');
+  tx.objectStore('blobs').put({ id: giftPhotoKey(giftId), blob, at: Date.now() });
+  await txDone(tx);
+}
+
+export async function getGiftPhoto(giftId) {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readonly');
+  const rec = await promisify(tx.objectStore('blobs').get(giftPhotoKey(giftId)));
+  return rec ? rec.blob : null;
+}
+
+export async function deleteGiftPhoto(giftId) {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readwrite');
+  tx.objectStore('blobs').delete(giftPhotoKey(giftId));
+  await txDone(tx);
+}
+
 /** 일부 필드만 갱신 (진행 위치, 제목, 자막 교체 등) */
 export async function updateItem(id, patch) {
   const db = await openDb();
@@ -705,13 +733,13 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })) };
+  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) } };
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -1068,6 +1096,22 @@ export function claimUnlockBase(base) {
     p.unlockBase = normalizeUnlockBase(base);
     return { ok: true };
   });
+}
+
+/**
+ * 🎁 아빠가 선물(실물)을 건넸다고 표시하는 규칙 — 이미 건넨 것은 그대로 (처음 건넨 날을 남긴다).
+ * 가방의 교환권은 지우지 않는다: 지우면 줄(voucherOrder)에서 "아직 안 가진 것"이 되어 그 선물을 또 모으게 된다
+ */
+export function giftGivenRule(profile, id, day) {
+  if (!id) return { ok: false };
+  profile.giftsGiven = { ...(profile.giftsGiven || {}) };
+  if (profile.giftsGiven[id]) return { ok: false };
+  profile.giftsGiven[id] = String(day || '');
+  return { ok: true };
+}
+
+export function markGiftGiven(id, day) {
+  return mutateProfile((p) => giftGivenRule(p, id, day));
 }
 
 // ── 프로필 쓰기 (규칙을 트랜잭션 안에서 돌린다) ──
@@ -1436,6 +1480,8 @@ export function mergeStatRecord(name, cur, rec) {
     // 🎟️ 기준선은 가방(교환권)과 짝이다 — 둘이 갈라지면 "샀는데 조건이 안 줄었다"가 된다.
     // 그래서 items와 같은 쪽(최근에 저장된 프로필)에서 가져온다. 옛 백업엔 이 값이 없다(그럼 null)
     out.unlockBase = latest.unlockBase || null;
+    // 🎁 아빠가 건넨 선물은 한 번 건넸으면 계속 건넨 것 (합집합) — 옛 백업이 "사 줘야 할 선물" 알림을 되살리지 않게
+    out.giftsGiven = { ...(rec.giftsGiven || {}), ...(cur.giftsGiven || {}) };
   }
   return out;
 }
