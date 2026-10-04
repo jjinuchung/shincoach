@@ -466,7 +466,9 @@ export function catchAttempt(id, rng = Math.random, opts = {}) {
   // 🔴 어떤 볼로 던지는가 — 몬스터볼은 언제나 쓸 수 있고, 나머지는 가방에 있을 때만 쓰고 바로 소모한다
   const wanted = opts.ball || (opts.golden ? GOLDEN.id : POKEBALL.id);
   const ballItem = itemById(wanted) || POKEBALL;
-  const used = ballItem.free || consumeItem(ballItem.id) ? ballItem : POKEBALL; // 가방에 없으면 그냥 몬스터볼
+  // 🌕 세상에 하나뿐인 볼은 미리 저장소에서 쓴 것(opts.paid)만 — 창이 기억하는 가방으로는 쓰지 않는다 (spendUniqueBall, Codex 29차 #1)
+  const spent = ballItem.free || (ballItem.unique ? opts.paid === ballItem.id : consumeItem(ballItem.id));
+  const used = spent ? ballItem : POKEBALL; // 가방에 없으면 그냥 몬스터볼
   const chance = ballChance(used.id, rarityOf(id), level, isUltraBeast(id)); // 🌌 울트라비스트는 ⚪ 비스트볼이라야 제대로 든다
   const caught = rollCatch(chance, rng);
   const golden = used.id === GOLDEN.id;
@@ -726,11 +728,37 @@ export async function undoShiny(monId) {
  * @returns {Promise<boolean>} 이번에 새로 찾았나
  */
 export async function rollTrueGold(rng = Math.random) {
-  if ((profile.items[TRUE_GOLD.id] || 0) > 0) return false;
-  if (!(rng() < TRUE_GOLD_CHANCE)) return false;
+  if (!trueGoldHit(profile.items, rng)) return false;
   const cost = { coins: 0 };
   const gain = { items: { [TRUE_GOLD.id]: 1 }, once: TRUE_GOLD.id };
-  const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
+  // ★ 저장이 안 되면 없던 일 — 메모리에만 넣고 "찾았다!"를 띄우면 다시 열 때 볼이 사라진다 (Codex 29차 #2)
+  const r = await runProfileOp(() => applyPurchase(cost, gain), () => ({ ok: false }));
+  return !!(r && r.ok);
+}
+
+/** 🌕 이번에 나오나 (순수) — 가지고 있으면 굴리지도 않는다 (세상에 하나뿐) */
+export function trueGoldHit(bag, rng = Math.random) {
+  if (((bag || {})[TRUE_GOLD.id] || 0) > 0) return false;
+  return rng() < TRUE_GOLD_CHANCE;
+}
+
+/**
+ * 🌕 세상에 하나뿐인 볼은 던지는 순간 **저장소에서** 먼저 쓴다 (한 트랜잭션).
+ * 창이 기억하는 가방으로 쓰면 두 창이 같은 볼로 두 번 무조건 잡았고, 늦은 창의 −1이 새로 나온 볼을 지웠다 (Codex 29차 #1).
+ * 저장이 안 되면 못 쓴 것 (메모리에서만 빼면 다시 열 때 돌아와 또 쓴다)
+ * @returns {Promise<boolean>} 썼나 — false면 다른 창에서 이미 썼거나 저장 실패
+ */
+export async function spendUniqueBall(ballId) {
+  const it = itemById(ballId);
+  if (!it || !it.unique) return false;
+  const r = await runProfileOp(() => applyPurchase({ coins: 0, items: { [ballId]: 1 } }, {}), () => ({ ok: false }));
+  return !!(r && r.ok);
+}
+
+/** 🌕 미리 쓴 볼을 못 던졌을 때(던지는 사이 잡기 화면이 닫힘) 돌려준다 — 그 사이 새로 하나 생겼으면 그대로 (세상에 하나뿐) */
+export async function refundUniqueBall(ballId) {
+  const gain = { items: { [ballId]: 1 }, once: ballId };
+  const r = await runProfileOp(() => applyPurchase({ coins: 0 }, gain), () => ({ ok: false }));
   return !!(r && r.ok);
 }
 /**

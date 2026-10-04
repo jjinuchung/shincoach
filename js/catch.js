@@ -1,6 +1,6 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
-import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold } from './xp.js';
+import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold, spendUniqueBall, refundUniqueBall } from './xp.js';
 import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
@@ -393,6 +393,27 @@ async function throwBall(c) {
   const ballId = ui.ball;
   $('catch-pick').hidden = true;
   $('catch-golden').hidden = true;
+  // 🌕 세상에 하나뿐인 볼은 **저장소에서 먼저 쓴다** — 다른 화면에서 이미 썼으면 볼을 다시 고르게 (Codex 29차 #1).
+  //    ⚙ 연습은 볼이 안 줄어서 쓰지 않는다. 쓴 뒤 던지기 전에 화면이 닫히면 돌려준다 (giveBack)
+  const picked = BALLS.find((x) => x.id === ballId);
+  let paid;
+  if (picked && picked.unique && !ui.practice) {
+    $('catch-msg').textContent = `${picked.emoji} ${picked.ko}${josa(picked.ko, '을', '를')} 꺼내는 중…`;
+    const ok = await spendUniqueBall(ballId);
+    if (!alive()) { if (ok) refundUniqueBall(ballId).catch(() => {}); return; }
+    if (!ok) {
+      ui.threw = false;
+      const tg = $('catch-truegold');
+      if (tg) tg.hidden = true; // "찾았다!" 알림이 남아 있으면 없는 볼을 가리킨다
+      $('catch-pick').hidden = false;
+      refreshBalls(POKEBALL.id);
+      $('catch-msg').textContent = `${picked.emoji} ${picked.ko}${josa(picked.ko, '은', '는')} 다른 화면에서 이미 썼어요 — 볼을 다시 골라요`;
+      return;
+    }
+    paid = ballId;
+  }
+  // 던지기 전에 화면이 닫혔다 — 미리 쓴 🌕를 돌려준다 (판정이 없었으니 쓴 게 아니다)
+  const giveBack = () => { if (paid) refundUniqueBall(paid).catch(() => {}); };
   const stage = $('catch-stage');
   const mon = $('catch-mon');
   const ball = $('catch-ball');
@@ -406,24 +427,24 @@ async function throwBall(c) {
   stage.hidden = false;
   $('catch-msg').textContent = `${c.ko}${josa(c.ko, '이', '가')} 나타났다! 몬스터볼, 가라!`;
   $('catch-msg').classList.remove('beat');
-  await sleep(700); if (!alive()) return;
+  await sleep(700); if (!alive()) return giveBack();
 
   ball.className = 'catch-ball throw';
   sfx.whoosh();
-  await sleep(650); if (!alive()) return;
+  await sleep(650); if (!alive()) return giveBack();
   fx.textContent = '💥';
   fx.style.bottom = '150px'; // 포켓몬 위치에서 맞는 효과
   sfx.hit();
   vibrate(25);
   mon.classList.add('captured');
   ball.className = 'catch-ball at-mon';
-  await sleep(400); if (!alive()) return;
+  await sleep(400); if (!alive()) return giveBack();
   fx.textContent = '';
   fx.style.bottom = '';
   ball.className = 'catch-ball drop';
-  await sleep(500); if (!alive()) return;
+  await sleep(500); if (!alive()) return giveBack();
 
-  const res = ui.attempt(c.id, { ball: ballId }); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만 (볼은 던질 때 고른 것)
+  const res = ui.attempt(c.id, { ball: ballId, paid }); // 결과는 여기서 결정, 흔들림 횟수로 긴장감만 (볼은 던질 때 고른 것, 🌕는 미리 쓴 것)
   const wobbles = res.caught ? 3 : 1 + Math.floor(Math.random() * 3);
   const msg = $('catch-msg');
   msg.textContent = '두근두근…';
@@ -458,8 +479,8 @@ async function throwBall(c) {
       : res.partnerSet ? '도감에 새로 등록됐어요! 🤝 첫 파트너가 됐어요 — 위쪽 ❤️ 칩에서 볼 수 있어요'
       : res.first ? '도감에 새로 등록됐어요!' : `또 잡았어요 ×${res.count} (+${res.bonusXp} 경험치)`;
     result.appendChild(sub);
-    // 🌕 세상에 하나뿐인 볼을 썼다 — 없어졌고, 언젠가 또 나타난다 (0.1%)
-    if (res.ball === TRUE_GOLD.id) result.appendChild(Object.assign(document.createElement('small'), { textContent: `${TRUE_GOLD.emoji} ${TRUE_GOLD.ko}은 다시 세상 어딘가로 떠났어요 — 언젠가 또 나타날지도 몰라요!` }));
+    // 🌕 세상에 하나뿐인 볼을 썼다 — 없어졌고, 언젠가 또 나타난다 (0.1%). ⚙ 연습은 볼이 그대로라 그렇게 말한다 (Codex 29차 #5)
+    if (res.ball === TRUE_GOLD.id) result.appendChild(Object.assign(document.createElement('small'), { textContent: ui.practice ? `연습이라 ${TRUE_GOLD.emoji} ${TRUE_GOLD.ko}은 그대로예요` : `${TRUE_GOLD.emoji} ${TRUE_GOLD.ko}은 다시 세상 어딘가로 떠났어요 — 언젠가 또 나타날지도 몰라요!` }));
     if (res.info) renderHeader(ui.xpGain + (res.bonusXp || 0), res.info, 0);
   } else {
     ball.className = 'catch-ball open';

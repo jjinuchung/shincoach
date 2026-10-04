@@ -117,7 +117,7 @@ test('🛒 Codex 28차 #2 — 던질 때 고른 볼로 판정한다: 연출 중 
   const grab = tb.indexOf('const ballId = ui.ball;');
   assert.ok(grab > 0, '던지는 순간 고른 볼을 붙잡는다');
   assert.ok(grab < tb.indexOf('await sleep('), '연출(기다림)보다 먼저');
-  assert.match(tb, /ui\.attempt\(c\.id, \{ ball: ballId \}\)/, '판정은 붙잡은 볼로');
+  assert.match(tb, /ui\.attempt\(c\.id, \{ ball: ballId, paid \}\)/, '판정은 붙잡은 볼로 (🌕는 미리 쓴 표시 paid와 함께, Codex 29차 #1)');
   assert.ok(!/ball: ui\.ball/.test(tb), '판정이 연출 뒤의 ui.ball을 읽지 않는다');
   assert.match(body(src('js/catch.js'), 'pickBall'), /if \(!ui\.open \|\| \$\('catch-pick'\)\.hidden\) return;/, '던진 뒤에는 볼을 못 바꾼다 (불·말도 그대로)');
 });

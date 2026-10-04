@@ -42,7 +42,8 @@ function refreshAfterChange(monId) {
   if (monId === null || monId === undefined) return;
   const fig = $('pokedex-main').querySelector(`.mon-figure[data-id="${monId}"]`);
   if (fig) {
-    setFigure(fig, undefined, getLook(monId));
+    // 원래 그림도 같이 넘긴다 — 안 넘기면 이로치를 원래 색으로 되돌려도 칸에는 이로치 그림이 남았다 (Codex 29차 #4)
+    setFigure(fig, urlById.get(Number(monId)), getLook(monId));
     fig.classList.remove('pop');
     void fig.offsetWidth;
     fig.classList.add('pop');

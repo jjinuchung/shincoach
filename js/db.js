@@ -1272,7 +1272,7 @@ export function applyLevelUp(monId, stoneId) {
  * 안 따라가는 것: 🎀 장식(마지막 한 마리였으면 가방으로 돌려준다) · ⚔️ 패배 누적 · ❤️ HP(가득 차서 시작)
  * @returns {{ok:boolean, why?:string, lv?:number, first?:boolean, gearBack?:string|null, partnerMoved?:boolean}}
  */
-export function evolveRule(profile, fromId, toId, hpMax = 100) {
+export function evolveRule(profile, fromId, toId, hpMax = 100, now = Date.now()) {
   const from = Number(fromId);
   const to = Number(toId);
   const m = profile.mons[from] || {};
@@ -1294,7 +1294,10 @@ export function evolveRule(profile, fromId, toId, hpMax = 100) {
     lv: Math.max(lvOf(t), lv), // 진화형이 이미 더 높으면 그대로 (성장을 되돌리지 않는다)
     hp: hpMax,
     losses: 0,
-    ...(m.shiny ? { shiny: true, ...(m.shinyAt ? { shinyAt: m.shinyAt } : {}) } : {}), // 🌈 이로치는 그 종의 색 — 진화해도 이로치다 (켜진 때도 같이)
+    // 🌈 이로치는 그 종의 색 — 진화해도 이로치다. 진화형이 이로치가 **아니었으면** 지금 켠 것이라 지금 시각을 적는다:
+    //    꼬부기의 옛 시각을 물려주면, 그 사이 되돌렸던 어니부기의 옛 백업(더 늦은 시각)이 병합에서 이겨 이로치가 꺼졌다 (Codex 29차 #3).
+    //    이미 이로치였으면 진화형의 시각 그대로 (…t에 들어 있다)
+    ...(m.shiny && !t.shiny ? { shiny: true, shinyAt: now } : {}),
   };
 
   const next = { ...m, evo: (Number(m.evo) || 0) + 1 };

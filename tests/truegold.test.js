@@ -11,7 +11,7 @@ import {
   TRUE_GOLD, TRUE_GOLD_CHANCE, BALLS, ITEMS, CATCH_SHOP, SHOP_BALLS, STONE_SHOP, SHINY_STONE, SHINY_USES, SHINY_CHARGE,
   itemById, canBuy, lootBox, shinyUsesLeft,
 } from '../js/items.js';
-import { ballChance, rollTrueGold, catchAttempt, inventory, buyItem, gainCoins } from '../js/xp.js';
+import { ballChance, rollTrueGold, trueGoldHit, spendUniqueBall, catchAttempt, inventory, buyItem, gainCoins, addItem } from '../js/xp.js';
 import { cloneProfile, emptyProfile, purchaseRule, shinyRule, unshinyRule, evolveRule, mergeStatRecord } from '../js/db.js';
 import { ballTip } from '../js/catch.js';
 
@@ -41,22 +41,17 @@ test('🌕 무조건 잡힌다 — 모든 등급·레벨, 🌌 울트라비스�
   assert.match(ballTip(TRUE_GOLD, false), /세상에 하나뿐/, '울트라비스트가 없어도 같은 말');
 });
 
-test('🌕 0.1% · 세상에 하나뿐: 가지고 있으면 굴리지 않고, 던지면 없어지고, 다시 0.1%', async () => {
+test('🌕 0.1% · 세상에 하나뿐: 가지고 있으면 굴리지 않고, 다시 0.1% · 저장이 안 되면 없던 일 (Codex 29차 #2)', async () => {
   assert.equal(TRUE_GOLD_CHANCE, 0.001);
-  assert.equal(await rollTrueGold(() => 0.001), false, '0.1% 바로 위는 안 나온다');
-  assert.equal(inventory().truegold, undefined);
-  assert.equal(await rollTrueGold(() => 0.000999), true, '0.1% 안');
-  assert.equal(inventory().truegold, 1);
+  assert.equal(trueGoldHit({}, () => 0.001), false, '0.1% 바로 위는 안 나온다');
+  assert.equal(trueGoldHit({}, () => 0.000999), true, '0.1% 안');
   let asked = 0;
-  assert.equal(await rollTrueGold(() => { asked++; return 0; }), false, '가지고 있으면 안 나온다');
+  assert.equal(trueGoldHit({ truegold: 1 }, () => { asked++; return 0; }), false, '가지고 있으면 안 나온다');
   assert.equal(asked, 0, '굴리지도 않는다');
-  assert.equal(inventory().truegold, 1, '둘이 되지 않는다');
-  // 던지면 반드시 잡히고 볼은 없어진다
-  const r = catchAttempt(150, () => 0.999999, { ball: 'truegold' });
-  assert.equal(r.caught, true);
-  assert.equal(r.ball, 'truegold');
-  assert.equal(inventory().truegold, undefined, '쓰면 없어진다');
-  assert.equal(await rollTrueGold(() => 0), true, '없어진 뒤에는 다시 나올 수 있다');
+  assert.equal(trueGoldHit({ truegold: 0 }, () => 0), true, '쓰고 없어진 뒤에는 다시 나올 수 있다');
+  // 이 테스트에는 IndexedDB가 없다 = 저장이 늘 실패한다 → "찾았다"도, 메모리 속 볼도 없어야 한다
+  assert.equal(await rollTrueGold(() => 0), false, '저장이 안 되면 찾았다고 하지 않는다');
+  assert.equal(inventory().truegold, undefined, '메모리에만 넣지 않는다 (다시 열면 사라지는 볼)');
   // 굴린 수가 많을 때 얼마나 나오나 (가지고 있지 않은 상태로 매번) — 0.1% 근처
   let hits = 0;
   let x = 12345;
@@ -79,8 +74,37 @@ test('🌕 저장 규칙: 저장된 가방에 이미 있으면 또 안 생긴다
   assert.equal(mergeStatRecord('profile', old, usedLater).items.truegold, undefined);
   assert.equal(mergeStatRecord('profile', old, { id: 'me', items: { truegold: 1 }, updatedAt: 300 }).items.truegold, 1, '합쳐도 둘이 아니라 하나');
   const rollSrc = src('js/xp.js');
-  assert.match(rollSrc, /if \(\(profile\.items\[TRUE_GOLD\.id\] \|\| 0\) > 0\) return false;\s*if \(!\(rng\(\) < TRUE_GOLD_CHANCE\)\) return false;/, '가지고 있으면 굴리기 전에 끝');
+  assert.match(rollSrc, /if \(!trueGoldHit\(profile\.items, rng\)\) return false;/, '가지고 있으면 굴리기 전에 끝');
   assert.match(rollSrc, /const gain = \{ items: \{ \[TRUE_GOLD\.id\]: 1 \}, once: TRUE_GOLD\.id \};/, '저장은 once로');
+  assert.match(rollSrc, /runProfileOp\(\(\) => applyPurchase\(cost, gain\), \(\) => \(\{ ok: false \}\)\);\s*return !!\(r && r\.ok\);\s*\}\s*\/\*\* 🌕 이번에 나오나/, '저장 실패의 대신 길은 "없던 일" (메모리 구매가 아니다)');
+});
+
+test('🌕 Codex 29차 #1 — 던질 때 저장소에서 먼저 쓴다: 창이 기억하는 가방으로는 못 쓰고, 다른 화면에서 썼으면 다시 고르기 · 닫히면 돌려준다', async () => {
+  // 저장소 규칙: 쓰기는 저장된 가방에서 (없으면 거절), 돌려주기는 once (그 사이 새로 생겼으면 그대로 하나)
+  const stored = prof({ items: { truegold: 1 } });
+  assert.equal(purchaseRule(stored, { coins: 0, items: { truegold: 1 } }, {}).ok, true, '창 A가 씀');
+  assert.equal(purchaseRule(stored, { coins: 0, items: { truegold: 1 } }, {}).ok, false, '창 B는 못 씀 (이미 없다)');
+  assert.equal(purchaseRule(stored, { coins: 0 }, { items: { truegold: 1 }, once: 'truegold' }).ok, true, '던지기 전에 닫혀 돌려줌');
+  assert.equal(purchaseRule(stored, { coins: 0 }, { items: { truegold: 1 }, once: 'truegold' }).ok, false, '돌려줘도 둘이 되지 않는다');
+  // 판정: 미리 쓴 표시(paid)가 없으면 창이 기억하는 가방에 있어도 🌕로 던지지 않는다 → 몬스터볼
+  addItem('truegold', 1);
+  const noPaid = catchAttempt(150, () => 0.999999, { ball: 'truegold' });
+  assert.equal(noPaid.ball, 'pokeball', '미리 쓰지 않은 🌕는 못 쓴다');
+  assert.equal(inventory().truegold, 1, '가방에서 빼지도 않는다');
+  const paid = catchAttempt(150, () => 0.999999, { ball: 'truegold', paid: 'truegold' });
+  assert.deepEqual([paid.ball, paid.caught], ['truegold', true], '미리 쓴 🌕는 무조건 잡힌다');
+  assert.equal(inventory().truegold, 1, '판정은 또 빼지 않는다 (이미 저장소에서 뺐다)');
+  assert.equal(await spendUniqueBall('truegold'), false, '저장이 안 되면 못 쓴 것');
+  assert.equal(await spendUniqueBall('greatball'), false, '하나뿐인 볼만');
+  // 잡기 화면 연결
+  const tb = src('js/catch.js');
+  const t = tb.slice(tb.indexOf('async function throwBall('));
+  assert.ok(t.indexOf('await spendUniqueBall(ballId)') > 0 && t.indexOf('await spendUniqueBall(ballId)') < t.indexOf('await sleep('), '연출 전에 쓴다');
+  assert.match(t, /if \(picked && picked\.unique && !ui\.practice\)/, '연습은 쓰지 않는다');
+  assert.match(t, /다른 화면에서 이미 썼어요 — 볼을 다시 골라요/);
+  assert.match(t, /if \(tg\) tg\.hidden = true; \/\/ "찾았다!" 알림이 남아 있으면 없는 볼을 가리킨다/, '못 쓰면 "찾았다" 알림도 내린다 (헤드리스가 잡음)');
+  assert.match(t, /ui\.attempt\(c\.id, \{ ball: ballId, paid \}\)/);
+  assert.equal((t.slice(0, t.indexOf('ui.attempt(')).match(/if \(!alive\(\)\) return giveBack\(\);/g) || []).length, 4, '판정 전에 닫히면 모두 돌려준다');
 });
 
 test('🌕 잡기 화면 연결 — 열릴 때마다 굴리고(연습 빼고), 찾으면 크게 알리되 저절로 고르지 않는다 · 쓰면 "다시 세상 어딘가로"', () => {
@@ -158,10 +182,25 @@ test('🌈 백업 병합: 되돌린 이로치를 옛 백업이 되살리지 않�
   assert.equal(mergeStatRecord('profile', { id: 'me', mons: { 25: {} }, updatedAt: 300 }, oldShiny).mons[25].shiny, true);
 });
 
-test('🌈 진화해도 이로치와 켜진 때가 따라간다 · 화면 연결(남은 횟수·두 번 눌러 되돌리기·🎒 가방 횟수)', () => {
+test('🌈 진화해도 이로치가 따라간다 — 새로 켜졌으면 진화한 때 (Codex 29차 #3) · 화면 연결(남은 횟수·두 번 눌러 되돌리기·🎒 가방 횟수·도감 칸)', () => {
   const p = prof({ caught: { 7: 1 }, partner: 7, mons: { 7: { lv: 5, shiny: true, shinyAt: 1234 } } });
-  evolveRule(p, 7, 8, 100);
-  assert.deepEqual([p.mons[8].shiny, p.mons[8].shinyAt], [true, 1234]);
+  evolveRule(p, 7, 8, 100, 5000);
+  assert.deepEqual([p.mons[8].shiny, p.mons[8].shinyAt], [true, 5000], '진화형이 새로 이로치가 됐다 = 진화한 때');
+  // Codex 재현: 어니부기를 되돌린(200) 백업 → 이로치 꼬부기(100)를 진화(300) → 그 백업을 합쳐도 이로치가 남는다
+  const q = prof({ caught: { 7: 1, 8: 1 }, mons: { 7: { lv: 5, shiny: true, shinyAt: 100 }, 8: { shiny: false, shinyAt: 200 } }, updatedAt: 250 });
+  const backup = cloneProfile(q);
+  evolveRule(q, 7, 8, 100, 300);
+  q.updatedAt = 400;
+  assert.deepEqual([q.mons[8].shiny, q.mons[8].shinyAt], [true, 300]);
+  assert.equal(mergeStatRecord('profile', q, backup).mons[8].shiny, true, '옛 백업이 진화로 켜진 이로치를 끄지 않는다');
+  // 진화형이 이미 이로치였으면 그 때 그대로
+  const r = prof({ caught: { 7: 1, 8: 1 }, mons: { 7: { lv: 5, shiny: true, shinyAt: 100 }, 8: { shiny: true, shinyAt: 50 } } });
+  evolveRule(r, 7, 8, 100, 900);
+  assert.equal(r.mons[8].shinyAt, 50);
+  // 🎒 도감 칸을 다시 그릴 때 원래 그림도 넘긴다 — 안 넘기면 되돌려도 칸에 이로치 그림이 남았다 (Codex 29차 #4)
+  assert.match(src('js/pokedex.js'), /setFigure\(fig, urlById\.get\(Number\(monId\)\), getLook\(monId\)\);/);
+  // ⚙ 연습에서 던진 🌕는 그대로라고 말한다 (Codex 29차 #5)
+  assert.match(src('js/catch.js'), /textContent: ui\.practice \? `연습이라 \$\{TRUE_GOLD\.emoji\} \$\{TRUE_GOLD\.ko\}은 그대로예요` : /);
   const s = src('js/shop.js');
   assert.match(s, /const n = shinyLeft\(\);/, '🌈 버튼은 남은 횟수로');
   assert.match(s, /`🌈 이로치로! \(남은 횟수 \$\{n\}번\)`/);
