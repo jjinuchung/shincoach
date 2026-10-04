@@ -1,8 +1,8 @@
-// 🏪 5일장 화면 — 🔀 퓨전 가게 (두 마리를 앞(모양) + 뒤(색)로 섞기) · 내 퓨전(분리) · 퓨전 도감(이름 바꾸기)
+// 🏪 5일장 화면 — 🔀 퓨전 가게 (두 마리를 앞(모양) + 뒤(색)로 섞기) · 🤝 교환 상인 (2단계) · 내 퓨전(분리) · 퓨전 도감(이름 바꾸기)
 // 규칙은 fusion.js(순수)와 db.js(트랜잭션), 화면은 여기. 🎒 도감의 "🏪 5일장" 버튼에서 연다 (장이 안 서는 날도 열려 다음 장날을 알려 준다)
 import { marketOpen, nextMarket, blendName, fusionId, recolor, FUSION_COST, NAME_MAX } from './fusion.js';
 import { ROSTER, loadCharacters } from './pokemon.js';
-import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList } from './xp.js';
+import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList, tradeOffers, tradeMon, RARITY } from './xp.js';
 import { STONE_MATH, STONE_ENGLISH } from './items.js';
 import { getFusionArt, putFusionArt } from './db.js';
 import { todayKey } from './track.js';
@@ -13,7 +13,8 @@ const $ = (id) => document.getElementById(id);
 const KO = new Map(ROSTER.map((m) => [m.id, m.ko]));
 const ART = 240; // 퓨전 그림 크기 (시험작과 같다)
 
-const ui = { open: false, override: null, a: null, b: null, picking: null, busy: false, result: null, renaming: null, splitArm: null, urlById: new Map(), onClose: null };
+const ui = { open: false, override: null, a: null, b: null, picking: null, busy: false, result: null, renaming: null, splitArm: null, urlById: new Map(), onClose: null,
+  trPick: null, trGive: {}, trArm: null }; // 🤝 trPick = 고르는 중인 상인 자리 · trGive = 자리마다 고른 내 포켓몬 · trArm = 한 번 누른 바꾸기
 const artUrls = new Map();  // fid → objectURL — 실제로 섞은 퓨전의 그림 (이 기기의 blobs에도 있다)
 const previews = new Map(); // fid → { url, blob } — 섞기 전 미리 보기, 최근 PREVIEW_MAX장만 (메모리만)
 const PREVIEW_MAX = 8;
@@ -41,6 +42,7 @@ const iga = (w) => (jong(w) > 0 ? '이' : '가');
 const rang = (w) => (jong(w) > 0 ? '이랑' : '랑');
 const wagwa = (w) => (jong(w) > 0 ? '과' : '와');
 const euro = (w) => (jong(w) > 0 && jong(w) !== 8 ? '으로' : '로'); // ㄹ 받침은 "로"
+const eul = (w) => (jong(w) > 0 ? '을' : '를');
 
 // ───────────── 🎨 퓨전 그림 (기기 안에서 만들고 blobs에 둔다) ─────────────
 
@@ -150,6 +152,7 @@ export async function openMarket(opts = {}) {
   ui.override = opts.today || null; // 시험용 날짜 — 보통은 null이라 누를 때마다 오늘을 다시 읽는다
   ui.onClose = opts.onClose || null;
   ui.a = null; ui.b = null; ui.picking = null; ui.result = null; ui.renaming = null; ui.splitArm = null;
+  ui.trPick = null; ui.trGive = {}; ui.trArm = null;
   $('market-msg').textContent = '';
   $('market').hidden = false;
   const chars = await loadCharacters().catch(() => []);
@@ -197,6 +200,7 @@ function render() {
   if (!open) body.appendChild(closedCard());
   else {
     body.appendChild(shopCard(nm, ne));
+    body.appendChild(tradeCard());
   }
   body.appendChild(dexCard(open));
 }
@@ -211,7 +215,7 @@ function closedCard() {
   const card = el('div', 'market-sec market-closed');
   card.appendChild(el('div', 'market-sign', '🏪 오늘은 장이 안 열려요'));
   if (nx) card.appendChild(el('p', 'market-next', `다음 장날: ${dateText(nx.key)} (${nx.days === 1 ? '내일' : `${nx.days}일 뒤`})`));
-  card.appendChild(el('p', 'market-note', '5일장은 5일마다 열려요. 장날에는 🔀 퓨전 가게에서 포켓몬 두 마리를 섞어 새 포켓몬을 만들고, 만든 퓨전을 다시 나눌 수도 있어요. 퓨전 도감과 이름 바꾸기는 언제든 돼요.'));
+  card.appendChild(el('p', 'market-note', '5일장은 5일마다 열려요. 장날에는 🔀 퓨전 가게에서 포켓몬 두 마리를 섞어 새 포켓몬을 만들고, 만든 퓨전을 다시 나눌 수도 있어요. 🤝 교환 상인 세 명도 와서 내 도감에 없는 포켓몬을 바꿔 줘요. 퓨전 도감과 이름 바꾸기는 언제든 돼요.'));
   return card;
 }
 
@@ -395,6 +399,156 @@ function splitBtn(f) {
     render();
   });
   return b;
+}
+
+// ───────────── 🤝 교환 상인 (2026-10-05, 🏪 2단계 — 규칙은 trade.js, 판정은 db.tradeRule 한 트랜잭션) ─────────────
+
+const nameOf = (id) => KO.get(Number(id)) || String(id);
+
+/** 포켓몬 그림 칸 (기기에 그림이 없으면 ?) */
+function monArt(id, cls = 'tr-art') {
+  const box = el('div', cls);
+  const u = ui.urlById.get(Number(id));
+  if (u) { const img = el('img'); img.src = u; img.alt = nameOf(id); img.draggable = false; box.appendChild(img); } else box.textContent = '?';
+  return box;
+}
+
+/** 🤝 교환 상인 셋 — 자리마다 ⭐ · ⭐⭐ · ⭐⭐⭐ */
+function tradeCard() {
+  const day = dayNow();
+  const offers = tradeOffers(day, new Set(ui.urlById.keys())); // 상인은 기기에 그림이 있는 포켓몬만 가져온다
+  const card = el('div', 'market-sec');
+  card.appendChild(el('h3', 'market-h', '🤝 교환 상인'));
+  card.appendChild(el('p', 'market-note', '상인들이 내 도감에 없는 포켓몬을 가져왔어요. 같은 등급에서 두 마리 이상 데리고 있는 포켓몬 하나와 바꿔요 — 상인마다 장날에 한 번, 바꾸면 되돌릴 수 없어요.'));
+  const list = el('div', 'tr-list');
+  for (const o of offers) list.appendChild(traderBox(o));
+  card.appendChild(list);
+  return card;
+}
+
+function traderBox(o) {
+  const box = el('div', 'tr-card' + (o.done ? ' done' : ''));
+  const head = el('div', 'tr-head');
+  head.appendChild(el('span', 'tr-who', `${o.who.emoji} ${o.who.name}`));
+  head.appendChild(el('span', 'tr-tier', `${RARITY[o.tier].stars} ${RARITY[o.tier].label}`));
+  box.appendChild(head);
+
+  if (o.done) { // 오늘 이미 바꿨다
+    box.appendChild(monArt(o.done.get));
+    box.appendChild(el('div', 'tr-did', `✅ ${nameOf(o.done.give)} → ${nameOf(o.done.get)}`));
+    box.appendChild(el('div', 'tr-say', '“고마워! 다음 장날에 또 와.”'));
+    return box;
+  }
+  if (!o.get) { // 이 등급에서 진우 도감에 없는 것(열린 것)을 못 찾았다
+    box.appendChild(el('div', 'tr-art', '🎒'));
+    box.appendChild(el('div', 'tr-say', `“네 도감에 없는 ${RARITY[o.tier].stars} 포켓몬을 못 찾았어. 다음 장날에 또 와!”`));
+    return box;
+  }
+
+  const X = nameOf(o.get);
+  box.appendChild(monArt(o.get));
+  box.appendChild(el('div', 'tr-name', X));
+  box.appendChild(el('div', 'tr-say', `“내 ${X} 줄게! 네 ${RARITY[o.tier].stars} 포켓몬 하나랑 바꿀래?”`));
+  if (o.subject === 'math') box.appendChild(el('p', 'market-note', '🔢 수학 포켓몬이라 수학 포켓몬끼리만 바꿔요'));
+  if (!o.gives.length) {
+    box.appendChild(el('p', 'market-note tr-cant', `${RARITY[o.tier].stars} ${o.subject === 'math' ? '수학 ' : ''}포켓몬을 두 마리 이상 데리고 있으면 바꿀 수 있어요`));
+    return box;
+  }
+
+  const give = o.gives.includes(ui.trGive[o.slot]) ? ui.trGive[o.slot] : null; // 그 사이 못 주게 됐으면 다시 고른다
+  const pick = el('button', 'fz-slot tr-give' + (ui.trPick === o.slot ? ' on' : '') + (give ? ' got' : ''));
+  pick.type = 'button';
+  pick.appendChild(el('span', 'fz-slot-label', '내가 줄 포켓몬'));
+  if (give) {
+    const u = ui.urlById.get(give);
+    if (u) { const img = el('img'); img.src = u; img.alt = nameOf(give); img.draggable = false; pick.appendChild(img); }
+    pick.appendChild(el('span', 'fz-slot-name', `${nameOf(give)} ×${haveCount(give)}`));
+  } else pick.appendChild(el('span', 'fz-slot-empty', '눌러서 고르기'));
+  pick.disabled = ui.busy;
+  pick.addEventListener('click', () => { unlock(); ui.trPick = ui.trPick === o.slot ? null : o.slot; ui.trArm = null; say(''); render(); });
+  box.appendChild(pick);
+
+  if (ui.trPick === o.slot) box.appendChild(givePicker(o));
+  else if (give) box.appendChild(tradeBtn(o, give));
+  return box;
+}
+
+/** 내가 줄 포켓몬 고르기 — 같은 등급(·같은 과목), 두 마리 이상 데리고 있는 것만 */
+function givePicker(o) {
+  const wrap = el('div', 'fz-picker');
+  wrap.appendChild(el('p', 'market-note', '두 마리 이상 있는 포켓몬만 줄 수 있어요 (한 마리는 남아요)'));
+  const grid = el('div', 'fz-grid');
+  for (const id of o.gives) {
+    const b = el('button', 'fz-pick');
+    b.type = 'button';
+    const u = ui.urlById.get(id);
+    if (u) { const img = el('img'); img.src = u; img.alt = ''; img.loading = 'lazy'; img.draggable = false; b.appendChild(img); }
+    b.appendChild(el('span', 'nm', nameOf(id)));
+    b.appendChild(el('span', 'cnt', `×${haveCount(id)}`));
+    b.addEventListener('click', () => { ui.trGive[o.slot] = id; ui.trPick = null; ui.trArm = null; render(); });
+    grid.appendChild(b);
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+/** 🤝 바꾸기 — 두 번 눌러야 (되돌릴 수 없다) */
+function tradeBtn(o, give) {
+  const armed = ui.trArm && ui.trArm.slot === o.slot && ui.trArm.give === give && Date.now() - ui.trArm.at < 5000;
+  const X = nameOf(o.get), Y = nameOf(give);
+  const b = el('button', 'btn btn-primary fz-go tr-go' + (armed ? ' armed' : ''), armed ? `정말 ${Y}${eul(Y)} 줄까요? 한 번 더!` : `🤝 ${Y} → ${X} 바꾸기`);
+  b.type = 'button';
+  b.disabled = ui.busy;
+  b.addEventListener('click', () => doTrade(o, give));
+  // 5초가 지나면 "한 번 더"가 풀린다 — 버튼도 원래대로 (안 그러면 망설이다 누른 아이에게 아무 일도 안 일어난 것처럼 보인다)
+  if (armed) {
+    const arm = ui.trArm;
+    setTimeout(() => {
+      if (ui.trArm !== arm || !b.isConnected) return;
+      ui.trArm = null;
+      b.classList.remove('armed');
+      b.textContent = `🤝 ${Y} → ${X} 바꾸기`;
+      if ($('market-msg').textContent.startsWith('🤝 한 번 더')) say(''); // 다른 일의 말은 그대로
+    }, Math.max(0, 5000 - (Date.now() - arm.at)));
+  }
+  return b;
+}
+
+async function doTrade(o, give) {
+  if (ui.busy) return;
+  const X = nameOf(o.get), Y = nameOf(give);
+  if (!(ui.trArm && ui.trArm.slot === o.slot && ui.trArm.give === give && Date.now() - ui.trArm.at < 5000)) {
+    ui.trArm = { slot: o.slot, give, at: Date.now() };
+    say(`🤝 한 번 더 누르면 ${Y}${eul(Y)} 주고 ${X}${eul(X)} 받아요 — 바꾸면 되돌릴 수 없어요`);
+    render();
+    return;
+  }
+  ui.trArm = null;
+  const day = dayNow();
+  if (!stillOpen(day)) { say('🏪 장이 닫혔어요 — 다음 장날에 바꿀 수 있어요'); render(); return; }
+  ui.busy = true;
+  render();
+  const r = await tradeMon({ day, slot: o.slot, give, get: o.get });
+  ui.busy = false;
+  if (!ui.open) return;
+  delete ui.trGive[o.slot];
+  ui.trPick = null;
+  if (!r.ok) {
+    say(r.why === 'have' ? `이제 ${Y}${iga(Y)} 한 마리뿐이라 줄 수 없어요 — 다른 포켓몬을 골라요`
+      : r.why === 'done' ? '이 상인하고는 오늘 벌써 바꿨어요'
+      : r.why === 'got' ? `${X}${iga(X)} 벌써 도감에 있어요 — 상인이 다른 포켓몬을 가져왔어요`
+      : r.why === 'closed' ? '🏪 장이 닫혔어요'
+      : r.why === 'subject' ? '🔢 수학 포켓몬은 수학 포켓몬끼리만 바꿔요'
+      : r.why === 'offer' || r.why === 'same' ? '이 포켓몬으로는 바꿀 수 없어요 — 다시 골라요'
+      : '저장을 못 했어요 — 한 번 더');
+    render();
+    return;
+  }
+  unlock();
+  sfx.success();
+  burstConfetti(90);
+  say(`🤝 ${X}${iga(X)} 왔어요! 도감에 새로 등록됐어요 (${Y}${iga(Y)} ${o.who.name}에게 갔어요)`);
+  render();
 }
 
 async function doFuse() {

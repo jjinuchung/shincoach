@@ -2679,3 +2679,21 @@ button { font-family: inherit; }
 .fz-split.armed { background: #fde68a; border-color: #d97706; font-weight: 800; }
 .fz-dex-cell .fz-art.small { width: 100%; }
 @media (max-width: 420px) { .fz-art.big { width: 160px; height: 160px; } .fz-slot img { width: 64px; height: 64px; } }
+/* 🤝 교환 상인 (2026-10-05, 🏪 2단계) — 상인 셋이 나란히 (좁으면 한 줄에 하나) */
+.tr-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.tr-card { display: grid; justify-items: center; align-content: start; gap: 6px; padding: 10px 8px; background: var(--card); border: 2px solid #ecdfc8; border-radius: 14px; min-width: 0; text-align: center; }
+.tr-card.done { border-color: #86c98a; background: #f3fbf3; }
+.tr-head { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 8px; }
+.tr-who { font-weight: 900; font-size: 1.05rem; }
+.tr-tier { font-size: 0.8rem; font-weight: 700; color: #9a6b1f; }
+.tr-art { display: grid; place-items: center; width: 120px; height: 120px; font-size: 2.6rem; color: var(--muted); }
+.tr-art img { width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.tr-name { font-size: 1.25rem; font-weight: 900; color: #a86f00; }
+.tr-say { font-weight: 700; line-height: 1.4; }
+.tr-did { font-weight: 900; color: #2f7d32; }
+.tr-cant { font-weight: 700; }
+.tr-give { width: 100%; min-height: 0; }
+.tr-give img { width: 64px; height: 64px; }
+.tr-give .fz-slot-empty { margin-top: 6px; }
+.tr-go { width: 100%; }
+.tr-go.armed { background: #d97706; border-color: #b45309; }

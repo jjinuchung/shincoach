@@ -173,7 +173,7 @@ export async function openPokedex(opts) {
   const mk = el('div', 'pokedex-coins pokedex-market' + (marketOpen(today) ? ' open' : ''));
   const mkLeft = el('div');
   mkLeft.appendChild(el('div', 'amt', marketOpen(today) ? '🏪 오늘은 5일장 날!' : '🏪 5일장'));
-  mkLeft.appendChild(el('div', 'pokedex-stats', marketOpen(today) ? '🔀 퓨전 가게에서 두 마리를 섞어 새 포켓몬을 만들어요' : nx ? `다음 장날 ${Number(nx.key.slice(5, 7))}월 ${Number(nx.key.slice(8))}일 (${nx.days === 1 ? '내일' : `${nx.days}일 뒤`})` : ''));
+  mkLeft.appendChild(el('div', 'pokedex-stats', marketOpen(today) ? '🔀 퓨전 가게 · 🤝 교환 상인 세 명이 왔어요' : nx ? `다음 장날 ${Number(nx.key.slice(5, 7))}월 ${Number(nx.key.slice(8))}일 (${nx.days === 1 ? '내일' : `${nx.days}일 뒤`})` : ''));
   mk.appendChild(mkLeft);
   const mkBtn = el('button', 'btn' + (marketOpen(today) ? ' btn-primary' : ''), marketOpen(today) ? '🏪 장 보러 가기' : '🏪 들어가 보기');
   mkBtn.type = 'button';

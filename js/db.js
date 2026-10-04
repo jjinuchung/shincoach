@@ -6,6 +6,7 @@ import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규�
 import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
 import { SHINY_USES, SHINY_CHARGE } from './items.js'; // 🌈 이로치 스톤 3회 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
+import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -754,13 +755,13 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions) };
+  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades) };
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -1323,6 +1324,35 @@ export function applyRenameFusion(fid, name) {
 }
 
 /**
+ * 🤝 5일장 교환 (2026-10-05, 🏪 2단계) — 상인 자리(slot)에게 give를 주고 get을 받는다. **한 트랜잭션**:
+ * 장날인지 · 그 상인과 오늘 안 바꿨는지 · get이 아직 도감에 없는지 · give를 2마리 이상 데리고 있는지 · 같은 등급·같은 과목인지를
+ * **저장된 프로필로** 다시 본다 (창이 기억하는 프로필로 보면 두 창이 마지막 한 마리를 두 번 준다).
+ * 보낸 수는 mons[give].traded 단조 카운터 (도감 칸은 남는다), 받은 종은 caught +1 (새로 등록, Lv1).
+ * 상인 이름은 날짜로 여기서 정한다 (밖에서 받지 않는다)
+ * @param {{day:string, slot:number, give:number, get:number}} req
+ * @param {{rarity:Function, subject:Function, allowed:Function, unlocked:Function}} ctx 명단의 정적인 사실 (trade.js)
+ * @returns {{ok:boolean, why?:string, give?:number, get?:number, who?:string}}
+ */
+export function tradeRule(profile, req, ctx, now = Date.now()) {
+  const chk = tradeCheck(profile, req, ctx);
+  if (!chk.ok) return chk;
+  const day = req.day, slot = Number(req.slot), give = Number(req.give), get = Number(req.get);
+  profile.mons = profile.mons || {};
+  profile.caught = profile.caught || {};
+  const m = profile.mons[give] || {};
+  profile.mons[give] = { ...m, traded: (Number(m.traded) || 0) + 1 };
+  profile.caught[get] = (Number(profile.caught[get]) || 0) + 1;
+  const who = (tradersFor(day)[slot] || {}).id || '';
+  profile.trades = profile.trades || {};
+  profile.trades[day] = { ...(profile.trades[day] || {}), [slot]: { who, give, get, at: now } };
+  if (!profile.partner) profile.partner = get;
+  return { ok: true, give, get, who };
+}
+export function applyTrade(req, ctx) {
+  return mutateProfile((p) => tradeRule(p, req, ctx));
+}
+
+/**
  * ⬆️ 레벨업 — 🔷🔶 스톤과 💰 코인을 치르고 `mons[id].lv`를 한 칸 올린다. **한 트랜잭션**.
  *
  * ★ 값은 **여기서** 계산한다(밖에서 받지 않는다). 두 창을 같이 열면 다른 창이 먼저 올려 레벨이 달라져 있고,
@@ -1591,7 +1621,7 @@ export function mergeStatRecord(name, cur, rec) {
       // 🔒 부모가 데려간 수·알려 준 수도 단조 카운터 (2026-09-28) — max가 아니면
       //    옛 백업을 되돌리는 것만으로 벌이 없던 일이 된다 (evo와 똑같은 함정)
       // 🔀 퓨전에 넣은 수·분리해 돌려받은 수도 단조 카운터 (2026-10-04) — max가 아니면 옛 백업이 퓨전에 넣은 포켓몬을 되살린다
-      for (const k of ['fused', 'unfused', 'fled']) { // ⚔️ 배틀에서 떠난 수도 (Codex 30차 #2)
+      for (const k of ['fused', 'unfused', 'fled', 'traded']) { // ⚔️ 배틀에서 떠난 수도 (Codex 30차 #2) · 🤝 상인에게 보낸 수도 (2026-10-05)
         const v = Math.max(Number(o[k]) || 0, Number(cur[k]) || 0);
         if (v && v !== (Number(cur[k]) || 0)) patch[k] = v;
       }
@@ -1608,6 +1638,8 @@ export function mergeStatRecord(name, cur, rec) {
     out.giftsGiven = { ...(rec.giftsGiven || {}), ...(cur.giftsGiven || {}) };
     // 🔀 퓨전 도감 — 만든 수·분리한 수는 max, 처음 만든 때는 이른 쪽, 이름은 나중에 고친 쪽 (fusion.mergeFusions)
     out.fusions = mergeFusions(cur.fusions, rec.fusions);
+    // 🤝 교환 기록 — 장날·상인 자리마다 합집합 (한 번 바꿨으면 계속 바꾼 것 — 옛 백업이 같은 상인과 또 바꾸게 하지 않는다)
+    out.trades = mergeTrades(cur.trades, rec.trades);
   }
   return out;
 }

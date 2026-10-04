@@ -9,12 +9,14 @@ import {
   applyExtend, // ⏳ 시간 연장권 (2026-10-01)
   applyUnshiny, // ⚪ 이로치 빼기 (2026-10-04)
   applyFuse, applyUnfuse, applyRenameFusion, // 🔀 퓨전 (2026-10-04, 🏪 5일장)
+  applyTrade, // 🤝 교환 상인 (2026-10-05, 🏪 2단계)
 } from './db.js';
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
+import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, MAX_LV } from './evolve.js';
-import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
+import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, MAX_LV } from './evolve.js';
+import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER } from './pokemon.js';
 import { findVoucher } from './unlock.js';
 
 // ── 경험치 ──
@@ -304,7 +306,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -336,7 +338,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions) };
+  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -554,6 +556,49 @@ export async function unfuseMon(fid, dateKey) {
 /** 🔀 이름 바꾸기 — 언제든 */
 export async function renameFusion(fid, name) {
   const r = await runProfileOp(() => applyRenameFusion(fid, name), () => ({ ok: false, why: 'save' }));
+  return r || { ok: false, why: 'save' };
+}
+
+// ── 🤝 5일장 교환 상인 (2026-10-05, 🏪 2단계 — 규칙은 trade.js, 트랜잭션은 db.tradeRule) ──
+
+const ROSTER_IDS = ROSTER.map((m) => m.id);
+const rosterSet = new Set(ROSTER_IDS);
+
+/**
+ * 교환 판정에 쓰는 명단의 사실 — 등급(부모가 옮긴 등급 포함) · 과목 · 원작 전설·환상·🌌 아님 · 진우 레벨로 열렸나.
+ * 게이트는 이 한 곳에서 만들어 상인이 가져올 것(offerFor)과 트랜잭션 판정(tradeRule) 둘 다 이것을 쓴다
+ */
+function tradeCtx(art) {
+  const level = levelFromXp(profile.xp).level;
+  return {
+    rarity: (id) => rarityOf(Number(id)),
+    subject: (id) => subjectOf(Number(id)),
+    allowed: (id) => rosterSet.has(Number(id)) && !isLegendary(id) && !isUltraBeast(id),
+    unlocked: (id) => isUnlocked(Number(id), level),
+    ...(art ? { art } : {}),
+  };
+}
+
+/**
+ * 그 장날 상인 셋이 가져온 것 [{ slot, tier, who, get, subject, gives, done }] — done은 오늘 이미 바꾼 기록
+ * @param {string} dateKey
+ * @param {Set<number>} [art] 기기에 그림이 있는 포켓몬 id (상인은 그림이 있는 것만 가져온다)
+ */
+export function tradeOffers(dateKey, art) {
+  const ctx = tradeCtx(art);
+  const done = tradesOn(profile.trades, dateKey);
+  return Array.from({ length: TRADER_COUNT }, (_, slot) => ({ ...offerFor(profile, dateKey, slot, ROSTER_IDS, ctx), done: done[slot] || null }));
+}
+
+/** 🤝 상인에게 보낸 마릿수 (도감 칸은 남는다) */
+export function tradedCount(id) {
+  return tradedOf(profile.mons[id]);
+}
+
+/** 🤝 바꾸기 — 한 트랜잭션 (장날·그 상인 오늘 한 번·2마리 이상·아직 없는 종·같은 등급·같은 과목). 저장이 안 되면 못 한 것 */
+export async function tradeMon(req) {
+  const r = await runProfileOp(() => applyTrade(req, tradeCtx()), () => ({ ok: false, why: 'save' }));
+  if (r && r.ok) ensurePartner();
   return r || { ok: false, why: 'save' };
 }
 
