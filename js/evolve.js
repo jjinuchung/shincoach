@@ -156,7 +156,16 @@ export function haveOf(caughtN, mon) {
   // 🔒 부모가 데려간 수도 같은 이유로 단조 카운터다 (2026-09-28). `caught`를 줄이면 백업을 되돌릴 때
   //    벌이 통째로 없던 일이 된다. 다시 잡으면 caught가 늘어 보유가 돌아온다 — 영구 삭제가 아니다
   const gone = Math.max(0, Math.floor(Number(mon && mon.taken) || 0));
-  return Math.max(0, got - out - gone - fusedOf(mon));
+  return Math.max(0, got - out - gone - fusedOf(mon) - fledOf(mon));
+}
+
+/**
+ * ⚔️ 배틀에서 져서 떠난 마릿수 (2026-10-05, Codex 30차 #2) — 단조 카운터. 예전에는 `caught`를 1 줄였는데,
+ * 병합은 caught를 max로 합쳐서 옛 백업을 가져오면 떠난 포켓몬이 되살아났다 (퓨전과 겹치면 복제까지).
+ * 이제 도감 칸(caught)은 남고 데리고 있는 수만 준다 — 진화·데려감·퓨전과 같은 규칙
+ */
+export function fledOf(mon) {
+  return Math.max(0, Math.floor(Number(mon && mon.fled) || 0));
 }
 
 /**

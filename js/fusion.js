@@ -90,7 +90,9 @@ export function mergeFusions(cur, rec) {
       made: Math.max(Number(c.made) || 0, Number(r.made) || 0),
       split: Math.max(Number(c.split) || 0, Number(r.split) || 0),
       at: at.length ? Math.min(...at) : 0,
-      ...(named.name ? { name: String(named.name), nameAt: Number(named.nameAt) || 0 } : {}),
+      // 원래 이름으로 되돌린 것(이름 없음)도 고친 때(nameAt)를 남긴다 — 버리면 옛 백업을 두 번 합칠 때 옛 이름이 돌아왔다 (Codex 30차 #3)
+      ...(named.name ? { name: String(named.name) } : {}),
+      ...(Number(named.nameAt) > 0 ? { nameAt: Number(named.nameAt) } : {}),
     };
   }
   return out;

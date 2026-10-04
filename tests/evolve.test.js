@@ -438,7 +438,8 @@ test('⚔️ 보유가 남아 있으면 배틀 패배는 그대로 적용된다'
   const p = cloneProfile(P({ caught: { 7: 2 }, mons: { 7: { losses: 2 } } }));
   const r = battleLossRule(p, 7, 3);
   assert.equal(r.lost, true, '3번 지면 한 마리가 떠난다');
-  assert.equal(p.caught[7], 1);
+  assert.equal(haveOf(p.caught[7], p.mons[7]), 1, '데리고 있는 수 2 → 1 (도감의 잡은 수는 그대로, 떠난 수 fled — Codex 30차 #2)');
+  assert.equal(p.caught[7], 2);
   assert.equal(p.mons[7].losses, 0, '떠나면 패배 수는 0으로');
 });
 

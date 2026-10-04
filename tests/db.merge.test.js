@@ -6,6 +6,7 @@ import {
   mergeStatRecord, pickReviewState, emptyDaily, mergeDailyDelta,
   cloneProfile, mergeProfileDelta, hpChangeRule, battleLossRule, purchaseRule,
 } from '../js/db.js';
+import { haveOf } from '../js/evolve.js';
 
 test('#6 sentenceStats: 오래된 백업이 최신 누적을 줄이지 않음', () => {
   const cur = { key: 'k', plays: 10, seconds: 100, speakPass: 3, bestRatio: 0.9, lastRatio: 0.9, lastAt: 200, done: true };
@@ -180,11 +181,20 @@ test('⚔️ battleLossRule: 누적과 "3번이면 잃음" 판정이 한 번에 
   assert.deepEqual(battleLossRule(p, 4, 3), { losses: 2, lost: false });
   assert.equal(p.caught[4], 2, '아직 안 잃음');
   assert.deepEqual(battleLossRule(p, 4, 3), { losses: 0, lost: true }, '3번째에 잃고 0으로');
-  assert.equal(p.caught[4], 1, '마릿수 −1');
-  // 마지막 한 마리를 잃으면 도감에서 빠진다
+  assert.equal(haveOf(p.caught[4], p.mons[4]), 1, '데리고 있는 수 −1');
+  // 마지막 한 마리를 잃으면 데리고 있는 수는 0, 도감 칸은 남는다 (2026-10-05, Codex 30차 #2 — 진화·데려감·퓨전과 같은 규칙)
   battleLossRule(p, 4, 3); battleLossRule(p, 4, 3);
   assert.equal(battleLossRule(p, 4, 3).lost, true);
-  assert.equal(p.caught[4], undefined);
+  assert.equal(haveOf(p.caught[4], p.mons[4]), 0);
+  assert.equal(p.caught[4], 2, '도감 칸(잡은 수)은 그대로 — 떠난 수는 fled로 센다');
+  assert.equal(p.mons[4].fled, 2);
+  // ★ 옛 백업(떠나기 전)을 합쳐도 떠난 포켓몬이 되살아나지 않는다 — caught를 줄이던 때는 max가 되살렸다
+  const before = cloneProfile({ caught: { 4: 2 }, mons: {}, updatedAt: 1 });
+  p.updatedAt = 2;
+  for (const [cur, rec] of [[p, before], [before, p]]) {
+    const m = mergeStatRecord('profile', cur, rec);
+    assert.equal(haveOf(m.caught[4], m.mons[4]), 0, '옛 백업으로 되살아나지 않는다');
+  }
 });
 
 test('💰 purchaseRule: 모자라면 아무것도 안 하고, 되면 치른 만큼만 빠진다', () => {

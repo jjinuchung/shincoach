@@ -13,9 +13,12 @@ const $ = (id) => document.getElementById(id);
 const KO = new Map(ROSTER.map((m) => [m.id, m.ko]));
 const ART = 240; // 퓨전 그림 크기 (시험작과 같다)
 
-const ui = { open: false, today: '', a: null, b: null, picking: null, busy: false, result: null, renaming: null, splitArm: null, urlById: new Map(), onClose: null };
-const artUrls = new Map(); // fid → objectURL (만든 그림)
-const making = new Map();  // fid → Promise (같은 그림을 겹쳐 만들지 않게)
+const ui = { open: false, override: null, a: null, b: null, picking: null, busy: false, result: null, renaming: null, splitArm: null, urlById: new Map(), onClose: null };
+const artUrls = new Map();  // fid → objectURL — 실제로 섞은 퓨전의 그림 (이 기기의 blobs에도 있다)
+const previews = new Map(); // fid → { url, blob } — 섞기 전 미리 보기, 최근 PREVIEW_MAX장만 (메모리만)
+const PREVIEW_MAX = 8;
+const making = new Map();   // fid → Promise (같은 그림을 겹쳐 만들지 않게)
+let artQueue = Promise.resolve(); // 그림은 한 장씩 차례로 — 퓨전 도감을 열 때 여러 장을 한꺼번에 만들면 태블릿이 멈칫한다 (한 장 약 0.2초)
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -52,41 +55,73 @@ async function imageData(url) {
   return g.getImageData(0, 0, ART, ART);
 }
 
-/**
- * 🔀 퓨전 그림 주소 — 이미 만든 것(메모리 → blobs) 아니면 두 포켓몬 그림으로 지금 만든다 (모양 A + 색 B).
- * 포켓몬 그림을 아직 못 받았으면 null (칸에는 🔀) — 다음에 열 때 다시
- */
-export async function fusionArtUrl(a, b, urlById) {
-  const fid = fusionId(a, b);
-  if (artUrls.has(fid)) return artUrls.get(fid);
-  if (making.has(fid)) return making.get(fid);
-  const job = (async () => {
-    let blob = null;
-    try { blob = await getFusionArt(fid); } catch { blob = null; }
-    if (!blob) {
-      const ua = urlById.get(Number(a)), ub = urlById.get(Number(b));
-      if (!ua || !ub) return null;
-      const [A, B] = await Promise.all([imageData(ua), imageData(ub)]);
-      const F = recolor(A, B);
-      const c = document.createElement('canvas');
-      c.width = F.width; c.height = F.height;
-      c.getContext('2d').putImageData(new ImageData(F.data, F.width, F.height), 0, 0);
-      blob = await new Promise((res) => c.toBlob(res, 'image/webp', 0.88));
-      if (!blob) return null;
-      try { await putFusionArt(fid, blob); } catch { /* 저장 못 해도 이번엔 보인다 */ }
-    }
-    const u = URL.createObjectURL(blob);
-    artUrls.set(fid, u);
-    return u;
-  })().catch(() => null).finally(() => making.delete(fid));
-  making.set(fid, job);
+/** 두 포켓몬 그림으로 퓨전 그림을 만든다 (모양 A + 색 B) — 차례를 기다렸다가, 한 장씩 */
+function makeArt(a, b, urlById) {
+  const job = artQueue.then(async () => {
+    const ua = urlById.get(Number(a)), ub = urlById.get(Number(b));
+    if (!ua || !ub) return null;
+    const [A, B] = await Promise.all([imageData(ua), imageData(ub)]);
+    const F = recolor(A, B);
+    const c = document.createElement('canvas');
+    c.width = F.width; c.height = F.height;
+    c.getContext('2d').putImageData(new ImageData(F.data, F.width, F.height), 0, 0);
+    const blob = await new Promise((res) => c.toBlob(res, 'image/webp', 0.88));
+    await new Promise((res) => setTimeout(res, 0)); // 다음 그림 전에 화면에 숨 돌릴 틈
+    return blob;
+  });
+  artQueue = job.catch(() => null);
   return job;
 }
 
-/** 퓨전 그림 칸 — 먼저 🔀, 그림이 되면 바꿔 끼운다 */
-export function fusionFigure(a, b, urlById, cls = 'fz-art') {
+/** 미리 보기를 최근 PREVIEW_MAX장만 — 오래된 것은 주소를 돌려준다 (섞지 않은 조합이 끝없이 쌓였다, Codex 30차 #6) */
+function keepPreview(fid, blob) {
+  const url = URL.createObjectURL(blob);
+  previews.delete(fid);
+  previews.set(fid, { url, blob });
+  while (previews.size > PREVIEW_MAX) {
+    const [old, rec] = previews.entries().next().value;
+    previews.delete(old);
+    URL.revokeObjectURL(rec.url);
+  }
+  return url;
+}
+
+/**
+ * 🔀 퓨전 그림 주소.
+ * made = 실제로 섞은 퓨전 → 메모리 → 이 기기의 blobs → (미리 보기 때 만든 것을 옮겨 담거나) 새로 만들어 blobs에 둔다.
+ * made가 아니면(섞기 전 미리 보기) 메모리에만, 최근 8장 — 기기에 쌓지 않는다 (Codex 30차 #6).
+ * 포켓몬 그림을 아직 못 받았으면 null (칸에는 🔀) — 다음에 열 때 다시
+ */
+export async function fusionArtUrl(a, b, urlById, made = true) {
+  const fid = fusionId(a, b);
+  if (artUrls.has(fid)) return artUrls.get(fid);
+  if (!made && previews.has(fid)) return previews.get(fid).url;
+  const key = `${made ? 'made' : 'preview'}:${fid}`;
+  if (making.has(key)) return making.get(key);
+  const job = (async () => {
+    if (!made) {
+      const blob = await makeArt(a, b, urlById);
+      return blob ? keepPreview(fid, blob) : null;
+    }
+    let blob = null;
+    let stored = false;
+    try { blob = await getFusionArt(fid); stored = !!blob; } catch { blob = null; }
+    if (!blob && previews.has(fid)) blob = previews.get(fid).blob; // 방금 미리 본 그림 그대로 (다시 만들지 않는다)
+    if (!blob) blob = await makeArt(a, b, urlById);
+    if (!blob) return null;
+    if (!stored) { try { await putFusionArt(fid, blob); } catch { /* 저장 못 해도 이번엔 보인다 */ } }
+    const u = URL.createObjectURL(blob);
+    artUrls.set(fid, u);
+    return u;
+  })().catch(() => null).finally(() => making.delete(key));
+  making.set(key, job);
+  return job;
+}
+
+/** 퓨전 그림 칸 — 먼저 🔀, 그림이 되면 바꿔 끼운다. made = 실제로 섞은 퓨전(기기에 저장), false = 미리 보기 */
+export function fusionFigure(a, b, urlById, cls = 'fz-art', made = true) {
   const box = el('div', cls, '🔀');
-  fusionArtUrl(a, b, urlById).then((u) => {
+  fusionArtUrl(a, b, urlById, made).then((u) => {
     if (!u) return;
     box.textContent = '';
     const img = el('img');
@@ -112,7 +147,7 @@ export function initMarket() {
  */
 export async function openMarket(opts = {}) {
   ui.open = true;
-  ui.today = opts.today || todayKey();
+  ui.override = opts.today || null; // 시험용 날짜 — 보통은 null이라 누를 때마다 오늘을 다시 읽는다
   ui.onClose = opts.onClose || null;
   ui.a = null; ui.b = null; ui.picking = null; ui.result = null; ui.renaming = null; ui.splitArm = null;
   $('market-msg').textContent = '';
@@ -137,9 +172,16 @@ export function isMarketOpen() {
 
 function say(t) { $('market-msg').textContent = t || ''; }
 
-/** 자정을 넘겼으면 오늘을 다시 — 장이 닫혔을 수 있다 (시험용 today는 그대로) */
-function stillOpen() {
-  return marketOpen(ui.today);
+/**
+ * 지금 날짜 — 그릴 때·누를 때마다 다시 읽는다. 창을 연 날을 들고 있으면 자정을 넘겨도 장이 열린 채였다 (Codex 30차 #1).
+ * 시험용 날짜(override)가 있으면 그것
+ */
+function dayNow() {
+  return ui.override || todayKey();
+}
+
+function stillOpen(day = dayNow()) {
+  return marketOpen(day);
 }
 
 // ───────────── 그리기 ─────────────
@@ -165,7 +207,7 @@ function dateText(key) {
 }
 
 function closedCard() {
-  const nx = nextMarket(ui.today);
+  const nx = nextMarket(dayNow());
   const card = el('div', 'market-sec market-closed');
   card.appendChild(el('div', 'market-sign', '🏪 오늘은 장이 안 열려요'));
   if (nx) card.appendChild(el('p', 'market-next', `다음 장날: ${dateText(nx.key)} (${nx.days === 1 ? '내일' : `${nx.days}일 뒤`})`));
@@ -243,7 +285,7 @@ function pickerGrid(which) {
 function previewBox(nm, ne) {
   const box = el('div', 'fz-preview');
   const name = blendName(KO.get(ui.a) || '', KO.get(ui.b) || '');
-  box.appendChild(fusionFigure(ui.a, ui.b, ui.urlById, 'fz-art big'));
+  box.appendChild(fusionFigure(ui.a, ui.b, ui.urlById, 'fz-art big', false)); // 미리 보기 — 기기에 저장하지 않는다
   box.appendChild(el('div', 'fz-name', name));
   box.appendChild(el('div', 'market-note', `${KO.get(ui.a)}의 모양 · ${KO.get(ui.b)}의 색`));
   const enough = nm >= FUSION_COST.stone_math && ne >= FUSION_COST.stone_english;
@@ -262,16 +304,19 @@ function resultCard() {
   const box = el('div', 'fz-result');
   box.appendChild(el('div', 'fz-result-title', r.first ? '✨ 새 포켓몬이 태어났어요! 퓨전 도감에 들어갔어요' : '✨ 또 만들었어요!'));
   box.appendChild(fusionFigure(f.a, f.b, ui.urlById, 'fz-art big'));
-  box.appendChild(nameRow(f));
+  box.appendChild(nameRow(f, 'result'));
   return box;
 }
 
-/** 이름 + ✏️ 바꾸기 (그 자리에서 고친다) */
-function nameRow(f) {
+/**
+ * 이름 + ✏️ 바꾸기 (그 자리에서 고친다). where = 'result'(섞은 결과) | 'dex'(퓨전 도감) — 누른 그 자리에만 입력칸을 연다.
+ * 퓨전 id만 들고 있으면 결과 카드와 도감에 입력칸이 둘 생겨 태블릿 키보드가 아래쪽으로 갔다 (Codex 30차 #5)
+ */
+function nameRow(f, where) {
   const row = el('div', 'fz-name-row');
-  if (ui.renaming === f.fid) {
+  if (ui.renaming && ui.renaming.fid === f.fid && ui.renaming.where === where) {
     const input = el('input', 'fz-name-input');
-    input.id = 'market-rename-input';
+    input.id = `market-rename-${where}`;
     input.type = 'text';
     input.maxLength = NAME_MAX;
     input.value = fusionName(f);
@@ -298,7 +343,7 @@ function nameRow(f) {
     row.appendChild(el('span', 'fz-name', fusionName(f)));
     const edit = el('button', 'btn fz-rename', '✏️ 이름 바꾸기');
     edit.type = 'button';
-    edit.addEventListener('click', () => { ui.renaming = f.fid; render(); });
+    edit.addEventListener('click', () => { ui.renaming = { fid: f.fid, where }; render(); });
     row.appendChild(edit);
   }
   return row;
@@ -314,7 +359,7 @@ function dexCard(open) {
   for (const f of list) {
     const cell = el('div', 'fz-cell' + (f.held > 0 ? ' held' : ''));
     cell.appendChild(fusionFigure(f.a, f.b, ui.urlById));
-    cell.appendChild(nameRow(f));
+    cell.appendChild(nameRow(f, 'dex'));
     cell.appendChild(el('div', 'market-note', `${KO.get(f.a)} + ${KO.get(f.b)}`));
     cell.appendChild(el('div', 'fz-held', f.held > 0 ? `데리고 있어요${f.held > 1 ? ` ×${f.held}` : ''}` : '나눴어요 — 다시 섞을 수 있어요'));
     if (open && f.held > 0) cell.appendChild(splitBtn(f));
@@ -339,9 +384,10 @@ function splitBtn(f) {
       return;
     }
     ui.splitArm = null;
-    if (!stillOpen()) { say('🏪 장이 닫혔어요 — 다음 장날에 나눌 수 있어요'); render(); return; }
+    const day = dayNow();
+    if (!stillOpen(day)) { say('🏪 장이 닫혔어요 — 다음 장날에 나눌 수 있어요'); render(); return; }
     ui.busy = true;
-    const r = await unfuseMon(f.fid, ui.today);
+    const r = await unfuseMon(f.fid, day);
     ui.busy = false;
     if (!ui.open) return;
     say(r.ok ? `🔀 ${fusionName(f)}${iga(fusionName(f))} ${KO.get(f.a)}${wagwa(KO.get(f.a))} ${KO.get(f.b)}${euro(KO.get(f.b))} 돌아왔어요` : r.why === 'closed' ? '🏪 장이 닫혔어요' : r.why === 'none' ? '이미 나눴어요' : '저장을 못 했어요 — 한 번 더');
@@ -353,11 +399,12 @@ function splitBtn(f) {
 
 async function doFuse() {
   if (ui.busy || !ui.a || !ui.b) return;
-  if (!stillOpen()) { say('🏪 장이 닫혔어요 — 다음 장날에 섞을 수 있어요'); render(); return; }
+  const day = dayNow();
+  if (!stillOpen(day)) { say('🏪 장이 닫혔어요 — 다음 장날에 섞을 수 있어요'); render(); return; }
   ui.busy = true;
   render();
   const a = ui.a, b = ui.b;
-  const r = await fuseMons(a, b, ui.today);
+  const r = await fuseMons(a, b, day);
   ui.busy = false;
   if (!ui.open) return;
   if (!r.ok) {

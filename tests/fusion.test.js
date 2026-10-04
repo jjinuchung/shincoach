@@ -9,7 +9,7 @@ import {
   MARKET_ANCHOR, MARKET_EVERY, FUSION_COST, marketOpen, nextMarket, dayNum, fusionId, parseFusionId, blendName, cleanName,
   fusionHeld, mergeFusions, copyFusions, recolor, hueGroups, toHsl,
 } from '../js/fusion.js';
-import { cloneProfile, emptyProfile, fuseRule, unfuseRule, renameFusionRule, mergeStatRecord, evolveRule, takeMonRule } from '../js/db.js';
+import { cloneProfile, emptyProfile, fuseRule, unfuseRule, renameFusionRule, mergeStatRecord, evolveRule, takeMonRule, battleLossRule } from '../js/db.js';
 import { haveOf, fusedOf } from '../js/evolve.js';
 import { ROSTER } from '../js/pokemon.js';
 
@@ -198,21 +198,25 @@ test('🔀 연결: 저장 규칙이 쓰는 비용·장날 · 앱 셸 · 화면 �
   const db = src('js/db.js');
   assert.match(db, /if \(!marketOpen\(dateKey\)\) return \{ ok: false, why: 'closed' \};/);
   assert.match(db, /purchaseRule\(profile, \{ items: \{ \.\.\.FUSION_COST \} \}, \{\}\)/, '스톤만 (coins 없음)');
-  assert.match(db, /for \(const k of \['fused', 'unfused'\]\)/, '병합은 max');
+  assert.match(db, /for \(const k of \['fused', 'unfused', 'fled'\]\)/, '병합은 max (⚔️ 배틀에서 떠난 수도)');
   assert.match(db, /out\.fusions = mergeFusions\(cur\.fusions, rec\.fusions\);/);
-  assert.match(src('js/evolve.js'), /return Math\.max\(0, got - out - gone - fusedOf\(mon\)\);/);
+  assert.match(src('js/evolve.js'), /return Math\.max\(0, got - out - gone - fusedOf\(mon\) - fledOf\(mon\)\);/, '퓨전·배틀에서 떠난 수까지 뺀다');
   const xp = src('js/xp.js');
   assert.match(xp, /fusions: copyFusions\(p\.fusions\)/, '메모리 프로필도 퓨전을 복사');
 });
 
 test('🏪 화면 연결 — 오늘 날짜로 판정 · 장이 닫히면 섞기·나누기 막음 · 고르기는 데리고 있는 것만(다른 칸 종 빼고) · 나누기는 두 번 · 도감에서 열고 닫으면 다시 그림', () => {
   const v = src('js/marketview.js');
-  assert.match(v, /ui\.today = opts\.today \|\| todayKey\(\);/, '보통은 오늘 (today는 시험용)');
-  assert.match(v, /const r = await fuseMons\(a, b, ui\.today\);/);
-  assert.match(v, /async function doFuse\(\) \{\s*if \(ui\.busy \|\| !ui\.a \|\| !ui\.b\) return;\s*if \(!stillOpen\(\)\)/, '섞기 전에 장날 확인');
+  // Codex 30차 #1 — 창을 연 날을 들고 있지 않고 누를 때마다 오늘을 다시 읽는다 (자정을 넘겨도 장이 열린 채였다)
+  assert.match(v, /ui\.override = opts\.today \|\| null;/, '시험용 날짜만 따로');
+  assert.match(v, /function dayNow\(\) \{\s*return ui\.override \|\| todayKey\(\);\s*\}/);
+  assert.ok(!/ui\.today/.test(v), '연 날짜를 들고 있는 곳이 없다');
+  assert.match(v, /async function doFuse\(\) \{\s*if \(ui\.busy \|\| !ui\.a \|\| !ui\.b\) return;\s*const day = dayNow\(\);\s*if \(!stillOpen\(day\)\)/, '섞기 전에 지금 날짜로 장날 확인');
+  assert.match(v, /const r = await fuseMons\(a, b, day\);/, '저장에도 그 날짜');
+  assert.match(v, /const day = dayNow\(\);\s*if \(!stillOpen\(day\)\) \{ say\('🏪 장이 닫혔어요 — 다음 장날에 나눌 수 있어요'\)/, '나누기도 지금 날짜');
   assert.match(v, /ROSTER\.filter\(\(m\) => m\.id !== other && haveCount\(m\.id\) > 0\)/, '데리고 있는 것만, 다른 칸 종은 빼고');
   assert.match(v, /b\.addEventListener\('click', async \(\) => \{\s*if \(ui\.busy\) return;\s*if \(!\(ui\.splitArm && ui\.splitArm\.fid === f\.fid && Date\.now\(\) - ui\.splitArm\.at < 5000\)\) \{\s*ui\.splitArm = \{ fid: f\.fid, at: Date\.now\(\) \};/, '나누기는 5초 안에 두 번 — 누르는 곳의 판정 (같은 조건이 버튼 글자에도 있어 그쪽만 보면 변이가 지나갔다)');
-  assert.match(v, /const r = await unfuseMon\(f\.fid, ui\.today\);/);
+  assert.match(v, /const r = await unfuseMon\(f\.fid, day\);/);
   assert.match(v, /const close = \(\) => \{ if \(!ui\.busy\) closeMarket\(\); \};/, '저장 중에는 닫지 않는다');
   assert.match(v, /try \{ await putFusionArt\(fid, blob\); \}/, '만든 그림은 이 기기에 둔다');
   assert.match(v, /const F = recolor\(A, B\);/, '그림은 fusion.recolor (모양 A + 색 B)');
@@ -222,10 +226,49 @@ test('🏪 화면 연결 — 오늘 날짜로 판정 · 장이 닫히면 섞기�
   const pd = src('js/pokedex.js');
   assert.match(pd, /openMarket\(\{ onClose: \(\) => \{ if \(!\$\('view-pokedex'\)\.hidden\) openPokedex\(\{ keepBack: true \}\); \} \}\);/, '닫으면 도감을 다시 그린다 (돌아갈 화면은 그대로)');
   assert.match(pd, /if \(!\(opts && opts\.keepBack\)\) backTo = visibleView\(\);/);
-  assert.match(pd, /fusedOf\(p\.mons\[m\.id\]\) > 0 \? '🔀' : '🧬'/, '퓨전에 들어간 종은 🔀');
+  assert.match(pd, /fusedOf\(p\.mons\[m\.id\]\) > 0 \? '🔀' : fledOf\(p\.mons\[m\.id\]\) > 0 \? '💨' : '🧬'/, '퓨전에 들어간 종은 🔀, 배틀에서 떠난 종은 💨');
   assert.match(pd, /initMarket\(\);/);
   assert.match(src('js/shop.js'), /fusedCount\(mon\.id\) > 0 \? '🔀 퓨전에 들어가 있어요 — 🏪 5일장에서 나누면 돌아와요'/);
   assert.match(src('index.html'), /<div id="market" class="modal" hidden>/);
   const sw = src('sw.js');
   for (const f of ['./js/fusion.js', './js/marketview.js']) assert.ok(sw.includes(`'${f}'`), `APP_SHELL에 ${f}`);
+});
+
+test('🔍 Codex 30차 — ② 배틀에서 떠난 수는 단조 카운터 · ③ 원래 이름으로 되돌린 때도 남는다 · ④ 나누면 파트너 다시 · ⑤ 입력칸은 누른 곳에만 · ⑥ 그림은 섞은 것만 기기에, 미리 보기는 8장', () => {
+  // ② Codex 재현: 꼬부기 둘 + 파이리 → 꼬부기 하나를 퓨전 → 백업 → 남은 꼬부기가 배틀에서 떠남 → 그 백업을 합친다
+  const p = prof({ caught: { 7: 2, 4: 1 }, items: { stone_math: 1, stone_english: 1 }, updatedAt: 1 });
+  fuseRule(p, 7, 4, OPEN);
+  p.updatedAt = 2;
+  const backup = cloneProfile(p);
+  battleLossRule(p, 7, 1);
+  p.updatedAt = 3;
+  assert.equal(haveOf(p.caught[7], p.mons[7]), 0);
+  for (const [cur, rec] of [[p, backup], [backup, p]]) {
+    const m = mergeStatRecord('profile', cur, rec);
+    assert.equal(haveOf(m.caught[7], m.mons[7]), 0, '떠난 꼬부기가 옛 백업으로 돌아오지 않는다');
+    assert.equal(fusionHeld(m.fusions['7-4']), 1, '퓨전은 그대로');
+  }
+  // ③ 이름 "old"(20) → 원래 이름으로(30) → 옛 백업을 두 번 합쳐도 원래 이름
+  const named = { '1-2': { made: 1, split: 0, at: 1, name: 'old', nameAt: 20 } };
+  const reset = { '1-2': { made: 1, split: 0, at: 1, nameAt: 30 } };
+  const once = mergeFusions(reset, named);
+  assert.deepEqual([once['1-2'].name, once['1-2'].nameAt], [undefined, 30], '되돌린 때를 남긴다');
+  const twice = mergeFusions(once, named);
+  assert.equal(twice['1-2'].name, undefined, '두 번째로 합쳐도 옛 이름이 안 돌아온다');
+  assert.deepEqual(mergeFusions(once, once)['1-2'], once['1-2'], '같은 것끼리 합쳐도 그대로');
+  // ④ 나눈 뒤에도 파트너를 다시 정한다
+  assert.match(src('js/xp.js'), /applyUnfuse\(fid, dateKey\), \(\) => \(\{ ok: false, why: 'save' \}\)\);\s*if \(r && r\.ok\) ensurePartner\(\);/);
+  // ⑤ 이름 입력칸은 누른 자리(결과/도감)에만
+  const v = src('js/marketview.js');
+  assert.match(v, /nameRow\(f, 'result'\)/);
+  assert.match(v, /nameRow\(f, 'dex'\)/);
+  assert.match(v, /if \(ui\.renaming && ui\.renaming\.fid === f\.fid && ui\.renaming\.where === where\)/);
+  assert.match(v, /input\.id = `market-rename-\$\{where\}`;/, '입력칸 id가 겹치지 않는다');
+  // ⑥ 그림: 섞은 퓨전만 기기에, 미리 보기는 메모리에 8장(오래된 주소는 돌려준다), 한 장씩 차례로, 저장 이름에 판 번호
+  assert.match(v, /const PREVIEW_MAX = 8;/);
+  assert.match(v, /while \(previews\.size > PREVIEW_MAX\) \{[\s\S]{0,160}URL\.revokeObjectURL\(rec\.url\);/);
+  assert.match(v, /fusionFigure\(ui\.a, ui\.b, ui\.urlById, 'fz-art big', false\)/, '미리 보기는 저장하지 않는다');
+  assert.match(v, /if \(!made\) \{\s*const blob = await makeArt\(a, b, urlById\);\s*return blob \? keepPreview\(fid, blob\) : null;\s*\}/, '미리 보기 길에는 putFusionArt가 없다');
+  assert.match(v, /const job = artQueue\.then\(/, '한 장씩');
+  assert.match(src('js/db.js'), /export const fusionArtKey = \(fid\) => `fusion:v1:\$\{fid\}`;/, '판 번호');
 });

@@ -205,7 +205,8 @@ export async function getGiftPhoto(giftId) {
  * 🔀 퓨전 그림 — 기기 안에서 만든 그림을 blobs 'fusion:<앞-뒤>'에 둔다 (이 기기만, 백업 밖 — 없으면 다시 만든다).
  * 포켓몬 그림으로 만든 것이라 공개 저장소에 두지 않는다 (선물 사진과 같은 원칙)
  */
-export const fusionArtKey = (fid) => `fusion:${fid}`;
+// 판 번호(v1) — 그리는 방식(fusion.recolor)을 바꾸면 v2로 올려 새로 만들게 한다 (안 그러면 옛 그림이 그대로 남는다, Codex 30차 #6)
+export const fusionArtKey = (fid) => `fusion:v1:${fid}`;
 export async function putFusionArt(fid, blob) {
   const db = await openDb();
   const tx = db.transaction('blobs', 'readwrite');
@@ -1069,8 +1070,8 @@ export function battleLossRule(profile, monId, lossesToLose) {
   if (haveOf((profile.caught || {})[monId], m) < 1) return { losses: Number(m.losses) || 0, lost: false, stale: true };
   const losses = (Number(m.losses) || 0) + 1;
   const lost = losses >= lossesToLose;
-  if (lost) addCount(profile.caught, monId, -1);
-  profile.mons[monId] = { ...m, losses: lost ? 0 : losses };
+  // 떠난 수(fled)를 올린다 — caught를 줄이면 옛 백업(max)이 되살렸다 (Codex 30차 #2). 도감 칸은 남는다
+  profile.mons[monId] = { ...m, losses: lost ? 0 : losses, ...(lost ? { fled: (Number(m.fled) || 0) + 1 } : {}) };
   return { losses: lost ? 0 : losses, lost };
 }
 
@@ -1590,7 +1591,7 @@ export function mergeStatRecord(name, cur, rec) {
       // 🔒 부모가 데려간 수·알려 준 수도 단조 카운터 (2026-09-28) — max가 아니면
       //    옛 백업을 되돌리는 것만으로 벌이 없던 일이 된다 (evo와 똑같은 함정)
       // 🔀 퓨전에 넣은 수·분리해 돌려받은 수도 단조 카운터 (2026-10-04) — max가 아니면 옛 백업이 퓨전에 넣은 포켓몬을 되살린다
-      for (const k of ['fused', 'unfused']) {
+      for (const k of ['fused', 'unfused', 'fled']) { // ⚔️ 배틀에서 떠난 수도 (Codex 30차 #2)
         const v = Math.max(Number(o[k]) || 0, Number(cur[k]) || 0);
         if (v && v !== (Number(cur[k]) || 0)) patch[k] = v;
       }

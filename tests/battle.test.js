@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BATTLE, MOVES, DAMAGE, TYPE_OF, typeOf, movesOf, speakTier, damageFor, damageForTier, quizTier, enemyDamage, shouldBattle, pickOpponent, eligibleMine, abortOutcome, formMult, FORM } from '../js/battle.js';
 import { ROSTER } from '../js/pokemon.js';
-import { battleWin, battleLoss, lossesOf, caughtCount, catchAttempt, consumeItem, addItem, itemCount } from '../js/xp.js';
+import { battleWin, battleLoss, lossesOf, caughtCount, haveCount, catchAttempt, consumeItem, addItem, itemCount } from '../js/xp.js';
 import { mergeStatRecord } from '../js/db.js';
 
 test('타입: 명단 60마리 전부 타입이 있고 기술 2개(강한/확실한)', () => {
@@ -65,7 +65,7 @@ test('상대 고르기: 못 잡은 것 중, 흔할수록 자주. 내보낼 포�
   assert.deepEqual(eligibleMine([25, 4], null, null), [25, 4]);
 });
 
-test('프로필: 승리는 상대 획득, 패배 3번이면 한 마리 잃음(마릿수 −1), 배틀 물약은 가방에서만', async () => {
+test('프로필: 승리는 상대 획득, 패배 3번이면 한 마리 잃음(데리고 있는 수 −1, 도감 칸은 남음), 배틀 물약은 가방에서만', async () => {
   catchAttempt(4, () => 0);
   assert.equal(caughtCount(4), 1);
   assert.equal(battleWin(150).first, true); assert.equal(caughtCount(150), 1);
@@ -74,10 +74,13 @@ test('프로필: 승리는 상대 획득, 패배 3번이면 한 마리 잃음(�
   assert.deepEqual(await battleLoss(4), { losses: 2, lost: false });
   assert.equal(lossesOf(4), 2);
   assert.deepEqual(await battleLoss(4), { losses: 0, lost: true }, '3번째 패배에 잃음');
-  assert.equal(caughtCount(4), 0, '한 마리뿐이었으니 도감에서 사라짐');
+  // 2026-10-05 (Codex 30차 #2, 아버님 결정): 떠난 수는 단조 카운터(fled) — 데리고 있는 수만 0, 도감 칸(잡은 수)은 남는다
+  assert.equal(haveCount(4), 0, '한 마리뿐이었으니 데리고 있는 수 0');
+  assert.equal(caughtCount(4), 1, '도감 칸은 남는다 (옛 백업이 되살리지 못하게)');
   assert.deepEqual(await battleLoss(150), { losses: 1, lost: false });
   assert.deepEqual(await battleLoss(150, 2), { losses: 0, lost: true }, '기준을 2로 주면 2번째에');
-  assert.equal(caughtCount(150), 1, '2마리 중 1마리 남음');
+  assert.equal(haveCount(150), 1, '2마리 중 1마리 남음');
+  assert.equal(caughtCount(150), 2, '잡은 수(도감)는 그대로');
   assert.equal(consumeItem('potion'), false);
   addItem('potion', 1);
   assert.equal(consumeItem('potion'), true); assert.equal(itemCount('potion'), 0);

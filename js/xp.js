@@ -13,7 +13,7 @@ import {
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, MAX_LV } from './evolve.js';
+import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
 import { findVoucher } from './unlock.js';
 
@@ -520,6 +520,11 @@ export function fusedCount(id) {
   return fusedOf(profile.mons[id]);
 }
 
+/** ⚔️ 배틀에서 져서 떠난 마릿수 (다시 잡으면 데리고 있는 수가 돌아온다) */
+export function fledCount(id) {
+  return fledOf(profile.mons[id]);
+}
+
 /**
  * 🔀 퓨전 도감 — 만든 적 있는 퓨전 [{ fid, a, b, made, split, held, name, at }] (처음 만든 순)
  * name은 아이가 지은 이름 (없으면 null — 화면이 앞 두 글자 + 끝 한 글자로 지어 보인다)
@@ -542,6 +547,7 @@ export async function fuseMons(a, b, dateKey) {
 /** 🔀 분리 — 장날에만, 두 마리가 돌아온다 */
 export async function unfuseMon(fid, dateKey) {
   const r = await runProfileOp(() => applyUnfuse(fid, dateKey), () => ({ ok: false, why: 'save' }));
+  if (r && r.ok) ensurePartner(); // 마지막 파트너를 넣었다가 나눴으면 다시 파트너가 생긴다 (Codex 30차 #4)
   return r || { ok: false, why: 'save' };
 }
 
