@@ -18,7 +18,8 @@ test('카탈로그: id가 겹치지 않고 가격은 양수, 장식은 head/face
     assert.ok(it.emoji && it.ko, it.id);
     assert.ok(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool', 'egg', 'extend'].includes(it.kind), it.id); // extend = ⏳ 시간 연장권 (2026-10-01)
     // 값이 없는 것 = 코인으로 못 사는 것: 🔴 몬스터볼(무료) · 🌟 황금 볼(복습으로만) · 🍄 다이버섯(학습으로만) · 🧤 스톤(학습으로만)
-    if (it.id === 'pokeball' || it.id === 'goldenball' || it.kind === 'mushroom' || it.kind === 'stone') assert.equal(it.price, 0, it.id);
+    // 🌕 진짜 황금 몬스터볼도 못 산다 (잡기 화면에서 0.1%로만, 2026-10-04)
+    if (it.id === 'pokeball' || it.id === 'goldenball' || it.id === 'truegold' || it.kind === 'mushroom' || it.kind === 'stone') assert.equal(it.price, 0, it.id);
     else assert.ok(it.price > 0, it.id);
   }
   for (const p of POTION) assert.ok(p.heal > 0, p.id);
@@ -288,10 +289,18 @@ test('🌈 이로치의 스톤: 🔷3 🔶3 💰500, 스톤 상점에만 · shin
   assert.ok(STONE_SHOP.includes(SHINY_STONE));
   const p = cloneProfile({ coins: 0, caught: { 25: 1 }, items: { shiny_stone: 1 }, mons: { 25: { gear: 'cap' } } });
   assert.deepEqual(shinyRule(p, 4), { ok: false, why: 'caught' }, '안 잡은 포켓몬');
-  assert.deepEqual(shinyRule(p, 25), { ok: true });
-  assert.deepEqual(p.mons[25], { gear: 'cap', shiny: true }, '꾸밈은 그대로, shiny만 얹는다');
-  assert.equal(p.items.shiny_stone, undefined, '스톤 하나 소모(0이면 지워짐)');
+  assert.deepEqual(shinyRule(p, 25, 'shiny_stone', 1000), { ok: true });
+  assert.deepEqual(p.mons[25], { gear: 'cap', shiny: true, shinyAt: 1000, dye: null }, '장식은 그대로, shiny를 얹고(켜진 때) 염색은 빠진다');
+  // 🌈 스톤 하나 = 3번 (2026-10-04): 뜯으면 스톤은 없어지고 남은 2번이 가방에
+  assert.equal(p.items.shiny_stone, undefined, '스톤을 뜯었다(0이면 지워짐)');
+  assert.equal(p.items.shiny_charge, 2, '남은 2번');
   assert.deepEqual(shinyRule(p, 25), { ok: false, why: 'already' });
   p.caught[4] = 1;
-  assert.deepEqual(shinyRule(p, 4), { ok: false, why: 'item' }, '스톤이 없다');
+  assert.deepEqual(shinyRule(p, 4), { ok: true }, '같은 스톤으로 두 번째');
+  assert.equal(p.items.shiny_charge, 1);
+  p.caught[7] = 1;
+  assert.deepEqual(shinyRule(p, 7), { ok: true }, '세 번째');
+  assert.equal(p.items.shiny_charge, undefined, '3번 다 쓰면 스톤이 사라진다');
+  p.caught[1] = 1;
+  assert.deepEqual(shinyRule(p, 1), { ok: false, why: 'item' }, '횟수가 없다');
 });

@@ -1148,6 +1148,23 @@ button { font-family: inherit; }
   animation: puzzle-bounce 0.6s ease 2;
 }
 .catch-levelup[hidden] { display: none; }
+/* 🌕 진짜 황금 몬스터볼을 찾은 순간 — 반년에 한 번쯤이라 레벨 업보다 크게 */
+.catch-truegold {
+  background-color: #fde68a;
+  border: 3px solid #d97706;
+  color: #78350f;
+  border-radius: 14px;
+  padding: 10px 12px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.05rem;
+  margin-bottom: 8px;
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.35), 0 0 22px rgba(245, 158, 11, 0.55);
+  animation: truegold-glow 1.4s ease-in-out infinite alternate;
+}
+@keyframes truegold-glow { from { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.3), 0 0 12px rgba(245, 158, 11, 0.4); } to { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0.45), 0 0 30px rgba(245, 158, 11, 0.75); } }
+.catch-ball-btn[data-ball="truegold"] { border: 2px solid #d97706; background: #fef3c7; color: #78350f; font-weight: 900; }
+.catch-ball-btn[data-ball="truegold"].on { background: #d97706; color: #fff; }
 .catch-msg { font-weight: 700; font-size: 1.05rem; margin: 4px 0 10px; min-height: 1.4em; text-align: center; }
 .catch-pick { display: flex; flex-wrap: wrap; justify-content: center; }
 .catch-pick[hidden] { display: none; }

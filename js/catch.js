@@ -1,10 +1,10 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
-import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory } from './xp.js';
+import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold } from './xp.js';
 import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
-import { makeFigure, setFigure, BALLS, POKEBALL } from './items.js';
+import { makeFigure, setFigure, BALLS, POKEBALL, TRUE_GOLD } from './items.js';
 import { openShop, closeShop, isBallShopOpen } from './shop.js'; // 🛒 볼 사러 가기 — 잡기 화면 위에 볼 상점
 import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
 import { isUltraBeast } from './pokemon.js'; // 🌌 울트라비스트 — ⚪ 비스트볼이 있어야 제대로 잡힌다
@@ -61,6 +61,7 @@ export function josa(word, withBatchim, without) {
  * @param {string} [o.note] 머리글에 덧붙일 한 줄
  * @param {{count:number, use:(cur:Array)=>Promise<{candidates:Array, pickId:number, note:string}|null>}} [o.radar] 🧭 레이더가 가방에 있으면 — 아이가 누르면 use()가 후보를 바꿔 준다
  * @param {() => void} [o.onDone] 닫힐 때
+ * @param {() => number} [o.goldRng] 🌕 진짜 황금 몬스터볼 뽑기의 난수 (헤드리스 확인용 — 보통은 Math.random)
  */
 export function openCatch(o) {
   bgm.play(); // 🎵 이어서
@@ -93,9 +94,12 @@ export function openCatch(o) {
   // 🌌 울트라비스트가 후보에 있으면 **던지기 전에** 알려 준다 — 몬스터볼로 던지면 거의 못 잡고 기회만 쓴다
   if ((o.candidates || []).some((c) => isUltraBeast(c.id))) {
     const has = (o.ballCounts || {})[BEASTBALL_ID] > 0;
+    const gold = (o.ballCounts || {})[TRUE_GOLD.id] > 0; // 🌕 진짜 황금 몬스터볼도 울트라비스트를 무조건 잡는다
     $('catch-msg').textContent = has
-      ? '🌌 울트라비스트가 나타났다! ⚪ 비스트볼로 던져야 잡혀요'
-      : `🌌 울트라비스트가 나타났다! ⚪ 비스트볼이 있어야 잡을 수 있어요 ${ui.practice ? '(🛒 상점)' : '— 아래 🛒 볼 사러 가기'}`;
+      ? `🌌 울트라비스트가 나타났다! ⚪ 비스트볼로 던져야 잡혀요${gold ? ' (🌕 진짜 황금 몬스터볼도 돼요)' : ''}`
+      : gold
+        ? '🌌 울트라비스트가 나타났다! 🌕 진짜 황금 몬스터볼이면 무조건 잡혀요 (아니면 ⚪ 비스트볼이 있어야 해요)'
+        : `🌌 울트라비스트가 나타났다! ⚪ 비스트볼이 있어야 잡을 수 있어요 ${ui.practice ? '(🛒 상점)' : '— 아래 🛒 볼 사러 가기'}`;
   }
   // 🕺 도트를 아직 안 받았으면 받아서 **그림만** 바꿔 끼운다.
   // ★ 여기서 renderPick을 다시 부르면 안 된다 — 후보 버튼을 통째로 새로 만들기 때문에,
@@ -136,7 +140,28 @@ export function openCatch(o) {
     }
   }
   renderBalls(o.ballCounts || {}, POKEBALL.id);
+  const tg = $('catch-truegold');
+  if (tg) tg.hidden = true;
   $('catch').hidden = false;
+  // 🌕 진짜 황금 몬스터볼 — 잡기 화면이 열릴 때마다 0.1% (⚙ 잡기 연습은 빼고). 세상에 하나뿐이라 가지고 있으면 안 굴린다
+  if (!ui.practice) {
+    const run = ui.run;
+    rollTrueGold(o.goldRng || Math.random).then((got) => { if (got) foundTrueGold(run); }).catch(() => {});
+  }
+}
+
+/** 🌕 찾았다! — 크게 알리고 볼 줄에 넣는다. 저절로 고르지는 않는다 (아껴 쓰게) */
+function foundTrueGold(run) {
+  if (!ui.open || ui.run !== run) return; // 그 사이 던졌거나 닫혔다 — 볼은 가방에 있다 (다음 잡기 화면에 보인다)
+  const tg = $('catch-truegold');
+  if (tg) {
+    tg.textContent = `✨ ${TRUE_GOLD.emoji} 세상에 하나뿐인 ${TRUE_GOLD.ko}을 찾았다! 무조건 잡히는 볼이에요 — 아껴 써요`;
+    tg.hidden = false;
+  }
+  burstConfetti(120);
+  sfx.success();
+  vibrate([60, 40, 60, 40, 200]);
+  refreshBalls(ui.ball);
 }
 
 /** 후보 목록 그리기 — pickId가 있으면 그 칸에 🧭 배지 */
@@ -217,6 +242,7 @@ export function keepBall(counts, sel) {
  */
 export function ballTip(b, hasUb) {
   if (!b || b.free) return '';
+  if (b.unique) return '세상에 하나뿐 — 무조건 잡혀요 (🌌 울트라비스트도)'; // 🌕 진짜 황금 몬스터볼
   if (b.sure) return '반드시 잡혀요';
   if (b.ub) return hasUb === false // ⚪ 비스트볼 — 보통 포켓몬에겐 몬스터볼과 같아 "1배"라고 하면 헷갈린다
     ? '이번 후보에는 🌌 울트라비스트가 없어서 몬스터볼과 확률이 같아요'
@@ -432,6 +458,8 @@ async function throwBall(c) {
       : res.partnerSet ? '도감에 새로 등록됐어요! 🤝 첫 파트너가 됐어요 — 위쪽 ❤️ 칩에서 볼 수 있어요'
       : res.first ? '도감에 새로 등록됐어요!' : `또 잡았어요 ×${res.count} (+${res.bonusXp} 경험치)`;
     result.appendChild(sub);
+    // 🌕 세상에 하나뿐인 볼을 썼다 — 없어졌고, 언젠가 또 나타난다 (0.1%)
+    if (res.ball === TRUE_GOLD.id) result.appendChild(Object.assign(document.createElement('small'), { textContent: `${TRUE_GOLD.emoji} ${TRUE_GOLD.ko}은 다시 세상 어딘가로 떠났어요 — 언젠가 또 나타날지도 몰라요!` }));
     if (res.info) renderHeader(ui.xpGain + (res.bonusXp || 0), res.info, 0);
   } else {
     ball.className = 'catch-ball open';

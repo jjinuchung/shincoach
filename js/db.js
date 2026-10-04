@@ -4,6 +4,7 @@
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
+import { SHINY_USES, SHINY_CHARGE } from './items.js'; // 🌈 이로치 스톤 3회 — items.js는 아무것도 import하지 않는다 (순환 없음)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -1196,21 +1197,42 @@ export function applyEggDay(subject, dateKey) {
   return mutateProfile((p) => eggRule(p, subject, dateKey));
 }
 /**
- * 🌈 이로치의 스톤 쓰기 — 잡은 포켓몬이고 아직 이로치가 아닐 때, 스톤 하나를 쓰고 mons[id].shiny = true를 **한 트랜잭션**에서 (영구)
+ * 🌈 이로치 입히기 — 잡은 포켓몬이고 아직 이로치가 아닐 때, 이로치 횟수 1번을 쓰고 mons[id].shiny = true를 **한 트랜잭션**에서.
+ * 스톤 하나는 3번(SHINY_USES): 뜯은 스톤의 남은 횟수(SHINY_CHARGE)를 먼저 쓰고, 없으면 새 스톤을 뜯어 2번을 남긴다.
+ * 입히면 그 포켓몬의 염색은 빠진다(염색약은 이미 썼다) — 되돌리면 옛 염색이 아니라 **원래 색**.
+ * shinyAt = 이로치가 켜지고 꺼진 때 — 백업 병합에서 되돌린 이로치가 되살아나지 않게 (mergeStatRecord)
  * @returns {{ok:boolean, why?:string}} why: 'caught' | 'already' | 'item'
  */
-export function shinyRule(profile, monId, itemId = 'shiny_stone') {
+export function shinyRule(profile, monId, itemId = 'shiny_stone', now = Date.now()) {
   const id = Number(monId);
   // 🧬 진화로 다 보낸 종에는 쓸 수 없다 — 도감에만 남은 모습에 500코인을 태우면 아이가 억울하다 (Codex 10차 #4)
   if (!id || haveOf((profile.caught || {})[id], profile.mons[id]) < 1) return { ok: false, why: 'caught' };
   if (profile.mons && profile.mons[id] && profile.mons[id].shiny) return { ok: false, why: 'already' };
-  const r = purchaseRule(profile, { items: { [itemId]: 1 } }, {});
-  if (!r.ok) return { ok: false, why: 'item' };
-  profile.mons[id] = { ...(profile.mons[id] || {}), shiny: true };
+  if ((profile.items[SHINY_CHARGE] || 0) > 0) addCount(profile.items, SHINY_CHARGE, -1);
+  else if ((profile.items[itemId] || 0) > 0) { addCount(profile.items, itemId, -1); addCount(profile.items, SHINY_CHARGE, SHINY_USES - 1); }
+  else return { ok: false, why: 'item' };
+  profile.mons[id] = { ...(profile.mons[id] || {}), shiny: true, shinyAt: now, dye: null };
   return { ok: true };
 }
 export function applyShiny(monId, itemId) {
   return mutateProfile((p) => shinyRule(p, monId, itemId));
+}
+
+/**
+ * ⚪ 이로치 빼기 — 원래 색으로 (2026-10-04, 진우 요청). 공짜지만 쓴 이로치 횟수는 돌아오지 않는다.
+ * 데리고 있는 포켓몬만 (입히는 규칙과 같다). 염색도 없는 원래 색으로
+ * @returns {{ok:boolean, why?:string}} why: 'caught' | 'not'
+ */
+export function unshinyRule(profile, monId, now = Date.now()) {
+  const id = Number(monId);
+  const m = (profile.mons || {})[id];
+  if (!id || haveOf((profile.caught || {})[id], m) < 1) return { ok: false, why: 'caught' };
+  if (!m || !m.shiny) return { ok: false, why: 'not' };
+  profile.mons[id] = { ...m, shiny: false, shinyAt: now, dye: null };
+  return { ok: true };
+}
+export function applyUnshiny(monId) {
+  return mutateProfile((p) => unshinyRule(p, monId));
 }
 
 /**
@@ -1272,7 +1294,7 @@ export function evolveRule(profile, fromId, toId, hpMax = 100) {
     lv: Math.max(lvOf(t), lv), // 진화형이 이미 더 높으면 그대로 (성장을 되돌리지 않는다)
     hp: hpMax,
     losses: 0,
-    ...(m.shiny ? { shiny: true } : {}), // 🌈 이로치는 그 종의 색 — 진화해도 이로치다
+    ...(m.shiny ? { shiny: true, ...(m.shinyAt ? { shinyAt: m.shinyAt } : {}) } : {}), // 🌈 이로치는 그 종의 색 — 진화해도 이로치다 (켜진 때도 같이)
   };
 
   const next = { ...m, evo: (Number(m.evo) || 0) + 1 };
@@ -1467,7 +1489,11 @@ export function mergeStatRecord(name, cur, rec) {
       if (!o) continue;
       const cur = out.mons[id] || {};
       const patch = {};
-      if (o.shiny && !cur.shiny) patch.shiny = true;
+      // 🌈 이로치: 켜고 끈 때(shinyAt)가 있으면 **나중에 바꾼 쪽**을 따른다 — 원래 색으로 되돌린 것을 옛 백업이 되살리지 않게 (2026-10-04).
+      //    둘 다 때가 없는 옛 기록끼리는 예전처럼 OR (그때 이로치는 되돌릴 수 없는 영구였다)
+      const oAt = Number(o.shinyAt) || 0;
+      const cAt = Number(cur.shinyAt) || 0;
+      if (oAt > cAt) { patch.shiny = !!o.shiny; patch.shinyAt = oAt; } else if (!oAt && !cAt && o.shiny && !cur.shiny) patch.shiny = true;
       const lv = Math.max(Number(o.lv) || 0, Number(cur.lv) || 0);
       if (lv && lv !== (Number(cur.lv) || 0)) patch.lv = lv;
       const evo = Math.max(Number(o.evo) || 0, Number(cur.evo) || 0);

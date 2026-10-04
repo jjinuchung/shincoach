@@ -3,7 +3,7 @@ import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf, isUl
 import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, RARITY_UB, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
 import { listDaily, getMath } from './db.js';
 import { todayKey, todayDone } from './track.js';
-import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES } from './items.js';
+import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES, SHINY_STONE, shinyUsesLeft } from './items.js';
 import { eggSummary } from './egg.js';
 import { gymClaimed } from './mathprog.js'; // 🕳 울트라홀 = 💎 스페셜 여덟 배지
 import { haveOf, lvOf } from './evolve.js';
@@ -73,7 +73,10 @@ function renderCoins() {
 function bagText() {
   const inv = inventory();
   // ⏳ 연장권은 두 과목이 같은 ⏳라 과목 표시를 붙인다 (⏳🔢×1 ⏳🎤×2)
-  const parts = Object.keys(inv).map((id) => itemById(id)).filter(Boolean).map((it) => `${it.emoji}${it.kind === 'extend' ? (it.subject === 'math' ? '🔢' : '🎤') : ''}×${inv[it.id]}`);
+  const parts = Object.keys(inv).map((id) => itemById(id)).filter((it) => it && it.id !== SHINY_STONE.id).map((it) => `${it.emoji}${it.kind === 'extend' ? (it.subject === 'math' ? '🔢' : '🎤') : ''}×${inv[it.id]}`);
+  // 🌈 이로치의 스톤은 개수가 아니라 남은 횟수로 (스톤 하나 = 3번, 뜯은 스톤의 남은 횟수 포함)
+  const left = shinyUsesLeft(inv);
+  if (left > 0) parts.push(`${SHINY_STONE.emoji}${left}번`);
   return parts.length ? `가방: ${parts.join(' ')}` : '가방이 비어 있어요';
 }
 

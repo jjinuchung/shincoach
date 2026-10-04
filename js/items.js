@@ -86,6 +86,14 @@ export const ULTRABALL = { id: 'ultraball', emoji: '🟡', ko: '하이퍼볼', p
 export const MASTERBALL = { id: 'masterball', emoji: '🟣', ko: '마스터볼', price: 1200, kind: 'ball', sure: true };
 // 🌟 황금 몬스터볼: 하이퍼볼과 같은 2배지만 상한이 더 높다(95%). 학습으로만 얻는다 — 🔁 영어 복습 완주(하루 1), 🔢 섞어 풀기 전부 정답(하루 1), ✨ 오늘의 보너스. (상점에서 못 사고 🎁 상자에서도 안 나옴)
 export const GOLDEN = { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', price: 0, mult: 2, cap: 0.95, kind: 'ball' };
+/**
+ * 🌕 진짜 황금 몬스터볼 (2026-10-04, 진우: "포켓몬 세계에는 황금 몬스터볼이 딱 하나 있고 무조건 잡힌다" → 아버님 "진행해줘").
+ * 🌟 황금 몬스터볼은 그대로 두고 따로 — 무조건 잡힌다(🌌 울트라비스트도), 상점에서 못 산다,
+ * 잡기 화면이 열릴 때마다 0.1%(TRUE_GOLD_CHANCE)로 나온다. **세상에 하나뿐**(unique): 가지고 있는 동안은 안 나오고,
+ * 쓰면 없어진 뒤 다시 0.1%. 두 창·백업을 합쳐도 하나 (xp.rollTrueGold — purchaseRule once)
+ */
+export const TRUE_GOLD = { id: 'truegold', emoji: '🌕', ko: '진짜 황금 몬스터볼', price: 0, kind: 'ball', sure: true, unique: true };
+export const TRUE_GOLD_CHANCE = 0.001;
 /** 잡기 화면에 보여줄 볼 순서 (몬스터볼은 언제나 첫 번째) */
 export const BALLS = [POKEBALL, GREATBALL, ULTRABALL, GOLDEN, MASTERBALL];
 // ⚪ 비스트볼은 아래(스톤 아이템 구역)에서 정의되므로 거기서 BALLS에 더한다 — 볼 고르기에 안 나오면 살 수는 있어도 못 던진다
@@ -128,6 +136,7 @@ export const EGG_ENGLISH = { id: 'egg_english', emoji: '🥚', ko: '영어 알',
 export const BEASTBALL = { id: 'beastball', emoji: '⚪', ko: '비스트볼', price: 300, stones: { stone_math: 2 }, mult: 1, ub: 5, cap: 0.9, kind: 'ball', hint: '🌌 울트라비스트에게만 아주 잘 들어요 — 보통 몬스터볼로는 거의 못 잡아요' };
 
 BALLS.push(BEASTBALL); // 🌌 울트라비스트를 잡으려면 잡기 화면의 볼 고르기에 나와야 한다
+BALLS.push(TRUE_GOLD); // 🌕 세상에 하나뿐 — 볼 줄 맨 끝
 /**
  * 🛒 잡기 화면에서 바로 여는 볼 상점 (2026-10-04, 진우 요청 → 아버님 "이대로 진행하자").
  * 잡고 싶은 포켓몬 앞에서 더 좋은 볼이 필요할 때 — 파는 볼 셋 + ⚪ 비스트볼(스톤 상점에도 그대로 있다).
@@ -135,7 +144,20 @@ BALLS.push(BEASTBALL); // 🌌 울트라비스트를 잡으려면 잡기 화면�
  */
 export const CATCH_SHOP = [...SHOP_BALLS, BEASTBALL];
 
-export const SHINY_STONE = { id: 'shiny_stone', emoji: '🌈', ko: '이로치의 스톤', price: 500, stones: { stone_math: 3, stone_english: 3 }, kind: 'tool', hint: '🎒 잡은 포켓몬을 눌러 "🌈 이로치로!"를 누르면 색이 다른 모습이 돼요 — 영원히' };
+export const SHINY_STONE = { id: 'shiny_stone', emoji: '🌈', ko: '이로치의 스톤', price: 500, stones: { stone_math: 3, stone_english: 3 }, kind: 'tool', hint: '🎒 잡은 포켓몬을 눌러 "🌈 이로치로!" — 스톤 하나로 3번 쓸 수 있고, 🎨 칸에서 원래 색으로 되돌릴 수도 있어요 (되돌려도 횟수는 안 돌아와요)' };
+/**
+ * 🌈 이로치의 스톤은 3번 (2026-10-04, 진우 요청 → 아버님 "진행해줘"): 이로치를 입힐 때마다 1번, 3번 다 쓰면 스톤이 사라진다.
+ * 원래 색으로 되돌리기는 공짜지만 쓴 횟수는 돌아오지 않는다 (A에 입혔다 되돌리면 1번 · B·C에 입히면 스톤 끝).
+ * 남은 횟수 = 뜯지 않은 스톤 × 3 + 뜯은 스톤의 남은 횟수(가방의 SHINY_CHARGE — 카탈로그 밖의 개수라 🎁 상자·상점에 안 나온다).
+ * 가방(items)에 두는 까닭: 두 창·백업 병합(가방은 최근 쪽 통째로)·복사가 스톤과 한 묶음으로 따라간다
+ */
+export const SHINY_USES = 3;
+export const SHINY_CHARGE = 'shiny_charge';
+/** 🌈 이로치를 입힐 수 있는 남은 횟수 */
+export function shinyUsesLeft(bag) {
+  const b = bag || {};
+  return (Number(b[SHINY_STONE.id]) || 0) * SHINY_USES + (Number(b[SHINY_CHARGE]) || 0);
+}
 export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH, SHINY_STONE, BEASTBALL];
 
 /**
@@ -172,6 +194,7 @@ export const ITEMS = [
   ULTRABALL,
   MASTERBALL,
   GOLDEN,
+  TRUE_GOLD,
   KEYSTONE,
   MEGASTONE,
   MUSHROOM,

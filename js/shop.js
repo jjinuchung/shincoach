@@ -2,7 +2,7 @@
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, CATCH_SHOP, STONE_SHOP, STONES, SHINY_STONE, EXTENDERS, itemById, canBuy, priceText, setFigure } from './items.js';
-import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone } from './xp.js';
+import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone, shinyLeft, undoShiny } from './xp.js';
 import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림
@@ -14,6 +14,7 @@ const $ = (id) => document.getElementById(id);
 let onChange = null; // (monId|null) 코인·꾸밈이 바뀌면 도감이 그 자리만 다시 그리도록
 let mon = null;      // 상세 모달에 열린 포켓몬 { id, ko, url }
 let gearDrag = null; // 🎀 끌고 있는 장식 { move, up, g } — 손 뗀 이벤트를 놓쳐도 정리할 수 있게 들고 있는다
+let unshinyArm = null; // ⚪ 이로치 빼기 첫 번째 누름 { id, at } — 5초 안에 한 번 더 눌러야 뺀다
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -41,14 +42,16 @@ export function initShop(ctx) {
     if (!mon || mon.caught === false) return;
     sb.disabled = true;
     const id = mon.id;
-    const r = await useShinyStone(id); // 트랜잭션: 스톤 하나 + shiny 표시 (두 창이 같은 스톤을 둘 다 못 쓴다)
+    const r = await useShinyStone(id); // 트랜잭션: 이로치 횟수 1번 + shiny 표시 (두 창이 같은 횟수를 둘 다 못 쓴다)
     if (!mon || mon.id !== id) return;
-    if (!r.ok) { renderMon(r.why === 'already' ? '✨ 이미 이로치예요' : r.why === 'item' ? '🌈 이로치의 스톤이 없어요 — 🛒 스톤 상점에서' : '저장을 못 했어요 — 한 번 더'); return; }
+    if (!r.ok) { renderMon(r.why === 'already' ? '✨ 이미 이로치예요' : r.why === 'item' ? '🌈 이로치 횟수가 없어요 — 🛒 스톤 상점에서 이로치의 스톤을 (하나에 3번)' : '저장을 못 했어요 — 한 번 더'); return; }
+    unshinyArm = null;
     renderMon('🌈 이로치가 됐어요! 그림을 받아 오는 중…', true);
     notify(id);
     await Promise.race([ensureShiny(id), new Promise((res) => setTimeout(res, 8000))]); // 그림은 지금 받는다 (못 받으면 일반 그림 + ✨)
     if (!mon || mon.id !== id) return;
-    renderMon(`✨ ${mon.ko}${josaIga(mon.ko)} 이로치가 됐어요! 도감·잡기·퍼즐·배틀 어디서나 이 모습이에요`, true);
+    const left = shinyLeft();
+    renderMon(`✨ ${mon.ko}${josaIga(mon.ko)} 이로치가 됐어요! 도감·잡기·퍼즐·배틀 어디서나 이 모습이에요 · 🌈 ${left ? `남은 횟수 ${left}번` : '이로치의 스톤을 다 썼어요'}`, true);
     notify(id);
   });
   // 화면이 꺼지거나 다른 앱으로 넘어가면 손 뗀 이벤트가 안 온다 → 끌고 있던 장식을 여기서 놓는다
@@ -132,7 +135,8 @@ function shopSection(title, sub, items, boughtId) {
     btn.appendChild(el('span', 'nm', it.ko));
     btn.appendChild(el('span', 'pr', priceText(it)));
     const n = itemCount(it.id);
-    if (n > 0) btn.appendChild(el('span', 'own', `가방에 ${n}개`));
+    if (it.id === SHINY_STONE.id) { const left = shinyLeft(); if (left > 0) btn.appendChild(el('span', 'own', `남은 ${left}번`)); } // 🌈 스톤 하나 = 3번 — 개수보다 횟수가 아이에게 맞는 말
+    else if (n > 0) btn.appendChild(el('span', 'own', `가방에 ${n}개`));
     const { ok, short, shortStones } = canBuy(it.id, coins(), inventory());
     const brooding = it.kind === 'egg' ? eggFor(it.subject) : null; // 🥚 품는 알이 있으면 부화할 때까지 또 못 산다
     if (brooding) {
@@ -401,11 +405,11 @@ function renderMon(msg, pop) {
   // 🌈 이로치의 스톤 — 가방에 있고 아직 이로치가 아니면 버튼, 이미 이로치면 표시만
   const sb = $('mon-shiny');
   if (sb) {
-    const n = itemCount(SHINY_STONE.id);
+    const n = shinyLeft(); // 🌈 남은 횟수 — 스톤 하나에 3번 (2026-10-04)
     // 🧬 진화로 보낸 모습에는 쓸 수 없다 (이미 이로치면 '이로치예요' 표시는 남긴다)
     sb.hidden = !got || (!look.shiny && (n < 1 || !here));
     sb.disabled = !!look.shiny;
-    sb.textContent = look.shiny ? (look.shinyUrl ? '✨ 이로치예요' : '✨ 이로치예요 — 색 그림을 받는 중…') : `🌈 이로치로! (스톤 1개 쓰기 · 영원히 · ${n}개 있음)`;
+    sb.textContent = look.shiny ? (look.shinyUrl ? '✨ 이로치예요 — 🎨 칸에서 원래 색으로 되돌릴 수 있어요' : '✨ 이로치예요 — 색 그림을 받는 중…') : `🌈 이로치로! (남은 횟수 ${n}번)`;
     // 이로치인데 그림이 아직 없다(처음 받기 실패·다른 창에서 만듦) → 열 때마다 다시 받아 본다 (Codex 8차 #2)
     if (look.shiny && !look.shinyUrl && got) retryShinyArt(mon.id);
   }
@@ -431,6 +435,25 @@ function renderMon(msg, pop) {
   const dyeBox = $('mon-dye');
   dyeBox.innerHTML = '';
   if (look.shiny) {
+    // ⚪ 이로치 빼기 (2026-10-04, 진우 요청) — 공짜지만 쓴 횟수는 안 돌아온다. 잘못 누르면 횟수 1번이 날아가니 두 번 눌러야
+    const armed = unshinyArm && unshinyArm.id === mon.id && Date.now() - unshinyArm.at < 5000;
+    dyeBox.appendChild(option('⚪', armed ? '정말 원래 색으로?' : '원래 색', armed ? '한 번 더 누르면 돼요' : '이로치 빼기', false, 'none', async () => {
+      if (!mon) return;
+      const id = mon.id;
+      if (!(unshinyArm && unshinyArm.id === id && Date.now() - unshinyArm.at < 5000)) {
+        unshinyArm = { id, at: Date.now() };
+        renderMon(`⚪ 한 번 더 누르면 원래 색으로 돌아가요 — 다시 🌈 이로치로 하려면 횟수 1번이 들어요 (남은 횟수 ${shinyLeft()}번)`);
+        return;
+      }
+      unshinyArm = null;
+      const r = await undoShiny(id);
+      if (!mon || mon.id !== id) { if (r.ok) notify(id); return; }
+      if (!r.ok) { renderMon(r.why === 'not' ? '이미 원래 색이에요' : '저장을 못 했어요 — 한 번 더'); return; }
+      unlock();
+      sfx.ding();
+      renderMon(`⚪ ${mon.ko}${josaIga(mon.ko)} 원래 색으로 돌아왔어요 (🌈 남은 횟수 ${shinyLeft()}번)`, true);
+      notify(id);
+    }));
     dyeBox.appendChild(el('span', 'mon-empty', '✨ 이로치는 제 색 그대로예요 — 염색약은 다른 포켓몬에게 써요'));
     return; // 염색 칸이 renderMon의 마지막이다
   }

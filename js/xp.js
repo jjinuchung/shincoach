@@ -7,8 +7,9 @@ import {
   hpChangeRule, battleLossRule, purchaseRule, normalizeUnlockBase, gearRule,
   applyTakeMons, applyTakenSeen, // 🔒 부모가 데려가기 (2026-09-28)
   applyExtend, // ⏳ 시간 연장권 (2026-10-01)
+  applyUnshiny, // ⚪ 이로치 빼기 (2026-10-04)
 } from './db.js';
-import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf } from './items.js';
+import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast } from './pokemon.js';
@@ -700,11 +701,37 @@ export function getLook(monId) {
   return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId), gearPos: m.gearPos || null, shiny: !!m.shiny, shinyUrl: m.shiny ? shinyUrl(monId) : null };
 }
 
-/** 🌈 이로치의 스톤 쓰기 — 트랜잭션(스톤 소모 + shiny 표시 한 번에). @returns {Promise<{ok:boolean, why?:string}>} */
+/** 🌈 이로치를 입힐 수 있는 남은 횟수 (스톤 하나 = 3번) */
+export function shinyLeft() {
+  return shinyUsesLeft(profile.items);
+}
+
+/** 🌈 이로치 입히기 — 트랜잭션(횟수 1번 + shiny 표시 한 번에). @returns {Promise<{ok:boolean, why?:string}>} */
 export async function useShinyStone(monId) {
-  if ((profile.items[SHINY_STONE.id] || 0) < 1) return { ok: false, why: 'item' };
+  if (shinyLeft() < 1) return { ok: false, why: 'item' };
   const r = await runProfileOp(() => applyShiny(monId, SHINY_STONE.id), () => ({ ok: false, why: 'save' }));
   return { ok: !!(r && r.ok), why: r && r.why };
+}
+
+/** ⚪ 이로치 빼기 — 원래 색으로 (공짜, 쓴 횟수는 안 돌아온다). @returns {Promise<{ok:boolean, why?:string}>} */
+export async function undoShiny(monId) {
+  if (!isShiny(monId)) return { ok: false, why: 'not' };
+  const r = await runProfileOp(() => applyUnshiny(monId), () => ({ ok: false, why: 'save' }));
+  return { ok: !!(r && r.ok), why: r && r.why };
+}
+
+/**
+ * 🌕 진짜 황금 몬스터볼 — 잡기 화면이 열릴 때 한 번 굴린다 (TRUE_GOLD_CHANCE = 0.1%).
+ * 세상에 하나뿐: 가지고 있으면 굴리지 않고, 저장은 once로 — 두 창이 같은 순간에 뽑아도 하나만 (purchaseRule)
+ * @returns {Promise<boolean>} 이번에 새로 찾았나
+ */
+export async function rollTrueGold(rng = Math.random) {
+  if ((profile.items[TRUE_GOLD.id] || 0) > 0) return false;
+  if (!(rng() < TRUE_GOLD_CHANCE)) return false;
+  const cost = { coins: 0 };
+  const gain = { items: { [TRUE_GOLD.id]: 1 }, once: TRUE_GOLD.id };
+  const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
+  return !!(r && r.ok);
 }
 /**
  * 💎 스페셜 한 회차 — 진도 기록과 **보상 지급을 한 트랜잭션**에서 끝낸다 (Codex 11차 #1).
