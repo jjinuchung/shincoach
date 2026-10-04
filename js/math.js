@@ -166,7 +166,9 @@ function storyBody(text) {
     let onlyFig = true;
     for (const seg of segs) {
       if (!seg) continue;
-      if (/^\[[a-z]+ [^\]]+\]$/.test(seg)) p.appendChild(svgBox(renderFigures(seg), 'math-fig inline'));
+      // 못 그리는 지시문(띄어쓰기 실수 등)은 빈 그림 상자 대신 글자 그대로 — 문제 글(qtNode)과 같은 규칙 (Codex 27차)
+      const svg = /^\[[a-z]+ [^\]]+\]$/.test(seg) ? renderFigures(seg) : '';
+      if (svg && svg !== seg) p.appendChild(svgBox(svg, 'math-fig inline'));
       else {
         seg.split('\n').forEach((line, i) => { if (i) p.appendChild(el('br')); p.appendChild(richNode(line)); });
         if (seg.trim()) onlyFig = false;

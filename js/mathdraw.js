@@ -2595,7 +2595,8 @@ function parseScaleSide(t) {
   const s = t.trim(); let m;
   if ((m = /^(\d+)$/.exec(s))) return { x: 0, n: +m[1] };
   if ((m = /^(\d*)x$/.exec(s))) return { x: m[1] ? +m[1] : 1, n: 0 };
-  if ((m = /^(\d*)x \+ (\d+)$/.exec(s))) return { x: m[1] ? +m[1] : 1, n: +m[2] };
+  // "2x+3"·"2x +3"처럼 손으로 쓴 지시문도 (Codex 27차 — 📊 답장·❓에 아빠가 직접 쓴다)
+  if ((m = /^(\d*)x\s*\+\s*(\d+)$/.exec(s))) return { x: m[1] ? +m[1] : 1, n: +m[2] };
   return null;
 }
 /** `2x + 3 | 11 take=3` → { L, R, take } (못 읽거나 그릴 수 없으면 null) */
@@ -2608,10 +2609,10 @@ export function parseScale(arg) {
   if (!okPan(L) || !okPan(R) || take > Math.min(L.n, R.n)) return null;
   return { L, R, take };
 }
-const scaleSide = (p) => [p.x ? `x ${p.x}개` : '', p.n ? `1 ${p.n}개` : ''].filter(Boolean).join('와 ');
-/** 📊·❓ 글용 */
+const scaleSide = (p) => [p.x ? `x 상자 ${p.x}개` : '', p.n ? `1 추 ${p.n}개` : ''].filter(Boolean).join('와 ');
+/** 📊·❓ 글용 (소리 내어 읽어도 그림이 떠오르게 "상자·추" — Codex 27차) */
 export function scaleText(sp) {
-  return `저울: 왼쪽 ${scaleSide(sp.L)} · 오른쪽 ${scaleSide(sp.R)}${sp.take ? ` · 양쪽에서 1을 ${sp.take}개씩 덜어 냄` : ''}`;
+  return `저울: 왼쪽 ${scaleSide(sp.L)} · 오른쪽 ${scaleSide(sp.R)}${sp.take ? ` · 양쪽에서 1 추를 ${sp.take}개씩 덜어 냄` : ''}`;
 }
 /** 저울 그림 — 막대는 수평, 접시마다 물건을 아래 줄부터 다섯 개씩 */
 export function scaleSvg(sp) {

@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { EQU, TAGS, makeQuestion, makeRound, ladder, placeFrom, diagnosticSet, lessonOf, checkContent, gradeLabel } from '../js/mathequ.js';
 import { valueOf } from '../js/mathexpr.js';
 import { tplKey } from '../js/mathgen.js';
-import { figureSvg, renderFigures, figText, richParts } from '../js/mathdraw.js';
+import { figureSvg, renderFigures, figText, richParts, parseScale } from '../js/mathdraw.js';
 import { padSpec, readTyped, matchTyped, partsOf } from '../js/mathpad.js';
 
 const OPTS = { names: ['피카츄', '리자몽', '개굴닌자'], me: '진우', worlds: { pokemon: [], toystory: [], minions: [], moana: [] } };
@@ -74,7 +74,8 @@ function rootOf(eq) {
 }
 const isIdentity = (eq) => { const f = fOf(eq); return [-2.3, 0.7, 4.1].every((x) => near(f(x), 0)); };
 const trueAt = (eq, x) => near(fOf(eq)(x), 0);
-const isLinearEq = (t) => / = /.test(t) && !/²/.test(t) && (() => { try { const f = fOf(t); return near(f(2) - 2 * f(1) + f(0), 0) && !near(f(1), f(0)); } catch { return false; } })();
+/** 이항해서 정리하면 일차인가 — 겉에 x²이 있어도 양변에서 없어지면 일차 (x에 0~3을 넣어 본다). Codex 27차: 예전엔 ²가 보이면 무조건 아니라고 봐서, Q5가 가르치는 "x² + 2x = x² + 6"을 이 판정이 틀리게 볼 뻔했다 */
+const isLinearEq = (t) => / = /.test(t) && (() => { try { const f = fOf(t); return near(f(2) - 2 * f(1) + f(0), 0) && near(f(3) - 3 * f(1) + 2 * f(0), 0) && !near(f(1), f(0)); } catch { return false; } })();
 
 /** 저울 지시문을 따로 읽는다 — "2x + 3" · "x + 8" · "11" */
 function scaleOf(q) {
@@ -104,10 +105,10 @@ function solveText(q) {
   if ((m = /x의 값이 1, 2, 3, 4, 5일 때, 방정식 (.+)의 해는/.exec(q))) { const eq = m[1]; return N('find', find(1, 5, (x) => trueAt(eq, x)), { eq }); }
   if (/^다음 중 x에 대한 항등식은/.test(q)) return P('ident');
   if ((m = /^등식 (.+)[이가] x에 대한 항등식이 되려면 □/.exec(q))) return N('box', boxValue(m[1]), { eq: m[1] });
-  if (/^a = b일 때, 다음 중 옳은 것은/.test(q)) return P('prop');
+  if (/^a = b일 때, 다음 중 항상 옳은 것은/.test(q)) return P('prop');
   const sc = scaleOf(q);
-  if (sc && (m = /양쪽에서 1[을를] (\d+)개씩 덜어 내면, 오른쪽에 남는 1은 몇 개/.exec(L))) return N('take', sc.R.n - +m[1], { sc, take: +m[1] });
-  if (sc && /x 한 개는 1 몇 개와 같을까요\?/.test(L)) return N('scale', find(1, 40, (x) => sc.L.x * x + sc.L.n === sc.R.x * x + sc.R.n), { sc });
+  if (sc && (m = /양쪽에서 1 추를 (\d+)개씩 덜어 내면, 오른쪽에 남는 1 추는 몇 개/.exec(L))) return N('take', sc.R.n - +m[1], { sc, take: +m[1] });
+  if (sc && /x 상자 하나의 무게는 1 추 몇 개와 같을까요\?/.test(L)) return N('scale', find(1, 40, (x) => sc.L.x * x + sc.L.n === sc.R.x * x + sc.R.n), { sc });
   if ((m = /^방정식 (\d+)x = (\d+)의 양변을 같은 수로 나누어 x = (\d+)[을를] 얻었어요/.exec(q))) return N('divby', +m[2] / +m[3], { a: +m[1], k: +m[2], s: +m[3] });
   if (/^다음 방정식의 해는 얼마일까요\?/.test(q)) { const eq = boldOf(q); return N('eq', rootOf(eq), { eq }); }
   if ((m = /^방정식 (.+)에서 (\d+)[을를] 이항하면/.exec(q))) return P('move', { eq: m[1], b: +m[2] });
@@ -201,7 +202,8 @@ function tagHolds(type, tag, f, t) {
     case 'num2': return { [TAGS.dropConst]: near(f.a * v(), f.k), [TAGS.distribFirst]: near(f.a * v() + f.b, f.k) }[tag] === true;
     case 'consec': { const x = f.x; return { [TAGS.askedOther]: is(x + 1) || is(x + 2), [TAGS.noDivide]: is(f.S - 3) }[tag] === true; }
     case 'age': return { [TAGS.oneAges]: near(f.b, f.k * (f.a + v())) || near(f.b + v(), f.k * f.a), [TAGS.noDivide]: is(f.b - f.k * f.a) }[tag] === true;
-    case 'card': return { [TAGS.subInstead]: near(f.p * v() - f.rem, f.N), [TAGS.noDivide]: is(f.N - f.rem) }[tag] === true;
+    // 남은 것을 빼지 않고 더함: px = N + rem (Codex 27차 — 예전 판정표가 생성기의 거꾸로 된 이름표 "더해야 할 것을 뺌"을 베껴 못 잡았다)
+    case 'card': return { [TAGS.addInstead]: near(f.p * v() - f.rem, f.N), [TAGS.noDivide]: is(f.N - f.rem) }[tag] === true;
     case 'meet': { const x = find(1, 100, (y) => f.v2 * y === f.v1 * (y + f.t)); return { [TAGS.askedOther]: is(x + f.t), [TAGS.noDivide]: is(f.v1 * f.t) }[tag] === true; }
     case 'match': return { [TAGS.allFour]: near(4 * v(), f.N), [TAGS.noDivide]: is(f.N - 1) }[tag] === true;
     default: return false;
@@ -448,6 +450,8 @@ const BAD = [
   [/x가 있는 등식은 (?:모두 )?항등식/, '방정식은 항등식이 아니다'],
   [/(?<!이항하지 않고 )곱해진 수(?:를|도) 이항/, '곱해진 수는 이항하지 않고 양변을 나눈다'],
   [/한쪽 변에만 (?:더해도|빼도|곱해도)/, '양변에 똑같이'],
+  [/양변이 달라져요/, '한쪽만 계산해도 우연히 같을 수 있다 — "같다고 할 수 없어요" (Codex 27차)'],
+  [/빼기 먼저, 나누기 나중|순서는 빼기 먼저/, '나누기 먼저도 맞고, 빼진 수는 더한다 — "수만 있는 항을 먼저 없애고 나누면 편해요" (Codex 27차)'],
 ];
 test('★ 참말에 틀린 말이 없다 — 이항·0으로 나누기·항등식·한쪽 변', () => {
   const truths = (q) => [q.choices.find((x) => x.ok).text, ...(q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule] : [])].join('\n').replace(/\*\*/g, '');
@@ -561,7 +565,7 @@ function truthBlocks(v) {
 }
 
 /** 이항해서 정리하면 일차인가 — 겉에 x²이 있어도 양변에서 없어지면 일차 (계산기로 x에 0~3을 넣어 본다) */
-const linFn = (t) => { try { const f = fOf(t); return near(f(2) - 2 * f(1) + f(0), 0) && near(f(3) - 3 * f(1) + 2 * f(0), 0) && !near(f(1), f(0)); } catch { return false; } };
+const linFn = isLinearEq; // 생성기 판정과 같은 것 (Codex 27차)
 
 /** 원고 확인 질문 읽기 — 원고에만 있는 꼴 + 생성기 문제 꼴(solveText) */
 function solveCheck(q) {
@@ -803,7 +807,12 @@ test('★ 원고의 조사·셈식·아직 안 배운 말·틀린 말 (배움 �
     assert.ok(!fp, `${id}: 분수 바로 뒤 조사 "${fp && fp[0]}"\n${fp && all.slice(Math.max(0, fp.index - 30), fp.index + 20)}`);
     assert.ok(!/(?<![\d./])1x|−1x|-\d/.test(all), `${id}: "1x" 또는 ASCII 빼기\n${all.match(/.*((?<![\d./])1x|−1x|-\d).*/)?.[0]}`);
     // 수만 있는 셈식 — 분모(/ 뒤의 수)와 음수(− 뒤)·문자 붙은 수는 셈식의 시작이 아니다
-    for (const m of all.matchAll(/(?<![\d.□a-z(−/])(\d+(?:\.\d+)?(?: [+−×÷] \d+(?:\.\d+)?)+) = (\d+(?:\.\d+)?)(?![\d.a-z²/(])/g)) { assert.ok(Math.abs(ev(m[1]) - Number(m[2])) < 1e-6, `${id}: ${m[0]}`); exprs++; }
+    for (const m of all.matchAll(/(?<![\d.□a-z(−/])(\d+(?:\.\d+)?(?: [+−×÷] \d+(?:\.\d+)?)+) = (\d+(?:\.\d+)?)(?![\d.a-z²/(])/g)) {
+      // "3 + 4 = 8도 등식이에요 — 거짓인 등식" (Q1, Codex 27차): 거짓인 등식의 예로 내민 셈식은 정말 거짓이어야 한다
+      const shownFalse = all.slice(m.index + m[0].length).startsWith('도 등식');
+      assert.ok((Math.abs(ev(m[1]) - Number(m[2])) < 1e-6) !== shownFalse, `${id}: ${m[0]}${shownFalse ? ' (거짓인 등식의 예인데 참)' : ''}`);
+      exprs++;
+    }
     const at = IDS.indexOf(id);
     for (const [re, first] of FIRST) if (IDS.indexOf(first) > at) assert.ok(!re.test(all), `${id}: 아직 안 배운 ${re}\n${all.match(new RegExp(`.*(${re.source}).*`))?.[0]}`);
     const truths = truthBlocks(CONTENT[id]).join('\n');
@@ -854,4 +863,69 @@ test('화면 연결 (3단계): STEMS.equation(Q)은 이 생성기·원고를 쓰
   const stats = readFileSync(new URL('../js/stats.js', import.meta.url), 'utf8');
   for (const src of [ask, stats]) for (const ex of src.match(/\[scale [^\]]+\]/g) || ['없음']) assert.ok(figureSvg(ex.slice(1, -1)), `예시가 그려지지 않음: ${ex}`);
   assert.ok(ask.includes('[scale 2x + 3 | 11]') && stats.includes('[scale 2x + 3 | 11]'), '❓ 복사문·📊 답장 안내에 [scale] 예');
+});
+
+// ───────────────────── Codex 27차 ─────────────────────
+
+test('★ Codex 27차 #1·#9 — 카드 나누기: 남은 것을 더한 오답은 "빼야 할 것을 더함"(예전엔 거꾸로 "더해야 할 것을 뺌") · 만나기는 "같은 곳에서 출발해"', () => {
+  const q = makeQuestion('equ.apply', 'calc', 5, OPTS);
+  assert.match(q.q, /카드 38장을 친구들에게 4장씩 나누어 주었더니 2장이 남았어요/);
+  const w = q.choices.find((c) => c.text === '10');
+  assert.ok(w && w.tag === TAGS.addInstead, `오답 10의 이름표 ${w && w.tag}`);
+  let cards = 0; let meets = 0;
+  for (let s = 1; s <= Math.max(SEEDS, 2000); s++) {
+    const x = makeQuestion('equ.apply', 'calc', s, OPTS);
+    if (x.probe.ask === 'card') {
+      const [N, p, rem] = /카드 (\d+)장을 친구들에게 (\d+)장씩 나누어 주었더니 (\d+)장이 남았어요/.exec(x.q).slice(1).map(Number);
+      const added = x.probe.allWrong.find((v) => near(numOf(v.text), (N + rem) / p));
+      assert.ok(added && added.tag === TAGS.addInstead, `#${s}: (N + 남은 것) ÷ p 오답의 이름표 ${added && added.tag}`);
+      cards++;
+    }
+    if (x.probe.ask === 'meet') { assert.match(x.q, /뒤에 .+?같은 곳에서 출발해 같은 길을/, `#${s}: 출발점`); meets++; }
+  }
+  assert.ok(cards > 50 && meets > 50, `카드 ${cards} · 만나기 ${meets}`);
+});
+
+test('★ Codex 27차 #2·#7 — 참·거짓은 원래 우변과 비교해서("좌변 … = A, 우변 B — 같아서 참/달라서 거짓"), 셈식 바로 뒤에 "— 거짓"을 붙이지 않는다 · Q1은 거짓인 등식도 등식이라고 가르친다', () => {
+  let n = 0;
+  const look = (all, where) => {
+    assert.ok(!/= −?\d+ — 거짓/.test(all), `${where}: 맞는 셈식 바로 뒤에 "— 거짓"\n${all.match(/.*= −?\d+ — 거짓.*/)?.[0]}`);
+    for (const m of all.matchAll(/좌변 [^,\n]+ = (−?\d+), 우변 (−?\d+) — (같아서 참|달라서 거짓)/g)) { assert.equal(numOf(m[1]) === numOf(m[2]), m[3] === '같아서 참', `${where}: ${m[0]}`); n++; }
+  };
+  for (const { c, k, s, q } of every()) look(allText(q), `${c.id} ${k} #${s}`);
+  for (const id of IDS) look(contentText(CONTENT[id]), id);
+  assert.ok(n > 100, `원래 우변과 비교한 말 ${n}`);
+  assert.match(CONTENT['equ.eq'].lesson[0].say, /3 \+ 4 = 8도 등식이에요 — 양변의 값이 달라서 \*\*거짓인 등식\*\*/, 'Q1 1장: 거짓인 등식도 등식');
+});
+
+test('★ Codex 27차 #3 — "a = b일 때 항상 옳은 것": 정답만 늘 참이고 오답은 늘 참이 아니다(a = b = 0이면 우연히 참일 수는 있다) · 풀이는 "같다고 할 수 없어요"', () => {
+  let n = 0;
+  const holds = (t, v) => { const [L, R] = sidesOf(t); const l = evalExpr(L, { a: v }); const r = evalExpr(R, { b: v }); return Number.isFinite(l) && Number.isFinite(r) && near(l, r); };
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = makeQuestion('equ.prop', 'calc', s, OPTS);
+    if (!/^a = b일 때/.test(q.q)) continue;
+    assert.match(q.q, /^a = b일 때, 다음 중 항상 옳은 것은/);
+    for (const ch of q.choices) {
+      const always = [0, 2.3, -1.7, 5, -7 / 6].every((v) => holds(ch.text, v));
+      assert.equal(always, !!ch.ok, `#${s}: "${ch.text}" 늘 참 ${always}`);
+    }
+    assert.ok(!/양변이 달라져요/.test(allText(q)), `#${s}: "양변이 달라져요" 단정`);
+    n++;
+  }
+  for (const id of ['equ.prop']) for (const p of CONTENT[id].lesson) if (p.check && /^a = b일 때/.test(p.check.q)) assert.match(p.check.q, /항상 옳은 것은/, '원고 확인 질문도 "항상"');
+  assert.ok(n > 50, `a = b 문항 ${n}`);
+});
+
+test('★ Codex 27차 #6·#11 — 손으로 쓴 저울 지시문은 띄어쓰기가 달라도 그린다 · 못 그리는 지시문은 배움 글에서 빈 그림 대신 글자 그대로 · 📊·❓ 글은 "x 상자·1 추"', () => {
+  for (const d of ['2x+3 | 11', '2x +3 | 11', '2x  +  3 | 11', '2x + 3|11']) {
+    assert.deepEqual(parseScale(d), { L: { x: 2, n: 3 }, R: { x: 0, n: 11 }, take: 0 }, d);
+    assert.ok(renderFigures(`[scale ${d}]`).includes('<svg'), `[scale ${d}]`);
+  }
+  assert.equal(parseScale('2x − 3 | 11'), null, '빼기는 저울로 못 그린다');
+  assert.equal(figText('[scale 2x + 3 | 11 take=3]'), '(저울: 왼쪽 x 상자 2개와 1 추 3개 · 오른쪽 1 추 11개 · 양쪽에서 1 추를 3개씩 덜어 냄)');
+  // 배움 글(storyBody)도 문제 글(qtNode)처럼 — renderFigures가 그림을 못 만들면 글자로 남긴다
+  const app = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
+  const body = /function storyBody\(text\) \{[\s\S]*?\r?\n\}\r?\n/.exec(app)[0]; // 작업 트리는 CRLF일 수 있다
+  assert.match(body, /const svg = .*renderFigures\(seg\)/);
+  assert.match(body, /if \(svg && svg !== seg\) p\.appendChild\(svgBox\(svg, 'math-fig inline'\)\);\s*else \{/);
 });
