@@ -54,6 +54,7 @@ function planeOf(q) {
     else if ((k = /^path=(.+)$/.exec(t))) P.path = k[1].split(',').map((s) => s.split(':').map(N));
     else if ((k = /^poly=([A-Z]+)$/.exec(t))) P.poly = k[1];
     else if (/^[xy]l=/.test(t)) { /* 축 이름 */ }
+    else if (t === 'smooth') P.smooth = true; // 관람차 — 같은 점을 지나는 부드러운 선
     else throw new Error(`모르는 지시문 토큰 ${t}`);
   }
   return P;
@@ -276,7 +277,7 @@ function tagHolds(sv, tag, text, chs) {
     case `atank ${TAGS.mulForDiv}`: return v === f.V * f.x;
     case `atank ${TAGS.subForDiv}`: return v === f.V - f.x;
     case `spring ${TAGS.addDiff}`: return v === f.c1 + f.g2 - f.g1;
-    case `spring ${TAGS.propInstead}`: return near(v, (f.c1 * f.g1) / f.g2);
+    case `spring ${TAGS.invInstead}`: return near(v, (f.c1 * f.g1) / f.g2); // 정비례 상황을 반비례로 (Codex 33차 #2 — 예전엔 "정비례처럼"이라 거꾸로 보고)
     case `rect ${TAGS.subForDiv}`: return v === f.S - f.w;
     case `rect ${TAGS.mulForDiv}`: return v === f.S * f.w;
     default: throw new Error(`판정표에 없는 이름표: ${sv.type} "${tag}"`);
@@ -605,15 +606,34 @@ test('🎨 좌표평면 그림: 점·후보는 그 좌표에 · 정비례 직선
     if (P.pts.P && P.lin !== null) assert.ok(near(P.pts.P[1], P.lin * P.pts.P[0]), `${at}: 점 P가 직선 y = ${P.lin}x 위가 아니다`);
     if (P.pts.P && P.inv !== null) assert.equal(P.pts.P[0] * P.pts.P[1], P.inv, `${at}: 점 P가 곡선 y = ${P.inv}/x 위가 아니다`);
     const pm = /<polyline class="pl-path" points="([^"]+)"/.exec(svg);
-    if (P.path) {
-      const got = pm[1].split(' ').map((pr) => pr.split(',').map(Number)).map(([px, py]) => [Math.round(R.vx(px) * 100) / 100, Math.round(R.vy(py) * 100) / 100]);
+    const wm = /<polyline class="pl-wave" points="([^"]+)"/.exec(svg);
+    const toVal = (s) => s.split(' ').map((pr) => pr.split(',').map(Number)).map(([px, py]) => [R.vx(px), R.vy(py)]);
+    if (P.path && !P.smooth) {
+      assert.ok(pm && !wm, `${at}: 꺾은선 없음`);
+      const got = toVal(pm[1]).map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]);
       assert.deepEqual(got, P.path, `${at}: 꺾은선이 지시문과 다르다`); seen.path++;
+    }
+    if (P.smooth) {
+      // 🎡 부드러운 선 (Codex 33차 #4): 관람차만 · 꼭짓점 점은 지시문 그대로 · 선 위의 모든 점이 이웃한 두 점 사이의 코사인 곡선 위 (꼭대기·바닥에서 기울기 0)
+      assert.ok(/관람차/.test(q.q) && wm && !pm, `${at}: smooth는 관람차의 부드러운 선만`);
+      const vt = [...svg.matchAll(/<circle class="pl-vtx" cx="([\d.]+)" cy="([\d.]+)"/g)].map((m) => [Math.round(R.vx(+m[1]) * 100) / 100, Math.round(R.vy(+m[2]) * 100) / 100]);
+      assert.deepEqual(vt, P.path, `${at}: 꼭짓점이 지시문과 다르다`);
+      const W = toVal(wm[1]);
+      assert.ok(W.length >= P.path.length * 8, `${at}: 부드러운 선의 점 ${W.length}`);
+      for (const [x, y] of W) {
+        const i = Math.max(1, P.path.findIndex(([px]) => px >= x - 1e-6));
+        const [[x0, y0], [x1, y1]] = [P.path[i - 1], P.path[i]];
+        const t = (x - x0) / (x1 - x0);
+        assert.ok(close(y, y0 + ((y1 - y0) * (1 - Math.cos(Math.PI * t))) / 2, 0.15), `${at}: (${x.toFixed(2)}, ${y.toFixed(2)})가 코사인 곡선 위가 아니다`);
+      }
+      for (const [px, py] of P.path) assert.ok(W.some(([x, y]) => close(x, px, 0.02) && close(y, py, 0.15)), `${at}: 부드러운 선이 (${px}, ${py})를 안 지난다`);
+      seen.wave = (seen.wave || 0) + 1;
     }
     assert.match(figText(q.q), /\(좌표평면: /);
     assert.ok(figText(q.q, true).includes('(좌표평면)'));
     assert.ok(!renderFigures(q.q).includes('[plane'), `${at}: renderFigures가 좌표평면을 못 바꿈`);
   }
-  assert.ok(seen.pt > 500 && seen.lin > 20 && seen.inv > 20 && seen.path > 20, `본 것 ${JSON.stringify(seen)}`);
+  assert.ok(seen.pt > 500 && seen.lin > 20 && seen.inv > 20 && seen.path > 20 && seen.wave > 5, `본 것 ${JSON.stringify(seen)}`);
 });
 
 test('🎨 이름표: 점 이름은 자기 점이 가장 가깝다 · 이름표·눈금 수끼리 겹치지 않는다 · 이름표가 선을 지나지 않는다', () => {
@@ -707,7 +727,7 @@ test('🎨 눈금 수는 도형·직선·곡선·꺾은선 위에 그린다 — 
   for (const f of figs) {
     const svg = figureSvg(f);
     assert.ok(svg.startsWith('<svg'), f);
-    const lastShape = Math.max(...['pl-poly', 'pl-lin', 'pl-inv', 'pl-path'].map((c) => svg.lastIndexOf(`class="${c}"`)));
+    const lastShape = Math.max(...['pl-poly', 'pl-lin', 'pl-inv', 'pl-path', 'pl-wave'].map((c) => svg.lastIndexOf(`class="${c}"`)));
     const firstTick = svg.indexOf('class="pl-tick"');
     assert.ok(lastShape > 0, `${f}: 선이 있다`);
     assert.ok(firstTick > lastShape, `${f}: 눈금 수가 선보다 뒤(위)에`);
@@ -722,7 +742,7 @@ test('🎨 눈금 수는 도형·직선·곡선·꺾은선 위에 그린다 — 
         const d = q && /\[(plane [^\]]+)\]/.exec(q.q);
         if (!d) continue;
         const svg = figureSvg(d[1]);
-        const lastShape = Math.max(...['pl-poly', 'pl-lin', 'pl-inv', 'pl-path'].map((cl) => svg.lastIndexOf(`class="${cl}"`)));
+        const lastShape = Math.max(...['pl-poly', 'pl-lin', 'pl-inv', 'pl-path', 'pl-wave'].map((cl) => svg.lastIndexOf(`class="${cl}"`)));
         if (lastShape < 0) continue;
         seen += 1;
         assert.ok(svg.indexOf('class="pl-tick"') > lastShape, `${c.id} ${k} #${s}: ${d[1]}`);
@@ -810,6 +830,7 @@ function planeAll(dir) {
     else if ((k = /^lin=(−?\d+)(?:\/(\d+))?$/.exec(t))) P.lins.push(N(k[1]) / (k[2] ? +k[2] : 1));
     else if ((k = /^inv=(−?\d+)$/.exec(t))) P.invs.push(N(k[1]));
     else if ((k = /^path=(.+)$/.exec(t))) P.path = k[1].split(',').map((x) => x.split(':').map(N));
+    else if (t === 'smooth') P.smooth = true;
     else if (!/^(poly=[A-Z]+|[xy]l=.+)$/.test(t)) throw new Error(`모르는 지시문 토큰 ${t}`);
   }
   return P;
@@ -1031,4 +1052,70 @@ test('❓ 아빠에게 묻기: 좌표평면 판에 찍은 답도 "모눈에 직�
   assert.equal(q.draw.mode, 'plane');
   assert.equal(askContext(q, { chosen: '(1, −3)', p: 1, g: '(1, −3)', w: 'u' }).grid, 1);
   assert.equal(askContext(q, { chosen: q.choices[0].text }).grid, undefined, '보기를 누른 답(판 꺼짐)은 그대로');
+});
+
+// ───────────────────── 🔍 Codex 33차 (2026-10-06) ─────────────────────
+
+test('🔍 Codex 33차 #1·#3·덧: 거리 그래프로 "쉬었다"는 곧게 뻗은 길에서만 · y ÷ x가 늘 같다는 일반 규칙은 "x가 0이 아닐 때" · 점으로 a를 구하는 규칙은 "원점이 아닌 점" · R8 아빠 카드의 교점은 모눈 위', () => {
+  // 아이가 보는 참말 — 생성기 문항(문제·정답·풀이·규칙)·칸 설명(idea·rule·slip) + 원고(배움·확인·규칙·아빠 카드)
+  const blocks = [];
+  for (const c of COORD) {
+    blocks.push(c.idea || '', c.rule || '', c.slip || '');
+    for (const k of ['calc', 'misread']) for (let s = 1; s <= 150; s++) {
+      const q = makeQuestion(c.id, k, s, OPTS);
+      const ok = q.choices.find((x) => x.ok);
+      blocks.push([q.q, ok ? ok.text : '', ...(q.solve ? [...q.solve.steps.map((x) => (typeof x === 'string' ? x : x.text || x.t)), q.solve.rule || ''] : [])].join('\n'));
+    }
+  }
+  for (const id of IDS) blocks.push(...truthBlocks(CONTENT[id]));
+  let rest = 0; let ratio = 0; let pointA = 0; let wheel = 0;
+  for (const b of blocks.map((x) => String(x).replace(/\*\*/g, ''))) {
+    // #1 집에서 떨어진 거리가 그대로라서 쉬었다 — 집 둘레를 빙 돌아도 거리는 그대로다. 곧게 뻗은 길이라는 조건이 같은 덩이에 있어야 한다
+    if (/(쉬었|쉰 |쉬고)/.test(b) && /거리/.test(b)) { assert.match(b, /곧게 뻗은 길/, `곧은 길 조건 없이 "쉬었다":\n${b}`); rest++; }
+    // #4 관람차 그래프는 부드러운 선 — 생성기·원고 모두
+    if (/관람차/.test(b)) for (const m of b.matchAll(/\[plane [^\]]+\]/g)) { assert.match(m[0], / smooth\]$/, `관람차 그래프가 꺾은선: ${m[0]}`); wheel++; }
+    for (const s of b.split(/[.\n]/)) {
+      // #3 "y ÷ x가 늘(항상) 같다"는 일반 규칙 — 수가 정해진 문장("늘 −2")·칸마다 구하는 표(x가 1, 2, 3 …)는 빼고
+      if (/y ÷ x/.test(s) && /(늘|항상)/.test(s) && !/(늘|항상) −?\d/.test(s) && !/칸마다/.test(s)) { assert.match(s, /x가 0이 아닐 때/, `0 ÷ 0을 막는 조건 없이: "${s.trim()}"`); ratio++; }
+      // #3 그래프 위의 점으로 a = y ÷ x를 구한다는 규칙 — 원점 (0, 0)은 0 ÷ 0 (반비례 a = x × y는 그래프가 원점을 안 지나 괜찮다)
+      if (/점[^.]*a = y ÷ x(?! = )/.test(s) && !/\(−?\d+, −?\d+\)/.test(s)) { assert.match(s, /원점이 아닌/, `원점 조건 없이: "${s.trim()}"`); pointA++; }
+    }
+  }
+  assert.ok(rest >= 50 && ratio >= 4 && pointA >= 3 && wheel >= 20, `실제로 본 곳: 쉬었다 ${rest} · y ÷ x 규칙 ${ratio} · 점으로 a ${pointA} · 관람차 ${wheel}`);
+  assert.match(CONTENT['crd.pgraph'].lesson[2].say, /^그래프 위의 원점이 아닌 한 점을 알면 a를 구할 수 있어요/, 'R6 배움 3장 첫 줄');
+  // 덧: R8 아빠 카드 — 직선 y = kx와 곡선 y = a/x가 만나는 점을 모눈에서 찾게 하면 x² = a ÷ k가 제곱수여야 한다 (y = 2x와 y = 12/x는 x = √6)
+  const doText = CONTENT['crd.igraph'].dad.do;
+  const k = +/y = (\d+)x/.exec(doText)[1]; const a = +/y = (\d+)\/x/.exec(doText)[1];
+  const x = Math.sqrt(a / k);
+  assert.ok(Number.isInteger(x) && Number.isInteger(k * x), `y = ${k}x와 y = ${a}/x가 만나는 점 x = ${x}`);
+});
+
+test('🔍 Codex 33차 #2: 용수철(정비례)에서 반비례처럼 나눈 오답은 "반비례처럼 계산함" — "정비례처럼"이라 아빠께 거꾸로 보고되던 것', () => {
+  let n = 0;
+  for (let s = 1; s <= 400; s++) {
+    const q = makeQuestion('crd.apply', 'calc', s, OPTS);
+    if (!/용수철/.test(q.q)) continue;
+    const [g1, c1, g2] = [...q.q.matchAll(/(\d+) (?:g|cm)/g)].map((m) => +m[1]);
+    const inv = q.choices.find((x) => near(val(x.text), (c1 * g1) / g2) && !x.ok);
+    if (inv) { assert.equal(inv.tag, TAGS.invInstead, `#${s}: ${q.q}`); n++; }
+    assert.ok(!q.choices.some((x) => x.tag === TAGS.propInstead), `#${s}: 정비례 상황에 "정비례처럼 계산함"`);
+  }
+  assert.ok(n >= 10, `본 용수철 문항 ${n}`);
+  assert.equal(TAGS.invInstead, '반비례처럼 계산함');
+});
+
+test('🔍 Codex 33차 #5: 점 이름표는 축 글자 x·y와 겹치지 않는다 — 축 끝에 있는 점(P(0, 10)이 "y"와 겹쳤다)', () => {
+  /** 글자 상자 (이 파일의 어림: 17px 글자 한 자 폭 11, 위로 13·아래로 4) */
+  const box = (x, y, anchor) => { const w = 11; const x0 = anchor === 'start' ? x : x - w / 2; return { x0, x1: x0 + w, y0: y - 13, y1: y + 4 }; };
+  const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+  let n = 0;
+  for (const d of ['plane x=0..10 y=0..10 P(0,10)', 'plane x=0..10 y=0..10 P(10,0)', 'plane P(0,5) Q(5,0)', 'plane x=−6..6 y=−6..6 A(0,6) B(6,0)', 'plane x=0..50 y=0..10 xs=5 P(0,10) Q(50,0)']) {
+    const s = figureSvg(d);
+    const axes = [...s.matchAll(/<text x="([\d.]+)" y="([\d.]+)" font-size="17"[^>]*>([xy])<\/text>/g)].map((m) => box(+m[1], +m[2], 'start'));
+    const names = [...s.matchAll(/<text class="pl-name" x="([\d.]+)" y="([\d.]+)"[^>]*>([A-Z])<\/text>/g)].map((m) => ({ t: m[3], b: box(+m[1], +m[2], 'middle') }));
+    assert.equal(axes.length, 2, `${d}: 축 글자`);
+    assert.ok(names.length >= 1, `${d}: 이름표`);
+    for (const nm of names) for (const a of axes) { assert.ok(!hit(nm.b, a), `${d}: 이름표 ${nm.t}이 축 글자와 겹친다`); n++; }
+  }
+  assert.ok(n >= 12, `본 짝 ${n}`);
 });

@@ -143,6 +143,7 @@ export const TAGS = {
   subForDiv: '나눠야 할 것을 뺌',
   sameTurns: '두 바퀴가 같은 수만큼 돈다고 봄',
   addDiff: '늘어난 만큼을 그대로 더함',
+  invInstead: '반비례처럼 계산함',
 };
 
 // ───────────────────── 그래프 해석에 쓰는 이야기 (R4) ─────────────────────
@@ -155,7 +156,7 @@ function bikeOf(r) {
   }, (b) => b.t2 <= 35 && allDiff(b.rest, b.t2, b.d1));
 }
 const bikePlane = (b) => PL('x=0..50 y=0..10 xs=5 xl=시간(분) yl=거리(km)', `path=0:0,${b.t1}:${b.d1},${b.t2}:${b.d1},50:${b.D}`);
-const BIKE = '{me/이/가} 자전거를 타고 집에서 출발해 공원까지 갔어요. 그래프는 출발한 지 x분 뒤 집에서 떨어진 거리 y km를 나타내요.';
+const BIKE = '{me/이/가} 자전거를 타고 집에서 공원까지 곧게 뻗은 길을 따라 갔어요. 그래프는 출발한 지 x분 뒤 집에서 떨어진 거리 y km를 나타내요.';
 
 /** 물통 — 물을 넣다가 멈추고 다시 뺌 (가로 1분 칸 · 세로 5 cm 칸) */
 function tankOf(r) {
@@ -172,7 +173,8 @@ function wheelOf(r) {
   const P = pick(r, [4, 6, 8]); const lo = 5; const hi = pick(r, [20, 25, 30]);
   return { P, lo, hi };
 }
-const wheelPlane = (w) => PL('x=0..16 y=0..30 ys=5 xl=시간(분) yl=높이(m)', `path=${[0, 1, 2, 3, 4].map((k) => `${(k * w.P) / 2}:${k % 2 ? w.hi : w.lo}`).join(',')}`);
+// 관람차 높이는 바닥·꼭대기에서 부드럽게 돈다 — 꺾은선이면 꼭대기에서 갑자기 방향을 바꾸는 것처럼 보인다 → smooth (Codex 33차 #4)
+const wheelPlane = (w) => PL('x=0..16 y=0..30 ys=5 xl=시간(분) yl=높이(m)', `path=${[0, 1, 2, 3, 4].map((k) => `${(k * w.P) / 2}:${k % 2 ? w.hi : w.lo}`).join(',')}`, 'smooth');
 const WHEEL = '관람차에 탄 지 x분 뒤의 높이를 y m라고 할 때, 그래프는 x와 y 사이의 관계를 나타내요.';
 
 // ───────────────────── 개념 사다리 (R. 좌표평면과 그래프 줄기) ─────────────────────
@@ -397,9 +399,9 @@ export const COORD = [
 
   {
     id: 'crd.prop', grade: 7, name: '정비례 관계', needs: ['crd.graph'],
-    idea: '두 변수 x, y에서 x의 값이 2배, 3배, 4배, …로 변할 때 y의 값도 2배, 3배, 4배, …로 변하는 관계가 있으면 y는 x에 **정비례**한다고 해요. 이때 y = ax (a ≠ 0) 꼴로 나타낼 수 있고, y ÷ x의 값은 항상 a로 같아요. a가 음수여도 정비례예요. "x가 커질 때 y도 커진다"만으로는 정비례가 아니에요 — y = x + 3은 x가 2배가 되어도 y가 2배가 되지 않아요.',
-    rule: 'y = ax 꼴(a ≠ 0) — y ÷ x가 늘 a로 같으면 정비례.',
-    slip: 'x가 2배가 될 때 y도 2배가 되는지, y ÷ x가 늘 같은지 봐요.',
+    idea: '두 변수 x, y에서 x의 값이 2배, 3배, 4배, …로 변할 때 y의 값도 2배, 3배, 4배, …로 변하는 관계가 있으면 y는 x에 **정비례**한다고 해요. 이때 y = ax (a ≠ 0) 꼴로 나타낼 수 있고, x가 0이 아닐 때 y ÷ x의 값은 항상 a로 같아요. a가 음수여도 정비례예요. "x가 커질 때 y도 커진다"만으로는 정비례가 아니에요 — y = x + 3은 x가 2배가 되어도 y가 2배가 되지 않아요.',
+    rule: 'y = ax 꼴(a ≠ 0) — x가 0이 아닐 때 y ÷ x가 늘 a로 같으면 정비례.',
+    slip: 'x가 2배가 될 때 y도 2배가 되는지, x가 0이 아닐 때 y ÷ x가 늘 같은지 봐요.',
     calc(r, c) {
       const fams = [];
       // 표 → 식 (표는 양수만 — 표 그림이 음수를 그리지 않는다)
@@ -445,8 +447,8 @@ export const COORD = [
   {
     id: 'crd.pgraph', grade: 7, name: '정비례 관계의 그래프', needs: ['crd.prop'],
     idea: 'y = ax (a ≠ 0)의 그래프는 **원점을 지나는 직선**이에요. a > 0이면 오른쪽 위로 향하는 직선 — 제1사분면과 제3사분면을 지나고 x의 값이 커지면 y의 값도 커져요. a < 0이면 오른쪽 아래로 향하는 직선 — 제2사분면과 제4사분면을 지나고 x의 값이 커지면 y의 값은 작아져요. a의 절댓값이 클수록 그래프는 y축에 가까워요. 그래프 위의 한 점 (p, q)를 알면 a = q ÷ p로 구해요.',
-    rule: '원점을 지나는 직선 — a > 0 오른쪽 위, a < 0 오른쪽 아래, a = y ÷ x.',
-    slip: 'a의 부호로 방향을, 그래프 위의 점으로 a = y ÷ x를 봐요.',
+    rule: '원점을 지나는 직선 — a > 0 오른쪽 위, a < 0 오른쪽 아래, 원점이 아닌 점에서 a = y ÷ x.',
+    slip: 'a의 부호로 방향을, 그래프 위의 원점이 아닌 점으로 a = y ÷ x를 봐요.',
     calc(r, c) {
       const fams = [];
       // 그래프 → 식 (정수 a · 분수 a, 부호마다 틀)
@@ -612,7 +614,7 @@ export const COORD = [
         (() => { const [V, x] = draw(() => [pick(r, [120, 180, 240, 300, 360]), pick(r, [10, 12, 15, 20, 24, 30])], ([V1, x1]) => V1 % x1 === 0 && allDiff(V1 / x1, V1 - x1)); return { t: `물 ${V} L를 채우는데, 1분에 x L씩 넣으면 y분이 걸려요. 1분에 ${x} L씩 넣으면 몇 분이 걸릴까요?`, ans: num(V / x), wr: [{ text: num(V * x), tag: TAGS.mulForDiv }, { text: num(V - x), tag: TAGS.subForDiv }], steps: [`x × y = ${V} → y = ${V}/x (반비례)`, `y = ${V} ÷ ${x} = ${V / x}`], why: { [TAGS.mulForDiv]: `x × y = ${V} — y는 ${V}를 ${x}로 나눠 구해요.`, [TAGS.subForDiv]: `${x}는 1분에 넣는 양 — 빼지 않고 나눠요.` }, probe: { ask: 'tank', V, x }, rule: '전체 양이 일정하면 1분에 넣는 양과 걸리는 시간은 반비례 — y = (전체)/x.' }; })(),
       ]));
       fams.push(famOf([
-        (() => { const [g1, c1, g2] = draw(() => [pick(r, [10, 20, 30, 40]), int(r, 2, 8), pick(r, [20, 30, 50, 60, 80])], ([a1, b1, d1]) => a1 !== d1 && (b1 * d1) % a1 === 0 && allDiff((b1 * d1) / a1, b1 + d1 - a1, (b1 * a1) / d1)); return { t: `용수철에 추를 매달면 늘어나는 길이는 추의 무게에 정비례해요. 무게가 ${g1} g인 추를 매달았더니 ${c1} cm 늘어났어요. 무게가 ${g2} g인 추를 매달면 몇 cm 늘어날까요?`, ans: num((c1 * g2) / g1), wr: [{ text: num(c1 + g2 - g1), tag: TAGS.addDiff }, { text: fr(c1 * g1, g2), tag: TAGS.propInstead }], steps: [`y = ax에서 a = ${c1} ÷ ${g1}`, `y = ${c1} ÷ ${g1} × ${g2} = ${(c1 * g2) / g1}`], why: { [TAGS.addDiff]: '정비례는 늘어난 무게만큼 더하는 것이 아니라 같은 배수로 늘어요.', [TAGS.propInstead]: '무게가 늘면 늘어나는 길이도 늘어요 — 정비례예요.' }, probe: { ask: 'spring', g1, c1, g2 }, rule: '정비례는 한쪽이 몇 배가 되면 다른 쪽도 그만큼 — 차가 아니라 배수.' }; })(),
+        (() => { const [g1, c1, g2] = draw(() => [pick(r, [10, 20, 30, 40]), int(r, 2, 8), pick(r, [20, 30, 50, 60, 80])], ([a1, b1, d1]) => a1 !== d1 && (b1 * d1) % a1 === 0 && allDiff((b1 * d1) / a1, b1 + d1 - a1, (b1 * a1) / d1)); return { t: `용수철에 추를 매달면 늘어나는 길이는 추의 무게에 정비례해요. 무게가 ${g1} g인 추를 매달았더니 ${c1} cm 늘어났어요. 무게가 ${g2} g인 추를 매달면 몇 cm 늘어날까요?`, ans: num((c1 * g2) / g1), wr: [{ text: num(c1 + g2 - g1), tag: TAGS.addDiff }, { text: fr(c1 * g1, g2), tag: TAGS.invInstead }], steps: [`y = ax에서 a = ${c1} ÷ ${g1}`, `y = ${c1} ÷ ${g1} × ${g2} = ${(c1 * g2) / g1}`], why: { [TAGS.addDiff]: '정비례는 늘어난 무게만큼 더하는 것이 아니라 같은 배수로 늘어요.', [TAGS.invInstead]: '정비례는 무게가 몇 배가 되면 늘어나는 길이도 그만큼 — 반비례처럼 거꾸로 나누면 안 돼요.' }, probe: { ask: 'spring', g1, c1, g2 }, rule: '정비례는 한쪽이 몇 배가 되면 다른 쪽도 그만큼 — 차가 아니라 배수.' }; })(),
       ]));
       fams.push(famOf([
         (() => { const [S, w] = draw(() => [pick(r, [24, 36, 48, 60, 72]), int(r, 2, 12)], ([S1, w1]) => S1 % w1 === 0 && S1 / w1 !== w1 && allDiff(S1 / w1, S1 - w1)); return { t: `넓이가 ${S} cm²인 직사각형의 가로를 x cm, 세로를 y cm라고 해요. 가로가 ${w} cm일 때 세로는 몇 cm일까요?`, ans: num(S / w), wr: [{ text: num(S - w), tag: TAGS.subForDiv }, { text: num(S * w), tag: TAGS.mulForDiv }], steps: [`x × y = ${S} → y = ${S}/x (반비례)`, `y = ${S} ÷ ${w} = ${S / w}`], why: { [TAGS.subForDiv]: '넓이는 가로 × 세로 — 빼지 않고 나눠요.', [TAGS.mulForDiv]: `가로 × 세로 = ${S} — 세로는 ${S}를 ${w}로 나눠 구해요.` }, probe: { ask: 'rect', S, w }, rule: '넓이가 일정하면 가로와 세로는 반비례 — y = (넓이)/x.' }; })(),

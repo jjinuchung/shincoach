@@ -2683,6 +2683,7 @@ export function parsePlane(arg) {
     if ((m = /^poly=([A-DPQ]{3,4})$/.exec(t))) { sp.poly = m[1]; continue; }
     if ((m = /^path=((?:-?\d+:-?\d+)(?:,-?\d+:-?\d+)+)$/.exec(t))) { sp.path = m[1].split(',').map((q) => q.split(':').map(Number)); continue; }
     if ((m = /^([xy])l=(\S{1,12})$/.exec(t))) { sp[`${m[1]}l`] = m[2].replace(/_/g, ' '); continue; }
+    if (t === 'smooth') { sp.smooth = true; continue; }
     return null; // 모르는 토큰 — 글자 그대로 남는 것보다 빈 그림이 낫다 (renderFigures가 지시문을 그대로 둔다)
   }
   const { x0, x1, y0, y1, xs, ys } = sp;
@@ -2695,7 +2696,21 @@ export function parsePlane(arg) {
   if (sp.lin.some((l) => !l.n || l.d < 1) || sp.inv.some((a) => !a)) return null;
   if (sp.poly && ![...sp.poly].every((ch) => names.includes(ch))) return null;
   if (sp.path && (!sp.path.every(([x, y]) => inBox({ x, y })) || sp.path.some(([x], i) => i && x <= sp.path[i - 1][0]))) return null;
+  if (sp.smooth && !sp.path) return null;
   return sp;
+}
+
+/**
+ * `smooth` 꺾은선 → 부드러운 선의 점들 (Codex 33차 #4, 관람차): 이웃한 두 점 사이를 코사인 곡선 y0 + (y1 − y0)(1 − cos πt)/2로 —
+ * 두 점에서 기울기가 0이라 바닥·꼭대기를 번갈아 지나면 사인 곡선(관람차 높이)이 되고, 지시문의 점은 모두 그대로 지난다.
+ */
+export function planeWave(path, steps = 16) {
+  const out = [path[0].slice()];
+  for (let i = 1; i < path.length; i++) {
+    const [x0, y0] = path[i - 1]; const [x1, y1] = path[i];
+    for (let k = 1; k <= steps; k++) { const t = k / steps; out.push([x0 + (x1 - x0) * t, y0 + ((y1 - y0) * (1 - Math.cos(Math.PI * t))) / 2]); }
+  }
+  return out;
 }
 
 const plNum = (v) => (v < 0 ? `−${Math.abs(v)}` : String(v));
@@ -2710,7 +2725,7 @@ export function planeText(sp) {
   for (const l of sp.lin) parts.push(`직선 y = ${plAx(l)}`);
   for (const a of sp.inv) parts.push(`곡선 y = ${plNum(a)}/x`);
   if (sp.poly) parts.push(`도형 ${sp.poly}`);
-  if (sp.path) parts.push(`꺾은선 ${sp.path.map(([x, y]) => `(${plNum(x)}, ${plNum(y)})`).join(' → ')}`);
+  if (sp.path) parts.push(`${sp.smooth ? '부드러운 선' : '꺾은선'} ${sp.path.map(([x, y]) => `(${plNum(x)}, ${plNum(y)})`).join(' → ')}`);
   return `좌표평면: ${parts.join(' · ') || '빈 좌표평면'}`;
 }
 
@@ -2756,6 +2771,8 @@ export function planeSvg(sp) {
   g += `<text x="${f(ox + 9)}" y="${f(ay[1][1] + 6)}" font-size="17" ${SERIF} fill="currentColor">y</text>`;
   const placed = [];
   const boxOf = (x, y, t, fs, anchor = 'middle') => { const w = (labelW(t) * fs) / 15; const x0 = anchor === 'end' ? x - w : anchor === 'start' ? x : x - w / 2; return { x0, x1: x0 + w, y0: y - fs * 0.78, y1: y + fs * 0.22 }; };
+  // 축 글자 x·y도 자리를 차지한다 — y축 맨 위의 점 P(0, 10) 이름표가 "y"와 겹쳤다 (Codex 33차 #5)
+  placed.push(boxOf(ax[1][0] + 5, oy + 5, 'x', 17, 'start'), boxOf(ox + 9, ay[1][1] + 6, 'y', 17, 'start'));
   // 눈금 수 — 0은 O가 대신한다
   let ticks = '';
   for (let k = 0; k <= G.cx; k += G.every(G.cx)) {
@@ -2800,9 +2817,11 @@ export function planeSvg(sp) {
   }
   if (sp.path) {
     const pts = sp.path.map(([x, y]) => [X(x), Y(y)]);
-    g += `<polyline class="pl-path" points="${pts.map(([px, py]) => `${f(px)},${f(py)}`).join(' ')}" fill="none" stroke="${FILL}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+    // smooth(관람차)는 같은 점들을 지나는 부드러운 선 pl-wave — 꼭짓점에서 꺾이면 꼭대기에서 갑자기 방향을 바꾸는 것처럼 보인다 (Codex 33차 #4)
+    const line = sp.smooth ? planeWave(sp.path).map(([x, y]) => [X(x), Y(y)]) : pts;
+    g += `<polyline class="${sp.smooth ? 'pl-wave' : 'pl-path'}" points="${line.map(([px, py]) => `${f(px)},${f(py)}`).join(' ')}" fill="none" stroke="${FILL}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
     for (const [px, py] of pts) g += `<circle class="pl-vtx" cx="${f(px)}" cy="${f(py)}" r="3" fill="${FILL}"/>`;
-    for (let i = 1; i < pts.length; i++) segs.push([pts[i - 1], pts[i]]);
+    for (let i = 1; i < line.length; i++) segs.push([line[i - 1], line[i]]);
   }
   // 눈금 수는 도형·직선·곡선·꺾은선 **위에** — 바탕색 테두리가 지나가는 선을 가린다 (먼저 그리면 선이 "−1"·"2"를 가로질렀다, 갤러리 눈 확인)
   g += ticks;
