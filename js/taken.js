@@ -154,7 +154,7 @@ export function closeTakeTool() {
 
 /** 다른 모달이 열려 있으면 그 위에 겹치지 않는다 (🐣 부화와 같은 규칙) */
 function anyModalOpen() {
-  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'hatch', 'timeup', 'take']
+  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'hatch', 'timeup', 'take', 'parcel']
     .some((id) => { const e = $(id); return e && !e.hidden; });
 }
 

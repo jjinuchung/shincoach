@@ -57,6 +57,19 @@ try {
     for (const m of e.text.matchAll(/\[([a-z]+) [^\]]*\]/g)) if (!figureSvg(m[0].slice(1, -1)).startsWith('<svg')) { bad++; console.error(`내용 오류: coach/math/replies.json[${i}] (💬${e.no}): 그림 지시문을 못 그림 ${m[0]} — 문법은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5]`); }
   });
 } catch (e) { bad++; console.error(`JSON 오류: coach/math/replies.json: ${e.message}`); }
+// 📦 아빠의 구호품(coach/gifts.json) — [{ id, items: { 아이템id: 1~10 }, title?, text? }], 틀린 줄은 앱이 조용히 건너뛰므로 여기서 잡는다
+try {
+  const { parcelOf } = await import('../js/items.js');
+  const gifts = JSON.parse(readFileSync('coach/gifts.json', 'utf8'));
+  const ids = new Set();
+  if (!Array.isArray(gifts)) { bad++; console.error('내용 오류: coach/gifts.json: 배열이 아님'); }
+  else gifts.forEach((e, i) => {
+    const pc = parcelOf(e);
+    if (!pc) { bad++; console.error(`내용 오류: coach/gifts.json[${i}]: { id: 글(64자 안), items: { 가방 아이템id 또는 shiny_charge: 1~10 정수 } } 이어야 함 (🌕 같은 하나뿐인 물건은 못 보냄)`); return; }
+    if (ids.has(pc.id)) { bad++; console.error(`내용 오류: coach/gifts.json[${i}]: id "${pc.id}"가 겹침 — 겹친 줄은 아이에게 안 간다`); }
+    ids.add(pc.id);
+  });
+} catch (e) { bad++; console.error(`JSON 오류: coach/gifts.json: ${e.message}`); }
 if (bad) {
   console.error(`검사 실패 ${bad}건`);
   process.exit(1);

@@ -13,6 +13,7 @@ import { initTimeLimit, setSubject, flushTime } from './timelimit.js'; // ⏳ �
 import { initTimeUp, refreshChips } from './timeup.js';
 import { initTaken, openTakeTool, showTakenNoticeIfAny } from './taken.js'; // 🔒 부모가 포켓몬 데려가기
 import { initGiftSettings } from './gift.js'; // 🎁 선물 교환권 사진 (⚙, 이 기기에만)
+import { initParcel, showParcelIfAny } from './parcel.js'; // 📦 아빠의 구호품 (coach/gifts.json으로 배포)
 
 const views = {
   home: document.getElementById('view-home'),
@@ -154,13 +155,17 @@ async function main() {
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
   initTaken({ requirePin });  // 🔒 포켓몬 데려가기 (부모) + "아빠가 데려갔어요" 알림 (아이)
   initGiftSettings();         // 🎁 ⚙ 선물 교환권 사진 (이 기기에만)
+  initParcel();               // 📦 아빠의 구호품 [📦 받기]
+  // 📦 🔒 알림을 닫은 뒤에 구호품을 띄운다 — 두 창이 겹쳐 뜨지 않게 하나씩 (initTaken이 먼저 붙인 닫기가 먼저 돈다)
+  document.getElementById('taken-ok')?.addEventListener('click', () => { setTimeout(() => { showParcelIfAny().catch(() => {}); }, 300); });
   initExit();
   // 🌈⭐ 받아둔 이로치·변신 그림을 **홈을 그리기 전에** 올린다 — 나중에 올리면 이미 그린 화면은 안 바뀐다 (Codex 8차 #3). 실패해도 계속
   try { const pk = await import('./pokemon.js'); await Promise.all([pk.loadShiny().catch(() => 0), pk.loadForms().catch(() => 0)]); } catch { /* 그림 없이 */ }
   showView('home'); // 🏠 과목 고르기부터 (영어는 카드를 눌러 들어간다)
   window.__appReady = true; // index.html의 시작 감시 타이머 해제
   // 🔒 아빠가 데려간 포켓몬이 있으면 한 번 알려 준다 — 조용히 사라지면 앱이 고장 난 줄 안다
-  showTakenNoticeIfAny().catch(() => {});
+  // 📦 그다음(🔒 알림이 없으면 바로) 아빠의 구호품이 왔으면 한 번 — [📦 받기]를 눌러야 가방에
+  showTakenNoticeIfAny().then((shown) => (shown ? false : showParcelIfAny())).catch(() => {});
   try {
     await initLibrary({ showView });
   } catch (err) {

@@ -2630,6 +2630,16 @@ button { font-family: inherit; }
 .taken-emoji { font-size: 2.4rem; opacity: .5; }
 .taken-name { font-size: .78rem; font-weight: 700; color: #5b5570; }
 
+/* 📦 아빠의 구호품 (2026-10-05, parcel.js) — 상자 속 물건 칸 + 아빠 한마디 */
+.parcel-card { word-break: keep-all; } /* "2번"이 "2 / 번"으로 끊기지 않게 낱말 단위로 줄바꿈 */
+.parcel-stage { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+.parcel-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 104px; padding: 10px 14px; border-radius: 14px; background: #fff7e0; border: 2px solid #f3c94b; }
+.parcel-emoji { font-size: 2.8rem; line-height: 1.1; }
+.parcel-name { font-size: .85rem; font-weight: 700; color: #5b4a1a; }
+.parcel-count { font-size: 1.1rem; font-weight: 800; color: #b7791f; }
+.parcel-note { background: #eef6ff; border-radius: 12px; padding: 10px 12px; margin: 4px 0; text-align: left; font-size: .95rem; line-height: 1.55; color: #2b3a55; }
+.parcel-note[hidden] { display: none; }
+
 /* ===== 🏪 5일장 · 🔀 퓨전 가게 (2026-10-04, marketview.js) — 장터 천막 줄무늬 아래 가판대 ===== */
 .market-card { max-width: 720px; border-top: 14px solid transparent; border-image: repeating-linear-gradient(90deg, #d9472b 0 24px, #f3e9d6 24px 48px) 14; }
 .market-body { display: grid; gap: 14px; }

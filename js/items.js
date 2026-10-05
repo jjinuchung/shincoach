@@ -214,6 +214,36 @@ export function itemById(id) {
   return byId[id] || null;
 }
 
+/**
+ * 📦 아빠의 구호품 (2026-10-05, 아버님: "이로치의 스톤 2번을 구호품(선물)으로 보내 주자").
+ * 배포 파일 coach/gifts.json의 한 줄 = { id, items: { 아이템id: 개수 }, title?, text? }.
+ * 보낼 수 있는 것은 가방 물건(카탈로그)과 🌈 이로치 남은 횟수(SHINY_CHARGE)뿐 — 세상에 하나뿐인 것(🌕)은 못 보낸다.
+ * 개수는 1~PARCEL_MAX 정수 (오타로 99개가 가지 않게). 하나라도 틀리면 그 구호품 통째로 안 받는다
+ */
+export const PARCEL_MAX = 10;
+/** 받은 구호품인가 — 받은 때 값이 아니라 **기록이 있느냐**로 (깨진 때 0이 "안 받음"이 되어 두 번 받지 않게) */
+export function parcelGot(received, id) {
+  return !!received && Object.prototype.hasOwnProperty.call(received, id);
+}
+/** @returns {{id:string, items:Object<string,number>, title:string, text:string}|null} 틀린 줄이면 null */
+export function parcelOf(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+  if (!id || id.length > 64) return null;
+  const src = raw.items;
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
+  const items = {};
+  for (const [k, n] of Object.entries(src)) {
+    const it = byId[k];
+    if (k !== SHINY_CHARGE && (!it || it.unique)) return null;
+    if (!Number.isInteger(n) || n < 1 || n > PARCEL_MAX) return null;
+    items[k] = n;
+  }
+  if (!Object.keys(items).length) return null;
+  const str = (v) => (typeof v === 'string' ? v.trim() : '');
+  return { id, items, title: str(raw.title), text: str(raw.text) };
+}
+
 /** 🎁 레벨업 선물 상자에서 나올 수 있는 것 (🌟 황금 볼·⭐ 메가 아이템·🍄 다이버섯·🧤 스톤·스톤 상점 물건은 제외 — 귀한 것이라 따로 모아야 한다) */
 const LOOT = ITEMS.filter((it) => it.kind !== 'ball' && it.kind !== 'mega' && it.kind !== 'mushroom' && it.kind !== 'stone' && !it.stones); // 스톤이 드는 물건은 종류를 불문하고 제외
 

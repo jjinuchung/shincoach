@@ -10,6 +10,7 @@ import {
   applyUnshiny, // ⚪ 이로치 빼기 (2026-10-04)
   applyFuse, applyUnfuse, applyRenameFusion, // 🔀 퓨전 (2026-10-04, 🏪 5일장)
   applyTrade, // 🤝 교환 상인 (2026-10-05, 🏪 2단계)
+  applyParcel, // 📦 아빠의 구호품 (2026-10-05)
 } from './db.js';
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
@@ -311,7 +312,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -343,7 +344,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades) };
+  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) } };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -809,6 +810,21 @@ export async function useShinyStone(monId) {
   if (shinyLeft() < 1) return { ok: false, why: 'item' };
   const r = await runProfileOp(() => applyShiny(monId, SHINY_STONE.id), () => ({ ok: false, why: 'save' }));
   return { ok: !!(r && r.ok), why: r && r.why };
+}
+
+/** 📦 받은 구호품 id → 받은 때 */
+export function parcelsReceived() {
+  return { ...(profile.parcels || {}) };
+}
+
+/**
+ * 📦 아빠의 구호품 받기 — 저장된 프로필에서 판정하는 트랜잭션(db.applyParcel). 저장이 안 되면 없던 일:
+ * 메모리에만 넣고 "받았어요"를 띄우면 다시 열 때 가방에 없다 (Codex 29차 #2와 같은 함정). 다음에 앱을 열면 다시 온다
+ * @returns {Promise<{ok:boolean, why?:string, items?:Object}>} why: 'bad' | 'done' | 'save'
+ */
+export async function receiveParcel(raw) {
+  const r = await runProfileOp(() => applyParcel(raw), () => ({ ok: false, why: 'save' }));
+  return { ok: !!(r && r.ok), why: r && r.why, items: r && r.items };
 }
 
 /** ⚪ 이로치 빼기 — 원래 색으로 (공짜, 쓴 횟수는 안 돌아온다). @returns {Promise<{ok:boolean, why?:string}>} */

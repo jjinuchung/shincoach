@@ -4,7 +4,7 @@
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
-import { SHINY_USES, SHINY_CHARGE } from './items.js'; // 🌈 이로치 스톤 3회 — items.js는 아무것도 import하지 않는다 (순환 없음)
+import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 const DB_NAME = 'shincoach';
@@ -755,13 +755,13 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades) };
+  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) } };
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -1257,6 +1257,34 @@ export function applyUnshiny(monId) {
 }
 
 /**
+ * 📦 아빠의 구호품 받기 (2026-10-05) — 배포 파일 coach/gifts.json의 한 줄을 가방에 넣고 받은 id를 적는다. **한 트랜잭션**:
+ * 두 창이 같은 구호품을 동시에 받아도 저장된 프로필로 판정하니 한 번만 들어간다. 받은 id(parcels)는 병합에서 합집합
+ * @returns {{ok:boolean, why?:string, items?:Object}} why: 'bad'(틀린 줄) | 'done'(이미 받음)
+ */
+export function parcelRule(profile, raw, now = Date.now()) {
+  const pc = parcelOf(raw);
+  if (!pc) return { ok: false, why: 'bad' };
+  if (parcelGot(profile.parcels, pc.id)) return { ok: false, why: 'done' };
+  for (const id of Object.keys(pc.items)) addCount(profile.items, id, pc.items[id]);
+  profile.parcels = { ...(profile.parcels || {}), [pc.id]: now };
+  return { ok: true, items: { ...pc.items } };
+}
+export function applyParcel(raw) {
+  return mutateProfile((p) => parcelRule(p, raw));
+}
+/** 📦 받은 구호품 합치기 — 한 번 받았으면 계속 받은 것 (합집합, 받은 때는 이른 쪽) */
+function mergeParcels(a, b) {
+  const out = {};
+  for (const side of [a, b]) {
+    for (const [id, at] of Object.entries(side || {})) {
+      const x = Number(out[id]) || 0, y = Number(at) || 0;
+      out[id] = x && y ? Math.min(x, y) : (x || y || 1); // 깨진 때(0·글자)도 받은 것 — 1로
+    }
+  }
+  return out;
+}
+
+/**
  * 🔀 퓨전 (2026-10-04, 🏪 5일장) — 데리고 있는 두 마리(앞 a = 모양, 뒤 b = 색)를 하나로. **한 트랜잭션**:
  * 장날인지 · 서로 다른 종인지 · 둘 다 데리고 있는지 · 스톤(🔷1 + 🔶1, 코인 없음)을 판정하고,
  * 두 종의 fused(단조 카운터)를 1씩 올리고 fusions[a-b].made를 1 올린다. 종의 레벨·이로치·장식 기록은 그대로 남는다
@@ -1641,6 +1669,8 @@ export function mergeStatRecord(name, cur, rec) {
     out.fusions = mergeFusions(cur.fusions, rec.fusions);
     // 🤝 교환 기록 — 장날·상인 자리마다 합집합 (한 번 바꿨으면 계속 바꾼 것 — 옛 백업이 같은 상인과 또 바꾸게 하지 않는다)
     out.trades = mergeTrades(cur.trades, rec.trades);
+    // 📦 받은 구호품 — 합집합 (옛 백업이 "아직 안 받음"으로 되돌려 같은 구호품을 두 번 받게 하지 않는다)
+    out.parcels = mergeParcels(cur.parcels, rec.parcels);
   }
   return out;
 }
