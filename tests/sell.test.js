@@ -11,12 +11,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { MON_PRICE, SELL_MON_MAX, monPrice, itemSellPrice, sellableMons, sellableItems, sellCheck, salesOn, monsSoldOn, saleKey, mergeSales, copySales, salesReport } from '../js/sell.js';
 import { MARKET_ANCHOR } from '../js/fusion.js';
-import { cloneProfile, emptyProfile, sellRule, mergeStatRecord } from '../js/db.js';
+import { cloneProfile, emptyProfile, sellRule, mergeStatRecord, unmegaRule, dyeRule, nextStamp, purchaseRule } from '../js/db.js';
 import { haveOf, soldOf } from '../js/evolve.js';
 import { ITEMS, itemById, SHINY_CHARGE } from '../js/items.js';
 import { ROSTER } from '../js/pokemon.js';
 import { ticketId } from '../js/unlock.js';
-import { RARITY_IDS, sellCtx } from '../js/xp.js';
+import { RARITY_IDS, sellCtx, catchAttempt, addItem, inventory, spendBall } from '../js/xp.js';
 
 const src = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const prof = (o) => cloneProfile({ ...emptyProfile(), ...o });
@@ -228,8 +228,8 @@ test('🔌 화면·저장 연결: 장날에만 가판대 · 두 번 눌러야 ·
   assert.match(src('js/db.js'), /out\.sales = mergeSales\(cur\.sales, rec\.sales\);/);
   const mv = src('js/marketview.js');
   assert.match(mv, /body\.appendChild\(tradeCard\(\)\);\s*body\.appendChild\(sellCard\(\)\);/, '장날에만 (교환 상인 다음) — 줄바꿈은 \\s로 (CRLF로 받아도)');
-  assert.match(mv, /if \(!sameSell\(ui\.slArm, day, kind, id, Date\.now\(\)\)\) \{\s*ui\.slArm = \{ day, kind, id, at: Date\.now\(\) \};/, '첫 번째 누름은 "한 번 더"만');
-  assert.match(mv, /return !!arm && arm\.day === day && arm\.kind === kind && arm\.id === id && now - arm\.at < 5000;/, '같은 것을 5초 안에');
+  assert.match(mv, /if \(!sameSell\(ui\.slArm, day, kind, id, price, Date\.now\(\)\)\) \{\s*ui\.slArm = \{ day, kind, id, price, at: Date\.now\(\) \};/, '첫 번째 누름은 "한 번 더"만');
+  assert.match(mv, /return !!arm && arm\.day === day && arm\.kind === kind && arm\.id === id && arm\.price === price && now - arm\.at < 5000;/, '같은 것·같은 값을 5초 안에 (Codex 32차 #5)');
   assert.match(mv, /async function doSell\(kind, id, price\) \{\s*if \(ui\.busy\) return;\s*const day = dayNow\(\);/, '누를 때마다 오늘을 다시 읽는다');
   assert.match(mv, /if \(!stillOpen\(day\)\) \{ saySell\('🏪 장이 닫혔어요 — 다음 장날에 팔 수 있어요'\)/);
   assert.match(mv, /if \(ui\.slSay\) card\.appendChild\(el\('p', 'sl-msg', ui\.slSay\)\);/, '창 맨 위 알림 줄은 가판대에서 안 보인다 — 가판대 안에도 (헤드리스가 잡음)');
@@ -240,4 +240,115 @@ test('🔌 화면·저장 연결: 장날에만 가판대 · 두 번 눌러야 ·
   assert.match(st, /const sold = salesReport\(salesByDay\(\), monKo, 3\);/);
   assert.match(st, /card\('🏪 5일장에서 판 것'\)/);
   assert.match(src('sw.js'), /'\.\/js\/sell\.js',/);
+});
+
+// ───────── 🔍 Codex 32차 (2026-10-05) — 💰 팔기가 생겨 "창이 기억하는 가방"의 구멍이 코인이 됐다 ─────────
+
+test('🔍 Codex 32차 #1 — 💠 메가스톤 빼기는 저장된 기록으로: 두 창이 같이 빼도 하나만 돌아온다 → 팔아도 300 한 번', () => {
+  const stored = prof({ caught: { 94: 1 }, mons: { 94: { mega: true } } });
+  assert.deepEqual(unmegaRule(stored, 94), { ok: true }, '창 A');
+  assert.deepEqual(unmegaRule(stored, 94), { ok: false, why: 'none' }, '창 B는 이미 빠진 것을 본다');
+  assert.deepEqual([stored.items.megastone, stored.mons[94].mega], [1, false]);
+  assert.equal(sell(stored, 'item', 'megastone').coins, 300);
+  assert.deepEqual(sell(stored, 'item', 'megastone'), { ok: false, why: 'none' }, '두 번째는 없다');
+  assert.deepEqual(unmegaRule(prof({}), 94), { ok: false, why: 'none' }, '기록이 없는 포켓몬');
+  const x = src('js/xp.js');
+  assert.match(x, /const r = await runProfileOp\(\(\) => applyUnmega\(id\), \(pf\) => unmegaRule\(pf, id\)\);\s*return !!\(r && \(r\.ok \|\| r\.why === 'none'\)\);/);
+  assert.ok(!/addDelta\(\{ items: \{ \[MEGASTONE\.id\]: 1 \}/.test(x), '창이 기억하는 "끼워져 있음"으로 돌려주는 증분이 없다');
+});
+
+test('🔍 Codex 32차 #2 — 🎨 염색은 저장된 기록으로: 다른 창에서 판 염색약은 못 쓴다 · 데리고 있는 것만 · 이로치는 안 됨', () => {
+  const stored = prof({ caught: { 25: 1 }, items: { red: 1 } });
+  assert.equal(sell(stored, 'item', 'red').ok, true, '창 A가 판다');
+  assert.deepEqual(dyeRule(stored, 25, 'red'), { ok: false, why: 'item' }, '창 B의 옛 가방으로는 못 쓴다');
+  assert.equal(stored.mons[25], undefined, '색도 안 바뀐다');
+  const q = prof({ caught: { 25: 1 }, items: { red: 2 } });
+  assert.deepEqual(dyeRule(q, 7, 'red'), { ok: false, why: 'caught' }, '안 잡은 꼬부기');
+  assert.deepEqual(dyeRule(q, 25, 'cap'), { ok: false, why: 'kind' }, '장식은 염색약이 아니다');
+  assert.deepEqual(dyeRule(q, 25, 'red'), { ok: true });
+  assert.deepEqual([q.items.red, q.mons[25].dye], [1, 'red']);
+  assert.deepEqual(dyeRule(q, 25, 'red'), { ok: true, same: true }, '같은 색이면 안 쓴다');
+  assert.equal(q.items.red, 1);
+  assert.deepEqual(dyeRule(q, 25, null), { ok: true }, '원래 색으로는 공짜');
+  assert.deepEqual([q.items.red, q.mons[25].dye], [1, null]);
+  const sh = prof({ caught: { 25: 1 }, items: { red: 1 }, mons: { 25: { shiny: true } } });
+  assert.deepEqual(dyeRule(sh, 25, 'red'), { ok: false, why: 'shiny' }, '저장된 기록의 이로치 (Codex 8차 #1)');
+  assert.equal(sh.items.red, 1);
+  const gone = prof({ caught: { 7: 1 }, items: { red: 1 }, mons: { 7: { sold: 0, traded: 1 } } });
+  assert.deepEqual(dyeRule(gone, 7, 'red'), { ok: false, why: 'caught' }, '상인에게 보내 지금은 없다');
+  assert.match(src('js/xp.js'), /const r = await runProfileOp\(\(\) => applyDyeTx\(monId, dyeId\), \(pf\) => dyeRule\(pf, monId, dyeId\)\);/);
+  const sh2 = src('js/shop.js');
+  assert.match(sh2, /async \(\) => change\(await applyDye\(mon\.id, null\), '원래 색으로 돌아왔어요'\)/);
+  assert.match(sh2, /change\(await applyDye\(mon\.id, d\.id\),/);
+});
+
+test('🔍 Codex 32차 #3 — 저장 시각은 늘 직전보다 크다: 시계가 뒤로 가도 판 쪽이 "나중"이라 코인·판 기록·보유가 함께 간다', () => {
+  assert.equal(nextStamp({ updatedAt: 2000 }, 1000), 2001, '시계가 뒤로 가도 앞으로');
+  assert.equal(nextStamp({ updatedAt: 2000 }, 5000), 5000);
+  assert.equal(nextStamp(null, 5000), 5000);
+  assert.equal(nextStamp({ updatedAt: 'x' }, 5), 5);
+  // Codex 재현: 백업(2000) → 시계가 뒤로 → 판매가 1000으로 저장되던 것이 이제 2001
+  const id = ofRarity(1)[0];
+  const backup = prof({ caught: { [id]: 2 }, coins: 0, updatedAt: 2000 });
+  const now = cloneProfile(backup);
+  assert.equal(sell(now, 'mon', id, OPEN, 1000).ok, true);
+  now.updatedAt = nextStamp(backup, 1000);
+  for (const [a, b] of [[now, backup], [backup, now]]) {
+    const m = mergeStatRecord('profile', a, b);
+    assert.deepEqual([m.coins, monsSoldOn(m.sales, OPEN), haveOf(m.caught[id], m.mons[id])], [10, 1, 1], '코인·판 기록·보유가 함께');
+  }
+  const db = src('js/db.js');
+  assert.equal((db.match(/updatedAt = nextStamp\(/g) || []).length, 5, 'mutateProfile · applyExtend · updateMath · updateMathAndProfile(수학·프로필)');
+  assert.ok(!/(next|p|m)\.updatedAt = Date\.now\(\);/.test(db), 'Date.now()를 그대로 쓰는 프로필 저장이 남지 않았다');
+});
+
+test('🔍 Codex 32차 #5 — 두 번 누르는 사이 값이 바뀌면 안 판다(보여 준 값과 다름) · 값 없이 부르면 예전처럼', () => {
+  const id = ofRarity(1)[0];
+  const p = prof({ caught: { [id]: 3 }, mons: { [id]: { rarity: 4 } }, items: { crown: 1 } });
+  assert.deepEqual(sellRule(p, { day: OPEN, kind: 'mon', id, price: 150 }, sellCtx(p)), { ok: true, kind: 'mon', id, coins: 150 });
+  p.mons[id] = { ...p.mons[id], rarity: 1 }; // 아빠가 다른 창에서 ⭐로 되돌렸다
+  assert.deepEqual(sellRule(p, { day: OPEN, kind: 'mon', id, price: 150 }, sellCtx(p)), { ok: false, why: 'price', price: 10 });
+  assert.equal(have(p, id), 2, '안 팔렸다');
+  assert.equal(p.coins, 150);
+  assert.deepEqual(sellRule(p, { day: OPEN, kind: 'item', id: 'crown', price: 999 }, CTX), { ok: false, why: 'price', price: 50 });
+  assert.equal(p.items.crown, 1);
+  assert.equal(sellRule(p, { day: OPEN, kind: 'item', id: 'crown', price: 50 }, CTX).ok, true);
+  assert.equal(sellRule(p, { day: OPEN, kind: 'mon', id }, sellCtx(p)).coins, 10, '값을 안 주면 지금 값으로 (옛 호출)');
+  const mv = src('js/marketview.js');
+  assert.match(mv, /const r = await sellThing\(\{ day, kind, id, price \}\);/);
+  assert.match(mv, /r\.why === 'price' \? `값이 바뀌었어요 \(지금 💰 \$\{r\.price\}\) — 다시 두 번 눌러요`/);
+});
+
+test('🔍 Codex 32차 #8 — 키스톤을 팔아도 끼운 메가스톤은 뺄 수 있다 · 못 뺐으면 뺐다고 말하지 않는다', () => {
+  const sh = src('js/shop.js');
+  const i = sh.indexOf('  if (forms.mega) {');
+  const blk = sh.slice(i, sh.indexOf('  if (forms.gmax) {', i));
+  const a = blk.indexOf('if (megaOn) {'), b = blk.indexOf("'메가스톤 빼기'"), c = blk.indexOf('} else if (!hasKeystone()) {');
+  assert.ok(a > 0 && a < b && b < c, '끼워져 있으면 키스톤을 묻기 전에 빼기 버튼');
+  assert.match(blk, /change\(await equipMega\(mon\.id, false\), '💠 메가스톤을 뺐어요'\)/);
+  assert.equal(sell(prof({ items: { keystone: 1 } }), 'item', 'keystone').coins, 300);
+});
+
+test('🔍 Codex 32차 ⑨ — 가방 볼도 던지기 전에 저장소에서 먼저 쓴다: 다른 창에서 판 하이퍼볼은 못 던진다 · 미리 쓴 볼은 판정이 또 빼지 않는다', async () => {
+  const stored = prof({ items: { ultraball: 1 } });
+  assert.equal(sell(stored, 'item', 'ultraball').coins, 300, '창 A가 판다');
+  assert.equal(purchaseRule(stored, { coins: 0, items: { ultraball: 1 } }, {}).ok, false, '창 B가 던지려고 쓰기 → 이미 없다');
+  addItem('ultraball', 1);
+  const paid = catchAttempt(150, () => 0.999999, { ball: 'ultraball', paid: 'ultraball' });
+  assert.equal(paid.ball, 'ultraball', '미리 쓴 볼로 던진다');
+  assert.equal(inventory().ultraball, 1, '판정은 또 빼지 않는다 (이미 저장소에서 뺐다)');
+  const wrong = catchAttempt(150, () => 0.999999, { ball: 'ultraball', paid: 'greatball' });
+  assert.equal(wrong.ball, 'pokeball', '미리 쓴 것과 다른 볼은 못 쓴다');
+  assert.equal(inventory().ultraball, 1);
+  const old = catchAttempt(150, () => 0.999999, { ball: 'ultraball' });
+  assert.equal(old.ball, 'ultraball', '미리 안 쓴 호출(옛 길)은 창의 가방에서');
+  assert.equal(inventory().ultraball, undefined);
+  assert.equal(await spendBall('ultraball'), false, '저장이 안 되면 못 쓴 것');
+  assert.equal(await spendBall('pokeball'), false, '몬스터볼은 공짜 — 미리 쓰지 않는다');
+  assert.equal(await spendBall('crown'), false, '볼이 아니다');
+  const t = src('js/catch.js').slice(src('js/catch.js').indexOf('async function throwBall('));
+  assert.ok(t.indexOf('await spendBall(ballId)') > 0 && t.indexOf('await spendBall(ballId)') < t.indexOf('await sleep('), '연출 전에 쓴다');
+  assert.match(t, /이제 가방에 없어요 \(다른 화면에서 썼거나 팔았어요\) — 볼을 다시 골라요/);
+  assert.match(t, /const giveBack = \(\) => \{ if \(paid\) refundBall\(paid\)\.catch\(\(\) => \{\}\); \};/, '못 던지고 닫히면 돌려준다');
+  assert.match(src('js/xp.js'), /const spent = ballItem\.free \|\| \(opts\.paid \? opts\.paid === ballItem\.id : \(!ballItem\.unique && consumeItem\(ballItem\.id\)\)\);/);
 });

@@ -1,6 +1,6 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
-import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold, spendUniqueBall, refundUniqueBall } from './xp.js';
+import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold, spendBall, refundBall } from './xp.js';
 import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
@@ -393,27 +393,30 @@ async function throwBall(c) {
   const ballId = ui.ball;
   $('catch-pick').hidden = true;
   $('catch-golden').hidden = true;
-  // 🌕 세상에 하나뿐인 볼은 **저장소에서 먼저 쓴다** — 다른 화면에서 이미 썼으면 볼을 다시 고르게 (Codex 29차 #1).
-  //    ⚙ 연습은 볼이 안 줄어서 쓰지 않는다. 쓴 뒤 던지기 전에 화면이 닫히면 돌려준다 (giveBack)
+  // 🌕·🔵·🟡·🟣·⚪ 가방 볼은 **저장소에서 먼저 쓴다** — 다른 화면에서 이미 썼거나 팔았으면 볼을 다시 고르게
+  //    (🌕 Codex 29차 #1 → 모든 가방 볼 Codex 32차 ⑨: 💰 팔기가 생겨 다른 창에서 판 볼을 또 던질 수 있었다).
+  //    🔴 몬스터볼은 언제나 공짜. ⚙ 연습은 볼이 안 줄어서 쓰지 않는다. 쓴 뒤 던지기 전에 화면이 닫히면 돌려준다 (giveBack)
   const picked = BALLS.find((x) => x.id === ballId);
   let paid;
-  if (picked && picked.unique && !ui.practice) {
-    $('catch-msg').textContent = `${picked.emoji} ${picked.ko}${josa(picked.ko, '을', '를')} 꺼내는 중…`;
-    const ok = await spendUniqueBall(ballId);
-    if (!alive()) { if (ok) refundUniqueBall(ballId).catch(() => {}); return; }
+  if (picked && !picked.free && !ui.practice) {
+    if (picked.unique) $('catch-msg').textContent = `${picked.emoji} ${picked.ko}${josa(picked.ko, '을', '를')} 꺼내는 중…`;
+    const ok = await spendBall(ballId);
+    if (!alive()) { if (ok) refundBall(ballId).catch(() => {}); return; }
     if (!ok) {
       ui.threw = false;
       const tg = $('catch-truegold');
       if (tg) tg.hidden = true; // "찾았다!" 알림이 남아 있으면 없는 볼을 가리킨다
       $('catch-pick').hidden = false;
       refreshBalls(POKEBALL.id);
-      $('catch-msg').textContent = `${picked.emoji} ${picked.ko}${josa(picked.ko, '은', '는')} 다른 화면에서 이미 썼어요 — 볼을 다시 골라요`;
+      $('catch-msg').textContent = picked.unique
+        ? `${picked.emoji} ${picked.ko}${josa(picked.ko, '은', '는')} 다른 화면에서 이미 썼어요 — 볼을 다시 골라요`
+        : `${picked.emoji} ${picked.ko}${josa(picked.ko, '이', '가')} 이제 가방에 없어요 (다른 화면에서 썼거나 팔았어요) — 볼을 다시 골라요`;
       return;
     }
     paid = ballId;
   }
-  // 던지기 전에 화면이 닫혔다 — 미리 쓴 🌕를 돌려준다 (판정이 없었으니 쓴 게 아니다)
-  const giveBack = () => { if (paid) refundUniqueBall(paid).catch(() => {}); };
+  // 던지기 전에 화면이 닫혔다 — 미리 쓴 볼을 돌려준다 (판정이 없었으니 쓴 게 아니다)
+  const giveBack = () => { if (paid) refundBall(paid).catch(() => {}); };
   const stage = $('catch-stage');
   const mon = $('catch-mon');
   const ball = $('catch-ball');

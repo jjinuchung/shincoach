@@ -13,7 +13,7 @@ import { initTimeLimit, setSubject, flushTime } from './timelimit.js'; // ⏳ �
 import { initTimeUp, refreshChips } from './timeup.js';
 import { initTaken, openTakeTool, showTakenNoticeIfAny } from './taken.js'; // 🔒 부모가 포켓몬 데려가기
 import { initGiftSettings } from './gift.js'; // 🎁 선물 교환권 사진 (⚙, 이 기기에만)
-import { initParcel, showParcelIfAny } from './parcel.js'; // 📦 아빠의 구호품 (coach/gifts.json으로 배포)
+import { initParcel, showParcelIfAny, retryParcel } from './parcel.js'; // 📦 아빠의 구호품 (coach/gifts.json으로 배포)
 
 const views = {
   home: document.getElementById('view-home'),
@@ -43,6 +43,8 @@ export function showView(name) {
   if (name === 'library') refreshList().catch(() => {});
   // 🏠 과목 카드도 다시 그린다 — 그 사이에 마스코트 그림을 받아 왔을 수 있다
   if (name === 'home') renderHome(showView).catch(() => {});
+  // 📦 다른 창 때문에 미뤄 둔 구호품이 있으면 홈으로 돌아왔을 때 다시 (Codex 32차 #7)
+  if (name === 'home') retryParcel().catch(() => {});
   // 🔢 수학은 들어올 때마다 진도를 다시 읽어 그린다 (사다리·오늘 복습이 최신이어야 한다)
   if (name === 'math') renderMath().catch(() => {});
   else stopCheer(); // ✨ 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)

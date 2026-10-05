@@ -99,8 +99,8 @@ test('🌕 Codex 29차 #1 — 던질 때 저장소에서 먼저 쓴다: 창이 �
   // 잡기 화면 연결
   const tb = src('js/catch.js');
   const t = tb.slice(tb.indexOf('async function throwBall('));
-  assert.ok(t.indexOf('await spendUniqueBall(ballId)') > 0 && t.indexOf('await spendUniqueBall(ballId)') < t.indexOf('await sleep('), '연출 전에 쓴다');
-  assert.match(t, /if \(picked && picked\.unique && !ui\.practice\)/, '연습은 쓰지 않는다');
+  assert.ok(t.indexOf('await spendBall(ballId)') > 0 && t.indexOf('await spendBall(ballId)') < t.indexOf('await sleep('), '연출 전에 쓴다 (🌕도 다른 가방 볼도 — Codex 32차 ⑨)');
+  assert.match(t, /if \(picked && !picked\.free && !ui\.practice\)/, '연습·몬스터볼은 쓰지 않는다');
   assert.match(t, /다른 화면에서 이미 썼어요 — 볼을 다시 골라요/);
   assert.match(t, /if \(tg\) tg\.hidden = true; \/\/ "찾았다!" 알림이 남아 있으면 없는 볼을 가리킨다/, '못 쓰면 "찾았다" 알림도 내린다 (헤드리스가 잡음)');
   assert.match(t, /ui\.attempt\(c\.id, \{ ball: ballId, paid \}\)/);

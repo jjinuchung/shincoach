@@ -457,16 +457,16 @@ function renderMon(msg, pop) {
     dyeBox.appendChild(el('span', 'mon-empty', '✨ 이로치는 제 색 그대로예요 — 염색약은 다른 포켓몬에게 써요'));
     return; // 염색 칸이 renderMon의 마지막이다
   }
-  dyeBox.appendChild(option('⚪', '원래 색', '공짜', !look.dye, 'none', () => change(applyDye(mon.id, null), '원래 색으로 돌아왔어요')));
+  dyeBox.appendChild(option('⚪', '원래 색', '공짜', !look.dye, 'none', async () => change(await applyDye(mon.id, null), '원래 색으로 돌아왔어요')));
   let anyDye = false;
   for (const d of DYE) {
     const n = itemCount(d.id);
     const on = look.dye === d.id;
     if (!n && !on) continue;
     anyDye = true;
-    dyeBox.appendChild(option(d.emoji, d.ko, on ? '지금 색' : `가방 ${n}개`, on, '', () => {
+    dyeBox.appendChild(option(d.emoji, d.ko, on ? '지금 색' : `가방 ${n}개`, on, '', async () => {
       if (on) return;
-      change(applyDye(mon.id, d.id), `${d.emoji} ${d.ko}으로 물들였어요! (염색약 하나 씀)`);
+      change(await applyDye(mon.id, d.id), `${d.emoji} ${d.ko}으로 물들였어요! (염색약 하나 씀)`);
     }));
   }
   if (!anyDye) dyeBox.appendChild(el('span', 'mon-empty', '가방에 염색약이 없어요 — 🛒 상점에서 사 보세요'));
@@ -637,13 +637,14 @@ function renderForms() {
   const notes = [];
 
   if (forms.mega) {
-    if (!hasKeystone()) {
-      notes.push(`🔑 키스톤이 있어야 메가진화를 할 수 있어요 — 🛒 상점에서 ${KEYSTONE.price}코인`);
-    } else if (megaOn) {
+    // 💠 끼워 둔 메가스톤은 키스톤이 없어도 뺄 수 있다 — 키스톤을 팔면 스톤이 갇혔다 (Codex 32차 #8)
+    if (megaOn) {
       box.appendChild(option('💠', '메가스톤 빼기', '가방으로 돌아와요', true, '', async () => {
-        await equipMega(mon.id, false);
-        change(true, '💠 메가스톤을 뺐어요');
+        change(await equipMega(mon.id, false), '💠 메가스톤을 뺐어요');
       }));
+      if (!hasKeystone()) notes.push(`🔑 키스톤이 있어야 메가진화를 할 수 있어요 — 🛒 상점에서 ${KEYSTONE.price}코인`);
+    } else if (!hasKeystone()) {
+      notes.push(`🔑 키스톤이 있어야 메가진화를 할 수 있어요 — 🛒 상점에서 ${KEYSTONE.price}코인`);
     } else {
       const n = itemCount(MEGASTONE.id);
       const btn = option('💠', '메가스톤 끼우기', n ? `가방 ${n}개` : `🛒 상점 ${MEGASTONE.price}코인`, false, '', async () => {

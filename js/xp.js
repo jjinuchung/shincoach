@@ -12,6 +12,7 @@ import {
   applyTrade, // 🤝 교환 상인 (2026-10-05, 🏪 2단계)
   applyParcel, // 📦 아빠의 구호품 (2026-10-05)
   applySell, // 💰 5일장 팔기 (2026-10-05)
+  applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
 } from './db.js';
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
@@ -241,10 +242,9 @@ export async function equipMega(id, on) {
     return r.ok;
   }
   if (!m.mega) return true;
-  delete m.mega;
-  profile.items[MEGASTONE.id] = (profile.items[MEGASTONE.id] || 0) + 1;
-  addDelta({ items: { [MEGASTONE.id]: 1 }, mons: { [id]: { mega: false } } });
-  return true;
+  // 💠 빼기도 저장된 기록으로 (Codex 32차 #1) — 다른 창이 먼저 뺐으면 돌려주지 않는다 (메가스톤 복제 → 💰 팔기로 300씩 끝없이)
+  const r = await runProfileOp(() => applyUnmega(id), (pf) => unmegaRule(pf, id));
+  return !!(r && (r.ok || r.why === 'none'));
 }
 
 /** 🍄 다이버섯 얻기 (하루 상한은 부르는 쪽에서 — track이 날짜를 안다) */
@@ -479,7 +479,8 @@ export function catchAttempt(id, rng = Math.random, opts = {}) {
   const wanted = opts.ball || (opts.golden ? GOLDEN.id : POKEBALL.id);
   const ballItem = itemById(wanted) || POKEBALL;
   // 🌕 세상에 하나뿐인 볼은 미리 저장소에서 쓴 것(opts.paid)만 — 창이 기억하는 가방으로는 쓰지 않는다 (spendUniqueBall, Codex 29차 #1)
-  const spent = ballItem.free || (ballItem.unique ? opts.paid === ballItem.id : consumeItem(ballItem.id));
+  // 🔴 가방 볼도 던지기 전에 저장소에서 먼저 쓴다(opts.paid, spendBall — Codex 32차 ⑨). 미리 안 쓴 호출만 창의 가방에서 (🌕는 늘 미리)
+  const spent = ballItem.free || (opts.paid ? opts.paid === ballItem.id : (!ballItem.unique && consumeItem(ballItem.id)));
   const used = spent ? ballItem : POKEBALL; // 가방에 없으면 그냥 몬스터볼
   const chance = ballChance(used.id, rarityOf(id), level, isUltraBeast(id)); // 🌌 울트라비스트는 ⚪ 비스트볼이라야 제대로 든다
   const caught = rollCatch(chance, rng);
@@ -906,6 +907,27 @@ export async function spendUniqueBall(ballId) {
   return !!(r && r.ok);
 }
 
+/**
+ * 🔴 가방 볼을 **저장소에서 먼저** 쓴다 (Codex 32차 ⑨) — 🌕와 같은 길. 창이 기억하는 가방으로 쓰면
+ * 다른 창에서 판 하이퍼볼(💰300)·마스터볼(💰600)을 또 던졌다. 저장이 안 되면 못 쓴 것
+ */
+export async function spendBall(ballId) {
+  const it = itemById(ballId);
+  if (!it || it.kind !== 'ball' || it.free) return false;
+  if (it.unique) return spendUniqueBall(ballId);
+  const r = await runProfileOp(() => applyPurchase({ coins: 0, items: { [ballId]: 1 } }, {}), () => ({ ok: false }));
+  return !!(r && r.ok);
+}
+
+/** 🔴 미리 쓴 볼을 못 던졌을 때 돌려준다 (🌕는 세상에 하나뿐 — refundUniqueBall) */
+export async function refundBall(ballId) {
+  const it = itemById(ballId);
+  if (!it || it.kind !== 'ball' || it.free) return false;
+  if (it.unique) return refundUniqueBall(ballId);
+  const r = await runProfileOp(() => applyPurchase({ coins: 0 }, { items: { [ballId]: 1 } }), () => ({ ok: false }));
+  return !!(r && r.ok);
+}
+
 /** 🌕 미리 쓴 볼을 못 던졌을 때(던지는 사이 잡기 화면이 닫힘) 돌려준다 — 그 사이 새로 하나 생겼으면 그대로 (세상에 하나뿐) */
 export async function refundUniqueBall(ballId) {
   const gain = { items: { [ballId]: 1 }, once: ballId };
@@ -1118,20 +1140,20 @@ export async function equipGear(monId, gearId) {
   return true;
 }
 
-/** 🎨 염색(dyeId, 염색약 한 개 소모) / 원래 색으로(null, 무료). 염색약이 없으면 false */
-export function applyDye(monId, dyeId) {
+/**
+ * 🎨 염색(dyeId, 염색약 한 개 소모) / 원래 색으로(null, 무료). 염색약이 없으면 false.
+ * 판정·소모는 **저장된 기록으로** 한 트랜잭션 (Codex 32차 #2) — 창이 기억하는 가방으로 쓰면 다른 창에서 판 염색약을 또 썼다
+ * @returns {Promise<boolean>}
+ */
+export async function applyDye(monId, dyeId) {
   if (getLook(monId).dye === (dyeId || null)) return true;
   if (dyeId && isShiny(monId)) return false; // 🌈 이로치는 제 색이 볼거리 — 염색 필터를 끄므로 염색약만 없어진다 (Codex 8차 #1)
-  const items = {};
-  if (dyeId) {
+  if (dyeId) { // 빠른 거르기 (진짜 판정은 트랜잭션 안에서)
     const it = itemById(dyeId);
     if (!it || it.kind !== 'dye' || (profile.items[dyeId] || 0) < 1) return false;
-    profile.items[dyeId] -= 1;
-    items[dyeId] = -1;
   }
-  profile.mons[monId] = { ...(profile.mons[monId] || {}), dye: dyeId || null };
-  addDelta({ items, mons: { [monId]: { dye: dyeId || null } } });
-  return true;
+  const r = await runProfileOp(() => applyDyeTx(monId, dyeId), (pf) => dyeRule(pf, monId, dyeId));
+  return !!(r && r.ok);
 }
 
 // ── ⚔️ 배틀 ──

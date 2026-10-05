@@ -52,6 +52,7 @@ let queue = [];    // 이번에 보여 줄 구호품들 (하나씩)
 let cur = null;    // 지금 창에 뜬 구호품
 let step = 'offer'; // 'offer'(받기 전) → 'busy' → 'done'(받았음·못 받았음 — 누르면 닫힘)
 let failed = false; // 이번에 저장을 못 했다 — 다음에 앱을 열 때까지 다시 안 띄운다
+let deferred = false; // 다른 창이 열려 있어 미뤘다 — 홈으로 돌아오면 다시 (Codex 32차 #7)
 
 function anyModalOpen() {
   return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'hatch', 'timeup', 'take', 'taken', 'market']
@@ -78,17 +79,26 @@ export function initParcel() {
  */
 export async function showParcelIfAny() {
   const box = $('parcel');
-  if (!box || !box.hidden || failed || anyModalOpen()) return false;
+  if (!box || !box.hidden || failed) return false;
+  if (anyModalOpen()) { deferred = true; return false; } // 다른 창이 닫히고 홈으로 돌아오면 다시 (retryParcel)
   if (!queue.length) queue = pendingParcels(await loadParcels(), parcelsReceived());
   // 그 사이 다른 창에서 받았을 수 있다 — 띄우기 직전에 한 번 더 거른다
   const got = parcelsReceived();
   queue = queue.filter((pc) => !parcelGot(got, pc.id));
-  if (!queue.length || anyModalOpen() || !box.hidden) return false;
+  if (!queue.length) { deferred = false; return false; }
+  if (anyModalOpen() || !box.hidden) { deferred = true; return false; } // 받아 오는 사이 다른 창이 열렸다
+  deferred = false;
   cur = queue.shift();
   render();
   box.hidden = false;
   try { sfx.ding(); } catch { /* 소리는 없어도 */ }
   return true;
+}
+
+/** 🏠 홈으로 돌아올 때 — 미뤄 둔 구호품이 있으면 다시 (미룬 적이 없거나 저장을 못 했으면 아무것도 안 한다 — 받아 오지도 않는다) */
+export function retryParcel() {
+  if (!deferred || failed) return Promise.resolve(false);
+  return showParcelIfAny();
 }
 
 function render() {

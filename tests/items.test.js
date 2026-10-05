@@ -120,18 +120,10 @@ test('프로필: 장식 장착·교체·벗기 (가방 개수 보존) — 이제
   assert.equal(await equipGear(25, 'red'), false, '염색약은 장착 불가');
 });
 
-test('프로필: 염색은 소모, 원래 색은 무료', () => {
-  assert.equal(applyDye(25, 'blue'), false, '없음');
-  assert.equal(applyDye(25, 'red'), true);
-  assert.equal(getLook(25).dye, 'red');
-  assert.equal(itemCount('red'), 1, '하나 소모');
-  assert.equal(applyDye(25, 'red'), true, '같은 색이면 소모 없음');
-  assert.equal(itemCount('red'), 1);
-  assert.equal(applyDye(25, null), true);
-  assert.equal(getLook(25).dye, null);
-  assert.equal(itemCount('red'), 1, '원래 색으로는 공짜');
-  assert.equal(applyDye(25, 'cap'), false, '장식은 염색 불가');
-  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null, shiny: false, shinyUrl: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리, shiny = 🌈 이로치
+test('프로필: 데리고 있지 않은 포켓몬은 못 물들인다 (염색은 저장된 기록으로 판정 — Codex 32차 #2, 화면도 염색 칸을 숨긴다)', async () => {
+  assert.equal(await applyDye(25, 'red'), false, '아직 안 잡은 피카츄');
+  assert.equal(itemCount('red'), 2, '염색약은 그대로');
+  assert.equal(await applyDye(25, 'cap'), false, '장식은 염색 불가');
 });
 
 test('❤️ 파트너·HP·물약: 처음 잡은 포켓몬이 파트너, HP는 0~100, 물약은 가방에서 소모', async () => {
@@ -159,6 +151,21 @@ test('❤️ 파트너·HP·물약: 처음 잡은 포켓몬이 파트너, HP는 
   assert.equal(usePotion(4, 'cap').ok, false, '물약이 아닌 건 못 먹임');
   assert.deepEqual(changeHp(4, 50), { from: 100, to: 100 }, '100 위로 안 올라감');
   assert.equal(itemCount('potion_big'), 0);
+});
+
+test('프로필: 염색은 소모, 원래 색은 무료 (위 테스트에서 잡은 피카츄로)', async () => {
+  assert.equal(await applyDye(25, 'blue'), false, '없음');
+  assert.equal(await applyDye(25, 'red'), true);
+  assert.equal(getLook(25).dye, 'red');
+  assert.equal(itemCount('red'), 1, '하나 소모');
+  assert.equal(await applyDye(25, 'red'), true, '같은 색이면 소모 없음');
+  assert.equal(itemCount('red'), 1);
+  assert.equal(await applyDye(25, null), true);
+  assert.equal(getLook(25).dye, null);
+  assert.equal(itemCount('red'), 1, '원래 색으로는 공짜');
+  assert.equal(await applyDye(25, 'cap'), false, '장식은 염색 불가');
+  assert.equal(getLook(25).dye, null);
+  assert.equal(getLook(25).gear, null);
 });
 
 test('백업 병합: 코인·가방·꾸밈은 최근 저장 쪽, 누적치는 큰 값', () => {

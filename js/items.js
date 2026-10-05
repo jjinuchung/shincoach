@@ -235,7 +235,8 @@ export function parcelOf(raw) {
   const items = {};
   for (const [k, n] of Object.entries(src)) {
     const it = byId[k];
-    if (k !== SHINY_CHARGE && (!it || it.unique)) return null;
+    // 🥚 알은 가방이 아니라 profile.eggs에서 품는다 — 가방에 넣으면 받기만 되고 못 품는다 (Codex 32차 #4)
+    if (k !== SHINY_CHARGE && (!it || it.unique || it.kind === 'egg')) return null;
     if (!Number.isInteger(n) || n < 1 || n > PARCEL_MAX) return null;
     items[k] = n;
   }

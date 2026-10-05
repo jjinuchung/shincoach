@@ -88,7 +88,8 @@ let showing = false;
  */
 /** 다른 모달(잡기·상점·포켓몬 팝업·배틀·퍼즐·복습·에세이·단어·🧬 진화 연출)이 열려 있나 — 그 위에 겹치지 않는다 */
 function anyModalOpen() {
-  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve'].some((id) => { const e = $(id); return e && !e.hidden; });
+  // 📦 구호품·🔒 데려감 알림·🏪 5일장·⏳ 잠금 위에도 겹치지 않는다 (Codex 32차 #6)
+  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'take', 'taken', 'timeup', 'market', 'parcel'].some((id) => { const e = $(id); return e && !e.hidden; });
 }
 export async function showHatchIfAny() {
   const box = $('hatch');

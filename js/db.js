@@ -4,7 +4,7 @@
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
-import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
+import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
@@ -436,7 +436,7 @@ export async function applyExtend(date, field, itemId, max) {
   const next = cloneProfile(curP);
   const r = extendRule(next, curD, date, field, itemId, max);
   if (!r.ok) { await txDone(tx); return { ...r, profile: curP }; }
-  next.updatedAt = Date.now();
+  next.updatedAt = nextStamp(curP);
   ps.put(next);
   ds.put(r.daily);
   await txDone(tx);
@@ -776,6 +776,14 @@ function addCount(map, id, n) {
  * 규칙이 `{ ok: false }`를 돌려주면 아무것도 쓰지 않는다 (코인·재료가 모자란 경우).
  * @param {(profile:object) => object|void} rule 복사본을 고치고 결과를 돌려주는 순수 함수
  */
+/**
+ * 프로필 저장 시각 — 늘 직전 값보다 크다 (Codex 32차 #3). 백업 병합은 코인·가방을 "나중에 저장된 쪽"으로 통째로 쓰는데,
+ * 태블릿 시계가 뒤로 가면 판 기록·구호품 기록(합집합)만 남고 코인·가방은 옛것이 됐다 (판 기록은 있는데 코인이 없다)
+ */
+export function nextStamp(cur, now = Date.now()) {
+  return Math.max(now, (Number(cur && cur.updatedAt) || 0) + 1);
+}
+
 async function mutateProfile(rule) {
   const db = await openDb();
   const tx = db.transaction('profile', 'readwrite');
@@ -784,7 +792,7 @@ async function mutateProfile(rule) {
   const next = cloneProfile(cur);
   const out = rule(next) || {};
   if (out.ok === false) { await txDone(tx); return { ...out, profile: cur }; }
-  next.updatedAt = Date.now();
+  next.updatedAt = nextStamp(cur);
   store.put(next);
   await txDone(tx);
   return { ...out, profile: next };
@@ -871,7 +879,7 @@ export async function updateMath(rule) {
   const next = cloneMath(cur);
   rule(next);
   next.id = MATH_ID;
-  next.updatedAt = Date.now();
+  next.updatedAt = nextStamp(cur);
   store.put(next);
   await txDone(tx);
   return next;
@@ -897,9 +905,9 @@ export async function updateMathAndProfile(rule) {
   const p = cloneProfile(curMe);
   const out = rule(m, p) || {};
   m.id = MATH_ID;
-  m.updatedAt = Date.now();
+  m.updatedAt = nextStamp(curMath);
   p.id = 'me';
-  p.updatedAt = Date.now();
+  p.updatedAt = nextStamp(curMe);
   store.put(m);
   store.put(p);
   await txDone(tx);
@@ -1255,6 +1263,49 @@ export function unshinyRule(profile, monId, now = Date.now()) {
 }
 export function applyUnshiny(monId) {
   return mutateProfile((p) => unshinyRule(p, monId));
+}
+
+/**
+ * 💠 메가스톤 빼기 (Codex 32차 #1) — **저장된 기록에 끼워져 있을 때만** 가방으로 돌려준다. 한 트랜잭션.
+ * 창이 기억하는 "끼워져 있음"으로 돌려주면 두 창이 같이 빼서 메가스톤이 둘이 되고, 💰 팔기로 300씩 끝없이 번다
+ * @returns {{ok:boolean, why?:string}} why: 'none' (이미 빠져 있다 — 다른 창이 먼저 뺐다)
+ */
+export function unmegaRule(profile, monId) {
+  const id = Number(monId);
+  const m = (profile.mons || {})[id];
+  if (!m || !m.mega) return { ok: false, why: 'none' };
+  profile.mons[id] = { ...m, mega: false };
+  addCount(profile.items, MEGASTONE.id, 1);
+  return { ok: true };
+}
+export function applyUnmega(monId) {
+  return mutateProfile((p) => unmegaRule(p, monId));
+}
+
+/**
+ * 🎨 염색 / 원래 색으로 (Codex 32차 #2) — 데리고 있는지·염색약이 가방에 있는지·이로치인지를 **저장된 기록으로 한 번에** 판정하고
+ * 염색약 하나를 쓴다. 창이 기억하는 가방으로 쓰면, 다른 창에서 판 염색약을 또 쓸 수 있었다 (💰 팔기 + 염색)
+ * @returns {{ok:boolean, why?:string, same?:boolean}} why: 'kind' | 'caught' | 'shiny' | 'item'
+ */
+export function dyeRule(profile, monId, dyeId) {
+  const id = Number(monId);
+  const m = (profile.mons || {})[id] || {};
+  const want = dyeId || null;
+  if (want) {
+    const it = itemById(want);
+    if (!it || it.kind !== 'dye') return { ok: false, why: 'kind' };
+  }
+  if ((m.dye || null) === want) return { ok: true, same: true };
+  if (!want) { profile.mons[id] = { ...m, dye: null }; return { ok: true }; } // 원래 색으로는 공짜
+  if (haveOf((profile.caught || {})[id], m) < 1) return { ok: false, why: 'caught' };
+  if (m.shiny) return { ok: false, why: 'shiny' }; // 🌈 이로치는 제 색이 볼거리 (Codex 8차 #1)
+  if ((Number((profile.items || {})[want]) || 0) < 1) return { ok: false, why: 'item' };
+  addCount(profile.items, want, -1);
+  profile.mons[id] = { ...m, dye: want };
+  return { ok: true };
+}
+export function applyDyeTx(monId, dyeId) {
+  return mutateProfile((p) => dyeRule(p, monId, dyeId));
 }
 
 /**

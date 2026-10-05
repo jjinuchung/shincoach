@@ -82,11 +82,16 @@ export function sellableItems(bag) {
   return out.sort((a, b) => b.price - a.price || a.id.localeCompare(b.id));
 }
 
+/** 두 번 누르는 사이 값이 바뀌었나 (Codex 32차 #5) — 보여 준 값(req.price)이 있으면 지금 값과 같아야 판다 */
+function quoteOk(req, price) {
+  return req.price === undefined || req.price === null || Number(req.price) === price;
+}
+
 /**
  * 💰 팔기 판정 — 저장된 프로필로 (db.sellRule이 트랜잭션 안에서 부른다)
  * @param {{day:string, kind:'mon'|'item', id:number|string}} req
  * @param {{rarity:Function, known?:Function}} ctx
- * @returns {{ok:boolean, why?:string, price?:number}} why: 'closed' | 'bad' | 'have' | 'limit' | 'none'
+ * @returns {{ok:boolean, why?:string, price?:number}} why: 'closed' | 'bad' | 'have' | 'limit' | 'none' | 'price'(보여 준 값과 다름 — price는 지금 값)
  */
 export function sellCheck(profile, req, ctx) {
   const day = req && req.day;
@@ -96,13 +101,16 @@ export function sellCheck(profile, req, ctx) {
     if (!id || (ctx.known && !ctx.known(id))) return { ok: false, why: 'bad' };
     if (haveOf((profile.caught || {})[id], (profile.mons || {})[id]) < 2) return { ok: false, why: 'have' };
     if (monsSoldOn(profile.sales, day) >= SELL_MON_MAX) return { ok: false, why: 'limit' };
-    return { ok: true, price: monPrice(ctx.rarity(id)) };
+    const price = monPrice(ctx.rarity(id));
+    if (!quoteOk(req, price)) return { ok: false, why: 'price', price };
+    return { ok: true, price };
   }
   if (req.kind === 'item') {
     const id = String(req.id || '');
     const price = itemSellPrice(id);
     if (!price) return { ok: false, why: 'bad' };
     if ((Number((profile.items || {})[id]) || 0) < 1) return { ok: false, why: 'none' };
+    if (!quoteOk(req, price)) return { ok: false, why: 'price', price };
     return { ok: true, price };
   }
   return { ok: false, why: 'bad' };

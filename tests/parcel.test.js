@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { cloneProfile, emptyProfile, parcelRule, shinyRule, unshinyRule, mergeStatRecord } from '../js/db.js';
-import { parcelOf, PARCEL_MAX, SHINY_CHARGE, SHINY_STONE, TRUE_GOLD, shinyUsesLeft } from '../js/items.js';
+import { parcelOf, PARCEL_MAX, SHINY_CHARGE, SHINY_STONE, TRUE_GOLD, shinyUsesLeft, ITEMS } from '../js/items.js';
 import { pendingParcels, parcelLabel, afterLine } from '../js/parcel.js';
 
 const prof = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
@@ -126,4 +126,21 @@ test('📦 화면 연결 — 앱을 열면(🔒 알림 뒤) 한 번 · [받기]�
   for (const id of ['parcel', 'parcel-title', 'parcel-stage', 'parcel-text', 'parcel-sub', 'parcel-ok']) assert.match(h, new RegExp(`id="${id}"`));
   assert.match(h, /<div id="parcel" class="catch parcel" hidden>/);
   assert.match(src('sw.js'), /'\.\/js\/parcel\.js',/);
+});
+
+test('🔍 Codex 32차 #4 — 🥚 알은 구호품으로 못 보낸다 (가방이 아니라 profile.eggs에서 품는다) · 받을 수 있는 것은 모두 가방에서 쓰는 것', () => {
+  assert.equal(parcelOf({ id: 'egg-gift', items: { egg_math: 1 } }), null);
+  assert.equal(parcelOf({ id: 'egg-gift', items: { egg_english: 1, potion: 1 } }), null, '하나라도 알이면 통째로');
+  const usable = new Set(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool', 'extend']);
+  for (const it of ITEMS) if (parcelOf({ id: 'x', items: { [it.id]: 1 } })) assert.ok(usable.has(it.kind), `${it.id} (${it.kind})는 받아도 쓸 곳이 있어야`);
+});
+
+test('🔍 Codex 32차 #6·#7 — 부화 창은 구호품 위에 안 겹친다 · 다른 창 때문에 미뤄 둔 구호품은 홈으로 돌아올 때 다시', () => {
+  assert.match(src('js/hatch.js'), /'evolve', 'take', 'taken', 'timeup', 'market', 'parcel'\]/);
+  const v = src('js/parcel.js');
+  assert.match(v, /if \(anyModalOpen\(\)\) \{ deferred = true; return false; \}/, '처음부터 다른 창이 열려 있으면 미룬다');
+  assert.match(v, /if \(anyModalOpen\(\) \|\| !box\.hidden\) \{ deferred = true; return false; \}/, '받아 오는 사이 열렸어도 미룬다');
+  assert.match(v, /if \(!queue\.length\) \{ deferred = false; return false; \}/, '받을 게 없으면 미룬 것도 없다');
+  assert.match(v, /export function retryParcel\(\) \{\s*if \(!deferred \|\| failed\) return Promise\.resolve\(false\);\s*return showParcelIfAny\(\);/, '미룬 적이 없거나 저장을 못 했으면 받아 오지도 않는다');
+  assert.match(src('js/app.js'), /if \(name === 'home'\) retryParcel\(\)\.catch\(\(\) => \{\}\);/);
 });
