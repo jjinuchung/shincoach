@@ -89,6 +89,9 @@ export function openCatch(o) {
   const mon = $('catch-mon');
   mon.className = 'catch-mon mon-figure';
   $('catch-fx').textContent = '';
+  ui.asking = null;
+  const cc = $('catch-confirm');
+  if (cc) { cc.hidden = true; cc.innerHTML = ''; }
 
   renderPick(o.candidates, 0);
   // 🌌 울트라비스트가 후보에 있으면 **던지기 전에** 알려 준다 — 몬스터볼로 던지면 거의 못 잡고 기회만 쓴다
@@ -199,7 +202,7 @@ function renderPick(candidates, pickId) {
       own.textContent = `✔ 잡음 ×${n}`;
       btn.appendChild(own);
     }
-    btn.addEventListener('click', () => { unlock(); throwBall(c); });
+    btn.addEventListener('click', () => { unlock(); askThrow(c); }); // 🎯 써서 없어지는 볼이면 던지기 전에 한 번 묻는다
     pick.appendChild(btn);
   }
 }
@@ -324,6 +327,9 @@ export function closeCatch() {
   if (ui.shop) { ui.shop = false; if (isBallShopOpen()) closeShop(); }
   clearTimeout(ui.timer);
   ui.timer = null;
+  ui.asking = null;
+  const cc = $('catch-confirm');
+  if (cc) { cc.hidden = true; cc.innerHTML = ''; }
   $('catch').hidden = true;
   ui.onDone = null;
   ui.attempt = null;
@@ -382,6 +388,84 @@ export function burstConfetti(count = 70) {
   setTimeout(() => layer.remove(), 3600);
 }
 
+/**
+ * 🎯 볼 확인 (2026-10-05, 아버님: "황금볼 안 썼는데 썼다고 — 볼을 정말 쓰는지 아이에게 확인받자").
+ * 써서 없어지는 볼(🔵🟡🌟🟣⚪🌕)을 고른 채 포켓몬을 누르면 바로 던지지 않고 한 번 묻는다.
+ * 🔴 몬스터볼은 공짜라 묻지 않는다 · ⚙ 잡기 연습은 볼이 안 줄어서 묻지 않는다
+ */
+export function needsConfirm(ballId, practice) {
+  const b = BALLS.find((x) => x.id === ballId);
+  return !!b && !b.free && !practice;
+}
+
+/** 확인 칸의 말 { q, sub, go } — 가방 n개 → n−1개, 🌕는 세상에 하나뿐 */
+export function confirmText(b, monKo, n) {
+  const q = `${b.emoji} ${b.ko}${josa(b.ko, '을', '를')} ${monKo}에게 던질까요?`;
+  const sub = b.unique ? '세상에 하나뿐 — 던지면 다시 세상 어딘가로 떠나요' : `가방 ${n}개 → ${Math.max(0, n - 1)}개`;
+  return { q, sub, go: `${b.emoji} ${b.ko} 던지기` };
+}
+
+/** 결과 화면 한 줄 — 공짜 몬스터볼·🌕(따로 말한다)·연습은 없음 */
+export function usedBallText(ballId, left, practice) {
+  const b = BALLS.find((x) => x.id === ballId);
+  if (!b || b.free || b.unique || practice) return '';
+  return `${b.emoji} ${b.ko}${josa(b.ko, '을', '를')} 썼어요 (남은 ${left}개)`;
+}
+
+/** 포켓몬을 눌렀을 때 — 써서 없어지는 볼이면 확인 칸, 아니면 바로 던진다 */
+function askThrow(c) {
+  if (!ui.open || ui.threw || $('catch-pick').hidden) return;
+  if (!needsConfirm(ui.ball, ui.practice)) { throwBall(c); return; }
+  const b = BALLS.find((x) => x.id === ui.ball);
+  const n = (ui.ballCounts || {})[b.id] || 0;
+  const t = confirmText(b, c.ko, n);
+  const radar = $('catch-radar');
+  ui.asking = { c, radarHidden: radar ? radar.hidden : true };
+  $('catch-pick').hidden = true;   // 확인하는 동안은 다른 포켓몬·볼을 못 누른다 (볼 줄을 다시 그리는 것도 멈춘다 — refreshBalls)
+  $('catch-golden').hidden = true;
+  if (radar) radar.hidden = true;
+  const cc = $('catch-confirm');
+  cc.innerHTML = '';
+  const face = makeFigure(animUrl(c.id) || c.url, c.ko, animUrl(c.id) ? null : c.look);
+  face.classList.add('cc-face');
+  cc.appendChild(face);
+  cc.appendChild(Object.assign(document.createElement('div'), { className: 'cc-q', textContent: t.q }));
+  cc.appendChild(Object.assign(document.createElement('div'), { className: 'cc-sub', textContent: t.sub }));
+  const row = document.createElement('div');
+  row.className = 'cc-row';
+  const btn = (cls, text, fn) => {
+    const e = document.createElement('button');
+    e.type = 'button';
+    e.className = `btn ${cls}`;
+    e.textContent = text;
+    e.addEventListener('click', () => { unlock(); fn(); });
+    row.appendChild(e);
+  };
+  btn('btn-primary cc-go', t.go, () => { if (!closeConfirm(false)) return; throwBall(c); }); // 그 사이 볼이 없어졌으면 throwBall이 "이제 가방에 없어요"
+  btn('cc-free', `${POKEBALL.emoji} ${POKEBALL.ko}로 던지기`, () => { if (!closeConfirm(false)) return; pickBall(POKEBALL); throwBall(c); });
+  btn('cc-back', '↩ 다시 고르기', () => { if (!closeConfirm(true)) return; $('catch-msg').textContent = '볼과 포켓몬을 다시 골라요'; });
+  cc.appendChild(row);
+  cc.hidden = false;
+  $('catch-msg').textContent = '정말 이 볼을 쓸까요?';
+}
+
+/**
+ * 확인 칸을 내리고 후보·볼 줄을 되살린다 — 이미 닫혔거나 던졌으면 false.
+ * refresh = 볼 줄을 가방에서 다시 읽기 ("다시 고르기"만 — 던지는 길에서 다시 읽으면 없어진 볼이 몰래 몬스터볼로 바뀐다)
+ */
+function closeConfirm(refresh) {
+  const a = ui.asking;
+  ui.asking = null;
+  const cc = $('catch-confirm');
+  if (cc) { cc.hidden = true; cc.innerHTML = ''; }
+  if (!ui.open || ui.threw || !a) return false;
+  $('catch-pick').hidden = false;
+  const radar = $('catch-radar');
+  if (radar) radar.hidden = a.radarHidden;
+  if (refresh) refreshBalls(ui.ball); // 묻는 사이 가방이 바뀌었을 수 있다 (🌕를 찾았다·다른 화면) — 볼 줄을 다시
+  return true;
+}
+
 /** 볼 던지기 연출 → 판정 → 결과 */
 async function throwBall(c) {
   if (!ui.open || !ui.attempt) return;
@@ -421,6 +505,8 @@ async function throwBall(c) {
   const mon = $('catch-mon');
   const ball = $('catch-ball');
   const fx = $('catch-fx');
+  const thrown = picked || POKEBALL; // 🎯 날아가는 볼·말은 실제로 고른 볼 (예전엔 늘 빨간 볼·"몬스터볼, 가라!"라 무슨 볼을 썼는지 몰랐다)
+  ball.dataset.ball = thrown.id;
   setFigure(mon, c.url, c.look);
   mon.querySelector('img').alt = c.ko;
   mon.className = 'catch-mon mon-figure';
@@ -428,7 +514,7 @@ async function throwBall(c) {
   fx.textContent = '';
   fx.style.bottom = '';
   stage.hidden = false;
-  $('catch-msg').textContent = `${c.ko}${josa(c.ko, '이', '가')} 나타났다! 몬스터볼, 가라!`;
+  $('catch-msg').textContent = `${c.ko}${josa(c.ko, '이', '가')} 나타났다! ${thrown.emoji} ${thrown.ko}, 가라!`;
   $('catch-msg').classList.remove('beat');
   await sleep(700); if (!alive()) return giveBack();
 
@@ -499,6 +585,8 @@ async function throwBall(c) {
     sub.textContent = '레벨이 오르면 더 잘 잡혀요. 다음에 다시!';
     result.appendChild(sub);
   }
+  const usedLine = usedBallText(res.ball, (inventory()[res.ball] || 0), ui.practice); // 🎯 무슨 볼을 썼는지 (남은 수와 함께)
+  if (usedLine) result.appendChild(Object.assign(document.createElement('small'), { className: 'catch-used', textContent: usedLine }));
   $('catch-continue').hidden = false;
   ui.timer = setTimeout(autoFinish, 5000);
 }
