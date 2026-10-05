@@ -11,12 +11,14 @@ import {
   applyFuse, applyUnfuse, applyRenameFusion, // 🔀 퓨전 (2026-10-04, 🏪 5일장)
   applyTrade, // 🤝 교환 상인 (2026-10-05, 🏪 2단계)
   applyParcel, // 📦 아빠의 구호품 (2026-10-05)
+  applySell, // 💰 5일장 팔기 (2026-10-05)
 } from './db.js';
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
+import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, MAX_LV } from './evolve.js';
+import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER } from './pokemon.js';
 import { findVoucher } from './unlock.js';
 
@@ -312,7 +314,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -344,7 +346,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) } };
+  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -608,6 +610,43 @@ export async function tradeMon(req) {
   const r = await runProfileOp(() => applyTrade(req, (stored) => tradeCtx(stored)), () => ({ ok: false, why: 'save' }));
   if (r && r.ok) ensurePartner();
   return r || { ok: false, why: 'save' };
+}
+
+/** 💰 팔기 판정 ctx — 저장된 프로필의 등급(아빠가 옮긴 것까지)·명단에 있는 종만 (교환과 같은 원칙, Codex 31차 #1) */
+export function sellCtx(pf) {
+  return { rarity: (id) => rarityIn(pf, Number(id)), known: (id) => rosterSet.has(Number(id)) };
+}
+
+/** 💰 그 장날 팔 수 있는 것 { mons: [{id, have, rarity, price}], items: [{id, n, price}], left: 오늘 더 팔 수 있는 포켓몬 수, sold: 오늘 판 것 } */
+export function sellOffers(dateKey) {
+  const sold = salesOn(profile.sales, dateKey);
+  return {
+    mons: sellableMons(profile, sellCtx(profile)),
+    items: sellableItems(profile.items),
+    left: Math.max(0, SELL_MON_MAX - monsSoldOn(profile.sales, dateKey)),
+    sold,
+  };
+}
+
+/** 💰 팔기 — 한 트랜잭션 (장날·2마리 이상·장날 한도·가방에 있는 것). 저장이 안 되면 못 판 것 */
+export async function sellThing(req) {
+  const r = await runProfileOp(() => applySell(req, (stored) => sellCtx(stored)), () => ({ ok: false, why: 'save' }));
+  return r || { ok: false, why: 'save' };
+}
+
+/** 💰 5일장에서 판 마릿수 (도감 칸은 남는다) */
+export function soldCount(id) {
+  return soldOf(profile.mons[id]);
+}
+
+/** 💰 판 기록 { 장날: [{ key, kind, id, coins, at }] } — 📊 부모 화면 */
+export function salesByDay() {
+  const out = {};
+  for (const day of Object.keys(profile.sales || {})) {
+    const list = salesOn(profile.sales, day);
+    if (list.length) out[day] = list;
+  }
+  return out;
 }
 
 /** 🔒 부모가 데려간 마릿수 */

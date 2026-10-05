@@ -321,9 +321,9 @@ test('🔌 화면·저장 연결: 게이트 한 곳(tradeCtx)을 상인과 판�
   assert.ok(/trades: copyTrades\(p\.trades\)/.test(xp), 'fromStored가 교환 기록을 복사');
   assert.ok(/fusions: \{\}, trades: \{\}/.test(xp), 'EMPTY에 trades');
   const ev = src('js/evolve.js');
-  assert.ok(/- fledOf\(mon\) - tradedOf\(mon\)\)/.test(ev), 'haveOf가 보낸 수를 뺀다');
+  assert.ok(/- fledOf\(mon\) - tradedOf\(mon\) - soldOf\(mon\)\)/.test(ev), 'haveOf가 보낸 수(와 💰 판 수)를 뺀다');
   const db = src('js/db.js');
-  assert.ok(/\['fused', 'unfused', 'fled', 'traded'\]/.test(db), '병합 max에 traded');
+  assert.ok(/\['fused', 'unfused', 'fled', 'traded', 'sold'\]/.test(db), '병합 max에 traded (와 💰 sold)');
   assert.ok(/out\.trades = mergeTrades\(cur\.trades, rec\.trades\)/.test(db));
   assert.ok(/mutateProfile\(\(p\) => tradeRule\(p, req, makeCtx\(p\)\)\)/.test(db), '트랜잭션 안의 저장된 프로필(p)로 ctx를 만든다 (Codex 31차 #1)');
   const mv = src('js/marketview.js');

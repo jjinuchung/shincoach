@@ -1,9 +1,10 @@
-// 🏪 5일장 화면 — 🔀 퓨전 가게 (두 마리를 앞(모양) + 뒤(색)로 섞기) · 🤝 교환 상인 (2단계) · 내 퓨전(분리) · 퓨전 도감(이름 바꾸기)
+// 🏪 5일장 화면 — 🔀 퓨전 가게 (두 마리를 앞(모양) + 뒤(색)로 섞기) · 🤝 교환 상인 (2단계) · 💰 팔기 (3단계) · 내 퓨전(분리) · 퓨전 도감(이름 바꾸기)
 // 규칙은 fusion.js(순수)와 db.js(트랜잭션), 화면은 여기. 🎒 도감의 "🏪 5일장" 버튼에서 연다 (장이 안 서는 날도 열려 다음 장날을 알려 준다)
 import { marketOpen, nextMarket, blendName, fusionId, recolor, FUSION_COST, NAME_MAX } from './fusion.js';
 import { ROSTER, loadCharacters } from './pokemon.js';
-import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList, tradeOffers, tradeMon, RARITY } from './xp.js';
-import { STONE_MATH, STONE_ENGLISH } from './items.js';
+import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList, tradeOffers, tradeMon, RARITY, coins, sellOffers, sellThing } from './xp.js';
+import { STONE_MATH, STONE_ENGLISH, itemById } from './items.js';
+import { SELL_MON_MAX } from './sell.js';
 import { getFusionArt, putFusionArt } from './db.js';
 import { sameDeal } from './trade.js';
 import { todayKey } from './track.js';
@@ -15,7 +16,8 @@ const KO = new Map(ROSTER.map((m) => [m.id, m.ko]));
 const ART = 240; // 퓨전 그림 크기 (시험작과 같다)
 
 const ui = { open: false, override: null, a: null, b: null, picking: null, busy: false, result: null, renaming: null, splitArm: null, urlById: new Map(), onClose: null,
-  trPick: null, trGive: {}, trArm: null }; // 🤝 trPick = 고르는 중인 상인 자리 · trGive = 자리마다 고른 내 포켓몬 · trArm = 한 번 누른 바꾸기 {day, slot, give, get, at}
+  trPick: null, trGive: {}, trArm: null, // 🤝 trPick = 고르는 중인 상인 자리 · trGive = 자리마다 고른 내 포켓몬 · trArm = 한 번 누른 바꾸기 {day, slot, give, get, at}
+  slTab: 'mon', slArm: null, slSay: '' }; // 💰 slTab = 'mon' | 'item' · slArm = 한 번 누른 팔기 {day, kind, id, at} · slSay = 가판대 안의 말
 const artUrls = new Map();  // fid → objectURL — 실제로 섞은 퓨전의 그림 (이 기기의 blobs에도 있다)
 const previews = new Map(); // fid → { url, blob } — 섞기 전 미리 보기, 최근 PREVIEW_MAX장만 (메모리만)
 const PREVIEW_MAX = 8;
@@ -154,6 +156,7 @@ export async function openMarket(opts = {}) {
   ui.onClose = opts.onClose || null;
   ui.a = null; ui.b = null; ui.picking = null; ui.result = null; ui.renaming = null; ui.splitArm = null;
   ui.trPick = null; ui.trGive = {}; ui.trArm = null;
+  ui.slTab = 'mon'; ui.slArm = null; ui.slSay = '';
   $('market-msg').textContent = '';
   $('market').hidden = false;
   const chars = await loadCharacters().catch(() => []);
@@ -193,7 +196,7 @@ function stillOpen(day = dayNow()) {
 function render() {
   if (!ui.open) return;
   const nm = itemCount(STONE_MATH.id), ne = itemCount(STONE_ENGLISH.id);
-  $('market-stones').textContent = `${STONE_MATH.emoji} ${nm} · ${STONE_ENGLISH.emoji} ${ne}`;
+  $('market-stones').textContent = `💰 ${coins()} · ${STONE_MATH.emoji} ${nm} · ${STONE_ENGLISH.emoji} ${ne}`; // 💰 팔면 코인이 바로 보이게
   const body = $('market-body');
   body.innerHTML = '';
   const open = stillOpen();
@@ -202,6 +205,7 @@ function render() {
   else {
     body.appendChild(shopCard(nm, ne));
     body.appendChild(tradeCard());
+    body.appendChild(sellCard());
   }
   body.appendChild(dexCard(open));
 }
@@ -570,6 +574,129 @@ async function doTrade(o, give) {
   sfx.success();
   burstConfetti(90);
   say(`🤝 ${X}${iga(X)} 왔어요! 도감에 새로 등록됐어요 (${Y}${iga(Y)} ${o.who.name}에게 갔어요)`);
+  render();
+}
+
+// ───────────── 💰 팔기 (2026-10-05) ─────────────
+
+/** 이 팔기 — 장날·종류·무엇 ("한 번 더"는 이것이 모두 같고 5초 안일 때만) */
+function sameSell(arm, day, kind, id, now) {
+  return !!arm && arm.day === day && arm.kind === kind && arm.id === id && now - arm.at < 5000;
+}
+
+/** 팔 것의 이름 — 포켓몬은 이름, 아이템은 그림 + 이름 */
+/** 💰 팔기 말 — 창 맨 위와 가판대 안에 같이 */
+function saySell(t) {
+  ui.slSay = t || '';
+  say(t);
+}
+
+function sellName(kind, id) {
+  if (kind === 'mon') return nameOf(id);
+  const it = itemById(id);
+  return it ? `${it.emoji} ${it.ko}` : String(id);
+}
+
+/** 💰 팔기 가판대 — [포켓몬] [아이템] 두 칸, 두 번 눌러야 팔린다 (되돌릴 수 없다) */
+function sellCard() {
+  const day = dayNow();
+  const of = sellOffers(day);
+  const card = el('div', 'market-sec sl-sec');
+  card.appendChild(el('h3', 'market-h', '💰 팔기'));
+  card.appendChild(el('p', 'market-note', '두 마리 이상 있는 포켓몬(한 마리는 남아요)과 가방 아이템을 코인으로 바꿔요. 두 번 눌러야 팔리고, 판 것은 되돌릴 수 없어요.'));
+  const tabs = el('div', 'sl-tabs');
+  for (const [k, label] of [['mon', `🐾 포켓몬 (오늘 ${of.left}마리 더)`], ['item', '🎒 아이템']]) {
+    const t = el('button', 'sl-tab' + (ui.slTab === k ? ' on' : ''), label);
+    t.type = 'button';
+    t.addEventListener('click', () => { ui.slTab = k; ui.slArm = null; ui.slSay = ''; say(''); render(); });
+    tabs.appendChild(t);
+  }
+  card.appendChild(tabs);
+  // 창 맨 위 알림 줄은 가판대까지 내려오면 안 보인다 — 같은 말을 가판대 안에도
+  if (ui.slSay) card.appendChild(el('p', 'sl-msg', ui.slSay));
+
+  const now = Date.now();
+  const grid = el('div', 'fz-grid sl-grid');
+  if (ui.slTab === 'mon') {
+    if (!of.left) card.appendChild(el('p', 'market-note tr-cant', `오늘은 포켓몬을 ${SELL_MON_MAX}마리 팔았어요 — 다음 장날에 또 팔 수 있어요`));
+    else if (!of.mons.length) card.appendChild(el('p', 'market-note tr-cant', '두 마리 이상 데리고 있는 포켓몬이 없어요'));
+    for (const m of of.mons) {
+      const armed = sameSell(ui.slArm, day, 'mon', m.id, now);
+      const b = el('button', 'fz-pick sl-pick' + (armed ? ' armed' : ''));
+      b.type = 'button';
+      b.disabled = ui.busy || !of.left;
+      const u = ui.urlById.get(m.id);
+      if (u) { const img = el('img'); img.src = u; img.alt = ''; img.loading = 'lazy'; img.draggable = false; b.appendChild(img); } else b.appendChild(el('span', 'sl-emoji', '?'));
+      b.appendChild(el('span', 'nm', nameOf(m.id)));
+      b.appendChild(el('span', 'cnt', `×${m.have}`));
+      b.appendChild(el('span', 'sl-star', RARITY[m.rarity] ? RARITY[m.rarity].stars : ''));
+      b.appendChild(el('span', 'sl-price', armed ? '한 번 더!' : `💰 ${m.price}`));
+      b.addEventListener('click', () => doSell('mon', m.id, m.price));
+      grid.appendChild(b);
+    }
+  } else {
+    if (!of.items.length) card.appendChild(el('p', 'market-note tr-cant', '팔 수 있는 아이템이 없어요 (스톤·황금 볼·교환권은 못 팔아요)'));
+    for (const it of of.items) {
+      const def = itemById(it.id);
+      const armed = sameSell(ui.slArm, day, 'item', it.id, now);
+      const b = el('button', 'fz-pick sl-pick' + (armed ? ' armed' : ''));
+      b.type = 'button';
+      b.disabled = ui.busy;
+      b.appendChild(el('span', 'sl-emoji', def ? def.emoji : '🎁'));
+      b.appendChild(el('span', 'nm', def ? def.ko : it.id));
+      b.appendChild(el('span', 'cnt', `×${it.n}`));
+      b.appendChild(el('span', 'sl-price', armed ? '한 번 더!' : `💰 ${it.price}`));
+      b.addEventListener('click', () => doSell('item', it.id, it.price));
+      grid.appendChild(b);
+    }
+  }
+  if (grid.childNodes.length) card.appendChild(grid);
+  if (of.sold.length) card.appendChild(el('p', 'market-note sl-sold', `오늘 판 것: ${of.sold.map((s) => `${sellName(s.kind, s.id)} 💰${s.coins}`).join(' · ')}`));
+
+  // 5초가 지나면 "한 번 더"가 풀린다 — 버튼도 원래대로 (교환과 같다)
+  const arm = ui.slArm;
+  if (arm && sameSell(arm, day, arm.kind, arm.id, now)) {
+    setTimeout(() => {
+      if (ui.slArm !== arm || !ui.open) return;
+      ui.slArm = null;
+      if ($('market-msg').textContent.startsWith('💰 한 번 더')) say('');
+      if (ui.slSay.startsWith('💰 한 번 더')) ui.slSay = '';
+      render();
+    }, Math.max(0, 5000 - (now - arm.at)));
+  }
+  return card;
+}
+
+async function doSell(kind, id, price) {
+  if (ui.busy) return;
+  const day = dayNow();
+  const nm = sellName(kind, id);
+  if (!sameSell(ui.slArm, day, kind, id, Date.now())) {
+    ui.slArm = { day, kind, id, at: Date.now() };
+    saySell(`💰 한 번 더 누르면 ${nm}${kind === 'mon' ? ' 한 마리' : ' 하나'}를 💰${price}에 팔아요 — 되돌릴 수 없어요`);
+    render();
+    return;
+  }
+  ui.slArm = null;
+  if (!stillOpen(day)) { saySell('🏪 장이 닫혔어요 — 다음 장날에 팔 수 있어요'); render(); return; }
+  ui.busy = true;
+  render();
+  const r = await sellThing({ day, kind, id });
+  ui.busy = false;
+  if (!ui.open) return;
+  if (!r.ok) {
+    saySell(r.why === 'have' ? `이제 ${nm}${iga(nm)} 한 마리뿐이라 팔 수 없어요`
+      : r.why === 'limit' ? `오늘은 포켓몬을 ${SELL_MON_MAX}마리 팔았어요 — 다음 장날에 또 팔 수 있어요`
+      : r.why === 'none' ? `${nm}${iga(nm)} 이제 가방에 없어요`
+      : r.why === 'closed' ? '🏪 장이 닫혔어요'
+      : r.why === 'bad' ? '이건 팔 수 없어요'
+      : '저장을 못 했어요 — 한 번 더');
+    render();
+    return;
+  }
+  unlock();
+  sfx.ding();
+  saySell(`💰 +${r.coins}! ${nm}${kind === 'mon' ? ' 한 마리' : ' 하나'}를 팔았어요`);
   render();
 }
 

@@ -156,7 +156,15 @@ export function haveOf(caughtN, mon) {
   // 🔒 부모가 데려간 수도 같은 이유로 단조 카운터다 (2026-09-28). `caught`를 줄이면 백업을 되돌릴 때
   //    벌이 통째로 없던 일이 된다. 다시 잡으면 caught가 늘어 보유가 돌아온다 — 영구 삭제가 아니다
   const gone = Math.max(0, Math.floor(Number(mon && mon.taken) || 0));
-  return Math.max(0, got - out - gone - fusedOf(mon) - fledOf(mon) - tradedOf(mon));
+  return Math.max(0, got - out - gone - fusedOf(mon) - fledOf(mon) - tradedOf(mon) - soldOf(mon));
+}
+
+/**
+ * 💰 5일장에서 판 마릿수 (2026-10-05) — 단조 카운터. 교환·데려감과 같은 규칙: caught를 줄이면 옛 백업(max)이
+ * 판 포켓몬을 되살려 코인만 남긴 채 복제한다. 도감 칸(caught)은 남는다
+ */
+export function soldOf(mon) {
+  return Math.max(0, Math.floor(Number(mon && mon.sold) || 0));
 }
 
 /**

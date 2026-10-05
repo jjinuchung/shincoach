@@ -198,9 +198,9 @@ test('🔀 연결: 저장 규칙이 쓰는 비용·장날 · 앱 셸 · 화면 �
   const db = src('js/db.js');
   assert.match(db, /if \(!marketOpen\(dateKey\)\) return \{ ok: false, why: 'closed' \};/);
   assert.match(db, /purchaseRule\(profile, \{ items: \{ \.\.\.FUSION_COST \} \}, \{\}\)/, '스톤만 (coins 없음)');
-  assert.match(db, /for \(const k of \['fused', 'unfused', 'fled', 'traded'\]\)/, '병합은 max (⚔️ 배틀에서 떠난 수도 · 🤝 상인에게 보낸 수도)');
+  assert.match(db, /for \(const k of \['fused', 'unfused', 'fled', 'traded', 'sold'\]\)/, '병합은 max (⚔️ 배틀에서 떠난 수도 · 🤝 상인에게 보낸 수도 · 💰 판 수도)');
   assert.match(db, /out\.fusions = mergeFusions\(cur\.fusions, rec\.fusions\);/);
-  assert.match(src('js/evolve.js'), /return Math\.max\(0, got - out - gone - fusedOf\(mon\) - fledOf\(mon\) - tradedOf\(mon\)\);/, '퓨전·배틀에서 떠난 수·상인에게 보낸 수까지 뺀다');
+  assert.match(src('js/evolve.js'), /return Math\.max\(0, got - out - gone - fusedOf\(mon\) - fledOf\(mon\) - tradedOf\(mon\) - soldOf\(mon\)\);/, '퓨전·배틀에서 떠난 수·상인에게 보낸 수·💰 판 수까지 뺀다');
   const xp = src('js/xp.js');
   assert.match(xp, /fusions: copyFusions\(p\.fusions\)/, '메모리 프로필도 퓨전을 복사');
 });

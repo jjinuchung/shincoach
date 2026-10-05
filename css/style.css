@@ -2707,3 +2707,18 @@ button { font-family: inherit; }
 .tr-give .fz-slot-empty { margin-top: 6px; }
 .tr-go { width: 100%; }
 .tr-go.armed { background: #d97706; border-color: #b45309; }
+
+/* 💰 5일장 팔기 (2026-10-05) — [포켓몬]/[아이템] 칸 · 값표 · 한 번 누르면 주황(한 번 더!) */
+.sl-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.sl-tab { flex: 1 1 auto; padding: 8px 10px; border: 2px solid #ecdfc8; border-radius: 12px; background: var(--card); font: inherit; font-weight: 800; color: inherit; cursor: pointer; }
+.sl-tab.on { background: #fde68a; border-color: #d97706; }
+.sl-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+.sl-pick { padding-bottom: 8px; }
+.sl-pick .sl-emoji { font-size: 2.4rem; line-height: 56px; height: 56px; }
+.sl-pick .sl-star { font-size: 0.62rem; line-height: 1; }
+.sl-pick .sl-price { font-size: 0.85rem; font-weight: 900; color: #a86f00; }
+.sl-pick.armed { background: #fde68a; border-color: #d97706; border-width: 2px; }
+.sl-pick.armed .sl-price { color: #b45309; }
+.sl-pick:disabled { opacity: .55; cursor: default; }
+.sl-sold { font-weight: 700; }
+.sl-msg { margin: 0; padding: 8px 10px; border-radius: 10px; background: #fff3cd; color: #7a5b00; font-weight: 800; }
