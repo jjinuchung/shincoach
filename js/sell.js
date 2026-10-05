@@ -17,8 +17,8 @@ import { itemById } from './items.js';
 
 /** 포켓몬 값 — 등급 번호(1 ⭐ · 2 ⭐⭐ · 3 ⭐⭐⭐ · 4 전설 · 5 🌌)로. ⭐ 하나가 퍼즐 두 개쯤 — 잡아서 파는 게 공부보다 나은 돈벌이가 되지 않게 */
 export const MON_PRICE = [0, 10, 25, 60, 150, 150];
-/** 장날마다 팔 수 있는 포켓몬 수 */
-export const SELL_MON_MAX = 5;
+/** 장날마다 팔 수 있는 포켓몬 수 — 처음 5마리, 아버님 "10마리까지 허용"으로 늘림 (2026-10-05 v191) */
+export const SELL_MON_MAX = 10;
 
 /** 등급 → 값 (모르는 등급은 ⭐⭐ 보통) */
 export function monPrice(rarity) {

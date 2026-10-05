@@ -12,7 +12,7 @@ import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED, favList, FAV_ICON } from './review.js';
 import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot, giftsGiven, markGiven, salesByDay } from './xp.js';
-import { salesReport } from './sell.js'; // 💰 5일장에서 판 것 (2026-10-05)
+import { salesReport, SELL_MON_MAX } from './sell.js'; // 💰 5일장에서 판 것 (2026-10-05)
 import { pendingTickets, pendingGifts } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
 import { ROSTER } from './pokemon.js';
@@ -374,7 +374,7 @@ export async function renderStats() {
   const sold = salesReport(salesByDay(), monKo, 3);
   if (sold.length) {
     const cs = card('🏪 5일장에서 판 것');
-    cs.appendChild(el('p', 'stats-note', '두 마리 이상 있는 포켓몬(한 마리는 남아요)과 가방 아이템만 팔 수 있어요. 장날마다 포켓몬은 5마리까지예요.'));
+    cs.appendChild(el('p', 'stats-note', `두 마리 이상 있는 포켓몬(한 마리는 남아요)과 가방 아이템만 팔 수 있어요. 장날마다 포켓몬은 ${SELL_MON_MAX}마리까지예요.`));
     for (const d of sold) {
       const row = el('div', 'stats-row');
       const [, m, dd] = d.day.split('-').map(Number);
