@@ -1402,14 +1402,16 @@ function padFor(q, done = null) {
  * 판이 그래프를 다시 그리므로 문제 글에서는 그 그래프를 뺀다(두 번 보이면 어느 쪽을 만지는지 헷갈린다).
  */
 function drawFor(q, spec, done = null) {
-  // 🪞 M 완성하기(모눈 판)는 답이 ㉠~㉣라 숫자판(spec)이 없다 — 같은 ⚙ 스위치·💎 스페셜 제외만 따른다 (답한 뒤면 그때 방식)
-  if (q.draw && q.draw.mode === 'grid') return done !== 'choice' && (done === 'typed' || padOn()) && ui.round && ui.round.mode !== 'special' && canDraw(q.draw) ? q.draw : null;
+  // 🪞 M 완성하기(모눈 판)·📈 R 점 고르기(좌표평면 판)는 답이 ㉠~㉣라 숫자판(spec)이 없다 — 같은 ⚙ 스위치·💎 스페셜 제외만 따른다 (답한 뒤면 그때 방식)
+  if (q.draw && (q.draw.mode === 'grid' || q.draw.mode === 'plane')) return done !== 'choice' && (done === 'typed' || padOn()) && ui.round && ui.round.mode !== 'special' && canDraw(q.draw) ? q.draw : null;
   return spec && q.draw && canDraw(q.draw) ? q.draw : null;
 }
 const qTextOf = (q, draw) => {
   if (!draw) return q.q;
   // 🪞 모눈 판: 후보 점 ㉠~㉣가 있는 그림을 빼고(판이 반쪽만 다시 그린다) "어느 것일까요?" → "어디일까요?"
   if (draw.mode === 'grid') return String(q.q).replace(/\[sym [^\]]+\]/g, (d) => (d.startsWith(`[${draw.fig} `) ? '' : d)).replace('어느 것일까요?', '어디일까요?').replace(/\n{3,}/g, '\n').trim();
+  // 📈 좌표평면 판: 후보 ㉠~㉣가 있는 좌표평면을 빼고(판이 후보 없이 다시 그린다) "어느 것일까요?" → "어디일까요?"
+  if (draw.mode === 'plane') return String(q.q).replace(/\[plane [^\]]+\]/g, (d) => (d.startsWith(`[${draw.fig} `) ? '' : d)).replace('어느 것일까요?', '어디일까요?').replace(/\n{3,}/g, '\n').trim();
   return String(q.q).split(`[${draw.fig}]`).join('').replace(/\n{3,}/g, '\n'); // 그래프가 있던 빈 줄 두 개는 한 줄로
 };
 /** 숫자판/점 찍기 판 한 벌 — 같은 채점 길 */

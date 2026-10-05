@@ -805,7 +805,7 @@ test('🖋 글 속 식 (richParts): 문자 분수는 세로로·바깥 괄호 �
   assert.equal(show('45 × 5/(4 + 5) = 25'), '45 × 5/(4 + 5) = 25', '괄호 속이 수뿐이면 예전처럼 한 줄 (F 비례배분 풀이)');
 });
 
-test('🖋 다른 줄기는 예전과 똑같이 그린다 — 모든 원고 글·생성 문항에서 수 분수·대분수가 예전 richNode와 같다 · 문자 분수는 D·Q 줄기에만 (Q 일차방정식도 x/2 · x/3을 쓴다)', async () => {
+test('🖋 다른 줄기는 예전과 똑같이 그린다 — 모든 원고 글·생성 문항에서 수 분수·대분수가 예전 richNode와 같다 · 문자 분수는 D·Q·R 줄기에만 (Q 일차방정식도 x/2 · x/3을, R 좌표평면도 y = x/2 · y = 6/x를 쓴다)', async () => {
   const { STEMS, STEM_ORDER } = await import('../js/mathprog.js');
   const { readdirSync } = await import('node:fs');
   let segs = 0; let fr = 0;
@@ -817,10 +817,10 @@ test('🖋 다른 줄기는 예전과 똑같이 그린다 — 모든 원고 글�
     }
   };
   const dir = new URL('../coach/math/', import.meta.url);
-  for (const f of readdirSync(dir).filter((x) => x.endsWith('.json') && !['expr.json', 'equation.json'].includes(x))) {
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.json') && !['expr.json', 'equation.json', 'coord.json'].includes(x))) {
     for (const s of stringsIn(JSON.parse(readFileSync(new URL(f, dir), 'utf8')))) same(s, f);
   }
-  for (const key of STEM_ORDER.filter((k) => !['expr', 'equation'].includes(k))) {
+  for (const key of STEM_ORDER.filter((k) => !['expr', 'equation', 'coord'].includes(k))) {
     const S = STEMS[key];
     for (const c of S.list) {
       same(`${c.idea || ''}\n${c.rule || ''}`, c.id);

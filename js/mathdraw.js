@@ -2462,6 +2462,7 @@ export function figureSvg(spec) {
   if ((m = /^pnet (.+)$/.exec(s))) { const sp = parsePnet(m[1]); return sp ? pnetSvg(sp) : ''; } // 🔷 P 각기둥 전개도
   if ((m = /^cnet (.+)$/.exec(s))) { const sp = parseCnet(m[1]); return sp ? cnetSvg(sp) : ''; } // 🔷 P 원기둥 전개도
   if ((m = /^scale (.+)$/.exec(s))) { const sp = parseScale(m[1]); return sp ? scaleSvg(sp) : ''; } // 🟰 Q 저울
+  if ((m = /^plane (.+)$/.exec(s))) { const sp = parsePlane(m[1]); return sp ? planeSvg(sp) : ''; } // 📈 R 좌표평면
   if ((m = /^steps ((?:\d+\s*){2,5})$/.exec(s))) return stepsSvg(m[1].trim().split(/\s+/).map(Number));
   if ((m = /^table (.+)$/.exec(s))) { const rows = parseTable(m[1]); return rows ? tableSvg(rows) : ''; }
   // 🔺 도형 — 끝에 단위(cm·m)를 붙일 수 있다. 수는 1~40, 모양이 말이 안 되면(밑변보다 큰 밀림 등) 빈 글자
@@ -2541,6 +2542,7 @@ export function figText(text, short = false) {
     .replace(/\[pnet ([^\]]+)\]/g, (all, arg) => { const sp = parsePnet(arg); return !sp ? all : short ? '(그림)' : `(${pnetText(sp)})`; })
     .replace(/\[cnet ([^\]]+)\]/g, (all, arg) => { const sp = parseCnet(arg); return !sp ? all : short ? '(그림)' : `(${cnetText(sp)})`; })
     .replace(/\[scale ([^\]]+)\]/g, (all, arg) => { const sp = parseScale(arg); return !sp ? all : short ? '(저울)' : `(${scaleText(sp)})`; })
+    .replace(/\[plane ([^\]]+)\]/g, (all, arg) => { const sp = parsePlane(arg); return !sp ? all : short ? '(좌표평면)' : `(${planeText(sp)})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
 }
@@ -2580,7 +2582,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|plane) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -2649,6 +2651,201 @@ export function scaleSvg(sp) {
   });
   // 보이는 크기는 1.25배 — 그린 크기(400px)면 태블릿에서 추 지름 22px·숫자 14px로 본문 글자보다 작다 (헤드리스 800px, 3단계). 폰에서는 max-width:100%로 줄어든다
   return `<svg class="frac-fig scale-fig" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${scaleText(sp)}">${g}</svg>`;
+}
+
+// ───────────────────── 📈 R 좌표평면과 그래프 — 좌표평면 (2026-10-05) ─────────────────────
+//
+// `[plane A(2,−3) B(−1,4)]` — 좌표평면(모눈·x축·y축·원점 O·눈금 수). 기본 범위 x·y −5~5.
+//   점: 이름 A~D·P·Q `A(2,−3)` · 고르기 후보 ㉠~㉣ `㉠(2,−3)`(흰 동그라미) · 이름 없는 점 `(2,−3)`
+//   `x=−6..6 y=−4..4` 범위(원점이 보이게 0을 품는다) · `xs=5 ys=2` 한 칸의 크기(눈금 수 = 칸 수 × 크기, 좌표는 그 배수)
+//   `lin=2` `lin=−1/2` 정비례 y = ax 직선 · `inv=6` `inv=−8` 반비례 y = a/x 곡선 · `poly=ABC` 이름 붙은 점을 이은 도형
+//   `path=0:0,10:3,20:3` 꺾은선(그래프 해석 — 가로가 늘어나는 순서) · `xl=시간(분) yl=거리(km)` 축 이름(띄어쓰기는 _)
+// 선·곡선에는 식을 적지 않는다("그래프가 나타내는 식은?"의 답이 그림에 보이면 안 된다). 점 이름표에도 좌표를 적지 않는다.
+// ★ 테스트가 그린 SVG에서 다시 잰다 — 점 pl-pt(data-name·data-x·data-y)·후보 pl-cand(data-k)·눈금 수 pl-tick(data-axis·data-v)·
+//   직선 pl-lin·곡선 pl-inv·꺾은선 pl-path·도형 pl-poly. 눈금 수 두 개로 자를 세워 점이 정말 그 좌표에 있는지 본다.
+// ★ 글자(지시문)는 U+2212 빼기로 쓴다 — 문제 글에 ASCII 빼기가 섞이지 않게. 읽을 때 '-'로 바꾼다.
+
+const PL_PT = /^([A-DPQ]|[㉠-㉣])?\((-?\d+),(-?\d+)\)$/;
+const PL_CAND = /^[㉠-㉣]$/;
+
+/** `A(2,−3) x=−6..6 lin=2 …` → 좌표평면 자료 (못 읽거나 그릴 수 없으면 null) */
+export function parsePlane(arg) {
+  const s = String(arg || '').replace(/−/g, '-').trim();
+  if (!s) return null;
+  const sp = { x0: -5, x1: 5, y0: -5, y1: 5, xs: 1, ys: 1, pts: [], cands: [], lin: [], inv: [], poly: '', path: null, xl: '', yl: '' };
+  for (const t of s.split(/\s+/)) {
+    let m;
+    if ((m = PL_PT.exec(t))) { const p = { name: m[1] || '', x: +m[2], y: +m[3] }; (PL_CAND.test(p.name) ? sp.cands : sp.pts).push(PL_CAND.test(p.name) ? { k: p.name, x: p.x, y: p.y } : p); continue; }
+    if ((m = /^([xy])=(-?\d+)\.\.(-?\d+)$/.exec(t))) { sp[`${m[1]}0`] = +m[2]; sp[`${m[1]}1`] = +m[3]; continue; }
+    if ((m = /^([xy])s=(\d+)$/.exec(t))) { sp[`${m[1]}s`] = +m[2]; continue; }
+    if ((m = /^lin=(-?\d+)(?:\/(\d+))?$/.exec(t))) { sp.lin.push({ n: +m[1], d: m[2] ? +m[2] : 1 }); continue; }
+    if ((m = /^inv=(-?\d+)$/.exec(t))) { sp.inv.push(+m[1]); continue; }
+    if ((m = /^poly=([A-DPQ]{3,4})$/.exec(t))) { sp.poly = m[1]; continue; }
+    if ((m = /^path=((?:-?\d+:-?\d+)(?:,-?\d+:-?\d+)+)$/.exec(t))) { sp.path = m[1].split(',').map((q) => q.split(':').map(Number)); continue; }
+    if ((m = /^([xy])l=(\S{1,12})$/.exec(t))) { sp[`${m[1]}l`] = m[2].replace(/_/g, ' '); continue; }
+    return null; // 모르는 토큰 — 글자 그대로 남는 것보다 빈 그림이 낫다 (renderFigures가 지시문을 그대로 둔다)
+  }
+  const { x0, x1, y0, y1, xs, ys } = sp;
+  const okAxis = (a0, a1, st) => st >= 1 && a0 <= 0 && a1 >= 0 && a1 > a0 && a0 % st === 0 && a1 % st === 0 && (a1 - a0) / st <= 16;
+  if (!okAxis(x0, x1, xs) || !okAxis(y0, y1, ys)) return null;
+  const inBox = (p) => p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1 && p.x % xs === 0 && p.y % ys === 0;
+  if (![...sp.pts, ...sp.cands].every(inBox)) return null;
+  const names = sp.pts.filter((p) => p.name).map((p) => p.name);
+  if (new Set(names).size !== names.length || new Set(sp.cands.map((c) => c.k)).size !== sp.cands.length) return null;
+  if (sp.lin.some((l) => !l.n || l.d < 1) || sp.inv.some((a) => !a)) return null;
+  if (sp.poly && ![...sp.poly].every((ch) => names.includes(ch))) return null;
+  if (sp.path && (!sp.path.every(([x, y]) => inBox({ x, y })) || sp.path.some(([x], i) => i && x <= sp.path[i - 1][0]))) return null;
+  return sp;
+}
+
+const plNum = (v) => (v < 0 ? `−${Math.abs(v)}` : String(v));
+const plAx = (l) => (l.d === 1 ? (l.n === 1 ? 'x' : l.n === -1 ? '−x' : `${plNum(l.n)}x`) : `${l.n < 0 ? '−' : ''}${Math.abs(l.n) === 1 ? '' : Math.abs(l.n)}x/${l.d}`);
+
+/** 📊·❓ 글용 — 그림에 보이는 것 그대로 (점 좌표는 아빠가 읽는 글이라 적는다) */
+export function planeText(sp) {
+  const parts = [];
+  if (sp.xl || sp.yl) parts.push(`가로 ${sp.xl || 'x'} · 세로 ${sp.yl || 'y'}`);
+  for (const p of sp.pts) parts.push(`${p.name ? `점 ${p.name}` : '점 '}(${plNum(p.x)}, ${plNum(p.y)})`);
+  for (const c of sp.cands) parts.push(`${c.k}(${plNum(c.x)}, ${plNum(c.y)})`);
+  for (const l of sp.lin) parts.push(`직선 y = ${plAx(l)}`);
+  for (const a of sp.inv) parts.push(`곡선 y = ${plNum(a)}/x`);
+  if (sp.poly) parts.push(`도형 ${sp.poly}`);
+  if (sp.path) parts.push(`꺾은선 ${sp.path.map(([x, y]) => `(${plNum(x)}, ${plNum(y)})`).join(' → ')}`);
+  return `좌표평면: ${parts.join(' · ') || '빈 좌표평면'}`;
+}
+
+/** 좌표평면의 자 — 그림(planeSvg)과 ✍️ 점 찍기 판(3단계)이 같이 쓴다 (아이가 본 그림과 만지는 그림이 같은 자) */
+export function planeGeom(sp) {
+  const cx = (sp.x1 - sp.x0) / sp.xs; const cy = (sp.y1 - sp.y0) / sp.ys;
+  const C = Math.min(32, Math.floor(320 / Math.max(cx, cy, 1)));
+  const every = (n) => (n > 10 ? 2 : 1); // 눈금 수는 칸이 많으면 두 칸마다
+  const yLab = []; for (let k = 0; k <= cy; k += every(cy)) { const v = sp.y0 + k * sp.ys; if (v) yLab.push(plNum(v)); }
+  const labW = Math.max(12, ...yLab.map((t) => t.length * 7.4));
+  const padL = sp.x0 === 0 ? 12 + labW + 6 : 16;
+  const padT = 28; const padR = 30; const padB = (sp.y0 === 0 ? 26 : 12) + (sp.xl && sp.y0 === 0 ? 18 : 0);
+  const X = (v) => padL + ((v - sp.x0) / sp.xs) * C;
+  const Y = (v) => padT + ((sp.y1 - v) / sp.ys) * C;
+  const W = Math.round(padL + cx * C + padR); const H = Math.round(padT + cy * C + padB);
+  /** 그림 좌표(px) → 가장 가까운 격자점 (그림 안) */
+  const gridAt = (px, py) => ({
+    x: Math.min(sp.x1, Math.max(sp.x0, Math.round((px - padL) / C) * sp.xs + sp.x0)),
+    y: Math.min(sp.y1, Math.max(sp.y0, sp.y1 - Math.round((py - padT) / C) * sp.ys)),
+  });
+  return { C, cx, cy, X, Y, W, H, padL, padT, every, gridAt };
+}
+
+/** 좌표평면 그림 */
+export function planeSvg(sp) {
+  const G = planeGeom(sp); const { X, Y, W, H, C } = G;
+  const f = (v) => v.toFixed(1);
+  const ox = X(0); const oy = Y(0);
+  let g = '';
+  // 모눈
+  for (let k = 0; k <= G.cx; k++) { const x = X(sp.x0 + k * sp.xs); g += `<line x1="${f(x)}" y1="${f(Y(sp.y1))}" x2="${f(x)}" y2="${f(Y(sp.y0))}" stroke="currentColor" stroke-opacity="0.14" stroke-width="1"/>`; }
+  for (let k = 0; k <= G.cy; k++) { const y = Y(sp.y0 + k * sp.ys); g += `<line x1="${f(X(sp.x0))}" y1="${f(y)}" x2="${f(X(sp.x1))}" y2="${f(y)}" stroke="currentColor" stroke-opacity="0.14" stroke-width="1"/>`; }
+  const segs = []; // 이름표가 걸치면 안 되는 선
+  // 좌표축 (화살표·x·y·O)
+  const ax = [[X(sp.x0) - (sp.x0 ? 6 : 0), oy], [X(sp.x1) + 14, oy]]; const ay = [[ox, Y(sp.y0) + (sp.y0 ? 6 : 0)], [ox, Y(sp.y1) - 14]];
+  g += `<line class="pl-axis" data-axis="x" x1="${f(ax[0][0])}" y1="${f(oy)}" x2="${f(ax[1][0])}" y2="${f(oy)}" stroke="currentColor" stroke-width="1.6"/>`;
+  g += `<path d="M${f(ax[1][0] + 1)} ${f(oy)} l-8 -4.5 l0 9 Z" fill="currentColor"/>`;
+  g += `<line class="pl-axis" data-axis="y" x1="${f(ox)}" y1="${f(ay[0][1])}" x2="${f(ox)}" y2="${f(ay[1][1])}" stroke="currentColor" stroke-width="1.6"/>`;
+  g += `<path d="M${f(ox)} ${f(ay[1][1] - 1)} l-4.5 8 l9 0 Z" fill="currentColor"/>`;
+  segs.push(ax, ay);
+  const SERIF = 'font-family="Times New Roman, Noto Serif, serif" font-style="italic"';
+  g += `<text x="${f(ax[1][0] + 5)}" y="${f(oy + 5)}" font-size="17" ${SERIF} fill="currentColor">x</text>`;
+  g += `<text x="${f(ox + 9)}" y="${f(ay[1][1] + 6)}" font-size="17" ${SERIF} fill="currentColor">y</text>`;
+  const placed = [];
+  const boxOf = (x, y, t, fs, anchor = 'middle') => { const w = (labelW(t) * fs) / 15; const x0 = anchor === 'end' ? x - w : anchor === 'start' ? x : x - w / 2; return { x0, x1: x0 + w, y0: y - fs * 0.78, y1: y + fs * 0.22 }; };
+  // 눈금 수 — 0은 O가 대신한다
+  let ticks = '';
+  for (let k = 0; k <= G.cx; k += G.every(G.cx)) {
+    const v = sp.x0 + k * sp.xs; if (!v) continue;
+    const t = plNum(v); const x = X(v); const y = oy + 15;
+    ticks += `<text class="pl-tick" data-axis="x" data-v="${v}" x="${f(x)}" y="${f(y)}" font-size="12" text-anchor="middle" fill="currentColor" fill-opacity="0.85" stroke="var(--card, #fff)" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">${t}</text>`;
+    placed.push(boxOf(x, y, t, 12));
+  }
+  for (let k = 0; k <= G.cy; k += G.every(G.cy)) {
+    const v = sp.y0 + k * sp.ys; if (!v) continue;
+    const t = plNum(v); const x = ox - 5; const y = Y(v) + 4;
+    ticks += `<text class="pl-tick" data-axis="y" data-v="${v}" x="${f(x)}" y="${f(y)}" font-size="12" text-anchor="end" fill="currentColor" fill-opacity="0.85" stroke="var(--card, #fff)" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">${t}</text>`;
+    placed.push(boxOf(x, y, t, 12, 'end'));
+  }
+  if (sp.xl) { const x = X(sp.x1); const y = sp.y0 === 0 ? oy + 33 : oy - 8; g += `<text class="pl-xl" x="${f(x)}" y="${f(y)}" font-size="13" font-weight="700" text-anchor="end" fill="currentColor">${esc(sp.xl)}</text>`; placed.push(boxOf(x, y, sp.xl, 13, 'end')); }
+  if (sp.yl) { const x = ox + 24; const y = ay[1][1] + 6; g += `<text class="pl-yl" x="${f(x)}" y="${f(y)}" font-size="13" font-weight="700" text-anchor="start" fill="currentColor">${esc(sp.yl)}</text>`; placed.push(boxOf(x, y, sp.yl, 13, 'start')); }
+  // 도형 · 직선 · 곡선 · 꺾은선
+  const byName = Object.fromEntries(sp.pts.filter((p) => p.name).map((p) => [p.name, p]));
+  if (sp.poly) {
+    const vs = [...sp.poly].map((ch) => byName[ch]);
+    g += `<polygon class="pl-poly" points="${vs.map((p) => `${f(X(p.x))},${f(Y(p.y))}`).join(' ')}" fill="${FILL}" fill-opacity="0.16" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`;
+    vs.forEach((p, i) => { const q = vs[(i + 1) % vs.length]; segs.push([[X(p.x), Y(p.y)], [X(q.x), Y(q.y)]]); });
+  }
+  for (const l of sp.lin) {
+    const a = l.n / l.d;
+    // x 범위를 y 범위로 자른다
+    const lo = Math.max(sp.x0, Math.min(sp.y0 / a, sp.y1 / a)); const hi = Math.min(sp.x1, Math.max(sp.y0 / a, sp.y1 / a));
+    const p = [[X(lo), Y(a * lo)], [X(hi), Y(a * hi)]];
+    g += `<line class="pl-lin" data-a="${l.n}/${l.d}" x1="${f(p[0][0])}" y1="${f(p[0][1])}" x2="${f(p[1][0])}" y2="${f(p[1][1])}" stroke="${FILL2}" stroke-width="2.6" stroke-linecap="round"/>`;
+    segs.push(p);
+  }
+  for (const a of sp.inv) {
+    for (const side of [1, -1]) { // x > 0 쪽, x < 0 쪽
+      const ySign = Math.sign(a) * side; const bound = ySign > 0 ? sp.y1 : -sp.y0; const xEnd = side > 0 ? sp.x1 : -sp.x0;
+      if (bound <= 0 || xEnd <= 0) continue;
+      const xs0 = Math.abs(a) / bound; if (xs0 >= xEnd) continue;
+      const pts = [];
+      for (let k = 0; k <= 48; k++) { const ax2 = xs0 * Math.pow(xEnd / xs0, k / 48); const x = side * ax2; pts.push([X(x), Y(a / x)]); }
+      g += `<polyline class="pl-inv" data-a="${a}" points="${pts.map(([px, py]) => `${f(px)},${f(py)}`).join(' ')}" fill="none" stroke="${FILL2}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+      for (let i = 1; i < pts.length; i++) segs.push([pts[i - 1], pts[i]]);
+    }
+  }
+  if (sp.path) {
+    const pts = sp.path.map(([x, y]) => [X(x), Y(y)]);
+    g += `<polyline class="pl-path" points="${pts.map(([px, py]) => `${f(px)},${f(py)}`).join(' ')}" fill="none" stroke="${FILL}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+    for (const [px, py] of pts) g += `<circle class="pl-vtx" cx="${f(px)}" cy="${f(py)}" r="3" fill="${FILL}"/>`;
+    for (let i = 1; i < pts.length; i++) segs.push([pts[i - 1], pts[i]]);
+  }
+  // 눈금 수는 도형·직선·곡선·꺾은선 **위에** — 바탕색 테두리가 지나가는 선을 가린다 (먼저 그리면 선이 "−1"·"2"를 가로질렀다, 갤러리 눈 확인)
+  g += ticks;
+  // 원점 O — 왼쪽 아래가 보통이지만 원점을 지나는 직선·도형 변이 지나가면 오른쪽 아래·왼쪽 위로 (q1 그래프는 늘 왼쪽 아래 — 그림 밖 여백)
+  {
+    const spots = [[-1, 1], [1, 1], [-1, -1]].map(([u, v]) => ({ x0: u < 0 ? ox - 15 : ox + 4, x1: u < 0 ? ox - 4 : ox + 15, y0: v > 0 ? oy + 4 : oy - 17, y1: v > 0 ? oy + 17 : oy - 4, u, v }));
+    const free = (B) => !segs.slice(2).some((sg) => segHitsBox(sg, B)) && !placed.some((q) => B.x0 < q.x1 && q.x0 < B.x1 && B.y0 < q.y1 && q.y0 < B.y1);
+    const o = spots.find(free) || spots[0];
+    g += `<text class="pl-origin" x="${f((o.x0 + o.x1) / 2)}" y="${f(o.y1 - 2)}" font-size="13" text-anchor="middle" fill="currentColor" font-style="italic"${' stroke="var(--card, #fff)" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke"'}>O</text>`;
+    placed.push(o);
+  }
+  // 점 · 후보
+  const dots = [];
+  for (const p of sp.pts) { dots.push([X(p.x), Y(p.y)]); g += `<circle class="pl-pt" data-name="${p.name}" data-x="${p.x}" data-y="${p.y}" cx="${f(X(p.x))}" cy="${f(Y(p.y))}" r="4.5" fill="currentColor"/>`; }
+  for (const c of sp.cands) { dots.push([X(c.x), Y(c.y)]); g += `<circle class="pl-cand" data-k="${c.k}" data-x="${c.x}" data-y="${c.y}" cx="${f(X(c.x))}" cy="${f(Y(c.y))}" r="6.5" fill="#fff" stroke="${FILL}" stroke-width="2.6"/>`; }
+  // 이름표 — 원점에서 먼 쪽부터 여덟 방향·세 거리로 시험해 그림 안·눈금 수·남의 이름표·선·점과 안 겹치는 첫 자리
+  const clear = (B, self) => B.x0 >= 1 && B.y0 >= 1 && B.x1 <= W - 1 && B.y1 <= H - 1
+    && !placed.some((q) => B.x0 < q.x1 && q.x0 < B.x1 && B.y0 < q.y1 && q.y0 < B.y1)
+    && !segs.some((sg) => segHitsBox(sg, B))
+    && !dots.some(([dx, dy]) => (dx !== self[0] || dy !== self[1]) && dx > B.x0 - 5 && dx < B.x1 + 5 && dy > B.y0 - 5 && dy < B.y1 + 5)
+    && !(self[0] > B.x0 - 4 && self[0] < B.x1 + 4 && self[1] > B.y0 - 4 && self[1] < B.y1 + 4)
+    // 제 점이 가장 가까워야 — 이웃 후보에 더 가까우면 그 점의 이름으로 읽힌다 (메모 37번)
+    && (() => { const mx = (B.x0 + B.x1) / 2; const my = (B.y0 + B.y1) / 2; const own = Math.hypot(self[0] - mx, self[1] - my); return dots.every(([dx, dy]) => (dx === self[0] && dy === self[1]) || Math.hypot(dx - mx, dy - my) > own + 3); })();
+  let labels = '';
+  const put = (x, y, t, fs, cls) => {
+    const out = [Math.sign(x - ox) || 1, Math.sign(y - oy) || -1];
+    const dirs = [out, [out[0], -out[1]], [-out[0], out[1]], [-out[0], -out[1]], [1, 0], [-1, 0], [0, -1], [0, 1]];
+    let at = null;
+    for (const d of [13, 18, 24]) {
+      for (const [u, v] of dirs) {
+        const lx = x + u * (d + (labelW(t) * fs) / 32 * Math.abs(u)); const ly = y + v * d + fs * 0.32;
+        if (clear(boxOf(lx, ly, t, fs), [x, y])) { at = [lx, ly]; break; }
+      }
+      if (at) break;
+    }
+    if (!at) at = [x + out[0] * 14, y + out[1] * 14 + fs * 0.32];
+    placed.push(boxOf(at[0], at[1], t, fs));
+    labels += `<text class="${cls}" x="${f(at[0])}" y="${f(at[1])}" font-size="${fs}" text-anchor="middle" fill="currentColor" font-weight="700">${esc(t)}</text>`;
+  };
+  for (const p of sp.pts) if (p.name) put(X(p.x), Y(p.y), p.name, 17, 'pl-name');
+  for (const c of sp.cands) put(X(c.x), Y(c.y), c.k, 17, 'pl-cand-name');
+  // 보이는 크기는 1.2배 — 눈금 수 12px가 태블릿에서 본문보다 작다 (Q 저울과 같은 까닭). 폰에서는 max-width:100%로 줄어든다
+  return `<svg class="frac-fig plane-fig" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.2)}" height="${Math.round(H * 1.2)}" data-c="${C}" role="img" aria-label="${esc(planeText(sp))}">${g}${labels}</svg>`;
 }
 
 // ───────────────────── 글 속 식 — 분수·대분수·문자 (2026-10-03, D 문자와 식 3단계) ─────────────────────

@@ -117,7 +117,7 @@ export function padSpec(q, stemKey = '') {
   for (const v of vals) if (v.form in count) count[v.form] += 1;
   const top = Object.entries(count).sort((a, b) => b[1] - a[1]);
   const start = need || (top[0][1] > top[1][1] ? top[0][0] : /\d+\/\d+/.test(text) ? 'frac' : 'num');
-  const signed = stemKey === 'negative' || stemKey === 'expr' || stemKey === 'equation' ||q.choices.some((c) => /^[+−-]\d/.test(String(c.text).trim()));
+  const signed = stemKey === 'negative' || stemKey === 'expr' || stemKey === 'equation' || stemKey === 'coord' || q.choices.some((c) => /^[+−-]\d/.test(String(c.text).trim()));
   return { modes, start: modes.includes(start) ? start : 'num', unit: unitOf(q.q), signed, need, reduce };
 }
 

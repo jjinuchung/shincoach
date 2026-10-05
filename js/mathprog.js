@@ -23,6 +23,7 @@ import * as cuboidGen from './mathcuboid.js';
 import * as solidGen from './mathsolid.js';
 import * as exprGen from './mathexpr.js';
 import * as equGen from './mathequ.js';
+import * as coordGen from './mathcoord.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -65,8 +66,11 @@ export const STEMS = {
   // Q 일차방정식 — D 다음 칸, 중1 「일차방정식」 2022 성취기준 [9수02-03·04]로 범위 확인 (2026-10-03 아버님 "D 문자와 식 먼저 가고 다음에 일차방정식 가자").
   // 중1 9칸 · D의 분배법칙·동류항·괄호 앞 −가 풀이에, H의 □ 구하기가 방정식으로 · 해는 숫자판(± 늘 켬, mathpad.padSpec), 등식·바꾼 식은 보기 · 저울 그림 [scale](Q3·Q4·Q6)
   equation: { key: 'equation', code: 'Q', label: '일차방정식 줄기', range: '중1', list: equGen.EQU, gen: equGen, file: './coach/math/equation.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (등식과 방정식부터 — 중1 · D 문자와 식 줄기를 먼저 하면 쉬워요 · H 규칙과 대응의 □ 구하기가 방정식으로 바뀌어요)', intro: '일차방정식 문제 5개를 먼저 풀어 볼게요. 부호(−)와 괄호를 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // R 좌표평면과 그래프 — Q 다음 칸, 중1 「좌표평면과 그래프」 2022 성취기준 [9수02-05·06·07]로 범위 확인 (2026-10-05 아버님 "니가 추천하는 순서대로 가보자" → 설계안 "이대로 진행하자").
+  // 중1 9칸 · E 음수가 좌표의 부호로, H 규칙과 대응의 식이 정비례·반비례로 · 수 답은 숫자판(± 늘 켬, mathpad.padSpec), 좌표·식·문장 답은 보기 · 좌표평면 그림 [plane] · R2 점 고르기는 ✍️ 좌표평면 판(drawview mode 'plane')
+  coord: { key: 'coord', code: 'R', label: '좌표평면과 그래프 줄기', range: '중1', list: coordGen.COORD, gen: coordGen, file: './coach/math/coord.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (순서쌍과 좌표부터 — 중1 · E 음수 줄기를 먼저 하면 쉬워요 · H 규칙과 대응이 정비례·반비례로 바뀌어요)', intro: '좌표평면과 그래프 문제 5개를 먼저 풀어 볼게요. x좌표·y좌표의 순서와 부호(−)를 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation'];
+export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;

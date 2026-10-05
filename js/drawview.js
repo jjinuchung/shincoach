@@ -16,7 +16,13 @@
 // 반쪽 도형만 그린 모눈에 아이가 점을 찍는다. 찍은 자리가 후보 점(㉠ 정답 · 밀기 · 두 배 · 뒤집기)과 같으면 그 보기를 고른 것 —
 // 오개념 이름표가 그대로 쌓이고, 어느 후보와도 다르면 "짐작한 답"이다. 답이 ㉠~㉣라 숫자판(padSpec)은 없다.
 // ★ 판의 범위 = 반쪽 + 완성한 쪽 + 후보 점 모두 — 후보 점을 숨겨도 그림 크기가 답 자리를 흘리지 않게 (mathdraw.symGeom의 box)
-import { figureSvg, parseChart, chartGeom, parseSym, symSvg, symGeom } from './mathdraw.js';
+//
+// 📈 R 좌표평면과 그래프 — 좌표평면 판(draw.mode 'plane', 2026-10-05 R 3단계): "좌표가 (2, −3)인 점은 어디일까요?"
+// 빈 좌표평면(후보 ㉠~㉣ 없이)에 아이가 점을 찍는다. 찍은 자리가 후보(정답 · x와 y 바꿈 · x 부호 반대 · y 부호 반대)와 같으면
+// 그 보기를 고른 것 — 오개념 이름표가 그대로 쌓이고, 어느 후보와도 다르면 "짐작한 답"(찍은 좌표 "(1, −3)")이다.
+// 판의 범위는 문항의 fig(늘 −5~5) 그대로라 후보를 숨겨도 답 자리를 흘리지 않는다. 자는 mathdraw.planeGeom 하나(그림과 같은 자).
+// ★ 찍는 동안에는 좌표를 말하지 않는다("원점에서 오른쪽으로 2칸, 아래로 3칸") — 좌표를 보여 주면 글자만 맞춰 찍게 된다. 답한 뒤에 좌표까지.
+import { figureSvg, parseChart, chartGeom, parseSym, symSvg, symGeom, parsePlane, planeSvg, planeGeom } from './mathdraw.js';
 import { textVal } from './mathpad.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -43,7 +49,7 @@ function geomOf(draw) {
 }
 
 /** 이 draw를 판으로 그릴 수 있나 — math.js가 문제 글에서 그래프를 뺄지 정할 때 (못 그리면 보기·숫자판 그대로) */
-export const canDraw = (draw) => (draw && draw.mode === 'grid' ? !!gridOf(draw) : !!geomOf(draw));
+export const canDraw = (draw) => (draw && draw.mode === 'grid' ? !!gridOf(draw) : draw && draw.mode === 'plane' ? !!planeOf(draw) : !!geomOf(draw));
 
 // ───────────────────── 🪞 모눈 판 ─────────────────────
 
@@ -111,34 +117,52 @@ const BOARD_SCALE = 1.35;
 const enlarge = (svg, G) => { if (svg) svg.style.width = `${Math.round(G.W * BOARD_SCALE)}px`; };
 
 /** 모눈 판 한 벌 — drawBox가 mode 'grid'일 때 부른다. 확인 → onSubmit({text: 후보 이름(㉡) 또는 "(8, 4)", at}) */
-function gridBox(draw, { onSubmit, onIdk }) {
+function gridBox(draw, hooks) {
   const g = gridOf(draw);
   if (!g) return null;
   const { G, sp } = g;
+  return pointBoard(draw, hooks, {
+    cls: '', lead: '✍️ 대응점을 찍어요 — 모눈의 선이 만나는 곳을 눌러요', html: symSvg(sp), G, fit: (svg) => enlarge(svg, G),
+    layer: (svg, p, cls) => gridLayer(svg, g, p, cls), say: (p) => gridSay(g, p),
+    // ◀▲▼▶를 처음 누르면 묻는 꼭짓점에서 출발한다
+    start: () => g.from || { x: Math.round((G.x0 + G.x1) / 2), y: Math.round((G.y0 + G.y1) / 2) },
+    clamp: (q) => ({ x: Math.min(Math.min(G.x1, 14), Math.max(Math.max(G.x0, 0), q.x)), y: Math.min(Math.min(G.y1, 14), Math.max(Math.max(G.y0, 0), q.y)) }),
+    step: [1, 1],
+    textOf: (p) => { const c = draw.cands.find((z) => z.x === p.x && z.y === p.y); return c ? c.k : `(${p.x}, ${p.y})`; },
+  });
+}
+
+/**
+ * 점 하나를 찍는 판 — 🪞 모눈 판과 📈 좌표평면 판이 같이 쓴다 (누르기·끌기 → 가장 가까운 격자점 · ◀▲▼▶ · 확인 · 모르겠어요 · 찍어 둔 점 기억).
+ * cfg: cls 판 이름 · lead 안내 · html 그림 SVG(우리 코드가 만든 문자열) · G 자(gridAt) · fit(svg) 보이는 크기 · layer(svg, p, cls) 찍은 점 층 ·
+ *      say(p) 찍은 자리 말 · start() 화살표를 처음 누를 때 출발점 · clamp(q) 판 안으로 · step [가로, 세로] 한 칸 · textOf(p) 확인할 때 보낼 글자
+ */
+function pointBoard(draw, { onSubmit, onIdk }, cfg) {
+  const { G } = cfg;
   // 확인 전에 찍어 둔 점 — 🎒·📊에 다녀와 판을 다시 그려도 그대로 (문항의 draw에 둔다, Codex 22차 #5)
   let p = draw.pending ? { x: draw.pending.x, y: draw.pending.y } : null;
   let done = false;
 
-  const wrap = el('div', 'math-draw is-grid');
-  wrap.appendChild(el('p', 'math-pad-lead', '✍️ 대응점을 찍어요 — 모눈의 선이 만나는 곳을 눌러요'));
+  const wrap = el('div', `math-draw is-grid${cfg.cls ? ` ${cfg.cls}` : ''}`);
+  wrap.appendChild(el('p', 'math-pad-lead', cfg.lead));
   const box = el('div', 'math-fig math-draw-fig');
-  box.innerHTML = symSvg(sp); // 우리 코드가 만든 SVG 문자열
+  box.innerHTML = cfg.html;
   const svg = box.querySelector('svg');
-  enlarge(svg, G);
+  if (cfg.fit) cfg.fit(svg);
   wrap.appendChild(box);
-  const lay = gridLayer(svg, g, null, 'is-live');
+  const lay = cfg.layer(svg, null, 'is-live');
   svg.classList.add('is-drawable');
 
   const say = el('p', 'math-draw-say');
   wrap.appendChild(say);
 
-  // ◀ ▲ ▼ ▶ 한 칸씩 — 처음 누르면 묻는 꼭짓점에서 출발한다
+  // ◀ ▲ ▼ ▶ 한 칸씩
   const nudge = el('div', 'math-draw-nudge is-grid');
   const steps = [['◀', '왼쪽으로 한 칸', -1, 0], ['▲', '위로 한 칸', 0, 1], ['▼', '아래로 한 칸', 0, -1], ['▶', '오른쪽으로 한 칸', 1, 0]].map(([t, aria, dx, dy]) => {
     const b = el('button', 'btn math-draw-step', t);
     b.type = 'button';
     b.setAttribute('aria-label', aria);
-    b.addEventListener('click', () => { if (done) return; const s = p || g.from || { x: Math.round((G.x0 + G.x1) / 2), y: Math.round((G.y0 + G.y1) / 2) }; set({ x: s.x + dx, y: s.y + dy }); });
+    b.addEventListener('click', () => { if (done) return; const s = p || cfg.start(); set({ x: s.x + dx * cfg.step[0], y: s.y + dy * cfg.step[1] }); });
     nudge.appendChild(b);
     return b;
   });
@@ -151,8 +175,7 @@ function gridBox(draw, { onSubmit, onIdk }) {
     if (done || !p) return;
     done = true;
     paint();
-    const c = draw.cands.find((z) => z.x === p.x && z.y === p.y);
-    onSubmit({ text: c ? c.k : `(${p.x}, ${p.y})`, val: null, at: [p.x, p.y] });
+    onSubmit({ text: cfg.textOf(p), val: null, at: [p.x, p.y] });
   });
   const idk = el('button', 'btn math-pad-idk', '🤷 모르겠어요');
   idk.type = 'button';
@@ -162,7 +185,7 @@ function gridBox(draw, { onSubmit, onIdk }) {
   wrap.appendChild(row);
 
   function set(q) {
-    p = { x: Math.min(Math.min(G.x1, 14), Math.max(Math.max(G.x0, 0), q.x)), y: Math.min(Math.min(G.y1, 14), Math.max(Math.max(G.y0, 0), q.y)) };
+    p = cfg.clamp(q);
     draw.pending = { x: p.x, y: p.y };
     paint();
   }
@@ -191,7 +214,7 @@ function gridBox(draw, { onSubmit, onIdk }) {
 
   function paint() {
     lay.set(p);
-    say.textContent = p ? gridSay(g, p) : '아직 안 찍었어요';
+    say.textContent = p ? cfg.say(p) : '아직 안 찍었어요';
     say.classList.toggle('is-empty', !p);
     for (const b of steps) b.disabled = done;
     ok.disabled = done || !p;
@@ -228,6 +251,95 @@ function gridAnswered(draw, text, ok) {
   p.appendChild(el('span', 'mark', ok ? '✔' : '✘'));
   wrap.appendChild(p);
   if (!ok && g && right) wrap.appendChild(el('p', 'math-draw-right', `점선이 맞는 자리 — ${right.k} (${gridSay(g, g.target)})`));
+  return wrap;
+}
+
+// ───────────────────── 📈 좌표평면 판 ─────────────────────
+
+const plNum = (v) => (v < 0 ? `−${Math.abs(v)}` : String(v));
+/** 좌표 글자 "(2, −3)" — 생성기(mathcoord)와 같은 모양 (U+2212 빼기) */
+export const planeCo = (p) => `(${plNum(p.x)}, ${plNum(p.y)})`;
+/** "(2, −3)" → {x, y} (아니면 null) */
+const planeAt = (t) => { const m = /^\(([−-]?\d+), ([−-]?\d+)\)$/.exec(String(t)); return m ? { x: Number(m[1].replace('−', '-')), y: Number(m[2].replace('−', '-')) } : null; };
+
+/** draw → 좌표평면(sp, 후보 없이)·자(G)·묻는 점 (못 그리면 null) */
+export function planeOf(draw) {
+  if (!draw || draw.mode !== 'plane' || !Array.isArray(draw.target) || !Array.isArray(draw.cands) || draw.cands.length < 2) return null;
+  const sp = parsePlane(String(draw.fig || '').replace(/^plane /, ''));
+  if (!sp || sp.cands.length) return null; // 판에 후보가 보이면 답을 흘린다
+  const [tx, ty] = draw.target;
+  const inBoard = (c) => Number.isInteger(c.x) && Number.isInteger(c.y) && c.x >= sp.x0 && c.x <= sp.x1 && c.y >= sp.y0 && c.y <= sp.y1 && c.x % sp.xs === 0 && c.y % sp.ys === 0;
+  if (!draw.cands.every(inBoard) || !draw.cands.some((c) => c.x === tx && c.y === ty)) return null;
+  return { sp, G: planeGeom(sp), target: { x: tx, y: ty } };
+}
+
+/** 찍은 자리를 말로 — 풀이 카드와 같은 말("원점에서 오른쪽으로 2칸, 아래로 3칸"). 좌표는 말하지 않는다 */
+export function planeSay(g, p) {
+  const parts = [p.x ? `${p.x > 0 ? '오른쪽' : '왼쪽'}으로 ${Math.abs(p.x) / g.sp.xs}칸` : '', p.y ? `${p.y > 0 ? '위' : '아래'}로 ${Math.abs(p.y) / g.sp.ys}칸` : ''].filter(Boolean);
+  return parts.length ? `원점에서 ${parts.join(', ')}` : '원점에 찍었어요';
+}
+
+/** 찍은 점 + 원점에서 가로 먼저(x좌표만큼)·세로로(y좌표만큼) 가는 점선 — 풀이 카드의 "가로 먼저, 세로로"가 눈에 보인다 */
+function planeLayer(svg, g, p, cls) {
+  const { G } = g;
+  const grp = svgEl('g', { class: `draw-layer ${cls}` });
+  const o = { x: G.X(0), y: G.Y(0) };
+  const run = svgEl('line', { class: 'draw-seg', x1: o.x, y1: o.y, x2: o.x, y2: o.y });
+  const rise = svgEl('line', { class: 'draw-seg', x1: o.x, y1: o.y, x2: o.x, y2: o.y });
+  const dot = svgEl('circle', { class: 'draw-dot', cx: o.x, cy: o.y, r: 8 });
+  for (const e of [run, rise, dot]) grp.appendChild(e);
+  grp.set = (q) => {
+    for (const e of [run, rise, dot]) e.style.display = q ? '' : 'none';
+    if (!q) return;
+    const x = G.X(q.x); const y = G.Y(q.y);
+    run.setAttribute('x2', x);
+    rise.setAttribute('x1', x); rise.setAttribute('x2', x); rise.setAttribute('y2', y);
+    dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+  };
+  svg.appendChild(grp);
+  grp.set(p);
+  return grp;
+}
+
+/** 좌표평면 판 한 벌 — drawBox가 mode 'plane'일 때 부른다. 확인 → onSubmit({text: 후보 이름(㉡) 또는 "(1, −3)", at}) */
+function planeBox(draw, hooks) {
+  const g = planeOf(draw);
+  if (!g) return null;
+  const { G, sp } = g;
+  return pointBoard(draw, hooks, {
+    cls: 'is-plane', lead: '✍️ 점을 찍어요 — 모눈의 선이 만나는 곳을 눌러요', html: planeSvg(sp), G, // 보이는 크기는 그림 그대로(1.2배) — 판 폭 460px 안에 한 칸 38px쯤
+    layer: (svg, p, cls) => planeLayer(svg, g, p, cls), say: (p) => planeSay(g, p),
+    start: () => ({ x: 0, y: 0 }), // ◀▲▼▶를 처음 누르면 원점에서 출발한다
+    clamp: (q) => ({ x: Math.min(sp.x1, Math.max(sp.x0, q.x)), y: Math.min(sp.y1, Math.max(sp.y0, q.y)) }),
+    step: [sp.xs, sp.ys],
+    textOf: (p) => { const c = draw.cands.find((z) => z.x === p.x && z.y === p.y); return c ? c.k : planeCo(p); },
+  });
+}
+
+/**
+ * 답한 뒤 좌표평면 — 후보 ㉠~㉣가 있는 원래 그림(풀이 카드가 이 이름으로 말한다) 위에 내가 찍은 점과 원점에서 간 길,
+ * 틀렸으면 맞는 자리(점선)까지. 이제는 좌표도 함께 — 내가 찍은 (−3, 2)와 묻는 (2, −3)을 나란히 본다. text는 ㉡·"(1, −3)"·"모르겠어요"
+ */
+function planeAnswered(draw, text, ok) {
+  const g = planeOf(draw);
+  const wrap = el('div', `math-draw is-answered is-grid is-plane ${ok ? 'ok' : 'no'}`);
+  const cand = (draw && draw.cands || []).find((c) => c.k === text);
+  const at = cand ? { x: cand.x, y: cand.y } : planeAt(text);
+  const right = g ? draw.cands.find((c) => c.x === g.target.x && c.y === g.target.y) : null;
+  if (g) {
+    const box = el('div', 'math-fig math-draw-fig');
+    box.innerHTML = planeSvg({ ...g.sp, cands: draw.cands.map((c) => ({ k: c.k, x: c.x, y: c.y })) });
+    const svg = box.querySelector('svg');
+    // 맞는 자리(점선, 속은 비움)를 내 점 **위에** — 같은 길(x좌표가 같으면 가로 점선)이 겹쳐도 둘 다 보인다
+    if (at) planeLayer(svg, g, at, ok ? 'is-ok' : 'is-no');
+    if (!ok) planeLayer(svg, g, g.target, 'is-right');
+    wrap.appendChild(box);
+  }
+  const p = el('p', `math-pad-answered ${ok ? 'ok' : 'no'}`);
+  p.appendChild(document.createTextNode(at && g ? `✍️ 내가 찍은 점: ${cand ? `${cand.k} ` : ''}${planeCo(at)} — ${planeSay(g, at)} ` : `✍️ 내 답: ${text} `));
+  p.appendChild(el('span', 'mark', ok ? '✔' : '✘'));
+  wrap.appendChild(p);
+  if (!ok && g && right) wrap.appendChild(el('p', 'math-draw-right', `점선이 맞는 자리 — ${right.k} ${planeCo(g.target)} (${planeSay(g, g.target)})`));
   return wrap;
 }
 
@@ -285,6 +397,7 @@ function chartBox(draw) {
  */
 export function drawBox(draw, { onSubmit, onIdk }) {
   if (draw && draw.mode === 'grid') return gridBox(draw, { onSubmit, onIdk });
+  if (draw && draw.mode === 'plane') return planeBox(draw, { onSubmit, onIdk });
   const g = geomOf(draw);
   if (!g) return null;
   g.target = draw.target;
@@ -388,6 +501,7 @@ export function drawBox(draw, { onSubmit, onIdk }) {
  */
 export function drawAnswered(draw, text, ok, okK) {
   if (draw && draw.mode === 'grid') return gridAnswered(draw, text, ok);
+  if (draw && draw.mode === 'plane') return planeAnswered(draw, text, ok);
   const g = geomOf(draw);
   const wrap = el('div', `math-draw is-answered ${ok ? 'ok' : 'no'}`);
   const k = /^\d+$/.test(String(text)) ? Number(text) : null;
