@@ -85,6 +85,13 @@ export function unitOf(text) {
 const FORM_NAME = { num: '수', frac: '분수', mixed: '대분수', ratio: '비' };
 
 /**
+ * 보기에서 고르는 문제의 말 (2026-10-05, 아버님 사진 — "다음 중 45의 약수가 아닌 수는 어느 것일까요?"에 숫자판이 떠 보기가 사라졌다).
+ * 고를 것이 보기에만 있거나(다음 중 가장 작은 수 · 약수가 아닌 수), 맞는 답이 여럿이라(비율이 같은 비 · 될 수 있는 배수 · 공배수가 아닌 것)
+ * 친 답을 정답 보기 하나와만 견줄 수 없다 → 숫자판 대신 보기 그대로. "막대를 고르게 하면"(평균)은 고르기가 아니다
+ */
+export const CHOICE_WORDS = /다음 중|어느 것|어떤 것|보기 중|고르세요|골라/;
+
+/**
  * 이 문항을 숫자판으로 받을지와 칸 모양. 수가 답인 ① 계산만 — 아니면 null (보기를 그대로 쓴다).
  * @param {{kind:string, q:string, expr?:string, choices:Array<{text:string, ok?:boolean}>}} q
  * @param {string} stemKey 줄기 (음수 줄기는 +/− 키)
@@ -93,6 +100,7 @@ const FORM_NAME = { num: '수', frac: '분수', mixed: '대분수', ratio: '비'
  */
 export function padSpec(q, stemKey = '') {
   if (!q || q.kind !== 'calc' || !Array.isArray(q.choices)) return null;
+  if (CHOICE_WORDS.test(String(q.q || ''))) return null; // 보기에서 고르는 문제는 보기 그대로
   const ok = q.choices.find((c) => c.ok);
   const okV = ok && textVal(ok.text);
   if (!okV) return null;

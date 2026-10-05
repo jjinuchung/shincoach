@@ -4,7 +4,7 @@
 // ★ 씨앗은 PAD_SEEDS로 넓게 (기본 300 × 개념 80여 개).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { textVal, unitOf, padSpec, readTyped, matchTyped, partsOf } from '../js/mathpad.js';
+import { textVal, unitOf, padSpec, readTyped, matchTyped, partsOf, CHOICE_WORDS } from '../js/mathpad.js';
 import { STEMS, STEM_ORDER, applyRound, applyPlacement, conceptReport, mathReportText } from '../js/mathprog.js';
 import { emptyMath } from '../js/db.js';
 import { askContext, addAsk, asksText } from '../js/mathask.js';
@@ -125,6 +125,8 @@ test('★ 모든 줄기의 ① 계산: 정답을 치면 맞음 · 오답을 치�
         const spec = padSpec(q, k);
         const where = `${S.code} ${c.id} seed ${s}: ${String(q.q).replace(/\n/g, ' ').slice(0, 90)} | ${q.choices.map((x) => x.text + (x.ok ? '✔' : '')).join(' / ')}`;
         if (!okV) { assert.equal(spec, null, where); continue; }
+        // 📸 보기에서 고르는 문제(다음 중·어느 것·고르세요)는 수가 답이어도 보기 그대로 (2026-10-05 아버님 사진) — 아래 📸 테스트
+        if (/다음 중|어느 것|어떤 것|보기 중|고르세요|골라/.test(String(q.q))) { assert.equal(spec, null, `${where}: 고르는 문제인데 숫자판`); continue; }
         assert.ok(spec, `${where}: 수가 답인데 숫자판이 없다`);
         count[S.code] = (count[S.code] || 0) + 1;
         assert.ok(spec.modes.includes(spec.start), `${where}: 처음 칸 ${spec.start}`);
@@ -234,4 +236,37 @@ test('기록 (Codex 18차 #4·#5·#6): 꼴·약분만 틀린 답은 짐작이 �
   };
   put('1'); put('2', true); put('3'); put('4'); put('5');
   assert.deepEqual(conceptReport(mg).find((r) => r.id === 'frac.mul').guesses, ['3', '4', '5']);
+});
+
+// ───────── 📸 2026-10-05 아버님 사진: "다음 중 45의 약수가 아닌 수는 어느 것일까요?"에 숫자판이 떠 보기가 사라졌다 ─────────
+test('📸 보기에서 고르는 문제는 숫자판 대신 보기 그대로 — 사진의 문제 · "고르게 하면"(평균)은 숫자판', () => {
+  const ch = (ok, ...xs) => xs.map((t) => ({ text: String(t), ok: String(t) === String(ok) }));
+  const pick = (q, ok, ...xs) => padSpec({ kind: 'calc', q, choices: ch(ok, ...xs) }, 'factor');
+  assert.equal(pick('다음 중 45의 약수가 **아닌** 수는 어느 것일까요?', 7, 9, 7, 15, 5), null, '사진 그대로');
+  assert.equal(pick('다음 중 가장 작은 수는 어느 것일까요?', '0.3', '0.3', '0.35', '0.4', '1.2'), null, '비교할 수가 보기에만 있다');
+  assert.equal(pick('9 : 10과 비율이 같은 비는 어느 것일까요?', '27 : 30', '27 : 30', '9 : 11', '10 : 9', '18 : 19'), null, '맞는 답이 여럿 (18 : 20도 맞다)');
+  assert.equal(pick('포키가 하루에 몬스터볼을 12개씩 모아요. 며칠 동안 모은 몬스터볼 수가 될 수 있는 것은 어느 것일까요?', 36, 36, 30, 40, 50), null, '될 수 있는 배수는 여럿');
+  assert.equal(pick('연필 4개, 지우개 9개가 있어요. 연필 수와 지우개 수의 비를 고르세요.', '4 : 9', '4 : 9', '9 : 4', '4 : 13', '13 : 4'), null, '"고르세요"인데 고를 게 없으면 안 된다');
+  assert.ok(pick('막대를 고르게 하면 막대 하나는 몇 마리만큼이 될까요?', 6, 6, 5, 30, 7), '"고르게"는 고르기가 아니다 — 숫자판');
+  assert.ok(pick('45의 약수는 모두 몇 개일까요?', 6, 6, 5, 4, 3), '보통 계산 문제는 숫자판 그대로');
+  for (const w of ['다음 중', '어느 것', '어떤 것', '보기 중', '고르세요', '골라']) assert.ok(CHOICE_WORDS.test(`… ${w} …`), w);
+  assert.ok(!CHOICE_WORDS.test('막대를 고르게 하면'), '평균의 "고르게"');
+});
+
+test('📸 모든 줄기 — 숫자판이 뜨는 ① 계산에 "다음 중·어느 것·고르세요"가 하나도 없다 · 고르기 말투 문항은 보기로 (이 파일이 따로 적은 말 목록)', () => {
+  const SAY = ['다음 중', '어느 것', '어떤 것', '보기 중', '고르세요', '골라']; // 규칙 모듈의 정규식을 베끼지 않고 따로 적는다
+  const has = (t) => SAY.some((w) => String(t || '').includes(w));
+  let choiceQs = 0;
+  for (const key of STEM_ORDER) {
+    const st = STEMS[key];
+    for (const c of st.list) {
+      for (let s = 1; s <= Math.min(SEEDS, 200); s += 1) {
+        const q = st.gen.makeQuestion(c.id, 'calc', s * 7919, OPTS);
+        if (!q) continue;
+        const spec = padSpec(q, key);
+        if (has(q.q)) { choiceQs += 1; assert.equal(spec, null, `${key} ${c.id} 씨앗 ${s}: ${q.q}`); }
+      }
+    }
+  }
+  assert.ok(choiceQs > 300, `고르기 말투 문항이 실제로 있다 (${choiceQs}) — 0이면 이 테스트가 아무것도 안 본 것`);
 });
