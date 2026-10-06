@@ -18,6 +18,7 @@ import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsF
 import { ROSTER } from './pokemon.js';
 import { lvOf } from './evolve.js';
 import { visibleView } from './pokedex.js';
+import { ENGLISH_STONE_HOW, VIDEO_STONE } from './items.js'; // 🔶 영어스톤 받는 곳 안내 (2026-10-06)
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
 
 const $ = (id) => document.getElementById(id);
@@ -501,7 +502,7 @@ export async function renderStats() {
   }
 
 
-  // 3d) 🧬 키운 포켓몬 — 스톤은 "질"에서만 나오므로(개념 편 통과·👑·복습 완주·에세이)
+  // 3d) 🧬 키운 포켓몬 — 스톤은 "질"에서만 나오므로(개념 편 통과·👑 / 복습 다 맞힘·받아쓰기·단어 만점·에세이·영상 끝까지)
   //     여기 쌓인 레벨은 곧 "공부를 꾸준히 한 양"이다. 부모가 보는 지표로 삼을 만하다.
   const grown = growReport(getProfileSnapshot());
   if (grown && (grown.list.length || grown.evolved)) {
@@ -516,7 +517,7 @@ export async function renderStats() {
       box.appendChild(chip);
     }
     c3d.appendChild(box);
-    c3d.appendChild(el('p', 'stats-note', '스톤은 문제를 맞히는 것만으로는 안 나옵니다 — 개념 편을 통과하거나(🔷) 복습 회차를 다 맞히거나 에세이를 쓸 때(🔶) 하나씩 나와요. 레벨이 높다는 건 그만큼 꾸준히 했다는 뜻이에요.'));
+    c3d.appendChild(el('p', 'stats-note', `스톤은 문제를 맞히는 것만으로는 안 나옵니다 — 🔷는 개념 편을 통과할 때, 🔶는 ${ENGLISH_STONE_HOW} 나와요(영상은 하나에 ${VIDEO_STONE.n}개). 레벨이 높다는 건 그만큼 꾸준히 했다는 뜻이에요.`));
     main.appendChild(c3d);
   }
 

@@ -7,9 +7,11 @@
 // 받는 길: 앱을 열면 홈에서 한 번 "📦 구호품이 왔어요!" → 아이가 [📦 받기]를 눌러야 가방에 들어간다.
 //   받기는 db.applyParcel 한 트랜잭션(받은 id를 함께 적음) — 두 창·두 번 눌러도 한 번만.
 //   누르기 전에 앱을 끄면 다음에 다시 온다. 저장이 안 되면 "못 받았어요" — 다음에 앱을 열면 다시 온다.
+// 🏁 같은 창으로 "끝까지 본 영상"의 🔶 영어스톤도 온다 (2026-10-06) — 규칙이 생기기 전에 90%를 넘긴 지난 영상과,
+//   영상 화면에서 저장을 놓친 영상. 받기는 db.applyVideoStones 한 트랜잭션(받은 영상은 parcels에 'video:<id>').
 
-import { parcelOf, parcelGot, itemById, SHINY_CHARGE, SHINY_STONE } from './items.js';
-import { parcelsReceived, receiveParcel, shinyLeft } from './xp.js';
+import { parcelOf, parcelGot, itemById, SHINY_CHARGE, SHINY_STONE, STONE_ENGLISH, VIDEO_STONE, videoStoneDue, videoParcelId } from './items.js';
+import { parcelsReceived, receiveParcel, receiveVideoStones, shinyLeft } from './xp.js';
 import { sfx } from './sfx.js';
 
 export const PARCELS_URL = './coach/gifts.json';
@@ -45,7 +47,38 @@ export function parcelLabel(id, n) {
 /** 받은 뒤 한 줄 — 어디서 쓰는지 (순수) */
 export function afterLine(items, left) {
   if (items && (items[SHINY_CHARGE] || items[SHINY_STONE.id])) return `🌈 이로치 남은 횟수: ${left}번 — 🎒 도감에서 포켓몬을 누르고 "🌈 이로치로!"`;
+  if (items && items[STONE_ENGLISH.id]) return `${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko}은 🎒 도감에서 영어 포켓몬을 키울 때 · 🛒 스톤 상점에서 써요`;
   return '🎒 가방에서 볼 수 있어요';
+}
+
+/**
+ * 🏁 끝까지 본 영상들의 🔶을 구호품 한 칸으로 (순수) — 영상 이름을 보여 준다(무엇 때문에 받는지 아이가 알게).
+ * @param {Array<{id:string, title:string}>} due items.videoStoneDue 결과
+ */
+export function videoParcel(due) {
+  const list = Array.isArray(due) ? due : [];
+  if (!list.length) return null;
+  const names = list.map((d) => `「${d.title}」`);
+  const shown = names.slice(0, 3).join(' · ') + (names.length > 3 ? ` 외 ${names.length - 3}편` : '');
+  return {
+    kind: 'video', id: 'video', ids: list.map((d) => String(d.id)), icon: '🏁',
+    items: { [STONE_ENGLISH.id]: list.length * VIDEO_STONE.n },
+    title: `🏁 끝까지 본 영상 ${list.length}편 — ${STONE_ENGLISH.ko}이 왔어요!`,
+    text: `${shown} — 문장을 ${VIDEO_STONE.pct}% 넘게 했어요. 영상 하나에 ${STONE_ENGLISH.emoji} ${VIDEO_STONE.n}개!`,
+    due: list,
+  };
+}
+
+/** 띄우기 직전에 다시 거르기 (순수) — 다른 창에서 받은 구호품·영상은 빼고, 영상 칸은 남은 영상으로 다시 만든다 */
+export function stillDue(queue, got) {
+  const out = [];
+  for (const pc of Array.isArray(queue) ? queue : []) {
+    if (pc && pc.kind === 'video') {
+      const vp = videoParcel((pc.due || []).filter((d) => !parcelGot(got, videoParcelId(d.id))));
+      if (vp) out.push(vp);
+    } else if (pc && !parcelGot(got, pc.id)) out.push(pc);
+  }
+  return out;
 }
 
 let queue = [];    // 이번에 보여 줄 구호품들 (하나씩)
@@ -68,6 +101,16 @@ async function loadParcels() {
   } catch { return []; }
 }
 
+/** 🏁 90%를 넘겼는데 🔶을 아직 안 받은 영상 — 영상 기록을 못 읽으면 없음 (다음에 다시) */
+async function loadVideoDue() {
+  try {
+    const db = await import('./db.js');
+    const st = await import('./stats.js');
+    const [items, records] = await Promise.all([db.listItems(), db.getAllSentenceStats()]);
+    return videoStoneDue(st.contentSummary(items, records, st.cueCountOf), parcelsReceived());
+  } catch { return []; }
+}
+
 export function initParcel() {
   const ok = $('parcel-ok');
   if (ok) ok.addEventListener('click', onButton);
@@ -81,10 +124,13 @@ export async function showParcelIfAny() {
   const box = $('parcel');
   if (!box || !box.hidden || failed) return false;
   if (anyModalOpen()) { deferred = true; return false; } // 다른 창이 닫히고 홈으로 돌아오면 다시 (retryParcel)
-  if (!queue.length) queue = pendingParcels(await loadParcels(), parcelsReceived());
+  if (!queue.length) {
+    queue = pendingParcels(await loadParcels(), parcelsReceived());
+    const vp = videoParcel(await loadVideoDue()); // 🏁 끝까지 본 영상의 🔶 — 아빠 구호품 다음에
+    if (vp) queue.push(vp);
+  }
   // 그 사이 다른 창에서 받았을 수 있다 — 띄우기 직전에 한 번 더 거른다
-  const got = parcelsReceived();
-  queue = queue.filter((pc) => !parcelGot(got, pc.id));
+  queue = stillDue(queue, parcelsReceived());
   if (!queue.length) { deferred = false; return false; }
   if (anyModalOpen() || !box.hidden) { deferred = true; return false; } // 받아 오는 사이 다른 창이 열렸다
   deferred = false;
@@ -104,6 +150,9 @@ export function retryParcel() {
 function render() {
   step = 'offer';
   $('parcel-title').textContent = cur.title || '📦 아빠가 보낸 구호품이 왔어요!';
+  // 🏁 영상 몫은 아빠가 보낸 것이 아니다 — 그림·버튼 말도 그에 맞게 (헤드리스: "고마워요, 아빠!"가 떴다)
+  const icon = document.querySelector('#parcel .taken-lock');
+  if (icon) icon.textContent = cur.kind === 'video' ? '🏁' : '📦';
   const stage = $('parcel-stage');
   stage.innerHTML = '';
   for (const [id, n] of Object.entries(cur.items)) {
@@ -115,11 +164,11 @@ function render() {
     stage.appendChild(cell);
   }
   const note = $('parcel-text');
-  note.textContent = cur.text ? `💌 ${cur.text}` : '';
+  note.textContent = cur.text ? `${cur.icon || '💌'} ${cur.text}` : '';
   note.hidden = !cur.text;
   $('parcel-sub').textContent = '';
   const ok = $('parcel-ok');
-  ok.textContent = '📦 받기';
+  ok.textContent = cur.kind === 'video' ? `${STONE_ENGLISH.emoji} 받기` : '📦 받기';
   ok.disabled = false;
 }
 
@@ -130,13 +179,13 @@ async function onButton() {
   step = 'busy';
   ok.disabled = true;
   let r;
-  try { r = await receiveParcel(cur); } catch { r = { ok: false, why: 'save' }; }
+  try { r = cur.kind === 'video' ? await receiveVideoStones(cur.ids) : await receiveParcel(cur); } catch { r = { ok: false, why: 'save' }; }
   step = 'done';
   ok.disabled = false;
   if (r.ok) {
     $('parcel-title').textContent = '🎒 가방에 넣었어요!';
     $('parcel-sub').textContent = afterLine(r.items || cur.items, shinyLeft());
-    ok.textContent = '고마워요, 아빠!';
+    ok.textContent = cur.kind === 'video' ? '좋아요!' : '고마워요, 아빠!';
     try { sfx.success(); } catch { /* 소리는 없어도 */ }
   } else if (r.why === 'done') {
     // 다른 창에서 먼저 받았다 — 가방에는 이미 들어 있다

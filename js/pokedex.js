@@ -3,7 +3,7 @@ import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf, isUl
 import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, RARITY_UB, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
 import { listDaily, getMath } from './db.js';
 import { todayKey, todayDone } from './track.js';
-import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES, SHINY_STONE, shinyUsesLeft } from './items.js';
+import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES, SHINY_STONE, shinyUsesLeft, ENGLISH_STONE_SHORT } from './items.js';
 import { eggSummary } from './egg.js';
 import { gymClaimed } from './mathprog.js'; // 🕳 울트라홀 = 💎 스페셜 여덟 배지
 import { haveOf, lvOf, fusedOf, fledOf } from './evolve.js';
@@ -156,7 +156,7 @@ export async function openPokedex(opts) {
   for (const e of eggSummary(p)) gl.appendChild(el('span', 'egg', `🥚 ${e.subject === 'math' ? '수학' : '영어'} 알 ${e.done}/${e.need}일`)); // 품는 알 — 그 과목을 완주한 날 수
   card.appendChild(gl);
   showHatchIfAny(); // 🐣 다른 화면에서 부화했는데 아직 못 본 것
-  card.appendChild(el('div', 'pokedex-stats', '스톤은 배워야만 생겨요 — 🔷 개념 통과·👑 / 🔶 복습 완주·에세이. 🛒 상점 🧤 칸에서 코인과 같이 써요'));
+  card.appendChild(el('div', 'pokedex-stats', `스톤은 배워야만 생겨요 — 🔷 개념 통과·👑 / 🔶 ${ENGLISH_STONE_SHORT}. 🛒 상점 🧤 칸에서 코인과 같이 써요`));
   // 💰 코인·🎒 가방·🛒 상점
   const coinRow = el('div', 'pokedex-coins');
   const coinLeft = el('div');

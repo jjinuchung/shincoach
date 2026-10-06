@@ -11,13 +11,14 @@ import {
   applyFuse, applyUnfuse, applyRenameFusion, // 🔀 퓨전 (2026-10-04, 🏪 5일장)
   applyTrade, // 🤝 교환 상인 (2026-10-05, 🏪 2단계)
   applyParcel, // 📦 아빠의 구호품 (2026-10-05)
+  applyVideoStones, // 🏁 영상 끝까지 → 🔶 (2026-10-06)
   applySell, // 💰 5일장 팔기 (2026-10-05)
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
 } from './db.js';
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
-import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
+import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, parcelGot, videoParcelId, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, MAX_LV } from './evolve.js';
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER } from './pokemon.js';
@@ -865,6 +866,21 @@ export function parcelsReceived() {
 export async function receiveParcel(raw) {
   const r = await runProfileOp(() => applyParcel(raw), () => ({ ok: false, why: 'save' }));
   return { ok: !!(r && r.ok), why: r && r.why, items: r && r.items };
+}
+
+/** 🏁 이 영상의 🔶을 이미 받았나 (메모리 프로필 — 최종 판정은 db.videoStoneRule이 저장된 기록으로) */
+export function videoStoneGot(itemId) {
+  return parcelGot(profile.parcels, videoParcelId(itemId));
+}
+
+/**
+ * 🏁 영상 끝까지 → 🔶 받기 — 저장된 프로필에서 판정하는 트랜잭션(db.applyVideoStones). 저장이 안 되면 없던 일 (구호품과 같다):
+ * "받았어요"를 띄우고 가방에 없으면 안 된다. 놓친 영상은 다음에 앱을 열 때 📦 창이 다시 챙긴다
+ * @returns {Promise<{ok:boolean, why?:string, ids:string[], items?:Object}>} why: 'done' | 'save'
+ */
+export async function receiveVideoStones(itemIds) {
+  const r = await runProfileOp(() => applyVideoStones(itemIds), () => ({ ok: false, why: 'save' }));
+  return { ok: !!(r && r.ok), why: r && r.why, ids: (r && r.ids) || [], items: r && r.items };
 }
 
 /** ⚪ 이로치 빼기 — 원래 색으로 (공짜, 쓴 횟수는 안 돌아온다). @returns {Promise<{ok:boolean, why?:string}>} */

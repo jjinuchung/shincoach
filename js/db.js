@@ -4,7 +4,7 @@
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
-import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
+import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, VIDEO_STONE, videoParcelId } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
@@ -1323,6 +1323,26 @@ export function parcelRule(profile, raw, now = Date.now()) {
 }
 export function applyParcel(raw) {
   return mutateProfile((p) => parcelRule(p, raw));
+}
+
+/**
+ * 🏁 영상 끝까지 → 🔶 영어스톤 (2026-10-06) — 아직 안 받은 영상마다 VIDEO_STONE.n개. **한 트랜잭션**: 받은 영상은 구호품과 같은
+ * profile.parcels에 'video:<영상 id>'로 적는다 → 두 창이 같은 영상을 동시에 넘겨도, 옛 백업을 되돌려도(합집합) 한 번만.
+ * 90%를 넘겼는지는 부르는 쪽이 본다(player 문장마다 · 📦 창이 앱을 열 때 지난 영상까지) — 여기서는 "이미 받았나"만
+ * @returns {{ok:boolean, why?:string, ids?:string[], items?:Object}} why: 'done'(모두 이미 받음)
+ */
+export function videoStoneRule(profile, itemIds, now = Date.now()) {
+  const ids = [...new Set((Array.isArray(itemIds) ? itemIds : []).filter((x) => x !== undefined && x !== null && x !== '').map(String))];
+  const got = ids.filter((id) => !parcelGot(profile.parcels, videoParcelId(id)));
+  if (!got.length) return { ok: false, why: 'done' };
+  profile.parcels = { ...(profile.parcels || {}) };
+  for (const id of got) profile.parcels[videoParcelId(id)] = now;
+  const n = got.length * VIDEO_STONE.n;
+  addCount(profile.items, STONE_ENGLISH.id, n);
+  return { ok: true, ids: got, items: { [STONE_ENGLISH.id]: n } };
+}
+export function applyVideoStones(itemIds) {
+  return mutateProfile((p) => videoStoneRule(p, itemIds));
 }
 /** 📦 받은 구호품 합치기 — 한 번 받았으면 계속 받은 것 (합집합, 받은 때는 이른 쪽) */
 function mergeParcels(a, b) {

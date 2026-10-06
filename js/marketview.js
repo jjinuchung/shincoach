@@ -3,7 +3,7 @@
 import { marketOpen, nextMarket, blendName, fusionId, recolor, FUSION_COST, NAME_MAX } from './fusion.js';
 import { ROSTER, loadCharacters } from './pokemon.js';
 import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList, tradeOffers, tradeMon, RARITY, coins, sellOffers, sellThing } from './xp.js';
-import { STONE_MATH, STONE_ENGLISH, itemById } from './items.js';
+import { STONE_MATH, STONE_ENGLISH, itemById, ENGLISH_STONE_HOW } from './items.js';
 import { SELL_MON_MAX } from './sell.js';
 import { getFusionArt, putFusionArt } from './db.js';
 import { sameDeal } from './trade.js';
@@ -303,7 +303,7 @@ function previewBox(nm, ne) {
   go.disabled = !enough || ui.busy;
   go.addEventListener('click', doFuse);
   box.appendChild(go);
-  if (!enough) box.appendChild(el('p', 'market-note', '🔷 수학스톤은 수학 개념을 통과하면, 🔶 영어스톤은 복습을 끝내면 생겨요'));
+  if (!enough) box.appendChild(el('p', 'market-note', `🔷 수학스톤은 수학 개념을 통과하면, 🔶 영어스톤은 ${ENGLISH_STONE_HOW} 생겨요`));
   return box;
 }
 

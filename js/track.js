@@ -489,8 +489,15 @@ export function reviewGoldenTaken() {
 export function markReviewGolden() {
   return claim('reviewGolden', 1);
 }
+/** 🔶 복습 영어스톤을 받을 수 있는 회차 — 하루에 */
+export const REVIEW_STONE_ROUNDS = 2;
+/** 🔶 오늘 복습 영어스톤을 더 받을 수 있는 회차 수 (화면 안내용 — 실제 판정은 claimReviewStone의 트랜잭션) */
+export function reviewStoneRoundsLeft() {
+  const have = t.daily && Array.isArray(t.daily.reviewStoneKeys) ? t.daily.reviewStoneKeys.length : 0;
+  return Math.max(0, REVIEW_STONE_ROUNDS - have);
+}
 /**
- * 🔶 영어스톤 — 복습 회차를 전부 통과했을 때, **그 회차(문장 묶음)당 한 번**, 하루 2회차까지 (두 창이 같은 회차를 끝내도 한쪽만, Codex 7차 #6).
+ * 🔶 영어스톤 — 복습 회차를 전부 통과했거나 받아쓰기·단어를 다 맞혔을 때, **그 회차(문장 묶음)당 한 번**, 하루 2회차까지 (두 창이 같은 회차를 끝내도 한쪽만, Codex 7차 #6).
  * @param {string} roundKey 회차의 문장 열쇠 묶음
  * @returns {Promise<boolean>}
  */
@@ -499,12 +506,12 @@ export async function claimReviewStone(roundKey) {
   await flush();
   const date = t.daily.date;
   try {
-    const r = await claimDailyKey(date, 'reviewStoneKeys', String(roundKey || ''), 2);
+    const r = await claimDailyKey(date, 'reviewStoneKeys', String(roundKey || ''), REVIEW_STONE_ROUNDS);
     adoptSaved(date, r.daily);
     return r.won;
   } catch (e) {
     const have = Array.isArray(t.daily.reviewStoneKeys) ? t.daily.reviewStoneKeys : [];
-    if (have.includes(roundKey) || have.length >= 2) return false;
+    if (have.includes(roundKey) || have.length >= REVIEW_STONE_ROUNDS) return false;
     t.daily.reviewStoneKeys = [...have, roundKey];
     return true;
   }

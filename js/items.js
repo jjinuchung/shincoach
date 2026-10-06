@@ -230,6 +230,7 @@ export function parcelOf(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const id = typeof raw.id === 'string' ? raw.id.trim() : '';
   if (!id || id.length > 64) return null;
+  if (id.startsWith(VIDEO_PARCEL)) return null; // 🏁 영상 🔶 기록 자리 — 아빠 구호품이 이 이름이면 영상 몫과 섞인다
   const src = raw.items;
   if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
   const items = {};
@@ -243,6 +244,40 @@ export function parcelOf(raw) {
   if (!Object.keys(items).length) return null;
   const str = (v) => (typeof v === 'string' ? v.trim() : '');
   return { id, items, title: str(raw.title), text: str(raw.text) };
+}
+
+/**
+ * 🏁 영상 끝까지 → 🔶 영어스톤 (2026-10-06, 진우 "영어 스톤 구하기가 너무 힘들다 — 수학 스톤은 남아돈다").
+ * 아버님 9/22 스톤 결정의 "영상 완주 +3"이 v113에서 빠져 있었다 → 되살림 (아버님 "이대로 진행").
+ * "끝까지" = 그 영상 문장의 VIDEO_STONE.pct% 이상을 했다 — 📊 진행률·수학 이야기 세계가 열리는 기준(mathprog SEEN_PCT)과 같다.
+ * 마지막 문장 하나만 끝내도 뜨는 🏁 여행 끝과 다르다(목록에서 마지막 줄을 눌러 받는 길을 막는다). 영상마다 한 번.
+ * 받은 기록은 📦 구호품과 같은 profile.parcels에 'video:<영상 id>'로 — 한 트랜잭션·백업 병합 합집합을 그대로 쓴다 (db.videoStoneRule)
+ */
+export const VIDEO_STONE = { n: 3, pct: 90 };
+/** 🔶 영어스톤이 생기는 곳 — 아이에게 보이는 안내(🛒 스톤 상점·🏪 5일장·도감·📊)가 같이 쓴다. 받는 곳을 바꾸면 여기 한 곳만 */
+export const ENGLISH_STONE_HOW = `복습을 다 맞히거나, 받아쓰기·단어를 다 맞히거나, 에세이를 쓰거나, 영상을 끝까지(문장 ${VIDEO_STONE.pct}%) 하면`;
+export const ENGLISH_STONE_SHORT = '복습 다 맞힘·받아쓰기·단어 만점·에세이·영상 끝까지';
+export const VIDEO_PARCEL = 'video:';
+export function videoParcelId(itemId) {
+  return `${VIDEO_PARCEL}${itemId}`;
+}
+/** 진행률(%) — stats.contentSummary의 pct와 같은 셈 (반올림) */
+export function videoPct(done, total) {
+  return total > 0 ? Math.round((done / total) * 100) : 0;
+}
+/** 🔶을 받을 영상 (순수) — 깨진 영상·이미 받은 영상은 빼고 VIDEO_STONE.pct% 이상 한 것만, 같은 id는 한 번 */
+export function videoStoneDue(summaries, received) {
+  const out = [];
+  const seen = new Set();
+  for (const s of Array.isArray(summaries) ? summaries : []) {
+    if (!s || s.broken || s.id === undefined || s.id === null || s.id === '') continue;
+    const id = String(s.id);
+    if (seen.has(id) || parcelGot(received, videoParcelId(id))) continue;
+    if (!(Number(s.total) > 0) || !(Number(s.pct) >= VIDEO_STONE.pct)) continue;
+    seen.add(id);
+    out.push({ id, title: String(s.title || '') });
+  }
+  return out;
 }
 
 /** 🎁 레벨업 선물 상자에서 나올 수 있는 것 (🌟 황금 볼·⭐ 메가 아이템·🍄 다이버섯·🧤 스톤·스톤 상점 물건은 제외 — 귀한 것이라 따로 모아야 한다) */

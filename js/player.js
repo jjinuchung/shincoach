@@ -11,13 +11,13 @@ import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZ
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle, forHole, isUltraBeast } from './pokemon.js';
 // 🕳 울트라홀은 하나다 — 💎 스페셜 배지 8개(수학)로 열리고, 그 뒤에 영어 쪽 울트라비스트도 나온다 (아버님 결정 2026-09-28)
 import { gymClaimed } from './mathprog.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneGot, receiveVideoStones } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
-import { STONE_ENGLISH, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
+import { STONE_ENGLISH, VIDEO_STONE, videoPct, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
-import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT, pickFavExtra, FAV_ICON } from './review.js';
+import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, reviewStones, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT, pickFavExtra, FAV_ICON } from './review.js';
 import {
   initEssay, openEssay, abortEssay, pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds,
   DEFAULT_MINUTES as ESSAY_MINUTES, DEFAULT_COUNT as ESSAY_COUNT,
@@ -1036,9 +1036,16 @@ async function grantReviewRound() {
   awardXp(reward.xp);
   awardCoins(reward.coin);
   if (reward.golden) addItem(GOLDEN.id, reward.golden);
-  // 🔶 영어스톤 — "제대로 배웠나": 회차의 문장·단어·받아쓰기를 **전부 통과**했을 때만, 하루 2개까지 트랜잭션 선점 (두 창이 같은 회차를 끝내도 한쪽만, Codex 6차 #6)
-  const roundKey = state.reviewKey || ''; const fails = state.reviewFails || 0; // await 전에 잡아 둔다 — 그 사이 다른 회차가 시작될 수 있다
-  reward.stone = reward.stone && fails === 0 && await track.claimReviewStone(roundKey) ? reward.stone : 0;
+  // 🔶 영어스톤 — "제대로 배웠나": 회차의 문장·단어·받아쓰기를 **전부 통과** 1 + ✍️🔤 받아쓰기·단어를 다 맞힘 +1 (review.reviewStones).
+  //   회차마다 한 번·하루 2회차까지 트랜잭션 선점 (두 창이 같은 회차를 끝내도 한쪽만, Codex 6차 #6)
+  const roundKey = state.reviewKey || ''; // await 전에 잡아 둔다 — 그 사이 다른 회차가 시작될 수 있다
+  const st = reviewStones({ fails: state.reviewFails || 0, dw: state.reviewDw || 0, dwFails: state.reviewDwFails || 0 });
+  const want = st.all + st.dw;
+  const won = want > 0 && await track.claimReviewStone(roundKey);
+  reward.stone = won ? want : 0;
+  reward.stoneAll = won ? st.all : 0;
+  reward.stoneDw = won ? st.dw : 0;
+  reward.stoneCapped = want > 0 && !won; // 받을 만했는데 오늘 몫(하루 2회차)을 다 받았다 — 끝 화면이 말해 준다
   if (reward.stone) addItem(STONE_ENGLISH.id, reward.stone);
   if (reward.hp) hpHeal(reward.hp);
   dropMushroom('복습을 끝까지 했어요'); // 🍄 거다이맥스 재료
@@ -1075,6 +1082,7 @@ function startReview(items, practice, after) {
   hidePlayerMessage();
   if (!video.paused) video.pause();
   state.reviewFails = 0; // 🔶 이 회차에서 못 넘긴 문항 수 — 0이어야 영어스톤
+  state.reviewDw = 0; state.reviewDwFails = 0; // 🔶 +1 — 받아쓰기·단어 문항 수와 그중 못 넘긴 수 (💖 덤 빼고)
   state.reviewKey = reviewKeyOf(items); // 회차의 정체 — 같은 묶음은 스톤 한 번 (Codex 8차 #9)
   const p = practice ? null : partnerInfo();
   const summary = reviewSummary(track.statsList(), track.todayKey());
@@ -1085,6 +1093,7 @@ function startReview(items, practice, after) {
     items,
     practice,
     reward: roundReward(track.reviewGoldenTaken()),
+    stoneLeft: practice ? null : track.reviewStoneRoundsLeft(), // 🔶 시작 화면 안내 — 오늘 다 받았으면 그렇게
     partner: p ? { url: p.url, ko: p.ko, look: getLook(p.id) } : null,
     waiting: practice ? 0 : summary.waiting,
     setFigure,
@@ -1108,6 +1117,8 @@ function startReview(items, practice, after) {
     onDictation: (item, passed) => {
       if (item && item.extra) return favExtraDone(item.cue, passed, practice);
       if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
+      state.reviewDw = (state.reviewDw || 0) + 1;
+      if (!passed) state.reviewDwFails = (state.reviewDwFails || 0) + 1;
       if (practice) return null;
       const info = track.review(item.cue, passed); // 받아쓰기도 문장 복습이므로 같은 라이트너 규칙
       if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
@@ -1115,6 +1126,8 @@ function startReview(items, practice, after) {
     },
     onWord: (item, passed) => {
       if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
+      state.reviewDw = (state.reviewDw || 0) + 1;
+      if (!passed) state.reviewDwFails = (state.reviewDwFails || 0) + 1;
       if (practice) return null;
       const today = track.todayKey();
       const rec = item.rec;
@@ -1359,6 +1372,7 @@ function markDone(cue) {
   const before = track.todayDone();
   track.done(cue);
   const after = track.todayDone();
+  maybeVideoStone(); // 🏁 이 영상 문장의 90%를 넘기면 🔶 영어스톤 (영상마다 한 번)
   if (after !== before) {
     ensureStreakDate(); // 자정을 넘겼으면 스트릭 상태를 오늘 기준으로
     awardXp(XP.done); // 오늘 처음 완료한 문장 → 경험치
@@ -2576,6 +2590,27 @@ function updateJourneyWalker() {
     mon.hidden = true;
     fb.hidden = false;
   }
+}
+
+/**
+ * 🏁 영상 끝까지 → 🔶 영어스톤 VIDEO_STONE.n개 (2026-10-06, 진우 "영어 스톤 구하기가 너무 힘들다" → 아버님 9/22 결정 "영상 완주 +3" 되살림).
+ * "끝까지" = 이 영상 문장의 VIDEO_STONE.pct% 이상을 했다 — 마지막 문장만 끝내도 뜨는 🏁 여행 끝과 다르다.
+ * 받기는 저장된 프로필로 판정하는 트랜잭션(영상마다 한 번). 저장이 안 되면 말없이 넘어가고, 다음에 앱을 열 때 📦 창이 챙긴다.
+ * 다른 말(🔥·목표·🏁)이 떠 있으면 조금 뒤에 — 말 칸은 하나라 덮이면 아이가 못 본다
+ */
+function maybeVideoStone() {
+  const it = state.item;
+  if (!it || state.parentMode || state.videoStoneBusy || state.videoStoneFor === it.id) return;
+  if (videoPct(track.doneCount(), state.cues.length) < VIDEO_STONE.pct) return;
+  if (videoStoneGot(it.id)) { state.videoStoneFor = it.id; return; }
+  state.videoStoneBusy = true;
+  receiveVideoStones([it.id]).then((r) => {
+    if (r.ok || r.why === 'done') state.videoStoneFor = it.id;
+    if (!r.ok) return;
+    const n = (r.items && r.items[STONE_ENGLISH.id]) || VIDEO_STONE.n;
+    const say = () => { showPlayerMessage(`🏁 「${it.title}」 문장을 ${VIDEO_STONE.pct}% 넘게 했어요! ${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko} +${n}`, 6000); sfx.success(); };
+    if ($('player-msg').hidden) say(); else setTimeout(say, 3000);
+  }).catch(() => {}).finally(() => { state.videoStoneBusy = false; });
 }
 
 /** 🏁 마지막 문장을 완료 → 도착 연출 (세션당 한 번). 보너스 ⚡·💰는 콘텐츠당 한 번, 부모 모드는 연출만 */

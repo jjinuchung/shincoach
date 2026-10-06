@@ -4,13 +4,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD, pickFavExtra, FAV_ICON } from '../js/review.js';
+import { pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD, pickFavExtra, FAV_ICON, reviewStones } from '../js/review.js';
 import { wordResults } from '../js/speak.js';
 import { makeDictation } from '../js/dictation.js';
 import { pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds, REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH } from '../js/essay.js';
 import { pickMatchRound, shuffle as shuffleMons, PAIRS as MATCH_PAIRS, NEED_NEW as MATCH_NEED } from '../js/match.js';
 import { matchXp, XP as REAL_XP } from '../js/xp.js';
-import { matchCoins, COIN as REAL_COIN } from '../js/items.js';
+import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, videoPct } from '../js/items.js';
 import fsNode from 'node:fs';
 
 // 받아쓰기 오답은 실제 사전에서 만들어지므로 테스트도 진짜 사전을 쓴다
@@ -86,6 +86,8 @@ function loadPlayer() {
   const mushroomState = { today: 0, gained: 0 };
   const formState = { forms: {}, keystone: false, mega: {}, gmax: {} };
   const reviewState = { stats: [], sentences: 0, items: 0, words: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
+  // 🏁 영상 끝까지 → 🔶 (2026-10-06): done = 이 영상에서 한 문장 수(track.doneCount) · got = 받은 영상 · calls = 받기 트랜잭션을 부른 기록
+  const videoState = { done: 0, got: {}, calls: [], fail: false };
   const missedLog = [];
   const vocabViewsStub = [];
   const vocabReviewLog = [];
@@ -115,7 +117,7 @@ function loadPlayer() {
     gymClaimed: () => false, getMath: async () => ({}),
     runSpeakCheck: () => ({ promise: new Promise(() => {}), stop() {}, cancel() {} }), prepareMic: async () => null, releaseMic() {},
     // 하루 한 번(mark*)은 실제 코드에서 **트랜잭션 선점**이라 Promise<선점 성공 여부>를 준다 — 스텁도 같은 약속을 지킨다
-    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => 0, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false,
+    track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => videoState.done, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false,
       claimSpeakReward: () => true, markHpMissed: async () => true, todayBattles: () => 0, markBattle: async () => true, MASTER_RATIO: 0.8, puzzle() {},
       // 🔁 복습 스텁: 문장 기록과 오늘 상태를 reviewState로 제어
       statsList: () => reviewState.stats,
@@ -127,6 +129,7 @@ function loadPlayer() {
       todayReviewRounds: () => reviewState.rounds, markReviewRound() { reviewState.rounds++; },
       reviewGoldenTaken: () => reviewState.golden,
       async markReviewGolden() { if (reviewState.golden) return false; reviewState.golden = true; return true; },
+      reviewStoneRoundsLeft: () => Math.max(0, 2 - (reviewState.stoneKeys || []).length),
       async claimReviewStone(key) { reviewState.stoneKeys = reviewState.stoneKeys || []; if (reviewState.stoneKeys.includes(key) || reviewState.stoneKeys.length >= 2) return false; reviewState.stoneKeys.push(key); return true; }, // 🔶 회차당 한 번·하루 2회차 (트랜잭션 선점 흉내)
       todayReviewSkips: () => reviewState.skips, markReviewSkip() { reviewState.skips++; },
       // ✍️ 에세이: 오늘 공부 시간·완료 여부 (essayState로 테스트가 조작)
@@ -172,7 +175,7 @@ function loadPlayer() {
     // items.js / 코인 스텁: 코인 획득과 🎁 상자 아이템을 기록
     coinLog, itemLog,
     coins: () => coinLog.reduce((a, b) => a + b, 0), gainCoins: (n) => { if (n) coinLog.push(n); return { gained: n, coins: 0 }; },
-    addItem: (id) => { itemLog.push(id); return true; }, getLook: () => ({ gear: null, dye: null }),
+    addItem: (id, n = 1) => { for (let k = 0; k < n; k++) itemLog.push(id); return true; }, getLook: () => ({ gear: null, dye: null }), // addItem은 개수만큼 (🔶 회차 2개)
     MUSHROOM_PER_DAY: 2, SOUP_MUSHROOMS: 10,
     gainMushroom: (n) => { mushroomState.gained += n; return mushroomState.gained; },
     COIN: { done: 1, speak: 2, speakStar: 3, goal: 10, journey: 20, match: REAL_COIN.match }, puzzleCoins: (r) => (r && r.solved ? [5, 3, 2][Math.min(r.wrong || 0, 2)] : 0),
@@ -194,6 +197,16 @@ function loadPlayer() {
     battleWin: (id) => { battleState.won.push(id); return { first: true }; }, battleLoss: (id) => { battleState.lost.push(id); return { losses: 1, lost: false }; },
     consumeItem: () => true, inventory: () => ({}), POTION: [], GOLDEN: { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', mult: 2, kind: 'ball' },
     STONE_ENGLISH: { id: 'stone_english', emoji: '🔶', ko: '영어스톤', subject: 'english', kind: 'stone' }, // 🧤 스톤 (2026-09-22)
+    // 🏁 영상 끝까지 → 🔶 (2026-10-06) — 규칙(VIDEO_STONE·videoPct)은 실제 모듈, 받기는 트랜잭션 흉내(영상마다 한 번)
+    VIDEO_STONE, videoPct, videoState,
+    videoStoneGot: (id) => !!videoState.got[id],
+    async receiveVideoStones(ids) {
+      videoState.calls.push(ids.slice());
+      if (videoState.fail) return { ok: false, why: 'save', ids: [] };
+      const fresh = ids.filter((id) => !videoState.got[id]);
+      for (const id of fresh) videoState.got[id] = 1;
+      return fresh.length ? { ok: true, ids: fresh, items: { stone_english: fresh.length * VIDEO_STONE.n } } : { ok: false, why: 'done', ids: [] };
+    },
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
     initReview() {}, abortReview() {}, isReviewOpen: () => false, openReview(o) { reviewCalls.push(o); },
@@ -217,7 +230,7 @@ function loadPlayer() {
     formUrl: (id, kind) => `url:${id}:${kind}`,
     hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
-    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewSchedule, reviewable, makeDictation, VOCAB_KNOWN, REAL_VOCAB, pickFavExtra, FAV_ICON,
+    pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewStones, reviewSchedule, reviewable, makeDictation, VOCAB_KNOWN, REAL_VOCAB, pickFavExtra, FAV_ICON,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 5, REVIEW_COUNT: 5,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
     // sfx.js 스텁
@@ -227,7 +240,7 @@ function loadPlayer() {
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔', ctx);
-  return { ctx, video, els, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, matchCalls, matchState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, videoState, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, reviewCalls, reviewState, matchCalls, matchState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -2102,4 +2115,95 @@ test('💖 고르기: 지금 문장 칩이 💖로 · 다시 누르면 ♡ · �
   run('state.parentMode = true; toggleFav(1)');
   assert.equal(!!reviewState.stats[1].fav, false, '부모 모드는 아이 기록이 아니다');
   assert.equal(xpLog.length + coinLog.length, 0, '고르기에는 보상이 없다');
+});
+
+// ── 🔶 영어스톤 늘리기 (2026-10-06, 진우 "영어 스톤 구하기가 너무 힘들다 — 수학 스톤은 남아돈다" → 아버님 9/22 결정 되살림, "이대로 진행") ──
+
+test('🏁 영상 끝까지(문장 90%) → 🔶 영어스톤 3개 — 영상마다 한 번 · 마지막 문장만 끝내도 안 나온다 · 부모 모드 없음 · 저장을 못 하면 다음 문장에서 다시', async () => {
+  const { run, ctx, els, videoState } = loadPlayer();
+  ctx.track.done = () => {};
+  run('state.cues = Array.from({ length: 10 }, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a", ko: "" })); settings.listenFirst = 0; settings.dailyGoal = 0; state.journeyCelebrated = true; state.item = { id: "ep1", title: "피카츄의 모험" };');
+  run("$('player-msg').hidden = true;");
+  // 목록에서 마지막 줄만 눌러 끝냄(1/10) — 🏁 여행 끝은 뜰 수 있어도 🔶은 없다
+  videoState.done = 1; run('markDone(state.cues[9])'); await tick();
+  assert.equal(videoState.calls.length, 0, '10%');
+  videoState.done = 8; run('markDone(state.cues[7])'); await tick();
+  assert.equal(videoState.calls.length, 0, '80%');
+  videoState.done = 9; run('markDone(state.cues[8])'); await tick();
+  assert.deepEqual(videoState.calls.map((c) => Array.from(c)), [['ep1']], '90% — 이 영상 id로 받기 트랜잭션 한 번');
+  assert.match(els['player-msg'].textContent, /「피카츄의 모험」/, '어느 영상인지 이름으로');
+  assert.match(els['player-msg'].textContent, /🔶 영어스톤 \+3/, '무엇을 몇 개 받았는지');
+  assert.equal(els['player-msg'].hidden, false);
+  videoState.done = 10; run('markDone(state.cues[9])'); await tick();
+  assert.equal(videoState.calls.length, 1, '같은 영상은 다시 부르지 않는다');
+  // 이미 받은 영상(다른 창·📦 창에서) — 부르지도 않는다
+  videoState.got.ep2 = 1;
+  run('state.item = { id: "ep2", title: "둘째" };'); videoState.done = 10; run('markDone(state.cues[9])'); await tick();
+  assert.equal(videoState.calls.length, 1, '이미 받은 영상');
+  // 저장을 못 했다 — 말하지 않고, 다음 문장에서 다시 한다 (받았다고 적지 않는다)
+  run("state.item = { id: 'ep3', title: '셋째' }; $('player-msg').textContent = ''; $('player-msg').hidden = true;");
+  videoState.fail = true; videoState.done = 9; run('markDone(state.cues[8])'); await tick();
+  assert.equal(videoState.calls.length, 2);
+  assert.equal(els['player-msg'].textContent, '', '못 받았으면 "받았어요"가 없다');
+  videoState.fail = false; run('markDone(state.cues[9])'); await tick();
+  assert.equal(videoState.calls.length, 3, '다음 문장에서 다시');
+  assert.match(els['player-msg'].textContent, /「셋째」/);
+  // 다른 말이 떠 있으면 바로 덮지 않는다 (말 칸은 하나)
+  run("state.item = { id: 'ep4', title: '넷째' }; $('player-msg').textContent = '🔥 3일 연속 학습!'; $('player-msg').hidden = false;");
+  videoState.done = 9; run('markDone(state.cues[8])'); await tick();
+  assert.equal(videoState.calls.length, 4);
+  assert.equal(els['player-msg'].textContent, '🔥 3일 연속 학습!', '떠 있던 말은 그대로 (조금 뒤에 🔶 말)');
+  // 👀 부모 모드는 아이 기록이 아니다
+  run("state.item = { id: 'ep5', title: '다섯째' }; setParentMode(true);"); videoState.done = 10; run('markDone(state.cues[9])'); await tick();
+  assert.equal(videoState.calls.length, 4, '부모 모드는 없음');
+});
+
+test('🔁 🔶 받아쓰기·단어 만점 +1 — 따라 말하기에서 미끄러져도 받는다 · 전부 통과면 2개 · 받은 까닭을 끝 화면에 · 오늘 몫(2회차)을 다 받으면 그렇게', async () => {
+  const { run, reviewCalls, reviewState, itemLog } = loadPlayer();
+  reviewState.stats = [due(1), due(2), due(3), due(4)];
+  vocabStub(reviewState, [{ word: 'brave', meaning: '용감한', views: 3, box: 0, dueAt: '' }, { word: 'x', meaning: '느린', views: 3 }]);
+  run('state.cues = [{start:1,end:2,en:"a",ko:""},{start:2,end:3,en:"b",ko:""},{start:3,end:4,en:"c",ko:""},{start:4,end:5,en:"d",ko:""}]; settings.reviewCount = 3; state.reviewDone = false;');
+  run('state.vocabViews = ' + JSON.stringify([{ word: 'brave', meaning: '용감한', views: 3, box: 0, dueAt: '' }, { word: 'x', meaning: '느린', views: 3, box: 0, dueAt: '' }]) + '; maybeReview();');
+  const o = reviewCalls[0];
+  assert.equal(o.stoneLeft, 2, '시작 화면 안내 — 오늘 받을 수 있는 회차');
+  const word = Array.from(o.items).find((it) => it.type === 'word');
+  assert.ok(word, '단어 문항');
+  o.onSentence({ start: 1, en: 'a' }, false); // 따라 말하기에서 미끄러짐
+  o.onSentence({ start: 2, en: 'b' }, true);
+  o.onWord(word, true); // 단어는 맞힘
+  assert.deepEqual([run('state.reviewFails'), run('state.reviewDw'), run('state.reviewDwFails')], [1, 1, 0]);
+  const g1 = await o.onFinished();
+  assert.equal(g1.stoneAll, 0, '전부 통과는 아니다');
+  assert.equal(g1.stoneDw, 1, '받아쓰기·단어 만점 +1');
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 1);
+  // 전부 통과 + 단어 만점 → 2개 (다른 회차)
+  run('state.reviewFails = 0; state.reviewDw = 2; state.reviewDwFails = 0; state.reviewKey = "r2";');
+  const g2 = await o.onFinished();
+  assert.deepEqual([g2.stoneAll, g2.stoneDw, g2.stone], [1, 1, 2]);
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 3, '가방에 2개 더');
+  // 3회차째 — 오늘 몫은 2회차까지 (밀린 문장이 많아도 양으로 못 늘린다)
+  run('state.reviewFails = 0; state.reviewDw = 1; state.reviewDwFails = 0; state.reviewKey = "r3";');
+  const g3 = await o.onFinished();
+  assert.equal(g3.stone, 0);
+  assert.equal(g3.stoneCapped, true, '끝 화면이 "오늘 다 받았어요"라고 말한다');
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 3);
+  // 단어를 틀리면 +1이 없다 · 받아쓰기·단어가 없는 회차도 +1이 없다
+  run('state.reviewDw = 0; state.reviewDwFails = 0;');
+  o.onWord(word, false);
+  assert.deepEqual([run('state.reviewDw'), run('state.reviewDwFails')], [1, 1]);
+});
+
+test('🔁 🔶 ✍️ 받아쓰기도 "받아쓰기·단어 만점"에 센다 — 틀리면 +1이 없다 · 💖 덤 받아쓰기는 세지 않는다', () => {
+  const { run, reviewCalls, reviewState } = loadPlayer();
+  reviewState.stats = [due(1, { box: 2, en: 'He was very brave that day.' })];
+  run(`state.cues = [{start:1,end:4,en:"He was very brave that day.",ko:""}];
+    settings.reviewCount = 3; state.reviewDone = false; state.vocab = { known: VOCAB_KNOWN }; maybeReview();`);
+  const o = reviewCalls[0];
+  const dict = Array.from(o.items).find((it) => it.type === 'dictation');
+  assert.ok(dict, '받아쓰기가 만들어져야 함');
+  assert.deepEqual([run('state.reviewDw'), run('state.reviewDwFails')], [0, 0], '회차를 열 때 0');
+  o.onDictation(dict, false);
+  assert.deepEqual([run('state.reviewDw'), run('state.reviewDwFails'), run('state.reviewFails')], [1, 1, 1]);
+  o.onDictation({ type: 'dictation', cue: { start: 9, en: 'x' }, rec: { key: 'v|90', fav: true }, extra: true }, true);
+  assert.deepEqual([run('state.reviewDw'), run('state.reviewDwFails')], [1, 1], '💖 덤은 안 센다');
 });
