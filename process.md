@@ -1942,3 +1942,28 @@
 ### TODO (다음 작업)
 - [ ] 태블릿: 📦 창(지난 영상 차액) · 에세이 새 문장 · ❓ 답장 붙음 확인 (업로드로 보기)
 - [ ] Codex 35차(T + S 판 + 🔶 + 📤 + ✍️ 열쇠 + 소수 비교 + v201, 새 세션) → v202
+
+## 2026-10-07 — 세션 정리 (/ress)
+
+### 진행 내용
+- 이번 세션 흐름(자세한 것은 위 절마다): /checkp → ➗ T 3단계 화면 연결 v196(헤드리스가 잡은 "진한 칸" 두 색) → 🔶 영어스톤 늘리기 v197(9/22 결정의 빠진 두 줄) → 📊 수학 카드 읽는 법·알려 주는 길 안내 → 📤 Claude에게 기록 보내기 v198(비공개 저장소 shincoach-data, 아버님 열쇠 넣기 — 기한 1년 넘기면 GitHub가 말없이 안 만든다) → "기록 봐 줘" 첫 진단(A 분수 연산 · ❓ 넷은 고장 신고) → 에세이 업로드 v199 → 밀린 에세이 18·❓15~19·소수 비교·에세이 열쇠 날짜+id v200(태블릿 반영 0개 확인) → 에세이 문장 한 번만·영상 길이별 💰·🔶 v201
+- 배포 여섯 번(v196 35초 · v197 45초 · v198 35초 · v199 45초 · v200 45초 · v201 40초), 매번 라이브 반영·배포본 대조 · 전체 테스트 1291 → 1325
+- 아버님 "세션이 많이 찼으니 /ress 하고 clear 후 다음 세션에서 이어서"
+
+### 변경 파일 (세션 전체, 커밋 `ad3a342`·`ecbf4df`·`62e32b2`·`184d344`·`2d9ddfb`·`dc241ac` + docs)
+- `js/mathfdiv.js`·`coach/math/fracdiv.json`·`tools/mathfdiv.mjs`·`coach/math/review-fdv.html`·`tests/mathfdiv.test.js` (새) — T 줄기
+- `js/upload.js`·`tests/upload.test.js`·`tests/englishstone.test.js` (새) — 📤 기록 보내기 · 🔶
+- `js/mathprog.js`·`js/mathdraw.js`·`js/mathdec.js`·`js/items.js`·`js/db.js`·`js/xp.js`·`js/player.js`·`js/parcel.js`·`js/review.js`·`js/track.js`·`js/essay.js`·`js/stats.js`·`js/app.js`·`js/shop.js`·`js/marketview.js`·`js/pokedex.js`·`js/mathask.js`·`css/style.css`·`sw.js`
+- `coach/fixes.json`(에세이 18) · `coach/math/replies.json`(❓15~19)
+- 테스트: mathstem·mathprog·mathdec·parcel·player.logic·essay·stats
+
+### 결정사항 / 메모
+- 이번 세션에 메모리로 남긴 교훈: ❓는 진우의 고장 신고일 때가 많다(지금 생성기로 다시 만들어 확인부터) · 에세이 id는 같은 배운 문장이면 날마다 같다(교정은 날짜까지) · 원고가 그림을 "진한 칸"이라 부르면 그림에서 참인지 눈으로 · 열쇠 기한 2027-10-31쯤(1년 넘기면 Generate가 말없이 안 됨) · 명령을 &&로 잇다 앞이 실패하면 고침이 빠진 채 다음 줄이 돈다
+- 사진 대신 업로드: 진우 기록(수학·❓·고칠 에세이)은 비공개 저장소에서 `gh api`로 읽는다 — 공개 저장소(신코치)엔 아이 기록을 절대 안 올린다
+- 작업 트리: 이 /ress 절만 미커밋
+
+### TODO (다음 작업)
+- [ ] "기록 봐 줘"로 태블릿 반영 확인 — 📦 지난 영상 차액(💰·🔶) 받았나 · ❓15~19 답장 붙었나 · 에세이 새 문장
+- [ ] Codex 35차(T 줄기 + v195 S1·S5 칠하기 판 + 🔶 v197 + 📤 v198·199 + ✍️ 에세이 열쇠 v200 + 소수 비교 + v201, 새 세션·여유 메모리·"2만 씨앗 금지") → v202
+- [ ] (제안, 미결정) 분수의 곱셈 줄기(초5-2) → 분수의 덧셈·뺄셈 줄기 · 📊에 막힌 개념 옆 아빠 카드 · 🎤 목표 문장 +1(🔶 모자라면)
+- [ ] 다음 배포 때도 라이브 버전 확인(옛 재실행 run 37371255984 queued)
