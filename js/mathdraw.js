@@ -2462,6 +2462,7 @@ export function figureSvg(spec) {
   if ((m = /^pnet (.+)$/.exec(s))) { const sp = parsePnet(m[1]); return sp ? pnetSvg(sp) : ''; } // 🔷 P 각기둥 전개도
   if ((m = /^cnet (.+)$/.exec(s))) { const sp = parseCnet(m[1]); return sp ? cnetSvg(sp) : ''; } // 🔷 P 원기둥 전개도
   if ((m = /^scale (.+)$/.exec(s))) { const sp = parseScale(m[1]); return sp ? scaleSvg(sp) : ''; } // 🟰 Q 저울
+  if ((m = /^fbar (.+)$/.exec(s))) { const sp = parseFbar(m[1]); return sp ? fbarSvg(sp) : ''; } // ➗ T 나눗셈 막대
   if ((m = /^plane (.+)$/.exec(s))) { const sp = parsePlane(m[1]); return sp ? planeSvg(sp) : ''; } // 📈 R 좌표평면
   if ((m = /^stack (.+)$/.exec(s))) { const sp = parseStackFig(m[1]); return sp ? stackSvg(sp) : ''; } // 🧊 S 쌓은 모양
   if ((m = /^stacks (.+)$/.exec(s))) { const sp = parseStacks(m[1]); return sp ? stacksSvg(sp) : ''; } // 🧊 S 쌓은 모양 후보
@@ -2547,6 +2548,7 @@ export function figText(text, short = false) {
     .replace(/\[pnet ([^\]]+)\]/g, (all, arg) => { const sp = parsePnet(arg); return !sp ? all : short ? '(그림)' : `(${pnetText(sp)})`; })
     .replace(/\[cnet ([^\]]+)\]/g, (all, arg) => { const sp = parseCnet(arg); return !sp ? all : short ? '(그림)' : `(${cnetText(sp)})`; })
     .replace(/\[scale ([^\]]+)\]/g, (all, arg) => { const sp = parseScale(arg); return !sp ? all : short ? '(저울)' : `(${scaleText(sp)})`; })
+    .replace(/\[fbar ([^\]]+)\]/g, (all, arg) => { const sp = parseFbar(arg); return !sp ? all : short ? '(막대 그림)' : `(${fbarText(sp)})`; })
     .replace(/\[plane ([^\]]+)\]/g, (all, arg) => { const sp = parsePlane(arg); return !sp ? all : short ? '(좌표평면)' : `(${planeText(sp)})`; })
     .replace(/\[(stack|stacks|views|top|layers) ([^\]]+)\]/g, (all, kind, arg) => { const tx = spaceText(kind, arg); return !tx ? all : short ? '(쌓기나무)' : `(${tx})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
@@ -2588,7 +2590,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -2657,6 +2659,101 @@ export function scaleSvg(sp) {
   });
   // 보이는 크기는 1.25배 — 그린 크기(400px)면 태블릿에서 추 지름 22px·숫자 14px로 본문 글자보다 작다 (헤드리스 800px, 3단계). 폰에서는 max-width:100%로 줄어든다
   return `<svg class="frac-fig scale-fig" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${scaleText(sp)}">${g}</svg>`;
+}
+
+// ───────────────────── ➗ T 분수의 나눗셈 — 나눗셈 막대 (2026-10-06) ─────────────────────
+//
+// 교과서가 분수의 나눗셈을 설명하는 막대 그림 세 가지 (배움 장·② 문항에서만 — ① 계산 문제에 그리면 답을 흘린다):
+//   `[fbar take 6/7 2/7]` — 덜어 내기: 1을 7칸으로 나눈 막대에 6칸을 칠하고 2칸씩 묶는다(①②③). 남는 칸은 "나머지".
+//                           나누어지는 수는 자연수도 된다 `[fbar take 3 1/4]`(막대 3개) — 두 수의 분모가 같아야 한다.
+//   `[fbar share 3/5 2]`  — 똑같이 나누기: 5칸 중 3칸을 칠하고 칸마다 2줄로 나눠 한 줄씩(진한 색) — 3/10.
+//   `[fbar unit 2/3 6]`   — 1만큼: 3칸 중 2칸 위에 "6", 막대 전체(1) 아래에 "1만큼 = ?".
+// 테스트가 그린 그림에서 다시 셀 수 있게 칸마다 class="fb-c"와 data-g(묶음 번호 · r 나머지 · 0 빈 칸) · data-on · data-pick.
+
+/** "6/7" → {n:6, d:7} · "3" → {n:3, d:1} (못 읽으면 null) */
+function fbarNum(t) {
+  const m = /^(\d+)(?:\/(\d+))?$/.exec(String(t || '').trim());
+  if (!m) return null;
+  const n = +m[1]; const d = m[2] ? +m[2] : 1;
+  return d > 0 ? { n, d } : null;
+}
+/** `take 6/7 2/7` · `share 3/5 2` · `unit 2/3 6` → 그림 자료 (못 읽거나 그릴 수 없으면 null) */
+export function parseFbar(arg) {
+  const p = String(arg || '').trim().split(/\s+/);
+  if (p.length !== 3) return null;
+  const [mode, x, y] = p;
+  if (mode === 'take') {
+    const A = fbarNum(x); const B = fbarNum(y);
+    if (!A || !B || B.d === 1 || B.n < 1) return null;
+    const d = B.d;
+    if (A.d !== 1 && A.d !== d) return null; // 분모가 같아야 묶을 수 있다 (자연수는 그 분모로 센다)
+    const a = A.d === 1 ? A.n * d : A.n; const b = B.n;
+    const bars = Math.max(1, Math.ceil(a / d));
+    if (a < 1 || d > 12 || bars > 4) return null;
+    return { mode, a, b, d, bars, groups: Math.floor(a / b), rem: a % b, A: x, B: y };
+  }
+  if (mode === 'share') {
+    const A = fbarNum(x); const k = /^\d+$/.test(y) ? +y : 0;
+    if (!A || A.d === 1 || A.n < 1 || A.n > A.d || A.d > 10 || k < 2 || k > 6) return null;
+    return { mode, n: A.n, d: A.d, k, A: x };
+  }
+  if (mode === 'unit') {
+    const P = fbarNum(x); const V = fbarNum(y);
+    if (!P || !V || P.d === 1 || P.n < 1 || P.n > P.d || P.d > 10) return null;
+    return { mode, p: P.n, q: P.d, v: y, P: x };
+  }
+  return null;
+}
+/** 📊·❓ 글용 */
+export function fbarText(sp) {
+  if (sp.mode === 'take') return `막대: 1을 ${sp.d}칸으로 나눈 막대${sp.bars > 1 ? ` ${sp.bars}개` : ''}에 ${sp.a}칸을 칠하고 ${sp.b}칸씩 묶음 — ${sp.groups}묶음${sp.rem ? `, 나머지 ${sp.rem}칸` : ''}`;
+  if (sp.mode === 'share') return `막대: ${sp.d}칸 중 ${sp.n}칸을 칠하고 칸마다 ${sp.k}줄로 나눠 한 줄씩 — 작은 칸 ${sp.n}개`;
+  return `막대: ${sp.q}칸 중 ${sp.p}칸이 ${sp.v}만큼 — 막대 전체(1만큼)는 ?`;
+}
+const NUM_CIRCLE = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫'];
+/** 나눗셈 막대 그림 */
+export function fbarSvg(sp) {
+  const W = 400; const X0 = 30; const BW = 340; let g = ''; let H;
+  const lab = (x, y, t, o = '') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor"${o}>${t}</text>`;
+  const cell = (x, y, w, h, fill, attrs) => `<rect class="fb-c" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${fill}" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" ${attrs}/>`;
+  if (sp.mode === 'take') {
+    const cw = BW / sp.d; const BH = 30; const gap = 34; const top = 10;
+    for (let i = 0; i < sp.bars * sp.d; i++) {
+      const row = Math.floor(i / sp.d); const col = i % sp.d;
+      const x = X0 + col * cw; const y = top + row * (BH + gap);
+      const on = i < sp.a; const gi = on ? Math.floor(i / sp.b) + 1 : 0;
+      const isRem = on && gi > sp.groups;
+      const fill = !on ? EMPTY : isRem ? 'var(--frac-rem, rgba(127,127,127,0.35))' : gi % 2 ? FILL : FILL2;
+      g += cell(x, y, cw, BH, fill, `data-g="${!on ? 0 : isRem ? 'r' : gi}" data-on="${on ? 1 : 0}"`);
+      // 묶음 번호는 그 묶음의 첫 칸 아래 · 나머지는 첫 칸 아래 "나머지"
+      if (on && i % sp.b === 0) g += lab(x + Math.min(cw * (isRem ? sp.rem : sp.b), (sp.d - col) * cw) / 2, y + BH + 18, isRem ? '나머지' : NUM_CIRCLE[gi - 1] || String(gi), ` class="fb-l"`); // 나머지는 남은 칸 가운데에
+    }
+    for (let r = 0; r < sp.bars; r++) g += `<text x="${X0 - 8}" y="${(top + r * (BH + gap) + BH / 2 + 5).toFixed(1)}" font-size="13" text-anchor="end" fill="currentColor" fill-opacity="0.7">1</text>`;
+    H = top + sp.bars * (BH + gap);
+  } else if (sp.mode === 'share') {
+    const cw = BW / sp.d; const rh = Math.max(14, 72 / sp.k); const top = 10;
+    for (let c = 0; c < sp.d; c++) {
+      for (let r = 0; r < sp.k; r++) {
+        // 한 사람 몫(맨 아래 줄)만 진하게, 나머지 칠한 칸은 같은 색을 옅게 — 원고·풀이가 "진한 칸"이라 부른다.
+        // 두 색(파랑·주황)으로 칠하면 어느 쪽이 "진한" 칸인지 갈리고, 색 이름은 세계(--frac-fill)마다 바뀐다 (3단계 헤드리스)
+        const on = c < sp.n; const pick = on && r === sp.k - 1;
+        g += cell(X0 + c * cw, top + r * rh, cw, rh, on ? FILL : EMPTY, `${on && !pick ? 'fill-opacity="0.3" ' : ''}data-on="${on ? 1 : 0}" data-pick="${pick ? 1 : 0}" data-c="${c}" data-r="${r}"`);
+      }
+    }
+    g += `<rect x="${X0}" y="${top}" width="${BW}" height="${(rh * sp.k).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+    for (let c = 1; c < sp.d; c++) g += `<line x1="${(X0 + c * cw).toFixed(1)}" y1="${top}" x2="${(X0 + c * cw).toFixed(1)}" y2="${(top + rh * sp.k).toFixed(1)}" stroke="currentColor" stroke-width="1.6"/>`;
+    H = top + rh * sp.k + 12;
+  } else {
+    const cw = BW / sp.q; const BH = 34; const top = 34;
+    for (let i = 0; i < sp.q; i++) g += cell(X0 + i * cw, top, cw, BH, i < sp.p ? FILL : EMPTY, `data-on="${i < sp.p ? 1 : 0}"`);
+    const brace = (x1, x2, y, up) => { const d = up ? -8 : 8; return `<path d="M${x1.toFixed(1)} ${y} L${x1.toFixed(1)} ${y + d} L${x2.toFixed(1)} ${y + d} L${x2.toFixed(1)} ${y}" fill="none" stroke="currentColor" stroke-width="1.6"/>`; };
+    g += brace(X0, X0 + sp.p * cw, top - 4, true) + lab(X0 + (sp.p * cw) / 2, top - 16, sp.v, ' class="fb-v"');
+    g += brace(X0, X0 + BW, top + BH + 4, false) + lab(X0 + BW / 2, top + BH + 30, '1만큼 = ?', ' class="fb-one"');
+    H = top + BH + 40;
+  }
+  const meta = sp.mode === 'take' ? `data-a="${sp.a}" data-b="${sp.b}" data-d="${sp.d}"` : sp.mode === 'share' ? `data-n="${sp.n}" data-d="${sp.d}" data-k="${sp.k}"` : `data-p="${sp.p}" data-q="${sp.q}"`;
+  // 보이는 크기는 1.25배 (저울과 같다 — 태블릿에서 칸·글자가 본문 글자보다 작지 않게)
+  return `<svg class="frac-fig fbar-fig" data-mode="${sp.mode}" ${meta} viewBox="0 0 ${W} ${Math.round(H)}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${fbarText(sp)}">${g}</svg>`;
 }
 
 // ───────────────────── 📈 R 좌표평면과 그래프 — 좌표평면 (2026-10-05) ─────────────────────

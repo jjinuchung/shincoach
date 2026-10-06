@@ -1,0 +1,1035 @@
+<title>분수의 나눗셈 검수</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에 개념 바로가기, 개념마다 [배움 + 문제 예시 | 아빠 카드] 두 칸 (폰에서는 한 칸) — 문자와 식 검수 페이지와 같은 체계 */
+:root{
+  --bg:#f5f7ff; --card:#ffffff; --ink:#1f2340; --muted:#6b7280; --line:#e3e6f3;
+  --primary:#4f46e5; --primary-soft:#eef2ff; --accent:#f59e0b; --accent-soft:#fff7ed;
+  --ok:#0f9f6e; --ok-soft:#ecfdf5; --no-soft:#f8f9fc;
+  --dad:#fff8ec; --dad-line:#f3c27a; --dad-ink:#7c4a03;
+  --font-display:"Gowun Dodum","Noto Sans KR",sans-serif;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --font-math:"Times New Roman","Cambria Math",Georgia,serif;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;margin:0;padding-block:0 60px;padding-inline:16px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top h1{font-size:1.35rem}
+.top .sub{color:var(--muted);font-size:.9rem;margin:2px 0 8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.nav a{flex:0 0 auto;font-size:.8rem;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.nav a b{color:var(--primary);margin-right:3px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--primary);outline:none}
+.intro{display:grid;grid-template-columns:1fr;gap:12px;margin-block:16px}
+@media(min-width:760px){.intro{grid-template-columns:1.2fr 1fr}}
+.intro .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.intro .box.dadbox{background:var(--dad);border-color:var(--dad-line)}
+.intro h3{font-size:1rem;margin-bottom:6px}
+.intro p{margin:4px 0;font-size:.92rem}
+.intro .stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.92rem}
+.intro .stats b{font-size:1.25rem;color:var(--primary);font-variant-numeric:tabular-nums}
+.how{padding-left:20px}
+.how li{margin:3px 0}
+.ladder{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0 4px;padding:0;list-style:none}
+.ladder li{font-size:.85rem;background:var(--primary-soft);border-radius:8px;padding:5px 9px}
+.ladder li b{color:var(--primary);margin-right:4px}
+.ladder li small{color:var(--muted);margin-left:4px}
+.concept{margin-block:36px 0;scroll-margin-top:110px}
+.ch-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.ch-head > div:last-child{min-width:0}
+.ch-no{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--primary);background:var(--primary-soft);border-radius:12px;min-width:56px;height:56px;display:grid;place-items:center}
+.grade{font-size:.75rem;letter-spacing:.06em;color:var(--muted)}
+.ch-head h2{font-size:1.4rem}
+.idea{color:var(--muted);margin:2px 0 0;font-size:.95rem;max-width:65ch}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+.cols > *{min-width:0}
+@media(min-width:900px){.cols{grid-template-columns:1.35fr 1fr}}
+.col-title{margin:0 0 10px;font-size:.95rem}
+.col-title small{color:var(--muted);font-weight:400;margin-left:6px}
+.samples-title{margin-top:18px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.step{display:flex;gap:10px;scroll-margin-top:110px}
+.step-no{flex:0 0 30px;height:30px;border-radius:50%;background:var(--primary);color:var(--card);font-weight:700;display:grid;place-items:center;font-size:.9rem;margin-top:12px}
+.step-body{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.say{max-width:65ch}
+.say p{margin:0 0 10px}
+.say p:last-child{margin-bottom:0}
+.check{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;scroll-margin-top:110px}
+.qt{margin:0 0 6px;font-weight:500}
+.qt p{margin:0 0 6px}
+.ch{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ch li{display:flex;align-items:center;gap:8px;border-radius:9px;padding:6px 10px;background:var(--no-soft);border:1px solid transparent}
+.ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
+.ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
+.ch .txt{flex:1;min-width:0}
+.ch .tag{font-size:.75rem;color:var(--muted);text-align:right}
+.why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
+.samples{display:grid;gap:10px}
+.sample{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
+body.hide-ans .ch .mark,body.hide-ans .why,body.hide-ans .ch .tag{visibility:hidden}
+.rule{margin-top:12px;background:var(--primary-soft);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.rule p{margin:2px 0 0;font-weight:700;font-size:1.05rem}
+.dad{background:var(--dad);border:1px solid var(--dad-line);border-radius:14px;padding:14px 16px;position:sticky;top:104px;scroll-margin-top:110px;color:var(--ink)}
+.dad h3{font-size:1.05rem;margin:4px 0 10px;color:var(--dad-ink)}
+.dad h4{margin:12px 0 4px;font-size:.9rem;color:var(--dad-ink)}
+.dad-say{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.dad-say li,.traps li{display:flex;gap:8px;align-items:flex-start;scroll-margin-top:110px}
+.dad-say li > span,.traps li > div{min-width:0}
+.dad-do,.dad-pass{margin:0;font-size:.95rem}
+.traps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.traps .kid{font-weight:500}
+.traps .dadsay{color:var(--muted);font-size:.92rem}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.ref .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.03em}
+.ref code,code.mini{font-size:.78rem;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+code.mini{flex:0 0 auto;margin-top:2px}
+.dad .ref code,.dad code.mini{color:var(--dad-ink);background:var(--accent-soft)}
+/* 식: 문자는 기울여(교과서 표기), 나눗셈은 세로 분수 — 분수 막대가 괄호 노릇을 해서 괄호는 뗀다 */
+i.v{font-family:var(--font-math);font-style:italic;font-size:1.1em;padding:0 .04em}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.1;margin:0 2px;font-variant-numeric:tabular-nums}
+.fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
+.fr .d{padding:0 3px}
+.mx{display:inline-flex;align-items:center;gap:3px;vertical-align:middle}
+/* 막대 그림 — 앱과 같은 SVG (currentColor라 어두운 화면에서도 보인다) */
+.fig{margin:6px 0 8px;color:var(--ink);display:inline-block;max-width:100%;overflow-x:auto}
+.fig svg{max-width:100%;height:auto;display:block}
+div.fig{display:block;max-width:400px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none;margin-top:8px}
+.toggle input{width:18px;height:18px;accent-color:var(--primary)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (max-width:899px){.dad{position:static}}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  body{background:#fff;padding:0;font-size:13px}
+  .wrap{max-width:100%}
+  .top{position:static}
+  .dad{position:static;box-shadow:none;break-inside:auto}
+  .step,.sample,.check,.rule,.traps li,.fr,.fig{break-inside:avoid}
+}
+</style>
+<div class="wrap">
+  <div class="top">
+    <h1>➗ 분수의 나눗셈 줄기 — 배움 원고 검수</h1>
+    <p class="sub">신코치 수학 · 초6 「분수의 나눗셈」(6-1·6-2) · 개념 9개</p>
+    <div class="nav"><a href="#T1"><b>T1</b> (자연수)÷(자연수)의 몫을 분수로</a><a href="#T2"><b>T2</b> (진분수)÷(자연수)</a><a href="#T3"><b>T3</b> (대분수)÷(자연수)</a><a href="#T4"><b>T4</b> 분모가 같은 (분수)÷(분수)</a><a href="#T5"><b>T5</b> 분모가 다른 (분수)÷(분수)</a><a href="#T6"><b>T6</b> (자연수)÷(분수)</a><a href="#T7"><b>T7</b> (분수)÷(분수)를 곱셈으로</a><a href="#T8"><b>T8</b> 대분수의 나눗셈</a><a href="#T9"><b>T9</b> ⭐ 분수의 나눗셈 활용</a></div>
+  </div>
+
+  <div class="intro">
+    <div class="box">
+      <h3>무엇을 봐 주시면 되나</h3>
+      <div class="stats">
+        <span><b>9</b> 개념</span>
+        <span><b>39</b> 📘 배움 장</span>
+        <span><b>39</b> 확인 질문</span>
+        <span><b>10</b> ➗ 막대 그림</span>
+        <span><b>18</b> 헷갈리는 자리</span>
+        <span><b>27</b> 🧪 문제 예시</span>
+      </div>
+      <ol class="ladder"><li><b>T1</b>(자연수)÷(자연수)의 몫을 분수로<small>초6</small></li><li><b>T2</b>(진분수)÷(자연수)<small>초6</small></li><li><b>T3</b>(대분수)÷(자연수)<small>초6</small></li><li><b>T4</b>분모가 같은 (분수)÷(분수)<small>초6</small></li><li><b>T5</b>분모가 다른 (분수)÷(분수)<small>초6</small></li><li><b>T6</b>(자연수)÷(분수)<small>초6</small></li><li><b>T7</b>(분수)÷(분수)를 곱셈으로<small>초6</small></li><li><b>T8</b>대분수의 나눗셈<small>초6</small></li><li><b>T9</b>⭐ 분수의 나눗셈 활용<small>초6</small></li></ol>
+      <ul class="how">
+        <li><b>📘 배움</b> — 진우가 앱에서 읽는 것. <b>한 장 = 한 화면</b>, 짧은 설명 → 확인 질문 → 다음 장. 범위는 미래엔 6-1·6-2 지도서 「분수의 나눗셈」 학습 흐름도와 2022 개정 성취기준 [6수01-10] (자연수)÷(자연수)의 몫을 분수로 · [6수01-11] 분수의 나눗셈의 계산 원리를 탐구하고 계산하기입니다. T1~T3은 6-1, T4~T9는 6-2 차시 순서 그대로입니다. <b>"뒤집어 곱한다"는 말은 T7에서 처음</b> 씁니다 — 앞 칸은 통분(T5)과 "1만큼 구하기"(T6)로 까닭을 먼저 쌓습니다(테스트로 막았습니다)</li>
+        <li><b>➗ 막대 그림</b> — 교과서처럼 막대로 보여 줍니다. <b>덜어 내기</b>(6/7 ÷ 2/7 — 2칸씩 묶어 ①②③, 남으면 "나머지"), <b>똑같이 나누기</b>(3/5 ÷ 2 — 칸마다 한 번 더 나눠 진한 칸이 한 사람 몫), <b>1만큼</b>(6 ÷ 2/3 — 2칸이 6이면 3칸은?). 그림이 있는 장은 글에 같은 식이 나오고, "3묶음"처럼 글이 말하는 묶음 수도 그림과 맞춰 봤습니다. ① 계산 문제에는 그림을 넣지 않습니다(답을 흘려서)</li>
+        <li><b>풀이 표기</b> — 계산은 한 줄에 한 단계씩 "= …"로 내려 씁니다(폰에서 식 한가운데가 끊기지 않게). 답은 진분수·대분수·자연수로 약분해서 씁니다. 앱의 숫자판에서는 <b>약분 안 한 답도 맞음</b>으로 치고 "약분하면 …" 한 줄을 띄웁니다(2022 성취기준 고려사항과 같습니다). "분수로", "대분수로"를 묻는 문제만 꼴까지 봅니다</li>
+        <li><b>🧪 문제 예시</b> — 앱이 숫자를 바꿔 가며 끝없이 만드는 문제 중 몇 개입니다. 오답은 <b>아이가 실제로 하는 틀린 생각</b>입니다 (나누는 수를 분자로 씀 · 1을 나눈 몫만 씀 · 나머지를 버림 · 나누지 않고 분자에 곱함 · 분모를 빠뜨림 · 대분수의 자연수 부분을 빠뜨림·잘못 바꿈 · 분모를 그대로 둠 · 거꾸로 나눔 · 통분하지 않고 분자끼리 나눔 · 나누기를 곱하기로 · 단위분수만큼에서 멈춤 · 나누는 분수를 그대로 곱함 · 앞 분수를 뒤집음 · 자연수 부분은 그대로 둠 · 몇 배를 거꾸로 · "분수로 나누면 늘 커진다")</li>
+        <li><b>🔢 숫자판</b> — 답이 수 하나인 ① 문제는 앱에서 숫자판(수·분수·대분수 칸)으로 직접 씁니다. 곱셈식 고르기·몫의 크기 고르기는 보기를 고릅니다</li>
+        <li><b>👨 아빠 카드</b> — 저녁 10분에 처음 소개할 때 쓰는 반 장. 종이 띠 접기·페트병 물 떠내기·계량컵·물통·부엌 저울·카드 놀이처럼 집에서 실제로 할 수 있는 활동인지, 아버님 말투에 맞는지</li>
+        <li>확인 질문 39개는 테스트가 <b>문제 글을 따로 읽어</b> 분수 계산기로 다시 풀었고, 오답 보기 하나하나가 어느 틀린 셈에서 나왔는지도 대조했습니다. 배움 글·까닭·아빠 카드의 <b>셈식 줄 95곳</b>도 "= …"로 이어지는 줄까지 다시 계산했습니다</li>
+      </ul>
+      <p>고칠 곳은 번호로 가리켜 주시면 됩니다. 예) <code>T3-2 설명이 길다</code>, <code>T4-1✓ 그림이 작다</code>, <code>T6-①a 이 오답은 안 나올 것 같다</code>, <code>T8-👨함정1</code></p>
+      <label class="toggle"><input type="checkbox" id="ans" checked> 정답·오개념 이름 보이기 (끄면 진우가 보는 모양)</label>
+    </div>
+    <div class="box dadbox">
+      <h3>👨 이 줄기에서 제일 중요한 한 가지</h3>
+      <p>"뒤집어 곱하기"는 외우면 금방이지만, 외우기만 하면 <b>어느 분수를 뒤집는지·대분수를 먼저 바꿔야 하는지</b>에서 무너집니다(10월 1일 📊 사진 — A 줄기 "분수 ÷ 분수" 30문제 중 6개, 오답이 세 오개념에 고르게 = 찍기). 그래서 이 줄기는 <b>덜어 내기(몇 번 들어가나) → 통분해서 분자끼리 → 1만큼 구하기 → 그래서 뒤집어 곱하기</b> 순서로 까닭을 쌓습니다.</p>
+      <p>또 하나는 <b>"나누면 늘 작아진다"</b>는 생각입니다. 1보다 작은 수로 나누면 몫이 커진다는 것을 T6·T9에서 계속 확인합니다. 답이 나오면 <b>몫 × 나누는 수 = 나누어지는 수</b>로 확인하는 습관도 함께 들입니다.</p>
+      <p>A 분수 줄기(통분·분수 × 분수까지)를 먼저 하면 쉽습니다. A의 나눗셈 두 칸은 그대로 두었습니다(진우 기록 보존).</p>
+      <p style="margin-top:10px"><b>예시 출연진</b>: 앱에서는 진우가 도감에서 잡은 포켓몬이 들어갑니다. 이 페이지는 피카츄·리자몽·개굴닌자·루카리오 등을 예시로 끼웠습니다.</p>
+    </div>
+  </div>
+
+  <section class="concept" id="T1">
+    <header class="ch-head">
+      <div class="ch-no">T1</div>
+      <div>
+        <div class="grade">초6 · 첫 개념</div>
+        <h2>(자연수)÷(자연수)의 몫을 분수로</h2>
+        <p class="idea">나눗셈의 몫은 분수로 나타낼 수 있어요 — <strong>나누어지는 수가 분자, 나누는 수가 분모</strong>. 1 ÷ 4 = <span class="fr"><span class="n">1</span><span class="d">4</span></span> — 3 ÷ 4는 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리 3개라서 <span class="fr"><span class="n">3</span><span class="d">4</span></span>. 7 ÷ 3 = <span class="fr"><span class="n">7</span><span class="d">3</span></span> = <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span>처럼 대분수로도 나타내요. 3 ÷ 4 = 3 × <span class="fr"><span class="n">1</span><span class="d">4</span></span>처럼 곱셈으로도 나타낼 수 있어요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T1-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T1-1</code></div>
+        <div class="say"><p>케이크 1개를 3명이 똑같이 나누어 먹으면 한 명은 얼마를 먹을까요? 1개를 셋으로 나누니까 한 명은 <strong><span class="fr"><span class="n">1</span><span class="d">3</span></span>개</strong>를 먹어요.</p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 18" width="160" height="18" role="img" aria-label="막대 3칸 중 1/3"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="53.3" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="53.3" y="0" width="53.3" height="18" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="106.7" y="0" width="53.3" height="18" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>1 ÷ 3 = <span class="fr"><span class="n">1</span><span class="d">3</span></span></p><p>나눗셈의 몫이 1보다 작아도 분수로 나타낼 수 있어요. 1 ÷ 3은 1을 똑같이 3으로 나눈 것 중 하나 — 바로 <span class="fr"><span class="n">1</span><span class="d">3</span></span>.</p></div>
+        <div class="check" id="T1-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T1-1✓</code></div>
+        <div class="qt"><p>케이크 1개를 4명이 똑같이 나누어 먹으려고 해요. 한 명이 먹는 케이크는 몇 개일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">0</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1개를 넷으로 나누니까 한 명은 <span class="fr"><span class="n">1</span><span class="d">4</span></span>개 — 1 ÷ 4 = <span class="fr"><span class="n">1</span><span class="d">4</span></span>.<br>4개는 거꾸로 나눈 것이고, 0은 &quot;나눌 수 없다&quot;며 나머지를 버린 거예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T1-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T1-2</code></div>
+        <div class="say"><p>케이크 3개를 4명이 똑같이 나누면요? 케이크를 하나씩 4조각으로 잘라 한 조각씩 받으면, 한 명이 받는 것은 <span class="fr"><span class="n">1</span><span class="d">4</span></span>조각이 3개 — <strong><span class="fr"><span class="n">3</span><span class="d">4</span></span>개</strong>.</p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 18" width="160" height="18" role="img" aria-label="막대 4칸 중 3/4"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="40.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="40.0" y="0" width="40.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="80.0" y="0" width="40.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="120.0" y="0" width="40.0" height="18" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p>3 ÷ 4 = <span class="fr"><span class="n">3</span><span class="d">4</span></span></p><p>나누어지는 수 3이 <strong>분자</strong>, 나누는 수 4가 <strong>분모</strong>로 가요.</p></div>
+        <div class="check" id="T1-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T1-2✓</code></div>
+        <div class="qt"><p>나눗셈의 몫을 분수로 나타내면 얼마일까요?</p><p><strong>2 ÷ 7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">7</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">7</span><span class="d">2</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">7</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>나누어지는 수 2가 분자, 나누는 수 7이 분모 — 2 ÷ 7 = <span class="fr"><span class="n">2</span><span class="d">7</span></span>.<br>거꾸로 쓰면 <span class="fr"><span class="n">7</span><span class="d">2</span></span> — 1보다 커져서 이상해요. 1 ÷ 7만 하면 <span class="fr"><span class="n">1</span><span class="d">7</span></span> — 2개를 나눠야 해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T1-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T1-3</code></div>
+        <div class="say"><p>몫이 1보다 클 때도 똑같이 7 ÷ 3 = <span class="fr"><span class="n">7</span><span class="d">3</span></span> — 대분수로 바꾸면 <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span>.</p><p>케이크 7개를 3명이 나누면 먼저 한 명에게 2개씩 주고 1개가 남아요(7 ÷ 3 = 2 … 1). 남은 1개도 셋으로 나눠 <span class="fr"><span class="n">1</span><span class="d">3</span></span>씩 — 그래서 한 명은 <strong>2개와 <span class="fr"><span class="n">1</span><span class="d">3</span></span>개</strong>를 먹어요.</p><p>나머지를 버리면 안 돼요. 나머지도 나누는 수로 나눠 분수 부분이 돼요.</p></div>
+        <div class="check" id="T1-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T1-3✓</code></div>
+        <div class="qt"><p>나눗셈의 몫을 대분수로 나타내면 얼마일까요?</p><p><strong>11 ÷ 4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">2<span class="fr"><span class="n">3</span><span class="d">4</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">3</span><span class="d">11</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>11 ÷ 4 = 2 … 3 — 나머지 3도 4로 나누면 <span class="fr"><span class="n">3</span><span class="d">4</span></span>. 그래서 <span class="mx">2<span class="fr"><span class="n">3</span><span class="d">4</span></span></span>.<br>나머지를 버리면 2, 나머지를 11로 나누면 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T1-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T1-4</code></div>
+        <div class="say"><p>3 ÷ 4는 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리가 3개 — 그래서 곱셈으로도 쓸 수 있어요.</p><p>3 ÷ 4 = 3 × <span class="fr"><span class="n">1</span><span class="d">4</span></span></p><p><strong>÷ 4 → × <span class="fr"><span class="n">1</span><span class="d">4</span></span></strong> — 나누는 수를 분모로 하는 단위분수를 곱해요. 4 ÷ 7 = 4 × <span class="fr"><span class="n">1</span><span class="d">7</span></span>, 2 ÷ 9 = 2 × <span class="fr"><span class="n">1</span><span class="d">9</span></span>.</p></div>
+        <div class="check" id="T1-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T1-4✓</code></div>
+        <div class="qt"><p>나눗셈을 곱셈으로 나타내려고 해요. □ 안에 알맞은 수는 얼마일까요?</p><p><strong>5 ÷ 6 = 5 × □</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">6</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">6</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">5</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>÷ 6 → × <span class="fr"><span class="n">1</span><span class="d">6</span></span> — 나누는 수 6이 분모예요.<br>× 6을 하면 오히려 커지고, <span class="fr"><span class="n">1</span><span class="d">5</span></span> — 나누어지는 수 5로 만든 분수라 틀려요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T1-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T1-📏</code></div><p>나누어지는 수는 분자, 나누는 수는 분모 — 3 ÷ 4 = <span class="fr"><span class="n">3</span><span class="d">4</span></span> = 3 × <span class="fr"><span class="n">1</span><span class="d">4</span></span>.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T1-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T1-①a</code></div>
+      <div class="say"><p>나눗셈의 몫을 대분수로 나타내면 얼마일까요?</p><p><strong>8 ÷ 3</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">8</span></span></span><span class="tag">나누는 수를 분자로 씀</span></li><li class="no"><span class="mark"></span><span class="txt">2</span><span class="tag">나머지를 버림</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">3</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">4</span></span></span></span><span class="tag">나머지를 나누어지는 수로 나눔</span></li></ol>
+    </div><div class="sample" id="T1-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T1-①b</code></div>
+      <div class="say"><p>나눗셈을 곱셈으로 나타내려고 해요. □ 안에 알맞은 수는 얼마일까요?</p><p><strong>9 ÷ 4 = 9 × □</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">9</span></span></span><span class="tag">나누어지는 수를 분모로 씀</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span></span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">나누는 수를 그대로 곱함</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li></ol>
+    </div><div class="sample" id="T1-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T1-②</code></div>
+      <div class="say"><p>나눗셈 17 ÷ 3의 몫을 대분수로 나타내요.</p><p>리자몽이 이렇게 말했어요.</p><p><strong>17 ÷ 3 = <span class="mx">5<span class="fr"><span class="n">2</span><span class="d">17</span></span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">나머지 2도 나누는 수 3으로 나눠요 — <span class="mx">5<span class="fr"><span class="n">2</span><span class="d">3</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt">나누어떨어지지 않으면 분수로 나타낼 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">나머지는 버려서 5</span><span class="tag">나머지를 버림</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T1-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T1-👨</code></div>
+    <h3>나눗셈의 몫이 분수가 되는 뜻(3 ÷ 4는 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리가 3개)과, 나누어지는 수가 분자로 간다는 것을 손으로 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T1-👨말1"><code class="mini">말1</code><span>&quot;케이크 3개를 4명이 나누면 한 명이 1개를 다 먹을 수 있을까? 그럼 얼마일까?&quot;</span></li><li id="T1-👨말2"><code class="mini">말2</code><span>&quot;나누어지는 수가 위(분자)로 가, 아래(분모)로 가?&quot;</span></li><li id="T1-👨말3"><code class="mini">말3</code><span>&quot;7개를 3명이 나누면 2개씩 주고 1개 남지? 남은 1개는 어떻게 하지?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이 띠 3장을 케이크라고 해요. 4명이 나눈다고 하고 띠마다 4칸으로 접어 한 사람 몫(한 칸씩)을 색칠해 모아 보면 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리 3개 — <span class="fr"><span class="n">3</span><span class="d">4</span></span>개. 띠 7장을 3명이 나누는 것도 해 보면 2개와 <span class="fr"><span class="n">1</span><span class="d">3</span></span>개가 돼요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T1-👨함정1"><code class="mini">함정1</code><div><div class="kid">3 ÷ 4를 거꾸로 써서 분모에 3, 분자에 4를 쓴다</div><div class="dadsay">→ &quot;그러면 1보다 커. 케이크 3개를 4명이 나누는데 한 명이 1개보다 많이 먹을 수 있을까?&quot;</div></div></li><li id="T1-👨함정2"><code class="mini">함정2</code><div><div class="kid">7 ÷ 3 = 2 나머지 1에서 멈춘다</div><div class="dadsay">→ &quot;남은 1개도 셋이 나눌 수 있어. 1 ÷ 3은?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">5 ÷ 8의 몫을 분수로, 9 ÷ 4의 몫을 대분수로 나타내고 어떻게 구했는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="T2">
+    <header class="ch-head">
+      <div class="ch-no">T2</div>
+      <div>
+        <div class="grade">초6 · T1 다음</div>
+        <h2>(진분수)÷(자연수)</h2>
+        <p class="idea">분자가 자연수로 나누어떨어지면 <strong>분자를 나눠요</strong> — <span class="fr"><span class="n">4</span><span class="d">5</span></span> ÷ 2 = <span class="fr"><span class="n">2</span><span class="d">5</span></span>. 나누어떨어지지 않으면 <strong>크기가 같은 분수로 바꿔</strong> 분자를 나눠요 — <span class="fr"><span class="n">3</span><span class="d">5</span></span> ÷ 2 = <span class="fr"><span class="n">6</span><span class="d">10</span></span> ÷ 2 = <span class="fr"><span class="n">3</span><span class="d">10</span></span>. ÷ 2는 곱셈 × <span class="fr"><span class="n">1</span><span class="d">2</span></span> — <span class="fr"><span class="n">3</span><span class="d">5</span></span> ÷ 2 = <span class="fr"><span class="n">3</span><span class="d">5</span></span> × <span class="fr"><span class="n">1</span><span class="d">2</span></span> = <span class="fr"><span class="n">3</span><span class="d">10</span></span>.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T2-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T2-1</code></div>
+        <div class="say"><p><span class="fr"><span class="n">4</span><span class="d">5</span></span> ÷ 2 — <span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리 4조각을 두 사람이 똑같이 나누면 한 사람은 <span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리 2조각 — <span class="fr"><span class="n">2</span><span class="d">5</span></span>.</p><div class="fig"><svg class="frac-fig" viewBox="0 0 160 18" width="160" height="18" role="img" aria-label="막대 5칸 중 4/5"><g shape-rendering="crispEdges"><rect x="0.0" y="0" width="32.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="32.0" y="0" width="32.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="64.0" y="0" width="32.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="96.0" y="0" width="32.0" height="18" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/><rect x="128.0" y="0" width="32.0" height="18" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.55" stroke-width="1"/></g></svg></div><p><span class="fr"><span class="n">4</span><span class="d">5</span></span> ÷ 2 = <span class="fr"><span class="n">2</span><span class="d">5</span></span></p><p>분자가 나누는 수로 나누어떨어지면 <strong>분자만 나눠요</strong>. 분모는 그대로 — 조각의 크기는 그대로고 개수만 줄어요.</p></div>
+        <div class="check" id="T2-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T2-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">6</span><span class="d">7</span></span> ÷ 3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">7</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">4</span><span class="d">7</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>분자 6을 3으로 나누면 2 — <span class="fr"><span class="n">1</span><span class="d">7</span></span>짜리 2조각이니까 <span class="fr"><span class="n">2</span><span class="d">7</span></span>.<br>분모를 빼면 2, 곱하면 오히려 커져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T2-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T2-2</code></div>
+        <div class="say"><p><span class="fr"><span class="n">3</span><span class="d">5</span></span> ÷ 2는요? <span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리 3조각을 둘로 나누면 1조각 반씩 — 조각으로 딱 나누어떨어지지 않아요.</p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="share" data-n="3" data-d="5" data-k="2" viewBox="0 0 400 94" width="500" height="118" role="img" aria-label="막대: 5칸 중 3칸을 칠하고 칸마다 2줄로 나눠 한 줄씩 — 작은 칸 3개"><rect class="fb-c" x="30.0" y="10.0" width="68.0" height="36.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.3" data-on="1" data-pick="0" data-c="0" data-r="0"/><rect class="fb-c" x="30.0" y="46.0" width="68.0" height="36.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1" data-pick="1" data-c="0" data-r="1"/><rect class="fb-c" x="98.0" y="10.0" width="68.0" height="36.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.3" data-on="1" data-pick="0" data-c="1" data-r="0"/><rect class="fb-c" x="98.0" y="46.0" width="68.0" height="36.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1" data-pick="1" data-c="1" data-r="1"/><rect class="fb-c" x="166.0" y="10.0" width="68.0" height="36.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.3" data-on="1" data-pick="0" data-c="2" data-r="0"/><rect class="fb-c" x="166.0" y="46.0" width="68.0" height="36.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1" data-pick="1" data-c="2" data-r="1"/><rect class="fb-c" x="234.0" y="10.0" width="68.0" height="36.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="3" data-r="0"/><rect class="fb-c" x="234.0" y="46.0" width="68.0" height="36.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="3" data-r="1"/><rect class="fb-c" x="302.0" y="10.0" width="68.0" height="36.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="4" data-r="0"/><rect class="fb-c" x="302.0" y="46.0" width="68.0" height="36.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="4" data-r="1"/><rect x="30" y="10" width="340" height="72.0" fill="none" stroke="currentColor" stroke-width="2"/><line x1="98.0" y1="10" x2="98.0" y2="82.0" stroke="currentColor" stroke-width="1.6"/><line x1="166.0" y1="10" x2="166.0" y2="82.0" stroke="currentColor" stroke-width="1.6"/><line x1="234.0" y1="10" x2="234.0" y2="82.0" stroke="currentColor" stroke-width="1.6"/><line x1="302.0" y1="10" x2="302.0" y2="82.0" stroke="currentColor" stroke-width="1.6"/></svg></div><p>그럴 땐 조각을 더 잘게 — 칸마다 반으로 자르면 <span class="fr"><span class="n">1</span><span class="d">10</span></span>짜리 6조각이 돼요(<span class="fr"><span class="n">3</span><span class="d">5</span></span> = <span class="fr"><span class="n">6</span><span class="d">10</span></span>). 6조각을 둘이 나누면 3조각씩!</p><p><span class="fr"><span class="n">3</span><span class="d">5</span></span> ÷ 2<br>= <span class="fr"><span class="n">6</span><span class="d">10</span></span> ÷ 2<br>= <span class="fr"><span class="n">3</span><span class="d">10</span></span></p><p><strong>크기가 같은 분수로 바꿔</strong> 분자를 나눠요. 그림의 진한 칸이 한 사람 몫이에요.</p></div>
+        <div class="check" id="T2-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T2-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">15</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">3</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">3<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">2</span><span class="d">3</span></span> = <span class="fr"><span class="n">10</span><span class="d">15</span></span> — 분자 10을 5로 나누면 2, 그래서 <span class="fr"><span class="n">2</span><span class="d">15</span></span>.<br>바꾸기만 하고 멈추면 <span class="fr"><span class="n">2</span><span class="d">3</span></span> 그대로, 분자에 5를 곱하면 커져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T2-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T2-3</code></div>
+        <div class="say"><p>÷ 2는 &quot;반으로&quot; — 곱셈으로 쓰면 × <span class="fr"><span class="n">1</span><span class="d">2</span></span>. 그래서</p><p><span class="fr"><span class="n">3</span><span class="d">5</span></span> ÷ 2<br>= <span class="fr"><span class="n">3</span><span class="d">5</span></span> × <span class="fr"><span class="n">1</span><span class="d">2</span></span><br>= <span class="fr"><span class="n">3</span><span class="d">10</span></span></p><p><strong>÷ 2 → × <span class="fr"><span class="n">1</span><span class="d">2</span></span>, ÷ 3 → × <span class="fr"><span class="n">1</span><span class="d">3</span></span></strong> — 앞 분수는 그대로 두고, 나누는 자연수만 단위분수로 바꿔 곱해요.</p></div>
+        <div class="check" id="T2-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T2-3✓</code></div>
+        <div class="qt"><p>나눗셈을 곱셈으로 나타낸 것은 어느 것일까요?</p><p><strong><span class="fr"><span class="n">4</span><span class="d">7</span></span> ÷ 3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">4</span><span class="d">7</span></span> × <span class="fr"><span class="n">1</span><span class="d">3</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">4</span><span class="d">7</span></span> × 3</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">7</span><span class="d">4</span></span> × <span class="fr"><span class="n">1</span><span class="d">3</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>앞 분수는 그대로 <span class="fr"><span class="n">4</span><span class="d">7</span></span> — 바뀌는 것은 ÷ 3뿐이에요. ÷ 3 → × <span class="fr"><span class="n">1</span><span class="d">3</span></span>.<br>× 3을 하면 오히려 커지고, 앞 분수의 분모와 분자를 바꾸면 안 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T2-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T2-4</code></div>
+        <div class="say"><p>주스가 <span class="fr"><span class="n">3</span><span class="d">4</span></span> L 있어요. 컵 2개에 똑같이 나누어 담으면 한 컵에는</p><p><span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ 2<br>= <span class="fr"><span class="n">6</span><span class="d">8</span></span> ÷ 2<br>= <span class="fr"><span class="n">3</span><span class="d">8</span></span></p><p><span class="fr"><span class="n">3</span><span class="d">8</span></span> L씩. 2 이상인 자연수로 나누면 몫은 처음보다 작아져요 — 나누었는데 커졌다면 어딘가 틀린 거예요.</p></div>
+        <div class="check" id="T2-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T2-4✓</code></div>
+        <div class="qt"><p>주스가 <span class="fr"><span class="n">2</span><span class="d">5</span></span> L 있어요. 이 주스를 컵 3개에 똑같이 나누어 담으면 한 컵에 몇 L씩 담게 될까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">15</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">5</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">2</span><span class="d">5</span></span> ÷ 3 = <span class="fr"><span class="n">6</span><span class="d">15</span></span> ÷ 3 = <span class="fr"><span class="n">2</span><span class="d">15</span></span>.<br>곱하면 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span> — 처음보다 커지니까 틀린 거예요. <span class="fr"><span class="n">2</span><span class="d">5</span></span> 그대로면 나누지 않은 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T2-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T2-📏</code></div><p>분자를 자연수로 나눠요 — 나누어떨어지지 않으면 크기가 같은 분수로 바꿔서 (÷ 2 → × <span class="fr"><span class="n">1</span><span class="d">2</span></span>).</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T2-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T2-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">12</span><span class="d">13</span></span> ÷ 3</strong></p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">4</span><span class="d">13</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">5</span><span class="d">13</span></span></span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">4</span><span class="tag">분모를 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">10</span><span class="d">13</span></span></span></span><span class="tag">나누지 않고 분자에 곱함</span></li></ol>
+    </div><div class="sample" id="T2-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T2-①b</code></div>
+      <div class="say"><p>길이가 <span class="fr"><span class="n">5</span><span class="d">8</span></span> m인 끈을 3도막으로 똑같이 자르면 한 도막은 몇 m일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">5</span><span class="d">8</span></span></span><span class="tag">크기가 같은 분수로 바꾸기만 하고 나누지 않음</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">7</span><span class="d">8</span></span></span></span><span class="tag">나누지 않고 분자에 곱함</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">5</span><span class="d">24</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="T2-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T2-②</code></div>
+      <div class="say"><p>그림을 보고 나눗셈을 계산해요.</p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="share" data-n="2" data-d="7" data-k="3" viewBox="0 0 400 94" width="500" height="118" role="img" aria-label="막대: 7칸 중 2칸을 칠하고 칸마다 3줄로 나눠 한 줄씩 — 작은 칸 2개"><rect class="fb-c" x="30.0" y="10.0" width="48.6" height="24.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.3" data-on="1" data-pick="0" data-c="0" data-r="0"/><rect class="fb-c" x="30.0" y="34.0" width="48.6" height="24.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.3" data-on="1" data-pick="0" data-c="0" data-r="1"/><rect class="fb-c" x="30.0" y="58.0" width="48.6" height="24.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1" data-pick="1" data-c="0" data-r="2"/><rect class="fb-c" x="78.6" y="10.0" width="48.6" height="24.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.3" data-on="1" data-pick="0" data-c="1" data-r="0"/><rect class="fb-c" x="78.6" y="34.0" width="48.6" height="24.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.3" data-on="1" data-pick="0" data-c="1" data-r="1"/><rect class="fb-c" x="78.6" y="58.0" width="48.6" height="24.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1" data-pick="1" data-c="1" data-r="2"/><rect class="fb-c" x="127.1" y="10.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="2" data-r="0"/><rect class="fb-c" x="127.1" y="34.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="2" data-r="1"/><rect class="fb-c" x="127.1" y="58.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="2" data-r="2"/><rect class="fb-c" x="175.7" y="10.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="3" data-r="0"/><rect class="fb-c" x="175.7" y="34.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="3" data-r="1"/><rect class="fb-c" x="175.7" y="58.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="3" data-r="2"/><rect class="fb-c" x="224.3" y="10.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="4" data-r="0"/><rect class="fb-c" x="224.3" y="34.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="4" data-r="1"/><rect class="fb-c" x="224.3" y="58.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="4" data-r="2"/><rect class="fb-c" x="272.9" y="10.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="5" data-r="0"/><rect class="fb-c" x="272.9" y="34.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="5" data-r="1"/><rect class="fb-c" x="272.9" y="58.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="5" data-r="2"/><rect class="fb-c" x="321.4" y="10.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="6" data-r="0"/><rect class="fb-c" x="321.4" y="34.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="6" data-r="1"/><rect class="fb-c" x="321.4" y="58.0" width="48.6" height="24.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0" data-pick="0" data-c="6" data-r="2"/><rect x="30" y="10" width="340" height="72.0" fill="none" stroke="currentColor" stroke-width="2"/><line x1="78.6" y1="10" x2="78.6" y2="82.0" stroke="currentColor" stroke-width="1.6"/><line x1="127.1" y1="10" x2="127.1" y2="82.0" stroke="currentColor" stroke-width="1.6"/><line x1="175.7" y1="10" x2="175.7" y2="82.0" stroke="currentColor" stroke-width="1.6"/><line x1="224.3" y1="10" x2="224.3" y2="82.0" stroke="currentColor" stroke-width="1.6"/><line x1="272.9" y1="10" x2="272.9" y2="82.0" stroke="currentColor" stroke-width="1.6"/><line x1="321.4" y1="10" x2="321.4" y2="82.0" stroke="currentColor" stroke-width="1.6"/></svg></div><p>피카츄가 이렇게 말했어요.</p><p><strong><span class="fr"><span class="n">2</span><span class="d">7</span></span> ÷ 3 = <span class="fr"><span class="n">6</span><span class="d">21</span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">바꾼 다음 분자를 3으로 나눠야 해요 — <span class="fr"><span class="n">6</span><span class="d">21</span></span> ÷ 3 = <span class="fr"><span class="n">2</span><span class="d">21</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">분자에 3을 곱해서 <span class="fr"><span class="n">6</span><span class="d">7</span></span></span><span class="tag">나누지 않고 분자에 곱함</span></li><li class="no"><span class="mark"></span><span class="txt">분자가 나누어떨어지지 않으면 계산할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T2-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T2-👨</code></div>
+    <h3>분수를 자연수로 나누면 조각의 수를 나누고, 안 나누어지면 조각을 더 잘게 자른다는 것을 손으로 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T2-👨말1"><code class="mini">말1</code><span>&quot;<span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리 4조각을 둘이 나누면 한 사람은 몇 조각?&quot;</span></li><li id="T2-👨말2"><code class="mini">말2</code><span>&quot;3조각은 둘로 딱 안 나뉘지? 조각을 반으로 자르면?&quot;</span></li><li id="T2-👨말3"><code class="mini">말3</code><span>&quot;나눴는데 처음보다 커지면 이상하지 않아?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이 띠를 5칸으로 접고 3칸을 색칠해요(<span class="fr"><span class="n">3</span><span class="d">5</span></span>). 두 사람이 나누려면? 띠를 가로로 한 번 더 접으면 작은 칸이 10개 — 색칠한 곳의 작은 칸 6개를 3개씩 나누면 한 사람 몫은 <span class="fr"><span class="n">3</span><span class="d">10</span></span>.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T2-👨함정1"><code class="mini">함정1</code><div><div class="kid"><span class="fr"><span class="n">3</span><span class="d">5</span></span> ÷ 2를 계산하며 분자 3에 2를 곱한다</div><div class="dadsay">→ &quot;나눴는데 1보다 커졌네? 반으로 나누면 작아져야 하지 않을까?&quot;</div></div></li><li id="T2-👨함정2"><code class="mini">함정2</code><div><div class="kid"><span class="fr"><span class="n">4</span><span class="d">5</span></span> ÷ 2의 답을 분모 없이 2라고 쓴다</div><div class="dadsay">→ &quot;2는 무엇 2개야? <span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리 2개 — 분모를 붙여야지.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ 3과 <span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ 4를 그림이나 크기가 같은 분수로 풀고 몫이 처음보다 작은지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="T3">
+    <header class="ch-head">
+      <div class="ch-no">T3</div>
+      <div>
+        <div class="grade">초6 · T2 다음</div>
+        <h2>(대분수)÷(자연수)</h2>
+        <p class="idea">대분수는 <strong>가분수로 바꾼 다음</strong> 나눠요. <span class="mx">2<span class="fr"><span class="n">2</span><span class="d">5</span></span></span> ÷ 3 = <span class="fr"><span class="n">12</span><span class="d">5</span></span> ÷ 3 = <span class="fr"><span class="n">4</span><span class="d">5</span></span>. 분자가 나누어떨어지지 않으면 진분수처럼 크기가 같은 분수로 — <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span> ÷ 2 = <span class="fr"><span class="n">7</span><span class="d">3</span></span> ÷ 2 = <span class="fr"><span class="n">14</span><span class="d">6</span></span> ÷ 2 = <span class="fr"><span class="n">7</span><span class="d">6</span></span> = <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">6</span></span></span>.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T3-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T3-1</code></div>
+        <div class="say"><p>대분수를 자연수로 나눌 때는 먼저 <strong>가분수로 바꿔요</strong>.</p><p><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">5</span></span></span> — 자연수 2는 <span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리 10개, 거기에 2개를 더하면 <span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리 12개.</p><p><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">5</span></span></span> = (2 × 5 + 2)/5 = <span class="fr"><span class="n">12</span><span class="d">5</span></span></p><p>그다음은 진분수처럼 분자를 나눠요.</p><p><span class="fr"><span class="n">12</span><span class="d">5</span></span> ÷ 3 = <span class="fr"><span class="n">4</span><span class="d">5</span></span></p></div>
+        <div class="check" id="T3-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T3-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="mx">1<span class="fr"><span class="n">3</span><span class="d">4</span></span></span> ÷ 7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">28</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">7</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">1<span class="fr"><span class="n">3</span><span class="d">4</span></span></span> = <span class="fr"><span class="n">7</span><span class="d">4</span></span> — 분자 7을 7로 나누면 1, 그래서 <span class="fr"><span class="n">1</span><span class="d">4</span></span>.<br>자연수 1을 빼먹으면 <span class="fr"><span class="n">3</span><span class="d">28</span></span>, 자연수와 분자를 더하기만 하면 (1 + 3)/4 = 1 — 그래서 <span class="fr"><span class="n">1</span><span class="d">7</span></span>. 둘 다 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T3-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T3-2</code></div>
+        <div class="say"><p><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span> ÷ 2 — 가분수로 바꾸면 <span class="fr"><span class="n">7</span><span class="d">3</span></span>, 분자 7은 2로 나누어떨어지지 않아요. 크기가 같은 분수로 바꿔요.</p><p><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span> ÷ 2<br>= <span class="fr"><span class="n">7</span><span class="d">3</span></span> ÷ 2<br>= <span class="fr"><span class="n">14</span><span class="d">6</span></span> ÷ 2<br>= <span class="fr"><span class="n">7</span><span class="d">6</span></span><br>= <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">6</span></span></span></p></div>
+        <div class="check" id="T3-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T3-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">2</span></span></span> ÷ 4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">8</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">8</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">6</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">2</span></span></span> = <span class="fr"><span class="n">3</span><span class="d">2</span></span><br><span class="fr"><span class="n">3</span><span class="d">2</span></span> ÷ 4 = <span class="fr"><span class="n">12</span><span class="d">8</span></span> ÷ 4 = <span class="fr"><span class="n">3</span><span class="d">8</span></span>.<br>자연수 1을 빼먹으면 <span class="fr"><span class="n">1</span><span class="d">8</span></span>, 4를 곱하면 6 — 나눴는데 커졌어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T3-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T3-3</code></div>
+        <div class="say"><p><span class="mx">4<span class="fr"><span class="n">2</span><span class="d">7</span></span></span> ÷ 2 — 자연수 4만 반으로 나눠 <span class="mx">2<span class="fr"><span class="n">2</span><span class="d">7</span></span></span>… 이러면 틀려요. 분수 부분도 반으로 나눠야 하니까요.</p><p>가분수로 바꾸면 빠뜨릴 걱정이 없어요.</p><p><span class="mx">4<span class="fr"><span class="n">2</span><span class="d">7</span></span></span> ÷ 2<br>= <span class="fr"><span class="n">30</span><span class="d">7</span></span> ÷ 2<br>= <span class="fr"><span class="n">15</span><span class="d">7</span></span><br>= <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">7</span></span></span></p></div>
+        <div class="check" id="T3-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T3-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="mx">3<span class="fr"><span class="n">3</span><span class="d">5</span></span></span> ÷ 3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">3</span><span class="d">5</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">5</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">3<span class="fr"><span class="n">3</span><span class="d">5</span></span></span> = <span class="fr"><span class="n">18</span><span class="d">5</span></span><br><span class="fr"><span class="n">18</span><span class="d">5</span></span> ÷ 3 = <span class="fr"><span class="n">6</span><span class="d">5</span></span> = <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span>.<br>자연수만 나누면 <span class="mx">1<span class="fr"><span class="n">3</span><span class="d">5</span></span></span>, 자연수를 빼먹으면 <span class="fr"><span class="n">1</span><span class="d">5</span></span> — 둘 다 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T3-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T3-4</code></div>
+        <div class="say"><p>밀가루가 <span class="mx">2<span class="fr"><span class="n">2</span><span class="d">3</span></span></span> kg 있어요. 봉지 4개에 똑같이 나누어 담으면</p><p><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">3</span></span></span> ÷ 4<br>= <span class="fr"><span class="n">8</span><span class="d">3</span></span> ÷ 4<br>= <span class="fr"><span class="n">2</span><span class="d">3</span></span></p><p>한 봉지에 <span class="fr"><span class="n">2</span><span class="d">3</span></span> kg씩. 확인: <span class="fr"><span class="n">2</span><span class="d">3</span></span> × 4 = <span class="fr"><span class="n">8</span><span class="d">3</span></span> = <span class="mx">2<span class="fr"><span class="n">2</span><span class="d">3</span></span></span> ✔</p></div>
+        <div class="check" id="T3-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T3-4✓</code></div>
+        <div class="qt"><p>밀가루가 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> kg 있어요. 봉지 5개에 똑같이 나누어 담으면 한 봉지에 몇 kg씩 담게 될까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">20</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">10</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> = <span class="fr"><span class="n">5</span><span class="d">4</span></span> — 분자 5를 5로 나누면 1, 그래서 <span class="fr"><span class="n">1</span><span class="d">4</span></span> kg씩.<br>자연수 1을 빼먹으면 <span class="fr"><span class="n">1</span><span class="d">20</span></span>, 가분수로 잘못 바꾸면 <span class="fr"><span class="n">1</span><span class="d">10</span></span> — 틀려요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T3-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T3-📏</code></div><p>대분수 → 가분수(자연수 × 분모 + 분자) → 분자를 나눠요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T3-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T3-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="mx">3<span class="fr"><span class="n">1</span><span class="d">6</span></span></span> ÷ 3</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="mx">9<span class="fr"><span class="n">1</span><span class="d">2</span></span></span></span><span class="tag">나누지 않고 분자에 곱함</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">18</span></span></span><span class="tag">자연수 부분을 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">9</span></span></span><span class="tag">가분수로 잘못 바꿈</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">18</span></span></span></span></li></ol>
+    </div><div class="sample" id="T3-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T3-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="mx">2<span class="fr"><span class="n">6</span><span class="d">7</span></span></span> ÷ 5</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">6</span><span class="d">35</span></span></span><span class="tag">자연수 부분을 빠뜨림</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">4</span><span class="d">7</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">14<span class="fr"><span class="n">2</span><span class="d">7</span></span></span></span><span class="tag">나누지 않고 분자에 곱함</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">8</span><span class="d">35</span></span></span><span class="tag">가분수로 잘못 바꿈</span></li></ol>
+    </div><div class="sample" id="T3-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T3-②</code></div>
+      <div class="say"><p>나눗셈을 계산해요.</p><p>개굴닌자가 이렇게 말했어요.</p><p><strong><span class="mx">2<span class="fr"><span class="n">6</span><span class="d">7</span></span></span> ÷ 4 = <span class="fr"><span class="n">8</span><span class="d">7</span></span> ÷ 4 = <span class="fr"><span class="n">2</span><span class="d">7</span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">대분수는 가분수로 바꿀 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">2<span class="fr"><span class="n">6</span><span class="d">7</span></span></span> = <span class="fr"><span class="n">20</span><span class="d">7</span></span> — <span class="fr"><span class="n">20</span><span class="d">7</span></span> ÷ 4 = <span class="fr"><span class="n">5</span><span class="d">7</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">자연수 2는 빼고 <span class="fr"><span class="n">6</span><span class="d">7</span></span> ÷ 4 = <span class="fr"><span class="n">3</span><span class="d">14</span></span></span><span class="tag">자연수 부분을 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T3-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T3-👨</code></div>
+    <h3>대분수를 나눌 때 가분수로 바꾸면 자연수 부분을 빠뜨리지 않는다는 것을 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T3-👨말1"><code class="mini">말1</code><span>&quot;2와 <span class="fr"><span class="n">2</span><span class="d">5</span></span> — 자연수 2는 <span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리 몇 개일까?&quot;</span></li><li id="T3-👨말2"><code class="mini">말2</code><span>&quot;자연수만 반으로 나누고 끝내면 분수 부분은 누가 나눠?&quot;</span></li><li id="T3-👨말3"><code class="mini">말3</code><span>&quot;다 나누고 나서 다시 곱해 보면 처음 수가 나와?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이 띠 2장에 <span class="fr"><span class="n">2</span><span class="d">5</span></span>만큼 색칠한 띠 한 장을 더하면 2와 <span class="fr"><span class="n">2</span><span class="d">5</span></span> — 대분수가 돼요. 띠를 모두 5칸으로 접어 세면 12칸 — <span class="fr"><span class="n">12</span><span class="d">5</span></span>. 이걸 세 사람이 나누면 한 사람 4칸 — <span class="fr"><span class="n">4</span><span class="d">5</span></span>.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T3-👨함정1"><code class="mini">함정1</code><div><div class="kid"><span class="mx">4<span class="fr"><span class="n">2</span><span class="d">7</span></span></span> ÷ 2에서 자연수 4만 반으로 나누고 분수 부분은 그대로 쓴다</div><div class="dadsay">→ &quot;분수 부분도 둘이 나눠 가져야지. 가분수로 바꿔서 해 볼까?&quot;</div></div></li><li id="T3-👨함정2"><code class="mini">함정2</code><div><div class="kid">대분수를 가분수로 바꿀 때 자연수와 분자를 더하기만 한다</div><div class="dadsay">→ &quot;자연수 1은 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리 몇 개였지? 1 × 4개야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span> ÷ 2를 가분수로 바꿔 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">6</span></span></span>까지 구하고, <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">6</span></span></span> × 2로 처음 수가 나오는지 확인하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="T4">
+    <header class="ch-head">
+      <div class="ch-no">T4</div>
+      <div>
+        <div class="grade">초6 · T3 다음</div>
+        <h2>분모가 같은 (분수)÷(분수)</h2>
+        <p class="idea">분모가 같으면 <strong>분자끼리 나눠요</strong> — <span class="fr"><span class="n">6</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span> = 6 ÷ 2 = 3. <span class="fr"><span class="n">1</span><span class="d">7</span></span>짜리 6칸을 2칸씩 묶으면 3묶음이에요. 나누어떨어지지 않으면 <span class="fr"><span class="n">5</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span> = 5 ÷ 2 = <span class="fr"><span class="n">5</span><span class="d">2</span></span> = <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">2</span></span></span> — 2묶음과 반 묶음.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T4-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T4-1</code></div>
+        <div class="say"><p>분모가 같은 분수끼리 나누는 것은 <strong>몇 번 덜어 낼 수 있나</strong>를 묻는 거예요. <span class="fr"><span class="n">6</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span> — <span class="fr"><span class="n">1</span><span class="d">7</span></span>짜리 6칸을 2칸씩 묶어 봐요.</p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="take" data-a="6" data-b="2" data-d="7" viewBox="0 0 400 74" width="500" height="93" role="img" aria-label="막대: 1을 7칸으로 나눈 막대에 6칸을 칠하고 2칸씩 묶음 — 3묶음"><rect class="fb-c" x="30.0" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><text x="78.6" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">①</text><rect class="fb-c" x="78.6" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><rect class="fb-c" x="127.1" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><text x="175.7" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">②</text><rect class="fb-c" x="175.7" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><rect class="fb-c" x="224.3" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><text x="272.9" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">③</text><rect class="fb-c" x="272.9" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><rect class="fb-c" x="321.4" y="10.0" width="48.6" height="30.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="0"/><text x="22" y="30.0" font-size="13" text-anchor="end" fill="currentColor" fill-opacity="0.7">1</text></svg></div><p>3묶음! 그래서 <span class="fr"><span class="n">6</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span> = 3</p></div>
+        <div class="check" id="T4-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T4-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">8</span><span class="d">9</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">9</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">4</span><span class="d">9</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">1</span><span class="d">9</span></span>짜리 8칸을 2칸씩 묶으면 4묶음 — 8 ÷ 2 = 4.<br>분모를 붙이면 <span class="fr"><span class="n">4</span><span class="d">9</span></span>, 거꾸로 나누면 <span class="fr"><span class="n">1</span><span class="d">4</span></span> — 둘 다 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T4-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T4-2</code></div>
+        <div class="say"><p>분모가 같으면 <strong>분자끼리 나누면</strong> 돼요. 칸의 크기가 같으니까 칸의 수만 보면 되거든요.</p><p><span class="fr"><span class="n">6</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span> = 6 ÷ 2 = 3</p><p>몫은 &quot;몇 번&quot;이라서 분모가 붙지 않아요. <span class="fr"><span class="n">3</span><span class="d">7</span></span>처럼 분모를 붙이면 틀려요.</p></div>
+        <div class="check" id="T4-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T4-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">9</span><span class="d">11</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">11</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">11</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">27</span><span class="d">121</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>분자끼리 나누면 9 ÷ 3 = 3.<br>분모를 붙이면 <span class="fr"><span class="n">3</span><span class="d">11</span></span>, 곱하면 <span class="fr"><span class="n">27</span><span class="d">121</span></span> — 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T4-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T4-3</code></div>
+        <div class="say"><p><span class="fr"><span class="n">5</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span> — 5칸을 2칸씩 묶으면?</p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="take" data-a="5" data-b="2" data-d="7" viewBox="0 0 400 74" width="500" height="93" role="img" aria-label="막대: 1을 7칸으로 나눈 막대에 5칸을 칠하고 2칸씩 묶음 — 2묶음, 나머지 1칸"><rect class="fb-c" x="30.0" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><text x="78.6" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">①</text><rect class="fb-c" x="78.6" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><rect class="fb-c" x="127.1" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><text x="175.7" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">②</text><rect class="fb-c" x="175.7" y="10.0" width="48.6" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><rect class="fb-c" x="224.3" y="10.0" width="48.6" height="30.0" fill="var(--frac-rem, rgba(127,127,127,0.35))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="r" data-on="1"/><text x="248.6" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">나머지</text><rect class="fb-c" x="272.9" y="10.0" width="48.6" height="30.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="0"/><rect class="fb-c" x="321.4" y="10.0" width="48.6" height="30.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="0"/><text x="22" y="30.0" font-size="13" text-anchor="end" fill="currentColor" fill-opacity="0.7">1</text></svg></div><p>2묶음과 나머지 1칸. 나머지 1칸은 한 묶음(2칸)의 반이에요. 그래서</p><p><span class="fr"><span class="n">5</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span><br>= 5 ÷ 2<br>= <span class="fr"><span class="n">5</span><span class="d">2</span></span><br>= <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">2</span></span></span></p></div>
+        <div class="check" id="T4-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T4-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">7</span><span class="d">9</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">9</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">3<span class="fr"><span class="n">1</span><span class="d">2</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">7</span><span class="d">18</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">7</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>7 ÷ 2 = <span class="fr"><span class="n">7</span><span class="d">2</span></span> = <span class="mx">3<span class="fr"><span class="n">1</span><span class="d">2</span></span></span> — 세 묶음과 반 묶음.<br>분모를 붙이면 <span class="fr"><span class="n">7</span><span class="d">18</span></span>, 거꾸로 나누면 <span class="fr"><span class="n">2</span><span class="d">7</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T4-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T4-4</code></div>
+        <div class="say"><p><span class="fr"><span class="n">2</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">5</span><span class="d">7</span></span> — 2칸으로는 5칸짜리 한 묶음도 못 채워요. 한 묶음의 <span class="fr"><span class="n">2</span><span class="d">5</span></span>만큼만 채워요.</p><p><span class="fr"><span class="n">2</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">5</span><span class="d">7</span></span><br>= 2 ÷ 5<br>= <span class="fr"><span class="n">2</span><span class="d">5</span></span></p><p>나누어지는 수가 나누는 수보다 작으면 몫은 1보다 작아요.</p></div>
+        <div class="check" id="T4-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T4-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">3</span><span class="d">8</span></span> ÷ <span class="fr"><span class="n">7</span><span class="d">8</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">7</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">56</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3 ÷ 7 = <span class="fr"><span class="n">3</span><span class="d">7</span></span> — 한 묶음도 못 채워서 1보다 작아요.<br>거꾸로 나누면 <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span>, 분모를 붙이면 <span class="fr"><span class="n">3</span><span class="d">56</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T4-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>T4-5</code></div>
+        <div class="say"><p>물이 <span class="fr"><span class="n">8</span><span class="d">11</span></span> L 있어요. 한 컵에 <span class="fr"><span class="n">2</span><span class="d">11</span></span> L씩 담으면 몇 컵이 될까요? <span class="fr"><span class="n">2</span><span class="d">11</span></span> L씩 몇 번 덜어 낼 수 있는지 —</p><p><span class="fr"><span class="n">8</span><span class="d">11</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">11</span></span> = 8 ÷ 2 = 4</p><p>4컵이에요.</p></div>
+        <div class="check" id="T4-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T4-5✓</code></div>
+        <div class="qt"><p>물이 <span class="fr"><span class="n">9</span><span class="d">10</span></span> L 있어요. 한 컵에 <span class="fr"><span class="n">3</span><span class="d">10</span></span> L씩 담으면 몇 컵이 될까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">10</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">3</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">9</span><span class="d">10</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">10</span></span> = 9 ÷ 3 = 3 — 3컵.<br>분모를 붙이면 <span class="fr"><span class="n">3</span><span class="d">10</span></span>, 거꾸로 나누면 <span class="fr"><span class="n">1</span><span class="d">3</span></span> — 컵 수가 아니에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T4-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T4-📏</code></div><p>분모가 같으면 분자끼리 나눠요 — 몇 번 덜어 낼 수 있나.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T4-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T4-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">3</span><span class="d">11</span></span> ÷ <span class="fr"><span class="n">8</span><span class="d">11</span></span></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">24</span><span class="d">121</span></span></span><span class="tag">나누기를 곱하기로 함</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">3</span></span></span></span><span class="tag">거꾸로 나눔</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">88</span></span></span><span class="tag">분모를 그대로 둠</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">8</span></span></span></li></ol>
+    </div><div class="sample" id="T4-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T4-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">10</span><span class="d">13</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">13</span></span></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">5</span><span class="d">13</span></span></span><span class="tag">분모를 그대로 둠</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">5</span></span></span><span class="tag">거꾸로 나눔</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">20</span><span class="d">169</span></span></span><span class="tag">나누기를 곱하기로 함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">5</span></li></ol>
+    </div><div class="sample" id="T4-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T4-②</code></div>
+      <div class="say"><p>그림을 보고 몫을 구해요.</p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="take" data-a="9" data-b="3" data-d="11" viewBox="0 0 400 74" width="500" height="93" role="img" aria-label="막대: 1을 11칸으로 나눈 막대에 9칸을 칠하고 3칸씩 묶음 — 3묶음"><rect class="fb-c" x="30.0" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><text x="76.4" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">①</text><rect class="fb-c" x="60.9" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><rect class="fb-c" x="91.8" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><rect class="fb-c" x="122.7" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><text x="169.1" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">②</text><rect class="fb-c" x="153.6" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><rect class="fb-c" x="184.5" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><rect class="fb-c" x="215.5" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><text x="261.8" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">③</text><rect class="fb-c" x="246.4" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><rect class="fb-c" x="277.3" y="10.0" width="30.9" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><rect class="fb-c" x="308.2" y="10.0" width="30.9" height="30.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="0"/><rect class="fb-c" x="339.1" y="10.0" width="30.9" height="30.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="0"/><text x="22" y="30.0" font-size="13" text-anchor="end" fill="currentColor" fill-opacity="0.7">1</text></svg></div><p>리자몽이 이렇게 말했어요.</p><p><strong><span class="fr"><span class="n">9</span><span class="d">11</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">11</span></span> = <span class="fr"><span class="n">3</span><span class="d">11</span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">분모가 같으면 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt">3칸씩 3묶음 — 분자끼리 나눈 3이 몫이에요</span></li><li class="no"><span class="mark"></span><span class="txt">작은 쪽을 큰 쪽으로 나눠서 <span class="fr"><span class="n">1</span><span class="d">3</span></span></span><span class="tag">거꾸로 나눔</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T4-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T4-👨</code></div>
+    <h3>분모가 같은 분수의 나눗셈이 &quot;몇 번 덜어 낼 수 있나&quot;이고, 그래서 분자끼리 나눈다는 것을 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T4-👨말1"><code class="mini">말1</code><span>&quot;<span class="fr"><span class="n">1</span><span class="d">7</span></span>짜리 6칸에서 2칸씩 몇 번 덜어 낼 수 있어?&quot;</span></li><li id="T4-👨말2"><code class="mini">말2</code><span>&quot;몇 번은 개수야 — 분모가 붙을까?&quot;</span></li><li id="T4-👨말3"><code class="mini">말3</code><span>&quot;5칸을 2칸씩 묶으면 2묶음 하고 남는 1칸은 한 묶음의 얼마지?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">페트병에 물 높이를 7칸으로 표시하고 6칸까지 채워요. 2칸만큼 들어가는 작은 컵으로 몇 번 떠낼 수 있는지 직접 떠 보면 3번 — <span class="fr"><span class="n">6</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span> = 3이에요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T4-👨함정1"><code class="mini">함정1</code><div><div class="kid">분모가 같은 나눗셈의 몫에 분모를 그대로 붙인다</div><div class="dadsay">→ &quot;몇 번 떠냈어? 번 수에 분모가 붙을까?&quot;</div></div></li><li id="T4-👨함정2"><code class="mini">함정2</code><div><div class="kid">작은 분수를 큰 분수로 나눌 때 큰 분자를 작은 분자로 나눈다</div><div class="dadsay">→ &quot;나누어지는 수는 앞의 수야. 앞의 분자를 뒤의 분자로 나눠.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><span class="fr"><span class="n">8</span><span class="d">9</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">9</span></span> = 4, <span class="fr"><span class="n">5</span><span class="d">9</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">9</span></span> = <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">2</span></span></span> — 둘 다 묶음으로 설명하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="T5">
+    <header class="ch-head">
+      <div class="ch-no">T5</div>
+      <div>
+        <div class="grade">초6 · T4 다음</div>
+        <h2>분모가 다른 (분수)÷(분수)</h2>
+        <p class="idea">분모가 다르면 <strong>통분한 다음 분자끼리 나눠요</strong>. <span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">8</span></span> = <span class="fr"><span class="n">6</span><span class="d">8</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">8</span></span> = 6 ÷ 1 = 6. <span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <span class="fr"><span class="n">8</span><span class="d">12</span></span> ÷ <span class="fr"><span class="n">9</span><span class="d">12</span></span> = 8 ÷ 9 = <span class="fr"><span class="n">8</span><span class="d">9</span></span>.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T5-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T5-1</code></div>
+        <div class="say"><p>분모가 다르면 칸의 크기가 달라서 바로 묶을 수 없어요. 먼저 <strong>통분</strong>해서 칸의 크기를 맞춰요.</p><p><span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">8</span></span> — 통분하면 <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <span class="fr"><span class="n">6</span><span class="d">8</span></span></p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="take" data-a="6" data-b="1" data-d="8" viewBox="0 0 400 74" width="500" height="93" role="img" aria-label="막대: 1을 8칸으로 나눈 막대에 6칸을 칠하고 1칸씩 묶음 — 6묶음"><rect class="fb-c" x="30.0" y="10.0" width="42.5" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><text x="51.3" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">①</text><rect class="fb-c" x="72.5" y="10.0" width="42.5" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><text x="93.8" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">②</text><rect class="fb-c" x="115.0" y="10.0" width="42.5" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><text x="136.3" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">③</text><rect class="fb-c" x="157.5" y="10.0" width="42.5" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4" data-on="1"/><text x="178.8" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">④</text><rect class="fb-c" x="200.0" y="10.0" width="42.5" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="5" data-on="1"/><text x="221.3" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑤</text><rect class="fb-c" x="242.5" y="10.0" width="42.5" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="6" data-on="1"/><text x="263.8" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑥</text><rect class="fb-c" x="285.0" y="10.0" width="42.5" height="30.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="0"/><rect class="fb-c" x="327.5" y="10.0" width="42.5" height="30.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="0"/><text x="22" y="30.0" font-size="13" text-anchor="end" fill="currentColor" fill-opacity="0.7">1</text></svg></div><p><span class="fr"><span class="n">1</span><span class="d">8</span></span>짜리 6칸을 1칸씩 묶으면 6묶음!</p><p><span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">8</span></span><br>= <span class="fr"><span class="n">6</span><span class="d">8</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">8</span></span><br>= 6 ÷ 1<br>= 6</p></div>
+        <div class="check" id="T5-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T5-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">6</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">9</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">2</span><span class="d">3</span></span> = <span class="fr"><span class="n">4</span><span class="d">6</span></span><br><span class="fr"><span class="n">4</span><span class="d">6</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">6</span></span> = 4 ÷ 1 = 4.<br>통분하지 않고 분자끼리 나누면 2, 곱하면 <span class="fr"><span class="n">1</span><span class="d">9</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T5-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T5-2</code></div>
+        <div class="say"><p>분모끼리 곱해서 통분해도 돼요. <span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span></p><p><span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span><br>= <span class="fr"><span class="n">8</span><span class="d">12</span></span> ÷ <span class="fr"><span class="n">9</span><span class="d">12</span></span><br>= 8 ÷ 9<br>= <span class="fr"><span class="n">8</span><span class="d">9</span></span></p><p>통분한 다음에는 분모가 같은 나눗셈 — 분자끼리 나눠요.</p></div>
+        <div class="check" id="T5-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T5-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">1</span><span class="d">2</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">5</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">4</span><span class="d">5</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>통분하면 <span class="fr"><span class="n">5</span><span class="d">10</span></span> ÷ <span class="fr"><span class="n">4</span><span class="d">10</span></span> — 5 ÷ 4 = <span class="fr"><span class="n">5</span><span class="d">4</span></span> = <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span>.<br>통분하지 않으면 <span class="fr"><span class="n">1</span><span class="d">2</span></span>, 거꾸로 나누면 <span class="fr"><span class="n">4</span><span class="d">5</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T5-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T5-3</code></div>
+        <div class="say"><p>통분하지 않고 분자끼리 나누면 어떻게 될까요? <span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">8</span></span> — 분자끼리 3 ÷ 1 = 3? 맞는 몫은 6이에요.</p><p><span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리와 <span class="fr"><span class="n">1</span><span class="d">8</span></span>짜리는 크기가 달라요. 다른 크기의 칸을 그냥 세면 안 돼요. 꼭 통분부터!</p></div>
+        <div class="check" id="T5-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T5-3✓</code></div>
+        <div class="qt"><p>끈이 <span class="fr"><span class="n">3</span><span class="d">5</span></span> m 있어요. 한 도막을 <span class="fr"><span class="n">3</span><span class="d">10</span></span> m씩 자르면 몇 도막이 될까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">1</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">3</span><span class="d">5</span></span> = <span class="fr"><span class="n">6</span><span class="d">10</span></span><br><span class="fr"><span class="n">6</span><span class="d">10</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">10</span></span> = 6 ÷ 3 = 2.<br>통분하지 않으면 3 ÷ 3 = 1, 거꾸로 나누면 <span class="fr"><span class="n">1</span><span class="d">2</span></span> — 둘 다 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T5-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T5-4</code></div>
+        <div class="say"><p>몫이 맞는지 확인하는 방법 — <strong>몫 × 나누는 수 = 나누어지는 수</strong>.</p><p><span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <span class="fr"><span class="n">8</span><span class="d">9</span></span>였죠? 곱해 보면</p><p><span class="fr"><span class="n">8</span><span class="d">9</span></span> × <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <span class="fr"><span class="n">24</span><span class="d">36</span></span> = <span class="fr"><span class="n">2</span><span class="d">3</span></span> ✔</p><p>처음 수 <span class="fr"><span class="n">2</span><span class="d">3</span></span> — 맞았어요.</p></div>
+        <div class="check" id="T5-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T5-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">5</span><span class="d">6</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">2</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">5</span><span class="d">9</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">2</span><span class="d">3</span></span> = <span class="fr"><span class="n">4</span><span class="d">6</span></span> — 분자끼리 5 ÷ 4<br>= <span class="fr"><span class="n">5</span><span class="d">4</span></span> = <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span>.<br>확인: <span class="fr"><span class="n">5</span><span class="d">4</span></span> × <span class="fr"><span class="n">2</span><span class="d">3</span></span> = <span class="fr"><span class="n">10</span><span class="d">12</span></span> = <span class="fr"><span class="n">5</span><span class="d">6</span></span> ✔<br>통분하지 않으면 <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">2</span></span></span>, 곱하면 <span class="fr"><span class="n">5</span><span class="d">9</span></span>.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T5-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T5-📏</code></div><p>분모가 다르면 통분부터 — 그다음 분자끼리 나눠요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T5-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T5-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">1</span><span class="d">6</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">5</span><span class="d">7</span></span></span></span><span class="tag">거꾸로 나눔</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span></span><span class="tag">통분하지 않고 분자끼리 나눔</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">21</span></span></span><span class="tag">나누기를 곱하기로 함</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">7</span><span class="d">12</span></span></span></li></ol>
+    </div><div class="sample" id="T5-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T5-①b</code></div>
+      <div class="say"><p>끈이 <span class="fr"><span class="n">1</span><span class="d">6</span></span> m 있어요. 한 도막을 <span class="fr"><span class="n">1</span><span class="d">24</span></span> m씩 자르면 몇 도막이 될까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">144</span></span></span><span class="tag">나누기를 곱하기로 함</span></li><li class="no"><span class="mark"></span><span class="txt">1</span><span class="tag">통분하지 않고 분자끼리 나눔</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span><span class="tag">거꾸로 나눔</span></li><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li></ol>
+    </div><div class="sample" id="T5-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T5-②</code></div>
+      <div class="say"><p>나눗셈을 계산해요.</p><p>루카리오가 이렇게 말했어요.</p><p><strong><span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">1</span><span class="d">5</span></span> = <span class="fr"><span class="n">10</span><span class="d">15</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">15</span></span> = 3 ÷ 10 = <span class="fr"><span class="n">3</span><span class="d">10</span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">앞의 분자를 뒤의 분자로 나눠요 — 10 ÷ 3 = <span class="mx">3<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt">통분하면 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">통분하지 않고 분자끼리 나눠서 2</span><span class="tag">통분하지 않고 분자끼리 나눔</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T5-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T5-👨</code></div>
+    <h3>분모가 다르면 칸 크기를 맞추는(통분) 것이 먼저라는 것과, 몫을 곱해 확인하는 습관을 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T5-👨말1"><code class="mini">말1</code><span>&quot;<span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리 칸과 <span class="fr"><span class="n">1</span><span class="d">8</span></span>짜리 칸 — 크기가 같아?&quot;</span></li><li id="T5-👨말2"><code class="mini">말2</code><span>&quot;칸 크기를 똑같이 하려면 어떻게 하지?&quot;</span></li><li id="T5-👨말3"><code class="mini">말3</code><span>&quot;답에 나누는 수를 곱해 보면 처음 수가 나와?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이 띠 두 장 — 하나는 4칸, 하나는 8칸으로 접어요. 4칸 띠의 3칸(<span class="fr"><span class="n">3</span><span class="d">4</span></span>)에 8칸 띠를 대 보면 작은 칸 6개 — <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <span class="fr"><span class="n">6</span><span class="d">8</span></span>. 작은 칸 1개씩 떼면 6번 떼어져요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T5-👨함정1"><code class="mini">함정1</code><div><div class="kid">분모가 다른데 분자끼리 바로 나눈다</div><div class="dadsay">→ &quot;칸 크기가 다르잖아. 먼저 크기를 맞춰 볼까?&quot;</div></div></li><li id="T5-👨함정2"><code class="mini">함정2</code><div><div class="kid">통분하고 나서 몫에 분모를 붙인다</div><div class="dadsay">→ &quot;통분하면 분모가 같은 나눗셈이야. 몇 번 덜어 내는지만 세면 돼.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">통분해서 <span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <span class="fr"><span class="n">8</span><span class="d">9</span></span> — 이렇게 구하고, 곱해서 처음 수가 나오는지 확인까지 하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="T6">
+    <header class="ch-head">
+      <div class="ch-no">T6</div>
+      <div>
+        <div class="grade">초6 · T5 다음</div>
+        <h2>(자연수)÷(분수)</h2>
+        <p class="idea">3 ÷ <span class="fr"><span class="n">1</span><span class="d">4</span></span> — 1 안에 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리가 4개, 3 안에는 3 × 4 = 12개. 6 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> — <span class="fr"><span class="n">2</span><span class="d">3</span></span>만큼이 6이면 <span class="fr"><span class="n">1</span><span class="d">3</span></span>만큼은 6 ÷ 2 = 3, 1만큼은 3 × 3 = 9. 그래서 6 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> = (6 ÷ 2) × 3 = 9.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T6-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T6-1</code></div>
+        <div class="say"><p>자연수를 단위분수로 나누면 <strong>1 안에 몇 개 들어가는지</strong>를 생각해요. 3 ÷ <span class="fr"><span class="n">1</span><span class="d">4</span></span> — 1 안에 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리가 4개, 3 안에는 3 × 4 = 12개.</p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="take" data-a="12" data-b="1" data-d="4" viewBox="0 0 400 202" width="500" height="253" role="img" aria-label="막대: 1을 4칸으로 나눈 막대 3개에 12칸을 칠하고 1칸씩 묶음 — 12묶음"><rect class="fb-c" x="30.0" y="10.0" width="85.0" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><text x="72.5" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">①</text><rect class="fb-c" x="115.0" y="10.0" width="85.0" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><text x="157.5" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">②</text><rect class="fb-c" x="200.0" y="10.0" width="85.0" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><text x="242.5" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">③</text><rect class="fb-c" x="285.0" y="10.0" width="85.0" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4" data-on="1"/><text x="327.5" y="58.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">④</text><rect class="fb-c" x="30.0" y="74.0" width="85.0" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="5" data-on="1"/><text x="72.5" y="122.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑤</text><rect class="fb-c" x="115.0" y="74.0" width="85.0" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="6" data-on="1"/><text x="157.5" y="122.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑥</text><rect class="fb-c" x="200.0" y="74.0" width="85.0" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="7" data-on="1"/><text x="242.5" y="122.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑦</text><rect class="fb-c" x="285.0" y="74.0" width="85.0" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="8" data-on="1"/><text x="327.5" y="122.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑧</text><rect class="fb-c" x="30.0" y="138.0" width="85.0" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="9" data-on="1"/><text x="72.5" y="186.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑨</text><rect class="fb-c" x="115.0" y="138.0" width="85.0" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="10" data-on="1"/><text x="157.5" y="186.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑩</text><rect class="fb-c" x="200.0" y="138.0" width="85.0" height="30.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="11" data-on="1"/><text x="242.5" y="186.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑪</text><rect class="fb-c" x="285.0" y="138.0" width="85.0" height="30.0" fill="var(--frac-fill2, #f59e0b)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="12" data-on="1"/><text x="327.5" y="186.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-l">⑫</text><text x="22" y="30.0" font-size="13" text-anchor="end" fill="currentColor" fill-opacity="0.7">1</text><text x="22" y="94.0" font-size="13" text-anchor="end" fill="currentColor" fill-opacity="0.7">1</text><text x="22" y="158.0" font-size="13" text-anchor="end" fill="currentColor" fill-opacity="0.7">1</text></svg></div><p>3 ÷ <span class="fr"><span class="n">1</span><span class="d">4</span></span> = 3 × 4 = 12</p><p>1보다 작은 수로 나누니까 몫이 3보다 커졌어요.</p></div>
+        <div class="check" id="T6-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T6-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>2 ÷ <span class="fr"><span class="n">1</span><span class="d">5</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">5</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1 안에 <span class="fr"><span class="n">1</span><span class="d">5</span></span>짜리가 5개 — 2 안에는 2 × 5 = 10개.<br>곱하면 <span class="fr"><span class="n">2</span><span class="d">5</span></span>, 1 안의 개수만 세면 5.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T6-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T6-2</code></div>
+        <div class="say"><p>6 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> — &quot;<span class="fr"><span class="n">2</span><span class="d">3</span></span>만큼이 6이면 1만큼은 얼마?&quot;로 생각해요.</p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="unit" data-p="2" data-q="3" viewBox="0 0 400 108" width="500" height="135" role="img" aria-label="막대: 3칸 중 2칸이 6만큼 — 막대 전체(1만큼)는 ?"><rect class="fb-c" x="30.0" y="34.0" width="113.3" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1"/><rect class="fb-c" x="143.3" y="34.0" width="113.3" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1"/><rect class="fb-c" x="256.7" y="34.0" width="113.3" height="34.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0"/><path d="M30.0 30 L30.0 22 L256.7 22 L256.7 30" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="143.3" y="18.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-v">6</text><path d="M30.0 72 L30.0 80 L370.0 80 L370.0 72" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="200.0" y="98.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-one">1만큼 = ?</text></svg></div><p>2칸이 6이니까 1칸(<span class="fr"><span class="n">1</span><span class="d">3</span></span>만큼)은 6 ÷ 2 = 3, 3칸(1만큼)은 3 × 3 = 9.</p><p>6 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> = 9</p></div>
+        <div class="check" id="T6-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T6-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>8 ÷ <span class="fr"><span class="n">4</span><span class="d">5</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">6<span class="fr"><span class="n">2</span><span class="d">5</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>4칸이 8 — 1칸은 8 ÷ 4 = 2, 5칸(1만큼)은 2 × 5 = 10.<br>1칸에서 멈추면 2, 곱하면 <span class="mx">6<span class="fr"><span class="n">2</span><span class="d">5</span></span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T6-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T6-3</code></div>
+        <div class="say"><p>그림 없이 식으로 하면 — <strong>(자연수 ÷ 분자) × 분모</strong>.</p><p>6 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> = (6 ÷ 2) × 3 = 9</p><p>10 ÷ <span class="fr"><span class="n">5</span><span class="d">6</span></span> = (10 ÷ 5) × 6 = 12</p><p>분자로 나누면 단위분수만큼, 분모를 곱하면 1만큼이에요.</p></div>
+        <div class="check" id="T6-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T6-3✓</code></div>
+        <div class="qt"><p>물통의 <span class="fr"><span class="n">3</span><span class="d">4</span></span>만큼 채우는 데 물이 6 L 들었어요. 물통을 가득 채우려면 물이 몇 L 들까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">4<span class="fr"><span class="n">1</span><span class="d">2</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">3</span><span class="d">4</span></span>만큼이 6 L — <span class="fr"><span class="n">1</span><span class="d">4</span></span>만큼은 6 ÷ 3 = 2, 가득(1만큼)은 2 × 4 = 8.<br>2에서 멈추거나 곱하면(<span class="mx">4<span class="fr"><span class="n">1</span><span class="d">2</span></span></span>) 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T6-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T6-4</code></div>
+        <div class="say"><p>나눈다고 늘 작아지는 건 아니에요! <strong>1보다 작은 수로 나누면 몫이 나누어지는 수보다 커져요.</strong></p><p>6 ÷ 2 = 3 — 2는 1보다 커서 몫이 작아져요.</p><p>6 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> = 9 — 나누는 수가 1보다 작아서 몫이 커져요.</p></div>
+        <div class="check" id="T6-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T6-4✓</code></div>
+        <div class="qt"><p>길이가 4 m인 끈을 <span class="fr"><span class="n">2</span><span class="d">5</span></span> m씩 자르면 모두 몇 도막이 될까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">3</span><span class="d">5</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1 m 끈을 <span class="fr"><span class="n">1</span><span class="d">5</span></span> m씩 자르면 5도막, 4 m 끈이면 20도막, <span class="fr"><span class="n">2</span><span class="d">5</span></span> m씩 자르면 그 반 — 10도막.<br>식으로는 (4 ÷ 2) × 5 = 10. 4보다 작게 나오면 이상한 거예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T6-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T6-📏</code></div><p>자연수 ÷ 분수 = (자연수 ÷ 분자) × 분모 — 1만큼이 얼마인지 구해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T6-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T6-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>3 ÷ <span class="fr"><span class="n">1</span><span class="d">6</span></span></strong></p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">18</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">18</span></span></span><span class="tag">거꾸로 나눔</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span></span><span class="tag">나누기를 곱하기로 함</span></li><li class="no"><span class="mark"></span><span class="txt">6</span><span class="tag">1에 들어가는 개수만 셈</span></li></ol>
+    </div><div class="sample" id="T6-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T6-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>15 ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">20</span></span></span><span class="tag">거꾸로 나눔</span></li><li class="ok"><span class="mark">✔</span><span class="txt">20</span></li><li class="no"><span class="mark"></span><span class="txt">5</span><span class="tag">단위분수만큼의 양에서 멈춤</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">11<span class="fr"><span class="n">1</span><span class="d">4</span></span></span></span><span class="tag">나누기를 곱하기로 함</span></li></ol>
+    </div><div class="sample" id="T6-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T6-②</code></div>
+      <div class="say"><p>나눗셈을 계산해요.</p><p>리자몽이 이렇게 말했어요.</p><p><strong>10 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> = 10 × <span class="fr"><span class="n">2</span><span class="d">3</span></span> = <span class="mx">6<span class="fr"><span class="n">2</span><span class="d">3</span></span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">자연수는 분수로 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">3</span></span>만큼이 10 — 1만큼은 (10 ÷ 2) × 3 = 15</span></li><li class="no"><span class="mark"></span><span class="txt">몫은 10 ÷ 2 = 5</span><span class="tag">단위분수만큼의 양에서 멈춤</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T6-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T6-👨</code></div>
+    <h3>자연수를 분수로 나누면 &quot;1만큼이 얼마인가&quot;를 구하는 것이고, 1보다 작은 수로 나누면 몫이 커진다는 것을 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T6-👨말1"><code class="mini">말1</code><span>&quot;1 안에 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리가 몇 개 들어가?&quot;</span></li><li id="T6-👨말2"><code class="mini">말2</code><span>&quot;<span class="fr"><span class="n">2</span><span class="d">3</span></span>만큼이 6이면 <span class="fr"><span class="n">1</span><span class="d">3</span></span>만큼은? 1만큼은?&quot;</span></li><li id="T6-👨말3"><code class="mini">말3</code><span>&quot;나눴는데 커졌네 — 이상한 걸까, 맞는 걸까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">큰 물통 옆면을 3칸으로 표시하고 2칸까지 물을 부어요(<span class="fr"><span class="n">2</span><span class="d">3</span></span>만큼). 그 물이 컵 6잔이었다고 하면 1칸은 몇 잔? 가득 채우면 몇 잔? — 직접 따라 보며 6 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> = 9를 확인해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T6-👨함정1"><code class="mini">함정1</code><div><div class="kid">자연수를 분수로 나누면서 곱셈을 해서 처음보다 작은 답을 쓴다</div><div class="dadsay">→ &quot;1보다 작은 수로 나누면 몫이 커져야 해. <span class="fr"><span class="n">2</span><span class="d">3</span></span>만큼이 6이면 1만큼은 6보다 클까 작을까?&quot;</div></div></li><li id="T6-👨함정2"><code class="mini">함정2</code><div><div class="kid">6 ÷ 2 = 3에서 멈춘다</div><div class="dadsay">→ &quot;3은 <span class="fr"><span class="n">1</span><span class="d">3</span></span>만큼이야. 1만큼은 3칸 — 3 × 3이지.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">8 ÷ <span class="fr"><span class="n">2</span><span class="d">5</span></span> = 20, 3 ÷ <span class="fr"><span class="n">1</span><span class="d">4</span></span> = 12 — 둘 다 &quot;1만큼&quot;이나 &quot;1 안에 몇 개&quot;로 설명하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="T7">
+    <header class="ch-head">
+      <div class="ch-no">T7</div>
+      <div>
+        <div class="grade">초6 · T6 다음</div>
+        <h2>(분수)÷(분수)를 곱셈으로</h2>
+        <p class="idea">÷ (분수)는 그 분수의 <strong>분모와 분자를 바꾼 수를 곱하는 것</strong>과 같아요 — &quot;뒤집어 곱해요&quot;. <span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">5</span></span> = <span class="fr"><span class="n">3</span><span class="d">4</span></span> × <span class="fr"><span class="n">5</span><span class="d">2</span></span> = <span class="fr"><span class="n">15</span><span class="d">8</span></span>. 까닭: 통분해서 나눠도 <span class="fr"><span class="n">15</span><span class="d">20</span></span> ÷ <span class="fr"><span class="n">8</span><span class="d">20</span></span> = 15 ÷ 8 = <span class="fr"><span class="n">15</span><span class="d">8</span></span> — 같아요. 앞 분수는 그대로 두어요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T7-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T7-1</code></div>
+        <div class="say"><p>지금까지는 통분해서 나눴어요.</p><p><span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">5</span></span><br>= <span class="fr"><span class="n">15</span><span class="d">20</span></span> ÷ <span class="fr"><span class="n">8</span><span class="d">20</span></span><br>= 15 ÷ 8<br>= <span class="fr"><span class="n">15</span><span class="d">8</span></span></p><p>그런데 곱셈 <span class="fr"><span class="n">3</span><span class="d">4</span></span> × <span class="fr"><span class="n">5</span><span class="d">2</span></span> — 계산해 보면?</p><p><span class="fr"><span class="n">3</span><span class="d">4</span></span> × <span class="fr"><span class="n">5</span><span class="d">2</span></span> = <span class="fr"><span class="n">15</span><span class="d">8</span></span></p><p>똑같아요! <strong>÷ <span class="fr"><span class="n">2</span><span class="d">5</span></span> → × <span class="fr"><span class="n">5</span><span class="d">2</span></span></strong> — 나누는 분수의 분모와 분자를 바꿔 곱해도 몫이 같아요. 이것을 &quot;뒤집어 곱한다&quot;고 해요.</p></div>
+        <div class="check" id="T7-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T7-1✓</code></div>
+        <div class="qt"><p>나눗셈을 곱셈으로 나타낸 것은 어느 것일까요?</p><p><strong><span class="fr"><span class="n">2</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">4</span><span class="d">7</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">3</span></span> × <span class="fr"><span class="n">7</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">3</span></span> × <span class="fr"><span class="n">4</span><span class="d">7</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">2</span></span> × <span class="fr"><span class="n">4</span><span class="d">7</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>나누는 분수 <span class="fr"><span class="n">4</span><span class="d">7</span></span>만 뒤집어 <span class="fr"><span class="n">7</span><span class="d">4</span></span> — 앞 분수는 그대로 <span class="fr"><span class="n">2</span><span class="d">3</span></span>.<br>그대로 곱하거나, 앞 분수를 뒤집으면 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T7-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T7-2</code></div>
+        <div class="say"><p>왜 뒤집을까요? ÷ <span class="fr"><span class="n">2</span><span class="d">5</span></span> — &quot;<span class="fr"><span class="n">2</span><span class="d">5</span></span>만큼이 주어지면 1만큼은?&quot;이었죠. 2로 나누면 <span class="fr"><span class="n">1</span><span class="d">5</span></span>만큼, 5를 곱하면 1만큼.</p><p>÷ <span class="fr"><span class="n">2</span><span class="d">5</span></span> → ÷ 2 × 5 → × <span class="fr"><span class="n">5</span><span class="d">2</span></span></p><p>분자로 나누고 분모를 곱하는 것 — 그게 바로 분모와 분자를 바꾼 수를 곱하는 거예요.</p></div>
+        <div class="check" id="T7-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T7-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">3</span><span class="d">5</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">4</span><span class="d">5</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">9</span><span class="d">20</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">3</span><span class="d">5</span></span> × <span class="fr"><span class="n">4</span><span class="d">3</span></span> = <span class="fr"><span class="n">12</span><span class="d">15</span></span> = <span class="fr"><span class="n">4</span><span class="d">5</span></span>.<br>그대로 곱하면 <span class="fr"><span class="n">9</span><span class="d">20</span></span>, 앞 분수를 뒤집으면 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> — 틀려요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T7-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T7-3</code></div>
+        <div class="say"><p>가분수도 똑같이 — 나누는 분수만 뒤집어 곱해요.</p><p><span class="fr"><span class="n">7</span><span class="d">3</span></span> ÷ <span class="fr"><span class="n">5</span><span class="d">6</span></span><br>= <span class="fr"><span class="n">7</span><span class="d">3</span></span> × <span class="fr"><span class="n">6</span><span class="d">5</span></span><br>= <span class="fr"><span class="n">42</span><span class="d">15</span></span><br>= <span class="mx">2<span class="fr"><span class="n">4</span><span class="d">5</span></span></span></p></div>
+        <div class="check" id="T7-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T7-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">5</span><span class="d">2</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">3<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">7</span><span class="d">8</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">10</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">5</span><span class="d">2</span></span> × <span class="fr"><span class="n">4</span><span class="d">3</span></span> = <span class="fr"><span class="n">20</span><span class="d">6</span></span> = <span class="mx">3<span class="fr"><span class="n">1</span><span class="d">3</span></span></span>.<br>그대로 곱하면 <span class="mx">1<span class="fr"><span class="n">7</span><span class="d">8</span></span></span>, 앞 분수를 뒤집으면 <span class="fr"><span class="n">3</span><span class="d">10</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T7-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T7-4</code></div>
+        <div class="say"><p>곱하기 전에 약분하면 계산이 쉬워져요.</p><p><span class="fr"><span class="n">4</span><span class="d">9</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span><br>= <span class="fr"><span class="n">4</span><span class="d">9</span></span> × <span class="fr"><span class="n">3</span><span class="d">2</span></span><br>= <span class="fr"><span class="n">12</span><span class="d">18</span></span><br>= <span class="fr"><span class="n">2</span><span class="d">3</span></span></p><p>4와 2, 3과 9를 먼저 약분해도 <span class="fr"><span class="n">2</span><span class="d">3</span></span> — 같은 답이에요.</p></div>
+        <div class="check" id="T7-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T7-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">5</span><span class="d">8</span></span> ÷ <span class="fr"><span class="n">5</span><span class="d">6</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">25</span><span class="d">48</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="fr"><span class="n">5</span><span class="d">8</span></span> × <span class="fr"><span class="n">6</span><span class="d">5</span></span> = <span class="fr"><span class="n">30</span><span class="d">40</span></span> = <span class="fr"><span class="n">3</span><span class="d">4</span></span>.<br>그대로 곱하면 <span class="fr"><span class="n">25</span><span class="d">48</span></span>, 앞 분수를 뒤집으면 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">3</span></span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T7-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>T7-5</code></div>
+        <div class="say"><p>자연수를 분수로 나눌 때도 뒤집어 곱하면 돼요.</p><p>6 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span><br>= 6 × <span class="fr"><span class="n">3</span><span class="d">2</span></span><br>= 9</p><p>(6 ÷ 2) × 3 = 9와 같은 답이에요.</p></div>
+        <div class="check" id="T7-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T7-5✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>4 ÷ <span class="fr"><span class="n">2</span><span class="d">7</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">14</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">7</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">14</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>4 × <span class="fr"><span class="n">7</span><span class="d">2</span></span> = <span class="fr"><span class="n">28</span><span class="d">2</span></span> = 14.<br>그대로 곱하면 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">7</span></span></span>, 거꾸로 나누면 <span class="fr"><span class="n">1</span><span class="d">14</span></span>.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T7-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T7-📏</code></div><p>나누는 분수만 뒤집어 곱해요 — 앞 분수는 그대로.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T7-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T7-①a</code></div>
+      <div class="say"><p>나눗셈을 곱셈으로 나타낸 것은 어느 것일까요?</p><p><strong><span class="fr"><span class="n">2</span><span class="d">9</span></span> ÷ <span class="fr"><span class="n">4</span><span class="d">7</span></span></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">9</span><span class="d">2</span></span> × <span class="fr"><span class="n">7</span><span class="d">4</span></span></span><span class="tag">두 분수의 분모와 분자를 모두 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">9</span></span> × <span class="fr"><span class="n">4</span><span class="d">7</span></span></span><span class="tag">나누는 분수를 그대로 곱함</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">9</span><span class="d">2</span></span> × <span class="fr"><span class="n">4</span><span class="d">7</span></span></span><span class="tag">앞 분수의 분모와 분자를 바꿈</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">9</span></span> × <span class="fr"><span class="n">7</span><span class="d">4</span></span></span></li></ol>
+    </div><div class="sample" id="T7-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T7-①b</code></div>
+      <div class="say"><p>나눗셈을 곱셈으로 나타낸 것은 어느 것일까요?</p><p><strong><span class="fr"><span class="n">3</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">7</span><span class="d">3</span></span> × <span class="fr"><span class="n">8</span><span class="d">3</span></span></span><span class="tag">두 분수의 분모와 분자를 모두 바꿈</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">7</span></span> × <span class="fr"><span class="n">8</span><span class="d">3</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">7</span><span class="d">3</span></span> × <span class="fr"><span class="n">3</span><span class="d">8</span></span></span><span class="tag">앞 분수의 분모와 분자를 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">7</span></span> × <span class="fr"><span class="n">3</span><span class="d">8</span></span></span><span class="tag">나누는 분수를 그대로 곱함</span></li></ol>
+    </div><div class="sample" id="T7-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T7-②</code></div>
+      <div class="say"><p>나눗셈을 곱셈으로 바꿔 계산해요.</p><p>리자몽이 이렇게 말했어요.</p><p><strong><span class="fr"><span class="n">2</span><span class="d">7</span></span> ÷ <span class="fr"><span class="n">5</span><span class="d">6</span></span> = <span class="fr"><span class="n">2</span><span class="d">7</span></span> × <span class="fr"><span class="n">5</span><span class="d">6</span></span> = <span class="fr"><span class="n">5</span><span class="d">21</span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">앞 분수를 뒤집어 <span class="fr"><span class="n">7</span><span class="d">2</span></span> × <span class="fr"><span class="n">5</span><span class="d">6</span></span> = <span class="mx">2<span class="fr"><span class="n">11</span><span class="d">12</span></span></span></span><span class="tag">앞 분수의 분모와 분자를 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">분수끼리는 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt">나누는 분수만 뒤집어 곱해요 — <span class="fr"><span class="n">2</span><span class="d">7</span></span> × <span class="fr"><span class="n">6</span><span class="d">5</span></span> = <span class="fr"><span class="n">12</span><span class="d">35</span></span></span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T7-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T7-👨</code></div>
+    <h3>÷ (분수)가 × (분모와 분자를 바꾼 수)와 같은 까닭을 통분 계산과 견주어 이해하고, 앞 분수는 그대로 둔다는 것을 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T7-👨말1"><code class="mini">말1</code><span>&quot;통분해서 푼 답이랑 뒤집어 곱한 답이 같아?&quot;</span></li><li id="T7-👨말2"><code class="mini">말2</code><span>&quot;<span class="fr"><span class="n">2</span><span class="d">5</span></span>만큼이 주어지면 1만큼은 2로 나누고 5를 곱하지 — 그게 뒤집어 곱하는 거야.&quot;</span></li><li id="T7-👨말3"><code class="mini">말3</code><span>&quot;어느 분수를 뒤집어야 해? 앞이야, 뒤야?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">카드 놀이: 종이에 분수 나눗셈을 몇 개 쓰고, 아빠는 통분으로, 진우는 뒤집어 곱하기로 동시에 풀어 답이 같은지 맞춰 봐요. 누가 더 빠른지도 재 보면 재미있어요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T7-👨함정1"><code class="mini">함정1</code><div><div class="kid">앞 분수를 뒤집어 곱한다</div><div class="dadsay">→ &quot;나누는 수가 누구지? 뒤에 있는 수만 뒤집어.&quot;</div></div></li><li id="T7-👨함정2"><code class="mini">함정2</code><div><div class="kid">÷를 ×로 바꾸기만 하고 뒤집지 않는다</div><div class="dadsay">→ &quot;×로 바꿨으면 꼭 뒤집어야 해. 통분해서 푼 답이랑 비교해 볼까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">5</span></span> — 통분으로도, 뒤집어 곱해서도 둘 다 <span class="fr"><span class="n">15</span><span class="d">8</span></span> — 같은 답이 나오는 것을 보여 주면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="T8">
+    <header class="ch-head">
+      <div class="ch-no">T8</div>
+      <div>
+        <div class="grade">초6 · T7 다음</div>
+        <h2>대분수의 나눗셈</h2>
+        <p class="idea">대분수가 있으면 <strong>가분수로 바꾼 다음</strong> 나누는 분수를 뒤집어 곱해요. <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span> = <span class="fr"><span class="n">9</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span> = <span class="fr"><span class="n">9</span><span class="d">4</span></span> × <span class="fr"><span class="n">8</span><span class="d">3</span></span> = 6. 자연수 부분만 따로 두면 안 돼요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T8-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T8-1</code></div>
+        <div class="say"><p>대분수가 있으면 먼저 <strong>가분수로</strong> 바꾼 다음 뒤집어 곱해요.</p><p><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span><br>= <span class="fr"><span class="n">9</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span><br>= <span class="fr"><span class="n">9</span><span class="d">4</span></span> × <span class="fr"><span class="n">8</span><span class="d">3</span></span><br>= <span class="fr"><span class="n">72</span><span class="d">12</span></span><br>= 6</p></div>
+        <div class="check" id="T8-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T8-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">2</span></span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">2</span><span class="d">3</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">2</span></span></span> = <span class="fr"><span class="n">3</span><span class="d">2</span></span><br><span class="fr"><span class="n">3</span><span class="d">2</span></span> × <span class="fr"><span class="n">4</span><span class="d">3</span></span> = <span class="fr"><span class="n">12</span><span class="d">6</span></span> = 2.<br>자연수를 그대로 두면 <span class="mx">1<span class="fr"><span class="n">2</span><span class="d">3</span></span></span>, 가분수로 잘못 바꾸면 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">3</span></span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T8-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T8-2</code></div>
+        <div class="say"><p>자연수 부분을 그대로 두고 분수 부분만 나누면 어떻게 될까요?</p><p>2 + <span class="fr"><span class="n">1</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span> = 2 + <span class="fr"><span class="n">2</span><span class="d">3</span></span> = <span class="mx">2<span class="fr"><span class="n">2</span><span class="d">3</span></span></span> — 맞는 답 6과 달라요.</p><p>자연수 2도 함께 나눠야 해요. 그래서 가분수로 바꾸는 게 안전해요.</p></div>
+        <div class="check" id="T8-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T8-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">3</span></span></span> ÷ <span class="fr"><span class="n">4</span><span class="d">9</span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">3<span class="fr"><span class="n">1</span><span class="d">2</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">5</span><span class="d">27</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">3</span></span></span> = <span class="fr"><span class="n">8</span><span class="d">3</span></span><br><span class="fr"><span class="n">8</span><span class="d">3</span></span> × <span class="fr"><span class="n">9</span><span class="d">4</span></span> = <span class="fr"><span class="n">72</span><span class="d">12</span></span> = 6.<br>자연수를 그대로 두면 <span class="mx">3<span class="fr"><span class="n">1</span><span class="d">2</span></span></span>, 뒤집지 않으면 <span class="mx">1<span class="fr"><span class="n">5</span><span class="d">27</span></span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T8-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T8-3</code></div>
+        <div class="say"><p>나누는 수가 대분수여도 똑같이 — 가분수로 바꾼 다음 뒤집어요.</p><p><span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">2</span></span></span><br>= <span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">2</span></span><br>= <span class="fr"><span class="n">3</span><span class="d">4</span></span> × <span class="fr"><span class="n">2</span><span class="d">3</span></span><br>= <span class="fr"><span class="n">6</span><span class="d">12</span></span><br>= <span class="fr"><span class="n">1</span><span class="d">2</span></span></p></div>
+        <div class="check" id="T8-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T8-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">5</span><span class="d">6</span></span> ÷ <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">3</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">3<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">24</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> = <span class="fr"><span class="n">5</span><span class="d">4</span></span><br><span class="fr"><span class="n">5</span><span class="d">6</span></span> × <span class="fr"><span class="n">4</span><span class="d">5</span></span> = <span class="fr"><span class="n">20</span><span class="d">30</span></span> = <span class="fr"><span class="n">2</span><span class="d">3</span></span>.<br>자연수를 빼먹으면 <span class="mx">3<span class="fr"><span class="n">1</span><span class="d">3</span></span></span>, 뒤집지 않으면 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">24</span></span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T8-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T8-4</code></div>
+        <div class="say"><p>쌀이 <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> kg 있어요. 한 봉지에 <span class="fr"><span class="n">3</span><span class="d">4</span></span> kg씩 담으면</p><p><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span><br>= <span class="fr"><span class="n">9</span><span class="d">4</span></span> × <span class="fr"><span class="n">4</span><span class="d">3</span></span><br>= <span class="fr"><span class="n">36</span><span class="d">12</span></span><br>= 3</p><p>3봉지예요. 확인: <span class="fr"><span class="n">3</span><span class="d">4</span></span> × 3 = <span class="fr"><span class="n">9</span><span class="d">4</span></span> = <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> ✔</p></div>
+        <div class="check" id="T8-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T8-4✓</code></div>
+        <div class="qt"><p>쌀이 <span class="mx">3<span class="fr"><span class="n">3</span><span class="d">4</span></span></span> kg 있어요. 한 봉지에 <span class="fr"><span class="n">3</span><span class="d">8</span></span> kg씩 담으면 몇 봉지가 될까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">10</span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">13</span><span class="d">32</span></span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">3<span class="fr"><span class="n">3</span><span class="d">4</span></span></span> = <span class="fr"><span class="n">15</span><span class="d">4</span></span><br><span class="fr"><span class="n">15</span><span class="d">4</span></span> × <span class="fr"><span class="n">8</span><span class="d">3</span></span> = <span class="fr"><span class="n">120</span><span class="d">12</span></span> = 10.<br>자연수를 그대로 두면 5, 뒤집지 않으면 <span class="mx">1<span class="fr"><span class="n">13</span><span class="d">32</span></span></span>.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T8-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T8-📏</code></div><p>대분수 → 가분수 → 나누는 분수를 뒤집어 곱해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T8-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T8-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">2</span><span class="d">7</span></span> ÷ <span class="mx">1<span class="fr"><span class="n">4</span><span class="d">5</span></span></span></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">7</span></span></span><span class="tag">가분수로 잘못 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">5</span><span class="d">14</span></span></span><span class="tag">자연수 부분을 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">18</span><span class="d">35</span></span></span><span class="tag">나누는 분수를 그대로 곱함</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">10</span><span class="d">63</span></span></span></li></ol>
+    </div><div class="sample" id="T8-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T8-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="fr"><span class="n">7</span><span class="d">9</span></span> ÷ <span class="mx">3<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">7</span><span class="d">12</span></span></span><span class="tag">가분수로 잘못 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">16</span><span class="d">27</span></span></span></span><span class="tag">나누는 분수를 그대로 곱함</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span><span class="tag">자연수 부분을 빠뜨림</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">7</span><span class="d">30</span></span></span></li></ol>
+    </div><div class="sample" id="T8-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T8-②</code></div>
+      <div class="say"><p>나눗셈을 계산해요.</p><p>루카리오가 이렇게 말했어요.</p><p><strong><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span> ÷ <span class="fr"><span class="n">5</span><span class="d">7</span></span> = 1 + <span class="fr"><span class="n">1</span><span class="d">5</span></span> ÷ <span class="fr"><span class="n">5</span><span class="d">7</span></span> = <span class="mx">1<span class="fr"><span class="n">7</span><span class="d">25</span></span></span></strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">가분수 <span class="fr"><span class="n">2</span><span class="d">5</span></span> × <span class="fr"><span class="n">7</span><span class="d">5</span></span> = <span class="fr"><span class="n">14</span><span class="d">25</span></span></span><span class="tag">가분수로 잘못 바꿈</span></li><li class="ok"><span class="mark">✔</span><span class="txt">자연수 부분까지 가분수로 바꿔 나눠요 — <span class="fr"><span class="n">6</span><span class="d">5</span></span> × <span class="fr"><span class="n">7</span><span class="d">5</span></span> = <span class="mx">1<span class="fr"><span class="n">17</span><span class="d">25</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt">대분수는 분수로 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T8-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T8-👨</code></div>
+    <h3>대분수가 있는 나눗셈에서 가분수로 바꾸기를 빼먹지 않고, 자연수 부분까지 함께 나눈다는 것을 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T8-👨말1"><code class="mini">말1</code><span>&quot;대분수 그대로 뒤집을 수 있을까? 먼저 무엇으로 바꿔야 해?&quot;</span></li><li id="T8-👨말2"><code class="mini">말2</code><span>&quot;자연수 2는 어디 갔어? 같이 나눠야지.&quot;</span></li><li id="T8-👨말3"><code class="mini">말3</code><span>&quot;답에 나누는 수를 곱해서 처음 수가 나오는지 볼까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">쌀이나 콩을 계량컵으로 <span class="mx">2<span class="fr"><span class="n">1</span><span class="d">4</span></span></span>컵 퍼 놓고, <span class="fr"><span class="n">3</span><span class="d">4</span></span>컵짜리로 몇 번 담을 수 있는지 직접 퍼 봐요. 3번 — 식으로도 <span class="fr"><span class="n">9</span><span class="d">4</span></span> × <span class="fr"><span class="n">4</span><span class="d">3</span></span> = 3을 확인해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T8-👨함정1"><code class="mini">함정1</code><div><div class="kid">대분수의 자연수는 그대로 두고 분수 부분만 나눈다</div><div class="dadsay">→ &quot;자연수 2도 쌀이야. 같이 나눠야지 — 가분수로 바꿔 볼까?&quot;</div></div></li><li id="T8-👨함정2"><code class="mini">함정2</code><div><div class="kid">대분수를 가분수로 바꿀 때 자연수와 분자를 더하기만 한다</div><div class="dadsay">→ &quot;자연수 1은 <span class="fr"><span class="n">1</span><span class="d">4</span></span>짜리 몇 개였지? 자연수 × 분모 + 분자야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass"><span class="mx">2<span class="fr"><span class="n">1</span><span class="d">4</span></span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span> = 6 — 가분수로 바꾸고 뒤집어 곱해 구한 뒤, 6 × <span class="fr"><span class="n">3</span><span class="d">8</span></span> — 곱해서 처음 수가 나오는지 확인하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="T9">
+    <header class="ch-head">
+      <div class="ch-no">T9</div>
+      <div>
+        <div class="grade">초6 · T8 다음</div>
+        <h2>⭐ 분수의 나눗셈 활용</h2>
+        <p class="idea"><strong>몇 배</strong>는 (비교하는 양) ÷ (기준이 되는 양), <strong>1만큼의 양</strong>은 (주어진 양) ÷ (분수)예요. 그리고 <strong>1보다 작은 수로 나누면 몫이 나누어지는 수보다 커지고</strong>, 1보다 큰 수로 나누면 작아져요 — 나눈다고 늘 작아지는 것은 아니에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>5장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="T9-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>T9-1</code></div>
+        <div class="say"><p>&quot;몇 배&quot;는 <strong>비교하는 양 ÷ 기준이 되는 양</strong>이에요. 피카츄는 나무열매를 <span class="fr"><span class="n">3</span><span class="d">4</span></span> kg, 루카리오는 <span class="fr"><span class="n">3</span><span class="d">8</span></span> kg 땄어요. 피카츄의 열매는 루카리오의 몇 배일까요?</p><p>기준은 루카리오의 무게 — <span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span><br>= <span class="fr"><span class="n">3</span><span class="d">4</span></span> × <span class="fr"><span class="n">8</span><span class="d">3</span></span><br>= 2</p><p>2배예요.</p></div>
+        <div class="check" id="T9-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T9-1✓</code></div>
+        <div class="qt"><p>피카츄는 나무열매를 <span class="fr"><span class="n">5</span><span class="d">6</span></span> kg 땄고, 루카리오는 <span class="fr"><span class="n">5</span><span class="d">12</span></span> kg 땄어요. 피카츄의 나무열매 무게는 루카리오의 몇 배일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">2</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">25</span><span class="d">72</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>기준은 루카리오의 무게 — <span class="fr"><span class="n">5</span><span class="d">6</span></span> ÷ <span class="fr"><span class="n">5</span><span class="d">12</span></span> = <span class="fr"><span class="n">5</span><span class="d">6</span></span> × <span class="fr"><span class="n">12</span><span class="d">5</span></span> = 2.<br>거꾸로 나누면 <span class="fr"><span class="n">1</span><span class="d">2</span></span>, 곱하면 <span class="fr"><span class="n">25</span><span class="d">72</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T9-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>T9-2</code></div>
+        <div class="say"><p>철근 <span class="fr"><span class="n">2</span><span class="d">3</span></span> m 무게를 재었더니 <span class="fr"><span class="n">4</span><span class="d">5</span></span> kg 나갔어요. 1 m 무게는 얼마일까요?</p><div class="fig"><svg class="frac-fig fbar-fig" data-mode="unit" data-p="2" data-q="3" viewBox="0 0 400 108" width="500" height="135" role="img" aria-label="막대: 3칸 중 2칸이 4/5만큼 — 막대 전체(1만큼)는 ?"><rect class="fb-c" x="30.0" y="34.0" width="113.3" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1"/><rect class="fb-c" x="143.3" y="34.0" width="113.3" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="1"/><rect class="fb-c" x="256.7" y="34.0" width="113.3" height="34.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-on="0"/><path d="M30.0 30 L30.0 22 L256.7 22 L256.7 30" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="143.3" y="18.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-v">4/5</text><path d="M30.0 72 L30.0 80 L370.0 80 L370.0 72" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="200.0" y="98.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="fb-one">1만큼 = ?</text></svg></div><p><span class="fr"><span class="n">2</span><span class="d">3</span></span>만큼이 <span class="fr"><span class="n">4</span><span class="d">5</span></span> — 1만큼 구하기예요.</p><p><span class="fr"><span class="n">4</span><span class="d">5</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span><br>= <span class="fr"><span class="n">4</span><span class="d">5</span></span> × <span class="fr"><span class="n">3</span><span class="d">2</span></span><br>= <span class="fr"><span class="n">12</span><span class="d">10</span></span><br>= <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span></p></div>
+        <div class="check" id="T9-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T9-2✓</code></div>
+        <div class="qt"><p>철근 <span class="fr"><span class="n">3</span><span class="d">4</span></span> m 무게를 재었더니 <span class="fr"><span class="n">3</span><span class="d">5</span></span> kg 나갔어요. 이 철근 1 m 무게는 몇 kg일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">4</span><span class="d">5</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">9</span><span class="d">20</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1 m 무게 = 무게 ÷ 길이 — <span class="fr"><span class="n">3</span><span class="d">5</span></span> × <span class="fr"><span class="n">4</span><span class="d">3</span></span> = <span class="fr"><span class="n">4</span><span class="d">5</span></span>.<br>길이를 무게로 나누면 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">4</span></span></span>, 곱하면 <span class="fr"><span class="n">9</span><span class="d">20</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T9-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>T9-3</code></div>
+        <div class="say"><p>넓이 = 가로 × 세로니까, <strong>세로 = 넓이 ÷ 가로</strong>.</p><p>가로 <span class="fr"><span class="n">3</span><span class="d">4</span></span> m, 넓이 <span class="fr"><span class="n">9</span><span class="d">10</span></span> m²인 직사각형의 세로는</p><p><span class="fr"><span class="n">9</span><span class="d">10</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span><br>= <span class="fr"><span class="n">9</span><span class="d">10</span></span> × <span class="fr"><span class="n">4</span><span class="d">3</span></span><br>= <span class="fr"><span class="n">36</span><span class="d">30</span></span><br>= <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span></p><p>세로는 <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span> m.</p></div>
+        <div class="check" id="T9-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T9-3✓</code></div>
+        <div class="qt"><p>가로가 <span class="fr"><span class="n">2</span><span class="d">3</span></span> m, 넓이가 <span class="fr"><span class="n">8</span><span class="d">9</span></span> m²인 직사각형이 있어요. 세로는 몇 m일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt"><span class="mx">1<span class="fr"><span class="n">1</span><span class="d">3</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">3</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">16</span><span class="d">27</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>세로 = 넓이 ÷ 가로 — <span class="fr"><span class="n">8</span><span class="d">9</span></span> × <span class="fr"><span class="n">3</span><span class="d">2</span></span> = <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">3</span></span></span>.<br>가로를 넓이로 나누면 <span class="fr"><span class="n">3</span><span class="d">4</span></span>, 곱하면 <span class="fr"><span class="n">16</span><span class="d">27</span></span>.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T9-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>T9-4</code></div>
+        <div class="say"><p>계산하지 않고도 몫의 크기를 알 수 있어요.</p><p>6 ÷ <span class="fr"><span class="n">1</span><span class="d">2</span></span> = 12 — 1보다 작은 수로 나누면 커져요.</p><p>6 ÷ <span class="fr"><span class="n">3</span><span class="d">2</span></span> = 4 — 1보다 큰 수로 나누면 작아져요.</p><p>6 ÷ 1 = 6 — 1로 나누면 그대로예요.</p></div>
+        <div class="check" id="T9-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T9-4✓</code></div>
+        <div class="qt"><p>계산하지 않고 고르려고 해요. 몫이 5보다 큰 것은 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5 ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">5 ÷ <span class="fr"><span class="n">4</span><span class="d">3</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">5 × <span class="fr"><span class="n">2</span><span class="d">3</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>나누는 수 <span class="fr"><span class="n">2</span><span class="d">3</span></span> — 1보다 작아서 몫이 5보다 커요.<br><span class="fr"><span class="n">4</span><span class="d">3</span></span> — 1보다 커서 몫이 작아지고, 1보다 작은 수를 곱하면 작아져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="T9-5">
+      <div class="step-no">5</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">5장</span><code>T9-5</code></div>
+        <div class="say"><p>같은 수를 나눌 때는 나누는 수가 작을수록 몫이 커요.</p><p><span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">8</span></span> = 2, <span class="fr"><span class="n">3</span><span class="d">4</span></span> ÷ <span class="fr"><span class="n">3</span><span class="d">2</span></span> = <span class="fr"><span class="n">1</span><span class="d">2</span></span></p><p>몫을 구한 다음엔 <strong>몫 × 나누는 수 = 나누어지는 수</strong>로 확인 — 2 × <span class="fr"><span class="n">3</span><span class="d">8</span></span> = <span class="fr"><span class="n">3</span><span class="d">4</span></span> ✔</p></div>
+        <div class="check" id="T9-5✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>T9-5✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">5</span></span></span> ÷ <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span></strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="mx">2<span class="fr"><span class="n">22</span><span class="d">25</span></span></span></span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">2</span><span class="d">3</span></span></span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span><span class="mx">2<span class="fr"><span class="n">2</span><span class="d">5</span></span></span> = <span class="fr"><span class="n">12</span><span class="d">5</span></span>, <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span> = <span class="fr"><span class="n">6</span><span class="d">5</span></span><br><span class="fr"><span class="n">12</span><span class="d">5</span></span> × <span class="fr"><span class="n">5</span><span class="d">6</span></span> = 2.<br>뒤집지 않으면 <span class="mx">2<span class="fr"><span class="n">22</span><span class="d">25</span></span></span>, 가분수로 잘못 바꾸면 <span class="fr"><span class="n">2</span><span class="d">3</span></span>.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="T9-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>T9-📏</code></div><p>무엇이 기준인지 보고 나눠요 — 1보다 작은 수로 나누면 몫이 커져요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="T9-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>T9-①a</code></div>
+      <div class="say"><p>개굴닌자는 나무열매를 <span class="fr"><span class="n">1</span><span class="d">8</span></span> kg 땄고, 리자몽은 <span class="fr"><span class="n">4</span><span class="d">5</span></span> kg 땄어요. 개굴닌자의 나무열매 무게는 리자몽의 몇 배일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt"><span class="mx">6<span class="fr"><span class="n">2</span><span class="d">5</span></span></span></span><span class="tag">몇 배를 거꾸로 셈</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">10</span></span></span><span class="tag">나누기를 곱하기로 함</span></li><li class="no"><span class="mark"></span><span class="txt"><span class="fr"><span class="n">1</span><span class="d">4</span></span></span><span class="tag">통분하지 않고 분자끼리 나눔</span></li><li class="ok"><span class="mark">✔</span><span class="txt"><span class="fr"><span class="n">5</span><span class="d">32</span></span></span></li></ol>
+    </div><div class="sample" id="T9-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>T9-①b</code></div>
+      <div class="say"><p>계산하지 않고 고르려고 해요. 몫이 9보다 큰 것은 어느 것일까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9 ÷ <span class="fr"><span class="n">3</span><span class="d">4</span></span></span></li><li class="no"><span class="mark"></span><span class="txt">9 × <span class="fr"><span class="n">3</span><span class="d">4</span></span></span><span class="tag">곱하면 늘 커진다고 봄</span></li><li class="no"><span class="mark"></span><span class="txt">9 ÷ <span class="fr"><span class="n">8</span><span class="d">3</span></span></span><span class="tag">분수로 나누면 늘 커진다고 봄</span></li></ol>
+    </div><div class="sample" id="T9-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>T9-②</code></div>
+      <div class="say"><p>나눗셈 9 ÷ <span class="fr"><span class="n">3</span><span class="d">5</span></span> — 몫을 어림해요.</p><p>피카츄가 이렇게 말했어요.</p><p><strong>나누면 늘 작아지니까 몫은 9보다 작아요</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1보다 작은 수로 나누면 몫이 커져요 — 9 ÷ <span class="fr"><span class="n">3</span><span class="d">5</span></span> = 15</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">몫은 9 × <span class="fr"><span class="n">3</span><span class="d">5</span></span> = <span class="mx">5<span class="fr"><span class="n">2</span><span class="d">5</span></span></span></span><span class="tag">나누기를 곱하기로 함</span></li><li class="no"><span class="mark"></span><span class="txt">분수로 나눈 몫은 어림할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="T9-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>T9-👨</code></div>
+    <h3>생활 속 분수의 나눗셈(몇 배·1만큼·넓이에서 길이)에서 무엇을 무엇으로 나눌지 정하고, 몫의 크기를 미리 어림하는 습관을 들인다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="T9-👨말1"><code class="mini">말1</code><span>&quot;몇 배라고 물으면 기준이 누구야? 기준으로 나눠.&quot;</span></li><li id="T9-👨말2"><code class="mini">말2</code><span>&quot;1 m 무게를 물으면 무게를 길이로 나눠야 할까, 길이를 무게로 나눠야 할까?&quot;</span></li><li id="T9-👨말3"><code class="mini">말3</code><span>&quot;계산하기 전에 — 답이 처음 수보다 클까, 작을까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">부엌 저울로 국수 다발처럼 나눌 수 있는 것을 재요. 예를 들어 국수 <span class="fr"><span class="n">1</span><span class="d">2</span></span> 다발이 <span class="fr"><span class="n">3</span><span class="d">10</span></span> kg 나갔다면 한 다발은 얼마일까? 식을 세우고 계산한 뒤 실제로 한 다발을 재 봐요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="T9-👨함정1"><code class="mini">함정1</code><div><div class="kid">몇 배를 구할 때 기준이 되는 양을 나누어지는 수로 둔다</div><div class="dadsay">→ &quot;'○○의 몇 배'에서 ○○가 기준이야. 기준이 되는 양으로 나눠.&quot;</div></div></li><li id="T9-👨함정2"><code class="mini">함정2</code><div><div class="kid">1보다 작은 분수로 나누었는데 답이 작게 나와도 이상하다고 생각하지 않는다</div><div class="dadsay">→ &quot;1보다 작은 수로 나누면 몫이 커져야 해. 다시 볼까?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">철근 문제 — <span class="fr"><span class="n">2</span><span class="d">3</span></span> m 무게가 <span class="fr"><span class="n">4</span><span class="d">5</span></span> kg일 때 1 m 무게 <span class="fr"><span class="n">4</span><span class="d">5</span></span> ÷ <span class="fr"><span class="n">2</span><span class="d">3</span></span> = <span class="mx">1<span class="fr"><span class="n">1</span><span class="d">5</span></span></span> — 이렇게 구하고, 왜 몫이 <span class="fr"><span class="n">4</span><span class="d">5</span></span>보다 큰지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+
+  <footer>신코치 ➗ 수학 · 분수의 나눗셈 줄기 배움 원고 · 2026-10-06</footer>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('ans');
+  function apply(){document.body.classList.toggle('hide-ans',!cb.checked);}
+  try{var v=localStorage.getItem('fdv-review-ans');if(v==='0'){cb.checked=false;}}catch(e){}
+  cb.addEventListener('change',function(){apply();try{localStorage.setItem('fdv-review-ans',cb.checked?'1':'0');}catch(e){}});
+  apply();
+})();
+</script>

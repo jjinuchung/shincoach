@@ -25,6 +25,7 @@ import * as exprGen from './mathexpr.js';
 import * as equGen from './mathequ.js';
 import * as coordGen from './mathcoord.js';
 import * as spaceGen from './mathspace.js';
+import * as fdivGen from './mathfdiv.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -73,8 +74,11 @@ export const STEMS = {
   // S 공간과 입체 — R 다음 칸, 초6 2학기 「공간과 입체」 미래엔 6-2 지도서 134~135쪽 흐름도·2022 성취기준 [6수03-09·10]으로 범위 확인 (2026-10-06 아버님 "다음 줄기 「공간과 입체」 해보자" → 설계안 "이대로 진행하자").
   // 초6 9칸 · O 직육면체의 쌓기나무 세기가 위·앞·옆에서 본 모양으로 · 개수는 숫자판, 방향·본 모양·쌓은 모양은 보기 · 쌓기나무 그림 [stack]·[views]·[top]·[layers] · 본 모양 고르기(S1·S2·S5)는 ✍️ 칸 칠하기 판(drawview mode 'cells', S1·S5는 v195)
   space: { key: 'space', code: 'S', label: '공간과 입체 줄기', range: '초6', list: spaceGen.SPACE, gen: spaceGen, file: './coach/math/space.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (어느 방향에서 보았나부터 — 학교 6-2 3단원 · O 직육면체 줄기를 먼저 하면 쉬워요)', intro: '공간과 입체 문제 5개를 먼저 풀어 볼게요. 보는 쪽(앞·옆·위)과 뒤에 숨은 쌓기나무를 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // T 분수의 나눗셈 — A 분수 줄기의 나눗셈은 두 칸뿐이고 배움 장이 없다 · 2026-10-01 📊 사진에서 A "분수 ÷ 분수" ①이 찍기였다. 미래엔 6-1·6-2 지도서 86쪽 흐름도·2022 [6수01-10·11]로 범위 확인
+  // (2026-10-06 아버님 "초등 줄기(분수의 나눗셈)를 먼저 하자" → 설계안 "이대로 진행하자"). 초6 9칸 · 사다리에서 A 바로 뒤 · 답은 숫자판(수·분수·대분수 칸, 약분 안 한 답도 맞음) · 나눗셈 막대 [fbar take|share|unit]은 배움·② 일부에만
+  fracdiv: { key: 'fracdiv', code: 'T', label: '분수의 나눗셈 줄기', range: '초6', list: fdivGen.FDIV, gen: fdivGen, file: './coach/math/fracdiv.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (나눗셈의 몫을 분수로 나타내기부터 —학교 6-1·6-2 분수의 나눗셈 · A 분수 줄기(분수 × 분수까지)를 먼저 하면 쉬워요)', intro: '분수의 나눗셈 문제 5개를 먼저 풀어 볼게요. 무엇을 무엇으로 나누는지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];
+export const STEM_ORDER = ['fraction', 'fracdiv', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
