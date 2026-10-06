@@ -344,7 +344,7 @@ function pushLog(m, entry) {
 function logQ(q) {
   return { k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }), ...(q.sn === undefined ? {} : { sn: q.sn ? 1 : 0 }), ...(q.w ? { w: q.w } : {}),
     // 🔢 숫자판(2026-10-01) — p: 직접 쓴 답 · g: 어느 보기와도 다른 "짐작한 답"의 값 (오개념엔 안 넣고 부모가 보게)
-    ...(q.p ? { p: 1 } : {}), ...(q.g ? { g: String(q.g).slice(0, 16) } : {}),
+    ...(q.p ? { p: 1 } : {}), ...(q.g ? { g: String(q.g).slice(0, 24) } : {}), // 24자 — 🧊 칠하기 판의 "뒤 줄부터 ■■■ / ■■■ / ■■■"(21자)가 셋째 줄까지 (Codex 34차 #3)
     // pf: 값은 맞는데 꼴('form' — 대분수로·소수로를 물었는데 다른 꼴) · 약분('reduce')만 틀림 — 짐작이 아니다 (Codex 18차 #4)
     ...(q.pf === 'form' || q.pf === 'reduce' ? { pf: q.pf } : {}) };
 }

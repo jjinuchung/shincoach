@@ -74,6 +74,20 @@ function allFits(topCells, front, side) {
 /** 't:110/011' → 칸 표 (j = 0이 앞) */
 const topCellsOf = (t) => t.slice(2).split('/').map((r) => [...r].map(Number)).reverse();
 
+/** 't:110/011/111' 위 모양을 종이째 90°·180°·270° 돌린 것 — 칸 (줄 r, 칸 c)를 (c, n − 1 − r)로 옮겨 가며 (정사각형 바닥만) */
+function turnsOfTop(t) {
+  let g = t.slice(2).split('/').map((r) => [...r]);
+  const n = g.length;
+  const out = [];
+  for (let k = 0; k < 3; k++) {
+    const h = Array.from({ length: n }, () => Array(n).fill('0'));
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) h[c][n - 1 - r] = g[r][c];
+    g = h;
+    out.push(`t:${g.map((r) => r.join('')).join('/')}`);
+  }
+  return g[0].length === n ? out : [];
+}
+
 /** 바깥에 드러난 면 (바닥 빼고) — 쌓기나무마다 이웃이 없는 위·네 옆 */
 function paintCount(H) {
   let n = 0;
@@ -284,7 +298,8 @@ function tagHolds(sv, tag, text) {
     case `pickView ${TAGS.sideMix}`: return ['front', 'back'].includes(f.d) ? [seen(H, 'right'), seen(H, 'left')].includes(f.C[text]) : [seen(H, 'front'), seen(H, 'back')].includes(f.C[text]);
     case `pickView ${TAGS.nearOnly}`: return f.d === 'front' ? f.C[text] === `s:${H[0].join(',')}` : f.C[text] === `s:${H.map((row) => row[row.length - 1]).join(',')}`;
     case `pickView ${TAGS.flipFB}`: return f.C[text] === fromTop(H.slice().reverse());
-    case `pickView ${TAGS.turnTop}`: return f.C[text] === fromTop(H[0].map((_, i) => H.map((row) => row[i])));
+    // 돌려 놓은 위 모양 = 90°·180°·270° 중 하나 — 이 파일이 칸 자리를 따로 돌린다 (Codex 34차 #5: 생성기와 같은 "가로세로 바꾸기"를 베껴 대각선 뒤집기를 돌리기로 받아 줬다)
+    case `pickView ${TAGS.turnTop}`: return f.C[text] !== fromTop(H) && turnsOfTop(fromTop(H)).includes(f.C[text]);
     case `pickView ${TAGS.sumView}`: return f.d === 'front' && f.C[text] === `s:${H[0].map((_, i) => H.reduce((a, row) => a + row[i], 0)).join(',')}`;
     case `count ${TAGS.visibleOnly}`: return v === paintSvg(stackSvgOf(H)).visible.size;
     case `count ${TAGS.cellsOnly}`: return v === cellsN(H);
@@ -605,8 +620,13 @@ test('★ 아직 안 배운 말을 앞 칸에 쓰지 않는다 — 층별 S6 · 
 /** 참이라고 내미는 글에 틀린 말 — 오답 보기·② 보여 준 말은 빼고, 굵게(**)는 떼고 */
 const BAD = [
   [/뒤에서 본 모양은 앞에서 본 모양과 같아/, '뒤에서 보면 좌우가 바뀐다'],
-  [/거울에 비친 모양(?:도|은) 같은 모양/, '거울 모양은 돌려도 겹쳐지지 않는다'],
+  // (Codex 34차 #4) 거울에 비친 모양이 늘 다른 것은 아니다 — 한 층 ㄴ자와 그 거울 모양은 뒤집으면 겹쳐진다. 예전 이 줄은 거꾸로 "거울 모양은 같다"를 막아 오개념을 굳혔다
+  [/거울에 비친 모양은[^.\n]*(?:다른 모양|겹쳐지지 않)/, '거울 모양도 뒤집으면 겹쳐질 수 있다 (한 층 ㄴ자)'],
+  [/마주 보는 두 모양은[^.\n]*겹쳐지지 않/, '거울 모양도 뒤집으면 겹쳐질 수 있다 (한 층 ㄴ자)'],
   [/칸 수가 (?:곧 )?쌓기나무(?:의)? 개수/, '칸 하나에 여러 층'],
+  // (Codex 34차 #6) 세 모양이 같아도 여러 가지로 쌓을 수 있다 (S8)
+  [/위·앞·옆에서 본 모양이 있으면 개수를 알 수 있/, '세 모양이 같아도 여러 가지로 쌓을 수 있다'],
+  [/위·앞·옆에서 본 모양\**을 함께 보면 쌓은 모양을 알아낼 수 있어요/, '세 모양이 같아도 여러 가지로 쌓을 수 있다'],
 ];
 test('★ 참말에 틀린 말이 없다 — 뒤에서 본 모양·거울 모양·칸 수', () => {
   const truths = (q) => [q.choices.find((x) => x.ok).text, ...(q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule] : [])].join('\n').replace(/\*\*/g, '');
@@ -871,7 +891,8 @@ test('🎨 원고의 그림: 모두 그려진다 · 한 장의 높이 표는 하
       for (const X of Hs.slice(1)) assert.deepEqual(X, Hs[0], `${where}: 한 장에 서로 다른 높이 표 — 아이가 어느 그림 이야기인지 헷갈린다`);
       const V3 = F.filter((x) => x.kind === 'views').map((x) => viewsOf(x.arg)).find((v) => v['위'] || v['앞'] || v['옆']) || null;
       const LV = F.filter((x) => x.kind === 'views').map((x) => viewsOf(x.arg)).find((v) => v['㉠']) || null;
-      const CD = F.filter((x) => x.kind === 'stacks').map((x) => stacksOf(x.arg))[0] || null;
+      // 한 장에 후보 그림이 여럿이면(㉠㉡ · ㉢㉣) 이름으로 합친다
+      const CD = F.some((x) => x.kind === 'stacks') ? Object.assign({}, ...F.filter((x) => x.kind === 'stacks').map((x) => stacksOf(x.arg))) : null;
       const need = (x, what) => assert.ok(x, `${where}: ${what}을 말하는데 그림이 없다`);
       // 함께 그린 위·앞·옆 모양 = 그 높이 표의 모양
       if (H && V3) {
@@ -899,7 +920,8 @@ test('🎨 원고의 그림: 모두 그려진다 · 한 장의 높이 표는 하
         assert.deepEqual(a, b, `${where}: "${m[0]}" — 보이는 쌓기나무가 다르다`); assert.notDeepEqual(CD[m[1]], CD[m[2]]); n.look++;
       }
       for (const m of say.matchAll(/([㉠-㉣])과 ([㉠-㉣])은 [^.]*?(같은 모양|다른 모양)이에요/g)) { assert.equal(sameShape(CD[m[1]], CD[m[2]]), m[3] === '같은 모양', `${where}: "${m[0]}"`); n.same++; }
-      for (const m of say.matchAll(/([㉠-㉣])과 ([㉠-㉣])은 거울에 비친/g)) { const A = CD[m[1]]; const B = CD[m[2]]; assert.ok(!sameShape(A, B) && sameShape(mirrorOfH(A), B), `${where}: "${m[0]}"`); n.mirror++; }
+      // 거울에 비친 모양이라는 말은 거울 관계만 — 같은지 다른지는 "같은/다른 모양이에요" 대조가 따로 본다 (Codex 34차 #4: 거울 모양도 뒤집으면 같을 수 있다)
+      for (const m of say.matchAll(/([㉠-㉣])과 ([㉠-㉣])은 거울에 비친/g)) { const A = CD[m[1]]; const B = CD[m[2]]; assert.ok(sameShape(mirrorOfH(A), B), `${where}: "${m[0]}" — 거울 모양이 아니다`); n.mirror++; }
       if (/둘 다 세 모양에 맞아요/.test(say)) { need(V3 && CD, '세 모양과 후보'); for (const [k, X] of Object.entries(CD)) assert.ok(fitsV(X, V3), `${where}: ${k}이 세 모양에 안 맞는다`); n.fits++; }
       for (const m of say.matchAll(/세 모양에 모두 맞는 것은 ([㉠-㉣])/g)) { for (const [k, X] of Object.entries(CD)) assert.equal(fitsV(X, V3), k === m[1], `${where}: "${m[0]}" — ${k}`); n.fits++; }
       for (const m of say.matchAll(/가장 (많이|적게) 쌓을 때 (?:[\d +]+ = )?(\d+)개/g)) {
@@ -1100,4 +1122,59 @@ test('🔍 "바깥 면 = 본 모양의 칸 수"는 움푹 들어간 곳이 없�
   for (const c of SPACE) assert.deepEqual(bad([c.idea, c.rule, c.slip].join('\n')), [], c.id);
   for (const k of ['calc', 'misread']) for (let s = 1; s <= SEEDS; s++) assert.deepEqual(bad(allText(qOf('spc.apply', k, s))), [], `spc.apply ${k} #${s}`);
   for (const id of IDS) assert.deepEqual(bad(contentText(CONTENT[id])), [], id);
+});
+
+// ───────────────────── 🔍 Codex 34차 (2026-10-06) ─────────────────────
+
+test('🔍 Codex 34차 #1·#2: ② 보기의 결론이 정답과 같은 수·같은 본 모양이면 그 보기가 정답이다 — 칸이 모두 1층이면 "위에서 본 칸만 — 5개"도 맞았다(S4 #34) · 4개가 있으면 "2 × 2 = 4개만 더"도 맞았다(S9 #15)', () => {
+  // 보기 글의 마지막 수 (본 모양 "왼쪽부터 …층"은 목록째로 따로)
+  const endN = (t) => { const m = String(t).match(/(\d+)개[^\d]*$/) || String(t).match(/= (\d+)[^\d]*$/); return m ? m[1] : null; }; // "…5개" · "… = 8" (층 이름 "2층"은 개수가 아니다)
+  const list = (t) => (String(t).match(/왼쪽부터 ([\d, ]+)층/) || [])[1] || null;
+  let n = 0;
+  for (const { c, s, q } of every(['misread'])) {
+    const ok = q.choices.find((x) => x.ok);
+    for (const w of q.choices.filter((x) => !x.ok && x.text !== '맞게 말했어요')) {
+      if (endN(ok.text) && endN(w.text)) { assert.notEqual(endN(w.text), endN(ok.text), `${c.id} #${s}: 오답 "${w.text}"의 결론이 정답 "${ok.text}"과 같다\n${q.q}`); n++; }
+      if (list(ok.text) && list(w.text)) { assert.notEqual(list(w.text), list(ok.text), `${c.id} #${s}: 오답 "${w.text}"의 본 모양이 정답과 같다`); n++; }
+    }
+  }
+  assert.ok(n > SEEDS * 4, `대조한 오답 ${n}`);
+  // S9 ② "바닥만 채움" 오답은 정말 1층의 빈 칸 수다
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = qOf('spc.apply', 'misread', s);
+    if (q.probe.ask !== 'misCube') continue;
+    const H = rowsOf(figsOf(q.q).find((x) => x.kind === 'top').arg);
+    const fl = q.choices.find((x) => x.tag === TAGS.floorOnly);
+    assert.ok(fl && Number(fl.text.match(/(\d+)개/)[1]) === 4 - cellsN(H), `spc.apply misread #${s}: ${fl && fl.text}`);
+  }
+});
+
+test('🔍 Codex 34차 #3: 칠하기 판의 짐작한 답은 📊 기록에 셋째 줄까지 남는다 — 16자에서 잘려 "뒤 줄부터 ■■■ / ■■■"가 됐다', async () => {
+  const { applyRound, conceptReport } = await import('../js/mathprog.js');
+  const { emptyMath } = await import('../js/db.js');
+  const m = emptyMath();
+  const a = '뒤 줄부터 ■■■ / ■■■ / ■■■'; const b = '뒤 줄부터 ■■■ / ■■■ / ■■□';
+  applyRound(m, 'spc.view', { correct: 0, total: 2, missTags: [], qs: [{ k: 'calc', ok: false, p: 1, g: a }, { k: 'calc', ok: false, p: 1, g: b }] }, '2026-10-06');
+  const rep = conceptReport(m).find((x) => x.id === 'spc.view');
+  assert.deepEqual(rep.guesses, [a, b], '두 짐작이 셋째 줄까지 따로 남는다');
+});
+
+test('🔍 Codex 34차 #4: 거울에 비친 모양이 늘 다른 모양은 아니다 — 한 층 ㄴ자와 그 거울 모양은 뒤집으면 같고, 2층으로 쌓는 나선 둘만 끝까지 다르다 · 원고 S7이 두 경우를 다 보여 준다', () => {
+  assert.ok(sameShape(rowsOf('1 0 0 / 1 1 1'), mirrorOfH(rowsOf('1 0 0 / 1 1 1'))), '한 층 ㄴ자와 거울 모양은 같은 모양');
+  assert.ok(!sameShape(rowsOf('0 1 / 2 1'), mirrorOfH(rowsOf('0 1 / 2 1'))), '나선과 거울 모양은 다른 모양');
+  const P = polyShapes(4);
+  assert.equal(P.all - P.mirrorOne, 1, '4개짜리에서 거울 짝이 따로인 것은 한 쌍뿐');
+  // 원고 S7 배움 글의 "㉠과 ㉡은 거울에 비친" — 같은 모양인 쌍과 다른 모양인 쌍이 둘 다 나온다
+  const kinds = new Set();
+  for (const p of CONTENT['spc.make'].lesson) {
+    const say = fillC(p.say);
+    const CD = Object.assign({}, ...figsOf(say).filter((x) => x.kind === 'stacks').map((x) => stacksOf(x.arg)));
+    for (const m of say.matchAll(/([㉠-㉣])과 ([㉠-㉣])은 거울에 비친/g)) kinds.add(sameShape(CD[m[1]], CD[m[2]]) ? 'same' : 'diff');
+  }
+  assert.deepEqual([...kinds].sort(), ['diff', 'same'], `원고가 보여 준 거울 쌍: ${[...kinds]}`);
+  // 생성기 ② 거울 갈래의 고치는 말도 "이 두 모양"의 일이다 (일반 규칙으로 말하지 않는다 — BAD가 본다)
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = qOf('spc.make', 'misread', s);
+    if (q.probe.ask === 'misMirror') assert.ok(!/거울에 비친 모양은/.test(q.choices.find((x) => x.ok).text), `#${s}`);
+  }
 });

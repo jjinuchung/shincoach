@@ -67,6 +67,8 @@ const frontV = (g) => g[0].map((_, i) => Math.max(...g.map((row) => row[i])));
 const sideV = (g) => g.map((row) => Math.max(...row));
 /** 위에서 본 모양 "110/111" (첫 줄이 뒤) */
 const footV = (g) => [...g].reverse().map((row) => row.map((h) => (h ? 1 : 0)).join('')).join('/');
+/** 위에서 본 모양 "110/011/111"을 종이째 시계 방향으로 90° 돌린 것 (정사각형 바닥) — 가로세로 바꾸기(전치)는 대각선 뒤집기라 "돌려 놓음"이 아니다 (Codex 34차 #5) */
+const turnFoot = (f) => { const R = f.split('/'); return [...R[0]].map((_, i) => R.map((row) => row[i]).reverse().join('')).join('/'); };
 const prof = (h) => h.join(',');
 const rev = (a) => [...a].reverse();
 const mirrorG = (g) => g.map((row) => rev(row));
@@ -251,7 +253,7 @@ export const TAGS = {
   // S7 조건에 따라 모양 만들기
   rotDiff: '돌린 모양을 다른 모양으로 봄',
   diffShape: '다른 모양을 같은 모양으로 봄',
-  mirrorSame: '거울에 비친 모양을 같은 모양으로 봄',
+  mirrorSame: '겹쳐지지 않는 거울 모양을 같은 모양으로 봄',
   // S8 가장 적게·가장 많이
   maxForMin: '가장 많을 때를 답함',
   minForMax: '가장 적을 때를 답함',
@@ -354,7 +356,7 @@ export const SPACE = [
           const F = frontV(x); const S = sideV(x);
           const list = d === 'front' ? [prof(F), prof(rev(F)), prof(S), prof(x[0])] : d === 'side' ? [prof(S), prof(rev(S)), prof(F), prof(x.map((row) => row[2]))] : null;
           if (list) return new Set(list).size === 4 && list.every((v) => !/(^|,)0(,|$)/.test(v)) && readable(x);
-          const T = [footV(x), footV(mirrorG(x)), footV(flipG(x)), footV(x[0].map((_, i) => x.map((row) => row[i])))];
+          const T = [footV(x), footV(mirrorG(x)), footV(flipG(x)), turnFoot(footV(x))];
           return new Set(T).size === 4 && readable(x); // 무거운 보임 검사는 맨 뒤에
         }, 0.25);
         const F = frontV(g); const S = sideV(g);
@@ -369,7 +371,7 @@ export const SPACE = [
           steps = [`오른쪽 옆에서는 왼쪽이 앞 줄 — 줄마다 가장 높은 층 ${S.join(', ')}층`];
           why = { [TAGS.mirrorView]: '그것은 왼쪽 옆에서 본 모양이에요 — 오른쪽 옆에서 보면 앞 줄이 왼쪽이에요.', [TAGS.sideMix]: '그것은 앞에서 본 모양이에요.', [TAGS.nearOnly]: '오른쪽 끝 기둥들만 본 모양이에요 — 안쪽 기둥이 더 높으면 그 위로 보여요.' };
         } else {
-          const turned = footV(g[0].map((_, i) => g.map((row) => row[i])));
+          const turned = turnFoot(footV(g));
           list = [{ v: footV(g) }, { v: footV(mirrorG(g)), tag: TAGS.mirrorView }, { v: footV(flipG(g)), tag: TAGS.flipFB }, { v: turned, tag: TAGS.turnTop }];
           steps = ['위에서 내려다보면 바닥 칸이 보여요 — 앞 줄이 아래쪽', `뒤 줄부터 ${footV(g).split('/').map((row) => [...row].map((x) => (x === '1' ? '■' : '□')).join('')).join(' / ')}`];
           why = { [TAGS.mirrorView]: '좌우가 바뀌었어요.', [TAGS.flipFB]: '앞뒤가 바뀌었어요 — 위에서 본 모양은 앞 줄이 아래쪽이에요.', [TAGS.turnTop]: '돌려 놓은 모양이에요 — 앞 줄이 아래쪽에 오게 놓아요.' };
@@ -472,7 +474,7 @@ export const SPACE = [
 
   {
     id: 'spc.count2', grade: 6, name: '쌓기나무의 개수 (2)', needs: ['spc.count1'],
-    idea: '**위·앞·옆에서 본 모양**을 함께 보면 쌓은 모양을 알아낼 수 있어요. 위에서 본 모양으로 자리를, 앞에서 본 모양으로 왼쪽부터 기둥마다 가장 높은 층을, 옆에서 본 모양으로 앞 줄부터 줄마다 가장 높은 층을 맞춰 보아요.',
+    idea: '**위·앞·옆에서 본 모양**을 함께 보면 칸마다 몇 층인지 알아낼 수 있을 때가 많아요(세 모양이 같아도 여러 가지로 쌓을 수 있는 경우는 뒤에서 배워요). 위에서 본 모양으로 자리를, 앞에서 본 모양으로 왼쪽부터 기둥마다 가장 높은 층을, 옆에서 본 모양으로 앞 줄부터 줄마다 가장 높은 층을 맞춰 보아요.',
     rule: '위 모양으로 자리, 앞·옆 모양으로 층 — 세 모양에 모두 맞게.',
     slip: '세 모양에 모두 맞는지, 칸마다 몇 층인지 봐요.',
     calc(r, c) {
@@ -528,7 +530,7 @@ export const SPACE = [
     },
     misread(r, c) {
       if (branchOf(r, c, ['sum', 'max']) === 'sum') {
-        const g = genStack(r, 3, 2, 3, 5, 12, (x) => fitAll(topOf(x), frontV(x), sideV(x)).n === 1);
+        const g = genStack(r, 3, 2, 3, 5, 12, (x) => total(x) !== cellsOf(x) && fitAll(topOf(x), frontV(x), sideV(x)).n === 1); // 칸 수 ≠ 개수 — "위에서 본 칸만"이 우연히 맞지 않게 (Codex 34차 #1)
         const F = frontV(g); const S = sideV(g); const fs = F.reduce((a, b) => a + b, 0); const ss = S.reduce((a, b) => a + b, 0);
         return misAsk(r, c, this, 'sum', {
           q: `위, 앞, 옆에서 본 모양을 보고\n\n${VW([['위', footV(g)], ['앞', prof(F)], ['옆', prof(S)]])}\n\n${showWork(`세 모양의 칸을 더하면 ${cellsOf(g)} + ${fs} + ${ss} = ${cellsOf(g) + fs + ss}, 쌓기나무는 ${cellsOf(g) + fs + ss}개예요`)}`,
@@ -708,7 +710,7 @@ export const SPACE = [
 
   {
     id: 'spc.make', grade: 6, name: '조건에 따라 모양 만들기', needs: ['spc.layer'],
-    idea: '쌓기나무 2개로는 1가지, 3개로는 2가지 모양을 만들 수 있어요. **돌리거나 뒤집었을 때 모양이 같으면 같은 모양**으로 생각해요. 거울에 비친 것처럼 마주 보는 두 모양은 쌓기나무를 아무리 돌려도 겹쳐지지 않으니 다른 모양이에요.',
+    idea: '쌓기나무 2개로는 1가지, 3개로는 2가지 모양을 만들 수 있어요. **돌리거나 뒤집었을 때 모양이 같으면 같은 모양**으로 생각해요. 거울에 비친 것처럼 마주 보는 두 모양도 돌리거나 뒤집어 보고, 겹쳐지면 같은 모양, 끝까지 겹쳐지지 않으면 다른 모양이에요.',
     rule: '돌리거나 뒤집어서 겹쳐지면 같은 모양.',
     slip: '머릿속으로 돌려 보고, 쌓기나무가 몇 개씩 어떻게 붙어 있는지 봐요.',
     calc(r, c) {
@@ -725,7 +727,7 @@ export const SPACE = [
           t: `쌓기나무 4개로 만든 모양이에요. 돌리거나 뒤집었을 때 이 모양과 같은 모양은 어느 것일까요?\n\n[stack ${stackText(given)} free]\n\n[stacks ${P.pairs.map(([k, v]) => `${k}=${v}`).join(' ')} free]`,
           text: true, ans: P.ans, wr: P.wr,
           steps: ['쌓기나무가 몇 개씩 어떻게 붙어 있는지 봐요 — 한 줄에 몇 개, 위에 몇 개', `돌려 보면 ${P.ans}과 겹쳐져요`],
-          why: { [TAGS.diffShape]: '돌리거나 뒤집어도 겹쳐지지 않아요 — 붙어 있는 모양이 달라요.', [TAGS.mirrorSame]: '거울에 비친 모양이에요 — 쌓기나무를 아무리 돌려도 겹쳐지지 않아요.' },
+          why: { [TAGS.diffShape]: '돌리거나 뒤집어도 겹쳐지지 않아요 — 붙어 있는 모양이 달라요.', [TAGS.mirrorSame]: '주어진 모양이 거울에 비친 모양인데, 돌리거나 뒤집어도 겹쳐지지 않아요 — 다른 모양이에요.' },
           probe: { ask: 'same' },
         };
       };
@@ -763,10 +765,10 @@ export const SPACE = [
       const M = TETRA.find((t) => t.key === A.mirror);
       return misAsk(r, c, this, 'mirror', {
         q: `쌓기나무 4개로 만든 두 모양 ㉠, ㉡을 보고\n\n[stacks ㉠=${stackTok(pick(r, A.gs))} ㉡=${stackTok(pick(r, M.gs))} free]\n\n${showWork('㉠과 ㉡은 거울에 비친 것처럼 마주 보니까 같은 모양이에요')}`,
-        ok: '거울에 비친 모양은 쌓기나무를 아무리 돌려도 겹쳐지지 않아요 — 다른 모양이에요',
+        ok: '㉠을 아무리 돌리거나 뒤집어도 ㉡과 꼭 맞게 겹쳐지지 않아요 — 다른 모양이에요',
         wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: '쌓기나무 수가 달라서 다른 모양이에요', tag: TAGS.wrongReason }, { text: '쌓기나무 모양은 돌릴 수 없어요', tag: OFF }],
         steps: ['㉠을 이리저리 돌려 ㉡에 맞춰 봐요', '어떻게 돌려도 하나는 반대쪽에 붙어 겹쳐지지 않아요 → 다른 모양'],
-        whyAny: '거울에 비친 모양은 돌리기만으로는 만들 수 없어요.',
+        whyAny: '거울에 비친 것처럼 보여도 겹쳐지는지 직접 돌리고 뒤집어 봐야 해요 — 이 두 모양은 끝까지 겹쳐지지 않아요.',
         probe: { ask: 'misMirror' },
       });
     },
@@ -868,11 +870,11 @@ export const SPACE = [
     },
     misread(r, c) {
       if (branchOf(r, c, ['cube', 'paint']) === 'cube') {
-        const g = genStack(r, 2, 2, 2, 3, 6, (x) => maxH(x) === 2 && total(x) < 8, 0.15);
+        const g = genStack(r, 2, 2, 2, 3, 6, (x) => maxH(x) === 2 && total(x) < 8 && cellsOf(x) < 4, 0.15); // 1층에 빈 칸이 있어야 "1층 빈 칸만" 오답이 선다 (Codex 34차 #2)
         return misAsk(r, c, this, 'cube', {
           q: `위에서 본 모양에 수를 쓴 그림을 보고, 더 쌓아서 가장 작은 정육면체를 만들려고 해요.\n\n${TOP(g)}\n\n${showWork('정육면체는 2 × 2 × 2 = 8개니까 8개가 더 필요해요')}`,
           ok: `이미 쌓은 ${total(g)}개를 빼야 해요 — 8 − ${total(g)} = ${8 - total(g)}개`,
-          wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `2 × 2 = 4개만 더 놓으면 돼요`, tag: TAGS.floorOnly }, { text: '정육면체는 쌓기나무로 만들 수 없어요', tag: OFF }],
+          wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `1층의 빈 칸만 채우면 돼요 — ${4 - cellsOf(g)}개`, tag: TAGS.floorOnly }, { text: '정육면체는 쌓기나무로 만들 수 없어요', tag: OFF }],
           steps: ['가장 작은 정육면체: 2 × 2 × 2 = 8개', `지금 ${sumText(g)} = ${total(g)}개 → 8 − ${total(g)} = ${8 - total(g)}`],
           whyAny: '8개는 정육면체 전체예요. 더 필요한 수는 이미 쌓은 것을 빼요.',
           probe: { ask: 'misCube' },
