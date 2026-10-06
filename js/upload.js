@@ -7,6 +7,7 @@
 //   (같은 jjinuchung.github.io 주소의 다른 Pages도 localStorage를 같이 쓰지만, 공개 Pages는 신코치뿐이다)
 // 올리는 것: math/YYYY-MM-DD.md (📋 수학 기록 글 + ❓ 답할 차례인 질문 글 — 같은 날은 덮어쓴다)
 //           math/latest.json (수학 기록 원본 전체 — 복사 글은 12개념까지라 진단은 원본으로)
+//           essay/todo.md · essay/todo.json (✍️ 아직 아빠가 고쳐 주지 않은 글 — 📊 "📮 고쳐 주세요"와 같은 글·같은 [번호], 2026-10-06 v199)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 
@@ -25,6 +26,29 @@ export function reportFiles(math, today, reportText, askText) {
   return [
     { path: `math/${today}.md`, text: md },
     { path: 'math/latest.json', text: `${JSON.stringify({ day: today, math: math || null }, null, 1)}\n` },
+  ];
+}
+
+/**
+ * ✍️ 고칠 에세이 글 (순수) — stats.collectTodo 목록 그대로(오래된 글이 [1], 📊와 같은 번호).
+ * Claude는 이걸 읽어 coach/fixes.json에 written → fixed로 적고 배포한다 (태블릿에 아무것도 안 넣는다)
+ * @param {Array<{id:string, date?:string, origin?:string, written:string, fixed?:string, notes?:string[]}>} todo
+ */
+export function essayFiles(todo, today) {
+  const list = (Array.isArray(todo) ? todo : []).filter((e) => e && e.written);
+  const lines = [`✍️ 진우가 쓴 영어 문장 — 아직 아빠가 고쳐 주지 않은 글 ${list.length}개 (${today}) · 번호는 📊 "📮 고쳐 주세요"와 같아요`, ''];
+  list.forEach((e, i) => {
+    lines.push(`[${i + 1}] ${e.date || ''} 배운 문장: ${e.origin || ''}`);
+    lines.push(`    진우: ${e.written}`);
+    if (e.fixed && e.fixed !== e.written) lines.push(`    앱 교정: ${e.fixed}`);
+    if (Array.isArray(e.notes) && e.notes.length) lines.push(`    앱 메모: ${e.notes.join(' · ')}`);
+    lines.push('');
+  });
+  if (!list.length) lines.push('(고칠 글 없음)');
+  const json = list.map((e, i) => ({ no: i + 1, id: e.id, date: e.date || '', origin: e.origin || '', written: e.written, fixed: e.fixed || '', notes: Array.isArray(e.notes) ? e.notes : [] }));
+  return [
+    { path: 'essay/todo.md', text: `${lines.join('\n').trim()}\n` },
+    { path: 'essay/todo.json', text: `${JSON.stringify(json, null, 1)}\n` },
   ];
 }
 
@@ -138,10 +162,14 @@ export function sendReport({ force = false } = {}) {
   running = (async () => {
     const token = getToken();
     if (!token) return { ok: false, skipped: true, why: '열쇠가 없어요' };
-    const [{ getMath }, prog, ask, { todayKey }] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js')]);
+    const [{ getMath, listDaily }, prog, ask, { todayKey }, st] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js')]);
     const math = await getMath().catch(() => null);
+    const days = await listDaily().catch(() => []);
     const today = todayKey();
-    const files = reportFiles(math, today, math ? prog.mathReportText(math, today) : '(수학 기록 없음)', math ? ask.asksText(math, today) : '');
+    const files = [
+      ...reportFiles(math, today, math ? prog.mathReportText(math, today) : '(수학 기록 없음)', math ? ask.asksText(math, today) : ''),
+      ...essayFiles(st.collectTodo(days), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
+    ];
     const hash = hashOf(files);
     const online = typeof navigator === 'undefined' || navigator.onLine !== false;
     if (!force && !shouldAuto({ token, online, now: Date.now(), state: uploadState(), hash })) return { ok: false, skipped: true };

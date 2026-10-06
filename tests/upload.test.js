@@ -4,7 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { DATA_REPO, DATA_BRANCH, AUTO_GAP_MS, reportFiles, b64, hashOf, cleanToken, shouldAuto, whyOf, putFile } from '../js/upload.js';
+import { DATA_REPO, DATA_BRANCH, AUTO_GAP_MS, reportFiles, essayFiles, b64, hashOf, cleanToken, shouldAuto, whyOf, putFile } from '../js/upload.js';
+import { collectTodo, essayNumbers } from '../js/stats.js';
 
 const src = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const unb64 = (s) => new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
@@ -142,4 +143,28 @@ test('📤 화면 연결 — 홈으로 올 때·앱을 내릴 때 저절로 · �
     }
   }
   assert.ok(!/github_pat_[A-Za-z0-9_]{40,}|ghp_[A-Za-z0-9]{30,}/.test(src('index.html')));
+});
+
+test('✍️ 고칠 에세이 글도 올린다 (v199) — 📊 "📮 고쳐 주세요"와 같은 글·같은 [번호](오래된 글이 [1]) · 고쳐 준 글은 빼고 · 날짜·배운 문장·앱 교정까지', () => {
+  const days = [
+    { date: '2026-10-05', essays: [{ id: 'b1', origin: 'I know, right?', written: 'I know right', fixed: 'I know, right?', notes: ['쉼표'] }, { id: 'b2', origin: 'x', written: 'done one', coachFix: 'Done one.' }] },
+    { date: '2026-10-03', essays: [{ id: 'a1', origin: 'You look great.', written: 'you look grate' }, { id: 'a0', origin: 'y', written: '' }] },
+    { date: '2026-10-06', essays: [{ id: 'c1', origin: 'Let us go.', written: 'Lets go' }] },
+  ];
+  const todo = collectTodo(days);
+  assert.deepEqual(todo.map((e) => [e.id, e.date]), [['a1', '2026-10-03'], ['b1', '2026-10-05'], ['c1', '2026-10-06']], '오래된 날부터 · 고쳐 준 글·빈 글 빼고 · 날짜를 붙여');
+  const nums = essayNumbers(days);
+  const [md, js] = essayFiles(todo, '2026-10-06');
+  assert.deepEqual([md.path, js.path], ['essay/todo.md', 'essay/todo.json']);
+  const parsed = JSON.parse(js.text);
+  assert.deepEqual(parsed.map((e) => [e.no, e.id]), todo.map((e) => [nums.get(e.id), e.id]), '번호가 📊 화면의 [번호]와 같다');
+  assert.deepEqual(parsed[1], { no: 2, id: 'b1', date: '2026-10-05', origin: 'I know, right?', written: 'I know right', fixed: 'I know, right?', notes: ['쉼표'] });
+  assert.match(md.text, /^✍️ 진우가 쓴 영어 문장 — 아직 아빠가 고쳐 주지 않은 글 3개 \(2026-10-06\)/);
+  assert.match(md.text, /\[1\] 2026-10-03 배운 문장: You look great\.\n {4}진우: you look grate\n/);
+  assert.match(md.text, /\[2\] 2026-10-05 배운 문장: I know, right\?\n {4}진우: I know right\n {4}앱 교정: I know, right\?\n {4}앱 메모: 쉼표/);
+  assert.ok(!md.text.includes('done one'), '고쳐 준 글은 없다');
+  assert.match(essayFiles([], '2026-10-06')[0].text, /고칠 글 없음/, '없으면 없다고 (안 올라온 것과 가른다)');
+  assert.deepEqual(JSON.parse(essayFiles(null, 'd')[1].text), []);
+  const u = src('js/upload.js');
+  assert.match(u, /\.\.\.essayFiles\(st\.collectTodo\(days\), today\)/, '보내는 파일에 에세이');
 });

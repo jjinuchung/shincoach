@@ -203,10 +203,11 @@ export function essayNumbers(essayDays) {
   return new Map(todo.map((e, i) => [e.id, i + 1]));
 }
 
-function collectTodo(essayDays) {
+/** 📮 아직 고쳐 주지 않은 글 — 오래된 날부터 (번호 순서). 📤 업로드도 같은 목록·같은 번호를 쓴다 (날짜를 붙여 돌려준다) */
+export function collectTodo(essayDays) {
   const days = [...(essayDays || [])].sort((a, b) => String(a.date).localeCompare(String(b.date))); // 오래된 날부터
   const todo = [];
-  for (const d of days) for (const e of (d.essays || [])) if (e && e.id && e.written && !e.coachFix) todo.push(e);
+  for (const d of days) for (const e of (d.essays || [])) if (e && e.id && e.written && !e.coachFix) todo.push({ ...e, date: d.date });
   return todo;
 }
 
@@ -858,7 +859,7 @@ function renderUploadCard(main) {
   const st = uploadState();
   const fmt = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   box.appendChild(el('p', 'stats-note', token
-    ? `수학 기록과 ❓ 질문을 비공개 저장소(${DATA_REPO})에 저절로 올려요 — 앱을 열 때·홈으로 올 때·앱을 내릴 때, 10분에 한 번까지. Claude에게 "기록 봐 줘"라고만 하면 돼요.`
+    ? `수학 기록·❓ 질문·✍️ 고칠 에세이 글을 비공개 저장소(${DATA_REPO})에 저절로 올려요 — 앱을 열 때·홈으로 올 때·앱을 내릴 때, 10분에 한 번까지. Claude에게 "기록 봐 줘"라고만 하면 돼요.`
     : `사진·복사 없이 Claude가 바로 볼 수 있게, 수학 기록을 비공개 저장소(${DATA_REPO})에 올려요. GitHub에서 만든 열쇠(fine-grained token)를 아래에 한 번 넣어 주세요 — 이 태블릿에만 저장돼요.`));
   const status = el('p', 'stats-sub', '');
   const paint = (s) => {
