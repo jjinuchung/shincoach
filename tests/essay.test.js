@@ -225,10 +225,10 @@ test('👨‍👩‍👦 배포로 온 교정문 짝맞추기: 다듬은 문장�
   ]);
 });
 
-test('👨‍👩‍👦 사진에서 조금 잘못 옮겨 적어도 앞 4단어로 찾는다', () => {
-  const entries = [{ id: 'a', written: 'I played soccer with Minjun yesterday', origin: 'X' }];
-  const fixes = [{ written: 'I played soccer with Minjoon yesterday at school', fixed: 'I played soccer with Minjun yesterday.' }];
-  assert.deepEqual(matchFixes(entries, fixes), [{ id: 'a', fixed: 'I played soccer with Minjun yesterday.' }]);
+test('👨‍👩‍👦 사진에서 조금 잘못 옮겨 적어도 앞 4단어로 찾는다 (날짜를 적은 교정 — 그날 안에서만)', () => {
+  const entries = [{ id: 'a', date: '2026-10-07', written: 'I played soccer with Minjun yesterday', origin: 'X' }];
+  const fixes = [{ date: '2026-10-07', written: 'I played soccer with Minjoon yesterday at school', fixed: 'I played soccer with Minjun yesterday.' }];
+  assert.deepEqual(matchFixes(entries, fixes), [{ id: 'a', date: '2026-10-07', fixed: 'I played soccer with Minjun yesterday.' }]);
 });
 
 test('👨‍👩‍👦 이미 고쳐 준 글·짝이 없는 글은 건드리지 않는다 (여러 번 배포해도 안전)', () => {
@@ -241,10 +241,22 @@ test('👨‍👩‍👦 이미 고쳐 준 글·짝이 없는 글은 건드리�
   assert.equal(matchFixes(entries, []).length, 0);
 });
 
-test('👨‍👩‍👦 written으로 못 찾으면 배운 문장(origin)으로 찾는다', () => {
-  const entries = [{ id: 'a', written: 'totally different text', origin: 'I want to play with my friend today.' }];
-  const fixes = [{ written: 'nope', origin: 'I want to play with my friend today.', fixed: 'I want to play with my cousin today.' }];
-  assert.deepEqual(matchFixes(entries, fixes), [{ id: 'a', fixed: 'I want to play with my cousin today.' }]);
+test('👨‍👩‍👦 written으로 못 찾으면 배운 문장(origin)으로 찾는다 (날짜를 적은 교정 — 그날 안에서만)', () => {
+  const entries = [{ id: 'a', date: '2026-10-07', written: 'totally different text', origin: 'I want to play with my friend today.' }];
+  const fixes = [{ date: '2026-10-07', written: 'nope', origin: 'I want to play with my friend today.', fixed: 'I want to play with my cousin today.' }];
+  assert.deepEqual(matchFixes(entries, fixes), [{ id: 'a', date: '2026-10-07', fixed: 'I want to play with my cousin today.' }]);
+});
+
+test('🔍 Codex 35차 #3 — 날짜 없는 옛 교정은 글이 똑같을 때만 붙는다 (같은 배운 문장·앞 4단어로 새 글에 옮겨 붙지 않게)', () => {
+  // 원래 글(고쳐 준 글)이 이 기기에 없을 때 — 일부만 되돌린 백업·새 기기 — 옛 "자기 글이 이미 고쳐짐" 막이가 못 막는다
+  const origin = 'I want to play with my friend today.';
+  const old = [{ written: 'I want to play with my brother at a park', origin, fixed: 'I want to play with my brother at the park.' }];
+  const fresh = [{ id: 'v|10', date: '2026-10-07', written: 'I want to visit my cousin at the park today.', origin }];
+  assert.deepEqual(matchFixes(fresh, old), [], '배운 문장(origin)만 같은 새 글');
+  const sameHead = [{ id: 'v|10', date: '2026-10-07', written: 'I want to play with my cat', origin }];
+  assert.deepEqual(matchFixes(sameHead, old), [], '앞 4단어(틀의 고정 부분)만 같은 새 글');
+  const exact = [{ id: 'v|10', date: '2026-10-07', written: 'i want to play with my brother at a park.', origin }];
+  assert.deepEqual(matchFixes(exact, old), [{ id: 'v|10', date: '2026-10-07', fixed: 'I want to play with my brother at the park.' }], '똑같은 글이면 붙는다');
 });
 
 // ── ★ 같은 배운 문장으로 다른 날 쓴 글은 id가 같다 (2026-10-06 — 밀린 에세이 18개 중 7개가 이 꼴이라 교정이 엉뚱한 날 글에 붙었다) ──
@@ -292,8 +304,8 @@ test('✍️ 흐린 짝은 똑같은 짝을 가로채지 않는다 — 단계마
     { id: 'b', date: 'd2', written: 'I went to the zoo today', origin: 'o2' },
   ];
   const fixes = [
-    { written: 'I went to the beach', fixed: '흐린 짝 (앞 4단어만 같음)' },
-    { written: 'I went to the park today', fixed: '똑같은 짝' },
+    { date: 'd2', written: 'I went to the beach', fixed: '흐린 짝 (앞 4단어만 같음)' },
+    { date: 'd1', written: 'I went to the park today', fixed: '똑같은 짝' },
   ];
   const out = matchFixes(entries, fixes);
   assert.deepEqual(out.find((o) => o.id === 'a'), { id: 'a', date: 'd1', fixed: '똑같은 짝' }, '똑같은 글이 먼저');
@@ -354,6 +366,31 @@ test('✍️ 에세이 문장: 그 영상 문장을 다 썼으면 나온 지 가
   assert.equal(pickPrompts(list, 3)[0].rec.start, 2, '안 나온 문장이 먼저');
 });
 
+test('🔍 Codex 35차 #4 — 오늘 이미 쓴 문장은 다 쓴 뒤에도 다시 안 낸다 (같은 날·같은 id로 다시 쓰면 앞 글을 덮어쓴다)', () => {
+  const list = SIX.map((en, i) => rec(en, { start: i, essayAt: 1000 * (6 - i) })); // 다 나옴 · 5번이 가장 오래전
+  const today = new Set([5, 4]); // 오늘 쓴 글
+  const p = pickPrompts(list, 3, { skip: (r) => today.has(r.start) });
+  assert.deepEqual(p.map((x) => x.rec.start), [3, 2, 1], '오늘 쓴 5·4번은 건너뛴다');
+  assert.deepEqual(pickPrompts(list.slice(4), 3, { skip: (r) => today.has(r.start) }), [], '남은 게 오늘 쓴 것뿐이면 빈 목록 (에세이를 열지 않는다)');
+  const pl = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
+  assert.match(pl, /skip: \(r\) => wroteToday\.has\(essayIdOf\(r\)\)/, '화면: 오늘 쓴 글의 id는 후보에서 뺀다');
+  assert.match(pl, /const wroteToday = track\.todayEssayIds\(\);/);
+});
+
+test('🔍 Codex 35차 #5 — 교정 붙이기는 똑같은 교정이면 아무 일도 안 한다 ("안 읽음"으로 되돌리지 않게) · 다른 교정이면 새로 붙인다', async () => {
+  const { fixEssayEntry } = await import('../js/db.js');
+  const e = { id: 'v|10', written: 'I go', coachFix: 'I went.', fixedAt: 100, readAt: 200 };
+  assert.equal(fixEssayEntry(e, ' I went. ', 300), false, '똑같은 교정(앞뒤 빈칸만 다름)');
+  assert.deepEqual(e, { id: 'v|10', written: 'I go', coachFix: 'I went.', fixedAt: 100, readAt: 200 }, '읽은 기록 그대로');
+  assert.equal(fixEssayEntry(e, 'I will go.', 300), true, '아빠가 다시 고쳐 준 것');
+  assert.deepEqual(e, { id: 'v|10', written: 'I go', coachFix: 'I will go.', fixedAt: 300, readAt: 0 });
+  const fresh = { id: 'v|11', written: 'I run' };
+  assert.equal(fixEssayEntry(fresh, 'I ran.', 400), true);
+  assert.deepEqual(fresh, { id: 'v|11', written: 'I run', coachFix: 'I ran.', fixedAt: 400, readAt: 0 });
+  const src = fs.readFileSync(new URL('../js/db.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(fixEssayEntry\(e, fixed, now\)\) touched\+\+;/, 'applyEssayFixes가 이 규칙으로 붙인다');
+});
+
 test('✍️ 화면 연결 — 문장이 뜰 때 적는다(연습·아빠 교정 회차는 안 적음) · 기록은 sentenceStats.essayAt(백업 병합 max) · 이미 쓴 글도 나온 것', () => {
   const e = fs.readFileSync(new URL('../js/essay.js', import.meta.url), 'utf8');
   assert.match(e, /if \(ui\.o\.mode !== 'coach' && !ui\.o\.practice && ui\.o\.onShown\) ui\.o\.onShown\(it\);/);
@@ -365,6 +402,7 @@ test('✍️ 화면 연결 — 문장이 뜰 때 적는다(연습·아빠 교정
   assert.match(d, /'reviewedAt', 'essayAt'\]\) out\[k\] = maxOf\(cur\[k\], rec\[k\]\);/, '백업 병합 max — 옛 백업이 "안 나옴"으로 되돌리지 않게');
   const p = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
   assert.match(p, /onShown: \(it\) => \{ if \(it\.cue\) track\.essayShown\(it\.cue\); state\.essayUsed\.add\(essayIdOf\(it\.rec\)\); \},/);
-  assert.match(p, /const used = \(r\) => state\.essayUsed\.has\(essayIdOf\(r\)\);\n\s*return pickEssayPrompts\(track\.statsList\(\), count, \{ cueOf: \(r\) => !!cueForStart\(r\.start\), used \}\)/);
+  assert.match(p, /const used = \(r\) => state\.essayUsed\.has\(essayIdOf\(r\)\);/);
+  assert.match(p, /return pickEssayPrompts\(track\.statsList\(\), count, \{ cueOf: \(r\) => !!cueForStart\(r\.start\), used, skip: /);
   assert.match(p, /if \(e && typeof e\.id === 'string' && e\.id\.startsWith\(`\$\{item\.id\}\|`\)\) state\.essayUsed\.add\(e\.id\);/, '콘텐츠를 열 때 이미 쓴 글');
 });

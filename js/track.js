@@ -2,7 +2,7 @@
 // 메모리에 모았다가 5초마다·닫을 때 IndexedDB에 저장 (문장마다 쓰지 않도록)
 import {
   sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, bumpVocabViews,
-  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey } from './db.js';
+  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey, mergeEssayEntry } from './db.js';
 import { enroll, schedule, GRADUATED } from './review.js';
 
 export const MASTER_RATIO = 0.8; // 발음 점수 80% 이상이면 ⭐ 정복
@@ -414,10 +414,15 @@ export function markEssayWritten(entry) {
   t.daily.essays = t.daily.essays || [];
   t.dailyDelta.essays.push(entry); // 글은 id로 합쳐 저장 (다른 창이 쓴 글도 남음)
   const at = t.daily.essays.findIndex((e) => e && e.id && e.id === entry.id);
-  // 저장소는 { ...옛것, ...새것 }으로 합치므로 화면 사본도 같게 (아니면 아빠 교정이 화면에서만 사라진다)
-  if (at >= 0) { t.daily.essays[at] = { ...t.daily.essays[at], ...entry }; return false; } // 다시 쓴 것 → 글은 갱신, 보상은 없음
+  // 저장소(mergeDailyDelta)와 같은 규칙으로 화면 사본도 (아니면 아빠 교정이 화면에서만 사라지거나 남는다) — 글이 바뀌면 옛 교정은 지운다
+  if (at >= 0) { t.daily.essays[at] = mergeEssayEntry(t.daily.essays[at], entry); return false; } // 다시 쓴 것 → 글은 갱신, 보상은 없음
   t.daily.essays.push(entry);
   return true;
+}
+
+/** ✍️ 오늘 이미 쓴 글의 id — 쓸 문장을 다 쓴 뒤에도 같은 날 같은 문장을 다시 내지 않게 (Codex 35차 #4) */
+export function todayEssayIds() {
+  return new Set(((t.daily && t.daily.essays) || []).filter((e) => e && e.id && e.written).map((e) => e.id));
 }
 
 /** ✍️ 오늘 몫을 전부 썼다고 기록 → 완주 보상은 하루 1번 (@returns 내가 선점했는지) */

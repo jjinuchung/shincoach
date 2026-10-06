@@ -84,3 +84,9 @@ test('needsFileBackup: 한 번도 안 했거나 7일이 지났으면 아버님�
   assert.equal(daysSince('2026-09-10T09:00:00Z', now), 7);
   assert.equal(daysSince('', now), null);
 });
+
+test('🔍 Codex 35차 #8 — slimStats는 ✍️ 에세이로 나온 때(essayAt)도 담는다 (복구한 뒤 나온 문장이 또 나오지 않게)', () => {
+  const [r] = slimStats([{ key: 'v|10', itemId: 'v', start: 1, done: true, essayAt: 123, plays: 9 }]);
+  assert.equal(r.essayAt, 123);
+  assert.equal(r.plays, undefined, '통계는 여전히 뺀다');
+});

@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import {
   mergeStatRecord, pickReviewState, emptyDaily, mergeDailyDelta,
   cloneProfile, mergeProfileDelta, hpChangeRule, battleLossRule, purchaseRule,
@@ -133,12 +134,38 @@ test('🪟 증분 합치기: 저장된 기록이 없어도 되고, 빈 증분은
   assert.deepEqual(same.doneKeys, ['a']);
 });
 
-test('✍️ 증분 합치기: 다시 쓴 글은 갱신하되 아빠 교정(coachFix)은 지우지 않는다', () => {
-  const cur = { ...emptyDaily('2026-09-17'), essays: [{ id: 'e1', written: 'I go', coachFix: 'I went.', readAt: 0 }] };
-  const out = mergeDailyDelta(cur, '2026-09-17', { essays: [{ id: 'e1', written: 'I went' }, { id: 'e2', written: 'new' }] });
+test('✍️ 증분 합치기: 같은 글이 다시 오면 아빠 교정(coachFix)은 지우지 않는다 · 🔍 Codex 35차 #4 글이 바뀌면 옛 교정·읽음은 지운다', () => {
+  // 같은 글 — 다른 창의 증분·교정이 붙은 뒤 늦게 온 저장: 저장된 쪽에만 있던 교정·읽음은 남는다
+  const cur = { ...emptyDaily('2026-09-17'), essays: [{ id: 'e1', written: 'I go', coachFix: 'I went.', fixedAt: 100, readAt: 200 }] };
+  const out = mergeDailyDelta(cur, '2026-09-17', { essays: [{ id: 'e1', written: 'I go', fixed: 'I go.' }, { id: 'e2', written: 'new' }] });
   assert.equal(out.essays.length, 2, '새 글은 더해짐');
-  assert.equal(out.essays[0].written, 'I went', '고쳐 쓴 내용은 갱신');
-  assert.equal(out.essays[0].coachFix, 'I went.', '저장된 쪽에만 있던 아빠 교정은 남음');
+  assert.deepEqual(out.essays[0], { id: 'e1', written: 'I go', fixed: 'I go.', coachFix: 'I went.', fixedAt: 100, readAt: 200 });
+  // 다른 글 — 그 교정은 앞 글에 대한 것: 새 글이 "이미 고쳐 주고 읽은 글"로 보이면 안 된다
+  const re = mergeDailyDelta(cur, '2026-09-17', { essays: [{ id: 'e1', written: 'I play soccer' }] });
+  assert.equal(re.essays[0].written, 'I play soccer', '다시 쓴 글로 갱신');
+  for (const k of ['coachFix', 'fixedAt', 'readAt']) assert.equal(re.essays[0][k], undefined, `${k}는 앞 글의 것 — 지운다`);
+  const src = readFileSync(new URL('../js/track.js', import.meta.url), 'utf8');
+  assert.match(src, /t\.daily\.essays\[at\] = mergeEssayEntry\(t\.daily\.essays\[at\], entry\);/, '화면 사본도 같은 규칙');
+});
+
+test('🔍 Codex 35차 #7 — 백업 되돌리기: 같은 날·같은 글이면 아빠 교정이 있는 쪽·새 교정을 남긴다 (먼저 나온 사본만 남겨 교정이 사라졌다)', () => {
+  const plain = { id: 'v|10', written: 'original', fixed: 'Original.' };
+  const fixed = { id: 'v|10', written: 'original', fixed: 'Original.', coachFix: 'corrected', fixedAt: 200, readAt: 250 };
+  const day = (e) => ({ date: '2026-10-05', doneKeys: [], essays: [e] });
+  for (const [a, b] of [[plain, fixed], [fixed, plain]]) {
+    const m = mergeStatRecord('daily', day(a), day(b));
+    assert.equal(m.essays.length, 1);
+    assert.deepEqual(m.essays[0], fixed, '교정·읽음이 남는다 (어느 쪽이 먼저여도)');
+  }
+  // 둘 다 교정 — 나중에 고친 쪽 · 같은 교정이면 읽은 시각은 큰 쪽(읽은 글이 "안 읽음"으로 돌아오지 않게)
+  const newer = { ...fixed, coachFix: 'corrected again', fixedAt: 300, readAt: 0 };
+  assert.deepEqual(mergeStatRecord('daily', day(fixed), day(newer)).essays[0], newer, '나중 교정');
+  assert.deepEqual(mergeStatRecord('daily', day(newer), day(fixed)).essays[0], newer, '나중 교정 (순서 바꿔도)');
+  const unread = { ...fixed, readAt: 0 };
+  assert.equal(mergeStatRecord('daily', day(unread), day(fixed)).essays[0].readAt, 250, '같은 교정이면 읽은 쪽');
+  // 글이 다르면 지금 기기의 글(앞)을 그대로 — 예전과 같다
+  const other = { id: 'v|10', written: 'something else', coachFix: 'Something else.', fixedAt: 400 };
+  assert.deepEqual(mergeStatRecord('daily', day(plain), day(other)).essays[0], plain);
 });
 
 // ── ⚡ 프로필 규칙 (순수 함수) ──

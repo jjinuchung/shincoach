@@ -235,7 +235,7 @@ export const FDIV = [
           t: calcQ(`${n}/${d} ÷ ${k}`), ans: V(m, d),
           wr: [{ text: V(n * k, d), tag: TAGS.mulNum }, { text: String(m), tag: TAGS.dropDen }],
           steps: [`분자를 ${k}로 나눠요 — ${n} ÷ ${k} = ${m}`, `${n}/${d} ÷ ${k} = ${m}/${d}`],
-          why: { [TAGS.mulNum]: `${k}로 나누는데 분자에 곱했어요 — 자연수로 나누면 작아져요.`, [TAGS.dropDen]: `분모 ${d}는 그대로 — 몫은 ${m}/${d}` },
+          why: { [TAGS.mulNum]: `${k}로 나누는데 분자에 곱했어요 — 2 이상인 자연수로 나누면 작아져요.`, [TAGS.dropDen]: `분모 ${d}는 그대로 — 몫은 ${m}/${d}` },
           probe: { ask: 'calc' },
         };
       })()]));
@@ -245,7 +245,7 @@ export const FDIV = [
           t: calcQ(`${n}/${d} ÷ ${k}`), ans: V(n, d * k),
           wr: [{ text: V(n * k, d), tag: TAGS.mulNum }, { text: V(n, d), tag: TAGS.sameOnly }],
           steps: [`분자 ${n}는 ${k}로 나누어떨어지지 않아요 — ${n}/${d} = ${n * k}/${d * k}`, `${n * k}/${d * k} ÷ ${k} = ${n}/${d * k}`],
-          why: { [TAGS.mulNum]: `${k}로 나누는데 분자에 곱했어요 — 자연수로 나누면 작아져요.`, [TAGS.sameOnly]: `크기가 같은 분수 ${n * k}/${d * k} — 바꾸기만 했어요. 분자 ${n * k}를 ${k}로 나눠야 해요.` },
+          why: { [TAGS.mulNum]: `${k}로 나누는데 분자에 곱했어요 — 2 이상인 자연수로 나누면 작아져요.`, [TAGS.sameOnly]: `크기가 같은 분수 ${n * k}/${d * k} — 바꾸기만 했어요. 분자 ${n * k}를 ${k}로 나눠야 해요.` },
           probe: { ask: 'calc' },
         };
       })()]));
@@ -498,7 +498,7 @@ export const FDIV = [
       fams.push(famOf([
         (() => {
           const [n, m, t] = genNums(); const k = n * t;
-          return { t: `물통의 ${n}/${m}만큼 채우는 데 물이 ${k} L 들었어요. 물통을 가득 채우려면 물이 몇 L 들까요?`, ans: String(t * m), wr: genWr(k, n, m, t), steps: [`${k} ÷ ${n}/${m} — ${n}/${m}만큼이 ${k} L`, `1/${m}만큼은 ${k} ÷ ${n} = ${t}, 1만큼은 ${t} × ${m} = ${t * m}`], why: genWhy(k, n, m, t), probe: { ask: 'story' } };
+          return { t: `물통의 ${n}/${m}만큼 채우는 데 물이 ${k} L 들었어요. 빈 물통을 가득 채우려면 물이 모두 몇 L 들까요?`, ans: String(t * m), wr: genWr(k, n, m, t), steps: [`${k} ÷ ${n}/${m} — ${n}/${m}만큼이 ${k} L`, `1/${m}만큼은 ${k} ÷ ${n} = ${t}, 1만큼은 ${t} × ${m} = ${t * m}`], why: genWhy(k, n, m, t), probe: { ask: 'story' } };
         })(),
         (() => {
           const [k, m] = unitNums();

@@ -352,6 +352,47 @@ export function emptyDaily(date) {
   return d;
 }
 
+const sameText = (a, b) => String(a || '').trim() === String(b || '').trim();
+
+/**
+ * ✍️ 같은 날·같은 id 글에 새로 쓴 것을 합친다 (순수) — 저장된 쪽에만 있는 것(아빠 교정 coachFix·fixedAt·readAt)은 남기되,
+ * **글이 바뀌었으면** 그 교정·읽음은 앞 글에 대한 것이라 지운다 (Codex 35차 #4: 다시 쓴 글이 "이미 고쳐 주고 읽은 글"로 보였다).
+ * 저장소(mergeDailyDelta)와 화면 사본(track.markEssayWritten)이 같이 쓴다.
+ */
+export function mergeEssayEntry(old, e) {
+  const out = { ...(old || {}), ...(e || {}) };
+  if (old && e && 'written' in e && !sameText(old.written, e.written)) {
+    for (const k of ['coachFix', 'fixedAt', 'readAt']) if (!(k in e)) delete out[k];
+  }
+  return out;
+}
+
+/**
+ * ✍️ 백업 되돌리기에서 같은 날·같은 id 사본 둘 (순수) — 같은 글이면 아빠 교정이 있는 쪽·나중 교정을, 같은 교정이면 읽은 시각은 큰 쪽을 (Codex 35차 #7:
+ * 먼저 나온 사본만 남겨, 교정 전 사본이 있는 기기에 백업을 넣으면 교정이 사라졌다). 글이 다르면 지금 기기의 것(a)을 그대로.
+ */
+export function mergeEssayCopies(a, b) {
+  if (!a || !b || !sameText(a.written, b.written)) return a || b;
+  if (!b.coachFix) return a;
+  if (!a.coachFix) return b;
+  const win = (Number(b.fixedAt) || 0) > (Number(a.fixedAt) || 0) ? b : a;
+  const lose = win === a ? b : a;
+  return sameText(win.coachFix, lose.coachFix) ? { ...win, readAt: Math.max(Number(win.readAt) || 0, Number(lose.readAt) || 0) } : win;
+}
+
+/**
+ * ✍️ 글 하나에 아빠 교정을 붙인다 (순수, 트랜잭션 안에서 부른다) — 똑같은 교정이면 아무 일도 안 한다:
+ * 두 번 붙여넣기·두 창이 같은 교정을 동시에 붙여도 읽은 글이 "안 읽음"으로 돌아가지 않게 (Codex 35차 #5). 다른 교정이면 새로 (아빠가 다시 고쳐 줌).
+ * @returns {boolean} 바뀌었는가
+ */
+export function fixEssayEntry(e, fixed, now = Date.now()) {
+  if (!e || sameText(e.coachFix, fixed)) return false;
+  e.coachFix = String(fixed).trim();
+  e.fixedAt = now;
+  e.readAt = 0; // 아이가 아직 안 읽음
+  return true;
+}
+
 /**
  * 저장된 오늘 기록 + 증분 → 저장할 기록 (순수 함수).
  * 수치는 더하고, 플래그는 한 번 켜지면 유지, 문장 key는 합집합, ✍️ 글은 id로 갱신·추가.
@@ -368,8 +409,8 @@ export function mergeDailyDelta(cur, date, delta) {
   for (const e of (d.essays || [])) {
     if (!e || !e.id) continue;
     const at = out.essays.findIndex((x) => x && x.id === e.id);
-    // 다시 쓴 글은 갱신하되, 저장된 쪽에만 있는 것(아빠 교정 coachFix·readAt)은 남긴다
-    if (at >= 0) out.essays[at] = { ...out.essays[at], ...e };
+    // 다시 쓴 글은 갱신하되, 저장된 쪽에만 있는 것(아빠 교정 coachFix·readAt)은 남긴다 — 글이 바뀌었으면 그 교정은 지운다 (mergeEssayEntry)
+    if (at >= 0) out.essays[at] = mergeEssayEntry(out.essays[at], e);
     else out.essays.push(e);
   }
   return out;
@@ -515,14 +556,12 @@ export async function applyEssayFixes(fixes) {
     // 밖에서 읽어둔 사본을 그대로 쓰면 그 사이 아이가 공부한 기록을 덮어쓴다 → 트랜잭션 안에서 다시 읽고 고친다
     let touched = 0;
     await editDaily(day.date, (d) => {
+      const now = Date.now();
       for (const e of (d.essays || [])) {
         if (!e || !e.id) continue;
         const fixed = pick(day.date, e);
         if (fixed === null) continue;
-        e.coachFix = fixed;
-        e.fixedAt = Date.now();
-        e.readAt = 0;             // 아이가 아직 안 읽음
-        touched++;
+        if (fixEssayEntry(e, fixed, now)) touched++; // 똑같은 교정이면 그대로 (읽은 글을 "안 읽음"으로 돌리지 않게)
       }
       return touched ? d : null;
     });
@@ -532,21 +571,17 @@ export async function applyEssayFixes(fixes) {
 }
 
 /**
- * ✍️ 배포에 실려 온 교정문(coach/fixes.json)을 앱에 반영한다.
- * 태블릿에 손으로 옮겨 적지 않아도 되게, 아빠 교정을 **앱 업데이트로** 전달하는 길.
+ * ✍️ 아빠 교정문을 앱에 반영한다 — 태블릿에 손으로 옮겨 적지 않아도 되게.
+ * ★ (2026-10-07 Codex 35차 #1) 예전엔 공개 저장소의 coach/fixes.json(배포)으로 왔다 — 진우 글이 날짜와 함께 인터넷에 실렸다.
+ *   이제 **비공개 저장소**(shincoach-data) essay/fixes.json을 이 기기 열쇠로 읽는다 (📤 기록 보내기와 같은 열쇠). 배포도 필요 없다.
+ *   열쇠가 없거나 오프라인이면 아무것도 안 한다 (학습에는 영향 없음).
  * 이미 고쳐진 글은 건드리지 않으므로 여러 번 불려도 안전하다.
  * @returns {Promise<number>} 새로 붙은 문장 수
  */
-export async function syncCoachFixes(base = './coach/') {
-  let list = [];
-  try {
-    const res = await fetch(`${base}fixes.json`);
-    if (!res.ok) return 0;
-    list = await res.json();
-  } catch (e) {
-    return 0; // 파일이 없거나 오프라인 — 학습에는 영향 없음
-  }
-  if (!Array.isArray(list) || !list.length) return 0;
+export async function syncCoachFixes() {
+  const { readPrivateList, PRIVATE_FIXES } = await import('./upload.js');
+  const list = await readPrivateList(PRIVATE_FIXES);
+  if (!list.length) return 0;
   const { matchFixes } = await import('./essay.js');
   const entries = await listEssays();
   const fixes = matchFixes(entries, list);
@@ -1723,14 +1758,15 @@ export function mergeStatRecord(name, cur, rec) {
     out.hpMissed = !!(cur.hpMissed || rec.hpMissed);
     out.reviewGolden = !!(cur.reviewGolden || rec.reviewGolden); // 🌟 하루 1개 — 백업을 되돌려 다시 받는 것도 막는다
     out.essayDone = !!(cur.essayDone || rec.essayDone);             // ✍️ 하루 1번 — 백업으로 되돌려 또 받는 것 방지
-    // 쓴 글은 지워지면 안 되므로 양쪽을 합친다 (같은 글은 한 번만)
-    const seen = new Set();
-    out.essays = [...(cur.essays || []), ...(rec.essays || [])].filter((e) => {
+    // 쓴 글은 지워지면 안 되므로 양쪽을 합친다 (같은 글은 한 번만 — 같은 id면 아빠 교정이 있는 쪽·나중 교정을, mergeEssayCopies)
+    const seen = new Map();
+    out.essays = [];
+    for (const e of [...(cur.essays || []), ...(rec.essays || [])]) {
       const k = (e && e.id) ? `id:${e.id}` : `${e && e.origin}|${e && e.written}`;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
+      if (seen.has(k)) { const i = seen.get(k); out.essays[i] = mergeEssayCopies(out.essays[i], e); continue; }
+      seen.set(k, out.essays.length);
+      out.essays.push(e);
+    }
   } else if (name === 'vocabViews') {
     for (const k of ['views', 'taps', 'lastAt', 'quizzes', 'quizPass', 'reviewedAt']) out[k] = maxOf(cur[k], rec[k]);
     // 🔁 복습 진도는 문장과 같은 규칙 — 최근에 복습한 쪽의 box·dueAt을 한 쌍으로

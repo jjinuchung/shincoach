@@ -10,8 +10,13 @@
 //           essay/todo.md · essay/todo.json (✍️ 아직 아빠가 고쳐 주지 않은 글 — 📊 "📮 고쳐 주세요"와 같은 글·같은 [번호], 2026-10-06 v199)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
+// 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
+//           essay/fixes.json (✍️ 아빠 교정 — Claude가 essay/todo.json을 보고 날짜·글·교정을 적는다)
+//           math/replies.json (❓ 아빠 답장 [{ no, text }]) — 같은 열쇠로 읽는다, 배포가 필요 없다
 
 export const DATA_REPO = 'jjinuchung/shincoach-data';
+export const PRIVATE_FIXES = 'essay/fixes.json';
+export const PRIVATE_REPLIES = 'math/replies.json';
 export const DATA_BRANCH = 'main';
 export const AUTO_GAP_MS = 10 * 60 * 1000;
 const TOKEN_KEY = 'shincoach.dataToken';
@@ -31,7 +36,7 @@ export function reportFiles(math, today, reportText, askText) {
 
 /**
  * ✍️ 고칠 에세이 글 (순수) — stats.collectTodo 목록 그대로(오래된 글이 [1], 📊와 같은 번호).
- * Claude는 이걸 읽어 coach/fixes.json에 written → fixed로 적고 배포한다 (태블릿에 아무것도 안 넣는다)
+ * Claude는 이걸 읽어 비공개 저장소 essay/fixes.json에 date·written → fixed로 적는다 (태블릿에 아무것도 안 넣고, 배포도 없다)
  * @param {Array<{id:string, date?:string, origin?:string, written:string, fixed?:string, notes?:string[]}>} todo
  */
 export function essayFiles(todo, today) {
@@ -58,6 +63,26 @@ export function b64(text) {
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(bin);
+}
+
+/** base64 → UTF-8 글 (GitHub contents API가 돌려주는 content — 60자마다 줄바꿈이 끼어 온다) */
+export function unb64(s) {
+  const bin = atob(String(s || '').replace(/\s+/g, ''));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+
+/**
+ * 올릴 파일들 — 기기 기록을 읽어 만든다. ★ 읽기가 실패하면 그대로 실패한다 (Codex 35차 #2: 전엔 실패를 null·[]로 바꿔
+ * "수학 기록 없음"·빈 에세이 목록을 올리고 성공으로 적어, 비공개 저장소의 좋은 기록을 덮어썼다). 읽었는데 없는 것(null·[])은 "없음"으로.
+ * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, today:string}} o
+ */
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, today }) {
+  const math = await getMath();
+  const days = await listDaily();
+  return [
+    ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
+    ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
+  ];
 }
 
 /** 내용 지문 (FNV-1a 32비트) — 그대로면 또 올리지 않으려고 */
@@ -127,6 +152,38 @@ export async function putFile({ fetchFn, token, path, text, message, repo = DATA
   throw httpError(409);
 }
 
+/**
+ * 파일 하나 읽기 — 없으면(404) null · 못 읽으면 까닭과 함께 실패 (열쇠는 머리글에만, 까닭 글에는 안 넣는다)
+ * @param {{fetchFn:Function, token:string, path:string, repo?:string}} o
+ * @returns {Promise<string|null>}
+ */
+export async function getFile({ fetchFn, token, path, repo = DATA_REPO }) {
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  let g;
+  try { g = await fetchFn(`${API}/repos/${repo}/contents/${path}?ref=${DATA_BRANCH}`, { headers, cache: 'no-store' }); } catch { throw httpError(0); }
+  if (g.status === 404) return null;
+  if (g.status !== 200) throw httpError(g.status);
+  const body = await g.json();
+  return unb64(body && body.content);
+}
+
+/**
+ * 📥 비공개 저장소의 목록 파일(JSON 배열) — 아빠 교정 essay/fixes.json · ❓ 답장 math/replies.json (Codex 35차 #1: 공개 배포 대신).
+ * 열쇠가 없으면 묻지도 않고, 없거나·못 읽거나·배열이 아니면 빈 목록 (앱은 그대로 — 다음에 다시).
+ * @param {string} path
+ * @param {{fetchFn?:Function, token?:string|null}} [o] 테스트용 — 안 주면 이 기기 열쇠·fetch
+ * @returns {Promise<Array>}
+ */
+export async function readPrivateList(path, o = {}) {
+  const token = 'token' in o ? o.token : getToken();
+  if (!token) return [];
+  try {
+    const text = await getFile({ fetchFn: o.fetchFn || fetch, token, path });
+    const list = text === null ? [] : JSON.parse(text);
+    return Array.isArray(list) ? list : [];
+  } catch { return []; }
+}
+
 // ───────────────────── 이 기기의 열쇠·상태 ─────────────────────
 
 function readJson(key) {
@@ -163,13 +220,14 @@ export function sendReport({ force = false } = {}) {
     const token = getToken();
     if (!token) return { ok: false, skipped: true, why: '열쇠가 없어요' };
     const [{ getMath, listDaily }, prog, ask, { todayKey }, st] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js')]);
-    const math = await getMath().catch(() => null);
-    const days = await listDaily().catch(() => []);
     const today = todayKey();
-    const files = [
-      ...reportFiles(math, today, math ? prog.mathReportText(math, today) : '(수학 기록 없음)', math ? ask.asksText(math, today) : ''),
-      ...essayFiles(st.collectTodo(days), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
-    ];
+    let files;
+    try { files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, today }); } catch {
+      // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
+      const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
+      try { localStorage.setItem(STATE_KEY, JSON.stringify({ at: fail.at, ok: false, why: fail.why, hash: '', files: [] })); } catch { /* 저장 못 해도 */ }
+      return fail;
+    }
     const hash = hashOf(files);
     const online = typeof navigator === 'undefined' || navigator.onLine !== false;
     if (!force && !shouldAuto({ token, online, now: Date.now(), state: uploadState(), hash })) return { ok: false, skipped: true };

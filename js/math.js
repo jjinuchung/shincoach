@@ -469,7 +469,7 @@ export async function renderMath() {
   m.innerHTML = '';
   m.appendChild(el('p', 'math-loading', '불러오는 중…'));
   let [state] = await Promise.all([getMath(), buildOpts()]);
-  state = await syncMathReplies(state); // 📬 배포로 온 아빠 답장이 있으면 붙인다
+  state = await syncMathReplies(state); // 📬 비공개 저장소의 아빠 답장이 있으면 붙인다
   if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다
   updateChip();
   ui.state = state;
@@ -1569,15 +1569,15 @@ function askOfferForRound(r, state, today) {
   return box;
 }
 
-/** 배포로 온 답장(coach/math/replies.json)을 붙인다 — 이미 붙은 글은 건너뛰어 여러 번 불려도 안전. 못 받으면 그대로 */
+/**
+ * 💬 아빠 답장을 붙인다 — 이미 붙은 글은 건너뛰어 여러 번 불려도 안전. 못 받으면 그대로.
+ * ★ (2026-10-07 Codex 35차 #1) 예전엔 공개 저장소 coach/math/replies.json(배포)으로 와서 "진우야, …" 답장이 공개됐다 →
+ *   비공개 저장소(shincoach-data) math/replies.json을 이 기기 열쇠로 읽는다 (📤 기록 보내기와 같은 열쇠, 배포 필요 없음)
+ */
 async function syncMathReplies(state) {
-  let list = [];
-  try {
-    const res = await fetch('./coach/math/replies.json');
-    if (!res.ok) return state;
-    list = await res.json();
-  } catch { return state; }
-  if (!Array.isArray(list) || !list.length) return state;
+  const { readPrivateList, PRIVATE_REPLIES } = await import('./upload.js');
+  const list = await readPrivateList(PRIVATE_REPLIES);
+  if (!list.length) return state;
   const probe = JSON.parse(JSON.stringify(state));
   const todo = list.filter((e) => e && applyReply(probe, e.no, e.text));
   if (!todo.length) return state;

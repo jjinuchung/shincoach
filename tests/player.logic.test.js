@@ -136,7 +136,7 @@ function loadPlayer() {
       // 🍄 다이버섯: 하루 상한 확인용
       todayMushrooms: () => mushroomState.today,
       async markMushroom(max) { if (max !== undefined && mushroomState.today >= max) return false; mushroomState.today++; return true; },
-      todaySeconds: () => essayState.seconds, essayDoneToday: () => essayState.done,
+      todaySeconds: () => essayState.seconds, essayDoneToday: () => essayState.done, todayEssayIds: () => new Set(essayState.wroteToday || []),
       markEssayWritten(entry) {
         const at = essayState.saved.findIndex((e) => e.id === entry.id);
         if (at >= 0) { essayState.saved[at] = entry; return false; } // 같은 문장 재작성 → 보상 없음

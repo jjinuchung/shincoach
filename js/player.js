@@ -706,7 +706,9 @@ function essayPrompts() {
   const count = settings.essayCount || ESSAY_COUNT;
   // 이미 에세이로 쓴 문장도 "나온 것" — 화면에 뜬 때(essayAt)를 적기 전에 쓴 글까지 (콘텐츠를 열 때 state.essayUsed)
   const used = (r) => state.essayUsed.has(essayIdOf(r));
-  return pickEssayPrompts(track.statsList(), count, { cueOf: (r) => !!cueForStart(r.start), used })
+  // 오늘 이미 쓴 문장은 다 쓴 뒤에도 다시 안 낸다 — 같은 날·같은 id로 다시 쓰면 앞 글을 덮어쓴다 (Codex 35차 #4)
+  const wroteToday = track.todayEssayIds();
+  return pickEssayPrompts(track.statsList(), count, { cueOf: (r) => !!cueForStart(r.start), used, skip: (r) => wroteToday.has(essayIdOf(r)) })
     .map((p) => ({ ...p, cue: cueForStart(p.rec.start) }));
 }
 
@@ -825,7 +827,7 @@ async function maybeCoachFix() {
   state.coachFixDone = true;
   let list = [];
   try {
-    await syncCoachFixes();            // 배포로 온 교정문이 있으면 먼저 반영
+    await syncCoachFixes();            // 비공개 저장소의 아빠 교정문이 있으면 먼저 반영
     list = await listEssays();
   } catch (e) { return false; }        // 기록을 못 읽어도 학습은 계속
   const unread = list.filter((e) => e.coachFix && !e.readAt).slice(-COACH_FIX_MAX);

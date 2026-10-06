@@ -712,3 +712,26 @@ test('화면 연결 (3단계): STEMS.fracdiv(T)는 이 생성기·원고를 쓰�
     if (spec) assert.equal(spec.signed, false, `${c.id} #${s}: ± 키`);
   }
 });
+
+// ── 🔍 Codex 35차 (2026-10-07) ──
+test('🔍 Codex 35차 #9 — "자연수로 나누면 작아져요"는 2 이상인 자연수로만 (1로 나누면 그대로) — 오답 풀이·칸 설명·원고', () => {
+  const loose = /(?<!2 이상인 |1보다 큰 )자연수로 나누면 (?:몫이 )?(?:처음보다 )?작아/;
+  for (const { c, k, s, q } of every()) {
+    const t = q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule].join('\n') : '';
+    assert.ok(!loose.test(t), `${c.id} ${k} #${s}: 1로 나누면 그대로\n${t}`);
+  }
+  for (const c of FDIV) assert.ok(!loose.test([c.idea, c.rule, c.slip].join('\n')), c.id);
+  for (const v of CONTENT.cells || Object.values(CONTENT)) if (v && v.lesson) assert.ok(!loose.test(contentText(v)), '원고');
+});
+
+test('🔍 Codex 35차 #10 — 물통 이야기는 "빈 물통을 가득 — 모두 몇 L" (더 부을 물로 읽히지 않게) · 원고 확인 질문도 같은 말', () => {
+  let n = 0;
+  for (const { q } of every(['calc', 'misread'])) {
+    if (!/물통의/.test(q.q)) continue;
+    n++;
+    assert.match(q.q, /빈 물통을 가득 채우려면 물이 모두 몇 L 들까요\?/, q.q);
+  }
+  assert.ok(n > 0, '물통 이야기가 나온다');
+  const raw = readFileSync(new URL('../coach/math/fracdiv.json', import.meta.url), 'utf8');
+  assert.ok(!/(?<!빈 )물통을 가득 채우려면 물이 몇 L/.test(raw), '원고에 옛 말이 없다');
+});

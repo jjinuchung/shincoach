@@ -37,6 +37,7 @@ export function slimStats(records = []) {
     if (r.reviewedAt) keep.reviewedAt = r.reviewedAt;
     if (r.reviewPass) keep.reviewPass = r.reviewPass;
     if (r.speakPass) keep.speakPass = r.speakPass;
+    if (r.essayAt) keep.essayAt = r.essayAt; // ✍️ 에세이로 나온 때 — 복구한 뒤 나온 문장이 또 나오지 않게 (Codex 35차 #8)
     // 💖 아이가 고른 문장 — 다시 만들 수 없다 (뺀 것도 favAt째로 남겨야 되살아나지 않는다).
     // 고른 문장은 📊 목록에 글로 보이므로 영어·한글도 (몇 개 안 되어 사본이 크게 안 는다, Codex 20차 #3)
     if (r.fav || r.favAt) {

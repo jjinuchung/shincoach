@@ -167,5 +167,73 @@ test('✍️ 고칠 에세이 글도 올린다 (v199) — 📊 "📮 고쳐 주�
   assert.match(essayFiles([], '2026-10-06')[0].text, /고칠 글 없음/, '없으면 없다고 (안 올라온 것과 가른다)');
   assert.deepEqual(JSON.parse(essayFiles(null, 'd')[1].text), []);
   const u = src('js/upload.js');
-  assert.match(u, /\.\.\.essayFiles\(st\.collectTodo\(days\), today\)/, '보내는 파일에 에세이');
+  assert.match(u, /\.\.\.essayFiles\(collectTodo\(days \|\| \[\]\), today\)/, '보내는 파일에 에세이');
+  assert.match(u, /collectTodo: st\.collectTodo/, '📊와 같은 목록');
+});
+
+// ── 🔍 Codex 35차 (2026-10-07) ──
+// #2 기기 기록을 못 읽으면 빈 기록을 올려 "성공"으로 적었다 → 비공개 저장소의 좋은 기록을 덮어씀
+// #1 아빠 교정·❓ 답장이 공개 저장소(coach/fixes.json·replies.json)로 배포됐다 → 비공개 저장소에서 이 기기 열쇠로 읽는다
+import * as UP from '../js/upload.js';
+
+test('📤 기기 기록을 못 읽으면 올릴 파일을 만들지 않는다 (빈 기록으로 덮어쓰지 않게) · 읽었는데 없는 것은 "없음"으로', async () => {
+  const ok = { getMath: async () => ({ concepts: {}, asks: [] }), listDaily: async () => [{ date: '2026-10-06', essays: [{ id: 'a', written: 'I go' }] }] };
+  const fmt = { mathReportText: () => '보고', asksText: () => '질문', collectTodo: (days) => days.flatMap((d) => d.essays.map((e) => ({ ...e, date: d.date }))) };
+  const files = await UP.gatherFiles({ ...ok, ...fmt, today: '2026-10-07' });
+  assert.deepEqual(files.map((f) => f.path), ['math/2026-10-07.md', 'math/latest.json', 'essay/todo.md', 'essay/todo.json']);
+  await assert.rejects(UP.gatherFiles({ ...ok, ...fmt, today: 'd', getMath: async () => { throw new Error('IDB 닫힘'); } }), '수학 기록을 못 읽으면 실패');
+  await assert.rejects(UP.gatherFiles({ ...ok, ...fmt, today: 'd', listDaily: async () => { throw new Error('IDB 닫힘'); } }), '날짜 기록을 못 읽으면 실패');
+  const none = await UP.gatherFiles({ ...fmt, getMath: async () => null, listDaily: async () => [], today: 'd' });
+  assert.match(none[0].text, /수학 기록 없음/, '읽었는데 없으면 없다고');
+  assert.deepEqual(JSON.parse(none[3].text), []);
+  const u = src('js/upload.js');
+  assert.ok(!/getMath\(\)\.catch\(/.test(u) && !/listDaily\(\)\.catch\(/.test(u), '실패를 빈 기록으로 바꾸지 않는다');
+  assert.match(u, /try \{ files = await gatherFiles\(/, '보내기는 gatherFiles가 실패하면 아무것도 안 올린다');
+});
+
+/** 가짜 GitHub(읽기) — 파일 표 · 요청 기록 */
+function fakeRead(files = {}, status = 0) {
+  const calls = [];
+  const fetchFn = async (url, opt = {}) => {
+    calls.push({ url, headers: opt.headers || {} });
+    const path = decodeURIComponent(url.split('/contents/')[1].split('?')[0]);
+    if (status) return { status, json: async () => ({ message: 'Bad credentials' }) };
+    if (!(path in files)) return { status: 404, json: async () => ({}) };
+    return { status: 200, json: async () => ({ sha: 'x', encoding: 'base64', content: b64(files[path]).replace(/(.{60})/g, '$1\n') }) };
+  };
+  return { fetchFn, calls };
+}
+
+test('📥 비공개 저장소에서 아빠 교정·❓ 답장 읽기 — 이 기기 열쇠로 · 없거나 못 읽으면 빈 목록(앱은 그대로) · 열쇠가 없으면 묻지도 않는다', async () => {
+  assert.equal(UP.PRIVATE_FIXES, 'essay/fixes.json');
+  assert.equal(UP.PRIVATE_REPLIES, 'math/replies.json');
+  const list = [{ date: '2026-10-07', written: '나는 진우 ✍️ I go', fixed: 'I went.' }];
+  const gh = fakeRead({ 'essay/fixes.json': JSON.stringify(list) });
+  assert.deepEqual(await UP.readPrivateList('essay/fixes.json', { fetchFn: gh.fetchFn, token: 'tok' }), list, '한글·이모지 그대로 (줄바꿈 섞인 base64)');
+  assert.equal(gh.calls[0].url, 'https://api.github.com/repos/jjinuchung/shincoach-data/contents/essay/fixes.json?ref=main');
+  assert.equal(gh.calls[0].headers.Authorization, 'Bearer tok');
+  assert.deepEqual(await UP.readPrivateList('math/replies.json', { fetchFn: gh.fetchFn, token: 'tok' }), [], '파일이 없으면(404) 빈 목록');
+  for (const st of [401, 403, 500]) assert.deepEqual(await UP.readPrivateList('essay/fixes.json', { fetchFn: fakeRead({}, st).fetchFn, token: 'tok' }), [], `${st}도 빈 목록`);
+  const off = async () => { throw new TypeError('Failed to fetch'); };
+  assert.deepEqual(await UP.readPrivateList('essay/fixes.json', { fetchFn: off, token: 'tok' }), [], '인터넷이 없으면 빈 목록');
+  for (const bad of ['{not json', '{"a":1}', '"글"']) assert.deepEqual(await UP.readPrivateList('x.json', { fetchFn: fakeRead({ 'x.json': bad }).fetchFn, token: 'tok' }), [], `배열이 아니면 빈 목록: ${bad}`);
+  let asked = 0;
+  assert.deepEqual(await UP.readPrivateList('essay/fixes.json', { fetchFn: async () => { asked++; return { status: 200 }; }, token: null }), []);
+  assert.equal(asked, 0, '열쇠 없으면 GitHub에 묻지 않는다');
+});
+
+test('📥 화면 연결 — 아빠 교정(db.syncCoachFixes)·❓ 답장(math.syncMathReplies)은 비공개 저장소에서 · ★ 공개 저장소엔 아이 글·답장 파일이 없다', () => {
+  const d = src('js/db.js');
+  const fx = d.slice(d.indexOf('export async function syncCoachFixes'), d.indexOf('/** 하루치 기록에서 에세이 하나에 readAt'));
+  assert.match(fx, /readPrivateList\(PRIVATE_FIXES\)/, '교정은 비공개 저장소 essay/fixes.json');
+  assert.ok(!/fetch\(/.test(fx), '공개 배포 파일을 읽지 않는다');
+  const m = src('js/math.js');
+  const rp = m.slice(m.indexOf('async function syncMathReplies'), m.indexOf('/** 📬 답장 화면'));
+  assert.match(rp, /readPrivateList\(PRIVATE_REPLIES\)/, '답장은 비공개 저장소 math/replies.json');
+  assert.ok(!/fetch\(/.test(rp), '공개 배포 파일을 읽지 않는다');
+  const sw = src('sw.js');
+  assert.ok(!sw.includes("'./coach/fixes.json'") && !sw.includes("'./coach/math/replies.json'"), '앱 셸에 없다');
+  assert.ok(!fs.existsSync(new URL('../coach/fixes.json', import.meta.url)), '공개 저장소에 coach/fixes.json이 없다');
+  assert.ok(!fs.existsSync(new URL('../coach/math/replies.json', import.meta.url)), '공개 저장소에 coach/math/replies.json이 없다');
+  assert.match(src('tools/check.mjs'), /coach\/fixes\.json.*coach\/math\/replies\.json|PUBLIC_PRIVATE/, '검사가 다시 생기는 것을 막는다');
 });

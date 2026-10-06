@@ -1,6 +1,6 @@
 // 커밋/배포 전 검사: 모든 JS 문법 + JSON 파싱 (heredoc 백슬래시 깨짐 같은 사고 방지)
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 
 const jsFiles = [
   'sw.js',
@@ -35,7 +35,7 @@ for (const f of readdirSync('vocab').filter((f) => f.endsWith('.json'))) {
 }
 // 🔢 사람이 쓴 수학 내용 — 배포로 실려 가므로 형식(정답·오답·자리표시)을 여기서 잡는다. 줄기마다 검사 모듈이 다르다
 const MATH_CHECK = { 'coach/math/fraction.json': '../js/mathgen.js', 'coach/math/negative.json': '../js/mathneg.js', 'coach/math/mixed.json': '../js/mathmix.js', 'coach/math/decimal.json': '../js/mathdec.js', 'coach/math/ratio.json': '../js/mathrat.js', 'coach/math/factor.json': '../js/mathfac.js', 'coach/math/correspond.json': '../js/mathcor.js', 'coach/math/area.json': '../js/matharea.js', 'coach/math/shape.json': '../js/mathshape.js', 'coach/math/data.json': '../js/mathdata.js', 'coach/math/range.json': '../js/mathrange.js', 'coach/math/sym.json': '../js/mathsym.js', 'coach/math/circle.json': '../js/mathcircle.js', 'coach/math/cuboid.json': '../js/mathcuboid.js', 'coach/math/solid.json': '../js/mathsolid.js', 'coach/math/expr.json': '../js/mathexpr.js', 'coach/math/equation.json': '../js/mathequ.js', 'coach/math/coord.json': '../js/mathcoord.js', 'coach/math/space.json': '../js/mathspace.js', 'coach/math/fracdiv.json': '../js/mathfdiv.js' };
-for (const f of [...Object.keys(MATH_CHECK), 'coach/fixes.json']) {
+for (const f of Object.keys(MATH_CHECK)) {
   try {
     const data = JSON.parse(readFileSync(f, 'utf8'));
     if (MATH_CHECK[f]) {
@@ -48,15 +48,31 @@ for (const f of [...Object.keys(MATH_CHECK), 'coach/fixes.json']) {
   }
 }
 const { figureSvg } = await import('../js/mathdraw.js');
-// ❓ 아빠 답장(coach/math/replies.json) — [{ no, text }], 그림 지시문은 앱이 아는 것만 (모르면 글자 그대로 아이 화면에 찍힌다)
-try {
-  const rep = JSON.parse(readFileSync('coach/math/replies.json', 'utf8'));
-  if (!Array.isArray(rep)) { bad++; console.error('내용 오류: coach/math/replies.json: 배열이 아님'); }
-  else rep.forEach((e, i) => {
-    if (!e || !Number.isInteger(e.no) || e.no <= 0 || typeof e.text !== 'string' || !e.text.trim()) { bad++; console.error(`내용 오류: coach/math/replies.json[${i}]: { no: 양의 정수, text: 글 } 이어야 함`); return; }
-    for (const m of e.text.matchAll(/\[([a-z]+) [^\]]*\]/g)) if (!figureSvg(m[0].slice(1, -1)).startsWith('<svg')) { bad++; console.error(`내용 오류: coach/math/replies.json[${i}] (💬${e.no}): 그림 지시문을 못 그림 ${m[0]} — 문법은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5]`); }
-  });
-} catch (e) { bad++; console.error(`JSON 오류: coach/math/replies.json: ${e.message}`); }
+// ★ 아이 기록(✍️ 아빠 교정·❓ 아빠 답장)은 공개 저장소에 두지 않는다 (2026-10-07 Codex 35차 #1) —
+//   비공개 저장소 shincoach-data의 essay/fixes.json · math/replies.json에 올리고, 앱은 이 기기 📤 열쇠로 읽는다
+const PUBLIC_PRIVATE = ['coach/fixes.json', 'coach/math/replies.json'];
+for (const f of PUBLIC_PRIVATE) if (existsSync(f)) { bad++; console.error(`공개 저장소에 아이 기록: ${f} — 비공개 저장소(shincoach-data)에 올려 주세요`); }
+// 비공개 저장소에 올리기 전 검사: node tools/check.mjs --private <폴더> (그 안의 essay/fixes.json · math/replies.json)
+const pi = process.argv.indexOf('--private');
+const privDir = pi > 0 ? process.argv[pi + 1] : null;
+if (privDir) {
+  const fx = `${privDir}/essay/fixes.json`;
+  try {
+    const list = JSON.parse(readFileSync(fx, 'utf8'));
+    if (!Array.isArray(list)) { bad++; console.error(`내용 오류: ${fx}: 배열이 아님`); }
+    else list.forEach((e, i) => { if (!e || typeof e.fixed !== 'string' || !e.fixed.trim()) { bad++; console.error(`내용 오류: ${fx}[${i}]: fixed(고친 글)가 있어야 함`); } });
+  } catch (e) { if (existsSync(fx)) { bad++; console.error(`JSON 오류: ${fx}: ${e.message}`); } }
+  // ❓ 아빠 답장 — [{ no, text }], 그림 지시문은 앱이 아는 것만 (모르면 글자 그대로 아이 화면에 찍힌다)
+  const rp = `${privDir}/math/replies.json`;
+  try {
+    const rep = JSON.parse(readFileSync(rp, 'utf8'));
+    if (!Array.isArray(rep)) { bad++; console.error(`내용 오류: ${rp}: 배열이 아님`); }
+    else rep.forEach((e, i) => {
+      if (!e || !Number.isInteger(e.no) || e.no <= 0 || typeof e.text !== 'string' || !e.text.trim()) { bad++; console.error(`내용 오류: ${rp}[${i}]: { no: 양의 정수, text: 글 } 이어야 함`); return; }
+      for (const m of e.text.matchAll(/\[([a-z]+) [^\]]*\]/g)) if (!figureSvg(m[0].slice(1, -1)).startsWith('<svg')) { bad++; console.error(`내용 오류: ${rp}[${i}] (💬${e.no}): 그림 지시문을 못 그림 ${m[0]} — 문법은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5]`); }
+    });
+  } catch (e) { if (existsSync(rp)) { bad++; console.error(`JSON 오류: ${rp}: ${e.message}`); } }
+}
 // 📦 아빠의 구호품(coach/gifts.json) — [{ id, items: { 아이템id: 1~10 }, title?, text? }], 틀린 줄은 앱이 조용히 건너뛰므로 여기서 잡는다
 try {
   const { parcelOf } = await import('../js/items.js');

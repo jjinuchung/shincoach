@@ -117,6 +117,7 @@ export function pickPrompts(records, count = DEFAULT_COUNT, opts = {}) {
   for (const r of records || []) {
     if (!r || !r.done || !r.en) continue;
     if (!cueOf(r)) continue;                       // 지금 자막에 없는 옛 기록 제외
+    if (opts.skip && opts.skip(r)) continue;       // 오늘 이미 쓴 문장 — 다 쓴 뒤에도 다시 안 낸다 (같은 날·같은 id면 앞 글을 덮어쓴다, Codex 35차 #4)
     if (hasEchoedRun(splitWords(r.en))) continue;  // 두 화자가 겹쳐 말한 줄 제외 (퍼즐과 같은 규칙)
     const frame = makeFrame(r.en);
     if (!frame) continue;
@@ -366,14 +367,16 @@ export function normalizeWritten(text) {
 }
 
 /**
- * 배포에 실어 보낸 교정문(coach/fixes.json)을 아이가 쓴 글과 짝지어 준다.
+ * 아빠 교정문(비공개 저장소 essay/fixes.json — 2026-10-07 전엔 공개 coach/fixes.json)을 아이가 쓴 글과 짝지어 준다.
  *
  * 사진에서 옮겨 적은 문장이라 완벽히 같지 않을 수 있으므로 세 단계로 찾는다:
  * ① 다듬어서 똑같은 글 → ② 앞 4단어가 같은 글 → ③ 배운 문장(origin)이 같은 글.
+ *   ★ (2026-10-07 Codex 35차 #3) ②·③ 흐린 짝은 날짜를 적은 교정만 — 날짜 없는 옛 교정은 ①(똑같은 글)만. 앞 4단어는 대개 틀의 고정 부분이라
+ *     같은 배운 문장으로 쓴 새 글이면 ②·③ 모두 맞아 버린다 (고쳐 준 원래 글이 없는 기기 — 일부만 되돌린 백업 — 에서 엉뚱한 글에 붙었다)
  * 못 찾으면 조용히 건너뛴다 (다른 기기이거나 지워진 기록일 수 있다).
  * ★ (2026-10-06) 같은 배운 문장으로 다른 날 쓴 글은 id가 같다 → 짝은 **날짜 + id**(essayKey)로 센다.
  *   · 교정에 date가 있으면 그날 글에만 붙는다 (업로드 essay/todo.json에 날짜가 있다)
- *   · 자기 글이 이미 고쳐진 옛 교정(fixes.json에 남아 있다)은 거기서 멈춘다 — 전엔 ②·③으로 같은 문장의 새 글에 옮겨 붙었다
+ *   · 자기 글이 이미 고쳐진 옛 교정(옛 fixes.json에 남아 있다)은 거기서 멈춘다 — 전엔 ②·③으로 같은 문장의 새 글에 옮겨 붙었다
  *   · 단계마다 모든 교정을 먼저 훑는다 — 앞 교정의 흐린 짝(②·③)이 뒤 교정의 똑같은 짝(①)을 가로채지 않게
  *
  * @param {Array<{id:string, written:string, origin:string, coachFix?:string}>} entries 앱에 쌓인 에세이
@@ -401,8 +404,9 @@ export function matchFixes(entries, fixes) {
     if (hit) { used.add(key(hit)); got[i] = hit; }
   });
   pass((f, e) => { const w = normalizeWritten(f.written); return !!w && normalizeWritten(e.written) === w; });
-  pass((f, e) => { const h = head(f.written); return !!h && head(e.written) === h; });
-  pass((f, e) => !!f.origin && normalizeWritten(e.origin) === normalizeWritten(f.origin));
+  // 흐린 짝(②·③)은 날짜를 적은 교정만 — 그날 안에서만 찾는다 (날짜 없는 옛 교정이 같은 배운 문장의 새 글에 붙지 않게, Codex 35차 #3)
+  pass((f, e) => { const h = head(f.written); return !!f.date && !!h && head(e.written) === h; });
+  pass((f, e) => !!f.date && !!f.origin && normalizeWritten(e.origin) === normalizeWritten(f.origin));
   const out = [];
   list.forEach((f, i) => {
     const e = got[i];
