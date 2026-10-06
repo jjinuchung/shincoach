@@ -1008,22 +1008,25 @@ test('화면 연결 (3단계): STEMS.space(S)는 이 생성기·원고를 쓰고
   assert.ok(renderFigures('[stack 2 1 / 1 3]').startsWith('<svg'), '안내의 예도 그려진다');
 });
 
-test('✍️ 칸 칠하기 판 (3단계): 판 크기는 늘 같다 · 판의 후보 = 문제 글의 후보 그림 · 목표 = 따로 푼 답 · 칠하는 말 = 풀이 카드 말 · 눌러서 목표를 만든다 · 짐작한 답은 보기와 안 겹친다 · 화면 배선', async () => {
+/** ✍️ 칸 칠하기 판이 서는 문항 — [칸, 따로 푼 문제 종류, 판 크기 [칸 수, 층 수]] (S1·S5는 v195에서 넓힘) */
+const BOARDS = [['spc.dir', 'pickView', [3, 3]], ['spc.view', 'pickView', [3, 3]], ['spc.topnum', 'topView', [3, 4]]];
+test('✍️ 칸 칠하기 판 (3단계 · S1·S5 v195): 판 크기는 칸마다 늘 같다 · 판의 후보 = 문제 글의 후보 그림 · 목표 = 따로 푼 답 · 칠하는 말 = 풀이 카드 말 · 눌러서 목표를 만든다 · 짐작한 답은 보기와 안 겹친다 · 화면 배선', async () => {
   const { canDraw, paintOf, paintSay, paintText, paintTap, paintFromText } = await import('../js/drawview.js');
   const valOf = (s) => s.slice(2); // 's:2,3,1' · 't:110/011' → 판 값
-  let n = 0; const kinds = new Set();
-  for (let s = 1; s <= SEEDS; s++) {
-    const q = qOf('spc.view', 'calc', s);
-    const where = `spc.view #${s}`;
+  const kinds = new Set(); const per = {};
+  for (const [id, type, size] of BOARDS) for (let s = 1; s <= SEEDS; s++) {
+    const q = qOf(id, 'calc', s);
+    const where = `${id} #${s}`;
+    const sv = solveText(q.q);
+    if (sv.type !== type) { assert.ok(!q.draw, `${where}: 본 모양 고르기가 아닌데(${sv.type}) 판이 있다`); continue; }
     assert.ok(q.draw, `${where}: 본 모양 고르기에 판이 없다`);
     assert.ok(canDraw(q.draw), where);
     const g = paintOf(q.draw);
-    const sv = solveText(q.q);
-    assert.equal(sv.type, 'pickView', where);
-    // 판의 종류 = 문제가 묻는 쪽 · 판 크기는 늘 3 × 3 (답 모양에 따라 달라지면 답을 흘린다)
+    // 판의 종류 = 문제가 묻는 쪽 · 판 크기는 칸마다 늘 같다 (답 모양·오답 후보에 따라 달라지면 답을 흘린다 — S5는 "줄의 수를 더함" 후보가 4층까지라 늘 4층)
     assert.equal(g.kind, sv.f.d === 'top' ? 'top' : 'side', `${where}: 판 종류`);
-    assert.deepEqual([g.cols, g.rows], [3, 3], `${where}: 판 크기`);
-    kinds.add(`${g.kind}:${sv.f.d}`);
+    assert.deepEqual([g.cols, g.rows], size, `${where}: 판 크기`);
+    kinds.add(`${id}:${g.kind}:${sv.f.d}`);
+    per[id] = (per[id] || 0) + 1;
     // 판의 후보 = 문제 글의 [views] 그림 그대로(이름·값) · 그 그림은 문제 글에 한 번 · 목표 = 따로 푼 답의 모양
     assert.equal(q.q.split(`[${q.draw.fig}]`).length, 2, `${where}: 후보 그림이 문제 글에 한 번`);
     assert.deepEqual(q.draw.cands.map((z) => `${z.k}=${z.v}`), Object.entries(sv.f.C).map(([k, v]) => `${k}=${valOf(v)}`), `${where}: 판 후보 ≠ 그림 후보`);
@@ -1039,17 +1042,20 @@ test('✍️ 칸 칠하기 판 (3단계): 판 크기는 늘 같다 · 판의 후
     // 칠하는 동안의 말 = 풀이 카드의 말 (앞·옆 "…2, 3, 1층" · 위 "뒤 줄부터 ■■□ / …")
     const st = q.solve.steps.map((x) => (typeof x === 'string' ? x : x.text || x.t).replace(/^[①-⑨] /, ''));
     const say = paintSay(g, g.target);
-    if (g.kind === 'side') assert.ok(st[0].endsWith(say.replace('왼쪽부터 ', '')), `${where}: ${say} · ${st[0]}`);
+    if (g.kind === 'side') assert.ok(st.slice(0, -1).some((x) => x.endsWith(` ${say.replace('왼쪽부터 ', '')}`)), `${where}: ${say} · ${st.join(' / ')}`);
     else assert.equal(st[1], say, `${where}: ${say} · ${st[1]}`);
+    // S5 옆: 오른쪽 옆에서는 앞 줄(위에서 본 모양의 아래쪽 줄)이 판의 왼쪽 — 풀이 카드가 그 말을 한다
+    if (id === 'spc.topnum' && sv.f.d === 'right') assert.ok(st.some((x) => x.startsWith('오른쪽 옆에서는 앞 줄이 왼쪽 — ')), `${where}: ${st.join(' / ')}`);
     // 눌러서 목표 만들기 — 빈 판에서 (앞·옆) 기둥마다 그 높이 칸을 한 번 · (위) 칠할 칸마다 한 번
     const T = g.kind === 'side' ? g.target.split(',').map(Number) : g.target.split('/').map((r) => [...r].map(Number));
-    let v = g.kind === 'side' ? '0,0,0' : '000/000/000';
+    let v = g.kind === 'side' ? Array(g.cols).fill(0).join(',') : '000/000/000';
     if (g.kind === 'side') T.forEach((h, i) => { v = paintTap(g, v, i, g.rows - h); });
     else T.forEach((row, r) => row.forEach((x, i) => { if (x) v = paintTap(g, v, i, r); }));
     assert.equal(v, g.target, `${where}: 눌러서 목표를 못 만든다`);
     // 짐작한 답(후보가 아닌 모양)의 글자는 어느 보기와도 안 겹친다 — 판 위 모든 모양을 다 칠해 본다
+    const H = Array.from({ length: g.rows }, (_, k) => k + 1);
     const all = g.kind === 'side'
-      ? [1, 2, 3].flatMap((a) => [1, 2, 3].flatMap((b) => [1, 2, 3].map((c) => `${a},${b},${c}`)))
+      ? H.flatMap((a) => H.flatMap((b) => H.map((c) => `${a},${b},${c}`)))
       : Array.from({ length: 511 }, (_, k) => (k + 1).toString(2).padStart(9, '0')).map((b) => `${b.slice(0, 3)}/${b.slice(3, 6)}/${b.slice(6)}`);
     for (const x of all) {
       const t = paintText(g, x);
@@ -1062,10 +1068,16 @@ test('✍️ 칸 칠하기 판 (3단계): 판 크기는 늘 같다 · 판의 후
     }
     // 고르기 문항이라 숫자판은 없다 — 판이 숫자판 자리에 선다
     assert.equal(padSpec(q, 'space'), null, where);
-    n++;
   }
-  assert.equal(n, SEEDS);
-  assert.deepEqual([...kinds].sort(), ['side:front', 'side:right', 'top:top'], `판 종류 ${[...kinds]}`);
+  assert.equal(per['spc.view'], SEEDS, 'S2는 문항마다 판');
+  for (const id of ['spc.dir', 'spc.topnum']) assert.ok(per[id] > SEEDS / 5, `${id} 판 문항 ${per[id]}`);
+  assert.deepEqual([...kinds].sort(), ['spc.dir:side:back', 'spc.dir:side:front', 'spc.dir:side:left', 'spc.dir:side:right', 'spc.topnum:side:front', 'spc.topnum:side:right', 'spc.view:side:front', 'spc.view:side:right', 'spc.view:top:top'], `판 종류 ${[...kinds]}`);
+  // 판 높이(draw.rows): S5는 후보가 3층까지인 문항도 4층 판 · 없으면 3층 · 3~4 밖이거나 정수가 아니면 판을 안 연다
+  const s5 = (() => { for (let s = 1; s <= 400; s++) { const d = qOf('spc.topnum', 'calc', s).draw; if (d && Math.max(...d.cands.flatMap((z) => z.v.split(',').map(Number))) <= 3) return d; } return null; })();
+  assert.ok(s5, 'S5 후보가 3층까지인 문항');
+  assert.equal(paintOf(s5).rows, 4, 'S5 판은 후보가 3층까지여도 4층');
+  assert.equal(paintOf({ ...s5, rows: undefined }).rows, 3, '판 높이를 안 정하면 3층');
+  for (const bad of [2, 5, 3.5, '4', null]) assert.equal(canDraw({ ...s5, rows: bad }), false, `판 높이 ${bad}`);
   // 같은 기둥의 같은 칸을 다시 누르면 한 층 내린다 · 위 판은 다시 누르면 지운다
   const gs = { kind: 'side', cols: 3, rows: 3, cands: [], target: '' };
   assert.equal(paintTap(gs, '2,0,0', 0, 1), '1,0,0', '2층까지 칠한 기둥의 2층 칸을 다시 누르면 1층');
@@ -1100,8 +1112,18 @@ test('✍️ 칸 칠하기 판 (3단계): 판 크기는 늘 같다 · 판의 후
   const dv = readFileSync(new URL('../js/drawview.js', import.meta.url), 'utf8');
   assert.match(dv, /if \(draw && draw\.mode === 'cells'\) return paintBox\(draw, \{ onSubmit, onIdk \}\);/);
   assert.match(dv, /if \(draw && draw\.mode === 'cells'\) return paintAnswered\(draw, text, ok\);/);
-  // 판은 S2 본 모양 고르기에만 — 다른 칸·② 문항에는 draw가 없다
-  for (const c of SPACE) for (const k of ['calc', 'misread']) for (let s = 1; s <= 30; s++) { const q = qOf(c.id, k, s); if (c.id !== 'spc.view' || k !== 'calc') assert.ok(!q.draw, `${c.id} ${k} #${s}`); }
+  // 판은 S1·S2·S5 본 모양 고르기에만 — 다른 문항·다른 칸·② 문항에는 draw가 없다
+  for (const c of SPACE) for (const k of ['calc', 'misread']) for (let s = 1; s <= 30; s++) {
+    const q = qOf(c.id, k, s);
+    const want = k === 'calc' && BOARDS.some(([id, type]) => id === c.id && solveText(q.q).type === type);
+    assert.equal(!!q.draw, want, `${c.id} ${k} #${s}`);
+  }
+  // S1·S5 문제 글도 바꿀 말이 한 번, 후보 그림을 빼도 쌓은 모양·수를 쓴 그림은 남는다
+  for (const id of ['spc.dir', 'spc.topnum']) {
+    const q = (() => { for (let s = 1; ; s++) { const x = qOf(id, 'calc', s); if (x.draw) return x; } })();
+    assert.equal(q.q.split('본 모양은 어느 것일까요?').length, 2, `${id}: 바꿀 말이 한 번`);
+    assert.ok(/\[(stack|top) /.test(q.q.split(`[${q.draw.fig}]`).join('')), `${id}: 후보 그림을 빼도 문제 그림은 남는다`);
+  }
 });
 
 test('❓ 아빠에게 묻기: 칸 칠하기 판에 칠한 답은 "칸에 직접 칠함"으로 — 보기 ㉠~㉣는 아이가 못 본 후보 모양이라고 알린다', async () => {

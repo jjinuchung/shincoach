@@ -71,7 +71,7 @@ export const STEMS = {
   // 중1 9칸 · E 음수가 좌표의 부호로, H 규칙과 대응의 식이 정비례·반비례로 · 수 답은 숫자판(± 늘 켬, mathpad.padSpec), 좌표·식·문장 답은 보기 · 좌표평면 그림 [plane] · R2 점 고르기는 ✍️ 좌표평면 판(drawview mode 'plane')
   coord: { key: 'coord', code: 'R', label: '좌표평면과 그래프 줄기', range: '중1', list: coordGen.COORD, gen: coordGen, file: './coach/math/coord.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (순서쌍과 좌표부터 — 중1 · E 음수 줄기를 먼저 하면 쉬워요 · H 규칙과 대응이 정비례·반비례로 바뀌어요)', intro: '좌표평면과 그래프 문제 5개를 먼저 풀어 볼게요. x좌표·y좌표의 순서와 부호(−)를 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
   // S 공간과 입체 — R 다음 칸, 초6 2학기 「공간과 입체」 미래엔 6-2 지도서 134~135쪽 흐름도·2022 성취기준 [6수03-09·10]으로 범위 확인 (2026-10-06 아버님 "다음 줄기 「공간과 입체」 해보자" → 설계안 "이대로 진행하자").
-  // 초6 9칸 · O 직육면체의 쌓기나무 세기가 위·앞·옆에서 본 모양으로 · 개수는 숫자판, 방향·본 모양·쌓은 모양은 보기 · 쌓기나무 그림 [stack]·[views]·[top]·[layers] · S2 본 모양 고르기는 ✍️ 칸 칠하기 판(drawview mode 'cells')
+  // 초6 9칸 · O 직육면체의 쌓기나무 세기가 위·앞·옆에서 본 모양으로 · 개수는 숫자판, 방향·본 모양·쌓은 모양은 보기 · 쌓기나무 그림 [stack]·[views]·[top]·[layers] · 본 모양 고르기(S1·S2·S5)는 ✍️ 칸 칠하기 판(drawview mode 'cells', S1·S5는 v195)
   space: { key: 'space', code: 'S', label: '공간과 입체 줄기', range: '초6', list: spaceGen.SPACE, gen: spaceGen, file: './coach/math/space.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (어느 방향에서 보았나부터 — 학교 6-2 3단원 · O 직육면체 줄기를 먼저 하면 쉬워요)', intro: '공간과 입체 문제 5개를 먼저 풀어 볼게요. 보는 쪽(앞·옆·위)과 뒤에 숨은 쌓기나무를 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
 export const STEM_ORDER = ['fraction', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];

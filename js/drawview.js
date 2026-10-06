@@ -28,7 +28,8 @@
 // 후보 ㉠~㉣ 그림([views …])만 빼서 빈 칸을 준다. 앞·옆(kind 'side')은 누른 칸까지 그 기둥을 아래부터 칠하고(같은 칸을 다시 누르면 한 층 내림),
 // 위(kind 'top')는 누를 때마다 칠하고 지운다(아래쪽이 앞). 칠한 모양이 후보와 같으면 그 보기(오개념 이름표가 그대로 쌓인다),
 // 어느 후보와도 다르면 "짐작한 답"("왼쪽부터 2, 3, 1층" · "뒤 줄부터 ■■□ / □■■")이다. 칠하는 동안의 말 = 풀이 카드의 말.
-// ★ 판의 크기는 후보 모두가 들어가는 크기로 정해져 있다(앞·옆은 3층까지) — 판 크기가 답 모양을 흘리지 않게.
+// ★ 판의 크기는 후보 모두가 들어가는 크기로 정해져 있다(앞·옆은 3층까지, 생성기가 draw.rows로 4층까지) — 판 크기가 답 모양을 흘리지 않게.
+// (2026-10-06 v195) S1 어느 쪽에서 본 모양 고르기 · S5 수를 쓴 그림에서 앞·옆 모양 고르기에도 같은 판.
 import { figureSvg, parseChart, chartGeom, parseSym, symSvg, symGeom, parsePlane, planeSvg, planeGeom, parseViews } from './mathdraw.js';
 import { textVal } from './mathpad.js';
 
@@ -371,7 +372,9 @@ export function paintOf(draw) {
   if (draw.kind === 'side') {
     cols = vals[0].length;
     if (vals.some((h) => h.length !== cols)) return null;
-    rows = Math.max(3, ...vals.flat()); // 3층까지는 늘 — 판 높이가 답의 가장 높은 층을 흘리지 않게
+    // 3층까지는 늘 — 판 높이가 답의 가장 높은 층을 흘리지 않게. 생성기가 판 높이(rows)를 정하면 그만큼은 늘 (S5: 줄의 수를 더한 후보가 4층까지라 늘 4층)
+    if (draw.rows !== undefined && !(Number.isInteger(draw.rows) && draw.rows >= 3 && draw.rows <= 4)) return null;
+    rows = Math.max(draw.rows || 3, ...vals.flat());
   } else {
     rows = vals[0].length; cols = vals[0][0].length;
     if (vals.some((t) => t.length !== rows || t.some((r) => r.length !== cols))) return null;

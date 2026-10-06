@@ -34,7 +34,7 @@ import { _kit as cubKit } from './mathcuboid.js';
 export { gradeLabel };
 
 const { famOf, runFamily, calcAsk, textChoices, branchOf, showWork, step, RIGHT_AS_WRONG, OFF } = cubKit;
-/** 가족에서 틀 하나를 골라 ① 문항으로 — 본 모양 고르기 틀의 draw(✍️ 칸 칠하기 판)도 넘긴다 (공용 calcAsk는 draw를 모른다) */
+/** 가족에서 틀 하나를 골라 ① 문항으로 — 본 모양 고르기 틀(S1·S2·S5)의 draw(✍️ 칸 칠하기 판)도 넘긴다 (공용 calcAsk는 draw를 모른다) */
 function askFam(r, c, concept, fams) {
   const v = runFamily(r, c, fams);
   const q = calcAsk(r, c, concept, v);
@@ -306,16 +306,20 @@ export const SPACE = [
         const g = genStack(r, 3, 3, 3, 5, 14, (x) => new Set(Object.values(dirViews(x))).size === 4 && readable(x));
         const V = dirViews(g);
         const P = placeCands(r, [{ v: V[d] }, ...Object.keys(DIRS).filter((k) => k !== d).map((k) => ({ v: V[k], tag: MIRROR[d] === k ? TAGS.mirrorDir : TAGS.sideMix }))]);
+        // ✍️ 칸 칠하기 판(S2와 같은 판): 후보 그림을 빼고 그 쪽에서 본 모양을 칠한다 — 네 쪽 모양 모두 3칸·3층 안이라 판은 늘 3 × 3
+        const fig = VW(P.pairs).slice(1, -1);
+        const draw = { fig, mode: 'cells', kind: 'side', target: V[d], cands: P.pairs.map(([k, v]) => ({ k, v })) };
         return {
-          t: `쌓기나무로 쌓은 모양을 ${DIRS[d]} 본 모양은 어느 것일까요?\n\n${ST(g)}\n\n${VW(P.pairs)}`,
+          t: `쌓기나무로 쌓은 모양을 ${DIRS[d]} 본 모양은 어느 것일까요?\n\n${ST(g)}\n\n[${fig}]`,
           text: true, ans: P.ans, wr: P.wr,
           steps: [DIR_STEP[d](g), `→ ${P.ans}`],
           why: { [TAGS.mirrorDir]: `그것은 ${DIRS[MIRROR[d]]} 본 모양이에요 — ${DIRS[d]} 보면 좌우가 바뀌어요.`, [TAGS.sideMix]: `그것은 ${d === 'front' || d === 'back' ? '옆' : '앞이나 뒤'}에서 본 모양이에요.` },
           probe: { ask: 'pickView', d },
+          draw,
         };
       };
       fams.push(famOf([pickView('front'), pickView('back'), pickView('right'), pickView('left')]));
-      return calcAsk(r, c, this, runFamily(r, c, fams));
+      return askFam(r, c, this, fams);
     },
     misread(r, c) {
       if (branchOf(r, c, ['back', 'left']) === 'back') {
@@ -587,12 +591,18 @@ export const SPACE = [
           ? [{ v: prof(F) }, { v: prof(rev(F)), tag: TAGS.mirrorView }, { v: prof(S), tag: TAGS.sideMix }, { v: prof(colSum), tag: TAGS.sumView }]
           : [{ v: prof(S) }, { v: prof(rev(S)), tag: TAGS.mirrorView }, { v: prof(F), tag: TAGS.sideMix }, { v: prof(rowSum), tag: TAGS.sumView }];
         const P = placeCands(r, list);
+        // ✍️ 칸 칠하기 판(S2와 같은 판) — "줄의 수를 더함" 후보가 4층까지라 판은 늘 4층(rows): 후보에 4가 있을 때만 4층이면 문항마다 판 높이가 갈린다
+        const fig = VW(P.pairs).slice(1, -1);
+        const draw = { fig, mode: 'cells', kind: 'side', rows: 4, target: list[0].v, cands: P.pairs.map(([k, v]) => ({ k, v })) };
+        // 풀이 카드는 판에서 칠한 말("왼쪽부터 2, 3, 1층")까지 — 옆은 "앞 줄이 왼쪽"을 한 줄 더
+        const seenLine = d === 'front' ? `앞에서 보면 왼쪽부터 ${F.join(', ')}층` : `오른쪽 옆에서는 앞 줄이 왼쪽 — 왼쪽부터 ${S.join(', ')}층`;
         return {
-          t: `위에서 본 모양에 쌓은 쌓기나무의 수를 썼어요. ${d === 'front' ? '앞에서' : '오른쪽 옆에서'} 본 모양은 어느 것일까요?\n\n${TOP(g)}\n\n${VW(P.pairs)}`,
+          t: `위에서 본 모양에 쌓은 쌓기나무의 수를 썼어요. ${d === 'front' ? '앞에서' : '오른쪽 옆에서'} 본 모양은 어느 것일까요?\n\n${TOP(g)}\n\n[${fig}]`,
           text: true, ans: P.ans, wr: P.wr,
-          steps: [d === 'front' ? `세로 줄마다 가장 큰 수 — 왼쪽부터 ${F.join(', ')}` : `가로 줄마다 가장 큰 수 — 앞 줄(아래쪽)부터 ${S.join(', ')}`, `→ ${P.ans}`],
+          steps: [d === 'front' ? `세로 줄마다 가장 큰 수 — 왼쪽부터 ${F.join(', ')}` : `가로 줄마다 가장 큰 수 — 앞 줄(아래쪽)부터 ${S.join(', ')}`, seenLine, `→ ${P.ans}`],
           why: { [TAGS.mirrorView]: '좌우가 바뀌었어요.', [TAGS.sideMix]: `그것은 ${d === 'front' ? '옆' : '앞'}에서 본 모양이에요.`, [TAGS.sumView]: '줄의 수를 더하지 않고 가장 큰 수만 — 겹친 쌓기나무는 하나로 보여요.' },
           probe: { ask: 'topView', d },
+          draw,
         };
       };
       fams.push(famOf([viewQ('front'), viewQ('side')]));
@@ -618,7 +628,7 @@ export const SPACE = [
         };
       };
       fams.push(famOf([stackQ()]));
-      return calcAsk(r, c, this, runFamily(r, c, fams));
+      return askFam(r, c, this, fams);
     },
     misread(r, c) {
       if (branchOf(r, c, ['sumview', 'cells']) === 'sumview') {
