@@ -19,6 +19,7 @@ import { ROSTER } from './pokemon.js';
 import { lvOf } from './evolve.js';
 import { visibleView } from './pokedex.js';
 import { ENGLISH_STONE_HOW, VIDEO_STONE } from './items.js'; // 🔶 영어스톤 받는 곳 안내 (2026-10-06)
+import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport } from './upload.js'; // 📤 Claude에게 기록 보내기 (2026-10-06)
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
 
 const $ = (id) => document.getElementById(id);
@@ -333,6 +334,7 @@ export async function renderStats() {
   // 0) 🛟 기록이 비어 있는데 사본이 있으면 — 되돌릴지는 **부모가** 정한다 (아이 화면엔 안 뜬다)
   renderRestoreOffer(main);
   renderBackupReminder(main);
+  renderUploadCard(main); // 📤 Claude에게 기록 보내기
 
   // 0) 🎟️ 아이가 산 영상 — 아빠가 파일을 넣어 줘야 볼 수 있다 (제일 위에, 놓치지 않게)
   const tickets = pendingTickets(inventory(), items).filter((t) => !t.delivered);
@@ -846,6 +848,65 @@ function renderRestoreOffer(main) {
 }
 
 /** 진짜 백업은 파일이다 — 주 1회 아버님께만 알린다 (사이트 데이터를 지우면 기기 안 사본도 같이 사라진다) */
+/**
+ * 📤 Claude에게 기록 보내기 (2026-10-06) — 열쇠(GitHub fine-grained token)를 넣고, 마지막으로 보낸 때를 보고, 바로 보낸다.
+ * 열쇠는 이 기기에만 (📊는 비밀번호 뒤). 저장소는 비공개 — 공개 저장소(신코치)에는 아이 기록을 올리지 않는다.
+ */
+function renderUploadCard(main) {
+  const box = card('📤 Claude에게 기록 보내기');
+  const token = getToken();
+  const st = uploadState();
+  const fmt = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  box.appendChild(el('p', 'stats-note', token
+    ? `수학 기록과 ❓ 질문을 비공개 저장소(${DATA_REPO})에 저절로 올려요 — 앱을 열 때·홈으로 올 때·앱을 내릴 때, 10분에 한 번까지. Claude에게 "기록 봐 줘"라고만 하면 돼요.`
+    : `사진·복사 없이 Claude가 바로 볼 수 있게, 수학 기록을 비공개 저장소(${DATA_REPO})에 올려요. GitHub에서 만든 열쇠(fine-grained token)를 아래에 한 번 넣어 주세요 — 이 태블릿에만 저장돼요.`));
+  const status = el('p', 'stats-sub', '');
+  const paint = (s) => {
+    status.textContent = !s || !s.at ? '아직 보낸 적이 없어요' : s.ok ? `✅ 마지막으로 보낸 때: ${fmt(s.at)}` : `❌ ${fmt(s.at)} 못 보냈어요 — ${s.why}`;
+  };
+  if (token) {
+    paint(st);
+    box.appendChild(status);
+    const row = el('div', 'stats-actions');
+    const send = el('button', 'btn btn-primary', '📤 지금 보내기');
+    send.type = 'button';
+    send.addEventListener('click', async () => {
+      send.disabled = true; send.textContent = '보내는 중…';
+      let r = await sendReport({ force: true }).catch((e) => ({ ok: false, why: String(e) }));
+      if (r.skipped && getToken()) r = await sendReport({ force: true }).catch((e) => ({ ok: false, why: String(e) })); // 저절로 보내던 것과 겹쳤다 — 한 번 더
+      paint(uploadState());
+      send.disabled = false; send.textContent = r.ok ? '✅ 보냈어요' : '📤 다시 보내기';
+    });
+    row.appendChild(send);
+    const del = el('button', 'btn', '열쇠 지우기');
+    del.type = 'button';
+    del.addEventListener('click', () => { clearToken(); renderStats(); });
+    row.appendChild(del);
+    box.appendChild(row);
+  } else {
+    const row = el('div', 'stats-actions');
+    const input = el('input', 'stats-token');
+    input.type = 'password';
+    input.autocomplete = 'off';
+    input.placeholder = 'github_pat_… 열쇠 붙여 넣기';
+    const save = el('button', 'btn btn-primary', '열쇠 넣고 보내 보기');
+    save.type = 'button';
+    save.addEventListener('click', async () => {
+      if (!setToken(input.value)) { status.textContent = '열쇠 모양이 아니에요 — github_pat_로 시작하는 긴 글을 통째로 붙여 넣어 주세요'; return; }
+      input.value = '';
+      save.disabled = true; status.textContent = '보내 보는 중…';
+      const r = await sendReport({ force: true }).catch((e) => ({ ok: false, why: String(e) }));
+      if (!r.ok) { clearToken(); status.textContent = `❌ 못 보냈어요 — ${r.why} (열쇠는 지웠어요, 다시 넣어 주세요)`; save.disabled = false; return; }
+      renderStats();
+    });
+    row.appendChild(input);
+    row.appendChild(save);
+    box.appendChild(row);
+    box.appendChild(status);
+  }
+  main.appendChild(box);
+}
+
 function renderBackupReminder(main) {
   const last = lastFileBackup();
   if (!needsFileBackup(last)) return;

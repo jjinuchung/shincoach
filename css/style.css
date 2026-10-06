@@ -1928,6 +1928,7 @@ button { font-family: inherit; }
 .math-report td.kinds { color: var(--muted); min-width: 11em; }
 .math-report td.miss { color: #92400e; }
 .stats-actions { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.stats-token { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border, #cbd5e1); border-radius: 10px; font-size: 0.95rem; } /* 📤 열쇠 칸 */
 .stats-copy-fallback { width: 100%; font-size: 0.8rem; font-family: ui-monospace, monospace; }
 
 /* 📖 단어 패널에서 그 단어만 다시 듣기 */

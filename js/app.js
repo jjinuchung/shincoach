@@ -14,6 +14,7 @@ import { initTimeUp, refreshChips } from './timeup.js';
 import { initTaken, openTakeTool, showTakenNoticeIfAny } from './taken.js'; // 🔒 부모가 포켓몬 데려가기
 import { initGiftSettings } from './gift.js'; // 🎁 선물 교환권 사진 (⚙, 이 기기에만)
 import { initParcel, showParcelIfAny, retryParcel } from './parcel.js'; // 📦 아빠의 구호품 (coach/gifts.json으로 배포)
+import { autoSend } from './upload.js'; // 📤 Claude에게 기록 보내기 (비공개 저장소, 열쇠는 📊에서 — 없으면 아무것도 안 한다)
 
 const views = {
   home: document.getElementById('view-home'),
@@ -45,6 +46,8 @@ export function showView(name) {
   if (name === 'home') renderHome(showView).catch(() => {});
   // 📦 다른 창 때문에 미뤄 둔 구호품이 있으면 홈으로 돌아왔을 때 다시 (Codex 32차 #7)
   if (name === 'home') retryParcel().catch(() => {});
+  // 📤 홈으로 돌아올 때(앱을 열 때 포함) 기록을 비공개 저장소로 — 10분에 한 번까지, 내용이 그대로면 안 올린다. 시작을 늦추지 않게 조금 뒤에
+  if (name === 'home') setTimeout(() => { autoSend(); }, 3000);
   // 🔢 수학은 들어올 때마다 진도를 다시 읽어 그린다 (사다리·오늘 복습이 최신이어야 한다)
   if (name === 'math') renderMath().catch(() => {});
   else stopCheer(); // ✨ 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)
@@ -184,7 +187,7 @@ async function main() {
   import('./backup.js').then((m) => m.saveMirror()).catch(() => {});
   // 👀 다른 창(홈 화면 앱 ↔ Chrome 탭)에서 산 것·이로치로 만든 것을 이 창이 앞으로 올 때 받아들인다 (Codex 8차 #5)
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
+    if (document.hidden) { autoSend(); return; } // 📤 앱을 내릴 때도 — 홈을 거치지 않고 끄는 날이 있다
     import('./xp.js').then((x) => x.reloadProfile()).catch(() => {});
     import('./pokemon.js').then((m) => Promise.all([m.loadShiny(), m.loadForms()])).catch(() => {});
   });
