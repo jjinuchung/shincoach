@@ -22,7 +22,14 @@
 // 그 보기를 고른 것 — 오개념 이름표가 그대로 쌓이고, 어느 후보와도 다르면 "짐작한 답"(찍은 좌표 "(1, −3)")이다.
 // 판의 범위는 문항의 fig(늘 −5~5) 그대로라 후보를 숨겨도 답 자리를 흘리지 않는다. 자는 mathdraw.planeGeom 하나(그림과 같은 자).
 // ★ 찍는 동안에는 좌표를 말하지 않는다("원점에서 오른쪽으로 2칸, 아래로 3칸") — 좌표를 보여 주면 글자만 맞춰 찍게 된다. 답한 뒤에 좌표까지.
-import { figureSvg, parseChart, chartGeom, parseSym, symSvg, symGeom, parsePlane, planeSvg, planeGeom } from './mathdraw.js';
+//
+// 🧊 S 공간과 입체 — 칸 칠하기 판(draw.mode 'cells', 2026-10-06 S 3단계): "쌓은 모양을 앞에서 보면 어떤 모양일까요? 칸을 칠해 보세요."
+// 교과서 S2 차시는 위·앞·옆에서 본 모양을 모눈에 **그린다** — 후보 넷 중 고르는 것과 다른 일이다. 쌓은 모양 그림은 문제 글에 두고
+// 후보 ㉠~㉣ 그림([views …])만 빼서 빈 칸을 준다. 앞·옆(kind 'side')은 누른 칸까지 그 기둥을 아래부터 칠하고(같은 칸을 다시 누르면 한 층 내림),
+// 위(kind 'top')는 누를 때마다 칠하고 지운다(아래쪽이 앞). 칠한 모양이 후보와 같으면 그 보기(오개념 이름표가 그대로 쌓인다),
+// 어느 후보와도 다르면 "짐작한 답"("왼쪽부터 2, 3, 1층" · "뒤 줄부터 ■■□ / □■■")이다. 칠하는 동안의 말 = 풀이 카드의 말.
+// ★ 판의 크기는 후보 모두가 들어가는 크기로 정해져 있다(앞·옆은 3층까지) — 판 크기가 답 모양을 흘리지 않게.
+import { figureSvg, parseChart, chartGeom, parseSym, symSvg, symGeom, parsePlane, planeSvg, planeGeom, parseViews } from './mathdraw.js';
 import { textVal } from './mathpad.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -49,7 +56,7 @@ function geomOf(draw) {
 }
 
 /** 이 draw를 판으로 그릴 수 있나 — math.js가 문제 글에서 그래프를 뺄지 정할 때 (못 그리면 보기·숫자판 그대로) */
-export const canDraw = (draw) => (draw && draw.mode === 'grid' ? !!gridOf(draw) : draw && draw.mode === 'plane' ? !!planeOf(draw) : !!geomOf(draw));
+export const canDraw = (draw) => (draw && draw.mode === 'grid' ? !!gridOf(draw) : draw && draw.mode === 'plane' ? !!planeOf(draw) : draw && draw.mode === 'cells' ? !!paintOf(draw) : !!geomOf(draw));
 
 // ───────────────────── 🪞 모눈 판 ─────────────────────
 
@@ -343,6 +350,189 @@ function planeAnswered(draw, text, ok) {
   return wrap;
 }
 
+// ───────────────────── 🧊 칸 칠하기 판 ─────────────────────
+
+const PC = 40; // 판 한 칸 (보이는 크기는 BOARD_SCALE배 — 태블릿에서 한 칸 54px쯤)
+const PPAD = 18;
+/** 후보 값 "2,3,1"(앞·옆 — 왼쪽부터 기둥 높이) · "110/011"(위 — 뒤 줄부터) → 판 상태 */
+const paintParse = (kind, v) => (kind === 'side' ? String(v).split(',').map(Number) : String(v).split('/').map((r) => [...r].map(Number)));
+const paintVal = (kind, s) => (kind === 'side' ? s.join(',') : s.map((r) => r.join('')).join('/'));
+
+/** draw → { kind, cols, rows, target, cands } (못 그리면 null) — 문제 글의 후보 그림([views])과 draw.cands가 이름·값까지 같아야 한다 */
+export function paintOf(draw) {
+  if (!draw || draw.mode !== 'cells' || !['side', 'top'].includes(draw.kind) || !Array.isArray(draw.cands) || draw.cands.length < 2) return null;
+  const sp = parseViews(String(draw.fig || '').replace(/^views /, ''));
+  if (!sp || sp.items.length !== draw.cands.length) return null;
+  const valOf = (it) => (it.kind === 'side' ? it.h.join(',') : it.cells.map((r) => r.join('')).join('/'));
+  if (!sp.items.every((it, n) => it.kind === draw.kind && it.k === draw.cands[n].k && valOf(it) === draw.cands[n].v)) return null;
+  if (!draw.cands.some((c) => c.v === draw.target)) return null;
+  const vals = draw.cands.map((c) => paintParse(draw.kind, c.v));
+  let cols; let rows;
+  if (draw.kind === 'side') {
+    cols = vals[0].length;
+    if (vals.some((h) => h.length !== cols)) return null;
+    rows = Math.max(3, ...vals.flat()); // 3층까지는 늘 — 판 높이가 답의 가장 높은 층을 흘리지 않게
+  } else {
+    rows = vals[0].length; cols = vals[0][0].length;
+    if (vals.some((t) => t.length !== rows || t.some((r) => r.length !== cols))) return null;
+  }
+  return cols <= 4 && rows <= 4 ? { kind: draw.kind, cols, rows, target: draw.target, cands: draw.cands } : null;
+}
+
+/** 칠한 모양을 말로 — 풀이 카드와 같은 말 ("왼쪽부터 2, 3, 1층" · "뒤 줄부터 ■■□ / □■■") */
+export function paintSay(g, v) {
+  const s = paintParse(g.kind, v);
+  return g.kind === 'side' ? `왼쪽부터 ${s.join(', ')}층` : `뒤 줄부터 ${s.map((r) => r.map((x) => (x ? '■' : '□')).join('')).join(' / ')}`;
+}
+/** 짐작한 답 글자 → 값 (paintSay의 거꾸로, 못 읽으면 null) */
+export function paintFromText(g, text) {
+  const t = String(text);
+  if (g.kind === 'side') { const m = /^왼쪽부터 (\d+(?:, \d+)*)층$/.exec(t); return m && m[1].split(', ').length === g.cols ? m[1].replace(/ /g, '') : null; }
+  const m = /^뒤 줄부터 ([■□]+(?: \/ [■□]+)*)$/.exec(t);
+  return m ? m[1].split(' / ').map((r) => [...r].map((x) => (x === '■' ? 1 : 0)).join('')).join('/') : null;
+}
+/** 확인할 때 보낼 글자 — 후보와 같으면 그 이름(㉡), 아니면 칠한 모양의 말 */
+export function paintText(g, v) {
+  const c = g.cands.find((z) => z.v === v);
+  return c ? c.k : paintSay(g, v);
+}
+
+/** 판 그림 — 칸마다 rect.draw-cell(칠하면 .is-on). 앞·옆은 바닥선, 위는 아래에 "앞". svg.set(값)으로 칠한다 */
+function paintSvgEl(g, v, cls, scale) {
+  const W = PPAD * 2 + g.cols * PC; const H = PPAD + g.rows * PC + (g.kind === 'top' ? 32 : 18);
+  const svg = svgEl('svg', { class: `frac-fig paint-fig ${cls}`, viewBox: `0 0 ${W} ${H}`, width: Math.round(W * scale), height: Math.round(H * scale), role: 'img', 'aria-label': g.kind === 'side' ? '앞이나 옆에서 본 모양을 칠하는 칸' : '위에서 본 모양을 칠하는 칸' });
+  const cells = [];
+  for (let r = 0; r < g.rows; r++) {
+    for (let i = 0; i < g.cols; i++) {
+      const rect = svgEl('rect', { class: 'draw-cell', x: PPAD + i * PC, y: PPAD + r * PC, width: PC, height: PC, 'data-i': i, 'data-r': r });
+      svg.appendChild(rect);
+      cells.push(rect);
+    }
+  }
+  if (g.kind === 'side') svg.appendChild(svgEl('line', { class: 'paint-base', x1: PPAD - 8, y1: PPAD + g.rows * PC, x2: W - PPAD + 8, y2: PPAD + g.rows * PC }));
+  else { const t = svgEl('text', { x: W / 2, y: PPAD + g.rows * PC + 24, 'font-size': 16, 'font-weight': 700, 'text-anchor': 'middle', fill: 'currentColor' }); t.textContent = '앞'; svg.appendChild(t); }
+  svg.set = (val) => {
+    const s = paintParse(g.kind, val);
+    for (const rect of cells) {
+      const i = Number(rect.getAttribute('data-i')); const r = Number(rect.getAttribute('data-r'));
+      rect.classList.toggle('is-on', g.kind === 'side' ? g.rows - r <= s[i] : s[r][i] === 1);
+    }
+  };
+  svg.set(v);
+  return svg;
+}
+
+/** 칸 칠하기 판 한 벌 — drawBox가 mode 'cells'일 때 부른다. 확인 → onSubmit({text: 후보 이름(㉡) 또는 "왼쪽부터 2, 3, 1층"}) */
+function paintBox(draw, { onSubmit, onIdk }) {
+  const g = paintOf(draw);
+  if (!g) return null;
+  const empty = () => paintVal(g.kind, g.kind === 'side' ? Array(g.cols).fill(0) : Array.from({ length: g.rows }, () => Array(g.cols).fill(0)));
+  // 확인 전에 칠해 둔 모양 — 🎒·📊에 다녀와 판을 다시 그려도 그대로 (점 찍기 판의 pending과 같은 자리)
+  const okPending = (v) => typeof v === 'string' && (g.kind === 'side' ? new RegExp(`^\\d(,\\d){${g.cols - 1}}$`).test(v) && v.split(',').every((h) => +h <= g.rows) : new RegExp(`^[01]{${g.cols}}(/[01]{${g.cols}}){${g.rows - 1}}$`).test(v));
+  let v = okPending(draw.pending) ? draw.pending : empty();
+  let done = false;
+
+  const wrap = el('div', 'math-draw is-paint');
+  wrap.appendChild(el('p', 'math-pad-lead', g.kind === 'side' ? '✍️ 기둥마다 높이만큼 칠해요 — 누른 칸까지 아래부터 칠해져요' : '✍️ 쌓기나무가 놓인 자리를 칠해요 — 누르면 칠하고, 다시 누르면 지워요 (아래쪽이 앞)'));
+  const box = el('div', 'math-fig math-draw-fig');
+  const svg = paintSvgEl(g, v, 'is-live', BOARD_SCALE);
+  box.appendChild(svg);
+  wrap.appendChild(box);
+  const say = el('p', 'math-draw-say');
+  wrap.appendChild(say);
+
+  const tools = el('div', 'math-draw-nudge is-grid');
+  const clear = el('button', 'btn math-draw-step', '↺ 다 지우기');
+  clear.type = 'button';
+  clear.addEventListener('click', () => { if (done) return; set(empty()); });
+  tools.appendChild(clear);
+  wrap.appendChild(tools);
+
+  const row = el('div', 'math-pad-actions');
+  const ok = el('button', 'btn btn-primary btn-big-wide math-pad-ok', '확인');
+  ok.type = 'button';
+  ok.addEventListener('click', () => {
+    if (done || !ready()) return;
+    done = true;
+    paint();
+    onSubmit({ text: paintText(g, v), val: null });
+  });
+  const idk = el('button', 'btn math-pad-idk', '🤷 모르겠어요');
+  idk.type = 'button';
+  idk.addEventListener('click', () => { if (done) return; done = true; paint(); onIdk(); });
+  row.appendChild(ok);
+  row.appendChild(idk);
+  wrap.appendChild(row);
+
+  /** 앞·옆은 기둥마다 1층 이상, 위는 한 칸 이상 칠해야 확인 */
+  function ready() { const s = paintParse(g.kind, v); return g.kind === 'side' ? s.every((h) => h >= 1) : s.flat().some(Boolean); }
+  function set(nv) { v = nv; draw.pending = v; paint(); }
+  svg.addEventListener('pointerdown', (e) => {
+    if (done) return;
+    const m = svg.getScreenCTM();
+    if (!m) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    const u = pt.matrixTransform(m.inverse());
+    const i = Math.floor((u.x - PPAD) / PC); const r = Math.floor((u.y - PPAD) / PC);
+    if (i < 0 || i >= g.cols || r < 0 || r >= g.rows) return;
+    e.preventDefault();
+    set(paintTap(g, v, i, r));
+  });
+
+  function paint() {
+    svg.set(v);
+    const s = paintParse(g.kind, v);
+    const any = g.kind === 'side' ? s.some((h) => h > 0) : s.flat().some(Boolean);
+    say.textContent = !any ? '아직 안 칠했어요' : g.kind === 'side' && !ready() ? `${paintSay(g, v)} — 빈 기둥이 있어요` : paintSay(g, v);
+    say.classList.toggle('is-empty', !any);
+    clear.disabled = done || !any;
+    ok.disabled = done || !ready();
+    idk.disabled = done;
+    wrap.classList.toggle('is-done', done);
+    svg.classList.toggle('is-drawable', !done);
+  }
+  paint();
+  return wrap;
+}
+/**
+ * 칸 하나를 누르면 — 앞·옆: 그 기둥을 누른 칸 높이까지(이미 그 높이면 한 층 내림) · 위: 그 칸을 칠하거나 지움.
+ * i 왼쪽부터 칸 번호, r 위에서부터 줄 번호(판 그림 그대로). 순수 함수 — 테스트가 직접 누른다
+ */
+export function paintTap(g, v, i, r) {
+  const s = paintParse(g.kind, v);
+  if (g.kind === 'side') { const k = g.rows - r; s[i] = s[i] === k ? k - 1 : k; } else s[r][i] = s[r][i] ? 0 : 1;
+  return paintVal(g.kind, s);
+}
+
+/**
+ * 답한 뒤 칸 칠하기 판 — 후보 ㉠~㉣ 그림(풀이 카드가 이 이름으로 말한다) + 내가 칠한 모양 + 틀렸으면 맞는 모양.
+ * text는 후보 이름(㉡)·"왼쪽부터 2, 3, 1층"·"모르겠어요"
+ */
+function paintAnswered(draw, text, ok) {
+  const g = paintOf(draw);
+  const wrap = el('div', `math-draw is-answered is-paint ${ok ? 'ok' : 'no'}`);
+  const cand = (draw && draw.cands || []).find((c) => c.k === text);
+  const mine = g ? (cand ? cand.v : paintFromText(g, text)) : null;
+  const right = g ? draw.cands.find((c) => c.v === g.target) : null;
+  if (g) {
+    const fig = el('div', 'math-fig math-draw-fig');
+    fig.innerHTML = figureSvg(draw.fig);
+    wrap.appendChild(fig);
+    const pair = el('div', 'math-paint-pair');
+    const one = (val, cls, cap) => { const f = el('figure', 'math-draw-fig'); f.appendChild(paintSvgEl(g, val, cls, 1)); f.appendChild(el('figcaption', '', cap)); pair.appendChild(f); };
+    if (mine) one(mine, ok ? 'is-ok' : 'is-no', '내가 칠한 모양');
+    if (!ok) one(g.target, 'is-right', `맞는 모양 ${right ? right.k : ''}`.trim());
+    wrap.appendChild(pair);
+  }
+  const p = el('p', `math-pad-answered ${ok ? 'ok' : 'no'}`);
+  p.appendChild(document.createTextNode(mine && g ? `✍️ 내가 칠한 모양: ${cand ? `${cand.k}과 같아요 — ` : ''}${paintSay(g, mine)} ` : `✍️ 내 답: ${text} `));
+  p.appendChild(el('span', 'mark', ok ? '✔' : '✘'));
+  wrap.appendChild(p);
+  if (!ok && g && right) wrap.appendChild(el('p', 'math-draw-right', `맞는 모양 — ${right.k} (${paintSay(g, g.target)})`));
+  return wrap;
+}
+
 /** 칸 수를 말로 — 막대 "3칸" · 점 "물결선 위 첫 눈금에서 4칸 위" / "0에서 4칸 위" */
 function cellsSay(mode, G, k) {
   if (mode === 'bar') return `막대 ${k}칸`;
@@ -398,6 +588,7 @@ function chartBox(draw) {
 export function drawBox(draw, { onSubmit, onIdk }) {
   if (draw && draw.mode === 'grid') return gridBox(draw, { onSubmit, onIdk });
   if (draw && draw.mode === 'plane') return planeBox(draw, { onSubmit, onIdk });
+  if (draw && draw.mode === 'cells') return paintBox(draw, { onSubmit, onIdk });
   const g = geomOf(draw);
   if (!g) return null;
   g.target = draw.target;
@@ -502,6 +693,7 @@ export function drawBox(draw, { onSubmit, onIdk }) {
 export function drawAnswered(draw, text, ok, okK) {
   if (draw && draw.mode === 'grid') return gridAnswered(draw, text, ok);
   if (draw && draw.mode === 'plane') return planeAnswered(draw, text, ok);
+  if (draw && draw.mode === 'cells') return paintAnswered(draw, text, ok);
   const g = geomOf(draw);
   const wrap = el('div', `math-draw is-answered ${ok ? 'ok' : 'no'}`);
   const k = /^\d+$/.test(String(text)) ? Number(text) : null;

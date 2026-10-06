@@ -2463,6 +2463,11 @@ export function figureSvg(spec) {
   if ((m = /^cnet (.+)$/.exec(s))) { const sp = parseCnet(m[1]); return sp ? cnetSvg(sp) : ''; } // 🔷 P 원기둥 전개도
   if ((m = /^scale (.+)$/.exec(s))) { const sp = parseScale(m[1]); return sp ? scaleSvg(sp) : ''; } // 🟰 Q 저울
   if ((m = /^plane (.+)$/.exec(s))) { const sp = parsePlane(m[1]); return sp ? planeSvg(sp) : ''; } // 📈 R 좌표평면
+  if ((m = /^stack (.+)$/.exec(s))) { const sp = parseStackFig(m[1]); return sp ? stackSvg(sp) : ''; } // 🧊 S 쌓은 모양
+  if ((m = /^stacks (.+)$/.exec(s))) { const sp = parseStacks(m[1]); return sp ? stacksSvg(sp) : ''; } // 🧊 S 쌓은 모양 후보
+  if ((m = /^views (.+)$/.exec(s))) { const sp = parseViews(m[1]); return sp ? viewsSvg(sp) : ''; } // 🧊 S 위·앞·옆에서 본 모양
+  if ((m = /^top (.+)$/.exec(s))) { const g = parseStack(m[1]); return g ? topSvg(g) : ''; } // 🧊 S 위에서 본 모양에 수
+  if ((m = /^layers (.+)$/.exec(s))) { const g = parseStack(m[1]); return g ? layersSvg(g) : ''; } // 🧊 S 층별로 나타낸 모양
   if ((m = /^steps ((?:\d+\s*){2,5})$/.exec(s))) return stepsSvg(m[1].trim().split(/\s+/).map(Number));
   if ((m = /^table (.+)$/.exec(s))) { const rows = parseTable(m[1]); return rows ? tableSvg(rows) : ''; }
   // 🔺 도형 — 끝에 단위(cm·m)를 붙일 수 있다. 수는 1~40, 모양이 말이 안 되면(밑변보다 큰 밀림 등) 빈 글자
@@ -2543,6 +2548,7 @@ export function figText(text, short = false) {
     .replace(/\[cnet ([^\]]+)\]/g, (all, arg) => { const sp = parseCnet(arg); return !sp ? all : short ? '(그림)' : `(${cnetText(sp)})`; })
     .replace(/\[scale ([^\]]+)\]/g, (all, arg) => { const sp = parseScale(arg); return !sp ? all : short ? '(저울)' : `(${scaleText(sp)})`; })
     .replace(/\[plane ([^\]]+)\]/g, (all, arg) => { const sp = parsePlane(arg); return !sp ? all : short ? '(좌표평면)' : `(${planeText(sp)})`; })
+    .replace(/\[(stack|stacks|views|top|layers) ([^\]]+)\]/g, (all, kind, arg) => { const tx = spaceText(kind, arg); return !tx ? all : short ? '(쌓기나무)' : `(${tx})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
 }
@@ -2582,7 +2588,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|plane) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -2865,6 +2871,295 @@ export function planeSvg(sp) {
   for (const c of sp.cands) put(X(c.x), Y(c.y), c.k, 17, 'pl-cand-name');
   // 보이는 크기는 1.2배 — 눈금 수 12px가 태블릿에서 본문보다 작다 (Q 저울과 같은 까닭). 폰에서는 max-width:100%로 줄어든다
   return `<svg class="frac-fig plane-fig" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.2)}" height="${Math.round(H * 1.2)}" data-c="${C}" role="img" aria-label="${esc(planeText(sp))}">${g}${labels}</svg>`;
+}
+
+// ───────────────────── 🧊 S 공간과 입체 — 쌓기나무 (2026-10-06) ─────────────────────
+//
+// 모든 그림은 높이 표 하나에서 — `2 1 0 / 1 3 1`은 위에서 본 모양에 수를 쓴 것과 같다 (첫 줄이 뒤, 마지막 줄이 앞, 칸은 왼쪽부터).
+//   `[stack 2 1 0 / 1 3 1]` 쌓은 모양 — O 직육면체 겨냥도처럼 앞면은 반듯하게, 안쪽은 오른쪽 위 45°로 반만큼. 앞쪽에 "앞" 화살표 (`free`면 화살표 없음)
+//   `[stacks ㉠=2,1/0,1 ㉡=… free]` 쌓은 모양 후보 — 칸은 쉼표, 줄은 /, 크기를 같게 맞춰 두 줄로
+//   `[views ㉠=2,3,1 ㉡=11/01 …]` 본 모양 — 쉼표 목록은 앞·옆에서 본 모양(왼쪽부터 기둥 높이), 0·1 줄과 /는 위에서 본 모양. 이름은 ㉠~㉣ 또는 위·앞·옆
+//   `[top 2 1 0 / 1 3 1]` 위에서 본 모양에 수를 쓴 그림 · `[layers 2 1 0 / 1 3 1]` 층별로 나타낸 모양(1층·2층·3층)
+// 쌓기나무는 꽉 찬 덩어리 — 맞닿은 면은 그리지 않고, 뒤에서 앞으로·아래에서 위로·왼쪽에서 오른쪽으로 칠해 앞의 것이 뒤를 가린다.
+// ★ 테스트는 그린 SVG의 면(sk-f: data-c="i,j,k" data-f)을 그 순서대로 다시 칠해 보이는 쌓기나무·보이는 윗면을 따로 센다.
+
+// 안쪽 한 칸 = 오른쪽으로 0.6, 위로 0.42 — O 직육면체 겨냥도(45°, 반만큼)보다 깊게: 그만큼이면 뒤 줄 윗면이 가는 띠로만 보여 셀 수 없었다 (갤러리 눈 확인)
+const SK_DX = 0.6; const SK_DY = 0.42;
+const SK_MAX = 4;
+
+/** "2 1 0 / 1 3 1" 또는 "2,1,0/1,3,1" → g[j][i] (j = 0이 앞 줄, i = 0이 왼쪽). 말이 안 되면 null */
+export function parseStack(arg) {
+  const rows = String(arg || '').trim().split('/').map((r) => r.trim().split(/[\s,]+/).filter(Boolean));
+  if (!rows.length || rows.some((r) => !r.length || r.some((t) => !/^\d$/.test(t)))) return null;
+  const W = rows[0].length;
+  if (rows.some((r) => r.length !== W) || W > SK_MAX || rows.length > SK_MAX) return null;
+  const g = rows.reverse().map((r) => r.map(Number));
+  if (g.flat().some((v) => v > SK_MAX) || !g.flat().some((v) => v > 0)) return null;
+  return g;
+}
+/** 높이 표 → 지시문 글 "2 1 0 / 1 3 1" (첫 줄이 뒤) */
+export const stackText = (g) => [...g].reverse().map((r) => r.join(' ')).join(' / ');
+/** 높이 표 → 후보 글 "2,1,0/1,3,1" */
+export const stackTok = (g) => [...g].reverse().map((r) => r.join(',')).join('/');
+
+const skHas = (g, i, j, k) => j >= 0 && j < g.length && i >= 0 && i < g[0].length && k >= 0 && g[j][i] > k;
+/** 칠하는 순서: 뒤 줄부터(j 큰 것), 아래층부터, 왼쪽부터 */
+function skCubes(g) {
+  const out = [];
+  for (let j = g.length - 1; j >= 0; j--) for (let k = 0; k < SK_MAX; k++) for (let i = 0; i < g[0].length; i++) if (g[j][i] > k) out.push([i, j, k]);
+  return out;
+}
+/** 쌓기나무 하나의 보이는 쪽 세 면(앞·위·오른쪽) — 다른 쌓기나무와 맞닿은 면은 뺀다. 꼭짓점은 [x, y, z] */
+function skFaces(g, [i, j, k]) {
+  const f = [];
+  if (!skHas(g, i, j - 1, k)) f.push(['front', [[i, j, k], [i + 1, j, k], [i + 1, j, k + 1], [i, j, k + 1]]]);
+  if (!skHas(g, i, j, k + 1)) f.push(['top', [[i, j, k + 1], [i + 1, j, k + 1], [i + 1, j + 1, k + 1], [i, j + 1, k + 1]]]);
+  if (!skHas(g, i + 1, j, k)) f.push(['right', [[i + 1, j, k], [i + 1, j + 1, k], [i + 1, j + 1, k + 1], [i + 1, j, k + 1]]]);
+  return f;
+}
+/** [x, y, z] → 단위 화면 좌표 (아래로 갈수록 y가 크다) */
+const skP = ([x, y, z]) => [x + y * SK_DX, -(z + y * SK_DY)];
+/** 점이 볼록 사각형 안(경계 제외)에 있나 */
+function skInQuad(p, q) {
+  let sgn = 0;
+  for (let a = 0; a < 4; a++) {
+    const [x1, y1] = q[a]; const [x2, y2] = q[(a + 1) % 4];
+    const c = (x2 - x1) * (p[1] - y1) - (y2 - y1) * (p[0] - x1);
+    if (Math.abs(c) < 1e-9) return false;
+    const s = Math.sign(c);
+    if (!sgn) sgn = s; else if (s !== sgn) return false;
+  }
+  return true;
+}
+
+/**
+ * 쌓기나무마다 보이는 정도 — 그리는 순서대로 칠했을 때 각 면에서 가려지지 않은 몫(면마다 6 × 6 점).
+ * 생성기가 "기둥마다 맨 위가 보이는 그림"·"보이지 않는 쌓기나무가 있는 그림"을 고를 때 쓴다.
+ * @returns {{cubes: Array<{i:number,j:number,k:number,vis:{front:number,top:number,right:number},any:boolean}>, topVis: Array<Array<number|null>>}}
+ */
+const SK_VIS = new Map(); // 같은 높이 표는 한 번만 — 생성기가 모양을 고르며 수십 번 묻는다
+export function stackVis(g) {
+  const key = stackText(g);
+  if (SK_VIS.has(key)) return SK_VIS.get(key);
+  const out = skVis(g);
+  if (SK_VIS.size > 20000) SK_VIS.clear();
+  SK_VIS.set(key, out);
+  return out;
+}
+function skVis(g) {
+  const cubes = skCubes(g);
+  const faces = [];
+  cubes.forEach((c, ci) => { for (const [f, pts] of skFaces(g, c)) faces.push({ ci, f, q: pts.map(skP) }); });
+  const res = cubes.map(([i, j, k]) => ({ i, j, k, vis: { front: 0, top: 0, right: 0 }, any: false }));
+  const N = 6;
+  faces.forEach((F, fi) => {
+    let seen = 0;
+    const [p0, p1, p2, p3] = F.q;
+    for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) {
+      const u = (a + 0.5) / N; const v = (b + 0.5) / N;
+      const pt = [0, 1].map((d) => (1 - u) * (1 - v) * p0[d] + u * (1 - v) * p1[d] + u * v * p2[d] + (1 - u) * v * p3[d]);
+      let hid = false;
+      for (let gi = fi + 1; gi < faces.length && !hid; gi++) if (faces[gi].ci !== F.ci && skInQuad(pt, faces[gi].q)) hid = true;
+      if (!hid) seen++;
+    }
+    res[F.ci].vis[F.f] = seen / (N * N);
+  });
+  for (const c of res) c.any = c.vis.front + c.vis.top + c.vis.right > 0.04;
+  const topVis = g.map((row, j) => row.map((h, i) => (h ? res.find((x) => x.i === i && x.j === j && x.k === h - 1).vis.top : null)));
+  return { cubes: res, topVis };
+}
+
+/** 화살표 한 개 (머리는 끝에) */
+function skArrow(cls, a, b, label, lx, ly) {
+  const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
+  const ux = dx / L; const uy = dy / L; const nx = -uy; const ny = ux;
+  const h1 = [b[0] - ux * 10 + nx * 5.5, b[1] - uy * 10 + ny * 5.5]; const h2 = [b[0] - ux * 10 - nx * 5.5, b[1] - uy * 10 - ny * 5.5];
+  return `<g class="${cls}"><line x1="${cf(a[0])}" y1="${cf(a[1])}" x2="${cf(b[0] - ux * 8)}" y2="${cf(b[1] - uy * 8)}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`
+    + `<polygon points="${cf(b[0])},${cf(b[1])} ${cf(h1[0])},${cf(h1[1])} ${cf(h2[0])},${cf(h2[1])}" fill="currentColor"/>`
+    + `<text x="${cf(lx)}" y="${cf(ly)}" font-size="16" font-weight="700" text-anchor="middle" fill="currentColor">${esc(label)}</text></g>`;
+}
+
+/** 쌓은 모양 한 덩이 — 앞 왼쪽 아래 모서리를 (bx, by)에, 한 칸 s로. 쌓기나무마다 면 두 겹(바탕색 + 옅은 색·테두리) */
+function skBlock(g, s, bx, by) {
+  const P = (pt) => { const [u, v] = skP(pt); return [bx + s * u, by + s * v]; };
+  let out = '';
+  for (const c of skCubes(g)) {
+    for (const [f, pts] of skFaces(g, c)) {
+      const q = pts.map(P).map(([x, y]) => `${cf(x)},${cf(y)}`).join(' ');
+      out += `<polygon class="sk-f" data-c="${c.join(',')}" data-f="${f}" points="${q}" fill="var(--card, #fff)"/>`;
+      out += `<polygon points="${q}" fill="${FILL}" fill-opacity="${f === 'top' ? 0.12 : f === 'front' ? 0.28 : 0.46}" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>`;
+    }
+  }
+  return { svg: out, P };
+}
+const skSize = (g) => ({ W: g[0].length, D: g.length, Hm: Math.max(...g.flat()) });
+
+/** `[stack …]` 인자 → { g, free } */
+export function parseStackFig(arg) {
+  const toks = String(arg || '').trim().split(/\s+/);
+  const free = toks.includes('free');
+  const g = parseStack(toks.filter((t) => t !== 'free').join(' '));
+  return g ? { g, free } : null;
+}
+
+/** 쌓은 모양 그림 — 보이는 크기는 그린 크기의 1.2배(태블릿에서 칸이 본문 글자보다 커야 셀 수 있다) */
+export function stackSvg(sp) {
+  const { g } = sp;
+  const { W, D, Hm } = skSize(g);
+  const s = Math.min(46, 260 / (W + D * SK_DX), 200 / (Hm + D * SK_DY));
+  const padL = 58; const padT = 22; const padR = 30; const padB = sp.free ? 18 : 62;
+  const bx = padL; const by = padT + s * (Hm + D * SK_DY);
+  const B = skBlock(g, s, bx, by);
+  const Wd = Math.round(padL + s * (W + D * SK_DX) + padR); const Ht = Math.round(by + padB);
+  let arrow = '';
+  if (!sp.free) {
+    // "앞" — 앞 줄 아래 가운데를 왼쪽 아래에서 오른쪽 위(안쪽 방향)로 가리킨다
+    const tip = B.P([W / 2, 0, 0]);
+    arrow = skArrow('sk-front', [tip[0] - 34, tip[1] + 36], [tip[0] - 5, tip[1] + 7], '앞', tip[0] - 42, tip[1] + 56);
+  }
+  return `<svg class="frac-fig stack-fig" viewBox="0 0 ${Wd} ${Ht}" width="${Math.round(Wd * 1.2)}" height="${Math.round(Ht * 1.2)}" role="img" aria-label="${esc(stackDesc(g))}">${B.svg}${arrow}</svg>`;
+}
+const stackDesc = (g) => `쌓기나무로 쌓은 모양 (위에서 본 모양에 수를 쓰면 ${stackText(g)})`;
+
+/** `[stacks ㉠=2,1/0,1 …]` → { items: [{k, g}], free } */
+export function parseStacks(arg) {
+  const toks = String(arg || '').trim().split(/\s+/);
+  const free = toks.includes('free');
+  const items = [];
+  for (const t of toks.filter((x) => x !== 'free')) {
+    const m = /^([㉠-㉣])=(.+)$/.exec(t);
+    if (!m) return null;
+    const g = parseStack(m[2]);
+    if (!g || items.some((x) => x.k === m[1])) return null;
+    items.push({ k: m[1], g });
+  }
+  return items.length >= 2 && items.length <= 4 ? { items, free } : null;
+}
+/** 쌓은 모양 후보 — 같은 크기의 칸으로 두 줄 (한 줄에 둘) */
+export function stacksSvg(sp) {
+  const dims = sp.items.map((x) => skSize(x.g));
+  const Wm = Math.max(...dims.map((d) => d.W + d.D * SK_DX)); const Hmm = Math.max(...dims.map((d) => d.Hm + d.D * SK_DY));
+  const s = Math.min(34, 150 / Wm, 130 / Hmm);
+  const cellW = s * Wm + 70; const cellH = s * Hmm + (sp.free ? 44 : 78);
+  const cols = 2; const rows = Math.ceil(sp.items.length / cols);
+  let out = '';
+  sp.items.forEach((it, n) => {
+    const cx = (n % cols) * cellW; const cy = Math.floor(n / cols) * cellH;
+    const d = skSize(it.g);
+    const bx = cx + 40; const by = cy + 30 + s * (d.Hm + d.D * SK_DY);
+    const B = skBlock(it.g, s, bx, by);
+    out += `<g class="sk-cand" data-k="${it.k}" data-g="${stackTok(it.g)}">${B.svg}`;
+    if (!sp.free) { const tip = B.P([d.W / 2, 0, 0]); out += skArrow('sk-front', [tip[0] - 24, tip[1] + 26], [tip[0] - 4, tip[1] + 6], '앞', tip[0] - 30, tip[1] + 42); }
+    out += `<text class="sk-k" x="${cf(cx + 14)}" y="${cf(cy + 24)}" font-size="18" font-weight="700" fill="currentColor">${it.k}</text></g>`;
+  });
+  const Wd = Math.round(cols * cellW); const Ht = Math.round(rows * cellH);
+  return `<svg class="frac-fig stack-fig" viewBox="0 0 ${Wd} ${Ht}" width="${Math.round(Wd * 1.15)}" height="${Math.round(Ht * 1.15)}" role="img" aria-label="${esc(stacksText(sp))}">${out}</svg>`;
+}
+const stacksText = (sp) => `쌓은 모양 ${sp.items.map((x) => `${x.k} ${stackText(x.g)}`).join(' · ')}`;
+
+const SK_VIEW_NAMES = ['㉠', '㉡', '㉢', '㉣', '위', '앞', '옆'];
+/**
+ * `[views ㉠=2,3,1 ㉡=11/01 …]` → items [{k, kind:'side', h:[2,3,1]} | {k, kind:'top', cells:[[0/1]] (첫 줄이 뒤)}]
+ * 쉼표가 있으면(또는 수 하나면) 앞·옆에서 본 모양, 0·1로만 된 줄이면 위에서 본 모양
+ */
+export function parseViews(arg) {
+  const items = [];
+  for (const t of String(arg || '').trim().split(/\s+/)) {
+    const m = /^(.)=(.+)$/u.exec(t);
+    if (!m || !SK_VIEW_NAMES.includes(m[1]) || items.some((x) => x.k === m[1])) return null;
+    const v = m[2];
+    if (/^[1-4](,[1-4]){0,3}$/.test(v) && (v.includes(',') || v.length === 1)) { items.push({ k: m[1], kind: 'side', h: v.split(',').map(Number) }); continue; }
+    if (/^[01]{1,4}(\/[01]{1,4}){0,3}$/.test(v)) {
+      const cells = v.split('/').map((r) => [...r].map(Number));
+      if (cells.some((r) => r.length !== cells[0].length) || !cells.flat().some(Boolean)) return null;
+      items.push({ k: m[1], kind: 'top', cells });
+      continue;
+    }
+    return null;
+  }
+  return items.length ? { items } : null;
+}
+const SKC = 24; // 본 모양 한 칸
+/** 칸 하나 */
+const skCell = (x, y, cls = 'sk-sq') => `<rect class="${cls}" x="${cf(x)}" y="${cf(y)}" width="${SKC}" height="${SKC}" fill="${FILL}" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/>`;
+/** 본 모양 후보 — 한 줄에 넷까지(넓으면 두 줄). 앞·옆 모양은 바닥선 위에 기둥을, 위 모양은 점선 칸 위에 칠한 칸을 */
+export function viewsSvg(sp) {
+  const dims = sp.items.map((it) => (it.kind === 'side' ? { w: it.h.length, h: Math.max(...it.h) } : { w: it.cells[0].length, h: it.cells.length }));
+  const bw = Math.max(...dims.map((d) => d.w)) * SKC + 44; const bh = Math.max(...dims.map((d) => d.h)) * SKC + 46;
+  const cols = sp.items.length * bw > 400 ? 2 : sp.items.length;
+  let out = '';
+  sp.items.forEach((it, n) => {
+    const x0 = (n % cols) * bw + 30; const y0 = Math.floor(n / cols) * bh + 30;
+    const d = dims[n];
+    out += `<g class="sk-view" data-k="${it.k}" data-kind="${it.kind}" data-v="${it.kind === 'side' ? it.h.join(',') : it.cells.map((r) => r.join('')).join('/')}">`;
+    out += `<text class="sk-k" x="${cf(x0 - 18)}" y="${cf(y0 - 6)}" font-size="${it.k.length === 1 && /[㉠-㉣]/.test(it.k) ? 18 : 15}" font-weight="700" fill="currentColor">${it.k}</text>`;
+    const top = y0 + (bh - 46 - d.h * SKC);
+    if (it.kind === 'side') {
+      it.h.forEach((h, i) => { for (let k = 0; k < h; k++) out += skCell(x0 + i * SKC, top + (d.h - 1 - k) * SKC); });
+      out += `<line x1="${cf(x0 - 6)}" y1="${cf(top + d.h * SKC)}" x2="${cf(x0 + d.w * SKC + 6)}" y2="${cf(top + d.h * SKC)}" stroke="currentColor" stroke-width="2.2"/>`;
+    } else {
+      it.cells.forEach((row, r) => row.forEach((v, c) => {
+        out += v ? skCell(x0 + c * SKC, top + r * SKC) : `<rect x="${cf(x0 + c * SKC)}" y="${cf(top + r * SKC)}" width="${SKC}" height="${SKC}" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"/>`;
+      }));
+    }
+    out += '</g>';
+  });
+  const rows = Math.ceil(sp.items.length / cols);
+  const Wd = Math.round(cols * bw + 16); const Ht = Math.round(rows * bh + 10);
+  return `<svg class="frac-fig views-fig" viewBox="0 0 ${Wd} ${Ht}" width="${Math.round(Wd * 1.15)}" height="${Math.round(Ht * 1.15)}" role="img" aria-label="${esc(viewsText(sp))}">${out}</svg>`;
+}
+const viewsText = (sp) => sp.items.map((it) => (it.kind === 'side' ? `${it.k} 기둥 높이 ${it.h.join(', ')}` : `${it.k} 위에서 본 칸 ${it.cells.map((r) => r.join('')).join('/')}`)).join(' · ');
+
+/** 위에서 본 모양에 수를 쓴 그림 — 앞은 아래쪽 */
+export function topSvg(g) {
+  const { W, D } = skSize(g);
+  const c = 40; const x0 = 24; const y0 = 16;
+  let out = '';
+  for (let r = 0; r < D; r++) for (let i = 0; i < W; i++) {
+    const h = g[D - 1 - r][i];
+    const x = x0 + i * c; const y = y0 + r * c;
+    if (!h) { out += `<rect x="${x}" y="${y}" width="${c}" height="${c}" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"/>`; continue; }
+    out += `<rect class="sk-top" data-i="${i}" data-j="${D - 1 - r}" data-h="${h}" x="${x}" y="${y}" width="${c}" height="${c}" fill="${FILL}" fill-opacity="0.18" stroke="currentColor" stroke-width="1.6"/>`;
+    out += `<text x="${x + c / 2}" y="${y + c / 2 + 7}" font-size="20" font-weight="700" text-anchor="middle" fill="currentColor">${h}</text>`;
+  }
+  const Wd = x0 * 2 + W * c; const Ht = y0 + D * c + 30;
+  out += `<text x="${Wd / 2}" y="${y0 + D * c + 22}" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor">앞</text>`;
+  return `<svg class="frac-fig top-fig" viewBox="0 0 ${Wd} ${Ht}" width="${Math.round(Wd * 1.1)}" height="${Math.round(Ht * 1.1)}" role="img" aria-label="${esc(`위에서 본 모양에 수를 쓴 그림 ${stackText(g)}`)}">${out}</svg>`;
+}
+
+/** 층별로 나타낸 모양 — 1층부터 맨 위층까지 나란히, 칸 자리는 모두 같은 틀 위에 (앞은 아래쪽) */
+export function layersSvg(g) {
+  const { W, D, Hm } = skSize(g);
+  const c = 26; const gap = 34; const bw = W * c + gap;
+  let out = '';
+  for (let k = 1; k <= Hm; k++) {
+    const x0 = 16 + (k - 1) * bw; const y0 = 30;
+    out += `<g class="sk-layer" data-k="${k}"><text x="${x0 + (W * c) / 2}" y="20" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor">${k}층</text>`;
+    for (let r = 0; r < D; r++) for (let i = 0; i < W; i++) {
+      const on = g[D - 1 - r][i] >= k;
+      out += on ? `<rect class="sk-sq" data-i="${i}" data-j="${D - 1 - r}" x="${x0 + i * c}" y="${y0 + r * c}" width="${c}" height="${c}" fill="${FILL}" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/>`
+        : `<rect x="${x0 + i * c}" y="${y0 + r * c}" width="${c}" height="${c}" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-dasharray="3 3"/>`;
+    }
+    out += `<text x="${x0 + (W * c) / 2}" y="${y0 + D * c + 18}" font-size="13" text-anchor="middle" fill="currentColor" fill-opacity="0.8">앞</text></g>`;
+  }
+  const Wd = Math.round(16 * 2 + Hm * bw - gap); const Ht = 30 + D * c + 26;
+  return `<svg class="frac-fig layers-fig" viewBox="0 0 ${Wd} ${Ht}" width="${Math.round(Wd * 1.15)}" height="${Math.round(Ht * 1.15)}" role="img" aria-label="${esc(layersText(g))}">${out}</svg>`;
+}
+const layersText = (g) => {
+  const { D, Hm } = skSize(g);
+  const parts = [];
+  for (let k = 1; k <= Hm; k++) { const rows = []; for (let j = D - 1; j >= 0; j--) rows.push(g[j].map((h) => (h >= k ? 1 : 0)).join('')); parts.push(`${k}층 ${rows.join('/')}`); }
+  return `층별로 나타낸 모양: ${parts.join(' · ')}`;
+};
+
+/** 📊·❓ 글용 — 그림 종류별 */
+export function spaceText(kind, arg) {
+  if (kind === 'stack') { const sp = parseStackFig(arg); return sp ? stackDesc(sp.g) : ''; }
+  if (kind === 'stacks') { const sp = parseStacks(arg); return sp ? stacksText(sp) : ''; }
+  if (kind === 'views') { const sp = parseViews(arg); return sp ? `본 모양: ${viewsText(sp)}` : ''; }
+  if (kind === 'top') { const g = parseStack(arg); return g ? `위에서 본 모양에 수를 쓴 그림 ${stackText(g)}` : ''; }
+  if (kind === 'layers') { const g = parseStack(arg); return g ? layersText(g) : ''; }
+  return '';
 }
 
 // ───────────────────── 글 속 식 — 분수·대분수·문자 (2026-10-03, D 문자와 식 3단계) ─────────────────────

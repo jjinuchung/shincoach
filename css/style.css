@@ -517,6 +517,17 @@ button { font-family: inherit; }
 .math-draw-nudge.is-grid .math-draw-step { min-width: 64px; padding: 10px 12px; font-size: 1.3rem; }
 .math-draw.is-grid .math-draw-say { font-size: 1.1rem; }
 .math-draw.is-answered .math-pad-answered { margin-top: 4px; }
+/* 🧊 칸 칠하기 판 (S 3단계) — 빈 칸은 점선, 칠한 칸은 채움 · 답한 뒤 내 모양(맞음 초록·틀림 빨강)과 맞는 모양(초록 점선) */
+.math-draw-fig .draw-cell { fill: transparent; stroke: currentColor; stroke-opacity: .3; stroke-dasharray: 4 3; stroke-width: 1.5; }
+.math-draw-fig .draw-cell.is-on { fill: var(--frac-fill, #6366f1); fill-opacity: .5; stroke-opacity: .9; stroke-dasharray: none; }
+.math-draw-fig .is-ok .draw-cell.is-on { fill: var(--ok); }
+.math-draw-fig .is-no .draw-cell.is-on { fill: var(--danger); }
+.math-draw-fig .is-right .draw-cell.is-on { fill: var(--ok); fill-opacity: .15; stroke: var(--ok); stroke-width: 2.5; stroke-dasharray: 6 4; }
+.math-draw-fig .paint-base { stroke: currentColor; stroke-width: 2.2; }
+.math-paint-pair { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.math-paint-pair figure { margin: 0; flex-direction: column; align-items: center; }
+.math-paint-pair figcaption { font-size: .9rem; font-weight: 700; margin-top: 2px; }
+.math-draw.is-paint .math-pad-answered, .math-draw.is-paint .math-draw-right { word-break: keep-all; } /* "3층"이 "3 / 층"으로 갈리지 않게 */
 .math-feedback { margin-top: 12px; }
 .math-fb { font-size: 1.05rem; font-weight: 700; margin: 4px 0 6px; line-height: 1.6; }
 .math-fb.ok { color: #047857; }
