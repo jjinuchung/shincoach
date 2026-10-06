@@ -230,7 +230,7 @@ export function parcelOf(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const id = typeof raw.id === 'string' ? raw.id.trim() : '';
   if (!id || id.length > 64) return null;
-  if (id.startsWith(VIDEO_PARCEL)) return null; // 🏁 영상 🔶 기록 자리 — 아빠 구호품이 이 이름이면 영상 몫과 섞인다
+  if (id.startsWith(VIDEO_PARCEL) || id.startsWith(VIDEO_PLUS)) return null; // 🏁 영상 보상 기록 자리 — 아빠 구호품이 이 이름이면 영상 몫과 섞인다
   const src = raw.items;
   if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
   const items = {};
@@ -261,21 +261,51 @@ export const VIDEO_PARCEL = 'video:';
 export function videoParcelId(itemId) {
   return `${VIDEO_PARCEL}${itemId}`;
 }
+/**
+ * 🏁 영상 길이별 끝까지 보상 (2026-10-06, 진우 "1시간 30분짜리 영상을 끝냈는데 보상이 너무 없다" → 아버님 "코인하고 스톤도 추가로" · 기본값 "이대로 진행").
+ * 전엔 영화도 에피소드도 🔶3(v197) + 마지막 문장 🏁 💰20뿐이었다. 길이 = 그 영상의 문장 수(📊 진행률의 분모).
+ * 🔶은 v197의 3개(video:)를 포함한 개수 — 나머지(💰 전부 + 🔶 차액)는 따로 받은 기록 videoplus:<id>에 적는다.
+ * 그래서 v197에 🔶3만 받고 끝낸 지난 영상도 차액을 받는다 (📦 창, 규칙을 바꿀 때 이미 한 것도 정한다)
+ */
+export const VIDEO_TIERS = [
+  { upto: 399, coin: 50, stone: 3, label: '짧은 영상' },       // 에피소드 20분쯤
+  { upto: 799, coin: 100, stone: 5, label: '중간 영상' },
+  { upto: Infinity, coin: 200, stone: 8, label: '긴 영상' },   // 영화 1~2시간
+];
+export const VIDEO_PLUS = 'videoplus:';
+export function videoPlusId(itemId) {
+  return `${VIDEO_PLUS}${itemId}`;
+}
+/** 영상 길이(문장 수) → 보상 칸 (순수) — 모르는 길이는 짧은 영상 */
+export function videoTier(total) {
+  const n = Math.max(0, Number(total) || 0);
+  return VIDEO_TIERS.find((t) => n <= t.upto) || VIDEO_TIERS[0];
+}
+/**
+ * 이 영상에서 받을 💰·🔶 (순수) — base: 🔶 3개(video:)를 아직 안 받음 · plus: 길이별 나머지(videoplus:)를 아직 안 받음.
+ * db.videoStoneRule(받기)과 📦 창(보여 주기)이 같은 셈을 쓴다
+ */
+export function videoGrant({ total, base, plus }) {
+  const t = videoTier(total);
+  return { coins: plus ? t.coin : 0, stones: (base ? VIDEO_STONE.n : 0) + (plus ? Math.max(0, t.stone - VIDEO_STONE.n) : 0), tier: t };
+}
 /** 진행률(%) — stats.contentSummary의 pct와 같은 셈 (반올림) */
 export function videoPct(done, total) {
   return total > 0 ? Math.round((done / total) * 100) : 0;
 }
-/** 🔶을 받을 영상 (순수) — 깨진 영상·이미 받은 영상은 빼고 VIDEO_STONE.pct% 이상 한 것만, 같은 id는 한 번 */
+/** 끝까지 보상을 받을 영상 (순수) — 깨진 영상·다 받은 영상은 빼고 VIDEO_STONE.pct% 이상 한 것만, 같은 id는 한 번 · base·plus = 아직 안 받은 몫 */
 export function videoStoneDue(summaries, received) {
   const out = [];
   const seen = new Set();
   for (const s of Array.isArray(summaries) ? summaries : []) {
     if (!s || s.broken || s.id === undefined || s.id === null || s.id === '') continue;
     const id = String(s.id);
-    if (seen.has(id) || parcelGot(received, videoParcelId(id))) continue;
+    const base = !parcelGot(received, videoParcelId(id));
+    const plus = !parcelGot(received, videoPlusId(id));
+    if (seen.has(id) || (!base && !plus)) continue;
     if (!(Number(s.total) > 0) || !(Number(s.pct) >= VIDEO_STONE.pct)) continue;
     seen.add(id);
-    out.push({ id, title: String(s.title || '') });
+    out.push({ id, title: String(s.title || ''), total: Number(s.total), base, plus });
   }
   return out;
 }

@@ -118,7 +118,7 @@ test('📦 화면 연결 — 앱을 열면(🔒 알림 뒤) 한 번 · [받기]�
   assert.match(src('js/taken.js'), /'take', 'parcel'\]/, '🔒 알림이 구호품 창 위에 겹쳐 뜨지 않는다');
   const v = src('js/parcel.js');
   assert.match(v, /'timeup', 'take', 'taken', 'market'\]/, '다른 창이 열려 있으면 기다린다');
-  assert.match(v, /try \{ r = cur\.kind === 'video' \? await receiveVideoStones\(cur\.ids\) : await receiveParcel\(cur\); \}/, '받기 버튼이 트랜잭션을 부른다 (🏁 영상 칸은 영상 트랜잭션 — tests/englishstone.test.js)');
+  assert.match(v, /try \{ r = cur\.kind === 'video' \? await receiveVideoStones\(cur\.due\.map\(\(d\) => \(\{ id: d\.id, total: d\.total \}\)\)\) : await receiveParcel\(cur\); \}/, '받기 버튼이 트랜잭션을 부른다 (🏁 영상 칸은 영상 트랜잭션 — tests/englishstone.test.js)');
   assert.match(v, /if \(r\.ok\) \{\s*\$\('parcel-title'\)\.textContent = '🎒 가방에 넣었어요!';/, '"넣었어요"는 저장된 뒤에만');
   assert.match(v, /if \(step === 'busy'\) return;/, '두 번 눌러도 한 번');
   assert.match(v, /failed = true;/, '못 받았으면 이번에는 다시 안 띄운다');

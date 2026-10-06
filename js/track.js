@@ -251,6 +251,19 @@ export function setFav(cue, on) {
   return r.fav;
 }
 
+/**
+ * ✍️ 이 문장이 에세이 문장으로 화면에 떴다 (2026-10-06) — 한 번 나온 문장은 다시 안 낸다 (essay.pickPrompts).
+ * 에세이 문장은 이미 끝낸(done) 문장이라 기록이 있다 · lastAt은 안 바꾼다(문장을 다시 들은 게 아니다) · 백업 병합은 max
+ */
+export function essayShown(cue) {
+  if (!t.item || !cue) return;
+  const key = sentenceKey(t.item.id, cue.start);
+  const r = t.stats.get(key);
+  if (!r) return;
+  r.essayAt = Date.now();
+  t.dirty.add(key);
+}
+
 /** 💖 이 문장을 골랐나 (기록을 새로 만들지 않는다 — 화면을 그리며 묻는 용도) */
 export function isFav(cue) {
   const r = statFor(cue);

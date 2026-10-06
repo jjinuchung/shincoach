@@ -18,7 +18,7 @@ import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsF
 import { ROSTER } from './pokemon.js';
 import { lvOf } from './evolve.js';
 import { visibleView } from './pokedex.js';
-import { ENGLISH_STONE_HOW, VIDEO_STONE } from './items.js'; // 🔶 영어스톤 받는 곳 안내 (2026-10-06)
+import { ENGLISH_STONE_HOW, VIDEO_TIERS } from './items.js'; // 🔶 영어스톤 받는 곳 안내 (2026-10-06)
 import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport } from './upload.js'; // 📤 Claude에게 기록 보내기 (2026-10-06)
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
 
@@ -520,7 +520,7 @@ export async function renderStats() {
       box.appendChild(chip);
     }
     c3d.appendChild(box);
-    c3d.appendChild(el('p', 'stats-note', `스톤은 문제를 맞히는 것만으로는 안 나옵니다 — 🔷는 개념 편을 통과할 때, 🔶는 ${ENGLISH_STONE_HOW} 나와요(영상은 하나에 ${VIDEO_STONE.n}개). 레벨이 높다는 건 그만큼 꾸준히 했다는 뜻이에요.`));
+    c3d.appendChild(el('p', 'stats-note', `스톤은 문제를 맞히는 것만으로는 안 나옵니다 — 🔷는 개념 편을 통과할 때, 🔶는 ${ENGLISH_STONE_HOW} 나와요(영상은 길이에 따라 ${VIDEO_TIERS[0].stone}~${VIDEO_TIERS[VIDEO_TIERS.length - 1].stone}개와 💰 ${VIDEO_TIERS[0].coin}~${VIDEO_TIERS[VIDEO_TIERS.length - 1].coin}). 레벨이 높다는 건 그만큼 꾸준히 했다는 뜻이에요.`));
     main.appendChild(c3d);
   }
 

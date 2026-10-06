@@ -10,7 +10,7 @@ import { makeDictation } from '../js/dictation.js';
 import { pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds, REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH } from '../js/essay.js';
 import { pickMatchRound, shuffle as shuffleMons, PAIRS as MATCH_PAIRS, NEED_NEW as MATCH_NEED } from '../js/match.js';
 import { matchXp, XP as REAL_XP } from '../js/xp.js';
-import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, videoPct } from '../js/items.js';
+import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, videoPct, videoGrant } from '../js/items.js';
 import fsNode from 'node:fs';
 
 // 받아쓰기 오답은 실제 사전에서 만들어지므로 테스트도 진짜 사전을 쓴다
@@ -200,12 +200,13 @@ function loadPlayer() {
     // 🏁 영상 끝까지 → 🔶 (2026-10-06) — 규칙(VIDEO_STONE·videoPct)은 실제 모듈, 받기는 트랜잭션 흉내(영상마다 한 번)
     VIDEO_STONE, videoPct, videoState,
     videoStoneGot: (id) => !!videoState.got[id],
-    async receiveVideoStones(ids) {
-      videoState.calls.push(ids.slice());
-      if (videoState.fail) return { ok: false, why: 'save', ids: [] };
-      const fresh = ids.filter((id) => !videoState.got[id]);
-      for (const id of fresh) videoState.got[id] = 1;
-      return fresh.length ? { ok: true, ids: fresh, items: { stone_english: fresh.length * VIDEO_STONE.n } } : { ok: false, why: 'done', ids: [] };
+    async receiveVideoStones(list) {
+      videoState.calls.push(list.map((v) => ({ ...v })));
+      if (videoState.fail) return { ok: false, why: 'save', ids: [], coins: 0 };
+      const fresh = list.filter((v) => !videoState.got[v.id]);
+      for (const v of fresh) videoState.got[v.id] = 1;
+      const g = fresh.map((v) => videoGrant({ total: v.total, base: true, plus: true }));
+      return fresh.length ? { ok: true, ids: fresh.map((v) => v.id), items: { stone_english: g.reduce((a, x) => a + x.stones, 0) }, coins: g.reduce((a, x) => a + x.coins, 0) } : { ok: false, why: 'done', ids: [], coins: 0 };
     },
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
@@ -2130,9 +2131,9 @@ test('🏁 영상 끝까지(문장 90%) → 🔶 영어스톤 3개 — 영상마
   videoState.done = 8; run('markDone(state.cues[7])'); await tick();
   assert.equal(videoState.calls.length, 0, '80%');
   videoState.done = 9; run('markDone(state.cues[8])'); await tick();
-  assert.deepEqual(videoState.calls.map((c) => Array.from(c)), [['ep1']], '90% — 이 영상 id로 받기 트랜잭션 한 번');
+  assert.deepEqual(JSON.parse(JSON.stringify(videoState.calls)), [[{ id: 'ep1', total: 10 }]], '90% — 이 영상 id와 문장 수(길이별 보상)로 받기 트랜잭션 한 번');
   assert.match(els['player-msg'].textContent, /「피카츄의 모험」/, '어느 영상인지 이름으로');
-  assert.match(els['player-msg'].textContent, /🔶 영어스톤 \+3/, '무엇을 몇 개 받았는지');
+  assert.match(els['player-msg'].textContent, /💰 \+50 · 🔶 영어스톤 \+3/, '무엇을 몇 개 받았는지 (10문장 = 짧은 영상)');
   assert.equal(els['player-msg'].hidden, false);
   videoState.done = 10; run('markDone(state.cues[9])'); await tick();
   assert.equal(videoState.calls.length, 1, '같은 영상은 다시 부르지 않는다');

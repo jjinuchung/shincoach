@@ -10,7 +10,7 @@
 // 🏁 같은 창으로 "끝까지 본 영상"의 🔶 영어스톤도 온다 (2026-10-06) — 규칙이 생기기 전에 90%를 넘긴 지난 영상과,
 //   영상 화면에서 저장을 놓친 영상. 받기는 db.applyVideoStones 한 트랜잭션(받은 영상은 parcels에 'video:<id>').
 
-import { parcelOf, parcelGot, itemById, SHINY_CHARGE, SHINY_STONE, STONE_ENGLISH, VIDEO_STONE, videoStoneDue, videoParcelId } from './items.js';
+import { parcelOf, parcelGot, itemById, SHINY_CHARGE, SHINY_STONE, STONE_ENGLISH, VIDEO_STONE, videoStoneDue, videoParcelId, videoPlusId, videoGrant } from './items.js';
 import { parcelsReceived, receiveParcel, receiveVideoStones, shinyLeft } from './xp.js';
 import { sfx } from './sfx.js';
 
@@ -40,6 +40,7 @@ export function pendingParcels(list, received) {
 /** 구호품 한 칸의 그림·이름·개수 (순수) — 🌈 남은 횟수는 "이로치의 스톤 · 2번" */
 export function parcelLabel(id, n) {
   if (id === SHINY_CHARGE) return { emoji: SHINY_STONE.emoji, name: SHINY_STONE.ko, count: `${n}번` };
+  if (id === COIN_ITEM) return { emoji: '💰', name: '코인', count: `+${n}` }; // 🏁 영상 끝까지 보상 (가방 물건이 아니다)
   const it = itemById(id);
   return it ? { emoji: it.emoji, name: it.ko, count: `×${n}` } : { emoji: '🎁', name: id, count: `×${n}` };
 }
@@ -51,20 +52,30 @@ export function afterLine(items, left) {
   return '🎒 가방에서 볼 수 있어요';
 }
 
+/** 📦 칸에서 💰 코인을 가리키는 이름 (가방 물건이 아니라 보여 주기만) */
+export const COIN_ITEM = 'coin';
+
 /**
- * 🏁 끝까지 본 영상들의 🔶을 구호품 한 칸으로 (순수) — 영상 이름을 보여 준다(무엇 때문에 받는지 아이가 알게).
- * @param {Array<{id:string, title:string}>} due items.videoStoneDue 결과
+ * 🏁 끝까지 본 영상들의 보상을 구호품 한 칸으로 (순수) — 영상 이름을 보여 준다(무엇 때문에 받는지 아이가 알게).
+ * 💰·🔶은 영상마다 길이별(items.videoGrant) — v197에 🔶3만 받은 영상은 차액만
+ * @param {Array<{id:string, title:string, total:number, base:boolean, plus:boolean}>} due items.videoStoneDue 결과
  */
 export function videoParcel(due) {
   const list = Array.isArray(due) ? due : [];
   if (!list.length) return null;
+  let coins = 0;
+  let stones = 0;
+  for (const d of list) { const g = videoGrant(d); coins += g.coins; stones += g.stones; }
   const names = list.map((d) => `「${d.title}」`);
   const shown = names.slice(0, 3).join(' · ') + (names.length > 3 ? ` 외 ${names.length - 3}편` : '');
+  const items = {};
+  if (coins) items[COIN_ITEM] = coins;
+  if (stones) items[STONE_ENGLISH.id] = stones;
   return {
     kind: 'video', id: 'video', ids: list.map((d) => String(d.id)), icon: '🏁',
-    items: { [STONE_ENGLISH.id]: list.length * VIDEO_STONE.n },
-    title: `🏁 끝까지 본 영상 ${list.length}편 — ${STONE_ENGLISH.ko}이 왔어요!`,
-    text: `${shown} — 문장을 ${VIDEO_STONE.pct}% 넘게 했어요. 영상 하나에 ${STONE_ENGLISH.emoji} ${VIDEO_STONE.n}개!`,
+    items,
+    title: `🏁 끝까지 본 영상 ${list.length}편 — 상이 왔어요!`,
+    text: `${shown} — 문장을 ${VIDEO_STONE.pct}% 넘게 했어요. 긴 영상일수록 💰·${STONE_ENGLISH.emoji}이 더 많아요!`,
     due: list,
   };
 }
@@ -74,7 +85,8 @@ export function stillDue(queue, got) {
   const out = [];
   for (const pc of Array.isArray(queue) ? queue : []) {
     if (pc && pc.kind === 'video') {
-      const vp = videoParcel((pc.due || []).filter((d) => !parcelGot(got, videoParcelId(d.id))));
+      const left = (pc.due || []).map((d) => ({ ...d, base: d.base && !parcelGot(got, videoParcelId(d.id)), plus: d.plus && !parcelGot(got, videoPlusId(d.id)) }));
+      const vp = videoParcel(left.filter((d) => d.base || d.plus));
       if (vp) out.push(vp);
     } else if (pc && !parcelGot(got, pc.id)) out.push(pc);
   }
@@ -168,7 +180,7 @@ function render() {
   note.hidden = !cur.text;
   $('parcel-sub').textContent = '';
   const ok = $('parcel-ok');
-  ok.textContent = cur.kind === 'video' ? `${STONE_ENGLISH.emoji} 받기` : '📦 받기';
+  ok.textContent = cur.kind === 'video' ? '🎁 받기' : '📦 받기'; // 🏁 영상 몫은 💰·🔶 둘 다
   ok.disabled = false;
 }
 
@@ -179,7 +191,7 @@ async function onButton() {
   step = 'busy';
   ok.disabled = true;
   let r;
-  try { r = cur.kind === 'video' ? await receiveVideoStones(cur.ids) : await receiveParcel(cur); } catch { r = { ok: false, why: 'save' }; }
+  try { r = cur.kind === 'video' ? await receiveVideoStones(cur.due.map((d) => ({ id: d.id, total: d.total }))) : await receiveParcel(cur); } catch { r = { ok: false, why: 'save' }; }
   step = 'done';
   ok.disabled = false;
   if (r.ok) {

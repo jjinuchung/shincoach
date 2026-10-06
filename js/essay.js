@@ -111,6 +111,8 @@ export function makeFrame(text) {
 /** 문장 기록에서 오늘 쓸 문장 고르기 (💖 내 문장 → 잘 아는 문장 · 내 이야기로 바꾸기 쉬운 문장 우선) */
 export function pickPrompts(records, count = DEFAULT_COUNT, opts = {}) {
   const cueOf = opts.cueOf || (() => true);
+  // 이미 나온 문장인가 — 화면에 뜬 적 있음(essayAt) · 에세이로 쓴 적 있음(opts.used) (2026-10-06)
+  const used = (r) => !!(r && r.essayAt) || !!(opts.used && opts.used(r));
   const cands = [];
   for (const r of records || []) {
     if (!r || !r.done || !r.en) continue;
@@ -120,9 +122,15 @@ export function pickPrompts(records, count = DEFAULT_COUNT, opts = {}) {
     if (!frame) continue;
     cands.push({ rec: r, frame, score: scoreFrame(r, frame) });
   }
-  // 💖 내 문장(아이가 고른 것)이 먼저 — 고른 문장으로 내 이야기를 쓰는 게 제일 쓰고 싶다 (2026-10-01)
-  cands.sort((a, b) => ((b.rec.fav ? 1 : 0) - (a.rec.fav ? 1 : 0)) || (b.score - a.score) || ((b.rec.lastAt || 0) - (a.rec.lastAt || 0)));
-  return cands.slice(0, count).map(({ rec, frame }) => ({ rec, frame, cue: null }));
+  // ★ 한 번 나온 문장은 다시 안 낸다 (2026-10-06, 진우 "에세이가 똑같은 문장만 매번 나온다" → 아버님 "💖 고른 문장도 한 번만, 다 보여 줬으면 다른 문장").
+  //   전엔 아래 순서로 줄 세워 맨 위만 가져가 같은 영상 동안 매일 같은 문장이 나왔다.
+  // 안 나온 문장: 💖 내 문장(아이가 고른 것)이 먼저 — 고른 문장으로 내 이야기를 쓰는 게 제일 쓰고 싶다 (2026-10-01) → 쓰기 좋은 것 → 최근
+  const fresh = cands.filter((c) => !used(c.rec));
+  fresh.sort((a, b) => ((b.rec.fav ? 1 : 0) - (a.rec.fav ? 1 : 0)) || (b.score - a.score) || ((b.rec.lastAt || 0) - (a.rec.lastAt || 0)));
+  // 그 영상 문장을 다 썼으면 나온 지 가장 오래된 문장부터 다시 (빈 화면 대신)
+  const old = cands.filter((c) => used(c.rec));
+  old.sort((a, b) => ((a.rec.essayAt || 0) - (b.rec.essayAt || 0)) || (b.score - a.score));
+  return [...fresh, ...old].slice(0, count).map(({ rec, frame }) => ({ rec, frame, cue: null }));
 }
 
 function scoreFrame(r, frame) {
@@ -510,6 +518,7 @@ export function isEssayOpen() {
  * @param {(cue:object) => void} o.onPlay 원문 들려주기
  * @param {(text:string, hooks:object) => Promise<object>} o.speak 고친 문장 따라 말하기
  * @param {(item:object) => void} o.onWritten 문장 하나 완성 (기록·보상)
+ * @param {(item:object) => void} [o.onShown] 문장이 화면에 떴다 — 한 번 나온 문장은 다시 안 내려고 적는다 (연습·아빠 교정 회차는 안 부름)
  * @param {() => object} o.onFinished 전부 완성
  * @param {(summary:object) => void} o.onDone
  */
@@ -590,6 +599,7 @@ function renderDots() {
 function showPrompt() {
   const it = ui.o.prompts[ui.i];
   if (!it) { showDone(); return; }
+  if (ui.o.mode !== 'coach' && !ui.o.practice && ui.o.onShown) ui.o.onShown(it); // ✍️ 이 문장은 나왔다 (다음부터 다른 문장)
   renderDots();
   $('essay-intro').hidden = true;
   $('essay-result').hidden = true;

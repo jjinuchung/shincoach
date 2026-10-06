@@ -317,3 +317,54 @@ test('✍️ 적용(db.applyEssayFixes) — 날짜가 있으면 그날 글에만
   assert.match(st, /parseFixes\(area\.value, todo\.map\(\(e\) => \(\{ id: e\.id, date: e\.date \}\)\)\)/, '📊 붙여 넣기도 날짜까지');
   assert.match(st, /todoNo\.get\(essayKey\(d\.date, e\.id\)\)/, '📊 [번호]도 날짜까지');
 });
+
+// ── ★ 한 번 나온 문장은 다시 안 낸다 (2026-10-06, 진우 "에세이가 똑같은 문장만 매번 나온다" → 아버님 "💖 고른 문장도 한 번만, 다 보여 줬으면 다른 문장") ──
+
+const SIX = [
+  'I want to play soccer with my friends after school today.',
+  'I can not believe we finally found the hidden treasure map.',
+  'We have to find the key before the sun goes down tonight.',
+  'I will open the door to the castle and see the dragon.',
+  'She could be hiding in the forest behind the big tree.',
+  'I used to feel scared of the dark until I got a lamp.',
+];
+
+test('✍️ 에세이 문장: 이미 나온 문장(essayAt · 쓴 적 있음)은 안 낸다 — 💖 내 문장도 한 번 · 안 나온 💖가 먼저', () => {
+  const list = SIX.map((en, i) => rec(en, { start: i, fav: i === 0 || i === 3 }));
+  // 처음: 💖 둘이 먼저
+  const p1 = pickPrompts(list, 3);
+  assert.deepEqual(p1.slice(0, 2).map((p) => p.rec.start).sort(), [0, 3], '💖 내 문장 먼저');
+  // 💖 0번이 나왔다(essayAt) → 다음엔 💖 3번 + 다른 문장 — 0번은 안 나온다
+  list[0].essayAt = 1000;
+  const p2 = pickPrompts(list, 3);
+  assert.equal(p2[0].rec.start, 3, '아직 안 나온 💖');
+  assert.ok(!p2.some((p) => p.rec.start === 0), '나온 💖는 다시 안 나온다');
+  // 쓴 적 있는 문장(opts.used — essayAt을 적기 전에 쓴 글)도 나온 것
+  const used = (r) => r.start === 3;
+  const p3 = pickPrompts(list, 3, { used });
+  assert.ok(!p3.some((p) => p.rec.start === 0 || p.rec.start === 3), `나온 문장 없이 ${p3.map((p) => p.rec.start)}`);
+  assert.equal(p3.length, 3);
+});
+
+test('✍️ 에세이 문장: 그 영상 문장을 다 썼으면 나온 지 가장 오래된 문장부터 다시 (빈 화면 대신) · 안 나온 문장이 늘 먼저', () => {
+  const list = SIX.map((en, i) => rec(en, { start: i, essayAt: 1000 * (6 - i) })); // 5번이 가장 오래전에 나옴
+  const p = pickPrompts(list, 3);
+  assert.deepEqual(p.map((x) => x.rec.start), [5, 4, 3], '가장 오래된 것부터');
+  list[2].essayAt = 0; delete list[2].essayAt; // 2번은 아직 안 나옴
+  assert.equal(pickPrompts(list, 3)[0].rec.start, 2, '안 나온 문장이 먼저');
+});
+
+test('✍️ 화면 연결 — 문장이 뜰 때 적는다(연습·아빠 교정 회차는 안 적음) · 기록은 sentenceStats.essayAt(백업 병합 max) · 이미 쓴 글도 나온 것', () => {
+  const e = fs.readFileSync(new URL('../js/essay.js', import.meta.url), 'utf8');
+  assert.match(e, /if \(ui\.o\.mode !== 'coach' && !ui\.o\.practice && ui\.o\.onShown\) ui\.o\.onShown\(it\);/);
+  const t = fs.readFileSync(new URL('../js/track.js', import.meta.url), 'utf8');
+  assert.match(t, /export function essayShown\(cue\) \{[\s\S]*?r\.essayAt = Date\.now\(\);\s*t\.dirty\.add\(key\);/);
+  const body = t.split('export function essayShown(cue) {')[1].split('\n}')[0];
+  assert.ok(body.includes('r.essayAt = Date.now()') && !/lastAt/.test(body), 'lastAt은 안 바꾼다 (문장을 다시 들은 게 아니다)');
+  const d = fs.readFileSync(new URL('../js/db.js', import.meta.url), 'utf8');
+  assert.match(d, /'reviewedAt', 'essayAt'\]\) out\[k\] = maxOf\(cur\[k\], rec\[k\]\);/, '백업 병합 max — 옛 백업이 "안 나옴"으로 되돌리지 않게');
+  const p = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
+  assert.match(p, /onShown: \(it\) => \{ if \(it\.cue\) track\.essayShown\(it\.cue\); state\.essayUsed\.add\(essayIdOf\(it\.rec\)\); \},/);
+  assert.match(p, /const used = \(r\) => state\.essayUsed\.has\(essayIdOf\(r\)\);\n\s*return pickEssayPrompts\(track\.statsList\(\), count, \{ cueOf: \(r\) => !!cueForStart\(r\.start\), used \}\)/);
+  assert.match(p, /if \(e && typeof e\.id === 'string' && e\.id\.startsWith\(`\$\{item\.id\}\|`\)\) state\.essayUsed\.add\(e\.id\);/, '콘텐츠를 열 때 이미 쓴 글');
+});

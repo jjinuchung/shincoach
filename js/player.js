@@ -84,6 +84,7 @@ const state = {
   essayPending: false, // ✍️ 다음 문장으로 넘어갈 때 열 에세이 (오늘 학습 시간을 채우면 예약됨)
   essayOpen: false,    // ✍️ 에세이 화면이 열려 있음 (키보드 무시)
   essaySuggested: false, // 이번에 콘텐츠를 연 뒤로 한 번 제안했는지 (계속 묻지 않기)
+  essayUsed: new Set(), // ✍️ 이 영상에서 이미 에세이로 쓴·나온 문장 id (한 번 나온 문장은 다시 안 낸다)
   coachFixDone: false, // 👨‍👩‍👦 아빠 교정문을 이번 콘텐츠에서 이미 보여줬는지
   battleOpen: false,   // ⚔️ 배틀 화면이 열려 있음 (키보드 무시)
   battleLastCue: null, // 배틀에서 방금 따라 말한 문장 (연달아 같은 문장 안 나오게)
@@ -696,9 +697,16 @@ function setEssayOpen(on) {
 }
 
 /** 지금 자막에 있는 문장 중에서 바꿔 쓸 문장 고르기 */
+/** 에세이 글 id = 영상 id|배운 문장 시각 (같은 문장으로 다른 날 쓴 글도 같다 — 교정은 날짜까지, essay.essayKey) */
+function essayIdOf(r) {
+  return `${(r && r.itemId) || (state.item && state.item.id) || ''}|${Math.round(((r && r.start) || 0) * 10)}`;
+}
+
 function essayPrompts() {
   const count = settings.essayCount || ESSAY_COUNT;
-  return pickEssayPrompts(track.statsList(), count, { cueOf: (r) => !!cueForStart(r.start) })
+  // 이미 에세이로 쓴 문장도 "나온 것" — 화면에 뜬 때(essayAt)를 적기 전에 쓴 글까지 (콘텐츠를 열 때 state.essayUsed)
+  const used = (r) => state.essayUsed.has(essayIdOf(r));
+  return pickEssayPrompts(track.statsList(), count, { cueOf: (r) => !!cueForStart(r.start), used })
     .map((p) => ({ ...p, cue: cueForStart(p.rec.start) }));
 }
 
@@ -772,8 +780,10 @@ function startEssay(practice, cont) {
       playPuzzleSentence(cue, () => {});
     },
     // 문장을 쓰는 즉시 저장한다 — 중간에 그만둬도 글이 남고, 같은 문장으로 보상을 두 번 받지 않는다
+    // ✍️ 문장이 화면에 떴다 — 다음부터 다른 문장 (연습은 essay.js가 안 부른다)
+    onShown: (it) => { if (it.cue) track.essayShown(it.cue); state.essayUsed.add(essayIdOf(it.rec)); },
     onWritten: (it) => {
-      const id = `${it.rec.itemId || myItem || ''}|${Math.round((it.rec.start || 0) * 10)}`;
+      const id = essayIdOf(it.rec);
       const first = track.markEssayWritten({
         id,
         origin: it.frame.full, keep: it.frame.keep,
@@ -1530,6 +1540,12 @@ export async function openPlayer(id, opts = {}) {
   state.item = item;
   state.cues = buildCues(item);
   await track.open(item).catch((e) => console.warn('기록 로드 실패:', e));
+  // ✍️ 이 영상에서 이미 에세이로 쓴 문장 — 한 번 나온 문장은 다시 안 낸다 (못 읽으면 빈 채로: essayAt만으로 거른다)
+  state.essayUsed = new Set();
+  listEssays().then((list) => {
+    if (state.item !== item) return;
+    for (const e of list) if (e && typeof e.id === 'string' && e.id.startsWith(`${item.id}|`)) state.essayUsed.add(e.id);
+  }).catch(() => {});
   resetRecognition(); // 콘텐츠를 열 때마다 음성 인식을 다시 시도 (인터넷이 돌아왔을 수 있음)
   loadStreak();
   state.idx = -1;
@@ -2593,7 +2609,7 @@ function updateJourneyWalker() {
 }
 
 /**
- * 🏁 영상 끝까지 → 🔶 영어스톤 VIDEO_STONE.n개 (2026-10-06, 진우 "영어 스톤 구하기가 너무 힘들다" → 아버님 9/22 결정 "영상 완주 +3" 되살림).
+ * 🏁 영상 끝까지 → 💰 + 🔶 영어스톤 (2026-10-06 v197 🔶3 → v201 길이별 items.VIDEO_TIERS: 짧은 💰50 🔶3 · 중간 💰100 🔶5 · 긴 💰200 🔶8).
  * "끝까지" = 이 영상 문장의 VIDEO_STONE.pct% 이상을 했다 — 마지막 문장만 끝내도 뜨는 🏁 여행 끝과 다르다.
  * 받기는 저장된 프로필로 판정하는 트랜잭션(영상마다 한 번). 저장이 안 되면 말없이 넘어가고, 다음에 앱을 열 때 📦 창이 챙긴다.
  * 다른 말(🔥·목표·🏁)이 떠 있으면 조금 뒤에 — 말 칸은 하나라 덮이면 아이가 못 본다
@@ -2604,11 +2620,13 @@ function maybeVideoStone() {
   if (videoPct(track.doneCount(), state.cues.length) < VIDEO_STONE.pct) return;
   if (videoStoneGot(it.id)) { state.videoStoneFor = it.id; return; }
   state.videoStoneBusy = true;
-  receiveVideoStones([it.id]).then((r) => {
+  receiveVideoStones([{ id: it.id, total: state.cues.length }]).then((r) => {
     if (r.ok || r.why === 'done') state.videoStoneFor = it.id;
     if (!r.ok) return;
-    const n = (r.items && r.items[STONE_ENGLISH.id]) || VIDEO_STONE.n;
-    const say = () => { showPlayerMessage(`🏁 「${it.title}」 문장을 ${VIDEO_STONE.pct}% 넘게 했어요! ${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko} +${n}`, 6000); sfx.success(); };
+    const n = (r.items && r.items[STONE_ENGLISH.id]) || 0;
+    const got = [r.coins ? `💰 +${r.coins}` : '', n ? `${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko} +${n}` : ''].filter(Boolean).join(' · ');
+    if (r.coins) { updateLevelChip(); pulseChip('coin-chip'); } // 코인은 저장된 프로필에 이미 들어갔다 — 칩만 새로
+    const say = () => { showPlayerMessage(`🏁 「${it.title}」 문장을 ${VIDEO_STONE.pct}% 넘게 했어요! ${got}`, 6000); sfx.success(); };
     if ($('player-msg').hidden) say(); else setTimeout(say, 3000);
   }).catch(() => {}).finally(() => { state.videoStoneBusy = false; });
 }

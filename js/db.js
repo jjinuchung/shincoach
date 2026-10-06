@@ -4,7 +4,7 @@
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
-import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, VIDEO_STONE, videoParcelId } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
+import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, VIDEO_STONE, videoParcelId, videoPlusId, videoGrant } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
@@ -1333,23 +1333,46 @@ export function applyParcel(raw) {
 }
 
 /**
- * 🏁 영상 끝까지 → 🔶 영어스톤 (2026-10-06) — 아직 안 받은 영상마다 VIDEO_STONE.n개. **한 트랜잭션**: 받은 영상은 구호품과 같은
- * profile.parcels에 'video:<영상 id>'로 적는다 → 두 창이 같은 영상을 동시에 넘겨도, 옛 백업을 되돌려도(합집합) 한 번만.
- * 90%를 넘겼는지는 부르는 쪽이 본다(player 문장마다 · 📦 창이 앱을 열 때 지난 영상까지) — 여기서는 "이미 받았나"만
- * @returns {{ok:boolean, why?:string, ids?:string[], items?:Object}} why: 'done'(모두 이미 받음)
+ * 🏁 영상 끝까지 → 💰 + 🔶 (2026-10-06 v197 🔶3 → v201 길이별 items.VIDEO_TIERS). **한 트랜잭션**: 받은 몫은 구호품과 같은
+ * profile.parcels에 'video:<id>'(🔶 3개) · 'videoplus:<id>'(길이별 나머지)로 적는다 → 두 창이 같은 영상을 동시에 넘겨도,
+ * 옛 백업을 되돌려도(합집합) 한 번만. v197에 🔶3만 받은 지난 영상은 videoplus만 남아 차액을 받는다.
+ * 90%를 넘겼는지는 부르는 쪽이 본다(player 문장마다 · 📦 창이 앱을 열 때) — 여기서는 "이미 받았나"와 길이별 셈만
+ * @param {Array<{id:string, total?:number}|string>} list 영상 id와 문장 수 (모르면 짧은 영상)
+ * @returns {{ok:boolean, why?:string, ids?:string[], items?:Object, coins?:number}} why: 'done'(모두 이미 받음)
  */
-export function videoStoneRule(profile, itemIds, now = Date.now()) {
-  const ids = [...new Set((Array.isArray(itemIds) ? itemIds : []).filter((x) => x !== undefined && x !== null && x !== '').map(String))];
-  const got = ids.filter((id) => !parcelGot(profile.parcels, videoParcelId(id)));
-  if (!got.length) return { ok: false, why: 'done' };
+export function videoStoneRule(profile, list, now = Date.now()) {
+  const seen = new Set();
+  const vids = [];
+  for (const v of Array.isArray(list) ? list : []) {
+    const id = v && typeof v === 'object' ? v.id : v;
+    if (id === undefined || id === null || id === '' || seen.has(String(id))) continue;
+    seen.add(String(id));
+    vids.push({ id: String(id), total: v && typeof v === 'object' ? Number(v.total) || 0 : 0 });
+  }
   profile.parcels = { ...(profile.parcels || {}) };
-  for (const id of got) profile.parcels[videoParcelId(id)] = now;
-  const n = got.length * VIDEO_STONE.n;
-  addCount(profile.items, STONE_ENGLISH.id, n);
-  return { ok: true, ids: got, items: { [STONE_ENGLISH.id]: n } };
+  let coins = 0;
+  let stones = 0;
+  const got = [];
+  for (const v of vids) {
+    const base = !parcelGot(profile.parcels, videoParcelId(v.id));
+    const plus = !parcelGot(profile.parcels, videoPlusId(v.id));
+    if (!base && !plus) continue;
+    const g = videoGrant({ total: v.total, base, plus });
+    if (base) profile.parcels[videoParcelId(v.id)] = now;
+    if (plus) profile.parcels[videoPlusId(v.id)] = now;
+    coins += g.coins;
+    stones += g.stones;
+    got.push(v.id);
+  }
+  if (!got.length) return { ok: false, why: 'done' };
+  if (stones) addCount(profile.items, STONE_ENGLISH.id, stones);
+  profile.coins = (Number(profile.coins) || 0) + coins;
+  profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
+  return { ok: true, ids: got, items: { [STONE_ENGLISH.id]: stones }, coins };
 }
-export function applyVideoStones(itemIds) {
-  return mutateProfile((p) => videoStoneRule(p, itemIds));
+
+export function applyVideoStones(list) {
+  return mutateProfile((p) => videoStoneRule(p, list));
 }
 /** 📦 받은 구호품 합치기 — 한 번 받았으면 계속 받은 것 (합집합, 받은 때는 이른 쪽) */
 function mergeParcels(a, b) {
@@ -1666,7 +1689,7 @@ export function mergeStatRecord(name, cur, rec) {
   if (!cur) return rec;
   const out = { ...cur, ...rec };
   if (name === 'sentenceStats') {
-    for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt', 'puzzles', 'puzzleSolved', 'puzzleWrong', 'reviews', 'reviewPass', 'reviewedAt']) out[k] = maxOf(cur[k], rec[k]);
+    for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt', 'puzzles', 'puzzleSolved', 'puzzleWrong', 'reviews', 'reviewPass', 'reviewedAt', 'essayAt']) out[k] = maxOf(cur[k], rec[k]); // essayAt: ✍️ 에세이 문장으로 나온 때 (한 번 나온 문장은 다시 안 냄)
     out.done = !!(cur.done || rec.done);
     // 🎤 오늘 말하기 보상을 받았다는 표시 — 옛 백업이 덮으면 같은 문장으로 코인을 또 받는다
     out.speakPaidAt = (cur.speakPaidAt || '') >= (rec.speakPaidAt || '') ? (cur.speakPaidAt || '') : rec.speakPaidAt;
