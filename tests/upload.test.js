@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DATA_REPO, DATA_BRANCH, AUTO_GAP_MS, reportFiles, essayFiles, b64, hashOf, cleanToken, shouldAuto, whyOf, putFile } from '../js/upload.js';
 import { collectTodo, essayNumbers } from '../js/stats.js';
+import { essayKey } from '../js/essay.js';
 
 const src = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const unb64 = (s) => new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
@@ -157,7 +158,7 @@ test('✍️ 고칠 에세이 글도 올린다 (v199) — 📊 "📮 고쳐 주�
   const [md, js] = essayFiles(todo, '2026-10-06');
   assert.deepEqual([md.path, js.path], ['essay/todo.md', 'essay/todo.json']);
   const parsed = JSON.parse(js.text);
-  assert.deepEqual(parsed.map((e) => [e.no, e.id]), todo.map((e) => [nums.get(e.id), e.id]), '번호가 📊 화면의 [번호]와 같다');
+  assert.deepEqual(parsed.map((e) => [e.no, e.id]), todo.map((e) => [nums.get(essayKey(e.date, e.id)), e.id]), '번호가 📊 화면의 [번호]와 같다');
   assert.deepEqual(parsed[1], { no: 2, id: 'b1', date: '2026-10-05', origin: 'I know, right?', written: 'I know right', fixed: 'I know, right?', notes: ['쉼표'] });
   assert.match(md.text, /^✍️ 진우가 쓴 영어 문장 — 아직 아빠가 고쳐 주지 않은 글 3개 \(2026-10-06\)/);
   assert.match(md.text, /\[1\] 2026-10-03 배운 문장: You look great\.\n {4}진우: you look grate\n/);

@@ -502,17 +502,24 @@ export async function listEssays() {
  */
 export async function applyEssayFixes(fixes) {
   if (!fixes || !fixes.length) return 0;
-  const byId = new Map(fixes.map((f) => [f.id, f.fixed]));
+  // ★ (2026-10-06) 날짜가 있는 교정은 그날 글에만 — 같은 배운 문장으로 다른 날 쓴 글은 id가 같아서, id로만 붙이면
+  //   그 문장의 모든 날 글(이미 고쳐 준 글까지)이 덮어써지고 "안 읽음"으로 돌아갔다.
+  //   날짜가 없는 교정(옛 붙여넣기)은 아직 안 고친 글에만 붙인다.
+  const dated = new Map(fixes.filter((f) => f && f.date).map((f) => [`${f.date}|${f.id}`, f.fixed]));
+  const undated = new Map(fixes.filter((f) => f && !f.date).map((f) => [f.id, f.fixed]));
+  const pick = (date, e) => (dated.has(`${date}|${e.id}`) ? dated.get(`${date}|${e.id}`) : !e.coachFix && undated.has(e.id) ? undated.get(e.id) : null);
   const days = await listDaily();
   let n = 0;
   for (const day of days) {
-    if (!Array.isArray(day.essays) || !day.essays.some((e) => e && e.id && byId.has(e.id))) continue;
+    if (!Array.isArray(day.essays) || !day.essays.some((e) => e && e.id && pick(day.date, e) !== null)) continue;
     // 밖에서 읽어둔 사본을 그대로 쓰면 그 사이 아이가 공부한 기록을 덮어쓴다 → 트랜잭션 안에서 다시 읽고 고친다
     let touched = 0;
     await editDaily(day.date, (d) => {
       for (const e of (d.essays || [])) {
-        if (!e || !e.id || !byId.has(e.id)) continue;
-        e.coachFix = byId.get(e.id);
+        if (!e || !e.id) continue;
+        const fixed = pick(day.date, e);
+        if (fixed === null) continue;
+        e.coachFix = fixed;
         e.fixedAt = Date.now();
         e.readAt = 0;             // 아이가 아직 안 읽음
         touched++;

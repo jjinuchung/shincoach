@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { makeFrame, pickPrompts, correct, looksEnglish, tooShort, exportText, parseFixes, matchFixes, isMultiSentence, MIN_WORDS, MIN_BLANK_WORDS, MAX_BLANK_WORDS } from '../js/essay.js';
+import { makeFrame, pickPrompts, correct, looksEnglish, tooShort, exportText, parseFixes, matchFixes, essayKey, isMultiSentence, MIN_WORDS, MIN_BLANK_WORDS, MAX_BLANK_WORDS } from '../js/essay.js';
 
 const words = JSON.parse(fs.readFileSync(new URL('../vocab/words.json', import.meta.url), 'utf8'));
 const basic = JSON.parse(fs.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8'));
@@ -245,4 +245,75 @@ test('👨‍👩‍👦 written으로 못 찾으면 배운 문장(origin)으로
   const entries = [{ id: 'a', written: 'totally different text', origin: 'I want to play with my friend today.' }];
   const fixes = [{ written: 'nope', origin: 'I want to play with my friend today.', fixed: 'I want to play with my cousin today.' }];
   assert.deepEqual(matchFixes(entries, fixes), [{ id: 'a', fixed: 'I want to play with my cousin today.' }]);
+});
+
+// ── ★ 같은 배운 문장으로 다른 날 쓴 글은 id가 같다 (2026-10-06 — 밀린 에세이 18개 중 7개가 이 꼴이라 교정이 엉뚱한 날 글에 붙었다) ──
+
+const SAME = 'muls4hp5-3rzcjd|20548'; // 진우의 [7]·[10]·[14]·[16] — 영상 id|배운 문장 시각
+const dupEntries = () => [
+  { id: SAME, date: '2026-10-03', origin: "I'll expand my rule from Juniper City to every city and town and village", written: "I'll expand my rule from Juniper City to space." },
+  { id: SAME, date: '2026-10-04', origin: "I'll expand my rule from Juniper City to every city and town and village", written: "I'll expand my rule from Juniper City to every universe" },
+  { id: SAME, date: '2026-10-05', origin: "I'll expand my rule from Juniper City to every city and town and village", written: "I'll expand my rule from Juniper City to whole universe." },
+  { id: SAME, date: '2026-09-20', origin: "I'll expand my rule from Juniper City to every city and town and village", written: "I'll expand my rule from Juniper City to the sea.", coachFix: 'I will expand my rule from Juniper City to the sea.' },
+];
+
+test('✍️ 같은 id·다른 날 — 교정마다 제 날 글에 붙는다 (날짜 + id) · 이미 고쳐 준 날 글은 건드리지 않는다', () => {
+  const fixes = [
+    { date: '2026-10-05', written: "I'll expand my rule from Juniper City to whole universe.", fixed: 'C' },
+    { date: '2026-10-03', written: "I'll expand my rule from Juniper City to space.", fixed: 'A' },
+    { date: '2026-10-04', written: "I'll expand my rule from Juniper City to every universe", fixed: 'B' },
+  ];
+  assert.deepEqual(matchFixes(dupEntries(), fixes), [
+    { id: SAME, date: '2026-10-05', fixed: 'C' },
+    { id: SAME, date: '2026-10-03', fixed: 'A' },
+    { id: SAME, date: '2026-10-04', fixed: 'B' },
+  ]);
+  assert.equal(essayKey('2026-10-03', SAME), `2026-10-03|${SAME}`);
+});
+
+test('✍️ 날짜를 적은 교정은 그날 글에만 — 앞 4단어·배운 문장이 같은 다른 날 글로 새지 않는다', () => {
+  const fixes = [{ date: '2026-10-04', written: "I'll expand my rule from Juniper City to every universes!!", fixed: 'B' }];
+  assert.deepEqual(matchFixes(dupEntries(), fixes), [{ id: SAME, date: '2026-10-04', fixed: 'B' }], '흐린 짝(앞 4단어)도 그날 안에서만');
+  assert.deepEqual(matchFixes(dupEntries(), [{ date: '2026-10-09', written: 'nothing', origin: "I'll expand my rule from Juniper City to every city and town and village", fixed: 'X' }]), [], '그날 글이 없으면 안 붙는다');
+});
+
+test('✍️ 자기 글이 이미 고쳐진 옛 교정(fixes.json에 남은 것)은 같은 문장의 새 글로 옮겨 붙지 않는다', () => {
+  // 9/20에 고쳐 준 교정이 fixes.json에 남아 있다 — 전엔 ②앞 4단어·③배운 문장으로 10/03 새 글에 붙었다
+  const old = [{ written: "I'll expand my rule from Juniper City to the sea.", origin: "I'll expand my rule from Juniper City to every city and town and village", fixed: 'I will expand my rule from Juniper City to the sea.' }];
+  assert.deepEqual(matchFixes(dupEntries(), old), []);
+  // 같은 글을 또 쓴 경우(그 글은 아직 안 고침)는 똑같은 교정이 맞다 — 붙는다
+  const twice = [...dupEntries(), { id: SAME, date: '2026-10-06', written: "I'll expand my rule from Juniper City to the sea.", origin: 'x' }];
+  assert.deepEqual(matchFixes(twice, old), [{ id: SAME, date: '2026-10-06', fixed: 'I will expand my rule from Juniper City to the sea.' }]);
+});
+
+test('✍️ 흐린 짝은 똑같은 짝을 가로채지 않는다 — 단계마다 모든 교정을 먼저 훑는다', () => {
+  const entries = [
+    { id: 'a', date: 'd1', written: 'I went to the park today', origin: 'o1' },
+    { id: 'b', date: 'd2', written: 'I went to the zoo today', origin: 'o2' },
+  ];
+  const fixes = [
+    { written: 'I went to the beach', fixed: '흐린 짝 (앞 4단어만 같음)' },
+    { written: 'I went to the park today', fixed: '똑같은 짝' },
+  ];
+  const out = matchFixes(entries, fixes);
+  assert.deepEqual(out.find((o) => o.id === 'a'), { id: 'a', date: 'd1', fixed: '똑같은 짝' }, '똑같은 글이 먼저');
+  assert.deepEqual(out.find((o) => o.id === 'b'), { id: 'b', date: 'd2', fixed: '흐린 짝 (앞 4단어만 같음)' });
+});
+
+test('✍️ 📊 붙여 넣기 — refs(날짜까지)로 되돌린다 · 같은 id라도 번호마다 따로', () => {
+  const entries = dupEntries().filter((e) => !e.coachFix);
+  const { refs, ids } = exportText(entries);
+  assert.deepEqual(ids, [SAME, SAME, SAME]);
+  assert.deepEqual(refs.map((r) => r.date), ['2026-10-03', '2026-10-04', '2026-10-05']);
+  const fixes = parseFixes('[1] A.\n[2] B.\n[3] C.', refs);
+  assert.deepEqual(fixes, [{ id: SAME, date: '2026-10-03', fixed: 'A.' }, { id: SAME, date: '2026-10-04', fixed: 'B.' }, { id: SAME, date: '2026-10-05', fixed: 'C.' }], '같은 id여도 셋 다');
+});
+
+test('✍️ 적용(db.applyEssayFixes) — 날짜가 있으면 그날 글에만, 없으면 아직 안 고친 글에만 (이미 고쳐 준 글을 덮어써 "안 읽음"으로 돌리지 않는다)', () => {
+  const src = fs.readFileSync(new URL("../js/db.js", import.meta.url), "utf8");
+  assert.match(src, /const dated = new Map\(fixes\.filter\(\(f\) => f && f\.date\)\.map\(\(f\) => \[`\$\{f\.date\}\|\$\{f\.id\}`, f\.fixed\]\)\);/);
+  assert.match(src, /: !e\.coachFix && undated\.has\(e\.id\) \? undated\.get\(e\.id\) : null\);/);
+  const st = fs.readFileSync(new URL("../js/stats.js", import.meta.url), "utf8");
+  assert.match(st, /parseFixes\(area\.value, todo\.map\(\(e\) => \(\{ id: e\.id, date: e\.date \}\)\)\)/, '📊 붙여 넣기도 날짜까지');
+  assert.match(st, /todoNo\.get\(essayKey\(d\.date, e\.id\)\)/, '📊 [번호]도 날짜까지');
 });

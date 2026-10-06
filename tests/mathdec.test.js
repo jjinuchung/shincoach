@@ -518,3 +518,19 @@ test('내용 검사(checkContent): 빈 파일은 10칸 모두 "내용 없음", �
   bad['dec.frac'].lesson[1].check.no = ['1/2', '0.45'];
   assert.ok(checkContent(bad).some((x) => /값이 같은 보기/.test(x)), '0.5와 1/2은 같은 값');
 });
+
+test('❓16·17 (2026-10-03·04 진우 "보기 추가") — 후보가 보기에만 있는 크기 비교는 숫자판이 아니라 보기로: "다음 중 … 어느 것일까요?" 말투', async () => {
+  const { padSpec } = await import('../js/mathpad.js');
+  let n = 0; let story = 0;
+  for (let s = 1; s <= 400; s++) {
+    const q = makeQuestion('dec.compare', 'calc', s, OPTS);
+    const listed = q.choices.every((c) => q.q.includes(c.text)); // 후보가 문제 글에 다 있으면 숫자판이어도 풀 수 있다
+    if (!listed) {
+      n++;
+      if (/쟀어요|기록/.test(q.q)) story++;
+      assert.match(q.q, /다음 중 .*어느 것일까요\?/, `#${s}: ${q.q}`);
+      assert.equal(padSpec(q, 'decimal'), null, `#${s}: 후보가 보기에만 있는데 숫자판 — ${q.q}`);
+    }
+  }
+  assert.ok(n > 100 && story > 30, `후보가 보기에만 있는 문항 ${n} · 이야기 ${story}`);
+});

@@ -5,7 +5,7 @@ import {
 } from './db.js';
 import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, KIND_SHORT, WHY_LABEL, STAGE_MARK } from './mathprog.js';
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
-import { exportText, parseFixes } from './essay.js';
+import { exportText, parseFixes, essayKey } from './essay.js';
 import { countPlayableCues } from './srt.js';
 import { figText } from './mathdraw.js';
 import { openPlayer, applyItemPatch } from './player.js';
@@ -196,11 +196,11 @@ let askMsg = '';   // ❓ 질문함도 같은 방식
  * 아직 고쳐 주지 않은 글의 번호 (오래된 것이 [1]).
  * **오래된 순**이라 새 글을 써도 이미 매긴 번호가 밀리지 않는다 —
  * 화면을 사진 찍어 두고 나중에 붙여넣어도 번호가 맞는다.
- * @returns {Map<string, number>} id → 번호
+ * @returns {Map<string, number>} essayKey(날짜, id) → 번호 — 같은 배운 문장으로 다른 날 쓴 글은 id가 같아 날짜까지 (2026-10-06)
  */
 export function essayNumbers(essayDays) {
   const todo = collectTodo(essayDays);
-  return new Map(todo.map((e, i) => [e.id, i + 1]));
+  return new Map(todo.map((e, i) => [essayKey(e.date, e.id), i + 1]));
 }
 
 /** 📮 아직 고쳐 주지 않은 글 — 오래된 날부터 (번호 순서). 📤 업로드도 같은 목록·같은 번호를 쓴다 (날짜를 붙여 돌려준다) */
@@ -290,7 +290,7 @@ function buildCoachTools(essayDays) {
 
   applyBtn.addEventListener('click', async () => {
     // 번호는 화면에 보이는 것과 같은 순서(오래된 글이 [1]) — 따로 저장해 둘 필요가 없다
-    const fixes = parseFixes(area.value, todo.map((e) => e.id));
+    const fixes = parseFixes(area.value, todo.map((e) => ({ id: e.id, date: e.date }))); // 날짜까지 — 같은 배운 문장으로 다른 날 쓴 글은 id가 같다
     if (!fixes.length) { msg.textContent = '[번호] 로 시작하는 줄을 못 찾았어요. 예: [1] I want to ...'; return; }
     const n = await applyEssayFixes(fixes);
     if (!n) { msg.textContent = '해당하는 글을 못 찾았어요 (번호가 바뀌었을 수 있어요).'; return; }
@@ -555,7 +555,7 @@ export async function renderStats() {
       cE.appendChild(el('h3', 'stats-essay-head', '📮 여기까지만 사진으로 찍어 보내시면 돼요'));
       for (const d of todoDays) {
         cE.appendChild(el('p', 'stats-sub', d.date));
-        for (const e of d.essays) cE.appendChild(essayBox(e, todoNo.get(e.id)));
+        for (const e of d.essays) cE.appendChild(essayBox(e, todoNo.get(essayKey(d.date, e.id))));
       }
     }
     if (doneCount) {

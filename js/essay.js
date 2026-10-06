@@ -297,7 +297,8 @@ function word1(s) {
 /**
  * 📋 부모에게 넘길 텍스트. 메신저를 거쳐도 살아남게 `[번호]` 한 줄 형식으로 고정한다.
  * @param {Array<{id:string, origin:string, written:string}>} entries 아직 고쳐 주지 않은 글
- * @returns {{text:string, ids:string[]}} ids는 번호 순서 — 붙여넣기 때 이 순서로 다시 붙인다
+ * @returns {{text:string, ids:string[], refs:Array<{id:string, date:string}>}} ids·refs는 번호 순서 — 붙여넣기 때 이 순서로 다시 붙인다.
+ *   ★ 붙일 때는 refs(날짜까지)를 쓴다 — 같은 배운 문장으로 다른 날 쓴 글은 id가 같다 (essayKey)
  */
 export function exportText(entries) {
   const list = (entries || []).filter((e) => e && e.written);
@@ -307,15 +308,24 @@ export function exportText(entries) {
     lines.push(`    진우: ${e.written}`);
     lines.push('');
   });
-  return { text: lines.join('\n'), ids: list.map((e) => e.id) };
+  return { text: lines.join('\n'), ids: list.map((e) => e.id), refs: list.map((e) => ({ id: e.id, date: e.date || '' })) };
+}
+
+/**
+ * 에세이 한 편의 열쇠 = 날짜 + id (2026-10-06).
+ * 글 id는 "영상 id|배운 문장 시각"이라 **같은 배운 문장으로 다른 날 쓴 글은 id가 같다** — id만으로 붙이면
+ * 교정문이 엉뚱한 날 글에 붙거나, 그 문장의 모든 날 글(이미 고쳐 준 글까지)을 덮어썼다 (밀린 18개 중 7개가 이 꼴).
+ */
+export function essayKey(date, id) {
+  return `${date || ''}|${id}`;
 }
 
 /**
  * 부모가 붙여넣은 교정문 파싱. `[3] I want to ...` 형태의 줄만 읽는다.
  * 사이에 다른 설명이 섞여 있어도(메신저에서 복사하면 흔하다) 번호 줄만 골라낸다.
  * @param {string} text 붙여넣은 내용
- * @param {string[]} ids exportText가 돌려준 순서
- * @returns {Array<{id:string, fixed:string}>}
+ * @param {Array<string|{id:string, date?:string}>} ids exportText가 돌려준 순서 — refs(날짜까지)를 넘기면 그날 글에만 붙는다
+ * @returns {Array<{id:string, date?:string, fixed:string}>}
  */
 export function parseFixes(text, ids) {
   const out = [];
@@ -324,11 +334,13 @@ export function parseFixes(text, ids) {
     const m = raw.match(/^\s*\[(\d{1,3})\]\s*(.+?)\s*$/);
     if (!m) continue;
     const n = Number(m[1]);
-    const id = (ids || [])[n - 1];
+    const ref = (ids || [])[n - 1];
+    const id = ref && typeof ref === 'object' ? ref.id : ref;
+    const date = ref && typeof ref === 'object' && ref.date ? ref.date : '';
     const fixed = m[2].replace(/^(배운 문장|진우)\s*:\s*/, '').trim();
-    if (!id || !fixed || seen.has(id)) continue;   // 번호가 범위 밖이거나 같은 번호가 두 번이면 무시
-    seen.add(id);
-    out.push({ id, fixed });
+    if (!id || !fixed || seen.has(n)) continue;   // 번호가 범위 밖이거나 같은 번호가 두 번이면 무시
+    seen.add(n);
+    out.push(date ? { id, date, fixed } : { id, fixed });
   }
   return out;
 }
@@ -351,32 +363,43 @@ export function normalizeWritten(text) {
  * 사진에서 옮겨 적은 문장이라 완벽히 같지 않을 수 있으므로 세 단계로 찾는다:
  * ① 다듬어서 똑같은 글 → ② 앞 4단어가 같은 글 → ③ 배운 문장(origin)이 같은 글.
  * 못 찾으면 조용히 건너뛴다 (다른 기기이거나 지워진 기록일 수 있다).
+ * ★ (2026-10-06) 같은 배운 문장으로 다른 날 쓴 글은 id가 같다 → 짝은 **날짜 + id**(essayKey)로 센다.
+ *   · 교정에 date가 있으면 그날 글에만 붙는다 (업로드 essay/todo.json에 날짜가 있다)
+ *   · 자기 글이 이미 고쳐진 옛 교정(fixes.json에 남아 있다)은 거기서 멈춘다 — 전엔 ②·③으로 같은 문장의 새 글에 옮겨 붙었다
+ *   · 단계마다 모든 교정을 먼저 훑는다 — 앞 교정의 흐린 짝(②·③)이 뒤 교정의 똑같은 짝(①)을 가로채지 않게
  *
  * @param {Array<{id:string, written:string, origin:string, coachFix?:string}>} entries 앱에 쌓인 에세이
  * @param {Array<{written?:string, origin?:string, fixed:string}>} fixes 배포로 온 교정문
- * @returns {Array<{id:string, fixed:string}>} 아직 안 고쳐진 글에만
+ * @returns {Array<{id:string, date?:string, fixed:string}>} 아직 안 고쳐진 글에만
  */
 export function matchFixes(entries, fixes) {
-  const open = (entries || []).filter((e) => e && e.id && !e.coachFix);
+  const all = (entries || []).filter((e) => e && e.id);
+  const open = all.filter((e) => !e.coachFix);
   const used = new Set();
-  const out = [];
+  const key = (e) => essayKey(e.date, e.id);
   const head = (s, n = 4) => normalizeWritten(s).split(' ').slice(0, n).join(' ');
-
-  for (const f of (fixes || [])) {
-    if (!f || !f.fixed) continue;
-    const want = normalizeWritten(f.written);
-    const wantHead = head(f.written);
-    let hit = null;
-    if (want) hit = open.find((e) => !used.has(e.id) && normalizeWritten(e.written) === want);
-    if (!hit && wantHead) hit = open.find((e) => !used.has(e.id) && head(e.written) === wantHead);
-    if (!hit && f.origin) {
-      const wantOrigin = normalizeWritten(f.origin);
-      hit = open.find((e) => !used.has(e.id) && normalizeWritten(e.origin) === wantOrigin);
-    }
-    if (!hit) continue;
-    used.add(hit.id);
-    out.push({ id: hit.id, fixed: String(f.fixed).trim() });
-  }
+  const sameDay = (f, e) => !f.date || !e.date || f.date === e.date;
+  const list = (fixes || []).filter((f) => f && f.fixed);
+  const got = list.map(() => null);
+  // 자기 글이 이미 고쳐진 교정은 끝난 것 — 흐린 짝으로 다른 날 글에 옮겨 붙지 않게
+  const done = list.map((f) => {
+    const w = normalizeWritten(f.written);
+    return !!w && all.some((e) => e.coachFix && sameDay(f, e) && normalizeWritten(e.written) === w)
+      && !open.some((e) => sameDay(f, e) && normalizeWritten(e.written) === w);
+  });
+  const pass = (same) => list.forEach((f, i) => {
+    if (got[i] || done[i]) return;
+    const hit = open.find((e) => !used.has(key(e)) && sameDay(f, e) && same(f, e));
+    if (hit) { used.add(key(hit)); got[i] = hit; }
+  });
+  pass((f, e) => { const w = normalizeWritten(f.written); return !!w && normalizeWritten(e.written) === w; });
+  pass((f, e) => { const h = head(f.written); return !!h && head(e.written) === h; });
+  pass((f, e) => !!f.origin && normalizeWritten(e.origin) === normalizeWritten(f.origin));
+  const out = [];
+  list.forEach((f, i) => {
+    const e = got[i];
+    if (e) out.push(e.date ? { id: e.id, date: e.date, fixed: String(f.fixed).trim() } : { id: e.id, fixed: String(f.fixed).trim() });
+  });
   return out;
 }
 

@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fmtDur, weekSeries, hardScore, hardSentences, contentSummary, essayNumbers, splitEssayDays, countEssays, agoLabel } from '../js/stats.js';
+import { essayKey } from '../js/essay.js';
 import { todayKey } from '../js/track.js';
 
 test('fmtDur', () => {
@@ -81,10 +82,10 @@ test('✍️ 에세이 번호는 오래된 글이 [1] — 새 글을 써도 이�
     { date: '2026-09-15', essays: [{ id: 'mid1', written: 'middle one' }] },
   ];
   const no = essayNumbers(days);
-  assert.equal(no.get('old1'), 1, '가장 오래된 글이 1번');
-  assert.equal(no.get('mid1'), 2);
-  assert.equal(no.get('new1'), 3, '새 글은 뒤에 붙는다');
-  assert.equal(no.has('done'), false, '이미 고쳐 준 글에는 번호를 안 붙인다');
+  assert.equal(no.get(essayKey('2026-09-14', 'old1')), 1, '가장 오래된 글이 1번');
+  assert.equal(no.get(essayKey('2026-09-15', 'mid1')), 2);
+  assert.equal(no.get(essayKey('2026-09-16', 'new1')), 3, '새 글은 뒤에 붙는다');
+  assert.equal(no.has(essayKey('2026-09-14', 'done')), false, '이미 고쳐 준 글에는 번호를 안 붙인다');
 });
 
 test('✍️ 📮 고쳐 줄 글과 ✅ 고쳐 준 글을 나눈다 (남는 글 없는 날은 버린다)', () => {
@@ -111,9 +112,9 @@ test('✍️ 나눈 뒤에도 번호는 그대로 (📮 덩어리만 넘겨도 �
     { date: '2026-09-15', essays: [{ id: 'mid1', written: 'middle one' }] },
   ];
   const no = essayNumbers(splitEssayDays(days, false));
-  assert.equal(no.get('old1'), 1);
-  assert.equal(no.get('mid1'), 2);
-  assert.equal(no.get('new1'), 3);
+  assert.equal(no.get(essayKey('2026-09-14', 'old1')), 1);
+  assert.equal(no.get(essayKey('2026-09-15', 'mid1')), 2);
+  assert.equal(no.get(essayKey('2026-09-16', 'new1')), 3);
   assert.equal(no.size, 3, '고쳐 준 글은 번호에서 빠진 채로 유지');
 });
 
