@@ -1,0 +1,1094 @@
+<title>소수의 나눗셈 검수</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에 개념 바로가기, 개념마다 [배움 + 문제 예시 | 아빠 카드] 두 칸 (폰에서는 한 칸) — 문자와 식 검수 페이지와 같은 체계 */
+:root{
+  --bg:#f5f7ff; --card:#ffffff; --ink:#1f2340; --muted:#6b7280; --line:#e3e6f3;
+  --primary:#4f46e5; --primary-soft:#eef2ff; --accent:#f59e0b; --accent-soft:#fff7ed;
+  --ok:#0f9f6e; --ok-soft:#ecfdf5; --no-soft:#f8f9fc;
+  --dad:#fff8ec; --dad-line:#f3c27a; --dad-ink:#7c4a03;
+  --font-display:"Gowun Dodum","Noto Sans KR",sans-serif;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --font-math:"Times New Roman","Cambria Math",Georgia,serif;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;margin:0;padding-block:0 60px;padding-inline:16px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top h1{font-size:1.35rem}
+.top .sub{color:var(--muted);font-size:.9rem;margin:2px 0 8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.nav a{flex:0 0 auto;font-size:.8rem;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.nav a b{color:var(--primary);margin-right:3px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--primary);outline:none}
+.intro{display:grid;grid-template-columns:1fr;gap:12px;margin-block:16px}
+@media(min-width:760px){.intro{grid-template-columns:1.2fr 1fr}}
+.intro .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.intro .box.dadbox{background:var(--dad);border-color:var(--dad-line)}
+.intro h3{font-size:1rem;margin-bottom:6px}
+.intro p{margin:4px 0;font-size:.92rem}
+.intro .stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.92rem}
+.intro .stats b{font-size:1.25rem;color:var(--primary);font-variant-numeric:tabular-nums}
+.how{padding-left:20px}
+.how li{margin:3px 0}
+.ladder{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0 4px;padding:0;list-style:none}
+.ladder li{font-size:.85rem;background:var(--primary-soft);border-radius:8px;padding:5px 9px}
+.ladder li b{color:var(--primary);margin-right:4px}
+.ladder li small{color:var(--muted);margin-left:4px}
+.concept{margin-block:36px 0;scroll-margin-top:110px}
+.ch-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.ch-head > div:last-child{min-width:0}
+.ch-no{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--primary);background:var(--primary-soft);border-radius:12px;min-width:56px;height:56px;display:grid;place-items:center}
+.grade{font-size:.75rem;letter-spacing:.06em;color:var(--muted)}
+.ch-head h2{font-size:1.4rem}
+.idea{color:var(--muted);margin:2px 0 0;font-size:.95rem;max-width:65ch}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+.cols > *{min-width:0}
+@media(min-width:900px){.cols{grid-template-columns:1.35fr 1fr}}
+.col-title{margin:0 0 10px;font-size:.95rem}
+.col-title small{color:var(--muted);font-weight:400;margin-left:6px}
+.samples-title{margin-top:18px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.step{display:flex;gap:10px;scroll-margin-top:110px}
+.step-no{flex:0 0 30px;height:30px;border-radius:50%;background:var(--primary);color:var(--card);font-weight:700;display:grid;place-items:center;font-size:.9rem;margin-top:12px}
+.step-body{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.say{max-width:65ch}
+.say p{margin:0 0 10px}
+.say p:last-child{margin-bottom:0}
+.check{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;scroll-margin-top:110px}
+.qt{margin:0 0 6px;font-weight:500}
+.qt p{margin:0 0 6px}
+.ch{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ch li{display:flex;align-items:center;gap:8px;border-radius:9px;padding:6px 10px;background:var(--no-soft);border:1px solid transparent}
+.ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
+.ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
+.ch .txt{flex:1;min-width:0}
+.ch .tag{font-size:.75rem;color:var(--muted);text-align:right}
+.why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
+.samples{display:grid;gap:10px}
+.sample{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
+body.hide-ans .ch .mark,body.hide-ans .why,body.hide-ans .ch .tag{visibility:hidden}
+.rule{margin-top:12px;background:var(--primary-soft);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.rule p{margin:2px 0 0;font-weight:700;font-size:1.05rem}
+.dad{background:var(--dad);border:1px solid var(--dad-line);border-radius:14px;padding:14px 16px;position:sticky;top:104px;scroll-margin-top:110px;color:var(--ink)}
+.dad h3{font-size:1.05rem;margin:4px 0 10px;color:var(--dad-ink)}
+.dad h4{margin:12px 0 4px;font-size:.9rem;color:var(--dad-ink)}
+.dad-say{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.dad-say li,.traps li{display:flex;gap:8px;align-items:flex-start;scroll-margin-top:110px}
+.dad-say li > span,.traps li > div{min-width:0}
+.dad-do,.dad-pass{margin:0;font-size:.95rem}
+.traps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.traps .kid{font-weight:500}
+.traps .dadsay{color:var(--muted);font-size:.92rem}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.ref .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.03em}
+.ref code,code.mini{font-size:.78rem;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+code.mini{flex:0 0 auto;margin-top:2px}
+.dad .ref code,.dad code.mini{color:var(--dad-ink);background:var(--accent-soft)}
+/* 식: 문자는 기울여(교과서 표기), 나눗셈은 세로 분수 — 분수 막대가 괄호 노릇을 해서 괄호는 뗀다 */
+i.v{font-family:var(--font-math);font-style:italic;font-size:1.1em;padding:0 .04em}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.1;margin:0 2px;font-variant-numeric:tabular-nums}
+.fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
+.fr .d{padding:0 3px}
+.mx{display:inline-flex;align-items:center;gap:3px;vertical-align:middle}
+/* 나눗셈 그림 — 앱과 같은 SVG (currentColor라 어두운 화면에서도 보인다) */
+.fig{margin:6px 0 8px;color:var(--ink);display:inline-block;max-width:100%;overflow-x:auto}
+.fig svg{max-width:100%;height:auto;display:block}
+div.fig{display:block;max-width:400px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none;margin-top:8px}
+.toggle input{width:18px;height:18px;accent-color:var(--primary)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (max-width:899px){.dad{position:static}}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  body{background:#fff;padding:0;font-size:13px}
+  .wrap{max-width:100%}
+  .top{position:static}
+  .dad{position:static;box-shadow:none;break-inside:auto}
+  .step,.sample,.check,.rule,.traps li,.fr,.fig{break-inside:avoid}
+}
+</style>
+<div class="wrap">
+  <div class="top">
+    <h1>➗ 소수의 나눗셈 줄기 — 배움 원고 검수</h1>
+    <p class="sub">신코치 수학 · 초6 「소수의 나눗셈」(6-1 · 6-2) · 개념 10개</p>
+    <div class="nav"><a href="#X1"><b>X1</b> (소수) ÷ (자연수)</a><a href="#X2"><b>X2</b> 몫이 1보다 작은 (소수) ÷ (자연수)</a><a href="#X3"><b>X3</b> 소수점 아래 0을 내려 계산하는 (소수) ÷ (자연수)</a><a href="#X4"><b>X4</b> 몫의 소수 첫째 자리에 0이 있는 (소수) ÷ (자연수)</a><a href="#X5"><b>X5</b> (자연수) ÷ (자연수)의 몫을 소수로</a><a href="#X6"><b>X6</b> 자릿수가 같은 (소수) ÷ (소수)</a><a href="#X7"><b>X7</b> 자릿수가 다른 (소수) ÷ (소수)</a><a href="#X8"><b>X8</b> (자연수) ÷ (소수)</a><a href="#X9"><b>X9</b> 몫을 반올림하여 나타내기</a><a href="#X10"><b>X10</b> ⭐ 나누어 주고 남는 양</a></div>
+  </div>
+
+  <div class="intro">
+    <div class="box">
+      <h3>무엇을 봐 주시면 되나</h3>
+      <div class="stats">
+        <span><b>10</b> 개념</span>
+        <span><b>40</b> 📘 배움 장</span>
+        <span><b>40</b> 확인 질문</span>
+        <span><b>5</b> ➗ 나눗셈 그림</span>
+        <span><b>20</b> 헷갈리는 자리</span>
+        <span><b>30</b> 🧪 문제 예시</span>
+      </div>
+      <ol class="ladder"><li><b>X1</b>(소수) ÷ (자연수)<small>초6</small></li><li><b>X2</b>몫이 1보다 작은 (소수) ÷ (자연수)<small>초6</small></li><li><b>X3</b>소수점 아래 0을 내려 계산하는 (소수) ÷ (자연수)<small>초6</small></li><li><b>X4</b>몫의 소수 첫째 자리에 0이 있는 (소수) ÷ (자연수)<small>초6</small></li><li><b>X5</b>(자연수) ÷ (자연수)의 몫을 소수로<small>초6</small></li><li><b>X6</b>자릿수가 같은 (소수) ÷ (소수)<small>초6</small></li><li><b>X7</b>자릿수가 다른 (소수) ÷ (소수)<small>초6</small></li><li><b>X8</b>(자연수) ÷ (소수)<small>초6</small></li><li><b>X9</b>몫을 반올림하여 나타내기<small>초6</small></li><li><b>X10</b>⭐ 나누어 주고 남는 양<small>초6</small></li></ol>
+      <ul class="how">
+        <li><b>📘 배움</b> — 진우가 앱에서 읽는 것. <b>한 장 = 한 화면</b>, 짧은 설명 → 확인 질문 → 다음 장. 범위는 2015 미래엔 지도서 6-1 3단원·6-2 3단원 「소수의 나눗셈」 차시 계획 그대로입니다 — X1~X5(6-1, 나누는 수가 자연수): (소수) ÷ (자연수) → 몫이 1보다 작은 → 0을 내려 계산 → 몫의 소수 첫째 자리 0 → (자연수) ÷ (자연수)의 몫을 소수로, X6~X10(6-2, 나누는 수가 소수): 자릿수가 같은 (소수) ÷ (소수) → 자릿수가 다른 → (자연수) ÷ (소수) → 몫 반올림 → 나누어 주고 남는 양·몇 배·1 m의 무게. 2022 개정 성취기준 [6수01-14]·[6수01-15]도 같은 차례입니다</li>
+        <li><b>방법 셋</b> — <b>0.1·0.01이 몇 개인지</b>(2.4는 0.1이 24개 → 2묶음이면 12개씩), <b>자연수의 나눗셈 이용</b>(936 ÷ 3 = 312 → 9.36 ÷ 3 = 3.12), <b>분수로 바꾸기</b>(11.2 ÷ 4 = 112/10 ÷ 4 = 28/10). 나누는 수가 소수면 <b>두 수에 같은 수(10·100)를 곱해도 몫은 같다</b>(4.8 ÷ 1.2 = 48 ÷ 12)는 것으로 나누는 수를 자연수로 만듭니다(6-2 지도서 181쪽 유의점). 세로셈에서 몫의 소수점은 나누어지는 수의 소수점(옮겼다면 옮긴 자리) 바로 위에 찍습니다</li>
+        <li><b>어림</b> — 칸마다 몫이 "몇쯤"인지 어림해 소수점 위치를 확인하고(25.36 ÷ 8은 3쯤), 몫 × 나누는 수로 확인합니다. <b>0보다 큰 수를 1보다 작은 수로 나누면 몫은 처음 수보다 커진다</b>는 것은 X7·X8(띠·계산하지 않고 고르기)에서 다룹니다 — "나누면 늘 작아진다"는 생각을 깨뜨립니다</li>
+        <li><b>➗ 나눗셈 그림</b> — <b>똑같이 나누기</b>(2.4 ÷ 2 — 0.1 칸 24개를 2묶음으로, 한 묶음에 12칸)와 <b>띠에서 덜어 내기</b>(1.2 ÷ 0.3 — 1.2에서 0.3씩 4도막). 남는 끝이 있는 띠(6.4 ÷ 2.1 — 3도막, 남는 길이 0.1)는 X10에서만 씁니다. 그림이 있는 장은 글에 같은 식과 그림이 센 수가 나오는지 맞춰 봤습니다. ① 계산 문제에는 그림을 넣지 않습니다(답을 흘려서)</li>
+        <li><b>"나머지" 대신 "남는 양"</b> — 6-2 지도서 181쪽 유의점대로 나누는 수가 소수인 칸에서는 "나머지"라는 말을 쓰지 않고 "나누어 주고 남는 양"이라고 합니다(이 원고는 6-1 칸에서도 쓰지 않습니다). 남는 양은 <b>몫의 소수 부분이 아니라</b> 처음 양에서 나누어 준 양을 뺀 것입니다 — 6.6 ÷ 1.5 = 4.4이지만 남는 양은 0.6(지도서 212쪽). "반올림"은 X9부터, "남는 양"은 X10부터 나옵니다</li>
+        <li><b>답의 꼴</b> — 소수 부분의 끝자리 0은 지운 꼴로 씁니다. 앱 숫자판은 지우지 않은 답(2.10)도 맞음으로 칩니다. 반올림은 "="가 아니라 "→"로 씁니다(2.5 ÷ 0.7 → 3.571… → 3.6)</li>
+        <li><b>🧪 문제 예시</b> — 앱이 숫자를 바꿔 가며 끝없이 만드는 문제 중 몇 개입니다. 오답은 <b>아이가 실제로 하는 틀린 생각</b>이고, C 소수·L 어림 줄기와 같은 말은 같은 이름을 써서 📊에서 한 오개념으로 모입니다 (소수점을 빼먹음 · 소수점 위치를 잘못 찍음 · 몫의 0을 빠뜨림 · 나머지를 버림(6-1 칸에서 0을 내리지 않고 멈춤 — C와 같은 이름) · 분자·분모를 이어 씀 · 나누는 수만 옮김 · 나누어지는 수만 옮김 · 옮긴 칸 수가 틀림 · 나누면 항상 작아진다 · 올려야 하는데 버림 · 5를 버림 · 한 자리 아래까지 어림함 · 한 자리 위까지 어림함 · 남는데 올림 + 새것: 나누는 수와 나누어지는 수를 바꿈 · 몫의 소수 부분을 남는 양으로 봄 · 남는 양에 옮긴 소수점을 그대로 씀). 6)4.8의 몫을 8(6-1 186쪽), 20.1 ÷ 5를 4.2(199쪽), 3.68 ÷ 0.4를 0.92(6-2 200쪽)처럼 지도서에 나오는 흔한 실수가 그대로 오답이 됩니다</li>
+        <li><b>🔢 숫자판</b> — 수가 답인 ① 문제는 앱에서 숫자판(소수 칸)으로 직접 씁니다. "몫이 8보다 큰 것은 어느 것" 같은 고르기는 보기 그대로입니다</li>
+        <li><b>👨 아빠 카드</b> — 저녁 10분에 처음 소개할 때 쓰는 반 장. 동전·계량컵·종이띠·줄자·천 원짜리·계산기·저울처럼 집에서 실제로 할 수 있는 활동인지, 아버님 말투에 맞는지. 통과 기준의 답도 테스트가 다시 계산했습니다(반올림·남는 양까지)</li>
+        <li>확인 질문 40개는 테스트가 <b>문제 글을 따로 읽어</b> 분수 계산기로 다시 풀었고(반올림은 정수 셈으로 따로), 오답 보기 하나하나가 어느 틀린 셈에서 나왔는지·까닭에 그 오답 이야기가 있는지도 대조했습니다. 배움 글·까닭·아빠 카드의 <b>셈식 줄 140곳</b>도 "= …"로 이어지는 줄까지 다시 계산했습니다</li>
+      </ul>
+      <p>고칠 곳은 번호로 가리켜 주시면 됩니다. 예) <code>X3-2 설명이 길다</code>, <code>X6-1 그림이 헷갈린다</code>, <code>X9-①a 이 오답은 안 나올 것 같다</code>, <code>X1-👨함정1</code></p>
+      <label class="toggle"><input type="checkbox" id="ans" checked> 정답·오개념 이름 보이기 (끄면 진우가 보는 모양)</label>
+    </div>
+    <div class="box dadbox">
+      <h3>👨 이 줄기에서 제일 중요한 한 가지</h3>
+      <p>소수의 나눗셈은 지도서가 꼽은 대로 오답이 <b>몫의 소수점 위치</b>(소수점을 빼먹음 · 한 자리 잘못 찍음 · 몫의 0을 빠뜨림)와 <b>나누는 수만 옮기기</b>에 몰립니다. C 소수 줄기의 나눗셈은 두 칸(소수 ÷ 자연수 · 소수 ÷ 소수)뿐이고 배움 장이 없어서, 이 줄기가 처음부터 다시 세웁니다. 진우의 실제 기록은 📊와 비공개 기록에서 보시면 됩니다.</p>
+      <p>그래서 규칙을 외우기 전에 <b>왜 그 자리에 소수점을 찍는지</b>부터 봅니다 — 2.4는 0.1이 24개라서 2묶음이면 0.1이 12개(X1), 4.3과 4.30은 같은 수라서 0을 내려 끝까지 나눌 수 있고(X3), 두 수에 같은 수를 곱해도 몫은 같습니다(X6). 6-2의 "나누는 수를 자연수로 만들기"는 W 소수의 곱셈(10배·100배)을 바탕으로 합니다.</p>
+      <p>또 하나는 <b>나누어 주고 남는 양</b>입니다(X10). 사람 수는 자연수까지만 구하고, 남는 양은 처음 양에서 나누어 준 양을 빼서 구합니다 — 몫의 소수 부분을 남는 양으로 보거나(6.6 ÷ 1.5 = 4.4라서 0.4), 옮긴 소수점을 그대로 쓰는(64 ÷ 21에서 1이 남으니 1) 실수를 오답으로 넣었습니다.</p>
+      <p>앱에서는 W 소수의 곱셈 바로 뒤에 놓입니다(3단계). C 줄기의 나눗셈 두 칸은 그대로 둡니다.</p>
+      <p style="margin-top:10px"><b>예시 출연진</b>: 앱에서는 진우가 도감에서 잡은 포켓몬이 들어갑니다. 이 페이지는 피카츄·리자몽·개굴닌자·루카리오 등을 예시로 끼웠습니다.</p>
+    </div>
+  </div>
+
+  <section class="concept" id="X1">
+    <header class="ch-head">
+      <div class="ch-no">X1</div>
+      <div>
+        <div class="grade">초6 · 첫 개념</div>
+        <h2>(소수) ÷ (자연수)</h2>
+        <p class="idea">9.36 ÷ 3 — 936 ÷ 3 = 312이고, 9.36은 936의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배라서 몫도 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 → <strong>3.12</strong>. 11.2 ÷ 4는 세로로 — 자연수처럼 나누고 몫의 소수점은 나누어지는 수의 소수점 바로 위에 찍어요: 11.2 ÷ 4 = 2.8.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X1-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X1-1</code></div>
+        <div class="say"><p>2.4 ÷ 2 — 2.4는 0.1이 24개예요. 24칸을 2묶음으로 똑같이 나누어요.</p><div class="fig"><svg class="frac-fig ddiv-fig" data-mode="share" data-n="2" data-q="12" viewBox="0 0 400 78" width="500" height="98" role="img" aria-label="똑같이 나누기: 0.1 칸 24개를 2묶음으로 — 한 묶음에 12칸"><rect class="dd-c" x="70.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="92.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="114.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="136.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="158.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="180.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="202.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="224.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="246.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="268.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="290.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="312.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><text x="36.0" y="24.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-l">1묶음</text><rect class="dd-c" x="70.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="92.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="114.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="136.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="158.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="180.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="202.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="224.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="246.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="268.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="290.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="312.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><text x="36.0" y="60.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-l">2묶음</text></svg></div><p>한 묶음에 12칸 — 0.1이 12개라서 2.4 ÷ 2 = <strong>1.2</strong>.</p></div>
+        <div class="check" id="X1-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X1-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>3.6 ÷ 3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1.2</span></li><li class="no"><span class="mark"></span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">0.12</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3.6은 0.1이 36개 — 36 ÷ 3 = 12, 0.1이 12개라서 1.2.<br>소수점을 빼먹으면 12 — 12는 0.1의 개수예요. 0.12라면 3묶음을 합쳐도 0.36밖에 안 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X1-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X1-2</code></div>
+        <div class="say"><p>9.36 ÷ 3 — 자연수의 나눗셈을 이용해요. 9.36은 936의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배라서 몫도 312의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배예요.</p><p>936 ÷ 3 = 312<br>9.36 ÷ 3 = 3.12</p></div>
+        <div class="check" id="X1-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X1-2✓</code></div>
+        <div class="qt"><p>846 ÷ 2 = 423 — 이 나눗셈을 이용하여 다음을 계산하면 얼마일까요?</p><p><strong>8.46 ÷ 2</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4.23</span></li><li class="no"><span class="mark"></span><span class="txt">423</span></li><li class="no"><span class="mark"></span><span class="txt">42.3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>8.46은 846의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 몫도 423의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배라서 4.23.<br>소수점을 빼먹으면 423, 한 자리만 옮기면 42.3 — 어림하면 8 ÷ 2 = 4쯤이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X1-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X1-3</code></div>
+        <div class="say"><p>소수를 분수로 바꾸어 나눌 수도 있어요. 11.2는 <span class="fr"><span class="n">112</span><span class="d">10</span></span> — 분모가 10인 분수예요.</p><p>11.2 ÷ 4 = <span class="fr"><span class="n">112</span><span class="d">10</span></span> ÷ 4<br>= <span class="fr"><span class="n">28</span><span class="d">10</span></span><br>= 2.8</p></div>
+        <div class="check" id="X1-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X1-3✓</code></div>
+        <div class="qt"><p>진우는 무게가 7.5 kg인 밀가루를 3봉지에 똑같이 나누어 담았어요. 한 봉지에 담은 밀가루는 몇 kg일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.5</span></li><li class="no"><span class="mark"></span><span class="txt">25</span></li><li class="no"><span class="mark"></span><span class="txt">0.25</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>7.5 ÷ 3 = <span class="fr"><span class="n">75</span><span class="d">10</span></span> ÷ 3<br>= <span class="fr"><span class="n">25</span><span class="d">10</span></span> = 2.5 kg.<br>소수점을 빼먹으면 25 kg — 밀가루 전체보다 많아요. 0.25 kg씩이라면 3봉지를 합쳐도 0.75 kg밖에 안 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X1-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X1-4</code></div>
+        <div class="say"><p>세로로 나눌 때는 자연수의 나눗셈처럼 나누고, <strong>몫의 소수점은 나누어지는 수의 소수점 바로 위에</strong> 찍어요.</p><p>2536 ÷ 8 = 317<br>25.36 ÷ 8 = 3.17</p><p>어림하면 24 ÷ 8 = 3 — 몫은 3쯤이라 3.17이 맞아요.</p></div>
+        <div class="check" id="X1-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X1-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>17.25 ÷ 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3.45</span></li><li class="no"><span class="mark"></span><span class="txt">345</span></li><li class="no"><span class="mark"></span><span class="txt">0.345</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1725 ÷ 5 = 345 — 몫의 소수점은 17.25의 소수점 바로 위라서 3.45.<br>소수점을 빼먹으면 345, 한 자리 더 옮기면 0.345 — 어림하면 15 ÷ 5 = 3이니까 몫은 3쯤이에요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X1-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X1-📏</code></div><p>자연수처럼 나눈 다음 몫의 소수점은 나누어지는 수의 소수점 바로 위에 찍고, 어림해서 확인해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X1-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X1-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>17.6 ÷ 4</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">44</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">0.44</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">4.5</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">4.4</span></li></ol>
+    </div><div class="sample" id="X1-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X1-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>9.96 ÷ 3</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">33.2</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">332</span><span class="tag">소수점을 빼먹음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">3.32</span></li><li class="no"><span class="mark"></span><span class="txt">0.332</span><span class="tag">소수점 위치를 잘못 찍음</span></li></ol>
+    </div><div class="sample" id="X1-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X1-②</code></div>
+      <div class="say"><p>어림해서 확인해요.</p><p>리자몽이 이렇게 계산했어요.</p><p><strong>31.2 ÷ 6 = 0.52</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5 × 6 = 30이니까 몫은 5보다 커요 — 31.2 ÷ 6 = 5.2</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">소수점을 빼서 52</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">소수는 자연수로 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X1-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X1-👨</code></div>
+    <h3>(소수) ÷ (자연수)를 0.1이 몇 개인지로 나누어 보고, 자연수의 나눗셈을 이용해 몫의 소수점을 나누어지는 수의 소수점 바로 위에 찍는다는 것을 손으로 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X1-👨말1"><code class="mini">말1</code><span>&quot;2.4는 0.1이 몇 개야? 그걸 2묶음으로 나누면?&quot;</span></li><li id="X1-👨말2"><code class="mini">말2</code><span>&quot;9.36 ÷ 3은 936 ÷ 3의 몇 배일까?&quot;</span></li><li id="X1-👨말3"><code class="mini">말3</code><span>&quot;몫이 어디쯤일지 먼저 어림해 봐 — 25.36 ÷ 8은 3쯤일까, 30쯤일까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">100원짜리 동전 하나를 0.1로 정해요(천 원짜리 한 장이 1). 2.4는 천 원짜리 2장과 동전 4개 — 천 원짜리를 동전 10개씩으로 바꾸면 동전 24개, 두 사람이 똑같이 나누면 12개씩이라 1.2예요. 3.6을 세 사람이 나누어 봐요(1.2).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X1-👨함정1"><code class="mini">함정1</code><div><div class="kid">9.36 ÷ 3 = 312 — 자연수처럼 나누고 소수점을 빼먹는다</div><div class="dadsay">→ &quot;9.36은 10보다 작은데 몫이 312? 936 ÷ 3 = 312의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배야.&quot;</div></div></li><li id="X1-👨함정2"><code class="mini">함정2</code><div><div class="kid">25.36 ÷ 8 = 31.7 — 소수점을 한 자리 잘못 찍는다</div><div class="dadsay">→ &quot;어림하면 24 ÷ 8 = 3이야. 31.7은 너무 크지? 몫의 소수점은 25.36의 소수점 바로 위야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">6.8 ÷ 2, 15.6 ÷ 4 — 두 나눗셈을 하고(3.4 · 3.9), 몫의 소수점을 어디에 찍었는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X2">
+    <header class="ch-head">
+      <div class="ch-no">X2</div>
+      <div>
+        <div class="grade">초6 · X1 다음</div>
+        <h2>몫이 1보다 작은 (소수) ÷ (자연수)</h2>
+        <p class="idea">3.5 ÷ 5 — 3.5는 5보다 작아서 몫은 1보다 작아요. 35 ÷ 5 = 7이니까 몫은 0.7 — <strong>일의 자리에 0을 써요</strong>. 8.55 ÷ 15 = 0.57.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X2-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X2-1</code></div>
+        <div class="say"><p>3.5 ÷ 5 — 3.5는 5보다 작아서 몫은 1보다 작아요. 0.1이 35개를 5묶음으로 나누면</p><div class="fig"><svg class="frac-fig ddiv-fig" data-mode="share" data-n="5" data-q="7" viewBox="0 0 400 186" width="500" height="233" role="img" aria-label="똑같이 나누기: 0.1 칸 35개를 5묶음으로 — 한 묶음에 7칸"><rect class="dd-c" x="70.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="92.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="114.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="136.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="158.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="180.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><rect class="dd-c" x="202.0" y="6" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0"/><text x="36.0" y="24.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-l">1묶음</text><rect class="dd-c" x="70.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="92.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="114.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="136.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="158.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="180.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><rect class="dd-c" x="202.0" y="42" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1"/><text x="36.0" y="60.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-l">2묶음</text><rect class="dd-c" x="70.0" y="78" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2"/><rect class="dd-c" x="92.0" y="78" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2"/><rect class="dd-c" x="114.0" y="78" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2"/><rect class="dd-c" x="136.0" y="78" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2"/><rect class="dd-c" x="158.0" y="78" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2"/><rect class="dd-c" x="180.0" y="78" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2"/><rect class="dd-c" x="202.0" y="78" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2"/><text x="36.0" y="96.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-l">3묶음</text><rect class="dd-c" x="70.0" y="114" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3"/><rect class="dd-c" x="92.0" y="114" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3"/><rect class="dd-c" x="114.0" y="114" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3"/><rect class="dd-c" x="136.0" y="114" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3"/><rect class="dd-c" x="158.0" y="114" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3"/><rect class="dd-c" x="180.0" y="114" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3"/><rect class="dd-c" x="202.0" y="114" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3"/><text x="36.0" y="132.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-l">4묶음</text><rect class="dd-c" x="70.0" y="150" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4"/><rect class="dd-c" x="92.0" y="150" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4"/><rect class="dd-c" x="114.0" y="150" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4"/><rect class="dd-c" x="136.0" y="150" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4"/><rect class="dd-c" x="158.0" y="150" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4"/><rect class="dd-c" x="180.0" y="150" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4"/><rect class="dd-c" x="202.0" y="150" width="22.0" height="26" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4"/><text x="36.0" y="168.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-l">5묶음</text></svg></div><p>한 묶음은 0.1이 7개 — 3.5 ÷ 5 = <strong>0.7</strong>. 몫의 자연수 부분이 비면 <strong>일의 자리에 0</strong>을 써요.</p></div>
+        <div class="check" id="X2-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X2-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>4.8 ÷ 6</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.8</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li><li class="no"><span class="mark"></span><span class="txt">0.08</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>48 ÷ 6 = 8 — 0.1이 8개라서 0.8.<br>몫에 소수점을 빼먹으면 8 — 8 × 6 = 48이 되어 버려요. 0.08이면 0.08 × 6 = 0.48이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X2-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X2-2</code></div>
+        <div class="say"><p>분수로 바꾸어 나누어도 같아요. 2.4는 <span class="fr"><span class="n">24</span><span class="d">10</span></span> — 분모가 10인 분수예요.</p><p>2.4 ÷ 4 = <span class="fr"><span class="n">24</span><span class="d">10</span></span> ÷ 4<br>= <span class="fr"><span class="n">6</span><span class="d">10</span></span><br>= 0.6</p></div>
+        <div class="check" id="X2-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X2-2✓</code></div>
+        <div class="qt"><p>진우는 길이가 2.8 m인 끈을 4도막으로 똑같이 잘랐어요. 한 도막은 몇 m일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.7</span></li><li class="no"><span class="mark"></span><span class="txt">7</span></li><li class="no"><span class="mark"></span><span class="txt">0.07</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2.8 ÷ 4 = <span class="fr"><span class="n">28</span><span class="d">10</span></span> ÷ 4<br>= <span class="fr"><span class="n">7</span><span class="d">10</span></span> = 0.7 m.<br>소수점을 빼먹으면 7 m — 끈 전체보다 길어요. 한 도막이 0.07 m라면 4도막을 이어도 0.28 m밖에 안 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X2-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X2-3</code></div>
+        <div class="say"><p>8.55 ÷ 15 — 8.55는 15보다 작아서 몫은 1보다 작아요. 자연수처럼 나누고 몫의 소수점은 8.55의 소수점 바로 위 — 일의 자리에는 0이에요.</p><p>855 ÷ 15 = 57<br>8.55 ÷ 15 = 0.57</p></div>
+        <div class="check" id="X2-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X2-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>9.52 ÷ 14</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.68</span></li><li class="no"><span class="mark"></span><span class="txt">68</span></li><li class="no"><span class="mark"></span><span class="txt">6.8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>952 ÷ 14 = 68 — 9.52는 14보다 작으니 몫은 1보다 작은 0.68.<br>소수점을 빼먹으면 68, 한 자리 잘못 찍으면 6.8 — 6.8 × 14는 9.52보다 훨씬 커요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X2-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X2-4</code></div>
+        <div class="say"><p>몫을 구하기 전에 1보다 작을지 먼저 봐요. <strong>나누어지는 수가 나누는 수보다 작으면 몫은 1보다 작아요.</strong></p><p>4.2 ÷ 7 — 4.2는 7보다 작아요<br>42 ÷ 7 = 6<br>4.2 ÷ 7 = 0.6</p><p>0.6 × 7 = 4.2로 확인해요.</p></div>
+        <div class="check" id="X2-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X2-4✓</code></div>
+        <div class="qt"><p>3.6 L인 주스를 9컵에 똑같이 나누어 담았어요. 한 컵에 담은 주스는 몇 L일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.4</span></li><li class="no"><span class="mark"></span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">0.04</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>36 ÷ 9 = 4 — 3.6은 9보다 작으니 한 컵에 1 L도 안 돼요: 0.4 L.<br>소수점을 빼먹으면 4 L — 주스 전체보다 많아요. 0.04 L씩이라면 9컵을 합쳐도 0.36 L밖에 안 돼요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X2-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X2-📏</code></div><p>나누어지는 수가 나누는 수보다 작으면 몫은 1보다 작아요 — 일의 자리에 0을 쓰고 소수점을 찍어요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X2-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X2-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>11.05 ÷ 13</strong></p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.85</span></li><li class="no"><span class="mark"></span><span class="txt">0.86</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">0.085</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">85</span><span class="tag">소수점을 빼먹음</span></li></ol>
+    </div><div class="sample" id="X2-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X2-①b</code></div>
+      <div class="say"><p>길이가 2.4 m인 끈을 4도막으로 똑같이 잘랐어요. 한 도막은 몇 m일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">6</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">0.06</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">0.6</span></li><li class="no"><span class="mark"></span><span class="txt">0.7</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="X2-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X2-②</code></div>
+      <div class="say"><p>어림해서 확인해요.</p><p>피카츄가 이렇게 계산했어요.</p><p><strong>1.8 ÷ 9 = 0.02</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9 × 0.1 = 0.9이고 9 × 1 = 9 — 1.8은 그 사이라서 몫은 0.1과 1 사이: 0.2</span></li><li class="no"><span class="mark"></span><span class="txt">작은 수를 큰 수로 나눌 수는 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">소수점을 빼서 2</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X2-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X2-👨</code></div>
+    <h3>몫이 1보다 작은 (소수) ÷ (자연수)에서 몫의 일의 자리에 0을 쓰고, 나누어지는 수와 나누는 수를 비교해 몫이 1보다 작은지 먼저 어림한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X2-👨말1"><code class="mini">말1</code><span>&quot;3.5를 5명이 나누면 한 사람이 1보다 많이 가질까, 적게 가질까?&quot;</span></li><li id="X2-👨말2"><code class="mini">말2</code><span>&quot;몫의 일의 자리가 비면 무엇을 쓸까?&quot;</span></li><li id="X2-👨말3"><code class="mini">말3</code><span>&quot;0.7 × 5를 하면 3.5가 될까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">계량컵으로 해 봐요. 1000 mL가 1 L — 물 1.5 L만큼을 3컵에 똑같이 나누어 부으면 한 컵에 500 mL, 곧 0.5 L씩이에요. 2.4 L만큼을 4컵에 나누면 한 컵에 몇 mL일지 먼저 어림한 다음 부어 봐요(600 mL, 0.6).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X2-👨함정1"><code class="mini">함정1</code><div><div class="kid">4.8 ÷ 6의 몫을 8이라고 쓴다 — 소수점을 빼먹는다</div><div class="dadsay">→ &quot;4.8은 6보다 작아. 몫이 1보다 클 수 있을까? 8 × 6 = 48이야.&quot;</div></div></li><li id="X2-👨함정2"><code class="mini">함정2</code><div><div class="kid">8.55 ÷ 15의 몫을 5.7이라고 쓴다 — 소수점을 한 자리 잘못 찍는다</div><div class="dadsay">→ &quot;8.55는 15보다 작아. 그러면 몫은 1보다 작아야지? 일의 자리에 0.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">2.4 ÷ 3, 6.12 ÷ 18 — 두 나눗셈을 하고(0.8 · 0.34), 몫이 1보다 작은 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X3">
+    <header class="ch-head">
+      <div class="ch-no">X3</div>
+      <div>
+        <div class="grade">초6 · X2 다음</div>
+        <h2>소수점 아래 0을 내려 계산하는 (소수) ÷ (자연수)</h2>
+        <p class="idea">4.3 ÷ 2 — 43 ÷ 2는 나누어떨어지지 않아요. 4.3 = 4.30이니까 0을 내려 430 ÷ 2 = 215 → <strong>2.15</strong>. 분수로는 <span class="fr"><span class="n">43</span><span class="d">10</span></span> ÷ 2 = <span class="fr"><span class="n">43</span><span class="d">20</span></span> = <span class="fr"><span class="n">215</span><span class="d">100</span></span> = 2.15.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X3-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X3-1</code></div>
+        <div class="say"><p>4.3 ÷ 2 — 43 ÷ 2는 나누어떨어지지 않아요. 4.3과 4.30은 같은 수 — 소수점 아래 끝에 0이 있다고 보고 <strong>0을 내려</strong> 계속 나눠요.</p><p>430 ÷ 2 = 215<br>4.3 ÷ 2 = 2.15</p></div>
+        <div class="check" id="X3-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X3-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>5.7 ÷ 2</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.85</span></li><li class="no"><span class="mark"></span><span class="txt">2.8</span></li><li class="no"><span class="mark"></span><span class="txt">285</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>5.7 = 5.70 — 0을 내려 570 ÷ 2 = 285, 몫은 2.85.<br>2.8에서 멈추면 2.8 × 2 = 5.6 — 5.7이 안 돼요. 소수점을 빼먹으면 285.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X3-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X3-2</code></div>
+        <div class="say"><p>분수로 바꾸면 분모를 100으로 만들어 소수로 나타내요.</p><p>4.3 ÷ 2 = <span class="fr"><span class="n">43</span><span class="d">10</span></span> ÷ 2<br>= <span class="fr"><span class="n">43</span><span class="d">20</span></span><br>= <span class="fr"><span class="n">215</span><span class="d">100</span></span> = 2.15</p></div>
+        <div class="check" id="X3-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X3-2✓</code></div>
+        <div class="qt"><p>길이가 9.4 m인 돗자리를 4명이 똑같이 나누어 쓰려고 해요. 한 사람이 쓰는 돗자리는 몇 m일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.35</span></li><li class="no"><span class="mark"></span><span class="txt">2.3</span></li><li class="no"><span class="mark"></span><span class="txt">23.5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>9.4 ÷ 4 = <span class="fr"><span class="n">94</span><span class="d">10</span></span> ÷ 4<br>= <span class="fr"><span class="n">94</span><span class="d">40</span></span> = <span class="fr"><span class="n">235</span><span class="d">100</span></span><br>= 2.35 m.<br>2.3에서 멈추면 2.3 × 4 = 9.2 — 9.4가 안 돼요. 소수점을 한 자리 잘못 찍으면 23.5 m — 돗자리 전체보다 길어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X3-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X3-3</code></div>
+        <div class="say"><p>나누어떨어질 때까지 0을 몇 번이든 내려요. 6.3 ÷ 4는 6.300으로 보고</p><p>6300 ÷ 4 = 1575<br>6.3 ÷ 4 = 1.575</p></div>
+        <div class="check" id="X3-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X3-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>2.6 ÷ 8</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.325</span></li><li class="no"><span class="mark"></span><span class="txt">0.3</span></li><li class="no"><span class="mark"></span><span class="txt">3.25</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2.6 = 2.600 — 0을 두 번 내려 2600 ÷ 8 = 325, 몫은 0.325.<br>0.3에서 멈추면 0.3 × 8 = 2.4 — 2.6이 안 돼요. 2.6은 8보다 작으니 몫은 1보다 작아요 — 3.25가 아니에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X3-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X3-4</code></div>
+        <div class="say"><p>몫 × 나누는 수가 나누어지는 수가 되는지 곱해서 확인해요.</p><p>2.15 × 2 = 4.3</p><p>4.3 ÷ 2를 2.1이라고 하면 2.1 × 2 = 4.2 — 끝까지 나누지 않았어요.</p></div>
+        <div class="check" id="X3-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X3-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>7.8 ÷ 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1.56</span></li><li class="no"><span class="mark"></span><span class="txt">1.5</span></li><li class="no"><span class="mark"></span><span class="txt">156</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>7.8 = 7.80 — 780 ÷ 5 = 156, 몫은 1.56.<br>1.56 × 5 = 7.8로 확인해요.<br>1.5에서 멈추면 1.5 × 5 = 7.5 — 7.8이 안 돼요. 소수점을 빼먹으면 156.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X3-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X3-📏</code></div><p>나누어떨어지지 않으면 소수점 아래 0을 내려 끝까지 나눠요 — 4.3과 4.30은 같은 수예요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X3-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X3-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.9 ÷ 5</strong></p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.18</span></li><li class="no"><span class="mark"></span><span class="txt">18</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">0.018</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">0.1</span><span class="tag">나머지를 버림</span></li></ol>
+    </div><div class="sample" id="X3-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X3-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>7.07 ÷ 5</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">1414</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">1.41</span><span class="tag">나머지를 버림</span></li><li class="ok"><span class="mark">✔</span><span class="txt">1.414</span></li><li class="no"><span class="mark"></span><span class="txt">0.1414</span><span class="tag">소수점 위치를 잘못 찍음</span></li></ol>
+    </div><div class="sample" id="X3-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X3-②</code></div>
+      <div class="say"><p>개굴닌자가 이렇게 계산했어요.</p><p><strong>5.7 ÷ 2 = 2.8</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5.7 = 5.70 — 0을 내려 끝까지 나눠요: 5.7 ÷ 2 = 2.85</span></li><li class="no"><span class="mark"></span><span class="txt">몫에 소수점을 빼서 285</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">나누어떨어지지 않으면 그만 나눠요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X3-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X3-👨</code></div>
+    <h3>나누어떨어지지 않는 (소수) ÷ (자연수)에서 소수점 아래 0을 내려 끝까지 나누고, 몫 × 나누는 수로 확인하는 습관을 들인다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X3-👨말1"><code class="mini">말1</code><span>&quot;4.3과 4.30은 같은 수일까?&quot;</span></li><li id="X3-👨말2"><code class="mini">말2</code><span>&quot;2.1 × 2를 하면 4.3이 될까? 멈추면 안 되는 까닭은?&quot;</span></li><li id="X3-👨말3"><code class="mini">말3</code><span>&quot;0을 몇 번까지 내려도 될까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">종이띠와 자로 해 봐요. 43 cm 종이띠를 두 사람이 똑같이 나누면 21 cm씩 자르고 1 cm가 그대로 있어요. 그 1 cm는 10 mm — 5 mm씩 나누면 한 사람은 21 cm 5 mm, 곧 21.5 cm예요. 멈추지 않고 작은 단위로 바꾸어 끝까지 나누는 것이 &quot;0을 내리는&quot; 거예요. 4.3 ÷ 2도 4.30으로 보고 0을 내려 2.15 — 같은 생각이에요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X3-👨함정1"><code class="mini">함정1</code><div><div class="kid">4.3 ÷ 2 = 2.1 — 나누어떨어지지 않으면 멈춘다</div><div class="dadsay">→ &quot;2.1 × 2 = 4.2 — 4.3이 되려면? 4.30으로 보고 0을 내려 봐.&quot;</div></div></li><li id="X3-👨함정2"><code class="mini">함정2</code><div><div class="kid">5.7 ÷ 2 = 28.5 — 0을 내린 뒤 몫의 소수점을 잘못 찍는다</div><div class="dadsay">→ &quot;몫의 소수점은 5.7의 소수점 바로 위야. 어림하면 6 ÷ 2 = 3쯤이지?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">6.9 ÷ 2, 8.6 ÷ 4 — 두 나눗셈을 하고(3.45 · 2.15), 0을 내린 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X4">
+    <header class="ch-head">
+      <div class="ch-no">X4</div>
+      <div>
+        <div class="grade">초6 · X3 다음</div>
+        <h2>몫의 소수 첫째 자리에 0이 있는 (소수) ÷ (자연수)</h2>
+        <p class="idea">16.2 ÷ 4 — 16 ÷ 4 = 4이고 소수 첫째 자리 2는 4로 나눌 수 없어요. 그 자리에 <strong>0</strong>을 쓰고 0을 내려 20 ÷ 4 = 5 → <strong>4.05</strong>. 1620 ÷ 4 = 405의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배라고 봐도 같아요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X4-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X4-1</code></div>
+        <div class="say"><p>16.2 ÷ 4 — 16 ÷ 4 = 4, 그다음 소수 첫째 자리 2는 4로 나눌 수 없어요. 그 자리에 <strong>0</strong>을 쓰고 0을 내려 20 ÷ 4 = 5.</p><p>1620 ÷ 4 = 405<br>16.2 ÷ 4 = 4.05</p></div>
+        <div class="check" id="X4-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X4-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>20.1 ÷ 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4.02</span></li><li class="no"><span class="mark"></span><span class="txt">4.2</span></li><li class="no"><span class="mark"></span><span class="txt">40.2</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2010 ÷ 5 = 402 — 몫은 4.02.<br>소수 첫째 자리 1은 5로 나눌 수 없어 0을 써요 — 0을 빠뜨리면 4.2, 4.2 × 5 = 21이 되어 버려요. 소수점을 잘못 찍으면 40.2.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X4-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X4-2</code></div>
+        <div class="say"><p>분수로 바꾸어도 같아요.</p><p>16.2 ÷ 4 = <span class="fr"><span class="n">162</span><span class="d">10</span></span> ÷ 4<br>= <span class="fr"><span class="n">162</span><span class="d">40</span></span><br>= <span class="fr"><span class="n">405</span><span class="d">100</span></span> = 4.05</p></div>
+        <div class="check" id="X4-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X4-2✓</code></div>
+        <div class="qt"><p>길이가 8.4 km인 길을 8구간으로 똑같이 나누었어요. 한 구간은 몇 km일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1.05</span></li><li class="no"><span class="mark"></span><span class="txt">1.5</span></li><li class="no"><span class="mark"></span><span class="txt">105</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>8.4 ÷ 8 = <span class="fr"><span class="n">84</span><span class="d">10</span></span> ÷ 8<br>= <span class="fr"><span class="n">84</span><span class="d">80</span></span> = <span class="fr"><span class="n">105</span><span class="d">100</span></span><br>= 1.05 km.<br>소수 첫째 자리 4는 8로 나눌 수 없어 몫에 0 — 0을 빠뜨리면 1.5 km, 8구간이면 12 km라 길보다 길어요. 소수점을 빼먹으면 105.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X4-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X4-3</code></div>
+        <div class="say"><p>0.4 ÷ 5 — 0.4는 0.1이 4개라 5묶음으로 나눌 수 없어요. 0.40으로 보면 0.01이 40개 — 5묶음이면 한 묶음에 0.01이 8개예요.</p><p>40 ÷ 5 = 8<br>0.4 ÷ 5 = 0.08</p></div>
+        <div class="check" id="X4-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X4-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.3 ÷ 6</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.05</span></li><li class="no"><span class="mark"></span><span class="txt">0.5</span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.3 = 0.30 — 0.01이 30개, 30 ÷ 6 = 5라서 0.05.<br>0을 빠뜨리면 0.5 — 0.5 × 6 = 3이 되어 버려요. 소수점을 빼먹으면 5.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X4-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X4-4</code></div>
+        <div class="say"><p>몫의 0을 빠뜨리거나 소수점을 잘못 찍으면 어림으로 찾아요. 16.24 ÷ 8 — 어림하면 16 ÷ 8 = 2라서 몫은 2쯤이에요.</p><p>1624 ÷ 8 = 203<br>16.24 ÷ 8 = 2.03</p></div>
+        <div class="check" id="X4-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X4-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>24.18 ÷ 6</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4.03</span></li><li class="no"><span class="mark"></span><span class="txt">40.3</span></li><li class="no"><span class="mark"></span><span class="txt">4.3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2418 ÷ 6 = 403 — 어림하면 24 ÷ 6 = 4라서 4.03.<br>40.3은 너무 커요. 소수 첫째 자리 1은 6으로 나눌 수 없어 0 — 빠뜨리면 4.3.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X4-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X4-📏</code></div><p>나눌 수 없는 자리에는 몫에 0을 쓰고 다음 자리를 내려요 — 어림해서 소수점 위치를 확인해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X4-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X4-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.18 ÷ 6</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">3</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">0.04</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">0.3</span><span class="tag">몫의 0을 빠뜨림</span></li><li class="ok"><span class="mark">✔</span><span class="txt">0.03</span></li></ol>
+    </div><div class="sample" id="X4-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X4-①b</code></div>
+      <div class="say"><p>길이가 36.2 km인 길을 4구간으로 똑같이 나누었어요. 한 구간은 몇 km일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">9.5</span><span class="tag">몫의 0을 빠뜨림</span></li><li class="no"><span class="mark"></span><span class="txt">90.5</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">905</span><span class="tag">소수점을 빼먹음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">9.05</span></li></ol>
+    </div><div class="sample" id="X4-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X4-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 계산했어요.</p><p><strong>45.4 ÷ 5 = 9.8</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">나눌 수 없는 자리는 건너뛰어요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt">소수 첫째 자리는 나눌 수 없어 0을 써요 — 45.4 ÷ 5 = 9.08</span></li><li class="no"><span class="mark"></span><span class="txt">소수점을 빼서 908</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X4-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X4-👨</code></div>
+    <h3>몫의 소수 첫째 자리에 0이 생기는 (소수) ÷ (자연수)에서 나눌 수 없는 자리에 0을 쓰는 까닭을 0.1·0.01의 개수로 알고, 어림으로 소수점 위치를 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X4-👨말1"><code class="mini">말1</code><span>&quot;16.2 ÷ 4 — 소수 첫째 자리 2를 4로 나눌 수 있어?&quot;</span></li><li id="X4-👨말2"><code class="mini">말2</code><span>&quot;0.4는 0.01이 몇 개야? 5묶음이면?&quot;</span></li><li id="X4-👨말3"><code class="mini">말3</code><span>&quot;16.24 ÷ 8을 어림하면 2쯤일까, 20쯤일까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">동전으로 해 봐요. 100원짜리를 0.1, 10원짜리를 0.01로 정하면 0.4는 100원짜리 4개 — 5명에게 똑같이 나눌 수 없으니 10원짜리 40개로 바꿔 8개씩, 곧 0.08이에요. 20.1 ÷ 5도 어림부터(4쯤) 한 다음 해 봐요(4.02).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X4-👨함정1"><code class="mini">함정1</code><div><div class="kid">20.1 ÷ 5 = 4.2 — 몫의 0을 빠뜨린다</div><div class="dadsay">→ &quot;4.2 × 5 = 21 — 20.1이 안 돼. 소수 첫째 자리 1은 5로 나눌 수 있을까?&quot;</div></div></li><li id="X4-👨함정2"><code class="mini">함정2</code><div><div class="kid">16.24 ÷ 8 = 20.3 — 소수점을 잘못 찍는다</div><div class="dadsay">→ &quot;어림하면 16 ÷ 8 = 2야. 20.3은 너무 크지?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">12.3 ÷ 6, 0.2 ÷ 4 — 두 나눗셈을 하고(2.05 · 0.05), 몫에 0을 쓴 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X5">
+    <header class="ch-head">
+      <div class="ch-no">X5</div>
+      <div>
+        <div class="grade">초6 · X4 다음</div>
+        <h2>(자연수) ÷ (자연수)의 몫을 소수로</h2>
+        <p class="idea">3 ÷ 4 — 3 = 3.00으로 보고 0을 내려 300 ÷ 4 = 75 → <strong>0.75</strong>. 분수로는 3 ÷ 4 = <span class="fr"><span class="n">3</span><span class="d">4</span></span> = <span class="fr"><span class="n">75</span><span class="d">100</span></span> = 0.75. 6 ÷ 5 = <span class="fr"><span class="n">6</span><span class="d">5</span></span> = <span class="fr"><span class="n">12</span><span class="d">10</span></span> = 1.2.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X5-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X5-1</code></div>
+        <div class="say"><p>6 ÷ 5 — 6은 5로 나누어떨어지지 않아요. 6 = 6.0으로 보고 0을 내려요.</p><p>60 ÷ 5 = 12<br>6 ÷ 5 = 1.2</p><p>몫의 소수점은 6 바로 뒤에 찍은 소수점 위에 찍어요.</p></div>
+        <div class="check" id="X5-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X5-1✓</code></div>
+        <div class="qt"><p>다음 나눗셈의 몫을 소수로 나타내면 얼마일까요?</p><p><strong>9 ÷ 4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.25</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">22.5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>9 = 9.00 — 0을 두 번 내려 900 ÷ 4 = 225, 몫은 2.25.<br>2에서 멈추면 2 × 4 = 8 — 9가 안 돼요. 소수점을 한 자리 잘못 찍으면 22.5.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X5-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X5-2</code></div>
+        <div class="say"><p>3 ÷ 4 — 3이 4보다 작아서 몫은 1보다 작아요. 나눗셈의 몫은 분수로 나타낼 수 있어요.</p><p>3 ÷ 4 = <span class="fr"><span class="n">3</span><span class="d">4</span></span><br>= <span class="fr"><span class="n">75</span><span class="d">100</span></span><br>= 0.75</p></div>
+        <div class="check" id="X5-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X5-2✓</code></div>
+        <div class="qt"><p>다음 나눗셈의 몫을 소수로 나타내면 얼마일까요?</p><p><strong>2 ÷ 5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.4</span></li><li class="no"><span class="mark"></span><span class="txt">0.25</span></li><li class="no"><span class="mark"></span><span class="txt">2.5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2 ÷ 5 = <span class="fr"><span class="n">2</span><span class="d">5</span></span><br>= <span class="fr"><span class="n">4</span><span class="d">10</span></span> = 0.4.<br>0.25는 2와 5를 이어 쓴 수예요 — 0.25 × 5는 2가 안 돼요. 2.5는 5 ÷ 2의 몫 — 나누는 수와 나누어지는 수를 바꿨어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X5-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X5-3</code></div>
+        <div class="say"><p>분모가 10·100·1000이 되게 분모와 분자에 같은 수를 곱하면 소수로 바뀌어요.</p><p>7 ÷ 20 = <span class="fr"><span class="n">7</span><span class="d">20</span></span><br>= <span class="fr"><span class="n">35</span><span class="d">100</span></span><br>= 0.35</p></div>
+        <div class="check" id="X5-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X5-3✓</code></div>
+        <div class="qt"><p>3 L인 주스를 8컵에 똑같이 나누어 담았어요. 한 컵에 담은 주스는 몇 L일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.375</span></li><li class="no"><span class="mark"></span><span class="txt">0.38</span></li><li class="no"><span class="mark"></span><span class="txt">3.75</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3 ÷ 8 = <span class="fr"><span class="n">3</span><span class="d">8</span></span><br>= <span class="fr"><span class="n">375</span><span class="d">1000</span></span> = 0.375 L.<br>0.38은 3과 8을 이어 쓴 수예요. 3.75 L씩이라면 8컵을 합쳐 30 L — 주스 3 L의 10배예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X5-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X5-4</code></div>
+        <div class="say"><p>나누어지는 수가 나누는 수보다 크면 몫은 1보다 크고, 작으면 1보다 작아요.</p><p>13 ÷ 4 = 3.25<br>3 ÷ 4 = 0.75</p></div>
+        <div class="check" id="X5-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X5-4✓</code></div>
+        <div class="qt"><p>푸린이 길이가 18 m인 리본을 8명이 똑같이 나누어 가졌어요. 한 사람이 가진 리본은 몇 m일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.25</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">0.225</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>18 = 18.00 — 1800 ÷ 8 = 225, 몫은 2.25 m. 18은 8보다 크니까 몫은 1보다 커요.<br>2에서 멈추면 8명이 가진 리본을 합쳐 16 m — 18 m에 못 미쳐요. 0.225 m씩이라면 8명을 합쳐도 1.8 m — 리본의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배밖에 안 돼요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X5-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X5-📏</code></div><p>자연수 뒤에 소수점을 찍고 0을 내려 끝까지 나눠요 — 분수로 나타낸 다음 분모를 10·100·1000으로 만들어도 돼요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X5-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X5-①a</code></div>
+      <div class="say"><p>길이가 137 m인 리본을 20명이 똑같이 나누어 가졌어요. 한 사람이 가진 리본은 몇 m일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">6</span><span class="tag">나머지를 버림</span></li><li class="no"><span class="mark"></span><span class="txt">0.685</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">6.86</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">6.85</span></li></ol>
+    </div><div class="sample" id="X5-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X5-①b</code></div>
+      <div class="say"><p>길이가 42 m인 리본을 15명이 똑같이 나누어 가졌어요. 한 사람이 가진 리본은 몇 m일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">2.9</span><span class="tag">계산 실수</span></li><li class="no"><span class="mark"></span><span class="txt">2</span><span class="tag">나머지를 버림</span></li><li class="no"><span class="mark"></span><span class="txt">0.28</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">2.8</span></li></ol>
+    </div><div class="sample" id="X5-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X5-②</code></div>
+      <div class="say"><p>루카리오가 이렇게 계산했어요.</p><p><strong>50 ÷ 8 = 6</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">자연수끼리 나눈 몫은 소수가 될 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt">50 = 50.0 — 0을 내려 끝까지 나눠요: 50 ÷ 8 = 6.25</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">나누는 수와 나누어지는 수를 바꿔서 0.16</span><span class="tag">나누는 수와 나누어지는 수를 바꿈</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X5-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X5-👨</code></div>
+    <h3>(자연수) ÷ (자연수)의 몫을 소수로 나타낼 때 자연수 뒤에 소수점과 0을 붙여 끝까지 나누거나, 분수의 분모를 10·100으로 바꾸어 소수로 나타낸다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X5-👨말1"><code class="mini">말1</code><span>&quot;6과 6.0은 같은 수일까?&quot;</span></li><li id="X5-👨말2"><code class="mini">말2</code><span>&quot;3 ÷ 4를 분수로 쓰면? 분모를 100으로 만들면?&quot;</span></li><li id="X5-👨말3"><code class="mini">말3</code><span>&quot;2 ÷ 5의 몫을 0.25라고 쓰면 맞을까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">천 원짜리로 해 봐요. 3000원을 4명이 똑같이 나누면 750원씩 — 천 원을 1로 보면 3 ÷ 4 = 0.75예요. 6000원을 5명이 나누면 1200원씩이라 6 ÷ 5 = 1.2예요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X5-👨함정1"><code class="mini">함정1</code><div><div class="kid">2 ÷ 5 = 0.25 — 두 수를 이어 쓴다</div><div class="dadsay">→ &quot;0.25 × 5를 해 봐. 2가 나와? 2 ÷ 5 = <span class="fr"><span class="n">2</span><span class="d">5</span></span> — 분모를 10으로 만들면?&quot;</div></div></li><li id="X5-👨함정2"><code class="mini">함정2</code><div><div class="kid">9 ÷ 4 = 2 — 나누어떨어지지 않으면 멈춘다</div><div class="dadsay">→ &quot;2 × 4 = 8 — 9가 되려면? 9.00으로 보고 0을 내려 봐.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">7 ÷ 4, 3 ÷ 5 — 두 나눗셈을 하고(1.75 · 0.6), 0을 내린 까닭이나 분모를 10·100으로 바꾼 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X6">
+    <header class="ch-head">
+      <div class="ch-no">X6</div>
+      <div>
+        <div class="grade">초6 · X5 다음</div>
+        <h2>자릿수가 같은 (소수) ÷ (소수)</h2>
+        <p class="idea">4.8 ÷ 1.2 — 두 수에 똑같이 10을 곱해도 몫은 같아요: 48 ÷ 12 = 4. 분수로는 <span class="fr"><span class="n">48</span><span class="d">10</span></span> ÷ <span class="fr"><span class="n">12</span><span class="d">10</span></span> = 48 ÷ 12 = 4. 1.44 ÷ 0.06 = 144 ÷ 6 = 24 — 두 자리면 100을 곱해요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X6-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X6-1</code></div>
+        <div class="say"><p>1.2 ÷ 0.3 — 1.2에서 0.3씩 몇 번 덜어 낼 수 있을까요?</p><div class="fig"><svg class="frac-fig ddiv-fig" data-mode="fit" data-k="4" viewBox="0 0 400 98" width="500" height="123" role="img" aria-label="띠: 길이 1.2에서 0.3씩 4도막"><rect class="dd-p" x="20.0" y="34" width="90.0" height="34" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1.6" data-i="0"/><rect class="dd-p" x="110.0" y="34" width="90.0" height="34" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-width="1.6" data-i="1"/><rect class="dd-p" x="200.0" y="34" width="90.0" height="34" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1.6" data-i="2"/><rect class="dd-p" x="290.0" y="34" width="90.0" height="34" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-width="1.6" data-i="3"/><rect x="20" y="34" width="360" height="34" fill="none" stroke="currentColor" stroke-width="2"/><text x="20.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">0</text><text x="110.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">0.3</text><text x="200.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">0.6</text><text x="290.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">0.9</text><text x="380.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">1.2</text><path d="M20 28 L20 20 L110.0 20 L110.0 28" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="65.0" y="15.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-b">0.3</text></svg></div><p>0.3씩 4도막 — 1.2 ÷ 0.3 = <strong>4</strong>. 0.1이 12개에서 0.1이 3개씩 덜어 내는 것과 같아서 12 ÷ 3 = 4예요.</p></div>
+        <div class="check" id="X6-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X6-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>2.4 ÷ 0.6</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">0.4</span></li><li class="no"><span class="mark"></span><span class="txt">40</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 10을 곱하면 24 ÷ 6 = 4.<br>나누는 수만 옮기면 2.4 ÷ 6 — 0.4, 나누어지는 수만 옮기면 24 ÷ 0.6 — 40. 두 수를 똑같이 옮겨야 몫이 같아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X6-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X6-2</code></div>
+        <div class="say"><p>분수로 바꾸면 분모가 같은 분수의 나눗셈 — 분자끼리 나눠요.</p><p>4.8 ÷ 1.2 = <span class="fr"><span class="n">48</span><span class="d">10</span></span> ÷ <span class="fr"><span class="n">12</span><span class="d">10</span></span><br>= 48 ÷ 12<br>= 4</p><p><strong>두 수에 같은 수를 곱해도 몫은 같아요.</strong> 4.8과 1.2에 똑같이 10을 곱한 것과 같아요.</p></div>
+        <div class="check" id="X6-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X6-2✓</code></div>
+        <div class="qt"><p>잠만보는 무게가 3.6 kg인 호두를 0.4 kg씩 묶으려고 해요. 몇 묶음이 될까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9</span></li><li class="no"><span class="mark"></span><span class="txt">0.9</span></li><li class="no"><span class="mark"></span><span class="txt">90</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3.6 ÷ 0.4 = <span class="fr"><span class="n">36</span><span class="d">10</span></span> ÷ <span class="fr"><span class="n">4</span><span class="d">10</span></span><br>= 36 ÷ 4 = 9 — 9묶음.<br>나누는 수만 옮기면 0.9, 나누어지는 수만 옮기면 90 — 0.4 kg씩 90묶음이면 모두 36 kg, 호두보다 훨씬 많아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X6-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X6-3</code></div>
+        <div class="say"><p>3.6 ÷ 0.5 — 두 수에 10을 곱해 36 ÷ 5. 나누어떨어지지 않으면 0을 내려요.</p><p>36 ÷ 5 = 7.2<br>3.6 ÷ 0.5 = 7.2</p></div>
+        <div class="check" id="X6-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X6-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>5.2 ÷ 0.8</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6.5</span></li><li class="no"><span class="mark"></span><span class="txt">0.65</span></li><li class="no"><span class="mark"></span><span class="txt">65</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 10을 곱해 52 ÷ 8 = 6.5.<br>나누는 수만 옮기면 0.65, 몫에 소수점을 빼먹으면 65.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X6-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X6-4</code></div>
+        <div class="say"><p>1.44 ÷ 0.06 — 소수 두 자리 수끼리는 두 수에 100을 곱해요.</p><p>144 ÷ 6 = 24<br>1.44 ÷ 0.06 = 24</p><p>0.35 ÷ 0.14도 100을 곱해 35 ÷ 14 = 2.5예요.</p></div>
+        <div class="check" id="X6-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X6-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>2.16 ÷ 0.08</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">27</span></li><li class="no"><span class="mark"></span><span class="txt">0.27</span></li><li class="no"><span class="mark"></span><span class="txt">2.7</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 100을 곱해 216 ÷ 8 = 27.<br>나누는 수만 옮기면 0.27, 나누어지는 수를 한 자리만 옮기면 21.6 ÷ 8 — 2.7. 두 수 모두 두 자리씩 옮겨요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X6-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X6-📏</code></div><p>나누는 수가 자연수가 되도록 두 수의 소수점을 똑같이 옮겨요 — 두 수에 같은 수를 곱해도 몫은 같아요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X6-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X6-①a</code></div>
+      <div class="say"><p>무게가 7.7 kg인 호두를 1.1 kg씩 묶으려고 해요. 몇 묶음이 될까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">70</span><span class="tag">나누어지는 수만 옮김</span></li><li class="ok"><span class="mark">✔</span><span class="txt">7</span></li><li class="no"><span class="mark"></span><span class="txt">0.7</span><span class="tag">나누는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">8</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="X6-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X6-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>1.44 ÷ 0.06</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">2400</span><span class="tag">나누어지는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">0.24</span><span class="tag">나누는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">25</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">24</span></li></ol>
+    </div><div class="sample" id="X6-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X6-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 계산했어요.</p><p><strong>5.4 ÷ 0.6 = 54 ÷ 0.6 = 90</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">소수는 소수로 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt">두 수를 똑같이 옮겨요 — 54 ÷ 6 = 9</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">나누는 수만 옮겨서 0.9</span><span class="tag">나누는 수만 옮김</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X6-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X6-👨</code></div>
+    <h3>(소수) ÷ (소수)를 &quot;몇 번 덜어 낼 수 있나&quot;로 보고, 두 수에 같은 수(10·100)를 곱해도 몫이 같다는 것을 띠와 계산으로 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X6-👨말1"><code class="mini">말1</code><span>&quot;1.2 m 끈에서 0.3 m씩 몇 번 자를 수 있을까?&quot;</span></li><li id="X6-👨말2"><code class="mini">말2</code><span>&quot;4.8 ÷ 1.2와 48 ÷ 12는 몫이 같을까?&quot;</span></li><li id="X6-👨말3"><code class="mini">말3</code><span>&quot;나누는 수만 옮기면 몫이 어떻게 될까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">줄자와 끈으로 해 봐요. 1.2 m 끈에 30 cm씩 표시해 자르면 4도막 — 1.2 ÷ 0.3 = 4예요. cm로 바꾸면 120 ÷ 30 = 4 — 두 수를 똑같이 100배 해도 몫이 같아요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X6-👨함정1"><code class="mini">함정1</code><div><div class="kid">2.4 ÷ 0.6 = 0.4 — 나누는 수만 옮긴다</div><div class="dadsay">→ &quot;0.6을 6으로 바꿨으면 2.4도 24로 — 두 수를 똑같이 옮겨야 몫이 같아.&quot;</div></div></li><li id="X6-👨함정2"><code class="mini">함정2</code><div><div class="kid">3.6 ÷ 0.5 = 72 — 0을 내린 다음 몫에 소수점을 빼먹는다</div><div class="dadsay">→ &quot;36 ÷ 5 = 7.2야. 몫의 소수점도 찍어야지.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">6.3 ÷ 0.7, 0.84 ÷ 0.12 — 두 나눗셈을 하고(9 · 7), 두 수의 소수점을 몇 자리씩 옮겼는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X7">
+    <header class="ch-head">
+      <div class="ch-no">X7</div>
+      <div>
+        <div class="grade">초6 · X6 다음</div>
+        <h2>자릿수가 다른 (소수) ÷ (소수)</h2>
+        <p class="idea">3.48 ÷ 0.4 — 나누는 수가 자연수가 되게 두 수에 10을 곱해요: 34.8 ÷ 4 = 8.7. 몫의 소수점은 <strong>옮긴</strong> 소수점 위에 찍어요. 9.5 ÷ 0.19는 100을 곱해 950 ÷ 19 = 50 — 빈 자리에는 0을 써요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X7-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X7-1</code></div>
+        <div class="say"><p>3.48 ÷ 0.4 — 나누는 수 0.4가 자연수가 되게 두 수에 10을 곱해요.</p><p>3.48 ÷ 0.4 = 34.8 ÷ 4<br>= 8.7</p><p>몫의 소수점은 <strong>옮긴</strong> 소수점 위에 찍어요.</p></div>
+        <div class="check" id="X7-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X7-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>3.68 ÷ 0.4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9.2</span></li><li class="no"><span class="mark"></span><span class="txt">0.92</span></li><li class="no"><span class="mark"></span><span class="txt">92</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 10을 곱해 36.8 ÷ 4 = 9.2.<br>0.4만 4로 옮기면 0.92 — 나누는 수만 옮겼어요. 3.68을 368로 두 자리 옮기면 92 — 나누는 수를 한 자리 옮겼으면 나누어지는 수도 한 자리만 옮겨요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X7-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X7-2</code></div>
+        <div class="say"><p>분모를 100으로 같게 하면 분자끼리 나눠요.</p><p>3.48 ÷ 0.4 = <span class="fr"><span class="n">348</span><span class="d">100</span></span> ÷ <span class="fr"><span class="n">40</span><span class="d">100</span></span><br>= 348 ÷ 40<br>= 8.7</p><p>348 ÷ 40은 34.8 ÷ 4와 몫이 같아요.</p></div>
+        <div class="check" id="X7-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X7-2✓</code></div>
+        <div class="qt"><p>넓이가 4.56 m²인 직사각형의 세로가 1.2 m일 때, 가로는 몇 m일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3.8</span></li><li class="no"><span class="mark"></span><span class="txt">0.38</span></li><li class="no"><span class="mark"></span><span class="txt">38</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 10을 곱해 45.6 ÷ 12 = 3.8 — 가로 3.8 m.<br>세로만 12로 옮기면 0.38 m — 넓이가 1 m²도 안 돼요. 4.56을 456으로 옮기면 38 m — 너무 길어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X7-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X7-3</code></div>
+        <div class="say"><p>9.5 ÷ 0.19 — 나누는 수가 소수 두 자리라서 두 수에 100을 곱해요. 9.5는 950 — 빈 자리에는 0을 써요.</p><p>950 ÷ 19 = 50<br>9.5 ÷ 0.19 = 50</p></div>
+        <div class="check" id="X7-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X7-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>7.2 ÷ 0.24</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">30</span></li><li class="no"><span class="mark"></span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt">0.3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 100을 곱해 720 ÷ 24 = 30.<br>7.2를 72로 한 자리만 옮기면 72 ÷ 24 — 3, 나누는 수만 옮기면 7.2 ÷ 24 — 0.3. 0보다 큰 수를 1보다 작은 수로 나누면 몫은 처음 수보다 커요 — 7.2보다 커야 해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X7-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X7-4</code></div>
+        <div class="say"><p>20.72 ÷ 3.7 — 어림하면 20 ÷ 4 = 5쯤이에요.</p><p>207.2 ÷ 37 = 5.6<br>20.72 ÷ 3.7 = 5.6</p><p>2072 ÷ 37로 나누어지는 수만 두 자리 옮기면 몫이 56 — 10배가 돼요.</p></div>
+        <div class="check" id="X7-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X7-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>8.64 ÷ 2.4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3.6</span></li><li class="no"><span class="mark"></span><span class="txt">36</span></li><li class="no"><span class="mark"></span><span class="txt">0.36</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 10을 곱해 86.4 ÷ 24 = 3.6 — 어림하면 9 ÷ 3 = 3쯤이에요.<br>864 ÷ 24로 나누어지는 수만 두 자리 옮기면 36, 나누는 수만 옮기면 0.36.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X7-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X7-📏</code></div><p>나누는 수가 자연수가 되는 만큼 두 수의 소수점을 똑같이 옮기고, 몫의 소수점은 옮긴 소수점 위에 찍어요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X7-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X7-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>46.2 ÷ 0.66</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">7</span><span class="tag">옮긴 칸 수가 틀림</span></li><li class="ok"><span class="mark">✔</span><span class="txt">70</span></li><li class="no"><span class="mark"></span><span class="txt">0.7</span><span class="tag">나누는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">700</span><span class="tag">나누어지는 수만 옮김</span></li></ol>
+    </div><div class="sample" id="X7-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X7-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>6.4 ÷ 0.08</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">0.8</span><span class="tag">나누는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">8</span><span class="tag">옮긴 칸 수가 틀림</span></li><li class="no"><span class="mark"></span><span class="txt">800</span><span class="tag">나누어지는 수만 옮김</span></li><li class="ok"><span class="mark">✔</span><span class="txt">80</span></li></ol>
+    </div><div class="sample" id="X7-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X7-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 계산했어요.</p><p><strong>58.8 ÷ 0.84 = 58.8 ÷ 84 = 0.7</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">자릿수가 다른 소수끼리는 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">나누어지는 수를 한 자리만 옮겨서 7</span><span class="tag">옮긴 칸 수가 틀림</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">두 수에 똑같이 100을 곱해요 — 5880 ÷ 84 = 70</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X7-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X7-👨</code></div>
+    <h3>자릿수가 다른 (소수) ÷ (소수)에서 나누는 수를 자연수로 만드는 만큼만 두 수의 소수점을 옮기고, 빈 자리에 0을 쓰며, 어림으로 몫의 크기를 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X7-👨말1"><code class="mini">말1</code><span>&quot;3.48 ÷ 0.4 — 0.4를 자연수로 만들려면 몇 자리 옮겨야 할까?&quot;</span></li><li id="X7-👨말2"><code class="mini">말2</code><span>&quot;9.5에 100을 곱하면?&quot;</span></li><li id="X7-👨말3"><code class="mini">말3</code><span>&quot;20.72 ÷ 3.7을 어림하면 5쯤일까, 50쯤일까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">계산기 놀이를 해요. 아빠가 3.48 ÷ 0.4를 내면 34.8 ÷ 4로 바꿔 말하고 몫을 먼저 어림해요(9쯤). 그다음 계산기로 3.48 ÷ 0.4와 34.8 ÷ 4를 둘 다 눌러 몫이 같은지 확인해요(8.7). 348 ÷ 4도 눌러 보면 87 — 나누어지는 수만 더 옮기면 몫이 달라져요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X7-👨함정1"><code class="mini">함정1</code><div><div class="kid">3.68 ÷ 0.4 = 0.92 — 나누는 수만 옮긴다</div><div class="dadsay">→ &quot;0.4를 4로 바꿨으면 3.68도 36.8로 — 어림하면 4 ÷ 0.4는 10쯤이야.&quot;</div></div></li><li id="X7-👨함정2"><code class="mini">함정2</code><div><div class="kid">20.72 ÷ 3.7을 2072 ÷ 37로 바꿔 56이라고 한다</div><div class="dadsay">→ &quot;3.7을 한 자리 옮겼으면 20.72도 한 자리만 — 207.2 ÷ 37이야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">2.52 ÷ 0.6, 6.5 ÷ 0.13 — 두 나눗셈을 하고(4.2 · 50), 두 수의 소수점을 몇 자리 옮겼는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X8">
+    <header class="ch-head">
+      <div class="ch-no">X8</div>
+      <div>
+        <div class="grade">초6 · X7 다음</div>
+        <h2>(자연수) ÷ (소수)</h2>
+        <p class="idea">8 ÷ 0.5 — 두 수에 10을 곱하면 80 ÷ 5 = 16. 0.5가 8에 16번 들어가요. 5 ÷ 1.25는 100을 곱해 500 ÷ 125 = 4 — 자연수 뒤에 0을 붙여요. 0보다 큰 수를 1보다 작은 수로 나누면 몫은 처음 수보다 커요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X8-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X8-1</code></div>
+        <div class="say"><p>2 ÷ 0.5 — 2에서 0.5씩 몇 번 덜어 낼 수 있을까요?</p><div class="fig"><svg class="frac-fig ddiv-fig" data-mode="fit" data-k="4" viewBox="0 0 400 98" width="500" height="123" role="img" aria-label="띠: 길이 2에서 0.5씩 4도막"><rect class="dd-p" x="20.0" y="34" width="90.0" height="34" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1.6" data-i="0"/><rect class="dd-p" x="110.0" y="34" width="90.0" height="34" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-width="1.6" data-i="1"/><rect class="dd-p" x="200.0" y="34" width="90.0" height="34" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1.6" data-i="2"/><rect class="dd-p" x="290.0" y="34" width="90.0" height="34" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-width="1.6" data-i="3"/><rect x="20" y="34" width="360" height="34" fill="none" stroke="currentColor" stroke-width="2"/><text x="20.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">0</text><text x="110.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">0.5</text><text x="200.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">1</text><text x="290.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">1.5</text><text x="380.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">2</text><path d="M20 28 L20 20 L110.0 20 L110.0 28" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="65.0" y="15.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-b">0.5</text></svg></div><p>0.5씩 4도막 — 2 ÷ 0.5 = <strong>4</strong>. 두 수에 10을 곱한 20 ÷ 5 = 4와 같아요.</p></div>
+        <div class="check" id="X8-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X8-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>8 ÷ 0.5</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">16</span></li><li class="no"><span class="mark"></span><span class="txt">1.6</span></li><li class="no"><span class="mark"></span><span class="txt">160</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 10을 곱해 80 ÷ 5 = 16 — 0.5가 8에 16번 들어가요.<br>8 ÷ 5로 나누는 수만 옮기면 1.6, 80 ÷ 0.5로 나누어지는 수만 옮기면 160.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X8-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X8-2</code></div>
+        <div class="say"><p>5 ÷ 1.25 — 1.25를 125로 두 자리 옮기면 5에도 0을 2개 붙여 500이에요.</p><p>500 ÷ 125 = 4<br>5 ÷ 1.25 = 4</p></div>
+        <div class="check" id="X8-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X8-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>9 ÷ 0.36</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">25</span></li><li class="no"><span class="mark"></span><span class="txt">2.5</span></li><li class="no"><span class="mark"></span><span class="txt">0.25</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.36을 36으로 두 자리 옮겼으니 9에도 0을 2개 — 900 ÷ 36 = 25.<br>0을 하나만 붙이면 90 ÷ 36 — 2.5, 9 ÷ 36으로 나누는 수만 옮기면 0.25.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X8-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X8-3</code></div>
+        <div class="say"><p>몫이 소수가 될 때도 있어요. 7 ÷ 2.5 — 두 수에 10을 곱하면</p><p>70 ÷ 25 = 2.8<br>7 ÷ 2.5 = 2.8</p></div>
+        <div class="check" id="X8-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X8-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>9 ÷ 1.2</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7.5</span></li><li class="no"><span class="mark"></span><span class="txt">0.75</span></li><li class="no"><span class="mark"></span><span class="txt">75</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>두 수에 10을 곱해 90 ÷ 12 = 7.5.<br>9 ÷ 12로 나누는 수만 옮기면 0.75, 90 ÷ 1.2로 나누어지는 수만 옮기면 75 — 1.2는 1보다 조금 크니까 몫은 9보다 조금 작아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X8-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X8-4</code></div>
+        <div class="say"><p><strong>0보다 큰 수를 1보다 작은 수로 나누면 몫은 처음 수보다 커요.</strong></p><p>6 ÷ 0.5 = 12 — 6보다 커요<br>6 ÷ 1.5 = 4 — 6보다 작아요</p><p>0.5는 6에 6번보다 많이 들어가요.</p></div>
+        <div class="check" id="X8-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X8-4✓</code></div>
+        <div class="qt"><p>계산하지 않고 고르려고 해요. 몫이 8보다 큰 것은 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8 ÷ 0.8</span></li><li class="no"><span class="mark"></span><span class="txt">8 ÷ 1.6</span></li><li class="no"><span class="mark"></span><span class="txt">8 ÷ 2.5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.8은 1보다 작아서 8 ÷ 0.8 = 10 — 8보다 커요.<br>8 ÷ 1.6 = 5, 8 ÷ 2.5 = 3.2 — 8을 1보다 큰 수로 나누면 8보다 작아져요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X8-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X8-📏</code></div><p>두 수에 같은 수를 곱해 나누는 수를 자연수로 만들어요 — 자연수 쪽에는 옮긴 자리만큼 0을 붙여요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X8-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X8-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>77 ÷ 2.2</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">3.5</span><span class="tag">나누는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">350</span><span class="tag">나누어지는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">36</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">35</span></li></ol>
+    </div><div class="sample" id="X8-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X8-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>3 ÷ 0.4</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">0.75</span><span class="tag">나누는 수만 옮김</span></li><li class="ok"><span class="mark">✔</span><span class="txt">7.5</span></li><li class="no"><span class="mark"></span><span class="txt">75</span><span class="tag">나누어지는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">7.6</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="X8-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X8-②</code></div>
+      <div class="say"><p>루카리오가 이렇게 말했어요.</p><p><strong>2 ÷ 0.1의 몫은 2보다 작아요</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">나누는 수만 옮겨서 2</span><span class="tag">나누는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">2를 1보다 작은 0.1로 나누면 몫은 2보다 커요 — 2 ÷ 0.1 = 20</span></li><li class="no"><span class="mark"></span><span class="txt">자연수는 소수로 나눌 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X8-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X8-👨</code></div>
+    <h3>(자연수) ÷ (소수)에서 자연수 뒤에 옮긴 자리만큼 0을 붙이고, 0보다 큰 수를 1보다 작은 수로 나누면 몫이 처음 수보다 커진다는 것을 &quot;몇 번 들어가나&quot;로 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X8-👨말1"><code class="mini">말1</code><span>&quot;2 m에서 0.5 m씩 덜어 내면 몇 번일까?&quot;</span></li><li id="X8-👨말2"><code class="mini">말2</code><span>&quot;5 ÷ 1.25 — 5에 0을 몇 개 붙여야 할까?&quot;</span></li><li id="X8-👨말3"><code class="mini">말3</code><span>&quot;8을 0.8로 나누면 8보다 클까, 작을까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">물과 컵으로 해 봐요. 2 L 물병의 물을 500 mL 컵으로 퍼 담으면 4컵 — 2 ÷ 0.5 = 4예요. 250 mL 컵이면 몇 컵일지 먼저 어림한 다음 퍼 담아 봐요(8컵, 2 ÷ 0.25 = 8). 컵이 작을수록 컵 수가 많아져요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X8-👨함정1"><code class="mini">함정1</code><div><div class="kid">8 ÷ 0.5 = 1.6 — 나누는 수만 옮긴다</div><div class="dadsay">→ &quot;0.5가 8에 몇 번 들어가? 1.6번일까? 80 ÷ 5로 해 봐.&quot;</div></div></li><li id="X8-👨함정2"><code class="mini">함정2</code><div><div class="kid">9 ÷ 0.36을 90 ÷ 36으로 해 2.5라고 한다 — 0을 하나만 붙인다</div><div class="dadsay">→ &quot;0.36을 두 자리 옮겼으면 9에도 0을 2개 — 900 ÷ 36이야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">6 ÷ 0.4, 3 ÷ 0.75 — 두 나눗셈을 하고(15 · 4), 6 ÷ 0.4의 몫이 6보다 큰 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X9">
+    <header class="ch-head">
+      <div class="ch-no">X9</div>
+      <div>
+        <div class="grade">초6 · X8 다음</div>
+        <h2>몫을 반올림하여 나타내기</h2>
+        <p class="idea">2.5 ÷ 0.7 → 3.571… 처럼 나누어떨어지지 않으면 몫을 반올림해요. 소수 첫째 자리까지 나타내려면 <strong>바로 아래</strong> 소수 둘째 자리(7)를 보고 올려 3.6, 소수 둘째 자리까지면 3.57.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X9-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X9-1</code></div>
+        <div class="say"><p>2.5 ÷ 0.7 — 25 ÷ 7은 나누어떨어지지 않아요. 몫이 3.571…처럼 끝없이 이어질 때는 <strong>반올림</strong>해서 나타내요.</p><p>2.5 ÷ 0.7 → 3.571…</p><p>일의 자리까지 → 4<br>소수 첫째 자리까지 → 3.6<br>소수 둘째 자리까지 → 3.57</p></div>
+        <div class="check" id="X9-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X9-1✓</code></div>
+        <div class="qt"><p>다음 나눗셈의 몫을 반올림하여 소수 첫째 자리까지 나타내면 얼마일까요?</p><p><strong>4.7 ÷ 0.6</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7.8</span></li><li class="no"><span class="mark"></span><span class="txt">7.83</span></li><li class="no"><span class="mark"></span><span class="txt">8</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>47 ÷ 6 → 7.83…, 소수 첫째 자리까지면 바로 아래 숫자 3을 버려 7.8.<br>7.83은 소수 둘째 자리까지, 8은 일의 자리까지 나타낸 수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X9-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X9-2</code></div>
+        <div class="say"><p>반올림은 나타낼 자리 <strong>바로 아래</strong> 숫자를 봐요 — 0~4면 버리고, 5~9면 올려요.</p><p>3.571… → 소수 첫째 자리까지: 바로 아래 7 → 3.6<br>3.571… → 소수 둘째 자리까지: 바로 아래 1 → 3.57</p></div>
+        <div class="check" id="X9-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X9-2✓</code></div>
+        <div class="qt"><p>다음 나눗셈의 몫을 반올림하여 소수 첫째 자리까지 나타내면 얼마일까요?</p><p><strong>5.3 ÷ 0.7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7.6</span></li><li class="no"><span class="mark"></span><span class="txt">7.5</span></li><li class="no"><span class="mark"></span><span class="txt">7.57</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>53 ÷ 7 → 7.57…, 바로 아래 숫자 7은 올려 7.6.<br>7.5는 올리지 않고 버린 수, 7.57은 소수 둘째 자리까지 나타낸 수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X9-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X9-3</code></div>
+        <div class="say"><p>바로 아래 숫자가 <strong>5</strong>면 올려요.</p><p>31 ÷ 12 → 2.58…<br>일의 자리까지 → 바로 아래 5 → 3</p></div>
+        <div class="check" id="X9-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X9-3✓</code></div>
+        <div class="qt"><p>다음 나눗셈의 몫을 반올림하여 일의 자리까지 나타내면 얼마일까요?</p><p><strong>4.6 ÷ 1.8</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3</span></li><li class="no"><span class="mark"></span><span class="txt">2</span></li><li class="no"><span class="mark"></span><span class="txt">2.6</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>46 ÷ 18 → 2.55…, 일의 자리까지면 바로 아래 숫자 5를 보고 올려 3.<br>2는 5를 버린 수, 2.6은 소수 첫째 자리까지 나타낸 수예요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X9-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X9-4</code></div>
+        <div class="say"><p>나타낼 자리보다 <strong>한 자리 더</strong> 구한 다음 반올림해요. 소수 둘째 자리까지 나타내려면 셋째 자리까지 구해요.</p><p>13 ÷ 7 → 1.857…<br>소수 둘째 자리까지 → 1.86</p></div>
+        <div class="check" id="X9-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X9-4✓</code></div>
+        <div class="qt"><p>다음 나눗셈의 몫을 반올림하여 소수 둘째 자리까지 나타내면 얼마일까요?</p><p><strong>11 ÷ 7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1.57</span></li><li class="no"><span class="mark"></span><span class="txt">1.6</span></li><li class="no"><span class="mark"></span><span class="txt">1.571</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>11 ÷ 7 → 1.571…, 소수 둘째 자리까지면 바로 아래 숫자 1을 버려 1.57.<br>1.6은 소수 첫째 자리까지, 1.571은 소수 셋째 자리까지 나타낸 수예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X9-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X9-📏</code></div><p>나타낼 자리보다 한 자리 더 구한 다음, 바로 아래 숫자가 0~4면 버리고 5~9면 올려요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X9-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X9-①a</code></div>
+      <div class="say"><p>다음 나눗셈의 몫을 반올림하여 소수 첫째 자리까지 나타내면 얼마일까요?</p><p><strong>8.7 ÷ 0.9</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">9.6</span><span class="tag">올려야 하는데 버림</span></li><li class="no"><span class="mark"></span><span class="txt">10</span><span class="tag">한 자리 위까지 어림함</span></li><li class="no"><span class="mark"></span><span class="txt">9.67</span><span class="tag">한 자리 아래까지 어림함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">9.7</span></li></ol>
+    </div><div class="sample" id="X9-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X9-①b</code></div>
+      <div class="say"><p>다음 나눗셈의 몫을 반올림하여 소수 첫째 자리까지 나타내면 얼마일까요?</p><p><strong>3.8 ÷ 2.9</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">1.31</span><span class="tag">한 자리 아래까지 어림함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">1.3</span></li><li class="no"><span class="mark"></span><span class="txt">1</span><span class="tag">한 자리 위까지 어림함</span></li><li class="no"><span class="mark"></span><span class="txt">1.4</span><span class="tag">계산 실수</span></li></ol>
+    </div><div class="sample" id="X9-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X9-②</code></div>
+      <div class="say"><p>몫을 반올림하여 소수 첫째 자리까지 나타내요.</p><p>피카츄가 이렇게 계산했어요.</p><p><strong>7.9 ÷ 1.5 → 5.26… → 5.27</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">소수 첫째 자리까지 — 바로 아래 숫자 6을 보고 5.3</span></li><li class="no"><span class="mark"></span><span class="txt">반올림하지 않고 버려서 5.2</span><span class="tag">올려야 하는데 버림</span></li><li class="no"><span class="mark"></span><span class="txt">나누어떨어지지 않으면 몫을 구할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X9-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X9-👨</code></div>
+    <h3>나누어떨어지지 않는 몫을 반올림해 나타낼 때 나타낼 자리 바로 아래 숫자를 보고 올리거나 버리며, &quot;어느 자리까지&quot;를 정확히 읽는다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X9-👨말1"><code class="mini">말1</code><span>&quot;2.5 ÷ 0.7을 소수 첫째 자리까지 나타내려면 몫을 어느 자리까지 구해야 할까?&quot;</span></li><li id="X9-👨말2"><code class="mini">말2</code><span>&quot;바로 아래 숫자가 5면 올릴까, 버릴까?&quot;</span></li><li id="X9-👨말3"><code class="mini">말3</code><span>&quot;3.57은 소수 첫째 자리까지 나타낸 수일까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">계산기로 해 봐요. 2.5 ÷ 0.7을 누르면 3.5714…처럼 길게 나와요. 아빠가 &quot;소수 첫째 자리까지!&quot; 하면 3.6, &quot;일의 자리까지!&quot; 하면 4 — 바로 아래 숫자를 손가락으로 짚고 말해요. 10 ÷ 3과 2 ÷ 7을 소수 첫째 자리까지 해 봐요(3.3 · 0.3).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X9-👨함정1"><code class="mini">함정1</code><div><div class="kid">5.3 ÷ 0.7 → 7.57… → 7.5 — 반올림하지 않고 버린다</div><div class="dadsay">→ &quot;바로 아래 숫자가 7이야. 5보다 크면?&quot;</div></div></li><li id="X9-👨함정2"><code class="mini">함정2</code><div><div class="kid">&quot;소수 첫째 자리까지&quot;인데 7.57이라고 쓴다</div><div class="dadsay">→ &quot;첫째 자리까지면 답도 소수 한 자리야. 둘째 자리 7을 보고 정해.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">6.5 ÷ 0.7의 몫을 반올림하여 일의 자리까지, 소수 첫째 자리까지 나타내고(9 · 9.3), 바로 아래 숫자로 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="X10">
+    <header class="ch-head">
+      <div class="ch-no">X10</div>
+      <div>
+        <div class="grade">초6 · X9 다음</div>
+        <h2>⭐ 나누어 주고 남는 양</h2>
+        <p class="idea">6.4 kg인 알밤을 한 사람에게 2.1 kg씩 나누어 주면 — 2.1 × 3 = 6.3이라 <strong>3명</strong>에게 주고, 6.4 − 6.3 = 0.1 → 남는 알밤은 <strong>0.1 kg</strong>. 사람 수는 자연수까지만 구해요. 남는 양은 몫의 소수 부분이 아니에요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="X10-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>X10-1</code></div>
+        <div class="say"><p>6.4 kg인 알밤을 한 사람에게 2.1 kg씩 나누어 주면 — 6.4 ÷ 2.1의 몫을 자연수까지만 구해요.</p><div class="fig"><svg class="frac-fig ddiv-fig" data-mode="fit" data-k="3" viewBox="0 0 400 98" width="500" height="123" role="img" aria-label="띠: 길이 6.4에서 2.1씩 3도막 — 남는 길이 0.1"><rect class="dd-p" x="20.0" y="34" width="118.1" height="34" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1.6" data-i="0"/><rect class="dd-p" x="138.1" y="34" width="118.1" height="34" fill="var(--frac-fill, #6366f1)" fill-opacity="0.55" stroke="currentColor" stroke-width="1.6" data-i="1"/><rect class="dd-p" x="256.3" y="34" width="118.1" height="34" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-width="1.6" data-i="2"/><rect class="dd-r" x="374.4" y="34" width="5.6" height="34" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-width="1.6" stroke-dasharray="4 3" data-rem="0.1"/><rect x="20" y="34" width="360" height="34" fill="none" stroke="currentColor" stroke-width="2"/><text x="20.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">0</text><text x="138.1" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">2.1</text><text x="256.3" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">4.2</text><text x="380.0" y="88.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-t">6.4</text><text class="dd-rl" x="380" y="15" font-size="13" font-weight="700" text-anchor="end" fill="currentColor">남는 길이 0.1</text><path d="M20 28 L20 20 L138.1 20 L138.1 28" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="79.1" y="15.0" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor" class="dd-b">2.1</text></svg></div><p>2.1 × 3 = 6.3 — <strong>3명</strong>에게 주고<br>6.4 − 6.3 = 0.1 — 남는 알밤은 <strong>0.1 kg</strong></p><p>사람 수는 자연수예요.</p></div>
+        <div class="check" id="X10-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X10-1✓</code></div>
+        <div class="qt"><p>진우는 무게가 9.5 kg인 알밤을 한 사람에게 2 kg씩 나누어 주려고 해요. 몇 명에게 나누어 줄 수 있을까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">5</span></li><li class="no"><span class="mark"></span><span class="txt">47</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2 × 4 = 8 — 4명에게 주면 남는 알밤은 1.5 kg.<br>2 kg보다 적어서 다섯째 사람에게는 줄 수 없어요 — 5명이라면 알밤이 10 kg 있어야 해요.<br>47은 9.5의 소수점을 빼고 95 ÷ 2를 한 수예요 — 47명이라면 알밤이 94 kg 있어야 해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X10-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>X10-2</code></div>
+        <div class="say"><p>6.6 ÷ 1.5 = 4.4 — 그런데 남는 양은 0.4가 아니에요.</p><p>1.5 × 4 = 6<br>6.6 − 6 = 0.6</p><p>0.4는 &quot;1.5씩 몇 번&quot;의 0.4번 — 무게가 아니에요. <strong>남는 양은 처음 양에서 나누어 준 양을 빼서 구해요.</strong></p></div>
+        <div class="check" id="X10-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X10-2✓</code></div>
+        <div class="qt"><p>무게가 3.9 kg인 알밤을 한 사람에게 1.5 kg씩 나누어 주면, 나누어 주고 남는 알밤은 몇 kg일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.9</span></li><li class="no"><span class="mark"></span><span class="txt">0.6</span></li><li class="no"><span class="mark"></span><span class="txt">9</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1.5 × 2 = 3 — 2명에게 주고<br>3.9 − 3 = 0.9 — 남는 알밤은 0.9 kg.<br>3.9 ÷ 1.5 = 2.6에서 0.6은 몫의 소수 부분이지 남는 무게가 아니에요.<br>39 ÷ 15로 계산해 9가 남았다면 처음 소수점을 다시 찍어 0.9 — 9 kg이라면 알밤 전체보다 많아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X10-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>X10-3</code></div>
+        <div class="say"><p>&quot;몇 배&quot;도 나눗셈이에요. 파란 리본의 길이는 4.5 m, 빨간 리본의 길이는 1.8 m라면</p><p>4.5 ÷ 1.8 = 45 ÷ 18<br>= 2.5</p><p>파란 리본은 빨간 리본의 2.5배예요.</p></div>
+        <div class="check" id="X10-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X10-3✓</code></div>
+        <div class="qt"><p>파란 리본의 길이는 3 m, 빨간 리본의 길이는 1.2 m — 파란 리본의 길이는 빨간 리본의 몇 배일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.5</span></li><li class="no"><span class="mark"></span><span class="txt">0.4</span></li><li class="no"><span class="mark"></span><span class="txt">25</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3 ÷ 1.2 = 30 ÷ 12<br>= 2.5 — 2.5배.<br>0.4는 1.2 ÷ 3의 몫 — 빨간 리본이 파란 리본의 몇 배인지예요. 25는 몫에 소수점을 빼먹은 수 — 1.2 m의 25배면 30 m, 파란 리본보다 훨씬 길어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="X10-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>X10-4</code></div>
+        <div class="say"><p>철근 2.5 m의 무게가 9.5 kg일 때 1 m의 무게는 — 무게를 길이로 나눠요.</p><p>9.5 ÷ 2.5 = 95 ÷ 25<br>= 3.8</p><p>1 m의 무게는 3.8 kg — 어림하면 10 ÷ 2.5 = 4보다 조금 가벼워요.</p></div>
+        <div class="check" id="X10-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>X10-4✓</code></div>
+        <div class="qt"><p>철근 0.8 m의 무게가 3.2 kg일 때, 이 철근 1 m의 무게는 몇 kg일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4</span></li><li class="no"><span class="mark"></span><span class="txt">0.25</span></li><li class="no"><span class="mark"></span><span class="txt">0.4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1 m의 무게는 무게 ÷ 길이 — 3.2 ÷ 0.8 = 32 ÷ 8<br>= 4, 곧 4 kg.<br>0.25는 0.8 ÷ 3.2의 몫 — 나누는 수와 나누어지는 수를 바꿨어요. 0.4는 3.2 ÷ 8의 몫 — 나누는 수만 옮겼어요.<br>철근 1 m — 0.8 m보다 기니까 3.2 kg보다 무거워야 해요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="X10-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>X10-📏</code></div><p>나누어 줄 수 있는 만큼(자연수)만 몫을 구하고, 남는 양은 처음 양에서 나누어 준 양을 빼서 구해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="X10-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>X10-①a</code></div>
+      <div class="say"><p>파란 리본의 길이는 9.5 m, 빨간 리본의 길이는 1.9 m — 파란 리본의 길이는 빨간 리본의 몇 배일까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5</span></li><li class="no"><span class="mark"></span><span class="txt">50</span><span class="tag">나누어지는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">0.5</span><span class="tag">나누는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">0.2</span><span class="tag">나누는 수와 나누어지는 수를 바꿈</span></li></ol>
+    </div><div class="sample" id="X10-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>X10-①b</code></div>
+      <div class="say"><p>파란 리본의 길이는 5.4 m, 빨간 리본의 길이는 2.7 m — 파란 리본의 길이는 빨간 리본의 몇 배일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">0.5</span><span class="tag">나누는 수와 나누어지는 수를 바꿈</span></li><li class="no"><span class="mark"></span><span class="txt">20</span><span class="tag">나누어지는 수만 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">0.2</span><span class="tag">나누는 수만 옮김</span></li><li class="ok"><span class="mark">✔</span><span class="txt">2</span></li></ol>
+    </div><div class="sample" id="X10-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>X10-②</code></div>
+      <div class="say"><p>18.2 kg인 알밤을 한 사람에게 2.8 kg씩 나누어 주었어요.</p><p>개굴닌자가 이렇게 말했어요.</p><p><strong>182 ÷ 28은 6명에게 주고 14 남으니까, 남는 알밤은 14 kg</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">소수끼리 나누면 남는 양이 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt">남는 양에는 처음 소수점을 찍어요 — 18.2 − 16.8 = 1.4</span></li><li class="no"><span class="mark"></span><span class="txt">몫의 소수 부분이라서 0.5</span><span class="tag">몫의 소수 부분을 남는 양으로 봄</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 말했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="X10-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>X10-👨</code></div>
+    <h3>나누어 주는 문제에서 사람 수는 자연수까지만 구하고, 남는 양은 처음 양에서 나누어 준 양을 빼서 구하며, 남는 양이 몫의 소수 부분과 다르다는 것을 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="X10-👨말1"><code class="mini">말1</code><span>&quot;알밤 6.4 kg — 한 사람에게 2.1 kg씩이면 몇 명에게 줄 수 있어?&quot;</span></li><li id="X10-👨말2"><code class="mini">말2</code><span>&quot;6.6 ÷ 1.5 = 4.4에서 0.4가 남는 알밤일까?&quot;</span></li><li id="X10-👨말3"><code class="mini">말3</code><span>&quot;남는 알밤이 한 사람 몫보다 많을 수 있을까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">콩이나 쌀을 저울로 해 봐요. 콩 650 g을 한 봉지에 200 g씩 담으면 3봉지 — 3봉지에 600 g이 들어가고 50 g이 그대로 있어요. 0.65 ÷ 0.2 = 3.25에서 0.25는 &quot;봉지 수&quot;의 소수 부분이고, 남는 콩은 0.65 − 0.6 = 0.05, 곧 50 g이에요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="X10-👨함정1"><code class="mini">함정1</code><div><div class="kid">6.6 ÷ 1.5 = 4.4라서 남는 알밤이 0.4 kg이라고 한다</div><div class="dadsay">→ &quot;1.5 kg씩 4명에게 주면 6 kg — 6.6에서 6을 빼 봐.&quot;</div></div></li><li id="X10-👨함정2"><code class="mini">함정2</code><div><div class="kid">9.5 kg인 알밤을 2 kg씩 나누어 주면 5명이라고 한다 — 남는 것까지 올린다</div><div class="dadsay">→ &quot;다섯째 사람 몫 2 kg — 남아 있을까? 2 × 5 = 10이야.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;무게가 8.5 kg인 알밤을 한 사람에게 2 kg씩 나누어 주면, 나누어 주고 남는 알밤은 몇 kg일까요?&quot; — 몇 명에게 주고 얼마가 남는지 구하고(4명 · 0.5 kg), 남는 양을 어떻게 구했는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+
+  <footer>신코치 ➗ 수학 · 소수의 나눗셈 줄기 배움 원고 · 2026-10-07</footer>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('ans');
+  function apply(){document.body.classList.toggle('hide-ans',!cb.checked);}
+  try{var v=localStorage.getItem('ddiv-review-ans');if(v==='0'){cb.checked=false;}}catch(e){}
+  cb.addEventListener('change',function(){apply();try{localStorage.setItem('ddiv-review-ans',cb.checked?'1':'0');}catch(e){}});
+  apply();
+})();
+</script>

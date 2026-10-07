@@ -2466,6 +2466,7 @@ export function figureSvg(spec) {
   if ((m = /^fmul (.+)$/.exec(s))) { const sp = parseFmul(m[1]); return sp ? fmulSvg(sp) : ''; } // ✖️ U 곱셈 그림
   if ((m = /^fsub (.+)$/.exec(s))) { const sp = parseFsub(m[1]); return sp ? fsubSvg(sp) : ''; } // ➕ V 뺄셈 막대
   if ((m = /^dmul (.+)$/.exec(s))) { const sp = parseDmul(m[1]); return sp ? dmulSvg(sp) : ''; } // ✖️ W 소수 곱셈 그림
+  if ((m = /^ddiv (.+)$/.exec(s))) { const sp = parseDdiv(m[1]); return sp ? ddivSvg(sp) : ''; } // ➗ X 나눗셈 그림
   if ((m = /^plane (.+)$/.exec(s))) { const sp = parsePlane(m[1]); return sp ? planeSvg(sp) : ''; } // 📈 R 좌표평면
   if ((m = /^stack (.+)$/.exec(s))) { const sp = parseStackFig(m[1]); return sp ? stackSvg(sp) : ''; } // 🧊 S 쌓은 모양
   if ((m = /^stacks (.+)$/.exec(s))) { const sp = parseStacks(m[1]); return sp ? stacksSvg(sp) : ''; } // 🧊 S 쌓은 모양 후보
@@ -2555,6 +2556,7 @@ export function figText(text, short = false) {
     .replace(/\[fmul ([^\]]+)\]/g, (all, arg) => { const sp = parseFmul(arg); return !sp ? all : short ? '(곱셈 그림)' : `(${fmulText(sp)})`; })
     .replace(/\[fsub ([^\]]+)\]/g, (all, arg) => { const sp = parseFsub(arg); return !sp ? all : short ? '(뺄셈 막대)' : `(${fsubText(sp)})`; })
     .replace(/\[dmul ([^\]]+)\]/g, (all, arg) => { const sp = parseDmul(arg); return !sp ? all : short ? '(소수 곱셈 그림)' : `(${dmulText(sp)})`; })
+    .replace(/\[ddiv ([^\]]+)\]/g, (all, arg) => { const sp = parseDdiv(arg); return !sp ? all : short ? '(나눗셈 그림)' : `(${ddivText(sp)})`; })
     .replace(/\[plane ([^\]]+)\]/g, (all, arg) => { const sp = parsePlane(arg); return !sp ? all : short ? '(좌표평면)' : `(${planeText(sp)})`; })
     .replace(/\[(stack|stacks|views|top|layers) ([^\]]+)\]/g, (all, kind, arg) => { const tx = spaceText(kind, arg); return !tx ? all : short ? '(쌓기나무)' : `(${tx})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
@@ -2596,7 +2598,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -2985,6 +2987,84 @@ export function dmulSvg(sp) {
   const meta = sp.mode === 'rep' ? `data-a="${sp.a}" data-k="${sp.k}"` : sp.mode === 'band' ? `data-big="${sp.N}" data-a="${sp.a}"` : `data-a="${sp.a}" data-b="${sp.b}"`;
   // 보이는 크기는 1.25배 (곱셈 그림·뺄셈 막대와 같다)
   return `<svg class="frac-fig dmul-fig" data-mode="${sp.mode}" ${meta} viewBox="0 0 ${W} ${Math.round(H)}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${dmulText(sp)}">${g}</svg>`;
+}
+
+// ───────────────────── ➗ X 소수의 나눗셈 — 나눗셈 그림 (2026-10-07) ─────────────────────
+//
+// 교과서(미래엔 6-1·6-2 「소수의 나눗셈」 — 6-2 지도서 191쪽 "그림에 0.3씩 선 긋기", 6-1 수 모형으로 똑같이 나누기)의 그림 두 가지 (배움 장·② 문항에서만):
+//   `[ddiv fit 1.2 0.3]` — 띠: 길이 1.2인 띠에 0.3씩 선을 그어 도막을 센다(포함제) → 4도막. 다 못 채운 끝은 옅게 = 나누어 주고 남는 양.
+//   `[ddiv share 2.4 2]` — 똑같이 나누기: 0.1 칸 24개를 2묶음으로 → 한 묶음에 12칸 = 1.2 (등분제). 묶음마다 한 줄.
+// "나머지"라는 말은 쓰지 않는다 (6-2 지도서 181쪽 — "나누어 주고 남는 양").
+// 테스트가 다시 셀 수 있게 도막마다 class="dd-p"(data-i) · 남는 끝 class="dd-r" · 칸마다 class="dd-c"(data-g 묶음 번호).
+
+/** `fit 1.2 0.3` · `share 2.4 2` → 그림 자료 (못 읽거나 그릴 수 없으면 null) */
+export function parseDdiv(arg) {
+  const p = String(arg || '').trim().split(/\s+/);
+  if (p.length !== 3) return null;
+  const dec = (t) => { const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(t); return m ? { u: Number(m[1] + (m[2] || '')), p: (m[2] || '').length } : null; };
+  if (p[0] === 'fit') {
+    const a = dec(p[1]); const b = dec(p[2]);
+    if (!a || !b || !a.u || !b.u) return null;
+    const P = Math.max(a.p, b.p); const A = a.u * 10 ** (P - a.p); const B = b.u * 10 ** (P - b.p); // 같은 단위의 정수
+    const k = Math.floor(A / B); const rem = A - k * B;
+    if (k < 1 || k > 12) return null;
+    return { mode: 'fit', A: p[1], B: p[2], a: A, b: B, k, rem, P };
+  }
+  if (p[0] === 'share') {
+    const a = dec(p[1]); const n = /^\d+$/.test(p[2]) ? +p[2] : 0;
+    if (!a || a.p > 1 || n < 2 || n > 5) return null;
+    const t = a.u * 10 ** (1 - a.p); // 0.1 칸 수
+    if (t > 40 || t % n || t / n < 1 || t / n > 15) return null;
+    return { mode: 'share', A: p[1], n, t, q: t / n };
+  }
+  return null;
+}
+/** 0.1·0.01 단위 정수 → 글자 (끝자리 0은 지운다) */
+const ddivNum = (u, P) => { let x = u; let q = P; while (q > 0 && x % 10 === 0) { x /= 10; q -= 1; } if (!q) return String(x); const s = String(x).padStart(q + 1, '0'); return `${s.slice(0, -q)}.${s.slice(-q)}`; };
+/** 📊·❓ 글용 */
+export function ddivText(sp) {
+  if (sp.mode === 'fit') return `띠: 길이 ${sp.A}에서 ${sp.B}씩 ${sp.k}도막${sp.rem ? ` — 남는 길이 ${ddivNum(sp.rem, sp.P)}` : ''}`;
+  return `똑같이 나누기: 0.1 칸 ${sp.t}개를 ${sp.n}묶음으로 — 한 묶음에 ${sp.q}칸`;
+}
+/** 나눗셈 그림 */
+export function ddivSvg(sp) {
+  const W = 400; let g = ''; let H;
+  const lab = (x, y, t, o = '') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="14" font-weight="700" text-anchor="middle" fill="currentColor"${o}>${t}</text>`;
+  if (sp.mode === 'fit') {
+    const X0 = 20; const L = 360; const s = L / sp.a; const top = 34; const BH = 34;
+    for (let i = 0; i < sp.k; i++) {
+      g += `<rect class="dd-p" x="${(X0 + i * sp.b * s).toFixed(1)}" y="${top}" width="${(sp.b * s).toFixed(1)}" height="${BH}" fill="${FILL}"${i % 2 ? ' fill-opacity="0.55"' : ''} stroke="currentColor" stroke-width="1.6" data-i="${i}"/>`;
+    }
+    if (sp.rem) g += `<rect class="dd-r" x="${(X0 + sp.k * sp.b * s).toFixed(1)}" y="${top}" width="${(sp.rem * s).toFixed(1)}" height="${BH}" fill="${EMPTY}" stroke="currentColor" stroke-width="1.6" stroke-dasharray="4 3" data-rem="${ddivNum(sp.rem, sp.P)}"/>`;
+    g += `<rect x="${X0}" y="${top}" width="${L}" height="${BH}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+    // 눈금 — 0, B, 2B, … (도막이 많으면 0·B·끝 도막만) · 남는 끝이 있으면 전체 길이도
+    // 남는 끝이 좁으면(6.4 ÷ 2.1의 0.1) 그 앞 눈금(6.3)을 빼야 끝 글자(6.4)와 안 겹친다 (갤러리 눈 확인이 잡음)
+    const marks = sp.k <= 6 ? Array.from({ length: sp.k + 1 }, (_, i) => i) : [0, 1, sp.k];
+    for (const i of marks) {
+      const x = X0 + i * sp.b * s;
+      if (sp.rem && i === sp.k && X0 + L - x < 36) continue;
+      g += lab(x, top + BH + 20, ddivNum(i * sp.b, sp.P), ' class="dd-t"');
+    }
+    if (sp.rem) {
+      g += lab(X0 + L, top + BH + 20, sp.A, ' class="dd-t"');
+      g += `<text class="dd-rl" x="${X0 + L}" y="${top - 19}" font-size="13" font-weight="700" text-anchor="end" fill="currentColor">남는 길이 ${ddivNum(sp.rem, sp.P)}</text>`;
+    }
+    // 첫 도막 위에 한 도막의 길이
+    const xb = X0 + sp.b * s;
+    g += `<path d="M${X0} ${top - 6} L${X0} ${top - 14} L${xb.toFixed(1)} ${top - 14} L${xb.toFixed(1)} ${top - 6}" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+    g += lab((X0 + xb) / 2, top - 19, sp.B, ' class="dd-b"');
+    H = top + BH + 30;
+  } else {
+    const X0 = 70; const cw = Math.min(22, 300 / sp.q); const BH = 26; const gap = 10; const top = 6;
+    for (let r = 0; r < sp.n; r++) {
+      const y = top + r * (BH + gap);
+      for (let i = 0; i < sp.q; i++) g += `<rect class="dd-c" x="${(X0 + i * cw).toFixed(1)}" y="${y}" width="${cw.toFixed(1)}" height="${BH}" fill="${FILL}"${r % 2 ? ' fill-opacity="0.55"' : ''} stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="${r}"/>`;
+      g += lab(X0 - 34, y + BH / 2 + 5, `${r + 1}묶음`, ' class="dd-l"');
+    }
+    H = top + sp.n * (BH + gap);
+  }
+  const meta = sp.mode === 'fit' ? `data-k="${sp.k}"` : `data-n="${sp.n}" data-q="${sp.q}"`;
+  return `<svg class="frac-fig ddiv-fig" data-mode="${sp.mode}" ${meta} viewBox="0 0 ${W} ${Math.round(H)}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${ddivText(sp)}">${g}</svg>`;
 }
 
 // ───────────────────── 📈 R 좌표평면과 그래프 — 좌표평면 (2026-10-05) ─────────────────────

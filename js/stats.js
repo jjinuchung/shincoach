@@ -737,7 +737,7 @@ export async function renderStats() {
     cA.appendChild(row);
     cA.appendChild(area);
     cA.appendChild(msg);
-    cA.appendChild(el('p', 'stats-note', '답은 아빠 이름으로 나가요. [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] [bgraph 2x5 명 사과:12 배:6] [lgraph 1x5 kg ~25 1월:26 2월:28] [pie 봄:30 여름:25 가을:45] [range 10..20 13● 17○] [sym x=5 ㄱ:5,4 ㄴ:2,2 ㄷ:5,0 ㄹ:8,2] [circle r=5] [circle half d=10] [cuboid 5 3 4] [prism n=5] [cyl r=3 h=7] [scale 2x + 3 | 11] [plane A(2,-3) lin=2] [stack 2 1 / 1 3] [fbar take 6/7 2/7] [fmul rep 2/5 3] [fsub 3 1/4 | 1 3/4] [dmul area 0.4 0.8] 같은 그림 지시문을 쓰면 그림으로 보여요. 비공개 저장소(math/replies.json)로 보내도 돼요 — Claude에게 부탁하면 됩니다(이 기기에 📤 열쇠가 있어야 받아요).'));
+    cA.appendChild(el('p', 'stats-note', '답은 아빠 이름으로 나가요. [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] [bgraph 2x5 명 사과:12 배:6] [lgraph 1x5 kg ~25 1월:26 2월:28] [pie 봄:30 여름:25 가을:45] [range 10..20 13● 17○] [sym x=5 ㄱ:5,4 ㄴ:2,2 ㄷ:5,0 ㄹ:8,2] [circle r=5] [circle half d=10] [cuboid 5 3 4] [prism n=5] [cyl r=3 h=7] [scale 2x + 3 | 11] [plane A(2,-3) lin=2] [stack 2 1 / 1 3] [fbar take 6/7 2/7] [fmul rep 2/5 3] [fsub 3 1/4 | 1 3/4] [dmul area 0.4 0.8] [ddiv fit 6.4 2.1] 같은 그림 지시문을 쓰면 그림으로 보여요. 비공개 저장소(math/replies.json)로 보내도 돼요 — Claude에게 부탁하면 됩니다(이 기기에 📤 열쇠가 있어야 받아요).'));
     main.appendChild(cA);
   }
 
