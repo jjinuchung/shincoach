@@ -684,10 +684,10 @@ test('원고는 배포 파일 검사(check.mjs)에도 걸린다 — fracdiv.json
 
 // ───────────────────── 3단계: 화면 연결 ─────────────────────
 
-test('화면 연결 (3단계): STEMS.fracdiv(T)는 이 생성기·원고를 쓰고 A 분수 바로 뒤 · 앱 셸이 둘 다 들고 간다 · 사다리 안내에 A 분수 줄기 · 나눗셈 막대를 📊·❓가 안다', async () => {
+test('화면 연결 (3단계): STEMS.fracdiv(T)는 이 생성기·원고를 쓰고 U 분수의 곱셈 바로 뒤 · 앱 셸이 둘 다 들고 간다 · 사다리 안내에 A 분수 줄기 · 나눗셈 막대를 📊·❓가 안다', async () => {
   const { STEMS, STEM_ORDER, stemOf } = await import('../js/mathprog.js');
   assert.equal(STEMS.fracdiv.code, 'T');
-  assert.equal(STEM_ORDER[STEM_ORDER.indexOf('fraction') + 1], 'fracdiv', 'A 분수 줄기 바로 뒤 (A의 분수 × 분수 다음)');
+  assert.equal(STEM_ORDER[STEM_ORDER.indexOf('fracmul') + 1], 'fracdiv', 'U 분수의 곱셈 바로 뒤 (A → U → T, 2026-10-07 U가 끼어듦)');
   assert.equal(STEMS.fracdiv.list, FDIV);
   assert.equal(STEMS.fracdiv.gen.makeQuestion, makeQuestion);
   assert.equal(STEMS.fracdiv.gen.lessonOf, lessonOf, '📚 배움은 이 생성기의 lessonOf');
