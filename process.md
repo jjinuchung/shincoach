@@ -2058,5 +2058,31 @@
 - 봤지만 안 고친 것: ② "누가 틀렸을까"의 "왜 틀렸나"는 고른 보기가 아니라 말한 사람의 잘못(whyAny — 모든 줄기 같은 설계) · 보기 속 식 줄바꿈(식 nowrap 제안)
 
 ### TODO (다음 작업)
-- [ ] Codex 36차(U + 35차 확인, 새 세션, 여유 메모리 재기·"2만 씨앗 금지") → v204
+- [x] Codex 36차 → v204 (아래)
 - [ ] 아버님: U 원고 검수 · 태블릿에서 U 줄기 · 아이폰 영어 시험 결과 · "기록 봐 줘"
+
+## 2026-10-07 (오후) — 🔍 Codex 36차 반영 (v204)
+
+### 진행 내용
+- 아버님 "Codex 36차를 바로 진행하자" → 요청문 `.context/codex_prompt_36.txt`(PART 1 35차 확인 8건 · PART 2 U 줄기) · 여유 메모리 15 GB, 브라우저 끔 · 새 세션 158만 토큰
+- 결과: **35차 8건 모두 holds** · U에서 정답이 틀리거나 둘인 문항 없음(U7 4,000문항 따로) · 2022 개정 5-2 목차(디딤돌·미래엔)로 큰 순서 확인 · 새 5건 → 판단 표 → 아버님 **"이대로 진행하자"** (process.md의 옛 기록은 (가) 그대로)
+- #1 P1 공개 코드 주석에 아이 기록 수치 → 앱 js 주석 6곳을 일반적인 말로 · check.mjs가 점수 꼴을 막음. 검수 페이지를 다시 올리다 **검수 페이지 생성 도구 첫 상자에도 같은 수치**가 있는 것을 찾아 함께 고치고(review-fmul·review-fdv 다시 만듦) 검사를 도구·테스트·검수 페이지·원고까지 넓힘
+- #2 P2 U2 아빠 카드 컵 계량 식(1 1/3컵씩인데 7/3로 확인) → 4/3 × 3 = 4/3 + 4/3 + 4/3 = 4 · 아빠 카드 대분수 양 = 가분수 식 테스트 · 검수 artifact Version 2
+- #3 P2 숫자판: 보기 4개에서 빠진 오개념 후보와 같은 값을 치면 "짐작"이 아니라 그 오개념으로 채점·기록 (`matchTyped` 'known' → `typedHooks`) — U·직육면체 등 공통
+- #4 P2 비공개 저장소 받기 결과를 📊 📤 카드에 한 줄(받음·아직 없음·인터넷·열쇠·권한·JSON 깨짐), 아이 화면은 그대로
+- #5 P2 `check.mjs --private` 폴더 이름 빠짐·없는 폴더·빈 폴더는 실패 (`tools/privcheck.mjs`)
+- 새 테스트 9개는 고치기 전 코드에서 실패 확인 · 전체 **1371 통과** · 헤드리스(가짜 GitHub): 4/9 × 2에 8/11 → "분모에 더함", 📥 줄 · 콘솔 오류 0 · **v204 배포**(`71f20a0`, 라이브 v204·배포본 10개 같음) + `009eaa3`
+
+### 변경 파일 (`71f20a0` · `009eaa3`)
+- `js/mathpad.js` matchTyped known · `js/math.js` typedHooks · `js/mathask.js` typedTag 빼기 · `js/upload.js` readStatus·readState·readSummary · `js/stats.js` 📥 줄
+- `js/mathfmul.js`·`js/mathfdiv.js`·`js/mathpad.js`·`js/mathprog.js` 주석 · `coach/math/fracmul.json` U2 아빠 카드 · `sw.js` v204
+- `tools/privcheck.mjs`(새) · `tools/check.mjs` 비공개 검사·점수 꼴 검사 · `tools/mathfmul.mjs`·`tools/mathfdiv.mjs` → `coach/math/review-fmul.html`·`review-fdv.html`
+- `tests/privcheck.test.js`(새) · `tests/mathfmul.test.js` · `tests/upload.test.js`
+
+### 결정사항 / 메모
+- 공개 저장소(앱·도구·테스트·검수 페이지·이 문서)에 아이 기록 수치를 새로 적지 않는다 — 수치는 비공개 저장소에만
+- 숫자판 채점은 화면 보기 → 빠진 오개념 후보(probe.allWrong) → 짐작 순서
+
+### TODO (다음 작업)
+- [ ] 아버님: U 원고 검수(Version 2) · 태블릿 v204(U 줄기·📊 📥 받기 줄) · 아이폰 영어 시험 결과 · "기록 봐 줘"
+- [ ] (제안, 미결정) 분수의 덧셈·뺄셈 줄기 · 📊에 막힌 개념 옆 아빠 카드 · 식 줄바꿈 nowrap
