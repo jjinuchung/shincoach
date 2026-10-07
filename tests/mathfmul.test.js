@@ -755,12 +755,12 @@ test('원고는 배포 파일 검사(check.mjs)에도 걸린다 — fracmul.json
 
 // ───────────────────── 3단계: 화면 연결 ─────────────────────
 
-test('화면 연결 (3단계): STEMS.fracmul(U)은 이 생성기·원고를 쓰고 A 분수 바로 뒤·T 분수의 나눗셈 앞 · 앱 셸이 둘 다 들고 간다 · 사다리 안내에 A 분수 줄기 · 곱셈 그림을 📊·❓가 안다', async () => {
+test('화면 연결 (3단계): STEMS.fracmul(U)은 이 생성기·원고를 쓰고 V 분수의 덧셈·뺄셈 바로 뒤·T 분수의 나눗셈 앞 · 앱 셸이 둘 다 들고 간다 · 사다리 안내에 A 분수 줄기 · 곱셈 그림을 📊·❓가 안다', async () => {
   const { STEMS, STEM_ORDER, stemOf } = await import('../js/mathprog.js');
   assert.equal(STEMS.fracmul.code, 'U');
   assert.equal(STEMS.fracmul.label, '분수의 곱셈 줄기', '줄기 고르기·📊에 보이는 이름');
-  const at = STEM_ORDER.indexOf('fraction');
-  assert.deepEqual(STEM_ORDER.slice(at, at + 3), ['fraction', 'fracmul', 'fracdiv'], 'A 분수 → U 곱셈 → T 나눗셈 (5-2 분수의 곱셈 다음에 6학년 분수의 나눗셈)');
+  const at = STEM_ORDER.indexOf('fracadd');
+  assert.deepEqual(STEM_ORDER.slice(at, at + 3), ['fracadd', 'fracmul', 'fracdiv'], 'V 덧셈·뺄셈 → U 곱셈 → T 나눗셈 (2026-10-07 V가 A와 U 사이에 끼어듦 — 5-1 덧셈·뺄셈 다음에 5-2 곱셈, 그다음 6학년 나눗셈)');
   assert.equal(STEMS.fracmul.list, FMUL);
   assert.equal(STEMS.fracmul.gen.makeQuestion, makeQuestion);
   assert.equal(STEMS.fracmul.gen.lessonOf, lessonOf, '📚 배움은 이 생성기의 lessonOf');

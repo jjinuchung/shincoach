@@ -188,7 +188,7 @@ export function askSummary(m) {
  */
 export function asksText(m, today) {
   const open = openAsks(m);
-  const lines = [`❓ 진우의 수학 질문 ${open.length}개 (${today}) — 답은 \`💬번호\`로 시작하는 줄 뒤에 써 주세요. 여러 줄 가능, 그림은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] [bgraph 2x5 명 사과:12 배:6] [lgraph 1x5 kg ~25 1월:26 2월:28] [pie 봄:30 여름:25 가을:45] [range 10..20 13● 17○] [sym x=5 ㄱ:5,4 ㄴ:2,2 ㄷ:5,0 ㄹ:8,2] [circle r=5] [circle half d=10] [cuboid 5 3 4] [prism n=5] [cyl r=3 h=7] [scale 2x + 3 | 11] [plane A(2,-3) lin=2] [stack 2 1 / 1 3] [fbar take 6/7 2/7] [fmul rep 2/5 3] 처럼.`, '아이 눈높이(초4)로, 답을 바로 말하지 말고 왜 그런지부터. 아빠 이름으로 나갑니다.', ''];
+  const lines = [`❓ 진우의 수학 질문 ${open.length}개 (${today}) — 답은 \`💬번호\`로 시작하는 줄 뒤에 써 주세요. 여러 줄 가능, 그림은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] [bgraph 2x5 명 사과:12 배:6] [lgraph 1x5 kg ~25 1월:26 2월:28] [pie 봄:30 여름:25 가을:45] [range 10..20 13● 17○] [sym x=5 ㄱ:5,4 ㄴ:2,2 ㄷ:5,0 ㄹ:8,2] [circle r=5] [circle half d=10] [cuboid 5 3 4] [prism n=5] [cyl r=3 h=7] [scale 2x + 3 | 11] [plane A(2,-3) lin=2] [stack 2 1 / 1 3] [fbar take 6/7 2/7] [fmul rep 2/5 3] [fsub 3 1/4 | 1 3/4] 처럼.`, '아이 눈높이(초4)로, 답을 바로 말하지 말고 왜 그런지부터. 아빠 이름으로 나갑니다.', ''];
   for (const a of open) {
     lines.push(`❓${a.no} ${nameOf(a.concept)} · ${KIND_SHORT[a.k] || a.k} · ${a.d}`);
     lines.push(`문제: ${a.q}`);

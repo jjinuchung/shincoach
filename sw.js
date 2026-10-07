@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v204';
+const CACHE_VERSION = 'v205';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -41,6 +41,7 @@ const APP_SHELL = [
   './coach/math/space.json',
   './coach/math/fracdiv.json',
   './coach/math/fracmul.json',
+  './coach/math/fracadd.json',
   './coach/math/challenge.json',
   './js/db.js',
   './js/srt.js',
@@ -87,6 +88,7 @@ const APP_SHELL = [
   './js/mathspace.js',
   './js/mathfdiv.js',
   './js/mathfmul.js',
+  './js/mathfadd.js',
   './js/upload.js',
   './js/gift.js',
   './js/fusion.js',

@@ -27,6 +27,7 @@ import * as coordGen from './mathcoord.js';
 import * as spaceGen from './mathspace.js';
 import * as fdivGen from './mathfdiv.js';
 import * as fmulGen from './mathfmul.js';
+import * as faddGen from './mathfadd.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -81,8 +82,12 @@ export const STEMS = {
   // U 분수의 곱셈 — A 분수 줄기의 곱셈도 두 칸뿐이고 배움 장이 없다 · 📊 기록에서 A "분수 × 자연수" 오답이 한 오개념에 몰렸다. 미래엔 5-2 지도서 134쪽 흐름도(12차시)·166쪽 넓이 모델·2022 [6수01-09]로 범위 확인
   // (2026-10-07 아버님 "분수의 곱셈 줄기(초5-2) 진행하자" → 설계안 "이대로 진행"). 초5 9칸 · 사다리에서 A 바로 뒤·T 앞(A → U → T) · 답은 숫자판(약분 안 한 답도 맞음) · 곱셈 그림 [fmul rep|part|area]은 배움·② 일부에만
   fracmul: { key: 'fracmul', code: 'U', label: '분수의 곱셈 줄기', range: '초5', list: fmulGen.FMUL, gen: fmulGen, file: './coach/math/fracmul.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (분수 × 자연수부터 — 학교 5-2 분수의 곱셈 · A 분수 줄기(약분·통분까지)를 먼저 하면 쉬워요)', intro: '분수의 곱셈 문제 5개를 먼저 풀어 볼게요. 무엇에 무엇을 곱하는지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // V 분수의 덧셈·뺄셈 — A 분수 줄기의 덧셈·뺄셈은 진분수끼리 두 칸뿐이고(대분수·받아내림 없음) 배움 장이 없다 · 📊 기록에서 A "분모가 다른 분수의 덧셈·뺄셈" 오답이 "통분 없이 분자만 더함"에 몰렸다.
+  // 미래엔 4-2 교과서 1단원·5-1 지도서 248쪽 흐름도·2022 [4수01-15]·[6수01-08]로 범위 확인 (2026-10-07 아버님 "분수의 덧셈·뺄셈 줄기 가자" → 설계안 "이대로 진행").
+  // V1~V5 초4 · V6~V9 초5 · 사다리에서 A 바로 뒤·U 앞(A → V → U → T) · 4학년 칸 답은 분모를 그대로 둔 꼴(숫자판은 약분한 답도 맞음) · 뺄셈 막대 [fsub]는 배움·② 일부에만
+  fracadd: { key: 'fracadd', code: 'V', label: '분수의 덧셈·뺄셈 줄기', range: '초4 → 초5', list: faddGen.FADD, gen: faddGen, file: './coach/math/fracadd.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (분모가 같은 분수의 덧셈부터 — 학교 4-2 1단원·5-1 5단원 분수의 덧셈과 뺄셈 · 분모가 다른 칸은 A 분수 줄기를 먼저 하면 쉬워요)', intro: '분수의 덧셈·뺄셈 문제 5개를 먼저 풀어 볼게요. 더하는지 빼는지, 분모가 같은지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'fracmul', 'fracdiv', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];
+export const STEM_ORDER = ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
