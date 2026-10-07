@@ -53,9 +53,40 @@ test('🔒 공개 저장소 파일(앱 js·sw.js·도구·테스트·검수 페�
   const chk = readFileSync('tools/check.mjs', 'utf8');
   assert.ok(chk.includes('SCORE_RE') && chk.includes(re.source) && /readdirSync\('coach\/math'\)/.test(chk), 'check.mjs가 같은 꼴로 같은 곳을 막는다');
   // 검수 페이지 첫 상자에 실렸던 날짜·횟수도 없다 (꼴이 달라 위 검사로는 못 잡는다)
-  for (const f of ['tools/mathfmul.mjs', 'tools/mathfdiv.mjs', 'coach/math/review-fmul.html', 'coach/math/review-fdv.html']) {
+  for (const f of ['tools/mathfmul.mjs', 'tools/mathfdiv.mjs', 'tools/mathfadd.mjs', 'coach/math/review-fmul.html', 'coach/math/review-fdv.html', 'coach/math/review-fadd.html']) {
     assert.ok(!/진우 기록\(|📊 사진 —|\d+문제 중 \d+개/.test(readFileSync(f, 'utf8')), `${f}: 기록 수치`);
   }
+});
+
+// Codex 37차 #1 — 진행 기록(process.md)은 마크다운이라 검사 밖이었고("이번 주 N/M(P%)"가 남음), 수치를 뺀 뒤에도 "어느 칸이 가장 막혔고 오답이 무엇에 몰렸다"처럼
+//   기록을 옮겨 적은 말은 남았다(V 주석·검수 페이지, T·U 주석과 검수 도구). 마크다운도 보고, 그 말투도 막는다
+test('🔒 진행 기록·README(마크다운)도 검사한다 — 점수 꼴도, 수치 없이 기록을 옮겨 적은 말투(📊 기록 뒤 "에서"·쌍점, 첫 진단 뒤 쌍점)도 공개 파일에 없다', () => {
+  const rec = /📊 기록(?:에서|:)|첫 진단\s?:/;
+  const score = /\d+\/\d+\s*\(\d+(?:\.\d+)?%\)/;
+  const md = ['process.md', 'README.md', 'coach/README.md'];
+  const files = [...md, 'sw.js', ...readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => `js/${f}`),
+    ...readdirSync('tools').filter((f) => f.endsWith('.mjs')).map((f) => `tools/${f}`),
+    ...readdirSync('tests').filter((f) => f.endsWith('.js')).map((f) => `tests/${f}`),
+    ...readdirSync('coach/math').filter((f) => /\.(html|json)$/.test(f)).map((f) => `coach/math/${f}`)];
+  for (const f of files) {
+    const t = readFileSync(f, 'utf8');
+    assert.ok(!score.test(t), `${f}: 점수 꼴 ${(t.match(score) || [])[0]}`);
+    assert.ok(!rec.test(t), `${f}: 기록 말투 ${(t.match(rec) || [])[0]}`);
+  }
+  // 예시 글은 이어 붙여 만든다 — 이 파일도 검사 대상이다
+  assert.ok(rec.test(['📊 기록', '에서 A 줄기'].join('')) && rec.test(['첫 진단', ': 513편'].join('')) && score.test(['이번 주 3/10', '(30%)'].join('')), '꼴 자체는 잡는다');
+  const chk = readFileSync('tools/check.mjs', 'utf8');
+  assert.ok(chk.includes('RECORD_RE') && chk.includes(rec.source), 'check.mjs가 같은 말투를 막는다');
+  for (const f of md) assert.ok(chk.includes(`'${f}'`), `check.mjs가 ${f}도 본다`);
+  // check.mjs를 실제로 돌려 마크다운에서 잡히는지 — process.md 끝에 예시 한 줄을 붙였다 떼어 본다
+  const P = 'process.md'; const orig = readFileSync(P, 'utf8');
+  try {
+    writeFileSync(P, `${orig}\n- ${['이번 주 3/10', '(30%)'].join('')}\n`, 'utf8');
+    const r = spawnSync(process.execPath, ['tools/check.mjs'], { encoding: 'utf8' });
+    assert.notEqual(r.status, 0, 'process.md의 점수 꼴을 check.mjs가 잡는다');
+    assert.match(r.stderr, /process\.md/);
+  } finally { writeFileSync(P, orig, 'utf8'); }
+  assert.equal(readFileSync(P, 'utf8'), orig, 'process.md 되돌림');
 });
 
 test('🔒 check.mjs --private <없는 폴더> → 실패로 끝나고 그 폴더 이름을 말한다 (전엔 "검사 통과")', () => {

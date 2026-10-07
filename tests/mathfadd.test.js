@@ -500,6 +500,39 @@ test('🔢 숫자판: ① 모두 숫자판 · 분수·대분수 답도 칠 수 �
   assert.ok(dropped > 0, `빠진 후보 ${dropped}`);
 });
 
+// 🔍 Codex 37차 #2 — 4학년 칸 6/8 + 1/8에 14/16을 치면 맞음과 함께 "약분하면 7/8 — 다음엔 끝까지 약분해요"가 떴다.
+//   V1~V5는 분모를 그대로 둔 꼴로 답하고 "약분"은 V6부터 배운다 — 숫자판 말에도 안 배운 말·없는 요구를 넣지 않는다
+test('🔢 숫자판 말: 4학년 칸(V1~V5)은 같은 값의 다른 꼴을 쳐도 맞음 · "약분·통분·최소공배수"를 말하지 않는다 · 5학년 칸은 약분 안내 그대로', () => {
+  const q0 = makeQuestion('fadd.same', 'calc', 1, OPTS);
+  const s0 = padSpec(q0, 'fracadd');
+  const r0 = matchTyped(q0, readTyped('frac', { n: '14', d: '16' }, s0), s0);
+  assert.equal(q0.choices[r0.i].text, '7/8', 'Codex 재현: 6/8 + 1/8');
+  assert.ok(r0.note && !/약분/.test(r0.note), `Codex 재현의 말: ${r0.note}`);
+  const BANNED = /약분|통분|최소공배수/;
+  let said = 0; let g5said = 0;
+  for (const { c, s, q } of every(['calc'], 150)) {
+    const g4 = GRADE4.includes(c.id);
+    assert.equal(!!q.keepDen, g4, `${c.id} #${s}: keepDen 표시는 4학년 칸에만`);
+    const spec = padSpec(q, 'fracadd');
+    const okI = q.choices.findIndex((x) => x.ok);
+    const p = partsOfNum(q.choices[okI].text);
+    if (p.kind === 'int') continue;
+    const top = p.w * p.d + p.n;
+    // 같은 값의 다른 꼴: 분자·분모 2배 · 가분수 · 가분수 2배 · 대분수의 분수 부분 2배
+    const forms = p.kind === 'frac' ? [['frac', { n: String(2 * p.n), d: String(2 * p.d) }]]
+      : [['frac', { n: String(top), d: String(p.d) }], ['frac', { n: String(2 * top), d: String(2 * p.d) }], ['mixed', { w: String(p.w), n: String(2 * p.n), d: String(2 * p.d) }]];
+    for (const [mode, parts] of forms) {
+      if (!spec.modes.includes(mode)) continue;
+      const r = matchTyped(q, readTyped(mode, parts, spec), spec);
+      assert.equal(r.i, okI, `${c.id} #${s}: ${JSON.stringify(parts)}이 틀림`);
+      if (!r.note) continue;
+      if (g4) { assert.ok(!BANNED.test(r.note), `${c.id} #${s}: 4학년 칸 숫자판 말 "${r.note}"`); said++; } else if (/약분/.test(r.note)) g5said++;
+    }
+  }
+  assert.ok(said > 50, `4학년 칸에서 본 숫자판 말 ${said}`);
+  assert.ok(g5said > 0, `5학년 칸은 약분 안내 그대로 ${g5said}`);
+});
+
 // ───────────────────── 그림 ─────────────────────
 
 const attrsOf = (svg, cls) => [...svg.matchAll(new RegExp(`<(?:rect|path|text) class="${cls}"([^>]*)>`, 'g'))].map((m) => {

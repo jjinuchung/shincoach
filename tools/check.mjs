@@ -27,17 +27,20 @@ for (const f of readdirSync('js').filter((f) => f.endsWith('.js'))) {
 }
 // ★ 공개 저장소 파일(앱 js·sw.js는 빌드 없이 주석까지 그대로 배포되고, 도구·테스트·검수 페이지도 누구나 본다)에
 //   아이 기록의 점수 꼴 "맞힌 수/푼 수(정답률%)"를 적지 않는다 (Codex 36차 #1) — 기록 수치는 비공개 저장소에만
+//   수치가 없어도 기록을 옮겨 적는 말투(📊 기록 뒤에 "에서"나 쌍점, 첫 진단 뒤에 쌍점)는 그 아이의 성적 묘사다 — 진행 기록(process.md)·README도 본다 (Codex 37차 #1)
 const SCORE_RE = /\d+\/\d+\s*\(\d+(?:\.\d+)?%\)/;
+const RECORD_RE = /📊 기록(?:에서|:)|첫 진단\s?:/;
 const PUBLIC_TEXT = [
-  'sw.js',
+  'sw.js', 'process.md', 'README.md', 'coach/README.md',
   ...readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => 'js/' + f),
   ...readdirSync('tools').filter((f) => f.endsWith('.mjs')).map((f) => 'tools/' + f),
   ...readdirSync('tests').filter((f) => f.endsWith('.js')).map((f) => 'tests/' + f),
   ...readdirSync('coach/math').filter((f) => /\.(html|json)$/.test(f)).map((f) => 'coach/math/' + f),
 ];
 for (const f of PUBLIC_TEXT) {
-  const hit = readFileSync(f, 'utf8').match(SCORE_RE);
-  if (hit) { bad++; console.error(`공개 저장소 파일에 아이 점수: ${f} "${hit[0]}" — 기록 수치는 비공개 저장소(shincoach-data)에만 적어 주세요`); }
+  const text = readFileSync(f, 'utf8');
+  const hit = text.match(SCORE_RE) || text.match(RECORD_RE);
+  if (hit) { bad++; console.error(`공개 저장소 파일에 아이 기록: ${f} "${hit[0]}" — 기록 수치·칸별 진단은 비공개 저장소(shincoach-data)에만 적어 주세요`); }
 }
 for (const f of readdirSync('vocab').filter((f) => f.endsWith('.json'))) {
   try {

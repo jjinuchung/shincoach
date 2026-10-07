@@ -161,6 +161,7 @@ test('★ 모든 줄기의 ① 계산: 정답을 치면 맞음 · 오답을 치�
           const tw = { ...tOk.p, n: String(+tOk.p.n * 2), d: String(+tOk.p.d * 2) }; // 정답 글의 수를 두 배로 (6/8 → 12/16)
           const r = matchTyped(q, readTyped('frac', tw, spec), spec);
           if (spec.reduce) { assert.equal(r.i, -1, where); assert.match(r.note, /약분/, where); }
+          else if (q.keepDen) { assert.equal(r.i, okI, where); assert.match(r.note, /같은 크기/, where); assert.ok(!/약분/.test(r.note), `${where}: 분모를 그대로 두는 칸에 약분 안내 (Codex 37차 #2)`); }
           else { assert.equal(r.i, okI, where); assert.match(r.note, /약분하면/, where); }
           reducedChecks++;
         }

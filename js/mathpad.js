@@ -184,7 +184,8 @@ export function matchTyped(q, typed, spec = {}) {
   if (sameVal(v, okV)) {
     // 약분 안내는 값을 끝까지 약분한 꼴로 (정답 글이 6/8처럼 일부러 약분 안 한 것일 수도 있다 — 분수의 뜻)
     const low = `${v.v.n < 0 ? '−' : ''}${Math.abs(v.v.n)}/${v.v.d}`;
-    const note = v.form === 'frac' && !v.reduced && okV.form === 'frac' && v.v.d !== 1 ? `맞아요! 약분하면 ${low} — 다음엔 끝까지 약분해요`
+    // 분모를 그대로 두는 칸(q.keepDen — V 4학년 칸, 약분은 5학년)에는 "약분"을 말하지 않는다 (🔍 Codex 37차 #2)
+    const note = v.form === 'frac' && !v.reduced && okV.form === 'frac' && v.v.d !== 1 ? (q.keepDen ? `맞아요! ${ok.text} — 같은 크기예요` : `맞아요! 약분하면 ${low} — 다음엔 끝까지 약분해요`)
       : v.form !== okV.form && (v.form === 'mixed' || okV.form === 'mixed') ? `맞아요! ${ok.text}로 써도 같아요` : null;
     return { i: okI, note };
   }
