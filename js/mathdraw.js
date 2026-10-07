@@ -2465,6 +2465,7 @@ export function figureSvg(spec) {
   if ((m = /^fbar (.+)$/.exec(s))) { const sp = parseFbar(m[1]); return sp ? fbarSvg(sp) : ''; } // ➗ T 나눗셈 막대
   if ((m = /^fmul (.+)$/.exec(s))) { const sp = parseFmul(m[1]); return sp ? fmulSvg(sp) : ''; } // ✖️ U 곱셈 그림
   if ((m = /^fsub (.+)$/.exec(s))) { const sp = parseFsub(m[1]); return sp ? fsubSvg(sp) : ''; } // ➕ V 뺄셈 막대
+  if ((m = /^dmul (.+)$/.exec(s))) { const sp = parseDmul(m[1]); return sp ? dmulSvg(sp) : ''; } // ✖️ W 소수 곱셈 그림
   if ((m = /^plane (.+)$/.exec(s))) { const sp = parsePlane(m[1]); return sp ? planeSvg(sp) : ''; } // 📈 R 좌표평면
   if ((m = /^stack (.+)$/.exec(s))) { const sp = parseStackFig(m[1]); return sp ? stackSvg(sp) : ''; } // 🧊 S 쌓은 모양
   if ((m = /^stacks (.+)$/.exec(s))) { const sp = parseStacks(m[1]); return sp ? stacksSvg(sp) : ''; } // 🧊 S 쌓은 모양 후보
@@ -2553,6 +2554,7 @@ export function figText(text, short = false) {
     .replace(/\[fbar ([^\]]+)\]/g, (all, arg) => { const sp = parseFbar(arg); return !sp ? all : short ? '(막대 그림)' : `(${fbarText(sp)})`; })
     .replace(/\[fmul ([^\]]+)\]/g, (all, arg) => { const sp = parseFmul(arg); return !sp ? all : short ? '(곱셈 그림)' : `(${fmulText(sp)})`; })
     .replace(/\[fsub ([^\]]+)\]/g, (all, arg) => { const sp = parseFsub(arg); return !sp ? all : short ? '(뺄셈 막대)' : `(${fsubText(sp)})`; })
+    .replace(/\[dmul ([^\]]+)\]/g, (all, arg) => { const sp = parseDmul(arg); return !sp ? all : short ? '(소수 곱셈 그림)' : `(${dmulText(sp)})`; })
     .replace(/\[plane ([^\]]+)\]/g, (all, arg) => { const sp = parsePlane(arg); return !sp ? all : short ? '(좌표평면)' : `(${planeText(sp)})`; })
     .replace(/\[(stack|stacks|views|top|layers) ([^\]]+)\]/g, (all, kind, arg) => { const tx = spaceText(kind, arg); return !tx ? all : short ? '(쌓기나무)' : `(${tx})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
@@ -2594,7 +2596,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -2898,6 +2900,91 @@ export function fsubSvg(sp) {
   }
   const H = top + sp.rows * (BH + gap);
   return `<svg class="frac-fig fsub-fig" data-d="${sp.d}" data-ta="${sp.ta}" data-tb="${sp.tb}" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${fsubText(sp)}">${g}</svg>`;
+}
+
+// ───────────────────── ✖️ W 소수의 곱셈 — 소수 곱셈 그림 (2026-10-07) ─────────────────────
+//
+// 교과서(미래엔 5-2 「소수의 곱셈」 — 지도서 241쪽 "수 모형, 띠 모델, 넓이 모델")의 그림 세 가지 (배움 장·② 문항에서만 — ① 계산에 그리면 답을 흘린다):
+//   `[dmul rep 0.7 3]`    — 0.1 막대: 1을 10칸(한 칸 0.1)으로 나눈 막대 3개에 7칸씩 칠한다 → 0.1이 21개 (0.7 × 3 = 2.1).
+//   `[dmul band 2 0.9]`   — 띠 모델: 2만큼의 띠(한 칸 0.1, 20칸)를 똑같이 10묶음으로 나눠 9묶음을 칠한다 → 18칸 = 1.8 (2 × 0.9, "2의 0.9배").
+//   `[dmul area 0.4 0.8]` — 넓이 모델: 1 m² 정사각형을 가로 10칸·세로 10칸(한 칸 0.01)으로 나눠 가로 4칸·세로 8칸을 칠한다 →
+//                          두 번 칠한 칸(진하게) 32개 = 0.32. 한 번만 칠한 칸은 같은 색을 옅게 (U 넓이 그림과 같은 약속 — "진한 칸").
+// 소수는 1보다 작은 소수 한 자리만(그림이 1을 넘지 않게) — 1보다 큰 소수·두 자리 소수는 그림 없이 글로.
+// 테스트가 다시 셀 수 있게 칸마다 class="dm-c", data-on(칠함 · area는 두 번 칠함) · data-r(rep 막대 번호) · data-g(band 묶음 번호).
+
+/** `rep 0.7 3` · `band 2 0.9` · `area 0.4 0.8` → 그림 자료 (못 읽거나 그릴 수 없으면 null) */
+export function parseDmul(arg) {
+  const p = String(arg || '').trim().split(/\s+/);
+  if (p.length !== 3) return null;
+  const [mode, x, y] = p;
+  const tenth = (t) => { const m = /^0\.([1-9])$/.exec(t); return m ? +m[1] : 0; };
+  if (mode === 'rep') {
+    const a = tenth(x); const k = /^\d+$/.test(y) ? +y : 0;
+    if (!a || k < 2 || k > 5) return null;
+    return { mode, a, k, A: x };
+  }
+  if (mode === 'band') {
+    const N = /^\d+$/.test(x) ? +x : 0; const a = tenth(y);
+    if (!a || N < 1 || N > 4) return null;
+    return { mode, N, a, B: y };
+  }
+  if (mode === 'area') {
+    const a = tenth(x); const b = tenth(y);
+    if (!a || !b) return null;
+    return { mode, a, b, A: x, B: y };
+  }
+  return null;
+}
+/** 📊·❓ 글용 */
+export function dmulText(sp) {
+  if (sp.mode === 'rep') return `막대: 1을 10칸(한 칸 0.1)으로 나눈 막대 ${sp.k}개에 ${sp.a}칸씩 칠함 — 0.1이 ${sp.a * sp.k}개`;
+  if (sp.mode === 'band') return `띠: ${sp.N}만큼의 띠(한 칸 0.1, ${sp.N * 10}칸)를 똑같이 10묶음으로 나눠 ${sp.a}묶음을 칠함 — ${sp.a * sp.N}칸`;
+  return `넓이 그림: 1을 가로 10칸·세로 10칸(한 칸 0.01)으로 나눠 가로 ${sp.a}칸, 세로 ${sp.b}칸을 칠함 — 두 번 칠한 칸 ${sp.a * sp.b}개`;
+}
+/** 소수 곱셈 그림 */
+export function dmulSvg(sp) {
+  const W = 400; let g = ''; let H;
+  const lab = (x, y, t, o = '') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor"${o}>${t}</text>`;
+  const cell = (x, y, w, h, fill, attrs) => `<rect class="dm-c" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${fill}" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" ${attrs}/>`;
+  if (sp.mode === 'rep') {
+    const X0 = 60; const BW = 320; const cw = BW / 10; const BH = 28; const gap = 14; const top = 8;
+    for (let r = 0; r < sp.k; r++) {
+      const y = top + r * (BH + gap);
+      for (let i = 0; i < 10; i++) g += cell(X0 + i * cw, y, cw, BH, i < sp.a ? FILL : EMPTY, `data-r="${r}" data-on="${i < sp.a ? 1 : 0}"`);
+      g += lab(X0 - 26, y + BH / 2 + 5, sp.A, ' class="dm-l"');
+    }
+    H = top + sp.k * (BH + gap);
+  } else if (sp.mode === 'band') {
+    const n = sp.N * 10; const X0 = 30; const BW = 340; const cw = BW / n; const BH = 34; const top = 34;
+    for (let i = 0; i < n; i++) {
+      const on = i < sp.a * sp.N;
+      g += cell(X0 + i * cw, top, cw, BH, on ? FILL : EMPTY, `data-g="${Math.floor(i / sp.N)}" data-on="${on ? 1 : 0}"`);
+    }
+    // 10묶음의 경계는 굵게 (묶음 하나 = ${sp.N}칸) · 아래에 0, 1, 2 … 눈금 (10칸마다)
+    for (let k = 0; k <= 10; k++) g += `<line class="dm-b" x1="${(X0 + k * sp.N * cw).toFixed(1)}" y1="${top - 4}" x2="${(X0 + k * sp.N * cw).toFixed(1)}" y2="${top + BH + 4}" stroke="currentColor" stroke-width="2.2"/>`;
+    for (let k = 0; k <= sp.N; k++) g += lab(X0 + k * 10 * cw, top + BH + 22, String(k), ' class="dm-t"');
+    const xe = X0 + sp.a * sp.N * cw;
+    g += `<path d="M${X0} ${top - 6} L${X0} ${top - 14} L${xe.toFixed(1)} ${top - 14} L${xe.toFixed(1)} ${top - 6}" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+    g += lab((X0 + xe) / 2, top - 20, `${sp.B}배`, ' class="dm-a"');
+    H = top + BH + 30;
+  } else {
+    const S = 220; const X0 = 120; const top = 34; const c = S / 10;
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 10; x++) {
+        const inA = x < sp.a; const inB = y < sp.b; const on = inA && inB;
+        g += cell(X0 + x * c, top + y * c, c, c, inA || inB ? FILL : EMPTY, `${(inA || inB) && !on ? 'fill-opacity="0.28" ' : ''}data-x="${x}" data-y="${y}" data-on="${on ? 1 : 0}"`);
+      }
+    }
+    g += `<rect x="${X0}" y="${top}" width="${S}" height="${S}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+    g += `<path d="M${X0} ${top - 4} L${X0} ${top - 12} L${(X0 + sp.a * c).toFixed(1)} ${top - 12} L${(X0 + sp.a * c).toFixed(1)} ${top - 4}" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+    g += lab(X0 + (sp.a * c) / 2, top - 16, sp.A, ' class="dm-a"');
+    g += `<path d="M${X0 - 4} ${top} L${X0 - 12} ${top} L${X0 - 12} ${(top + sp.b * c).toFixed(1)} L${X0 - 4} ${(top + sp.b * c).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+    g += lab(X0 - 40, top + (sp.b * c) / 2 + 5, sp.B, ' class="dm-b"');
+    H = top + S + 10;
+  }
+  const meta = sp.mode === 'rep' ? `data-a="${sp.a}" data-k="${sp.k}"` : sp.mode === 'band' ? `data-big="${sp.N}" data-a="${sp.a}"` : `data-a="${sp.a}" data-b="${sp.b}"`;
+  // 보이는 크기는 1.25배 (곱셈 그림·뺄셈 막대와 같다)
+  return `<svg class="frac-fig dmul-fig" data-mode="${sp.mode}" ${meta} viewBox="0 0 ${W} ${Math.round(H)}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${dmulText(sp)}">${g}</svg>`;
 }
 
 // ───────────────────── 📈 R 좌표평면과 그래프 — 좌표평면 (2026-10-05) ─────────────────────

@@ -1,0 +1,911 @@
+<title>소수의 곱셈 검수</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에 개념 바로가기, 개념마다 [배움 + 문제 예시 | 아빠 카드] 두 칸 (폰에서는 한 칸) — 문자와 식 검수 페이지와 같은 체계 */
+:root{
+  --bg:#f5f7ff; --card:#ffffff; --ink:#1f2340; --muted:#6b7280; --line:#e3e6f3;
+  --primary:#4f46e5; --primary-soft:#eef2ff; --accent:#f59e0b; --accent-soft:#fff7ed;
+  --ok:#0f9f6e; --ok-soft:#ecfdf5; --no-soft:#f8f9fc;
+  --dad:#fff8ec; --dad-line:#f3c27a; --dad-ink:#7c4a03;
+  --font-display:"Gowun Dodum","Noto Sans KR",sans-serif;
+  --font-body:"Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --font-math:"Times New Roman","Cambria Math",Georgia,serif;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#14162a; --card:#1d2040; --ink:#e8e9f5; --muted:#a0a6c2; --line:#2e3258;
+  --primary:#9b9cf8; --primary-soft:#262a55; --accent:#fbbf24; --accent-soft:#3a2f14;
+  --ok:#34d399; --ok-soft:#153a2d; --no-soft:#22254a;
+  --dad:#2c261a; --dad-line:#a16207; --dad-ink:#fcd9a0;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;margin:0;padding-block:0 60px;padding-inline:16px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 8px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top h1{font-size:1.35rem}
+.top .sub{color:var(--muted);font-size:.9rem;margin:2px 0 8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.nav a{flex:0 0 auto;font-size:.8rem;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.nav a b{color:var(--primary);margin-right:3px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--primary);outline:none}
+.intro{display:grid;grid-template-columns:1fr;gap:12px;margin-block:16px}
+@media(min-width:760px){.intro{grid-template-columns:1.2fr 1fr}}
+.intro .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.intro .box.dadbox{background:var(--dad);border-color:var(--dad-line)}
+.intro h3{font-size:1rem;margin-bottom:6px}
+.intro p{margin:4px 0;font-size:.92rem}
+.intro .stats{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.92rem}
+.intro .stats b{font-size:1.25rem;color:var(--primary);font-variant-numeric:tabular-nums}
+.how{padding-left:20px}
+.how li{margin:3px 0}
+.ladder{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0 4px;padding:0;list-style:none}
+.ladder li{font-size:.85rem;background:var(--primary-soft);border-radius:8px;padding:5px 9px}
+.ladder li b{color:var(--primary);margin-right:4px}
+.ladder li small{color:var(--muted);margin-left:4px}
+.concept{margin-block:36px 0;scroll-margin-top:110px}
+.ch-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.ch-head > div:last-child{min-width:0}
+.ch-no{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--primary);background:var(--primary-soft);border-radius:12px;min-width:56px;height:56px;display:grid;place-items:center}
+.grade{font-size:.75rem;letter-spacing:.06em;color:var(--muted)}
+.ch-head h2{font-size:1.4rem}
+.idea{color:var(--muted);margin:2px 0 0;font-size:.95rem;max-width:65ch}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+.cols > *{min-width:0}
+@media(min-width:900px){.cols{grid-template-columns:1.35fr 1fr}}
+.col-title{margin:0 0 10px;font-size:.95rem}
+.col-title small{color:var(--muted);font-weight:400;margin-left:6px}
+.samples-title{margin-top:18px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.step{display:flex;gap:10px;scroll-margin-top:110px}
+.step-no{flex:0 0 30px;height:30px;border-radius:50%;background:var(--primary);color:var(--card);font-weight:700;display:grid;place-items:center;font-size:.9rem;margin-top:12px}
+.step-body{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.say{max-width:65ch}
+.say p{margin:0 0 10px}
+.say p:last-child{margin-bottom:0}
+.check{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;scroll-margin-top:110px}
+.qt{margin:0 0 6px;font-weight:500}
+.qt p{margin:0 0 6px}
+.ch{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ch li{display:flex;align-items:center;gap:8px;border-radius:9px;padding:6px 10px;background:var(--no-soft);border:1px solid transparent}
+.ch li.ok{background:var(--ok-soft);border-color:var(--ok)}
+.ch .mark{width:16px;color:var(--ok);font-weight:700;flex:0 0 16px}
+.ch .txt{flex:1;min-width:0}
+.ch .tag{font-size:.75rem;color:var(--muted);text-align:right}
+.why{margin:8px 0 0;font-size:.9rem;color:var(--muted)}
+.why-lbl{display:inline-block;font-size:.72rem;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;margin-right:6px;font-weight:700}
+.samples{display:grid;gap:10px}
+.sample{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+body.hide-ans .ch li.ok{background:var(--no-soft);border-color:transparent}
+body.hide-ans .ch .mark,body.hide-ans .why,body.hide-ans .ch .tag{visibility:hidden}
+.rule{margin-top:12px;background:var(--primary-soft);border-radius:12px;padding:10px 14px;scroll-margin-top:110px}
+.rule p{margin:2px 0 0;font-weight:700;font-size:1.05rem}
+.dad{background:var(--dad);border:1px solid var(--dad-line);border-radius:14px;padding:14px 16px;position:sticky;top:104px;scroll-margin-top:110px;color:var(--ink)}
+.dad h3{font-size:1.05rem;margin:4px 0 10px;color:var(--dad-ink)}
+.dad h4{margin:12px 0 4px;font-size:.9rem;color:var(--dad-ink)}
+.dad-say{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.dad-say li,.traps li{display:flex;gap:8px;align-items:flex-start;scroll-margin-top:110px}
+.dad-say li > span,.traps li > div{min-width:0}
+.dad-do,.dad-pass{margin:0;font-size:.95rem}
+.traps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.traps .kid{font-weight:500}
+.traps .dadsay{color:var(--muted);font-size:.92rem}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.ref .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.03em}
+.ref code,code.mini{font-size:.78rem;color:var(--primary);background:var(--primary-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+code.mini{flex:0 0 auto;margin-top:2px}
+.dad .ref code,.dad code.mini{color:var(--dad-ink);background:var(--accent-soft)}
+/* 식: 문자는 기울여(교과서 표기), 나눗셈은 세로 분수 — 분수 막대가 괄호 노릇을 해서 괄호는 뗀다 */
+i.v{font-family:var(--font-math);font-style:italic;font-size:1.1em;padding:0 .04em}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.1;margin:0 2px;font-variant-numeric:tabular-nums}
+.fr .n{border-bottom:1.5px solid currentColor;padding:0 3px}
+.fr .d{padding:0 3px}
+.mx{display:inline-flex;align-items:center;gap:3px;vertical-align:middle}
+/* 소수 곱셈 그림 — 앱과 같은 SVG (currentColor라 어두운 화면에서도 보인다) */
+.fig{margin:6px 0 8px;color:var(--ink);display:inline-block;max-width:100%;overflow-x:auto}
+.fig svg{max-width:100%;height:auto;display:block}
+div.fig{display:block;max-width:400px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;user-select:none;margin-top:8px}
+.toggle input{width:18px;height:18px;accent-color:var(--primary)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+@media (max-width:899px){.dad{position:static}}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  body{background:#fff;padding:0;font-size:13px}
+  .wrap{max-width:100%}
+  .top{position:static}
+  .dad{position:static;box-shadow:none;break-inside:auto}
+  .step,.sample,.check,.rule,.traps li,.fr,.fig{break-inside:avoid}
+}
+</style>
+<div class="wrap">
+  <div class="top">
+    <h1>✖️ 소수의 곱셈 줄기 — 배움 원고 검수</h1>
+    <p class="sub">신코치 수학 · 초5 「소수의 곱셈」(5-2) · 개념 8개</p>
+    <div class="nav"><a href="#W1"><b>W1</b> (소수 한 자리 수) × (자연수)</a><a href="#W2"><b>W2</b> (소수 두 자리 수) × (자연수)</a><a href="#W3"><b>W3</b> (자연수) × (소수 한 자리 수)</a><a href="#W4"><b>W4</b> (자연수) × (소수 두 자리 수)</a><a href="#W5"><b>W5</b> (소수 한 자리 수) × (소수 한 자리 수)</a><a href="#W6"><b>W6</b> (소수 두 자리 수) × (소수 한 자리 수)</a><a href="#W7"><b>W7</b> 곱의 소수점 위치</a><a href="#W8"><b>W8</b> ⭐ 소수의 곱셈 활용</a></div>
+  </div>
+
+  <div class="intro">
+    <div class="box">
+      <h3>무엇을 봐 주시면 되나</h3>
+      <div class="stats">
+        <span><b>8</b> 개념</span>
+        <span><b>32</b> 📘 배움 장</span>
+        <span><b>32</b> 확인 질문</span>
+        <span><b>3</b> ✖️ 곱셈 그림</span>
+        <span><b>16</b> 헷갈리는 자리</span>
+        <span><b>24</b> 🧪 문제 예시</span>
+      </div>
+      <ol class="ladder"><li><b>W1</b>(소수 한 자리 수) × (자연수)<small>초5</small></li><li><b>W2</b>(소수 두 자리 수) × (자연수)<small>초5</small></li><li><b>W3</b>(자연수) × (소수 한 자리 수)<small>초5</small></li><li><b>W4</b>(자연수) × (소수 두 자리 수)<small>초5</small></li><li><b>W5</b>(소수 한 자리 수) × (소수 한 자리 수)<small>초5</small></li><li><b>W6</b>(소수 두 자리 수) × (소수 한 자리 수)<small>초5</small></li><li><b>W7</b>곱의 소수점 위치<small>초5</small></li><li><b>W8</b>⭐ 소수의 곱셈 활용<small>초5</small></li></ol>
+      <ul class="how">
+        <li><b>📘 배움</b> — 진우가 앱에서 읽는 것. <b>한 장 = 한 화면</b>, 짧은 설명 → 확인 질문 → 다음 장. 범위는 2015 미래엔 5-2 지도서 4단원 「소수의 곱셈」 차시 계획 그대로입니다 — (소수) × (자연수) 소수 한 자리 → 두 자리 → (자연수) × (소수) 한 자리 → 두 자리 → (소수) × (소수) 한 자리끼리 → 두 자리와 한 자리 → 곱의 소수점 위치, W8은 생활 속 값·넓이·"몇 배"·곱의 크기 어림입니다. 2022 개정 성취기준 [6수01-13], 2022 미래엔 5-2 4단원도 같은 차례입니다</li>
+        <li><b>방법 셋</b> — <b>0.1·0.01이 몇 개인지</b> 세기(0.7 × 3은 0.1이 21개), <b>분수로 바꾸기</b>(7/10 × 3 = 21/10), <b>자연수처럼 곱한 다음 1/10·1/100배</b>(23 × 4 = 92 → 9.2). 지도서 241쪽처럼 칸을 소수 자리 수(한 자리/두 자리)로 나눕니다. "자리 수를 더한다"는 말은 W5부터, "소수 세 자리"는 W6부터 나옵니다</li>
+        <li><b>어림</b> — 칸마다 곱을 "몇과 몇 사이"로 어림해 소수점 위치를 확인합니다(2.3 × 4는 8과 12 사이 → 9.2). <b>1보다 작은 수를 곱하면 처음 수보다 작아진다</b>는 것은 W3(띠)·W5(넓이)·W8(계산하지 않고 고르기)에서 되풀이합니다. 2022 성취기준 고려사항의 "어림셈이 필요한 실생활 상황"입니다</li>
+        <li><b>✖️ 곱셈 그림</b> — 지도서 241쪽의 "수 모형, 띠 모델, 넓이 모델"을 그림으로 보여 줍니다. <b>0.1 막대</b>(0.7 × 3 — 10칸 막대 3개에 7칸씩), <b>띠</b>(2 × 0.9 — 2만큼의 띠를 10묶음으로 나눠 9묶음), <b>넓이</b>(0.4 × 0.8 — 1 m² 100칸에서 두 번 칠한 32칸). 그림은 1보다 작은 소수 한 자리만이고, 그림이 있는 장은 글에 같은 식과 칠한 칸 수가 나오는지 맞춰 봤습니다. ① 계산 문제에는 그림을 넣지 않습니다(답을 흘려서)</li>
+        <li><b>답의 꼴</b> — 끝자리 0은 지운 꼴(2.10 → 2.1, 5.00 → 5)로 씁니다. 지도서 채점 기준처럼 앱 숫자판은 지우지 않은 답(2.10)도 맞음으로 칩니다</li>
+        <li><b>🧪 문제 예시</b> — 앱이 숫자를 바꿔 가며 끝없이 만드는 문제 중 몇 개입니다. 오답은 <b>아이가 실제로 하는 틀린 생각</b>이고, C 소수 줄기와 같은 말은 같은 이름을 써서 📊에서 한 오개념으로 모입니다 (소수점을 빼먹음 · 소수점 위치를 잘못 찍음 · 소수점 자리 수를 더하지 않음 · 분모를 10으로 봄 · 받아올림을 안 함 · 자연수 부분과 소수 부분을 따로 곱함 · 곱하지 않고 더함 · 소수점을 반대로 옮김 · 옮긴 칸 수가 틀림 · 0을 붙임 · 곱하면 항상 커진다). "소수점 위치를 잘못 찍음"(6.39 × 7을 447.3)과 "분모를 10으로 봄"(13 × 0.38을 49.4)은 5-2 익힘책 53·57쪽에 나오는 흔한 실수입니다</li>
+        <li><b>🔢 숫자판</b> — 수가 답인 ① 문제는 앱에서 숫자판(소수 칸)으로 직접 씁니다. "곱이 8보다 큰 것은 어느 것" 같은 고르기는 보기 그대로입니다</li>
+        <li><b>👨 아빠 카드</b> — 저녁 10분에 처음 소개할 때 쓰는 반 장. 동전·줄자·우유팩·모눈종이·계산기·마트 전단지처럼 집에서 실제로 할 수 있는 활동인지, 아버님 말투에 맞는지. 통과 기준의 답도 테스트가 다시 계산했습니다</li>
+        <li>확인 질문 32개는 테스트가 <b>문제 글을 따로 읽어</b> 소수 계산기로 다시 풀었고, 오답 보기 하나하나가 어느 틀린 셈에서 나왔는지(어느 수가 앞인지까지)·까닭에 그 오답 이야기가 있는지도 대조했습니다. 배움 글·까닭·아빠 카드의 <b>셈식 줄 140곳</b>도 "= …"로 이어지는 줄까지 다시 계산했습니다</li>
+      </ul>
+      <p>고칠 곳은 번호로 가리켜 주시면 됩니다. 예) <code>W3-2 설명이 길다</code>, <code>W5-1 그림이 헷갈린다</code>, <code>W7-①a 이 오답은 안 나올 것 같다</code>, <code>W1-👨함정1</code></p>
+      <label class="toggle"><input type="checkbox" id="ans" checked> 정답·오개념 이름 보이기 (끄면 진우가 보는 모양)</label>
+    </div>
+    <div class="box dadbox">
+      <h3>👨 이 줄기에서 제일 중요한 한 가지</h3>
+      <p>소수의 곱셈은 지도서가 꼽은 대로 오답이 <b>소수점 찍기</b>(소수점을 빼먹음 · 한 자리 잘못 찍음 · 자리 수를 더하지 않음)에 가장 많이 몰리고, 소수 자리 수가 늘수록 더 많아집니다. C 소수 줄기의 곱셈은 두 칸(소수 × 자연수 · 소수 × 소수)뿐이고 배움 장이 없어서, 이 줄기가 처음부터 다시 세웁니다. 진우의 실제 기록은 📊와 비공개 기록에서 보시면 됩니다.</p>
+      <p>그래서 규칙을 외우기 전에 <b>왜 그 자리에 소수점을 찍는지</b>부터 봅니다 — 0.7은 0.1이 7개라서 0.7 × 3은 0.1이 21개(W1), 소수 두 자리 수는 분모가 100인 분수(W4), 넓이 그림의 한 칸은 0.01(W5). "두 수의 소수 자리 수를 더한다"는 규칙은 이것들을 본 다음 W5·W7에서 정리합니다(2022 지도서의 "곱의 소수점 위치 찾기를 지나치게 기능적으로 접근하지 않도록").</p>
+      <p>또 하나는 <b>어림</b>입니다. 곱을 구한 다음 늘 "몇과 몇 사이"인지 어림해 소수점이 맞는지 확인하고, <b>곱하면 늘 커진다</b>는 생각(1보다 작은 수를 곱하면 작아진다)을 띠·넓이·고르기로 깨뜨립니다.</p>
+      <p>앱에서는 C 소수 바로 뒤에 놓입니다(3단계). C 줄기의 곱셈 두 칸은 그대로 둡니다.</p>
+      <p style="margin-top:10px"><b>예시 출연진</b>: 앱에서는 진우가 도감에서 잡은 포켓몬이 들어갑니다. 이 페이지는 피카츄·리자몽·개굴닌자·루카리오 등을 예시로 끼웠습니다.</p>
+    </div>
+  </div>
+
+  <section class="concept" id="W1">
+    <header class="ch-head">
+      <div class="ch-no">W1</div>
+      <div>
+        <div class="grade">초5 · 첫 개념</div>
+        <h2>(소수 한 자리 수) × (자연수)</h2>
+        <p class="idea">0.7 × 3 — 0.7은 0.1이 7개라서 0.7 × 3은 0.1이 7 × 3 = 21개 → <strong>2.1</strong>. 분수로 바꿔도 돼요: 0.7 × 3 = <span class="fr"><span class="n">7</span><span class="d">10</span></span> × 3 = <span class="fr"><span class="n">21</span><span class="d">10</span></span> = 2.1. 2.3 × 4는 23 × 4 = 92의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배라서 9.2.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="W1-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>W1-1</code></div>
+        <div class="say"><p>0.7 × 3 — 0.7을 3번 더한 것과 같아요.</p><div class="fig"><svg class="frac-fig dmul-fig" data-mode="rep" data-a="7" data-k="3" viewBox="0 0 400 134" width="500" height="168" role="img" aria-label="막대: 1을 10칸(한 칸 0.1)으로 나눈 막대 3개에 7칸씩 칠함 — 0.1이 21개"><rect class="dm-c" x="60.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="1"/><rect class="dm-c" x="92.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="1"/><rect class="dm-c" x="124.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="1"/><rect class="dm-c" x="156.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="1"/><rect class="dm-c" x="188.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="1"/><rect class="dm-c" x="220.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="1"/><rect class="dm-c" x="252.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="1"/><rect class="dm-c" x="284.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="0"/><rect class="dm-c" x="316.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="0"/><rect class="dm-c" x="348.0" y="8.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="0" data-on="0"/><text x="34.0" y="27.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-l">0.7</text><rect class="dm-c" x="60.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="1"/><rect class="dm-c" x="92.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="1"/><rect class="dm-c" x="124.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="1"/><rect class="dm-c" x="156.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="1"/><rect class="dm-c" x="188.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="1"/><rect class="dm-c" x="220.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="1"/><rect class="dm-c" x="252.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="1"/><rect class="dm-c" x="284.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="0"/><rect class="dm-c" x="316.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="0"/><rect class="dm-c" x="348.0" y="50.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="1" data-on="0"/><text x="34.0" y="69.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-l">0.7</text><rect class="dm-c" x="60.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="1"/><rect class="dm-c" x="92.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="1"/><rect class="dm-c" x="124.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="1"/><rect class="dm-c" x="156.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="1"/><rect class="dm-c" x="188.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="1"/><rect class="dm-c" x="220.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="1"/><rect class="dm-c" x="252.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="1"/><rect class="dm-c" x="284.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="0"/><rect class="dm-c" x="316.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="0"/><rect class="dm-c" x="348.0" y="92.0" width="32.0" height="28.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-r="2" data-on="0"/><text x="34.0" y="111.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-l">0.7</text></svg></div><p>0.7 + 0.7 + 0.7 = 2.1</p><p>0.7은 0.1이 7개 — 3묶음이면 0.1이 7 × 3 = 21개, 그래서 0.7 × 3 = <strong>2.1</strong>이에요.</p></div>
+        <div class="check" id="W1-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W1-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.4 × 6</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.4</span></li><li class="no"><span class="mark"></span><span class="txt">24</span></li><li class="no"><span class="mark"></span><span class="txt">6.4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.4는 0.1이 4개 — 0.1이 4 × 6 = 24개라서 2.4.<br>소수점을 빼먹으면 24 — 24는 0.1의 개수예요. 곱하지 않고 더하면 6.4.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W1-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>W1-2</code></div>
+        <div class="say"><p>소수를 분수로 바꾸어 곱할 수도 있어요. 0.7은 <span class="fr"><span class="n">7</span><span class="d">10</span></span> — 분모가 10인 분수예요.</p><p>0.7 × 3 = <span class="fr"><span class="n">7</span><span class="d">10</span></span> × 3<br>= <span class="fr"><span class="n">21</span><span class="d">10</span></span><br>= 2.1</p><p>분모가 10인 분수는 소수 한 자리 수로 나타내요.</p></div>
+        <div class="check" id="W1-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W1-2✓</code></div>
+        <div class="qt"><p>진우는 하루에 우유를 0.9 L씩 마셔요. 7일 동안 마신 우유는 모두 몇 L일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6.3</span></li><li class="no"><span class="mark"></span><span class="txt">63</span></li><li class="no"><span class="mark"></span><span class="txt">7.9</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.9 × 7 = <span class="fr"><span class="n">9</span><span class="d">10</span></span> × 7<br>= <span class="fr"><span class="n">63</span><span class="d">10</span></span> = 6.3 L.<br>소수점을 빼먹으면 63 L — 하루에 1 L도 안 마시는데 너무 많아요. 곱하지 않고 더하면 7.9.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W1-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>W1-3</code></div>
+        <div class="say"><p>2.3 × 4 — 2.3은 23의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배예요. 그래서 곱도 23 × 4의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배예요.</p><p>23 × 4 = 92<br>2.3 × 4 = 9.2</p><p><strong>자연수처럼 곱한 다음, 곱해지는 수의 소수 자리 수만큼 소수점을 찍어요.</strong></p></div>
+        <div class="check" id="W1-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W1-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>3.6 × 4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">14.4</span></li><li class="no"><span class="mark"></span><span class="txt">144</span></li><li class="no"><span class="mark"></span><span class="txt">12.24</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>36 × 4 = 144의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배 — 3.6 × 4 = 14.4.<br>소수점을 빼먹으면 144.<br>3 × 4 = 12와 6 × 4 = 24를 따로 써서 12.24로 하면 안 돼요.<br>0.6 × 4 = 2.4 — 1을 넘어서 자연수 부분으로 올라가요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W1-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>W1-4</code></div>
+        <div class="say"><p>곱을 구한 다음 어림해서 확인해요. 2.3 × 4에서 2.3은 2와 3 사이</p><p>2 × 4 = 8<br>3 × 4 = 12</p><p>곱은 8과 12 사이 — 9.2가 맞아요. 92나 0.92라면 소수점을 잘못 찍은 거예요.</p></div>
+        <div class="check" id="W1-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W1-4✓</code></div>
+        <div class="qt"><p>한 상자의 무게가 1.8 kg인 몬스터볼 상자가 5개 있어요. 상자는 모두 몇 kg일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">9</span></li><li class="no"><span class="mark"></span><span class="txt">90</span></li><li class="no"><span class="mark"></span><span class="txt">0.9</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>18 × 5 = 90의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배 — 9.0 = 9 kg. 끝자리 0은 지워요.<br>어림하면 2 × 5 = 10보다 조금 작아요 — 90은 너무 크고, 0.9는 너무 작아요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="W1-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>W1-📏</code></div><p>자연수처럼 곱한 다음 곱해지는 수의 소수 자리 수만큼 소수점을 찍고, 어림해서 확인해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="W1-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>W1-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>2.1 × 2</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">4.1</span><span class="tag">곱하지 않고 더함</span></li><li class="no"><span class="mark"></span><span class="txt">42</span><span class="tag">소수점을 빼먹음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">4.2</span></li><li class="no"><span class="mark"></span><span class="txt">0.42</span><span class="tag">소수점 위치를 잘못 찍음</span></li></ol>
+    </div><div class="sample" id="W1-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>W1-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.8 × 9</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">72</span><span class="tag">소수점을 빼먹음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">7.2</span></li><li class="no"><span class="mark"></span><span class="txt">9.8</span><span class="tag">곱하지 않고 더함</span></li><li class="no"><span class="mark"></span><span class="txt">0.72</span><span class="tag">소수점 위치를 잘못 찍음</span></li></ol>
+    </div><div class="sample" id="W1-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>W1-②</code></div>
+      <div class="say"><p>어림해서 확인해요.</p><p>리자몽이 이렇게 계산했어요.</p><p><strong>3.2 × 5 = 1.6</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3.2는 3보다 크니까 곱은 15보다 커요 — 3.2 × 5 = 16</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">소수점을 빼서 160</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">소수의 곱셈은 어림할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="W1-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>W1-👨</code></div>
+    <h3>(소수 한 자리 수) × (자연수)는 같은 소수를 여러 번 더한 것이고, 0.1이 몇 개인지 세면 소수점 자리가 정해진다는 것을 손으로 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="W1-👨말1"><code class="mini">말1</code><span>&quot;0.7이 3개면 0.1이 몇 개야?&quot;</span></li><li id="W1-👨말2"><code class="mini">말2</code><span>&quot;2.3 × 4는 23 × 4의 몇 배일까?&quot;</span></li><li id="W1-👨말3"><code class="mini">말3</code><span>&quot;답이 어디쯤일지 먼저 어림해 봐 — 2 × 4와 3 × 4 사이야?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">100원짜리 동전 하나를 0.1로 정해요(천 원짜리 한 장이 1). 0.7은 동전 7개 — 7개씩 세 번 놓으면 동전 21개, 2100원은 천 원짜리 2장과 동전 1개만큼이라 2.1이에요. 2.3 × 4는 천 원짜리 2장과 동전 3개를 네 번 놓아 세어 봐요(9.2).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="W1-👨함정1"><code class="mini">함정1</code><div><div class="kid">0.7 × 3 = 21 — 소수점을 빼먹는다</div><div class="dadsay">→ &quot;0.7이 3개인데 21? 1이 3개여도 3인데.&quot;</div></div></li><li id="W1-👨함정2"><code class="mini">함정2</code><div><div class="kid">2.3 × 4를 2 × 4 = 8, 3 × 4 = 12로 따로 해서 8.12라고 쓴다</div><div class="dadsay">→ &quot;0.3 × 4 = 1.2 — 1이 넘으면 자연수 부분으로 올라가. 23 × 4부터 해 봐.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">0.6 × 7, 2.4 × 3 — 두 곱셈을 하고(4.2 · 7.2), 0.1이 몇 개인지로 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="W2">
+    <header class="ch-head">
+      <div class="ch-no">W2</div>
+      <div>
+        <div class="grade">초5 · W1 다음</div>
+        <h2>(소수 두 자리 수) × (자연수)</h2>
+        <p class="idea">0.46 × 7 — 0.46은 0.01이 46개라서 0.01이 46 × 7 = 322개 → <strong>3.22</strong>. 1.27 × 5는 1.27을 5번 더한 것과 같아요 — 127 × 5 = 635의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배라서 6.35.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="W2-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>W2-1</code></div>
+        <div class="say"><p>0.46 × 7 — 0.46은 0.01이 46개예요.</p><p>46 × 7 = 322</p><p>0.01이 322개 — 그래서 0.46 × 7 = <strong>3.22</strong>. 소수 두 자리 수를 곱했으니 곱도 소수 두 자리예요.</p></div>
+        <div class="check" id="W2-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W2-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.35 × 6</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.1</span></li><li class="no"><span class="mark"></span><span class="txt">21</span></li><li class="no"><span class="mark"></span><span class="txt">210</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>35 × 6 = 210 — 0.01이 210개라서 2.10, 끝자리 0을 지우면 2.1.<br>소수점을 빼먹으면 210, 한 자리만 옮기면 21 — 0.35는 1보다 작으니 곱은 6보다 작아야 해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W2-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>W2-2</code></div>
+        <div class="say"><p>1.27 × 5 — 1.27을 5번 더한 것과 같아요.</p><p>1.27 + 1.27 + 1.27 + 1.27 + 1.27 = 6.35</p><p>곱셈으로는 127 × 5 = 635, 1.27은 127의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배라서 곱도 635의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 6.35.</p></div>
+        <div class="check" id="W2-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W2-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>2.14 × 3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6.42</span></li><li class="no"><span class="mark"></span><span class="txt">642</span></li><li class="no"><span class="mark"></span><span class="txt">6.32</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>214 × 3 = 642의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 6.42.<br>소수점을 빼먹으면 642. 4 × 3 = 12에서 받아올린 1을 빠뜨리면 632 — 6.32가 돼요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W2-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>W2-3</code></div>
+        <div class="say"><p>자연수 부분과 소수 부분을 따로 곱하면 안 돼요. 1.27 × 5에서</p><p>0.27 × 5 = 1.35</p><p>소수 부분의 곱이 1을 넘어서 자연수 부분으로 올라가요. 1 × 5 = 5에 1.35를 더하면 6.35 — 5.135가 아니에요.</p></div>
+        <div class="check" id="W2-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W2-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>2.35 × 3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7.05</span></li><li class="no"><span class="mark"></span><span class="txt">6.105</span></li><li class="no"><span class="mark"></span><span class="txt">70.5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>235 × 3 = 705 — 소수 두 자리로 7.05.<br>2 × 3 = 6과 35 × 3 = 105를 이어 쓰면 6.105 — 안 돼요.<br>0.35 × 3 = 1.05 — 1을 넘어요. 소수점을 한 자리만 옮기면 70.5.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W2-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>W2-4</code></div>
+        <div class="say"><p>곱의 소수점을 어림으로 확인해요. 6.39 × 7을 447.3이라고 쓰면 — 6.39는 6과 7 사이라서</p><p>6 × 7 = 42<br>7 × 7 = 49</p><p>곱은 42와 49 사이예요. 639 × 7 = 4473이니까 <strong>44.73</strong>이 맞아요.</p></div>
+        <div class="check" id="W2-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W2-4✓</code></div>
+        <div class="qt"><p>진우는 날마다 2.48 km씩 달려요. 5일 동안 달린 거리는 모두 몇 km일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">12.4</span></li><li class="no"><span class="mark"></span><span class="txt">124</span></li><li class="no"><span class="mark"></span><span class="txt">1.24</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>248 × 5 = 1240의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 12.40 = 12.4 km.<br>어림하면 2 × 5 = 10과 3 × 5 = 15 사이예요. 124는 너무 크고, 1.24는 너무 작아요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="W2-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>W2-📏</code></div><p>자연수처럼 곱한 다음 소수 두 자리로 — 소수 부분의 곱이 1을 넘으면 자연수 부분으로 올라가요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="W2-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>W2-①a</code></div>
+      <div class="say"><p>진우는 날마다 2.85 km씩 달려요. 3일 동안 달린 거리는 모두 몇 km일까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8.55</span></li><li class="no"><span class="mark"></span><span class="txt">6.255</span><span class="tag">자연수 부분과 소수 부분을 따로 곱함</span></li><li class="no"><span class="mark"></span><span class="txt">855</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">85.5</span><span class="tag">소수점 위치를 잘못 찍음</span></li></ol>
+    </div><div class="sample" id="W2-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>W2-①b</code></div>
+      <div class="say"><p>진우는 날마다 6.59 km씩 달려요. 8일 동안 달린 거리는 모두 몇 km일까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">52.72</span></li><li class="no"><span class="mark"></span><span class="txt">5272</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">527.2</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">48.472</span><span class="tag">자연수 부분과 소수 부분을 따로 곱함</span></li></ol>
+    </div><div class="sample" id="W2-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>W2-②</code></div>
+      <div class="say"><p>피카츄가 이렇게 계산했어요.</p><p><strong>2.91 × 9 = 18.819</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">자연수 부분과 소수 부분을 따로 곱하면 안 돼요 — 2.91 × 9 = 26.19</span></li><li class="no"><span class="mark"></span><span class="txt">소수 두 자리 수는 자연수와 곱할 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">소수점을 한 자리만 옮겨 261.9</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="W2-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>W2-👨</code></div>
+    <h3>(소수 두 자리 수) × (자연수)에서 0.01이 몇 개인지로 소수점 자리를 정하고, 자연수 부분과 소수 부분을 따로 곱하지 않으며, 어림으로 곱의 크기를 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="W2-👨말1"><code class="mini">말1</code><span>&quot;0.46은 0.01이 몇 개지? 7번이면?&quot;</span></li><li id="W2-👨말2"><code class="mini">말2</code><span>&quot;1.27 × 5 — 0.27 × 5가 1을 넘을까?&quot;</span></li><li id="W2-👨말3"><code class="mini">말3</code><span>&quot;6.39 × 7은 6 × 7과 7 × 7 사이 어디쯤일까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">줄자로 해 봐요. 1 cm가 0.01 m — 끈을 46 cm씩 7번 이어 재면 322 cm, 곧 3.22 m. 1.27 m짜리 끈을 5번 이으면 몇 m일지 어림한 다음 재어 확인해요(6.35 m).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="W2-👨함정1"><code class="mini">함정1</code><div><div class="kid">0.46 × 7 = 32.2 — 곱을 소수 한 자리로 찍는다</div><div class="dadsay">→ &quot;0.46은 0.01이 46개야. 0.01이 322개면?&quot;</div></div></li><li id="W2-👨함정2"><code class="mini">함정2</code><div><div class="kid">1.27 × 5 = 5.135 — 1 × 5와 27 × 5를 따로 곱해 이어 쓴다</div><div class="dadsay">→ &quot;0.27 × 5 = 1.35 — 1이 넘었지? 그 1은 자연수 부분으로 가.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">1.25 × 4, 0.38 × 6 — 두 곱셈을 하고(5 · 2.28), 어림으로 곱의 크기를 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="W3">
+    <header class="ch-head">
+      <div class="ch-no">W3</div>
+      <div>
+        <div class="grade">초5 · W2 다음</div>
+        <h2>(자연수) × (소수 한 자리 수)</h2>
+        <p class="idea">2 × 0.9 — 2의 0.9배는 2를 똑같이 10묶음으로 나눈 것 중 9묶음이에요. 한 칸이 0.1이면 18칸 → <strong>1.8</strong>. 1보다 작은 수를 곱하면 처음 수보다 작아져요. 곱하는 순서를 바꿔도 곱은 같아요 — 4 × 3.2 = 3.2 × 4 = 12.8.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="W3-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>W3-1</code></div>
+        <div class="say"><p>2 × 0.9 — 2의 0.9배예요. 2만큼의 띠를 똑같이 10묶음으로 나눈 것 중 9묶음이에요.</p><div class="fig"><svg class="frac-fig dmul-fig" data-mode="band" data-big="2" data-a="9" viewBox="0 0 400 98" width="500" height="123" role="img" aria-label="띠: 2만큼의 띠(한 칸 0.1, 20칸)를 똑같이 10묶음으로 나눠 9묶음을 칠함 — 18칸"><rect class="dm-c" x="30.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="1"/><rect class="dm-c" x="47.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="0" data-on="1"/><rect class="dm-c" x="64.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><rect class="dm-c" x="81.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="1" data-on="1"/><rect class="dm-c" x="98.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><rect class="dm-c" x="115.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="2" data-on="1"/><rect class="dm-c" x="132.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><rect class="dm-c" x="149.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="3" data-on="1"/><rect class="dm-c" x="166.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4" data-on="1"/><rect class="dm-c" x="183.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="4" data-on="1"/><rect class="dm-c" x="200.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="5" data-on="1"/><rect class="dm-c" x="217.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="5" data-on="1"/><rect class="dm-c" x="234.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="6" data-on="1"/><rect class="dm-c" x="251.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="6" data-on="1"/><rect class="dm-c" x="268.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="7" data-on="1"/><rect class="dm-c" x="285.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="7" data-on="1"/><rect class="dm-c" x="302.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="8" data-on="1"/><rect class="dm-c" x="319.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="8" data-on="1"/><rect class="dm-c" x="336.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="9" data-on="0"/><rect class="dm-c" x="353.0" y="34.0" width="17.0" height="34.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-g="9" data-on="0"/><line class="dm-b" x1="30.0" y1="30" x2="30.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="64.0" y1="30" x2="64.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="98.0" y1="30" x2="98.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="132.0" y1="30" x2="132.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="166.0" y1="30" x2="166.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="200.0" y1="30" x2="200.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="234.0" y1="30" x2="234.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="268.0" y1="30" x2="268.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="302.0" y1="30" x2="302.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="336.0" y1="30" x2="336.0" y2="72" stroke="currentColor" stroke-width="2.2"/><line class="dm-b" x1="370.0" y1="30" x2="370.0" y2="72" stroke="currentColor" stroke-width="2.2"/><text x="30.0" y="90.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-t">0</text><text x="200.0" y="90.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-t">1</text><text x="370.0" y="90.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-t">2</text><path d="M30 28 L30 20 L336.0 20 L336.0 28" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="183.0" y="14.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-a">0.9배</text></svg></div><p>한 칸이 0.1 — 칠한 칸이 2 × 9 = 18칸이라서 2 × 0.9 = <strong>1.8</strong>.</p></div>
+        <div class="check" id="W3-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W3-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>3 × 0.4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1.2</span></li><li class="no"><span class="mark"></span><span class="txt">12</span></li><li class="no"><span class="mark"></span><span class="txt">3.4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3 × 4 = 12 — 0.1이 12칸이라서 1.2. 3의 0.4배라서 3보다 작아요.<br>소수점을 빼먹으면 12, 곱하지 않고 더하면 3.4 — 둘 다 3보다 커요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W3-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>W3-2</code></div>
+        <div class="say"><p><strong>1보다 작은 수를 곱하면 처음 수보다 작아져요.</strong></p><p>5 × 0.6 = 3<br>5 × 1 = 5<br>5 × 1.4 = 7</p><p>0.6은 1보다 작아서 곱 3이 5보다 작고, 1.4는 1보다 커서 곱 7이 5보다 커요.</p></div>
+        <div class="check" id="W3-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W3-2✓</code></div>
+        <div class="qt"><p>계산하지 않고 고르려고 해요. 곱이 6보다 큰 것은 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">6 × 1.3</span></li><li class="no"><span class="mark"></span><span class="txt">6 × 0.8</span></li><li class="no"><span class="mark"></span><span class="txt">6 × 0.5</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1.3은 1보다 커서 6 × 1.3 = 7.8 — 6보다 커요.<br>6 × 0.8 = 4.8, 6 × 0.5 = 3 — 1보다 작은 수를 곱하면 6보다 작아져요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W3-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>W3-3</code></div>
+        <div class="say"><p>4 × 3.2 — 곱하는 순서를 바꿔도 곱은 같아요. 3.2 × 4로 생각해도 돼요.</p><p>4 × 32 = 128<br>4 × 3.2 = 12.8</p><p>어림하면 4 × 3 = 12보다 조금 커요 — 12.8이 맞아요.</p></div>
+        <div class="check" id="W3-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W3-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>6 × 2.7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">16.2</span></li><li class="no"><span class="mark"></span><span class="txt">162</span></li><li class="no"><span class="mark"></span><span class="txt">12.42</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>6 × 27 = 162의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배 — 16.2.<br>소수점을 빼먹으면 162.<br>6 × 2 = 12와 6 × 7 = 42를 따로 이어 쓰면 12.42.<br>6 × 0.7 = 4.2 — 1을 넘어서 자연수 부분으로 올라가요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W3-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>W3-4</code></div>
+        <div class="say"><p>분수로 바꾸어 곱해도 같아요. 3.2는 <span class="fr"><span class="n">32</span><span class="d">10</span></span> — 분모가 10인 분수예요.</p><p>4 × 3.2 = 4 × <span class="fr"><span class="n">32</span><span class="d">10</span></span><br>= <span class="fr"><span class="n">128</span><span class="d">10</span></span><br>= 12.8</p></div>
+        <div class="check" id="W3-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W3-4✓</code></div>
+        <div class="qt"><p>한 바퀴가 3 km인 산책길을 2.5바퀴 걸었어요. 걸은 거리는 모두 몇 km일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7.5</span></li><li class="no"><span class="mark"></span><span class="txt">75</span></li><li class="no"><span class="mark"></span><span class="txt">6.15</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3 × 2.5 = 3 × <span class="fr"><span class="n">25</span><span class="d">10</span></span><br>= <span class="fr"><span class="n">75</span><span class="d">10</span></span> = 7.5 km.<br>소수점을 빼먹으면 75.<br>3 × 2 = 6과 3 × 5 = 15를 이어 쓰면 6.15.<br>3 × 0.5 = 1.5 — 1을 넘어요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="W3-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>W3-📏</code></div><p>자연수처럼 곱한 다음 소수 한 자리로 — 1보다 작은 수를 곱하면 처음 수보다 작아져요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="W3-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>W3-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>3 × 5.7</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">1.71</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">15.21</span><span class="tag">자연수 부분과 소수 부분을 따로 곱함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">17.1</span></li><li class="no"><span class="mark"></span><span class="txt">171</span><span class="tag">소수점을 빼먹음</span></li></ol>
+    </div><div class="sample" id="W3-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>W3-①b</code></div>
+      <div class="say"><p>리자몽은 9 m 리본의 0.7배만큼을 썼어요. 쓴 리본은 몇 m일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">63</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">0.63</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">9.7</span><span class="tag">곱하지 않고 더함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">6.3</span></li></ol>
+    </div><div class="sample" id="W3-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>W3-②</code></div>
+      <div class="say"><p>어림해서 확인해요.</p><p>개굴닌자가 이렇게 계산했어요.</p><p><strong>3 × 3.5 = 1.05</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">소수점을 빼서 105</span><span class="tag">소수점을 빼먹음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">3.5는 3보다 크니까 곱은 9보다 커요 — 3 × 3.5 = 10.5</span></li><li class="no"><span class="mark"></span><span class="txt">자연수에 소수를 곱할 수는 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="W3-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>W3-👨</code></div>
+    <h3>(자연수) × (소수 한 자리 수)를 &quot;2의 0.9배&quot;처럼 읽고, 1보다 작은 수를 곱하면 처음 수보다 작아지고 1보다 큰 수를 곱하면 커진다는 것을 띠로 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="W3-👨말1"><code class="mini">말1</code><span>&quot;2의 0.9배는 2보다 클까, 작을까?&quot;</span></li><li id="W3-👨말2"><code class="mini">말2</code><span>&quot;2 m 끈을 똑같이 10묶음으로 나누면 한 묶음은 몇 m야?&quot;</span></li><li id="W3-👨말3"><code class="mini">말3</code><span>&quot;4 × 3.2와 3.2 × 4는 같을까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">2 m 끈을 줄자로 재어 20 cm씩 10묶음으로 표시해요. 그중 9묶음만큼을 잘라 재면 180 cm, 곧 1.8 m — 2 × 0.9 = 1.8이에요. 1.4배라면 2 m 끈 하나로는 모자라요 — 2 × 1.4 = 2.8.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="W3-👨함정1"><code class="mini">함정1</code><div><div class="kid">2 × 0.9 = 18 — 소수점을 빼먹는다</div><div class="dadsay">→ &quot;2의 0.9배는 2보다 작아야 해. 18은 2보다 훨씬 크지?&quot;</div></div></li><li id="W3-👨함정2"><code class="mini">함정2</code><div><div class="kid">6 × 2.7 = 12.42 — 6 × 2와 6 × 7을 따로 곱해 이어 쓴다</div><div class="dadsay">→ &quot;6 × 0.7 = 4.2 — 1이 넘었어. 6 × 27을 먼저 해 봐.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">5 × 0.8, 3 × 4.6 — 두 곱셈을 하고(4 · 13.8), 5 × 0.8이 5보다 작은 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="W4">
+    <header class="ch-head">
+      <div class="ch-no">W4</div>
+      <div>
+        <div class="grade">초5 · W3 다음</div>
+        <h2>(자연수) × (소수 두 자리 수)</h2>
+        <p class="idea">6 × 0.64 — 0.64는 64의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배라서 6 × 64 = 384의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 → <strong>3.84</strong>. 분수로 바꾸면 0.64 = <span class="fr"><span class="n">64</span><span class="d">100</span></span> — 분모가 100이에요(10이 아니에요). 3 × 3.16 = 9.48.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="W4-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>W4-1</code></div>
+        <div class="say"><p>6 × 0.64 — 0.64는 64의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배예요. 그래서 곱도 6 × 64의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배예요.</p><p>6 × 64 = 384<br>6 × 0.64 = 3.84</p><p>어림하면 6의 0.64배는 6의 반(3)보다 조금 커요 — 3.84가 맞아요.</p></div>
+        <div class="check" id="W4-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W4-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>7 × 0.36</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">2.52</span></li><li class="no"><span class="mark"></span><span class="txt">25.2</span></li><li class="no"><span class="mark"></span><span class="txt">7.36</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>7 × 36 = 252의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 2.52.<br>0.36을 분모가 10인 분수로 보면 25.2 — 0.36은 1보다 작으니 곱은 7보다 작아야 해요. 곱하지 않고 더하면 7.36.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W4-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>W4-2</code></div>
+        <div class="say"><p><strong>소수 두 자리 수는 분모가 100인 분수예요.</strong> 0.64는 <span class="fr"><span class="n">64</span><span class="d">100</span></span> — 분모가 10이 아니라 100이에요.</p><p>6 × 0.64 = 6 × <span class="fr"><span class="n">64</span><span class="d">100</span></span><br>= <span class="fr"><span class="n">384</span><span class="d">100</span></span><br>= 3.84</p><p>분모를 10으로 보면 38.4 — 6보다 커져 버려요.</p></div>
+        <div class="check" id="W4-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W4-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>12 × 0.45</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5.4</span></li><li class="no"><span class="mark"></span><span class="txt">54</span></li><li class="no"><span class="mark"></span><span class="txt">540</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>12 × 45 = 540의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 5.40 = 5.4.<br>0.45를 분모가 10인 분수로 보면 54, 소수점을 빼먹으면 540 — 0.45는 1보다 작으니 곱은 12보다 작아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W4-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>W4-3</code></div>
+        <div class="say"><p>3 × 3.16 — 3.16은 316의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배예요.</p><p>3 × 316 = 948<br>3 × 3.16 = 9.48</p><p>어림하면 3 × 3 = 9보다 조금 커요.</p></div>
+        <div class="check" id="W4-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W4-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>4 × 1.25</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5</span></li><li class="no"><span class="mark"></span><span class="txt">500</span></li><li class="no"><span class="mark"></span><span class="txt">50</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>4 × 125 = 500의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 5.00 = 5.<br>소수점을 빼먹으면 500, 분모를 10으로 보면 50 — 어림하면 4 × 1 = 4보다 조금 커야 해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W4-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>W4-4</code></div>
+        <div class="say"><p>13 × 0.38을 49.4라고 쓰면 — 0.38은 1보다 작으니 곱은 13보다 작아야 해요.</p><p>13 × 38 = 494<br>13 × 0.38 = 4.94</p><p>0.38을 분모가 10인 분수로 보면 곱이 10배 커져요.</p></div>
+        <div class="check" id="W4-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W4-4✓</code></div>
+        <div class="qt"><p>루카리오는 무게가 15 kg인 나무열매 바구니의 0.24배만큼을 먹었어요. 먹은 나무열매는 몇 kg일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3.6</span></li><li class="no"><span class="mark"></span><span class="txt">36</span></li><li class="no"><span class="mark"></span><span class="txt">360</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>15 × 24 = 360의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 3.60 = 3.6 kg.<br>0.24를 분모가 10인 분수로 보면 36, 소수점을 빼먹으면 360 — 바구니 15 kg보다 많이 먹을 수는 없어요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="W4-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>W4-📏</code></div><p>자연수처럼 곱한 다음 소수 두 자리로 — 소수 두 자리 수는 분모가 100인 분수예요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="W4-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>W4-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>2 × 0.88</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">0.176</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">176</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">17.6</span><span class="tag">분모를 10으로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">1.76</span></li></ol>
+    </div><div class="sample" id="W4-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>W4-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>9 × 2.76</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">2484</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">2.484</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">24.84</span></li><li class="no"><span class="mark"></span><span class="txt">248.4</span><span class="tag">분모를 10으로 봄</span></li></ol>
+    </div><div class="sample" id="W4-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>W4-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 계산했어요.</p><p><strong>8 × 0.05 = 40</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">분모를 10으로 봐서 4</span><span class="tag">분모를 10으로 봄</span></li><li class="ok"><span class="mark">✔</span><span class="txt">소수점을 찍어요 — 8 × 0.05 = 0.4</span></li><li class="no"><span class="mark"></span><span class="txt">자연수와 소수 두 자리 수는 곱할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="W4-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>W4-👨</code></div>
+    <h3>(자연수) × (소수 두 자리 수)에서 소수 두 자리 수가 분모 100인 분수라는 것을 알고, 곱이 처음 수보다 작은지 큰지 어림으로 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="W4-👨말1"><code class="mini">말1</code><span>&quot;0.64는 분모가 10인 분수야, 100인 분수야?&quot;</span></li><li id="W4-👨말2"><code class="mini">말2</code><span>&quot;6의 0.64배는 6의 반보다 클까?&quot;</span></li><li id="W4-👨말3"><code class="mini">말3</code><span>&quot;곱이 처음 수보다 커졌다면 곱한 수가 1보다 커야 해 — 그래?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">냉장고의 250 mL 우유로 해 봐요. 1000 mL가 1 L — 250 mL 우유 한 개는 0.25 L. 우유 12개면 12 × 0.25 = 3, 모두 3 L. 우유 4개를 1 L 물병에 부으면 딱 차요 — 4 × 0.25 = 1.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="W4-👨함정1"><code class="mini">함정1</code><div><div class="kid">13 × 0.38 = 49.4 — 0.38을 분모가 10인 분수로 본다</div><div class="dadsay">→ &quot;0.38은 1보다 작아. 13보다 큰 49.4가 될 수 있을까?&quot;</div></div></li><li id="W4-👨함정2"><code class="mini">함정2</code><div><div class="kid">6 × 0.64 = 384 — 소수점을 빼먹는다</div><div class="dadsay">→ &quot;0.64는 1보다 작으니 곱은 6보다 작아. 384의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배는?&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">5 × 0.72, 3 × 2.15 — 두 곱셈을 하고(3.6 · 6.45), 0.72가 분모 몇인 분수인지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="W5">
+    <header class="ch-head">
+      <div class="ch-no">W5</div>
+      <div>
+        <div class="grade">초5 · W4 다음</div>
+        <h2>(소수 한 자리 수) × (소수 한 자리 수)</h2>
+        <p class="idea">0.4 × 0.8 — 1 m² 정사각형을 가로·세로 10칸씩(한 칸 0.01 m²)으로 나눠 가로 4칸, 세로 8칸을 칠하면 두 번 칠한 칸이 32개 → <strong>0.32</strong>. 분수로는 <span class="fr"><span class="n">4</span><span class="d">10</span></span> × <span class="fr"><span class="n">8</span><span class="d">10</span></span> = <span class="fr"><span class="n">32</span><span class="d">100</span></span> = 0.32. 0.1 × 0.1 = 0.01 — 소수 한 자리 수끼리 곱하면 소수 두 자리 수예요. 1.9 × 2.8 = 5.32.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="W5-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>W5-1</code></div>
+        <div class="say"><p>0.4 × 0.8 — 가로 0.4 m, 세로 0.8 m인 직사각형의 넓이예요. 1 m² 정사각형을 가로·세로 10칸씩, 100칸으로 나누면 한 칸은 0.01 m².</p><div class="fig"><svg class="frac-fig dmul-fig" data-mode="area" data-a="4" data-b="8" viewBox="0 0 400 264" width="500" height="330" role="img" aria-label="넓이 그림: 1을 가로 10칸·세로 10칸(한 칸 0.01)으로 나눠 가로 4칸, 세로 8칸을 칠함 — 두 번 칠한 칸 32개"><rect class="dm-c" x="120.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="0" data-on="1"/><rect class="dm-c" x="142.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="0" data-on="1"/><rect class="dm-c" x="164.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="0" data-on="1"/><rect class="dm-c" x="186.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="0" data-on="1"/><rect class="dm-c" x="208.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="0" data-on="0"/><rect class="dm-c" x="230.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="0" data-on="0"/><rect class="dm-c" x="252.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="0" data-on="0"/><rect class="dm-c" x="274.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="0" data-on="0"/><rect class="dm-c" x="296.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="0" data-on="0"/><rect class="dm-c" x="318.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="0" data-on="0"/><rect class="dm-c" x="120.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="1" data-on="1"/><rect class="dm-c" x="142.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="1" data-on="1"/><rect class="dm-c" x="164.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="1" data-on="1"/><rect class="dm-c" x="186.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="1" data-on="1"/><rect class="dm-c" x="208.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="1" data-on="0"/><rect class="dm-c" x="230.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="1" data-on="0"/><rect class="dm-c" x="252.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="1" data-on="0"/><rect class="dm-c" x="274.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="1" data-on="0"/><rect class="dm-c" x="296.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="1" data-on="0"/><rect class="dm-c" x="318.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="1" data-on="0"/><rect class="dm-c" x="120.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="2" data-on="1"/><rect class="dm-c" x="142.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="2" data-on="1"/><rect class="dm-c" x="164.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="2" data-on="1"/><rect class="dm-c" x="186.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="2" data-on="1"/><rect class="dm-c" x="208.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="2" data-on="0"/><rect class="dm-c" x="230.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="2" data-on="0"/><rect class="dm-c" x="252.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="2" data-on="0"/><rect class="dm-c" x="274.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="2" data-on="0"/><rect class="dm-c" x="296.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="2" data-on="0"/><rect class="dm-c" x="318.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="2" data-on="0"/><rect class="dm-c" x="120.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="3" data-on="1"/><rect class="dm-c" x="142.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="3" data-on="1"/><rect class="dm-c" x="164.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="3" data-on="1"/><rect class="dm-c" x="186.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="3" data-on="1"/><rect class="dm-c" x="208.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="3" data-on="0"/><rect class="dm-c" x="230.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="3" data-on="0"/><rect class="dm-c" x="252.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="3" data-on="0"/><rect class="dm-c" x="274.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="3" data-on="0"/><rect class="dm-c" x="296.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="3" data-on="0"/><rect class="dm-c" x="318.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="3" data-on="0"/><rect class="dm-c" x="120.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="4" data-on="1"/><rect class="dm-c" x="142.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="4" data-on="1"/><rect class="dm-c" x="164.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="4" data-on="1"/><rect class="dm-c" x="186.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="4" data-on="1"/><rect class="dm-c" x="208.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="4" data-on="0"/><rect class="dm-c" x="230.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="4" data-on="0"/><rect class="dm-c" x="252.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="4" data-on="0"/><rect class="dm-c" x="274.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="4" data-on="0"/><rect class="dm-c" x="296.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="4" data-on="0"/><rect class="dm-c" x="318.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="4" data-on="0"/><rect class="dm-c" x="120.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="5" data-on="1"/><rect class="dm-c" x="142.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="5" data-on="1"/><rect class="dm-c" x="164.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="5" data-on="1"/><rect class="dm-c" x="186.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="5" data-on="1"/><rect class="dm-c" x="208.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="5" data-on="0"/><rect class="dm-c" x="230.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="5" data-on="0"/><rect class="dm-c" x="252.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="5" data-on="0"/><rect class="dm-c" x="274.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="5" data-on="0"/><rect class="dm-c" x="296.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="5" data-on="0"/><rect class="dm-c" x="318.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="5" data-on="0"/><rect class="dm-c" x="120.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="6" data-on="1"/><rect class="dm-c" x="142.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="6" data-on="1"/><rect class="dm-c" x="164.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="6" data-on="1"/><rect class="dm-c" x="186.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="6" data-on="1"/><rect class="dm-c" x="208.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="6" data-on="0"/><rect class="dm-c" x="230.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="6" data-on="0"/><rect class="dm-c" x="252.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="6" data-on="0"/><rect class="dm-c" x="274.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="6" data-on="0"/><rect class="dm-c" x="296.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="6" data-on="0"/><rect class="dm-c" x="318.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="6" data-on="0"/><rect class="dm-c" x="120.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="7" data-on="1"/><rect class="dm-c" x="142.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="7" data-on="1"/><rect class="dm-c" x="164.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="7" data-on="1"/><rect class="dm-c" x="186.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="7" data-on="1"/><rect class="dm-c" x="208.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="7" data-on="0"/><rect class="dm-c" x="230.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="7" data-on="0"/><rect class="dm-c" x="252.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="7" data-on="0"/><rect class="dm-c" x="274.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="7" data-on="0"/><rect class="dm-c" x="296.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="7" data-on="0"/><rect class="dm-c" x="318.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="7" data-on="0"/><rect class="dm-c" x="120.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="8" data-on="0"/><rect class="dm-c" x="142.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="8" data-on="0"/><rect class="dm-c" x="164.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="8" data-on="0"/><rect class="dm-c" x="186.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="8" data-on="0"/><rect class="dm-c" x="208.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="4" data-y="8" data-on="0"/><rect class="dm-c" x="230.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="8" data-on="0"/><rect class="dm-c" x="252.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="8" data-on="0"/><rect class="dm-c" x="274.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="8" data-on="0"/><rect class="dm-c" x="296.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="8" data-on="0"/><rect class="dm-c" x="318.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="8" data-on="0"/><rect class="dm-c" x="120.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="9" data-on="0"/><rect class="dm-c" x="142.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="9" data-on="0"/><rect class="dm-c" x="164.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="9" data-on="0"/><rect class="dm-c" x="186.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="9" data-on="0"/><rect class="dm-c" x="208.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="4" data-y="9" data-on="0"/><rect class="dm-c" x="230.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="9" data-on="0"/><rect class="dm-c" x="252.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="9" data-on="0"/><rect class="dm-c" x="274.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="9" data-on="0"/><rect class="dm-c" x="296.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="9" data-on="0"/><rect class="dm-c" x="318.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="9" data-on="0"/><rect x="120" y="34" width="220" height="220" fill="none" stroke="currentColor" stroke-width="2"/><path d="M120 30 L120 22 L208.0 22 L208.0 30" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="164.0" y="18.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-a">0.4</text><path d="M116 34 L108 34 L108 210.0 L116 210.0" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="80.0" y="127.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-b">0.8</text></svg></div><p>진하게 두 번 칠한 칸이 4 × 8 = 32개 — 0.4 × 0.8 = <strong>0.32</strong>.</p></div>
+        <div class="check" id="W5-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W5-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.6 × 0.7</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.42</span></li><li class="no"><span class="mark"></span><span class="txt">4.2</span></li><li class="no"><span class="mark"></span><span class="txt">1.3</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>6 × 7 = 42 — 한 칸 0.01이 42개라서 0.42.<br>소수 한 자리로 찍으면 4.2 — 1보다 작은 두 수를 곱했는데 4.2는 두 수보다 커요. 더하면 1.3.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W5-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>W5-2</code></div>
+        <div class="say"><p>분수로 바꾸어 곱해도 같아요.</p><p>0.4 × 0.8 = <span class="fr"><span class="n">4</span><span class="d">10</span></span> × <span class="fr"><span class="n">8</span><span class="d">10</span></span><br>= <span class="fr"><span class="n">32</span><span class="d">100</span></span><br>= 0.32</p><p>0.1 × 0.1 = 0.01 — <strong>소수 한 자리 수끼리 곱하면 소수 두 자리 수예요.</strong></p></div>
+        <div class="check" id="W5-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W5-2✓</code></div>
+        <div class="qt"><p>가로가 0.9 m, 세로가 0.5 m인 직사각형 모양 꽃밭이 있어요. 꽃밭의 넓이는 몇 m²일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.45</span></li><li class="no"><span class="mark"></span><span class="txt">4.5</span></li><li class="no"><span class="mark"></span><span class="txt">1.4</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.9 × 0.5 = <span class="fr"><span class="n">9</span><span class="d">10</span></span> × <span class="fr"><span class="n">5</span><span class="d">10</span></span><br>= <span class="fr"><span class="n">45</span><span class="d">100</span></span> = 0.45 m².<br>소수 한 자리로 찍으면 4.5 — 1 m²보다 작은 꽃밭인데 너무 커요. 더하면 1.4 — 넓이는 가로와 세로를 곱해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W5-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>W5-3</code></div>
+        <div class="say"><p>1.9 × 2.8 — 1.9는 19의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배, 2.8은 28의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배라서 곱은 19 × 28의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배예요.</p><p>19 × 28 = 532<br>1.9 × 2.8 = 5.32</p><p>어림하면 2 × 3 = 6보다 조금 작아요 — 5.32가 맞아요.</p></div>
+        <div class="check" id="W5-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W5-3✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>2.3 × 1.4</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3.22</span></li><li class="no"><span class="mark"></span><span class="txt">32.2</span></li><li class="no"><span class="mark"></span><span class="txt">2.12</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>23 × 14 = 322의 <span class="fr"><span class="n">1</span><span class="d">100</span></span>배 — 3.22.<br>소수 한 자리로 찍으면 32.2.<br>2 × 1 = 2와 3 × 4 = 12를 따로 이어 쓰면 2.12.<br>어림하면 2 × 1.4 = 2.8보다 커야 해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W5-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>W5-4</code></div>
+        <div class="say"><p>1보다 작은 두 수를 곱하면 곱은 두 수보다 작아요. 0.4 × 0.8 = 0.32는 0.4보다도, 0.8보다도 작아요.</p><p>0.4의 0.8배 → 0.4보다 작아요<br>0.8의 0.4배 → 0.8보다 작아요</p></div>
+        <div class="check" id="W5-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W5-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.5 × 0.3</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.15</span></li><li class="no"><span class="mark"></span><span class="txt">1.5</span></li><li class="no"><span class="mark"></span><span class="txt">0.015</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>5 × 3 = 15 — 소수 두 자리로 0.15.<br>소수 한 자리로 찍으면 1.5 — 1보다 작은 두 수의 곱이 1보다 커질 수는 없어요. 소수점을 한 자리 더 옮기면 0.015 — 자리 수를 더하면 1 + 1 = 2자리예요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="W5-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>W5-📏</code></div><p>자연수처럼 곱한 다음 소수 두 자리로 — 두 수의 소수 자리 수를 더해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="W5-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>W5-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.3 × 0.3</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">0.9</span><span class="tag">소수점 자리 수를 더하지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">9</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">0.6</span><span class="tag">곱하지 않고 더함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">0.09</span></li></ol>
+    </div><div class="sample" id="W5-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>W5-①b</code></div>
+      <div class="say"><p>가로가 0.4 m, 세로가 0.2 m인 직사각형 모양 꽃밭이 있어요. 꽃밭의 넓이는 몇 m²일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">0.8</span><span class="tag">소수점 자리 수를 더하지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">8</span><span class="tag">소수점을 빼먹음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">0.08</span></li><li class="no"><span class="mark"></span><span class="txt">0.6</span><span class="tag">곱하지 않고 더함</span></li></ol>
+    </div><div class="sample" id="W5-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>W5-②</code></div>
+      <div class="say"><p>그림을 보고 곱셈을 계산해요.</p><div class="fig"><svg class="frac-fig dmul-fig" data-mode="area" data-a="5" data-b="2" viewBox="0 0 400 264" width="500" height="330" role="img" aria-label="넓이 그림: 1을 가로 10칸·세로 10칸(한 칸 0.01)으로 나눠 가로 5칸, 세로 2칸을 칠함 — 두 번 칠한 칸 10개"><rect class="dm-c" x="120.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="0" data-on="1"/><rect class="dm-c" x="142.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="0" data-on="1"/><rect class="dm-c" x="164.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="0" data-on="1"/><rect class="dm-c" x="186.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="0" data-on="1"/><rect class="dm-c" x="208.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="4" data-y="0" data-on="1"/><rect class="dm-c" x="230.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="0" data-on="0"/><rect class="dm-c" x="252.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="0" data-on="0"/><rect class="dm-c" x="274.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="0" data-on="0"/><rect class="dm-c" x="296.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="0" data-on="0"/><rect class="dm-c" x="318.0" y="34.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="0" data-on="0"/><rect class="dm-c" x="120.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="0" data-y="1" data-on="1"/><rect class="dm-c" x="142.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="1" data-y="1" data-on="1"/><rect class="dm-c" x="164.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="2" data-y="1" data-on="1"/><rect class="dm-c" x="186.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="3" data-y="1" data-on="1"/><rect class="dm-c" x="208.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="4" data-y="1" data-on="1"/><rect class="dm-c" x="230.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="5" data-y="1" data-on="0"/><rect class="dm-c" x="252.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="6" data-y="1" data-on="0"/><rect class="dm-c" x="274.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="7" data-y="1" data-on="0"/><rect class="dm-c" x="296.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="8" data-y="1" data-on="0"/><rect class="dm-c" x="318.0" y="56.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="9" data-y="1" data-on="0"/><rect class="dm-c" x="120.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="2" data-on="0"/><rect class="dm-c" x="142.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="2" data-on="0"/><rect class="dm-c" x="164.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="2" data-on="0"/><rect class="dm-c" x="186.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="2" data-on="0"/><rect class="dm-c" x="208.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="2" data-on="0"/><rect class="dm-c" x="230.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="2" data-on="0"/><rect class="dm-c" x="252.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="2" data-on="0"/><rect class="dm-c" x="274.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="2" data-on="0"/><rect class="dm-c" x="296.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="2" data-on="0"/><rect class="dm-c" x="318.0" y="78.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="2" data-on="0"/><rect class="dm-c" x="120.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="3" data-on="0"/><rect class="dm-c" x="142.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="3" data-on="0"/><rect class="dm-c" x="164.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="3" data-on="0"/><rect class="dm-c" x="186.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="3" data-on="0"/><rect class="dm-c" x="208.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="3" data-on="0"/><rect class="dm-c" x="230.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="3" data-on="0"/><rect class="dm-c" x="252.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="3" data-on="0"/><rect class="dm-c" x="274.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="3" data-on="0"/><rect class="dm-c" x="296.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="3" data-on="0"/><rect class="dm-c" x="318.0" y="100.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="3" data-on="0"/><rect class="dm-c" x="120.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="4" data-on="0"/><rect class="dm-c" x="142.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="4" data-on="0"/><rect class="dm-c" x="164.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="4" data-on="0"/><rect class="dm-c" x="186.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="4" data-on="0"/><rect class="dm-c" x="208.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="4" data-on="0"/><rect class="dm-c" x="230.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="4" data-on="0"/><rect class="dm-c" x="252.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="4" data-on="0"/><rect class="dm-c" x="274.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="4" data-on="0"/><rect class="dm-c" x="296.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="4" data-on="0"/><rect class="dm-c" x="318.0" y="122.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="4" data-on="0"/><rect class="dm-c" x="120.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="5" data-on="0"/><rect class="dm-c" x="142.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="5" data-on="0"/><rect class="dm-c" x="164.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="5" data-on="0"/><rect class="dm-c" x="186.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="5" data-on="0"/><rect class="dm-c" x="208.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="5" data-on="0"/><rect class="dm-c" x="230.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="5" data-on="0"/><rect class="dm-c" x="252.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="5" data-on="0"/><rect class="dm-c" x="274.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="5" data-on="0"/><rect class="dm-c" x="296.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="5" data-on="0"/><rect class="dm-c" x="318.0" y="144.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="5" data-on="0"/><rect class="dm-c" x="120.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="6" data-on="0"/><rect class="dm-c" x="142.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="6" data-on="0"/><rect class="dm-c" x="164.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="6" data-on="0"/><rect class="dm-c" x="186.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="6" data-on="0"/><rect class="dm-c" x="208.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="6" data-on="0"/><rect class="dm-c" x="230.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="6" data-on="0"/><rect class="dm-c" x="252.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="6" data-on="0"/><rect class="dm-c" x="274.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="6" data-on="0"/><rect class="dm-c" x="296.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="6" data-on="0"/><rect class="dm-c" x="318.0" y="166.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="6" data-on="0"/><rect class="dm-c" x="120.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="7" data-on="0"/><rect class="dm-c" x="142.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="7" data-on="0"/><rect class="dm-c" x="164.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="7" data-on="0"/><rect class="dm-c" x="186.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="7" data-on="0"/><rect class="dm-c" x="208.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="7" data-on="0"/><rect class="dm-c" x="230.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="7" data-on="0"/><rect class="dm-c" x="252.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="7" data-on="0"/><rect class="dm-c" x="274.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="7" data-on="0"/><rect class="dm-c" x="296.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="7" data-on="0"/><rect class="dm-c" x="318.0" y="188.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="7" data-on="0"/><rect class="dm-c" x="120.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="8" data-on="0"/><rect class="dm-c" x="142.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="8" data-on="0"/><rect class="dm-c" x="164.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="8" data-on="0"/><rect class="dm-c" x="186.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="8" data-on="0"/><rect class="dm-c" x="208.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="8" data-on="0"/><rect class="dm-c" x="230.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="8" data-on="0"/><rect class="dm-c" x="252.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="8" data-on="0"/><rect class="dm-c" x="274.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="8" data-on="0"/><rect class="dm-c" x="296.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="8" data-on="0"/><rect class="dm-c" x="318.0" y="210.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="8" data-on="0"/><rect class="dm-c" x="120.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="0" data-y="9" data-on="0"/><rect class="dm-c" x="142.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="1" data-y="9" data-on="0"/><rect class="dm-c" x="164.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="2" data-y="9" data-on="0"/><rect class="dm-c" x="186.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="3" data-y="9" data-on="0"/><rect class="dm-c" x="208.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-fill, #6366f1)" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" fill-opacity="0.28" data-x="4" data-y="9" data-on="0"/><rect class="dm-c" x="230.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="5" data-y="9" data-on="0"/><rect class="dm-c" x="252.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="6" data-y="9" data-on="0"/><rect class="dm-c" x="274.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="7" data-y="9" data-on="0"/><rect class="dm-c" x="296.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="8" data-y="9" data-on="0"/><rect class="dm-c" x="318.0" y="232.0" width="22.0" height="22.0" fill="var(--frac-empty, rgba(127,127,127,0.12))" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-x="9" data-y="9" data-on="0"/><rect x="120" y="34" width="220" height="220" fill="none" stroke="currentColor" stroke-width="2"/><path d="M120 30 L120 22 L230.0 22 L230.0 30" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="175.0" y="18.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-a">0.5</text><path d="M116 34 L108 34 L108 78.0 L116 78.0" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="80.0" y="61.0" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" class="dm-b">0.2</text></svg></div><p>루카리오가 이렇게 계산했어요.</p><p><strong>0.5 × 0.2 = 1</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">1보다 작은 소수끼리는 곱할 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="ok"><span class="mark">✔</span><span class="txt">진한 칸 한 칸은 0.01이에요 — 0.5 × 0.2 = 0.1</span></li><li class="no"><span class="mark"></span><span class="txt">소수점을 빼서 10</span><span class="tag">소수점을 빼먹음</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="W5-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>W5-👨</code></div>
+    <h3>(소수 한 자리 수) × (소수 한 자리 수)를 1 m² 모눈의 넓이로 보고, 한 칸이 0.01이라 곱이 소수 두 자리 수가 된다는 것을 손으로 익힌다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="W5-👨말1"><code class="mini">말1</code><span>&quot;10칸 × 10칸 모눈에서 한 칸은 1의 얼마야?&quot;</span></li><li id="W5-👨말2"><code class="mini">말2</code><span>&quot;0.4 × 0.8 — 1보다 작은 두 수를 곱하면 커질까, 작아질까?&quot;</span></li><li id="W5-👨말3"><code class="mini">말3</code><span>&quot;1.9 × 2.8은 어림하면 몇쯤일까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">모눈종이에 가로·세로 10칸씩 정사각형을 그리고 1 m²라고 정해요. 가로 4칸에 빨간색, 세로 8칸에 파란색을 칠하면 두 번 칠한 칸이 32칸 — 0.4 × 0.8 = 0.32예요. 가로 6칸·세로 5칸으로 한 번 더 해 봐요(0.3).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="W5-👨함정1"><code class="mini">함정1</code><div><div class="kid">0.4 × 0.8 = 3.2 — 소수 한 자리로 찍는다</div><div class="dadsay">→ &quot;0.4 m, 0.8 m짜리 꽃밭이 1 m²보다 넓을 수 있을까? 한 칸이 0.01이야.&quot;</div></div></li><li id="W5-👨함정2"><code class="mini">함정2</code><div><div class="kid">1.9 × 2.8 = 2.72 — 1 × 2와 9 × 8을 따로 곱해 이어 쓴다</div><div class="dadsay">→ &quot;어림하면 2 × 3 = 6쯤이야. 19 × 28부터 해 봐.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">0.7 × 0.6, 1.5 × 2.3 — 두 곱셈을 하고(0.42 · 3.45), 곱이 소수 두 자리 수인 까닭을 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="W6">
+    <header class="ch-head">
+      <div class="ch-no">W6</div>
+      <div>
+        <div class="grade">초5 · W5 다음</div>
+        <h2>(소수 두 자리 수) × (소수 한 자리 수)</h2>
+        <p class="idea">0.58 × 0.3 — 58 × 3 = 174, 소수 두 자리 × 소수 한 자리 → 소수 세 자리 → <strong>0.174</strong>. 분수로는 <span class="fr"><span class="n">58</span><span class="d">100</span></span> × <span class="fr"><span class="n">3</span><span class="d">10</span></span> = <span class="fr"><span class="n">174</span><span class="d">1000</span></span>. 5.1 × 1.12 = 5.712 — 곱하는 순서가 바뀌어도 자리 수를 더해요.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="W6-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>W6-1</code></div>
+        <div class="say"><p>0.58 × 0.3 — 58 × 3 = 174, 소수 두 자리 × 소수 한 자리 → 소수 2 + 1 = 3자리.</p><p>0.58 × 0.3 = 0.174</p><p>분수로는 <span class="fr"><span class="n">58</span><span class="d">100</span></span> × <span class="fr"><span class="n">3</span><span class="d">10</span></span> = <span class="fr"><span class="n">174</span><span class="d">1000</span></span> — 분모가 1000인 분수는 소수 세 자리 수예요.</p></div>
+        <div class="check" id="W6-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W6-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.47 × 0.2</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.094</span></li><li class="no"><span class="mark"></span><span class="txt">0.94</span></li><li class="no"><span class="mark"></span><span class="txt">94</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>47 × 2 = 94 — 소수 2자리 + 1자리 = 3자리라서 0.094.<br>소수 두 자리로 찍으면 0.94 — 자리 수를 더해요. 소수점을 빼먹으면 94.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W6-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>W6-2</code></div>
+        <div class="say"><p>곱하는 순서가 바뀌어도 자리 수를 더하는 건 같아요.</p><p>0.3 × 0.58 = 0.174<br>5.1 × 1.12 = 5.712</p><p>5.1 × 1.12 — 51 × 112 = 5712, 소수 1 + 2 = 3자리.</p></div>
+        <div class="check" id="W6-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W6-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.6 × 0.25</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.15</span></li><li class="no"><span class="mark"></span><span class="txt">1.5</span></li><li class="no"><span class="mark"></span><span class="txt">150</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>6 × 25 = 150 — 소수 1자리 + 2자리 = 3자리라서 0.150, 끝자리 0을 지우면 0.15.<br>소수 두 자리로 찍으면 1.5, 소수점을 빼먹으면 150 — 1보다 작은 두 수의 곱은 1보다 작아요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W6-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>W6-3</code></div>
+        <div class="say"><p>1보다 큰 소수끼리 곱할 때도 어림해서 소수점 위치를 확인해요.</p><p>437 × 21 = 9177<br>4.37 × 2.1 = 9.177</p><p>4.37 × 2.1은 4 × 2 = 8보다 조금 커요 — 91.77이나 0.9177이 아니에요.</p></div>
+        <div class="check" id="W6-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W6-3✓</code></div>
+        <div class="qt"><p>1 m의 무게가 2.4 kg인 철사가 있어요. 이 철사 1.35 m의 무게는 몇 kg일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">3.24</span></li><li class="no"><span class="mark"></span><span class="txt">32.4</span></li><li class="no"><span class="mark"></span><span class="txt">3.75</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>24 × 135 = 3240, 소수 세 자리로 3.240 = 3.24 kg.<br>소수 두 자리로 찍으면 32.4 — 어림하면 2 × 1 = 2와 3 × 2 = 6 사이예요. 더하면 3.75 — 1.35 m의 무게는 곱해서 구해요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W6-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>W6-4</code></div>
+        <div class="say"><p>곱의 끝자리에 0이 생기면 지워도 돼요.</p><p>0.25 × 0.8 → 25 × 8 = 200<br>소수 2 + 1 = 3자리 → 0.200 = 0.2</p></div>
+        <div class="check" id="W6-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W6-4✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>3.25 × 1.6</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">5.2</span></li><li class="no"><span class="mark"></span><span class="txt">52</span></li><li class="no"><span class="mark"></span><span class="txt">0.52</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>325 × 16 = 5200 — 소수 3자리로 5.200 = 5.2.<br>소수 두 자리로 찍으면 52, 네 자리로 찍으면 0.52 — 어림하면 3 × 2 = 6보다 작고 3 × 1 = 3보다 커요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="W6-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>W6-📏</code></div><p>자연수처럼 곱한 다음 두 수의 소수 자리 수를 더한 만큼 소수점을 찍어요 — 끝자리 0은 지워도 돼요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="W6-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>W6-①a</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>0.9 × 0.51</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">0.0459</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">459</span><span class="tag">소수점을 빼먹음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">0.459</span></li><li class="no"><span class="mark"></span><span class="txt">4.59</span><span class="tag">소수점 자리 수를 더하지 않음</span></li></ol>
+    </div><div class="sample" id="W6-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>W6-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>4.94 × 1.7</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">8398</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">0.8398</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">83.98</span><span class="tag">소수점 자리 수를 더하지 않음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">8.398</span></li></ol>
+    </div><div class="sample" id="W6-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>W6-②</code></div>
+      <div class="say"><p>어림해서 확인해요.</p><p>리자몽이 이렇게 계산했어요.</p><p><strong>3.76 × 1.6 = 0.6016</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">어림하면 3 × 1 = 3보다 커요 — 3.76 × 1.6 = 6.016</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="no"><span class="mark"></span><span class="txt">소수의 곱셈은 어림할 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">소수 자리 수를 하나만 세어 60.16</span><span class="tag">소수점 자리 수를 더하지 않음</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="W6-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>W6-👨</code></div>
+    <h3>소수 두 자리 수와 소수 한 자리 수의 곱에서 두 수의 소수 자리 수를 더해 소수점을 찍고, 어림으로 소수점 위치를 확인하는 습관을 들인다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="W6-👨말1"><code class="mini">말1</code><span>&quot;0.58은 소수 몇 자리, 0.3은 몇 자리? 곱은 몇 자리일까?&quot;</span></li><li id="W6-👨말2"><code class="mini">말2</code><span>&quot;곱하는 순서를 바꾸면 자리 수가 달라질까?&quot;</span></li><li id="W6-👨말3"><code class="mini">말3</code><span>&quot;4.37 × 2.1을 어림하면 몇쯤이야?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">계산기 놀이를 해요. 아빠가 0.58 × 0.3을 내면 58 × 3만 눌러 174를 보고, 소수점을 어디에 찍을지 먼저 말해요(0.174). 그다음 계산기로 0.58 × 0.3을 눌러 맞춰 봐요. 4.37 × 2.1도 같은 방법으로(9.177).</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="W6-👨함정1"><code class="mini">함정1</code><div><div class="kid">5.1 × 1.12 = 57.12 — 소수 두 자리로만 찍는다</div><div class="dadsay">→ &quot;5.1은 한 자리, 1.12는 두 자리 — 더하면 세 자리야. 어림하면 5쯤이지?&quot;</div></div></li><li id="W6-👨함정2"><code class="mini">함정2</code><div><div class="kid">0.47 × 0.2 = 0.94 — 곱이 0.47보다 커진 줄 모른다</div><div class="dadsay">→ &quot;0.47의 0.2배인데 0.47보다 커졌어? 1보다 작은 수를 곱하면 작아져.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">0.36 × 0.4, 2.15 × 1.3 — 두 곱셈을 하고(0.144 · 2.795), 소수 자리 수를 어떻게 정했는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="W7">
+    <header class="ch-head">
+      <div class="ch-no">W7</div>
+      <div>
+        <div class="grade">초5 · W6 다음</div>
+        <h2>곱의 소수점 위치</h2>
+        <p class="idea">곱하는 수가 10배가 될 때마다 곱의 소수점이 <strong>오른쪽으로 한 자리씩</strong> — 2.45 × 10 = 24.5, 2.45 × 100 = 245. 곱하는 수가 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배가 될 때마다 <strong>왼쪽으로 한 자리씩</strong> — 2450 × 0.1 = 245, 2450 × 0.01 = 24.5. 6 × 8 = 48이면 0.6 × 0.08 = 0.048 — 소수 한 자리 + 두 자리 = 세 자리.</p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="W7-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>W7-1</code></div>
+        <div class="say"><p>곱하는 수가 10배가 될 때마다 곱의 소수점이 <strong>오른쪽으로 한 자리씩</strong> 옮겨 가요.</p><p>2.45 × 10 = 24.5<br>2.45 × 100 = 245<br>2.45 × 1000 = 2450</p></div>
+        <div class="check" id="W7-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W7-1✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>3.07 × 100</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">307</span></li><li class="no"><span class="mark"></span><span class="txt">30.7</span></li><li class="no"><span class="mark"></span><span class="txt">3.0700</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>100은 0이 2개 — 소수점을 오른쪽으로 두 자리 옮겨 307.<br>한 자리만 옮기면 30.7. 3.0700은 3.07 뒤에 0을 붙인 것뿐이라 3.07과 같은 수예요 — 0을 붙이지 말고 소수점을 옮겨요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W7-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>W7-2</code></div>
+        <div class="say"><p>곱하는 수가 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배가 될 때마다 곱의 소수점이 <strong>왼쪽으로 한 자리씩</strong> 옮겨 가요.</p><p>2450 × 0.1 = 245<br>2450 × 0.01 = 24.5<br>2450 × 0.001 = 2.45</p></div>
+        <div class="check" id="W7-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W7-2✓</code></div>
+        <div class="qt"><p>다음을 계산하면 얼마일까요?</p><p><strong>5240 × 0.01</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">52.4</span></li><li class="no"><span class="mark"></span><span class="txt">524</span></li><li class="no"><span class="mark"></span><span class="txt">524000</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.01을 곱하면 소수점이 왼쪽으로 두 자리 — 52.40 = 52.4.<br>한 자리만 옮기면 524. 오른쪽으로 옮기면 524000 — 1보다 작은 수를 곱했는데 커졌어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W7-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>W7-3</code></div>
+        <div class="say"><p>6 × 8 = 48을 알면 소수끼리의 곱도 소수점만 찍으면 돼요. <strong>곱의 소수 자리 수는 두 수의 소수 자리 수를 더한 것과 같아요.</strong></p><p>0.6 × 8 = 4.8<br>0.6 × 0.8 = 0.48<br>0.6 × 0.08 = 0.048</p></div>
+        <div class="check" id="W7-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W7-3✓</code></div>
+        <div class="qt"><p>7 × 9 = 63 — 이 곱셈을 이용하여 다음을 계산하면 얼마일까요?</p><p><strong>0.7 × 0.09</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.063</span></li><li class="no"><span class="mark"></span><span class="txt">0.63</span></li><li class="no"><span class="mark"></span><span class="txt">0.0063</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>0.7은 한 자리, 0.09는 두 자리 — 1 + 2 = 3자리라서 0.063.<br>두 자리로 찍으면 0.63, 네 자리로 찍으면 0.0063.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W7-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>W7-4</code></div>
+        <div class="say"><p>같은 숫자를 곱해도 소수 자리 수에 따라 곱이 달라요. 25 × 13 = 325일 때</p><p>2.5 × 1.3 = 3.25<br>0.25 × 1.3 = 0.325<br>2.5 × 0.13 = 0.325</p></div>
+        <div class="check" id="W7-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W7-4✓</code></div>
+        <div class="qt"><p>34 × 12 = 408 — 이 곱셈을 이용하여 다음을 계산하면 얼마일까요?</p><p><strong>3.4 × 0.12</strong></p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.408</span></li><li class="no"><span class="mark"></span><span class="txt">4.08</span></li><li class="no"><span class="mark"></span><span class="txt">0.0408</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>3.4는 한 자리, 0.12는 두 자리 — 1 + 2 = 3자리라서 0.408.<br>두 자리로 찍으면 4.08, 네 자리로 찍으면 0.0408 — 어림하면 3 × 0.1 = 0.3보다 조금 커요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="W7-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>W7-📏</code></div><p>× 10·100·1000은 소수점을 오른쪽으로, × 0.1·0.01·0.001은 왼쪽으로 — 소수끼리는 소수 자리 수를 더해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="W7-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>W7-①a</code></div>
+      <div class="say"><p>7 × 4 = 28 — 이 곱셈을 이용하여 다음을 계산하면 얼마일까요?</p><p><strong>0.07 × 0.04</strong></p></div>
+      <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">0.0028</span></li><li class="no"><span class="mark"></span><span class="txt">0.28</span><span class="tag">소수점 자리 수를 더하지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">0.00028</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">0.028</span><span class="tag">소수점 위치를 잘못 찍음</span></li></ol>
+    </div><div class="sample" id="W7-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>W7-①b</code></div>
+      <div class="say"><p>다음을 계산하면 얼마일까요?</p><p><strong>81.3 × 0.1</strong></p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">8.14</span><span class="tag">계산 실수</span></li><li class="ok"><span class="mark">✔</span><span class="txt">8.13</span></li><li class="no"><span class="mark"></span><span class="txt">813</span><span class="tag">소수점을 반대로 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">0.813</span><span class="tag">옮긴 칸 수가 틀림</span></li></ol>
+    </div><div class="sample" id="W7-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>W7-②</code></div>
+      <div class="say"><p>리자몽이 이렇게 계산했어요.</p><p><strong>6.58 × 10 = 6.580</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">소수에는 10을 곱할 수 없어요</span><span class="tag">엉뚱한 지적</span></li><li class="no"><span class="mark"></span><span class="txt">소수점을 왼쪽으로 옮겨 0.658</span><span class="tag">소수점을 반대로 옮김</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">0을 붙이는 게 아니라 소수점을 옮겨요 — 6.58 × 10 = 65.8</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="W7-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>W7-👨</code></div>
+    <h3>곱하는 수가 10배·<span class="fr"><span class="n">1</span><span class="d">10</span></span>배가 될 때 곱의 소수점이 오른쪽·왼쪽으로 옮겨 가는 것과, 소수끼리의 곱은 두 수의 소수 자리 수를 더한 만큼 소수점을 찍는다는 것을 계산기로 확인한다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="W7-👨말1"><code class="mini">말1</code><span>&quot;2.45에 10을 곱하면 소수점이 어느 쪽으로 몇 자리 갈까?&quot;</span></li><li id="W7-👨말2"><code class="mini">말2</code><span>&quot;0을 붙이는 거랑 소수점을 옮기는 거랑 같을까?&quot;</span></li><li id="W7-👨말3"><code class="mini">말3</code><span>&quot;6 × 8 = 48이면 0.6 × 0.08은?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">계산기에 2.45를 누르고 × 10을 세 번 눌러 봐요 — 24.5, 245, 2450으로 소수점이 한 자리씩 오른쪽으로 가요. 이번엔 2450에서 × 0.1을 세 번 — 245, 24.5, 2.45로 돌아와요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="W7-👨함정1"><code class="mini">함정1</code><div><div class="kid">2.45 × 10 = 2.450 — 자연수처럼 끝에 0을 붙인다</div><div class="dadsay">→ &quot;2.450은 2.45와 같은 수야. 10배가 됐을까? 소수점을 옮겨 봐.&quot;</div></div></li><li id="W7-👨함정2"><code class="mini">함정2</code><div><div class="kid">5240 × 0.01 = 524000 — 소수점을 반대쪽으로 옮긴다</div><div class="dadsay">→ &quot;1보다 작은 수를 곱했는데 커졌어? 왼쪽으로 옮겨.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">4.06 × 100, 380 × 0.01 — 두 곱셈을 하고(406 · 3.8), 소수점을 어느 쪽으로 몇 자리 옮겼는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+<section class="concept" id="W8">
+    <header class="ch-head">
+      <div class="ch-no">W8</div>
+      <div>
+        <div class="grade">초5 · W7 다음</div>
+        <h2>⭐ 소수의 곱셈 활용</h2>
+        <p class="idea">생활 속 곱셈 — 1 kg에 3200원인 고구마 2.5 kg의 값은 3200 × 2.5 = 8000원. 계산하기 전에 어림해요: 2.5는 3보다 작으니 3200 × 3 = 9600보다 적어요. <strong>1보다 큰 수를 곱하면 커지고, 1보다 작은 수를 곱하면 작아져요.</strong></p>
+      </div>
+    </header>
+    <div class="cols">
+      <div class="lesson">
+        <h4 class="col-title">📘 배움 <small>4장 · 진우가 읽는 것 · 확인 질문에 답해야 다음 장</small></h4>
+        <ol class="steps"><li class="step" id="W8-1">
+      <div class="step-no">1</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">1장</span><code>W8-1</code></div>
+        <div class="say"><p>1 kg에 3200원인 고구마 2.5 kg의 값 — 3200 × 2.5</p><p>3200 × 25 = 80000<br>3200 × 2.5 = 8000</p><p>어림하면 2.5는 3보다 작으니 3200 × 3 = 9600원보다 적어요 — 8000원이 맞아요.</p></div>
+        <div class="check" id="W8-1✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W8-1✓</code></div>
+        <div class="qt"><p>1 kg에 1800원인 고구마를 2.5 kg 샀어요. 고구마값은 몇 원일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">4500</span></li><li class="no"><span class="mark"></span><span class="txt">45000</span></li><li class="no"><span class="mark"></span><span class="txt">450</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1800 × 25 = 45000의 <span class="fr"><span class="n">1</span><span class="d">10</span></span>배 — 1800 × 2.5 = 4500원.<br>소수점을 빼먹으면 45000, 소수점을 두 자리 옮기면 450 — 어림하면 1800 × 2 = 3600원보다 많고 1800 × 3 = 5400원보다 적어요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W8-2">
+      <div class="step-no">2</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">2장</span><code>W8-2</code></div>
+        <div class="say"><p>넓이는 가로와 세로를 곱해요. 가로 3.5 m, 세로 2.4 m인 텃밭의 넓이는</p><p>35 × 24 = 840<br>3.5 × 2.4 = 8.4</p><p>8.40의 끝자리 0을 지워 8.4 m². 더하면 3.5 + 2.4 = 5.9 — 둘레의 반이에요.</p></div>
+        <div class="check" id="W8-2✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W8-2✓</code></div>
+        <div class="qt"><p>가로가 4.5 m, 세로가 1.6 m인 직사각형 모양의 텃밭이 있어요. 텃밭의 넓이는 몇 m²일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">7.2</span></li><li class="no"><span class="mark"></span><span class="txt">72</span></li><li class="no"><span class="mark"></span><span class="txt">6.1</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>45 × 16 = 720 — 소수 두 자리로 7.20 = 7.2 m².<br>소수 한 자리로 찍으면 72 — 어림하면 5 × 2 = 10보다 작아요. 더하면 6.1 — 넓이가 아니라 둘레의 반이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W8-3">
+      <div class="step-no">3</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">3장</span><code>W8-3</code></div>
+        <div class="say"><p>&quot;몇의 몇 배&quot;는 곱셈이에요. 4.5 m의 0.8배는</p><p>4.5 × 0.8 = 3.6</p><p>0.8은 1보다 작으니 4.5 m보다 짧아요. 1.2배라면 4.5 × 1.2 = 5.4 — 4.5 m보다 길어요.</p></div>
+        <div class="check" id="W8-3✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W8-3✓</code></div>
+        <div class="qt"><p>뮤츠가 가진 리본은 2.5 m짜리예요. 개굴닌자가 가진 리본은 그 0.6배라면 몇 m일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">1.5</span></li><li class="no"><span class="mark"></span><span class="txt">15</span></li><li class="no"><span class="mark"></span><span class="txt">3.1</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>2.5 × 0.6 = 1.5 m.<br>25 × 6 = 150, 소수 두 자리로 1.50 = 1.5.<br>소수 한 자리로 찍으면 15 — 0.6배는 처음보다 짧아야 해요. 더하면 3.1 — 몇 배는 곱셈이에요.</p>
+      </div>
+      </div>
+    </li><li class="step" id="W8-4">
+      <div class="step-no">4</div>
+      <div class="step-body">
+        <div class="ref"><span class="lbl">4장</span><code>W8-4</code></div>
+        <div class="say"><p>계산하기 전에 곱이 처음 수보다 커질지 작아질지 먼저 생각해요.</p><p><strong>1보다 큰 수를 곱하면 커지고, 1보다 작은 수를 곱하면 작아져요.</strong></p><p>7 × 1.2 = 8.4 — 7보다 커요<br>7 × 0.9 = 6.3 — 7보다 작아요</p></div>
+        <div class="check" id="W8-4✓">
+        <div class="ref"><span class="lbl">확인 질문</span><code>W8-4✓</code></div>
+        <div class="qt"><p>계산하지 않고 고르려고 해요. 곱이 8보다 큰 것은 어느 것일까요?</p></div>
+        <ol class="ch"><li class="ok"><span class="mark">✔</span><span class="txt">8 × 1.1</span></li><li class="no"><span class="mark"></span><span class="txt">8 × 0.9</span></li><li class="no"><span class="mark"></span><span class="txt">8 × 0.99</span></li></ol>
+        <p class="why"><span class="why-lbl">틀리면</span>1.1은 1보다 커서 8 × 1.1 = 8.8 — 8보다 커요.<br>0.9와 0.99는 1보다 작아서 8 × 0.9 = 7.2, 8 × 0.99 = 7.92 — 8보다 작아요.</p>
+      </div>
+      </div>
+    </li></ol>
+        <div class="rule" id="W8-📏"><div class="ref"><span class="lbl">📏 한 줄로</span><code>W8-📏</code></div><p>무엇과 무엇을 곱하는지 정하고, 어림한 값과 맞는지 확인해요.</p></div>
+        <h4 class="col-title samples-title">🧪 문제 예시 <small>앱이 숫자를 바꿔 가며 만드는 문제 · 오답 옆 회색 글씨 = 📊에 쌓이는 오개념 이름</small></h4>
+        <div class="samples"><div class="sample" id="W8-①a">
+      <div class="ref"><span class="lbl">① 계산</span><code>W8-①a</code></div>
+      <div class="say"><p>개굴닌자가 가진 리본은 1.2 m짜리예요. 피카츄가 가진 리본은 그 1.9배라면 몇 m일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">22.8</span><span class="tag">소수점 자리 수를 더하지 않음</span></li><li class="no"><span class="mark"></span><span class="txt">3.1</span><span class="tag">곱하지 않고 더함</span></li><li class="no"><span class="mark"></span><span class="txt">228</span><span class="tag">소수점을 빼먹음</span></li><li class="ok"><span class="mark">✔</span><span class="txt">2.28</span></li></ol>
+    </div><div class="sample" id="W8-①b">
+      <div class="ref"><span class="lbl">① 계산</span><code>W8-①b</code></div>
+      <div class="say"><p>루카리오가 가진 리본은 6.5 m짜리예요. 개굴닌자가 가진 리본은 그 1.5배라면 몇 m일까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">8</span><span class="tag">곱하지 않고 더함</span></li><li class="ok"><span class="mark">✔</span><span class="txt">9.75</span></li><li class="no"><span class="mark"></span><span class="txt">975</span><span class="tag">소수점을 빼먹음</span></li><li class="no"><span class="mark"></span><span class="txt">97.5</span><span class="tag">소수점 자리 수를 더하지 않음</span></li></ol>
+    </div><div class="sample" id="W8-②">
+      <div class="ref"><span class="lbl">② 어디가 틀렸을까</span><code>W8-②</code></div>
+      <div class="say"><p>1 kg에 4200원인 고구마를 1.9 kg 샀어요.</p><p>루카리오가 이렇게 계산했어요.</p><p><strong>4200 × 1.9 = 79800</strong></p><p>어디가 틀렸을까요?</p></div>
+      <ol class="ch"><li class="no"><span class="mark"></span><span class="txt">소수점을 두 자리 옮겨 798</span><span class="tag">소수점 위치를 잘못 찍음</span></li><li class="no"><span class="mark"></span><span class="txt">맞게 계산했어요</span><span class="tag">틀린 줄 모름</span></li><li class="ok"><span class="mark">✔</span><span class="txt">어림하면 4200 × 2 = 8400보다 적어요 — 4200 × 1.9 = 7980</span></li><li class="no"><span class="mark"></span><span class="txt">돈은 소수와 곱할 수 없어요</span><span class="tag">엉뚱한 지적</span></li></ol>
+    </div></div>
+      </div>
+      <aside class="dad" id="W8-👨">
+    <div class="ref"><span class="lbl">👨 아빠 카드 · 저녁 10분</span><code>W8-👨</code></div>
+    <h3>생활 속 값·넓이·&quot;몇 배&quot; 문제를 소수의 곱셈으로 세우고, 곱하는 수가 1보다 큰지 작은지로 답의 크기를 먼저 어림하는 습관을 들인다.</h3>
+    <h4>🗣 이렇게 말해 보세요</h4>
+    <ol class="dad-say"><li id="W8-👨말1"><code class="mini">말1</code><span>&quot;1 kg에 3200원이면 2.5 kg 값은 3 kg 값보다 쌀까, 비쌀까?&quot;</span></li><li id="W8-👨말2"><code class="mini">말2</code><span>&quot;넓이는 더해, 곱해?&quot;</span></li><li id="W8-👨말3"><code class="mini">말3</code><span>&quot;0.8배라면 처음보다 길어질까, 짧아질까?&quot;</span></li></ol>
+    <h4>✋ 같이 해 보기</h4>
+    <p class="dad-do">마트 전단지나 영수증에서 &quot;1 kg에 ○원&quot;을 찾아요. 1 kg에 2400원인 감자를 1.5 kg 산다면 — 먼저 어림(2400원과 4800원 사이), 그다음 계산(2400 × 1.5 = 3600), 마지막에 계산기로 확인해요.</p>
+    <h4>⚠️ 여기서 헷갈려요</h4>
+    <ul class="traps"><li id="W8-👨함정1"><code class="mini">함정1</code><div><div class="kid">1 kg에 1800원인 고구마 2.5 kg의 값을 45000원이라고 한다 — 소수점을 빼먹는다</div><div class="dadsay">→ &quot;3 kg 값도 5400원인데 45000원? 어림부터 해 봐.&quot;</div></div></li><li id="W8-👨함정2"><code class="mini">함정2</code><div><div class="kid">8 × 0.9도 곱하면 커진다고 생각해 8보다 크다고 고른다</div><div class="dadsay">→ &quot;1보다 작은 수를 곱하면 작아져. 8의 0.9배는 8보다 조금 작아.&quot;</div></div></li></ul>
+    <h4>✅ 이걸 말하면 통과</h4>
+    <p class="dad-pass">&quot;1 kg에 2600원인 고구마를 1.5 kg 샀어요. 고구마값은 몇 원일까요?&quot; — 식을 세워 구하고(3900원), 어림한 값과 맞는지 말하면 통과.</p>
+  </aside>
+    </div>
+  </section>
+
+  <footer>신코치 ✖️ 수학 · 소수의 곱셈 줄기 배움 원고 · 2026-10-07</footer>
+</div>
+<script>
+(function(){
+  var cb=document.getElementById('ans');
+  function apply(){document.body.classList.toggle('hide-ans',!cb.checked);}
+  try{var v=localStorage.getItem('dmul-review-ans');if(v==='0'){cb.checked=false;}}catch(e){}
+  cb.addEventListener('change',function(){apply();try{localStorage.setItem('dmul-review-ans',cb.checked?'1':'0');}catch(e){}});
+  apply();
+})();
+</script>

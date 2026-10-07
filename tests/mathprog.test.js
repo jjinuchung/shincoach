@@ -27,6 +27,7 @@ import { SPACE } from '../js/mathspace.js';
 import { FDIV } from '../js/mathfdiv.js';
 import { FMUL } from '../js/mathfmul.js';
 import { FADD } from '../js/mathfadd.js';
+import { DMUL } from '../js/mathdmul.js';
 import { GRADUATED } from '../js/review.js';
 
 const T = '2026-09-20';
@@ -160,11 +161,11 @@ test('요약: 배운 수·👑 수·헷갈리는 오개념', () => {
   applyRound(m, 'frac.mean', { correct: 2, total: 4, missTags: ['분모끼리 더함', '분모끼리 더함'] }, T);
   applyRound(m, 'frac.mean', { correct: 4, total: 4, missTags: [] }, T);
   const s = mathSummary(m);
-  // 줄기가 스물둘(분수·분수의 덧셈·뺄셈·분수의 곱셈·분수의 나눗셈·혼합계산·소수·문자와 식·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기·합동과 대칭·원의 넓이·직육면체·입체도형·일차방정식·좌표평면과 그래프·공간과 입체)가 되면서 total은 스물두 줄기의 합, 줄기별은 stems에
-  assert.equal(s.total, FRACTION.length + MIXED.length + DECIMAL.length + EXPR.length + 9 + RATIO.length + FACTOR.length + CORRESPOND.length + AREA.length + SHAPE.length + DATA.length + RANGE.length + SYM.length + CIRCLE.length + CUBOID.length + SOLID.length + EQU.length + COORD.length + SPACE.length + FDIV.length + FMUL.length + FADD.length);
+  // 줄기가 스물셋(분수·분수의 덧셈·뺄셈·분수의 곱셈·분수의 나눗셈·혼합계산·소수·소수의 곱셈·문자와 식·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기·합동과 대칭·원의 넓이·직육면체·입체도형·일차방정식·좌표평면과 그래프·공간과 입체)가 되면서 total은 스물세 줄기의 합, 줄기별은 stems에
+  assert.equal(s.total, FRACTION.length + MIXED.length + DECIMAL.length + EXPR.length + 9 + RATIO.length + FACTOR.length + CORRESPOND.length + AREA.length + SHAPE.length + DATA.length + RANGE.length + SYM.length + CIRCLE.length + CUBOID.length + SOLID.length + EQU.length + COORD.length + SPACE.length + FDIV.length + FMUL.length + FADD.length + DMUL.length);
   assert.equal(s.done, 1);
   assert.equal(s.crowned, 0);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.total, x.done]), [['fraction', FRACTION.length, 1], ['fracadd', FADD.length, 0], ['fracmul', FMUL.length, 0], ['fracdiv', FDIV.length, 0], ['mixed', MIXED.length, 0], ['decimal', DECIMAL.length, 0], ['expr', EXPR.length, 0], ['negative', 9, 0], ['ratio', RATIO.length, 0], ['factor', FACTOR.length, 0], ['correspond', CORRESPOND.length, 0], ['area', AREA.length, 0], ['shape', SHAPE.length, 0], ['data', DATA.length, 0], ['range', RANGE.length, 0], ['sym', SYM.length, 0], ['circle', CIRCLE.length, 0], ['cuboid', CUBOID.length, 0], ['solid', SOLID.length, 0], ['equation', EQU.length, 0], ['coord', COORD.length, 0], ['space', SPACE.length, 0]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.total, x.done]), [['fraction', FRACTION.length, 1], ['fracadd', FADD.length, 0], ['fracmul', FMUL.length, 0], ['fracdiv', FDIV.length, 0], ['mixed', MIXED.length, 0], ['decimal', DECIMAL.length, 0], ['decmul', DMUL.length, 0], ['expr', EXPR.length, 0], ['negative', 9, 0], ['ratio', RATIO.length, 0], ['factor', FACTOR.length, 0], ['correspond', CORRESPOND.length, 0], ['area', AREA.length, 0], ['shape', SHAPE.length, 0], ['data', DATA.length, 0], ['range', RANGE.length, 0], ['sym', SYM.length, 0], ['circle', CIRCLE.length, 0], ['cuboid', CUBOID.length, 0], ['solid', SOLID.length, 0], ['equation', EQU.length, 0], ['coord', COORD.length, 0], ['space', SPACE.length, 0]]);
   assert.deepEqual(s.miss[0], { tag: '분모끼리 더함', n: 2 });
   assert.equal(nameOf('frac.add'), '분모가 다른 분수의 덧셈·뺄셈');
   assert.equal(nameOf('zzz'), 'zzz');

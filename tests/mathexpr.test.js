@@ -756,7 +756,7 @@ test('★ 원고의 조사·셈식·아직 안 배운 말·틀린 말 (배움 �
 test('화면 연결 (3단계): STEMS.expr(D)는 이 생성기·원고를 쓰고 C 소수와 E 음수 사이 · 앱 셸이 둘 다 들고 간다 · 사다리 안내에 E·H 줄기 · 숫자판은 ± 늘 켬', async () => {
   const { STEMS, STEM_ORDER, stemOf } = await import('../js/mathprog.js');
   assert.equal(STEMS.expr.code, 'D');
-  assert.deepEqual(STEM_ORDER.slice(STEM_ORDER.indexOf('decimal'), STEM_ORDER.indexOf('decimal') + 3), ['decimal', 'expr', 'negative'], 'C 소수와 E 음수 사이 (비워 둔 D 자리)');
+  assert.deepEqual(STEM_ORDER.slice(STEM_ORDER.indexOf('decimal'), STEM_ORDER.indexOf('decimal') + 4), ['decimal', 'decmul', 'expr', 'negative'], 'C 소수(그 뒤 W 소수의 곱셈)와 E 음수 사이 (비워 둔 D 자리) — W가 2026-10-07 C 바로 뒤에 끼어듦');
   assert.equal(STEMS.expr.list, EXPR);
   assert.equal(STEMS.expr.gen.makeQuestion, makeQuestion);
   assert.equal(STEMS.expr.gen.lessonOf, lessonOf, '📚 배움은 이 생성기의 lessonOf');

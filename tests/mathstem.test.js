@@ -10,9 +10,9 @@ import { lessonOf, checkContent } from '../js/mathneg.js';
 const content = JSON.parse(readFileSync(new URL('../coach/math/negative.json', import.meta.url), 'utf8'));
 const T = '2026-09-21';
 
-test('STEMS: 분수·분수의 덧셈·뺄셈·분수의 곱셈·분수의 나눗셈·혼합계산·소수·문자와 식·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기·합동과 대칭·원의 넓이·직육면체·입체도형·일차방정식·좌표평면과 그래프·공간과 입체 스물두 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
-  assert.deepEqual(STEM_ORDER, ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'mixed', 'decimal', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space']);
-  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'V', 'U', 'T', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S'], '글자 순서대로 (비워 둔 D 자리에 문자와 식, P 뒤에 일차방정식, 그 뒤에 좌표평면과 그래프, 공간과 입체) · V 분수의 덧셈·뺄셈·U 분수의 곱셈·T 분수의 나눗셈만 A 분수 바로 뒤 (A → 덧셈·뺄셈 → 곱셈 → 나눗셈 순서로 배운다)');
+test('STEMS: 분수·분수의 덧셈·뺄셈·분수의 곱셈·분수의 나눗셈·혼합계산·소수·소수의 곱셈·문자와 식·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기·합동과 대칭·원의 넓이·직육면체·입체도형·일차방정식·좌표평면과 그래프·공간과 입체 스물세 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
+  assert.deepEqual(STEM_ORDER, ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'mixed', 'decimal', 'decmul', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space']);
+  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'V', 'U', 'T', 'B', 'C', 'W', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S'], '글자 순서대로 (비워 둔 D 자리에 문자와 식, P 뒤에 일차방정식, 그 뒤에 좌표평면과 그래프, 공간과 입체) · V 분수의 덧셈·뺄셈·U 분수의 곱셈·T 분수의 나눗셈만 A 분수 바로 뒤 (A → 덧셈·뺄셈 → 곱셈 → 나눗셈 순서로 배운다) · W 소수의 곱셈은 C 소수 바로 뒤');
   assert.equal(STEMS.fracmul.lesson, true, '분수의 곱셈도 📚 배움');
   assert.equal(STEMS.fracmul.file, './coach/math/fracmul.json');
   assert.equal(stemOf('fmul.apply').key, 'fracmul');
@@ -21,6 +21,10 @@ test('STEMS: 분수·분수의 덧셈·뺄셈·분수의 곱셈·분수의 나�
   assert.equal(STEMS.fracadd.file, './coach/math/fracadd.json');
   assert.equal(stemOf('fadd.apply').key, 'fracadd');
   assert.equal(nameOf('fadd.borrow'), '받아내림이 있는 대분수의 뺄셈');
+  assert.equal(STEMS.decmul.lesson, true, '소수의 곱셈도 📚 배움');
+  assert.equal(STEMS.decmul.file, './coach/math/decmul.json');
+  assert.equal(stemOf('dmul.apply').key, 'decmul');
+  assert.equal(nameOf('dmul.d2d1'), '(소수 두 자리 수) × (소수 한 자리 수)');
   assert.equal(STEMS.fracdiv.lesson, true, '분수의 나눗셈도 📚 배움');
   assert.equal(STEMS.fracdiv.file, './coach/math/fracdiv.json');
   assert.equal(stemOf('fdv.apply').key, 'fracdiv');
@@ -119,7 +123,7 @@ test('줄기별 사다리·진단: 음수 줄기의 진단은 음수 사다리�
   assert.equal(ladderOf(m, T, 'fraction').filter((r) => r.state === 'done').length, 0);
   assert.deepEqual(dueIds(m, '2026-09-30', 'negative'), ['neg.mean', 'neg.line', 'neg.add', 'neg.sub']);
   const s = mathSummary(m);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['fracadd', 0, false], ['fracmul', 0, false], ['fracdiv', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['expr', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false], ['area', 0, false], ['shape', 0, false], ['data', 0, false], ['range', 0, false], ['sym', 0, false], ['circle', 0, false], ['cuboid', 0, false], ['solid', 0, false], ['equation', 0, false], ['coord', 0, false], ['space', 0, false]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['fracadd', 0, false], ['fracmul', 0, false], ['fracdiv', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['decmul', 0, false], ['expr', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false], ['area', 0, false], ['shape', 0, false], ['data', 0, false], ['range', 0, false], ['sym', 0, false], ['circle', 0, false], ['cuboid', 0, false], ['solid', 0, false], ['equation', 0, false], ['coord', 0, false], ['space', 0, false]]);
   assert.equal(s.done, 4);
 });
 
