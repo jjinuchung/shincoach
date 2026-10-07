@@ -415,6 +415,15 @@ const BAD = [
   [/소수점(?:을|끼리)? (?:맞춰|맞추어) (?:곱|계산)/, '곱셈은 소수점을 맞추지 않는다(덧셈의 규칙)'],
   [/자리 수를 곱해/, '소수 자리 수는 더한다'],
   [/0을 붙이면 (?:돼|된다)/, '10을 곱할 때 0을 붙이는 것은 자연수에서만'],
+  // Codex 38차 #2 — 0 × 0.6 = 0은 그대로다: 일반 규칙엔 "0보다 큰 수에"(또는 그 문제의 수 "6에")를 같은 줄 앞에
+  [/(?<!(?:0보다 큰 수에|\d에) [^\n]*)1보다 (?:작은|큰) 수를 곱하면/, '0에 곱하면 그대로 — "0보다 큰 수에 1보다 작은 수를 곱하면"'],
+  [/(?<!0보다 크고 )1보다 작은 두 수(?:를 곱하면 곱은|의 곱은) 두 수보다/, '0이 끼면 두 수보다 작지 않다 — "0보다 크고 1보다 작은 두 수"'],
+  // Codex 38차 #3 — 0.2 × 0.5 = 0.1: 끝자리 0을 지우면 "소수 두 자리 수"가 아니다 → "소수점을 두 자리에 찍어요"
+  [/수끼리 곱하면 소수 (?:한|두|세) 자리 수(?:예요|가 돼)|분모가 10+인 분수는 소수 (?:한|두|세) 자리 수/, '끝자리 0을 지우면 자리 수가 줄어든다 — "소수점을 두 자리에 찍어요"'],
+  // Codex 38차 #4 — 4500의 0은 지우면 안 된다: 지워도 되는 것은 "소수 부분의" 끝자리 0
+  [/(?<!소수 부분의 )끝자리(?:에)? 0(?:이 생기면|은 지워)/, '자연수의 0은 지우면 안 된다 — "소수 부분의 끝자리 0"'],
+  // Codex 38차 #5 — 따로 곱해 더하는 것(1 × 5 + 0.27 × 5)은 맞는 방법이다: 잘못은 두 곱을 이어 쓰는 것
+  [/자연수 부분과 소수 부분을 따로 곱하(?:면 안|지 않|지 말)/, '따로 곱해 더하는 것은 맞다 — 잘못은 이어 쓰는 것'],
 ];
 test('★ 참말에 틀린 말이 없다 — 곱하면 늘 커진다 · 소수를 곱하면 늘 작아진다 · 소수점을 맞춰 곱한다 · 자리 수를 곱한다', () => {
   const truths = (q) => [q.choices.find((x) => x.ok).text, ...(q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule] : [])].join('\n').replace(/\*\*/g, '');
@@ -742,6 +751,32 @@ test('★ 원고의 조사·아직 안 배운 말·틀린 말 (배움 글·확�
 test('원고는 배포 파일 검사(check.mjs)에도 걸린다 — decmul.json → mathdmul.js의 checkContent', () => {
   const src = readFileSync(new URL('../tools/check.mjs', import.meta.url), 'utf8');
   assert.ok(src.includes("'coach/math/decmul.json': '../js/mathdmul.js'"));
+});
+
+// Codex 38차 #3 — 0.2 × 0.5 = 0.1(W5 씨앗 3)에서 풀이가 "소수 두 자리 — 0.1", 힌트가 "곱을 소수 한 자리로 쓰지 않았는지 봐요"로 정답의 꼴을 나무랐다
+test('★ 끝자리 0을 지운 답의 풀이: 소수점을 먼저 찍은 꼴(0.10)을 보이고 지운다 · 힌트가 정답의 꼴을 나무라지 않는다 (W5 씨앗 3: 0.2 × 0.5 = 0.1)', () => {
+  const q3 = makeQuestion('dmul.d1d1', 'calc', 3, OPTS);
+  assert.equal(solveText(q3.q).f.ops.join(' × '), '0.2 × 0.5', '씨앗 3의 문제');
+  assert.equal(q3.choices.find((c) => c.ok).text, '0.1');
+  assert.ok(q3.solve.steps.some((s) => /0\.10 = 0\.1(?!\d)/.test(s)), q3.solve.steps.join(' | '));
+  assert.ok(!/소수 한 자리로 (?:쓰지|썼)/.test(q3.solve.whyAny), q3.solve.whyAny);
+  // 자리 수를 말하는 풀이(W5·W6·W8 넓이·몇 배)는 끝자리 0이 지워지면 찍은 꼴 = 지운 꼴을 단계에 보인다
+  const placedOf = (u, p) => { const t = String(u).padStart(p + 1, '0'); return `${t.slice(0, -p)}.${t.slice(-p)}`; };
+  let n = 0;
+  for (const id of ['dmul.d1d1', 'dmul.d2d1', 'dmul.apply']) {
+    for (let s = 1; s <= SEEDS; s++) {
+      const q = makeQuestion(id, 'calc', s, OPTS);
+      const sv = solveText(q.q);
+      if (sv.form !== 'num' || sv.type === 'price') continue;
+      const [A, B] = sv.f.ops.map(dec);
+      if (!A.p || !B.p) continue;
+      const P = A.p + B.p; const U = A.u * B.u; const ok = q.choices.find((c) => c.ok).text;
+      if (U % 10 !== 0) continue; // 끝자리 0이 안 생기는 곱
+      assert.ok(q.solve.steps.some((st) => st.includes(`${placedOf(U, P)} = ${ok}`)), `${id} #${s}: ${sv.f.ops.join(' × ')} — 찍은 꼴 ${placedOf(U, P)}이 풀이에 없다\n${q.solve.steps.join(' | ')}`);
+      n++;
+    }
+  }
+  assert.ok(n >= SEEDS / 10, `끝자리 0이 지워지는 문항 ${n}`);
 });
 
 // 헤드리스가 잡음(3단계): "2 m 리본의 0.3배"(2 × 0.3) 풀이 카드가 "0.3 × 2는 0.3을 2번 더한 거예요"로 순서를 뒤집어 말했다 — W1과 W3가 같은 설명 함수를 썼다

@@ -52,6 +52,10 @@ const addD = (a, b) => { const p = Math.max(a.p, b.p); return { u: a.u * P10[p -
 const sameD = (a, b) => !!(a && b && a.u * P10[b.p] === b.u * P10[a.p]);
 const whole = (x) => Math.floor(x.u / P10[x.p]);
 const fpart = (x) => x.u % P10[x.p];
+/** 자연수처럼 곱한 수 u에 소수점을 p자리에 찍은 꼴 — 끝자리 0을 지우기 전 (10, 2 → "0.10") */
+const placed = (u, p) => { if (!p) return String(u); const t = String(u).padStart(p + 1, '0'); return `${t.slice(0, -p)}.${t.slice(-p)}`; };
+/** 찍은 꼴과 지운 꼴이 다르면 둘 다 — "0.10 = 0.1" (Codex 38차 #3: 0.2 × 0.5 = 0.1에서 풀이가 "소수 두 자리"라고만 했다) */
+const full = (u, p) => { const a = placed(u, p); const b = decText(u, p); return a === b ? b : `${a} = ${b}`; };
 /** 글자 → 분수 값 {n, d} (checkHuman이 쓴다) */
 const ratOf = (t) => { const x = D(String(t || '').trim()); return x ? { n: x.u, d: P10[x.p] } : null; };
 /** 조건에 맞을 때까지 다시 뽑기 */
@@ -156,7 +160,7 @@ function whyNat(a, n, ans, places, natFirst = false) {
     [TAGS.dropPoint]: `소수점을 빼먹었어요 — ${e} = ${a.u * n}은 ${places}이 ${a.u * n}개라는 뜻이에요. 곱은 ${ans}.`,
     [TAGS.pointPos]: `소수점을 한 자리 잘못 찍었어요 — ${natFirst ? '곱하는' : '곱해지는'} 수의 소수 자리 수만큼 곱도 소수 ${a.p}자리예요.`,
     [TAGS.tenth]: `소수 두 자리 수는 분모가 100인 분수예요 — ${T(a)} = ${a.u}/${P10[a.p]}.`,
-    [TAGS.splitMul]: `자연수 부분과 소수 부분을 따로 곱하면 안 돼요 — 소수 부분의 곱이 자리를 넘쳐요. ${places}이 ${a.u * n}개예요.`,
+    [TAGS.splitMul]: `따로 곱한 두 곱을 소수점 앞뒤에 이어 쓰면 안 돼요 — 소수 부분의 곱이 1을 넘으면 자연수 부분에 더해요. ${places}이 ${a.u * n}개예요.`,
     [TAGS.noCarry]: `자연수 곱셈에서 받아올림을 빠뜨렸어요 — ${e} = ${a.u * n}.`,
     [TAGS.addInstead]: natFirst ? `더하지 않고 곱해요 — ${n} × ${T(a)}는 ${n}의 ${T(a)}배예요.` : `더하지 않고 곱해요 — ${T(a)} × ${n}은 ${T(a)}를 ${n}번 더한 거예요.`,
   };
@@ -261,7 +265,7 @@ export const DMUL = [
       const N = nat(n); const ans = T(mulD(a, N)); const shown = WR.splitNat(a, n);
       return misAsk(r, c, this, 'split', {
         q: WORK(`${T(a)} × ${n} = ${shown}`),
-        ok: `자연수 부분과 소수 부분을 따로 곱하면 안 돼요 — ${T(a)} × ${n} = ${ans}`,
+        ok: `따로 곱한 것을 이어 쓰지 말고 더해요 — ${T(a)} × ${n} = ${ans}`,
         wr: [RIGHT, { text: `소수점을 한 자리만 옮겨 ${WR.pos(a, N, -1)}`, tag: TAGS.pointPos }, { text: '소수 두 자리 수는 자연수와 곱할 수 없어요', tag: OFF }],
         steps: [`${a.u} × ${n} = ${a.u * n}`, `0.01이 ${a.u * n}개 — ${ans}`],
         whyAny: `${whole(a)} × ${n}과 ${fpart(a)} × ${n}을 따로 곱해 이어 썼어요. 소수 부분의 곱 ${fpart(a) * n}은 1을 넘어요.`,
@@ -272,8 +276,8 @@ export const DMUL = [
 
   {
     id: 'dmul.natd1', grade: 5, name: '(자연수) × (소수 한 자리 수)', needs: ['dmul.d2nat'],
-    idea: '2 × 0.9 — 2의 0.9배는 2를 똑같이 10묶음으로 나눈 것 중 9묶음이에요. 한 칸이 0.1이면 18칸 → **1.8**. 1보다 작은 수를 곱하면 처음 수보다 작아져요. 곱하는 순서를 바꿔도 곱은 같아요 — 4 × 3.2 = 3.2 × 4 = 12.8.',
-    rule: '자연수처럼 곱한 다음 소수 한 자리로 — 1보다 작은 수를 곱하면 작아져요.',
+    idea: '2 × 0.9 — 2의 0.9배는 2를 똑같이 10묶음으로 나눈 것 중 9묶음이에요. 한 칸이 0.1이면 18칸 → **1.8**. 0보다 큰 수에 1보다 작은 수를 곱하면 처음 수보다 작아져요. 곱하는 순서를 바꿔도 곱은 같아요 — 4 × 3.2 = 3.2 × 4 = 12.8.',
+    rule: '자연수처럼 곱한 다음 소수 한 자리로 — 0보다 큰 수에 1보다 작은 수를 곱하면 작아져요.',
     slip: '1보다 작은 소수를 곱했는데 곱이 처음 수보다 커지지 않았는지 봐요.',
     calc(r, c) {
       const one = (big, t) => {
@@ -305,7 +309,7 @@ export const DMUL = [
           ok: `${n}의 ${T(a)}배는 ${n}보다 작아요 — ${n} × ${T(a)} = ${ans}`,
           wr: [RIGHT, { text: `곱하지 않고 더해서 ${WR.add(N, a)}`, tag: TAGS.addInstead }, { text: '자연수에 소수를 곱할 수는 없어요', tag: OFF }],
           steps: [`${n}을 똑같이 10묶음으로 나눈 것 중 ${a.u}묶음 — 0.1이 ${n * a.u}칸`, `${n} × ${T(a)} = ${ans}`],
-          whyAny: `소수점을 빼먹었어요. 1보다 작은 수를 곱하면 처음 수 ${n}보다 작아져야 해요.`,
+          whyAny: `소수점을 빼먹었어요. ${n}에 1보다 작은 수를 곱하면 ${n}보다 작아져야 해요.`,
           probe: { ask: 'small', calc: `${n} × ${T(a)}` },
         });
       }
@@ -376,9 +380,9 @@ export const DMUL = [
 
   {
     id: 'dmul.d1d1', grade: 5, name: '(소수 한 자리 수) × (소수 한 자리 수)', needs: ['dmul.natd2'],
-    idea: '0.4 × 0.8 — 1 m² 정사각형을 가로·세로 10칸씩(한 칸 0.01 m²)으로 나눠 가로 4칸, 세로 8칸을 칠하면 두 번 칠한 칸이 32개 → **0.32**. 분수로는 4/10 × 8/10 = 32/100 = 0.32. 0.1 × 0.1 = 0.01 — 소수 한 자리 수끼리 곱하면 소수 두 자리 수예요. 1.9 × 2.8 = 5.32.',
+    idea: '0.4 × 0.8 — 1 m² 정사각형을 가로·세로 10칸씩(한 칸 0.01 m²)으로 나눠 가로 4칸, 세로 8칸을 칠하면 두 번 칠한 칸이 32개 → **0.32**. 분수로는 4/10 × 8/10 = 32/100 = 0.32. 0.1 × 0.1 = 0.01 — 소수 한 자리 수끼리 곱하면 소수점을 두 자리에 찍어요. 1.9 × 2.8 = 5.32.',
     rule: '자연수처럼 곱한 다음 소수 두 자리로 — 두 수의 소수 자리 수를 더해요.',
-    slip: '소수 한 자리 수끼리 곱했는데 곱을 소수 한 자리로 쓰지 않았는지 봐요.',
+    slip: '두 수의 소수 자리 수를 더한 만큼 소수점을 찍었는지 봐요 — 끝자리 0은 찍은 다음에 지워요.',
     calc(r, c) {
       const one = (shape, t) => {
         const [a, b] = shape === 'small' ? [rd(r, 0, 0, 1), rd(r, 0, 0, 1)] : shape === 'one' ? [rd(r, 1, 5, 1), rd(r, 0, 0, 1)] : [rd(r, 1, 4, 1), rd(r, 1, 4, 1)];
@@ -390,12 +394,12 @@ export const DMUL = [
         return {
           t: t(T(a), T(b)), ans, wr,
           why: {
-            [TAGS.placesNotAdded]: `소수 한 자리 수끼리 곱하면 소수 두 자리 수예요 — 0.1 × 0.1 = 0.01.`,
+            [TAGS.placesNotAdded]: `소수 한 자리 수끼리 곱하면 소수점을 두 자리에 찍어요 — 0.1 × 0.1 = 0.01.`,
             [TAGS.dropPoint]: `소수점을 빼먹었어요 — ${a.u} × ${b.u} = ${a.u * b.u}은 0.01이 ${a.u * b.u}개예요.`,
-            [TAGS.splitMul]: `자연수 부분과 소수 부분을 따로 곱하면 안 돼요 — ${a.u} × ${b.u} = ${a.u * b.u}에서 소수 두 자리로.`,
+            [TAGS.splitMul]: `자연수 부분끼리, 소수 부분끼리만 곱하면 빠지는 곱이 있어요 — ${a.u} × ${b.u} = ${a.u * b.u}에서 소수 두 자리로.`,
             [TAGS.addInstead]: `더하지 않고 곱해요 — 넓이는 가로 × 세로예요.`,
           },
-          steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 한 자리 × 소수 한 자리 → 소수 두 자리 — ${T(a)} × ${T(b)} = ${ans}`],
+          steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 한 자리 × 소수 한 자리 → 소수점을 두 자리에 — ${T(a)} × ${T(b)} = ${full(a.u * b.u, 2)}`],
           probe: { ask: 'calc', shape },
         };
       };
@@ -414,7 +418,7 @@ export const DMUL = [
           q: `그림을 보고 곱셈을 계산해요.\n\n[dmul area ${T(a)} ${T(b)}]\n\n${WORK(`${T(a)} × ${T(b)} = ${shown}`)}`,
           ok: `진한 칸 한 칸은 0.01이에요 — ${T(a)} × ${T(b)} = ${ans}`,
           wr: [RIGHT, { text: `소수점을 빼서 ${WR.drop(a, b)}`, tag: TAGS.dropPoint }, { text: '1보다 작은 소수끼리는 곱할 수 없어요', tag: OFF }],
-          steps: [`진한 칸 ${a.u} × ${b.u} = ${a.u * b.u}개 — 한 칸 0.01`, `${T(a)} × ${T(b)} = ${ans}`],
+          steps: [`진한 칸 ${a.u} × ${b.u} = ${a.u * b.u}개 — 한 칸 0.01`, `${T(a)} × ${T(b)} = ${full(a.u * b.u, 2)}`],
           whyAny: `소수 한 자리로 썼어요. 1보다 작은 두 수를 곱했는데 ${shown}은 두 수보다 커요.`,
           probe: { ask: 'places', calc: `${T(a)} × ${T(b)}` },
         });
@@ -423,9 +427,9 @@ export const DMUL = [
       const ans = T(mulD(a, b)); const shown = WR.splitDec(a, b);
       return misAsk(r, c, this, 'split', {
         q: WORK(`${T(a)} × ${T(b)} = ${shown}`),
-        ok: `자연수 부분과 소수 부분을 따로 곱하면 안 돼요 — ${T(a)} × ${T(b)} = ${ans}`,
+        ok: `자연수 부분끼리, 소수 부분끼리만 곱하면 안 돼요 — ${T(a)} × ${T(b)} = ${ans}`,
         wr: [RIGHT, { text: `소수점 자리 수를 하나만 세어 ${WR.places(a, b)}`, tag: TAGS.placesNotAdded }, { text: '1보다 큰 소수끼리는 곱할 수 없어요', tag: OFF }],
-        steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 두 자리로 — ${ans}`],
+        steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 두 자리로 — ${full(a.u * b.u, 2)}`],
         whyAny: `${whole(a)} × ${whole(b)}과 ${fpart(a)} × ${fpart(b)}만 곱했어요. 어림하면 ${whole(a)} × ${whole(b)} = ${whole(a) * whole(b)}보다 커요.`,
         probe: { ask: 'split', calc: `${T(a)} × ${T(b)}` },
       });
@@ -454,7 +458,7 @@ export const DMUL = [
             [TAGS.pointPos]: `소수점을 한 자리 더 옮겼어요 — 곱은 소수 ${a.p + b.p}자리예요.`,
             [TAGS.addInstead]: '더하지 않고 곱해요.',
           },
-          steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 ${a.p}자리 + ${b.p}자리 = ${a.p + b.p}자리 — ${T(a)} × ${T(b)} = ${ans}`],
+          steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 ${a.p}자리 + ${b.p}자리 = ${a.p + b.p}자리 — ${T(a)} × ${T(b)} = ${full(a.u * b.u, a.p + b.p)}`],
           probe: { ask: 'calc', flip, big },
         };
       };
@@ -473,8 +477,8 @@ export const DMUL = [
           q: WORK(`${T(a)} × ${T(b)} = ${shown}`),
           ok: `소수 두 자리 × 소수 한 자리는 소수 세 자리 — ${T(a)} × ${T(b)} = ${ans}`,
           wr: [RIGHT, { text: `소수점을 빼서 ${WR.drop(a, b)}`, tag: TAGS.dropPoint }, { text: '자리 수가 다른 소수끼리는 곱할 수 없어요', tag: OFF }],
-          steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `2자리 + 1자리 = 3자리 — ${ans}`],
-          whyAny: `소수 자리 수를 더하지 않았어요. 1보다 작은 두 수의 곱은 두 수보다 작아야 해요.`,
+          steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `2자리 + 1자리 = 3자리 — ${full(a.u * b.u, 3)}`],
+          whyAny: `소수 자리 수를 더하지 않았어요. ${T(a)}와 ${T(b)}는 둘 다 1보다 작으니 곱은 ${T(a)}보다도 작아야 해요.`,
           probe: { ask: 'places', calc: `${T(a)} × ${T(b)}` },
         });
       }
@@ -484,7 +488,7 @@ export const DMUL = [
         q: `어림해서 확인해요.\n\n${WORK(`${T(a)} × ${T(b)} = ${shown}`)}`,
         ok: `어림하면 ${whole(a)} × ${whole(b)} = ${whole(a) * whole(b)}보다 커요 — ${T(a)} × ${T(b)} = ${ans}`,
         wr: [RIGHT, { text: `소수 자리 수를 하나만 세어 ${WR.places(a, b)}`, tag: TAGS.placesNotAdded }, { text: '소수의 곱셈은 어림할 수 없어요', tag: OFF }],
-        steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 3자리 — ${ans}`],
+        steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 3자리 — ${full(a.u * b.u, 3)}`],
         whyAny: `소수점을 한 자리 더 옮겼어요. 어림하면 ${whole(a) * whole(b)}보다 커야 해요.`,
         probe: { ask: 'est', calc: `${T(a)} × ${T(b)}` },
       });
@@ -580,7 +584,7 @@ export const DMUL = [
 
   {
     id: 'dmul.apply', grade: 5, name: '⭐ 소수의 곱셈 활용', needs: ['dmul.point'],
-    idea: '생활 속 곱셈 — 1 kg에 3200원인 고구마 2.5 kg의 값은 3200 × 2.5 = 8000원. 계산하기 전에 어림해요: 2.5는 3보다 작으니 3200 × 3 = 9600보다 적어요. **1보다 큰 수를 곱하면 커지고, 1보다 작은 수를 곱하면 작아져요.**',
+    idea: '생활 속 곱셈 — 1 kg에 3200원인 고구마 2.5 kg의 값은 3200 × 2.5 = 8000원. 계산하기 전에 어림해요: 2.5는 3보다 작으니 3200 × 3 = 9600보다 적어요. **0보다 큰 수에 1보다 큰 수를 곱하면 커지고, 1보다 작은 수를 곱하면 작아져요.**',
     rule: '무엇과 무엇을 곱하는지 정하고, 어림한 값과 맞는지 확인해요.',
     slip: '곱이 어림한 값과 비슷한지, 1보다 작은 수를 곱했는데 커지지 않았는지 봐요.',
     calc(r, c) {
@@ -605,12 +609,12 @@ export const DMUL = [
         return {
           t: `가로가 ${T(a)} m, 세로가 ${T(b)} m인 직사각형 모양의 텃밭이 있어요. 텃밭의 넓이는 몇 m²일까요?`, ans, wr,
           why: {
-            [TAGS.placesNotAdded]: '소수 한 자리 수끼리 곱하면 소수 두 자리 수예요.',
+            [TAGS.placesNotAdded]: '소수 한 자리 수끼리 곱하면 소수점을 두 자리에 찍어요.',
             [TAGS.addInstead]: '넓이는 가로와 세로를 곱해요 — 더하면 둘레의 반이에요.',
             [TAGS.dropPoint]: `소수점을 빼먹었어요 — ${a.u} × ${b.u} = ${a.u * b.u}에서 소수 두 자리로.`,
-            [TAGS.splitMul]: '자연수 부분과 소수 부분을 따로 곱하면 안 돼요.',
+            [TAGS.splitMul]: '자연수 부분끼리, 소수 부분끼리만 곱하면 빠지는 곱이 있어요.',
           },
-          steps: [`넓이 = 가로 × 세로 — ${a.u} × ${b.u} = ${a.u * b.u}`, `소수 두 자리로 — ${T(a)} × ${T(b)} = ${ans}`],
+          steps: [`넓이 = 가로 × 세로 — ${a.u} × ${b.u} = ${a.u * b.u}`, `소수 두 자리로 — ${T(a)} × ${T(b)} = ${full(a.u * b.u, 2)}`],
           probe: { ask: 'area' },
         };
       };
@@ -621,11 +625,11 @@ export const DMUL = [
         return {
           t: `{mon/이/가} 가진 리본은 ${T(a)} m짜리예요. {mon2/이/가} 가진 리본은 그 ${T(b)}배라면 몇 m일까요?`, ans, wr,
           why: {
-            [TAGS.placesNotAdded]: '소수 한 자리 수끼리 곱하면 소수 두 자리 수예요.',
+            [TAGS.placesNotAdded]: '소수 한 자리 수끼리 곱하면 소수점을 두 자리에 찍어요.',
             [TAGS.dropPoint]: `소수점을 빼먹었어요 — ${a.u} × ${b.u} = ${a.u * b.u}에서 소수 두 자리로.`,
             [TAGS.addInstead]: '"몇 배"는 곱셈이에요 — 더하지 않아요.',
           },
-          steps: [`${T(a)}의 ${T(b)}배 — ${a.u} × ${b.u} = ${a.u * b.u}`, `${T(a)} × ${T(b)} = ${ans}`],
+          steps: [`${T(a)}의 ${T(b)}배 — ${a.u} × ${b.u} = ${a.u * b.u}`, `${T(a)} × ${T(b)} = ${full(a.u * b.u, 2)}`],
           probe: { ask: 'times' },
         };
       };
@@ -636,8 +640,8 @@ export const DMUL = [
           words: true,
           t: `계산하지 않고 고르려고 해요. 곱이 ${N}보다 큰 것은 어느 것일까요?`, ans: `${N} × ${T(hi)}`,
           wr: [{ text: `${N} × ${T(lo1)}`, tag: TAGS.mulBigger }, { text: `${N} × ${T(lo2)}`, tag: TAGS.mulBigger }],
-          why: { [TAGS.mulBigger]: '1보다 작은 수를 곱하면 처음 수보다 작아져요 — 곱한다고 늘 커지는 건 아니에요.' },
-          steps: [`${T(hi)}는 1보다 커요 — ${N} × ${T(hi)} = ${T(mulD(nat(N), hi))}`, `1보다 작은 수를 곱하면 ${N}보다 작아져요`],
+          why: { [TAGS.mulBigger]: '0보다 큰 수에 1보다 작은 수를 곱하면 처음 수보다 작아져요 — 곱한다고 늘 커지는 건 아니에요.' },
+          steps: [`${T(hi)}는 1보다 커요 — ${N} × ${T(hi)} = ${T(mulD(nat(N), hi))}`, `${N}에 1보다 작은 수를 곱하면 ${N}보다 작아져요`],
           probe: { ask: 'bigger', N },
         };
       };
@@ -659,10 +663,10 @@ export const DMUL = [
       const N = int(r, 3, 9); const b = rd(r, 0, 0, 1); const ans = T(mulD(nat(N), b));
       return misAsk(r, c, this, 'big', {
         q: showWork(`${N} × ${T(b)}는 ${N}보다 커요`, '말했어요'),
-        ok: `1보다 작은 수를 곱하면 작아져요 — ${N} × ${T(b)} = ${ans}`,
+        ok: `${N}에 1보다 작은 수를 곱하면 작아져요 — ${N} × ${T(b)} = ${ans}`,
         wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `곱하지 않고 더해서 ${WR.add(nat(N), b)}`, tag: TAGS.addInstead }, { text: '자연수에 소수를 곱할 수는 없어요', tag: OFF }],
         steps: [`${T(b)}는 1보다 작아요`, `${N} × ${T(b)} = ${ans} — ${N}보다 작아요`],
-        whyAny: '곱하면 늘 커진다고 생각했어요. 1보다 작은 수를 곱하면 처음 수보다 작아져요.',
+        whyAny: '곱하면 늘 커진다고 생각했어요. 0보다 큰 수에 1보다 작은 수를 곱하면 처음 수보다 작아져요.',
         probe: { ask: 'big', calc: `${N} × ${T(b)}`, base: String(N) },
       });
     },

@@ -29,7 +29,8 @@ for (const f of readdirSync('js').filter((f) => f.endsWith('.js'))) {
 //   아이 기록의 점수 꼴 "맞힌 수/푼 수(정답률%)"를 적지 않는다 (Codex 36차 #1) — 기록 수치는 비공개 저장소에만
 //   수치가 없어도 기록을 옮겨 적는 말투(📊 기록 뒤에 "에서"나 쌍점, 첫 진단 뒤에 쌍점)는 그 아이의 성적 묘사다 — 진행 기록(process.md)·README도 본다 (Codex 37차 #1)
 const SCORE_RE = /\d+\/\d+\s*\(\d+(?:\.\d+)?%\)/;
-const RECORD_RE = /📊 기록(?:에서|:)|첫 진단\s?:/;
+//   맞힌 수/푼 수 바로 뒤 괄호에 붙인 설명(찍기 확률과 견줌)과, 오답 개수를 가운뎃점으로 늘어놓은 분포도 그 아이의 기록이다 (Codex 38차 #1 — 옛 숫자판 주석)
+const RECORD_RE = /📊 기록(?:에서|:)|첫 진단\s?:|(?<![\d/])\d+\/\d+\s*\((?:찍|정답률|맞[힌힘혔]|틀[린림렸])|오답이 \d+(?:·\d+){2,}/;
 const PUBLIC_TEXT = [
   'sw.js', 'process.md', 'README.md', 'coach/README.md',
   ...readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => 'js/' + f),

@@ -61,7 +61,7 @@ test('🔒 공개 저장소 파일(앱 js·sw.js·도구·테스트·검수 페�
 // Codex 37차 #1 — 진행 기록(process.md)은 마크다운이라 검사 밖이었고("이번 주 N/M(P%)"가 남음), 수치를 뺀 뒤에도 "어느 칸이 가장 막혔고 오답이 무엇에 몰렸다"처럼
 //   기록을 옮겨 적은 말은 남았다(V 주석·검수 페이지, T·U 주석과 검수 도구). 마크다운도 보고, 그 말투도 막는다
 test('🔒 진행 기록·README(마크다운)도 검사한다 — 점수 꼴도, 수치 없이 기록을 옮겨 적은 말투(📊 기록 뒤 "에서"·쌍점, 첫 진단 뒤 쌍점)도 공개 파일에 없다', () => {
-  const rec = /📊 기록(?:에서|:)|첫 진단\s?:/;
+  const rec = /📊 기록(?:에서|:)|첫 진단\s?:|(?<![\d/])\d+\/\d+\s*\((?:찍|정답률|맞[힌힘혔]|틀[린림렸])|오답이 \d+(?:·\d+){2,}/;
   const score = /\d+\/\d+\s*\(\d+(?:\.\d+)?%\)/;
   const md = ['process.md', 'README.md', 'coach/README.md'];
   const files = [...md, 'sw.js', ...readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => `js/${f}`),
@@ -75,6 +75,9 @@ test('🔒 진행 기록·README(마크다운)도 검사한다 — 점수 꼴도
   }
   // 예시 글은 이어 붙여 만든다 — 이 파일도 검사 대상이다
   assert.ok(rec.test(['📊 기록', '에서 A 줄기'].join('')) && rec.test(['첫 진단', ': 513편'].join('')) && score.test(['이번 주 3/10', '(30%)'].join('')), '꼴 자체는 잡는다');
+  // Codex 38차 #1 — 맞힌 수/푼 수 뒤 괄호에 설명을 붙이거나(퍼센트 없이), 오답 개수를 가운뎃점으로 늘어놓은 꼴도 기록이다 (옛 숫자판 주석)
+  assert.ok(rec.test(['① 계산이 6/30', '(찍어도 나오는 확률보다 낮게)'].join('')) && rec.test(['오답이 9', '·9·8로 고르게'].join('')), '설명 붙은 기록 수·오답 분포도 잡는다');
+  assert.ok(!rec.test('3/4(분모가 4)') && !rec.test('오답이 여러 오개념에') && !rec.test('2·3학년') && !rec.test('퍼즐 5/3/2(정답 공개 0)'), '분수 설명·말로 쓴 분포·코인 규칙(5/3/2)은 걸지 않는다');
   const chk = readFileSync('tools/check.mjs', 'utf8');
   assert.ok(chk.includes('RECORD_RE') && chk.includes(rec.source), 'check.mjs가 같은 말투를 막는다');
   for (const f of md) assert.ok(chk.includes(`'${f}'`), `check.mjs가 ${f}도 본다`);
