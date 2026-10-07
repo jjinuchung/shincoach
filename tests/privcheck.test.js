@@ -40,14 +40,22 @@ test('🔒 없는 폴더·검사할 파일이 하나도 없는 폴더는 실패 
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
 
-// Codex 36차 #1 — 공개 앱 파일은 빌드 없이 주석까지 그대로 배포된다. 아이 기록의 점수("12/34(35%)")가 주석에 실렸다
-test('🔒 공개 앱 파일(js·sw.js)에 아이 점수 꼴 "N/M(P%)"이 없다 · check.mjs가 다시 들어오는 것을 막는다', () => {
+// Codex 36차 #1 — 공개 앱 파일은 빌드 없이 주석까지 그대로 배포된다. 아이 기록의 점수(맞힌 수/푼 수(정답률%))가 주석·검수 페이지에 실렸다
+test('🔒 공개 저장소 파일(앱 js·sw.js·도구·테스트·검수 페이지·원고)에 아이 점수 꼴 "N/M(P%)"이 없다 · check.mjs가 다시 들어오는 것을 막는다', () => {
   const re = /\d+\/\d+\s*\(\d+(?:\.\d+)?%\)/;
-  const files = ['sw.js', ...readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => `js/${f}`)];
+  const files = ['sw.js', ...readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => `js/${f}`),
+    ...readdirSync('tools').filter((f) => f.endsWith('.mjs')).map((f) => `tools/${f}`),
+    ...readdirSync('tests').filter((f) => f.endsWith('.js')).map((f) => `tests/${f}`),
+    ...readdirSync('coach/math').filter((f) => /\.(html|json)$/.test(f)).map((f) => `coach/math/${f}`)];
   for (const f of files) assert.ok(!re.test(readFileSync(f, 'utf8')), `${f}: ${(readFileSync(f, 'utf8').match(re) || [])[0]}`);
-  assert.ok(files.length > 50);
+  assert.ok(files.length > 100);
+  assert.ok(re.test(['A 줄기 ①이 3/10', '(30%)'].join('')), '꼴 자체는 잡는다 (예시 글은 이어 붙여 만든다 — 이 파일도 검사 대상이다)');
   const chk = readFileSync('tools/check.mjs', 'utf8');
-  assert.ok(chk.includes('SCORE_RE') && chk.includes(re.source), 'check.mjs가 같은 꼴로 막는다');
+  assert.ok(chk.includes('SCORE_RE') && chk.includes(re.source) && /readdirSync\('coach\/math'\)/.test(chk), 'check.mjs가 같은 꼴로 같은 곳을 막는다');
+  // 검수 페이지 첫 상자에 실렸던 날짜·횟수도 없다 (꼴이 달라 위 검사로는 못 잡는다)
+  for (const f of ['tools/mathfmul.mjs', 'tools/mathfdiv.mjs', 'coach/math/review-fmul.html', 'coach/math/review-fdv.html']) {
+    assert.ok(!/진우 기록\(|📊 사진 —|\d+문제 중 \d+개/.test(readFileSync(f, 'utf8')), `${f}: 기록 수치`);
+  }
 });
 
 test('🔒 check.mjs --private <없는 폴더> → 실패로 끝나고 그 폴더 이름을 말한다 (전엔 "검사 통과")', () => {
