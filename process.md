@@ -1967,3 +1967,96 @@
 - [ ] Codex 35차(T 줄기 + v195 S1·S5 칠하기 판 + 🔶 v197 + 📤 v198·199 + ✍️ 에세이 열쇠 v200 + 소수 비교 + v201, 새 세션·여유 메모리·"2만 씨앗 금지") → v202
 - [ ] (제안, 미결정) 분수의 곱셈 줄기(초5-2) → 분수의 덧셈·뺄셈 줄기 · 📊에 막힌 개념 옆 아빠 카드 · 🎤 목표 문장 +1(🔶 모자라면)
 - [ ] 다음 배포 때도 라이브 버전 확인(옛 재실행 run 37371255984 queued)
+
+## 2026-10-07 (아침) — 🔍 Codex 35차 반영 → 아빠 교정·❓ 답장을 비공개 저장소로 (v202)
+
+### 진행 내용
+- /checkp → 아버님 "② Codex 35차 진행하자" → 요청문 `.context/codex_prompt_35.txt`(12.5 KB, 새 세션, "npm test 전체·2만 씨앗 금지", GitHub 네트워크 금지) · 여유 메모리 4.6 GB · 214만 토큰 → 원문 `.context/codex_review_35.md` · 세션 id `.context/codex-session-id-35`
+- 결과: 34차 6건 모두 holds · T 줄기 셈·보기 겹침·숫자판 문제 0 · 새 10건(P1 8 · P2 2) — 대부분 에세이·기록 데이터
+- 판단 표 → 아버님 "#1 비공개로 옮김(추천)" · "나머지 표대로" (#6 보류)
+- #1 (P1) 공개 저장소 `coach/fixes.json`(진우 영어 글 + 날짜)·`coach/math/replies.json`("진우야, …" 답장)이 v198 "아이 기록은 공개 저장소에 안 올린다"와 어긋남 → 앱이 📤 열쇠로 비공개 저장소 `essay/fixes.json`·`math/replies.json`을 읽는다(`upload.getFile`·`readPrivateList`·`PRIVATE_FIXES/REPLIES`, `db.syncCoachFixes`·`math.syncMathReplies`) · 공개 두 파일 git rm·APP_SHELL에서 뺌 · 옛 내용은 비공개 저장소에 올림(다시 받아 바이트 같음) · `check.mjs`가 공개 파일이 다시 생기면 막고 `--private <폴더>`로 올리기 전 검사 · ★ 덤: 교정·답장에 배포가 필요 없어졌다
+- #2 기기 기록을 못 읽으면 빈 기록을 올리고 "성공"으로 적던 것 → `upload.gatherFiles`(읽기 실패면 아무것도 안 올리고 실패로 적음)
+- #3 날짜 없는 옛 교정이 "같은 배운 문장"·앞 4단어로 새 글에 붙던 것 → 흐린 짝은 날짜 있는 교정만
+- #4 같은 날·같은 문장을 다시 쓰면 앞 글을 덮어쓰고 옛 교정·읽음이 남던 것 → `pickPrompts` opts.skip + `track.todayEssayIds` · `db.mergeEssayEntry`(글이 바뀌면 옛 교정·읽음 지움, 저장소·화면 사본 같은 규칙) — 아빠 교정 회차는 쓰기 단계가 없어 영향 없음 확인
+- #5 같은 교정을 또 붙이면 "안 읽음"으로 돌아가던 것 → `db.fixEssayEntry`(똑같으면 그대로)
+- #7 백업 되돌리기가 교정 전 사본을 남기고 교정을 버리던 것 → `db.mergeEssayCopies`
+- #8 자동 백업 사본에 `essayAt` 빠짐 → 담음 · #9 T2 "2 이상인 자연수로 나누면 작아져요" · #10 T6 "빈 물통을 가득 — 모두 몇 L"(생성기·원고·검수 페이지)
+- #6 갈라진 두 기기 백업의 영상 보상 금액은 보류(31차 ③과 같은 갈래)
+- 새 테스트 10개는 고치기 전 코드에서 모두 실패 확인 · 플레이어 하네스에 `todayEssayIds` · 전체 **1335 통과**
+- 헤드리스(가짜 GitHub): 비공개 읽기 한글·줄바꿈 base64 · 교정 1건 붙고 두 번째 0·읽음 유지 · 열쇠 없으면 0 · 📤 4파일 · 수학 화면이 math/replies.json 읽음 · 콘솔 오류 0 · 시험 기록 지움
+- 아버님 "커밋하고 v202로 배포" → `4072bce` → 라이브 v202 40초 · 공개 두 파일 404 · 배포본 10개 커밋과 같음(작업 사본 track.js는 파이썬이 쓴 CRLF — git이 LF로 맞춤) · 옛 run 37371255984 queued 그대로
+- 아버님 "기록 봐 줘 하면 태블릿에서 뭘 해야 해?" → 아무것도 안 해도 된다(앱을 열 때·홈으로 올 때·내릴 때 10분에 한 번 저절로), 📊 "📤 지금 보내기"는 방금 것까지 바로 볼 때만
+
+### 변경 파일 (`4072bce`)
+- `js/upload.js` — gatherFiles · getFile · readPrivateList · unb64 · PRIVATE_FIXES/REPLIES
+- `js/db.js` — mergeEssayEntry · mergeEssayCopies · fixEssayEntry · syncCoachFixes 비공개
+- `js/math.js` — syncMathReplies 비공개 · `js/essay.js` — 흐린 짝은 날짜 있는 교정만 · pickPrompts skip
+- `js/track.js` — mergeEssayEntry · todayEssayIds · `js/player.js` — 오늘 쓴 문장 건너뛰기 · `js/backup.js` — essayAt
+- `js/mathfdiv.js` · `coach/math/fracdiv.json` · `coach/math/review-fdv.html` — T 말 두 곳
+- `js/stats.js` · `js/mathask.js` · `js/parcel.js` — 안내 글·주석(비공개 저장소)
+- `sw.js` — v202, 공개 두 파일 뺌 · `tools/check.mjs` — 공개 파일 막기·--private 검사
+- `coach/fixes.json` · `coach/math/replies.json` — 삭제(비공개 저장소로)
+- 테스트: upload · essay · db.merge · backup · mathfdiv · player.logic
+
+### 결정사항 / 메모
+- 앞으로 ✍️ 교정·❓ 답장은 비공개 저장소에 쓴다(절차는 메모리 essay-coach-roundtrip ①~⑤) — 열쇠 없는 기기는 교정이 안 온다 · git 옛 기록은 지우지 않음(아버님 선택)
+
+## 2026-10-07 (오전) — ✖️ U 분수의 곱셈 줄기 설계 · 1단계 · 2단계 (미커밋)
+
+### 진행 내용
+- 아버님 "분수의 곱셈 줄기(초5-2) 진행하자" → 범위: 미래엔 5-2 지도서 134쪽 학습 흐름도(2단원 「분수의 곱셈」 12차시) · 136쪽 평가표 · 166쪽 7차시((단위분수)×(단위분수) → (진분수)×(진분수), 직사각형 넓이 모델·색종이 접기) · 160쪽 "대분수를 가분수로 바꾼 다음 약분" · 2022 [6수01-09] · 근거: 진우 기록 A "분수 × 자연수" 12/34, "분모에도 곱함" 14·"분모에만 곱함" 8에 몰림 = 오개념 · "분수 × 분수"는 "전부 더함"·"통분한 뒤 분모를 한 번만 씀" = 덧셈 규칙과 섞임
+- 설계안 9칸·기본값 8개 → 아버님 **"이대로 진행"**: U1 (진분수)×(자연수) · U2 (대분수)×(자연수) · U3 (자연수)×(진분수) · U4 (자연수)×(대분수) · U5 (단위분수)×(단위분수) · U6 (진분수)×(진분수) · U7 (대분수)×(대분수) · U8 세 분수의 곱셈 · U9 ⭐ 활용 · 글자 U, A 뒤·T 앞
+- **1단계**: 생성기 `js/mathfmul.js`(FMUL 9칸 초5, 이름표 20 — A와 같은 말, "분모에도 곱함"은 A처럼 약분 안 한 꼴) · 곱셈 그림 `[fmul rep|part|area]`(②에만) · 테스트 20 · 300·3,000·2만 통과 · 변이 67곳 다 잡힘(`.context/u_stage1/`)
+  - 견본 눈 확인이 잡은 것: U1 ② 보여 준 답이 "1"로 떨어짐 · U6에 단위분수끼리 섞임 · U7 수가 큼 → 고치고 테스트로 고정 · 갤러리: 한 묶음 4개 3 + 1 → 2 × 2
+  - 변이 검사가 잡은 것: 씨앗 40에선 쌍둥이 테스트가 틀마다 너무 적게 봄 → 최소 150 씨앗
+  - ★ 처음 `npm test` 전체가 메모리 부족(여유 1.2~1.6 GB)으로 Claude Code에 강제 종료 → 다시 켜지 않고 여쭘 → 아버님 재부팅(여유 23 GB) → 1355 통과
+- **2단계** (아버님 "2단계로 가자"): 원고 `coach/math/fracmul.json` 9칸 배움 39장·확인 39·아빠 카드 9(빌더 `.context/u_stage2/build_fmul.mjs`) · 원고 테스트 6(확인 질문 따로 풀기·오답마다 틀린 셈·까닭이 정답·오답 말함·셈식 126줄·그림의 식과 "진한 칸 N"·조사·참말) · check.mjs 등록 · 원고 변이 28곳 다 잡힘
+  - 테스트가 잡은 것: 분수 뒤 조사(초안에서 20곳 넘게 미리 고침 + "1/3을"·"m가"·"/3에") · 한 줄에 = 셋 · "곱셈도 통분해야 할까?"(참말 금지어) → "덧셈처럼 통분해야 할까?"
+  - ★ 원고 변이가 잡은 테스트 구멍 둘: "3/4 × 3"의 오답 3/4가 "단위분수만큼에서 멈춤"으로 우연히 맞음 → 판정표가 셈의 순서까지 · "1/6"이 "4 1/6" 안의 글자로 지나감 → 까닭 검사를 낱개 수로
+  - 검수 https://claude.ai/artifact/5ogNgxkj1RuYjWSJLYrwfk (`tools/mathfmul.mjs` → `coach/math/review-fmul.html`) · 폰 390px 넘침 0 · 전체 **1361 통과**
+
+### 변경 파일 (미커밋)
+- `js/mathfmul.js` (새) — U 줄기 생성기 · `tests/mathfmul.test.js` (새) — 생성기 20 + 원고 6
+- `js/mathdraw.js` — `[fmul]` 곱셈 그림 절 · figureSvg·figText·renderFigures 등록
+- `sw.js` — APP_SHELL mathfmul.js 줄만(버전 v202 그대로) · `tools/check.mjs` — fracmul.json 원고 검사 등록
+- `coach/math/fracmul.json` (새) — 배움 원고 · `tools/mathfmul.mjs` (새) · `coach/math/review-fmul.html` (새) — 검수 페이지
+- 도구(git 무시): `.context/u_stage1/`(mutate_fmul.mjs · gal_fmul.mjs) · `.context/u_stage2/`(build_fmul.mjs · mutate_content.mjs)
+
+### 결정사항 / 메모
+- 분수 줄기 테스트의 이름표 판정은 "어느 꼴의 셈에서 나오는 오답인가"(수의 순서)까지 조건으로 · 글 속 수 대조는 낱개 수로
+- 백그라운드 node 테스트를 겹치지 말고, 헤드리스·서버는 확인 끝나면 바로 끈다(메모리)
+
+## 2026-10-07 — 세션 정리 (/ress)
+
+### 진행 내용
+- 이번 세션 흐름: /checkp → 🔍 Codex 35차(34차 holds · 새 10건) → 반영·#1 교정·답장 비공개로 **v202** 배포 → ✖️ U 분수의 곱셈 설계 → 1단계(생성기·그림·테스트·변이 67) → 메모리 부족·재부팅 → 2단계(원고 39장·원고 변이 28·검수 artifact)
+- 아버님 "3단계 가기 전에 세션이 많이 찼으니 /ress 하고 clear 후 다음 세션에서 이어서"
+
+### TODO (다음 작업)
+- [ ] U 3단계: STEMS.fracmul(code U, A 뒤·T 앞, 스물한 줄기) · APP_SHELL fracmul.json · ❓·📊 안내에 `[fmul rep 2/5 3]` 예 · 줄기 수 테스트 스물하나 · T 테스트의 "fraction 다음 = fracdiv"를 "fracmul 다음 = fracdiv"로 · 화면 연결 테스트 · sw v203 · 헤드리스 800·390 · 화면 연결 변이 → 커밋·배포 v203
+- [ ] Codex 36차(U + 35차 확인, 새 세션, 여유 메모리 재기·"2만 씨앗 금지") → v204
+- [ ] 아버님: U 원고 검수(https://claude.ai/artifact/5ogNgxkj1RuYjWSJLYrwfk) · "기록 봐 줘"(첫 비공개 교정·답장 왕복 확인)
+- [ ] 배포 때 라이브 버전 확인(옛 run 37371255984 queued)
+- [ ] (제안, 미결정) 분수의 덧셈·뺄셈 줄기 · 📊에 막힌 개념 옆 아빠 카드
+
+## 2026-10-07 (낮) — ✖️ U 분수의 곱셈 3단계 → v203 배포
+
+### 진행 내용
+- 새 세션 /checkp → 아버님 질문 "와이프 아이폰에서도 돼?" → 영어 섀도잉만 쓸 것 · 파일 넣기(구글 드라이브 → 아이폰 파일 앱 → "📄 파일 직접 고르기")·홈 화면에 추가·음성 인식은 기기 진단으로 안내 · 걱정: `#imp-files`의 accept가 .srt를 흐리게 막을 수 있음 → 아버님이 저녁에 집에서 해 보고 다시 물어보기로 (메모리에 남김)
+- 아버님 **"3단계 가자"** → STEMS.fracmul(code U, 초5, lesson) · STEM_ORDER A → **U** → T (스물한 줄기) · APP_SHELL fracmul.json · ❓·📊 안내에 `[fmul rep 2/5 3]` · sw **v203**
+- 테스트: 줄기 수 스물하나(mathstem·mathprog) · T 순서 "fracmul 다음 = fracdiv" · U 화면 연결 1 → 전체 **1362 통과**
+- 헤드리스 800·390: 줄기 고르기 A → U → T · U 진단 5문제(숫자판 분수·대분수) → 사다리 · U1·U3·U5·U6·U8·U9 배움 그림·확인 · ② 그림 문항(`[fmul part 20 2/5]`·`[fmul area 1/6 1/5]`) · 쌍둥이(그림 있는 것도) · 📊 "U. 분수의 곱셈 줄기" · 넘침 0·콘솔 오류 0
+- 화면 연결 변이 22곳 — ★ 줄기 이름(label) 틀림이 지나감(T 테스트도 안 보던 자리) → label 확인 한 줄 → 22 다 잡힘(`.context/u_stage3/`)
+- 아버님 "커밋하고 배포하자" → `ad03351` → 라이브 v203 · 배포본 7개 같음
+
+### 변경 파일 (`ad03351`)
+- `js/mathfmul.js`·`tests/mathfmul.test.js`·`coach/math/fracmul.json`·`tools/mathfmul.mjs`·`coach/math/review-fmul.html` (새, 1·2단계) · `js/mathdraw.js` `[fmul]` · `tools/check.mjs`
+- `js/mathprog.js` STEMS.fracmul·STEM_ORDER · `sw.js` v203·APP_SHELL · `js/mathask.js`·`js/stats.js` [fmul] 예 · `tests/mathstem.test.js`·`tests/mathprog.test.js`·`tests/mathfdiv.test.js`
+
+### 결정사항 / 메모
+- 헤드리스 도우미 `h.q()`는 쌍둥이 문제를 `__mathRound.twin.q`에서 읽어야 한다(옛 도우미는 원래 문항을 다시 읽었다) · 쌍둥이 숫자판도 htype으로
+- 봤지만 안 고친 것: ② "누가 틀렸을까"의 "왜 틀렸나"는 고른 보기가 아니라 말한 사람의 잘못(whyAny — 모든 줄기 같은 설계) · 보기 속 식 줄바꿈(식 nowrap 제안)
+
+### TODO (다음 작업)
+- [ ] Codex 36차(U + 35차 확인, 새 세션, 여유 메모리 재기·"2만 씨앗 금지") → v204
+- [ ] 아버님: U 원고 검수 · 태블릿에서 U 줄기 · 아이폰 영어 시험 결과 · "기록 봐 줘"
