@@ -94,6 +94,13 @@ function clean(ans, list) {
   return out;
 }
 const W = (x, tag) => ({ text: x ? T(x) : '', tag });
+/** 자리 수를 말로 — "2자리" 말고 "두 자리" */
+const PL = ['', '한', '두', '세', '네'];
+/**
+ * 옮김 오답 x가 몫에 소수점을 빼먹은 수(몫의 숫자)와 같으면 — 보기에 남은 이름표만으로는 어느 생각인지 모른다 (Codex 39차 #3, 4.5 ÷ 2.5 → 18)
+ * → 이름표 글자는 그대로 두고(📊 집계), 풀이 글이 두 생각을 다 말한 뒤 바른 셈을 보인다
+ */
+const orDrop = (x, q, one, fix) => (x && q.p > 0 && sameD(x, nat(q.u)) ? `${one}거나, 몫에 소수점을 빼먹었어요 — ${fix}.` : null);
 /** 정답 근처의 "계산 실수" — 오개념 오답이 모자랄 때만 */
 function nearD(ans, k) {
   const x = D(ans); if (!x) return '';
@@ -439,15 +446,16 @@ export const DDIV = [
     rule: '나누는 수가 자연수가 되도록 두 수의 소수점을 똑같이 옮겨요 — 같은 수를 곱해도 몫은 같아요.',
     slip: '두 수의 소수점을 똑같이 옮겼는지 봐요.',
     calc(r, c) {
+      // 소수 두 자리끼리는 나누는 수를 1보다 작게(교과서 1.44 ÷ 0.06 · 0.35 ÷ 0.14) — 3.24처럼 크면 4536 ÷ 324 같은 무거운 나눗셈이 된다 (Codex 39차 #5)
       const one = (pB, qDec, lo, hi, t) => {
-        const [B, q] = draw(() => [rd(r, 0, 3, pB), qDec ? rd(r, 1, 9, 1) : nat(int(r, lo, hi))], ([b, x]) => b.u >= 2 && isP(tidy(mulD(b, x)), pB));
+        const [B, q] = draw(() => [rd(r, 0, pB > 1 ? 0 : 3, pB), qDec ? rd(r, 1, 9, 1) : nat(int(r, lo, hi))], ([b, x]) => b.u >= 2 && isP(tidy(mulD(b, x)), pB));
         const A = tidy(mulD(B, q)); const ans = T(q);
         const wr = clean(ans, [W(shiftD(q, -pB), TAGS.divisorOnly), W(shiftD(q, pB), TAGS.dividendOnly), W(qDec ? nat(q.u) : null, TAGS.dropPoint)]);
         return {
           t: t(T(A), T(B)), ans, wr,
           why: {
-            [TAGS.divisorOnly]: `나누는 수만 옮겼어요 — 나누어지는 수도 똑같이 ${pB}자리 옮겨야 몫이 같아요.`,
-            [TAGS.dividendOnly]: '나누어지는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
+            [TAGS.divisorOnly]: `나누는 수만 옮겼어요 — 나누어지는 수도 똑같이 ${PL[pB]} 자리 옮겨야 몫이 같아요.`,
+            [TAGS.dividendOnly]: orDrop(shiftD(q, pB), q, '나누어지는 수만 옮겼', `두 수를 함께 옮기면 ${A.u} ÷ ${B.u} = ${ans}`) || '나누어지는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
             [TAGS.dropPoint]: `몫에 소수점을 안 찍었어요 — ${A.u} ÷ ${B.u} = ${T(q)}.`,
           },
           steps: [`두 수에 ${P10[pB]}을 곱해요 — ${T(A)} ÷ ${T(B)} = ${A.u} ÷ ${B.u}`, `${A.u} ÷ ${B.u} = ${ans}`],
@@ -502,8 +510,8 @@ export const DDIV = [
         return {
           t: t(T(A), T(B)), ans, wr,
           why: {
-            [TAGS.moves]: `나누는 수를 ${pB}자리 옮겼으면 나누어지는 수도 ${pB}자리만 옮겨요 — 빈 자리에는 0.`,
-            [TAGS.divisorOnly]: `나누는 수만 옮겼어요 — 나누어지는 수도 똑같이 ${pB}자리 옮겨야 몫이 같아요.`,
+            [TAGS.moves]: orDrop(shiftD(q, pA - pB), q, `나누어지는 수를 ${PL[pA]} 자리 옮겼`, `두 수를 ${PL[pB]} 자리씩 옮기면 ${T(shiftD(A, pB))} ÷ ${B.u} = ${ans}`) || `나누는 수를 ${PL[pB]} 자리 옮겼으면 나누어지는 수도 ${PL[pB]} 자리만 옮겨요 — 빈 자리에는 0.`,
+            [TAGS.divisorOnly]: `나누는 수만 옮겼어요 — 나누어지는 수도 똑같이 ${PL[pB]} 자리 옮겨야 몫이 같아요.`,
             [TAGS.dividendOnly]: '나누어지는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
           },
           steps: [`두 수에 ${P10[pB]}을 곱해요 — ${T(A)} ÷ ${T(B)} = ${T(shiftD(A, pB))} ÷ ${B.u}`, `${T(shiftD(A, pB))} ÷ ${B.u} = ${ans}`],
@@ -558,7 +566,7 @@ export const DDIV = [
           why: {
             [TAGS.divisorOnly]: `나누는 수만 옮겼어요 — ${T(A)}에도 ${P10[pB]}을 곱해 ${A.u * P10[pB]}로 만들어요.`,
             [TAGS.moves]: `${T(A)}에 0을 ${pB}개 붙여야 해요 — ${A.u * P10[pB]} ÷ ${B.u}.`,
-            [TAGS.dividendOnly]: '나누어지는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
+            [TAGS.dividendOnly]: orDrop(shiftD(q, pB), q, '나누어지는 수만 옮겼', `두 수에 ${P10[pB]}을 곱하면 ${A.u * P10[pB]} ÷ ${B.u} = ${ans}`) || '나누어지는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
           },
           steps: [`두 수에 ${P10[pB]}을 곱해요 — ${A.u * P10[pB]} ÷ ${B.u}`, `${T(A)} ÷ ${T(B)} = ${ans}`],
           probe: { ask: 'calc', pB, qDec },
@@ -726,9 +734,12 @@ export const DDIV = [
           why: {
             [TAGS.swapDiv]: `"파란 리본은 빨간 리본의 몇 배" — 파란 리본의 길이를 빨간 리본의 길이로 나눠요.`,
             [TAGS.divisorOnly]: '나누는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
-            [TAGS.dividendOnly]: '나누어지는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
+            [TAGS.dividendOnly]: orDrop(shiftD(q, 1), q, '나누어지는 수만 옮겼', `두 수를 함께 옮기면 ${A.u} ÷ ${B.u} = ${ans}`) || '나누어지는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
           },
           steps: [`${T(A)} ÷ ${T(B)} = ${A.u} ÷ ${B.u}`, `${A.u} ÷ ${B.u} = ${ans} — ${ans}배`],
+          // 몫이 소수로 끝나는 문제 — 칸 규칙(자연수만·남는 양)을 물려받지 않는다 (Codex 39차 #2)
+          rule: '"몇 배"는 비교하는 양을 기준이 되는 양으로 나눠요 — 두 수의 소수점은 똑같이 옮겨요.',
+          whyAny: '무엇을 무엇으로 나누는지(기준이 되는 양으로), 두 수의 소수점을 똑같이 옮겼는지 봐요.',
           probe: { ask: 'times' },
         };
       };
@@ -742,9 +753,11 @@ export const DDIV = [
           why: {
             [TAGS.swapDiv]: '1 m의 무게 = 무게 ÷ 길이 — 나누는 수와 나누어지는 수를 바꿨어요.',
             [TAGS.divisorOnly]: '나누는 수만 옮겼어요 — 두 수를 함께 옮겨요.',
-            [TAGS.moves]: '나누는 수를 한 자리 옮겼으면 나누어지는 수도 한 자리만 옮겨요.',
+            [TAGS.moves]: orDrop(shiftD(q, 1), q, '나누어지는 수를 두 자리 옮겼', `두 수를 한 자리씩 옮기면 ${T(shiftD(Wt, 1))} ÷ ${L.u} = ${ans}`) || '나누는 수를 한 자리 옮겼으면 나누어지는 수도 한 자리만 옮겨요.',
           },
           steps: [`1 m의 무게 = ${T(Wt)} ÷ ${T(L)} = ${T(shiftD(Wt, 1))} ÷ ${L.u}`, `${T(shiftD(Wt, 1))} ÷ ${L.u} = ${ans}`],
+          rule: '1 m의 무게는 무게 ÷ 길이 — 두 수의 소수점을 똑같이 옮겨 나눠요.',
+          whyAny: '무게를 길이로 나눴는지, 두 수의 소수점을 똑같이 옮겼는지 봐요.',
           probe: { ask: 'unit' },
         };
       };

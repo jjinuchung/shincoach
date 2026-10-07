@@ -434,9 +434,9 @@ test('🔁 쌍둥이·🤔 노트: 요청한 틀·갈래로 온다 · 같은 셈
 const BAD = [
   [/나누면 (?:늘|항상) 작아져/, '0보다 큰 수를 1보다 작은 수로 나누면 커진다'],
   // Codex 38차 #2와 같은 뿌리 — 0 ÷ 0.5 = 0은 그대로: 일반 규칙엔 "0보다 큰 수를"(또는 그 문제의 수)을 바로 앞에
-  // "0보다 큰 수를"은 같은 줄 앞 어디든(두 마디를 한 조건으로) · 그 문제의 수(8을)는 바로 앞에만 — 처음엔 수도 "같은 줄 앞 어디든"이라
-  // "7.2를 72로 … 1보다 작은 수로 나누면"이 지나갔다 (원고 변이 검사가 잡음)
-  [/(?<!0보다 큰 수를 [^\n]*|\d[를을] |\d에 )1보다 (?:작은|큰) 수로 나누면/, '0을 나누면 그대로 — "0보다 큰 수를 1보다 작은 수로 나누면"'],
+  // "0보다 큰 수를"은 같은 문장 앞 어디든(두 마디를 한 조건으로 — 소수점 말고 . ? ! 에서 끊는다) · 그 문제의 수(8을)는 바로 앞에만, 0은 조건이 아니다
+  //   (처음엔 수도 "같은 줄 앞 어디든"이라 "7.2를 72로 … 1보다 작은 수로 나누면"이 지나갔고 — 원고 변이 검사가 잡음 — "0을 …"·앞 문장의 조건도 봐줬다 — Codex 39차 #6)
+  [/(?<!0보다 큰 수를 (?:[^\n.?!]|\.(?=\d))*|\d*[1-9]\d*[를을] |\d*[1-9]\d*에 )1보다 (?:작은|큰) 수로 나누면/, '0을 나누면 그대로 — "0보다 큰 수를 1보다 작은 수로 나누면"'],
   [/소수점을 (?:맞춰|맞추어) 나누/, '나눗셈은 소수점을 맞추지 않는다(덧셈의 규칙)'],
   [/나누는 수(?:의 소수점)?만 옮겨(?:요|도 돼)/, '두 수를 똑같이 옮긴다'],
   [/남는 양은 몫의 소수 부분이에요|몫의 소수 부분이 남는 양/, '남는 양은 몫의 소수 부분이 아니다(지도서 6-2 212쪽)'],
@@ -861,4 +861,65 @@ test('화면 연결 (3단계): STEMS.decdiv(X)는 이 생성기·원고를 쓰�
   const stats = readFileSync(new URL('../js/stats.js', import.meta.url), 'utf8');
   assert.ok(ask.includes('[ddiv fit 6.4 2.1]') && stats.includes('[ddiv fit 6.4 2.1]'), '❓ 복사문·📊 답장 안내에 [ddiv] 예');
   assert.ok(renderFigures('[ddiv fit 6.4 2.1]').startsWith('<svg'), '안내의 예도 그려진다');
+});
+
+// ───────────────────── 🔍 Codex 39차 ─────────────────────
+
+// #2 — "몇 배"·"1 m의 무게"는 몫이 소수로 끝나는 문제인데, 칸 규칙("자연수만 몫을 구하고 … 남는 양")과 힌트(사람 수·남는 양)를 그대로 물려받았다
+test('★ X10 풀이 카드의 규칙·힌트는 그 문제에 맞다 — 몇 배·1 m의 무게엔 "자연수만"·사람·남는 양 말이 없고, 사람 수·남는 양 문제엔 있다 (Codex 39차 #2)', () => {
+  const seen = {};
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = makeQuestion('ddiv.apply', 'calc', s, OPTS); const { type } = solveText(q.q);
+    const say = `${q.solve.rule}\n${q.solve.whyAny}`;
+    if (type === 'times' || type === 'unit') assert.ok(!/자연수|사람|남는|나누어 줄/.test(say), `X10 #${s} (${type}): 규칙·힌트가 나누어 주기 말\n${say}`);
+    else assert.ok(/자연수/.test(q.solve.rule) && /남는|사람/.test(say), `X10 #${s} (${type}): ${say}`);
+    seen[type] = (seen[type] || 0) + 1;
+  }
+  for (const t of ['count', 'remain', 'times', 'unit']) assert.ok(seen[t] > 0, `가족 ${t}`);
+});
+
+// #3 — 오답 값이 "몫에 소수점을 빼먹은 수"와 같으면(4.5 ÷ 2.5 → 18), 보기에 남은 이름표("나누어지는 수만 옮김")만으로는 어느 생각인지 모른다
+//   → 이름표 글자는 그대로(📊 집계) 두고, 풀이 글이 두 생각을 다 말하고 바른 셈을 보인다
+test('★ 같은 값이 두 틀린 생각에서 나오면 풀이 글이 둘 다 말한다 — 몫의 숫자(소수점을 뺀 수)와 같은 오답의 "왜"에 "소수점을 빼먹"과 바른 몫 (Codex 39차 #3)', () => {
+  let n = 0;
+  for (const { c, s, q } of every(['calc'])) {
+    const ok = q.choices.find((x) => x.ok).text;
+    if (!/\./.test(ok)) continue;
+    const digits = String(+ok.replace('.', ''));
+    for (const w of q.choices.filter((x) => !x.ok && x.text === digits && ![TAGS.dropPoint, TAGS.remScaled, '계산 실수'].includes(x.tag))) {
+      const why = q.solve.why[w.tag] || '';
+      assert.ok(/소수점을 빼먹/.test(why) && hasNum(why, ok), `${c.id} #${s}: "${w.text}"[${w.tag}] — 몫에 소수점을 빼먹어도 같은 수인데 풀이가 한 생각만 말한다\n${q.q}\n${why}`);
+      n++;
+    }
+  }
+  assert.ok(n > SEEDS, `본 겹친 오답 ${n}`);
+});
+
+// #4 — 똑같이 나누기 그림에 "한 칸 = 0.1"이 화면 글자로 없었다(aria-label·figText에만) — 틀린 셈 1.2 ÷ 4 = 3 옆에서 칸 3개만 세면 그림이 틀린 답을 편든다
+test('🎨 똑같이 나누기 그림은 화면에 "한 칸 = 0.1"을 적는다 (aria-label 말고 보이는 글자로) (Codex 39차 #4)', () => {
+  for (const d of ['ddiv share 1.2 4', 'ddiv share 2.4 2', 'ddiv share 3.5 5']) {
+    const svg = figureSvg(d);
+    const shown = [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+    assert.ok(shown.includes('한 칸 = 0.1'), `${d}: 보이는 글자 ${shown.join(' | ')}`);
+    assert.ok(!/나머지|남는/.test(shown.join(' ')), d);
+  }
+});
+
+// #5 — X6 "소수 두 자리 ÷ 소수 두 자리"는 나누는 수가 3.99까지라 45.36 ÷ 3.24 → 4536 ÷ 324처럼 무거운 나눗셈이 됐다 (교과서 1.44 ÷ 0.06 · 0.35 ÷ 0.14)
+test('X6 소수 두 자리끼리의 나눗셈은 나누는 수가 1보다 작다 — 옮긴 나누는 수가 두 자리 이하 (Codex 39차 #5)', () => {
+  let n = 0;
+  for (let s = 1; s <= SEEDS; s++) {
+    const sv = solveText(makeQuestion('ddiv.same', 'calc', s, OPTS).q);
+    if (!sv.f.ops) continue;
+    const [A, B] = sv.f.ops.map(dec);
+    if (A.p === 2 && B.p === 2) { assert.ok(B.u < 100, `X6 #${s}: ${sv.f.ops.join(' ÷ ')} — 나누는 수 ${B.text}`); n++; }
+  }
+  assert.ok(n > SEEDS / 10, `두 자리끼리 ${n}`);
+});
+
+// #6 — 참말 금지 정규식이 0을 "그 문제의 수"로 봐주고("0을 1보다 작은 수로 나누면 커져요"), 앞 문장의 "0보다 큰 수를"이 다음 문장까지 봐줬다
+test('★ 참말 금지 정규식 자체 — 0은 조건이 아니다 · "0보다 큰 수를"은 같은 문장 안에서만 · 그 문제의 수는 바로 앞에만 (Codex 39차 #6)', () => {
+  const re = BAD.find(([r]) => r.source.includes('1보다 (?:작은|큰) 수로 나누면'))[0];
+  for (const t of ['0을 1보다 작은 수로 나누면 커져요.', '0보다 큰 수를 3으로 나눠요. 1보다 작은 수로 나누면 커져요.', '7.2를 72로 옮기면 72 ÷ 24 — 3. 1보다 작은 수로 나누면 커져요.', '1보다 작은 수로 나누면 몫이 커져요.']) assert.ok(re.test(t), `걸러야 함: ${t}`);
+  for (const t of ['0보다 큰 수를 1보다 작은 수로 나누면 몫은 처음 수보다 커요.', '8을 1보다 큰 수로 나누면 8보다 작아져요.', '7.2를 1보다 작은 수로 나누면 7.2보다 커요.', '0.6을 1보다 작은 수로 나누면 0.6보다 커요.', '0보다 큰 수를 1보다 큰 수로 나누면 작아지고, 1보다 작은 수로 나누면 커져요.']) assert.ok(!re.test(t), `참말: ${t}`);
 });

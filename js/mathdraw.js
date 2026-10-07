@@ -3062,6 +3062,9 @@ export function ddivSvg(sp) {
       g += lab(X0 - 34, y + BH / 2 + 5, `${r + 1}묶음`, ' class="dd-l"');
     }
     H = top + sp.n * (BH + gap);
+    // 한 칸의 크기를 화면 글자로 — 칸 수만 세면 0.1 칸 3개를 "3"으로 읽어 틀린 셈(1.2 ÷ 4 = 3)을 편드는 그림이 된다 (Codex 39차 #4)
+    g += `<text class="dd-u" x="${X0}" y="${H + 10}" font-size="13" font-weight="700" fill="currentColor">한 칸 = 0.1</text>`;
+    H += 20;
   }
   const meta = sp.mode === 'fit' ? `data-k="${sp.k}"` : `data-n="${sp.n}" data-q="${sp.q}"`;
   return `<svg class="frac-fig ddiv-fig" data-mode="${sp.mode}" ${meta} viewBox="0 0 ${W} ${Math.round(H)}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${ddivText(sp)}">${g}</svg>`;
