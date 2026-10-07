@@ -481,6 +481,49 @@ test('🔢 숫자판: 수가 답인 ①만 숫자판 · 분수·대분수 답도
   assert.ok(n > 1000, `쳐 본 보기 ${n}`);
 });
 
+// 🔍 Codex 36차 #3 — 보기는 4개라 오개념 오답 후보(probe.allWrong)가 화면에서 빠질 수 있다. 빠진 후보의 값을 숫자판에 치면
+//   "짐작한 답"(이름표 없음)이 되어 📊 오개념 집계에서 사라졌다 (6/7 × 4에 24/11 "분모에 더함")
+test('🔢 숫자판: 화면에서 빠진 오답 후보를 쳐도 그 오개념 이름표로 간다 (짐작이 아니다) · 그 이름표의 "왜"가 있다 · 꼴을 바꿔 쳐도', () => {
+  let dropped = 0;
+  for (const { c, s, q } of every(['calc'], 200)) {
+    const spec = padSpec(q, 'fracmul');
+    if (!spec) continue;
+    for (const w of q.probe.allWrong) {
+      let t = partsOf(w.text);
+      // 대분수 칸이 없는 문항(답이 진분수)이면 아이는 가분수로 친다
+      if (t && t.mode === 'mixed' && !spec.modes.includes('mixed')) t = { mode: 'frac', p: { n: String(+t.p.w * +t.p.d + +t.p.n), d: t.p.d } };
+      assert.ok(t && spec.modes.includes(t.mode), `${c.id} #${s}: 후보 "${w.text}"를 칸으로 못 나눔`);
+      const hit = matchTyped(q, readTyped(t.mode, t.p, spec), spec);
+      const shown = q.choices[hit.i];
+      if (shown) { assert.ok(!shown.ok && shown.tag, `${c.id} #${s}: "${w.text}"가 ${shown.ok ? '정답' : '이름표 없는 보기'}로 간다`); continue; }
+      dropped++;
+      assert.equal(hit.reason, 'known', `${c.id} #${s}: 빠진 후보 "${w.text}"[${w.tag}]가 짐작으로 간다`);
+      assert.equal(hit.known.tag, w.tag, `${c.id} #${s}: "${w.text}" 이름표`);
+      assert.ok(q.solve.why[w.tag], `${c.id} #${s}: "${w.tag}"의 왜가 없다`);
+      // 약분 안 한 꼴·가분수로 쳐도 같은 오개념
+      const v = val(w.text);
+      const hit2 = matchTyped(q, readTyped('frac', { n: String(v.n * 2), d: String(v.d * 2) }, spec), spec);
+      assert.equal(hit2.known && hit2.known.tag, w.tag, `${c.id} #${s}: ${v.n * 2}/${v.d * 2}`);
+    }
+  }
+  assert.ok(dropped > 100, `빠진 후보 ${dropped}`);
+  // Codex 재현: 6/7 × 4에 24/11
+  const q = makeQuestion('fmul.fracnat', 'calc', 1, OPTS);
+  const spec = padSpec(q, 'fracmul');
+  const hit = matchTyped(q, readTyped('frac', { n: '24', d: '11' }, spec), spec);
+  assert.ok(/6\/7 × 4/.test(q.q) && hit.known && hit.known.tag === TAGS.addDen, `${q.q} → ${JSON.stringify(hit)}`);
+});
+
+test('🔢 숫자판 화면 연결: 빠진 후보로 간 답은 이름표 있는 보기로 덧붙여 채점 (짐작 기록 g 없음) · ❓ 복사문 보기 목록에서는 뺀다', () => {
+  const src = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
+  const hooks = src.slice(src.indexOf('function typedHooks('), src.indexOf('function answer('));
+  assert.match(hooks, /res\.known/, 'typedHooks가 matchTyped의 known을 본다');
+  assert.match(hooks, /tag: res\.known\.tag/, '덧붙인 보기에 그 이름표');
+  assert.match(hooks, /guess: res\.i < 0 && !miss && !res\.known/, '짐작으로 세지 않는다');
+  const ask = readFileSync(new URL('../js/mathask.js', import.meta.url), 'utf8');
+  assert.match(ask, /!c\.typedTag/, '❓ 복사문 보기 목록에서 뺀다');
+});
+
 // ───────────────────── 곱셈 그림 ─────────────────────
 
 const attrsOf = (svg, cls) => [...svg.matchAll(new RegExp(`<(?:rect|circle) class="${cls}"([^>]*)>`, 'g'))].map((m) => {
@@ -635,6 +678,26 @@ test('★ 원고의 셈식 — "= …"로 내려 쓴 줄까지 이어서 전부 
     }
   }
   assert.ok(n >= 120, `본 셈식 ${n}`);
+});
+
+// 🔍 Codex 36차 #2 — U2 아빠 카드가 "1 1/3컵씩 3번"을 붓고 확인 식은 7/3 × 3(= 2 1/3컵씩)이었다. 식 하나하나는 참이라 셈식 검사가 못 잡았다
+test('★ 아빠 카드: 활동에 나온 대분수 양을 가분수로 쓴 식은 그 대분수와 같은 값 (같은 분모의 가분수가 식에 있으면 그중 하나는 그 양)', () => {
+  let n = 0;
+  for (const id of IDS) {
+    const d = CONTENT[id].dad;
+    for (const b of [d.goal, ...d.say, d.do, d.pass].map(fillC)) {
+      // 결과(= 뒤)가 아닌 대분수 — 활동에서 다루는 양
+      const qty = [...b.matchAll(/(?<![\d/])(?<!= )(\d+) (\d+)\/(\d+)(?![\d/])/g)].map((m) => ({ t: m[0], w: +m[1], n: +m[2], d: +m[3] }));
+      const imp = [...b.matchAll(/(?<![\d/])(?<!\d )(\d+)\/(\d+)(?![\d/])/g)].map((m) => ({ p: +m[1], d: +m[2] })).filter((x) => x.p > x.d);
+      for (const m of qty) {
+        const same = imp.filter((x) => x.d === m.d);
+        if (!same.length) continue;
+        n++;
+        assert.ok(same.some((x) => x.p === m.w * m.d + m.n), `${id} 아빠 카드: ${m.t}을 가분수로 쓴 식이 없다 (${same.map((x) => `${x.p}/${x.d}`).join(', ')})\n${b}`);
+      }
+    }
+  }
+  assert.ok(n >= 2, `본 대분수 양 ${n}`);
 });
 
 test('🎨 원고의 그림: 모두 그려진다 (곱셈 그림·분수 막대만) · 그림이 있는 장은 글에 같은 식 · "진한 칸 N"은 그림의 진한 칸 수', () => {

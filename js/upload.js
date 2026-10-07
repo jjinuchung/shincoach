@@ -21,6 +21,7 @@ export const DATA_BRANCH = 'main';
 export const AUTO_GAP_MS = 10 * 60 * 1000;
 const TOKEN_KEY = 'shincoach.dataToken';
 const STATE_KEY = 'shincoach.dataUpload';
+const READ_KEY = 'shincoach.dataRead'; // 📥 받기 결과 (파일마다) — Codex 36차 #4
 const API = 'https://api.github.com';
 
 // ───────────────────── 순수 ─────────────────────
@@ -177,11 +178,44 @@ export async function getFile({ fetchFn, token, path, repo = DATA_REPO }) {
 export async function readPrivateList(path, o = {}) {
   const token = 'token' in o ? o.token : getToken();
   if (!token) return [];
-  try {
-    const text = await getFile({ fetchFn: o.fetchFn || fetch, token, path });
-    const list = text === null ? [] : JSON.parse(text);
-    return Array.isArray(list) ? list : [];
-  } catch { return []; }
+  // 받기 결과를 파일마다 이 기기에 적는다 — 📊 📤 카드가 한 줄로 보인다 (Codex 36차 #4: 실패가 "받을 것 없음"과 똑같이 보였다)
+  const note = (kind, n) => noteRead(path, readStatus(kind, n, (o.now || Date.now)()), o.store);
+  let text;
+  try { text = await getFile({ fetchFn: o.fetchFn || fetch, token, path }); } catch (e) { note(e && e.status !== undefined ? e.status : 0); return []; }
+  if (text === null) { note('missing'); return []; }
+  let list;
+  try { list = JSON.parse(text); } catch { note('json'); return []; }
+  if (!Array.isArray(list)) { note('shape'); return []; }
+  note('ok', list.length);
+  return list;
+}
+
+/**
+ * 📥 받기 결과 → 아버님이 볼 상태 (순수). kind: 'ok' · 'missing'(404 — 아직 안 올렸으면 정상) · 'json' · 'shape' · HTTP 상태 수(0 = 인터넷)
+ * @returns {{at:number, ok:boolean, n?:number, missing?:boolean, why?:string}}
+ */
+export function readStatus(kind, n = 0, at = Date.now()) {
+  if (kind === 'ok') return { at, ok: true, n };
+  if (kind === 'missing') return { at, ok: true, n: 0, missing: true };
+  if (kind === 'json') return { at, ok: false, why: '파일이 깨져 못 읽었어요 (JSON) — Claude에게 고쳐 달라고 해 주세요' };
+  if (kind === 'shape') return { at, ok: false, why: '파일 모양이 틀렸어요 (목록이 아님) — Claude에게 고쳐 달라고 해 주세요' };
+  if (kind === 403) return { at, ok: false, why: '이 열쇠로는 저장소를 읽을 수 없어요 — 열쇠의 저장소·권한(Contents)을 확인해 주세요' };
+  return { at, ok: false, why: whyOf(kind) };
+}
+const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장' };
+/**
+ * 📊 📤 카드의 받기 한 줄 (순수) — "📥 받기: ✍️ 교정 ✅ 10/07 10:32 (3개) · ❓ 답장 · 아직 없음"
+ * @param {Object<string, {at:number, ok:boolean, n?:number, missing?:boolean, why?:string}>|null} state readState()
+ * @param {(t:number) => string} fmt 시각 글
+ */
+export function readSummary(state, fmt) {
+  const s = state || {};
+  const parts = Object.keys(READ_NAMES).filter((p) => s[p]).map((p) => {
+    const r = s[p]; const name = READ_NAMES[p];
+    if (!r.ok) return `${name} ❌ ${fmt(r.at)} 못 받았어요 — ${r.why}`;
+    return r.missing ? `${name} · 아직 없음` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
+  });
+  return parts.length ? `📥 받기: ${parts.join(' · ')}` : '📥 받기: 아직 받아 본 적이 없어요 (앱을 열 때·수학을 열 때 저절로)';
 }
 
 // ───────────────────── 이 기기의 열쇠·상태 ─────────────────────
@@ -199,11 +233,18 @@ export function setToken(raw) {
   try { localStorage.setItem(TOKEN_KEY, t); return true; } catch { return false; }
 }
 export function clearToken() {
-  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(STATE_KEY); } catch { /* 없으면 그만 */ }
+  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(STATE_KEY); localStorage.removeItem(READ_KEY); } catch { /* 없으면 그만 */ }
 }
 /** 마지막 시도 { at, ok, why, hash, files } */
 export function uploadState() {
   return readJson(STATE_KEY);
+}
+/** 📥 받기 결과 — { 파일 경로: readStatus } (store는 테스트용, 안 주면 이 기기 localStorage) */
+export function readState(store) {
+  try { return JSON.parse((store || localStorage).getItem(READ_KEY) || 'null') || {}; } catch { return {}; }
+}
+function noteRead(path, st, store) {
+  try { const s = readState(store); s[path] = st; (store || localStorage).setItem(READ_KEY, JSON.stringify(s)); } catch { /* 적지 못해도 받기는 그대로 */ }
 }
 
 // ───────────────────── 보내기 ─────────────────────

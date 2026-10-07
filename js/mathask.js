@@ -34,8 +34,8 @@ export function askContext(q, a) {
   return {
     concept: q.concept, k: q.kind || 'calc', key: q.key || '', q: String(q.q || ''), expr: String(q.expr || ''),
     my: String((a && a.chosen) || ''), ans: String(okCh.text || ''), tag: String((a && a.tag) || ''), w: String((a && a.w) || ''),
-    // 🔢 숫자판으로 쓴 답은 보기에 없는 수일 수 있다 — 화면이 덧붙인 "짐작한 답"·"모르겠어요"는 보기 목록에서 뺀다
-    choices: (q && q.choices || []).filter((c) => c && !c.guess && !c.idk && !c.formMiss).map((c) => String(c.text || '')), seen,
+    // 🔢 숫자판으로 쓴 답은 보기에 없는 수일 수 있다 — 화면이 덧붙인 "짐작한 답"·"모르겠어요"·빠진 오개념 후보(typedTag)는 보기 목록에서 뺀다
+    choices: (q && q.choices || []).filter((c) => c && !c.guess && !c.idk && !c.formMiss && !c.typedTag).map((c) => String(c.text || '')), seen,
     ...(a && a.p ? { pad: 1 } : {}),
     // 🪞 모눈 판·📈 좌표평면 판에 찍은 답 — 보기는 아이가 못 본 후보 점이고, 후보가 아닌 자리는 "(6, 2)"·"(1, −3)"로 온다
     ...(a && a.p && q && q.draw && (q.draw.mode === 'grid' || q.draw.mode === 'plane') ? { grid: 1 } : {}),

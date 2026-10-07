@@ -222,6 +222,50 @@ test('📥 비공개 저장소에서 아빠 교정·❓ 답장 읽기 — 이 �
   assert.equal(asked, 0, '열쇠 없으면 GitHub에 묻지 않는다');
 });
 
+// 🔍 Codex 36차 #4 — 인터넷 끊김·열쇠 문제·파일 없음·JSON 깨짐이 모두 "받을 것 없음"과 똑같이 빈 목록이라 아버님이 알 수 없었다.
+//   아이 화면은 그대로 조용히, 받기 결과를 이 기기에 적어 📊 📤 카드에 한 줄로 보인다 (이미 붙은 교정·답장은 그대로)
+test('📥 받기 결과를 파일마다 적는다 — 받음(개수)·아직 없음(404)·인터넷·열쇠·권한·깨진 JSON·목록 아님 · 열쇠가 없으면 적지 않는다', async () => {
+  const mem = {}; const store = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
+  const at = (o) => ({ ...o, store, now: () => 1000 });
+  const list = [{ no: 1, text: '답' }, { no: 2, text: '또' }];
+  assert.deepEqual(await UP.readPrivateList('math/replies.json', at({ fetchFn: fakeRead({ 'math/replies.json': JSON.stringify(list) }).fetchFn, token: 'tok' })), list);
+  assert.deepEqual(UP.readState(store)['math/replies.json'], { at: 1000, ok: true, n: 2 });
+  await UP.readPrivateList('essay/fixes.json', at({ fetchFn: fakeRead({}).fetchFn, token: 'tok' }));
+  assert.deepEqual(UP.readState(store)['essay/fixes.json'], { at: 1000, ok: true, n: 0, missing: true }, '404 = 아직 없음 (실패가 아니다)');
+  assert.deepEqual(UP.readState(store)['math/replies.json'].n, 2, '다른 파일의 결과는 그대로');
+  const cases = [
+    [async () => { throw new TypeError('Failed to fetch'); }, /인터넷/],
+    [fakeRead({}, 401).fetchFn, /열쇠가 틀렸거나 기한/],
+    [fakeRead({}, 403).fetchFn, /읽을 수 없어요/],
+    [fakeRead({ 'essay/fixes.json': '{not json' }).fetchFn, /깨져/],
+    [fakeRead({ 'essay/fixes.json': '{"a":1}' }).fetchFn, /목록이 아님/],
+  ];
+  for (const [fetchFn, why] of cases) {
+    assert.deepEqual(await UP.readPrivateList('essay/fixes.json', at({ fetchFn, token: 'tok' })), [], '실패해도 빈 목록 (앱은 그대로)');
+    const s = UP.readState(store)['essay/fixes.json'];
+    assert.equal(s.ok, false); assert.match(s.why, why);
+  }
+  const before = JSON.stringify(UP.readState(store));
+  await UP.readPrivateList('essay/fixes.json', at({ fetchFn: async () => ({ status: 200 }), token: null }));
+  assert.equal(JSON.stringify(UP.readState(store)), before, '열쇠가 없으면 묻지도 적지도 않는다');
+  // 📊 한 줄 — 파일마다 받은 때·개수, 못 받았으면 까닭
+  const line = UP.readSummary({ 'essay/fixes.json': { at: Date.UTC(2026, 9, 7, 1, 32), ok: true, n: 3 }, 'math/replies.json': { at: 1, ok: false, why: '인터넷이 안 돼요' } }, () => '10/07 10:32');
+  assert.match(line, /✍️ 교정 ✅ 10\/07 10:32 \(3개\)/);
+  assert.match(line, /❓ 답장 ❌ .*인터넷이 안 돼요/);
+  assert.match(UP.readSummary({}, () => ''), /아직 받아 본 적이 없어요/);
+  assert.match(UP.readSummary({ 'math/replies.json': { at: 5, ok: true, n: 0, missing: true } }, () => 't'), /❓ 답장 · 아직 없음/);
+});
+
+test('📥 받기 결과 화면 연결 — 📊 📤 카드에 한 줄 · 열쇠를 지우면 받기 결과도 지운다 · 아이 화면(수학·에세이)은 그대로 조용히', () => {
+  const s = src('js/stats.js');
+  const cardSrc = s.slice(s.indexOf('function renderUploadCard('), s.indexOf('function renderUploadCard(') + 4000);
+  assert.match(cardSrc, /readSummary\(readState\(\)/, '📤 카드가 받기 결과를 보인다');
+  const u = src('js/upload.js');
+  const clr = u.slice(u.indexOf('export function clearToken'), u.indexOf('export function clearToken') + 300);
+  assert.match(clr, /READ_KEY/, '열쇠 지우기 = 받기 결과도');
+  assert.ok(!/readState|readSummary/.test(src('js/math.js') + src('js/db.js') + src('js/essay.js') + src('js/player.js')), '아이 화면엔 안 보인다');
+});
+
 test('📥 화면 연결 — 아빠 교정(db.syncCoachFixes)·❓ 답장(math.syncMathReplies)은 비공개 저장소에서 · ★ 공개 저장소엔 아이 글·답장 파일이 없다', () => {
   const d = src('js/db.js');
   const fx = d.slice(d.indexOf('export async function syncCoachFixes'), d.indexOf('/** 하루치 기록에서 에세이 하나에 readAt'));

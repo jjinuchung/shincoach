@@ -25,6 +25,12 @@ for (const f of readdirSync('js').filter((f) => f.endsWith('.js'))) {
     console.error(`sw.js APP_SHELL 누락: js/${f} — 오프라인에서 이 기능이 동작하지 않습니다`);
   }
 }
+// ★ 공개 앱 파일(js·sw.js — 빌드 없이 주석까지 그대로 배포된다)에 아이 기록의 점수 꼴 "12/34(35%)"를 적지 않는다 (Codex 36차 #1)
+const SCORE_RE =/\d+\/\d+\s*\(\d+(?:\.\d+)?%\)/;
+for (const f of ['sw.js', ...readdirSync('js').filter((f) => f.endsWith('.js')).map((f) => 'js/' + f)]) {
+  const hit = readFileSync(f, 'utf8').match(SCORE_RE);
+  if (hit) { bad++; console.error(`공개 앱 파일에 아이 점수: ${f} "${hit[0]}" — 기록 수치는 비공개 저장소(shincoach-data)에만 적어 주세요`); }
+}
 for (const f of readdirSync('vocab').filter((f) => f.endsWith('.json'))) {
   try {
     JSON.parse(readFileSync('vocab/' + f, 'utf8'));
@@ -52,26 +58,15 @@ const { figureSvg } = await import('../js/mathdraw.js');
 //   비공개 저장소 shincoach-data의 essay/fixes.json · math/replies.json에 올리고, 앱은 이 기기 📤 열쇠로 읽는다
 const PUBLIC_PRIVATE = ['coach/fixes.json', 'coach/math/replies.json'];
 for (const f of PUBLIC_PRIVATE) if (existsSync(f)) { bad++; console.error(`공개 저장소에 아이 기록: ${f} — 비공개 저장소(shincoach-data)에 올려 주세요`); }
-// 비공개 저장소에 올리기 전 검사: node tools/check.mjs --private <폴더> (그 안의 essay/fixes.json · math/replies.json)
-const pi = process.argv.indexOf('--private');
-const privDir = pi > 0 ? process.argv[pi + 1] : null;
-if (privDir) {
-  const fx = `${privDir}/essay/fixes.json`;
-  try {
-    const list = JSON.parse(readFileSync(fx, 'utf8'));
-    if (!Array.isArray(list)) { bad++; console.error(`내용 오류: ${fx}: 배열이 아님`); }
-    else list.forEach((e, i) => { if (!e || typeof e.fixed !== 'string' || !e.fixed.trim()) { bad++; console.error(`내용 오류: ${fx}[${i}]: fixed(고친 글)가 있어야 함`); } });
-  } catch (e) { if (existsSync(fx)) { bad++; console.error(`JSON 오류: ${fx}: ${e.message}`); } }
-  // ❓ 아빠 답장 — [{ no, text }], 그림 지시문은 앱이 아는 것만 (모르면 글자 그대로 아이 화면에 찍힌다)
-  const rp = `${privDir}/math/replies.json`;
-  try {
-    const rep = JSON.parse(readFileSync(rp, 'utf8'));
-    if (!Array.isArray(rep)) { bad++; console.error(`내용 오류: ${rp}: 배열이 아님`); }
-    else rep.forEach((e, i) => {
-      if (!e || !Number.isInteger(e.no) || e.no <= 0 || typeof e.text !== 'string' || !e.text.trim()) { bad++; console.error(`내용 오류: ${rp}[${i}]: { no: 양의 정수, text: 글 } 이어야 함`); return; }
-      for (const m of e.text.matchAll(/\[([a-z]+) [^\]]*\]/g)) if (!figureSvg(m[0].slice(1, -1)).startsWith('<svg')) { bad++; console.error(`내용 오류: ${rp}[${i}] (💬${e.no}): 그림 지시문을 못 그림 ${m[0]} — 문법은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5]`); }
-    });
-  } catch (e) { if (existsSync(rp)) { bad++; console.error(`JSON 오류: ${rp}: ${e.message}`); } }
+// 비공개 저장소에 올리기 전 검사: node tools/check.mjs --private <폴더> (그 안의 essay/fixes.json · math/replies.json 중 있는 것)
+// 없는 폴더·빈 폴더·폴더 이름 빠짐은 실패 (Codex 36차 #5) — tools/privcheck.mjs
+const { privateArg, checkPrivateDir } = await import('./privcheck.mjs');
+const priv = privateArg(process.argv);
+if (priv.error) { bad++; console.error(priv.error); }
+if (priv.dir) {
+  const pr = checkPrivateDir(priv.dir, figureSvg);
+  for (const msg of pr.errors) { bad++; console.error(msg); }
+  if (pr.checked.length) console.log(`비공개 파일 검사: ${pr.checked.map((f) => `${priv.dir}/${f}`).join(' · ')}`);
 }
 // 📦 아빠의 구호품(coach/gifts.json) — [{ id, items: { 아이템id: 1~10 }, title?, text? }], 틀린 줄은 앱이 조용히 건너뛰므로 여기서 잡는다
 try {

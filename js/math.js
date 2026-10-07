@@ -1428,6 +1428,7 @@ function typedAnswered(list, q, text, ok) {
 /**
  * 숫자판의 확인·모르겠어요 → 보기 번호. 어느 보기와도 다른 값("짐작한 답")·모르겠어요는 이름표 없는 보기로 덧붙여
  * 같은 채점 길로 보낸다 (풀이 카드·틀린 이유·쌍둥이·❓가 그대로 돈다). ❓ 복사문의 보기 목록에서는 뺀다(mathask).
+ * 화면에서 빠진 오개념 오답 후보와 같은 값이면(matchTyped의 known) 그 이름표를 단 보기로 덧붙인다 — 짐작이 아니다 (Codex 36차 #3)
  */
 function typedHooks(q, spec, go) {
   const extra = (text, flag) => { q.choices.push({ text, ok: false, [flag]: true }); return q.choices.length - 1; };
@@ -1437,8 +1438,9 @@ function typedHooks(q, spec, go) {
       const res = spec ? matchTyped(q, typed, spec) : { i: q.choices.findIndex((c) => c.text === typed.text) };
       // 값은 맞는데 꼴·약분만 틀린 답은 "짐작"이 아니다 — 틀림은 그대로, 기록은 pf(꼴/약분)로 (Codex 18차 #4)
       const miss = res.i < 0 && (res.reason === 'form' || res.reason === 'reduce') ? res.reason : null;
-      const i = res.i >= 0 ? res.i : extra(typed.text, miss ? 'formMiss' : 'guess');
-      go(i, { text: typed.text, note: res.note, guess: res.i < 0 && !miss, form: miss });
+      const tagged = () => { q.choices.push({ text: typed.text, ok: false, tag: res.known.tag, typedTag: true }); return q.choices.length - 1; };
+      const i = res.i >= 0 ? res.i : res.known ? tagged() : extra(typed.text, miss ? 'formMiss' : 'guess');
+      go(i, { text: typed.text, note: res.note, guess: res.i < 0 && !miss && !res.known, form: miss });
     },
     onIdk: () => go(extra('모르겠어요', 'idk'), { text: '모르겠어요', note: null, idk: true }),
   };

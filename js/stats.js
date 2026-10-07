@@ -19,7 +19,7 @@ import { ROSTER } from './pokemon.js';
 import { lvOf } from './evolve.js';
 import { visibleView } from './pokedex.js';
 import { ENGLISH_STONE_HOW, VIDEO_TIERS } from './items.js'; // 🔶 영어스톤 받는 곳 안내 (2026-10-06)
-import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport } from './upload.js'; // 📤 Claude에게 기록 보내기 (2026-10-06)
+import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport, readState, readSummary } from './upload.js'; // 📤 Claude에게 기록 보내기 (2026-10-06)
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
 
 const $ = (id) => document.getElementById(id);
@@ -868,6 +868,8 @@ function renderUploadCard(main) {
   if (token) {
     paint(st);
     box.appendChild(status);
+    // 📥 아빠 교정·❓ 답장 받기 결과 — 못 받았으면 까닭 (아이 화면은 조용히, 여기서만 — Codex 36차 #4)
+    box.appendChild(el('p', 'stats-sub', readSummary(readState(), fmt)));
     const row = el('div', 'stats-actions');
     const send = el('button', 'btn btn-primary', '📤 지금 보내기');
     send.type = 'button';

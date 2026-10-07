@@ -1,8 +1,8 @@
 // 🔢 수학 — 숫자판(주관식) 답칸의 순수 로직: 어떤 칸을 보여 줄지 · 친 칸을 답 글로 · 답 글을 보기 번호로.
 // 화면 없음 (node 테스트에서 그대로 돈다). 화면은 math.js가 이 결과로 그린다.
 //
-// 왜 (2026-10-01, 아버님 사진 — 📊 수학 기록): 분수 ÷ 분수 ① 계산이 6/30(20%)으로 찍어도 나오는 25%보다 낮고,
-// 오답이 세 오개념에 9·9·8로 고르게 흩어졌다 = 보기를 찍고 있었다. 수가 답인 ① 계산은 숫자판으로 직접 쓴다.
+// 왜 (2026-10-01, 아버님 결정 — 📊 수학 기록): 정답률이 찍기 확률보다 낮고 오답이 여러 오개념에 고르게 흩어지면
+// 보기를 찍고 있다는 뜻이다(아이 기록의 수치는 공개 코드에 적지 않는다 — Codex 36차 #1). 수가 답인 ① 계산은 숫자판으로 직접 쓴다.
 //
 // ★ 오개념 진단은 그대로 산다: 친 값이 오답 보기의 값과 같으면 그 보기를 고른 것으로 친다(이름표가 그대로 쌓인다).
 //   어느 보기와도 안 같으면 "짐작한 답"(i = -1) — 오개념 집계에는 안 넣고 친 답만 남긴다.
@@ -161,6 +161,7 @@ const norm = (t) => String(t).replace(/−/g, '-').replace(/\s*:\s*/g, ' : ').re
  * @returns {{i:number, note:string|null, reason?:string}} i = 보기 번호(-1이면 어느 보기도 아님) · note = 한 줄 안내 ·
  *   reason(i가 -1일 때): 'form' 값은 맞는데 꼴이 다름 · 'reduce' 약분이 덜 됨 · 'none' 어느 보기와도 다른 짐작한 답
  *   (꼴·약분은 "짐작"이 아니다 — 값은 안다. 📊에 짐작으로 적히던 것, Codex 18차 #4)
+ *   · 'known' 화면에서 빠진 오개념 오답 후보와 같은 값 — known: { text, tag } (Codex 36차 #3)
  */
 export function matchTyped(q, typed, spec = {}) {
   const choices = q.choices || [];
@@ -188,7 +189,11 @@ export function matchTyped(q, typed, spec = {}) {
     return { i: okI, note };
   }
   const wrong = choices.findIndex((c) => !c.ok && sameVal(v, textVal(c.text)));
-  return wrong >= 0 ? { i: wrong, note: null } : { i: -1, note: null, reason: 'none' };
+  if (wrong >= 0) return { i: wrong, note: null };
+  // 🔍 Codex 36차 #3 — 보기는 4개라 오개념 오답 후보(probe.allWrong)가 화면에서 빠질 수 있다. 친 값이 빠진 후보와 같으면
+  //   짐작이 아니라 그 오개념이다 → 이름표를 돌려준다(화면 typedHooks가 이름표 있는 보기로 덧붙여 채점한다)
+  const known = ((q.probe && q.probe.allWrong) || []).find((w) => w && w.tag && sameVal(v, textVal(w.text)));
+  return known ? { i: -1, note: null, reason: 'known', known: { text: String(known.text), tag: known.tag } } : { i: -1, note: null, reason: 'none' };
 }
 
 /** 보기 글 → 그 꼴의 칸에 친 글자 (테스트·헤드리스 도우미가 "정답을 쳐 본다") */
