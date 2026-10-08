@@ -22,11 +22,14 @@ const LIMIT = 9e15;
 const KD = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 };
 const KS = { 천: 1000, 백: 100, 십: 10 };
 const KB = [['조', 1e12], ['억', 1e8], ['만', 1e4]];
-/** 네 자리 안쪽 읽은 말 → 수 ("천이백삼십구" → 1239, 앞의 일이 빠진 천·백·십은 1) */
+/** 네 자리 안쪽 읽은 말 → 수 ("천이백삼십구" → 1239, 앞의 일이 빠진 천·백·십은 1) — 단위는 천 → 백 → 십 차례로 한 번씩만("백천"·"십십"은 못 읽음, Codex 40차 #4) */
 function parseSmall(s) {
-  let v = 0; let cur = 0;
+  let v = 0; let cur = 0; let last = 10000;
   for (const ch of s) {
-    if (KD[ch]) { if (cur) throw new Error(`숫자 두 번: ${s}`); cur = KD[ch]; } else if (KS[ch]) { v += (cur || 1) * KS[ch]; cur = 0; } else throw new Error(`못 읽음 "${ch}" in ${s}`);
+    if (KD[ch]) { if (cur) throw new Error(`숫자 두 번: ${s}`); cur = KD[ch]; } else if (KS[ch]) {
+      if (KS[ch] >= last) throw new Error(`단위 차례: ${s}`);
+      last = KS[ch]; v += (cur || 1) * KS[ch]; cur = 0;
+    } else throw new Error(`못 읽음 "${ch}" in ${s}`);
   }
   return v + cur;
 }
@@ -133,7 +136,8 @@ function tagHolds(f, ans, tag, wv) {
   switch (tag) {
     case TAGS.placeOff: return ['x10', 'write', 'expand', 'value', 'read', 'countk'].includes(f.kind) && (wv === ans * 10 || wv * 10 === ans);
     case TAGS.zeroPad: return ['write', 'mix'].includes(f.kind) && wv === +grp(ans).filter(Boolean).reverse().join('');
-    case TAGS.zeroSkip: return ['expand', 'read', 'cardLarge'].includes(f.kind) && wv === +String(ans).replace(/0/g, '');
+    // 수로 쓰기·조억 섞기에서도 — 0이 없는 묶음끼리면 "0 빼기"와 "네 자리를 채우지 않음"이 같은 값이 된다(삼만 사백육십팔 → 3468, Codex 40차 #2)
+    case TAGS.zeroSkip: return ['expand', 'read', 'cardLarge', 'write', 'mix'].includes(f.kind) && wv === +String(ans).replace(/0/g, '');
     case TAGS.faceValue: return (f.kind === 'value' && wv === f.d) || (f.kind === 'countk' && wv === f.k);
     case TAGS.unitShift:
       if (f.kind === 'mix') return wv === f.a * 1e12 + f.b * 1e4;
@@ -328,7 +332,9 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고치는 
     const F = misreadFacts(q);
     assert.ok(F && F.right > 0, `${at}: 못 읽는 ②\n${q.q}`);
     assert.notEqual(F.shown, F.right, `${at}: 보여 준 말이 맞다\n${q.q}`);
-    assert.ok(ALL_TAGS.some((tg) => tagHolds(F.f, F.right, tg, F.shown)), `${at}: 보여 준 답 ${F.shown}이 어느 틀린 셈에서도 안 나온다\n${q.q}`);
+    // 보여 준 틀린 답도 한 생각에만 맞는다 — 둘에 맞으면 고치는 말·풀이가 한 생각만 짚는다 (Codex 40차 #2를 ②에도)
+    const shownTags = ALL_TAGS.filter((tg) => tagHolds(F.f, F.right, tg, F.shown));
+    assert.equal(shownTags.length, 1, `${at}: 보여 준 답 ${F.shown}에 맞는 틀린 생각 ${shownTags.length}개 ${shownTags.join(' · ')}\n${q.q}`);
     const ok = q.choices.find((x) => x.ok);
     assert.equal(F.tail(ok.text), F.right, `${at}: 고치는 말 "${ok.text}"의 결론`);
     for (const w of q.choices.filter((x) => !x.ok)) {
@@ -662,22 +668,59 @@ function numbersIn(text) {
   for (const m of t.matchAll(/\d+/g)) out.add(+m[0]);
   return out;
 }
-/** 글 속 한글로 읽은 수 — 자리 이름(천만의 자리 · 천·백·십·일)·한 글자(만·천)·수 뒤 단위(386만)는 빼고, 끝의 "이"는 조사면 뗀다 */
+/**
+ * 글 속 한글로 읽은 수 — [{ r, alts(읽은 말 후보), seg(그 말이 있는 줄 — "→ "로 시작하는 줄은 앞 줄에 이어서) }]
+ * 자리 이름(천만의 자리 · 천·백·십·일)·한 글자(만·천)·수 뒤 단위(386만)는 뺀다 · 끝의 "이"는 수(천이 = 1002)일 수도 조사일 수도 있어 후보 둘
+ * (단 한 글자 큰 단위 + 이 — "억이 있는 수"·"만이야" — 는 조사) — Codex 40차 #4: 끝의 이를 늘 떼면 "육만 사백이"가 60400으로 읽혔다
+ */
 function readingsIn(text) {
   const t = String(text).replace(/\*\*/g, '').replace(PLACE_FIG, '');
+  const segs = [];
+  for (const line of t.split('\n')) { if (/^→ /.test(line) && segs.length) segs[segs.length - 1] += `\n${line}`; else segs.push(line); }
   const out = [];
-  for (const m of t.matchAll(new RegExp(`[${KO}]+(?: [${KO}]+)*`, 'g'))) {
-    let r = m[0];
-    const prev = t[m.index - 1] || ''; let next = t.slice(m.index + r.length);
-    if (/[\d가-힣·]/.test(prev) || next.startsWith('·')) continue;
-    // 끝의 "이"가 조사 — 뒤에 라고·에요 같은 말이 붙거나, 한 글자 단위(억이 있는 수)에 띄어 쓴 말이 올 때
-    if (r.endsWith('이') && (/^(라고|라서|에요|야|고|면|니까|었|다|며)/.test(next) || (r.length === 2 && /^[\s.,!?)—]/.test(next)))) { r = r.slice(0, -1); next = '이' + next; }
-    if (next.startsWith('의') || r.replace(/ /g, '').length < 2) continue;
-    out.push(r);
+  for (const seg of segs) {
+    for (const m of seg.matchAll(new RegExp(`[${KO}]+(?: [${KO}]+)*`, 'g'))) {
+      const r = m[0];
+      const prev = seg[m.index - 1] || ''; const next = seg.slice(m.index + r.length);
+      if (/[\d가-힣·]/.test(prev) || next.startsWith('·') || next.startsWith('의')) continue;
+      const alts = [r];
+      if (r.endsWith('이') && r.length > 1) {
+        const cut = r.slice(0, -1);
+        if (/^[만억조]$/.test(cut)) continue;
+        alts.push(cut);
+      }
+      if (r.replace(/ /g, '').length < 2) continue;
+      out.push({ r, alts, seg });
+    }
   }
   return out;
 }
-test('★ 원고의 한글로 읽은 수는 같은 글에 있는 수를 바르게 읽은 말이다 — 장마다(배움·확인 질문·보기·까닭) · 아빠 카드마다 (아이 말은 빼고 읽는다)', () => {
+/**
+ * 읽은 말이 그 수를 바르게 읽었나 — 그 줄(→ 줄은 이어서)에 백 이상의 수가 있으면 그 줄의 수와, 없으면 글 전체(all)의 수와 맞춘다
+ * (장 전체로만 보면 "30481은 칠만 삼백육십"이 같은 장 확인 질문의 70360 때문에 지나갔다 — Codex 40차 #4)
+ * @returns {{ n: number, bad: string[] }}
+ */
+function readingProblems(allText, readText) {
+  const nums = numbersIn(allText); const bad = []; let n = 0;
+  for (const { r, alts, seg } of readingsIn(readText)) {
+    const vals = alts.map(parseKo).filter((x) => x !== null);
+    if (!vals.length) { bad.push(`못 읽는 말 "${r}"`); continue; }
+    const local = [...numbersIn(seg)].filter((x) => x >= 100);
+    const pool = local.length ? new Set(local) : nums;
+    if (!vals.some((x) => pool.has(x))) bad.push(`"${r}"(= ${vals.join(' 또는 ')})이 ${local.length ? `그 줄의 수(${local.join(', ')})` : '같은 글의 수'}가 아니다`);
+    n++;
+  }
+  return { n, bad };
+}
+test('★ 원고의 한글로 읽은 수는 그 줄(없으면 같은 글)에 있는 수를 바르게 읽은 말이다 — 장마다(배움·확인 질문·보기·까닭) · 아빠 카드마다 (아이 말은 빼고 읽는다)', () => {
+  // 검사 자체 점검 (Codex 40차 #4의 예)
+  assert.deepEqual(readingProblems('', '30481은 삼만 사백팔십일이라고 읽어요.').bad, []);
+  assert.equal(readingProblems('70360', '30481은 칠만 삼백육십 — 천의 자리가 0이에요.').bad.length, 1, '같은 장의 다른 수로 지나가지 않는다');
+  assert.deepEqual(readingProblems('', '60402는 육만 사백이라고 읽어요.').bad, [], '끝의 "이"가 수(2)인 말');
+  assert.deepEqual(readingProblems('', '1002는 천이라고 읽어요.').bad, []);
+  assert.equal(readingProblems('', '60400은 육만 사백이라고 읽어요.').bad.length, 0, '조사 "이라고"로도 읽힌다(후보 둘)');
+  assert.equal(readingProblems('', '60402는 육만 오백이라고 읽어요.').bad.length, 1);
+  assert.deepEqual(readingProblems('', '억이 있는 수도 끊어요. 10000은 만이야.').bad, [], '한 글자 단위 + 조사 이');
   let n = 0;
   for (const id of IDS) {
     const v = CONTENT[id];
@@ -687,13 +730,9 @@ test('★ 원고의 한글로 읽은 수는 같은 글에 있는 수를 바르�
       { all: [v.dad.goal, ...v.dad.say, v.dad.do, v.dad.pass, ...v.dad.traps.flatMap((t) => [t.kid, t.dad])], read: [v.dad.goal, ...v.dad.say, v.dad.do, v.dad.pass, ...v.dad.traps.map((t) => t.dad)] },
     ];
     for (const g of groups) {
-      const nums = numbersIn(fillC(g.all.join('\n')));
-      for (const r of readingsIn(fillC(g.read.join('\n')))) {
-        const val = parseKo(r);
-        assert.ok(val !== null, `${id}: 못 읽는 말 "${r}"`);
-        assert.ok(nums.has(val), `${id}: "${r}"(= ${val})이 같은 글의 어느 수도 아니다`);
-        n++;
-      }
+      const res = readingProblems(fillC(g.all.join('\n')), fillC(g.read.join('\n')));
+      assert.deepEqual(res.bad, [], `${id}`);
+      n += res.n;
     }
   }
   assert.ok(n >= 40, `본 읽은 말 ${n}`);
@@ -712,7 +751,7 @@ test('★ 원고의 네 자리씩 끊은 꼴(2759 | 0300)은 같은 글의 수�
       for (const m of text.matchAll(/(?<![\d|] ?)([1-9]\d{0,3})((?: \| \d{4})+)/g)) {
         const joined = +(m[1] + m[2].replace(/ \| /g, ''));
         const rest = text.slice(0, m.index) + ' ' + text.slice(m.index + m[0].length);
-        const seen = new Set([...numbersIn(rest), ...readingsIn(rest).map(parseKo)]);
+        const seen = new Set([...numbersIn(rest), ...readingsIn(rest).flatMap((x) => x.alts.map(parseKo))]);
         assert.ok(seen.has(joined), `${id}: "${m[0]}"(= ${joined})이 같은 글의 어느 수도 아니다`);
         n++;
       }
@@ -874,4 +913,76 @@ test('화면 연결 (3단계): STEMS.bignum(Y)는 이 생성기·원고를 쓰�
   const stats = readFileSync(new URL('../js/stats.js', import.meta.url), 'utf8');
   assert.ok(ask.includes('[place 27590300]') && stats.includes('[place 27590300]'), '❓ 복사문·📊 답장 안내에 [place] 예');
   assert.ok(renderFigures('[place 27590300]').startsWith('<svg'), '안내의 예도 그려진다');
+});
+
+// ───────────────────── 🔍 Codex 40차 ─────────────────────
+
+const PNT = ['일', '십', '백', '천', '만', '십만', '백만', '천만', '억', '십억', '백억', '천억', '조', '십조', '백조', '천조'];
+const digitAt = (n, p) => Math.floor(n / P10(p)) % 10;
+// #1 — "397874에서 10000씩: 만의 자리 숫자가 1씩 커져요 — 407874, 417874"는 만의 자리가 9 → 0 → 1이다(정답 보기에 틀린 말)
+test('★ Y6 뛰어 세기: "…의 자리 숫자가 1씩 커져요"라고 말한 수열은 정말 그 자리 숫자가 1씩 커진다 — 9에서 0으로 넘어가면 그 글에 "9 다음에는 0" · ② 갈래는 받아올림 없이 · 규칙 가족은 "차"를 말하는 규칙 (Codex 40차 #1)', () => {
+  let claims = 0; let carries = 0; let patterns = 0;
+  for (const k of ['calc', 'misread']) {
+    for (let s = 1; s <= Math.max(SEEDS, 600); s++) {
+      const q = makeQuestion('big.skip', k, s, OPTS);
+      const at = `${k} #${s}`;
+      if (/규칙에 따라|다음은/.test(q.q)) { assert.match(q.solve.rule, /차/, `${at}: 규칙 가족의 기억할 것 "${q.solve.rule}"`); patterns++; continue; }
+      let m; let start; let step; let count;
+      if ((m = /^(\d+)에서 (\d+)씩 (\d+)번 뛰어 세면/.exec(q.q))) [start, step, count] = [+m[1], +m[2], +m[3]];
+      else if ((m = /^(\d+)억에서 (\d+)억씩 (\d+)번 뛰어 센/.exec(q.q))) [start, step, count] = [+m[1] * 1e8, +m[2] * 1e8, +m[3]];
+      else if ((m = /\*\*(\d+)에서 (\d+)씩 뛰어 세면 /.exec(q.q))) [start, step, count] = [+m[1], +m[2], 3];
+      assert.ok(start !== undefined, `${at}: 못 읽는 뛰어 세기\n${q.q}`);
+      for (const t of [...q.choices.map((c) => c.text), ...q.solve.steps, ...Object.values(q.solve.why)]) {
+        const c = /(\S+)의 자리 숫자가 1씩 커져요/.exec(t);
+        if (!c) continue;
+        const p = PNT.indexOf(c[1]) + (/억의 묶음에서/.test(t) ? 8 : 0);
+        assert.ok(PNT.includes(c[1]), `${at}: 자리 이름 "${c[1]}"`);
+        // 수열 — 보기는 "— a, b, c"(그 보기가 말한 수), 풀이·왜는 문제의 수열
+        const listed = / — ([\d, ]+)$/.exec(t);
+        const seq = listed ? [start, ...listed[1].split(', ').map(Number)] : Array.from({ length: count + 1 }, (_, i) => start + i * step);
+        let wrap = false;
+        for (let i = 1; i < seq.length; i++) {
+          const a = digitAt(seq[i - 1], p); const b = digitAt(seq[i], p);
+          assert.equal(b, (a + 1) % 10, `${at}: "${t}" — ${seq[i - 1]} → ${seq[i]}에서 ${PNT[p]}의 자리가 ${a} → ${b}`);
+          if (a === 9) wrap = true;
+        }
+        if (wrap) {
+          assert.equal(k, 'calc', `${at}: ② 갈래에 받아올림 "${t}"`);
+          assert.match(t, /9 다음에는 0/, `${at}: 받아올림인데 "9 다음에는 0"이 없다 "${t}"`);
+          carries++;
+        }
+        claims++;
+      }
+    }
+  }
+  assert.ok(claims > 400 && carries > 20 && patterns > 100, `본 말 ${claims} · 받아올림 ${carries} · 규칙 가족 ${patterns}`);
+  // 칸 규칙(기억할 것)도 일반으로 참 — 9 다음은 0
+  assert.match(BIG.find((c) => c.id === 'big.skip').rule, /9 다음에는 0/);
+});
+
+// #3 — 앞에 더 큰 묶음이 있으면 1만은 "일만"(삼억 일만) · 맨 앞이면 "만"(교과서 "만 또는 일만")
+test('한글로 읽기: 맨 앞의 1만은 "만", 억·조 뒤에 끼인 1만은 "일만" — 글자 그대로 대조 (Codex 40차 #3) · 풀이기는 단위 차례가 틀린 말을 못 읽는다 (#4)', () => {
+  assert.equal(readKo(10000), '만');
+  assert.equal(readKo(10010), '만 십');
+  assert.equal(readKo(110000), '십일만');
+  assert.equal(readKo(300010000), '삼억 일만');
+  assert.equal(readKo(100010000), '일억 일만');
+  assert.equal(readKo(1000000010000), '일조 일만');
+  assert.equal(readKo(1000100000000), '일조 일억');
+  assert.equal(parseKo('삼억 일만'), 300010000);
+  assert.equal(parseKo('백천'), null);
+  assert.equal(parseKo('십십'), null);
+  assert.equal(parseKo('천이'), 1002);
+});
+
+// #6 — 16칸 표는 viewBox 400에 글자 12라 폰(318px)에서 9.5px였다
+test('🎨 자릿값 표: 묶음이 셋 이상(12·16칸)이면 글자 15 이상·칸이 글자보다 넓다 — 폰 폭(318px)에서도 12px쯤 (Codex 40차 #6)', () => {
+  for (const n of ['352900000000', '764123900000000', '4170235896000000']) {
+    const svg = figureSvg(`place ${n}`);
+    const fs = [...svg.matchAll(/font-size="([\d.]+)"/g)].map((m) => +m[1]);
+    assert.ok(fs.length && Math.min(...fs) >= 15, `${n}: 글자 ${Math.min(...fs)}`);
+    const cw = +attrsOf(svg, 'pl-d')[0].width;
+    assert.ok(cw >= Math.min(...fs) * 1.4, `${n}: 칸 ${cw} · 글자 ${Math.min(...fs)}`);
+    assert.ok(+/viewBox="0 0 (\d+)/.exec(svg)[1] <= 400, n);
+  }
 });

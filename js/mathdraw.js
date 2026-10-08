@@ -3097,21 +3097,23 @@ export function placeText(sp) {
 }
 /** 자릿값 표 */
 export function placeSvg(sp) {
-  const W = 400; const cols = sp.G * 4; const cw = Math.min(26, 360 / cols); const X0 = (W - cols * cw) / 2;
-  const rh = 24; const top = 4; let g = '';
-  const fs = cw < 24 ? 12 : 13;
+  // 묶음이 셋 이상(12·16칸)이면 폭을 거의 다 쓰고 글자를 키운다 — 16칸에 글자 12였을 때 폰(318px로 줄어듦)에서 9.5px였다 (Codex 40차 #6)
+  const W = 400; const cols = sp.G * 4; const wide = sp.G >= 3; const cw = Math.min(26, (wide ? 392 : 360) / cols); const X0 = (W - cols * cw) / 2;
+  const rh = wide ? 27 : 24; const top = 4; let g = '';
+  const fs = wide ? 15 : cw < 24 ? 12 : 13;
+  const dy = wide ? 5.5 : 5; const dys = wide ? 5 : 4;
   const txt = (x, y, t, cls, o = '') => `<text class="${cls}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${fs}" font-weight="700" text-anchor="middle" fill="currentColor"${o}>${t}</text>`;
   for (let i = 0; i < sp.G; i++) {
     const x = X0 + i * 4 * cw; const name = PLACE_GROUP[sp.G - 1 - i];
     g += `<rect class="pl-g" x="${x.toFixed(1)}" y="${top}" width="${(4 * cw).toFixed(1)}" height="${rh}" fill="${EMPTY}" stroke="currentColor" stroke-width="1.6" data-name="${name}"/>`;
-    g += txt(x + 2 * cw, top + rh / 2 + 5, name, 'pl-gl');
+    g += txt(x + 2 * cw, top + rh / 2 + dy, name, 'pl-gl');
   }
   for (let c = 0; c < cols; c++) {
     const x = X0 + c * cw; const place = cols - 1 - c; const d = sp.cells[c].trim();
     g += `<rect x="${x.toFixed(1)}" y="${top + rh}" width="${cw.toFixed(1)}" height="${rh}" fill="none" stroke="currentColor" stroke-opacity="0.6" stroke-width="1"/>`;
-    g += txt(x + cw / 2, top + rh * 1.5 + 4, PLACE_SUB[c % 4], 'pl-s', ' fill-opacity="0.7"');
+    g += txt(x + cw / 2, top + rh * 1.5 + dys, PLACE_SUB[c % 4], 'pl-s', ' fill-opacity="0.7"');
     g += `<rect class="pl-d" x="${x.toFixed(1)}" y="${top + 2 * rh}" width="${cw.toFixed(1)}" height="${rh}" fill="${d ? FILL : 'none'}" fill-opacity="${d ? '0.18' : '0'}" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-place="${place}" data-v="${d}"/>`;
-    if (d) g += txt(x + cw / 2, top + rh * 2.5 + 5, d, 'pl-dt');
+    if (d) g += txt(x + cw / 2, top + rh * 2.5 + dy, d, 'pl-dt');
   }
   for (let i = 1; i < sp.G; i++) { const x = X0 + i * 4 * cw; g += `<line x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + 3 * rh}" stroke="currentColor" stroke-width="2.6"/>`; }
   g += `<rect x="${X0.toFixed(1)}" y="${top}" width="${(cols * cw).toFixed(1)}" height="${3 * rh}" fill="none" stroke="currentColor" stroke-width="2"/>`;

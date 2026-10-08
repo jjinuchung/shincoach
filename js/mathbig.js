@@ -44,11 +44,14 @@ function readGroup(g) {
   const u = ['천', '백', '십', ''];
   return d.map((x, i) => (!x ? '' : (x === 1 && i < 3 ? '' : DG[x]) + u[i])).join('');
 }
-/** 수를 한글로 읽은 말 — 30481 → "삼만 사백팔십일" · 만의 묶음이 1이면 "만"(교과서 "만 또는 일만"), 억·조가 1이면 "일억"·"일조" */
+/**
+ * 수를 한글로 읽은 말 — 30481 → "삼만 사백팔십일" · 맨 앞의 만의 묶음이 1이면 "만"(교과서 "만 또는 일만"), 억·조가 1이면 "일억"·"일조"
+ * 앞에 억·조가 있으면 끼인 1만은 "일만"(300010000 → "삼억 일만", Codex 40차 #3)
+ */
 export function readKo(n) {
   if (!n) return '영';
   const g = groupsOf(n); const parts = [];
-  for (let i = 3; i >= 0; i--) if (g[i]) parts.push((i === 1 && g[i] === 1 ? '' : readGroup(g[i])) + BIGU[i]);
+  for (let i = 3; i >= 0; i--) if (g[i]) parts.push((i === 1 && g[i] === 1 && !parts.length ? '' : readGroup(g[i])) + BIGU[i]);
   return parts.join(' ');
 }
 /** 만·억·조를 섞어 쓴 꼴 — 15690000 → "1569만" · 1620000000000 → "1조 6200억" */
@@ -75,6 +78,11 @@ function onlyAt(n, d) {
   const s = String(n); const at = s.indexOf(String(d));
   return at >= 0 && at === s.lastIndexOf(String(d)) ? s.length - 1 - at : -1;
 }
+/** n의 k자리 숫자 (일의 자리 k = 0) */
+const digitAt = (n, k) => Math.floor(n / P10(k)) % 10;
+/** k자리를 times번 1씩 키울 때 9를 넘으면 붙이는 말 (Codex 40차 #1) */
+const carryNote = (n, k, times) => (digitAt(n, k) + times > 9 ? ' — 9 다음에는 0이 되고 바로 윗자리가 1 커져요' : '');
+const PATTERN_RULE = '앞의 두 수의 차를 먼저 보고, 그만큼씩 계속 더해요.';
 /** 조건에 맞을 때까지 다시 뽑기 */
 function draw(gen, ok) {
   for (let k = 0; k < 6000; k++) { const v = gen(); if (ok(v)) return v; }
@@ -212,7 +220,8 @@ export const BIG = [
       // 만의 자리 2~9 (만의 묶음이 1이면 "만"·"일만" 두 가지로 읽혀서 뺀다)
       const five = (ok) => draw(() => int(r, 20000, 99999), ok);
       const write = () => {
-        const n = five((x) => x % 10000 >= 1 && x % 10000 < 1000);
+        // 0인 자리가 천의 자리 하나뿐이면(30468) "0 빼기"와 "네 자리를 채우지 않음"이 같은 3468 — 두 생각이 다른 값이 되는 수만 (Codex 40차 #2)
+        const n = five((x) => x % 10000 >= 1 && x % 10000 < 1000 && zeroSkip(x) !== zeroPad(x));
         return {
           t: `다음을 수로 쓰면 얼마일까요?${BOLD(n)}`, text: `다음을 수로 쓰면 얼마일까요?${BOLD(readKo(n))}`, ans: n, wr: clean(n, [W(zeroPad(n), TAGS.zeroPad), W(n * 10, TAGS.placeOff)]),
           why: { [TAGS.zeroPad]: `만 아래는 천·백·십·일 네 자리 — 빈 자리에 0을 써서 ${n}.`, [TAGS.placeOff]: `다섯 자리 수예요 — 0을 하나 더 써서 여섯 자리가 됐어요.` },
@@ -256,7 +265,7 @@ export const BIG = [
     },
     misread(r, c) {
       if (branchOf(r, c, ['write', 'value']) === 'write') {
-        const n = draw(() => int(r, 20000, 99999), (x) => x % 10000 >= 1 && x % 10000 < 1000);
+        const n = draw(() => int(r, 20000, 99999), (x) => x % 10000 >= 1 && x % 10000 < 1000 && zeroSkip(x) !== zeroPad(x));
         return misAsk(r, c, this, 'write', {
           q: WORK(`${readKo(n)} → ${zeroPad(n)}`, '썼어요'),
           ok: `만 아래 네 자리를 다 채워요 — 빈 자리에 0을 써서 ${n}`,
@@ -375,7 +384,7 @@ export const BIG = [
       const ab = () => draw(() => int(r, 11, 9999) * 1e8 + int(r, 100, 9999) * 1e4, (x) => groupsOf(x)[1] !== 1 && groupsOf(x)[2] % 10 !== 0 && /0/.test(String(x).slice(0, -4)));
       const write = () => {
         // 만의 묶음은 세 자리 이하 — 네 자리면 "네 자리를 다 채우지 않음"(억·만 묶음을 이어 씀)과 "억을 만으로 씀"이 같은 수가 된다
-        const n = draw(() => int(r, 11, 9999) * 1e8 + int(r, 11, 999) * 1e4, (x) => groupsOf(x)[2] % 10 !== 0);
+        const n = draw(() => int(r, 11, 9999) * 1e8 + int(r, 11, 999) * 1e4, (x) => groupsOf(x)[2] % 10 !== 0 && zeroSkip(x) !== zeroPad(x));
         return {
           words: true, t: `다음을 수로 쓴 것은 어느 것일까요?${BOLD(n)}`, text: `다음을 수로 쓴 것은 어느 것일까요?${BOLD(readKo(n))}`, ans: n,
           wr: clean(n, [W(zeroPad(n), TAGS.zeroPad), W(n / 1e4, TAGS.unitShift), W(n * 10, TAGS.placeOff)]),
@@ -449,7 +458,8 @@ export const BIG = [
           probe: { ask: 'count', k },
         };
       };
-      const ab = () => draw(() => [int(r, 11, 8999), int(r, 100, 9999)], ([a, b]) => b % 10 !== 0 && a % 10 !== 0);
+      // 조·억 묶음에 0이 하나도 없으면(8715조 2882억) "0 빼기"와 "채우지 않고 이어 씀"이 같은 87152882 (Codex 40차 #2)
+      const ab = () => draw(() => [int(r, 11, 8999), int(r, 100, 9999)], ([a, b]) => b % 10 !== 0 && a % 10 !== 0 && zeroSkip(a * 1e12 + b * 1e8) !== zeroPad(a * 1e12 + b * 1e8));
       const mix = () => {
         const [a, b] = ab(); const ans = a * 1e12 + b * 1e8;
         return {
@@ -495,7 +505,7 @@ export const BIG = [
           probe: { ask: 'unit', n },
         });
       }
-      const [a, b] = draw(() => [int(r, 11, 8999), int(r, 100, 9999)], ([x, y]) => y % 10 !== 0 && x % 10 !== 0);
+      const [a, b] = draw(() => [int(r, 11, 8999), int(r, 100, 9999)], ([x, y]) => y % 10 !== 0 && x % 10 !== 0 && zeroSkip(x * 1e12 + y * 1e8) !== zeroPad(x * 1e12 + y * 1e8));
       const n = a * 1e12 + b * 1e8;
       return misAsk(r, c, this, 'mix', {
         q: WORK(`1조가 ${a}개, 1억이 ${b}개인 수는 ${a}${b}`),
@@ -511,27 +521,28 @@ export const BIG = [
   {
     id: 'big.skip', grade: 4, name: '뛰어 세기', needs: ['big.jo'],
     idea: '120000에서 10000씩 뛰어 세면 130000, 140000, 150000 — 만의 자리 숫자가 1씩 커져요. 3250만에서 1000만씩 뛰어 세면 4250만, 5250만 — 천만의 자리 숫자가 1씩 커져요. 어느 자리 숫자가 바뀌는지 보면 얼마씩 뛰어 셌는지 알 수 있어요.',
-    rule: '얼마씩 뛰어 세는지 보고, 그 자리의 숫자를 1씩 키워요.',
+    rule: '얼마씩 뛰어 세는지 보고 그만큼씩 더해요 — 10000씩이면 만의 자리 숫자가 1씩 커지고, 9 다음에는 0이 되며 바로 윗자리가 1 커져요.',
     slip: '어느 자리 숫자가 1씩 커지는지 봐요.',
     calc(r, c) {
       const man = () => {
         const st = pick(r, [10000, 100000]); const s = int(r, 100000, 899999); const k = int(r, 2, 5);
         const ans = s + k * st; const list = Array.from({ length: k }, (_, i) => s + (i + 1) * st);
+        const pl = lenOf(st) - 1; const note = carryNote(s, pl, k);
         return {
           t: `${s}에서 ${st}씩 ${k}번 뛰어 세면 얼마일까요?`, ans,
           wr: clean(ans, [W(s + k * st * 10, TAGS.skipPlace), W(s + (k * st) / 10, TAGS.skipPlace)]),
-          why: { [TAGS.skipPlace]: `${st}씩 — ${PN[lenOf(st) - 1]}의 자리 숫자가 1씩 커져요.` },
-          steps: [`${st}씩 뛰어 세면 ${PN[lenOf(st) - 1]}의 자리 숫자가 1씩 커져요`, `${s} → ${list.join(' → ')}`],
+          why: { [TAGS.skipPlace]: `${st}씩 — ${PN[pl]}의 자리 숫자가 1씩 커져요${note}.` },
+          steps: [`${st}씩 뛰어 세면 ${PN[pl]}의 자리 숫자가 1씩 커져요${note}`, `${s} → ${list.join(' → ')}`],
           probe: { ask: 'man', s, st, k },
         };
       };
       const eok = () => {
         const a = int(r, 1000, 4999); const st = pick(r, [100, 1000]); const k = int(r, 2, 4);
-        const ans = (a + k * st) * 1e8;
+        const ans = (a + k * st) * 1e8; const note = carryNote(a, lenOf(st) - 1, k);
         return {
           words: true, fmt: mixed, t: `${a}억에서 ${st}억씩 ${k}번 뛰어 센 수는 어느 것일까요?`, ans,
           wr: clean(ans, [W((a + k * st * 10) * 1e8, TAGS.skipPlace), W((a + (k * st) / 10) * 1e8, TAGS.skipPlace)]),
-          why: { [TAGS.skipPlace]: `${st}억씩 — 억의 묶음에서 ${PN[lenOf(st) - 1]}의 자리 숫자가 1씩 커져요.` },
+          why: { [TAGS.skipPlace]: `${st}억씩 — 억의 묶음에서 ${PN[lenOf(st) - 1]}의 자리 숫자가 1씩 커져요${note}.` },
           steps: [`${st}억씩 ${k}번 — ${k * st}억 커져요`, `${a}억 → ${mixed(ans)}`],
           probe: { ask: 'eok', a, st, k },
         };
@@ -546,6 +557,7 @@ export const BIG = [
           wr: clean(ans, [W((a + 2 * d + 10 * d) * unit, TAGS.skipPlace), W((a + 2 * d + d / 10) * unit, TAGS.skipPlace)]),
           why: { [TAGS.skipPlace]: `${mixed(d * unit)}씩 커져요 — 앞의 두 수의 차를 먼저 봐요.` },
           steps: [`${mixed(x[1])} − ${mixed(x[0])} — ${mixed(d * unit)}씩 커져요`, `${mixed(x[2])} 다음은 ${mixed(ans)}`],
+          rule: PATTERN_RULE,
           probe: { ask: 'pattern', unit, d },
         };
       };
@@ -553,7 +565,9 @@ export const BIG = [
     },
     misread(r, c) {
       if (branchOf(r, c, ['place', 'pattern']) === 'place') {
-        const st = pick(r, [10000, 100000]); const s = int(r, 100000, 799999);
+        const st = pick(r, [10000, 100000]); const pl = lenOf(st) - 1;
+        // 받아올림이 있으면 "그 자리 숫자가 1씩 커져요"가 거짓 — 보여 준 자리·고칠 자리·틀린 자리 모두 3번 더해도 9 이하 (Codex 40차 #1)
+        const s = draw(() => int(r, 100000, 799999), (x) => [pl - 1, pl, pl + 1].every((p) => digitAt(x, p) <= 6));
         const shown = [1, 2, 3].map((i) => s + (i * st) / 10); const right = [1, 2, 3].map((i) => s + i * st); const big = [1, 2, 3].map((i) => s + i * st * 10);
         return misAsk(r, c, this, 'place', {
           q: WORK(`${s}에서 ${st}씩 뛰어 세면 ${shown.join(', ')}`),
@@ -572,6 +586,7 @@ export const BIG = [
         wr: [RIGHT, { text: `${mixed(d * 10 * 1e4)}씩 커져서 ${mixed((a + 2 * d + 10 * d) * 1e4)}`, tag: TAGS.skipPlace }, { text: '만이 붙은 수는 뛰어 셀 수 없어요', tag: OFF }],
         steps: [`${mixed(x[1])} − ${mixed(x[0])} — ${mixed(d * 1e4)}씩`, `${mixed(x[2])} 다음은 ${mixed(ans)}`],
         whyAny: `앞의 두 수의 차를 다시 봐요 — ${mixed(d * 1e4)}씩 커지고 있어요.`,
+        rule: PATTERN_RULE,
         probe: { ask: 'pattern', d },
       });
     },
