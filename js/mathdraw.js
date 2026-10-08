@@ -399,7 +399,7 @@ function polySvg(o) {
     return { cx, cy, u, v, b, th };
   };
   let extra = '';
-  const angLabs = []; // 각도·㉠ 글자 자리와 그 꼭짓점 (report.stray)
+  const angLabs = []; // 각도·㉠ 글자 가운데와 그 꼭짓점 (report.stray) — 15px 각도는 기준선 5px 위, 18px ㉠은 6px 위
   for (const nm of o.names || []) {
     // ㄱ·ㄴ 같은 자모는 같은 크기에서 숫자보다 작아 보인다 → 18px
     const { cx, cy, b } = corner(nm.i);
@@ -416,7 +416,7 @@ function polySvg(o) {
     const d = Math.min(80, Math.max(30, (labelW(an.text) / 2 + 9) / Math.sin(th / 2)));
     const at = [cx + b[0] * d, cy + b[1] * d + 5, 'middle'];
     busy.push(boxAt(at, an.text));
-    angLabs.push({ at, i: an.i });
+    angLabs.push({ c: [at[0], at[1] - 5], i: an.i });
     extra += text(at[0], at[1], an.text, 'middle', FILL2);
   }
   // 📐 Z ⭐ 한 변을 늘인 직선과 이웃 변이 이루는 각 ㉠ (변 (i−1)→i를 꼭짓점 i 너머로 늘인다) — 도형 밖의 각
@@ -429,7 +429,7 @@ function polySvg(o) {
     const d = Math.min(80, Math.max(32, (labelW(o.ext.text) / 2 + 9) / Math.sin(th / 2)));
     const at = [cx + b[0] * d, cy + b[1] * d + 6, 'middle'];
     busy.push(boxAt(at, o.ext.text));
-    angLabs.push({ at, i });
+    angLabs.push({ c: [at[0], at[1] - 6], i });
     extra += `<text class="ext-lab" x="${f(at[0])}" y="${f(at[1])}" font-size="18" text-anchor="middle" fill="${FILL2}" font-weight="700">${esc(o.ext.text)}</text>`;
   }
 
@@ -482,7 +482,8 @@ function polySvg(o) {
     const gapOf = (a, b) => Math.max(0, a.x0 - b.x1, b.x0 - a.x1, a.y0 - b.y1, b.y0 - a.y1);
     o.report.gap = Math.min(Infinity, ...busy.flatMap((a, i) => busy.slice(i + 1).map((b) => gapOf(a, b))));
     const V = o.pts.map(P);
-    o.report.stray = angLabs.some(({ at, i }) => { const dv = (p) => Math.hypot(p[0] - at[0], p[1] - (at[1] - 5)); return V.some((p, j) => j !== i && dv(p) < dv(V[i])); });
+    // 다른 꼭짓점이 6px 안쪽으로 비슷하게 가까워도 stray — 0.3px 차이로 ㄴ의 ㉠이 ㄷ과 거의 같은 거리인 모양이 지나갔다 (Codex 41차 #5)
+    o.report.stray = angLabs.some(({ c, i }) => { const dv = (p) => Math.hypot(p[0] - c[0], p[1] - c[1]); return V.some((p, j) => j !== i && dv(p) < dv(V[i]) + STRAY_MARGIN); });
   }
   return `<svg class="frac-fig shape-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria)}"><g>${g}</g></svg>`;
 }
@@ -722,6 +723,7 @@ export function quadSvg(ang, rh = false, ext = false) {
   return best.svg;
 }
 const QUAD_GAP = 8; // px — 처음 모양이 이만큼 떨어지면 그대로 둔다(J 사각형은 거의 그대로)
+const STRAY_MARGIN = 6; // px — 각도·㉠ 글자는 제 꼭짓점이 다른 꼭짓점보다 이만큼 더 가까워야
 /** "65" 보임 · "?65" 묻는 각(? 로 보임) · "_65" 표시 없음 → {v, mode} */
 function angTokens(list, total) {
   const out = list.map((s) => { const m = /^([?_]?)(\d{1,3})$/.exec(s); return m ? { v: +m[2], mode: m[1] === '?' ? 'ask' : m[1] === '_' ? 'hide' : 'val' } : null; });

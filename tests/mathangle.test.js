@@ -183,7 +183,7 @@ function tagHolds(f, ans, tag, wv) {
     case TAGS.armLen: return ['most', 'same'].includes(f.kind) && wv === f.armPick;
     case TAGS.arcBig: return ['most', 'same'].includes(f.kind) && wv === f.arcPick;
     case TAGS.scaleSwap: return f.kind === 'prot' && wv === 180 - f.A;
-    case TAGS.tickMiss: return f.kind === 'prot' && f.A % 10 === 5 && wv === f.A - 5;
+    case TAGS.tickMiss: return f.kind === 'prot' && f.A % 10 === 5 && (wv === f.A - 5 || wv === f.A + 5); // 다른 변 바로 아래·위의 숫자 눈금 (Codex 41차 #4)
     case TAGS.notZero: return f.kind === 'zero' && wv === f.E;
     case TAGS.swap:
       if (f.kind === 'pickOb') return n && wv > 0 && wv < 90;
@@ -242,6 +242,9 @@ function tagHolds(f, ans, tag, wv) {
   }
 }
 const ALL_TAGS = Object.values(TAGS);
+// 보기를 채운 근처 수의 이름표 — 셈 문항은 "계산 실수", 각도기 읽기는 "각도기 눈금을 잘못 읽음" (생성기 상수를 베끼지 않고 따로 적는다)
+const READ = '각도기 눈금을 잘못 읽음';
+const FILLER = new Set(['계산 실수', READ]);
 const allText = (q) => [q.q, ...q.choices.map((x) => x.text), ...(q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule] : [])].join('\n');
 function* every(kinds = ['calc', 'misread'], n = SEEDS) {
   for (const c of ANGLE) for (const k of kinds) for (let s = 1; s <= n; s++) yield { c, k, s, q: makeQuestion(c.id, k, s, OPTS) };
@@ -300,7 +303,7 @@ test('★ 오개념 이름표: 그 오답이 정말 그 틀린 생각이다 — 
   let n = 0; const used = new Set(); const two = {};
   for (const { c, s, q } of cached(['calc'], SEEDS)) {
     const sv = solveText(q.q, q.choices);
-    const tagged = q.choices.filter((x) => !x.ok && x.tag !== '계산 실수');
+    const tagged = q.choices.filter((x) => !x.ok && !FILLER.has(x.tag));
     assert.ok(tagged.length >= 1, `${c.id} #${s}: 이름표 붙은 오답 없음\n${q.q}`);
     if (tagged.length >= 2) two[c.id] = (two[c.id] || 0) + 1;
     for (const w of tagged) { assert.ok(tagHolds(sv.f, sv.ans, w.tag, valOf(w.text)), `${c.id} #${s} (${sv.type}): "${w.text}"의 이름표 "${w.tag}"가 뜻과 다르다\n${q.q}`); n++; used.add(w.tag); }
@@ -329,6 +332,52 @@ test('★ 한 오답 값이 두 틀린 생각에 다 맞는 일이 없다 — �
     }
   }
   assert.ok(n > 1.5 * 8 * SEEDS, `본 오답 ${n}`);
+});
+
+// Codex 41차 #4 → 아버님 (가) — 각도기 읽기는 셈이 없다. 165를 재는 문항에서 160은 "숫자가 적힌 눈금만 읽음"인데 170은 "계산 실수"였다
+test('★ 보기에 남은 모든 오답(채운 근처 수까지): 각도기 문항엔 "계산 실수"가 없다 — 바로 아래·위 숫자 눈금은 "숫자가 적힌 눈금만 읽음", 나머지 근처 수는 "각도기 눈금을 잘못 읽음" · 셈 문항엔 "각도기 눈금을 잘못 읽음"이 없다 · 고른 보기마다 풀이 글', () => {
+  let prot = 0; let ticks = 0; let reads = 0;
+  for (const { c, s, q } of cached(['calc'], SEEDS)) {
+    const wrong = q.choices.filter((x) => !x.ok);
+    if (!figsOf(q.q).some((f) => f.kind === 'prot')) { assert.ok(wrong.every((x) => x.tag !== READ), `${c.id} #${s}: 셈 문항에 "${READ}"`); continue; }
+    prot++;
+    const A = solveText(q.q, q.choices).ans;
+    for (const w of wrong) {
+      const v = valOf(w.text);
+      assert.notEqual(w.tag, '계산 실수', `${c.id} #${s}: 각도기 문항에 "계산 실수" (${w.text})`);
+      if (v === 180 - A) assert.equal(w.tag, TAGS.scaleSwap, `${c.id} #${s}: ${w.text}`);
+      else if (A % 10 === 5 && Math.abs(v - A) === 5) { assert.equal(w.tag, TAGS.tickMiss, `${c.id} #${s}: ${v}는 숫자가 적힌 눈금`); ticks++; }
+      else { assert.equal(w.tag, READ, `${c.id} #${s}: ${w.text}[${w.tag}]`); reads++; }
+      assert.ok(q.solve.why[w.tag], `${c.id} #${s}: "${w.tag}" 풀이 글 없음`);
+    }
+    if (A % 10 === 5) for (const v of [A - 5, A + 5]) assert.ok(wrong.some((x) => valOf(x.text) === v), `${c.id} #${s}: 숫자 눈금 ${v}가 보기에 없다`);
+  }
+  assert.ok(prot > SEEDS / 2 && ticks > SEEDS / 4 && reads > SEEDS / 4, `각도기 문항 ${prot} · 숫자 눈금 ${ticks} · 근처 수 ${reads}`);
+});
+
+// Codex 41차 #1 — 90°는 호 대신 직각 표시로 그려진다: "나는 호를 크게 그렸을 뿐이에요"라는데 그림에 큰 호가 없었다
+test('🎨 Z1 호 비교: 그림의 모든 각에 호가 보인다(직각 표시 없음) · "호를 크게/작게 그린 각"은 그린 호가 정말 가장 큰/작은 각 (문항·원고)', () => {
+  const check = (qtext, arcName, small, where) => {
+    for (const f of figsOf(qtext).filter((x) => x.kind === 'ang')) {
+      const got = measureAng(figureSvg(`ang ${f.arg}`));
+      for (const g of got) assert.ok(g.arc !== null && !g.right, `${where}: ${g.name || '각'}에 호가 없다(직각 표시)\n${f.raw}`);
+      if (!arcName) continue;
+      const me = got.find((g) => g.name === arcName); const others = got.filter((g) => g !== me);
+      assert.ok(me && others.length && others.every((g) => (small ? me.arc < g.arc : me.arc > g.arc)), `${where}: ${arcName}의 호가 가장 ${small ? '작지' : '크지'} 않다\n${f.raw}`);
+    }
+  };
+  let n = 0;
+  for (const k of ['calc', 'misread']) {
+    for (let s = 1; s <= Math.max(SEEDS, 1500); s++) {
+      const q = makeQuestion('ang.compare', k, s, OPTS);
+      const arcW = q.choices.find((x) => x.tag === TAGS.arcBig);
+      const m = (arcW && /^(?:호가 가장 큰 )?([가나다])/.exec(arcW.text)) || /([가나다])의 호가 가장 크니까/.exec(q.q);
+      assert.ok(m, `${k} #${s}: 호가 큰 각이 어느 것인지 못 찾음\n${q.q}`);
+      check(q.q, m[1], (q.probe || {}).ask === 'min', `ang.compare ${k} #${s}`); n++;
+    }
+  }
+  for (const pg of CONTENT['ang.compare'].lesson) for (const t of [pg.say, pg.check.q]) check(t, null, false, 'Z1 원고');
+  assert.ok(n >= 3000, `본 Z1 문항 ${n}`);
 });
 
 // 드문 조합은 씨앗을 넓혀 따로 (메모 test-seed-breadth — 300씨앗이 놓친 것을 2만이 잡았다)
@@ -548,6 +597,8 @@ const BAD = [
   [/(?:사각형의 네 각의 합은|사각형은) 180°/, '사각형은 360°'],
   [/삼각형의 세 각의 합은 (?:늘 )?360°/, '삼각형은 180°'],
   [/(?:늘|언제나|항상) (?:바깥쪽|안쪽) 눈금/, '0이 있는 쪽 눈금을 읽는다 — 늘 한쪽 눈금이 아니다'],
+  [/맞추지 않으면 (?:틀리게|잘못) 재/, '0이 아닌 눈금에서 재도 두 눈금의 차로 바르게 잴 수 있다 — 틀리는 것은 끝 눈금만 읽을 때 (Codex 41차 #2)'],
+  [/재어 더하면 (?:꼭 |늘 |언제나 )?180°가 (?:돼|나와)/, '잰 값은 180°에 가깝다 — 정확히 180°인 것은 세 각의 크기의 합 (Codex 41차 #2)'],
 ];
 test('★ 참말에 틀린 말이 없다 — 변·호로 비교 · 90°·180° · 조건 없는 둔각 · 세 각의 합 · 눈금', () => {
   const truths = (q) => [q.choices.find((x) => x.ok).text, ...(q.solve ? [...q.solve.steps, ...Object.values(q.solve.why), q.solve.whyAny, q.solve.rule] : [])].join('\n').replace(/\*\*/g, '');
@@ -715,7 +766,7 @@ test('🎨 도형·이어 붙인 각 그림의 각 = 지시문의 각 (J 테스�
 });
 
 // 3단계 헤드리스(Z8 진단): 각 ㄴ이 작은 사각형에서 변 ㄷㄹ이 짧게 그려져 "95°"와 "115°"가 겹쳤다 — 같은 그림 코드를 쓰는 J 사각형도 함께 본다
-test('🎨 사각형 그림의 글자: 꼭짓점 이름·각도·㉠ 글자끼리 겹치지 않고 4px 넘게 떨어진다 · 각도 글자에서 가장 가까운 꼭짓점이 그 각도의 꼭짓점 (Z·J 문항·원고)', async () => {
+test('🎨 사각형 그림의 글자: 꼭짓점 이름·각도·㉠ 글자끼리 겹치지 않고 4px 넘게 떨어진다 · 각도 글자에서 가장 가까운 꼭짓점이 그 각도의 꼭짓점 · ㉠은 ㄴ이 다른 꼭짓점보다 3px 넘게 가깝다 (Z·J 문항·원고)', async () => {
   const J = await import('../js/mathshape.js');
   const specs = new Map();
   const add = (t, where) => { for (const m of String(t).matchAll(/\[(quad [^\]]+)\]/g)) if (!specs.has(m[1])) specs.set(m[1], where); };
@@ -745,6 +796,12 @@ test('🎨 사각형 그림의 글자: 꼭짓점 이름·각도·㉠ 글자끼�
     for (const lab of T.filter((x) => /°$|^\?$/.test(x.t))) {
       const d = V.map((p) => Math.hypot(p[0] - lab.cx, p[1] - lab.cy));
       assert.equal(want[d.indexOf(Math.min(...d))], lab.t, `${spec} (${where}): "${lab.t}"에서 가장 가까운 꼭짓점의 각이 다르다`);
+    }
+    // Codex 41차 #5 — ㉠이 ㄴ과 ㄷ에서 거의 같은 거리(0.3px 차)인 모양이 지나갔다
+    const E = T.find((x) => x.t === '㉠');
+    if (E) {
+      const d = V.map((p) => Math.hypot(p[0] - E.cx, p[1] - E.cy)); const other = Math.min(...d.filter((_, j) => j !== 1));
+      assert.ok(d[1] + 3 < other, `${spec} (${where}): ㉠에서 ㄴ까지 ${d[1].toFixed(1)}px · 다른 꼭짓점까지 ${other.toFixed(1)}px`);
     }
     n++; if (/ ext$/.test(spec)) ext++;
   }
@@ -916,6 +973,31 @@ test('★ 원고 확인 질문은 칸마다 그 칸의 문제 · 보기 꼴이 �
 
 /** 글 속 각도 — "40°" · 이름 붙은 "가는 40°" */
 const degsIn = (t) => [...String(t).matchAll(/(?<![\d.])(\d+)°/g)].map((m) => +m[1]);
+// Codex 41차 #3 — Z1-4 그림은 가 = 나 = 80°(돌려 놓은 같은 각)인데 바로 아래 글이 "가에 3번, 나에 5번 들어가면 나가 더 큰 각"
+test('🎨 원고의 이름 붙은 비교 말("나가 더 큰 각"·"가가 더 커요")은 그 글의 각 그림과 맞다 — 배움 글은 그 장의 그림, 정답·까닭은 확인 질문의 그림 (오답 보기는 빼고)', () => {
+  let n = 0;
+  for (const id of IDS) for (const [i, pg] of CONTENT[id].lesson.entries()) {
+    for (const [txt, src] of [[pg.say, pg.say], [`${pg.check.ok}\n${pg.check.why}`, pg.check.q]]) {
+      const items = figsOf(src).filter((f) => f.kind === 'ang').flatMap((f) => angItems(f.arg));
+      const plain = fillC(txt).replace(/\*\*/g, '').replace(FIGS, '');
+      const say = (m, ok) => { assert.ok(ok, `${id} ${i + 1}장: "${m[0]}"이 그 글의 그림(${items.map((x) => `${x.name} ${x.v}°`).join(' · ') || '없음'})과 다르다`); n++; };
+      const of = (nm) => items.find((x) => x.name === nm);
+      // 이름 글자는 낱말 속 글자가 아닐 때만 ("들어가는"의 가는 이름이 아니다)
+      for (const m of plain.matchAll(/(?<![가-힣])([가나다])가 (?:(?:더|가장) (큰|작은|커요|작아요)|가장 (많이|적게) 벌어)/g)) {
+        const me = of(m[1]); const others = items.filter((x) => x !== me); const big = /^(큰|커요|많이)$/.test(m[2] || m[3]);
+        say(m, me && others.length && others.every((x) => (big ? me.v > x.v : me.v < x.v)));
+      }
+      for (const m of plain.matchAll(/(?<![가-힣])([가나다])는 ([가나다])보다 (?:두 변이 )?(?:더 )?(많이|적게) 벌어/g)) {
+        const a = of(m[1]); const b = of(m[2]); say(m, a && b && (m[3] === '많이' ? a.v > b.v : a.v < b.v));
+      }
+      for (const m of plain.matchAll(/(?<![가-힣])([가나다])는 직각보다 (많이|적게) 벌어/g)) {
+        const a = of(m[1]); say(m, a && (m[2] === '많이' ? a.v > 90 : a.v < 90));
+      }
+    }
+  }
+  assert.ok(n >= 6, `본 비교 말 ${n}`);
+});
+
 test('🎨 원고의 그림: 모두 그려진다 · 글이 말하는 각도는 그 그림의 각도 (각도기는 읽은 값, 이름 붙은 각은 그 이름의 각, 도형·이어 붙인 각은 조각·합·㉠) · 각은 5의 배수', () => {
   let n = 0;
   for (const id of IDS) {

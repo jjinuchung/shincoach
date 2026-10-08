@@ -64,8 +64,10 @@ function clean(ans, list) {
   return out;
 }
 const W = (v, tag) => ({ v, tag });
-/** 수 보기 4개 — 정답 + 오개념 오답 + 모자라면 근처 수("계산 실수": 각도는 5씩, 개수는 1씩) */
-function nchoices(r, ans, wr) {
+/** 각도기 읽기 문항의 근처 수 — 셈이 없는 문항이라 "계산 실수"가 아니다 (Codex 41차 #4 → 아버님 (가)) */
+const READ_SLIP = '각도기 눈금을 잘못 읽음';
+/** 수 보기 4개 — 정답 + 오개념 오답 + 모자라면 근처 수(filler 이름표, 기본 "계산 실수": 각도는 5씩, 개수는 1씩) */
+function nchoices(r, ans, wr, filler = '계산 실수') {
   const list = [{ text: String(ans), ok: true }];
   const seen = new Set([ans]);
   for (const w of wr) { if (list.length >= 4) break; seen.add(w.v); list.push({ text: String(w.v), ok: false, tag: w.tag }); }
@@ -73,7 +75,7 @@ function nchoices(r, ans, wr) {
   for (const d of st) {
     if (list.length >= 4) break;
     const v = ans + d;
-    if (v > 0 && v <= 360 && !seen.has(v)) { seen.add(v); list.push({ text: String(v), ok: false, tag: '계산 실수' }); }
+    if (v > 0 && v <= 360 && !seen.has(v)) { seen.add(v); list.push({ text: String(v), ok: false, tag: filler }); }
   }
   return shuffle(r, list);
 }
@@ -84,7 +86,7 @@ function nchoices(r, ans, wr) {
 function zcalcAsk(r, c, concept, v) {
   const F = (t) => jfix(fill(t, c));
   const wr = v.wr.map((w) => ({ text: F(String(w.v)), tag: w.tag }));
-  const chs = v.words ? textChoices(r, F(String(v.ans)), wr) : nchoices(r, v.ans, v.wr);
+  const chs = v.words ? textChoices(r, F(String(v.ans)), wr) : nchoices(r, v.ans, v.wr, v.filler);
   const why = Object.fromEntries(Object.entries(v.why || {}).map(([k, t]) => [k, F(t)]));
   return {
     ...ask(concept.id, 'calc', F(v.t), chs, { solve: solve(v.steps.map((s, i) => step(i, F(s))), { why, whyAny: F(v.whyAny || ''), rule: v.rule || concept.rule }) }),
@@ -122,14 +124,16 @@ export const TAGS = {
  * 가장 큰 각 묻기 — 정답(변 짧고 호 작음) · 변이 가장 긴 각(armLen이 고른다) · 호가 가장 큰 각(arcBig이 고른다).
  * 변 길이 순서와 호 크기 순서가 각자 한 각만 가리키게 — 한 오답 = 한 생각
  */
+// Z1에는 90°를 쓰지 않는다 — 90°는 호 대신 직각 표시로 그려져 "호를 크게 그린 각"의 호가 그림에 없다 (Codex 41차 #1)
+const no90 = (xs) => !xs.includes(90);
 function trioMax(r) {
-  const [X, Y, Z] = draw(() => { const x = f5(r, 85, 150); return [x, f5(r, 30, x - 30), f5(r, 30, x - 30)]; }, ([x, y, z]) => Math.abs(y - z) >= 10 && y < x && z < x);
+  const [X, Y, Z] = draw(() => { const x = f5(r, 85, 150); return [x, f5(r, 30, x - 30), f5(r, 30, x - 30)]; }, ([x, y, z]) => Math.abs(y - z) >= 10 && y < x && z < x && no90([x, y, z]));
   const rot = () => f5(r, 0, 20);
   return named(r, [{ v: X, arm: ARM_S, arc: 16, rot: rot(), role: 'ok' }, { v: Y, arm: ARM_L, arc: 16, rot: rot(), role: 'arm' }, { v: Z, arm: ARM_M, arc: 40, rot: rot(), role: 'arc' }]);
 }
 /** 가장 작은 각 묻기 — 정답(변 가장 길고 호 가장 큼) · 변이 가장 짧은 각(armLen) · 호가 가장 작은 각(arcBig) */
 function trioMin(r) {
-  const [X, Y, Z] = draw(() => { const x = f5(r, 25, 60); return [x, f5(r, x + 30, 150), f5(r, x + 30, 150)]; }, ([, y, z]) => Math.abs(y - z) >= 10);
+  const [X, Y, Z] = draw(() => { const x = f5(r, 25, 60); return [x, f5(r, x + 30, 150), f5(r, x + 30, 150)]; }, ([x, y, z]) => Math.abs(y - z) >= 10 && no90([x, y, z]));
   const rot = () => f5(r, 0, 20);
   return named(r, [{ v: X, arm: ARM_L, arc: 40, rot: rot(), role: 'ok' }, { v: Y, arm: ARM_S, arc: 28, rot: rot(), role: 'arm' }, { v: Z, arm: ARM_M, arc: 14, rot: rot(), role: 'arc' }]);
 }
@@ -160,7 +164,7 @@ export const ANGLE = [
         };
       };
       const same = () => {
-        const V = f5(r, 35, 140);
+        const V = draw(() => f5(r, 35, 140), (x) => no90([x]));
         const items = named(r, [{ v: V, arm: ARM_L, arc: 16, rot: f5(r, 0, 30), role: 'arm' }, { v: V, arm: ARM_S, arc: 40, rot: f5(r, 0, 30), role: 'arc' }]);
         const arm = roleOf(items, 'arm'); const arc = roleOf(items, 'arc');
         return {
@@ -202,12 +206,14 @@ export const ANGLE = [
         const A = draw(() => f5(r, 15, 165), (x) => x !== 90);
         const ring = left ? '바깥쪽' : '안쪽'; const other = left ? '안쪽' : '바깥쪽';
         const wr = [W(180 - A, TAGS.scaleSwap)];
-        if (A % 10) wr.push(W(A - 5, TAGS.tickMiss));
+        // 다른 변이 숫자 없는 눈금을 지나면 바로 아래·위 숫자 눈금이 둘 다 "숫자가 적힌 눈금만 읽음" (Codex 41차 #4 — 165의 170도)
+        if (A % 10) wr.push(W(A - 5, TAGS.tickMiss), W(A + 5, TAGS.tickMiss));
         return {
-          t: `[prot 0 ${A}${left ? ' left' : ''}]\n\n각도기로 각의 크기를 재었어요. 이 각은 몇 도일까요?`, ans: A, wr: clean(A, wr),
+          t: `[prot 0 ${A}${left ? ' left' : ''}]\n\n각도기로 각의 크기를 재었어요. 이 각은 몇 도일까요?`, ans: A, wr: clean(A, wr), filler: READ_SLIP,
           why: {
             [TAGS.scaleSwap]: `${180 - A}은 ${other} 눈금이에요 — 한 변이 0에 있는 ${ring} 눈금을 따라 읽어요.`,
-            [TAGS.tickMiss]: `작은 눈금 한 칸은 5°예요 — ${A - 5}에서 한 칸 더 가요.`,
+            [TAGS.tickMiss]: `작은 눈금 한 칸은 5°예요 — 다른 변은 숫자가 적힌 ${A - 5}과 ${A + 5} 사이의 가운데 눈금을 지나요.`,
+            [READ_SLIP]: `다른 변은 ${ring} 눈금 ${A}을 바로 지나요 — 작은 눈금 한 칸은 5°예요.`,
           },
           steps: [`한 변이 ${left ? '왼쪽' : '오른쪽'}의 0에 있어요 — ${ring} 눈금을 읽어요`, `다른 변이 지나는 ${ring} 눈금은 ${A} — ${A}°`],
           probe: { ask: left ? 'left' : 'right' },
