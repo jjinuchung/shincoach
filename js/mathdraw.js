@@ -2467,6 +2467,7 @@ export function figureSvg(spec) {
   if ((m = /^fsub (.+)$/.exec(s))) { const sp = parseFsub(m[1]); return sp ? fsubSvg(sp) : ''; } // ➕ V 뺄셈 막대
   if ((m = /^dmul (.+)$/.exec(s))) { const sp = parseDmul(m[1]); return sp ? dmulSvg(sp) : ''; } // ✖️ W 소수 곱셈 그림
   if ((m = /^ddiv (.+)$/.exec(s))) { const sp = parseDdiv(m[1]); return sp ? ddivSvg(sp) : ''; } // ➗ X 나눗셈 그림
+  if ((m = /^place (.+)$/.exec(s))) { const sp = parsePlace(m[1]); return sp ? placeSvg(sp) : ''; } // 🔢 Y 자릿값 표
   if ((m = /^plane (.+)$/.exec(s))) { const sp = parsePlane(m[1]); return sp ? planeSvg(sp) : ''; } // 📈 R 좌표평면
   if ((m = /^stack (.+)$/.exec(s))) { const sp = parseStackFig(m[1]); return sp ? stackSvg(sp) : ''; } // 🧊 S 쌓은 모양
   if ((m = /^stacks (.+)$/.exec(s))) { const sp = parseStacks(m[1]); return sp ? stacksSvg(sp) : ''; } // 🧊 S 쌓은 모양 후보
@@ -2557,6 +2558,7 @@ export function figText(text, short = false) {
     .replace(/\[fsub ([^\]]+)\]/g, (all, arg) => { const sp = parseFsub(arg); return !sp ? all : short ? '(뺄셈 막대)' : `(${fsubText(sp)})`; })
     .replace(/\[dmul ([^\]]+)\]/g, (all, arg) => { const sp = parseDmul(arg); return !sp ? all : short ? '(소수 곱셈 그림)' : `(${dmulText(sp)})`; })
     .replace(/\[ddiv ([^\]]+)\]/g, (all, arg) => { const sp = parseDdiv(arg); return !sp ? all : short ? '(나눗셈 그림)' : `(${ddivText(sp)})`; })
+    .replace(/\[place ([^\]]+)\]/g, (all, arg) => { const sp = parsePlace(arg); return !sp ? all : short ? '(자릿값 표)' : `(${placeText(sp)})`; })
     .replace(/\[plane ([^\]]+)\]/g, (all, arg) => { const sp = parsePlane(arg); return !sp ? all : short ? '(좌표평면)' : `(${planeText(sp)})`; })
     .replace(/\[(stack|stacks|views|top|layers) ([^\]]+)\]/g, (all, kind, arg) => { const tx = spaceText(kind, arg); return !tx ? all : short ? '(쌓기나무)' : `(${tx})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
@@ -2598,7 +2600,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|place|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -3068,6 +3070,53 @@ export function ddivSvg(sp) {
   }
   const meta = sp.mode === 'fit' ? `data-k="${sp.k}"` : `data-n="${sp.n}" data-q="${sp.q}"`;
   return `<svg class="frac-fig ddiv-fig" data-mode="${sp.mode}" ${meta} viewBox="0 0 ${W} ${Math.round(H)}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${ddivText(sp)}">${g}</svg>`;
+}
+
+// ───────────────────── 🔢 Y 큰 수 — 자릿값 표 (2026-10-08) ─────────────────────
+//
+// `[place 352900000000]` — 일의 자리부터 네 자리씩 묶은 자릿값 표. 맨 위 줄은 묶음 이름(조·억·만·일), 가운데 줄은 천·백·십·일, 맨 아래 줄은 숫자.
+//   수는 숫자만 1~16자리(맨 앞이 0이 아니게). 수가 채우지 않는 맨 앞 묶음의 윗자리 칸은 비운다. 묶음 사이는 굵은 선.
+//   교과서처럼 쉼표 없이 쓰고, 네 자리씩 끊어 읽는 법을 보이려는 그림 — 배움 장·② 일부에만 (① 계산에는 답을 흘려서 안 쓴다)
+const PLACE_GROUP = ['일', '만', '억', '조'];
+const PLACE_SUB = ['천', '백', '십', '일'];
+export function parsePlace(arg) {
+  const s = String(arg || '').trim();
+  if (!/^[1-9]\d{0,15}$/.test(s)) return null;
+  const G = Math.ceil(s.length / 4);
+  return { n: s, G, cells: s.padStart(G * 4, ' ').split('') };
+}
+/** 📊·❓ 글용 — "자릿값 표: 3529억 | 0000만 | 0000" */
+export function placeText(sp) {
+  const parts = [];
+  for (let i = 0; i < sp.G; i++) {
+    const grp = sp.cells.slice(i * 4, i * 4 + 4).join('').trim();
+    const name = PLACE_GROUP[sp.G - 1 - i];
+    parts.push(name === '일' ? grp : `${grp}${name}`);
+  }
+  return `자릿값 표: ${parts.join(' | ')}`;
+}
+/** 자릿값 표 */
+export function placeSvg(sp) {
+  const W = 400; const cols = sp.G * 4; const cw = Math.min(26, 360 / cols); const X0 = (W - cols * cw) / 2;
+  const rh = 24; const top = 4; let g = '';
+  const fs = cw < 24 ? 12 : 13;
+  const txt = (x, y, t, cls, o = '') => `<text class="${cls}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${fs}" font-weight="700" text-anchor="middle" fill="currentColor"${o}>${t}</text>`;
+  for (let i = 0; i < sp.G; i++) {
+    const x = X0 + i * 4 * cw; const name = PLACE_GROUP[sp.G - 1 - i];
+    g += `<rect class="pl-g" x="${x.toFixed(1)}" y="${top}" width="${(4 * cw).toFixed(1)}" height="${rh}" fill="${EMPTY}" stroke="currentColor" stroke-width="1.6" data-name="${name}"/>`;
+    g += txt(x + 2 * cw, top + rh / 2 + 5, name, 'pl-gl');
+  }
+  for (let c = 0; c < cols; c++) {
+    const x = X0 + c * cw; const place = cols - 1 - c; const d = sp.cells[c].trim();
+    g += `<rect x="${x.toFixed(1)}" y="${top + rh}" width="${cw.toFixed(1)}" height="${rh}" fill="none" stroke="currentColor" stroke-opacity="0.6" stroke-width="1"/>`;
+    g += txt(x + cw / 2, top + rh * 1.5 + 4, PLACE_SUB[c % 4], 'pl-s', ' fill-opacity="0.7"');
+    g += `<rect class="pl-d" x="${x.toFixed(1)}" y="${top + 2 * rh}" width="${cw.toFixed(1)}" height="${rh}" fill="${d ? FILL : 'none'}" fill-opacity="${d ? '0.18' : '0'}" stroke="currentColor" stroke-opacity="0.6" stroke-width="1" data-place="${place}" data-v="${d}"/>`;
+    if (d) g += txt(x + cw / 2, top + rh * 2.5 + 5, d, 'pl-dt');
+  }
+  for (let i = 1; i < sp.G; i++) { const x = X0 + i * 4 * cw; g += `<line x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + 3 * rh}" stroke="currentColor" stroke-width="2.6"/>`; }
+  g += `<rect x="${X0.toFixed(1)}" y="${top}" width="${(cols * cw).toFixed(1)}" height="${3 * rh}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+  const H = top + 3 * rh + 4;
+  return `<svg class="frac-fig place-fig" data-n="${sp.n}" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${placeText(sp)}">${g}</svg>`;
 }
 
 // ───────────────────── 📈 R 좌표평면과 그래프 — 좌표평면 (2026-10-05) ─────────────────────

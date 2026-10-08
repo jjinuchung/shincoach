@@ -30,6 +30,7 @@ import * as fmulGen from './mathfmul.js';
 import * as faddGen from './mathfadd.js';
 import * as dmulGen from './mathdmul.js';
 import * as ddivGen from './mathddiv.js';
+import * as bigGen from './mathbig.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -97,8 +98,13 @@ export const STEMS = {
   // 초6 10칸(6-1 나누는 수가 자연수 X1~X5 · 6-2 나누는 수가 소수 X6~X10) · 사다리에서 W 소수의 곱셈 바로 뒤(C → W → X) · 답은 숫자판(끝자리 0을 지우지 않은 답도 맞음) · 고르기("몫이 N보다 큰 것은 어느 것")는 보기 그대로
   //   · 6-2 칸 글엔 "나머지" 대신 "나누어 주고 남는 양"(지도서 181쪽) · 나눗셈 그림 [ddiv share|fit]은 배움·② 일부에만
   decdiv: { key: 'decdiv', code: 'X', label: '소수의 나눗셈 줄기', range: '초6', list: ddivGen.DDIV, gen: ddivGen, file: './coach/math/decdiv.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (소수 ÷ 자연수부터 — 학교 6-1·6-2 3단원 소수의 나눗셈 · W 소수의 곱셈 줄기를 먼저 하면 쉬워요)', intro: '소수의 나눗셈 문제 5개를 먼저 풀어 볼게요. 무엇을 무엇으로 나누는지, 소수점이 어디에 있는지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // Y 큰 수 — 사다리에 4-1 단원이 없었다 · 큰 수의 자릿값(네 자리씩 끊어 읽기)은 L 어림·AA 곱셈과 나눗셈의 바탕 · 지도서가 꼽은 흔한 오류는 자리 수를 잘못 셈·0인 자리를 빼고 씀·세 자리 쉼표와 네 자리 단위 혼동·앞자리만 비교다.
+  // 2022 [4수01-01·02](진우 4학년 책이 2022판)·2015 비상 4-1 지도서 118쪽 흐름도로 범위 확인 (2026-10-08 아버님 "다음 줄기로 4-1 단원 시작하자" → 네 줄기 설계안 "이대로 진행하자").
+  // 초4 8칸(10000 → 다섯 자리 수 → 십만·백만·천만 → 억 → 조 → 뛰어 세기 → 크기 비교 → ⭐ 활용) · 사다리에서 B 혼합계산 바로 앞(T → Y → B) · 8자리 이하 답은 숫자판, 9자리 이상·만/억/조를 섞어 쓴 꼴·읽은 말은 보기
+  //   · 수는 9000조 미만·쉼표 없이 · 자릿값 표 [place]는 배움·② 일부에만
+  bignum: { key: 'bignum', code: 'Y', label: '큰 수 줄기', range: '초4', list: bigGen.BIG, gen: bigGen, file: './coach/math/bignum.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (10000과 다섯 자리 수부터 — 학교 4-1 1단원 큰 수 · 큰 수는 일의 자리부터 네 자리씩 끊어 읽어요)', intro: '큰 수 문제 5개를 먼저 풀어 볼게요. 몇 자리 수인지, 숫자가 어느 자리에 있는지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'mixed', 'decimal', 'decmul', 'decdiv', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];
+export const STEM_ORDER = ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'bignum', 'mixed', 'decimal', 'decmul', 'decdiv', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;
