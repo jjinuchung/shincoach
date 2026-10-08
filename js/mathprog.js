@@ -31,6 +31,7 @@ import * as faddGen from './mathfadd.js';
 import * as dmulGen from './mathdmul.js';
 import * as ddivGen from './mathddiv.js';
 import * as bigGen from './mathbig.js';
+import * as angGen from './mathangle.js';
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -103,8 +104,13 @@ export const STEMS = {
   // 초4 8칸(10000 → 다섯 자리 수 → 십만·백만·천만 → 억 → 조 → 뛰어 세기 → 크기 비교 → ⭐ 활용) · 사다리에서 B 혼합계산 바로 앞(T → Y → B) · 8자리 이하 답은 숫자판, 9자리 이상·만/억/조를 섞어 쓴 꼴·읽은 말은 보기
   //   · 수는 9000조 미만·쉼표 없이 · 자릿값 표 [place]는 배움·② 일부에만
   bignum: { key: 'bignum', code: 'Y', label: '큰 수 줄기', range: '초4', list: bigGen.BIG, gen: bigGen, file: './coach/math/bignum.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (10000과 다섯 자리 수부터 — 학교 4-1 1단원 큰 수 · 큰 수는 일의 자리부터 네 자리씩 끊어 읽어요)', intro: '큰 수 문제 5개를 먼저 풀어 볼게요. 몇 자리 수인지, 숫자가 어느 자리에 있는지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
+  // Z 각도 — 사다리에 각도의 바탕(1°·각도기·예각과 둔각·어림·합과 차)이 없었다 — J 줄기의 "삼각형·사각형의 각의 합" 칸 하나뿐 · 지도서가 꼽은 흔한 오류는 변이 길면 각도도 크다고 봄·각도기의 반대쪽 눈금을 읽음·중심과 밑금을 안 맞춤·예각과 둔각을 바꿔 앎·잰 값의 오차다.
+  // 천재 2022 4-1 지도서 2단원 11차시 흐름·2022 [4수03-02]·[4수03-24]·[4수03-25]로 범위 확인 (2026-10-08 아버님 "Z 각도 줄기의 칸별 설계안" → "이대로 진행").
+  // 초4 8칸(각의 크기 비교 → 각도와 각도기 → 예각과 둔각 → 어림 → 합과 차 → 삼각형 180° → 사각형 360° → ⭐ 일직선과 ㉠) · 사다리에서 I 둘레와 넓이 다음·J 삼각형·사각형 바로 앞(I → Z → J) · 각도 답은 숫자판(단위 °), 어림·예각과 둔각 고르기("어느 것")는 보기
+  //   · 각은 5의 배수·180° 이하(사각형의 합 360° 빼고) · J의 "각의 합" 칸은 그대로(4-2 응용) · 그림 [ang]·[fan]·[prot]·삼각형·사각형 ext(㉠)는 배움·문항 일부에
+  angle: { key: 'angle', code: 'Z', label: '각도 줄기', range: '초4', list: angGen.ANGLE, gen: angGen, file: './coach/math/angle.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (각의 크기 비교부터 — 학교 4-1 2단원 각도 · 각의 크기는 변의 길이가 아니라 두 변이 벌어진 정도예요)', intro: '각도 문제 5개를 먼저 풀어 볼게요. 두 변이 얼마나 벌어졌는지 잘 보고, 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
 };
-export const STEM_ORDER = ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'bignum', 'mixed', 'decimal', 'decmul', 'decdiv', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];
+export const STEM_ORDER = ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'bignum', 'mixed', 'decimal', 'decmul', 'decdiv', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'angle', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space'];
 /** 개념 id → 줄기 (없으면 null) */
 export function stemOf(id) {
   return Object.values(STEMS).find((s) => s.list.some((c) => c.id === id)) || null;

@@ -330,8 +330,13 @@ function segHitsBox([a, b], B) {
   }
   return true;
 }
+/** 📐 Z — 변 (i−1)→i를 꼭짓점 i 너머로 그 변 길이의 0.55만큼 늘인 끝점 (도형 좌표) */
+function extEnd(o) {
+  const i = o.ext.i; const n = o.pts.length; const a = o.pts[(i + n - 1) % n]; const b = o.pts[i];
+  return [b[0] + (b[0] - a[0]) * 0.55, b[1] + (b[1] - a[1]) * 0.55];
+}
 function polySvg(o) {
-  const all = [...o.pts, ...(o.dashes || []).flatMap((d) => [d.a, d.b])];
+  const all = [...o.pts, ...(o.dashes || []).flatMap((d) => [d.a, d.b]), ...(o.ext ? [extEnd(o)] : [])];
   const xs = all.map((p) => p[0]); const ys = all.map((p) => p[1]);
   const minX = Math.min(...xs); const maxX = Math.max(...xs); const minY = Math.min(...ys); const maxY = Math.max(...ys);
   const span = Math.max(maxX - minX, maxY - minY, 1);
@@ -394,6 +399,7 @@ function polySvg(o) {
     return { cx, cy, u, v, b, th };
   };
   let extra = '';
+  const angLabs = []; // 각도·㉠ 글자 자리와 그 꼭짓점 (report.stray)
   for (const nm of o.names || []) {
     // ㄱ·ㄴ 같은 자모는 같은 크기에서 숫자보다 작아 보인다 → 18px
     const { cx, cy, b } = corner(nm.i);
@@ -410,7 +416,21 @@ function polySvg(o) {
     const d = Math.min(80, Math.max(30, (labelW(an.text) / 2 + 9) / Math.sin(th / 2)));
     const at = [cx + b[0] * d, cy + b[1] * d + 5, 'middle'];
     busy.push(boxAt(at, an.text));
+    angLabs.push({ at, i: an.i });
     extra += text(at[0], at[1], an.text, 'middle', FILL2);
+  }
+  // 📐 Z ⭐ 한 변을 늘인 직선과 이웃 변이 이루는 각 ㉠ (변 (i−1)→i를 꼭짓점 i 너머로 늘인다) — 도형 밖의 각
+  if (o.ext) {
+    const i = o.ext.i; const [cx, cy] = P(o.pts[i]); const [ex, ey] = P(extEnd(o)); const [qx, qy] = P(o.pts[(i + 1) % n]);
+    g += `<line class="ext-line" x1="${f(cx)}" y1="${f(cy)}" x2="${f(ex)}" y2="${f(ey)}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`;
+    const u = unit(ex - cx, ey - cy); const v = unit(qx - cx, qy - cy); const b = unit(u[0] + v[0], u[1] + v[1]);
+    const th = Math.acos(Math.max(-1, Math.min(1, u[0] * v[0] + u[1] * v[1])));
+    extra += `<path class="ext-arc" d="M ${f(cx + u[0] * 18)} ${f(cy + u[1] * 18)} A 18 18 0 0 ${u[0] * v[1] - u[1] * v[0] > 0 ? 1 : 0} ${f(cx + v[0] * 18)} ${f(cy + v[1] * 18)}" fill="none" stroke="${FILL2}" stroke-width="1.6"/>`;
+    const d = Math.min(80, Math.max(32, (labelW(o.ext.text) / 2 + 9) / Math.sin(th / 2)));
+    const at = [cx + b[0] * d, cy + b[1] * d + 6, 'middle'];
+    busy.push(boxAt(at, o.ext.text));
+    angLabs.push({ at, i });
+    extra += `<text class="ext-lab" x="${f(at[0])}" y="${f(at[1])}" font-size="18" text-anchor="middle" fill="${FILL2}" font-weight="700">${esc(o.ext.text)}</text>`;
   }
 
   // 점선 이름표(높이·대각선) — 후보 자리(side·at, 그다음 alts)를 차례로 보고, 도형 변·다른 점선·직각 표시·다른 이름표·그림 밖에
@@ -457,6 +477,13 @@ function polySvg(o) {
     if (s.lb) g += text(s.at[0], s.at[1], s.lb.text);
   });
   g += extra;
+  // 사각형 모양 고르기(quadSvg)가 본다 — gap: 글자 상자 사이 가장 좁은 틈(px, 겹치면 0) · stray: 각도·㉠ 글자가 제 꼭짓점보다 다른 꼭짓점에 가깝다
+  if (o.report) {
+    const gapOf = (a, b) => Math.max(0, a.x0 - b.x1, b.x0 - a.x1, a.y0 - b.y1, b.y0 - a.y1);
+    o.report.gap = Math.min(Infinity, ...busy.flatMap((a, i) => busy.slice(i + 1).map((b) => gapOf(a, b))));
+    const V = o.pts.map(P);
+    o.report.stray = angLabs.some(({ at, i }) => { const dv = (p) => Math.hypot(p[0] - at[0], p[1] - (at[1] - 5)); return V.some((p, j) => j !== i && dv(p) < dv(V[i])); });
+  }
   return `<svg class="frac-fig shape-fig" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria)}"><g>${g}</g></svg>`;
 }
 const ul = (v, u) => `${v} ${u}`; // 길이 이름표 "8 cm"
@@ -637,16 +664,19 @@ export function trisSvg(a, b, c, ask = -1) {
 }
 
 /** 세 각으로 그린 삼각형 ㄱ(왼쪽 아래)·ㄴ(오른쪽 아래)·ㄷ — ang: [{v, mode:'val'|'ask'|'hide'}], iso면 변 ㄴㄷ·ㄷㄱ에 같은 변 눈금 */
-export function triaSvg(ang, iso = false) {
+export function triaSvg(ang, iso = false, ext = false) {
   const [A, B, C] = ang.map((t) => (t.v * Math.PI) / 180);
   const side = (10 * Math.sin(B)) / Math.sin(C); // 변 ㄱㄷ (사인 법칙)
   const pts = [[0, 0], [10, 0], [side * Math.cos(A), side * Math.sin(A)]];
   return polySvg({
     pts, names: VNAMES.slice(0, 3).map((t, i) => ({ i, text: t })),
-    angles: angleMarks(ang), tickSides: iso ? [{ i: 1, n: 1 }, { i: 2, n: 1 }] : [],
-    aria: `삼각형 세 각 ${ang.map((t, i) => `${VNAMES[i]} ${t.mode === 'val' ? `${t.v}도` : t.mode === 'ask' ? '?' : '표시 없음'}`).join(', ')}`,
+    angles: angleMarks(ang), tickSides: iso ? [{ i: 1, n: 1 }, { i: 2, n: 1 }] : [], ext: ext ? EXT_AT_B : null,
+    aria: `삼각형 세 각 ${ang.map((t, i) => `${VNAMES[i]} ${t.mode === 'val' ? `${t.v}도` : t.mode === 'ask' ? '?' : '표시 없음'}`).join(', ')}${ext ? EXT_ARIA : ''}`,
   });
 }
+// 📐 Z ⭐ `ext` — 변 ㄱㄴ을 꼭짓점 ㄴ 너머로 늘이고, 늘인 직선과 변 ㄴㄷ이 이루는 각에 ㉠ (각 ㄴ은 _로 가린 꼴만)
+const EXT_AT_B = { i: 1, text: '㉠' };
+const EXT_ARIA = ' · 변 ㄱㄴ을 늘인 직선과 변 ㄴㄷ이 이루는 각 ㉠';
 function angleMarks(ang) {
   return ang.map((t, i) => (t.mode === 'hide' ? null : { i, text: t.mode === 'ask' ? '?' : `${t.v}°`, right: t.v === 90 && t.mode === 'val' })).filter(Boolean);
 }
@@ -654,11 +684,12 @@ function angleMarks(ang) {
 /**
  * 네 각으로 그린 사각형 ㄱ(왼쪽 아래)·ㄴ(오른쪽 아래)·ㄷ(오른쪽 위)·ㄹ(왼쪽 위) — 변 ㄱㄴ = 10, 변 ㄹㄱ 길이 p를 몇 가지 대 보며
  * 나머지 두 변이 알맞은 길이로 닫히는 모양을 찾는다. 평행사변형 각(ㄱ + ㄴ = 180°, ㄷ = ㄱ)이면 저절로 평행사변형, rh면 네 변을 같게(마름모).
- * 못 닫으면 null
+ * 닫히는 모양을 대 보는 차례대로 모두 (못 닫으면 빈 배열)
  */
-function quadPts(A, B, C, D, rh) {
+function quadCands(A, B, C, D, rh) {
   const rad = (d) => (d * Math.PI) / 180;
   const d2 = [Math.cos(rad(180 - B)), Math.sin(rad(180 - B))]; const d3 = [Math.cos(rad(360 - B - C)), Math.sin(rad(360 - B - C))];
+  const out = [];
   for (const p of rh ? [10] : [8, 7, 9, 6, 10, 5, 11, 12, 4, 13, 14, 3.5, 15]) {
     const D4 = [p * Math.cos(rad(A)), p * Math.sin(rad(A))]; // 꼭짓점 ㄹ
     // ㄴ + L2·d2 + L3·d3 = ㄹ  →  L2·d2 + L3·d3 = ㄹ − ㄴ
@@ -667,19 +698,30 @@ function quadPts(A, B, C, D, rh) {
     if (Math.abs(det) < 1e-9) continue;
     const L2 = (rx * d3[1] - d3[0] * ry) / det; const L3 = (d2[0] * ry - rx * d2[1]) / det;
     if (L2 < 3 || L3 < 3 || L2 > 28 || L3 > 28) continue;
-    if (rh && (Math.abs(L2 - 10) > 1e-6 || Math.abs(L3 - 10) > 1e-6)) return null;
-    return [[0, 0], [10, 0], [10 + L2 * d2[0], L2 * d2[1]], D4];
+    if (rh && (Math.abs(L2 - 10) > 1e-6 || Math.abs(L3 - 10) > 1e-6)) return [];
+    out.push([[0, 0], [10, 0], [10 + L2 * d2[0], L2 * d2[1]], D4]);
   }
-  return null;
+  return out;
 }
-export function quadSvg(ang, rh = false) {
-  const pts = quadPts(...ang.map((t) => t.v), rh);
-  if (!pts) return '';
-  return polySvg({
-    pts, names: VNAMES.slice(0, 4).map((t, i) => ({ i, text: t })), angles: angleMarks(ang),
-    aria: `사각형 네 각 ${ang.map((t, i) => `${VNAMES[i]} ${t.mode === 'val' ? `${t.v}도` : t.mode === 'ask' ? '?' : '표시 없음'}`).join(', ')}`,
+export function quadSvg(ang, rh = false, ext = false) {
+  const cands = quadCands(...ang.map((t) => t.v), rh);
+  if (!cands.length) return '';
+  const draw = (pts, report) => polySvg({
+    pts, names: VNAMES.slice(0, 4).map((t, i) => ({ i, text: t })), angles: angleMarks(ang), ext: ext ? EXT_AT_B : null, report,
+    aria: `사각형 네 각 ${ang.map((t, i) => `${VNAMES[i]} ${t.mode === 'val' ? `${t.v}도` : t.mode === 'ask' ? '?' : '표시 없음'}`).join(', ')}${ext ? EXT_ARIA : ''}`,
   });
+  // 글자(꼭짓점 이름·각도·㉠)가 넉넉히 떨어지고 각도 글자가 제 꼭짓점에 가장 가까운 첫 모양 — 아니면 다음 길이로, 다 모자라면 그중 나은 것
+  // (Z8 헤드리스: 각 ㄴ이 작으면 변 ㄷㄹ이 짧아져 95°·115°가 겹쳤고, 각 ㄴ이 크면 ㉠이 ㄷ 옆으로 밀려 ㄷ의 각처럼 보였다)
+  let best = null;
+  for (const pts of cands) {
+    const r = {}; const svg = draw(pts, r);
+    if (!r.stray && r.gap >= QUAD_GAP) return svg;
+    const score = r.gap - (r.stray ? 1000 : 0);
+    if (!best || score > best.score) best = { svg, score };
+  }
+  return best.svg;
 }
+const QUAD_GAP = 8; // px — 처음 모양이 이만큼 떨어지면 그대로 둔다(J 사각형은 거의 그대로)
 /** "65" 보임 · "?65" 묻는 각(? 로 보임) · "_65" 표시 없음 → {v, mode} */
 function angTokens(list, total) {
   const out = list.map((s) => { const m = /^([?_]?)(\d{1,3})$/.exec(s); return m ? { v: +m[2], mode: m[1] === '?' ? 'ask' : m[1] === '_' ? 'hide' : 'val' } : null; });
@@ -2512,15 +2554,20 @@ export function figureSvg(spec) {
     return trisSvg(a, b, c, asks.length ? asks[0] : -1);
   }
   // 세 각 삼각형 `[tria 50 60 ?70]` · 사각형 `[quad 65 _115 ?65 _115]` (각의 합 180° · 360°, `iso` 같은 변 눈금 · `rh` 마름모)
-  if ((m = /^tria (\S+) (\S+) (\S+)( iso)?$/.exec(s))) {
+  // `ext`(📐 Z ⭐) — 변 ㄱㄴ을 ㄴ 너머로 늘여 ㉠ 표시. 각 ㄴ은 가린 꼴(_)만 — 안쪽 각까지 보이면 ㉠을 바로 읽는다
+  if ((m = /^tria (\S+) (\S+) (\S+)( iso)?( ext)?$/.exec(s))) {
     const ang = angTokens([m[1], m[2], m[3]], 180);
-    if (!ang || (m[4] && ang[0].v !== ang[1].v)) return '';
-    return triaSvg(ang, !!m[4]);
+    if (!ang || (m[4] && ang[0].v !== ang[1].v) || (m[5] && ang[1].mode !== 'hide')) return '';
+    return triaSvg(ang, !!m[4], !!m[5]);
   }
-  if ((m = /^quad (\S+) (\S+) (\S+) (\S+)( rh)?$/.exec(s))) {
+  if ((m = /^quad (\S+) (\S+) (\S+) (\S+)( rh)?( ext)?$/.exec(s))) {
     const ang = angTokens([m[1], m[2], m[3], m[4]], 360);
-    return ang ? quadSvg(ang, !!m[5]) : '';
+    if (!ang || (m[6] && ang[1].mode !== 'hide')) return '';
+    return quadSvg(ang, !!m[5], !!m[6]);
   }
+  if ((m = /^ang (.+)$/.exec(s))) { const sp = parseAng(m[1]); return sp ? angSvg(sp) : ''; } // 📐 Z 각
+  if ((m = /^fan (.+)$/.exec(s))) { const sp = parseFan(m[1]); return sp ? fanSvg(sp) : ''; } // 📐 Z 이어 붙인 각
+  if ((m = /^prot (.+)$/.exec(s))) { const sp = parseProt(m[1]); return sp ? protSvg(sp) : ''; } // 📐 Z 각도기
   // 📊 K 줄기 — 막대·꺾은선·띠·원그래프
   if ((m = /^(bgraph|lgraph) (.+)$/.exec(s))) {
     const sp = parseChart(m[1], m[2]);
@@ -2559,6 +2606,9 @@ export function figText(text, short = false) {
     .replace(/\[dmul ([^\]]+)\]/g, (all, arg) => { const sp = parseDmul(arg); return !sp ? all : short ? '(소수 곱셈 그림)' : `(${dmulText(sp)})`; })
     .replace(/\[ddiv ([^\]]+)\]/g, (all, arg) => { const sp = parseDdiv(arg); return !sp ? all : short ? '(나눗셈 그림)' : `(${ddivText(sp)})`; })
     .replace(/\[place ([^\]]+)\]/g, (all, arg) => { const sp = parsePlace(arg); return !sp ? all : short ? '(자릿값 표)' : `(${placeText(sp)})`; })
+    .replace(/\[ang ([^\]]+)\]/g, (all, arg) => { const sp = parseAng(arg); return !sp ? all : short ? '(각 그림)' : `(${angFigText(sp)})`; })
+    .replace(/\[fan ([^\]]+)\]/g, (all, arg) => { const sp = parseFan(arg); return !sp ? all : short ? '(각 그림)' : `(${fanText(sp)})`; })
+    .replace(/\[prot ([^\]]+)\]/g, (all, arg) => { const sp = parseProt(arg); return !sp ? all : short ? '(각도기)' : `(${protText(sp)})`; })
     .replace(/\[plane ([^\]]+)\]/g, (all, arg) => { const sp = parsePlane(arg); return !sp ? all : short ? '(좌표평면)' : `(${planeText(sp)})`; })
     .replace(/\[(stack|stacks|views|top|layers) ([^\]]+)\]/g, (all, kind, arg) => { const tx = spaceText(kind, arg); return !tx ? all : short ? '(쌓기나무)' : `(${tx})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
@@ -2592,15 +2642,15 @@ function shapeText(kind, arg) {
       const eq = v[0] === v[1] && v[1] === v[2] ? ' · 세 변의 길이가 모두 같음' : pair ? ` · 변 ${nm[pair[0]]}과 변 ${nm[pair[1]]}의 길이가 같음` : '';
       return `삼각형 ㄱㄴㄷ — ${t.map((x, i) => `변 ${nm[i]} ${x.startsWith('?') ? '?' : x} cm`).join(' · ')}${eq}`;
     }
-    case 'tria': return `삼각형 세 각 ${angText(arg.replace(/ iso$/, '').trim().split(/\s+/))}${/ iso$/.test(arg) ? ' · 변 ㄴㄷ과 변 ㄷㄱ의 길이가 같음' : ''}`;
-    case 'quad': return `사각형 네 각 ${angText(arg.replace(/ rh$/, '').trim().split(/\s+/))}`;
+    case 'tria': { const a = arg.replace(/ ext$/, ''); return `삼각형 세 각 ${angText(a.replace(/ iso$/, '').trim().split(/\s+/))}${/ iso$/.test(a) ? ' · 변 ㄴㄷ과 변 ㄷㄱ의 길이가 같음' : ''}${/ ext$/.test(arg) ? EXT_ARIA : ''}`; }
+    case 'quad': { const a = arg.replace(/ ext$/, ''); return `사각형 네 각 ${angText(a.replace(/ rh$/, '').trim().split(/\s+/))}${/ ext$/.test(arg) ? EXT_ARIA : ''}`; }
     default: return null;
   }
 }
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|place|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|place|ang|fan|prot|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -3119,6 +3169,178 @@ export function placeSvg(sp) {
   g += `<rect x="${X0.toFixed(1)}" y="${top}" width="${(cols * cw).toFixed(1)}" height="${3 * rh}" fill="none" stroke="currentColor" stroke-width="2"/>`;
   const H = top + 3 * rh + 4;
   return `<svg class="frac-fig place-fig" data-n="${sp.n}" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${placeText(sp)}">${g}</svg>`;
+}
+
+// ───────────────────── 📐 Z 각도 — 각 · 이어 붙인 각 · 각도기 (2026-10-08) ─────────────────────
+//
+// `[ang 가:60/120/16 나:45/60/34@30]` — 각 1~3개를 나란히. 이름:각도/변의 길이/호의 반지름@돌린 각(시계 반대 방향, 첫 변이 오른쪽에서 돈다).
+//   이름(가·나·다)은 각이 하나면 없어도 된다 `[ang 65/85/16@40]`. 각도 5~175 · 변 50~130 · 호 12~44 · 돌림 0~180. 90°는 호 대신 직각 표시.
+//   각도는 그림에 적지 않는다(크기 비교·예각 둔각·어림은 눈으로 보는 문제). 변의 길이·호의 크기도 **수**로 적어
+//   틀 열쇠(숫자만 #로 바뀐다)가 늘 같다 — 어느 각의 변이 긴지가 문제마다 바뀌어도 🔁 쌍둥이가 같은 틀을 찾는다.
+// `[fan 40 ?35 _25]` — 한 꼭짓점에서 이어 붙인 각(첫 변은 오른쪽, 시계 반대 방향으로). 수는 "40°", ?는 "?", _는 호만.
+//   끝에 `names`를 붙이면 꼭짓점 ㅇ과 변 끝 ㄱ·ㄴ·ㄷ… (각 ㄱㅇㄷ처럼 부르려고). 조각 20~175, 합 ≤ 360.
+//   합이 180이면 일직선(삼각형의 세 각을 잘라 모은 모양), 360이면 한 바퀴(사각형의 네 각).
+// `[prot 0 75]` — 각도기 위의 각. 각도기 중심에 꼭짓점, 한 변은 0 눈금, 다른 변은 75 눈금. 바깥쪽 눈금은 왼쪽이 0, 안쪽 눈금은 오른쪽이 0(교과서 각도기).
+//   `[prot 0 75 left]` 한 변이 왼쪽(바깥쪽 눈금으로 읽는다) · `[prot 20 95]` 한 변을 0에 맞추지 않은 모습(② 잘못 잰 친구에만).
+//   눈금은 5°마다(10°마다 길게), 수는 10°마다 — 폰에서 1° 눈금은 안 보인다. 각도는 5의 배수만.
+// ★ 테스트가 그린 SVG에서 다시 잰다 — 각 ang-ray(data-name)·호 ang-arc(data-r) · 조각 fan-ray(data-i) · 각도기 prot-arm·prot-n(data-ring·data-v)
+
+const zr = (d) => (d * Math.PI) / 180;
+const ANG_TOK = /^(?:([가-다]):)?(\d{1,3})\/(\d{2,3})\/(\d{2})(?:@(\d{1,3}))?$/;
+/** `가:60/120/16 나:45/60/34@30` → { items: [{name, v, arm, arc, rot}] } (못 읽거나 그릴 수 없으면 null) */
+export function parseAng(arg) {
+  const toks = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  if (!toks.length || toks.length > 3) return null;
+  const items = [];
+  for (const t of toks) {
+    const m = ANG_TOK.exec(t);
+    if (!m) return null;
+    const it = { name: m[1] || '', v: +m[2], arm: +m[3], arc: +m[4], rot: m[5] ? +m[5] : 0 };
+    if (it.v < 5 || it.v > 175 || it.arm < 50 || it.arm > 130 || it.arc < 12 || it.arc > 44 || it.arc > it.arm - 20 || it.rot > 180) return null;
+    items.push(it);
+  }
+  const named = items.filter((x) => x.name).length;
+  if (named ? named !== items.length || new Set(items.map((x) => x.name)).size !== items.length : items.length > 1) return null;
+  return { items };
+}
+/** 📊·❓ 글용 — "각 그림: 가 60°(변 120·호 16) · 나 45°(변 60·호 34)" */
+export function angFigText(sp) {
+  return `각 그림: ${sp.items.map((it) => `${it.name ? `${it.name} ` : ''}${it.v}°(변 ${it.arm}·호 ${it.arc})`).join(' · ')}`;
+}
+export function angSvg(sp) {
+  const GAP = 36; const PAD = 14; const named = !!sp.items[0].name;
+  const parts = sp.items.map((it) => {
+    const a1 = zr(it.rot); const a2 = zr(it.rot + it.v);
+    const p1 = [it.arm * Math.cos(a1), it.arm * Math.sin(a1)]; const p2 = [it.arm * Math.cos(a2), it.arm * Math.sin(a2)];
+    const xs = [0, p1[0], p2[0]]; const ys = [0, p1[1], p2[1]];
+    for (let k = 0; k <= 8; k++) { const t = zr(it.rot + (it.v * k) / 8); xs.push(it.arc * Math.cos(t)); ys.push(it.arc * Math.sin(t)); }
+    let minX = Math.min(...xs); let maxX = Math.max(...xs);
+    if (maxX - minX < 30) { const c = (minX + maxX) / 2; minX = c - 15; maxX = c + 15; } // 거의 세로인 좁은 각 — 이름 칸 폭
+    return { it, a1, a2, p1, p2, minX, maxX, minY: Math.min(...ys), maxY: Math.max(...ys) };
+  });
+  const top = Math.max(...parts.map((p) => p.maxY)); const bottom = Math.min(...parts.map((p) => p.minY));
+  const oy = PAD + top; const H = Math.round(oy - bottom + (named ? 36 : 0) + PAD);
+  let x = PAD; let g = '';
+  for (const p of parts) {
+    const { it } = p; const ox = x - p.minX;
+    const X = (v) => cf(ox + v); const Y = (v) => cf(oy - v);
+    let body = '';
+    for (const q of [p.p1, p.p2]) body += `<line class="ang-ray" data-name="${it.name}" x1="${X(0)}" y1="${Y(0)}" x2="${X(q[0])}" y2="${Y(q[1])}" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>`;
+    const u = [Math.cos(p.a1), Math.sin(p.a1)]; const w = [Math.cos(p.a2), Math.sin(p.a2)];
+    if (it.v === 90) {
+      const s = 14;
+      body += `<path class="ang-right" d="M ${X(u[0] * s)} ${Y(u[1] * s)} L ${X((u[0] + w[0]) * s)} ${Y((u[1] + w[1]) * s)} L ${X(w[0] * s)} ${Y(w[1] * s)}" fill="none" stroke="${FILL2}" stroke-width="2"/>`;
+    } else {
+      body += `<path class="ang-arc" data-r="${it.arc}" d="M ${X(u[0] * it.arc)} ${Y(u[1] * it.arc)} A ${it.arc} ${it.arc} 0 0 0 ${X(w[0] * it.arc)} ${Y(w[1] * it.arc)}" fill="none" stroke="${FILL2}" stroke-width="2.2"/>`;
+    }
+    body += `<circle cx="${X(0)}" cy="${Y(0)}" r="3" fill="currentColor"/>`;
+    if (named) body += `<text class="ang-name" x="${X((p.minX + p.maxX) / 2)}" y="${cf(oy - bottom + 30)}" font-size="18" font-weight="700" text-anchor="middle" fill="currentColor">${it.name}</text>`;
+    g += `<g class="ang-a" data-name="${it.name}" data-v="${it.v}" data-arm="${it.arm}" data-arc="${it.arc}">${body}</g>`;
+    x += p.maxX - p.minX + GAP;
+  }
+  const W = Math.round(x - GAP + PAD);
+  return `<svg class="frac-fig ang-fig" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.3)}" height="${Math.round(H * 1.3)}" role="img" aria-label="${esc(angFigText(sp))}">${g}</svg>`;
+}
+
+const FAN_NAMES = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ'];
+/** `40 ?35 _25 names` → { pieces: [{v, mode}], names, sum } (못 읽거나 그릴 수 없으면 null) */
+export function parseFan(arg) {
+  const toks = String(arg || '').trim().split(/\s+/).filter(Boolean);
+  let names = false;
+  if (toks[toks.length - 1] === 'names') { names = true; toks.pop(); }
+  if (!toks.length || toks.length > 5) return null;
+  const pieces = [];
+  for (const t of toks) {
+    const m = /^([?_]?)(\d{1,3})$/.exec(t);
+    if (!m) return null;
+    pieces.push({ v: +m[2], mode: m[1] === '?' ? 'ask' : m[1] === '_' ? 'hide' : 'val' });
+  }
+  const sum = pieces.reduce((a, p) => a + p.v, 0);
+  if (pieces.some((p) => p.v < 20 || p.v > 175) || sum > 360 || pieces.filter((p) => p.mode === 'ask').length > 1 || (names && sum >= 360)) return null;
+  return { pieces, names, sum };
+}
+const fanLab = (p) => (p.mode === 'ask' ? '?' : p.mode === 'hide' ? '' : `${p.v}°`);
+/** 📊·❓ 글용 — "이어 붙인 각: 각 ㄱㅇㄴ 40° · 각 ㄴㅇㄷ ? — 일직선" */
+export function fanText(sp) {
+  const ps = sp.pieces.map((p, i) => `${sp.names ? `각 ${FAN_NAMES[i]}ㅇ${FAN_NAMES[i + 1]} ` : ''}${fanLab(p) || '표시만'}`);
+  return `이어 붙인 각: ${ps.join(' · ')}${sp.sum === 180 ? ' — 일직선' : sp.sum === 360 ? ' — 한 바퀴' : ''}`;
+}
+export function fanSvg(sp) {
+  const L = 118; const n = sp.pieces.length;
+  const cum = [0]; for (const p of sp.pieces) cum.push(cum[cum.length - 1] + p.v);
+  const rays = sp.sum === 360 ? cum.slice(0, n) : cum;
+  const items = []; // 그릴 것 (수학 좌표, y 위로) — 상자를 먼저 재고 옮긴다
+  const boxes = [[0, 0]];
+  rays.forEach((d) => { const q = [L * Math.cos(zr(d)), L * Math.sin(zr(d))]; boxes.push(q); });
+  const labs = sp.pieces.map((p, i) => {
+    const t = fanLab(p); const mid = zr(cum[i] + p.v / 2); const th = zr(p.v);
+    const d = Math.max(48, Math.min(96, (labelW(t) / 2 + 10) / Math.sin(th / 2)));
+    const at = [d * Math.cos(mid), d * Math.sin(mid)];
+    if (t) { boxes.push([at[0] - labelW(t) / 2, at[1] - 8], [at[0] + labelW(t) / 2, at[1] + 8]); }
+    return { t, at, i };
+  });
+  const names = [];
+  if (sp.names) {
+    const back = zr((sp.sum + 360) / 2);
+    names.push({ t: 'ㅇ', at: [20 * Math.cos(back), 20 * Math.sin(back)] });
+    rays.forEach((d, i) => names.push({ t: FAN_NAMES[i], at: [(L + 16) * Math.cos(zr(d)), (L + 16) * Math.sin(zr(d))] }));
+    for (const nm of names) boxes.push([nm.at[0] - 10, nm.at[1] - 10], [nm.at[0] + 10, nm.at[1] + 10]);
+  }
+  const PAD = 12;
+  const minX = Math.min(...boxes.map((b) => b[0])); const maxX = Math.max(...boxes.map((b) => b[0]));
+  const minY = Math.min(...boxes.map((b) => b[1])); const maxY = Math.max(...boxes.map((b) => b[1]));
+  const X = (v) => cf(PAD + v - minX); const Y = (v) => cf(PAD + maxY - v);
+  const W = Math.round(maxX - minX + 2 * PAD); const H = Math.round(maxY - minY + 2 * PAD);
+  let g = '';
+  sp.pieces.forEach((p, i) => {
+    const r = i % 2 ? 31 : 24; const a = zr(cum[i]); const b = zr(cum[i + 1]);
+    items.push(`<path class="fan-arc" data-i="${i}" d="M ${X(r * Math.cos(a))} ${Y(r * Math.sin(a))} A ${r} ${r} 0 ${p.v > 180 ? 1 : 0} 0 ${X(r * Math.cos(b))} ${Y(r * Math.sin(b))}" fill="none" stroke="${FILL2}" stroke-width="2"/>`);
+  });
+  rays.forEach((d, i) => { g += `<line class="fan-ray" data-i="${i}" x1="${X(0)}" y1="${Y(0)}" x2="${X(L * Math.cos(zr(d)))}" y2="${Y(L * Math.sin(zr(d)))}" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>`; });
+  g += items.join('');
+  g += `<circle cx="${X(0)}" cy="${Y(0)}" r="3" fill="currentColor"/>`;
+  for (const lb of labs) if (lb.t) g += `<text class="fan-lab" data-i="${lb.i}" x="${X(lb.at[0])}" y="${cf(PAD + maxY - lb.at[1] + 5)}" font-size="15" font-weight="700" text-anchor="middle" fill="${FILL2}">${esc(lb.t)}</text>`;
+  for (const nm of names) g += `<text class="fan-name" x="${X(nm.at[0])}" y="${cf(PAD + maxY - nm.at[1] + 6)}" font-size="18" font-weight="700" text-anchor="middle" fill="currentColor">${nm.t}</text>`;
+  return `<svg class="frac-fig fan-fig" data-sum="${sp.sum}" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.3)}" height="${Math.round(H * 1.3)}" role="img" aria-label="${esc(fanText(sp))}">${g}</svg>`;
+}
+
+/** `0 75` · `0 75 left` · `20 95` → { a, b, left } (못 읽거나 그릴 수 없으면 null) */
+export function parseProt(arg) {
+  const m = /^(\d{1,3}) (\d{1,3})( left)?$/.exec(String(arg || '').trim());
+  if (!m) return null;
+  const a = +m[1]; const b = +m[2];
+  if (a % 5 || b % 5 || b > 180 || b - a < 10 || a > 60) return null;
+  return { a, b, left: !!m[3] };
+}
+/** 📊·❓ 글용 — "각도기 위의 각: 한 변은 안쪽 눈금 0(밑금), 다른 변은 안쪽 눈금 75·바깥쪽 눈금 105" */
+export function protText(sp) {
+  const ring = sp.left ? '바깥쪽' : '안쪽'; const other = sp.left ? '안쪽' : '바깥쪽';
+  return `각도기 위의 각: 한 변은 ${ring} 눈금 ${sp.a}${sp.a ? '(0에 안 맞춤)' : '(밑금)'}, 다른 변은 ${ring} 눈금 ${sp.b}·${other} 눈금 ${180 - sp.b}`;
+}
+export function protSvg(sp) {
+  const W = 400; const cx = 200; const cy = 206; const R = 184; const RO = 161; const RI = 140; const ARM = 196;
+  const at = (r, phi) => [cx + r * Math.cos(zr(phi)), cy - r * Math.sin(zr(phi))];
+  let g = `<path class="prot-body" d="M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${cx + R} ${cy} Z" fill="${EMPTY}" stroke="currentColor" stroke-width="1.6"/>`;
+  for (let d = 0; d <= 180; d += 5) {
+    const len = d % 10 ? 7 : 14; const [x1, y1] = at(R, d); const [x2, y2] = at(R - len, d);
+    g += `<line x1="${cf(x1)}" y1="${cf(y1)}" x2="${cf(x2)}" y2="${cf(y2)}" stroke="currentColor" stroke-width="${d % 10 ? 1 : 1.5}"/>`;
+  }
+  g += `<line class="prot-base" x1="${cx - R}" y1="${cy}" x2="${cx + R}" y2="${cy}" stroke="currentColor" stroke-width="1.6"/>`;
+  // 각 — 두 변(굵게)과 호. 변을 먼저 그리고 눈금 수는 그 위에(흰 테두리) — 변이 지나는 자리의 수도 읽힌다
+  const phi = (t) => (sp.left ? 180 - t : t);
+  for (const t of [sp.a, sp.b]) { const [x2, y2] = at(ARM, phi(t)); g += `<line class="prot-arm" data-v="${t}" x1="${cx}" y1="${cy}" x2="${cf(x2)}" y2="${cf(y2)}" stroke="${FILL2}" stroke-width="3.2" stroke-linecap="round"/>`; }
+  const [p, q] = sp.left ? [phi(sp.b), phi(sp.a)] : [phi(sp.a), phi(sp.b)];
+  const [ax, ay] = at(30, p); const [bx, by] = at(30, q);
+  g += `<path class="prot-arc" d="M ${cf(ax)} ${cf(ay)} A 30 30 0 0 0 ${cf(bx)} ${cf(by)}" fill="none" stroke="${FILL2}" stroke-width="2"/>`;
+  const num = (ring, v, r, ph, fs, color) => {
+    const [x, y] = at(r, ph); const yy = ph < 8 || ph > 172 ? y - 4 : y + 5;
+    return `<text class="prot-n" data-ring="${ring}" data-v="${v}" x="${cf(x)}" y="${cf(yy)}" font-size="${fs}" font-weight="700" text-anchor="middle" fill="${color}" stroke="var(--card, #fff)" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${v}</text>`;
+  };
+  // 안쪽 수는 12 — 위쪽(80~100)에서는 이웃 수가 옆으로 24쯤만 떨어져 13이면 "110100"처럼 붙어 보였다
+  for (let d = 0; d <= 180; d += 10) { g += num('out', d, RO, 180 - d, 14, 'currentColor'); g += num('in', d, RI, d, 12, FILL); }
+  g += `<circle cx="${cx}" cy="${cy}" r="3.5" fill="currentColor"/>`;
+  const H = cy + 10;
+  return `<svg class="frac-fig prot-fig" data-a="${sp.a}" data-b="${sp.b}" data-left="${sp.left ? 1 : 0}" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${esc(protText(sp))}">${g}</svg>`;
 }
 
 // ───────────────────── 📈 R 좌표평면과 그래프 — 좌표평면 (2026-10-05) ─────────────────────

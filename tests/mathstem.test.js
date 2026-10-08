@@ -10,9 +10,13 @@ import { lessonOf, checkContent } from '../js/mathneg.js';
 const content = JSON.parse(readFileSync(new URL('../coach/math/negative.json', import.meta.url), 'utf8'));
 const T = '2026-09-21';
 
-test('STEMS: 분수·분수의 덧셈·뺄셈·분수의 곱셈·분수의 나눗셈·큰 수·혼합계산·소수·소수의 곱셈·소수의 나눗셈·문자와 식·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·삼각형·사각형·자료와 그래프·수의 범위와 어림하기·합동과 대칭·원의 넓이·직육면체·입체도형·일차방정식·좌표평면과 그래프·공간과 입체 스물다섯 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
-  assert.deepEqual(STEM_ORDER, ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'bignum', 'mixed', 'decimal', 'decmul', 'decdiv', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space']);
-  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'V', 'U', 'T', 'Y', 'B', 'C', 'W', 'X', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S'], '글자 순서대로 (비워 둔 D 자리에 문자와 식, P 뒤에 일차방정식, 그 뒤에 좌표평면과 그래프, 공간과 입체) · V 분수의 덧셈·뺄셈·U 분수의 곱셈·T 분수의 나눗셈만 A 분수 바로 뒤 (A → 덧셈·뺄셈 → 곱셈 → 나눗셈 순서로 배운다) · Y 큰 수는 B 혼합계산 바로 앞 · W 소수의 곱셈은 C 소수 바로 뒤, X 소수의 나눗셈은 그 뒤');
+test('STEMS: 분수·분수의 덧셈·뺄셈·분수의 곱셈·분수의 나눗셈·큰 수·혼합계산·소수·소수의 곱셈·소수의 나눗셈·문자와 식·음수·비와 비율·약수와 배수·규칙과 대응·둘레와 넓이·각도·삼각형·사각형·자료와 그래프·수의 범위와 어림하기·합동과 대칭·원의 넓이·직육면체·입체도형·일차방정식·좌표평면과 그래프·공간과 입체 스물여섯 줄기, 개념 id 접두사로 줄기를 찾는다, 이름은 어느 줄기든', () => {
+  assert.deepEqual(STEM_ORDER, ['fraction', 'fracadd', 'fracmul', 'fracdiv', 'bignum', 'mixed', 'decimal', 'decmul', 'decdiv', 'expr', 'negative', 'ratio', 'factor', 'correspond', 'area', 'angle', 'shape', 'data', 'range', 'sym', 'circle', 'cuboid', 'solid', 'equation', 'coord', 'space']);
+  assert.deepEqual(STEM_ORDER.map((k) => STEMS[k].code), ['A', 'V', 'U', 'T', 'Y', 'B', 'C', 'W', 'X', 'D', 'E', 'F', 'G', 'H', 'I', 'Z', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S'], '글자 순서대로 (비워 둔 D 자리에 문자와 식, P 뒤에 일차방정식, 그 뒤에 좌표평면과 그래프, 공간과 입체) · V 분수의 덧셈·뺄셈·U 분수의 곱셈·T 분수의 나눗셈만 A 분수 바로 뒤 (A → 덧셈·뺄셈 → 곱셈 → 나눗셈 순서로 배운다) · Y 큰 수는 B 혼합계산 바로 앞 · W 소수의 곱셈은 C 소수 바로 뒤, X 소수의 나눗셈은 그 뒤 · Z 각도는 I 둘레와 넓이 다음·J 삼각형·사각형 바로 앞');
+  assert.equal(STEMS.angle.lesson, true, '각도도 📚 배움');
+  assert.equal(STEMS.angle.file, './coach/math/angle.json');
+  assert.equal(stemOf('ang.apply').key, 'angle');
+  assert.equal(nameOf('ang.estimate'), '각도 어림하기');
   assert.equal(STEMS.bignum.lesson, true, '큰 수도 📚 배움');
   assert.equal(STEMS.bignum.file, './coach/math/bignum.json');
   assert.equal(stemOf('big.apply').key, 'bignum');
@@ -131,7 +135,7 @@ test('줄기별 사다리·진단: 음수 줄기의 진단은 음수 사다리�
   assert.equal(ladderOf(m, T, 'fraction').filter((r) => r.state === 'done').length, 0);
   assert.deepEqual(dueIds(m, '2026-09-30', 'negative'), ['neg.mean', 'neg.line', 'neg.add', 'neg.sub']);
   const s = mathSummary(m);
-  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['fracadd', 0, false], ['fracmul', 0, false], ['fracdiv', 0, false], ['bignum', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['decmul', 0, false], ['decdiv', 0, false], ['expr', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false], ['area', 0, false], ['shape', 0, false], ['data', 0, false], ['range', 0, false], ['sym', 0, false], ['circle', 0, false], ['cuboid', 0, false], ['solid', 0, false], ['equation', 0, false], ['coord', 0, false], ['space', 0, false]]);
+  assert.deepEqual(s.stems.map((x) => [x.key, x.done, x.started]), [['fraction', 0, false], ['fracadd', 0, false], ['fracmul', 0, false], ['fracdiv', 0, false], ['bignum', 0, false], ['mixed', 0, false], ['decimal', 0, false], ['decmul', 0, false], ['decdiv', 0, false], ['expr', 0, false], ['negative', 4, true], ['ratio', 0, false], ['factor', 0, false], ['correspond', 0, false], ['area', 0, false], ['angle', 0, false], ['shape', 0, false], ['data', 0, false], ['range', 0, false], ['sym', 0, false], ['circle', 0, false], ['cuboid', 0, false], ['solid', 0, false], ['equation', 0, false], ['coord', 0, false], ['space', 0, false]]);
   assert.equal(s.done, 4);
 });
 
