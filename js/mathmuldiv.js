@@ -644,17 +644,19 @@ export const MULDIV = [
           probe: { ask: 'remMean' },
         };
       };
+      // 묻는 것은 한 명에게 주는 수 — 틀린 셈을 한 아이도 그 몫을 답한다. 오답은 "11 … 17"이 아니라 11 (숫자판에 11을 치면 그 오개념, 🔍 Codex 42차 #2)
+      //   먹은 수 ≥ 나누는 수 — 그래야 빼지 않은 몫이 바른 몫과 다르다(먹은 수가 작으면 빼지 않아도 몫이 같아 진단이 안 된다)
       const twoStep = () => {
         const [a, s, b] = draw(() => { const y = int(r, 12, 48); const k = int(r, 6, 19); const ss = int(r, 2, 30) * 10; return [y * k + ss, ss, y]; },
-          ([x, ss, y]) => x <= 999 && y % 10 !== 0 && x % y !== 0 && (x + ss) % y !== 0);
+          ([x, ss, y]) => x <= 999 && y % 10 !== 0 && ss >= y && x % y !== 0 && (x + ss) % y !== 0);
         const q = (a - s) / b; const o = divmod(a, b); const p = divmod(a + s, b);
         return {
           t: `사탕이 ${a}개 있었는데 그중 ${s}개를 먹었어요. 남은 사탕을 ${b}명에게 똑같이 나누어 주면 한 명에게 몇 개씩 줄 수 있을까요?`, ans: String(q),
-          wr: clean(String(q), [W(RT(o.q, o.r), TAGS.oneStep), W(RT(p.q, p.r), TAGS.subAsAdd)]),
+          wr: clean(String(q), [W(String(o.q), TAGS.oneStep), W(String(p.q), TAGS.subAsAdd)]),
           near: [String(q + 1), String(q - 1)],
           why: {
-            [TAGS.oneStep]: `먹은 ${s}개를 먼저 빼요 — 남은 사탕은 ${a} − ${s} = ${a - s}개예요.`,
-            [TAGS.subAsAdd]: `먹은 사탕은 빼요 — ${a} − ${s} = ${a - s}.`,
+            [TAGS.oneStep]: `${o.q}개씩은 먹기 전 사탕 ${a}개를 나눈 몫이에요 — 먹은 ${s}개를 먼저 빼요: ${a} − ${s} = ${a - s}.`,
+            [TAGS.subAsAdd]: `${p.q}개씩은 먹은 사탕을 더한 ${a + s}개를 나눈 몫이에요 — 먹은 사탕은 빼요: ${a} − ${s} = ${a - s}.`,
           },
           steps: [`남은 사탕: ${a} − ${s} = ${a - s}`, `${a - s} ÷ ${b} = ${q}`],
           probe: { ask: 'twoStep' },
@@ -677,10 +679,11 @@ export const MULDIV = [
       }
       const [a, b] = draw(() => [int(r, 150, 999), int(r, 12, 48)], ([x, y]) => { const d = divmod(x, y); return y % 10 !== 0 && d.r > 0 && d.q !== d.r && d.q !== d.r + y && d.q >= 2; });
       const { q, r: m } = divmod(a, b);
+      // ①과 같은 말("될 수 있는 대로 많이") · 오개념 보기는 틀린 나눗셈 식으로 — "한 명에게 43장씩 주면 남는 것은 27"은 그 조건에서 참이었다 (🔍 Codex 42차 #1)
       return misAsk(r, c, this, 'rem', {
-        q: `색종이 ${a}장을 ${b}명에게 똑같이 나누어 주려고 해요. 남는 색종이는 몇 장일까요?\n\n${showWork(`남는 색종이는 ${q}장이에요`, '말했어요')}`,
+        q: `색종이 ${a}장을 ${b}명에게 똑같이 나누어 주려고 해요. 한 명에게 될 수 있는 대로 많이 주면 남는 색종이는 몇 장일까요?\n\n${showWork(`남는 색종이는 ${q}장이에요`, '말했어요')}`,
         ok: `${a} ÷ ${b} = ${RT(q, m)} — 남는 것은 나머지 ${m}`,
-        wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `한 명에게 ${q - 1}장씩 주면 남는 것은 ${m + b}`, tag: TAGS.remBig }, { text: '똑같이 나누면 남는 색종이는 없어요', tag: OFF }],
+        wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `${a} ÷ ${b} = ${RT(q - 1, m + b)} — 남는 것은 ${m + b}`, tag: TAGS.remBig }, { text: '똑같이 나누면 남는 색종이는 없어요', tag: OFF }],
         steps: [`${a} ÷ ${b} = ${RT(q, m)}`, `${q}는 한 명에게 주는 장수 — 남는 것은 나머지 ${m}`],
         whyAny: `${q}는 몫 — 한 명에게 주는 장수예요. 남는 색종이는 나머지 ${m}장이에요.`,
         probe: { ask: 'rem', a, b },

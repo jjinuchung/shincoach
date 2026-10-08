@@ -181,8 +181,9 @@ function tagHolds(f, tag, t) {
     return false;
   }
   if (f.op === 'two') {
-    if (tag === TAGS.oneStep) return is(dm(a, b));
-    if (tag === TAGS.subAsAdd) return is(dm(a + f.s, b));
+    // 묻는 것은 한 명에게 주는 수 — 틀린 셈을 한 아이도 그 몫을 답한다("11 … 17"이 아니라 11, 🔍 Codex 42차 #2)
+    if (tag === TAGS.oneStep) return is(P(Math.floor(a / b)));
+    if (tag === TAGS.subAsAdd) return is(P(Math.floor((a + f.s) / b)));
     return false;
   }
   return false;
@@ -438,7 +439,9 @@ function misreadFacts(q) {
     return { kind: 'digits', claim: `${a} ÷ ${b}`, right: dm(a, b), f: { op: 'div', a, b } };
   }
   if ((m = /^남는 색종이는 (\d+)장이에요$/.exec(line))) {
-    const st = /^색종이 (\d+)장을 (\d+)명에게 똑같이 나누어 주려고 해요\. 남는 색종이는 몇 장일까요\?/.exec(q.q);
+    // ①과 같은 말 — "될 수 있는 대로 많이"가 없으면 "43장씩 주면 27장 남는다"도 참이 된다 (🔍 Codex 42차 #1)
+    const st = /^색종이 (\d+)장을 (\d+)명에게 똑같이 나누어 주려고 해요\. 한 명에게 될 수 있는 대로 많이 주면 남는 색종이는 몇 장일까요\?/.exec(q.q);
+    assert.ok(st, `남는 색종이 ②의 문제 글이 ①과 다르다\n${q.q}`);
     const a = +st[1]; const b = +st[2];
     return { kind: 'rem', shown: P(+m[1]), right: P(a % b), f: { op: 'div', a, b }, g: { op: 'remOnly', a, b } };
   }
@@ -478,6 +481,47 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 그 틀린
   assert.ok(tagged >= 8 * 600, `본 ② 이름표 ${tagged}`);
 });
 
+// 🔍 Codex 42차 #1 — 위 테스트는 보기의 끝 수만 본다. "한 명에게 43장씩 주면 남는 것은 27"(973 − 22 × 43 = 27)은 끝 수가 틀린 답이어도 말 전체는 참이었다
+test('★ ② 보기는 말 전체로 — 오개념 보기 속 나눗셈 식은 바른 식이 아니다 · 고치는 말의 나눗셈 식은 바르다 · "…씩 주면 남는 것은 …" 같은 조건문 보기 없음', () => {
+  let n = 0;
+  for (const { c, s, q } of every(['misread'], Math.max(SEEDS, 600))) {
+    const at = `${c.id} #${s} ${q.key}`;
+    for (const x of q.choices) {
+      for (const m of x.text.matchAll(/(\d+) ÷ (\d+) = (\d+)(?: … (\d+))?/g)) {
+        const right = eqP(P(+m[3], m[4] === undefined ? 0 : +m[4]), dm(+m[1], +m[2]));
+        assert.equal(right, !!x.ok, `${at}: ${x.ok ? '고치는 말' : '오개념 보기'} "${x.text}"의 식 ${m[0]}이 ${right ? '바른' : '틀린'} 식\n${q.q}`);
+        n++;
+      }
+      assert.ok(!/씩 주면 남는/.test(x.text), `${at}: 조건문 보기 "${x.text}" — 그 조건에서는 참일 수 있다`);
+    }
+  }
+  assert.ok(n > 600, `본 나눗셈 식 ${n}`);
+});
+
+// 🔍 Codex 42차 #2 — 보기를 그대로 쳐 보는 것만으로는 모른다. "한 명에게 몇 개씩"을 묻는데 오답 보기가 "11 … 17"이면,
+//   먹은 것을 빼지 않은 아이가 치는 11은 어느 보기와도 달라 짐작한 답(reason none)으로 셌다 — 이야기가 묻는 수로 쳐 본다
+test('★ 이야기가 묻는 것으로 쳐 보기 — 두 단계(한 명에게 몇 개씩)에서 빼지 않은 몫·더한 몫, 나머지만 묻는 문제에서 몫을 숫자판에 치면 그 오개념 · 답이 수인 문제의 숫자판은 수 칸부터', () => {
+  let n = 0; const seen = new Set();
+  for (const { c, s, q } of every(['calc'])) {
+    const sv = solveText(q.q);
+    if (sv.form === 'pick') continue;
+    const at = `${c.id} #${s} (${sv.type}): ${q.q}\n${q.choices.map((x) => x.text).join(' | ')}`;
+    const spec = padSpec(q, 'muldiv');
+    // 나눗셈 계산(어림한 350 ÷ 50 포함)은 1단계 규칙 그대로 — 보기에 많은 꼴, 같으면 몫 … 나머지 칸부터. 곱셈·두 단계·나머지만 묻는 문제는 수 칸부터
+    if (sv.form === 'num' && sv.f.op !== 'div') assert.equal(spec.start, 'num', `${at}: 답이 수인데 숫자판이 ${spec.start} 칸부터`);
+    const want = [];
+    if (sv.f.op === 'two') { const { a, s: e, b } = sv.f; want.push([Math.floor(a / b), TAGS.oneStep], [Math.floor((a + e) / b), TAGS.subAsAdd]); }
+    if (sv.f.op === 'remOnly') want.push([Math.floor(sv.f.a / sv.f.b), TAGS.quotForRem]);
+    for (const [v, tag] of want) {
+      const got = matchTyped(q, readTyped('num', { x: String(v) }, spec), spec);
+      const gotTag = got.i >= 0 ? q.choices[got.i].tag : got.known && got.known.tag;
+      assert.equal(gotTag, tag, `${at}: ${v}을(를) 치면 ${JSON.stringify(got)}`);
+      seen.add(sv.type); n++;
+    }
+  }
+  assert.ok(seen.has('twoStep') && seen.has('remMean') && n > SEEDS / 4, `본 ${n} ${[...seen]}`);
+});
+
 test('🎨 ② 세로셈 그림은 그 틀린 셈 그대로 — 곱셈 부분곱 줄 = 문제의 수로 한 부분곱(덜 옮김) · 한 줄은 몇을 곱한 값 · 나눗셈 몫 칸·맨 아래 = 보여 준 답 · 몫의 일의 자리를 비운 그림은 0을 빠뜨린 문항에서만', () => {
   const seen = { rows: 0, one: 0, blank: 0, vdiv: 0 };
   for (const { c, s, q } of every(['misread'], Math.max(SEEDS, 600))) {
@@ -491,6 +535,8 @@ test('🎨 ② 세로셈 그림은 그 틀린 셈 그대로 — 곱셈 부분곱
     if (F.kind === 'vdiv') {
       const svg = figureSvg(/\[(vdiv [^\]]+)\]/.exec(q.q)[1]);
       assert.match(svg, new RegExp(`data-q="${F.shown.q}${F.blank ? '_' : ''}" data-r="${F.shown.r}"`), at);
+      const R = vdivCheck(svg, F.f.a, F.f.b, `${F.shown.q}${F.blank ? '_' : ''}`, at);
+      assert.equal(+R[R.length - 1].v, F.shown.r, `${at}: 맨 아래 = 보여 준 나머지`);
       if (F.blank) { assert.equal(c.id, 'md.div3d2', at); assert.equal(F.right.q % 10, 0, at); seen.blank++; }
       seen.vdiv++;
     }
@@ -695,8 +741,41 @@ test('🔢 숫자판: 수·"몫 … 나머지"가 답인 ①은 모두 숫자판
 /** 세로셈 그림의 줄 → { k, v, ps(자리 번호들), xs } */
 function rowsOf(svg, cls) {
   return [...svg.matchAll(new RegExp(`<g class="${cls}" data-k="([a-z0-9]+)" data-v="([^"]*)">(.*?)</g>`, 'g'))].map((m) => ({
-    k: m[1], v: m[2], ps: [...m[3].matchAll(/data-p="(-?\d+)"/g)].map((x) => +x[1]), xs: [...m[3].matchAll(/ x="([\d.]+)"/g)].map((x) => +x[1]), ds: [...m[3].matchAll(/>(\d)</g)].map((x) => x[1]).join(''),
+    k: m[1], v: m[2], ps: [...m[3].matchAll(/data-p="(-?\d+)"/g)].map((x) => +x[1]), xs: [...m[3].matchAll(/ x="([\d.]+)"/g)].map((x) => +x[1]),
+    ys: [...m[3].matchAll(/ y="([\d.]+)"/g)].map((x) => +x[1]), ds: [...m[3].matchAll(/>(\d)</g)].map((x) => x[1]).join(''),
   }));
+}
+/**
+ * [vdiv] 그림 하나를 이 파일이 따로 다시 셈해 맞춰 본다 — Qs = 몫 칸 글("32" · 아이가 쓴 "8" · 일의 자리를 비운 "2_")
+ * 줄의 값(data-v)·자리(data-p)만이 아니라 **보이는 숫자**·x(나누어지는 수의 같은 자리 칸)·y(위에서 아래로, 한 줄은 한 높이)까지
+ * (🔍 Codex 42차 #3 — data-v·data-p만 보면 빼는 수 48을 49로 그려도, 몫 숫자를 한 칸 옮겨 그려도 지나갔다)
+ */
+function vdivCheck(svg, a, b, Qs, at) {
+  const R = rowsOf(svg, 'vd-row');
+  const A = String(a); let cur = +A.slice(0, A.length - Qs.length + 1); const want = [];
+  for (let j = 0; j < Qs.length; j++) {
+    const p = Qs.length - 1 - j; const d = Qs[j] === '_' ? 0 : +Qs[j];
+    if (d) { want.push(['prod', b * d, p]); cur -= b * d; }
+    if (j < Qs.length - 1) { cur = cur * 10 + +A[A.length - p]; want.push(['next', cur, p - 1]); } else if (d) want.push(['rest', cur, p]);
+  }
+  assert.deepEqual(R.map((x) => x.k).slice(0, 2), ['q', 'a'], `${at}: 몫·나누어지는 수 줄`);
+  const got = R.slice(2).map((x) => [x.k, +x.v, x.ps[x.ps.length - 1]]);
+  assert.deepEqual(got, want, `${at}: 줄`);
+  const Qr = R[0]; const qp = [...Qs].map((ch, i) => (ch === '_' ? null : Qs.length - 1 - i)).filter((p) => p !== null);
+  assert.deepEqual([Qr.ds, Qr.ps], [Qs.replace(/_/g, ''), qp], `${at}: 몫 칸의 숫자·자리`);
+  const Ar = R[1]; assert.equal(Ar.ds, A, `${at}: 나누어지는 수의 숫자`);
+  const colX = {}; Ar.ps.forEach((p, i) => { colX[p] = Ar.xs[i]; });
+  let lastY = -1;
+  for (const r of R) {
+    if (r.k !== 'q') {
+      assert.equal(r.ds, String(+r.v), `${at}: 줄 ${r.k}의 보이는 숫자 ${r.ds} ≠ ${r.v}`);
+      const low = r.ps[r.ps.length - 1]; assert.deepEqual(r.ps, r.ps.map((_, i) => low + r.ps.length - 1 - i), `${at}: 줄 ${r.k}의 자리가 이어지지 않음`);
+    }
+    r.ps.forEach((p, i) => assert.ok(colX[p] !== undefined && Math.abs(r.xs[i] - colX[p]) < 0.01, `${at}: 줄 ${r.k}의 ${p}자리 숫자 x ${r.xs[i]} ≠ 나누어지는 수의 그 자리 ${colX[p]}`));
+    assert.ok(r.ys.every((y) => y === r.ys[0]) && r.ys[0] > lastY, `${at}: 줄 ${r.k}의 높이 ${r.ys} (앞 줄 ${lastY})`);
+    lastY = r.ys[0];
+  }
+  return R;
 }
 test('🎨 곱셈 세로셈 [vmul]: 부분곱 = 일의 자리 곱·몇십 곱(0까지) · 합 · 숫자는 일의 자리끼리 오른쪽 맞춤 · 몇십·한 자리는 한 줄 · 아이가 쓴 줄 그대로 · 폭 400 · 글로 바꾸기 · 못 그리는 지시문은 빈 그림', () => {
   for (const [a, b] of [[123, 24], [726, 53], [857, 74], [641, 81], [99, 11]]) {
@@ -727,25 +806,18 @@ test('🎨 나눗셈 세로셈 [vdiv]: 몫의 끝 글자는 일의 자리 위 ·
       const q = Math.floor(a / b); if (q < 1 || q > 99) continue;
       const svg = figureSvg(`vdiv ${a} ${b}`); const at = `${a} ÷ ${b}`;
       assert.match(svg, new RegExp(`data-q="${q}" data-r="${a % b}"`), at);
-      const R = rowsOf(svg, 'vd-row');
-      const Qr = R.find((x) => x.k === 'q'); assert.equal(Qr.ds, String(q), at);
-      assert.deepEqual(Qr.ps, [...String(q)].map((_, i) => String(q).length - 1 - i), `${at}: 몫의 자리`);
-      // 다시 셈 — 이 파일이 나눗셈을 높은 자리부터 따로 해 본다
-      const A = String(a); const qs2 = String(q); let cur = +A.slice(0, A.length - qs2.length + 1); const want = [];
-      for (let j = 0; j < qs2.length; j++) {
-        const p = qs2.length - 1 - j; const d = +qs2[j];
-        if (d) { want.push(['prod', b * d, p]); cur -= b * d; }
-        if (j < qs2.length - 1) { cur = cur * 10 + +A[A.length - p]; want.push(['next', cur, p - 1]); } else if (d) want.push(['rest', cur, p]);
-      }
-      const got = R.filter((x) => x.k !== 'q' && x.k !== 'a').map((x) => [x.k, +x.v, x.ps[x.ps.length - 1]]);
-      assert.deepEqual(got, want, `${at}: 줄`);
+      // 다시 셈 — 이 파일이 나눗셈을 높은 자리부터 따로 해 본다(보이는 숫자·자리·높이까지)
+      const R = vdivCheck(svg, a, b, String(q), at);
       const bottom = R[R.length - 1]; assert.equal(+bottom.v, a % b, `${at}: 맨 아래 = 나머지`);
     }
   }
-  assert.match(figureSvg('vdiv 873 43 2_ 13'), /data-q="2_" data-r="13"/);
+  // 아이가 쓴 틀린 세로셈도 같은 검사 — 맨 아래는 아이가 쓴 나머지
+  for (const [sp, a, b, Qs, r] of [['vdiv 873 43 2_ 13', 873, 43, '2_', 13], ['vdiv 162 18 8 18', 162, 18, '8', 18], ['vdiv 689 78 7 143', 689, 78, '7', 143]]) {
+    const svg = figureSvg(sp); assert.match(svg, new RegExp(`data-q="${Qs}" data-r="${r}"`), sp);
+    const R = vdivCheck(svg, a, b, Qs, sp); assert.equal(+R[R.length - 1].v, r, `${sp}: 맨 아래`);
+  }
   const blank = rowsOf(figureSvg('vdiv 873 43 2_ 13'), 'vd-row').find((x) => x.k === 'q');
   assert.deepEqual([blank.ds, blank.ps], ['2', [1]], '비운 일의 자리 — 2는 십의 자리 위');
-  assert.match(figureSvg('vdiv 162 18 8 18'), /data-q="8" data-r="18"/);
   for (const bad of ['vdiv 53 12 5 7', 'vdiv 180 30 6_ 0', 'vdiv 162 18 8 17', 'vdiv 873 43 _2 13', 'vdiv 5 2', 'vdiv 1000 12', 'vdiv 527 1', 'vdiv 527 160', 'vdiv 999 2', 'vdiv 527 16 032 15', 'vdiv 527 16 3', 'vdiv']) assert.equal(figureSvg(bad), '', bad);
   assert.equal(figText('[vdiv 873 43 2_ 13]'), '(나눗셈 세로셈 873 ÷ 43: 몫 칸 2(빈칸) · 빼는 수 86 · 맨 아래 13)');
   assert.equal(figText('[vdiv 527 16]', true), '(나눗셈 세로셈)');
@@ -1064,4 +1136,20 @@ test('화면 연결 (3단계): STEMS.muldiv(AA)는 이 생성기·원고를 쓰�
     assert.ok(ask.includes(ex) && stats.includes(ex), `❓ 복사문·📊 답장 안내에 ${ex} 예`);
     assert.ok(renderFigures(ex).startsWith('<svg'), `안내의 예 ${ex}도 그려진다`);
   }
+});
+
+// 🔍 Codex 42차 #4 — 검수 페이지가 "[4수01-05] 나누는 수가 두 자리 수인 나눗셈"이라 썼다. 2022 [4수01-05]는 나눗셈의 의미·곱셈과 나눗셈의 관계,
+//   두 자리 수로 나누는 나눗셈은 [4수01-07] — 번호 바로 뒤에 쓴 말이 그 번호의 뜻인지 본다
+test('검수 페이지의 성취기준 번호 = 그 뜻 (2022 [4수01-04] 곱셈 · [4수01-05] 나눗셈의 의미 · [4수01-07] 나누는 수가 두 자리 수인 나눗셈 · [4수01-08] 어림셈)', () => {
+  const MEAN = { '4수01-04': /곱셈/, '4수01-05': /나눗셈의 의미/, '4수01-07': /나누는 수가 두 자리 수인 나눗셈/, '4수01-08': /어림/ };
+  const src = readFileSync(new URL('../tools/mathmuldiv.mjs', import.meta.url), 'utf8');
+  const seen = new Set();
+  for (const m of src.matchAll(/\[(4수\d\d-\d\d)\]([^[<]*)/g)) {
+    const said = m[2].split(' · ')[0];
+    if (!said.trim()) continue; // "[4수01-07]·[4수01-08]"처럼 번호만 이어 쓴 곳
+    assert.ok(MEAN[m[1]], `모르는 번호 [${m[1]}]`);
+    assert.match(said, MEAN[m[1]], `[${m[1]}] 뒤의 말 "${said.trim()}"`);
+    seen.add(m[1]);
+  }
+  assert.deepEqual([...seen].sort(), Object.keys(MEAN), `뜻을 적은 번호 ${[...seen]}`);
 });
