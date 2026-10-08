@@ -37,10 +37,12 @@ const same = (x, y) => x.n * y.d === y.n * x.d;
  *   "1/3" "−1/2" → {form:'frac', v, reduced}
  *   "2 1/6" → {form:'mixed', v}
  *   "2 : 4" "24 : 1.5" → {form:'ratio', a, b}
+ *   "4 … 5" → {form:'rem', q, r} (AA 곱셈과 나눗셈 — 몫 … 나머지)
  */
 export function textVal(text) {
   const s = String(text == null ? '' : text).trim().replace(/−/g, '-').replace(/\s+/g, ' ');
   let m;
+  if ((m = /^(\d+) ?(?:…|\.\.\.) ?(\d+)$/.exec(s))) return { form: 'rem', q: +m[1], r: +m[2] };
   if ((m = /^(\d+(?:\.\d+)?) ?: ?(\d+(?:\.\d+)?)$/.exec(s))) return { form: 'ratio', a: decRat(m[1]), b: decRat(m[2]) };
   if ((m = /^([+-]?)(\d+) (\d+)\/(\d+)$/.exec(s))) {
     if (+m[4] === 0) return null;
@@ -59,9 +61,12 @@ export function textVal(text) {
   return null;
 }
 
-/** 두 값이 같은가 — 비는 두 수가 그대로 같을 때만(2 : 4와 1 : 2는 다른 답이다) */
+/** 몫 … 나머지 꼴로 — 자연수 "9"는 나머지 0 ("9 … 0"과 같다). 다른 수는 null */
+const remPair = (z) => (z.form === 'rem' ? { q: z.q, r: z.r } : z.form === 'num' && !z.pct && z.v.d === 1 && z.v.n >= 0 ? { q: z.v.n, r: 0 } : null);
+/** 두 값이 같은가 — 비는 두 수가 그대로 같을 때만(2 : 4와 1 : 2는 다른 답이다) · 몫 … 나머지는 몫과 나머지가 둘 다 같을 때만 */
 function sameVal(x, y) {
   if (!x || !y) return false;
+  if (x.form === 'rem' || y.form === 'rem') { const a = remPair(x); const b = remPair(y); return !!(a && b && a.q === b.q && a.r === b.r); }
   if (x.form === 'ratio' || y.form === 'ratio') return x.form === y.form && same(x.a, y.a) && same(x.b, y.b);
   return same(x.v, y.v);
 }
@@ -82,7 +87,7 @@ export function unitOf(text) {
   return UNITS.has(u) ? u : '';
 }
 
-const FORM_NAME = { num: '수', frac: '분수', mixed: '대분수', ratio: '비' };
+const FORM_NAME = { num: '수', frac: '분수', mixed: '대분수', ratio: '비', rem: '몫 … 나머지' };
 
 /**
  * 보기에서 고르는 문제의 말 (2026-10-05, 아버님 사진 — "다음 중 45의 약수가 아닌 수는 어느 것일까요?"에 숫자판이 떠 보기가 사라졌다).
@@ -107,6 +112,12 @@ export function padSpec(q, stemKey = '') {
   const text = `${q.q || ''}\n${q.expr || ''}`.replace(/\[[a-z]+ [^\]]*\]/g, ' '); // 그림 지시문의 수는 빼고
   const vals = q.choices.map((c) => textVal(c.text)).filter(Boolean);
   if (okV.form === 'ratio') return { modes: ['ratio'], start: 'ratio', unit: '', signed: false, need: 'ratio', reduce: false };
+  // ✖️➗ AA — 보기에 "몫 … 나머지"가 있으면 [수] [몫 … 나머지] (나누어떨어지는 답 9와 "8 … 18" 오답이 함께 나온다).
+  //   처음 칸은 보기 전체에서 많은 꼴 — 같으면 [몫 … 나머지] (정답 꼴을 흘리지 않게)
+  if (vals.some((v) => v.form === 'rem')) {
+    const nRem = vals.filter((v) => v.form === 'rem').length;
+    return { modes: ['num', 'rem'], start: vals.length - nRem > nRem ? 'num' : 'rem', unit: unitOf(q.q), signed: false, need: null, reduce: false };
+  }
   // "약분해서 나타내면"을 못 알아봐 4/10·0.4가 맞음이 됐다 (Codex 18차 #1) — 약분하면·약분해서·약분하여 모두
   const need = /대분수로/.test(text) ? 'mixed' : /분수로|기약분수|약분(하면|해서|하여)/.test(text) ? 'frac' : /소수로|백분율로/.test(text) ? 'num' : null;
   const reduce = /기약분수|약분(하면|해서|하여)|가장 간단한/.test(text);
@@ -134,8 +145,8 @@ const intOf = (s) => (/^\d+$/.test(String(s || '')) ? String(Number(s)) : null);
 
 /**
  * 친 칸 → 답 글과 값. 덜 쳤거나 말이 안 되면(분모 0) null — 화면은 "확인"을 잠근다.
- * @param {string} mode 'num'|'frac'|'mixed'|'ratio'
- * @param {{sign?:string, x?:string, w?:string, n?:string, d?:string, a?:string, b?:string}} p 칸마다 친 글자
+ * @param {string} mode 'num'|'frac'|'mixed'|'ratio'|'rem'
+ * @param {{sign?:string, x?:string, w?:string, n?:string, d?:string, a?:string, b?:string, q?:string, r?:string}} p 칸마다 친 글자
  * @param {{unit?:string}} spec
  * @returns {null | {text:string, val:object}}
  */
@@ -146,6 +157,7 @@ export function readTyped(mode, p, spec = {}) {
   else if (mode === 'frac') { const n = intOf(p.n); const d = intOf(p.d); if (n !== null && d !== null && +d > 0) text = `${sign}${n}/${d}`; }
   else if (mode === 'mixed') { const w = intOf(p.w); const n = intOf(p.n); const d = intOf(p.d); if (w !== null && n !== null && d !== null && +d > 0) text = `${sign}${w} ${n}/${d}`; }
   else if (mode === 'ratio') { const a = cleanNum(p.a); const b = cleanNum(p.b); if (a !== null && b !== null) text = `${a} : ${b}`; }
+  else if (mode === 'rem') { const q = intOf(p.q); const r = intOf(p.r); if (q !== null && r !== null) text = `${q} … ${r}`; }
   if (text === null) return null;
   const val = textVal(text);
   return val ? { text, val } : null;
@@ -181,11 +193,16 @@ export function matchTyped(q, typed, spec = {}) {
   }
   const exact = choices.findIndex((c) => norm(c.text) === norm(typed.text));
   if (exact >= 0) return { i: exact, note: null };
+  // ✖️➗ AA — 몫은 맞는데 나머지를 안 씀("4 … 5"에 4) — 짐작이 아니라 꼴이 덜 된 답
+  if (okV && okV.form === 'rem' && okV.r && v.form === 'num' && remPair(v) && remPair(v).q === okV.q) {
+    return { i: -1, note: `나머지도 써요 — ${ok.text}`, reason: 'form' };
+  }
   if (sameVal(v, okV)) {
     // 약분 안내는 값을 끝까지 약분한 꼴로 (정답 글이 6/8처럼 일부러 약분 안 한 것일 수도 있다 — 분수의 뜻)
-    const low = `${v.v.n < 0 ? '−' : ''}${Math.abs(v.v.n)}/${v.v.d}`;
+    const low = v.v ? `${v.v.n < 0 ? '−' : ''}${Math.abs(v.v.n)}/${v.v.d}` : ''; // 몫 … 나머지(rem)에는 v가 없다
     // 분모를 그대로 두는 칸(q.keepDen — V 4학년 칸, 약분은 5학년)에는 "약분"을 말하지 않는다 (🔍 Codex 37차 #2)
-    const note = v.form === 'frac' && !v.reduced && okV.form === 'frac' && v.v.d !== 1 ? (q.keepDen ? `맞아요! ${ok.text} — 같은 크기예요` : `맞아요! 약분하면 ${low} — 다음엔 끝까지 약분해요`)
+    const note = v.form === 'rem' && okV.form !== 'rem' ? `맞아요! 나머지가 0이면 몫만 써요 — ${ok.text}`
+      : v.form === 'frac' && !v.reduced && okV.form === 'frac' && v.v.d !== 1 ? (q.keepDen ? `맞아요! ${ok.text} — 같은 크기예요` : `맞아요! 약분하면 ${low} — 다음엔 끝까지 약분해요`)
       : v.form !== okV.form && (v.form === 'mixed' || okV.form === 'mixed') ? `맞아요! ${ok.text}로 써도 같아요` : null;
     return { i: okI, note };
   }
@@ -203,6 +220,7 @@ export function partsOf(text) {
   const sign = s.startsWith('-') ? '-' : s.startsWith('+') ? '+' : '';
   const b = s.replace(/^[+-]/, '').replace(/%$/, '');
   let m;
+  if ((m = /^(\d+) ?… ?(\d+)$/.exec(b))) return { mode: 'rem', p: { q: m[1], r: m[2] } };
   if ((m = /^(\d+(?:\.\d+)?) ?: ?(\d+(?:\.\d+)?)$/.exec(b))) return { mode: 'ratio', p: { a: m[1], b: m[2] } };
   if ((m = /^(\d+) (\d+)\/(\d+)$/.exec(b))) return { mode: 'mixed', p: { sign, w: m[1], n: m[2], d: m[3] } };
   if ((m = /^(\d+)\/(\d+)$/.exec(b))) return { mode: 'frac', p: { sign, n: m[1], d: m[2] } };

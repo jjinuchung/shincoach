@@ -113,6 +113,25 @@ test('채점 규칙: 같은 값 · 꼴을 묻는 문제 · 약분 안내 · 오�
   assert.equal(padSpec({ kind: 'misread', q: '', choices: [{ text: '6', ok: true }] }), null);
 });
 
+test('✖️➗ 몫 … 나머지 칸 (AA): 글 → 값 · 친 칸 → 답 글 · "9 … 0"은 9와 같다 · 몫만 치면 "나머지도 써요"(꼴, 짐작 아님) · 보기에 몫 … 나머지가 있을 때만 그 칸 · 처음 칸은 많은 꼴', () => {
+  assert.deepEqual(textVal('4 … 5'), { form: 'rem', q: 4, r: 5 });
+  assert.deepEqual(textVal('4...5'), { form: 'rem', q: 4, r: 5 });
+  assert.deepEqual(partsOf('32 … 15'), { mode: 'rem', p: { q: '32', r: '15' } });
+  assert.equal(readTyped('rem', { q: '07', r: '5' }).text, '7 … 5');
+  assert.equal(readTyped('rem', { q: '7', r: '' }), null);
+  const q = { kind: 'calc', q: '다음을 계산하면 얼마일까요?\n\n**162 ÷ 18**', choices: [{ text: '9', ok: true }, { text: '8 … 18', tag: '나머지가 나누는 수와 같음' }, { text: '10 … 18', tag: '어림한 몫이 큰데 그대로 둠' }, { text: '9 … 1', tag: '계산 실수' }] };
+  const sp = padSpec(q, 'muldiv');
+  assert.deepEqual(sp.modes, ['num', 'rem']);
+  assert.equal(sp.start, 'rem', '몫 … 나머지 보기 3 · 수 보기 1');
+  assert.deepEqual(matchTyped(q, readTyped('rem', { q: '9', r: '0' }, sp), sp), { i: 0, note: '맞아요! 나머지가 0이면 몫만 써요 — 9' });
+  assert.equal(matchTyped(q, readTyped('rem', { q: '8', r: '18' }, sp), sp).i, 1);
+  assert.equal(matchTyped(q, readTyped('num', { x: '8' }, sp), sp).reason, 'none', '8만 치면 "8 … 18"이 아니다');
+  const q2 = { kind: 'calc', q: '**53 ÷ 12**', choices: [{ text: '4 … 5', ok: true }, { text: '5 … 7' }, { text: '3 … 17' }, { text: '60' }] };
+  const sp2 = padSpec(q2, 'muldiv');
+  assert.deepEqual(matchTyped(q2, readTyped('num', { x: '4' }, sp2), sp2), { i: -1, note: '나머지도 써요 — 4 … 5', reason: 'form' });
+  assert.equal(padSpec({ kind: 'calc', q: '**143 × 20**', choices: [{ text: '2860', ok: true }, { text: '286' }, { text: '28600' }] }, 'muldiv').modes.includes('rem'), false, '몫 … 나머지 보기가 없으면 그 칸도 없다');
+});
+
 test('★ 모든 줄기의 ① 계산: 정답을 치면 맞음 · 오답을 치면 그 오개념 · 꼴을 묻는 문제 · 약분 · 짐작 · 처음 칸은 정답과 상관없다', () => {
   const count = {}; const need = {}; let wrongTyped = 0; let reducedChecks = 0; let formChecks = 0;
   for (const k of STEM_ORDER) {

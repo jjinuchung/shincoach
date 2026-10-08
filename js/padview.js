@@ -3,14 +3,14 @@
 //
 // 모양 (2026-10-01, 아버님 "시작하자" — 수가 답인 ① 계산은 보기 대신 직접 쓴다):
 //   [수] [분수] ([대분수])  ← 아이가 바꾼다 (분수 × 자연수의 "분모에도 곱함" 오답은 분수라 칸을 고정하면 못 친다)
-//   칸: 수 [ 12.5 ] cm² · 분수 분자/분모 세로 · 대분수 [2] + 분자/분모 · 비 [ 8 ] : [ 5 ]
+//   칸: 수 [ 12.5 ] cm² · 분수 분자/분모 세로 · 대분수 [2] + 분자/분모 · 비 [ 8 ] : [ 5 ] · 몫 … 나머지 [ 4 ] … [ 5 ] (AA)
 //   숫자 키 · (음수 줄기면 − / + 키) · ⌫ · 확인 · 🤷 모르겠어요
 // 칸을 눌러 고르고 숫자를 친다 — 여러 자리를 치므로 저절로 다음 칸으로 넘어가지 않는다.
 import { readTyped } from './mathpad.js';
 
-const MODE_LABEL = { num: '수', frac: '분수', mixed: '대분수', ratio: '비' };
-const FIELDS = { num: ['x'], frac: ['n', 'd'], mixed: ['w', 'n', 'd'], ratio: ['a', 'b'] };
-const FIELD_LABEL = { x: '답', n: '분자', d: '분모', w: '자연수', a: '앞', b: '뒤' };
+const MODE_LABEL = { num: '수', frac: '분수', mixed: '대분수', ratio: '비', rem: '몫 … 나머지' };
+const FIELDS = { num: ['x'], frac: ['n', 'd'], mixed: ['w', 'n', 'd'], ratio: ['a', 'b'], rem: ['q', 'r'] };
+const FIELD_LABEL = { x: '답', n: '분자', d: '분모', w: '자연수', a: '앞', b: '뒤', q: '몫', r: '나머지' };
 const DOT_OK = new Set(['x', 'a', 'b']); // 소수점을 칠 수 있는 칸
 const KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', '⌫'];
 // 칸 하나에 칠 수 있는 글자 수 (소수점 포함) — 7이면 원의 넓이 줄기의 오개념 값 118.3152(37.68 × 3.14)를 못 쳐서 "짐작"이 됐다 (Codex 23차 #2)
@@ -32,7 +32,7 @@ function el(tag, cls, text) {
 export function padBox(spec, { onSubmit, onIdk }) {
   const box = el('div', 'math-pad');
   let mode = spec.start;
-  let parts = { sign: '', x: '', w: '', n: '', d: '', a: '', b: '' };
+  let parts = { sign: '', x: '', w: '', n: '', d: '', a: '', b: '', q: '', r: '' };
   let focus = FIELDS[mode][0];
   let done = false;
   const drafts = {}; // 칸 종류마다 쓰던 것 — [분수]에 17/4를 쓰다 [수]를 눌렀다 돌아오면 그대로 (Codex 18차 #7: 전엔 다 지워졌다)
@@ -40,7 +40,7 @@ export function padBox(spec, { onSubmit, onIdk }) {
   // 칸 바꾸기 — 한 가지뿐이면(비) 안 보인다
   const modeRow = el('div', 'math-pad-modes');
   if (spec.modes.length > 1) {
-    box.appendChild(el('p', 'math-pad-lead', '✍️ 답을 직접 써요 — 분수면 [분수]를 눌러요'));
+    box.appendChild(el('p', 'math-pad-lead', spec.modes.includes('rem') ? '✍️ 답을 직접 써요 — 나머지가 있으면 [몫 … 나머지]를 눌러요' : '✍️ 답을 직접 써요 — 분수면 [분수]를 눌러요'));
     for (const m of spec.modes) {
       const b = el('button', 'btn math-pad-mode', MODE_LABEL[m]);
       b.type = 'button';
@@ -48,7 +48,7 @@ export function padBox(spec, { onSubmit, onIdk }) {
       b.addEventListener('click', () => {
         if (done || mode === m) return;
         drafts[mode] = Object.fromEntries(FIELDS[mode].map((f) => [f, parts[f]]));
-        mode = m; parts = { ...parts, x: '', w: '', n: '', d: '', a: '', b: '', ...(drafts[m] || {}) }; focus = FIELDS[m][0];
+        mode = m; parts = { ...parts, x: '', w: '', n: '', d: '', a: '', b: '', q: '', r: '', ...(drafts[m] || {}) }; focus = FIELDS[m][0];
         paint();
       });
       modeRow.appendChild(b);
@@ -125,6 +125,7 @@ export function padBox(spec, { onSubmit, onIdk }) {
     if (parts.sign) line.appendChild(el('span', 'math-pad-sign', parts.sign === '-' ? '−' : '+'));
     if (mode === 'num') line.appendChild(field('x'));
     else if (mode === 'ratio') { line.appendChild(field('a')); line.appendChild(el('span', 'math-pad-colon', ':')); line.appendChild(field('b')); }
+    else if (mode === 'rem') { line.appendChild(field('q')); line.appendChild(el('span', 'math-pad-colon', '…')); line.appendChild(field('r')); }
     else {
       if (mode === 'mixed') line.appendChild(field('w'));
       const fr = el('span', 'math-pad-frac');
@@ -133,7 +134,7 @@ export function padBox(spec, { onSubmit, onIdk }) {
       fr.appendChild(field('d'));
       line.appendChild(fr);
     }
-    if (spec.unit) line.appendChild(el('span', 'math-pad-unit', spec.unit));
+    if (spec.unit && mode !== 'rem') line.appendChild(el('span', 'math-pad-unit', spec.unit)); // 몫과 나머지는 단위가 서로 다를 수 있다(봉지·개)
     show.appendChild(line);
     keyBtns['.'].disabled = done || !DOT_OK.has(focus);
     for (const k of ['-', '+']) if (keyBtns[k]) keyBtns[k].classList.toggle('on', parts.sign === k);

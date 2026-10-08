@@ -2512,6 +2512,8 @@ export function figureSvg(spec) {
   if ((m = /^dmul (.+)$/.exec(s))) { const sp = parseDmul(m[1]); return sp ? dmulSvg(sp) : ''; } // ✖️ W 소수 곱셈 그림
   if ((m = /^ddiv (.+)$/.exec(s))) { const sp = parseDdiv(m[1]); return sp ? ddivSvg(sp) : ''; } // ➗ X 나눗셈 그림
   if ((m = /^place (.+)$/.exec(s))) { const sp = parsePlace(m[1]); return sp ? placeSvg(sp) : ''; } // 🔢 Y 자릿값 표
+  if ((m = /^vmul (.+)$/.exec(s))) { const sp = parseVmul(m[1]); return sp ? vmulSvg(sp) : ''; } // ✖️ AA 곱셈 세로셈
+  if ((m = /^vdiv (.+)$/.exec(s))) { const sp = parseVdiv(m[1]); return sp ? vdivSvg(sp) : ''; } // ➗ AA 나눗셈 세로셈
   if ((m = /^plane (.+)$/.exec(s))) { const sp = parsePlane(m[1]); return sp ? planeSvg(sp) : ''; } // 📈 R 좌표평면
   if ((m = /^stack (.+)$/.exec(s))) { const sp = parseStackFig(m[1]); return sp ? stackSvg(sp) : ''; } // 🧊 S 쌓은 모양
   if ((m = /^stacks (.+)$/.exec(s))) { const sp = parseStacks(m[1]); return sp ? stacksSvg(sp) : ''; } // 🧊 S 쌓은 모양 후보
@@ -2608,6 +2610,8 @@ export function figText(text, short = false) {
     .replace(/\[dmul ([^\]]+)\]/g, (all, arg) => { const sp = parseDmul(arg); return !sp ? all : short ? '(소수 곱셈 그림)' : `(${dmulText(sp)})`; })
     .replace(/\[ddiv ([^\]]+)\]/g, (all, arg) => { const sp = parseDdiv(arg); return !sp ? all : short ? '(나눗셈 그림)' : `(${ddivText(sp)})`; })
     .replace(/\[place ([^\]]+)\]/g, (all, arg) => { const sp = parsePlace(arg); return !sp ? all : short ? '(자릿값 표)' : `(${placeText(sp)})`; })
+    .replace(/\[vmul ([^\]]+)\]/g, (all, arg) => { const sp = parseVmul(arg); return !sp ? all : short ? '(곱셈 세로셈)' : `(${vmulText(sp)})`; })
+    .replace(/\[vdiv ([^\]]+)\]/g, (all, arg) => { const sp = parseVdiv(arg); return !sp ? all : short ? '(나눗셈 세로셈)' : `(${vdivText(sp)})`; })
     .replace(/\[ang ([^\]]+)\]/g, (all, arg) => { const sp = parseAng(arg); return !sp ? all : short ? '(각 그림)' : `(${angFigText(sp)})`; })
     .replace(/\[fan ([^\]]+)\]/g, (all, arg) => { const sp = parseFan(arg); return !sp ? all : short ? '(각 그림)' : `(${fanText(sp)})`; })
     .replace(/\[prot ([^\]]+)\]/g, (all, arg) => { const sp = parseProt(arg); return !sp ? all : short ? '(각도기)' : `(${protText(sp)})`; })
@@ -2652,7 +2656,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|place|ang|fan|prot|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|place|vmul|vdiv|ang|fan|prot|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -3343,6 +3347,110 @@ export function protSvg(sp) {
   g += `<circle cx="${cx}" cy="${cy}" r="3.5" fill="currentColor"/>`;
   const H = cy + 10;
   return `<svg class="frac-fig prot-fig" data-a="${sp.a}" data-b="${sp.b}" data-left="${sp.left ? 1 : 0}" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${esc(protText(sp))}">${g}</svg>`;
+}
+
+// ───────────────────── ✖️➗ AA 곱셈과 나눗셈 — 세로셈 (2026-10-08) ─────────────────────
+//
+// `[vmul 123 24]` — 곱셈 세로셈. 곱하는 수가 두 자리이면 부분곱 두 줄(123 × 4 = 492 · 123 × 20 = 2460 — 교과서처럼 0까지 쓴다)과 합.
+//   곱하는 수가 한 자리이거나 몇십이면 한 줄(143 × 20 → 2860). 수는 일의 자리끼리 오른쪽으로 맞춘다.
+//   아이가 쓴 세로셈을 그대로: `[vmul 726 53 2178+3630=5808]`(부분곱 두 줄과 합 — 두 줄의 합이 맞아야 그린다) · `[vmul 216 40 =864]`(한 줄)
+// `[vdiv 527 16]` — 나눗셈 세로셈(나누는 수 ) 나누어지는 수, 몫은 위). 높은 자리부터 나누고, 뺀 나머지에 다음 자리 수를 내려 쓴다.
+//   몫이 0인 자리는 빼는 줄 없이 내린 수가 곧 나머지(873 ÷ 43 = 20 … 13).
+//   아이가 쓴 몫·나머지 그대로: `[vdiv 162 18 8 18]`(몫 8 · 맨 아래 18) · `[vdiv 873 43 2_ 13]`(몫의 일의 자리를 비움 — "_")
+//   몫의 끝 글자는 나누어지는 수의 일의 자리 위. 몫의 자리로 셈이 안 되면(빼는 수가 더 크거나 맨 아래 수가 다르면) 그리지 않는다.
+//   ① 계산에는 답을 흘려서 안 쓴다 — 배움 장·② 일부에만
+const V_CW = 24; const V_RH = 30; const V_FS = 22;
+const vNum = (t) => /^[1-9]\d*$|^0$/.test(t);
+export function parseVmul(arg) {
+  const m = /^(\d{2,3}) (\d{1,2})(?: (?:(\d{1,6})\+(\d{1,6}))?=(\d{1,6}))?$/.exec(String(arg || '').trim());
+  if (!m || ![m[1], m[2], m[3], m[4], m[5]].every((t) => t === undefined || vNum(t))) return null;
+  const a = +m[1]; const b = +m[2];
+  if (b < 2) return null;
+  if (m[5] !== undefined) {
+    if (m[3] !== undefined && +m[3] + +m[4] !== +m[5]) return null;
+    return { a, b, rows: m[3] !== undefined ? [+m[3], +m[4]] : [], sum: +m[5], given: true };
+  }
+  const u = b % 10;
+  return { a, b, rows: b < 10 || !u ? [] : [a * u, a * (b - u)], sum: a * b, given: false };
+}
+export function vmulText(sp) {
+  return `곱셈 세로셈 ${sp.a} × ${sp.b}: ${sp.rows.length ? `${sp.rows.join(', ')} → ` : ''}${sp.sum}`;
+}
+export function vmulSvg(sp) {
+  const W = 400; const len = (n) => String(n).length;
+  const cols = Math.max(len(sp.a), len(sp.b), ...sp.rows.map(len), len(sp.sum)) + 1; // 맨 왼쪽 한 칸은 × 자리
+  const X0 = (W - cols * V_CW) / 2; const cx = (c) => X0 + c * V_CW + V_CW / 2;
+  let g = ''; let y = 26;
+  const num = (n, k, cls) => {
+    const t = String(n); let out = `<g class="vm-row" data-k="${k}" data-v="${t}">`;
+    for (let i = 0; i < t.length; i++) out += `<text class="${cls}" x="${cx(cols - t.length + i).toFixed(1)}" y="${y}" font-size="${V_FS}" font-weight="700" text-anchor="middle" fill="currentColor" data-p="${t.length - 1 - i}">${t[i]}</text>`;
+    return `${out}</g>`;
+  };
+  const line = () => { g += `<line x1="${(X0 - 4).toFixed(1)}" y1="${y - V_FS - 1}" x2="${(X0 + cols * V_CW + 4).toFixed(1)}" y2="${y - V_FS - 1}" stroke="currentColor" stroke-width="2"/>`; };
+  g += num(sp.a, 'a', 'vm-d'); y += V_RH;
+  g += `<text class="vm-x" x="${cx(0).toFixed(1)}" y="${y}" font-size="${V_FS}" font-weight="700" text-anchor="middle" fill="currentColor">×</text>`;
+  g += num(sp.b, 'b', 'vm-d'); y += V_RH + 6;
+  line();
+  sp.rows.forEach((v, i) => { g += num(v, `p${i + 1}`, 'vm-d'); y += V_RH; });
+  if (sp.rows.length) { y += 6; line(); }
+  g += num(sp.sum, 's', 'vm-d vm-s');
+  const H = y + 10;
+  return `<svg class="frac-fig vmul-fig" data-a="${sp.a}" data-b="${sp.b}" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${vmulText(sp)}">${g}</svg>`;
+}
+export function parseVdiv(arg) {
+  const m = /^(\d{2,3}) (\d{1,2})(?: ([1-9]\d?|[1-9]_) (\d{1,3}))?$/.exec(String(arg || '').trim());
+  if (!m || !vNum(m[1]) || !vNum(m[2]) || (m[4] !== undefined && !vNum(m[4]))) return null;
+  const A = m[1]; const a = +A; const b = +m[2];
+  if (b < 2) return null;
+  let Q; let R;
+  if (m[3] === undefined) { const q = Math.floor(a / b); if (q < 1 || q > 99) return null; Q = String(q); R = a % b; } else { Q = m[3]; R = +m[4]; }
+  const n = A.length; const c0 = n - Q.length;
+  if (c0 < 0) return null;
+  let cur = +A.slice(0, c0 + 1); const steps = [];
+  for (let j = 0; j < Q.length; j++) {
+    const col = c0 + j; const d = Q[j] === '_' ? 0 : +Q[j];
+    let prod = null; let diff = cur;
+    if (d) { prod = b * d; if (prod > cur) return null; diff = cur - prod; }
+    const last = j === Q.length - 1;
+    const next = last ? null : diff * 10 + +A[col + 1];
+    steps.push({ col, cur, prod, diff, next });
+    if (!last) cur = next;
+  }
+  if (steps[steps.length - 1].diff !== R) return null;
+  return { a, b, A, Q, R, steps };
+}
+export function vdivText(sp) {
+  const prods = sp.steps.filter((x) => x.prod !== null).map((x) => x.prod);
+  return `나눗셈 세로셈 ${sp.a} ÷ ${sp.b}: 몫 칸 ${sp.Q.replace('_', '(빈칸)')} · 빼는 수 ${prods.join(', ') || '없음'} · 맨 아래 ${sp.R}`;
+}
+export function vdivSvg(sp) {
+  const W = 400; const lb = String(sp.b).length; const n = sp.A.length;
+  const cols = lb + 1 + n; const X0 = (W - cols * V_CW) / 2;
+  const cx = (c) => X0 + (lb + 1 + c) * V_CW + V_CW / 2; // 나누어지는 수의 c번째 칸 가운데
+  const digits = (t, endCol, y, cls, k, v) => {
+    let out = `<g class="vd-row" data-k="${k}" data-v="${v}">`;
+    for (let i = 0; i < t.length; i++) if (t[i] !== ' ') out += `<text class="${cls}" x="${cx(endCol - t.length + 1 + i).toFixed(1)}" y="${y}" font-size="${V_FS}" font-weight="700" text-anchor="middle" fill="currentColor" data-p="${n - 1 - (endCol - t.length + 1 + i)}">${t[i]}</text>`;
+    return `${out}</g>`;
+  };
+  let g = ''; const qy = 26; const barY = 36; let y = 62;
+  // 몫 — 끝 글자가 일의 자리 위 ("_"는 비운 칸)
+  g += digits(sp.Q.replace('_', ' '), n - 1, qy, 'vd-q', 'q', sp.Q);
+  // 나누는 수 ) 나누어지는 수
+  const bx = X0 + lb * V_CW + V_CW * 0.55;
+  for (let i = 0; i < lb; i++) g += `<text class="vd-b" x="${(X0 + i * V_CW + V_CW / 2).toFixed(1)}" y="${y}" font-size="${V_FS}" font-weight="700" text-anchor="middle" fill="currentColor">${String(sp.b)[i]}</text>`;
+  g += `<path d="M${(bx - 5).toFixed(1)} ${barY} Q${(bx + 5).toFixed(1)} ${barY + 17} ${(bx - 5).toFixed(1)} ${y + 8}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+  g += `<line x1="${(bx - 5).toFixed(1)}" y1="${barY}" x2="${(X0 + cols * V_CW + 4).toFixed(1)}" y2="${barY}" stroke="currentColor" stroke-width="2"/>`;
+  g += digits(sp.A, n - 1, y, 'vd-a', 'a', sp.A);
+  for (const st of sp.steps) {
+    if (st.prod === null) continue;
+    y += V_RH; g += digits(String(st.prod), st.col, y, 'vd-d', 'prod', st.prod);
+    const left = st.col - String(st.cur).length + 1;
+    g += `<line x1="${(cx(left) - V_CW / 2 - 2).toFixed(1)}" y1="${y + 8}" x2="${(cx(st.col) + V_CW / 2 + 2).toFixed(1)}" y2="${y + 8}" stroke="currentColor" stroke-width="2"/>`;
+    y += V_RH + 2;
+    g += st.next === null ? digits(String(st.diff), st.col, y, 'vd-d vd-r', 'rest', st.diff) : digits(String(st.next), st.col + 1, y, 'vd-d', 'next', st.next);
+  }
+  const H = y + 12;
+  return `<svg class="frac-fig vdiv-fig" data-a="${sp.a}" data-b="${sp.b}" data-q="${sp.Q}" data-r="${sp.R}" viewBox="0 0 ${W} ${H}" width="${Math.round(W * 1.25)}" height="${Math.round(H * 1.25)}" role="img" aria-label="${vdivText(sp)}">${g}</svg>`;
 }
 
 // ───────────────────── 📈 R 좌표평면과 그래프 — 좌표평면 (2026-10-05) ─────────────────────

@@ -37,7 +37,7 @@ const sum = (a) => a.reduce((x, y) => x + y, 0);
 /** 보기 글자 → 값 (겹침 검사용 — 수·분수·%만, 문장은 null) */
 export function valueOf(text) {
   const v = textVal(text);
-  if (!v || v.form === 'ratio') return null;
+  if (!v || v.form === 'ratio' || v.form === 'rem') return null;
   return v.v.n / v.v.d;
 }
 const sameValue = (a, b) => a !== null && b !== null && Math.abs(a - b) < 1e-9;

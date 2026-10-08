@@ -881,13 +881,13 @@ test('원고는 배포 파일 검사(check.mjs)에도 걸린다 — bignum.json 
 
 // ───────────────────── 3단계: 화면 연결 ─────────────────────
 
-test('화면 연결 (3단계): STEMS.bignum(Y)는 이 생성기·원고를 쓰고 B 혼합계산 바로 앞 · 앱 셸이 둘 다 들고 간다 · 사다리 안내에 아직 안 배운 단위·틀린 말 없음 · 숫자판 ± 없음 · 자릿값 표를 📊·❓가 안다', async () => {
+test('화면 연결 (3단계): STEMS.bignum(Y)는 이 생성기·원고를 쓰고 AA 곱셈과 나눗셈 바로 앞(그다음 B 혼합계산) · 앱 셸이 둘 다 들고 간다 · 사다리 안내에 아직 안 배운 단위·틀린 말 없음 · 숫자판 ± 없음 · 자릿값 표를 📊·❓가 안다', async () => {
   const { STEMS, STEM_ORDER, stemOf } = await import('../js/mathprog.js');
   const Y = STEMS.bignum;
   assert.equal(Y.code, 'Y');
   assert.equal(Y.label, '큰 수 줄기', '줄기 고르기·📊에 보이는 이름');
   const at = STEM_ORDER.indexOf('bignum');
-  assert.deepEqual(STEM_ORDER.slice(at - 1, at + 2), ['fracdiv', 'bignum', 'mixed'], 'T 분수의 나눗셈 뒤·B 혼합계산 바로 앞 (4-1 큰 수 — 혼합계산의 자연수 셈보다 먼저)');
+  assert.deepEqual(STEM_ORDER.slice(at - 1, at + 2), ['fracdiv', 'bignum', 'muldiv'], 'T 분수의 나눗셈 뒤·AA 곱셈과 나눗셈 바로 앞 (4-1 큰 수 → 곱셈과 나눗셈 → B 혼합계산 — 혼합계산의 자연수 셈보다 먼저)');
   assert.equal(Y.list, BIG);
   assert.equal(Y.gen.makeQuestion, makeQuestion);
   assert.equal(Y.gen.lessonOf, lessonOf, '📚 배움은 이 생성기의 lessonOf');
