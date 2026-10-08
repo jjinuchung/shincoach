@@ -2489,4 +2489,68 @@
 ### TODO (다음 작업)
 - [x] 배포: `90257fd` fix · `c245861` docs → 라이브 v214 · 배포본 5개 같음 · 고친 검수 페이지는 새 artifact https://claude.ai/artifact/FJBvcqspDQu6JuHb1CWHQL (옛 2T2idTveZELr7TuVLbGeQg는 41차 전 판)
 - [ ] 아버님: Z 원고 검수(새 검수 페이지) · 태블릿 v214(Z 줄기) · Y·X·W·V·U 검수
-- [ ] 다음 줄기 AA 곱셈과 나눗셈(4-1, 숫자판 "몫 … 나머지" 두 칸) → AB 평면도형의 이동
+- [x] 다음 줄기 AA 곱셈과 나눗셈(4-1, 숫자판 "몫 … 나머지" 두 칸) → 아래 절 · 그다음 AB 평면도형의 이동
+
+## 2026-10-08 (밤) — ✖️➗ AA 곱셈과 나눗셈 줄기 설계 · 1단계 생성기·세로셈 그림·숫자판 · 2단계 배움 원고 · 3단계 화면 연결 (미커밋, v215 준비)
+
+### 진행 내용
+- 설계: 아버님 **"그다음 줄기는 AA 곱셈과 나눗셈 시작하자"** → 칸별 설계안(8칸·기본값 8개) → **"이대로 진행하자"**
+  - 근거: 천재(한대희) 2022 4-1 지도서 3단원(148~197쪽) 차례 · 2022 [4수01-04]·[4수01-05]·[4수01-07]·[4수01-08] · ÷(한 자리)·(두 자리)×(두 자리)는 3-2
+  - 칸: AA1 (세 자리)×(몇십) · AA2 (세 자리)×(두 자리) · AA3 (두 자리)÷(두 자리) · AA4 (세 자리)÷(몇십) · AA5 ÷(두 자리) 몫 한 자리 · AA6 몫 두 자리 · AA7 어림 · AA8 ⭐ 활용 — 모두 초4, id `md.*`, key `muldiv`
+  - 범위: 곱 다섯 자리까지 · 나누어지는 수 세 자리 · 몫 두 자리까지 · "반올림" 대신 "…쯤으로 생각하면" · 검산은 "확인: 12 × 4 = 48, 48 + 5 = 53" · 나머지는 남는 수로만(올림 해석 없음) · 어림한 값은 답이 하나가 아니다(지도서) → 어림할 수를 정해 주고 그 셈만 · 몫의 자리 수 고르기
+- 1단계 `js/mathmuldiv.js` (8칸, 이름표 16)
+  - 오답 = 지도서·교과서의 흔한 오류: 230 × 50 = 1150(몇을 곱한 결과가 0으로 끝날 때 0을 하나만) · 0을 하나 더 · 받아올림 · 부분곱 자리(726 × 53 = 2178 + 3630, 교과서 유나) · 부분곱 하나 빠뜨림 · 어림한 몫이 큰데 그대로(곱이 커서 거꾸로 뺌) · 나머지 > 나누는 수(689 ÷ 78 = 7 … 143) · 나머지 = 나누는 수(162 ÷ 18 = 8 … 18) · (몇백몇십) ÷ (몇십)의 몫을 십의 자리에(180 ÷ 30 = 60) · 몫의 일의 자리 빠뜨림(873 ÷ 43 = 2 … 13) · 맨 앞 숫자만 비교 · 곱해야 할 것을 나눔 · 나눠야 할 것을 곱함 · 나머지 대신 몫 · 한 단계만 · 빼야 할 것을 더함
+  - 한 값이 두 틀린 생각에서 다 나오면 버림(242 × 19: 242 × 9 + 242 = 2420 = 242 × 10) · 몫 9 안 뽑음(어림한 몫이 크면 10 — 세로셈 한 칸에 못 씀) · 채우는 근처 수는 몫 그대로·나머지만(나머지 < 나누는 수)
+  - 같은 틀 글("다음을 계산하면 얼마일까요? **# ÷ #**")의 가족은 하나로 — 나머지 있음/없음·0으로 끝남은 가족 안에서 고름(🔁 쌍둥이가 열쇠로 첫 가족만 찾던 Y 함정)
+- 1단계 그림 `[vmul]`·`[vdiv]` (mathdraw, 그리기·글로 바꾸기·렌더러 세 곳 등록)
+  - 곱셈 세로셈: 부분곱 두 줄은 0까지(교과서) · 아이가 쓴 줄 그대로 `[vmul 726 53 2178+3630=5808]`·`[vmul 216 40 =864]`(두 줄의 합이 맞아야 그림)
+  - 나눗셈 세로셈: 높은 자리부터 · 내린 수 · 몫 0인 자리는 빼는 줄 없이 · 아이가 쓴 몫·맨 아래 수 `[vdiv 162 18 8 18]`·몫의 일의 자리를 비운 `[vdiv 873 43 2_ 13]` · 셈이 안 되는 몫이면 안 그림
+- 1단계 숫자판 "몫 … 나머지" (mathpad·padview)
+  - 글 "4 … 5" → `{form:'rem'}` · 보기에 몫 … 나머지가 있으면 [수] [몫 … 나머지] 칸(처음 칸은 보기에 많은 꼴, 같으면 몫 … 나머지)
+  - "9 … 0"을 쳐도 9와 같음("나머지가 0이면 몫만 써요") · 몫만 치면 "나머지도 써요"(꼴, 짐작 아님) · 몫 … 나머지 칸 옆에는 단위 안 씀 · mathdata 값 비교에서 rem 뺌
+- 1단계 테스트 `tests/mathmuldiv.test.js` 26 +`tests/mathpad.test.js` 1 — 문제 글·그림을 따로 읽어 다시 풀기 · 이름표 판정표(한 오답 = 한 생각) · 근처 수 · 받아올림 없는 곱 · × 19 꼴 · 몫 9 · ② 보여 준 답·그림 · 쌍둥이 · 조사·" … " · 셈식(몫 … 나머지까지) · 비교 말(식의 끝 수 빼고) · 숫자판 · 세로셈 그림 줄·자리
+  - 변이 64 중 63 잡힘(남은 1 = 같은 뜻 변이, `.context/aa_stage1/mutate_aa1.mjs`) — 처음 지나간 셋(몫 9 두 곳·② 어림 비교 말)은 테스트를 더해 잡음 · 300·3,000 씨앗 통과
+- 2단계 배움 원고 `coach/math/muldiv.json` (빌더 `.context/aa_stage2/build_muldiv.mjs`) 33장 · 확인 질문 33 · 세로셈 그림 17 · 아빠 카드 8
+  - 원고 테스트 9: 형식 · 확인 질문 따로 풀기(오답마다 **한** 틀린 생각 · 까닭이 정답·오답·그림의 틀린 수를 다 말함 · 이름표 16개 다 쓰임) · 칸마다 그 칸의 문제·수 · 셈식(폰 폭 한 줄) · 아빠 카드 통과 기준 따로 풀기 · 그림 = 글 · 조사·" … "·검산/반올림 안 씀·참말 금지 · 비교 말 · check.mjs 등록
+  - 원고 변이 36 다 잡힘(`.context/aa_stage2/mutate_aa2.mjs`) — 처음 지나간 "비교 말"(450은 461보다 크고)은 테스트를 더해 잡음
+  - 검수 페이지 `tools/mathmuldiv.mjs` → `coach/math/review-muldiv.html` → artifact https://claude.ai/artifact/85wnFbhcrJvTAWEqmx6pdq (Version 1)
+- 전체 테스트 1576 다 통과(한 파일씩, 1540 + AA 35 + 숫자판 1) · check.mjs는 APP_SHELL 누락 1건뿐(3단계에서 들어감)
+- 3단계 (아버님 **"3단계 가자"**): STEMS.muldiv(code AA, '곱셈과 나눗셈 줄기', 초4) · STEM_ORDER Y 큰 수 → **AA** → B 혼합계산(스물일곱 줄기) · sw **v215**·APP_SHELL mathmuldiv.js·muldiv.json · ❓ 복사문(mathask)·📊 답장 안내(stats)에 `[vmul 123 24] [vdiv 527 16]` · check.mjs 통과(JS 124)
+  - 테스트: AA 화면 연결 1 · mathstem·mathprog 줄기 수 · Y 화면 연결 테스트를 "Y → AA → B"로(기준선에서 Y가 B 바로 앞이라는 옛 테스트가 깨짐) · 화면 연결 변이 28 다 잡힘(`.context/aa_stage3/mutate_wiring.mjs`)
+  - 헤드리스 800·390(도우미 scratchpad diag_md.sh·walk_md.sh·seed_md.js·h_md.js·htype_md.js — 숫자판 "4 … 5"를 몫·나머지 칸에 쳐 봄): 줄기 고르기(Y → AA → B) · 진단 5문제(몫 … 나머지 칸으로 친 오답이 그 오개념으로 채점) · AA2·AA6·AA7 배움 장·문제 편·② 세로셈 그림·🔁 쌍둥이 · 콘솔 오류 0 · 가로 넘침 0
+  - 300·3,000 씨앗 AA 36 통과 · 전체 **1577** 다 통과 · check.mjs 통과
+  - 헤드리스가 잡아 고침: (몇십) ÷ (몇십)에 80 ÷ 10이 나옴 → 나누는 수 20부터 · ② 어림 정답 보기가 세 줄 → "어림하면 곱은 500 × 90 = 45000보다 작아요 — …"(까닭은 풀이 줄로) · 폰 폭에서 "→ 몫이 두 자리 수"의 "수"가 혼자 넘어감(AA6-1·AA7-4) → 줄 나눔
+
+### 변경 파일
+- `js/mathmuldiv.js` (새) · `tests/mathmuldiv.test.js` (새) · `coach/math/muldiv.json` (새) · `tools/mathmuldiv.mjs` (새) → `coach/math/review-muldiv.html` (새)
+- `js/mathdraw.js` — [vmul]·[vdiv] 절 + 등록 · `js/mathpad.js` — rem 꼴·칸·채점 · `js/padview.js` — 몫 … 나머지 칸 · `js/mathdata.js` — valueOf에서 rem 뺌
+- `tests/mathpad.test.js` — 몫 … 나머지 칸 테스트 · `tools/check.mjs` — muldiv.json 등록
+
+### 결정사항 / 메모
+- 나누어떨어지는 답은 "9", 나머지가 있으면 "4 … 5" — 같은 계산 틀에서 둘 다 나온다(문제 글로 나누어떨어짐을 흘리지 않게)
+- 어림한 몫이 커서 곱이 나누어지는 수보다 클 때의 오답 값은 "(몫 + 1) … (곱 − 나누어지는 수)"(거꾸로 뺌) — 그 셈 하나로 판정
+- 비교 말 검사 정규식은 식의 끝 수("143 × 20은 2000보다")를 주어로 읽으면 안 된다 — 연산 기호 바로 뒤 수는 뺀다
+- check.mjs "APP_SHELL 누락: js/mathmuldiv.js"는 3단계(화면 연결)에서 들어간다 — 그 전까지 예상된 실패 1건
+
+### TODO (다음 작업)
+- [x] 아버님: AA 원고 검수(artifact 85wnFbhcrJvTAWEqmx6pdq) → "3단계 가자"
+- [x] 3단계(위) → [ ] 승인 → v215 커밋·배포·라이브 확인 → Codex 42차(AA + 41차 확인) → v216 · 3단계 계획이었던 것: STEMS.muldiv(code 'AA', Y 큰 수 → AA → B 혼합계산) · sw v215(APP_SHELL에 mathmuldiv.js·muldiv.json) · ❓/📊 그림 안내에 [vmul]·[vdiv] · 헤드리스(숫자판 몫 … 나머지 칸 · 세로셈) → 커밋·배포 → Codex 42차 → v216
+
+## 2026-10-09 (새벽) — 세션 정리 (/ress)
+
+### 진행 내용
+- AA 3단계 보고 뒤 아버님 "진행하기 전에 현재 세션이 많이 찼으니 /ress 하고 clear 후에 다음 세션에서 이어서 하자" → 커밋·배포는 다음 세션으로
+- 작업 트리: 미커밋 19파일(새 5: js/mathmuldiv.js · tests/mathmuldiv.test.js · coach/math/muldiv.json · coach/math/review-muldiv.html · tools/mathmuldiv.mjs / 고침 14: js/mathask.js · mathdata.js · mathdraw.js · mathpad.js · mathprog.js · padview.js · stats.js · sw.js(v215) · tests/mathbig·mathpad·mathprog·mathstem.test.js · tools/check.mjs · process.md) · 전체 1577 통과 · check 통과 · 배포본은 v214 그대로
+
+### 변경 파일
+- 없음(이 항목은 기록만) — 커밋 메시지 초안 `.context/aa_stage3/commit_feat_aa.txt`·`commit_docs_aa.txt`(git 밖)
+
+### 결정사항 / 메모
+- 다음 세션은 커밋 2개(feat · docs)·배포·라이브 v215 확인부터 — 커밋은 보고에 명시
+- AA 도구: 생성기 변이 `.context/aa_stage1/mutate_aa1.mjs` · 원고 빌더·변이 `.context/aa_stage2/` · 화면 연결·변이 `.context/aa_stage3/` · 헤드리스 도우미는 이번 scratchpad(19a0a5fc…)의 diag_md.sh·walk_md.sh·seed_md.js·h_md.js·htype_md.js(새 세션에서 없으면 Z 것을 본떠 다시)
+
+### TODO (다음 작업)
+- [ ] v215 커밋(feat + docs)·푸시·라이브 v215 확인
+- [ ] Codex 42차(AA + 41차 확인, 새 세션 · 여유 메모리 재기 · "2만 씨앗·전체 npm test 금지") → 원문 + 판단 표 → 아버님 승인 → v216
+- [ ] 아버님: AA 검수 artifact 85wnFbhcrJvTAWEqmx6pdq(Version 2) · 태블릿 v215 · Z·Y·X·W·V·U 검수
+- [ ] 그다음 줄기 AB 평면도형의 이동(4-1 마지막)
