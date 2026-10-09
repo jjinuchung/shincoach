@@ -14,13 +14,15 @@ import {
   applyVideoStones, // 🏁 영상 끝까지 → 🔶 (2026-10-06)
   applySell, // 💰 5일장 팔기 (2026-10-05)
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
+  applyRocketSteal, applyRocketWin, rocketStealRule, rocketWinRule, applyRocketBegin, rocketBeginRule, applyRocketStep, rocketStepRule, // 🚀 로켓단 습격 (2026-10-09)
 } from './db.js';
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, parcelGot, videoParcelId, videoPlusId, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, MAX_LV } from './evolve.js';
+import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, MAX_LV } from './evolve.js';
+import { ROCKET, stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER } from './pokemon.js';
 import { findVoucher } from './unlock.js';
 
@@ -315,7 +317,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -392,6 +394,13 @@ function runProfileOp(op, fallback) {
   return p;
 }
 
+let readyResolve = null;
+const readyP = new Promise((r) => { readyResolve = r; });
+/** 🚀 프로필을 처음 다 읽었을 때 풀린다 — 앱을 열자마자 "끝나지 않은 로켓단 배틀"을 볼 때 (그 전엔 메모리 프로필이 비어 있다) */
+export function profileReady() {
+  return readyP;
+}
+
 export async function initProfile() {
   try {
     const p = await getProfile();
@@ -399,6 +408,7 @@ export async function initProfile() {
   } catch { /* 저장소 문제면 메모리로만 */ }
   loaded = true;
   ensurePartner();
+  if (readyResolve) { readyResolve(); readyResolve = null; }
   return profile;
 }
 
@@ -1201,6 +1211,87 @@ export async function battleLoss(monId, lossesToLose = 3) {
     (pf) => battleLossRule(pf, monId, lossesToLose),
   );
   return { losses: r.losses, lost: r.lost };
+}
+
+// ── 🚀 로켓단 습격 (2026-10-09) ──
+
+/** 🚀 빼앗기 판정 ctx — 저장된 프로필의 등급(아빠가 옮긴 것까지)·명단에 있는 종만·🌌 울트라비스트는 빼고 (팔기·교환과 같은 원칙, Codex 31차 #1) */
+export function rocketCtx(pf) {
+  return { rarity: (id) => rarityIn(pf, Number(id)), known: (id) => rosterSet.has(Number(id)) && !isUltraBeast(Number(id)) };
+}
+
+/** 🚀 지금 노릴 수 있는 포켓몬 [{ id, tier }] — 화면용(창의 프로필). 비어 있으면 로켓단이 안 나온다 */
+export function rocketTargets() {
+  return stealables(profile, rocketCtx(profile));
+}
+
+/** 🚀 노릴 포켓몬 하나 (흔함 50 · 보통 35 · 희귀 15) — 없으면 null */
+export function rocketPick(rng = Math.random) {
+  return pickTarget(rocketTargets(), rng);
+}
+
+/** 🚀 로켓단 아지트에 갇힌 포켓몬 [{ id, n }] — 이기면 이 중 하나를 되찾는다 */
+export function rocketHideout() {
+  return hideout(profile);
+}
+
+/** 🚀 아지트에 갇혀 있는 마릿수 (도감 🚀 표시) */
+export function rocketHeldCount(id) {
+  return rocketHeldOf(profile.mons[id]);
+}
+
+/** 🚀 물리친 수·진 수 (📊) */
+export function rocketRecord() {
+  return { won: Number(profile.rocketWon) || 0, lost: Number(profile.rocketLost) || 0 };
+}
+
+/**
+ * 🚀 졌다 — 노리던 포켓몬을 빼앗긴다. 판정은 **저장된 프로필로** 한 트랜잭션에서(그 사이 팔았거나 파트너가 됐으면 빈손).
+ * @param {string|null} battleId 배틀 id — 같은 배틀은 한 번만(이미 끝났으면 ok:false, 아무것도 안 함)
+ * @returns {Promise<{ok:boolean, stolen:boolean, id:number}>}
+ */
+export async function rocketLose(targetId, battleId = null) {
+  const req = { id: Number(targetId), ...(battleId ? { battle: String(battleId) } : {}) };
+  const r = await runProfileOp(() => applyRocketSteal(req, (stored) => rocketCtx(stored)), (pf) => rocketStealRule(pf, req, rocketCtx(pf)));
+  ensurePartner();
+  return { ok: !(r && r.ok === false), stolen: !!(r && r.stolen), id: req.id };
+}
+
+/**
+ * 🚀 이겼다 — 물리친 수 +1 · 아지트에서 고른 한 마리 되찾기(한 트랜잭션) · ⚡ 야생 배틀과 같게 · 💰20.
+ * @param {number|null} backId 되찾을 포켓몬 (아지트가 비었으면 null)
+ * @param {string|null} battleId 배틀 id — 같은 배틀은 한 번만(이미 끝났으면 보상 없이 ok:false)
+ * @returns {Promise<{ok:boolean, back:number|null}>}
+ */
+export async function rocketWin(backId = null, battleId = null) {
+  const req = { backId: backId ? Number(backId) : null, ...(battleId ? { battle: String(battleId) } : {}) };
+  const r = await runProfileOp(() => applyRocketWin(req), (pf) => rocketWinRule(pf, req));
+  if (r && r.ok === false) return { ok: false, back: null }; // 이미 끝난 배틀 — 보상을 두 번 주지 않는다
+  gainXp(ROCKET.winXp);
+  gainCoins(ROCKET.winCoins);
+  return { ok: true, back: r && r.back ? Number(r.back) : null };
+}
+
+/** 🚀 진행 중인 배틀 (없으면 null) — 앱을 다시 열면 이걸로 이어 간다 */
+export function rocketCurrent() {
+  const cur = profile.rocketCur;
+  return cur && cur.id && !(profile.rocketDone || {})[cur.id] ? cur : null;
+}
+
+/**
+ * 🚀 배틀 시작을 저장한다 — 이미 진행 중인 배틀이 있으면(다른 창) 그것을 돌려준다(새로 열지 않음).
+ * 저장이 안 되면(오프라인) 메모리에만 — 그 배틀은 이 창에서만 이어진다
+ * @returns {Promise<{ok:boolean, why?:string, cur:object|null}>}
+ */
+export async function rocketBegin(cur) {
+  const r = await runProfileOp(() => applyRocketBegin(cur), (pf) => rocketBeginRule(pf, cur));
+  return { ok: !!(r && r.ok), why: r && r.why, cur: (r && r.cur) || null };
+}
+
+/** 🚀 문제 하나의 결과를 저장된 배틀에 더한다 → { ok, st } (다른 창이 이미 끝냈으면 ok:false) */
+export async function rocketSaveStep(battleId, correct) {
+  const r = await runProfileOp(() => applyRocketStep(battleId, correct), (pf) => rocketStepRule(pf, battleId, correct));
+  return { ok: !!(r && r.ok), why: r && r.why, st: (r && r.st) || null };
 }
 
 /** 백업 가져오기 뒤 다시 읽기 */

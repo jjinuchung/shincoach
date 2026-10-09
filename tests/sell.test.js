@@ -232,8 +232,8 @@ test('🔌 화면·저장 연결: 장날에만 가판대 · 두 번 눌러야 ·
   const x = src('js/xp.js');
   assert.match(x, /export async function sellThing\(req\) \{\s*const r = await runProfileOp\(\(\) => applySell\(req, \(stored\) => sellCtx\(stored\)\), \(\) => \(\{ ok: false, why: 'save' \}\)\);/);
   assert.match(x, /sales: copySales\(p\.sales\) \};/, '창의 프로필도 판 기록을 읽는다');
-  assert.match(src('js/evolve.js'), /- tradedOf\(mon\) - soldOf\(mon\)\);/, '보유에서 판 수를 뺀다');
-  assert.match(src('js/db.js'), /for \(const k of \['fused', 'unfused', 'fled', 'traded', 'sold'\]\)/, '병합에서 판 수는 max');
+  assert.match(src('js/evolve.js'), /- tradedOf\(mon\) - soldOf\(mon\) - rocketHeldOf\(mon\)\);/, '보유에서 판 수를 뺀다');
+  assert.match(src('js/db.js'), /for \(const k of \['fused', 'unfused', 'fled', 'traded', 'sold', 'stolen', 'back'\]\)/, '병합에서 판 수는 max');
   assert.match(src('js/db.js'), /out\.sales = mergeSales\(cur\.sales, rec\.sales\);/);
   const mv = src('js/marketview.js');
   assert.match(mv, /body\.appendChild\(tradeCard\(\)\);\s*body\.appendChild\(sellCard\(\)\);/, '장날에만 (교환 상인 다음) — 줄바꿈은 \\s로 (CRLF로 받아도)');

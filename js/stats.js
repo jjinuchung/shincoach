@@ -11,7 +11,7 @@ import { figText } from './mathdraw.js';
 import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED, favList, FAV_ICON } from './review.js';
-import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot, giftsGiven, markGiven, salesByDay } from './xp.js';
+import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot, giftsGiven, markGiven, salesByDay, rocketRecord, rocketHideout } from './xp.js';
 import { salesReport, SELL_MON_MAX } from './sell.js'; // 💰 5일장에서 판 것 (2026-10-05)
 import { pendingTickets, pendingGifts } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
@@ -387,6 +387,19 @@ export async function renderStats() {
       cs.appendChild(row);
     }
     main.appendChild(cs);
+  }
+
+  // 🚀 로켓단 (2026-10-09) — 물리친 수·진 수·아지트에 갇힌 포켓몬. 빼앗긴 것을 부모가 알 수 있게 (조용히 사라지면 앱이 고장 난 줄 안다)
+  const rk = rocketRecord();
+  const held = rocketHideout();
+  if (rk.won || rk.lost || held.length) {
+    const cr = card('🚀 로켓단');
+    cr.appendChild(el('p', 'stats-note', '공부 중 세 번 연속 맞히면 로켓단이 나타나 포켓몬을 노려요(수학·영어 하루 3번씩). 3번 맞히면 쫓아내고, 3번 틀리면 빼앗겨 아지트에 갇혀요 — 다음에 이기면 하나씩 구해 와요.'));
+    const row = el('div', 'stats-row');
+    row.appendChild(el('span', 'name', `물리침 ${rk.won}번 · 짐 ${rk.lost}번`));
+    row.appendChild(el('span', 'meta', held.length ? `아지트: ${held.map((h) => `${monKo(h.id)}${h.n > 1 ? ` ×${h.n}` : ''}`).join(' · ')}` : '아지트가 비었어요'));
+    cr.appendChild(row);
+    main.appendChild(cr);
   }
 
   const c1 = card('이번 주 (최근 7일)');

@@ -156,7 +156,17 @@ export function haveOf(caughtN, mon) {
   // 🔒 부모가 데려간 수도 같은 이유로 단조 카운터다 (2026-09-28). `caught`를 줄이면 백업을 되돌릴 때
   //    벌이 통째로 없던 일이 된다. 다시 잡으면 caught가 늘어 보유가 돌아온다 — 영구 삭제가 아니다
   const gone = Math.max(0, Math.floor(Number(mon && mon.taken) || 0));
-  return Math.max(0, got - out - gone - fusedOf(mon) - fledOf(mon) - tradedOf(mon) - soldOf(mon));
+  return Math.max(0, got - out - gone - fusedOf(mon) - fledOf(mon) - tradedOf(mon) - soldOf(mon) - rocketHeldOf(mon));
+}
+
+/**
+ * 🚀 로켓단 아지트에 갇혀 있는 마릿수 (2026-10-09) = 빼앗긴 누적(stolen) − 되찾은 누적(back). 둘 다 단조 카운터 —
+ * 퓨전(fused/unfused)과 같은 모양: 줄이는 값을 두면 옛 백업을 합칠 때 빼앗긴 포켓몬이 되살아나 복제된다. 도감 칸(caught)은 남는다
+ */
+export function rocketHeldOf(mon) {
+  const took = Math.max(0, Math.floor(Number(mon && mon.stolen) || 0));
+  const back = Math.max(0, Math.floor(Number(mon && mon.back) || 0));
+  return Math.max(0, took - back);
 }
 
 /**

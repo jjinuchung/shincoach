@@ -118,6 +118,51 @@ export const sfx = {
     const c = ac(); if (!c) return;
     tone(c, { freq: 200, freqEnd: 150, type: 'triangle', dur: 0.25, gain: 0.12 });
   },
+  /** 🚀 로켓단 경보: 삐뽀삐뽀 (두 음을 번갈아) */
+  siren() {
+    const c = ac(); if (!c) return;
+    for (let i = 0; i < 6; i++) tone(c, { freq: i % 2 ? 620 : 880, at: i * 0.2, dur: 0.18, gain: 0.09, type: 'square' });
+  },
+  /** ⚡ 공격: 지지직 (높은 소음을 짧게) */
+  zap() {
+    const c = ac(); if (!c) return;
+    const s = noise(c);
+    const f = c.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = 1800;
+    const g = c.createGain();
+    const t0 = c.currentTime;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+    s.connect(f).connect(g).connect(c.destination);
+    s.start(t0);
+    s.stop(t0 + 0.3);
+    tone(c, { freq: 1200, freqEnd: 300, type: 'sawtooth', dur: 0.25, gain: 0.07 });
+  },
+  /** 💥 폭발: 쾅 (낮은 소음 + 내려가는 음) */
+  boom() {
+    const c = ac(); if (!c) return;
+    const s = noise(c);
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    const g = c.createGain();
+    const t0 = c.currentTime;
+    f.frequency.setValueAtTime(900, t0);
+    f.frequency.exponentialRampToValueAtTime(120, t0 + 0.7);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.4, t0 + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.8);
+    s.connect(f).connect(g).connect(c.destination);
+    s.start(t0);
+    s.stop(t0 + 0.85);
+    tone(c, { freq: 140, freqEnd: 40, type: 'sine', dur: 0.6, gain: 0.25 });
+  },
+  /** ✨ 반짝: 높은 음 셋 (하늘 저편의 별) */
+  twinkle() {
+    const c = ac(); if (!c) return;
+    [1568, 2093, 2637, 3136].forEach((f, i) => tone(c, { freq: f, at: i * 0.07, dur: i === 3 ? 0.6 : 0.1, gain: 0.08 }));
+  },
 };
 
 /** 진동 (지원 기기에서만, 설정 꺼져 있으면 무시) */

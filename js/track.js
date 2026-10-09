@@ -469,6 +469,14 @@ export function markBattle(max) {
   return claim('battles', max, true); // 🔢 수학과 같은 칸을 쓴다 — 실패하면 안 쓴 것으로 (Codex 9차 #9)
 }
 
+/** 🚀 오늘 영어에서 로켓단이 나온 수 / 한 자리 선점 (영어 하루 3번 — 수학은 rocketMath를 따로 센다, 아버님 결정) */
+export function todayRocketsEn() {
+  return t.daily ? (Number(t.daily.rocketEn) || 0) : 0;
+}
+export function markRocketEn(max) {
+  return claim('rocketEn', max, true); // 저장이 안 되면 안 나온 것으로 (배틀과 같다)
+}
+
 /** 🔤 오늘 단어 이어 주기를 몇 판 했는지 / 한 판 선점 (하루 상한) */
 export function todayMatches() {
   return t.daily ? (t.daily.matches || 0) : 0;

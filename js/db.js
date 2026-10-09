@@ -8,6 +8,7 @@ import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE, STO
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
+import { stealables, hideout, rocketStep, copyRocketCur, mergeRocketDone } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수 — evolve만 import)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -338,7 +339,9 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   //   (예전 `mathSeconds`는 이름만 있고 아무도 쓰지 않아 여기서 뺐다 — mathTime과 헷갈린다)
   'mathTime', 'mathBonus', 'enTime', 'enBonus',
   // ⏳ 오늘 쓴 시간 연장권 수 (2026-10-01) — 하루 한도 판정용. 병합이 maxOf라 옛 백업으로 한도를 되살리지 못한다
-  'mathExt', 'enExt'];
+  'mathExt', 'enExt',
+  // 🚀 오늘 로켓단이 나온 수 (2026-10-09) — 과목마다 하루 3번(아버님), claimDailyCount로 선점. 병합 maxOf라 옛 백업으로 한도를 되살리지 못한다
+  'rocketMath', 'rocketEn'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 // 💖 덤으로 풀어 ⚡💰를 받은 문장 — 두 창이 같은 덤을 내도 한 번 (Codex 20차 #4)
@@ -798,13 +801,13 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales) };
+  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) } };
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -1642,6 +1645,100 @@ export function applyBattleLoss(monId, lossesToLose) {
 }
 
 /**
+ * 🚀 로켓단에게 져서 노리던 포켓몬을 빼앗긴다 (2026-10-09). **저장된 프로필로 다시 판정** — 배틀 사이에 다른 창에서 팔았거나
+ * 파트너로 정했거나 아빠가 등급을 옮겼으면 빼앗을 수 없다(빈손으로 돌아감). 빼앗긴 수는 mons[id].stolen 단조 카운터 —
+ * caught를 줄이면 옛 백업(max)이 되살려 복제된다(배틀 fled와 같은 함정). 도감 칸(caught)은 남는다. 진 수(rocketLost)는 빈손이어도 센다
+ * @param {{id:number, battle?:string}} req 노리던 포켓몬 · 배틀 id(있으면 그 배틀은 한 번만 — 두 창·다시 연 앱이 두 번 빼앗지 않게)
+ * @param {{rarity:(id:number) => number, known?:(id:number) => boolean}} ctx 저장된 프로필로 만든 등급 ctx
+ * @returns {{ok:true, stolen:boolean, id:number}}
+ */
+export function rocketStealRule(profile, req, ctx, now = Date.now()) {
+  const id = Number(req && req.id);
+  const end = endBattle(profile, req && req.battle, 'lose', now);
+  if (!end.ok) return end;
+  profile.rocketLost = (Number(profile.rocketLost) || 0) + 1;
+  if (!stealables(profile, ctx).some((m) => m.id === id)) return { ok: true, stolen: false, id };
+  profile.mons = profile.mons || {};
+  const m = profile.mons[id] || {};
+  profile.mons[id] = { ...m, stolen: (Number(m.stolen) || 0) + 1 };
+  return { ok: true, stolen: true, id };
+}
+/** @param {(stored:object) => object} makeCtx 저장된 프로필로 등급 ctx를 만든다 (아빠가 옮긴 등급까지) */
+export function applyRocketSteal(req, makeCtx) {
+  return mutateProfile((p) => rocketStealRule(p, req, makeCtx(p)));
+}
+
+/**
+ * 🚀 로켓단을 쫓아냈다 (2026-10-09) — 물리친 수(rocketWon) +1, 아지트에 갇힌 포켓몬이 있으면 고른 한 마리를 되찾는다(mons[id].back 단조).
+ * 고른 것이 그 사이 다른 창에서 이미 되찾아졌으면 되찾지 않는다(저장된 아지트로 판정). ⚡💰는 호출부가 증분으로 (야생 배틀과 같게)
+ * @param {{backId?:number|null, battle?:string}} req 배틀 id(있으면 한 번만)
+ * @returns {{ok:true, back:number|null}}
+ */
+export function rocketWinRule(profile, req, now = Date.now()) {
+  const end = endBattle(profile, req && req.battle, 'win', now);
+  if (!end.ok) return end;
+  profile.rocketWon = (Number(profile.rocketWon) || 0) + 1;
+  const id = Number(req && req.backId);
+  if (!id || !hideout(profile).some((h) => h.id === id)) return { ok: true, back: null };
+  profile.mons = profile.mons || {};
+  const m = profile.mons[id] || {};
+  profile.mons[id] = { ...m, back: (Number(m.back) || 0) + 1 };
+  return { ok: true, back: id };
+}
+export function applyRocketWin(req) {
+  return mutateProfile((p) => rocketWinRule(p, req));
+}
+
+/**
+ * 🚀 배틀을 끝낼 수 있나 — 이미 끝난 배틀(rocketDone)이면 아무것도 안 한다(두 창·다시 연 앱이 같은 배틀을 두 번 처리하지 않게).
+ * 진행 중인 배틀 기록이 이 배틀이면 그 결과가 맞아야 끝낸다(진 배틀로 이긴 보상을 받지 않게) — 끝내면 기록을 비우고 끝난 목록에 적는다
+ */
+function endBattle(profile, battle, outcome, now) {
+  if (!battle) return { ok: true };
+  const bid = String(battle);
+  profile.rocketDone = { ...(profile.rocketDone || {}) };
+  if (profile.rocketDone[bid]) return { ok: false, why: 'done' };
+  const cur = profile.rocketCur;
+  if (cur && cur.id === bid && cur.st && cur.st.outcome !== outcome) return { ok: false, why: 'outcome' };
+  profile.rocketDone[bid] = { o: outcome, at: Math.floor(now) };
+  if (cur && cur.id === bid) profile.rocketCur = null;
+  return { ok: true };
+}
+
+/**
+ * 🚀 배틀 시작 — 진행 중인 배틀 기록(rocketCur)을 저장한다. 이미 다른 배틀이 진행 중이면(다른 창이 먼저 열었거나 앞 배틀이 안 끝났으면)
+ * 새로 열지 않고 그 배틀을 돌려준다 — 한 번에 하나만
+ * @returns {{ok:boolean, why?:'busy'|'done', cur:object}}
+ */
+export function rocketBeginRule(profile, cur) {
+  const done = profile.rocketDone || {};
+  if (profile.rocketCur && !done[profile.rocketCur.id]) return { ok: false, why: 'busy', cur: profile.rocketCur };
+  if (!cur || !cur.id || done[cur.id]) return { ok: false, why: 'done', cur: null };
+  profile.rocketCur = copyRocketCur(cur);
+  return { ok: true, cur: profile.rocketCur };
+}
+export function applyRocketBegin(cur) {
+  return mutateProfile((p) => rocketBeginRule(p, cur));
+}
+
+/**
+ * 🚀 문제 하나의 결과를 저장된 배틀에 더한다 — 앱이 꺼져도 맞힌·틀린 수가 남아 다음에 이어진다.
+ * 진행 중인 배틀이 이 배틀이 아니거나(다른 창이 끝냈다) 이미 승패가 났으면 더하지 않는다
+ * @returns {{ok:boolean, why?:string, st?:object}}
+ */
+export function rocketStepRule(profile, battle, correct) {
+  const cur = profile.rocketCur;
+  if (!cur || cur.id !== String(battle) || (profile.rocketDone || {})[cur.id]) return { ok: false, why: 'stale' };
+  if (cur.st && cur.st.outcome) return { ok: false, why: 'over', st: cur.st };
+  const st = rocketStep(cur.st || { asked: 0, right: 0, wrong: 0, outcome: null }, !!correct);
+  profile.rocketCur = { ...copyRocketCur(cur), st };
+  return { ok: true, st };
+}
+export function applyRocketStep(battle, correct) {
+  return mutateProfile((p) => rocketStepRule(p, battle, correct));
+}
+
+/**
  * 🎀 장식 장착(gearId) / 벗기(null) — **한 트랜잭션**.
  *
  * ★ 메모리에서 "지금 낀 것"을 읽어 환불하면 두 창에서 장식이 복제된다 (Codex 10차 #1이 재현):
@@ -1779,7 +1876,8 @@ export function mergeStatRecord(name, cur, rec) {
     return mergeMath(cur, rec); // 🔢 수학 진도는 'me' 규칙과 모양이 다르다
   } else if (name === 'profile') {
     // ⬆️ stonesSpent는 단조 카운터 — 옛 백업이 쓴 스톤 기록을 되돌리지 않게 max (Codex 10차 #8)
-    for (const k of ['xp', 'throws', 'catches', 'coinsEarned', 'stonesSpent', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
+    // 🚀 로켓단을 물리친 수·진 수도 단조 카운터 (2026-10-09)
+    for (const k of ['xp', 'throws', 'catches', 'coinsEarned', 'stonesSpent', 'rocketWon', 'rocketLost', 'updatedAt']) out[k] = maxOf(cur[k], rec[k]);
     out.caught = { ...(cur.caught || {}) };
     for (const id of Object.keys(rec.caught || {})) out.caught[id] = maxOf(out.caught[id], rec.caught[id]);
     // 💰 코인·🎒 가방·꾸밈은 구매·장착으로 줄어드는 값이라 큰 값이 아니라 "최근에 저장된 쪽"을 통째로 씀
@@ -1817,7 +1915,7 @@ export function mergeStatRecord(name, cur, rec) {
       // 🔒 부모가 데려간 수·알려 준 수도 단조 카운터 (2026-09-28) — max가 아니면
       //    옛 백업을 되돌리는 것만으로 벌이 없던 일이 된다 (evo와 똑같은 함정)
       // 🔀 퓨전에 넣은 수·분리해 돌려받은 수도 단조 카운터 (2026-10-04) — max가 아니면 옛 백업이 퓨전에 넣은 포켓몬을 되살린다
-      for (const k of ['fused', 'unfused', 'fled', 'traded', 'sold']) { // ⚔️ 배틀에서 떠난 수도 (Codex 30차 #2) · 🤝 상인에게 보낸 수도 · 💰 5일장에서 판 수도 (2026-10-05)
+      for (const k of ['fused', 'unfused', 'fled', 'traded', 'sold', 'stolen', 'back']) { // ⚔️ 배틀에서 떠난 수도 (Codex 30차 #2) · 🤝 상인에게 보낸 수도 · 💰 5일장에서 판 수도 (2026-10-05) · 🚀 로켓단이 빼앗은 수·되찾은 수도 (2026-10-09)
         const v = Math.max(Number(o[k]) || 0, Number(cur[k]) || 0);
         if (v && v !== (Number(cur[k]) || 0)) patch[k] = v;
       }
@@ -1840,6 +1938,11 @@ export function mergeStatRecord(name, cur, rec) {
     out.parcels = mergeParcels(cur.parcels, rec.parcels);
     // 💰 5일장에서 판 기록 — 장날·열쇠마다 합집합 (장날 한도를 옛 백업이 되돌리지 않게, 📊에 판 것이 남게)
     out.sales = mergeSales(cur.sales, rec.sales);
+    // 🚀 끝난 로켓단 배틀 — 합집합(옛 백업이 끝난 배틀을 "진행 중"으로 되살려 두 번 빼앗거나 두 번 보상하지 않게).
+    //    진행 중인 배틀은 최근 쪽(없으면 다른 쪽) — 끝난 목록에 있으면 비운다
+    out.rocketDone = mergeRocketDone(cur.rocketDone, rec.rocketDone);
+    const rc = latest.rocketCur || older.rocketCur || null;
+    out.rocketCur = rc && !out.rocketDone[rc.id] ? copyRocketCur(rc) : null;
   }
   return out;
 }

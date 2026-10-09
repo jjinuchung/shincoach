@@ -6,7 +6,7 @@ import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES, SHINY_STONE, shinyUsesLeft, ENGLISH_STONE_SHORT } from './items.js';
 import { eggSummary } from './egg.js';
 import { gymClaimed } from './mathprog.js'; // 🕳 울트라홀 = 💎 스페셜 여덟 배지
-import { haveOf, lvOf, fusedOf, fledOf } from './evolve.js';
+import { haveOf, lvOf, fusedOf, fledOf, rocketHeldOf } from './evolve.js';
 import { initMarket, openMarket, fusionFigure, fusionName } from './marketview.js'; // 🏪 5일장 · 🔀 퓨전 (2026-10-04)
 import { marketOpen, nextMarket } from './fusion.js';
 import { fusionList } from './xp.js';
@@ -239,7 +239,9 @@ export async function openPokedex(opts) {
       // 🧬 다 진화시켜 지금은 없는 모습 — 도감 칸은 남고 "보냈다"는 것만 보여 준다
       // 🔀 퓨전에 들어가 있으면 🔀 (5일장에서 나누면 돌아온다)
       // 💨 배틀에서 져서 떠났으면 💨 (2026-10-05 — 도감 칸은 남는다, 다시 잡으면 돌아온다)
-      else if (n > 0 && have === 0) cell.appendChild(el('div', 'cnt evolved', fusedOf(p.mons[m.id]) > 0 ? '🔀' : fledOf(p.mons[m.id]) > 0 ? '💨' : '🧬'));
+      // 🚀 로켓단 아지트에 갇혀 있으면 🚀 (2026-10-09 — 도감 칸은 남는다, 로켓단을 이기면 구해 온다)
+      else if (n > 0 && have === 0) cell.appendChild(el('div', 'cnt evolved', fusedOf(p.mons[m.id]) > 0 ? '🔀' : rocketHeldOf(p.mons[m.id]) > 0 ? '🚀' : fledOf(p.mons[m.id]) > 0 ? '💨' : '🧬'));
+      if (n > 0 && have > 0 && rocketHeldOf(p.mons[m.id]) > 0) cell.appendChild(el('div', 'rocket-held', '🚀')); // 데리고 있는 것 말고 한 마리가 더 아지트에
       if (n > 0 && lv > 1) cell.appendChild(el('div', 'lv', `Lv${lv}`));
       // 🌌 울트라비스트는 🕳 울트라홀이 열려야 만난다 — 🔢 대신 🌌를 달아 "다른 차원에서 온 것"을 표시
       if (isUltraBeast(m.id)) cell.appendChild(el('div', 'subj ub', '🌌'));

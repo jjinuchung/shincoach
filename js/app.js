@@ -1,6 +1,6 @@
 // 앱 진입점: 화면 전환, 서비스워커 등록, 모듈 초기화
 import { initLibrary, refreshList } from './library.js';
-import { initPlayer, requirePin, timeLimitConf } from './player.js';
+import { initPlayer, requirePin, timeLimitConf, resumeEnglishRocket } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
 import { initHatch } from './hatch.js';
@@ -9,7 +9,8 @@ import { initHome, renderHome } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
-import { initTimeLimit, setSubject, flushTime } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
+import { initTimeLimit, setSubject, flushTime, isLocked } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
+import { profileReady, rocketCurrent } from './xp.js'; // 🚀 끝나지 않은 로켓단 배틀 이어 가기
 import { initTimeUp, refreshChips } from './timeup.js';
 import { initTaken, openTakeTool, showTakenNoticeIfAny } from './taken.js'; // 🔒 부모가 포켓몬 데려가기
 import { initGiftSettings } from './gift.js'; // 🎁 선물 교환권 사진 (⚙, 이 기기에만)
@@ -192,7 +193,15 @@ async function main() {
     import('./pokemon.js').then((m) => Promise.all([m.loadShiny(), m.loadForms()])).catch(() => {});
   });
   // ⏳ 하루 시간 제한 시계 — ⚙ 설정을 읽어 가고, 1초마다 칩을 갱신한다 (실패해도 학습은 계속)
-  initTimeLimit({ conf: timeLimitConf, onTick: refreshChips }).catch(() => {});
+  const timeReady = initTimeLimit({ conf: timeLimitConf, onTick: refreshChips }).catch(() => {});
+  // 🚀 끝나지 않은 로켓단 배틀이 있으면 그 과목 화면으로 — 수학 화면이 열리면 거기서 이어 간다 (아버님 결정 (다): 앱이 꺼져도
+  //    다음에 열면 이어진다 — 도망칠 수도 억울할 수도 없게). 아직 홈에 있을 때만 · 그 과목 시간이 다 됐으면 다시 열 수 있을 때
+  Promise.all([timeReady, profileReady()]).then(() => {
+    const rc = rocketCurrent();
+    if (!rc || views.home.hidden) return;
+    if (rc.subject === 'math' && !isLocked('math')) showView('math');
+    else if (rc.subject === 'en' && !isLocked('english')) resumeEnglishRocket().catch(() => {}); // 영어는 영상 없이 홈에서 바로 (저장된 단어로)
+  }).catch(() => {});
   requestPersistentStorage();
   registerServiceWorker();
 }

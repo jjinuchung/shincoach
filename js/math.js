@@ -28,11 +28,15 @@ import { unlockState, MATH_PTS, nextTarget, previewGift, ownedVoucherIds, needOf
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
+import { rocketPick, rocketBegin, rocketCurrent, profileReady } from './xp.js'; // 🚀 로켓단 습격 (2026-10-09)
+import { ROCKET, shouldRocket, rocketNew } from './rocket.js';
+import { isRocketOpen } from './rocketview.js';
+import { playRocket } from './rocketplay.js'; // 🚀 저장·화면을 묶는 공통 실행기 (영어와 같다)
 import { eggProgress } from './egg.js';
 import { showHatchIfAny } from './hatch.js';
 // ⏳ 하루 시간 제한 — **새로 시작하는 자리에만** 관문을 단다. 풀던 회차는 끝까지 간다 (아버님 결정 2026-09-27)
 import { guardStart } from './timeup.js';
-import { setExempt } from './timelimit.js'; // ⏳ 도전 문제 동안은 시간을 안 센다
+import { setExempt, status as timeStatus, isLocked } from './timelimit.js'; // ⏳ 도전 문제 동안은 시간을 안 센다 · 🚀 남은 시간(로켓단은 5분 미만이면 안 나온다)
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole } from './pokemon.js';
 import { openCatch } from './catch.js';
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
@@ -474,9 +478,10 @@ export async function renderMath() {
   updateChip();
   ui.state = state;
   if (!ui.stem) ui.stem = savedStem();
-  if (!ui.stem) { renderStemPicker(state); return; }
-  if (needsPlacement(state, ui.stem)) renderDiagIntro();
+  if (!ui.stem) renderStemPicker(state);
+  else if (needsPlacement(state, ui.stem)) renderDiagIntro();
   else renderLadder(state);
+  resumeRocketIfAny(); // 🚀 끝나지 않은 로켓단 배틀
 }
 
 // ── 🌳 줄기 고르기
@@ -1469,6 +1474,7 @@ function answer(i, list, card, typed = null) {
   });
   paintAnswer(i, list, card, false);
   maybeBattle(); // ⚔️ 아주 가끔 트레이너가 걸어온다 (다음 문항으로 넘어갈 때 열린다)
+  maybeRocket(!!ch.ok); // 🚀 세 번 연속 맞히면 로켓단이 탐을 낸다 (다음 문항으로 넘어갈 때 열린다)
   maybeCheer(!ch.ok); // ✨ 포켓몬이 지나가며 응원 (틀린 직후에 더 자주)
 }
 
@@ -1824,6 +1830,8 @@ function advance() {
   // ⚔️ 배틀은 **저장이 끝난 뒤에**. 마지막 문항에서 배틀을 먼저 열면, 일일 횟수 트랜잭션을 기다리는 사이
   // 아이가 홈으로 나갔을 때 ui.round가 지워져 **다 푼 편의 기록·보상이 통째로 사라진다** (Codex 9차 #1).
   if (ui.battlePending && !last) { startMathBattle(go); return; }
+  if (ui.rocketPending && !last) { startRocket(go); return; } // 🚀 배틀과 같은 까닭으로 마지막 문항 뒤에는 열지 않는다
+  ui.rocketPending = false;
   go();
 }
 // ───────────────────── ✨ 응원 포켓몬 ─────────────────────
@@ -1944,7 +1952,7 @@ async function loadTodayCounts() {
   const today = todayKey();
   try {
     const d = await getDaily(today);
-    ui.today = { d: today, q: (d && Number(d.mathQ)) || 0, battles: (d && Number(d.battles)) || 0 };
+    ui.today = { d: today, q: (d && Number(d.mathQ)) || 0, battles: (d && Number(d.battles)) || 0, rockets: (d && Number(d[ROCKET.field.math])) || 0 };
   } catch { ui.today = { d: today, q: 0, battles: 0 }; }
 }
 
@@ -1953,7 +1961,7 @@ function maybeBattle() {
   const today = todayKey();
   if (ui.today.d !== today) ui.today = { d: today, q: 0, battles: 0 }; // 자정을 넘김
   ui.today.q += 1;
-  if (ui.battlePending || ui.battleOpen) return;
+  if (ui.battlePending || ui.battleOpen || ui.rocketPending || ui.rocketOpen) return; // 🚀 로켓단과 한 번에 하나만
   // 📏 진단은 "어디까지 아는지" 재는 자리다 — 도중에 트레이너가 끼어들면 흐름이 끊긴다 (문항 수는 그대로 센다)
   if (ui.round && ui.round.mode === 'diag') return;
   if (!shouldBattle({ todayDone: ui.today.q, todayBattles: ui.today.battles })) return;
@@ -1993,10 +2001,10 @@ function mathPotions() {
  * ⚔️ 배틀 턴에 낼 문제 — 아는 개념에서 하나. **기록하지 않는다**(연습과 같은 성격):
  * 얼굴별 누적·오개념·🤔 노트·교환권을 건드리지 않는다. 영어 배틀이 문장 기록을 안 남기는 것과 같다.
  */
-function battleQuestion(seed) {
+function battleQuestion(seed, stemKey = null) {
   const st = ui.state;
   const today = todayKey();
-  const rows = ladderOf(st, today, ui.stem);
+  const rows = ladderOf(st, today, stemKey || ui.stem || savedStem() || undefined);
   const known = rows.filter((x) => x.state === 'done');
   const pool = known.length ? known : rows.filter((x) => x.state === 'now');
   if (!pool.length) return null;
@@ -2014,7 +2022,7 @@ function battleQuestion(seed) {
  * 배틀의 한 턴을 그린다 — battle.js가 자리를 주고, 문제·보기·판정은 여기서.
  * @returns {Promise<{correct:boolean, skipped:boolean, interrupted:boolean}>}
  */
-function battleQuiz(box, hooks) {
+function battleQuiz(box, hooks, stemKey = null) {
   return new Promise((resolve) => {
     let done = false;
     let picked = false; // 답을 이미 골랐나 (표시 대기 중 ⏭ 잠금용)
@@ -2022,8 +2030,9 @@ function battleQuiz(box, hooks) {
     // 배틀이 닫히면(화면 꺼짐·뒤로) 이 턴은 없던 것으로 — 약속이 안 풀리면 배틀이 멈춘다
     if (hooks && hooks.register) hooks.register(() => finish({ correct: false, skipped: false, interrupted: true }));
 
-    const q = battleQuestion((Date.now() % 1000000) | 0);
+    const q = battleQuestion((Date.now() % 1000000) | 0, stemKey);
     if (!q) { finish({ correct: false, skipped: true, interrupted: false }); return; }
+    if (/[?&]nosw=1/.test(location.search)) window.__battleQ = q; // 헤드리스 검증용 (개발 모드에서만)
     box.appendChild(el('div', 'battle-quiz-label', `🔢 ${nameOf(q.concept)}`));
     const qt = el('div', 'battle-quiz-q');
     qt.appendChild(qtNode(q.q));
@@ -2080,6 +2089,71 @@ async function startMathBattle(after) {
       after();
     },
   });
+}
+
+// ───────────────────── 🚀 로켓단 습격 (2026-10-09, 아버님 아이디어) ─────────────────────
+// 규칙은 rocket.js, 저장은 db.js·xp.js, 화면은 rocketview.js — 여기서는 언제 여는지와 수학 문제만.
+// 나오는 편: 개념 편·연습·확인·☀️ 섞어 풀기 — 진단·❓·💎 스페셜·🤔 노트·🔁 쌍둥이(따로 그린다)·🎯 도전(다른 길)에서는 안 나온다
+const ROCKET_MODES = ['learn', 'practice', 'review', 'mix'];
+
+/** 헤드리스 시험용 — ?nosw=1에서 window.__rocketForce면 확률·조건 없이 (나오는 편·마지막 문항 규칙은 그대로) */
+function rocketForced() {
+  return /[?&]nosw=1/.test(location.search) && !!window.__rocketForce;
+}
+
+/** 문항 하나를 끝낼 때마다 — 연속으로 맞힌 수를 세고, 차례가 맞으면 다음 전환에서 열 로켓단을 걸어 둔다 */
+function maybeRocket(ok) {
+  const r = ui.round;
+  if (!r || !ROCKET_MODES.includes(r.mode)) return;
+  ui.rocketStreak = ok ? (ui.rocketStreak || 0) + 1 : 0;
+  if (!ok || ui.rocketPending || ui.rocketOpen || ui.battlePending || ui.battleOpen) return;
+  if (r.at >= r.qs.length - 1) return; // 마지막 문항 뒤에는 열지 않는다 (advance와 같은 규칙 — 다 푼 편의 저장을 지킨다)
+  if (!rocketForced()) {
+    const t = timeStatus('math');
+    const leftSec = t && !t.off ? t.left : null;
+    if (!shouldRocket({ subject: 'math', doneToday: ui.today.q, streak: ui.rocketStreak, todayCount: ui.today.rockets || 0, leftSec })) return;
+  }
+  ui.rocketPending = true;
+}
+
+/** 걸어 둔 로켓단을 연다 — 오늘 몫(수학 하루 3번)을 선점하고, 노릴 포켓몬을 고르고, 배틀 기록을 저장한 뒤. 끝나면 after() */
+async function startRocket(after) {
+  ui.rocketPending = false;
+  ui.rocketStreak = 0;
+  const run = ui.run; // 트랜잭션을 기다리는 사이 아이가 홈·사다리로 나갔으면 열지 않는다 (배틀과 같다)
+  const target = rocketPick();
+  if (!target || !getPartner() || mathHidden()) { after(); return; }
+  let won = false;
+  try { won = (await claimDailyCount(todayKey(), ROCKET.field.math, ROCKET.maxPerDay)).won; } catch { won = false; }
+  if (!won || run !== ui.run || mathHidden()) { after(); return; }
+  ui.today.rockets = (ui.today.rockets || 0) + 1;
+  const b = await rocketBegin(rocketNew({ subject: 'math', target: target.id, stem: ui.stem }));
+  // 다른 창이 연 배틀이 있으면 그것을 이어 간다 — 영어 배틀이면 영어에서 이어 가므로 여기서는 열지 않는다
+  if (!b.cur || b.cur.subject !== 'math' || run !== ui.run) { after(); return; }
+  await runRocket(b.cur, !b.ok, after);
+}
+
+/** 로켓단 화면을 연다 (새 배틀·이어 가기 공통). 문제는 그 배틀을 시작한 줄기의 아는 개념에서 — 기록하지 않는다(배틀 문제와 같다) */
+async function runRocket(cur, resume, after) {
+  ui.rocketOpen = true;
+  try {
+    await playRocket({ cur, resume, kid: (ui.opts && ui.opts.me) || '진우', chars: ui.chars, quiz: (box, hooks) => battleQuiz(box, hooks, cur.stem) });
+  } finally {
+    ui.rocketOpen = false;
+    updateChip();
+    if (after) after();
+  }
+}
+
+/** 🚀 끝나지 않은 수학 로켓단 배틀이 있으면 이어 간다 (아버님 결정 (다): 앱이 꺼져도 다음에 열면 이어진다 — 도망칠 수도 억울할 수도 없게) */
+function resumeRocketIfAny() {
+  const run = ui.run;
+  profileReady().then(() => {
+    const cur = rocketCurrent();
+    if (!cur || cur.subject !== 'math' || ui.rocketOpen || isRocketOpen() || !ui.state || run !== ui.run || mathHidden()) return;
+    if (ui.round || isLocked('math')) return; // 풀던 편이 있으면 그 편을 마친 뒤 · 시간이 다 됐으면 다시 열 수 있을 때
+    runRocket(cur, true, null);
+  }).catch(() => {});
 }
 
 /** 배틀 결과: 승 → 상대 획득 + ⚡💰, 패 → 그 포켓몬 패배 +1 (영어와 같은 규칙·같은 함수) */
