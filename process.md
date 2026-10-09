@@ -2693,3 +2693,39 @@
 - [ ] 승인 → v218 커밋·푸시·라이브 확인
 - [ ] (재부팅 뒤 새 세션) Codex 43차 — 요청문에 20분 간격도 넣어 둠 → v219
 - [ ] 아버님·진우: 구호 한국판 확인 · 내일 영어에서 간격 확인
+
+## 2026-10-09 (밤) — 재부팅 뒤 전체 테스트 · 💰 팔기 20마리 v219 · 🔍 Codex 43차 반영 (v220)
+
+### 진행 내용
+- 재부팅 뒤 여유 메모리 23.3 GB → 지난번 메모리 부족으로 끊긴 전체 `npm test`를 끝까지: **1622 통과 · 0 실패**(v218 그대로)
+- 아버님 "장날 하루에 20마리까지 판매할 수 있게 제한을 풀자" → `sell.SELL_MON_MAX` 10 → 20 · 테스트 한도 20·21번째는 다음 장날·한 종 여러 번도 20에서 멈춤 · 고치기 전 실패 · 변이 3(>=→>·19·21) 다 잡힘 · sw **v219** → `ed4b8fc` 배포(라이브 v219, 배포본 5개 같음 — 다음 장날 10-10부터)
+- Codex 43차(`.context/codex_review_43.md`): 42차 #1~#4 **모두 holds** · 로켓단 새 7건(P1 2 · P2 5) → 코드로 모두 확인 → 판단 표 → 아버님 "7건 다 고치기"
+  1. (P1) 이기면 "끝남"은 먼저 저장되고 ⚡40·💰20은 증분으로 따로 → 그 사이 꺼지거나 저장이 실패하면 보상만 영영 사라짐 → **보상을 rocketWinRule 안으로**(끝남·되찾기와 한 트랜잭션, 5일장 팔기 코인과 같은 모양) · xp.rocketWin의 gainXp·gainCoins 없앰
+  2. (P1) 로켓단 저장이 실패하면 메모리 프로필에 같은 규칙을 돌려 이어 갔다 → 다음 저장이 메모리를 덮어 **맞힌 답이 사라지거나**, 끝내기만 실패하고 보상 증분은 저장돼 **다시 연 앱에서 보상 두 번** → 로켓단 저장 4개(시작·한 문제·빼앗기·이기기)는 실패면 `{ok:false, why:'save'}` · 화면 `persist()`가 "💾 저장이 안 됐어요 — 다시 저장 / 나중에"(나중에면 닫고 배틀은 저장된 데까지 남아 다음에 이어짐) · 다른 화면이 먼저 끝낸 진 배틀을 "빈손"이라 말하던 것도 "이미 끝난 배틀"로
+  3. (P2) 20분 간격을 창의 기억으로만 봐서 두 창(홈 화면 앱 + 크롬 탭)이면 1분 뒤 또 열림 · 하루 몫을 먼저 쓰고 나서 배틀을 열어, 영어 배틀이 진행 중일 때 수학이 걸리면 수학 몫만 사라짐 → **시작 판정과 몫을 한 트랜잭션**(`db.rocketAdmitRule`·`applyRocketAdmit` — 프로필·오늘 기록 두 저장소, ⏳ 연장권 applyExtend와 같은 모양): 진행 중이면 몫 안 쓰고 그 배틀(busy) · 하루 몫(cap) · **저장된** 마지막 시각으로 간격(gap, `rocket.rocketGapOk` 한 규칙을 창 판정과 같이 씀) · xp.rocketAdmit · 수학 startRocket · 영어 `track.admitRocketEn(max, admit)`(보기값 flush → 저장된 오늘 기록 받기) · 옛 markRocketEn·rocketBegin·applyRocketBegin 없앰
+  4. (P2) 영어 로켓단 준비(단어 읽기·저장)를 기다리는 사이 '다음'을 또 누르면 퍼즐이 먼저 열리고 로켓단이 그 위에 → 준비할 때부터 `state.rocketOpen`·영상 멈춤·따라 말하기 대기 취소 · goTo가 로켓단 중엔 안 넘어감 · 못 열면 풀고 이어 감 · 그 사이 영상을 닫거나 바꿨으면 이어 가지 않음(같은 영상일 때만)
+  5. (P2) 따라 말하기를 켠 채 마지막 문장에서 걸린 로켓단이 안 열림(afterShadowWait 마지막 문장 갈래에 없었다) → onCueEnd처럼 로켓단이 먼저
+  6. (P2) 끝내기 규칙이 "저장된 진행 중 배틀과 맞는지"를 꼭 보지 않음(배틀 id 없음·진행 중 기록 없음이면 통과 — 화면 길은 없었다) → endBattle이 배틀 id·저장된 진행 중 배틀·그 결과·(빼앗기면) 노리던 포켓몬까지 맞아야 끝냄, 빼앗는 포켓몬은 저장된 배틀의 것
+  7. (P2) 앱을 다시 열어 홈에서 이어 간 영어 배틀은 영어 시간에 안 셈 → resumeEnglishRocket이 배틀 동안 영어 시간으로, 끝나면 원래 과목(홈 = 안 셈)으로
+- 테스트
+  - **`tests/fakeidb.js`(새)** — node용 작은 IndexedDB: 쓰기는 커밋 때 한꺼번에·트랜잭션은 차례로·`failNext`로 저장 실패 흉내. node에 indexedDB가 없어 xp.js 저장 연산이 늘 "실패 → 메모리로"만 통과하던 틈(Codex가 찾은 #2가 바로 그 길)
+  - **`tests/rocketstore.test.js`(새, 5)** — 진짜 트랜잭션 경로: 이기기 저장 실패면 끝남·보상 둘 다 없음 → 다시 하면 한 번 → 다시 연 앱에서 또 끝내도 한 번 · 한 문제 저장 실패 뒤 다시 저장하면 두 답 다 · 빼앗기 실패면 안 빼앗김 → 한 번만 → 다음에 이기면 구함 · 다른 창이 1분 전에 연 과목은 gap · 진행 중이면 busy(몫 안 씀) · 저장 실패면 몫·배틀·간격 시각 모두 그대로 · 하루 3번 뒤 cap
+  - `tests/rocket.test.js` — 규칙 테스트가 저장된 배틀을 거쳐 끝내도록(battle·steal·win 도우미) · #6 거절 6가지 · #1 보상이 규칙 안 · #3 admit(gap·20분 경계·busy·cap·미래 시각·기록 없음) · 저장 경로 xp 테스트 둘은 rocketstore로 옮김
+  - `tests/player.logic.test.js` — 스텁(rocketAdmit·admitRocketEn·시간 과목) · 행동 4: 준비 중 두 번째 '다음'(Codex 재현 ['puzzle','rocket'])·못 열면 풂·닫거나 바꾼 영상 · 마지막 문장 따라 말하기 · 이어 간 배틀 영어 시간
+  - `tests/rocketwire.test.js` — 여는 순서(rocketAdmit, 몫만 따로 먼저 안 씀)·persist 연결·저장 함수들의 실패 = save·⚡💰 증분 없음
+  - `tests/sell.test.js` — 프로필 저장 시각(nextStamp) 쓰는 곳 5 → 6(applyRocketAdmit도 nextStamp)
+  - 고치기 전 실패 확인 · 변이 검사 `.context/codex43/mutate_43.mjs` **34 중 33** → 지나간 하나("진행 중 배틀이 있고 오늘 몫도 다 썼으면" 이어 가기 대신 cap — 시작 규칙 안에서 begin이 같은 확인을 한 번 더 해 가려졌다)는 테스트를 더해 잡음(`mutate_one.mjs`) → **34/34** · 전체 **1634 통과**
+  - 헤드리스(800·390): 수학 이기기(⚡+40 💰+20)·지기(빼앗겨 아지트)·껐다 켜서 이어 가기(1/3에서) → 이기고 아지트에서 구하기 · 💾 저장 실패 화면("다시 저장"이면 그 답 한 번만·"나중에"면 닫힘, `persist_probe.js`로 첫 저장만 실패시켜) · 콘솔 오류 없음 · 가로 넘침 없음
+- 함정: player.logic 테스트는 import를 "줄 끝 `;`"로 걸러 낸다 — **마지막 import 줄 끝에 주석을 달면 그 뒤 코드까지 잘려** 115개가 모두 깨졌다(주석을 윗줄로)
+
+### 변경 파일
+- `js/rocket.js` — rocketGapOk · `js/db.js` — endBattle 엄격·빼앗기는 저장된 대상·이기기 보상·시작 간격·rocketAdmitRule·applyRocketAdmit · `js/xp.js` — 로켓단 저장 실패 = save·rocketAdmit · `js/math.js` — startRocket · `js/player.js` — startRocketEn·goTo·afterShadowWait·resumeEnglishRocket · `js/track.js` — admitRocketEn · `js/rocketview.js` — persist · `sw.js` — v220
+- `tests/fakeidb.js`·`tests/rocketstore.test.js` (새) · `tests/rocket.test.js` · `tests/player.logic.test.js` · `tests/rocketwire.test.js`
+
+### 결정사항 / 메모
+- 저장 실패 때 메모리로 이어 가는 runProfileOp 폴백은 다른 기능(❤️·구매 등)엔 그대로 — 로켓단처럼 "한 번만 끝나는 배틀"엔 맞지 않아 로켓단만 뺐다. ⚔️ 야생 배틀 startBattle도 몫(markBattle)을 기다리는 사이 같은 겹침 틈이 아주 짧게 있다(이번 범위 밖, 기록만)
+
+### TODO (다음 작업)
+- [ ] 승인 → v220 커밋·푸시·라이브 확인
+- [ ] 아버님·진우: 구호 한국판 확인 · 태블릿 영어 문장 끝 등장·20분 간격 · 💾 저장 실패 화면은 드물다(저장소 오류 때만)
+- [ ] 그다음 줄기 AB 평면도형의 이동(설계부터)
