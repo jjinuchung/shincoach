@@ -49,7 +49,7 @@ test('🚀 마지막 문항 뒤에는 안 연다 — 걸 때(maybeRocket)도 열
 
 test('🚀 등장 판정은 shouldRocket(오늘 푼 수·연속 정답·오늘 로켓단 수·남은 시간) — 헤드리스 강제는 ?nosw=1에서만', () => {
   const f = body(math, 'maybeRocket');
-  assert.match(f, /shouldRocket\(\{ subject: 'math', doneToday: ui\.today\.q, streak: ui\.rocketStreak, todayCount: ui\.today\.rockets \|\| 0, leftSec \}\)/);
+  assert.match(f, /shouldRocket\(\{ subject: 'math', doneToday: ui\.today\.q, streak: ui\.rocketStreak, todayCount: ui\.today\.rockets \|\| 0, leftSec, lastAt: rocketLastAt\('math'\) \}\)/, '20분 간격은 수학의 마지막 등장 시각으로');
   assert.match(f, /const leftSec = t && !t\.off \? t\.left : null;/, '제한을 끄면 남은 시간을 안 본다');
   assert.match(body(math, 'rocketForced'), /\/\[\?&\]nosw=1\/\.test\(location\.search\) && !!window\.__rocketForce/);
   assert.match(math, /rockets: \(d && Number\(d\[ROCKET\.field\.math\]\)\) \|\| 0/, '오늘 로켓단 수를 저장된 기록에서 읽는다');
@@ -124,7 +124,7 @@ test('🔤 영어: 문장을 처음 끝낼 때마다 maybeRocketEn(배틀 판정
   const pm = f.indexOf('if (state.parentMode) return;');
   assert.ok(pm >= 0 && pm < f.indexOf('state.rocketStreak = (state.rocketStreak || 0) + 1;'), '부모 보기에서는 세지도 않는다');
   assert.match(f, /state\.rocketPending \|\| state\.rocketOpen \|\| state\.battlePending \|\| state\.battleOpen \|\| isRocketOpen\(\)\) return;/);
-  assert.match(f, /shouldRocket\(\{ subject: 'en', doneToday: todayDone, streak: state\.rocketStreak, todayCount: track\.todayRocketsEn\(\), leftSec \}\)/);
+  assert.match(f, /shouldRocket\(\{ subject: 'en', doneToday: todayDone, streak: state\.rocketStreak, todayCount: track\.todayRocketsEn\(\), leftSec, lastAt: rocketLastAt\('en'\) \}\)/, '20분 간격은 영어의 마지막 등장 시각으로');
   assert.match(f, /const t = rocketTimeStatus\('english'\);/, '영어 남은 시간');
   assert.match(f, /if \(!rocketTargets\(\)\.length \|\| !getPartner\(\)\) return;/, '노릴 포켓몬·싸울 파트너가 없으면 안 건다');
 });
@@ -169,7 +169,7 @@ test('📊 🚀 로켓단 카드(물리친 수·진 수·아지트) · 도감 �
   assert.match(dex, /if \(n > 0 && have > 0 && rocketHeldOf\(p\.mons\[m\.id\]\) > 0\) cell\.appendChild\(el\('div', 'rocket-held', '🚀'\)\);/);
   const sw = src('sw.js');
   for (const f of ['rocket', 'rocketview', 'rocketplay', 'rocketquiz']) assert.match(sw, new RegExp(`^\\s*'\\./js/${f}\\.js',`, 'm'), `앱 셸(주석 아닌 줄)에 ${f}.js`);
-  assert.match(sw, /const CACHE_VERSION = 'v217';/);
+  assert.match(sw, /const CACHE_VERSION = 'v218';/);
 });
 
 test('🚀⚔️ 배틀과 로켓단은 한 번에 하나 — 서로 걸려 있거나 열려 있으면 걸지 않는다 (수학·영어 둘 다)', () => {

@@ -321,3 +321,32 @@ test('🚀 rocket.js는 순수 규칙 — DOM·db·xp를 import하지 않는다(
   const sw = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
   assert.match(sw, /'\.\/js\/rocket\.js'/);
 });
+
+// ───────── 2026-10-09 저녁, 아버님: "너무 빠른 간격으로 나와서 벌써 영어에서 3번 다 나왔어. 20분 간격으로" ─────────
+
+test('🚀 간격: 그 과목에서 로켓단이 나온 뒤 20분이 지나야 다시 — 19분 59초는 안 되고 20분은 된다 · 처음(기록 없음)은 바로', () => {
+  assert.equal(ROCKET.gapMin, 20);
+  const now = 1760000000000;
+  const ok = { subject: 'en', doneToday: 30, streak: 5, todayCount: 1, leftSec: null, rng: () => 0, now };
+  assert.equal(shouldRocket({ ...ok, lastAt: now - (20 * 60 - 1) * 1000 }), false, '19분 59초');
+  assert.equal(shouldRocket({ ...ok, lastAt: now - 20 * 60 * 1000 }), true, '20분');
+  assert.equal(shouldRocket({ ...ok, lastAt: 0 }), true, '오늘 처음');
+  assert.equal(shouldRocket({ ...ok }), true, '기록 없음');
+  assert.equal(shouldRocket({ ...ok, lastAt: now + 60 * 1000 }), false, '시계가 뒤로 간 기기 — 미래 기록도 간격 안으로');
+});
+
+test('🚀 간격 기록: 배틀을 시작하면 그 과목의 마지막 등장 시각을 저장(과목마다 따로) · 병합은 과목마다 늦은 쪽', () => {
+  const p = P({ caught: { [C1]: 1 } });
+  const a = rocketNew({ subject: 'en', target: C1, now: 5000, rnd: () => 0.1 });
+  rocketBeginRule(p, a);
+  assert.deepEqual(p.rocketLast, { en: 5000 });
+  const busy = rocketNew({ subject: 'math', target: C1, now: 9000, rnd: () => 0.2 });
+  rocketBeginRule(p, busy);
+  assert.deepEqual(p.rocketLast, { en: 5000 }, '진행 중인 배틀이 있어 못 연 것은 기록하지 않는다');
+  // 수학 배틀은 수학 칸에 — 영어 간격과 따로 (변이 검사가 찾음: 과목 구분 없이 적어도 지나갔다)
+  const q = P({ caught: { [C1]: 1 }, rocketLast: { en: 5000 } });
+  rocketBeginRule(q, rocketNew({ subject: 'math', target: C1, now: 9000, rnd: () => 0.3 }));
+  assert.deepEqual(q.rocketLast, { en: 5000, math: 9000 });
+  const m = mergeStatRecord('profile', P({ rocketLast: { en: 5000, math: 100 }, updatedAt: 9 }), P({ rocketLast: { en: 3000, math: 7000 }, updatedAt: 1 }));
+  assert.deepEqual(m.rocketLast, { en: 5000, math: 7000 }, '옛 백업이 간격을 되돌리지 않게');
+});

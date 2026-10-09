@@ -198,7 +198,7 @@ function loadPlayer() {
     shouldRocket: (o) => !!rocketState.roll && o.subject === 'en' && o.streak >= 3 && o.todayCount < 3,
     rocketTargets: () => rocketState.targets, rocketPick: () => rocketState.targets[0] || null,
     rocketNew: (o) => ({ id: 'r1', subject: o.subject, target: o.target, st: { asked: 0, right: 0, wrong: 0, outcome: null } }),
-    rocketBegin: async (cur) => ({ ok: true, cur }), rocketCurrent: () => null,
+    rocketBegin: async (cur) => ({ ok: true, cur }), rocketCurrent: () => null, rocketLastAt: () => rocketState.lastAt || 0,
     playRocket: (o) => { rocketState.played.push(o); return new Promise((res) => { rocketState.release = res; }); },
     wordQuiz: () => () => Promise.resolve({ correct: true, skipped: false, interrupted: false }),
     wordQuestion: () => (rocketState.words ? { word: 'a', meaning: 'b', choices: ['b', 'c', 'd'] } : null),

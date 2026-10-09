@@ -33,7 +33,7 @@ import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import { DEFAULT_MIN as TIME_MIN, EXTEND_MAX, EXTEND_MIN, extMaxOf, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
 import { setBgmEnabled } from './bgm.js';
 import * as track from './track.js';
-import { rocketPick, rocketBegin, rocketCurrent, rocketTargets } from './xp.js'; // 🚀 로켓단 습격 — 영어 (2026-10-09)
+import { rocketPick, rocketBegin, rocketCurrent, rocketTargets, rocketLastAt } from './xp.js'; // 🚀 로켓단 습격 — 영어 (2026-10-09)
 import { ROCKET, shouldRocket, rocketNew } from './rocket.js';
 import { playRocket } from './rocketplay.js';
 import { wordQuiz, wordQuestion } from './rocketquiz.js';
@@ -601,7 +601,7 @@ function maybeRocketEn(todayDone) {
   if (!rocketForcedEn()) {
     const t = rocketTimeStatus('english');
     const leftSec = t && !t.off ? t.left : null;
-    if (!shouldRocket({ subject: 'en', doneToday: todayDone, streak: state.rocketStreak, todayCount: track.todayRocketsEn(), leftSec })) return;
+    if (!shouldRocket({ subject: 'en', doneToday: todayDone, streak: state.rocketStreak, todayCount: track.todayRocketsEn(), leftSec, lastAt: rocketLastAt('en') })) return;
   }
   if (!rocketTargets().length || !getPartner()) return;
   state.rocketPending = true;

@@ -801,13 +801,13 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, updatedAt: 0 };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) } };
+  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) } };
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -1715,6 +1715,10 @@ export function rocketBeginRule(profile, cur) {
   if (profile.rocketCur && !done[profile.rocketCur.id]) return { ok: false, why: 'busy', cur: profile.rocketCur };
   if (!cur || !cur.id || done[cur.id]) return { ok: false, why: 'done', cur: null };
   profile.rocketCur = copyRocketCur(cur);
+  // ⏱ 그 과목의 마지막 등장 시각 — 20분 간격(ROCKET.gapMin)의 기준. 저장된 프로필이라 앱을 껐다 켜도·두 창이어도 지켜진다
+  const last = { ...(profile.rocketLast || {}) };
+  last[cur.subject] = Math.max(Number(last[cur.subject]) || 0, Number(cur.at) || 0);
+  profile.rocketLast = last;
   return { ok: true, cur: profile.rocketCur };
 }
 export function applyRocketBegin(cur) {
@@ -1941,6 +1945,9 @@ export function mergeStatRecord(name, cur, rec) {
     // 🚀 끝난 로켓단 배틀 — 합집합(옛 백업이 끝난 배틀을 "진행 중"으로 되살려 두 번 빼앗거나 두 번 보상하지 않게).
     //    진행 중인 배틀은 최근 쪽(없으면 다른 쪽) — 끝난 목록에 있으면 비운다
     out.rocketDone = mergeRocketDone(cur.rocketDone, rec.rocketDone);
+    // ⏱ 과목마다 마지막 등장 시각은 늦은 쪽 — 옛 백업이 20분 간격을 되돌리지 않게
+    out.rocketLast = {};
+    for (const src of [cur.rocketLast, rec.rocketLast]) for (const k of Object.keys(src || {})) out.rocketLast[k] = Math.max(Number(out.rocketLast[k]) || 0, Number(src[k]) || 0);
     const rc = latest.rocketCur || older.rocketCur || null;
     out.rocketCur = rc && !out.rocketDone[rc.id] ? copyRocketCur(rc) : null;
   }

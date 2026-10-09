@@ -28,7 +28,7 @@ import { unlockState, MATH_PTS, nextTarget, previewGift, ownedVoucherIds, needOf
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
-import { rocketPick, rocketBegin, rocketCurrent, profileReady } from './xp.js'; // 🚀 로켓단 습격 (2026-10-09)
+import { rocketPick, rocketBegin, rocketCurrent, rocketLastAt, profileReady } from './xp.js'; // 🚀 로켓단 습격 (2026-10-09)
 import { ROCKET, shouldRocket, rocketNew } from './rocket.js';
 import { isRocketOpen } from './rocketview.js';
 import { playRocket } from './rocketplay.js'; // 🚀 저장·화면을 묶는 공통 실행기 (영어와 같다)
@@ -2111,7 +2111,7 @@ function maybeRocket(ok) {
   if (!rocketForced()) {
     const t = timeStatus('math');
     const leftSec = t && !t.off ? t.left : null;
-    if (!shouldRocket({ subject: 'math', doneToday: ui.today.q, streak: ui.rocketStreak, todayCount: ui.today.rockets || 0, leftSec })) return;
+    if (!shouldRocket({ subject: 'math', doneToday: ui.today.q, streak: ui.rocketStreak, todayCount: ui.today.rockets || 0, leftSec, lastAt: rocketLastAt('math') })) return;
   }
   ui.rocketPending = true;
 }
