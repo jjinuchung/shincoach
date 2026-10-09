@@ -122,7 +122,8 @@ test('🎬 저장이 안 되면(💾) "다시 저장·나중에"를 묻는다 �
 
 test('🎬 구호·외침·효과음 — 확인받을 대사는 한곳에(MOTTO·BLAST) · 앱 셸이 rocketview.js를 들고 간다', async () => {
   assert.match(view, /export const MOTTO = \[/);
-  assert.match(view, /export const BLAST = '/);
+  assert.match(view, /export const BLAST = '불쌍한 내 인생~';/, '아버님 결정(2026-10-09): 쫓겨날 때 말은 "불쌍한 내 인생~"');
+  assert.ok(!/날아간다~/.test(view), '옛 대사가 남지 않았다');
   assert.match(view, /나옹! 바로 그거다옹!/);
   const sfx = src('js/sfx.js');
   for (const k of ['siren', 'zap', 'boom', 'twinkle']) assert.match(sfx, new RegExp(`  ${k}\\(\\) \\{`), k);
@@ -190,7 +191,7 @@ test('📊 🚀 로켓단 카드(물리친 수·진 수·아지트) · 도감 �
   assert.match(dex, /if \(n > 0 && have > 0 && rocketHeldOf\(p\.mons\[m\.id\]\) > 0\) cell\.appendChild\(el\('div', 'rocket-held', '🚀'\)\);/);
   const sw = src('sw.js');
   for (const f of ['rocket', 'rocketview', 'rocketplay', 'rocketquiz']) assert.match(sw, new RegExp(`^\\s*'\\./js/${f}\\.js',`, 'm'), `앱 셸(주석 아닌 줄)에 ${f}.js`);
-  assert.match(sw, /const CACHE_VERSION = 'v220';/);
+  assert.match(sw, /const CACHE_VERSION = 'v221';/);
 });
 
 test('🚀⚔️ 배틀과 로켓단은 한 번에 하나 — 서로 걸려 있거나 열려 있으면 걸지 않는다 (수학·영어 둘 다)', () => {
