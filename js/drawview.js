@@ -30,7 +30,16 @@
 // 어느 후보와도 다르면 "짐작한 답"("왼쪽부터 2, 3, 1층" · "뒤 줄부터 ■■□ / □■■")이다. 칠하는 동안의 말 = 풀이 카드의 말.
 // ★ 판의 크기는 후보 모두가 들어가는 크기로 정해져 있다(앞·옆은 3층까지, 생성기가 draw.rows로 4층까지) — 판 크기가 답 모양을 흘리지 않게.
 // (2026-10-06 v195) S1 어느 쪽에서 본 모양 고르기 · S5 수를 쓴 그림에서 앞·옆 모양 고르기에도 같은 판.
-import { figureSvg, parseChart, chartGeom, parseSym, symSvg, symGeom, parsePlane, planeSvg, planeGeom, parseViews } from './mathdraw.js';
+//
+// 🔄 AB 평면도형의 이동 — 모눈점 찍기 판·모눈 칸 칠하기 판(2026-10-10 AB 3단계): 교과서 4-1 4단원은 점을 옮겨 **찍고**, 밀고·뒤집고·돌린 도형을 모눈에 **그린다**.
+// · 점 찍기(draw.mode 'mpoint'): 출발점 ㄱ만 있는 모눈에 점을 찍는다. 찍은 자리가 후보 점(정답 · 출발점도 셈 · 반대쪽 · 가로세로 바꿈 · 한 방향만)이면
+//   그 보기 — 오개념 이름표가 그대로 쌓이고, 아니면 "점 ㄱ에서 오른쪽으로 3칸, 위쪽으로 2칸"(짐작한 답).
+//   ★ 찍는 동안에는 몇 칸인지 말하지 않는다 — 이 칸에서 배우는 것이 바로 칸 세기다(좌표평면 판은 좌표를 숨기고 칸을 말하지만 여기서는 칸이 답이다). 답한 뒤에 말한다.
+// · 칸 칠하기(draw.mode 'mcells'): kind 'place'(밀기·거꾸로 밀기)는 처음(나중) 도형이 있는 그 모눈에 자리까지 칠하고, kind 'shape'(뒤집기·돌리기·무늬)는
+//   빈 5 × 5 모눈에 모양만 칠한다(지도서: 뒤집기·돌리기는 모눈째 옮겨 그리기를 강요하지 않는다). 누르면 칠하고 다시 누르면 지운다.
+//   칠한 칸이 후보와 같으면(place는 자리까지, shape는 모양만) 그 보기, 아니면 "오른쪽으로 5칸 옮김"·"칠한 모양 ■■□ / □■■"(짐작한 답, 📊 기록 24자 안).
+// ★ 자는 mathdraw.moveGeom 하나 — 본 모눈과 누르는 모눈이 같다. shape 판은 늘 5 × 5(모양 바탕은 가로·세로 4칸 이하)라 판 크기가 답을 흘리지 않는다.
+import { figureSvg, parseChart, chartGeom, parseSym, symSvg, symGeom, parsePlane, planeSvg, planeGeom, parseViews, parseMove, moveSvg, moveGeom, mvCells, parseShapes } from './mathdraw.js';
 import { textVal } from './mathpad.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -57,7 +66,8 @@ function geomOf(draw) {
 }
 
 /** 이 draw를 판으로 그릴 수 있나 — math.js가 문제 글에서 그래프를 뺄지 정할 때 (못 그리면 보기·숫자판 그대로) */
-export const canDraw = (draw) => (draw && draw.mode === 'grid' ? !!gridOf(draw) : draw && draw.mode === 'plane' ? !!planeOf(draw) : draw && draw.mode === 'cells' ? !!paintOf(draw) : !!geomOf(draw));
+export const canDraw = (draw) => (draw && draw.mode === 'grid' ? !!gridOf(draw) : draw && draw.mode === 'plane' ? !!planeOf(draw) : draw && draw.mode === 'cells' ? !!paintOf(draw)
+  : draw && draw.mode === 'mpoint' ? !!mpointOf(draw) : draw && draw.mode === 'mcells' ? !!mcellsOf(draw) : !!geomOf(draw));
 
 // ───────────────────── 🪞 모눈 판 ─────────────────────
 
@@ -536,6 +546,311 @@ function paintAnswered(draw, text, ok) {
   return wrap;
 }
 
+// ───────────────────── 🔄 모눈점 찍기 판 ─────────────────────
+
+/** "오른쪽으로 3칸, 위쪽으로 2칸" — 가로 먼저 (생성기·풀이 카드와 같은 말) · 같은 자리면 빈 글자 */
+const mvWay = (dx, dy) => [dx ? `${dx > 0 ? '오른쪽' : '왼쪽'}으로 ${Math.abs(dx)}칸` : '', dy ? `${dy > 0 ? '아래쪽' : '위쪽'}으로 ${Math.abs(dy)}칸` : ''].filter(Boolean).join(', ');
+/** "오른쪽으로 3칸, 위쪽으로 2칸" → [dx, dy] (못 읽으면 null) */
+const mvWayOf = (t) => { const m = /^(?:(오른쪽|왼쪽)으로 (\d+)칸)?(?:, )?(?:(위쪽|아래쪽)으로 (\d+)칸)?$/.exec(String(t)); return m && (m[1] || m[3]) ? [m[1] ? (m[1] === '오른쪽' ? 1 : -1) * m[2] : 0, m[3] ? (m[3] === '아래쪽' ? 1 : -1) * m[4] : 0] : null; };
+
+/** draw → 출발점만 그린 모눈(sp)·자(G)·출발점·묻는 점·후보 (못 그리면 null) */
+export function mpointOf(draw) {
+  if (!draw || draw.mode !== 'mpoint' || !Array.isArray(draw.target) || !Array.isArray(draw.from) || !Array.isArray(draw.cands) || draw.cands.length < 2) return null;
+  const sp = parseMove(String(draw.fig || '').replace(/^move /, ''));
+  if (!sp || sp.shapes.length || sp.pts.length !== 1 || sp.pts[0].k !== 'ㄱ') return null; // 판에 후보 점이 보이면 답을 흘린다
+  const from = { x: sp.pts[0].x, y: sp.pts[0].y };
+  if (draw.from[0] !== from.x || draw.from[1] !== from.y) return null;
+  const inGrid = (c) => /^[㉠-㉣]$/.test(c.k) && Number.isInteger(c.x) && Number.isInteger(c.y) && c.x >= 0 && c.y >= 0 && c.x <= sp.W && c.y <= sp.H;
+  if (!draw.cands.every(inGrid) || new Set(draw.cands.map((c) => c.k)).size !== draw.cands.length || new Set(draw.cands.map((c) => `${c.x},${c.y}`)).size !== draw.cands.length) return null;
+  const [tx, ty] = draw.target;
+  if (!draw.cands.some((c) => c.x === tx && c.y === ty)) return null;
+  const G = moveGeom(sp);
+  return { sp, G: { ...G, gridAt: G.ptAt }, from, target: { x: tx, y: ty }, cands: draw.cands };
+}
+/** 찍은 자리를 말로 — "점 ㄱ에서 오른쪽으로 3칸, 위쪽으로 2칸" (답한 뒤 화면·짐작한 답 글자) */
+export const mpointSay = (g, p) => { const w = mvWay(p.x - g.from.x, p.y - g.from.y); return w ? `점 ㄱ에서 ${w}` : '점 ㄱ 자리'; };
+/** 확인할 때 보낼 글자 — 후보 점이면 그 이름(㉡), 아니면 찍은 자리의 말 */
+export const mpointText = (g, p) => { const c = g.cands.find((z) => z.x === p.x && z.y === p.y); return c ? c.k : mpointSay(g, p); };
+/** 보낸 글자 → 찍은 자리 (mpointText의 거꾸로, 못 읽으면 null) */
+export function mpointFromText(g, text) {
+  const t = String(text);
+  const c = g.cands.find((z) => z.k === t);
+  if (c) return { x: c.x, y: c.y };
+  if (t === '점 ㄱ 자리') return { ...g.from };
+  const w = t.startsWith('점 ㄱ에서 ') ? mvWayOf(t.slice(6)) : null;
+  return w ? { x: g.from.x + w[0], y: g.from.y + w[1] } : null;
+}
+/** 찍은 점 + 출발점에서 가로 먼저·세로로 가는 점선 — "한 방향씩 차례로"가 눈에 보인다 (칸 수는 쓰지 않는다) */
+function mpointLayer(svg, g, p, cls) {
+  const { G, from } = g;
+  const grp = svgEl('g', { class: `draw-layer ${cls}` });
+  const o = { x: G.X(from.x), y: G.Y(from.y) };
+  const run = svgEl('line', { class: 'draw-seg', x1: o.x, y1: o.y, x2: o.x, y2: o.y });
+  const rise = svgEl('line', { class: 'draw-seg', x1: o.x, y1: o.y, x2: o.x, y2: o.y });
+  const dot = svgEl('circle', { class: 'draw-dot', cx: o.x, cy: o.y, r: 8 });
+  for (const e of [run, rise, dot]) grp.appendChild(e);
+  grp.set = (q) => {
+    for (const e of [run, rise, dot]) e.style.display = q ? '' : 'none';
+    if (!q) return;
+    const x = G.X(q.x); const y = G.Y(q.y);
+    run.setAttribute('x2', x);
+    rise.setAttribute('x1', x); rise.setAttribute('x2', x); rise.setAttribute('y2', y);
+    dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+  };
+  svg.appendChild(grp);
+  grp.set(p);
+  return grp;
+}
+/** 모눈점 찍기 판 한 벌 — drawBox가 mode 'mpoint'일 때 부른다. 확인 → onSubmit({text: 후보 이름(㉡) 또는 "점 ㄱ에서 …", at}) */
+function mpointBox(draw, hooks) {
+  const g = mpointOf(draw);
+  if (!g) return null;
+  const { G, sp } = g;
+  return pointBoard(draw, hooks, {
+    cls: 'is-mpoint', lead: '✍️ 점을 찍어요 — 모눈의 선이 만나는 곳을 눌러요', html: moveSvg(sp), G, fit: (svg) => enlarge(svg, G),
+    layer: (svg, p, cls) => mpointLayer(svg, g, p, cls),
+    say: () => '점을 찍었어요 — 맞으면 확인을 눌러요', // 칸 수는 답한 뒤에 (위 머리말)
+    start: () => g.from, // ◀▲▼▶를 처음 누르면 점 ㄱ에서 출발한다
+    clamp: (q) => ({ x: Math.min(sp.W, Math.max(0, q.x)), y: Math.min(sp.H, Math.max(0, q.y)) }),
+    step: [1, -1], // 모눈은 아래로 갈수록 y가 크다 — ▲는 한 칸 위
+    textOf: (p) => mpointText(g, p),
+  });
+}
+/** 답한 뒤 모눈점 판 — 후보 점 ㉠~㉣가 있는 원래 그림(풀이 카드가 이 이름으로 말한다) 위에 내가 찍은 점, 틀렸으면 맞는 자리(점선)까지 */
+function mpointAnswered(draw, text, ok) {
+  const g = mpointOf(draw);
+  const wrap = el('div', `math-draw is-answered is-grid is-mpoint ${ok ? 'ok' : 'no'}`);
+  const at = g ? mpointFromText(g, text) : null;
+  const cand = g ? g.cands.find((c) => c.k === text) : null;
+  const right = g ? g.cands.find((c) => c.x === g.target.x && c.y === g.target.y) : null;
+  if (g) {
+    const box = el('div', 'math-fig math-draw-fig');
+    box.innerHTML = moveSvg({ ...g.sp, pts: [...g.sp.pts, ...g.cands.map((c) => ({ k: c.k, x: c.x, y: c.y }))] });
+    const svg = box.querySelector('svg');
+    enlarge(svg, g.G);
+    if (at) mpointLayer(svg, g, at, ok ? 'is-ok' : 'is-no');
+    if (!ok) mpointLayer(svg, g, g.target, 'is-right');
+    wrap.appendChild(box);
+  }
+  const p = el('p', `math-pad-answered ${ok ? 'ok' : 'no'}`);
+  p.appendChild(document.createTextNode(at && g ? `✍️ 내가 찍은 점: ${cand ? `${cand.k} 자리 — ` : ''}${mpointSay(g, at)} ` : `✍️ 내 답: ${text} `));
+  p.appendChild(el('span', 'mark', ok ? '✔' : '✘'));
+  wrap.appendChild(p);
+  if (!ok && g && right) wrap.appendChild(el('p', 'math-draw-right', `점선이 맞는 자리 — ${right.k} (${mpointSay(g, g.target)})`));
+  return wrap;
+}
+
+// ───────────────────── 🔄 모눈 칸 칠하기 판 ─────────────────────
+
+const MV_SHAPE_BOARD = 5; // 모양만 칠하는 판 — 늘 5 × 5
+/** 칸 좌표 목록 ↔ 판 값 "x,y x,y …"(위 줄부터, 왼쪽부터) */
+const mvKey = (cs) => [...cs].sort((a, b) => a[1] - b[1] || a[0] - b[0]).map((c) => c.join(',')).join(' ');
+const mvCellsOfVal = (v) => (v ? String(v).split(' ').map((s) => s.split(',').map(Number)) : []);
+const mvNormCells = (cs) => { const x0 = Math.min(...cs.map((c) => c[0])); const y0 = Math.min(...cs.map((c) => c[1])); return cs.map(([x, y]) => [x - x0, y - y0]); };
+const mvShapeKey = (cs) => mvKey(mvNormCells(cs));
+/** 칸 모양 글("011/110" · "3.011110") → 칸 좌표 (왼쪽 위 x0, y0부터) */
+const mvGridCells = (g, x0 = 0, y0 = 0) => { const out = []; g.forEach((row, j) => row.forEach((on, i) => { if (on) out.push([x0 + i, y0 + j]); })); return out; };
+/** 칸 좌표 → "■■□ / □■■" (왼쪽 위로 붙여) */
+const mvRowsOf = (cs) => {
+  const n = mvNormCells(cs); const W = Math.max(...n.map((c) => c[0])) + 1; const H = Math.max(...n.map((c) => c[1])) + 1;
+  return Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) => (n.some((c) => c[0] === x && c[1] === y) ? '■' : '□')).join('')).join(' / ');
+};
+
+/** draw → { kind, sp(판 모눈), G, W, H, base(처음·나중 도형 — place만), cands [{k, v, cells}], target } (못 그리면 null) */
+export function mcellsOf(draw) {
+  if (!draw || draw.mode !== 'mcells' || !['place', 'shape'].includes(draw.kind) || !Array.isArray(draw.cands) || draw.cands.length < 2) return null;
+  if (!draw.cands.every((c) => c && /^[㉠-㉣]$/.test(c.k)) || new Set(draw.cands.map((c) => c.k)).size !== draw.cands.length) return null;
+  let sp; let base = null; let cands;
+  if (draw.kind === 'place') {
+    sp = parseMove(String(draw.fig || '').replace(/^move /, ''));
+    if (!sp || sp.shapes.length !== 1 || sp.pts.length || sp.cands.length) return null; // 판에 후보 도형이 보이면 답을 흘린다
+    const b = sp.shapes[0];
+    base = { k: b.k, cells: mvGridCells(b.g, b.x, b.y) };
+    cands = draw.cands.map((c) => { const m = /^(\d+),(\d+)=([0-9./]+)$/.exec(String(c.v)); const gg = m && mvCells(m[3]); return gg ? { k: c.k, v: c.v, cells: mvGridCells(gg, +m[1], +m[2]) } : null; });
+    if (cands.some((c) => !c || c.cells.some(([x, y]) => x >= sp.W || y >= sp.H))) return null;
+    if (new Set(cands.map((c) => mvKey(c.cells))).size !== cands.length) return null;
+  } else {
+    const fs = parseShapes(String(draw.fig || '').replace(/^shapes /, ''));
+    if (!fs || fs.items.length !== draw.cands.length) return null;
+    cands = draw.cands.map((c, n) => { const it = fs.items[n]; const gg = mvCells(c.v); return gg && it.g && it.k === c.k && mvKey(mvGridCells(it.g)) === mvKey(mvGridCells(gg)) ? { k: c.k, v: c.v, cells: mvGridCells(gg) } : null; });
+    if (cands.some((c) => !c || c.cells.some(([x, y]) => x >= MV_SHAPE_BOARD - 1 || y >= MV_SHAPE_BOARD - 1))) return null; // 4칸 이하 — 판에 한 칸 여유
+    if (new Set(cands.map((c) => mvShapeKey(c.cells))).size !== cands.length) return null;
+    sp = { W: MV_SHAPE_BOARD, H: MV_SHAPE_BOARD, cm: false, shapes: [], pts: [], cands: [] };
+  }
+  const target = cands.find((c) => c.v === draw.target);
+  return target ? { kind: draw.kind, sp, G: moveGeom(sp), W: sp.W, H: sp.H, base, cands, target } : null;
+}
+/** 칸 하나를 누르면 칠하고, 다시 누르면 지운다 — i 왼쪽부터, j 위에서부터 (판 밖이면 그대로). 순수 함수 — 테스트가 직접 누른다 */
+export function mcellsTap(g, v, i, j) {
+  if (!(i >= 0 && j >= 0 && i < g.W && j < g.H)) return v;
+  const cs = mvCellsOfVal(v);
+  const k = cs.findIndex(([x, y]) => x === i && y === j);
+  if (k >= 0) cs.splice(k, 1); else cs.push([i, j]);
+  return mvKey(cs);
+}
+/** 확인할 때 보낼 글자 — 후보와 같으면(자리까지 · 모양만) 그 이름(㉡), 아니면 칠한 것의 말 (빈 판이면 '') */
+export function mcellsText(g, v) {
+  const cs = mvCellsOfVal(v);
+  if (!cs.length) return '';
+  const hit = g.cands.find((c) => (g.kind === 'place' ? mvKey(c.cells) === mvKey(cs) : mvShapeKey(c.cells) === mvShapeKey(cs)));
+  if (hit) return hit.k;
+  if (g.kind === 'shape') return `칠한 모양 ${mvRowsOf(cs)}`;
+  // 자리 판: 처음(나중) 도형을 모양 그대로 옮긴 꼴이면 몇 칸 옮겼는지, 모양이 다르면 그 모양
+  if (mvShapeKey(cs) !== mvShapeKey(g.base.cells)) return `바뀐 모양 ${mvRowsOf(cs)}`;
+  const tl = (c) => [Math.min(...c.map((x) => x[0])), Math.min(...c.map((x) => x[1]))];
+  const [bx, by] = tl(g.base.cells); const [x, y] = tl(cs);
+  const w = mvWay(x - bx, y - by);
+  return w ? `${w} 옮김` : `${g.base.k} 도형 자리 그대로`;
+}
+/** 보낸 글자 → 칠한 칸 (mcellsText의 거꾸로 — 모양만 아는 글자는 왼쪽 위에 붙여서, 못 읽으면 null) */
+export function mcellsFromText(g, text) {
+  const t = String(text);
+  const c = g.cands.find((z) => z.k === t);
+  if (c) return c.cells;
+  if (g.kind === 'place') {
+    if (t === `${g.base.k} 도형 자리 그대로`) return g.base.cells;
+    const w = t.endsWith(' 옮김') ? mvWayOf(t.slice(0, -3)) : null;
+    if (w) return g.base.cells.map(([x, y]) => [x + w[0], y + w[1]]);
+  }
+  const m = /^(?:칠한|바뀐) 모양 ([■□]+(?: \/ [■□]+)*)$/.exec(t);
+  if (!m) return null;
+  const out = [];
+  m[1].split(' / ').forEach((row, y) => [...row].forEach((ch, x) => { if (ch === '■') out.push([x, y]); }));
+  return out.length ? out : null;
+}
+/** 칠한 칸 층 — rect.draw-cell.is-on (g.G의 자로) */
+function mcellsLayer(svg, g, cells, cls) {
+  const grp = svgEl('g', { class: `draw-layer ${cls}` });
+  grp.set = (cs) => {
+    while (grp.firstChild) grp.removeChild(grp.firstChild);
+    for (const [x, y] of cs) grp.appendChild(svgEl('rect', { class: 'draw-cell is-on', 'data-i': x, 'data-j': y, x: g.G.X(x), y: g.G.Y(y), width: g.G.C, height: g.G.C }));
+  };
+  svg.appendChild(grp);
+  grp.set(cells);
+  return grp;
+}
+/** 모눈 칸 칠하기 판 한 벌 — drawBox가 mode 'mcells'일 때 부른다. 확인 → onSubmit({text: 후보 이름(㉡) 또는 "오른쪽으로 5칸 옮김"·"칠한 모양 …"}) */
+function mcellsBox(draw, { onSubmit, onIdk }) {
+  const g = mcellsOf(draw);
+  if (!g) return null;
+  // 확인 전에 칠해 둔 칸 — 🎒·📊에 다녀와 판을 다시 그려도 그대로 (다른 판의 pending과 같은 자리)
+  const okPending = (v) => typeof v === 'string' && (v === '' || v.split(' ').every((s) => { const m = /^(\d+),(\d+)$/.exec(s); return m && +m[1] < g.W && +m[2] < g.H; }));
+  let v = okPending(draw.pending) ? draw.pending : '';
+  let done = false;
+
+  const wrap = el('div', 'math-draw is-paint is-move');
+  wrap.appendChild(el('p', 'math-pad-lead', g.kind === 'place' ? '✍️ 도형을 모눈에 칠해요 — 칸을 누르면 칠하고, 다시 누르면 지워요' : '✍️ 모양을 칠해요 — 칸을 누르면 칠하고, 다시 누르면 지워요 (판의 어느 자리든 괜찮아요)'));
+  const box = el('div', 'math-fig math-draw-fig');
+  box.innerHTML = moveSvg(g.sp);
+  const svg = box.querySelector('svg');
+  enlarge(svg, g.G);
+  const lay = mcellsLayer(svg, g, mvCellsOfVal(v), 'is-live');
+  wrap.appendChild(box);
+  const say = el('p', 'math-draw-say');
+  wrap.appendChild(say);
+
+  const tools = el('div', 'math-draw-nudge is-grid');
+  const clear = el('button', 'btn math-draw-step', '↺ 다 지우기');
+  clear.type = 'button';
+  clear.addEventListener('click', () => { if (done) return; set(''); });
+  tools.appendChild(clear);
+  wrap.appendChild(tools);
+
+  const row = el('div', 'math-pad-actions');
+  const ok = el('button', 'btn btn-primary btn-big-wide math-pad-ok', '확인');
+  ok.type = 'button';
+  ok.addEventListener('click', () => {
+    if (done || !v) return;
+    done = true;
+    paint();
+    onSubmit({ text: mcellsText(g, v), val: null });
+  });
+  const idk = el('button', 'btn math-pad-idk', '🤷 모르겠어요');
+  idk.type = 'button';
+  idk.addEventListener('click', () => { if (done) return; done = true; paint(); onIdk(); });
+  row.appendChild(ok);
+  row.appendChild(idk);
+  wrap.appendChild(row);
+
+  function set(nv) { v = nv; draw.pending = v; paint(); }
+  svg.addEventListener('pointerdown', (e) => {
+    if (done) return;
+    const m = svg.getScreenCTM();
+    if (!m) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    const u = pt.matrixTransform(m.inverse());
+    const c = g.G.cellAt(u.x, u.y);
+    if (!c) return;
+    e.preventDefault();
+    set(mcellsTap(g, v, c.i, c.j));
+  });
+
+  function paint() {
+    const n = mvCellsOfVal(v).length;
+    lay.set(mvCellsOfVal(v));
+    say.textContent = n ? `칠한 칸 ${n}개` : '아직 안 칠했어요';
+    say.classList.toggle('is-empty', !n);
+    clear.disabled = done || !n;
+    ok.disabled = done || !n;
+    idk.disabled = done;
+    wrap.classList.toggle('is-done', done);
+    svg.classList.toggle('is-drawable', !done);
+  }
+  paint();
+  return wrap;
+}
+/** 모양 하나만 작은 모눈에 — 답한 뒤 "내가 칠한 모양 · 맞는 모양" */
+function mvShapeFig(cells, cls) {
+  const n = mvNormCells(cells);
+  const sp = { W: Math.max(2, Math.max(...n.map((c) => c[0])) + 1), H: Math.max(2, Math.max(...n.map((c) => c[1])) + 1), cm: false, shapes: [], pts: [], cands: [] };
+  const box = el('div');
+  box.innerHTML = moveSvg(sp);
+  const svg = box.querySelector('svg');
+  mcellsLayer(svg, { G: moveGeom(sp) }, n, cls);
+  return svg;
+}
+/**
+ * 답한 뒤 칸 칠하기 판 — 후보 ㉠~㉣ 그림(풀이 카드가 이 이름으로 말한다. 판에서는 못 봤다) + 내가 칠한 것 + 틀렸으면 맞는 것.
+ * place는 한 모눈에(처음·나중 도형 · 내 칸 · 맞는 칸 점선), shape는 모양 둘을 나란히. text는 ㉡·"오른쪽으로 5칸 옮김"·"칠한 모양 …"·"모르겠어요"
+ */
+function mcellsAnswered(draw, text, ok) {
+  const g = mcellsOf(draw);
+  const wrap = el('div', `math-draw is-answered is-paint is-move ${ok ? 'ok' : 'no'}`);
+  const cand = g ? g.cands.find((c) => c.k === text) : null;
+  // 칠한 칸은 판에 남은 값이 보낸 글자와 같으면 그 자리 그대로(모양이 바뀐 도형도 칠한 자리에), 아니면 글자에서
+  const pend = g && typeof draw.pending === 'string' && draw.pending && mcellsText(g, draw.pending) === text ? mvCellsOfVal(draw.pending) : null;
+  const mine = !g ? null : cand ? cand.cells : pend || mcellsFromText(g, text);
+  const noun = g && g.kind === 'place' ? '도형' : '모양';
+  if (g) {
+    const fig = el('div', 'math-fig math-draw-fig');
+    const b0 = g.sp.shapes[0];
+    fig.innerHTML = figureSvg(g.kind === 'place' ? `move ${g.W}x${g.H} ${b0.k}@${b0.x},${b0.y}=${b0.v} ${g.cands.map((c) => `${c.k}@${c.v}`).join(' ')}` : draw.fig);
+    wrap.appendChild(fig);
+    if (g.kind === 'place') {
+      const b = el('div', 'math-fig math-draw-fig');
+      b.innerHTML = moveSvg(g.sp);
+      const svg = b.querySelector('svg');
+      const placed = cand || pend || !/^바뀐 모양 /.test(text); // 글자로만 아는 "바뀐 모양"은 자리를 몰라 모눈에 안 얹는다
+      if (mine && placed) mcellsLayer(svg, g, mine, ok ? 'is-ok' : 'is-no');
+      if (!ok) mcellsLayer(svg, g, g.target.cells, 'is-right');
+      wrap.appendChild(b);
+    } else {
+      const pair = el('div', 'math-paint-pair');
+      const one = (cells, cls, cap) => { const f = el('figure', 'math-draw-fig'); f.appendChild(mvShapeFig(cells, cls)); f.appendChild(el('figcaption', '', cap)); pair.appendChild(f); };
+      if (mine) one(mine, ok ? 'is-ok' : 'is-no', '내가 칠한 모양');
+      if (!ok) one(g.target.cells, 'is-right', `맞는 모양 ${g.target.k}`);
+      wrap.appendChild(pair);
+    }
+  }
+  const p = el('p', `math-pad-answered ${ok ? 'ok' : 'no'}`);
+  p.appendChild(document.createTextNode(mine && g ? `✍️ 내가 칠한 ${noun}: ${cand ? `${cand.k}과 같아요` : text} ` : `✍️ 내 답: ${text} `));
+  p.appendChild(el('span', 'mark', ok ? '✔' : '✘'));
+  wrap.appendChild(p);
+  if (!ok && g) wrap.appendChild(el('p', 'math-draw-right', g.kind === 'place' ? `점선이 맞는 자리 — ${g.target.k}` : `맞는 모양 — ${g.target.k}`));
+  return wrap;
+}
+
 /** 칸 수를 말로 — 막대 "3칸" · 점 "물결선 위 첫 눈금에서 4칸 위" / "0에서 4칸 위" */
 function cellsSay(mode, G, k) {
   if (mode === 'bar') return `막대 ${k}칸`;
@@ -592,6 +907,8 @@ export function drawBox(draw, { onSubmit, onIdk }) {
   if (draw && draw.mode === 'grid') return gridBox(draw, { onSubmit, onIdk });
   if (draw && draw.mode === 'plane') return planeBox(draw, { onSubmit, onIdk });
   if (draw && draw.mode === 'cells') return paintBox(draw, { onSubmit, onIdk });
+  if (draw && draw.mode === 'mpoint') return mpointBox(draw, { onSubmit, onIdk });
+  if (draw && draw.mode === 'mcells') return mcellsBox(draw, { onSubmit, onIdk });
   const g = geomOf(draw);
   if (!g) return null;
   g.target = draw.target;
@@ -697,6 +1014,8 @@ export function drawAnswered(draw, text, ok, okK) {
   if (draw && draw.mode === 'grid') return gridAnswered(draw, text, ok);
   if (draw && draw.mode === 'plane') return planeAnswered(draw, text, ok);
   if (draw && draw.mode === 'cells') return paintAnswered(draw, text, ok);
+  if (draw && draw.mode === 'mpoint') return mpointAnswered(draw, text, ok);
+  if (draw && draw.mode === 'mcells') return mcellsAnswered(draw, text, ok);
   const g = geomOf(draw);
   const wrap = el('div', `math-draw is-answered ${ok ? 'ok' : 'no'}`);
   const k = /^\d+$/.test(String(text)) ? Number(text) : null;

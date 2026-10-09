@@ -528,6 +528,8 @@ button { font-family: inherit; }
 .math-paint-pair figure { margin: 0; flex-direction: column; align-items: center; }
 .math-paint-pair figcaption { font-size: .9rem; font-weight: 700; margin-top: 2px; }
 .math-draw.is-paint .math-pad-answered, .math-draw.is-paint .math-draw-right { word-break: keep-all; } /* "3층"이 "3 / 층"으로 갈리지 않게 */
+/* 🔄 AB 모눈 칸 칠하기 판 — 칠한 칸은 주황(판에 있는 처음·나중 도형의 파랑과 헷갈리지 않게) */
+.math-draw.is-move .math-draw-fig .draw-layer.is-live .draw-cell.is-on { fill: var(--frac-fill2, #f59e0b); fill-opacity: .75; }
 .math-feedback { margin-top: 12px; }
 .math-fb { font-size: 1.05rem; font-weight: 700; margin: 4px 0 6px; line-height: 1.6; }
 .math-fb.ok { color: #047857; }

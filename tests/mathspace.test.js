@@ -1103,7 +1103,7 @@ test('✍️ 칸 칠하기 판 (3단계 · S1·S5 v195): 판 크기는 칸마다
   assert.equal(canDraw({ mode: 'cells', kind: 'side', fig: 'views ㉠=1 ㉡=2', cands: [{ k: '㉠', v: '1' }, { k: '㉡', v: '2' }], target: '1' }), true, '같은 값, 맞는 종류면 연다');
   // 화면 배선 — 문항·🔁 쌍둥이 둘 다 판을 연다(숫자판 없이도), 칠한 글자로 보기를 찾는다, 문제 글에서는 후보 그림만 빼고 "칸을 칠해 보세요"
   const src = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(q\.draw && \(q\.draw\.mode === 'grid' \|\| q\.draw\.mode === 'plane' \|\| q\.draw\.mode === 'cells'\)\) return done !== 'choice' && \(done === 'typed' \|\| padOn\(\)\) && ui\.round && ui\.round\.mode !== 'special' && canDraw\(q\.draw\)/);
+  assert.match(src, /if \(q\.draw && \(q\.draw\.mode === 'grid' \|\| q\.draw\.mode === 'plane' \|\| q\.draw\.mode === 'cells'(?: \|\| q\.draw\.mode === '\w+')*\)\) return done !== 'choice' && \(done === 'typed' \|\| padOn\(\)\) && ui\.round && ui\.round\.mode !== 'special' && canDraw\(q\.draw\)/);
   assert.ok(src.includes("if (draw.mode === 'cells') return String(q.q).split(`[${draw.fig}]`).join('').replace('본 모양은 어느 것일까요?', '보면 어떤 모양일까요? 칸을 칠해 보세요.')"), 'qTextOf 칸 칠하기');
   assert.match(src, /const res = spec \? matchTyped\(q, typed, spec\) : \{ i: q\.choices\.findIndex\(\(c\) => c\.text === typed\.text\) \};/);
   const q1 = qOf('spc.view', 'calc', 1);

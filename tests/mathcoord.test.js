@@ -1031,7 +1031,7 @@ test('✍️ 좌표평면 판 (3단계): 판에는 후보가 없고 범위는 �
   ]) assert.equal(canDraw(bad), false, JSON.stringify(bad));
   // 화면 배선 — 문항·🔁 쌍둥이 둘 다 판을 연다(숫자판 없이도), 찍은 글자로 보기를 찾는다, 문제 글에서는 후보 있는 좌표평면을 빼고 "어디일까요?"
   const src = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(q\.draw && \(q\.draw\.mode === 'grid' \|\| q\.draw\.mode === 'plane' \|\| q\.draw\.mode === 'cells'\)\) return done !== 'choice' && \(done === 'typed' \|\| padOn\(\)\) && ui\.round && ui\.round\.mode !== 'special' && canDraw\(q\.draw\)/);
+  assert.match(src, /if \(q\.draw && \(q\.draw\.mode === 'grid' \|\| q\.draw\.mode === 'plane' \|\| q\.draw\.mode === 'cells'(?: \|\| q\.draw\.mode === '\w+')*\)\) return done !== 'choice' && \(done === 'typed' \|\| padOn\(\)\) && ui\.round && ui\.round\.mode !== 'special' && canDraw\(q\.draw\)/);
   assert.match(src, /if \(draw\.mode === 'plane'\) return String\(q\.q\)\.replace\(\/\\\[plane \[\^\\\]\]\+\\\]\/g, \(d\) => \(d\.startsWith\(`\[\$\{draw\.fig\} `\) \? '' : d\)\)\.replace\('어느 것일까요\?', '어디일까요\?'\)/);
   assert.match(src, /const res = spec \? matchTyped\(q, typed, spec\) : \{ i: q\.choices\.findIndex\(\(c\) => c\.text === typed\.text\) \};/);
   // 문제 글: 좌표평면 지시문은 하나뿐이고 판의 그림으로 시작한다(빼고 나면 그림이 안 남는다) · "어느 것일까요?"가 한 번

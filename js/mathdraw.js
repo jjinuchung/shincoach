@@ -2515,6 +2515,9 @@ export function figureSvg(spec) {
   if ((m = /^vmul (.+)$/.exec(s))) { const sp = parseVmul(m[1]); return sp ? vmulSvg(sp) : ''; } // ✖️ AA 곱셈 세로셈
   if ((m = /^vdiv (.+)$/.exec(s))) { const sp = parseVdiv(m[1]); return sp ? vdivSvg(sp) : ''; } // ➗ AA 나눗셈 세로셈
   if ((m = /^plane (.+)$/.exec(s))) { const sp = parsePlane(m[1]); return sp ? planeSvg(sp) : ''; } // 📈 R 좌표평면
+  if ((m = /^move (.+)$/.exec(s))) { const sp = parseMove(m[1]); return sp ? moveSvg(sp) : ''; } // 🔄 AB 모눈 위 칸 도형·모눈점
+  if ((m = /^shapes (.+)$/.exec(s))) { const sp = parseShapes(m[1]); return sp ? shapesSvg(sp) : ''; } // 🔄 AB 모양 나란히
+  if ((m = /^seg (.+)$/.exec(s))) { const sp = parseSeg(m[1]); return sp ? segSvg(sp) : ''; } // 🔄 AB 디지털 숫자
   if ((m = /^stack (.+)$/.exec(s))) { const sp = parseStackFig(m[1]); return sp ? stackSvg(sp) : ''; } // 🧊 S 쌓은 모양
   if ((m = /^stacks (.+)$/.exec(s))) { const sp = parseStacks(m[1]); return sp ? stacksSvg(sp) : ''; } // 🧊 S 쌓은 모양 후보
   if ((m = /^views (.+)$/.exec(s))) { const sp = parseViews(m[1]); return sp ? viewsSvg(sp) : ''; } // 🧊 S 위·앞·옆에서 본 모양
@@ -2616,6 +2619,7 @@ export function figText(text, short = false) {
     .replace(/\[fan ([^\]]+)\]/g, (all, arg) => { const sp = parseFan(arg); return !sp ? all : short ? '(각 그림)' : `(${fanText(sp)})`; })
     .replace(/\[prot ([^\]]+)\]/g, (all, arg) => { const sp = parseProt(arg); return !sp ? all : short ? '(각도기)' : `(${protText(sp)})`; })
     .replace(/\[plane ([^\]]+)\]/g, (all, arg) => { const sp = parsePlane(arg); return !sp ? all : short ? '(좌표평면)' : `(${planeText(sp)})`; })
+    .replace(/\[(move|shapes|seg) ([^\]]+)\]/g, (all, kind, arg) => { const t = moveFigText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(stack|stacks|views|top|layers) ([^\]]+)\]/g, (all, kind, arg) => { const tx = spaceText(kind, arg); return !tx ? all : short ? '(쌓기나무)' : `(${tx})`; })
     .replace(/\[(rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad) ([^\]]+)\]/g, (all, kind, arg) => { const t = shapeText(kind, arg); return !t ? all : short ? '(그림)' : `(${t})`; })
     .replace(/\[(bgraph|lgraph|band|pie) ([^\]]+)\]/g, (all, kind, arg) => { const t = chartText(kind, arg); return !t ? all : short ? '(그래프)' : `(${t})`; });
@@ -2656,7 +2660,7 @@ function shapeText(kind, arg) {
 
 /** 글 속 `[bar 7/8]` `[walk 2 -3]` 지시문을 SVG로 바꾼다 (화면·검수 페이지가 같이 쓴다) */
 export function renderFigures(text) {
-  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|place|vmul|vdiv|ang|fan|prot|plane|stack|stacks|views|top|layers) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
+  return String(text || '').replace(/\[(bar|pizza|bars|line|vline|walk|steps|table|rect|reg|para|tri|rhom|trap|lshape|grid|gpoly|lines|tris|tria|quad|bgraph|lgraph|band|pie|range|sym|circle|cuboid|net|prism|pyramid|cyl|cone|sphere|spin|pnet|cnet|scale|fbar|fmul|fsub|dmul|ddiv|place|vmul|vdiv|ang|fan|prot|plane|stack|stacks|views|top|layers|move|shapes|seg) ([^\]]+)\]/g, (_, kind, arg) => figureSvg(`${kind} ${arg}`));
 }
 
 // ───────────────────── 🟰 Q 일차방정식 — 저울 (2026-10-03) ─────────────────────
@@ -4195,4 +4199,249 @@ export function shadeWidget({ d, onChange }) {
   });
   paint();
   return { el: wrap, count, set: (k) => { for (let i = 0; i < d; i++) on[i] = i < k; paint(); }, lock: () => { locked = true; cells.forEach((c) => { c.style.cursor = 'default'; }); } };
+}
+
+// ───────────────────── 🔄 AB 평면도형의 이동: 모눈 위 칸 도형·모눈점 · 모양 나란히 · 디지털 숫자 (2026-10-09) ─────────────────────
+// 도형은 모눈 칸으로 만든 모양 — 줄을 "/"로 잇고 1이 칠한 칸 ("011/110/010", 첫 줄이 위쪽). 칸 모양이라 밀기·뒤집기·돌리기를
+// 칸으로 셀 수 있고, 아이가 ✍️ 칸 칠하기 판에 그대로 칠할 수 있다.
+// `[move 9x5 처음@1,1=011/110/010 나중@5,1=011/110/010 cm]` — 모눈(가로 9칸 · 세로 5칸) 위 도형. x,y = 도형의 왼쪽 위 칸(위에서부터 셈)
+//    이름: 처음·나중·가~라는 도형, cm = 왼쪽 아래 칸에 "1 cm" 눈금
+// `[move 7x5 ㄱ@1,4 ㉮@4,2]` — 모눈점(선이 만나는 점, 0~가로 · 0~세로, 위에서부터 셈) · ㄱ~ㅎ 점 · ㉮㉯ 도착할 곳 · ㉠~㉣ 후보 점 · ★ 아이가 찍은 점
+// `[move 9x4 처음@1,1=110/011 ㉠@5,1=110/011 ㉡@… ㉢@… ㉣@…]` — 후보 도형(㉠~㉣=모양)이 있으면 후보마다 작은 모눈에
+//    처음 도형(흐리게)과 그 후보를 함께 — 밀기 결과 고르기
+// `[shapes 처음=011/110/010 ㉠=… ㉡=… 4=?]` — 이름 붙은 모양을 같은 크기 칸에 나란히(? = 빈칸) · 무늬는 1~6번 칸
+// `[seg 258]` — 디지털 숫자 카드(일곱 막대)
+// ★ 테스트가 그린 SVG에서 칸·점·모양을 다시 읽는다 (data-k·data-x·data-y·data-v)
+
+const MV_SHAPE_NAMES = ['처음', '나중', '가', '나', '다', '라'];
+const MV_CAND = ['㉠', '㉡', '㉢', '㉣'];
+const MV_POINT_NAMES = /^[ㄱ-ㅎ㉮㉯㉠-㉣★]$/u;
+
+/**
+ * 칸 모양 글 → [[0,1,1],[1,1,0]] (못 읽으면 null) — 5 × 5까지, 칠한 칸 하나 이상, 맨 위·아래 줄과 맨 왼쪽·오른쪽 칸에 칠한 칸이 있다(빈 테두리 없음)
+ * 두 꼴: "011/110"(줄을 /로 — 사람이 쓰기 좋다) · "3.011110"(가로 칸 수.칸들 — 생성기가 쓴다: 🔁 쌍둥이 열쇠는 숫자만 #로 지워서
+ * 줄 수가 다른 모양이면 같은 틀도 열쇠가 갈린다. 이 꼴은 모양이 무엇이든 "#.#")
+ */
+export function mvCells(v) {
+  let s = String(v || '');
+  const c = /^([1-5])\.([01]{1,25})$/.exec(s);
+  if (c) {
+    const w = +c[1];
+    if (c[2].length % w) return null;
+    s = c[2].match(new RegExp(`.{${w}}`, 'g')).join('/');
+  }
+  if (!/^[01]{1,5}(\/[01]{1,5}){0,4}$/.test(s)) return null;
+  const g = s.split('/').map((r) => [...r].map(Number));
+  if (g.some((r) => r.length !== g[0].length)) return null;
+  if (!g[0].some(Boolean) || !g[g.length - 1].some(Boolean)) return null;
+  if (!g.some((r) => r[0]) || !g.some((r) => r[r.length - 1])) return null;
+  return g;
+}
+
+/** `[move …]` 인자 → { W, H, cm, shapes:[{k,x,y,v,g}], pts:[{k,x,y}], cands:[{k,x,y,v,g}] } (말이 안 되면 null) */
+export function parseMove(arg) {
+  const t = String(arg || '').trim().split(/\s+/);
+  const m = /^(\d+)x(\d+)$/.exec(t[0] || '');
+  if (!m) return null;
+  const out = { W: +m[1], H: +m[2], cm: false, shapes: [], pts: [], cands: [] };
+  if (out.W < 2 || out.W > 14 || out.H < 2 || out.H > 14) return null;
+  const used = new Set();
+  for (const s of t.slice(1)) {
+    let q;
+    if (s === 'cm') { out.cm = true; continue; }
+    if ((q = /^(.+?)@(\d+),(\d+)=([0-9./]+)$/u.exec(s))) {
+      const [, k, x, y, v] = q; const g = mvCells(v);
+      if (!g || used.has(k)) return null;
+      const it = { k, x: +x, y: +y, v, g };
+      if (it.x + g[0].length > out.W || it.y + g.length > out.H) return null;
+      if (MV_CAND.includes(k)) out.cands.push(it);
+      else if (MV_SHAPE_NAMES.includes(k)) out.shapes.push(it);
+      else return null;
+      used.add(k);
+      continue;
+    }
+    if ((q = /^(.)@(\d+),(\d+)$/u.exec(s))) {
+      const [, k, x, y] = q;
+      if (!MV_POINT_NAMES.test(k) || used.has(k) || +x > out.W || +y > out.H) return null;
+      out.pts.push({ k, x: +x, y: +y });
+      used.add(k);
+      continue;
+    }
+    return null;
+  }
+  if (!out.shapes.length && !out.pts.length) return null;
+  if (out.cands.length && (out.cands.length < 2 || out.shapes.length !== 1 || out.pts.length)) return null; // 후보 그림은 처음 도형 하나와 후보만
+  return out;
+}
+
+/** 모눈 자 — 그림(moveSvg)과 ✍️ 판(drawview)이 같은 자를 써야 누른 자리가 본 자리다. C = 한 칸(px), X(i)·Y(j) = 칸 경계선 자리 */
+export function moveGeom(sp, maxW = 330) {
+  const C = Math.max(16, Math.min(34, Math.floor(maxW / Math.max(sp.W, sp.H * 1.2))));
+  const pad = 24;
+  const X = (i) => pad + i * C; const Y = (j) => pad + j * C;
+  const W = Math.round(sp.W * C + pad * 2); const H = Math.round(sp.H * C + pad * 2 + (sp.cm ? 14 : 0));
+  /** 그림 좌표(px) → 칸 (모눈 밖이면 null) */
+  const cellAt = (px, py) => { const i = Math.floor((px - pad) / C); const j = Math.floor((py - pad) / C); return i >= 0 && j >= 0 && i < sp.W && j < sp.H ? { i, j } : null; };
+  /** 그림 좌표(px) → 가장 가까운 모눈점 */
+  const ptAt = (px, py) => ({ x: Math.min(sp.W, Math.max(0, Math.round((px - pad) / C))), y: Math.min(sp.H, Math.max(0, Math.round((py - pad) / C))) });
+  return { C, pad, X, Y, W, H, cellAt, ptAt };
+}
+
+/** 모눈 하나 — 선·도형·점 (ox,oy = 이 모눈의 왼쪽 위, G = moveGeom) */
+function mvGrid(sp, G, { shapes = sp.shapes, faint = [], pts = sp.pts, cm = sp.cm, tags = true } = {}) {
+  const { C, X, Y } = G;
+  let g = '';
+  for (let i = 0; i <= sp.W; i++) g += `<line x1="${cf(X(i))}" y1="${cf(Y(0))}" x2="${cf(X(i))}" y2="${cf(Y(sp.H))}" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"/>`;
+  for (let j = 0; j <= sp.H; j++) g += `<line x1="${cf(X(0))}" y1="${cf(Y(j))}" x2="${cf(X(sp.W))}" y2="${cf(Y(j))}" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"/>`;
+  const shape = (it, cls, color, op, dash) => {
+    let s = `<g class="${cls}" data-k="${it.k}" data-x="${it.x}" data-y="${it.y}" data-v="${mvNorm(it.g)}">`;
+    it.g.forEach((row, r) => row.forEach((on, c) => {
+      if (on) s += `<rect class="mv-cell" data-i="${it.x + c}" data-j="${it.y + r}" x="${cf(X(it.x + c))}" y="${cf(Y(it.y + r))}" width="${C}" height="${C}" fill="${color}" fill-opacity="${op}" stroke="currentColor" stroke-width="${dash ? 1 : 1.6}"${dash ? ' stroke-dasharray="3 3" stroke-opacity="0.6"' : ''}/>`;
+    }));
+    return `${s}</g>`;
+  };
+  for (const it of faint) g += shape(it, 'mv-base', FILL, 0.12, true);
+  shapes.forEach((it, n) => { g += shape(it, 'mv-shape', n && it.k !== '처음' ? FILL2 : FILL, 0.38, false); });
+  // 도형 이름표 — 맨 위 칸 바로 위 (맨 위 줄이면 모눈 위 여백). 두 도형이 한 모눈에 있을 때 색만으로 고르지 않게 · 후보 모눈은 이름이 모눈 머리에 있다(tags false)
+  if (tags && (shapes.length > 1 || shapes.some((it) => it.k !== '처음'))) {
+    for (const it of shapes) {
+      const first = it.g[0].indexOf(1);
+      const tx = X(it.x + first) + 2; const ty = Y(it.y) - 5;
+      g += `<text class="mv-tag" data-k="${it.k}" x="${cf(tx)}" y="${cf(ty)}" font-size="13" font-weight="700" fill="currentColor">${it.k}</text>`;
+    }
+  }
+  // 점 이름표 자리 — 오른쪽 위 → 왼쪽 위 → 오른쪽 아래 → 왼쪽 아래 중 그림 안이고 다른 점·이름표·1 cm 자와 안 겹치는 첫 자리
+  // (전에는 맨 윗줄이면 아래에 달아 바로 아래 점의 이름표와 겹쳤다 — 원고 검수 페이지 AB1-1, 2026-10-10)
+  const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+  const nameBox = ([x, y]) => [x, y - 13, x + 15, y + 3];
+  const taken = pts.map((p) => [X(p.x) - 7, Y(p.y) - 7, X(p.x) + 7, Y(p.y) + 7]);
+  if (cm) taken.push([X(0) - 2, Y(sp.H) + 4, X(1) + 44, Y(sp.H) + 20]);
+  for (const p of pts) {
+    const cx = X(p.x); const cy = Y(p.y);
+    if (/[ㄱ-ㅎ]/.test(p.k)) g += `<circle class="mv-pt" data-k="${p.k}" data-x="${p.x}" data-y="${p.y}" cx="${cf(cx)}" cy="${cf(cy)}" r="6" fill="${FILL}" stroke="currentColor" stroke-width="1.2"/>`;
+    else if (p.k === '★') g += `<circle class="mv-pt" data-k="★" data-x="${p.x}" data-y="${p.y}" cx="${cf(cx)}" cy="${cf(cy)}" r="6.5" fill="${FILL2}" stroke="currentColor" stroke-width="1.2"/>`;
+    else g += `<circle class="mv-pt" data-k="${p.k}" data-x="${p.x}" data-y="${p.y}" cx="${cf(cx)}" cy="${cf(cy)}" r="6.5" fill="#fff" stroke="${/[㉮㉯]/.test(p.k) ? FILL2 : FILL}" stroke-width="2.6"/>`;
+    const spots = [[cx + 9, cy - 7], [cx - 24, cy - 7], [cx + 9, cy + 19], [cx - 24, cy + 19]];
+    const fits = (s) => { const b = nameBox(s); return b[0] >= 0 && b[1] >= 0 && b[2] <= G.W && b[3] <= G.H && !taken.some((t) => hit(b, t)); };
+    const [lx, ly] = spots.find(fits) || spots[0];
+    taken.push(nameBox([lx, ly]));
+    g +=`<text class="mv-name" data-k="${p.k}" x="${cf(lx)}" y="${cf(ly)}" font-size="15" font-weight="700" fill="currentColor">${p.k}</text>`;
+  }
+  if (cm) {
+    const y = Y(sp.H) + 12;
+    g += `<line x1="${cf(X(0))}" y1="${cf(y)}" x2="${cf(X(1))}" y2="${cf(y)}" stroke="currentColor" stroke-width="1.6"/><line x1="${cf(X(0))}" y1="${cf(y - 4)}" x2="${cf(X(0))}" y2="${cf(y + 4)}" stroke="currentColor" stroke-width="1.6"/><line x1="${cf(X(1))}" y1="${cf(y - 4)}" x2="${cf(X(1))}" y2="${cf(y + 4)}" stroke="currentColor" stroke-width="1.6"/>`;
+    g += `<text x="${cf(X(1) + 6)}" y="${cf(y + 5)}" font-size="13" fill="currentColor">1 cm</text>`;
+  }
+  return g;
+}
+
+/** 🔄 그리기 — 모눈 하나, 또는 후보(㉠~㉣)마다 작은 모눈(처음 도형은 흐리게) */
+export function moveSvg(sp) {
+  if (!sp.cands.length) {
+    const G = moveGeom(sp);
+    return `<svg class="frac-fig move-fig" viewBox="0 0 ${G.W} ${G.H}" width="${Math.round(G.W * 1.1)}" height="${Math.round(G.H * 1.1)}" role="img" aria-label="${esc(moveText(sp))}">${mvGrid(sp, G)}</svg>`;
+  }
+  // 후보 모눈이 넓으면(가로로 미는 문항) 한 줄에 하나 — 둘씩 놓으면 폰 폭에서 칸이 너무 작아진다
+  const G = moveGeom(sp, sp.W > sp.H ? 280 : 190);
+  const pw = G.W + 8; const ph = G.H + 14; const cols = pw * 2 <= 440 ? 2 : 1;
+  let out = '';
+  sp.cands.forEach((c, n) => {
+    const ox = (n % cols) * pw; const oy = Math.floor(n / cols) * ph;
+    out += `<g class="mv-panel" data-k="${c.k}" transform="translate(${ox} ${oy})">`;
+    out += `<text x="4" y="18" font-size="18" font-weight="700" fill="currentColor">${c.k}</text>`;
+    out += mvGrid(sp, G, { shapes: [{ ...c }], faint: sp.shapes, pts: [], cm: false, tags: false });
+    out += '</g>';
+  });
+  const rows = Math.ceil(sp.cands.length / cols);
+  const Wd = cols * pw; const Ht = rows * ph;
+  return `<svg class="frac-fig move-fig move-cands" viewBox="0 0 ${Wd} ${Ht}" width="${Math.round(Wd * 1.1)}" height="${Math.round(Ht * 1.1)}" role="img" aria-label="${esc(moveText(sp))}">${out}</svg>`;
+}
+/** 칸 모양 → "011/110" (두 꼴 모두 같은 글로) */
+export const mvNorm = (g) => g.map((r) => r.join('')).join('/');
+/** 칸 모양을 글로 — "■■□ / □■■" (두 꼴 모두) */
+export const mvRows = (v) => { const g = mvCells(v); return g ? g.map((r) => r.map((x) => (x ? '■' : '□')).join('')).join(' / ') : ''; };
+const moveText = (sp) => {
+  const parts = [`모눈 가로 ${sp.W}칸 · 세로 ${sp.H}칸${sp.cm ? '(한 칸 1 cm)' : ''}`];
+  for (const s of sp.shapes) parts.push(`${s.k === '처음' ? '처음 도형' : s.k === '나중' ? '움직인 도형' : `도형 ${s.k}`}: 왼쪽에서 ${s.x}칸 · 위에서 ${s.y}칸 떨어진 곳부터 ${mvRows(s.v)}`);
+  for (const c of sp.cands) parts.push(`${c.k}: 왼쪽에서 ${c.x}칸 · 위에서 ${c.y}칸 떨어진 곳부터 ${mvRows(c.v)}`);
+  for (const p of sp.pts) parts.push(`${/[ㄱ-ㅎ]/.test(p.k) ? '점 ' : ''}${p.k}: 왼쪽 끝에서 ${p.x}칸 · 위 끝에서 ${p.y}칸`);
+  return parts.join(' · ');
+};
+
+const MV_ITEM_NAMES = ['처음', '㉠', '㉡', '㉢', '㉣', '1', '2', '3', '4', '5', '6', '가', '나'];
+/** `[shapes …]` 인자 → { items:[{k, v, g|null}] } — ? 는 빈칸 */
+export function parseShapes(arg) {
+  const items = [];
+  for (const s of String(arg || '').trim().split(/\s+/)) {
+    const m = /^(.+?)=(.+)$/u.exec(s);
+    if (!m || !MV_ITEM_NAMES.includes(m[1]) || items.some((x) => x.k === m[1])) return null;
+    if (m[2] === '?') { items.push({ k: m[1], v: '?', g: null }); continue; }
+    const g = mvCells(m[2]);
+    if (!g) return null;
+    items.push({ k: m[1], v: m[2], g });
+  }
+  return items.length && items.length <= 6 && items.some((x) => x.g) ? { items } : null;
+}
+/** 🔄 모양 나란히 — 칸마다 같은 크기 틀(가장 큰 모양이 들어가는 정사각형, 점선) 가운데에 모양 */
+export function shapesSvg(sp) {
+  const B = Math.max(...sp.items.filter((x) => x.g).map((x) => Math.max(x.g.length, x.g[0].length)));
+  const c = B >= 4 ? 18 : 22; // 4칸 모양이면 칸을 줄여 한 줄에 넷 (무늬 1~4가 한 줄에)
+  const bw = B * c + 34; const bh = B * c + 34;
+  const per = Math.max(2, Math.min(sp.items.length, Math.floor(440 / bw)));
+  let out = '';
+  sp.items.forEach((it, n) => {
+    const x0 = (n % per) * bw + 26; const y0 = Math.floor(n / per) * bh + 26;
+    out += `<g class="mv-item" data-k="${it.k}" data-v="${it.g ? mvNorm(it.g) : '?'}">`;
+    out += `<text x="${cf(x0 - 20)}" y="${cf(y0 - 6)}" font-size="${it.k === '처음' ? 13 : 16}" font-weight="700" fill="currentColor">${it.k}</text>`;
+    for (let j = 0; j < B; j++) for (let i = 0; i < B; i++) out += `<rect x="${cf(x0 + i * c)}" y="${cf(y0 + j * c)}" width="${c}" height="${c}" fill="none" stroke="currentColor" stroke-opacity="0.22" stroke-dasharray="3 3"/>`;
+    if (!it.g) out += `<text x="${cf(x0 + (B * c) / 2)}" y="${cf(y0 + (B * c) / 2 + 12)}" font-size="34" font-weight="700" text-anchor="middle" fill="${FILL2}">?</text>`;
+    else {
+      const ox = Math.floor((B - it.g[0].length) / 2); const oy = Math.floor((B - it.g.length) / 2);
+      it.g.forEach((row, r) => row.forEach((on, cc) => {
+        if (on) out += `<rect class="mv-cell" data-i="${cc}" data-j="${r}" x="${cf(x0 + (ox + cc) * c)}" y="${cf(y0 + (oy + r) * c)}" width="${c}" height="${c}" fill="${it.k === '처음' ? FILL : FILL2}" fill-opacity="0.38" stroke="currentColor" stroke-width="1.6"/>`;
+      }));
+    }
+    out += '</g>';
+  });
+  const rows = Math.ceil(sp.items.length / per);
+  const Wd = Math.round(per * bw + 14); const Ht = Math.round(rows * bh + 8);
+  return `<svg class="frac-fig shapes-fig" viewBox="0 0 ${Wd} ${Ht}" width="${Math.round(Wd * 1.1)}" height="${Math.round(Ht * 1.1)}" role="img" aria-label="${esc(shapesText(sp))}">${out}</svg>`;
+}
+const shapesText = (sp) => sp.items.map((it) => `${it.k} ${it.g ? mvRows(it.v) : '?'}`).join(' · ');
+
+// 디지털 숫자 — 일곱 막대 a(위)·b(오른쪽 위)·c(오른쪽 아래)·d(아래)·e(왼쪽 아래)·f(왼쪽 위)·g(가운데)
+export const SEG = { 0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
+/** `[seg 258]` 인자 → { digits:[2,5,8] } (1~4자리) */
+export function parseSeg(arg) {
+  const s = String(arg || '').trim();
+  return /^\d{1,4}$/.test(s) ? { digits: [...s].map(Number) } : null;
+}
+/** 🔄 디지털 숫자 카드 */
+export function segSvg(sp) {
+  const cw = 54; const ch = 86; const gap = 12; const t = 7; const L = 30; const V = 28;
+  let out = '';
+  sp.digits.forEach((d, n) => {
+    const x0 = 10 + n * (cw + gap); const y0 = 8;
+    out += `<g class="mv-seg" data-d="${d}"><rect x="${x0}" y="${y0}" width="${cw}" height="${ch}" rx="8" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1.5"/>`;
+    // 가로 막대(a·g·d) 사이에 세로 막대(f·b 위, e·c 아래) — 높이 3t + 2V = 77 (카드 86 안)
+    const lx = x0 + (cw - L) / 2; const ty = y0 + 4;
+    const bar = {
+      a: [lx, ty, L, t], g: [lx, ty + t + V, L, t], d: [lx, ty + 2 * t + 2 * V, L, t],
+      f: [lx - t, ty + t, t, V], b: [lx + L, ty + t, t, V], e: [lx - t, ty + 2 * t + V, t, V], c: [lx + L, ty + 2 * t + V, t, V],
+    };
+    for (const s of 'abcdefg') {
+      const [x, y, w, h] = bar[s]; const on = SEG[d].includes(s);
+      out += `<rect class="mv-bar" data-s="${s}" data-on="${on ? 1 : 0}" x="${cf(x)}" y="${cf(y)}" width="${w}" height="${h}" rx="2" fill="${on ? FILL : 'currentColor'}" fill-opacity="${on ? 0.9 : 0.06}"/>`;
+    }
+    out += '</g>';
+  });
+  const Wd = 20 + sp.digits.length * (cw + gap) - gap; const Ht = ch + 16;
+  return `<svg class="frac-fig seg-fig" viewBox="0 0 ${Wd} ${Ht}" width="${Math.round(Wd * 1.1)}" height="${Math.round(Ht * 1.1)}" role="img" aria-label="${esc(`디지털 숫자 카드 ${sp.digits.join(' ')}`)}">${out}</svg>`;
+}
+/** 🔄 지시문 → 글 (❓ 복사문·📊·🤔 노트) */
+export function moveFigText(kind, arg) {
+  if (kind === 'move') { const sp = parseMove(arg); return sp ? moveText(sp) : null; }
+  if (kind === 'shapes') { const sp = parseShapes(arg); return sp ? shapesText(sp) : null; }
+  if (kind === 'seg') { const sp = parseSeg(arg); return sp ? `디지털 숫자 카드 ${sp.digits.join(' ')}` : null; }
+  return null;
 }

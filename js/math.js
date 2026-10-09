@@ -1408,8 +1408,9 @@ function padFor(q, done = null) {
  * 판이 그래프를 다시 그리므로 문제 글에서는 그 그래프를 뺀다(두 번 보이면 어느 쪽을 만지는지 헷갈린다).
  */
 function drawFor(q, spec, done = null) {
-  // 🪞 M 완성하기(모눈 판)·📈 R 점 고르기(좌표평면 판)·🧊 S 본 모양 그리기(칸 칠하기 판)는 답이 ㉠~㉣라 숫자판(spec)이 없다 — 같은 ⚙ 스위치·💎 스페셜 제외만 따른다 (답한 뒤면 그때 방식)
-  if (q.draw && (q.draw.mode === 'grid' || q.draw.mode === 'plane' || q.draw.mode === 'cells')) return done !== 'choice' && (done === 'typed' || padOn()) && ui.round && ui.round.mode !== 'special' && canDraw(q.draw) ? q.draw : null;
+  // 🪞 M 완성하기(모눈 판)·📈 R 점 고르기(좌표평면 판)·🧊 S 본 모양 그리기(칸 칠하기 판)·🔄 AB 점 찍기(모눈점 판)·도형 그리기(모눈 칸 칠하기 판)는
+  // 답이 ㉠~㉣라 숫자판(spec)이 없다 — 같은 ⚙ 스위치·💎 스페셜 제외만 따른다 (답한 뒤면 그때 방식)
+  if (q.draw && (q.draw.mode === 'grid' || q.draw.mode === 'plane' || q.draw.mode === 'cells' || q.draw.mode === 'mpoint' || q.draw.mode === 'mcells')) return done !== 'choice' && (done === 'typed' || padOn()) && ui.round && ui.round.mode !== 'special' && canDraw(q.draw) ? q.draw : null;
   return spec && q.draw && canDraw(q.draw) ? q.draw : null;
 }
 const qTextOf = (q, draw) => {
@@ -1420,6 +1421,11 @@ const qTextOf = (q, draw) => {
   if (draw.mode === 'plane') return String(q.q).replace(/\[plane [^\]]+\]/g, (d) => (d.startsWith(`[${draw.fig} `) ? '' : d)).replace('어느 것일까요?', '어디일까요?').replace(/\n{3,}/g, '\n').trim();
   // 🧊 칸 칠하기 판: 후보 ㉠~㉣ 본 모양 그림을 빼고(쌓은 모양 그림은 둔다) "본 모양은 어느 것일까요?" → "보면 어떤 모양일까요? 칸을 칠해 보세요."
   if (draw.mode === 'cells') return String(q.q).split(`[${draw.fig}]`).join('').replace('본 모양은 어느 것일까요?', '보면 어떤 모양일까요? 칸을 칠해 보세요.').replace(/\n{3,}/g, '\n').trim();
+  // 🔄 모눈점 판: 후보 점 ㉠~㉣가 있는 모눈을 빼고(판이 출발점 ㄱ만 다시 그린다) "어느 것일까요?" → "어디일까요?"
+  if (draw.mode === 'mpoint') return String(q.q).replace(/\[move [^\]]+\]/g, '').replace('어느 것일까요?', '어디일까요?').replace(/\n{3,}/g, '\n').trim();
+  // 🔄 모눈 칸 칠하기 판: 후보 ㉠~㉣ 그림을 빼고(자리 판은 처음·나중 도형을 모눈째 판이 다시 그린다 · 모양 판은 처음 도형·무늬 그림을 둔다)
+  //   "…도형은(모양은) 어느 것일까요?" → "…도형을(모양을) 모눈에(칸에) 칠해 보세요."
+  if (draw.mode === 'mcells') return (draw.kind === 'place' ? String(q.q).replace(/\[move [^\]]+\]/g, '') : String(q.q).split(`[${draw.fig}]`).join('')).replace(/(도형|모양)은 어느 것일까요\?/, (_, w) => `${w}을 ${draw.kind === 'place' ? '모눈' : '칸'}에 칠해 보세요.`).replace(/\n{3,}/g, '\n').trim();
   return String(q.q).split(`[${draw.fig}]`).join('').replace(/\n{3,}/g, '\n'); // 그래프가 있던 빈 줄 두 개는 한 줄로
 };
 /** 숫자판/점 찍기 판 한 벌 — 같은 채점 길 */

@@ -1136,7 +1136,7 @@ test('화면 연결 (3단계): STEMS.angle(Z)는 이 생성기·원고를 쓰고
   assert.equal(Z.code, 'Z');
   assert.equal(Z.label, '각도 줄기', '줄기 고르기·📊에 보이는 이름');
   const at = STEM_ORDER.indexOf('angle');
-  assert.deepEqual(STEM_ORDER.slice(at - 1, at + 2), ['area', 'angle', 'shape'], 'I 둘레와 넓이 다음·J 삼각형·사각형 바로 앞 (4-1 각도 — J의 4-2 도형·각의 합보다 먼저)');
+  assert.deepEqual(STEM_ORDER.slice(at - 1, at + 3), ['area', 'angle', 'move', 'shape'], 'I 둘레와 넓이 다음 · AB 평면도형의 이동을 사이에 두고 J 삼각형·사각형 앞 (4-1 각도 — J의 4-2 도형·각의 합보다 먼저, 2026-10-10 AB가 끼어듦)');
   assert.equal(Z.list, ANGLE);
   assert.equal(Z.gen.makeQuestion, makeQuestion);
   assert.equal(Z.gen.lessonOf, lessonOf, '📚 배움은 이 생성기의 lessonOf');

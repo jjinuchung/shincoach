@@ -38,9 +38,11 @@ export function askContext(q, a) {
     choices: (q && q.choices || []).filter((c) => c && !c.guess && !c.idk && !c.formMiss && !c.typedTag).map((c) => String(c.text || '')), seen,
     ...(a && a.p ? { pad: 1 } : {}),
     // 🪞 모눈 판·📈 좌표평면 판에 찍은 답 — 보기는 아이가 못 본 후보 점이고, 후보가 아닌 자리는 "(6, 2)"·"(1, −3)"로 온다
-    ...(a && a.p && q && q.draw && (q.draw.mode === 'grid' || q.draw.mode === 'plane') ? { grid: 1 } : {}),
+    // 🔄 AB 모눈점 판(mpoint)도 같다 — 후보가 아닌 자리는 "점 ㄱ에서 오른쪽으로 3칸, 위쪽으로 2칸"
+    ...(a && a.p && q && q.draw && (q.draw.mode === 'grid' || q.draw.mode === 'plane' || q.draw.mode === 'mpoint') ? { grid: 1 } : {}),
     // 🧊 칸 칠하기 판에 칠한 답 — 보기는 아이가 못 본 후보 모양이고, 후보가 아닌 모양은 "왼쪽부터 2, 3, 1층"으로 온다
-    ...(a && a.p && q && q.draw && q.draw.mode === 'cells' ? { paint: 1 } : {}),
+    // 🔄 AB 모눈 칸 칠하기 판(mcells)도 같다 — 후보가 아닌 칸은 "오른쪽으로 5칸 옮김"·"칠한 모양 ■■□ / □■■"
+    ...(a && a.p && q && q.draw && (q.draw.mode === 'cells' || q.draw.mode === 'mcells') ? { paint: 1 } : {}),
   };
 }
 
@@ -188,7 +190,7 @@ export function askSummary(m) {
  */
 export function asksText(m, today) {
   const open = openAsks(m);
-  const lines = [`❓ 진우의 수학 질문 ${open.length}개 (${today}) — 답은 \`💬번호\`로 시작하는 줄 뒤에 써 주세요. 여러 줄 가능, 그림은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] [bgraph 2x5 명 사과:12 배:6] [lgraph 1x5 kg ~25 1월:26 2월:28] [pie 봄:30 여름:25 가을:45] [range 10..20 13● 17○] [sym x=5 ㄱ:5,4 ㄴ:2,2 ㄷ:5,0 ㄹ:8,2] [circle r=5] [circle half d=10] [cuboid 5 3 4] [prism n=5] [cyl r=3 h=7] [scale 2x + 3 | 11] [plane A(2,-3) lin=2] [stack 2 1 / 1 3] [fbar take 6/7 2/7] [fmul rep 2/5 3] [fsub 3 1/4 | 1 3/4] [dmul area 0.4 0.8] [ddiv fit 6.4 2.1] [place 27590300] [prot 0 75] [vmul 123 24] [vdiv 527 16] 처럼.`, '아이 눈높이(초4)로, 답을 바로 말하지 말고 왜 그런지부터. 아빠 이름으로 나갑니다.', ''];
+  const lines = [`❓ 진우의 수학 질문 ${open.length}개 (${today}) — 답은 \`💬번호\`로 시작하는 줄 뒤에 써 주세요. 여러 줄 가능, 그림은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5] [table □:1, 2, 3 / △:4, 8, 12] [steps 3 5 7] [rect 8x5] [para 10 4 3] [tri 10 4 3] [tris 5 5 6] [tria 50 60 ?70] [bgraph 2x5 명 사과:12 배:6] [lgraph 1x5 kg ~25 1월:26 2월:28] [pie 봄:30 여름:25 가을:45] [range 10..20 13● 17○] [sym x=5 ㄱ:5,4 ㄴ:2,2 ㄷ:5,0 ㄹ:8,2] [circle r=5] [circle half d=10] [cuboid 5 3 4] [prism n=5] [cyl r=3 h=7] [scale 2x + 3 | 11] [plane A(2,-3) lin=2] [stack 2 1 / 1 3] [fbar take 6/7 2/7] [fmul rep 2/5 3] [fsub 3 1/4 | 1 3/4] [dmul area 0.4 0.8] [ddiv fit 6.4 2.1] [place 27590300] [prot 0 75] [vmul 123 24] [vdiv 527 16] [move 8x6 ㄱ@2,3 ★@5,3] [shapes 처음=10/10/11 가=01/01/11] [seg 258] 처럼.`, '아이 눈높이(초4)로, 답을 바로 말하지 말고 왜 그런지부터. 아빠 이름으로 나갑니다.', ''];
   for (const a of open) {
     lines.push(`❓${a.no} ${nameOf(a.concept)} · ${KIND_SHORT[a.k] || a.k} · ${a.d}`);
     lines.push(`문제: ${a.q}`);

@@ -852,7 +852,7 @@ test('✍️ 모눈 판 (3단계): 판에는 후보 점이 없고 범위는 답�
   for (const bad of [{ mode: 'grid', fig: 'sym open 0,0 2,0', target: [1, 1], cands: [{ k: '㉠', x: 1, y: 1 }, { k: '㉡', x: 2, y: 2 }] }, { mode: 'grid', fig: 'sym open x=5 ㄱ:5,7 ㄴ:2,5', target: [9, 9], cands: [{ k: '㉠', x: 8, y: 5 }, { k: '㉡', x: 7, y: 5 }] }]) assert.equal(canDraw(bad), false, JSON.stringify(bad));
   // 화면 배선 — 문항·🔁 쌍둥이 둘 다 모눈 판을 연다(숫자판 없이도), 찍은 글자로 보기를 찾는다, 문제 글에서는 후보 점 그림을 뺀다
   const src = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(q\.draw && \(q\.draw\.mode === 'grid' \|\| q\.draw\.mode === 'plane' \|\| q\.draw\.mode === 'cells'\)\) return done !== 'choice' && \(done === 'typed' \|\| padOn\(\)\) && ui\.round && ui\.round\.mode !== 'special' && canDraw\(q\.draw\)/);
+  assert.match(src, /if \(q\.draw && \(q\.draw\.mode === 'grid' \|\| q\.draw\.mode === 'plane' \|\| q\.draw\.mode === 'cells'(?: \|\| q\.draw\.mode === '\w+')*\)\) return done !== 'choice' && \(done === 'typed' \|\| padOn\(\)\) && ui\.round && ui\.round\.mode !== 'special' && canDraw\(q\.draw\)/);
   assert.equal((src.match(/const typedOn = spec \|\| draw;/g) || []).length, 2, 'renderQuestion·renderTwin 둘 다');
   assert.equal((src.match(/if \(typedOn && !\(restore && [rt]\.answered\)\) list\.appendChild\(typedBox\(q, spec, draw,/g) || []).length, 2);
   assert.match(src, /const res = spec \? matchTyped\(q, typed, spec\) : \{ i: q\.choices\.findIndex\(\(c\) => c\.text === typed\.text\) \};/);
