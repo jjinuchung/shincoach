@@ -169,7 +169,7 @@ test('📊 🚀 로켓단 카드(물리친 수·진 수·아지트) · 도감 �
   assert.match(dex, /if \(n > 0 && have > 0 && rocketHeldOf\(p\.mons\[m\.id\]\) > 0\) cell\.appendChild\(el\('div', 'rocket-held', '🚀'\)\);/);
   const sw = src('sw.js');
   for (const f of ['rocket', 'rocketview', 'rocketplay', 'rocketquiz']) assert.match(sw, new RegExp(`^\\s*'\\./js/${f}\\.js',`, 'm'), `앱 셸(주석 아닌 줄)에 ${f}.js`);
-  assert.match(sw, /const CACHE_VERSION = 'v218';/);
+  assert.match(sw, /const CACHE_VERSION = 'v219';/);
 });
 
 test('🚀⚔️ 배틀과 로켓단은 한 번에 하나 — 서로 걸려 있거나 열려 있으면 걸지 않는다 (수학·영어 둘 다)', () => {

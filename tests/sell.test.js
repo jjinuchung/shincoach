@@ -2,7 +2,7 @@
 //
 // 아버님 "이대로 진행" (기본값 9개): 장날에만 · 포켓몬은 2마리 이상 데리고 있는 종만(마지막 한 마리는 남는다) ·
 // 값은 등급으로만 ⭐10 · ⭐⭐25 · ⭐⭐⭐60 · 전설150 · 🌌150 · 아이템은 💰로 살 수 있는 것만 산 값의 절반(스톤이 든 것도 코인만) ·
-// 스톤·🌟·🌕·🍄·교환권·🌈 남은 횟수는 못 판다 · 장날마다 포켓몬 10마리(처음 5마리 → v191) · 두 번 눌러야 · 판 코인은 coinsEarned에 안 넣는다 ·
+// 스톤·🌟·🌕·🍄·교환권·🌈 남은 횟수는 못 판다 · 장날마다 포켓몬 20마리(처음 5마리 → 10마리 v191 → 20마리 v219) · 두 번 눌러야 · 판 코인은 coinsEarned에 안 넣는다 ·
 // 📊에 판 것 · 저장은 mons[id].sold 단조 카운터 + 한 트랜잭션 + sales 합집합
 //
 // ★ 판정표가 규칙을 베끼면 같이 틀린다 — 값은 이 파일이 아버님 결정대로 **손으로 적은 표**와 카탈로그 값에서 따로 계산한다
@@ -92,24 +92,24 @@ test('💰 보유는 진화·데려감·퓨전·떠남·교환·판 수를 모�
   assert.equal(sell(p, 'mon', b).ok, true);
 });
 
-test('💰 장날마다 포켓몬 10마리까지 — 여러 종을 섞어도 · 한 종을 여러 번 팔아도 · 아이템은 한도 없음 · 다음 장날엔 다시 10마리 · 장이 안 서는 날은 못 판다', () => {
-  // 아버님 결정: 처음 5마리 → "10마리까지 허용" (2026-10-05 v191) — 손으로 적은 값
-  assert.equal(SELL_MON_MAX, 10);
-  const ids = ofRarity(1).slice(0, 11);
-  assert.equal(ids.length, 11);
+test('💰 장날마다 포켓몬 20마리까지 — 여러 종을 섞어도 · 한 종을 여러 번 팔아도 · 아이템은 한도 없음 · 다음 장날엔 다시 20마리 · 장이 안 서는 날은 못 판다', () => {
+  // 아버님 결정: 처음 5마리 → "10마리까지 허용" (2026-10-05 v191) → "20마리까지 제한을 풀자" (2026-10-09) — 손으로 적은 값
+  assert.equal(SELL_MON_MAX, 20);
+  const ids = ofRarity(1).slice(0, 21);
+  assert.equal(ids.length, 21);
   const p = prof({ caught: Object.fromEntries(ids.map((x) => [x, 3])), items: { potion: 9 } });
-  for (let i = 0; i < 10; i += 1) assert.equal(sell(p, 'mon', ids[i], OPEN, 100 + i).ok, true, `${i + 1}번째`);
-  assert.deepEqual(sell(p, 'mon', ids[10], OPEN), { ok: false, why: 'limit' }, '11번째는 다음 장날에');
-  assert.equal(monsSoldOn(p.sales, OPEN), 10);
+  for (let i = 0; i < 20; i += 1) assert.equal(sell(p, 'mon', ids[i], OPEN, 100 + i).ok, true, `${i + 1}번째`);
+  assert.deepEqual(sell(p, 'mon', ids[20], OPEN), { ok: false, why: 'limit' }, '21번째는 다음 장날에');
+  assert.equal(monsSoldOn(p.sales, OPEN), 20);
   for (let i = 0; i < 7; i += 1) assert.equal(sell(p, 'item', 'potion', OPEN, 200 + i).ok, true, '아이템은 한도 없음');
   assert.equal(p.items.potion, 2);
-  assert.equal(sell(p, 'mon', ids[10], OPEN2).ok, true, '다음 장날');
-  assert.deepEqual(sell(p, 'mon', ids[10], CLOSED), { ok: false, why: 'closed' });
-  // 한 종을 여러 번 — 12마리면 11번까지 팔 수 있는 종이어도 장날 한도 10에서 멈추고, 한도는 종을 섞어 센다
-  const many = ofRarity(1)[11];
-  const q = prof({ caught: { [many]: 12, [ids[0]]: 5 } });
-  for (let i = 0; i < 10; i += 1) assert.equal(sell(q, 'mon', many, OPEN, 300 + i).ok, true, `한 종 ${i + 1}번째`);
-  assert.deepEqual(sell(q, 'mon', many, OPEN), { ok: false, why: 'limit' }, '같은 종 11번째');
+  assert.equal(sell(p, 'mon', ids[20], OPEN2).ok, true, '다음 장날');
+  assert.deepEqual(sell(p, 'mon', ids[20], CLOSED), { ok: false, why: 'closed' });
+  // 한 종을 여러 번 — 22마리면 21번까지 팔 수 있는 종이어도 장날 한도 20에서 멈추고, 한도는 종을 섞어 센다
+  const many = ofRarity(1)[21];
+  const q = prof({ caught: { [many]: 22, [ids[0]]: 5 } });
+  for (let i = 0; i < 20; i += 1) assert.equal(sell(q, 'mon', many, OPEN, 300 + i).ok, true, `한 종 ${i + 1}번째`);
+  assert.deepEqual(sell(q, 'mon', many, OPEN), { ok: false, why: 'limit' }, '같은 종 21번째');
   assert.deepEqual(sell(q, 'mon', ids[0], OPEN), { ok: false, why: 'limit' }, '다른 종도 그날은 끝');
   assert.equal(sell(q, 'mon', many, OPEN2, 400).ok, true, '다음 장날엔 다시');
   assert.deepEqual(sell(p, 'item', 'potion', CLOSED), { ok: false, why: 'closed' });
