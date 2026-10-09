@@ -14,7 +14,7 @@ import {
   applyVideoStones, // 🏁 영상 끝까지 → 🔶 (2026-10-06)
   applySell, // 💰 5일장 팔기 (2026-10-05)
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
-  applyRocketSteal, applyRocketWin, rocketStealRule, rocketWinRule, applyRocketBegin, rocketBeginRule, applyRocketStep, rocketStepRule, // 🚀 로켓단 습격 (2026-10-09)
+  applyRocketSteal, applyRocketWin, applyRocketAdmit, applyRocketStep, // 🚀 로켓단 습격 (2026-10-09) — 저장이 안 되면 메모리로 잇지 않는다 (Codex 43차 #2)
 } from './db.js';
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
@@ -22,7 +22,7 @@ import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_M
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, parcelGot, videoParcelId, videoPlusId, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, MAX_LV } from './evolve.js';
-import { ROCKET, stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
+import { stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER } from './pokemon.js';
 import { findVoucher } from './unlock.js';
 
@@ -1250,31 +1250,34 @@ export function rocketRecord() {
   return { won: Number(profile.rocketWon) || 0, lost: Number(profile.rocketLost) || 0 };
 }
 
+// 🚀 로켓단 저장은 **저장이 안 되면 메모리로 잇지 않는다** — { ok:false, why:'save' }를 돌려주고 화면이 "다시 저장·나중에"를 묻는다.
+// 메모리로 이어 가면 다음 저장이 메모리를 저장된 값으로 덮어 맞힌 답이 사라지거나, 끝내기만 실패하고 보상은 저장돼
+// 다시 연 앱에서 같은 배틀로 보상을 두 번 받았다 (Codex 43차 #2). 배틀은 저장된 데까지 남아 다음에 이어진다
+
 /**
  * 🚀 졌다 — 노리던 포켓몬을 빼앗긴다. 판정은 **저장된 프로필로** 한 트랜잭션에서(그 사이 팔았거나 파트너가 됐으면 빈손).
- * @param {string|null} battleId 배틀 id — 같은 배틀은 한 번만(이미 끝났으면 ok:false, 아무것도 안 함)
- * @returns {Promise<{ok:boolean, stolen:boolean, id:number}>}
+ * @param {string} battleId 배틀 id — 저장된 진행 중 배틀이 진 상태여야(같은 배틀은 한 번만, 이미 끝났으면 ok:false·why:'done')
+ * @returns {Promise<{ok:boolean, why?:string, stolen:boolean, id:number}>} why:'save'면 저장이 안 됐다(다시)
  */
 export async function rocketLose(targetId, battleId = null) {
   const req = { id: Number(targetId), ...(battleId ? { battle: String(battleId) } : {}) };
-  const r = await runProfileOp(() => applyRocketSteal(req, (stored) => rocketCtx(stored)), (pf) => rocketStealRule(pf, req, rocketCtx(pf)));
+  const r = await runProfileOp(() => applyRocketSteal(req, (stored) => rocketCtx(stored)), () => ({ ok: false, why: 'save' }));
   ensurePartner();
-  return { ok: !(r && r.ok === false), stolen: !!(r && r.stolen), id: req.id };
+  if (!r || r.ok === false) return { ok: false, why: (r && r.why) || 'save', stolen: false, id: req.id };
+  return { ok: true, stolen: !!r.stolen, id: req.id };
 }
 
 /**
- * 🚀 이겼다 — 물리친 수 +1 · 아지트에서 고른 한 마리 되찾기(한 트랜잭션) · ⚡ 야생 배틀과 같게 · 💰20.
+ * 🚀 이겼다 — 물리친 수 +1 · 아지트에서 고른 한 마리 되찾기 · ⚡ 야생 배틀과 같게 · 💰20 — 모두 **한 트랜잭션**(db.rocketWinRule, Codex 43차 #1)
  * @param {number|null} backId 되찾을 포켓몬 (아지트가 비었으면 null)
- * @param {string|null} battleId 배틀 id — 같은 배틀은 한 번만(이미 끝났으면 보상 없이 ok:false)
- * @returns {Promise<{ok:boolean, back:number|null}>}
+ * @param {string} battleId 배틀 id — 같은 배틀은 한 번만(이미 끝났으면 보상 없이 ok:false·why:'done')
+ * @returns {Promise<{ok:boolean, why?:string, back:number|null}>} why:'save'면 저장이 안 됐다(다시)
  */
 export async function rocketWin(backId = null, battleId = null) {
   const req = { backId: backId ? Number(backId) : null, ...(battleId ? { battle: String(battleId) } : {}) };
-  const r = await runProfileOp(() => applyRocketWin(req), (pf) => rocketWinRule(pf, req));
-  if (r && r.ok === false) return { ok: false, back: null }; // 이미 끝난 배틀 — 보상을 두 번 주지 않는다
-  gainXp(ROCKET.winXp);
-  gainCoins(ROCKET.winCoins);
-  return { ok: true, back: r && r.back ? Number(r.back) : null };
+  const r = await runProfileOp(() => applyRocketWin(req), () => ({ ok: false, why: 'save' }));
+  if (!r || r.ok === false) return { ok: false, why: (r && r.why) || 'save', back: null }; // 이미 끝난 배틀 — 보상을 두 번 주지 않는다
+  return { ok: true, back: r.back ? Number(r.back) : null };
 }
 
 /** 🚀 진행 중인 배틀 (없으면 null) — 앱을 다시 열면 이걸로 이어 간다 */
@@ -1284,18 +1287,19 @@ export function rocketCurrent() {
 }
 
 /**
- * 🚀 배틀 시작을 저장한다 — 이미 진행 중인 배틀이 있으면(다른 창) 그것을 돌려준다(새로 열지 않음).
- * 저장이 안 되면(오프라인) 메모리에만 — 그 배틀은 이 창에서만 이어진다
- * @returns {Promise<{ok:boolean, why?:string, cur:object|null}>}
+ * 🚀 배틀 시작 + 오늘 몫을 한 트랜잭션에서 (Codex 43차 #3) — 진행 중인 배틀이 있으면(다른 창·앞 배틀) 몫을 쓰지 않고 그것을 돌려준다(busy).
+ * 하루 몫을 다 썼거나(cap) 그 과목의 20분 간격 안이면(gap — 저장된 시각으로) 열지 않는다. 저장이 안 되면 열지 않는다(save — 몫도 안 쓴다)
+ * @param {string} date 오늘 기록 날짜 · @param {string} field rocketMath | rocketEn · @param {number} max 하루 몫
+ * @returns {Promise<{ok:boolean, why?:string, cur:object|null, daily?:object}>} daily: 저장된 오늘 기록(열었을 때)
  */
-export async function rocketBegin(cur) {
-  const r = await runProfileOp(() => applyRocketBegin(cur), (pf) => rocketBeginRule(pf, cur));
-  return { ok: !!(r && r.ok), why: r && r.why, cur: (r && r.cur) || null };
+export async function rocketAdmit(date, field, max, cur) {
+  const r = await runProfileOp(() => applyRocketAdmit(date, field, max, cur), () => ({ ok: false, why: 'save' }));
+  return { ok: !!(r && r.ok), why: r && r.why, cur: (r && r.cur) || null, ...(r && r.ok ? { daily: r.daily } : {}) };
 }
 
-/** 🚀 문제 하나의 결과를 저장된 배틀에 더한다 → { ok, st } (다른 창이 이미 끝냈으면 ok:false) */
+/** 🚀 문제 하나의 결과를 저장된 배틀에 더한다 → { ok, st } (다른 창이 이미 끝냈으면 ok:false · 저장이 안 되면 why:'save') */
 export async function rocketSaveStep(battleId, correct) {
-  const r = await runProfileOp(() => applyRocketStep(battleId, correct), (pf) => rocketStepRule(pf, battleId, correct));
+  const r = await runProfileOp(() => applyRocketStep(battleId, correct), () => ({ ok: false, why: 'save' }));
   return { ok: !!(r && r.ok), why: r && r.why, st: (r && r.st) || null };
 }
 

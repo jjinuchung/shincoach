@@ -35,13 +35,20 @@ export const STEAL_WEIGHT = { 1: 50, 2: 35, 3: 15 };
  * @param {{subject:'math'|'en', doneToday:number, streak:number, todayCount:number, leftSec?:number|null, lastAt?:number, now?:number, rng?:() => number}} o
  *   leftSec: 남은 공부 시간(초) — 시간 제한이 꺼져 있으면 null · lastAt: 그 과목에서 마지막으로 나온 시각(ms, 없으면 0)
  */
+/**
+ * 20분 간격이 지났나 — 그 과목의 마지막 등장 시각(lastAt)에서. 기록이 미래(시계가 뒤로 간 기기)여도 간격 안으로 본다.
+ * 창의 판정(shouldRocket)과 저장된 기록으로 하는 시작 판정(db.rocketBeginRule, Codex 43차 #3)이 같은 규칙을 쓴다
+ */
+export function rocketGapOk(lastAt, now) {
+  const last = Number(lastAt) || 0;
+  return !last || now - last >= ROCKET.gapMin * 60 * 1000;
+}
+
 export function shouldRocket({ subject, doneToday, streak, todayCount, leftSec = null, lastAt = 0, now = Date.now(), rng = Math.random }) {
   const need = ROCKET.minDone[subject];
   if (!need) return false;
   if ((Number(todayCount) || 0) >= ROCKET.maxPerDay) return false;
-  // 20분 간격 — 기록이 미래(시계가 뒤로 간 기기)여도 간격 안으로 본다
-  const last = Number(lastAt) || 0;
-  if (last && now - last < ROCKET.gapMin * 60 * 1000) return false;
+  if (!rocketGapOk(lastAt, now)) return false;
   if ((Number(doneToday) || 0) < need) return false;
   if ((Number(streak) || 0) < ROCKET.streak) return false;
   if (leftSec !== null && leftSec !== undefined && Number(leftSec) < ROCKET.minLeftSec) return false;

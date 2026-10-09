@@ -79,7 +79,8 @@ function loadPlayer() {
   const battleCalls = [];
   const battleState = { roll: false, caught: {}, won: [], lost: [] };
   // 🚀 로켓단 스텁 (2026-10-09): shouldRocket은 rocketState.roll로, 열린 로켓단(playRocket)은 rocketState.played에
-  const rocketState = { roll: false, targets: [{ id: 7, tier: 1 }], played: [], words: true, claims: 0, claim: true, release: null };
+  // 시작은 몫과 배틀 기록을 한 저장에서(rocketAdmit, Codex 43차 #3) — busy면 진행 중인 배틀을 돌려준다 · subjects는 ⏳ 시간을 세는 과목이 바뀐 차례
+  const rocketState = { roll: false, targets: [{ id: 7, tier: 1 }], played: [], words: true, claims: 0, claim: true, release: null, busy: null, subjects: [], timeSubject: 'english', current: null };
   const reviewCalls = [];
   const essayCalls = [];
   const matchCalls = [];
@@ -121,7 +122,8 @@ function loadPlayer() {
     // 하루 한 번(mark*)은 실제 코드에서 **트랜잭션 선점**이라 Promise<선점 성공 여부>를 준다 — 스텁도 같은 약속을 지킨다
     track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak() {}, tick() {}, vocab() {}, isMastered: () => false, doneCount: () => videoState.done, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false,
       claimSpeakReward: () => true, markHpMissed: async () => true, todayBattles: () => 0, markBattle: async () => true, MASTER_RATIO: 0.8, puzzle() {},
-      todayRocketsEn: () => rocketState.claims, markRocketEn: async () => { if (!rocketState.claim) return false; rocketState.claims++; return true; },
+      todayRocketsEn: () => rocketState.claims,
+      admitRocketEn: async (max, admit) => { if (!rocketState.claim) return { ok: false, why: 'cap', cur: null }; const r = await admit('2026-09-14', 'rocketEn', max); if (r.ok) rocketState.claims++; return r; },
       // 🔁 복습 스텁: 문장 기록과 오늘 상태를 reviewState로 제어
       statsList: () => reviewState.stats,
       // 이 문장을 이미 끝냈는지 (없으면 null) — 끝낸 문장으로는 자유롭게 이동할 수 있어야 한다
@@ -198,7 +200,9 @@ function loadPlayer() {
     shouldRocket: (o) => !!rocketState.roll && o.subject === 'en' && o.streak >= 3 && o.todayCount < 3,
     rocketTargets: () => rocketState.targets, rocketPick: () => rocketState.targets[0] || null,
     rocketNew: (o) => ({ id: 'r1', subject: o.subject, target: o.target, st: { asked: 0, right: 0, wrong: 0, outcome: null } }),
-    rocketBegin: async (cur) => ({ ok: true, cur }), rocketCurrent: () => null, rocketLastAt: () => rocketState.lastAt || 0,
+    rocketAdmit: async (date, field, max, cur) => (rocketState.busy ? { ok: false, why: 'busy', cur: rocketState.busy } : { ok: true, cur }),
+    rocketCurrent: () => rocketState.current, rocketLastAt: () => rocketState.lastAt || 0,
+    rocketTimeSubject: (s) => { rocketState.subjects.push(s); rocketState.timeSubject = s; }, rocketTimeNow: () => rocketState.timeSubject,
     playRocket: (o) => { rocketState.played.push(o); return new Promise((res) => { rocketState.release = res; }); },
     wordQuiz: () => () => Promise.resolve({ correct: true, skipped: false, interrupted: false }),
     wordQuestion: () => (rocketState.words ? { word: 'a', meaning: 'b', choices: ['b', 'c', 'd'] } : null),
@@ -2284,4 +2288,85 @@ test('🚀 로켓단(영어): 낼 단어가 없거나·오늘 몫을 못 잡거�
   assert.equal(run('state.rocketPending'), true);
   run('closeMedia()');
   assert.equal(run('state.rocketPending'), false, '영상을 닫으면 걸어 둔 로켓단은 없던 것으로');
+});
+
+// ───────── 🔍 Codex 43차 (2026-10-09) — 영어 로켓단 흐름 ─────────
+
+test('🚀 로켓단(영어): 여는 준비(단어 읽기·저장)를 하는 사이 다음 문장을 또 눌러도 퍼즐이 끼어들지 않는다 — 준비할 때부터 막고 영상도 멈춘다 (Codex 43차 #4)', async () => {
+  const { run, video, rocketState, puzzleCalls, hpState, ctx } = loadPlayer();
+  hpState.partner = 25;
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 2; settings.dailyGoal = 0; state.idx = 1;');
+  run('markDone(state.cues[0]); markDone(state.cues[1]);'); // 퍼즐도 찼다
+  let release = null;
+  ctx.listVocabViews = () => new Promise((r) => { release = () => r([]); }); // 단어 읽기가 늦다
+  run('state.rocketPending = true;');
+  video.paused = false;
+  run('goTo(2)');
+  assert.equal(video.paused, true, '준비할 때부터 영상을 멈춘다');
+  assert.equal(run('state.rocketOpen'), true, '준비 중에도 열린 것으로 친다');
+  run('goTo(2)'); // 두 번째 '다음'
+  await tick(); await tick();
+  assert.equal(puzzleCalls.length, 0, "Codex 재현: ['puzzle', 'rocket'] — 퍼즐이 먼저 열리던 것");
+  assert.equal(run('state.idx'), 1, '아직 이동 안 함');
+  release(); await tick(); await tick(); await tick();
+  assert.equal(rocketState.played.length, 1, '준비가 끝나면 로켓단');
+  assert.equal(puzzleCalls.length, 0);
+  rocketState.release(); await tick(); await tick();
+  assert.equal(run('state.rocketOpen'), false);
+  assert.equal(run('state.idx'), 2, '끝나면 가려던 문장으로');
+});
+
+test('🚀 로켓단(영어): 준비하다 못 열면(낼 단어 없음) 막은 것을 풀고 그대로 이동 · 그 사이 영상을 닫았으면 이어 가지 않는다 (Codex 43차 #4)', async () => {
+  const { run, rocketState, hpState, ctx } = loadPlayer();
+  hpState.partner = 25;
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.dailyGoal = 0; state.idx = 1; state.open = true;');
+  rocketState.words = false;
+  run('state.rocketPending = true; goTo(2)');
+  await tick(); await tick();
+  assert.equal(run('state.rocketOpen'), false, '막은 것을 푼다');
+  assert.equal(run('state.idx'), 2, '그대로 이동');
+  rocketState.words = true;
+  let release = null;
+  ctx.listVocabViews = () => new Promise((r) => { release = () => r([]); });
+  run('state.rocketPending = true; goTo(3)');
+  run('closeMedia()');
+  release(); await tick(); await tick(); await tick();
+  assert.equal(rocketState.played.length, 0, '닫은 영상에서 로켓단을 열지 않는다');
+  assert.equal(run('state.rocketOpen'), false);
+  // 그 사이 다른 영상을 열었으면 — 그 영상에서 열거나 그 영상의 문장으로 옮기지 않는다
+  run('state.open = true; state.item = { id: "a" }; state.idx = 1;');
+  run('state.rocketPending = true; goTo(2)');
+  run('state.item = { id: "b" }; state.idx = 0;');
+  release(); await tick(); await tick(); await tick();
+  assert.equal(rocketState.played.length, 0, '다른 영상에서 열지 않는다');
+  assert.equal(run('state.idx'), 0, '다른 영상의 문장을 옮기지 않는다');
+  assert.equal(run('state.rocketOpen'), false);
+});
+
+test('🚀 로켓단(영어): 따라 말하기를 켠 채 마지막 문장에서 걸린 로켓단도 열린다 — 배틀보다 먼저 (Codex 43차 #5)', async () => {
+  const { run, rocketState, battleCalls, hpState } = loadPlayer();
+  hpState.partner = 25;
+  run(FIVE_CUES + ' settings.listenFirst = 0; settings.dailyGoal = 0; state.open = true;');
+  run('state.idx = state.cues.length - 1; state.rocketPending = true; state.battlePending = { id: 4 }; state.shadowNext = null;');
+  run('afterShadowWait()');
+  await tick(); await tick();
+  assert.equal(rocketState.played.length, 1, 'Codex 재현: 걸린 채 열리지 않던 것');
+  assert.equal(battleCalls.length, 0, '배틀보다 먼저');
+  assert.equal(run('state.rocketPending'), false);
+  rocketState.release(); await tick(); await tick();
+  assert.equal(run('state.idx'), 4, '마지막 문장 그대로');
+});
+
+test('🚀 로켓단(영어) 이어 가기: 앱을 다시 열어 홈에서 이어 간 배틀도 영어 시간으로 센다 — 끝나면 원래대로(홈은 안 셈) (Codex 43차 #7)', async () => {
+  const { run, rocketState } = loadPlayer();
+  rocketState.current = { id: 'r9', subject: 'en', target: 7, st: { asked: 1, right: 1, wrong: 0, outcome: null } };
+  rocketState.timeSubject = null; // 홈
+  const p = run('resumeEnglishRocket()');
+  await tick(); await tick();
+  assert.equal(rocketState.played.length, 1);
+  assert.equal(rocketState.played[0].resume, true);
+  assert.deepEqual(rocketState.subjects, ['english'], '배틀 동안 영어 시간');
+  rocketState.release();
+  assert.equal(await p, true);
+  assert.deepEqual(rocketState.subjects, ['english', null], '끝나면 홈으로(안 셈)');
 });

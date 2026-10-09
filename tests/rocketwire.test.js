@@ -55,15 +55,14 @@ test('🚀 등장 판정은 shouldRocket(오늘 푼 수·연속 정답·오늘 �
   assert.match(math, /rockets: \(d && Number\(d\[ROCKET\.field\.math\]\)\) \|\| 0/, '오늘 로켓단 수를 저장된 기록에서 읽는다');
 });
 
-test('🚀 여는 순서: 노릴 포켓몬·파트너 → 오늘 몫(수학 하루 3번) 선점 → 배틀 기록 저장 → 화면 · 기다리는 사이 나갔으면 안 연다', () => {
+test('🚀 여는 순서: 노릴 포켓몬·파트너 → 오늘 몫(수학 하루 3번)과 배틀 기록을 한 저장에서(rocketAdmit) → 화면 · 기다리는 사이 나갔으면 안 연다', () => {
   const f = body(math, 'startRocket');
   const i = (t) => { const k = f.indexOf(t); assert.ok(k > 0, t); return k; };
-  assert.ok(i('rocketPick()') < i('claimDailyCount(todayKey(), ROCKET.field.math, ROCKET.maxPerDay)'));
-  assert.ok(i('claimDailyCount(') < i('rocketBegin(rocketNew({ subject: \'math\''));
-  assert.ok(i('rocketBegin(') < i('runRocket(b.cur, !b.ok, after)'), '다른 창이 연 배틀이면(b.ok false) 이어 가기로');
-  assert.match(f, /if \(!won \|\| run !== ui\.run \|\| mathHidden\(\)\) \{ after\(\); return; \}/);
-  assert.match(f, /b\.cur\.subject !== 'math'/, '영어 배틀이 진행 중이면 수학에서 열지 않는다');
-  assert.match(f, /stem: ui\.stem/, '문제를 낼 줄기를 기록한다(이어 갈 때 그 줄기)');
+  assert.ok(i('rocketPick()') < i("rocketAdmit(todayKey(), ROCKET.field.math, ROCKET.maxPerDay, rocketNew({ subject: 'math', target: target.id, stem: ui.stem }))"));
+  assert.ok(i('rocketAdmit(') < i('runRocket(b.cur, !b.ok, after)'), '진행 중인 배틀이면(b.ok false·busy) 몫을 안 쓰고 이어 가기로');
+  assert.ok(!/claimDailyCount\(/.test(f), '몫만 따로 먼저 쓰지 않는다 — 배틀을 못 열면 몫이 사라졌다 (Codex 43차 #3)');
+  assert.match(f, /if \(!b\.cur \|\| b\.cur\.subject !== 'math' \|\| run !== ui\.run \|\| mathHidden\(\)\) \{ after\(\); return; \}/, '영어 배틀이 진행 중이면 수학에서 열지 않는다 · 기다리는 사이 나갔으면');
+  assert.match(f, /if \(b\.ok\) ui\.today\.rockets = /, '오늘 수는 연 배틀만');
 });
 
 test('🚀 화면에 넘기는 저장 함수는 그 배틀 id로 — 한 문제씩·빼앗기·이기기 (같은 배틀은 한 번만) · 수학·영어 공통 실행기(rocketplay)', () => {
@@ -91,15 +90,34 @@ test('🚀 이어 가기: 수학 화면을 열면(사다리를 그린 뒤) · �
 
 test('🎬 화면(rocketview): ⏭ 모르겠어요는 틀린 것 · 한 문제마다 먼저 저장하고 그린다 · 지면 그림보다 먼저 저장 · 이기면 아지트에서 하나 고르기', () => {
   assert.match(view, /const correct = !!r\.correct && !r\.skipped;/);
-  const save = view.indexOf('const saved = await o.saveStep(correct);');
+  const save = view.indexOf('const saved = await persist(() => o.saveStep(correct));');
   const draw = view.indexOf('if (correct) await attack(o.partner); else await armDown();');
   assert.ok(save > 0 && draw > save, '저장 → 그림 (그림 중에 꺼져도 맞힌 수가 남는다)');
-  const lose = view.indexOf('const l = await o.lose();');
+  const lose = view.indexOf('const l = await persist(() => o.lose());');
   assert.ok(lose > 0 && view.indexOf('await snatch(', lose) > lose, '빼앗기 저장 → 그물 그림');
   assert.match(view, /const held = o\.hideout\(\);/);
-  assert.match(view, /const w = await o\.win\(backId\);/);
-  assert.match(view, /const w = await o\.win\(null\);/, '아지트가 비어도 이긴 것은 저장');
+  assert.match(view, /const w = await persist\(\(\) => o\.win\(backId\)\);/);
+  assert.match(view, /const w = await persist\(\(\) => o\.win\(null\)\);/, '아지트가 비어도 이긴 것은 저장');
   assert.match(view, /if \(!saved\.ok\)/, '다른 창이 끝낸 배틀이면 더 묻지 않는다');
+});
+
+test('🎬 저장이 안 되면(💾) "다시 저장·나중에"를 묻는다 — 메모리로 이어 가지 않는다 · 나중에면 화면을 닫고 배틀은 저장된 데까지 남아 다음에 이어진다 (Codex 43차 #2)', () => {
+  const f = body(view, 'persist');
+  assert.match(f, /if \(!r \|\| r\.why !== 'save'\) return r;/, '저장 실패만 다시 묻는다(이미 끝난 배틀 등은 그대로)');
+  assert.match(f, /button\('다시 저장', true/);
+  assert.match(f, /button\('나중에', false/);
+  assert.match(f, /if \(!again \|\| !ui\.open\) return null;/, '나중에면 그만둔다(다시 묻지 않는다)');
+  for (const t of ['const saved = await persist(', 'const w = await persist(() => o.win(backId));', 'const w = await persist(() => o.win(null));', 'const l = await persist(() => o.lose());']) {
+    const k = view.indexOf(t);
+    assert.ok(k > 0, t);
+    assert.match(view.slice(k, k + 200), /\n\s*if \(!(saved|w|l)\) return;/, `${t} — 나중에면 닫는다`);
+  }
+  assert.match(view, /if \(!l\.ok\) \{ msg\('다른 화면에서 이미 끝난 배틀이에요\.'\); await finish\('닫기'\); return; \}/, '다른 화면이 먼저 끝낸 진 배틀을 "빈손"이라고 하지 않는다');
+  const xp = src('js/xp.js');
+  for (const fn of ['rocketSaveStep', 'rocketLose', 'rocketWin', 'rocketAdmit']) {
+    assert.match(body(xp, fn), /\(\) => \(\{ ok: false, why: 'save' \}\)\)/, `${fn}: 저장이 안 되면 메모리로 이어 가지 않는다`);
+  }
+  assert.ok(!/gainXp\(ROCKET\.winXp\)|gainCoins\(ROCKET\.winCoins\)/.test(xp), '⚡💰는 이기기 저장 안에서 (따로 더하지 않는다, Codex 43차 #1)');
 });
 
 test('🎬 구호·외침·효과음 — 확인받을 대사는 한곳에(MOTTO·BLAST) · 앱 셸이 rocketview.js를 들고 간다', async () => {
@@ -136,15 +154,18 @@ test('🔤 영어: 문장 전환에서 연다 — 다음 문장으로 가기 전
   assert.match(player, /if \(state\.rocketPending\) startRocketEn\(\(\) => \{\}\);[^\n]*\n\s*else if \(state\.battlePending\) startBattle/);
 });
 
-test('🔤 영어: 여는 순서 — 노릴 포켓몬·파트너·낼 단어 → 오늘 몫(영어 하루 3번) 선점 → 배틀 기록 저장 → 화면 · 수학 배틀이 진행 중이면 안 연다', () => {
+test('🔤 영어: 여는 순서 — 노릴 포켓몬·파트너·낼 단어 → 오늘 몫(영어 하루 3번)과 배틀 기록을 한 저장에서 → 화면 · 수학 배틀이 진행 중이면 안 연다', () => {
   const f = body(player, 'startRocketEn');
   const at = (t) => { const k = f.indexOf(t); assert.ok(k > 0, t); return k; };
-  assert.ok(at('rocketPick()') < at('track.markRocketEn(ROCKET.maxPerDay)'));
-  assert.ok(at('wordQuestion(records)') < at('track.markRocketEn('), '낼 단어가 없으면 몫을 쓰지 않는다');
-  assert.ok(at('track.markRocketEn(') < at("rocketBegin(rocketNew({ subject: 'en', target: target.id }))"));
+  assert.ok(at('state.rocketOpen = true;') < at('await listVocabViews()'), '준비할 때부터 막는다 (Codex 43차 #4)');
+  assert.ok(at('rocketPick()') < at('track.admitRocketEn(ROCKET.maxPerDay'));
+  assert.ok(at('wordQuestion(records)') < at('track.admitRocketEn('), '낼 단어가 없으면 몫을 쓰지 않는다');
+  assert.match(f, /track\.admitRocketEn\(ROCKET\.maxPerDay, \(date, field, max\) => rocketAdmit\(date, field, max, cur\)\)/, '몫과 배틀 기록을 한 트랜잭션에서 (Codex 43차 #3)');
   assert.match(f, /b\.cur\.subject !== 'en'/);
-  assert.match(src('js/track.js'), /export function markRocketEn\(max\) \{\s*return claim\('rocketEn', max, true\);/, '저장이 안 되면 안 나온 것으로(strict)');
-  assert.match(src('js/track.js'), /export function todayRocketsEn\(\) \{\s*return t\.daily \? \(Number\(t\.daily\.rocketEn\) \|\| 0\) : 0;/, '영어 몫은 영어 칸(rocketEn) — 수학과 따로');
+  const tr = src('js/track.js');
+  assert.ok(!/markRocketEn/.test(tr), '몫만 따로 쓰는 길은 없앴다');
+  assert.match(body(tr, 'admitRocketEn'), /await flush\(\);[\s\S]*const r = await admit\(date, 'rocketEn', max\);[\s\S]*adoptSaved\(date, r\.daily\)/, '보기값을 먼저 맞추고, 저장된 오늘 기록을 받아 온다');
+  assert.match(tr, /export function todayRocketsEn\(\) \{\s*return t\.daily \? \(Number\(t\.daily\.rocketEn\) \|\| 0\) : 0;/, '영어 몫은 영어 칸(rocketEn) — 수학과 따로');
   const run = body(player, 'runRocketEn');
   assert.match(run, /if \(!video\.paused\) video\.pause\(\);/, '영상을 멈춘다');
   assert.match(run, /setBattleOpen\(true\);/, '뒤 화면을 못 누르게');
@@ -169,7 +190,7 @@ test('📊 🚀 로켓단 카드(물리친 수·진 수·아지트) · 도감 �
   assert.match(dex, /if \(n > 0 && have > 0 && rocketHeldOf\(p\.mons\[m\.id\]\) > 0\) cell\.appendChild\(el\('div', 'rocket-held', '🚀'\)\);/);
   const sw = src('sw.js');
   for (const f of ['rocket', 'rocketview', 'rocketplay', 'rocketquiz']) assert.match(sw, new RegExp(`^\\s*'\\./js/${f}\\.js',`, 'm'), `앱 셸(주석 아닌 줄)에 ${f}.js`);
-  assert.match(sw, /const CACHE_VERSION = 'v219';/);
+  assert.match(sw, /const CACHE_VERSION = 'v220';/);
 });
 
 test('🚀⚔️ 배틀과 로켓단은 한 번에 하나 — 서로 걸려 있거나 열려 있으면 걸지 않는다 (수학·영어 둘 다)', () => {

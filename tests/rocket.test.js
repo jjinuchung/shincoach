@@ -7,8 +7,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { ROCKET, STEAL_WEIGHT, shouldRocket, stealables, pickTarget, rocketStart, rocketStep, hideout, rocketNew, copyRocketCur, mergeRocketDone } from '../js/rocket.js';
 import { haveOf, rocketHeldOf } from '../js/evolve.js';
-import { rocketStealRule, rocketWinRule, rocketBeginRule, rocketStepRule, cloneProfile, emptyProfile, mergeStatRecord, mergeDailyDelta, emptyDaily, takeMonRule } from '../js/db.js';
-import { rocketCtx, rarityIn, battleWin, haveCount, caughtCount, rocketTargets, rocketPick, rocketLose, rocketWin, rocketHideout, rocketHeldCount, rocketRecord, getProfileSnapshot, rocketBegin, rocketSaveStep, rocketCurrent } from '../js/xp.js';
+import { rocketStealRule, rocketWinRule, rocketBeginRule, rocketStepRule, rocketAdmitRule, cloneProfile, emptyProfile, mergeStatRecord, mergeDailyDelta, emptyDaily, takeMonRule } from '../js/db.js';
+import { rocketCtx, rarityIn, battleWin, rocketTargets, rocketPick } from '../js/xp.js';
+// 화면 쪽 저장 함수(rocketLose·rocketWin·rocketAdmit…)는 tests/rocketstore.test.js — 진짜 트랜잭션 경로(작은 IndexedDB)로 본다 (Codex 43차 #2)
 import { BATTLE } from '../js/battle.js';
 import { ROSTER, isUltraBeast } from '../js/pokemon.js';
 
@@ -22,6 +23,25 @@ const UB = ROSTER.map((m) => m.id).find((id) => isUltraBeast(id));
 
 /** 정해 둔 수를 차례로 내는 rng */
 const seq = (...xs) => { let i = 0; return () => xs[Math.min(i++, xs.length - 1)]; };
+
+// 끝내기(빼앗기·이기기)는 **저장된 진행 중 배틀**이 그 결과로 끝났을 때만 (Codex 43차 #6) — 규칙 테스트도 배틀을 거친다
+let NOW = 1760000000000;
+let RN = 0;
+const LOST = [false, false, false];
+const WON = [true, true, true];
+/** 저장 규칙으로 배틀 하나를 연다(시작 → 답들) → 배틀 id. 같은 과목은 20분 간격이라 30분씩 띄운다 */
+function battle(p, target, answers, subject = 'math') {
+  NOW += 30 * 60 * 1000;
+  RN += 1;
+  const cur = rocketNew({ subject, target, now: NOW, rnd: () => (RN % 997) / 997 });
+  assert.equal(rocketBeginRule(p, cur).ok, true, '배틀을 열었다');
+  for (const c of answers) rocketStepRule(p, cur.id, c);
+  return cur.id;
+}
+/** 세 번 틀린 배틀로 빼앗기 */
+const steal = (p, id) => rocketStealRule(p, { id, battle: battle(p, id, LOST) }, rocketCtx(p));
+/** 세 번 맞힌 배틀로 이기기 (backId를 구해 온다) */
+const win = (p, backId) => rocketWinRule(p, { backId, battle: battle(p, backId || C1, WON) });
 
 test('명단에 등급마다 종이 있다 (테스트 재료 점검)', () => {
   assert.ok(C1 && C2 && U1 && U2 && R1 && L1 && UB, JSON.stringify({ C1, C2, U1, U2, R1, L1, UB }));
@@ -117,14 +137,14 @@ test('🚀 노릴 포켓몬 고르기: 등급은 50 : 35 : 15 — 없는 등급�
 
 test('🚀 빼앗기(저장 규칙): stolen +1 · 데리고 있는 수 −1 · **도감(caught)은 그대로** · 진 수 +1', () => {
   const p = P({ caught: { [C1]: 2 }, mons: {} });
-  const r = rocketStealRule(p, { id: C1 }, rocketCtx(p));
+  const r = steal(p, C1);
   assert.deepEqual(r, { ok: true, stolen: true, id: C1 });
   assert.equal(p.caught[C1], 2, '★ caught를 줄이면 옛 백업이 되살린다');
   assert.equal(p.mons[C1].stolen, 1);
   assert.equal(haveOf(p.caught[C1], p.mons[C1]), 1);
   assert.equal(p.rocketLost, 1);
   // 마지막 한 마리도 빼앗긴다 — 보유 0, 도감 칸은 남음
-  rocketStealRule(p, { id: C1 }, rocketCtx(p));
+  steal(p, C1);
   assert.equal(haveOf(p.caught[C1], p.mons[C1]), 0);
   assert.equal(p.caught[C1], 2);
   assert.deepEqual(hideout(p), [{ id: C1, n: 2 }], '아지트에 둘');
@@ -132,31 +152,30 @@ test('🚀 빼앗기(저장 규칙): stolen +1 · 데리고 있는 수 −1 · *
 
 test('🚀 빼앗기는 저장된 프로필로 다시 판정 — 그 사이 팔았거나·파트너가 됐거나·전설로 옮겼으면 빈손(진 수만 +1)', () => {
   const sold = P({ caught: { [C1]: 1 }, mons: { [C1]: { sold: 1 } } });
-  assert.deepEqual(rocketStealRule(sold, { id: C1 }, rocketCtx(sold)), { ok: true, stolen: false, id: C1 });
+  assert.deepEqual(steal(sold, C1), { ok: true, stolen: false, id: C1 });
   assert.equal(sold.mons[C1].stolen, undefined, '없는 것을 또 세지 않는다');
   assert.equal(sold.rocketLost, 1, '진 것은 센다');
   const partner = P({ caught: { [C1]: 1 }, partner: C1 });
-  assert.equal(rocketStealRule(partner, { id: C1 }, rocketCtx(partner)).stolen, false, '파트너는 지킨다');
+  assert.equal(steal(partner, C1).stolen, false, '파트너는 지킨다');
   const moved = P({ caught: { [C1]: 1 }, mons: { [C1]: { rarity: 4 } } });
-  assert.equal(rocketStealRule(moved, { id: C1 }, rocketCtx(moved)).stolen, false, '전설로 옮긴 것');
+  assert.equal(steal(moved, C1).stolen, false, '전설로 옮긴 것');
   const legend = P({ caught: { [L1]: 1 } });
-  assert.equal(rocketStealRule(legend, { id: L1 }, rocketCtx(legend)).stolen, false, '전설');
+  assert.equal(steal(legend, L1).stolen, false, '전설');
   const ub = P({ caught: { [UB]: 1 } });
-  assert.equal(rocketStealRule(ub, { id: UB }, rocketCtx(ub)).stolen, false, '🌌');
-  assert.equal(rocketStealRule(P(), { id: 0 }, rocketCtx(P())).stolen, false, '깨진 id');
+  assert.equal(steal(ub, UB).stolen, false, '🌌');
 });
 
 test('🚀 이기기(저장 규칙): 물리친 수 +1 · 아지트에서 고른 한 마리 되찾기(back +1) — 아지트에 없으면 되찾지 않는다 · 갇힌 수보다 많이는 못 되찾는다', () => {
   const p = P({ caught: { [C1]: 1, [U1]: 1 }, mons: {} });
-  rocketStealRule(p, { id: C1 }, rocketCtx(p));
-  assert.deepEqual(rocketWinRule(p, { backId: U1 }), { ok: true, back: null }, '아지트에 없는 것');
-  assert.deepEqual(rocketWinRule(p, { backId: null }), { ok: true, back: null }, '고르지 않음');
+  steal(p, C1);
+  assert.deepEqual(win(p, U1), { ok: true, back: null }, '아지트에 없는 것');
+  assert.deepEqual(win(p, null), { ok: true, back: null }, '고르지 않음');
   assert.equal(p.rocketWon, 2, '되찾지 않아도 물리친 수는 센다');
-  assert.deepEqual(rocketWinRule(p, { backId: C1 }), { ok: true, back: C1 });
+  assert.deepEqual(win(p, C1), { ok: true, back: C1 });
   assert.equal(haveOf(p.caught[C1], p.mons[C1]), 1, '돌아왔다');
   assert.equal(p.caught[C1], 1, 'caught는 그대로 — 되찾음은 back 카운터');
   assert.deepEqual(hideout(p), [], '아지트가 비었다');
-  assert.equal(rocketWinRule(p, { backId: C1 }).back, null, '두 번 되찾지 못한다 (다른 창이 먼저 되찾은 것과 같다)');
+  assert.equal(win(p, C1).back, null, '두 번 되찾지 못한다 (다른 창이 먼저 되찾은 것과 같다)');
   assert.equal(p.mons[C1].back, 1);
   assert.equal(rocketHeldOf(p.mons[C1]), 0);
 });
@@ -197,32 +216,20 @@ test('🚀 하루 횟수: 오늘 기록에 rocketMath·rocketEn — 더해지고
 
 test('🚀 빼앗긴 것과 다른 "보유 줄이기"가 겹쳐도 보유는 음수가 되지 않고, 아빠가 데려간 것과 따로 센다', () => {
   const p = P({ caught: { [C1]: 2 }, mons: {} });
-  rocketStealRule(p, { id: C1 }, rocketCtx(p));
+  steal(p, C1);
   takeMonRule(p, C1, 1);
   assert.equal(haveOf(p.caught[C1], p.mons[C1]), 0);
-  assert.equal(rocketStealRule(p, { id: C1 }, rocketCtx(p)).stolen, false, '보유 0이면 못 빼앗는다');
-  rocketWinRule(p, { backId: C1 });
+  assert.equal(steal(p, C1).stolen, false, '보유 0이면 못 빼앗는다');
+  win(p, C1);
   assert.equal(haveOf(p.caught[C1], p.mons[C1]), 1, '되찾으면 하나');
   assert.equal(haveOf(1, { stolen: 1, back: 3 }), 1, '깨진 기록(되찾음 > 빼앗김)이어도 잡은 수보다 많아지지 않는다');
   assert.equal(rocketHeldOf({ stolen: -2 }), 0);
 });
 
-test('🚀 화면 쪽 함수(xp.js): 노리기 → 졌을 때 빼앗김 → 아지트 → 이기면 되찾고 ⚡·💰 · 기록', async () => {
+test('🚀 화면 쪽 함수(xp.js): 노릴 수 있는 포켓몬·고르기 — 전설은 안 노린다 (빼앗기·아지트·되찾기·⚡💰는 rocketstore.test.js)', () => {
   battleWin(C1); battleWin(U1); battleWin(L1);
   assert.deepEqual(rocketTargets().map((m) => m.id).sort((a, b) => a - b), [C1, U1].sort((a, b) => a - b), '전설은 안 노린다');
   assert.ok([C1, U1].includes(rocketPick(() => 0).id));
-  const before = getProfileSnapshot();
-  assert.deepEqual(await rocketLose(C1), { ok: true, stolen: true, id: C1 });
-  assert.equal(haveCount(C1), 0); assert.equal(caughtCount(C1), 1, '도감 칸은 남는다');
-  assert.equal(rocketHeldCount(C1), 1);
-  assert.deepEqual(rocketHideout(), [{ id: C1, n: 1 }]);
-  assert.deepEqual(await rocketWin(C1), { ok: true, back: C1 });
-  assert.equal(haveCount(C1), 1);
-  assert.deepEqual(rocketRecord(), { won: 1, lost: 1 });
-  const after = getProfileSnapshot();
-  assert.equal(after.coins - before.coins, ROCKET.winCoins, '💰20');
-  assert.equal(after.xp - before.xp, ROCKET.winXp, '⚡ 야생 배틀과 같게');
-  assert.deepEqual(await rocketWin(null), { ok: true, back: null }, '아지트가 비면 되찾을 것 없음');
 });
 
 // ───────── 2단계: 진행 중인 배틀 — 앱이 꺼져도 다음에 열면 이어진다(아버님 결정 (다)) · 같은 배틀은 한 번만 ─────────
@@ -264,8 +271,8 @@ test('★ 🚀 같은 배틀은 한 번만 끝난다 — 두 번 빼앗거나 �
   assert.deepEqual(p.rocketDone[a.id], { o: 'lose', at: 20 });
   assert.deepEqual(rocketStealRule(p, { id: C1, battle: a.id }, rocketCtx(p), 30), { ok: false, why: 'done' }, '같은 배틀을 또 처리하면');
   assert.deepEqual([p.mons[C1].stolen, p.rocketLost], [1, 1], '한 번만 빼앗고 한 번만 셌다');
-  // 이긴 배틀
-  const b = rocketNew({ subject: 'math', target: C1, now: 40, rnd: () => 0.4 });
+  // 이긴 배틀 (같은 과목이라 20분 뒤)
+  const b = rocketNew({ subject: 'math', target: C1, now: 10 + ROCKET.gapMin * 60 * 1000, rnd: () => 0.4 });
   assert.equal(rocketBeginRule(p, b).ok, true, '앞 배틀이 끝났으니 새로 연다');
   for (let i = 0; i < 3; i++) rocketStepRule(p, b.id, true);
   assert.deepEqual(rocketStealRule(p, { id: C1, battle: b.id }, rocketCtx(p), 50), { ok: false, why: 'outcome' }, '이긴 배틀로 빼앗지 않는다');
@@ -296,21 +303,6 @@ test('★ 🚀 병합: 끝난 배틀은 합집합 — 옛 백업의 "진행 중"
   const late = P({ caught: { [C1]: 1 }, updatedAt: 9 });
   assert.equal(mergeStatRecord('profile', late, oldPf).rocketCur.id, a.id);
   assert.deepEqual(mergeRocketDone({ x: { o: 'win', at: 9 } }, { x: { o: 'win', at: 3 }, y: { o: 'lose', at: 4 } }), { x: { o: 'win', at: 3 }, y: { o: 'lose', at: 4 } });
-});
-
-test('🚀 화면 쪽(xp.js): 시작 → 한 문제씩 저장 → 이어 가기(rocketCurrent) → 끝 · 이미 끝난 배틀이면 보상 없음', async () => {
-  battleWin(U2);
-  const cur = rocketNew({ subject: 'math', target: U2, now: Date.now(), rnd: () => 0.7 });
-  assert.equal((await rocketBegin(cur)).ok, true);
-  assert.equal(rocketCurrent().id, cur.id, '앱을 다시 열면 이 배틀이 이어진다');
-  await rocketSaveStep(cur.id, true); await rocketSaveStep(cur.id, true);
-  assert.deepEqual(rocketCurrent().st, { asked: 2, right: 2, wrong: 0, outcome: null });
-  assert.equal((await rocketSaveStep(cur.id, true)).st.outcome, 'win');
-  const before = getProfileSnapshot();
-  assert.deepEqual(await rocketWin(null, cur.id), { ok: true, back: null });
-  assert.equal(rocketCurrent(), null, '끝나면 이어 갈 배틀이 없다');
-  assert.deepEqual(await rocketWin(null, cur.id), { ok: false, back: null }, '같은 배틀 두 번째 — 보상 없음');
-  assert.equal(getProfileSnapshot().coins - before.coins, ROCKET.winCoins, '💰는 한 번만');
 });
 
 test('🚀 rocket.js는 순수 규칙 — DOM·db·xp를 import하지 않는다(db.js가 이 파일을 import해도 순환 없음) · 앱 셸이 들고 간다', () => {
@@ -349,4 +341,67 @@ test('🚀 간격 기록: 배틀을 시작하면 그 과목의 마지막 등장 
   assert.deepEqual(q.rocketLast, { en: 5000, math: 9000 });
   const m = mergeStatRecord('profile', P({ rocketLast: { en: 5000, math: 100 }, updatedAt: 9 }), P({ rocketLast: { en: 3000, math: 7000 }, updatedAt: 1 }));
   assert.deepEqual(m.rocketLast, { en: 5000, math: 7000 }, '옛 백업이 간격을 되돌리지 않게');
+});
+
+// ───────── 🔍 Codex 43차 (2026-10-09) — 저장 경계: 끝내기는 저장된 배틀과 맞을 때만 · 보상은 끝남과 같은 저장 · 시작은 몫과 함께 ─────────
+
+test('★ 🚀 끝내기는 저장된 진행 중 배틀과 맞을 때만 — 배틀 id 없음·진행 중 배틀 없음·다른 배틀·승패 전·노리던 것과 다른 포켓몬은 거절하고 아무것도 안 바꾼다 (Codex 43차 #6)', () => {
+  const p = P({ caught: { [C1]: 2, [U1]: 2 }, mons: {} });
+  const ctx = rocketCtx(p);
+  const keep = () => JSON.stringify([p.mons, p.rocketLost, p.rocketWon, p.rocketDone, p.rocketCur]);
+  const before = keep();
+  assert.deepEqual(rocketStealRule(p, { id: C1 }, ctx), { ok: false, why: 'nobattle' }, '배틀 id 없는 끝내기');
+  assert.deepEqual(rocketWinRule(p, { backId: C1 }), { ok: false, why: 'nobattle' });
+  assert.deepEqual(rocketStealRule(p, { id: C1, battle: 'never-started' }, ctx), { ok: false, why: 'nocur' }, 'Codex 재현: 시작한 적 없는 배틀로 빼앗기');
+  assert.deepEqual(rocketWinRule(p, { backId: C1, battle: 'never-started' }), { ok: false, why: 'nocur' }, '시작한 적 없는 배틀로 이기기');
+  assert.equal(keep(), before, '거절하면 아무것도 안 바뀐다');
+  const id = battle(p, C1, [false, false]);
+  assert.deepEqual(rocketStealRule(p, { id: C1, battle: id }, ctx), { ok: false, why: 'outcome' }, '두 번만 틀렸으면(승패 전) 못 빼앗는다');
+  assert.deepEqual(rocketWinRule(p, { battle: id }), { ok: false, why: 'outcome' });
+  rocketStepRule(p, id, false);
+  assert.deepEqual(rocketStealRule(p, { id: U1, battle: id }, ctx), { ok: false, why: 'target' }, '노리던 것과 다른 포켓몬');
+  assert.deepEqual(rocketStealRule(p, { id: C1, battle: 'r-other' }, ctx), { ok: false, why: 'nocur' }, '다른 배틀 id');
+  assert.equal(p.rocketCur.id, id, '거절해도 진행 중인 배틀은 그대로');
+  assert.deepEqual(rocketStealRule(p, { id: C1, battle: id }, ctx), { ok: true, stolen: true, id: C1 });
+  assert.deepEqual([p.mons[C1].stolen, p.rocketLost, p.mons[U1]], [1, 1, undefined]);
+});
+
+test('★ 🚀 이기기 규칙이 ⚡40·💰20(번 코인 통계에도)을 끝남과 같은 저장에서 더한다 — 이미 끝난 배틀이면 안 더한다 (Codex 43차 #1)', () => {
+  const p = P({ caught: { [C1]: 1 }, xp: 100, coins: 7, coinsEarned: 50 });
+  const id = battle(p, C1, WON);
+  assert.deepEqual(rocketWinRule(p, { backId: null, battle: id }), { ok: true, back: null });
+  assert.deepEqual([p.xp, p.coins, p.coinsEarned], [100 + ROCKET.winXp, 7 + ROCKET.winCoins, 50 + ROCKET.winCoins]);
+  assert.deepEqual(rocketWinRule(p, { backId: null, battle: id }), { ok: false, why: 'done' });
+  assert.deepEqual([p.xp, p.coins, p.coinsEarned], [100 + ROCKET.winXp, 7 + ROCKET.winCoins, 50 + ROCKET.winCoins], '두 번 주지 않는다');
+  const lost = P({ caught: { [C1]: 2 }, xp: 5 });
+  steal(lost, C1);
+  assert.equal(lost.xp, 5, '진 배틀에는 보상이 없다');
+});
+
+test('★ 🚀 시작(rocketAdmitRule): 오늘 몫과 배틀 기록을 같은 자리에서 — 진행 중 배틀이 있으면 몫을 안 쓰고 그 배틀 · 저장된 20분 간격 · 하루 몫을 다 쓰면 안 연다 (Codex 43차 #3)', () => {
+  const D = '2026-10-09';
+  const t0 = 1760000000000;
+  const p = P({ caught: { [C1]: 1 }, rocketLast: { en: t0 } });
+  const early = rocketAdmitRule(p, null, D, 'rocketEn', 3, rocketNew({ subject: 'en', target: C1, now: t0 + 60 * 1000 }));
+  assert.deepEqual([early.ok, early.why, early.cur, early.daily], [false, 'gap', null, undefined], '저장된 기록으로 1분 뒤는 안 연다(다른 창이 막 열었다)');
+  assert.equal(p.rocketCur, null);
+  const almost = rocketAdmitRule(p, null, D, 'rocketEn', 3, rocketNew({ subject: 'en', target: C1, now: t0 + ROCKET.gapMin * 60 * 1000 - 1 }));
+  assert.equal(almost.why, 'gap', '20분에서 1ms 모자라도');
+  const a = rocketNew({ subject: 'en', target: C1, now: t0 + ROCKET.gapMin * 60 * 1000 });
+  const r = rocketAdmitRule(p, { date: D, rocketEn: 1 }, D, 'rocketEn', 3, a);
+  assert.equal(r.ok, true, '20분이면 연다');
+  assert.deepEqual([r.cur.id, p.rocketCur.id, p.rocketLast.en], [a.id, a.id, a.at]);
+  assert.deepEqual([r.daily.date, r.daily.rocketEn], [D, 2], '몫은 같은 자리에서 +1');
+  const m = rocketNew({ subject: 'math', target: C1, now: a.at });
+  const busy = rocketAdmitRule(p, { date: D, rocketMath: 0 }, D, 'rocketMath', 3, m);
+  assert.deepEqual([busy.ok, busy.why, busy.cur.id, busy.daily], [false, 'busy', a.id, undefined], '진행 중인 배틀이 있으면 몫을 안 쓰고 그 배틀을');
+  const busyFull = rocketAdmitRule(p, { date: D, rocketEn: 3 }, D, 'rocketEn', 3, rocketNew({ subject: 'en', target: C1, now: a.at + 3600 * 1000 }));
+  assert.deepEqual([busyFull.why, busyFull.cur && busyFull.cur.id], ['busy', a.id], '오늘 몫을 다 썼어도 진행 중인 배틀은 이어 간다(변이 검사가 찾음)');
+  const q = P({ caught: { [C1]: 1 } });
+  const cap = rocketAdmitRule(q, { date: D, rocketMath: 3 }, D, 'rocketMath', 3, m);
+  assert.deepEqual([cap.ok, cap.why, cap.cur, q.rocketCur, q.rocketLast], [false, 'cap', null, null, {}], '하루 몫을 다 썼으면 안 연다(간격 시각도 안 남긴다)');
+  const fut = P({ rocketLast: { math: t0 } });
+  assert.equal(rocketAdmitRule(fut, null, D, 'rocketMath', 3, rocketNew({ subject: 'math', target: C1, now: t0 - 3600 * 1000 })).why, 'gap', '시계가 뒤로 간 기기 — 저장된 시각이 미래여도 간격 안');
+  const fresh = rocketAdmitRule(P(), null, D, 'rocketMath', 3, rocketNew({ subject: 'math', target: C1, now: t0 }));
+  assert.deepEqual([fresh.ok, fresh.daily.rocketMath], [true, 1], '오늘 기록이 없어도 연다');
 });

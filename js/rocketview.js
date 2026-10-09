@@ -211,6 +211,28 @@ function button(label, primary, onClick) {
   $('.rocket-actions').appendChild(b);
   return b;
 }
+/**
+ * 💾 저장 — 저장이 안 되면(why:'save') "다시 저장·나중에"를 묻는다 (Codex 43차 #2). 메모리로 이어 가지 않는다:
+ * 그러면 다음 저장이 덮어 맞힌 답이 사라지거나 보상을 두 번 받았다. 나중에면 null — 화면을 닫고, 배틀은 저장된 데까지 남아 다음에 이어진다.
+ * 저장 실패가 아닌 결과(이미 끝난 배틀 등)는 그대로 돌려준다
+ * @param {() => Promise<{ok:boolean, why?:string}>} fn
+ */
+async function persist(fn) {
+  for (;;) {
+    const r = await fn();
+    if (!r || r.why !== 'save') return r;
+    clearPanel();
+    msg('💾 저장이 안 됐어요. 다시 눌러 볼까요? (나중에 하면 다음에 이 자리부터 이어서 해요)');
+    const again = await new Promise((resolve) => {
+      button('다시 저장', true, () => resolve(true));
+      button('나중에', false, () => resolve(false));
+    });
+    clearPanel();
+    msg('');
+    if (!again || !ui.open) return null;
+  }
+}
+
 /** 마지막 버튼 하나 — 누르면 닫힌다 */
 function finish(label) {
   return new Promise((resolve) => {
@@ -275,7 +297,8 @@ export async function openRocket(o) {
       ui.closeQuiz = null;
       if (!ui.open || r.interrupted) return;
       const correct = !!r.correct && !r.skipped; // ⏭ 모르겠어요는 틀린 것
-      const saved = await o.saveStep(correct);
+      const saved = await persist(() => o.saveStep(correct));
+      if (!saved) return; // 💾 나중에 — 이 답은 저장되지 않았다(다음에 이 자리부터)
       if (!saved.ok) {
         // 다른 창(또는 다시 연 앱)이 이미 이 배틀을 끝냈다
         if (saved.st && saved.st.outcome) { st = saved.st; break; }
@@ -304,20 +327,24 @@ export async function openRocket(o) {
             b.appendChild(el('span', '', `${h.ko}${h.n > 1 ? ` ×${h.n}` : ''}`));
           }
         });
-        const w = await o.win(backId);
+        const w = await persist(() => o.win(backId));
+        if (!w) return; // 💾 나중에 — 이긴 배틀로 남아 다음에 다시 고른다
         clearPanel();
         const got = held.find((h) => h.id === w.back);
         msg(w.ok ? (got ? `🎉 ${got.ko}${josa(got.ko, '을', '를')} 구했어요! ⚡+${ROCKET.winXp} 💰+${ROCKET.winCoins}` : `🎉 로켓단을 쫓아냈어요! ⚡+${ROCKET.winXp} 💰+${ROCKET.winCoins}`) : '이미 끝난 배틀이에요.');
         $('.rocket-score').textContent = '';
       } else {
-        const w = await o.win(null);
+        const w = await persist(() => o.win(null));
+        if (!w) return;
         if (!w.ok) msg('이미 끝난 배틀이에요.');
         $('.rocket-score').textContent = '';
       }
       await finish('계속하기 ▶');
     } else if (st.outcome === 'lose') {
-      const l = await o.lose(); // 그림보다 먼저 저장 — 애니메이션 중에 꺼져도 결과는 남는다
-      await snatch(!!(l && l.stolen));
+      const l = await persist(() => o.lose()); // 그림보다 먼저 저장 — 애니메이션 중에 꺼져도 결과는 남는다
+      if (!l) return; // 💾 나중에 — 진 배틀로 남아 다음에 이어진다
+      if (!l.ok) { msg('다른 화면에서 이미 끝난 배틀이에요.'); await finish('닫기'); return; } // "빈손"이라고 잘못 말하지 않게
+      await snatch(!!l.stolen);
       $('.rocket-score').textContent = '';
       msg(l && l.stolen
         ? `😢 ${o.target.ko}${josa(o.target.ko, '을', '를')} 빼앗겼어요… 다음에 로켓단을 이기면 아지트에서 구해 올 수 있어요!`

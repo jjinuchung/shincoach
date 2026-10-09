@@ -33,12 +33,13 @@ import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import { DEFAULT_MIN as TIME_MIN, EXTEND_MAX, EXTEND_MIN, extMaxOf, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
 import { setBgmEnabled } from './bgm.js';
 import * as track from './track.js';
-import { rocketPick, rocketBegin, rocketCurrent, rocketTargets, rocketLastAt } from './xp.js'; // 🚀 로켓단 습격 — 영어 (2026-10-09)
+import { rocketPick, rocketAdmit, rocketCurrent, rocketTargets, rocketLastAt } from './xp.js'; // 🚀 로켓단 습격 — 영어 (2026-10-09)
 import { ROCKET, shouldRocket, rocketNew } from './rocket.js';
 import { playRocket } from './rocketplay.js';
 import { wordQuiz, wordQuestion } from './rocketquiz.js';
 import { isRocketOpen } from './rocketview.js';
-import { status as rocketTimeStatus } from './timelimit.js';
+// ⏳ 남은 시간 · 홈에서 이어 간 영어 배틀도 영어 시간으로 (Codex 43차 #7) — 마지막 import 줄 끝에는 주석을 달지 않는다(player.logic 테스트가 import를 줄 끝 ';'로 걸러 낸다)
+import { status as rocketTimeStatus, setSubject as rocketTimeSubject, currentSubject as rocketTimeNow } from './timelimit.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -607,17 +608,27 @@ function maybeRocketEn(todayDone) {
   state.rocketPending = true;
 }
 
-/** 걸어 둔 로켓단을 연다 — 낼 단어가 있고, 오늘 몫(영어 하루 3번)을 선점하고, 배틀 기록을 저장한 뒤. 끝나면 continueFn */
+/**
+ * 걸어 둔 로켓단을 연다 — 낼 단어가 있고, 오늘 몫(영어 하루 3번)과 배틀 기록을 한 저장에서 잡은 뒤. 끝나면 continueFn.
+ * 준비(단어 읽기·저장)를 기다리는 동안에도 **열린 것으로** 친다 — 그 사이 '다음'을 또 누르면 퍼즐이 먼저 열리고
+ * 로켓단이 그 위에 또 열렸다 (Codex 43차 #4). 영상도 여기서 멈춘다. 못 열면 막은 것을 풀고 이어 간다(같은 영상일 때만)
+ */
 async function startRocketEn(continueFn) {
   state.rocketPending = false;
   state.rocketStreak = 0;
+  state.rocketOpen = true;
+  cancelShadowWait();
+  if (!video.paused) video.pause();
+  const item = state.item;
+  const live = () => state.open && state.item === item;
+  const skip = () => { state.rocketOpen = false; if (live()) continueFn(); };
   const target = rocketPick();
   const records = await listVocabViews().catch(() => []);
-  if (!target || !getPartner() || !wordQuestion(records) || !state.open) { continueFn(); return; }
-  if (!await track.markRocketEn(ROCKET.maxPerDay) || !state.open) { continueFn(); return; }
-  const b = await rocketBegin(rocketNew({ subject: 'en', target: target.id }));
-  // 다른 창이 연 배틀이 있으면 그것을 이어 간다 — 수학 배틀이면 수학에서 이어 가므로 여기서는 열지 않는다
-  if (!b.cur || b.cur.subject !== 'en' || !state.open) { continueFn(); return; }
+  if (!target || !getPartner() || !wordQuestion(records) || !live()) { skip(); return; }
+  const cur = rocketNew({ subject: 'en', target: target.id });
+  const b = await track.admitRocketEn(ROCKET.maxPerDay, (date, field, max) => rocketAdmit(date, field, max, cur));
+  // 진행 중인 배틀이 있으면(다른 창·앞 배틀) 몫을 쓰지 않고 그것을 이어 간다 — 수학 배틀이면 수학에서 이어 가므로 여기서는 열지 않는다
+  if (!b.cur || b.cur.subject !== 'en' || !live()) { skip(); return; }
   await runRocketEn(b.cur, !b.ok, continueFn);
 }
 
@@ -651,9 +662,13 @@ export async function resumeEnglishRocket() {
   const records = await listVocabViews().catch(() => []);
   if (!wordQuestion(records)) return false;
   state.rocketOpen = true;
+  // ⏳ 홈(시간을 안 세는 화면)에서 이어 가도 영어 배틀이니 영어 시간으로 센다 — 끝나면 원래대로 (Codex 43차 #7)
+  const prevSubject = rocketTimeNow();
+  rocketTimeSubject('english');
   try {
     await playRocket({ cur, resume: true, chars: state.characters, quiz: wordQuiz(() => listVocabViews()) });
   } finally {
+    if (rocketTimeNow() === 'english') rocketTimeSubject(prevSubject);
     state.rocketOpen = false;
     updateLevelChip();
     updatePartnerChip();
@@ -1828,6 +1843,8 @@ function goTo(i, { play = true, force = false } = {}) {
     showPlayerMessage('🎤 따라 말해야 다음으로 넘어갈 수 있어요');
     return;
   }
+  // 🚀 로켓단을 준비하거나 여는 중에는 넘어가지 않는다 — 끝나면 로켓단이 가려던 문장으로 데려간다(force) (Codex 43차 #4)
+  if (!force && state.rocketOpen) return;
   // 🚀 로켓단이 걸려 있으면 앞으로 넘어가기 전에 먼저 (배틀보다 먼저 — 따라 말하기 흐름은 이 goTo를 탄다)
   if (!force && i > state.idx && state.rocketPending) {
     startRocketEn(() => goTo(i, { play, force: true }));
@@ -2235,7 +2252,8 @@ function afterShadowWait() {
   cancelShadowWait();
   if (next === 'repeat') { replayCurrent(); return; }
   if (state.idx >= state.cues.length - 1) { // 마지막 문장: 배틀이 걸려 있으면 배틀, 아니면 퍼즐 (Codex #4)
-    if (state.battlePending) startBattle(() => {});
+    if (state.rocketPending) startRocketEn(() => {}); // 🚀 로켓단이 먼저 — onCueEnd 마지막 문장과 같게 (따라 말하기 길에 빠져 있었다, Codex 43차 #5)
+    else if (state.battlePending) startBattle(() => {});
     else if (puzzleReady()) startPuzzle(() => {});
     else if (state.reviewPending) {
       state.reviewPending = false;

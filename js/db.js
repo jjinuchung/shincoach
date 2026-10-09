@@ -8,7 +8,7 @@ import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE, STO
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
-import { stealables, hideout, rocketStep, copyRocketCur, mergeRocketDone } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수 — evolve만 import)
+import { ROCKET, rocketGapOk, stealables, hideout, rocketStep, copyRocketCur, mergeRocketDone } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수 — evolve만 import)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -1648,14 +1648,15 @@ export function applyBattleLoss(monId, lossesToLose) {
  * 🚀 로켓단에게 져서 노리던 포켓몬을 빼앗긴다 (2026-10-09). **저장된 프로필로 다시 판정** — 배틀 사이에 다른 창에서 팔았거나
  * 파트너로 정했거나 아빠가 등급을 옮겼으면 빼앗을 수 없다(빈손으로 돌아감). 빼앗긴 수는 mons[id].stolen 단조 카운터 —
  * caught를 줄이면 옛 백업(max)이 되살려 복제된다(배틀 fled와 같은 함정). 도감 칸(caught)은 남는다. 진 수(rocketLost)는 빈손이어도 센다
- * @param {{id:number, battle?:string}} req 노리던 포켓몬 · 배틀 id(있으면 그 배틀은 한 번만 — 두 창·다시 연 앱이 두 번 빼앗지 않게)
+ * @param {{id:number, battle:string}} req 노리던 포켓몬 · 배틀 id — 저장된 진행 중 배틀이 이 id이고, 세 번 틀려 진 상태이고, 노리던 포켓몬이 이것이어야
+ *   끝낸다(endBattle). 그 배틀은 한 번만 — 두 창·다시 연 앱이 두 번 빼앗지 않게
  * @param {{rarity:(id:number) => number, known?:(id:number) => boolean}} ctx 저장된 프로필로 만든 등급 ctx
- * @returns {{ok:true, stolen:boolean, id:number}}
+ * @returns {{ok:boolean, why?:string, stolen?:boolean, id?:number}}
  */
 export function rocketStealRule(profile, req, ctx, now = Date.now()) {
-  const id = Number(req && req.id);
-  const end = endBattle(profile, req && req.battle, 'lose', now);
+  const end = endBattle(profile, req && req.battle, 'lose', now, Number(req && req.id));
   if (!end.ok) return end;
+  const id = Number(end.cur.target); // 저장된 배틀이 노리던 포켓몬 (Codex 43차 #6)
   profile.rocketLost = (Number(profile.rocketLost) || 0) + 1;
   if (!stealables(profile, ctx).some((m) => m.id === id)) return { ok: true, stolen: false, id };
   profile.mons = profile.mons || {};
@@ -1670,14 +1671,19 @@ export function applyRocketSteal(req, makeCtx) {
 
 /**
  * 🚀 로켓단을 쫓아냈다 (2026-10-09) — 물리친 수(rocketWon) +1, 아지트에 갇힌 포켓몬이 있으면 고른 한 마리를 되찾는다(mons[id].back 단조).
- * 고른 것이 그 사이 다른 창에서 이미 되찾아졌으면 되찾지 않는다(저장된 아지트로 판정). ⚡💰는 호출부가 증분으로 (야생 배틀과 같게)
- * @param {{backId?:number|null, battle?:string}} req 배틀 id(있으면 한 번만)
- * @returns {{ok:true, back:number|null}}
+ * 고른 것이 그 사이 다른 창에서 이미 되찾아졌으면 되찾지 않는다(저장된 아지트로 판정).
+ * ⚡40·💰20(번 코인 통계에도)도 **여기서** — 끝남과 같은 저장에. 예전엔 끝남을 먼저 저장하고 ⚡💰를 증분으로 따로 더해서,
+ * 그 사이 앱이 꺼지거나 저장이 실패하면 보상만 사라지고 "이미 끝난 배틀"이라 다시 받을 길도 없었다 (Codex 43차 #1)
+ * @param {{backId?:number|null, battle:string}} req 배틀 id — 저장된 진행 중 배틀이 이 id이고 세 번 맞혀 이긴 상태여야 끝낸다(endBattle)
+ * @returns {{ok:boolean, why?:string, back?:number|null}}
  */
 export function rocketWinRule(profile, req, now = Date.now()) {
   const end = endBattle(profile, req && req.battle, 'win', now);
   if (!end.ok) return end;
   profile.rocketWon = (Number(profile.rocketWon) || 0) + 1;
+  profile.xp = (Number(profile.xp) || 0) + ROCKET.winXp;
+  profile.coins = (Number(profile.coins) || 0) + ROCKET.winCoins;
+  profile.coinsEarned = (Number(profile.coinsEarned) || 0) + ROCKET.winCoins;
   const id = Number(req && req.backId);
   if (!id || !hideout(profile).some((h) => h.id === id)) return { ok: true, back: null };
   profile.mons = profile.mons || {};
@@ -1691,29 +1697,36 @@ export function applyRocketWin(req) {
 
 /**
  * 🚀 배틀을 끝낼 수 있나 — 이미 끝난 배틀(rocketDone)이면 아무것도 안 한다(두 창·다시 연 앱이 같은 배틀을 두 번 처리하지 않게).
- * 진행 중인 배틀 기록이 이 배틀이면 그 결과가 맞아야 끝낸다(진 배틀로 이긴 보상을 받지 않게) — 끝내면 기록을 비우고 끝난 목록에 적는다
+ * **저장된 진행 중 배틀**이 이 배틀이고 그 결과(outcome)로 끝난 상태여야 끝낸다 — 빼앗기면 노리던 포켓몬(target)도 같아야 한다.
+ * 예전엔 배틀 id가 없거나 진행 중 기록이 없으면 그냥 통과시켜, 시작한 적 없는 배틀로도 빼앗기·되찾기가 됐다 (Codex 43차 #6).
+ * 끝내면 기록을 비우고 끝난 목록에 적는다. 거절이면 프로필을 건드리지 않는다
+ * @returns {{ok:true, cur:object}|{ok:false, why:'nobattle'|'done'|'nocur'|'outcome'|'target'}}
  */
-function endBattle(profile, battle, outcome, now) {
-  if (!battle) return { ok: true };
+function endBattle(profile, battle, outcome, now, target = null) {
+  if (!battle) return { ok: false, why: 'nobattle' };
   const bid = String(battle);
-  profile.rocketDone = { ...(profile.rocketDone || {}) };
-  if (profile.rocketDone[bid]) return { ok: false, why: 'done' };
+  const done = profile.rocketDone || {};
+  if (done[bid]) return { ok: false, why: 'done' };
   const cur = profile.rocketCur;
-  if (cur && cur.id === bid && cur.st && cur.st.outcome !== outcome) return { ok: false, why: 'outcome' };
-  profile.rocketDone[bid] = { o: outcome, at: Math.floor(now) };
-  if (cur && cur.id === bid) profile.rocketCur = null;
-  return { ok: true };
+  if (!cur || cur.id !== bid) return { ok: false, why: 'nocur' };
+  if (!cur.st || cur.st.outcome !== outcome) return { ok: false, why: 'outcome' };
+  if (target !== null && Number(cur.target) !== Number(target)) return { ok: false, why: 'target' };
+  profile.rocketDone = { ...done, [bid]: { o: outcome, at: Math.floor(now) } };
+  profile.rocketCur = null;
+  return { ok: true, cur };
 }
 
 /**
  * 🚀 배틀 시작 — 진행 중인 배틀 기록(rocketCur)을 저장한다. 이미 다른 배틀이 진행 중이면(다른 창이 먼저 열었거나 앞 배틀이 안 끝났으면)
- * 새로 열지 않고 그 배틀을 돌려준다 — 한 번에 하나만
- * @returns {{ok:boolean, why?:'busy'|'done', cur:object}}
+ * 새로 열지 않고 그 배틀을 돌려준다 — 한 번에 하나만. 그 과목의 20분 간격도 **저장된** 마지막 등장 시각으로 본다 —
+ * 창의 판정(shouldRocket)은 그 창이 아는 시각뿐이라, 다른 창이 1분 전에 연 것을 모르고 또 열었다 (Codex 43차 #3)
+ * @returns {{ok:boolean, why?:'busy'|'done'|'gap', cur:object|null}}
  */
 export function rocketBeginRule(profile, cur) {
   const done = profile.rocketDone || {};
   if (profile.rocketCur && !done[profile.rocketCur.id]) return { ok: false, why: 'busy', cur: profile.rocketCur };
   if (!cur || !cur.id || done[cur.id]) return { ok: false, why: 'done', cur: null };
+  if (!rocketGapOk((profile.rocketLast || {})[cur.subject], Number(cur.at) || 0)) return { ok: false, why: 'gap', cur: null };
   profile.rocketCur = copyRocketCur(cur);
   // ⏱ 그 과목의 마지막 등장 시각 — 20분 간격(ROCKET.gapMin)의 기준. 저장된 프로필이라 앱을 껐다 켜도·두 창이어도 지켜진다
   const last = { ...(profile.rocketLast || {}) };
@@ -1721,8 +1734,38 @@ export function rocketBeginRule(profile, cur) {
   profile.rocketLast = last;
   return { ok: true, cur: profile.rocketCur };
 }
-export function applyRocketBegin(cur) {
-  return mutateProfile((p) => rocketBeginRule(p, cur));
+
+/**
+ * 🚀 배틀 시작 + 오늘 몫 (Codex 43차 #3) — 진행 중인 배틀이 있으면 몫을 쓰지 않고 그 배틀을 돌려준다(busy, 이어 가기) ·
+ * 하루 몫을 다 썼으면(cap)·간격 안이면(gap) 열지 않는다 · 열면 오늘 기록의 그 칸(field: rocketMath·rocketEn)을 +1.
+ * 몫과 배틀 기록을 **같은 자리에서** 정한다 — 예전엔 몫을 먼저 쓰고 나서야 영어 배틀이 진행 중인 걸 알아 수학 몫만 사라졌다
+ * @param {object|null} curDaily 저장된 오늘 기록
+ * @returns {{ok:boolean, why?:'busy'|'cap'|'gap'|'done', cur:object|null, daily?:object}}
+ */
+export function rocketAdmitRule(profile, curDaily, date, field, max, cur) {
+  const done = profile.rocketDone || {};
+  if (profile.rocketCur && !done[profile.rocketCur.id]) return { ok: false, why: 'busy', cur: profile.rocketCur };
+  if (((curDaily && Number(curDaily[field])) || 0) >= max) return { ok: false, why: 'cap', cur: null };
+  const b = rocketBeginRule(profile, cur);
+  if (!b.ok) return b;
+  return { ...b, daily: mergeDailyDelta(curDaily, date, { [field]: 1 }) };
+}
+/** 🚀 배틀 시작 + 오늘 몫을 **한 트랜잭션**에서 (프로필·오늘 기록 두 저장소 — ⏳ 연장권 applyExtend와 같은 모양) */
+export async function applyRocketAdmit(date, field, max, cur) {
+  const db = await openDb();
+  const tx = db.transaction(['profile', 'daily'], 'readwrite');
+  const ps = tx.objectStore('profile');
+  const ds = tx.objectStore('daily');
+  const curP = (await promisify(ps.get('me'))) || emptyProfile();
+  const curD = await promisify(ds.get(date));
+  const next = cloneProfile(curP);
+  const r = rocketAdmitRule(next, curD, date, field, max, cur);
+  if (!r.ok) { await txDone(tx); return { ...r, profile: curP }; }
+  next.updatedAt = nextStamp(curP);
+  ps.put(next);
+  ds.put(r.daily);
+  await txDone(tx);
+  return { ...r, profile: next };
 }
 
 /**

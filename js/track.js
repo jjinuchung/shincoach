@@ -469,12 +469,23 @@ export function markBattle(max) {
   return claim('battles', max, true); // 🔢 수학과 같은 칸을 쓴다 — 실패하면 안 쓴 것으로 (Codex 9차 #9)
 }
 
-/** 🚀 오늘 영어에서 로켓단이 나온 수 / 한 자리 선점 (영어 하루 3번 — 수학은 rocketMath를 따로 센다, 아버님 결정) */
+/** 🚀 오늘 영어에서 로켓단이 나온 수 (영어 하루 3번 — 수학은 rocketMath를 따로 센다, 아버님 결정) */
 export function todayRocketsEn() {
   return t.daily ? (Number(t.daily.rocketEn) || 0) : 0;
 }
-export function markRocketEn(max) {
-  return claim('rocketEn', max, true); // 저장이 안 되면 안 나온 것으로 (배틀과 같다)
+/**
+ * 🚀 영어 로켓단 시작 — 오늘 몫(rocketEn)과 배틀 기록을 **한 트랜잭션**에서 (admit = xp.rocketAdmit, Codex 43차 #3).
+ * 예전엔 몫을 먼저 선점(claim)하고 배틀 기록을 따로 저장해, 진행 중인 배틀이 있거나 저장이 안 되면 몫만 사라졌다.
+ * 몫은 새 배틀을 열 때만 쓰인다 — 열면 저장된 오늘 기록을 받아 보기값을 맞춘다
+ * @param {(date:string, field:string, max:number) => Promise<{ok:boolean, why?:string, cur:object|null, daily?:object}>} admit
+ */
+export async function admitRocketEn(max, admit) {
+  if (!t.daily || (Number(t.daily.rocketEn) || 0) >= max) return { ok: false, why: 'cap', cur: null };
+  await flush();                       // 보기값과 저장값을 먼저 맞춘다 (claim과 같다)
+  const date = t.daily.date;
+  const r = await admit(date, 'rocketEn', max);
+  if (r && r.ok) adoptSaved(date, r.daily);
+  return r || { ok: false, why: 'save', cur: null };
 }
 
 /** 🔤 오늘 단어 이어 주기를 몇 판 했는지 / 한 판 선점 (하루 상한) */

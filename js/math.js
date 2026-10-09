@@ -28,7 +28,7 @@ import { unlockState, MATH_PTS, nextTarget, previewGift, ownedVoucherIds, needOf
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
-import { rocketPick, rocketBegin, rocketCurrent, rocketLastAt, profileReady } from './xp.js'; // 🚀 로켓단 습격 (2026-10-09)
+import { rocketPick, rocketAdmit, rocketCurrent, rocketLastAt, profileReady } from './xp.js'; // 🚀 로켓단 습격 (2026-10-09)
 import { ROCKET, shouldRocket, rocketNew } from './rocket.js';
 import { isRocketOpen } from './rocketview.js';
 import { playRocket } from './rocketplay.js'; // 🚀 저장·화면을 묶는 공통 실행기 (영어와 같다)
@@ -2123,13 +2123,11 @@ async function startRocket(after) {
   const run = ui.run; // 트랜잭션을 기다리는 사이 아이가 홈·사다리로 나갔으면 열지 않는다 (배틀과 같다)
   const target = rocketPick();
   if (!target || !getPartner() || mathHidden()) { after(); return; }
-  let won = false;
-  try { won = (await claimDailyCount(todayKey(), ROCKET.field.math, ROCKET.maxPerDay)).won; } catch { won = false; }
-  if (!won || run !== ui.run || mathHidden()) { after(); return; }
-  ui.today.rockets = (ui.today.rockets || 0) + 1;
-  const b = await rocketBegin(rocketNew({ subject: 'math', target: target.id, stem: ui.stem }));
-  // 다른 창이 연 배틀이 있으면 그것을 이어 간다 — 영어 배틀이면 영어에서 이어 가므로 여기서는 열지 않는다
-  if (!b.cur || b.cur.subject !== 'math' || run !== ui.run) { after(); return; }
+  // 오늘 몫(수학 하루 3번)과 배틀 기록을 한 트랜잭션에서 — 저장된 20분 간격·진행 중인 배틀도 거기서 본다 (Codex 43차 #3)
+  const b = await rocketAdmit(todayKey(), ROCKET.field.math, ROCKET.maxPerDay, rocketNew({ subject: 'math', target: target.id, stem: ui.stem }));
+  if (b.ok) ui.today.rockets = Number(b.daily && b.daily[ROCKET.field.math]) || (ui.today.rockets || 0) + 1;
+  // 진행 중인 배틀이 있으면(다른 창·앞 배틀) 몫을 쓰지 않고 그것을 이어 간다 — 영어 배틀이면 영어에서 이어 가므로 여기서는 열지 않는다
+  if (!b.cur || b.cur.subject !== 'math' || run !== ui.run || mathHidden()) { after(); return; }
   await runRocket(b.cur, !b.ok, after);
 }
 
