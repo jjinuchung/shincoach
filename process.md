@@ -2587,3 +2587,85 @@
 - [ ] 승인 → v216 커밋(fix + docs)·푸시·라이브 v216 확인
 - [ ] 아버님: AA 새 검수 페이지 · 태블릿 v216 · Z·Y·X·W·V·U 검수
 - [ ] 그다음 줄기 AB 평면도형의 이동(4-1 마지막) — 설계부터, Codex 43차
+
+## 2026-10-09 (낮) — 🚀 로켓단 습격 설계 · 1단계 규칙·저장 (미커밋)
+
+### 진행 내용
+- 아버님 아이디어: 수학·영어 공부 중 진우의 포켓몬을 노리는 로켓단(로사·로이·나옹)이 나타나고, 문제를 맞혀 쫓아내면 만화처럼 날아가며 "반짝" · 지면 전설 아래(흔함 50 · 보통 35 · 희귀 15)에서 빼앗김 · 애니메이션 많이
+- 설계안(나타나는 때·배틀·빼앗김·애니메이션·기본값 5개) → 아버님 **"하루 3번, 수학·영어 따로 각각 3번. 나머지는 너의 추천대로"**
+  - 등장: 그 과목을 어느 정도 한 뒤(수학 5문항·영어 10문장) **세 번 연속 맞힌 바로 다음 쉼표**에서 30% — 틀리고 기운 빠졌을 때 빼앗으면 공부가 싫어진다, 잘 풀리는 흐름이라 이기는 경험이 쌓인다 · 안 나옴: 진단·배움 장·🔁 쌍둥이·🎯 도전·❓·회차 마지막 문항 뒤·남은 시간 5분 미만·야생 배틀이 잡혀 있을 때·빼앗을 포켓몬이 없을 때
+  - 배틀: 문제 최대 5개(수학은 아는 개념, 영어는 오늘 영상의 단어 뜻 고르기) · 3번 맞히면 쫓아냄 · 3번 틀리면 빼앗김 · 파트너가 싸우고 파트너만 지킴
+  - 빼앗긴 포켓몬은 🚀 로켓단 아지트에 갇힘 → 다음 습격에서 이기면 1마리 되찾기 · 도감 칸은 남고 🚀 표시 · 이기면 ⚡(야생 배틀과 같게) + 💰20
+- 1단계 `js/rocket.js`(순수 규칙 — evolve.js만 import): ROCKET 상수 · shouldRocket(등장) · stealables(노릴 수 있는 포켓몬: 데리고 있음·파트너 아님·흔함~희귀·명단 안·🌌 아님, 아빠가 옮긴 등급까지) · pickTarget(등급 50 : 35 : 15, 없는 등급은 남은 등급끼리, 등급 안에서는 종마다 같게) · rocketStart/rocketStep(3승 3패) · hideout(아지트)
+- 저장: 빼앗김 `mons[id].stolen`·되찾음 `back` 단조 카운터(evolve.rocketHeldOf = stolen − back, haveOf에서 뺌) · 병합 max(mons 카운터 목록 + 프로필 rocketWon·rocketLost) · 오늘 기록 rocketMath·rocketEn(DAILY_SUMS, 선점은 claimDailyCount) · db.rocketStealRule(저장된 프로필로 다시 판정 — 그 사이 팔았거나·파트너가 됐거나·전설로 옮겼으면 빈손, 진 수는 셈)·rocketWinRule(물리친 수 +1, 아지트에서 고른 한 마리 back +1) · xp.js rocketCtx·rocketTargets·rocketPick·rocketHideout·rocketHeldCount·rocketRecord·rocketLose·rocketWin(⚡·💰는 증분) · sw APP_SHELL에 rocket.js
+- 테스트 `tests/rocket.test.js` 14(결정 상수 · 등장 조건 하나씩 · 32가지 답 차례 · 노릴 수 있는 포켓몬 · 50 : 35 : 15와 경계 · 빼앗기·다시 판정 · 이기기·되찾기 · 병합 max 두 방향 · 하루 횟수 · 다른 보유 줄이기와 겹침 · xp 함수 · 순수 import) + 카운터 목록·haveOf 줄을 그대로 비교하던 테스트 셋(fusion·sell·trade)을 새 목록에 맞춤
+- 변이 40 다 잡힘(`.context/rocket_stage1/mutate_r1.mjs`) — 처음 지나간 셋(등급 경계 < → <= · 병합에서 back만 빠짐 · 🌌을 아빠가 희귀로 옮긴 경우)은 테스트를 더해 잡음
+
+### 변경 파일
+- `js/rocket.js` (새) · `tests/rocket.test.js` (새)
+- `js/evolve.js` — rocketHeldOf · haveOf · `js/db.js` — DAILY_SUMS·emptyProfile·병합·rocketStealRule·rocketWinRule · `js/xp.js` — 로켓단 함수 · `sw.js` — APP_SHELL
+- `tests/fusion.test.js`·`sell.test.js`·`trade.test.js` — 카운터 목록·haveOf 줄 정규식
+
+### 결정사항 / 메모
+- 빼앗김·되찾음은 caught를 건드리지 않는 단조 카운터 둘 — 줄이는 값을 두면 옛 백업(max)이 빼앗긴 포켓몬을 되살리거나 되찾은 것을 다시 가둔다(퓨전 fused/unfused와 같은 모양)
+- 빼앗기 판정은 배틀 시작에 고른 대상을 **저장된 프로필로 다시** 본다 — 배틀 사이 다른 창의 팔기·파트너·등급 옮기기를 따른다(교환·팔기와 같은 원칙)
+
+### TODO (다음 작업)
+- [ ] 2단계: 로켓단 화면·애니메이션(열기구 등장·구호·노리기·공격·폭발·날아가며 반짝·그물) · 효과음 · 수학 연결 · 헤드리스 800·390
+- [ ] 3단계: 영어 연결(단어 뜻 고르기) · 📊 기록 · 도감 🚀 · 아지트 보기 → v217 → Codex 43차 → v218
+
+## 2026-10-09 (오후) — 🚀 로켓단 2단계: 화면·애니메이션·수학 연결·이어 가기 (미커밋)
+
+### 진행 내용
+- 아버님: 배틀 도중 앱을 닫으면 **(다) 다음에 앱을 열면 그 배틀이 이어지게**(도망칠 수도 억울할 수도 없게) → "2단계 진행하자"
+- 진행 중인 배틀을 프로필에 저장: `rocketCur`(id·과목·노리는 포켓몬·줄기·맞힌/틀린 수) · 끝난 배틀 `rocketDone`(합집합) — rocket.rocketNew·copyRocketCur·mergeRocketDone · db.rocketBeginRule(진행 중이면 그것을 돌려줌 — 한 번에 하나)·rocketStepRule(문제마다 저장, 다른 배틀 id·승패 뒤는 거절) · 빼앗기·이기기는 배틀 id로 **한 번만**(endBattle: 끝난 배틀이면 아무것도 안 함, 결과가 다르면 거절, 끝나면 진행 중 기록을 비움) · 병합: 끝난 목록 합집합, 진행 중은 최근 쪽(없으면 다른 쪽) — 끝난 목록에 있으면 비움 · xp.rocketCurrent·rocketBegin·rocketSaveStep·profileReady · 이미 끝난 배틀이면 ⚡💰 없음
+- 화면 `js/rocketview.js`(과목과 무관 — 문제·저장 함수는 부르는 쪽이 넘김): ① 경보(삐뽀·빨간 번쩍) ② 나옹 열기구(공식 도트 52번, 없으면 😼)가 흔들리며 내려옴 ③ 구호 말풍선(탭하면 건너뜀 — 대사는 MOTTO·BLAST 한곳에, **한국판 표현 확인 필요**) ④ "진우의 ○○를 가져가겠다옹!" 노리는 포켓몬 빨갛게 ⑤ 문제(수학은 배틀 문제 — 그 배틀을 시작한 줄기의 아는 개념, 기록 안 함): 맞히면 파트너의 타입 기술 이모지가 열기구로 날아가 ❤️ 하나 깨짐(번쩍·흔들림), 틀리면 🦾 로봇팔이 한 칸 내려옴 · ⏭ 모르겠어요는 틀린 것 · 문제마다 **먼저 저장하고** 그림 ⑥ 이기면 💥 → 빙글빙글 하늘 저편으로 "로켓단은 또 날아간다~!" → ✨ 반짝 → ⚡+40 💰+20 → 아지트에 갇힌 포켓몬이 있으면 진우가 하나 골라 구함 ⑦ 지면 **먼저 저장하고** 🕸️ 그물이 그 포켓몬을 낚아채 함께 열기구로, 로켓단은 날아감 — "다음에 로켓단을 이기면 아지트에서 구해 올 수 있어요" · 효과음 sfx.siren·zap·boom·twinkle(합성) · CSS 키프레임 20여 개
+- 수학 연결(math.js): answer → maybeRocket(배틀 판정 다음, 개념 편·연습·확인·☀️ 섞어 풀기만, 마지막 문항 뒤 안 걸음, 배틀과 안 겹침) → advance에서 startRocket(노릴 포켓몬·파트너 → 오늘 몫 선점 rocketMath 3 → 배틀 기록 저장 → 화면, 기다리는 사이 나갔으면 안 엶, 다른 창의 영어 배틀이면 안 엶) · 이어 가기: 수학 화면을 열면(사다리를 그린 뒤, 풀던 편이 없고 시간이 남았을 때) · 앱을 열 때 끝나지 않은 수학 배틀이 있으면 수학 화면으로(app.js, 프로필·시간 제한을 다 읽은 뒤)
+- 테스트: rocket.test.js 19(+진행 중 배틀 5: 새 기록·한 문제씩 저장·같은 배틀 한 번만·병합 두 방향·xp 흐름) · 새 tests/rocketwire.test.js 9(화면 연결 규칙을 소스에서) · 변이 31 중 30 + 같은 뜻 1(rocketCurrent의 끝난 목록 확인 — 끝내는 규칙과 병합이 이미 진행 중 기록을 비운다) (`.context/rocket_stage2/mutate_r2.mjs`) — 처음 지나간 "병합에서 끝난 목록을 합치지 않음"은 늦게 저장된 쪽이 진행 중인 경우 테스트를 더해 잡음 · 1단계 변이 40 다시 다 잡힘
+- 헤드리스 800·390(scratchpad c_rocket.sh <폭> <접두사> win|lose|resume1|resume2 · seed_rocket.js — 포켓몬·파트너·AA 7칸·오늘 로켓단 0, `?nosw=1` window.__rocketForce · 배틀 문제는 window.__battleQ): 이기기(구호·백만볼트 3번·날아가며 반짝·💰) · 지기(로봇팔 3칸·그물·이브이 빼앗김·아지트) · 한 문제 맞히고 앱을 끈 뒤 다시 열면 **수학 화면으로 가서 맞힘 1/3에서 이어짐** → 이기고 아지트의 이브이를 골라 구함 · 가로 넘침 0
+  - 헤드리스가 잡아 고침: 그물이 포켓몬이 끌려간 뒤에도 바닥에 남음 → 그물도 함께 올라감 · 앱을 열자마자 이어 갈 때(아직 안 누름) 진동·소리를 부르면 Chrome이 막고 콘솔 오류 → 누르기 전엔 조용히, 첫 탭(구호 건너뛰기)에서 소리를 엶
+
+### 변경 파일
+- `js/rocketview.js` (새) · `tests/rocketwire.test.js` (새)
+- `js/rocket.js` — rocketNew·copyRocketCur·mergeRocketDone · `js/db.js` — rocketCur·rocketDone·endBattle·rocketBeginRule·rocketStepRule·병합 · `js/xp.js` — rocketCurrent·rocketBegin·rocketSaveStep·profileReady, 끝난 배틀은 보상 없음
+- `js/math.js` — maybeRocket·startRocket·runRocket·resumeRocketIfAny·battleQuestion 줄기 · `js/app.js` — 앱을 열 때 이어 가기 · `js/sfx.js` — 효과음 넷 · `css/style.css` — 로켓단 화면 · `sw.js` — APP_SHELL rocketview.js
+- `tests/rocket.test.js` — 진행 중 배틀 테스트
+
+### 결정사항 / 메모
+- 같은 배틀이 두 번 끝나는 길(두 창·다시 연 앱·옛 백업)은 배틀 id + 끝난 목록 합집합으로 막는다 — 보유 줄이기 카운터와 같은 원칙(되돌릴 수 없는 일은 합집합·단조)
+- 화면은 저장한 뒤 그린다 — 애니메이션 중에 앱이 꺼져도 결과가 남는다
+- 시간이 다 된 과목의 배틀은 그 과목을 다시 열 수 있을 때 이어 간다(시간 제한을 넘기지 않게)
+
+### TODO (다음 작업)
+- [ ] 아버님·진우: 구호(MOTTO)·날아갈 때 말(BLAST) 한국판 표현 확인
+- [ ] 3단계: 영어 연결(문장 끝, 단어 뜻 고르기) · 📊 기록(물리친 수·진 수·아지트) · 도감 🚀 표시 · 아지트 보기 → v217 → Codex 43차 → v218
+
+## 2026-10-09 (오후) — 🚀 로켓단 3단계: 영어 연결·📊·도감 🚀 · v217 준비 (미커밋)
+
+### 진행 내용
+- 아버님 "3단계 가자"
+- 공통 실행기 `js/rocketplay.js`(monView·playRocket — 저장 함수는 그 배틀 id로, 화면은 rocketview) — 수학 runRocket도 이것을 쓴다
+- 영어 문제 `js/rocketquiz.js`: 영상에서 본 단어(vocabViews)의 뜻 고르기 — 뜻이 있고 본 적 있는 단어, 두 번 이상 본 단어부터, 이번 배틀에 낸 단어는 다시 안 냄, 보기는 review.quizChoices(같은 뜻·표기만 다른 보기 없음) 3개 이상일 때만 · 🔊 단어 소리(기기 음성) · 낼 단어가 없으면 배틀을 멈춘 채 두고(다음에 이어 감) 틀리게 하지 않음 · 말하기 대신 단어 뜻: 태블릿 음성 인식이 불안정 · 영상 없이도 낼 수 있어 앱을 다시 열어도 이어 감
+- 영어 연결(player.js): 문장을 처음 끝낼 때마다 maybeRocketEn(배틀 판정 다음) — 영어에는 "틀림"이 없어 **문장을 연달아 처음 끝낸 수**를 연속으로 센다(로켓단이 나오면 0부터) · 부모 보기 제외 · 배틀과 안 겹침 · 영어 남은 시간 · 노릴 포켓몬·파트너가 있을 때만 → 문장 전환에서(다음 문장 가기 전, 배틀보다 먼저 · 마지막 문장에서도) startRocketEn: 낼 단어 → 영어 하루 3번 선점(track.markRocketEn, rocketEn 칸 strict) → 배틀 기록 저장 → 영상 멈춤·뒤 화면 막고 화면 → 끝나면 다음 문장으로 · 수학 배틀이 진행 중이면 안 엶
+- 이어 가기: 앱을 열 때 끝나지 않은 배틀이 수학이면 수학 화면으로, **영어면 홈에서 바로**(저장된 단어로, resumeEnglishRocket) — 홈에 있고 그 과목 시간이 남았을 때만
+- 📊 「🚀 로켓단」 카드: 물리침·짐 횟수 · 아지트에 갇힌 포켓몬(빼앗긴 것을 부모가 알 수 있게) · 도감: 다 빼앗기면 칸에 🚀, 한 마리가 남아 있으면 작은 🚀
+- sw **v217** · APP_SHELL rocketplay.js·rocketquiz.js
+- 테스트: 새 tests/rocketquiz.test.js 4 · rocketwire 15(+영어 5 · 공통 실행기 · 📊·도감·앱 셸·v217 · 배틀과 한 번에 하나) · player.logic +2(영어 로켓단 행동 — vm 스텁 rocketState: 연달아 세 번째에 걸림 → 다음 문장 가기 전 배틀보다 먼저 열림 → 영상 멈춤 → 끝나면 그 문장으로 → 연달아 센 수 0부터 · 낼 단어·몫·노릴 포켓몬이 없으면 안 열고 이동 · 닫으면 지움) · 몸통 도우미가 주석 줄을 빼고 export에서도 멈춤(주석으로 막은 호출에 테스트가 속았다) · 변이 38 중 36 + 같은 뜻 2(단어 셋 미만 — 보기 3개 조건이 이미 막음 · goTo에서 배틀이 없을 때만 — 둘은 한 번에 하나라 동시에 걸리지 않음) (`.context/rocket_stage3/mutate_r3.mjs`) — 처음 지나간 7 중 6은 테스트를 고쳐 잡음(주석 줄·없는 줄 순서 비교·export 경계·영어 몫 칸·같은 뜻 단어뿐인 보기 둘·앱 셸 주석) · 1·2단계 변이 다시 통과(2단계 넷은 공통 실행기로 옮겨 3단계에서 검사)
+- 전체 테스트가 잡아 고침: player.logic(import를 떼고 vm으로 도는 테스트)이 로켓단 이름 스텁이 없어 9개 실패 → 스텁을 넣으며 본 것 — **goTo(다음 문장 이동, 따라 말하기 흐름)에서도 로켓단을 열어야** 했고(문장 끝 경로에만 넣었다), 영상을 닫으면 걸어 둔 로켓단을 지워야 했다 · 복습·단어 잇기·⚔️ 배틀의 "한 번에 하나만"에 로켓단(수학 배틀도) · 헤드리스 강제 함수는 location이 없는 곳에서도 안전하게 · 도감 🔀·💨 줄을 글자 그대로 보던 퓨전 테스트에 🚀
+- 헤드리스 390(scratchpad c_rocket_en.sh·seed_rocket_en.js·c_rocket_dex.sh): 끝나지 않은 영어 배틀(맞힘 1)을 저장해 두고 앱을 열면 **홈에서 바로 이어짐** → "fast — 무슨 뜻일까요?" 4지선다 → 이김 · 도감 🚀 두 꼴 · 📊 카드 · 콘솔 오류 0 · 가로 넘침 0
+  - 못 본 것: 영상 재생 중 문장 끝 등장(헤드리스 브라우저에 영상이 없다) — 연결 규칙은 rocketwire 테스트로, 화면·저장·문제는 이어 가기 경로로 확인 → 태블릿에서 확인 필요
+
+### 변경 파일
+- `js/rocketplay.js`·`js/rocketquiz.js` (새) · `tests/rocketquiz.test.js` (새)
+- `js/player.js` — maybeRocketEn·startRocketEn·runRocketEn·resumeEnglishRocket · `js/track.js` — todayRocketsEn·markRocketEn · `js/app.js` — 영어 이어 가기 · `js/math.js` — 공통 실행기 · `js/stats.js` — 🚀 카드 · `js/pokedex.js` — 🚀 · `css/style.css` — 단어 문제·도감 🚀 · `sw.js` — v217
+- `tests/rocketwire.test.js` — 영어·📊·도감·몸통 도우미·한 번에 하나 · `tests/player.logic.test.js` — 로켓단 스텁·영어 행동 2 · `tests/fusion.test.js` — 도감 🚀
+
+### 결정사항 / 메모
+- 영어의 "연속"은 문장을 연달아 처음 끝낸 수 — 수학처럼 틀림이 없어서. 영어 로켓단은 수학보다 일찍·자주 몰려 나올 수 있다(하루 3번은 아버님 결정) → 태블릿에서 보고 확률·간격 조절 여부를 정하면 된다
+- 시간이 다 된 과목의 배틀은 그 과목을 다시 열 수 있을 때 — 영어는 홈에서 열리므로 영어 시간으로 판단
+
+### TODO (다음 작업)
+- [ ] 아버님 승인 → v217 커밋(feat + docs)·푸시·라이브 v217 확인
+- [ ] Codex 43차(로켓단 1·2·3단계 + 42차 확인) → v218
+- [ ] 아버님·진우: 구호·날아갈 때 말(한국판) 확인 · 태블릿에서 영어 문장 끝 등장 확인
+- [ ] 그다음 줄기 AB 평면도형의 이동
