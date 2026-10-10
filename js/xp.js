@@ -15,7 +15,9 @@ import {
   applySell, // 💰 5일장 팔기 (2026-10-05)
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
   applyRocketSteal, applyRocketWin, applyRocketAdmit, applyRocketStep, // 🚀 로켓단 습격 (2026-10-09) — 저장이 안 되면 메모리로 잇지 않는다 (Codex 43차 #2)
+  applyHouseRule, copyHouse, // 🏠 진우네 집 (2026-10-10)
 } from './db.js';
+import { houseOf, leftOf } from './house.js'; // 🏠 진우네 집 규칙 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
@@ -349,7 +351,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -818,6 +820,27 @@ export async function buyItem(id) {
   const gain = { items: { [id]: 1 } };
   const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
   return r.ok;
+}
+
+/**
+ * 🏠 진우네 집 — 규칙 하나(house.js: houseBuyRule·houseStartRule·placeRule·moveRule·flipRule·storeRule·paintRule)를
+ * **저장된 프로필로** 한 트랜잭션에서 판정한다. 두 창이 같은 코인으로 두 번 사거나, 서랍의 마지막 가구를 두 번 놓지 않게.
+ * 저장이 안 되면 없던 일로 한다(메모리로 "성공"하지 않는다 — 다음에 열면 가구가 사라져 있으면 아이가 억울하다).
+ * @param {(p:object) => {ok:boolean, why?:string}} rule 프로필 복사본을 고치는 규칙
+ * @returns {Promise<{ok:boolean, why?:string, u?:number}>}
+ */
+export async function houseDo(rule) {
+  const r = await runProfileOp(() => applyHouseRule(rule), () => ({ ok: false, why: 'save' }));
+  const { profile: _p, ...rest } = r || {};
+  return { ok: false, ...rest };
+}
+/** 🏠 지금 집 (이 창의 프로필로 고쳐 읽은 것 — 그리기용) */
+export function houseNow() {
+  return houseOf(profile);
+}
+/** 🏠 서랍에 남은 가구 { 가구id: 개수 } (그리기용) */
+export function houseLeft() {
+  return leftOf(profile);
 }
 
 /**

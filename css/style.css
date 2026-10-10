@@ -2849,3 +2849,65 @@ button { font-family: inherit; }
 @keyframes rocket-star { 0% { opacity: 0; transform: scale(0) rotate(0); } 35% { opacity: 1; transform: scale(1.7) rotate(90deg); } 70% { opacity: 1; transform: scale(1) rotate(180deg); } 100% { opacity: 0; transform: scale(0.2) rotate(270deg); } }
 @keyframes rocket-star-text { 0%, 25% { opacity: 0; } 45%, 80% { opacity: 1; } 100% { opacity: 0; } }
 @media (max-width: 420px) { .rocket-sky { height: 250px; } .rocket-mon { width: 96px; } .rocket-bubble { max-width: 60%; font-size: 0.88rem; } }
+
+/* ===== 🏠 진우네 집 (2026-10-10) — 위에서 내려다본 방: 벽 한 줄 + 바닥 모눈, 가구는 서 있는 이모지(--cell = 칸 크기 px, houseview가 정한다) ===== */
+.house-card { max-width: 720px; }
+.house-body { display: grid; gap: 12px; }
+.house-room { --cell: 40px; position: relative; width: 100%; margin: 0 auto; border-radius: 14px; overflow: hidden; box-shadow: inset 0 0 0 2px #d8c7a6; user-select: none; -webkit-user-select: none; background: #e2c79f; }
+.house-room.is-arming { box-shadow: inset 0 0 0 3px var(--primary); cursor: copy; }
+.house-wall { position: absolute; left: 0; right: 0; top: 0; border-bottom: 6px solid #c9a978; box-shadow: inset 0 -12px 18px rgba(0, 0, 0, 0.06); }
+.house-floor { position: absolute; left: 0; right: 0; bottom: 0; background-image: linear-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px); background-size: var(--cell) var(--cell); }
+.house-item { position: absolute; display: flex; align-items: flex-end; justify-content: center; padding-bottom: calc(var(--cell) * 0.06); box-sizing: border-box; touch-action: none; cursor: grab; border-radius: 8px; }
+.house-item.is-wall { align-items: center; }
+.house-emoji { font-size: calc(var(--cell) * 0.86); line-height: 1; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.25)); pointer-events: none; }
+.house-item.is-wide .house-emoji { font-size: calc(var(--cell) * 1.45); }
+.house-item.is-flip .house-emoji { transform: scaleX(-1); }
+.house-item.is-sel { outline: 3px dashed var(--primary); outline-offset: -2px; }
+.house-item.is-lifted { opacity: 0.35; }
+.house-hint { position: absolute; z-index: 30; border-radius: 8px; background: rgba(16, 185, 129, 0.28); box-shadow: inset 0 0 0 2px var(--ok); pointer-events: none; }
+.house-hint.is-bad { background: rgba(239, 68, 68, 0.25); box-shadow: inset 0 0 0 2px var(--danger); }
+.house-hint[hidden] { display: none; }
+.house-ghost { position: fixed; left: 0; top: 0; z-index: 90; line-height: 1; pointer-events: none; filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.3)); }
+.house-tools { position: absolute; z-index: 40; display: flex; gap: 6px; transform: translate(-50%, -110%); }
+.house-tools.is-below { transform: translate(-50%, 10%); }
+.house-tool { padding: 6px 10px; font-size: 0.9rem; white-space: nowrap; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
+.house-sec { background: #fffaf2; border: 1px solid #ecdfc8; border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; }
+.house-h { margin: 0; font-size: 1.05rem; }
+.house-note { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.house-drawer { display: flex; flex-wrap: wrap; gap: 8px; }
+.house-drawer-item { position: relative; display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 72px; padding: 8px 6px; border: 2px solid var(--border); border-radius: 12px; background: #fff; font: inherit; color: inherit; touch-action: none; cursor: grab; }
+.house-drawer-item.is-arm { border-color: var(--primary); background: #eef2ff; }
+.house-drawer-emoji { font-size: 2rem; line-height: 1; pointer-events: none; }
+.house-drawer-name { font-size: 0.8rem; font-weight: 700; pointer-events: none; }
+.house-drawer-n { position: absolute; top: 2px; right: 6px; font-size: 0.75rem; font-weight: 800; color: var(--primary); pointer-events: none; }
+.house-paints { display: flex; flex-wrap: wrap; gap: 6px; }
+.house-paint { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 2px solid var(--border); border-radius: 999px; background: #fff; font: inherit; font-size: 0.85rem; color: inherit; }
+.house-paint.is-on { border-color: var(--primary); font-weight: 800; }
+.house-swatch { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+/* 🏠 가로 화면(태블릿 가로): 방은 왼쪽, 서랍·벽지는 오른쪽 — 방을 줄이지 않고도 서랍이 같은 화면에 (houseview.WIDE와 같은 조건) */
+@media (orientation: landscape) and (min-width: 700px) {
+  .house-card { max-width: 980px; }
+  .house-body { grid-template-columns: minmax(0, 1fr) 230px; align-items: start; }
+  .house-body > .house-room { grid-row: span 2; }
+  .house-drawer-item { min-width: 64px; }
+}
+/* 🏠 3단계: 탭 · 이사 선물 · 🛒 가구 상점 */
+.house-tabs { display: flex; gap: 8px; margin: 2px 0 2px; }
+.house-tab { flex: 1; padding: 8px 10px; font-weight: 800; border: 2px solid var(--border); background: #fff; }
+.house-tab.is-on { border-color: var(--primary); background: #eef2ff; color: var(--primary); }
+.house-gift { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: #fff7ed; border: 2px dashed var(--accent); }
+.house-gift-text { margin: 0; font-weight: 800; }
+.house-go-shop { justify-self: start; }
+.house-body.is-shop { grid-template-columns: minmax(0, 1fr); }
+.house-shop { display: grid; gap: 12px; }
+.house-shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.house-shop-item { display: grid; justify-items: center; gap: 3px; padding: 10px 6px; border: 2px solid var(--border); border-radius: 14px; background: #fff; font: inherit; color: inherit; text-align: center; }
+.house-shop-item.is-arm { border-color: var(--primary); background: #eef2ff; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); }
+.house-shop-item.is-short { opacity: 0.6; }
+.house-shop-item.is-done { opacity: 0.55; }
+.house-shop-emoji { font-size: 2.1rem; line-height: 1.1; }
+.house-shop-swatch { width: 34px; height: 34px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.house-shop-name { font-weight: 800; font-size: 0.9rem; }
+.house-shop-price { font-size: 0.8rem; color: #92400e; font-weight: 700; }
+.house-shop-have { font-size: 0.75rem; color: var(--muted); min-height: 1em; }
+.house-shop-item.is-arm .house-shop-have { color: var(--primary); font-weight: 800; }

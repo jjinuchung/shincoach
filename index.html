@@ -21,6 +21,7 @@
   <section id="view-home" class="view">
     <header class="topbar">
       <h1 class="topbar-title">🏫 신코치</h1>
+      <button id="btn-house" class="btn btn-icon" data-open="house" aria-label="진우네 집">🏠</button>
       <button id="btn-pokedex" class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button id="btn-stats" class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
     </header>
@@ -254,6 +255,20 @@
       </div>
       <div id="market-msg" class="modal-msg"></div>
       <div id="market-body" class="market-body"></div>
+    </div>
+  </div>
+
+  <!-- ===== 🏠 진우네 집 (2026-10-10) — 방 그리기·끌어 놓기는 houseview.js ===== -->
+  <div id="house" class="modal" hidden>
+    <div class="modal-card house-card">
+      <div class="modal-head">
+        <span class="modal-title">🏠 진우네 집</span>
+        <span id="house-coins" class="coin-chip">💰 0</span>
+        <button type="button" id="house-close" class="btn btn-icon" aria-label="닫기">✕</button>
+      </div>
+      <div id="house-tabs" class="house-tabs" role="tablist"></div>
+      <div id="house-msg" class="modal-msg" aria-live="polite"></div>
+      <div id="house-body" class="house-body"></div>
     </div>
   </div>
 

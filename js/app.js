@@ -3,6 +3,7 @@ import { initLibrary, refreshList } from './library.js';
 import { initPlayer, requirePin, timeLimitConf, resumeEnglishRocket } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
+import { initHouse } from './houseview.js'; // 🏠 진우네 집 (2026-10-10)
 import { initHatch } from './hatch.js';
 import { initEvolveShow } from './evolveshow.js';
 import { initHome, renderHome } from './home.js';
@@ -154,6 +155,7 @@ async function main() {
   initPlayer({ showView, onTakeTool: openTakeTool });
   initStats({ showView, requirePin });
   initPokedex({ showView });
+  initHouse();                // 🏠 진우네 집 — 앱 홈의 🏠 버튼
   initHatch();
   initEvolveShow();
   initHome({ showView });

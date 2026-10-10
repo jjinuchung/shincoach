@@ -804,10 +804,16 @@ export function emptyProfile() {
   return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, updatedAt: 0 };
 }
 
+/** 🏠 진우네 집 복사 — 방·놓은 가구까지 (규칙이 고쳐도 원본이 안 바뀌게) · 없으면 undefined */
+export function copyHouse(h) {
+  if (!h || typeof h !== 'object') return undefined;
+  return { ...h, rooms: (Array.isArray(h.rooms) ? h.rooms : []).map((r) => ({ ...r, items: (Array.isArray(r && r.items) ? r.items : []).map((it) => ({ ...it })) })) };
+}
+
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) } };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) } };
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -1828,6 +1834,11 @@ export function applyPurchase(cost, gain) {
   return mutateProfile((p) => purchaseRule(p, cost, gain));
 }
 
+/** 🏠 진우네 집 규칙 하나(house.js — 사기·처음 선물·놓기·옮기기·뒤집기·서랍·벽지)를 저장된 프로필로 한 트랜잭션에서 */
+export function applyHouseRule(rule) {
+  return mutateProfile(rule);
+}
+
 /** 기록 전체 내보내기 (영상 제외) */
 export async function exportStats() {
   const db = await openDb();
@@ -1993,6 +2004,15 @@ export function mergeStatRecord(name, cur, rec) {
     for (const src of [cur.rocketLast, rec.rocketLast]) for (const k of Object.keys(src || {})) out.rocketLast[k] = Math.max(Number(out.rocketLast[k]) || 0, Number(src[k]) || 0);
     const rc = latest.rocketCur || older.rocketCur || null;
     out.rocketCur = rc && !out.rocketDone[rc.id] ? copyRocketCur(rc) : null;
+    // 🏠 진우네 집 — 놓은 자리는 가구(가방)와 같은 쪽(최근에 저장된 쪽)을 따른다. 처음 집 선물을 받았다는 표시는 OR
+    //    (옛 백업이 "아직 안 받음"으로 되돌려 🛏️를 또 받지 않게) · 놓을 때 붙는 번호는 큰 쪽.
+    //    가진 수보다 많이 놓인 것·겹침은 읽을 때 house.houseOf가 고친다 (병합은 입력을 그대로 옮기기만)
+    const hs = latest.house || older.house;
+    if (hs) {
+      out.house = copyHouse(hs);
+      out.house.started = !!((cur.house && cur.house.started) || (rec.house && rec.house.started));
+      out.house.seq = Math.max(Number(cur.house && cur.house.seq) || 0, Number(rec.house && rec.house.seq) || 0, Number(hs.seq) || 0);
+    } else delete out.house;
   }
   return out;
 }
