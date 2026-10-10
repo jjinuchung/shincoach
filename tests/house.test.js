@@ -17,6 +17,8 @@ const R = FIRST_ROOM;
 /** 코인·가방을 가진 프로필 (복사본 — 규칙이 고쳐도 되는) */
 const pf = (coins = 0, items = {}, house) => cloneProfile({ ...emptyProfile(), coins, items: { ...items }, ...(house ? { house } : {}) });
 const houseWith = (items, extra = {}) => ({ started: true, seq: 0, rooms: [{ id: R, wall: '', floor: '', items }], ...extra });
+/** 이사 선물을 받은 집의 프로필 — 선물을 받기 전에는 상점에서 못 산다 (Codex 45차 #5) */
+const buyer = (coins = 0, items = {}) => pf(coins, items, houseWith([]));
 const FLOOR1 = FURN.find((f) => f.at === 'floor' && f.w === 1).id; // 한 칸 바닥 가구
 const FLOOR2 = FURN.find((f) => f.at === 'floor' && f.w === 2).id; // 두 칸 바닥 가구
 const WALL1 = FURN.find((f) => f.at === 'wall').id;
@@ -112,7 +114,7 @@ test('🏠 houseOf가 고치는 것: 모르는 가구 · 방 밖(바닥 너머·
   assert.equal(houseOf(q).rooms[0].wall, '');
   // 방 목록이 깨졌으면 첫 방을 만든다 · 같은 이름 방은 하나
   const b = pf(0, {}, { started: false, seq: 0, rooms: [null, { id: 'r9', items: [] }, { id: 'r9', items: [] }] });
-  assert.deepEqual(houseOf(b).rooms.map((r) => r.id), [R, 'r9']);
+  assert.deepEqual(houseOf(b).rooms.map((r) => r.id), [R], '1단계는 방 하나뿐 — 다른 방은 버리고 그 가구는 서랍으로 (Codex 45차 #4)');
 });
 
 test('🏠 leftOf: 서랍 = 가진 수 − 놓은 수 (0은 뺀다) · 집 밖 물건(볼)은 안 센다', () => {
@@ -152,28 +154,28 @@ test('🏠 처음 집 선물: 🛏️ 한 번만 — 두 번째는 "already" · 
 
 test('🏠 사기: 코인·스톤을 정확히 빼고 하나 더 · 모자라면 아무것도 안 바뀜(short) · 기기는 스톤 없으면 못 삼 · 벽지·바닥은 하나만(owned) · 가구는 FURN_MAX개까지(max) · 집 물건이 아니면 unknown', () => {
   const d = furnById(DEVICE);
-  const p = pf(d.price + 7, { stone_math: d.stones.stone_math + 1, stone_english: d.stones.stone_english });
+  const p = buyer(d.price + 7, { stone_math: d.stones.stone_math + 1, stone_english: d.stones.stone_english });
   assert.deepEqual(houseBuyRule(p, DEVICE), { ok: true });
   assert.deepEqual([p.coins, p.items[DEVICE], p.items.stone_math, p.items.stone_english], [7, 1, 1, undefined], '쓴 스톤이 0개면 가방에서 지운다');
-  const q = pf(99999, {});
+  const q = buyer(99999, {});
   const before = JSON.stringify(q);
   assert.deepEqual(houseBuyRule(q, DEVICE), { ok: false, why: 'short' }, '스톤 없이 기기');
   assert.equal(JSON.stringify(q), before);
-  const exact = pf(d.price, { ...d.stones });
+  const exact = buyer(d.price, { ...d.stones });
   assert.deepEqual(houseBuyRule(exact, DEVICE), { ok: true }, '코인·스톤이 값과 딱 같으면 산다');
   assert.deepEqual([exact.coins, exact.items.stone_math, exact.items.stone_english, exact.items[DEVICE]], [0, undefined, undefined, 1]);
-  const poor = pf(furnById(FLOOR1).price - 1);
+  const poor = buyer(furnById(FLOOR1).price - 1);
   assert.deepEqual(houseBuyRule(poor, FLOOR1), { ok: false, why: 'short' });
   assert.equal(poor.coins, furnById(FLOOR1).price - 1);
-  const w = pf(5000);
+  const w = buyer(5000);
   assert.deepEqual(houseBuyRule(w, WALLP), { ok: true });
   assert.deepEqual(houseBuyRule(w, WALLP), { ok: false, why: 'owned' });
   assert.equal(w.coins, 5000 - paintById(WALLP).price);
-  const m = pf(999999, { [FLOOR1]: FURN_MAX - 1 });
+  const m = buyer(999999, { [FLOOR1]: FURN_MAX - 1 });
   assert.deepEqual(houseBuyRule(m, FLOOR1), { ok: true });
   assert.deepEqual(houseBuyRule(m, FLOOR1), { ok: false, why: 'max' });
   assert.equal(m.items[FLOOR1], FURN_MAX);
-  for (const id of ['greatball', 'stone_math', 'f_없음', '', undefined]) assert.deepEqual(houseBuyRule(pf(999999), id), { ok: false, why: 'unknown' }, String(id));
+  for (const id of ['greatball', 'stone_math', 'f_없음', '', undefined]) assert.deepEqual(houseBuyRule(buyer(999999), id), { ok: false, why: 'unknown' }, String(id));
 });
 
 test('🏠 놓기: 서랍에 있을 때만(none) · 놓으면 서랍에서 하나 줄고 번호가 붙음 · 겹치거나 방 밖이면 spot · 코인·가방은 그대로', () => {
@@ -304,7 +306,7 @@ test('★ 🏠 두 창: 다른 창이 먼저 마지막 가구를 놓았으면 �
 test('★ 🏠 동시에 두 번 사기 — 코인이 하나 값뿐이면 하나만 산다 · 저장이 실패하면 없던 일(save) — 코인·가구·집 모두 그대로', async () => {
   await setup();
   const price = furnById(FLOOR2).price;
-  await seed(price + 10, {});
+  await seed(price + 10, {}, houseWith([]));
   const rs = await Promise.all([houseDo((p) => houseBuyRule(p, FLOOR2)), houseDo((p) => houseBuyRule(p, FLOOR2))]);
   assert.deepEqual(rs.map((r) => r.ok).sort(), [false, true]);
   assert.equal(rs.find((r) => !r.ok).why, 'short');
@@ -382,30 +384,48 @@ test('🏠 화면 연결: 🏠 창 틀(index.html) · 앱 셸에 house.js·house
 
 // ───────────────────── 3단계 🛒 가구 상점 · 🏠 버튼 · 🎁 이사 선물 ─────────────────────
 
-test('🏠 houseBuyCheck: 살 수 있나 = 사기 규칙의 판정 — 모자란 코인·스톤을 정확히 · 가진 수 · 무작위 프로필 4,000개에서 houseBuyRule과 늘 같은 답', async () => {
+test('🏠 houseBuyCheck: 살 수 있나 — 모자란 코인·스톤을 정확히 · 가진 수 · 무작위 프로필 4,000개에서 판정·규칙이 테스트가 따로 셈한 답과 같다(선물 전·이미 있음·한도·모자람·모르는 물건)', async () => {
   const { houseBuyCheck } = await import('../js/house.js');
   const d = furnById(DEVICE);
-  assert.deepEqual(houseBuyCheck(pf(d.price - 30, { stone_math: 0, stone_english: d.stones.stone_english }), DEVICE),
+  assert.deepEqual(houseBuyCheck(buyer(d.price - 30, { stone_math: 0, stone_english: d.stones.stone_english }), DEVICE),
     { ok: false, why: 'short', have: 0, shortCoins: 30, shortStones: { stone_math: d.stones.stone_math } });
-  assert.deepEqual(houseBuyCheck(pf(d.price, { ...d.stones, [DEVICE]: 1 }), DEVICE), { ok: true, have: 1 });
-  assert.deepEqual(houseBuyCheck(pf(0, { [WALLP]: 1 }), WALLP), { ok: false, why: 'owned', have: 1 });
-  assert.deepEqual(houseBuyCheck(pf(999999, { [FLOOR1]: FURN_MAX }), FLOOR1), { ok: false, why: 'max', have: FURN_MAX });
-  assert.deepEqual(houseBuyCheck(pf(999999), 'greatball'), { ok: false, why: 'unknown' });
-  // 무작위 — 화면(check)과 저장(rule)이 갈라지지 않는다
+  assert.deepEqual(houseBuyCheck(buyer(d.price, { ...d.stones, [DEVICE]: 1 }), DEVICE), { ok: true, have: 1 });
+  assert.deepEqual(houseBuyCheck(buyer(0, { [WALLP]: 1 }), WALLP), { ok: false, why: 'owned', have: 1 });
+  assert.deepEqual(houseBuyCheck(buyer(999999, { [FLOOR1]: FURN_MAX }), FLOOR1), { ok: false, why: 'max', have: FURN_MAX });
+  assert.deepEqual(houseBuyCheck(buyer(999999), 'greatball'), { ok: false, why: 'unknown' });
+  // 무작위 — 테스트가 등록부 값으로 **따로 셈한 답**과 판정(check)·규칙(rule)이 늘 같다
+  //   (Codex 45차 F: 규칙이 판정 함수를 그대로 불러 둘끼리 견주는 것만으로는 독립 검사가 아니다)
   let seed = 7;
-  const rnd = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
-  const ids = [...FURN.map((f) => f.id), ...PAINT.map((p) => p.id), 'f_없음'];
-  let oks = 0;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor(seed / 65536) % n; }; // 윗자리 — 아랫자리는 고르지 않다
+  const ids = [...FURN.map((f) => f.id), ...PAINT.map((x) => x.id), 'f_없음'];
+  const seen = {};
   for (let i = 0; i < 4000; i++) {
     const id = ids[rnd(ids.length)];
-    const p = pf(rnd(4200), { stone_math: rnd(4), stone_english: rnd(4), [id]: rnd(FURN_MAX + 2) });
+    const started = rnd(5) > 0;
+    const coins = rnd(4200);
+    const items = { stone_math: rnd(4), stone_english: rnd(4), [id]: rnd(FURN_MAX + 2) };
+    const p = started ? buyer(coins, items) : pf(coins, items);
+    const def = FURN.find((f) => f.id === id) || PAINT.find((x) => x.id === id);
+    const have = items[id];
+    let want;
+    if (!def) want = 'unknown';
+    else if (!started) want = 'gift';
+    else if (def.part && have > 0) want = 'owned';
+    else if (!def.part && have >= FURN_MAX) want = 'max';
+    else if (coins < def.price || Object.entries(def.stones || {}).some(([sid, n]) => items[sid] < n)) want = 'short';
+    else want = 'ok';
+    seen[want] = (seen[want] || 0) + 1;
     const c = houseBuyCheck(p, id);
+    assert.equal(c.ok ? 'ok' : c.why, want, `${id} 코인 ${coins} ${JSON.stringify(items)} 선물 ${started}`);
     const q = cloneProfile(p);
     const r = houseBuyRule(q, id);
-    assert.equal(r.ok, c.ok, `${id} ${JSON.stringify(c)}`);
-    if (!r.ok) { assert.equal(r.why, c.why); assert.equal(JSON.stringify(q), JSON.stringify(p), '못 사면 아무것도 안 바뀐다'); } else oks++;
+    assert.equal(r.ok ? 'ok' : r.why, want, `${id} 규칙`);
+    if (!r.ok) { assert.equal(JSON.stringify(q), JSON.stringify(p), '못 사면 아무것도 안 바뀐다'); continue; }
+    assert.equal(q.coins, coins - def.price, '코인');
+    assert.equal(q.items[id], have + 1, '하나 더');
+    for (const [sid, n] of Object.entries(def.stones || {})) assert.equal(q.items[sid] || 0, items[sid] - n, sid);
   }
-  assert.ok(oks > 300, `산 경우 ${oks}`);
+  for (const k of ['ok', 'gift', 'owned', 'max', 'short', 'unknown']) assert.ok(seen[k] > 30, `${k} ${seen[k]}`);
 });
 
 test('🏠 연결 (3단계): 앱 홈 머리줄에 🏠 버튼(data-open="house") · 창에 탭 자리 · app.js가 initHouse를 부른다 · houseview가 🏠 버튼을 붙인다 · 상점은 두 번 눌러야 산다 · sw v224 이상', async () => {
@@ -427,4 +447,99 @@ test('🏠 연결 (3단계): 앱 홈 머리줄에 🏠 버튼(data-open="house")
   assert.ok(src.includes('run(houseStartRule,'), '이사 선물은 houseDo로');
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
   assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1] >= 224, 'sw 버전 v224 이상');
+});
+
+// ───────────────────── 🔍 Codex 45차 ─────────────────────
+
+test('🔍 Codex 45차 #1: 끌기는 **손을 뗀 자리**에 놓는다 — 손 뗀 이벤트의 좌표로 다시 셈한 뒤에 놓을 칸을 정한다 (마지막으로 움직인 자리가 아니라)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
+  const up = src.slice(src.indexOf('function onUp(e) {'), src.indexOf('\n}\n', src.indexOf('function onUp(e) {')));
+  const setAt = up.indexOf('d.x = e.clientX;');
+  const setYAt = up.indexOf('d.y = e.clientY;');
+  const hintAt = up.indexOf('showHint(d);');
+  assert.ok(setAt > 0 && setYAt > 0 && hintAt > Math.max(setAt, setYAt), '손 뗀 좌표 → showHint 순서');
+});
+
+test('🔍 Codex 45차 #2: 백업의 house가 객체가 아니면(글자·참·수·배열·null) 합치기가 멈추지 않는다 — 없는 것으로 보고 다른 쪽의 멀쩡한 집을 쓴다 · 코인·가방은 그대로 최근 쪽', () => {
+  const good = { ...emptyProfile(), coins: 7, items: { [FLOOR1]: 1 }, house: houseWith([{ u: 1, id: FLOOR1, x: 0, y: 0 }], { seq: 3 }), updatedAt: 1 };
+  for (const bad of ['bad', true, 42, [], [1, 2], null]) {
+    const rec = { ...emptyProfile(), coins: 9, items: { [FLOOR1]: 1 }, updatedAt: 2, house: bad };
+    let m;
+    assert.doesNotThrow(() => { m = mergeStatRecord('profile', good, rec); }, JSON.stringify(bad));
+    assert.equal(m.coins, 9, '코인은 최근 쪽');
+    assert.deepEqual(m.house.rooms[0].items, [{ u: 1, id: FLOOR1, x: 0, y: 0 }], `${JSON.stringify(bad)}: 다른 쪽의 멀쩡한 집`);
+    assert.equal(m.house.started, true);
+    assert.doesNotThrow(() => mergeStatRecord('profile', rec, good), `${JSON.stringify(bad)} 반대 순서`);
+    const none = mergeStatRecord('profile', { ...emptyProfile(), updatedAt: 1 }, rec);
+    assert.equal('house' in none, false, `${JSON.stringify(bad)}: 둘 다 없으면 집 없음`);
+    assert.deepEqual(houseOf({ ...emptyProfile(), house: bad }), emptyHouse());
+  }
+});
+
+test('🔍 Codex 45차 #3: 놓는 번호(seq)가 안전한 정수가 아니거나 너무 크면 읽을 때 1부터 다시 매긴다 — 두 번 놓으면 둘 다 남고 번호가 다르다', () => {
+  for (const seq of [Number.MAX_SAFE_INTEGER, 1e20, Infinity, -5, 'x', 2.5, NaN, 1e9 + 5]) {
+    const p = pf(0, { f_teddy: 3 }, houseWith([{ u: 1e20, id: 'f_teddy', x: 5, y: 5 }], { seq }));
+    const a = placeRule(p, R, 'f_teddy', 0, 0);
+    const b = placeRule(p, R, 'f_teddy', 1, 0);
+    assert.ok(a.ok && b.ok && a.u !== b.u, `${seq}: ${JSON.stringify([a, b])}`);
+    const h = houseOf(p);
+    assert.deepEqual(h.rooms[0].items.map((i) => i.id), ['f_teddy', 'f_teddy', 'f_teddy'], `${seq}: 셋 다 남는다`);
+    assert.ok(h.rooms[0].items.every((i) => Number.isSafeInteger(i.u) && i.u > 0) && Number.isSafeInteger(h.seq), `${seq}: 번호`);
+    assert.equal(new Set(h.rooms[0].items.map((i) => i.u)).size, 3);
+    assert.ok(h.rooms[0].items.every((i) => i.u <= h.seq));
+  }
+  // 하나만 깨져도 — 번호(seq)만 깨짐(가구 번호는 멀쩡) · 가구 번호만 깨짐(seq는 멀쩡)
+  for (const [seq, u] of [[Number.MAX_SAFE_INTEGER, 1], [1e20, 1], [-5, 1], [2.5, 1], [1e9 + 5, 1], [3, 1e20], [3, Number.MAX_SAFE_INTEGER]]) {
+    const p = pf(0, { f_teddy: 3 }, houseWith([{ u, id: 'f_teddy', x: 5, y: 5 }], { seq }));
+    const a = placeRule(p, R, 'f_teddy', 0, 0);
+    const b = placeRule(p, R, 'f_teddy', 1, 0);
+    const h = houseOf(p);
+    assert.ok(a.ok && b.ok && a.u !== b.u && h.rooms[0].items.length === 3 && new Set(h.rooms[0].items.map((i) => i.u)).size === 3, `seq ${seq} · u ${u}: ${JSON.stringify(h.rooms[0].items.map((i) => i.u))}`);
+    assert.ok(h.rooms[0].items.every((i) => Number.isSafeInteger(i.u) && i.u <= 1e9), `seq ${seq} · u ${u}: 번호가 끝 안`);
+  }
+  // 멀쩡한 번호는 그대로 (다시 매기지 않는다)
+  const ok = pf(0, { f_teddy: 2 }, houseWith([{ u: 4, id: 'f_teddy', x: 0, y: 0 }, { u: 9, id: 'f_teddy', x: 1, y: 0 }], { seq: 12 }));
+  assert.deepEqual([houseOf(ok).rooms[0].items.map((i) => i.u), houseOf(ok).seq], [[4, 9], 12]);
+});
+
+test('🔍 Codex 45차 #4: 1단계가 모르는 방(r2…)에 놓인 가구는 서랍으로 돌아온다 — 가진 가구는 모두 지금 화면에서 닿는다', () => {
+  const p = pf(0, { f_bed: 1, [FLOOR1]: 1 }, { started: true, seq: 2, rooms: [{ id: 'r2', wall: '', floor: '', items: [{ u: 1, id: 'f_bed', x: 0, y: 0 }] }, { id: R, wall: '', floor: '', items: [{ u: 2, id: FLOOR1, x: 3, y: 3 }] }] });
+  const h = houseOf(p);
+  assert.deepEqual(h.rooms.map((r) => r.id), [R]);
+  assert.deepEqual(h.rooms[0].items.map((i) => i.id), [FLOOR1]);
+  assert.deepEqual(leftOf(p), { f_bed: 1 });
+  assert.ok(placeRule(p, R, 'f_bed', 0, 0).ok, '서랍에서 다시 놓을 수 있다');
+});
+
+test('🔍 Codex 45차 #5: 이사 선물을 받기 전에는 상점에서 못 산다(gift) — 침대 넷을 사고 선물을 받아 5/4가 되지 않게 · 선물을 받으면 산다', async () => {
+  const p = pf(99999, {});
+  for (const id of [START_GIFT, FLOOR1, WALLP, DEVICE]) assert.deepEqual(houseBuyRule(p, id), { ok: false, why: 'gift' }, id);
+  assert.equal(p.coins, 99999);
+  assert.deepEqual(houseStartRule(p), { ok: true, gift: START_GIFT });
+  for (let i = 0; i < FURN_MAX + 1; i++) houseBuyRule(p, START_GIFT);
+  assert.equal(p.items[START_GIFT], FURN_MAX, '선물 + 산 것 = 한도까지');
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
+  const shop = src.slice(src.indexOf('function shopBox() {'), src.indexOf('\n}\n', src.indexOf('function shopBox() {')));
+  assert.ok(/if \(!houseNow\(\)\.started\) \{[\s\S]*?먼저 🎁 이사 선물을 받아요[\s\S]*?goTab\('room'\)/.test(shop), '상점 탭이 선물부터 받으라고 말하고 꾸미기로 보낸다');
+  assert.ok(/gift: '먼저 🎁 이사 선물을 받아요/.test(src), '눌렀을 때의 말');
+});
+
+test('🔍 Codex 45차 #6·#7: 다시 그리면 진행 중인 끌기는 없던 일(두 번째 손가락으로 다른 것을 누를 때) · 가구를 다 놓았으면 "가구를 모두 방에 놓았어요"', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
+  const r = src.slice(src.indexOf('function render() {'), src.indexOf('\n}\n', src.indexOf('function render() {')));
+  assert.ok(/function render\(\) \{\n {2}if \(!ui\.open\) return;\n {2}if \(ui\.drag\) cancelDrag\(\);/.test(r), 'render 맨 앞에서 끌기 정리');
+  assert.ok(src.includes('const anyOwned = FURN.some((f) => itemCount(f.id) > 0);') && src.includes("anyOwned ? '가구를 모두 방에 놓았어요"), '가진 가구가 있는데 서랍이 비면 "모두 놓았어요"');
+});
+
+test('★ 🔍 Codex 45차 F: 저장소 경계에서 동시에 — applyHouseRule 두 번을 한꺼번에 부르면 코인이 하나 값뿐일 때 하나만 산다 (xp 줄 세우기 없이)', async () => {
+  await setup();
+  const { applyHouseRule } = await import('../js/db.js');
+  const price = furnById(FLOOR1).price;
+  await seed(price + 1, {}, houseWith([]));
+  const rs = await Promise.all([applyHouseRule((p) => houseBuyRule(p, FLOOR1)), applyHouseRule((p) => houseBuyRule(p, FLOOR1))]);
+  assert.deepEqual(rs.map((r) => r.ok).sort(), [false, true]);
+  assert.deepEqual([stored().coins, stored().items[FLOOR1]], [1, 1]);
 });

@@ -806,7 +806,7 @@ export function emptyProfile() {
 
 /** 🏠 진우네 집 복사 — 방·놓은 가구까지 (규칙이 고쳐도 원본이 안 바뀌게) · 없으면 undefined */
 export function copyHouse(h) {
-  if (!h || typeof h !== 'object') return undefined;
+  if (!h || typeof h !== 'object' || Array.isArray(h)) return undefined;
   return { ...h, rooms: (Array.isArray(h.rooms) ? h.rooms : []).map((r) => ({ ...r, items: (Array.isArray(r && r.items) ? r.items : []).map((it) => ({ ...it })) })) };
 }
 
@@ -2007,11 +2007,14 @@ export function mergeStatRecord(name, cur, rec) {
     // 🏠 진우네 집 — 놓은 자리는 가구(가방)와 같은 쪽(최근에 저장된 쪽)을 따른다. 처음 집 선물을 받았다는 표시는 OR
     //    (옛 백업이 "아직 안 받음"으로 되돌려 🛏️를 또 받지 않게) · 놓을 때 붙는 번호는 큰 쪽.
     //    가진 수보다 많이 놓인 것·겹침은 읽을 때 house.houseOf가 고친다 (병합은 입력을 그대로 옮기기만)
-    const hs = latest.house || older.house;
+    //    집이 객체가 아니면(깨진 백업의 글자·수·배열) 없는 것으로 본다 — 합치기가 멈추지 않게 (Codex 45차 #2)
+    const okHouse = (h) => (h && typeof h === 'object' && !Array.isArray(h) ? h : null);
+    const lh = okHouse(latest.house); const oh = okHouse(older.house);
+    const hs = lh || oh;
     if (hs) {
       out.house = copyHouse(hs);
-      out.house.started = !!((cur.house && cur.house.started) || (rec.house && rec.house.started));
-      out.house.seq = Math.max(Number(cur.house && cur.house.seq) || 0, Number(rec.house && rec.house.seq) || 0, Number(hs.seq) || 0);
+      out.house.started = !!((lh && lh.started) || (oh && oh.started));
+      out.house.seq = Math.max(Number(lh && lh.seq) || 0, Number(oh && oh.seq) || 0); // 깨진 큰 번호는 읽을 때 house.houseOf가 다시 매긴다
     } else delete out.house;
   }
   return out;

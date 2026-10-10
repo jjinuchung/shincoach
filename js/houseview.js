@@ -143,6 +143,7 @@ function sizeRoom() {
 
 function render() {
   if (!ui.open) return;
+  if (ui.drag) cancelDrag(); // 끄는 도중 두 번째 손가락으로 다른 것을 눌러 다시 그리면 그 끌기는 없던 일 (Codex 45차 #6 — 끌던 가구가 사라진 판에 남지 않게)
   const st = stones();
   $('house-coins').textContent = `💰 ${coins().toLocaleString('ko-KR')} · 🔷 ${st.math || 0} · 🔶 ${st.english || 0}`;
   renderTabs();
@@ -269,7 +270,8 @@ function drawerBox() {
   const ids = FURN.map((f) => f.id).filter((id) => left[id] > 0);
   if (!ids.length) {
     if (!houseNow().started) return sec; // 선물을 받기 전에는 선물 카드만 (상점 안내가 같이 뜨면 무엇을 먼저 할지 헷갈린다)
-    sec.appendChild(el('p', 'house-note', '서랍이 비었어요 — 가구는 🛒 가구 상점에서 사 와요.'));
+    const anyOwned = FURN.some((f) => itemCount(f.id) > 0);
+    sec.appendChild(el('p', 'house-note', anyOwned ? '가구를 모두 방에 놓았어요 — 더 갖고 싶으면 🛒 가구 상점에서 사 와요.' : '서랍이 비었어요 — 가구는 🛒 가구 상점에서 사 와요.')); // Codex 45차 D
     const go = el('button', 'btn house-go-shop', '🛒 가구 상점 가기');
     go.type = 'button';
     go.addEventListener('click', () => goTab('shop'));
@@ -331,6 +333,7 @@ const WHY = {
   owned: '이미 있어요 — 🏠 꾸미기에서 칠할 수 있어요',
   max: `한 가지 가구는 ${FURN_MAX}개까지 가질 수 있어요`,
   already: '이사 선물은 벌써 받았어요',
+  gift: '먼저 🎁 이사 선물을 받아요 — 🏠 꾸미기의 서랍에 와 있어요',
 };
 /** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다 */
 async function run(rule, okText) {
@@ -369,6 +372,16 @@ function shortText(c) {
 function shopBox() {
   const wrap = el('div', 'house-shop');
   const pf = getProfileSnapshot();
+  // 🎁 이사 선물을 받기 전에는 못 산다(house.houseBuyCheck 'gift') — 무엇을 먼저 할지 알려 주고 꾸미기로 보낸다 (Codex 45차 #5)
+  if (!houseNow().started) {
+    const card = el('div', 'house-gift');
+    card.appendChild(el('p', 'house-gift-text', '먼저 🎁 이사 선물을 받아요 — 받으면 가구를 살 수 있어요'));
+    const go = el('button', 'btn btn-primary house-gift-btn', '🏠 꾸미기로 가기');
+    go.type = 'button';
+    go.addEventListener('click', () => goTab('room'));
+    card.appendChild(go);
+    wrap.appendChild(card);
+  }
   for (const g of SHOP_GROUPS) {
     const sec = el('div', 'house-sec');
     sec.appendChild(el('h3', 'house-h', g.title));
@@ -386,7 +399,7 @@ function shopCard(it, c) {
   const paint = !!it.part;
   const done = c.why === 'owned' || c.why === 'max';
   const armed = ui.buyArm === it.id;
-  const b = el('button', `house-shop-item${c.why === 'short' ? ' is-short' : ''}${done ? ' is-done' : ''}${armed ? ' is-arm' : ''}`);
+  const b = el('button', `house-shop-item${c.why === 'short' || c.why === 'gift' ? ' is-short' : ''}${done ? ' is-done' : ''}${armed ? ' is-arm' : ''}`);
   b.type = 'button';
   b.dataset.buy = it.id;
   if (paint) { const sw = el('span', 'house-shop-swatch'); sw.style.background = it.color; b.appendChild(sw); } else b.appendChild(el('span', 'house-shop-emoji', it.emoji));
@@ -503,6 +516,9 @@ function onUp(e) {
   ui.drag = null;
   unbind();
   if (!d.moved) { endDrag(d); tap(d); return; }
+  // 손을 뗀 자리로 다시 셈한다 — 마지막으로 움직인 자리를 쓰면 방 밖에서 떼어도 방 안에 놓였다 (Codex 45차 #1)
+  d.x = e.clientX;
+  d.y = e.clientY;
   showHint(d);
   endDrag(d);
   const f = furnById(d.id);

@@ -23,6 +23,12 @@ export const FURN_MAX = 4;
 export const START_GIFT = 'f_bed';
 /** 1단계 방 이름 (방이 늘면 r2, r3 …) */
 export const FIRST_ROOM = 'r1';
+/** 지금 그리는 방 — 다른 방(r2…)에 놓인 가구는 읽을 때 서랍으로 돌아온다(화면에서 닿지 않는 가구가 없게, Codex 45차 #4). 집을 넓히면(3단계) 여기에 더한다 */
+export const ROOMS = [FIRST_ROOM];
+/** 놓는 번호의 끝 — 번호(seq·u)가 이보다 크거나 안전한 정수가 아니면 읽을 때 1부터 다시 매긴다
+ *  (Codex 45차 #3: 깨진 백업의 아주 큰 번호로 두 번 놓으면 둘 다 "놓았어요"인데 번호가 겹쳐 하나가 사라졌다) */
+export const SEQ_MAX = 1e9;
+const isHouseObj = (h) => !!h && typeof h === 'object' && !Array.isArray(h);
 
 /**
  * 가구 — id는 'f_'로 시작 · w = 차지하는 칸(가로) · at = 'floor' 바닥 | 'wall' 벽 · group = small 소품 | furn 가구 | device 기기
@@ -128,23 +134,27 @@ function ownedOf(profile, id) {
 
 /**
  * 고쳐 읽은 집 (새 객체 — 입력은 안 바꾼다). 백업 병합·옛 기록·다른 창으로 어긋난 것을 여기서 고친다:
- * 모르는 가구·방 밖·겹침(먼저 놓은 것이 남음)·가진 수보다 많이 놓음(나중에 놓은 것부터 뺌)·안 가진 벽지·바닥(처음 것으로)
+ * 집이 객체가 아님(빈 집) · 지금 그리지 않는 방(그 가구는 서랍으로) · 모르는 가구·방 밖·겹침(먼저 놓은 것이 남음) ·
+ * 가진 수보다 많이 놓음(나중에 놓은 것부터 뺌) · 같은 번호 · 안 가진 벽지·바닥(처음 것으로) · 깨진 번호(1부터 다시)
  */
 export function houseOf(profile) {
-  const src = profile && profile.house && typeof profile.house === 'object' ? profile.house : null;
+  const src = profile && isHouseObj(profile.house) ? profile.house : null;
   const out = emptyHouse();
   if (!src) return out;
   out.started = !!src.started;
-  let seq = Math.max(0, Math.floor(Number(src.seq) || 0));
+  const seqRaw = src.seq === undefined || src.seq === null ? 0 : Number(src.seq);
+  let renumber = !(Number.isSafeInteger(seqRaw) && seqRaw >= 0 && seqRaw <= SEQ_MAX);
+  let seq = renumber ? 0 : seqRaw;
   const rooms = Array.isArray(src.rooms) ? src.rooms : [];
   const seen = new Set();
   const fixed = [];
   for (const r of rooms) {
-    if (!r || typeof r.id !== 'string' || !r.id || seen.has(r.id)) continue;
+    if (!r || typeof r.id !== 'string' || !ROOMS.includes(r.id) || seen.has(r.id)) continue;
     seen.add(r.id);
     fixed.push(r);
   }
-  if (!fixed.some((r) => r.id === FIRST_ROOM)) fixed.unshift(emptyRoom(FIRST_ROOM));
+  for (const id of ROOMS) if (!seen.has(id)) fixed.push(emptyRoom(id));
+  fixed.sort((a, b) => ROOMS.indexOf(a.id) - ROOMS.indexOf(b.id));
   const placed = {}; // 집 전체에서 놓은 수 (방이 늘어도 가진 수는 하나)
   const uSeen = new Set();
   out.rooms = fixed.map((r) => {
@@ -156,7 +166,8 @@ export function houseOf(profile) {
     };
     room.wall = paint('wall');
     room.floor = paint('floor');
-    const list = (Array.isArray(r.items) ? r.items : []).filter((it) => it && Number.isInteger(it.u) && it.u > 0).slice().sort((a, b) => a.u - b.u);
+    // 번호는 양수면 받는다(아주 큰 수도 차례를 정하는 데는 쓴다) — 안전한 정수가 아니면 아래에서 다시 매긴다
+    const list = (Array.isArray(r.items) ? r.items : []).filter((it) => it && typeof it.u === 'number' && it.u > 0).slice().sort((a, b) => a.u - b.u);
     for (const it of list) {
       if (uSeen.has(it.u)) continue;
       const d = furnById(it.id);
@@ -165,11 +176,18 @@ export function houseOf(profile) {
       if (!canPlace(room, it.id, it.x, it.y)) continue;
       uSeen.add(it.u);
       placed[it.id] = (placed[it.id] || 0) + 1;
-      seq = Math.max(seq, it.u);
+      if (!(Number.isSafeInteger(it.u) && it.u <= SEQ_MAX)) renumber = true;
+      else seq = Math.max(seq, it.u);
       room.items.push({ u: it.u, id: it.id, x: it.x, y: it.y, f: it.f ? 1 : 0 });
     }
     return room;
   });
+  if (renumber) {
+    // 놓은 차례(번호 순서)는 그대로 두고 1부터 — 늘 같은 결과라 다시 읽어도 번호가 같다
+    const all = out.rooms.flatMap((r) => r.items).sort((a, b) => a.u - b.u);
+    all.forEach((it, i) => { it.u = i + 1; });
+    seq = all.length;
+  }
   out.seq = seq;
   return out;
 }
@@ -203,13 +221,15 @@ export function houseStartRule(profile) {
 
 /**
  * 살 수 있나 (순수) — 🛒 가구 상점 화면이 단추·모자란 것을 보여 줄 때, houseBuyRule이 같은 판정을 쓴다(화면과 저장이 갈라지지 않게).
- * @returns {{ok:boolean, why?:'unknown'|'owned'|'max'|'short', have?:number, shortCoins?:number, shortStones?:Object<string,number>}}
+ * @returns {{ok:boolean, why?:'unknown'|'gift'|'owned'|'max'|'short', have?:number, shortCoins?:number, shortStones?:Object<string,number>}}
  */
 export function houseBuyCheck(profile, id) {
   const furn = furnById(id);
   const paint = paintById(id);
   if (!furn && !paint) return { ok: false, why: 'unknown' };
   const have = ownedOf(profile, id);
+  // 🎁 이사 선물(🛏️)을 받기 전에는 못 산다 — 침대 넷을 사고 선물을 받으면 한도를 넘었다 (Codex 45차 #5)
+  if (!houseOf(profile).started) return { ok: false, why: 'gift', have };
   if (paint && have > 0) return { ok: false, why: 'owned', have };
   if (furn && have >= FURN_MAX) return { ok: false, why: 'max', have };
   const cost = houseCost(id);
