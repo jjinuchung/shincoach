@@ -87,8 +87,8 @@ function nearOf(answer, k) {
   if (v === null || !Number.isInteger(v)) return '';
   return num(v + [1, -1, 2, -2, 3, -3, 5, -5][k % 8]);
 }
-/** 수 보기 4개 — 정답 + 오개념 오답 (음수도 된다). 글자·값이 같은 보기는 넣지 않는다 */
-function choices(r, answer, wrongs) {
+/** 수 보기 4개 — 정답 + 오개념 오답 (음수도 된다). 글자·값이 같은 보기는 넣지 않는다 · near false면 근처 수로 채우지 않는다(셈이 없는 줄기 — AB) */
+function choices(r, answer, wrongs, near = true) {
   const list = [{ text: String(answer), ok: true }];
   const vals = [valueOf(answer)];
   const seen = new Set([String(answer)]);
@@ -98,7 +98,7 @@ function choices(r, answer, wrongs) {
     if (!w || w.text === undefined || w.text === '' || valueOf(w.text) === null || dup(w.text) || list.length >= 4) continue;
     add(w.text, w.tag);
   }
-  for (let k = 0; list.length < 4 && k < 30; k++) {
+  for (let k = 0; near && list.length < 4 && k < 30; k++) {
     const alt = nearOf(answer, k);
     if (alt && !dup(alt)) add(alt, '계산 실수');
   }
@@ -220,7 +220,7 @@ function runFamily(r, c, fams) {
 }
 /** 고른 틀로 ① 문항 만들기 — v: { t, ans, wr, steps, why, whyAny, rule, text(식·문장 보기), probe } */
 function calcAsk(r, c, concept, v) {
-  const chs = v.text ? textChoices(r, v.ans, v.wr) : choices(r, v.ans, v.wr);
+  const chs = v.text ? textChoices(r, v.ans, v.wr) : choices(r, v.ans, v.wr, v.near !== false);
   const why = Object.fromEntries(Object.entries(v.why || {}).map(([k, t]) => [k, jfix(t)]));
   return {
     ...ask(concept.id, 'calc', jfix(fill(v.t, c)), chs, {

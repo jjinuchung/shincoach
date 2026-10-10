@@ -133,7 +133,8 @@ function solveText(q, choices) {
     const p = M.pts['ㄱ']; const t = M.pts['㉮']; const d = KO[m[1]];
     const n = (t.x - p.x) * VEC[d][0] + (t.y - p.y) * VEC[d][1];
     assert.ok(n > 0 && (t.x - p.x) * VEC[d][1] === 0 && (t.y - p.y) * VEC[d][0] === 0, `㉮가 그 쪽에 없다\n${q}`);
-    return { type: 'ptcm', ans: String(n), mis: { [TAGS.startCount]: [String(n + 1)] } };
+    // 점을 세면 점 ㄱ까지 n + 1개 · 두 점 사이에 있는 점만 세면 n − 1개 (Codex 44차 #4 — 근처 수 "계산 실수"를 채우지 않는다)
+    return { type: 'ptcm', ans: String(n), mis: { [TAGS.startCount]: [String(n + 1)], [TAGS.between]: [String(n - 1)] } };
   }
   // ── 밀기
   if ((m = /^모눈 한 칸의 길이는 1 cm예요\. 처음 도형을 (오른쪽|왼쪽|위쪽|아래쪽)으로 몇 cm 밀었을까요\?$/.exec(L)) || /^모눈 한 칸의 길이는 1 cm예요\. 처음 도형을 밀었더니 나중 도형이 되었어요\. 어느 쪽으로 몇 cm 밀었을까요\?$/.test(L)) {
@@ -185,11 +186,18 @@ function solveText(q, choices) {
   if ((m = /^처음 도형을 (오른쪽|왼쪽|위쪽|아래쪽)으로 뒤집었더니 가가 되었어요\. 처음 도형을 (오른쪽|왼쪽|위쪽|아래쪽)으로 뒤집었을 때의 도형은 어느 것일까요\?$/.exec(L))) {
     const d1 = KO[m[1]]; const d2 = KO[m[2]]; const A = given['처음'];
     assert.equal(norm(given['가']), norm(flipBy(d1, A)), `가가 ${m[1]}으로 뒤집은 모양이 아니다\n${q}`);
+    // 처음 모양 그대로는 "반대쪽으로 뒤집으면 다른 모양" — "뒤집어도 그대로"로도 나오는 모양이지만, 이 문제 그림이 이미
+    //   처음 도형을 뒤집으면 가로 바뀌는 것을 보여 준다. 처음 모양을 고른 아이는 반드시 "반대쪽으로 뒤집으면 가와 다르다"고 본 것
+    //   (Codex 44차 #2 뒷부분 — 아버님 "이대로 진행": 이름표 그대로, 까닭은 여기에)
     return { type: 'pair', ans: one(byShape(flipBy(d2, A)), '반대쪽으로 뒤집은 도형'), mis: { [TAGS.upDownDiff]: byShape(A), [TAGS.axisMix]: byShape(flipOther(d2, A)), [TAGS.flipAsTurn]: byShape(turn(A, 2)) } };
   }
-  if ((m = /^처음 도형을 (오른쪽|왼쪽|위쪽|아래쪽)으로 두 번 뒤집었을 때의 도형은 어느 것일까요\?$/.exec(L))) {
-    const d = KO[m[1]]; const A = given['처음'];
-    return { type: 'twice', ans: one(byShape(flipBy(d, flipBy(d, A))), '두 번 뒤집은 도형'), mis: { [TAGS.twiceFlip]: byShape(flipBy(d, A)), [TAGS.axisMix]: byShape(flipOther(d, A)), [TAGS.flipAsTurn]: byShape(turn(A, 2)) } };
+  // 두 번 뒤집기 — 가(한 번 뒤집은 도형)를 보여 주고 같은 쪽으로 한 번 더. 틀린 생각은 **묻는 움직임 전체**(가를 한 번 뒤집기)에 적용한다
+  //   (Codex 44차 #2: "두 번"을 통째로 물으면 다른 축·두 쪽 모두는 그 생각을 두 번 다 하면 처음 모양 = 정답이 된다 — 한 번만 했다는 실수가 하나 더 붙어야 나왔다)
+  if ((m = /^처음 도형을 (오른쪽|왼쪽|위쪽|아래쪽)으로 뒤집었더니 가가 되었어요\. 가를 (오른쪽|왼쪽|위쪽|아래쪽)으로 한 번 더 뒤집었을 때의 도형은 어느 것일까요\?$/.exec(L))) {
+    const d = KO[m[1]]; assert.equal(m[2], m[1], `같은 쪽으로 한 번 더가 아니다\n${q}`);
+    const A = given['처음']; const B = given['가'];
+    assert.equal(norm(B), norm(flipBy(d, A)), `가가 ${m[1]}으로 뒤집은 모양이 아니다\n${q}`);
+    return { type: 'twice', ans: one(byShape(flipBy(d, B)), '두 번 뒤집은 도형'), mis: { [TAGS.twiceFlip]: byShape(B), [TAGS.axisMix]: byShape(flipOther(d, B)), [TAGS.flipAsTurn]: byShape(turn(B, 2)) } };
   }
   if (/^처음 도형을 뒤집었더니 가가 되었어요\. 어느 쪽으로 뒤집었을까요\?$/.test(L)) {
     const A = given['처음']; const B = given['가'];
@@ -368,9 +376,15 @@ test('★ 오개념 이름표: 그 오답이 정말 그 틀린 생각이다 — 
   let n = 0;
   for (const { c, s, q } of every(['calc'])) {
     const sv = solveText(q.q, q.choices);
-    const tagged = q.choices.filter((x) => !x.ok && x.tag && x.tag !== '계산 실수');
-    assert.ok(tagged.length >= (/^\d+$/.test(sv.ans) && sv.type !== 'cards' ? 1 : 2), `${c.id} #${s}: 이름표 붙은 오답 ${tagged.length}`);
-    for (const w of tagged) { assert.ok(tagHolds(sv, w.tag, w.text), `${c.id} #${s}: "${w.text}"는 "${w.tag}"가 아니다 (${JSON.stringify(sv.mis[w.tag])})\n${q.q}`); n++; }
+    // 보기 전체 — 근처 수 "계산 실수"도 빼지 않는다 (Codex 44차 #4: 셈이 없는 문제에 826 "계산 실수"가 끼었는데 이 검사가 걸러 냈다)
+    const wrong = q.choices.filter((x) => !x.ok);
+    assert.ok(wrong.length >= 2, `${c.id} #${s}: 오답 ${wrong.length}`);
+    for (const w of wrong) {
+      assert.ok(w.tag && Object.values(TAGS).includes(w.tag), `${c.id} #${s}: "${w.text}"의 이름표 "${w.tag}"는 이 줄기의 틀린 생각이 아니다\n${q.q}`);
+      assert.ok(tagHolds(sv, w.tag, w.text), `${c.id} #${s}: "${w.text}"는 "${w.tag}"가 아니다 (${JSON.stringify(sv.mis[w.tag])})\n${q.q}`); n++;
+      const tags = Object.keys(sv.mis).filter((t) => sv.mis[t].includes(w.text));
+      assert.equal(tags.length, 1, `${c.id} #${s}: 오답 "${w.text}"에 맞는 틀린 생각 ${tags.length}개 ${tags.join(' · ')}\n${q.q}`);
+    }
   }
   assert.ok(n > SEEDS * 8 * 2, `본 이름표 ${n}`);
 });
@@ -794,7 +808,7 @@ test('원고(move.json)가 형식 검사를 통과한다 — 8칸이 사다리 �
   assert.ok(checkContent(bad).some((x) => /정답이 오답에도/.test(x)));
 });
 
-test('★ 원고 확인 질문도 따로 풀어 대조 — 전부 읽히고, 맞는 보기는 정답 하나뿐 · 오답 하나하나가 **한** 틀린 생각에만 맞다 · 그림 후보 = 보기 · 까닭은 보기를 다 말한다 · 이름표 23개 다 쓰임', () => {
+test('★ 원고 확인 질문도 따로 풀어 대조 — 전부 읽히고, 맞는 보기는 정답 하나뿐 · 오답 하나하나가 **한** 틀린 생각에만 맞다 · 그림 후보 = 보기 · 까닭은 보기를 다 말한다 · 이름표 24개 다 쓰임', () => {
   let n = 0; const types = new Set(); const used = new Set();
   for (const { at, q, why, chs, sv } of checksOf()) {
     assert.notEqual(sv.type, 'unknown', `${at}: 못 읽는 확인 질문\n${q}`);
@@ -808,7 +822,8 @@ test('★ 원고 확인 질문도 따로 풀어 대조 — 전부 읽히고, 맞
       const tags = Object.keys(sv.mis).filter((t) => sv.mis[t].includes(x.text));
       assert.equal(tags.length, 1, `${at} (${sv.type}): 오답 "${x.text}"에 맞는 틀린 생각 ${tags.length}개 ${tags.join(' · ')}\n${q}`);
       used.add(tags[0]);
-      assert.ok(mentions(why, x.text), `${at}: 까닭에 오답 "${x.text}" 이야기가 없다\n${why}`);
+      // 오답 이야기는 그 보기로 시작하는 줄 ("㉠은 …" · "5는 …" · "‘…’은 …") — 수 보기가 첫 줄의 "1, 2, 3, 4칸" 속에서 잡히지 않게 (Codex 44차 변이에서 찾음)
+      assert.ok(why.split('\n').slice(1).some((l) => (l.startsWith(x.text) && !/^\d/.test(l.slice(x.text.length))) || l.startsWith(`‘${x.text}’`)), `${at}: 까닭에 오답 "${x.text}"로 시작하는 줄이 없다\n${why}`);
       n++;
     }
     assert.ok(mentions(why, sv.ans), `${at}: 까닭에 정답 "${sv.ans}"이 없다\n${why}`);
@@ -820,9 +835,40 @@ test('★ 원고 확인 질문도 따로 풀어 대조 — 전부 읽히고, 맞
 
 // 칸마다 그 칸의 문제
 const CELL = {
-  'mv.point': ['pt1', 'pt1cm', 'pt2', 'how'], 'mv.slide': ['pick', 'far', 'way'], 'mv.flip': ['flip', 'swaps'], 'mv.flip2': ['pair', 'twice', 'side'],
+  'mv.point': ['pt1', 'pt1cm', 'ptcm', 'pt2', 'how'], 'mv.slide': ['pick', 'far', 'way'], 'mv.flip': ['flip', 'swaps'], 'mv.flip2': ['pair', 'twice', 'side'],
   'mv.turn': ['top', 'turn'], 'mv.turn2': ['same', 'turn', 'much'], 'mv.pattern': ['next', 'rule'], 'mv.apply': ['undoTurn', 'undoFlip', 'undoSlide', 'cards'],
 };
+test('★ 원고 까닭의 후보 말 = 후보 그림 — "㉢은 가의 왼쪽과 오른쪽이 바뀌었어요" · "모두 바뀌었어요" · "처음 도형 그대로" · "3과 같은 모양" · "180°만큼 돌린 모양" · "시계 반대 방향으로 돌린 모양" · "3을 뒤집은 모양" (Codex 44차 변이에서 찾음: ㉢ 그림을 바꿔도 지나갔다)', () => {
+  let n = 0;
+  for (const { at, q, why } of checksOf()) {
+    const sh = figsOf(q).filter((f) => f.kind === 'shapes').map((f) => shapesOf(f.arg));
+    const given = sh[0] || {}; const cand = sh[1] || {};
+    const degQ = +((/(\d+)°만큼/.exec(firstLine(q)) || [])[1] || 90);
+    for (const line of why.split('\n').slice(1)) {
+      const m = /^([㉠-㉣])은 (.+)$/.exec(line);
+      if (!m || !cand[m[1]]) continue;
+      const C = norm(cand[m[1]]); const rest = m[2].split(' — ')[0].replace(/\.$/, '');
+      // 무엇에 견준 말인가 — "가의·가와·가 그대로"는 가, "3과·3을"은 무늬 3, 그 밖은 처음 도형(없으면 가·무늬 3)
+      let bm; let B;
+      if (/^가(의|와| 그대로)/.test(rest)) B = given['가'];
+      else if ((bm = /^(\d)(을|과|와) /.exec(rest))) B = given[bm[1]];
+      else B = given['처음'] || given['가'] || given['3'];
+      assert.ok(B && B !== '?', `${at}: 견줄 도형이 그림에 없다 — ${line}`);
+      let want = null;
+      if (/모두 바뀌/.test(rest)) want = [turn(B, 2)];
+      else if ((bm = /(위쪽과 아래쪽|왼쪽과 오른쪽)(?:이|만) 바뀌/.exec(rest))) want = [bm[1] === '위쪽과 아래쪽' ? T.ud(B) : T.lr(B)];
+      else if (/(그대로예요|같은 모양이에요)$/.test(rest)) want = [B];
+      else if ((bm = /(\d+)°만큼만? 돌(?:린 모양이에요|렸어요)$/.exec(rest))) want = [turn(B, +bm[1] / 90), turn(B, -bm[1] / 90)];
+      else if ((bm = /^(시계 방향|시계 반대 방향)으로 돌린 모양이에요$/.exec(rest))) want = [turn(B, quarterOf(bm[1], degQ))];
+      else if (/^\d을 뒤집은 모양이에요$/.test(rest)) want = [T.lr(B), T.ud(B)];
+      if (!want) continue;
+      assert.ok(want.some((w) => norm(w) === C), `${at}: "${line}" — ${m[1]} 그림이 그 말과 다르다\n${q}`);
+      n++;
+    }
+  }
+  assert.ok(n >= 25, `대조한 후보 말 ${n}`);
+});
+
 test('★ 원고 확인 질문은 칸마다 그 칸의 문제(두 가지 이상) · 돌리기 칸은 90°·180°·270°, 성질 칸은 360° · 보기 꼴이 문제와 맞다(㉠~㉢ · 수 · 각도 · 말)', () => {
   const kinds = {};
   for (const { id, at, q, chs, sv } of checksOf()) {
@@ -1191,6 +1237,7 @@ test('✍️ 모눈점 찍기 판 (3단계): 판에는 출발점 ㄱ만 · 목�
 
 test('✍️ 모눈 칸 칠하기 판 (3단계): 밀기는 문제 모눈째 자리까지 · 뒤집기·돌리기·무늬는 늘 5 × 5에 모양만 · 목표 = 따로 푼 답 · 후보를 칠하면 그 보기 · 다른 칸은 짐작한 답(보기와 안 겹치고 다시 읽힌다) · 문제 글은 후보 그림을 빼고 "칠해 보세요"', async () => {
   const { canDraw, mcellsOf, mcellsTap, mcellsText, mcellsFromText } = await import('../js/drawview.js');
+  const { GUESS_MAX } = await import('../js/mathprog.js');
   const kinds = {};
   const paint = (g, cells) => cells.reduce((v, [x, y]) => mcellsTap(g, v, x, y), '');
   for (const { c, q, D, sv, at } of boardsOf()) {
@@ -1236,7 +1283,7 @@ test('✍️ 모눈 칸 칠하기 판 (3단계): 밀기는 문제 모눈째 자�
       const v = paint(g, cs); const t = mcellsText(g, v);
       if (LBL.includes(t)) { assert.equal(g.kind === 'place' ? place(g.cands.find((z) => z.k === t).cells) : norm(g.cands.find((z) => z.k === t).cells), g.kind === 'place' ? place(cs) : norm(cs), `${at}: ${t}`); continue; }
       assert.ok(!q.choices.some((z) => z.text === t), `${at}: 짐작한 답 "${t}"이 보기와 겹친다`);
-      if (!/^(칠한|바뀐) 모양 /.test(t) || cs.length <= 5) assert.ok(t.length <= 24, `${at}: 📊 기록이 잘린다 "${t}" (${t.length}자)`);
+      assert.ok(t.length <= GUESS_MAX, `${at}: 📊 기록이 잘린다 "${t}" (${t.length}자)`); // 큰 그림도 빼지 않는다 (Codex 44차 #1)
       const back = mcellsFromText(g, t);
       if (/ 옮김$| 자리 그대로$/.test(t)) assert.equal(place(back), place(cs), `${at}: "${t}"을 다시 못 칠한다`);
       else assert.equal(norm(back), norm(cs), `${at}: "${t}"의 모양을 다시 못 칠한다`);
@@ -1299,4 +1346,104 @@ test('✍️ 판 배선 (3단계): 문항·🔁 쌍둥이 둘 다 판을 연다(
   assert.equal(askContext(qp, { chosen: '점 ㄱ에서 위쪽으로 2칸', p: 1, g: '점 ㄱ에서 위쪽으로 2칸' }).grid, 1);
   assert.equal(askContext(qc, { chosen: '칠한 모양 ■■ / ■□', p: 1, g: '칠한 모양 ■■ / ■□' }).paint, 1);
   assert.equal(askContext(qp, { chosen: qp.choices[0].text }).grid, undefined, '보기를 누른 답(판 꺼짐)은 그대로');
+});
+
+// ───────────────────── 🔍 Codex 44차 ─────────────────────
+
+test('🔍 Codex 44차 #1: 칠한 모양은 📊 기록에 다 남는다 — 판 크기마다 가장 넓게 칠한 답(두 구석 · 줄마다 끝 칸)도 기록 경로를 지나 같은 칸으로 다시 읽힌다 (24자에서 둘째 칸이 사라졌다)', async () => {
+  const { mcellsOf, mcellsTap, mcellsText, mcellsFromText } = await import('../js/drawview.js');
+  const { applyRound, conceptReport, GUESS_MAX } = await import('../js/mathprog.js');
+  const { emptyMath } = await import('../js/db.js');
+  assert.ok(Number.isInteger(GUESS_MAX), 'GUESS_MAX');
+  const sizes = new Map(); // 판 크기마다 하나 — 모양 판 5 × 5 · 자리 판 12 × 4 · 5 × 12 · 14 × 4 · 5 × 14
+  for (const { c, D, at } of boardsOf()) {
+    if (D.mode !== 'mcells') continue;
+    const g = mcellsOf(D); const k = `${g.kind} ${g.W}x${g.H}`;
+    if (!sizes.has(k)) sizes.set(k, { c, g, at });
+  }
+  assert.ok(sizes.size >= 5, `본 판 크기 ${[...sizes.keys()]}`);
+  let longest = 0;
+  for (const [k, { c, g, at }] of sizes) {
+    const paint = (cells) => cells.reduce((v, [x, y]) => mcellsTap(g, v, x, y), '');
+    const corners = [[0, 0], [g.W - 1, g.H - 1]]; // Codex 재현 — 두 번 누르기
+    const zig = Array.from({ length: g.H }, (_, j) => [j % 2 ? g.W - 1 : 0, j]); // 판 전체를 차지하는 모양 — 가장 긴 글
+    for (const cs of [corners, zig]) {
+      const t = mcellsText(g, paint(cs));
+      assert.ok(/^(칠한|바뀐) 모양 /.test(t), `${at} (${k}): "${t}"`);
+      longest = Math.max(longest, t.length);
+      const m = emptyMath();
+      applyRound(m, c.id, { correct: 0, total: 1, missTags: [], qs: [{ k: 'calc', ok: false, p: 1, g: t }] }, '2026-10-10');
+      const got = conceptReport(m).find((x) => x.id === c.id).guesses;
+      assert.deepEqual(got, [t], `${at} (${k}): 기록이 잘렸다 — ${t.length}자`);
+      assert.equal(norm(mcellsFromText(g, got[0])), norm(cs), `${at} (${k}): 기록에서 칠한 칸을 다시 못 읽는다`);
+    }
+  }
+  assert.ok(longest > 100 && longest <= GUESS_MAX, `가장 긴 짐작 ${longest}자 · 상한 ${GUESS_MAX}`);
+});
+
+test('🔍 Codex 44차 #2: 두 번 뒤집기는 가(한 번 뒤집은 도형)를 보여 주고 같은 쪽으로 한 번 더 — "두 번"을 통째로 물으면 다른 축·두 쪽 모두는 그 생각을 두 번 다 해서 처음 모양(= 정답)이 된다', () => {
+  // 이 테스트가 지키는 까닭 자체 — 같은 생각을 두 번 하면 제자리
+  for (const b of BASES) {
+    const A = cellsOf(b);
+    for (const d of ['R', 'U']) assert.equal(norm(flipOther(d, flipOther(d, A))), norm(A), `${b}: 다른 축으로 두 번`);
+    assert.equal(norm(turn(turn(A, 2), 2)), norm(A), `${b}: 두 쪽 모두 두 번`);
+  }
+  let n = 0;
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = qOf('mv.flip2', 'calc', s);
+    if (q.probe.ask !== 'twice') continue;
+    assert.equal(solveText(q.q, q.choices).type, 'twice', `#${s}: 가를 한 번 더 뒤집는 문제가 아니다\n${q.q}`);
+    n++; // 오답마다 생각 하나·그 뜻은 ★ 오개념 이름표 테스트가 본다
+  }
+  assert.ok(n > SEEDS / 6, `본 두 번 뒤집기 ${n}`);
+});
+
+test('🔍 Codex 44차 #3: 돌리기 문제의 이름표가 말하는 각도는 묻는 각도·고른 각도(·360°)뿐 — 270°에서 180°를 고르면 "90°"를 말하지 않는다', () => {
+  const angles = (t) => [...String(t).matchAll(/(\d+)°/g)].map((x) => +x[1]);
+  let n = 0;
+  for (const id of ['mv.turn', 'mv.turn2']) for (let s = 1; s <= SEEDS; s++) {
+    const q = qOf(id, 'calc', s); const L = firstLine(q.q);
+    const sv = solveText(q.q, q.choices);
+    const dir = /시계 반대 방향/.test(L) ? -1 : 1;
+    const asked = sv.type === 'much' ? +sv.ans.replace('°', '') : +/(\d+)°만큼/.exec(L)[1];
+    const sh = figsOf(q.q).filter((f) => f.kind === 'shapes').map((f) => shapesOf(f.arg));
+    const A = sh[0] && sh[0]['처음']; const cand = sh[1] || {};
+    for (const w of q.choices.filter((x) => !x.ok)) {
+      let chosen = angles(w.text);
+      if (/^[㉠-㉣]$/.test(w.text)) chosen = [1, 2, 3].filter((k) => norm(turn(A, k * dir)) === norm(cand[w.text])).map((k) => k * 90);
+      const side = /^(위쪽|오른쪽|아래쪽|왼쪽)으로 가요$/.exec(w.text);
+      if (side) chosen = [1, 2, 3].filter((k) => topSide(k * dir) === side[1]).map((k) => k * 90);
+      for (const a of angles(w.tag)) assert.ok(a === asked || chosen.includes(a), `${id} #${s}: ${asked}°를 묻는데 "${w.text}"(${chosen}°)의 이름표 "${w.tag}"\n${L}`);
+      if (asked === 270 && chosen.includes(180)) n++;
+    }
+  }
+  assert.ok(n > 30, `본 270° → 180° 오답 ${n}`);
+});
+
+test('🔍 Codex 44차 #4: 셈이 없는 이 줄기에는 근처 수 "계산 실수" 보기가 없다 — 수 답(점 몇 cm · 민 길이 · 숫자 카드)도 일부러 만든 오답만 · 점 몇 cm는 n + 1(점을 셈)과 n − 1(두 점 사이의 점만 셈)', () => {
+  const seen = {};
+  for (const c of MOVE) for (let s = 1; s <= SEEDS; s++) {
+    const q = qOf(c.id, 'calc', s);
+    assert.ok(q.choices.every((x) => x.tag !== '계산 실수'), `${c.id} #${s}: ${q.choices.map((x) => `${x.text}[${x.tag || ''}]`).join(' ')}`);
+    const sv = solveText(q.q, q.choices);
+    if (!/^\d+$/.test(sv.ans)) continue;
+    seen[sv.type] = (seen[sv.type] || 0) + 1;
+    assert.deepEqual(q.choices.filter((x) => !x.ok).map((x) => x.text).sort(), Object.values(sv.mis).flat().sort(), `${c.id} #${s} (${sv.type}): 오답 = 틀린 생각이 낸 수`);
+  }
+  assert.deepEqual(Object.keys(seen).sort(), ['cards', 'far', 'ptcm'], JSON.stringify(seen));
+  // Codex 재현: [seg 258]을 오른쪽으로 뒤집기 — 825 · 528 · 852뿐 (826 없음)
+  const q = qOf('mv.apply', 'calc', 15);
+  assert.match(q.q, /\[seg 258\]/); assert.deepEqual(q.choices.map((x) => x.text).sort(), ['528', '825', '852']);
+});
+
+test('🔍 Codex 44차 #5: 숫자 카드 문제의 이름표는 묻지 않은 움직임을 말하지 않는다 — 뒤집기 문제에 "돌리면" · 돌리기 문제에 "뒤집"', () => {
+  const seen = new Set();
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = qOf('mv.apply', 'calc', s);
+    if (q.probe.ask !== 'cards') continue;
+    seen.add(q.probe.how);
+    const L = firstLine(q.q); const turnQ = /돌리면/.test(L);
+    for (const w of q.choices.filter((x) => !x.ok)) assert.ok(!(turnQ ? /뒤집/ : /돌리/).test(w.tag), `#${s}: "${w.tag}"\n${L}`);
+  }
+  assert.deepEqual([...seen].sort(), ['lr', 'turn', 'ud']);
 });

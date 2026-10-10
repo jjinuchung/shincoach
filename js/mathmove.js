@@ -13,8 +13,9 @@
 //   칸 모양이라 ✍️ 칸 칠하기 판에 그대로 칠할 수 있다 — 밀기는 자리까지, 뒤집기·돌리기는 모양만(지도서 ②: 모눈을 같이 옮겨 그리게 강요하지 않음)
 // 오답은 지도서·연구(이승진 2017, 천재 2022 지도서 210쪽 인용)·2015 지도서 오답 유형이 꼽은 흔한 생각:
 //   · 밀기를 뒤집기와 헷갈림(모양을 바꿈) · 두 도형 사이의 빈칸을 민 길이로 봄 · 방향을 반대로 봄 · 출발점도 한 칸으로 셈
+//   · 두 점 사이의 점만 셈(점 몇 cm — 두 도형 사이의 빈칸만 세는 생각의 점 판, Codex 44차 #4)
 //   · 위쪽과 아래쪽으로 뒤집은 모양이 다르다고 봄 · 뒤집기를 180° 돌리기로 봄 · 오른쪽으로 뒤집었는데 위아래를 바꿈
-//   · 돌리는 방향을 반대로 봄 · 180°만큼 돌리기를 위아래 뒤집기로 봄 · 처음 도형을 찾을 때 거꾸로 하지 않음 · 카드를 돌리면 순서도 바뀌는 것을 놓침
+//   · 돌리는 방향을 반대로 봄 · 돌리는 각도를 헷갈림 · 180°만큼 돌리기를 위아래 뒤집기로 봄 · 처음 도형을 찾을 때 거꾸로 하지 않음 · 카드 줄의 순서가 바뀌는 것을 놓침
 //
 // 새 줄기의 함정(메모 stem-generator-pitfalls)을 처음부터:
 //   · 가족 = 틀 여러 개(방향·각도 낱말마다 한 틀) — 🔁 쌍둥이가 요청한 틀(tplKey)로 온다
@@ -22,6 +23,9 @@
 //     모양의 줄 수가 열쇠에 들어가 같은 틀도 열쇠가 갈린다. 모눈 크기는 틀마다 고정
 //   · 후보에서 고르는 ①은 "어느 것" 말투 (아니면 숫자판이 뜬다) · ㉠~㉣는 늘 받침 — "㉠은 · ㉠과"
 //   · 한 값(한 모양·한 자리)이 서로 다른 두 틀린 생각에서 다 나오면 그 후보는 진단이 안 된다 — 후보 모양·자리는 서로 다르게
+//   · ★ 틀린 생각은 **묻는 움직임 전체**에 적용해 오답을 만든다 — "두 번 뒤집기"에 다른 축을 두 번 다 하면 처음 모양(= 정답)이라
+//     묻는 움직임을 한 번(가를 한 번 더)으로 묻는다 (Codex 44차 #2)
+//   · 셈이 없는 줄기라 수 답(점 몇 cm·민 길이·숫자 카드)에도 근처 수 "계산 실수"를 채우지 않는다 — 일부러 만든 오답만 (Codex 44차 #4)
 //   · 아직 안 배운 말을 앞 칸에 쓰지 않는다(점의 이동에 밀기·뒤집기·돌리기 · 밀기에 뒤집기·돌리기 · 뒤집기에 돌리기·°)
 // ★ 정답·오답은 테스트가 **문제 글과 그림 지시문을 따로 읽어** 다시 움직여 본다 (tests/mathmove.test.js).
 
@@ -33,10 +37,10 @@ export { gradeLabel };
 
 const { famOf, runFamily, calcAsk, misAsk, branchOf, RIGHT_AS_WRONG, OFF } = _kit;
 
-/** 가족에서 틀 하나를 골라 ① 문항으로 — ✍️ 판(draw)도 넘긴다 (공용 calcAsk는 draw를 모른다) */
+/** 가족에서 틀 하나를 골라 ① 문항으로 — ✍️ 판(draw)도 넘긴다 (공용 calcAsk는 draw를 모른다) · 수 답에도 근처 수 "계산 실수"를 채우지 않는다(셈이 없는 줄기, Codex 44차 #4) */
 function askFam(r, c, concept, fams) {
   const v = runFamily(r, c, fams);
-  const q = calcAsk(r, c, concept, v);
+  const q = calcAsk(r, c, concept, { ...v, near: false });
   return v.draw ? { ...q, draw: v.draw } : q;
 }
 /** 조건에 맞을 때까지 다시 뽑기 */
@@ -121,6 +125,7 @@ const topGoes = (k) => TOP_GOES[((k % 4) + 4) % 4];
 /** 이 줄기의 오개념 이름표 (📊·🤔 노트·결과 카드에 그대로 뜬다) — 이름표 하나에 생각 하나 */
 export const TAGS = {
   startCount: '출발점도 한 칸으로 셈',
+  between: '두 점 사이의 점만 셈', // 점 몇 cm에서 n − 1 — 두 점 사이에 있는 점만 셈 (Codex 44차 #4: 그 자리에 근처 수 "계산 실수"가 들어갔다)
   wayBack: '방향을 반대로 봄',
   swapXY: '가로와 세로 칸 수를 바꿈',
   oneWay: '한 방향만 움직임',
@@ -133,14 +138,14 @@ export const TAGS = {
   upDownDiff: '반대쪽으로 뒤집으면 다른 모양이라고 봄',
   twiceFlip: '두 번 뒤집으면 처음 모양인 것을 모름',
   turnBack: '돌리는 방향을 반대로 봄',
-  turnHalf: '90°만큼과 180°만큼을 헷갈림',
+  turnHalf: '돌리는 각도를 헷갈림', // 90°↔180°만이 아니라 270°에서 180°를 고르는 것도 — 어느 각도인지는 풀이 글이 말한다 (Codex 44차 #3)
   turnAsFlip: '돌리기를 뒤집기로 봄',
   dirIgnore: '돌리는 방향을 생각하지 않음',
   full360: '360°만큼 돌리면 처음 모양인 것을 모름',
   ruleSkip: '규칙대로 한 번 더 움직이지 않음',
   noUndo: '움직인 모양을 처음 모양으로 봄',
   notReverse: '거꾸로 하지 않고 같은 쪽으로 또 움직임',
-  orderKeep: '카드를 돌리면 순서도 바뀌는 것을 놓침',
+  orderKeep: '카드 줄의 순서가 바뀌는 것을 놓침', // 한꺼번에 돌리기·왼쪽(오른쪽)으로 뒤집기 둘 다 — 어느 움직임인지는 문제 글이 말한다 (Codex 44차 #5)
   orderSwap: '위아래로 뒤집어도 카드 순서가 바뀐다고 봄',
   digitKeep: '숫자 모양은 그대로 둠',
 };
@@ -281,9 +286,12 @@ export const MOVE = [
         const { n, p } = drawUntil(() => ({ n: int(r, 2, 6), p: { x: int(r, 0, PW), y: int(r, 0, PH) } }), (s) => inP(go(s.p, d, s.n)));
         return {
           t: `모눈 한 칸의 길이는 1 cm예요. 점 ㄱ을 ${DIR_KO[d]}으로 몇 cm 이동하면 ㉮에 도착할까요?\n\n${PT([['ㄱ', p], ['㉮', go(p, d, n)]], true)}`,
-          ans: String(n), wr: [{ text: String(n + 1), tag: TAGS.startCount }],
+          ans: String(n), wr: [{ text: String(n + 1), tag: TAGS.startCount }, { text: String(n - 1), tag: TAGS.between }],
           steps: [`점 ㄱ에서 ㉮까지 ${DIR_KO[d]}으로 ${n}칸 — 점 ㄱ이 있는 곳은 세지 않아요`, `한 칸이 1 cm → ${n} cm`],
-          why: { [TAGS.startCount]: `점을 세었어요 — 점 ㄱ까지 세면 ${n + 1}개지만, 칸은 ${n}칸이에요.` },
+          why: {
+            [TAGS.startCount]: `점을 세었어요 — 점 ㄱ까지 세면 ${n + 1}개지만, 칸은 ${n}칸이에요.`,
+            [TAGS.between]: `두 점 사이에 있는 점 ${n - 1}개만 셌어요 — 점 ㄱ에서 ㉮까지 옮긴 칸은 ${n}칸이에요.`,
+          },
           probe: { ask: 'cm', d, n, p },
         };
       };
@@ -518,18 +526,20 @@ export const MOVE = [
           probe: { ask: 'pair', dir, v },
         });
       };
-      // 두 번 뒤집기
+      // 두 번 뒤집기 — 한 번 뒤집은 가를 보여 주고 같은 쪽으로 한 번 더. 오답은 그 한 번에 생각 하나씩
+      //   (Codex 44차 #2: "두 번"을 통째로 물으면 다른 축·두 쪽 모두는 그 생각을 두 번 다 하면 처음 모양 = 정답이라
+      //    "한 번만 뒤집음"이 하나 더 붙어야 나오는 모양이었다)
       const twice = (dir) => {
-        const v = shapeOf(r);
+        const v = shapeOf(r); const w = flipBy(dir, v);
         return shapeAsk(r, {
-          head: `처음 도형을 ${FLIP_KO[dir]}으로 두 번 뒤집었을 때의 도형은 어느 것일까요?`,
-          given: SH([['처음', v]]),
-          list: [{ v }, { v: flipBy(dir, v), tag: TAGS.twiceFlip }, { v: flipOther(dir, v), tag: TAGS.axisMix }, { v: rot(v, 2), tag: TAGS.flipAsTurn }],
-          steps: [`한 번 뒤집으면 ${SWAP_KO[dir]}이 바뀌고, 한 번 더 뒤집으면 다시 바뀌어요`, '→ 처음 도형과 같은 모양'],
+          head: `처음 도형을 ${FLIP_KO[dir]}으로 뒤집었더니 가가 되었어요. 가를 ${FLIP_KO[dir]}으로 한 번 더 뒤집었을 때의 도형은 어느 것일까요?`,
+          given: SH([['처음', v], ['가', w]]),
+          list: [{ v }, { v: w, tag: TAGS.twiceFlip }, { v: flipOther(dir, w), tag: TAGS.axisMix }, { v: rot(w, 2), tag: TAGS.flipAsTurn }],
+          steps: [`가를 ${FLIP_KO[dir]}으로 뒤집으면 ${SWAP_KO[dir]}이 다시 바뀌어요`, '→ 처음 도형과 같은 모양 — 같은 쪽으로 두 번 뒤집으면 처음 도형'],
           why: {
-            [TAGS.twiceFlip]: '한 번만 뒤집은 모양이에요 — 한 번 더 뒤집으면 처음 모양으로 돌아와요.',
-            [TAGS.axisMix]: `${OTHER_KO[dir]}이 바뀌었어요 — ${FLIP_KO[dir]}으로 뒤집으면 ${SWAP_KO[dir]}이 바뀌어요.`,
-            [TAGS.flipAsTurn]: '두 쪽이 모두 바뀐 모양이에요 — 같은 쪽으로 두 번 뒤집으면 처음 모양이에요.',
+            [TAGS.twiceFlip]: '가 그대로예요 — 가를 한 번 더 뒤집으면 바뀐 두 쪽이 제자리로 돌아와 처음 도형이 돼요.',
+            [TAGS.axisMix]: `가의 ${OTHER_KO[dir]}이 바뀌었어요 — ${FLIP_KO[dir]}으로 뒤집으면 ${SWAP_KO[dir]}이 바뀌어요.`,
+            [TAGS.flipAsTurn]: `가의 두 쪽이 모두 바뀌었어요 — 한 번 뒤집으면 ${SWAP_KO[dir]}만 바뀌어요.`,
           },
           probe: { ask: 'twice', dir, v },
         });
