@@ -474,11 +474,12 @@ test('🏠 houseBuyCheck: 살 수 있나 — 모자란 코인·스톤을 정확�
     const p = started ? buyer(coins, items) : pf(coins, items);
     const have = items[id];
     const maxNow = items.x_wide > 0 && items.x_floor2 > 0 ? FURN_MAX_2F : FURN_MAX; // 🏗️ 2층이 있으면 한 가지 6개까지 — 2층은 📐 방 넓히기가 있을 때만 (Codex 46차 #2)
+    const limit = def && def.max ? Math.min(maxNow, def.max) : maxNow; // 💊 회복 캡슐처럼 가구가 따로 정한 한도(2)가 있으면 그것과 작은 쪽
     let want;
     if (!def) want = 'unknown';
     else if (!started) want = 'gift';
     else if ((def.part || isGrow) && have > 0) want = 'owned';
-    else if (!def.part && !isGrow && have >= maxNow) want = 'max';
+    else if (!def.part && !isGrow && have >= limit) want = 'max';
     else if (isGrow && def.after && !(items[def.after] > 0)) want = 'order';
     else if (coins < def.price || Object.entries(def.stones || {}).some(([sid, n]) => items[sid] < n)) want = 'short';
     else want = 'ok';
@@ -773,7 +774,7 @@ test('🏗️ 화면 (넓히기 2단계): 탭 — 방 하나면 [🏠 꾸미기]
   const groups = src.slice(src.indexOf('const SHOP_GROUPS = ['), src.indexOf('];', src.indexOf('const SHOP_GROUPS = [')));
   assert.ok(groups.indexOf("key: 'grow'") > 0 && groups.indexOf("key: 'grow'") < groups.indexOf("key: 'small'"), '집 넓히기가 맨 위');
   assert.ok(src.includes("g.key === 'grow' ? GROW"), '넓히기 칸은 GROW 등록부로');
-  assert.ok(src.includes('`가진 것 ${have}/${houseShapeNow().max}`'), '가진 것 n/한도 — 한도는 집 모양에서(2층이면 6)');
+  assert.ok(src.includes('`가진 것 ${have}/${houseFurnMax(it.id)}`'), '가진 것 n/한도 — 한도는 집 모양에서(2층이면 6) · 가구가 따로 정했으면 그것(💊 2)');
   assert.ok(/get max\(\) \{[\s\S]{0,120}houseShapeNow\(\)\.max/.test(src), '한도 말도 집 모양에서');
   assert.ok(src.includes('for (const t of houseTabs(houseShapeNow().rooms))'), '탭은 집 모양의 방으로');
   assert.ok(src.includes('ui.drag = { ...what, room: roomId(),'), '끌기는 시작한 방을 잡아 둔다');

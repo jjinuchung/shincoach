@@ -16,8 +16,10 @@ import {
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
   applyRocketSteal, applyRocketWin, applyRocketAdmit, applyRocketStep, // 🚀 로켓단 습격 (2026-10-09) — 저장이 안 되면 메모리로 잇지 않는다 (Codex 43차 #2)
   applyHouseRule, copyHouse, // 🏠 진우네 집 (2026-10-10)
+  evolveRule, copyRestsDone, // 💊 회복 캡슐 — 깜짝 진화 · 받은 휴식 (2026-10-10)
 } from './db.js';
-import { houseOf, leftOf, houseShape } from './house.js'; // 🏠 진우네 집 규칙 (순수)
+import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진우네 집 규칙 (순수)
+import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
@@ -319,7 +321,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -351,7 +353,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -851,6 +853,30 @@ export async function houseDo(rule) {
   const r = await runProfileOp(() => applyHouseRule(rule), () => ({ ok: false, why: 'save' }));
   const { profile: _p, ...rest } = r || {};
   return { ok: false, ...rest };
+}
+/** 💊 캡슐 u에 포켓몬 넣기 — 행운은 지금 뽑아 **넣을 때** 정해 둔다(두 창·저장 실패로 다시 뽑지 못하게) · 시각은 트랜잭션 안에서 */
+export function restStart(u, monId, luck = rollLuck(Math.random())) {
+  return houseDo((p) => restStartRule(p, u, monId, Date.now(), luck));
+}
+/** 💊 일찍 꺼내기 — 보상 없음 */
+export function restCancel(u) {
+  return houseDo((p) => restCancelRule(p, u, Date.now()));
+}
+/** 💊 다 쉰 포켓몬 받기 — decide: 깜짝 진화일 때 진우가 고른 갈래(0 = 그대로 두기) · 진화는 evolveRule(레벨이 모자라도) */
+export function restClaim(u, decide) {
+  return houseDo((p) => restClaimRule(p, u, Date.now(), decide, HP.max, evolveRule));
+}
+/** 💊 고르기 창 — 데리고 있는 포켓몬 id (한 마리 이상) */
+export function ownedMonIds() {
+  return Object.keys(profile.caught || {}).map(Number).filter((id) => id > 0 && haveCount(id) > 0);
+}
+/** 💊 💤 막대 { have, need, full } */
+export function monExp(id) {
+  return expOf(profile.mons[id]);
+}
+/** 🏠 한 가지 가구를 가질 수 있는 수 (💊 캡슐은 2) */
+export function houseFurnMax(id) {
+  return furnMax(profile, id);
 }
 /** 🏠 지금 집 (이 창의 프로필로 고쳐 읽은 것 — 그리기용) */
 export function houseNow() {

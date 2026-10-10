@@ -14,10 +14,15 @@
 //   가구는 되팔지 않으므로(아버님 ④) 상점은 **두 번 눌러야** 산다 — 잘못 누른 값비싼 기기를 되돌릴 길이 없다
 // 🏗️ 집 넓히기 2단계(2026-10-10, 아버님 "2단계 가자"): 방 크기는 houseShapeNow().size(📐 방을 넓히면 10 × 7) ·
 //   🏗️ 2층이 있으면 탭이 [🏠 1층] [🏠 2층] [🛒 가구 상점] — 층마다 벽지·바닥, 서랍은 하나 · 상점 맨 위 "🏗️ 집 넓히기"(💰·🔷·🔶 모은 만큼)
+// 💊 회복 캡슐 2단계(2026-10-10, 아버님 설계안 "이대로 진행"): 놓인 캡슐을 누르면 🐾 쉬게 하기(고르기 창) · 쉬는 중엔 캡슐에 포켓몬과
+//   남은 시간 · ⏏️ 꺼내기(두 번 — 보상 없음) · 다 쉬면 캡슐을 눌러 ✨ 받기 · 깜짝 진화면 진우가 갈래를 고르거나 그대로 둔다. 규칙은 rest.js
 // 🔍 Codex 46차 #1: 다른 창에서 돌아와 프로필을 다시 읽으면(app.js visibilitychange) 열린 집을 새로 그린다 — 화면은 옛 2층 10 × 7인데
 //   누르면 새 1층 8 × 6으로 셈해 다른 칸·다른 층에 놓였다. 그린 모양(ui.drawn)과 지금 모양이 다르면 놓기·끌기·칠하기·도구는 하지 않고 다시 그린다(stale)
-import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, storeRule, paintRule } from './house.js';
-import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading } from './xp.js';
+import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, storeRule, paintRule } from './house.js';
+import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading, restStart, restCancel, restClaim, ownedMonIds, monExp, houseFurnMax, hpOf, monLv, getPartner } from './xp.js';
+import { REST_EXP, REST_MS, restLeft } from './rest.js';
+import { showRestDone } from './restshow.js'; // ✨ 다 쉰 포켓몬 받기 연출 (3단계)
+import { ROSTER, characterUrl, artUrl, ensureArt } from './pokemon.js';
 import { ENGLISH_STONE_HOW } from './items.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 
@@ -44,6 +49,8 @@ function jong(w) {
 }
 const eul = (w) => (jong(w) > 0 ? '을' : '를');
 const euro = (w) => (jong(w) > 0 && jong(w) !== 8 ? '으로' : '로');
+const iga = (w) => (jong(w) > 0 ? '이' : '가');
+const eun = (w) => (jong(w) > 0 ? '은' : '는');
 
 /**
  * 손가락 자리 → 놓을 칸 (순수 — node 테스트가 직접 부른다).
@@ -110,7 +117,8 @@ export function growProgress(profile, id) {
 // ───────────────────── 화면 ─────────────────────
 
 // tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다) · drawn: 그린 집 모양(shapeKey)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '' };
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0 };
+// 💊 pick: 고르기 창을 연 캡슐 번호 · evoAsk: 깜짝 진화 물음 { u, mon, choices } · outArm: ⏏️ 꺼내기를 한 번 누른 캡슐 · tick: 남은 시간 시계
 /** 지금 보는 방 id — 그 층이 없어졌으면(2층 없는 백업으로 합쳐짐) 1층 */
 const roomId = () => {
   const rs = houseShapeNow().rooms;
@@ -136,6 +144,10 @@ export function initHouse() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) cancelDrag(); });
   window.addEventListener('pagehide', () => cancelDrag());
   onProfileReload(onReloaded);
+  // ✨ 다 쉰 캡슐이 있으면 앱 홈의 🏠 버튼에 표시 — 집을 안 열어도 알게 (15초마다 · 다시 읽은 뒤 · 닫을 때)
+  onProfileReload(markReady);
+  setInterval(markReady, 15000);
+  markReady();
 }
 
 /** 🏠 집 열기 */
@@ -144,8 +156,10 @@ export function openHouse(opts = {}) {
   ui.open = true;
   ui.onClose = opts.onClose || null;
   ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.buyArm = ''; ui.floor = FIRST_ROOM;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0;
   ui.tab = opts.tab === 'shop' ? 'shop' : 'room';
   $('house').hidden = false;
+  if (!ui.tick) ui.tick = setInterval(tickRests, 1000);
   render();
 }
 
@@ -153,7 +167,9 @@ export function closeHouse() {
   if (!ui.open) return;
   cancelDrag();
   ui.open = false;
+  if (ui.tick) { clearInterval(ui.tick); ui.tick = 0; }
   $('house').hidden = true;
+  markReady();
   const cb = ui.onClose;
   ui.onClose = null;
   if (cb) cb();
@@ -169,6 +185,7 @@ function onReloaded() {
   cancelDrag();
   const moved = ui.drawn && ui.drawn !== shapeKey();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0;
   ui.floor = roomId();
   if (moved) ui.msg = WHY.changed;
   render();
@@ -180,6 +197,7 @@ function stale() {
   if (ui.drawn === shapeKey()) return false;
   cancelDrag();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0;
   ui.floor = roomId();
   ui.msg = WHY.changed;
   render();
@@ -227,8 +245,11 @@ function render() {
   renderTabs();
   const body = $('house-body');
   body.innerHTML = '';
-  body.classList.toggle('is-shop', ui.tab === 'shop');
+  const panel = ui.tab === 'room' && (ui.evoAsk || ui.pick);
+  body.classList.toggle('is-shop', ui.tab === 'shop' || !!panel); // 한 칸(가로 화면에서도)
   if (ui.tab === 'shop') body.appendChild(shopBox());
+  else if (ui.evoAsk) body.appendChild(evoAskBox());
+  else if (ui.pick) body.appendChild(pickBox());
   else {
     body.appendChild(roomBox());
     body.appendChild(drawerBox());
@@ -260,6 +281,7 @@ function goTab(key, floor) {
   if (ui.tab === key && (!floor || floor === roomId())) return;
   cancelDrag();
   ui.tab = key; ui.sel = 0; ui.arm = ''; ui.buyArm = ''; ui.msg = '';
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0;
   if (floor) ui.floor = floor;
   render();
 }
@@ -308,6 +330,7 @@ function itemEl(it) {
   e.dataset.id = it.id;
   Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(d.at === 'wall' ? 5 : 10 + it.y) });
   e.appendChild(el('span', 'house-emoji', d.emoji));
+  if (it.id === HEAL) restDecor(e, it);
   e.addEventListener('pointerdown', (ev) => startDrag(ev, { kind: 'move', id: it.id, u: it.u, src: e }));
   return e;
 }
@@ -328,6 +351,7 @@ function toolsEl(it) {
   const store = el('button', 'btn house-tool', '📦 서랍에');
   store.type = 'button';
   store.addEventListener('click', () => { if (stale()) return; ui.sel = 0; run((p) => storeRule(p, rid, it.u), `${d.emoji} ${d.ko}${eul(d.ko)} 서랍에 넣었어요`); });
+  if (it.id === HEAL) t.appendChild(restTool(it)); // 💊 캡슐 — 🐾 쉬게 하기 · ⏏️ 꺼내기 · ✨ 받기
   t.appendChild(flip);
   t.appendChild(store);
   return t;
@@ -427,6 +451,7 @@ const WHY = {
   changed: '다른 화면에서 집이 바뀌었어요 — 바뀐 집으로 다시 그렸으니 다시 해 봐요',
   room: '그 방이 없어요 — 다른 화면에서 집이 바뀌었나 봐요',
   already: '이사 선물은 벌써 받았어요',
+  resting: '쉬는 중이라 서랍에 못 넣어요 — 먼저 ⏏️ 꺼내요',
   gift: '먼저 🎁 이사 선물을 받아요 — 🏠 꾸미기의 서랍에 와 있어요',
 };
 /** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다
@@ -513,7 +538,7 @@ function shopCard(it, c, pf) {
     b.appendChild(prog);
   } else {
     const need = c.why === 'order' ? growById(c.need) : null;
-    b.appendChild(el('span', 'house-shop-have', armed ? '한 번 더 누르면 사요' : paint || grow ? (have ? '✔ 있어요' : need ? `${need.emoji} ${need.ko} 먼저` : '') : `가진 것 ${have}/${houseShapeNow().max}`));
+    b.appendChild(el('span', 'house-shop-have', armed ? '한 번 더 누르면 사요' : paint || grow ? (have ? '✔ 있어요' : need ? `${need.emoji} ${need.ko} 먼저` : '') : `가진 것 ${have}/${houseFurnMax(it.id)}`));
   }
   b.addEventListener('click', () => shopTap(it.id));
   return b;
@@ -536,7 +561,9 @@ async function shopTap(id) {
   if (!c.ok) {
     ui.buyArm = '';
     const why = (growById(id) && GROW_WHY[c.why]) || c.why;
-    ui.msg = why === 'short' ? `${name} — ${shortText(c)}가 모자라요. 배우고 다시 와요!` : (WHY[why] || '다시 해 볼까요?'); // shortText는 늘 "…개"로 끝난다
+    const own = why === 'max' && furnById(id) && furnById(id).max; // 💊 캡슐처럼 가구가 따로 정한 한도
+    ui.msg = why === 'short' ? `${name} — ${shortText(c)}가 모자라요. 배우고 다시 와요!` // shortText는 늘 "…개"로 끝난다
+      : own ? `${name}${eun(it.ko)} ${own}대까지 가질 수 있어요` : (WHY[why] || '다시 해 볼까요?');
     render();
     return;
   }
@@ -561,6 +588,281 @@ function placeAt(id, rect, px, py) {
   if (!spot || !canPlace(houseShapeNow().size, room(), id, spot.x, spot.y)) { say(WHY.spot); return; }
   ui.arm = '';
   run((p) => placeRule(p, rid, id, spot.x, spot.y), `${d.emoji} ${d.ko}${eul(d.ko)} 놓았어요`);
+}
+
+// ───────────────────── 💊 회복 캡슐 ─────────────────────
+
+/** 남은 시간 "분:초" (순수) — 60:00 · 0:05 */
+export function restClock(ms) {
+  const s = Math.max(0, Math.ceil((Number(ms) || 0) / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+const REST_WHY = {
+  busy: '이미 다른 포켓몬이 쉬고 있어요',
+  twice: '그 포켓몬은 다른 캡슐에서 쉬고 있어요',
+  none: '그 포켓몬이 이제 없어요 — 다른 포켓몬을 골라요',
+  gone: '캡슐이 비어 있어요 — 다른 화면에서 꺼냈나 봐요',
+  ready: '다 쉬었어요! 캡슐을 눌러 받아요',
+  to: '그 모습으로는 진화할 수 없어요',
+  decide: '',
+};
+/** "N분 남았어요" (순수) — 1분 아래도 1분 */
+export function minsLeft(ms) {
+  return `${Math.max(1, Math.ceil((Number(ms) || 0) / 60000))}분 남았어요`;
+}
+/** 캡슐 일이 안 됐을 때의 말 (순수) — 아직이면 몇 분 남았는지 */
+export function restWhy(r) {
+  const why = r && r.why;
+  if (why === 'early') return `아직 쉬는 중이에요 — ${minsLeft(r.left)}`;
+  const own = (o) => typeof why === 'string' && Object.prototype.hasOwnProperty.call(o, why); // 물려받은 이름(toString…)은 말이 아니다
+  if (own(REST_WHY)) return REST_WHY[why];
+  return (own(WHY) && WHY[why]) || '다시 해 볼까요?';
+}
+
+/**
+ * 다 쉰 포켓몬을 받았을 때의 말 (순수) — ko = id → 이름
+ * @returns {string[]}
+ */
+export function claimLines(r, ko) {
+  const name = ko(r.mon);
+  if (r.gone) return [`${name}${iga(name)} 이제 없어서 캡슐이 비었어요`];
+  const out = [`❤️ ${name} HP 가득!`, `💤 +${REST_EXP}`];
+  const lvUp = (r.exp && r.exp.lvUp) || 0;
+  const lucky = r.lv ? r.lv.to - r.lv.from - lvUp : 0;
+  if (lvUp) out.push(`💤 경험치가 가득 차서 레벨 +${lvUp}`);
+  if (lucky > 0) out.push('🍀 행운의 레벨 +1');
+  if (r.coins) out.push(`🍀 레벨이 가득해서 대신 💰${r.coins}`);
+  if (r.lv && r.lv.to > r.lv.from) out.push(`Lv ${r.lv.from} → ${r.lv.to}`);
+  if (r.evo && r.evo.ok) {
+    const t = ko(r.evo.to);
+    out.push(`✨ ${t}${euro(t)} 진화!`);
+  }
+  if (r.kept) out.push('진화하지 않고 그대로 두었어요');
+  return out;
+}
+
+/** 포켓몬 이름 */
+function monKo(id) {
+  const r = ROSTER.find((x) => x.id === Number(id));
+  return r ? r.ko : `포켓몬 ${id}`;
+}
+/** 포켓몬 그림 — 받아 둔 캐릭터·포스터 그림, 없으면 🐾를 두고 받아 오면 바꾼다 */
+function monFace(id, cls) {
+  const img = (url) => {
+    const i = el('img', cls);
+    i.src = url;
+    i.alt = monKo(id);
+    i.draggable = false;
+    return i;
+  };
+  const url = characterUrl(id) || artUrl(id);
+  if (url) return img(url);
+  const s = el('span', `${cls} is-emoji`, '🐾');
+  ensureArt(id).then((u) => { if (u && s.isConnected) s.replaceWith(img(u)); }).catch(() => {});
+  return s;
+}
+
+/** 쉰 만큼 (0~1) — 남은 시간 링 */
+function restDone(left) {
+  return Math.max(0, Math.min(1, 1 - left / REST_MS)).toFixed(3);
+}
+
+/** ✨ 다 쉰 캡슐 수 → 🏠 버튼(앱 홈의 [data-open="house"])에 has-ready */
+function markReady() {
+  const now = Date.now();
+  let n = 0;
+  for (const r of houseNow().rooms) for (const i of r.items) if (i.rest && restLeft(i.rest, now) === 0) n++;
+  for (const b of document.querySelectorAll('[data-open="house"]')) {
+    b.classList.toggle('has-ready', n > 0);
+    b.setAttribute('aria-label', n > 0 ? '진우네 집 — 다 쉰 포켓몬이 있어요' : '진우네 집');
+  }
+}
+
+/** 💊 캡슐 꾸밈 — 쉬는 포켓몬 · 💤 · 남은 시간(다 쉬면 ✨). 시계(tickRests)가 1초마다 글자만 바꾼다(다시 그리면 끌기가 끊긴다) */
+function restDecor(e, it) {
+  e.classList.add('is-heal');
+  if (!it.rest) return;
+  const left = restLeft(it.rest, Date.now());
+  e.classList.add('is-resting');
+  if (!left) e.classList.add('is-ready');
+  e.dataset.at = String(it.rest.at);
+  e.dataset.mon = String(it.rest.mon);
+  e.setAttribute('aria-label', `${furnById(it.id).ko} — ${monKo(it.rest.mon)} ${left ? '쉬는 중' : '다 쉼'}`);
+  e.style.setProperty('--rest-p', String(restDone(left)));
+  const box = el('span', 'house-rest');
+  box.appendChild(el('span', 'house-rest-ring')); // 남은 시간 링 — 찬 만큼(--rest-p) 파랗게
+  box.appendChild(monFace(it.rest.mon, 'house-rest-mon'));
+  box.appendChild(el('span', 'house-rest-zz', '💤'));
+  box.appendChild(el('span', 'house-rest-time', left ? restClock(left) : '✨'));
+  e.appendChild(box);
+}
+
+/** 1초마다 — 쉬는 캡슐의 남은 시간 · 다 쉬는 순간 ✨와 말(고른 캡슐이면 도구도 ✨ 받기로) */
+function tickRests() {
+  if (!ui.open || ui.tab !== 'room') return;
+  const now = Date.now();
+  for (const e of document.querySelectorAll('#house-body .house-item.is-resting')) {
+    const left = restLeft({ at: Number(e.dataset.at) }, now);
+    const t = e.querySelector('.house-rest-time');
+    if (t) t.textContent = left ? restClock(left) : '✨';
+    e.style.setProperty('--rest-p', String(restDone(left)));
+    if (!left && !e.classList.contains('is-ready')) {
+      e.classList.add('is-ready');
+      const ko = monKo(Number(e.dataset.mon));
+      say(`✨ ${ko}${iga(ko)} 다 쉬었어요! 캡슐을 눌러 꺼내 봐요`);
+      if (ui.sel === Number(e.dataset.u) && !ui.drag) render();
+    }
+  }
+}
+
+/** 고른 캡슐의 도구 — 비었으면 🐾 쉬게 하기 · 쉬는 중이면 ⏏️ 꺼내기(두 번) · 다 쉬었으면 ✨ 받기 */
+function restTool(it) {
+  const b = el('button', 'btn house-tool house-tool-rest');
+  b.type = 'button';
+  if (!it.rest) {
+    b.textContent = '🐾 쉬게 하기';
+    b.addEventListener('click', () => { if (stale()) return; ui.pick = it.u; ui.sel = 0; ui.msg = ''; render(); });
+  } else if (restLeft(it.rest, Date.now()) > 0) {
+    const armed = ui.outArm === it.u;
+    b.textContent = armed ? '⏏️ 정말 꺼내요' : '⏏️ 꺼내기';
+    if (armed) b.classList.add('is-arm');
+    b.addEventListener('click', () => {
+      if (stale()) return;
+      if (ui.outArm !== it.u) { ui.outArm = it.u; ui.msg = '한 번 더 누르면 꺼내요 — 1시간을 다 못 쉬면 아무것도 없어요'; render(); return; }
+      cancelAt(it.u, it.rest.mon);
+    });
+  } else {
+    b.textContent = '✨ 받기';
+    b.addEventListener('click', () => claimAt(it.u));
+  }
+  return b;
+}
+
+/** 🐾 고르기 창 — 데리고 있는 포켓몬(🤝 파트너 먼저, ❤️ 낮은 순) · 다른 캡슐에서 쉬는 포켓몬은 못 고름 */
+function pickBox() {
+  const sec = el('div', 'house-sec house-pick');
+  const head = el('div', 'house-pick-head');
+  head.appendChild(el('h3', 'house-h', '🐾 누구를 쉬게 할까요?'));
+  const back = el('button', 'btn house-pick-back', '← 방으로');
+  back.type = 'button';
+  back.addEventListener('click', () => { ui.pick = 0; ui.msg = ''; render(); });
+  head.appendChild(back);
+  sec.appendChild(head);
+  sec.appendChild(el('p', 'house-note', `💊 1시간 쉬면 ❤️ HP가 가득 차고 💤 경험치가 ${REST_EXP} 올라요 — 아주 가끔은 행운도!`));
+  const busy = new Set();
+  for (const r of houseNow().rooms) for (const i of r.items) if (i.rest) busy.add(i.rest.mon);
+  const partner = Number(getPartner()) || 0;
+  const ids = ownedMonIds().sort((a, b) => (b === partner) - (a === partner) || hpOf(a) - hpOf(b) || monLv(b) - monLv(a) || a - b);
+  if (!ids.length) {
+    sec.appendChild(el('p', 'house-note', '아직 데리고 있는 포켓몬이 없어요 — 공부하고 잡아 와요!'));
+    return sec;
+  }
+  const grid = el('div', 'house-pick-grid');
+  for (const id of ids) {
+    const b = el('button', `house-pick-mon${busy.has(id) ? ' is-busy' : ''}`);
+    b.type = 'button';
+    b.dataset.mon = String(id);
+    b.appendChild(monFace(id, 'house-pick-pic'));
+    b.appendChild(el('span', 'house-pick-name', `${id === partner ? '🤝 ' : ''}${monKo(id)}`));
+    b.appendChild(el('span', 'house-pick-stat', `Lv ${monLv(id)} · ❤️ ${hpOf(id)}`));
+    const x = monExp(id);
+    const bar = el('span', 'house-pick-exp');
+    bar.title = `💤 ${x.have}/${x.need}`;
+    const fill = el('span', 'house-pick-exp-fill');
+    fill.style.width = `${(x.have / x.need) * 100}%`;
+    bar.appendChild(fill);
+    b.appendChild(bar);
+    if (busy.has(id)) {
+      b.disabled = true;
+      b.appendChild(el('span', 'house-pick-busy', '💤 쉬는 중'));
+    } else b.addEventListener('click', () => pickMon(ui.pick, id));
+    grid.appendChild(b);
+  }
+  sec.appendChild(grid);
+  return sec;
+}
+
+/** ✨ 깜짝 진화 물음 — 갈래마다 단추 · 그대로 두기 (원작의 B 버튼) */
+function evoAskBox() {
+  const q = ui.evoAsk;
+  const ko = monKo(q.mon);
+  const sec = el('div', 'house-sec house-evo-ask');
+  sec.appendChild(el('h3', 'house-h', '✨ 깜짝 진화!'));
+  sec.appendChild(monFace(q.mon, 'house-evo-from'));
+  sec.appendChild(el('p', 'house-evo-text', `캡슐에서 푹 쉰 ${ko}${iga(ko)} 진화하려고 해요! 어떻게 할까요?`));
+  const row = el('div', 'house-evo-choices');
+  for (const to of q.choices) {
+    const tk = monKo(to);
+    const b = el('button', 'btn btn-primary house-evo-go');
+    b.type = 'button';
+    b.dataset.to = String(to);
+    b.appendChild(monFace(to, 'house-evo-pic'));
+    b.appendChild(el('span', '', `${tk}${euro(tk)} 진화`));
+    b.addEventListener('click', () => claimAt(q.u, to));
+    row.appendChild(b);
+  }
+  sec.appendChild(row);
+  const keep = el('button', 'btn house-evo-keep', `그대로 두기 — ${ko} 그대로`);
+  keep.type = 'button';
+  keep.addEventListener('click', () => claimAt(q.u, 0));
+  sec.appendChild(keep);
+  return sec;
+}
+
+/** 캡슐 일 하나(넣기·꺼내기·받기) — xp가 저장된 프로필로 한 트랜잭션에서 · run과 같은 바쁨·다시 그리기 · ok는 말(또는 결과 → 말) */
+async function runRest(call, ok) {
+  if (ui.busy) return null;
+  ui.busy = true;
+  let r;
+  try { r = await call(); } finally { ui.busy = false; }
+  ui.msg = r && r.ok ? (typeof ok === 'function' ? ok(r) : ok) : restWhy(r);
+  render();
+  return r;
+}
+
+async function pickMon(u, id) {
+  if (stale()) return;
+  ui.pick = 0;
+  sfxUnlock();
+  const ko = monKo(id);
+  const r = await runRest(() => restStart(u, id), `🐾 ${ko}${iga(ko)} 캡슐에 들어갔어요 — 1시간 뒤에 와서 꺼내 봐요`);
+  if (r && r.ok) {
+    sfx.ding();
+    const e = document.querySelector(`#house-body .house-item[data-u="${u}"]`); // 쏙 들어가는 모습 (한 번)
+    if (e) { e.classList.add('is-enter'); setTimeout(() => e.classList.remove('is-enter'), 900); }
+  }
+}
+
+async function cancelAt(u, mon) {
+  ui.outArm = 0;
+  ui.sel = 0;
+  const ko = monKo(mon);
+  const r = await runRest(() => restCancel(u), `⏏️ ${ko}${eul(ko)} 꺼냈어요 — 다음엔 1시간을 다 쉬어 봐요`);
+  if (r && r.why === 'ready') claimAt(u); // 누르는 사이 다 쉬었다 — 보상 없이 꺼내지 않고 받는다
+}
+
+/** ✨ 받기 — 깜짝 진화면 먼저 묻는다(decide) */
+async function claimAt(u, decide) {
+  if (stale()) return;
+  sfxUnlock();
+  const r = await runRest(() => restClaim(u, decide), (x) => claimLines(x, monKo).join(' · '));
+  if (!r) return;
+  if (r.why === 'decide') {
+    ui.evoAsk = { u, mon: r.mon, choices: r.choices };
+    ui.sel = 0;
+    ui.msg = '';
+    render();
+    try { sfx.whoosh(); } catch { /* 소리는 없어도 */ }
+    return;
+  }
+  if (ui.evoAsk) { ui.evoAsk = null; render(); }
+  markReady();
+  if (r.ok && !r.gone) {
+    ui.sel = 0;
+    await showRestDone({ r, ko: monKo, pic: (id) => characterUrl(id) || artUrl(id) || '', lines: claimLines(r, monKo) });
+    render(); // 진화했으면 서랍·고르기 창의 이름이 바뀐다
+  }
 }
 
 // ───────────────────── 끌기 ─────────────────────
@@ -665,7 +967,13 @@ function cancelDrag() {
 
 /** 끌지 않고 눌렀을 때 — 놓인 가구는 고르기(도구가 뜬다), 서랍 물건은 "방을 눌러 놓기" */
 function tap(d) {
-  if (d.kind === 'move') { ui.sel = ui.sel === d.u ? 0 : d.u; ui.arm = ''; say(''); render(); return; }
+  if (d.kind === 'move') {
+    const it = d.id === HEAL && room() ? room().items.find((i) => i.u === d.u) : null;
+    if (it && it.rest && restLeft(it.rest, Date.now()) === 0) { claimAt(it.u); return; } // 💊 다 쉰 캡슐 — 누르면 바로 ✨ 받기
+    ui.sel = ui.sel === d.u ? 0 : d.u; ui.arm = ''; ui.outArm = 0;
+    if (it && it.rest && ui.sel) { const ko = monKo(it.rest.mon); ui.msg = `💤 ${ko}${iga(ko)} 쉬는 중이에요 — ${minsLeft(restLeft(it.rest, Date.now()))}`; } else ui.msg = '';
+    render(); return;
+  }
   ui.arm = ui.arm === d.id ? '' : d.id;
   ui.sel = 0;
   say('');

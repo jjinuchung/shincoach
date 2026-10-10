@@ -21,6 +21,9 @@
 //    놓은 수 ≤ 가진 수 · 겹치지 않음 · 방 안 — houseOf()가 읽을 때마다 고쳐서 돌려준다(백업 병합·옛 기록으로 어긋나도)
 //  · 넓히기 = profile.items['x_wide'·'x_floor2'] 1 — 가구처럼 코인과 같은 가방(같은 쪽). 방 크기·방 수·가구 한도는
 //    houseShape()가 가방에서 셈한다(따로 저장하지 않는다) — 넓히기가 없는 쪽으로 합쳐지면 넓힌 칸·2층의 가구는 서랍으로
+// 💊 회복 캡슐 (2026-10-10 아버님 설계안 "이대로 진행" — 큰 그림 2 "포켓몬이 사는 집"의 첫 단계, 규칙은 rest.js):
+//  · 캡슐(f_heal)은 기기 — 2대까지(HEAL_MAX, 2층이 있어도). 쉬는 중이면 놓인 캡슐에 rest = { id, mon, at, luck }
+//    (가구와 함께 옮겨 다니고, 집과 같은 쪽으로 합쳐진다) · 받은/꺼낸 휴식 id는 profile.restsDone(합집합) — houseOf가 지운다
 
 /** 방 크기 — 바닥 W × H칸, 벽 WALL칸 */
 export const ROOM = { W: 8, H: 6, WALL: 8 };
@@ -41,6 +44,9 @@ export const ROOMS = [FIRST_ROOM, SECOND_ROOM];
 export const MATH_RATE = 5;
 /** 스톤 값 — m·e는 "같은 노력" 단위 (🔷 m × MATH_RATE개 · 🔶 e개) */
 const st = (m, e) => ({ stone_math: m * MATH_RATE, stone_english: e });
+/** 💊 회복 캡슐 id · 가질 수 있는 수 (2층이 있어도 — 한 대마다 행운이 있으니 많으면 너무 쉽다) */
+export const HEAL = 'f_heal';
+export const HEAL_MAX = 2;
 /** 놓는 번호의 끝 — 번호(seq·u)가 이보다 크거나 안전한 정수가 아니면 읽을 때 1부터 다시 매긴다
  *  (Codex 45차 #3: 깨진 백업의 아주 큰 번호로 두 번 놓으면 둘 다 "놓았어요"인데 번호가 겹쳐 하나가 사라졌다) */
 export const SEQ_MAX = 1e9;
@@ -68,6 +74,8 @@ export const FURN = [
   { id: 'f_game', emoji: '🎮', ko: '게임기', w: 1, at: 'floor', price: 3000, stones: st(2, 1), group: 'device' },
   { id: 'f_pc', emoji: '💻', ko: '컴퓨터', w: 1, at: 'floor', price: 3000, stones: st(1, 2), group: 'device' },
   { id: 'f_piano', emoji: '🎹', ko: '피아노', w: 2, at: 'floor', price: 3500, stones: st(2, 2), group: 'device' },
+  // 💊 포켓몬이 들어가 1시간 쉬는 기계 — max = 이 가구만의 한도 (furnMax)
+  { id: HEAL, emoji: '💊', ko: '회복 캡슐', w: 2, at: 'floor', price: 3000, stones: st(2, 2), group: 'device', max: HEAL_MAX },
 ];
 
 /**
@@ -125,6 +133,25 @@ export function houseCost(id) {
 function ownedOf(profile, id) {
   const n = Number(profile && profile.items && profile.items[id]) || 0;
   return n > 0 ? Math.floor(n) : 0;
+}
+
+/** 한 가지 가구를 가질 수 있는 수 — 집 모양의 한도(4·2층 6), 가구가 따로 정했으면 그것과 작은 쪽(💊 캡슐 2) */
+export function furnMax(profile, id) {
+  const m = houseShape(profile).max;
+  const d = furnById(id);
+  return d && d.max ? Math.min(m, d.max) : m;
+}
+
+/** 휴식 기록의 모양이 바른가 — { id: 글자(1~80자), mon: 양의 정수, at: 양의 유한수, luck: '' | 'lv' | 'evo' } (모르는 칸은 버린 새 객체, 아니면 null) */
+const LUCKS = ['', 'lv', 'evo'];
+function restCopy(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+  if (typeof r.id !== 'string' || !r.id || r.id.length > 80) return null;
+  if (!Number.isSafeInteger(r.mon) || r.mon <= 0) return null;
+  if (typeof r.at !== 'number' || !Number.isFinite(r.at) || r.at <= 0) return null;
+  const luck = r.luck === undefined ? '' : r.luck;
+  if (!LUCKS.includes(luck)) return null;
+  return { id: r.id, mon: r.mon, at: r.at, luck };
 }
 
 /**
@@ -220,6 +247,9 @@ export function houseOf(profile) {
   all.sort((a, b) => a.it.u - b.it.u);
   const placed = {}; // 집 전체에서 놓은 수 (방이 늘어도 가진 수는 하나)
   const uSeen = new Set();
+  // 💊 받은/꺼낸 휴식은 되살리지 않는다(옛 창·옛 백업의 집) · 같은 종은 캡슐 한 대에만(먼저 놓은 캡슐)
+  const done = isHouseObj(profile.restsDone) ? profile.restsDone : {};
+  const resting = new Set();
   for (const { k, it } of all) {
     const room = out.rooms[k];
     if (uSeen.has(it.u)) continue;
@@ -231,7 +261,13 @@ export function houseOf(profile) {
     placed[it.id] = (placed[it.id] || 0) + 1;
     if (!(Number.isSafeInteger(it.u) && it.u <= SEQ_MAX)) renumber = true;
     else seq = Math.max(seq, it.u);
-    room.items.push({ u: it.u, id: it.id, x: it.x, y: it.y, f: it.f ? 1 : 0 });
+    const fixedItem = { u: it.u, id: it.id, x: it.x, y: it.y, f: it.f ? 1 : 0 };
+    const rest = it.id === HEAL ? restCopy(it.rest) : null;
+    if (rest && !own(done, rest.id) && !resting.has(rest.mon)) {
+      resting.add(rest.mon);
+      fixedItem.rest = rest;
+    }
+    room.items.push(fixedItem);
   }
   if (renumber) {
     // 놓은 차례(번호 순서)는 그대로 두고 1부터 — 늘 같은 결과라 다시 읽어도 번호가 같다
@@ -284,7 +320,7 @@ export function houseBuyCheck(profile, id) {
   // 🎁 이사 선물(🛏️)을 받기 전에는 못 산다 — 침대 넷을 사고 선물을 받으면 한도를 넘었다 (Codex 45차 #5)
   if (!houseOf(profile).started) return { ok: false, why: 'gift', have };
   if ((paint || grow) && have > 0) return { ok: false, why: 'owned', have };
-  if (furn && have >= houseShape(profile).max) return { ok: false, why: 'max', have };
+  if (furn && have >= furnMax(profile, id)) return { ok: false, why: 'max', have };
   if (grow && grow.after && ownedOf(profile, grow.after) < 1) return { ok: false, why: 'order', have, need: grow.after };
   const cost = houseCost(id);
   const shortCoins = Math.max(0, cost.coins - (Number(profile && profile.coins) || 0));
@@ -355,13 +391,14 @@ export function flipRule(profile, roomId, u) {
   return { ok: true };
 }
 
-/** 📦 서랍에 넣기 (가진 수는 그대로 — 다시 꺼내 놓을 수 있다) */
+/** 📦 서랍에 넣기 (가진 수는 그대로 — 다시 꺼내 놓을 수 있다) · why 'resting' 쉬는 중인 💊 캡슐 */
 export function storeRule(profile, roomId, u) {
   const h = houseOf(profile);
   const room = roomIn(h, roomId);
   if (!room) return { ok: false, why: 'room' };
   const k = room.items.findIndex((i) => i.u === u);
   if (k < 0) return { ok: false, why: 'gone' };
+  if (room.items[k].rest) return { ok: false, why: 'resting' }; // 💊 쉬는 캡슐은 서랍에 못 넣는다(먼저 꺼내기)
   room.items.splice(k, 1);
   profile.house = h;
   return { ok: true };

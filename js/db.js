@@ -3,7 +3,7 @@
 
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
-import { canEvolve, capReason, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
+import { canEvolve, capReason, evoAt, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
 import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, VIDEO_STONE, videoParcelId, videoPlusId, videoGrant } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
@@ -801,19 +801,26 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
 }
 
 /** 🏠 진우네 집 복사 — 방·놓은 가구까지 (규칙이 고쳐도 원본이 안 바뀌게) · 없으면 undefined */
 export function copyHouse(h) {
   if (!h || typeof h !== 'object' || Array.isArray(h)) return undefined;
-  return { ...h, rooms: (Array.isArray(h.rooms) ? h.rooms : []).map((r) => ({ ...r, items: (Array.isArray(r && r.items) ? r.items : []).map((it) => ({ ...it })) })) };
+  // 💊 쉬는 캡슐의 rest도 새 객체로 (규칙이 고쳐도 원본이 안 바뀌게)
+  const item = (it) => ({ ...it, ...(it && it.rest && typeof it.rest === 'object' ? { rest: { ...it.rest } } : {}) });
+  return { ...h, rooms: (Array.isArray(h.rooms) ? h.rooms : []).map((r) => ({ ...r, items: (Array.isArray(r && r.items) ? r.items : []).map(item) })) };
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) } };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, restsDone: copyRestsDone(cur.restsDone) };
+}
+
+/** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
+export function copyRestsDone(d) {
+  return d && typeof d === 'object' && !Array.isArray(d) ? { ...d } : {};
 }
 
 /** 개수 맵에 더하고 0 이하는 지움 (가방·잡은 마릿수 공용) */
@@ -1593,13 +1600,14 @@ export function applyLevelUp(monId, stoneId) {
  * 안 따라가는 것: 🎀 장식(마지막 한 마리였으면 가방으로 돌려준다) · ⚔️ 패배 누적 · ❤️ HP(가득 차서 시작)
  * @returns {{ok:boolean, why?:string, lv?:number, first?:boolean, gearBack?:string|null, partnerMoved?:boolean}}
  */
-export function evolveRule(profile, fromId, toId, hpMax = 100, now = Date.now()) {
+export function evolveRule(profile, fromId, toId, hpMax = 100, now = Date.now(), opts = {}) {
   const from = Number(fromId);
   const to = Number(toId);
   const m = profile.mons[from] || {};
   const have = haveOf((profile.caught || {})[from], m);
   const lv = lvOf(m);
-  const can = canEvolve(from, lv, have, to);
+  // 💊 회복 캡슐의 깜짝 진화(0.5%)는 **레벨이 모자라도** 진화한다(아버님 설계안) — 마릿수·갈래 검사는 그대로, 레벨은 지금 레벨을 이어 간다
+  const can = canEvolve(from, opts && opts.anyLevel ? Math.max(lv, evoAt(from) || lv) : lv, have, to);
   if (!can.ok) return { ok: false, why: can.why };
 
   const t = profile.mons[to] || {};
@@ -1977,6 +1985,11 @@ export function mergeStatRecord(name, cur, rec) {
         const v = Math.max(Number(o[k]) || 0, Number(cur[k]) || 0);
         if (v && v !== (Number(cur[k]) || 0)) patch[k] = v;
       }
+      // 💊 회복 캡슐 — 모은 💤(rx)·💤로 오른 레벨(rxLv)도 누적 (2026-10-10) — max가 아니면 옛 백업이 받은 💤를 되돌린다
+      for (const k of ['rx', 'rxLv']) {
+        const v = Math.max(Number(o[k]) || 0, Number(cur[k]) || 0);
+        if (v && v !== (Number(cur[k]) || 0)) patch[k] = v;
+      }
       const taken = Math.max(Number(o.taken) || 0, Number(cur.taken) || 0);
       if (taken && taken !== (Number(cur.taken) || 0)) patch.taken = taken;
       const seen = Math.max(Number(o.takenSeen) || 0, Number(cur.takenSeen) || 0);
@@ -1994,6 +2007,8 @@ export function mergeStatRecord(name, cur, rec) {
     out.trades = mergeTrades(cur.trades, rec.trades);
     // 📦 받은 구호품 — 합집합 (옛 백업이 "아직 안 받음"으로 되돌려 같은 구호품을 두 번 받게 하지 않는다)
     out.parcels = mergeParcels(cur.parcels, rec.parcels);
+    // 💊 받은/꺼낸 휴식 — 합집합(이른 때) · 깨진 쪽(객체가 아님)은 버린다 — 옛 백업의 집이 같은 휴식을 되살려 두 번 받지 않게
+    out.restsDone = mergeParcels(copyRestsDone(cur.restsDone), copyRestsDone(rec.restsDone));
     // 💰 5일장에서 판 기록 — 장날·열쇠마다 합집합 (장날 한도를 옛 백업이 되돌리지 않게, 📊에 판 것이 남게)
     out.sales = mergeSales(cur.sales, rec.sales);
     // 🚀 끝난 로켓단 배틀 — 합집합(옛 백업이 끝난 배틀을 "진행 중"으로 되살려 두 번 빼앗거나 두 번 보상하지 않게).
