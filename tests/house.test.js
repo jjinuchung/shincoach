@@ -5,13 +5,14 @@ import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ROOM, FURN, PAINT, FURN_MAX, START_GIFT, FIRST_ROOM, furnById, paintById, isHouseItem, houseCost, emptyHouse, canPlace, houseOf, leftOf,
+  ROOM, FURN, PAINT, FURN_MAX, START_GIFT, FIRST_ROOM, furnById, paintById, isHouseItem, houseCost, emptyHouse, canPlace as canPlaceSized, houseOf, leftOf,
   houseStartRule, houseBuyRule, placeRule, moveRule, flipRule, storeRule, paintRule,
+  ROOM_WIDE, FURN_MAX_2F, SECOND_ROOM, ROOMS, GROW, MATH_RATE, growById, houseShape, houseBuyCheck,
 } from '../js/house.js';
 import { emptyProfile, cloneProfile, mergeStatRecord } from '../js/db.js';
 import { ITEMS, itemById, lootBox, parcelOf } from '../js/items.js';
 import { sellableItems, itemSellPrice } from '../js/sell.js';
-import { initProfile, flushProfile, reloadProfile, houseDo, houseNow, houseLeft, getProfileSnapshot } from '../js/xp.js';
+import { initProfile, flushProfile, reloadProfile, houseDo, houseNow, houseLeft, houseShapeNow, getProfileSnapshot } from '../js/xp.js';
 
 const R = FIRST_ROOM;
 /** 코인·가방을 가진 프로필 (복사본 — 규칙이 고쳐도 되는) */
@@ -28,8 +29,15 @@ const FLOORP = PAINT.find((p) => p.part === 'floor').id;
 
 // ───────────────────── 등록부 ─────────────────────
 
-test('🏠 등록부: 가구는 f_ · 벽지 w_ · 바닥 fl_ · 겹치는 id 없음 · 기존 아이템 등록부(ITEMS) 밖 · 방에 들어가는 크기 · 처음 선물은 가구', () => {
-  const ids = [...FURN, ...PAINT].map((x) => x.id);
+test('🏠 등록부: 가구는 f_ · 벽지 w_ · 바닥 fl_ · 넓히기 x_ · 겹치는 id 없음 · 기존 아이템 등록부(ITEMS) 밖 · 방에 들어가는 크기 · 처음 선물은 가구', () => {
+  const ids = [...FURN, ...PAINT, ...GROW].map((x) => x.id);
+  for (const g of GROW) {
+    assert.match(g.id, /^x_[a-z0-9]+$/, g.id);
+    assert.ok(g.emoji && g.ko && g.what, g.id);
+    assert.equal(growById(g.id), g);
+    if (g.after) assert.ok(growById(g.after), `${g.id}: 먼저 살 넓히기가 등록부에`);
+  }
+  assert.equal(growById('f_bed'), null);
   assert.equal(new Set(ids).size, ids.length, 'id가 겹친다');
   for (const f of FURN) {
     assert.match(f.id, /^f_[a-z]+$/, f.id);
@@ -53,7 +61,7 @@ test('🏠 등록부: 가구는 f_ · 벽지 w_ · 바닥 fl_ · 겹치는 id �
 
 test('🏠 그림은 태블릿이 그리는 이모지(Emoji 12 이하)만 — 13 이후 집 물건 이모지(🪴🪟🪞🛖🪜🪣🪤🪥🪠🪦🪧) 금지', () => {
   const newer = ['🪴', '🪟', '🪞', '🛖', '🪜', '🪣', '🪤', '🪥', '🪠', '🪦', '🪧', '🪨', '🪵', '🛻', '🪆', '🪅'];
-  for (const f of FURN) for (const e of newer) assert.ok(!f.emoji.includes(e), `${f.id} ${f.emoji}`);
+  for (const f of [...FURN, ...GROW]) for (const e of newer) assert.ok(!f.emoji.includes(e), `${f.id} ${f.emoji}`);
 });
 
 test('🏠 값: 쉽게 못 얻게 — 소품 < 가구 < 기기 · 기기는 🔷·🔶 둘 다 · 소품·가구·벽지는 코인만 · 값 = 등록부 그대로', () => {
@@ -68,6 +76,32 @@ test('🏠 값: 쉽게 못 얻게 — 소품 < 가구 < 기기 · 기기는 🔷
   }
   for (const p of PAINT) assert.deepEqual(houseCost(p.id), { coins: p.price, items: {} });
   assert.deepEqual(houseCost('없는것'), { coins: 0, items: {} });
+});
+
+test('🏗️ 값 (아버님 ⑤⑥): 넓히기는 💰 + 🔷 + 🔶 셋 다 · 🔷는 🔶 노력의 MATH_RATE배(🔷가 훨씬 쉽게 모인다) · 넓히기 두 스톤은 같은 노력 · 기기보다 비싸고 2층이 평수보다 비쌈', () => {
+  assert.equal(MATH_RATE, 5, '비율을 바꾸면 이 줄도 같이 — 아버님께 여쭌 값');
+  const stoned = [...FURN, ...GROW].filter((x) => x.stones);
+  assert.ok(stoned.length >= 6);
+  for (const x of stoned) {
+    assert.deepEqual(Object.keys(x.stones).sort(), ['stone_english', 'stone_math'], `${x.id}: 두 스톤 다`);
+    assert.ok(x.stones.stone_math > 0 && x.stones.stone_english > 0, x.id);
+    assert.equal(x.stones.stone_math % MATH_RATE, 0, `${x.id}: 🔷는 MATH_RATE의 배수`);
+    assert.ok(x.stones.stone_math >= MATH_RATE, `${x.id}: 🔷가 🔶 하나 노력보다 적으면 비율이 안 걸린 것`);
+  }
+  for (const g of GROW) {
+    assert.equal(g.stones.stone_math, g.stones.stone_english * MATH_RATE, `${g.id}: 두 과목 같은 노력`);
+    assert.deepEqual(houseCost(g.id), { coins: g.price, items: { ...g.stones } });
+  }
+  const devices = FURN.filter((f) => f.group === 'device');
+  const maxDev = (k) => Math.max(...devices.map((f) => (k ? f.stones[k] : f.price)));
+  const wide = growById('x_wide');
+  const two = growById('x_floor2');
+  for (const k of [null, 'stone_math', 'stone_english']) {
+    assert.ok((k ? wide.stones[k] : wide.price) > maxDev(k), `평수 > 가장 비싼 기기 (${k || '💰'})`);
+    assert.ok((k ? two.stones[k] : two.price) > (k ? wide.stones[k] : wide.price), `2층 > 평수 (${k || '💰'})`);
+  }
+  assert.equal(two.after, 'x_wide', '2층은 평수를 넓힌 뒤');
+  assert.equal(wide.after, undefined);
 });
 
 // ───────────────────── 고쳐 읽기 ─────────────────────
@@ -124,6 +158,7 @@ test('🏠 leftOf: 서랍 = 가진 수 − 놓은 수 (0은 뺀다) · 집 밖 �
 
 test('🏠 canPlace: 방 안·안 겹침 · 벽 물건은 벽 줄(y 0)만 · 두 칸 가구는 오른쪽 칸까지 · 옮길 때 제 자리와는 겹쳐도 된다', () => {
   const room = { id: R, items: [{ u: 1, id: FLOOR2, x: 2, y: 1 }] };
+  const canPlace = (...a) => canPlaceSized(ROOM, ...a); // 넓히기 전 방
   assert.equal(canPlace(room, FLOOR1, 0, 0), true);
   assert.equal(canPlace(room, FLOOR1, 3, 1), false, '두 칸 가구의 오른쪽 칸');
   assert.equal(canPlace(room, FLOOR1, 4, 1), true);
@@ -138,6 +173,18 @@ test('🏠 canPlace: 방 안·안 겹침 · 벽 물건은 벽 줄(y 0)만 · 두
   assert.equal(canPlace(room, WALL1, ROOM.WALL, 0), false);
   assert.equal(canPlace(room, 'f_없음', 0, 0), false);
   assert.equal(canPlace(null, FLOOR1, 0, 0), false);
+  // 📐 넓힌 방 — 오른쪽 두 줄·아래 한 줄·벽 두 칸이 더 생긴다 · 크기를 빠뜨리면 아무 데도 못 놓는다(조용히 8 × 6으로 재지 않게)
+  const wide = (...a) => canPlaceSized(ROOM_WIDE, ...a);
+  assert.equal(wide(room, FLOOR2, ROOM_WIDE.W - 2, ROOM_WIDE.H - 1), true);
+  assert.equal(canPlace(room, FLOOR2, ROOM_WIDE.W - 2, ROOM_WIDE.H - 1), false, '넓히기 전엔 방 밖');
+  assert.equal(wide(room, FLOOR1, ROOM.W, ROOM.H), true);
+  assert.equal(wide(room, FLOOR1, ROOM_WIDE.W, 0), false);
+  assert.equal(wide(room, FLOOR1, 0, ROOM_WIDE.H), false);
+  assert.equal(wide(room, WALL1, ROOM_WIDE.WALL - 1, 0), true);
+  assert.equal(wide(room, WALL1, ROOM_WIDE.WALL, 0), false);
+  assert.equal(wide(room, FLOOR1, 3, 1), false, '넓혀도 겹침은 겹침');
+  assert.equal(canPlaceSized(undefined, room, FLOOR1, 0, 0), false, '크기 없음');
+  assert.equal(canPlaceSized(room, FLOOR1, 0, 0), false, '옛 꼴(크기 없이)로 부르면 못 놓는다');
 });
 
 // ───────────────────── 규칙 ─────────────────────
@@ -226,9 +273,9 @@ test('🏠 옮기기·뒤집기·서랍에 넣기 · 벽지·바닥: 그 번호�
 
 test('🏠 가구는 되팔지 않는다(아버님 ④) · 🎁 상자에서 안 나온다 · 📦 구호품으로 못 보낸다 — 가방에 같이 있어도', () => {
   const bag = { greatball: 2 };
-  for (const x of [...FURN, ...PAINT]) bag[x.id] = 1;
+  for (const x of [...FURN, ...PAINT, ...GROW]) bag[x.id] = 1;
   const sell = sellableItems(bag).map((s) => s.id || s);
-  for (const x of [...FURN, ...PAINT]) {
+  for (const x of [...FURN, ...PAINT, ...GROW]) {
     assert.ok(!sell.includes(x.id), `${x.id}를 팔 수 있다`);
     assert.ok(!(itemSellPrice(x.id) > 0), `${x.id} 판 값`);
     assert.equal(parcelOf({ id: 'p1', items: { [x.id]: 1 } }), null, `${x.id} 구호품`);
@@ -330,40 +377,54 @@ test('🏠 화면 계산 dropSpot: 가구 가운데가 손가락 아래 · 두 �
   const rect = { left: 100, top: 50, width: 400 };
   const cell = 50; const wallH = cell * WALL_RATIO;
   const at = (cx, cy) => [rect.left + cx * cell, rect.top + wallH + cy * cell]; // 바닥 칸 단위 자리 → 화면
-  assert.deepEqual(dropSpot(rect, FLOOR1, ...at(2.5, 3.5)), { x: 2, y: 3 });
-  assert.deepEqual(dropSpot(rect, FLOOR2, ...at(4, 1.5)), { x: 3, y: 1 }, '두 칸 사이');
-  assert.deepEqual(dropSpot(rect, FLOOR2, ...at(0.1, 0.5)), { x: 0, y: 0 }, '왼쪽 끝 → 안으로');
-  assert.deepEqual(dropSpot(rect, FLOOR2, ...at(7.98, 5.5)), { x: ROOM.W - 2, y: ROOM.H - 1 }, '오른쪽 끝 → 안으로');
-  assert.deepEqual(dropSpot(rect, WALL1, rect.left + 3.5 * cell, rect.top + wallH / 2), { x: 3, y: 0 });
-  assert.deepEqual(dropSpot(rect, WALL1, rect.left + 3.5 * cell, rect.top + wallH + cell * 0.4), { x: 3, y: 0 }, '벽 바로 아래 반 칸');
-  assert.equal(dropSpot(rect, WALL1, ...at(3.5, 3.5)), null, '벽 물건을 바닥 한가운데에');
-  assert.equal(dropSpot(rect, FLOOR1, rect.left + 50, rect.top + 10), null, '바닥 가구를 벽 위에');
-  assert.deepEqual(dropSpot(rect, FLOOR1, rect.left + 75, rect.top + wallH - cell * 0.3), { x: 1, y: 0 }, '벽과 바닥 사이 조금은 바닥 첫 줄');
-  assert.equal(dropSpot(rect, FLOOR1, rect.left - 1, rect.top + 200), null, '방 왼쪽 밖');
-  assert.equal(dropSpot(rect, FLOOR1, rect.left + 10, rect.top + wallH + cell * ROOM.H + 1), null, '방 아래 밖');
-  assert.equal(dropSpot(rect, 'f_없음', ...at(1, 1)), null);
-  assert.equal(dropSpot({ left: 0, top: 0, width: 0 }, FLOOR1, 0, 0), null);
+  assert.deepEqual(dropSpot(ROOM, rect, FLOOR1, ...at(2.5, 3.5)), { x: 2, y: 3 });
+  assert.deepEqual(dropSpot(ROOM, rect, FLOOR2, ...at(4, 1.5)), { x: 3, y: 1 }, '두 칸 사이');
+  assert.deepEqual(dropSpot(ROOM, rect, FLOOR2, ...at(0.1, 0.5)), { x: 0, y: 0 }, '왼쪽 끝 → 안으로');
+  assert.deepEqual(dropSpot(ROOM, rect, FLOOR2, ...at(7.98, 5.5)), { x: ROOM.W - 2, y: ROOM.H - 1 }, '오른쪽 끝 → 안으로');
+  assert.deepEqual(dropSpot(ROOM, rect, WALL1, rect.left + 3.5 * cell, rect.top + wallH / 2), { x: 3, y: 0 });
+  assert.deepEqual(dropSpot(ROOM, rect, WALL1, rect.left + 3.5 * cell, rect.top + wallH + cell * 0.4), { x: 3, y: 0 }, '벽 바로 아래 반 칸');
+  assert.equal(dropSpot(ROOM, rect, WALL1, ...at(3.5, 3.5)), null, '벽 물건을 바닥 한가운데에');
+  assert.equal(dropSpot(ROOM, rect, FLOOR1, rect.left + 50, rect.top + 10), null, '바닥 가구를 벽 위에');
+  assert.deepEqual(dropSpot(ROOM, rect, FLOOR1, rect.left + 75, rect.top + wallH - cell * 0.3), { x: 1, y: 0 }, '벽과 바닥 사이 조금은 바닥 첫 줄');
+  assert.equal(dropSpot(ROOM, rect, FLOOR1, rect.left - 1, rect.top + 200), null, '방 왼쪽 밖');
+  assert.equal(dropSpot(ROOM, rect, FLOOR1, rect.left + 10, rect.top + wallH + cell * ROOM.H + 1), null, '방 아래 밖');
+  assert.equal(dropSpot(ROOM, rect, 'f_없음', ...at(1, 1)), null);
+  assert.equal(dropSpot(ROOM, { left: 0, top: 0, width: 0 }, FLOOR1, 0, 0), null);
+  assert.equal(dropSpot(undefined, rect, FLOOR1, ...at(2.5, 3.5)), null, '크기 없음');
+  // 📐 넓힌 방 — 같은 폭에 칸이 10개(칸이 작아진다) · 오른쪽 끝·아래 끝이 넓힌 칸까지
+  const wc = rect.width / ROOM_WIDE.W; const wh = wc * WALL_RATIO;
+  const wat = (cx, cy) => [rect.left + cx * wc, rect.top + wh + cy * wc];
+  assert.deepEqual(dropSpot(ROOM_WIDE, rect, FLOOR1, ...wat(9.5, 6.5)), { x: 9, y: 6 });
+  assert.deepEqual(dropSpot(ROOM_WIDE, rect, FLOOR2, ...wat(9.98, 6.5)), { x: ROOM_WIDE.W - 2, y: ROOM_WIDE.H - 1 });
+  assert.deepEqual(dropSpot(ROOM_WIDE, rect, WALL1, rect.left + 9.5 * wc, rect.top + wh / 2), { x: 9, y: 0 });
+  assert.equal(dropSpot(ROOM_WIDE, rect, FLOOR1, rect.left + 10, rect.top + wh + wc * ROOM_WIDE.H + 1), null, '넓힌 방 아래 밖');
 });
 
 test('🏠 화면 계산 boxOf ↔ dropSpot: 모든 가구를 방의 모든 자리에 그린 뒤 그 가운데를 누르면 그 자리로 돌아온다 (그린 자리와 놓는 자리가 어긋나지 않게)', async () => {
-  const { dropSpot, boxOf, ROOM_ROWS } = await import('../js/houseview.js');
-  const rect = { left: 7, top: 11, width: 333, height: 333 * ROOM_ROWS / ROOM.W };
+  const { dropSpot, boxOf, rowsOf } = await import('../js/houseview.js');
   let n = 0;
-  for (const f of FURN) {
-    const ys = f.at === 'wall' ? [0] : [...Array(ROOM.H).keys()];
-    const span = f.at === 'wall' ? ROOM.WALL : ROOM.W;
-    for (const y of ys) for (let x = 0; x + f.w <= span; x++) {
-      const b = boxOf(f.id, x, y);
-      const cx = rect.left + ((b.left + b.width / 2) / 100) * rect.width;
-      const cy = rect.top + ((b.top + b.height / 2) / 100) * rect.height;
-      assert.deepEqual(dropSpot(rect, f.id, cx, cy), { x, y }, `${f.id} (${x}, ${y})`);
-      assert.ok(b.top + b.height <= 100.0001 && b.left + b.width <= 100.0001, `${f.id} 그림이 방 밖`);
-      assert.ok(Math.abs(b.width - (f.w / ROOM.W) * 100) < 1e-9 && Math.abs(b.left - (x / ROOM.W) * 100) < 1e-9, `${f.id}: 그림 폭·자리 = 차지하는 칸 (가운데를 눌러 돌아오는 것만으로는 두 칸 가구를 한 칸으로 그려도 지나간다)`);
-      n++;
+  for (const size of [ROOM, ROOM_WIDE]) {
+    const rect = { left: 7, top: 11, width: 333, height: 333 * rowsOf(size) / size.W };
+    for (const f of FURN) {
+      const ys = f.at === 'wall' ? [0] : [...Array(size.H).keys()];
+      const span = f.at === 'wall' ? size.WALL : size.W;
+      for (const y of ys) for (let x = 0; x + f.w <= span; x++) {
+        const b = boxOf(size, f.id, x, y);
+        const cx = rect.left + ((b.left + b.width / 2) / 100) * rect.width;
+        const cy = rect.top + ((b.top + b.height / 2) / 100) * rect.height;
+        assert.deepEqual(dropSpot(size, rect, f.id, cx, cy), { x, y }, `${size.W}×${size.H} ${f.id} (${x}, ${y})`);
+        assert.ok(b.top + b.height <= 100.0001 && b.left + b.width <= 100.0001, `${f.id} 그림이 방 밖`);
+        assert.ok(Math.abs(b.width - (f.w / size.W) * 100) < 1e-9 && Math.abs(b.left - (x / size.W) * 100) < 1e-9, `${f.id}: 그림 폭·자리 = 차지하는 칸 (가운데를 눌러 돌아오는 것만으로는 두 칸 가구를 한 칸으로 그려도 지나간다)`);
+        assert.ok(Math.abs(b.height - 100 / rowsOf(size)) < 1e-9, `${f.id}: 그림 높이 = 한 줄`);
+        n++;
+      }
     }
   }
-  assert.ok(n > 300, `본 자리 ${n}`);
-  assert.equal(boxOf('f_없음', 0, 0), null);
+  assert.ok(n > 800, `본 자리 ${n}`);
+  assert.equal(boxOf(ROOM, 'f_없음', 0, 0), null);
+  assert.equal(boxOf(undefined, FLOOR1, 0, 0), null);
+  const { WALL_RATIO } = await import('../js/houseview.js');
+  assert.equal(rowsOf(ROOM_WIDE), WALL_RATIO + ROOM_WIDE.H);
 });
 
 test('🏠 화면 연결: 🏠 창 틀(index.html) · 앱 셸에 house.js·houseview.js · 화면은 저장을 houseDo로만(규칙을 직접 저장하지 않는다)', async () => {
@@ -376,7 +437,8 @@ test('🏠 화면 연결: 🏠 창 틀(index.html) · 앱 셸에 house.js·house
   const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
   assert.ok(!/applyHouseRule|mutateProfile|from '\.\/db\.js'/.test(src), '화면이 저장소를 직접 만진다');
   assert.ok(!/profile\.items\s*\[|\.house\s*=/.test(src), '화면이 프로필을 직접 고친다');
-  for (const r of ['placeRule', 'moveRule', 'flipRule', 'storeRule', 'paintRule']) assert.ok(src.includes(`run((p) => ${r}(p, FIRST_ROOM,`), `${r}는 run(→ houseDo)으로`);
+  for (const r of ['placeRule', 'moveRule', 'flipRule', 'storeRule', 'paintRule']) assert.ok(new RegExp(`run\\(\\(p\\) => ${r}\\(p, (rid|d\\.room),`).test(src), `${r}는 run(→ houseDo)으로, 지금 보는 방으로`);
+  assert.ok(!/Rule\(p, FIRST_ROOM/.test(src), '규칙을 1층에만 부르지 않는다 (🏗️ 2층)');
   assert.ok(/async function run\(rule, okText\) \{[\s\S]{0,200}await houseDo\(rule\)/.test(src), 'run은 houseDo로 저장');
   const v = await import('../js/houseview.js');
   for (const k of ['initHouse', 'openHouse', 'closeHouse', 'isHouseOpen', 'dropSpot', 'boxOf']) assert.equal(typeof v[k], 'function', k);
@@ -398,20 +460,26 @@ test('🏠 houseBuyCheck: 살 수 있나 — 모자란 코인·스톤을 정확�
   let seed = 7;
   const rnd = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor(seed / 65536) % n; }; // 윗자리 — 아랫자리는 고르지 않다
   const ids = [...FURN.map((f) => f.id), ...PAINT.map((x) => x.id), 'f_없음'];
+  const growIds = GROW.map((g) => g.id);
   const seen = {};
-  for (let i = 0; i < 4000; i++) {
-    const id = ids[rnd(ids.length)];
+  for (let i = 0; i < 6000; i++) {
+    const isGrow = rnd(4) === 0; // 🏗️ 넓히기를 넉넉히 섞는다 (차례·이미 있음·모자람이 다 나오게)
+    const id = isGrow ? growIds[rnd(growIds.length)] : ids[rnd(ids.length)];
+    const def = FURN.find((f) => f.id === id) || PAINT.find((x) => x.id === id) || GROW.find((g) => g.id === id);
     const started = rnd(5) > 0;
-    const coins = rnd(4200);
-    const items = { stone_math: rnd(4), stone_english: rnd(4), [id]: rnd(FURN_MAX + 2) };
+    const coins = rnd(isGrow ? 9000 : 4200);
+    const need = (def && def.stones) || { stone_math: 2, stone_english: 2 };
+    const items = { stone_math: rnd(need.stone_math * 2 + 1), stone_english: rnd(need.stone_english * 2 + 1), x_wide: rnd(2), x_floor2: rnd(3) === 0 ? 1 : 0 };
+    items[id] = isGrow ? rnd(2) : rnd(FURN_MAX_2F + 2);
     const p = started ? buyer(coins, items) : pf(coins, items);
-    const def = FURN.find((f) => f.id === id) || PAINT.find((x) => x.id === id);
     const have = items[id];
+    const maxNow = items.x_floor2 > 0 ? FURN_MAX_2F : FURN_MAX; // 🏗️ 2층이 있으면 한 가지 6개까지
     let want;
     if (!def) want = 'unknown';
     else if (!started) want = 'gift';
-    else if (def.part && have > 0) want = 'owned';
-    else if (!def.part && have >= FURN_MAX) want = 'max';
+    else if ((def.part || isGrow) && have > 0) want = 'owned';
+    else if (!def.part && !isGrow && have >= maxNow) want = 'max';
+    else if (isGrow && def.after && !(items[def.after] > 0)) want = 'order';
     else if (coins < def.price || Object.entries(def.stones || {}).some(([sid, n]) => items[sid] < n)) want = 'short';
     else want = 'ok';
     seen[want] = (seen[want] || 0) + 1;
@@ -425,7 +493,7 @@ test('🏠 houseBuyCheck: 살 수 있나 — 모자란 코인·스톤을 정확�
     assert.equal(q.items[id], have + 1, '하나 더');
     for (const [sid, n] of Object.entries(def.stones || {})) assert.equal(q.items[sid] || 0, items[sid] - n, sid);
   }
-  for (const k of ['ok', 'gift', 'owned', 'max', 'short', 'unknown']) assert.ok(seen[k] > 30, `${k} ${seen[k]}`);
+  for (const k of ['ok', 'gift', 'owned', 'max', 'order', 'short', 'unknown']) assert.ok(seen[k] > 30, `${k} ${seen[k]}`);
 });
 
 test('🏠 연결 (3단계): 앱 홈 머리줄에 🏠 버튼(data-open="house") · 창에 탭 자리 · app.js가 initHouse를 부른다 · houseview가 🏠 버튼을 붙인다 · 상점은 두 번 눌러야 산다 · sw v224 이상', async () => {
@@ -542,4 +610,177 @@ test('★ 🔍 Codex 45차 F: 저장소 경계에서 동시에 — applyHouseRul
   const rs = await Promise.all([applyHouseRule((p) => houseBuyRule(p, FLOOR1)), applyHouseRule((p) => houseBuyRule(p, FLOOR1))]);
   assert.deepEqual(rs.map((r) => r.ok).sort(), [false, true]);
   assert.deepEqual([stored().coins, stored().items[FLOOR1]], [1, 1]);
+});
+
+// ───────────────────── 🏗️ 집 넓히기 (2026-10-10 아버님 결정: 공부로 번 💰 + 🔷 + 🔶로만) ─────────────────────
+
+const R2 = SECOND_ROOM;
+const WIDE = 'x_wide';
+const TWO = 'x_floor2';
+const rooms = (h) => h.rooms.map((r) => [r.id, r.items.map((i) => i.u)]);
+
+test('🏗️ houseShape: 가방의 넓히기로 셈한다 — 처음 8 × 6 방 하나·4개 · 📐 10 × 7 · 🏗️ 방 둘·6개 · 새 객체(고쳐도 상수 그대로)', () => {
+  assert.deepEqual(houseShape(pf()), { size: ROOM, rooms: [R], max: FURN_MAX });
+  assert.deepEqual(houseShape(null), { size: ROOM, rooms: [R], max: FURN_MAX });
+  assert.deepEqual(houseShape(pf(0, { [WIDE]: 1 })), { size: ROOM_WIDE, rooms: [R], max: FURN_MAX });
+  assert.deepEqual(houseShape(pf(0, { [WIDE]: 1, [TWO]: 1 })), { size: ROOM_WIDE, rooms: [R, R2], max: FURN_MAX_2F });
+  assert.deepEqual(houseShape(pf(0, { [WIDE]: 0, [TWO]: -1 })), { size: ROOM, rooms: [R], max: FURN_MAX }, '0·음수는 없는 것');
+  assert.deepEqual(ROOMS, [R, R2]);
+  assert.deepEqual([ROOM, ROOM_WIDE, FURN_MAX, FURN_MAX_2F], [{ W: 8, H: 6, WALL: 8 }, { W: 10, H: 7, WALL: 10 }, 4, 6], '아버님께 말씀드린 크기·한도');
+  const s = houseShape(pf(0, { [WIDE]: 1 }));
+  s.size.W = 99;
+  s.rooms.push('r9');
+  assert.equal(ROOM_WIDE.W, 10, '상수는 그대로');
+  assert.deepEqual(houseShape(pf(0, { [WIDE]: 1 })).rooms, [R]);
+});
+
+test('🏗️ houseOf: 넓힌 칸·2층의 가구는 넓히기가 있을 때만 — 없는 쪽(옛 백업)이면 서랍으로 · 가진 수보다 많으면 나중에 놓은 것이 빠진다(방이 달라도) · 2층이 있으면 집 기록이 없어도 방이 둘', () => {
+  const items = { [FLOOR1]: 2, [FLOOR2]: 1, [WALL1]: 1 };
+  const house = { started: true, seq: 4, rooms: [
+    { id: R, wall: '', floor: '', items: [{ u: 1, id: FLOOR1, x: ROOM.W, y: ROOM.H }, { u: 2, id: WALL1, x: ROOM.WALL, y: 0 }, { u: 3, id: FLOOR1, x: 0, y: 0 }] },
+    { id: R2, wall: '', floor: '', items: [{ u: 4, id: FLOOR2, x: 0, y: 0 }] },
+  ] };
+  assert.deepEqual(rooms(houseOf(pf(0, { ...items, [WIDE]: 1, [TWO]: 1 }, house))), [[R, [1, 2, 3]], [R2, [4]]]);
+  const wideOnly = pf(0, { ...items, [WIDE]: 1 }, house);
+  assert.deepEqual(rooms(houseOf(wideOnly)), [[R, [1, 2, 3]]], '2층이 없으면 2층 가구는 서랍');
+  assert.deepEqual(leftOf(wideOnly), { [FLOOR2]: 1 });
+  const none = pf(0, items, house);
+  assert.deepEqual(rooms(houseOf(none)), [[R, [3]]], '넓히기가 없으면 넓힌 칸의 가구(바닥·벽)도 서랍');
+  assert.deepEqual(leftOf(none), { [FLOOR1]: 1, [FLOOR2]: 1, [WALL1]: 1 });
+  assert.ok(placeRule(none, R, FLOOR1, 1, 0).ok, '서랍에서 다시 놓을 수 있다');
+  assert.deepEqual(houseOf(pf(0, { [WIDE]: 1, [TWO]: 1 })).rooms.map((r) => r.id), [R, R2]);
+  // 가진 수(1)보다 많이 놓였다 — 2층에 먼저(u 1), 1층에 나중(u 2) → 1층 것이 빠진다 (방 차례가 아니라 놓은 차례)
+  const over = pf(0, { [FLOOR1]: 1, [WIDE]: 1, [TWO]: 1 }, { started: true, seq: 2, rooms: [
+    { id: R2, items: [{ u: 1, id: FLOOR1, x: 0, y: 0 }] }, { id: R, items: [{ u: 2, id: FLOOR1, x: 0, y: 0 }] }] });
+  assert.deepEqual(rooms(houseOf(over)), [[R, []], [R2, [1]]]);
+  // 같은 번호가 두 방에 — 하나만 남는다
+  const twin = pf(0, { [FLOOR1]: 2, [WIDE]: 1, [TWO]: 1 }, { started: true, seq: 1, rooms: [
+    { id: R, items: [{ u: 1, id: FLOOR1, x: 0, y: 0 }] }, { id: R2, items: [{ u: 1, id: FLOOR1, x: 0, y: 0 }] }] });
+  assert.equal(houseOf(twin).rooms.flatMap((r) => r.items).length, 1);
+});
+
+test('🏗️ 넓히기 사기: 이사 선물 전엔 gift · 2층은 평수 뒤(order — need) · 💰·🔷·🔶 중 하나라도 모자라면 short(무엇이 얼마나) · 사면 셋 다 정확히 빠지고 한 번만(owned) · 방이 넓어진다', () => {
+  const w = growById(WIDE);
+  const t = growById(TWO);
+  assert.deepEqual(houseBuyRule(pf(99999, { stone_math: 999, stone_english: 999 }), WIDE), { ok: false, why: 'gift' });
+  const p = buyer(w.price + t.price + 5, { stone_math: w.stones.stone_math + t.stones.stone_math, stone_english: w.stones.stone_english + t.stones.stone_english + 1 });
+  assert.deepEqual(houseBuyCheck(p, TWO), { ok: false, why: 'order', have: 0, need: WIDE });
+  assert.deepEqual(houseBuyRule(p, TWO), { ok: false, why: 'order' });
+  assert.deepEqual(houseBuyRule(p, WIDE), { ok: true });
+  assert.deepEqual([p.coins, p.items.stone_math, p.items.stone_english, p.items[WIDE]], [t.price + 5, t.stones.stone_math, t.stones.stone_english + 1, 1]);
+  assert.deepEqual(houseShape(p).size, ROOM_WIDE);
+  assert.deepEqual(houseBuyRule(p, WIDE), { ok: false, why: 'owned' });
+  assert.deepEqual(houseBuyRule(p, TWO), { ok: true });
+  assert.deepEqual([p.coins, p.items.stone_math, p.items.stone_english, p.items[TWO]], [5, undefined, 1, 1]);
+  assert.deepEqual(houseOf(p).rooms.map((r) => r.id), [R, R2]);
+  assert.deepEqual(houseBuyRule(p, TWO), { ok: false, why: 'owned' });
+  // 한 과목만으로는 못 산다 — 코인·한쪽 스톤이 넘쳐도 다른 쪽이 하나 모자라면 short, 무엇이 모자란지 정확히
+  const noEn = buyer(99999, { stone_math: 9999, stone_english: w.stones.stone_english - 1 });
+  assert.deepEqual(houseBuyCheck(noEn, WIDE), { ok: false, why: 'short', have: 0, shortCoins: 0, shortStones: { stone_english: 1 } });
+  const noMath = buyer(99999, { stone_math: w.stones.stone_math - 1, stone_english: 9999 });
+  assert.deepEqual(houseBuyCheck(noMath, WIDE), { ok: false, why: 'short', have: 0, shortCoins: 0, shortStones: { stone_math: 1 } });
+  const noCoin = buyer(w.price - 1, { ...w.stones });
+  assert.deepEqual(houseBuyCheck(noCoin, WIDE), { ok: false, why: 'short', have: 0, shortCoins: 1, shortStones: {} });
+  const before = JSON.stringify(noEn);
+  assert.deepEqual(houseBuyRule(noEn, WIDE), { ok: false, why: 'short' });
+  assert.equal(JSON.stringify(noEn), before, '못 사면 아무것도 안 바뀐다');
+});
+
+test('🏗️ 2층: 한 가지 가구를 6개까지 · 2층 방에 놓기·옮기기·뒤집기·서랍·벽지 · 두 방이 서랍 하나와 번호 하나를 같이 쓴다 · 2층이 없으면 r2는 room', () => {
+  const p = buyer(999999, { [FLOOR1]: FURN_MAX, [WIDE]: 1 });
+  assert.deepEqual(houseBuyRule(p, FLOOR1), { ok: false, why: 'max' }, '2층 전엔 4개');
+  assert.deepEqual(placeRule(p, R2, FLOOR1, 0, 0), { ok: false, why: 'room' }, '2층 전엔 2층 방이 없다');
+  p.items[TWO] = 1;
+  for (let i = FURN_MAX; i < FURN_MAX_2F; i++) assert.deepEqual(houseBuyRule(p, FLOOR1), { ok: true });
+  assert.deepEqual(houseBuyRule(p, FLOOR1), { ok: false, why: 'max' });
+  assert.equal(p.items[FLOOR1], FURN_MAX_2F);
+  const a = placeRule(p, R, FLOOR1, 0, 0);
+  const b = placeRule(p, R2, FLOOR1, 0, 0);
+  assert.ok(a.ok && b.ok && a.u !== b.u, '같은 칸이라도 방이 다르면 겹치지 않는다 · 번호는 집 전체에서 하나씩');
+  assert.deepEqual(placeRule(p, R2, FLOOR1, ROOM_WIDE.W - 1, ROOM_WIDE.H - 1), { ok: true, u: b.u + 1 }, '2층도 넓힌 크기');
+  assert.deepEqual(leftOf(p), { [FLOOR1]: FURN_MAX_2F - 3 });
+  assert.deepEqual(moveRule(p, R2, b.u, 2, 2), { ok: true });
+  assert.deepEqual(moveRule(p, R, a.u, ROOM_WIDE.W - 1, 0), { ok: true }, '넓힌 칸으로 옮기기');
+  assert.deepEqual(houseOf(p).rooms[0].items.map((i) => [i.x, i.y]), [[ROOM_WIDE.W - 1, 0]]);
+  assert.deepEqual(moveRule(p, R, b.u, 3, 3), { ok: false, why: 'gone' }, '다른 방의 번호로는 못 옮긴다');
+  assert.deepEqual(flipRule(p, R2, b.u), { ok: true });
+  assert.deepEqual(storeRule(p, R2, b.u), { ok: true });
+  assert.deepEqual(leftOf(p), { [FLOOR1]: FURN_MAX_2F - 2 });
+  p.items[WALLP] = 1;
+  assert.deepEqual(paintRule(p, R2, 'wall', WALLP), { ok: true });
+  const h = houseOf(p);
+  assert.deepEqual([h.rooms[0].wall, h.rooms[1].wall], ['', WALLP], '벽지는 방마다');
+  assert.deepEqual(h.rooms[1].items.map((i) => [i.x, i.y]), [[ROOM_WIDE.W - 1, ROOM_WIDE.H - 1]]);
+});
+
+test('🏗️ 병합: 넓히기는 가방이라 코인과 같은 쪽 — 최근 쪽이 넓힌 쪽이면 그대로 · 넓히기 전 백업으로 되돌리면 코인도 그 쪽이고 넓힌 칸·2층 가구는 서랍으로(사라지지 않음)', () => {
+  const bigHouse = { started: true, seq: 2, rooms: [{ id: R, items: [{ u: 1, id: FLOOR1, x: ROOM.W, y: 0 }] }, { id: R2, items: [{ u: 2, id: FLOOR1, x: 0, y: 0 }] }] };
+  const grown = { ...emptyProfile(), coins: 10, items: { [FLOOR1]: 2, [WIDE]: 1, [TWO]: 1 }, house: bigHouse, updatedAt: 20 };
+  const oldBackup = { ...emptyProfile(), coins: 9000, items: { [FLOOR1]: 2 }, house: houseWith([]), updatedAt: 10 };
+  for (const [a, b] of [[grown, oldBackup], [oldBackup, grown]]) {
+    const m = mergeStatRecord('profile', a, b);
+    assert.deepEqual([m.coins, m.items[WIDE], m.items[TWO]], [10, 1, 1], '최근 쪽(넓힌 쪽)');
+    assert.deepEqual(rooms(houseOf(m)), [[R, [1]], [R2, [2]]]);
+  }
+  const back = mergeStatRecord('profile', grown, { ...oldBackup, house: bigHouse, updatedAt: 30 });
+  assert.deepEqual([back.coins, back.items[WIDE], back.items[TWO]], [9000, undefined, undefined], '되돌린 쪽은 넓히기를 안 샀다 — 코인도 안 냈다');
+  assert.deepEqual(rooms(houseOf(back)), [[R, []]]);
+  assert.deepEqual(leftOf(back), { [FLOOR1]: 2 }, '넓힌 칸·2층 가구는 서랍으로');
+});
+
+test('★ 🏗️ 저장 경로: 두 창이 한꺼번에 평수를 넓혀도 한 번만 내고 한 번만 넓어진다 · 저장이 실패하면 없던 일 · 창의 집 모양도 저장된 쪽으로', async () => {
+  await setup();
+  const w = growById(WIDE);
+  const t = growById(TWO);
+  await seed(w.price * 2, { stone_math: w.stones.stone_math * 2, stone_english: w.stones.stone_english * 2 }, houseWith([]));
+  const rs = await Promise.all([houseDo((p) => houseBuyRule(p, WIDE)), houseDo((p) => houseBuyRule(p, WIDE))]);
+  assert.deepEqual(rs.map((r) => (r.ok ? 'ok' : r.why)).sort(), ['ok', 'owned']);
+  const s = stored();
+  assert.deepEqual([s.coins, s.items.stone_math, s.items.stone_english, s.items[WIDE]], [w.price, w.stones.stone_math, w.stones.stone_english, 1]);
+  assert.deepEqual(houseShapeNow().size, ROOM_WIDE);
+  await seed(t.price, { ...t.stones, [WIDE]: 1 }, houseWith([]));
+  const s0 = stored();
+  fakeIdb.failNext('profile');
+  assert.deepEqual(await houseDo((p) => houseBuyRule(p, TWO)), { ok: false, why: 'save' });
+  assert.equal(fakeIdb.failsLeft(), 0);
+  assert.deepEqual([stored().coins, stored().items], [s0.coins, s0.items]);
+  assert.deepEqual(houseShapeNow().rooms, [R], '메모리로 2층이 생긴 척하지 않는다');
+  assert.deepEqual(await houseDo((p) => houseBuyRule(p, TWO)), { ok: true });
+  assert.deepEqual(houseShapeNow().rooms, [R, R2]);
+  assert.deepEqual(houseNow().rooms.map((r) => r.id), [R, R2]);
+});
+
+test('🏗️ 화면도 집 모양으로: houseview의 canPlace는 모두 houseShapeNow().size를 넘긴다 (빠뜨리면 넓힌 칸에 못 놓는다)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
+  const calls = (src.match(/canPlace\(/g) || []).length;
+  const sized = (src.match(/canPlace\(houseShapeNow\(\)\.size, /g) || []).length;
+  assert.ok(calls >= 2 && sized === calls, `${sized}/${calls}`);
+});
+
+test('🏗️ 화면 (넓히기 2단계): 탭 — 방 하나면 [🏠 꾸미기][🛒], 2층이 있으면 [🏠 1층][🏠 2층][🛒] · 넓히기 카드의 💰·🔷·🔶 모은 만큼 · 상점 맨 위 🏗️ 집 넓히기 · 화면은 넓히기 전 크기를 직접 안 씀', async () => {
+  const v = await import('../js/houseview.js');
+  assert.deepEqual(v.houseTabs([R]), [{ tab: 'room', floor: R, label: '🏠 꾸미기' }, { tab: 'shop', label: '🛒 가구 상점' }]);
+  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.label), ['🏠 1층', '🏠 2층', '🛒 가구 상점']);
+  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.floor), [R, R2, undefined]);
+  const w = growById(WIDE);
+  const pr = v.growProgress(pf(w.price + 1, { stone_math: w.stones.stone_math - 3, stone_english: w.stones.stone_english }), WIDE);
+  assert.deepEqual(pr.map((x) => [x.emoji, x.have, x.need, x.ok]), [
+    ['💰', w.price + 1, w.price, true], ['🔷', w.stones.stone_math - 3, w.stones.stone_math, false], ['🔶', w.stones.stone_english, w.stones.stone_english, true]]);
+  assert.deepEqual(v.growProgress(pf(-5, { stone_math: -1 }), WIDE).map((x) => [x.have, x.ok]), [[0, false], [0, false], [0, false]], '음수·없음은 0');
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
+  const groups = src.slice(src.indexOf('const SHOP_GROUPS = ['), src.indexOf('];', src.indexOf('const SHOP_GROUPS = [')));
+  assert.ok(groups.indexOf("key: 'grow'") > 0 && groups.indexOf("key: 'grow'") < groups.indexOf("key: 'small'"), '집 넓히기가 맨 위');
+  assert.ok(src.includes("g.key === 'grow' ? GROW"), '넓히기 칸은 GROW 등록부로');
+  assert.ok(src.includes('`가진 것 ${have}/${houseShapeNow().max}`'), '가진 것 n/한도 — 한도는 집 모양에서(2층이면 6)');
+  assert.ok(/get max\(\) \{[\s\S]{0,120}houseShapeNow\(\)\.max/.test(src), '한도 말도 집 모양에서');
+  assert.ok(src.includes('for (const t of houseTabs(houseShapeNow().rooms))'), '탭은 집 모양의 방으로');
+  assert.ok(src.includes('ui.drag = { ...what, room: roomId(),'), '끌기는 시작한 방을 잡아 둔다');
+  assert.ok(/const roomId = \(\) => \{\n {2}const rs = houseShapeNow\(\)\.rooms;\n {2}return rs\.includes\(ui\.floor\) \? ui\.floor : rs\[0\];/.test(src), '없어진 층이면 1층');
+  assert.ok(!/ROOM\.(W|H|WALL)|ROOM_ROWS|\bROOM\b(?!_)/.test(src.replace(/^\/\/.*$/gm, '')), '화면이 넓히기 전 크기(ROOM)를 직접 쓰지 않는다');
+  assert.ok(src.includes('box.style.aspectRatio = `${size.W} / ${rows}`;'));
+  assert.ok(/r\.style\.setProperty\('--cell', `\$\{r\.clientWidth \/ size\.W\}px`\)/.test(src), '칸 크기(이모지 크기)도 넓힌 칸 수로');
+  for (const id of GROW.map((g) => g.id)) assert.ok(src.includes(`${id}: '`), `${id} 산 뒤의 말`);
+  assert.ok(/order: '먼저 📐 평수를 넓혀야/.test(src));
 });

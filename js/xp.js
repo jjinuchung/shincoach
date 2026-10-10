@@ -17,7 +17,7 @@ import {
   applyRocketSteal, applyRocketWin, applyRocketAdmit, applyRocketStep, // 🚀 로켓단 습격 (2026-10-09) — 저장이 안 되면 메모리로 잇지 않는다 (Codex 43차 #2)
   applyHouseRule, copyHouse, // 🏠 진우네 집 (2026-10-10)
 } from './db.js';
-import { houseOf, leftOf } from './house.js'; // 🏠 진우네 집 규칙 (순수)
+import { houseOf, leftOf, houseShape } from './house.js'; // 🏠 진우네 집 규칙 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
@@ -841,6 +841,10 @@ export function houseNow() {
 /** 🏠 서랍에 남은 가구 { 가구id: 개수 } (그리기용) */
 export function houseLeft() {
   return leftOf(profile);
+}
+/** 🏠 지금 집의 모양 { size, rooms, max } — 넓히기(📐·🏗️)에서 셈한 방 크기·있는 방·가구 한도 (그리기용) */
+export function houseShapeNow() {
+  return houseShape(profile);
 }
 
 /**

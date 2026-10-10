@@ -1,5 +1,5 @@
 // 🏠 진우네 집 — 2단계 방 화면 (2026-10-10, 아버님 "2단계 가자")
-// 방은 포켓몬 게임처럼 위에서 내려다본 모눈 — 바닥 ROOM.W × ROOM.H칸 + 위에 벽 한 줄(ROOM.WALL칸).
+// 방은 포켓몬 게임처럼 위에서 내려다본 모눈 — 바닥 size.W × size.H칸 + 위에 벽 한 줄(size.WALL칸) · size = houseShapeNow().size.
 // 가구는 서 있는 이모지로 그리고, 아래쪽(앞쪽) 줄의 가구가 위쪽 줄의 가구를 가린다(깊이).
 // 할 수 있는 것: 🗄️ 서랍에서 끌어다 놓기 · 서랍 물건을 누른 뒤 방을 눌러 놓기 · 놓인 가구 끌어서 옮기기 ·
 //               놓인 가구를 누르면 ↔️ 방향 바꾸기·📦 서랍에 넣기 · 🎨 벽지·바닥 고르기(가진 것만)
@@ -12,15 +12,19 @@
 
 // 3단계(2026-10-10, 아버님 "3단계 가자"): 🏠 버튼(앱 홈 [data-open="house"]) · 🛒 가구 상점 탭 · 🎁 이사 선물(🛏️, 한 번)
 //   가구는 되팔지 않으므로(아버님 ④) 상점은 **두 번 눌러야** 산다 — 잘못 누른 값비싼 기기를 되돌릴 길이 없다
-import { ROOM, FURN, PAINT, PAINT_BASE, FIRST_ROOM, FURN_MAX, START_GIFT, furnById, paintById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, storeRule, paintRule } from './house.js';
-import { houseDo, houseNow, houseLeft, coins, itemCount, stones, getProfileSnapshot } from './xp.js';
+// 🏗️ 집 넓히기 2단계(2026-10-10, 아버님 "2단계 가자"): 방 크기는 houseShapeNow().size(📐 평수를 넓히면 10 × 7) ·
+//   🏗️ 2층이 있으면 탭이 [🏠 1층] [🏠 2층] [🛒 가구 상점] — 층마다 벽지·바닥, 서랍은 하나 · 상점 맨 위 "🏗️ 집 넓히기"(💰·🔷·🔶 모은 만큼)
+import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, storeRule, paintRule } from './house.js';
+import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot } from './xp.js';
 import { ENGLISH_STONE_HOW } from './items.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 
 /** 벽 줄 높이 = 칸 × WALL_RATIO */
 export const WALL_RATIO = 1.3;
-/** 방 전체 높이(칸 단위) */
-export const ROOM_ROWS = WALL_RATIO + ROOM.H;
+/** 방 전체 높이(칸 단위) — size = houseShape().size */
+export function rowsOf(size) {
+  return WALL_RATIO + size.H;
+}
 /** 이만큼(px) 움직여야 끌기 — 그보다 적으면 누르기 */
 const DRAG_MIN = 8;
 
@@ -41,38 +45,73 @@ const euro = (w) => (jong(w) > 0 && jong(w) !== 8 ? '으로' : '로');
 
 /**
  * 손가락 자리 → 놓을 칸 (순수 — node 테스트가 직접 부른다).
- * rect = 방의 화면 자리 { left, top, width, height } · id = 가구 · px, py = 손가락.
+ * size = 방 크기(houseShape().size — 맨 앞, 빠뜨리면 null) · rect = 방의 화면 자리 { left, top, width, height } · id = 가구 · px, py = 손가락.
  * 가구 가운데가 손가락 아래에 오게 왼쪽 칸을 고르고, 방 가장자리에서는 방 안으로 당긴다(아이가 끝에 놓기 쉽게).
  * 벽 물건은 벽 줄(y 0)로만 · 바닥 가구는 바닥으로 — 방 밖이거나(바닥 가구가 벽 줄 한가운데 위) 모르는 가구면 null
  */
-export function dropSpot(rect, id, px, py) {
+export function dropSpot(size, rect, id, px, py) {
   const d = furnById(id);
-  if (!d || !rect || !(rect.width > 0)) return null;
-  const cell = rect.width / ROOM.W;
+  if (!d || !size || !rect || !(rect.width > 0)) return null;
+  const cell = rect.width / size.W;
   const wallH = cell * WALL_RATIO;
   const rx = px - rect.left;
   const ry = py - rect.top;
-  if (rx < 0 || ry < 0 || rx > rect.width || ry > wallH + cell * ROOM.H) return null;
-  const span = d.at === 'wall' ? ROOM.WALL : ROOM.W;
+  if (rx < 0 || ry < 0 || rx > rect.width || ry > wallH + cell * size.H) return null;
+  const span = d.at === 'wall' ? size.WALL : size.W;
   const x = Math.min(span - d.w, Math.max(0, Math.round(rx / cell - d.w / 2)));
   if (d.at === 'wall') return ry <= wallH + cell * 0.5 ? { x, y: 0 } : null; // 벽 바로 아래 반 칸까지는 벽으로 봐준다
   if (ry < wallH - cell * 0.4) return null; // 바닥 가구를 벽 위에
-  return { x, y: Math.min(ROOM.H - 1, Math.max(0, Math.floor((ry - wallH) / cell))) };
+  return { x, y: Math.min(size.H - 1, Math.max(0, Math.floor((ry - wallH) / cell))) };
 }
 
-/** 가구 하나의 자리(방에 대한 %) — 화면이 그릴 때 · 끄는 동안 칸 표시 */
-export function boxOf(id, x, y) {
+/** 가구 하나의 자리(방에 대한 %) — 화면이 그릴 때 · 끄는 동안 칸 표시 (size는 맨 앞) */
+export function boxOf(size, id, x, y) {
   const d = furnById(id);
-  if (!d) return null;
+  if (!d || !size) return null;
+  const rows = rowsOf(size);
   const top = d.at === 'wall' ? (WALL_RATIO - 1) / 2 : WALL_RATIO + y;
-  return { left: (x / ROOM.W) * 100, top: (top / ROOM_ROWS) * 100, width: ((d.w) / ROOM.W) * 100, height: (1 / ROOM_ROWS) * 100 };
+  return { left: (x / size.W) * 100, top: (top / rows) * 100, width: ((d.w) / size.W) * 100, height: (1 / rows) * 100 };
+}
+
+/** 층 이름 */
+const FLOOR_KO = { [FIRST_ROOM]: '1층', [SECOND_ROOM]: '2층' };
+/**
+ * 탭 목록 (순수) — 방이 하나면 [🏠 꾸미기][🛒 가구 상점], 🏗️ 2층이 있으면 [🏠 1층][🏠 2층][🛒 가구 상점]
+ * @param {string[]} rooms houseShape().rooms
+ * @returns {{tab:'room'|'shop', floor?:string, label:string}[]}
+ */
+export function houseTabs(rooms) {
+  const list = rooms.length > 1 ? rooms.map((id) => ({ tab: 'room', floor: id, label: `🏠 ${FLOOR_KO[id] || id}` })) : [{ tab: 'room', floor: rooms[0], label: '🏠 꾸미기' }];
+  return [...list, { tab: 'shop', label: '🛒 가구 상점' }];
+}
+
+/**
+ * 🏗️ 넓히기를 얼마나 모았나 (순수) — 💰·🔷·🔶 각각 가진 것/드는 것 (상점 카드가 과목별로 보여 준다: 무엇을 더 공부하면 되는지)
+ * @returns {{key:string, emoji:string, have:number, need:number, ok:boolean}[]}
+ */
+export function growProgress(profile, id) {
+  const c = houseCost(id);
+  const bag = (profile && profile.items) || {};
+  const out = [{ key: 'coins', emoji: '💰', have: Math.max(0, Number(profile && profile.coins) || 0), need: c.coins }];
+  for (const s of ['stone_math', 'stone_english']) if (c.items[s]) out.push({ key: s, emoji: STONE_EMOJI[s], have: Math.max(0, Number(bag[s]) || 0), need: c.items[s] });
+  return out.map((x) => ({ ...x, ok: x.have >= x.need }));
 }
 
 // ───────────────────── 화면 ─────────────────────
 
-// tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '' };
-const room = () => houseNow().rooms.find((r) => r.id === FIRST_ROOM);
+// tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다)
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM };
+/** 지금 보는 방 id — 그 층이 없어졌으면(2층 없는 백업으로 합쳐짐) 1층 */
+const roomId = () => {
+  const rs = houseShapeNow().rooms;
+  return rs.includes(ui.floor) ? ui.floor : rs[0];
+};
+const room = () => {
+  const id = roomId();
+  return houseNow().rooms.find((r) => r.id === id);
+};
+/** 지금 방 크기 */
+const sz = () => houseShapeNow().size;
 
 export function initHouse() {
   if (ui.wired) return;
@@ -91,7 +130,7 @@ export function openHouse(opts = {}) {
   initHouse();
   ui.open = true;
   ui.onClose = opts.onClose || null;
-  ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.buyArm = '';
+  ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.buyArm = ''; ui.floor = FIRST_ROOM;
   ui.tab = opts.tab === 'shop' ? 'shop' : 'room';
   $('house').hidden = false;
   render();
@@ -130,9 +169,10 @@ const ROOM_SPARE_WIDE = 175;
 function sizeRoom() {
   const r = document.querySelector('#house-body .house-room');
   if (!r) return;
+  const size = sz();
   const spare = window.matchMedia && window.matchMedia(WIDE).matches ? ROOM_SPARE_WIDE : ROOM_SPARE;
-  r.style.maxWidth = `${Math.max(260, ((window.innerHeight * 0.94 - spare) * ROOM.W) / ROOM_ROWS)}px`;
-  r.style.setProperty('--cell', `${r.clientWidth / ROOM.W}px`);
+  r.style.maxWidth = `${Math.max(260, ((window.innerHeight * 0.94 - spare) * size.W) / rowsOf(size))}px`;
+  r.style.setProperty('--cell', `${r.clientWidth / size.W}px`);
   const t = r.querySelector('.house-tools');
   if (t) {
     const w = r.clientWidth;
@@ -145,7 +185,8 @@ function render() {
   if (!ui.open) return;
   if (ui.drag) cancelDrag(); // 끄는 도중 두 번째 손가락으로 다른 것을 눌러 다시 그리면 그 끌기는 없던 일 (Codex 45차 #6 — 끌던 가구가 사라진 판에 남지 않게)
   const st = stones();
-  $('house-coins').textContent = `💰 ${coins().toLocaleString('ko-KR')} · 🔷 ${st.math || 0} · 🔶 ${st.english || 0}`;
+  const n = (x) => (x || 0).toLocaleString('ko-KR');
+  $('house-coins').textContent = `💰 ${n(coins())} · 🔷 ${n(st.math)} · 🔶 ${n(st.english)}`;
   renderTabs();
   const body = $('house-body');
   body.innerHTML = '';
@@ -160,38 +201,45 @@ function render() {
   sizeRoom();
 }
 
-/** 탭 — 🏠 꾸미기 · 🛒 가구 상점 (바꾸면 고른 것·한 번 누른 것은 지운다) */
+/** 탭 — 🏠 꾸미기(2층이 있으면 🏠 1층 · 🏠 2층) · 🛒 가구 상점 (바꾸면 고른 것·한 번 누른 것은 지운다) */
 function renderTabs() {
   const tabs = $('house-tabs');
   if (!tabs) return;
   tabs.innerHTML = '';
-  for (const [key, label] of [['room', '🏠 꾸미기'], ['shop', '🛒 가구 상점']]) {
-    const b = el('button', `btn house-tab${ui.tab === key ? ' is-on' : ''}`, label);
+  const cur = roomId();
+  for (const t of houseTabs(houseShapeNow().rooms)) {
+    const on = ui.tab === t.tab && (t.tab === 'shop' || t.floor === cur);
+    const b = el('button', `btn house-tab${on ? ' is-on' : ''}`, t.label);
     b.type = 'button';
-    b.dataset.tab = key;
+    b.dataset.tab = t.tab;
+    if (t.floor) b.dataset.floor = t.floor;
     b.setAttribute('role', 'tab');
-    b.setAttribute('aria-selected', ui.tab === key ? 'true' : 'false');
-    b.addEventListener('click', () => goTab(key));
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+    b.addEventListener('click', () => goTab(t.tab, t.floor));
     tabs.appendChild(b);
   }
 }
-function goTab(key) {
-  if (ui.tab === key) return;
+function goTab(key, floor) {
+  if (ui.tab === key && (!floor || floor === roomId())) return;
   cancelDrag();
   ui.tab = key; ui.sel = 0; ui.arm = ''; ui.buyArm = ''; ui.msg = '';
+  if (floor) ui.floor = floor;
   render();
 }
 
 /** 방 — 벽·바닥·놓인 가구·고른 가구의 도구 */
 function roomBox() {
   const rm = room();
+  const size = sz();
+  const rows = rowsOf(size);
   const box = el('div', 'house-room');
-  box.style.aspectRatio = `${ROOM.W} / ${ROOM_ROWS}`;
+  box.dataset.room = rm.id;
+  box.style.aspectRatio = `${size.W} / ${rows}`;
   const wall = el('div', 'house-wall');
-  wall.style.height = `${(WALL_RATIO / ROOM_ROWS) * 100}%`;
+  wall.style.height = `${(WALL_RATIO / rows) * 100}%`;
   wall.style.background = (paintById(rm.wall) || PAINT_BASE.wall).color;
   const floor = el('div', 'house-floor');
-  floor.style.top = `${(WALL_RATIO / ROOM_ROWS) * 100}%`;
+  floor.style.top = `${(WALL_RATIO / rows) * 100}%`;
   floor.style.backgroundColor = (paintById(rm.floor) || PAINT_BASE.floor).color;
   box.appendChild(wall);
   box.appendChild(floor);
@@ -215,7 +263,7 @@ function roomBox() {
 
 function itemEl(it) {
   const d = furnById(it.id);
-  const b = boxOf(it.id, it.x, it.y);
+  const b = boxOf(sz(), it.id, it.x, it.y);
   const e = el('div', `house-item is-${d.at}${it.u === ui.sel ? ' is-sel' : ''}${it.f ? ' is-flip' : ''}${d.w > 1 ? ' is-wide' : ''}`);
   e.setAttribute('role', 'button');
   e.setAttribute('aria-label', d.ko);
@@ -230,18 +278,19 @@ function itemEl(it) {
 /** 고른 가구 위의 도구 — ↔️ 방향 바꾸기 · 📦 서랍에 넣기 */
 function toolsEl(it) {
   const d = furnById(it.id);
-  const b = boxOf(it.id, it.x, it.y);
+  const b = boxOf(sz(), it.id, it.x, it.y);
   // 벽 물건은 도구를 아래에(위에 두면 방 밖으로 잘린다) · 가로는 sizeRoom이 버튼 폭을 재어 방 안으로 당긴다(양 끝 가구에서 잘리지 않게)
   const below = d.at === 'wall';
   const t = el('div', `house-tools${below ? ' is-below' : ''}`);
   t.dataset.cx = String(b.left + b.width / 2);
   Object.assign(t.style, { left: `${b.left + b.width / 2}%`, top: `${below ? b.top + b.height : b.top}%` });
+  const rid = roomId();
   const flip = el('button', 'btn house-tool', '↔️ 방향');
   flip.type = 'button';
-  flip.addEventListener('click', () => run((p) => flipRule(p, FIRST_ROOM, it.u), `${d.emoji} ${d.ko}의 방향을 바꿨어요`));
+  flip.addEventListener('click', () => run((p) => flipRule(p, rid, it.u), `${d.emoji} ${d.ko}의 방향을 바꿨어요`));
   const store = el('button', 'btn house-tool', '📦 서랍에');
   store.type = 'button';
-  store.addEventListener('click', () => { ui.sel = 0; run((p) => storeRule(p, FIRST_ROOM, it.u), `${d.emoji} ${d.ko}${eul(d.ko)} 서랍에 넣었어요`); });
+  store.addEventListener('click', () => { ui.sel = 0; run((p) => storeRule(p, rid, it.u), `${d.emoji} ${d.ko}${eul(d.ko)} 서랍에 넣었어요`); });
   t.appendChild(flip);
   t.appendChild(store);
   return t;
@@ -299,8 +348,9 @@ function drawerBox() {
 /** 🎨 벽지·바닥 — 처음 것(공짜)과 가진 것만 */
 function paintBox() {
   const rm = room();
+  const rid = rm.id;
   const sec = el('div', 'house-sec');
-  sec.appendChild(el('h3', 'house-h', '🎨 벽지 · 바닥'));
+  sec.appendChild(el('h3', 'house-h', houseShapeNow().rooms.length > 1 ? `🎨 ${FLOOR_KO[rid] || rid} 벽지 · 바닥` : '🎨 벽지 · 바닥'));
   for (const part of ['wall', 'floor']) {
     const row = el('div', 'house-paints');
     const opts = [{ id: '', ko: PAINT_BASE[part].ko, color: PAINT_BASE[part].color }, ...PAINT.filter((p) => p.part === part && itemCount(p.id) > 0)];
@@ -313,7 +363,7 @@ function paintBox() {
       sw.style.background = o.color;
       b.appendChild(sw);
       b.appendChild(el('span', '', o.ko));
-      b.addEventListener('click', () => { if (rm[part] !== o.id) run((p) => paintRule(p, FIRST_ROOM, part, o.id), `${o.ko}${euro(o.ko)} 바꿨어요`); });
+      b.addEventListener('click', () => { if (rm[part] !== o.id) run((p) => paintRule(p, rid, part, o.id), `${o.ko}${euro(o.ko)} 바꿨어요`); });
       row.appendChild(b);
     }
     sec.appendChild(row);
@@ -331,7 +381,12 @@ const WHY = {
   save: '저장이 안 됐어요 — 다시 해 볼까요?',
   short: '코인이나 스톤이 모자라요 — 배우고 다시 와요!',
   owned: '이미 있어요 — 🏠 꾸미기에서 칠할 수 있어요',
-  max: `한 가지 가구는 ${FURN_MAX}개까지 가질 수 있어요`,
+  grown: '벌써 했어요 — 🏠 꾸미기에서 봐요',
+  get max() { // 한도는 집 모양에서 (🏗️ 2층이면 6) — 아직 2층 전이면 늘리는 길도 알려 준다
+    const m = houseShapeNow().max;
+    return m < FURN_MAX_2F ? `한 가지 가구는 ${m}개까지 가질 수 있어요 — 🏗️ 2층을 올리면 ${FURN_MAX_2F}개까지` : `한 가지 가구는 ${m}개까지 가질 수 있어요`;
+  },
+  order: '먼저 📐 평수를 넓혀야 2층을 올릴 수 있어요',
   already: '이사 선물은 벌써 받았어요',
   gift: '먼저 🎁 이사 선물을 받아요 — 🏠 꾸미기의 서랍에 와 있어요',
 };
@@ -351,6 +406,7 @@ async function run(rule, okText) {
 const STONE_KO = { stone_math: '🔷 수학스톤', stone_english: '🔶 영어스톤' };
 const STONE_EMOJI = { stone_math: '🔷', stone_english: '🔶' };
 const SHOP_GROUPS = [
+  { key: 'grow', title: '🏗️ 집 넓히기', note: '💰 코인과 🔷 수학스톤 · 🔶 영어스톤이 모두 있어야 해요 — 수학도 영어도 골고루!' },
   { key: 'small', title: '🧸 소품' },
   { key: 'furn', title: '🛋️ 가구' },
   { key: 'device', title: '📺 기기', note: `코인과 함께 스톤도 들어요 — 🔷 수학스톤은 수학 개념을 통과하면, 🔶 영어스톤은 ${ENGLISH_STONE_HOW} 생겨요` },
@@ -387,39 +443,56 @@ function shopBox() {
     sec.appendChild(el('h3', 'house-h', g.title));
     if (g.note) sec.appendChild(el('p', 'house-note', g.note));
     const grid = el('div', 'house-shop-grid');
-    const list = g.key === 'paint' ? PAINT : FURN.filter((f) => f.group === g.key);
-    for (const it of list) grid.appendChild(shopCard(it, houseBuyCheck(pf, it.id)));
+    const list = g.key === 'paint' ? PAINT : g.key === 'grow' ? GROW : FURN.filter((f) => f.group === g.key);
+    for (const it of list) grid.appendChild(shopCard(it, houseBuyCheck(pf, it.id), pf));
     sec.appendChild(grid);
     wrap.appendChild(sec);
   }
   return wrap;
 }
 
-function shopCard(it, c) {
+function shopCard(it, c, pf) {
   const paint = !!it.part;
+  const grow = !!growById(it.id);
   const done = c.why === 'owned' || c.why === 'max';
   const armed = ui.buyArm === it.id;
-  const b = el('button', `house-shop-item${c.why === 'short' || c.why === 'gift' ? ' is-short' : ''}${done ? ' is-done' : ''}${armed ? ' is-arm' : ''}`);
+  const b = el('button', `house-shop-item${grow ? ' is-grow' : ''}${c.why === 'short' || c.why === 'gift' || c.why === 'order' ? ' is-short' : ''}${done ? ' is-done' : ''}${armed ? ' is-arm' : ''}`);
   b.type = 'button';
   b.dataset.buy = it.id;
   if (paint) { const sw = el('span', 'house-shop-swatch'); sw.style.background = it.color; b.appendChild(sw); } else b.appendChild(el('span', 'house-shop-emoji', it.emoji));
   b.appendChild(el('span', 'house-shop-name', it.ko));
+  if (grow) b.appendChild(el('span', 'house-shop-what', it.what));
   b.appendChild(el('span', 'house-shop-price', priceText(it.id)));
   const have = c.have || 0;
-  b.appendChild(el('span', 'house-shop-have', armed ? '한 번 더 누르면 사요' : paint ? (have ? '✔ 있어요' : '') : `가진 것 ${have}/${FURN_MAX}`));
+  // 🏗️ 아직 안 산 넓히기는 💰·🔷·🔶를 각각 얼마나 모았는지 — 모자란 과목이 눈에 띄게 (차례가 안 됐으면 먼저 살 것)
+  if (grow && !have && !armed && c.why !== 'order') {
+    const prog = el('span', 'house-shop-prog');
+    for (const x of growProgress(pf, it.id)) prog.appendChild(el('span', x.ok ? 'is-ok' : 'is-lack', `${x.emoji} ${x.have.toLocaleString('ko-KR')}/${x.need.toLocaleString('ko-KR')}${x.ok ? ' ✔' : ''}`));
+    b.appendChild(prog);
+  } else {
+    const need = c.why === 'order' ? growById(c.need) : null;
+    b.appendChild(el('span', 'house-shop-have', armed ? '한 번 더 누르면 사요' : paint || grow ? (have ? '✔ 있어요' : need ? `${need.emoji} ${need.ko} 먼저` : '') : `가진 것 ${have}/${houseShapeNow().max}`));
+  }
   b.addEventListener('click', () => shopTap(it.id));
   return b;
 }
 
+/** 🏗️ 넓히기를 산 뒤의 말 */
+const GROW_DONE = {
+  x_wide: '📐 평수를 넓혔어요! 방이 커졌어요 — 🏠 꾸미기에서 봐요',
+  x_floor2: '🏗️ 2층을 올렸어요! 위의 [🏠 2층]을 눌러 꾸며 봐요',
+};
+
 /** 상점 물건 누르기 — 처음 누르면 값을 보여 주고, 한 번 더 누르면 산다 (되팔 수 없으니 두 번) */
 async function shopTap(id) {
   if (ui.busy) return;
-  const it = furnById(id) || paintById(id);
+  const it = furnById(id) || paintById(id) || growById(id);
   const name = it.emoji ? `${it.emoji} ${it.ko}` : `🎨 ${it.ko}`;
   const c = houseBuyCheck(getProfileSnapshot(), id);
   if (!c.ok) {
     ui.buyArm = '';
-    ui.msg = c.why === 'short' ? `${name} — ${shortText(c)}가 모자라요. 배우고 다시 와요!` : (WHY[c.why] || '다시 해 볼까요?'); // shortText는 늘 "…개"로 끝난다
+    const why = c.why === 'owned' && growById(id) ? 'grown' : c.why;
+    ui.msg = why === 'short' ? `${name} — ${shortText(c)}가 모자라요. 배우고 다시 와요!` : (WHY[why] || '다시 해 볼까요?'); // shortText는 늘 "…개"로 끝난다
     render();
     return;
   }
@@ -431,17 +504,18 @@ async function shopTap(id) {
   }
   ui.buyArm = '';
   sfxUnlock();
-  const ok = paintById(id) ? `${name}${eul(it.ko)} 샀어요! 🏠 꾸미기에서 칠할 수 있어요` : `${name}${eul(it.ko)} 샀어요! 🏠 꾸미기의 🗄️ 서랍에 들어갔어요`;
+  const ok = GROW_DONE[id] || (paintById(id) ? `${name}${eul(it.ko)} 샀어요! 🏠 꾸미기에서 칠할 수 있어요` : `${name}${eul(it.ko)} 샀어요! 🏠 꾸미기의 🗄️ 서랍에 들어갔어요`);
   const r = await run((p) => houseBuyRule(p, id), ok);
   if (r && r.ok) sfx.ding();
 }
 
 function placeAt(id, rect, px, py) {
   const d = furnById(id);
-  const spot = dropSpot(rect, id, px, py);
-  if (!spot || !canPlace(room(), id, spot.x, spot.y)) { say(WHY.spot); return; }
+  const rid = roomId();
+  const spot = dropSpot(sz(), rect, id, px, py);
+  if (!spot || !canPlace(houseShapeNow().size, room(), id, spot.x, spot.y)) { say(WHY.spot); return; }
   ui.arm = '';
-  run((p) => placeRule(p, FIRST_ROOM, id, spot.x, spot.y), `${d.emoji} ${d.ko}${eul(d.ko)} 놓았어요`);
+  run((p) => placeRule(p, rid, id, spot.x, spot.y), `${d.emoji} ${d.ko}${eul(d.ko)} 놓았어요`);
 }
 
 // ───────────────────── 끌기 ─────────────────────
@@ -450,7 +524,7 @@ function startDrag(ev, what) {
   if (ui.busy) return;
   if (ui.drag) cancelDrag(); // 손을 뗀 이벤트를 못 받고 남은 끌기 — 이번 터치는 정상으로
   if (ev.pointerType === 'mouse' && ev.button !== 0) return;
-  ui.drag = { ...what, pid: ev.pointerId, sx: ev.clientX, sy: ev.clientY, x: ev.clientX, y: ev.clientY, moved: false, ghost: null, spot: null, ok: false };
+  ui.drag = { ...what, room: roomId(), pid: ev.pointerId, sx: ev.clientX, sy: ev.clientY, x: ev.clientX, y: ev.clientY, moved: false, ghost: null, spot: null, ok: false };
   document.addEventListener('pointermove', onMove);
   document.addEventListener('pointerup', onUp);
   document.addEventListener('pointercancel', onCancel);
@@ -467,7 +541,7 @@ function beginDrag(d) {
   d.moved = true;
   const f = furnById(d.id);
   const g = el('div', `house-ghost${f.w > 1 ? ' is-wide' : ''}`, f.emoji);
-  const cell = (document.querySelector('#house-body .house-room') || { clientWidth: 320 }).clientWidth / ROOM.W;
+  const cell = (document.querySelector('#house-body .house-room') || { clientWidth: 320 }).clientWidth / sz().W;
   g.style.fontSize = `${cell * (f.w > 1 ? 1.5 : 0.95)}px`;
   document.body.appendChild(g);
   d.ghost = g;
@@ -481,10 +555,10 @@ function showHint(d) {
   const box = document.querySelector('#house-body .house-room');
   const hint = box && box.querySelector('.house-hint');
   if (!hint) return;
-  d.spot = dropSpot(box.getBoundingClientRect(), d.id, d.x, d.y);
-  d.ok = !!(d.spot && canPlace(room(), d.id, d.spot.x, d.spot.y, d.kind === 'move' ? d.u : undefined));
+  d.spot = dropSpot(sz(), box.getBoundingClientRect(), d.id, d.x, d.y);
+  d.ok = !!(d.spot && canPlace(houseShapeNow().size, room(), d.id, d.spot.x, d.spot.y, d.kind === 'move' ? d.u : undefined));
   if (!d.spot) { hint.hidden = true; return; }
-  const b = boxOf(d.id, d.spot.x, d.spot.y);
+  const b = boxOf(sz(), d.id, d.spot.x, d.spot.y);
   Object.assign(hint.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%` });
   hint.classList.toggle('is-bad', !d.ok);
   hint.hidden = false;
@@ -524,8 +598,8 @@ function onUp(e) {
   const f = furnById(d.id);
   if (!d.spot) { ui.msg = ''; render(); return; } // 방 밖에서 손을 떼면 없던 일 (서랍 물건은 서랍에, 놓인 가구는 제자리에)
   if (!d.ok) { say(WHY.spot); render(); return; }
-  if (d.kind === 'new') { ui.arm = ''; run((p) => placeRule(p, FIRST_ROOM, d.id, d.spot.x, d.spot.y), `${f.emoji} ${f.ko}${eul(f.ko)} 놓았어요`); }
-  else run((p) => moveRule(p, FIRST_ROOM, d.u, d.spot.x, d.spot.y), `${f.emoji} ${f.ko}${eul(f.ko)} 옮겼어요`);
+  if (d.kind === 'new') { ui.arm = ''; run((p) => placeRule(p, d.room, d.id, d.spot.x, d.spot.y), `${f.emoji} ${f.ko}${eul(f.ko)} 놓았어요`); }
+  else run((p) => moveRule(p, d.room, d.u, d.spot.x, d.spot.y), `${f.emoji} ${f.ko}${eul(f.ko)} 옮겼어요`);
 }
 
 function onCancel(e) {
