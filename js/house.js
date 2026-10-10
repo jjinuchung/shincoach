@@ -10,7 +10,8 @@
 // 🏗️ 집 넓히기 (2026-10-10 아버님 결정 — 큰 그림 3을 앞당김):
 //  ⑤ 넓히기도 그냥 주지 않는다 — 공부로 번 💰 + 🔷 수학스톤 + 🔶 영어스톤 셋 다 있어야 산다(스톤은 못 산다 → 한 과목만으로는 못 넓힌다)
 //  ⑥ 🔷는 개념 편을 통과할 때마다 나와 🔶(하루 몫이 정해짐)보다 훨씬 쉽게 모인다 → 집 값의 🔷는 MATH_RATE배 (st())
-//  ⑦ 📐 평수 넓히기(바닥 8 × 6 → 10 × 7, 한 번) → 그 뒤에 🏗️ 2층 올리기(방 하나 더 · 한 가지 가구 6개까지) — 차례대로
+//  ⑦ 📐 방 넓히기(바닥 8 × 6 → 10 × 7, 한 번) → 그 뒤에 🏗️ 2층 올리기(방 하나 더 · 한 가지 가구 6개까지) — 차례대로
+//    (처음 이름 "평수 넓히기"는 열 살에게 어려운 말이라 "방 넓히기"로 — 아버님, Codex 46차 D)
 // 저장 모양:
 //  · 가진 가구·벽지·바닥 = profile.items['f_…'·'w_…'·'fl_…'] — 코인과 같은 가방이라 백업 병합에서 같은 쪽("최근 쪽")을 따른다
 //    (코인은 냈는데 가구가 없다·가구가 복제됐다가 안 생긴다). ★ ITEMS 등록부(items.js)에는 넣지 않는다 —
@@ -23,7 +24,7 @@
 
 /** 방 크기 — 바닥 W × H칸, 벽 WALL칸 */
 export const ROOM = { W: 8, H: 6, WALL: 8 };
-/** 📐 평수를 넓힌 방 크기 (1층·2층 같음 — 집 한 채의 넓이) */
+/** 📐 방을 넓힌 크기 (1층·2층 같음 — 집 한 채의 넓이) */
 export const ROOM_WIDE = { W: 10, H: 7, WALL: 10 };
 /** 한 가지 가구를 가질 수 있는 수 — 방이 하나일 때. 🏗️ 2층을 올리면 FURN_MAX_2F */
 export const FURN_MAX = 4;
@@ -74,7 +75,7 @@ export const FURN = [
  * 값은 기기보다 훨씬 크게: 코인은 2~3주·한 달쯤, 스톤은 두 과목이 같은 노력(st(n, n)) — 🔶가 모자라면 영어를, 🔷가 모자라면 수학을
  */
 export const GROW = [
-  { id: 'x_wide', emoji: '📐', ko: '평수 넓히기', price: 4000, stones: st(15, 15), what: `방 바닥이 가로 ${ROOM_WIDE.W} × 세로 ${ROOM_WIDE.H}칸으로 넓어져요` },
+  { id: 'x_wide', emoji: '📐', ko: '방 넓히기', price: 4000, stones: st(15, 15), what: `방 바닥이 가로 ${ROOM_WIDE.W} × 세로 ${ROOM_WIDE.H}칸으로 넓어져요` },
   { id: 'x_floor2', emoji: '🏗️', ko: '2층 올리기', price: 8000, stones: st(30, 30), after: 'x_wide', what: `2층 방이 하나 더 생기고, 한 가지 가구를 ${FURN_MAX_2F}개까지 가질 수 있어요` },
 ];
 
@@ -132,7 +133,9 @@ function ownedOf(profile, id) {
  */
 export function houseShape(profile) {
   const wide = ownedOf(profile, 'x_wide') > 0;
-  const two = ownedOf(profile, 'x_floor2') > 0;
+  // 🏗️ 2층은 📐 방 넓히기가 있을 때만 켠다 — 가방에 2층만 있는 백업(손으로 만든 것)이면 차례를 건너뛴 8 × 6 방 둘이었다 (Codex 46차 #2).
+  //    가방의 2층은 그대로 두므로 방 넓히기를 사면 바로 켜진다(2층 값을 또 내지 않는다)
+  const two = wide && ownedOf(profile, 'x_floor2') > 0;
   return { size: { ...(wide ? ROOM_WIDE : ROOM) }, rooms: two ? [FIRST_ROOM, SECOND_ROOM] : [FIRST_ROOM], max: two ? FURN_MAX_2F : FURN_MAX };
 }
 
@@ -269,7 +272,7 @@ export function houseStartRule(profile) {
 
 /**
  * 살 수 있나 (순수) — 🛒 가구 상점 화면이 단추·모자란 것을 보여 줄 때, houseBuyRule이 같은 판정을 쓴다(화면과 저장이 갈라지지 않게).
- * why 'order' = 먼저 있어야 하는 넓히기가 없다(need에 그 id) — 🏗️ 2층은 📐 평수를 넓힌 뒤에
+ * why 'order' = 먼저 있어야 하는 넓히기가 없다(need에 그 id) — 🏗️ 2층은 📐 방을 넓힌 뒤에
  * @returns {{ok:boolean, why?:'unknown'|'gift'|'owned'|'max'|'order'|'short', have?:number, need?:string, shortCoins?:number, shortStones?:Object<string,number>}}
  */
 export function houseBuyCheck(profile, id) {

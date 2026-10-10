@@ -12,10 +12,12 @@
 
 // 3단계(2026-10-10, 아버님 "3단계 가자"): 🏠 버튼(앱 홈 [data-open="house"]) · 🛒 가구 상점 탭 · 🎁 이사 선물(🛏️, 한 번)
 //   가구는 되팔지 않으므로(아버님 ④) 상점은 **두 번 눌러야** 산다 — 잘못 누른 값비싼 기기를 되돌릴 길이 없다
-// 🏗️ 집 넓히기 2단계(2026-10-10, 아버님 "2단계 가자"): 방 크기는 houseShapeNow().size(📐 평수를 넓히면 10 × 7) ·
+// 🏗️ 집 넓히기 2단계(2026-10-10, 아버님 "2단계 가자"): 방 크기는 houseShapeNow().size(📐 방을 넓히면 10 × 7) ·
 //   🏗️ 2층이 있으면 탭이 [🏠 1층] [🏠 2층] [🛒 가구 상점] — 층마다 벽지·바닥, 서랍은 하나 · 상점 맨 위 "🏗️ 집 넓히기"(💰·🔷·🔶 모은 만큼)
+// 🔍 Codex 46차 #1: 다른 창에서 돌아와 프로필을 다시 읽으면(app.js visibilitychange) 열린 집을 새로 그린다 — 화면은 옛 2층 10 × 7인데
+//   누르면 새 1층 8 × 6으로 셈해 다른 칸·다른 층에 놓였다. 그린 모양(ui.drawn)과 지금 모양이 다르면 놓기·끌기·칠하기·도구는 하지 않고 다시 그린다(stale)
 import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, storeRule, paintRule } from './house.js';
-import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot } from './xp.js';
+import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading } from './xp.js';
 import { ENGLISH_STONE_HOW } from './items.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 
@@ -73,6 +75,14 @@ export function boxOf(size, id, x, y) {
   return { left: (x / size.W) * 100, top: (top / rows) * 100, width: ((d.w) / size.W) * 100, height: (1 / rows) * 100 };
 }
 
+/**
+ * 그린 집을 알아보는 열쇠 (순수) — 보는 방 + 방 크기(가로·세로·벽) + 있는 방.
+ * 그린 때의 열쇠와 지금 열쇠가 다르면 화면이 옛 집이라 그대로 놓지 않고 다시 그린다 (Codex 46차 #1)
+ */
+export function shapeKeyOf(shape, floor) {
+  return `${floor}|${shape.size.W}x${shape.size.H}x${shape.size.WALL}|${shape.rooms.join(',')}`;
+}
+
 /** 층 이름 */
 const FLOOR_KO = { [FIRST_ROOM]: '1층', [SECOND_ROOM]: '2층' };
 /**
@@ -99,8 +109,8 @@ export function growProgress(profile, id) {
 
 // ───────────────────── 화면 ─────────────────────
 
-// tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM };
+// tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다) · drawn: 그린 집 모양(shapeKey)
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '' };
 /** 지금 보는 방 id — 그 층이 없어졌으면(2층 없는 백업으로 합쳐짐) 1층 */
 const roomId = () => {
   const rs = houseShapeNow().rooms;
@@ -112,6 +122,8 @@ const room = () => {
 };
 /** 지금 방 크기 */
 const sz = () => houseShapeNow().size;
+/** 지금 보는 방과 집 모양의 열쇠 — 그린 것(ui.drawn)과 다르면 화면이 옛 집이다 */
+const shapeKey = () => shapeKeyOf(houseShapeNow(), roomId());
 
 export function initHouse() {
   if (ui.wired) return;
@@ -123,6 +135,7 @@ export function initHouse() {
   // 끄는 도중 화면이 꺼지거나 다른 앱으로 가면 손을 뗀 이벤트가 안 온다 — 끌기를 없던 일로
   document.addEventListener('visibilitychange', () => { if (document.hidden) cancelDrag(); });
   window.addEventListener('pagehide', () => cancelDrag());
+  onProfileReload(onReloaded);
 }
 
 /** 🏠 집 열기 */
@@ -148,6 +161,29 @@ export function closeHouse() {
 
 export function isHouseOpen() {
   return ui.open;
+}
+
+/** 프로필을 다시 읽었으면(다른 창에서 돌아옴) 열린 집을 새 집으로 다시 그린다 — 고른 것·사려던 것은 풀고, 없어진 층이면 1층 (Codex 46차 #1) */
+function onReloaded() {
+  if (!ui.open) return;
+  cancelDrag();
+  const moved = ui.drawn && ui.drawn !== shapeKey();
+  ui.sel = 0; ui.arm = ''; ui.buyArm = '';
+  ui.floor = roomId();
+  if (moved) ui.msg = WHY.changed;
+  render();
+}
+
+/** 그린 집과 지금 집 모양이 다르면 그대로 하지 않고 다시 그린다 — 옛 화면의 자리·층으로 놓지 않게 (Codex 46차 #1) · 읽는 중이면 아무것도 안 한다 */
+function stale() {
+  if (profileLoading()) return true;
+  if (ui.drawn === shapeKey()) return false;
+  cancelDrag();
+  ui.sel = 0; ui.arm = ''; ui.buyArm = '';
+  ui.floor = roomId();
+  ui.msg = WHY.changed;
+  render();
+  return true;
 }
 
 function say(t) {
@@ -182,7 +218,8 @@ function sizeRoom() {
 }
 
 function render() {
-  if (!ui.open) return;
+  if (!ui.open || profileLoading()) return; // 다시 읽는 중엔 메모리 프로필이 비어 있다 — 다 읽으면 onReloaded가 그린다
+  ui.drawn = shapeKey();
   if (ui.drag) cancelDrag(); // 끄는 도중 두 번째 손가락으로 다른 것을 눌러 다시 그리면 그 끌기는 없던 일 (Codex 45차 #6 — 끌던 가구가 사라진 판에 남지 않게)
   const st = stones();
   const n = (x) => (x || 0).toLocaleString('ko-KR');
@@ -287,10 +324,10 @@ function toolsEl(it) {
   const rid = roomId();
   const flip = el('button', 'btn house-tool', '↔️ 방향');
   flip.type = 'button';
-  flip.addEventListener('click', () => run((p) => flipRule(p, rid, it.u), `${d.emoji} ${d.ko}의 방향을 바꿨어요`));
+  flip.addEventListener('click', () => { if (stale()) return; run((p) => flipRule(p, rid, it.u), `${d.emoji} ${d.ko}의 방향을 바꿨어요`); });
   const store = el('button', 'btn house-tool', '📦 서랍에');
   store.type = 'button';
-  store.addEventListener('click', () => { ui.sel = 0; run((p) => storeRule(p, rid, it.u), `${d.emoji} ${d.ko}${eul(d.ko)} 서랍에 넣었어요`); });
+  store.addEventListener('click', () => { if (stale()) return; ui.sel = 0; run((p) => storeRule(p, rid, it.u), `${d.emoji} ${d.ko}${eul(d.ko)} 서랍에 넣었어요`); });
   t.appendChild(flip);
   t.appendChild(store);
   return t;
@@ -363,7 +400,7 @@ function paintBox() {
       sw.style.background = o.color;
       b.appendChild(sw);
       b.appendChild(el('span', '', o.ko));
-      b.addEventListener('click', () => { if (rm[part] !== o.id) run((p) => paintRule(p, rid, part, o.id), `${o.ko}${euro(o.ko)} 바꿨어요`); });
+      b.addEventListener('click', () => { if (stale()) return; if (rm[part] !== o.id) run((p) => paintRule(p, rid, part, o.id), `${o.ko}${euro(o.ko)} 바꿨어요`); });
       row.appendChild(b);
     }
     sec.appendChild(row);
@@ -386,17 +423,21 @@ const WHY = {
     const m = houseShapeNow().max;
     return m < FURN_MAX_2F ? `한 가지 가구는 ${m}개까지 가질 수 있어요 — 🏗️ 2층을 올리면 ${FURN_MAX_2F}개까지` : `한 가지 가구는 ${m}개까지 가질 수 있어요`;
   },
-  order: '먼저 📐 평수를 넓혀야 2층을 올릴 수 있어요',
+  order: '먼저 📐 방을 넓혀야 2층을 올릴 수 있어요',
+  changed: '다른 화면에서 집이 바뀌었어요 — 바뀐 집으로 다시 그렸으니 다시 해 봐요',
+  room: '그 방이 없어요 — 다른 화면에서 집이 바뀌었나 봐요',
   already: '이사 선물은 벌써 받았어요',
   gift: '먼저 🎁 이사 선물을 받아요 — 🏠 꾸미기의 서랍에 와 있어요',
 };
-/** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다 */
-async function run(rule, okText) {
+/** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다
+ *  alias = 이 물건에서 다르게 말할 why ({ owned: 'grown' } — 늦은 창의 넓히기가 "칠할 수 있어요"로 나왔다, Codex 46차 #3) */
+async function run(rule, okText, alias) {
   if (ui.busy) return null;
   ui.busy = true;
   let r;
   try { r = await houseDo(rule); } finally { ui.busy = false; }
-  ui.msg = r && r.ok ? okText : (WHY[r && r.why] || '다시 해 볼까요?');
+  const why = r && r.why;
+  ui.msg = r && r.ok ? okText : (WHY[(alias && alias[why]) || why] || '다시 해 볼까요?');
   render();
   return r;
 }
@@ -467,6 +508,7 @@ function shopCard(it, c, pf) {
   // 🏗️ 아직 안 산 넓히기는 💰·🔷·🔶를 각각 얼마나 모았는지 — 모자란 과목이 눈에 띄게 (차례가 안 됐으면 먼저 살 것)
   if (grow && !have && !armed && c.why !== 'order') {
     const prog = el('span', 'house-shop-prog');
+    prog.appendChild(el('span', 'house-shop-prog-key', '모은 것 / 필요한 것'));
     for (const x of growProgress(pf, it.id)) prog.appendChild(el('span', x.ok ? 'is-ok' : 'is-lack', `${x.emoji} ${x.have.toLocaleString('ko-KR')}/${x.need.toLocaleString('ko-KR')}${x.ok ? ' ✔' : ''}`));
     b.appendChild(prog);
   } else {
@@ -479,9 +521,11 @@ function shopCard(it, c, pf) {
 
 /** 🏗️ 넓히기를 산 뒤의 말 */
 const GROW_DONE = {
-  x_wide: '📐 평수를 넓혔어요! 방이 커졌어요 — 🏠 꾸미기에서 봐요',
+  x_wide: '📐 방을 넓혔어요! 바닥이 커졌어요 — 🏠 꾸미기에서 봐요',
   x_floor2: '🏗️ 2층을 올렸어요! 위의 [🏠 2층]을 눌러 꾸며 봐요',
 };
+/** 넓히기는 "이미 있어요 — 칠할 수 있어요"(벽지 말)가 아니라 "벌써 했어요" — 누르기 전 판정과 저장소 판정 모두 */
+const GROW_WHY = { owned: 'grown' };
 
 /** 상점 물건 누르기 — 처음 누르면 값을 보여 주고, 한 번 더 누르면 산다 (되팔 수 없으니 두 번) */
 async function shopTap(id) {
@@ -491,7 +535,7 @@ async function shopTap(id) {
   const c = houseBuyCheck(getProfileSnapshot(), id);
   if (!c.ok) {
     ui.buyArm = '';
-    const why = c.why === 'owned' && growById(id) ? 'grown' : c.why;
+    const why = (growById(id) && GROW_WHY[c.why]) || c.why;
     ui.msg = why === 'short' ? `${name} — ${shortText(c)}가 모자라요. 배우고 다시 와요!` : (WHY[why] || '다시 해 볼까요?'); // shortText는 늘 "…개"로 끝난다
     render();
     return;
@@ -505,11 +549,12 @@ async function shopTap(id) {
   ui.buyArm = '';
   sfxUnlock();
   const ok = GROW_DONE[id] || (paintById(id) ? `${name}${eul(it.ko)} 샀어요! 🏠 꾸미기에서 칠할 수 있어요` : `${name}${eul(it.ko)} 샀어요! 🏠 꾸미기의 🗄️ 서랍에 들어갔어요`);
-  const r = await run((p) => houseBuyRule(p, id), ok);
+  const r = await run((p) => houseBuyRule(p, id), ok, growById(id) ? GROW_WHY : null);
   if (r && r.ok) sfx.ding();
 }
 
 function placeAt(id, rect, px, py) {
+  if (stale()) return;
   const d = furnById(id);
   const rid = roomId();
   const spot = dropSpot(sz(), rect, id, px, py);
@@ -521,7 +566,7 @@ function placeAt(id, rect, px, py) {
 // ───────────────────── 끌기 ─────────────────────
 
 function startDrag(ev, what) {
-  if (ui.busy) return;
+  if (ui.busy || profileLoading()) return;
   if (ui.drag) cancelDrag(); // 손을 뗀 이벤트를 못 받고 남은 끌기 — 이번 터치는 정상으로
   if (ev.pointerType === 'mouse' && ev.button !== 0) return;
   ui.drag = { ...what, room: roomId(), pid: ev.pointerId, sx: ev.clientX, sy: ev.clientY, x: ev.clientX, y: ev.clientY, moved: false, ghost: null, spot: null, ok: false };
@@ -590,6 +635,7 @@ function onUp(e) {
   ui.drag = null;
   unbind();
   if (!d.moved) { endDrag(d); tap(d); return; }
+  if (stale()) { endDrag(d); return; } // 끄는 동안 다른 창 것으로 다시 읽었으면 옛 화면의 자리로 놓지 않는다 (Codex 46차 #1)
   // 손을 뗀 자리로 다시 셈한다 — 마지막으로 움직인 자리를 쓰면 방 밖에서 떼어도 방 안에 놓였다 (Codex 45차 #1)
   d.x = e.clientX;
   d.y = e.clientY;

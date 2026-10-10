@@ -2921,3 +2921,5 @@ button { font-family: inherit; }
 .house-shop-prog { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font-size: 0.8rem; font-weight: 800; }
 .house-shop-prog .is-ok { color: var(--ok); }
 .house-shop-prog .is-lack { color: #b45309; }
+/* 🔍 Codex 46차 D(아버님): "40/75"가 무엇인지 — 모은 것 / 필요한 것 (한 줄 위에 작게) */
+.house-shop-prog-key { flex-basis: 100%; font-size: 0.68rem; font-weight: 600; color: var(--muted); }

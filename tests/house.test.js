@@ -12,7 +12,7 @@ import {
 import { emptyProfile, cloneProfile, mergeStatRecord } from '../js/db.js';
 import { ITEMS, itemById, lootBox, parcelOf } from '../js/items.js';
 import { sellableItems, itemSellPrice } from '../js/sell.js';
-import { initProfile, flushProfile, reloadProfile, houseDo, houseNow, houseLeft, houseShapeNow, getProfileSnapshot } from '../js/xp.js';
+import { initProfile, flushProfile, reloadProfile, houseDo, houseNow, houseLeft, houseShapeNow, getProfileSnapshot, onProfileReload, profileLoading } from '../js/xp.js';
 
 const R = FIRST_ROOM;
 /** 코인·가방을 가진 프로필 (복사본 — 규칙이 고쳐도 되는) */
@@ -439,7 +439,7 @@ test('🏠 화면 연결: 🏠 창 틀(index.html) · 앱 셸에 house.js·house
   assert.ok(!/profile\.items\s*\[|\.house\s*=/.test(src), '화면이 프로필을 직접 고친다');
   for (const r of ['placeRule', 'moveRule', 'flipRule', 'storeRule', 'paintRule']) assert.ok(new RegExp(`run\\(\\(p\\) => ${r}\\(p, (rid|d\\.room),`).test(src), `${r}는 run(→ houseDo)으로, 지금 보는 방으로`);
   assert.ok(!/Rule\(p, FIRST_ROOM/.test(src), '규칙을 1층에만 부르지 않는다 (🏗️ 2층)');
-  assert.ok(/async function run\(rule, okText\) \{[\s\S]{0,200}await houseDo\(rule\)/.test(src), 'run은 houseDo로 저장');
+  assert.ok(/async function run\(rule, okText, alias\) \{[\s\S]{0,300}await houseDo\(rule\)/.test(src), 'run은 houseDo로 저장');
   const v = await import('../js/houseview.js');
   for (const k of ['initHouse', 'openHouse', 'closeHouse', 'isHouseOpen', 'dropSpot', 'boxOf']) assert.equal(typeof v[k], 'function', k);
 });
@@ -473,7 +473,7 @@ test('🏠 houseBuyCheck: 살 수 있나 — 모자란 코인·스톤을 정확�
     items[id] = isGrow ? rnd(2) : rnd(FURN_MAX_2F + 2);
     const p = started ? buyer(coins, items) : pf(coins, items);
     const have = items[id];
-    const maxNow = items.x_floor2 > 0 ? FURN_MAX_2F : FURN_MAX; // 🏗️ 2층이 있으면 한 가지 6개까지
+    const maxNow = items.x_wide > 0 && items.x_floor2 > 0 ? FURN_MAX_2F : FURN_MAX; // 🏗️ 2층이 있으면 한 가지 6개까지 — 2층은 📐 방 넓히기가 있을 때만 (Codex 46차 #2)
     let want;
     if (!def) want = 'unknown';
     else if (!started) want = 'gift';
@@ -598,7 +598,7 @@ test('🔍 Codex 45차 #6·#7: 다시 그리면 진행 중인 끌기는 없던 �
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
   const r = src.slice(src.indexOf('function render() {'), src.indexOf('\n}\n', src.indexOf('function render() {')));
-  assert.ok(/function render\(\) \{\n {2}if \(!ui\.open\) return;\n {2}if \(ui\.drag\) cancelDrag\(\);/.test(r), 'render 맨 앞에서 끌기 정리');
+  assert.ok(/function render\(\) \{\n {2}if \(!ui\.open \|\| profileLoading\(\)\) return;[^\n]*\n {2}ui\.drawn = shapeKey\(\);\n {2}if \(ui\.drag\) cancelDrag\(\);/.test(r), 'render 맨 앞에서 끌기 정리');
   assert.ok(src.includes('const anyOwned = FURN.some((f) => itemCount(f.id) > 0);') && src.includes("anyOwned ? '가구를 모두 방에 놓았어요"), '가진 가구가 있는데 서랍이 비면 "모두 놓았어요"');
 });
 
@@ -782,5 +782,138 @@ test('🏗️ 화면 (넓히기 2단계): 탭 — 방 하나면 [🏠 꾸미기]
   assert.ok(src.includes('box.style.aspectRatio = `${size.W} / ${rows}`;'));
   assert.ok(/r\.style\.setProperty\('--cell', `\$\{r\.clientWidth \/ size\.W\}px`\)/.test(src), '칸 크기(이모지 크기)도 넓힌 칸 수로');
   for (const id of GROW.map((g) => g.id)) assert.ok(src.includes(`${id}: '`), `${id} 산 뒤의 말`);
-  assert.ok(/order: '먼저 📐 평수를 넓혀야/.test(src));
+  assert.ok(/order: '먼저 📐 방을 넓혀야/.test(src));
+});
+
+// ───────────────────── 🔍 Codex 46차 (2026-10-10, 아버님 "그래 … 니 제안대로") ─────────────────────
+
+test('🔍 Codex 46차 #2: 가방에 🏗️ 2층만 있고 📐 방 넓히기가 없으면(만든 백업) 2층은 꺼진 채 — 8 × 6 방 하나·한도 4 · 방 넓히기를 사면 가진 2층이 바로 켜진다(2층 값을 또 안 냄)', () => {
+  const w = growById(WIDE);
+  const orphan = buyer(w.price, { ...w.stones, [TWO]: 1, [FLOOR1]: FURN_MAX });
+  assert.deepEqual(houseShape(orphan), { size: ROOM, rooms: [R], max: FURN_MAX });
+  assert.deepEqual(houseOf(orphan).rooms.map((r) => r.id), [R]);
+  assert.deepEqual(placeRule(orphan, R2, FLOOR1, 0, 0), { ok: false, why: 'room' });
+  assert.deepEqual(houseBuyRule(orphan, FLOOR1), { ok: false, why: 'max' }, '한도도 4');
+  assert.deepEqual(houseBuyCheck(orphan, TWO), { ok: false, why: 'owned', have: 1 }, '2층을 또 사지 않는다');
+  assert.deepEqual(houseBuyRule(orphan, WIDE), { ok: true });
+  assert.deepEqual(houseShape(orphan), { size: ROOM_WIDE, rooms: [R, R2], max: FURN_MAX_2F });
+  assert.deepEqual([orphan.coins, orphan.items[TWO]], [0, 1]);
+});
+
+test('🔍 Codex 46차 B: 줄었다가 다시 넓히기 — 그 사이 집을 안 고쳤으면 옛 자리·2층 벽지가 돌아오고, 고쳤으면(고쳐 읽은 집이 저장됨) 서랍에서 다시 놓는다 · 어느 쪽이든 가진 가구·벽지는 그대로', () => {
+  const items = { [FLOOR2]: 1, [WALL1]: 1, [FLOOR1]: 1, [WALLP]: 1 };
+  const big = { [WIDE]: 1, [TWO]: 1 };
+  const house = () => ({ started: true, seq: 3, rooms: [
+    { id: R, wall: '', floor: '', items: [{ u: 1, id: FLOOR2, x: ROOM_WIDE.W - 2, y: ROOM_WIDE.H - 1, f: 0 }, { u: 2, id: WALL1, x: ROOM_WIDE.WALL - 1, y: 0, f: 0 }] },
+    { id: R2, wall: WALLP, floor: '', items: [{ u: 3, id: FLOOR1, x: 0, y: 0, f: 0 }] }] });
+  assert.deepEqual(rooms(houseOf(pf(0, { ...items, ...big }, house()))), [[R, [1, 2]], [R2, [3]]], '넓힌 집에서는 셋 다 제자리');
+  // 넓히기 없는 쪽으로 합쳐짐 — 셋 다 서랍
+  const small = pf(0, items, house());
+  assert.deepEqual(rooms(houseOf(small)), [[R, []]]);
+  assert.deepEqual(leftOf(small), { [FLOOR2]: 1, [WALL1]: 1, [FLOOR1]: 1 });
+  // (가) 안 고치고 다시 넓힘 → 옛 자리 · 2층 벽지
+  small.items = { ...items, ...big };
+  const back = houseOf(small);
+  assert.deepEqual(rooms(back), [[R, [1, 2]], [R2, [3]]]);
+  assert.equal(back.rooms[1].wall, WALLP);
+  // (나) 줄어든 채 하나라도 고치면 고쳐 읽은 집이 저장된다 → 다시 넓혀도 서랍에서 다시 놓기 · 가진 것은 그대로
+  const edited = pf(0, items, house());
+  assert.deepEqual(paintRule(edited, R, 'floor', ''), { ok: true });
+  edited.items = { ...items, ...big };
+  const h = houseOf(edited);
+  assert.deepEqual(rooms(h), [[R, []], [R2, []]]);
+  assert.equal(h.rooms[1].wall, '');
+  assert.deepEqual(leftOf(edited), { [FLOOR2]: 1, [WALL1]: 1, [FLOOR1]: 1 });
+  assert.deepEqual(placeRule(edited, R, FLOOR2, ROOM_WIDE.W - 2, ROOM_WIDE.H - 1), { ok: true, u: 4 });
+  assert.deepEqual(paintRule(edited, R2, 'wall', WALLP), { ok: true }, '2층 벽지도 다시 칠할 수 있다');
+});
+
+test('★ 🔍 Codex 46차 F: 저장소 경계에서 동시에 — 방 넓히기를 applyHouseRule 둘로 한꺼번에(xp 줄 세우기 없이) 사도 한 번만 내고 하나만', async () => {
+  await setup();
+  const { applyHouseRule } = await import('../js/db.js');
+  const w = growById(WIDE);
+  await seed(w.price * 2, { stone_math: w.stones.stone_math * 2, stone_english: w.stones.stone_english * 2 }, houseWith([]));
+  const rs = await Promise.all([applyHouseRule((p) => houseBuyRule(p, WIDE)), applyHouseRule((p) => houseBuyRule(p, WIDE))]);
+  assert.deepEqual(rs.map((r) => (r.ok ? 'ok' : r.why)).sort(), ['ok', 'owned']);
+  const s = stored();
+  assert.deepEqual([s.coins, s.items.stone_math, s.items.stone_english, s.items[WIDE]], [w.price, w.stones.stone_math, w.stones.stone_english, 1]);
+});
+
+test('★ 🔍 Codex 46차 #1: 다시 읽은 뒤(다른 창에서 돌아옴) onProfileReload에 건 함수를 부른다 — 그때는 다 읽었고 새 집 모양 · 건 함수가 깨져도 다시 읽기는 끝난다 · 뗄 수 있다', async () => {
+  await setup();
+  await seed(0, { [WIDE]: 1, [TWO]: 1 }, houseWith([]));
+  assert.equal(profileLoading(), false);
+  const seen = [];
+  const off1 = onProfileReload(() => seen.push([profileLoading(), houseShapeNow().rooms.length, houseShapeNow().size.W]));
+  const off2 = onProfileReload(() => { throw new Error('그리기 실패 흉내'); });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await seed(0, {}, houseWith([])); // 다른 창이 넓히기 없는 쪽을 저장 → 이 창이 다시 읽음
+  } finally { console.warn = warn; }
+  assert.deepEqual(seen, [[false, 1, ROOM.W]]);
+  assert.equal(profileLoading(), false);
+  off1();
+  off2();
+  await seed(0, {}, houseWith([]));
+  assert.equal(seen.length, 1, '뗀 뒤에는 안 부른다');
+  // 같은 함수를 두 번 걸어도 한 번만 부른다(열 때마다 다시 그리기가 두 번 돌지 않게) · 떼면 한 번에 떨어진다
+  let calls = 0;
+  const once = () => { calls++; };
+  const offA = onProfileReload(once);
+  onProfileReload(once);
+  await reloadProfile();
+  assert.equal(calls, 1);
+  offA();
+  await reloadProfile();
+  assert.equal(calls, 1);
+  // 읽는 동안에는 profileLoading()이 참 — 그때 화면이 빈 프로필로 그리거나 자리를 셈하지 않게
+  const pr = reloadProfile();
+  let sawLoading = false;
+  for (let i = 0; i < 200 && !sawLoading; i++) { await Promise.resolve(); sawLoading = profileLoading(); }
+  await pr;
+  assert.ok(sawLoading, '읽는 중에는 참');
+  assert.equal(profileLoading(), false, '다 읽으면 거짓');
+});
+
+test('🔍 Codex 46차 화면: 다시 읽으면 열린 집을 새로 그림 · 그려 둔 모양과 지금 모양이 다르면 놓기·끌기·칠하기·도구를 그대로 하지 않음 · 다시 읽는 중엔 안 그림 · 늦은 창의 넓히기 owned도 "벌써 했어요" · 📐 방 넓히기 · 모은 것 / 필요한 것', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
+  const fn = (head) => { const i = src.indexOf(head); assert.ok(i >= 0, head); return src.slice(i, src.indexOf('\n}\n', i)); };
+  assert.ok(fn('export function initHouse() {').includes('onProfileReload(onReloaded);'), '다시 읽기에 건다');
+  const reloaded = fn('function onReloaded() {');
+  assert.ok(/if \(!ui\.open\) return;[\s\S]*cancelDrag\(\);[\s\S]*ui\.sel = 0; ui\.arm = ''; ui\.buyArm = '';[\s\S]*ui\.floor = roomId\(\);[\s\S]*render\(\);/.test(reloaded), '고른 것·사려던 것을 풀고 층을 맞춰 다시 그림');
+  const r = fn('function render() {');
+  assert.ok(/if \(!ui\.open \|\| profileLoading\(\)\) return;/.test(r), '다시 읽는 중엔 안 그림(빈 집이 보이지 않게)');
+  assert.ok(r.includes('ui.drawn = shapeKey();'), '그린 모양을 적어 둔다');
+  const stale = fn('function stale() {');
+  assert.ok(/if \(profileLoading\(\)\) return true;\n {2}if \(ui\.drawn === shapeKey\(\)\) return false;/.test(stale));
+  assert.ok(/ui\.msg = WHY\.changed;\n {2}render\(\);\n {2}return true;/.test(stale));
+  assert.ok(/^ {2}if \(stale\(\)\) return;$/m.test(fn('function placeAt(')), '눌러 놓기');
+  assert.ok(/if \(!d\.moved\) \{ endDrag\(d\); tap\(d\); return; \}\n {2}if \(stale\(\)\) \{ endDrag\(d\); return; \}/.test(fn('function onUp(')), '끌어 놓기·옮기기');
+  assert.ok(/addEventListener\('click', \(\) => \{ if \(stale\(\)\) return; if \(rm\[part\] !== o\.id\)/.test(fn('function paintBox() {')), '칠하기');
+  const tools = fn('function toolsEl(');
+  assert.equal((tools.match(/if \(stale\(\)\) return;/g) || []).length, 2, '↔️·📦');
+  assert.ok(/if \(ui\.busy \|\| profileLoading\(\)\) return;/.test(fn('function startDrag(')), '다시 읽는 중엔 끌기 시작 안 함');
+  // #3 늦은 창: 저장소가 owned라고 해도 넓히기면 "벌써 했어요"
+  assert.ok(src.includes('const GROW_WHY = { owned: \'grown\' };'));
+  assert.ok(src.includes('run((p) => houseBuyRule(p, id), ok, growById(id) ? GROW_WHY : null)'));
+  assert.ok(/ui\.msg = r && r\.ok \? okText : \(WHY\[\(alias && alias\[why\]\) \|\| why\] \|\| '다시 해 볼까요\?'\);/.test(fn('async function run(')));
+  assert.ok(fn('async function shopTap(').includes('const why = (growById(id) && GROW_WHY[c.why]) || c.why;'), '누르기 전 판정도 같은 바꿈');
+  assert.ok(/room: '[^']+'/.test(src) && /changed: '[^']+'/.test(src), '없는 방·바뀐 집의 말');
+  // 그린 집 열쇠 — 층·크기·방 중 하나라도 다르면 다른 열쇠, 같으면 같은 열쇠
+  const v = await import('../js/houseview.js');
+  const k = v.shapeKeyOf;
+  const small = houseShape(pf());
+  const two = houseShape(pf(0, { [WIDE]: 1, [TWO]: 1 }));
+  const keys = [k(small, R), k(houseShape(pf(0, { [WIDE]: 1 })), R), k(two, R), k(two, R2)];
+  assert.equal(new Set(keys).size, keys.length, keys.join(' / '));
+  assert.equal(k(two, R2), k(houseShape(pf(0, { [WIDE]: 1, [TWO]: 1 })), R2));
+  for (const size of [{ W: 9, H: 6, WALL: 8 }, { W: 8, H: 7, WALL: 8 }, { W: 8, H: 6, WALL: 9 }]) assert.notEqual(k({ ...small, size }, R), k(small, R), JSON.stringify(size));
+  assert.ok(src.includes('const shapeKey = () => shapeKeyOf(houseShapeNow(), roomId());'), '지금 보는 방(roomId)·지금 집 모양으로');
+  // 말 다듬기 ①② (아버님)
+  assert.equal(growById(WIDE).ko, '방 넓히기');
+  const code = (s) => s.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*\*)/.test(l)).map((l) => l.replace(/\s\/\/ .*$/, '')).join('\n');
+  for (const f of ['house.js', 'houseview.js']) assert.ok(!code(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8')).includes('평수'), `${f}: 아이가 보는 말에 "평수" 없음`);
+  assert.ok(src.includes("prog.appendChild(el('span', 'house-shop-prog-key', '모은 것 / 필요한 것'));"));
 });

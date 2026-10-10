@@ -403,6 +403,21 @@ export function profileReady() {
   return readyP;
 }
 
+/** 프로필을 (다시) 다 읽은 뒤 부를 함수들 — 열린 화면이 새 프로필로 다시 그리게 (🏠 Codex 46차 #1) */
+const reloadHooks = [];
+/** 다 읽은 뒤 부를 함수를 건다 → 떼는 함수를 돌려준다 */
+export function onProfileReload(fn) {
+  if (typeof fn === 'function' && !reloadHooks.includes(fn)) reloadHooks.push(fn);
+  return () => {
+    const k = reloadHooks.indexOf(fn);
+    if (k >= 0) reloadHooks.splice(k, 1);
+  };
+}
+/** 읽는 중인가 — 그동안 메모리 프로필은 빈 것이다(그것으로 그리거나 자리를 셈하지 않게) */
+export function profileLoading() {
+  return !loaded;
+}
+
 export async function initProfile() {
   try {
     const p = await getProfile();
@@ -411,6 +426,9 @@ export async function initProfile() {
   loaded = true;
   ensurePartner();
   if (readyResolve) { readyResolve(); readyResolve = null; }
+  for (const fn of [...reloadHooks]) {
+    try { fn(); } catch (e) { console.warn('다시 읽은 뒤 그리기 실패:', e); }
+  }
   return profile;
 }
 
