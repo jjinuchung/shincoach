@@ -3085,5 +3085,37 @@
 - `js/korean.js`(nextStar·mergeDone·넘침·words 검사) · `js/koreanview.js`(whenText·wrongNotes·낱말·초점·알림·--kor-top·bringQ·말) · `coach/korean/reading.json` · `js/db.js`(korDone mergeDone) · `js/rest.js`(💤 넘침) · `css/style.css` · `sw.js`(v231) · `tests/korean.test.js`
 
 ### TODO (다음 작업)
-- [ ] v231 커밋·배포
+- [x] v231 커밋·배포 (`0cef263` fix · `3577de7` docs)
 - [ ] 아버님: 태블릿 📚 국어 → 진우 반응 · ⏳ 국어도 하루 시간에 넣을지 · 보상(💰만, 스톤은?) · 다음 글(교과서 단원 순서·📘 교과서 카드·🔤 낱말 줄기)
+
+## 2026-10-11 — 📚 국어 ⏳ 90분 · 🟩 국어스톤 · 🎯 국어 포켓몬 150 · 다음 글 6편 (v232)
+
+### 진행 내용
+- v231 배포(`0cef263` fix · `3577de7` docs)
+- 아버님: **"국어는 하루 1시간30분 제한 넣자. 국어 스톤도 만들자. 다음 글을 너가 추천하는 대로 하고 중요한 국어에서만 나오는 포켓몬스터 흔함부터 전설까지 수학 비율처럼 150마리 새로운 포켓몬스터 추가도 하자."** → 설계 제안 → **"그래 진행하자"**
+- **⏳ 국어 90분**(날마다 — 평일·주말 같음): `timelimit.js` SUBJECTS·FIELD·KO에 korean · `KOREAN_MIN` · `baseMinOf(subject)` · 막힘은 수학·영어와 같게(읽던 글은 끝까지, 새 글만 막힘) · 국어 화면 위 ⏳ 칩 · ⚙ "📚 국어 (분, 날마다)" · 부모 +10/20/30 · 📊 연장권 줄에 📚 · `db.js` DAILY_SUMS korTime·korBonus·korExt(병합 max) · app.js 국어 화면을 국어 시간으로 셈
+- **🟩 국어스톤**: 별을 **새로** 받을 때 보기·근거를 **모두 한 번에** 맞혔으면 하나(카드마다 ★·★★·★★★ — 많아야 셋) · 틀린 보기·근거 실수가 하나라도 있으면 없음 · 같은 날 다시 읽기(별 없음)도 없음 · 쓰는 곳: 📚 국어 포켓몬 레벨 업(`evolve.STONE_ID.korean`) · ⏳ 국어 +15분(💰100 + 🟩 1, 하루 2개) · 🏠 집 값은 그대로
+  - 그림은 📗 대신 **🟩** — 🎒 도감의 "앞으로 나올 스톤" 자리에 이미 🟩 ???가 있었다(FUTURE_STONES) → 그 자리를 채우고 다음 자리는 🟪 ???
+- **🎯 국어 포켓몬 150**(흔함 60 · 보통 45 · 희귀 30 · 전설 15 — 수학 165와 같은 비율): PokeAPI에서 **가족째**(진화 줄이 다른 과목으로 새지 않게 — 과목 넘는 진화 0) · `tools/math_roster.mjs`·`tools/evo_table.mjs`로 이름·타입·그림·진화 줄 · 진화 78줄(갈래 290·366·412·840·935) · 전설: 유크시·엠라이트·아그놈·크레세리아·마나피·메로엣타·코바르온·테라키온·비리디온·카푸꼬꼬꼭·카푸나비나·카푸브루루·카푸느지느·마기아나·마샤도
+  - 잡기: **별을 새로 받을 때마다 🎯 한 번** — `profile.korThrow { earned, used, refunded }`(셋 다 단조 카운터, 병합 max · 남은 기회 = earned − used + refunded) · 잡기 화면을 띄우기 **전에** 하나 빼고(`korTakeThrow`), 한 번도 안 던지고 닫으면 돌려줌(`korGiveBackThrow`, refunded ≤ used) · 후보는 국어 전용(풀린 것·안 지친 것) · 그림이 4장보다 적으면 6장 받기(8초)
+  - 화면: 끝 카드 "💰 +12 · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!) · 🎯 국어 포켓몬 잡기 1번" · 도감 머리·끝 카드에 "🎯 국어 포켓몬 잡기 (몬스터볼 N개)" · 잡기 화면 "📚 국어에서만 만나는 포켓몬이에요!" · 🎒 도감 "📚 국어에서 잡아요 n/150"·칸에 📚 · 🛒 "📚 국어에서 만나요"
+  - 헤드리스가 잡은 것 둘: ① 잡기 창이 **바깥에서 닫히면**(catch.closeCatch는 부른 쪽에 안 알린다) 뺀 기회가 안 돌아오고 다음 잡기도 안 열림 → 창마다 `{ threw }`(판정 때 적음) · `settleLostCatch()`(창이 닫혔는데 소식이 없으면 안 던진 기회를 돌려주고 단추를 살림 — 국어 화면에 들어올 때·단추를 그릴 때·잡기를 누를 때) ② 「알에서 태어나다」(문장으로 된 첫 명작)에서 **화면이 깨짐**(`card.stanzas is not iterable` — 명작 = 시라고 가정) → `proseEl` 따로, 명작은 stanzas가 있으면 연·줄, 없으면 번호 붙은 문장
+- **다음 글 6편**(12장 34문제):
+  - ✨ K7 🥚 「알에서 태어나다」(『삼국유사』 혁거세 이야기를 신코치가 쉬운 말로 다시 씀 — 일연 1289년) · 🎭 인물·사건·배경
+  - ✨ K8 🥔 권태응 「감자꽃」(1948 동요집 — 1951년에 세상을 떠남) · 🔤 낱말의 뜻 · 🎵 되풀이
+  - ✨ K9 🛤️ 윤동주 「새로운 길」(1955년 판 위키문헌 19~20쪽 대조) · 🎭 말하는 이의 마음 · 🎵 시의 짜임
+  - 📄 K10 🛶 「우포늪에 다녀와서」(기행문) · 🧭 여정·본 것·느낀 것
+  - 📄 K11 🐢 「거북과 자라는 어떻게 다를까」(설명하는 글) · 🔎 비교·대조
+  - 📄 K12 📺 「먹기만 하면 키가 쑥쑥?」(광고) · 📰 믿을 만한 정보인지 따지기
+  - 글마다 📖 낱말(우두머리·기슭 · 보나 마나 · 내·고개 · 늪·장대 · 등딱지·민물 · 칼슘·광고)
+- 전체 **1763** 통과(check 포함, `--test-concurrency=1` — 여유 메모리 1.9 GB) · 새 `tests/korpokemon.test.js` 6(150 명단·희귀도·타입·이름 · 과목 나눔 · 진화가 국어 안에서 · 기회 규칙·병합 · 저장 경로: 두 창이 동시에 빼도 하나 · 돌려주기 실패면 그대로 · 근거 실수면 🟩 없음 · 화면 연결) · korean 12 → **15**(글 6편 · 기회 · 🟩 · 이야기 명작 글 상자) · 수가 박힌 시험 고침(evolve 191줄·178종 · pokemon 492 · xp 국어 희귀도 · timelimit 과목·연장권 · items 🟩 · player.logic 흉내에 KOREAN_MIN)
+- 변이: 새 `.context/korean_stage2/mutate_kor2.mjs` **55 중 55**(⏳ 시간 · 🟩 · 기회 · 150 · 진화 · 화면 말 · 원고 · 잡기 창이 바깥에서 닫힘 5 · 이야기 명작 2 — 처음 지나간 셋 "국어 시계·xp evMiss·띄우기 전에 빼기"는 시험을 더해 잡음) · 1단계 `mutate_kor1.mjs` 낡은 줄 4 고침 → **74 중 73 + 같은 뜻 1**
+- 헤드리스 1280 · 390(scratchpad walk_kor3.sh + hh9.js · walk_kor4.sh): 국어 ⏳ 칩 "1시간 29분" · K8 한 번에 다 맞힘 → 🟩 +1 · 🎯 1 → 잡기 후보 넷 다 국어 · 바깥에서 닫기 → 기회 돌아옴 → 다시 열어 던지기 → 잡음(📚 1/150) · 🎒 🟩 국어스톤 1 · 🔒 🟪 ??? · K7~K12 글 상자·물음·끝까지 · 넘침 0 · 콘솔 오류 0(움직이는 그림 650 404는 원래 있던 일 — 5세대 움직이는 그림은 649까지, 일러스트로 대신함) · sw **v232**
+
+### 변경 파일
+- `js/timelimit.js` · `js/timeup.js` · `js/app.js` · `js/player.js`(⚙·칩) · `js/stats.js` · `index.html` · `js/items.js`(STONE_KOREAN·EXTEND_KOREAN·FUTURE_STONES 🟪) · `js/evolve.js`(국어 78줄·STONE_ID) · `js/korean.js`(korFinishRule 🟩·기회 · throwsOf·pendingOf·mergeThrows·korTakeRule·korGiveBackRule) · `js/db.js`(korThrow 빈 값·복사·병합 · DAILY_SUMS) · `js/xp.js`(korThrow · korTakeThrow·korGiveBackThrow·korThrowsLeft · RARITY_IDS 국어) · `js/pokemon.js`(150 · subjectById) · `js/battle.js`(타입) · `js/catch.js`·`js/pokedex.js`·`js/shop.js`(말) · `js/koreanview.js`(🎯 잡기·settleLostCatch·proseEl·끝 카드 말) · `coach/korean/reading.json`(K7~K12) · `css/style.css` · `sw.js`(v232) · 새 `tests/korpokemon.test.js` · `tests/korean.test.js`·`timelimit`·`items`·`evolve`·`pokemon`·`xp`·`player.logic`
+
+### TODO (다음 작업)
+- [ ] v232 커밋·배포 → Codex 49차
+- [ ] 아버님: 태블릿 📚 국어 → ⏳ 칩 · 한 번에 다 맞혀 🟩 · 🎯 국어 포켓몬 잡기 · 새 글 6편 → 진우 반응
+- [ ] 안 한 것(제안): 국어 🥚 알 · 🔤 낱말 줄기 · 📘 교과서 단원 순서 카드
