@@ -16,11 +16,11 @@ const at = (days, h = 12) => new Date(2026, 9, 11 + days, h, 0, 0).getTime();
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('📚 원고: 형식 검사 통과 · 여섯 편(연습 넷·명작 둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
+test('📚 원고: 형식 검사 통과 · 열아홉 편(연습 열둘·명작 일곱) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, ['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8', 'K9', 'K10', 'K11', 'K12']);
-  assert.deepEqual(DATA.cards.map((c) => c.kind), ['practice', 'practice', 'classic', 'practice', 'practice', 'classic', 'classic', 'classic', 'classic', 'practice', 'practice', 'practice']);
-  assert.equal(validCards(DATA).length, 12);
+  assert.deepEqual(IDS, ['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8', 'K9', 'K10', 'K11', 'K12', 'K13', 'K14', 'K15', 'K16', 'K17', 'K18', 'K19']);
+  assert.deepEqual(DATA.cards.map((c) => c.kind), ['practice', 'practice', 'classic', 'practice', 'practice', 'classic', 'classic', 'classic', 'classic', 'practice', 'practice', 'practice', 'practice', 'practice', 'practice', 'practice', 'practice', 'classic', 'classic']);
+  assert.equal(validCards(DATA).length, 19);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -32,8 +32,8 @@ test('📚 원고: 형식 검사 통과 · 여섯 편(연습 넷·명작 둘) ·
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 34);
-  assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 일곱 가지가 모두 한 번 이상 쓰인다');
+  assert.equal(qn, 55);
+  assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 여덟 가지(v236 짜임 놓치기 더함)가 모두 한 번 이상 쓰인다');
   // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {
     const law = c.facts.find((f) => f[0] === '저작권')[1];
@@ -176,6 +176,60 @@ test('📚 다음 글 6편 (2026-10-11 아버님 "너가 추천하는 대로"): 
   // 갈래 고루: 이야기·설명·주장·광고·기행문·시·옛이야기
   const genres = new Set(DATA.cards.map((c) => c.genre));
   for (const g of ['이야기', '설명하는 글', '주장하는 글', '광고', '기행문', '동시', '시']) assert.ok(genres.has(g), g);
+});
+
+test('📚 빈 단원 글 7편 (v236, 아버님 "이대로 진행"): 발표·정보 찾기·토의·여러 형태의 책·문장 호응·김영랑 방언 시·방정환 「만년 셔츠」 — 원문 대조 · 물음이 묻는 말을 풀이·글이 미리 알려 주지 않음 · 보기에 옮긴 문장 = 글의 그 문장 · 단원 지도에 이어짐', () => {
+  const card = (id) => DATA.cards.find((c) => c.id === id);
+  const NEW = ['K13', 'K14', 'K15', 'K16', 'K17', 'K18', 'K19'];
+  assert.deepEqual(NEW.map((id) => card(id).genre), ['발표하는 글', '조사 일기', '토의', '생활문', '일기', '시', '동화']);
+  // 김영랑 「오-매 단풍 들것네」 — 『영랑시집』(1935, 위키문헌) 원문에 facts에 적은 바꿈만 (방언은 그대로)
+  const ORIG = [['「오―매 단풍들것네」', '장광에 골불은 감닙 날러오아', '누이는 놀란듯이 치어다보며', '「오―매 단풍들것네」'], ['추석이 내일모레 기둘니리', '바람이 자지어서 걱졍이리', '누이의 마음아 나를보아라', '「오―매 단풍들것네」']];
+  const CHANGES = [['감닙', '감잎'], ['걱졍', '걱정'], ['기둘니리', '기둘리리'], ['골불은', '골붉은'], ['날러오아', '날아오아']];
+  const SPACING = [['단풍들것네', '단풍 들것네'], ['놀란듯이', '놀란 듯이'], ['나를보아라', '나를 보아라'], ['「', '"'], ['」', '"'], ['―', '-']];
+  const today = (t) => [...CHANGES, ...SPACING].reduce((x, [a, b]) => x.split(a).join(b), t);
+  assert.deepEqual(card('K18').stanzas, ORIG.map((st) => st.map(today)));
+  const k18src = card('K18').facts.find((f) => f[0] === '원문')[1];
+  for (const [a, b] of CHANGES) assert.ok(k18src.includes(`${a} → ${b}`), `원문에서 바꾼 표기는 facts에 적는다 — ${a} → ${b}`);
+  assert.equal(card('K18').author, '김영랑');
+  // 풀이가 갈리는 2연·낱말은 묻지 않는다 · 물음이 묻는 말('오-매'·'들것네')은 📖 풀이에 넣지 않는다
+  for (const q of card('K18').qs) assert.ok(!/나를 보아라|골붉은|자지어서|기둘리리/.test(q.q + q.opts.map((o) => o.t).join(' ')), `${q.id}: 풀이가 갈리는 곳은 묻지 않는다`);
+  assert.ok(!card('K18').words.some((w) => /오-매|들것네/.test(w[0])), '물음이 묻는 말은 풀이에 넣지 않는다');
+  // 방정환 「만년 샤쓰」 — 줄여 다시 썼어도 따옴표 안의 말은 원문 그대로 (위키문헌 본문 일부 · 저작권이 끝난 글)
+  const MANNYEON = [
+    '전 후열 모두 웃옷 벗어!', '선생님, 만년 셔츠도 좋습니까?', '무엇? 만년 셔츠? 만년 셔츠란 무어야?', '매, 매, 맨몸 말씀입니다.', '벗어랏!', '한창남! 왜 셔츠를 안 입었니?', '없어서 못 입었습니다.',
+    "'예, 두 벌 남았으니, 하나는 어머니 입으시지요.'", "'예, 셔츠도 잘 입고 버선도 잘 신었으니까, 춥지는 않습니다.'",
+    '그러나, 네가 거짓말을 하더라도 어머니께서 너의 벌거벗은 가슴과 버선 없이 맨발로 짚신을 신은 것을 보시고 아실 것이 아니냐?',
+    '저의 어머니는 제가 여덟 살 되던 해에 눈이 멀으셔서 보지를 못하고 사신답니다.',
+  ].join(' ');
+  const quotes = card('K19').lines.flatMap((l) => [...l.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+  assert.equal(quotes.length, 11);
+  for (const q of quotes) assert.ok(MANNYEON.includes(q.replace('머셔서', '멀으셔서')), `따옴표 안의 말은 원문 그대로: ${q}`);
+  assert.equal(card('K19').author, '방정환 · 신코치가 줄여 씀');
+  assert.match(card('K19').facts.find((f) => f[0] === '원문')[1], /줄여 썼어요/);
+  assert.equal(lineCount(card('K19')), 20);
+  // K13-1: 글이 답(표)을 미리 말하지 않는다 — 자료 목록은 "정리한 자료" ("발표"의 표는 빼고)
+  assert.ok(!card('K13').lines.some((l) => /(^|[^발])표/.test(l)), 'K13 글에 "표"가 나오면 K13-1 답이 보인다');
+  assert.ok(card('K13').lines.some((l) => l.startsWith('(사진을 보여 주며)')) && card('K13').lines.some((l) => l.startsWith('(영상을 보여 주며)')));
+  // 보기에 "⑦ …"처럼 옮긴 문장은 글의 그 문장 (K17 일기 · K15 토의는 말한 사람까지)
+  for (const q of [...card('K17').qs, ...card('K15').qs]) {
+    const c = card(q.id.split('-')[0]);
+    for (const o of q.opts) {
+      const m = /^([①-⑳]) (.+)$/.exec(o.t);
+      if (!m) continue;
+      const line = lineText(c, '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'.indexOf(m[1]) + 1);
+      if (c.id === 'K17') assert.equal(m[2], line, `${q.id} ${o.t}`);
+      else assert.ok(line.startsWith(m[2].split(':')[0] + ':'), `${q.id} 말한 사람 — ${o.t}`);
+    }
+  }
+  // K17 호응: 틀린 보기는 모두 짜임 놓치기 · 정답은 ⑦(주어–서술어) · ④ 고친 문장 · ⑨(때)
+  for (const q of card('K17').qs) for (const o of q.opts) if (!o.ok) assert.equal(o.type, 'agree', `${q.id} ${o.t}`);
+  assert.deepEqual(card('K17').qs.map((q) => q.opts.find((o) => o.ok).t.slice(0, 1)), ['⑦', '공', '⑨']);
+  assert.equal(TYPES.agree.name, '짜임 놓치기');
+  // 📘 단원 지도: 새 카드는 모두 어느 단원에 이어진다 · 독서·4단원 이름은 2026 예시자료대로
+  const UNITS = JSON.parse(readFileSync(new URL('../coach/korean/units.json', import.meta.url), 'utf8')).units;
+  for (const id of NEW) assert.ok(UNITS.some((u) => (u.cards || []).includes(id)), `${id} 단원`);
+  assert.ok(UNITS.every((u) => (u.cards || []).length > 0), '단원 열여섯 모두 글이 있다');
+  assert.deepEqual(['5-1-독서', '5-2-독서', '5-2-4'].map((id) => UNITS.find((u) => u.id === id).title), ['책을 읽고 함께 이야기해요', '여러 가지 형태의 책을 읽어요', '표준어와 방언을 알아봐요']);
 });
 
 // ───────────────────── 진짜 저장 경로 (fakeidb) ─────────────────────

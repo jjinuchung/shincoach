@@ -30,10 +30,10 @@ export function unitsOf(data, cards, words) {
     }));
 }
 
-/** 단원 머리 이름 — "6단원 「빗대어 표현해요」" · 독서·매체 단원은 그 이름 그대로 */
+/** 단원 머리 이름 — "6단원 「빗대어 표현해요」" · 독서·매체 단원은 번호 대신 단원 갈래로 (v236: 독서 단원에도 제 이름이 생겼다) */
 export function unitLabel(u) {
   if (!u) return '';
-  if (u.no === '독서') return `📖 ${u.title}`;
+  if (u.no === '독서') return `📖 독서 단원 「${u.title}」`;
   if (u.no === '매체') return `📺 매체 단원 「${u.title}」`;
   return `${u.no}단원 「${u.title}」`;
 }
