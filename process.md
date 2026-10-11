@@ -1631,7 +1631,7 @@
 - D 테스트의 "문자 분수는 D·Q 줄기에만"에 R 더함(R도 y = 6/x)
 - 검수 페이지 `tools/mathcoord.mjs` → https://claude.ai/artifact/9qado3Dc8z6b96mLUKLwbZ (배움 40장 · 확인 40 · 그림 43 · 셈식 52 · 함정 18 · 문제 예시 27) · 전체 1227
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - 신규 `coach/math/coord.json` · `tools/mathcoord.mjs` · `coach/math/review-crd.html`
 - `tests/mathcoord.test.js`(2단계 절) · `tests/mathexpr.test.js`(R 예외) · `tools/check.mjs`(coord.json)
 - (1단계부터) `js/mathcoord.js` · `js/mathdraw.js` · `sw.js`(mathcoord 줄)
@@ -1725,7 +1725,7 @@
 - ★ 갤러리 눈 확인이 잡은 것: 키 큰 기둥 뒤의 빈 칸은 그림만으로 "비었다"와 "낮은 기둥이 숨었다"를 가릴 수 없다 → 위에서 본 모양 없이 그림만 주는 문항은 빈 칸에 1개를 놓아도 윗면이 보이는 모양만
 - 생성기 `js/mathspace.js` · 테스트 19개(독립 검산 — SVG를 픽셀로 다시 칠해 보이는 쌓기나무, 칸마다 1~3층을 다 넣어 맞는 모양, 90° 돌리기로 같은 모양) · 테스트가 잡은 이름표 둘 · 변이 35 다 잡힘 · 전체 1252
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - 신규 `js/mathspace.js` · `tests/mathspace.test.js` · 바뀐 `js/mathdraw.js`(쌓기나무 절) · `sw.js`(APP_SHELL mathspace.js 줄만)
 
 ### TODO (다음 작업)
@@ -2015,7 +2015,7 @@
   - ★ 원고 변이가 잡은 테스트 구멍 둘: "3/4 × 3"의 오답 3/4가 "단위분수만큼에서 멈춤"으로 우연히 맞음 → 판정표가 셈의 순서까지 · "1/6"이 "4 1/6" 안의 글자로 지나감 → 까닭 검사를 낱개 수로
   - 검수 https://claude.ai/artifact/5ogNgxkj1RuYjWSJLYrwfk (`tools/mathfmul.mjs` → `coach/math/review-fmul.html`) · 폰 390px 넘침 0 · 전체 **1361 통과**
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - `js/mathfmul.js` (새) — U 줄기 생성기 · `tests/mathfmul.test.js` (새) — 생성기 20 + 원고 6
 - `js/mathdraw.js` — `[fmul]` 곱셈 그림 절 · figureSvg·figText·renderFigures 등록
 - `sw.js` — APP_SHELL mathfmul.js 줄만(버전 v202 그대로) · `tools/check.mjs` — fracmul.json 원고 검사 등록
@@ -2097,7 +2097,7 @@
   - 변이가 잡은 테스트 구멍: "받아올림 없는 문항 가족"에서 받아올림이 나와도 지나감 → 문항 probe에 모양(carry·borrow)을 적고 실제 수와 대조
   - 갤러리 눈 확인: 뺄셈 막대가 받아내림을 "꽉 찬 1을 헐어 덜어 냄"으로 보여 줌 · 기존 덧셈·통분 막대는 폭 160px로 작다(A와 같은 크기 — 제안으로만)
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - `js/mathfadd.js` (새) — V 줄기 생성기 · `tests/mathfadd.test.js` (새) — 생성기 테스트 21
 - `js/mathdraw.js` — `[fsub]` 뺄셈 막대 절 · figureSvg·figText·renderFigures 등록
 - `sw.js` — APP_SHELL mathfadd.js 줄만 (버전 v204 그대로)
@@ -2355,7 +2355,7 @@
   - 테스트: 줄기 수(mathstem·mathprog) · 화면 연결 1 · 화면 연결 변이 26 다 잡힘 · 헤드리스 800·390(줄기 고르기 → 진단 → 사다리 · Y4 배움 장·자릿값 표 · Y2 숫자판 → 🔁 비슷한 문제 · Y5) 넘침 0·콘솔 오류 0
   - ★ 헤드리스 390이 잡음: 원고의 "764123900000000 → 764 | 1239 | 0000 | 0000 — 칠백육십사조 …"처럼 끊은 꼴을 한 줄에 이어 쓰면 폰에서 끊은 꼴 한가운데가 끊긴다(16줄) → 한 단계 한 줄(수 / → 끊은 꼴 / → 읽은 말) + 원고 테스트 "끊은 꼴이 든 줄은 폰 폭에 한 줄" · 원고 변이 59 다 잡힘 · 검수 Version 2 · 전체 **1501 통과**
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - `js/mathbig.js` (새) — Y 줄기 생성기 · `tests/mathbig.test.js` (새) — 생성기 테스트 19 + 원고 테스트 11 + 화면 연결 1
 - `js/mathprog.js` — STEMS.bignum · STEM_ORDER · `js/mathask.js`·`js/stats.js` — [place] 예 · `tests/mathstem.test.js`·`tests/mathprog.test.js` — 스물다섯 줄기
 - `js/mathdraw.js` — `[place]` 자릿값 표 절 · figureSvg·figText·renderFigures 등록
@@ -2440,7 +2440,7 @@
     → 새 테스트 "🎨 사각형 그림의 글자"(SVG를 따로 읽어 글자 틈 > 4px · 각도 글자에서 가장 가까운 꼭짓점 = 그 각도, Z·J 문항·원고) — 고치기 전 코드로 실패 확인
   - 헤드리스 800·390: 줄기 고르기 · 진단 5 → 사다리 · Z2 배움 5장·각도기 숫자판(°) · Z8 ① 틀림 → 🔁 쌍둥이 → 고침 · 390 진단·Z2·Z7 — 넘침 0·콘솔 오류 0
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - `js/mathangle.js` (새) — Z 줄기 생성기 · `tests/mathangle.test.js` (새) — 생성기 테스트 23 + 원고 테스트 8
 - `js/mathdraw.js` — `[ang]`·`[fan]`·`[prot]` 절 · polySvg `ext`(㉠) · figureSvg·figText·renderFigures 등록
 - `sw.js` — APP_SHELL mathangle.js 줄만(버전 v212 그대로)
@@ -2749,7 +2749,7 @@
   - 테스트 쪽 함정: ② 첫머리 인물 이름 "돌리"(토이 스토리)가 "돌리기"로 잡힘 → 이름을 떼고 검사 · 후보 모눈을 자른 정규식이 닫는 </g>를 먹음
   - 150·3,000 씨앗 통과(3,000은 25초) · 변이 56 중 55 → 지나간 "칸을 화면에서 한 칸 옆에 그림(data-i는 그대로)"은 그린 모눈선 자리로 읽는 검사를 더해 잡음(`mutate_one.mjs`) → **56/56** (`.context/ab_stage1/mutate_ab1.mjs`) · 전체 **1653 통과** · check 통과(APP_SHELL에 mathmove.js, 버전은 3단계)
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - `js/mathmove.js` (새) · `tests/mathmove.test.js` (새)
 - `js/mathdraw.js` — 🔄 AB 절(`[move]`·`[shapes]`·`[seg]`, moveGeom·mvCells·mvNorm·mvRows·SEG·moveFigText) · figureSvg·figText·renderFigures 등록
 - `sw.js` — APP_SHELL mathmove.js 줄만(버전 v221 그대로)
@@ -2862,7 +2862,7 @@
 - 검수 페이지 다시 만듦(이름표 24가지·오답은 묻는 움직임 전체·계산 실수 없음) → **새 artifact**(옛 7G3b1TfpFnpNNMw6EHhr6r는 44차 전 판)
 - mathmove 41 · 3,000 씨앗 통과 · 전체 **1675** 통과(check 포함, 한 파일씩) · sw **v223**
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - `js/mathmove.js` — TAGS between 새로·turnHalf·orderKeep 말 · 점 몇 cm n − 1 · 두 번 뒤집기 틀 · askFam near 끔 · 머리말
 - `js/mathexpr.js` — choices `near` · calcAsk가 `v.near` 넘김 · `js/mathprog.js` — `GUESS_MAX` · `sw.js` — v223
 - `coach/math/move.json` — AB1 cm 확인 질문 · AB4 두 번 뒤집기 확인 질문 (빌더 `.context/ab_stage2/build_move.mjs`) · `tools/mathmove.mjs` → `coach/math/review-move.html`
@@ -2888,7 +2888,7 @@
 - 테스트 `tests/house.test.js` 16: 등록부(이름·크기·ITEMS 밖·Emoji 12 이하) · 값 차례(소품 < 가구 < 기기·기기는 스톤 둘 다) · 고쳐 읽기 · 놓을 자리 · 규칙 · 팔기·상자·구호품에 안 섞임 · 백업 병합 · 가짜 저장소(두 창 · 동시에 두 번 사기 · 저장 실패)
 - 전체 **1691** 통과(한 파일씩) · 변이 46 다 잡힘(`.context/house_stage1/mutate_house1.mjs`) — 처음 하나 지나감: "맞는 칸이지만 안 가진 벽지"를 시험 안 함 → 테스트에 더함
 
-### 변경 파일 (미커밋)
+### 변경 파일
 - 새: `js/house.js` · `tests/house.test.js` · 고침: `js/db.js`(copyHouse·cloneProfile·병합·applyHouseRule) · `js/xp.js`(fromStored·houseDo·houseNow·houseLeft) · `sw.js`(APP_SHELL 한 줄)
 
 ### 결정사항 / 메모
@@ -3275,3 +3275,23 @@
 - [ ] v237 커밋(fix + feat + docs)·배포 → Codex 52차(백그라운드)
 - [ ] 아버님: 태블릿 📚 K1·K7·K15·K17·K19 끝 → ✍️ 생각 쓰기 → 📊 "답장 기다리는 글" → Claude에게 "국어 답 봐 줘"
 - [ ] (반응 보고) 나머지 카드에도 서술형
+
+## 2026-10-11 — 🎬 스폰지밥 무비: 네모바지를 찾아서 영어 자료 · 호퍼스 자막 "were" 고침 · 🔍 Codex 52차
+
+### 진행 내용
+- 아버님 "다음에 할 영어 컨텐츠가 필요해. 호퍼스는 다 봤어 … 영어 자막 생성만 해서 학습 컨텐츠로" → mkv에 **글자 자막(SRT)이 들어 있었다**: 영어(보통) 1,328 · 영어 SDH 1,929 · 한글 전체 1,159 · 한글 Forced 42 → OCR·음성 인식 없이 트랙을 한 번에 뽑음(25초)
+- `tools/sdh_clean.py --text`(새): 글자 자막은 OCR 고치기를 건너뛰고 [소리 설명]·♪만 — 바뀐 조각 17개를 모두 눈으로 확인(열린 "♪ 가사" 닫기 · "x♪" 빈칸 · `[VOCAL FRY]` 지움)
+- ★ 그 과정에서 찾은 옛 잘못: OCR 규칙 `\b(You|They|We)re\b → 're`가 진짜 낱말 "were"를 "we're"로 바꿨다 → **호퍼스 자막에 4줄**("We we're very careful" 등) → We를 빼고 · `'?$` 지우기는 "doin'?"을 지키게 → 호퍼스를 다시 만들어 비교하니 그 4줄만 달라 `F:\per\mp3\hoppers\tablet\호퍼스.en.srt`를 바꿈(옛 것은 `hoppers\호퍼스.en.srt.bak-were`)
+- 한글 자막은 `{\an8}` 위치 꼬리표 36개만 지움 · synccheck ✅(차이 0.06~0.8초)
+- 영상: 1916×1032 h264 → 1440×776 x264 faster crf23 maxrate 1200k · 영어 5.1 → 대사 가중 스테레오 + loudnorm(평균 −19 dB · 최대 −0.8 dB, 그냥 내리면 −39 dB) · Idle 우선순위 20.8분(4.3배속) · 782 MB
+- 산출물 `F:\per\mp3\spongebob\tablet\` = 「스폰지밥 무비 네모바지를 찾아서」.mp4 · .en.srt(1,328문장 · 따라 말하기 쓸 만한 문장 1,110 = 84%) · .ko.srt
+- 단어장 `vocab/words.json` +248(2,197 → 2,445): 이름·소리·더듬기·이미 아는 기본형의 -in'은 빼고, 뜻은 영화 속 쓰임으로 · 기본형을 넣어 변화형은 stemWord가 · 불규칙·-in'은 `=기본형`(앱처럼 세 번까지 따라가 뜻이 비지 않게 검사, `.context/spongebob/merge_vocab.mjs`) · vocab·srt 시험 46 통과
+- 🔍 Codex 52차(`.context/codex_prompt_52.txt` → `.context/codex_review_52.md`, 54만 토큰): 51차 6건 모두 holds · P1 없음 · P2 여섯(올리기 경합 · 사본끼리 at 겹침 · 사본 병합 때 보상 잃음 · 병합된 앞 글 답장이 안 보임 · 답장 넘침·버린 줄 안 알림 · 채점 기준 어긋남) · P3 셋(기다리는 글도 30에서 잘림 · 판 번호를 안 맞춰 봄 · 그리기만 해도 읽음) → 판단 표, 아버님 결정 기다림 · 비공개 저장소에 korean/ 폴더가 아직 없음(진우가 서술형을 아직 안 보냄 — 채점 기준은 v1 그대로 고쳐도 됨)
+
+### 변경 파일
+- `tools/sdh_clean.py`(--text · were · in'?) · `vocab/words.json`(+248) · `sw.js`(v238)
+
+### TODO (다음 작업)
+- [ ] 아버님: 태블릿 📁 `F:\per\mp3\spongebob\tablet` 넣기 → 진우 반응 · (원하면) 호퍼스 .en.srt 다시 넣기
+- [x] 단어장 v238로 따로 배포(아버님 "v238로 따로 배포 해")
+- [ ] Codex 52차 판단 표 → 아버님 결정 → v239
