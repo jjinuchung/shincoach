@@ -110,24 +110,32 @@ export function wordsOf(raw) {
   for (const k of Object.keys(raw).slice(0, WORDS_MAX)) if (k && k.length <= KEY_MAX) out[k] = stateOf(raw[k]);
   return out;
 }
-/** 병합 — 낱말마다 나중에 푼 쪽(at)이 이긴다 · 같으면 칸이 높은 쪽 (차례와 상관없이 같은 결과) */
+/** 병합 — 낱말마다 나중에 푼 쪽(at)이 이긴다 · 같으면 칸·날·틀린 수가 큰 쪽(어느 차례로 합쳐도 같은 결과) ·
+ *  처음 배운 날(d0)은 따로 — 바른 날 중 이른 날 (이긴 쪽 d0을 그대로 쓰면 시계를 고친 뒤 오늘 배운 낱말이 "내일 배운 것"이 되어
+ *  그날 새 낱말 5개가 또 나왔다, Codex 50차 #5) */
 export function mergeWords(a, b) {
   const x = wordsOf(a);
   const y = wordsOf(b);
   const out = { ...x };
+  const later = (q, p) => q.at - p.at || q.box - p.box || q.due - p.due || q.miss - p.miss;
   for (const k of Object.keys(y)) {
     const p = out[k];
     const q = y[k];
-    if (!p || q.at > p.at || (q.at === p.at && (q.box > p.box || (q.box === p.box && q.due > p.due)))) out[k] = q;
+    if (!p) { out[k] = q; continue; }
+    const win = later(q, p) > 0 ? q : p;
+    const d0s = [p.d0, q.d0].filter((d) => d > 0);
+    out[k] = { ...win, d0: d0s.length ? Math.min(...d0s) : 0 };
   }
   return out;
 }
-/** 낱말 보상을 받은 날 { 날 번호: 1(받음) | 2(🟩까지) } — 최근 DAYS_MAX날 */
-export function wordDaysOf(raw) {
+/** 낱말 보상을 받은 날 { 날 번호: 1(받음) | 2(🟩까지) } — 최근 DAYS_MAX날 · keep 날은 늘 남긴다
+ *  (시계를 크게 되돌려 앞날 기록이 꽉 차면 오늘 기록이 잘려 그날 보상을 또 받았다, Codex 50차 #8) */
+export function wordDaysOf(raw, keep = 0) {
   const out = {};
   if (!isObj(raw)) return out;
   const keys = Object.keys(raw).filter((k) => cnt(k) > 0).sort((a, b) => Number(b) - Number(a)).slice(0, DAYS_MAX);
   for (const k of keys) { const v = cnt(raw[k], 2); if (v) out[k] = v; }
+  if (keep > 0 && cnt(raw[keep], 2)) out[keep] = cnt(raw[keep], 2);
   return out;
 }
 export function mergeWordDays(a, b) {
@@ -138,7 +146,7 @@ export function mergeWordDays(a, b) {
 }
 /** 오늘 낱말 보상 — 0 아직 · 1 받음 · 2 🟩까지 */
 export function wordsToday(days, now) {
-  return wordDaysOf(days)[dayNum(now)] || 0;
+  return isObj(days) ? cnt(days[dayNum(now)], 2) : 0; // 자르기 전 기록에서 바로 (앞날 기록이 꽉 차도 오늘을 본다)
 }
 
 /**
@@ -210,7 +218,9 @@ function uniqBy(list, key) {
 /**
  * 🔤 오늘의 낱말 한 판을 끝냈다 — 한 트랜잭션에서: 낱말마다 칸 옮기기 · 그날 처음 끝낸 판이면 💰·🎯(·🟩)
  * @param {object} profile 저장된 프로필 (mutateProfile 안)
- * @param {Array<{id:string, ok:boolean}>} answers 낱말마다 **처음 고른 것**이 맞았나 (같은 id는 처음 것만)
+ * @param {Array<{id:string, ok:boolean, from?:number}>} answers 낱말마다 **처음 고른 것**이 맞았나 (같은 id는 처음 것만) ·
+ *   from = 판을 시작할 때 그 낱말의 at(새 낱말이면 0) — 그 사이 다른 판(두 창·같은 판 여러 번 저장)이 그 낱말을 이미 옮겼으면
+ *   이 답은 **연습**(칸을 안 옮김): 낡은 판으로 하루에 ⭐까지 가거나 익힌 낱말이 낡은 오답으로 되돌아가지 않게 (Codex 50차 #4)
  * @param {number} now 트랜잭션 안의 시각
  * @param {string[]} ids 지금 있는 낱말 id (모르는 낱말은 세지 않는다 · 📖은 그 글에 ★이 있어야)
  * @returns {{ok:boolean, why?:string, first?:boolean, coins?:number, stone?:number, throws?:number, n?:number, okN?:number, mastered?:string[]}}
@@ -230,9 +240,11 @@ export function korWordsRule(profile, answers, now, ids) {
     seen.add(id);
     n++;
     const cur = st[id] || stateOf(null);
+    if (a.ok === true) okN++;
+    const stale = a.from !== undefined && Number(a.from) !== cur.at; // 판을 시작한 뒤 다른 판이 이 낱말을 옮겼다
+    if (stale || cur.box >= MASTER_BOX) continue; // 연습 — ⭐ 익힌 낱말은 더 안 옮긴다(낡은 판의 오답으로도 되돌리지 않음)
     const d0 = st[id] && cur.d0 ? cur.d0 : today; // 처음 배운 날 — 하루 새 낱말 수를 센다
     if (a.ok === true) {
-      okN++;
       const box = Math.min(MASTER_BOX, cur.box + 1);
       if (box === MASTER_BOX && cur.box < MASTER_BOX) mastered.push(id);
       st[id] = { box, due: box >= MASTER_BOX ? 0 : today + DUE_AFTER[box], at, miss: cur.miss, d0 };
@@ -242,8 +254,8 @@ export function korWordsRule(profile, answers, now, ids) {
   }
   if (!n) return { ok: false, why: 'empty' };
   profile.korWords = st;
-  const days = wordDaysOf(profile.korWordDay);
-  const first = !days[today];
+  const first = !wordsToday(profile.korWordDay, now);
+  const days = wordDaysOf(profile.korWordDay, today);
   let coins = 0;
   let stone = 0;
   if (first) {
@@ -260,7 +272,7 @@ export function korWordsRule(profile, answers, now, ids) {
     profile.coins = (Number(profile.coins) || 0) + coins;
     profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   }
-  profile.korWordDay = wordDaysOf(days);
+  profile.korWordDay = wordDaysOf(days, today);
   return { ok: true, first, coins, stone, throws: pendingOf(profile.korThrow), n, okN, mastered };
 }
 

@@ -163,9 +163,11 @@ export function holdStore(key, o = {}) {
       async refund(giveBack) {
         if (state !== 'open') return state === 'refunded';
         state = 'refunding';
-        stop(); // 이제 이 창이 쓰는 줄이 아니다 — 실패하면 다음 settle이 다시 돌려준다
+        // ★ 돌려주는 저장을 기다리는 동안에도 "쓰는 중"(live)·beat 그대로 — 먼저 풀면 같은 창의 settle이 이 줄을 버려진 것으로 보고
+        //   한 번 더 돌려줬다(refunded 2, Codex 50차 #1). 끝난 뒤에 푼다: 성공이면 줄을 지우고, 실패면 다음 settle이 돌려준다
         let r = 'fail';
         try { r = await giveBack(); } catch { r = 'fail'; }
+        stop();
         if (r === 'ok' || r === 'none') { write(holdDrop(read(), rid)); state = 'refunded'; return true; }
         state = 'failed';
         return false;

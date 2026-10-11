@@ -492,7 +492,7 @@ function clearMain() {
 
 /** 진입 — 진단 전이면 진단, 아니면 사다리 */
 export async function renderMath() {
-  settleLostMathCatch(); // 🎯 잡기 창이 소식 없이 닫혔으면 흐름부터 푼다 (Codex 49차)
+  await Promise.resolve(settleLostMathCatch()).catch(() => {}); // 🎯 잡기 창이 소식 없이 닫혔으면 흐름부터 푼다 (Codex 49차) — 장부 정리보다 먼저 (50차 #1)
   topUpMathCharacters();
   topUpCheerDots(); // 🕺 ✨ 응원이 걸어 다니려면 도트 그림이 있어야 한다 (몇 마리씩 미리)
   prepareBattle(); // ⚔️ 오늘 몫·그림을 읽어 둔다 (배틀 등장 판정은 문항마다 동기로 돈다)

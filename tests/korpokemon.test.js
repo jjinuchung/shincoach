@@ -172,7 +172,7 @@ test('🎯 화면 연결: 다 읽은 카드·도감 머리에 잡기 단추 · �
   assert.ok(settle.includes('if (!ui.catching || !st || isCatchOpen()) return null;'), '창이 아직 떠 있으면 건드리지 않는다');
   assert.ok(settle.includes('ui.catching = false;') && settle.includes('if (st.threw) return null;') && settle.includes('return st.hold.refund(korGiveBack)'), '안 던졌을 때만 돌려준다');
   assert.ok(run.indexOf('await settleLostCatch();') >= 0 && run.indexOf('await settleLostCatch();') < run.indexOf('if (ui.catching) return;'), '남은 단추를 눌러도 먼저 정리');
-  assert.ok(body('function catchBtnEl() {').includes('settleLostCatch();') && body('export async function enterKorean() {').includes('settleLostCatch();'));
+  assert.ok(body('function catchBtnEl() {').includes('settleLostCatch();') && body('export async function enterKorean() {').includes('Promise.resolve(settleLostCatch())'));
   assert.ok(run.includes('if (!koreanVisible()) { await st.hold.refund(korGiveBack); ui.catching = false; return; }'), '뺀 사이 나가면 돌려준다');
   assert.ok(body('async function korPool() {').includes("forSubject(chars, 'korean')"), '후보는 국어 전용');
   assert.ok(body('function finishEl() {').includes('const cb = catchBtnEl();') && body('export async function renderList() {').includes('const cb = catchBtnEl();'));

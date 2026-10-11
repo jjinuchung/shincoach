@@ -45,7 +45,11 @@ test('🔤 원고: 검사 통과 · 📘 36 · 🗣️ 25 · 📖 23(글의 낱�
   assert.ok(/없이/.test(mean('은유')), '은유 = 처럼·같이 없이');
   assert.match(mean('비교'), /같은 점/);
   assert.match(mean('대조'), /다른 점/);
-  assert.match(mean('방언'), /지역/);
+  assert.ok(/설명하는 방법에서/.test(mean('비교')) && /설명하는 방법에서/.test(mean('대조')), '비교·대조는 설명 방법으로 — 사전의 비교(같은 점·다른 점)보다 좁은 교과서 쓰임 (Codex 50차 #3)');
+  assert.match(mean('서술어'), /어찌하다.*어떠하다.*무엇이다/, '서술어 세 꼴');
+  assert.ok(/지역/.test(mean('방언')) && !/지역에서만/.test(mean('방언')), '방언은 그 지역"만"이 아니다');
+  assert.match(mean('인물'), /사물/, '사람처럼 그려진 사물도 인물');
+  assert.match(mean('입에 침이 마르다'), /자랑/);
 });
 
 test('🔤 원고 검사가 잡는 것: 묶음 · 빈 낱말 · 뜻에 그 낱말 · 빈칸 수 · 빈칸 뒤 받침 조사 · 빈칸 밖에 그 낱말 · 🗣️ 빈칸·표현 그대로 · 짝이 없는 낱말 · 같은 낱말·뜻 · 4개 미만', () => {
@@ -119,7 +123,7 @@ test('🔤 문장마다 같이 들어갈 수 있는 말은 보기에 없다 — 
   const USE = {
     근거: ['의견', '사실', '주장'], 주장: ['주제', '중심 생각', '의견', '근거'], 의견: ['감상', '사실', '주장'], 사실: ['견문', '의견'],
     '중심 생각': ['주제', '요약'], 주제: ['중심 생각', '감상'], 인물: ['말하는 이', '사건', '배경'], 견문: ['여정', '감상'],
-    매체: ['출처'], 출처: ['매체', '신뢰성', '근거'], 신뢰성: ['출처'], 조정: ['요약'], 짐작: ['추론'], 추론: ['짐작'],
+    매체: ['출처'], 출처: ['매체', '신뢰성', '근거'], 신뢰성: ['출처'], 조정: ['요약', '토의'], 짐작: ['추론'], 추론: ['짐작'],
     비유: ['직유', '은유'], 직유: ['은유', '비유'], 은유: ['직유', '비유'], 토의: ['토론'], 토론: ['토의'], 표준어: ['방언'], 방언: ['표준어'],
     주어: ['서술어'], 서술어: ['주어'], 비교: ['대조'], 대조: ['비교'], 여정: ['견문'],
     '입이 무겁다': ['입이 가볍다'], '입이 가볍다': ['입이 무겁다'], '손을 떼다': ['발을 빼다'], '발을 빼다': ['손을 떼다'],
@@ -128,7 +132,7 @@ test('🔤 문장마다 같이 들어갈 수 있는 말은 보기에 없다 — 
     '발 벗고 나서다': ['손발이 맞다'], '귀가 얇다': ['귀를 기울이다'], '귀를 기울이다': ['귀가 얇다'],
   };
   // 뜻 고르기 — 넓은 말과 좁은 말(비유 ⊃ 직유·은유)·거의 같은 말은 뜻도 겹친다
-  const MEAN = { 비유: ['직유', '은유'], 직유: ['비유'], 은유: ['비유'], 짐작: ['추론'], 추론: ['짐작'], '중심 생각': ['주제'], 주제: ['중심 생각'], '손을 떼다': ['발을 빼다'], '발을 빼다': ['손을 떼다'] };
+  const MEAN = { 비유: ['직유', '은유'], 직유: ['비유'], 은유: ['비유'], 짐작: ['추론'], 추론: ['짐작'], '중심 생각': ['주제'], 주제: ['중심 생각'], '손을 떼다': ['발을 빼다'], '발을 빼다': ['손을 떼다'], 주장: ['의견'], 의견: ['주장'] };
   for (const w of ALL.filter((x) => x.deck !== 'passage')) {
     for (let s = 1; s <= 150; s++) {
       const u = makeQuestion(w, 'use', ALL, rng(s));
@@ -140,6 +144,15 @@ test('🔤 문장마다 같이 들어갈 수 있는 말은 보기에 없다 — 
       }
     }
   }
+});
+
+test('🔍 Codex 50차 #2: 빈칸에 다른 보기도 들어가던 문장을 고쳤다 — 옛 문장이 돌아오지 않게 · 바뀐 문장은 그 말의 뜻을 짚는다', () => {
+  const ex = (w) => ALL.find((x) => x.w === w).ex;
+  assert.ok(!ex('근거').includes("같은 ___도 함께 들어요") && ex('근거').includes('주장이 옳은 까닭인 ___'), '근거 ← 예시');
+  assert.ok(!ex('매체').includes('___에 따라 전하는') && ex('매체').includes('정보나 생각을 전하는 ___'), '매체 ← 인물·방언');
+  assert.ok(!ex('신뢰성').includes('믿을 만한지 ___까지') && ex('신뢰성').includes('___ 높은 정보'), '신뢰성 ← 근거·주장');
+  assert.ok(!ex('조정').includes('의견을 ___하는') && ex('조정').includes('하나로 맞추는 의견 ___'), '조정 ← 비교·분류·토의');
+  assert.ok(!ex('꼬리를 내리다').includes('강아지'), '꼬리를 내리다 ← 간이 콩알만 해지다(겁먹은 강아지)');
 });
 
 test('🔤 오늘의 낱말: 복습(기다린 지 오래·낮은 칸부터) 먼저 · 새 낱말은 묶음마다 번갈아 5개까지 · 한 번에 10개 · ⭐ 익힌 것·잠긴 📖은 안 나옴 · 새 낱말 더 배우기 · 칸 홀수 = 쓰임', () => {
@@ -226,7 +239,12 @@ test('🔤 판 끝 규칙: 맞히면 칸 +1(다음 날·3일·7일·14일 뒤) �
   assert.deepEqual(korWordsRule(q, [{ id, ok: true }], t + 86400000, IDS).mastered, [], '⭐는 한 번만 새로');
   // 틀리면 0·다음 날·틀린 수
   korWordsRule(q, [{ id, ok: false }], t, IDS);
-  assert.deepEqual([q.korWords[id].box, q.korWords[id].due, q.korWords[id].miss], [0, dayNum(t) + 1, 1]);
+  assert.equal(q.korWords[id].box, MASTER_BOX, '⭐ 익힌 낱말은 더 안 옮긴다 (Codex 50차 #4)');
+  // 틀리면 0·다음 날·틀린 수 — 익히는 중인 낱말
+  const id3 = ids[2];
+  korWordsRule(q, [{ id: id3, ok: true }], t, IDS);
+  korWordsRule(q, [{ id: id3, ok: false }], t + 86400000, IDS);
+  assert.deepEqual([q.korWords[id3].box, q.korWords[id3].due, q.korWords[id3].miss], [0, dayNum(t + 86400000) + 1, 1]);
   // 같은 낱말은 처음 것만 · 모르는 낱말 · 잠긴 📖
   const z = pf();
   const pw = ALL.find((w) => w.deck === 'passage');
@@ -250,6 +268,44 @@ test('🔤 판 끝 규칙: 맞히면 칸 +1(다음 날·3일·7일·14일 뒤) �
   assert.equal(korWordsRule(p, [{ id: ids[0], ok: true }], at(1), IDS).first, true);
 });
 
+test('🔍 Codex 50차 #4·#5·#8: 낡은 판(시작한 뒤 다른 판이 옮긴 낱말)은 연습 — 같은 판을 여러 번 저장해도 칸 하나 · ⭐는 낡은 오답으로 안 되돌아감 · 처음 배운 날은 이른 날로 합침 · 완전 동점도 차례 상관없이 · 앞날 기록이 꽉 차도 오늘 보상은 한 번', () => {
+  const plan = planToday(ALL, {}, {}, T0);
+  const round = (st) => plan.map((x) => ({ id: x.id, ok: true, from: (st[x.id] && st[x.id].at) || 0 }));
+  const p = pf();
+  const starts = [0, 1, 2, 3, 4].map(() => round(wordsOf(p.korWords))); // 다섯 창이 같은 판을 시작
+  starts.forEach((ans, i) => korWordsRule(p, ans, T0 + i * 1000, IDS));
+  for (const x of plan) assert.equal(p.korWords[x.id].box, 1, '하루 만에 ⭐까지 가지 않는다');
+  assert.equal(p.coins, WORD_COINS, '보상은 한 번');
+  // 이어서 푼 판(시작 때 상태가 지금과 같다)은 옮긴다
+  const st1 = wordsOf(p.korWords);
+  korWordsRule(p, round(st1), at(1), IDS);
+  assert.equal(p.korWords[plan[0].id].box, 2);
+  // ⭐ 익힌 낱말은 낡은 판의 오답으로 되돌아가지 않는다 · 맞춘 판의 오답도(더 안 나오는 낱말)
+  const q = pf({ korWords: { [plan[0].id]: { box: MASTER_BOX, due: 0, at: 500, miss: 0, d0: D0 - 30 } } });
+  korWordsRule(q, [{ id: plan[0].id, ok: false, from: 100 }], T0, IDS);
+  korWordsRule(q, [{ id: plan[0].id, ok: false, from: 500 }], T0, IDS);
+  assert.equal(q.korWords[plan[0].id].box, MASTER_BOX);
+  // 처음 배운 날 — 이긴 쪽(나중에 푼 쪽) 것이 아니라 이른 날
+  const today = D0;
+  const a = { w: { box: 1, due: today + 1, at: 100, miss: 0, d0: today } };
+  const b = { w: { box: 1, due: today + 2, at: 200, miss: 0, d0: today + 1 } };
+  assert.equal(mergeWords(a, b).w.d0, today);
+  assert.equal(mergeWords(b, a).w.d0, today);
+  assert.equal(mergeWords(a, b).w.due, today + 2, '칸·날은 나중에 푼 쪽');
+  const x = { w: { box: 1, due: 5, at: 9, miss: 0, d0: 3 } };
+  const y = { w: { box: 1, due: 5, at: 9, miss: 2, d0: 4 } };
+  assert.deepEqual(mergeWords(x, y), mergeWords(y, x), '완전 동점도 차례 상관없이');
+  // 앞날 기록 400개 + 오늘 — 두 번째 판은 보상 없음
+  const days = {};
+  for (let i = 1; i <= 400; i++) days[D0 + i] = 1;
+  const z = pf({ korWordDay: days });
+  const ids2 = ALL.filter((w) => w.deck === 'concept').slice(0, 2).map((w) => w.id);
+  assert.equal(korWordsRule(z, [{ id: ids2[0], ok: true }], T0, IDS).first, true);
+  assert.equal(korWordsRule(z, [{ id: ids2[1], ok: true }], T0 + 1000, IDS).first, false);
+  assert.equal(z.coins, WORD_COINS);
+  assert.equal(wordsToday(z.korWordDay, T0), 1);
+});
+
 test('🔤 고쳐 읽기·병합: 깨진 칸은 0으로 · 낱말마다 나중에 푼 쪽(차례 상관없이) · 보상 받은 날은 큰 쪽 · 프로필 병합·복사·빈 프로필', () => {
   assert.deepEqual(stateOf({ box: 9, due: -3, at: 'x', miss: 2.7, d0: 'z' }), { box: MASTER_BOX, due: 0, at: 0, miss: 2, d0: 0 });
   assert.deepEqual(wordsOf('bad'), {});
@@ -257,7 +313,7 @@ test('🔤 고쳐 읽기·병합: 깨진 칸은 0으로 · 낱말마다 나중�
   const a = { w1: { box: 3, due: 10, at: 200, miss: 0, d0: 1 }, w2: { box: 1, due: 5, at: 100, miss: 0, d0: 1 } };
   const b = { w1: { box: 0, due: 8, at: 100, miss: 1, d0: 1 }, w2: { box: 4, due: 20, at: 300, miss: 0, d0: 2 }, w3: { box: 1, due: 2, at: 1, miss: 0, d0: 2 } };
   assert.deepEqual(mergeWords(a, b), mergeWords(b, a), '차례 상관없이');
-  assert.deepEqual(mergeWords(a, b), { w1: a.w1, w2: b.w2, w3: b.w3 });
+  assert.deepEqual(mergeWords(a, b), { w1: a.w1, w2: { ...b.w2, d0: 1 }, w3: b.w3 }, '칸은 나중에 푼 쪽 · 처음 배운 날은 이른 날');
   assert.deepEqual(mergeWordDays({ 100: 1, 101: 2 }, { 100: 2, 102: 1, x: 2 }), { 100: 2, 101: 2, 102: 1 });
   assert.deepEqual(wordDaysOf({ 100: 7, 101: 0 }), { 100: 2 });
   assert.deepEqual([emptyProfile().korWords, emptyProfile().korWordDay], [{}, {}]);
@@ -290,14 +346,14 @@ test('★ 🔤 저장 경로: 판을 끝내면 낱말 칸·💰·🎯가 저장�
   const bad = await korWordsFinish(ids.map((id) => ({ id, ok: true })), IDS);
   assert.equal(bad.ok, false);
   assert.deepEqual([stored().coins, Object.keys(stored().korWords || {}).length], [0, 0], '저장 실패 = 없던 일');
-  const [x, y] = await Promise.all([korWordsFinish(ids.map((id) => ({ id, ok: true })), IDS), korWordsFinish(ids.map((id) => ({ id, ok: true })), IDS)]);
+  const [x, y] = await Promise.all([korWordsFinish(ids.map((id) => ({ id, ok: true, from: 0 })), IDS), korWordsFinish(ids.map((id) => ({ id, ok: true, from: 0 })), IDS)]);
   assert.ok(x.ok && y.ok);
   assert.deepEqual([x.first, y.first].sort(), [false, true], '첫 판 보상은 한 번');
   const s = stored();
   assert.deepEqual([s.coins, s.korThrow.earned, (s.items || {}).stone_korean], [WORD_COINS, 1, 1]);
-  assert.equal(s.korWords[ids[0]].box, 2, '두 판 다 칸은 옮김(같은 날 두 번 맞힘)');
+  assert.equal(s.korWords[ids[0]].box, 1, '두 창이 같은 판을 저장해도 칸은 하나 — 나중 판은 연습 (Codex 50차 #4)');
   await reloadProfile();
-  assert.equal(korWordsMap()[ids[0]].box, 2);
+  assert.equal(korWordsMap()[ids[0]].box, 1);
   assert.ok(Object.values(korWordDayMap()).includes(2));
   assert.equal(korThrowsLeft(), 1);
   // 실제로 houseDo(트랜잭션)를 거친다
@@ -346,6 +402,12 @@ test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘) · 낱말 판 중엔 
   assert.ok(kt.includes("const start = (extra) => guardStart('korean', () => startSession(ctx, extra));"), '⏳ 시간이 끝나면 새 판을 막는다');
   assert.ok(kt.includes("b.addEventListener('click', () => guardStart('korean', () => ctx.openCard(c.id)));"), '단원에서 글을 열 때도');
   assert.ok(kt.includes('if (!ws.first.has(it.id)) ws.first.set(it.id, ok);'), '판정은 처음 고른 것');
+  assert.ok(kt.includes("const answers = [...ws.first.entries()].map(([id, ok]) => ({ id, ok, from: ws.from.get(id) || 0 }));"), '시작 때 상태를 같이 (50차 #4)');
+  assert.ok(kt.includes('  if (ws.i < n && !ws.saving) {'), '저장이 시작되면 그만하기 없음 (50차 #6)');
+  const fin = kt.slice(kt.indexOf('async function finishSession(ctx) {'), kt.indexOf('/** 판을 끝낸 말 (순수)'));
+  const between = fin.slice(fin.indexOf('res = await korWordsFinish('), fin.indexOf('const egg = await ctx.tickKorDay();'));
+  assert.ok(between.length > 0 && !/\breturn\b/.test(between), '🥚 칸은 화면이 바뀌어도 — 저장과 알 칸 사이에 빠져나가는 길이 없다');
+  assert.ok(kt.includes("top.appendChild(el('span', 'kor-q-no', `문제 ${Math.min(ws.i + 1, n)} / ${n}`));"), '문제 수 (50차 #9)');
   assert.ok(kt.includes('const egg = await ctx.tickKorDay();'), '🥚 낱말을 끝낸 날');
   assert.ok(kt.includes('res = await korWordsFinish(answers, (S.all || []).map((w) => w.id));'));
   const { wordsFinishText, todayLine } = await import('../js/kortabs.js');
@@ -355,7 +417,7 @@ test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘) · 낱말 판 중엔 
   assert.equal(wordsFinishText({ ok: true, first: false, coins: 0, stone: 0, n: 3, okN: 2, mastered: [] }).title, '🔤 낱말 연습 끝!');
   assert.match(wordsFinishText({ ok: true, first: false, n: 3, okN: 2, mastered: [] }).lines[1], /이미 받았어요/);
   assert.equal(wordsFinishText({ ok: false, why: 'save' }).title, '저장이 안 됐어요');
-  assert.match(todayLine(0), /💰10 · 🎯 국어 포켓몬 잡기 1번 · 5개 이상을 모두 한 번에/);
+  assert.match(todayLine(0), /💰10 · 🎯 국어 포켓몬 잡기 1번 · 낱말 5개 이상을 모두 한 번에/);
   assert.match(todayLine(2), /🟩까지/);
   const sw = read('sw.js');
   for (const f of ['./js/korwords.js', './js/korunits.js', './js/kortabs.js', './coach/korean/words.json', './coach/korean/units.json']) assert.ok(sw.includes(`'${f}',`), f);

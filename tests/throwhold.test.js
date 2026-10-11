@@ -237,7 +237,7 @@ test('🎯 화면 연결: 📚 국어·🔢 수학 잡기가 장부를 쓴다 �
   assert.ok(!/korGiveBackThrow\(\)\.catch/.test(kv), '저장 결과를 안 보는 돌려주기가 남지 않았다');
   assert.ok(body(kv, 'async function korGiveBack() {').includes('return refundOutcome(await korGiveBackThrow());'));
   assert.ok(body(kv, 'function settleLostCatch() {').includes('return st.hold.refund(korGiveBack).then((ok) => { if (!ok) ui.catchMsg = CATCH_WHY.owed; refreshAfterCatch(); });'));
-  assert.ok(body(kv, 'export async function enterKorean() {').includes('settleKorThrows();'), '국어에 들어올 때 정리');
+  assert.ok(body(kv, 'export async function enterKorean() {').includes('.then(() => settleKorThrows());'), '국어에 들어올 때 정리 — 소식 없이 닫힌 창 다음에');
   assert.match(kv, /const holds = holdStore\('shincoach\.korean\.throwHolds'\);/);
   // 수학 — 같은 모양 (Codex 49차: 국어만 본 틈이 수학에도)
   const m = read('js/math.js');
@@ -250,7 +250,8 @@ test('🎯 화면 연결: 📚 국어·🔢 수학 잡기가 장부를 쓴다 �
   assert.ok(rc.includes("stop(back ? 'error' : 'errorOwed');"));
   const iLost = rc.indexOf('await settleLostMathCatch();');
   assert.ok(iLost >= 0 && iLost < rc.indexOf('if (ui.catching) return;'), '소식 없이 닫힌 창부터 정리');
-  assert.ok(body(m, 'export async function renderMath() {').includes('  settleLostMathCatch(); //'), '수학에 들어올 때도');
+  assert.ok(body(m, 'export async function renderMath() {').includes('  await Promise.resolve(settleLostMathCatch()).catch(() => {});'), '수학에 들어올 때도 — 장부 정리보다 먼저');
+  assert.ok(read('js/koreanview.js').includes('Promise.resolve(settleLostCatch()).catch(() => {}).then(() => settleKorThrows());'), '국어도 차례대로 (50차 #1)');
   assert.ok(body(m, 'function settleLostMathCatch() {').includes('return st.threw ? null : st.hold.refund(mathGiveBack);'));
   assert.ok(body(m, 'async function mathGiveBack() {').includes("return 'ok'; } catch { return 'fail'; }"));
   const rm = body(m, 'export async function renderMath() {');
@@ -258,4 +259,34 @@ test('🎯 화면 연결: 📚 국어·🔢 수학 잡기가 장부를 쓴다 �
   assert.ok(!m.includes('settleOwedThrows'), '옛 정리는 새 정리 안으로');
   // sw
   assert.match(read('sw.js'), /'\.\/js\/throwhold\.js',/);
+});
+
+test('★ 🔍 Codex 50차 #1: 돌려주는 저장을 기다리는 동안 같은 창의 정리가 그 줄을 또 돌려주지 않는다 · 끝난 뒤 실패면 다음 정리가', async () => {
+  const ls = fakeLs();
+  const c = fakeClock();
+  const h = holdStore('k', { ls, page: 'tab1', now: c.now, timers: c.timers });
+  let refunded = 0;
+  let release;
+  const slow = () => new Promise((res) => { release = (r) => { if (r === 'ok') refunded++; res(r); }; });
+  const t = h.track('ra');
+  const p = t.refund(slow); // 저장을 기다리는 중
+  await Promise.resolve();
+  const g = giver('ok');
+  assert.equal(await h.settle(g), 0, '쓰는 중인 줄 — 정리가 건드리지 않는다');
+  assert.equal(g.calls, 0);
+  assert.equal(c.live(), 1, '기다리는 동안 beat도 그대로');
+  release('ok');
+  assert.equal(await p, true);
+  assert.equal(refunded, 1, '돌려준 것은 한 번');
+  assert.deepEqual(h.list(), {});
+  // 실패면 끝난 뒤에 풀려 다음 정리가 돌려준다
+  const t2 = h.track('rb');
+  const p2 = t2.refund(slow);
+  await Promise.resolve();
+  release('fail');
+  assert.equal(await p2, false);
+  assert.equal(c.live(), 0);
+  const g2 = giver('ok');
+  assert.equal(await h.settle(g2), 1);
+  assert.equal(g2.calls, 1);
 });

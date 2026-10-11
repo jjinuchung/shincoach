@@ -97,8 +97,8 @@ async function loadCards() {
 /** 📚 국어 화면에 들어올 때 (app.showView) — 읽던 글이 있으면 그대로(🎒·📊에서 돌아옴), 아니면 도감 */
 export async function enterKorean() {
   topUpKorChars(); // 🎯 국어 포켓몬 그림을 조금씩 먼저
-  settleLostCatch();
-  settleKorThrows(); // 🎯 지난번에 뺐는데 판정 전에 꺼진 기회·돌려주다 실패한 기회 (Codex 49차 #1·#2)
+  // 🎯 소식 없이 닫힌 창부터 정리한 뒤 장부 정리 — 지난번에 뺐는데 판정 전에 꺼진 기회·돌려주다 실패한 기회 (Codex 49차 #1·#2 · 50차 #1 차례대로)
+  Promise.resolve(settleLostCatch()).catch(() => {}).then(() => settleKorThrows());
   if (ui.read) { if (!$('korean-main').querySelector('.kor-read')) renderRead(); return; }
   if (tabs.inSession()) { tabs.renderSession(tabCtx); return; } // 🔤 낱말을 풀다 🎒·📊를 다녀왔다 — 그대로 이어서
   await renderList();

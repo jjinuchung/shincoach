@@ -21,7 +21,8 @@ const el = (tag, cls, text) => {
 };
 
 // wordsData·unitsData: 받은 원고 · all: 모든 낱말(📖 포함 — 카드가 바뀌면 다시) · ws: 지금 푸는 판
-const S = { wordsData: null, unitsData: null, all: null, allFor: null, loadErr: '', ws: null };
+const S = { wordsData: null, unitsData: null, all: null, allFor: null, loadErr: '', ws: null, live: null };
+// live = 읽어 주기 알림 한 칸 — 다시 그려도 같은 칸을 옮겨 단다(새로 만든 칸은 읽어 주지 않을 수 있다, Codex 50차 #9)
 
 async function fetchJson(url) {
   const res = await fetch(url);
@@ -63,7 +64,7 @@ export function inSession() {
 export function todayLine(today) {
   if (today >= 2) return '오늘의 낱말 끝 ✅ 🟩까지 받았어요';
   if (today === 1) return '오늘의 낱말 끝 ✅ — 더 해도 복습 날짜는 그대로 쌓여요';
-  return `오늘 처음 끝내면 💰${WORD_COINS} · 🎯 국어 포켓몬 잡기 1번 · ${PERFECT_MIN}개 이상을 모두 한 번에 맞히면 🟩 국어스톤`;
+  return `오늘 처음 끝내면 💰${WORD_COINS} · 🎯 국어 포켓몬 잡기 1번 · 낱말 ${PERFECT_MIN}개 이상을 모두 한 번에 맞히면 🟩 국어스톤`;
 }
 
 export async function renderWordsTab(box, ctx) {
@@ -135,7 +136,10 @@ function startSession(ctx, extra) {
   if (!S.all) return;
   sfxUnlock();
   const byId = new Map(S.all.map((w) => [w.id, w]));
-  const plan = planToday(S.all, korWordsMap(), korDoneMap(), Date.now(), extra);
+  const states = korWordsMap();
+  const plan = planToday(S.all, states, korDoneMap(), Date.now(), extra);
+  // 판을 시작할 때 낱말마다 마지막으로 푼 때 — 저장할 때 그 사이 다른 판이 옮겼으면 연습으로 (Codex 50차 #4)
+  const from = new Map(plan.map((x) => [x.id, (states[x.id] && states[x.id].at) || 0]));
   const items = [];
   for (const p of plan) {
     const w = byId.get(p.id);
@@ -143,7 +147,7 @@ function startSession(ctx, extra) {
     if (q) items.push({ id: p.id, kind: q.kind, q, retry: false });
   }
   if (!items.length) { ctx.rerender(); return; }
-  S.ws = { items, i: 0, first: new Map(), picked: null, result: null, saving: false, egg: null, quitAsk: false, focus: 'opt' };
+  S.ws = { items, i: 0, first: new Map(), from, picked: null, result: null, saving: false, egg: null, quitAsk: false, focus: 'opt' };
   renderSession(ctx);
   window.scrollTo(0, 0);
 }
@@ -183,26 +187,35 @@ export function renderSession(ctx) {
   const wrap = el('section', 'kor-wsess');
   const top = el('div', 'kor-wtop');
   const n = ws.items.length;
-  if (ws.i < n || !ws.result) {
+  if (ws.i < n && !ws.saving) {
     const quit = el('button', 'btn btn-small kor-wquit', ws.quitAsk ? '정말 그만할까요? (푼 것은 저장 안 돼요)' : '← 그만하기');
     quit.type = 'button';
     quit.addEventListener('click', () => {
       if (!ws.first.size || ws.quitAsk) { S.ws = null; ctx.toWords(); return; }
       ws.quitAsk = true;
+      ws.focus = 'quit';
       renderSession(ctx);
     });
     top.appendChild(quit);
   }
-  top.appendChild(el('span', 'kor-q-no', `낱말 ${Math.min(ws.i + 1, n)} / ${n}`));
+  // 문제 수 — 틀린 낱말이 끝에 한 번 더 나오면 늘어난다("낱말 2 / 6"은 낱말 수와 헷갈렸다, Codex 50차 #9)
+  top.appendChild(el('span', 'kor-q-no', `문제 ${Math.min(ws.i + 1, n)} / ${n}`));
   wrap.appendChild(top);
-  const live = el('p', 'kor-live');
-  live.setAttribute('aria-live', 'polite');
+  if (!S.live) { S.live = el('p', 'kor-live'); S.live.setAttribute('aria-live', 'polite'); }
+  const live = S.live;
   if (ws.i >= n) {
     const done = finishEl(ctx);
     wrap.appendChild(done);
-    live.textContent = (done.querySelector('.kor-done-title') || {}).textContent || '';
     wrap.appendChild(live);
     main.appendChild(wrap);
+    live.textContent = (done.querySelector('.kor-done-title') || {}).textContent || '';
+    // 끝내기 단추가 사라져 초점을 잃지 않게 — 끝 카드 제목으로
+    const t = done.querySelector('.kor-done-title');
+    if (t && ws.focus && ws.result) { // 저장하는 중 카드는 곧 바뀐다 — 결과 카드가 나오면 그 제목으로
+      t.setAttribute('tabindex', '-1');
+      try { t.focus({ preventScroll: true }); } catch { /* 초점은 없어도 */ }
+      ws.focus = '';
+    }
     return;
   }
   const it = ws.items[ws.i];
@@ -240,13 +253,13 @@ export function renderSession(ctx) {
     next.addEventListener('click', () => nextItem(ctx));
     card.appendChild(next);
   } else card.appendChild(fb);
-  live.textContent = fb.textContent;
   wrap.appendChild(card);
   wrap.appendChild(live);
   main.appendChild(wrap);
+  live.textContent = fb.textContent;
   const focusTo = ws.focus;
   ws.focus = '';
-  const t = focusTo === 'next' ? card.querySelector('.kor-next') : focusTo === 'opt' ? card.querySelector('.kor-opt:not(:disabled)') : null;
+  const t = focusTo === 'next' ? card.querySelector('.kor-next') : focusTo === 'opt' ? card.querySelector('.kor-opt:not(:disabled)') : focusTo === 'quit' ? wrap.querySelector('.kor-wquit') : null;
   if (t) { try { t.focus({ preventScroll: true }); } catch { /* 초점은 없어도 */ } }
 }
 
@@ -274,7 +287,7 @@ function nextItem(ctx) {
   ws.i++;
   ws.picked = null;
   ws.focus = 'opt';
-  if (ws.i >= ws.items.length) { finishSession(ctx); return; }
+  if (ws.i >= ws.items.length) { ws.focus = 'done'; finishSession(ctx); return; }
   renderSession(ctx);
   window.scrollTo(0, 0);
 }
@@ -285,15 +298,17 @@ async function finishSession(ctx) {
   ws.saving = true;
   ws.result = null;
   renderSession(ctx);
-  const answers = [...ws.first.entries()].map(([id, ok]) => ({ id, ok }));
+  const answers = [...ws.first.entries()].map(([id, ok]) => ({ id, ok, from: ws.from.get(id) || 0 }));
   let res;
   try { res = await korWordsFinish(answers, (S.all || []).map((w) => w.id)); } catch { res = { ok: false, why: 'save' }; }
-  if (S.ws !== ws) return; // 그 사이 그만두었다
-  ws.saving = false;
-  ws.result = res;
-  renderSession(ctx);
+  const live = S.ws === ws; // 저장 중엔 그만두기를 숨기지만 — 화면이 바뀌었어도 🥚 칸은 채운다 (Codex 50차 #6)
+  if (live) {
+    ws.saving = false;
+    ws.result = res;
+    renderSession(ctx);
+  }
   if (res && res.ok) {
-    if (res.stone || (res.mastered && res.mastered.length)) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
+    if (live && (res.stone || (res.mastered && res.mastered.length))) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
     const egg = await ctx.tickKorDay(); // 🥚 오늘의 낱말을 끝낸 날 = 국어 알 하루 칸
     if (S.ws === ws && egg && egg.ok) { ws.egg = egg; renderSession(ctx); }
   }
