@@ -1,7 +1,8 @@
 """청각장애인용(SDH) 영어 자막 → 따라 말하기용 영어 SRT
 
 사용:
-    python tools/sdh_clean.py ocr.srt 출력.en.srt [--fix 고칠목록.tsv] [--known 기존1.en.srt 기존2.en.srt ...]
+    python tools/sdh_clean.py ocr.srt 출력.en.srt [--fix 고칠목록.tsv] [--text] [--known 기존1.en.srt 기존2.en.srt ...]
+    --text: 처음부터 글자인 자막(mkv 안 SRT, 스폰지밥 2026-10-11) — OCR 고치기는 건너뛰고 [소리 설명]·♪만 다듬는다
 
 하는 일:
   · [bell ringing] [student 1] 같은 소리 설명·화자 이름표를 뺀다 (줄을 넘어가도, 닫는 괄호를 잘못 읽어도)
@@ -57,9 +58,29 @@ def fix_ocr(line):
     line = re.sub(r"(?<![A-Za-z'])l(?![A-Za-z'])", "I", line)          # 홀로 선 l → I
     line = re.sub(r"\bls\b", "Is", line)                               # ls → Is
     line = re.sub(r"\bI Know\b", "I know", line)                       # 기울임 k를 대문자로 읽음
-    line = re.sub(r"\b([Yy]ou|[Tt]hey|[Ww]e)re\b", r"\1're", line)     # youre → you're (아포스트로피 빠짐)
-    line = re.sub(r"(?<=[a-z])'\?$", "?", line)                        # life'? → life?
+    # youre → you're (아포스트로피 빠짐) — ★ "were"는 진짜 낱말이라 we는 빼야 한다
+    #   (2026-10-11 스폰지밥에서 찾음: "you were" → "you we're" — 호퍼스 자막에도 "they we're"가 들어갔다)
+    line = re.sub(r"\b([Yy]ou|[Tt]hey)re\b", r"\1're", line)
+    line = re.sub(r"(?<=[a-z])(?<!in)'\?$", "?", line)                 # life'? → life? (doin'? · comin'?은 그대로)
     return line
+
+
+def clean_text(text):
+    """--text: 처음부터 글자인 자막(mkv 안 SRT) — OCR 고치기 없이 소리 설명만 빼고 ♪만 다듬는다
+    (OCR 규칙을 글자 자막에 쓰면 진짜 낱말을 망친다 — "were" → "we're", "doin'?" → "doin?")"""
+    text = TAG.sub("", text)
+    lines = []
+    for raw in text.split("\n"):
+        ln = raw.strip().replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
+        ln = re.sub(r"^(-\s*)?♪\s*", lambda m: (m.group(1) or "") + "♪ ", ln)  # "♪Hurry" → "♪ Hurry"
+        ln = re.sub(r"\s*♪$", " ♪", ln) if ln != "♪" and not re.fullmatch(r"-?\s*♪", ln) else ln
+        if re.search(r"[A-Za-z0-9]", ln):
+            lines.append(ln)
+    if not lines:
+        return ""
+    if any(re.match(r"^(-\s*)?♪", x) for x in lines) and not lines[-1].endswith("♪"):
+        lines[-1] += " ♪"  # 가사를 연 조각은 끝에서 닫는다 — 기존 자막과 같은 "♪ 가사 ♪"
+    return "\n".join(lines)
 
 
 def clean(text):
@@ -119,6 +140,9 @@ def main():
         k = args.index("--known")
         known_paths = args[k + 1:]
         args = args[:k]
+    text_mode = "--text" in args
+    if text_mode:
+        args = [a for a in args if a != "--text"]
     fixes = {}
     if "--fix" in args:
         k = args.index("--fix")
@@ -133,7 +157,7 @@ def main():
             used.add(n)
             t = "" if fixes[n] == "DROP" else fixes[n]
         else:
-            t = clean(text)
+            t = clean_text(text) if text_mode else clean(text)
         if t:
             out.append((start, end, t, n))
         else:
