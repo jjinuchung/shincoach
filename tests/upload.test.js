@@ -132,8 +132,8 @@ test('📤 화면 연결 — 홈으로 올 때·앱을 내릴 때 저절로 · �
   assert.match(s, /input\.type = 'password';/, '열쇠가 화면에 그대로 안 보인다');
   const u = src('js/upload.js');
   assert.match(u, /localStorage\.setItem\(TOKEN_KEY, t\)/, '열쇠는 이 기기에만');
-  assert.match(u, /if \(running\) return running;/, '두 번 눌러도·겹쳐도 한 번');
-  assert.match(u, /\}\)\(\)\.finally\(\(\) => \{ running = null; \}\);/, '끝나면 반드시 풀린다 (껐다 켜야 낫는 전역 플래그가 되지 않게)');
+  assert.match(u, /const sendQueue = serialSender\(\(force\) => withUploadLock\(\(\) => sendOnce\(force\)\)/, '두 번 눌러도·겹쳐도 한 번 · 다른 창과도 한 번에 하나 (아래 Codex 52차 테스트)');
+  assert.match(u, /running = Promise\.resolve\(\)\.then\(\(\) => run\(force\)\)\.finally\(\(\) => \{ running = null; \}\);/, '끝나면 반드시 풀린다 (껐다 켜야 낫는 전역 플래그가 되지 않게)');
   assert.ok(src('sw.js').includes("'./js/upload.js'"), '앱 셸');
   // ★ 공개 저장소에 열쇠가 들어가면 누구나 진우 기록을 읽고 쓴다 — js·tests·tools·index.html 어디에도 진짜 열쇠 모양이 없다
   for (const dir of ['js', 'tests', 'tools']) {
@@ -280,4 +280,117 @@ test('📥 화면 연결 — 아빠 교정(db.syncCoachFixes)·❓ 답장(math.s
   assert.ok(!fs.existsSync(new URL('../coach/fixes.json', import.meta.url)), '공개 저장소에 coach/fixes.json이 없다');
   assert.ok(!fs.existsSync(new URL('../coach/math/replies.json', import.meta.url)), '공개 저장소에 coach/math/replies.json이 없다');
   assert.match(src('tools/check.mjs'), /coach\/fixes\.json.*coach\/math\/replies\.json|PUBLIC_PRIVATE/, '검사가 다시 생기는 것을 막는다');
+});
+
+// ───────── 🔍 Codex 52차 #1·#5 (v239) — 한 번에 하나씩 올리기 · 겹치면 새로 만들어 다시 · 받는 파일 크기 상한 · 📊 받은 수 ─────────
+const tick = () => new Promise((r) => setImmediate(r));
+
+test('🔍 Codex 52차 #1 — 같은 창: 보내는 중에 "지금 보내기"가 또 오면 끝난 뒤 force로 한 번 더(여러 번 와도 한 번) · 저절로 보내기는 같은 약속 · 실패해도 풀림', async () => {
+  const runs = [];
+  const send = UP.serialSender((force) => new Promise((res, rej) => runs.push({ force, res, rej })));
+  const a = send();
+  await tick();
+  assert.equal(runs.length, 1);
+  assert.equal(send(), a, '저절로 보내기는 같은 약속');
+  const f1 = send({ force: true });
+  const f2 = send({ force: true });
+  assert.equal(f1, f2, '여러 번 와도 한 번 더');
+  assert.notEqual(f1, a, '전엔 보내는 중의 약속을 그대로 돌려줘 그 사이 저장한 글이 빠졌다');
+  runs[0].res({ ok: true, n: 1 });
+  assert.deepEqual(await a, { ok: true, n: 1 });
+  await tick();
+  assert.deepEqual([runs.length, runs[1].force], [2, true], '끝난 뒤 force로 한 번 더');
+  runs[1].res({ ok: true, n: 2 });
+  assert.deepEqual(await f1, { ok: true, n: 2 }, '"지금 보내기"는 그 사이 저장한 것까지 올린 결과를 받는다');
+  const b = send();
+  await tick();
+  runs[2].rej(new Error('x'));
+  await assert.rejects(b);
+  const c = send();
+  await tick();
+  assert.equal(runs.length, 4, '실패 뒤에도 다음 보내기가 돈다 (전역 플래그가 남지 않는다)');
+  runs[3].res({ ok: true });
+  await c;
+  const d = send();
+  const e = send({ force: true });
+  await tick();
+  runs[4].rej(new Error('y'));
+  await assert.rejects(d);
+  await tick();
+  runs[5].res({ ok: true, n: 6 });
+  assert.deepEqual(await e, { ok: true, n: 6 }, '앞 보내기가 실패해도 한 번 더는 돈다');
+});
+
+test('🔍 Codex 52차 #1 — 다른 창과 한 번에 하나씩(Web Locks) · 없으면 그냥 · 두 창이 엇갈려도 마지막에 올라간 것이 가장 새 목록', async () => {
+  assert.equal(await UP.withUploadLock(async () => 7, null), 7, 'Web Locks가 없으면 그냥');
+  const fakeLocks = () => {
+    let tail = Promise.resolve();
+    const names = [];
+    return { names, request(name, opts, fn) { names.push(name); const p = tail.then(() => fn()); tail = p.catch(() => {}); return p; } };
+  };
+  // 두 창(A 느림 · B 빠름)이 같은 프로필(IndexedDB)을 보고 같은 원격 파일에 올린다
+  const race = async (locks) => {
+    const profile = [];
+    const remote = { puts: [] };
+    const win = (delay) => UP.serialSender(() => UP.withUploadLock(async () => {
+      const snap = JSON.stringify(profile); // 모으기
+      for (let i = 0; i < delay; i++) await tick();
+      remote.puts.push(snap); // 올리기
+      return { ok: true };
+    }, locks));
+    const A = win(4);
+    const B = win(1);
+    const pa = A({ force: true });
+    await tick();
+    profile.push('새 글'); // A가 모은 뒤 B 창에서 글을 저장하고 바로 보낸다
+    const pb = B({ force: true });
+    await Promise.all([pa, pb]);
+    return remote.puts[remote.puts.length - 1];
+  };
+  assert.equal(await race(null), '[]', '기준: 한 번에 하나씩이 아니면 느린 A의 옛 목록이 마지막에 덮는다');
+  const locks = fakeLocks();
+  assert.equal(await race(locks), '["새 글"]', '한 번에 하나씩이면 B는 A가 끝난 뒤 모아 올린다');
+  assert.deepEqual([...new Set(locks.names)], ['shincoach-upload']);
+});
+
+test('🔍 Codex 52차 #1 — 겹쳐서(409) 다시 올릴 때 글을 새로 만든다 · 옛 빈 목록을 새 sha로 다시 올리지 않는다', async () => {
+  const gh = fakeGitHub({ files: { 'korean/todo.json': { sha: 'a', text: '[]' } }, conflictOnce: true });
+  const made = ['[]', '[{"card":"K1"}]'];
+  let n = 0;
+  await putFile({ fetchFn: gh.fetchFn, token: 't', path: 'korean/todo.json', text: async () => made[Math.min(n++, 1)], message: 'm' });
+  assert.equal(n, 2, '다시 올릴 때 다시 만든다');
+  assert.equal(gh.files['korean/todo.json'].text, '[{"card":"K1"}]', '전엔 처음 만든 [] 를 새 sha로 올려 새 목록을 지웠다');
+  const g2 = fakeGitHub();
+  await putFile({ fetchFn: g2.fetchFn, token: 't', path: 'math/x.md', text: '글 그대로', message: 'm' });
+  assert.equal(g2.files['math/x.md'].text, '글 그대로', '글(문자열)도 그대로 받는다');
+});
+
+test('🔍 Codex 52차 #5 — 받는 파일 크기 상한(풀기 전에 · 풀고 나서도) · 📊 줄에 받지 않은 줄·맞는 글 없음·너무 많음', async () => {
+  const mem = {};
+  const store = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
+  const o = (fetchFn) => ({ fetchFn, token: 'tok', store, now: () => 5 });
+  let decoded = 0;
+  const huge = async () => ({ status: 200, json: async () => ({ size: UP.PRIVATE_MAX_BYTES + 1, get content() { decoded++; return ''; } }) });
+  assert.deepEqual(await UP.readPrivateList('korean/replies.json', o(huge)), []);
+  assert.equal(decoded, 0, '크기를 보고 풀지 않는다');
+  assert.match(UP.readState(store)['korean/replies.json'].why, /너무 커요/);
+  const big = '[' + '0,'.repeat(UP.PRIVATE_MAX_BYTES / 2) + '0]';
+  // ★ 길이로 비교 — 50만 칸 배열을 deepEqual로 비교하면 실패할 때 차이를 그리느라 14 GB까지 먹는다(v239 변이에서)
+  assert.equal((await UP.readPrivateList('korean/replies.json', o(fakeRead({ 'korean/replies.json': big }).fetchFn))).length, 0, '크기 칸이 없어도 푼 글이 크면');
+  assert.match(UP.readState(store)['korean/replies.json'].why, /너무 커요/);
+  // 받은 수 붙이기 — 받은 뒤(ok)에만
+  const rows = [{ a: 1 }, { a: 2 }, { a: 3 }];
+  await UP.readPrivateList('korean/replies.json', o(fakeRead({ 'korean/replies.json': JSON.stringify(rows) }).fetchFn));
+  UP.noteReadCheck('korean/replies.json', { rows: 3, bad: 1, none: 1, over: false }, store);
+  const fmt = () => 't';
+  assert.match(UP.readSummary(UP.readState(store), fmt), /📚 국어 답장 ⚠️ t \(3개 — 받지 않은 줄 1 · 맞는 글 없음 1 · Claude에게 "국어 답장 확인해 줘"\)/);
+  UP.noteReadCheck('korean/replies.json', { rows: 3, bad: 0, none: 0, over: false }, store);
+  assert.match(UP.readSummary(UP.readState(store), fmt), /📚 국어 답장 ✅ t \(3개\)/);
+  UP.noteReadCheck('korean/replies.json', { rows: 600, bad: 600, none: 0, over: true }, store);
+  assert.match(UP.readSummary(UP.readState(store), fmt), /📚 국어 답장 ❌ t 답장이 너무 많아\(600줄\) 하나도 안 받았어요/);
+  await UP.readPrivateList('math/replies.json', o(fakeRead({}, 401).fetchFn));
+  const before = JSON.stringify(UP.readState(store)['math/replies.json']);
+  UP.noteReadCheck('math/replies.json', { rows: 1, bad: 1, none: 0, over: false }, store);
+  assert.equal(JSON.stringify(UP.readState(store)['math/replies.json']), before, '못 받은 파일에는 붙이지 않는다');
+  assert.ok(!JSON.stringify(UP.readState(store)).includes('"text"'), '받은 수에 글은 없다');
 });

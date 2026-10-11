@@ -14,7 +14,9 @@
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
 //           essay/fixes.json (✍️ 아빠 교정 — Claude가 essay/todo.json을 보고 날짜·글·교정을 적는다)
 //           math/replies.json (❓ 아빠 답장 [{ no, text }]) — 같은 열쇠로 읽는다, 배포가 필요 없다
-//           korean/replies.json (✍️ 국어 서술형 답장 [{ card, at, grade, text }] — korwrite.checkReplies가 칸마다 검사, v237)
+//           korean/replies.json (✍️ 국어 서술형 답장 [{ card, id, at, grade, text }] — korwrite.checkReplies가 칸마다 검사, v237 · id는 v239)
+// 한 번에 하나씩 (Codex 52차 #1): 같은 창은 serialSender(보내는 중에 "지금 보내기"가 또 오면 끝난 뒤 한 번 더) ·
+//   다른 창(같은 주소)은 Web Locks(withUploadLock) · 국어 목록은 올리는 순간마다 다시 만든다(겹쳐서 다시 올릴 때도 — 옛 목록으로 덮지 않게)
 
 export const DATA_REPO = 'jjinuchung/shincoach-data';
 export const PRIVATE_FIXES = 'essay/fixes.json';
@@ -22,6 +24,8 @@ export const PRIVATE_REPLIES = 'math/replies.json';
 export const PRIVATE_KOR_REPLIES = 'korean/replies.json';
 export const DATA_BRANCH = 'main';
 export const AUTO_GAP_MS = 10 * 60 * 1000;
+/** 📥 받는 파일 크기 상한 — 넘으면 풀지도 읽지도 않는다 (GitHub contents API도 1 MB 넘으면 내용을 안 준다, Codex 52차 #5) */
+export const PRIVATE_MAX_BYTES = 1000 * 1000;
 const TOKEN_KEY = 'shincoach.dataToken';
 const STATE_KEY = 'shincoach.dataUpload';
 const READ_KEY = 'shincoach.dataRead'; // 📥 받기 결과 (파일마다) — Codex 36차 #4
@@ -62,15 +66,15 @@ export function essayFiles(todo, today) {
 }
 
 /**
- * ✍️ 국어 서술형 — 답장 기다리는 글 (순수) — korwrite.writeTodo 목록 그대로. Claude는 card·at을 그대로 korean/replies.json에 적는다.
+ * ✍️ 국어 서술형 — 답장 기다리는 글 (순수) — korwrite.writeTodo 목록 그대로. Claude는 card·id·at을 그대로 korean/replies.json에 적는다.
  * 하나도 없어도 빈 목록을 올린다 (다 답장한 뒤에도 옛 목록이 남아 있지 않게 — Codex 51차 PART 3 #6)
- * @param {Array<{card,title,q,v,at,date,text,before?:Array}>} todo
+ * @param {Array<{card,id,title,q,v,at,date,text,before?:Array}>} todo
  */
 export function koreanFiles(todo, today) {
   const list = Array.isArray(todo) ? todo : [];
-  const lines = [`✍️ 진우가 쓴 국어 서술형 — 답장 기다리는 글 ${list.length}개 (${today}) · 답장은 korean/replies.json에 { card, at, grade(ok·near·again), text }`, ''];
+  const lines = [`✍️ 진우가 쓴 국어 서술형 — 답장 기다리는 글 ${list.length}개 (${today}) · 답장은 korean/replies.json에 { card, id, at, grade(ok·near·again), text } (card·id·at은 아래 그대로)`, ''];
   for (const e of list) {
-    lines.push(`[${e.card} · at ${e.at}] ${e.date} 「${e.title}」 · 채점 기준 v${e.v}`);
+    lines.push(`[${e.card} · id ${e.id} · at ${e.at}] ${e.date} 「${e.title}」 · 채점 기준 v${e.v}`);
     lines.push(`    물음: ${e.q}`);
     lines.push(`    진우: ${e.text}`);
     for (const b of (Array.isArray(e.before) ? e.before : [])) lines.push(`    (전에 ${b.date} · ${b.grade}) ${b.text} → 답장: ${b.reply}`);
@@ -172,7 +176,9 @@ function httpError(status) {
 
 /**
  * 파일 하나 올리기 — 있으면 sha를 받아 덮어쓰고, 없으면 새로 만든다. 겹치면(409·422) sha를 다시 받아 한 번 더.
- * @param {{fetchFn:Function, token:string, path:string, text:string, message:string, repo?:string}} o
+ * text가 함수면 올릴 때마다(다시 올릴 때도) 새로 만든다 — 겹쳤다는 건 그 사이 다른 곳이 새 내용을 올렸다는 뜻이라,
+ * 처음 만든 옛 내용을 새 sha로 다시 올리면 새 목록을 덮는다 (Codex 52차 #1)
+ * @param {{fetchFn:Function, token:string, path:string, text:string|(() => Promise<string>|string), message:string, repo?:string}} o
  */
 export async function putFile({ fetchFn, token, path, text, message, repo = DATA_REPO }) {
   const url = `${API}/repos/${repo}/contents/${path}`;
@@ -183,7 +189,7 @@ export async function putFile({ fetchFn, token, path, text, message, repo = DATA
     try { g = await fetchFn(`${url}?ref=${DATA_BRANCH}`, { headers, cache: 'no-store' }); } catch { throw httpError(0); }
     if (g.status === 200) sha = (await g.json()).sha;
     else if (g.status !== 404) throw httpError(g.status);
-    const body = { message, content: b64(text), branch: DATA_BRANCH, ...(sha ? { sha } : {}) };
+    const body = { message, content: b64(typeof text === 'function' ? await text() : text), branch: DATA_BRANCH, ...(sha ? { sha } : {}) };
     let p;
     try { p = await fetchFn(url, { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); } catch { throw httpError(0); }
     if (p.status === 200 || p.status === 201) return { created: p.status === 201 };
@@ -205,6 +211,7 @@ export async function getFile({ fetchFn, token, path, repo = DATA_REPO }) {
   if (g.status === 404) return null;
   if (g.status !== 200) throw httpError(g.status);
   const body = await g.json();
+  if (body && Number(body.size) > PRIVATE_MAX_BYTES) throw httpError('big'); // 풀기 전에
   return unb64(body && body.content);
 }
 
@@ -223,6 +230,7 @@ export async function readPrivateList(path, o = {}) {
   let text;
   try { text = await getFile({ fetchFn: o.fetchFn || fetch, token, path }); } catch (e) { note(e && e.status !== undefined ? e.status : 0); return []; }
   if (text === null) { note('missing'); return []; }
+  if (text.length > PRIVATE_MAX_BYTES) { note('big'); return []; }
   let list;
   try { list = JSON.parse(text); } catch { note('json'); return []; }
   if (!Array.isArray(list)) { note('shape'); return []; }
@@ -231,12 +239,13 @@ export async function readPrivateList(path, o = {}) {
 }
 
 /**
- * 📥 받기 결과 → 아버님이 볼 상태 (순수). kind: 'ok' · 'missing'(404 — 아직 안 올렸으면 정상) · 'json' · 'shape' · HTTP 상태 수(0 = 인터넷)
+ * 📥 받기 결과 → 아버님이 볼 상태 (순수). kind: 'ok' · 'missing'(404 — 아직 안 올렸으면 정상) · 'json' · 'shape' · 'big'(크기 상한) · HTTP 상태 수(0 = 인터넷)
  * @returns {{at:number, ok:boolean, n?:number, missing?:boolean, why?:string}}
  */
 export function readStatus(kind, n = 0, at = Date.now()) {
   if (kind === 'ok') return { at, ok: true, n };
   if (kind === 'missing') return { at, ok: true, n: 0, missing: true };
+  if (kind === 'big') return { at, ok: false, why: `파일이 너무 커요(${PRIVATE_MAX_BYTES / 1000 / 1000} MB 넘음) — 하나도 안 받았어요. Claude에게 오래된 줄을 지워 달라고 해 주세요` };
   if (kind === 'json') return { at, ok: false, why: '파일이 깨져 못 읽었어요 (JSON) — Claude에게 고쳐 달라고 해 주세요' };
   if (kind === 'shape') return { at, ok: false, why: '파일 모양이 틀렸어요 (목록이 아님) — Claude에게 고쳐 달라고 해 주세요' };
   if (kind === 403) return { at, ok: false, why: '이 열쇠로는 저장소를 읽을 수 없어요 — 열쇠의 저장소·권한(Contents)을 확인해 주세요' };
@@ -245,7 +254,8 @@ export function readStatus(kind, n = 0, at = Date.now()) {
 const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장' };
 /**
  * 📊 📤 카드의 받기 한 줄 (순수) — "📥 받기: ✍️ 교정 ✅ 10/07 10:32 (3개) · ❓ 답장 · 아직 없음"
- * @param {Object<string, {at:number, ok:boolean, n?:number, missing?:boolean, why?:string}>|null} state readState()
+ * check(국어 답장 — 붙여 본 뒤의 수, noteReadCheck)가 있으면: 너무 많아 통째로 안 받음 ❌ · 받지 않은 줄·맞는 글 없음 ⚠️
+ * @param {Object<string, {at:number, ok:boolean, n?:number, missing?:boolean, why?:string, check?:{rows:number, bad:number, none:number, over:boolean}}>|null} state readState()
  * @param {(t:number) => string} fmt 시각 글
  */
 export function readSummary(state, fmt) {
@@ -253,7 +263,11 @@ export function readSummary(state, fmt) {
   const parts = Object.keys(READ_NAMES).filter((p) => s[p]).map((p) => {
     const r = s[p]; const name = READ_NAMES[p];
     if (!r.ok) return `${name} ❌ ${fmt(r.at)} 못 받았어요 — ${r.why}`;
-    return r.missing ? `${name} · 아직 없음` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
+    if (r.missing) return `${name} · 아직 없음`;
+    const c = r.check;
+    if (c && c.over) return `${name} ❌ ${fmt(r.at)} 답장이 너무 많아(${c.rows}줄) 하나도 안 받았어요 — Claude에게 오래된 줄을 지워 달라고 해 주세요`;
+    const warn = c ? [c.bad ? `받지 않은 줄 ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : ''].filter(Boolean).join(' · ') : '';
+    return warn ? `${name} ⚠️ ${fmt(r.at)} (${r.n}개 — ${warn} · Claude에게 "국어 답장 확인해 줘")` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
   });
   return parts.length ? `📥 받기: ${parts.join(' · ')}` : '📥 받기: 아직 받아 본 적이 없어요 (앱을 열 때·수학을 열 때 저절로)';
 }
@@ -286,52 +300,98 @@ export function readState(store) {
 function noteRead(path, st, store) {
   try { const s = readState(store); s[path] = st; (store || localStorage).setItem(READ_KEY, JSON.stringify(s)); } catch { /* 적지 못해도 받기는 그대로 */ }
 }
+/** 📥 받은 파일을 앱이 검사·적용해 본 수를 그 파일의 받기 결과에 붙인다 (국어 답장 — korwrite.replyStats, 글은 없다) */
+export function noteReadCheck(path, check, store) {
+  try {
+    const s = readState(store);
+    if (!s[path] || !s[path].ok) return;
+    s[path] = { ...s[path], check: { rows: check.rows | 0, bad: check.bad | 0, none: check.none | 0, over: !!check.over } };
+    (store || localStorage).setItem(READ_KEY, JSON.stringify(s));
+  } catch { /* 적지 못해도 받기는 그대로 */ }
+}
 
 // ───────────────────── 보내기 ─────────────────────
 
-let running = null; // 보내는 중이면 같은 약속을 돌려준다 (두 번 눌러도·홈과 내림이 겹쳐도 한 번)
+/**
+ * 같은 창에서 한 번에 하나씩 (순수 — run만 받는다). 보내는 중이면 같은 약속을 돌려준다(두 번 눌러도·홈과 내림이 겹쳐도 한 번).
+ * 보내는 중에 force가 오면 끝난 뒤 force로 한 번 더 — 그 사이 저장한 글이 "보내는 중"에 묻혀 빠지지 않게 (여러 번 와도 한 번 더, Codex 52차 #1)
+ * 끝나면(실패해도) 반드시 풀린다 — 껐다 켜야 낫는 전역 플래그가 되지 않게
+ * @param {(force:boolean) => Promise<any>} run
+ */
+export function serialSender(run) {
+  let running = null;
+  let again = null;
+  const send = ({ force = false } = {}) => {
+    if (running) {
+      if (!force) return running;
+      if (!again) again = running.catch(() => {}).then(() => { again = null; return send({ force: true }); });
+      return again;
+    }
+    running = Promise.resolve().then(() => run(force)).finally(() => { running = null; });
+    return running;
+  };
+  return send;
+}
+
+/** 다른 창과 한 번에 하나씩 — 기다림 상한 (그 창이 멈춰 있으면 이번엔 그만, 다음에 다시) */
+export const LOCK_WAIT_MS = 90 * 1000;
+/**
+ * 같은 주소의 다른 창과 한 번에 하나씩 올린다 (Web Locks) — 없으면 그냥 (Codex 52차 #1)
+ * @param {() => Promise<any>} fn
+ * @param {{request:Function}|undefined} [locks] 테스트용 — 안 주면 navigator.locks
+ */
+export function withUploadLock(fn, locks = typeof navigator !== 'undefined' ? navigator.locks : undefined) {
+  if (!locks || typeof locks.request !== 'function') return Promise.resolve().then(fn);
+  const opts = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(LOCK_WAIT_MS) } : {};
+  return locks.request('shincoach-upload', opts, () => fn());
+}
+
+/** ✍️ 국어 파일 하나의 글 — 올리는 순간의 프로필로 새로 만든다 */
+async function koreanTextNow(path, today) {
+  const f = koreanFiles(await korTodoNow(), today).find((x) => x.path === path);
+  return f ? f.text : '';
+}
+
+const sendQueue = serialSender((force) => withUploadLock(() => sendOnce(force)).catch((e) => ({ ok: false, why: e && e.name === 'TimeoutError' ? '다른 창이 올리는 중이라 기다리다 멈췄어요 — 잠시 뒤 다시' : (e && e.message) || String(e) })));
 
 /**
- * 📤 보내기. force면 10분·내용 비교 없이 바로 (📊 버튼).
+ * 📤 보내기. force면 10분·내용 비교 없이 바로 (📊 버튼 · ✍️ 국어 글 보낸 뒤).
  * @returns {Promise<{ok:boolean, skipped?:boolean, why?:string, at?:number}>}
  */
 export function sendReport({ force = false } = {}) {
-  if (running) return running;
-  running = (async () => {
-    const token = getToken();
-    if (!token) return { ok: false, skipped: true, why: '열쇠가 없어요' };
-    const [{ getMath, listDaily }, prog, ask, { todayKey }, st] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js')]);
-    const today = todayKey();
-    let files;
-    try { files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, today }); } catch {
-      // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
-      const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
-      try { localStorage.setItem(STATE_KEY, JSON.stringify({ at: fail.at, ok: false, why: fail.why, hash: '', files: [] })); } catch { /* 저장 못 해도 */ }
-      return fail;
+  return sendQueue({ force });
+}
+
+/** 한 번 보내기 — 다른 창과 겹치지 않는 자리(withUploadLock 안)에서 모으고 올린다 */
+async function sendOnce(force) {
+  const token = getToken();
+  if (!token) return { ok: false, skipped: true, why: '열쇠가 없어요' };
+  const [{ getMath, listDaily }, prog, ask, { todayKey }, st] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js')]);
+  const today = todayKey();
+  let files;
+  try { files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, today }); } catch {
+    // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
+    const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
+    try { localStorage.setItem(STATE_KEY, JSON.stringify({ at: fail.at, ok: false, why: fail.why, hash: '', files: [] })); } catch { /* 저장 못 해도 */ }
+    return fail;
+  }
+  const hash = hashOf(files);
+  const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+  if (!force && !shouldAuto({ token, online, now: Date.now(), state: uploadState(), hash })) return { ok: false, skipped: true };
+  const at = Date.now();
+  let res;
+  try {
+    for (const f of files) {
+      // ✍️ 국어 서술형은 올리는 순간마다(겹쳐서 다시 올릴 때도) 다시 만든다 — 모은 뒤 저장된 글이 빠지거나 옛 목록이 새 목록을 덮지 않게 (Codex 51차 PART 3 #6 · 52차 #1)
+      const text = f.path.startsWith('korean/') ? () => koreanTextNow(f.path, today) : f.text;
+      await putFile({ fetchFn: fetch, token, path: f.path, text, message: `📤 진우 기록 ${today} — ${f.path}` }); // 메시지에는 글을 넣지 않는다
     }
-    const hash = hashOf(files);
-    const online = typeof navigator === 'undefined' || navigator.onLine !== false;
-    if (!force && !shouldAuto({ token, online, now: Date.now(), state: uploadState(), hash })) return { ok: false, skipped: true };
-    const at = Date.now();
-    let res;
-    try {
-      let kor = null; // ✍️ 국어 서술형은 올리기 바로 전에 다시 읽는다 — 먼저 모은 다른 창의 옛 목록이 새 목록을 덮지 않게 (Codex 51차 PART 3 #6)
-      for (const f of files) {
-        let text = f.text;
-        if (f.path.startsWith('korean/')) {
-          if (!kor) kor = Object.fromEntries(koreanFiles(await korTodoNow(), today).map((x) => [x.path, x.text]));
-          text = kor[f.path];
-        }
-        await putFile({ fetchFn: fetch, token, path: f.path, text, message: `📤 진우 기록 ${today} — ${f.path}` }); // 메시지에는 글을 넣지 않는다
-      }
-      res = { ok: true, at };
-    } catch (e) {
-      res = { ok: false, at, why: (e && e.message) || String(e) };
-    }
-    try { localStorage.setItem(STATE_KEY, JSON.stringify({ at, ok: res.ok, why: res.why || '', hash: res.ok ? hash : '', files: files.map((f) => f.path) })); } catch { /* 저장 못 해도 */ }
-    return res;
-  })().finally(() => { running = null; });
-  return running;
+    res = { ok: true, at };
+  } catch (e) {
+    res = { ok: false, at, why: (e && e.message) || String(e) };
+  }
+  try { localStorage.setItem(STATE_KEY, JSON.stringify({ at, ok: res.ok, why: res.why || '', hash: res.ok ? hash : '', files: files.map((f) => f.path) })); } catch { /* 저장 못 해도 */ }
+  return res;
 }
 
 /** 저절로 보내기 — 실패해도 조용히 (진우 화면엔 아무것도 안 뜬다) */

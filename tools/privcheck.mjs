@@ -6,6 +6,7 @@
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { checkReplies } from '../js/korwrite.js';
 import { validCards } from '../js/korean.js';
+import { PRIVATE_MAX_BYTES } from '../js/upload.js';
 
 export const PRIVATE_FILES = ['essay/fixes.json', 'math/replies.json', 'korean/replies.json'];
 
@@ -30,13 +31,14 @@ export function checkPrivateDir(dir, figureSvg) {
     const f = `${dir}/${rel}`;
     if (!existsSync(f)) continue;
     checked.push(rel);
+    if (statSync(f).size > PRIVATE_MAX_BYTES) { errors.push(`크기 오류: ${f}: ${PRIVATE_MAX_BYTES} 바이트를 넘음 — 앱이 하나도 안 받는다(오래된 줄을 지울 것)`); continue; }
     let list;
     try { list = JSON.parse(readFileSync(f, 'utf8')); } catch (e) { errors.push(`JSON 오류: ${f}: ${e.message}`); continue; }
     if (!Array.isArray(list)) { errors.push(`내용 오류: ${f}: 배열이 아님`); continue; }
     if (rel === 'korean/replies.json') {
-      // ✍️ 국어 서술형 답장 — [{ card, at, grade, text }] · 앱이 받을 때와 같은 검사(korwrite.checkReplies) — 서술형 있는 카드·at·등급·길이·같은 글에 다른 답장 (v237)
+      // ✍️ 국어 서술형 답장 — [{ card, id, at, grade, text }] · 앱이 받을 때와 같은 검사(korwrite.checkReplies) — 서술형 있는 카드·id·at·등급·길이·같은 글에 다른 답장·줄 수 상한 (v237 · id v239)
       const cards = validCards(JSON.parse(readFileSync(new URL('../coach/korean/reading.json', import.meta.url), 'utf8')));
-      for (const b of checkReplies(list, cards).bad) errors.push(`내용 오류: ${f}[${b.i}]: ${b.why}`);
+      for (const b of checkReplies(list, cards).bad) errors.push(`내용 오류: ${b.i < 0 ? f : `${f}[${b.i}]`}: ${b.why}`);
       continue;
     }
     if (rel === 'essay/fixes.json') {

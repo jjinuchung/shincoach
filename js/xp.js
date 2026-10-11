@@ -907,9 +907,9 @@ export function korWriteAdd(cardId, text, cards) {
 export function korWriteApply(replies, cards) {
   return houseDo((p) => writeReplyRule(p, replies, Date.now(), cards));
 }
-/** 📬 답장을 읽었다 */
-export function korWriteRead(cardId, at) {
-  return houseDo((p) => writeReadRule(p, cardId, at));
+/** 📬 답장을 읽었다 (그 글의 id — 화면에 실제로 보였을 때만, korwriteview.watchRead) */
+export function korWriteRead(cardId, id) {
+  return houseDo((p) => writeReadRule(p, cardId, id));
 }
 /** ✍️ 서술형 기록 (그리기용 복사본) */
 export function korWritesMap() {
