@@ -3116,6 +3116,32 @@
 - `js/timelimit.js` · `js/timeup.js` · `js/app.js` · `js/player.js`(⚙·칩) · `js/stats.js` · `index.html` · `js/items.js`(STONE_KOREAN·EXTEND_KOREAN·FUTURE_STONES 🟪) · `js/evolve.js`(국어 78줄·STONE_ID) · `js/korean.js`(korFinishRule 🟩·기회 · throwsOf·pendingOf·mergeThrows·korTakeRule·korGiveBackRule) · `js/db.js`(korThrow 빈 값·복사·병합 · DAILY_SUMS) · `js/xp.js`(korThrow · korTakeThrow·korGiveBackThrow·korThrowsLeft · RARITY_IDS 국어) · `js/pokemon.js`(150 · subjectById) · `js/battle.js`(타입) · `js/catch.js`·`js/pokedex.js`·`js/shop.js`(말) · `js/koreanview.js`(🎯 잡기·settleLostCatch·proseEl·끝 카드 말) · `coach/korean/reading.json`(K7~K12) · `css/style.css` · `sw.js`(v232) · 새 `tests/korpokemon.test.js` · `tests/korean.test.js`·`timelimit`·`items`·`evolve`·`pokemon`·`xp`·`player.logic`
 
 ### TODO (다음 작업)
-- [ ] v232 커밋·배포 → Codex 49차
+- [x] v232 커밋·배포 (`ea887f0` feat · `ebb11e2` docs) → Codex 49차(아래 v233 절)
 - [ ] 아버님: 태블릿 📚 국어 → ⏳ 칩 · 한 번에 다 맞혀 🟩 · 🎯 국어 포켓몬 잡기 · 새 글 6편 → 진우 반응
 - [ ] 안 한 것(제안): 국어 🥚 알 · 🔤 낱말 줄기 · 📘 교과서 단원 순서 카드
+
+## 2026-10-11 — 📚 국어 v232 배포 · 🔍 Codex 49차 반영 (v233)
+
+### 진행 내용
+- v232 배포(`ea887f0` feat · `ebb11e2` docs, 라이브 12파일 같음)
+- Codex 49차(요청문 `.context/codex_prompt_49.txt` → `.context/codex_review_49.md`, 174만 토큰): 48차 일곱 모두 holds · 같은 별로 💰·🟩·🎯 두 번 받는 길 없음(두 창 동시 · 같은 날 다시 · 옛 백업) · ⏳ 90분 연결·포켓몬 150(겹침·진화·전설) 이상 없음 → 재현(코드·원고 대조) → 판단 표 → 아버님 **"표대로 고쳐줘. 수학도 함께 고쳐줘."**
+  - **#1 P1** 🎯 뺀 기회를 판정 전에 새로 고치거나 끄면 영영 사라짐("안 던졌다"가 메모리에만) — **🔢 수학 잡기도 같은 틈** → 새 `js/throwhold.js` **던지기 예약 장부**(localStorage 한 칸, 과목마다): 뺄 때 한 줄 · 판정이 나는 순간(catch의 attempt — 동기) 지움 · 돌려주기가 저장되면 지움 · 남은 줄은 그 과목에 들어올 때 돌려줌(`settle`) · 창 이름은 sessionStorage(새로 고쳐도 같은 창 → 바로) · 다른 창의 줄은 beat(10초)이 1분 넘게 멈춰야(아직 열린 잡기는 안 건드림 · 그때 다시 정리) · 돌려주려고 잡은 줄은 다른 창이 건너뜀 · 하나씩 바로 앞에서 다시 봄 · 이 창 안에서 겹쳐 돌지 않음 · 많아야 50줄 · 저장소가 막혀도 던지기는 됨
+  - **#2 P2** 돌려주기 저장 실패를 안 봄(houseDo는 실패를 오류 대신 `{ok:false}`로 준다) · 실패했는데 "돌려놨어요" → `refundOutcome`(ok·none·fail) · 실패하면 줄이 남아 다음에 · 말 "몬스터볼은 국어(수학)에 다시 들어오면 돌려줘요"(`errorOwed`·`owed`) · 수학 옛 빚 수(OWED_KEY)는 적힌 것만 그대로 갚음 · 수학 사다리는 남은 줄을 돌려준 **뒤에** 읽음 · 수학도 잡기 창이 소식 없이 닫히면 흐름을 풂(`settleLostMathCatch` — 예전엔 ui.catching이 켜진 채 다시 안 열렸다)
+  - **#3 P2** 따로 쓴 두 사본을 합치면 기회가 사라지거나 되살아날 수 있음 → **안 고침**(수학 기회와 같은 세 단조 카운터 설계 · 한 기록의 옛 사본 되살리기는 안전 · 두 기기가 따로 국어를 하다 합칠 때만)
+  - **#4 P2** 좋은 근거를 틀렸다고 함 → K7-3 ③④⑤⑥⑦(풀이의 "말이 절을 한 것"은 ④) · K8-1·K8-2 ①②③④(2연도 같은 근거) · K11-1 ①②③④⑤⑥⑧⑨(자라만 말한 ⑦은 견준 문장이 아니라 빼고 — 표의 ②③④⑤⑥⑧⑨에 ① "생김새가 비슷" = 같은 점을 더함), 물음 "같은 점이나 다른 점을 견주어 말한 문장"
+  - **#5 P2** K9 📖 '내' "시내보다 작은 물줄기"는 반대 → "시내보다 크고 강보다 작은 물줄기"(국립국어원)
+  - **#6 P2** K9-1 정답 "날마다 보고 만나는 것이 달라서"는 시에 없는 말을 단정 → "익숙한 길에서도 늘 새로움을 느껴서" · 풀이 "… 느끼는 마음을 짐작할 수 있어요"
+  - **#7 P2** K11 "거북은 단단하다"·"말랑한 것은 자라뿐"은 일반화(자라도 거북 무리 · 장수거북도 가죽 같은 등딱지) → ⑤ "많은 거북은 …" · 📖 자라 "거북 무리에 드는 동물 가운데 하나" · K11-2 풀이 "이 글에서 말랑하다고 한 것은 자라예요"
+  - **#8 P2** K12-1 "가장 믿기 어려운 말"은 글 밖 지식이 필요 · 칼슘 보기를 사실·의견으로 → 물음 "키가 얼마나 클지 딱 잘라 약속하는 말은?" · 풀이 "이런 약속을 믿으려면 누가 어떻게 재어 보았는지 같은 근거가 있어야 하는데, 광고에는 그 근거가 없어요" · 칼슘 보기 엉뚱한 연결 · "한 병 더"는 "한 병을 더 준다는 말"(값을 깎는 말이 아니다) · 글에 없는 우유 갑 이야기 뺌
+  - **#9 P3** K8-3 "되풀이에서 느껴지는 말의 리듬을 운율" · K10-3 "빈틈없이" 뺌 · K7-2 생일 보기 지어내기 · ⏳ 시간 끝 창 "오늘 📚 국어은" → `eunNeun`(받침으로 은/는 — **영어도 예전부터 "영어은"**이었다) · ★★ 뒤 "처음 읽은 날부터 일주일" → 규칙이 받은 뒤 다음 별까지 남은 날을 함께 줌(`korFinishRule` next·days — 10/1 ★ · 10/11 ★★ → "내일 다시 읽으면 ★★★")
+  - 그 밖: koreanview 머리 주석 "⏳ 국어를 세지 않는다"(v232 전 말) 고침
+- 전체 **1773** 통과(check 포함 — 처음 돌린 것은 여유 메모리 부족으로 984개째에 멈춤, 재부팅 뒤 다시) · characters 문구 시험(수학 못 열었을 때 말 둘) · 새 `tests/throwhold.test.js` 8(장부 고쳐 읽기 · 돌려줄 줄 · 결과 · 한 창 · 새로 고침·다시 켬·겹침 · 두 창 · 저장소 막힘 · 국어·수학 연결) · korpokemon 7(진짜 저장소: 새로 고침 → 돌려줌 · 판정 난 것은 안 돌려줌 · 돌려주기 실패 → 다음에) · korean 16(49차 원고·★★ 뒤 남은 날·조사) · 변이 `.context/codex49/mutate_49.mjs` **34 중 34**(처음 놓친 셋 — 정리가 실패에서 멈춤 · 이 창 줄은 안 기다림 · 수학 소식 없이 닫힌 창 정리 줄 — 은 시험을 더해 잡음)
+- 헤드리스 1280(scratchpad walk49.sh·walk49m.sh + hh10.js): 📚 국어 잡기 창 열기 → 기회 0·장부 1줄 → 새로 고침(같은 창 이름) → 국어에 들어오면 기회 1·장부 0줄 → 열어 던지기 → 잡음 · 기회 0·장부 0줄 · 🔢 수학 🎯 받은 몬스터볼 → 잡기 창(used 1·장부 1줄) → 새로 고침 → 사다리 "받은 몬스터볼 1개"(refunded 1·장부 0줄) → 열고 바깥에서 닫기 → 홈 갔다 오면 refunded 2·다시 열림 → 던지기 → 잡음(used 3·장부 0줄) · 조사 "수학은·영어는·국어는" · 390 K11(근거 물음·📖 자라)·K12(딱 잘라 약속하는 말) 넘침 0 · 콘솔 오류 0(649번 넘는 움직이는 그림 404는 원래 있던 일) · sw **v233**
+
+### 변경 파일
+- 새 `js/throwhold.js` · `js/koreanview.js`(장부·정리·말·끝 카드 남은 날) · `js/math.js`(장부·settleMathThrows·settleLostMathCatch·말) · `js/korean.js`(받은 뒤 next·days) · `js/timeup.js`(eunNeun) · `coach/korean/reading.json` · `sw.js`(v233 · APP_SHELL throwhold.js) · 새 `tests/throwhold.test.js` · `tests/korpokemon.test.js` · `tests/korean.test.js`
+
+### TODO (다음 작업)
+- [ ] v233 커밋·배포(재부팅 뒤 전체 1773 통과)
+- [ ] 아버님: 태블릿 📚 국어 → ⏳ 칩 · 🟩 · 🎯 국어 포켓몬 · 새 글 → 진우 반응
+- [ ] 안 한 것(제안): 국어 🥚 알 · 🔤 낱말 줄기 · 📘 교과서 단원 카드
