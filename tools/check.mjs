@@ -89,6 +89,16 @@ try {
   const data = JSON.parse(readFileSync('coach/korean/reading.json', 'utf8'));
   for (const msg of checkContent(data)) { bad++; console.error(`내용 오류: coach/korean/reading.json: ${msg}`); }
 } catch (e) { bad++; console.error(`JSON 오류: coach/korean/reading.json: ${e.message}`); }
+// 🔤 낱말(words.json)·📘 단원(units.json) — 빈칸 뒤 조사·같은 뜻 두 번·없는 단원·없는 카드를 배포 전에 (v234)
+try {
+  const { checkWords } = await import('../js/korwords.js');
+  const { checkUnits } = await import('../js/korunits.js');
+  const cards = JSON.parse(readFileSync('coach/korean/reading.json', 'utf8')).cards;
+  const words = JSON.parse(readFileSync('coach/korean/words.json', 'utf8'));
+  const units = JSON.parse(readFileSync('coach/korean/units.json', 'utf8'));
+  for (const msg of checkWords(words, cards)) { bad++; console.error(`내용 오류: coach/korean/words.json: ${msg}`); }
+  for (const msg of checkUnits(units, cards, words)) { bad++; console.error(`내용 오류: coach/korean/units.json: ${msg}`); }
+} catch (e) { bad++; console.error(`JSON 오류: coach/korean/words.json·units.json: ${e.message}`); }
 // 📦 아빠의 구호품(coach/gifts.json) — [{ id, items: { 아이템id: 1~10 }, title?, text? }], 틀린 줄은 앱이 조용히 건너뛰므로 여기서 잡는다
 try {
   const { parcelOf } = await import('../js/items.js');

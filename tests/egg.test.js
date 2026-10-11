@@ -1,9 +1,10 @@
 // 🥚 알: node --test tests/egg.test.js
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { EGG_NEED, activeEgg, newEgg, eggProgress, pickHatch, eggRule, eggSeenRule, unseenHatched, eggSummary } from '../js/egg.js';
 import { buyEggRule, cloneProfile, emptyProfile, mergeStatRecord } from '../js/db.js';
-import { EGG_MATH, EGG_ENGLISH, STONE_SHOP, costOf, lootBox, ITEMS } from '../js/items.js';
+import { EGG_MATH, EGG_ENGLISH, EGG_KOREAN, STONE_SHOP, costOf, lootBox, ITEMS, parcelOf } from '../js/items.js';
 import { ROSTER, forSubject, isLegendary, isTrueBase, FALSE_BASE } from '../js/pokemon.js';
 import { baseOf, evoFrom, pathTo } from '../js/evolve.js';
 import { rarityOf } from '../js/xp.js';
@@ -210,4 +211,47 @@ test('🥚 앱에선 시작형처럼 보여도 **원작에서 진화해 온 종*
     pickHatch(forSubject(ROSTER, subject), rarityOf, {}, { baseOf, isLegendary, isTrueBase, rng: () => i / 2000 }).target)).size;
   assert.equal(count('math'), 21);
   assert.equal(count('english'), 15);
+});
+
+test('📚 국어 알 (v234): 💰200 + 🟩 2 · 스톤 상점 · 팔기·구호품 안 됨 · 국어 전용 희귀의 시작형 · 과목 이름 한 곳(🐣·🎒·교환) · 글을 끝까지 읽은 날 = 하루 칸', async () => {
+  const { EGG_SUBJECT_KO, eggSummary, pickHatch, newEgg, eggRule } = await import('../js/egg.js');
+  const { ROSTER, forSubject, subjectOf } = await import('../js/pokemon.js');
+  const { isLegendary } = await import('../js/pokemon.js');
+  assert.deepEqual(costOf(EGG_KOREAN), { coins: 200, items: { stone_korean: 2 } });
+  assert.equal(EGG_KOREAN.subject, 'korean');
+  assert.ok(STONE_SHOP.includes(EGG_KOREAN) && ITEMS.includes(EGG_KOREAN));
+  assert.equal(parcelOf({ id: 'k-egg', items: { egg_korean: 1 } }), null, '구호품으로 알을 주지 않는다(가방이 아니라 품는 것)');
+  assert.deepEqual(EGG_SUBJECT_KO, { math: '수학', english: '영어', korean: '국어' });
+  // 국어 알의 목표는 국어 전용 희귀 · 부화는 시작형 · 전설 아님
+  for (let i = 0; i < 40; i++) {
+    const pick = pickHatch(forSubject(ROSTER, 'korean'), rarityOf, {}, { baseOf, isLegendary, rng: () => i / 40 });
+    assert.ok(pick.id > 0 && subjectOf(pick.target) === 'korean' && rarityOf(pick.target) === 3 && !isLegendary(pick.target), `${pick.target}`);
+    assert.equal(pick.id, baseOf(pick.target), '시작형으로 부화');
+    assert.equal(subjectOf(pick.id), 'korean', '시작형도 국어 전용(과목 넘는 진화 없음)');
+  }
+  // 하루 칸 · 요약에 국어
+  const p = { eggs: [newEgg('korean', 495, 1, 'egg_korean', 497)], caught: {} };
+  assert.equal(eggRule(p, 'korean', T(1)).ticked, true);
+  assert.equal(eggRule(p, 'korean', T(1)).ticked, false, '같은 날 두 번은 하루');
+  assert.deepEqual(eggSummary(p).map((e) => [e.subject, e.done]), [['korean', 1]]);
+  for (const d of [2, 3, 4]) eggRule(p, 'korean', T(d));
+  const last = eggRule(p, 'korean', T(5));
+  assert.equal(last.hatched, true);
+  assert.equal(p.caught[495], 1, '부화 = 시작형이 도감에');
+  // 화면: 과목 이름은 한 곳에서
+  const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  assert.match(read('js/hatch.js'), /\$\{EGG_SUBJECT_KO\[o\.subject\] \|\| '영어'\} 알이 부화했어요!/);
+  assert.match(read('js/pokedex.js'), /🥚 \$\{EGG_SUBJECT_KO\[e\.subject\] \|\| '영어'\} 알 /);
+  for (const f of ['js/hatch.js', 'js/pokedex.js']) assert.ok(!read(f).includes("=== 'math' ? '수학' : '영어'"), `${f}: 수학 아니면 영어가 남지 않았다`);
+  // 📚 다 읽으면(별이 없어도) 하루 칸 · 5일째면 🐣 · 끝 카드 줄
+  const kv = read('js/koreanview.js');
+  const fin = kv.slice(kv.indexOf('async function finishCard() {'), kv.indexOf('export async function tickKorDay()'));
+  assert.ok(fin.includes('if (res && res.ok) {\n    const egg = await tickKorDay();'), '별이 없어도 — res.ok면');
+  assert.match(kv, /egg = await tickEgg\('korean', todayKey\(\)\);/);
+  assert.match(kv, /if \(egg && egg\.hatched\) setTimeout\(\(\) => \{ showHatchIfAny\(\); \}, 1200\);/);
+  const { eggLine } = await import('../js/koreanview.js');
+  assert.equal(eggLine({ ok: true, ticked: true, egg: { days: [T(1), T(2)] } }), '🥚 국어 알 2/5일 — 오늘 칸을 채웠어요');
+  assert.equal(eggLine({ ok: true, ticked: false, egg: { days: [T(1)] } }), '', '오늘 이미 채웠으면 말하지 않는다');
+  assert.equal(eggLine({ ok: true, ticked: true, hatched: true, egg: {} }), '🐣 국어 알이 부화해요!');
+  assert.equal(eggLine({ ok: false }), '', '품는 알이 없으면');
 });

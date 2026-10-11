@@ -394,6 +394,6 @@ test('🔍 Codex 31차 #5·#6 — 나누기 버튼도 5초 뒤 원래대로 · �
   assert.ok(/o\.why === 'all' \?/.test(box) && /o\.why === 'level' \?/.test(box) && /o\.why === 'art'/.test(box), '까닭 셋');
   assert.ok(box.includes('"포켓몬 캐릭터 받기"'), '그림이 없으면 아빠께 받는 곳을 알려 준다 (도감의 안내와 같은 말)');
   assert.ok(src('js/pokedex.js').includes('"포켓몬 캐릭터 받기"'), '⚙의 그 이름이 아직 있다');
-  assert.ok(box.includes("${o.subject === 'math' ? '수학' : '영어'} 포켓몬을 두 마리 이상"), '영어 쪽도 과목을 말한다');
+  assert.ok(box.includes("${{ math: '수학', korean: '국어' }[o.subject] || '영어'} 포켓몬을 두 마리 이상"), '영어 쪽도 과목을 말한다 · 📚 국어 포켓몬도 (v234)');
   assert.ok(!/못 찾았어/.test(box), '옛 "못 찾았어"는 없다');
 });

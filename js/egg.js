@@ -11,6 +11,9 @@
 //   · 그림은 소유와 별개 — 그림을 못 받아도 도감엔 이미 있다(화면만 나중에)
 // 순수 로직만 — 저장(트랜잭션)은 db.js(buyEggRule·eggRule), 화면은 hatch.js·shop.js·math.js.
 
+/** 과목 이름 (🐣 부화 화면·🎒 알 줄) — 과목이 늘면 여기 한 곳만 (예전엔 "수학 아니면 영어"라 국어 알이 "영어 알"로 보였을 것이다) */
+export const EGG_SUBJECT_KO = { math: '수학', english: '영어', korean: '국어' };
+
 /** 부화까지 필요한 완주 일수 */
 export const EGG_NEED = 5;
 
@@ -26,10 +29,10 @@ export function unseenHatched(p) {
 
 /**
  * 새 알 레코드.
- * @param {string} subject 'math' | 'english'
+ * @param {string} subject 'math' | 'english' | 'korean'
  * @param {number} monId 부화할 포켓몬 = **줄기의 시작형** (살 때 정한다)
  * @param {number} now 산 시각(ms)
- * @param {string} item 산 아이템 id (egg_math·egg_english)
+ * @param {string} item 산 아이템 id (egg_math·egg_english·egg_korean)
  * @param {number} [target] 자라면 되는 종 (🐣 "자라면 염무왕이 돼요"). 안 주면 monId와 같다
  */
 export function newEgg(subject, monId, now, item, target) {
@@ -106,6 +109,6 @@ export function eggSeenRule(p, eggId) {
 }
 
 /** 🎒·사다리 표시용 — 과목별 { subject, egg, done, need } (품는 알만) */
-export function eggSummary(p, subjects = ['math', 'english']) {
+export function eggSummary(p, subjects = ['math', 'english', 'korean']) {
   return subjects.map((s) => { const egg = activeEgg(p, s); return egg ? { subject: s, egg, ...eggProgress(egg) } : null; }).filter(Boolean);
 }

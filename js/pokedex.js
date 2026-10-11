@@ -4,7 +4,7 @@ import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, RARITY_UB, caughtKi
 import { listDaily, getMath } from './db.js';
 import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES, SHINY_STONE, shinyUsesLeft, ENGLISH_STONE_SHORT } from './items.js';
-import { eggSummary } from './egg.js';
+import { eggSummary, EGG_SUBJECT_KO } from './egg.js';
 import { gymClaimed } from './mathprog.js'; // 🕳 울트라홀 = 💎 스페셜 여덟 배지
 import { haveOf, lvOf, fusedOf, fledOf, rocketHeldOf } from './evolve.js';
 import { initMarket, openMarket, fusionFigure, fusionName } from './marketview.js'; // 🏪 5일장 · 🔀 퓨전 (2026-10-04)
@@ -155,7 +155,7 @@ export async function openPokedex(opts) {
     gl.appendChild(el('span', 'stone' + (n > 0 ? ' have' : ''), `${s.emoji} ${s.ko} ${n}`));
   }
   for (const f of FUTURE_STONES) gl.appendChild(el('span', 'stone locked', `🔒 ${f.emoji} ${f.ko}`));
-  for (const e of eggSummary(p)) gl.appendChild(el('span', 'egg', `🥚 ${e.subject === 'math' ? '수학' : '영어'} 알 ${e.done}/${e.need}일`)); // 품는 알 — 그 과목을 완주한 날 수
+  for (const e of eggSummary(p)) gl.appendChild(el('span', 'egg', `🥚 ${EGG_SUBJECT_KO[e.subject] || '영어'} 알 ${e.done}/${e.need}일`)); // 품는 알 — 그 과목을 완주한 날 수
   card.appendChild(gl);
   showHatchIfAny(); // 🐣 다른 화면에서 부화했는데 아직 못 본 것
   card.appendChild(el('div', 'pokedex-stats', `스톤은 배워야만 생겨요 — 🔷 개념 통과·👑 / 🔶 ${ENGLISH_STONE_SHORT} / 🟩 국어 글을 한 번에 다 맞혀 별 받기. 🛒 상점 🧤 칸에서 코인과 같이 써요`));

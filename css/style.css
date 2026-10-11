@@ -3153,6 +3153,51 @@ button { font-family: inherit; }
   .kor-sent, .kor-line { transition: none; }
 }
 
+/* 📚 국어 탭 — 📚 도감 · 🔤 낱말 · 📘 단원 (v234) */
+.kor-tabs { display: flex; gap: 6px; margin: 0 0 12px; }
+.kor-tab {
+  flex: 1 1 0; min-width: 0; min-height: 44px; border: 2px solid var(--border); background: var(--card); border-radius: 999px;
+  font: inherit; font-weight: 700; color: var(--muted); cursor: pointer; padding: 6px 8px; white-space: nowrap;
+}
+.kor-tab.is-on { border-color: var(--primary); color: var(--primary-dark); background: #eef2ff; }
+.kor-tab:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.kor-tnote { font-size: 0.82rem; color: var(--muted); margin: 0; line-height: 1.5; word-break: keep-all; }
+.kor-wstart { justify-self: start; }
+.kor-decks { display: grid; gap: 8px; margin-bottom: 12px; }
+.kor-deck { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 12px 14px; }
+.kor-deck-name { font-weight: 800; }
+.kor-deck-star { font-weight: 700; color: #b7791f; font-variant-numeric: tabular-nums; }
+.kor-deck-sub { font-size: 0.85rem; color: var(--muted); word-break: keep-all; }
+.kor-wlist { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 10px 14px; }
+.kor-wlist summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+.kor-wlist-h { margin: 10px 0 6px; font-weight: 800; font-size: 0.9rem; }
+.kor-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kor-chip { border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 0.88rem; background: #f8f9fc; white-space: nowrap; }
+.kor-chip.is-star { border-color: #e3a008; background: #fff7dc; }
+.kor-chip.is-lock { color: var(--muted); }
+.kor-wsess { display: grid; gap: 10px; max-width: 760px; margin: 0 auto; }
+.kor-wtop { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kor-wbig { margin: 0; font-size: 1.8rem; font-weight: 800; text-align: center; color: var(--primary-dark); word-break: keep-all; }
+.kor-wsent, .kor-wsit { margin: 0; font-size: 1.1rem; line-height: 1.8; background: var(--kor-paper); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; word-break: keep-all; }
+.kor-blank { display: inline-block; min-width: 3.5em; border-bottom: 3px solid var(--primary); text-align: center; font-weight: 800; color: var(--primary-dark); margin: 0 2px; }
+.kor-blank.is-fill { background: var(--kor-ok-bg); padding: 0 4px; }
+.kor-note .kor-wsent { font-size: 0.98rem; background: transparent; border: 0; padding: 0; }
+.kor-note-ex { font-size: 0.92rem; color: #4b5563; }
+.kor-egg { font-weight: 700; color: #7c5a00; }
+.kor-term { margin: 16px 0 8px; font-size: 1.1rem; }
+.kor-units { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.kor-unit { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.kor-unit.is-empty { background: #f4f5f8; box-shadow: none; border: 1px dashed var(--border); }
+.kor-unit-h { margin: 0; font-size: 1.02rem; word-break: keep-all; }
+.kor-unit-goal { margin: 0; line-height: 1.55; word-break: keep-all; }
+.kor-unit-wait { margin: 0; color: var(--muted); font-size: 0.9rem; word-break: keep-all; }
+.kor-unit-cards { display: flex; flex-wrap: wrap; gap: 6px; }
+.kor-unit-card {
+  border: 1px solid var(--kor-gold-line); background: var(--kor-gold-bg); border-radius: 10px; padding: 6px 10px;
+  font: inherit; font-size: 0.92rem; cursor: pointer; min-height: 40px; text-align: left; color: inherit;
+}
+.kor-unit-card:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+
 /* 📚 🎯 국어 포켓몬 잡기 단추 (2026-10-11) */
 .kor-catch { display: grid; gap: 6px; justify-items: center; margin-top: 8px; }
 .kor-head .kor-catch { justify-items: start; }

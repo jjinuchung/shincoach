@@ -5,12 +5,16 @@
 //  · 근거가 둘 이상이면 하나만 눌러도 맞고, 맞히면 모두 칠한다 · 근거를 잘못 누른 것은 잘못 읽기로 세지 않는다
 //  · ⏳ 국어도 하루 1시간 30분(v232, 아버님) — 읽던 글은 끝까지, 새 글만 막는다
 import { TYPES, KINDS, KOR_COINS, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar } from './korean.js';
-import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt } from './xp.js';
+import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt, tickEgg } from './xp.js';
 import { loadCharacters, downloadCharacters, forSubject, isUnlocked, pickCharacters } from './pokemon.js';
 import { openCatch, isCatchOpen } from './catch.js';
 import { holdStore, refundOutcome } from './throwhold.js'; // 🎯 뺀 던지기 예약 장부 (Codex 49차 #1·#2)
 import { guardStart } from './timeup.js'; // ⏳ 국어 하루 1시간 30분 — 새 글을 열 때만 막는다(읽던 글은 끝까지, 아버님 결정 ②)
 import { sfx, unlock as sfxUnlock } from './sfx.js';
+import { todayKey } from './track.js';
+import { showHatchIfAny } from './hatch.js';
+import { eggProgress } from './egg.js';
+import * as tabs from './kortabs.js'; // 🔤 낱말 · 📘 단원 탭 (v234) — 탭 쪽은 이 파일을 import하지 않는다(ctx로 건넴)
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -24,7 +28,8 @@ const el = (tag, cls, text) => {
 export const CONTENT_URL = './coach/korean/reading.json';
 
 // cards: 쓸 수 있는 카드(validCards) · read: 읽는 중인 글 { card, qi, qs: [물음 상태], misses, result, saving }
-const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null };
+const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards' };
+// tab = 📚 도감(cards) · 🔤 낱말(words) · 📘 단원(units) — 글을 읽고 돌아오면 그 탭으로
 // catchState = 지금 열어 둔 잡기 창 { threw, hold } — 창이 바깥에서 닫혀(catch.closeCatch는 부른 쪽에 안 알린다) 소식이 없을 때 안 던진 기회를 돌려주려고
 
 /** 보기 차례를 섞는다 (rng = 0 이상 1 미만) → 원고 보기 번호 배열 */
@@ -95,7 +100,37 @@ export async function enterKorean() {
   settleLostCatch();
   settleKorThrows(); // 🎯 지난번에 뺐는데 판정 전에 꺼진 기회·돌려주다 실패한 기회 (Codex 49차 #1·#2)
   if (ui.read) { if (!$('korean-main').querySelector('.kor-read')) renderRead(); return; }
+  if (tabs.inSession()) { tabs.renderSession(tabCtx); return; } // 🔤 낱말을 풀다 🎒·📊를 다녀왔다 — 그대로 이어서
   await renderList();
+}
+
+/** 탭 쪽(kortabs)에 건네는 것 — 서로 import하지 않게 */
+const tabCtx = {
+  main: () => $('korean-main'),
+  cards: () => ui.cards || [],
+  catchBtnEl: () => catchBtnEl(),
+  tickKorDay: () => tickKorDay(),
+  eggLine: (e) => eggLine(e),
+  openCard: (id) => openCard(id),
+  toWords: () => { ui.tab = 'words'; renderList(); window.scrollTo(0, 0); },
+  toCards: () => { ui.tab = 'cards'; renderList(); window.scrollTo(0, 0); },
+  rerender: () => { renderList(); },
+};
+
+/** 📚 도감 · 🔤 낱말 · 📘 단원 탭 막대 */
+function tabBarEl() {
+  const bar = el('div', 'kor-tabs');
+  bar.setAttribute('role', 'tablist');
+  for (const [id, label] of [['cards', '📚 도감'], ['words', '🔤 낱말'], ['units', '📘 단원']]) {
+    const b = el('button', `kor-tab${ui.tab === id ? ' is-on' : ''}`, label);
+    b.type = 'button';
+    b.dataset.tab = id;
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(ui.tab === id));
+    b.addEventListener('click', () => { if (ui.tab === id) return; ui.tab = id; renderList(); });
+    bar.appendChild(b);
+  }
+  return bar;
 }
 
 /** 도감 (카드 목록) */
@@ -103,7 +138,7 @@ export async function renderList() {
   const main = $('korean-main');
   if (!main) return;
   const cards = await loadCards();
-  if (ui.read) return; // 읽는 사이 글을 골랐다
+  if (ui.read || tabs.inSession()) return; // 읽는 사이 글을 골랐다 · 🔤 낱말 판을 시작했다
   main.textContent = '';
   if (!cards || !cards.length) {
     const box = el('div', 'kor-empty');
@@ -114,6 +149,13 @@ export async function renderList() {
     again.addEventListener('click', () => { ui.cards = null; renderList(); });
     box.appendChild(again);
     main.appendChild(box);
+    return;
+  }
+  main.appendChild(tabBarEl());
+  if (ui.tab === 'words' || ui.tab === 'units') {
+    const body = el('div', 'kor-tabbody');
+    main.appendChild(body);
+    await (ui.tab === 'words' ? tabs.renderWordsTab(body, tabCtx) : tabs.renderUnitsTab(body, tabCtx));
     return;
   }
   const done = korDoneMap();
@@ -461,6 +503,30 @@ async function finishCard() {
     try { sfx.success(); } catch { /* 소리는 없어도 */ }
     import('./catch.js').then((m) => m.burstConfetti(res.star === 3 ? 90 : 50)).catch(() => {});
   }
+  if (res && res.ok) {
+    const egg = await tickKorDay(); // 🥚 글 한 편을 끝까지 읽은 날 — 별이 없어도(다시 읽기도 공부)
+    if (ui.read === r && egg && egg.ok) { r.egg = egg; renderQ(); }
+  }
+}
+
+/**
+ * 🥚 국어 알 하루 칸 (글 한 편을 끝까지 · 🔤 오늘의 낱말을 끝낸 날) — 품는 알이 없으면 {ok:false}. 5일째면 그 트랜잭션에서 부화하고 🐣 화면을 띄운다
+ * @returns {Promise<{ok:boolean, ticked?:boolean, hatched?:boolean, egg?:object}|null>}
+ */
+export async function tickKorDay() {
+  let egg = null;
+  try { egg = await tickEgg('korean', todayKey()); } catch { egg = null; }
+  if (egg && egg.hatched) setTimeout(() => { showHatchIfAny(); }, 1200);
+  return egg;
+}
+
+/** 🥚 끝 카드의 알 줄 (순수) — tickEgg 결과 → 말 · 오늘 이미 칸을 채웠으면 '' */
+export function eggLine(e) {
+  if (!e || !e.ok) return '';
+  if (e.hatched) return '🐣 국어 알이 부화해요!';
+  if (!e.ticked) return '';
+  const pg = eggProgress(e.egg);
+  return `🥚 국어 알 ${pg.done}/${pg.need}일 — 오늘 칸을 채웠어요`;
 }
 
 function finishEl() {
@@ -475,6 +541,8 @@ function finishEl() {
   box.appendChild(el('p', 'kor-done-title', t.title));
   box.appendChild(el('p', 'kor-done-stars', '★'.repeat(stars) + '☆'.repeat(3 - stars)));
   for (const line of t.lines) box.appendChild(el('p', 'kor-done-line', line));
+  const eg = eggLine(r.egg);
+  if (eg) box.appendChild(el('p', 'kor-done-line kor-egg', eg));
   const first = r.qs.filter((s) => !s.wrong.length).length;
   box.appendChild(el('p', 'kor-done-sub', `보기를 한 번에 맞힌 문제 ${first}개 · 「${r.card.title}」`));
   const row = el('div', 'kor-done-btns');
@@ -592,7 +660,9 @@ function catchBtnEl() {
 /** 잡은 뒤(또는 못 열었을 때) 지금 화면을 다시 그린다 — 남은 기회 수가 바뀐다 */
 function refreshAfterCatch() {
   if (!koreanVisible()) return;
-  if (ui.read) renderQ(); else renderList().catch(() => {});
+  if (ui.read) renderQ();
+  else if (tabs.inSession()) tabs.renderSession(tabCtx);
+  else renderList().catch(() => {});
 }
 
 export async function runKorCatch() {
@@ -646,6 +716,6 @@ export function initKorean({ showView }) {
   if (back) back.addEventListener('click', () => showView('home'));
   onProfileReload(() => {
     const v = $('view-korean');
-    if (v && !v.hidden && !ui.read && !profileLoading()) renderList().catch(() => {});
+    if (v && !v.hidden && !ui.read && !tabs.inSession() && !profileLoading()) renderList().catch(() => {});
   });
 }

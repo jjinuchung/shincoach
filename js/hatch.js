@@ -5,6 +5,7 @@ import { sfx } from './sfx.js';
 import { hatchedUnseen, markEggSeen, getLook } from './xp.js';
 import { ROSTER, ensureCast } from './pokemon.js';
 import { pathTo } from './evolve.js'; // 🧬 "자라면 무엇이 되나"
+import { EGG_SUBJECT_KO } from './egg.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -21,7 +22,7 @@ export function showDot(el, monId) {
 let onDone = null;
 
 /**
- * @param {{id?:number, target?:number, ko:string, url?:string|null, subject:'math'|'english', onDone?:()=>void}} o url이 없으면(그림을 못 받음) 🥚 이모지로
+ * @param {{id?:number, target?:number, ko:string, url?:string|null, subject:'math'|'english'|'korean', onDone?:()=>void}} o url이 없으면(그림을 못 받음) 🥚 이모지로
  */
 export function openHatch(o) {
   const box = $('hatch');
@@ -32,7 +33,7 @@ export function openHatch(o) {
   if (o.url) stage.appendChild(makeFigure(o.url, o.ko, o.look || null, 'hatch-mon'));
   else { const em = document.createElement('div'); em.className = 'hatch-emoji'; em.textContent = '🐣'; stage.appendChild(em); }
   showDot($('hatch-dot'), o.id); // 🕺 갓 태어난 모습이 움직인다
-  $('hatch-title').textContent = `🐣 ${o.subject === 'math' ? '수학' : '영어'} 알이 부화했어요!`;
+  $('hatch-title').textContent = `🐣 ${EGG_SUBJECT_KO[o.subject] || '영어'} 알이 부화했어요!`;
   $('hatch-text').textContent = `${o.ko}${josa(o.ko, '이', '가')} 태어났어요 — 도감에 들어갔어요. 잘 배운 5일의 선물이에요!`;
   // 🧬 알은 원작대로 **시작형**으로 부화한다. 그래서 "자라면 무엇이 되는지"를 여기서 알려 준다 —
   //    안 알려 주면 아이에겐 그냥 작은 포켓몬이 나온 것이 된다 (진우 지적 2026-09-27)
