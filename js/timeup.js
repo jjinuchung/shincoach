@@ -14,6 +14,12 @@ import { extenderOf, priceText } from './items.js';
 import { openShop } from './shop.js';
 import { sfx, unlock } from './sfx.js';
 
+/** 은/는 (순수) — 끝 글자 받침으로: "🔢 수학은" · "🎤 영어는" · "📚 국어는" (예전엔 늘 "은"이라 "영어은"·"국어은", Codex 49차) */
+export function eunNeun(word) {
+  const c = String(word || '').trim().slice(-1).charCodeAt(0);
+  return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? '은' : '는';
+}
+
 const $ = (id) => document.getElementById(id);
 
 let askPin = null;      // (onOk) => void — app.js가 player.requirePin을 끼워 준다
@@ -97,10 +103,11 @@ export function openTimeUp(subject, o = {}) {
   retryFn = typeof o.retry === 'function' ? o.retry : null;
   const st = status(s);
   const name = KO[s] || '';
+  const topic = eunNeun(name);
   const locked = !st || st.locked;
   const ok = $('timeup-ok');
   if (locked) {
-    $('timeup-title').textContent = `⏳ 오늘 ${name}은 여기까지!`;
+    $('timeup-title').textContent = `⏳ 오늘 ${name}${topic} 여기까지!`;
     $('timeup-text').textContent = st
       ? `오늘 ${fmtUsed(st.used)} 했어요. 푹 쉬고 내일 또 만나요 👋`
       : '오늘은 여기까지예요. 내일 또 만나요 👋';

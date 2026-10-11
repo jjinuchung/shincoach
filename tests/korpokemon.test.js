@@ -123,23 +123,57 @@ test('★ 🎯 저장 경로: 다 읽으면 기회 하나 · 두 창이 마지�
   assert.equal(stored().items.stone_korean, 1);
 });
 
+test('★ 🔍 Codex 49차 #1·#2 저장 경로: 뺀 뒤 판정 전에 새로 고치면 다음에 돌려준다 · 돌려주기 저장이 실패하면({ok:false} — 오류가 아니다) 줄이 남아 다음에 · 판정이 난 기회는 안 돌려준다', async () => {
+  const { holdStore, refundOutcome } = await import('../js/throwhold.js');
+  const m = new Map();
+  const ls = { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+  const timers = { setInterval: () => 1, clearInterval: () => {} };
+  const store = () => holdStore('kor', { ls, page: 'tab1', timers });
+  const giveBack = async () => { try { return refundOutcome(await korGiveBackThrow()); } catch { return 'fail'; } };
+  await initProfile();
+  await seed({ korThrow: { earned: 2, used: 0, refunded: 0 } });
+  // 뺐다 → 잡기 창 → 새로 고침(판정 없음)
+  assert.equal((await korTakeThrow()).ok, true);
+  store().track('r1');
+  assert.equal(korThrowsLeft(), 1);
+  await reloadProfile();
+  assert.equal(await store().settle(giveBack), 1, '다음에 들어오면 돌려준다');
+  assert.equal(korThrowsLeft(), 2);
+  assert.deepEqual(stored().korThrow, { earned: 2, used: 1, refunded: 1 });
+  // 뺐다 → 판정 → 새로 고침: 쓴 기회는 그대로
+  assert.equal((await korTakeThrow()).ok, true);
+  store().track('r2').judged();
+  assert.equal(await store().settle(giveBack), 0);
+  assert.equal(korThrowsLeft(), 1);
+  // 뺐다 → 안 던지고 닫음 → 돌려주기 저장 실패 → 줄이 남는다 → 다음에 들어오면
+  assert.equal((await korTakeThrow()).ok, true);
+  const h = store().track('r3');
+  fakeIdb.failNext('profile');
+  assert.equal(await h.refund(giveBack), false, '저장 실패를 놓치지 않는다');
+  assert.equal(korThrowsLeft(), 0);
+  assert.deepEqual(Object.keys(store().list()), ['r3']);
+  assert.equal(await store().settle(giveBack), 1);
+  assert.equal(korThrowsLeft(), 1);
+  assert.deepEqual(store().list(), {});
+});
+
 test('🎯 화면 연결: 다 읽은 카드·도감 머리에 잡기 단추 · 화면을 띄우기 전에 빼고 안 던지면 돌려준다 · 후보는 국어 전용 · 잡기 화면 말 · 🎒 📚 표시 · 상점 말', () => {
   const src = read('js/koreanview.js');
   const body = (head) => { const i = src.indexOf(head); assert.ok(i >= 0, head); return src.slice(i, src.indexOf('\n}\n', i)); };
   const run = body('export async function runKorCatch() {');
   const iTake = run.indexOf('taken = await korTakeThrow();');
   assert.ok(iTake >= 0 && iTake < run.indexOf('openCatch({') && run.includes("if (!taken || !taken.ok) { ui.catchMsg"), '띄우기 전에 뺀다 · 못 빼면 안 띄운다');
-  assert.ok(run.includes("if (r && r.threw === false && !st.threw) korGiveBackThrow()") && run.includes("subject: 'korean'"));
-  // 판정(attempt)이 나면 던진 것 — 연출 중에 닫히면 attempt가 안 불려 돌려준다
-  assert.ok(run.includes('attempt: (id, opts) => { st.threw = true; return catchAttempt(id, Math.random, opts); },'), '판정 때 던진 것으로 적는다');
+  assert.ok(run.includes("if (r && r.threw === false && !st.threw) st.hold.refund(korGiveBack)") && run.includes("subject: 'korean'"));
+  // 판정(attempt)이 나면 던진 것 — 연출 중에 닫히면 attempt가 안 불려 돌려준다 (장부의 줄도 그때 지운다 — tests/throwhold.test.js)
+  assert.ok(run.includes('attempt: (id, opts) => { st.threw = true; st.hold.judged(); return catchAttempt(id, Math.random, opts); },'), '판정 때 던진 것으로 적는다');
   assert.ok(run.indexOf('ui.catchState = st;') < run.indexOf('openCatch({'), '띄우기 전에 이번 창의 상태를 둔다');
   // 창이 소식 없이 닫히면(catch.closeCatch는 onDone을 안 부른다) 안 던진 기회를 돌려주고 단추를 살린다
   const settle = body('function settleLostCatch() {');
   assert.ok(settle.includes('if (!ui.catching || !st || isCatchOpen()) return null;'), '창이 아직 떠 있으면 건드리지 않는다');
-  assert.ok(settle.includes('ui.catching = false;') && settle.includes('return st.threw ? null : korGiveBackThrow()'), '안 던졌을 때만 돌려준다');
+  assert.ok(settle.includes('ui.catching = false;') && settle.includes('if (st.threw) return null;') && settle.includes('return st.hold.refund(korGiveBack)'), '안 던졌을 때만 돌려준다');
   assert.ok(run.indexOf('await settleLostCatch();') >= 0 && run.indexOf('await settleLostCatch();') < run.indexOf('if (ui.catching) return;'), '남은 단추를 눌러도 먼저 정리');
   assert.ok(body('function catchBtnEl() {').includes('settleLostCatch();') && body('export async function enterKorean() {').includes('settleLostCatch();'));
-  assert.ok(run.includes('if (!koreanVisible()) { await korGiveBackThrow().catch(() => {}); ui.catching = false; return; }'), '뺀 사이 나가면 돌려준다');
+  assert.ok(run.includes('if (!koreanVisible()) { await st.hold.refund(korGiveBack); ui.catching = false; return; }'), '뺀 사이 나가면 돌려준다');
   assert.ok(body('async function korPool() {').includes("forSubject(chars, 'korean')"), '후보는 국어 전용');
   assert.ok(body('function finishEl() {').includes('const cb = catchBtnEl();') && body('export async function renderList() {').includes('const cb = catchBtnEl();'));
   assert.ok(body('export async function enterKorean() {').includes('topUpKorChars();'));

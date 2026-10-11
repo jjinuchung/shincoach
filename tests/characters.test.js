@@ -96,7 +96,7 @@ test('수학 던지기 버튼: 후보 없음(그림 없음·만날 포켓몬 없
   assert.match(src, /const stop = \(why\) => \{ if \(typeof onStop === 'function'\) onStop\(why\); \}/);
   assert.match(src, /stop\(hasPics \? 'noavail' : 'nopics'\)/, '그림은 있는데 만날 포켓몬이 없는 것과 그림이 없는 것을 가른다');
   assert.match(src, /stop\('save'\)/, '던지기를 빼는 저장이 실패');
-  assert.match(src, /stop\('error'\)/, '잡기 화면을 못 띄움');
-  for (const why of ['nopics', 'noavail', 'save', 'error']) assert.match(src, new RegExp(`${why}: '🎯`), `${why} 안내 문구`);
+  assert.match(src, /stop\(back \? 'error' : 'errorOwed'\)/, '잡기 화면을 못 띄움 — 돌려주기가 저장됐는지에 따라 말이 다르다 (Codex 49차 #2)');
+  for (const why of ['nopics', 'noavail', 'save', 'error', 'errorOwed', 'owed']) assert.match(src, new RegExp(`${why}: '🎯`), `${why} 안내 문구`);
   assert.match(src, /if \(ui\.pendNote\) \{[^}]*ui\.pendNote = null; \}/);
 });

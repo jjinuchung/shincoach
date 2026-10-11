@@ -145,7 +145,7 @@ export function mergeMiss(a, b) {
  * evMiss = 근거를 잘못 누른 수(잘못 읽기로는 안 세지만 🟩 "한 번에 다 맞힘"에는 든다)
  * why: 'unknown' 모르는 카드
  * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, next?:number, days?:number}}
- *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날)
+ *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날) — 별을 받았을 때도 다음 별이 남았으면 next·days
  */
 export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0) {
   if (typeof cardId !== 'string' || !Array.isArray(ids) || !ids.includes(cardId)) return { ok: false, why: 'unknown' };
@@ -171,7 +171,9 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0) {
   if (perfect) profile.items = { ...(profile.items || {}), [KOR_STONE]: Math.min(Number.MAX_SAFE_INTEGER, (Math.floor(Number((profile.items || {})[KOR_STONE])) || 0) + 1) };
   profile.coins = (Number(profile.coins) || 0) + coins;
   profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
-  return { ok: true, star: next.star, coins, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId) };
+  // 다음 별까지 남은 날 — ★★ 뒤 "처음 읽은 날부터 일주일"은 ★★를 늦게 받으면 틀렸다(10/1 ★ · 10/11 ★★ → ★★★는 10/12, Codex 49차)
+  const after = nextStar(done, cardId, now);
+  return { ok: true, star: next.star, coins, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId), ...(after.why === 'wait' ? { next: after.next, days: after.days } : {}) };
 }
 
 // ── 🎯 국어 잡기 기회 (2026-10-11, 아버님 "국어에서만 나오는 포켓몬 150") ──

@@ -3,11 +3,12 @@
 // 샘플 검수 페이지(artifact 9QUtn2o2L8ogq7DJBZnp3f)를 그대로 앱으로 — 아버님 "우선 만들고 적용한 후에 반응을 보자"
 //  · 보기는 물음마다 섞어 그린다(원고의 정답 자리를 외우지 않게) · 틀린 보기는 한 번 누르면 꺼지고 힌트(잘못 읽기 종류)
 //  · 근거가 둘 이상이면 하나만 눌러도 맞고, 맞히면 모두 칠한다 · 근거를 잘못 누른 것은 잘못 읽기로 세지 않는다
-//  · ⏳ 하루 시간 제한(수학·영어)은 국어를 세지 않는다 — 처음엔 반응을 보려고(아버님께 여쭐 것)
+//  · ⏳ 국어도 하루 1시간 30분(v232, 아버님) — 읽던 글은 끝까지, 새 글만 막는다
 import { TYPES, KINDS, KOR_COINS, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar } from './korean.js';
 import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt } from './xp.js';
 import { loadCharacters, downloadCharacters, forSubject, isUnlocked, pickCharacters } from './pokemon.js';
 import { openCatch, isCatchOpen } from './catch.js';
+import { holdStore, refundOutcome } from './throwhold.js'; // 🎯 뺀 던지기 예약 장부 (Codex 49차 #1·#2)
 import { guardStart } from './timeup.js'; // ⏳ 국어 하루 1시간 30분 — 새 글을 열 때만 막는다(읽던 글은 끝까지, 아버님 결정 ②)
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 
@@ -24,7 +25,7 @@ export const CONTENT_URL = './coach/korean/reading.json';
 
 // cards: 쓸 수 있는 카드(validCards) · read: 읽는 중인 글 { card, qi, qs: [물음 상태], misses, result, saving }
 const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null };
-// catchState = 지금 열어 둔 잡기 창 { threw } — 창이 바깥에서 닫혀(catch.closeCatch는 부른 쪽에 안 알린다) 소식이 없을 때 안 던진 기회를 돌려주려고
+// catchState = 지금 열어 둔 잡기 창 { threw, hold } — 창이 바깥에서 닫혀(catch.closeCatch는 부른 쪽에 안 알린다) 소식이 없을 때 안 던진 기회를 돌려주려고
 
 /** 보기 차례를 섞는다 (rng = 0 이상 1 미만) → 원고 보기 번호 배열 */
 export function shuffled(n, rng = Math.random) {
@@ -64,8 +65,9 @@ export function finishText(r) {
     return { title: '저장이 안 됐어요', lines: ['[다시 저장하기]를 눌러 주세요 — 푼 것은 그대로예요'] };
   }
   const got = `💰 +${r.coins}${r.stone ? ' · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!)' : ''} · 🎯 국어 포켓몬 잡기 1번`;
-  if (r.star === 1) return { title: '📚 도감 등록!', lines: [got, `내일 다시 읽으면 ★★ 💰${KOR_COINS[2]}`] };
-  if (r.star === 2) return { title: '★★ 두 번째 별!', lines: [got, `처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★ 💰${KOR_COINS[3]}`] };
+  // 다음 별까지 남은 날은 규칙이 센 것(r.days) — ★★ 뒤 "일주일이 지나면"은 ★★를 늦게 받으면 틀렸다 (Codex 49차)
+  if (r.star === 1) return { title: '📚 도감 등록!', lines: [got, `${whenText(r.next === 2 ? r.days : 1)} 다시 읽으면 ★★ 💰${KOR_COINS[2]}`] };
+  if (r.star === 2) return { title: '★★ 두 번째 별!', lines: [got, r.next === 3 ? `${whenText(r.days)} 다시 읽으면 ★★★ 💰${KOR_COINS[3]}` : `처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★ 💰${KOR_COINS[3]}`] };
   if (r.star === 3) return { title: '★★★ 다 모았어요!', lines: [got, '이 글은 이제 진우 거예요'] };
   if (r.wait === 'wait' && (r.next === 2 || r.next === 3)) {
     return { title: r.next === 2 ? '오늘도 잘 읽었어요' : '또 읽었어요!', lines: [`${whenText(r.days)} 다시 읽으면 ${'★'.repeat(r.next)} 💰${KOR_COINS[r.next]}`] };
@@ -91,6 +93,7 @@ async function loadCards() {
 export async function enterKorean() {
   topUpKorChars(); // 🎯 국어 포켓몬 그림을 조금씩 먼저
   settleLostCatch();
+  settleKorThrows(); // 🎯 지난번에 뺐는데 판정 전에 꺼진 기회·돌려주다 실패한 기회 (Codex 49차 #1·#2)
   if (ui.read) { if (!$('korean-main').querySelector('.kor-read')) renderRead(); return; }
   await renderList();
 }
@@ -507,7 +510,27 @@ export const CATCH_WHY = {
   noavail: '🎯 지금은 만날 수 있는 포켓몬이 없어요 — 조금 뒤에 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
   save: '🎯 기록이 잠깐 저장되지 않았어요 — 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
   error: '🎯 잡기 화면을 열지 못했어요 — 다시 눌러 주세요 (몬스터볼은 돌려놨어요)',
+  // 돌려주는 저장까지 안 됐다 — "돌려놨어요"라고 하면 거짓말이다 (Codex 49차 #2)
+  errorOwed: '🎯 잡기 화면을 열지 못했어요 — 몬스터볼은 국어에 다시 들어오면 돌려줘요',
+  owed: '🎯 몬스터볼을 돌려주는 기록이 잠깐 저장되지 않았어요 — 국어에 다시 들어오면 돌려줘요',
 };
+
+// 🎯 뺀 기회 장부 — 뺄 때 한 줄, 판정이 나면(attempt) 지우고, 돌려주기가 저장되면 지운다. 남은 줄은 국어에 들어올 때 돌려준다
+const holds = holdStore('shincoach.korean.throwHolds');
+/** 기회 하나 돌려주기 → 'ok' · 'none'(돌려줄 게 없다) · 'fail'(저장 안 됨 — houseDo는 실패를 오류 대신 {ok:false}로 준다, Codex 49차 #2) */
+async function korGiveBack() {
+  try { return refundOutcome(await korGiveBackThrow()); } catch { return 'fail'; }
+}
+let holdTimer = null;
+/** 남은 예약을 돌려준다 — 돌려준 게 있으면 다시 그린다 · 다른 창의 줄은 그 창이 닫힌 지 1분 뒤에 (그때 다시 돈다) */
+function settleKorThrows() {
+  return holds.settle(korGiveBack).then((n) => {
+    if (n > 0) refreshAfterCatch();
+    const w = holds.waitMs();
+    if (w !== null && !holdTimer) holdTimer = setTimeout(() => { holdTimer = null; settleKorThrows(); }, w + 1000);
+    return n;
+  }).catch(() => 0);
+}
 
 function koreanVisible() {
   const v = $('view-korean');
@@ -547,7 +570,8 @@ function settleLostCatch() {
   if (!ui.catching || !st || isCatchOpen()) return null;
   ui.catchState = null;
   ui.catching = false;
-  return st.threw ? null : korGiveBackThrow().catch(() => {}).finally(refreshAfterCatch);
+  if (st.threw) return null; // 판정이 났다 — 쓴 기회
+  return st.hold.refund(korGiveBack).then((ok) => { if (!ok) ui.catchMsg = CATCH_WHY.owed; refreshAfterCatch(); });
 }
 
 function catchBtnEl() {
@@ -590,25 +614,26 @@ export async function runKorCatch() {
   let taken;
   try { taken = await korTakeThrow(); } catch { taken = { ok: false, why: 'save' }; }
   if (!taken || !taken.ok) { ui.catchMsg = taken && taken.why === 'none' ? '' : CATCH_WHY.save; done(); return; }
-  if (!koreanVisible()) { await korGiveBackThrow().catch(() => {}); ui.catching = false; return; } // 뺀 사이 나갔다 — 돌려준다
-  const st = { threw: false };
+  const st = { threw: false, hold: holds.track() }; // 뺀 기회를 장부에 — 판정 전에 앱이 꺼져도 다음에 돌려준다 (Codex 49차 #1)
+  if (!koreanVisible()) { await st.hold.refund(korGiveBack); ui.catching = false; return; } // 뺀 사이 나갔다 — 돌려준다
   ui.catchState = st;
   try {
     openCatch({
       candidates: pickCharacters(pool, 4), subject: 'korean', xpGain: 0, coinGain: 0, levelInfo: getLevelInfo(), levelUp: 0,
       ballCounts: inventory(),
-      attempt: (id, opts) => { st.threw = true; return catchAttempt(id, Math.random, opts); },
-      // ★ 한 번도 안 던지고 닫았으면 기회를 돌려준다 — 화면을 띄우기 전에 이미 뺐다
+      // 판정이 나는 순간 쓴 기회 — 장부의 줄을 지운다(동기). 판정 전에 닫히면 attempt가 안 불려 돌려준다
+      attempt: (id, opts) => { st.threw = true; st.hold.judged(); return catchAttempt(id, Math.random, opts); },
+      // ★ 한 번도 안 던지고 닫았으면 기회를 돌려준다 — 화면을 띄우기 전에 이미 뺐다 (저장이 안 되면 장부에 남아 다음에)
       onDone: (r) => {
-        ui.catchState = null;
-        if (r && r.threw === false && !st.threw) korGiveBackThrow().catch(() => {}).finally(done);
+        if (ui.catchState === st) ui.catchState = null;
+        if (r && r.threw === false && !st.threw) st.hold.refund(korGiveBack).then((ok) => { if (!ok) ui.catchMsg = CATCH_WHY.owed; }).finally(done);
         else done();
       },
     });
   } catch {
-    ui.catchState = null;
-    await korGiveBackThrow().catch(() => {});
-    ui.catchMsg = CATCH_WHY.error;
+    if (ui.catchState === st) ui.catchState = null;
+    const back = await st.hold.refund(korGiveBack);
+    ui.catchMsg = back ? CATCH_WHY.error : CATCH_WHY.errorOwed;
     done();
   }
 }

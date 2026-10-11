@@ -38,7 +38,8 @@ import { showHatchIfAny } from './hatch.js';
 import { guardStart } from './timeup.js';
 import { setExempt, status as timeStatus, isLocked } from './timelimit.js'; // ⏳ 도전 문제 동안은 시간을 안 센다 · 🚀 남은 시간(로켓단은 5분 미만이면 안 나온다)
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole } from './pokemon.js';
-import { openCatch } from './catch.js';
+import { openCatch, isCatchOpen } from './catch.js';
+import { holdStore } from './throwhold.js'; // 🎯 뺀 던지기 예약 장부 (Codex 49차 #1·#2)
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN } from './cheer.js';
 import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
@@ -56,6 +57,7 @@ const ui = {
   contents: {},         // 줄기별 사람이 쓴 내용 (coach/math/*.json, 한 번 받아 둠)
   charBusy: false,      // 🔢 수학 포켓몬 그림을 받는 중 (topUpMathCharacters 중복 방지)
   catching: false,      // 🎯 잡기 흐름이 도는 중 (runCatches 하나만)
+  catchState: null,     // 🎯 지금 열어 둔 잡기 창 { threw, hold } — 창이 소식 없이 닫혀도(catch.closeCatch는 onDone을 안 부른다) 정리하려고
   opts: null,           // makeRound에 넘길 출연진·세계 (content는 줄기별로 optsFor가 끼운다)
   round: null,          // 진행 중인 한 편 { id, mode:'learn'|'review'|'diag'|'notes'|'mix', qs, at, correct, missTags, answered }
   daily: null,          // ☀️ 오늘의 수학 흐름 { plan, step:'round'|'mix', roundInfo } — 개념 편 → 🎲 섞어 풀기. 사다리로 나가면 null
@@ -302,6 +304,9 @@ function topUpMathCharacters() {
 // 🎯 돌려주지 못한 던지기 (Codex 9차 #2) — `takePending`으로 뺐는데 화면을 못 띄웠고, 돌려주는 저장까지
 // 실패하면 그 기회는 영영 사라졌다. 저장이 될 때까지 **기기에 빚으로 적어 두고** 수학에 들어올 때 갚는다.
 // 레코드 쪽 `giveBackPending`이 "뺀 수보다 많이 돌려주지 않는다"를 지키므로 두 번 갚아도 안전하다.
+// → Codex 49차 #1·#2: 빚 수로는 "뺐는데 판정 전에 앱이 꺼진·새로 고친" 기회를 못 찾았다("안 던졌다"가 메모리에만 있었다).
+//   이제 뺀 기회마다 예약 장부(throwhold.js)에 한 줄 — 판정이 나면 지우고, 남은 줄은 수학에 들어올 때 돌려준다.
+//   옛 빚 수(OWED_KEY)는 이미 적힌 것만 그대로 갚는다
 const OWED_KEY = 'shincoach.math.owedThrows';
 function owedThrows() {
   try { return Math.max(0, Math.floor(Number(localStorage.getItem(OWED_KEY)) || 0)); } catch { return 0; }
@@ -309,15 +314,48 @@ function owedThrows() {
 function setOwedThrows(n) {
   try { if (n > 0) localStorage.setItem(OWED_KEY, String(n)); else localStorage.removeItem(OWED_KEY); } catch { /* 무시 */ }
 }
-/** 밀린 환불을 갚는다 — 수학 화면에 들어올 때 가장 먼저 (실패하면 빚을 남기고 다음에) */
-async function settleOwedThrows() {
-  let owed = owedThrows();
-  while (owed > 0) {
-    try { ui.state = await updateMath((mm) => { giveBackPending(mm); }); }
-    catch { return; }
-    owed -= 1;
-    setOwedThrows(owed);
-  }
+const holds = holdStore('shincoach.math.throwHolds');
+/** 기회 하나 돌려주기 → 'ok' 저장됨 · 'fail' 저장 안 됨 (레코드의 giveBackPending이 뺀 수보다 많이 돌려주지 않는다) */
+async function mathGiveBack() {
+  try { ui.state = await updateMath((mm) => { giveBackPending(mm); }); return 'ok'; } catch { return 'fail'; }
+}
+let settlingMath = null;
+let holdTimer = null;
+/** 밀린 환불을 갚는다 — 수학 화면에 들어올 때 가장 먼저 (실패하면 남겨 두고 다음에) · 이 창 안에서 겹쳐 돌지 않는다
+ *  다른 창의 줄은 그 창이 닫힌 지 1분이 지나야 돌려준다 — 그때 다시 돈다 */
+function settleMathThrows() {
+  if (settlingMath) return settlingMath;
+  settlingMath = (async () => {
+    let owed = owedThrows();
+    while (owed > 0) {
+      if ((await mathGiveBack()) !== 'ok') return 0;
+      owed -= 1;
+      setOwedThrows(owed);
+    }
+    const n = await holds.settle(mathGiveBack);
+    const w = holds.waitMs();
+    if (w !== null && !holdTimer) {
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        settleMathThrows().then((k) => { if (k > 0) refreshLadderIfShown(); }).catch(() => {});
+      }, w + 1000);
+    }
+    return n;
+  })().finally(() => { settlingMath = null; });
+  return settlingMath;
+}
+/** 돌려준 기회가 사다리의 "🎯 받은 몬스터볼" 수에 보이게 — 사다리가 떠 있고 잡는 중이 아닐 때만 */
+function refreshLadderIfShown() {
+  const m = main();
+  if (ui.state && mathVisible() && !ui.catching && m && m.querySelector('ul.math-ladder')) renderLadder(ui.state);
+}
+/** 잡기 창이 소식 없이 닫혔다(다른 화면이 catch.closeCatch를 불렀다 — onDone이 안 온다) — 흐름을 풀고, 판정 전이면 돌려준다 */
+function settleLostMathCatch() {
+  const st = ui.catchState;
+  if (!ui.catching || !st || isCatchOpen()) return null;
+  ui.catchState = null;
+  ui.catching = false;
+  return st.threw ? null : st.hold.refund(mathGiveBack);
 }
 
 /**
@@ -330,18 +368,20 @@ const PEND_NOTE = {
   noavail: '🎯 지금은 만날 수 있는 포켓몬이 없어요 — 조금 뒤에 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
   save: '🎯 기록이 잠깐 저장되지 않았어요 — 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
   error: '🎯 잡기 화면을 열지 못했어요 — 다시 눌러 주세요 (몬스터볼은 돌려놨어요)',
+  // 돌려주는 저장까지 안 됐다 — "돌려놨어요"라고 하면 거짓말이다 (Codex 49차 #2)
+  errorOwed: '🎯 잡기 화면을 열지 못했어요 — 몬스터볼은 수학에 다시 들어오면 돌려줘요',
+  owed: '🎯 몬스터볼을 돌려주는 기록이 잠깐 저장되지 않았어요 — 수학에 다시 들어오면 돌려줘요',
 };
 
 async function runCatches(n, { g, c, run, onAll, onStop }) {
   if (n <= 0) return;
+  await settleLostMathCatch(); // 지난 창이 소식 없이 닫혔으면 먼저 정리 (아니면 ui.catching이 켜진 채 다시는 안 열렸다)
   if (ui.catching) return; // 한 번에 하나의 잡기 흐름만 — 버튼을 연타해도 둘이 같이 돌며 던지기를 둘 다 쓰지 않게 (Codex 6차 #3)
   ui.catching = true;
   // 정리는 한 곳 — 예외·나감·끝남 전부 여기로: catching 내리고, 보이면 사다리·"다음 →" 버튼을 되살린다 (Codex 8차 #6)
   const finish = () => { ui.catching = false; if (typeof onAll === 'function' && run === ui.run && mathVisible()) onAll(); };
-  const giveBack = async () => {
-    try { ui.state = await updateMath((m) => { giveBackPending(m); }); }
-    catch { setOwedThrows(owedThrows() + 1); } // 저장 실패 — 빚으로 적어 두고 다음에 갚는다 (Codex 9차 #2)
-  };
+  // 돌려주기 — 저장이 실패하면 예약 장부의 줄이 남아 다음에 수학에 들어올 때 돌려준다 (Codex 9차 #2 → 49차 #2)
+  const giveBack = (hold) => hold.refund(mathGiveBack);
   let pool = [];
   try { pool = await catchPool(); } catch (e) { console.warn('후보 준비 실패:', e); pool = []; }
   // 나가 있으면(다른 화면·🎒) 안 띄운다 — 던질 기회는 레코드에 남아 사다리의 "🎯 받은 몬스터볼"로 다시 온다
@@ -359,6 +399,7 @@ async function runCatches(n, { g, c, run, onAll, onStop }) {
   let left = n;
   const one = async () => {
     let taken = false;
+    let st = null;
     try {
       if (run !== ui.run || !mathVisible()) { ui.catching = false; return; }
       // 던지기 하나를 **먼저** 레코드에서 뺀다(트랜잭션) — 두 창이 같은 기회를 두 번 던지지 못하게. 없으면 끝
@@ -366,26 +407,37 @@ async function runCatches(n, { g, c, run, onAll, onStop }) {
       try { const s = await updateMath((m) => { taken = takePending(m); }); ui.state = s; } catch { taken = false; saveFailed = true; }
       if (saveFailed) { stop('save'); finish(); return; } // 저장이 안 됐다 — 몬스터볼은 그대로, 이유를 보여 준다 (Codex 12차 #9)
       if (!taken) { finish(); return; } // 남은 게 없다 — 사다리를 새로 그린다 (숫자가 바뀌어 보인다)
-      if (run !== ui.run || !mathVisible()) { await giveBack(); ui.catching = false; return; } // 뺀 사이에 나갔다 — 돌려준다
+      st = { threw: false, hold: holds.track() }; // 뺀 기회를 장부에 — 판정 전에 앱이 꺼져도 다음에 돌려준다 (Codex 49차 #1)
+      if (run !== ui.run || !mathVisible()) { await giveBack(st.hold); ui.catching = false; return; } // 뺀 사이에 나갔다 — 돌려준다
       const candidates = pickCharacters(pool, 4);
+      ui.catchState = st;
       openCatch({
         candidates, subject: 'math', xpGain: g ? g.gained : 0, coinGain: c || 0, levelInfo: g ? g.info : getLevelInfo(), levelUp: g && g.leveledUp ? g.to : 0,
         ballCounts: inventory(),
         radar: itemCount(RADAR.id) > 0 ? { count: itemCount(RADAR.id), use: (cur) => useRadar(pool, cur) } : null, // 🧭 아이가 눌러야 쓴다
-        attempt: (id, opts) => catchAttempt(id, Math.random, opts),
+        // 판정이 나는 순간 쓴 기회 — 장부의 줄을 지운다(동기). 판정 전에 닫히면 attempt가 안 불려 돌려준다
+        attempt: (id, opts) => { st.threw = true; st.hold.judged(); return catchAttempt(id, Math.random, opts); },
         // ★ 한 번도 안 던지고 닫았으면 기회를 **돌려준다** — 던지기는 화면을 띄우기 전에 이미 뺐다.
         //    (진우: "볼을 던졌는데 아무 일도 안 일어나고 낭비만 했어요")
         onDone: (r) => {
+          if (ui.catchState === st) ui.catchState = null;
           updateChip();
-          if (r && r.threw === false) { giveBack().catch(() => {}); finish(); return; }
+          if (r && r.threw === false && !st.threw) {
+            giveBack(st.hold).then((ok) => { if (!ok) ui.pendNote = PEND_NOTE.owed; }).catch(() => {});
+            finish();
+            return;
+          }
           left--;
           if (left > 0) one(); else finish();
         },
       });
     } catch (e) {
       console.warn('잡기 흐름 오류:', e);
-      if (taken) await giveBack(); // 뺐는데 화면을 못 띄웠다 — 돌려준다
-      stop('error');
+      if (ui.catchState === st) ui.catchState = null;
+      let back = true;
+      if (taken && st) back = await giveBack(st.hold); // 뺐는데 화면을 못 띄웠다 — 돌려준다 (저장이 안 되면 장부에 남아 다음에)
+      else if (taken && (await mathGiveBack()) !== 'ok') { setOwedThrows(owedThrows() + 1); back = false; } // 장부에 적기 전에 멈췄다 — 옛 빚으로
+      stop(back ? 'error' : 'errorOwed');
       finish();
     }
   };
@@ -440,6 +492,7 @@ function clearMain() {
 
 /** 진입 — 진단 전이면 진단, 아니면 사다리 */
 export async function renderMath() {
+  settleLostMathCatch(); // 🎯 잡기 창이 소식 없이 닫혔으면 흐름부터 푼다 (Codex 49차)
   topUpMathCharacters();
   topUpCheerDots(); // 🕺 ✨ 응원이 걸어 다니려면 도트 그림이 있어야 한다 (몇 마리씩 미리)
   prepareBattle(); // ⚔️ 오늘 몫·그림을 읽어 둔다 (배틀 등장 판정은 문항마다 동기로 돈다)
@@ -472,6 +525,7 @@ export async function renderMath() {
   if (!m) return;
   m.innerHTML = '';
   m.appendChild(el('p', 'math-loading', '불러오는 중…'));
+  await settleMathThrows().catch(() => {}); // 🎯 남은 예약을 먼저 돌려줘야 사다리의 "받은 몬스터볼" 수가 맞다
   let [state] = await Promise.all([getMath(), buildOpts()]);
   state = await syncMathReplies(state); // 📬 비공개 저장소의 아빠 답장이 있으면 붙인다
   if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다
@@ -1948,7 +2002,7 @@ function mathHidden() {
 
 /** ⚔️ 배틀 준비 — 오늘 몫과 포켓몬 그림을 읽어 둔다 (등장 판정은 문항마다 동기로 돌아야 한다) */
 function prepareBattle() {
-  settleOwedThrows().catch(() => {}); // 🎯 밀린 환불부터 (Codex 9차 #2)
+  settleMathThrows().catch(() => {}); // 🎯 밀린 환불부터 (Codex 9차 #2 · 49차 예약 장부)
   loadTodayCounts().catch(() => {});
   loadCharacters().then((c) => { ui.chars = c || []; }).catch(() => { ui.chars = ui.chars || []; });
 }
