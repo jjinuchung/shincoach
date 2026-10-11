@@ -140,7 +140,9 @@ export async function openPokedex(opts) {
   const bySubj = (subj) => unlocked.filter((m) => subjectOf(m.id) === subj);
   const en = bySubj('english');
   const ma = bySubj('math');
-  card.appendChild(el('div', 'pokedex-stats pokedex-subjects', `🎤 영어 퍼즐에서 잡아요 ${en.filter((m) => p.caught[m.id] > 0).length}/${en.length} · 🔢 수학에서 잡아요 ${ma.filter((m) => p.caught[m.id] > 0).length}/${ma.length}`));
+  const ko = bySubj('korean');
+  const got = (list) => list.filter((m) => p.caught[m.id] > 0).length;
+  card.appendChild(el('div', 'pokedex-stats pokedex-subjects', `🎤 영어 퍼즐에서 잡아요 ${got(en)}/${en.length} · 🔢 수학에서 잡아요 ${got(ma)}/${ma.length}${ko.length ? ` · 📚 국어에서 잡아요 ${got(ko)}/${ko.length}` : ''}`));
   const hint = el('div', 'pokedex-hint');
   hint.appendChild(el('span', 'streak', streak > 0 ? `🔥 ${streak}일 연속 학습 중` : `🔥 하루 ${STREAK_MIN_DONE}문장 이상 하면 연속 학습이 시작돼요`));
   if (nextLv) hint.appendChild(el('span', 'unlock', `🔒 Lv.${nextLv}에 새 포켓몬 ${unlockCountAt(nextLv)}마리 — ⚡${xpToReach(nextLv) - p.xp} 남음`));
@@ -156,7 +158,7 @@ export async function openPokedex(opts) {
   for (const e of eggSummary(p)) gl.appendChild(el('span', 'egg', `🥚 ${e.subject === 'math' ? '수학' : '영어'} 알 ${e.done}/${e.need}일`)); // 품는 알 — 그 과목을 완주한 날 수
   card.appendChild(gl);
   showHatchIfAny(); // 🐣 다른 화면에서 부화했는데 아직 못 본 것
-  card.appendChild(el('div', 'pokedex-stats', `스톤은 배워야만 생겨요 — 🔷 개념 통과·👑 / 🔶 ${ENGLISH_STONE_SHORT}. 🛒 상점 🧤 칸에서 코인과 같이 써요`));
+  card.appendChild(el('div', 'pokedex-stats', `스톤은 배워야만 생겨요 — 🔷 개념 통과·👑 / 🔶 ${ENGLISH_STONE_SHORT} / 🟩 국어 글을 한 번에 다 맞혀 별 받기. 🛒 상점 🧤 칸에서 코인과 같이 써요`));
   // 💰 코인·🎒 가방·🛒 상점
   const coinRow = el('div', 'pokedex-coins');
   const coinLeft = el('div');
@@ -246,6 +248,7 @@ export async function openPokedex(opts) {
       // 🌌 울트라비스트는 🕳 울트라홀이 열려야 만난다 — 🔢 대신 🌌를 달아 "다른 차원에서 온 것"을 표시
       if (isUltraBeast(m.id)) cell.appendChild(el('div', 'subj ub', '🌌'));
       else if (subjectOf(m.id) === 'math') cell.appendChild(el('div', 'subj', '🔢')); // 수학에서만 잡히는 얼굴 — 못 잡은 칸에도 붙어 "수학 가면 있다"가 보인다
+      else if (subjectOf(m.id) === 'korean') cell.appendChild(el('div', 'subj', '📚')); // 📚 국어에서만 (2026-10-11)
       if (n > 0 && getPartner() === m.id) cell.appendChild(el('div', 'partner', '🤝'));
       // 못 잡은 포켓몬도 누를 수 있다 — 등급은 **잡기 전에** 맞아야 의미가 있다 (전설이 흔함에 있으면 쉽게 잡힌다)
       cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url, caught: n > 0 }));

@@ -58,6 +58,8 @@
     <header class="topbar">
       <button id="btn-korean-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
       <h1 class="topbar-title">📚 신코치 국어</h1>
+      <!-- ⏳ 오늘 남은 시간 — 국어는 날마다 1시간 30분 (2026-10-11) -->
+      <button type="button" id="time-chip-korean" class="time-chip" hidden></button>
       <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
     </header>
@@ -710,6 +712,10 @@
         <label class="field field-inline">
           <span class="field-label">주말 (분)</span>
           <input type="number" id="set-time-weekend" min="0" max="600" step="10" inputmode="numeric">
+        </label>
+        <label class="field field-inline">
+          <span class="field-label">📚 국어 (분, 날마다) <small>— 위 평일·주말은 수학·영어</small></span>
+          <input type="number" id="set-time-korean" min="0" max="600" step="10" inputmode="numeric">
         </label>
         <label class="field field-inline">
           <span class="field-label">⏳ 연장권 하루 최대 <small>— 과목마다. 아이가 🛒에서 산 것으로 15분씩</small></span>

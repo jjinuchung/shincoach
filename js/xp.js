@@ -20,7 +20,7 @@ import {
 } from './db.js';
 import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진우네 집 규칙 (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
-import { korFinishRule, missOf } from './korean.js'; // 📚 국어 별·💰 규칙 (순수)
+import { korFinishRule, missOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule } from './korean.js'; // 📚 국어 별·💰 규칙 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
@@ -133,7 +133,9 @@ export const RARITY_IDS = {
       // 🔢 수학 전용 (2026-09-22) 포획률 ≥120 60
       17, 20, 21, 27, 41, 43, 56, 77, 96, 100, 111, 120, 163, 170, 191, 201, 204, 206, 209, 231, 261, 262, 276, 287, 293, 300, 304, 320, 328, 361, 396, 404, 415, 420, 431, 449, 453, 507, 509, 519, 551, 580, 595, 627, 659, 662, 667, 677, 710, 731, 736, 742, 749, 819, 827, 833, 856, 924, 938, 967,
       // 🧬 줄기를 잇는 중간 단계 중 포획률 ≥120 (2026-09-27)
-      11, 75, 180, 281, 329],
+      11, 75, 180, 281, 329,
+      // 📚 국어 전용 (2026-10-11) 흔함 60
+      270, 271, 273, 274, 363, 364, 355, 290, 291, 366, 412, 532, 535, 536, 540, 541, 543, 544, 577, 574, 582, 583, 599, 602, 524, 525, 664, 665, 669, 670, 824, 825, 837, 838, 859, 860, 840, 928, 929, 932, 933, 13, 14, 29, 30, 165, 167, 177, 218, 223, 401, 422, 425, 434, 436, 451, 456, 459, 511, 513],
   2: [25, 133, 175, 143, 131, 94, 26, 95, 113,
       2, 5, 8, 447, 12, 147, 246, 123, 125, 137, 148, 91,
       212, 257, 260,
@@ -144,19 +146,25 @@ export const RARITY_IDS = {
       // 🔢 수학 전용 (2026-09-22) 포획률 45~119 45
       38, 55, 64, 105, 115, 128, 127, 93, 156, 159, 169, 184, 199, 229, 247, 256, 259, 319, 350, 371, 372, 387, 391, 394, 444, 461, 470, 471, 498, 571, 625, 634, 614, 656, 657, 697, 701, 728, 745, 776, 816, 884, 849, 912, 1000,
       // 🧬 줄기를 잇는 중간 단계 중 포획률 45~119 (2026-09-27)
-      42, 67, 176, 253, 305, 499, 502, 654, 680, 726, 729, 814, 817, 886, 913],
+      42, 67, 176, 253, 305, 499, 502, 654, 680, 726, 729, 814, 817, 886, 913,
+      // 📚 국어 전용 (2026-10-11) 보통 45
+      495, 496, 650, 651, 810, 811, 356, 292, 367, 368, 413, 414, 533, 578, 575, 600, 603, 782, 783, 841, 842, 1011, 935, 166, 168, 178, 219, 224, 402, 423, 426, 435, 437, 452, 457, 460, 512, 514, 138, 139, 140, 141, 408, 409, 225],
   3: [6, 9, 3, 130, 448, 658, 778, 248, 282, 445, 149, 373, 376, 887, // 149 망나뇽은 전설이 아니라 600족(마기라스·한카리아스급) — 아이 지적으로 수정
       // 전설조(3신조·기타 전설) — 전설만큼은 아니어도 귀하게
       144, 145, 146, 251, 483, 484, 487, 643, 644, 716,
       132, 359, // 2026-09-20 추가분 중 포획률 45 미만 — 메타몽(35)·앱솔(30)
       // 🔢 수학 전용 (2026-09-22) 포획률 <45 또는 3단계 최종형(스타터·600족) 30
-      34, 36, 76, 157, 160, 181, 208, 254, 330, 306, 375, 392, 395, 405, 468, 500, 503, 635, 612, 655, 681, 706, 727, 730, 815, 818, 823, 908, 914, 998,
+      34, 36, 76, 157, 160, 181, 208, 254, 330, 306, 375, 392, 395, 405, 468, 500, 503, 635, 612, 655, 681, 706, 727, 730, 815, 818, 823, 908, 914, 998,,
+      // 📚 국어 전용 (2026-10-11) 희귀 30
+      497, 652, 812, 272, 275, 365, 477, 534, 537, 542, 545, 579, 576, 584, 601, 604, 526, 666, 671, 784, 826, 839, 861, 1019, 930, 934, 936, 937, 15, 31
 ],
   // 🌌 울트라비스트 11 (2026-09-27) — ⭐ 등급 밖의 제 등급. 원작에서도 전설이 아니다(is_legendary: false)
   5: [793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806],
   4: [150, 151, 384, 249, 250, 382, 383, 493, // 가장 상징적인 8마리만 전설
       // 🔢 수학 전용 (2026-09-22) 전설·환상 15 — 수학에서만 만나는 전설이 있어야 도감이 수학으로 끈다
-      243, 244, 245, 379, 385, 491, 492, 494, 717, 791, 792, 807, 893, 1007, 1008],
+      243, 244, 245, 379, 385, 491, 492, 494, 717, 791, 792, 807, 893, 1007, 1008,
+      // 📚 국어 전용 (2026-10-11) 전설·환상 15
+      480, 481, 482, 488, 490, 648, 638, 639, 640, 785, 786, 787, 788, 801, 802],
 };
 const rarityById = {};
 for (const r of Object.keys(RARITY_IDS)) for (const id of RARITY_IDS[r]) rarityById[id] = Number(r);
@@ -322,7 +330,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korThrow: { earned: 0, used: 0, refunded: 0 }, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -354,7 +362,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korThrow: throwsOf(p.korThrow), sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -870,8 +878,20 @@ export function restClaim(u, decide, want) {
 }
 /** 📚 국어 글 한 편을 다 읽었다 — 잘못 읽기 횟수 + 받을 별이 있으면 별·💰를 저장된 프로필로 한 트랜잭션에서(houseDo = applyHouseRule = mutateProfile)
  *  ids = 지금 있는 카드 id · 날은 트랜잭션 안의 시각으로 센다(창을 연 날이 아니라) */
-export function korFinish(cardId, misses, ids) {
-  return houseDo((p) => korFinishRule(p, cardId, Date.now(), misses, ids));
+export function korFinish(cardId, misses, ids, evMiss = 0) {
+  return houseDo((p) => korFinishRule(p, cardId, Date.now(), misses, ids, evMiss)); // evMiss — 🟩 "한 번에 다 맞힘" 판정
+}
+/** 🎯 국어 잡기 기회 하나 빼기 — 잡기 화면을 띄우기 전에(두 창이 같은 기회를 두 번 던지지 못하게) */
+export function korTakeThrow() {
+  return houseDo((p) => korTakeRule(p));
+}
+/** 🎯 뺐는데 한 번도 안 던지고 닫았다 → 돌려준다 */
+export function korGiveBackThrow() {
+  return houseDo((p) => korGiveBackRule(p));
+}
+/** 🎯 남은 국어 잡기 기회 (그리기용) */
+export function korThrowsLeft() {
+  return pendingOf(profile.korThrow);
 }
 /** 📚 받은 별 { '카드id:별': 날 } (그리기용 복사본) */
 export function korDoneMap() {

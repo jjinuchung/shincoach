@@ -33,10 +33,12 @@ test('puzzleXp: 틀린 횟수 0/1/2 → 30/20/10, 정답 공개 → 3', () => {
   assert.equal(puzzleXp(null), 3);
 });
 
-test('희귀도: 명단 342마리 전부 등급이 있고 겹치지 않음 — 🔢 수학 165는 흔함 61·보통 51·희귀 30·전설 15·🌌 8', () => {
+test('희귀도: 명단 492마리 전부 등급이 있고 겹치지 않음 — 🔢 수학 165는 흔함 61·보통 51·희귀 30·전설 15·🌌 8 · 📚 국어 150은 60·45·30·15', () => {
   const all = Object.values(RARITY_IDS).flat();
-  assert.equal(all.length, 342);
-  assert.equal(new Set(all).size, 342, '겹침 없음');
+  assert.equal(all.length, 492);
+  assert.equal(new Set(all).size, 492, '겹침 없음');
+  const kor = new Set(ROSTER.filter((r) => r.subject === 'korean').map((r) => r.id));
+  assert.deepEqual([1, 2, 3, 4, 5].map((r) => RARITY_IDS[r].filter((id) => kor.has(id)).length), [60, 45, 30, 15, 0], '📚 국어 — 수학과 같은 비율 (2026-10-11)');
   const math = new Set(ROSTER.filter((r) => r.subject === 'math').map((r) => r.id));
   const cnt = [1, 2, 3, 4, 5].map((r) => RARITY_IDS[r].filter((id) => math.has(id)).length);
   // 🧬 줄기 중간 20은 흔함·보통뿐이다 — 희귀가 하나도 없어야 🥚 알 목표로 끼어들지 않는다

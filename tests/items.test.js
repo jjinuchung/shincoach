@@ -70,8 +70,10 @@ test('canBuy: 부족한 코인 계산', () => {
 });
 
 test('🧤 스톤 상점: 레이더는 💰100 + 🔷1 — 스톤이 없으면 코인이 많아도 못 사고, 스톤은 돈으로 못 산다 (2026-09-22 아버님 "인피니티 스톤")', () => {
-  assert.deepEqual(STONES.map((s) => s.id), ['stone_math', 'stone_english']);
+  assert.deepEqual(STONES.map((s) => s.id), ['stone_math', 'stone_english', 'stone_korean']);
   assert.equal(stoneOf('math').emoji, '🔷'); assert.equal(stoneOf('english').emoji, '🔶'); assert.equal(stoneOf('science'), null);
+  assert.deepEqual([stoneOf('korean').emoji, stoneOf('korean').ko, stoneOf('korean').kind, stoneOf('korean').price], ['🟩', '국어스톤', 'stone', 0], '🟩 국어스톤 — 건틀릿의 🔒 🟩 자리가 열렸다 (2026-10-11)');
+  assert.ok(!FUTURE_STONES.some((f) => f.emoji === '🟩'), '열린 자리는 🔒 목록에서 빠진다');
   assert.ok(FUTURE_STONES.length >= 1, '다음 과목 자리(🔒)가 건틀릿에 보인다');
   assert.deepEqual(costOf(RADAR), { coins: 100, items: { stone_math: 1 } });
   assert.deepEqual(costOf(itemById('ribbon')), { coins: 30, items: {} }, '스톤 없는 물건은 코인만');

@@ -14,8 +14,9 @@ test('⏳ 아버님이 정한 값: 평일 1시간 · 주말 2시간 · 10분 전
   assert.equal(WARN_SEC, 600);
   assert.deepEqual(GRANT_MIN, [10, 20, 30]);
   assert.equal(IDLE_SEC, 120);
-  assert.deepEqual(SUBJECTS, ['math', 'english']);
+  assert.deepEqual(SUBJECTS, ['math', 'english', 'korean']);
   assert.ok(KO.math && KO.english);
+  assert.equal(KO.korean, '📚 국어');
 });
 
 test('⏳ 주말 가리기 — 문자열을 조각으로 읽는다 (new Date("YYYY-MM-DD")는 UTC라 한국에선 하루 밀린다)', () => {
@@ -155,7 +156,8 @@ test('⏳ 연장권 값: 15분 · 과목마다 하루 2개 · 수학 💰100+�
   assert.equal(EXTEND_MAX, 2);
   assert.deepEqual([EXTEND_MATH.price, EXTEND_MATH.stones], [100, { stone_math: 1 }]);
   assert.deepEqual([EXTEND_ENGLISH.price, EXTEND_ENGLISH.stones], [150, { stone_math: 1 }], '영상을 더 보려면 수학을 제대로 — 🔷');
-  assert.deepEqual(EXTENDERS.map((x) => [x.subject, x.minutes, x.kind]), [['math', 15, 'extend'], ['english', 15, 'extend']]);
+  assert.deepEqual(EXTENDERS.map((x) => [x.subject, x.minutes, x.kind]), [['math', 15, 'extend'], ['english', 15, 'extend'], ['korean', 15, 'extend']]);
+  assert.deepEqual([extenderOf('korean').price, extenderOf('korean').stones], [100, { stone_korean: 1 }], '📚 국어 시간은 🟩 국어스톤으로');
   assert.equal(extenderOf('math'), EXTEND_MATH);
   assert.equal(extenderOf('english'), EXTEND_ENGLISH);
   assert.equal(extenderOf('없는과목'), null);
@@ -163,8 +165,8 @@ test('⏳ 연장권 값: 15분 · 과목마다 하루 2개 · 수학 💰100+�
   for (const it of EXTENDERS) {
     assert.equal(itemById(it.id), it, `${it.id}이 ITEMS에 없다 — 상점에서 사도 가방에 안 들어간다`);
     assert.equal(ITEMS.filter((x) => x.id === it.id).length, 1);
-    assert.equal(canBuy(it.id, 9999, {}).ok, false, '🔷 없이는 못 산다');
-    assert.equal(canBuy(it.id, it.price, { stone_math: 1 }).ok, true);
+    assert.equal(canBuy(it.id, 9999, {}).ok, false, '스톤 없이는 못 산다');
+    assert.equal(canBuy(it.id, it.price, it.stones).ok, true);
   }
   for (let i = 0; i < 400; i++) assert.ok(!lootBox(() => i / 400).startsWith('extend'), '🎁 상자에서 연장권이 나오면 시간을 공짜로 늘린다');
 });
@@ -272,9 +274,55 @@ test('★ ⏳ 연장권 Codex 21차 — 자정 넘김·느린 저장 사이 다�
   assert.match(doEx, /const here = seq === openSeq && box && !box\.hidden;/, '그 사이 다른 창이 열렸으면 그 창은 건드리지 않는다');
   assert.equal((up.match(/openSeq \+= 1;/g) || []).length, 2, '열 때·닫을 때 둘 다');
   // #6 다른 창에서 바꾼 ⚙ 시간 제한·연장권 한도를 이 창도 따른다
-  assert.match(read('js/player.js'), /window\.addEventListener\('storage', \(e\) => \{[\s\S]{0,300}for \(const k of \['timeLimit', 'timeWeekday', 'timeWeekend', 'timeExtMax'\]\)/);
+  assert.match(read('js/player.js'), /window\.addEventListener\('storage', \(e\) => \{[\s\S]{0,300}for \(const k of \['timeLimit', 'timeWeekday', 'timeWeekend', 'timeKorean', 'timeExtMax'\]\)/);
   // #7 영어 영상·🔁 복습도 잠금 뒤 "계속하기"로 이어서 연다 — 이어 할 것 없이 부르는 곳이 남지 않았다
   const lib = read('js/library.js');
   assert.equal((lib.match(/guardStart\('english', \(\) => \{ open\(\)/g) || []).length, 2);
   assert.doesNotMatch(lib, /guardStart\('english'\)/);
+});
+
+test('📚 국어 시간 (2026-10-11 아버님 "국어는 하루 1시간30분"): 날마다 90분 · 따로 세는 칸(korTime·korBonus·korExt) · ⚙ 국어 분은 따로 · 병합은 큰 쪽 · 잠금 칩', async () => {
+  const { KOREAN_MIN, baseMinOf, FIELD, setSubject, currentSubject } = await import('../js/timelimit.js');
+  // 시계: 국어 화면이면 국어를 센다 (모르는 과목은 null)
+  setSubject('korean');
+  assert.equal(currentSubject(), 'korean');
+  setSubject('science');
+  assert.equal(currentSubject(), null);
+  const { readFileSync } = await import('node:fs');
+  const read = (f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+  assert.deepEqual(KOREAN_MIN, { weekday: 90, weekend: 90 });
+  assert.equal(baseMinOf('korean'), KOREAN_MIN);
+  assert.equal(baseMinOf('math'), DEFAULT_MIN);
+  assert.deepEqual(FIELD.korean, { used: 'korTime', bonus: 'korBonus', ext: 'korExt' });
+  for (const day of ['2026-10-12', '2026-10-11']) { // 월요일 · 일요일
+    const st = statusOf({ ...emptyDaily(day), korTime: 5399 }, 'korean', day);
+    assert.deepEqual([st.limit, st.left, st.locked], [5400, 1, false], `${day} 90분`);
+    assert.equal(statusOf({ ...emptyDaily(day), korTime: 5400 }, 'korean', day).locked, true);
+  }
+  // 수학·영어 시간과 따로 — 수학을 다 써도 국어는 남는다
+  const both = { ...emptyDaily('2026-10-12'), mathTime: 9999, enTime: 9999, korTime: 600 };
+  assert.deepEqual([statusOf(both, 'math', '2026-10-12').locked, statusOf(both, 'korean', '2026-10-12').left], [true, 4800]);
+  // ⚙ 국어 분(날마다 같은 값) — 비었거나 이상하면 90
+  assert.equal(statusOf(both, 'korean', '2026-10-12', { weekday: 30, weekend: 30 }).limit, 1800);
+  assert.equal(statusOf(both, 'korean', '2026-10-12', { weekday: NaN, weekend: NaN }).limit, 5400);
+  assert.equal(statusOf(both, 'korean', '2026-10-11', { weekday: 'x' }).limit, 5400, '주말도 90');
+  // 부모 추가·연장권
+  const more = { ...emptyDaily('2026-10-12'), korTime: 5400, korBonus: 600, korExt: 1 };
+  assert.deepEqual([statusOf(more, 'korean', '2026-10-12').total, statusOf(more, 'korean', '2026-10-12').left], [5400 + 600 + 900, 1500]);
+  assert.deepEqual(tickDelta('korean', 3), { korTime: 3 });
+  assert.deepEqual(grantDelta('korean', 20), { korBonus: 1200 });
+  // 병합은 큰 쪽(DAILY_SUMS) — 옛 백업으로 오늘 쓴 국어 시간을 지우지 못한다
+  const { mergeStatRecord } = await import('../js/db.js');
+  const m = mergeStatRecord('daily', { ...emptyDaily('2026-10-12'), korTime: 300, korExt: 1 }, { ...emptyDaily('2026-10-12'), korTime: 900, korBonus: 600 });
+  assert.deepEqual([m.korTime, m.korBonus, m.korExt], [900, 600, 1]);
+  // 화면 연결: 국어 칩 · ⚙ 국어 분 · 📊 연장권 줄 · app이 국어 화면을 센다 · 국어는 새 글을 열 때만 막는다
+  const html = read('index.html');
+  assert.ok(html.includes('id="time-chip-korean"') && html.includes('id="set-time-korean"'));
+  assert.match(read('js/timeup.js'), /\{ id: 'time-chip-korean', subject: 'korean' \}/);
+  assert.match(read('js/player.js'), /minKorean: \{ weekday: Number\(settings\.timeKorean\), weekend: Number\(settings\.timeKorean\) \}/);
+  assert.match(read('js/stats.js'), /\['📚 국어', td && td\.korExt\]/);
+  assert.match(read('js/app.js'), /if \(name === 'korean'\) return 'korean';/);
+  assert.match(read('js/timelimit.js'), /return statusOf\(clock\.daily, s, clock\.today, s === 'korean' \? c\.minKorean : c\.min,/);
+  const kv = read('js/koreanview.js');
+  assert.ok(kv.includes("b.addEventListener('click', () => guardStart('korean', () => openCard(c.id)));") && kv.includes("re.addEventListener('click', () => guardStart('korean', () => openCard(r.card.id)));"), '새 글·다시 읽기만 막는다 — 읽던 글은 끝까지');
 });

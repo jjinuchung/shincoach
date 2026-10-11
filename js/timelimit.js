@@ -19,11 +19,13 @@
 
 import { applyDailyDelta, getDaily } from './db.js';
 
-/** 과목 두 가지 */
-export const SUBJECTS = ['math', 'english'];
+/** 과목 세 가지 — 📚 국어는 2026-10-11 (아버님 "국어는 하루 1시간30분 제한") */
+export const SUBJECTS = ['math', 'english', 'korean'];
 
-/** 기본 제한(분) — 아버님 요청값. ⚙ 설정에서 바꿀 수 있다 */
+/** 기본 제한(분) — 아버님 요청값. ⚙ 설정에서 바꿀 수 있다 (수학·영어) */
 export const DEFAULT_MIN = { weekday: 60, weekend: 120 };
+/** 📚 국어 기본 제한(분) — 날마다 1시간 30분 (아버님 2026-10-11) · ⚙ 설정에서 따로 바꾼다 */
+export const KOREAN_MIN = { weekday: 90, weekend: 90 };
 
 /** 남은 시간을 미리 알려 주기 시작하는 지점(초) */
 export const WARN_SEC = 600;
@@ -49,10 +51,16 @@ export const EXTEND_MAX = 2;
 export const FIELD = {
   math: { used: 'mathTime', bonus: 'mathBonus', ext: 'mathExt' },
   english: { used: 'enTime', bonus: 'enBonus', ext: 'enExt' },
+  korean: { used: 'korTime', bonus: 'korBonus', ext: 'korExt' },
 };
 
 /** 과목 이름 (화면에 쓰는 말) */
-export const KO = { math: '🔢 수학', english: '🎤 영어' };
+export const KO = { math: '🔢 수학', english: '🎤 영어', korean: '📚 국어' };
+
+/** 그 과목의 기본 제한(분) — 국어만 따로 */
+export function baseMinOf(subject) {
+  return subject === 'korean' ? KOREAN_MIN : DEFAULT_MIN;
+}
 
 /**
  * "YYYY-MM-DD"가 주말(토·일)인가.
@@ -65,12 +73,12 @@ export function isWeekend(dateKey) {
   return day === 0 || day === 6;
 }
 
-/** 오늘의 기본 제한(초) — min은 ⚙ 설정의 { weekday, weekend } (분) */
-export function limitSec(dateKey, min) {
-  const conf = { ...DEFAULT_MIN, ...(min || {}) };
+/** 오늘의 기본 제한(초) — min은 ⚙ 설정의 { weekday, weekend } (분) · base = 비었거나 이상할 때의 기본값(과목마다, baseMinOf) */
+export function limitSec(dateKey, min, base = DEFAULT_MIN) {
+  const conf = { ...base, ...(min || {}) };
   const raw = isWeekend(dateKey) ? conf.weekend : conf.weekday;
   const n = Math.floor(Number(raw));
-  if (!Number.isFinite(n) || n < 0) return (isWeekend(dateKey) ? DEFAULT_MIN.weekend : DEFAULT_MIN.weekday) * 60;
+  if (!Number.isFinite(n) || n < 0) return (isWeekend(dateKey) ? base.weekend : base.weekday) * 60;
   return n * 60;
 }
 
@@ -106,13 +114,13 @@ export function extMaxOf(v) {
 /**
  * 지금 형편 → { used, limit, bonus, ext, extN, total, left, locked, warn }
  * @param {object} daily 오늘 기록
- * @param {'math'|'english'} subject
+ * @param {'math'|'english'|'korean'} subject
  * @param {string} dateKey "YYYY-MM-DD"
- * @param {{weekday?:number, weekend?:number}} [min] ⚙ 설정의 제한(분)
+ * @param {{weekday?:number, weekend?:number}} [min] ⚙ 설정의 제한(분) — 그 과목 것(국어는 따로)
  * @param {{off?:boolean, extra?:number}} [o] off: 제한 자체를 껐다 · extra: 아직 저장 안 한 초
  */
 export function statusOf(daily, subject, dateKey, min, o = {}) {
-  const limit = limitSec(dateKey, min);
+  const limit = limitSec(dateKey, min, baseMinOf(subject));
   const bonus = bonusSec(daily, subject);
   const extN = extCount(daily, subject);
   const ext = extN * EXTEND_MIN * 60;
@@ -181,8 +189,8 @@ export function fmtUsed(sec) {
 // ───────────────────── 시계 (여기부터 브라우저) ─────────────────────
 
 const clock = {
-  subject: null,        // 지금 세고 있는 과목 ('math' | 'english' | null)
-  pending: { math: 0, english: 0 }, // 아직 저장 안 한 초
+  subject: null,        // 지금 세고 있는 과목 ('math' | 'english' | 'korean' | null)
+  pending: { math: 0, english: 0, korean: 0 }, // 아직 저장 안 한 초
   lastActive: 0,        // 마지막 입력 시각(ms)
   today: '',            // 지금 세고 있는 날짜
   daily: null,          // 오늘 기록 (저장할 때마다 갱신)
@@ -256,7 +264,7 @@ export function noteActivity() {
  * 🎒 도감·📊 기록·🏠 홈은 null — 아버님 결정 ③(잠겨도 볼 수 있고, 시간도 안 센다)
  */
 export function setSubject(subject) {
-  const next = subject === 'math' || subject === 'english' ? subject : null;
+  const next = SUBJECTS.includes(subject) ? subject : null;
   if (clock.subject === next) return;
   flushTime().catch(() => {});
   clock.subject = next;
@@ -278,7 +286,7 @@ export function status(subject) {
   const s = subject || clock.subject;
   if (!s) return null;
   const c = confNow();
-  return statusOf(clock.daily, s, clock.today, c.min, { off: !!c.off, extra: clock.pending[s] || 0 });
+  return statusOf(clock.daily, s, clock.today, s === 'korean' ? c.minKorean : c.min, { off: !!c.off, extra: clock.pending[s] || 0 }); // 📚 국어는 제한이 따로
 }
 
 /** 지금 그 과목이 잠겼나 (제한을 껐으면 언제나 false) */

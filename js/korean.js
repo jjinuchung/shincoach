@@ -30,6 +30,9 @@ export const KINDS = { practice: '📄 연습 카드', classic: '✨ 명작 카�
 
 /** 별마다 💰 — 수학 개념 편과 같은 크기(처음 다 맞힘 12 · 복습 통과 8 · 👑 이해 완료 20, mathprog.REWARD) */
 export const KOR_COINS = { 1: 12, 2: 8, 3: 20 };
+/** 🟩 국어스톤 아이템 id (items.STONE_KOREAN과 같아야 한다 — 테스트로 고정) · 별을 새로 받을 때 **보기·근거를 모두 한 번에** 맞혔으면 하나
+ *  (아버님 2026-10-11 "국어 스톤도 만들자" — 다른 스톤처럼 "제대로 배웠나"에서만, 글마다 많아야 별 수만큼 3개) */
+export const KOR_STONE = 'stone_korean';
 /** ★★★는 처음 ★을 받은 날부터 이만큼 지나 다시 읽으면 */
 export const STAR3_DAYS = 7;
 /** 한 번 다 읽을 때 셀 수 있는 잘못 읽기 수(종류마다) — 보기가 넷이라 틀린 보기는 물음마다 셋, 물음은 많아야 다섯 */
@@ -138,12 +141,13 @@ export function mergeMiss(a, b) {
 
 /**
  * 글 한 편을 다 읽었다 — 한 트랜잭션에서: 잘못 읽기 횟수 더하기 · 받을 별이 있으면 별 + 💰.
- * ids = 지금 있는 카드 id들(모르는 카드로 💰를 받지 못하게) · misses = { 종류: 이번에 고른 수 } · now = 트랜잭션 안의 시각
+ * ids = 지금 있는 카드 id들(모르는 카드로 💰를 받지 못하게) · misses = { 종류: 이번에 고른 수 } · now = 트랜잭션 안의 시각 ·
+ * evMiss = 근거를 잘못 누른 수(잘못 읽기로는 안 세지만 🟩 "한 번에 다 맞힘"에는 든다)
  * why: 'unknown' 모르는 카드
  * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, next?:number, days?:number}}
  *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날)
  */
-export function korFinishRule(profile, cardId, now, misses, ids) {
+export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0) {
   if (typeof cardId !== 'string' || !Array.isArray(ids) || !ids.includes(cardId)) return { ok: false, why: 'unknown' };
   const add = missOf(misses);
   const cur = missOf(profile.korMiss);
@@ -156,11 +160,58 @@ export function korFinishRule(profile, cardId, now, misses, ids) {
     return { ok: true, star: 0, coins: 0, stars: starsOf(done, cardId), wait: next.why, ...(next.days ? { next: next.next, days: next.days } : {}) };
   }
   done[starKey(cardId, next.star)] = dayNum(now) || 1;
+  // 🎯 별을 새로 받을 때마다 국어 포켓몬 잡기 한 번 (아버님 2026-10-11 — 다음 날 다시 읽어 ★★를 받아도 잡을 수 있게)
+  const tw = throwsOf(profile.korThrow);
+  tw.earned = Math.min(Number.MAX_SAFE_INTEGER, tw.earned + 1);
+  profile.korThrow = tw;
   profile.korDone = done;
   const coins = KOR_COINS[next.star];
+  // 🟩 보기도 근거도 한 번에 다 맞혔으면 국어스톤 하나 — 별을 새로 받을 때만(같은 날 다시 읽어 모으지 못하게)
+  const perfect = !Object.keys(add).length && !(Number(evMiss) > 0);
+  if (perfect) profile.items = { ...(profile.items || {}), [KOR_STONE]: Math.min(Number.MAX_SAFE_INTEGER, (Math.floor(Number((profile.items || {})[KOR_STONE])) || 0) + 1) };
   profile.coins = (Number(profile.coins) || 0) + coins;
   profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
-  return { ok: true, star: next.star, coins, stars: starsOf(done, cardId) };
+  return { ok: true, star: next.star, coins, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId) };
+}
+
+// ── 🎯 국어 잡기 기회 (2026-10-11, 아버님 "국어에서만 나오는 포켓몬 150") ──
+// 별을 새로 받을 때마다 한 번. 수학(mathprog.throwsOf)과 같은 꼴 — 늘어나기만 하는 세 카운터 { earned 번 수, used 뺀 수, refunded 돌려준 수 }
+// 남은 기회 = earned − used + refunded. 잡기 화면을 띄우기 **전에** 하나 빼고(korTakeRule), 한 번도 안 던지고 닫으면 돌려준다(korGiveBackRule)
+// → 두 창이 같은 기회를 두 번 던지지 못하고, 옛 백업이 쓴 기회를 되살리지 못한다(병합은 카운터마다 max)
+
+const cnt = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
+/** 잡기 기회 고쳐 읽기 — 새 객체 { earned, used, refunded } (돌려준 수는 뺀 수를 넘지 않는다) */
+export function throwsOf(t) {
+  const x = isObj(t) ? t : {};
+  const used = cnt(x.used);
+  return { earned: cnt(x.earned), used, refunded: Math.min(cnt(x.refunded), used) };
+}
+/** 남은 잡기 기회 */
+export function pendingOf(t) {
+  const x = throwsOf(t);
+  return Math.max(0, x.earned - x.used + x.refunded);
+}
+/** 병합 — 카운터마다 큰 쪽 */
+export function mergeThrows(a, b) {
+  const x = throwsOf(a);
+  const y = throwsOf(b);
+  return throwsOf({ earned: Math.max(x.earned, y.earned), used: Math.max(x.used, y.used), refunded: Math.max(x.refunded, y.refunded) });
+}
+/** 🎯 잡기 기회 하나 빼기 (잡기 화면을 띄우기 전, 한 트랜잭션) — why 'none' 남은 기회 없음 */
+export function korTakeRule(profile) {
+  const t = throwsOf(profile.korThrow);
+  if (t.earned - t.used + t.refunded <= 0) return { ok: false, why: 'none' };
+  t.used += 1;
+  profile.korThrow = t;
+  return { ok: true, left: pendingOf(t) };
+}
+/** 🎯 뺐는데 한 번도 안 던졌다 → 돌려준다 (뺀 수보다 많이 돌려주지 않는다) — why 'none' */
+export function korGiveBackRule(profile) {
+  const t = throwsOf(profile.korThrow);
+  if (t.refunded >= t.used) return { ok: false, why: 'none' };
+  t.refunded += 1;
+  profile.korThrow = t;
+  return { ok: true, left: pendingOf(t) };
 }
 
 /**

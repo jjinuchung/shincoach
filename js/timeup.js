@@ -23,9 +23,10 @@ let retryFn = null;     // 잠금 때문에 못 한 것 (guardStart의 fn) — �
 let extending = false;  // 연장권 저장 중 (두 번 눌러 두 개 쓰지 않게)
 let openSeq = 0;        // 창을 열고 닫을 때마다 +1 — 느린 저장이 끝났을 때 그 사이 다른 창이 열렸는지 본다
 
-/** 칩 세 개 (🔢 수학 / 🎬 목록 / ▶ 플레이어) */
+/** 칩 네 개 (🔢 수학 / 🎬 목록 / ▶ 플레이어 / 📚 국어) */
 const CHIPS = [
   { id: 'time-chip-math', subject: 'math' },
+  { id: 'time-chip-korean', subject: 'korean' },
   { id: 'time-chip-library', subject: 'english' },
   { id: 'time-chip-player', subject: 'english' },
 ];

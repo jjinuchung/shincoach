@@ -428,7 +428,7 @@ export async function renderStats() {
   c1.appendChild(bars);
   // ⏳ 오늘 아이가 쓴 시간 연장권 (2026-10-01) — 부모가 모르는 사이 늘어난 시간이 없게
   const td = daily.find((d) => d && d.date === today);
-  const ext = [['🔢 수학', td && td.mathExt], ['🎤 영어', td && td.enExt]].filter(([, n]) => Number(n) > 0).map(([ko, n]) => `${ko} +${Number(n) * EXTEND_MIN}분 (${Number(n)}개)`);
+  const ext = [['🔢 수학', td && td.mathExt], ['🎤 영어', td && td.enExt], ['📚 국어', td && td.korExt]].filter(([, n]) => Number(n) > 0).map(([ko, n]) => `${ko} +${Number(n) * EXTEND_MIN}분 (${Number(n)}개)`);
   if (ext.length) c1.appendChild(el('p', 'stats-note', `⏳ 오늘 진우가 시간 연장권을 썼어요 — ${ext.join(' · ')}`));
   main.appendChild(c1);
 

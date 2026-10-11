@@ -57,7 +57,7 @@ export function josa(word, withBatchim, without) {
  * @param {number} [o.levelUp] 레벨업했으면 새 레벨
  * @param {(id:number) => {caught:boolean, chance:number, count:number, first:boolean, bonusXp:number, info:object}} o.attempt 던지기 판정
  * @param {boolean} [o.practice] 연습 모드 표시
- * @param {'math'} [o.subject] 🔢 수학에서 연 잡기 — 후보가 수학 전용 포켓몬이라는 걸 아이에게 알린다
+ * @param {'math'|'korean'} [o.subject] 🔢 수학·📚 국어에서 연 잡기 — 후보가 그 과목 전용 포켓몬이라는 걸 아이에게 알린다
  * @param {string} [o.note] 머리글에 덧붙일 한 줄
  * @param {{count:number, use:(cur:Array)=>Promise<{candidates:Array, pickId:number, note:string}|null>}} [o.radar] 🧭 레이더가 가방에 있으면 — 아이가 누르면 use()가 후보를 바꿔 준다
  * @param {() => void} [o.onDone] 닫힐 때
@@ -78,7 +78,9 @@ export function openCatch(o) {
   renderHeader(o.xpGain, o.levelInfo, o.levelUp);
   $('catch-msg').textContent = (o.note ? `${o.note} · ` : '') + (o.subject === 'math'
     ? '🔢 수학에서만 만나는 포켓몬이에요! 한 마리 골라 몬스터볼을 던져봐요'
-    : '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!');
+    : o.subject === 'korean'
+      ? '📚 국어에서만 만나는 포켓몬이에요! 한 마리 골라 몬스터볼을 던져봐요'
+      : '포켓몬을 한 마리 골라 몬스터볼을 던져봐요!');
   $('catch-result').innerHTML = '';
   $('catch-continue').hidden = true;
   const stage = $('catch-stage');

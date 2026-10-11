@@ -30,9 +30,10 @@ const views = {
 };
 
 /** 지금 화면이 어느 과목의 시간을 쓰는가 — 🎒 도감·📊 기록·🏠 홈은 **안 센다** (아버님 결정 2026-09-27)
- *  📚 국어도 아직 안 센다 — 처음엔 반응을 보려고(⏳ 시간 제한·연장권은 수학·영어 둘뿐, 넣을지는 아버님께 여쭘) */
+ *  📚 국어는 날마다 1시간 30분 (아버님 2026-10-11) */
 function subjectOfView(name) {
   if (name === 'math') return 'math';
+  if (name === 'korean') return 'korean';
   if (name === 'library' || name === 'player') return 'english';
   return null;
 }

@@ -326,7 +326,7 @@ function renderMon(msg, pop) {
     ? `${RARITY[r].stars} ${RARITY[r].label} · Lv${monLv(mon.id)} · ${haveCount(mon.id) > 0 ? `데리고 있어요 ×${haveCount(mon.id)}` : (fusedCount(mon.id) > 0 ? '🔀 퓨전에 들어가 있어요 — 🏪 5일장에서 나누면 돌아와요' : takenCount(mon.id) > 0 ? '🔒 아빠가 데려갔어요 — 다시 잡으면 돌아와요' : fledCount(mon.id) > 0 ? '💨 배틀에서 져서 떠났어요 — 다시 잡으면 돌아와요' : '🧬 진화로 보냈어요')}`
       + (caughtCount(mon.id) > haveCount(mon.id) ? ` (도감 ×${caughtCount(mon.id)})` : '')
       + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '')
-    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${subjectOf(mon.id) === 'math' ? ' · 🔢 수학에서 만나요' : ' · 🎤 영어 퍼즐에서 만나요'}`;
+    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${{ math: ' · 🔢 수학에서 만나요', korean: ' · 📚 국어에서 만나요' }[subjectOf(mon.id)] || ' · 🎤 영어 퍼즐에서 만나요'}`;
   const fig = $('mon-figure');
   setFigure(fig, mon.url || '', got ? look : null);
   fig.classList.toggle('unknown', !got); // 실루엣 (도감과 같은 모습)
@@ -493,7 +493,7 @@ function renderGrow() {
   const g = growInfo(mon.id);
   const stone = itemById(g.stone);
   const em = stone ? stone.emoji : '🔷';
-  const subject = subjectOf(mon.id) === 'math' ? '🔢 수학' : '🎤 영어';
+  const subject = { math: '🔢 수학', korean: '📚 국어' }[subjectOf(mon.id)] || '🎤 영어';
 
   $('mon-lv-text').textContent = `Lv${g.lv}${g.lv >= g.max ? ' · 만렙!' : ` / ${g.max}`}`;
   $('mon-lv-fill').style.width = `${Math.round((g.lv / g.max) * 100)}%`;

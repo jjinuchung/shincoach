@@ -113,9 +113,12 @@ export const MUSHROOM = { id: 'mushroom', emoji: '🍄', ko: '다이버섯', pri
 // 가방 아이템으로 두는 이유: purchaseRule의 cost.items(재료)·백업 병합·두 창 안전이 그대로 된다 (새 저장 구조 없음)
 export const STONE_MATH = { id: 'stone_math', emoji: '🔷', ko: '수학스톤', subject: 'math', price: 0, kind: 'stone' };
 export const STONE_ENGLISH = { id: 'stone_english', emoji: '🔶', ko: '영어스톤', subject: 'english', price: 0, kind: 'stone' };
-export const STONES = [STONE_MATH, STONE_ENGLISH];
+// 🟩 국어스톤 (2026-10-11, 아버님 "국어 스톤도 만들자") — 건틀릿에 🔒 🟩 ???로 미리 보이던 자리. 📚 국어에서 별을 새로 받을 때
+//    보기·근거를 모두 한 번에 맞혔으면 하나(korean.korFinishRule) · 국어 포켓몬 레벨업·⏳ 국어 연장권에 쓴다
+export const STONE_KOREAN = { id: 'stone_korean', emoji: '🟩', ko: '국어스톤', subject: 'korean', price: 0, kind: 'stone' };
+export const STONES = [STONE_MATH, STONE_ENGLISH, STONE_KOREAN];
 /** 아직 없는 과목의 자리 — 건틀릿에 🔒로만 보인다 */
-export const FUTURE_STONES = [{ emoji: '🟩', ko: '???' }, { emoji: '🟪', ko: '???' }];
+export const FUTURE_STONES = [{ emoji: '🟪', ko: '???' }];
 export function stoneOf(subject) {
   return STONES.find((s) => s.subject === subject) || null;
 }
@@ -169,7 +172,9 @@ export const STONE_SHOP = [RADAR, EGG_MATH, EGG_ENGLISH, SHINY_STONE, BEASTBALL]
  */
 export const EXTEND_MATH = { id: 'extend_math', emoji: '⏳', ko: '수학 +15분', price: 100, stones: { stone_math: 1 }, kind: 'extend', subject: 'math', minutes: 15, hint: '🔢 수학 시간이 다 되면 잠금 화면에서 "⏳ 연장권 쓰기"를 눌러요 — 오늘 15분 더!' };
 export const EXTEND_ENGLISH = { id: 'extend_english', emoji: '⏳', ko: '영어 +15분', price: 150, stones: { stone_math: 1 }, kind: 'extend', subject: 'english', minutes: 15, hint: '🎤 영어 시간이 다 되면 잠금 화면에서 "⏳ 연장권 쓰기"를 눌러요 — 오늘 15분 더!' };
-export const EXTENDERS = [EXTEND_MATH, EXTEND_ENGLISH];
+/** 📚 국어 +15분 (2026-10-11) — 💰100 + 🟩1 (국어 시간은 국어를 제대로 해서) */
+export const EXTEND_KOREAN = { id: 'extend_korean', emoji: '⏳', ko: '국어 +15분', price: 100, stones: { stone_korean: 1 }, kind: 'extend', subject: 'korean', minutes: 15, hint: '📚 국어 시간이 다 되면 잠금 화면에서 "⏳ 연장권 쓰기"를 눌러요 — 오늘 15분 더!' };
+export const EXTENDERS = [EXTEND_MATH, EXTEND_ENGLISH, EXTEND_KOREAN];
 /** 그 과목의 연장권 (없으면 null) */
 export function extenderOf(subject) {
   return EXTENDERS.find((x) => x.subject === subject) || null;

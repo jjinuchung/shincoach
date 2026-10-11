@@ -3,14 +3,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ROSTER, pickCharacters, unlockedRoster, isUnlocked, nextUnlockLevel, unlockCountAt, headAnchor, subjectOf, forSubject, forPuzzle } from '../js/pokemon.js';
 
-test('ROSTER: 342마리(영어 177 / 🔢 수학 전용 165), id 중복 없음, 한글·영문 이름 있음', () => {
-  assert.equal(ROSTER.length, 342);
-  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 342);
+test('ROSTER: 492마리(영어 177 / 🔢 수학 전용 165 / 📚 국어 전용 150), id 중복 없음, 한글·영문 이름 있음', () => {
+  assert.equal(ROSTER.length, 492);
+  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 492);
+  assert.equal(ROSTER.filter((r) => r.subject === 'korean').length, 150, '📚 국어 전용 (2026-10-11)');
   assert.equal(ROSTER.filter((r) => r.subject === 'math').length, 165, '수학 150 + 🌌 8 + 🧬 줄기 중간 7 (🌌 셋은 2026-09-28 영어로)');
-  assert.equal(unlockedRoster(1).length, 281, '처음 40 + 추가 60 + 수학 165 + 🌌 영어 3 + 중간 13은 바로 (🌌는 울트라홀이 따로 막는다)');
-  assert.equal(unlockedRoster(5).length, 301);
-  assert.equal(unlockedRoster(14).length, 321);
-  assert.equal(unlockedRoster(15).length, 342);
+  assert.equal(unlockedRoster(1).length, 431, '처음 40 + 추가 60 + 수학 165 + 🌌 영어 3 + 중간 13 + 📚 국어 150은 바로 (🌌는 울트라홀이 따로 막는다)');
+  assert.equal(unlockedRoster(5).length, 451);
+  assert.equal(unlockedRoster(14).length, 471);
+  assert.equal(unlockedRoster(15).length, 492);
   assert.equal(ROSTER.find((r) => r.id === 889).ko, '자마젠타', '진우 요청 — 자시안의 짝');
   assert.equal(isUnlocked(25, 1), true, '피카츄는 처음부터');
   assert.equal(isUnlocked(129, 4), false, '잉어킹은 Lv5');
@@ -29,7 +30,7 @@ test('pickCharacters: n마리를 겹치지 않게, 부족하면 있는 만큼, �
   const picked = pickCharacters(chars, 8, () => 0.5);
   assert.equal(picked.length, 8);
   assert.equal(new Set(picked.map((c) => c.id)).size, 8, '중복 없음');
-  assert.equal(chars.length, 342, '원본 유지');
+  assert.equal(chars.length, 492, '원본 유지');
   assert.equal(pickCharacters(chars.slice(0, 3), 8).length, 3, '부족하면 있는 만큼');
   assert.deepEqual(pickCharacters([], 5), []);
   assert.deepEqual(pickCharacters(null, 5), []);
@@ -39,6 +40,8 @@ test('🔢 과목 가르기: subject는 잡히는 곳만 — 영어 177·수학 
   const en = ROSTER.filter((r) => subjectOf(r.id) === 'english');
   const ma = ROSTER.filter((r) => subjectOf(r.id) === 'math');
   assert.equal(en.length, 177); assert.equal(ma.length, 165);
+  assert.equal(ROSTER.filter((r) => subjectOf(r.id) === 'korean').length, 150, '📚 국어');
+  assert.equal(subjectOf(495), 'korean', '주리비얀은 국어');
   assert.equal(subjectOf(25), 'english', '피카츄는 영어');
   assert.equal(subjectOf(244), 'math', '앤테이는 수학');
   assert.equal(subjectOf(99999), 'english', '모르면 영어');

@@ -3087,6 +3087,7 @@ button { font-family: inherit; }
 .kor-stanza { display: grid; }
 .kor-line { display: flex; gap: 10px; align-items: baseline; border-radius: 4px; padding: 0 4px; transition: background-color 0.25s; }
 .kor-line .kor-num { font-family: inherit; font-size: 0.72rem; min-width: 1.3em; color: var(--kor-gold); }
+.kor-classic .kor-prose .kor-num { color: var(--kor-gold); }
 .kor-facts { display: grid; gap: 4px; font-size: 0.85rem; line-height: 1.55; border-top: 1px dashed var(--kor-gold-line); padding-top: 10px; }
 .kor-facts p { margin: 0; }
 .kor-facts b { color: var(--kor-gold); }
@@ -3151,3 +3152,9 @@ button { font-family: inherit; }
   .kor-slot.is-ready, .kor-ev-row.is-no, .kor-done.is-star .kor-done-title { animation: none; }
   .kor-sent, .kor-line { transition: none; }
 }
+
+/* 📚 🎯 국어 포켓몬 잡기 단추 (2026-10-11) */
+.kor-catch { display: grid; gap: 6px; justify-items: center; margin-top: 8px; }
+.kor-head .kor-catch { justify-items: start; }
+.kor-catch-btn { min-width: 220px; }
+.kor-catch-msg { margin: 0; font-size: 0.88rem; color: var(--muted); line-height: 1.5; word-break: keep-all; }

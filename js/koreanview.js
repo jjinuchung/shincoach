@@ -5,7 +5,10 @@
 //  · 근거가 둘 이상이면 하나만 눌러도 맞고, 맞히면 모두 칠한다 · 근거를 잘못 누른 것은 잘못 읽기로 세지 않는다
 //  · ⏳ 하루 시간 제한(수학·영어)은 국어를 세지 않는다 — 처음엔 반응을 보려고(아버님께 여쭐 것)
 import { TYPES, KINDS, KOR_COINS, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar } from './korean.js';
-import { korFinish, korDoneMap, onProfileReload, profileLoading } from './xp.js';
+import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt } from './xp.js';
+import { loadCharacters, downloadCharacters, forSubject, isUnlocked, pickCharacters } from './pokemon.js';
+import { openCatch, isCatchOpen } from './catch.js';
+import { guardStart } from './timeup.js'; // ⏳ 국어 하루 1시간 30분 — 새 글을 열 때만 막는다(읽던 글은 끝까지, 아버님 결정 ②)
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
@@ -20,7 +23,8 @@ const el = (tag, cls, text) => {
 export const CONTENT_URL = './coach/korean/reading.json';
 
 // cards: 쓸 수 있는 카드(validCards) · read: 읽는 중인 글 { card, qi, qs: [물음 상태], misses, result, saving }
-const ui = { cards: null, loadErr: '', read: null, wired: false };
+const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null };
+// catchState = 지금 열어 둔 잡기 창 { threw } — 창이 바깥에서 닫혀(catch.closeCatch는 부른 쪽에 안 알린다) 소식이 없을 때 안 던진 기회를 돌려주려고
 
 /** 보기 차례를 섞는다 (rng = 0 이상 1 미만) → 원고 보기 번호 배열 */
 export function shuffled(n, rng = Math.random) {
@@ -59,9 +63,10 @@ export function finishText(r) {
     if (r && r.why === 'unknown') return { title: '이 글은 지금 도감에 없어요', lines: ['도감으로 돌아가 다른 글을 골라요'] };
     return { title: '저장이 안 됐어요', lines: ['[다시 저장하기]를 눌러 주세요 — 푼 것은 그대로예요'] };
   }
-  if (r.star === 1) return { title: '📚 도감 등록!', lines: [`💰 +${r.coins}`, `내일 다시 읽으면 ★★ 💰${KOR_COINS[2]}`] };
-  if (r.star === 2) return { title: '★★ 두 번째 별!', lines: [`💰 +${r.coins}`, `처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★ 💰${KOR_COINS[3]}`] };
-  if (r.star === 3) return { title: '★★★ 다 모았어요!', lines: [`💰 +${r.coins}`, '이 글은 이제 진우 거예요'] };
+  const got = `💰 +${r.coins}${r.stone ? ' · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!)' : ''} · 🎯 국어 포켓몬 잡기 1번`;
+  if (r.star === 1) return { title: '📚 도감 등록!', lines: [got, `내일 다시 읽으면 ★★ 💰${KOR_COINS[2]}`] };
+  if (r.star === 2) return { title: '★★ 두 번째 별!', lines: [got, `처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★ 💰${KOR_COINS[3]}`] };
+  if (r.star === 3) return { title: '★★★ 다 모았어요!', lines: [got, '이 글은 이제 진우 거예요'] };
   if (r.wait === 'wait' && (r.next === 2 || r.next === 3)) {
     return { title: r.next === 2 ? '오늘도 잘 읽었어요' : '또 읽었어요!', lines: [`${whenText(r.days)} 다시 읽으면 ${'★'.repeat(r.next)} 💰${KOR_COINS[r.next]}`] };
   }
@@ -84,6 +89,8 @@ async function loadCards() {
 
 /** 📚 국어 화면에 들어올 때 (app.showView) — 읽던 글이 있으면 그대로(🎒·📊에서 돌아옴), 아니면 도감 */
 export async function enterKorean() {
+  topUpKorChars(); // 🎯 국어 포켓몬 그림을 조금씩 먼저
+  settleLostCatch();
   if (ui.read) { if (!$('korean-main').querySelector('.kor-read')) renderRead(); return; }
   await renderList();
 }
@@ -115,6 +122,8 @@ export async function renderList() {
   head.appendChild(el('h2', 'kor-h', '📚 작품 도감'));
   head.appendChild(el('p', 'kor-intro', '글을 읽고 문제를 풀면 카드가 모여요. 다른 날 다시 읽으면 ★★, 처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★!'));
   head.appendChild(el('p', 'kor-count', `모은 카드 ${got} / ${total} · ★ ${stars} / ${total * 3}`));
+  const cb = catchBtnEl(); // 🎯 남은 국어 잡기 기회 — 다 읽은 카드에서 안 던지고 나왔어도 여기서
+  if (cb) head.appendChild(cb);
   main.appendChild(head);
   const grid = el('div', 'kor-grid');
   cards.forEach((c, i) => {
@@ -130,7 +139,7 @@ export async function renderList() {
     b.appendChild(el('span', 'kor-slot-stars', '★'.repeat(s) + '☆'.repeat(3 - s)));
     b.appendChild(el('span', 'kor-slot-status', st.text));
     b.setAttribute('aria-label', `${c.title} — 별 ${s}개 · ${st.text}`);
-    b.addEventListener('click', () => openCard(c.id));
+    b.addEventListener('click', () => guardStart('korean', () => openCard(c.id)));
     grid.appendChild(b);
   });
   main.appendChild(grid);
@@ -145,6 +154,7 @@ function openCard(id) {
     qi: 0,
     qs: card.qs.map((q) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [] })),
     misses: {},
+    evMiss: 0, // 근거를 잘못 누른 수 — 잘못 읽기로는 안 세고 🟩 "한 번에 다 맞힘"에만
     result: null,
     saving: false,
     focus: '', // 다시 그린 뒤 초점을 옮길 곳 (moveFocus)
@@ -159,7 +169,20 @@ function backToList() {
   window.scrollTo(0, 0);
 }
 
-/** 글 상자 — 이야기·설명은 번호 붙은 문장, 명작은 금빛 카드(시는 연·줄) */
+/** 번호 붙은 문장 — 연습 글과 이야기 명작(「알에서 태어나다」)이 같이 쓴다 */
+function proseEl(card) {
+  const prose = el('p', 'kor-prose');
+  card.lines.forEach((t, i) => {
+    const sp = el('span', 'kor-sent');
+    sp.dataset.n = String(i + 1);
+    sp.appendChild(el('span', 'kor-num', circled(i + 1)));
+    sp.appendChild(document.createTextNode(`${t} `));
+    prose.appendChild(sp);
+  });
+  return prose;
+}
+
+/** 글 상자 — 이야기·설명은 번호 붙은 문장, 명작은 금빛 카드(시는 연·줄, 이야기는 문장) */
 function passageEl(card) {
   if (card.kind === 'classic') {
     const box = el('div', 'kor-classic');
@@ -168,9 +191,10 @@ function passageEl(card) {
     top.appendChild(el('span', 'kor-classic-by', `${card.author} · ${card.genre}`));
     box.appendChild(top);
     box.appendChild(el('h3', 'kor-classic-title', `「${card.title}」`));
-    const poem = el('div', 'kor-poem');
+    if (!Array.isArray(card.stanzas)) box.appendChild(proseEl(card)); // 이야기 명작 — 시가 아니라 문장
+    const poem = Array.isArray(card.stanzas) ? el('div', 'kor-poem') : null;
     let n = 0;
-    for (const st of card.stanzas) {
+    for (const st of poem ? card.stanzas : []) {
       const s = el('div', 'kor-stanza');
       for (const t of st) {
         n++;
@@ -182,7 +206,7 @@ function passageEl(card) {
       }
       poem.appendChild(s);
     }
-    box.appendChild(poem);
+    if (poem) box.appendChild(poem);
     if (card.words) box.appendChild(wordsEl(card));
     const facts = el('div', 'kor-facts');
     for (const [k, v] of card.facts) {
@@ -200,15 +224,7 @@ function passageEl(card) {
   top.appendChild(el('span', 'kor-passage-by', `${card.genre} · 글 신코치`));
   box.appendChild(top);
   box.appendChild(el('h3', 'kor-passage-title', `「${card.title}」`));
-  const prose = el('p', 'kor-prose');
-  card.lines.forEach((t, i) => {
-    const sp = el('span', 'kor-sent');
-    sp.dataset.n = String(i + 1);
-    sp.appendChild(el('span', 'kor-num', circled(i + 1)));
-    sp.appendChild(document.createTextNode(`${t} `));
-    prose.appendChild(sp);
-  });
-  box.appendChild(prose);
+  box.appendChild(proseEl(card));
   if (card.words) box.appendChild(wordsEl(card));
   return box;
 }
@@ -416,6 +432,7 @@ function evPick(n) {
     try { sfx.ding(); } catch { /* 소리는 없어도 */ }
   } else {
     st.evWrong.push(n);
+    r.evMiss += 1;
     try { sfx.wrong(); } catch { /* 소리는 없어도 */ }
   }
   r.focus = 'answer';
@@ -430,7 +447,7 @@ async function finishCard() {
   renderQ();
   let res;
   try {
-    res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id));
+    res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss);
   } catch { res = { ok: false, why: 'save' }; }
   if (ui.read !== r) return; // 그 사이 도감으로 나갔다
   r.saving = false;
@@ -471,11 +488,129 @@ function finishEl() {
   if (res.ok) {
     const re = el('button', 'btn', '🔁 처음부터 다시 읽기');
     re.type = 'button';
-    re.addEventListener('click', () => openCard(r.card.id));
+    re.addEventListener('click', () => guardStart('korean', () => openCard(r.card.id)));
     row.appendChild(re);
   }
   box.appendChild(row);
+  const cb = catchBtnEl(); // 🎯 별을 받았으면 국어 포켓몬 잡기
+  if (cb) box.appendChild(cb);
   return box;
+}
+
+// ───────────────────── 🎯 국어 포켓몬 잡기 (2026-10-11) ─────────────────────
+// 별을 새로 받을 때마다 한 번(korean.korFinishRule이 korThrow.earned +1). 수학 runCatches와 같은 안전:
+//  화면을 띄우기 **전에** 기회를 하나 빼고(xp.korTakeThrow — 두 창이 같은 기회를 두 번 던지지 못하게),
+//  한 번도 안 던지고 닫으면 돌려준다(korGiveBackThrow). 후보는 📚 국어 전용 150마리 중 그림이 있는 것 — 4마리 안 되면 몇 마리 받아 온다
+
+export const CATCH_WHY = {
+  nopics: '🎯 포켓몬 그림을 아직 못 받았어요 — 인터넷이 되는 곳에서 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
+  noavail: '🎯 지금은 만날 수 있는 포켓몬이 없어요 — 조금 뒤에 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
+  save: '🎯 기록이 잠깐 저장되지 않았어요 — 다시 눌러 주세요 (몬스터볼은 그대로 있어요)',
+  error: '🎯 잡기 화면을 열지 못했어요 — 다시 눌러 주세요 (몬스터볼은 돌려놨어요)',
+};
+
+function koreanVisible() {
+  const v = $('view-korean');
+  return !!v && !v.hidden;
+}
+
+/** 잡기 후보 — 📚 국어 전용, 레벨에 열린 것, 😴 쉬는 중 빼고 */
+async function korPool() {
+  const read = async () => {
+    let chars = [];
+    try { chars = await loadCharacters(); } catch { chars = []; }
+    const level = getLevelInfo().level;
+    return forSubject(chars, 'korean').filter((c) => isUnlocked(c.id, level) && !isTired(c.id)).map((c) => ({ ...c, look: getLook(c.id) }));
+  };
+  let pool = await read();
+  // 국어 그림이 4마리도 없으면(새 명단을 넣은 첫날) 몇 마리 받아서라도 — 번 기회를 그림이 없다고 삼키지 않는다 (8초 안에 못 받으면 있는 만큼)
+  if (pool.length < 4 && navigator.onLine !== false) {
+    try {
+      await Promise.race([downloadCharacters(null, 6, 'korean'), new Promise((res) => setTimeout(res, 8000))]);
+      pool = await read();
+    } catch { /* 오프라인·실패 — 있는 만큼으로 */ }
+  }
+  return pool;
+}
+
+/** 국어 화면에 들어올 때마다 국어 포켓몬 그림을 조금씩 먼저 받아 둔다 (명단 맨 뒤라 영어 자동 받기로는 늦게 온다) */
+function topUpKorChars() {
+  if (ui.charBusy || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+  ui.charBusy = true;
+  downloadCharacters(null, 8, 'korean').catch(() => {}).then(() => { ui.charBusy = false; });
+}
+
+/** 🎯 잡기 단추 (남은 기회가 있을 때만) — 다 읽은 카드·도감 머리에 */
+/** 잡기 창이 소식 없이 닫혔다(다른 화면이 catch.closeCatch를 불렀다) — 안 던졌으면 기회를 돌려주고 단추를 다시 살린다 */
+function settleLostCatch() {
+  const st = ui.catchState;
+  if (!ui.catching || !st || isCatchOpen()) return null;
+  ui.catchState = null;
+  ui.catching = false;
+  return st.threw ? null : korGiveBackThrow().catch(() => {}).finally(refreshAfterCatch);
+}
+
+function catchBtnEl() {
+  settleLostCatch();
+  const n = korThrowsLeft();
+  const box = el('div', 'kor-catch');
+  if (n > 0) {
+    const b = el('button', 'btn btn-primary kor-catch-btn', `🎯 국어 포켓몬 잡기 (몬스터볼 ${n}개)`);
+    b.type = 'button';
+    b.disabled = !!ui.catching;
+    b.addEventListener('click', () => { runKorCatch().catch(() => {}); });
+    box.appendChild(b);
+  }
+  if (ui.catchMsg) box.appendChild(el('p', 'kor-catch-msg', ui.catchMsg));
+  return box.childNodes.length ? box : null;
+}
+
+/** 잡은 뒤(또는 못 열었을 때) 지금 화면을 다시 그린다 — 남은 기회 수가 바뀐다 */
+function refreshAfterCatch() {
+  if (!koreanVisible()) return;
+  if (ui.read) renderQ(); else renderList().catch(() => {});
+}
+
+export async function runKorCatch() {
+  await settleLostCatch(); // 남은 단추를 눌렀다 — 지난 창이 소식 없이 닫혔으면 먼저 정리
+  if (ui.catching) return;
+  ui.catching = true;
+  ui.catchMsg = '';
+  const done = () => { ui.catching = false; refreshAfterCatch(); };
+  let pool = [];
+  try { pool = await korPool(); } catch { pool = []; }
+  if (!koreanVisible()) { ui.catching = false; return; } // 그 사이 나갔다 — 기회는 그대로(빼기 전)
+  if (!pool.length) {
+    let hasPics = false;
+    try { hasPics = forSubject(await loadCharacters(), 'korean').length > 0; } catch { hasPics = false; }
+    ui.catchMsg = CATCH_WHY[hasPics ? 'noavail' : 'nopics'];
+    done();
+    return;
+  }
+  let taken;
+  try { taken = await korTakeThrow(); } catch { taken = { ok: false, why: 'save' }; }
+  if (!taken || !taken.ok) { ui.catchMsg = taken && taken.why === 'none' ? '' : CATCH_WHY.save; done(); return; }
+  if (!koreanVisible()) { await korGiveBackThrow().catch(() => {}); ui.catching = false; return; } // 뺀 사이 나갔다 — 돌려준다
+  const st = { threw: false };
+  ui.catchState = st;
+  try {
+    openCatch({
+      candidates: pickCharacters(pool, 4), subject: 'korean', xpGain: 0, coinGain: 0, levelInfo: getLevelInfo(), levelUp: 0,
+      ballCounts: inventory(),
+      attempt: (id, opts) => { st.threw = true; return catchAttempt(id, Math.random, opts); },
+      // ★ 한 번도 안 던지고 닫았으면 기회를 돌려준다 — 화면을 띄우기 전에 이미 뺐다
+      onDone: (r) => {
+        ui.catchState = null;
+        if (r && r.threw === false && !st.threw) korGiveBackThrow().catch(() => {}).finally(done);
+        else done();
+      },
+    });
+  } catch {
+    ui.catchState = null;
+    await korGiveBackThrow().catch(() => {});
+    ui.catchMsg = CATCH_WHY.error;
+    done();
+  }
 }
 
 /** 배선 (app.main) — ← 과목 고르기 · 다른 창에서 별을 받고 돌아오면 도감을 다시 그린다 */

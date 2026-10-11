@@ -127,6 +127,22 @@ export const TYPE_OF = {
   67: 'fighting', 11: 'normal', 42: 'normal', 281: 'psychic', 886: 'dragon', 75: 'rock', 180: 'electric',
   253: 'grass', 305: 'steel', 680: 'steel', 329: 'ground', 176: 'fairy',
   499: 'fire', 654: 'fire', 726: 'fire', 814: 'fire', 502: 'water', 729: 'water', 817: 'water', 913: 'water',
+  // 📚 국어 전용 150 (2026-10-11) — tools/math_roster.mjs가 정한 기술표 타입(없는 타입은 가까운 것·노말)
+  495: 'grass', 496: 'grass', 497: 'grass', 650: 'grass', 651: 'grass', 652: 'grass', 810: 'grass', 811: 'grass', 812: 'grass', 273: 'grass', 274: 'grass', 275: 'grass', 413: 'grass', 540: 'grass', 541: 'grass', 542: 'grass', 840: 'grass', 841: 'grass', 842: 'grass', 1011: 'grass', 1019: 'grass', 928: 'grass', 929: 'grass', 930: 'grass', 459: 'grass', 460: 'grass', 511: 'grass', 512: 'grass', 640: 'grass', 787: 'grass',
+  270: 'water', 271: 'water', 272: 'water', 366: 'water', 367: 'water', 368: 'water', 535: 'water', 536: 'water', 537: 'water', 223: 'water', 224: 'water', 422: 'water', 423: 'water', 456: 'water', 457: 'water', 490: 'water', 788: 'water',
+  363: 'ice', 364: 'ice', 365: 'ice', 582: 'ice', 583: 'ice', 584: 'ice', 225: 'ice',
+  355: 'ghost', 356: 'ghost', 477: 'ghost', 292: 'ghost', 425: 'ghost', 426: 'ghost',
+  290: 'ground', 31: 'ground',
+  291: 'normal', 412: 'normal', 414: 'normal', 543: 'normal', 544: 'normal', 545: 'normal', 664: 'normal', 665: 'normal', 666: 'normal', 824: 'normal', 13: 'normal', 14: 'normal', 15: 'normal', 29: 'normal', 30: 'normal', 165: 'normal', 166: 'normal', 167: 'normal', 168: 'normal', 401: 'normal', 402: 'normal', 451: 'normal', 648: 'normal',
+  532: 'fighting', 533: 'fighting', 534: 'fighting', 802: 'fighting',
+  577: 'psychic', 578: 'psychic', 579: 'psychic', 574: 'psychic', 575: 'psychic', 576: 'psychic', 825: 'psychic', 826: 'psychic', 177: 'psychic', 178: 'psychic', 480: 'psychic', 481: 'psychic', 482: 'psychic', 488: 'psychic', 786: 'psychic',
+  599: 'steel', 600: 'steel', 601: 'steel', 436: 'steel', 437: 'steel', 638: 'steel', 801: 'steel',
+  602: 'electric', 603: 'electric', 604: 'electric', 785: 'electric',
+  524: 'rock', 525: 'rock', 526: 'rock', 837: 'rock', 838: 'rock', 839: 'rock', 932: 'rock', 933: 'rock', 934: 'rock', 138: 'rock', 139: 'rock', 140: 'rock', 141: 'rock', 408: 'rock', 409: 'rock', 639: 'rock',
+  669: 'fairy', 670: 'fairy', 671: 'fairy',
+  782: 'dragon', 783: 'dragon', 784: 'dragon',
+  859: 'dark', 860: 'dark', 861: 'dark', 434: 'dark', 435: 'dark', 452: 'dark',
+  935: 'fire', 936: 'fire', 937: 'fire', 218: 'fire', 219: 'fire', 513: 'fire', 514: 'fire',
 };
 
 export function typeOf(id) {

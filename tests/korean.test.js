@@ -18,9 +18,9 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 
 test('📚 원고: 형식 검사 통과 · 여섯 편(연습 넷·명작 둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, ['K1', 'K2', 'K3', 'K4', 'K5', 'K6']);
-  assert.deepEqual(DATA.cards.map((c) => c.kind), ['practice', 'practice', 'classic', 'practice', 'practice', 'classic']);
-  assert.equal(validCards(DATA).length, 6);
+  assert.deepEqual(IDS, ['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8', 'K9', 'K10', 'K11', 'K12']);
+  assert.deepEqual(DATA.cards.map((c) => c.kind), ['practice', 'practice', 'classic', 'practice', 'practice', 'classic', 'classic', 'classic', 'classic', 'practice', 'practice', 'practice']);
+  assert.equal(validCards(DATA).length, 12);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -32,7 +32,7 @@ test('📚 원고: 형식 검사 통과 · 여섯 편(연습 넷·명작 둘) ·
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 16);
+  assert.equal(qn, 34);
   assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 일곱 가지가 모두 한 번 이상 쓰인다');
   // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {
@@ -113,25 +113,25 @@ test('📚 별 규칙: 처음 ★ · 같은 날 다시는 별 없음(내일) · 
 
 test('📚 korFinishRule: 별마다 💰 한 번(번 코인에도) · 모르는 카드는 unknown · 잘못 읽기 횟수는 아는 종류만·한 번에 MISS_MAX까지 · 별이 없어도 횟수는 더함', () => {
   const p = pf({ coins: 5, coinsEarned: 40 });
-  assert.deepEqual(korFinishRule(p, 'K9', T0, {}, IDS), { ok: false, why: 'unknown' });
+  assert.deepEqual(korFinishRule(p, 'K99', T0, {}, IDS), { ok: false, why: 'unknown' });
   assert.deepEqual(korFinishRule(p, 'K1', T0, {}, null), { ok: false, why: 'unknown' });
   assert.equal(p.coins, 5);
   const r1 = korFinishRule(p, 'K1', T0, { make: 1, flip: 2, guess: 9, time: -3, link: 1e20 }, IDS);
-  assert.deepEqual(r1, { ok: true, star: 1, coins: 12, stars: 1 });
+  assert.deepEqual(r1, { ok: true, star: 1, coins: 12, stone: 0, throws: 1, stars: 1 });
   assert.deepEqual([p.coins, p.coinsEarned, p.korDone], [17, 52, { 'K1:1': dayNum(T0) }]);
   assert.deepEqual(p.korMiss, { make: 1, flip: 2 }, '모르는 종류·음수·아주 큰 수는 버린다');
   const again = korFinishRule(p, 'K1', at(0, 18), { make: 99 }, IDS);
   assert.deepEqual(again, { ok: true, star: 0, coins: 0, stars: 1, wait: 'wait', next: 2, days: 1 });
   assert.deepEqual([p.coins, p.korMiss.make], [17, 1 + MISS_MAX], '같은 날은 💰 없음 · 횟수는 MISS_MAX까지');
-  assert.deepEqual(korFinishRule(p, 'K1', at(1), {}, IDS), { ok: true, star: 2, coins: 8, stars: 2 });
+  assert.deepEqual(korFinishRule(p, 'K1', at(1), {}, IDS), { ok: true, star: 2, coins: 8, stone: 1, throws: 2, stars: 2 });
   assert.deepEqual(korFinishRule(p, 'K1', at(3), {}, IDS), { ok: true, star: 0, coins: 0, stars: 2, wait: 'wait', next: 3, days: 4 });
-  assert.deepEqual(korFinishRule(p, 'K1', at(7), {}, IDS), { ok: true, star: 3, coins: 20, stars: 3 });
+  assert.deepEqual(korFinishRule(p, 'K1', at(7), {}, IDS), { ok: true, star: 3, coins: 20, stone: 1, throws: 3, stars: 3 });
   assert.deepEqual(korFinishRule(p, 'K1', at(40), {}, IDS), { ok: true, star: 0, coins: 0, stars: 3, wait: 'full' });
   assert.equal(p.coins, 5 + 12 + 8 + 20);
   assert.equal(p.coinsEarned, 40 + 12 + 8 + 20);
   // 깨진 기록에서도 멈추지 않는다
   const q = pf({ korDone: 'bad', korMiss: [1, 2], coins: 'x' });
-  assert.deepEqual(korFinishRule(q, 'K2', T0, { detail: 1 }, IDS), { ok: true, star: 1, coins: 12, stars: 1 });
+  assert.deepEqual(korFinishRule(q, 'K2', T0, { detail: 1 }, IDS), { ok: true, star: 1, coins: 12, stone: 0, throws: 1, stars: 1 });
   assert.deepEqual([q.coins, q.korMiss], [12, { detail: 1 }]);
   assert.deepEqual([missOf({ make: '3', fo: 2.7, x: 1 }), missOf('x')], [{ make: 3, fo: 2 }, {}]);
 });
@@ -163,6 +163,21 @@ test('📚 병합: 받은 별은 합집합(이른 날 — 옛 백업이 별을 �
   assert.deepEqual([emptyProfile().korDone, emptyProfile().korMiss], [{}, {}]);
 });
 
+test('📚 다음 글 6편 (2026-10-11 아버님 "너가 추천하는 대로"): 「알에서 태어나다」(삼국유사, 다시 씀) · 권태응 「감자꽃」 · 윤동주 「새로운 길」 원문 · 기행문 · 비교·대조 · 광고 — 갈래·연습하는 것이 고루', () => {
+  const card = (id) => DATA.cards.find((c) => c.id === id);
+  // 원문 대조: 「새로운 길」 1955년 판(위키문헌, 나의길 → 나의 길 · 문들레 → 민들레) · 「감자꽃」 1948년 동요집(띄어쓰기만)
+  assert.deepEqual(card('K9').stanzas, [['내를 건너서 숲으로', '고개를 넘어서 마을로'], ['어제도 가고 오늘도 갈', '나의 길 새로운 길'], ['민들레가 피고 까치가 날고', '아가씨가 지나고 바람이 일고'], ['나의 길은 언제나 새로운 길', '오늘도…… 내일도……'], ['내를 건너서 숲으로', '고개를 넘어서 마을로']]);
+  assert.deepEqual(card('K8').stanzas, [['자주 꽃 핀 건 자주 감자.', '파 보나 마나 자주 감자.'], ['하얀 꽃 핀 건 하얀 감자.', '파 보나 마나 하얀 감자.']]);
+  assert.deepEqual(['K7', 'K8', 'K9'].map((id) => card(id).author), ['일연 · 신코치가 다시 씀', '권태응', '윤동주']);
+  assert.match(card('K7').facts.find((f) => f[0] === '원문')[1], /신코치가 쉬운 말로 다시 썼어요/, '옛이야기는 번역문을 옮기지 않고 다시 쓴다(번역자 저작권)');
+  assert.deepEqual(['K10', 'K11', 'K12'].map((id) => card(id).genre), ['기행문', '설명하는 글', '광고']);
+  // K8-1: 소리가 같은 낱말 — 낱말 풀이가 답을 미리 알려 주지 않는다
+  assert.ok(!card('K8').words.some((w) => w[0] === '자주'), '물음이 묻는 낱말은 풀이에 넣지 않는다');
+  // 갈래 고루: 이야기·설명·주장·광고·기행문·시·옛이야기
+  const genres = new Set(DATA.cards.map((c) => c.genre));
+  for (const g of ['이야기', '설명하는 글', '주장하는 글', '광고', '기행문', '동시', '시']) assert.ok(genres.has(g), g);
+});
+
 // ───────────────────── 진짜 저장 경로 (fakeidb) ─────────────────────
 
 const stored = () => fakeIdb.get('profile', 'me');
@@ -191,7 +206,7 @@ test('★ 📚 저장 경로: 다 읽으면 별·💰가 저장된 프로필에 
   const ok = await korFinish('K5', {}, IDS);
   assert.deepEqual([ok.ok, ok.star, ok.coins], [true, 1, 12]);
   assert.equal(stored().coins, 10 + 12 + 12);
-  assert.deepEqual(await korFinish('K7', {}, IDS), { ok: false, why: 'unknown' });
+  assert.deepEqual(await korFinish('K99', {}, IDS), { ok: false, why: 'unknown' });
 });
 
 test('🔍 Codex 48차 #7: 다음 별을 받을 날을 직접 센다 — 시계를 되돌려 ★이 앞날이어도 남은 날이 맞다 · ★★가 앞날이면 ★★★도 그 뒤 · 깨진 날 병합은 차례와 상관없이 바른 날이 이긴다 · ★ 없이 ★★만 있던 기록은 ★을 채워도 ★★를 다시 주지 않는다', () => {
@@ -211,7 +226,7 @@ test('🔍 Codex 48차 #7: 다음 별을 받을 날을 직접 센다 — 시계�
   }
   // ★ 없이 ★★만 있던 깨진 기록 — ★을 채우면 별 둘이 되고, ★★를 다시 주지 않는다
   const p = pf({ coins: 0, korDone: { 'K1:2': v } });
-  assert.deepEqual(korFinishRule(p, 'K1', T0, {}, IDS), { ok: true, star: 1, coins: KOR_COINS[1], stars: 2 });
+  assert.deepEqual(korFinishRule(p, 'K1', T0, {}, IDS), { ok: true, star: 1, coins: KOR_COINS[1], stone: 1, throws: 1, stars: 2 });
   assert.equal(korFinishRule(p, 'K1', at(1), {}, IDS).star, 0, '★★는 이미 있다 — ★★★는 7일 뒤');
   assert.equal(p.coins, KOR_COINS[1]);
 });
@@ -242,9 +257,9 @@ test('🔍 Codex 48차 원고: 근거를 넓힘(K1-3 ③④⑧ · K2-1 ⑤⑦⑧
   assert.ok(!q('K4-3').opts.some((o) => /주지 않았겠지요/.test(o.why || '')), 'K4-3: 선물하면서 자랑할 수도 있다');
   assert.ok(!q('K4-1').opts.some((o) => /상관없었다/.test(o.t)), 'K4-1: 막을 수 없는 보기는 뺐다');
   assert.ok(!/중심 생각은 한 문장에서 찾지 않아요/.test(q('K2-3').doneNote));
-  for (const c of DATA.cards.filter((x) => x.kind === 'classic')) assert.match(c.facts.find((f) => f[0] === '저작권')[1], /오늘 맞춤법으로 옮겨 실어요/);
+  for (const c of DATA.cards.filter((x) => x.kind === 'classic')) assert.match(c.facts.find((f) => f[0] === '저작권')[1], /오늘 맞춤법으로 옮겨 실어요|쉬운 말로 다시 써서 실어요/, `${c.id} — 원문을 "그대로"라고 하지 않는다`);
   const withWords = DATA.cards.filter((c) => c.words);
-  assert.equal(withWords.length, 6, '글마다 낱말 풀이');
+  assert.equal(withWords.length, DATA.cards.length, '글마다 낱말 풀이');
   assert.ok(DATA.cards[2].words.some((w) => w[0] === '그믐밤') && DATA.cards[5].words.some((w) => w[0] === '갈잎'));
   const base = clone(DATA.cards[0]);
   base.words = [['코끼리', '큰 동물']];
@@ -278,7 +293,7 @@ test('📚 화면 말(순수): 도감 칸 상태 · 다 읽은 뒤 말 · 보기
   d['K1:3'] = dayNum(at(8));
   assert.deepEqual(v.statusOf(d, 'K1', at(9)), { text: '★★★ 다 모았어요!', ready: false });
   assert.equal(v.finishText({ ok: true, star: 1, coins: 12, stars: 1 }).title, '📚 도감 등록!');
-  assert.deepEqual(v.finishText({ ok: true, star: 1, coins: 12, stars: 1 }).lines, ['💰 +12', '내일 다시 읽으면 ★★ 💰8']);
+  assert.deepEqual(v.finishText({ ok: true, star: 1, coins: 12, stars: 1 }).lines, ['💰 +12 · 🎯 국어 포켓몬 잡기 1번', '내일 다시 읽으면 ★★ 💰8']);
   assert.equal(v.finishText({ ok: true, star: 2, coins: 8, stars: 2 }).title, '★★ 두 번째 별!');
   assert.equal(v.finishText({ ok: true, star: 3, coins: 20, stars: 3 }).title, '★★★ 다 모았어요!');
   assert.deepEqual(v.finishText({ ok: true, star: 0, wait: 'wait', next: 2, days: 1 }), { title: '오늘도 잘 읽었어요', lines: ['내일 다시 읽으면 ★★ 💰8'] });
@@ -311,7 +326,7 @@ test('📚 화면 연결: 홈 카드 📚 국어(안농) · view-korean · app �
   const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   assert.ok(app.includes("korean: document.getElementById('view-korean'),") && app.includes("if (name === 'korean') enterKorean().catch(() => {});") && app.includes('initKorean({ showView });'));
   const fn = app.slice(app.indexOf('function subjectOfView(name) {'), app.indexOf('\n}\n', app.indexOf('function subjectOfView(name) {')));
-  assert.ok(!fn.includes('korean'), '⏳ 국어는 아직 시간을 안 센다');
+  assert.ok(fn.includes("if (name === 'korean') return 'korean';"), '⏳ 국어도 센다 — 날마다 1시간 30분 (2026-10-11)');
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
   for (const f of ['./js/korean.js', './js/koreanview.js', './coach/korean/reading.json']) assert.ok(sw.includes(`'${f}'`), f);
   const src = readFileSync(new URL('../js/koreanview.js', import.meta.url), 'utf8');
@@ -320,7 +335,7 @@ test('📚 화면 연결: 홈 카드 📚 국어(안농) · view-korean · app �
   const pick = body('function pick(k) {');
   assert.ok(pick.includes('r.misses[o.type] = (r.misses[o.type] || 0) + 1;') && pick.includes('st.wrong.push(k);'), '틀린 보기는 잘못 읽기로');
   assert.ok(!body('function evPick(n) {').includes('misses'), '근거 실수는 안 센다');
-  assert.ok(body('async function finishCard() {').includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id));'));
+  assert.ok(body('async function finishCard() {').includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss);'));
   assert.ok(body('function openCard(id) {').includes('order: shuffled(q.opts.length)'), '보기는 물음마다 섞는다');
   assert.ok(body('export async function enterKorean() {').includes("if (ui.read) {"), '🎒·📊에서 돌아오면 읽던 글 그대로');
   // Codex 48차: 틀린 까닭은 맞힌 뒤에 · 근거 실수 말은 부드럽게 · 읽어 주기 알림은 한 곳 · 초점 옮김 · 띠 높이만큼 띄움
@@ -337,4 +352,38 @@ test('📚 화면 연결: 홈 카드 📚 국어(안농) · view-korean · app �
   const check = readFileSync(new URL('../tools/check.mjs', import.meta.url), 'utf8');
   assert.ok(check.includes("readFileSync('coach/korean/reading.json', 'utf8')") && check.includes("readdirSync('coach/korean')"), '배포 전 검사 · 공개 파일 기록 검사');
   assert.deepEqual(Object.keys(KINDS), ['practice', 'classic']);
+});
+
+test('🟩 국어스톤 (2026-10-11): 별을 새로 받을 때 보기·근거를 모두 한 번에 맞혔으면 하나 · 틀린 보기·근거 실수가 있으면 없음 · 같은 날 다시 읽으면(별 없음) 없음 · 아이템 id는 items.STONE_KOREAN · 끝 카드 말', async () => {
+  const { KOR_STONE } = await import('../js/korean.js');
+  const { STONE_KOREAN } = await import('../js/items.js');
+  assert.equal(KOR_STONE, STONE_KOREAN.id);
+  const p = pf({ items: { stone_korean: 2 } });
+  assert.equal(korFinishRule(p, 'K1', T0, {}, IDS, 0).stone, 1);
+  assert.equal(p.items.stone_korean, 3);
+  assert.equal(korFinishRule(p, 'K1', at(0, 18), {}, IDS, 0).stone, undefined, '같은 날 다시 — 별도 스톤도 없음');
+  assert.equal(p.items.stone_korean, 3);
+  assert.deepEqual([korFinishRule(p, 'K2', T0, { make: 1 }, IDS, 0).stone, korFinishRule(p, 'K3', T0, {}, IDS, 1).stone], [0, 0], '틀린 보기 · 근거 실수');
+  assert.equal(p.items.stone_korean, 3);
+  const q = pf({ items: { stone_korean: 'x', ball: 2 } });
+  korFinishRule(q, 'K4', T0, {}, IDS);
+  assert.deepEqual(q.items, { stone_korean: 1, ball: 2 }, '깨진 수는 0부터 · 다른 아이템은 그대로');
+  const v = await import('../js/koreanview.js');
+  assert.equal(v.finishText({ ok: true, star: 1, coins: 12, stone: 1, stars: 1 }).lines[0], '💰 +12 · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!) · 🎯 국어 포켓몬 잡기 1번');
+  assert.equal(v.finishText({ ok: true, star: 1, coins: 12, stone: 0, stars: 1 }).lines[0], '💰 +12 · 🎯 국어 포켓몬 잡기 1번');
+  const src = readFileSync(new URL('../js/koreanview.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('    r.evMiss += 1;') && src.includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss);'), '근거 실수는 🟩 판정에만');
+});
+
+test('📚 명작도 문장 글일 수 있다 (v232 「알에서 태어나다」): 글 상자는 stanzas가 없으면 번호 붙은 문장으로 — 시 모양을 가정하면 화면이 깨졌다', () => {
+  const view = readFileSync(new URL('../js/koreanview.js', import.meta.url), 'utf8');
+  const i = view.indexOf('function passageEl(card) {');
+  const body = view.slice(i, view.indexOf('\n}\n', i));
+  assert.ok(body.includes('if (!Array.isArray(card.stanzas)) box.appendChild(proseEl(card));'), '이야기 명작은 문장으로');
+  assert.ok(body.includes("const poem = Array.isArray(card.stanzas) ? el('div', 'kor-poem') : null;") && body.includes('for (const st of poem ? card.stanzas : [])'), '시만 연·줄로');
+  assert.ok(!/card\.stanzas\)/.test(body.replaceAll('Array.isArray(card.stanzas)', '')), 'stanzas를 그대로 돌지 않는다');
+  // 원고의 모든 모양이 화면이 아는 모양 — 명작(lines 또는 stanzas) · 연습(lines만)
+  const shapes = new Set(DATA.cards.map((c) => `${c.kind}:${Array.isArray(c.stanzas) ? 'stanzas' : 'lines'}`));
+  for (const sh of shapes) assert.ok(['classic:stanzas', 'classic:lines', 'practice:lines'].includes(sh), sh);
+  assert.ok(shapes.has('classic:lines'), '「알에서 태어나다」 — 문장 명작이 실제로 있다');
 });
