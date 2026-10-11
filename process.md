@@ -3246,3 +3246,32 @@
 ### TODO (다음 작업)
 - [ ] 아버님: 검수 페이지에서 번호로 → "배포" → v236 커밋(feat + docs)·배포 → Codex 51차(백그라운드) → 판단 표 → v237
 - [ ] 아버님: 태블릿 📚 새 글 일곱 → 진우 반응
+
+## 2026-10-11 — 🔍 Codex 51차 반영 · ✍️ 국어 서술형(생각 쓰기) (v237)
+
+### 진행 내용
+- 아버님 "문제는 주관식도 만들 수가 있을까? … 너가 확인을 해서 … 답을 맞춰보고 해석을 해서" → 기본값 제안(카드마다 서술형 1 · 200자 · 💰5/🔸💰10/✅💰20 + 🟩 · 아빠 이름 답장 · 먼저 다섯 편 · v236 먼저 배포) → **"제안 기본값대로 가자"** → v236 배포(`7639131`·`482ed92`) → Codex 51차(요청문 `.context/codex_prompt_51.txt` → `.context/codex_review_51.md`, 136만 토큰, PART 3에 서술형 설계 사전 검토) → 재현·판단 표 → **"그래 니 제안대로 진행하자"**
+- **Codex 51차 반영** (새 글 7편 P1 없음 · 21문제 정답 하나 · 김영랑·「만년 셔츠」 따옴표 11개 원문과 같음):
+  - #1 P2 🔤 낱말 보상이 또 나옴 — 시계를 되돌려 앞날 기록 400개 + 오늘 받음이면 진짜 저장 경로(db.cloneProfile이 규칙보다 먼저 자름)에서 💰10·🎯가 또 나왔다(scratchpad repro51.mjs로 재현) → `wordDaysOf(raw, keep = 오늘)` — 복사·병합·그리기 어디서든 오늘은 남김
+  - #2 P2 근거 넓힘: K13-3 ⑫(자료 목록) · K14-1 ②(알고 싶던 것) — 안 받으면 🟩를 놓쳤다
+  - #3 P2 글 끝 저장 중 ← 도감 → 그날 🥚 칸 빠짐 → 저장이 되면 화면과 상관없이 칸(낱말 판과 같은 꼴)
+  - #4 P3 낱말 고친 때가 같은 ms면 낡은 판이 칸을 또 옮김 → 고친 때는 늘 앞으로(`max(now, at + 1)`)
+  - #5~7 원고: K15-2 "다른 친구가 낸 방법을 더 좋게 만들 방법을 보탠 말"(⑥은 "아쉬운 점을 짚는 것도 도움이 되지만 …") · K15-3 ④ 풀이 · K18-3 도움말("-것-"은 "-겠-"처럼 짐작) · K17-1 "어울리지 않는 문장이 세 개" · K18 '알아 둘 것' 아이 말 · K14-1 길이가 아니라 드러남 · K14 성취기준은 출처 밝히기 부분
+  - #8 공개 `coach/README.md`에 옛(v53) 공개 교정 절차·예시 문장이 남아 있었다 → 비공개 왕복 표로 바꿈
+- **✍️ 국어 서술형** — 비공개 왕복(✍️ 에세이·❓ 답장과 같은 길, 배포 없음):
+  - 원고: K1·K7·K15·K17·K19에 `write { q, v(채점 기준 판 번호), rubric { must 꼭 들어갈 생각, ok 괜찮은 다른 답, miss 흔한 잘못 }, model 예시 답 }` — 공개 원고지만 앱은 보여 주지 않는다 · `korean.checkWriteItem`(checkCard)
+  - 새 `js/korwrite.js`(순수): 10~200자(NFC·공백 정리 뒤, 자르지 않음) · 보내기 한 트랜잭션(답장 기다리는 글 하나 · ✅ 받은 카드는 끝 · 이름표 at은 그 카드 last보다 늘 크게) · 보상 카드마다 평생 한도(첫 글 💰5 · 🔸까지 💰10 · ✅까지 💰20 + 🟩1 — 다시 써서 모으지 못하게 모자란 만큼만) · 답장 검사(서술형 카드·at 정수·등급·600자·같은 글에 다른 답장 둘이면 둘 다 버림) · 답장은 그 글에만 한 번(없는 글이면 안 건드리고 남김) · 병합(at 합집합·답장 붙은 쪽·한도 큰 쪽·이른 날 · 기다리는 글은 안 자름, 답장 받은 글은 최근 4)
+  - 프로필 `korWrites`(db 빈·복사·병합 · xp korWriteAdd·korWriteApply·korWriteRead·korWritesMap)
+  - `js/upload.js`: `korean/todo.json`·`todo.md`(빈 목록도) · 보내기 직전 다시 읽음(다른 창의 옛 목록이 덮지 않게) · 받기 `korean/replies.json`(📊 "📚 국어 답장") · `tools/privcheck.mjs` 같은 검사 · `tools/check.mjs` 공개 저장소에 생기면 막음
+  - 화면 새 `js/korwriteview.js`(koreanview를 import하지 않음 · 글은 textContent로만): 끝 카드 "✍️ 생각 쓰기"(물음 · 원고지 쓰기 칸 · 글자 수 · 남은 보상 안내 · ✉️ 아빠에게 보내기 → 바로 📤) · 쓰던 글은 이 기기에 · 답장 기다림 · 📬 아빠 답장(등급·내 글·아빠 글) → 🔸·🔁면 ✍️ 다시 써 보기 · ✅ 끝 · 도감 위 📬 띠·칸 한 줄 · 답장 화면은 목록이 덮지 않음(ui.wview) · 국어에 들어올 때 답장 받기 · 📊 📤 "답장 기다리는 글 N개 — '국어 답 봐 줘'" · css `.kor-write*` · sw **v237**(APP_SHELL korwrite·korwriteview)
+- 전체 **1801** 통과(check 포함, concurrency 1, 여유 14 GB) · 시험: 새 `tests/korwrite.test.js` 11(원고·검사 · 글자 수 · 보내기 · 답장 검사 · 붙이기·한도·없는 글·앞 글 · 병합·백업 · 올릴 목록·파일 · 보내기·다시 읽기 · 비공개 검사 · 저장 경로 두 창 · 화면 말·연결) · korean "Codex 51차 원고" 1 · korwords 진짜 저장 경로 400 1 · egg 🥚 칸 순서 · 변이 `.context/korean_v237/mutate_v237.mjs` **40 중 40**(처음 놓친 둘 — 두 사본 ✅ 둘의 🟩 한도 · 답장 💰의 번 코인 — 은 시험을 더해 잡음)
+- 헤드리스 1280·390(scratchpad walk237.sh): K19 끝 → 생각 쓰기 · 짧음/김/알맞음 · 보내기 💰+5 · 칸 "✉️ 답장 기다리는 중" · 답장(🔸) 흉내 → 📬 띠·칸 → 답장 화면(초점·읽음) → 다시 써 보기(남은 보상 "💰10 + 🟩") → ✅ 흉내 → "✅ 이 생각 쓰기는 끝" · 💰 12 + 5 + 10 + 10 · 🟩 한 번 · 넘침 0 · 콘솔 오류 0
+- 절차 메모: "국어 답 봐 줘" → 비공개 korean/todo.json → rubric으로 채점(맞춤법 안 봄) → 잘한 점·다음 걸음·예시 → korean/replies.json(--private 검사 → PUT)
+
+### 변경 파일
+- 새 `js/korwrite.js` · `js/korwriteview.js` · `tests/korwrite.test.js` · `js/korean.js`(WRITE_MIN·MAX · checkWriteItem) · `js/koreanview.js`(🥚 순서 · 서술형 연결) · `js/korwords.js`(오늘 남김 · 고친 때) · `js/db.js`·`js/xp.js`(korWrites) · `js/upload.js` · `js/stats.js` · `css/style.css` · `coach/korean/reading.json` · `coach/README.md` · `tools/check.mjs`·`tools/privcheck.mjs` · `sw.js`(v237) · `tests/korean.test.js`·`korwords.test.js`·`egg.test.js`
+
+### TODO (다음 작업)
+- [ ] v237 커밋(fix + feat + docs)·배포 → Codex 52차(백그라운드)
+- [ ] 아버님: 태블릿 📚 K1·K7·K15·K17·K19 끝 → ✍️ 생각 쓰기 → 📊 "답장 기다리는 글" → Claude에게 "국어 답 봐 줘"
+- [ ] (반응 보고) 나머지 카드에도 서술형
