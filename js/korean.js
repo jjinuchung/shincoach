@@ -84,8 +84,9 @@ export function starsOf(done, id) {
 }
 
 /**
- * 지금 다 읽으면 받을 별 → { star: 1|2|3 } 또는 { star: 0, why: 'today' | 'wait' | 'full', days? }
- *  'today' ★은 받았고 오늘은 더 없음(내일 다시) · 'wait' ★★까지 받았고 days일 뒤 ★★★ · 'full' ★★★ 다 모음
+ * 지금 다 읽으면 받을 별 → { star: 1|2|3 } 또는 { star: 0, why: 'wait', next: 2|3, days } · { star: 0, why: 'full' }
+ *  다음 별을 받을 수 있는 날을 직접 센다 — ★★ = 처음 날 + 1 · ★★★ = max(처음 날 + STAR3_DAYS, ★★ 날 + 1).
+ *  days = 그날까지 남은 날(1이면 "내일") — 태블릿 시계를 되돌려 받은 날이 앞날이어도 남은 날이 맞게 (Codex 48차 #7: "내일"이라고 했는데 11일 뒤였다)
  */
 export function nextStar(done, id, now) {
   const d = isObj(done) ? done : {};
@@ -94,13 +95,26 @@ export function nextStar(done, id, now) {
   if (s >= 3) return { star: 0, why: 'full' };
   if (s === 0) return { star: 1 };
   const first = dayOf(d, id, 1);
-  if (s === 1) {
-    const last = first;
-    return today > last ? { star: 2 } : { star: 0, why: 'today' };
+  const at = s === 1 ? first + 1 : Math.max(first + STAR3_DAYS, (dayOf(d, id, 2) || 0) + 1);
+  if (today >= at) return { star: s + 1 };
+  return { star: 0, why: 'wait', next: s + 1, days: at - today };
+}
+
+/** 받은 별 병합 — 별마다 이른 날 · 바른 날(안전한 양의 정수)이 깨진 값을 이긴다 · 둘 다 깨졌으면 1(받은 것으로는 센다)
+ *  (Codex 48차 #7: 공용 mergeParcels는 깨진 쪽이 먼저 오면 1이 이겨 ★★★가 엿새 일찍 열렸다 — 차례에 따라 결과가 달랐다) */
+export function mergeDone(a, b) {
+  const out = {};
+  // 1은 "받았지만 날을 모름" 자리표시(korFinishRule·옛 병합) — 바른 날이 하나라도 있으면 그 날들의 가장 이른 날
+  const ok = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 1 ? n : 0; };
+  for (const side of [a, b]) {
+    if (!isObj(side)) continue;
+    for (const k of Object.keys(side)) {
+      const v = ok(side[k]);
+      if (v) out[k] = out[k] > 1 ? Math.min(out[k], v) : v;
+      else if (!own(out, k)) out[k] = 1;
+    }
   }
-  const gap = today - first;
-  if (gap >= STAR3_DAYS && today > (dayOf(d, id, 2) || 0)) return { star: 3 };
-  return { star: 0, why: 'wait', days: Math.max(1, STAR3_DAYS - gap) };
+  return out;
 }
 
 /** 잘못 읽기 횟수 고쳐 읽기 — 아는 종류만, 안전한 0 이상 정수만 */
@@ -126,20 +140,20 @@ export function mergeMiss(a, b) {
  * 글 한 편을 다 읽었다 — 한 트랜잭션에서: 잘못 읽기 횟수 더하기 · 받을 별이 있으면 별 + 💰.
  * ids = 지금 있는 카드 id들(모르는 카드로 💰를 받지 못하게) · misses = { 종류: 이번에 고른 수 } · now = 트랜잭션 안의 시각
  * why: 'unknown' 모르는 카드
- * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, days?:number}}
- *   star 0이면 wait('today'|'wait'|'full')·days
+ * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, next?:number, days?:number}}
+ *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날)
  */
 export function korFinishRule(profile, cardId, now, misses, ids) {
   if (typeof cardId !== 'string' || !Array.isArray(ids) || !ids.includes(cardId)) return { ok: false, why: 'unknown' };
   const add = missOf(misses);
   const cur = missOf(profile.korMiss);
-  for (const k of Object.keys(add)) cur[k] = (cur[k] || 0) + Math.min(MISS_MAX, add[k]);
+  for (const k of Object.keys(add)) cur[k] = Math.min(Number.MAX_SAFE_INTEGER, (cur[k] || 0) + Math.min(MISS_MAX, add[k])); // 끝에서 멈춘다(넘치면 다음 읽기에서 0이 됐다, Codex 48차 #8)
   profile.korMiss = cur;
   const done = isObj(profile.korDone) ? { ...profile.korDone } : {};
   const next = nextStar(done, cardId, now);
   if (!next.star) {
     profile.korDone = done;
-    return { ok: true, star: 0, coins: 0, stars: starsOf(done, cardId), wait: next.why, ...(next.days ? { days: next.days } : {}) };
+    return { ok: true, star: 0, coins: 0, stars: starsOf(done, cardId), wait: next.why, ...(next.days ? { next: next.next, days: next.days } : {}) };
   }
   done[starKey(cardId, next.star)] = dayNum(now) || 1;
   profile.korDone = done;
@@ -154,7 +168,8 @@ export function korFinishRule(profile, cardId, now, misses, ids) {
  * 국어 문제는 답이 계산으로 검사되지 않으니, 모양이라도 빈틈없이:
  *  카드 id K숫자(겹치지 않음) · 종류 · 제목 · 글은 lines(문장) 또는 stanzas(시) 하나 · 명작은 지은이·출처(facts) ·
  *  물음 id = 카드id-차례 · 보기 넷·서로 다름 · 정답 하나 · 틀린 보기마다 종류(TYPES)와 까닭 · 근거는 있는 문장 번호(차례대로·겹치지 않음) ·
- *  근거가 있으면 근거 물음과 풀이, 없으면 다 푼 뒤 풀이 · 글에 쓴 ①②… 번호는 그 글에 있는 번호만
+ *  근거가 있으면 근거 물음과 풀이, 없으면 다 푼 뒤 풀이 · 글에 쓴 ①②… 번호는 그 글에 있는 번호만 ·
+ *  📖 낱말 풀이(words, 없어도 됨)는 [낱말, 뜻] 여섯 개까지 — 낱말은 그 글에 나오는 말(Codex 48차 제안)
  */
 export function checkContent(data) {
   const errs = [];
@@ -186,6 +201,14 @@ export function checkCard(c, ids = new Set()) {
     if (!nonEmpty(c.author)) at('명작은 지은이가 있어야 해요');
     if (!Array.isArray(c.facts) || !c.facts.length || !c.facts.every((f) => Array.isArray(f) && f.length === 2 && nonEmpty(f[0]) && nonEmpty(f[1]))) at('명작은 facts([이름, 내용])가 있어야 해요');
     else if (!c.facts.some((f) => f[0] === '저작권')) at('명작은 저작권 줄이 있어야 해요');
+  }
+  if (own(c, 'words')) {
+    const text = hasLines ? c.lines.join(' ') : hasStanzas ? c.stanzas.flat().join(' ') : '';
+    if (!Array.isArray(c.words) || c.words.length > 6) at('words는 여섯 개까지의 [낱말, 뜻]');
+    else c.words.forEach((w, k) => {
+      if (!Array.isArray(w) || w.length !== 2 || !nonEmpty(w[0]) || !nonEmpty(w[1])) at(`words ${k + 1}은 [낱말, 뜻]`);
+      else if (!text.includes(w[0])) at(`words ${k + 1} "${w[0]}"은 글에 없는 말`);
+    });
   }
   const n = lineCount(c);
   const refs = (s, where) => {

@@ -3,7 +3,7 @@ import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TYPES, KINDS, KOR_COINS, STAR3_DAYS, MISS_MAX, circled, lineCount, lineText, unitOf, dayNum, starsOf, nextStar, missOf, mergeMiss, korFinishRule, checkContent, checkCard, validCards } from '../js/korean.js';
+import { TYPES, KINDS, KOR_COINS, STAR3_DAYS, MISS_MAX, circled, lineCount, lineText, unitOf, dayNum, starsOf, nextStar, missOf, mergeMiss, mergeDone, korFinishRule, checkContent, checkCard, validCards } from '../js/korean.js';
 import { emptyProfile, cloneProfile, mergeStatRecord } from '../js/db.js';
 import { initProfile, flushProfile, reloadProfile, korFinish, korDoneMap, getProfileSnapshot } from '../js/xp.js';
 
@@ -94,15 +94,15 @@ test('📚 별 규칙: 처음 ★ · 같은 날 다시는 별 없음(내일) · 
   const d = {};
   assert.deepEqual(nextStar(d, 'K1', T0), { star: 1 });
   d['K1:1'] = dayNum(T0);
-  assert.deepEqual(nextStar(d, 'K1', at(0, 20)), { star: 0, why: 'today' });
+  assert.deepEqual(nextStar(d, 'K1', at(0, 20)), { star: 0, why: 'wait', next: 2, days: 1 });
   assert.deepEqual(nextStar(d, 'K1', at(1)), { star: 2 });
   d['K1:2'] = dayNum(at(1));
-  assert.deepEqual(nextStar(d, 'K1', at(1, 20)), { star: 0, why: 'wait', days: STAR3_DAYS - 1 });
-  assert.deepEqual(nextStar(d, 'K1', at(6)), { star: 0, why: 'wait', days: 1 });
+  assert.deepEqual(nextStar(d, 'K1', at(1, 20)), { star: 0, why: 'wait', next: 3, days: STAR3_DAYS - 1 });
+  assert.deepEqual(nextStar(d, 'K1', at(6)), { star: 0, why: 'wait', next: 3, days: 1 });
   assert.deepEqual(nextStar(d, 'K1', at(7)), { star: 3 });
   // ★★를 7일 뒤에 받았으면 ★★★는 그다음 날부터
   const late = { 'K2:1': dayNum(T0), 'K2:2': dayNum(at(9)) };
-  assert.deepEqual(nextStar(late, 'K2', at(9, 18)), { star: 0, why: 'wait', days: 1 });
+  assert.deepEqual(nextStar(late, 'K2', at(9, 18)), { star: 0, why: 'wait', next: 3, days: 1 });
   assert.deepEqual(nextStar(late, 'K2', at(10)), { star: 3 });
   d['K1:3'] = dayNum(at(7));
   assert.deepEqual(nextStar(d, 'K1', at(30)), { star: 0, why: 'full' });
@@ -121,10 +121,10 @@ test('📚 korFinishRule: 별마다 💰 한 번(번 코인에도) · 모르는 
   assert.deepEqual([p.coins, p.coinsEarned, p.korDone], [17, 52, { 'K1:1': dayNum(T0) }]);
   assert.deepEqual(p.korMiss, { make: 1, flip: 2 }, '모르는 종류·음수·아주 큰 수는 버린다');
   const again = korFinishRule(p, 'K1', at(0, 18), { make: 99 }, IDS);
-  assert.deepEqual(again, { ok: true, star: 0, coins: 0, stars: 1, wait: 'today' });
+  assert.deepEqual(again, { ok: true, star: 0, coins: 0, stars: 1, wait: 'wait', next: 2, days: 1 });
   assert.deepEqual([p.coins, p.korMiss.make], [17, 1 + MISS_MAX], '같은 날은 💰 없음 · 횟수는 MISS_MAX까지');
   assert.deepEqual(korFinishRule(p, 'K1', at(1), {}, IDS), { ok: true, star: 2, coins: 8, stars: 2 });
-  assert.deepEqual(korFinishRule(p, 'K1', at(3), {}, IDS), { ok: true, star: 0, coins: 0, stars: 2, wait: 'wait', days: 4 });
+  assert.deepEqual(korFinishRule(p, 'K1', at(3), {}, IDS), { ok: true, star: 0, coins: 0, stars: 2, wait: 'wait', next: 3, days: 4 });
   assert.deepEqual(korFinishRule(p, 'K1', at(7), {}, IDS), { ok: true, star: 3, coins: 20, stars: 3 });
   assert.deepEqual(korFinishRule(p, 'K1', at(40), {}, IDS), { ok: true, star: 0, coins: 0, stars: 3, wait: 'full' });
   assert.equal(p.coins, 5 + 12 + 8 + 20);
@@ -194,6 +194,76 @@ test('★ 📚 저장 경로: 다 읽으면 별·💰가 저장된 프로필에 
   assert.deepEqual(await korFinish('K7', {}, IDS), { ok: false, why: 'unknown' });
 });
 
+test('🔍 Codex 48차 #7: 다음 별을 받을 날을 직접 센다 — 시계를 되돌려 ★이 앞날이어도 남은 날이 맞다 · ★★가 앞날이면 ★★★도 그 뒤 · 깨진 날 병합은 차례와 상관없이 바른 날이 이긴다 · ★ 없이 ★★만 있던 기록은 ★을 채워도 ★★를 다시 주지 않는다', () => {
+  assert.deepEqual(nextStar({ 'K1:1': dayNum(at(10)) }, 'K1', T0), { star: 0, why: 'wait', next: 2, days: 11 }, '"내일"이 아니라 11일 뒤');
+  assert.deepEqual(nextStar({ 'K1:1': dayNum(at(-20)), 'K1:2': dayNum(at(10)) }, 'K1', T0), { star: 0, why: 'wait', next: 3, days: 11 }, '★★ 날 다음 날부터');
+  const v = dayNum(T0);
+  for (const bad of ['bad', 1, 0, -5, 1e300, null]) {
+    const a = { 'K1:1': bad };
+    const b = { 'K1:1': v };
+    assert.deepEqual([mergeDone(a, b), mergeDone(b, a)], [{ 'K1:1': v }, { 'K1:1': v }], `바른 날이 이긴다 ${String(bad)}`);
+  }
+  assert.deepEqual(mergeDone({ 'K1:1': 'x' }, { 'K1:1': -3 }), { 'K1:1': 1 }, '둘 다 깨졌으면 받은 것으로만');
+  assert.deepEqual(mergeDone({ 'K1:1': v + 3 }, { 'K1:1': v, 'K2:1': v }), { 'K1:1': v, 'K2:1': v }, '이른 날 · 합집합');
+  assert.deepEqual(mergeDone('x', [1]), {});
+  for (const [x, y] of [[{ ...emptyProfile(), korDone: { 'K1:1': 'bad' }, updatedAt: 9 }, { ...emptyProfile(), korDone: { 'K1:1': v }, updatedAt: 5 }], [{ ...emptyProfile(), korDone: { 'K1:1': v }, updatedAt: 9 }, { ...emptyProfile(), korDone: { 'K1:1': 'bad' }, updatedAt: 5 }]]) {
+    assert.deepEqual(mergeStatRecord('profile', x, y).korDone, { 'K1:1': v }, '병합도');
+  }
+  // ★ 없이 ★★만 있던 깨진 기록 — ★을 채우면 별 둘이 되고, ★★를 다시 주지 않는다
+  const p = pf({ coins: 0, korDone: { 'K1:2': v } });
+  assert.deepEqual(korFinishRule(p, 'K1', T0, {}, IDS), { ok: true, star: 1, coins: KOR_COINS[1], stars: 2 });
+  assert.equal(korFinishRule(p, 'K1', at(1), {}, IDS).star, 0, '★★는 이미 있다 — ★★★는 7일 뒤');
+  assert.equal(p.coins, KOR_COINS[1]);
+});
+
+test('🔍 Codex 48차 #8·47차 #4: 아주 큰 카운터는 끝에서 멈춘다 — 잘못 읽기 횟수 · 💤(넘치면 다음 읽기에서 0이 됐다)', async () => {
+  const p = pf({ korMiss: { make: Number.MAX_SAFE_INTEGER } });
+  korFinishRule(p, 'K1', T0, { make: 1 }, IDS);
+  assert.equal(p.korMiss.make, Number.MAX_SAFE_INTEGER);
+  assert.deepEqual(missOf(p.korMiss), { make: Number.MAX_SAFE_INTEGER });
+  const RS = await import('../js/rest.js');
+  const { evolveRule } = await import('../js/db.js');
+  const q = pf({ items: { f_heal: 1 }, caught: { 7: 1 }, mons: { 7: { lv: 1, rx: Number.MAX_SAFE_INTEGER, rxLv: 0 } }, house: { started: true, seq: 1, rooms: [{ id: 'r1', wall: '', floor: '', items: [{ u: 1, id: 'f_heal', x: 0, y: 0, f: 0 }] }] } });
+  RS.restStartRule(q, 1, 7, T0, '');
+  RS.restClaimRule(q, 1, T0 + RS.REST_MS, undefined, 100, evolveRule);
+  assert.equal(q.mons[7].rx, Number.MAX_SAFE_INTEGER);
+  assert.equal(RS.rxOf(q.mons[7]).rx, Number.MAX_SAFE_INTEGER, '다음 읽기에서도 그대로');
+});
+
+test('🔍 Codex 48차 원고: 근거를 넓힘(K1-3 ③④⑧ · K2-1 ⑤⑦⑧ · K4-1 ④⑧) · 정답은 그대로 · 풀이는 "짐작할 수 있어요" · 종류 바로잡음 · 저작권 줄 "오늘 맞춤법으로 옮겨" · 📖 낱말은 글에 나오는 말', () => {
+  const q = (id) => DATA.cards.flatMap((c) => c.qs).find((x) => x.id === id);
+  const ans = (id) => q(id).opts.find((o) => o.ok).t;
+  assert.deepEqual([q('K1-3').ev, q('K2-1').ev, q('K4-1').ev], [[3, 4, 8], [5, 7, 8], [4, 8]]);
+  assert.deepEqual(['K1-1', 'K1-3', 'K2-1', 'K4-1', 'K4-2', 'K4-3', 'K5-3'].map(ans), ['민재가 그 주에 강낭콩에 물 주는 것을 잊었다.', '시든 강낭콩에 얼른 물을 주려고', '모두가 돌아가며 따뜻한 안쪽에 들어갈 수 있게', '뮤 카드', '부럽고 갖고 싶었다.', '하준이가 미안해하지 않고 마음 편히 받게 하려고', '도서관을 열어야 하는 까닭(근거)을 말한다.']);
+  assert.match(q('K1-1').evNote, /잊었을 거라고 짐작할 수 있어요/);
+  assert.ok(!/알 수 있어요/.test(q('K1-1').evNote));
+  const typeOf = (id, t) => q(id).opts.find((o) => o.t === t).type;
+  assert.deepEqual([typeOf('K1-3', '다음 주에도 당번을 하고 싶어서'), typeOf('K5-3', '점심시간을 줄이자고 한다.'), typeOf('K4-2', '카드를 선물로 받아 고마웠다.')], ['make', 'make', 'time']);
+  assert.ok(!q('K4-3').opts.some((o) => /주지 않았겠지요/.test(o.why || '')), 'K4-3: 선물하면서 자랑할 수도 있다');
+  assert.ok(!q('K4-1').opts.some((o) => /상관없었다/.test(o.t)), 'K4-1: 막을 수 없는 보기는 뺐다');
+  assert.ok(!/중심 생각은 한 문장에서 찾지 않아요/.test(q('K2-3').doneNote));
+  for (const c of DATA.cards.filter((x) => x.kind === 'classic')) assert.match(c.facts.find((f) => f[0] === '저작권')[1], /오늘 맞춤법으로 옮겨 실어요/);
+  const withWords = DATA.cards.filter((c) => c.words);
+  assert.equal(withWords.length, 6, '글마다 낱말 풀이');
+  assert.ok(DATA.cards[2].words.some((w) => w[0] === '그믐밤') && DATA.cards[5].words.some((w) => w[0] === '갈잎'));
+  const base = clone(DATA.cards[0]);
+  base.words = [['코끼리', '큰 동물']];
+  assert.match(checkCard(base).join(), /"코끼리"은 글에 없는 말/);
+  base.words = Array.from({ length: 7 }, () => ['당번', '차례']);
+  assert.match(checkCard(base).join(), /여섯 개까지/);
+  base.words = [['당번']];
+  assert.match(checkCard(base).join(), /\[낱말, 뜻\]/);
+});
+
+test('★ 🔍 Codex 48차 F: 저장소 트랜잭션을 바로 둘 — 같은 글을 동시에 끝내도 별 하나 · 💰 한 번 (xp 줄을 거치지 않고)', async () => {
+  const { applyHouseRule } = await import('../js/db.js');
+  await seed({ coins: 0, coinsEarned: 0, korDone: {}, korMiss: {} });
+  const two = await Promise.all([1, 2].map(() => applyHouseRule((p) => korFinishRule(p, 'K6', Date.now(), {}, IDS))));
+  assert.deepEqual(two.map((r) => r.star).sort(), [0, 1]);
+  assert.equal(stored().coins, KOR_COINS[1]);
+  assert.deepEqual(Object.keys(stored().korDone), ['K6:1']);
+});
+
 // ───────────────────── 화면 (koreanview) ─────────────────────
 
 test('📚 화면 말(순수): 도감 칸 상태 · 다 읽은 뒤 말 · 보기 섞기는 차례만 바꾼다', async () => {
@@ -211,8 +281,15 @@ test('📚 화면 말(순수): 도감 칸 상태 · 다 읽은 뒤 말 · 보기
   assert.deepEqual(v.finishText({ ok: true, star: 1, coins: 12, stars: 1 }).lines, ['💰 +12', '내일 다시 읽으면 ★★ 💰8']);
   assert.equal(v.finishText({ ok: true, star: 2, coins: 8, stars: 2 }).title, '★★ 두 번째 별!');
   assert.equal(v.finishText({ ok: true, star: 3, coins: 20, stars: 3 }).title, '★★★ 다 모았어요!');
-  assert.match(v.finishText({ ok: true, star: 0, wait: 'today' }).lines[0], /내일 다시 읽으면 ★★/);
-  assert.match(v.finishText({ ok: true, star: 0, wait: 'wait', days: 3 }).lines[0], /^3일 뒤에 다시 읽으면 ★★★/);
+  assert.deepEqual(v.finishText({ ok: true, star: 0, wait: 'wait', next: 2, days: 1 }), { title: '오늘도 잘 읽었어요', lines: ['내일 다시 읽으면 ★★ 💰8'] });
+  assert.deepEqual(v.finishText({ ok: true, star: 0, wait: 'wait', next: 2, days: 11 }).lines, ['11일 뒤 다시 읽으면 ★★ 💰8'], '시계를 되돌렸으면 남은 날 그대로');
+  assert.deepEqual(v.finishText({ ok: true, star: 0, wait: 'wait', next: 3, days: 3 }), { title: '또 읽었어요!', lines: ['3일 뒤 다시 읽으면 ★★★ 💰20'] });
+  assert.deepEqual(v.finishText({ ok: true, star: 0, wait: 'full' }).title, '또 읽어 줘서 고마워요');
+  assert.deepEqual(v.statusOf({ 'K1:1': dayNum(at(10)) }, 'K1', T0), { text: '11일 뒤 다시 읽으면 ★★', ready: false });
+  assert.deepEqual([v.whenText(1), v.whenText(2), v.whenText(0), v.whenText('x')], ['내일', '2일 뒤', '내일', '내일']);
+  const kq = DATA.cards[0].qs[0];
+  assert.deepEqual(v.wrongNotes(kq, [3, 0, 1]), [{ t: kq.opts[3].t, why: kq.opts[3].why }, { t: kq.opts[0].t, why: kq.opts[0].why }], '고른 차례대로 · 정답은 빼고');
+  assert.deepEqual(v.wrongNotes(kq, []), []);
   assert.equal(v.finishText({ ok: false, why: 'save' }).title, '저장이 안 됐어요');
   assert.equal(v.finishText({ ok: false, why: 'unknown' }).title, '이 글은 지금 도감에 없어요');
   let seq = [0.99, 0.01, 0.5];
@@ -246,6 +323,17 @@ test('📚 화면 연결: 홈 카드 📚 국어(안농) · view-korean · app �
   assert.ok(body('async function finishCard() {').includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id));'));
   assert.ok(body('function openCard(id) {').includes('order: shuffled(q.opts.length)'), '보기는 물음마다 섞는다');
   assert.ok(body('export async function enterKorean() {').includes("if (ui.read) {"), '🎒·📊에서 돌아오면 읽던 글 그대로');
+  // Codex 48차: 틀린 까닭은 맞힌 뒤에 · 근거 실수 말은 부드럽게 · 읽어 주기 알림은 한 곳 · 초점 옮김 · 띠 높이만큼 띄움
+  const rq = body('function renderQ() {');
+  assert.ok(rq.includes('for (const w of wrongNotes(q, st.wrong)) {') && rq.indexOf('wrongNotes(q, st.wrong)') > rq.indexOf('if (qDone) {'), '틀린 보기의 까닭은 맞힌 뒤에만');
+  assert.ok(rq.includes('if (live) live.textContent = say;') && rq.includes('if (focusTo) moveFocus(col,'));
+  assert.ok(!rq.includes("setAttribute('role', 'status')"), '다시 그리는 칸에는 role=status를 새로 만들지 않는다');
+  assert.ok(body('function evidenceEl(q, st, unit) {').includes('보다 답을 더 잘 받쳐 주는 ${unit}을 찾아볼까요?'));
+  assert.ok(!src.includes('에는 까닭이 없어요'));
+  assert.ok(body('function renderRead() {').includes("main.style.setProperty('--kor-top',") && body('function bringQ() {').includes("if (col.getBoundingClientRect().top < under + 4) col.scrollIntoView({ block: 'start' });"), '띠 아래까지 셈');
+  for (const f of ['function pick(k) {', 'function evPick(n) {']) assert.ok(body(f).includes("r.focus = 'answer';"), f);
+  const css = readFileSync(new URL('../css/style.css', import.meta.url), 'utf8');
+  assert.ok(css.includes('position: sticky; top: var(--kor-top, 72px);') && css.includes('.kor-qcol { scroll-margin-top: var(--kor-top, 72px); }'), '띠 아래에 붙는다');
   const check = readFileSync(new URL('../tools/check.mjs', import.meta.url), 'utf8');
   assert.ok(check.includes("readFileSync('coach/korean/reading.json', 'utf8')") && check.includes("readdirSync('coach/korean')"), '배포 전 검사 · 공개 파일 기록 검사');
   assert.deepEqual(Object.keys(KINDS), ['practice', 'classic']);

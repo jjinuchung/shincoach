@@ -171,7 +171,7 @@ export function restClaimRule(profile, u, now, decide, hpMax, evolve, want) {
   const hpFrom = typeof m0.hp === 'number' ? Math.max(0, Math.min(max, m0.hp)) : max;
   const bar = expOf(m0).have;
   let { rx, rxLv } = rxOf(m0);
-  rx += REST_EXP;
+  rx = Math.min(Number.MAX_SAFE_INTEGER, rx + REST_EXP); // 끝에서 멈춘다 — 넘치면 다음 읽기에서 0이 됐다 (Codex 48차 PART 1 #4)
   const lvFrom = lvOf(m0);
   let lv = lvFrom;
   let lvUp = 0;

@@ -10,7 +10,7 @@ import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; //
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
 import { ROCKET, rocketGapOk, stealables, hideout, rocketStep, copyRocketCur, mergeRocketDone } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수 — evolve만 import)
 import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 — house·evolve만 import)
-import { mergeMiss, missOf } from './korean.js'; // 📚 국어 잘못 읽기 횟수 (순수, import 없음)
+import { mergeMiss, missOf, mergeDone } from './korean.js'; // 📚 국어 잘못 읽기 횟수 (순수, import 없음)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -2015,7 +2015,7 @@ export function mergeStatRecord(name, cur, rec) {
     // 💊 받은/꺼낸 휴식 — 합집합(이른 때) · 깨진 쪽(객체가 아님)은 버린다 — 옛 백업의 집이 같은 휴식을 되살려 두 번 받지 않게
     out.restsDone = mergeParcels(copyRestsDone(cur.restsDone), copyRestsDone(rec.restsDone));
     // 📚 국어 — 받은 별은 합집합(이른 날 — 옛 백업이 받은 별을 되돌려 💰를 두 번 받지 않게) · 잘못 읽기 횟수는 종류마다 큰 쪽(늘어나기만)
-    out.korDone = mergeParcels(copyRestsDone(cur.korDone), copyRestsDone(rec.korDone));
+    out.korDone = mergeDone(cur.korDone, rec.korDone); // 바른 날이 깨진 값을 이긴다 — 차례에 따라 달라지지 않게 (Codex 48차 #7)
     out.korMiss = mergeMiss(cur.korMiss, rec.korMiss);
     // 💰 5일장에서 판 기록 — 장날·열쇠마다 합집합 (장날 한도를 옛 백업이 되돌리지 않게, 📊에 판 것이 남게)
     out.sales = mergeSales(cur.sales, rec.sales);

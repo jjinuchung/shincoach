@@ -38,9 +38,19 @@ export function statusOf(done, id, now) {
   const n = nextStar(done, id, now);
   if (s === 0) return { text: `새 글 · 다 읽으면 ★ 💰${KOR_COINS[1]}`, ready: true };
   if (n.star) return { text: `다시 읽으면 ${'★'.repeat(n.star)} 💰${KOR_COINS[n.star]}`, ready: true };
-  if (n.why === 'today') return { text: '내일 다시 읽으면 ★★', ready: false };
-  if (n.why === 'wait') return { text: `${n.days}일 뒤 다시 읽으면 ★★★`, ready: false };
+  if (n.why === 'wait') return { text: `${whenText(n.days)} 다시 읽으면 ${'★'.repeat(n.next)}`, ready: false };
   return { text: '★★★ 다 모았어요!', ready: false };
+}
+
+/** 남은 날 → "내일" · "N일 뒤" (순수) */
+export function whenText(days) {
+  const d = Math.max(1, Math.floor(Number(days) || 1));
+  return d === 1 ? '내일' : `${d}일 뒤`;
+}
+
+/** 맞힌 뒤 보여 줄 "아까 고른 보기가 왜 틀렸나" (순수) — 고른 차례대로 { t, why } (Codex 48차 #6: 써 둔 까닭이 화면에 안 나왔다) */
+export function wrongNotes(q, wrong) {
+  return (wrong || []).map((k) => q.opts[k]).filter((o) => o && !o.ok).map((o) => ({ t: o.t, why: o.why }));
 }
 
 /** 다 읽은 뒤의 말 (순수) — korFinish 결과 → { title, lines } */
@@ -52,8 +62,9 @@ export function finishText(r) {
   if (r.star === 1) return { title: '📚 도감 등록!', lines: [`💰 +${r.coins}`, `내일 다시 읽으면 ★★ 💰${KOR_COINS[2]}`] };
   if (r.star === 2) return { title: '★★ 두 번째 별!', lines: [`💰 +${r.coins}`, `처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★ 💰${KOR_COINS[3]}`] };
   if (r.star === 3) return { title: '★★★ 다 모았어요!', lines: [`💰 +${r.coins}`, '이 글은 이제 진우 거예요'] };
-  if (r.wait === 'today') return { title: '오늘도 잘 읽었어요', lines: [`별은 오늘 이미 받았어요 — 내일 다시 읽으면 ★★ 💰${KOR_COINS[2]}`] };
-  if (r.wait === 'wait') return { title: '또 읽었어요!', lines: [`${r.days}일 뒤에 다시 읽으면 ★★★ 💰${KOR_COINS[3]}`] };
+  if (r.wait === 'wait' && (r.next === 2 || r.next === 3)) {
+    return { title: r.next === 2 ? '오늘도 잘 읽었어요' : '또 읽었어요!', lines: [`${whenText(r.days)} 다시 읽으면 ${'★'.repeat(r.next)} 💰${KOR_COINS[r.next]}`] };
+  }
   return { title: '또 읽어 줘서 고마워요', lines: ['★★★를 다 모은 글이에요'] };
 }
 
@@ -136,6 +147,7 @@ function openCard(id) {
     misses: {},
     result: null,
     saving: false,
+    focus: '', // 다시 그린 뒤 초점을 옮길 곳 (moveFocus)
   };
   renderRead();
   window.scrollTo(0, 0);
@@ -171,6 +183,7 @@ function passageEl(card) {
       poem.appendChild(s);
     }
     box.appendChild(poem);
+    if (card.words) box.appendChild(wordsEl(card));
     const facts = el('div', 'kor-facts');
     for (const [k, v] of card.facts) {
       const p = el('p');
@@ -196,6 +209,20 @@ function passageEl(card) {
     prose.appendChild(sp);
   });
   box.appendChild(prose);
+  if (card.words) box.appendChild(wordsEl(card));
+  return box;
+}
+
+/** 📖 낱말 풀이 — 글 아래 작게 (어려운 낱말 몇 개, Codex 48차 제안 · 🔤 낱말 줄기의 첫걸음) */
+function wordsEl(card) {
+  const box = el('div', 'kor-words');
+  box.appendChild(el('span', 'kor-words-h', '📖 낱말'));
+  for (const [w, mean] of card.words) {
+    const p = el('p', 'kor-word');
+    p.appendChild(el('b', '', w));
+    p.appendChild(document.createTextNode(` — ${mean}`));
+    box.appendChild(p);
+  }
   return box;
 }
 
@@ -218,8 +245,31 @@ function renderRead() {
   const col = el('div', 'kor-qcol');
   body.appendChild(col);
   wrap.appendChild(body);
+  // 읽어 주기 알림은 다시 그려도 남는 한 곳에서 (매번 새로 만든 role=status는 잘 안 읽힌다, Codex 48차 #9)
+  const live = el('p', 'kor-live');
+  live.setAttribute('role', 'status');
+  live.setAttribute('aria-live', 'polite');
+  wrap.appendChild(live);
   main.appendChild(wrap);
+  // 위쪽 띠(sticky)만큼 글 상자·물음 칸을 띄운다 — 가로 화면에서 글 윗줄이 띠 밑으로 들어갔다 (Codex 48차 #3)
+  const bar = document.querySelector('#view-korean .topbar');
+  main.style.setProperty('--kor-top', `${Math.ceil(bar ? bar.getBoundingClientRect().height : 64) + 8}px`);
   renderQ();
+}
+
+/** 화면에 다시 그린 뒤 다음에 누를 곳으로 초점(키보드) — 'opt' 남은 보기 · 'ev' 근거 줄 · 'next' 다음 단추 · 'head' 새 물음 · 'done' 끝 카드 */
+function moveFocus(col, where) {
+  const pickEl = {
+    opt: () => col.querySelector('.kor-opt:not(:disabled)'),
+    ev: () => col.querySelector('.kor-ev-row:not(:disabled)'),
+    next: () => col.querySelector('.kor-next'),
+    head: () => col.querySelector('.kor-q-text'),
+    done: () => col.querySelector('.kor-done-title'),
+  }[where];
+  const t = pickEl && pickEl();
+  if (!t) return;
+  if (!t.matches('button')) t.setAttribute('tabindex', '-1');
+  try { t.focus({ preventScroll: true }); } catch { /* 초점은 없어도 */ }
 }
 
 /** 지금 물음(또는 다 읽은 뒤 카드)만 다시 그린다 — 글 상자는 그대로(칠한 근거만 바꾼다) */
@@ -230,7 +280,16 @@ function renderQ() {
   if (!r || !col) return;
   col.textContent = '';
   for (const m of main.querySelectorAll('.kor-sent.is-mark, .kor-line.is-mark')) m.classList.remove('is-mark');
-  if (r.qi >= r.card.qs.length) { col.appendChild(finishEl()); return; }
+  const live = main.querySelector('.kor-live');
+  const focusTo = r.focus;
+  r.focus = '';
+  if (r.qi >= r.card.qs.length) {
+    const done = finishEl();
+    col.appendChild(done);
+    if (live) live.textContent = (done.querySelector('.kor-done-title') || {}).textContent || '';
+    if (focusTo) moveFocus(col, 'done');
+    return;
+  }
   const q = r.card.qs[r.qi];
   const st = r.qs[r.qi];
   const unit = unitOf(r.card);
@@ -256,29 +315,49 @@ function renderQ() {
   });
   card.appendChild(opts);
   const fb = el('p', 'kor-fb');
-  fb.setAttribute('role', 'status');
   const lastWrong = st.wrong.length ? q.opts[st.wrong[st.wrong.length - 1]] : null;
   if (st.answered) { fb.classList.add('is-ok'); fb.textContent = q.ev && !st.evDone ? '맞아요! 이제 그렇게 생각한 까닭을 글에서 찾아볼까요?' : '맞아요!'; }
   else if (lastWrong) { fb.classList.add('is-no'); fb.textContent = `🤔 ${TYPES[lastWrong.type].hint}`; }
   card.appendChild(fb);
-  if (st.answered && q.ev) card.appendChild(evidenceEl(q, st, unit));
+  let say = fb.textContent;
+  if (st.answered && q.ev) {
+    const ev = evidenceEl(q, st, unit);
+    card.appendChild(ev);
+    const m = ev.querySelector('.kor-fb');
+    if (m && m.textContent) say = m.textContent;
+  }
   const qDone = st.answered && (!q.ev || st.evDone);
   if (qDone) {
     if (q.ev) for (const n of q.ev) { const m = main.querySelector(`.kor-read-body [data-n="${n}"]`); if (m) m.classList.add('is-mark'); }
-    card.appendChild(el('p', 'kor-note', `💡 ${q.ev ? q.evNote : q.doneNote}`));
+    const note = el('div', 'kor-note');
+    note.appendChild(el('p', '', `💡 ${q.ev ? q.evNote : q.doneNote}`));
+    // 아까 고른 틀린 보기가 왜 틀렸나 — 틀릴 때는 종류 힌트만 주고(답을 미리 알려 주지 않게), 맞힌 뒤에 보여 준다 (Codex 48차 #6)
+    for (const w of wrongNotes(q, st.wrong)) {
+      const p = el('p', 'kor-note-wrong');
+      p.appendChild(el('b', '', `✗ ${w.t}`));
+      p.appendChild(document.createTextNode(` — ${w.why}`));
+      note.appendChild(p);
+    }
+    card.appendChild(note);
     const last = r.qi === r.card.qs.length - 1;
     const next = el('button', 'btn btn-primary kor-next', last ? '다 풀었어요! →' : '다음 문제 →');
     next.type = 'button';
-    next.addEventListener('click', () => { r.qi++; if (r.qi >= r.card.qs.length) finishCard(); else renderQ(); bringQ(); });
+    next.addEventListener('click', () => { r.qi++; r.focus = 'head'; if (r.qi >= r.card.qs.length) finishCard(); else renderQ(); bringQ(); });
     card.appendChild(next);
   }
   col.appendChild(card);
+  if (live) live.textContent = say;
+  if (focusTo) moveFocus(col, focusTo === 'answer' ? (qDone ? 'next' : st.answered ? 'ev' : 'opt') : focusTo);
 }
 
-/** 새 물음(또는 다 읽은 카드)의 위쪽이 화면 위로 지나갔으면 보이게 — 세로 화면에서 긴 근거 줄 아래 "다음 문제"를 누르면 새 물음 머리가 화면 밖이었다 */
+/** 새 물음(또는 다 읽은 카드)의 머리가 위쪽 띠에 가렸거나 화면 위로 지나갔으면 띠 바로 아래로 — 세로 화면에서 긴 근거 줄 아래
+ *  "다음 문제"를 누르면 새 물음 머리가 화면 밖이었다 · 띠(sticky)를 셈에 넣는다 (Codex 48차 #3, css scroll-margin-top) */
 function bringQ() {
   const col = document.querySelector('#korean-main .kor-qcol');
-  if (col && col.getBoundingClientRect().top < 0) col.scrollIntoView({ block: 'start' });
+  if (!col) return;
+  const bar = document.querySelector('#view-korean .topbar');
+  const under = bar ? bar.getBoundingClientRect().bottom : 0;
+  if (col.getBoundingClientRect().top < under + 4) col.scrollIntoView({ block: 'start' });
 }
 
 function evidenceEl(q, st, unit) {
@@ -300,9 +379,9 @@ function evidenceEl(q, st, unit) {
   }
   box.appendChild(rows);
   const msg = el('p', 'kor-fb');
-  msg.setAttribute('role', 'status');
   if (st.evDone) { msg.classList.add('is-ok'); msg.textContent = `찾았어요! 근거 ${unit}: ${q.ev.map(circled).join(', ')}`; }
-  else if (st.evWrong.length) { msg.classList.add('is-no'); msg.textContent = `그 ${unit}에는 까닭이 없어요. 다시 찾아볼까요?`; }
+  // "까닭이 없어요"는 너무 단정적 — 그 문장도 조금은 관계있을 수 있다 (Codex 48차 #2)
+  else if (st.evWrong.length) { msg.classList.add('is-no'); msg.textContent = `그 ${unit}보다 답을 더 잘 받쳐 주는 ${unit}을 찾아볼까요?`; }
   box.appendChild(msg);
   return box;
 }
@@ -322,6 +401,7 @@ function pick(k) {
     r.misses[o.type] = (r.misses[o.type] || 0) + 1; // 잘못 읽기 종류를 센다 — 다 읽을 때 한 번에 저장
     try { sfx.wrong(); } catch { /* 소리는 없어도 */ }
   }
+  r.focus = 'answer';
   renderQ();
 }
 
@@ -338,6 +418,7 @@ function evPick(n) {
     st.evWrong.push(n);
     try { sfx.wrong(); } catch { /* 소리는 없어도 */ }
   }
+  r.focus = 'answer';
   renderQ();
 }
 
@@ -354,6 +435,7 @@ async function finishCard() {
   if (ui.read !== r) return; // 그 사이 도감으로 나갔다
   r.saving = false;
   r.result = res;
+  r.focus = 'done';
   renderQ();
   if (res && res.ok && res.star) {
     try { sfx.success(); } catch { /* 소리는 없어도 */ }
@@ -374,7 +456,7 @@ function finishEl() {
   box.appendChild(el('p', 'kor-done-stars', '★'.repeat(stars) + '☆'.repeat(3 - stars)));
   for (const line of t.lines) box.appendChild(el('p', 'kor-done-line', line));
   const first = r.qs.filter((s) => !s.wrong.length).length;
-  box.appendChild(el('p', 'kor-done-sub', `한 번에 맞힌 문제 ${first}개 · 「${r.card.title}」`));
+  box.appendChild(el('p', 'kor-done-sub', `보기를 한 번에 맞힌 문제 ${first}개 · 「${r.card.title}」`));
   const row = el('div', 'kor-done-btns');
   if (!res.ok && res.why !== 'unknown') {
     const again = el('button', 'btn btn-primary', '다시 저장하기');
