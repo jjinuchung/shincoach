@@ -21,6 +21,7 @@ import { visibleView } from './pokedex.js';
 import { ENGLISH_STONE_HOW, VIDEO_TIERS } from './items.js'; // 🔶 영어스톤 받는 곳 안내 (2026-10-06)
 import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport, readState, readSummary } from './upload.js'; // 📤 Claude에게 기록 보내기 (2026-10-06)
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
+import { writeTodo } from './korwrite.js'; // ✍️ 국어 서술형 — 답장 기다리는 글 수 (v237)
 
 const $ = (id) => document.getElementById(id);
 
@@ -872,7 +873,7 @@ function renderUploadCard(main) {
   const st = uploadState();
   const fmt = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   box.appendChild(el('p', 'stats-note', token
-    ? `수학 기록·❓ 질문·✍️ 고칠 에세이 글을 비공개 저장소(${DATA_REPO})에 저절로 올려요 — 앱을 열 때·홈으로 올 때·앱을 내릴 때, 10분에 한 번까지. Claude에게 "기록 봐 줘"라고만 하면 돼요.`
+    ? `수학 기록·❓ 질문·✍️ 고칠 에세이 글·✍️ 국어 생각 쓰기를 비공개 저장소(${DATA_REPO})에 저절로 올려요 — 앱을 열 때·홈으로 올 때·앱을 내릴 때, 10분에 한 번까지(생각 쓰기는 보낼 때 바로). Claude에게 "기록 봐 줘"·"국어 답 봐 줘"라고만 하면 돼요.`
     : `사진·복사 없이 Claude가 바로 볼 수 있게, 수학 기록을 비공개 저장소(${DATA_REPO})에 올려요. GitHub에서 만든 열쇠(fine-grained token)를 아래에 한 번 넣어 주세요 — 이 태블릿에만 저장돼요.`));
   const status = el('p', 'stats-sub', '');
   const paint = (s) => {
@@ -883,6 +884,9 @@ function renderUploadCard(main) {
     box.appendChild(status);
     // 📥 아빠 교정·❓ 답장 받기 결과 — 못 받았으면 까닭 (아이 화면은 조용히, 여기서만 — Codex 36차 #4)
     box.appendChild(el('p', 'stats-sub', readSummary(readState(), fmt)));
+    // ✍️ 국어 생각 쓰기 — 답장 기다리는 글이 있으면 Claude에게 "국어 답 봐 줘" (v237)
+    const waiting = writeTodo((getProfileSnapshot() || {}).korWrites, []).length;
+    box.appendChild(el('p', 'stats-sub', waiting ? `✍️ 국어 생각 쓰기: 답장 기다리는 글 ${waiting}개 — Claude에게 "국어 답 봐 줘"` : '✍️ 국어 생각 쓰기: 답장 기다리는 글 없음'));
     const row = el('div', 'stats-actions');
     const send = el('button', 'btn btn-primary', '📤 지금 보내기');
     send.type = 'button';

@@ -1,11 +1,13 @@
 // 🔒 비공개 저장소(shincoach-data)에 올리기 전 검사 — node tools/check.mjs --private <폴더>
-//   폴더 안의 essay/fixes.json(✍️ 아빠 교정) · math/replies.json(❓ 아빠 답장) 중 **있는 것**을 검사한다
+//   폴더 안의 essay/fixes.json(✍️ 아빠 교정) · math/replies.json(❓ 아빠 답장) · korean/replies.json(✍️ 국어 서술형 답장, v237) 중 **있는 것**을 검사한다
 //   (교정만 올릴 때는 답장 파일이 없어도 된다).
 // ★ 없는 폴더·검사할 파일이 하나도 없는 폴더·폴더 이름 빠짐은 실패다 (Codex 36차 #5 — 전엔 "검사 통과"로 끝나
 //   경로를 잘못 쳐도 검사한 줄 알았다). 검사한 파일 이름을 돌려줘 check.mjs가 찍는다.
 import { readFileSync, existsSync, statSync } from 'node:fs';
+import { checkReplies } from '../js/korwrite.js';
+import { validCards } from '../js/korean.js';
 
-export const PRIVATE_FILES = ['essay/fixes.json', 'math/replies.json'];
+export const PRIVATE_FILES = ['essay/fixes.json', 'math/replies.json', 'korean/replies.json'];
 
 /** argv → { dir } (--private을 안 쓰면 dir null) · --private 뒤에 폴더 이름이 없으면 { error } */
 export function privateArg(argv) {
@@ -31,6 +33,12 @@ export function checkPrivateDir(dir, figureSvg) {
     let list;
     try { list = JSON.parse(readFileSync(f, 'utf8')); } catch (e) { errors.push(`JSON 오류: ${f}: ${e.message}`); continue; }
     if (!Array.isArray(list)) { errors.push(`내용 오류: ${f}: 배열이 아님`); continue; }
+    if (rel === 'korean/replies.json') {
+      // ✍️ 국어 서술형 답장 — [{ card, at, grade, text }] · 앱이 받을 때와 같은 검사(korwrite.checkReplies) — 서술형 있는 카드·at·등급·길이·같은 글에 다른 답장 (v237)
+      const cards = validCards(JSON.parse(readFileSync(new URL('../coach/korean/reading.json', import.meta.url), 'utf8')));
+      for (const b of checkReplies(list, cards).bad) errors.push(`내용 오류: ${f}[${b.i}]: ${b.why}`);
+      continue;
+    }
     if (rel === 'essay/fixes.json') {
       list.forEach((e, i) => { if (!e || typeof e.fixed !== 'string' || !e.fixed.trim()) errors.push(`내용 오류: ${f}[${i}]: fixed(고친 글)가 있어야 함`); });
       continue;

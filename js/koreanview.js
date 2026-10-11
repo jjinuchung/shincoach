@@ -15,6 +15,9 @@ import { todayKey } from './track.js';
 import { showHatchIfAny } from './hatch.js';
 import { eggProgress } from './egg.js';
 import * as tabs from './kortabs.js'; // 🔤 낱말 · 📘 단원 탭 (v234) — 탭 쪽은 이 파일을 import하지 않는다(ctx로 건넴)
+import { writeBoxEl, replyBannerEl, renderReplyView, slotWriteText, syncWrites, appliedLine } from './korwriteview.js'; // ✍️ 서술형 (v237) — 이 파일을 import하지 않는다(ctx로 건넴)
+import { cardWriteState } from './korwrite.js';
+import { korWritesMap } from './xp.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -28,7 +31,8 @@ const el = (tag, cls, text) => {
 export const CONTENT_URL = './coach/korean/reading.json';
 
 // cards: 쓸 수 있는 카드(validCards) · read: 읽는 중인 글 { card, qi, qs: [물음 상태], misses, result, saving }
-const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards' };
+const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards', wview: '', writeNote: '' };
+// wview = 📬 답장 화면을 보고 있는 카드 id (그동안 목록이 덮지 않게) · writeNote = 답장이 붙었을 때 도감 위 한 줄(한 번)
 // tab = 📚 도감(cards) · 🔤 낱말(words) · 📘 단원(units) — 글을 읽고 돌아오면 그 탭으로
 // catchState = 지금 열어 둔 잡기 창 { threw, hold } — 창이 바깥에서 닫혀(catch.closeCatch는 부른 쪽에 안 알린다) 소식이 없을 때 안 던진 기회를 돌려주려고
 
@@ -99,10 +103,26 @@ export async function enterKorean() {
   topUpKorChars(); // 🎯 국어 포켓몬 그림을 조금씩 먼저
   // 🎯 소식 없이 닫힌 창부터 정리한 뒤 장부 정리 — 지난번에 뺐는데 판정 전에 꺼진 기회·돌려주다 실패한 기회 (Codex 49차 #1·#2 · 50차 #1 차례대로)
   Promise.resolve(settleLostCatch()).catch(() => {}).then(() => settleKorThrows());
+  // 📥 ✍️ 서술형 아빠 답장 — 비공개 저장소에서 받아 그 글에 한 번만 붙인다(보상도 한 트랜잭션) · 못 받으면 조용히
+  loadCards().then((cards) => (cards ? syncWrites(cards) : null)).then((r) => {
+    const line = appliedLine(r);
+    if (!line) return;
+    ui.writeNote = line;
+    if (!ui.read && !tabs.inSession() && !ui.wview && ui.tab === 'cards') renderList().catch(() => {});
+  }).catch(() => {});
   if (ui.read) { if (!$('korean-main').querySelector('.kor-read')) renderRead(); return; }
   if (tabs.inSession()) { tabs.renderSession(tabCtx); return; } // 🔤 낱말을 풀다 🎒·📊를 다녀왔다 — 그대로 이어서
+  if (ui.wview) { renderReplyView(ui.wview, writeCtx); return; } // 📬 답장을 보다 🎒·📊를 다녀왔다
   await renderList();
 }
+
+/** ✍️ 서술형 쪽(korwriteview)에 건네는 것 — 서로 import하지 않게 */
+const writeCtx = {
+  main: () => $('korean-main'),
+  cards: () => ui.cards || [],
+  open: (id) => { ui.wview = id; },
+  back: () => { ui.wview = ''; renderList(); window.scrollTo(0, 0); },
+};
 
 /** 탭 쪽(kortabs)에 건네는 것 — 서로 import하지 않게 */
 const tabCtx = {
@@ -138,7 +158,7 @@ export async function renderList() {
   const main = $('korean-main');
   if (!main) return;
   const cards = await loadCards();
-  if (ui.read || tabs.inSession()) return; // 읽는 사이 글을 골랐다 · 🔤 낱말 판을 시작했다
+  if (ui.read || tabs.inSession() || ui.wview) return; // 읽는 사이 글을 골랐다 · 🔤 낱말 판을 시작했다 · 📬 답장 화면
   main.textContent = '';
   if (!cards || !cards.length) {
     const box = el('div', 'kor-empty');
@@ -169,7 +189,11 @@ export async function renderList() {
   head.appendChild(el('p', 'kor-count', `모은 카드 ${got} / ${total} · ★ ${stars} / ${total * 3}`));
   const cb = catchBtnEl(); // 🎯 남은 국어 잡기 기회 — 다 읽은 카드에서 안 던지고 나왔어도 여기서
   if (cb) head.appendChild(cb);
+  if (ui.writeNote) { head.appendChild(el('p', 'kor-wnote', ui.writeNote)); ui.writeNote = ''; } // 📬 답장이 붙었다 — 한 번
+  const wb = replyBannerEl({ ...writeCtx, cards: () => cards }); // 📬 안 읽은 아빠 답장
+  if (wb) head.appendChild(wb);
   main.appendChild(head);
+  const writes = korWritesMap();
   const grid = el('div', 'kor-grid');
   cards.forEach((c, i) => {
     const s = starsOf(done, c.id);
@@ -183,7 +207,9 @@ export async function renderList() {
     b.appendChild(el('span', 'kor-slot-kind', c.kind === 'classic' ? `${KINDS.classic} · ${c.author}` : `${KINDS.practice} · ${c.genre}`));
     b.appendChild(el('span', 'kor-slot-stars', '★'.repeat(s) + '☆'.repeat(3 - s)));
     b.appendChild(el('span', 'kor-slot-status', st.text));
-    b.setAttribute('aria-label', `${c.title} — 별 ${s}개 · ${st.text}`);
+    const wl = slotWriteText(cardWriteState(writes, c.id), !!c.write); // ✍️ 서술형 — 답장 기다림 · 📬 왔어요 · ✅
+    if (wl) b.appendChild(el('span', 'kor-slot-write', wl));
+    b.setAttribute('aria-label', `${c.title} — 별 ${s}개 · ${st.text}${wl ? ` · ${wl}` : ''}`);
     b.addEventListener('click', () => guardStart('korean', () => openCard(c.id)));
     grid.appendChild(b);
   });
@@ -568,6 +594,7 @@ function finishEl() {
   box.appendChild(row);
   const cb = catchBtnEl(); // 🎯 별을 받았으면 국어 포켓몬 잡기
   if (cb) box.appendChild(cb);
+  if (res.ok && r.card.write) box.appendChild(writeBoxEl(r.card, writeCtx)); // ✍️ 생각 쓰기 — 객관식 뒤, 건너뛰어도 별은 그대로
   return box;
 }
 
@@ -719,6 +746,6 @@ export function initKorean({ showView }) {
   if (back) back.addEventListener('click', () => showView('home'));
   onProfileReload(() => {
     const v = $('view-korean');
-    if (v && !v.hidden && !ui.read && !tabs.inSession() && !profileLoading()) renderList().catch(() => {});
+    if (v && !v.hidden && !ui.read && !tabs.inSession() && !ui.wview && !profileLoading()) renderList().catch(() => {});
   });
 }

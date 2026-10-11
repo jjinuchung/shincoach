@@ -70,7 +70,7 @@ for (const f of Object.keys(MATH_CHECK)) {
 const { figureSvg } = await import('../js/mathdraw.js');
 // ★ 아이 기록(✍️ 아빠 교정·❓ 아빠 답장)은 공개 저장소에 두지 않는다 (2026-10-07 Codex 35차 #1) —
 //   비공개 저장소 shincoach-data의 essay/fixes.json · math/replies.json에 올리고, 앱은 이 기기 📤 열쇠로 읽는다
-const PUBLIC_PRIVATE = ['coach/fixes.json', 'coach/math/replies.json'];
+const PUBLIC_PRIVATE = ['coach/fixes.json', 'coach/math/replies.json', 'coach/korean/replies.json', 'coach/korean/todo.json'];
 for (const f of PUBLIC_PRIVATE) if (existsSync(f)) { bad++; console.error(`공개 저장소에 아이 기록: ${f} — 비공개 저장소(shincoach-data)에 올려 주세요`); }
 // 비공개 저장소에 올리기 전 검사: node tools/check.mjs --private <폴더> (그 안의 essay/fixes.json · math/replies.json 중 있는 것)
 // 없는 폴더·빈 폴더·폴더 이름 빠짐은 실패 (Codex 36차 #5) — tools/privcheck.mjs

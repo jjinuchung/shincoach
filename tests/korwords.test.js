@@ -415,10 +415,10 @@ test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이
 test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘) · 낱말 판 중엔 도감을 다시 그리지 않음 · 🎒에서 돌아오면 이어서 · 시작은 ⏳ guardStart · 끝나면 🥚 하루 칸 · 처음 고른 것만 · 말(순수) · sw', async () => {
   const kv = read('js/koreanview.js');
   assert.match(kv, /for \(const \[id, label\] of \[\['cards', '📚 도감'\], \['words', '🔤 낱말'\], \['units', '📘 단원'\]\]\)/);
-  assert.ok(kv.includes('if (ui.read || tabs.inSession()) return;'), '판을 시작했으면 목록이 덮지 않는다');
+  assert.ok(kv.includes('if (ui.read || tabs.inSession() || ui.wview) return;'), '판을 시작했으면(· 📬 답장 화면이면) 목록이 덮지 않는다');
   assert.ok(kv.includes("if (tabs.inSession()) { tabs.renderSession(tabCtx); return; }"), '🎒·📊에서 돌아오면 이어서');
   assert.ok(kv.includes('else if (tabs.inSession()) tabs.renderSession(tabCtx);'), '잡기 뒤에도');
-  assert.ok(kv.includes('!ui.read && !tabs.inSession() && !profileLoading()'), '다른 창 저장에도 판을 덮지 않는다');
+  assert.ok(kv.includes('!ui.read && !tabs.inSession() && !ui.wview && !profileLoading()'), '다른 창 저장에도 판(· 📬 답장 화면)을 덮지 않는다');
   assert.ok(kv.includes("await (ui.tab === 'words' ? tabs.renderWordsTab(body, tabCtx) : tabs.renderUnitsTab(body, tabCtx));"));
   const kt = read('js/kortabs.js');
   assert.ok(!/from '\.\/koreanview\.js'/.test(kt), '탭 쪽은 koreanview를 import하지 않는다(돌고 돈다)');

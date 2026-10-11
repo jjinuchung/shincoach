@@ -30,6 +30,10 @@ export const TYPES = {
 /** 카드 종류 */
 export const KINDS = { practice: '📄 연습 카드', classic: '✨ 명작 카드' };
 
+/** ✍️ 서술형 답 글자 수 (공백 정리 뒤) — 규칙은 korwrite.js, 원고 검사(write.model)도 같은 값 (v237) */
+export const WRITE_MIN = 10;
+export const WRITE_MAX = 200;
+
 /** 별마다 💰 — 수학 개념 편과 같은 크기(처음 다 맞힘 12 · 복습 통과 8 · 👑 이해 완료 20, mathprog.REWARD) */
 export const KOR_COINS = { 1: 12, 2: 8, 3: 20 };
 /** 🟩 국어스톤 아이템 id (items.STONE_KOREAN과 같아야 한다 — 테스트로 고정) · 별을 새로 받을 때 **보기·근거를 모두 한 번에** 맞혔으면 하나
@@ -272,6 +276,10 @@ export function checkCard(c, ids = new Set()) {
       if (k >= 0 && k + 1 > n) at(`${where}: ${ch}은 글에 없는 번호`);
     }
   };
+  if (own(c, 'write')) {
+    for (const m of checkWriteItem(c.write)) at(m);
+    if (isObj(c.write)) { refs(c.write.q, 'write.q'); refs(c.write.model, 'write.model'); }
+  }
   if (!Array.isArray(c.qs) || !c.qs.length || c.qs.length > 5) { at('물음은 1~5개'); return errs; }
   c.qs.forEach((q, i) => {
     const qid = `${c.id}-${i + 1}`;
@@ -309,6 +317,26 @@ export function checkCard(c, ids = new Set()) {
       refs(q.evNote, `${qid} 근거 풀이`);
     }
   });
+  return errs;
+}
+
+/**
+ * ✍️ 서술형 하나 검사 — { q 물음, v 채점 기준 판 번호(고치면 올린다 — 옛 글은 그 판으로 채점), rubric { must 꼭 들어갈 생각 ≥1, ok 괜찮은 다른 답, miss 흔한 잘못 }, model 예시 답 }
+ * rubric·model은 공개 원고(앱은 보여 주지 않는다) — Claude가 세션이 바뀌어도 같은 잣대로 채점하려고 (Codex 51차 PART 3 #11)
+ */
+export function checkWriteItem(w) {
+  const errs = [];
+  const strs = (a) => Array.isArray(a) && a.every(nonEmpty);
+  if (!isObj(w)) return ['write는 { q, v, rubric, model }'];
+  if (!nonEmpty(w.q)) errs.push('write.q(물음)가 비었어요');
+  if (!Number.isInteger(w.v) || w.v <= 0) errs.push('write.v(채점 기준 판 번호)는 1부터');
+  if (!isObj(w.rubric) || !strs(w.rubric.must) || !w.rubric.must.length) errs.push('write.rubric.must(꼭 들어갈 생각)가 하나 이상');
+  else {
+    if (!strs(w.rubric.ok)) errs.push('write.rubric.ok(괜찮은 다른 답)는 글 목록');
+    if (!strs(w.rubric.miss)) errs.push('write.rubric.miss(흔한 잘못)는 글 목록');
+  }
+  if (!nonEmpty(w.model)) errs.push('write.model(예시 답)이 비었어요');
+  else if ([...w.model.normalize('NFC').replace(/\s+/g, ' ').trim()].length > WRITE_MAX) errs.push(`write.model은 ${WRITE_MAX}자까지 — 아이에게 바라는 길이보다 길면 안 돼요`);
   return errs;
 }
 

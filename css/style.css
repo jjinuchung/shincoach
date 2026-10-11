@@ -3198,6 +3198,41 @@ button { font-family: inherit; }
 }
 .kor-unit-card:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 
+/* ✍️ 국어 서술형 (v237, korwriteview.js) — 끝 카드 아래 원고지 같은 쓰기 칸 · 📬 아빠 답장은 편지처럼 */
+.kor-write {
+  justify-self: stretch; text-align: left; display: grid; gap: 10px; margin-top: 10px;
+  border-top: 2px dashed var(--kor-rule); padding-top: 14px; min-width: 0;
+}
+.kor-write p { margin: 0; }
+.kor-wh { margin: 0; font-size: 1.12rem; }
+.kor-wq-text { display: block; font-weight: 700; line-height: 1.6; word-break: keep-all; }
+.kor-wform { display: grid; gap: 8px; min-width: 0; }
+.kor-wtext {
+  width: 100%; box-sizing: border-box; min-height: 7.5em; resize: vertical; font: inherit; font-size: 1.05rem; line-height: 1.8;
+  padding: 10px 12px; border: 2px solid var(--border); border-radius: 12px; color: inherit;
+  background: var(--kor-paper) repeating-linear-gradient(transparent, transparent calc(1.8em - 1px), var(--kor-rule) calc(1.8em - 1px), var(--kor-rule) 1.8em);
+  background-attachment: local; background-position: 0 10px;
+}
+.kor-wtext:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.kor-wcount { font-size: 0.88rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.kor-wcount.is-warn { color: #b3261e; font-weight: 700; }
+.kor-wreward { font-size: 0.9rem; color: var(--primary-dark); font-weight: 700; word-break: keep-all; }
+.kor-wsend { justify-self: start; }
+.kor-wmsg:empty { display: none; }
+.kor-wmsg, .kor-wnote { font-weight: 700; color: var(--primary-dark); word-break: keep-all; }
+.kor-wwait { color: var(--muted); line-height: 1.55; word-break: keep-all; }
+.kor-wdone { font-weight: 800; color: var(--ok); }
+.kor-wmine { background: #f4f5f8; border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }
+.kor-wreply { border: 2px solid var(--kor-gold-line); background: var(--kor-gold-bg); border-radius: 16px; padding: 12px 14px; display: grid; gap: 10px; }
+.kor-wreply.is-ok { border-color: var(--ok); background: var(--kor-ok-bg); }
+.kor-wgrade { font-weight: 800; font-size: 1.05rem; }
+.kor-wdad { display: grid; gap: 6px; }
+.kor-wlabel { font-size: 0.82rem; font-weight: 700; color: var(--muted); }
+.kor-wbody { line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; white-space: pre-wrap; }
+.kor-wagain { justify-self: start; }
+.kor-wbanner { justify-self: start; }
+.kor-slot-write { font-size: 0.8rem; font-weight: 700; color: var(--primary-dark); word-break: keep-all; }
+
 /* 📚 🎯 국어 포켓몬 잡기 단추 (2026-10-11) */
 .kor-catch { display: grid; gap: 6px; justify-items: center; margin-top: 8px; }
 .kor-head .kor-catch { justify-items: start; }
