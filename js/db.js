@@ -9,6 +9,7 @@ import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusion
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
 import { ROCKET, rocketGapOk, stealables, hideout, rocketStep, copyRocketCur, mergeRocketDone } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수 — evolve만 import)
+import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 — house·evolve만 import)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -809,7 +810,9 @@ export function copyHouse(h) {
   if (!h || typeof h !== 'object' || Array.isArray(h)) return undefined;
   // 💊 쉬는 캡슐의 rest도 새 객체로 (규칙이 고쳐도 원본이 안 바뀌게)
   const item = (it) => ({ ...it, ...(it && it.rest && typeof it.rest === 'object' ? { rest: { ...it.rest } } : {}) });
-  return { ...h, rooms: (Array.isArray(h.rooms) ? h.rooms : []).map((r) => ({ ...r, items: (Array.isArray(r && r.items) ? r.items : []).map(item) })) };
+  const out = { ...h, rooms: (Array.isArray(h.rooms) ? h.rooms : []).map((r) => ({ ...r, items: (Array.isArray(r && r.items) ? r.items : []).map(item) })) };
+  if (Array.isArray(h.parked)) out.parked = h.parked.map((r) => (r && typeof r === 'object' ? { ...r } : r)); // 💊 맡겨 둔 휴식도 (Codex 47차 #1)
+  return out;
 }
 
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
@@ -1986,9 +1989,10 @@ export function mergeStatRecord(name, cur, rec) {
         if (v && v !== (Number(cur[k]) || 0)) patch[k] = v;
       }
       // 💊 회복 캡슐 — 모은 💤(rx)·💤로 오른 레벨(rxLv)도 누적 (2026-10-10) — max가 아니면 옛 백업이 받은 💤를 되돌린다
+      //    깨진 값("1e309"·아주 큰 수)은 0으로 읽는다(rest.restCount) — 무한대가 큰 쪽으로 이기지 않게 (Codex 47차 #4)
       for (const k of ['rx', 'rxLv']) {
-        const v = Math.max(Number(o[k]) || 0, Number(cur[k]) || 0);
-        if (v && v !== (Number(cur[k]) || 0)) patch[k] = v;
+        const v = Math.max(restCount(o[k]), restCount(cur[k]));
+        if (v !== cur[k] && (v || cur[k] !== undefined)) patch[k] = v;
       }
       const taken = Math.max(Number(o.taken) || 0, Number(cur.taken) || 0);
       if (taken && taken !== (Number(cur.taken) || 0)) patch.taken = taken;

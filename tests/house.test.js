@@ -899,7 +899,7 @@ test('🔍 Codex 46차 화면: 다시 읽으면 열린 집을 새로 그림 · �
   // #3 늦은 창: 저장소가 owned라고 해도 넓히기면 "벌써 했어요"
   assert.ok(src.includes('const GROW_WHY = { owned: \'grown\' };'));
   assert.ok(src.includes('run((p) => houseBuyRule(p, id), ok, growById(id) ? GROW_WHY : null)'));
-  assert.ok(/ui\.msg = r && r\.ok \? okText : \(WHY\[\(alias && alias\[why\]\) \|\| why\] \|\| '다시 해 볼까요\?'\);/.test(fn('async function run(')));
+  assert.ok(/ui\.msg = r && r\.ok \? \(typeof okText === 'function' \? okText\(r\) : okText\) : \(WHY\[\(alias && alias\[why\]\) \|\| why\] \|\| '다시 해 볼까요\?'\);/.test(fn('async function run(')));
   assert.ok(fn('async function shopTap(').includes('const why = (growById(id) && GROW_WHY[c.why]) || c.why;'), '누르기 전 판정도 같은 바꿈');
   assert.ok(/room: '[^']+'/.test(src) && /changed: '[^']+'/.test(src), '없는 방·바뀐 집의 말');
   // 그린 집 열쇠 — 층·크기·방 중 하나라도 다르면 다른 열쇠, 같으면 같은 열쇠

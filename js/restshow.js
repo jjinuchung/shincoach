@@ -2,12 +2,12 @@
 // 소유는 이미 트랜잭션(rest.restClaimRule)에서 끝났다 — 이 화면은 축하만 한다 (🧬 evolveshow.js · 🐣 hatch.js와 같은 자리).
 //
 // 차례: 캡슐이 흔들흔들 → 번쩍 열리며 빛줄기·반짝이가 터지고 포켓몬이 톡 튀어나온다 → ❤️ HP 막대가 차오르고 →
-//       💤 경험치 막대가 차오른다(가득 차면 LEVEL UP!) → 🍀 행운이면 종이가루·금빛 → [좋아!] → 깜짝 진화면 진화 연출로 이어진다.
+//       💤 경험치 막대가 차오른다(가득 차면 ⬆️ 레벨 업! → 남은 💤부터 다시) → 🍀 행운이면 종이가루·금빛 → [좋아!] → 깜짝 진화면 진화 연출로 이어진다.
 // 구형 태블릿(갤럭시탭 A7, Android 10)을 생각해 **움직이는 것은 transform·opacity만** 쓴다(막대도 width가 아니라 scaleX).
 // 화면을 누르면 연출을 건너뛰고 끝 모습으로 간다(여러 번 보면 지겹다). 무엇이 터져도 화면이 잠기지 않게 닫힌다.
 import { sfx } from './sfx.js';
 import { showEvolve } from './evolveshow.js';
-import { EXP_LV } from './rest.js';
+import { EXP_LV, CAP_KO } from './rest.js';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let box = null;
@@ -181,20 +181,23 @@ export async function showRestDone(o) {
     // 3) ❤️ 막대
     b.querySelector('.rshow-bars').classList.add('is-on');
     await Promise.all([fillBar(hpFill, r.hp.from / 100, 1, 900), countUp(hpNum, r.hp.from, r.hp.to, 900, (n) => `${n}`)]);
-    // 4) 💤 막대 — 가득 차면 LEVEL UP
+    // 4) 💤 막대 — 가득 차면 레벨 업
     await Promise.all([fillBar(exFill, r.exp.from / EXP_LV, r.exp.to / EXP_LV, 700), countUp(exNum, r.exp.from, r.exp.to, 700, (n) => `${n}/${EXP_LV}`)]);
     const lucky = r.lv.to - r.lv.from - r.exp.lvUp;
     if (r.exp.lvUp > 0) {
-      badge(badges, `⬆️ LEVEL UP! Lv ${r.lv.from} → ${r.lv.from + r.exp.lvUp}`, 'is-level');
+      badge(badges, `⬆️ 레벨 업! Lv ${r.lv.from} → ${r.lv.from + r.exp.lvUp}`, 'is-level'); // 앱의 다른 곳처럼 우리말 (Codex 47차 D)
       try { sfx.levelUp(); } catch { /* 소리는 없어도 */ }
       await pause(500);
       await fillBar(exFill, 1, 0, 300); // 막대는 다음 레벨을 향해 다시 0부터
       exNum.textContent = `0/${EXP_LV}`;
+      // 남은 💤에서 끝난다 — 95 + 10이면 저장은 5/100인데 연출이 0/100으로 끝났다 (Codex 47차 #5)
+      const end = Math.max(0, Math.min(EXP_LV, Number(r.exp.end) || 0));
+      if (end > 0) await Promise.all([fillBar(exFill, 0, end / EXP_LV, 300), countUp(exNum, 0, end, 300, (n) => `${n}/${EXP_LV}`)]);
     }
     // 5) 🍀 행운
     if (lucky > 0 || r.coins) {
       stage.classList.add('is-lucky');
-      badge(badges, lucky > 0 ? `🍀 행운의 레벨업! Lv ${r.lv.to}` : `🍀 레벨이 가득해서 대신 💰${r.coins}`, 'is-lucky');
+      badge(badges, lucky > 0 ? `🍀 행운의 레벨 업! Lv ${r.lv.to}` : `🍀 ${CAP_KO[r.cap] || CAP_KO.max} 대신 💰${r.coins}`, 'is-lucky');
       burst(stage, 18);
       try { sfx.success(); } catch { /* 소리는 없어도 */ }
       import('./catch.js').then((m) => m.burstConfetti(60)).catch(() => {});

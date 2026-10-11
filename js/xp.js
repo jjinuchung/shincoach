@@ -858,13 +858,14 @@ export async function houseDo(rule) {
 export function restStart(u, monId, luck = rollLuck(Math.random())) {
   return houseDo((p) => restStartRule(p, u, monId, Date.now(), luck));
 }
-/** 💊 일찍 꺼내기 — 보상 없음 */
-export function restCancel(u) {
-  return houseDo((p) => restCancelRule(p, u, Date.now()));
+/** 💊 일찍 꺼내기 — 보상 없음 · want = 진우가 본 휴식 id(다르면 'changed' — Codex 47차 #2) */
+export function restCancel(u, want) {
+  return houseDo((p) => restCancelRule(p, u, Date.now(), want));
 }
-/** 💊 다 쉰 포켓몬 받기 — decide: 깜짝 진화일 때 진우가 고른 갈래(0 = 그대로 두기) · 진화는 evolveRule(레벨이 모자라도) */
-export function restClaim(u, decide) {
-  return houseDo((p) => restClaimRule(p, u, Date.now(), decide, HP.max, evolveRule));
+/** 💊 다 쉰 포켓몬 받기 — decide: 깜짝 진화일 때 진우가 고른 갈래(0 = 그대로 두기) · 진화는 evolveRule(레벨이 모자라도) ·
+ *  want = 진우가 본 휴식 id(다르면 'changed' — 옛 창의 "그대로 두기"가 새 휴식을 받지 않게, Codex 47차 #2) */
+export function restClaim(u, decide, want) {
+  return houseDo((p) => restClaimRule(p, u, Date.now(), decide, HP.max, evolveRule, want));
 }
 /** 💊 고르기 창 — 데리고 있는 포켓몬 id (한 마리 이상) */
 export function ownedMonIds() {

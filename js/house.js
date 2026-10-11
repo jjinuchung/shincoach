@@ -24,6 +24,8 @@
 // 💊 회복 캡슐 (2026-10-10 아버님 설계안 "이대로 진행" — 큰 그림 2 "포켓몬이 사는 집"의 첫 단계, 규칙은 rest.js):
 //  · 캡슐(f_heal)은 기기 — 2대까지(HEAL_MAX, 2층이 있어도). 쉬는 중이면 놓인 캡슐에 rest = { id, mon, at, luck }
 //    (가구와 함께 옮겨 다니고, 집과 같은 쪽으로 합쳐진다) · 받은/꺼낸 휴식 id는 profile.restsDone(합집합) — houseOf가 지운다
+//  · 맡겨 둔 휴식 house.parked = [rest…] — 방이 줄어든 백업과 합쳐져 쉬던 캡슐이 서랍으로 가도 휴식은 버리지 않는다(Codex 47차 #1).
+//    빈 캡슐이 놓여 있으면 거기로 옮겨 이어 쉬고, 없으면 서랍의 캡슐을 다시 놓을 때 이어진다(houseOf·placeRule)
 
 /** 방 크기 — 바닥 W × H칸, 벽 WALL칸 */
 export const ROOM = { W: 8, H: 6, WALL: 8 };
@@ -142,13 +144,14 @@ export function furnMax(profile, id) {
   return d && d.max ? Math.min(m, d.max) : m;
 }
 
-/** 휴식 기록의 모양이 바른가 — { id: 글자(1~80자), mon: 양의 정수, at: 양의 유한수, luck: '' | 'lv' | 'evo' } (모르는 칸은 버린 새 객체, 아니면 null) */
+/** 휴식 기록의 모양이 바른가 — { id: 글자(1~80자), mon: 양의 정수, at: 양의 안전한 정수(ms), luck: '' | 'lv' | 'evo' } (모르는 칸은 버린 새 객체, 아니면 null)
+ *  at은 안전한 정수만 — 깨진 백업의 1e300이면 "1e300 ms 남음"으로 영영 못 받았다 (Codex 47차 #4) */
 const LUCKS = ['', 'lv', 'evo'];
 function restCopy(r) {
   if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
   if (typeof r.id !== 'string' || !r.id || r.id.length > 80) return null;
   if (!Number.isSafeInteger(r.mon) || r.mon <= 0) return null;
-  if (typeof r.at !== 'number' || !Number.isFinite(r.at) || r.at <= 0) return null;
+  if (!Number.isSafeInteger(r.at) || r.at <= 0) return null;
   const luck = r.luck === undefined ? '' : r.luck;
   if (!LUCKS.includes(luck)) return null;
   return { id: r.id, mon: r.mon, at: r.at, luck };
@@ -276,7 +279,35 @@ export function houseOf(profile) {
     seq = all.length;
   }
   out.seq = seq;
+  // 💊 자리를 잃은 캡슐의 휴식은 버리지 않는다 (Codex 47차 #1: 2층이 없는 백업과 합쳐지면 2층 캡슐이 서랍으로 가며 쉬던 휴식이
+  //    사라졌고, 그 뒤 집을 한 번 고치면 2층을 되찾아도 영영 없었다). 전에 맡긴 것(parked) 먼저, 그다음 이번에 자리를 잃은 캡슐(놓은 차례).
+  //    빈 캡슐이 놓여 있으면 거기서 이어 쉬고 · 없으면 서랍의 캡슐 수만큼 맡겨 둔다(다시 놓으면 placeRule이 잇는다) · 그 밖은 버린다
+  const lostCaps = [];
+  for (const r of rooms) for (const it of (r && Array.isArray(r.items) ? r.items : [])) if (it && it.id === HEAL && it.rest) lostCaps.push(it);
+  lostCaps.sort((a, b) => (Number(a.u) || 0) - (Number(b.u) || 0));
+  const caps = out.rooms.flatMap((r) => r.items).filter((i) => i.id === HEAL).sort((a, b) => a.u - b.u);
+  const restIds = new Set(caps.filter((i) => i.rest).map((i) => i.rest.id));
+  const drawerCaps = ownedOf(profile, HEAL) - caps.length;
+  const parked = [];
+  for (const raw of [...(Array.isArray(src.parked) ? src.parked : []), ...lostCaps.map((i) => i.rest)]) {
+    const rest = restCopy(raw);
+    if (!rest || own(done, rest.id) || restIds.has(rest.id) || resting.has(rest.mon)) continue;
+    const empty = caps.find((i) => !i.rest);
+    if (empty) empty.rest = rest;
+    else if (parked.length < drawerCaps) parked.push(rest);
+    else continue;
+    restIds.add(rest.id);
+    resting.add(rest.mon);
+  }
+  if (parked.length) out.parked = parked;
   return out;
+}
+
+/** 💊 집에서 쉬는 휴식 전부 — 놓인 캡슐의 것 + 맡겨 둔 것 (h = houseOf 결과) · 같은 종 두 번(twice)·기록 번호 겹침을 볼 때 */
+export function restsOf(h) {
+  const out = [];
+  for (const r of h.rooms) for (const it of r.items) if (it.rest) out.push(it.rest);
+  return out.concat(h.parked || []);
 }
 
 /** 서랍에 남은 가구 — { 가구id: 가진 수 − 놓은 수 } (0개는 뺀다) */
@@ -361,9 +392,15 @@ export function placeRule(profile, roomId, id, x, y) {
   if (!(leftOf({ ...profile, house: h })[id] > 0)) return { ok: false, why: 'none' };
   if (!canPlace(houseShape(profile).size, room, id, x, y)) return { ok: false, why: 'spot' };
   h.seq += 1;
-  room.items.push({ u: h.seq, id, x, y, f: 0 });
+  const item = { u: h.seq, id, x, y, f: 0 };
+  // 💊 맡겨 둔 휴식이 있으면 다시 놓은 캡슐에서 이어 쉰다 (Codex 47차 #1) — rest를 돌려줘 화면이 "이어서 쉬어요"라고 말한다
+  if (id === HEAL && h.parked && h.parked.length) {
+    item.rest = h.parked.shift();
+    if (!h.parked.length) delete h.parked;
+  }
+  room.items.push(item);
   profile.house = h;
-  return { ok: true, u: h.seq };
+  return { ok: true, u: h.seq, ...(item.rest ? { rest: { ...item.rest } } : {}) };
 }
 
 /** 놓인 가구 옮기기 — why: 'room' · 'gone' 그 가구가 없음(다른 창에서 서랍에 넣음) · 'spot' */

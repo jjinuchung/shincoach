@@ -15,8 +15,12 @@
 //   · 받은/꺼낸 휴식 id는 profile.restsDone(병합 합집합) — 옛 창·옛 백업의 집이 같은 휴식을 되살리지 못한다(house.houseOf가 지운다)
 //   · 💤는 늘어나기만 하는 두 카운터 mons[id].rx(모은 💤 누적) · rxLv(💤로 오른 레벨 누적) — 병합은 max
 //   · 시각은 규칙을 돌리는 때(트랜잭션 안의 now) — 창을 연 때가 아니라
-import { HEAL, houseOf } from './house.js';
-import { haveOf, lvOf, nextCost, evoOf, evoTo } from './evolve.js';
+//   · 받기·꺼내기는 진우가 **본 그 휴식**(id)에 묶는다 — 캡슐 번호만 보면 옛 창의 단추가 그 사이 새로 들어간 다른 포켓몬의
+//     휴식을 받았다(Codex 47차 #2) → 다르면 'changed'
+// ⏰ 1시간은 **태블릿 시계**로 잰다 — 시계를 앞으로 돌리면 일찍, 뒤로 돌리면 늦게 받는다(앱이 진짜 흐른 시간을 알 길이 없다.
+//    시계 관리는 부모님 몫 — Codex 47차 A, 아버님께 알림)
+import { HEAL, houseOf, restsOf } from './house.js';
+import { haveOf, lvOf, nextCost, evoOf, evoTo, capReason } from './evolve.js';
 
 /** 쉬는 시간 — 1시간 (아버님) */
 export const REST_MS = 60 * 60 * 1000;
@@ -43,10 +47,24 @@ export function restLeft(rest, now) {
   return Math.max(0, Math.ceil(Number(rest && rest.at) + REST_MS - Number(now)) || 0);
 }
 
+/** 레벨 행운이 💰로 바뀐 까닭 → 말 (화면·연출 같은 말) — 'evolve' 진화 레벨에서 멈춤 · 'max' 만렙 */
+export const CAP_KO = { evolve: '진화할 때가 되어서', max: '레벨이 가득해서' };
+
+/** 💤 카운터 읽기 — 안전한 0 이상 정수만. 깨진 백업의 "1e309"(무한대)·아주 큰 수·음수·글자는 0
+ *  (Codex 47차 #4: 무한대 💤로 한 번 쉬고 Lv5가 되고 막대가 NaN이었다) — 병합(db)도 이것으로 */
+export function restCount(v) {
+  const n = Math.floor(Number(v));
+  return Number.isSafeInteger(n) && n > 0 ? n : 0;
+}
+/** 💤 두 카운터 { rx, rxLv } — 💤로 오른 레벨(rxLv)은 모은 💤로 오를 수 있는 수(rx / EXP_LV)를 넘지 않는다 */
+export function rxOf(mon) {
+  const rx = restCount(mon && mon.rx);
+  return { rx, rxLv: Math.min(restCount(mon && mon.rxLv), Math.floor(rx / EXP_LV)) };
+}
+
 /** 💤 막대 — { have: 지금 막대(0~EXP_LV), need: EXP_LV, full } (rx·rxLv 누적에서) */
 export function expOf(mon) {
-  const rx = Math.max(0, Math.floor(Number(mon && mon.rx) || 0));
-  const rxLv = Math.max(0, Math.floor(Number(mon && mon.rxLv) || 0));
+  const { rx, rxLv } = rxOf(mon);
   const have = Math.max(0, Math.min(EXP_LV, rx - rxLv * EXP_LV));
   return { have, need: EXP_LV, full: have >= EXP_LV };
 }
@@ -72,14 +90,26 @@ export function restStartRule(profile, u, monId, now, luck) {
   if (f.it.rest) return { ok: false, why: 'busy' };
   const mon = Number(monId);
   if (!Number.isSafeInteger(mon) || mon <= 0 || haveOf((profile.caught || {})[mon], (profile.mons || {})[mon]) < 1) return { ok: false, why: 'none' };
-  if (h.rooms.some((r) => r.items.some((i) => i.rest && i.rest.mon === mon))) return { ok: false, why: 'twice' };
+  const active = restsOf(h); // 놓인 캡슐 + 맡겨 둔 휴식(서랍의 캡슐)
+  if (active.some((r) => r.mon === mon)) return { ok: false, why: 'twice' };
   const at = Math.floor(Number(now));
-  const rest = { id: `${at}:${f.it.u}:${mon}`, mon, at, luck: rollable(luck) };
+  // 기록 번호가 겹치면 덧번호 — 시계를 되돌려 같은 때 같은 캡슐에 다시 넣으면 받은/꺼낸 번호와 같아져
+  // 넣자마자 houseOf가 지웠다("넣었는데 안 보임", Codex 47차 #3)
+  const done = isObj(profile.restsDone) ? profile.restsDone : {};
+  const used = new Set(active.map((r) => r.id));
+  const base = `${at}:${f.it.u}:${mon}`;
+  let id = base;
+  for (let k = 2; used.has(id) || hasOwn(done, id); k++) id = `${base}~${k}`;
+  const rest = { id, mon, at, luck: rollable(luck) };
   f.it.rest = rest;
   profile.house = h;
   return { ok: true, rest: { ...rest } };
 }
 const rollable = (l) => (l === 'evo' || l === 'lv' ? l : '');
+const isObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+/** 진우가 본 휴식과 다른가 — want를 안 주면(옛 부름) 묻지 않는다 */
+const changed = (rest, want) => want !== undefined && want !== null && rest.id !== want;
 
 /** 받은/꺼낸 휴식을 적는다 (합집합 — 옛 집 기록이 되살리지 못하게) */
 function markDone(profile, id, now) {
@@ -87,12 +117,14 @@ function markDone(profile, id, now) {
   profile.restsDone = { ...d, [id]: Math.floor(Number(now)) || 1 };
 }
 
-/** ⏏️ 일찍 꺼내기 — 보상 없이 비운다 · why 'gone' 쉬는 포켓몬이 없음 · 'ready' 이미 다 쉼(꺼내기로 보상을 잃지 않게 — 받기로) */
-export function restCancelRule(profile, u, now) {
+/** ⏏️ 일찍 꺼내기 — 보상 없이 비운다 · why 'gone' 쉬는 포켓몬이 없음 · 'changed' 진우가 본 휴식(want)이 아님 ·
+ *  'ready' 이미 다 쉼(꺼내기로 보상을 잃지 않게 — 받기로) */
+export function restCancelRule(profile, u, now, want) {
   const h = houseOf(profile);
   const f = findPlaced(h, u);
   if (!f || !f.it.rest) return { ok: false, why: 'gone' };
   const rest = f.it.rest;
+  if (changed(rest, want)) return { ok: false, why: 'changed' };
   if (restLeft(rest, now) === 0) return { ok: false, why: 'ready' };
   delete f.it.rest;
   profile.house = h;
@@ -104,16 +136,20 @@ export function restCancelRule(profile, u, now) {
  * ✨ 다 쉰 포켓몬 받기 — 한 트랜잭션에서: ❤️ 가득 · 💤 +REST_EXP(100마다 레벨 +1) · 행운(레벨 / 깜짝 진화) · 휴식은 restsDone으로.
  * 깜짝 진화면 진우가 정해야 한다: decide 없음 → { why: 'decide', choices } (아무것도 안 바꿈) · 0 → 그대로 두기 · 갈래 id → 진화
  * evolve = db.evolveRule (이 파일은 db를 모른다 — 순환 없게 부르는 쪽이 넘긴다)
- * why: 'gone' 쉬는 포켓몬 없음 · 'early' 아직(left ms) · 'decide' · 'to' 없는 갈래
- * @returns {{ok:boolean, why?:string, left?:number, choices?:number[], mon?:number, gone?:boolean, luck?:string,
- *   hp?:{from:number,to:number}, exp?:{from:number,to:number,lvUp:number}, lv?:{from:number,to:number}, coins?:number, evo?:object|null, kept?:boolean}}
- *   kept = 깜짝 진화였는데 진우가 "그대로 두기"를 골랐다
+ * want = 진우가 본 휴식 id — 다르면 'changed'(옛 창의 단추가 새 휴식을 받지 않게)
+ * why: 'gone' 쉬는 포켓몬 없음 · 'changed' · 'early' 아직(left ms) · 'decide'(id = 물은 휴식) · 'to' 없는 갈래
+ * @returns {{ok:boolean, why?:string, left?:number, id?:string, choices?:number[], mon?:number, gone?:boolean, luck?:string,
+ *   hp?:{from:number,to:number}, exp?:{from:number,to:number,lvUp:number,end:number}, lv?:{from:number,to:number}, coins?:number,
+ *   cap?:'evolve'|'max'|null, evo?:object|null, kept?:boolean}}
+ *   exp.to = 막대가 차오르는 끝(가득이면 100) · exp.end = 받은 뒤 진짜 막대(레벨이 오르면 남은 💤 — 95 + 10이면 5, Codex 47차 #5)
+ *   cap = 레벨 행운이 💰로 바뀐 까닭 · kept = 깜짝 진화였는데 진우가 "그대로 두기"를 골랐다
  */
-export function restClaimRule(profile, u, now, decide, hpMax, evolve) {
+export function restClaimRule(profile, u, now, decide, hpMax, evolve, want) {
   const h = houseOf(profile);
   const f = findPlaced(h, u);
   if (!f || !f.it.rest) return { ok: false, why: 'gone' };
   const rest = f.it.rest;
+  if (changed(rest, want)) return { ok: false, why: 'changed' };
   const left = restLeft(rest, now);
   if (left > 0) return { ok: false, why: 'early', left };
   const mon = rest.mon;
@@ -122,7 +158,7 @@ export function restClaimRule(profile, u, now, decide, hpMax, evolve) {
   const branches = evoOf(mon).map((e) => e.to);
   const evoLuck = rest.luck === 'evo' && branches.length > 0 && have > 0;
   if (evoLuck) {
-    if (decide === undefined || decide === null) return { ok: false, why: 'decide', mon, choices: branches };
+    if (decide === undefined || decide === null) return { ok: false, why: 'decide', id: rest.id, mon, choices: branches };
     if (Number(decide) !== 0 && !evoTo(mon, decide)) return { ok: false, why: 'to' };
   }
   // 여기부터 바꾼다 — 휴식은 끝났다(보상이 있든 없든)
@@ -134,8 +170,8 @@ export function restClaimRule(profile, u, now, decide, hpMax, evolve) {
   const max = Number(hpMax) || 100;
   const hpFrom = typeof m0.hp === 'number' ? Math.max(0, Math.min(max, m0.hp)) : max;
   const bar = expOf(m0).have;
-  let rx = Math.max(0, Math.floor(Number(m0.rx) || 0)) + REST_EXP;
-  let rxLv = Math.max(0, Math.floor(Number(m0.rxLv) || 0));
+  let { rx, rxLv } = rxOf(m0);
+  rx += REST_EXP;
   const lvFrom = lvOf(m0);
   let lv = lvFrom;
   let lvUp = 0;
@@ -158,9 +194,9 @@ export function restClaimRule(profile, u, now, decide, hpMax, evolve) {
   return {
     ok: true, mon, luck: rest.luck,
     hp: { from: hpFrom, to: max },
-    exp: { from: bar, to: Math.min(EXP_LV, bar + REST_EXP), lvUp },
+    exp: { from: bar, to: Math.min(EXP_LV, bar + REST_EXP), lvUp, end: expOf({ rx, rxLv }).have },
     lv: { from: lvFrom, to: lv },
-    coins, evo,
+    coins, cap: coins ? capReason(mon, lv) : null, evo,
     kept: evoLuck && Number(decide) === 0,
   };
 }

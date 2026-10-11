@@ -3,10 +3,10 @@
 import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FURN, FIRST_ROOM, SECOND_ROOM, FURN_MAX, FURN_MAX_2F, MATH_RATE, HEAL, HEAL_MAX, furnById, furnMax, houseOf, houseBuyCheck, houseBuyRule, placeRule, moveRule, flipRule, storeRule } from '../js/house.js';
-import { REST_MS, REST_EXP, EXP_LV, LUCK, LUCK_COINS, rollLuck, restLeft, expOf, restStartRule, restCancelRule, restClaimRule } from '../js/rest.js';
+import { FURN, FIRST_ROOM, SECOND_ROOM, FURN_MAX, FURN_MAX_2F, MATH_RATE, HEAL, HEAL_MAX, furnById, furnMax, houseOf, houseBuyCheck, houseBuyRule, placeRule, moveRule, flipRule, storeRule, restsOf } from '../js/house.js';
+import { REST_MS, REST_EXP, EXP_LV, LUCK, LUCK_COINS, CAP_KO, rollLuck, restLeft, expOf, restCount, rxOf, restStartRule, restCancelRule, restClaimRule } from '../js/rest.js';
 import { lvOf, haveOf, evoOf, levelCapOf } from '../js/evolve.js';
-import { emptyProfile, cloneProfile, mergeStatRecord, evolveRule } from '../js/db.js';
+import { emptyProfile, cloneProfile, mergeStatRecord, evolveRule, applyHouseRule } from '../js/db.js';
 import { initProfile, flushProfile, reloadProfile, houseNow, restStart, restCancel, restClaim, getProfileSnapshot } from '../js/xp.js';
 
 const R = FIRST_ROOM;
@@ -153,7 +153,7 @@ test('💊 다 쉬기 전엔 못 받음(early, 남은 시간) · 딱 1시간이�
   assert.equal(restLeft(capsule(p).rest, DONE + 5), 0);
   const r = claim(p, 1, DONE);
   assert.equal(r.ok, true);
-  assert.deepEqual([r.mon, r.hp, r.exp, r.lv, r.luck], [SQUIRTLE, { from: 20, to: 100 }, { from: 0, to: REST_EXP, lvUp: 0 }, { from: 2, to: 2 }, '']);
+  assert.deepEqual([r.mon, r.hp, r.exp, r.lv, r.luck], [SQUIRTLE, { from: 20, to: 100 }, { from: 0, to: REST_EXP, lvUp: 0, end: REST_EXP }, { from: 2, to: 2 }, '']);
   assert.deepEqual([p.mons[SQUIRTLE].hp, p.mons[SQUIRTLE].rx, p.mons[SQUIRTLE].lv], [100, REST_EXP, 2]);
   assert.ok(p.restsDone[`${T0}:1:${SQUIRTLE}`] === DONE);
   assert.equal(capsule(p).rest, undefined);
@@ -171,7 +171,7 @@ test('💊 💤 경험치: 10번 쉬면 100 → 스톤 없이 레벨 +1(rxLv) ·
     const r = claim(p, 1, t + REST_MS);
     assert.equal(r.ok, true);
     if (i < 9) assert.equal(r.exp.lvUp, 0);
-    else assert.deepEqual([r.exp, r.lv], [{ from: 90, to: 100, lvUp: 1 }, { from: 3, to: 4 }]);
+    else assert.deepEqual([r.exp, r.lv], [{ from: 90, to: 100, lvUp: 1, end: 0 }, { from: 3, to: 4 }]);
     t += REST_MS + 1;
   }
   assert.deepEqual([p.mons[SQUIRTLE].lv, p.mons[SQUIRTLE].rx, p.mons[SQUIRTLE].rxLv], [4, 100, 1]);
@@ -181,7 +181,7 @@ test('💊 💤 경험치: 10번 쉬면 100 → 스톤 없이 레벨 +1(rxLv) ·
   const cap = withCapsule({ mons: { [SQUIRTLE]: { lv: levelCapOf(SQUIRTLE), rx: 95, rxLv: 0 } } });
   restStartRule(cap, 1, SQUIRTLE, T0, '');
   const r = claim(cap, 1, DONE);
-  assert.deepEqual([r.exp, r.lv], [{ from: 95, to: 100, lvUp: 0 }, { from: 5, to: 5 }]);
+  assert.deepEqual([r.exp, r.lv], [{ from: 95, to: 100, lvUp: 0, end: 100 }, { from: 5, to: 5 }]);
   assert.deepEqual(expOf(cap.mons[SQUIRTLE]), { have: EXP_LV, need: EXP_LV, full: true });
   assert.deepEqual(expOf(undefined), { have: 0, need: EXP_LV, full: false });
   assert.deepEqual(expOf({ rx: -5, rxLv: 3 }), { have: 0, need: EXP_LV, full: false }, '깨진 값');
@@ -212,7 +212,7 @@ test('💊 0.5% 깜짝 진화: 진우가 정한다(decide) — 안 정하면 dec
   const p = withCapsule({ mons: { [SQUIRTLE]: { lv: 1, hp: 40 } } });
   restStartRule(p, 1, SQUIRTLE, T0, 'evo');
   const before = JSON.stringify(p);
-  assert.deepEqual(claim(p, 1, DONE), { ok: false, why: 'decide', mon: SQUIRTLE, choices: [WARTORTLE] });
+  assert.deepEqual(claim(p, 1, DONE), { ok: false, why: 'decide', id: capsule(p).rest.id, mon: SQUIRTLE, choices: [WARTORTLE] });
   assert.equal(JSON.stringify(p), before, '정하기 전엔 아무것도 안 바꾼다');
   assert.deepEqual(claim(p, 1, DONE, 999), { ok: false, why: 'to' });
   const r = claim(p, 1, DONE, WARTORTLE);
@@ -280,6 +280,213 @@ test('💊 병합: 받은 휴식은 합집합(깨진 쪽은 버림) · 💤 rx·
   assert.deepEqual(claim(back, 1, DONE + 10), { ok: false, why: 'gone' });
 });
 
+// ───────────────────── 🔍 Codex 47차 ─────────────────────
+
+const claimW = (p, u, now, decide, want) => restClaimRule(p, u, now, decide, 100, evolveRule, want);
+
+test('🔍 Codex 47차 #1: 쉬던 캡슐이 자리를 잃어도(2층이 없는 쪽과 합쳐짐) 휴식은 맡겨 둔다 · 저장된 집에도 남고 · 캡슐을 다시 놓으면 이어 쉰다(넣은 때·행운 그대로) · 빈 캡슐이 놓여 있으면 거기서', () => {
+  const mk = (heal, up, down = []) => pf({
+    items: { [HEAL]: heal, x_wide: 1, x_floor2: 1, f_teddy: 1 }, caught: { [SQUIRTLE]: 1, 25: 1 },
+    house: { started: true, seq: 5, rooms: [{ id: R, wall: '', floor: '', items: down }, { id: SECOND_ROOM, wall: '', floor: '', items: up }] },
+  });
+  const p = mk(1, [{ u: 1, id: HEAL, x: 0, y: 0, f: 0 }]);
+  const rest = restStartRule(p, 1, SQUIRTLE, T0, 'lv').rest;
+  delete p.items.x_floor2; // 2층이 없는 쪽(가방)으로 합쳐졌다
+  const h = houseOf(p);
+  assert.equal(h.rooms.length, 1);
+  assert.deepEqual(h.parked, [rest], '맡겨 둔 휴식');
+  assert.deepEqual(restsOf(h), [rest]);
+  assert.deepEqual(claim(p, 1, DONE), { ok: false, why: 'gone' }, '놓인 캡슐이 없으니 아직 못 받는다');
+  // 다른 가구를 놓아 고쳐 읽은 집이 저장돼도 남는다
+  assert.equal(placeRule(p, R, 'f_teddy', 5, 5).ok, true);
+  assert.deepEqual(p.house.parked, [rest], '저장된 집에도');
+  // 2층을 되찾아도 캡슐은 서랍에 — 다시 놓으면 이어 쉰다
+  p.items.x_floor2 = 1;
+  const put = placeRule(p, SECOND_ROOM, HEAL, 0, 0);
+  assert.deepEqual([put.ok, put.rest], [true, rest]);
+  assert.equal(houseOf(p).parked, undefined, '맡긴 것이 캡슐로 돌아갔다');
+  assert.deepEqual(capsule(p, put.u).rest, rest);
+  const got = claimW(p, put.u, DONE, undefined, rest.id);
+  assert.deepEqual([got.ok, got.luck, got.lv], [true, 'lv', { from: 1, to: 2 }]);
+  assert.ok(Object.prototype.hasOwnProperty.call(p.restsDone, rest.id), '받은 기록');
+  // 다른 가구를 놓을 때는 맡긴 휴식이 따라가지 않는다
+  const t = mk(2, [{ u: 1, id: HEAL, x: 0, y: 0, f: 0 }]);
+  restStartRule(t, 1, SQUIRTLE, T0, '');
+  delete t.items.x_floor2;
+  const tp = placeRule(t, R, 'f_teddy', 0, 0);
+  assert.deepEqual([tp.ok, tp.rest], [true, undefined]);
+  assert.equal(houseOf(t).parked.length, 1);
+  // 아래층에 빈 캡슐이 놓여 있으면 거기서 이어 쉰다
+  const q = mk(2, [{ u: 1, id: HEAL, x: 0, y: 0, f: 0 }], [{ u: 2, id: HEAL, x: 0, y: 0, f: 0 }]);
+  const r1 = restStartRule(q, 1, SQUIRTLE, T0, '').rest;
+  delete q.items.x_floor2;
+  assert.equal(houseOf(q).parked, undefined);
+  assert.deepEqual(capsule(q, 2).rest, r1, '빈 캡슐로');
+  assert.equal(claim(q, 2, DONE).ok, true);
+  // 아래층 캡슐이 쉬는 중이면 맡겨 두었다가 — 그 포켓몬을 꺼내면 빈 캡슐로 옮겨 이어 쉰다 · 맡긴 종은 또 못 넣는다
+  const w = mk(2, [{ u: 1, id: HEAL, x: 0, y: 0, f: 0 }], [{ u: 2, id: HEAL, x: 0, y: 0, f: 0 }]);
+  const ra = restStartRule(w, 1, SQUIRTLE, T0, '').rest;
+  restStartRule(w, 2, 25, T0, '');
+  delete w.items.x_floor2;
+  assert.deepEqual(houseOf(w).parked, [ra]);
+  assert.equal(restCancelRule(w, 2, T0 + 5).ok, true);
+  assert.equal(houseOf(w).parked, undefined);
+  assert.deepEqual(capsule(w, 2).rest, ra, '꺼낸 캡슐로');
+  assert.deepEqual(restStartRule(w, 2, SQUIRTLE, T0 + 9, ''), { ok: false, why: 'busy' });
+});
+
+test('🔍 Codex 47차 #1: 맡겨 둘 수 있는 것 — 받은/꺼낸 것·모양이 틀린 것·같은 종 둘째·서랍의 캡슐보다 많은 것은 버린다 · 캡슐이 없으면 없음 · 다시 읽어도 같다', () => {
+  const z = pf({
+    items: { [HEAL]: 1 }, caught: { [SQUIRTLE]: 1, 25: 1, 1: 1 }, restsDone: { done1: 5 },
+    house: { started: true, seq: 0, rooms: [{ id: R, wall: '', floor: '', items: [] }], parked: [
+      { id: 'done1', mon: 1, at: T0, luck: '' }, { id: 'a', mon: SQUIRTLE, at: 1e300, luck: '' }, { id: 'b', mon: SQUIRTLE, at: T0, luck: 'evo', x: 1 },
+      { id: 'c', mon: SQUIRTLE, at: T0, luck: '' }, { id: 'd', mon: 25, at: T0, luck: '' }, 'bad', null] },
+  });
+  assert.deepEqual(houseOf(z).parked, [{ id: 'b', mon: SQUIRTLE, at: T0, luck: 'evo' }], '서랍의 캡슐 하나만큼 — 받은 것·깨진 때·모르는 칸은 빼고');
+  assert.equal(houseOf({ ...z, items: {} }).parked, undefined, '캡슐이 없으면');
+  assert.deepEqual(houseOf({ ...z, house: houseOf(z) }), houseOf(z), '다시 읽어도 같다');
+  assert.deepEqual(houseOf({ ...z, restsDone: { done1: 5, b: 9 } }).parked, [{ id: 'c', mon: SQUIRTLE, at: T0, luck: '' }], '받은 것은 다음 것으로');
+  // 복사·병합 — 맡긴 휴식도 새 객체로, 집과 같은 쪽(최근)
+  const c = cloneProfile(z);
+  c.house.parked[2].mon = 99;
+  assert.equal(z.house.parked[2].mon, SQUIRTLE, '복사');
+  const m = mergeStatRecord('profile', { ...z, updatedAt: 9 }, { ...emptyProfile(), updatedAt: 1 });
+  assert.deepEqual(houseOf(m).parked, houseOf(z).parked);
+});
+
+test('🔍 Codex 47차 #2: 받기·꺼내기는 진우가 본 휴식(id)에만 — 그 사이 같은 캡슐에 다른 휴식이 들어왔으면 changed(아무것도 안 바꿈) · 물음(decide)은 휴식 id를 돌려준다', () => {
+  const p = withCapsule({ caught: { [EEVEE]: 1 } });
+  const a = restStartRule(p, 1, SQUIRTLE, T0, 'evo').rest;
+  assert.deepEqual(claim(p, 1, DONE), { ok: false, why: 'decide', id: a.id, mon: SQUIRTLE, choices: [WARTORTLE] });
+  assert.equal(claimW(p, 1, DONE, 0, a.id).kept, true, '창 B가 그대로 두고 받음');
+  const b = restStartRule(p, 1, EEVEE, DONE + 10, 'evo').rest;
+  const before = JSON.stringify(p);
+  assert.deepEqual(claimW(p, 1, DONE + 10 + REST_MS, 0, a.id), { ok: false, why: 'changed' }, '창 A의 옛 "그대로 두기"');
+  assert.deepEqual(claimW(p, 1, DONE + 10 + REST_MS, evoOf(EEVEE)[0].to, a.id), { ok: false, why: 'changed' }, '옛 갈래 단추');
+  assert.deepEqual(restCancelRule(p, 1, DONE + 20, a.id), { ok: false, why: 'changed' }, '옛 ⏏️');
+  assert.equal(JSON.stringify(p), before, '아무것도 안 바꿈');
+  // 본 휴식이면 된다 · 안 주면(옛 부름) 묻지 않는다
+  assert.equal(claimW(p, 1, DONE + 10 + REST_MS, undefined, b.id).why, 'decide');
+  assert.equal(claimW(p, 1, DONE + 10 + REST_MS, undefined, null).why, 'decide');
+  assert.equal(restCancelRule(p, 1, DONE + 20, b.id).ok, true);
+  assert.deepEqual(restCancelRule(p, 1, DONE + 20, b.id), { ok: false, why: 'gone' });
+});
+
+test('🔍 Codex 47차 #3: 시계를 되돌려 같은 때 같은 캡슐에 다시 넣어도 기록 번호가 겹치지 않는다(덧번호) — 넣은 휴식이 보이고 받을 수 있다', () => {
+  const p = withCapsule();
+  const a = restStartRule(p, 1, SQUIRTLE, T0, '').rest;
+  assert.equal(restCancelRule(p, 1, T0 + 1).ok, true);
+  const b = restStartRule(p, 1, SQUIRTLE, T0, '').rest;
+  assert.equal(b.id, `${a.id}~2`);
+  assert.deepEqual(capsule(p).rest, b, '보인다');
+  assert.equal(restCancelRule(p, 1, T0 + 1).ok, true);
+  const c = restStartRule(p, 1, SQUIRTLE, T0, '').rest;
+  assert.equal(c.id, `${a.id}~3`);
+  assert.equal(claim(p, 1, DONE).ok, true);
+  assert.deepEqual(Object.keys(p.restsDone).sort(), [a.id, b.id, c.id].sort());
+});
+
+test('🔍 Codex 47차 #4: 깨진 💤 카운터("1e309"·아주 큰 수·음수·글자)는 0 · rxLv는 rx로 오를 수 있는 수까지 · 넣은 때는 안전한 정수만 · 병합도 같은 읽기', () => {
+  assert.deepEqual(['1e309', 1e309, 1e20, 2 ** 53, -5, 'x', null, undefined, NaN, 12.7, '30', 2 ** 53 - 1].map(restCount), [0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 30, 2 ** 53 - 1]);
+  assert.deepEqual(rxOf({ rx: 250, rxLv: 9 }), { rx: 250, rxLv: 2 });
+  assert.deepEqual(rxOf(null), { rx: 0, rxLv: 0 });
+  assert.deepEqual(expOf({ rx: '1e309', rxLv: '1e309' }), { have: 0, need: EXP_LV, full: false });
+  assert.deepEqual(expOf({ rx: 250, rxLv: 9 }), { have: 50, need: EXP_LV, full: false });
+  const p = withCapsule({ mons: { [SQUIRTLE]: { lv: 1, rx: '1e309', rxLv: 3 } } });
+  restStartRule(p, 1, SQUIRTLE, T0, '');
+  const r = claim(p, 1, DONE);
+  assert.deepEqual([r.lv, p.mons[SQUIRTLE].rx, p.mons[SQUIRTLE].rxLv], [{ from: 1, to: 1 }, REST_EXP, 0], '한 번에 Lv5가 되지 않는다');
+  for (const at of [1e300, T0 + 0.5, -1, 0, '1760000000000', Infinity]) {
+    const q = withCapsule();
+    q.house.rooms[0].items[0].rest = { id: 'x', mon: SQUIRTLE, at, luck: '' };
+    assert.equal(capsule(q).rest, undefined, String(at));
+  }
+  const a = { ...emptyProfile(), mons: { 7: { rx: '1e309', rxLv: 1e20, lv: 2 } }, updatedAt: 20 };
+  const b = { ...emptyProfile(), mons: { 7: { rx: 50, lv: 2 } }, updatedAt: 10 };
+  for (const [x, y] of [[a, b], [b, a]]) {
+    const m = mergeStatRecord('profile', x, y);
+    assert.deepEqual([m.mons[7].rx, m.mons[7].rxLv || 0], [50, 0], '무한대가 큰 쪽으로 이기지 않는다');
+  }
+  const m = mergeStatRecord('profile', { ...emptyProfile(), mons: { 7: { rx: 1e20, lv: 2 } }, updatedAt: 9 }, { ...emptyProfile(), mons: { 7: { lv: 2 } }, updatedAt: 1 });
+  assert.equal(m.mons[7].rx, 0, '깨진 값은 고친다');
+});
+
+test('🔍 Codex 47차 #5: 💤가 넘쳐 레벨이 오르면 받은 뒤 막대(exp.end)는 남은 💤 · 레벨이 못 오르면 가득(100) · 연출은 레벨 업 뒤 end에서 끝난다', async () => {
+  const p = withCapsule({ mons: { [SQUIRTLE]: { lv: 1, rx: 95 } } });
+  restStartRule(p, 1, SQUIRTLE, T0, '');
+  assert.deepEqual(claim(p, 1, DONE).exp, { from: 95, to: 100, lvUp: 1, end: 5 });
+  assert.equal(expOf(p.mons[SQUIRTLE]).have, 5);
+  const q = withCapsule({ mons: { [SQUIRTLE]: { lv: 1, rx: 300 } } }); // 진화 레벨에 막혀 쌓인 💤 — 한 번에 여러 레벨
+  restStartRule(q, 1, SQUIRTLE, T0, '');
+  const rq = claim(q, 1, DONE);
+  assert.deepEqual([rq.exp, rq.lv], [{ from: 100, to: 100, lvUp: 3, end: 10 }, { from: 1, to: 4 }]);
+  const { readFileSync } = await import('node:fs');
+  const show = readFileSync(new URL('../js/restshow.js', import.meta.url), 'utf8');
+  const i = show.indexOf('if (r.exp.lvUp > 0) {');
+  const lvBlock = show.slice(i, show.indexOf('\n    }\n', i));
+  assert.ok(lvBlock.includes('const end = Math.max(0, Math.min(EXP_LV, Number(r.exp.end) || 0));'), '남은 💤');
+  assert.ok(lvBlock.includes('      if (end > 0) await Promise.all([fillBar(exFill, 0, end / EXP_LV, 300), countUp(exNum, 0, end, 300, (n) => `${n}/${EXP_LV}`)]);'), '0에서 남은 💤까지(남은 것이 있으면 늘)');
+});
+
+test('🔍 Codex 47차 D: 레벨 행운이 💰가 된 까닭(cap) — 진화 레벨이면 "진화할 때가 되어서" · 만렙이면 "레벨이 가득해서" · 연출은 "⬆️ 레벨 업!"', async () => {
+  const v = await import('../js/houseview.js');
+  const p = withCapsule({ mons: { [SQUIRTLE]: { lv: 5 } } });
+  restStartRule(p, 1, SQUIRTLE, T0, 'lv');
+  const r = claim(p, 1, DONE);
+  assert.deepEqual([r.coins, r.cap], [LUCK_COINS, 'evolve']);
+  assert.deepEqual(v.claimLines(r, () => '꼬부기').filter((l) => l.includes('💰')), ['🍀 진화할 때가 되어서 대신 💰100']);
+  const q = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: 12 } } });
+  restStartRule(q, 1, DITTO, T0, 'lv');
+  const s = claim(q, 1, DONE);
+  assert.deepEqual([s.coins, s.cap], [LUCK_COINS, 'max']);
+  assert.deepEqual(v.claimLines(s, () => '메타몽').filter((l) => l.includes('💰')), ['🍀 레벨이 가득해서 대신 💰100']);
+  const z = withCapsule();
+  restStartRule(z, 1, SQUIRTLE, T0, 'lv');
+  assert.deepEqual([claim(z, 1, DONE).cap], [null], '💰가 아니면 까닭 없음');
+  assert.deepEqual(CAP_KO, { evolve: '진화할 때가 되어서', max: '레벨이 가득해서' });
+  const { readFileSync } = await import('node:fs');
+  const show = readFileSync(new URL('../js/restshow.js', import.meta.url), 'utf8');
+  assert.ok(!show.includes('LEVEL UP') && show.includes('`⬆️ 레벨 업! Lv ${r.lv.from}') && show.includes('`🍀 ${CAP_KO[r.cap] || CAP_KO.max} 대신 💰${r.coins}`'));
+});
+
+test('🔍 Codex 47차 #6: 그림 받기 줄 — 한 번에 3장까지 · 같은 포켓몬은 한 번 · 창을 닫았으면(자리가 화면에 없음) 안 받는다 · 못 받으면 다음에 다시', async () => {
+  const { artQueue } = await import('../js/houseview.js');
+  const tick = () => new Promise((res) => setTimeout(res, 0));
+  const calls = [];
+  const wake = [];
+  let running = 0;
+  let peak = 0;
+  const ensure = (id) => {
+    calls.push(id);
+    running++;
+    peak = Math.max(peak, running);
+    return new Promise((res) => wake.push(() => { running--; res(id === 13 ? '' : `u${id}`); }));
+  };
+  const q = artQueue(ensure, 3);
+  const on = { isConnected: true };
+  const ps = [1, 2, 3, 4, 5, 1, 2].map((id) => q(id, on));
+  const shut = q(9, { isConnected: false });
+  await tick();
+  assert.deepEqual(calls, [1, 2, 3], '한 번에 셋');
+  while (wake.length) { wake.shift()(); await tick(); }
+  assert.deepEqual(await Promise.all(ps), ['u1', 'u2', 'u3', 'u4', 'u5', 'u1', 'u2']);
+  assert.equal(await shut, '', '닫힌 창의 것');
+  assert.deepEqual(calls, [1, 2, 3, 4, 5], '같은 포켓몬은 한 번 · 닫힌 창의 것은 안 받음');
+  assert.equal(peak, 3);
+  const r1 = q(13, on);
+  await tick();
+  wake.shift()();
+  assert.equal(await r1, '');
+  const r2 = q(13, on);
+  await tick();
+  wake.shift()();
+  assert.equal(await r2, '');
+  assert.equal(calls.filter((x) => x === 13).length, 2, '못 받은 것은 다시');
+  // 받다가 던져도 줄이 멈추지 않는다
+  const bad = artQueue(() => { throw new Error('x'); }, 1);
+  assert.deepEqual(await Promise.all([bad(1, on), bad(2, on)]), ['', '']);
+});
+
 // ───────────────────── 진짜 저장 경로 (fakeidb) ─────────────────────
 
 const stored = () => fakeIdb.get('profile', 'me');
@@ -342,11 +549,48 @@ test('★ 💊 저장 경로 깜짝 진화: 넣을 때 정한 행운이 저장�
   const s = stored();
   s.house.rooms[0].items[0].rest.at -= REST_MS;
   fakeIdb.put('profile', { ...s, updatedAt: s.updatedAt + 1 });
-  assert.deepEqual(await restClaim(1), { ok: false, why: 'decide', mon: SQUIRTLE, choices: [WARTORTLE] });
+  assert.deepEqual(await restClaim(1), { ok: false, why: 'decide', id: stored().house.rooms[0].items[0].rest.id, mon: SQUIRTLE, choices: [WARTORTLE] });
   const r = await restClaim(1, WARTORTLE);
   assert.deepEqual([r.ok, r.evo && r.evo.to, r.hp], [true, WARTORTLE, { from: 50, to: 100 }]);
   assert.deepEqual([stored().caught[WARTORTLE], stored().mons[SQUIRTLE].evo, stored().mons[WARTORTLE].hp], [1, 1, 100]);
   assert.equal(getProfileSnapshot().caught[WARTORTLE], 1);
+});
+
+test('★ 🔍 Codex 47차 F: 저장 경로 경쟁 — 두 창이 같은 종을 두 캡슐에 동시에 → 하나만 · 깜짝 진화를 서로 다른 갈래로 동시에 받아도 한 번 · 받기가 끊기면 휴식·포켓몬 그대로 다시 받는다 · 옛 id는 changed', async () => {
+  await setup();
+  await seed({ coins: 0, items: { [HEAL]: 2 }, caught: { [EEVEE]: 1 }, mons: {}, house: capsuleHouse(), restsDone: {} });
+  const both = await Promise.all([1, 2].map((u) => applyHouseRule((p) => restStartRule(p, u, EEVEE, Date.now(), 'evo'))));
+  assert.deepEqual(both.map((r) => (r.ok ? 'ok' : r.why)).sort(), ['ok', 'twice']);
+  const s = stored();
+  const cap = s.house.rooms[0].items.find((i) => i.rest);
+  cap.rest.at -= REST_MS;
+  fakeIdb.put('profile', { ...s, updatedAt: s.updatedAt + 1 });
+  const [toA, toB] = evoOf(EEVEE).map((e) => e.to);
+  const two = await Promise.all([toA, toB].map((to) => applyHouseRule((p) => restClaimRule(p, cap.u, Date.now(), to, 100, evolveRule, cap.rest.id))));
+  assert.deepEqual(two.map((r) => (r.ok ? 'ok' : r.why)).sort(), ['gone', 'ok']);
+  assert.equal([toA, toB].filter((k) => stored().caught[k]).length, 1, '한 갈래로만');
+  assert.equal(stored().mons[EEVEE].evo, 1, '이브이 한 마리만 씀');
+  // 받기가 끊기면(저장 실패) 없던 일 — 다시 받으면 된다
+  await seed({ caught: { [SQUIRTLE]: 1 }, mons: { [SQUIRTLE]: { lv: 1, hp: 30 } }, items: { [HEAL]: 2 }, house: capsuleHouse(), restsDone: {} });
+  assert.equal((await restStart(1, SQUIRTLE, 'evo')).ok, true);
+  const s2 = stored();
+  s2.house.rooms[0].items[0].rest.at -= REST_MS;
+  fakeIdb.put('profile', { ...s2, updatedAt: s2.updatedAt + 1 });
+  await reloadProfile();
+  const rid = stored().house.rooms[0].items[0].rest.id;
+  const before = JSON.stringify(stored());
+  fakeIdb.failNext('profile');
+  assert.deepEqual(await restClaim(1, WARTORTLE, rid), { ok: false, why: 'save' });
+  assert.equal(JSON.stringify(stored()), before, '저장된 것 그대로');
+  assert.equal(houseNow().rooms[0].items[0].rest.id, rid, '창의 집도 휴식 그대로');
+  const ok = await restClaim(1, WARTORTLE, rid);
+  assert.deepEqual([ok.ok, ok.evo && ok.evo.to, ok.luck], [true, WARTORTLE, 'evo'], '넣을 때 정한 행운 그대로');
+  assert.deepEqual(await restClaim(1, WARTORTLE, rid), { ok: false, why: 'gone' }, '두 번은 안 된다');
+  // 옛 창 — 같은 캡슐에 새 휴식이 들어온 뒤 옛 id로 꺼내기·받기
+  assert.equal((await restStart(1, WARTORTLE, '')).ok, true);
+  assert.deepEqual(await restCancel(1, rid), { ok: false, why: 'changed' });
+  assert.deepEqual(await restClaim(1, 0, rid), { ok: false, why: 'changed' });
+  assert.equal(stored().house.rooms[0].items[0].rest.mon, WARTORTLE, '새 휴식은 그대로');
 });
 
 // ───────────────────── 2단계 화면 (houseview) ─────────────────────
@@ -378,18 +622,31 @@ test('💊 화면 연결: 캡슐 도구(🐾 쉬게 하기 · ⏏️ 꺼내기 �
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../js/houseview.js', import.meta.url), 'utf8');
   const fn = (head) => { const i = src.indexOf(head); assert.ok(i >= 0, head); return src.slice(i, src.indexOf('\n}\n', i)); };
+  const v0 = await import('../js/houseview.js');
   const tool = fn('function restTool(it) {');
   assert.ok(tool.includes("b.textContent = '🐾 쉬게 하기';") && tool.includes('ui.pick = it.u;'), '빈 캡슐 → 고르기 창');
-  assert.ok(/if \(ui\.outArm !== it\.u\) \{ ui\.outArm = it\.u;[^\n]*return; \}\n\s+cancelAt\(it\.u, it\.rest\.mon\);/.test(tool), '꺼내기는 두 번');
-  assert.ok(tool.includes("b.textContent = '✨ 받기';") && tool.includes('claimAt(it.u)'));
-  assert.ok(/if \(it && it\.rest && restLeft\(it\.rest, Date\.now\(\)\) === 0\) \{ claimAt\(it\.u\); return; \}/.test(fn('function tap(d) {')), '다 쉰 캡슐은 누르면 받기');
-  assert.ok(fn('async function cancelAt(').includes("if (r && r.why === 'ready') claimAt(u);"), '꺼내는 사이 다 쉬었으면 받기');
+  // 꺼내기 두 번·받기·물음은 진우가 본 휴식(id)에 묶는다 (Codex 47차 #2)
+  assert.ok(tool.includes('const armed = ui.outArm === it.rest.id;'));
+  assert.ok(/if \(ui\.outArm !== it\.rest\.id\) \{ ui\.outArm = it\.rest\.id;[^\n]*return; \}\n\s+cancelAt\(it\.u, it\.rest\.mon, it\.rest\.id\);/.test(tool), '꺼내기는 두 번');
+  assert.ok(tool.includes("b.textContent = '✨ 받기';") && tool.includes('claimAt(it.u, undefined, it.rest.id)'));
+  assert.ok(/if \(it && it\.rest && restLeft\(it\.rest, Date\.now\(\)\) === 0\) \{ claimAt\(it\.u, undefined, it\.rest\.id\); return; \}/.test(fn('function tap(d) {')), '다 쉰 캡슐은 누르면 받기');
+  assert.ok(fn('async function cancelAt(').includes("if (r && r.why === 'ready') claimAt(u, undefined, want);"), '꺼내는 사이 다 쉬었으면 받기');
   const claimFn = fn('async function claimAt(');
-  assert.ok(claimFn.includes("if (r.why === 'decide') {") && claimFn.includes('ui.evoAsk = { u, mon: r.mon, choices: r.choices };'));
+  assert.ok(claimFn.includes("if (r.why === 'decide') {") && claimFn.includes('ui.evoAsk = { u, id: r.id, mon: r.mon, choices: r.choices };'));
   const ask = fn('function evoAskBox() {');
-  assert.ok(ask.includes('claimAt(q.u, to)') && ask.includes('claimAt(q.u, 0)'), '갈래 · 그대로 두기');
+  assert.ok(ask.includes('claimAt(q.u, to, q.id)') && ask.includes('claimAt(q.u, 0, q.id)'), '갈래 · 그대로 두기');
   assert.ok(fn('async function pickMon(').includes('restStart(u, id)'));
-  assert.ok(src.includes('() => restCancel(u)') && src.includes('() => restClaim(u, decide)'));
+  assert.ok(src.includes('() => restCancel(u, want)') && src.includes('() => restClaim(u, decide, want)'));
+  assert.ok(v0.restWhy({ why: 'changed' }).startsWith('캡슐 속 포켓몬이 바뀌었어요'), '바뀌었으면 그 말');
+  // 시계가 뒤로 가면 ✨를 끈다 (Codex 47차 C) · 맡겨 둔 휴식은 서랍에서 알리고 고르기 창에선 쉬는 중 (#1)
+  const tk = fn('function tickRests() {');
+  assert.ok(tk.includes("} else if (left && e.classList.contains('is-ready')) {") && tk.includes("e.classList.remove('is-ready');"));
+  assert.ok(fn('function drawerBox() {').includes('for (const r of houseNow().parked || []) {'));
+  assert.ok(fn('function pickBox() {').includes('const busy = new Set(restsOf(houseNow()).map((r) => r.mon));'));
+  assert.ok(src.includes('run((p) => placeRule(p, rid, id, spot.x, spot.y), placedText(d));') && src.includes('run((p) => placeRule(p, d.room, d.id, d.spot.x, d.spot.y), placedText(f));'), '다시 놓으면 이어서 쉰다는 말');
+  assert.equal(v0.placedText({ emoji: '💊', ko: '회복 캡슐' })({ ok: true, u: 3, rest: { mon: 7 } }), '💊 회복 캡슐을 놓았어요 — 💤 꼬부기가 이어서 쉬어요');
+  assert.equal(v0.placedText({ emoji: '🧸', ko: '곰인형' })({ ok: true, u: 3 }), '🧸 곰인형을 놓았어요');
+  assert.ok(fn('function monFace(id, cls) {').includes('queueArt(id, s)') && !fn('function monFace(id, cls) {').includes('ensureArt('), '그림은 줄로만 (#6)');
   assert.ok(/if \(it\.id === HEAL\) t\.appendChild\(restTool\(it\)\);/.test(fn('function toolsEl(')));
   assert.ok(/if \(it\.id === HEAL\) restDecor\(e, it\);/.test(fn('function itemEl(')));
   const open = fn('export function openHouse(');
