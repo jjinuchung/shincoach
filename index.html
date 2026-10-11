@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#4f46e5">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>신코치 - 영어·수학 학습</title>
+  <title>신코치 - 영어·수학·국어 학습</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -51,6 +51,17 @@
       <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
     </header>
     <main id="math-main" class="math-main"></main>
+  </section>
+
+  <!-- ===== 📚 국어 화면 ===== 내용은 js/koreanview.js가 그린다 (작품 도감 → 글 읽기 → 물음 · 🔍 근거 잡기 → ★) — 2026-10-11 -->
+  <section id="view-korean" class="view" hidden>
+    <header class="topbar">
+      <button id="btn-korean-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
+      <h1 class="topbar-title">📚 신코치 국어</h1>
+      <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
+      <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
+    </header>
+    <main id="korean-main" class="kor-main"></main>
   </section>
 
   <!-- ✨ 응원 포켓몬 — 수학을 푸는 동안 화면 아래를 가로질러 지나간다 (탭은 통과, 조작을 막지 않는다) -->

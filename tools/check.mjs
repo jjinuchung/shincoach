@@ -38,6 +38,7 @@ const PUBLIC_TEXT = [
   ...readdirSync('tools').filter((f) => f.endsWith('.mjs')).map((f) => 'tools/' + f),
   ...readdirSync('tests').filter((f) => f.endsWith('.js')).map((f) => 'tests/' + f),
   ...readdirSync('coach/math').filter((f) => /\.(html|json)$/.test(f)).map((f) => 'coach/math/' + f),
+  ...readdirSync('coach/korean').filter((f) => /\.(html|json)$/.test(f)).map((f) => 'coach/korean/' + f),
 ];
 for (const f of PUBLIC_TEXT) {
   const text = readFileSync(f, 'utf8');
@@ -81,6 +82,13 @@ if (priv.dir) {
   for (const msg of pr.errors) { bad++; console.error(msg); }
   if (pr.checked.length) console.log(`비공개 파일 검사: ${pr.checked.map((f) => `${priv.dir}/${f}`).join(' · ')}`);
 }
+// 📚 국어 원고(coach/korean/reading.json) — 사람이 쓴 글·물음이라 형식(정답 하나·틀린 보기마다 잘못 읽기·근거 문장 번호)을 여기서 잡는다
+//   깨진 카드는 앱이 조용히 빼고 그리므로(koreanview validCards) 배포 전에 막는다
+try {
+  const { checkContent } = await import('../js/korean.js');
+  const data = JSON.parse(readFileSync('coach/korean/reading.json', 'utf8'));
+  for (const msg of checkContent(data)) { bad++; console.error(`내용 오류: coach/korean/reading.json: ${msg}`); }
+} catch (e) { bad++; console.error(`JSON 오류: coach/korean/reading.json: ${e.message}`); }
 // 📦 아빠의 구호품(coach/gifts.json) — [{ id, items: { 아이템id: 1~10 }, title?, text? }], 틀린 줄은 앱이 조용히 건너뛰므로 여기서 잡는다
 try {
   const { parcelOf } = await import('../js/items.js');

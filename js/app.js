@@ -8,6 +8,7 @@ import { initHatch } from './hatch.js';
 import { initEvolveShow } from './evolveshow.js';
 import { initHome, renderHome } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
+import { initKorean, enterKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11)
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
 import { initTimeLimit, setSubject, flushTime, isLocked } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
@@ -25,16 +26,18 @@ const views = {
   stats: document.getElementById('view-stats'),
   pokedex: document.getElementById('view-pokedex'),
   math: document.getElementById('view-math'),
+  korean: document.getElementById('view-korean'),
 };
 
-/** 지금 화면이 어느 과목의 시간을 쓰는가 — 🎒 도감·📊 기록·🏠 홈은 **안 센다** (아버님 결정 2026-09-27) */
+/** 지금 화면이 어느 과목의 시간을 쓰는가 — 🎒 도감·📊 기록·🏠 홈은 **안 센다** (아버님 결정 2026-09-27)
+ *  📚 국어도 아직 안 센다 — 처음엔 반응을 보려고(⏳ 시간 제한·연장권은 수학·영어 둘뿐, 넣을지는 아버님께 여쭘) */
 function subjectOfView(name) {
   if (name === 'math') return 'math';
   if (name === 'library' || name === 'player') return 'english';
   return null;
 }
 
-/** 화면 전환 (home | library | player | stats | pokedex | math) */
+/** 화면 전환 (home | library | player | stats | pokedex | math | korean) */
 export function showView(name) {
   for (const [key, el] of Object.entries(views)) {
     el.hidden = key !== name;
@@ -52,6 +55,8 @@ export function showView(name) {
   if (name === 'home') setTimeout(() => { autoSend(); }, 3000);
   // 🔢 수학은 들어올 때마다 진도를 다시 읽어 그린다 (사다리·오늘 복습이 최신이어야 한다)
   if (name === 'math') renderMath().catch(() => {});
+  // 📚 국어는 읽던 글이 있으면 그대로(🎒·📊에서 돌아옴), 없으면 도감을 다시 그린다(다른 창에서 받은 별)
+  if (name === 'korean') enterKorean().catch(() => {});
   else stopCheer(); // ✨ 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)
 }
 
@@ -160,6 +165,7 @@ async function main() {
   initEvolveShow();
   initHome({ showView });
   initMath({ showView });
+  initKorean({ showView });  // 📚 국어 — ← 버튼 · 다시 읽으면 도감 다시 그리기
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
   initTaken({ requirePin });  // 🔒 포켓몬 데려가기 (부모) + "아빠가 데려갔어요" 알림 (아이)
   initGiftSettings();         // 🎁 ⚙ 선물 교환권 사진 (이 기기에만)

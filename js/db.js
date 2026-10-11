@@ -10,6 +10,7 @@ import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; //
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
 import { ROCKET, rocketGapOk, stealables, hideout, rocketStep, copyRocketCur, mergeRocketDone } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수 — evolve만 import)
 import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 — house·evolve만 import)
+import { mergeMiss, missOf } from './korean.js'; // 📚 국어 잘못 읽기 횟수 (순수, import 없음)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -802,7 +803,7 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, korDone: {}, korMiss: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
 }
 
 /** 🏠 진우네 집 복사 — 방·놓은 가구까지 (규칙이 고쳐도 원본이 안 바뀌게) · 없으면 undefined */
@@ -818,7 +819,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2013,6 +2014,9 @@ export function mergeStatRecord(name, cur, rec) {
     out.parcels = mergeParcels(cur.parcels, rec.parcels);
     // 💊 받은/꺼낸 휴식 — 합집합(이른 때) · 깨진 쪽(객체가 아님)은 버린다 — 옛 백업의 집이 같은 휴식을 되살려 두 번 받지 않게
     out.restsDone = mergeParcels(copyRestsDone(cur.restsDone), copyRestsDone(rec.restsDone));
+    // 📚 국어 — 받은 별은 합집합(이른 날 — 옛 백업이 받은 별을 되돌려 💰를 두 번 받지 않게) · 잘못 읽기 횟수는 종류마다 큰 쪽(늘어나기만)
+    out.korDone = mergeParcels(copyRestsDone(cur.korDone), copyRestsDone(rec.korDone));
+    out.korMiss = mergeMiss(cur.korMiss, rec.korMiss);
     // 💰 5일장에서 판 기록 — 장날·열쇠마다 합집합 (장날 한도를 옛 백업이 되돌리지 않게, 📊에 판 것이 남게)
     out.sales = mergeSales(cur.sales, rec.sales);
     // 🚀 끝난 로켓단 배틀 — 합집합(옛 백업이 끝난 배틀을 "진행 중"으로 되살려 두 번 빼앗거나 두 번 보상하지 않게).

@@ -38,6 +38,16 @@ export const SUBJECTS = [
     view: 'math',
     ready: true,
   },
+  {
+    key: 'korean',
+    title: 'Korean',
+    ko: '국어',
+    desc: '글 읽고 작품 카드 모으기',
+    emoji: '📚',
+    mascot: 201,  // 안농 — 글자 모양 포켓몬 (2026-10-11 국어)
+    view: 'korean',
+    ready: true,
+  },
 ];
 
 /**
