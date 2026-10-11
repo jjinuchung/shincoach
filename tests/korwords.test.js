@@ -361,6 +361,28 @@ test('★ 🔤 저장 경로: 판을 끝내면 낱말 칸·💰·🎯가 저장�
   assert.equal(direct.ok, true);
 });
 
+test('🔍 Codex 51차: 앞날 기록 400개 + 오늘 받음 — 진짜 저장 경로(프로필 복사·병합·그리기)에서도 오늘이 잘리지 않아 보상은 다시 없다 · 같은 시각에 거듭 저장해도 칸은 한 번만', async () => {
+  const today = dayNum(Date.now());
+  const days = { [today]: 1 };
+  for (let i = 1; i <= 400; i++) days[today + i] = 1;
+  await seed({ coins: 0, coinsEarned: 0, korWords: {}, korWordDay: days, korThrow: { earned: 0, used: 0, refunded: 0 }, items: {} });
+  const ids = ALL.filter((w) => w.deck === 'concept').slice(0, 10).map((w) => w.id);
+  for (const k of [0, 1]) {
+    const r = await korWordsFinish(ids.slice(k * 5, k * 5 + 5).map((id) => ({ id, ok: true })), IDS);
+    assert.deepEqual([r.ok, r.first, r.coins], [true, false, 0], `판 ${k + 1}: 오늘 보상은 이미 받았다`);
+  }
+  assert.deepEqual([stored().coins, stored().korThrow.earned], [0, 0]);
+  assert.ok(stored().korWordDay[today], '저장된 기록에 오늘이 남는다');
+  assert.ok(korWordDayMap()[today], '그리기용 복사본에도 오늘');
+  assert.ok(cloneProfile({ ...emptyProfile(), korWordDay: days }).korWordDay[today], 'cloneProfile도');
+  assert.ok(mergeWordDays(days, {})[today], 'mergeWordDays도');
+  // 같은 시각(시계가 멈춤)에 같은 판을 거듭 저장 — from이 늘 어긋나 칸은 한 번만 오른다
+  const p = pf({ korWords: { [ids[0]]: { box: 1, due: 0, at: 5000, miss: 0, d0: 1 } } });
+  for (let i = 0; i < 4; i++) korWordsRule(p, [{ id: ids[0], ok: true, from: 5000 }], 5000, IDS);
+  assert.equal(p.korWords[ids[0]].box, 2, '처음 한 번만 옮기고 나머지는 연습');
+  assert.ok(p.korWords[ids[0]].at > 5000, '고친 때는 늘 앞으로');
+});
+
 test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이름표 · 진행(★·⭐) · 모두 준비됨(v236) · 검사가 잡는 것', () => {
   const units = unitsOf(UNITS, CARDS, ALL);
   assert.equal(units.length, 16);

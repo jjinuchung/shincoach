@@ -129,8 +129,10 @@ export function mergeWords(a, b) {
   return out;
 }
 /** 낱말 보상을 받은 날 { 날 번호: 1(받음) | 2(🟩까지) } — 최근 DAYS_MAX날 · keep 날은 늘 남긴다
- *  (시계를 크게 되돌려 앞날 기록이 꽉 차면 오늘 기록이 잘려 그날 보상을 또 받았다, Codex 50차 #8) */
-export function wordDaysOf(raw, keep = 0) {
+ *  (시계를 크게 되돌려 앞날 기록이 꽉 차면 오늘 기록이 잘려 그날 보상을 또 받았다, Codex 50차 #8)
+ *  ★ keep을 안 주면 오늘 — 규칙 안에서만 오늘을 남기면 프로필 복사(db.cloneProfile)·병합·그리기가 먼저 잘라 버려
+ *    진짜 저장 경로에서는 또 받았다 (Codex 51차) */
+export function wordDaysOf(raw, keep = dayNum(Date.now())) {
   const out = {};
   if (!isObj(raw)) return out;
   const keys = Object.keys(raw).filter((k) => cnt(k) > 0).sort((a, b) => Number(b) - Number(a)).slice(0, DAYS_MAX);
@@ -244,12 +246,14 @@ export function korWordsRule(profile, answers, now, ids) {
     const stale = a.from !== undefined && Number(a.from) !== cur.at; // 판을 시작한 뒤 다른 판이 이 낱말을 옮겼다
     if (stale || cur.box >= MASTER_BOX) continue; // 연습 — ⭐ 익힌 낱말은 더 안 옮긴다(낡은 판의 오답으로도 되돌리지 않음)
     const d0 = st[id] && cur.d0 ? cur.d0 : today; // 처음 배운 날 — 하루 새 낱말 수를 센다
+    // 고친 때는 늘 앞으로 — 시계가 멈췄거나 같은 ms에 두 판이 저장돼도 from(시작할 때 본 때)이 어긋나게 (같은 시각이면 낡은 판이 칸을 또 옮겼다, Codex 51차)
+    const wat = Math.min(Number.MAX_SAFE_INTEGER, Math.max(at, cur.at + 1));
     if (a.ok === true) {
       const box = Math.min(MASTER_BOX, cur.box + 1);
       if (box === MASTER_BOX && cur.box < MASTER_BOX) mastered.push(id);
-      st[id] = { box, due: box >= MASTER_BOX ? 0 : today + DUE_AFTER[box], at, miss: cur.miss, d0 };
+      st[id] = { box, due: box >= MASTER_BOX ? 0 : today + DUE_AFTER[box], at: wat, miss: cur.miss, d0 };
     } else {
-      st[id] = { box: 0, due: today + DUE_AFTER[0], at, miss: Math.min(Number.MAX_SAFE_INTEGER, cur.miss + 1), d0 };
+      st[id] = { box: 0, due: today + DUE_AFTER[0], at: wat, miss: Math.min(Number.MAX_SAFE_INTEGER, cur.miss + 1), d0 };
     }
   }
   if (!n) return { ok: false, why: 'empty' };

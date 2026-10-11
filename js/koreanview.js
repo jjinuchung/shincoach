@@ -494,7 +494,10 @@ async function finishCard() {
   try {
     res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss);
   } catch { res = { ok: false, why: 'save' }; }
-  if (ui.read !== r) return; // 그 사이 도감으로 나갔다
+  // 🥚 글 한 편을 끝까지 읽은 날 — 별이 없어도(다시 읽기도 공부). ★ 저장이 됐으면 화면과 상관없이 칸을 채운다
+  //   (저장하는 사이 ← 도감을 누르면 그날 칸이 빠졌다, Codex 51차 — 🔤 낱말 판과 같은 꼴)
+  const eggP = res && res.ok ? tickKorDay() : null;
+  if (ui.read !== r) return; // 그 사이 도감으로 나갔다 — 그리기만 그만
   r.saving = false;
   r.result = res;
   r.focus = 'done';
@@ -503,8 +506,8 @@ async function finishCard() {
     try { sfx.success(); } catch { /* 소리는 없어도 */ }
     import('./catch.js').then((m) => m.burstConfetti(res.star === 3 ? 90 : 50)).catch(() => {});
   }
-  if (res && res.ok) {
-    const egg = await tickKorDay(); // 🥚 글 한 편을 끝까지 읽은 날 — 별이 없어도(다시 읽기도 공부)
+  if (eggP) {
+    const egg = await eggP;
     if (ui.read === r && egg && egg.ok) { r.egg = egg; renderQ(); }
   }
 }

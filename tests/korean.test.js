@@ -232,6 +232,22 @@ test('📚 빈 단원 글 7편 (v236, 아버님 "이대로 진행"): 발표·정
   assert.deepEqual(['5-1-독서', '5-2-독서', '5-2-4'].map((id) => UNITS.find((u) => u.id === id).title), ['책을 읽고 함께 이야기해요', '여러 가지 형태의 책을 읽어요', '표준어와 방언을 알아봐요']);
 });
 
+test('🔍 Codex 51차 원고: 좋은 근거를 더 받음(K13-3 ⑫ · K14-1 ②) · K15-2는 "방법을 보탠 말"로 좁힘(⑥은 아쉬운 점 — 보탠 게 없다고 단정 안 함) · K18-3 도움말 · K17-1 틀린 문장이 있다고 먼저 · K14-1 "길이"가 아니라 드러남', () => {
+  const q = (id) => DATA.cards.flatMap((c) => c.qs).find((x) => x.id === id);
+  assert.deepEqual(q('K13-3').ev, [1, 12, 14]);
+  assert.deepEqual(q('K14-1').ev, [2, 3, 5]);
+  assert.match(q('K13-3').evNote, /⑫/);
+  assert.match(q('K14-1').evNote, /②/);
+  assert.match(q('K15-2').q, /방법을 더 좋게 만들 방법을 보탠 말/);
+  const six = q('K15-2').opts.find((o) => o.t.startsWith('⑥'));
+  assert.ok(!/무엇을 보탠 것은 아니에요/.test(six.why) && /도움이 되지만/.test(six.why), '아쉬운 점을 짚는 것도 토의에 도움이 된다');
+  assert.match(q('K18-3').q, /도움말: 전라도 말의 '-것-'은 표준어 '-겠-'처럼/);
+  assert.match(q('K17-1').q, /어울리지 않는 문장이 세 개/);
+  assert.ok(!/너무 짧고/.test(q('K14-1').opts.map((o) => o.why || '').join(' ')), '"검색어는 길수록 좋다"로 읽히지 않게');
+  const k18 = DATA.cards.find((c) => c.id === 'K18');
+  assert.match(k18.facts.find((f) => f[0] === '알아 둘 것')[1], /사람마다 다르게/);
+});
+
 // ───────────────────── 진짜 저장 경로 (fakeidb) ─────────────────────
 
 const stored = () => fakeIdb.get('profile', 'me');

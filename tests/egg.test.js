@@ -246,7 +246,8 @@ test('📚 국어 알 (v234): 💰200 + 🟩 2 · 스톤 상점 · 팔기·구�
   // 📚 다 읽으면(별이 없어도) 하루 칸 · 5일째면 🐣 · 끝 카드 줄
   const kv = read('js/koreanview.js');
   const fin = kv.slice(kv.indexOf('async function finishCard() {'), kv.indexOf('export async function tickKorDay()'));
-  assert.ok(fin.includes('if (res && res.ok) {\n    const egg = await tickKorDay();'), '별이 없어도 — res.ok면');
+  assert.ok(fin.includes('const eggP = res && res.ok ? tickKorDay() : null;'), '별이 없어도 — res.ok면');
+  assert.ok(fin.indexOf('const eggP = res && res.ok ? tickKorDay() : null;') < fin.indexOf('if (ui.read !== r) return;'), '저장하는 사이 도감으로 나가도 칸은 채운다 — 화면 검사보다 먼저 (Codex 51차)');
   assert.match(kv, /egg = await tickEgg\('korean', todayKey\(\)\);/);
   assert.match(kv, /if \(egg && egg\.hatched\) setTimeout\(\(\) => \{ showHatchIfAny\(\); \}, 1200\);/);
   const { eggLine } = await import('../js/koreanview.js');
