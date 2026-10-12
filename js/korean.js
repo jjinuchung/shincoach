@@ -33,6 +33,11 @@ export const KINDS = { practice: '📄 연습 카드', classic: '✨ 명작 카�
 /** ✍️ 서술형 답 글자 수 (공백 정리 뒤) — 규칙은 korwrite.js, 원고 검사(write.model)도 같은 값 (v237) */
 export const WRITE_MIN = 10;
 export const WRITE_MAX = 200;
+/** ✍️ 🧩 문장 틀의 빈자리 — 틀마다 하나까지, 누르면 그 자리에 커서 (v240) · 틀은 2~4개, 스스로 확인(checks)은 2~3줄 */
+export const FRAME_GAP = '~';
+export const FRAMES_MAX = 4;
+export const CHECKS_MAX = 3;
+export const FRAME_LEN_MAX = 40;
 
 /** 별마다 💰 — 수학 개념 편과 같은 크기(처음 다 맞힘 12 · 복습 통과 8 · 👑 이해 완료 20, mathprog.REWARD) */
 export const KOR_COINS = { 1: 12, 2: 8, 3: 20 };
@@ -278,7 +283,11 @@ export function checkCard(c, ids = new Set()) {
   };
   if (own(c, 'write')) {
     for (const m of checkWriteItem(c.write)) at(m);
-    if (isObj(c.write)) { refs(c.write.q, 'write.q'); refs(c.write.model, 'write.model'); }
+    if (isObj(c.write)) {
+      refs(c.write.q, 'write.q'); refs(c.write.model, 'write.model');
+      for (const [k, f] of (Array.isArray(c.write.frames) ? c.write.frames : []).entries()) refs(f, `write.frames ${k + 1}`);
+      for (const [k, f] of (Array.isArray(c.write.checks) ? c.write.checks : []).entries()) refs(f, `write.checks ${k + 1}`);
+    }
   }
   if (!Array.isArray(c.qs) || !c.qs.length || c.qs.length > 5) { at('물음은 1~5개'); return errs; }
   c.qs.forEach((q, i) => {
@@ -321,13 +330,14 @@ export function checkCard(c, ids = new Set()) {
 }
 
 /**
- * ✍️ 서술형 하나 검사 — { q 물음, v 채점 기준 판 번호(고치면 올린다 — 옛 글은 그 판으로 채점), rubric { must 꼭 들어갈 생각 ≥1, ok 괜찮은 다른 답, miss 흔한 잘못 }, model 예시 답 }
+ * ✍️ 서술형 하나 검사 — { q 물음, v 채점 기준 판 번호(고치면 올린다 — 옛 글은 그 판으로 채점), rubric { must 꼭 들어갈 생각 ≥1, ok 괜찮은 다른 답, miss 흔한 잘못 }, model 예시 답,
+ *   frames 🧩 문장 틀 2~4(빈자리 ~ 하나까지), checks ✔️ 보내기 전 스스로 확인 2~3 (v240 — 아이에게 보이는 것: q·frames·checks뿐) }
  * rubric·model은 공개 원고(앱은 보여 주지 않는다) — Claude가 세션이 바뀌어도 같은 잣대로 채점하려고 (Codex 51차 PART 3 #11)
  */
 export function checkWriteItem(w) {
   const errs = [];
   const strs = (a) => Array.isArray(a) && a.every(nonEmpty);
-  if (!isObj(w)) return ['write는 { q, v, rubric, model }'];
+  if (!isObj(w)) return ['write는 { q, v, rubric, model, frames, checks }'];
   if (!nonEmpty(w.q)) errs.push('write.q(물음)가 비었어요');
   if (!Number.isInteger(w.v) || w.v <= 0) errs.push('write.v(채점 기준 판 번호)는 1부터');
   if (!isObj(w.rubric) || !strs(w.rubric.must) || !w.rubric.must.length) errs.push('write.rubric.must(꼭 들어갈 생각)가 하나 이상');
@@ -337,6 +347,24 @@ export function checkWriteItem(w) {
   }
   if (!nonEmpty(w.model)) errs.push('write.model(예시 답)이 비었어요');
   else if ([...w.model.normalize('NFC').replace(/\s+/g, ' ').trim()].length > WRITE_MAX) errs.push(`write.model은 ${WRITE_MAX}자까지 — 아이에게 바라는 길이보다 길면 안 돼요`);
+  const list = (a, lo, hi, name, each) => {
+    if (!Array.isArray(a) || a.length < lo || a.length > hi || !a.every(nonEmpty)) { errs.push(`${name}는 ${lo}~${hi}개의 글`); return; }
+    const seen = new Set();
+    a.forEach((s, k) => {
+      const t = s.normalize('NFC').replace(/\s+/g, ' ').trim();
+      if (seen.has(t)) errs.push(`${name} ${k + 1}이 앞의 것과 같아요`);
+      seen.add(t);
+      if ([...t].length > FRAME_LEN_MAX) errs.push(`${name} ${k + 1}은 ${FRAME_LEN_MAX}자까지 — 버튼·한 줄에 들어가게`);
+      if (each) each(t, k);
+    });
+  };
+  list(w.frames, 2, FRAMES_MAX, 'write.frames(문장 틀)', (t, k) => {
+    if (t.split(FRAME_GAP).length > 2) errs.push(`write.frames ${k + 1}의 빈자리 ${FRAME_GAP}는 하나까지`);
+    if (!t.replace(FRAME_GAP, '').trim()) errs.push(`write.frames ${k + 1}은 빈자리만 있어요`);
+  });
+  list(w.checks, 2, CHECKS_MAX, 'write.checks(스스로 확인)', (t, k) => {
+    if (t.includes(FRAME_GAP)) errs.push(`write.checks ${k + 1}에 빈자리 ${FRAME_GAP}가 있어요 — 확인 줄은 물음으로`);
+  });
   return errs;
 }
 

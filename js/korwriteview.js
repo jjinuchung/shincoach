@@ -3,8 +3,10 @@
 // · 아이 글·답장은 늘 textContent로 그린다(innerHTML 금지 — 글에 <img …>가 있어도 글자로, Codex 51차 PART 3 #7)
 // · 쓰던 글은 이 기기에 남긴다(다른 화면을 다녀와도·다시 그려도) — 한글 입력 중에는 자르지 않고, 보낼 때만 글자 수를 본다
 // · 📬 답장은 화면에 실제로 보였을 때만 "읽음"(watchSeen — Codex 52차 #9: 그리기만 해도 읽음이 되어, 끝 카드 아래로 밀린 답장을 못 보고 나가도 📬가 사라졌다)
+// · 생각 쓰기 도우미(v240): 🧩 문장 틀(늘 글 끝에 — 빈자리를 채운 뒤 커서가 문장 가운데 있어도, ~ 자리에 커서) · 🔢 글 번호 ①…(커서 자리에) · ✔️ 보내기 전 스스로 확인(채점·막기·저장 없음)
 import { korWritesMap, korWriteAdd, korWriteRead, korWriteApply } from './xp.js';
-import { cardWriteState, unreadReplies, replyStats, writeCheck, textLen, GRADES, WRITE_MIN, WRITE_MAX, WRITE_COINS } from './korwrite.js';
+import { cardWriteState, unreadReplies, replyStats, writeCheck, textLen, ownLen, GRADES, WRITE_MIN, WRITE_MAX, WRITE_COINS, FRAME_GAP, OWN_MIN } from './korwrite.js';
+import { circled, lineCount } from './korean.js';
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -25,12 +27,34 @@ function setDraft(id, text) {
   try { if (text) localStorage.setItem(DRAFT_KEY(id), text); else localStorage.removeItem(DRAFT_KEY(id)); } catch { /* 이 기기에 못 적어도 메모리에는 */ }
 }
 
-/** 글자 수 줄 (순수) — 짧음·김·괜찮음 */
-export function countLine(text) {
+/** 글자 수 줄 (순수) — 짧음·김·틀만·괜찮음 (frames = 그 카드의 🧩 틀 — 틀·번호·문장부호를 뺀 내 말이 OWN_MIN자) */
+export function countLine(text, frames) {
   const n = textLen(text);
   if (n > WRITE_MAX) return { text: `${WRITE_MAX}자까지예요 — 조금 줄여 볼까요? (지금 ${n}자)`, ok: false, warn: true };
   if (n < WRITE_MIN) return { text: n ? `${WRITE_MIN}자는 넘게 써 볼까요? (지금 ${n}자)` : `한두 문장이면 돼요 (${WRITE_MAX}자까지)`, ok: false, warn: false };
+  const o = ownLen(text, frames);
+  if (o < OWN_MIN) return { text: `틀 말고 내 말을 조금 더 써 볼까요? (내 말 ${o}자)`, ok: false, warn: false };
   return { text: `${n} / ${WRITE_MAX}자`, ok: true, warn: false };
+}
+/**
+ * 🧩 틀·🔢 번호 끼워 넣기 (순수) — 고른 곳(없으면 커서 자리)을 piece로 바꾼다 · 앞이 글자면 빈칸 하나 · piece의 첫 ~ 자리에 커서(없으면 끝)
+ * 뒤가 글자면 빈칸 하나 — glue(🔢 번호)면 안 띄운다: 틀 "~에서 …"의 빈자리에 ⑤를 넣으면 "⑤에서"
+ * @returns {{ value: string, caret: number }}
+ */
+export function insertAt(value, start, end, piece, glue = false) {
+  const v = String(value || '');
+  const at = (x, lo) => Math.min(v.length, Math.max(lo, Number.isInteger(x) ? x : v.length));
+  const s = at(start, 0);
+  const e = at(end, s);
+  const p = String(piece || '');
+  const k = p.indexOf(FRAME_GAP);
+  const head = k < 0 ? p : p.slice(0, k);
+  const tail = k < 0 ? '' : p.slice(k + FRAME_GAP.length);
+  const before = v.slice(0, s);
+  const after = v.slice(e);
+  const pre = before && !/\s$/.test(before) ? ' ' : '';
+  const post = !glue && after && !/^\s/.test(after) ? ' ' : '';
+  return { value: `${before}${pre}${head}${tail}${post}${after}`, caret: s + pre.length + head.length };
 }
 /** 보상 안내 (순수) — 카드마다 평생 한도에서 남은 것 */
 export function rewardLine(paid) {
@@ -49,14 +73,49 @@ export function sendWhy(r) {
     pending: '이미 보낸 글이 있어요 — 아빠 답장을 기다려요',
     done: '✅ 이 생각 쓰기는 벌써 끝났어요',
     short: `${WRITE_MIN}자는 넘게 써 볼까요?`,
+    own: '틀 말고 내 말을 조금 더 써 볼까요?',
     long: `${WRITE_MAX}자까지예요 — 조금 줄여 볼까요?`,
     unknown: '이 글에는 생각 쓰기가 없어요',
   })[r.why] || '저장을 못 했어요 — 한 번 더 눌러 주세요 (쓴 글은 그대로 있어요)';
 }
 
+/** 버튼 줄 하나 — 머리 말 + 버튼들 (누르면 put(그 항목)) */
+function helpRow(cls, head, items, put) {
+  const row = el('div', `kor-whelp ${cls}`);
+  row.setAttribute('role', 'group');
+  row.setAttribute('aria-label', head);
+  row.appendChild(el('p', 'kor-wlabel', head));
+  const btns = el('div', 'kor-whbtns');
+  for (const it of items) {
+    const b = el('button', 'kor-whbtn', it.label);
+    b.type = 'button';
+    if (it.title) { b.title = it.title; b.setAttribute('aria-label', it.title); }
+    b.addEventListener('click', () => put(it));
+    btns.appendChild(b);
+  }
+  row.appendChild(btns);
+  return row;
+}
+/** ✔️ 보내기 전 스스로 확인 — 아이가 제 글을 다시 읽으며 누르는 칸 (채점도·막기도·저장도 안 한다) */
+function checksEl(card) {
+  const box = el('fieldset', 'kor-wchk');
+  box.appendChild(el('legend', 'kor-wlabel', '✔️ 보내기 전에 내 글을 다시 읽어 봐요'));
+  card.write.checks.forEach((c, k) => {
+    const lab = el('label', 'kor-wchk-row');
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.id = `kor-wchk-${card.id}-${k}`;
+    lab.appendChild(cb);
+    lab.appendChild(el('span', '', c));
+    box.appendChild(lab);
+  });
+  return box;
+}
+
 /** 쓰기 칸 — 보내면 onSent() */
 function formEl(card, ctx, onSent) {
   const st = cardWriteState(korWritesMap(), card.id);
+  const frames = card.write.frames;
   const box = el('div', 'kor-wform');
   const id = `kor-write-${card.id}`;
   const label = el('label', 'kor-wq-text', card.write.q);
@@ -67,12 +126,37 @@ function formEl(card, ctx, onSent) {
   ta.rows = 4;
   ta.placeholder = '내 생각을 한두 문장으로 써 보세요';
   ta.value = getDraft(card.id);
+  // 🧩 틀은 늘 끝에(빈자리를 채우면 커서는 "…이해된다|고 생각해요." 가운데 — 다음 틀이 문장 한가운데 끼지 않게)
+  // 🔢 번호는 커서 자리에 — 단 커서를 한 번도 안 놓았으면 끝에(그리기 전에 값을 넣은 칸의 커서 자리는 브라우저마다 다르다)
+  let touched = false;
+  ta.addEventListener('focus', () => { touched = true; });
+  const put = (it) => {
+    if (ta.readOnly) return; // 보내는 중
+    const end = ta.value.length;
+    const here = touched && !it.atEnd;
+    const r = insertAt(ta.value, here ? ta.selectionStart : end, here ? ta.selectionEnd : end, it.piece, it.glue);
+    ta.value = r.value;
+    ta.focus();
+    ta.setSelectionRange(r.caret, r.caret);
+    setDraft(card.id, ta.value);
+    msg.textContent = ''; // 못 보낸 까닭은 글을 고치면 지운다
+    paint();
+  };
+  if (Array.isArray(frames) && frames.length) {
+    box.appendChild(helpRow('kor-wframes', '🧩 이렇게 써 볼까요? 누르면 내 글 끝에 붙어요', frames.map((f) => ({ label: f, piece: f, atEnd: true })), put));
+  }
   box.appendChild(ta);
+  const n = lineCount(card);
+  if (n > 0) {
+    const nums = Array.from({ length: n }, (_, i) => ({ label: circled(i + 1), piece: circled(i + 1), glue: true, title: `${i + 1}번 문장 번호 넣기` }));
+    box.appendChild(helpRow('kor-wnums', '🔢 글 번호 넣기', nums, put));
+  }
   const count = el('p', 'kor-wcount');
   count.setAttribute('aria-live', 'polite');
   box.appendChild(count);
   const reward = rewardLine(st.paid);
   if (reward) box.appendChild(el('p', 'kor-wreward', reward));
+  if (Array.isArray(card.write.checks) && card.write.checks.length) box.appendChild(checksEl(card));
   const send = el('button', 'btn btn-primary kor-wsend', '✉️ 아빠에게 보내기');
   send.type = 'button';
   box.appendChild(send);
@@ -80,15 +164,15 @@ function formEl(card, ctx, onSent) {
   msg.setAttribute('role', 'status');
   box.appendChild(msg);
   const paint = () => {
-    const c = countLine(ta.value);
+    const c = countLine(ta.value, frames);
     count.textContent = c.text;
     count.classList.toggle('is-warn', c.warn);
     send.disabled = !c.ok;
   };
-  ta.addEventListener('input', () => { setDraft(card.id, ta.value); paint(); });
+  ta.addEventListener('input', () => { setDraft(card.id, ta.value); msg.textContent = ''; paint(); });
   paint();
   send.addEventListener('click', async () => {
-    const chk = writeCheck(ta.value);
+    const chk = writeCheck(ta.value, frames);
     if (!chk.ok) { msg.textContent = sendWhy(chk); return; }
     send.disabled = true;
     ta.readOnly = true;
@@ -139,32 +223,69 @@ export function seenEnough(visibleH, boxH, viewH) {
 }
 /** 보인 채로 이만큼 머물러야 읽음 (스쳐 지나가면 그대로 📬) */
 export const READ_DWELL_MS = 1200;
+/** 보임을 다시 재는 칸 — 5%마다(키 큰 답장 상자는 화면의 40% 경계가 칸 사이에 있어 넘나들어도 못 들었다, Codex 53차 #3) */
+export const SEEN_STEPS = Array.from({ length: 21 }, (_, i) => i / 20);
 /**
- * 답장 상자가 보인 채로 READ_DWELL_MS 머물면 onSeen() 한 번 — 스쳐 지나가거나·다른 화면으로 가거나·앱을 내리면 그대로(다시 보일 때 또 잰다)
- * @param {{isConnected:boolean}} box 답장 상자
+ * 답장 상자가 보인 채로 READ_DWELL_MS 머물면 onSeen() 한 번 — 스쳐 지나가거나·다른 화면으로 가거나·앱을 내리면 그대로(다시 보일 때 처음부터 또 잰다)
+ * · 앱을 내리면(visibilitychange) 재던 시간을 끊고, 돌아와서 보이면 처음부터 (Codex 53차 #3: 내렸다 돌아온 시간까지 세어 0.1초 보고 읽음이 됐다)
+ * · 시간이 다 되면 상자 자리를 한 번 더 잰다(관찰 칸 사이에서 화면 밖으로 밀렸을 수 있다)
+ * @param {{isConnected:boolean, getBoundingClientRect?:Function}} box 답장 상자
  * @param {() => void} onSeen 읽음으로 적기 (못 적으면 다음에 또 📬)
  * @param {object} [g] 테스트용 — IntersectionObserver·setTimeout·clearTimeout·document·innerHeight (안 주면 이 창)
  */
 export function watchSeen(box, onSeen, g = globalThis) {
-  const hidden = () => !!g.document && g.document.visibilityState === 'hidden';
+  const doc = g.document;
+  const hidden = () => !!doc && doc.visibilityState === 'hidden';
   if (typeof g.IntersectionObserver !== 'function') { // 아주 옛 브라우저 — 붙은 뒤 머물면
     g.setTimeout(() => { if (box.isConnected && !hidden()) onSeen(); }, READ_DWELL_MS);
     return;
   }
+  const listen = !!doc && typeof doc.addEventListener === 'function';
   let timer = 0;
-  const io = new g.IntersectionObserver((entries) => {
-    const en = entries[entries.length - 1];
+  let ok = false; // 마지막으로 잰 "보였다"
+  let done = false;
+  let io = null;
+  // 지금 보이나 — 상자 자리를 잴 수 있으면 다시 잰다(못 재면 마지막 관찰대로)
+  const seenNow = () => {
+    if (typeof box.getBoundingClientRect !== 'function') return ok;
+    const r = box.getBoundingClientRect();
+    const vh = g.innerHeight;
+    return seenEnough(Math.min(r.bottom, vh) - Math.max(r.top, 0), r.height, vh);
+  };
+  const stop = () => {
+    done = true;
     g.clearTimeout(timer);
-    if (!box.isConnected) { io.disconnect(); return; }
-    if (!seenEnough(en.intersectionRect.height, en.boundingClientRect.height, g.innerHeight)) return;
+    if (io) io.disconnect();
+    if (listen) doc.removeEventListener('visibilitychange', onVis);
+  };
+  const arm = () => {
+    g.clearTimeout(timer);
+    if (done || !ok || hidden()) return;
     timer = g.setTimeout(() => {
-      if (!box.isConnected) { io.disconnect(); return; }
-      if (hidden()) return; // 앱을 내렸다 — 다시 보일 때(스크롤하면) 또 잰다
-      io.disconnect();
+      if (done) return;
+      if (!box.isConnected) { stop(); return; }
+      if (hidden()) return; // 내린 채로 시간이 다 됨 — 돌아오면(onVis) 다시 잰다
+      if (!seenNow()) { ok = false; return; } // 관찰 칸 사이에서 밀려났다 — 다시 보일 때(스크롤) 또 잰다
+      stop();
       onSeen();
     }, READ_DWELL_MS);
-  }, { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1] });
+  };
+  function onVis() {
+    if (done) return;
+    if (!box.isConnected) { stop(); return; }
+    if (hidden()) { g.clearTimeout(timer); return; } // 내리면 끊는다 — 돌아오면 처음부터
+    ok = seenNow();
+    arm();
+  }
+  io = new g.IntersectionObserver((entries) => {
+    if (done) return;
+    if (!box.isConnected) { stop(); return; }
+    const en = entries[entries.length - 1];
+    ok = seenEnough(en.intersectionRect.height, en.boundingClientRect.height, g.innerHeight);
+    arm();
+  }, { threshold: SEEN_STEPS });
   io.observe(box);
+  if (listen) doc.addEventListener('visibilitychange', onVis);
 }
 
 /**

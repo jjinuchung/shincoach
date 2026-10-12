@@ -1,5 +1,7 @@
 // ✍️ 국어 서술형 (v237) — 원고 · 글자 수 · 보내기 규칙 · 답장 검사·붙이기·보상 한도 · 병합 · 올릴 목록 · 저장 경로(두 창) · 비공개 검사 · 화면 연결
 // 🔍 Codex 52차 (v239) — 글 이름표 id(같은 at 다른 글) · 앞 글 답장 · 답장 줄 수 상한·받은 수 · 채점 기준 등급 하나로 · 기다리는 글 안 자름 · 보였을 때만 읽음
+// ✍️ 생각 쓰기 도우미 (v240) — 🧩 문장 틀 · 🔢 글 번호 · ✔️ 스스로 확인 · 틀·번호만으로는 못 보냄(규칙에서도)
+// 🔍 Codex 53차 — 짧아도 뜻이 있는 답은 보냄(내 말 3자·문장부호 안 셈) · 틀 빈자리는 끝에 · 같은 답장 at 차례 · 읽음 머무름(앱 내림·자리 다시 잼)
 import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,12 +12,13 @@ import { checkContent, checkCard, validCards, WRITE_MIN, WRITE_MAX, KOR_STONE } 
 import {
   normText, textLen, writeCheck, writesOf, mergeWrites, cardWriteState, unreadReplies, writeAddRule, checkReplies, writeReplyRule,
   writeReadRule, writeTodo, replyStats, writeIdOf, WRITE_ID_RE, GRADES, WRITE_COINS, KEEP_DONE, REPLY_ROWS_MAX,
+  frameParts, ownLen, FRAME_GAP, OWN_MIN,
 } from '../js/korwrite.js';
 import { emptyProfile, cloneProfile, mergeStatRecord } from '../js/db.js';
 import { initProfile, flushProfile, reloadProfile, korWriteAdd, korWriteApply, korWriteRead, korWritesMap } from '../js/xp.js';
 import * as UP from '../js/upload.js';
 import { checkPrivateDir } from '../tools/privcheck.mjs';
-import { countLine, rewardLine, sendWhy, slotWriteText, appliedLine, replyHead, seenEnough, watchSeen, READ_DWELL_MS } from '../js/korwriteview.js';
+import { countLine, rewardLine, sendWhy, slotWriteText, appliedLine, replyHead, seenEnough, watchSeen, READ_DWELL_MS, SEEN_STEPS, insertAt } from '../js/korwriteview.js';
 
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const DATA = JSON.parse(read('coach/korean/reading.json'));
@@ -443,4 +446,190 @@ test('✍️ 화면 말(순수)·연결: 글자 수 줄 · 보상 안내(남은 
   for (const f of ['./js/korwrite.js', './js/korwriteview.js']) assert.ok(sw.includes(`'${f}'`), f);
   assert.match(read('js/stats.js'), /국어 생각 쓰기: 답장 기다리는 글/);
   assert.ok(!/fixes\.json`에 교정문을 적고/.test(read('coach/README.md')), '옛 공개 교정 절차는 없앴다 (Codex 51차)');
+});
+
+// ───────── ✍️ 생각 쓰기 도우미 (v240) ─────────
+const help = (id) => DATA.cards.find((c) => c.id === id).write;
+
+test('✍️ 도우미 원고 (v240): 다섯 카드 모두 🧩 틀 2~4·✔️ 확인 2~3 · 빈자리 ~ 하나까지 · 틀만 다 눌러도 못 보냄 · 예시 답은 보냄 · 채점 기준은 v1 그대로 · 검사가 잡는 것', () => {
+  for (const c of DATA.cards.filter((x) => x.write)) {
+    const { frames, checks } = c.write;
+    assert.ok(frames.length >= 2 && frames.length <= 4, c.id);
+    assert.ok(checks.length >= 2 && checks.length <= 3, c.id);
+    for (const f of frames) assert.ok(f.split(FRAME_GAP).length <= 2, `${c.id}: ${f}`);
+    for (const q of checks) assert.match(q, /\?$/, `${c.id}: 확인 줄은 물음 — ${q}`);
+    const all = frames.map((f) => f.replace(FRAME_GAP, ' ')).join(' ');
+    assert.equal(writeCheck(all, frames).why, 'own', `${c.id}: 틀을 다 눌러도(빈자리를 비운 채) 못 보낸다`);
+    assert.equal(writeCheck(c.write.model, frames).ok, true, `${c.id}: 예시 답은 보낼 수 있다`);
+  }
+  assert.equal(help('K1').v, 1, '틀·확인은 채점 기준(rubric)이 아니다 — 판 번호 그대로');
+  const bad = (edit, re) => { const c = clone(DATA.cards.find((x) => x.id === 'K19')); edit(c.write); const e = checkCard(c); assert.ok(e.some((m) => re.test(m)), `${re}: ${e}`); };
+  bad((w) => { delete w.frames; }, /write\.frames\(문장 틀\)는 2~4개/);
+  bad((w) => { w.frames = ['하나 ~']; }, /write\.frames\(문장 틀\)는 2~4개/);
+  bad((w) => { w.frames = ['가 ~', '나 ~', '다 ~', '라 ~', '마 ~']; }, /write\.frames\(문장 틀\)는 2~4개/);
+  bad((w) => { w.frames[0] = '나는 ~ 그리고 ~'; }, /write\.frames 1의 빈자리 ~는 하나까지/);
+  bad((w) => { w.frames[0] = ' ~ '; }, /write\.frames 1은 빈자리만/);
+  bad((w) => { w.frames[1] = ` ${w.frames[0]}`; }, /write\.frames\(문장 틀\) 2이 앞의 것과 같아요/);
+  bad((w) => { w.frames[0] = `${'가'.repeat(40)} ~`; }, /write\.frames\(문장 틀\) 1은 40자까지/);
+  bad((w) => { delete w.checks; }, /write\.checks\(스스로 확인\)는 2~3개/);
+  bad((w) => { w.checks = ['하나뿐인가요?']; }, /write\.checks\(스스로 확인\)는 2~3개/);
+  bad((w) => { w.checks[0] = '~ 썼나요?'; }, /write\.checks 1에 빈자리 ~가 있어요/);
+  const k1 = clone(DATA.cards.find((x) => x.id === 'K1'));
+  k1.write.frames[0] = '⑩에서 ~';
+  k1.write.checks[0] = '⑫를 읽었나요?';
+  const e = checkCard(k1);
+  assert.ok(e.some((m) => /write\.frames 1: ⑩은 글에 없는 번호/.test(m)) && e.some((m) => /write\.checks 1: ⑫은 글에 없는 번호/.test(m)), `K1은 아홉 문장: ${e}`);
+});
+
+test('✍️ 도우미: 틀·번호만 눌러서는 못 보냄 — 틀 조각·①…⑳·문장부호를 뺀 내 말이 3자 · 규칙(writeAddRule)도 카드의 틀로 · 저장·💰5 없음', () => {
+  const f19 = help('K19').frames;
+  assert.equal(OWN_MIN, 3);
+  assert.deepEqual(frameParts(['왜냐하면 ~ 때문이에요.', ' 왜냐하면  ~때문이에요!']), ['때문이에요', '왜냐하면'], '뼈대 꼴(문장부호 뺌) · 겹치면 하나 · 긴 것부터');
+  const only = '내 생각에 창남이의 거짓말은 왜냐하면 ⑰에서 그렇게 생각했어요. 나라면';
+  assert.ok(textLen(only) >= WRITE_MIN);
+  assert.deepEqual([writeCheck(only, f19).why, ownLen(only, f19)], ['own', 0]);
+  assert.equal(writeCheck('①②③④⑤⑥⑦⑧⑨⑩⑪⑫').why, 'own', '번호만 — 틀이 없어도');
+  const good = '내 생각에 창남이의 거짓말은 이해돼요. 왜냐하면 ⑲ 어머니가 걱정하지 않게 하려고 한 거라서요.';
+  assert.equal(writeCheck(good, f19).ok, true);
+  assert.equal(ownLen('내 생각에   창남이의\n거짓말은 잘못했어요.', f19), [...'잘못했어요'].length, '빈칸·줄바꿈이 달라도 틀 조각');
+  assert.equal(writeCheck(ANS).ok, true, '틀 없이 쓴 글은 그대로');
+  assert.equal(writeCheck('가'.repeat(9), f19).why, 'short', '짧음이 먼저');
+  const p = pf({ coins: 0 });
+  const r = writeAddRule(p, 'K19', only, T0, CARDS);
+  assert.deepEqual([r.ok, r.why, p.coins, !!(p.korWrites && p.korWrites.K19)], [false, 'own', 0, false], '규칙에서도 막는다 — 저장·💰5 없음');
+  assert.equal(writeAddRule(p, 'K19', good, T0, CARDS).ok, true);
+  assert.deepEqual(countLine(only, f19), { text: '틀 말고 내 말을 조금 더 써 볼까요? (내 말 0자)', ok: false, warn: false });
+  assert.equal(countLine(good, f19).ok, true);
+  assert.equal(sendWhy({ why: 'own' }), '틀 말고 내 말을 조금 더 써 볼까요?');
+});
+
+test('✍️ 도우미: 🧩·🔢 끼워 넣기 — 커서 자리에 · 앞이 글자면 빈칸 · ~ 자리에 커서 · 번호는 뒤 말에 붙여 · 고른 곳은 바꿈 · 커서를 모르면 끝', () => {
+  assert.deepEqual(insertAt('', 0, 0, '왜냐하면 ~ 때문이에요.'), { value: '왜냐하면  때문이에요.', caret: 5 });
+  assert.deepEqual(insertAt('좋아요.', 4, 4, '왜냐하면 ~ 때문이에요.'), { value: '좋아요. 왜냐하면  때문이에요.', caret: 10 });
+  assert.deepEqual(insertAt('왜냐하면  때문이에요.', 5, 5, '⑰', true), { value: '왜냐하면 ⑰ 때문이에요.', caret: 6 });
+  const a = insertAt('좋아요.', 4, 4, '~에서 그렇게 생각했어요.');
+  assert.deepEqual(a, { value: '좋아요. 에서 그렇게 생각했어요.', caret: 5 });
+  assert.equal(insertAt(a.value, a.caret, a.caret, '⑤', true).value, '좋아요. ⑤에서 그렇게 생각했어요.', '번호는 뒤 말에 붙는다');
+  assert.equal(insertAt('가나라', 2, 2, '고친 문장: ~').value, '가나 고친 문장:  라', '틀은 뒤 글과 띄운다');
+  assert.deepEqual(insertAt('가나다라', 1, 3, '⑤', true), { value: '가 ⑤라', caret: 3 }, '고른 곳은 바꾼다');
+  assert.deepEqual(insertAt('가나', undefined, undefined, '⑤', true), { value: '가나 ⑤', caret: 4 }, '커서를 모르면 끝에');
+  assert.deepEqual(insertAt('가나', 99, -3, '⑤', true), { value: '가나 ⑤', caret: 4 }, '범위 밖이면 끝에');
+  assert.deepEqual(insertAt('가나\n', 3, 3, '⑤', true), { value: '가나\n⑤', caret: 4 }, '줄바꿈 뒤엔 안 띄움');
+});
+
+test('✍️ 도우미 화면 연결: 🧩 틀은 쓰기 칸 위(누르면 늘 글 끝에) · 🔢 번호는 아래(커서 자리에) · ✔️ 확인은 보내기 위 · 확인은 저장·막기 안 함 · 글자 수 줄·보내기 모두 틀로 · 보내는 중엔 안 넣음 · sw v240', () => {
+  const wv = read('js/korwriteview.js');
+  const form = wv.slice(wv.indexOf('function formEl('), wv.indexOf('/** 답장 한 덩이의 머리 줄'));
+  const order = ["'kor-wframes'", 'box.appendChild(ta);', "'kor-wnums'", 'box.appendChild(checksEl(card))', "'btn btn-primary kor-wsend'"].map((k) => form.indexOf(k));
+  assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), `차례: ${order}`);
+  assert.ok(form.includes('countLine(ta.value, frames)') && form.includes('writeCheck(ta.value, frames)'), '글자 수 줄·보내기 모두 틀로');
+  assert.ok(form.includes('if (ta.readOnly) return; // 보내는 중'));
+  assert.ok(form.includes('glue: true'), '번호는 뒤 말에 붙여');
+  assert.ok(form.includes('title: `${i + 1}번 문장 번호 넣기`') && wv.includes("b.setAttribute('aria-label', it.title);"), '번호 버튼은 읽어 주는 이름으로(Codex 53차 #6)');
+  assert.ok(form.includes('frames.map((f) => ({ label: f, piece: f, atEnd: true }))') && form.includes('const here = touched && !it.atEnd;'), '틀은 늘 끝에 · 번호만 커서 자리에');
+  const chk = wv.slice(wv.indexOf('function checksEl('), wv.indexOf('/** 쓰기 칸'));
+  assert.ok(chk.length > 100 && !/korWrite|setDraft|localStorage|disabled/.test(chk), '✔️ 확인은 저장도·막기도 안 한다');
+  assert.match(read('js/korwrite.js'), /const chk = writeCheck\(text, card\.write\.frames\);/, '규칙도 카드의 틀로');
+  assert.match(read('sw.js'), /CACHE_VERSION = 'v240'/);
+  const css = read('css/style.css');
+  for (const k of ['.kor-whbtn {', '.kor-wchk-row {', '.kor-wnums .kor-whbtn {']) assert.ok(css.includes(k), k);
+});
+
+// ───────── 🔍 Codex 53차 ─────────
+test('🔍 Codex 53차 #1·#5 — 짧아도 뜻이 있는 답은 보냄(아빠가 채점) · 빈 틀·점·그림 글자·번호만은 막음 · 번호가 틀 사이에 끼거나 마침표가 빠져도 틀로 봄', () => {
+  const f = (id) => help(id).frames;
+  for (const [card, t] of [['K1', '미안해서요. ⑤에서 그렇게 생각했어요.'], ['K19', '나라면 사실대로 말해요.'], ['K17', '고친 문장: 나는 조종사다.'], ['K19', '내 생각에 창남이의 거짓말은 잘못했어요.'], ['K7', '가장 신기했던 장면은 알이에요.']]) {
+    assert.equal(writeCheck(t, f(card)).ok, true, `${card} 보냄: ${t} (내 말 ${ownLen(t, f(card))})`);
+  }
+  for (const [card, t] of [['K1', '..........'], ['K1', '🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂'], ['K1', '왜냐하면 왜냐하면 왜냐하면 왜냐하면'], ['K19', '내 생각에 ① 창남이의 거짓말은 ⑳ 나라면'], ['K15', '나는 좋겠어요 그렇게 하면 앞에 나온 의견에 보태자면'], ['K17', '고친 문장: ⑦ 고친 곳: ⑦ 왜냐하면 ⑦']]) {
+    assert.equal(writeCheck(t, f(card)).why, 'own', `${card} 막음: ${t} (내 말 ${ownLen(t, f(card))})`);
+  }
+  assert.equal(ownLen('ㅋㅋㅋ 몰라요', f('K1')), 6, '자모·글자는 센다(채점은 사람이)');
+  assert.equal(ownLen('한글'.normalize('NFD'), []), 2, '분리된 자모(NFD)도 모아서');
+});
+
+test('🔍 Codex 53차 #4 — 틀은 빈자리를 끝에(가운데 빈자리는 "나는 ~ 좋겠어요."·"~에서 …"만) · 채운 말이 어떤 꼴이어도 뒤가 어긋나지 않게', () => {
+  for (const c of DATA.cards.filter((x) => x.write)) {
+    for (const fr of c.write.frames) {
+      const k = fr.indexOf(FRAME_GAP);
+      const tail = fr.slice(k + 1);
+      assert.ok(!tail || ['나는 ~ 좋겠어요.', '~에서 그렇게 생각했어요.'].includes(fr), `${c.id}: 빈자리 뒤에 말이 붙은 틀 — ${fr}`);
+    }
+  }
+  assert.deepEqual(help('K7').frames, ['가장 신기했던 장면은 ~', '옛사람들이 이렇게 신기하게 전한 까닭은 ~']);
+  assert.equal(help('K19').frames[0], '내 생각에 창남이의 거짓말은 ~', '"~고 생각해요"에 "잘못했어요"를 넣으면 "잘못했어요고"가 됐다');
+});
+
+test('🔍 Codex 53차 #2 — 같은 답장 두 줄 중 한 줄만 at을 적어도 줄 차례와 상관없이 같은 결과 · 적은 at끼리 다르면 둘 다 버림', () => {
+  const run = (rows) => {
+    const p = pf({ coins: 0 });
+    const a = writeAddRule(p, 'K1', ANS, T0, CARDS);
+    const chk = checkReplies(rows(a), CARDS);
+    const r = writeReplyRule(p, rows(a), T0 + 10, CARDS);
+    return { good: chk.good.map((x) => x.at), bad: chk.bad.length, applied: r.ok, coins: p.coins };
+  };
+  const base = (a) => ({ card: 'K1', id: a.id, grade: 'ok', text: '잘 썼어!' });
+  const wrongFirst = run((a) => [{ ...base(a), at: a.at + 1 }, base(a)]);
+  const wrongLast = run((a) => [base(a), { ...base(a), at: a.at + 1 }]);
+  assert.deepEqual(wrongLast, wrongFirst, '전엔 at을 뺀 줄이 먼저면 틀린 at을 버리고 붙어 💰20');
+  assert.deepEqual([wrongFirst.good, wrongFirst.applied, wrongFirst.coins], [[T0 + 1], false, WRITE_COINS.first], '적힌 at이 그 글과 다르면 안 붙음');
+  const right = run((a) => [base(a), { ...base(a), at: a.at }]);
+  assert.deepEqual([right.good, right.applied], [[T0], true], '맞는 at이면 붙음');
+  const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+  for (const order of perms) {
+    const r = run((a) => { const rows = [base(a), { ...base(a), at: a.at }, { ...base(a), at: a.at + 1 }]; return order.map((k) => rows[k]); });
+    assert.deepEqual([r.good.length, r.applied], [0, false], `뺌·맞음·틀림 세 줄 차례 ${order}: 다른 at이 섞이면 둘 다 버림`);
+  }
+});
+
+test('🔍 Codex 53차 #3 — 읽음 머무름: 앱을 내리면 끊고 돌아와 처음부터 · 내린 사이 시간이 다 돼도 돌아오면 다시 잼 · 끝날 때 상자 자리를 다시 잼 · 5%마다 관찰 · 다 읽으면 듣기 끝', () => {
+  const fake = () => {
+    let cb = null; let now = 0; let opts = null;
+    const timers = [];
+    const ls = new Set();
+    const f = {
+      disc: 0, removed: 0,
+      g: {
+        IntersectionObserver: class { constructor(fn, o) { cb = fn; opts = o; } observe() {} disconnect() { f.disc++; } },
+        setTimeout: (fn, ms) => { timers.push({ fn, at: now + ms, on: true }); return timers.length; },
+        clearTimeout: (i) => { if (timers[i - 1]) timers[i - 1].on = false; },
+        document: {
+          visibilityState: 'visible',
+          addEventListener: (t, fn) => { assert.equal(t, 'visibilitychange'); ls.add(fn); },
+          removeEventListener: (t, fn) => { if (ls.delete(fn)) f.removed++; },
+        },
+        innerHeight: 1000,
+      },
+      opts: () => opts,
+      fire: (vis, h) => cb([{ intersectionRect: { height: vis }, boundingClientRect: { height: h } }]),
+      vis: (state) => { f.g.document.visibilityState = state; for (const fn of [...ls]) fn(); },
+      to: (t) => { now = t; for (const x of timers) if (x.on && x.at <= now) { x.on = false; x.fn(); } },
+    };
+    return f;
+  };
+  let seen = 0;
+  const f = fake();
+  watchSeen({ isConnected: true }, () => { seen++; }, f.g);
+  assert.deepEqual(f.opts().threshold, SEEN_STEPS);
+  assert.ok(SEEN_STEPS.length === 21 && SEEN_STEPS.includes(0.15));
+  f.fire(300, 300); f.to(100); f.vis('hidden'); f.to(1190); f.vis('visible'); f.to(1200);
+  assert.equal(seen, 0, 'Codex 재현: 0.1초 보고 내렸다 돌아오면 아직 안 읽음');
+  f.to(1190 + READ_DWELL_MS);
+  assert.deepEqual([seen, f.disc, f.removed], [1, 1, 1], '돌아와서 1.2초 보이면 읽음 · 관찰·듣기 끝');
+  const f2 = fake();
+  let s2 = 0;
+  watchSeen({ isConnected: true }, () => { s2++; }, f2.g);
+  f2.fire(300, 300); f2.g.document.visibilityState = 'hidden'; f2.to(1300); // 내림 알림이 늦어 시간이 내린 채로 다 됨
+  assert.equal(s2, 0);
+  f2.vis('visible'); f2.to(1300 + READ_DWELL_MS);
+  assert.equal(s2, 1, '돌아오면 다시 잰다(전엔 새 관찰이 올 때까지 그대로)');
+  const f3 = fake();
+  let s3 = 0;
+  let top = 550; // 3000 높이 상자 · 화면 1000 → 400 넘게 보여야
+  const box = { isConnected: true, getBoundingClientRect: () => ({ top, bottom: top + 3000, height: 3000 }) };
+  watchSeen(box, () => { s3++; }, f3.g);
+  f3.fire(450, 3000); top = 650; f3.to(READ_DWELL_MS);
+  assert.equal(s3, 0, '관찰 칸 사이에서 350만 보이게 밀렸으면 안 읽음');
+  top = 550; f3.fire(450, 3000); f3.to(READ_DWELL_MS * 3);
+  assert.equal(s3, 1);
 });

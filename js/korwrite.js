@@ -1,5 +1,5 @@
 // ✍️ 국어 서술형(주관식) — 순수 규칙 (화면 없음, korean.js만 import — db·xp·check·테스트가 그대로 부른다)
-// 화면은 korwriteview.js, 원고는 coach/korean/reading.json 카드의 write { q, v, rubric:{ must, ok, miss }, model }
+// 화면은 korwriteview.js, 원고는 coach/korean/reading.json 카드의 write { q, v, rubric:{ must, ok, miss }, model, frames, checks }
 //
 // 아버님 (2026-10-11): "문제는 주관식도 만들 수가 있을까? 아이가 주관식을 작성해서 올리면 너가 확인을 해서 … 답을 맞춰보고 해석을 해서"
 //   → 기본값 제안 → "제안 기본값대로 가자" → Codex 51차 PART 3 조언 → "니 제안대로 진행하자"
@@ -16,10 +16,14 @@
 //  · 같은 (카드, id)에 다른 답장이 둘이면 둘 다 버린다(차례에 따라 달라지지 않게) · 답장 파일이 REPLY_ROWS_MAX줄을 넘으면 통째로 안 받는다 — 📊에 수만(replyStats, Codex 52차 #5)
 //  · 병합: 카드마다 글은 id로 합집합(답장 붙은 쪽이 이김) · last·paid.coins는 큰 쪽 · paid.first·stone은 이른 날
 //  · 지갑(coins·items)은 프로필 병합에서 새 사본을 따른다(db.js) — 두 사본이 갈린 뒤 한쪽만 받은 보상은 다시 붙지 않는다(Codex 52차 #3, 아버님 결정: 그대로)
-import { dayNum, KOR_STONE, WRITE_MIN, WRITE_MAX } from './korean.js';
+// 생각 쓰기 도우미 (v240, 아버님 "제안한 기본값대로" — 서술형에서 흔히 막히는 곳: 의견만 쓰고 글에 바탕을 둔 까닭·문장 번호를 안 듦, 묻는 것 옆의 물음에 답함):
+//  · 🧩 문장 틀(write.frames — ~ 자리에 커서) · 🔢 글 번호 넣기 · ✔️ 보내기 전 스스로 확인(write.checks — 채점·막기 없음)
+//  · 틀·번호만 눌러 보내지 않게 — 틀 조각·번호·문장부호를 뺀 "내 말"이 OWN_MIN(3)자 (writeCheck why 'own', 규칙에서도 카드의 frames로)
+//    처음엔 10자였는데 "미안해서요. ⑤에서 그렇게 생각했어요." 같은 짧지만 뜻이 있는 답까지 막았다(Codex 53차 #1) — 막는 것은 빈 틀만, 짧은 답은 채점에서
+import { dayNum, KOR_STONE, WRITE_MIN, WRITE_MAX, FRAME_GAP } from './korean.js';
 
 /** 글자 수(공백 정리 뒤) 10~200 — 짧은 한 문장 "엄마가 걱정하실까 봐요."도 받는다 (값은 korean.js — 원고 검사도 같은 값) */
-export { WRITE_MIN, WRITE_MAX };
+export { WRITE_MIN, WRITE_MAX, FRAME_GAP };
 /** 답장 글 길이 상한 */
 export const REPLY_MAX = 600;
 /** 답장 파일 줄 수 상한 — 넘으면 하나도 받지 않는다(잘라 받지 않는다 — 잘린 뒤쪽의 "같은 글에 다른 답장"을 못 보니까, Codex 52차 #5) */
@@ -54,11 +58,30 @@ export function normText(s) {
 export function textLen(s) {
   return [...normText(s)].length;
 }
-/** 보낼 수 있나 — { ok, n, why: 'short' | 'long' } */
-export function writeCheck(text) {
+/** "내 말"이 이만큼은 있어야 보낸다 — 틀·번호 버튼만 누른 글을 막는 데까지만(짧아도 뜻이 있는 답은 아빠가 채점 — Codex 53차 #1) */
+export const OWN_MIN = 3;
+/** 글자·숫자만 남긴 뼈대 — ①~⑳은 먼저 지우고(번호가 틀 사이에 끼어도), 문장부호·그림 글자·빈칸은 빈칸 하나로 (Codex 53차 #5) */
+export function bareText(s) {
+  return String(s === undefined || s === null ? '' : s).normalize('NFC').replace(/[\u2460-\u2473]/g, ' ').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+/** 틀 조각 — "왜냐하면 ~ 때문이에요." → ['때문이에요', '왜냐하면'] (뼈대 꼴 · 겹치면 하나 · 긴 것부터 — 짧은 조각이 긴 조각 속을 먼저 지우지 않게) */
+export function frameParts(frames) {
+  const out = new Set();
+  for (const f of Array.isArray(frames) ? frames : []) for (const p of String(f).split(FRAME_GAP)) { const t = bareText(p); if (t) out.add(t); }
+  return [...out].sort((a, b) => b.length - a.length);
+}
+/** 내 말 글자 수 — 뼈대에서 🧩 틀 조각을 빼고 남은 글자·숫자만 센다 (문장부호·그림 글자·🔢 번호는 안 셈 — 점 열 개로 보내지 않게, v240) */
+export function ownLen(text, frames) {
+  let t = bareText(text);
+  for (const p of frameParts(frames)) t = t.split(p).join(' ');
+  return [...t.replace(/\s/g, '')].length; // 뼈대엔 글자·숫자·빈칸만 남아 있다
+}
+/** 보낼 수 있나 — { ok, n, why: 'short' | 'long' | 'own' } · own = 틀·번호·문장부호 말고 내 말이 OWN_MIN자 안 됨 */
+export function writeCheck(text, frames) {
   const n = textLen(text);
   if (n < WRITE_MIN) return { ok: false, n, why: 'short' };
   if (n > WRITE_MAX) return { ok: false, n, why: 'long' };
+  if (ownLen(text, frames) < OWN_MIN) return { ok: false, n, why: 'own' };
   return { ok: true, n };
 }
 
@@ -178,7 +201,7 @@ export function unreadReplies(writes) {
 export function writeAddRule(profile, cardId, text, now, cards) {
   const card = (Array.isArray(cards) ? cards : []).find((c) => c && c.id === cardId && isObj(c.write));
   if (!card) return { ok: false, why: 'unknown' };
-  const chk = writeCheck(text);
+  const chk = writeCheck(text, card.write.frames);
   if (!chk.ok) return { ok: false, why: chk.why, n: chk.n };
   const all = writesOf(profile.korWrites);
   const w = all[cardId] || emptyCard();
@@ -228,7 +251,8 @@ export function checkReplies(list, cards) {
     const r = { card: e.card, id: e.id, at: e.at === undefined ? 0 : e.at, grade: e.grade, text };
     const p = seen.get(key);
     if (!p) { seen.set(key, { r, i, clash: false }); return; }
-    if (p.r.grade !== r.grade || p.r.text !== r.text || (p.r.at && r.at && p.r.at !== r.at)) { p.clash = true; bad.push({ i, why: `같은 글(${key})에 다른 답장` }); }
+    if (p.r.grade !== r.grade || p.r.text !== r.text || (p.r.at && r.at && p.r.at !== r.at)) { p.clash = true; bad.push({ i, why: `같은 글(${key})에 다른 답장` }); return; }
+    if (!p.r.at && r.at) p.r.at = r.at; // 같은 답장인데 한 줄만 at을 적었으면 그 at을 지킨다 — 줄 차례에 따라 붙고 안 붙고가 갈리지 않게(Codex 53차 #2)
   });
   for (const { r, i, clash } of seen.values()) {
     if (clash) bad.push({ i, why: `같은 글(${r.card}:${r.id})에 다른 답장` });

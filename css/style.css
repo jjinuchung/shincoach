@@ -3231,6 +3231,20 @@ button { font-family: inherit; }
 .kor-wbody { line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; white-space: pre-wrap; }
 .kor-wagain { justify-self: start; }
 .kor-wbanner { justify-self: start; }
+/* ✍️ 생각 쓰기 도우미 (v240) — 🧩 문장 틀 · 🔢 글 번호 · ✔️ 보내기 전 스스로 확인 */
+.kor-whelp { display: grid; gap: 6px; min-width: 0; }
+.kor-whbtns { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.kor-whbtn {
+  font: inherit; font-size: 0.95rem; line-height: 1.4; min-height: 40px; max-width: 100%; padding: 6px 12px; cursor: pointer;
+  border: 1px solid var(--kor-gold-line); background: var(--kor-gold-bg); border-radius: 12px; color: inherit; text-align: left; word-break: keep-all;
+}
+.kor-wnums .kor-whbtn { min-width: 44px; padding: 2px 0; text-align: center; font-size: 1.6rem; line-height: 1; background: var(--kor-paper); border-color: var(--border); } /* ①…은 글꼴에서 작게 나온다 */
+.kor-whbtn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.kor-whbtn:active { transform: translateY(1px); }
+.kor-wchk { margin: 0; padding: 6px 12px 10px; border: 2px dashed var(--kor-rule); border-radius: 12px; display: grid; gap: 4px; min-width: 0; }
+.kor-wchk legend { padding: 0 4px; }
+.kor-wchk-row { display: flex; gap: 8px; align-items: flex-start; min-height: 36px; padding-top: 4px; line-height: 1.5; word-break: keep-all; cursor: pointer; }
+.kor-wchk-row input { flex: none; width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--ok); }
 .kor-slot-write { font-size: 0.8rem; font-weight: 700; color: var(--primary-dark); word-break: keep-all; }
 
 /* 📚 🎯 국어 포켓몬 잡기 단추 (2026-10-11) */
