@@ -14,7 +14,7 @@
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
 //           essay/fixes.json (✍️ 아빠 교정 — Claude가 essay/todo.json을 보고 날짜·글·교정을 적는다)
 //           math/replies.json (❓ 아빠 답장 [{ no, text }]) — 같은 열쇠로 읽는다, 배포가 필요 없다
-//           korean/replies.json (✍️ 국어 서술형 답장 [{ card, id, at, grade, text }] — korwrite.checkReplies가 칸마다 검사, v237 · id는 v239)
+//           korean/replies.json (✍️ 국어 서술형 답장 [{ card, id, at, v, grade, text }] — korwrite.checkReplies가 칸마다 검사, v237 · id는 v239 · 채점한 판 v는 v243)
 // 한 번에 하나씩 (Codex 52차 #1): 같은 창은 serialSender(보내는 중에 "지금 보내기"가 또 오면 끝난 뒤 한 번 더) ·
 //   다른 창(같은 주소)은 Web Locks(withUploadLock) · 국어 목록은 올리는 순간마다 다시 만든다(겹쳐서 다시 올릴 때도 — 옛 목록으로 덮지 않게)
 
@@ -72,10 +72,12 @@ export function essayFiles(todo, today) {
  */
 export function koreanFiles(todo, today) {
   const list = Array.isArray(todo) ? todo : [];
-  const lines = [`✍️ 진우가 쓴 국어 서술형 — 답장 기다리는 글 ${list.length}개 (${today}) · 답장은 korean/replies.json에 { card, id, at, grade(ok·near·again), text } (card·id·at은 아래 그대로)`, ''];
+  const lines = [`✍️ 진우가 쓴 국어 서술형 — 답장 기다리는 글 ${list.length}개 (${today}) · 답장은 korean/replies.json에 { card, id, at, v, grade(ok·near·again), text } (card·id·at·v는 아래 그대로 — v는 채점한 판, 그 판의 rubric으로)`, ''];
   for (const e of list) {
-    lines.push(`[${e.card} · id ${e.id} · at ${e.at}] ${e.date} 「${e.title}」 · 채점 기준 v${e.v}`);
-    lines.push(`    물음: ${e.q}`);
+    // 원고를 고친 뒤의 옛 글 — 그 판의 물음·기준으로 (Codex 52차 #8)
+    const old = e.vNow && e.vNow !== e.v ? ` (지금 원고는 v${e.vNow} — 이 글은 v${e.v} 물음·기준으로, 원고 write.past)` : '';
+    lines.push(`[${e.card} · id ${e.id} · at ${e.at} · v ${e.v}] ${e.date} 「${e.title}」 · 채점 기준 v${e.v}${old}`);
+    lines.push(e.vNow && !e.q ? `    ⚠️ v${e.v} 물음을 원고(write.past)에서 못 찾았어요 — 원고를 확인해 주세요` : `    물음: ${e.q}`);
     lines.push(`    진우: ${e.text}`);
     for (const b of (Array.isArray(e.before) ? e.before : [])) lines.push(`    (전에 ${b.date} · ${b.grade}) ${b.text} → 답장: ${b.reply}`);
     lines.push('');
@@ -254,8 +256,8 @@ export function readStatus(kind, n = 0, at = Date.now()) {
 const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장' };
 /**
  * 📊 📤 카드의 받기 한 줄 (순수) — "📥 받기: ✍️ 교정 ✅ 10/07 10:32 (3개) · ❓ 답장 · 아직 없음"
- * check(국어 답장 — 붙여 본 뒤의 수, noteReadCheck)가 있으면: 너무 많아 통째로 안 받음 ❌ · 받지 않은 줄·맞는 글 없음 ⚠️
- * @param {Object<string, {at:number, ok:boolean, n?:number, missing?:boolean, why?:string, check?:{rows:number, bad:number, none:number, over:boolean}}>|null} state readState()
+ * check(국어 답장 — 붙여 본 뒤의 수, noteReadCheck)가 있으면: 너무 많아 통째로 안 받음 ❌ · 받지 않은 줄·맞는 글 없음·판 다름 ⚠️
+ * @param {Object<string, {at:number, ok:boolean, n?:number, missing?:boolean, why?:string, check?:{rows:number, bad:number, none:number, stale?:number, over:boolean}}>|null} state readState()
  * @param {(t:number) => string} fmt 시각 글
  */
 export function readSummary(state, fmt) {
@@ -266,7 +268,7 @@ export function readSummary(state, fmt) {
     if (r.missing) return `${name} · 아직 없음`;
     const c = r.check;
     if (c && c.over) return `${name} ❌ ${fmt(r.at)} 답장이 너무 많아(${c.rows}줄) 하나도 안 받았어요 — Claude에게 오래된 줄을 지워 달라고 해 주세요`;
-    const warn = c ? [c.bad ? `받지 않은 줄 ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : ''].filter(Boolean).join(' · ') : '';
+    const warn = c ? [c.bad ? `받지 않은 줄 ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : '', c.stale ? `판 다름 ${c.stale}` : ''].filter(Boolean).join(' · ') : '';
     return warn ? `${name} ⚠️ ${fmt(r.at)} (${r.n}개 — ${warn} · Claude에게 "국어 답장 확인해 줘")` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
   });
   return parts.length ? `📥 받기: ${parts.join(' · ')}` : '📥 받기: 아직 받아 본 적이 없어요 (앱을 열 때·수학을 열 때 저절로)';
@@ -305,7 +307,7 @@ export function noteReadCheck(path, check, store) {
   try {
     const s = readState(store);
     if (!s[path] || !s[path].ok) return;
-    s[path] = { ...s[path], check: { rows: check.rows | 0, bad: check.bad | 0, none: check.none | 0, over: !!check.over } };
+    s[path] = { ...s[path], check: { rows: check.rows | 0, bad: check.bad | 0, none: check.none | 0, stale: check.stale | 0, over: !!check.over } };
     (store || localStorage).setItem(READ_KEY, JSON.stringify(s));
   } catch { /* 적지 못해도 받기는 그대로 */ }
 }

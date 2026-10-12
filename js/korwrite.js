@@ -20,6 +20,11 @@
 //  · 🧩 문장 틀(write.frames — ~ 자리에 커서) · 🔢 글 번호 넣기 · ✔️ 보내기 전 스스로 확인(write.checks — 채점·막기 없음)
 //  · 틀·번호만 눌러 보내지 않게 — 틀 조각·번호·문장부호를 뺀 "내 말"이 OWN_MIN(3)자 (writeCheck why 'own', 규칙에서도 카드의 frames로)
 //    처음엔 10자였는데 "미안해서요. ⑤에서 그렇게 생각했어요." 같은 짧지만 뜻이 있는 답까지 막았다(Codex 53차 #1) — 막는 것은 빈 틀만, 짧은 답은 채점에서
+// 채점 기준 판 번호 (v243, Codex 52차 #8 — 아버님 "이대로 진행"):
+//  · 글은 쓸 때의 판(v)을 지닌다 · 물음·rubric을 고치면 원고의 v를 올리고 옛 판은 write.past로(questionOf가 판마다 찾는다)
+//  · korean/todo.json에는 그 글을 쓴 판의 물음(지금 원고의 물음이 아니라)과 지금 판(vNow) · 진우 화면의 "답장 기다리는 글" 위 물음도 그 판으로
+//  · 답장은 채점한 판 v를 적는다 — 그 글의 판과 같아야 붙는다 · v가 없는 줄은 1판(v243 전 답장은 모두 1판) · 그 카드에 없는 판은 받지 않는다
+//  · 판이 달라 안 붙은 답장은 📊 받기 줄에 "판 다름 N"(replyStats.stale)
 import { dayNum, KOR_STONE, WRITE_MIN, WRITE_MAX, FRAME_GAP } from './korean.js';
 
 /** 글자 수(공백 정리 뒤) 10~200 — 짧은 한 문장 "엄마가 걱정하실까 봐요."도 받는다 (값은 korean.js — 원고 검사도 같은 값) */
@@ -83,6 +88,25 @@ export function writeCheck(text, frames) {
   if (n > WRITE_MAX) return { ok: false, n, why: 'long' };
   if (ownLen(text, frames) < OWN_MIN) return { ok: false, n, why: 'own' };
   return { ok: true, n };
+}
+
+/** 글이 지닌 판 번호 — 없거나 깨졌으면 1판 (v237부터 늘 적었다) */
+export const editionOf = (e) => cnt(e && e.v) || 1;
+/** 원고 write에 있는 판 번호들 — 지금 판 + 옛 판(past) */
+export function editionsOf(write) {
+  const out = new Set();
+  if (!isObj(write)) return out;
+  if (cnt(write.v)) out.add(cnt(write.v));
+  for (const x of Array.isArray(write.past) ? write.past : []) if (isObj(x) && cnt(x.v)) out.add(cnt(x.v));
+  return out;
+}
+/** 판 v의 물음·채점 기준 { v, q, rubric, model, now } — 지금 판이면 now true · 원고에 그 판이 없으면 null */
+export function questionOf(write, v) {
+  if (!isObj(write)) return null;
+  const want = cnt(v) || 1;
+  if (cnt(write.v) === want) return { v: want, q: write.q, rubric: write.rubric, model: write.model, now: true };
+  const x = (Array.isArray(write.past) ? write.past : []).find((p) => isObj(p) && cnt(p.v) === want);
+  return x ? { v: want, q: x.q, rubric: x.rubric, model: x.model, now: false } : null;
 }
 
 /** 글 이름표 꼴 — w + 14자 */
@@ -226,14 +250,15 @@ export function writeAddRule(profile, cardId, text, now, cards) {
 }
 
 /**
- * 📥 답장 파일 검사 (앱이 받을 때 · tools/check.mjs --private) — { good: [{ card, id, at, grade, text }], bad: [{ i, why }], over }
+ * 📥 답장 파일 검사 (앱이 받을 때 · tools/check.mjs --private) — { good: [{ card, id, at, v, grade, text }], bad: [{ i, why }], over }
  * · 서술형이 있는 카드 · id는 korean/todo.json의 id 그대로 · at은 그 글의 at(사람이 보는 칸 — 적었으면 id의 글과 같아야 붙는다)
+ * · v = 채점한 판(그 카드의 지금 판이나 옛 판 · 안 적었으면 1 — v243 전 답장) — 글의 판과 같아야 붙는다
  * · grade는 ok·near·again · text는 1~REPLY_MAX자 · 모르는 칸은 무시
  * · 같은 (카드, id)에 다른 답장이 둘이면 둘 다 bad(어느 쪽이 맞는지 앱이 정하지 않는다) · 똑같으면 하나로
  * · REPLY_ROWS_MAX줄을 넘으면 하나도 받지 않는다(over — 앞쪽만 잘라 받으면 뒤쪽의 다른 답장을 못 본다, Codex 52차 #5)
  */
 export function checkReplies(list, cards) {
-  const has = new Set((Array.isArray(cards) ? cards : []).filter((c) => c && isObj(c.write)).map((c) => c.id));
+  const has = new Map((Array.isArray(cards) ? cards : []).filter((c) => c && isObj(c.write)).map((c) => [c.id, editionsOf(c.write)]));
   const rows = Array.isArray(list) ? list : [];
   if (rows.length > REPLY_ROWS_MAX) return { good: [], bad: [{ i: -1, why: `답장이 ${REPLY_ROWS_MAX}줄을 넘어요(${rows.length}줄) — 하나도 받지 않아요. 답장이 이미 붙은 오래된 줄을 지워 주세요` }], over: true };
   const good = [];
@@ -244,14 +269,16 @@ export function checkReplies(list, cards) {
     if (typeof e.card !== 'string' || !has.has(e.card)) { bad.push({ i, why: '서술형이 있는 카드가 아님' }); return; }
     if (typeof e.id !== 'string' || !WRITE_ID_RE.test(e.id)) { bad.push({ i, why: 'id는 korean/todo.json의 id 그대로(w + 14자)' }); return; }
     if (e.at !== undefined && (!Number.isSafeInteger(e.at) || e.at <= 0)) { bad.push({ i, why: 'at은 양의 정수(그 글의 at 그대로)' }); return; }
+    const v = e.v === undefined ? 1 : e.v;
+    if (!Number.isSafeInteger(v) || v <= 0 || !has.get(e.card).has(v)) { bad.push({ i, why: `v는 ${e.card}의 채점 기준 판 번호(${[...has.get(e.card)].sort((a, b) => a - b).map((x) => `v${x}`).join('·')}) — 그 글을 채점한 판` }); return; }
     if (!own(GRADES, e.grade)) { bad.push({ i, why: 'grade는 ok·near·again' }); return; }
     const text = typeof e.text === 'string' ? e.text.trim() : '';
     if (!text || [...text].length > REPLY_MAX) { bad.push({ i, why: `text는 1~${REPLY_MAX}자` }); return; }
     const key = `${e.card}:${e.id}`;
-    const r = { card: e.card, id: e.id, at: e.at === undefined ? 0 : e.at, grade: e.grade, text };
+    const r = { card: e.card, id: e.id, at: e.at === undefined ? 0 : e.at, v, grade: e.grade, text };
     const p = seen.get(key);
     if (!p) { seen.set(key, { r, i, clash: false }); return; }
-    if (p.r.grade !== r.grade || p.r.text !== r.text || (p.r.at && r.at && p.r.at !== r.at)) { p.clash = true; bad.push({ i, why: `같은 글(${key})에 다른 답장` }); return; }
+    if (p.r.grade !== r.grade || p.r.text !== r.text || p.r.v !== r.v || (p.r.at && r.at && p.r.at !== r.at)) { p.clash = true; bad.push({ i, why: `같은 글(${key})에 다른 답장` }); return; }
     if (!p.r.at && r.at) p.r.at = r.at; // 같은 답장인데 한 줄만 at을 적었으면 그 at을 지킨다 — 줄 차례에 따라 붙고 안 붙고가 갈리지 않게(Codex 53차 #2)
   });
   for (const { r, i, clash } of seen.values()) {
@@ -260,18 +287,23 @@ export function checkReplies(list, cards) {
   }
   return { good, bad, over: false };
 }
-/** 답장 r이 붙을 글 (id가 같고, at을 적었으면 at도 같은 글) */
-const target = (w, r) => (w ? w.list.find((x) => x.id === r.id && (!r.at || x.at === r.at)) : undefined) || null;
+/** 답장 r이 가리키는 글 (id가 같고, at을 적었으면 at도 같은 글) — 판은 아직 안 본다 */
+const pointed = (w, r) => (w ? w.list.find((x) => x.id === r.id && (!r.at || x.at === r.at)) : undefined) || null;
+/** 답장 r이 붙을 글 — 가리키는 글의 판이 답장의 판(채점한 판)과 같을 때만 (Codex 52차 #8) */
+const target = (w, r) => { const e = pointed(w, r); return e && editionOf(e) === r.v ? e : null; };
 
 /**
  * 📊 답장 파일을 한 번 받은 결과 수 (순수 — 글은 넣지 않는다) · 붙인 뒤의 기록으로 센다
- * @returns {{rows:number, good:number, bad:number, none:number, over:boolean}} bad = 받지 않은 줄 · none = 이 기기에 그 글이 없음
+ * @returns {{rows:number, good:number, bad:number, none:number, stale:number, over:boolean}} bad = 받지 않은 줄 · none = 이 기기에 그 글이 없음 ·
+ *   stale = 그 글은 있지만 판이 달라 안 붙음(다른 판의 기준으로 채점한 답장)
  */
 export function replyStats(writes, list, cards) {
   const { good, bad, over } = checkReplies(list, cards);
   const w = writesOf(writes);
   const rows = Array.isArray(list) ? list.length : 0;
-  return { rows, good: good.length, bad: over ? rows : bad.length, none: good.filter((r) => !target(w[r.card], r)).length, over: !!over };
+  const none = good.filter((r) => !pointed(w[r.card], r)).length;
+  const stale = good.filter((r) => { const e = pointed(w[r.card], r); return !!e && editionOf(e) !== r.v; }).length;
+  return { rows, good: good.length, bad: over ? rows : bad.length, none, stale, over: !!over };
 }
 
 /**
@@ -328,8 +360,10 @@ function ymd(t) {
 }
 
 /**
- * 📤 답장 기다리는 글 (순수) — 비공개 저장소 korean/todo.json · Claude는 card·id·at을 그대로 답장에 적는다
- * @returns {Array<{card,id,title,q,v,at,date,text,before:Array<{date,text,grade,reply}>}>}
+ * 📤 답장 기다리는 글 (순수) — 비공개 저장소 korean/todo.json · Claude는 card·id·at·v를 그대로 답장에 적는다
+ * q = 그 글을 쓴 판(v)의 물음 — 지금 원고의 물음이 아니다(원고를 고친 뒤 옛 글이 새 물음 옆에 놓이지 않게, Codex 52차 #8) ·
+ * vNow = 지금 원고의 판(원고를 못 받았으면 0) · 그 판을 원고(write.past)에서 못 찾으면 q는 ''
+ * @returns {Array<{card,id,title,q,v,vNow,at,date,text,before:Array<{date,text,grade,reply}>}>}
  */
 export function writeTodo(writes, cards) {
   const w = writesOf(writes);
@@ -338,8 +372,10 @@ export function writeTodo(writes, cards) {
   for (const id of Object.keys(w)) {
     const c = byId.get(id);
     for (const e of w[id].list.filter((x) => !x.grade)) {
+      const v = editionOf(e);
+      const ed = c ? questionOf(c.write, v) : null;
       out.push({
-        card: id, id: e.id, title: c ? c.title : '', q: c ? c.write.q : '', v: e.v, at: e.at, date: ymd(e.at), text: e.text,
+        card: id, id: e.id, title: c ? c.title : '', q: ed ? ed.q : '', v, vNow: c ? cnt(c.write.v) : 0, at: e.at, date: ymd(e.at), text: e.text,
         before: w[id].list.filter((x) => x.grade && x.at < e.at).slice(-2).map((x) => ({ date: ymd(x.at), text: x.text, grade: x.grade, reply: x.reply })),
       });
     }

@@ -36,7 +36,7 @@ export function checkPrivateDir(dir, figureSvg) {
     try { list = JSON.parse(readFileSync(f, 'utf8')); } catch (e) { errors.push(`JSON 오류: ${f}: ${e.message}`); continue; }
     if (!Array.isArray(list)) { errors.push(`내용 오류: ${f}: 배열이 아님`); continue; }
     if (rel === 'korean/replies.json') {
-      // ✍️ 국어 서술형 답장 — [{ card, id, at, grade, text }] · 앱이 받을 때와 같은 검사(korwrite.checkReplies) — 서술형 있는 카드·id·at·등급·길이·같은 글에 다른 답장·줄 수 상한 (v237 · id v239)
+      // ✍️ 국어 서술형 답장 — [{ card, id, at, v, grade, text }] · 앱이 받을 때와 같은 검사(korwrite.checkReplies) — 서술형 있는 카드·id·at·판(v)·등급·길이·같은 글에 다른 답장·줄 수 상한 (v237 · id v239 · v v243)
       const cards = validCards(JSON.parse(readFileSync(new URL('../coach/korean/reading.json', import.meta.url), 'utf8')));
       for (const b of checkReplies(list, cards).bad) errors.push(`내용 오류: ${b.i < 0 ? f : `${f}[${b.i}]`}: ${b.why}`);
       continue;

@@ -5,7 +5,7 @@
 // · 📬 답장은 화면에 실제로 보였을 때만 "읽음"(watchSeen — Codex 52차 #9: 그리기만 해도 읽음이 되어, 끝 카드 아래로 밀린 답장을 못 보고 나가도 📬가 사라졌다)
 // · 생각 쓰기 도우미(v240): 🧩 문장 틀(늘 글 끝에 — 빈자리를 채운 뒤 커서가 문장 가운데 있어도, ~ 자리에 커서) · 🔢 글 번호 ①…(커서 자리에) · ✔️ 보내기 전 스스로 확인(채점·막기·저장 없음)
 import { korWritesMap, korWriteAdd, korWriteRead, korWriteApply } from './xp.js';
-import { cardWriteState, unreadReplies, replyStats, writeCheck, textLen, ownLen, GRADES, WRITE_MIN, WRITE_MAX, WRITE_COINS, FRAME_GAP, OWN_MIN } from './korwrite.js';
+import { cardWriteState, unreadReplies, replyStats, writeCheck, textLen, ownLen, questionOf, GRADES, WRITE_MIN, WRITE_MAX, WRITE_COINS, FRAME_GAP, OWN_MIN } from './korwrite.js';
 import { circled, lineCount } from './korean.js';
 
 const el = (tag, cls, text) => {
@@ -309,14 +309,17 @@ export function writeBoxEl(card, ctx) {
       if (!e.read) watchSeen(r, () => { korWriteRead(card.id, e.id).catch(() => {}); }); // 읽음은 보였을 때
     }
     if (st.pendings.length) {
-      sec.appendChild(el('p', 'kor-wq-text', card.write.q));
+      // 물음은 그 글을 쓴 판의 것 — 원고를 고친 뒤에도 진우가 답한 물음이 보이게 (Codex 52차 #8)
+      const qs = st.pendings.map((p) => { const ed = questionOf(card.write, p.v); return ed ? ed.q : card.write.q; });
+      sec.appendChild(el('p', 'kor-wq-text', qs[0]));
       sec.appendChild(el('p', 'kor-wwait', '✉️ 아빠에게 보낸 글이에요 — 답장을 기다리고 있어요. 다른 글을 읽어도 돼요.'));
-      for (const p of st.pendings) {
+      st.pendings.forEach((p, k) => {
         const mine = el('div', 'kor-wmine');
+        if (k > 0 && qs[k] !== qs[0]) mine.appendChild(el('p', 'kor-wq-text', qs[k])); // 판이 다른 글(두 기기)
         if (dated) { const d = new Date(p.at); mine.appendChild(el('p', 'kor-wlabel', `📝 ${d.getMonth() + 1}/${d.getDate()}에 쓴 글`)); }
         mine.appendChild(el('p', 'kor-wbody', p.text));
         sec.appendChild(mine);
-      }
+      });
       return;
     }
     if (st.done) { sec.appendChild(el('p', 'kor-wdone', '✅ 이 생각 쓰기는 끝! 잘했어요')); return; }

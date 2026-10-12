@@ -8,11 +8,11 @@ import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkContent, checkCard, validCards, WRITE_MIN, WRITE_MAX, KOR_STONE } from '../js/korean.js';
+import { checkContent, checkCard, validCards, WRITE_MIN, WRITE_MAX, KOR_STONE, PAST_MAX } from '../js/korean.js';
 import {
   normText, textLen, writeCheck, writesOf, mergeWrites, cardWriteState, unreadReplies, writeAddRule, checkReplies, writeReplyRule,
   writeReadRule, writeTodo, replyStats, writeIdOf, WRITE_ID_RE, GRADES, WRITE_COINS, KEEP_DONE, REPLY_ROWS_MAX,
-  frameParts, ownLen, FRAME_GAP, OWN_MIN,
+  frameParts, ownLen, FRAME_GAP, OWN_MIN, questionOf, editionsOf, editionOf,
 } from '../js/korwrite.js';
 import { emptyProfile, cloneProfile, mergeStatRecord } from '../js/db.js';
 import { initProfile, flushProfile, reloadProfile, korWriteAdd, korWriteApply, korWriteRead, korWritesMap } from '../js/xp.js';
@@ -90,7 +90,7 @@ test('✍️ 답장 검사: 서술형 카드 · id 꼴 · at(적었으면) 정�
   const ok = { card: 'K1', id: ID, at: T0, grade: 'ok', text: '잘 썼어!', extra: 1 };
   const rows = [ok, null, { ...ok, card: 'K2' }, { ...ok, card: 'K99' }, { ...ok, at: '1' }, { ...ok, at: 1.5 }, { ...ok, grade: 'great' }, { ...ok, text: ' ' }, { ...ok, text: '가'.repeat(601) }, { ...ok }, { ...ok, id: undefined }, { ...ok, id: 'w123' }, { ...ok, id: 'W'.repeat(15) }];
   const r = checkReplies(rows, CARDS);
-  assert.deepEqual(r.good, [{ card: 'K1', id: ID, at: T0, grade: 'ok', text: '잘 썼어!' }], '똑같은 두 줄은 하나');
+  assert.deepEqual(r.good, [{ card: 'K1', id: ID, at: T0, v: 1, grade: 'ok', text: '잘 썼어!' }], '똑같은 두 줄은 하나 · v를 안 적으면 1판');
   assert.equal(r.bad.length, 11);
   assert.equal(r.over, false);
   const noAt = checkReplies([{ card: 'K1', id: ID, grade: 'ok', text: '좋아' }], CARDS).good[0];
@@ -186,8 +186,10 @@ test('✍️ 올릴 목록: 답장 기다리는 글만 · 카드·id·제목·�
   const [md, js] = UP.koreanFiles(todo, '2026-10-11');
   assert.deepEqual([md.path, js.path], ['korean/todo.md', 'korean/todo.json']);
   assert.deepEqual(JSON.parse(js.text).map((t) => [t.id, t.at]), [[b.id, T0 + 2], [c.id, T0 + 3]]);
-  assert.ok(md.text.includes(`[K19 · id ${b.id} · at ${T0 + 2}]`));
-  assert.match(md.text, /\{ card, id, at, grade\(ok·near·again\), text \}/);
+  assert.ok(md.text.includes(`[K19 · id ${b.id} · at ${T0 + 2} · v 1]`));
+  assert.match(md.text, /\{ card, id, at, v, grade\(ok·near·again\), text \}/);
+  assert.deepEqual([todo[0].v, todo[0].vNow], [1, 1]);
+  assert.ok(!md.text.includes('지금 원고는'), '판이 같으면 옛 판 줄 없음');
   const empty = UP.koreanFiles([], 'd');
   assert.deepEqual(JSON.parse(empty[1].text), []);
   assert.match(empty[0].text, /답장 기다리는 글 없음/);
@@ -292,10 +294,10 @@ test('🔍 Codex 52차 #5 — 답장이 500줄을 넘으면 하나도 안 받음
   const c = checkReplies(over, CARDS);
   assert.deepEqual([c.good.length, c.over, c.bad.length], [0, true, 1], '전엔 앞 500줄만 보고 1번 답장을 그대로 받았다');
   assert.equal(writeReplyRule(p, over, T0 + 1, CARDS).why, 'none', '하나도 안 붙음');
-  assert.deepEqual(replyStats(p.korWrites, over, CARDS), { rows: 501, good: 0, bad: 501, none: 0, over: true });
+  assert.deepEqual(replyStats(p.korWrites, over, CARDS), { rows: 501, good: 0, bad: 501, none: 0, stale: 0, over: true });
   const list = [R('K1', a, 'ok', '좋아!'), { card: 'K1', id: a.id, grade: 'wow', text: 'x' }, R('K15', E(5, '없는 글입니다 없는 글'), 'ok', '좋아')];
   writeReplyRule(p, list, T0 + 2, CARDS);
-  assert.deepEqual(replyStats(p.korWrites, list, CARDS), { rows: 3, good: 2, bad: 1, none: 1, over: false });
+  assert.deepEqual(replyStats(p.korWrites, list, CARDS), { rows: 3, good: 2, bad: 1, none: 1, stale: 0, over: false });
   const dir = mkdtempSync(join(tmpdir(), 'kw-'));
   mkdirSync(join(dir, 'korean'));
   writeFileSync(join(dir, 'korean/replies.json'), JSON.stringify(over));
@@ -632,4 +634,91 @@ test('🔍 Codex 53차 #3 — 읽음 머무름: 앱을 내리면 끊고 돌아�
   assert.equal(s3, 0, '관찰 칸 사이에서 350만 보이게 밀렸으면 안 읽음');
   top = 550; f3.fire(450, 3000); f3.to(READ_DWELL_MS * 3);
   assert.equal(s3, 1);
+});
+
+/** K19 원고를 2판으로 고친 꼴 — 지금 판의 물음·rubric을 past로 옮기고 v를 올림 (keepPast false면 옛 판을 빠뜨린 원고) */
+function bumpK19(keepPast = true) {
+  const d = clone(DATA);
+  const c = d.cards.find((x) => x.id === 'K19');
+  const old = { v: 1, q: c.write.q, rubric: c.write.rubric, model: c.write.model };
+  c.write.v = 2;
+  c.write.q = '창남이가 어머니께 거짓말을 한 까닭은 무엇일까요? 글에서 찾아 써 보세요.';
+  if (keepPast) c.write.past = [old];
+  return { data: d, cards: validCards(d), oldQ: old.q, newQ: c.write.q };
+}
+
+test('🔍 Codex 52차 #8 — 채점 기준 판 번호: 옛 판은 원고 write.past에 · 올릴 목록은 그 글을 쓴 판의 물음 · 답장은 채점한 판(v)이 글의 판과 같아야 붙음 · v 없는 줄은 1판 · 없는 판은 안 받음 · 판 다름은 📊에', () => {
+  // 원고 — 옛 판 검사
+  const { data, cards, oldQ, newQ } = bumpK19();
+  assert.deepEqual(checkContent(data), [], '2판 + past 1판 원고는 통과');
+  assert.ok(cards.some((c) => c.id === 'K19'), '쓸 수 있는 카드');
+  const bad = (edit, re) => { const c = clone(data.cards.find((x) => x.id === 'K19')); edit(c.write); const e = checkCard(c); assert.ok(e.some((m) => re.test(m)), `${re}: ${e}`); };
+  bad((w) => { w.past[0].v = 2; }, /write\.past 1의 v는 1부터, 지금 판\(v2\)보다 작게/);
+  bad((w) => { w.past[0].v = 3; }, /지금 판\(v2\)보다 작게/);
+  bad((w) => { w.past.push(clone(w.past[0])); w.v = 3; }, /v1가 앞의 옛 판과 겹쳐요/);
+  bad((w) => { w.past[0].q = ''; }, /write\.past 1\.q/);
+  bad((w) => { w.past[0].rubric = {}; }, /write\.past 1\.rubric\.must/);
+  bad((w) => { w.past[0].model = ''; }, /write\.past 1\.model/);
+  bad((w) => { w.past = {}; }, /write\.past\(옛 판\)는/);
+  bad((w) => { w.v = PAST_MAX + 2; w.past = Array.from({ length: PAST_MAX + 1 }, (_, i) => ({ ...clone(w.past[0]), v: i + 1 })); }, /write\.past\(옛 판\)는 5개까지/);
+  bad((w) => { w.past = [null]; }, /write\.past 1은/);
+  // 판마다 물음
+  const w2 = data.cards.find((x) => x.id === 'K19').write;
+  assert.deepEqual([questionOf(w2, 1).q, questionOf(w2, 1).now, questionOf(w2, 2).q, questionOf(w2, 2).now], [oldQ, false, newQ, true]);
+  assert.equal(questionOf(w2, 3), null, '없는 판');
+  assert.equal(questionOf(w2, 0).q, oldQ, '판이 없거나 깨진 글은 1판');
+  assert.deepEqual([...editionsOf(w2)].sort(), [1, 2]);
+  assert.deepEqual([editionOf({}), editionOf({ v: 2 }), editionOf({ v: 'x' })], [1, 2, 1]);
+  // 1판에 쓴 글 → 원고가 2판이 된 뒤의 올릴 목록: 그 글의 물음(옛 물음)·지금 판
+  const p = pf({ coins: 0, items: {} });
+  const a = writeAddRule(p, 'K19', ANS, T0, CARDS);
+  assert.equal(p.korWrites.K19.list[0].v, 1);
+  const todo = writeTodo(p.korWrites, cards);
+  assert.deepEqual([todo[0].q, todo[0].v, todo[0].vNow], [oldQ, 1, 2], '지금 원고의 물음이 아니라 그 글을 쓴 판의 물음');
+  const [md] = UP.koreanFiles(todo, 'd');
+  assert.ok(md.text.includes(`at ${T0} · v 1]`) && md.text.includes('(지금 원고는 v2 — 이 글은 v1 물음·기준으로') && md.text.includes(`물음: ${oldQ}`));
+  // 옛 판을 빠뜨린 원고 — 물음 없이 ⚠️
+  const lost = writeTodo(p.korWrites, bumpK19(false).cards);
+  assert.deepEqual([lost[0].q, lost[0].v, lost[0].vNow], ['', 1, 2]);
+  assert.match(UP.koreanFiles(lost, 'd')[0].text, /⚠️ v1 물음을 원고\(write\.past\)에서 못 찾았어요/);
+  // 답장 — 채점한 판이 글의 판과 달라 안 붙음 → 📊 판 다름
+  const v2 = [{ ...R('K19', a, 'ok', '좋아!'), v: 2 }];
+  assert.equal(writeReplyRule(p, v2, T0 + 1, cards).why, 'none', '2판 기준으로 채점한 답장은 1판 글에 안 붙는다');
+  assert.deepEqual(replyStats(p.korWrites, v2, cards), { rows: 1, good: 1, bad: 0, none: 0, stale: 1, over: false });
+  assert.match(UP.readSummary({ 'korean/replies.json': { at: 1, ok: true, n: 1, check: { rows: 1, bad: 0, none: 0, stale: 1, over: false } } }, () => 't'), /판 다름 1 · Claude에게 "국어 답장 확인해 줘"/);
+  // v가 없는 줄 = 1판 (v243 전 답장) · v 1 — 붙음
+  const q = clone(p);
+  assert.equal(writeReplyRule(q, [R('K19', a, 'near', '거의!')], T0 + 2, cards).applied.length, 1, 'v 없는 줄은 1판');
+  const ok1 = writeReplyRule(p, [{ ...R('K19', a, 'ok', '좋아!'), v: 1 }], T0 + 3, cards);
+  assert.deepEqual([ok1.applied.length, ok1.coins, ok1.stone], [1, 20, 1]);
+  // 2판에 쓴 새 글 — v 없는 줄(1판)은 판 다름 · v 2는 붙음
+  const r = pf();
+  const b = writeAddRule(r, 'K19', ANS, T0, cards);
+  assert.equal(r.korWrites.K19.list[0].v, 2, '새 글은 지금 판');
+  assert.equal(writeReplyRule(r, [R('K19', b, 'ok', '좋아!')], T0 + 1, cards).why, 'none', 'v를 안 적은 답장(1판)은 2판 글에 안 붙는다');
+  assert.equal(replyStats(r.korWrites, [R('K19', b, 'ok', '좋아!')], cards).stale, 1);
+  assert.equal(writeReplyRule(r, [{ ...R('K19', b, 'ok', '좋아!'), v: 2 }], T0 + 2, cards).applied.length, 1);
+  // 검사 — 그 카드에 없는 판·꼴이 틀린 판은 안 받음 · 같은 글에 판이 다른 답장 둘이면 둘 다 버림
+  for (const v of [999, 0, -1, 1.5, '1', null]) {
+    const c = checkReplies([{ ...R('K19', a, 'ok', '좋아!'), v }], cards);
+    assert.deepEqual([c.good.length, c.bad.length], [0, 1], `v ${v}`);
+    assert.match(c.bad[0].why, /v는 K19의 채점 기준 판 번호\(v1·v2\)/);
+  }
+  assert.equal(checkReplies([{ ...R('K19', a, 'ok', '좋아!'), v: 2 }], CARDS).bad.length, 1, '지금 원고(1판뿐)에 없는 판');
+  const both = checkReplies([{ ...R('K19', a, 'ok', '좋아!'), v: 1 }, { ...R('K19', a, 'ok', '좋아!'), v: 2 }], cards);
+  assert.deepEqual([both.good.length, both.bad.length], [0, 2], '판이 다른 같은 답장 둘');
+  const same = checkReplies([{ ...R('K19', a, 'ok', '좋아!'), v: 1 }, R('K19', a, 'ok', '좋아!')], cards);
+  assert.deepEqual([same.good.length, same.bad.length], [1, 0], 'v 1과 v 없음은 같은 판');
+  // 비공개 검사(check --private)도 같은 검사
+  const dir = mkdtempSync(join(tmpdir(), 'kw-'));
+  mkdirSync(join(dir, 'korean'));
+  writeFileSync(join(dir, 'korean/replies.json'), JSON.stringify([{ ...R('K19', a, 'ok', '좋아!'), v: 999 }]));
+  assert.match(checkPrivateDir(dir, () => '<svg>').errors.join(' '), /v는 K19의 채점 기준 판 번호\(v1\)/);
+  // 화면 — 답장 기다리는 글 위 물음은 그 글을 쓴 판의 것 · 📊 받기 줄에 판 다름
+  const wv = read('js/korwriteview.js');
+  assert.ok(wv.includes('const qs = st.pendings.map((p) => { const ed = questionOf(card.write, p.v); return ed ? ed.q : card.write.q; });'));
+  assert.ok(wv.includes("sec.appendChild(el('p', 'kor-wq-text', qs[0]));") && !wv.includes("sec.appendChild(el('p', 'kor-wq-text', card.write.q));"));
+  assert.ok(wv.includes("if (k > 0 && qs[k] !== qs[0]) mine.appendChild(el('p', 'kor-wq-text', qs[k]));"), '두 기기에서 판이 다른 글이 함께 기다리면 글마다 그 물음');
+  const up = read('js/upload.js');
+  assert.ok(up.includes('stale: check.stale | 0'), '판 다름 수를 받기 결과에');
 });

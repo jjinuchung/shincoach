@@ -38,6 +38,8 @@ export const FRAME_GAP = '~';
 export const FRAMES_MAX = 4;
 export const CHECKS_MAX = 3;
 export const FRAME_LEN_MAX = 40;
+/** ✍️ 옛 채점 기준 판(write.past)은 몇 개까지 — 답장 기다리는 글이 그 판으로 남아 있을 동안만 있으면 된다 (v243) */
+export const PAST_MAX = 5;
 
 /** 별마다 💰 — 수학 개념 편과 같은 크기(처음 다 맞힘 12 · 복습 통과 8 · 👑 이해 완료 20, mathprog.REWARD) */
 export const KOR_COINS = { 1: 12, 2: 8, 3: 20 };
@@ -333,20 +335,41 @@ export function checkCard(c, ids = new Set()) {
  * ✍️ 서술형 하나 검사 — { q 물음, v 채점 기준 판 번호(고치면 올린다 — 옛 글은 그 판으로 채점), rubric { must 꼭 들어갈 생각 ≥1, ok 괜찮은 다른 답, miss 흔한 잘못 }, model 예시 답,
  *   frames 🧩 문장 틀 2~4(빈자리 ~ 하나까지), checks ✔️ 보내기 전 스스로 확인 2~3 (v240 — 아이에게 보이는 것: q·frames·checks뿐) }
  * rubric·model은 공개 원고(앱은 보여 주지 않는다) — Claude가 세션이 바뀌어도 같은 잣대로 채점하려고 (Codex 51차 PART 3 #11)
+ * past [{ v, q, rubric, model }] — 옛 판 (v243, Codex 52차 #8): 물음·rubric을 고칠 때 v를 올리고 지금 판을 여기로 옮긴다 —
+ *   그 판으로 쓴 글은 그 판의 물음·기준으로 채점하고(korean/todo.json에 그 판의 물음), 답장의 v가 글의 판과 같아야 붙는다
  */
 export function checkWriteItem(w) {
   const errs = [];
   const strs = (a) => Array.isArray(a) && a.every(nonEmpty);
   if (!isObj(w)) return ['write는 { q, v, rubric, model, frames, checks }'];
-  if (!nonEmpty(w.q)) errs.push('write.q(물음)가 비었어요');
-  if (!Number.isInteger(w.v) || w.v <= 0) errs.push('write.v(채점 기준 판 번호)는 1부터');
-  if (!isObj(w.rubric) || !strs(w.rubric.must) || !w.rubric.must.length) errs.push('write.rubric.must(꼭 들어갈 생각)가 하나 이상');
-  else {
-    if (!strs(w.rubric.ok)) errs.push('write.rubric.ok(괜찮은 다른 답)는 글 목록');
-    if (!strs(w.rubric.miss)) errs.push('write.rubric.miss(흔한 잘못)는 글 목록');
+  /** 한 판의 물음·rubric·예시 답 (지금 판·옛 판 같은 검사) */
+  const edition = (x, name) => {
+    if (!nonEmpty(x.q)) errs.push(`${name}.q(물음)가 비었어요`);
+    if (!isObj(x.rubric) || !strs(x.rubric.must) || !x.rubric.must.length) errs.push(`${name}.rubric.must(꼭 들어갈 생각)가 하나 이상`);
+    else {
+      if (!strs(x.rubric.ok)) errs.push(`${name}.rubric.ok(괜찮은 다른 답)는 글 목록`);
+      if (!strs(x.rubric.miss)) errs.push(`${name}.rubric.miss(흔한 잘못)는 글 목록`);
+    }
+    if (!nonEmpty(x.model)) errs.push(`${name}.model(예시 답)이 비었어요`);
+    else if ([...x.model.normalize('NFC').replace(/\s+/g, ' ').trim()].length > WRITE_MAX) errs.push(`${name}.model은 ${WRITE_MAX}자까지 — 아이에게 바라는 길이보다 길면 안 돼요`);
+  };
+  const vOk = Number.isInteger(w.v) && w.v > 0;
+  if (!vOk) errs.push('write.v(채점 기준 판 번호)는 1부터');
+  edition(w, 'write');
+  if (w.past !== undefined) {
+    if (!Array.isArray(w.past) || w.past.length > PAST_MAX) errs.push(`write.past(옛 판)는 ${PAST_MAX}개까지의 목록`);
+    else {
+      const seen = new Set();
+      w.past.forEach((x, k) => {
+        const name = `write.past ${k + 1}`;
+        if (!isObj(x)) { errs.push(`${name}은 { v, q, rubric, model }`); return; }
+        if (!Number.isInteger(x.v) || x.v <= 0 || (vOk && x.v >= w.v)) errs.push(`${name}의 v는 1부터, 지금 판(v${w.v})보다 작게`);
+        else if (seen.has(x.v)) errs.push(`${name}의 v${x.v}가 앞의 옛 판과 겹쳐요`);
+        seen.add(x.v);
+        edition(x, name);
+      });
+    }
   }
-  if (!nonEmpty(w.model)) errs.push('write.model(예시 답)이 비었어요');
-  else if ([...w.model.normalize('NFC').replace(/\s+/g, ' ').trim()].length > WRITE_MAX) errs.push(`write.model은 ${WRITE_MAX}자까지 — 아이에게 바라는 길이보다 길면 안 돼요`);
   const list = (a, lo, hi, name, each) => {
     if (!Array.isArray(a) || a.length < lo || a.length > hi || !a.every(nonEmpty)) { errs.push(`${name}는 ${lo}~${hi}개의 글`); return; }
     const seen = new Set();
