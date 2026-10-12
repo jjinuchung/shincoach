@@ -3252,3 +3252,38 @@ button { font-family: inherit; }
 .kor-head .kor-catch { justify-items: start; }
 .kor-catch-btn { min-width: 220px; }
 .kor-catch-msg { margin: 0; font-size: 0.88rem; color: var(--muted); line-height: 1.5; word-break: keep-all; }
+
+/* 🧩 글 퍼즐 (v242) — 차례 맞추기: 놓은 칸 · 남은 조각 / 사실·의견 가르기: 문장마다 두 단추 */
+.kor-pslots { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.kor-pslot { display: flex; gap: 10px; align-items: baseline; border: 2px dashed var(--border); border-radius: 12px; padding: 10px 12px; min-height: 48px; background: var(--kor-paper); line-height: 1.55; word-break: keep-all; }
+.kor-pslot-no { font-weight: 800; color: var(--primary-dark); min-width: 1.2em; }
+.kor-pslot-empty { color: var(--muted); font-size: 0.92rem; }
+.kor-pslot-t { flex: 1; min-width: 0; }
+.kor-pslot-mark { font-weight: 800; }
+.kor-pslot.is-ok { border-style: solid; border-color: var(--ok); background: var(--kor-ok-bg); }
+.kor-pslot.is-ok .kor-pslot-mark { color: var(--ok); }
+.kor-pslot.is-no { border-style: solid; border-color: var(--danger); background: var(--kor-no-bg); }
+.kor-pslot.is-no .kor-pslot-mark { color: var(--danger); }
+.kor-ppool { display: grid; gap: 8px; border-top: 1px dashed var(--border); padding-top: 10px; }
+.kor-pchunk {
+  text-align: left; border: 2px solid var(--border); background: #f8f9fc; border-radius: 12px; padding: 10px 14px; min-height: 48px;
+  font: inherit; font-size: 1.02rem; line-height: 1.55; color: inherit; cursor: pointer; word-break: keep-all;
+}
+.kor-pchunk:focus-visible, .kor-pfo:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.kor-ptools { display: flex; gap: 8px; flex-wrap: wrap; }
+.kor-pcheck { justify-self: start; min-width: 8em; }
+.kor-pnote-h { margin: 0; font-weight: 800; }
+.kor-pright { margin: 0; padding-left: 1.4em; display: grid; gap: 4px; line-height: 1.6; word-break: keep-all; }
+.kor-pclue { background: var(--kor-mark); border-radius: 4px; padding: 0 2px; }
+.kor-pwhy { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; font-size: 0.92rem; color: #4b5563; word-break: keep-all; }
+.kor-psorts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.kor-psort { border: 2px solid var(--border); border-radius: 12px; padding: 10px 12px; display: grid; gap: 8px; background: #fff; }
+.kor-psort.is-ok { border-color: var(--ok); background: var(--kor-ok-bg); }
+.kor-psort.is-no { border-color: var(--danger); background: var(--kor-no-bg); }
+.kor-psort-t { margin: 0; font-size: 1.04rem; line-height: 1.6; word-break: keep-all; }
+.kor-psort-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.kor-pfo { min-width: 5.5em; min-height: 44px; border: 2px solid var(--border); background: #f8f9fc; border-radius: 999px; padding: 6px 16px; font: inherit; font-weight: 700; cursor: pointer; color: inherit; }
+.kor-pfo.is-fact.is-on { border-color: #2563eb; background: #dbeafe; color: #1e3a8a; }
+.kor-pfo.is-opinion.is-on { border-color: #d97706; background: #fef3c7; color: #78350f; }
+.kor-pfo:disabled { cursor: default; }
+.kor-psort-why { margin: 0; font-size: 0.92rem; line-height: 1.5; word-break: keep-all; }

@@ -99,6 +99,13 @@ try {
   for (const msg of checkWords(words, cards)) { bad++; console.error(`내용 오류: coach/korean/words.json: ${msg}`); }
   for (const msg of checkUnits(units, cards, words)) { bad++; console.error(`내용 오류: coach/korean/units.json: ${msg}`); }
 } catch (e) { bad++; console.error(`JSON 오류: coach/korean/words.json·units.json: ${e.message}`); }
+// 🧩 글 퍼즐(puzzles.json) — 차례 맞추기는 실마리에 맞는 차례가 하나뿐인지·사실·의견은 섞인 꼴이 없는지 배포 전에 (v242)
+try {
+  const { checkPuzzles } = await import('../js/korpuzzle.js');
+  const cards = JSON.parse(readFileSync('coach/korean/reading.json', 'utf8')).cards;
+  const puzzles = JSON.parse(readFileSync('coach/korean/puzzles.json', 'utf8'));
+  for (const msg of checkPuzzles(puzzles, cards)) { bad++; console.error(`내용 오류: coach/korean/puzzles.json: ${msg}`); }
+} catch (e) { bad++; console.error(`JSON 오류: coach/korean/puzzles.json: ${e.message}`); }
 // 📦 아빠의 구호품(coach/gifts.json) — [{ id, items: { 아이템id: 1~10 }, title?, text? }], 틀린 줄은 앱이 조용히 건너뛰므로 여기서 잡는다
 try {
   const { parcelOf } = await import('../js/items.js');

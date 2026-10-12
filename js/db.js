@@ -13,6 +13,7 @@ import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 —
 import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows } from './korean.js'; // 📚 국어 잘못 읽기 횟수 (순수, import 없음)
 import { wordsOf, mergeWords, wordDaysOf, mergeWordDays } from './korwords.js'; // 🔤 국어 낱말 칸·보상 받은 날 (순수, korean.js만 import)
 import { writesOf, mergeWrites } from './korwrite.js'; // ✍️ 국어 서술형 글·답장·보상 한도 (순수, korean.js만 import)
+import { mergePuzzles } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 (순수 — korean·korwords만 import)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -805,7 +806,7 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, korDone: {}, korMiss: {}, korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korWrites: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, korDone: {}, korMiss: {}, korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
 }
 
 /** 🏠 진우네 집 복사 — 방·놓은 가구까지 (규칙이 고쳐도 원본이 안 바뀌게) · 없으면 undefined */
@@ -821,7 +822,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korWrites: writesOf(cur.korWrites), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korWrites: writesOf(cur.korWrites), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2023,6 +2024,9 @@ export function mergeStatRecord(name, cur, rec) {
     // 🔤 낱말 칸 — 낱말마다 나중에 푼 쪽 · 보상 받은 날 — 날마다 큰 쪽(옛 백업이 "아직 안 받음"으로 되돌려 💰·🎯를 두 번 받지 않게)
     out.korWords = mergeWords(cur.korWords, rec.korWords);
     out.korWordDay = mergeWordDays(cur.korWordDay, rec.korWordDay);
+    // 🧩 퍼즐 칸 — 한쪽이라도 ⭐면 ⭐(다른 기기의 더 나중 오답이 ⭐를 지우지 못하게, Codex 55차) · 보상 받은 날 — 날마다 큰 쪽(옛 백업이 받은 보상을 되돌리지 못하게)
+    out.korPuzzle = mergePuzzles(cur.korPuzzle, rec.korPuzzle);
+    out.korPuzzleDay = mergeWordDays(cur.korPuzzleDay, rec.korPuzzleDay);
     out.korWrites = mergeWrites(cur.korWrites, rec.korWrites); // ✍️ 글은 (카드, at)로 합집합 · 답장 붙은 쪽이 이김 · 보상 한도는 큰 쪽(옛 백업이 받은 보상을 되살리지 못하게)
     // 💰 5일장에서 판 기록 — 장날·열쇠마다 합집합 (장날 한도를 옛 백업이 되돌리지 않게, 📊에 판 것이 남게)
     out.sales = mergeSales(cur.sales, rec.sales);

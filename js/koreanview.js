@@ -15,6 +15,7 @@ import { todayKey } from './track.js';
 import { showHatchIfAny } from './hatch.js';
 import { eggProgress } from './egg.js';
 import * as tabs from './kortabs.js'; // 🔤 낱말 · 📘 단원 탭 (v234) — 탭 쪽은 이 파일을 import하지 않는다(ctx로 건넴)
+import * as puzzles from './korpuzzleview.js'; // 🧩 퍼즐 탭 (v242) — 같은 꼴(ctx로 건넴)
 import { writeBoxEl, replyBannerEl, renderReplyView, slotWriteText, syncWrites, appliedLine } from './korwriteview.js'; // ✍️ 서술형 (v237) — 이 파일을 import하지 않는다(ctx로 건넴)
 import { cardWriteState } from './korwrite.js';
 import { korWritesMap } from './xp.js';
@@ -108,10 +109,10 @@ export async function enterKorean() {
     const line = appliedLine(r);
     if (!line) return;
     ui.writeNote = line;
-    if (!ui.read && !tabs.inSession() && !ui.wview && ui.tab === 'cards') renderList().catch(() => {});
+    if (!ui.read && !anySession() && !ui.wview && ui.tab === 'cards') renderList().catch(() => {});
   }).catch(() => {});
   if (ui.read) { if (!$('korean-main').querySelector('.kor-read')) renderRead(); return; }
-  if (tabs.inSession()) { tabs.renderSession(tabCtx); return; } // 🔤 낱말을 풀다 🎒·📊를 다녀왔다 — 그대로 이어서
+  if (anySession()) { resumeSession(); return; } // 🔤 낱말·🧩 퍼즐을 풀다 🎒·📊를 다녀왔다 — 그대로 이어서
   if (ui.wview) { renderReplyView(ui.wview, writeCtx); return; } // 📬 답장을 보다 🎒·📊를 다녀왔다
   await renderList();
 }
@@ -133,15 +134,25 @@ const tabCtx = {
   eggLine: (e) => eggLine(e),
   openCard: (id) => openCard(id),
   toWords: () => { ui.tab = 'words'; renderList(); window.scrollTo(0, 0); },
+  toPuzzle: () => { ui.tab = 'puzzle'; renderList(); window.scrollTo(0, 0); },
   toCards: () => { ui.tab = 'cards'; renderList(); window.scrollTo(0, 0); },
   rerender: () => { renderList(); },
 };
+/** 🔤 낱말 판 · 🧩 퍼즐 판을 푸는 중인가 — 다시 그릴 때 목록이 판을 덮지 않게 (v242: 퍼즐 판도 같은 다섯 자리에서 본다) */
+function anySession() {
+  return tabs.inSession() || puzzles.inSession();
+}
+/** 푸는 중이던 판을 그대로 다시 그린다 */
+function resumeSession() {
+  if (puzzles.inSession()) puzzles.renderSession(tabCtx);
+  else tabs.renderSession(tabCtx);
+}
 
-/** 📚 도감 · 🔤 낱말 · 📘 단원 탭 막대 */
+/** 📚 도감 · 🔤 낱말 · 📘 단원 · 🧩 퍼즐 탭 막대 */
 function tabBarEl() {
   const bar = el('div', 'kor-tabs');
   bar.setAttribute('role', 'tablist');
-  for (const [id, label] of [['cards', '📚 도감'], ['words', '🔤 낱말'], ['units', '📘 단원']]) {
+  for (const [id, label] of [['cards', '📚 도감'], ['words', '🔤 낱말'], ['units', '📘 단원'], ['puzzle', '🧩 퍼즐']]) {
     const b = el('button', `kor-tab${ui.tab === id ? ' is-on' : ''}`, label);
     b.type = 'button';
     b.dataset.tab = id;
@@ -158,7 +169,7 @@ export async function renderList() {
   const main = $('korean-main');
   if (!main) return;
   const cards = await loadCards();
-  if (ui.read || tabs.inSession() || ui.wview) return; // 읽는 사이 글을 골랐다 · 🔤 낱말 판을 시작했다 · 📬 답장 화면
+  if (ui.read || anySession() || ui.wview) return; // 읽는 사이 글을 골랐다 · 🔤 낱말·🧩 퍼즐 판을 시작했다 · 📬 답장 화면
   main.textContent = '';
   if (!cards || !cards.length) {
     const box = el('div', 'kor-empty');
@@ -172,10 +183,11 @@ export async function renderList() {
     return;
   }
   main.appendChild(tabBarEl());
-  if (ui.tab === 'words' || ui.tab === 'units') {
+  if (ui.tab === 'words' || ui.tab === 'units' || ui.tab === 'puzzle') {
     const body = el('div', 'kor-tabbody');
     main.appendChild(body);
-    await (ui.tab === 'words' ? tabs.renderWordsTab(body, tabCtx) : tabs.renderUnitsTab(body, tabCtx));
+    if (ui.tab === 'puzzle') await puzzles.renderPuzzleTab(body, tabCtx);
+    else await (ui.tab === 'words' ? tabs.renderWordsTab(body, tabCtx) : tabs.renderUnitsTab(body, tabCtx));
     return;
   }
   const done = korDoneMap();
@@ -691,7 +703,7 @@ function catchBtnEl() {
 function refreshAfterCatch() {
   if (!koreanVisible()) return;
   if (ui.read) renderQ();
-  else if (tabs.inSession()) tabs.renderSession(tabCtx);
+  else if (anySession()) resumeSession();
   else renderList().catch(() => {});
 }
 
@@ -746,6 +758,6 @@ export function initKorean({ showView }) {
   if (back) back.addEventListener('click', () => showView('home'));
   onProfileReload(() => {
     const v = $('view-korean');
-    if (v && !v.hidden && !ui.read && !tabs.inSession() && !ui.wview && !profileLoading()) renderList().catch(() => {});
+    if (v && !v.hidden && !ui.read && !anySession() && !ui.wview && !profileLoading()) renderList().catch(() => {});
   });
 }
