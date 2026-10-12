@@ -25,19 +25,19 @@ const D0 = dayNum(T0);
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const rng = (seed) => { let s = seed >>> 0 || 1; return () => { s = (s * 1103515245 + 12345) >>> 0; return (s >>> 8) / 16777216; }; };
 
-test('🔤 원고: 검사 통과 · 📘 36 · 🗣️ 25 · 📖 39(글의 낱말 — v236 새 글 일곱의 16 더함) · 📖은 뜻 고르기만(ex 없음, 나온 문장은 src) · 📘 빈칸 하나 · 🗣️ 상황 글 · 📘 단원 검사 통과', () => {
+test('🔤 원고: 검사 통과 · 📘 51 · 🗣️ 40 · 🐢 20 · 📖 68(글의 낱말 — v241 새 글 열둘의 29 더함) · 📖은 뜻 고르기만(ex 없음, 나온 문장은 src) · 📘 빈칸 하나 · 🗣️·🐢 상황 글 · 📘 단원 검사 통과', () => {
   assert.deepEqual(checkWords(WORDS, CARDS), []);
   assert.deepEqual(checkUnits(UNITS, CARDS, WORDS), []);
   const by = {};
   for (const w of ALL) by[w.deck] = (by[w.deck] || 0) + 1;
-  assert.deepEqual(by, { concept: 36, idiom: 25, passage: 39 });
+  assert.deepEqual(by, { concept: 51, idiom: 40, proverb: 20, passage: 68 });
   for (const w of ALL.filter((x) => x.deck === 'passage')) {
     assert.equal(w.ex, '', `${w.w}: 📖은 빈칸 문제 없음 — 다른 글의 낱말이 빈칸에 같이 들어갈 수 있다`);
     assert.ok(w.src.includes(w.w), `${w.w}: 나온 글 문장`);
     assert.equal(w.id, wordId('passage', w.w, w.card));
   }
   for (const w of ALL.filter((x) => x.deck === 'concept')) { assert.equal(w.ex.split('___').length, 2); assert.ok(followOk(w.ex), w.w); }
-  for (const w of ALL.filter((x) => x.deck === 'idiom')) assert.ok(w.ex && !w.ex.includes('___') && !w.ex.includes(w.w), w.w);
+  for (const w of ALL.filter((x) => x.deck === 'idiom' || x.deck === 'proverb')) assert.ok(w.ex && !w.ex.includes('___') && !w.ex.includes(w.w), w.w);
   assert.equal(new Set(IDS).size, IDS.length, 'id 겹침 없음');
   // 국립국어원 풀이를 거스르지 않는 몇 개 (Codex 49차 "내"처럼 거꾸로 쓰지 않게)
   const mean = (w) => ALL.find((x) => x.w === w).mean;
@@ -121,18 +121,39 @@ test('🔤 문제: 보기 넷·정답 하나·겹침 없음 · 뜻 고르기는 
 test('🔤 문장마다 같이 들어갈 수 있는 말은 보기에 없다 — 문장을 따로 읽어 만든 표(원고 pair·avoid를 베끼지 않음) · 넓은 말·좁은 말은 뜻 고르기에도 같이 안', () => {
   // 그 낱말의 빈칸 문장(📘)·상황 글(🗣️)에 함께 들어가 말이 되는 낱말 — 보기에 나오면 답이 둘이 된다
   const USE = {
-    근거: ['의견', '사실', '주장'], 주장: ['주제', '중심 생각', '의견', '근거'], 의견: ['감상', '사실', '주장'], 사실: ['견문', '의견'],
-    '중심 생각': ['주제', '요약'], 주제: ['중심 생각', '감상'], 인물: ['말하는 이', '사건', '배경'], 견문: ['여정', '감상'],
-    매체: ['출처'], 출처: ['매체', '신뢰성', '근거'], 신뢰성: ['출처'], 조정: ['요약', '토의'], 짐작: ['추론'], 추론: ['짐작'],
+    근거: ['의견', '사실', '주장', '뒷받침 문장'], 주장: ['주제', '중심 생각', '의견', '근거'], 의견: ['감상', '사실', '주장'], 사실: ['견문', '의견'],
+    '중심 생각': ['주제', '요약', '중심 문장'], 주제: ['중심 생각', '감상'], 인물: ['말하는 이', '사건', '배경'], 견문: ['여정', '감상'],
+    매체: ['출처'], 출처: ['매체', '신뢰성', '근거', '검색어'], 신뢰성: ['출처', '타당성'], 조정: ['요약', '토의'], 짐작: ['추론'], 추론: ['짐작'],
     비유: ['직유', '은유'], 직유: ['은유', '비유'], 은유: ['직유', '비유'], 토의: ['토론'], 토론: ['토의'], 표준어: ['방언'], 방언: ['표준어'],
-    주어: ['서술어'], 서술어: ['주어'], 비교: ['대조'], 대조: ['비교'], 여정: ['견문'],
+    주어: ['서술어', '목적어'], 서술어: ['주어', '목적어'], 비교: ['대조'], 대조: ['비교'], 여정: ['견문'],
+    // v241 새 📘 — "때를 알려 주는 ___ 덕분에" · "___ 하나만 바꿔도" · "___ 하나를 찾아 밑줄" · "풀어 주는 ___ 여러 개" · "고르는 ___부터" ·
+    //   "짐작하게 하는 ___ 구실" · "근거의 ___부터" · "4___짜리"/"2___짜리"
+    '시간 표현': ['단서', '배경'], 검색어: ['기준', '출처'], 인용: ['예시'], '중심 문장': ['중심 생각', '주제'], '뒷받침 문장': ['예시', '근거'],
+    기준: ['근거', '주제'], 목적어: ['주어', '서술어'], 단서: ['근거'], 타당성: ['신뢰성', '출처'], 행: ['연'], 연: ['행'],
     '입이 무겁다': ['입이 가볍다'], '입이 가볍다': ['입이 무겁다'], '손을 떼다': ['발을 빼다'], '발을 빼다': ['손을 떼다'],
     '가슴이 뜨끔하다': ['간이 콩알만 해지다', '시치미를 떼다'], '간이 콩알만 해지다': ['가슴이 뜨끔하다', '손에 땀을 쥐다'], '손에 땀을 쥐다': ['간이 콩알만 해지다'],
     '코가 납작해지다': ['꼬리를 내리다'], '꼬리를 내리다': ['코가 납작해지다'], '머리를 맞대다': ['손발이 맞다'], '손발이 맞다': ['머리를 맞대다', '발 벗고 나서다'],
     '발 벗고 나서다': ['손발이 맞다'], '귀가 얇다': ['귀를 기울이다'], '귀를 기울이다': ['귀가 얇다'],
+    // v241 새 🗣️ — 상황 글마다 따로 읽음 (바쁨·급함 · 칭찬·귀여움 · 건성·지겨움 · 한목소리·의논 · 몰래·모르는 척)
+    '발등에 불이 떨어지다': ['눈코 뜰 새 없다'], '눈코 뜰 새 없다': ['발등에 불이 떨어지다'],
+    '눈에 넣어도 아프지 않다': ['입에 침이 마르다'], '입에 침이 마르다': ['눈에 넣어도 아프지 않다'],
+    '한 귀로 듣고 한 귀로 흘리다': ['귀가 따갑다'], '귀가 따갑다': ['한 귀로 듣고 한 귀로 흘리다'],
+    '입을 모으다': ['머리를 맞대다'], '쥐도 새도 모르게': ['시치미를 떼다'], '시치미를 떼다': ['쥐도 새도 모르게'],
+    // v241 🐢 속담 — 같은 교훈 쪽(말 조심 · 작은 것이 모임 · 한 대로 돌아옴)은 서로 들어간다
+    '가는 말이 고와야 오는 말이 곱다': ['콩 심은 데 콩 나고 팥 심은 데 팥 난다'],
+    '낮말은 새가 듣고 밤말은 쥐가 듣는다': ['발 없는 말이 천 리 간다'], '발 없는 말이 천 리 간다': ['낮말은 새가 듣고 밤말은 쥐가 듣는다'],
+    '티끌 모아 태산': ['천 리 길도 한 걸음부터', '콩 심은 데 콩 나고 팥 심은 데 팥 난다'], '천 리 길도 한 걸음부터': ['티끌 모아 태산'],
+    '콩 심은 데 콩 나고 팥 심은 데 팥 난다': ['티끌 모아 태산', '가는 말이 고와야 오는 말이 곱다'],
+    '꿩 먹고 알 먹고': ['콩 심은 데 콩 나고 팥 심은 데 팥 난다'], '빈 수레가 요란하다': ['원숭이도 나무에서 떨어진다', '벼는 익을수록 고개를 숙인다', '우물 안 개구리'],
+    '소 잃고 외양간 고친다': ['돌다리도 두들겨 보고 건너라'], '돌다리도 두들겨 보고 건너라': ['소 잃고 외양간 고친다'],
   };
   // 뜻 고르기 — 넓은 말과 좁은 말(비유 ⊃ 직유·은유)·거의 같은 말은 뜻도 겹친다
-  const MEAN = { 비유: ['직유', '은유'], 직유: ['비유'], 은유: ['비유'], 짐작: ['추론'], 추론: ['짐작'], '중심 생각': ['주제'], 주제: ['중심 생각'], '손을 떼다': ['발을 빼다'], '발을 빼다': ['손을 떼다'], 주장: ['의견'], 의견: ['주장'] };
+  const MEAN = {
+    비유: ['직유', '은유'], 직유: ['비유'], 은유: ['비유'], 짐작: ['추론'], 추론: ['짐작'], '중심 생각': ['주제'], 주제: ['중심 생각'], '손을 떼다': ['발을 빼다'], '발을 빼다': ['손을 떼다'], 주장: ['의견'], 의견: ['주장'],
+    // v241: 뜻이 거의 겹치는 속담 — 작은 것부터·모이면 크다 · 말은 퍼진다·조심
+    '티끌 모아 태산': ['천 리 길도 한 걸음부터'], '천 리 길도 한 걸음부터': ['티끌 모아 태산'],
+    '낮말은 새가 듣고 밤말은 쥐가 듣는다': ['발 없는 말이 천 리 간다'], '발 없는 말이 천 리 간다': ['낮말은 새가 듣고 밤말은 쥐가 듣는다'],
+  };
   for (const w of ALL.filter((x) => x.deck !== 'passage')) {
     for (let s = 1; s <= 150; s++) {
       const u = makeQuestion(w, 'use', ALL, rng(s));
@@ -158,7 +179,7 @@ test('🔍 Codex 50차 #2: 빈칸에 다른 보기도 들어가던 문장을 고
 test('🔤 오늘의 낱말: 복습(기다린 지 오래·낮은 칸부터) 먼저 · 새 낱말은 묶음마다 번갈아 5개까지 · 한 번에 10개 · ⭐ 익힌 것·잠긴 📖은 안 나옴 · 새 낱말 더 배우기 · 칸 홀수 = 쓰임', () => {
   const none = planToday(ALL, {}, {}, T0);
   assert.equal(none.length, NEW_PER_DAY, '처음엔 새 낱말 5개');
-  assert.deepEqual(none.map((p) => ALL.find((w) => w.id === p.id).deck), ['concept', 'idiom', 'concept', 'idiom', 'concept'], '📖은 잠겨 있으니 📘·🗣️ 번갈아');
+  assert.deepEqual(none.map((p) => ALL.find((w) => w.id === p.id).deck), ['concept', 'idiom', 'proverb', 'concept', 'idiom'], '📖은 잠겨 있으니 📘·🗣️·🐢 번갈아');
   assert.ok(none.every((p) => p.kind === 'mean'), '새 낱말은 뜻부터');
   // 📖은 그 글에 ★이 있어야
   const done = { 'K1:1': D0 };
@@ -389,12 +410,12 @@ test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이
   assert.deepEqual([...new Set(units.map((u) => u.term))], ['5-1', '5-2']);
   const six = units.find((u) => u.id === '5-1-6');
   assert.equal(unitLabel(six), '6단원 「빗대어 표현해요」');
-  assert.deepEqual(six.cards.map((c) => c.id), ['K3', 'K6']);
+  assert.deepEqual(six.cards.map((c) => c.id), ['K3', 'K6', 'K27', 'K28'], 'v241: 윤동주 「해바라기 얼굴」·정지용 「호수」 더함');
   assert.deepEqual(six.words.map((w) => w.w), ['비유', '직유', '은유']);
   assert.equal(unitLabel(units.find((u) => u.id === '5-2-매체')), '📺 매체 단원 「평가하며 이용해요」');
   assert.equal(unitLabel(units.find((u) => u.id === '5-1-독서')), '📖 독서 단원 「책을 읽고 함께 이야기해요」');
   const st = { [six.words[0].id]: { box: MASTER_BOX, due: 0, at: 1, miss: 0 }, [six.words[1].id]: { box: 3, due: D0 + 7, at: 1, miss: 0 } };
-  assert.deepEqual(unitProgress(six, { 'K3:1': D0, 'K3:2': D0 + 1, 'K6:1': D0 }, st), { stars: 3, starMax: 6, words: 3, mastered: 1, empty: false });
+  assert.deepEqual(unitProgress(six, { 'K3:1': D0, 'K3:2': D0 + 1, 'K6:1': D0 }, st), { stars: 3, starMax: 12, words: 3, mastered: 1, empty: false });
   assert.ok(units.every((u) => !unitProgress(u, {}, {}).empty), 'v236: 단원 열여섯 모두 글이 있다(준비 중 없음)');
   assert.equal(unitProgress({ cards: [], words: [] }, {}, {}).empty, true, '이어진 것이 없는 단원은 준비 중');
   // 모든 📘 낱말은 어느 단원에 있다
@@ -408,8 +429,8 @@ test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이
   const ws = JSON.parse(JSON.stringify(WORDS));
   ws.words[0].unit = '9-9';
   assert.ok(checkUnits(UNITS, CARDS, ws).some((e) => /없는 단원 9-9/.test(e)));
-  assert.deepEqual(deckStats(ALL, {}, {}).map((s) => [s.deck, s.total, s.open]), [['concept', 36, 36], ['idiom', 25, 25], ['passage', 39, 0]]);
-  assert.equal(Object.keys(DECKS).length, 3);
+  assert.deepEqual(deckStats(ALL, {}, {}).map((s) => [s.deck, s.total, s.open]), [['concept', 51, 51], ['idiom', 40, 40], ['proverb', 20, 20], ['passage', 68, 0]]);
+  assert.equal(Object.keys(DECKS).length, 4);
 });
 
 test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘) · 낱말 판 중엔 도감을 다시 그리지 않음 · 🎒에서 돌아오면 이어서 · 시작은 ⏳ guardStart · 끝나면 🥚 하루 칸 · 처음 고른 것만 · 말(순수) · sw', async () => {
@@ -444,4 +465,64 @@ test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘) · 낱말 판 중엔 
   assert.match(todayLine(2), /🟩까지/);
   const sw = read('sw.js');
   for (const f of ['./js/korwords.js', './js/korunits.js', './js/kortabs.js', './coach/korean/words.json', './coach/korean/units.json']) assert.ok(sw.includes(`'${f}',`), f);
+});
+
+test('🐢 속담 묶음 (v241): 관용 표현처럼 "이럴 때"(sit) — 쓰임 물음은 "어울리는 속담" · 상황 글에 속담이 그대로 안 나옴 · 낱말 id는 s: · 하루 새 낱말에 번갈아 · 화면은 sit 표시로 상황 글 · 원고 검사가 잡는 것', () => {
+  assert.deepEqual([DECKS.idiom.sit, DECKS.proverb.sit, !!DECKS.concept.sit, !!DECKS.passage.sit], [true, true, false, false]);
+  assert.deepEqual([DECKS.proverb.icon, DECKS.proverb.ko, DECKS.proverb.prefix], ['🐢', '속담', 's']);
+  assert.equal(new Set(Object.values(DECKS).map((d) => d.prefix)).size, 4, '저장 키 앞글자가 겹치지 않는다');
+  const pv = ALL.filter((w) => w.deck === 'proverb');
+  assert.equal(pv.length, 20);
+  for (const w of pv) {
+    assert.equal(w.id, `s:${w.w}`);
+    assert.ok(!w.unit, `${w.w}: 속담은 6학년 미리 — 5학년 단원에 잇지 않는다`);
+    assert.equal(makeQuestion(w, 'use', ALL, rng(5)).prompt, '이럴 때 어울리는 속담은 무엇인가요?');
+  }
+  assert.equal(makeQuestion(ALL.find((w) => w.w === '등잔 밑이 어둡다'), 'mean', ALL, rng(5)).prompt, "'등잔 밑이 어둡다'의 뜻으로 알맞은 것은 무엇인가요?");
+  // 원고 검사 — 속담도 상황 글(빈칸 없이 · 속담 그대로 없이)
+  const bad = (edit, re) => { const d = JSON.parse(JSON.stringify(WORDS)); edit(d.words); const errs = checkWords(d, CARDS); assert.ok(errs.some((e) => re.test(e)), `${re} — ${errs.join(' / ')}`); };
+  const p = (w) => (ws) => ws.find((x) => x.w === w);
+  bad((ws) => { p('누워서 떡 먹기')(ws).ex = '이 문제는 ___예요.'; }, /속담의 ex는 상황 글/);
+  bad((ws) => { p('누워서 떡 먹기')(ws).ex = '이 문제는 누워서 떡 먹기예요.'; }, /그대로 나와요/);
+  bad((ws) => { p('누워서 떡 먹기')(ws).ex = ''; }, /속담은 어울리는 상황 글/);
+  bad((ws) => { p('누워서 떡 먹기')(ws).avoid = ['식은 죽 먹기']; }, /같은 묶음에 없어요/);
+  bad((ws) => { p('누워서 떡 먹기')(ws).deck = 'saying'; }, /deck은/);
+  // 화면: 상황 글·풀이는 묶음의 sit 표시로 (관용 표현 이름에 묶지 않는다)
+  const kt = read('js/kortabs.js');
+  assert.ok(kt.includes("DECKS[w.deck].sit ? el('p', 'kor-wsit', q.sentence)"), '쓰임 물음 — 속담도 상황 글');
+  assert.ok(kt.includes("DECKS[w.deck] && DECKS[w.deck].sit && w.ex) note.appendChild(el('p', 'kor-note-ex', `이럴 때: ${w.ex}`))"), '풀이 — 속담도 "이럴 때"');
+  assert.ok(!kt.includes("w.deck === 'idiom'"), '관용 표현 이름으로 가르지 않는다');
+});
+
+test('🔍 v241 변이: 번갈아(DECK_ORDER)에 없는 묶음의 낱말이 있어도 오늘의 낱말이 멈추지 않는다 — 그런 낱말은 빠지고 아는 묶음은 그대로', () => {
+  const odd = [...ALL, { id: 'x:낯선', deck: 'unknown', w: '낯선', mean: '처음 보는', ex: '', pair: [], avoid: [] }];
+  const t0 = Date.now();
+  const plan = planToday(odd, {}, {}, T0, SESSION_MAX);
+  assert.ok(Date.now() - t0 < 2000, '바로 끝난다');
+  assert.equal(plan.length, SESSION_MAX);
+  assert.ok(!plan.some((p) => p.id === 'x:낯선'), '모르는 묶음은 새 낱말로 안 나온다');
+  assert.deepEqual(plan.slice(0, 3).map((p) => ALL.find((w) => w.id === p.id).deck), ['concept', 'idiom', 'proverb']);
+});
+
+test('🔍 Codex 54차 낱말: 묶음 이름은 자기 이름의 글자만(배열·"constructor"는 오류로, 멈추지 않게) · 답이 둘이던 문장을 고침(높임 표현·콧대가 높다) · 인용↔예시 짝 · 빈 수레↔우물 안 개구리 · 시조는 세 장 · 사전 쪽 뜻', () => {
+  const base = () => JSON.parse(JSON.stringify(WORDS));
+  const d1 = base();
+  for (const x of d1.words.filter((w) => w.deck === 'proverb').slice(0, 4)) x.deck = ['proverb'];
+  assert.ok(checkWords(d1, CARDS).filter((e) => /deck은/.test(e)).length === 4, '배열 묶음 이름은 넷 다 오류');
+  assert.equal(allWords(d1, CARDS).filter((w) => Array.isArray(w.deck)).length, 0, '배열 묶음 낱말은 쓰지 않는다');
+  const d2 = base();
+  d2.words.push({ deck: 'constructor', w: '가나', mean: '다라', ex: '마바' });
+  let errs = null;
+  assert.doesNotThrow(() => { errs = checkWords(d2, CARDS); });
+  assert.ok(errs.some((e) => /가나: deck은/.test(e)), '물려받은 이름은 오류 한 줄');
+  assert.ok(!allWords(d2, CARDS).some((w) => w.w === '가나'));
+  assert.equal(wordId('constructor', '가나'), '', '모르는 묶음은 id 없음');
+  const w = (x) => ALL.find((y) => y.w === x);
+  assert.match(w('높임 표현').ex, /상대를 높여 주는 ___/, '"웃어른께 알맞은 ___"에는 표준어도 들어갔다');
+  assert.ok(!/말을/.test(w('콧대가 높다').ex), '"친구들 말을 잘 안 들음"은 한 귀로 흘리기에도 맞았다');
+  assert.deepEqual(w('인용').pair, ['출처', '예시']);
+  assert.ok(w('빈 수레가 요란하다').avoid.includes('우물 안 개구리'));
+  assert.ok(/초장·중장·종장으로 이루어진/.test(w('시조').mean) && !/세 줄/.test(w('시조').mean + w('시조').ex), '시조는 세 장 — 줄 바꿈은 정의가 아니다');
+  assert.match(w('소 잃고 외양간 고친다').mean, /손해/);
+  assert.match(w('혀를 내두르다').mean, /어이없어서/);
 });

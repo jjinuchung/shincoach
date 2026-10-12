@@ -1,8 +1,8 @@
 // 🔤 국어 낱말 줄기 (2026-10-11, 아버님 "니 제안대로 하자") — 순수 규칙 (저장은 xp.korWordsFinish → houseDo 한 트랜잭션)
 //
-// 묶음 셋: 📘 국어 공부 말(5학년 국어 단원에서 그대로 쓰는 말) · 🗣️ 관용 표현 · 📖 글에서 만난 낱말
-//   (📖은 coach/korean/reading.json의 words — 그 글에 ★이 있으면 열린다. 앞 둘은 coach/korean/words.json)
-// 문제 두 꼴: mean(뜻 고르기) · use(빈칸 채우기 — 관용 표현은 "이럴 때 어울리는 말")
+// 묶음 넷: 📘 국어 공부 말(5학년 국어 단원에서 그대로 쓰는 말) · 🗣️ 관용 표현 · 🐢 속담(v241 — 6-1 「관용 표현을 이해하고 생각을 표현해요」 미리) · 📖 글에서 만난 낱말
+//   (📖은 coach/korean/reading.json의 words — 그 글에 ★이 있으면 열린다. 나머지는 coach/korean/words.json)
+// 문제 두 꼴: mean(뜻 고르기) · use(빈칸 채우기 — 관용 표현·속담(sit 묶음)은 "이럴 때 어울리는 말")
 //   · 보기는 같은 묶음의 다른 낱말 — 헷갈리는 짝(pair: 직유·은유, 사실·의견 …)은 뜻 고르기에 일부러 같이,
 //     빈칸 채우기에는 빼고(둘 다 들어갈 수 있다), 넓은 말·좁은 말(avoid: 비유 ⊃ 직유)은 어느 꼴에도 같이 안 낸다
 //   · 빈칸 바로 뒤에 받침 따라 바뀌는 조사(을/를·이/가·은/는·와/과·로/으로·예요 …)를 두지 않는다 — 조사가 답을 알려 주지 않게
@@ -19,13 +19,14 @@ export const PERFECT_MIN = 5;
 export const MASTER_BOX = 5;
 /** 맞힌 뒤 새 칸 → 며칠 뒤 다시 (0 = 틀림) */
 export const DUE_AFTER = { 0: 1, 1: 1, 2: 3, 3: 7, 4: 14 };
-/** 묶음 — 차례대로 새 낱말을 섞어 낸다 */
+/** 묶음 — 차례대로 새 낱말을 섞어 낸다 · sit = 쓰임 문제가 빈칸이 아니라 "이럴 때"(상황 글 ex)인 묶음, ask = 그 물음 */
 export const DECKS = {
   concept: { icon: '📘', ko: '국어 공부 말', prefix: 'c' },
-  idiom: { icon: '🗣️', ko: '관용 표현', prefix: 'i' },
+  idiom: { icon: '🗣️', ko: '관용 표현', prefix: 'i', sit: true, ask: '이럴 때 어울리는 관용 표현은 무엇인가요?' },
+  proverb: { icon: '🐢', ko: '속담', prefix: 's', sit: true, ask: '이럴 때 어울리는 속담은 무엇인가요?' },
   passage: { icon: '📖', ko: '글에서 만난 낱말', prefix: 'p' },
 };
-export const DECK_ORDER = ['concept', 'idiom', 'passage'];
+export const DECK_ORDER = ['concept', 'idiom', 'proverb', 'passage'];
 const KEY_MAX = 80;
 const WORDS_MAX = 2000;
 const DAYS_MAX = 400;
@@ -43,9 +44,14 @@ export function followOk(ex) {
   return !BAD_FOLLOW.test(String(ex).slice(i + 3));
 }
 
-/** 낱말 id — 📘·🗣️ "c:비유" · 📖 "p:K1:당번" */
+/** words.json에 쓸 수 있는 묶음 이름인가 — 자기 이름의 글자만(📖은 글에서 온다) · 배열("proverb"로 바뀌던 것)·"constructor" 같은 물려받은 이름은 아니다 (Codex 54차) */
+function isDeck(deck) {
+  return typeof deck === 'string' && own(DECKS, deck) && deck !== 'passage';
+}
+
+/** 낱말 id — 📘·🗣️·🐢 "c:비유" · 📖 "p:K1:당번" */
 export function wordId(deck, w, cardId) {
-  const d = DECKS[deck];
+  const d = typeof deck === 'string' && own(DECKS, deck) ? DECKS[deck] : null;
   if (!d) return '';
   return deck === 'passage' ? `${d.prefix}:${cardId}:${w}` : `${d.prefix}:${w}`;
 }
@@ -79,7 +85,7 @@ export function passageWords(cards) {
 export function allWords(data, cards) {
   const out = [];
   for (const x of (data && Array.isArray(data.words) ? data.words : [])) {
-    if (!x || !DECKS[x.deck] || x.deck === 'passage' || typeof x.w !== 'string' || !x.w || typeof x.mean !== 'string' || !x.mean) continue;
+    if (!x || !isDeck(x.deck) || typeof x.w !== 'string' || !x.w || typeof x.mean !== 'string' || !x.mean) continue;
     out.push({ id: wordId(x.deck, x.w), deck: x.deck, w: x.w, mean: x.mean, ex: typeof x.ex === 'string' ? x.ex : '', unit: typeof x.unit === 'string' ? x.unit : '', pair: Array.isArray(x.pair) ? x.pair : [], avoid: Array.isArray(x.avoid) ? x.avoid : [] });
   }
   return out.concat(passageWords(cards));
@@ -173,11 +179,13 @@ export function planToday(words, states, korDone, now, extra = 0) {
   for (const w of fresh.slice(0, Math.max(0, room))) take.push({ id: w.id, kind: 'mean' });
   return take;
 }
-/** 새 낱말을 묶음마다 번갈아 (📘 → 🗣️ → 📖 → 📘 …) */
+/** 새 낱말을 묶음마다 번갈아 (📘 → 🗣️ → 🐢 → 📖 → 📘 …) — 반복은 가장 긴 묶음 길이까지
+ *  (v241 변이: DECK_ORDER에 없는 묶음의 낱말이 있으면 "다 넣을 때까지" 돌던 반복이 끝나지 않아 화면이 멈췄다 — 그런 낱말은 빠진다) */
 function interleave(list) {
   const by = DECK_ORDER.map((d) => list.filter((w) => w.deck === d));
+  const n = Math.max(0, ...by.map((q) => q.length));
   const out = [];
-  for (let i = 0; out.length < list.length; i++) for (const q of by) if (q[i]) out.push(q[i]);
+  for (let i = 0; i < n; i++) for (const q of by) if (q[i]) out.push(q[i]);
   return out;
 }
 
@@ -209,7 +217,7 @@ export function makeQuestion(word, kind, pool, rng = Math.random) {
   const opts = shuffle([{ t: k === 'mean' ? word.mean : word.w, ok: true, id: word.id }, ...picks.map((x) => ({ t: k === 'mean' ? x.mean : x.w, ok: false, id: x.id }))], rng);
   const prompt = k === 'mean'
     ? `'${word.w}'의 뜻으로 알맞은 것은 무엇인가요?`
-    : word.deck === 'idiom' ? '이럴 때 어울리는 관용 표현은 무엇인가요?' : '빈칸에 들어갈 알맞은 말은 무엇인가요?';
+    : (DECKS[word.deck] && DECKS[word.deck].ask) || '빈칸에 들어갈 알맞은 말은 무엇인가요?';
   return { kind: k, id: word.id, w: word.w, prompt, sentence: k === 'use' ? word.ex : '', opts };
 }
 function uniqBy(list, key) {
@@ -298,9 +306,9 @@ export function deckStats(words, states, korDone) {
 
 /**
  * 낱말 원고 검사 (tools/check.mjs · 테스트) — 오류 문장 배열
- * · 묶음은 concept·idiom만(📖은 글에서) · 낱말·뜻 비지 않음 · 같은 묶음에 같은 낱말·같은 뜻 없음 · 뜻에 그 낱말을 쓰지 않음
+ * · 묶음은 concept·idiom·proverb만(📖은 글에서) · 낱말·뜻 비지 않음 · 같은 묶음에 같은 낱말·같은 뜻 없음 · 뜻에 그 낱말을 쓰지 않음
  * · 📘: ex에 빈칸(___) 하나, 빈칸 뒤에 받침 따라 바뀌는 조사 없음, 빈칸 밖에 그 낱말이 또 나오지 않음
- * · 🗣️: ex는 상황 글(빈칸 없음), 그 표현이 글에 그대로 나오지 않음
+ * · 🗣️·🐢(sit 묶음): ex는 상황 글(빈칸 없음), 그 표현이 글에 그대로 나오지 않음
  * · pair·avoid는 같은 묶음에 있는 낱말 · 묶음마다 4개 이상(보기 넷)
  * · 📖(cards가 있으면): 글에 나오는 낱말이고, 같은 카드 안에서 겹치지 않음
  */
@@ -312,7 +320,7 @@ export function checkWords(data, cards) {
   list.forEach((x, i) => {
     const at = (m) => errs.push(`words[${i}] ${x && x.w ? x.w : ''}: ${m}`);
     if (!x || typeof x !== 'object') { at('낱말이 아니에요'); return; }
-    if (x.deck !== 'concept' && x.deck !== 'idiom') { at('deck은 concept 또는 idiom'); return; }
+    if (!isDeck(x.deck)) { at('deck은 concept·idiom·proverb 가운데 하나'); return; }
     if (typeof x.w !== 'string' || !x.w.trim()) { at('낱말이 비었어요'); return; }
     if (typeof x.mean !== 'string' || !x.mean.trim()) at('뜻이 비었어요');
     else if (x.mean.length > 60) at('뜻은 60자까지');
@@ -323,8 +331,8 @@ export function checkWords(data, cards) {
       else if (!followOk(ex)) at('빈칸 바로 뒤에 받침 따라 바뀌는 조사가 있으면 답이 보여요');
       else if (ex.replace('___', '').includes(x.w)) at('빈칸 밖에 그 낱말이 또 나와요');
     } else {
-      if (!ex.trim()) at('관용 표현은 어울리는 상황 글(ex)이 있어야 해요');
-      else if (ex.includes('___')) at('관용 표현의 ex는 상황 글 — 빈칸 없이');
+      if (!ex.trim()) at(`${DECKS[x.deck].ko}은 어울리는 상황 글(ex)이 있어야 해요`);
+      else if (ex.includes('___')) at(`${DECKS[x.deck].ko}의 ex는 상황 글 — 빈칸 없이`);
       else if (ex.includes(x.w)) at('상황 글에 그 표현이 그대로 나와요');
     }
     for (const f of ['pair', 'avoid']) if (x[f] !== undefined && !(Array.isArray(x[f]) && x[f].every((v) => typeof v === 'string' && v))) at(`${f}는 낱말 배열`);

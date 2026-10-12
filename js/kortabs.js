@@ -166,7 +166,7 @@ function sentenceEl(text, fill) {
   return p;
 }
 
-/** 맞힌·틀린 뒤 낱말 풀이 — 뜻 · 쓰임(📘 빈칸을 채운 문장 · 🗣️ 어울리는 상황 · 📖 나온 글) */
+/** 맞힌·틀린 뒤 낱말 풀이 — 뜻 · 쓰임(📘 빈칸을 채운 문장 · 🗣️·🐢 어울리는 상황 · 📖 나온 글) */
 function noteEl(w) {
   const note = el('div', 'kor-note');
   const p = el('p');
@@ -174,7 +174,7 @@ function noteEl(w) {
   p.appendChild(document.createTextNode(` — ${w.mean}`));
   note.appendChild(p);
   if (w.deck === 'concept' && w.ex) note.appendChild(sentenceEl(w.ex, w.w));
-  else if (w.deck === 'idiom' && w.ex) note.appendChild(el('p', 'kor-note-ex', `이럴 때: ${w.ex}`));
+  else if (DECKS[w.deck] && DECKS[w.deck].sit && w.ex) note.appendChild(el('p', 'kor-note-ex', `이럴 때: ${w.ex}`));
   else if (w.deck === 'passage' && w.src) note.appendChild(el('p', 'kor-note-ex', `「${w.title}」에서: ${w.src}`));
   return note;
 }
@@ -227,7 +227,7 @@ export function renderSession(ctx) {
   card.appendChild(head);
   if (q.kind === 'mean') card.appendChild(el('p', 'kor-wbig', w.w));
   card.appendChild(el('p', 'kor-q-text', q.prompt));
-  if (q.kind === 'use') card.appendChild(w.deck === 'idiom' ? el('p', 'kor-wsit', q.sentence) : sentenceEl(q.sentence, ws.picked !== null ? w.w : ''));
+  if (q.kind === 'use') card.appendChild(DECKS[w.deck].sit ? el('p', 'kor-wsit', q.sentence) : sentenceEl(q.sentence, ws.picked !== null ? w.w : ''));
   const opts = el('div', 'kor-opts');
   q.opts.forEach((o, k) => {
     const picked = ws.picked === k;

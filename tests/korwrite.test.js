@@ -32,9 +32,9 @@ const R = (card, w, grade, text) => ({ card, id: w.id, at: w.at, grade, text });
 /** 옛 꼴(id 없이 저장된 글)의 이름표 */
 const E = (at, text) => ({ id: writeIdOf(at, text), at });
 
-test('✍️ 원고: 서술형은 K1·K7·K15·K17·K19 · 판 번호 1 · 꼭 들어갈 생각·괜찮은 답·흔한 잘못·예시 답 · 검사가 잡는 것', () => {
+test('✍️ 원고: 서술형은 K1·K7·K15·K17·K19 + v241 K20(처음 해 본 일)·K26(방언·표준어)·K31(토끼전 인물) · 판 번호 1 · 꼭 들어갈 생각·괜찮은 답·흔한 잘못·예시 답 · 검사가 잡는 것', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(DATA.cards.filter((c) => c.write).map((c) => c.id), ['K1', 'K7', 'K15', 'K17', 'K19']);
+  assert.deepEqual(DATA.cards.filter((c) => c.write).map((c) => c.id), ['K1', 'K7', 'K15', 'K17', 'K19', 'K20', 'K26', 'K31']);
   for (const c of DATA.cards.filter((x) => x.write)) {
     assert.equal(c.write.v, 1, c.id);
     assert.ok(c.write.rubric.must.length >= 2, `${c.id}: 생각 + 까닭(근거)`);
@@ -530,7 +530,7 @@ test('✍️ 도우미 화면 연결: 🧩 틀은 쓰기 칸 위(누르면 늘 �
   const chk = wv.slice(wv.indexOf('function checksEl('), wv.indexOf('/** 쓰기 칸'));
   assert.ok(chk.length > 100 && !/korWrite|setDraft|localStorage|disabled/.test(chk), '✔️ 확인은 저장도·막기도 안 한다');
   assert.match(read('js/korwrite.js'), /const chk = writeCheck\(text, card\.write\.frames\);/, '규칙도 카드의 틀로');
-  assert.match(read('sw.js'), /CACHE_VERSION = 'v240'/);
+  assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1] >= 240, 'sw 버전 v240 이상');
   const css = read('css/style.css');
   for (const k of ['.kor-whbtn {', '.kor-wchk-row {', '.kor-wnums .kor-whbtn {']) assert.ok(css.includes(k), k);
 });

@@ -16,11 +16,12 @@ const at = (days, h = 12) => new Date(2026, 9, 11 + days, h, 0, 0).getTime();
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('📚 원고: 형식 검사 통과 · 열아홉 편(연습 열둘·명작 일곱) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
+test('📚 원고: 형식 검사 통과 · 서른한 편(연습 열아홉·명작 열둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, ['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8', 'K9', 'K10', 'K11', 'K12', 'K13', 'K14', 'K15', 'K16', 'K17', 'K18', 'K19']);
-  assert.deepEqual(DATA.cards.map((c) => c.kind), ['practice', 'practice', 'classic', 'practice', 'practice', 'classic', 'classic', 'classic', 'classic', 'practice', 'practice', 'practice', 'practice', 'practice', 'practice', 'practice', 'practice', 'classic', 'classic']);
-  assert.equal(validCards(DATA).length, 19);
+  assert.deepEqual(IDS, Array.from({ length: 31 }, (_, i) => `K${i + 1}`));
+  const P = 'practice'; const C = 'classic';
+  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C]);
+  assert.equal(validCards(DATA).length, 31);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -32,13 +33,14 @@ test('📚 원고: 형식 검사 통과 · 열아홉 편(연습 열둘·명작 �
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 55);
+  assert.equal(qn, 99);
   assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 여덟 가지(v236 짜임 놓치기 더함)가 모두 한 번 이상 쓰인다');
-  // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남)
+  // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남 · 또는 지은이를 알 수 없는 옛이야기를 다시 씀)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {
     const law = c.facts.find((f) => f[0] === '저작권')[1];
     const year = Number((/(\d{4})년에 세상을 떠나/.exec(law) || [])[1]);
-    assert.ok(year > 0 && year < 1963, `${c.id} ${c.author} ${year}`);
+    const folk = /^지은이를 알 수 없는 옛이야기/.test(law) && /^지은이 모름 · 신코치가 다시 씀$/.test(c.author);
+    assert.ok((year > 0 && year < 1963) || folk, `${c.id} ${c.author} ${year}`);
   }
   // 「반딧불」·「엄마야 누나야」 본문 — 위키문헌 1955년 판·『진달래꽃』을 오늘 맞춤법으로 옮긴 그대로
   assert.deepEqual(DATA.cards[2].stanzas, [['가자 가자 가자', '숲으로 가자', '달 조각을 주우려', '숲으로 가자.'], ['그믐밤 반딧불은', '부서진 달 조각,'], ['가자 가자 가자', '숲으로 가자', '달 조각을 주우려', '숲으로 가자.']]);
@@ -230,6 +232,111 @@ test('📚 빈 단원 글 7편 (v236, 아버님 "이대로 진행"): 발표·정
   for (const id of NEW) assert.ok(UNITS.some((u) => (u.cards || []).includes(id)), `${id} 단원`);
   assert.ok(UNITS.every((u) => (u.cards || []).length > 0), '단원 열여섯 모두 글이 있다');
   assert.deepEqual(['5-1-독서', '5-2-독서', '5-2-4'].map((id) => UNITS.find((u) => u.id === id).title), ['책을 읽고 함께 이야기해요', '여러 가지 형태의 책을 읽어요', '표준어와 방언을 알아봐요']);
+});
+
+test('📚 새 글 12편 (v241, 아버님 "이대로 진행" — 지금 방식으로 더 많이):글이 한 편뿐이던 단원 일곱에 한 편씩 · ✨ 명작 다섯(윤동주·정지용·이육사·양사언 시조·토끼전) — 원문 대조 · 보기에 옮긴 문장 = 글 · 글 속 수가 맞음 · 물음이 묻는 말은 풀이에 없음 · 단원 지도', () => {
+  const card = (id) => DATA.cards.find((c) => c.id === id);
+  const NEW = ['K20', 'K21', 'K22', 'K23', 'K24', 'K25', 'K26', 'K27', 'K28', 'K29', 'K30', 'K31'];
+  assert.deepEqual(NEW.map((id) => card(id).genre), ['생활문', '발표 준비 일기', '조사 일기', '토의', '생활문', '편지', '생활문', '동시', '시', '시', '시조', '옛이야기']);
+  assert.equal(NEW.reduce((n, id) => n + card(id).qs.length, 0), 44, '글이 긴 연습 카드는 물음 넷, 짧은 시는 셋');
+  // 윤동주 「해바라기 얼굴」 — 『하늘과 바람과 별과 시』 1955년 판(위키문헌 페이지 132) 그대로
+  assert.deepEqual(card('K27').stanzas, [['누나의 얼굴은', '해바라기 얼굴', '해가 금방 뜨자', '일터에 간다.'], ['해바라기 얼굴은', '누나의 얼굴', '얼굴이 숙어들어', '집으로 온다.']]);
+  // 정지용 「호수 1」 — 위키문헌 《향수》 원문에 facts에 적은 바꿈만
+  const HOSU = [['얼골 하나 야', '손바닥 둘 로', '폭 가리지 만,'], ['보고 싶은 마음', '호수 만 하니', '눈 감을 밖에.']];
+  const HOSU_CH = [['얼골', '얼굴'], ['하나 야', '하나야'], ['둘 로', '둘로'], ['가리지 만', '가리지만'], ['호수 만', '호수만'], ['감을 밖에', '감을밖에']];
+  const apply = (t, ch) => ch.reduce((x, [a, b]) => x.split(a).join(b), t);
+  assert.deepEqual(card('K28').stanzas, HOSU.map((st) => st.map((l) => apply(l, HOSU_CH))));
+  for (const [a, b] of HOSU_CH) assert.ok(card('K28').facts.find((f) => f[0] === '원문')[1].includes(`${a} → ${b}`), `호수: ${a} → ${b}`);
+  // 이육사 「청포도」 — 위키문헌(1939 《문장》 · 『육사시집』)에 facts에 적은 바꿈만
+  const GRAPE = [['내 고장 칠월은', '청포도가 익어가는 시절'], ['이 마을 전설이 주절이주절이 열리고', '먼데 하늘이 꿈꾸며 알알이 들어와 박혀'], ['하늘 밑 푸른 바다가 가슴을 열고', '흰 돛단배가 곱게 밀려서 오면'],
+    ['내가 바라는 손님은 고달픈 몸으로', '청포(靑袍)를 입고 찾아온다고 했으니'], ['내 그를 맞아 이 포도를 따먹으면', '두 손은 함뿍 적셔도 좋으련'], ['아이야 우리 식탁엔 은쟁반에', '하이얀 모시 수건을 마련해두렴']];
+  const GRAPE_CH = [['익어가는', '익어 가는'], ['먼데', '먼 데'], ['따먹으면', '따 먹으면'], ['마련해두렴', '마련해 두렴'], ['주절이주절이', '주저리주저리'], ['청포(靑袍)', '청포']];
+  assert.deepEqual(card('K29').stanzas, GRAPE.map((st) => st.map((l) => apply(l, GRAPE_CH))));
+  for (const [a, b] of GRAPE_CH) assert.ok(card('K29').facts.find((f) => f[0] === '원문')[1].includes(`${a} → ${b}`), `청포도: ${a} → ${b}`);
+  // 양사언 시조 — 『청구영언』(1728)을 오늘 말로 · 끝 구절이 책마다 다르다는 것도 적는다
+  assert.deepEqual(card('K30').stanzas, [['태산이 높다 하되 하늘 아래 뫼이로다', '오르고 또 오르면 못 오를 리 없건마는', '사람이 제 아니 오르고 뫼를 높다 하느니']]);
+  const k30src = card('K30').facts.find((f) => f[0] === '원문')[1];
+  for (const s of ['청구영언', '뫼히로다 → 뫼이로다', '뫼흘 → 뫼를', '가곡원류']) assert.ok(k30src.includes(s), `시조 원문 줄: ${s}`);
+  // 옛 한글(아래아 같은 조합 자모)은 태블릿 글꼴에서 "ㅎ되"처럼 깨진다(v241 헤드리스) — 아이에게 보이는 원고에는 지금 글자만
+  const OLD_JAMO = /[\u1100-\u11FF\u3164\uA960-\uA97F\uD7B0-\uD7FF]/;
+  for (const f of ['../coach/korean/reading.json', '../coach/korean/words.json', '../coach/korean/units.json']) assert.ok(!OLD_JAMO.test(readFileSync(new URL(f, import.meta.url), 'utf8')), `${f}: 옛 한글 조합 자모`);
+  // 토끼전 — 지은이를 알 수 없는 옛이야기를 다시 씀(따옴표 안도 다시 쓴 말) · 뿌리는 『삼국사기』
+  assert.equal(card('K31').author, '지은이 모름 · 신코치가 다시 씀');
+  assert.match(card('K31').facts.find((f) => f[0] === '원문')[1], /다시 썼어요 — 따옴표 안의 말도 신코치가 다시 쓴 말/);
+  assert.match(card('K31').facts.find((f) => f[0] === '만나는 곳')[1], /삼국사기/);
+  // 풀이가 갈리는 것은 묻지 않는다 — 적어 둔다
+  for (const id of ['K27', 'K28', 'K29']) assert.ok(card(id).facts.some((f) => f[0] === '알아 둘 것' && /묻지 않았어요/.test(f[1])), id);
+  for (const q of card('K29').qs) assert.ok(!/손님은 누구|누구를 기다/.test(q.q), `${q.id}: 손님이 누구인지는 묻지 않는다`);
+  // 물음이 묻는 말은 📖 풀이에 넣지 않는다
+  const glossed = (id) => card(id).words.map((w) => w[0]);
+  for (const w of ['혼저', '옵서예', '하영', '복삭', '속앗수다']) assert.ok(!glossed('K26').some((g) => g.includes(w)), `K26 ${w}`);
+  for (const w of ['호수만', '감을밖에']) assert.ok(!glossed('K28').includes(w), `K28 ${w}`);
+  assert.ok(!glossed('K30').includes('제'), 'K30-2가 묻는 "제 아니 오르고"');
+  assert.ok(!glossed('K31').some((g) => g.startsWith('솔깃')), 'K31-2가 묻는 까닭');
+  // 방언 글은 뜻을 묻기 전에 알려 주지 않는다(⑧의 '속았수다'만 글이 알려 주고, K26-3은 놀란 까닭을 묻는다)
+  assert.ok(!card('K26').lines.some((l) => /어서 오|많이 먹/.test(l)), 'K26-1·2 답이 글에 미리 나오지 않는다');
+  // 글 속 수가 맞는다 — K21 조사 · K22 시간
+  const k21 = card('K21').lines.join(' ');
+  assert.ok(/25명/.test(k21) && /15명/.test(k21) && /10명/.test(k21) && 15 + 10 === 25, 'K21 먹는 15 + 안 먹는 10 = 25');
+  assert.ok(/6명/.test(k21) && /4명/.test(k21) && 6 + 4 === 10, 'K21 까닭 6 + 4 = 안 먹는 10');
+  assert.ok(/3분짜리/.test(k21) && /모두 5분/.test(k21));
+  const k22 = card('K22').lines;
+  assert.ok(k22[3].includes('아침 9시') && k22[5].includes('아침 7시') && k22[5].includes('매주 월요일은 쉽니다'), 'K22 블로그 9시 · 안내문 7시 · 월요일 쉼');
+  assert.match(card('K22').qs[1].opts.find((o) => o.type === 'flip').why, /안내문은 아침 7시, 블로그는 아침 9시/);
+  // 보기에 "⑥ …"처럼 옮긴 문장은 글의 그 문장 그대로 (K20 겪은 일·느낌 · K25 편지 호응)
+  for (const q of [...card('K20').qs, ...card('K25').qs]) {
+    const c = card(q.id.split('-')[0]);
+    for (const o of q.opts) {
+      const m = /^([①-⑳]) (.+)$/.exec(o.t);
+      if (m) assert.equal(m[2], lineText(c, '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'.indexOf(m[1]) + 1), `${q.id} ${o.t}`);
+    }
+  }
+  // K25 호응: 어울리지 않는 문장은 ④(높임)·⑦(왜냐하면)·⑨(결코) 셋 · 고친 문장은 그 문장의 앞부분을 그대로 두고 끝을 맞춘다
+  const k25 = card('K25');
+  assert.deepEqual(k25.qs[0].opts.filter((o) => !o.ok).map((o) => o.t.slice(0, 1)), ['④', '⑦', '⑨']);
+  assert.match(k25.qs[0].opts.find((o) => o.ok).t, /^⑧ 비록 .+지만/);
+  const fix = (q) => q.opts.find((o) => o.ok).t;
+  assert.ok(fix(k25.qs[1]).startsWith('왜냐하면 할머니 댁 마당이 정말 넓어서') && fix(k25.qs[1]).endsWith('때문이에요.'));
+  assert.ok(fix(k25.qs[2]).includes('결코 잊지 않을'));
+  assert.ok(fix(k25.qs[3]).includes('만드신') && fix(k25.qs[3]).endsWith('주셨어요.'));
+  for (const q of k25.qs) for (const o of q.opts) if (!o.ok) assert.ok(['agree', 'flip'].includes(o.type), `${q.id} ${o.t}`);
+  // 📘 단원 지도: 새 글은 모두 어느 단원에 · 한 편뿐이던 단원 일곱은 이제 두 편 이상
+  const UNITS = JSON.parse(readFileSync(new URL('../coach/korean/units.json', import.meta.url), 'utf8')).units;
+  for (const id of NEW) assert.ok(UNITS.some((u) => (u.cards || []).includes(id)), `${id} 단원`);
+  for (const u of ['5-1-2', '5-1-3', '5-1-매체', '5-1-5', '5-2-독서', '5-2-2', '5-2-4']) assert.ok(UNITS.find((x) => x.id === u).cards.length >= 2, `${u} 두 편 이상`);
+});
+
+test('🔍 Codex 54차 원고: 같이 고를 만한 보기를 막음(K20 "드디어" · K21-4 과정 전체 · K25-3 뜻을 지키며) · 좋은 근거를 더 받음 · 제주어 표기 · 결식 학생 · 광고 단서 · K24-1 · K26-4 두 쪽짝 · K27-3 · 시조는 세 장 · 저작권은 한국 기준', () => {
+  const card = (id) => DATA.cards.find((c) => c.id === id);
+  const q = (id) => DATA.cards.flatMap((c) => c.qs).find((x) => x.id === id);
+  // 1. ⑨ "드디어"는 기다린 마음 — 겪은 일 보기로 쓰려면 빼야 ⑬ 하나만 생각·느낌
+  assert.ok(!card('K20').lines.some((l) => l.includes('드디어')) && !q('K20-1').opts.some((o) => o.t.includes('드디어')));
+  // 2. "준비하며 생각한 것"이면 그래프도 맞다 → 과정 전체
+  assert.match(q('K21-4').q, /과정을 전체적으로 정리한 말/);
+  // 3. 근거 넓힘
+  assert.deepEqual([q('K21-3').ev, q('K22-2').ev, q('K22-4').ev, q('K31-1').ev, q('K31-3').ev], [[9, 10, 12], [4, 5, 8, 9], [4, 5, 7, 8, 9], [1, 2, 3, 8], [9, 12, 13]]);
+  for (const [id, n] of [['K21-3', '⑫'], ['K22-2', '⑤'], ['K22-4', '④'], ['K31-1', '⑧'], ['K31-3', '⑫']]) assert.ok(q(id).evNote.includes(n), `${id} 풀이에 ${n}`);
+  // 4. "꼭 잊을 거예요"도 문장은 바르다 → 마음을 지키며 고치라고
+  assert.match(q('K25-3').q, /잊지 않겠다는 마음이 드러나도록/);
+  // 5. 제주어 표기 — 제주어 교육 플랫폼 '복삭 속앗수다'
+  const k26 = card('K26').lines.join(' ');
+  assert.ok(k26.includes('복삭 속앗수다') && !/폭싹|속았수다/.test(k26) && q('K26-3').q.includes('복삭 속앗수다'));
+  assert.match(card('K26').lines[7], /'속았다'는 말로 들려/);
+  // 9. 결식률(비율) → 결식 학생(사람)
+  assert.ok(!JSON.stringify(card('K21')).includes('결식률') && card('K21').lines[4].includes("'아침 식사 결식 학생'"));
+  // 10. 광고 뜻의 단서가 글 안에 · 11. 사서가 눈 이야기를 들었다는 말 없이
+  assert.match(card('K22').lines[2], /새로 나온 수영복 사진/);
+  assert.ok(!/사서 선생님께서/.test(q('K24-1').q) && /큰 글자책이 할아버지께 알맞았던 까닭/.test(q('K24-1').q));
+  // 12. 보기 넷 모두 두 쪽짝
+  for (const o of q('K26-4').opts) assert.ok(/^발표는 .+, 할머니 말은 .+ 그대로$/.test(o.t), o.t);
+  // 13. 글에 없는 길이("하루 내내")를 정답에 넣지 않는다
+  assert.ok(!q('K27-3').opts.some((o) => o.t.includes('하루 내내')));
+  // 8. 시조는 세 '장' · 16. '-을밖에'
+  assert.match(card('K30').facts.find((f) => f[0] === '만나는 곳')[1], /초장·중장·종장으로 이루어진 .+각 장을 한 줄씩/);
+  assert.match(q('K28-3').doneNote, /-을밖에/);
+  // 17. 저작권 줄은 한국 법 기준
+  for (const c of DATA.cards.filter((x) => x.kind === 'classic')) assert.match(c.facts.find((f) => f[0] === '저작권')[1], /한국에서 저작권 보호 기간이 끝난/, c.id);
+  assert.ok(!JSON.stringify(DATA).includes('저작권이 끝난'), '옛 말투("저작권이 끝난")가 남지 않는다');
 });
 
 test('🔍 Codex 51차 원고: 좋은 근거를 더 받음(K13-3 ⑫ · K14-1 ②) · K15-2는 "방법을 보탠 말"로 좁힘(⑥은 아쉬운 점 — 보탠 게 없다고 단정 안 함) · K18-3 도움말 · K17-1 틀린 문장이 있다고 먼저 · K14-1 "길이"가 아니라 드러남', () => {
