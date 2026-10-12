@@ -3494,3 +3494,32 @@
 ### TODO (다음 작업)
 - [ ] 아버님 "배포" → v242 커밋(feat + docs)·배포 → 라이브 v242 확인
 - [ ] 아버님: 태블릿 🧩 퍼즐 · v241 새 글 · 🐢 속담 — 진우 반응
+
+## 2026-10-12 — ✍️ 생각 쓰기 채점 기준 판 번호 (v243, Codex 52차 #8)
+
+### 진행 내용
+- v242 배포(`df64597` feat · `e9c7b95` docs, 라이브 v242) 뒤 아버님 "생각 쓰기 채점 기준표 판 번호 진행하자" → 기본안 여섯 → "이대로 진행"
+- 문제(Codex 52차 #8): 글은 쓸 때의 판(v)을 지니지만 korean/todo.json엔 지금 원고의 물음이 붙어, 원고를 2판으로 고치면 옛 답이 새 물음 옆에 놓인다 · 옛 rubric이 원고에 남지 않는다 · 답장은 판을 적지도 맞춰 보지도 않는다(v 999도 붙음)
+- **옛 판 보관** — 원고 write에 `past: [{ v, q, rubric, model }]`(PAST_MAX 5): 물음·rubric을 고칠 때 v를 올리고 지금 판을 past로 · `korean.checkWriteItem`이 옛 판도 지금 판과 같은 검사(물음·rubric·예시 답) + v는 지금 판보다 작게·겹치지 않게
+- **판마다 물음** — `korwrite.questionOf(write, v)`(지금 판 → past → 없으면 null) · `editionsOf(write)` · `editionOf(글)`(판이 없거나 깨진 글은 1판)
+- **올릴 목록** — `writeTodo`의 q는 그 글을 쓴 판의 물음 + `vNow`(지금 판) · todo.md 줄에 `v N` · 판이 다르면 "(지금 원고는 v2 — 이 글은 v1 물음·기준으로, 원고 write.past)" · 그 판을 못 찾으면 "⚠️ v1 물음을 원고(write.past)에서 못 찾았어요" · 머리 줄의 답장 꼴 `{ card, id, at, v, grade, text }`
+- **답장 판 맞춰 보기** — `checkReplies`: v는 그 카드의 판(지금·옛) 가운데 하나 · 안 적은 줄은 1판(v243 전 답장 — 비공개 저장소의 지금 답장 줄은 그대로 통과함을 `check --private`로 확인) · 같은 글에 판이 다른 답장 둘이면 둘 다 버림 · 답장은 글의 판과 같을 때만 붙음(`target`) · `tools/privcheck.mjs`도 같은 검사
+- **📊 판 다름** — `replyStats.stale`(그 글은 있지만 판이 달라 안 붙음 — "맞는 글 없음"과 따로 셈) → 📥 받기 줄 "⚠️ … 판 다름 N · Claude에게 '국어 답장 확인해 줘'" (`noteReadCheck`·`readSummary`)
+- **화면** — 답장 기다리는 글 위 물음은 그 글을 쓴 판의 물음 · 두 기기에서 판이 다른 글이 함께 기다리면 둘째 글 안에 그 물음
+- 지금 원고 여덟 카드는 모두 1판 그대로(원고 글 바뀐 것 없음)
+- 시험 korwrite +1(옛 판 원고 검사 아홉 · 판마다 물음 · 2판이 된 뒤의 올릴 목록 · 옛 판 빠진 원고 ⚠️ · 판이 다른 답장 안 붙음·📊 판 다름 · v 없는 줄 = 1판 · 2판 새 글 · 없는 판·꼴 틀린 판 · 판이 다른 같은 답장 · 비공개 검사 · 화면) · 기존 시험의 답장 꼴(v 1)·목록 머리·replyStats(stale 0) 고침
+- 변이 `.context/korean_v243/mutate_v243.mjs` **25 중 25**(원고 5 · 판 3 · 목록 6 · 답장 5 · 📊 4 · 화면 2)
+- 헤드리스 1280·390(`.context/korean_v243/walk243.sh` — 지어낸 연습 글로): 1판 원고 → 1판 물음 · 2판 + past → 1판 물음 그대로 · past 빠진 2판 → 지금 물음(빈칸 없음) · 판이 다른 글 둘 → 글마다 제 물음 · 넘침 0 · 콘솔 오류 0
+- 전체 **1835** 통과(concurrency 1, 여유 9.9 GB) · `tools/check.mjs` 통과(JS 144) · sw **v243**
+
+### 변경 파일
+- `js/korean.js`(PAST_MAX · checkWriteItem 옛 판) · `js/korwrite.js`(questionOf·editionsOf·editionOf · checkReplies v · target·replyStats stale · writeTodo q·vNow) · `js/upload.js`(todo.md 판 줄 · 받기 줄 판 다름) · `js/korwriteview.js`(기다리는 글 위 물음) · `tools/privcheck.mjs`(주석) · `sw.js`(v243) · `tests/korwrite.test.js`
+
+### 결정사항 / 메모
+- v 없는 답장 줄 = 1판 — 지금까지의 답장은 모두 1판이라 그대로 통과하고, 원고가 2판이 되면 v를 안 적은 답장은 2판 글에 붙지 않는다(필요한 곳에서만 막힘)
+- frames·checks만 고칠 때는 v를 올리지 않는다(채점 기준이 아니다) · 옛 판은 그 판으로 쓴 글이 답장을 다 받을 때까지 지우지 않는다
+- Codex 리뷰는 다음 큰 변경과 함께
+
+### TODO (다음 작업)
+- [ ] 아버님 "배포" → v243 커밋(feat + docs)·배포 → 라이브 v243 확인
+- [ ] 아버님: 태블릿 🧩 퍼즐 · v241 새 글 · 🐢 속담 — 진우 반응
