@@ -4,7 +4,7 @@
 //  · 보기는 물음마다 섞어 그린다(원고의 정답 자리를 외우지 않게) · 틀린 보기는 한 번 누르면 꺼지고 힌트(잘못 읽기 종류)
 //  · 근거가 둘 이상이면 하나만 눌러도 맞고, 맞히면 모두 칠한다 · 근거를 잘못 누른 것은 잘못 읽기로 세지 않는다
 //  · ⏳ 국어도 하루 1시간 30분(v232, 아버님) — 읽던 글은 끝까지, 새 글만 막는다
-import { TYPES, KINDS, KOR_COINS, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar } from './korean.js';
+import { TYPES, KINDS, PRE, KOR_COINS, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar } from './korean.js';
 import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt, tickEgg } from './xp.js';
 import { loadCharacters, downloadCharacters, forSubject, isUnlocked, pickCharacters } from './pokemon.js';
 import { openCatch, isCatchOpen } from './catch.js';
@@ -207,21 +207,28 @@ export async function renderList() {
   main.appendChild(head);
   const writes = korWritesMap();
   const grid = el('div', 'kor-grid');
-  cards.forEach((c, i) => {
+  // ⭐ 미리보기 카드는 맨 뒤에 따로 — 제목 한 줄 아래 (v244, 원고 차례와 상관없이)
+  const shown = [...cards.filter((c) => !c.pre), ...cards.filter((c) => c.pre)];
+  shown.forEach((c, i) => {
+    if (c.pre && !(i && shown[i - 1].pre)) {
+      const h = el('p', 'kor-grid-h', `${PRE[c.pre]} — 앞으로 국어 시간에 만날 작품을 미리 읽어요`);
+      grid.appendChild(h);
+    }
     const s = starsOf(done, c.id);
     const st = statusOf(done, c.id, now);
-    const b = el('button', `kor-slot is-${c.kind}${s ? ' is-got' : ''}${st.ready ? ' is-ready' : ''}`);
+    const b = el('button', `kor-slot is-${c.kind}${c.pre ? ' is-pre' : ''}${s ? ' is-got' : ''}${st.ready ? ' is-ready' : ''}`);
     b.type = 'button';
     b.dataset.card = c.id;
     b.appendChild(el('span', 'kor-slot-no', `No.${i + 1}`));
     b.appendChild(el('span', 'kor-slot-ico', c.icon));
     b.appendChild(el('span', 'kor-slot-title', c.title));
     b.appendChild(el('span', 'kor-slot-kind', c.kind === 'classic' ? `${KINDS.classic} · ${c.author}` : `${KINDS.practice} · ${c.genre}`));
+    if (c.pre) b.appendChild(el('span', 'kor-slot-pre', PRE[c.pre]));
     b.appendChild(el('span', 'kor-slot-stars', '★'.repeat(s) + '☆'.repeat(3 - s)));
     b.appendChild(el('span', 'kor-slot-status', st.text));
     const wl = slotWriteText(cardWriteState(writes, c.id), !!c.write); // ✍️ 서술형 — 답장 기다림 · 📬 왔어요 · ✅
     if (wl) b.appendChild(el('span', 'kor-slot-write', wl));
-    b.setAttribute('aria-label', `${c.title} — 별 ${s}개 · ${st.text}${wl ? ` · ${wl}` : ''}`);
+    b.setAttribute('aria-label', `${c.title}${c.pre ? ` (${PRE[c.pre]})` : ''} — 별 ${s}개 · ${st.text}${wl ? ` · ${wl}` : ''}`);
     b.addEventListener('click', () => guardStart('korean', () => openCard(c.id)));
     grid.appendChild(b);
   });
@@ -271,6 +278,7 @@ function passageEl(card) {
     const box = el('div', 'kor-classic');
     const top = el('div', 'kor-classic-top');
     top.appendChild(el('span', 'kor-classic-badge', KINDS.classic));
+    if (card.pre) top.appendChild(el('span', 'kor-pre-badge', PRE[card.pre])); // ⭐ 미리보기 (v244)
     top.appendChild(el('span', 'kor-classic-by', `${card.author} · ${card.genre}`));
     box.appendChild(top);
     box.appendChild(el('h3', 'kor-classic-title', `「${card.title}」`));

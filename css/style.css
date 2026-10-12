@@ -3058,6 +3058,10 @@ button { font-family: inherit; }
 .kor-slot.is-ready .kor-slot-status { color: var(--primary-dark); font-weight: 700; }
 .kor-slot.is-ready { animation: korReady 2.4s ease-in-out infinite; }
 @keyframes korReady { 0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); } 50% { box-shadow: 0 0 0 5px rgba(79, 70, 229, 0.18); } }
+/* ⭐ 미리보기 카드 (v244) — 도감 맨 뒤 제목 한 줄(칸 전체 폭) · 칸·글 위 작은 표시 */
+.kor-grid-h { grid-column: 1 / -1; margin: 10px 0 0; padding-top: 12px; border-top: 2px dashed var(--border); font-weight: 800; color: #b45309; word-break: keep-all; }
+.kor-slot-pre { font-size: 0.74rem; font-weight: 800; color: #b45309; background: #fff7e6; border-radius: 999px; padding: 1px 8px; }
+.kor-pre-badge { font-weight: 800; color: #b45309; }
 .kor-empty { display: grid; gap: 10px; justify-items: start; background: var(--card); border-radius: var(--radius); padding: 18px; }
 .kor-small { font-size: 0.8rem; color: var(--muted); margin: 0; word-break: break-all; }
 

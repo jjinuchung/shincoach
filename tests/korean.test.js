@@ -16,12 +16,12 @@ const at = (days, h = 12) => new Date(2026, 9, 11 + days, h, 0, 0).getTime();
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('📚 원고: 형식 검사 통과 · 서른한 편(연습 열아홉·명작 열둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
+test('📚 원고: 형식 검사 통과 · 서른다섯 편(연습 열아홉·명작 열여섯 — v244 ⭐ 중학교 미리보기 넷) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, Array.from({ length: 31 }, (_, i) => `K${i + 1}`));
+  assert.deepEqual(IDS, Array.from({ length: 35 }, (_, i) => `K${i + 1}`));
   const P = 'practice'; const C = 'classic';
-  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C]);
-  assert.equal(validCards(DATA).length, 31);
+  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C]);
+  assert.equal(validCards(DATA).length, 35);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -33,7 +33,7 @@ test('📚 원고: 형식 검사 통과 · 서른한 편(연습 열아홉·명�
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 99);
+  assert.equal(qn, 114);
   assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 여덟 가지(v236 짜임 놓치기 더함)가 모두 한 번 이상 쓰인다');
   // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남 · 또는 지은이를 알 수 없는 옛이야기를 다시 씀)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {
@@ -602,4 +602,76 @@ test('🔍 Codex 49차 원고·말: 좋은 근거를 다 받음(K7-3 ③~⑦ · 
   assert.ok(tu.includes('`⏳ 오늘 ${name}${topic} 여기까지!`') && !tu.includes('${name}은'));
   const { eunNeun } = await import('../js/timeup.js');
   assert.deepEqual(['🔢 수학', '🎤 영어', '📚 국어', ''].map(eunNeun), ['은', '는', '는', '는']);
+});
+
+test('⭐ 중학교 미리보기 (v244, 아버님 "이대로 진행"): 명작 넷 K32 「홍길동전」·K33 「양반전」(다시 씀) · K34 「하여가」·「단심가」·K35 「오우가」(『청구영언』·『산중신곡』 원문을 오늘 글자로) · pre 표시 · 도감 맨 뒤 · 저작권 해 · 물음 4·4·3·4', async () => {
+  const card = (id) => DATA.cards.find((c) => c.id === id);
+  const PREV = ['K32', 'K33', 'K34', 'K35'];
+  assert.deepEqual(DATA.cards.filter((c) => c.pre).map((c) => c.id), PREV, '미리보기는 이 넷');
+  for (const id of PREV) assert.deepEqual([card(id).kind, card(id).pre], ['classic', '중학교'], id);
+  assert.deepEqual(PREV.map((id) => card(id).qs.length), [4, 4, 3, 4]);
+  // 원문 대조 — 시조는 옛 글자를 오늘 글자로만(위키문헌: 『청구영언』 216·8, 『산중신곡』 오우가 첫째·둘째 수)
+  assert.deepEqual(card('K34').stanzas, [
+    ['이런들 어떠하며 저런들 어떠하료', '만수산 드렁칡이 얽어진들 어떠하리', '우리도 이같이 얽어져 백 년까지 누리리라'],
+    ['이 몸이 죽어 죽어 일백 번 고쳐 죽어', '백골이 진토 되어 넋이라도 있고 없고', '임 향한 일편단심이야 가실 줄이 있으랴'],
+  ]);
+  assert.deepEqual(card('K35').stanzas, [
+    ['내 벗이 몇이나 하니 수석과 송죽이라', '동산에 달 오르니 그 더욱 반갑고야', '두어라 이 다섯 밖에 또 더하여 무엇하리'],
+    ['구름 빛이 좋다 하나 검기를 자주 한다', '바람 소리 맑다 하나 그칠 적이 하노매라', '좋고도 그칠 뉘 없기는 물뿐인가 하노라'],
+  ]);
+  // 지은이·저작권 해(돌아가신 해) — 옛 소설은 번역문을 옮기지 않고 다시 쓴다(번역자 저작권)
+  const year = (id) => Number(/(\d{4})년에 세상을 떠나/.exec(card(id).facts.find((f) => f[0] === '저작권')[1])[1]);
+  assert.deepEqual(PREV.map(year), [1618, 1805, 1422, 1671]);
+  assert.deepEqual(PREV.map((id) => card(id).author), ['허균(전해짐) · 신코치가 다시 씀', '박지원 · 신코치가 다시 씀', '이방원 · 정몽주', '윤선도']);
+  for (const id of ['K32', 'K33']) assert.match(card(id).facts.find((f) => f[0] === '원문')[1], /신코치가 쉬운 말로 다시 썼어요 — 따옴표 안의 말도 신코치가 다시 쓴 말/, id);
+  // 아이에게 맞게 — 원문의 해치는 장면(자객을 벤 일 · 잿물·상투)은 옮기지 않는다
+  assert.ok(!/죽였|베었|잿물|상투/.test(JSON.stringify([card('K32').lines, card('K33').lines])));
+  // 중학교 성취기준 — 2022 개정 국어과 교육과정([별책 5] 54쪽) 원문 그대로 · 학년은 확인된 것만(오우가 중1 지학사 1-1 · 양반전 주로 중2 · 홍길동전 학년 여럿)
+  assert.deepEqual(PREV.map((id) => card(id).meta.find((m) => m.startsWith('중학교: '))), [
+    '중학교: [9국05-02] 갈등의 진행과 해결 과정을 파악하며 작품을 감상한다.',
+    '중학교: [9국05-05] 작품에 반영된 사회⋅문화적 상황을 이해하며 작품을 감상한다.',
+    '중학교: [9국05-07] 연관성이 있는 다른 작품들과의 관계를 파악하며 작품을 감상한다.',
+    '중학교: [9국05-01] 운율, 비유, 상징의 특성과 효과에 유의하며 작품을 감상하고 창작한다.',
+  ]);
+  assert.ok(!PREV.some((id) => JSON.stringify(card(id)).includes('중1')), '"중1"이라고 하지 않는다(작품마다 학년이 다르다) — 오우가의 "중학교 1학년"만');
+  // ✍️ K32 — 틀은 빈자리를 끝에
+  assert.deepEqual(card('K32').write.frames, ['내 생각에 길동이 겪은 일은 ~', '왜냐하면 ~', '~에서 그렇게 생각했어요.']);
+  // pre 검사
+  const bad = clone(card('K35'));
+  bad.pre = '중1';
+  assert.ok(checkCard(bad).some((m) => /pre\(미리보기\)는 중학교/.test(m)));
+  // 화면 — 도감 맨 뒤에 따로(제목 한 줄) · 칸과 글 위 표시
+  const src = readFileSync(new URL('../js/koreanview.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('const shown = [...cards.filter((c) => !c.pre), ...cards.filter((c) => c.pre)];'), '미리보기는 맨 뒤');
+  assert.ok(src.includes("if (c.pre && !(i && shown[i - 1].pre)) {") && src.includes("el('p', 'kor-grid-h', `${PRE[c.pre]}"), '미리보기 앞에 제목 한 줄 한 번');
+  assert.ok(src.includes("if (c.pre) b.appendChild(el('span', 'kor-slot-pre', PRE[c.pre]));") && src.includes("if (card.pre) top.appendChild(el('span', 'kor-pre-badge', PRE[card.pre]));"));
+  const { PRE } = await import('../js/korean.js');
+  assert.deepEqual(PRE, { '중학교': '⭐ 중학교 미리보기' });
+});
+
+test('🔍 Codex 56차 원고 (v244): K34 배경(새 나라 조선 ↔ 고려를 섬김) · K35 동산 = 동쪽에 있는 산(東山) · 틀린 보기 종류(K32-3 지어내기 · K33-2 지어내기 · K35-4 거꾸로) · 단정한 풀이 부드럽게 · 낱말·말 다듬기 · K32-4 근거 넓힘', () => {
+  const card = (id) => DATA.cards.find((c) => c.id === id);
+  const q = (id) => DATA.cards.flatMap((c) => c.qs).find((x) => x.id === id);
+  const opt = (qid, t) => q(qid).opts.find((o) => o.t === t);
+  const fact = (id, k) => card(id).facts.find((f) => f[0] === k)[1];
+  const word = (id, w) => card(id).words.find((x) => x[0] === w)[1];
+  // ④ K34-3은 배경 없이 풀 수 없었다 — 무엇을 바랐고 누구에게 마음을 지켰는지 · 전해지는 이야기임은 그대로
+  assert.match(fact('K34', '만나는 곳'), /전해져요\. 이방원은 정몽주가 새 나라\(조선\)를 세우는 쪽에 함께하기를 바랐고, 정몽주는 끝까지 고려를 섬기려 했어요/);
+  assert.match(q('K34-3').evNote, /임\(고려의 임금\)/);
+  // ⑤ 東山 — 마을 가까운 동산이 아니다(📖 낱말 줄기에도 들어간다)
+  assert.equal(word('K35', '동산'), '동쪽에 있는 산');
+  assert.match(fact('K35', '원문'), /東山의 → 동산에/);
+  // ⑩ 틀린 보기 종류는 실제 잘못대로
+  assert.deepEqual([opt('K32-3', '짚으로 사람 일곱을 만들어 팔았다').type, opt('K33-2', '새벽에 일어나기가 싫어서').type, opt('K35-4', '벗을 더 많이 사귀고 싶다').type], ['make', 'make', 'flip']);
+  assert.match(opt('K32-3', '짚으로 사람 일곱을 만들어 팔았다').why, /^팔았다는 말은 글에 없어요/);
+  // ⑪ 한 장면은 한 장면으로 · 첫 번째 증서는 "겉치레만"이 아니다
+  assert.equal(opt('K32-4', '산속의 도적 무리').type, 'detail');
+  assert.ok(!/맞선 것이 아니라/.test(opt('K32-4', '산속의 도적 무리').why) && !/맞선 것이 아니에요\.$/.test(opt('K32-4', '아무도 들지 못하던 무거운 돌').why));
+  assert.ok(!q('K33-4').doneNote.includes('겉치레만 가득') && q('K33-4').doneNote.includes('생활에 도움이 되기보다 지켜야 할 형식과 규칙이 많고'));
+  // ⑫ 낱말·말
+  assert.equal(word('K34', '가실'), "여기서는 '변하거나 사라질'이라는 뜻의 옛말");
+  assert.match(fact('K35', '원문'), /반갑고야는 '반갑구나'/);
+  assert.match(fact('K34', '원문'), /塵土ㅣ 되여 → 진토 되어/);
+  assert.ok(card('K32').lines[3].startsWith('어느 가을밤,'));
+  assert.deepEqual(q('K32-4').ev, [2, 3, 4, 5, 8, 11]);
 });

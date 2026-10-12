@@ -1,6 +1,6 @@
 // 📦 아빠의 구호품 (2026-10-05): node --test tests/parcel.test.js
 // 왜: v179에서 이로치의 스톤을 "하나에 3번"으로 바꿀 때, 그 전에 이미 써 버린 스톤의 남은 2번은 돌려주지 않았다.
-//     진우가 이로치를 빼자 스톤이 사라졌다 → 아빠가 coach/gifts.json으로 남은 2번을 보낸다. 받기는 한 번만.
+//     → 아빠가 coach/gifts.json으로 남은 2번을 보낸다. 받기는 한 번만. (공개 파일이라 구호품 글에 아이 이름·그때 일은 적지 않는다 — Codex 56차)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -96,7 +96,7 @@ test('📦 아직 안 받은 것만 하나씩 — 틀린 줄·받은 것·겹친
   assert.equal(afterLine({ potion: 1 }, 0), '🎒 가방에서 볼 수 있어요');
 });
 
-test('📦 배포 파일 coach/gifts.json — 진우에게 🌈 2번 · 모든 줄이 맞는 꼴 · id가 겹치지 않는다', () => {
+test('📦 배포 파일 coach/gifts.json — 🌈 2번 · 모든 줄이 맞는 꼴 · id가 겹치지 않는다 · 글에 아이 이름 없음(공개 파일)', () => {
   const list = JSON.parse(src('coach/gifts.json'));
   assert.ok(Array.isArray(list));
   const ids = list.map((e) => (parcelOf(e) || {}).id);
@@ -105,6 +105,7 @@ test('📦 배포 파일 coach/gifts.json — 진우에게 🌈 2번 · 모든 �
   const shiny = list.map(parcelOf).find((x) => x.items[SHINY_CHARGE]);
   assert.deepEqual(shiny.items, { [SHINY_CHARGE]: 2 }, '아버님: 2번 쓸 수 있게');
   assert.ok(shiny.text.length > 0, '아빠 한마디');
+  assert.ok(list.every((e) => !/진우/.test(`${e.title || ''} ${e.text || ''}`)), '공개 파일 — 구호품 글에 아이 이름을 적지 않는다(Codex 56차)');
 });
 
 test('📦 화면 연결 — 앱을 열면(🔒 알림 뒤) 한 번 · [받기]를 눌러야 저장소 트랜잭션 · 저장이 안 되면 "못 받았어요" · 오프라인 셸', () => {

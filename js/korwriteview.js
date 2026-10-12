@@ -15,6 +15,9 @@ const el = (tag, cls, text) => {
   return e;
 };
 
+/** 답장 기다리는 글의 판이 이 기기 원고에 없을 때 물음 자리에 (Codex 56차 — 지금 물음을 대신 보이면 다른 물음의 답처럼 보인다) */
+export const NO_EDITION_Q = '이 글을 쓸 때의 물음은 앱이 새로워지면 다시 보여요.';
+
 // ── 쓰던 글 (이 기기에만 — 아이 편의, 못 쓰면 메모리에만) ──
 const DRAFT_KEY = (id) => `shincoach.korDraft.${id}`;
 const drafts = new Map();
@@ -310,7 +313,8 @@ export function writeBoxEl(card, ctx) {
     }
     if (st.pendings.length) {
       // 물음은 그 글을 쓴 판의 것 — 원고를 고친 뒤에도 진우가 답한 물음이 보이게 (Codex 52차 #8)
-      const qs = st.pendings.map((p) => { const ed = questionOf(card.write, p.v); return ed ? ed.q : card.write.q; });
+      // 이 기기 원고에 그 판이 없으면(다른 기기가 새 판으로 쓴 글이 병합으로 옴) 지금 물음을 대신 보이지 않는다 (Codex 56차)
+      const qs = st.pendings.map((p) => { const ed = questionOf(card.write, p.v); return ed ? ed.q : NO_EDITION_Q; });
       sec.appendChild(el('p', 'kor-wq-text', qs[0]));
       sec.appendChild(el('p', 'kor-wwait', '✉️ 아빠에게 보낸 글이에요 — 답장을 기다리고 있어요. 다른 글을 읽어도 돼요.'));
       st.pendings.forEach((p, k) => {

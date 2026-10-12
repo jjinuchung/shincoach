@@ -3050,6 +3050,19 @@ function initSettingsDialog() {
   });
   $('set-catch-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startCatchPractice(); });
   $('set-battle-try').addEventListener('click', () => { unlock(); $('dlg-settings').close(); startBattlePractice(); });
+  // 🔊 한국어 읽어 주기 확인 (v244 — 📚 🎧 듣고 답하기 준비 · 기록 안 함 · 창은 그대로 두고 결과를 아래 줄에)
+  // 확인하는 동안 단추를 끄고, 마지막 확인의 결과만 적는다(겹친 확인·창을 닫았다 연 뒤의 옛 결과가 새 결과를 덮지 않게, Codex 56차)
+  $('set-tts-try').addEventListener('click', () => {
+    const btn = $('set-tts-try');
+    const note = $('set-tts-note');
+    const seq = ++ttsSeq;
+    const mine = () => seq === ttsSeq;
+    btn.disabled = true;
+    note.textContent = '🔊 읽는 중…';
+    import('./speakko.js').then((m) => m.ttsCheck().then((r) => { if (mine()) note.textContent = m.ttsCheckLine(r); }))
+      .catch((e) => { if (mine()) note.textContent = `⚠️ 확인하지 못했어요 — ${(e && e.message) || e}`; })
+      .finally(() => { if (mine()) btn.disabled = false; });
+  });
   $('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
     setParentMode($('set-parent').checked); // 저장하지 않음 (앱을 다시 열면 학습 모드)
@@ -3144,9 +3157,14 @@ function openSettings() {
     $('set-time-ext').value = String(extMaxOf(settings.timeExtMax));
     $('set-mathpad').checked = settings.mathPad !== false;
     renderTimeToday();
+    ttsSeq++; // 🔊 아직 안 끝난 지난 확인은 결과를 적지 않는다
+    $('set-tts-note').textContent = ''; // 🔊 지난번 확인 결과는 지운다
+    $('set-tts-try').disabled = false;
     $('dlg-settings').showModal();
   });
 }
+/** 🔊 한국어 읽어 주기 확인의 차례 — 마지막 확인만 결과 줄에 (Codex 56차) */
+let ttsSeq = 0;
 
 function initPinDialog() {
   $('pin-cancel').addEventListener('click', () => $('dlg-pin').close());

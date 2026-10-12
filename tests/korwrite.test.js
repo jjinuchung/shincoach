@@ -18,7 +18,7 @@ import { emptyProfile, cloneProfile, mergeStatRecord } from '../js/db.js';
 import { initProfile, flushProfile, reloadProfile, korWriteAdd, korWriteApply, korWriteRead, korWritesMap } from '../js/xp.js';
 import * as UP from '../js/upload.js';
 import { checkPrivateDir } from '../tools/privcheck.mjs';
-import { countLine, rewardLine, sendWhy, slotWriteText, appliedLine, replyHead, seenEnough, watchSeen, READ_DWELL_MS, SEEN_STEPS, insertAt } from '../js/korwriteview.js';
+import { countLine, rewardLine, sendWhy, slotWriteText, appliedLine, replyHead, seenEnough, watchSeen, READ_DWELL_MS, SEEN_STEPS, insertAt, NO_EDITION_Q } from '../js/korwriteview.js';
 
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const DATA = JSON.parse(read('coach/korean/reading.json'));
@@ -34,7 +34,7 @@ const E = (at, text) => ({ id: writeIdOf(at, text), at });
 
 test('✍️ 원고: 서술형은 K1·K7·K15·K17·K19 + v241 K20(처음 해 본 일)·K26(방언·표준어)·K31(토끼전 인물) · 판 번호 1 · 꼭 들어갈 생각·괜찮은 답·흔한 잘못·예시 답 · 검사가 잡는 것', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(DATA.cards.filter((c) => c.write).map((c) => c.id), ['K1', 'K7', 'K15', 'K17', 'K19', 'K20', 'K26', 'K31']);
+  assert.deepEqual(DATA.cards.filter((c) => c.write).map((c) => c.id), ['K1', 'K7', 'K15', 'K17', 'K19', 'K20', 'K26', 'K31', 'K32']);
   for (const c of DATA.cards.filter((x) => x.write)) {
     assert.equal(c.write.v, 1, c.id);
     assert.ok(c.write.rubric.must.length >= 2, `${c.id}: 생각 + 까닭(근거)`);
@@ -702,11 +702,14 @@ test('🔍 Codex 52차 #8 — 채점 기준 판 번호: 옛 판은 원고 write.
   for (const v of [999, 0, -1, 1.5, '1', null]) {
     const c = checkReplies([{ ...R('K19', a, 'ok', '좋아!'), v }], cards);
     assert.deepEqual([c.good.length, c.bad.length], [0, 1], `v ${v}`);
-    assert.match(c.bad[0].why, /v는 K19의 채점 기준 판 번호\(v1·v2\)/);
+    assert.match(c.bad[0].why, v === 999 ? /v는 K19의 채점 기준 판 번호\(v1·v2\)/ : /v는 1부터의 판 번호/);
   }
   assert.equal(checkReplies([{ ...R('K19', a, 'ok', '좋아!'), v: 2 }], CARDS).bad.length, 1, '지금 원고(1판뿐)에 없는 판');
-  const both = checkReplies([{ ...R('K19', a, 'ok', '좋아!'), v: 1 }, { ...R('K19', a, 'ok', '좋아!'), v: 2 }], cards);
-  assert.deepEqual([both.good.length, both.bad.length], [0, 2], '판이 다른 같은 답장 둘');
+  const pair = [{ ...R('K19', a, 'ok', '좋아!'), v: 1 }, { ...R('K19', a, 'near', '거의!'), v: 2 }];
+  for (const [list, cs, name] of [[pair, cards, '2판 원고'], [pair, CARDS, '1판뿐인 원고'], [[...pair].reverse(), CARDS, '1판뿐 · 차례 거꾸로']]) {
+    const both = checkReplies(list, cs);
+    assert.deepEqual([both.good.length, both.bad.length], [0, 2], `판이 다른 같은 글 답장 둘은 원고에 그 판이 있든 없든 둘 다 버림 — ${name} (Codex 56차: 1판뿐인 원고에선 하나를 받았다)`);
+  }
   const same = checkReplies([{ ...R('K19', a, 'ok', '좋아!'), v: 1 }, R('K19', a, 'ok', '좋아!')], cards);
   assert.deepEqual([same.good.length, same.bad.length], [1, 0], 'v 1과 v 없음은 같은 판');
   // 비공개 검사(check --private)도 같은 검사
@@ -716,7 +719,8 @@ test('🔍 Codex 52차 #8 — 채점 기준 판 번호: 옛 판은 원고 write.
   assert.match(checkPrivateDir(dir, () => '<svg>').errors.join(' '), /v는 K19의 채점 기준 판 번호\(v1\)/);
   // 화면 — 답장 기다리는 글 위 물음은 그 글을 쓴 판의 것 · 📊 받기 줄에 판 다름
   const wv = read('js/korwriteview.js');
-  assert.ok(wv.includes('const qs = st.pendings.map((p) => { const ed = questionOf(card.write, p.v); return ed ? ed.q : card.write.q; });'));
+  assert.ok(wv.includes('const qs = st.pendings.map((p) => { const ed = questionOf(card.write, p.v); return ed ? ed.q : NO_EDITION_Q; });'), '이 기기 원고에 그 판이 없으면 지금 물음을 대신 보이지 않는다(Codex 56차)');
+  assert.equal(NO_EDITION_Q, '이 글을 쓸 때의 물음은 앱이 새로워지면 다시 보여요.');
   assert.ok(wv.includes("sec.appendChild(el('p', 'kor-wq-text', qs[0]));") && !wv.includes("sec.appendChild(el('p', 'kor-wq-text', card.write.q));"));
   assert.ok(wv.includes("if (k > 0 && qs[k] !== qs[0]) mine.appendChild(el('p', 'kor-wq-text', qs[k]));"), '두 기기에서 판이 다른 글이 함께 기다리면 글마다 그 물음');
   const up = read('js/upload.js');

@@ -24,12 +24,12 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const byId = (id) => LIST.find((p) => p.id === id);
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 
-test('🧩 원고: 검사 통과 · 차례 맞추기 14(이야기 흐름 10 — 모두 있는 글 카드 · 하는 차례 4) · 사실·의견 10묶음 50문장 · 차례는 실마리에 맞는 것이 하나뿐 · 실마리 말은 조각에 있음', () => {
+test('🧩 원고: 검사 통과 · 차례 맞추기 16(이야기 흐름 12 — 모두 있는 글 카드, v244 홍길동전·양반전 · 하는 차례 4) · 사실·의견 10묶음 50문장 · 차례는 실마리에 맞는 것이 하나뿐 · 실마리 말은 조각에 있음', () => {
   assert.deepEqual(checkPuzzles(DATA, CARDS), []);
   assert.equal(LIST.length, DATA.puzzles.length, '쓸 수 있는 퍼즐 = 전부');
   const orders = LIST.filter((p) => p.kind === 'order');
   const sorts = LIST.filter((p) => p.kind === 'sort');
-  assert.deepEqual([orders.length, orders.filter((p) => p.ask === 'event').length, orders.filter((p) => p.ask === 'process').length, sorts.length], [14, 10, 4, 10]);
+  assert.deepEqual([orders.length, orders.filter((p) => p.ask === 'event').length, orders.filter((p) => p.ask === 'process').length, sorts.length], [16, 12, 4, 10]);
   assert.equal(sorts.reduce((n, p) => n + p.sents.length, 0), 50);
   for (const p of orders) {
     const vs = validOrders(p.chunks.length, p.need);
@@ -144,7 +144,7 @@ test('🧩 오늘의 판: 이야기 흐름은 그 글에 ★이 있어야 열림
   for (const p of LIST.filter((x) => x.kind === 'sort')) allSortsDone[p.id] = { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 };
   assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'order', 'order']);
   assert.ok(isSolved({ box: 1 }) && !isSolved({ box: 0 }) && !isSolved(null));
-  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 14, 4, 0, 1], ['sort', 10, 10, 1, 0]]);
+  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 16, 4, 0, 1], ['sort', 10, 10, 1, 0]]);
 });
 
 test('🧩 보상 규칙: 그날 첫 판만 💰·🎯 · 3개 모두 한 번에 → 🟩 · 같은 날 둘째 판은 보상 없음(⭐는 모임) · 틀리면 다음 날 · ⭐는 되돌리지 않음 · 낡은 판은 연습 · 모르는 퍼즐은 안 셈 · 빈 판은 empty', () => {
@@ -298,4 +298,14 @@ test('🧩 화면(Codex 55차): 그만하기 — 놓은 조각·고른 칸도 �
   assert.ok(pv.includes("fo ? (card.querySelectorAll('.kor-psort')[Number(fo[1])] || card).querySelector(`.kor-pfo.is-${fo[2]}`)"));
   assert.ok(pv.includes("focusTo === 'start' || focusTo === 'pool' ? card.querySelector('.kor-pchunk:not(:disabled), .kor-pfo:not(:disabled), .kor-pcheck:not(:disabled)')"), '새 퍼즐 — 첫 조각·첫 [사실]');
   assert.ok(pv.includes("quitAsk: false, focus: 'start' };"), '판을 시작하면 첫 퍼즐에 초점');
+});
+
+test('🧩 v244 이야기 흐름 둘 — 「홍길동전」(O15)·「양반전」(O16)은 그 글에 ★이 있어야 열림 · 실마리에 맞는 차례가 하나뿐', () => {
+  for (const [id, card] of [['O15', 'K32'], ['O16', 'K33']]) {
+    const p = byId(id);
+    assert.deepEqual([p.kind, p.ask, p.card, p.chunks.length], ['order', 'event', card, 4], id);
+    assert.ok(!isOpen(p, {}) && isOpen(p, { [`${card}:1`]: D0 }), `${id}: ${card}에 ★이 있어야`);
+    assert.deepEqual(validOrders(4, p.need), [[0, 1, 2, 3]], id);
+  }
+  assert.ok(!planPuzzles(LIST, {}, {}, T0).some((p) => p.id === 'O15' || p.id === 'O16'), '★ 없으면 안 나온다');
 });

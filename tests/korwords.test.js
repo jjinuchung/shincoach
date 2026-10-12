@@ -25,12 +25,12 @@ const D0 = dayNum(T0);
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const rng = (seed) => { let s = seed >>> 0 || 1; return () => { s = (s * 1103515245 + 12345) >>> 0; return (s >>> 8) / 16777216; }; };
 
-test('🔤 원고: 검사 통과 · 📘 51 · 🗣️ 40 · 🐢 20 · 📖 68(글의 낱말 — v241 새 글 열둘의 29 더함) · 📖은 뜻 고르기만(ex 없음, 나온 문장은 src) · 📘 빈칸 하나 · 🗣️·🐢 상황 글 · 📘 단원 검사 통과', () => {
+test('🔤 원고: 검사 통과 · 📘 51 · 🗣️ 40 · 🐢 20 · 📖 92(글의 낱말 — v241 새 글 열둘의 29 · v244 ⭐ 중학교 미리보기 넷의 24 더함) · 📖은 뜻 고르기만(ex 없음, 나온 문장은 src) · 📘 빈칸 하나 · 🗣️·🐢 상황 글 · 📘 단원 검사 통과', () => {
   assert.deepEqual(checkWords(WORDS, CARDS), []);
   assert.deepEqual(checkUnits(UNITS, CARDS, WORDS), []);
   const by = {};
   for (const w of ALL) by[w.deck] = (by[w.deck] || 0) + 1;
-  assert.deepEqual(by, { concept: 51, idiom: 40, proverb: 20, passage: 68 });
+  assert.deepEqual(by, { concept: 51, idiom: 40, proverb: 20, passage: 92 });
   for (const w of ALL.filter((x) => x.deck === 'passage')) {
     assert.equal(w.ex, '', `${w.w}: 📖은 빈칸 문제 없음 — 다른 글의 낱말이 빈칸에 같이 들어갈 수 있다`);
     assert.ok(w.src.includes(w.w), `${w.w}: 나온 글 문장`);
@@ -429,7 +429,7 @@ test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이
   const ws = JSON.parse(JSON.stringify(WORDS));
   ws.words[0].unit = '9-9';
   assert.ok(checkUnits(UNITS, CARDS, ws).some((e) => /없는 단원 9-9/.test(e)));
-  assert.deepEqual(deckStats(ALL, {}, {}).map((s) => [s.deck, s.total, s.open]), [['concept', 51, 51], ['idiom', 40, 40], ['proverb', 20, 20], ['passage', 68, 0]]);
+  assert.deepEqual(deckStats(ALL, {}, {}).map((s) => [s.deck, s.total, s.open]), [['concept', 51, 51], ['idiom', 40, 40], ['proverb', 20, 20], ['passage', 92, 0]]);
   assert.equal(Object.keys(DECKS).length, 4);
 });
 

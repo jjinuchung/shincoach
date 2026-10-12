@@ -270,7 +270,9 @@ export function checkReplies(list, cards) {
     if (typeof e.id !== 'string' || !WRITE_ID_RE.test(e.id)) { bad.push({ i, why: 'id는 korean/todo.json의 id 그대로(w + 14자)' }); return; }
     if (e.at !== undefined && (!Number.isSafeInteger(e.at) || e.at <= 0)) { bad.push({ i, why: 'at은 양의 정수(그 글의 at 그대로)' }); return; }
     const v = e.v === undefined ? 1 : e.v;
-    if (!Number.isSafeInteger(v) || v <= 0 || !has.get(e.card).has(v)) { bad.push({ i, why: `v는 ${e.card}의 채점 기준 판 번호(${[...has.get(e.card)].sort((a, b) => a - b).map((x) => `v${x}`).join('·')}) — 그 글을 채점한 판` }); return; }
+    // 꼴만 여기서 — 이 기기 원고에 그 판이 있는지는 겹침을 본 뒤에(아래). 먼저 보면 같은 글에 판이 다른 답장 둘이
+    // 원고에 따라 "하나 받음"과 "둘 다 버림"으로 갈렸다 (Codex 56차)
+    if (!Number.isSafeInteger(v) || v <= 0) { bad.push({ i, why: 'v는 1부터의 판 번호 — 그 글을 채점한 판' }); return; }
     if (!own(GRADES, e.grade)) { bad.push({ i, why: 'grade는 ok·near·again' }); return; }
     const text = typeof e.text === 'string' ? e.text.trim() : '';
     if (!text || [...text].length > REPLY_MAX) { bad.push({ i, why: `text는 1~${REPLY_MAX}자` }); return; }
@@ -282,7 +284,9 @@ export function checkReplies(list, cards) {
     if (!p.r.at && r.at) p.r.at = r.at; // 같은 답장인데 한 줄만 at을 적었으면 그 at을 지킨다 — 줄 차례에 따라 붙고 안 붙고가 갈리지 않게(Codex 53차 #2)
   });
   for (const { r, i, clash } of seen.values()) {
+    const eds = has.get(r.card);
     if (clash) bad.push({ i, why: `같은 글(${r.card}:${r.id})에 다른 답장` });
+    else if (!eds.has(r.v)) bad.push({ i, why: `v는 ${r.card}의 채점 기준 판 번호(${[...eds].sort((a, b) => a - b).map((x) => `v${x}`).join('·')}) — 그 글을 채점한 판` });
     else good.push(r);
   }
   return { good, bad, over: false };

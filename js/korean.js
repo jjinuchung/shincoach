@@ -29,6 +29,9 @@ export const TYPES = {
 
 /** 카드 종류 */
 export const KINDS = { practice: '📄 연습 카드', classic: '✨ 명작 카드' };
+/** ⭐ 미리보기 카드(pre) — 5학년 단원 밖, 다음 학교에서 만날 작품을 미리 (v244, 수학 M9 ⭐ 중1 미리보기처럼) ·
+ *  도감 맨 뒤에 따로 · 잠그지 않고 보상은 같다 · 작품이 학년마다·출판사마다 달라 "중1"이 아니라 "중학교"로 */
+export const PRE = { '중학교': '⭐ 중학교 미리보기' };
 
 /** ✍️ 서술형 답 글자 수 (공백 정리 뒤) — 규칙은 korwrite.js, 원고 검사(write.model)도 같은 값 (v237) */
 export const WRITE_MIN = 10;
@@ -256,6 +259,7 @@ export function checkCard(c, ids = new Set()) {
   else if (ids.has(c.id)) at('id가 겹쳐요');
   else ids.add(c.id);
   if (!own(KINDS, c.kind)) at('kind는 practice 또는 classic');
+  if (own(c, 'pre') && !own(PRE, c.pre)) at(`pre(미리보기)는 ${Object.keys(PRE).join('·')}`);
   for (const k of ['title', 'genre', 'icon', 'skill']) if (!nonEmpty(c[k])) at(`${k}가 비었어요`);
   if (!Array.isArray(c.meta) || !c.meta.length || !c.meta.every(nonEmpty)) at('meta(만나는 곳·성취기준)가 비었어요');
   const hasLines = Array.isArray(c.lines);
