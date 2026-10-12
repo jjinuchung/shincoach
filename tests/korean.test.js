@@ -16,12 +16,12 @@ const at = (days, h = 12) => new Date(2026, 9, 11 + days, h, 0, 0).getTime();
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('📚 원고: 형식 검사 통과 · 서른다섯 편(연습 열아홉·명작 열여섯 — v244 ⭐ 중학교 미리보기 넷) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
+test('📚 원고: 형식 검사 통과 · 마흔한 편(연습 스물다섯·명작 열여섯 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, Array.from({ length: 35 }, (_, i) => `K${i + 1}`));
+  assert.deepEqual(IDS, Array.from({ length: 41 }, (_, i) => `K${i + 1}`));
   const P = 'practice'; const C = 'classic';
-  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C]);
-  assert.equal(validCards(DATA).length, 35);
+  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P]);
+  assert.equal(validCards(DATA).length, 41);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -33,7 +33,7 @@ test('📚 원고: 형식 검사 통과 · 서른다섯 편(연습 열아홉·�
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 114);
+  assert.equal(qn, 132);
   assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 여덟 가지(v236 짜임 놓치기 더함)가 모두 한 번 이상 쓰인다');
   // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남 · 또는 지은이를 알 수 없는 옛이야기를 다시 씀)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {
@@ -436,7 +436,7 @@ test('🔍 Codex 48차 원고: 근거를 넓힘(K1-3 ③④⑧ · K2-1 ⑤⑦⑧
   assert.ok(!/중심 생각은 한 문장에서 찾지 않아요/.test(q('K2-3').doneNote));
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) assert.match(c.facts.find((f) => f[0] === '저작권')[1], /오늘 맞춤법으로 옮겨 실어요|쉬운 말로 다시 써서 실어요/, `${c.id} — 원문을 "그대로"라고 하지 않는다`);
   const withWords = DATA.cards.filter((c) => c.words);
-  assert.equal(withWords.length, DATA.cards.length, '글마다 낱말 풀이');
+  assert.equal(withWords.length, DATA.cards.filter((c) => !c.listen).length, '글마다 낱말 풀이 (🎧 듣기 카드는 글이 안 보여서 없음 — v245)');
   assert.ok(DATA.cards[2].words.some((w) => w[0] === '그믐밤') && DATA.cards[5].words.some((w) => w[0] === '갈잎'));
   const base = clone(DATA.cards[0]);
   base.words = [['코끼리', '큰 동물']];
@@ -512,7 +512,7 @@ test('📚 화면 연결: 홈 카드 📚 국어(안농) · view-korean · app �
   const pick = body('function pick(k) {');
   assert.ok(pick.includes('r.misses[o.type] = (r.misses[o.type] || 0) + 1;') && pick.includes('st.wrong.push(k);'), '틀린 보기는 잘못 읽기로');
   assert.ok(!body('function evPick(n) {').includes('misses'), '근거 실수는 안 센다');
-  assert.ok(body('async function finishCard() {').includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss);'));
+  assert.ok(body('async function finishCard() {').includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text) });'));
   assert.ok(body('function openCard(id) {').includes('order: shuffled(q.opts.length)'), '보기는 물음마다 섞는다');
   assert.ok(body('export async function enterKorean() {').includes("if (ui.read) {"), '🎒·📊에서 돌아오면 읽던 글 그대로');
   // Codex 48차: 틀린 까닭은 맞힌 뒤에 · 근거 실수 말은 부드럽게 · 읽어 주기 알림은 한 곳 · 초점 옮김 · 띠 높이만큼 띄움
@@ -522,7 +522,7 @@ test('📚 화면 연결: 홈 카드 📚 국어(안농) · view-korean · app �
   assert.ok(!rq.includes("setAttribute('role', 'status')"), '다시 그리는 칸에는 role=status를 새로 만들지 않는다');
   assert.ok(body('function evidenceEl(q, st, unit) {').includes('보다 답을 더 잘 받쳐 주는 ${unit}을 찾아볼까요?'));
   assert.ok(!src.includes('에는 까닭이 없어요'));
-  assert.ok(body('function renderRead() {').includes("main.style.setProperty('--kor-top',") && body('function bringQ() {').includes("if (col.getBoundingClientRect().top < under + 4) col.scrollIntoView({ block: 'start' });"), '띠 아래까지 셈');
+  assert.ok(body('function renderRead() {').includes("main.style.setProperty('--kor-top',") && body('function bringQ() {').includes('const top = col.getBoundingClientRect().top;') && body('function bringQ() {').includes("if (top < under + 4 || top > window.innerHeight - 96) col.scrollIntoView({ block: 'start' });"), '띠 아래까지 셈 · 🎧 화면 아래 밖이어도(Codex 57차)');
   for (const f of ['function pick(k) {', 'function evPick(n) {']) assert.ok(body(f).includes("r.focus = 'answer';"), f);
   const css = readFileSync(new URL('../css/style.css', import.meta.url), 'utf8');
   assert.ok(css.includes('position: sticky; top: var(--kor-top, 72px);') && css.includes('.kor-qcol { scroll-margin-top: var(--kor-top, 72px); }'), '띠 아래에 붙는다');
@@ -549,7 +549,7 @@ test('🟩 국어스톤 (2026-10-11): 별을 새로 받을 때 보기·근거를
   assert.equal(v.finishText({ ok: true, star: 1, coins: 12, stone: 1, stars: 1 }).lines[0], '💰 +12 · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!) · 🎯 국어 포켓몬 잡기 1번');
   assert.equal(v.finishText({ ok: true, star: 1, coins: 12, stone: 0, stars: 1 }).lines[0], '💰 +12 · 🎯 국어 포켓몬 잡기 1번');
   const src = readFileSync(new URL('../js/koreanview.js', import.meta.url), 'utf8');
-  assert.ok(src.includes('    r.evMiss += 1;') && src.includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss);'), '근거 실수는 🟩 판정에만');
+  assert.ok(src.includes('    r.evMiss += 1;') && src.includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text) });'), '근거 실수는 🟩 판정에만');
 });
 
 test('📚 명작도 문장 글일 수 있다 (v232 「알에서 태어나다」): 글 상자는 stanzas가 없으면 번호 붙은 문장으로 — 시 모양을 가정하면 화면이 깨졌다', () => {
@@ -642,8 +642,11 @@ test('⭐ 중학교 미리보기 (v244, 아버님 "이대로 진행"): 명작 �
   assert.ok(checkCard(bad).some((m) => /pre\(미리보기\)는 중학교/.test(m)));
   // 화면 — 도감 맨 뒤에 따로(제목 한 줄) · 칸과 글 위 표시
   const src = readFileSync(new URL('../js/koreanview.js', import.meta.url), 'utf8');
-  assert.ok(src.includes('const shown = [...cards.filter((c) => !c.pre), ...cards.filter((c) => c.pre)];'), '미리보기는 맨 뒤');
-  assert.ok(src.includes("if (c.pre && !(i && shown[i - 1].pre)) {") && src.includes("el('p', 'kor-grid-h', `${PRE[c.pre]}"), '미리보기 앞에 제목 한 줄 한 번');
+  // v245: 묶음이 셋(보통 · 🎧 듣기 · ⭐ 미리보기) — 미리보기는 그대로 맨 뒤
+  assert.ok(src.includes("const shown = [...cards.filter((c) => !groupOf(c)), ...cards.filter((c) => groupOf(c) === 'listen'), ...cards.filter((c) => groupOf(c) === 'pre')];"), '미리보기는 맨 뒤');
+  assert.ok(src.includes('if (g && !(i && groupOf(shown[i - 1]) === g)) grid.appendChild(') && src.includes("g === 'pre' ? `${PRE[c.pre]} — 앞으로 국어 시간에 만날 작품을 미리 읽어요`"), '미리보기 앞에 제목 한 줄 한 번');
+  const { groupOf } = await import('../js/koreanview.js');
+  assert.deepEqual(['K1', 'K32', 'K36'].map((id) => groupOf(card(id))), ['', 'pre', 'listen']);
   assert.ok(src.includes("if (c.pre) b.appendChild(el('span', 'kor-slot-pre', PRE[c.pre]));") && src.includes("if (card.pre) top.appendChild(el('span', 'kor-pre-badge', PRE[card.pre]));"));
   const { PRE } = await import('../js/korean.js');
   assert.deepEqual(PRE, { '중학교': '⭐ 중학교 미리보기' });

@@ -33,12 +33,28 @@ export function waitVoices(synth, ms = 1500, want = (l) => l.length > 0) {
   });
 }
 
+// 읽는 중인 말 — 끝날 때까지 붙잡아 둔다 (크롬은 아무도 안 잡은 말을 치워 버려 끝 알림(onend)이 안 오는 일이 있다 — 🎧 줄마다 읽기에서 줄 사이가 길어졌다)
+const KEEP = new Set();
+let sayNo = 0; // 마지막으로 넣은 말의 번호 — 시간이 다 된 옛 말이 새 말을 끊지 않게 (Codex 57차 #2)
+
+/** 시작 기다림(ms) — 이때까지 시작 알림도 없고 말하는 중도 아니면 소리 없음 */
+export const START_MS = 6000;
+/** 말하는 중인지 살피는 간격(ms) — 시작한 뒤 speaking이 두 번 이어 거짓이면 끝 알림 없이 끝난 것 */
+export const POLL_MS = 250;
+/** 끝 기다림(ms) — 시작한 뒤부터 · 글자 수와 빠르기에 맞춰 넉넉히 (🐢 천천히는 더 길게) */
+export function endWaitMs(text, rate = 1) {
+  const r = Number(rate) > 0 ? Number(rate) : 1;
+  return 3000 + Math.round((String(text || '').length * 250) / r);
+}
+
 /**
  * 한국어 한 덩이 읽기 — Promise<{ ok, started, why? }>
- * ok = 끝 알림(onend)까지 왔다 · started = 소리를 내기 시작했다는 알림(onstart)이 왔다 ·
+ * ok = 끝 알림(onend)까지 왔다 · started = 소리를 내기 시작했다는 알림(onstart)이 왔다(또는 시작 기다림 끝에 말하는 중이었다) ·
  * why = 'none'(읽어 주기 없음) | 'silent'(아무 소식 없음) | 'noend'(시작했지만 끝 알림이 없음) | 오류 이름(interrupted …)
+ * Codex 57차 #2: 시작 기다림과 끝 기다림을 나눈다 · 시작한 뒤 말하는 중이 아니게 되면 바로 끝(기다리지 않음) ·
+ *               시간이 다 되면 그 말이 아직 마지막 말일 때만 기기에서도 지운다(cancel — 늦게 소리가 나지 않게 · 새 말은 건드리지 않음)
  * @param {string} text
- * @param {{rate?:number, pitch?:number, voice?:object, win?:object, timeout?:number}} [o]
+ * @param {{rate?:number, pitch?:number, voice?:object, win?:object, timeout?:number, startMs?:number, endMs?:number}} [o] timeout은 두 기다림 모두
  */
 export function sayKo(text, o = {}) {
   const win = o.win || (typeof window !== 'undefined' ? window : null);
@@ -46,27 +62,55 @@ export function sayKo(text, o = {}) {
     const synth = win && win.speechSynthesis;
     const U = win && win.SpeechSynthesisUtterance;
     if (!synth || typeof U !== 'function') { resolve({ ok: false, started: false, why: 'none' }); return; }
+    const my = ++sayNo;
     let started = false;
     let done = false;
     let timer = null;
+    let poll = null;
+    let quiet = 0;
+    let u = null;
     const end = (ok, why) => {
       if (done) return;
       done = true;
       if (timer !== null) clearTimeout(timer);
+      if (poll !== null) clearInterval(poll);
+      timer = null;
+      poll = null;
+      if (u) KEEP.delete(u);
       resolve(ok ? { ok, started } : { ok, started, why });
     };
+    // 시간이 다 됐다 — 아직 마지막 말이면 기기의 줄에서도 지우고 끝낸다
+    const drop = (why) => {
+      if (done) return;
+      if (my === sayNo) { try { synth.cancel(); } catch { /* 없어도 */ } }
+      end(false, why);
+    };
+    // 말하는 중인가 — 모르는 브라우저는 null(살피지 않고 기다림만)
+    const speaking = () => { try { return typeof synth.speaking === 'boolean' ? synth.speaking : null; } catch { return null; } };
+    const onStarted = () => {
+      if (started || done) return;
+      started = true;
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => drop('noend'), o.endMs || o.timeout || endWaitMs(text, o.rate));
+      if (speaking() === null) return;
+      poll = setInterval(() => {
+        quiet = speaking() === false ? quiet + 1 : 0;
+        if (quiet >= 2) end(false, 'noend'); // 말은 끝났는데 끝 알림이 없다 — 기다리지 않고 다음 줄
+      }, POLL_MS);
+    };
     try {
-      const u = new U(String(text || ''));
+      u = new U(String(text || ''));
+      KEEP.add(u);
       u.lang = 'ko-KR';
       if (o.voice) u.voice = o.voice;
       u.rate = Number(o.rate) || 1;
       u.pitch = Number(o.pitch) || 1;
-      u.onstart = () => { started = true; };
+      u.onstart = onStarted;
       u.onend = () => end(true);
       u.onerror = (e) => end(false, (e && e.error) || 'error');
       synth.speak(u);
-      // 소식 없이 멎는 기기가 있다 — 글자 수에 맞춰 넉넉히 기다리고 끝낸다(끝 알림이 없었으면 끝까지 읽었다고 하지 않는다)
-      timer = setTimeout(() => end(false, started ? 'noend' : 'silent'), o.timeout || 4000 + String(text || '').length * 250);
+      // 시작 알림이 없는 기기 — 기다림 끝에 말하는 중이면 시작한 것으로, 아니면 소리 없음(줄에서 지운다)
+      timer = setTimeout(() => { if (speaking()) onStarted(); else drop('silent'); }, o.startMs || o.timeout || START_MS);
     } catch (e) {
       end(false, String((e && e.message) || e));
     }

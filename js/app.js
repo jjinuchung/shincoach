@@ -8,7 +8,7 @@ import { initHatch } from './hatch.js';
 import { initEvolveShow } from './evolveshow.js';
 import { initHome, renderHome } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
-import { initKorean, enterKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11)
+import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
 import { initTimeLimit, setSubject, flushTime, isLocked } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
@@ -59,6 +59,7 @@ export function showView(name) {
   // 📚 국어는 읽던 글이 있으면 그대로(🎒·📊에서 돌아옴), 없으면 도감을 다시 그린다(다른 창에서 받은 별)
   if (name === 'korean') enterKorean().catch(() => {});
   else stopCheer(); // ✨ 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)
+  if (name !== 'korean') leaveKorean(); // 🎧 듣기 카드 소리는 국어 화면에서만 (v245)
 }
 
 /** 전체 화면 로딩 표시 (영상 열기/저장처럼 수 초 이상 걸리는 작업용) */

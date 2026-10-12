@@ -1,18 +1,20 @@
 // 🔊 한국어 읽어 주기 (v244) — 한국어 음성 고르기 · 음성 목록 늦게 오기 · 읽기 시작·끝 · 소리 없음 · ⚙ 확인 한 줄 · 설정 화면 연결
 // 🔍 Codex 56차 — 시작한 뒤 멈춘 읽기를 ✅로 보이지 않음 · 끝 알림이 없으면 "끝났는지 모름" · 한국어 음성이 늦게 오면 끝까지 기다림 · 목록에 없음 ≠ 없음 · 겹친 확인
+// 🔍 Codex 57차 — 시간이 다 되면 아직 마지막 말일 때만 기기에서도 지움(cancel) · 시작 기다림과 끝 기다림을 나눔 · 말하기가 멈추면 곧 끝
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { koVoicesOf, waitVoices, sayKo, ttsCheck, ttsCheckLine, CHECK_TEXT } from '../js/speakko.js';
+import { koVoicesOf, waitVoices, sayKo, ttsCheck, ttsCheckLine, CHECK_TEXT, START_MS, POLL_MS, endWaitMs } from '../js/speakko.js';
 
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const V = (lang, name = lang) => ({ lang, name });
 
 /**
  * 가짜 브라우저 — voices: 처음 목록 · later: [[ms, 목록]…] voiceschanged로 바뀌는 목록 ·
- * mode: 'ok'(시작·끝) | 'silent'(아무 소식 없음) | 'error'(시작 전 오류) | 'startErr'(시작 뒤 멈춤) | 'noend'(시작만)
+ * mode: 'ok'(시작·끝) | 'silent'(아무 소식 없음) | 'error'(시작 전 오류) | 'startErr'(시작 뒤 멈춤) | 'noend'(시작만) |
+ *       'quiet'(시작하고 ms 뒤 말하기를 멈추지만 끝 알림 없음 — speaking으로만 안다) | 'nostart'(시작 알림 없이 말하다 ms 뒤 끝)
  */
-function fakeWin({ voices = [], later = [], mode = 'ok' } = {}) {
+function fakeWin({ voices = [], later = [], mode = 'ok', ms = 20 } = {}) {
   const said = [];
   let list = voices;
   const listeners = [];
@@ -21,6 +23,7 @@ function fakeWin({ voices = [], later = [], mode = 'ok' } = {}) {
     getVoices: () => list,
     addEventListener: (ev, fn) => { if (ev === 'voiceschanged') listeners.push(fn); },
     removeEventListener: (ev, fn) => { const k = listeners.indexOf(fn); if (k >= 0) listeners.splice(k, 1); },
+    speaking: mode === 'quiet' || mode === 'nostart' ? false : undefined, // 말하는 중인지 알려 주는 브라우저만
     cancel: () => { cancels++; },
     speak(u) {
       said.push({ text: u.text, lang: u.lang, voice: u.voice, rate: u.rate, pitch: u.pitch });
@@ -28,6 +31,8 @@ function fakeWin({ voices = [], later = [], mode = 'ok' } = {}) {
       if (mode === 'error') setTimeout(() => u.onerror({ error: 'synthesis-failed' }), 0);
       if (mode === 'startErr') setTimeout(() => { u.onstart(); u.onerror({ error: 'interrupted' }); }, 0);
       if (mode === 'noend') setTimeout(() => u.onstart(), 0);
+      if (mode === 'quiet') setTimeout(() => { synth.speaking = true; u.onstart(); setTimeout(() => { synth.speaking = false; }, ms); }, 0);
+      if (mode === 'nostart') { synth.speaking = true; setTimeout(() => { synth.speaking = false; u.onend(); }, ms); }
     },
   };
   for (const [ms, l] of later) setTimeout(() => { list = l; [...listeners].forEach((f) => f()); }, ms);
@@ -93,4 +98,37 @@ test('🔊 ⚙ 한국어 읽어 주기 확인 — 결과(음성 수·끝까지·
   assert.ok(pl.includes("    ttsSeq++; // 🔊 아직 안 끝난 지난 확인은 결과를 적지 않는다\n    $('set-tts-note').textContent = '';"), '창을 열면 지난 확인을 무르고 결과를 지운다');
   assert.ok(!/^import .*speakko/m.test(pl), 'player.js 맨 위 import에 넣지 않는다(누를 때만)');
   assert.ok(read('sw.js').includes("'./js/speakko.js',"));
+});
+
+test('🔊 Codex 57차: 시간이 다 되면 그 말이 아직 마지막 말일 때만 cancel(늦게 소리가 나지 않게 · 새 말은 안 끊음) · 시작 기다림 6초와 끝 기다림(글자 수·빠르기) · 시작 뒤 말하기가 멈추면 끝 알림을 기다리지 않음 · 시작 알림 없이 말하는 기기', async () => {
+  assert.equal(START_MS, 6000);
+  assert.ok(POLL_MS > 0 && POLL_MS <= 500);
+  const long = '가'.repeat(40);
+  assert.ok(endWaitMs(long, 0.7) > endWaitMs(long, 0.9) && endWaitMs(long, 0.9) > endWaitMs('가', 0.9), '천천히·긴 줄은 더 기다린다');
+  assert.equal(endWaitMs(long, 0), endWaitMs(long, 1), '빠르기가 이상하면 1로');
+  // 소식 없음 — 기다림 끝에 줄에서 지운다(전엔 cancel 0번, 줄에 남아 늦게 소리가 날 수 있었다)
+  const silent = fakeWin({ mode: 'silent' });
+  assert.deepEqual(await sayKo('안녕', { win: silent.win, startMs: 20 }), { ok: false, started: false, why: 'silent' });
+  assert.equal(silent.cancels(), 1, '시간이 다 되면 cancel');
+  // 시작만 하고 끝 알림이 없음 — 끝 기다림 뒤 cancel
+  const noend = fakeWin({ mode: 'noend' });
+  assert.deepEqual(await sayKo('안녕', { win: noend.win, endMs: 20 }), { ok: false, started: true, why: 'noend' });
+  assert.equal(noend.cancels(), 1);
+  // 옛 말의 시간이 다 됐을 때 그 사이 새 말을 넣었으면 cancel하지 않는다(새 읽기를 끊지 않게 — 번호로 확인)
+  const old = fakeWin({ mode: 'silent' });
+  const pOld = sayKo('옛 말', { win: old.win, startMs: 30 });
+  const fresh = fakeWin({ mode: 'ok' });
+  assert.deepEqual(await sayKo('새 말', { win: fresh.win }), { ok: true, started: true });
+  assert.deepEqual(await pOld, { ok: false, started: false, why: 'silent' });
+  assert.equal(old.cancels(), 0, '옛 말은 마지막 말이 아니다 — cancel하지 않음');
+  // 시작 뒤 말하기가 멈췄는데 끝 알림이 없다 — 끝 기다림(수 초)까지 가지 않고 곧 noend · 이미 끝난 말이라 cancel 없음
+  const quiet = fakeWin({ mode: 'quiet', ms: 10 });
+  const t0 = Date.now();
+  assert.deepEqual(await sayKo(long, { win: quiet.win, rate: 0.7 }), { ok: false, started: true, why: 'noend' });
+  assert.ok(Date.now() - t0 < 2000, `곧 끝 (${Date.now() - t0}ms)`);
+  assert.equal(quiet.cancels(), 0);
+  // 시작 알림 없이 말하는 기기 — 시작 기다림 끝에 말하는 중이면 시작한 것으로, 끝 알림까지 기다린다
+  const nostart = fakeWin({ mode: 'nostart', ms: 60 });
+  assert.deepEqual(await sayKo('안녕', { win: nostart.win, startMs: 15 }), { ok: true, started: true });
+  assert.equal(nostart.cancels(), 0, '말하는 중이면 지우지 않는다');
 });

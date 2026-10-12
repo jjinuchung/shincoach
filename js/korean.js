@@ -14,18 +14,40 @@
 //  · 잘못 읽기 횟수 = profile.korMiss { 종류: 수 } — 늘어나기만(병합 max)
 //  · 💰는 별과 같은 트랜잭션(db.applyHouseRule = mutateProfile) · 날은 규칙을 돌리는 때(트랜잭션 안의 now)로 센다
 
-/** 틀린 보기의 종류 = 흔한 잘못 읽기 — name 이름 · what 뜻(아빠용) · hint 아이에게 주는 힌트 */
+/** 틀린 보기의 종류 = 흔한 잘못 읽기 — name 이름 · what 뜻(아빠용) · hint 아이에게 주는 힌트 ·
+ *  hintL 🎧 듣기 카드에서 주는 힌트(글이 안 보이니 "들은 말"로 — v245) */
 export const TYPES = {
-  make: { name: '지어내기', what: '글에 없는 내용이나 마음을 만들어 냄', hint: '글에 그런 말이 있나요? 글에 있는 것만 가지고 짐작해요.' },
-  flip: { name: '거꾸로 읽기', what: '글과 반대로 읽음', hint: '글을 다시 읽어 보세요. 반대로 쓰여 있어요.' },
-  time: { name: '때 헷갈리기', what: '다른 때에 일어난 일을 끌어옴', hint: '그건 다른 때에 일어난 일이에요. 언제 일어났는지 보세요.' },
-  link: { name: '엉뚱한 연결', what: '묻는 것과 상관없는 내용을 이어 붙임', hint: '그 내용은 이 물음과 이어지지 않아요.' },
-  literal: { name: '글자만 보기', what: '쓰인 낱말·문장만 보고 묻는 것에 답하지 않음', hint: '글에 쓰인 걸 그대로 골랐어요. 묻는 것에 대한 답이 되나요?' },
-  detail: { name: '세부만 보기', what: '글 전체가 아니라 한 부분을 고름', hint: '글의 한 부분만 말하고 있어요. 글 전체가 하는 말은 무엇일까요?' },
-  fo: { name: '사실·의견 헷갈리기', what: '글쓴이의 생각·짐작을 사실로(또는 거꾸로) 봄', hint: '그건 확인할 수 있는 일인가요, 글쓴이의 생각인가요?' },
+  make: { name: '지어내기', what: '글에 없는 내용이나 마음을 만들어 냄', hint: '글에 그런 말이 있나요? 글에 있는 것만 가지고 짐작해요.', hintL: '들은 말에 그런 내용이 있었나요? 들은 것만 가지고 짐작해요.' },
+  flip: { name: '거꾸로 읽기', what: '글과 반대로 읽음', hint: '글을 다시 읽어 보세요. 반대로 쓰여 있어요.', hintL: '다시 들어 보세요. 반대로 말했어요.' },
+  time: { name: '때 헷갈리기', what: '다른 때에 일어난 일을 끌어옴', hint: '그건 다른 때에 일어난 일이에요. 언제 일어났는지 보세요.', hintL: '그건 다른 때의 일이에요. 언제라고 했는지 다시 들어 보세요.' },
+  link: { name: '엉뚱한 연결', what: '묻는 것과 상관없는 내용을 이어 붙임', hint: '그 내용은 이 물음과 이어지지 않아요.', hintL: '들은 내용이지만 이 물음과는 이어지지 않아요.' },
+  literal: { name: '글자만 보기', what: '쓰인 낱말·문장만 보고 묻는 것에 답하지 않음', hint: '글에 쓰인 걸 그대로 골랐어요. 묻는 것에 대한 답이 되나요?', hintL: '들은 말을 그대로 골랐어요. 묻는 것에 대한 답이 되나요?' },
+  detail: { name: '세부만 보기', what: '글 전체가 아니라 한 부분을 고름', hint: '글의 한 부분만 말하고 있어요. 글 전체가 하는 말은 무엇일까요?', hintL: '들은 내용의 한 부분만 말하고 있어요. 전체가 하는 말은 무엇일까요?' },
+  fo: { name: '사실·의견 헷갈리기', what: '글쓴이의 생각·짐작을 사실로(또는 거꾸로) 봄', hint: '그건 확인할 수 있는 일인가요, 글쓴이의 생각인가요?', hintL: '그건 확인할 수 있는 일인가요, 말한 사람의 생각인가요?' },
   // v236 (5-2 「올바른 문장으로 글을 써요」 — 문장의 호응): 맞춤법이 아니라 문장 짜임
-  agree: { name: '짜임 놓치기', what: '문장의 앞뒤(주어·목적어·때를 나타내는 말과 서술어)가 어울리는지 놓침', hint: '문장의 처음과 끝만 이어 읽어 보세요. 어울리나요?' },
+  agree: { name: '짜임 놓치기', what: '문장의 앞뒤(주어·목적어·때를 나타내는 말과 서술어)가 어울리는지 놓침', hint: '문장의 처음과 끝만 이어 읽어 보세요. 어울리나요?', hintL: '문장의 처음과 끝만 이어 보세요. 어울리나요?' },
 };
+
+/** 🎧 듣기 카드 (v245, 2026-10-12 아버님 "이대로 진행") — 글 대신 소리로 듣고 답한다. 원고 꼴 = 연습 카드 + listen { who }
+ *  · who = 말하는 사람(대화·토의 — 줄마다 "이름: 말", 사람마다 목소리 높낮이를 달리) · 빈 목록이면 한 사람(안내 방송·발표·메시지·이야기)
+ *  · 글이 보이지 않으니: 근거 잡기 없음 · 물음·보기·풀이에 문장 번호(①…) 없음 · 📖 낱말·✍️ 쓰기 없음 ·
+ *    읽어 주기가 이상하게 읽는 글자(숫자·가운뎃점·괄호·물결·빗금) 없음 — 수는 "여덟 시 사십 분"처럼 한글로 */
+export const LISTEN_KIND = '🎧 듣기 카드';
+export const LISTEN_WHO_MAX = 4;
+export const LISTEN_LINES = { min: 6, max: 16 };
+export const LISTEN_LINE_MAX = 90;
+/** 듣기 카드인가 */
+export function isListen(card) {
+  return !!card && isObj(card.listen);
+}
+/** 줄 → { who 말하는 사람('' = 한 사람), text 읽을 말 } — who 목록에 있는 이름 + ": "로 시작하는 줄만 사람을 가른다 */
+export function speakerOf(card, line) {
+  const s = String(line || '');
+  const who = card && isObj(card.listen) && Array.isArray(card.listen.who) ? card.listen.who : [];
+  const k = s.indexOf(': ');
+  if (k > 0 && who.includes(s.slice(0, k))) return { who: s.slice(0, k), text: s.slice(k + 2) };
+  return { who: '', text: s };
+}
 
 /** 카드 종류 */
 export const KINDS = { practice: '📄 연습 카드', classic: '✨ 명작 카드' };
@@ -158,12 +180,13 @@ export function mergeMiss(a, b) {
 /**
  * 글 한 편을 다 읽었다 — 한 트랜잭션에서: 잘못 읽기 횟수 더하기 · 받을 별이 있으면 별 + 💰.
  * ids = 지금 있는 카드 id들(모르는 카드로 💰를 받지 못하게) · misses = { 종류: 이번에 고른 수 } · now = 트랜잭션 안의 시각 ·
- * evMiss = 근거를 잘못 누른 수(잘못 읽기로는 안 세지만 🟩 "한 번에 다 맞힘"에는 든다)
+ * evMiss = 근거를 잘못 누른 수(잘못 읽기로는 안 세지만 🟩 "한 번에 다 맞힘"에는 든다) ·
+ * opts.noStone = 🟩를 주지 않는다 — 🎧 듣기 카드를 글로 읽고 풀었다(별·💰·🎯는 같다, v245 아버님 "이대로 진행")
  * why: 'unknown' 모르는 카드
  * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, next?:number, days?:number}}
  *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날) — 별을 받았을 때도 다음 별이 남았으면 next·days
  */
-export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0) {
+export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opts = {}) {
   if (typeof cardId !== 'string' || !Array.isArray(ids) || !ids.includes(cardId)) return { ok: false, why: 'unknown' };
   const add = missOf(misses);
   const cur = missOf(profile.korMiss);
@@ -183,7 +206,7 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0) {
   profile.korDone = done;
   const coins = KOR_COINS[next.star];
   // 🟩 보기도 근거도 한 번에 다 맞혔으면 국어스톤 하나 — 별을 새로 받을 때만(같은 날 다시 읽어 모으지 못하게)
-  const perfect = !Object.keys(add).length && !(Number(evMiss) > 0);
+  const perfect = !Object.keys(add).length && !(Number(evMiss) > 0) && !(opts && opts.noStone);
   if (perfect) profile.items = { ...(profile.items || {}), [KOR_STONE]: Math.min(Number.MAX_SAFE_INTEGER, (Math.floor(Number((profile.items || {})[KOR_STONE])) || 0) + 1) };
   profile.coins = (Number(profile.coins) || 0) + coins;
   profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
@@ -295,11 +318,19 @@ export function checkCard(c, ids = new Set()) {
       for (const [k, f] of (Array.isArray(c.write.checks) ? c.write.checks : []).entries()) refs(f, `write.checks ${k + 1}`);
     }
   }
+  const listen = own(c, 'listen');
+  if (listen) for (const m of checkListen(c)) at(m);
   if (!Array.isArray(c.qs) || !c.qs.length || c.qs.length > 5) { at('물음은 1~5개'); return errs; }
   c.qs.forEach((q, i) => {
     const qid = `${c.id}-${i + 1}`;
     const qat = (m) => at(`${qid} ${m}`);
     if (!isObj(q)) { qat('물음이 객체가 아니에요'); return; }
+    if (listen) {
+      // 🎧 글이 보이지 않는다 — 근거 잡기 없이, 문장 번호 없이 (풀이는 맞힌 바로 뒤에 나온다 — 들은 글은 다 푼 뒤에야 보인다)
+      if (q.ev !== null && q.ev !== undefined) qat('듣기 카드는 근거 잡기(ev) 없이 doneNote로');
+      const said = [q.q, q.doneNote, ...(Array.isArray(q.opts) ? q.opts.flatMap((o) => (isObj(o) ? [o.t, o.why] : [])) : [])];
+      if (said.some((s) => [...String(s || '')].some((ch) => CIRC.includes(ch)))) qat('듣기 카드의 물음·보기·풀이에는 문장 번호(①…)를 쓰지 않아요 — 글이 보이지 않아요');
+    }
     if (idOk && q.id !== qid) qat(`id는 ${qid}`); // 카드 id가 깨졌으면 그 오류 하나로(물음마다 따라 나오지 않게)
     if (!nonEmpty(q.q)) qat('물음 글이 비었어요');
     if (!nonEmpty(q.skill)) qat('skill이 비었어요');
@@ -332,6 +363,47 @@ export function checkCard(c, ids = new Set()) {
       refs(q.evNote, `${qid} 근거 풀이`);
     }
   });
+  return errs;
+}
+
+/** 🎧 읽어 주기가 이상하게 읽는 글자 — 숫자(8시 → "팔 시"로 읽는 기기) · 가운뎃점 · 괄호 · 물결 · 빗금 */
+export const LISTEN_BAD_CHARS = /[0-9·()~/]/;
+/** 🎧 이름: 말 꼴처럼 보이는 줄 (who가 빈 카드에서 막는다 — 한 사람 글인데 사람 이름처럼 읽히지 않게) */
+const LOOKS_SPEAKER = /^[가-힣]{1,6}: /;
+
+/**
+ * 🎧 듣기 카드 검사 (checkCard가 부른다 — 카드 id는 checkCard가 붙인다)
+ *  연습 카드만 · 글은 lines 6~16줄 · 줄마다 읽을 말 90자까지 · listen은 { who }만 · who는 0~4명(서로 다른 이름) ·
+ *  who가 있으면 줄마다 "이름: 말"이고 모두 한 번 이상 말한다 · 없으면 "이름: "처럼 보이는 줄이 없다 ·
+ *  읽을 말에 숫자·가운뎃점·괄호·물결·빗금 없음 · words·write·pre·stanzas 없음
+ */
+export function checkListen(c) {
+  const errs = [];
+  if (!isObj(c)) return ['카드가 객체가 아니에요'];
+  const L = c.listen;
+  if (!isObj(L)) return ['listen은 { who: [말하는 사람] }'];
+  for (const k of Object.keys(L)) if (k !== 'who') errs.push(`listen에는 who만 — ${k}`);
+  const who = L.who;
+  const whoOk = Array.isArray(who) && who.length <= LISTEN_WHO_MAX && who.every((w) => nonEmpty(w) && /^[가-힣]{1,6}$/.test(w)) && new Set(who).size === who.length;
+  if (!whoOk) errs.push(`listen.who는 0~${LISTEN_WHO_MAX}명의 서로 다른 이름(한글 1~6자)`);
+  if (c.kind !== 'practice') errs.push('듣기 카드는 신코치가 쓴 연습 카드(practice)만');
+  for (const k of ['words', 'write', 'pre', 'stanzas']) if (own(c, k)) errs.push(`듣기 카드에는 ${k}가 없어요 — 글이 보이지 않아요`);
+  if (!Array.isArray(c.lines)) { errs.push('듣기 카드의 글은 lines(문장)로'); return errs; }
+  if (c.lines.length < LISTEN_LINES.min || c.lines.length > LISTEN_LINES.max) errs.push(`듣기 카드는 ${LISTEN_LINES.min}~${LISTEN_LINES.max}줄`);
+  const spoke = new Set();
+  c.lines.forEach((line, k) => {
+    if (!nonEmpty(line)) return; // 빈 줄은 checkCard가 잡는다
+    const s = whoOk ? speakerOf(c, line) : { who: '', text: line };
+    const where = `listen ${k + 1}줄`;
+    if (!whoOk) { /* who가 깨졌으면 그 오류 하나로(줄마다 따라 나오지 않게) */ } else if (who.length) {
+      if (!s.who) errs.push(`${where}: "이름: 말" 꼴이 아니거나 who에 없는 이름`);
+      else spoke.add(s.who);
+    } else if (LOOKS_SPEAKER.test(line)) errs.push(`${where}: 한 사람 글인데 "이름: "처럼 시작해요 — who에 넣거나 바꿔 주세요`);
+    if (!nonEmpty(s.text)) errs.push(`${where}: 읽을 말이 비었어요`);
+    else if ([...s.text].length > LISTEN_LINE_MAX) errs.push(`${where}: 읽을 말은 ${LISTEN_LINE_MAX}자까지 — 긴 말은 기기가 중간에 끊어요`);
+    if (LISTEN_BAD_CHARS.test(s.text)) errs.push(`${where}: 읽어 주기가 이상하게 읽는 글자(숫자·가운뎃점·괄호·물결·빗금) — 수는 한글로`);
+  });
+  if (whoOk) for (const w of who) if (!spoke.has(w)) errs.push(`listen.who "${w}"가 한 번도 말하지 않아요`);
   return errs;
 }
 

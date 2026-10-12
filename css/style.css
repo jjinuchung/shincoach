@@ -3291,3 +3291,38 @@ button { font-family: inherit; }
 .kor-pfo.is-opinion.is-on { border-color: #d97706; background: #fef3c7; color: #78350f; }
 .kor-pfo:disabled { cursor: default; }
 .kor-psort-why { margin: 0; font-size: 0.92rem; line-height: 1.5; word-break: keep-all; }
+
+/* 🎧 듣고 답하기 (v245) — 글 상자 자리에 듣기 상자: 말하는 사람 칸 · 줄 점 · ▶ 듣기 / 🐢 천천히 / ⏹ 멈추기 · 📄 글로 읽고 풀기 */
+.kor-listen { background: #f3f7ff; border: 2px solid #c7d7fe; border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 10px; }
+.kor-listen.is-playing { border-color: var(--primary); }
+.kor-listen-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); }
+.kor-listen-badge { font-weight: 800; color: #1d4ed8; }
+.kor-listen-title { margin: 0; font-size: 1.25rem; word-break: keep-all; }
+.kor-listen-who { display: flex; flex-wrap: wrap; gap: 6px; }
+.kor-listen-chip { border: 2px solid var(--border); border-radius: 999px; padding: 3px 12px; background: #fff; font-weight: 700; font-size: 0.95rem; }
+.kor-listen-chip.is-on { border-color: #1d4ed8; background: #dbeafe; color: #1e3a8a; }
+.kor-listen-dots { display: flex; flex-wrap: wrap; gap: 5px; }
+.kor-listen-dot { width: 12px; height: 12px; border-radius: 50%; background: #dbe3f0; }
+.kor-listen-dot.is-past { background: #93b4f5; }
+.kor-listen-dot.is-on { background: #1d4ed8; transform: scale(1.25); }
+.kor-listen-status { margin: 0; font-size: 1rem; font-weight: 700; color: #1e3a8a; line-height: 1.5; word-break: keep-all; }
+.kor-listen-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.kor-listen-btns .btn { min-height: 48px; font-size: 1.05rem; }
+.kor-listen-note { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; word-break: keep-all; }
+.kor-listen-note.is-no { color: #b42318; font-weight: 700; }
+.kor-listen-note.is-ask { color: #1d4ed8; font-weight: 700; } /* 끝났는지 모름 — 끝까지 들렸나요? (Codex 57차 #1) */
+.kor-listen-text { justify-self: start; }
+.kor-listen-text.is-big { min-height: 48px; font-size: 1.05rem; }
+.kor-listen-textnote { margin: 0 0 8px; font-size: 0.85rem; color: #1d4ed8; font-weight: 700; line-height: 1.5; word-break: keep-all; }
+.kor-listen-wait { border-style: dashed; }
+.kor-slot.is-listen .kor-slot-kind { color: #1d4ed8; font-weight: 700; }
+.kor-script { margin-top: 10px; text-align: left; background: var(--kor-paper); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
+.kor-script summary { cursor: pointer; font-weight: 800; min-height: 32px; }
+.kor-script-line { margin: 6px 0; line-height: 1.7; word-break: keep-all; }
+@media (min-width: 900px) {
+  .kor-read-body > .kor-listen { position: sticky; top: var(--kor-top, 72px); }
+}
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .kor-listen-btns, .kor-listen-text { display: none; }
+}

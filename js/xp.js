@@ -881,8 +881,8 @@ export function restClaim(u, decide, want) {
 }
 /** 📚 국어 글 한 편을 다 읽었다 — 잘못 읽기 횟수 + 받을 별이 있으면 별·💰를 저장된 프로필로 한 트랜잭션에서(houseDo = applyHouseRule = mutateProfile)
  *  ids = 지금 있는 카드 id · 날은 트랜잭션 안의 시각으로 센다(창을 연 날이 아니라) */
-export function korFinish(cardId, misses, ids, evMiss = 0) {
-  return houseDo((p) => korFinishRule(p, cardId, Date.now(), misses, ids, evMiss)); // evMiss — 🟩 "한 번에 다 맞힘" 판정
+export function korFinish(cardId, misses, ids, evMiss = 0, opts = {}) {
+  return houseDo((p) => korFinishRule(p, cardId, Date.now(), misses, ids, evMiss, opts)); // evMiss — 🟩 "한 번에 다 맞힘" 판정 · opts.noStone 🎧 글로 읽고 풀었다
 }
 /** 🎯 국어 잡기 기회 하나 빼기 — 잡기 화면을 띄우기 전에(두 창이 같은 기회를 두 번 던지지 못하게) */
 export function korTakeThrow() {
