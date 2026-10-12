@@ -19,7 +19,7 @@ const num = (n, i = 0) => Number(ans(n, i));
 
 test('🎯 자료: 3단원 20문제, 번호가 1~20으로 빠짐·겹침 없음', () => {
   assert.equal(DATA.book, '만점왕 수학 플러스 4-2');
-  assert.deepEqual(setsOf(DATA).map((s) => s.id), ['u3', 'u5'], '3단원 소수 · 5단원 꺾은선그래프 (2026-10-01)');
+  assert.deepEqual(setsOf(DATA).map((s) => s.id), ['u3', 'u5', 'u5b', 'u6'], '3단원 소수 · 5단원 꺾은선그래프 (2026-10-01) · 5단원 LEVEL 1 · 6단원 다각형 (v246)');
   assert.equal(U3.items.length, 20);
   assert.deepEqual(U3.items.map((it) => it.no), Array.from({ length: 20 }, (_, i) => i + 1));
   assert.ok(U3.unit.includes('소수') && U3.pages);

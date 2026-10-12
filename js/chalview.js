@@ -9,6 +9,7 @@
 // 5단원 꺾은선그래프(2026-10-01)에서 더한 것: 그래프 그림(`chart`·`charts` — 📊 K 줄기와 같은 [lgraph] 그림),
 // 표(`table`), 그림 여럿(배열), 그리고 **점 여러 개 찍기 답칸**(`plot` — 07·12 "꺾은선그래프로 나타내 보세요").
 import { figureSvg, parseChart, chartGeom, lgraphSvg } from './mathdraw.js';
+import { diagKind } from './mathchal.js'; // ✍️ 대각선 그어 보기 판 (v246) — mathchal은 아무것도 import하지 않는다
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -179,6 +180,190 @@ function tableEl(f) {
   return box;
 }
 
+// ───────────────────── 다각형 (v246 6단원) ─────────────────────
+
+const POLY_NAME = { 3: '삼각형', 4: '사각형', 5: '오각형', 6: '육각형', 7: '칠각형', 8: '팔각형', 9: '구각형', 10: '십각형' };
+
+/** 그릴 대각선 쌍 — lines: 'all' 모두 · 꼭짓점 번호면 그 꼭짓점에서만 */
+function linePairs(n, lines) {
+  const out = [];
+  for (let a = 0; a < n; a++) {
+    for (let b = a + 1; b < n; b++) {
+      if (diagKind(n, a, b) !== 'diag') continue;
+      if (lines === 'all' || a === lines || b === lines) out.push([a, b]);
+    }
+  }
+  return out;
+}
+
+/** 사각형 두 대각선이 수직이면 만나는 점의 직각 표시 (작은 네모) — 아니면 '' (테스트가 자리를 잰다) */
+export function rightMarkSvg(P) {
+  if (P.length !== 4) return '';
+  const [A, B, C, D] = P;
+  const u = [C[0] - A[0], C[1] - A[1]];
+  const v = [D[0] - B[0], D[1] - B[1]];
+  const lu = Math.hypot(...u);
+  const lv = Math.hypot(...v);
+  if (!lu || !lv || Math.abs(u[0] * v[0] + u[1] * v[1]) / (lu * lv) > 1e-6) return '';
+  const den = u[0] * v[1] - u[1] * v[0];
+  const t = ((B[0] - A[0]) * v[1] - (B[1] - A[1]) * v[0]) / den;
+  const I = [A[0] + u[0] * t, A[1] + u[1] * t];
+  const s = 7;
+  const e1 = [(u[0] / lu) * s, (u[1] / lu) * s];
+  const e2 = [(v[0] / lv) * s, (v[1] / lv) * s];
+  const p = (q) => `${q[0].toFixed(1)},${q[1].toFixed(1)}`;
+  return `<polyline points="${p([I[0] + e1[0], I[1] + e1[1]])} ${p([I[0] + e1[0] + e2[0], I[1] + e1[1] + e2[1]])} ${p([I[0] + e2[0], I[1] + e2[1]])}" fill="none" stroke="var(--chal-mark, #d6336c)" stroke-width="1.6"/>`;
+}
+
+/**
+ * 다각형 그림 — f.shapes: [{ label?, pts:[[x,y]…], mark? 표시된 꼭짓점 번호 }] (도형끼리 같은 배율 — 문제집처럼 크기를 견줄 수 있게)
+ *  · f.lines: 'all' 대각선 모두 · 꼭짓점 번호면 그 꼭짓점에서만 (답 그림) · f.right: 수직인 사각형 대각선에 직각 표시
+ *  · f.board: ✍️ 대각선 그어 보기 — 꼭짓점 두 개를 누르면 선이 그어지고 수를 센다(이웃한 꼭짓점이면 "변이에요", 두 번이면 "이미") ·
+ *    채점과 상관없는 도우미라 저장하지 않는다 (아이가 대각선을 두 번 세거나 변까지 세는 착각을 손으로 확인하게)
+ */
+function polysEl(f) {
+  const shapes = (f.shapes || []).filter((s) => s && Array.isArray(s.pts) && s.pts.length >= 3);
+  if (!shapes.length) return null;
+  const one = shapes.length === 1;
+  const H = one ? 170 : 92;
+  const maxW = one ? 280 : 130;
+  const PAD = 12;
+  const box0 = shapes.map((s) => {
+    const xs = s.pts.map((q) => Number(q[0]));
+    const ys = s.pts.map((q) => Number(q[1]));
+    return { minX: Math.min(...xs), minY: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs) || 1, h: Math.max(...ys) - Math.min(...ys) || 1 };
+  });
+  const k = Math.min(...box0.map((b) => Math.min(H / b.h, maxW / b.w)));
+  const wrap = el('div', `chal-fig chal-polys${one ? ' is-one' : ''}`);
+  const row = el('div', 'chal-polys-row');
+  wrap.appendChild(row);
+  // f.boardFrom: 표시된 꼭짓점(mark)에서 긋는 대각선만 받는다 (14번 — "한 꼭짓점에서"를 묻는데 전체 수를 세지 않게, Codex 58차)
+  const board = f.board ? { pick: null, lines: shapes.map(() => new Map()), msg: null, svgs: [], from: f.boardFrom ? shapes.map((s) => (Number.isInteger(s.mark) ? s.mark : null)) : null } : null;
+  const hello = board && board.from ? '✍️ 표시된 꼭짓점(●)과 다른 꼭짓점을 차례로 누르면 대각선을 그어요' : '✍️ 꼭짓점 두 개를 차례로 누르면 대각선을 그어요';
+
+  shapes.forEach((s, si) => {
+    const b = box0[si];
+    const P = s.pts.map(([x, y]) => [PAD + (Number(x) - b.minX) * k, PAD + (Number(y) - b.minY) * k]);
+    const n = P.length;
+    const W = b.w * k + PAD * 2;
+    const HH = b.h * k + PAD * 2;
+    const pts = P.map((q) => `${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(' ');
+    let inner = `<polygon points="${pts}" fill="#fbf7ff" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`;
+    if (f.lines !== undefined && f.lines !== null) {
+      for (const [a, c] of linePairs(n, f.lines)) inner += `<line x1="${P[a][0].toFixed(1)}" y1="${P[a][1].toFixed(1)}" x2="${P[c][0].toFixed(1)}" y2="${P[c][1].toFixed(1)}" stroke="var(--chal-mark, #d6336c)" stroke-width="1.8"/>`;
+      if (f.right) inner += rightMarkSvg(P);
+    }
+    inner += '<g class="chal-poly-drawn"></g>';
+    P.forEach((q, i) => {
+      const big = s.mark === i;
+      inner += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${big ? 5.5 : 2.6}" fill="currentColor"/>`;
+    });
+    const name = POLY_NAME[n] || `${n}각형`;
+    const label = `${s.label ? `${s.label}: ` : ''}${name}${Number.isInteger(s.mark) ? ' — 꼭짓점 하나에 점 표시' : ''}${f.lines === 'all' ? ' — 대각선을 모두 그음' : Number.isInteger(f.lines) ? ' — 표시된 꼭짓점에서 대각선을 그음' : ''}`;
+    const cell = el('div', 'chal-poly');
+    const svgBox = el('div', 'chal-poly-svg');
+    svgBox.style.width = `${Math.round(W)}px`;
+    // 판이면 안에 누를 꼭짓점이 있으니 group (img는 속을 한 장의 그림으로 읽어 버튼이 묻힌다, Codex 58차)
+    svgBox.innerHTML = board
+      ? `<svg viewBox="0 0 ${W.toFixed(1)} ${HH.toFixed(1)}" role="group" aria-label="${esc(`${label} — ✍️ 꼭짓점을 눌러 대각선을 그어 보는 판`)}">${inner}</svg>`
+      : `<svg viewBox="0 0 ${W.toFixed(1)} ${HH.toFixed(1)}" role="img" aria-label="${esc(label)}">${inner}</svg>`;
+    cell.appendChild(svgBox);
+    if (s.label) cell.appendChild(el('div', 'chal-poly-label', s.label));
+    row.appendChild(cell);
+    if (board) {
+      const svg = svgBox.querySelector('svg');
+      board.svgs[si] = { svg, P, label: s.label || '' };
+      P.forEach((q, i) => {
+        const hit = document.createElementNS(SVGNS, 'circle');
+        hit.setAttribute('cx', q[0].toFixed(1));
+        hit.setAttribute('cy', q[1].toFixed(1));
+        hit.setAttribute('r', '15');
+        hit.setAttribute('class', 'chal-poly-hit');
+        hit.setAttribute('tabindex', '0');
+        hit.setAttribute('role', 'button');
+        hit.setAttribute('aria-label', `${s.label ? `${s.label} ` : ''}꼭짓점 ${i + 1}${s.mark === i ? ' (표시된 꼭짓점)' : ''}`);
+        hit.setAttribute('aria-pressed', 'false');
+        hit.dataset.shape = String(si);
+        hit.dataset.v = String(i);
+        const go = () => tapVertex(board, shapes, si, i);
+        hit.addEventListener('click', go);
+        hit.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+        svg.appendChild(hit);
+      });
+    }
+  });
+
+  if (board) {
+    const tools = el('div', 'chal-board');
+    board.msg = el('p', 'chal-board-msg', hello);
+    board.msg.setAttribute('role', 'status');
+    board.msg.setAttribute('aria-live', 'polite');
+    tools.appendChild(board.msg);
+    const clear = el('button', 'btn btn-small chal-board-clear', '🧽 다 지우기');
+    clear.type = 'button';
+    clear.addEventListener('click', () => {
+      board.lines.forEach((m) => m.clear());
+      board.pick = null;
+      board.svgs.forEach((x) => { x.svg.querySelector('.chal-poly-drawn').textContent = ''; });
+      paintPick(board);
+      board.msg.textContent = `✍️ 다 지웠어요 — ${hello.replace('✍️ ', '')}`;
+    });
+    tools.appendChild(clear);
+    wrap.appendChild(tools);
+  }
+  return wrap;
+}
+
+/** 그어 보기 판 — 고른 꼭짓점 칠하기 */
+function paintPick(board) {
+  board.svgs.forEach((x, si) => {
+    for (const h of x.svg.querySelectorAll('.chal-poly-hit')) {
+      const on = !!board.pick && board.pick.si === si && board.pick.v === Number(h.dataset.v);
+      h.classList.toggle('is-pick', on);
+      h.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  });
+}
+
+/** 그어 보기 판 — 그은 대각선 수 한 줄 */
+function boardCount(board, shapes) {
+  if (board.from && shapes.length === 1) return `표시된 꼭짓점에서 그은 대각선 ${board.lines[0].size}개`;
+  if (shapes.length === 1) return `그은 대각선 ${board.lines[0].size}개`;
+  return shapes.map((s, i) => `${s.label || i + 1} ${board.lines[i].size}개`).join(' · ');
+}
+
+/** 그어 보기 판 — 꼭짓점을 눌렀다 (테스트가 가짜 판으로 누른다) */
+export function tapVertex(board, shapes, si, v) {
+  const n = shapes[si].pts.length;
+  if (!board.pick || board.pick.si !== si) {
+    board.pick = { si, v };
+    paintPick(board);
+    board.msg.textContent = `${shapes[si].label ? `${shapes[si].label}의 ` : ''}꼭짓점을 골랐어요 — 이을 꼭짓점을 눌러요`;
+    return;
+  }
+  const a = board.pick.v;
+  const kind = diagKind(n, a, v);
+  if (kind === 'same') { board.pick = null; paintPick(board); board.msg.textContent = '고른 꼭짓점을 놓았어요'; return; }
+  board.pick = null;
+  paintPick(board);
+  if (kind === 'side') { board.msg.textContent = '그건 이웃한 꼭짓점끼리라 변이에요 — 대각선은 이웃하지 않는 꼭짓점끼리 이어요'; return; }
+  const from = board.from ? board.from[si] : null;
+  if (Number.isInteger(from) && a !== from && v !== from) { board.msg.textContent = '이 문제는 표시된 꼭짓점(●)에서 긋는 대각선만 세요 — ● 꼭짓점을 먼저 눌러 봐요'; return; }
+  const key = a < v ? `${a}-${v}` : `${v}-${a}`;
+  const lines = board.lines[si];
+  if (lines.has(key)) { board.msg.textContent = `이미 그은 대각선이에요 · ${boardCount(board, shapes)}`; return; }
+  const { svg, P } = board.svgs[si];
+  const ln = document.createElementNS(SVGNS, 'line');
+  ln.setAttribute('x1', P[a][0].toFixed(1));
+  ln.setAttribute('y1', P[a][1].toFixed(1));
+  ln.setAttribute('x2', P[v][0].toFixed(1));
+  ln.setAttribute('y2', P[v][1].toFixed(1));
+  ln.setAttribute('class', 'chal-poly-line');
+  svg.querySelector('.chal-poly-drawn').appendChild(ln);
+  lines.set(key, ln);
+  board.msg.textContent = `✍️ ${boardCount(board, shapes)}`;
+}
+
 /** 문제의 그림 하나 (없으면 null). 배열이면 차례로 (표 + 그래프) */
 export function figureEl(fig) {
   if (Array.isArray(fig)) {
@@ -202,6 +387,7 @@ export function figureEl(fig) {
     case 'talkbox': return talkEl(fig, true);
     case 'expr': return exprEl(fig);
     case 'compare': return compareEl(fig);
+    case 'polys': return polysEl(fig);
     default: return null;
   }
 }

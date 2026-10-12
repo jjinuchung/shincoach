@@ -2621,6 +2621,25 @@ button { font-family: inherit; }
 .chal-answer { background: #f4f6fb; border-radius: 12px; padding: 10px; margin-bottom: 10px; }
 .chal-answer-row { font-weight: 800; }
 .chal-why { text-align: left; line-height: 1.55; background: #fffbe8; border-radius: 12px; padding: 12px; }
+/* v246 6단원 다각형 — 다각형 그림 · ✍️ 대각선 그어 보기 판 · 💡 핵심 개념 · 보기마다 까닭 */
+.chal-idea { text-align: left; line-height: 1.55; background: #eef6ff; color: #1e3a6e; border-radius: 12px; padding: 10px 12px; margin: 0 0 8px; font-weight: 700; word-break: keep-all; }
+.chal-notes { display: grid; gap: 6px; margin-top: 8px; text-align: left; }
+.chal-note { margin: 0; line-height: 1.5; border-radius: 10px; padding: 8px 10px; word-break: keep-all; }
+.chal-note.is-ok { background: #ecf8f0; }
+.chal-note.is-no { background: #fdf0f3; }
+.chal-note b { margin-right: 2px; }
+.chal-polys-row { display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: center; align-items: flex-end; }
+.chal-poly { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.chal-poly-svg { max-width: 100%; }
+.chal-poly-svg svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chal-poly-label { font-weight: 800; font-size: 1rem; }
+.chal-poly-hit { fill: transparent; cursor: pointer; }
+.chal-poly-hit:hover, .chal-poly-hit:focus-visible { fill: rgba(59, 91, 219, .16); outline: none; }
+.chal-poly-hit.is-pick { fill: rgba(59, 91, 219, .32); stroke: #3b5bdb; stroke-width: 2; }
+.chal-poly-line { stroke: #3b5bdb; stroke-width: 2.4; stroke-linecap: round; }
+.chal-board { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; }
+.chal-board-msg { margin: 0; flex: 1 1 220px; font-size: .92rem; color: #2b3f8f; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+.chal-answer + .chal-polys { margin-top: 0; }
 .chal-done { text-align: center; }
 .chal-reward { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
 .chal-reward-item { background: #eef1fb; border-radius: 999px; padding: 6px 12px; font-weight: 800; }

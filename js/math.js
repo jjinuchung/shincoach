@@ -18,7 +18,7 @@ import { todayKey } from './track.js';
 // 💎 스페셜 문제 — 문제집에서 뽑은 여덟 얼굴 (2026-09-26)
 import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKindOf, makeSpecial, makeSpecialRound } from './mathspecial.js';
 // 🎯 도전 문제 — 문제집에 있는 그 문제 그대로 (2026-09-28)
-import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, chalReward, setNote as chalNote, solvedCount, setCleared } from './mathchal.js';
+import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, chalReward, setNote as chalNote, solvedCount, setCleared, notesFor } from './mathchal.js';
 import { figureEl, inputEl } from './chalview.js';
 import { padSpec, matchTyped } from './mathpad.js';
 import { padBox, padAnswered } from './padview.js';
@@ -914,7 +914,24 @@ function renderChalA() {
     ansRow.appendChild(el('div', 'chal-answer-row', `${p.label ? p.label + ' ' : ''}답: ${want}${p.unit ? ' ' + p.unit : ''}`));
   });
   card.appendChild(ansRow);
+  // 🎯 v246 — 답 그림(대각선을 그은 다각형) · 💡 핵심 개념 한 줄 · 풀이 · 고른 보기마다 까닭(틀린 보기 · 빠뜨린 보기 · ㉠~㉣처럼 모두)
+  const ansFig = item.ansFig ? figureEl(item.ansFig) : null;
+  if (ansFig) card.appendChild(ansFig);
+  if (item.idea) card.appendChild(el('p', 'chal-idea', `💡 ${item.idea}`));
   card.appendChild(el('p', 'chal-why', item.why));
+  const given = c.answers[c.at];
+  const notes = item.parts.flatMap((p, i) => notesFor(p, Array.isArray(given) ? given[i] : given));
+  if (notes.length) {
+    const box = el('div', 'chal-notes');
+    for (const n of notes) {
+      const row = el('p', `chal-note ${n.ok ? 'is-ok' : 'is-no'}`);
+      const tag = n.num ? ' (내 답)' : !n.picked && n.ok ? ' (빠뜨린 것)' : n.picked ? ' (고른 것)' : '';
+      row.appendChild(el('b', '', `${n.ok ? '✔' : '✗'} ${n.t}${tag}`));
+      row.appendChild(document.createTextNode(` — ${n.note}`));
+      box.appendChild(row);
+    }
+    card.appendChild(box);
+  }
 
   const next = el('button', 'btn btn-primary btn-big-wide', c.at + 1 < c.items.length ? '다음 문제 →' : '끝내기');
   next.type = 'button';
@@ -938,7 +955,7 @@ async function finishChal() {
 
   const saved = await commitChalRound((s) => {
     const result = applyChalRound(s, set.id, results, set);
-    const reward = chalReward({ fresh: result.fresh, n, firstClear: result.firstClear });
+    const reward = chalReward({ fresh: result.fresh, n, firstClear: result.firstClear, setN: (set.items || []).length }); // 작은 단원은 보너스를 줄인다 (v246)
     if (reward.throws) addPending(s, reward.throws);   // 🎯 던지기는 수학 진도 쪽 카운터
     return { result, reward };
   });
@@ -972,10 +989,11 @@ async function finishChal() {
     if (rw.throws) g.appendChild(el('span', 'chal-reward-item', `🎯 ${rw.throws}번`));
     card.appendChild(g);
   } else {
-    card.appendChild(el('p', 'math-note', '이미 맞혔던 문제라 보상은 없어요 — 연습은 언제든 좋아요!'));
+    // 하나도 못 맞힌 회차를 "이미 맞혔던 문제라"고 하던 것 (v246 헤드리스에서 봄)
+    card.appendChild(el('p', 'math-note', correct === 0 ? '이번엔 맞힌 문제가 없어요 — 풀이를 다시 읽고 🎯 계속 풀기로 다시 해 봐요!' : '이미 맞혔던 문제라 보상은 없어요 — 연습은 언제든 좋아요!'));
   }
   if (rw.round) card.appendChild(el('p', 'chal-bonus', `✨ ${n}문제를 모두 처음으로 맞혀서 보너스를 받았어요!`));
-  if (rw.set) card.appendChild(el('p', 'chal-bonus chal-bonus-big', `🏅 ${set.unit}을 다 풀었어요! 🌟 황금 몬스터볼을 받았어요`));
+  if (rw.set) card.appendChild(el('p', 'chal-bonus chal-bonus-big', `🏅 ${set.unit}을 다 풀었어요!${rw.ball ? ' 🌟 황금 몬스터볼을 받았어요' : ''}`));
   if (saved.level && saved.level.leveledUp) card.appendChild(el('p', 'chal-bonus', `🎉 Lv.${saved.level.to}이 되었어요!`));
 
   const go = el('button', 'btn btn-primary btn-big-wide', '사다리로 →');

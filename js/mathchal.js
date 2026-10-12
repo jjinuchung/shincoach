@@ -185,14 +185,31 @@ export function applyChalRound(m, setId, results, set) {
 }
 
 /**
+ * 🏅 단원 완주 보상은 **20문제 단원**이 기준이다 — 문제집에서 고른 몇 문제만 옮긴 작은 단원(2026-10-12 v246, 아버님 "기본안 가자")은
+ * 문제 수만큼만: ⚡·💰는 문제 수 ÷ 20만큼 · 🌟 황금 몬스터볼은 10문제부터(아버님: 틀린 문제를 다시 다 풀면 볼) ·
+ * 한 회차(5문제)도 안 되는 단원은 회차·완주 보너스 없이 문제 보상만
+ */
+export const SET_FULL = 20;
+export const SET_BALL_MIN = 10;
+
+/** 단원 크기에 맞춘 완주 보상 → { xp, coin, ball } (setN을 모르면 20문제 단원으로) */
+export function setGiftOf(setN) {
+  const n = Number.isFinite(Number(setN)) && Number(setN) > 0 ? Math.floor(Number(setN)) : SET_FULL;
+  if (n < ROUND_N) return { xp: 0, coin: 0, ball: false };
+  const k = Math.min(1, n / SET_FULL);
+  return { xp: Math.round(REWARD.set.xp * k), coin: Math.round(REWARD.set.coin * k), ball: n >= SET_BALL_MIN };
+}
+
+/**
  * 회차 보상 (순수) — 저장 트랜잭션 안에서 쓰는 값.
  * ★ **처음 맞힌 문제(fresh)에만** 준다. 같은 문제를 다시 풀어 보상을 캐지 못한다.
- * @param {{fresh:number, n:number, firstClear:boolean}} o n: 이번 회차 문제 수
+ * @param {{fresh:number, n:number, firstClear:boolean, setN?:number}} o n: 이번 회차 문제 수 · setN: 단원의 문제 수(작은 단원은 보너스를 줄인다)
  */
-export function chalReward({ fresh = 0, n = ROUND_N, firstClear = false } = {}) {
+export function chalReward({ fresh = 0, n = ROUND_N, firstClear = false, setN } = {}) {
   const f = Math.max(0, Math.floor(Number(fresh) || 0));
-  const out = { xp: REWARD.item.xp * f, coin: REWARD.item.coin * f, items: {}, stone: 0, throws: 0, round: false, set: false };
-  if (f > 0 && f >= Math.max(1, Math.floor(Number(n) || ROUND_N))) {
+  const out = { xp: REWARD.item.xp * f, coin: REWARD.item.coin * f, items: {}, stone: 0, throws: 0, round: false, set: false, ball: false };
+  const small = Number.isFinite(Number(setN)) && Number(setN) > 0 && Number(setN) < ROUND_N; // 한 회차도 안 되는 단원
+  if (!small && f > 0 && f >= Math.max(1, Math.floor(Number(n) || ROUND_N))) {
     out.round = true;
     out.xp += REWARD.round.xp;
     out.coin += REWARD.round.coin;
@@ -201,11 +218,57 @@ export function chalReward({ fresh = 0, n = ROUND_N, firstClear = false } = {}) 
   }
   if (firstClear) {
     out.set = true;
-    out.xp += REWARD.set.xp;
-    out.coin += REWARD.set.coin;
-    out.items[REWARD.set.ball] = (out.items[REWARD.set.ball] || 0) + 1;
+    const g = setGiftOf(setN);
+    out.xp += g.xp;
+    out.coin += g.coin;
+    if (g.ball) { out.ball = true; out.items[REWARD.set.ball] = (out.items[REWARD.set.ball] || 0) + 1; }
   }
   return out;
+}
+
+/**
+ * ✍️ 대각선 그어 보기 판의 두 꼭짓점 (순수, v246) — n각형의 꼭짓점 a·b(0부터) → 'same' 같은 점 · 'side' 이웃(변) · 'diag' 대각선
+ */
+export function diagKind(n, a, b) {
+  const N = Math.floor(Number(n));
+  const i = Math.floor(Number(a));
+  const j = Math.floor(Number(b));
+  if (i === j) return 'same';
+  const d = Math.abs(i - j);
+  return d === 1 || d === N - 1 ? 'side' : 'diag';
+}
+
+/** n각형의 대각선 수 = n × (n − 3) ÷ 2 (한 꼭짓점에서 n − 3개, 양 끝에서 두 번 세니 ÷ 2) */
+export function diagTotal(n) {
+  const N = Math.floor(Number(n));
+  return N >= 3 ? (N * (N - 3)) / 2 : 0;
+}
+
+/**
+ * 답한 뒤 보여 줄 보기 풀이 (순수, v246) — 칸(part)의 notes(보기 → 까닭) · numNotes(흔한 틀린 수 → 까닭)에서
+ *  · choice: 고른 틀린 보기 하나 · many: 고른 것과 답이 어긋난 보기(잘못 고른 것 + 빠뜨린 것) · allNotes면 보기 모두(㉠~㉣·①~⑤ 설명)
+ *  · num: 낸 수가 numNotes에 있으면 그 까닭 (예: 팔각형 대각선 40 — 두 번 셈)
+ * @returns {Array<{t:string, ok:boolean, picked:boolean, num?:boolean, note:string}>} ok = 정답에 들어가는 보기 · num = 숫자판에 낸 수
+ */
+export function notesFor(part, given) {
+  if (!part) return [];
+  const kind = part.input || 'num';
+  if (kind === 'num') {
+    const g = numOf(given);
+    if (!Number.isFinite(g) || checkPart(part, given)) return [];
+    const hit = Object.entries(part.numNotes || {}).find(([k]) => numOf(k) === g);
+    return hit ? [{ t: String(given).trim(), ok: false, picked: true, num: true, note: hit[1] }] : [];
+  }
+  if (kind !== 'choice' && kind !== 'many') return [];
+  const notes = part.notes || {};
+  const want = new Set([].concat(part.answer == null ? [] : part.answer).map(String));
+  const got = new Set([].concat(given == null ? [] : given).map(String));
+  const show = (c) => {
+    if (part.allNotes) return true;
+    if (kind === 'choice') return got.has(c) && !want.has(c);
+    return want.has(c) !== got.has(c);
+  };
+  return (part.choices || []).filter((c) => notes[c] && show(c)).map((c) => ({ t: c, ok: want.has(c), picked: got.has(c), note: notes[c] }));
 }
 
 /** 한 단원의 진행 한 줄 — 사다리 버튼에 쓴다 */

@@ -405,7 +405,8 @@ test('🎧 화면 연결: 듣기 카드는 글 대신 듣기 상자 · 처음 �
   assert.ok(sk.includes('KEEP.add(u);') && sk.includes('if (u) KEEP.delete(u);'));
   // 오프라인 목록 · 판
   const sw = read('sw.js');
-  assert.ok(sw.includes("const CACHE_VERSION = 'v245';") && sw.includes("'./js/korlisten.js',") && sw.includes("'./js/korlistenview.js',"));
+  assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1] >= 245, 'sw 버전 v245 이상');
+  assert.ok(sw.includes("'./js/korlisten.js',") && sw.includes("'./js/korlistenview.js',"));
   assert.ok(read('css/style.css').includes('.kor-listen {'));
 });
 
