@@ -226,7 +226,7 @@ test('🏅 작은 단원 보상: 20문제는 그대로(⚡300 💰400 🌟) · 1
   assert.deepEqual([r4.xp, r4.coin, r4.stone, r4.throws, r4.round, r4.set, r4.ball, r4.items[REWARD.set.ball]], [220, 231, 1, 1, true, true, true, 1]);
   // 화면 — 단원 크기를 넘기고, 볼은 받았을 때만 말한다
   const math = read('js/math.js');
-  assert.ok(math.includes('chalReward({ fresh: result.fresh, n, firstClear: result.firstClear, setN: (set.items || []).length })'));
+  assert.ok(math.includes('chalReward({ fresh: result.fresh, clean: result.clean, n, firstClear: result.firstClear, setN: (set.items || []).length })'));
   assert.ok(math.includes("`🏅 ${set.unit}을 다 풀었어요!${rw.ball ? ' 🌟 황금 몬스터볼을 받았어요' : ''}`"));
 });
 

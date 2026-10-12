@@ -213,14 +213,19 @@ test('🎯 칸이 여럿인 문제는 **하나라도 틀리면** 틀린 것 (문
 
 // ───────────────────── 진도 · 보상 ─────────────────────
 
-test('🎯 다음 회차는 **못 맞힌 것부터 번호 순서대로**, 다 맞히면 처음부터 다시', () => {
+test('🎯 다음 회차는 **못 맞힌 것을 번호 순서대로 — 처음 보는 문제 먼저, 틀렸던 문제(🔁)는 그 뒤**, 다 맞히면 처음부터 다시 (v247)', () => {
   const m = cloneMath(emptyMath());
   assert.deepEqual(nextItems(U3, m, 5).map((it) => it.no), [1, 2, 3, 4, 5]);
   assert.equal(nextNo(U3, m), 1);
 
   applyChalRound(m, 'u3', [{ no: 1, ok: true }, { no: 2, ok: true }, { no: 3, ok: false }], U3);
-  assert.deepEqual(nextItems(U3, m, 3).map((it) => it.no), [3, 4, 5], '틀린 3번이 다시 나온다');
+  assert.deepEqual(nextItems(U3, m, 3).map((it) => it.no), [4, 5, 6], '틀린 3번은 새 문제 뒤로 — 다음 회차 ✨ 보너스를 막지 않게');
   assert.equal(solvedCount(m, U3), 2);
+  const rest = nextItems(U3, m, 20).map((it) => it.no);
+  assert.ok(!rest.includes(3) && rest.length === 17, '새 문제가 남아 있으면 새 문제만 (Codex 59차 #4)');
+  // 새 문제를 다 맞히면 틀렸던 문제가 나온다
+  for (const it of U3.items.filter((x) => x.no > 3)) applyChalRound(m, 'u3', [{ no: it.no, ok: true }], U3);
+  assert.deepEqual(nextItems(U3, m, 5).map((it) => it.no), [3]);
 
   for (const it of U3.items) applyChalRound(m, 'u3', [{ no: it.no, ok: true }], U3);
   assert.equal(setCleared(m, U3), true);
@@ -525,7 +530,7 @@ test('🎯 도전 문제 이어 풀기·⏳ 예외 끄기: 🎒·📊에서 돌�
   assert.match(math, /if \(ui\.chal\) \{ ui\.run\+\+; resumeChal\(\); return; \}\s*const r = ui\.round;/, 'renderMath가 풀던 편보다 먼저 도전 문제를 이어 준다');
   assert.match(math, /back\.addEventListener\('click', \(\) => \{ ui\.round = null; ui\.daily = null; endChal\(\);/, '← 뒤로(홈)도 예외를 끈다');
   assert.match(math, /function renderLadder\(state\) \{[\s\S]{0,200}if \(ui\.chal\) endChal\(\);/, '사다리로 나오는 길은 전부 예외를 끈다');
-  assert.match(math, /function resumeChal\(\) \{[\s\S]{0,300}if \(c\.phase === 'a'\) renderChalA\(\);\s*else renderChalQ\(\);/, '답한 뒤면 정답 화면을 채점 없이');
+  assert.match(math, /function resumeChal\(\) \{[\s\S]{0,700}(else )?if \(c\.phase === 'a'\) renderChalA\(\);\s*else renderChalQ\(\);/, '답한 뒤면 정답 화면을 채점 없이 (v247: 저장 중·저장 실패 화면이 앞에 있다)');
   assert.match(math, /function renderChalA\(\) \{[\s\S]{0,200}const r = c\.results\[c\.at\]/, '정답 화면은 저장된 채점 결과로');
   assert.ok(!/function renderChalA\(\) \{[\s\S]{0,400}checkItem\(/.test(math), '다시 그릴 때 다시 채점하지 않는다');
   assert.match(math, /c\.phase = 'saving';/, '저장 중 다녀와도 두 번 저장하지 않는다');

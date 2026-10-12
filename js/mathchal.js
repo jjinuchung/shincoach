@@ -15,6 +15,12 @@
 // 저장은 `math.chal` 하나: { ok: {문제키: 1}, tries: {문제키: n}, rounds: n, done: {단원: 1} }
 // 전부 **단조 증가**라 백업 병합이 키마다 max — 옛 백업을 되돌려도 푼 문제가 사라지지 않는다.
 //
+// ★ v247 (2026-10-13, 아버님 "노가다 탈출구 막기 먼저"): 답은 **고른 순간** 적는다(applyChalAnswer) — 회차 끝에만 적으면
+//   틀린 답과 정답을 본 뒤 그만두고 다시 열어 외운 답으로 ✨ 회차 보너스를 받을 수 있었다. 그래서
+//   · ✨ 보너스는 **처음 보는 문제를 첫 번에 맞힌 것**(clean = 맞힘 전 tries 0)만 센다 — 틀렸던 문제는 문제 보상만
+//   · 틀린 문제는 새 문제를 다 낸 뒤에 다시 낸다(nextItems) — 한 번 틀린 게 다음 회차 보너스까지 막지 않게
+//   · 문장·수 보기는 풀 때마다 섞는다(shuffleChoices) — "1번부터 차례로"·자리 외우기가 안 통하게
+//
 // ★ 이 파일은 아무것도 import하지 않는다 (db.js가 트랜잭션 규칙에서 쓴다 — egg.js·evolve.js와 같은 원칙).
 
 /** 한 회차에 내는 문제 수 */
@@ -126,16 +132,31 @@ export function setClaimed(m, setId) {
   return (Number((chalOf(m).done || {})[setId]) || 0) > 0;
 }
 
+/** 이 문제를 풀어 본 횟수 (답한 순간 늘어난다) */
+export function triesOf(m, setId, no) {
+  return Number((chalOf(m).tries || {})[qid(setId, no)]) || 0;
+}
+
+/** 못 맞힌 채 풀어 본 적이 있나 = 틀렸던 문제 (🔁) */
+export function missed(m, setId, no) {
+  return !solved(m, setId, no) && triesOf(m, setId, no) > 0;
+}
+
 /**
- * 다음 회차에 낼 문제 — **번호 순서대로**, 아직 못 맞힌 것부터.
+ * 다음 회차에 낼 문제 — 아직 못 맞힌 것을 **번호 순서대로**: 처음 보는 문제가 남아 있으면 **그것만**(n개가 안 돼도),
+ * 다 냈으면 틀렸던 문제(🔁)만 (v247).
+ * 틀린 문제를 곧바로 다음 회차에 끼우면 그 회차는 ✨ 보너스를 못 받는다 — 한 번 틀린 게 다른 회차를 막지 않게
+ * (마지막 짧은 묶음에 섞여도 막았다, Codex 59차 #4), 그리고 틀린 문제는 조금 뒤에 다시 풀어야 외운 답이 아니라 이해로 푼다.
  * 다 맞혔으면 처음부터 다시 (연습은 언제든, 보상만 안 나온다).
- * @returns {Array<object>} 문제 n개 (없으면 빈 배열)
+ * @returns {Array<object>} 문제 n개까지 (없으면 빈 배열)
  */
 export function nextItems(set, m, n = ROUND_N) {
   const items = (set && set.items) || [];
   if (!items.length) return [];
   const todo = items.filter((it) => !solved(m, set.id, it.no));
-  const pool = todo.length ? todo : items;
+  const fresh = todo.filter((it) => !missed(m, set.id, it.no));
+  const again = todo.filter((it) => missed(m, set.id, it.no));
+  const pool = fresh.length ? fresh : again.length ? again : items;
   return pool.slice(0, Math.max(1, Math.floor(n) || ROUND_N));
 }
 
@@ -145,41 +166,63 @@ export function nextNo(set, m) {
   return next ? next.no : 0;
 }
 
-/**
- * 회차 결과를 진도에 적는다 — **트랜잭션 규칙** (db.updateMath 안에서 부른다).
- * @param {object} m 수학 진도 (cloneMath로 복사된 것)
- * @param {string} setId
- * @param {Array<{no:number, ok:boolean}>} results
- * @returns {{fresh:number, correct:number, solved:number, total:number, cleared:boolean, firstClear:boolean}}
- */
-export function applyChalRound(m, setId, results, set) {
+function chalMaps(m) {
   m.chal = { ...(m.chal || {}) };
   m.chal.ok = { ...(m.chal.ok || {}) };
   m.chal.tries = { ...(m.chal.tries || {}) };
   m.chal.done = { ...(m.chal.done || {}) };
+}
 
-  let fresh = 0;
-  let correct = 0;
-  for (const r of results || []) {
-    if (!r || !Number.isFinite(Number(r.no))) continue;
-    const k = qid(setId, r.no);
-    m.chal.tries[k] = (Number(m.chal.tries[k]) || 0) + 1;
-    if (!r.ok) continue;
-    correct += 1;
-    if (!(Number(m.chal.ok[k]) || 0)) { m.chal.ok[k] = 1; fresh += 1; }   // ★ 처음 맞힌 것만 센다
-  }
-  m.chal.rounds = (Number(m.chal.rounds) || 0) + 1;
-
+/**
+ * 🎯 한 문제에 **답한 순간** 적는다 — 트랜잭션 규칙 (v247). 그만두거나 앱을 닫아도 답은 남는다.
+ * @returns {{ok:boolean, fresh:boolean, clean:boolean, cleared:boolean, firstClear:boolean, solved:number, total:number}}
+ *   fresh: 처음 맞힘(문제 보상) · clean: 처음 보는 문제를 첫 번에 맞힘(✨ 회차 보너스에 센다) · firstClear: 🏅 단원 완주(한 번)
+ */
+export function applyChalAnswer(m, setId, no, ok, set) {
+  chalMaps(m);
+  const k = qid(setId, no);
+  const before = Number(m.chal.tries[k]) || 0;
+  m.chal.tries[k] = before + 1;
+  let fresh = false;
+  if (ok && !(Number(m.chal.ok[k]) || 0)) { m.chal.ok[k] = 1; fresh = true; }   // ★ 처음 맞힌 것만 센다
   const cleared = setCleared(m, set);
   const firstClear = cleared && !setClaimed(m, setId);
   if (firstClear) m.chal.done[setId] = 1;   // 단원 보상은 한 번만 (단조)
+  return { ok: !!ok, fresh, clean: fresh && before === 0, cleared, firstClear, solved: solvedCount(m, set), total: ((set && set.items) || []).length };
+}
 
+/**
+ * 회차를 끝낼 때 — **트랜잭션 규칙** (db.updateMath 안에서 부른다).
+ * 답은 고른 순간 이미 적혔다(saved). 저장하지 못한 답(saved가 아님 — 옛 흐름·저장 실패)만 여기서 적고 그 문제 보상을 센다.
+ * @param {object} m 수학 진도 (cloneMath로 복사된 것)
+ * @param {string} setId
+ * @param {Array<{no:number, ok:boolean, saved?:boolean, clean?:boolean}>} results
+ * @returns {{fresh:number, clean:number, correct:number, solved:number, total:number, cleared:boolean, firstClear:boolean}}
+ *   fresh·firstClear: **여기서** 적은 답의 몫만(이미 적힌 답의 보상은 그때 줬다) · clean: 회차 전체에서 처음 보는 문제를 첫 번에 맞힌 수
+ */
+export function applyChalRound(m, setId, results, set) {
+  chalMaps(m);
+  let fresh = 0;
+  let clean = 0;
+  let correct = 0;
+  let firstClear = false;
+  for (const r of results || []) {
+    if (!r || !Number.isFinite(Number(r.no))) continue;
+    if (r.ok) correct += 1;
+    if (r.saved) { if (r.clean) clean += 1; continue; }
+    const a = applyChalAnswer(m, setId, r.no, r.ok, set);
+    if (a.fresh) fresh += 1;
+    if (a.clean) clean += 1;
+    if (a.firstClear) firstClear = true;
+  }
+  m.chal.rounds = (Number(m.chal.rounds) || 0) + 1;
   return {
     fresh,
+    clean,
     correct,
     solved: solvedCount(m, set),
     total: ((set && set.items) || []).length,
-    cleared,
+    cleared: setCleared(m, set),
     firstClear,
   };
 }
@@ -203,13 +246,16 @@ export function setGiftOf(setN) {
 /**
  * 회차 보상 (순수) — 저장 트랜잭션 안에서 쓰는 값.
  * ★ **처음 맞힌 문제(fresh)에만** 준다. 같은 문제를 다시 풀어 보상을 캐지 못한다.
- * @param {{fresh:number, n:number, firstClear:boolean, setN?:number}} o n: 이번 회차 문제 수 · setN: 단원의 문제 수(작은 단원은 보너스를 줄인다)
+ * ★ ✨ 회차 보너스는 **처음 보는 문제를 첫 번에 맞힌 수(clean)**가 회차 문제 수와 같을 때만 (v247 — 틀렸던 문제는 문제 보상만).
+ *   clean을 안 주면 fresh와 같다고 본다(옛 부름).
+ * @param {{fresh:number, clean?:number, n:number, firstClear:boolean, setN?:number}} o n: 이번 회차 문제 수 · setN: 단원의 문제 수(작은 단원은 보너스를 줄인다)
  */
-export function chalReward({ fresh = 0, n = ROUND_N, firstClear = false, setN } = {}) {
+export function chalReward({ fresh = 0, clean, n = ROUND_N, firstClear = false, setN } = {}) {
   const f = Math.max(0, Math.floor(Number(fresh) || 0));
+  const c = clean === undefined ? f : Math.max(0, Math.floor(Number(clean) || 0));
   const out = { xp: REWARD.item.xp * f, coin: REWARD.item.coin * f, items: {}, stone: 0, throws: 0, round: false, set: false, ball: false };
   const small = Number.isFinite(Number(setN)) && Number(setN) > 0 && Number(setN) < ROUND_N; // 한 회차도 안 되는 단원
-  if (!small && f > 0 && f >= Math.max(1, Math.floor(Number(n) || ROUND_N))) {
+  if (!small && c > 0 && c >= Math.max(1, Math.floor(Number(n) || ROUND_N))) {
     out.round = true;
     out.xp += REWARD.round.xp;
     out.coin += REWARD.round.coin;
@@ -224,6 +270,36 @@ export function chalReward({ fresh = 0, n = ROUND_N, firstClear = false, setN } 
     if (g.ball) { out.ball = true; out.items[REWARD.set.ball] = (out.items[REWARD.set.ball] || 0) + 1; }
   }
   return out;
+}
+
+/** 보기를 섞을 칸인가 — 고르기·여러 개 고르기에서, 보기 하나라도 다섯 글자 넘는 글(문장·소수)일 때만.
+ *  ㉠·가·요일·이름 같은 짧은 이름 보기는 그림·표의 차례와 맞춰 읽어야 해서 그대로 둔다. keepOrder면 그대로. */
+export function shuffles(part) {
+  if (!part || part.keepOrder || !(part.input === 'choice' || part.input === 'many')) return false;
+  const list = Array.isArray(part.choices) ? part.choices : [];
+  return list.length >= 2 && list.some((c) => [...String(c)].length > 4);
+}
+
+/**
+ * 🔀 보기 차례 섞기 (순수, v247) — 같은 씨앗이면 같은 차례(🎒에 다녀와 다시 그려도 그대로), 회차마다 씨앗이 바뀐다.
+ * "1번부터 차례로 눌러 보기"·보기 자리 외우기가 안 통하게. 채점은 보기 글로 하니 차례와 상관없다.
+ */
+export function shuffleChoices(part, seed) {
+  const list = Array.isArray(part && part.choices) ? [...part.choices] : [];
+  if (!shuffles(part)) return list;
+  let s = Math.floor(Number(seed) || 0) >>> 0;
+  const rnd = () => { // mulberry32
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
 }
 
 /**
@@ -278,5 +354,7 @@ export function setNote(m, set) {
   const total = (set.items || []).length;
   if (done >= total && total > 0) return `🏅 ${set.unit} — ${total}문제를 다 풀었어요!`;
   const no = nextNo(set, m);
-  return `${done}/${total}문제 · 다음은 ${no}번`;
+  const again = (set.items || []).filter((it) => missed(m, set.id, it.no)).length;
+  // 🔁 틀렸던 문제는 새 문제를 다 낸 뒤에 나온다 (v247) — 남아 있다는 걸 사다리에서도 보이게
+  return `${done}/${total}문제 · 다음은 ${missed(m, set.id, no) ? '🔁 ' : ''}${no}번${again ? ` · 🔁 틀렸던 문제 ${again}개` : ''}`;
 }

@@ -2621,6 +2621,10 @@ button { font-family: inherit; }
 .chal-answer { background: #f4f6fb; border-radius: 12px; padding: 10px; margin-bottom: 10px; }
 .chal-answer-row { font-weight: 800; }
 .chal-why { text-align: left; line-height: 1.55; background: #fffbe8; border-radius: 12px; padding: 12px; }
+/* v247 답마다 바로 저장 — 얻은 것 한 줄(저장이 끝난 뒤 정답 화면에) · 🔁 나중에 다시 · 다 맞혔는데 보너스가 없는 까닭 */
+.chal-gain { margin: -4px 0 8px; font-weight: 800; color: #4a2f9c; }
+.chal-later { margin: 0 0 10px; color: #8a3b12; word-break: keep-all; }
+.chal-retried { word-break: keep-all; }
 /* v246 6단원 다각형 — 다각형 그림 · ✍️ 대각선 그어 보기 판 · 💡 핵심 개념 · 보기마다 까닭 */
 .chal-idea { text-align: left; line-height: 1.55; background: #eef6ff; color: #1e3a6e; border-radius: 12px; padding: 10px 12px; margin: 0 0 8px; font-weight: 700; word-break: keep-all; }
 .chal-notes { display: grid; gap: 6px; margin-top: 8px; text-align: left; }

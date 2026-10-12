@@ -18,7 +18,7 @@ import { todayKey } from './track.js';
 // 💎 스페셜 문제 — 문제집에서 뽑은 여덟 얼굴 (2026-09-26)
 import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKindOf, makeSpecial, makeSpecialRound } from './mathspecial.js';
 // 🎯 도전 문제 — 문제집에 있는 그 문제 그대로 (2026-09-28)
-import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, chalReward, setNote as chalNote, solvedCount, setCleared, notesFor } from './mathchal.js';
+import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, applyChalAnswer, chalReward, setNote as chalNote, solvedCount, setCleared, notesFor, missed as chalMissed, solved as chalSolved, shuffleChoices } from './mathchal.js';
 import { figureEl, inputEl } from './chalview.js';
 import { padSpec, matchTyped } from './mathpad.js';
 import { padBox, padAnswered } from './padview.js';
@@ -811,7 +811,8 @@ function addChalButtons(box) {
 function startChal(set) {
   const items = nextItems(set, ui.state, CHAL_N);
   if (!items.length) { renderLadder(ui.state); return; }
-  ui.chal = { set, items, at: 0, answers: [], results: [], phase: 'q' };
+  // seed: 🔀 보기 차례(회차마다 바뀌고 🎒에 다녀와도 그대로) · again: 🔁 틀렸던 문제 · todo: 회차를 열 때 못 맞힌 문제 (v247)
+  ui.chal = { set, items, at: 0, answers: [], results: [], phase: 'q', seed: Date.now() % 2147483647, again: items.map((it) => chalMissed(ui.state, set.id, it.no)), todo: items.map((it) => !chalSolved(ui.state, set.id, it.no)) };
   setExempt(true);   // ⏳ 도전 문제를 푸는 동안은 시간을 안 센다
   renderChalQ();
 }
@@ -830,7 +831,7 @@ function renderChalQ() {
 
   const card = el('section', 'math-card math-q chal-q');
   const eye = el('div', 'math-eyebrow');
-  eye.textContent = `🎯 도전 문제 · ${c.set.unit} · ${c.at + 1} / ${c.items.length}`;
+  eye.textContent = `🎯 도전 문제 · ${c.set.unit} · ${c.at + 1} / ${c.items.length}${c.again && c.again[c.at] ? ' · 🔁 틀렸던 문제' : ''}`;
   card.appendChild(eye);
 
   const head = el('div', 'chal-head');
@@ -850,11 +851,12 @@ function renderChalQ() {
   const done = el('button', 'btn btn-primary btn-big-wide chal-ok', '확인');
   done.type = 'button';
   const refresh = () => { done.disabled = !ins.every((x) => x.filled()); };
-  for (const p of item.parts) {
-    const w = inputEl(p, refresh);
+  item.parts.forEach((p, i) => {
+    // 🔀 문장·수 보기는 회차마다 차례를 섞는다 (v247 — 보기 자리 외우기·"1번부터 차례로"가 안 통하게)
+    const w = inputEl(Array.isArray(p.choices) ? { ...p, choices: shuffleChoices(p, (c.seed || 0) + item.no * 7919 + i * 104729) } : p, refresh);
     ins.push(w);
     card.appendChild(w.el);
-  }
+  });
   if (item.write) card.appendChild(el('p', 'math-note chal-write', `✍️ ${item.write}`));
 
   done.addEventListener('click', () => answerChal(ins.map((x) => x.value())));
@@ -863,6 +865,7 @@ function renderChalQ() {
 
   const out = el('button', 'btn chal-quit', '← 그만하고 사다리로');
   out.type = 'button';
+  // 그만둬도 이미 낸 답은 저장이 끝난 뒤에야 다음 문제가 열렸다(v247, Codex 59차 #1) — ui.state가 이미 그 진도다
   out.addEventListener('click', () => { endChal(); renderLadder(ui.state); });
   card.appendChild(out);
 
@@ -876,8 +879,11 @@ function renderChalQ() {
 function resumeChal() {
   const c = ui.chal;
   if (!c) { renderLadder(ui.state); return; }
-  if (c.phase === 'saving') { const m = clearMain(); m.appendChild(el('p', 'math-loading', '기록하는 중…')); return; }
-  if (c.phase === 'a') renderChalA();
+  // saving: 회차 끝 저장 중 · saving1: 고른 답 저장 중 — 끝나면 그쪽이 이어서 그린다 / unsaved·unsavedEnd: 저장 실패 → 💾 다시 저장
+  if (c.phase === 'saving' || c.phase === 'saving1') { const m = clearMain(); m.appendChild(el('p', 'math-loading', '기록하는 중…')); return; }
+  if (c.phase === 'unsaved') renderChalUnsaved();
+  else if (c.phase === 'unsavedEnd') renderChalEndFail();
+  else if (c.phase === 'a') renderChalA();
   else renderChalQ();
 }
 
@@ -887,10 +893,82 @@ function answerChal(given) {
   const item = c.items[c.at];
   const r = checkItem(item, given);
   c.answers.push(given);
-  c.results.push({ no: item.no, ok: r.ok });
+  c.results.push({ no: item.no, ok: r.ok, saved: false });
+  saveChalAnswer(c);
+}
+
+/**
+ * ★ v247 고른 답을 **저장한 뒤에** 정답을 보여 준다 (Codex 59차 #1) — 회차 끝에만 적으면 틀린 답과 정답을 본 뒤 그만두고
+ *   다시 열어 ✨ 보너스를 받을 수 있었고, 저장보다 정답을 먼저 보여 주면 저장이 끝나기 전에 앱을 닫는 틈이 남는다.
+ *   문제 보상(처음 맞힘)·🏅 단원 완주도 여기서 — ✨ 회차 보너스만 회차 끝(finishChal). 소리도 저장 뒤에(맞고 틀림이 먼저 새지 않게)
+ */
+async function saveChalAnswer(c) {
+  const res = c.results[c.at];
+  if (!res || res.saved) return;
+  c.phase = 'saving1';
+  const m = clearMain();
+  m.appendChild(el('p', 'math-loading', '기록하는 중…'));
+  const set = c.set;
+  const saved = await commitChalRound((s) => {
+    const result = applyChalAnswer(s, set.id, res.no, res.ok, set);
+    const reward = chalReward({ fresh: result.fresh ? 1 : 0, clean: 0, n: CHAL_N, firstClear: result.firstClear, setN: (set.items || []).length });
+    return { result, reward };
+  });
+  if (ui.chal !== c) return; // 그 사이 홈으로 나갔다 — 저장은 진도에 남았고, 화면은 그쪽 것 (Codex 59차 #3)
+  if (!saved.ok) { c.phase = 'unsaved'; renderChalUnsaved(); return; }
+  Object.assign(res, { saved: true, clean: saved.result.clean, reward: saved.reward, level: saved.level });
+  ui.state = saved.math;
+  updateChip();
   c.phase = 'a';
-  try { if (r.ok) sfx.ding(); else sfx.wrong(); } catch { /* 소리는 없어도 */ }
+  try { if (res.ok) sfx.ding(); else sfx.wrong(); } catch { /* 소리는 없어도 */ }
   renderChalA();
+}
+
+/** 고른 답을 저장하지 못했다 — 답은 그대로 두고 💾 다시 저장 (정답은 아직 안 보여 준다) */
+function renderChalUnsaved() {
+  const c = ui.chal;
+  if (!c) { renderLadder(ui.state); return; }
+  const m = clearMain();
+  const card = el('section', 'math-card');
+  card.appendChild(el('h2', '', '앗, 기록을 저장하지 못했어요'));
+  card.appendChild(el('p', 'math-p', '고른 답은 그대로 있어요. 한 번 더 눌러 주세요.'));
+  const retry = el('button', 'btn btn-primary btn-big-wide', '💾 다시 저장');
+  retry.type = 'button';
+  retry.addEventListener('click', () => { if (ui.chal === c && c.phase === 'unsaved') saveChalAnswer(c); });
+  card.appendChild(retry);
+  const out = el('button', 'btn chal-quit', '← 그만하고 사다리로');
+  out.type = 'button';
+  out.addEventListener('click', () => { endChal(); renderLadder(ui.state); });
+  card.appendChild(out);
+  m.appendChild(card);
+}
+
+/** 회차 끝 저장이 안 됐다 — 회차를 그대로 두고 💾 다시 저장 (푼 답은 고른 순간 저장돼 있다) */
+function renderChalEndFail() {
+  const c = ui.chal;
+  if (!c) { renderLadder(ui.state); return; }
+  const m = clearMain();
+  const card = el('section', 'math-card');
+  card.appendChild(el('h2', '', '앗, 기록을 저장하지 못했어요'));
+  card.appendChild(el('p', 'math-p', '푼 답은 저장돼 있어요. 이번 회차를 마치려면 한 번 더 눌러 주세요.'));
+  const retry = el('button', 'btn btn-primary btn-big-wide', '💾 다시 저장');
+  retry.type = 'button';
+  retry.addEventListener('click', () => { if (ui.chal === c && c.phase === 'unsavedEnd') finishChal(); });
+  card.appendChild(retry);
+  const out = el('button', 'btn chal-quit', '사다리로');
+  out.type = 'button';
+  out.addEventListener('click', () => { endChal(); renderLadder(ui.state); });
+  card.appendChild(out);
+  m.appendChild(card);
+}
+
+/** 답한 뒤 화면의 "얻은 것" 한 줄 (고른 답의 저장이 끝난 뒤라 이미 안다) */
+function chalGainText(res) {
+  const rw = res && res.reward;
+  const bits = [];
+  if (rw && (rw.xp || rw.coin)) bits.push(`+⚡ ${rw.xp} 💰 ${rw.coin}`);
+  if (rw && rw.set) bits.push(`🏅 단원을 다 풀었어요!${rw.ball ? ' 🌟 황금 몬스터볼' : ''}`);
+  return bits.join(' · ');
 }
 
 /** 답한 뒤 화면 — 채점 결과는 c.results에서 읽는다 (돌아와서 다시 그려도 두 번 채점하지 않게) */
@@ -904,6 +982,9 @@ function renderChalA() {
   const card = el('section', `math-card chal-a ${r.ok ? 'is-ok' : 'is-no'}`);
   card.appendChild(el('div', 'chal-mark', r.ok ? '⭕' : '❌'));
   card.appendChild(el('h2', 'chal-verdict', r.ok ? '맞았어요!' : '아쉬워요'));
+  const gain = chalGainText(r);
+  if (gain) card.appendChild(el('p', 'chal-gain', gain));
+  if (!r.ok && c.todo && c.todo[c.at]) card.appendChild(el('p', 'math-note chal-later', '🔁 이 문제는 나중에 다시 나와요 — 풀이를 잘 읽어 두세요'));
 
   // 정답 보여 주기 — 틀렸으면 꼭, 맞았어도 확인용으로 한 줄
   const ansRow = el('div', 'chal-answer');
@@ -954,27 +1035,28 @@ async function finishChal() {
   c.phase = 'saving'; // 그 사이 🎒를 다녀오면 resumeChal이 "기록하는 중…"으로 기다린다
 
   const saved = await commitChalRound((s) => {
+    // 답은 고른 순간 이미 적혔다 — ✨ 회차 보너스는 처음 보는 문제를 첫 번에 맞힌 수(clean)로 (v247) · 저장 못 한 답이 있으면 여기서 적는다
     const result = applyChalRound(s, set.id, results, set);
-    const reward = chalReward({ fresh: result.fresh, n, firstClear: result.firstClear, setN: (set.items || []).length }); // 작은 단원은 보너스를 줄인다 (v246)
+    const reward = chalReward({ fresh: result.fresh, clean: result.clean, n, firstClear: result.firstClear, setN: (set.items || []).length }); // 작은 단원은 보너스를 줄인다 (v246)
     if (reward.throws) addPending(s, reward.throws);   // 🎯 던지기는 수학 진도 쪽 카운터
     return { result, reward };
   });
+  // ★ 그 사이 홈으로 나가 새 회차를 열었으면 그 회차를 닫거나 덮어 그리지 않는다 (Codex 59차 #3) — 🎒·📊는 ui.chal이 그대로라 이어서 그린다
+  if (ui.chal !== c) return;
+  // ★ 저장이 안 되면 회차를 그대로 두고 💾 다시 저장 — 닫아 버리면 이미 맞힌 문제라 ✨ 보너스를 되찾을 길이 없다 (Codex 59차 #2)
+  if (!saved.ok) { c.phase = 'unsavedEnd'; renderChalEndFail(); return; }
   endChal();
-  if (!saved.ok) {
-    const m = clearMain();
-    const card = el('section', 'math-card');
-    card.appendChild(el('p', 'math-qtext', '저장이 안 됐어요 — 잠시 뒤 다시 해 볼까요?'));
-    const again = el('button', 'btn btn-primary btn-big-wide', '사다리로');
-    again.type = 'button';
-    again.addEventListener('click', () => renderLadder(ui.state));
-    card.appendChild(again);
-    m.appendChild(card);
-    return;
-  }
   ui.state = saved.math;
   updateChip(); // 맨 위 Lv·⚡·💰·🔷 — 저장은 됐는데 칩을 안 다시 그려 도전 문제를 푸는 내내 옛 숫자였다 (2026-10-01 헤드리스)
   const res = saved.result;
-  const rw = saved.reward;
+  // 이번 회차에서 얻은 것 = 답마다 고른 순간 받은 것 + 회차 끝에 받은 것(✨ 보너스 · 저장 못 했던 답) (v247)
+  const got = [...results.filter((x) => x.saved && x.reward).map((x) => x.reward), saved.reward];
+  const rw = got.reduce((a, b) => ({
+    xp: a.xp + (b.xp || 0), coin: a.coin + (b.coin || 0), stone: a.stone + (b.stone || 0), throws: a.throws + (b.throws || 0),
+    round: a.round || !!b.round, set: a.set || !!b.set, ball: a.ball || !!b.ball,
+  }), { xp: 0, coin: 0, stone: 0, throws: 0, round: false, set: false, ball: false });
+  const lvUp = [...results.map((x) => x.level), saved.level].filter((l) => l && l.leveledUp).map((l) => l.to);
+  const retried = (c.again || []).filter(Boolean).length; // 🔁 틀렸던 문제가 이 회차에 몇 개
 
   const m = clearMain();
   const card = el('section', 'math-card chal-done');
@@ -992,9 +1074,11 @@ async function finishChal() {
     // 하나도 못 맞힌 회차를 "이미 맞혔던 문제라"고 하던 것 (v246 헤드리스에서 봄)
     card.appendChild(el('p', 'math-note', correct === 0 ? '이번엔 맞힌 문제가 없어요 — 풀이를 다시 읽고 🎯 계속 풀기로 다시 해 봐요!' : '이미 맞혔던 문제라 보상은 없어요 — 연습은 언제든 좋아요!'));
   }
-  if (rw.round) card.appendChild(el('p', 'chal-bonus', `✨ ${n}문제를 모두 처음으로 맞혀서 보너스를 받았어요!`));
+  if (rw.round) card.appendChild(el('p', 'chal-bonus', `✨ 처음 보는 ${n}문제를 한 번에 모두 맞혀서 보너스를 받았어요!`));
+  // 다 맞혔는데 보너스가 없는 까닭을 말해 준다 — 틀렸던 문제가 섞인 회차 (v247)
+  else if (correct === n && retried > 0 && (set.items || []).length >= CHAL_N) card.appendChild(el('p', 'math-note chal-retried', `🔁 틀렸던 문제 ${retried}개를 다시 맞혔어요! ✨ 회차 보너스는 처음 보는 문제를 한 번에 다 맞힐 때 나와요`));
   if (rw.set) card.appendChild(el('p', 'chal-bonus chal-bonus-big', `🏅 ${set.unit}을 다 풀었어요!${rw.ball ? ' 🌟 황금 몬스터볼을 받았어요' : ''}`));
-  if (saved.level && saved.level.leveledUp) card.appendChild(el('p', 'chal-bonus', `🎉 Lv.${saved.level.to}이 되었어요!`));
+  if (lvUp.length) card.appendChild(el('p', 'chal-bonus', `🎉 Lv.${Math.max(...lvUp)}이 되었어요!`));
 
   const go = el('button', 'btn btn-primary btn-big-wide', '사다리로 →');
   go.type = 'button';
