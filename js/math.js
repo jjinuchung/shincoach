@@ -11,7 +11,7 @@ import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
   applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, widenRound, rungSub, practiceNote, waitNote, LEARNING_MAX,
-  sameDayRounds, repeatNote, roundPay, setLive, applyQuit, settleLives,
+  sameDayRounds, repeatNote, roundPay, setLive, applyQuit, settleLives, liveKeep,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -1686,7 +1686,7 @@ function answer(i, list, card, typed = null) {
 }
 
 /** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
-const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}), ...(a.pf ? { pf: a.pf } : {}) });
+const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.w === 's' && a.sv !== undefined ? { sv: a.sv ? 1 : 0 } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}), ...(a.pf ? { pf: a.pf } : {}) });
 /** 개념 편의 문항 기록 — 끝낼 때(applyRound)와 푸는 중 기록(setLive·applyQuit)이 같은 꼴 */
 const conceptQs = (r) => r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
 
@@ -1753,33 +1753,38 @@ async function settleLive(state) {
   const waiting = Object.values((state && state.lives) || {}).filter((l) => l && !(r && r.rid === l.rid));
   if (!state || (!waiting.length && !ui.unsaved.length)) return state;
   const held = await heldRids();
+  // 잠금을 보기 **전에** 본 편만 정리한다 — 잠금을 본 뒤에 다른 창이 막 시작해 적은 편은 이 목록에 없다 (Codex 63차 #3)
+  const settle = new Set(waiting.map((l) => l.rid).filter((rid) => !held.has(rid)));
   const redo = ui.unsaved.slice();
   try {
     const next = await updateMath((s) => {
       const today = todayKey();
       for (const u of redo) applyQuit(s, u, today);
-      const keep = new Set(held);
-      if (ui.round && ui.round.rid) keep.add(ui.round.rid);
-      settleLives(s, keep, today);
+      settleLives(s, liveKeep(s, settle, ui.round && ui.round.rid), today);
     });
     ui.unsaved = ui.unsaved.filter((u) => !redo.includes(u));
     return next;
   } catch { return state; }
 }
 
-/** 🙈 틀린 이유 고르기 — 고를 때까지 다음 버튼이 잠긴다. 실수면 이 문항의 오개념 이름표를 거둔다 */
-function whyBlock(a, next, onDone) {
+/**
+ * 🙈 틀린 이유 고르기 — 고를 때까지 다음 버튼이 잠긴다.
+ * "실수"는 바로 빼 주지 않고 확인 대기(a.sv = 0) — 같은 틀 쌍둥이를 맞히면(answerTwin) 그때 오개념 이름표를 거두고 노트에서 뺀다.
+ * 쌍둥이가 없는 문제(③⭐)는 노트에 남겨 다음에 다시 묻고, 💎·틀 없는 문제는 기록에만 남는다 (v251, 노가다 탈출구 막기 4단계)
+ * @param {'twin'|'twinNote'|'note'|'log'} way 실수를 어떻게 확인하나 (slipWayOf)
+ */
+function whyBlock(a, next, onDone, way = 'twin') {
   const box = el('div', 'math-why');
-  box.appendChild(el('div', 'math-solve-h', '🙈 왜 틀렸을까요? 솔직하게 골라요 — 실수면 노트에 안 남겨요'));
+  box.appendChild(el('div', 'math-solve-h', `🙈 왜 틀렸을까요? 솔직하게 골라요${SLIP_HEAD[way] || ''}`));
   const row = el('div', 'math-why-row');
   for (const [code, label] of WHY) {
     const b = el('button', 'btn math-why-btn', label);
     b.type = 'button';
     b.addEventListener('click', () => {
       a.w = code;
-      if (code === 's' && a.tag) { const r = ui.round; const k = r.missTags.lastIndexOf(a.tag); if (k >= 0) r.missTags.splice(k, 1); }
-      saveLive(); // 🙈 실수라고 했으면 그만둬도 노트에 안 남게
-      box.replaceWith(whyPicked(a));
+      if (code === 's') a.sv = 0; else delete a.sv; // 🙈 실수는 확인 대기 — 오개념 이름표는 쌍둥이를 맞힐 때 거둔다
+      saveLive(); // 그만두면 확인 전 실수는 노트에 남는다
+      box.replaceWith(whyPicked(a, way));
       next.disabled = false;
       onDone && onDone();
     });
@@ -1788,9 +1793,23 @@ function whyBlock(a, next, onDone) {
   box.appendChild(row);
   return box;
 }
-const WHY_SAID = { s: '🙈 실수라고 했어요 — 오답 노트에는 안 남겨요. 비슷한 문제로 바로 확인해 봐요.', c: '🤔 헷갈렸다고 했어요 — 풀이를 읽고 비슷한 문제로 확인해요.', u: '😶 잘 몰랐다고 했어요 — 괜찮아요, 풀이를 천천히 읽어요.' };
-function whyPicked(a) {
-  return el('p', 'math-why-picked', WHY_SAID[a.w] || '');
+const WHY_SAID = { c: '🤔 헷갈렸다고 했어요 — 풀이를 읽고 비슷한 문제로 확인해요.', u: '😶 잘 몰랐다고 했어요 — 괜찮아요, 풀이를 천천히 읽어요.' };
+// 🙈 실수를 어떻게 확인하나에 맞춘 말 — 하지 않는 일을 약속하지 않게 (Codex 63차 #4)
+//   twin: 쌍둥이로 확인 · twinNote: 이미 노트에 있는 문제(노트는 남는다) · note: 쌍둥이가 없어 노트에 · log: 💎·틀 없는 문제(노트 없음, 기록에만)
+const SLIP_HEAD = { twin: ' — 실수라면 비슷한 문제로 확인해요', twinNote: ' — 실수라면 비슷한 문제로 확인해요', note: ' — 실수여도 노트에 남겨 다음에 다시 물어볼게요', log: '' };
+const SLIP_SAID = {
+  twin: '🙈 실수라고 했어요 — 비슷한 문제를 맞히면 오답 노트에 안 남겨요.',
+  twinNote: '🙈 실수라고 했어요 — 비슷한 문제로 확인해 봐요.',
+  note: '🙈 실수라고 했어요 — 이 문제는 비슷한 문제가 없어서 노트에 남겨 두고 다음에 다시 물어볼게요.',
+  log: '🙈 실수라고 했어요 — 이번 답은 기록에 남겨 둘게요. 풀이를 한 번 더 읽어 봐요.',
+};
+/** 이 문제에서 실수를 어떻게 확인하나 — 쌍둥이가 나오면 twin(노트 문제면 twinNote), 아니면 노트가 생기는 문제는 note, 💎·틀 없는 문제는 log */
+function slipWayOf(r, q, canTwin) {
+  if (canTwin) return q.fromNote ? 'twinNote' : 'twin';
+  return r.mode === 'special' || !q.key ? 'log' : 'note';
+}
+function whyPicked(a, way = 'twin') {
+  return el('p', 'math-why-picked', a.w === 's' ? (SLIP_SAID[way] || SLIP_SAID.twin) : (WHY_SAID[a.w] || ''));
 }
 
 // ───────────────────── ❓ 아빠에게 묻기 (2026-09-21, 아버님 제안) ─────────────────────
@@ -1802,7 +1821,7 @@ function whyPicked(a) {
 /** ❓ 제안 블록 — 틀린 문항에서 "잘 몰랐어요"를 골랐거나 🤔 노트 문항을 또 틀렸을 때만. 이미 보냈으면 보냈다는 줄 */
 function askOffer(q, a) {
   const r = ui.round;
-  if (!r || light(r) || !a || a.correct || a.w === 's' || !(a.w === 'u' || q.fromNote) || !q.key) return null;
+  if (!r || light(r) || !a || a.correct || (a.w === 's' && a.sv !== 0) || !(a.w === 'u' || q.fromNote) || !q.key) return null; // 확인 전 실수는 ❓ 그대로 (Codex 63차 #2)
   if (a.asked) return el('p', 'math-ask-sent', `📮 아빠에게 보냈어요 (❓${a.asked}) — 답장이 오면 📬로 알려 줄게요`);
   const box = el('div', 'math-ask');
   box.appendChild(el('p', 'math-ask-lead', q.fromNote ? '❓ 아직 헷갈리면 아빠에게 물어볼까요? 문제는 앱이 그대로 보내요.' : '❓ 잘 몰랐다면 아빠에게 물어볼래요? 문제는 앱이 그대로 보내요.'));
@@ -1851,7 +1870,7 @@ function askForm(ctx, onSent) {
 function askOfferForRound(r, state, today) {
   if (!r || light(r) || r.mode === 'notes') return null;
   if (askedToday(state, today) >= ASK_DAILY_MAX) return null;
-  const wrongs = r.answers.map((a, i) => ({ a, q: r.qs[i] })).filter((x) => x.a && !x.a.correct && x.a.w !== 's' && !x.a.asked && x.q && x.q.key && !pendingAskFor(state, x.q.concept, x.q.key));
+  const wrongs = r.answers.map((a, i) => ({ a, q: r.qs[i] })).filter((x) => x.a && !x.a.correct && !(x.a.w === 's' && x.a.sv !== 0) && !x.a.asked && x.q && x.q.key && !pendingAskFor(state, x.q.concept, x.q.key));
   if (!wrongs.length) return null;
   const box = el('div', 'math-ask');
   box.appendChild(el('p', 'math-ask-lead', '❓ 아빠에게 물어볼 게 있어요? 틀린 문제를 골라요 — 문제는 앱이 그대로 보내요.'));
@@ -2095,8 +2114,9 @@ function paintAnswer(i, list, card, restoring) {
     fb.appendChild(slot);
     next.disabled = true;
     const afterReview = (byKid) => {
-      if (a.w) { slot.appendChild(whyPicked(a)); const offer = askOffer(q, a); if (offer) slot.appendChild(offer); next.disabled = false; }
-      else slot.appendChild(whyBlock(a, next, () => { const offer = askOffer(q, a); if (offer) next.before(offer); }));
+      const way = slipWayOf(r, q, canTwin);
+      if (a.w) { slot.appendChild(whyPicked(a, way)); const offer = askOffer(q, a); if (offer) slot.appendChild(offer); next.disabled = false; }
+      else slot.appendChild(whyBlock(a, next, () => { const offer = askOffer(q, a); if (offer) next.before(offer); }, way));
       if (byKid) { slot.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); focusQuiet(slot.querySelector('.math-why-btn') || next); }
     };
     if (!rv || rv.done) afterReview(false);
@@ -2675,6 +2695,11 @@ function answerTwin(i, list, card, typed = null) {
   const ch = t.q.choices[i];
   const a = r.answers[t.of];
   if (a) a.fixed = !!ch.ok;
+  // 🙈 실수라고 한 문제 — 쌍둥이를 맞히면 실수로 인정(sv 1): 그 오개념 이름표를 거둔다. 틀리면 확인 전 그대로(노트에 남는다) (v251)
+  if (a && a.w === 's') {
+    a.sv = ch.ok ? 1 : 0;
+    if (ch.ok && a.tag) { const k = r.missTags.lastIndexOf(a.tag); if (k >= 0) r.missTags.splice(k, 1); }
+  }
   if (ch.ok) { r.fixed = (r.fixed || 0) + 1; sfx.success(); } else { sfx.wrong(); if (ch.tag) r.missTags.push(ch.tag); }
   saveLive();
   paintTwin(i, list, card, false);
@@ -2698,10 +2723,14 @@ function paintTwin(i, list, card, restoring) {
   const shown = t.typed ? { ...ch, text: t.typed.text } : ch;
   if (list.classList.contains('is-pad')) typedAnswered(list, q, shown.text, !!ch.ok);
   if (t.typed && t.typed.note) fb.appendChild(el('p', `math-pad-note ${ch.ok ? 'ok' : 'no'}`, t.typed.note));
+  const slip = (r.answers[t.of] || {}).w === 's'; // 🙈 실수라고 한 문제의 확인 (v251)
+  const noteQ = !!(r.qs[t.of] && r.qs[t.of].fromNote); // 이미 노트에 있는 문제 — 맞혀도 노트는 남는다(또 틀림만 안 센다)
+  // 결과만 말하고 아이의 마음(실수였나)은 넘겨짚지 않는다 (Codex 63차 #4)
+  const slipOk = noteQ ? `🙈 확인 문제를 맞혔어요! ⚡+${REWARD.fix.xp} — 이번에는 '또 틀림'으로 세지 않아요` : `🙈 확인 문제를 맞혔어요! ⚡+${REWARD.fix.xp} — 실수로 보고 오답 노트에 안 남겨요`;
   if (ch.ok) {
-    fb.appendChild(el('p', 'math-fb ok', `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`));
+    fb.appendChild(el('p', 'math-fb ok', slip ? slipOk : `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`));
   } else {
-    fb.appendChild(el('p', 'math-fb no', '아직 헷갈리나 봐요. 풀이를 한 번 더 읽어요.'));
+    fb.appendChild(el('p', 'math-fb no', slip ? '🙈 확인 문제도 틀렸어요 — 노트에 남겨 두고 다음에 다시 풀어 봐요. 풀이를 한 번 더 읽어요.' : '아직 헷갈리나 봐요. 풀이를 한 번 더 읽어요.'));
     scrollTo = solveCard(q, shown);
     fb.appendChild(scrollTo);
   }

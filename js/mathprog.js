@@ -448,12 +448,21 @@ function pushLog(m, entry) {
 export const GUESS_MAX = 120;
 function logQ(q) {
   return { k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }), ...(q.sn === undefined ? {} : { sn: q.sn ? 1 : 0 }), ...(q.w ? { w: q.w } : {}),
+    ...(q.w === 's' && q.sv !== undefined ? { sv: q.sv ? 1 : 0 } : {}), // 🙈 실수 확인 (v251)
     // 🔢 숫자판(2026-10-01) — p: 직접 쓴 답 · g: 어느 보기와도 다른 "짐작한 답"의 값 (오개념엔 안 넣고 부모가 보게)
     ...(q.p ? { p: 1 } : {}), ...(q.g ? { g: String(q.g).slice(0, GUESS_MAX) } : {}),
     // pf: 값은 맞는데 꼴('form' — 대분수로·소수로를 물었는데 다른 꼴) · 약분('reduce')만 틀림 — 짐작이 아니다 (Codex 18차 #4)
     ...(q.pf === 'form' || q.pf === 'reduce' ? { pf: q.pf } : {}) };
 }
 export const WHY_LABEL = { s: '실수', c: '헷갈림', u: '몰랐음' };
+/**
+ * 🙈 "실수"라고 한 오답을 노트·오개념에서 빼 주는가 (v251, 노가다 탈출구 막기 4단계 — Codex 62차 PART 3).
+ * 새로 고른 실수는 확인 표시 sv를 단다 — 0 확인 전(쌍둥이를 아직 안 풀었거나 틀림·쌍둥이가 없는 문제·그만둠) · 1 같은 틀 쌍둥이를 맞힘.
+ * 면제는 sv === 1일 때만. sv가 없는 옛 기록은 예전 뜻(면제) 그대로 — 소급하지 않는다
+ */
+export function slipExempt(q) {
+  return !!q && !q.ok && q.w === 's' && q.sv !== 0;
+}
 
 /**
  * 문항 하나를 개념 기록에 반영 — 얼굴별(①②③⭐) 누적과 개념별 오개념("이 개념에서 어느 얼굴이 약한가"), 🤔 오답 노트.
@@ -467,7 +476,7 @@ function recordQ(rec, q, today) {
   const kk = rec.kinds[q.k] || [0, 0];
   rec.kinds[q.k] = [kk[0] + (q.ok ? 1 : 0), kk[1] + 1];
   // 🙈 아이가 '실수로 눌렀어요'라고 한 오답(w:'s')은 오개념도 노트도 아니다 — 정답률(kinds)에만 남는다 (2026-09-21 ③ 틀린 이유 고르기)
-  const slip = q.w === 's' && !q.ok;
+  const slip = slipExempt(q); // 🙈 확인된 실수만 (v251)
   if (q.tag && !slip) rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1;
   // 🤔 오답 노트 — 틀린 문항의 틀(key)을 적어 두고, 다음 편에서 그 유형을 한 문제 다시 낸다.
   //    처음에 맞히면(ok) 노트에서 지운다 — 쌍둥이로 고친 것(fx)은 "바로 고침"으로만 표시하고 남겨 둔다 (며칠 뒤에도 맞아야 진짜)
@@ -511,6 +520,15 @@ export function setLive(m, live) {
 }
 
 /**
+ * 정리할 때 둘 편 — 정리 대상(settle: 잠금을 보기 **전에** 본, 쥔 창이 없던 편)만 빼고 나머지는 다 둔다.
+ * 잠금을 본 뒤에 다른 창이 막 시작해 적은 편은 settle에 없으니 그대로, 이 창이 푸는 편(cur)도 그대로 (Codex 63차 #3)
+ * @param {Set<number>} settle
+ */
+export function liveKeep(m, settle, cur) {
+  return new Set(Object.values((m && m.lives) || {}).map((l) => l && l.rid).filter((rid) => rid && (!settle.has(rid) || rid === cur)));
+}
+
+/**
  * 수학을 열 때 — 지금 쥔 창이 없는 푸는 중 편(keep에 없는 rid)을 그만둠으로 정리한다 (Codex 62차 #1).
  * keep = 다른 창이 Web Locks로 쥐고 있는 편 + 이 창이 푸는 편 — 살아 있는 창의 편은 닫지 않는다
  * @param {Set<number>} keep
@@ -540,7 +558,7 @@ export function applyQuit(m, live, today) {
   const rec = m.concepts[live.id] || { done: false, box: 0, dueAt: '', passes: 0, fails: 0, lastAt: 0 };
   rec.notes = Array.isArray(rec.notes) ? rec.notes : [];
   for (const q of qs) {
-    if (!q.key || q.ok || q.w === 's') continue;
+    if (!q.key || q.ok || slipExempt(q)) continue;
     const prev = rec.notes.find((n) => n.key === q.key);
     rec.notes = rec.notes.filter((n) => n.key !== q.key);
     rec.notes.push(noteOf(q, today, prev));
@@ -693,7 +711,7 @@ function recordNoteQ(m, rec, q, today) {
   rec.notes = Array.isArray(rec.notes) ? rec.notes : [];
   if (q.k) { const kk = rec.kinds[q.k] || [0, 0]; rec.kinds[q.k] = [kk[0] + (q.ok ? 1 : 0), kk[1] + 1]; }
   if (q.ok) { rec.notes = rec.notes.filter((n) => n.key !== q.key); markCleared(rec, q.key); return; }
-  if (q.w === 's') return; // 🙈 실수 — 노트는 그대로, 오개념도 안 쌓는다
+  if (slipExempt(q)) return; // 🙈 쌍둥이로 확인된 실수 — 노트는 그대로, 오개념도 안 쌓는다 (확인 전이면 틀린 것처럼, v251)
   if (q.tag) { rec.miss[q.tag] = (rec.miss[q.tag] || 0) + 1; m.miss[q.tag] = (m.miss[q.tag] || 0) + 1; }
   const t = Math.max(Date.now(), ((rec.cleared && rec.cleared[q.key]) || 0) + 1);
   const n = rec.notes.find((x) => x.key === q.key);
@@ -782,7 +800,7 @@ export function applyMixRound(m, qs, today) {
     if (q.note) recordNoteQ(m, rec, q, today);
     else {
       recordQ(rec, q, today);
-      if (q.tag && !(q.w === 's' && !q.ok)) m.miss[q.tag] = (m.miss[q.tag] || 0) + 1;
+      if (q.tag && !slipExempt(q)) m.miss[q.tag] = (m.miss[q.tag] || 0) + 1;
     }
     rec.lastAt = Date.now();
   }
@@ -991,7 +1009,7 @@ export function applySpecialRound(m, qs, today, need = 3) {
   for (const q of list) {
     if (!q.ok) {
       // 틀린 것은 📊 진단에만 쌓는다 (아이가 "실수"라고 한 것은 빼는 규칙은 개념 편과 같다)
-      if (q.tag && !(q.w === 's')) m.miss[q.tag] = (m.miss[q.tag] || 0) + 1;
+      if (q.tag && !slipExempt(q)) m.miss[q.tag] = (m.miss[q.tag] || 0) + 1; // 💎는 쌍둥이가 없어 실수도 확인 전 (v251)
       continue;
     }
     ok++;
@@ -1001,7 +1019,7 @@ export function applySpecialRound(m, qs, today, need = 3) {
   }
   sp.rounds = (Number(sp.rounds) || 0) + 1;
   if (list.length) {
-    pushLog(m, { d: today, t: Date.now(), id: 'special', mode: 'special', ok, n: list.length, qs: list.map((q) => ({ k: q.kind, ok: !!q.ok, ...(q.tag ? { tag: q.tag } : {}) })) });
+    pushLog(m, { d: today, t: Date.now(), id: 'special', mode: 'special', ok, n: list.length, qs: list.map((q) => ({ k: q.kind, ok: !!q.ok, ...(q.tag ? { tag: q.tag } : {}), ...(q.w ? { w: q.w } : {}), ...(q.w === 's' && q.sv !== undefined ? { sv: q.sv ? 1 : 0 } : {}) })) }); // 🙈 실수·확인 표시도 (Codex 63차 #1)
   }
   return { ok, total: list.length, got };
 }
@@ -1160,7 +1178,7 @@ export function mathReportText(m, today) {
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
-      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
+      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}${q.w === 's' && q.sv !== undefined ? (q.sv ? '✓' : '✗') : ''}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
       const res = e.mode === 'quit' ? `⏹그만둠 ${e.ok}/${e.n}${e.of ? ` (${e.of}문제 중)` : ''}` : `${e.mode || ''} ${e.ok}/${e.n}`; // ⏹ 그만둔 편 (v250)
       lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? '🎲섞어풀기' : e.id === 'ask' ? '❓답장뒤풀기' : nameOf(e.id)} ${res} ${qs}`);
     }

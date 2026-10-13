@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
-  applyRound, roundReward, roundPay, repeatPay, REPEAT_PAY, sameDayRounds, repeatNote, setLive, applyQuit, settleLives, LIVE_MAX, practiceNote,
+  applyRound, roundReward, roundPay, repeatPay, REPEAT_PAY, sameDayRounds, repeatNote, setLive, applyQuit, settleLives, liveKeep, LIVE_MAX, practiceNote,
   conceptReport, mathReportText, tallyRound, stoneReward, REWARD, STEMS,
 } from '../js/mathprog.js';
 import { emptyMath, mergeMath, updateMath, getMath } from '../js/db.js';
@@ -173,6 +173,14 @@ test('⏹ settleLives: 수학을 열 때 — 쥔 창이 없는 편만 그만둠�
   assert.equal(settleLives(m, new Set(), T), 2, 'Web Locks가 없으면(빈 목록) 예전처럼 다 그만둠');
   assert.equal(m.lives, undefined);
   assert.equal(settleLives(emptyMath(), new Set(), T), 0);
+  // Codex 63차 #3: 정리 대상은 잠금을 보기 전에 본 편만 — 그 뒤에 다른 창이 막 적은 편(74)·이 창이 푸는 편(76)은 그대로
+  const m2 = emptyMath();
+  for (const rid of [74, 75, 76]) setLive(m2, { rid, id: ID, mode: 'learn', d: T, n: 3, qs: [{ k: 'calc', ok: 1 }] });
+  const keep = liveKeep(m2, new Set([75, 76]), 76);
+  assert.deepEqual([...keep].sort(), [74, 76]);
+  assert.equal(settleLives(m2, keep, T), 1);
+  assert.deepEqual(Object.keys(m2.lives), ['74', '76']);
+  assert.deepEqual([...liveKeep(emptyMath(), new Set([1]), null)], []);
 });
 
 test('🔁⏹ mergeMath: 편 수는 두 기기 합 · 같은 백업을 다시 넣어도 그대로 · 같은 밀리초의 다른 편도 둘 다 · 푸는 중 기록은 이 기기 것만, 합친 일지에서 끝난 편은 지운다', () => {
@@ -302,7 +310,8 @@ test('🔁⏹ 화면 배선(math.js): 편 번호·시작한 날·미리 안내·
   assert.ok(rm.indexOf('state = await settleLive(state);') > rm.indexOf('syncMathReplies(state)') && rm.indexOf('state = await settleLive(state);') < rm.indexOf('ui.state = state;'));
   assert.ok(rm.indexOf('if (r) {') < rm.indexOf('settleLive'), '🎒·📊 다녀온 것(ui.round 있음)은 정리 전에 이어서 — 멈춤');
   const sl = fn('settleLive');
-  assert.ok(sl.includes('const held = await heldRids();') && sl.includes('const keep = new Set(held);') && sl.includes('if (ui.round && ui.round.rid) keep.add(ui.round.rid);') && sl.includes('settleLives(s, keep, today);'), '다른 창이 쥔 편·이 창이 푸는 편은 그대로');
+  assert.ok(sl.includes('const held = await heldRids();') && sl.includes('const settle = new Set(waiting.map((l) => l.rid).filter((rid) => !held.has(rid)));') && sl.includes('settleLives(s, liveKeep(s, settle, ui.round && ui.round.rid), today);'), '다른 창이 쥔 편·잠금을 본 뒤 생긴 편·이 창이 푸는 편은 그대로 (Codex 63차 #3)');
+  assert.ok(sl.indexOf('const held = await heldRids();') < sl.indexOf('const settle = '), '잠금을 본 다음에 정리 대상을 정한다');
   assert.ok(sl.indexOf('for (const u of redo) applyQuit(s, u, today);') > 0 && sl.includes('ui.unsaved = ui.unsaved.filter((u) => !redo.includes(u));'), '못 적은 그만둠을 다시 적고, 적은 것만 지운다');
   const fr = fn('finishRound');
   const iCount = fr.indexOf('const repeat = r.rid ? sameDayRounds(s, r.id, r.day || today, r.rid) : 0;');
