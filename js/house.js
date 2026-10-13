@@ -57,6 +57,7 @@ const isHouseObj = (h) => !!h && typeof h === 'object' && !Array.isArray(h);
 /**
  * 가구 — id는 'f_'로 시작 · w = 차지하는 칸(가로) · at = 'floor' 바닥 | 'wall' 벽 · group = small 소품 | furn 가구 | device 기기
  * 그림은 이모지 하나(파일·저작권 없음, 오프라인). 태블릿 글꼴 때문에 Emoji 12 이하만 (🪑 12 · 🧸 11 · 나머지 1.0)
+ * 이모지가 없는 가구는 art(houseview가 코드로 그린다 — 책상)를 두고, emoji는 알림 글에만 쓴다
  */
 export const FURN = [
   // 소품 — 하루 공부로 1~2개
@@ -71,6 +72,8 @@ export const FURN = [
   { id: 'f_drawer', emoji: '🗄️', ko: '서랍장', w: 1, at: 'floor', price: 700, group: 'furn' },
   { id: 'f_bed', emoji: '🛏️', ko: '침대', w: 2, at: 'floor', price: 1000, group: 'furn' },
   { id: 'f_sofa', emoji: '🛋️', ko: '소파', w: 2, at: 'floor', price: 1000, group: 'furn' },
+  // ✏️ 책상 (2026-10-13 아버님 v252) — 책상 이모지가 없어 방·서랍·가게에는 코드로 그린 그림(art), 알림 글에는 ✏️
+  { id: 'f_desk', emoji: '✏️', art: 'desk', ko: '책상', w: 2, at: 'floor', price: 800, group: 'furn' },
   // 기기 — 1~2주 + 스톤 (코인만으로는 못 산다) · 🔷는 MATH_RATE배 (아버님 ⑥)
   { id: 'f_tv', emoji: '📺', ko: 'TV', w: 1, at: 'floor', price: 2500, stones: st(1, 1), group: 'device' },
   { id: 'f_game', emoji: '🎮', ko: '게임기', w: 1, at: 'floor', price: 3000, stones: st(2, 1), group: 'device' },

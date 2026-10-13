@@ -68,7 +68,8 @@ export function lineReveal(units, st, ready) {
 
 /**
  * 🔍 내 답 돌아보기 — 셋 중 내 답의 까닭을 고른다. 틀리면 맞는 문장에 👉를 붙여 칠하고 그것만 누를 수 있게(다시 고르기).
- * o: { title, lead?(요소), node?(글 → 노드, 분수 글은 richNode), result(box, 맞는 문장) — 고른 뒤 이 자리에 남길 모양 }
+ * o: { title, lead?(요소), node?(글 → 노드, 분수 글은 richNode), result(box, 맞는 문장) — 고른 뒤 이 자리에 남길 모양,
+ *      onFirst?(맞음 0|1) — 처음 누른 문장이 맞았나 (📊 첫 선택 기록, v252) }
  */
 export function reviewQuizEl(qz, st, o, onPass) {
   const node = o.node || ((t) => document.createTextNode(t));
@@ -86,6 +87,8 @@ export function reviewQuizEl(qz, st, o, onPass) {
     b.appendChild(node(t));
     b.addEventListener('click', () => {
       if (st.rq) return;
+      // 첫 선택만 알린다(v252) — 한 번 틀리면 맞는 문장만 누를 수 있어 그 뒤는 첫 선택이 아니다
+      if (!st.rqMiss && o.onFirst) o.onFirst(k === qz.ok ? 1 : 0);
       if (k === qz.ok) { st.rq = 1; settle(); onPass(); return; }
       st.rqMiss = 1;
       hint(true);

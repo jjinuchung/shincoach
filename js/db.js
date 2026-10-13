@@ -3,8 +3,9 @@
 
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
+import { mergeReviewFirst } from './mathchal.js'; // 🔍 🎯 까닭 고르기 첫 선택 합치기 (v252) — mathchal.js는 아무것도 import하지 않는다
 import { canEvolve, capReason, evoAt, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
-import { SHINY_USES, SHINY_CHARGE, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, VIDEO_STONE, videoParcelId, videoPlusId, videoGrant } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
+import { SHINY_USES, SHINY_CHARGE, PARCEL_COIN, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, VIDEO_STONE, videoParcelId, videoPlusId, videoGrant } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
@@ -890,7 +891,7 @@ export function cloneMath(m) {
   //   (Codex가 daily에서 잡았던 것과 같은 함정)
   const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])], ...(m.tot ? { tot: { ...m.tot } } : {}), ...(m.sp ? { sp: { ...m.sp, pass: { ...(m.sp.pass || {}) } } } : {}) };
   // 🎯 도전 문제도 sp와 같은 이유로 안쪽 맵까지 새 객체로
-  if (m.chal) out.chal = { ...m.chal, ok: { ...(m.chal.ok || {}) }, tries: { ...(m.chal.tries || {}) }, done: { ...(m.chal.done || {}) } };
+  if (m.chal) out.chal = { ...m.chal, ok: { ...(m.chal.ok || {}) }, tries: { ...(m.chal.tries || {}) }, done: { ...(m.chal.done || {}) }, ...(m.chal.rf ? { rf: { ...m.chal.rf } } : {}) };
   for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
   if (Array.isArray(m.asks)) out.asks = m.asks.map(cloneAsk); // ❓ 질문은 안쪽에 답장 배열이 있어 따로 복사
   return out;
@@ -1088,11 +1089,14 @@ export function mergeMath(cur, rec) {
       for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) o[k] = Math.max(Number(a[k]) || 0, Number(b[k]) || 0);
       return o;
     };
+    // 🔍 까닭 고르기 첫 선택(v252)은 max가 아니라 **먼저 고른 것** — 고칠 수 없는 기록이다
+    const rf = mergeReviewFirst(out.chal && out.chal.rf, rec && rec.chal && rec.chal.rf);
     out.chal = {
       ok: pick('ok'),
       tries: pick('tries'),
       done: pick('done'),
       rounds: Math.max(Number(out.chal && out.chal.rounds) || 0, Number(rec && rec.chal && rec.chal.rounds) || 0),
+      ...(Object.keys(rf).length ? { rf } : {}),
     };
   }
   // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편.
@@ -1391,7 +1395,10 @@ export function parcelRule(profile, raw, now = Date.now()) {
   const pc = parcelOf(raw);
   if (!pc) return { ok: false, why: 'bad' };
   if (parcelGot(profile.parcels, pc.id)) return { ok: false, why: 'done' };
-  for (const id of Object.keys(pc.items)) addCount(profile.items, id, pc.items[id]);
+  for (const id of Object.keys(pc.items)) {
+    if (id === PARCEL_COIN) profile.coins = (Number(profile.coins) || 0) + pc.items[id]; // 💰는 가방이 아니라 코인에 (v252)
+    else addCount(profile.items, id, pc.items[id]);
+  }
   profile.parcels = { ...(profile.parcels || {}), [pc.id]: now };
   return { ok: true, items: { ...pc.items } };
 }

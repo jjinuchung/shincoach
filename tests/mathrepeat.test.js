@@ -241,7 +241,8 @@ test('⏹ 📊: 그만둔 편은 답한 것을 다 맞혔어도 통과가 아니
   // 두 창: 한 편(rid 81)이 그만둠으로도, 끝냄으로도 남았다 → 📊는 끝낸 줄만, 편 수는 하나 (Codex 62차 #3)
   m.log.push({ d: T, t: Date.now() + 5, rid: 81, id: ID, mode: 'learn', ok: 4, n: 5, qs: [] });
   assert.deepEqual(conceptReport(m).find((r) => r.id === ID).trail.map((t) => t.mode), ['learn']);
-  assert.ok(!mathReportText(m, T).includes('⏹'));
+  const txt2 = mathReportText(m, T); // v252부터 🛡️ 줄 "⏹ 그만둔 편 없음"이 늘 있다 — 그만둔 편의 흔적만 본다
+  assert.ok(!txt2.includes('⏹그만둠') && !txt2.includes('⏹1/1') && txt2.includes('⏹ 그만둔 편 없음'), txt2);
   assert.equal(sameDayRounds(m, ID, T), 1);
 });
 

@@ -19,7 +19,7 @@ import { todayKey } from './track.js';
 // 💎 스페셜 문제 — 문제집에서 뽑은 여덟 얼굴 (2026-09-26)
 import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKindOf, makeSpecial, makeSpecialRound } from './mathspecial.js';
 // 🎯 도전 문제 — 문제집에 있는 그 문제 그대로 (2026-09-28)
-import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, applyChalAnswer, chalReward, setNote as chalNote, solvedCount, setCleared, notesFor, missed as chalMissed, solved as chalSolved, shuffleChoices } from './mathchal.js';
+import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, applyChalAnswer, applyReviewFirsts, chalReward, setNote as chalNote, solvedCount, setCleared, notesFor, missed as chalMissed, solved as chalSolved, shuffleChoices } from './mathchal.js';
 import { figureEl, inputEl } from './chalview.js';
 // 📖 풀이 돌아보기 — 틀린 문제의 풀이를 한 줄씩 · 🔍 내 답은 왜 틀렸을까 (v248)
 import { splitLines, conceptQuiz, chalQuiz } from './lookback.js';
@@ -926,14 +926,17 @@ async function saveChalAnswer(c) {
   const m = clearMain();
   m.appendChild(el('p', 'math-loading', '기록하는 중…'));
   const set = c.set;
+  const rf = rfPending.slice(); // 🔍 못 적은 첫 선택도 함께 (Codex 64차)
   const saved = await commitChalRound((s) => {
+    applyReviewFirsts(s, rf);
     const result = applyChalAnswer(s, set.id, res.no, res.ok, set);
-    const reward = chalReward({ fresh: result.fresh ? 1 : 0, clean: 0, n: CHAL_N, firstClear: result.firstClear, setN: (set.items || []).length });
+    const reward = chalReward({ fresh: result.fresh ? 1 : 0, coin: result.coin, clean: 0, n: CHAL_N, firstClear: result.firstClear, setN: (set.items || []).length }); // 💰 난이도별 (v252)
     return { result, reward };
   });
+  if (saved.ok) dropRfPending(rf);
   if (ui.chal !== c) return; // 그 사이 홈으로 나갔다 — 저장은 진도에 남았고, 화면은 그쪽 것 (Codex 59차 #3)
   if (!saved.ok) { c.phase = 'unsaved'; renderChalUnsaved(); return; }
-  Object.assign(res, { saved: true, clean: saved.result.clean, reward: saved.reward, level: saved.level });
+  Object.assign(res, { saved: true, clean: saved.result.clean, first: !!saved.result.first, reward: saved.reward, level: saved.level });
   ui.state = saved.math;
   updateChip();
   c.phase = 'a';
@@ -1024,6 +1027,8 @@ function renderChalA() {
       title: '🔍 내 답은 왜 틀렸을까요? 골라 봐요',
       lead: el('p', 'chal-review-mine', `❌ ${qz.label ? `${qz.label} — ` : ''}내 답: ${qz.key}`),
       result: (box, t) => { box.appendChild(chalNoteRow({ t: qz.key, ok: false, picked: true, num: qz.num, note: t }, true)); },
+      // 📊 첫 선택(v252) — 이 문제에 처음 낸 답일 때만, 한 번
+      onFirst: (ok) => { if (r.first && !r.rf) { r.rf = 1; saveReviewFirst(c.set.id, item.no, qz.part, ok); } },
     }, () => { if (reveal) reveal.refresh(); }));
   }
   const units = []; // 📖 한 줄씩 열 줄 — 줄마다 함께 보일 요소
@@ -1057,6 +1062,24 @@ function renderChalA() {
   m.appendChild(card);
 }
 
+/**
+ * 🔍 아직 못 적은 첫 선택 — 누른 순간의 날·시각 그대로 들고 있다가 다음 🎯 답 저장·회차 끝 저장이 같은 트랜잭션에 함께 적는다 (Codex 64차).
+ * 적히면 뺀다. 앱을 닫으면 사라진다(점수·보상과 상관없는 기록)
+ */
+const rfPending = [];
+const dropRfPending = (list) => { for (const p of list) { const i = rfPending.indexOf(p); if (i >= 0) rfPending.splice(i, 1); } };
+
+/**
+ * 🔍 🎯 까닭 고르기 첫 선택을 적는다(v252, 노가다 탈출구 막기 5단계) — 📊에 "첫 선택 정답 3/4"로.
+ * 답은 이미 저장됐고 점수·보상과 상관없는 기록이라 기다리지 않는다 — 못 적으면 rfPending에 남아 다음 저장 때 다시.
+ * ui.state는 안 바꾼다 — 늦게 끝나면 그 사이 저장한 다음 문제의 진도를 옛것으로 덮는다(화면은 rf를 안 쓴다)
+ */
+function saveReviewFirst(setId, no, part, ok) {
+  rfPending.push({ setId, no, part, ok: ok ? 1 : 0, day: todayKey(), t: Date.now() });
+  const list = rfPending.slice();
+  updateMath((s) => { applyReviewFirsts(s, list); }).then(() => dropRfPending(list), () => {});
+}
+
 /** 🎯 보기 까닭 한 줄 — ✔/✗ 보기 (내 답 · 빠뜨린 것 · 고른 것) — 까닭. got: 🔍에서 골라 맞힌 줄 */
 function chalNoteRow(n, got = false) {
   const row = el('p', `chal-note ${n.ok ? 'is-ok' : 'is-no'}${got ? ' math-review-got' : ''}`);
@@ -1076,13 +1099,16 @@ async function finishChal() {
   if (c.phase === 'saving') return; // 두 번 누름
   c.phase = 'saving'; // 그 사이 🎒를 다녀오면 resumeChal이 "기록하는 중…"으로 기다린다
 
+  const rf = rfPending.slice(); // 🔍 못 적은 첫 선택도 함께 (Codex 64차)
   const saved = await commitChalRound((s) => {
+    applyReviewFirsts(s, rf);
     // 답은 고른 순간 이미 적혔다 — ✨ 회차 보너스는 처음 보는 문제를 첫 번에 맞힌 수(clean)로 (v247) · 저장 못 한 답이 있으면 여기서 적는다
     const result = applyChalRound(s, set.id, results, set);
-    const reward = chalReward({ fresh: result.fresh, clean: result.clean, n, firstClear: result.firstClear, setN: (set.items || []).length }); // 작은 단원은 보너스를 줄인다 (v246)
+    const reward = chalReward({ fresh: result.fresh, coin: result.coin, clean: result.clean, n, firstClear: result.firstClear, setN: (set.items || []).length }); // 작은 단원은 보너스를 줄인다 (v246) · 💰 난이도별 (v252)
     if (reward.throws) addPending(s, reward.throws);   // 🎯 던지기는 수학 진도 쪽 카운터
     return { result, reward };
   });
+  if (saved.ok) dropRfPending(rf);
   // ★ 그 사이 홈으로 나가 새 회차를 열었으면 그 회차를 닫거나 덮어 그리지 않는다 (Codex 59차 #3) — 🎒·📊는 ui.chal이 그대로라 이어서 그린다
   if (ui.chal !== c) return;
   // ★ 저장이 안 되면 회차를 그대로 두고 💾 다시 저장 — 닫아 버리면 이미 맞힌 문제라 ✨ 보너스를 되찾을 길이 없다 (Codex 59차 #2)

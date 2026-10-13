@@ -152,6 +152,25 @@ test('🔍 고르기 뒤 줄이 없으면 바로 onDone 한 번 · 🎒 복원: 
   assert.deepEqual([done.className, done.textContent], ['math-review is-done', '고른 것: 내 까닭']);
 });
 
+test('🔍 첫 선택(v252): onFirst는 처음 누른 것만 — 남의 까닭이면 0(그 뒤 맞는 문장을 눌러도 안 부름) · 처음 맞히면 1 · 🎒 복원(틀린 뒤·고른 뒤)에서는 안 부름 · 없어도 그대로', () => {
+  setup();
+  const got = [];
+  const o = { ...RESULT, onFirst: (ok) => got.push(ok) };
+  const [a0, a1] = opts(reviewQuizEl(QZ, {}, o, () => {}));
+  a0.click(); a1.click(); a1.click();
+  assert.deepEqual(got, [0]);
+  const [b0, b1] = opts(reviewQuizEl(QZ, {}, o, () => {}));
+  b1.click(); b0.click();
+  assert.deepEqual(got, [0, 1]);
+  opts(reviewQuizEl(QZ, { rqMiss: 1 }, o, () => {}))[1].click();
+  assert.deepEqual(got, [0, 1], '🎒 복원 — 이미 한 번 틀린 뒤');
+  reviewQuizEl(QZ, { rq: 1 }, o, () => assert.fail('복원에서 onPass'));
+  assert.deepEqual(got, [0, 1]);
+  const st = {};
+  opts(reviewQuizEl(QZ, st, RESULT, () => {}))[1].click();
+  assert.equal(st.rq, 1, 'onFirst가 없어도 고르기는 그대로');
+});
+
 test('🔍 고르기 글: node가 있으면 그것으로(분수 글은 세로 분수) · 없으면 글자 그대로', () => {
   const d = setup();
   const seen = [];

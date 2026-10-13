@@ -48,6 +48,42 @@ function jong(w) {
   return c < 0 || c > 11171 ? -1 : c % 28;
 }
 const eul = (w) => (jong(w) > 0 ? '을' : '를');
+
+// ── 🖍️ 이모지가 없는 가구의 그림 (v252 책상) — 파일 없이 코드로, 크기는 글자 크기(1em)를 따른다 ──
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const ART = {
+  // 책상 — 위판·앞 모서리·왼쪽 다리·오른쪽 서랍 셋(손잡이)·위에 책 두 권
+  desk: [
+    ['rect', { x: 20, y: 8, width: 16, height: 6, rx: 1, fill: '#3fa34d' }],
+    ['rect', { x: 22, y: 4, width: 13, height: 4, rx: 1, fill: '#e0533d' }],
+    ['rect', { x: 4, y: 14, width: 92, height: 8, rx: 2, fill: '#c08446' }],
+    ['rect', { x: 4, y: 20, width: 92, height: 3, fill: '#8a5a2b' }],
+    ['rect', { x: 10, y: 23, width: 6, height: 37, fill: '#8a5a2b' }],
+    ['rect', { x: 60, y: 23, width: 30, height: 37, fill: '#a86f38', stroke: '#7a4c22', 'stroke-width': 1.5 }],
+    ['line', { x1: 60, y1: 35, x2: 90, y2: 35, stroke: '#7a4c22', 'stroke-width': 1.5 }],
+    ['line', { x1: 60, y1: 47, x2: 90, y2: 47, stroke: '#7a4c22', 'stroke-width': 1.5 }],
+    ['circle', { cx: 75, cy: 29, r: 2, fill: '#f2d07a' }],
+    ['circle', { cx: 75, cy: 41, r: 2, fill: '#f2d07a' }],
+    ['circle', { cx: 75, cy: 53, r: 2, fill: '#f2d07a' }],
+  ],
+};
+/** 가구 그림 하나 — art가 있으면 그린 그림, 없으면 이모지 글자 */
+function artEl(d, tag, cls) {
+  const box = el(tag, cls);
+  const parts = d && d.art && ART[d.art];
+  if (!parts) { box.textContent = d ? d.emoji : ''; return box; }
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 64');
+  svg.setAttribute('class', 'house-art');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const [name, attrs] of parts) {
+    const n = document.createElementNS(SVG_NS, name);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+    svg.appendChild(n);
+  }
+  box.appendChild(svg);
+  return box;
+}
 const euro = (w) => (jong(w) > 0 && jong(w) !== 8 ? '으로' : '로');
 const iga = (w) => (jong(w) > 0 ? '이' : '가');
 const eun = (w) => (jong(w) > 0 ? '은' : '는');
@@ -329,7 +365,7 @@ function itemEl(it) {
   e.dataset.u = String(it.u);
   e.dataset.id = it.id;
   Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(d.at === 'wall' ? 5 : 10 + it.y) });
-  e.appendChild(el('span', 'house-emoji', d.emoji));
+  e.appendChild(artEl(d, 'span', 'house-emoji'));
   if (it.id === HEAL) restDecor(e, it);
   e.addEventListener('pointerdown', (ev) => startDrag(ev, { kind: 'move', id: it.id, u: it.u, src: e }));
   return e;
@@ -401,7 +437,7 @@ function drawerBox() {
     b.type = 'button';
     b.dataset.id = id;
     b.setAttribute('aria-label', `${d.ko} ${left[id]}개`);
-    b.appendChild(el('span', 'house-drawer-emoji', d.emoji));
+    b.appendChild(artEl(d, 'span', 'house-drawer-emoji'));
     b.appendChild(el('span', 'house-drawer-name', d.ko));
     if (left[id] > 1) b.appendChild(el('span', 'house-drawer-n', `×${left[id]}`));
     b.addEventListener('pointerdown', (ev) => startDrag(ev, { kind: 'new', id, src: b }));
@@ -540,7 +576,7 @@ function shopCard(it, c, pf) {
   const b = el('button', `house-shop-item${grow ? ' is-grow' : ''}${c.why === 'short' || c.why === 'gift' || c.why === 'order' ? ' is-short' : ''}${done ? ' is-done' : ''}${armed ? ' is-arm' : ''}`);
   b.type = 'button';
   b.dataset.buy = it.id;
-  if (paint) { const sw = el('span', 'house-shop-swatch'); sw.style.background = it.color; b.appendChild(sw); } else b.appendChild(el('span', 'house-shop-emoji', it.emoji));
+  if (paint) { const sw = el('span', 'house-shop-swatch'); sw.style.background = it.color; b.appendChild(sw); } else b.appendChild(artEl(it, 'span', 'house-shop-emoji'));
   b.appendChild(el('span', 'house-shop-name', it.ko));
   if (grow) b.appendChild(el('span', 'house-shop-what', it.what));
   b.appendChild(el('span', 'house-shop-price', priceText(it.id)));
@@ -945,7 +981,10 @@ function unbind() {
 function beginDrag(d) {
   d.moved = true;
   const f = furnById(d.id);
-  const g = el('div', `house-ghost${f.w > 1 ? ' is-wide' : ''}`, f.emoji);
+  // 뒤집어 놓은 가구는 끄는 그림도 뒤집어서 — 바깥 transform은 onMove가 손가락 자리로 쓰니 안쪽 그림에 (Codex 64차)
+  const it = d.kind === 'move' ? ((room() || {}).items || []).find((x) => x.u === d.u) : null;
+  const g = el('div', `house-ghost${f.w > 1 ? ' is-wide' : ''}`);
+  g.appendChild(artEl(f, 'span', `house-ghost-art${it && it.f ? ' is-flip' : ''}`));
   const cell = (document.querySelector('#house-body .house-room') || { clientWidth: 320 }).clientWidth / sz().W;
   g.style.fontSize = `${cell * (f.w > 1 ? 1.5 : 0.95)}px`;
   document.body.appendChild(g);

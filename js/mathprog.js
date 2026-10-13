@@ -34,6 +34,7 @@ import * as bigGen from './mathbig.js';
 import * as angGen from './mathangle.js';
 import * as mdGen from './mathmuldiv.js';
 import * as mvGen from './mathmove.js';
+import { rfOk } from './mathchal.js'; // 🔍 첫 선택 한 줄의 꼴 (Codex 64차) — mathchal.js는 아무것도 import하지 않는다
 
 /**
  * 🌳 줄기 — 개념 사다리 하나 = 생성기 모듈 하나. 화면(math.js)은 `STEMS[key]`만 바꿔 끼운다 (2026-09-21, E 음수 3단계).
@@ -1160,6 +1161,89 @@ export function conceptReport(m, limit = 8) {
   }).filter((r) => r.trail.length || r.notes || (r.rounds > 0 && !r.placedOnly)).sort((a, b) => b.lastAt - a.lastAt); // 🤔 노트만 있는 개념(진단으로 안 것)도 표에 — 못 고친 유형을 보여 줘야 한다
 }
 
+// ── 🛡️ 꼼수 막기 기록 (2026-10-13, 노가다 탈출구 막기 5단계, v252 — Codex 63차 PART 3) ──
+// 1~4단계가 막은 길(⏹ 그만두기 · 🔁 같은 날 다시 풀기 · 🙈 실수 · 🔍 까닭 고르기)을 아빠가 📊와 📋 글에서 같은 숫자로 본다.
+// 새 카운터는 없다 — 있는 일지와 🎯 첫 선택(m.chal.rf)에서 센다.
+
+/** 📊·📋가 보는 기간 — 오늘까지 7일 */
+export const GUARD_DAYS = 7;
+/** 한 줄에 늘어놓는 개수 — 넘으면 "외 N" */
+export const GUARD_LIST = 6;
+
+/**
+ * 최근 days일의 꼼수 막기 기록 (순수).
+ *   quits: ⏹ 그만둔 개념 편 [{ id, name, d, ok, n, of }] — 같은 편(rid)을 끝내기도 했으면 끝낸 줄만(shownLog), 최근 것부터
+ *   repeats: 🔁 같은 날 같은 개념을 두 편 이상 푼 날 [{ id, name, d, k }] — k는 그날 편 수(그만둔 편 포함, 같은 편은 한 번 — sameDayRounds와 같은 셈)
+ *   slip: 🙈 "실수"라고 한 오답 { yes: 확인 문제를 맞힘(sv 1) · twin: 확인 문제도 틀림(sv 0 · fx 0) · none: 확인 못 함(sv 0 — 확인 문제가 없거나 그 전에 그만둠) ·
+ *         old: 확인 없이 빼 주던 v251 전 기록(sv 없음 — 셈에서 뺀다) } — sv 0을 "쌍둥이 틀림"이라 부르지 않는다(쌍둥이를 틀린 것은 fx 0)
+ *   review: 🔍 🎯 까닭 고르기 첫 선택 { ok, n } — 문제에 처음 낸 답일 때만 적혀 있다(applyReviewFirst)
+ * 날은 편을 시작한 날(sd || d). 일지는 최근 LOG_MAX편까지라 그보다 많이 풀면 오래된 날이 빠진다
+ */
+export function guardReport(m, today, days = GUARD_DAYS) {
+  const span = Math.max(1, Math.trunc(Number(days) || GUARD_DAYS));
+  const from = addDays(today, -(span - 1));
+  const inWin = (d) => typeof d === 'string' && d >= from && d <= today;
+  // 같은 편(rid)이 두 줄이면(같은 편을 두 번 적음) 앞 줄만 — 편 수도 🙈 셈도 한 번 (그만둠·끝냄 둘이면 shownLog가 끝낸 줄만 남긴다)
+  const seen = new Set();
+  const log = shownLog((m && Array.isArray(m.log)) ? m.log : [])
+    .filter((e) => e && inWin(e.sd || e.d) && (e.rid === undefined || (!seen.has(e.rid) && !!seen.add(e.rid))));
+  const quits = log.filter((e) => e.mode === 'quit').reverse()
+    .map((e) => ({ id: e.id, name: nameOf(e.id), d: e.d, ok: Number(e.ok) || 0, n: Number(e.n) || 0, of: Number(e.of || e.n) || 0 }));
+  const byDay = new Map();
+  for (const e of log) {
+    if (!CONCEPT_MODES.has(e.mode)) continue;
+    const day = e.sd || e.d;
+    const key = `${e.id}|${day}`;
+    const g = byDay.get(key) || { id: e.id, d: day, k: 0 };
+    g.k += 1;
+    byDay.set(key, g);
+  }
+  const repeats = [...byDay.values()].filter((g) => g.k >= 2)
+    .sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : b.k - a.k))
+    .map((g) => ({ id: g.id, name: nameOf(g.id), d: g.d, k: g.k }));
+  const slip = { yes: 0, twin: 0, none: 0, old: 0 };
+  for (const e of log) {
+    for (const q of (e.qs || [])) {
+      if (!q || q.ok || q.w !== 's') continue;
+      if (q.sv === undefined) slip.old += 1;
+      else if (q.sv === 1) slip.yes += 1;
+      else if (q.fx === 0) slip.twin += 1;
+      else slip.none += 1;
+    }
+  }
+  const review = { ok: 0, n: 0 };
+  for (const v of Object.values((m && m.chal && m.chal.rf) || {})) {
+    if (!rfOk(v) || !inWin(v[1])) continue;   // 꼴이 틀린 줄은 안 센다 — 손질 안 된 길로 들어와도 (Codex 64차)
+    review.n += 1;
+    if (v[0] === 1) review.ok += 1;
+  }
+  return { from, to: today, days: span, quits, repeats, slip, review };
+}
+
+/** 🛡️ 기록을 글 줄로 — 📊 화면과 📋 복사 글(비공개 저장소 math/날짜.md)이 같은 줄을 쓴다. 첫 줄은 제목 */
+export function guardLines(g) {
+  const md = (d) => String(d || '').slice(5);
+  const list = (arr, f) => arr.slice(0, GUARD_LIST).map(f).join(' · ') + (arr.length > GUARD_LIST ? ` 외 ${arr.length - GUARD_LIST}` : '');
+  const s = g.slip;
+  const sN = s.yes + s.twin + s.none;
+  const old = s.old ? `확인 없이 빼 주던 옛 기록 ${s.old}개는 셈에서 뺐어요` : '';
+  return [
+    `🛡️ 최근 ${g.days}일(${md(g.from)}~${md(g.to)}) 꼼수 막기 기록`,
+    g.quits.length
+      ? `⏹ 그만둔 편 ${g.quits.length}: ${list(g.quits, (x) => `${x.name} ${md(x.d)} (${x.of}문제 중 ${x.n}개 풀고 ${x.ok}개 맞힘)`)}`
+      : '⏹ 그만둔 편 없음',
+    g.repeats.length
+      ? `🔁 같은 날 같은 개념 여러 편 ${g.repeats.length}: ${list(g.repeats, (x) => `${x.name} ${md(x.d)} ${x.k}편`)}`
+      : '🔁 같은 날 같은 개념 여러 편 없음',
+    sN
+      ? `🙈 "실수"라고 한 오답 ${sN}: ✓ 확인 문제를 맞힘 ${s.yes} · ✗ 확인 문제도 틀림 ${s.twin} · ✗ 확인 못 함 ${s.none}(확인 문제가 없거나 그 전에 그만둠)${old ? ` — ${old}` : ''}`
+      : `🙈 "실수"라고 한 오답 없음${old ? ` (${old})` : ''}`,
+    g.review.n
+      ? `🔍 🎯 까닭 고르기 첫 선택 정답 ${g.review.ok}/${g.review.n} — 맞는 까닭을 골랐다는 뜻이에요(이해했다는 증거는 아니에요)`
+      : '🔍 🎯 까닭 고르기 첫 선택 아직 없음 — 문제를 처음 풀 때 틀려서 까닭을 고른 경우만 세요',
+  ];
+}
+
 /**
  * 📋 아빠가 Claude에게 붙여 넣을 글 — 개념별 요약 + 최근 일지. JSON보다 짧고 사람이 읽을 수 있다.
  * (내보내기 JSON에도 math 레코드가 통째로 들어가지만, 폰에서 대화창에 붙이기엔 이게 낫다)
@@ -1174,6 +1258,7 @@ export function mathReportText(m, today) {
     lines.push(`- ${r.name}${r.stage ? ` ${STAGE_MARK[r.stage]}` : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}${r.sense[1] ? ` · 감 잡기 ${r.sense[0]}/${r.sense[1]}` : ''}${(r.why.s + r.why.c + r.why.u) ? ` · 틀린 이유: 실수 ${r.why.s}·헷갈림 ${r.why.c}·몰랐음 ${r.why.u}` : ''}${r.pad[1] ? ` · ✍️ 직접 쓴 답 ${r.pad[0]}/${r.pad[1]}${r.guesses.length ? ` (짐작: ${r.guesses.join(', ')})` : ''}` : ''}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`);
   }
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
+  lines.push('', ...guardLines(guardReport(m, today))); // 🛡️ 📊와 같은 줄 (v252)
   const log = shownLog((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);

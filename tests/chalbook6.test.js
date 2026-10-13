@@ -223,10 +223,10 @@ test('🏅 작은 단원 보상: 20문제는 그대로(⚡300 💰400 🌟) · 1
   assert.deepEqual([6, 7, 8, 9].map((n) => { const g = setGiftOf(n); return [g.xp, g.coin, g.ball]; }), [[90, 120, false], [105, 140, false], [120, 160, false], [135, 180, false]]);
   // 10문제 단원의 마지막 회차가 4문제(앞 회차에서 하나를 이미 맞힘) — 넷 다 처음 맞히면 문제 + 회차 + 완주 보상
   const r4 = chalReward({ fresh: 4, n: 4, firstClear: true, setN: 10 });
-  assert.deepEqual([r4.xp, r4.coin, r4.stone, r4.throws, r4.round, r4.set, r4.ball, r4.items[REWARD.set.ball]], [220, 231, 1, 1, true, true, true, 1]);
+  assert.deepEqual([r4.xp, r4.coin, r4.stone, r4.throws, r4.round, r4.set, r4.ball, r4.items[REWARD.set.ball]], [220, 255, 1, 1, true, true, true, 1]); // 💰 문제 4 → 10 (v252)
   // 화면 — 단원 크기를 넘기고, 볼은 받았을 때만 말한다
   const math = read('js/math.js');
-  assert.ok(math.includes('chalReward({ fresh: result.fresh, clean: result.clean, n, firstClear: result.firstClear, setN: (set.items || []).length })'));
+  assert.ok(math.includes('chalReward({ fresh: result.fresh, coin: result.coin, clean: result.clean, n, firstClear: result.firstClear, setN: (set.items || []).length })'));
   assert.ok(math.includes("`🏅 ${set.unit}을 다 풀었어요!${rw.ball ? ' 🌟 황금 몬스터볼을 받았어요' : ''}`"));
 });
 

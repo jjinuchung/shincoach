@@ -3,7 +3,7 @@ import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
   applyEssayFixes, getMath, updateMath, updateItem,
 } from './db.js';
-import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, KIND_SHORT, WHY_LABEL, STAGE_MARK } from './mathprog.js';
+import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK } from './mathprog.js';
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes, essayKey } from './essay.js';
 import { countPlayableCues } from './srt.js';
@@ -667,6 +667,12 @@ export async function renderStats() {
         cM.appendChild(box);
       }
     }
+    // 🛡️ 꼼수 막기 기록 (v252, 노가다 탈출구 막기 5단계) — 📋 복사 글과 같은 줄(guardLines)이라 숫자가 같다
+    const guard = guardLines(guardReport(math, today));
+    cM.appendChild(el('p', 'stats-sub', guard[0]));
+    const gl = el('ul', 'stats-guard');
+    for (const t of guard.slice(1)) gl.appendChild(el('li', '', t));
+    cM.appendChild(gl);
     // 📋 Claude에게 보여 줄 글 — 폰에서 복사해 대화창에 붙인다 (내보내기 JSON은 크고 사람이 못 읽는다)
     const copyRow = el('div', 'stats-actions');
     const copyBtn = el('button', 'btn', '📋 수학 기록 복사 (Claude에게 붙여 넣기)');

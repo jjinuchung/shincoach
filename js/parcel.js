@@ -47,13 +47,18 @@ export function parcelLabel(id, n) {
 
 /** 받은 뒤 한 줄 — 어디서 쓰는지 (순수) */
 export function afterLine(items, left) {
+  if (onlyCoins(items)) return '💰 코인은 바로 들어왔어요 — 🏠 집 꾸미기·🛒 가게에서 써요'; // v252
   if (items && (items[SHINY_CHARGE] || items[SHINY_STONE.id])) return `🌈 이로치 남은 횟수: ${left}번 — 🎒 도감에서 포켓몬을 누르고 "🌈 이로치로!"`;
   if (items && items[STONE_ENGLISH.id]) return `${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko}은 🎒 도감에서 영어 포켓몬을 키울 때 · 🛒 스톤 상점에서 써요`;
   return '🎒 가방에서 볼 수 있어요';
 }
 
-/** 📦 칸에서 💰 코인을 가리키는 이름 (가방 물건이 아니라 보여 주기만) */
+/** 📦 칸에서 💰 코인을 가리키는 이름 (가방 물건이 아니라 보여 주기만 · 아빠 구호품도 이 이름으로 코인을 보낸다 — items.PARCEL_COIN, v252) */
 export const COIN_ITEM = 'coin';
+/** 💰 코인만 온 구호품인가 (순수) */
+export function onlyCoins(items) {
+  return !!items && !!items[COIN_ITEM] && Object.keys(items).length === 1;
+}
 
 /**
  * 🏁 끝까지 본 영상들의 보상을 구호품 한 칸으로 (순수) — 영상 이름을 보여 준다(무엇 때문에 받는지 아이가 알게).
@@ -195,7 +200,7 @@ async function onButton() {
   step = 'done';
   ok.disabled = false;
   if (r.ok) {
-    $('parcel-title').textContent = '🎒 가방에 넣었어요!';
+    $('parcel-title').textContent = onlyCoins(cur.items) ? '💰 코인을 받았어요!' : '🎒 가방에 넣었어요!'; // 💰만 온 구호품은 가방이 아니다 (v252)
     $('parcel-sub').textContent = afterLine(r.items || cur.items, shinyLeft());
     ok.textContent = cur.kind === 'video' ? '좋아요!' : '고마워요, 아빠!';
     try { sfx.success(); } catch { /* 소리는 없어도 */ }

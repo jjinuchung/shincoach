@@ -167,7 +167,7 @@ test('🎯 화면: 고른 답을 **저장한 뒤에** 정답 · 저장이 안 �
   assert.ok(ans.includes('saveChalAnswer(c);'));
   const save = ans.slice(ans.indexOf('async function saveChalAnswer(c) {'));
   assert.ok(save.includes('const result = applyChalAnswer(s, set.id, res.no, res.ok, set);'), '고른 순간 저장');
-  assert.ok(save.includes('chalReward({ fresh: result.fresh ? 1 : 0, clean: 0, n: CHAL_N,'), '답마다는 ✨ 없이');
+  assert.ok(save.includes('chalReward({ fresh: result.fresh ? 1 : 0, coin: result.coin, clean: 0, n: CHAL_N,'), '답마다는 ✨ 없이');
   const iCommit = save.indexOf('await commitChalRound(');
   const iShow = save.indexOf('renderChalA();');
   assert.ok(iCommit > 0 && iShow > iCommit, '★ 정답 화면은 저장이 끝난 뒤');

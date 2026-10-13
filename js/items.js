@@ -225,10 +225,13 @@ export function itemById(id) {
 /**
  * 📦 아빠의 구호품 (2026-10-05, 아버님: "이로치의 스톤 2번을 구호품(선물)으로 보내 주자").
  * 배포 파일 coach/gifts.json의 한 줄 = { id, items: { 아이템id: 개수 }, title?, text? }.
- * 보낼 수 있는 것은 가방 물건(카탈로그)과 🌈 이로치 남은 횟수(SHINY_CHARGE)뿐 — 세상에 하나뿐인 것(🌕)은 못 보낸다.
- * 개수는 1~PARCEL_MAX 정수 (오타로 99개가 가지 않게). 하나라도 틀리면 그 구호품 통째로 안 받는다
+ * 보낼 수 있는 것은 가방 물건(카탈로그)과 🌈 이로치 남은 횟수(SHINY_CHARGE)·💰 코인(PARCEL_COIN, v252)뿐 — 세상에 하나뿐인 것(🌕)은 못 보낸다.
+ * 개수는 1~PARCEL_MAX 정수 (오타로 99개가 가지 않게) · 💰는 1~PARCEL_COIN_MAX. 하나라도 틀리면 그 구호품 통째로 안 받는다
  */
 export const PARCEL_MAX = 10;
+/** 📦 구호품의 💰 코인 칸 이름 (가방 물건이 아니라 코인에 더한다 — parcel.js COIN_ITEM과 같은 이름) · 한 번에 보낼 수 있는 끝 */
+export const PARCEL_COIN = 'coin';
+export const PARCEL_COIN_MAX = 2000;
 /** 받은 구호품인가 — 받은 때 값이 아니라 **기록이 있느냐**로 (깨진 때 0이 "안 받음"이 되어 두 번 받지 않게) */
 export function parcelGot(received, id) {
   return !!received && Object.prototype.hasOwnProperty.call(received, id);
@@ -243,6 +246,11 @@ export function parcelOf(raw) {
   if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
   const items = {};
   for (const [k, n] of Object.entries(src)) {
+    if (k === PARCEL_COIN) { // 💰 (v252)
+      if (!Number.isInteger(n) || n < 1 || n > PARCEL_COIN_MAX) return null;
+      items[k] = n;
+      continue;
+    }
     const it = byId[k];
     // 🥚 알은 가방이 아니라 profile.eggs에서 품는다 — 가방에 넣으면 받기만 되고 못 품는다 (Codex 32차 #4)
     if (k !== SHINY_CHARGE && (!it || it.unique || it.kind === 'egg')) return null;

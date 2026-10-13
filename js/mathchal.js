@@ -26,12 +26,30 @@
 /** 한 회차에 내는 문제 수 */
 export const ROUND_N = 5;
 
-/** 보상 — 💎 스페셜(⚡8·💰3)보다 조금 높다. 문제집에서 온 진짜 문제라 한 문제가 더 무겁다 */
+/** 보상 — 💎 스페셜(⚡8·💰3)보다 높다. 문제집에서 온 진짜 문제(엄마가 고른 틀렸던 문제)라 한 문제가 더 무겁다 */
 export const REWARD = {
-  item: { xp: 10, coin: 4 },                                  // 처음 맞힌 문제 하나당
+  item: { xp: 10, coin: 10 },                                 // 처음 맞힌 문제 하나당 — 💰는 난이도별(itemCoin), 이 값은 보통 문제
   round: { xp: 30, coin: 15, stone: 1, throws: 1 },           // 한 회차(5문제)를 **전부 처음 맞혔을 때**
   set: { xp: 300, coin: 400, math: 3, english: 3, ball: 'goldenball' }, // 한 단원 20문제를 다 맞혔을 때 (한 번)
 };
+
+/**
+ * 💰 처음 맞힌 문제 하나의 코인 — 난이도별 (2026-10-13 아버님: "틀렸던 문제를 다시 낸 거라 10에서 20까지는 줘야", v252).
+ * 보통 문제(칸 1개) 10 · 칸이 2개 이상 15 · '도전'·'서술형' 배지 20. 문제에 coin(10~20 정수)을 적으면 그 값
+ */
+export const ITEM_COIN = { base: 10, multi: 15, hard: 20 };
+export const HARD_BADGES = ['도전', '서술형'];
+export function itemCoin(item) {
+  if (!item) return ITEM_COIN.base;
+  const c = item.coin;
+  if (Number.isInteger(c) && c >= ITEM_COIN.base && c <= ITEM_COIN.hard) return c;
+  if (HARD_BADGES.includes(item.badge)) return ITEM_COIN.hard;
+  return (Array.isArray(item.parts) ? item.parts.length : 1) >= 2 ? ITEM_COIN.multi : ITEM_COIN.base;
+}
+/** 단원에서 번호로 문제 하나 */
+export function itemOf(set, no) {
+  return ((set && set.items) || []).find((it) => it && Number(it.no) === Number(no)) || null;
+}
 
 /** 답 입력 방식 */
 export const INPUTS = ['num', 'choice', 'many', 'order', 'plot'];
@@ -175,7 +193,7 @@ function chalMaps(m) {
 
 /**
  * 🎯 한 문제에 **답한 순간** 적는다 — 트랜잭션 규칙 (v247). 그만두거나 앱을 닫아도 답은 남는다.
- * @returns {{ok:boolean, fresh:boolean, clean:boolean, cleared:boolean, firstClear:boolean, solved:number, total:number}}
+ * @returns {{ok:boolean, fresh:boolean, clean:boolean, first:boolean, coin:number, cleared:boolean, firstClear:boolean, solved:number, total:number}}
  *   fresh: 처음 맞힘(문제 보상) · clean: 처음 보는 문제를 첫 번에 맞힘(✨ 회차 보너스에 센다) · firstClear: 🏅 단원 완주(한 번)
  */
 export function applyChalAnswer(m, setId, no, ok, set) {
@@ -188,7 +206,66 @@ export function applyChalAnswer(m, setId, no, ok, set) {
   const cleared = setCleared(m, set);
   const firstClear = cleared && !setClaimed(m, setId);
   if (firstClear) m.chal.done[setId] = 1;   // 단원 보상은 한 번만 (단조)
-  return { ok: !!ok, fresh, clean: fresh && before === 0, cleared, firstClear, solved: solvedCount(m, set), total: ((set && set.items) || []).length };
+  // first: 이 문제에 처음 낸 답 — 🔍 까닭 고르기 첫 선택은 이때만 센다 · coin: 처음 맞혔으면 이 문제의 💰(난이도별) (v252)
+  return { ok: !!ok, fresh, clean: fresh && before === 0, first: before === 0, coin: fresh ? itemCoin(itemOf(set, no)) : 0, cleared, firstClear, solved: solvedCount(m, set), total: ((set && set.items) || []).length };
+}
+
+/**
+ * 🔍 까닭 고르기 첫 선택의 열쇠 — 문제와 칸(part)으로 (v252, 노가다 탈출구 막기 5단계)
+ */
+export function rfKey(setId, no, part) {
+  return `${qid(setId, no)}|${Number(part) || 0}`;
+}
+
+/**
+ * 🔍 🎯 까닭 고르기 **첫 선택**을 적는다 — 트랜잭션 규칙 (v252, Codex 63차 PART 3).
+ * m.chal.rf = { 'setId-no|part': [맞음 0|1, 날, 시각] } — 문제·칸마다 **처음 한 번만**(이미 있으면 그대로).
+ * 화면은 그 문제에 처음 낸 답(applyChalAnswer의 first)일 때만 부른다 — 다시 풀 때는 정답과 풀이를 본 뒤라 세지 않는다.
+ * 답은 이미 저장된 뒤라 점수·보상·tries·ok는 건드리지 않는다. "맞는 까닭을 골랐다"일 뿐 이해의 증거는 아니다
+ * @returns {boolean} 적었나
+ */
+export function applyReviewFirst(m, setId, no, part, ok, day, t = Date.now()) {
+  const k = rfKey(setId, no, part);
+  const v = [ok ? 1 : 0, String(day || ''), Number(t)];
+  if (!rfOk(v)) return false;   // 날·시각이 틀린 줄은 적지 않는다 (Codex 64차)
+  if (m.chal && m.chal.rf && rfOk(m.chal.rf[k])) return false;
+  m.chal = { ...(m.chal || {}) };
+  m.chal.rf = { ...(m.chal.rf || {}), [k]: v };
+  return true;
+}
+
+/**
+ * 🔍 못 적은 첫 선택을 다시 적는다 — 누른 순간의 날·시각 그대로 (Codex 64차). 처음 한 번만이라 두 번 적어도 같고,
+ * 처음 틀린 것을 나중에 맞힌 것으로 바꾸지 않는다
+ * @param {Array<{setId:string, no:number, part:number, ok:number, day:string, t:number}>} list
+ * @returns {number} 새로 적은 수
+ */
+export function applyReviewFirsts(m, list) {
+  let n = 0;
+  for (const p of list || []) if (p && applyReviewFirst(m, p.setId, p.no, p.part, p.ok, p.day, p.t)) n += 1;
+  return n;
+}
+
+const RF_DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** 🔍 첫 선택 한 줄의 꼴 — [0|1, 'YYYY-MM-DD', 시각(0보다 큰 수)] · null·''이 시각 0으로 모두를 이기지 않게 (Codex 64차) */
+export const rfOk = (v) => Array.isArray(v) && (v[0] === 0 || v[0] === 1) && typeof v[1] === 'string' && RF_DAY.test(v[1])
+  && typeof v[2] === 'number' && Number.isFinite(v[2]) && v[2] > 0;
+
+/**
+ * 🔍 첫 선택 합치기 (백업·두 기기) — 열쇠마다 **먼저 고른 것**(시각이 작은 쪽 → 같으면 0 쪽 → 같으면 이른 날). 어느 쪽에서 합쳐도 같다.
+ * 꼴이 틀린 줄은 버린다
+ */
+export function mergeReviewFirst(a, b) {
+  const out = {};
+  for (const src of [a, b]) {
+    for (const [k, v] of Object.entries((src && typeof src === 'object') ? src : {})) {
+      if (!rfOk(v)) continue;
+      const cur = out[k];
+      const t = v[2];
+      if (!cur || t < cur[2] || (t === cur[2] && (v[0] < cur[0] || (v[0] === cur[0] && v[1] < cur[1])))) out[k] = [v[0], v[1], t];
+    }
+  }
+  return out;
 }
 
 /**
@@ -197,12 +274,13 @@ export function applyChalAnswer(m, setId, no, ok, set) {
  * @param {object} m 수학 진도 (cloneMath로 복사된 것)
  * @param {string} setId
  * @param {Array<{no:number, ok:boolean, saved?:boolean, clean?:boolean}>} results
- * @returns {{fresh:number, clean:number, correct:number, solved:number, total:number, cleared:boolean, firstClear:boolean}}
- *   fresh·firstClear: **여기서** 적은 답의 몫만(이미 적힌 답의 보상은 그때 줬다) · clean: 회차 전체에서 처음 보는 문제를 첫 번에 맞힌 수
+ * @returns {{fresh:number, coin:number, clean:number, correct:number, solved:number, total:number, cleared:boolean, firstClear:boolean}}
+ *   fresh·coin·firstClear: **여기서** 적은 답의 몫만(coin은 그 문제들의 💰 합)(이미 적힌 답의 보상은 그때 줬다) · clean: 회차 전체에서 처음 보는 문제를 첫 번에 맞힌 수
  */
 export function applyChalRound(m, setId, results, set) {
   chalMaps(m);
   let fresh = 0;
+  let coin = 0;
   let clean = 0;
   let correct = 0;
   let firstClear = false;
@@ -211,13 +289,14 @@ export function applyChalRound(m, setId, results, set) {
     if (r.ok) correct += 1;
     if (r.saved) { if (r.clean) clean += 1; continue; }
     const a = applyChalAnswer(m, setId, r.no, r.ok, set);
-    if (a.fresh) fresh += 1;
+    if (a.fresh) { fresh += 1; coin += a.coin; }
     if (a.clean) clean += 1;
     if (a.firstClear) firstClear = true;
   }
   m.chal.rounds = (Number(m.chal.rounds) || 0) + 1;
   return {
     fresh,
+    coin,
     clean,
     correct,
     solved: solvedCount(m, set),
@@ -248,12 +327,14 @@ export function setGiftOf(setN) {
  * ★ **처음 맞힌 문제(fresh)에만** 준다. 같은 문제를 다시 풀어 보상을 캐지 못한다.
  * ★ ✨ 회차 보너스는 **처음 보는 문제를 첫 번에 맞힌 수(clean)**가 회차 문제 수와 같을 때만 (v247 — 틀렸던 문제는 문제 보상만).
  *   clean을 안 주면 fresh와 같다고 본다(옛 부름).
- * @param {{fresh:number, clean?:number, n:number, firstClear:boolean, setN?:number}} o n: 이번 회차 문제 수 · setN: 단원의 문제 수(작은 단원은 보너스를 줄인다)
+ * @param {{fresh:number, coin?:number, clean?:number, n:number, firstClear:boolean, setN?:number}} o n: 이번 회차 문제 수 · setN: 단원의 문제 수(작은 단원은 보너스를 줄인다) ·
+ *   coin: 처음 맞힌 문제들의 💰 합(itemCoin, applyChalAnswer·applyChalRound가 센다) — 안 주면 보통 문제 값 × fresh(옛 부름)
  */
-export function chalReward({ fresh = 0, clean, n = ROUND_N, firstClear = false, setN } = {}) {
+export function chalReward({ fresh = 0, coin, clean, n = ROUND_N, firstClear = false, setN } = {}) {
   const f = Math.max(0, Math.floor(Number(fresh) || 0));
   const c = clean === undefined ? f : Math.max(0, Math.floor(Number(clean) || 0));
-  const out = { xp: REWARD.item.xp * f, coin: REWARD.item.coin * f, items: {}, stone: 0, throws: 0, round: false, set: false, ball: false };
+  const qc = coin === undefined ? REWARD.item.coin * f : Math.max(0, Math.floor(Number(coin) || 0));
+  const out = { xp: REWARD.item.xp * f, coin: qc, items: {}, stone: 0, throws: 0, round: false, set: false, ball: false };
   const small = Number.isFinite(Number(setN)) && Number(setN) > 0 && Number(setN) < ROUND_N; // 한 회차도 안 되는 단원
   if (!small && c > 0 && c >= Math.max(1, Math.floor(Number(n) || ROUND_N))) {
     out.round = true;
