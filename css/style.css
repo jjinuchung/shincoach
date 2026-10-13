@@ -2632,6 +2632,23 @@ button { font-family: inherit; }
 .chal-note.is-ok { background: #ecf8f0; }
 .chal-note.is-no { background: #fdf0f3; }
 .chal-note b { margin-right: 2px; }
+/* v248 📖 틀린 문제 풀이 한 줄씩 열기 · 🔍 내 답 돌아보기 (개념 편 풀이 카드와 🎯가 같이 쓴다) */
+.chal-why-line { margin: 0; }
+.chal-why-line + .chal-why-line { margin-top: 6px; }
+.chal-review-mine { margin: 6px 0 0; font-weight: 800; color: #a61e4d; word-break: keep-all; }
+.math-line-btn { display: block; width: 100%; margin: 10px 0 2px; min-height: 48px; font-weight: 800; color: var(--primary); background: #fff; border: 2px dashed #c7d2fe; }
+.math-review { margin: 10px 0 6px; padding: 12px; border-radius: 14px; background: #f5f3ff; border: 1px solid #ddd6fe; text-align: left; }
+.math-review.is-done { margin: 0 0 8px; padding: 0; background: transparent; border: 0; }
+.math-review-opts { display: grid; gap: 8px; margin-top: 8px; }
+.math-review-opt { text-align: left; white-space: normal; min-height: 48px; line-height: 1.5; background: #fff; border: 2px solid #ddd6fe; word-break: keep-all; }
+.math-review-opt.is-hint { border-color: #f59e0b; background: #fffbeb; box-shadow: 0 0 0 3px rgba(245, 158, 11, .25); }
+.math-review-opt.is-off { opacity: .4; }
+.math-review-msg { margin: 8px 0 0; font-size: .9rem; color: #5b21b6; font-weight: 700; word-break: keep-all; }
+.math-review-got { background: #ecfdf5; border-radius: 10px; padding: 6px 10px; }
+.chal-note.math-review-got { background: #fdf0f3; outline: 2px solid #86efac; }
+.math-review-point { font-weight: 800; }
+/* 화면에는 안 보이고 화면 읽기 프로그램만 읽는 글 (새로 연 풀이 줄 — Codex 60차 #2) */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .chal-polys-row { display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: center; align-items: flex-end; }
 .chal-poly { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
 .chal-poly-svg { max-width: 100%; }

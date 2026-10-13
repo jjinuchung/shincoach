@@ -20,6 +20,9 @@ import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKin
 // 🎯 도전 문제 — 문제집에 있는 그 문제 그대로 (2026-09-28)
 import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, applyChalAnswer, chalReward, setNote as chalNote, solvedCount, setCleared, notesFor, missed as chalMissed, solved as chalSolved, shuffleChoices } from './mathchal.js';
 import { figureEl, inputEl } from './chalview.js';
+// 📖 풀이 돌아보기 — 틀린 문제의 풀이를 한 줄씩 · 🔍 내 답은 왜 틀렸을까 (v248)
+import { splitLines, conceptQuiz, chalQuiz } from './lookback.js';
+import { lineReveal, reviewQuizEl } from './lookview.js';
 import { padSpec, matchTyped } from './mathpad.js';
 import { padBox, padAnswered } from './padview.js';
 import { drawBox, drawAnswered, canDraw } from './drawview.js';
@@ -998,30 +1001,55 @@ function renderChalA() {
   // 🎯 v246 — 답 그림(대각선을 그은 다각형) · 💡 핵심 개념 한 줄 · 풀이 · 고른 보기마다 까닭(틀린 보기 · 빠뜨린 보기 · ㉠~㉣처럼 모두)
   const ansFig = item.ansFig ? figureEl(item.ansFig) : null;
   if (ansFig) card.appendChild(ansFig);
-  if (item.idea) card.appendChild(el('p', 'chal-idea', `💡 ${item.idea}`));
-  card.appendChild(el('p', 'chal-why', item.why));
   const given = c.answers[c.at];
-  const notes = item.parts.flatMap((p, i) => notesFor(p, Array.isArray(given) ? given[i] : given));
+  // 📖 v248 틀렸으면 — 🔍 내 답은 왜 틀렸을까(고를 수 있는 칸만) → 💡·풀이·보기 까닭을 한 줄씩. 다 열어야 다음 문제 (점수·보상은 그대로)
+  const qz = r.ok ? null : chalQuiz(item, given, (c.seed || 0) + item.no * 31);
+  let reveal = null;
+  if (qz) {
+    card.appendChild(reviewQuizEl(qz, r, {
+      title: '🔍 내 답은 왜 틀렸을까요? 골라 봐요',
+      lead: el('p', 'chal-review-mine', `❌ ${qz.label ? `${qz.label} — ` : ''}내 답: ${qz.key}`),
+      result: (box, t) => { box.appendChild(chalNoteRow({ t: qz.key, ok: false, picked: true, num: qz.num, note: t }, true)); },
+    }, () => { if (reveal) reveal.refresh(); }));
+  }
+  const units = []; // 📖 한 줄씩 열 줄 — 줄마다 함께 보일 요소
+  if (item.idea) { const p = el('p', 'chal-idea', `💡 ${item.idea}`); card.appendChild(p); units.push([p]); }
+  const whyBox = el('div', 'chal-why');
+  splitLines(item.why).forEach((t, k) => { const p = el('p', 'chal-why-line', t); whyBox.appendChild(p); units.push(k ? [p] : [whyBox, p]); });
+  if (whyBox.firstChild) card.appendChild(whyBox);
+  // 🔍에서 고른 까닭은 거기서 이미 보였다 — 보기 까닭 줄에서는 뺀다
+  const notes = item.parts.flatMap((p, i) => notesFor(p, Array.isArray(given) ? given[i] : given).map((n) => ({ ...n, part: i })))
+    .filter((n) => !(qz && n.part === qz.part && n.picked && !n.ok));
   if (notes.length) {
     const box = el('div', 'chal-notes');
-    for (const n of notes) {
-      const row = el('p', `chal-note ${n.ok ? 'is-ok' : 'is-no'}`);
-      const tag = n.num ? ' (내 답)' : !n.picked && n.ok ? ' (빠뜨린 것)' : n.picked ? ' (고른 것)' : '';
-      row.appendChild(el('b', '', `${n.ok ? '✔' : '✗'} ${n.t}${tag}`));
-      row.appendChild(document.createTextNode(` — ${n.note}`));
-      box.appendChild(row);
-    }
+    notes.forEach((n, k) => { const row = chalNoteRow(n); box.appendChild(row); units.push(k ? [row] : [box, row]); });
     card.appendChild(box);
   }
 
   const next = el('button', 'btn btn-primary btn-big-wide', c.at + 1 < c.items.length ? '다음 문제 →' : '끝내기');
   next.type = 'button';
   next.addEventListener('click', () => {
+    if (next.disabled) return;
     if (c.at + 1 < c.items.length) { c.at += 1; c.phase = 'q'; renderChalQ(); }
     else finishChal();
   });
+  if (!r.ok) {
+    reveal = lineReveal(units, r, () => !qz || !!r.rq);
+    card.appendChild(reveal.say);
+    if (!reveal.done) { card.appendChild(reveal.btn); next.disabled = true; }
+    reveal.onDone = () => { next.disabled = false; focusQuiet(next); };
+  }
   card.appendChild(next);
   m.appendChild(card);
+}
+
+/** 🎯 보기 까닭 한 줄 — ✔/✗ 보기 (내 답 · 빠뜨린 것 · 고른 것) — 까닭. got: 🔍에서 골라 맞힌 줄 */
+function chalNoteRow(n, got = false) {
+  const row = el('p', `chal-note ${n.ok ? 'is-ok' : 'is-no'}${got ? ' math-review-got' : ''}`);
+  const tag = n.num ? ' (내 답)' : !n.picked && n.ok ? ' (빠뜨린 것)' : n.picked ? ' (고른 것)' : '';
+  row.appendChild(el('b', '', `${got ? '🔍 ' : ''}${n.ok ? '✔' : '✗'} ${n.t}${tag}`));
+  row.appendChild(document.createTextNode(` — ${n.note}`));
+  return row;
 }
 
 async function finishChal() {
@@ -1923,7 +1951,8 @@ function paintAnswer(i, list, card, restoring) {
   const fb = card.querySelector('.math-feedback');
   fb.innerHTML = '';
   let scrollTo = null;
-  const a = r.answers[r.at] || {}; // 이 문항의 답 기록 (감 잡기·이유가 여기 붙는다)
+  let rv = null; // 📖 v248 한 줄씩 열기 · 🔍 돌아보기 (진단·❓풀어보기 같은 가벼운 편은 지금처럼 한꺼번에)
+  const a = r.answers[r.at] || {}; // 이 문항의 답 기록 (감 잡기·이유·연 줄 수가 여기 붙는다)
   const sense = senseOf(q);
   // 🔢 숫자판으로 쓴 답 — 숫자판 자리에 "✍️ 내 답"만 남기고, 풀이 카드의 "내 답"도 친 그대로
   const shown = a.p ? { ...ch, text: a.chosen || ch.text } : ch;
@@ -1945,7 +1974,8 @@ function paintAnswer(i, list, card, restoring) {
     const showTag = ch.tag && !META_TAGS.has(ch.tag);
     p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : ch.idk ? '괜찮아요 — 풀이를 천천히 읽어 봐요.' : '아쉬워요.'));
     fb.appendChild(p);
-    scrollTo = solveCard(q, shown); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (진우, 2026-09-21)
+    rv = light(r) ? null : { st: a, seed: (r.seed || 0) + r.at * 7919 };
+    scrollTo = solveCard(q, shown, rv); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (2026-09-21)
     fb.appendChild(scrollTo);
   }
   // 🎯 감 잡기 결과 — 답을 본 뒤에야 알려 준다
@@ -1962,9 +1992,18 @@ function paintAnswer(i, list, card, restoring) {
   next.type = 'button';
   next.addEventListener('click', () => { if (canTwin) startTwin(); else advance(); });
   // 🙈 틀린 이유 — 고를 때까지 다음이 잠긴다 (진단 제외). 복원이면 고른 것을 보여 준다
+  // v248: 📖 풀이를 다 열고 🔍 돌아보기를 마친 **뒤에** 나온다 — 그때까지 다음도 잠김
   if (!ch.ok && !light(r)) {
-    if (a.w) { fb.appendChild(whyPicked(a)); const offer = askOffer(q, a); if (offer) fb.appendChild(offer); }
-    else { next.disabled = true; fb.appendChild(whyBlock(a, next, () => { const offer = askOffer(q, a); if (offer) next.before(offer); })); }
+    const slot = el('div', 'math-why-slot');
+    fb.appendChild(slot);
+    next.disabled = true;
+    const afterReview = (byKid) => {
+      if (a.w) { slot.appendChild(whyPicked(a)); const offer = askOffer(q, a); if (offer) slot.appendChild(offer); next.disabled = false; }
+      else slot.appendChild(whyBlock(a, next, () => { const offer = askOffer(q, a); if (offer) next.before(offer); }));
+      if (byKid) { slot.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); focusQuiet(slot.querySelector('.math-why-btn') || next); }
+    };
+    if (!rv || rv.done) afterReview(false);
+    else rv.onDone = () => afterReview(true);
   }
   fb.appendChild(next);
   // 포커스가 버튼으로 가면서 화면이 풀이 아래로 밀리면 아이가 풀이를 못 본다 (Codex #10) — 풀이 카드 머리를 보이게
@@ -2335,12 +2374,20 @@ async function applyMathBattleResult(r) {
 }
 
 
+// ───────────────────── 📖 풀이 돌아보기 (v248, 노가다 탈출구 막기 2단계) ─────────────────────
+// 틀린 문제의 풀이를 한꺼번에 펼치면 훑고 "다음"을 누르기 쉽다 → 첫 줄만 보이고 "▶ 다음 줄"로 하나씩, 다 열어야 다음.
+// 사람이 확인해 켠 칸(quiz)만 먼저 🔍 내 답은 왜 틀렸을까를 셋 중 하나 — 규칙은 lookback.js, 부품(줄 열기·고르기)은 lookview.js.
+// 연 줄 수(open)·고르기를 마쳤나(rq)·한 번 틀렸나(rqMiss)는 이 답의 기록(개념 편 r.answers[r.at] · 🎯 c.results[c.at])에 —
+// 🎒·📊에 다녀와 다시 그려도 그대로. 점수·보상·노트·tries는 안 건드린다(저장하는 문항 기록에도 안 들어간다).
+
 /**
  * 📖 풀이 카드 — 보기 아래에 펼쳐진다.
  *   ❌ 내 답 / ✔ 정답 → 1️⃣ 왜 틀렸나(이 오개념을 이 숫자로) + 내 답·정답 막대 비교 → 2️⃣ 이렇게 풀어요 + 정답 그림 → 3️⃣ 다음에 기억할 것
  * 사람이 쓴 ③⭐ 문항은 아직 풀이가 없어 정답과 개념 한 줄만 (2차에서 채운다).
+ * rv (v248): 틀린 문제면 { st: 이 답의 기록, seed } — 1️⃣ 자리에 🔍 고르기(고를 수 있으면) + 줄마다 한 줄씩 열기.
+ *   다 마치면 rv.done = true, 아이가 마지막 줄을 열 때 rv.onDone(). 없으면(맞힌 뒤 📖 풀이 보기·쌍둥이·되짚기) 한꺼번에
  */
-function solveCard(q, ch) {
+function solveCard(q, ch, rv = null) {
   const card = el('div', 'math-solve');
   const okCh = q.choices.find((x) => x.ok) || { text: '' };
   const head = el('div', 'math-solve-head');
@@ -2353,16 +2400,18 @@ function solveCard(q, ch) {
   const c = conceptOf(q.concept);
   if (!s) {
     if (c && c.idea) { const p = el('p', 'math-solve-p'); p.appendChild(document.createTextNode('💡 ')); p.appendChild(richNode(c.idea)); card.appendChild(p); }
+    if (rv) rv.done = true;
     return card;
   }
+  const units = []; // 📖 한 줄씩 열 줄 — 줄마다 함께 보일 요소 (rv가 없으면 안 쓴다)
+  const tail = (e) => { if (units.length) units[units.length - 1].push(e); else units.push([e]); }; // 그림은 바로 앞 줄과 함께
+  let quiz = null;
+  let reveal = null;
   let hadWhy = false; // "왜 틀렸나"가 없으면(🤷 모르겠어요 · 짐작한 답) 번호를 1️⃣부터
   if (!ch.ok) {
     const why = s.why[ch.tag] || s.whyAny || (ch.tag && !META_TAGS.has(ch.tag) ? `이 답은 "${ch.tag}" 실수예요.` : '');
     hadWhy = !!why;
-    if (why) {
-      card.appendChild(el('div', 'math-solve-h', s.steps.length ? '1️⃣ 왜 틀렸나' : '📖 왜 틀렸나'));
-      const p = el('p', 'math-solve-p'); p.appendChild(richNode(why)); card.appendChild(p);
-    }
+    const figs = [];
     // 내 답과 정답을 막대로 나란히 — 글보다 먼저 눈에 들어온다 (분수 모양 답이고 너무 크지 않을 때만)
     if (s.compare) {
       const a = fracOf(ch.text); const b = fracOf(okCh.text);
@@ -2370,13 +2419,35 @@ function solveCard(q, ch) {
         const row = el('div', 'math-compare');
         row.appendChild(compareBox('내 답', ch.text, barSvg(a.d, a.n), 'no'));
         row.appendChild(compareBox('정답', okCh.text, barSvg(b.d, b.n), 'ok'));
-        card.appendChild(row);
+        figs.push(row);
       }
     }
     // 정수 답(음수 줄기) — 내 답과 정답을 한 수직선에: 부호 실수가 "0의 어느 쪽으로 갔나"로 보인다
     if (s.numline) {
       const svg = compareLineSvg(intOf(ch.text), intOf(okCh.text));
-      if (svg) card.appendChild(svgBox(svg, 'math-fig math-numline'));
+      if (svg) figs.push(svgBox(svg, 'math-fig math-numline'));
+    }
+    const whyH = s.steps.length ? '1️⃣ 왜 틀렸나' : '📖 왜 틀렸나';
+    // 🔍 v248 — 고를 수 있으면 1️⃣ 자리에서 먼저 고른다 (까닭 글을 위에 펼쳐 두면 고르기가 베끼기가 된다)
+    const qz = rv ? conceptQuiz(q, ch, rv.seed) : null;
+    if (qz) {
+      quiz = reviewQuizEl(qz, rv.st, {
+        title: `${s.steps.length ? '1️⃣ ' : ''}🔍 내 답은 왜 틀렸을까요? 골라 봐요`,
+        node: richNode,
+        result: (box, t) => {
+          box.appendChild(el('div', 'math-solve-h', whyH));
+          const p = el('p', 'math-solve-p math-review-got'); p.appendChild(document.createTextNode('🔍 ')); p.appendChild(richNode(t)); box.appendChild(p);
+          for (const f of figs) box.appendChild(f);
+        },
+      }, () => { if (reveal) reveal.refresh(); });
+      card.appendChild(quiz);
+    } else {
+      if (why) {
+        const h = el('div', 'math-solve-h', whyH);
+        card.appendChild(h);
+        (rv ? splitLines(why) : [why]).forEach((t, k) => { const p = el('p', 'math-solve-p'); p.appendChild(richNode(t)); card.appendChild(p); units.push(k ? [p] : [h, p]); });
+      }
+      for (const f of figs) { card.appendChild(f); tail(f); }
     }
   } else if (!s.steps.length && s.whyAny) {
     // ③ 왜 그런가 — 맞혔어도 "왜"를 읽을 수 있게 (사람이 쓴 풀이는 단계가 없고 이유 한 덩이다)
@@ -2384,16 +2455,26 @@ function solveCard(q, ch) {
     const p = el('p', 'math-solve-p'); p.appendChild(richNode(s.whyAny)); card.appendChild(p);
   }
   if (s.steps.length) {
-    card.appendChild(el('div', 'math-solve-h', ch.ok ? '📖 이렇게 풀어요' : hadWhy ? '2️⃣ 이렇게 풀어요' : '1️⃣ 이렇게 풀어요'));
+    const h = el('div', 'math-solve-h', ch.ok ? '📖 이렇게 풀어요' : hadWhy ? '2️⃣ 이렇게 풀어요' : '1️⃣ 이렇게 풀어요');
+    card.appendChild(h);
     const ol = el('ol', 'math-solve-steps');
-    for (const st of s.steps) { const li = el('li'); li.appendChild(richNode(st)); ol.appendChild(li); }
+    s.steps.forEach((st, k) => { const li = el('li'); li.appendChild(richNode(st)); ol.appendChild(li); units.push(k ? [li] : [h, ol, li]); });
     card.appendChild(ol);
   }
-  if (s.figure) card.appendChild(svgBox(s.figure, 'math-fig'));
+  if (s.figure) { const f = svgBox(s.figure, 'math-fig'); card.appendChild(f); tail(f); }
   const rule = s.rule || (c && c.idea) || '';
   if (rule) {
-    card.appendChild(el('div', 'math-solve-h', (ch.ok || !s.steps.length) ? '💡 기억할 것' : hadWhy ? '3️⃣ 다음에 기억할 것' : '2️⃣ 다음에 기억할 것'));
-    const p = el('p', 'math-solve-p rule'); p.appendChild(richNode(rule)); card.appendChild(p);
+    const h = el('div', 'math-solve-h', (ch.ok || !s.steps.length) ? '💡 기억할 것' : hadWhy ? '3️⃣ 다음에 기억할 것' : '2️⃣ 다음에 기억할 것');
+    const p = el('p', 'math-solve-p rule'); p.appendChild(richNode(rule));
+    card.appendChild(h); card.appendChild(p);
+    units.push([h, p]);
+  }
+  if (rv) {
+    reveal = lineReveal(units, rv.st, () => !quiz || !!rv.st.rq);
+    card.appendChild(reveal.say);
+    if (!reveal.done) card.appendChild(reveal.btn);
+    rv.done = reveal.done;
+    reveal.onDone = () => { rv.done = true; if (rv.onDone) rv.onDone(); };
   }
   return card;
 }
