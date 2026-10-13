@@ -415,7 +415,7 @@ export const SOLID = [
             t: `밑면의 변이 ${n}개인 각기둥이 있어요.\n\n이 각기둥의 이름은 무엇일까요?`, text: true, ans: prismName(n),
             wr: [{ text: prismName(n + 2), tag: TAGS.byFace }, { text: prismName(3 * n), tag: TAGS.byEdge }, { text: pyrName(n), tag: TAGS.kindSwap }],
             steps: [`밑면의 변이 ${n}개 — 밑면은 ${polyName(n)}`, `→ ${prismName(n)}`],
-            why: { [TAGS.byFace]: '면의 수로 붙인 이름이에요. 밑면의 모양으로 붙여요.', [TAGS.byEdge]: '모서리의 수로 붙인 이름이에요. 밑면의 모양으로 붙여요.', [TAGS.kindSwap]: '각기둥이라고 했어요.' },
+            why: { [TAGS.byFace]: '면의 수로 붙인 이름이에요. 밑면의 모양으로 붙여요.', [TAGS.byEdge]: '모서리의 수로 붙인 이름이에요. 밑면의 모양으로 붙여요.', [TAGS.kindSwap]: '문제는 각기둥이라고 했어요 — 각뿔이 아니에요.' },
             probe: { ask: 'name', kind: 'prism', n },
           };
         })(),
@@ -425,7 +425,7 @@ export const SOLID = [
             t: `밑면의 변이 ${n}개인 각뿔이 있어요.\n\n이 각뿔의 이름은 무엇일까요?`, text: true, ans: pyrName(n),
             wr: [{ text: pyrName(n + 1), tag: TAGS.byFace }, { text: pyrName(2 * n), tag: TAGS.byEdge }, { text: prismName(n), tag: TAGS.kindSwap }],
             steps: [`밑면의 변이 ${n}개 — 밑면은 ${polyName(n)}`, `→ ${pyrName(n)}`],
-            why: { [TAGS.byFace]: '면의 수로 붙인 이름이에요. 밑면의 모양으로 붙여요.', [TAGS.byEdge]: '모서리의 수로 붙인 이름이에요. 밑면의 모양으로 붙여요.', [TAGS.kindSwap]: '각뿔이라고 했어요.' },
+            why: { [TAGS.byFace]: '면의 수로 붙인 이름이에요. 밑면의 모양으로 붙여요.', [TAGS.byEdge]: '모서리의 수로 붙인 이름이에요. 밑면의 모양으로 붙여요.', [TAGS.kindSwap]: '문제는 각뿔이라고 했어요 — 각기둥이 아니에요.' },
             probe: { ask: 'name', kind: 'pyramid', n },
           };
         })(),
@@ -650,10 +650,10 @@ export const SOLID = [
       }
       // 거꾸로 — 수에서 이름 (이름은 보기에만)
       fams.push(famOf([
-        (() => { const n = pick(r, [4, 6, 8, 10, 12]); const E = 3 * n; return { t: `모서리가 ${E}개인 각기둥이 있어요.\n\n이 각기둥의 이름은 무엇일까요?`, text: true, ans: prismName(n), wr: [{ text: prismName(E), tag: TAGS.condCount }, { text: prismName(E / 2), tag: TAGS.pyrRule }, { text: pyrName(n), tag: TAGS.kindSwap }], steps: ['각기둥의 모서리 = 밑면의 변의 수 × 3', `${E} ÷ 3 = ${n} → 밑면이 ${polyName(n)} → ${prismName(n)}`], why: { [TAGS.condCount]: '모서리의 수를 그대로 이름에 썼어요. 3으로 나눠요.', [TAGS.pyrRule]: '2로 나눈 것은 각뿔의 규칙이에요.', [TAGS.kindSwap]: '각기둥이라고 했어요.' }, probe: { ask: 'inv', kind: 'prism', what: 'edge', v: E } }; })(),
-        (() => { const n = int(r, 3, 12); const F = n + 2; return { t: `면이 ${F}개인 각기둥이 있어요.\n\n이 각기둥의 이름은 무엇일까요?`, text: true, ans: prismName(n), wr: [{ text: prismName(F), tag: TAGS.condCount }, { text: prismName(F - 1), tag: TAGS.pyrRule }, { text: pyrName(n), tag: TAGS.kindSwap }], steps: ['각기둥의 면 = 밑면의 변의 수 + 2', `${F} − 2 = ${n} → ${prismName(n)}`], why: { [TAGS.condCount]: '면의 수를 그대로 이름에 썼어요. 2를 빼요.', [TAGS.pyrRule]: '1을 뺀 것은 각뿔의 규칙이에요.', [TAGS.kindSwap]: '각기둥이라고 했어요.' }, probe: { ask: 'inv', kind: 'prism', what: 'face', v: F } }; })(),
-        (() => { const n = pick(r, [6, 9, 12]); const E = 2 * n; return { t: `모서리가 ${E}개인 각뿔이 있어요.\n\n이 각뿔의 이름은 무엇일까요?`, text: true, ans: pyrName(n), wr: [{ text: pyrName(E), tag: TAGS.condCount }, { text: pyrName(E / 3), tag: TAGS.prismRule }, { text: prismName(n), tag: TAGS.kindSwap }], steps: ['각뿔의 모서리 = 밑면의 변의 수 × 2', `${E} ÷ 2 = ${n} → ${pyrName(n)}`], why: { [TAGS.condCount]: '모서리의 수를 그대로 이름에 썼어요. 2로 나눠요.', [TAGS.prismRule]: '3으로 나눈 것은 각기둥의 규칙이에요.', [TAGS.kindSwap]: '각뿔이라고 했어요.' }, probe: { ask: 'inv', kind: 'pyramid', what: 'edge', v: E } }; })(),
-        (() => { const n = pick(r, [5, 7, 9, 11]); const V = n + 1; /* n = 3이면 2로 나눈 오답이 "이각뿔" — 없는 입체도형 */ return { t: `꼭짓점이 ${V}개인 각뿔이 있어요.\n\n이 각뿔의 이름은 무엇일까요?`, text: true, ans: pyrName(n), wr: [{ text: pyrName(V), tag: TAGS.condCount }, { text: pyrName(V / 2), tag: TAGS.prismRule }, { text: prismName(n), tag: TAGS.kindSwap }], steps: ['각뿔의 꼭짓점 = 밑면의 변의 수 + 1', `${V} − 1 = ${n} → ${pyrName(n)}`], why: { [TAGS.condCount]: '꼭짓점의 수를 그대로 이름에 썼어요. 1을 빼요.', [TAGS.prismRule]: '2로 나눈 것은 각기둥의 규칙이에요.', [TAGS.kindSwap]: '각뿔이라고 했어요.' }, probe: { ask: 'inv', kind: 'pyramid', what: 'vertex', v: V } }; })(),
+        (() => { const n = pick(r, [4, 6, 8, 10, 12]); const E = 3 * n; return { t: `모서리가 ${E}개인 각기둥이 있어요.\n\n이 각기둥의 이름은 무엇일까요?`, text: true, ans: prismName(n), wr: [{ text: prismName(E), tag: TAGS.condCount }, { text: prismName(E / 2), tag: TAGS.pyrRule }, { text: pyrName(n), tag: TAGS.kindSwap }], steps: ['각기둥의 모서리 = 밑면의 변의 수 × 3', `${E} ÷ 3 = ${n} → 밑면이 ${polyName(n)} → ${prismName(n)}`], why: { [TAGS.condCount]: '모서리의 수를 그대로 이름에 썼어요. 3으로 나눠요.', [TAGS.pyrRule]: '2로 나눈 것은 각뿔의 규칙이에요.', [TAGS.kindSwap]: '문제는 각기둥이라고 했어요 — 각뿔이 아니에요.' }, probe: { ask: 'inv', kind: 'prism', what: 'edge', v: E } }; })(),
+        (() => { const n = int(r, 3, 12); const F = n + 2; return { t: `면이 ${F}개인 각기둥이 있어요.\n\n이 각기둥의 이름은 무엇일까요?`, text: true, ans: prismName(n), wr: [{ text: prismName(F), tag: TAGS.condCount }, { text: prismName(F - 1), tag: TAGS.pyrRule }, { text: pyrName(n), tag: TAGS.kindSwap }], steps: ['각기둥의 면 = 밑면의 변의 수 + 2', `${F} − 2 = ${n} → ${prismName(n)}`], why: { [TAGS.condCount]: '면의 수를 그대로 이름에 썼어요. 2를 빼요.', [TAGS.pyrRule]: '1을 뺀 것은 각뿔의 규칙이에요.', [TAGS.kindSwap]: '문제는 각기둥이라고 했어요 — 각뿔이 아니에요.' }, probe: { ask: 'inv', kind: 'prism', what: 'face', v: F } }; })(),
+        (() => { const n = pick(r, [6, 9, 12]); const E = 2 * n; return { t: `모서리가 ${E}개인 각뿔이 있어요.\n\n이 각뿔의 이름은 무엇일까요?`, text: true, ans: pyrName(n), wr: [{ text: pyrName(E), tag: TAGS.condCount }, { text: pyrName(E / 3), tag: TAGS.prismRule }, { text: prismName(n), tag: TAGS.kindSwap }], steps: ['각뿔의 모서리 = 밑면의 변의 수 × 2', `${E} ÷ 2 = ${n} → ${pyrName(n)}`], why: { [TAGS.condCount]: '모서리의 수를 그대로 이름에 썼어요. 2로 나눠요.', [TAGS.prismRule]: '3으로 나눈 것은 각기둥의 규칙이에요.', [TAGS.kindSwap]: '문제는 각뿔이라고 했어요 — 각기둥이 아니에요.' }, probe: { ask: 'inv', kind: 'pyramid', what: 'edge', v: E } }; })(),
+        (() => { const n = pick(r, [5, 7, 9, 11]); const V = n + 1; /* n = 3이면 2로 나눈 오답이 "이각뿔" — 없는 입체도형 */ return { t: `꼭짓점이 ${V}개인 각뿔이 있어요.\n\n이 각뿔의 이름은 무엇일까요?`, text: true, ans: pyrName(n), wr: [{ text: pyrName(V), tag: TAGS.condCount }, { text: pyrName(V / 2), tag: TAGS.prismRule }, { text: prismName(n), tag: TAGS.kindSwap }], steps: ['각뿔의 꼭짓점 = 밑면의 변의 수 + 1', `${V} − 1 = ${n} → ${pyrName(n)}`], why: { [TAGS.condCount]: '꼭짓점의 수를 그대로 이름에 썼어요. 1을 빼요.', [TAGS.prismRule]: '2로 나눈 것은 각기둥의 규칙이에요.', [TAGS.kindSwap]: '문제는 각뿔이라고 했어요 — 각기둥이 아니에요.' }, probe: { ask: 'inv', kind: 'pyramid', what: 'vertex', v: V } }; })(),
       ]));
       return calcAsk(r, c, this, runFamily(r, c, fams));
     },

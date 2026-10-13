@@ -254,3 +254,27 @@ test('Codex #11: 복사문에 보기 목록(✔/❌ 표시)과 아이가 본 설
   assert.ok(txt.includes('앱이 이미 보여 준 설명: 규칙: 분모가 다르면 크기를 맞춘다 / ① 12로 통분 / ② 더한다'), txt);
   assert.ok(txt.includes('[line -5..5]'), '수직선 문법 안내가 맞다');
 });
+
+test('🔤 Codex 61차 #2: 복사문의 앱 글(문제·식·답·보기·설명)은 화면처럼 숫자 뒤 조사를 고쳐 싣는다 · 저장값·아이가 쓴 말·아빠 답장은 그대로 · ✔❌는 원문끼리', () => {
+  const m = known();
+  const q = {
+    concept: 'neg.mixed', kind: 'calc', key: 'N1', q: '(−5) − 3는 얼마일까요?', expr: '(−5) − 3',
+    choices: [{ text: '답은 −8예요', ok: true }, { text: '답은 −2예요' }, { text: '답은 8예요' }],
+    solve: { steps: ['① −5에서 3를 더 빼요', '② 그래서 −8예요'] },
+  };
+  const a = { kind: 'calc', correct: false, chosen: '답은 8예요', tag: '부호를 잊음', w: 'u' };
+  addAsk(m, askContext(q, a), T, '왜 5이 아니에요?');
+  applyReply(m, 1, '−8예요 — 7가 아니라');
+  decideAsk(m, m.asks[0].id, false, '3는 왜요');
+  const txt = asksText(m, T);
+  assert.ok(txt.includes('문제: (−5) − 3은 얼마일까요?'), txt);
+  assert.ok(txt.includes(' 답: 답은 8이에요 ❌'), txt);
+  assert.ok(txt.includes('정답: 답은 −8이에요'), txt);
+  assert.ok(txt.includes('보기: ① 답은 −8이에요 ✔ · ② 답은 −2예요 · ③ 답은 8이에요 ❌'), txt);
+  assert.ok(txt.includes('앱이 이미 보여 준 설명: ① −5에서 3을 더 빼요 / ② 그래서 −8이에요'), txt);
+  assert.ok(txt.includes(' 말: "왜 5이 아니에요?"'), '아이가 쓴 말은 그대로');
+  assert.ok(txt.includes('아빠 답장 1: −8예요 — 7가 아니라'), '아빠 답장은 그대로');
+  assert.ok(txt.includes('아직 모르겠어요 — "3는 왜요"'), '되물은 말도 그대로');
+  const s = m.asks[0];
+  assert.deepEqual([s.q, s.my, s.ans, s.choices[0]], [q.q, '답은 8예요', '답은 −8예요', '답은 −8예요'], '저장한 값은 원문');
+});

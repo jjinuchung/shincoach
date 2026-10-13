@@ -294,7 +294,7 @@ export const FADD = [
       }
       const pwr = (a, b, d) => [{ text: S(a + b, d), tag: TAGS.addForSub }, { text: `${a * b}/${d * d}`, tag: TAGS.mulInstead }, { text: `${a}/${d}`, tag: TAGS.oneSide }];
       const pwhy = (a, b, d) => ({
-        [TAGS.addForSub]: `"남은"을 물었으니 빼요 — ${a} − ${b} = ${a - b}.`,
+        [TAGS.addForSub]: `빼기예요 — 더하지 않고 분자끼리 빼요: ${a} − ${b} = ${a - b}.`,
         [TAGS.mulInstead]: '곱셈이 아니라 뺄셈이에요 — 조각 개수를 덜어 내요.',
         [TAGS.oneSide]: `처음 수를 그대로 썼어요 — 분자끼리 빼요: ${a} − ${b} = ${a - b}.`,
       });
@@ -759,10 +759,10 @@ export const FADD = [
         if (A > C && a > cc) out.push({ pair: [W * L + a - cc, L], tag: TAGS.noLcdSub });
         return out;
       }
-      const whyXY = (w1, a, b, w2, cc, d) => {
+      const whyXY = (w1, a, b, w2, cc, d, box = false) => {
         const { L, A, C } = lcdOf(a, b, cc, d);
         return {
-          [TAGS.addForSub]: '"몇 m 더"는 차이 — 큰 수에서 작은 수를 빼요.',
+          [TAGS.addForSub]: box ? '□는 더하기 전의 수예요 — 큰 수에서 더한 수를 빼요.' : '"몇 m 더"는 차이 — 큰 수에서 작은 수를 빼요.',
           [TAGS.noReduce]: `1을 받아내렸으면 자연수 ${w1}은 ${w1 - 1}로 줄어요.`,
           [TAGS.swapSub]: `분수 부분을 거꾸로(${C}/${L} − ${A}/${L}) 뺐어요 — 1을 받아내려요.`,
           [TAGS.noLcdSub]: `분모를 ${L}로 바꿨으면 분자에도 같은 수를 곱해요 — ${a} → ${A}, ${cc} → ${C}.`,
@@ -774,12 +774,12 @@ export const FADD = [
           ? [lcdLine(w1, a, b, w2, cc, d), `받아내려요 — ${MX(w1, A, L)} = ${MX(w1 - 1, A + L, L)}, ${MX(w1 - 1, A + L, L)} − ${MX(w2, C, L)} = ${chainM(tot, L)}`]
           : [lcdLine(w1, a, b, w2, cc, d), `${MX(w1, A, L)} − ${MX(w2, C, L)} = ${chainM(tot, L)}`];
       };
-      const xy = (t) => {
+      const xy = (t, box = false) => {
         const [w1, b, a, w2, d, cc] = pickXY(); const { L, A, C } = lcdOf(a, b, cc, d);
-        return { t: t(w1, a, b, w2, cc, d), ans: V((w1 - w2) * L + A - C, L), wr: wrXY(w1, a, b, w2, cc, d).map((w) => ({ text: V(...w.pair), tag: w.tag })), steps: stepsXY(w1, a, b, w2, cc, d), why: whyXY(w1, a, b, w2, cc, d), probe: { ask: 'diff' } };
+        return { t: t(w1, a, b, w2, cc, d), ans: V((w1 - w2) * L + A - C, L), wr: wrXY(w1, a, b, w2, cc, d).map((w) => ({ text: V(...w.pair), tag: w.tag })), steps: stepsXY(w1, a, b, w2, cc, d), why: whyXY(w1, a, b, w2, cc, d, box), probe: { ask: 'diff' } };
       };
       fams.push(famOf([xy((w1, a, b, w2, cc, d) => `초록 로봇은 ${MX(w1, a, b)} m, 파란 로봇은 ${MX(w2, cc, d)} m 움직였어요. 초록 로봇은 파란 로봇보다 몇 m 더 움직였을까요?`)]));
-      fams.push(famOf([xy((w1, a, b, w2, cc, d) => `**□ + ${MX(w2, cc, d)} = ${MX(w1, a, b)}** — □에 알맞은 수는 얼마일까요?`)]));
+      fams.push(famOf([xy((w1, a, b, w2, cc, d) => `**□ + ${MX(w2, cc, d)} = ${MX(w1, a, b)}** — □에 알맞은 수는 얼마일까요?`, true)]));
       // 더 붓고 쓰기 — X + Y − Z (분모 2·3·4·6·12)
       fams.push(famOf([(() => {
         const DEN = [2, 3, 4, 6, 12];

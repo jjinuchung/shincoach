@@ -5,7 +5,7 @@
 // 영어 화면은 한 줄도 건드리지 않는다 — 🏠 홈에서 갈라져 들어오고 ←로 홈으로 나간다.
 // 보상(⚡💰🎯)은 영어와 같은 xp.js·catch.js를 그대로 쓴다 — 도감·코인이 한 몸이라야 "수학을 해서 마스터볼을 산다"가 된다.
 
-import { WORLDS, rng, shuffle, josa } from './mathgen.js';
+import { WORLDS, rng, shuffle, josa, numJosa, numTail, fixNumJosa } from './mathgen.js';
 import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget, richParts, cutLine } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
@@ -120,10 +120,11 @@ function qtNode(text) {
 /**
  * "2 3/8" → 2 와 세로 분수, "5/6"·"x/3"·"(x + 2)/3" → 세로 분수, 문자 x·a → 기울임, **굵게**.
  * 나누기는 mathdraw.richParts (검수 페이지와 같은 규칙). DOM으로 만든다 (innerHTML에 글을 넣지 않는다)
+ * 숫자 바로 뒤 조사는 읽는 소리로 고쳐 그린다(fixNumJosa — "5이 돼요"·"4/1은"·"−16는", v249) — richNode를 거치는 글만(🎯 도전 문제·평문 힌트·❓ 짧은 버튼은 아님)
  */
 function richNode(text) {
   const frag = document.createDocumentFragment();
-  for (const p of String(text || '').split(/(\*\*[^*]+\*\*)/g)) {
+  for (const p of fixNumJosa(text).split(/(\*\*[^*]+\*\*)/g)) {
     if (!p) continue;
     const m = /^\*\*([^*]+)\*\*$/.exec(p);
     if (m) { const b = document.createElement('strong'); b.appendChild(richNode(m[1])); frag.appendChild(b); continue; }
@@ -1984,7 +1985,7 @@ function paintAnswer(i, list, card, restoring) {
     const noun = sense.nouns[sense.ok];
     s.appendChild(document.createTextNode(a.sn ? '🎯 감 잡기도 맞았어요 — 답은 ' : `🎯 감 잡기는 "${sense.options[r.senses[r.at]]}"라고 했는데, 답은 `));
     s.appendChild(richNode(noun));
-    s.appendChild(document.createTextNode(a.sn ? '' : `${noun === '0' ? '이었어요' : josa(noun, '이었어요', '였어요')}. 계산 전에 어느 쪽일지 한 번 더 생각해요.`));
+    s.appendChild(document.createTextNode(a.sn ? '' : `${numTail(noun) ? numJosa(noun, '이었어요', '였어요') : josa(noun, '이었어요', '였어요')}. 계산 전에 어느 쪽일지 한 번 더 생각해요.`));
     fb.appendChild(s);
   }
   const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && !light(r) && q.key;

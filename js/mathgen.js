@@ -32,15 +32,63 @@ export function josa(word, withBatchim, without) {
 }
 
 /**
+ * 숫자를 읽는 소리의 끝 — { b: 받침이 있나, l: ㄹ받침인가 } · 숫자 글이 아니면 null (v249)
+ *  · 정수: 끝자리(3 삼·6 육 받침, 1 일·7 칠·8 팔 ㄹ받침) · 0으로 끝나면 십·백·천 받침, 네 자리 묶음이 비면 단위로 끝난다
+ *    — 만·억·경은 받침, **조는 받침 없음**(121조는 · 1500억은) (0 하나는 영)
+ *  · 소수: 끝자리 (16.5 → "십육 점 오")   · 분수 a/b: **분자** ("b분의 a" — 4/1 → "1분의 4" → 사)
+ *  · 음수 −·대분수 앞 자연수는 끝 소리와 상관없다
+ *  · 세 자리마다 쉼표(1,000,000)는 수 전체로 읽는다 — 묶음이 어긋난 "12,34"는 숫자 글이 아니다 (Codex 61차 #1)
+ */
+export function numTail(x) {
+  const t = String(x == null ? '' : x).trim().replace(/[−–-]/g, '');
+  const m = /^(?:\d+ )?((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)(?:\/\d+)?$/.exec(t);
+  if (!m) return null;
+  const d = m[1].replace(/,/g, '');
+  if (d.includes('.')) return digitTail(d[d.length - 1]);
+  const z = /^0+$/.test(d) ? 0 : d.length - d.replace(/0+$/, '').length; // 끝에 붙은 0의 수
+  if (z >= 4) return { b: [true, true, false, true][Math.min(Math.floor(z / 4), 4) - 1], l: false }; // 만·억·조·경으로 끝남
+  if (z > 0) return { b: true, l: false }; // 십·백·천
+  return digitTail(d[d.length - 1]);
+}
+function digitTail(c) {
+  const n = Number(c);
+  return { b: [0, 1, 3, 6, 7, 8].includes(n), l: [1, 7, 8].includes(n) };
+}
+
+/**
  * 숫자 뒤 조사 — 읽는 소리로 정한다. 3(삼)·6(육)·0(십·백)은 받침, 1·7·8은 ㄹ받침이라 '으로'가 아니라 '로'.
  * numJosa(3, '으로', '로') → '으로', numJosa(8, '으로', '로') → '로', numJosa(2, '을', '를') → '를'
+ * 소수·분수 글도 읽는 소리로(numTail) — numJosa('4/1', '은', '는') → '는', numJosa(16.5, '이', '가') → '가' (v249)
  */
 export function numJosa(n, withBatchim, without) {
-  const last = Math.abs(Math.trunc(Number(n) || 0)) % 10;
-  const batchim = [0, 1, 3, 6, 7, 8].includes(last);
-  if (!batchim) return without;
-  if (withBatchim === '으로' && [1, 7, 8].includes(last)) return without; // ㄹ받침 뒤에는 '로'
+  const t = numTail(n) || digitTail(Math.abs(Math.trunc(Number(n) || 0)) % 10);
+  if (!t.b) return without;
+  if (withBatchim === '으로' && t.l) return without; // ㄹ받침 뒤에는 '로'
   return withBatchim;
+}
+
+// 숫자 바로 뒤에 붙은 조사 — [받침 있을 때, 없을 때]. 홀로 쓰는 조사는 뒤에 한글이 붙으면 조사가 아니다(3가지·2과목·5이상)
+const NUM_JOSA_PAIRS = [['이에요', '예요'], ['이었', '였'], ['이랑', '랑'], ['으로', '로'], ['은', '는'], ['을', '를'], ['과', '와'], ['이', '가']];
+const NUM_JOSA_ALONE = new Set(['이랑', '랑', '으로', '로', '은', '는', '을', '를', '과', '와', '이', '가']);
+// 쉼표 묶음은 한 수로 잡는다 — 앞 글자에 쉼표를 허용하면 "1,000,000,000,000는"의 끝 "000"만 읽어 '은'으로 바꿨다 (Codex 61차 #1)
+const NUM_JOSA_RE = /(^|[^\d./,])([−–-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:\/\d+)?)(\*\*)?(이에요|예요|이었|였|이랑|랑|으로|로|은|는|을|를|과|와|이|가)/g;
+
+/**
+ * 글 속 "숫자 + 조사"를 읽는 소리에 맞게 고친다 — **richNode로 그리는 수학 글**(math.js — 문제·보기·풀이·배틀·로켓단 퀴즈)과
+ * ❓ 아빠에게 보내는 복사문(mathask.js asksText)에서 (v249, Codex 61차).
+ * 틀 글마다 조사를 손으로 맞추다 "5이 돼요 · 16.5이 · −16는 · 4/1은 · 1예요"가 300가지 나왔다 → 틀은 그대로 두고 여기서.
+ * 바뀌는 것은 숫자에 바로 붙은 조사뿐이고, 3가지·2과목처럼 뒤에 한글이 이어지면 조사가 아니라 그대로 둔다.
+ * 닿지 않는 곳: 🎯 도전 문제 화면·평문 힌트·❓ 짧은 버튼(지금 글에는 틀린 조사 없음) · "(−3)는"·"10²는"·따옴표 숫자처럼 숫자에 바로 붙지 않은 조사는 그대로 둔다.
+ */
+export function fixNumJosa(text) {
+  return String(text == null ? '' : text).replace(NUM_JOSA_RE, (all, pre, num, star, jo, at, src) => {
+    if (NUM_JOSA_ALONE.has(jo) && /[가-힣]/.test(src[at + all.length] || '')) return all;
+    const t = numTail(num);
+    if (!t) return all;
+    const pair = NUM_JOSA_PAIRS.find((p) => p.includes(jo));
+    const want = pair[0] === '으로' ? (t.b && !t.l ? '으로' : '로') : t.b ? pair[0] : pair[1];
+    return `${pre}${num}${star || ''}${want}`;
+  });
 }
 
 /**
@@ -920,15 +968,17 @@ export const FRACTION = [
       const kJ = numJosa(k, '으로', '로');
       return ask(this.id, 'misread', fill(`{mon/이/가} 3/${d} ÷ ${k} 를 풀 때 분자 3을 ${k}${kJ} 나누려다 막혔어요. {me/아/야}, 어떻게 하면 될까?`, c), choices(r, `분모에 ${k}${numJosa(k, '을', '를')} 곱하면 돼요 (3/${d * k})`, [
         { text: `분자에 ${k}${numJosa(k, '을', '를')} 곱해요`, tag: '곱셈으로 착각' },
-        { text: '나누어떨어질 때까지 통분해요', tag: '통분으로 착각' },
+        // 예전 보기 "나누어떨어질 때까지 통분해요"는 뺐다 — 크기가 같은 분수로 바꿔 분자를 나누는 것은 맞는 방법이라 고른 아이가 억울하다 (v249)
+        { text: '나누어떨어지지 않으니 나머지는 버려요', tag: '나머지를 버림' },
         { text: '나눌 수 없는 문제예요', tag: '나눗셈이 안 된다고 생각' },
       ]), { solve: solve([
         `① 3/${d} ÷ ${k}: 분자 3을 ${k}${kJ} 못 나누면 분모에 ${k}${numJosa(k, '을', '를')} 곱해요`,
         `② ${d} × ${k} = ${d * k} → 3/${d * k} (조각이 ${k}배 잘게 쪼개진 것)`,
+        `③ 이렇게 해도 돼요: 크기가 같은 분수로 바꿔 분자를 나눠요 — 3/${d} = ${3 * k}/${d * k} → ${3 * k} ÷ ${k} = 3 → 3/${d * k}`,
       ], {
         why: {
           '곱셈으로 착각': `분자에 곱하면 커져요. 나누는 거니까 작아져야 해요.`,
-          '통분으로 착각': `통분은 더하기·빼기 때 하는 거예요. 나눗셈은 분모에 곱하면 끝이에요.`,
+          '나머지를 버림': `나머지를 버리면 양이 줄어요 — 분모에 ${k}${numJosa(k, '을', '를')} 곱하면 남김없이 나눠져요.`,
           '나눗셈이 안 된다고 생각': `분자가 안 나누어떨어져도 돼요 — 분모에 ${k}${numJosa(k, '을', '를')} 곱하면 항상 나눌 수 있어요.`,
         },
         figure: barsSvg([{ n: 3, d }, { n: 3, d: d * k }]), rule: '분수 ÷ 자연수: 분모에 곱한다.',
