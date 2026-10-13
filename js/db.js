@@ -1095,11 +1095,20 @@ export function mergeMath(cur, rec) {
       rounds: Math.max(Number(out.chal && out.chal.rounds) || 0, Number(rec && rec.chal && rec.chal.rounds) || 0),
     };
   }
-  // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편
-  const seen = new Set(out.log.map((e) => e && e.t));
-  for (const e of (Array.isArray(rec && rec.log) ? rec.log : [])) if (e && e.t && !seen.has(e.t)) { seen.add(e.t); out.log.push(e); }
+  // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편.
+  // 편 번호(rid, v250)가 있으면 시각 + 번호로 — 두 기기에서 같은 밀리초에 끝낸 다른 편이 하나로 줄지 않게 (Codex 62차 #3)
+  const lineKey = (e) => `${e.t}|${e.rid || ''}`;
+  const seen = new Set(out.log.map((e) => e && lineKey(e)));
+  for (const e of (Array.isArray(rec && rec.log) ? rec.log : [])) if (e && e.t && !seen.has(lineKey(e))) { seen.add(lineKey(e)); out.log.push(e); }
   out.log.sort((a, b) => (a.t || 0) - (b.t || 0));
   if (out.log.length > 400) out.log.splice(0, out.log.length - 400);
+  // ⏹ 푸는 중인 개념 편(lives, v250)은 이 기기 것만 — 가져온 쪽의 것은 안 받는다(다른 기기가 이 기기의 편을 그만둠으로 닫지 않게).
+  // 합친 일지에 그 편(rid)이 이미 끝났거나 그만둔 것으로 있으면 지운다 (입력은 건드리지 않게 새 객체로)
+  if (out.lives) {
+    const ended = new Set(out.log.map((e) => e && e.rid).filter(Boolean));
+    const keep = Object.fromEntries(Object.entries(out.lives).filter(([, v]) => v && !ended.has(v.rid)));
+    if (Object.keys(keep).length) out.lives = keep; else delete out.lives;
+  }
   out.updatedAt = Math.max(Number(out.updatedAt) || 0, Number(rec && rec.updatedAt) || 0);
   return out;
 }

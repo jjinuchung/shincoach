@@ -634,8 +634,9 @@ export async function renderStats() {
         tr.appendChild(el('td', 'num', `${r.passes}/${r.fails}`));
         const trail = el('td', 'trail');
         for (const t of r.trail) {
-          const dot = el('span', t.pass ? 'dot ok' : 'dot no', t.pass ? '✔' : `${t.ok}`);
-          dot.title = `${t.d} ${t.ok}/${t.n}`;
+          // ⏹ 그만둔 편(v250) — 통과도 실패도 아닌 회색 점
+          const dot = el('span', t.quit ? 'dot quit' : t.pass ? 'dot ok' : 'dot no', t.quit ? '⏹' : t.pass ? '✔' : `${t.ok}`);
+          dot.title = t.quit ? `${t.d} 그만둠 ${t.ok}/${t.n} (${t.of}문제 중)` : `${t.d} ${t.ok}/${t.n}`;
           trail.appendChild(dot);
         }
         tr.appendChild(trail);

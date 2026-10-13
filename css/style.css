@@ -1926,6 +1926,7 @@ button { font-family: inherit; }
 .math-report .dot { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.75rem; font-weight: 700; margin-right: 3px; }
 .math-report .dot.ok { background: #d1fae5; color: #065f46; }
 .math-report .dot.no { background: #fee2e2; color: #991b1b; }
+.math-report .dot.quit { background: #e5e7eb; color: #374151; } /* ⏹ 그만둔 편 (v250) */
 .math-report td:first-child { min-width: 9em; }
 .math-report td.kinds { color: var(--muted); min-width: 11em; }
 .math-report td.miss { color: #92400e; }

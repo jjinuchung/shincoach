@@ -11,6 +11,7 @@ import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
   applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, widenRound, rungSub, practiceNote, waitNote, LEARNING_MAX,
+  sameDayRounds, repeatNote, roundPay, setLive, applyQuit, settleLives,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -74,6 +75,10 @@ const ui = {
   today: { d: '', q: 0, battles: 0 }, // 오늘 푼 문항 수·배틀 수 (등장 판정용, 화면을 열 때 저장소에서 읽는다)
   chars: [],            // 기기에 받아 둔 포켓몬 그림 (⚔️ 상대·내 편을 고를 때 동기로 필요하다 — 화면을 열 때 한 번 읽는다)
   cheer: { cd: 0, n: 0, d: '', last: '', timer: 0 }, // ✨ 응원 포켓몬 — 쿨다운·오늘 본 횟수·방금 한 말
+  // ⏹ 그만둔 개념 편 (v250) — locks: 이 창이 쥔 편 잠금 { rid: { release, dropped } } · unsaved: 적지 못한 그만둠(다음에 수학을 열 때 다시)
+  lastRid: 0,
+  locks: {},
+  unsaved: [],
 };
 const RECENT_KEEP = 10; // 두 편 반 분량 — 틀이 4개뿐인 개념도 한 바퀴는 돈다
 const STEM_KEY = 'shincoach.mathStem'; // 마지막에 고른 줄기 (이 기기 편의용 — 없어도 고르기 화면이 나올 뿐)
@@ -532,6 +537,7 @@ export async function renderMath() {
   await settleMathThrows().catch(() => {}); // 🎯 남은 예약을 먼저 돌려줘야 사다리의 "받은 몬스터볼" 수가 맞다
   let [state] = await Promise.all([getMath(), buildOpts()]);
   state = await syncMathReplies(state); // 📬 비공개 저장소의 아빠 답장이 있으면 붙인다
+  state = await settleLive(state); // ⏹ 앱을 닫아 못 끝낸 개념 편 → 그만둠 (v250)
   if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다
   updateChip();
   ui.state = state;
@@ -765,7 +771,14 @@ function startRound(id, mode, o = {}) {
   ui.recent[id] = [...recent, ...qs.map((q) => q.key).filter(Boolean)].slice(-RECENT_KEEP);
   // 처음 배우는 줄기(S().lesson)는 📖 이야기 대신 📚 단계식 배움 — 한 장씩 확인하며 간다
   const first = S().lesson ? 'lesson' : 'story';
-  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, page: 0, phase: o.again ? 'retry' : mode === 'learn' ? first : 'q', wrong: o.again ? (o.wrong || []) : [] };
+  // 🔁⏹ rid: 이 편의 번호(일지·푸는 중 기록이 같은 편을 알아본다) · day: 시작한 날(자정을 넘겨도 그날 편) · rep: 그날 몇 번째 편인지 — 첫 문항 위에 미리 (v250)
+  const day = todayKey();
+  // 편 번호 = 시각 × 1000 + 무작위 세 자리 — 두 기기·두 창이 같은 밀리초에 열어도 안 겹치게, 이 창 안에서는 늘 커지게 (Codex 62차 #3)
+  ui.lastRid = Math.max(Date.now() * 1000 + Math.floor(Math.random() * 1000), (ui.lastRid || 0) + 1);
+  const rep = repeatNote(ui.state, id, day);
+  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, page: 0, phase: o.again ? 'retry' : mode === 'learn' ? first : 'q', wrong: o.again ? (o.wrong || []) : [], rid: ui.lastRid, day, rep };
+  for (const k of Object.keys(ui.locks)) if (Number(k) !== ui.lastRid) releaseRoundLock(k); // 앞 편 잠금은 놓고
+  holdRoundLock(ui.lastRid); // 🔒 이 편은 이 창이 푼다 — 다른 창이 그만둠으로 닫지 않게
   if (o.again) renderRetry(id, o.wrong || []);
   else if (mode === 'learn') { if (S().lesson) renderLesson(id, seed, 0); else renderStory(id, seed); }
   else renderQuestion();
@@ -1519,9 +1532,11 @@ function renderQuestion(restore = false) {
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
   // 🔁 확인 차례가 아닌 아는 칸 = 연습 — 첫 문항에서 받는 것을 미리 말한다 (③, 막지는 않는다). '🤔 한 번 더'는 mode가 learn이라 기록으로 판정
   if ((r.mode === 'practice' || r.mode === 'learn') && r.at === 0) {
-    const pn = practiceNote(ui.state && ui.state.concepts && ui.state.concepts[r.id], todayKey(), ui.state && ui.state.luck);
+    const pn = practiceNote(ui.state && ui.state.concepts && ui.state.concepts[r.id], todayKey(), ui.state && ui.state.luck, r.rep ? r.rep.pay : 1);
     if (pn) card.appendChild(el('p', 'math-practice-note', pn));
   }
+  // 🔁 같은 날 둘째 편부터 — 문항 ⚡💰가 줄어드는 것을 풀기 전에 말한다 (v250)
+  if (r.rep && r.rep.text && r.at === 0) card.appendChild(el('p', 'math-practice-note math-repeat-note', r.rep.text));
 
   // 🔢 수가 답인 ① 계산은 숫자판, ✍️ 그리기 문항은 점 찍기 판 (판이 그래프를 그리므로 글에서는 뺀다)
   const done = restore && r.answered ? ((r.answers[r.at] || {}).p ? 'typed' : 'choice') : null; // 답한 뒤 복원은 답할 때 방식으로
@@ -1663,6 +1678,7 @@ function answer(i, list, card, typed = null) {
     // 🔢 직접 쓴 답 — 친 그대로 남기고(10/64를 5/32로 바꿔 적지 않는다), 짐작한 값은 g로, 모르겠어요는 "잘 몰랐어요"로
     ...(typed ? { p: 1, chosen: typed.text, ...(typed.guess ? { g: typed.text } : {}), ...(typed.form ? { pf: typed.form } : {}), ...(typed.idk ? { w: 'u' } : {}), ...(typed.note ? { pn: typed.note } : {}) } : {}),
   });
+  saveLive(); // ⏹ 앱을 닫아도 다음에 열 때 그만둔 편으로 남게 (v250)
   paintAnswer(i, list, card, false);
   maybeBattle(); // ⚔️ 아주 가끔 트레이너가 걸어온다 (다음 문항으로 넘어갈 때 열린다)
   maybeRocket(!!ch.ok); // 🚀 세 번 연속 맞히면 로켓단이 탐을 낸다 (다음 문항으로 넘어갈 때 열린다)
@@ -1671,6 +1687,85 @@ function answer(i, list, card, typed = null) {
 
 /** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
 const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}), ...(a.pf ? { pf: a.pf } : {}) });
+/** 개념 편의 문항 기록 — 끝낼 때(applyRound)와 푸는 중 기록(setLive·applyQuit)이 같은 꼴 */
+const conceptQs = (r) => r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
+
+// ── ⏹ 그만둔 개념 편 (v250, 노가다 탈출구 막기 3단계) ──
+// 한 문제라도 답한 개념 편(learn·review·practice — 사다리의 아는 칸은 practice로 연다, ☀️ 개념 편 포함)을 ←로 나가거나 앱을 닫으면 일지에 "그만둠" + 이미 틀린 문항은 🤔 노트.
+// 🎒·📊 다녀오기는 멈춤(ui.round가 그대로). 노트 회차·섞어 풀기·💎·❓·진단은 그대로
+const isConceptRound = (r) => !!(r && r.id && r.rid && (r.mode === 'learn' || r.mode === 'review' || r.mode === 'practice'));
+const liveOf = (r) => ({ rid: r.rid, id: r.id, mode: r.mode, d: r.day || todayKey(), n: r.qs.length, qs: conceptQs(r) });
+// 🔒 지금 이 편을 쥔 창 (Codex 62차 #1) — 편마다 브라우저 잠금(Web Locks)을 쥐고, 수학을 여는 다른 창은 쥔 편을 그만둠으로 닫지 않는다.
+// 창이 닫히거나 앱이 꺼지면 잠금은 저절로 풀린다. Web Locks가 없는 브라우저는 예전처럼(이 창에 없는 편은 그만둠)
+const LOCK_PREFIX = 'shincoach-math-round-';
+function holdRoundLock(rid) {
+  try {
+    if (!rid || ui.locks[rid] || typeof navigator === 'undefined' || !navigator.locks) return;
+    const h = { release: null, dropped: false };
+    ui.locks[rid] = h;
+    navigator.locks.request(`${LOCK_PREFIX}${rid}`, () => (h.dropped ? null : new Promise((res) => { h.release = res; }))).catch(() => {});
+  } catch { /* 잠금이 없으면 예전처럼 */ }
+}
+function releaseRoundLock(rid) {
+  const h = ui.locks[rid];
+  if (!h) return;
+  delete ui.locks[rid];
+  h.dropped = true; // 아직 잠금을 못 받았으면 받는 순간 바로 놓는다
+  if (h.release) h.release();
+}
+/** 다른 창(또는 이 창)이 지금 쥐고 있는 편 번호들 */
+async function heldRids() {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.locks || !navigator.locks.query) return new Set();
+    const q = await navigator.locks.query();
+    return new Set((q.held || []).map((l) => String(l.name || '')).filter((n) => n.startsWith(LOCK_PREFIX)).map((n) => Number(n.slice(LOCK_PREFIX.length))));
+  } catch { return new Set(); }
+}
+/**
+ * 답할 때마다 푸는 중인 편을 적어 둔다(편마다 따로) — 기다리지 않는다. 못 적으면 다음 답에서 편 전체를 다시 적고, ←로 나가면 화면의 기록으로 적는다.
+ * (적기가 끝나기 전에 앱이 꺼지면 그 마지막 답은 못 남길 수 있다 — 닫는 순간의 저장에는 기대지 않는다)
+ */
+function saveLive() {
+  const r = ui.round;
+  if (!isConceptRound(r) || !r.answers.length || r.saving) return;
+  const live = liveOf(r);
+  updateMath((s) => { setLive(s, live); }).catch(() => {});
+}
+/**
+ * ←로 나갈 때 — 답한 개념 편이면 그만둠으로 적는다(화면의 기록으로 — 마지막 답이 아직 안 적혔어도). 저장 중인 편은 finishRound가 끝낸다.
+ * 못 적었으면 기억해 두었다가 다음에 수학을 열 때 다시 적는다 (Codex 62차 #4). 잠금은 적기가 끝난 뒤에 놓는다 — 그 사이 다른 창이 옛 적기로 닫지 않게
+ */
+function quitLive() {
+  const r = ui.round;
+  if (!isConceptRound(r) || r.saving) return;
+  if (!r.answers.length) { releaseRoundLock(r.rid); return; }
+  const live = liveOf(r);
+  updateMath((s) => { applyQuit(s, live, todayKey()); })
+    .catch(() => { ui.unsaved.push(live); })
+    .finally(() => releaseRoundLock(live.rid));
+}
+/**
+ * 수학을 열 때 — 못 적은 그만둠을 다시 적고, 쥔 창이 없는 푸는 중 편(앱을 닫아 못 끝낸 편)을 그만둠으로 정리한다.
+ * 다른 창이 쥔 편·이 창이 푸는 편은 그대로 (Codex 62차 #1)
+ */
+async function settleLive(state) {
+  const r = ui.round;
+  const waiting = Object.values((state && state.lives) || {}).filter((l) => l && !(r && r.rid === l.rid));
+  if (!state || (!waiting.length && !ui.unsaved.length)) return state;
+  const held = await heldRids();
+  const redo = ui.unsaved.slice();
+  try {
+    const next = await updateMath((s) => {
+      const today = todayKey();
+      for (const u of redo) applyQuit(s, u, today);
+      const keep = new Set(held);
+      if (ui.round && ui.round.rid) keep.add(ui.round.rid);
+      settleLives(s, keep, today);
+    });
+    ui.unsaved = ui.unsaved.filter((u) => !redo.includes(u));
+    return next;
+  } catch { return state; }
+}
 
 /** 🙈 틀린 이유 고르기 — 고를 때까지 다음 버튼이 잠긴다. 실수면 이 문항의 오개념 이름표를 거둔다 */
 function whyBlock(a, next, onDone) {
@@ -1683,6 +1778,7 @@ function whyBlock(a, next, onDone) {
     b.addEventListener('click', () => {
       a.w = code;
       if (code === 's' && a.tag) { const r = ui.round; const k = r.missTags.lastIndexOf(a.tag); if (k >= 0) r.missTags.splice(k, 1); }
+      saveLive(); // 🙈 실수라고 했으면 그만둬도 노트에 안 남게
       box.replaceWith(whyPicked(a));
       next.disabled = false;
       onDone && onDone();
@@ -2580,6 +2676,7 @@ function answerTwin(i, list, card, typed = null) {
   const a = r.answers[t.of];
   if (a) a.fixed = !!ch.ok;
   if (ch.ok) { r.fixed = (r.fixed || 0) + 1; sfx.success(); } else { sfx.wrong(); if (ch.tag) r.missTags.push(ch.tag); }
+  saveLive();
   paintTwin(i, list, card, false);
 }
 
@@ -2678,12 +2775,15 @@ async function finishRound() {
         addPending(s, catches);
       });
     } else {
-      const qs = r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
+      const qs = conceptQs(r);
       // 🍀 트랜잭션 밖에서 편마다 한 번만 굴린다 — 편(r)에 붙여 두어 💾 다시 저장(finishRound를 다시 부름)도 같은 값 (Codex 19차 #4)
       if (r.luckyRoll === undefined) r.luckyRoll = Math.random() < LUCKY.chance;
       const roll = r.luckyRoll;
       state = await updateMath((s) => {
-        result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode }, today);
+        // 🔁 그날 이 개념을 이미 푼 편 수(끝낸 편 + 그만둔 편, 이 편 빼고) — 저장소의 일지로 센다 (v250)
+        const repeat = r.rid ? sameDayRounds(s, r.id, r.day || today, r.rid) : 0;
+        result = applyRound(s, r.id, { correct: r.correct, total: r.qs.length, missTags: r.missTags, qs, mode: r.mode, ...(r.rid ? { rid: r.rid, day: r.day } : {}) }, today);
+        result.repeat = repeat;
         if (lastOfDaily) daily = markDaily(s, today);
         tally = tallyRound(s, { mode: r.mode, correct: r.correct, result }); // 🎟️ 교환권 누적 (같은 트랜잭션)
         const inDaily = !!d && d.step === 'round';
@@ -2708,6 +2808,7 @@ async function finishRound() {
     return;
   }
   ui.round = null; // 저장이 됐으니 이제 비운다
+  if (r.rid) releaseRoundLock(r.rid); // 🔒 끝낸 편 — 잠금을 놓는다
   ui.state = state; // 🤔 오답 노트가 바뀌었을 수 있다
   // ☀️ 흐름의 다음 단계는 화면을 그리든 말든 저장 성공 직후에 정한다 — 🎒에 가 있어도 돌아오면 섞어 풀기로 이어진다 (Codex 3차 #2)
   if (d && lastOfDaily) d.marked = true;
@@ -2900,6 +3001,13 @@ async function finishRound() {
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.stone ? ` 🔷 수학스톤 +${rw.stone}` : ''}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (rw.bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(rw.bonus)} 받았어요!`));
   if (lucky) card.appendChild(el('p', 'math-bonus-got', '🍀 운이 좋았어요! 아는 개념을 다시 풀었는데 몬스터볼이 나왔어요'));
+  // 🔁 같은 날 둘째 편부터 (v250) — 줄었으면 까닭을, 다 맞혀 통과해서 다 받았으면 그걸
+  if (result.repeat > 0) {
+    const pay = roundPay(result);
+    card.appendChild(el('p', 'math-practice-note math-repeat-note', pay >= 1
+      ? `🔁 오늘 이 개념 ${result.repeat + 1}번째 편이지만 다 맞혀 통과해서 ⚡💰를 다 받았어요`
+      : `🔁 오늘 이 개념 ${result.repeat + 1}번째 편이라 문항 ⚡💰가 ${pay ? '반이에요' : '없어요'}`));
+  }
   if (rw.egg && rw.egg.ok) card.appendChild(el('p', 'math-note math-egg', rw.egg.hatched ? '🐣 수학 알이 부화했어요!' : `🥚 수학 알 ${eggProgress(rw.egg.egg).done}/${eggProgress(rw.egg.egg).need}일 — 완주한 날이 쌓여요`));
   ticketNote(state, rw.ticket).then((t) => { if (t && card.isConnected) card.appendChild(t); }); // 🎟️ 다음 영상까지 (수학도 채운다)
   const offer = askOfferForRound(r, state, today); // ❓ 틀린 문제를 아빠에게
@@ -2907,7 +3015,9 @@ async function finishRound() {
 
   const row = el('div', 'math-actions');
   if (!all) {
-    const again = el('button', 'btn btn-primary btn-big-wide', '🤔 한 번 더');
+    // 🔁 다음 편이 받을 문항 몫을 단추에 미리 (v250)
+    const nx = repeatNote(state, r.id, today);
+    const again = el('button', 'btn btn-primary btn-big-wide', nx.pay >= 1 ? '🤔 한 번 더' : `🤔 한 번 더 (문항 ⚡💰 ${nx.pay ? '반' : '없음'}${nx.practice ? '' : ' · 통과하면 다'})`);
     again.type = 'button';
     const wrong = r.answers.map((a, i) => ({ a, q: r.qs[i] })).filter((x) => x.a && !x.a.correct && x.q).map((x) => ({ q: x.q, chosen: x.q.choices.find((ch) => ch.text === x.a.chosen) || { text: x.a.chosen || '', ok: false, tag: x.a.tag } }));
     again.addEventListener('click', () => guardStart('math', () => startRound(r.id, r.mode === 'review' ? 'review' : 'learn', { again: true, wrong })));
@@ -2941,7 +3051,7 @@ export function initMath({ showView }) {
   ui.showView = showView;
   const back = $('btn-math-back');
   // 🎯 도전 문제도 여기서 끝낸다 — 안 끄면 ⏳ 예외가 켜진 채 남아 수학 시간이 안 세어졌다 (Codex 20차 #1)
-  if (back) back.addEventListener('click', () => { ui.round = null; ui.daily = null; endChal(); ui.run++; showView('home'); });
+  if (back) back.addEventListener('click', () => { quitLive(); ui.round = null; ui.daily = null; endChal(); ui.run++; showView('home'); });
 }
 
 /** 홈에서 진우가 본 영상 세계를 미리 알고 싶을 때 (표시용) */
