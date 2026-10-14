@@ -3178,6 +3178,12 @@ button { font-family: inherit; }
 .kor-fb.is-no { color: var(--danger); }
 .kor-ev { display: grid; gap: 8px; border-top: 1px dashed var(--border); padding-top: 12px; }
 .kor-ev-title { margin: 0; font-weight: 800; line-height: 1.5; }
+/* 🔍 근거 먼저 (v258) — 두 번 틀린 뒤 답을 고르기 전에 · 💡 둘째 힌트 — 근거가 없는 물음 */
+.kor-ev.is-first { border: 2px solid var(--kor-gold-line); border-radius: 12px; background: var(--kor-mark); padding: 10px 12px; }
+.kor-ev.is-first .kor-ev-row { background: #fff; }
+.kor-opts.is-locked .kor-opt:not(.is-no) { opacity: 0.55; }
+.kor-q > .kor-fb { scroll-margin-top: var(--kor-top, 72px); } /* 근거 먼저로 바뀌면 이 말부터 띠 아래로 (Codex 69차 #2) */
+.kor-fb.kor-hint2 { color: var(--primary-dark); background: #eef2ff; border-radius: 10px; padding: 8px 12px; word-break: keep-all; }
 .kor-ev-rows { display: grid; gap: 6px; }
 .kor-ev-row {
   display: flex; gap: 8px; text-align: left; border: 1px solid var(--border); background: #f8f9fc; border-radius: 10px;

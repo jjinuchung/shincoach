@@ -202,12 +202,89 @@ export function mergeQMiss(a, b) {
   return qMissOf(out);
 }
 
+// ── 🔍 근거 먼저 · 💡 둘째 힌트 (v258, 2026-10-14 아버님 "이대로 진행") ──
+// 물음은 틀리면 그 보기만 꺼지고 다시 고른다 — 보기 넷 중 틀린 셋을 다 눌러 맞히는 것이 글을 다시 읽는 것보다 빨랐다.
+// 그래서 틀린 보기를 EV_FIRST_AT번 고르면: 근거가 있는 물음은 남은 보기를 잠그고 답이 들어 있는 줄(근거)부터 찾게 하고,
+// 근거가 없는 물음(글 전체를 보는 물음 · 🎧 듣기)은 둘째 힌트(원고 hint2 — 답을 말하지 않고 볼 곳만 짚는다)를 보인다.
+// 별·💰·🎯는 그대로(🟩는 지금처럼 한 번에 다 맞혀야) — 찍기가 읽기보다 빠르지 않게 하는 것이 목적
+export const EV_FIRST_AT = 2;
+/** 근거 먼저에서 줄을 이만큼 잘못 누르면 근거 둘레의 줄 범위를 알려 준다 */
+export const EV_RANGE_AT = 2;
+/** 그 범위 — 근거 앞뒤로 이만큼 */
+export const EV_RANGE_PAD = 2;
+/** 둘째 힌트 글자 수 — 한두 문장 */
+export const HINT2_MAX = 90;
+
+/** 지금 근거부터 찾아야 하나 (순수) — 근거가 있고 · 아직 못 맞혔고 · 근거를 아직 못 찾았고 · 틀린 보기를 EV_FIRST_AT번 이상 골랐다 */
+export function evFirstNow(q, st) {
+  return !!q && Array.isArray(q.ev) && q.ev.length > 0 && !!st && !st.answered && !st.evDone && Array.isArray(st.wrong) && st.wrong.length >= EV_FIRST_AT;
+}
+/** 둘째 힌트를 보일 때인가 (순수) — 원고에 hint2가 있고(근거가 없는 물음) · 아직 못 맞혔고 · 틀린 보기를 EV_FIRST_AT번 이상 골랐다 */
+export function hint2Now(q, st) {
+  return !!q && nonEmpty(q.hint2) && !!st && !st.answered && Array.isArray(st.wrong) && st.wrong.length >= EV_FIRST_AT;
+}
+/** 근거 둘레 줄 범위 [처음, 끝] (순수) — 근거 가운데 **첫 줄** 앞뒤로 pad줄 (근거는 하나만 눌러도 맞다 — 근거가 ③⑤⑨처럼 흩어져 있으면
+ *  모두를 감싼 범위가 글 거의 전체가 되어 도움이 안 됐다, 헤드리스 v258) · n = 글의 줄 수 · 근거가 없거나 깨졌으면 null */
+export function evRange(ev, n, pad = EV_RANGE_PAD) {
+  const xs = (Array.isArray(ev) ? ev : []).filter((x) => Number.isInteger(x) && x >= 1 && x <= n);
+  if (!xs.length) return null;
+  const at = Math.min(...xs);
+  return [Math.max(1, at - pad), Math.min(n, at + pad)];
+}
+
+// ── 📤 읽은 기록 (v258 — 국어 요약 "최근 7일 읽은 글") ──
+// 글을 끝까지 읽을 때마다 한 줄: 읽은 시간(⏳ 시계처럼 쉼은 빼고) · 첫 답까지 걸린 시간 · 첫 번에 맞힌 물음 · 끝까지 고른 물음 ·
+// 근거 먼저 · 둘째 힌트를 쓴 수 — 막히면 어떻게 하는지 아빠·Claude가 본다. 별과 같은 트랜잭션(korFinishRule)에서 적는다.
+// 저장 = profile.korReads [{ c 카드, t 연 시각(ms — 열쇠는 c@t), d 다 읽은 날 번호, s 읽은 초, a 첫 답까지 초, n 물음 수, f 첫 번에 맞힘,
+//   x 오답 보기를 모두 고른 물음(요약 말 — "끝까지 고른"은 끝까지 푼 물음으로 읽혔다, Codex 69차 #4), e 근거 먼저, h 둘째 힌트, g 이번에 받은 별(0 = 별 없이 다시 읽음), m '' 글 · 'listen' 🎧 들음 · 'text' 🎧 글로 읽음 }]
+// 병합은 열쇠로 합집합(같은 열쇠는 한 줄) · 최근 READS_MAX줄
+export const READS_MAX = 120;
+/** 한 줄의 읽은 초 상한 (6시간 — 깨진 시계 값이 요약을 부풀리지 않게) */
+export const READ_SEC_MAX = 6 * 3600;
+const READ_MODES = ['', 'listen', 'text'];
+const int = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) ? n : NaN; };
+const clampInt = (v, lo, hi) => { const n = int(v); return Number.isNaN(n) ? lo : Math.min(hi, Math.max(lo, n)); };
+const readKey = (x) => `${x.c}@${x.t}`;
+
+/** 읽은 기록 한 줄 고쳐 읽기 (순수) — 꼴이 틀리면 null · 수는 범위 안으로 */
+export function readOf(x) {
+  if (!isObj(x) || typeof x.c !== 'string' || !/^K\d{1,3}$/.test(x.c)) return null;
+  const t = int(x.t);
+  const d = int(x.d);
+  const n = int(x.n);
+  if (!(t > 0) || !(d > 1) || !(n >= 1 && n <= 5)) return null;
+  const s = clampInt(x.s, 0, READ_SEC_MAX);
+  return {
+    c: x.c, t, d, s, a: clampInt(x.a, 0, s), n,
+    f: clampInt(x.f, 0, n), x: clampInt(x.x, 0, n), e: clampInt(x.e, 0, n), h: clampInt(x.h, 0, n),
+    g: clampInt(x.g, 0, 3), m: READ_MODES.includes(x.m) ? x.m : '',
+  };
+}
+/** 읽은 기록 고쳐 읽기 (순수) — 깨진 줄은 버리고 · 같은 열쇠는 한 줄(차례와 상관없이 같은 것이 남게) · 연 시각 차례로 최근 READS_MAX줄 */
+export function readsOf(list) {
+  const by = new Map();
+  for (const raw of Array.isArray(list) ? list : []) {
+    const x = readOf(raw);
+    if (!x) continue;
+    const k = readKey(x);
+    const had = by.get(k);
+    if (!had || JSON.stringify(x) > JSON.stringify(had)) by.set(k, x);
+  }
+  return [...by.values()].sort((a, b) => a.t - b.t || (a.c < b.c ? -1 : a.c > b.c ? 1 : 0)).slice(-READS_MAX);
+}
+/** 병합 — 열쇠로 합집합 */
+export function mergeReads(a, b) {
+  return readsOf([...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]);
+}
+
 /**
  * 글 한 편을 다 읽었다 — 한 트랜잭션에서: 잘못 읽기 횟수 더하기 · 받을 별이 있으면 별 + 💰.
  * ids = 지금 있는 카드 id들(모르는 카드로 💰를 받지 못하게) · misses = { 종류: 이번에 고른 수 } · now = 트랜잭션 안의 시각 ·
  * evMiss = 근거를 잘못 누른 수(잘못 읽기로는 안 세지만 🟩 "한 번에 다 맞힘"에는 든다) ·
  * opts.noStone = 🟩를 주지 않는다 — 🎧 듣기 카드를 글로 읽고 풀었다(별·💰·🎯는 같다, v245 아버님 "이대로 진행") ·
- * opts.qMiss = { 물음 id: 이번에 고른 틀린 보기 수 } — 이 카드의 물음만 korQMiss에 더한다(📤 국어 요약, v254)
+ * opts.qMiss = { 물음 id: 이번에 고른 틀린 보기 수 } — 이 카드의 물음만 korQMiss에 더한다(📤 국어 요약, v254) ·
+ * opts.read = { t 연 시각, s 읽은 초, a 첫 답까지 초, n, f, x, e, h, m } — 읽은 기록 한 줄(📤, v258). 카드·날·별은 여기서 채운다(트랜잭션 안의 now) ·
+ *   같은 열쇠(카드·연 시각)가 이미 있으면 더 적지 않는다 — [다시 저장하기]가 두 줄을 만들지 않게
  * why: 'unknown' 모르는 카드
  * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, next?:number, days?:number}}
  *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날) — 별을 받았을 때도 다음 별이 남았으면 next·days
@@ -225,6 +302,12 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
   profile.korQMiss = qMissOf(qcur);
   const done = isObj(profile.korDone) ? { ...profile.korDone } : {};
   const next = nextStar(done, cardId, now);
+  // 📤 읽은 기록 한 줄 — 별을 받든 안 받든(다시 읽기도 읽기다) · 같은 열쇠는 한 번
+  const rd = opts && isObj(opts.read) ? readOf({ ...opts.read, c: cardId, d: dayNum(now), g: next.star || 0 }) : null;
+  if (rd) {
+    const cur = readsOf(profile.korReads);
+    profile.korReads = cur.some((x) => readKey(x) === readKey(rd)) ? cur : readsOf([...cur, rd]);
+  }
   if (!next.star) {
     profile.korDone = done;
     return { ok: true, star: 0, coins: 0, stars: starsOf(done, cardId), wait: next.why, ...(next.days ? { next: next.next, days: next.days } : {}) };
@@ -291,7 +374,7 @@ export function korGiveBackRule(profile) {
  * 국어 문제는 답이 계산으로 검사되지 않으니, 모양이라도 빈틈없이:
  *  카드 id K숫자(겹치지 않음) · 종류 · 제목 · 글은 lines(문장) 또는 stanzas(시) 하나 · 명작은 지은이·출처(facts) ·
  *  물음 id = 카드id-차례 · 보기 넷·서로 다름 · 정답 하나 · 틀린 보기마다 종류(TYPES)와 까닭 · 근거는 있는 문장 번호(차례대로·겹치지 않음) ·
- *  근거가 있으면 근거 물음과 풀이, 없으면 다 푼 뒤 풀이 · 글에 쓴 ①②… 번호는 그 글에 있는 번호만 ·
+ *  근거가 있으면 근거 물음과 풀이, 없으면 다 푼 뒤 풀이와 💡 둘째 힌트(hint2, v258) · 글에 쓴 ①②… 번호는 그 글에 있는 번호만 ·
  *  📖 낱말 풀이(words, 없어도 됨)는 [낱말, 뜻] 여섯 개까지 — 낱말은 그 글에 나오는 말(Codex 48차 제안)
  */
 export function checkContent(data) {
@@ -359,7 +442,7 @@ export function checkCard(c, ids = new Set()) {
     if (listen) {
       // 🎧 글이 보이지 않는다 — 근거 잡기 없이, 문장 번호 없이 (풀이는 맞힌 바로 뒤에 나온다 — 들은 글은 다 푼 뒤에야 보인다)
       if (q.ev !== null && q.ev !== undefined) qat('듣기 카드는 근거 잡기(ev) 없이 doneNote로');
-      const said = [q.q, q.doneNote, ...(Array.isArray(q.opts) ? q.opts.flatMap((o) => (isObj(o) ? [o.t, o.why] : [])) : [])];
+      const said = [q.q, q.doneNote, q.hint2, ...(Array.isArray(q.opts) ? q.opts.flatMap((o) => (isObj(o) ? [o.t, o.why] : [])) : [])];
       if (said.some((s) => [...String(s || '')].some((ch) => CIRC.includes(ch)))) qat('듣기 카드의 물음·보기·풀이에는 문장 번호(①…)를 쓰지 않아요 — 글이 보이지 않아요');
     }
     if (idOk && q.id !== qid) qat(`id는 ${qid}`); // 카드 id가 깨졌으면 그 오류 하나로(물음마다 따라 나오지 않게)
@@ -384,7 +467,17 @@ export function checkCard(c, ids = new Set()) {
       if (!nonEmpty(q.doneNote)) qat('근거 잡기가 없으면 doneNote(다 푼 뒤 풀이)가 있어야 해요');
       if (own(q, 'evQ') || own(q, 'evNote')) qat('근거 잡기가 없는데 evQ·evNote가 있어요');
       refs(q.doneNote, `${qid} 풀이`);
+      // 💡 둘째 힌트 (v258) — 두 번 틀린 뒤에 보인다 · 볼 곳만 짚고 답은 말하지 않는다(정답 보기 글이 그대로 들어 있으면 막는다)
+      if (!nonEmpty(q.hint2)) qat(`근거 잡기가 없으면 hint2(틀린 보기를 ${EV_FIRST_AT}번 고른 뒤 보일 둘째 힌트)가 있어야 해요`);
+      else {
+        if ([...q.hint2].length > HINT2_MAX) qat(`hint2는 ${HINT2_MAX}자까지`);
+        refs(q.hint2, `${qid} 둘째 힌트`);
+        const bare = (s) => String(s || '').normalize('NFC').replace(/[\s.,!?'"“”‘’·…—–-]/g, '');
+        const right = q.opts.find((o) => isObj(o) && o.ok === true);
+        if (right && bare(right.t).length >= 2 && bare(q.hint2).includes(bare(right.t))) qat('hint2에 정답 보기 글이 그대로 있어요 — 볼 곳만 짚어 주세요');
+      }
     } else {
+      if (own(q, 'hint2')) qat('근거 잡기가 있는 물음은 hint2 없이 — 두 번 틀리면 근거부터 찾아요');
       const ev = q.ev;
       if (!Array.isArray(ev) || !ev.length || !ev.every((x) => Number.isInteger(x) && x >= 1 && x <= n)) qat(`ev는 1~${n} 문장 번호`);
       else if (ev.some((x, k) => k > 0 && x <= ev[k - 1])) qat('ev는 작은 번호부터, 겹치지 않게');

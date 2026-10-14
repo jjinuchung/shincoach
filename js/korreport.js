@@ -1,15 +1,18 @@
 // 📤 국어 기록 요약 (순수, 2026-10-14 v254 — 아버님 "1단계부터 진행하고 8번을 넣자") — 비공개 저장소 korean/YYYY-MM-DD.md
 // Claude가 "올라온 거 봐 줘" 때 어느 글·물음에서 막히는지 보고 다음 국어 자료를 고른다 (영어 요약 english/날짜.md와 같은 꼴)
-// 싣는 것: 최근 7일 국어 시간 · 글마다 별·처음 받은 날·틀린 물음 · 완료 기록이 없는 글 · 잘못 읽기 종류별 합 ·
+// 싣는 것: 최근 7일 국어 시간 · 최근 7일 읽은 글(v258 — 읽은 시간·첫 답까지·첫 번에 맞힘·끝까지 고름·근거 먼저·둘째 힌트) ·
+//          글마다 별·처음 받은 날·틀린 물음 · 완료 기록이 없는 글 · 잘못 읽기 종류별 합 ·
 //          자주 틀린 물음(v254부터 셈 — profile.korQMiss) · 🔤 낱말 묶음마다 · 🧩 퍼즐 꼴마다 · ✍️ 생각 쓰기
 // ★ 공개 저장소에는 올리지 않는다 — upload.js가 비공개 저장소로만 (아이 기록)
-import { TYPES, starsOf, missOf, qMissOf, validCards } from './korean.js';
+import { TYPES, starsOf, missOf, qMissOf, readsOf, READS_MAX, validCards } from './korean.js';
 import { deckStats, DECKS, DECK_ORDER, allWords } from './korwords.js';
 import { puzzleStats, KINDS as PUZZLE_KINDS, allPuzzles } from './korpuzzle.js';
 import { writesOf, cardWriteState } from './korwrite.js';
 
 /** 자주 틀린 물음을 몇 개까지 싣나 */
 export const KOR_TOP = 12;
+/** 📤 최근 7일 읽은 글 — 몇 줄까지 싣나 (최근 것부터 · 넘치면 앞을 줄였다고 적는다, v258) */
+export const READ_LINES = 60;
 
 const num = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
 const pad = (n) => String(n).padStart(2, '0');
@@ -26,6 +29,44 @@ function dayBefore(today, k) {
   const t = new Date(Date.UTC(y, m - 1, d - k));
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
+/** 'YYYY-MM-DD' → 날 번호 (korean.dayNum과 같은 셈 — 그 날짜의 자정) */
+function dayNumOf(today) {
+  const [y, m, d] = String(today).split('-').map(Number);
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+/** 초 → "4분 10초" · "40초" (순수) */
+export function secText(sec) {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  const m = Math.floor(s / 60);
+  return m ? `${m}분${s % 60 ? ` ${s % 60}초` : ''}` : `${s}초`;
+}
+
+/**
+ * 📤 최근 7일 읽은 글 (순수, v258) — profile.korReads(korean.readsOf)에서 today를 넣은 7일 · 연 차례
+ * 맨 위 한 줄은 모은 수(글 몇 번 · 한 편 평균 · 첫 번에 맞힌 물음 · 오답 보기를 모두 고른 물음 · 근거 먼저 · 둘째 힌트), 그 아래 READ_LINES줄까지(최근 것)
+ * 기기에 저장된 최근 READS_MAX줄 안에서 센다 — 그보다 많이 읽은 주에는 앞의 것이 빠진다 (Codex 69차 #5)
+ */
+export function readLines(reads, cards, today) {
+  const title = new Map((Array.isArray(cards) ? cards : []).map((c) => [c.id, c.title]));
+  const to = dayNumOf(today);
+  const list = readsOf(reads).filter((x) => x.d <= to && x.d > to - 7);
+  const L = ['', `## 최근 7일 읽은 글 (v258부터 셈 — 끝까지 읽을 때마다 한 줄 · 기기에 저장된 최근 ${READS_MAX}줄 안에서 · 시간은 ⏳처럼 쉼을 빼고 · 첫 답까지 = 글을 연 뒤 처음 보기를 고를 때까지)`];
+  if (!list.length) { L.push('(아직 기록 없음)'); return L; }
+  const sum = (k) => list.reduce((n, x) => n + x[k], 0);
+  const qs = sum('n');
+  const f = sum('f');
+  L.push(`- 모두 ${list.length}번 읽음 · 한 번 평균 ${secText(sum('s') / list.length)} · 첫 번에 맞힌 물음 ${f}/${qs}${qs ? ` (${Math.round((f / qs) * 100)}%)` : ''}` +
+    ` · 오답 보기를 모두 고른 물음 ${sum('x')} · 🔍 근거 먼저 ${sum('e')} · 💡 둘째 힌트 ${sum('h')}`);
+  const shown = list.slice(-READ_LINES);
+  if (shown.length < list.length) L.push(`- (앞의 ${list.length - shown.length}줄은 줄였어요)`);
+  for (const x of shown) {
+    const how = x.m === 'listen' ? ' 🎧 들음' : x.m === 'text' ? ' 🎧→📄 글로 읽음' : '';
+    const star = x.g ? `${'★'.repeat(x.g)} 새로` : '별 없이 다시';
+    const more = [x.x ? `오답 보기를 모두 고른 물음 ${x.x}` : '', x.e ? `🔍 근거 먼저 ${x.e}` : '', x.h ? `💡 둘째 힌트 ${x.h}` : ''].filter(Boolean);
+    L.push(`- ${dayLabel(x.d)} ${x.c} 「${title.get(x.c) || '?'}」${how} ${star} · ${secText(x.s)} (첫 답까지 ${secText(x.a)}) · 첫 번에 ${x.f}/${x.n}${more.length ? ` · ${more.join(' · ')}` : ''}`);
+  }
+  return L;
+}
 
 /**
  * 국어 요약 글 (순수)
@@ -39,7 +80,7 @@ export function korReportText(p, data, today, days) {
   const done = prof.korDone && typeof prof.korDone === 'object' ? prof.korDone : {};
   const qmiss = qMissOf(prof.korQMiss);
   const byDate = new Map((Array.isArray(days) ? days : []).filter((d) => d && d.date).map((d) => [d.date, d]));
-  const L = [`📚 국어 기록 (${today}) — 글마다 별 · 잘못 읽기 · 자주 틀린 물음(v254부터 셈) · 낱말 · 퍼즐 · 생각 쓰기`,
+  const L = [`📚 국어 기록 (${today}) — 읽은 글(v258부터) · 글마다 별 · 잘못 읽기 · 자주 틀린 물음(v254부터 셈) · 낱말 · 퍼즐 · 생각 쓰기`,
     '(틀린 물음 수는 끝까지 다 읽은 글에서만 세요 · 두 기기의 기록을 합칠 때는 물음마다 큰 쪽 수만 남아서 둘을 더한 수가 아니에요)',
     '', '## 최근 7일 국어 시간'];
   for (let k = 6; k >= 0; k--) {
@@ -51,6 +92,7 @@ export function korReportText(p, data, today, days) {
     // 30초 아래는 반올림하면 0분 — "기록 없음"이 아니라 "1분 미만" (Codex 66차)
     L.push(`- ${day.slice(5)}: ${min ? `${min}분` : sec ? '1분 미만' : '(국어 기록 없음)'}${ext ? ` · ⏳ 연장권 ${ext}개` : ''}`);
   }
+  L.push(...readLines(prof.korReads, cards, today)); // 📤 최근 7일 읽은 글 (v258)
   // 글마다
   const st = cards.map((c) => ({ c, s: starsOf(done, c.id), wrong: c.qs.filter((q) => qmiss[q.id]).map((q) => `${q.id}(${qmiss[q.id]})`) }));
   const read = st.filter((x) => x.s > 0 || x.wrong.length);

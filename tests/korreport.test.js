@@ -32,12 +32,12 @@ test('📚 새 글 12편 (v254): 연습 여덟(체험·검색 결과·분류·�
     ['practice', '독서 모임 기록'], ['practice', '이야기'], ['classic', '시'], ['classic', '동시'], ['classic', '시조'], ['classic', '옛이야기']]);
   assert.equal(NEW.reduce((n, id) => n + card(id).qs.length, 0), 46, '연습은 넷씩 · 짧은 시 「눈」과 시조는 셋');
   assert.deepEqual(NEW.filter((id) => card(id).write), ['K44', 'K48', 'K53']);
-  assert.equal(validCards(DATA).length, 53);
+  assert.equal(validCards(DATA).length, 60, 'v258 시 일곱 더함');
   // 📘 단원 지도 — 새 글은 모두 단원에 · 두 편뿐이던 단원 일곱은 이제 세 편 이상
   for (const id of NEW) assert.ok(UNITS.some((u) => (u.cards || []).includes(id)), `${id} 단원`);
   for (const u of ['5-1-독서', '5-1-2', '5-1-매체', '5-1-4', '5-2-2', '5-2-매체', '5-2-4']) assert.ok(UNITS.find((x) => x.id === u).cards.length >= 3, `${u} 세 편 이상`);
   const of = (u) => UNITS.find((x) => x.id === u).cards;
-  assert.deepEqual([of('5-2-3'), of('5-2-6').slice(-2), of('5-1-6').slice(-1)], [['K1', 'K2', 'K4', 'K49'], ['K50', 'K52'], ['K51']]);
+  assert.deepEqual([of('5-2-3'), of('5-2-6').filter((id) => NEW.includes(id)), of('5-1-6').filter((id) => NEW.includes(id))], [['K1', 'K2', 'K4', 'K49'], ['K50', 'K52'], ['K51']]); // v258 시는 그 뒤에
   // 아이 이름 없이 (공개 저장소)
   assert.ok(!NEW.some((id) => JSON.stringify(card(id)).includes(String.fromCharCode(0xC9C4, 0xC6B0))));
 });
@@ -179,7 +179,7 @@ test('★ 📤 저장 경로 (v254): 다 읽으면 물음별 틀린 수가 저�
   const v = read('js/koreanview.js');
   const fin = v.slice(v.indexOf('async function finishCard() {'), v.indexOf('\n}\n', v.indexOf('async function finishCard() {')));
   assert.ok(fin.includes("r.card.qs.forEach((q, i) => { const n = (r.qs[i] && r.qs[i].wrong.length) || 0; if (n) qMiss[q.id] = n; });"), '물음마다 고른 틀린 보기 수(같은 보기는 한 번 — pick이 막는다)');
-  assert.ok(fin.includes('{ noStone: !!(r.ls && r.ls.text), qMiss }'));
+  assert.ok(fin.includes('{ noStone: !!(r.ls && r.ls.text), qMiss, read: readLog(r) }'));
 });
 
 const R = (n) => JSON.parse(read(`coach/korean/${n}.json`));
@@ -203,17 +203,17 @@ test('📤 국어 요약 글 (korreport.korReportText, v254): 7일 국어 시간
     { date: '2026-10-12', korTime: 29 }, { date: '2026-10-10', korTime: 30 }, { date: '2026-10-09', korTime: 0, korExt: 1 }];
   const t = korReportText(p, BASE, '2026-10-14', days);
   const L = t.split('\n');
-  assert.equal(L[0], '📚 국어 기록 (2026-10-14) — 글마다 별 · 잘못 읽기 · 자주 틀린 물음(v254부터 셈) · 낱말 · 퍼즐 · 생각 쓰기');
+  assert.equal(L[0], '📚 국어 기록 (2026-10-14) — 읽은 글(v258부터) · 글마다 별 · 잘못 읽기 · 자주 틀린 물음(v254부터 셈) · 낱말 · 퍼즐 · 생각 쓰기');
   assert.equal(L[1], '(틀린 물음 수는 끝까지 다 읽은 글에서만 세요 · 두 기기의 기록을 합칠 때는 물음마다 큰 쪽 수만 남아서 둘을 더한 수가 아니에요)', '틀린 수를 읽는 법 (Codex 66차)');
   assert.equal(L.filter((l) => /^- \d\d-\d\d: /.test(l)).length, 7, '7일 다');
   assert.ok(t.includes('- 10-13: 25분 · ⏳ 연장권 1개\n') && t.includes('- 10-14: 1분\n') && t.includes('- 10-11: (국어 기록 없음)\n') && !t.includes('10-01'));
   // 경계 (Codex 66차): 29초 = 반올림 0분이지만 기록은 있다 → "1분 미만" · 30초 = 1분 · 0초 = 기록 없음(연장권만 있어도)
   assert.ok(t.includes('- 10-12: 1분 미만\n') && t.includes('- 10-10: 1분\n') && t.includes('- 10-09: (국어 기록 없음) · ⏳ 연장권 1개\n'));
-  assert.ok(t.includes('## 글 — 53편 중 별을 받은 글 3편 (★★★ 0 · ★★ 1 · ★ 2)'));
+  assert.ok(t.includes('## 글 — 60편 중 별을 받은 글 3편 (★★★ 0 · ★★ 1 · ★ 2)'));
   assert.ok(t.includes('- K1 「시든 강낭콩」 ★★ — 처음 10-11 · 틀린 물음 K1-3(1)\n'));
   assert.ok(t.includes('- K20 「처음 혼자 탄 버스」 ★ — 처음 10-14 · 틀린 물음 K20-2(2)\n'));
   assert.ok(t.includes('- K42 「도자기 마을 체험 학습」 ★ — 처음 ? · 틀린 물음 K42-1(5)\n'), '날을 모르는 별(1)은 ?');
-  assert.match(t, /- 완료 기록이 없는 글 50편: K2 「황제펭귄의 겨울나기」 · /, '읽다가 그만둔 글은 기록이 없어 "안 읽은 글"이라 하지 않는다 (Codex 66차)');
+  assert.match(t, /- 완료 기록이 없는 글 57편: K2 「황제펭귄의 겨울나기」 · /, '읽다가 그만둔 글은 기록이 없어 "안 읽은 글"이라 하지 않는다 (Codex 66차)');
   assert.ok(!t.includes('안 읽은 글'));
   assert.ok(t.includes('- 지어내기 3 · 거꾸로 읽기 1\n'), '아는 종류만, TYPES 차례로');
   const top = L.filter((l) => /^- K\d+-\d /.test(l));

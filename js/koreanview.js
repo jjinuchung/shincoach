@@ -4,7 +4,10 @@
 //  · 보기는 물음마다 섞어 그린다(원고의 정답 자리를 외우지 않게) · 틀린 보기는 한 번 누르면 꺼지고 힌트(잘못 읽기 종류)
 //  · 근거가 둘 이상이면 하나만 눌러도 맞고, 맞히면 모두 칠한다 · 근거를 잘못 누른 것은 잘못 읽기로 세지 않는다
 //  · ⏳ 국어도 하루 1시간 30분(v232, 아버님) — 읽던 글은 끝까지, 새 글만 막는다
-import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar } from './korean.js';
+//  · 🔍 근거 먼저 · 💡 둘째 힌트(v258) — 틀린 보기를 두 번 고르면 근거가 있는 물음은 남은 보기를 잠그고 답이 든 줄부터 찾게,
+//    근거가 없는 물음은 둘째 힌트(korean.evFirstNow·hint2Now) · ⏱️ 읽는 시계(쉼 빼고)와 함께 📤 읽은 기록 한 줄(korean.readOf)
+import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT } from './korean.js';
+import { IDLE_SEC } from './timelimit.js'; // ⏱️ 읽는 시계는 ⏳ 시계와 같은 쉼 규칙(2분 넘게 손을 안 대면 안 센다)
 import { newListenState, playListen, haltListen, stopListening, listenBoxEl, scriptEl, confirmHeard, syncListenBox } from './korlistenview.js'; // 🎧 듣기 카드 (v245) — 이 파일을 import하지 않는다
 import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt, tickEgg } from './xp.js';
 import { loadCharacters, downloadCharacters, forSubject, isUnlocked, pickCharacters } from './pokemon.js';
@@ -248,14 +251,19 @@ function openCard(id) {
   ui.read = {
     card,
     qi: 0,
-    qs: card.qs.map((q) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [] })),
+    // evFirst = 맞히기 전에 🔍 근거를 먼저 찾았다 · hint2 = 💡 둘째 힌트를 보았다 (v258 📤 읽은 기록)
+    qs: card.qs.map((q) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false })),
     misses: {},
     evMiss: 0, // 근거를 잘못 누른 수 — 잘못 읽기로는 안 세고 🟩 "한 번에 다 맞힘"에만
     result: null,
     saving: false,
     focus: '', // 다시 그린 뒤 초점을 옮길 곳 (moveFocus)
     ls: isListen(card) ? newListenState() : null, // 🎧 듣기 카드 — 들었나 · 글로 읽나 · 읽는 중 (v245)
+    t0: Date.now(), // ⏱️ 연 시각 — 📤 읽은 기록의 열쇠 (v258)
+    sec: 0, // 읽은 초 (쉼 빼고 — tickRead)
+    firstSec: -1, // 첫 답을 고를 때의 읽은 초
   };
+  lastAct = Date.now();
   stopListening(); // 앞 카드에서 읽던 소리
   renderRead();
   window.scrollTo(0, 0);
@@ -503,13 +511,14 @@ function renderQ() {
   const q = r.card.qs[r.qi];
   const st = r.qs[r.qi];
   const unit = unitOf(r.card);
+  const evFirst = evFirstNow(q, st); // 🔍 두 번 틀렸다 — 근거부터 (v258)
   const card = el('div', 'kor-q');
   const head = el('div', 'kor-q-head');
   head.appendChild(el('span', 'kor-q-no', `문제 ${r.qi + 1} / ${r.card.qs.length}`));
   head.appendChild(el('span', 'kor-q-skill', q.skill));
   card.appendChild(head);
   card.appendChild(el('p', 'kor-q-text', q.q));
-  const opts = el('div', 'kor-opts');
+  const opts = el('div', `kor-opts${evFirst ? ' is-locked' : ''}`); // 🔍 근거 먼저 동안 남은 보기는 흐리게(잠김)
   st.order.forEach((k, pos) => {
     const o = q.opts[k];
     const isWrong = st.wrong.includes(k);
@@ -517,7 +526,7 @@ function renderQ() {
     const b = el('button', `kor-opt${isWrong ? ' is-no' : ''}${isRight ? ' is-ok' : ''}${st.answered && !o.ok && !isWrong ? ' is-dim' : ''}`);
     b.type = 'button';
     b.dataset.k = String(k);
-    b.disabled = st.answered || isWrong;
+    b.disabled = st.answered || isWrong || evFirst;
     b.appendChild(el('span', 'kor-opt-mark', circled(pos + 1)));
     b.appendChild(el('span', '', o.t));
     b.addEventListener('click', () => pick(k));
@@ -527,18 +536,27 @@ function renderQ() {
   const fb = el('p', 'kor-fb');
   const lastWrong = st.wrong.length ? q.opts[st.wrong[st.wrong.length - 1]] : null;
   if (st.answered) { fb.classList.add('is-ok'); fb.textContent = q.ev && !st.evDone ? '맞아요! 이제 그렇게 생각한 까닭을 글에서 찾아볼까요?' : '맞아요!'; }
+  else if (evFirst) { fb.classList.add('is-no'); fb.textContent = `🔍 두 번 틀렸어요. 답을 고르기 전에, 답이 들어 있는 ${unit}을 글에서 먼저 찾아 눌러 봐요.`; }
+  else if (st.evFirst) { fb.classList.add('is-ok'); fb.textContent = `찾았어요! 칠한 ${unit}(${q.ev.map(circled).join(', ')})을 다시 읽고 남은 보기에서 골라 봐요.`; } // 번호 뒤 조사는 읽는 소리마다 달라 낱말 뒤에
   else if (lastWrong) { fb.classList.add('is-no'); fb.textContent = `🤔 ${hintOf(lastWrong.type, r)}`; }
   card.appendChild(fb);
   let say = fb.textContent;
-  if (st.answered && q.ev) {
+  if (hint2Now(q, st)) {
+    // 💡 근거가 없는 물음 — 두 번 틀리면 볼 곳을 짚는 둘째 힌트 (v258)
+    const h2 = el('p', 'kor-fb kor-hint2', `💡 ${q.hint2}`);
+    card.appendChild(h2);
+    say = `${say} ${h2.textContent}`;
+  }
+  if (q.ev && (st.answered || evFirst)) {
     const ev = evidenceEl(q, st, unit);
     card.appendChild(ev);
     const m = ev.querySelector('.kor-fb');
     if (m && m.textContent) say = m.textContent;
   }
   const qDone = st.answered && (!q.ev || st.evDone);
+  // 칠한 근거 — 다 푼 뒤 · 🔍 근거 먼저로 찾은 뒤(남은 보기를 고르는 동안 그 줄을 다시 읽게)
+  if (q.ev && st.evDone) for (const n of q.ev) { const m = main.querySelector(`.kor-read-body [data-n="${n}"]`); if (m) m.classList.add('is-mark'); }
   if (qDone) {
-    if (q.ev) for (const n of q.ev) { const m = main.querySelector(`.kor-read-body [data-n="${n}"]`); if (m) m.classList.add('is-mark'); }
     const note = el('div', 'kor-note');
     note.appendChild(el('p', '', `💡 ${q.ev ? q.evNote : q.doneNote}`));
     // 아까 고른 틀린 보기가 왜 틀렸나 — 틀릴 때는 종류 힌트만 주고(답을 미리 알려 주지 않게), 맞힌 뒤에 보여 준다 (Codex 48차 #6)
@@ -557,7 +575,7 @@ function renderQ() {
   }
   col.appendChild(card);
   if (live) live.textContent = say;
-  if (focusTo) moveFocus(col, focusTo === 'answer' ? (qDone ? 'next' : st.answered ? 'ev' : 'opt') : focusTo);
+  if (focusTo) moveFocus(col, focusTo === 'answer' ? (qDone ? 'next' : (st.answered || evFirst) ? 'ev' : 'opt') : focusTo);
 }
 
 /** 틀린 보기 힌트 (순수) — 🎧 듣고 푸는 중이면 "들은 말" 말투(hintL), 글로 읽고 풀면 글 말투 */
@@ -581,7 +599,9 @@ function bringQ() {
 
 function evidenceEl(q, st, unit) {
   const box = el('div', 'kor-ev');
-  box.appendChild(el('p', 'kor-ev-title', `🔍 근거 잡기 — ${q.evQ}`));
+  const first = !st.answered; // 🔍 근거 먼저 (v258) — 답을 고르기 전
+  if (first) box.classList.add('is-first');
+  box.appendChild(el('p', 'kor-ev-title', first ? `🔍 근거 먼저 — 답이 들어 있는 ${unit}을 눌러 보세요` : `🔍 근거 잡기 — ${q.evQ}`));
   const rows = el('div', 'kor-ev-rows');
   const card = ui.read.card;
   for (let n = 1; n <= lineCount(card); n++) {
@@ -600,8 +620,15 @@ function evidenceEl(q, st, unit) {
   const msg = el('p', 'kor-fb');
   if (st.evDone) { msg.classList.add('is-ok'); msg.textContent = `찾았어요! 근거 ${unit}: ${q.ev.map(circled).join(', ')}`; }
   // "까닭이 없어요"는 너무 단정적 — 그 문장도 조금은 관계있을 수 있다 (Codex 48차 #2)
-  else if (st.evWrong.length) { msg.classList.add('is-no'); msg.textContent = `그 ${unit}보다 답을 더 잘 받쳐 주는 ${unit}을 찾아볼까요?`; }
-  box.appendChild(msg);
+  else if (first && st.evWrong.length >= EV_RANGE_AT && evRange(q.ev, lineCount(card))) {
+    // 근거 먼저에서 두 번 잘못 눌렀다 — 근거 둘레 범위만 (답 줄은 알려 주지 않는다)
+    const [a, b] = evRange(q.ev, lineCount(card));
+    msg.classList.add('is-no');
+    msg.textContent = `${circled(a)}~${circled(b)} 사이에 있어요. 그 ${unit}들을 다시 읽어 봐요.`;
+  } else if (st.evWrong.length) { msg.classList.add('is-no'); msg.textContent = `그 ${unit}보다 답을 더 잘 받쳐 주는 ${unit}을 찾아볼까요?`; }
+  // 근거 먼저는 말을 제목 바로 아래에 — 세로 화면에서 줄 목록 맨 아래 말은 눈에 안 띄었다 (헤드리스 390, v258)
+  if (first) { if (msg.textContent) box.insertBefore(msg, rows); } // 할 말이 없으면 빈 줄을 두지 않는다
+  else box.appendChild(msg);
   return box;
 }
 
@@ -610,18 +637,33 @@ function pick(k) {
   if (!r || r.qi >= r.card.qs.length) return;
   const q = r.card.qs[r.qi];
   const st = r.qs[r.qi];
-  if (st.answered || st.wrong.includes(k)) return;
+  if (st.answered || st.wrong.includes(k) || evFirstNow(q, st)) return; // 🔍 근거 먼저 동안은 보기가 잠겼다
   const o = q.opts[k];
+  if (r.firstSec < 0) r.firstSec = r.sec; // ⏱️ 첫 답까지 (📤)
   if (o.ok) {
     st.answered = true;
     try { sfx.ding(); } catch { /* 소리는 없어도 */ }
   } else {
     st.wrong.push(k);
     r.misses[o.type] = (r.misses[o.type] || 0) + 1; // 잘못 읽기 종류를 센다 — 다 읽을 때 한 번에 저장
+    if (hint2Now(q, st)) st.hint2 = true; // 💡 둘째 힌트가 나왔다
     try { sfx.wrong(); } catch { /* 소리는 없어도 */ }
   }
   r.focus = 'answer';
   renderQ();
+  if (evFirstNow(q, st)) bringEvFirst(); // 🔍 방금 근거 먼저로 바뀌었다 — 초점이 간 근거 줄이 화면 밖일 수 있다 (Codex 69차 #2)
+}
+
+/** 🔍 근거 먼저 상자가 화면 아래(또는 띠 밑)에 있으면 "두 번 틀렸어요" 말부터 띠 바로 아래로 — 초점은 preventScroll이라 저절로 안 온다
+ *  (세로 화면에서 긴 물음·보기 넷 아래로 상자가 밀려, 키보드 초점이 보이지 않는 근거 줄에 가 있었다) */
+function bringEvFirst() {
+  const box = document.querySelector('#korean-main .kor-ev.is-first');
+  const say = document.querySelector('#korean-main .kor-q > .kor-fb');
+  if (!box || !say) return;
+  const bar = document.querySelector('#view-korean .topbar');
+  const under = bar ? bar.getBoundingClientRect().bottom : 0;
+  const top = box.getBoundingClientRect().top;
+  if (top < under + 4 || top > window.innerHeight - 96) say.scrollIntoView({ block: 'start' });
 }
 
 function evPick(n) {
@@ -629,8 +671,10 @@ function evPick(n) {
   if (!r || r.qi >= r.card.qs.length) return;
   const q = r.card.qs[r.qi];
   const st = r.qs[r.qi];
-  if (!st.answered || !q.ev || st.evDone || st.evWrong.includes(n)) return;
+  if (!(st.answered || evFirstNow(q, st)) || !q.ev || st.evDone || st.evWrong.includes(n)) return; // 맞힌 뒤 · 🔍 근거 먼저
+  let reopen = false;
   if (q.ev.includes(n)) {
+    if (!st.answered) { st.evFirst = true; reopen = true; } // 맞히기 전에 찾았다 — 보기가 다시 열린다(뒤의 근거 잡기는 건너뜀)
     st.evDone = true;
     try { sfx.ding(); } catch { /* 소리는 없어도 */ }
   } else {
@@ -640,6 +684,7 @@ function evPick(n) {
   }
   r.focus = 'answer';
   renderQ();
+  if (reopen) bringQ(); // 근거 상자가 사라져 화면이 짧아진다 — 다시 열린 보기를 데려온다(세로 화면에서 긴 줄 목록 아래였다)
 }
 
 /** 다 읽었다 — 저장(별·💰 한 트랜잭션) → 다 읽은 카드 */
@@ -654,7 +699,7 @@ async function finishCard() {
     // 📤 물음마다 틀린 보기 수 — 국어 요약의 "자주 틀린 물음" (v254)
     const qMiss = {};
     r.card.qs.forEach((q, i) => { const n = (r.qs[i] && r.qs[i].wrong.length) || 0; if (n) qMiss[q.id] = n; });
-    res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text), qMiss });
+    res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text), qMiss, read: readLog(r) });
   } catch { res = { ok: false, why: 'save' }; }
   // 🥚 글 한 편을 끝까지 읽은 날 — 별이 없어도(다시 읽기도 공부). ★ 저장이 됐으면 화면과 상관없이 칸을 채운다
   //   (저장하는 사이 ← 도감을 누르면 그날 칸이 빠졌다, Codex 51차 — 🔤 낱말 판과 같은 꼴)
@@ -672,6 +717,19 @@ async function finishCard() {
     const egg = await eggP;
     if (ui.read === r && egg && egg.ok) { r.egg = egg; renderQ(); }
   }
+}
+
+/** 📤 읽은 기록 한 줄 (순수) — 읽는 상태 → korFinishRule opts.read (카드·날·별은 규칙이 채운다, v258) */
+export function readLog(r) {
+  const qs = r.card.qs;
+  const cnt = (f) => r.qs.filter((st, i) => f(st, qs[i])).length;
+  return {
+    t: r.t0, s: r.sec, a: Math.max(0, r.firstSec), n: qs.length,
+    f: cnt((st) => !st.wrong.length), // 첫 번에 맞힘
+    x: cnt((st, q) => st.wrong.length >= q.opts.length - 1), // 오답 보기를 모두 고른 물음
+    e: cnt((st) => st.evFirst), h: cnt((st) => st.hint2),
+    m: r.ls ? (r.ls.text ? 'text' : 'listen') : '',
+  };
 }
 
 /**
@@ -877,6 +935,19 @@ export async function runKorCatch() {
   }
 }
 
+// ⏱️ 읽는 시계 (v258 📤 읽은 기록) — 글을 연 때부터 다 읽기까지 1초씩. ⏳ 시계와 같은 쉼 규칙: 앱을 내렸거나 · 국어 화면이 아니거나 ·
+//   IDLE_SEC 넘게 아무것도 안 눌렀으면 안 센다 — 🎧 소리가 나오는 동안은 센다(듣는 동안은 누르지 않는다) · 저장 중·다 읽은 뒤는 멈춘다
+let lastAct = 0;
+let readTimer = null;
+function tickRead() {
+  const r = ui.read;
+  if (!r || r.result || r.saving || r.qi >= r.card.qs.length) return;
+  if (typeof document !== 'undefined' && document.hidden) return;
+  if (!koreanVisible()) return;
+  if (!(r.ls && r.ls.playing) && Date.now() - lastAct > IDLE_SEC * 1000) return;
+  r.sec += 1;
+}
+
 /** 배선 (app.main) — ← 과목 고르기 · 다른 창에서 별을 받고 돌아오면 도감을 다시 그린다 */
 export function initKorean({ showView }) {
   if (ui.wired) return;
@@ -884,7 +955,9 @@ export function initKorean({ showView }) {
   const back = $('btn-korean-back');
   if (back) back.addEventListener('click', () => showView('home'));
   // 🎧 앱을 내리면(다른 앱·화면 끔) 읽던 소리를 멈춘다 — 돌아오면 ▶ 다시 듣기
-  document.addEventListener('visibilitychange', () => { if (document.hidden) leaveKorean(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) leaveKorean(); else lastAct = Date.now(); });
+  for (const ev of ['pointerdown', 'keydown', 'touchstart', 'wheel']) document.addEventListener(ev, () => { lastAct = Date.now(); }, { passive: true, capture: true });
+  if (readTimer === null) readTimer = setInterval(tickRead, 1000);
   onProfileReload(() => {
     const v = $('view-korean');
     if (v && !v.hidden && !ui.read && !anySession() && !ui.wview && !profileLoading()) renderList().catch(() => {});

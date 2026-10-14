@@ -16,12 +16,12 @@ const at = (days, h = 12) => new Date(2026, 9, 11 + days, h, 0, 0).getTime();
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('📚 원고: 형식 검사 통과 · 쉰세 편(연습 서른셋·명작 스물 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯 · v254 새 글 열둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
+test('📚 원고: 형식 검사 통과 · 예순 편(연습 서른셋·명작 스물일곱 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯 · v254 새 글 열둘 · v258 시 일곱) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, Array.from({ length: 53 }, (_, i) => `K${i + 1}`));
+  assert.deepEqual(IDS, Array.from({ length: 60 }, (_, i) => `K${i + 1}`));
   const P = 'practice'; const C = 'classic';
-  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C]);
-  assert.equal(validCards(DATA).length, 53);
+  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, C, C]);
+  assert.equal(validCards(DATA).length, 60);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -33,7 +33,7 @@ test('📚 원고: 형식 검사 통과 · 쉰세 편(연습 서른셋·명작 �
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 178);
+  assert.equal(qn, 199);
   assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 여덟 가지(v236 짜임 놓치기 더함)가 모두 한 번 이상 쓰인다');
   // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남 · 또는 지은이를 알 수 없는 옛이야기를 다시 씀)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {
@@ -68,7 +68,7 @@ test('📚 원고 검사가 잡는다 — 한 곳만 틀리게 바꾼 원고마�
     ['종류', (c) => { c.kind = 'textbook'; }, /kind/],
     ['글 둘 다', (c) => { c.stanzas = [['가']]; }, /lines 또는 stanzas 하나만/],
     ['근거 풀이 없음', (c) => { delete c.qs[0].evNote; }, /evNote/],
-    ['근거 없는데 풀이 없음', (c) => { c.qs[0].ev = null; delete c.qs[0].evQ; delete c.qs[0].evNote; }, /doneNote/],
+    ['근거 없는데 풀이 없음', (c) => { c.qs[0].ev = null; delete c.qs[0].evQ; delete c.qs[0].evNote; c.qs[0].hint2 = '글을 다시 읽어 봐요.'; }, /doneNote/], // v258: 근거가 없으면 💡 둘째 힌트도 있어야 — 이 경우는 풀이 하나만
     ['정답에 까닭', (c) => { c.qs[0].opts[1].why = 'x'; }, /정답 보기에 type·why는 없어요/],
     ['meta 없음', (c) => { c.meta = []; }, /meta/],
   ];
@@ -512,7 +512,7 @@ test('📚 화면 연결: 홈 카드 📚 국어(안농) · view-korean · app �
   const pick = body('function pick(k) {');
   assert.ok(pick.includes('r.misses[o.type] = (r.misses[o.type] || 0) + 1;') && pick.includes('st.wrong.push(k);'), '틀린 보기는 잘못 읽기로');
   assert.ok(!body('function evPick(n) {').includes('misses'), '근거 실수는 안 센다');
-  assert.ok(body('async function finishCard() {').includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text), qMiss });'));
+  assert.ok(body('async function finishCard() {').includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text), qMiss, read: readLog(r) });'));
   assert.ok(body('function openCard(id) {').includes('order: shuffled(q.opts.length)'), '보기는 물음마다 섞는다');
   assert.ok(body('export async function enterKorean() {').includes("if (ui.read) {"), '🎒·📊에서 돌아오면 읽던 글 그대로');
   // Codex 48차: 틀린 까닭은 맞힌 뒤에 · 근거 실수 말은 부드럽게 · 읽어 주기 알림은 한 곳 · 초점 옮김 · 띠 높이만큼 띄움
@@ -549,7 +549,7 @@ test('🟩 국어스톤 (2026-10-11): 별을 새로 받을 때 보기·근거를
   assert.equal(v.finishText({ ok: true, star: 1, coins: 12, stone: 1, stars: 1 }).lines[0], '💰 +12 · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!) · 🎯 국어 포켓몬 잡기 1번');
   assert.equal(v.finishText({ ok: true, star: 1, coins: 12, stone: 0, stars: 1 }).lines[0], '💰 +12 · 🎯 국어 포켓몬 잡기 1번');
   const src = readFileSync(new URL('../js/koreanview.js', import.meta.url), 'utf8');
-  assert.ok(src.includes('    r.evMiss += 1;') && src.includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text), qMiss });'), '근거 실수는 🟩 판정에만');
+  assert.ok(src.includes('    r.evMiss += 1;') && src.includes('res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text), qMiss, read: readLog(r) });'), '근거 실수는 🟩 판정에만');
 });
 
 test('📚 명작도 문장 글일 수 있다 (v232 「알에서 태어나다」): 글 상자는 stanzas가 없으면 번호 붙은 문장으로 — 시 모양을 가정하면 화면이 깨졌다', () => {
@@ -607,7 +607,7 @@ test('🔍 Codex 49차 원고·말: 좋은 근거를 다 받음(K7-3 ③~⑦ · 
 test('⭐ 중학교 미리보기 (v244, 아버님 "이대로 진행"): 명작 넷 K32 「홍길동전」·K33 「양반전」(다시 씀) · K34 「하여가」·「단심가」·K35 「오우가」(『청구영언』·『산중신곡』 원문을 오늘 글자로) · pre 표시 · 도감 맨 뒤 · 저작권 해 · 물음 4·4·3·4', async () => {
   const card = (id) => DATA.cards.find((c) => c.id === id);
   const PREV = ['K32', 'K33', 'K34', 'K35'];
-  assert.deepEqual(DATA.cards.filter((c) => c.pre).map((c) => c.id), PREV, '미리보기는 이 넷');
+  assert.deepEqual(DATA.cards.filter((c) => c.pre).map((c) => c.id), [...PREV, 'K59', 'K60'], '미리보기는 이 넷 + v258 시조 「오백 년 도읍지를」·김소월 「진달래꽃」');
   for (const id of PREV) assert.deepEqual([card(id).kind, card(id).pre], ['classic', '중학교'], id);
   assert.deepEqual(PREV.map((id) => card(id).qs.length), [4, 4, 3, 4]);
   // 원문 대조 — 시조는 옛 글자를 오늘 글자로만(위키문헌: 『청구영언』 216·8, 『산중신곡』 오우가 첫째·둘째 수)

@@ -78,7 +78,7 @@ test('🎧 단원 지도: 5-1 1단원(K36·K40) · 3단원(K38) · 5단원(K39) 
 test('🎧 원고 검사가 잡는다 — 한 곳만 틀리게 바꾼 듣기 카드마다 그 오류 하나', () => {
   const one = (id, fix) => { const c = clone(card(id)); fix(c); return checkCard(c); };
   const cases = [
-    ['근거 잡기', 'K36', (c) => { c.qs[0].ev = [1]; c.qs[0].evQ = 'x'; c.qs[0].evNote = 'x'; delete c.qs[0].doneNote; }, /근거 잡기\(ev\) 없이/],
+    ['근거 잡기', 'K36', (c) => { c.qs[0].ev = [1]; c.qs[0].evQ = 'x'; c.qs[0].evNote = 'x'; delete c.qs[0].doneNote; delete c.qs[0].hint2; }, /근거 잡기\(ev\) 없이/], // v258: 근거가 있으면 둘째 힌트는 없이
     ['물음에 문장 번호', 'K36', (c) => { c.qs[1].q = '② 소라는 왜 그랬나요?'; }, /문장 번호/],
     ['풀이에 문장 번호', 'K37', (c) => { c.qs[0].doneNote += ' ③을 보세요.'; }, /문장 번호/],
     ['보기 까닭에 문장 번호', 'K38', (c) => { c.qs[0].opts[0].why = '⑦에 있어요.'; }, /문장 번호/],
@@ -388,7 +388,7 @@ test('🎧 화면 연결: 듣기 카드는 글 대신 듣기 상자 · 처음 �
   assert.ok(body('function bringQ() {').includes('top > window.innerHeight - 96'), '물음이 화면 아래 밖이어도');
   assert.ok(view.includes('alive: () => ui.read === r && koreanVisible(),'), '다른 카드·화면이면 그만');
   assert.ok(body('export function leaveKorean() {').includes('haltListen(r.ls)'));
-  assert.ok(view.includes("document.addEventListener('visibilitychange', () => { if (document.hidden) leaveKorean(); });"), '앱을 내리면 멈춤');
+  assert.ok(view.includes("document.addEventListener('visibilitychange', () => { if (document.hidden) leaveKorean(); else lastAct = Date.now(); });"), '앱을 내리면 멈춤 (v258: 돌아오면 ⏱️ 읽는 시계가 바로 센다)');
   const toText = view.slice(view.indexOf('  toText: () => {'), view.indexOf('};', view.indexOf('  toText: () => {')));
   assert.ok(toText.includes('haltListen(r.ls);') && toText.includes('r.ls.text = true;') && toText.includes('renderRead();'));
   const app = read('js/app.js');
