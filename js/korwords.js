@@ -1,6 +1,7 @@
 // 🔤 국어 낱말 줄기 (2026-10-11, 아버님 "니 제안대로 하자") — 순수 규칙 (저장은 xp.korWordsFinish → houseDo 한 트랜잭션)
 //
-// 묶음 넷: 📘 국어 공부 말(5학년 국어 단원에서 그대로 쓰는 말) · 🗣️ 관용 표현 · 🐢 속담(v241 — 6-1 「관용 표현을 이해하고 생각을 표현해요」 미리) · 📖 글에서 만난 낱말
+// 묶음 다섯: 📘 국어 공부 말(5학년 국어 단원에서 그대로 쓰는 말) · 🗣️ 관용 표현 · 🐢 속담(v241 — 6-1 「관용 표현을 이해하고 생각을 표현해요」 미리) ·
+//   🀄 사자성어(v255 — 넉 자 한자어 · han 한자 · lit 글자 뜻은 답을 고른 뒤 풀이에만) · 📖 글에서 만난 낱말
 //   (📖은 coach/korean/reading.json의 words — 그 글에 ★이 있으면 열린다. 나머지는 coach/korean/words.json)
 // 문제 두 꼴: mean(뜻 고르기) · use(빈칸 채우기 — 관용 표현·속담(sit 묶음)은 "이럴 때 어울리는 말")
 //   · 보기는 같은 묶음의 다른 낱말 — 헷갈리는 짝(pair: 직유·은유, 사실·의견 …)은 뜻 고르기에 일부러 같이,
@@ -24,9 +25,13 @@ export const DECKS = {
   concept: { icon: '📘', ko: '국어 공부 말', prefix: 'c' },
   idiom: { icon: '🗣️', ko: '관용 표현', prefix: 'i', sit: true, ask: '이럴 때 어울리는 관용 표현은 무엇인가요?' },
   proverb: { icon: '🐢', ko: '속담', prefix: 's', sit: true, ask: '이럴 때 어울리는 속담은 무엇인가요?' },
+  saja: { icon: '🀄', ko: '사자성어', prefix: 'h', sit: true, ask: '이럴 때 어울리는 사자성어는 무엇인가요?' },
   passage: { icon: '📖', ko: '글에서 만난 낱말', prefix: 'p' },
 };
-export const DECK_ORDER = ['concept', 'idiom', 'proverb', 'passage'];
+export const DECK_ORDER = ['concept', 'idiom', 'proverb', 'saja', 'passage'];
+/** 🀄 사자성어 꼴 — 한글 넉 자 · 한자 넉 자 (v255) */
+const SAJA_W = /^[가-힣]{4}$/;
+const SAJA_HAN = /^[\u4E00-\u9FFF]{4}$/;
 const KEY_MAX = 80;
 const WORDS_MAX = 2000;
 const DAYS_MAX = 400;
@@ -86,7 +91,10 @@ export function allWords(data, cards) {
   const out = [];
   for (const x of (data && Array.isArray(data.words) ? data.words : [])) {
     if (!x || !isDeck(x.deck) || typeof x.w !== 'string' || !x.w || typeof x.mean !== 'string' || !x.mean) continue;
-    out.push({ id: wordId(x.deck, x.w), deck: x.deck, w: x.w, mean: x.mean, ex: typeof x.ex === 'string' ? x.ex : '', unit: typeof x.unit === 'string' ? x.unit : '', pair: Array.isArray(x.pair) ? x.pair : [], avoid: Array.isArray(x.avoid) ? x.avoid : [] });
+    const w = { id: wordId(x.deck, x.w), deck: x.deck, w: x.w, mean: x.mean, ex: typeof x.ex === 'string' ? x.ex : '', unit: typeof x.unit === 'string' ? x.unit : '', pair: Array.isArray(x.pair) ? x.pair : [], avoid: Array.isArray(x.avoid) ? x.avoid : [] };
+    // 🀄 한자·글자 뜻은 꼴이 맞을 때만 (풀이에 그대로 보인다)
+    if (x.deck === 'saja' && typeof x.han === 'string' && SAJA_HAN.test(x.han) && typeof x.lit === 'string' && x.lit.trim()) { w.han = x.han; w.lit = x.lit; }
+    out.push(w);
   }
   return out.concat(passageWords(cards));
 }
@@ -306,9 +314,10 @@ export function deckStats(words, states, korDone) {
 
 /**
  * 낱말 원고 검사 (tools/check.mjs · 테스트) — 오류 문장 배열
- * · 묶음은 concept·idiom·proverb만(📖은 글에서) · 낱말·뜻 비지 않음 · 같은 묶음에 같은 낱말·같은 뜻 없음 · 뜻에 그 낱말을 쓰지 않음
+ * · 묶음은 concept·idiom·proverb·saja만(📖은 글에서) · 낱말·뜻 비지 않음 · 같은 묶음에 같은 낱말·같은 뜻 없음 · 뜻에 그 낱말을 쓰지 않음
  * · 📘: ex에 빈칸(___) 하나, 빈칸 뒤에 받침 따라 바뀌는 조사 없음, 빈칸 밖에 그 낱말이 또 나오지 않음
- * · 🗣️·🐢(sit 묶음): ex는 상황 글(빈칸 없음), 그 표현이 글에 그대로 나오지 않음
+ * · 🗣️·🐢·🀄(sit 묶음): ex는 상황 글(빈칸 없음), 그 표현이 글에 그대로 나오지 않음
+ * · 🀄: 한글 넉 자 · han 한자 넉 자 · lit(글자 뜻) 60자까지 · 상황 글에 한자도 없음 — han·lit은 🀄에만
  * · pair·avoid는 같은 묶음에 있는 낱말 · 묶음마다 4개 이상(보기 넷)
  * · 📖(cards가 있으면): 글에 나오는 낱말이고, 같은 카드 안에서 겹치지 않음
  */
@@ -320,7 +329,7 @@ export function checkWords(data, cards) {
   list.forEach((x, i) => {
     const at = (m) => errs.push(`words[${i}] ${x && x.w ? x.w : ''}: ${m}`);
     if (!x || typeof x !== 'object') { at('낱말이 아니에요'); return; }
-    if (!isDeck(x.deck)) { at('deck은 concept·idiom·proverb 가운데 하나'); return; }
+    if (!isDeck(x.deck)) { at('deck은 concept·idiom·proverb·saja 가운데 하나'); return; }
     if (typeof x.w !== 'string' || !x.w.trim()) { at('낱말이 비었어요'); return; }
     if (typeof x.mean !== 'string' || !x.mean.trim()) at('뜻이 비었어요');
     else if (x.mean.length > 60) at('뜻은 60자까지');
@@ -335,6 +344,13 @@ export function checkWords(data, cards) {
       else if (ex.includes('___')) at(`${DECKS[x.deck].ko}의 ex는 상황 글 — 빈칸 없이`);
       else if (ex.includes(x.w)) at('상황 글에 그 표현이 그대로 나와요');
     }
+    if (x.deck === 'saja') {
+      if (!SAJA_W.test(x.w)) at('사자성어는 한글 넉 자');
+      if (typeof x.han !== 'string' || !SAJA_HAN.test(x.han)) at('han은 한자 넉 자');
+      else if (ex.includes(x.han)) at('상황 글에 한자가 그대로 나와요');
+      if (typeof x.lit !== 'string' || !x.lit.trim()) at('lit(글자 뜻)이 비었어요');
+      else if (x.lit.length > 60) at('lit은 60자까지');
+    } else if (x.han !== undefined || x.lit !== undefined) at('han·lit은 사자성어에만');
     for (const f of ['pair', 'avoid']) if (x[f] !== undefined && !(Array.isArray(x[f]) && x[f].every((v) => typeof v === 'string' && v))) at(`${f}는 낱말 배열`);
     (by[x.deck] = by[x.deck] || []).push(x);
   });

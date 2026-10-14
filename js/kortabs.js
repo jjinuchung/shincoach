@@ -76,7 +76,7 @@ export async function renderWordsTab(box, ctx) {
   const plan = planToday(words, states, done, now);
   const head = el('section', 'kor-head');
   head.appendChild(el('h2', 'kor-h', '🔤 오늘의 낱말'));
-  head.appendChild(el('p', 'kor-intro', '국어 시간에 쓰는 말, 관용 표현, 글에서 만난 낱말을 익혀요. 맞힌 낱말은 다음 날 → 3일 → 7일 → 14일 뒤에 다시 나오고, 끝까지 맞히면 ⭐ 익힌 낱말이 돼요.'));
+  head.appendChild(el('p', 'kor-intro', '국어 시간에 쓰는 말, 관용 표현, 속담, 사자성어, 글에서 만난 낱말을 익혀요. 맞힌 낱말은 다음 날 → 3일 → 7일 → 14일 뒤에 다시 나오고, 끝까지 맞히면 ⭐ 익힌 낱말이 돼요.'));
   head.appendChild(el('p', 'kor-count', todayLine(wordsToday(korWordDayMap(), now))));
   const start = (extra) => guardStart('korean', () => startSession(ctx, extra));
   if (plan.length) {
@@ -166,7 +166,7 @@ function sentenceEl(text, fill) {
   return p;
 }
 
-/** 맞힌·틀린 뒤 낱말 풀이 — 뜻 · 쓰임(📘 빈칸을 채운 문장 · 🗣️·🐢 어울리는 상황 · 📖 나온 글) */
+/** 맞힌·틀린 뒤 낱말 풀이 — 뜻 · 쓰임(📘 빈칸을 채운 문장 · 🗣️·🐢·🀄 어울리는 상황 · 📖 나온 글) · 🀄 한자와 글자 뜻(v255) */
 function noteEl(w) {
   const note = el('div', 'kor-note');
   const p = el('p');
@@ -176,6 +176,7 @@ function noteEl(w) {
   if (w.deck === 'concept' && w.ex) note.appendChild(sentenceEl(w.ex, w.w));
   else if (DECKS[w.deck] && DECKS[w.deck].sit && w.ex) note.appendChild(el('p', 'kor-note-ex', `이럴 때: ${w.ex}`));
   else if (w.deck === 'passage' && w.src) note.appendChild(el('p', 'kor-note-ex', `「${w.title}」에서: ${w.src}`));
+  if (w.han && w.lit) note.appendChild(el('p', 'kor-note-ex kor-note-han', `🀄 ${w.han} — 글자 뜻: ${w.lit}`));
   return note;
 }
 

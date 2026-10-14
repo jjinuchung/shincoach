@@ -220,7 +220,7 @@ test('📤 국어 요약 글 (korreport.korReportText, v254): 7일 국어 시간
   assert.deepEqual(top.map((l) => l.split(' ')[1]), ['K42-1', 'K20-2', 'K1-3'], '많은 차례 · 카드에 없는 물음(K99-1)은 뺌');
   assert.ok(top[1].includes('「처음 혼자 탄 버스」 마음의 변화 — 2번 · 물음: 버스를 타고 가는 동안'));
   assert.ok(t.includes(`- 📘 국어 공부 말: 배우는 중 0 · ⭐ 1 · 열린 51 / 전체 51\n`));
-  assert.ok(t.includes('- 🗣️ 관용 표현: 배우는 중 0 · ⭐ 0 · 열린 40 / 전체 40\n'), '없는 낱말 id는 세지 않는다');
+  assert.ok(t.includes('- 🗣️ 관용 표현: 배우는 중 0 · ⭐ 0 · 열린 55 / 전체 55\n'), '없는 낱말 id는 세지 않는다');
   assert.match(t, /- 🧩 차례 맞추기: ⭐ 1 · 풀어 봤지만 아직 ⭐ 아님 0 · 열린 \d+ \/ 전체 \d+\n/);
   // ⭐ 아닌 기록만 따로 (Codex 66차 — "풀어 봄"이라 하면 ⭐까지 든 수로 읽힌다)
   const pz = PUZZLES.filter((x) => x.kind === 'order').slice(0, 2).map((x) => x.id);

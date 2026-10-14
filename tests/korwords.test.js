@@ -25,19 +25,19 @@ const D0 = dayNum(T0);
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const rng = (seed) => { let s = seed >>> 0 || 1; return () => { s = (s * 1103515245 + 12345) >>> 0; return (s >>> 8) / 16777216; }; };
 
-test('🔤 원고: 검사 통과 · 📘 51 · 🗣️ 40 · 🐢 20 · 📖 127(글의 낱말 — v241 새 글 열둘의 29 · v244 ⭐ 중학교 미리보기 넷의 24 · v254 새 글 열둘의 35 더함) · 📖은 뜻 고르기만(ex 없음, 나온 문장은 src) · 📘 빈칸 하나 · 🗣️·🐢 상황 글 · 📘 단원 검사 통과', () => {
+test('🔤 원고: 검사 통과 · 📘 51 · 🗣️ 55 · 🐢 35 · 🀄 20(v255 — 관용 15 · 속담 15 · 사자성어 20 더함) · 📖 127(글의 낱말 — v241 새 글 열둘의 29 · v244 ⭐ 중학교 미리보기 넷의 24 · v254 새 글 열둘의 35 더함) · 📖은 뜻 고르기만(ex 없음, 나온 문장은 src) · 📘 빈칸 하나 · 🗣️·🐢·🀄 상황 글 · 📘 단원 검사 통과', () => {
   assert.deepEqual(checkWords(WORDS, CARDS), []);
   assert.deepEqual(checkUnits(UNITS, CARDS, WORDS), []);
   const by = {};
   for (const w of ALL) by[w.deck] = (by[w.deck] || 0) + 1;
-  assert.deepEqual(by, { concept: 51, idiom: 40, proverb: 20, passage: 127 });
+  assert.deepEqual(by, { concept: 51, idiom: 55, proverb: 35, saja: 20, passage: 127 });
   for (const w of ALL.filter((x) => x.deck === 'passage')) {
     assert.equal(w.ex, '', `${w.w}: 📖은 빈칸 문제 없음 — 다른 글의 낱말이 빈칸에 같이 들어갈 수 있다`);
     assert.ok(w.src.includes(w.w), `${w.w}: 나온 글 문장`);
     assert.equal(w.id, wordId('passage', w.w, w.card));
   }
   for (const w of ALL.filter((x) => x.deck === 'concept')) { assert.equal(w.ex.split('___').length, 2); assert.ok(followOk(w.ex), w.w); }
-  for (const w of ALL.filter((x) => x.deck === 'idiom' || x.deck === 'proverb')) assert.ok(w.ex && !w.ex.includes('___') && !w.ex.includes(w.w), w.w);
+  for (const w of ALL.filter((x) => DECKS[x.deck].sit)) assert.ok(w.ex && !w.ex.includes('___') && !w.ex.includes(w.w), w.w);
   assert.equal(new Set(IDS).size, IDS.length, 'id 겹침 없음');
   // 국립국어원 풀이를 거스르지 않는 몇 개 (Codex 49차 "내"처럼 거꾸로 쓰지 않게)
   const mean = (w) => ALL.find((x) => x.w === w).mean;
@@ -179,7 +179,7 @@ test('🔍 Codex 50차 #2: 빈칸에 다른 보기도 들어가던 문장을 고
 test('🔤 오늘의 낱말: 복습(기다린 지 오래·낮은 칸부터) 먼저 · 새 낱말은 묶음마다 번갈아 5개까지 · 한 번에 10개 · ⭐ 익힌 것·잠긴 📖은 안 나옴 · 새 낱말 더 배우기 · 칸 홀수 = 쓰임', () => {
   const none = planToday(ALL, {}, {}, T0);
   assert.equal(none.length, NEW_PER_DAY, '처음엔 새 낱말 5개');
-  assert.deepEqual(none.map((p) => ALL.find((w) => w.id === p.id).deck), ['concept', 'idiom', 'proverb', 'concept', 'idiom'], '📖은 잠겨 있으니 📘·🗣️·🐢 번갈아');
+  assert.deepEqual(none.map((p) => ALL.find((w) => w.id === p.id).deck), ['concept', 'idiom', 'proverb', 'saja', 'concept'], '📖은 잠겨 있으니 📘·🗣️·🐢·🀄 번갈아');
   assert.ok(none.every((p) => p.kind === 'mean'), '새 낱말은 뜻부터');
   // 📖은 그 글에 ★이 있어야
   const done = { 'K1:1': D0 };
@@ -429,8 +429,8 @@ test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이
   const ws = JSON.parse(JSON.stringify(WORDS));
   ws.words[0].unit = '9-9';
   assert.ok(checkUnits(UNITS, CARDS, ws).some((e) => /없는 단원 9-9/.test(e)));
-  assert.deepEqual(deckStats(ALL, {}, {}).map((s) => [s.deck, s.total, s.open]), [['concept', 51, 51], ['idiom', 40, 40], ['proverb', 20, 20], ['passage', 127, 0]]);
-  assert.equal(Object.keys(DECKS).length, 4);
+  assert.deepEqual(deckStats(ALL, {}, {}).map((s) => [s.deck, s.total, s.open]), [['concept', 51, 51], ['idiom', 55, 55], ['proverb', 35, 35], ['saja', 20, 20], ['passage', 127, 0]]);
+  assert.equal(Object.keys(DECKS).length, 5);
 });
 
 test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘·🧩 v242) · 낱말·퍼즐 판 중엔 도감을 다시 그리지 않음 · 🎒에서 돌아오면 이어서 · 시작은 ⏳ guardStart · 끝나면 🥚 하루 칸 · 처음 고른 것만 · 말(순수) · sw', async () => {
@@ -474,9 +474,9 @@ test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘·🧩 v242) · 낱말�
 test('🐢 속담 묶음 (v241): 관용 표현처럼 "이럴 때"(sit) — 쓰임 물음은 "어울리는 속담" · 상황 글에 속담이 그대로 안 나옴 · 낱말 id는 s: · 하루 새 낱말에 번갈아 · 화면은 sit 표시로 상황 글 · 원고 검사가 잡는 것', () => {
   assert.deepEqual([DECKS.idiom.sit, DECKS.proverb.sit, !!DECKS.concept.sit, !!DECKS.passage.sit], [true, true, false, false]);
   assert.deepEqual([DECKS.proverb.icon, DECKS.proverb.ko, DECKS.proverb.prefix], ['🐢', '속담', 's']);
-  assert.equal(new Set(Object.values(DECKS).map((d) => d.prefix)).size, 4, '저장 키 앞글자가 겹치지 않는다');
+  assert.equal(new Set(Object.values(DECKS).map((d) => d.prefix)).size, 5, '저장 키 앞글자가 겹치지 않는다');
   const pv = ALL.filter((w) => w.deck === 'proverb');
-  assert.equal(pv.length, 20);
+  assert.equal(pv.length, 35);
   for (const w of pv) {
     assert.equal(w.id, `s:${w.w}`);
     assert.ok(!w.unit, `${w.w}: 속담은 6학년 미리 — 5학년 단원에 잇지 않는다`);

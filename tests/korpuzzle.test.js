@@ -24,13 +24,13 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const byId = (id) => LIST.find((p) => p.id === id);
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 
-test('🧩 원고: 검사 통과 · 차례 맞추기 16(이야기 흐름 12 — 모두 있는 글 카드, v244 홍길동전·양반전 · 하는 차례 4) · 사실·의견 10묶음 50문장 · 차례는 실마리에 맞는 것이 하나뿐 · 실마리 말은 조각에 있음', () => {
+test('🧩 원고: 검사 통과 · 차례 맞추기 20(이야기 흐름 16 — 모두 있는 글 카드, v244 홍길동전·양반전 · v255 도자기 체험·가짜 동영상·생일 쪽지·흥부와 놀부 · 하는 차례 4) · 사실·의견 14묶음 70문장 · 차례는 실마리에 맞는 것이 하나뿐 · 실마리 말은 조각에 있음', () => {
   assert.deepEqual(checkPuzzles(DATA, CARDS), []);
   assert.equal(LIST.length, DATA.puzzles.length, '쓸 수 있는 퍼즐 = 전부');
   const orders = LIST.filter((p) => p.kind === 'order');
   const sorts = LIST.filter((p) => p.kind === 'sort');
-  assert.deepEqual([orders.length, orders.filter((p) => p.ask === 'event').length, orders.filter((p) => p.ask === 'process').length, sorts.length], [16, 12, 4, 10]);
-  assert.equal(sorts.reduce((n, p) => n + p.sents.length, 0), 50);
+  assert.deepEqual([orders.length, orders.filter((p) => p.ask === 'event').length, orders.filter((p) => p.ask === 'process').length, sorts.length], [20, 16, 4, 14]);
+  assert.equal(sorts.reduce((n, p) => n + p.sents.length, 0), 70);
   for (const p of orders) {
     const vs = validOrders(p.chunks.length, p.need);
     assert.deepEqual(vs, [p.chunks.map((_, i) => i)], `${p.id}: 맞는 차례가 원고 차례 하나뿐`);
@@ -144,7 +144,7 @@ test('🧩 오늘의 판: 이야기 흐름은 그 글에 ★이 있어야 열림
   for (const p of LIST.filter((x) => x.kind === 'sort')) allSortsDone[p.id] = { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 };
   assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'order', 'order']);
   assert.ok(isSolved({ box: 1 }) && !isSolved({ box: 0 }) && !isSolved(null));
-  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 16, 4, 0, 1], ['sort', 10, 10, 1, 0]]);
+  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 20, 4, 0, 1], ['sort', 14, 14, 1, 0]]);
 });
 
 test('🧩 보상 규칙: 그날 첫 판만 💰·🎯 · 3개 모두 한 번에 → 🟩 · 같은 날 둘째 판은 보상 없음(⭐는 모임) · 틀리면 다음 날 · ⭐는 되돌리지 않음 · 낡은 판은 연습 · 모르는 퍼즐은 안 셈 · 빈 판은 empty', () => {
