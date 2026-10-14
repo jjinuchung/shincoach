@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import { josa, numJosa, numTail, fixNumJosa } from '../js/mathgen.js';
 import { STEMS } from '../js/mathprog.js';
 import { KIND_IDS as SP_KIND_IDS, makeSpecial } from '../js/mathspecial.js';
+import { askCardLines } from '../js/stats.js';
 
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const OPTS = { names: ['피카츄', '리자몽', '개굴닌자'], me: '아이', worlds: { pokemon: [], toystory: [], minions: [], moana: [] } };
@@ -233,4 +234,25 @@ test('📝 v249 풀이 글 문구: 식 계산에 "남은을 물었으니" 없음
     assert.ok(!q.choices.some((x) => /통분/.test(x.text)), '★ 크기가 같은 분수로 바꿔 나누기는 맞는 방법 — "통분해요"를 틀린 보기로 내지 않는다');
     assert.ok(q.solve.steps.some((st) => st.includes('크기가 같은 분수로 바꿔 분자를 나눠요')));
   }
+});
+
+test('🔤 v256 📊 ❓ 질문 카드도 문제 화면·복사문처럼 — 문제·식·아이 답·정답의 숫자 뒤 조사를 고쳐 보이고(저장한 값은 그대로) · 굵게 뺌 · 빈 값 · 아이 말·답장은 쓴 그대로', () => {
+  const a = { q: '어떤 수에 3을 곱하면 **15**이 돼요. 4/1은 얼마인가요?', expr: '□ × 3 = 15', my: '1예요', ans: '5', tag: '계산 실수', w: '' };
+  const before = JSON.stringify(a);
+  assert.deepEqual(askCardLines(a), {
+    q: '문제: 어떤 수에 3을 곱하면 15가 돼요. 4/1는 얼마인가요? · 식: □ × 3 = 15',
+    mine: '진우 답: 1이에요 ❌ (계산 실수) · 정답: 5',
+  });
+  assert.equal(JSON.stringify(a), before, '저장한 질문은 그대로');
+  assert.equal(askCardLines({ q: '2이 되려면?', ans: '−16' }).mine, '진우 답: (없음) ❌ · 정답: −16');
+  assert.deepEqual(askCardLines(null), { q: '문제: ', mine: '진우 답: (없음) ❌ · 정답: ' });
+  // 복사문(asksText)과 같은 고침 — 같은 질문이면 문제 글이 같다
+  assert.ok(askCardLines(a).q.startsWith(`문제: ${fixNumJosa(a.q).replace(/\*\*/g, '')}`));
+  // 배선: 카드는 이 함수로 그리고, 아이 말·답장 줄은 고치지 않는다
+  const st = read('js/stats.js');
+  const card = st.slice(st.indexOf('// 3f) ❓'), st.indexOf("const closeB = el('button'", st.indexOf('// 3f) ❓')));
+  assert.ok(card.includes('const ln = askCardLines(a);') && card.includes("el('p', 'q', ln.q)") && card.includes("el('p', '', ln.mine)"));
+  assert.ok(card.includes('진우 말: "${a.kid}"') && card.includes('💬 답장 ${i + 1}: ${rp.text}'), '아이 말·답장은 쓴 그대로');
+  assert.ok(!/fixNumJosa\(a\.kid|fixNumJosa\(rp/.test(st));
+  assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1] >= 256, 'sw v256 이상 — 고친 stats.js를 받게');
 });

@@ -432,7 +432,7 @@ test('🔍 Codex 14차: 보기 문장의 뜻 · 문제 글의 조건 · 아직 �
   assert.match(gcdPages[0].say, /공약수로 계속/);
   assert.match(gcdPages[gcdPages.length - 1].say, /다른 방법[\s\S]*더 쪼갤 수 없을 때까지/);
   // #9 📊 ❓ 펼친 문제 글도 줄바꿈을 살린다
-  assert.match(readFileSync('js/stats.js', 'utf8'), /el\('p', 'q', `문제: /);
+  assert.match(readFileSync('js/stats.js', 'utf8'), /el\('p', 'q', ln\.q\)/, 'v256: 문제 줄(askCardLines)도 .q 칸에');
   assert.match(readFileSync('css/style.css', 'utf8'), /\.stats-ask-item \.q \{ white-space: pre-line; \}/);
 });
 

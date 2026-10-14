@@ -714,7 +714,8 @@ test('화면 연결: 한 줄 요약은 표·도형 배열을 글로 · 문제 �
   assert.match(src, /const oneLine = \(t\) => figText\(t, true\)\.replace\(\/\\\*\\\*\/g, ''\)/, '한 줄 요약은 ** 를 뺀다 (잘리면 반쪽 ** 가 보인다)');
   assert.equal(figText('[table □:1, 2 / △:3, 4] 식은?', true), '(표) 식은?', '한 줄 요약은 표를 짧게 — ❓ 버튼 26자를 표가 다 먹지 않게');
   assert.equal(figText('[steps 3 5 7]', true), '(블록 그림)');
-  assert.ok(readFileSync('js/stats.js', 'utf8').includes("문제: ${figText(a.q).replace(/\\*\\*/g, '')}"), '📊 ❓ 펼친 문제는 표를 글로, ** 는 빼고');
+  // v256: 📊 ❓ 펼친 문제 줄은 askCardLines가 만든다 — 표를 글로(figText) · 숫자 뒤 조사(fixNumJosa) · ** 는 빼고
+  assert.ok(readFileSync('js/stats.js', 'utf8').includes("q: `문제: ${fx(figText(x.q)).replace(/\\*\\*/g, '')}"), '📊 ❓ 펼친 문제는 표를 글로, ** 는 빼고');
   assert.match(readFileSync('css/style.css', 'utf8'), /\.math-fig\.qfig \{ display: block;/);
 });
 

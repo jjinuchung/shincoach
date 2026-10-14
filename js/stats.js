@@ -22,10 +22,25 @@ import { ENGLISH_STONE_HOW, VIDEO_TIERS } from './items.js'; // 🔶 영어스�
 import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport, readState, readSummary } from './upload.js'; // 📤 Claude에게 기록 보내기 (2026-10-06)
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
 import { writeTodo } from './korwrite.js'; // ✍️ 국어 서술형 — 답장 기다리는 글 수 (v237)
+import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질문 카드도 화면·복사문처럼 (v256)
 
 const $ = (id) => document.getElementById(id);
 
 // ───────────────────── 순수 계산 (테스트 가능) ─────────────────────
+
+/**
+ * 📊 ❓ 질문 카드의 문제·답 두 줄 (순수, v256) — 앱이 만든 수학 글(문제·식·아이 답·정답)은 문제 화면(richNode)과
+ * 복사문(mathask.asksText)처럼 숫자 뒤 조사를 고쳐 보인다(fixNumJosa — "15이 돼요" → "15가 돼요") · 저장한 값은 그대로 ·
+ * 아이가 쓴 말·아빠 답장은 이 줄에 없다(쓴 그대로 따로 그린다) · 그림 지시문은 글로(figText), **굵게** 표시는 뺀다(H 줄기)
+ */
+export function askCardLines(a) {
+  const fx = fixNumJosa;
+  const x = a || {};
+  return {
+    q: `문제: ${fx(figText(x.q)).replace(/\*\*/g, '')}${x.expr ? ` · 식: ${fx(x.expr)}` : ''}`,
+    mine: `진우 답: ${fx(x.my) || '(없음)'} ❌${x.tag ? ` (${x.tag})` : ''}${x.w && WHY_LABEL[x.w] ? ` · ${WHY_LABEL[x.w]}` : ''} · 정답: ${fx(x.ans)}`,
+  };
+}
 
 /** 초 → "1시간 20분" / "25분" / "40초" */
 export function fmtDur(sec) {
@@ -733,8 +748,9 @@ export async function renderStats() {
       it.appendChild(el('span', `st${ASK_OPEN.has(a.status) ? ' wait' : a.status === 'understood' ? ' done' : ''}`, STATUS_LABEL[a.status] || a.status));
       const det = el('details');
       det.appendChild(el('summary', '', '문제 · 진우 답 · 답장 보기'));
-      det.appendChild(el('p', 'q', `문제: ${figText(a.q).replace(/\*\*/g, '')}${a.expr ? ` · 식: ${a.expr}` : ''}`)); // .q = 줄바꿈 살림 (곱셈식 두 줄·② — Codex 14차 #9) · 대응표·도형 배열은 글로, **굵게** 표시는 뺀다 (H 줄기)
-      det.appendChild(el('p', '', `진우 답: ${a.my || '(없음)'} ❌${a.tag ? ` (${a.tag})` : ''}${a.w && WHY_LABEL[a.w] ? ` · ${WHY_LABEL[a.w]}` : ''} · 정답: ${a.ans}`));
+      const ln = askCardLines(a);
+      det.appendChild(el('p', 'q', ln.q)); // .q = 줄바꿈 살림 (곱셈식 두 줄·② — Codex 14차 #9)
+      det.appendChild(el('p', '', ln.mine));
       if (a.kid) det.appendChild(el('p', '', `진우 말: "${a.kid}"`));
       (a.replies || []).forEach((rp, i) => {
         det.appendChild(el('div', 'reply', `💬 답장 ${i + 1}: ${rp.text}`));
