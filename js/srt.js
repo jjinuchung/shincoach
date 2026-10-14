@@ -267,9 +267,17 @@ export function findNearestCueIndex(cues, time) {
  * 진행률의 분모가 화면에 보이는 문장 수와 달라진다 (조건을 영영 못 채우거나 거저 채워진다).
  * @param {{merge?:boolean, duration?:number}} o merge = 문장 합치기 설정, duration = 영상 길이(초)
  */
-export function countPlayableCues(enText, { merge = true, duration = 0 } = {}) {
+export function countPlayableCues(enText, opts) {
+  return playableStarts(enText, opts).length;
+}
+
+/**
+ * 그 영상에서 실제로 학습할 수 있는 문장들의 시작 시각 (countPlayableCues와 같은 규칙) — 문장 기록 열쇠(db.sentenceKey)를 만든다.
+ * 🎤 말해 본 문장은 이 열쇠의 기록만 센다 — 합치기 설정을 바꾸면 옛 조각 문장 기록이 남아 %가 부풀었다 (Codex 65차 #1)
+ */
+export function playableStarts(enText, { merge = true, duration = 0 } = {}) {
   let cues = parseSubtitle(enText || '');
   if (merge) cues = mergeIntoSentences(cues);
   if (duration > 0) cues = cues.filter((c) => c.start < duration); // 플레이어도 길이 밖은 버린다
-  return cues.length;
+  return cues.map((c) => c.start);
 }

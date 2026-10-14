@@ -1,12 +1,12 @@
 // 📊 학습 기록 화면 (부모용): 이번 주 요약, 콘텐츠별 진행률, 어려워한 문장, 복습 단어장, 최근 세션, 내보내기/가져오기
 import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
-  applyEssayFixes, getMath, updateMath, updateItem,
+  applyEssayFixes, getMath, updateMath, updateItem, saidOf, sentenceKey,
 } from './db.js';
 import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK } from './mathprog.js';
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes, essayKey } from './essay.js';
-import { countPlayableCues } from './srt.js';
+import { countPlayableCues, playableStarts } from './srt.js';
 import { figText } from './mathdraw.js';
 import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
@@ -66,6 +66,8 @@ export function weekSeries(dailyList, today = todayKey()) {
       speakAttempts: rec ? rec.speakAttempts : 0, speakPass: rec ? rec.speakPass : 0,
       puzzles: rec ? rec.puzzles || 0 : 0, puzzleSolved: rec ? rec.puzzleSolved || 0 : 0,
       reviewSentences: rec ? rec.reviewSentences || 0 : 0, reviewRounds: rec ? rec.reviewRounds || 0 : 0, isToday: i === 0,
+      // 🎤 ⏭ 직접 넘김 · 3번 해 보고 넘어감 · 연속 보너스 (v253 — 그 전 날은 0)
+      speakSkipBtn: rec ? Number(rec.speakSkipBtn) || 0 : 0, speakGaveUp: rec ? Number(rec.speakGaveUp) || 0 : 0, speakCombos: rec ? Number(rec.speakCombos) || 0 : 0,
     });
   }
   return out;
@@ -88,18 +90,23 @@ export function hardSentences(records, limit = 10) {
     .slice(0, limit);
 }
 
-/** 콘텐츠별 요약 */
-export function contentSummary(items, records, cueCountOf) {
+/**
+ * 콘텐츠별 요약 — said·saidPct: 🎤 말해 본 문장(🏁 영상 보상을 이것으로 센다, v253) · pct: 한 문장(📊 진행률·수학 이야기 세계)
+ * cueKeysOf(있으면): 지금 문장 열쇠 — said는 이 열쇠의 기록만 센다(옛 조각 문장 기록은 안 셈, Codex 65차 #1). 플레이어 track.saidCount(cues)와 같은 셈
+ */
+export function contentSummary(items, records, cueCountOf, cueKeysOf) {
   return items.map((it) => {
     const rs = records.filter((r) => r.itemId === it.id);
     const total = cueCountOf(it);
     const done = rs.filter((r) => r.done).length;
+    const keys = cueKeysOf ? cueKeysOf(it) : null;
+    const said = rs.filter((r) => saidOf(r) && (!keys || keys.has(r.key || sentenceKey(r.itemId, r.start)))).length;
     const mastered = rs.filter((r) => (r.bestRatio || 0) >= MASTER_RATIO).length;
     const seconds = rs.reduce((a, r) => a + (r.seconds || 0), 0);
     const attempts = rs.reduce((a, r) => a + (r.speakAttempts || 0), 0);
     const pass = rs.reduce((a, r) => a + (r.speakPass || 0), 0);
     const lastAt = rs.reduce((a, r) => Math.max(a, r.lastAt || 0), 0);
-    return { id: it.id, title: it.title, broken: !!it.broken, total, done, mastered, seconds, attempts, pass, lastAt, pct: total ? Math.round((done / total) * 100) : 0 };
+    return { id: it.id, title: it.title, broken: !!it.broken, total, done, said, mastered, seconds, attempts, pass, lastAt, pct: total ? Math.round((done / total) * 100) : 0, saidPct: total ? Math.round((said / total) * 100) : 0 };
   });
 }
 
@@ -180,10 +187,18 @@ function reviewToggle(item) {
   return row;
 }
 
+/** ⚙ 문장 합치기 설정 (플레이어와 같은 값) */
+function mergeSetting() {
+  try { return JSON.parse(localStorage.getItem('shincoach.settings') || '{}').mergeSentences !== false; } catch { return true; /* 기본값 */ }
+}
+
 export function cueCountOf(item) {
-  let merge = true;
-  try { merge = JSON.parse(localStorage.getItem('shincoach.settings') || '{}').mergeSentences !== false; } catch { /* 기본값 */ }
-  return countPlayableCues(item.enText, { merge, duration: item.duration });
+  return countPlayableCues(item.enText, { merge: mergeSetting(), duration: item.duration });
+}
+
+/** 지금 문장 열쇠들 (db.sentenceKey) — contentSummary의 🎤 말해 본 문장 셈 (Codex 65차 #1) */
+export function cueKeysOf(item) {
+  return new Set(playableStarts(item.enText, { merge: mergeSetting(), duration: item.duration }).map((s) => sentenceKey(item.id, s)));
 }
 
 /**
@@ -328,6 +343,8 @@ export async function renderStats() {
   const wPz = week.reduce((a, d) => a + d.puzzles, 0);
   const wPzOk = week.reduce((a, d) => a + d.puzzleSolved, 0);
   const wRv = week.reduce((a, d) => a + d.reviewSentences, 0);
+  const wSkip = week.reduce((a, d) => a + d.speakSkipBtn, 0); // 🎤 ⏭ 직접 넘김 (v253)
+  const wGave = week.reduce((a, d) => a + d.speakGaveUp, 0);  // 🎤 3번 해 보고 넘어감
   // 🔁 복습 큐 현황 — **복습에 쓰는 콘텐츠만** (미니언즈를 빼면 아이 화면과 숫자가 맞는다)
   const revIds = new Set(items.filter((it) => reviewable(it)).map((it) => String(it.id)));
   const rv = reviewSummary(records.filter((r) => revIds.has(String(r.itemId))), today);
@@ -410,6 +427,7 @@ export async function renderStats() {
   sum.appendChild(kpi(`${wDays}일`, '학습한 날'));
   sum.appendChild(kpi(`${wSent}문장`, '한 문장'));
   sum.appendChild(kpi(wAtt ? `${Math.round((wPass / wAtt) * 100)}%` : '-', `말하기 통과 (${wPass}/${wAtt})`));
+  sum.appendChild(kpi(`⏭ ${wSkip}`, `직접 넘김 · 3번 해 보고 넘어감 ${wGave}`));
   sum.appendChild(kpi(wPz ? `${Math.round((wPzOk / wPz) * 100)}%` : '-', `🧩 퍼즐 정답 (${wPzOk}/${wPz})`));
   sum.appendChild(kpi(`${wRv}문장`, '🔁 복습한 문장'));
   sum.appendChild(kpi(`${rv.dueCount}문장`, `🔁 오늘 복습할 것 (👑 ${rv.graduated} 완성)`));
@@ -435,7 +453,7 @@ export async function renderStats() {
 
   // 2) 콘텐츠별
   const c2 = card('콘텐츠별 진행');
-  const summ = contentSummary(items, records, cueCountOf);
+  const summ = contentSummary(items, records, cueCountOf, cueKeysOf); // 🎤 말한 문장은 지금 문장 열쇠로 (Codex 65차 #1)
   if (!summ.length) c2.appendChild(el('p', 'stats-empty', '아직 가져온 영상이 없어요'));
   for (const s of summ) {
     const wrap = el('div', 'stats-item');
@@ -443,7 +461,7 @@ export async function renderStats() {
     row.appendChild(el('span', 'name', s.title));
     row.appendChild(el('span', 'meta', s.broken
       ? '⚠️ 저장이 깨졌어요 — 다시 가져와 주세요 (기록은 남아 있어요)'
-      : `${s.pct}% · ${s.done}/${s.total}문장 · ⭐${s.mastered}`));
+      : `${s.pct}% · ${s.done}/${s.total}문장 · 🎤 말한 문장 ${s.said} · ⭐${s.mastered}`));
     wrap.appendChild(row);
     const pg = el('div', 'stats-progress');
     const pf = el('div', 'fill'); pf.style.width = `${s.pct}%`; pg.appendChild(pf);
@@ -466,7 +484,13 @@ export async function renderStats() {
     d.appendChild(el('div', 'en', `${r.dueAt || (r.box || 0) >= GRADUATED ? `${stageIcon(r)} ` : ''}${r.en}`));
     if (r.ko) d.appendChild(el('div', 'ko', r.ko));
     const why = [];
-    if (r.speakSkipped) why.push(`3번 미달로 통과 ${r.speakSkipped}회`);
+    // ⏭ 직접 넘김과 3번 해 보고 넘어감을 따로 (v253) — 그 전 기록은 한 칸에 섞여 "넘어감"으로
+    const btn = Number(r.speakSkipBtn) || 0;
+    const gave = Number(r.speakGaveUp) || 0;
+    const oldSkip = Math.max(0, (r.speakSkipped || 0) - btn - gave);
+    if (btn) why.push(`⏭ 직접 넘김 ${btn}회`);
+    if (gave) why.push(`3번 해 보고 넘어감 ${gave}회`);
+    if (oldSkip) why.push(`넘어감 ${oldSkip}회(옛 기록)`);
     if (r.speakFail) why.push(`미달 ${r.speakFail}회`);
     if (r.speakAttempts) why.push(`최고 점수 ${Math.round((r.bestRatio || 0) * 100)}%`);
     why.push(`재생 ${r.plays}회`);

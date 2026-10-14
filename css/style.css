@@ -800,6 +800,10 @@ button { font-family: inherit; }
 .vocab-item.phrase { background: #eef2ff; border-color: #c7d2fe; }
 .vocab-item.phrase b { color: #4338ca; }
 .cue-counter { font-size: 0.8rem; color: var(--muted); font-weight: 600; white-space: nowrap; min-width: 52px; text-align: right; }
+/* 🎤 말해 본 문장 (v253) — 좁은 화면에서는 여행 길 아래 줄로 */
+.said-counter { font-size: 0.78rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.said-counter[hidden] { display: none; }
+@media (max-width: 520px) { .progress-row { flex-wrap: wrap; row-gap: 2px; } .said-counter { flex-basis: 100%; text-align: right; } }
 
 /* ===== 🗺️ 여행 길 ===== */
 .journey { position: relative; flex: 1; height: 66px; min-width: 0; }

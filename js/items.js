@@ -268,11 +268,19 @@ export function parcelOf(raw) {
  * "끝까지" = 그 영상 문장의 VIDEO_STONE.pct% 이상을 했다 — 📊 진행률·수학 이야기 세계가 열리는 기준(mathprog SEEN_PCT)과 같다.
  * 마지막 문장 하나만 끝내도 뜨는 🏁 여행 끝과 다르다(목록에서 마지막 줄을 눌러 받는 길을 막는다). 영상마다 한 번.
  * 받은 기록은 📦 구호품과 같은 profile.parcels에 'video:<영상 id>'로 — 한 트랜잭션·백업 병합 합집합을 그대로 쓴다 (db.videoStoneRule)
+ * ★ v253(영어 ⏭ 넘기기): 셈은 **🎤 말해 본 문장**(db.saidOf — 통과·3번 해 봄·말하기 확인을 안 하는 줄)으로. ⏭로 넘긴 문장은 영상은 넘어가도 🏁 칸이 안 찬다.
+ *   📊 진행률·수학 이야기 세계는 그대로 한 문장(done)으로
  */
 export const VIDEO_STONE = { n: 3, pct: 90 };
 /** 🔶 영어스톤이 생기는 곳 — 아이에게 보이는 안내(🛒 스톤 상점·🏪 5일장·도감·📊)가 같이 쓴다. 받는 곳을 바꾸면 여기 한 곳만 */
-export const ENGLISH_STONE_HOW = `복습을 다 맞히거나, 받아쓰기·단어를 다 맞히거나, 에세이를 쓰거나, 영상을 끝까지(문장 ${VIDEO_STONE.pct}%) 하면`;
-export const ENGLISH_STONE_SHORT = '복습 다 맞힘·받아쓰기·단어 만점·에세이·영상 끝까지';
+export const ENGLISH_STONE_HOW = `복습을 다 맞히거나, 받아쓰기·단어를 다 맞히거나, 에세이를 쓰거나, 영상 문장의 ${VIDEO_STONE.pct}%를 따라 말해 보면`;
+export const ENGLISH_STONE_SHORT = '복습 다 맞힘·받아쓰기·단어 만점·에세이·영상 끝까지 따라 말하기';
+
+/**
+ * 🎤 연속 성공 보너스 (2026-10-14 v253, 영어 ⏭ 넘기기) — 그 문장의 오늘 첫 말하기 보상이 every번 연달아 나오면 💰coin.
+ * 하루 maxPerDay번까지(💰30). ⏭·3번 못 함은 연속만 끊고 벌은 없다 · ◀▶로 같은 문장을 다시 말해도 늘지 않는다
+ */
+export const SPEAK_COMBO = { every: 5, coin: 5, maxPerDay: 6 };
 export const VIDEO_PARCEL = 'video:';
 export function videoParcelId(itemId) {
   return `${VIDEO_PARCEL}${itemId}`;
@@ -305,11 +313,11 @@ export function videoGrant({ total, base, plus }) {
   const t = videoTier(total);
   return { coins: plus ? t.coin : 0, stones: (base ? VIDEO_STONE.n : 0) + (plus ? Math.max(0, t.stone - VIDEO_STONE.n) : 0), tier: t };
 }
-/** 진행률(%) — stats.contentSummary의 pct와 같은 셈 (반올림) */
+/** 진행률(%) — stats.contentSummary의 pct·saidPct와 같은 셈 (반올림) */
 export function videoPct(done, total) {
   return total > 0 ? Math.round((done / total) * 100) : 0;
 }
-/** 끝까지 보상을 받을 영상 (순수) — 깨진 영상·다 받은 영상은 빼고 VIDEO_STONE.pct% 이상 한 것만, 같은 id는 한 번 · base·plus = 아직 안 받은 몫 */
+/** 끝까지 보상을 받을 영상 (순수) — 깨진 영상·다 받은 영상은 빼고 🎤 말해 본 문장(saidPct)이 VIDEO_STONE.pct% 이상인 것만, 같은 id는 한 번 · base·plus = 아직 안 받은 몫 */
 export function videoStoneDue(summaries, received) {
   const out = [];
   const seen = new Set();
@@ -319,7 +327,7 @@ export function videoStoneDue(summaries, received) {
     const base = !parcelGot(received, videoParcelId(id));
     const plus = !parcelGot(received, videoPlusId(id));
     if (seen.has(id) || (!base && !plus)) continue;
-    if (!(Number(s.total) > 0) || !(Number(s.pct) >= VIDEO_STONE.pct)) continue;
+    if (!(Number(s.total) > 0) || !(Number(s.saidPct) >= VIDEO_STONE.pct)) continue;
     seen.add(id);
     out.push({ id, title: String(s.title || ''), total: Number(s.total), base, plus });
   }

@@ -185,6 +185,8 @@
             </div>
           </div>
           <span id="cue-counter" class="cue-counter">0 / 0</span>
+          <!-- 🎤 말해 본 문장 (v253) — 🏁 영상 보상을 이것으로 센다 (⏭로 넘긴 문장은 안 셈) -->
+          <span id="said-counter" class="said-counter" hidden>🎤 말한 문장 0/0</span>
         </div>
 
         <details id="vocab-panel" class="vocab-panel" hidden>
@@ -802,7 +804,7 @@
         <span class="field-label">🎤 한 번 더 읽기 <small>— 따라 말한 뒤 영어 문장을 보면서 한 번 더 정확히 읽기 (틀린 단어가 표시된 채로)</small></span>
         <select id="set-reread">
           <option value="always">항상</option>
-          <option value="missed">못 말한 단어가 있을 때만</option>
+          <option value="missed">못 말한 단어가 있을 때만 (기본)</option>
           <option value="off">끔</option>
         </select>
       </label>

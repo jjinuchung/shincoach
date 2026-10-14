@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { enroll, schedule, GRADUATED, addDays } from '../js/review.js';
 // 오늘 기록 합치기 규칙은 **실제 db.js 함수**를 그대로 쓴다 (스텁이 진짜 규칙과 어긋나지 않게)
-import { emptyDaily, mergeDailyDelta } from '../js/db.js';
+import { emptyDaily, mergeDailyDelta, saidOf, saidFlag } from '../js/db.js';
 
 function loadTrack(dbStub) {
   let src = fs.readFileSync(new URL('../js/track.js', import.meta.url), 'utf8');
@@ -36,6 +36,7 @@ function stub() {
     bumpVocabViews: async () => {},
     emptyDaily,
     mergeDailyDelta,
+    saidOf, saidFlag, // 🎤 말해 본 문장 규칙도 실제 db.js (v253)
     applyDailyDelta: async (date, delta) => {
       if (store.dailyFail) throw new Error('quota');
       const next = mergeDailyDelta(get(date), date, delta);
@@ -354,4 +355,84 @@ test('💖 claimFavExtra: 두 창(트랙 둘)이 같은 저장소를 쓰면 같�
   assert.equal(await A.run(`claimFavExtra(${cue})`), false, '같은 창에서 두 번도 안 된다');
   assert.equal(await B.run('claimFavExtra({ start: 6, end: 7, en: "Me too." })'), true, '다른 문장은 따로');
   assert.deepEqual(Array.from(s.store.days.get(A.run('todayKey()')).favExtraKeys), ['x|30', 'x|60']);
+});
+
+// ── 🎤 영어 ⏭ 넘기기 (2026-10-14 v253) — ⏭ 직접 넘김과 3번 해 보고 넘어감을 따로 · 말해 본 문장(🏁 셈) · 옛 줄 · 연속 보너스 하루 몫 ──
+test('🎤 speak: ⏭(btn)·3번 넘어감·통과·실패 — 문장 기록·오늘 기록이 따로 세고, 말해 본 문장은 통과·3번 넘어감만 (v253)', async () => {
+  const s = stub();
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  const C = (n) => `{ start: ${n}, end: ${n + 1}, en: "a" }`;
+  run(`done(${C(1)}); done(${C(2)}); done(${C(3)}); done(${C(4)});`);
+  run(`speak(${C(1)}, { passed: false, skipped: true, btn: true, score: null })`);
+  run(`speak(${C(2)}, { passed: false, skipped: false, score: null }); speak(${C(2)}, { passed: false, skipped: false, score: null }); speak(${C(2)}, { passed: true, skipped: true, score: null })`);
+  run(`speak(${C(3)}, { passed: true, skipped: false, score: null })`);
+  run(`speak(${C(4)}, { passed: false, skipped: false, score: null })`);
+  const rec = (n) => JSON.parse(run(`JSON.stringify(t.stats.get('x|${n * 10}'))`));
+  assert.deepEqual([rec(1).speakSkipBtn, rec(1).speakGaveUp, rec(1).speakSkipped, rec(1).said], [1, 0, 1, 0], '⏭ 직접 — 말해 본 문장이 아니다');
+  assert.deepEqual([rec(2).speakSkipBtn, rec(2).speakGaveUp, rec(2).speakSkipped, rec(2).speakFail, rec(2).said], [0, 1, 1, 2, 1], '3번 해 보고 넘어감 — 말해 본 문장');
+  assert.deepEqual([rec(3).speakPass, rec(3).said], [1, 1], '통과');
+  assert.deepEqual([rec(4).speakFail, rec(4).said], [1, 0], '한 번 실패만으로는 아니다');
+  assert.equal(run('saidCount()'), 2);
+  assert.deepEqual([run('t.daily.speakSkipBtn'), run('t.daily.speakGaveUp')], [1, 1], '오늘 기록');
+  assert.deepEqual([run('t.dailyDelta.speakSkipBtn'), run('t.dailyDelta.speakGaveUp')], [1, 1], '증분으로 저장(두 창 합)');
+  run(`said(${C(1)})`);
+  assert.equal(run('saidCount()'), 3, 'said()로 적으면 센다 (말하기 확인을 안 하는 줄)');
+  run(`said(${C(9)})`);
+  assert.equal(run('saidCount()'), 3, '끝내지 않은 문장은 안 센다');
+  await run('flush()');
+  const sent = s.store.sent.find((r) => r.key === 'x|10');
+  assert.deepEqual([sent.speakSkipBtn, sent.said, sent.v], [1, 1, 2], '저장되는 줄');
+});
+
+test('🎤 v253 전 줄은 처음 손댈 때 새 꼴로 — 통과·두 번 이상 틀린 뒤 넘어감·말하기 기록 없음은 말해 본 문장, ⏭만 한 줄·안 끝낸 줄은 아니다 (v253)', async () => {
+  const s = stub();
+  const old = (start, o) => ({ key: `x|${start * 10}`, itemId: 'x', start, en: 'a', plays: 3, listens: 3, done: true, seconds: 5, speakAttempts: 0, speakPass: 0, speakFail: 0, speakSkipped: 0, bestRatio: 0, lastRatio: 0, lastAt: 1, ...o });
+  const legacy = [old(1, { speakAttempts: 1, speakPass: 1 }), old(2, { speakAttempts: 3, speakFail: 2, speakSkipped: 1 }), old(3, { speakAttempts: 1, speakSkipped: 1 }),
+    old(4, {}), old(5, { done: false }), old(6, { speakAttempts: 2, speakFail: 1, speakSkipped: 1 })];
+  s.getSentenceStats = async () => new Map(legacy.map((r) => [r.key, { ...r }]));
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  assert.equal(run('saidCount()'), 3, '손대기 전에도 옛 규칙으로 센다 (통과·두 번 틀린 뒤 넘어감·기록 없음)');
+  for (let n = 1; n <= 6; n++) run(`play({ start: ${n}, end: ${n + 1}, en: "a" }, ${n})`);
+  const rec = (n) => JSON.parse(run(`JSON.stringify(t.stats.get('x|${n * 10}'))`));
+  assert.deepEqual([1, 2, 3, 4, 5, 6].map((n) => [rec(n).said, rec(n).v]), [[1, 2], [1, 2], [0, 2], [1, 2], [0, 2], [0, 2]]);
+  assert.equal(run('saidCount()'), 3, '새 꼴로 바꿔도 같은 수');
+  // 새 꼴이 된 뒤에는 새 규칙만 — 안 끝냈던 줄을 끝내고 ⏭하면 말해 본 문장이 아니다
+  run('done({ start: 5, end: 6, en: "a" }); speak({ start: 5, end: 6, en: "a" }, { passed: false, skipped: true, btn: true, score: null })');
+  assert.equal(run('saidCount()'), 3);
+});
+
+test('🎤 연속 보너스 하루 몫 — claimSpeakCombo(max)는 선점, 상한이면 false · todaySpeakCombos (v253)', async () => {
+  const s = stub();
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  assert.equal(await run('claimSpeakCombo(2)'), true);
+  assert.equal(await run('claimSpeakCombo(2)'), true);
+  assert.equal(await run('claimSpeakCombo(2)'), false, '하루 상한');
+  assert.equal(run('todaySpeakCombos()'), 2);
+  assert.equal(s.store.days.get(run('todayKey()')).speakCombos, 2, '저장소에 선점');
+});
+
+// ── 🔍 Codex 65차 (v253) ──
+test('🔍 Codex 65차 #1 — saidCount(cues)는 지금 문장 열쇠의 기록만 · 같은 열쇠는 한 번 · 안 주면 옛 셈 그대로', async () => {
+  const s = stub();
+  const r = (start, said) => ({ key: `x|${Math.round(start * 10)}`, itemId: 'x', start, en: 'a', done: true, v: 2, said, speakAttempts: 1, speakPass: said, speakFail: 0, speakSkipped: 0, lastAt: 1 });
+  // 합치기를 끄고 한 기록 — 첫 조각(1)·둘째 조각(2.2)은 말해 봄, 다음 문장(10)은 ⏭
+  s.getSentenceStats = async () => new Map([r(1, 1), r(2.2, 1), r(10, 0)].map((x) => [x.key, x]));
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  assert.equal(run('saidCount()'), 2, '열쇠를 안 주면 기록 전부');
+  assert.equal(run('saidCount([{ start: 1 }, { start: 10 }])'), 1, '지금 문장(합친 1 · 10)만 — 옛 조각 2.2는 안 셈');
+  assert.equal(run('saidCount([{ start: 1 }, { start: 1.01 }, { start: 10 }])'), 1, '같은 열쇠(x|10)는 한 번');
+  assert.equal(run('saidCount([])'), 0);
+});
+
+test('🔍 Codex 65차 #4 — 연속 보너스 칸 선점이 저장소에서 실패하면 false (메모리로 성공 처리하지 않음 — 💰를 안 준다)', async () => {
+  const s = stub();
+  s.claimDailyCount = async () => { throw new Error('저장 실패 (테스트가 일부러)'); }; // loadTrack 전에 (vm에 넣을 때 복사된다)
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  assert.equal(await run('claimSpeakCombo(6)'), false);
+  assert.equal(run('todaySpeakCombos()'), 0, '메모리에도 안 늘림');
 });

@@ -13,7 +13,7 @@ import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockC
 import { gymClaimed } from './mathprog.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneGot, receiveVideoStones } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
-import { STONE_ENGLISH, VIDEO_STONE, videoPct, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
+import { STONE_ENGLISH, VIDEO_STONE, videoPct, SPEAK_COMBO, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
@@ -87,6 +87,7 @@ const state = {
   streakToday: false, // 오늘 5문장을 채워 스트릭에 들어갔는지
   streakDate: '',     // 위 두 값의 기준 날짜 (자정을 넘기면 다시 계산)
   journeyCelebrated: false, // 🏁 이번에 연 콘텐츠에서 도착 연출을 이미 했는지 (세션당 한 번)
+  speakCombo: 0,      // 🎤 연달아 받은 말하기 보상 수 (v253 — ⏭·3번 못 함이면 0, 콘텐츠를 열 때 0)
   battlePending: null, // ⚔️ 다음 문장으로 넘어갈 때 걸어올 트레이너의 포켓몬 { id, ko, url } (markDone에서 확률로 정해짐)
   essayPending: false, // ✍️ 다음 문장으로 넘어갈 때 열 에세이 (오늘 학습 시간을 채우면 예약됨)
   essayOpen: false,    // ✍️ 에세이 화면이 열려 있음 (키보드 무시)
@@ -1216,6 +1217,8 @@ function startReview(items, practice, after) {
       if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
       if (practice) return null;
       const info = track.review(cue, passed);
+      // 🎤 복습에서 따라 말하기를 통과하면 말해 본 문장 — 전에 ⏭로 넘긴 문장도 🏁 칸이 찬다 (Codex 65차 #2, 받아쓰기는 아님)
+      if (passed) track.said(cue);
       if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
       return info;
     },
@@ -1269,6 +1272,7 @@ function startReview(items, practice, after) {
       if (after) after(); else restoreSpot(spot);
       if (!practice && !s.started && !s.done) track.markReviewSkip(); // 시작도 안 하고 닫음
       if (!practice) track.flush();
+      if (!practice) { updateSaidCounter(); maybeVideoStone(); } // 🎤 복습에서 말한 문장이 늘었을 수 있다 (Codex 65차 #2)
     },
   });
 }
@@ -1482,8 +1486,11 @@ function markDone(cue) {
   if (state.parentMode) return; // 그냥 보기는 학습이 아님 → 기록·XP·코인·퍼즐 후보 전부 없음
   const before = track.todayDone();
   track.done(cue);
+  // 🎤 말하기 확인을 안 하는 줄(영어가 아닌 대사·마이크를 못 씀·⚙ 말하기 확인 끔)은 말해 본 문장으로 (v253) — 하는 줄은 통과·3번 해 봄에서
+  if (!speakNeeded(cue)) track.said(cue);
+  updateSaidCounter();
   const after = track.todayDone();
-  maybeVideoStone(); // 🏁 이 영상 문장의 90%를 넘기면 🔶 영어스톤 (영상마다 한 번)
+  maybeVideoStone(); // 🏁 이 영상 문장의 90%를 따라 말해 보면 💰·🔶 영어스톤 (영상마다 한 번)
   if (after !== before) {
     ensureStreakDate(); // 자정을 넘겼으면 스트릭 상태를 오늘 기준으로
     awardXp(XP.done); // 오늘 처음 완료한 문장 → 경험치
@@ -1654,6 +1661,7 @@ export async function openPlayer(id, opts = {}) {
   state.repeatCount = 0;
   state.puzzlePool = [];
   state.journeyCelebrated = false;
+  state.speakCombo = 0;
   state.reviewDone = false;
   state.speakUnavailableAt = 0; // 영상을 새로 열면 마이크를 다시 시도한다
   state.matchPending = null;
@@ -2216,9 +2224,14 @@ function speakableCue(cue) {
   return isSpeakable(cue.en, state.vocab);
 }
 
-/** 말하기 확인을 실제로 수행할 상황인지 (설정 켬 + 마이크 가능 + 아직 통과 전 + 영어 문장) */
+/** 이 문장은 따라 말하기를 확인하는 줄인가 (설정 켬 + 마이크 가능 + 영어 문장) — 아니면 🏁 셈에서 말해 본 것으로 친다 (v253) */
+function speakNeeded(cue) {
+  return !!settings.speakCheck && !speakOff() && speakableCue(cue);
+}
+
+/** 말하기 확인을 실제로 수행할 상황인지 (말하기를 확인하는 줄 + 아직 통과 전) */
 function speakCheckActive(cue) {
-  return settings.speakCheck && !speakOff() && !state.speakPassed && speakableCue(cue);
+  return speakNeeded(cue) && !state.speakPassed;
 }
 
 function startShadowWait(cue, opts = {}) {
@@ -2310,9 +2323,53 @@ function skipSpeaking() {
   $('shadow-skip').hidden = true;
   $('shadow-overlay').classList.remove('speaking');
   state.speakPassed = true;
-  track.speak(cue, { passed: false, skipped: true, score: null });
+  state.speakCombo = 0; // 🎤 연속만 끊는다 (벌 없음, v253)
+  track.speak(cue, { passed: false, skipped: true, btn: true, score: null }); // ⏭ 직접 넘김 — 말해 본 문장이 아니다(🏁 칸이 안 참)
   showPlayerMessage('⏭ 이 문장은 넘어갈게요', 2000);
   afterShadowWait();
+}
+
+/**
+ * 🎤 연속 성공 (2026-10-14 v253, 영어 ⏭ 넘기기) — 그 문장의 오늘 첫 말하기 보상이 SPEAK_COMBO.every번 연달아 나오면 💰 (하루 maxPerDay번, 선점).
+ * ⏭·3번 못 함은 연속만 끊는다(벌 없음). ◀▶로 돌아와 다시 말한 문장은 보상이 없으니 늘지 않는다
+ */
+function bumpSpeakCombo() {
+  if (state.parentMode) return;
+  state.speakCombo = (state.speakCombo || 0) + 1;
+  if (state.speakCombo % SPEAK_COMBO.every) return;
+  const n = state.speakCombo;
+  track.claimSpeakCombo(SPEAK_COMBO.maxPerDay).then((won) => {
+    if (!won) return;
+    const c = awardCoins(SPEAK_COMBO.coin);
+    if (!c) return;
+    sayWhenFree(`🎤 ${n}문장 연속 성공! 💰+${c}`, 3500);
+  }).catch(() => {});
+}
+
+/**
+ * 🎁 보상 알림 — 말 칸이 비면 띄운다(1초마다 보고 8번까지 — 그래도 차 있으면 그냥). 🎤 연속 보너스와 🏁가 한 문장에서 같이 나와도
+ * 서로 덮지 않게 · 그 사이 영상을 닫거나 다른 영상을 열면 안 띄운다 (Codex 65차 #6)
+ */
+function sayWhenFree(text, ms, onShow) {
+  const it = state.item;
+  let tries = 0;
+  const go = () => {
+    if (!state.open || state.item !== it) return;
+    if (!$('player-msg').hidden && tries++ < 8) { setTimeout(go, 1000); return; }
+    showPlayerMessage(text, ms);
+    if (onShow) onShow();
+  };
+  go();
+}
+
+/** 🎤 말해 본 문장 칸 (여행 길 옆) — 🏁 영상 보상을 이것으로 센다 (v253). 부모 모드는 안 쌓이니 숨김 */
+function updateSaidCounter() {
+  const c = $('said-counter');
+  if (!c) return;
+  const n = state.cues.length;
+  c.hidden = !n || state.parentMode;
+  c.textContent = `🎤 말한 문장 ${track.saidCount(state.cues)}/${n}`;
+  c.title = `따라 말해 본 문장(말하기 확인을 안 하는 줄도 세요) — ${VIDEO_STONE.pct}% 이상이면 🏁 영상 보상 (⏭로 넘긴 문장은 안 세요)`;
 }
 
 function skipShadowWait() {
@@ -2332,7 +2389,8 @@ function startSpeakWait(cue) {
   overlay.hidden = false;
   overlay.classList.add('speaking');
   msg.textContent = '🎤 따라 말해보세요!';
-  $('shadow-skip').hidden = false; // ⏭ 어려우면 바로 넘어갈 수 있게 (세 번 틀릴 때까지 기다리지 않아도 된다)
+  // ⏭는 한 번 해 본 뒤에 (v253) — 못 해도 한 번 말해 보면 나타나 세 번 틀릴 때까지 기다리지 않아도 된다
+  $('shadow-skip').hidden = state.speakFails === 0;
   // 못 한 횟수에 따라 힌트 단계 안내 (영어 숨김 설정이 켜져 있을 때: 절반 힌트 → 전부 보임)
   if (state.speakFails === 0) sub.textContent = '';
   else if (settings.hideEnWhileSpeaking && state.speakFails === 1) sub.textContent = `다시 한번! 빈칸은 기억해서 말해봐요 (${state.speakFails + 1}/3)`;
@@ -2523,6 +2581,9 @@ function onSpeakResult(cue, result) {
       showPlayerMessage('🎤 마이크를 쓸 수 없어 잠깐 말하기 확인 없이 진행해요', 4000);
     }
     state.speakPassed = true;
+    track.said(cue); // 🎤 마이크를 못 쓰면 지금처럼 인정 (v253)
+    updateSaidCounter();
+    maybeVideoStone();
     afterShadowWait();
     return;
   }
@@ -2536,7 +2597,10 @@ function onSpeakResult(cue, result) {
     if (track.claimSpeakReward(cue)) {
       awardXp(star ? XP.speakStar : XP.speak);
       awardCoins(star ? COIN.speakStar : COIN.speak);
+      bumpSpeakCombo(); // 🎤 오늘 처음 받는 말하기 보상만 연속으로 센다 (v253)
     }
+    updateSaidCounter();
+    maybeVideoStone(); // 🏁 말해 본 문장이 늘었다
     if (result.method === 'speech' && result.score) {
       msg.textContent = result.score.ratio >= 0.8 ? '🌟 완벽해요!' : '🎯 잘했어요!';
       sub.textContent = `${result.score.matched}/${result.score.total} 단어 맞음: "${result.transcript}"`;
@@ -2553,7 +2617,10 @@ function onSpeakResult(cue, result) {
   state.speakFails++;
   if (state.speakFails >= 3) {
     state.speakPassed = true;
-    track.speak(cue, { passed: true, skipped: true, score: result.score });
+    track.speak(cue, { passed: true, skipped: true, score: result.score }); // 3번 해 보고 넘어감 — 말해 본 문장 (v253)
+    state.speakCombo = 0;
+    updateSaidCounter();
+    maybeVideoStone();
     hpPenalty(HP.speakSkipped, '따라 말하기를 넘겼어요');
     msg.textContent = '👍 괜찮아요, 넘어갈게요';
     sub.textContent = result.transcript ? `들린 말: "${result.transcript}"` : '';
@@ -2665,6 +2732,7 @@ function markScriptRevealed() {
 function updateProgress() {
   const n = state.cues.length;
   $('cue-counter').textContent = `${state.idx + 1} / ${n}`;
+  updateSaidCounter();
   // 🗺️ 여행 길: 지나온 길 색칠, 캐릭터 이동, 앞쪽 풍경은 안개
   const pct = n ? ((state.idx + 1) / n) * 100 : 0;
   $('journey-done').style.width = `${pct}%`;
@@ -2733,12 +2801,12 @@ function updateJourneyWalker() {
  * 🏁 영상 끝까지 → 💰 + 🔶 영어스톤 (2026-10-06 v197 🔶3 → v201 길이별 items.VIDEO_TIERS: 짧은 💰50 🔶3 · 중간 💰100 🔶5 · 긴 💰200 🔶8).
  * "끝까지" = 이 영상 문장의 VIDEO_STONE.pct% 이상을 했다 — 마지막 문장만 끝내도 뜨는 🏁 여행 끝과 다르다.
  * 받기는 저장된 프로필로 판정하는 트랜잭션(영상마다 한 번). 저장이 안 되면 말없이 넘어가고, 다음에 앱을 열 때 📦 창이 챙긴다.
- * 다른 말(🔥·목표·🏁)이 떠 있으면 조금 뒤에 — 말 칸은 하나라 덮이면 아이가 못 본다
+ * 다른 말(🔥·목표·🏁·🎤 연속)이 떠 있으면 비고 나서(sayWhenFree) — 말 칸은 하나라 덮이면 아이가 못 본다
  */
 function maybeVideoStone() {
   const it = state.item;
   if (!it || state.parentMode || state.videoStoneBusy || state.videoStoneFor === it.id) return;
-  if (videoPct(track.doneCount(), state.cues.length) < VIDEO_STONE.pct) return;
+  if (videoPct(track.saidCount(state.cues), state.cues.length) < VIDEO_STONE.pct) return; // 🎤 말해 본 문장으로 (v253 — ⏭로 넘긴 문장은 빠진다)
   if (videoStoneGot(it.id)) { state.videoStoneFor = it.id; return; }
   state.videoStoneBusy = true;
   receiveVideoStones([{ id: it.id, total: state.cues.length }]).then((r) => {
@@ -2747,8 +2815,8 @@ function maybeVideoStone() {
     const n = (r.items && r.items[STONE_ENGLISH.id]) || 0;
     const got = [r.coins ? `💰 +${r.coins}` : '', n ? `${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko} +${n}` : ''].filter(Boolean).join(' · ');
     if (r.coins) { updateLevelChip(); pulseChip('coin-chip'); } // 코인은 저장된 프로필에 이미 들어갔다 — 칩만 새로
-    const say = () => { showPlayerMessage(`🏁 「${it.title}」 문장을 ${VIDEO_STONE.pct}% 넘게 했어요! ${got}`, 6000); sfx.success(); };
-    if ($('player-msg').hidden) say(); else setTimeout(say, 3000);
+    // 말하기 확인을 안 하는 줄로 채웠을 수도 있으니 "따라 했어요" · 기준은 이상 (Codex 65차 #7)
+    sayWhenFree(`🏁 「${it.title}」 영상 보상! 문장의 ${VIDEO_STONE.pct}% 이상을 따라 했어요 ${got}`, 6000, () => sfx.success());
   }).catch(() => {}).finally(() => { state.videoStoneBusy = false; });
 }
 
@@ -2952,7 +3020,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'always',
+  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'missed',
     // ⏳ 하루 과목별 시간 제한 (2026-09-27, 아버님) — 켜짐이 기본. 지워도 이 값으로 돌아올 뿐 시간이 늘지 않는다
     timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend, timeKorean: KOREAN_MIN.weekday,
     // ⏳ 시간 연장권 — 과목마다 하루 최대 (2026-10-01, 아버님 "이대로 진행"). 0이면 아이가 못 쓴다

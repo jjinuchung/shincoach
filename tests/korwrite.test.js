@@ -203,7 +203,7 @@ test('📤 보내기: 국어 서술형도 올림 · 프로필을 못 읽으면 �
   assert.deepEqual(files.map((f) => f.path).slice(-2), ['korean/todo.md', 'korean/todo.json']);
   await assert.rejects(UP.gatherFiles({ ...fmt, getKorTodo: async () => { throw new Error('IDB 닫힘'); }, today: 'd' }));
   const u = read('js/upload.js');
-  assert.match(u, /getKorTodo: korTodoNow, today/);
+  assert.match(u, /getKorTodo: korTodoNow, getEnglish: enNow, today/); // 🎤 영어 요약(v253)이 국어 뒤에
   assert.match(u, /const text = f\.path\.startsWith\('korean\/'\) \? \(\) => koreanTextNow\(f\.path, today\) : f\.text;/, '국어 파일은 함수로 — 겹쳐서 다시 올릴 때도 새로');
   assert.match(u, /message: `📤 진우 기록 \$\{today\} — \$\{f\.path\}` \}\);/, '메시지에는 파일 이름만');
 });

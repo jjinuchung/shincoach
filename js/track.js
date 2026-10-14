@@ -2,7 +2,7 @@
 // 메모리에 모았다가 5초마다·닫을 때 IndexedDB에 저장 (문장마다 쓰지 않도록)
 import {
   sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, bumpVocabViews,
-  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey, mergeEssayEntry } from './db.js';
+  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey, mergeEssayEntry, saidOf, saidFlag } from './db.js';
 import { enroll, schedule, GRADUATED } from './review.js';
 
 export const MASTER_RATIO = 0.8; // 발음 점수 80% 이상이면 ⭐ 정복
@@ -55,6 +55,7 @@ function emptyRecord(itemId, cue) {
     key: sentenceKey(itemId, cue.start), itemId, start: cue.start, en: cue.en, ko: cue.ko || '',
     plays: 0, listens: 0, done: false, seconds: 0,
     speakAttempts: 0, speakPass: 0, speakFail: 0, speakSkipped: 0, bestRatio: 0, lastRatio: 0, lastAt: 0,
+    speakSkipBtn: 0, speakGaveUp: 0, said: 0, v: 2, // 🎤 ⏭ 직접 넘김 · 3번 해 보고 넘어감 · 말해 본 문장 (v253 — 옛 줄은 speakSkipped 하나에 섞였다)
     puzzles: 0, puzzleSolved: 0, puzzleWrong: 0,
     // 🔁 복습: box = 라이트너 단계, dueAt = 다음 복습 날짜('' 면 아직 복습 대상 아님)
     box: 0, dueAt: '', reviews: 0, reviewPass: 0, reviewedAt: 0,
@@ -80,6 +81,8 @@ function rec(cue) {
   const key = sentenceKey(t.item.id, cue.start);
   let r = t.stats.get(key);
   if (!r) { r = emptyRecord(t.item.id, cue); t.stats.set(key, r); }
+  // 🎤 v253 전 줄은 처음 손댈 때 새 꼴로 — 옛 규칙으로 말해 본 문장이었으면 그대로 (그 뒤로는 새 규칙으로만 센다)
+  if (!((Number(r.v) || 0) >= 2)) { r.said = saidFlag(r) ? 1 : 0; r.v = 2; }
   r.lastAt = Date.now();
   t.dirty.add(key);
   return r;
@@ -318,9 +321,14 @@ export function speak(cue, result) {
   r.speakAttempts++;
   if (t.session) t.session.speakAttempts++;
   bump('speakAttempts');
-  if (result.skipped) r.speakSkipped++;
-  else if (result.passed) {
+  if (result.skipped) {
+    r.speakSkipped++; // 옛 칸(⏭ + 3번 넘어감 합) — 어려워한 문장 점수가 쓴다
+    // ⏭ 직접 넘김(btn)과 3번 해 보고 넘어감을 따로 (v253) — 3번 해 본 문장은 말해 본 문장이다
+    if (result.btn) { r.speakSkipBtn = (r.speakSkipBtn || 0) + 1; bump('speakSkipBtn'); }
+    else { r.speakGaveUp = (r.speakGaveUp || 0) + 1; bump('speakGaveUp'); r.said = 1; }
+  } else if (result.passed) {
     r.speakPass++;
+    r.said = 1;
     if (t.session) t.session.speakPass++;
     bump('speakPass');
   } else r.speakFail++;
@@ -372,6 +380,31 @@ export function isMastered(cue) {
   if (!t.item || !cue) return false;
   const r = t.stats.get(sentenceKey(t.item.id, cue.start));
   return !!(r && r.bestRatio >= MASTER_RATIO);
+}
+
+/**
+ * 🎤 말해 본 문장으로 적는다 — 말하기 확인을 하지 않는 줄(영어가 아닌 대사·마이크를 못 씀·⚙ 말하기 확인 끔) (v253).
+ * 통과·3번 해 봄은 speak()가 적는다
+ */
+export function said(cue) {
+  const r = rec(cue); if (!r) return;
+  r.said = 1;
+}
+
+/**
+ * 현재 콘텐츠에서 🎤 말해 본 문장 수 — 🏁 영상 보상을 이것으로 센다 (v253, ⏭로 넘긴 문장은 빠진다).
+ * cues(지금 문장 목록)를 주면 그 열쇠의 기록만, 같은 열쇠는 한 번 — 합치기 설정을 바꿔 남은 옛 조각 문장 기록은 안 센다 (Codex 65차 #1, 📊 contentSummary의 cueKeysOf와 같은 셈)
+ */
+export function saidCount(cues) {
+  let n = 0;
+  if (Array.isArray(cues)) {
+    if (!t.item) return 0;
+    const keys = new Set(cues.map((c) => sentenceKey(t.item.id, c.start)));
+    for (const k of keys) if (saidOf(t.stats.get(k))) n++;
+    return n;
+  }
+  for (const r of t.stats.values()) if (saidOf(r)) n++;
+  return n;
 }
 
 /** 현재 콘텐츠에서 "한" 문장 수 */
@@ -486,6 +519,14 @@ export async function admitRocketEn(max, admit) {
   const r = await admit(date, 'rocketEn', max);
   if (r && r.ok) adoptSaved(date, r.daily);
   return r || { ok: false, why: 'save', cur: null };
+}
+
+/** 🎤 오늘 받은 연속 성공 보너스 수 / 하나 선점 (하루 상한, v253) */
+export function todaySpeakCombos() {
+  return t.daily ? (Number(t.daily.speakCombos) || 0) : 0;
+}
+export function claimSpeakCombo(max) {
+  return claim('speakCombos', max, true); // 💰라 저장이 안 되면 안 준다 — 메모리로 성공 처리하면 두 창이 상한을 넘긴다 (Codex 65차 #4)
 }
 
 /** 🔤 오늘 단어 이어 주기를 몇 판 했는지 / 한 판 선점 (하루 상한) */

@@ -80,7 +80,7 @@ export function videoParcel(due) {
     kind: 'video', id: 'video', ids: list.map((d) => String(d.id)), icon: '🏁',
     items,
     title: `🏁 끝까지 본 영상 ${list.length}편 — 상이 왔어요!`,
-    text: `${shown} — 문장을 ${VIDEO_STONE.pct}% 넘게 했어요. 긴 영상일수록 💰·${STONE_ENGLISH.emoji}이 더 많아요!`,
+    text: `${shown} — 문장의 ${VIDEO_STONE.pct}% 이상을 따라 했어요. 긴 영상일수록 💰·${STONE_ENGLISH.emoji}이 더 많아요!`,
     due: list,
   };
 }
@@ -124,7 +124,7 @@ async function loadVideoDue() {
     const db = await import('./db.js');
     const st = await import('./stats.js');
     const [items, records] = await Promise.all([db.listItems(), db.getAllSentenceStats()]);
-    return videoStoneDue(st.contentSummary(items, records, st.cueCountOf), parcelsReceived());
+    return videoStoneDue(st.contentSummary(items, records, st.cueCountOf, st.cueKeysOf), parcelsReceived());
   } catch { return []; }
 }
 

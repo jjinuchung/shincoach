@@ -49,16 +49,18 @@ test('🏁 영상 길이별 보상 (v201) — 짧은 💰50 🔶3 · 중간 💰
   assert.equal(VIDEO_PLUS, 'videoplus:');
 });
 
-test('🏁 받을 영상 고르기(videoStoneDue) — 90% 이상만 · 깨진 영상·다 받은 영상·문장 없는 영상 빼고 · 같은 id는 한 번 · 아직 안 받은 몫(base·plus)과 길이', () => {
+test('🏁 받을 영상 고르기(videoStoneDue) — 🎤 말해 본 문장 90% 이상만(한 문장 pct가 아니라 saidPct, v253) · 깨진 영상·다 받은 영상·문장 없는 영상 빼고 · 같은 id는 한 번 · 아직 안 받은 몫(base·plus)과 길이', () => {
   const S = [
-    { id: 'a', title: '가', total: 10, pct: 90 },
-    { id: 'b', title: '나', total: 10, pct: 89 },
-    { id: 'c', title: '다', total: 10, pct: 100, broken: true },
-    { id: 'd', title: '라', total: 0, pct: 100 },
-    { id: 'e', title: '마', total: 1200, pct: 95 },
-    { id: 'a', title: '가 또', total: 10, pct: 100 },
-    { id: 7, title: '수 id', total: 5, pct: 100 },
-    null, { title: 'id 없음', total: 5, pct: 100 },
+    { id: 'a', title: '가', total: 10, pct: 90, saidPct: 90 },
+    { id: 'b', title: '나', total: 10, pct: 89, saidPct: 89 },
+    { id: 'c', title: '다', total: 10, pct: 100, saidPct: 100, broken: true },
+    { id: 'd', title: '라', total: 0, pct: 100, saidPct: 100 },
+    { id: 'e', title: '마', total: 1200, pct: 95, saidPct: 95 },
+    { id: 'a', title: '가 또', total: 10, pct: 100, saidPct: 100 },
+    { id: 7, title: '수 id', total: 5, pct: 100, saidPct: 100 },
+    null, { title: 'id 없음', total: 5, pct: 100, saidPct: 100 },
+    { id: 'f', title: '⏭ 많이', total: 10, pct: 100, saidPct: 80 }, // 한 문장은 다 했어도 ⏭로 넘긴 문장이 많으면 없음
+    { id: 'g', title: '옛 요약', total: 10, pct: 100 }, // saidPct 없음 → 없음
   ];
   assert.deepEqual(videoStoneDue(S, {}), [
     { id: 'a', title: '가', total: 10, base: true, plus: true },
@@ -101,7 +103,7 @@ test('🏁 백업 병합 — 받은 영상은 합집합: 옛 백업을 합쳐도
     const m = mergeStatRecord('profile', a, b);
     assert.deepEqual(m.parcels, { 'video:ep1': 2000, 'videoplus:ep1': 2000 });
     assert.equal(videoStoneRule(cloneProfile({ ...emptyProfile(), ...m }), [{ id: 'ep1', total: 1200 }]).why, 'done', '합친 뒤에도 다시 못 받는다');
-    assert.deepEqual(videoStoneDue([{ id: 'ep1', title: 't', total: 1200, pct: 100 }], m.parcels), [], '📦 창도 같은 판정');
+    assert.deepEqual(videoStoneDue([{ id: 'ep1', title: 't', total: 1200, pct: 100, saidPct: 100 }], m.parcels), [], '📦 창도 같은 판정');
   }
   assert.equal(parcelOf({ id: 'video:ep9', items: { potion: 1 } }), null, '구호품 이름이 영상 기록 자리를 쓰면 안 받는다');
   assert.equal(parcelOf({ id: 'videoplus:ep9', items: { potion: 1 } }), null);
@@ -120,7 +122,7 @@ test('🏁 📦 창 한 칸(videoParcel) — 영상 이름(셋까지 + 외 N편)
   assert.deepEqual(one.ids, ['ep1']);
   assert.deepEqual(one.items, { [COIN_ITEM]: 200, [SE]: 8 });
   assert.equal(one.title, '🏁 끝까지 본 영상 1편 — 상이 왔어요!');
-  assert.match(one.text, /^「피카츄의 모험」 — 문장을 90% 넘게 했어요\. 긴 영상일수록 💰·🔶이 더 많아요!$/);
+  assert.match(one.text, /^「피카츄의 모험」 — 문장의 90% 이상을 따라 했어요\. 긴 영상일수록 💰·🔶이 더 많아요!$/);
   assert.equal(one.icon, '🏁');
   assert.deepEqual(parcelLabel(COIN_ITEM, 200), { emoji: '💰', name: '코인', count: '+200' });
   // v197에 🔶3만 받은 짧은 영상 두 편 → 💰50씩, 🔶 차액 0
@@ -163,7 +165,7 @@ test('🔶 화면 연결 — 📦 창이 지난 영상을 챙긴다(앱을 열 �
   assert.match(src('js/db.js'), /export function applyVideoStones\(list\) \{\s*return mutateProfile\(\(p\) => videoStoneRule\(p, list\)\);/, '한 트랜잭션');
   const v = src('js/parcel.js');
   assert.match(v, /const vp = videoParcel\(await loadVideoDue\(\)\);[^\n]*\n\s*if \(vp\) queue\.push\(vp\);/, '앱을 열 때 지난 영상도');
-  assert.match(v, /return videoStoneDue\(st\.contentSummary\(items, records, st\.cueCountOf\), parcelsReceived\(\)\);/, '📊 진행률과 같은 셈');
+  assert.match(v, /return videoStoneDue\(st\.contentSummary\(items, records, st\.cueCountOf, st\.cueKeysOf\), parcelsReceived\(\)\);/, '📊와 같은 셈 (말해 본 문장은 지금 문장 열쇠로, Codex 65차 #1)');
   assert.match(v, /queue = stillDue\(queue, parcelsReceived\(\)\);/, '띄우기 직전에 다시 거른다');
   assert.match(v, /try \{ r = cur\.kind === 'video' \? await receiveVideoStones\(cur\.due\.map\(\(d\) => \(\{ id: d\.id, total: d\.total \}\)\)\) : await receiveParcel\(cur\); \}/, '[받기]가 영상 트랜잭션 (길이까지)');
   assert.match(v, /note\.textContent = cur\.text \? `\$\{cur\.icon \|\| '💌'\} \$\{cur\.text\}` : '';/);
@@ -172,8 +174,10 @@ test('🔶 화면 연결 — 📦 창이 지난 영상을 챙긴다(앱을 열 �
   assert.match(v, /ok\.textContent = cur\.kind === 'video' \? '🎁 받기' : '📦 받기';/);
   assert.match(v, /ok\.textContent = cur\.kind === 'video' \? '좋아요!' : '고마워요, 아빠!';/);
   const pl = src('js/player.js');
-  assert.match(pl, /track\.done\(cue\);\s*const after = track\.todayDone\(\);\s*maybeVideoStone\(\);/, '문장을 끝낼 때마다');
-  assert.match(pl, /if \(videoPct\(track\.doneCount\(\), state\.cues\.length\) < VIDEO_STONE\.pct\) return;/);
+  assert.match(pl, /track\.done\(cue\);\s*\/\/[^\n]*\n\s*if \(!speakNeeded\(cue\)\) track\.said\(cue\);\s*updateSaidCounter\(\);\s*const after = track\.todayDone\(\);\s*maybeVideoStone\(\);/, '문장을 끝낼 때마다 (말하기 확인을 안 하는 줄은 말해 본 문장으로, v253)');
+  assert.match(pl, /if \(videoPct\(track\.saidCount\(state\.cues\), state\.cues\.length\) < VIDEO_STONE\.pct\) return;/, '🏁는 말해 본 문장으로 (v253) · 지금 문장 목록으로 (Codex 65차 #1)');
+  assert.ok(!/videoPct\(track\.doneCount\(\)/.test(pl), '한 문장 수로 세는 곳이 남지 않게');
+  assert.match(src('js/parcel.js'), /return videoStoneDue\(st\.contentSummary\(items, records, st\.cueCountOf, st\.cueKeysOf\), parcelsReceived\(\)\);/, '📦 창도 contentSummary(saidPct)로');
   assert.match(pl, /const st = reviewStones\(\{ fails: state\.reviewFails \|\| 0, dw: state\.reviewDw \|\| 0, dwFails: state\.reviewDwFails \|\| 0 \}\);/);
   assert.match(pl, /stoneLeft: practice \? null : track\.reviewStoneRoundsLeft\(\),/);
   const t = src('js/track.js');
@@ -188,7 +192,7 @@ test('🔶 화면 연결 — 📦 창이 지난 영상을 챙긴다(앱을 열 �
 });
 
 test('🔶 아이에게 보이는 안내 — 영어스톤이 생기는 곳을 한 문장으로 같이 쓴다(🛒 스톤 상점·🏪 5일장·도감·📊) · 다섯 곳이 다 들어 있다 · 옛 말("복습을 끝내면")이 남지 않았다', () => {
-  for (const w of ['복습을 다 맞히거나', '받아쓰기·단어', '에세이', '영상을 끝까지', '90%']) assert.ok(ENGLISH_STONE_HOW.includes(w), `${w}`);
+  for (const w of ['복습을 다 맞히거나', '받아쓰기·단어', '에세이', '영상 문장의', '90%', '따라 말해 보면']) assert.ok(ENGLISH_STONE_HOW.includes(w), `${w}`);
   for (const w of ['복습', '받아쓰기·단어', '에세이', '영상']) assert.ok(ENGLISH_STONE_SHORT.includes(w), `${w}`);
   assert.match(src('js/shop.js'), /🔶 영어스톤은 \$\{ENGLISH_STONE_HOW\} 생겨요/);
   assert.match(src('js/marketview.js'), /🔶 영어스톤은 \$\{ENGLISH_STONE_HOW\} 생겨요/);

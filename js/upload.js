@@ -9,6 +9,7 @@
 //           math/latest.json (수학 기록 원본 전체 — 복사 글은 12개념까지라 진단은 원본으로)
 //           essay/todo.md · essay/todo.json (✍️ 아직 아빠가 고쳐 주지 않은 글 — 📊 "📮 고쳐 주세요"와 같은 글·같은 [번호], 2026-10-06 v199)
 //           korean/todo.md · korean/todo.json (✍️ 국어 서술형 — 답장 기다리는 글, 2026-10-11 v237 · 하나도 없으면 빈 목록도 올린다)
+//           english/YYYY-MM-DD.md (🎤 영어 기록 요약 — 최근 7일 넘김·말하기 · 영상별 말해 본 문장, 2026-10-14 v253 · 같은 날은 덮어쓴다)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
@@ -17,6 +18,8 @@
 //           korean/replies.json (✍️ 국어 서술형 답장 [{ card, id, at, v, grade, text }] — korwrite.checkReplies가 칸마다 검사, v237 · id는 v239 · 채점한 판 v는 v243)
 // 한 번에 하나씩 (Codex 52차 #1): 같은 창은 serialSender(보내는 중에 "지금 보내기"가 또 오면 끝난 뒤 한 번 더) ·
 //   다른 창(같은 주소)은 Web Locks(withUploadLock) · 국어 목록은 올리는 순간마다 다시 만든다(겹쳐서 다시 올릴 때도 — 옛 목록으로 덮지 않게)
+
+import { VIDEO_STONE } from './items.js'; // 🏁 영상 보상 기준 (🎤 영어 요약, v253) — items.js는 아무것도 import하지 않는다
 
 export const DATA_REPO = 'jjinuchung/shincoach-data';
 export const PRIVATE_FIXES = 'essay/fixes.json';
@@ -65,6 +68,44 @@ export function essayFiles(todo, today) {
   ];
 }
 
+/** today에서 k일 전 'YYYY-MM-DD' (순수) */
+function dayBefore(today, k) {
+  const [y, m, d] = String(today).split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d - k));
+  const p = (n) => String(n).padStart(2, '0');
+  return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}`;
+}
+
+/** 🎤 영어 요약에 싣는 영상 수 (최근에 연 순서) */
+export const EN_VIDEOS = 10;
+
+/**
+ * 🎤 영어 기록 요약 (순수, 2026-10-14 v253 — 영어 ⏭ 넘기기) — Claude가 "올라온 거 봐 줘" 때 넘김을 숫자로 본다.
+ * 최근 7일 날마다: 한 문장 · 🔁 복습 문장 · 🎤 말하기 통과/시도 · ⏭ 직접 넘김 · 3번 해 보고 넘어감 · 🎤 연속 보너스 (기록이 하나도 없는 날만 "영어 기록 없음")
+ * 영상(최근에 연 순서 EN_VIDEOS편): 한 문장 · 🎤 말해 본 문장(🏁 영상 보상은 이것이 VIDEO_STONE.pct% 이상일 때)
+ * @param {Array<object>} days listDaily 결과 · @param {Array<object>} summaries stats.contentSummary 결과
+ */
+export function englishFiles(days, summaries, today) {
+  const num = (v) => Number(v) || 0;
+  const byDate = new Map((Array.isArray(days) ? days : []).filter((d) => d && d.date).map((d) => [d.date, d]));
+  const lines = [`🎤 영어 기록 (${today}) — ⏭ 직접 넘김과 3번 해 보고 넘어감은 v253부터 따로 셉니다 (그 전 날은 0)`, '', '## 최근 7일'];
+  for (let k = 6; k >= 0; k--) {
+    const day = dayBefore(today, k);
+    const d = byDate.get(day);
+    const done = d && Array.isArray(d.doneKeys) ? d.doneKeys.length : 0;
+    // 복습·퍼즐·단어 잇기·영어 화면 시간만 있는 날도 영어를 한 날 (Codex 65차 #5 — 전엔 "영어 안 함"으로 적었다)
+    const any = d && (done || ['speakAttempts', 'reviewItems', 'reviewSentences', 'puzzles', 'matches', 'seconds', 'enTime'].some((k) => num(d[k]) > 0));
+    if (!any) { lines.push(`- ${day.slice(5)}: (영어 기록 없음)`); continue; }
+    lines.push(`- ${day.slice(5)}: 한 문장 ${done} · 🔁 복습 문장 ${num(d.reviewSentences)} · 🎤 말하기 통과 ${num(d.speakPass)}/${num(d.speakAttempts)} · ⏭ 직접 넘김 ${num(d.speakSkipBtn)} · 3번 해 보고 넘어감 ${num(d.speakGaveUp)} · 🎤 연속 보너스 ${num(d.speakCombos)}번`);
+  }
+  const vids = (Array.isArray(summaries) ? summaries : []).filter((x) => x && !x.broken && num(x.lastAt) > 0 && num(x.total) > 0)
+    .sort((a, b) => num(b.lastAt) - num(a.lastAt)).slice(0, EN_VIDEOS);
+  lines.push('', `## 영상 (최근에 연 순서, ${EN_VIDEOS}편까지) — 🏁 영상 보상은 🎤 말해 본 문장이 ${VIDEO_STONE.pct}% 이상일 때`);
+  for (const v of vids) lines.push(`- 「${v.title}」 한 문장 ${num(v.done)}/${num(v.total)} · 🎤 말해 본 문장 ${num(v.said)}/${num(v.total)} (${num(v.saidPct)}%)`);
+  if (!vids.length) lines.push('(연 영상 없음)');
+  return [{ path: `english/${today}.md`, text: `${lines.join('\n').trim()}\n` }];
+}
+
 /**
  * ✍️ 국어 서술형 — 답장 기다리는 글 (순수) — korwrite.writeTodo 목록 그대로. Claude는 card·id·at을 그대로 korean/replies.json에 적는다.
  * 하나도 없어도 빈 목록을 올린다 (다 답장한 뒤에도 옛 목록이 남아 있지 않게 — Codex 51차 PART 3 #6)
@@ -107,16 +148,19 @@ export function unb64(s) {
  * 올릴 파일들 — 기기 기록을 읽어 만든다. ★ 읽기가 실패하면 그대로 실패한다 (Codex 35차 #2: 전엔 실패를 null·[]로 바꿔
  * "수학 기록 없음"·빈 에세이 목록을 올리고 성공으로 적어, 비공개 저장소의 좋은 기록을 덮어썼다). 읽었는데 없는 것(null·[])은 "없음"으로.
  * getKorTodo(있으면) = ✍️ 국어 서술형 답장 기다리는 글 — 프로필을 못 읽으면 실패해야 한다(빈 목록으로 덮어쓰지 않게)
- * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, today:string}} o
+ * getEnglish(있으면) = 🎤 영상 요약(stats.contentSummary) — 영상 기록을 못 읽으면 실패 (v253)
+ * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
+  const en = getEnglish ? await getEnglish() : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
     ...(getKorTodo ? koreanFiles(kor, today) : []), // ✍️ 국어 서술형 (v237)
+    ...(getEnglish ? englishFiles(days, en, today) : []), // 🎤 영어 요약 (v253)
   ];
 }
 
@@ -130,6 +174,13 @@ async function korTodoNow() {
   let cards = [];
   try { cards = validCards(await (await fetch('./coach/korean/reading.json')).json()); } catch { cards = []; }
   return writeTodo(p && p.korWrites, cards);
+}
+
+/** 🎤 영어 영상 요약 — 이 기기의 영상·문장 기록. 못 읽으면 실패 (빈 요약으로 덮어쓰지 않게, v253) */
+async function enNow() {
+  const [db, st] = await Promise.all([import('./db.js'), import('./stats.js')]);
+  const [items, records] = await Promise.all([db.listItems(), db.getAllSentenceStats()]);
+  return st.contentSummary(items, records, st.cueCountOf, st.cueKeysOf);
 }
 
 /** 내용 지문 (FNV-1a 32비트) — 그대로면 또 올리지 않으려고 */
@@ -371,7 +422,7 @@ async function sendOnce(force) {
   const [{ getMath, listDaily }, prog, ask, { todayKey }, st] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js')]);
   const today = todayKey();
   let files;
-  try { files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, today }); } catch {
+  try { files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, today }); } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
     try { localStorage.setItem(STATE_KEY, JSON.stringify({ at: fail.at, ok: false, why: fail.why, hash: '', files: [] })); } catch { /* 저장 못 해도 */ }

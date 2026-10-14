@@ -20,7 +20,8 @@ const DB_VERSION = 4;
 
 // 학습 기록 스토어 (v2에서 추가)
 //  sentenceStats: 문장별 누적 { key: "<itemId>|<start×10>", itemId, start, en, ko, plays, listens, done, seconds,
-//                 speakAttempts, speakPass, speakFail, speakSkipped, bestRatio, lastRatio, lastAt, puzzles, puzzleSolved, puzzleWrong }
+//                 speakAttempts, speakPass, speakFail, speakSkipped, bestRatio, lastRatio, lastAt, puzzles, puzzleSolved, puzzleWrong,
+//                 speakSkipBtn(⏭ 직접 넘김) · speakGaveUp(3번 해 보고 넘어감) · said(🎤 말해 본 문장) · v(2 = v253 규칙으로 적은 줄) }
 //  sessions:      앱을 열고 닫은 단위 { id, itemId, title, startedAt, endedAt, seconds, sentences, firstIdx, lastIdx, speakAttempts, speakPass, puzzles, puzzleSolved }
 //  daily:         날짜별 { date: "YYYY-MM-DD", doneKeys: [문장 key...], seconds, speakAttempts, speakPass, puzzles, puzzleSolved, goalRewarded, hpMissed,
 //                          mathTime/enTime(⏳ 과목 화면에 머문 초), mathBonus/enBonus(🔒 부모가 더 준 초), mathExt/enExt(⏳ 쓴 연장권 수) }
@@ -347,7 +348,9 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // ⏳ 오늘 쓴 시간 연장권 수 (2026-10-01) — 하루 한도 판정용. 병합이 maxOf라 옛 백업으로 한도를 되살리지 못한다
   'mathExt', 'enExt', 'korExt',
   // 🚀 오늘 로켓단이 나온 수 (2026-10-09) — 과목마다 하루 3번(아버님), claimDailyCount로 선점. 병합 maxOf라 옛 백업으로 한도를 되살리지 못한다
-  'rocketMath', 'rocketEn'];
+  'rocketMath', 'rocketEn',
+  // 🎤 ⏭ 직접 넘김 · 3번 해 보고 넘어감 · 연속 보너스를 받은 수 (2026-10-14 v253) — 연속 보너스는 claimDailyCount로 선점(하루 상한)
+  'speakSkipBtn', 'speakGaveUp', 'speakCombos'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 // 💖 덤으로 풀어 ⚡💰를 받은 문장 — 두 창이 같은 덤을 내도 한 번 (Codex 20차 #4)
@@ -1906,12 +1909,38 @@ export function pickReviewState(a, b) {
   return state((a.dueAt || '') >= (b.dueAt || '') ? a : b);
 }
 
+/**
+ * 🎤 v253 전 기록에서 "말해 본 문장"인가 (순수) — 그때는 ⏭와 "3번 못 해 넘어감"을 한 칸(speakSkipped)에 셌다.
+ * 통과했거나 · 두 번 이상 틀린 뒤 넘어감(3번째에 ⏭를 눌렀어도 세 번 해 본 셈) · 말하기 기록이 아예 없는 줄(영어가 아닌 대사·마이크 없음·말하기 확인 끔으로 본다)
+ */
+function legacySaid(r) {
+  return !!r.done && ((Number(r.speakPass) || 0) > 0 || ((Number(r.speakSkipped) || 0) > 0 && (Number(r.speakFail) || 0) >= 2) || !(Number(r.speakAttempts) || 0));
+}
+
+/** 🎤 말해 본 표시만 (끝냈는지는 안 봄) — v253 규칙으로 적은 줄(v 2)은 said, 옛 줄은 legacySaid */
+export function saidFlag(r) {
+  if (!r) return false;
+  return (Number(r.v) || 0) >= 2 ? !!r.said : legacySaid(r);
+}
+
+/**
+ * 🎤 말해 본 문장인가 (순수, 2026-10-14 v253 노가다 탈출구 — 영어 ⏭) — 🏁 영상 보상을 이것으로 센다.
+ * 끝낸 문장(done) 가운데 · 따라 말하기를 통과했거나 3번 해 본 문장 · 말하기 확인을 하지 않는 줄(영어가 아닌 대사·마이크를 못 씀·⚙ 말하기 확인 끔).
+ * ⏭로 직접 넘긴 문장은 아니다
+ */
+export function saidOf(r) {
+  return !!(r && r.done && saidFlag(r));
+}
+
 export function mergeStatRecord(name, cur, rec) {
   if (!cur) return rec;
   const out = { ...cur, ...rec };
   if (name === 'sentenceStats') {
     for (const k of ['plays', 'listens', 'seconds', 'speakAttempts', 'speakPass', 'speakFail', 'speakSkipped', 'bestRatio', 'lastAt', 'puzzles', 'puzzleSolved', 'puzzleWrong', 'reviews', 'reviewPass', 'reviewedAt', 'essayAt']) out[k] = maxOf(cur[k], rec[k]); // essayAt: ✍️ 에세이 문장으로 나온 때 (한 번 나온 문장은 다시 안 냄)
     out.done = !!(cur.done || rec.done);
+    // 🎤 ⏭ 직접 넘김 · 3번 해 보고 넘어감은 늘기만 하는 수 · 말해 본 표시는 한쪽이라도 말했으면 (옛 줄은 옛 규칙으로 읽고 새 꼴로) (v253)
+    for (const k of ['speakSkipBtn', 'speakGaveUp']) if (cur[k] !== undefined || rec[k] !== undefined) out[k] = maxOf(cur[k], rec[k]);
+    if (cur.v || rec.v) { out.said = saidFlag(cur) || saidFlag(rec) ? 1 : 0; out.v = 2; }
     // 🎤 오늘 말하기 보상을 받았다는 표시 — 옛 백업이 덮으면 같은 문장으로 코인을 또 받는다
     out.speakPaidAt = (cur.speakPaidAt || '') >= (rec.speakPaidAt || '') ? (cur.speakPaidAt || '') : rec.speakPaidAt;
     out.lastRatio = (rec.lastAt || 0) >= (cur.lastAt || 0) ? (rec.lastRatio || 0) : (cur.lastRatio || 0);
