@@ -177,11 +177,37 @@ export function mergeMiss(a, b) {
   return out;
 }
 
+/** 📤 물음마다 틀린 보기를 고른 수 (v254, 아버님 "8번을 넣자" — 국어 요약의 "자주 틀린 물음") · 열쇠 = 물음 id('K12-3') ·
+ *  늘어나기만 하는 수(병합 max) · 한 번 읽을 때 물음마다 많아야 QMISS_ONCE(틀린 보기 셋) · 열쇠는 QMISS_KEYS까지 */
+export const QMISS_ONCE = 3;
+export const QMISS_KEYS = 600;
+const QID_RE = /^K\d{1,3}-[1-5]$/;
+/** 물음별 틀린 수 고쳐 읽기 — 물음 id 꼴의 열쇠만, 안전한 양의 정수만 */
+export function qMissOf(m) {
+  const out = {};
+  if (!isObj(m)) return out;
+  for (const k of Object.keys(m)) {
+    if (!QID_RE.test(k)) continue;
+    const n = Math.floor(Number(m[k]));
+    if (Number.isSafeInteger(n) && n > 0) out[k] = n;
+    if (Object.keys(out).length >= QMISS_KEYS) break;
+  }
+  return out;
+}
+/** 병합 — 물음마다 큰 쪽 */
+export function mergeQMiss(a, b) {
+  const out = qMissOf(a);
+  const y = qMissOf(b);
+  for (const k of Object.keys(y)) out[k] = Math.max(out[k] || 0, y[k]);
+  return qMissOf(out);
+}
+
 /**
  * 글 한 편을 다 읽었다 — 한 트랜잭션에서: 잘못 읽기 횟수 더하기 · 받을 별이 있으면 별 + 💰.
  * ids = 지금 있는 카드 id들(모르는 카드로 💰를 받지 못하게) · misses = { 종류: 이번에 고른 수 } · now = 트랜잭션 안의 시각 ·
  * evMiss = 근거를 잘못 누른 수(잘못 읽기로는 안 세지만 🟩 "한 번에 다 맞힘"에는 든다) ·
- * opts.noStone = 🟩를 주지 않는다 — 🎧 듣기 카드를 글로 읽고 풀었다(별·💰·🎯는 같다, v245 아버님 "이대로 진행")
+ * opts.noStone = 🟩를 주지 않는다 — 🎧 듣기 카드를 글로 읽고 풀었다(별·💰·🎯는 같다, v245 아버님 "이대로 진행") ·
+ * opts.qMiss = { 물음 id: 이번에 고른 틀린 보기 수 } — 이 카드의 물음만 korQMiss에 더한다(📤 국어 요약, v254)
  * why: 'unknown' 모르는 카드
  * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, next?:number, days?:number}}
  *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날) — 별을 받았을 때도 다음 별이 남았으면 next·days
@@ -192,6 +218,11 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
   const cur = missOf(profile.korMiss);
   for (const k of Object.keys(add)) cur[k] = Math.min(Number.MAX_SAFE_INTEGER, (cur[k] || 0) + Math.min(MISS_MAX, add[k])); // 끝에서 멈춘다(넘치면 다음 읽기에서 0이 됐다, Codex 48차 #8)
   profile.korMiss = cur;
+  // 📤 물음마다 틀린 수 — 이 카드의 물음만, 한 번에 QMISS_ONCE까지 (별을 받든 안 받든 센다 — 다시 읽기에서 틀린 것도 막힌 자리다)
+  const qadd = qMissOf(opts && opts.qMiss);
+  const qcur = qMissOf(profile.korQMiss);
+  for (const k of Object.keys(qadd)) if (k.startsWith(`${cardId}-`)) qcur[k] = Math.min(Number.MAX_SAFE_INTEGER, (qcur[k] || 0) + Math.min(QMISS_ONCE, qadd[k]));
+  profile.korQMiss = qMissOf(qcur);
   const done = isObj(profile.korDone) ? { ...profile.korDone } : {};
   const next = nextStar(done, cardId, now);
   if (!next.star) {

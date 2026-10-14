@@ -121,7 +121,7 @@ test('📤 gatherFiles — getEnglish가 있으면 english/날짜.md를 함께 �
   assert.ok(en && /- 「영상」 한 문장 4\/4 · 🎤 말해 본 문장 2\/4 \(50%\)/.test(en.text));
   await assert.rejects(gatherFiles({ ...base, getEnglish: async () => { throw new Error('idb'); } }));
   const u = read('js/upload.js');
-  assert.ok(u.includes('collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, today }); } catch {'));
+  assert.ok(u.includes('collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, today }); } catch {'));
   assert.ok(u.includes("return st.contentSummary(items, records, st.cueCountOf, st.cueKeysOf);"), '지금 문장 열쇠로 (Codex 65차 #1)');
 });
 
@@ -132,7 +132,7 @@ test('🎤 연속 보너스 상수 · 안내 글 — 5번마다 💰5, 하루 6�
   for (const f of ['js/parcel.js', 'js/player.js']) assert.ok(!read(f).includes('넘게 따라 말했어요'), `${f} — 말하기 확인을 안 하는 줄로 채웠을 수도 있다`);
   assert.match(read('js/player.js'), /essayCount: ESSAY_COUNT, rereadMode: 'missed',/);
   assert.match(read('css/style.css'), /\.said-counter \{/);
-  assert.match(read('sw.js'), /const CACHE_VERSION = 'v253';/);
+  assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1] >= 253, 'sw v253 이상');
 });
 
 // ── 🔍 Codex 65차 (v253) ──

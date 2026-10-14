@@ -32,9 +32,9 @@ const R = (card, w, grade, text) => ({ card, id: w.id, at: w.at, grade, text });
 /** 옛 꼴(id 없이 저장된 글)의 이름표 */
 const E = (at, text) => ({ id: writeIdOf(at, text), at });
 
-test('✍️ 원고: 서술형은 K1·K7·K15·K17·K19 + v241 K20(처음 해 본 일)·K26(방언·표준어)·K31(토끼전 인물) · 판 번호 1 · 꼭 들어갈 생각·괜찮은 답·흔한 잘못·예시 답 · 검사가 잡는 것', () => {
+test('✍️ 원고: 서술형은 K1·K7·K15·K17·K19 + v241 K20(처음 해 본 일)·K26(방언·표준어)·K31(토끼전 인물) + v254 K44(분류)·K48(인상 깊은 장면)·K53(흥부와 놀부) · 판 번호 1 · 꼭 들어갈 생각·괜찮은 답·흔한 잘못·예시 답 · 검사가 잡는 것', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(DATA.cards.filter((c) => c.write).map((c) => c.id), ['K1', 'K7', 'K15', 'K17', 'K19', 'K20', 'K26', 'K31', 'K32']);
+  assert.deepEqual(DATA.cards.filter((c) => c.write).map((c) => c.id), ['K1', 'K7', 'K15', 'K17', 'K19', 'K20', 'K26', 'K31', 'K32', 'K44', 'K48', 'K53']);
   for (const c of DATA.cards.filter((x) => x.write)) {
     assert.equal(c.write.v, 1, c.id);
     assert.ok(c.write.rubric.must.length >= 2, `${c.id}: 생각 + 까닭(근거)`);
@@ -203,8 +203,9 @@ test('📤 보내기: 국어 서술형도 올림 · 프로필을 못 읽으면 �
   assert.deepEqual(files.map((f) => f.path).slice(-2), ['korean/todo.md', 'korean/todo.json']);
   await assert.rejects(UP.gatherFiles({ ...fmt, getKorTodo: async () => { throw new Error('IDB 닫힘'); }, today: 'd' }));
   const u = read('js/upload.js');
-  assert.match(u, /getKorTodo: korTodoNow, getEnglish: enNow, today/); // 🎤 영어 요약(v253)이 국어 뒤에
-  assert.match(u, /const text = f\.path\.startsWith\('korean\/'\) \? \(\) => koreanTextNow\(f\.path, today\) : f\.text;/, '국어 파일은 함수로 — 겹쳐서 다시 올릴 때도 새로');
+  assert.match(u, /getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, today/); // 🎤 영어 요약(v253) · 📚 국어 요약(v254)
+  assert.match(u, /const text = KOR_LIVE\.has\(f\.path\) \? \(\) => koreanTextNow\(f\.path, today\) : f\.text;/, '답장 기다리는 글은 함수로 — 겹쳐서 다시 올릴 때도 새로');
+  assert.match(u, /const KOR_LIVE = new Set\(\['korean\/todo\.md', 'korean\/todo\.json'\]\);/, '다시 만드는 것은 두 파일만 — 📚 국어 요약(korean/날짜.md)은 모은 글 그대로(v254)');
   assert.match(u, /message: `📤 진우 기록 \$\{today\} — \$\{f\.path\}` \}\);/, '메시지에는 파일 이름만');
 });
 

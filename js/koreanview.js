@@ -651,7 +651,10 @@ async function finishCard() {
   let res;
   try {
     // 🎧 글로 읽고 풀었으면 🟩는 없다(별·💰·🎯는 같다)
-    res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text) });
+    // 📤 물음마다 틀린 보기 수 — 국어 요약의 "자주 틀린 물음" (v254)
+    const qMiss = {};
+    r.card.qs.forEach((q, i) => { const n = (r.qs[i] && r.qs[i].wrong.length) || 0; if (n) qMiss[q.id] = n; });
+    res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text), qMiss });
   } catch { res = { ok: false, why: 'save' }; }
   // 🥚 글 한 편을 끝까지 읽은 날 — 별이 없어도(다시 읽기도 공부). ★ 저장이 됐으면 화면과 상관없이 칸을 채운다
   //   (저장하는 사이 ← 도감을 누르면 그날 칸이 빠졌다, Codex 51차 — 🔤 낱말 판과 같은 꼴)

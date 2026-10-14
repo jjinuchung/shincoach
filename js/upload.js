@@ -10,6 +10,7 @@
 //           essay/todo.md · essay/todo.json (✍️ 아직 아빠가 고쳐 주지 않은 글 — 📊 "📮 고쳐 주세요"와 같은 글·같은 [번호], 2026-10-06 v199)
 //           korean/todo.md · korean/todo.json (✍️ 국어 서술형 — 답장 기다리는 글, 2026-10-11 v237 · 하나도 없으면 빈 목록도 올린다)
 //           english/YYYY-MM-DD.md (🎤 영어 기록 요약 — 최근 7일 넘김·말하기 · 영상별 말해 본 문장, 2026-10-14 v253 · 같은 날은 덮어쓴다)
+//           korean/YYYY-MM-DD.md (📚 국어 기록 요약 — 국어 시간 · 글마다 별·틀린 물음 · 잘못 읽기 · 낱말 · 퍼즐 · 생각 쓰기, 2026-10-14 v254 · korreport.js)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
@@ -149,18 +150,21 @@ export function unb64(s) {
  * "수학 기록 없음"·빈 에세이 목록을 올리고 성공으로 적어, 비공개 저장소의 좋은 기록을 덮어썼다). 읽었는데 없는 것(null·[])은 "없음"으로.
  * getKorTodo(있으면) = ✍️ 국어 서술형 답장 기다리는 글 — 프로필을 못 읽으면 실패해야 한다(빈 목록으로 덮어쓰지 않게)
  * getEnglish(있으면) = 🎤 영상 요약(stats.contentSummary) — 영상 기록을 못 읽으면 실패 (v253)
- * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, today:string}} o
+ * getKorReport(있으면) = 📚 국어 요약 글(today, days) — 프로필을 못 읽으면 실패 · 원고를 못 받거나 꼴이 틀리면 null(이번엔 국어 요약만 안 올림, v254)
+ * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
   const en = getEnglish ? await getEnglish() : null;
+  const korRep = getKorReport ? await getKorReport(today, days || []) : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
     ...(getKorTodo ? koreanFiles(kor, today) : []), // ✍️ 국어 서술형 (v237)
     ...(getEnglish ? englishFiles(days, en, today) : []), // 🎤 영어 요약 (v253)
+    ...(typeof korRep === 'string' && korRep ? [{ path: `korean/${today}.md`, text: korRep }] : []), // 📚 국어 요약 (v254)
   ];
 }
 
@@ -174,6 +178,20 @@ async function korTodoNow() {
   let cards = [];
   try { cards = validCards(await (await fetch('./coach/korean/reading.json')).json()); } catch { cards = []; }
   return writeTodo(p && p.korWrites, cards);
+}
+
+/**
+ * 📚 국어 기록 요약 글 (v254) — 이 기기 프로필 + 원고(글·낱말·퍼즐). 프로필을 못 읽으면 실패(빈 기록으로 덮어쓰지 않게) ·
+ * 원고를 못 받거나 꼴이 틀리면(cards 없음 등) null — 이번엔 국어 요약만 안 올린다(옛 요약을 원고 없는 글로 덮지 않게, Codex 66차)
+ */
+async function korReportNow(today, days) {
+  const [{ getProfile }, kr] = await Promise.all([import('./db.js'), import('./korreport.js')]);
+  const p = await getProfile();
+  let raw;
+  try {
+    raw = await Promise.all(['reading', 'words', 'puzzles'].map((n) => fetch(`./coach/korean/${n}.json`).then((r) => { if (!r.ok) throw new Error(n); return r.json(); })));
+  } catch { return null; }
+  return kr.korReportFromRaw(p, raw, today, days);
 }
 
 /** 🎤 영어 영상 요약 — 이 기기의 영상·문장 기록. 못 읽으면 실패 (빈 요약으로 덮어쓰지 않게, v253) */
@@ -400,6 +418,8 @@ export function withUploadLock(fn, locks = typeof navigator !== 'undefined' ? na
 }
 
 /** ✍️ 국어 파일 하나의 글 — 올리는 순간의 프로필로 새로 만든다 */
+/** 올리는 순간마다 다시 만드는 국어 파일 — ✍️ 답장 기다리는 글 (koreanFiles) */
+const KOR_LIVE = new Set(['korean/todo.md', 'korean/todo.json']);
 async function koreanTextNow(path, today) {
   const f = koreanFiles(await korTodoNow(), today).find((x) => x.path === path);
   return f ? f.text : '';
@@ -422,7 +442,7 @@ async function sendOnce(force) {
   const [{ getMath, listDaily }, prog, ask, { todayKey }, st] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js')]);
   const today = todayKey();
   let files;
-  try { files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, today }); } catch {
+  try { files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, today }); } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
     try { localStorage.setItem(STATE_KEY, JSON.stringify({ at: fail.at, ok: false, why: fail.why, hash: '', files: [] })); } catch { /* 저장 못 해도 */ }
@@ -436,7 +456,8 @@ async function sendOnce(force) {
   try {
     for (const f of files) {
       // ✍️ 국어 서술형은 올리는 순간마다(겹쳐서 다시 올릴 때도) 다시 만든다 — 모은 뒤 저장된 글이 빠지거나 옛 목록이 새 목록을 덮지 않게 (Codex 51차 PART 3 #6 · 52차 #1)
-      const text = f.path.startsWith('korean/') ? () => koreanTextNow(f.path, today) : f.text;
+      //   📚 국어 요약(korean/날짜.md, v254)은 모은 글 그대로 — 다시 만드는 것은 답장 기다리는 글 두 파일만
+      const text = KOR_LIVE.has(f.path) ? () => koreanTextNow(f.path, today) : f.text;
       await putFile({ fetchFn: fetch, token, path: f.path, text, message: `📤 진우 기록 ${today} — ${f.path}` }); // 메시지에는 글을 넣지 않는다
     }
     res = { ok: true, at };
