@@ -594,12 +594,14 @@ export function applyRound(m, id, r, today) {
   const wasStage = stageOf(rec);
   let review = false;
   let practice = false;
+  let late = 0; // ⏰ 확인 차례가 며칠 밀렸나 (확인 편만 — 일정을 바꾸기 전의 dueAt으로, v257)
   // ★ 일정(box·dueAt)이 바뀔 때만 schedAt을 올린다 — 백업 병합(mergeMath)은 일정을 schedAt이 최신인 쪽에서 가져온다.
   //   lastAt은 "마지막 활동"이라 연습·섞어 풀기도 올리는데, 그걸로 일정을 고르면 옛 상태의 기기가 나중에 연습만 해도 👑이 되돌아간다 (Codex 3차 #1)
   if (!wasDone) {
     if (passed) { rec.done = true; Object.assign(rec, enroll(today)); rec.schedAt = Date.now(); }
   } else if (isDue(rec, today)) {
     review = true;
+    late = Math.max(0, daysBetween(rec.dueAt, today));
     Object.assign(rec, schedule(rec.box || 0, passed, today));
     rec.schedAt = Date.now();
   } else {
@@ -622,7 +624,7 @@ export function applyRound(m, id, r, today) {
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
   // 🐣 방금 "안다"가 됐나 — 🥚 배우는 중·📏 진단으로 친 칸이 다음 날 이후 확인을 통과한 순간 (결과 카드가 축하한다)
   const known = (wasStage === 'learning' || wasStage === 'placed') && stageOf(rec) === 'known';
-  return { passed, first: !wasDone && passed, crowned, review, practice, known };
+  return { passed, first: !wasDone && passed, crowned, review, practice, known, late };
 }
 
 /** 이 편의 문항 ⚡💰 몫 (1 · 0.5 · 0) — 화면이 결과 카드에 까닭을 보여 줄 때도 */
@@ -753,20 +755,117 @@ export function weakKinds(rec, r = Math.random) {
     .map((x) => x.k);
 }
 
+// ── ⏰ 밀린 복습 (2026-10-14, 아버님 "기본안 1~4대로", v257) ──
+// 줄기 고르는 화면에 밀린 복습이 안 보이고 ☀️도 고른 줄기 안에서만 고르면, 다른 줄기를 고르는 사이 어떤 줄기의 복습은 계속 밀릴 수 있다
+// → ① 줄기 화면에 밀린 복습 수 ② ☀️는 줄기와 상관없이 복습 날짜가 가장 이른 칸부터 ③ 복습 날짜가 오래 지난 칸을 통과하면 💰 조금 더
+// ④ 교과서에서 흔히 헷갈리는 옛 분수 칸은 그림으로 한 장씩 배우는 줄기로 잇는다. 막지 않고 보이고 이끈다(잠금 대신 보상).
+
+/** 줄기마다 오늘 복습 차례인 칸 — [{ key, due: 칸 수, oldest: 가장 이른 dueAt, late: 그게 며칠 지났나 }] (밀린 것만, 오래된 줄기부터 · 같으면 STEM_ORDER) */
+export function stemDueList(m, today) {
+  const concepts = (m && m.concepts) || {};
+  const out = [];
+  STEM_ORDER.forEach((key, i) => {
+    const due = ladderOf(m, today, key).filter((r) => r.due);
+    if (!due.length) return;
+    const oldest = due.map((r) => (concepts[r.id] || {}).dueAt || today).sort()[0];
+    out.push({ key, due: due.length, oldest, late: Math.max(0, daysBetween(oldest, today)), i });
+  });
+  return out.sort((a, b) => (a.oldest < b.oldest ? -1 : a.oldest > b.oldest ? 1 : a.i - b.i)).map(({ i, ...x }) => x);
+}
+
+/** 🌳 줄기 고르는 화면의 차례 — 밀린 복습이 있는 줄기를 오래된 것부터 위로, 나머지는 원래 차례 */
+export function stemPickOrder(m, today) {
+  const first = stemDueList(m, today).map((x) => x.key);
+  return [...first, ...STEM_ORDER.filter((k) => !first.includes(k))];
+}
+
+/**
+ * ☀️가 고를 복습 — 줄기와 상관없이 dueAt이 가장 이른 칸 하나. 같은 날이면 지금 줄기(prefer) 먼저, 그다음 STEM_ORDER·사다리 차례.
+ * @returns {{id:string, stem:string, dueAt:string, late:number}|null}
+ */
+export function oldestDue(m, today, prefer) {
+  const concepts = (m && m.concepts) || {};
+  const keys = [...(STEMS[prefer] ? [prefer] : []), ...STEM_ORDER.filter((k) => k !== prefer)];
+  let best = null;
+  for (const key of keys) {
+    for (const r of ladderOf(m, today, key)) {
+      if (!r.due) continue;
+      const dueAt = (concepts[r.id] || {}).dueAt || today;
+      if (!best || dueAt < best.dueAt) best = { id: r.id, stem: key, dueAt };
+    }
+  }
+  return best ? { ...best, late: Math.max(0, daysBetween(best.dueAt, today)) } : null;
+}
+
+/** ⏰ 오래 밀린 복습 보너스 — 복습 날짜가 days일 이상 지난 칸을 확인 차례에 통과하면 💰coin, 하루 max번 (🍀처럼 하루 횟수는 m.late = {d, n}) */
+export const LATE = { days: 7, coin: 5, max: 3 };
+
+/**
+ * 오늘 남은 ⏰ 보너스 횟수. 적힌 날이 오늘보다 **뒤**면 0 — 시계를 되돌리거나 미래 날짜 기록이 합쳐져 들어와도
+ * 이미 쓴 날의 횟수가 다시 열리지 않게 (그 기록은 그대로 둔다, Codex 68차 #3)
+ */
+export function lateLeft(m, today) {
+  if (m && m.late && m.late.d && today && m.late.d > today) return 0;
+  const used = m && m.late && m.late.d === today ? Number(m.late.n) || 0 : 0;
+  return Math.max(0, LATE.max - used);
+}
+
+/**
+ * ⏰ 이 편이 받는 보너스 💰 — 트랜잭션 안에서 부른다(하루 횟수를 올린다). 확인 차례(review)를 통과했고 복습 날짜가 LATE.days일 이상 지났을 때만.
+ * 연습·처음 배우기·못 통과한 편은 0 — 일부러 밀려 두는 길이 되지 않게 보너스는 작고 하루 max번
+ */
+export function lateBonus(m, { mode, result, today }) {
+  if (!today || (mode !== 'learn' && mode !== 'review')) return 0;
+  if (!result || !result.review || !result.passed || !((Number(result.late) || 0) >= LATE.days)) return 0;
+  if (!lateLeft(m, today)) return 0;
+  const used = m.late && m.late.d === today ? Number(m.late.n) || 0 : 0;
+  m.late = { d: today, n: used + 1 }; // 새 객체로 — cloneMath가 얕게 복사하므로 입력을 건드리지 않게
+  return LATE.coin;
+}
+
+/**
+ * 📚 그림 배움 줄기로 잇기 — 처음 만든 A 분수 줄기의 칸은 문제만 있고, 같은 내용을 그림·한 장씩 배우는 줄기가 따로 생겼다.
+ * 교과서에서 흔히 헷갈리는 칸(분모가 다른 덧셈·뺄셈, ×·÷, 분수가 섞인 혼합 계산)을 그 줄기로 잇는다 — 칸 id → 줄기
+ */
+export const BRIDGE = { 'frac.add': 'fracadd', 'frac.mulnat': 'fracmul', 'frac.mul': 'fracmul', 'frac.divnat': 'fracdiv', 'frac.div': 'fracdiv', 'mix.frac': 'fracmul' };
+export function bridgeOf(id) {
+  const key = Object.prototype.hasOwnProperty.call(BRIDGE, id) ? BRIDGE[id] : null;
+  return key && STEMS[key] ? key : null;
+}
+/**
+ * 이 줄기 사다리 위에 띄울 📚 잇기 — 이 줄기의 잇는 칸 가운데 오늘 복습 차례이거나 통과보다 실패가 많은 칸이 있으면 그 배움 줄기들
+ * @returns {Array<{key:string, from:string[]}>}
+ */
+export function bridgeOffers(m, today, stem) {
+  const concepts = (m && m.concepts) || {};
+  const out = new Map();
+  for (const r of ladderOf(m, today, stem)) {
+    const key = bridgeOf(r.id);
+    if (!key) continue;
+    const rec = concepts[r.id];
+    const weak = !!rec && (Number(rec.fails) || 0) > (Number(rec.passes) || 0);
+    if (!r.due && !weak) continue;
+    if (!out.has(key)) out.set(key, []);
+    out.get(key).push(r.id);
+  }
+  return [...out].map(([key, from]) => ({ key, from }));
+}
+
 /**
  * ☀️ 오늘의 수학 계획.
- *  1) 개념 편 하나 — 🔁 복습 차례(due)가 있으면 사다리 순서의 첫 것(review), 없으면 ▶ 지금 배울 개념(learn). 사다리가 끝났으면 null
- *  2) 🎲 섞어 풀기 — 개념 편의 개념을 뺀 아는 개념(done) 중 **안 본 지 오래된**(lastAt) 것부터 MIX_CONCEPTS개, 각각 약한 얼굴 순서
- *     + 🤔 노트(어제 이전에 틀린 유형, 이 줄기, 개념 편의 개념은 제외 — 그 편에 이미 한 문제 끼어 든다) 하나. 순서는 섞는다.
- * 지금 줄기 안에서만. 아는 개념이 없으면 mix는 비고 개념 편만 — 그것도 오늘의 수학이다.
- * @returns {{ roundId: string|null, roundMode: 'review'|'learn'|null, mix: Array<{id:string, kinds:string[], note?:object}> }}
+ *  1) 개념 편 하나 — 🔁 복습 차례가 있으면 **줄기와 상관없이 가장 오래 밀린 칸**(oldestDue, review · v257), 없으면 지금 줄기의 ▶(learn). 사다리가 끝났으면 null
+ *  2) 🎲 섞어 풀기 — 개념 편 줄기(roundStem)의 아는 개념(done) 중 **안 본 지 오래된**(lastAt) 것부터 MIX_CONCEPTS개, 각각 약한 얼굴 순서
+ *     + 🤔 노트(어제 이전에 틀린 유형, 그 줄기, 개념 편의 개념은 제외 — 그 편에 이미 한 문제 끼어 든다) 하나. 순서는 섞는다.
+ * 아는 개념이 없으면 mix는 비고 개념 편만 — 그것도 오늘의 수학이다. 화면은 roundStem으로 줄기를 옮겨 편을 연다.
+ * @returns {{ roundId: string|null, roundMode: 'review'|'learn'|null, roundStem: string, late: number, mix: Array<{id:string, kinds:string[], note?:object}> }}
  */
 export function dailyPlan(m, today, stem = 'fraction', seed = 0) {
-  const rows = ladderOf(m, today, stem);
-  const due = rows.filter((x) => x.due).map((x) => x.id);
+  const pick = oldestDue(m, today, stem);
+  const roundStem = pick ? pick.stem : (STEMS[stem] ? stem : 'fraction');
+  const rows = ladderOf(m, today, roundStem);
   const now = rows.find((x) => x.state === 'now');
-  const roundId = due.length ? due[0] : now ? now.id : null;
-  const roundMode = due.length ? 'review' : now ? 'learn' : null;
+  const roundId = pick ? pick.id : now ? now.id : null;
+  const roundMode = pick ? 'review' : now ? 'learn' : null;
   const r = fractionGen.rng(seed);
   const concepts = (m && m.concepts) || {};
   const known = rows.filter((x) => x.state === 'done' && x.id !== roundId)
@@ -774,13 +873,13 @@ export function dailyPlan(m, today, stem = 'fraction', seed = 0) {
     .sort((a, b) => ((a.rec.lastAt || 0) - (b.rec.lastAt || 0)) || (a.i - b.i))
     .slice(0, MIX_CONCEPTS)
     .map((x) => ({ id: x.id, kinds: weakKinds(x.rec, r) }));
-  const stemKey = (STEMS[stem] || STEMS.fraction).key;
+  const stemKey = STEMS[roundStem].key;
   // 전부 받아서 줄기·개념 편 개념을 거른 뒤 가장 오래된 하나 — 개수 제한을 먼저 걸면 다른 줄기의 노트가 자리를 다 차지한다 (Codex 3차 #6)
   const note = dueNotes(m, today, Infinity).find((x) => x.id !== roundId && (stemOf(x.id) || {}).key === stemKey) || null;
   const mix = fractionGen.shuffle(r, [...known, ...(note ? [{ id: note.id, kinds: [note.note.k], note: note.note }] : [])]);
   // 🥚가 다 차서 새 칸이 잠겼다 — 화면이 "오늘 배운 건 내일 확인해요"라고 알린다
   const waiting = !roundId && rows.some((x) => x.state === 'wait');
-  return { roundId, roundMode, mix, waiting };
+  return { roundId, roundMode, roundStem, late: pick ? pick.late : 0, mix, waiting };
 }
 
 /**

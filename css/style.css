@@ -585,6 +585,12 @@ button { font-family: inherit; }
 .math-stem-body { display: flex; flex-direction: column; gap: 3px; }
 .math-stem-name { font-weight: 800; font-size: 1.05rem; }
 .math-stem-sub { color: var(--muted); font-size: 0.85rem; }
+/* ⏰ 밀린 복습 (v257) — 줄기마다 다시 확인할 수 · 7일 넘게 기다린 줄기는 진하게 */
+.math-stem-due { font-size: 0.85rem; font-weight: 700; color: var(--accent); }
+.math-stem-due.is-late { color: #c2410c; }
+.math-due-sum { margin: 0 0 10px; }
+.math-bridge-note { margin: 8px 0 4px; }
+.math-bridge-btn { margin-top: 6px; }
 .math-eyebrow-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .math-stem-switch { font-size: 0.8rem; padding: 4px 10px; min-height: 30px; }
 

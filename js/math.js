@@ -12,6 +12,7 @@ import {
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
   applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, widenRound, rungSub, practiceNote, waitNote, LEARNING_MAX,
   sameDayRounds, repeatNote, roundPay, setLive, applyQuit, settleLives, liveKeep,
+  stemDueList, stemPickOrder, LATE, lateBonus, lateLeft, bridgeOf, bridgeOffers,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -226,6 +227,24 @@ function savedStem() {
 }
 function rememberStem(k) {
   try { localStorage.setItem(STEM_KEY, k); } catch { /* 사생활 모드 등 — 무시 */ }
+}
+/** 줄기를 옮겨 연다 — 🌳 고르는 화면·📚 그림 배움 줄기로 잇기가 같은 길로 (진단 전이면 📏부터) */
+function openStem(state, key) {
+  if (!STEMS[key]) return;
+  ui.daily = null; // ☀️ 흐름은 여기서 끝 — 📏 진단 안내는 renderLadder를 안 지나, 남은 흐름이 🎒 뒤에 옛 줄기의 섞어 풀기를 열었다 (Codex 68차 #1)
+  ui.stem = key;
+  rememberStem(key);
+  if (needsPlacement(state, key)) renderDiagIntro(); else renderLadder(state);
+}
+/** 📚 이 줄기로 가는 단추 — "U 분수의 곱셈 줄기 (지금 2/9칸)" */
+function bridgeBtn(state, key, label) {
+  const st = STEMS[key];
+  const rows = ladderOf(state, todayKey(), key);
+  const done = rows.filter((r) => r.state === 'done').length;
+  const b = el('button', 'btn btn-big-wide math-bridge-btn', `📚 ${label} — ${st.code} ${st.label} (지금 ${done}/${rows.length}칸)`);
+  b.type = 'button';
+  b.addEventListener('click', () => openStem(state, key));
+  return b;
 }
 
 /**
@@ -555,8 +574,13 @@ function renderStemPicker(state) {
   const card = el('section', 'math-card');
   card.appendChild(el('h2', '', '🌳 어떤 줄기를 할까?'));
   card.appendChild(el('p', 'math-p muted', '줄기 하나가 개념 사다리 하나예요. 하던 줄기를 이어서 해도 되고, 새 줄기를 시작해도 돼요.'));
+  // ⏰ 밀린 복습 (v257) — 어느 줄기에 얼마나 오래 밀렸는지 보이고, 오래 밀린 줄기를 위로
+  const today = todayKey();
+  const dues = new Map(stemDueList(state, today).map((x) => [x.key, x]));
+  const allDue = [...dues.values()].reduce((n, x) => n + x.due, 0);
+  if (allDue) card.appendChild(el('p', 'math-note math-due-sum', `🔁 다시 확인할 개념 ${allDue}개가 기다려요 — ☀️ 오늘의 수학이 복습 날짜가 가장 오래 지난 것부터 가져와요${lateLeft(state, today) ? ` · ⏰ 복습 날짜가 ${LATE.days}일 이상 지난 개념을 통과하면 💰+${LATE.coin} 더 · 하루 ${LATE.max}번까지` : ''}`));
   const list = el('div', 'math-stems');
-  for (const key of STEM_ORDER) {
+  for (const key of stemPickOrder(state, today)) {
     const st = STEMS[key];
     const rows = ladderOf(state, todayKey(), key);
     const done = rows.filter((r) => r.state === 'done').length;
@@ -569,8 +593,10 @@ function renderStemPicker(state) {
     body.appendChild(el('span', 'math-stem-name', `${st.label} · ${st.range}`));
     // 줄기가 제 소개(pick)를 가지면 그것 — 소수는 앞 다섯 칸이 학교 진도라 "처음 배우는 줄기"가 맞지 않다
     body.appendChild(el('span', 'math-stem-sub', started ? `개념 ${rows.length}개 중 ${done}개를 알아요 · 👑 ${crown}` : (st.pick || (st.lesson ? '처음 배우는 줄기 — 한 장씩 배우고 문제를 풀어요' : '📏 진단 5문제로 시작해요'))));
+    const dx = dues.get(key);
+    if (dx) body.appendChild(el('span', `math-stem-due${dx.late >= LATE.days ? ' is-late' : ''}`, `🔁 다시 확인 ${dx.due}개${dx.late ? ` · 복습 날짜가 ${dx.late}일 지난 것도 있어요` : ' · 오늘 차례'}`));
     b.appendChild(body);
-    b.addEventListener('click', () => { ui.stem = key; rememberStem(key); if (needsPlacement(state, key)) renderDiagIntro(); else renderLadder(state); });
+    b.addEventListener('click', () => openStem(state, key));
     list.appendChild(b);
   }
   card.appendChild(list);
@@ -662,7 +688,13 @@ function renderLadder(state) {
     db.addEventListener('click', () => guardStart('math', () => startDaily()));
     head.appendChild(db);
     const parts = [];
-    if (preview.roundId) parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${nameOf(preview.roundId)}`);
+    if (preview.roundId) {
+      // ⏰ ☀️는 줄기와 상관없이 가장 오래 기다린 확인부터 (v257) — 다른 줄기면 그 줄기 이름을, 밀린 날 수와 ⏰ 보너스를 미리
+      const ps = preview.roundStem && preview.roundStem !== ui.stem ? STEMS[preview.roundStem] : null;
+      const wait = preview.roundMode === 'review' && preview.late
+        ? ` (복습 날짜가 ${preview.late}일 지남${preview.late >= LATE.days && lateLeft(state, today) ? ` — 통과하면 ⏰ 💰+${LATE.coin}` : ''})` : '';
+      parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${ps ? `${ps.code} ${ps.label}의 ` : ''}${nameOf(preview.roundId)}${wait}`);
+    }
     else if (preview.waiting) parts.push('🥚 오늘 배운 건 다음 날 확인해요'); // "그때 새 칸이 열려요"는 🥚가 셋이면 거짓이다 — 잠금 안내는 사다리 위 배너가 (Codex 20차 #6)
     if (preview.mix.length) parts.push(`🎲 배운 것 섞어 풀기 ${preview.mix.length}문제`);
     head.appendChild(el('p', 'math-note math-daily-sub', unread.length ? `📬 답장을 읽으면 열려요 · ${parts.join(' → ')}` : parts.join(' → ')));
@@ -688,6 +720,11 @@ function renderLadder(state) {
     b.type = 'button';
     b.addEventListener('click', () => guardStart('math', () => startRound(due[0], 'review')));
     head.appendChild(b);
+  }
+  // 📚 실패가 많은 옛 분수 칸 → 그림으로 한 장씩 배우는 줄기로 잇기 (v257)
+  for (const bo of bridgeOffers(state, today, ui.stem)) {
+    head.appendChild(el('p', 'math-note math-bridge-note', `📚 ${bo.from.map((id) => nameOf(id)).join(' · ')} — 어렵다면 그림으로 한 장씩 배우는 줄기가 있어요`));
+    head.appendChild(bridgeBtn(state, bo.key, '그림으로 다시 배우기'));
   }
   // 🤔 오답 노트 회차 — 어제 이전에 틀린 유형만 (개념 일정과 따로). 오늘 틀린 건 그 개념을 다시 열면 끼어 든다. 이 줄기의 것만
   const notesDue = dueNotes(state, today).filter((x) => { const s = stemOf(x.id); return s && s.key === ui.stem; });
@@ -1221,6 +1258,8 @@ function startDaily() {
   const today = todayKey();
   const seed = (Date.now() % 1000000) | 0;
   const plan = dailyPlan(ui.state, today, ui.stem, seed);
+  // ⏰ 가장 오래 기다린 확인이 다른 줄기면 그 줄기로 옮겨 연다 — 편의 문제는 그 줄기의 만들기(G)가 만든다 (v257)
+  if (plan.roundStem && plan.roundStem !== ui.stem && STEMS[plan.roundStem]) { ui.stem = plan.roundStem; rememberStem(ui.stem); }
   ui.daily = { plan, step: plan.roundId ? 'round' : 'mix', roundInfo: null };
   if (plan.roundId) startRound(plan.roundId, plan.roundMode);
   else startMixRound();
@@ -2793,6 +2832,7 @@ async function finishRound() {
   let spLevel = null;           // 그때의 레벨 변화
   let catches = 0;              // 🎯 이번 편이 준 몬스터볼 (roundCatches, 레코드 pend에 적힘)
   let lucky = 0;                // 🍀 그중 어쩌다 나온 몫 (luckyCatch)
+  let lateCoin = 0;             // ⏰ 오래 기다린 확인을 통과해 더 받는 💰 (lateBonus, v257)
   let daily = null; // ☀️ 이 편이 오늘의 수학의 마지막이면 완주 기록 (같은 트랜잭션 — 두 창이 같이 끝내도 첫 창만 보너스)
   const d = ui.daily;
   // 한 ☀️ 흐름에서 완주는 한 번만 적는다 — 섞어 풀기가 없는 날 "🤔 한 번 더"를 거듭해도 완주 횟수가 늘지 않게 (Codex 3차 #4)
@@ -2846,6 +2886,7 @@ async function finishRound() {
         lucky = luckyCatch(s, { mode: r.mode, result, inDaily, roll, today }); // 🍀 이미 아는 개념이면 가끔 (하루 횟수도 같은 트랜잭션)
         catches += lucky;
         addPending(s, catches);
+        lateCoin = lateBonus(s, { mode: r.mode, result, today }); // ⏰ 오래 기다린 확인 통과 (하루 횟수도 같은 트랜잭션, v257)
       });
     }
   } catch (err) {
@@ -2881,6 +2922,7 @@ async function finishRound() {
       ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } // 🤔 노트 회차·🎲 섞어 풀기: 문항 정답만, 잡기 없음 (연습)
       : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
   rw.xp += (r.fixed || 0) * REWARD.fix.xp; // 🔁 쌍둥이로 바로 고친 문항 (통과 여부와 무관)
+  rw.coin += lateCoin; // ⏰ 트랜잭션이 정한 몫 그대로 (개념 편만 0이 아니다)
   if (daily && daily.first) { rw.xp += REWARD.daily.xp; rw.coin += REWARD.daily.coin; } // ☀️ 하루 첫 완주 보너스
   // 🎯 수학 잡기 (2026-09-22, 아버님 결정): ☀️ 안의 개념 편을 다 맞히면 1번(처음이든 복습이든), ☀️ 하루 첫 완주에 1번 — 좋은 날 2번.
   // 영어는 퍼즐마다(하루 4번쯤) 던지는데 수학은 첫 통과 때만이라 아이가 영어만 골랐다. 자격은 트랜잭션 안(mathprog.roundCatches)에서 정해 레코드에 적혔다
@@ -3056,6 +3098,10 @@ async function finishRound() {
   card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${rw.stone ? ` 🔷 수학스톤 +${rw.stone}` : ''}${rw.catches ? ` 🎯 몬스터볼 ${rw.catches}개!` : ''}${daily && daily.first ? ' ☀️ 첫 완주 보너스!' : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
   if (rw.bonus) card.appendChild(el('p', 'math-bonus-got', `✨ 오늘의 보너스 ${bonusText(rw.bonus)} 받았어요!`));
   if (lucky) card.appendChild(el('p', 'math-bonus-got', '🍀 운이 좋았어요! 아는 개념을 다시 풀었는데 몬스터볼이 나왔어요'));
+  if (lateCoin) card.appendChild(el('p', 'math-bonus-got', `⏰ 복습 날짜가 ${result.late}일 지난 개념을 통과했어요 — 💰+${lateCoin} 더 (위 💰에 들어 있어요)`));
+  // 📚 실패가 많은 옛 분수 칸을 못 통과했으면 — 그림으로 한 장씩 배우는 줄기로 (v257)
+  const bk = !all ? bridgeOf(r.id) : null;
+  if (bk) card.appendChild(bridgeBtn(state, bk, '그림으로 다시 배우기'));
   // 🔁 같은 날 둘째 편부터 (v250) — 줄었으면 까닭을, 다 맞혀 통과해서 다 받았으면 그걸
   if (result.repeat > 0) {
     const pay = roundPay(result);
