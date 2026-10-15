@@ -673,9 +673,9 @@ export async function renderStats() {
         tr.appendChild(el('td', 'num', `${r.passes}/${r.fails}`));
         const trail = el('td', 'trail');
         for (const t of r.trail) {
-          // ⏹ 그만둔 편(v250) — 통과도 실패도 아닌 회색 점
-          const dot = el('span', t.quit ? 'dot quit' : t.pass ? 'dot ok' : 'dot no', t.quit ? '⏹' : t.pass ? '✔' : `${t.ok}`);
-          dot.title = t.quit ? `${t.d} 그만둠 ${t.ok}/${t.n} (${t.of}문제 중)` : `${t.d} ${t.ok}/${t.n}`;
+          // ⏹ 그만둔 편(v250) — 통과도 실패도 아닌 회색 점 · 💪 v262: 확인 차례에 틀린 뒤 그만둬 못 통과로 친 편은 빨간 ⏹, 칸을 지킨 확인 편은 노란 점
+          const dot = el('span', t.quit ? `dot quit${t.rf ? ' rf' : ''}` : t.pass ? 'dot ok' : `dot no${t.kept ? ' kept' : ''}`, t.quit ? '⏹' : t.pass ? '✔' : `${t.ok}`);
+          dot.title = t.quit ? `${t.d} 그만둠 ${t.ok}/${t.n} (${t.of}문제 중)${t.rf ? ' — 확인 차례에 틀린 뒤라 못 통과로 침' : ''}` : `${t.d} ${t.ok}/${t.n}${t.kept ? ' — 💪 비슷한 문제를 맞혀 칸 그대로' : ''}`;
           trail.appendChild(dot);
         }
         tr.appendChild(trail);
@@ -689,6 +689,7 @@ export async function renderStats() {
       wrap.appendChild(tbl);
       cM.appendChild(wrap);
       if (report.some((r) => r.pad && r.pad[1])) cM.appendChild(el('p', 'stats-note', '✍️는 숫자판으로 직접 쓴 답(정답/전체)이에요 — 보기로 풀 때보다 많이 낮으면 보기를 찍고 있었던 거예요. "짐작"은 어느 보기와도 다른 값을 쓴 것이에요.'));
+      if (report.some((r) => r.trail.some((t) => t.kept || t.rf))) cM.appendChild(el('p', 'stats-note', '💪 노란 점은 확인 편에서 한 문제만 틀리고 비슷한 문제를 맞혀 칸을 지킨 편이에요. 빨간 ⏹은 확인 차례에 틀린 뒤 그만둬서 못 통과로 친 편이에요(한 칸 내려가고 다음 날 다시).'));
       const weak = report.filter((r) => r.weak && r.weak.rate < 0.6).map((r) => `${r.name}의 ${r.weak.label}(${r.weak.ok}/${r.weak.n})`);
       if (weak.length) cM.appendChild(el('p', 'stats-note', `약한 얼굴: ${weak.join(' · ')} — ①은 계산, ②는 남의 오류 찾기, ③은 왜 그런지, ⭐는 이야기 문제예요.`));
       // 🤔 아직 못 고친 유형 — 틀린 뒤 처음에 맞힌 적이 없는 것. 내일부터 오답 노트 회차에 나온다

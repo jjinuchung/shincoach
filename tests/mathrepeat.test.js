@@ -129,9 +129,10 @@ test('⏹ applyQuit: 일지에 그만둠 한 줄 + 틀린 문항만 🤔 노트(
   assert.equal(m2.concepts[ID].notes[0].d, T1);
 });
 
-test('⏹ applyQuit: 아는 개념이면 일정·통과 그대로 · 노트의 "또 틀림"(again)은 이어 가고, 이번에 맞힌 노트 문항도 노트는 안 지운다(끝낸 편에서만)', () => {
+test('⏹ applyQuit: 아는 개념이고 확인 차례가 아니면 일정·통과 그대로 · 노트의 "또 틀림"(again)은 이어 가고, 이번에 맞힌 노트 문항도 노트는 안 지운다(끝낸 편에서만)', () => {
+  // 💪 v262: 확인 차례인 칸에서 틀린 뒤 그만두면 못 통과로 친다 — 그건 tests/mathkeep.test.js. 여기는 차례가 내일인 칸(배운 날 T)
   const m = emptyMath();
-  learn(m, ID, 2, 2, { day: '2026-10-10' });
+  learn(m, ID, 2, 2, { day: T });
   const rec0 = m.concepts[ID];
   rec0.notes = [{ k: 'calc', key: 'A', d: '2026-10-10', t: 1, again: 2 }, { k: 'calc', key: 'B', d: '2026-10-10', t: 2 }];
   const before = JSON.stringify({ done: rec0.done, box: rec0.box, dueAt: rec0.dueAt, schedAt: rec0.schedAt, passes: rec0.passes, fails: rec0.fails });
@@ -236,7 +237,7 @@ test('⏹ 📊: 그만둔 편은 답한 것을 다 맞혔어도 통과가 아니
   assert.ok(txt.includes(' · ⏹1/1'), txt);
   assert.ok(txt.includes('⏹그만둠 1/1 (5문제 중)'), txt);
   const st = read('js/stats.js');
-  assert.ok(st.includes("t.quit ? 'dot quit' : t.pass ? 'dot ok' : 'dot no', t.quit ? '⏹'"));
+  assert.ok(st.includes("t.quit ? `dot quit${t.rf ? ' rf' : ''}` : t.pass ? 'dot ok' : `dot no${t.kept ? ' kept' : ''}`, t.quit ? '⏹'")); // 💪 v262: 빨간 ⏹ · 노란 점
   assert.ok(read('css/style.css').includes('.math-report .dot.quit {'));
   // 두 창: 한 편(rid 81)이 그만둠으로도, 끝냄으로도 남았다 → 📊는 끝낸 줄만, 편 수는 하나 (Codex 62차 #3)
   m.log.push({ d: T, t: Date.now() + 5, rid: 81, id: ID, mode: 'learn', ok: 4, n: 5, qs: [] });
@@ -285,7 +286,7 @@ test('🔁⏹ 화면 배선(math.js): 편 번호·시작한 날·미리 안내·
   const src = read('js/math.js');
   const fn = (name) => { const i = src.indexOf(`function ${name}(`); assert.ok(i >= 0, name); return src.slice(i, src.indexOf('\n}\n', i)); };
   const sr = fn('startRound');
-  assert.ok(sr.includes('const rep = repeatNote(ui.state, id, day);') && sr.includes('rid: ui.lastRid, day, rep };'));
+  assert.ok(sr.includes('const rep = repeatNote(ui.state, id, day);') && sr.includes('rid: ui.lastRid, day, rep, keep };')); // 💪 keep (v262)
   assert.ok(sr.includes('ui.lastRid = Math.max(Date.now() * 1000 + Math.floor(Math.random() * 1000), (ui.lastRid || 0) + 1);'), '편 번호: 무작위 자리 + 이 창 안에서 늘 커지게 (Codex 62차 #3)');
   assert.ok(sr.indexOf('holdRoundLock(ui.lastRid);') > sr.indexOf('ui.round = {') && sr.includes('if (Number(k) !== ui.lastRid) releaseRoundLock(k);'), '🔒 이 편 잠금을 쥐고 앞 편 잠금은 놓는다');
   assert.ok(src.includes("const isConceptRound = (r) => !!(r && r.id && r.rid && (r.mode === 'learn' || r.mode === 'review' || r.mode === 'practice'));"), '개념 편만(노트·섞어·💎·❓·진단은 id가 없거나 mode가 다르다) — 사다리의 아는 칸은 practice로 연다');

@@ -622,6 +622,7 @@ button { font-family: inherit; }
 .math-sense-verdict.ok { color: #047857; }
 .math-sense-verdict.no { color: #b45309; }
 .math-why { margin: 10px 0 4px; padding: 12px; border-radius: 14px; background: #fffbeb; border: 1px dashed #fcd34d; }
+.math-keep { color: #065f46; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 8px 12px; font-size: 0.95rem; font-weight: 700; margin: 6px 0 8px; line-height: 1.6; } /* 💪 확인 편에서 한 번 틀려도 (v262) */
 .math-why-picked { color: #92400e; background: #fffbeb; border-radius: 12px; padding: 8px 12px; font-size: 0.92rem; font-weight: 700; margin: 8px 0; line-height: 1.6; }
 
 /* ===== 종료 인사 화면 ===== */
@@ -1934,6 +1935,8 @@ button { font-family: inherit; }
 .math-report .dot.ok { background: #d1fae5; color: #065f46; }
 .math-report .dot.no { background: #fee2e2; color: #991b1b; }
 .math-report .dot.quit { background: #e5e7eb; color: #374151; } /* ⏹ 그만둔 편 (v250) */
+.math-report .dot.quit.rf { background: #fee2e2; color: #991b1b; } /* 💪 확인 차례에 틀린 뒤 그만둬 못 통과 (v262) */
+.math-report .dot.no.kept { background: #fef3c7; color: #92400e; } /* 💪 한 문제만 틀리고 쌍둥이를 맞혀 칸을 지킴 (v262) */
 .math-report td:first-child { min-width: 9em; }
 .math-report td.kinds { color: var(--muted); min-width: 11em; }
 .math-report td.miss { color: #92400e; }

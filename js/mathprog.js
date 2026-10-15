@@ -465,6 +465,51 @@ export function slipExempt(q) {
   return !!q && !q.ok && q.w === 's' && q.sv !== 0;
 }
 
+// ── 💪 확인 편에서 한 번 틀려도 괜찮게 (2026-10-15, v262 — 아버님 "이대로 진행") ──
+// 확인 편(문제를 다 맞혀야 통과)은 하나만 틀려도 한 칸 내려가는데, 틀린 뒤 ⏹ 그만두면 아무것도 안 바뀌었다 →
+// 틀리면 바로 그만두고 새 편을 받는 쪽이 아이에게 덜 손해였다. 이제
+//   · 하나만 틀리고 그 문제의 비슷한 문제(쌍둥이)를 맞히면 칸(box)·📏은 그대로, 내일 다시 (applyRound)
+//   · 쌍둥이도 틀리거나 둘 넘게 틀리면 예전처럼 한 칸 내려간다
+//   · 확인 차례에 틀린 뒤 그만두면 틀린 채 끝낸 확인 편과 같다 — 한 칸 내려가고 내일 다시 (applyQuit)
+// 그래서 그만두는 것보다 쌍둥이를 푸는 쪽이 늘 낫다. 처음 배우기·연습 편은 그대로
+
+/** 💪 칸을 지키나 — 틀린 문항이 꼭 하나이고 그 문항의 쌍둥이를 맞혔다(fx 1) */
+export function keptReview(qs) {
+  const wrong = (Array.isArray(qs) ? qs : []).filter((q) => q && !q.ok);
+  return wrong.length === 1 && wrong[0].fx === 1;
+}
+/** 칸 그림 — 사다리와 같은 것(📏 진단으로 친 칸 · 🥚 🐣 🐥 ⭐ 🏅 👑) */
+export function stageIcon(rec) {
+  if (!rec) return '';
+  return rec.placed ? '📏' : STAGES[Math.min(Math.max(0, rec.box || 0), STAGES.length - 1)];
+}
+/** 오늘 확인 차례인 칸이면 그 그림, 아니면 null — 화면이 편을 열 때 적어 두고 💪 말을 보일지 정한다(편 이름 'review'는 "🤔 한 번 더"에도 붙는다).
+ *  푸는 중 기록에도 due로 남아, 그만둘 때 "확인 편이었나"를 정리하는 날이 아니라 연 날로 본다 (Codex 73차 #1) */
+export function reviewKeep(rec, today) {
+  return rec && rec.done && isDue(rec, today) ? stageIcon(rec) : null;
+}
+/**
+ * 💪 같은 칸을 다른 창이 확인 편으로 열어 이미 틀린 채 풀고 있나(푸는 중 기록 due + 틀린 문항) — 그러면 이 편은 확인이 아니라 연습이다.
+ * 오늘 확인은 먼저 틀린 편이 정한다 — 한 창에서 틀린 채 두고 다른 창에서 다 맞혀 칸을 올리지 못하게 (Codex 73차 #2).
+ * 푸는 중 기록은 이 기기 것만이라 서로 다른 두 기기는 못 막는다(한계)
+ */
+export function rivalWrong(m, id, rid) {
+  return Object.values((m && m.lives) || {}).some((l) => l && l.id === id && l.rid !== rid && l.due && (Array.isArray(l.qs) ? l.qs : []).some((q) => q && !q.ok));
+}
+/**
+ * 💪 아이가 보는 말 — 지키는 것을 그림으로 보여 주고, 칸이 내려간다·몇 번째 같은 셈은 말하지 않는다
+ * @param {string|null} icon reviewKeep·stageIcon
+ * @param {'wrong'|'fixed'|'kept'} step 처음 틀렸을 때 · 쌍둥이를 맞혔을 때(left: 남은 문항 수) · 결과 카드
+ */
+export function keepLine(icon, step, left = 0) {
+  if (!icon) return null;
+  // 결과 보기를 누르기 전에는 "그대로예요"라고 못 박지 않는다 — 그 전에 ←로 나가면 못 통과다 (Codex 73차 #4)
+  if (step === 'wrong') return `💪 괜찮아요! 한 문제는 틀려도 비슷한 문제를 맞히고 끝까지 풀면 ${icon} 그대로예요.`;
+  if (step === 'fixed') return left > 0 ? `💪 좋아요! 남은 문제도 끝까지 맞히면 ${icon} 그대로예요.` : `💪 좋아요! [결과 보기]를 누르면 ${icon} 그대로예요.`;
+  if (step === 'kept') return `💪 틀린 문제와 비슷한 문제를 맞혀서 ${icon} 그대로예요 — 내일 한 번 더 확인해요.`;
+  return null;
+}
+
 /**
  * 문항 하나를 개념 기록에 반영 — 얼굴별(①②③⭐) 누적과 개념별 오개념("이 개념에서 어느 얼굴이 약한가"), 🤔 오답 노트.
  * 개념 편(applyRound)과 ☀️ 섞어 풀기(applyMixRound)가 같은 규칙을 쓴다. 통과·라이트너는 여기서 안 건드린다.
@@ -495,7 +540,7 @@ function noteOf(q, today, prev) {
   return { k: q.k, key: q.key, d: today, t: Date.now(), ...(prev && prev.again ? { again: prev.again } : {}), ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }) };
 }
 
-/** 푸는 중으로 적어 두는 편 수 — 창마다 하나씩이라 넉넉하다. 넘으면 오래된 것부터 그만둠으로 */
+/** 푸는 중으로 적어 두는 편 수 — 창마다 하나씩이라 넉넉하다. 넘으면 오래된 것부터 그만둠으로(칸은 안 건드린다 — 아직 푸는 창일 수 있다, Codex 73차 #3) */
 export const LIVE_MAX = 4;
 const loggedRid = (m, rid) => (Array.isArray(m.log) ? m.log : []).some((e) => e && e.rid === rid);
 const dropLive = (m, rid) => {
@@ -509,14 +554,14 @@ const dropLive = (m, rid) => {
  * ⏹ 푸는 중인 개념 편을 적어 둔다(답할 때마다, v250) — 앱을 닫아도 다음에 수학을 열 때 그만둔 편으로 남게 (Codex 60차 PART 3:
  * 닫는 순간의 저장에 기대지 말고 푸는 동안 적어 두기). **편마다 따로**(m.lives[rid]) — 두 창이 서로의 편을 덮거나 닫지 않게 (Codex 62차 #1).
  * 이미 끝냈거나 그만둔 편(일지에 그 rid)이면 **아무것도 안 바꾼다** — 늦게 도착한 저장이 되살리지도, 다른 편을 건드리지도 않게
- * @param {{rid:number, id:string, mode:string, d:string, n:number, qs:Array}} live
+ * @param {{rid:number, id:string, mode:string, d:string, n:number, due?:1, qs:Array}} live due: 연 날 확인 차례였나(reviewKeep, v262)
  */
 export function setLive(m, live) {
   if (!live || !live.rid || !live.id) return false;
   if (loggedRid(m, live.rid)) return false;
   m.lives = { ...(m.lives || {}), [live.rid]: { ...live, qs: (Array.isArray(live.qs) ? live.qs : []).map((q) => ({ ...q })) } };
   const all = Object.values(m.lives).sort((a, b) => a.rid - b.rid);
-  while (all.length > LIVE_MAX) applyQuit(m, all.shift(), live.d || '');
+  while (all.length > LIVE_MAX) applyQuit(m, all.shift(), live.d || '', { evict: true });
   return true;
 }
 
@@ -545,11 +590,17 @@ export function settleLives(m, keep, today) {
  * ⏹ 그만둔 개념 편 — 한 문제라도 답한 뒤 ←로 나갔거나 앱을 닫았다(다음에 수학을 열 때 정리). applyRound는 끝낸 편 규칙(통과·일정·보상)이라 따로 (Codex 60차 PART 3).
  * 일지에 'quit' 한 줄(그날 편 수에 들어간다 — 그만두고 다시 열어도 보상 단계가 처음으로 안 돌아간다) · 이미 틀린 문항은 🤔 노트에
  * (🙈 실수라고 한 것은 빼고 — recordQ와 같은 규칙, 이유를 고르기 전에 나갔으면 남긴다).
- * 통과·실패 수·일정·얼굴별 누적·오개념 수·편 수·☀️·보상은 안 건드린다. 같은 편(rid)은 한 번만 — 일지에 그 rid가 있으면 아무것도 안 한다.
- * @param {{rid:number, id:string, d:string, n:number, qs:Array<{k:string, ok:0|1, key?:string, tag?:string, w?:string}>}} live 답한 문항까지
+ * 얼굴별 누적·오개념 수·편 수·☀️·보상은 안 건드린다. 같은 편(rid)은 한 번만 — 일지에 그 rid가 있으면 아무것도 안 한다.
+ * 💪 통과·실패 수·일정도 안 건드리지만 하나 다르다(v262): **확인 차례에 연 편에서 틀린 뒤** 그만두면 틀린 채 끝낸 확인 편과 같다 —
+ * 한 칸 내려가고(📏도 지움) 내일 다시, 실패 +1, 일지 줄에 rf. 차례가 내일로 가니 그날 새 편을 받아 다 맞혀도 연습이 된다.
+ * "확인 편"은 연 날의 표시(live.due)와 지금 저장된 칸(오늘도 차례인가) 둘 다로 본다 — 연습 편을 닫았다가 그 칸 차례인 날에 정리해도
+ * 못 통과가 되지 않고(Codex 73차 #1), 다른 창이 먼저 끝내 차례가 지났으면 두 번 내리지 않는다.
+ * 틀리기 전에 나갔거나, 처음 배우기·연습 편이면 예전 그대로. 푸는 중 편이 넘쳐 밀려난 편(o.evict)도 칸은 그대로 — 아직 푸는 창일 수 있다 (Codex 73차 #3)
+ * @param {{rid:number, id:string, d:string, n:number, due?:1, qs:Array<{k:string, ok:0|1, key?:string, tag?:string, w?:string}>}} live 답한 문항까지
+ * @param {{evict?:boolean}} [o]
  * @returns {boolean} 적었나
  */
-export function applyQuit(m, live, today) {
+export function applyQuit(m, live, today, o = {}) {
   if (!live || !live.rid || !live.id) return false;
   dropLive(m, live.rid);
   const qs = Array.isArray(live.qs) ? live.qs.filter(Boolean) : [];
@@ -557,6 +608,14 @@ export function applyQuit(m, live, today) {
   if (loggedRid(m, live.rid)) return false;
   m.concepts = m.concepts || {};
   const rec = m.concepts[live.id] || { done: false, box: 0, dueAt: '', passes: 0, fails: 0, lastAt: 0 };
+  // 💪 확인 차례에 연 편에서 틀린 뒤 그만둠 = 못 통과 (연 날의 표시 + applyRound가 확인 편을 가르는 것과 같은 조건 — 저장소에서 읽은 rec로)
+  const failed = !o.evict && !!live.due && !!rec.done && isDue(rec, today) && qs.some((q) => !q.ok);
+  if (failed) {
+    Object.assign(rec, schedule(rec.box || 0, false, today));
+    rec.schedAt = Date.now();
+    rec.fails = (rec.fails || 0) + 1;
+    delete rec.placed;
+  }
   rec.notes = Array.isArray(rec.notes) ? rec.notes : [];
   for (const q of qs) {
     if (!q.key || q.ok || slipExempt(q)) continue;
@@ -567,7 +626,7 @@ export function applyQuit(m, live, today) {
   if (rec.notes.length > NOTES_MAX) rec.notes.splice(0, rec.notes.length - NOTES_MAX);
   rec.lastAt = Date.now();
   m.concepts[live.id] = rec;
-  pushLog(m, { d: live.d || today, t: Date.now(), rid: live.rid, id: live.id, mode: 'quit', ok: qs.filter((q) => q.ok).length, n: qs.length, of: Number(live.n) || qs.length, qs: qs.map(logQ) });
+  pushLog(m, { d: live.d || today, t: Date.now(), rid: live.rid, id: live.id, mode: 'quit', ok: qs.filter((q) => q.ok).length, n: qs.length, of: Number(live.n) || qs.length, ...(failed ? { rf: 1 } : {}), qs: qs.map(logQ) });
   return true;
 }
 
@@ -582,7 +641,7 @@ export function applyQuit(m, live, today) {
  * @param {string} id 개념
  * @param {{correct:number, total:number, missTags:string[], qs?:Array<{k:string, ok:0|1, tag?:string}>, mode?:string}} r
  *   qs: 문항별 결과(얼굴·정오·고른 오개념) — 개념별 누적(kinds·miss)과 일지(log)에 남는다
- * @returns {{passed:boolean, first:boolean, crowned:boolean, review:boolean, practice:boolean}}
+ * @returns {{passed:boolean, first:boolean, crowned:boolean, review:boolean, practice:boolean, kept:boolean}} kept: 💪 확인 편에서 칸을 지킴 (v262)
  */
 export function applyRound(m, id, r, today) {
   m.concepts = m.concepts || {};
@@ -594,15 +653,19 @@ export function applyRound(m, id, r, today) {
   const wasStage = stageOf(rec);
   let review = false;
   let practice = false;
+  let kept = false; // 💪 확인 편에서 하나만 틀리고 쌍둥이를 맞혀 칸을 지켰나 (v262)
   let late = 0; // ⏰ 확인 차례가 며칠 밀렸나 (확인 편만 — 일정을 바꾸기 전의 dueAt으로, v257)
   // ★ 일정(box·dueAt)이 바뀔 때만 schedAt을 올린다 — 백업 병합(mergeMath)은 일정을 schedAt이 최신인 쪽에서 가져온다.
   //   lastAt은 "마지막 활동"이라 연습·섞어 풀기도 올리는데, 그걸로 일정을 고르면 옛 상태의 기기가 나중에 연습만 해도 👑이 되돌아간다 (Codex 3차 #1)
   if (!wasDone) {
     if (passed) { rec.done = true; Object.assign(rec, enroll(today)); rec.schedAt = Date.now(); }
-  } else if (isDue(rec, today)) {
+  } else if (isDue(rec, today) && !rivalWrong(m, id, r.rid)) { // 💪 다른 창이 이 칸 확인 편에서 이미 틀렸으면 연습 (Codex 73차 #2)
     review = true;
     late = Math.max(0, daysBetween(rec.dueAt, today));
-    Object.assign(rec, schedule(rec.box || 0, passed, today));
+    // 💪 정답 수와 문항 기록이 둘 다 "하나만 틀림"일 때만 — 통과는 아니라 실패 +1, 칸(box)·📏은 그대로 내일 다시 (v262)
+    kept = !passed && r.total - r.correct === 1 && keptReview(r.qs);
+    if (kept) rec.dueAt = addDays(today, 1);
+    else Object.assign(rec, schedule(rec.box || 0, passed, today));
     rec.schedAt = Date.now();
   } else {
     practice = true; // 차례가 아닌 연습 — 일정은 안 건드린다
@@ -611,7 +674,7 @@ export function applyRound(m, id, r, today) {
   rec.lastAt = Date.now();
   // 📏 진단 표시는 일정이 바뀌는 확인(복습)에서만 지운다 — 연습으로 지우면 진단의 box 1이 그대로 🐣가 되어
   // 진단한 날 연습을 0/2로 틀려도 "안다"가 됐다 (Codex 19차 #2). 확인에서 틀리면 box 0 → 🥚로 돌아간다
-  if (review) delete rec.placed;
+  if (review && !kept) delete rec.placed; // 💪 지킨 📏는 그대로 — 지우면 box 1이 그대로 🐣 "안다"가 된다
   for (const q of (r.qs || [])) recordQ(rec, q, today);
   m.concepts[id] = rec;
   for (const t of (r.missTags || [])) if (t) m.miss[t] = (m.miss[t] || 0) + 1;
@@ -620,11 +683,11 @@ export function applyRound(m, id, r, today) {
   // rid: 화면이 편을 열 때 붙인 번호 — 그날 편 수(sameDayRounds)가 같은 편을 두 번 세지 않고, 적어 둔 푸는 중 편(m.lives[rid])을 여기서 닫는다 (v250)
   // sd: 자정을 넘겨 끝냈으면 시작한 날 — 편 수는 시작한 날로 센다(일정·☀️는 끝낸 날 today 그대로, Codex 62차 #2)
   if (r.rid) dropLive(m, r.rid);
-  pushLog(m, { d: today, t: Date.now(), ...(r.rid ? { rid: r.rid } : {}), ...(r.day && r.day !== today ? { sd: r.day } : {}), id, mode, ok: r.correct, n: r.total, qs: (r.qs || []).map(logQ) });
+  pushLog(m, { d: today, t: Date.now(), ...(r.rid ? { rid: r.rid } : {}), ...(r.day && r.day !== today ? { sd: r.day } : {}), id, mode, ok: r.correct, n: r.total, ...(kept ? { kp: 1 } : {}), qs: (r.qs || []).map(logQ) });
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
   // 🐣 방금 "안다"가 됐나 — 🥚 배우는 중·📏 진단으로 친 칸이 다음 날 이후 확인을 통과한 순간 (결과 카드가 축하한다)
   const known = (wasStage === 'learning' || wasStage === 'placed') && stageOf(rec) === 'known';
-  return { passed, first: !wasDone && passed, crowned, review, practice, known, late };
+  return { passed, first: !wasDone && passed, crowned, review, practice, known, late, kept };
 }
 
 /** 이 편의 문항 ⚡💰 몫 (1 · 0.5 · 0) — 화면이 결과 카드에 까닭을 보여 줄 때도 */
@@ -1236,8 +1299,8 @@ export function conceptReport(m, limit = 8) {
     const mine = log.filter((e) => e.id === id);
     // 🤔 노트 회차(id 'notes')·🎲 섞어 풀기(id 'mix')의 이 개념 문항들 — 편의 통과/실패 흔적(trail)에는 안 넣고, 바로 고침·활동에만 센다
     const noteQs = log.filter((e) => e.id === 'notes' || e.id === 'mix' || e.id === 'ask').flatMap((e) => (e.qs || []).filter((q) => q.c === id));
-    // ⏹ 그만둔 편(v250)은 답한 것을 다 맞혔어도 통과가 아니다
-    const trail = mine.slice(-limit).map((e) => ({ d: e.d, ok: e.ok, n: e.n, pass: e.mode !== 'quit' && e.n > 0 && e.ok === e.n, mode: e.mode, ...(e.mode === 'quit' ? { quit: 1, of: e.of || e.n } : {}) }));
+    // ⏹ 그만둔 편(v250)은 답한 것을 다 맞혔어도 통과가 아니다 · 💪 kept: 확인 편에서 칸을 지킴 · rf: 확인 차례에 틀린 뒤 그만둬 못 통과로 침 (v262)
+    const trail = mine.slice(-limit).map((e) => ({ d: e.d, ok: e.ok, n: e.n, pass: e.mode !== 'quit' && e.n > 0 && e.ok === e.n, mode: e.mode, ...(e.mode === 'quit' ? { quit: 1, of: e.of || e.n } : {}), ...(e.kp ? { kept: 1 } : {}), ...(e.mode === 'quit' && e.rf ? { rf: 1 } : {}) }));
     const kinds = Object.entries(rec.kinds || {}).map(([k, v]) => ({ k, label: KIND_SHORT[k] || k, ok: v[0], n: v[1], rate: v[1] ? v[0] / v[1] : 1 }));
     const weak = kinds.filter((x) => x.n >= 2).sort((a, b) => a.rate - b.rate)[0] || null;
     const miss = Object.entries(rec.miss || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag, n]) => ({ tag, n }));
@@ -1276,6 +1339,7 @@ export const GUARD_LIST = 6;
  *   slip: 🙈 "실수"라고 한 오답 { yes: 확인 문제를 맞힘(sv 1) · twin: 확인 문제도 틀림(sv 0 · fx 0) · none: 확인 못 함(sv 0 — 확인 문제가 없거나 그 전에 그만둠) ·
  *         old: 확인 없이 빼 주던 v251 전 기록(sv 없음 — 셈에서 뺀다) } — sv 0을 "쌍둥이 틀림"이라 부르지 않는다(쌍둥이를 틀린 것은 fx 0)
  *   review: 🔍 🎯 까닭 고르기 첫 선택 { ok, n } — 문제에 처음 낸 답일 때만 적혀 있다(applyReviewFirst)
+ *   kept: 💪 확인 편에서 하나만 틀리고 쌍둥이를 맞혀 칸을 지킨 편 [{ id, name, d }] · quits의 rf: 확인 차례에 틀린 뒤 그만둬 못 통과로 친 편 (v262)
  * 날은 편을 시작한 날(sd || d). 일지는 최근 LOG_MAX편까지라 그보다 많이 풀면 오래된 날이 빠진다
  */
 export function guardReport(m, today, days = GUARD_DAYS) {
@@ -1287,7 +1351,9 @@ export function guardReport(m, today, days = GUARD_DAYS) {
   const log = shownLog((m && Array.isArray(m.log)) ? m.log : [])
     .filter((e) => e && inWin(e.sd || e.d) && (e.rid === undefined || (!seen.has(e.rid) && !!seen.add(e.rid))));
   const quits = log.filter((e) => e.mode === 'quit').reverse()
-    .map((e) => ({ id: e.id, name: nameOf(e.id), d: e.d, ok: Number(e.ok) || 0, n: Number(e.n) || 0, of: Number(e.of || e.n) || 0 }));
+    .map((e) => ({ id: e.id, name: nameOf(e.id), d: e.d, ok: Number(e.ok) || 0, n: Number(e.n) || 0, of: Number(e.of || e.n) || 0, ...(e.rf ? { rf: 1 } : {}) }));
+  // 💪 확인 편에서 하나만 틀리고 쌍둥이를 맞혀 칸을 지킨 편 (v262)
+  const kept = log.filter((e) => e.kp && e.mode !== 'quit').reverse().map((e) => ({ id: e.id, name: nameOf(e.id), d: e.d }));
   const byDay = new Map();
   for (const e of log) {
     if (!CONCEPT_MODES.has(e.mode)) continue;
@@ -1316,7 +1382,7 @@ export function guardReport(m, today, days = GUARD_DAYS) {
     review.n += 1;
     if (v[0] === 1) review.ok += 1;
   }
-  return { from, to: today, days: span, quits, repeats, slip, review };
+  return { from, to: today, days: span, quits, repeats, slip, review, kept };
 }
 
 /** 🛡️ 기록을 글 줄로 — 📊 화면과 📋 복사 글(비공개 저장소 math/날짜.md)이 같은 줄을 쓴다. 첫 줄은 제목 */
@@ -1326,10 +1392,12 @@ export function guardLines(g) {
   const s = g.slip;
   const sN = s.yes + s.twin + s.none;
   const old = s.old ? `확인 없이 빼 주던 옛 기록 ${s.old}개는 셈에서 뺐어요` : '';
+  const kept = g.kept || [];
+  const rfN = g.quits.filter((x) => x.rf).length;
   return [
     `🛡️ 최근 ${g.days}일(${md(g.from)}~${md(g.to)}) 꼼수 막기 기록`,
     g.quits.length
-      ? `⏹ 그만둔 편 ${g.quits.length}: ${list(g.quits, (x) => `${x.name} ${md(x.d)} (${x.of}문제 중 ${x.n}개 풀고 ${x.ok}개 맞힘)`)}`
+      ? `⏹ 그만둔 편 ${g.quits.length}${rfN ? `(그중 확인 차례에 틀린 뒤 그만둬 못 통과로 친 편 ${rfN})` : ''}: ${list(g.quits, (x) => `${x.name} ${md(x.d)} (${x.of}문제 중 ${x.n}개 풀고 ${x.ok}개 맞힘${x.rf ? ' · 못 통과로 침' : ''})`)}`
       : '⏹ 그만둔 편 없음',
     g.repeats.length
       ? `🔁 같은 날 같은 개념 여러 편 ${g.repeats.length}: ${list(g.repeats, (x) => `${x.name} ${md(x.d)} ${x.k}편`)}`
@@ -1340,6 +1408,10 @@ export function guardLines(g) {
     g.review.n
       ? `🔍 🎯 까닭 고르기 첫 선택 정답 ${g.review.ok}/${g.review.n} — 맞는 까닭을 골랐다는 뜻이에요(이해했다는 증거는 아니에요)`
       : '🔍 🎯 까닭 고르기 첫 선택 아직 없음 — 문제를 처음 풀 때 틀려서 까닭을 고른 경우만 세요',
+    // 💪 v262 — 줄 순서를 바꾸지 않게 맨 끝에
+    kept.length
+      ? `💪 확인 편에서 한 문제만 틀리고 비슷한 문제를 맞혀 칸을 지킨 편 ${kept.length}: ${list(kept, (x) => `${x.name} ${md(x.d)}`)}`
+      : '💪 확인 편에서 한 문제만 틀리고 비슷한 문제를 맞혀 칸을 지킨 편 없음',
   ];
 }
 
@@ -1351,7 +1423,7 @@ export function mathReportText(m, today) {
   const s = mathSummary(m);
   const lines = [`🔢 신코치 수학 기록 (${today}) — 개념 ${s.total}개 중 🐣 안다 ${s.known} · 🥚 배우는 중 ${s.learning} · 📏 진단으로 침 ${s.placed} · 👑 ${s.crowned} · 지금까지 ${s.rounds}편`];
   for (const r of conceptReport(m, 12)) {
-    const trail = r.trail.map((t) => (t.quit ? `⏹${t.ok}/${t.n}` : t.pass ? '✔' : `✘${t.ok}/${t.n}`)).join(' ');
+    const trail = r.trail.map((t) => (t.quit ? `⏹${t.rf ? '✘' : ''}${t.ok}/${t.n}` : t.pass ? '✔' : `✘${t.ok}/${t.n}${t.kept ? '💪' : ''}`)).join(' '); // 💪 칸 지킴 · ⏹✘ 틀린 뒤 그만둬 못 통과 (v262)
     const kinds = r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(', ');
     const miss = r.miss.map((x) => `${x.tag}×${x.n}`).join(', ');
     lines.push(`- ${r.name}${r.stage ? ` ${STAGE_MARK[r.stage]}` : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}${r.sense[1] ? ` · 감 잡기 ${r.sense[0]}/${r.sense[1]}` : ''}${(r.why.s + r.why.c + r.why.u) ? ` · 틀린 이유: 실수 ${r.why.s}·헷갈림 ${r.why.c}·몰랐음 ${r.why.u}` : ''}${r.pad[1] ? ` · ✍️ 직접 쓴 답 ${r.pad[0]}/${r.pad[1]}${r.guesses.length ? ` (짐작: ${r.guesses.join(', ')})` : ''}` : ''}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`);
@@ -1363,7 +1435,7 @@ export function mathReportText(m, today) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
       const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}${q.w === 's' && q.sv !== undefined ? (q.sv ? '✓' : '✗') : ''}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
-      const res = e.mode === 'quit' ? `⏹그만둠 ${e.ok}/${e.n}${e.of ? ` (${e.of}문제 중)` : ''}` : `${e.mode || ''} ${e.ok}/${e.n}`; // ⏹ 그만둔 편 (v250)
+      const res = e.mode === 'quit' ? `⏹그만둠 ${e.ok}/${e.n}${e.of ? ` (${e.of}문제 중)` : ''}${e.rf ? ' → 확인 못 통과로 침' : ''}` : `${e.mode || ''} ${e.ok}/${e.n}${e.kp ? ' 💪칸 그대로' : ''}`; // ⏹ 그만둔 편 (v250) · 💪 (v262)
       lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? '🎲섞어풀기' : e.id === 'ask' ? '❓답장뒤풀기' : nameOf(e.id)} ${res} ${qs}`);
     }
   }

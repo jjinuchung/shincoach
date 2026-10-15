@@ -13,6 +13,7 @@ import {
   applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, widenRound, rungSub, practiceNote, waitNote, LEARNING_MAX,
   sameDayRounds, repeatNote, roundPay, setLive, applyQuit, settleLives, liveKeep,
   stemPickOrder, LATE, lateBonus, lateLeft, bridgeOf, bridgeOffers,
+  keepLine, reviewKeep, rivalWrong, stageIcon,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -803,7 +804,10 @@ function startRound(id, mode, o = {}) {
   // 편 번호 = 시각 × 1000 + 무작위 세 자리 — 두 기기·두 창이 같은 밀리초에 열어도 안 겹치게, 이 창 안에서는 늘 커지게 (Codex 62차 #3)
   ui.lastRid = Math.max(Date.now() * 1000 + Math.floor(Math.random() * 1000), (ui.lastRid || 0) + 1);
   const rep = repeatNote(ui.state, id, day);
-  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, page: 0, phase: o.again ? 'retry' : mode === 'learn' ? first : 'q', wrong: o.again ? (o.wrong || []) : [], rid: ui.lastRid, day, rep };
+  // 💪 오늘 확인 차례인 칸이면 그 그림(🐥 등) — 한 번 틀렸을 때 "비슷한 문제를 맞히면 🐥 그대로"를 보인다 (v262)
+  //    다른 창이 이 칸 확인 편에서 이미 틀린 채 풀고 있으면 이 편은 연습이라 안 보인다 (Codex 73차 #2)
+  const keep = rivalWrong(ui.state, id, ui.lastRid) ? null : reviewKeep(ui.state && ui.state.concepts && ui.state.concepts[id], day);
+  ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, page: 0, phase: o.again ? 'retry' : mode === 'learn' ? first : 'q', wrong: o.again ? (o.wrong || []) : [], rid: ui.lastRid, day, rep, keep };
   for (const k of Object.keys(ui.locks)) if (Number(k) !== ui.lastRid) releaseRoundLock(k); // 앞 편 잠금은 놓고
   holdRoundLock(ui.lastRid); // 🔒 이 편은 이 창이 푼다 — 다른 창이 그만둠으로 닫지 않게
   if (o.again) renderRetry(id, o.wrong || []);
@@ -1749,7 +1753,8 @@ const conceptQs = (r) => r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1
 // 한 문제라도 답한 개념 편(learn·review·practice — 사다리의 아는 칸은 practice로 연다, ☀️ 개념 편 포함)을 ←로 나가거나 앱을 닫으면 일지에 "그만둠" + 이미 틀린 문항은 🤔 노트.
 // 🎒·📊 다녀오기는 멈춤(ui.round가 그대로). 노트 회차·섞어 풀기·💎·❓·진단은 그대로
 const isConceptRound = (r) => !!(r && r.id && r.rid && (r.mode === 'learn' || r.mode === 'review' || r.mode === 'practice'));
-const liveOf = (r) => ({ rid: r.rid, id: r.id, mode: r.mode, d: r.day || todayKey(), n: r.qs.length, qs: conceptQs(r) });
+// due: 연 날 확인 차례였나(r.keep) — 그만둘 때 못 통과로 칠지는 정리하는 날이 아니라 이 표시로 (Codex 73차 #1)
+const liveOf = (r) => ({ rid: r.rid, id: r.id, mode: r.mode, d: r.day || todayKey(), n: r.qs.length, ...(r.keep ? { due: 1 } : {}), qs: conceptQs(r) });
 // 🔒 지금 이 편을 쥔 창 (Codex 62차 #1) — 편마다 브라우저 잠금(Web Locks)을 쥐고, 수학을 여는 다른 창은 쥔 편을 그만둠으로 닫지 않는다.
 // 창이 닫히거나 앱이 꺼지면 잠금은 저절로 풀린다. Web Locks가 없는 브라우저는 예전처럼(이 창에 없는 편은 그만둠)
 const LOCK_PREFIX = 'shincoach-math-round-';
@@ -2131,6 +2136,7 @@ function paintAnswer(i, list, card, restoring) {
   if (a.pn) fb.appendChild(el('p', `math-pad-note ${ch.ok ? 'ok' : 'no'}`, a.pn)); // "약분하면 3/4" · "분수로 나타내야 해요"
   // 🎲 섞어 풀기는 답하기 전엔 개념 이름을 숨긴다("어떤 개념인지 알아내기"가 목적) — 답한 뒤에 알려 준다 (Codex 3차 #8)
   if (r.mode === 'mix') fb.appendChild(el('p', 'math-mix-concept', `📚 ${nameOf(q.concept)} 문제였어요`));
+  const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && !light(r) && q.key;
   if (ch.ok) {
     fb.appendChild(el('p', 'math-fb ok', ['맞았어요! 🎉', '정확해요! ⭐', '바로 그거예요! 👍'][r.at % 3]));
     // 맞혀도 풀이는 접어 두고 볼 수 있게 — "왜 맞았는지"도 개념이다
@@ -2145,6 +2151,9 @@ function paintAnswer(i, list, card, restoring) {
     const showTag = ch.tag && !META_TAGS.has(ch.tag);
     p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : ch.idk ? '괜찮아요 — 풀이를 천천히 읽어 봐요.' : '아쉬워요.'));
     fb.appendChild(p);
+    // 💪 오늘 확인 차례인 칸에서 처음 틀렸고 비슷한 문제가 나오면 — 그만두지 않아도 된다는 걸 풀이보다 먼저 (v262)
+    const kl = canTwin && r.answers.slice(0, r.at).every((x) => x && x.correct) ? keepLine(r.keep, 'wrong') : null;
+    if (kl) fb.appendChild(el('p', 'math-keep', kl));
     rv = light(r) ? null : { st: a, seed: (r.seed || 0) + r.at * 7919 };
     scrollTo = solveCard(q, shown, rv); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (2026-09-21)
     fb.appendChild(scrollTo);
@@ -2158,7 +2167,6 @@ function paintAnswer(i, list, card, restoring) {
     s.appendChild(document.createTextNode(a.sn ? '' : `${numTail(noun) ? numJosa(noun, '이었어요', '였어요') : josa(noun, '이었어요', '였어요')}. 계산 전에 어느 쪽일지 한 번 더 생각해요.`));
     fb.appendChild(s);
   }
-  const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && !light(r) && q.key;
   const next = el('button', 'btn btn-primary btn-big-wide', canTwin ? '알겠어요, 비슷한 문제 하나 더 →' : r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
   next.addEventListener('click', () => { if (canTwin) startTwin(); else advance(); });
@@ -2783,7 +2791,10 @@ function paintTwin(i, list, card, restoring) {
   // 결과만 말하고 아이의 마음(실수였나)은 넘겨짚지 않는다 (Codex 63차 #4)
   const slipOk = noteQ ? `🙈 확인 문제를 맞혔어요! ⚡+${REWARD.fix.xp} — 이번에는 '또 틀림'으로 세지 않아요` : `🙈 확인 문제를 맞혔어요! ⚡+${REWARD.fix.xp} — 실수로 보고 오답 노트에 안 남겨요`;
   if (ch.ok) {
-    fb.appendChild(el('p', 'math-fb ok', slip ? slipOk : `고쳤어요! 이제 알겠죠? ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`));
+    fb.appendChild(el('p', 'math-fb ok', slip ? slipOk : `고쳤어요! 같은 방법으로 잘 풀었어요 ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`));
+    // 💪 확인 차례 칸에서 틀린 것이 이 문제 하나뿐이면 — 칸을 지켰다고 (남은 문제가 있으면 끝까지) (v262)
+    const kl = r.answers.slice(0, t.of).every((x) => x && x.correct) ? keepLine(r.keep, 'fixed', r.qs.length - t.of - 1) : null;
+    if (kl) fb.appendChild(el('p', 'math-keep', kl));
   } else {
     fb.appendChild(el('p', 'math-fb no', slip ? '🙈 확인 문제도 틀렸어요 — 노트에 남겨 두고 다음에 다시 풀어 봐요. 풀이를 한 번 더 읽어요.' : '아직 헷갈리나 봐요. 풀이를 한 번 더 읽어요.'));
     scrollTo = solveCard(q, shown);
@@ -3075,7 +3086,8 @@ async function finishRound() {
             : '다음 확인은 며칠 뒤예요.')
     : (result.practice
       ? '연습이라 기록은 그대로예요. 이야기를 다시 읽어 봐요.'
-      : '아직 조금 헷갈리나 봐요. 이야기를 다시 읽고 한 번 더 해 봐요 — 틀린 게 있으면 "안다"가 안 돼요.')));
+      : (result.kept && keepLine(stageIcon(state && state.concepts && state.concepts[r.id]), 'kept')) // 💪 (v262)
+        || '아직 조금 헷갈리나 봐요. 이야기를 다시 읽고 한 번 더 해 봐요 — 틀린 게 있으면 "안다"가 안 돼요.')));
   const shown = kidTags(r.missTags);
   if (shown.length) {
     const tags = el('p', 'math-tags');

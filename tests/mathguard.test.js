@@ -87,7 +87,7 @@ test('🛡️ 🔍 첫 선택: 기간 안의 m.chal.rf만 · 맞음/전체', () 
   assert.deepEqual(guardReport(m, T).review, { ok: 1, n: 2 });
 });
 
-test('🛡️ guardLines: 제목 + 네 줄 · 없으면 "없음" · 많으면 "외 N" · 옛 실수는 뺐다고 · 🔍는 분모와 함께, 이해의 증거가 아니라고', () => {
+test('🛡️ guardLines: 제목 + 다섯 줄 · 없으면 "없음" · 많으면 "외 N" · 옛 실수는 뺐다고 · 🔍는 분모와 함께, 이해의 증거가 아니라고', () => {
   const none = guardLines(guardReport(emptyMath(), T));
   assert.deepEqual(none, [
     '🛡️ 최근 7일(10-07~10-13) 꼼수 막기 기록',
@@ -95,6 +95,7 @@ test('🛡️ guardLines: 제목 + 네 줄 · 없으면 "없음" · 많으면 "�
     '🔁 같은 날 같은 개념 여러 편 없음',
     '🙈 "실수"라고 한 오답 없음',
     '🔍 🎯 까닭 고르기 첫 선택 아직 없음 — 문제를 처음 풀 때 틀려서 까닭을 고른 경우만 세요',
+    '💪 확인 편에서 한 문제만 틀리고 비슷한 문제를 맞혀 칸을 지킨 편 없음', // v262 — 맨 끝에
   ]);
   const m = emptyMath();
   applyQuit(m, { rid: 1, id: ID, d: T, n: 4, qs: [{ k: 'calc', ok: 1 }, { k: 'calc', ok: 0 }] }, T);
