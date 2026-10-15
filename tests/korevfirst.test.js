@@ -69,11 +69,11 @@ test('💡 원고 검사가 잡는다 (v258) — 한 곳만 틀리게: 근거 �
   }
 });
 
-test('💡 원고 (v258): 근거가 없는 물음 54개에 모두 둘째 힌트 · 근거가 있는 물음엔 없음 · 정답을 말하지 않음 · 🎧은 번호 없이 · 짧게', () => {
+test('💡 원고 (v258): 근거가 없는 물음 58개(v261 새 글 넷 더함)에 모두 둘째 힌트 · 근거가 있는 물음엔 없음 · 정답을 말하지 않음 · 🎧은 번호 없이 · 짧게', () => {
   assert.deepEqual(checkContent(DATA), []);
   const all = DATA.cards.flatMap((c) => c.qs.map((q) => ({ c, q })));
   const noEv = all.filter(({ q }) => q.ev === null || q.ev === undefined);
-  assert.equal(noEv.length, 54, '글 36 · 🎧 18');
+  assert.equal(noEv.length, 58, '글 40 · 🎧 18 (v261 K61-3·K67-1·K68-2·K69-3 더함)');
   assert.equal(noEv.filter(({ c }) => c.listen).length, 18);
   for (const { c, q } of all) {
     if (q.ev === null || q.ev === undefined) {
@@ -93,8 +93,8 @@ test('💡 원고 (v258): 근거가 없는 물음 54개에 모두 둘째 힌트 
 });
 
 test('📚 새 시 일곱 (v258): 윤동주 셋 · 정지용 · 시조 둘 · 김소월 — 원문 대조 · 모두 근거가 있는 물음 셋(근거 먼저가 된다) · 저작권 해 · ⭐ 미리보기 둘 · 단원 지도', () => {
-  assert.deepEqual(IDS.slice(-7), NEW);
-  assert.equal(validCards(DATA).length, 60);
+  assert.deepEqual(IDS.slice(53, 60), NEW);
+  assert.equal(validCards(DATA).length, 72); // v261 새 글 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre, card(id).author]), [
     ['classic', '동시', '윤동주'], ['classic', '동시', '윤동주'], ['classic', '동시', '윤동주'], ['classic', '동시', '정지용'],
     ['classic', '시조', '남구만'], ['classic', '시조', '길재'], ['classic', '시', '김소월']]);
@@ -113,7 +113,7 @@ test('📚 새 시 일곱 (v258): 윤동주 셋 · 정지용 · 시조 둘 · �
   assert.ok(!/[ᄀ-ᇿꥠ-꥿ힰ-퟿]/.test(JSON.stringify(NEW.map(card))), '옛 글자 없음');
   // 📘 단원 — 동시 둘은 「빗대어 표현해요」, 나머지 셋은 「작품을 감상해요」 · ⭐ 미리보기는 단원 밖(K32~K35와 같게)
   const of = (u) => UNITS.find((x) => x.id === u).cards;
-  assert.deepEqual([of('5-1-6').slice(-2), of('5-2-6').slice(-3)], [['K54', 'K55'], ['K56', 'K57', 'K58']]);
+  assert.deepEqual([of('5-1-6').filter((id) => NEW.includes(id)), of('5-2-6').filter((id) => NEW.includes(id))], [['K54', 'K55'], ['K56', 'K57', 'K58']]); // v261 새 글은 그 뒤에
   for (const id of ['K59', 'K60']) assert.ok(!UNITS.some((u) => u.cards.includes(id)), `${id} 단원 밖`);
   // 풀이가 갈리는 줄은 묻지 않았다고 적는다 · 낱말은 사전에서 확인한 뜻
   assert.match(card('K60').facts.find((f) => f[0] === '알아 둘 것')[1], /말 그대로의 뜻만 물었어요/);

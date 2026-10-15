@@ -356,9 +356,9 @@ const listenAct = {
   },
 };
 
-/** 번호 붙은 문장 — 연습 글과 이야기 명작(「알에서 태어나다」)이 같이 쓴다 */
+/** 번호 붙은 문장 — 연습 글과 이야기 명작(「알에서 태어나다」)이 같이 쓴다 · layout rows면 문장마다 줄을 바꾼다(v261 극본·두 글·기사) */
 function proseEl(card) {
-  const prose = el('p', 'kor-prose');
+  const prose = el('p', card.layout === 'rows' ? 'kor-prose is-rows' : 'kor-prose');
   card.lines.forEach((t, i) => {
     const sp = el('span', 'kor-sent');
     sp.dataset.n = String(i + 1);

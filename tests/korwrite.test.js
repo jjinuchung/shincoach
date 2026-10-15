@@ -32,9 +32,9 @@ const R = (card, w, grade, text) => ({ card, id: w.id, at: w.at, grade, text });
 /** 옛 꼴(id 없이 저장된 글)의 이름표 */
 const E = (at, text) => ({ id: writeIdOf(at, text), at });
 
-test('✍️ 원고: 서술형은 K1·K7·K15·K17·K19 + v241 K20(처음 해 본 일)·K26(방언·표준어)·K31(토끼전 인물) + v254 K44(분류)·K48(인상 깊은 장면)·K53(흥부와 놀부) · 판 번호 1 · 꼭 들어갈 생각·괜찮은 답·흔한 잘못·예시 답 · 검사가 잡는 것', () => {
+test('✍️ 원고: 서술형은 K1·K7·K15·K17·K19 + v241 K20(처음 해 본 일)·K26(방언·표준어)·K31(토끼전 인물) + v254 K44(분류)·K48(인상 깊은 장면)·K53(흥부와 놀부) + v261 K61(기사 내용으로 친구에게)·K62(주장에 대한 내 생각과 근거의 출처) · 판 번호 1 · 꼭 들어갈 생각·괜찮은 답·흔한 잘못·예시 답 · 검사가 잡는 것', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(DATA.cards.filter((c) => c.write).map((c) => c.id), ['K1', 'K7', 'K15', 'K17', 'K19', 'K20', 'K26', 'K31', 'K32', 'K44', 'K48', 'K53']);
+  assert.deepEqual(DATA.cards.filter((c) => c.write).map((c) => c.id), ['K1', 'K7', 'K15', 'K17', 'K19', 'K20', 'K26', 'K31', 'K32', 'K44', 'K48', 'K53', 'K61', 'K62']);
   for (const c of DATA.cards.filter((x) => x.write)) {
     assert.equal(c.write.v, 1, c.id);
     assert.ok(c.write.rubric.must.length >= 2, `${c.id}: 생각 + 까닭(근거)`);

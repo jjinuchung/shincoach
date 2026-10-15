@@ -54,6 +54,8 @@ export const KINDS = { practice: '📄 연습 카드', classic: '✨ 명작 카�
 /** ⭐ 미리보기 카드(pre) — 5학년 단원 밖, 다음 학교에서 만날 작품을 미리 (v244, 수학 M9 ⭐ 중1 미리보기처럼) ·
  *  도감 맨 뒤에 따로 · 잠그지 않고 보상은 같다 · 작품이 학년마다·출판사마다 달라 "중1"이 아니라 "중학교"로 */
 export const PRE = { '중학교': '⭐ 중학교 미리보기' };
+/** 글 꼴(layout, v261) — rows면 문장마다 줄을 바꾼다(극본의 대사 · 두 사람의 글 · 기사 제목처럼 줄이 나뉘어야 읽기 쉬운 글) · 없으면 이어 쓴 문단 */
+export const LAYOUTS = { rows: '문장마다 줄 바꿈' };
 
 /** ✍️ 서술형 답 글자 수 (공백 정리 뒤) — 규칙은 korwrite.js, 원고 검사(write.model)도 같은 값 (v237) */
 export const WRITE_MIN = 10;
@@ -419,6 +421,7 @@ export function checkCard(c, ids = new Set()) {
   const hasLines = Array.isArray(c.lines);
   const hasStanzas = Array.isArray(c.stanzas);
   if (hasLines === hasStanzas) at('글은 lines 또는 stanzas 하나만');
+  if (own(c, 'layout') && (!own(LAYOUTS, c.layout) || !hasLines)) at(`layout(글 꼴)은 ${Object.keys(LAYOUTS).join('·')}만 — 문장(lines)으로 된 글에`);
   if (hasLines && (!c.lines.length || c.lines.length > 20 || !c.lines.every(nonEmpty))) at('lines는 1~20개의 문장');
   if (hasStanzas && (!c.stanzas.length || !c.stanzas.every((s) => Array.isArray(s) && s.length && s.every(nonEmpty)) || lineCount(c) > 20)) at('stanzas는 연마다 줄 하나 이상(모두 20줄까지)');
   if (c.kind === 'classic') {
@@ -528,7 +531,7 @@ export function checkListen(c) {
   const whoOk = Array.isArray(who) && who.length <= LISTEN_WHO_MAX && who.every((w) => nonEmpty(w) && /^[가-힣]{1,6}$/.test(w)) && new Set(who).size === who.length;
   if (!whoOk) errs.push(`listen.who는 0~${LISTEN_WHO_MAX}명의 서로 다른 이름(한글 1~6자)`);
   if (c.kind !== 'practice') errs.push('듣기 카드는 신코치가 쓴 연습 카드(practice)만');
-  for (const k of ['words', 'write', 'pre', 'stanzas']) if (own(c, k)) errs.push(`듣기 카드에는 ${k}가 없어요 — 글이 보이지 않아요`);
+  for (const k of ['words', 'write', 'pre', 'stanzas', 'layout']) if (own(c, k)) errs.push(`듣기 카드에는 ${k}가 없어요 — 글이 보이지 않아요`);
   if (!Array.isArray(c.lines)) { errs.push('듣기 카드의 글은 lines(문장)로'); return errs; }
   if (c.lines.length < LISTEN_LINES.min || c.lines.length > LISTEN_LINES.max) errs.push(`듣기 카드는 ${LISTEN_LINES.min}~${LISTEN_LINES.max}줄`);
   const spoke = new Set();
