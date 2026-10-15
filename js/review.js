@@ -30,7 +30,8 @@ export const REWARD = {
   bonusCoin: 10,
   hp: 15,         // 파트너 HP 회복 (물약 없이 회복하는 유일한 공짜 수단)
   golden: 1,      // 🌟 황금 몬스터볼 — 하루 1개만, 복습에서만 나온다
-  stone: 1,       // 🔶 영어스톤 — 회차의 문항을 전부 통과했을 때 (복습은 밀린 문장이 있을 때만 열려 유한)
+  stone: 1,       // 🔶 영어스톤 — 회차의 문항을 거의 다 통과했을 때(nearMin개 이상이면 하나까지 못 넘겨도) (복습은 밀린 문장이 있을 때만 열려 유한)
+  nearMin: 3,     // 🔶 "하나까지 괜찮아요"가 되는 회차의 문항 수 (2026-10-15 v263 — 둘 이하 회차에서 하나를 빼 주면 절반만 맞혀도 나온다)
   dwStone: 1,     // 🔶 +1 — 회차의 ✍️ 받아쓰기·🔤 단어를 다 맞혔을 때 (2026-10-06, 아버님 9/22 결정 "받아쓰기·단어 만점 +1" 되살림)
 };
 /** 말하기를 몇 번 미달하면 넘어가는지 (복습은 짧게 끝나야 하므로 평소 3번보다 적게) */
@@ -299,16 +300,21 @@ export function pickDueItem(records, today, itemIds = []) {
  * 두 번째부터 빈손이면 아이가 "왜 또 해?"가 된다. 회복량은 회차당 15로 작고,
  * 복습은 밀린 문장이 있을 때만 열리므로 무한정 회복되지는 않는다.
  */
+/** 🔶 이 회차에서 못 넘겨도 되는 문항 수 (순수, v263) — 문항이 REWARD.nearMin개 이상이면 하나, 아니면 0 */
+export function reviewSlack(n) {
+  return (Number(n) || 0) >= REWARD.nearMin ? 1 : 0;
+}
 /**
  * 🔶 이 회차가 주는 영어스톤 (순수, 2026-10-06 — 진우 "영어 스톤 구하기가 너무 힘들다").
- *   all: 회차의 문항(문장·받아쓰기·단어)을 **전부** 통과 — 하나라도 못 넘기면 0 (다 틀려도 완주만 하면 나오던 것을 막은 Codex 6차 그대로)
+ *   all: 회차의 문항(문장·받아쓰기·단어)을 **거의 다** 통과 — 못 넘긴 문항이 reviewSlack(n)개 이하(셋 이상 회차는 하나까지, 2026-10-15 v263 아버님 결정).
+ *        둘 넘게 못 넘기면 0 (다 틀려도 완주만 하면 나오던 것을 막은 Codex 6차 그대로)
  *   dw: 회차에 ✍️ 받아쓰기·🔤 단어 문항이 있었고 그것을 **다** 맞힘 — 따라 말하기에서 미끄러져도 받는다 (아버님 9/22 결정 "받아쓰기·단어 만점 +1")
  * 💖 덤은 어느 쪽에도 안 센다. 하루 몇 회차까지인지는 track.claimReviewStone이 정한다.
- * @param {{fails?:number, dw?:number, dwFails?:number}} o fails: 못 넘긴 문항 수 · dw: 받아쓰기·단어 문항 수 · dwFails: 그중 못 넘긴 수
+ * @param {{fails?:number, n?:number, dw?:number, dwFails?:number}} o fails: 못 넘긴 문항 수 · n: 회차 문항 수(💖 덤 빼고) · dw: 받아쓰기·단어 문항 수 · dwFails: 그중 못 넘긴 수
  * @returns {{all:number, dw:number}}
  */
-export function reviewStones({ fails = 0, dw = 0, dwFails = 0 } = {}) {
-  return { all: fails === 0 ? REWARD.stone : 0, dw: dw > 0 && dwFails === 0 ? REWARD.dwStone : 0 };
+export function reviewStones({ fails = 0, n = 0, dw = 0, dwFails = 0 } = {}) {
+  return { all: fails <= reviewSlack(n) ? REWARD.stone : 0, dw: dw > 0 && dwFails === 0 ? REWARD.dwStone : 0 };
 }
 
 export function roundReward(alreadyRewardedToday) {
@@ -427,7 +433,8 @@ export function openReview(o) {
     // 🔶 영어스톤 받는 법 — 무엇을 하면 받는지 아이가 미리 알게 (2026-10-06). 오늘 몫을 다 받았으면 그렇게 말한다
     if (o.stoneLeft === 0) rw.appendChild(el('span', 'review-chip dim', '🔶 복습 영어스톤은 오늘 다 받았어요'));
     else {
-      rw.appendChild(el('span', 'review-chip stone', '🔶 다 맞히면 영어스톤 +1'));
+      // 💪 하나까지 괜찮아요 (v263) — 문항이 셋 이상인 회차만 (💖 덤 빼고)
+      rw.appendChild(el('span', 'review-chip stone', reviewSlack(o.items.filter((it) => it && !it.extra).length) ? '🔶 하나까지 틀려도 영어스톤 +1' : '🔶 다 맞히면 영어스톤 +1'));
       if (nDict + nWord) rw.appendChild(el('span', 'review-chip stone', '🔶 받아쓰기·단어 만점 +1')); // 칩 하나에 둘을 넣으면 폰에서 두 줄이 된다 (헤드리스)
     }
   }
@@ -829,7 +836,7 @@ function showDone() {
     if (given.hp) rw.appendChild(el('span', 'review-chip hp', `❤️ +${given.hp}`));
     rw.appendChild(el('span', 'review-chip', `⚡+${given.xp} 💰+${given.coin}`));
     // 🔶 받은 영어스톤을 까닭과 함께 — 말없이 가방에만 들어가면 아이는 받은 줄 모른다 (2026-10-06)
-    if (given.stoneAll) rw.appendChild(el('span', 'review-chip stone', `🔶 영어스톤 +${given.stoneAll} (전부 통과)`));
+    if (given.stoneAll) rw.appendChild(el('span', 'review-chip stone', `🔶 영어스톤 +${given.stoneAll} (${given.stoneNear ? '하나 빼고 다 통과' : '전부 통과'})`));
     if (given.stoneDw) rw.appendChild(el('span', 'review-chip stone', `🔶 영어스톤 +${given.stoneDw} (받아쓰기·단어 만점)`));
     if (given.stoneCapped) rw.appendChild(el('span', 'review-chip dim', '🔶 복습 영어스톤은 오늘 다 받았어요'));
     box.appendChild(rw);

@@ -5,7 +5,7 @@ import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { mergeReviewFirst } from './mathchal.js'; // 🔍 🎯 까닭 고르기 첫 선택 합치기 (v252) — mathchal.js는 아무것도 import하지 않는다
 import { canEvolve, capReason, evoAt, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
-import { SHINY_USES, SHINY_CHARGE, PARCEL_COIN, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, VIDEO_STONE, videoParcelId, videoPlusId, videoGrant } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
+import { SHINY_USES, SHINY_CHARGE, PARCEL_COIN, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, videoOwed } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
@@ -350,11 +350,14 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // 🚀 오늘 로켓단이 나온 수 (2026-10-09) — 과목마다 하루 3번(아버님), claimDailyCount로 선점. 병합 maxOf라 옛 백업으로 한도를 되살리지 못한다
   'rocketMath', 'rocketEn',
   // 🎤 ⏭ 직접 넘김 · 3번 해 보고 넘어감 · 연속 보너스를 받은 수 (2026-10-14 v253) — 연속 보너스는 claimDailyCount로 선점(하루 상한)
-  'speakSkipBtn', 'speakGaveUp', 'speakCombos'];
+  'speakSkipBtn', 'speakGaveUp', 'speakCombos',
+  // 🎤 따라 말하기로 받은 🔶 수 (2026-10-15 v263) — 셈은 문장 목록 speakFirstKeys의 길이, 받기는 applySpeakStone(가방과 한 트랜잭션)
+  'speakStones'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 // 💖 덤으로 풀어 ⚡💰를 받은 문장 — 두 창이 같은 덤을 내도 한 번 (Codex 20차 #4)
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys'];
+// 🎤 오늘 처음 통과한 문장(따라 말하기 🔶의 셈, v263) — 두 창이 같은 문장을 통과해도·다른 기기 기록과 합쳐도 한 번 (Codex 74차 #3)
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys'];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {
@@ -488,6 +491,42 @@ export async function applyExtend(date, field, itemId, max) {
   const curD = await promisify(ds.get(date));
   const next = cloneProfile(curP);
   const r = extendRule(next, curD, date, field, itemId, max);
+  if (!r.ok) { await txDone(tx); return { ...r, profile: curP }; }
+  next.updatedAt = nextStamp(curP);
+  ps.put(next);
+  ds.put(r.daily);
+  await txDone(tx);
+  return { ...r, profile: next };
+}
+
+/**
+ * 🔶 따라 말하기 영어스톤 규칙 (순수, 2026-10-15 v263) — 오늘 처음 통과한 문장(speakFirstKeys)이 every개 모일 때마다 하나, 하루 max개.
+ * 받을 만하면 오늘 받은 수(speakStones) +1과 가방 🔶 +1을 **같은 자리에서** (Codex 74차 #4: 선점과 가방을 따로 쓰면 그 사이에 꺼질 때 영영 잃는다).
+ * 고친 프로필 복사본은 profile에 그대로 (호출부가 저장)
+ * @returns {{ok:boolean, why?:'none', daily:object}}
+ */
+export function speakStoneRule(profile, curDaily, date, every, max) {
+  const have = (curDaily && Number(curDaily.speakStones)) || 0;
+  const n = curDaily && Array.isArray(curDaily.speakFirstKeys) ? curDaily.speakFirstKeys.length : 0;
+  if (have >= Number(max) || Math.floor(n / Math.max(1, Number(every) || 1)) <= have) return { ok: false, why: 'none', daily: curDaily || emptyDaily(date) };
+  addCount(profile.items, STONE_ENGLISH.id, 1);
+  return { ok: true, daily: mergeDailyDelta(curDaily, date, { speakStones: 1 }) };
+}
+
+/**
+ * 🔶 따라 말하기 영어스톤 받기 — `profile`(가방)과 `daily`(문턱·받은 수)를 **한 트랜잭션에서** (⏳ 연장권 applyExtend와 같은 모양).
+ * 두 창이 같은 문턱에서 불러도 하나만 · 문턱 전에는 없다 · 저장이 안 되면 둘 다 안 바뀐다(다음에 다시 본다)
+ * @returns {Promise<{ok:boolean, why?:string, profile:object, daily:object}>}
+ */
+export async function applySpeakStone(date, every, max) {
+  const db = await openDb();
+  const tx = db.transaction(['profile', 'daily'], 'readwrite');
+  const ps = tx.objectStore('profile');
+  const ds = tx.objectStore('daily');
+  const curP = (await promisify(ps.get('me'))) || emptyProfile();
+  const curD = await promisify(ds.get(date));
+  const next = cloneProfile(curP);
+  const r = speakStoneRule(next, curD, date, every, max);
   if (!r.ok) { await txDone(tx); return { ...r, profile: curP }; }
   next.updatedAt = nextStamp(curP);
   ps.put(next);
@@ -1413,12 +1452,12 @@ export function applyParcel(raw) {
 }
 
 /**
- * 🏁 영상 끝까지 → 💰 + 🔶 (2026-10-06 v197 🔶3 → v201 길이별 items.VIDEO_TIERS). **한 트랜잭션**: 받은 몫은 구호품과 같은
- * profile.parcels에 'video:<id>'(🔶 3개) · 'videoplus:<id>'(길이별 나머지)로 적는다 → 두 창이 같은 영상을 동시에 넘겨도,
- * 옛 백업을 되돌려도(합집합) 한 번만. v197에 🔶3만 받은 지난 영상은 videoplus만 남아 차액을 받는다.
- * 90%를 넘겼는지는 부르는 쪽이 본다(player 문장마다 · 📦 창이 앱을 열 때) — 여기서는 "이미 받았나"와 길이별 셈만
- * @param {Array<{id:string, total?:number}|string>} list 영상 id와 문장 수 (모르면 짧은 영상)
- * @returns {{ok:boolean, why?:string, ids?:string[], items?:Object, coins?:number}} why: 'done'(모두 이미 받음)
+ * 🏁 영상 보상 → 💰 + 🔶 (2026-10-06 v197 🔶3 → v201 길이별 items.VIDEO_TIERS → v263 🎤 말해 본 문장 눈금마다 나눠). **한 트랜잭션**: 받은 몫은 구호품과 같은
+ * profile.parcels에 눈금 'videostep:<id>:<25|50|75>' · 90%는 'video:<id>'·'videoplus:<id>'로 적는다 → 두 창이 같은 영상을 동시에 넘겨도,
+ * 옛 백업을 되돌려도(합집합) 한 번만. 받을 양은 items.videoOwed — 받은 기록에서 이미 받은 양을 다시 세니 옛 규칙으로 받은 영상과 겹치지 않는다.
+ * 말해 본 문장 %(pct)는 부르는 쪽이 센다(player 문장마다 · 📦 창이 앱을 열 때) — pct가 없으면 받을 것이 없다
+ * @param {Array<{id:string, total?:number, pct?:number}>} list 영상 id · 문장 수(모르면 짧은 영상) · 🎤 말해 본 문장 %
+ * @returns {{ok:boolean, why?:string, ids?:string[], items?:Object, coins?:number}} why: 'done'(받을 것이 없음 — 이미 받았거나 눈금 전)
  */
 export function videoStoneRule(profile, list, now = Date.now()) {
   const seen = new Set();
@@ -1427,21 +1466,18 @@ export function videoStoneRule(profile, list, now = Date.now()) {
     const id = v && typeof v === 'object' ? v.id : v;
     if (id === undefined || id === null || id === '' || seen.has(String(id))) continue;
     seen.add(String(id));
-    vids.push({ id: String(id), total: v && typeof v === 'object' ? Number(v.total) || 0 : 0 });
+    vids.push({ id: String(id), total: v && typeof v === 'object' ? Number(v.total) || 0 : 0, pct: v && typeof v === 'object' ? Number(v.pct) || 0 : 0 });
   }
   profile.parcels = { ...(profile.parcels || {}) };
   let coins = 0;
   let stones = 0;
   const got = [];
   for (const v of vids) {
-    const base = !parcelGot(profile.parcels, videoParcelId(v.id));
-    const plus = !parcelGot(profile.parcels, videoPlusId(v.id));
-    if (!base && !plus) continue;
-    const g = videoGrant({ total: v.total, base, plus });
-    if (base) profile.parcels[videoParcelId(v.id)] = now;
-    if (plus) profile.parcels[videoPlusId(v.id)] = now;
-    coins += g.coins;
-    stones += g.stones;
+    const o = videoOwed(v, profile.parcels);
+    if (!o.stones && !o.coins) continue;
+    for (const k of o.keys) profile.parcels[k] = now;
+    coins += o.coins;
+    stones += o.stones;
     got.push(v.id);
   }
   if (!got.length) return { ok: false, why: 'done' };

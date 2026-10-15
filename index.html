@@ -186,7 +186,11 @@
           </div>
           <span id="cue-counter" class="cue-counter">0 / 0</span>
           <!-- 🎤 말해 본 문장 (v253) — 🏁 영상 보상을 이것으로 센다 (⏭로 넘긴 문장은 안 셈) -->
-          <span id="said-counter" class="said-counter" hidden>🎤 말한 문장 0/0</span>
+          <span id="said-wrap" class="said-wrap" hidden>
+            <span id="said-counter" class="said-counter" hidden>🎤 말한 문장 0/0</span>
+            <!-- 🔶 눈금 25·50·75·90% (v263) — 말해 본 문장이 넘을 때마다 🔶 -->
+            <span id="said-bar" class="said-bar" hidden aria-hidden="true"><span id="said-fill" class="said-fill"></span><i id="said-tick-25" class="said-tick" style="left:25%"></i><i id="said-tick-50" class="said-tick" style="left:50%"></i><i id="said-tick-75" class="said-tick" style="left:75%"></i><i id="said-tick-90" class="said-tick" style="left:90%"></i></span>
+          </span>
         </div>
 
         <details id="vocab-panel" class="vocab-panel" hidden>

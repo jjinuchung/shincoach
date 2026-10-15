@@ -529,6 +529,42 @@ export function claimSpeakCombo(max) {
   return claim('speakCombos', max, true); // 💰라 저장이 안 되면 안 준다 — 메모리로 성공 처리하면 두 창이 상한을 넘긴다 (Codex 65차 #4)
 }
 
+/**
+ * 🎤 오늘 처음 통과한 문장 하나를 오늘 기록의 문장 목록(speakFirstKeys)에 트랜잭션으로 적는다 — 따라 말하기 🔶의 셈 (v263).
+ * 셈은 목록의 길이: 두 창이 같은 문장을 통과해도, 다른 기기 기록과 합쳐도(합집합) 같은 문장은 한 번 (Codex 74차 #3 — 창마다 메모리로 세면 둘로 셌다).
+ * 저장이 안 되면 안 센다 — 🔶은 되돌릴 수 없으니 한 번 덜 세는 쪽
+ * @returns {Promise<boolean>} 새로 적었나
+ */
+export async function claimSpeakFirst(cue) {
+  if (!t.daily || !t.item || !cue) return false;
+  const key = sentenceKey(t.item.id, cue.start);
+  const date = t.daily.date;
+  try {
+    const r = await claimDailyKey(date, 'speakFirstKeys', key);
+    adoptSaved(date, r.daily);
+    return r.won;
+  } catch { return false; }
+}
+/** 🎤 오늘 처음 통과한 문장 수 · 그것으로 받은 🔶 수 (v263) */
+export function todaySpeakFirst() {
+  return t.daily && Array.isArray(t.daily.speakFirstKeys) ? t.daily.speakFirstKeys.length : 0;
+}
+export function todaySpeakStones() {
+  return t.daily ? (Number(t.daily.speakStones) || 0) : 0;
+}
+/** 🔶 따라 말하기 몫이 남았나 — 문턱(every개마다)을 넘었고 하루 max개 전 (보기값 — 진짜 판정은 db.speakStoneRule 트랜잭션) */
+export function speakStoneDue(every, max) {
+  return todaySpeakStones() < max && Math.floor(todaySpeakFirst() / every) > todaySpeakStones();
+}
+/** 오늘 기록의 날 (없으면 '') — 🔶 따라 말하기 받기가 이 날 기록을 본다 */
+export function dailyDate() {
+  return t.daily ? t.daily.date : '';
+}
+/** 다른 저장소와 한 트랜잭션으로 고친 오늘 기록을 보기값으로 (🔶 따라 말하기 — xp.receiveSpeakStone, v263) */
+export function adoptDaily(saved) {
+  if (saved && saved.date) adoptSaved(saved.date, saved);
+}
+
 /** 🔤 오늘 단어 이어 주기를 몇 판 했는지 / 한 판 선점 (하루 상한) */
 export function todayMatches() {
   return t.daily ? (t.daily.matches || 0) : 0;

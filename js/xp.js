@@ -12,6 +12,7 @@ import {
   applyTrade, // 🤝 교환 상인 (2026-10-05, 🏪 2단계)
   applyParcel, // 📦 아빠의 구호품 (2026-10-05)
   applyVideoStones, // 🏁 영상 끝까지 → 🔶 (2026-10-06)
+  applySpeakStone, // 🎤 따라 말하기 → 🔶 (2026-10-15 v263)
   applySell, // 💰 5일장 팔기 (2026-10-05)
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
   applyRocketSteal, applyRocketWin, applyRocketAdmit, applyRocketStep, // 🚀 로켓단 습격 (2026-10-09) — 저장이 안 되면 메모리로 잇지 않는다 (Codex 43차 #2)
@@ -27,7 +28,7 @@ import { writeAddRule, writeReplyRule, writeReadRule, writesOf } from './korwrit
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
-import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, parcelGot, videoParcelId, videoPlusId, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
+import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, videoOwed, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, MAX_LV } from './evolve.js';
 import { stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
@@ -1023,9 +1024,10 @@ export async function receiveParcel(raw) {
   return { ok: !!(r && r.ok), why: r && r.why, items: r && r.items };
 }
 
-/** 🏁 이 영상의 끝까지 보상(🔶 3개 + 길이별 나머지)을 다 받았나 (메모리 프로필 — 최종 판정은 db.videoStoneRule이 저장된 기록으로) */
-export function videoStoneGot(itemId) {
-  return parcelGot(profile.parcels, videoParcelId(itemId)) && parcelGot(profile.parcels, videoPlusId(itemId));
+/** 🎤 이 영상에서 지금 받을 💰·🔶이 있나 — 말해 본 문장 눈금(v263) (메모리 프로필 — 최종 판정은 db.videoStoneRule이 저장된 기록으로) */
+export function videoStoneOwed(v) {
+  const o = videoOwed(v, profile.parcels);
+  return o.stones > 0 || o.coins > 0;
 }
 
 /**
@@ -1037,6 +1039,16 @@ export function videoStoneGot(itemId) {
 export async function receiveVideoStones(list) {
   const r = await runProfileOp(() => applyVideoStones(list), () => ({ ok: false, why: 'save' }));
   return { ok: !!(r && r.ok), why: r && r.why, ids: (r && r.ids) || [], items: r && r.items, coins: (r && r.coins) || 0 };
+}
+
+/**
+ * 🎤 따라 말하기 → 🔶 받기 (v263) — 오늘 기록의 문턱 다시 보기·받은 수 +1·가방 🔶 +1을 **한 트랜잭션에서** (db.applySpeakStone).
+ * 선점만 되고 가방에 안 들어가는 틈이 없다 (Codex 74차 #4). 저장이 안 되면 안 준다 — 셈은 저장된 채라 다음에 다시 본다
+ * @returns {Promise<{ok:boolean, why?:string, daily?:object}>} why: 'none'(받을 몫 없음) | 'save'
+ */
+export async function receiveSpeakStone(date, every, max) {
+  const r = await runProfileOp(() => applySpeakStone(date, every, max), () => ({ ok: false, why: 'save' }));
+  return r || { ok: false, why: 'save' };
 }
 
 /** ⚪ 이로치 빼기 — 원래 색으로 (공짜, 쓴 횟수는 안 돌아온다). @returns {Promise<{ok:boolean, why?:string}>} */

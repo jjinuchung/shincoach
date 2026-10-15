@@ -11,9 +11,9 @@ import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZ
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle, forHole, isUltraBeast } from './pokemon.js';
 // 🕳 울트라홀은 하나다 — 💎 스페셜 배지 8개(수학)로 열리고, 그 뒤에 영어 쪽 울트라비스트도 나온다 (아버님 결정 2026-09-28)
 import { gymClaimed } from './mathprog.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneGot, receiveVideoStones } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
-import { STONE_ENGLISH, VIDEO_STONE, videoPct, SPEAK_COMBO, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
+import { STONE_ENGLISH, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoTier, SPEAK_COMBO, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
@@ -1148,14 +1148,15 @@ async function grantReviewRound() {
   awardXp(reward.xp);
   awardCoins(reward.coin);
   if (reward.golden) addItem(GOLDEN.id, reward.golden);
-  // 🔶 영어스톤 — "제대로 배웠나": 회차의 문장·단어·받아쓰기를 **전부 통과** 1 + ✍️🔤 받아쓰기·단어를 다 맞힘 +1 (review.reviewStones).
+  // 🔶 영어스톤 — "제대로 배웠나": 회차의 문장·단어·받아쓰기를 **거의 다 통과**(문항이 셋 이상이면 하나까지, v263) 1 + ✍️🔤 받아쓰기·단어를 다 맞힘 +1 (review.reviewStones).
   //   회차마다 한 번·하루 2회차까지 트랜잭션 선점 (두 창이 같은 회차를 끝내도 한쪽만, Codex 6차 #6)
   const roundKey = state.reviewKey || ''; // await 전에 잡아 둔다 — 그 사이 다른 회차가 시작될 수 있다
-  const st = reviewStones({ fails: state.reviewFails || 0, dw: state.reviewDw || 0, dwFails: state.reviewDwFails || 0 });
+  const st = reviewStones({ fails: state.reviewFails || 0, n: state.reviewN || 0, dw: state.reviewDw || 0, dwFails: state.reviewDwFails || 0 });
   const want = st.all + st.dw;
   const won = want > 0 && await track.claimReviewStone(roundKey);
   reward.stone = won ? want : 0;
   reward.stoneAll = won ? st.all : 0;
+  reward.stoneNear = won && st.all > 0 && (state.reviewFails || 0) > 0; // 💪 하나 빼고 다 통과 — 끝 화면이 까닭을 그렇게 말한다
   reward.stoneDw = won ? st.dw : 0;
   reward.stoneCapped = want > 0 && !won; // 받을 만했는데 오늘 몫(하루 2회차)을 다 받았다 — 끝 화면이 말해 준다
   if (reward.stone) addItem(STONE_ENGLISH.id, reward.stone);
@@ -1193,7 +1194,8 @@ function startReview(items, practice, after) {
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
-  state.reviewFails = 0; // 🔶 이 회차에서 못 넘긴 문항 수 — 0이어야 영어스톤
+  state.reviewFails = 0; // 🔶 이 회차에서 못 넘긴 문항 수 — 0이어야(문항이 셋 이상이면 하나까지, v263) 영어스톤
+  state.reviewN = (items || []).filter((x) => x && !x.extra).length; // 🔶 💖 덤을 뺀 문항 수 (v263)
   state.reviewDw = 0; state.reviewDwFails = 0; // 🔶 +1 — 받아쓰기·단어 문항 수와 그중 못 넘긴 수 (💖 덤 빼고)
   state.reviewKey = reviewKeyOf(items); // 회차의 정체 — 같은 묶음은 스톤 한 번 (Codex 8차 #9)
   const p = practice ? null : partnerInfo();
@@ -1691,6 +1693,7 @@ export async function openPlayer(id, opts = {}) {
   updateChips();
   updateGoalChip();
   showView('player');
+  checkSpeakStone(); // 🔶 저장을 놓쳐 남은 따라 말하기 몫 (Codex 74차 #4)
 
   state.onMeta = () => {
     state.onMeta = null;
@@ -2347,6 +2350,34 @@ function bumpSpeakCombo() {
 }
 
 /**
+ * 🔶 따라 말하기로 매일 (2026-10-15 v263, 아버님 결정) — 그 문장의 오늘 첫 말하기 보상(통과)을 오늘 기록의 문장 목록에 적어
+ * (track.claimSpeakFirst — 두 창·두 기기가 같은 문장을 적어도 한 번, Codex 74차 #3) SPEAK_STONE.every개마다 🔶1, 하루 maxPerDay개.
+ * ⏭·3번 못 함·◀▶로 다시 말한 문장은 여기 안 온다
+ */
+function bumpSpeakStone(cue) {
+  if (state.parentMode) return;
+  track.claimSpeakFirst(cue).then((won) => { if (won) checkSpeakStone(); }).catch(() => {});
+}
+
+/**
+ * 🔶 따라 말하기 몫 받기 — 문턱 확인·받은 수·가방 🔶을 한 트랜잭션에서 (xp.receiveSpeakStone, Codex 74차 #4).
+ * 문장을 적은 뒤와 영상을 열 때 부른다 — 저장을 놓쳐 남은 몫도 다음 문장 없이 챙긴다. 하나 받으면 또 남았는지 다시 본다.
+ * 말은 까닭이 보이게 "오늘 처음 통과한 문장" (같은 문장을 다시 말하면 안 는다)
+ */
+function checkSpeakStone() {
+  if (state.parentMode || state.speakStoneBusy || !track.speakStoneDue(SPEAK_STONE.every, SPEAK_STONE.maxPerDay)) return;
+  state.speakStoneBusy = true;
+  let again = false;
+  receiveSpeakStone(track.dailyDate(), SPEAK_STONE.every, SPEAK_STONE.maxPerDay).then((r) => {
+    if (r && r.daily) track.adoptDaily(r.daily);
+    if (!r || !r.ok) return;
+    again = true;
+    const n = SPEAK_STONE.every * (Number(r.daily && r.daily.speakStones) || 1);
+    sayWhenFree(`🎤 오늘 처음 통과한 문장 ${n}개! ${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko} +1`, 4500, () => sfx.success());
+  }).catch(() => {}).finally(() => { state.speakStoneBusy = false; if (again) checkSpeakStone(); });
+}
+
+/**
  * 🎁 보상 알림 — 말 칸이 비면 띄운다(1초마다 보고 8번까지 — 그래도 차 있으면 그냥). 🎤 연속 보너스와 🏁가 한 문장에서 같이 나와도
  * 서로 덮지 않게 · 그 사이 영상을 닫거나 다른 영상을 열면 안 띄운다 (Codex 65차 #6)
  */
@@ -2362,14 +2393,34 @@ function sayWhenFree(text, ms, onShow) {
   go();
 }
 
-/** 🎤 말해 본 문장 칸 (여행 길 옆) — 🏁 영상 보상을 이것으로 센다 (v253). 부모 모드는 안 쌓이니 숨김 */
+/**
+ * 🎤 말해 본 문장 칸 (여행 길 옆) — 🏁 영상 보상을 이것으로 센다 (v253). 부모 모드는 안 쌓이니 숨김.
+ * 옆 막대(said-bar)에 🔶 눈금 25·50·75·90% (v263) — 채운 만큼 · 넘은 눈금은 켜져 다음 🔶이 어디서 나오는지 보인다.
+ * 🔶이 안 나오는 눈금(짧은 영상의 25%)은 숨긴다 (Codex 74차 #6 — 눈금마다 나온다고 보이지 않게)
+ */
 function updateSaidCounter() {
   const c = $('said-counter');
   if (!c) return;
   const n = state.cues.length;
+  const said = track.saidCount(state.cues);
   c.hidden = !n || state.parentMode;
-  c.textContent = `🎤 말한 문장 ${track.saidCount(state.cues)}/${n}`;
-  c.title = `따라 말해 본 문장(말하기 확인을 안 하는 줄도 세요) — ${VIDEO_STONE.pct}% 이상이면 🏁 영상 보상 (⏭로 넘긴 문장은 안 세요)`;
+  c.textContent = `🎤 말한 문장 ${said}/${n}`;
+  c.title = `따라 말해 본 문장(말하기 확인을 안 하는 줄도 세요) — 막대의 눈금을 넘을 때마다 🔶, ${VIDEO_STONE.pct}% 이상이면 🏁 영상 보상 (⏭로 넘긴 문장은 안 세요)`;
+  const wrap = $('said-wrap');
+  if (wrap) wrap.hidden = c.hidden;
+  const bar = $('said-bar');
+  if (!bar) return;
+  const pct = videoPct(said, n);
+  bar.hidden = c.hidden;
+  const fill = $('said-fill');
+  if (fill) fill.style.width = `${Math.min(100, pct)}%`;
+  const steps = videoTier(n).steps;
+  VIDEO_STEPS.forEach((s, i) => {
+    const tk = $(`said-tick-${s}`);
+    if (!tk) return;
+    tk.hidden = !steps[i];
+    tk.classList.toggle('on', pct >= s);
+  });
 }
 
 function skipShadowWait() {
@@ -2598,6 +2649,7 @@ function onSpeakResult(cue, result) {
       awardXp(star ? XP.speakStar : XP.speak);
       awardCoins(star ? COIN.speakStar : COIN.speak);
       bumpSpeakCombo(); // 🎤 오늘 처음 받는 말하기 보상만 연속으로 센다 (v253)
+      bumpSpeakStone(cue); // 🔶 오늘 처음 통과한 문장 30개마다 (v263)
     }
     updateSaidCounter();
     maybeVideoStone(); // 🏁 말해 본 문장이 늘었다
@@ -2798,25 +2850,31 @@ function updateJourneyWalker() {
 }
 
 /**
- * 🏁 영상 끝까지 → 💰 + 🔶 영어스톤 (2026-10-06 v197 🔶3 → v201 길이별 items.VIDEO_TIERS: 짧은 💰50 🔶3 · 중간 💰100 🔶5 · 긴 💰200 🔶8).
- * "끝까지" = 이 영상 문장의 VIDEO_STONE.pct% 이상을 했다 — 마지막 문장만 끝내도 뜨는 🏁 여행 끝과 다르다.
- * 받기는 저장된 프로필로 판정하는 트랜잭션(영상마다 한 번). 저장이 안 되면 말없이 넘어가고, 다음에 앱을 열 때 📦 창이 챙긴다.
+ * 🏁 영상 보상 → 💰 + 🔶 영어스톤 (2026-10-06 v197 🔶3 → v201 길이별 items.VIDEO_TIERS: 짧은 💰50 🔶3 · 중간 💰100 🔶5 · 긴 💰200 🔶8
+ * → v263 🎤 말해 본 문장이 눈금(VIDEO_STEPS 25·50·75·90%)을 넘을 때마다 🔶을 나눠, 💰는 90%에 한 번 — items.videoOwed).
+ * 마지막 문장만 끝내도 뜨는 🏁 여행 끝과 다르다. 받기는 저장된 프로필로 판정하는 트랜잭션(눈금마다 한 번).
+ * 저장이 안 되면 말없이 넘어가고 다음 문장에서 다시 — 앱을 닫으면 다음에 열 때 📦 창이 챙긴다.
  * 다른 말(🔥·목표·🏁·🎤 연속)이 떠 있으면 비고 나서(sayWhenFree) — 말 칸은 하나라 덮이면 아이가 못 본다
  */
 function maybeVideoStone() {
   const it = state.item;
-  if (!it || state.parentMode || state.videoStoneBusy || state.videoStoneFor === it.id) return;
-  if (videoPct(track.saidCount(state.cues), state.cues.length) < VIDEO_STONE.pct) return; // 🎤 말해 본 문장으로 (v253 — ⏭로 넘긴 문장은 빠진다)
-  if (videoStoneGot(it.id)) { state.videoStoneFor = it.id; return; }
+  if (!it || state.parentMode || state.videoStoneBusy) return;
+  const v = { id: it.id, total: state.cues.length, pct: videoPct(track.saidCount(state.cues), state.cues.length) }; // 🎤 말해 본 문장으로 (v253 — ⏭로 넘긴 문장은 빠진다)
+  const step = VIDEO_STEPS.filter((s) => v.pct >= s).pop() || 0;
+  const at = `${it.id}:${step}`;
+  if (!step || state.videoStoneFor === at) return;
+  if (!videoStoneOwed(v)) { state.videoStoneFor = at; return; }
   state.videoStoneBusy = true;
-  receiveVideoStones([{ id: it.id, total: state.cues.length }]).then((r) => {
-    if (r.ok || r.why === 'done') state.videoStoneFor = it.id;
+  receiveVideoStones([v]).then((r) => {
+    if (r.ok || r.why === 'done') state.videoStoneFor = at;
     if (!r.ok) return;
     const n = (r.items && r.items[STONE_ENGLISH.id]) || 0;
     const got = [r.coins ? `💰 +${r.coins}` : '', n ? `${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko} +${n}` : ''].filter(Boolean).join(' · ');
     if (r.coins) { updateLevelChip(); pulseChip('coin-chip'); } // 코인은 저장된 프로필에 이미 들어갔다 — 칩만 새로
+    updateSaidCounter(); // 받은 눈금을 🔶로
     // 말하기 확인을 안 하는 줄로 채웠을 수도 있으니 "따라 했어요" · 기준은 이상 (Codex 65차 #7)
-    sayWhenFree(`🏁 「${it.title}」 영상 보상! 문장의 ${VIDEO_STONE.pct}% 이상을 따라 했어요 ${got}`, 6000, () => sfx.success());
+    if (step >= VIDEO_STONE.pct) sayWhenFree(`🏁 「${it.title}」 영상 보상! 문장의 ${VIDEO_STONE.pct}% 이상을 따라 했어요 ${got}`, 6000, () => sfx.success());
+    else sayWhenFree(`🎤 「${it.title}」 문장의 ${step}%를 따라 했어요! ${got}`, 5000, () => sfx.success());
   }).catch(() => {}).finally(() => { state.videoStoneBusy = false; });
 }
 

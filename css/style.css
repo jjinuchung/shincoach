@@ -807,7 +807,15 @@ button { font-family: inherit; }
 /* 🎤 말해 본 문장 (v253) — 좁은 화면에서는 여행 길 아래 줄로 */
 .said-counter { font-size: 0.78rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .said-counter[hidden] { display: none; }
-@media (max-width: 520px) { .progress-row { flex-wrap: wrap; row-gap: 2px; } .said-counter { flex-basis: 100%; text-align: right; } }
+/* 🔶 눈금 막대 (v263) — 말해 본 문장 25·50·75·90%를 넘을 때마다 🔶. 넘은 눈금은 주황으로 켜진다 */
+.said-wrap { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.said-wrap[hidden] { display: none; }
+.said-bar { position: relative; display: inline-block; width: 68px; height: 8px; border-radius: 999px; background: #e5e7eb; flex: none; }
+.said-bar[hidden] { display: none; }
+.said-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 999px; background: #fdba74; }
+.said-tick { position: absolute; top: 50%; width: 9px; height: 9px; margin-left: -5px; box-sizing: border-box; transform: translateY(-50%) rotate(45deg); background: #fff; border: 1.5px solid #f59e0b; border-radius: 2px; }
+.said-tick.on { background: #f97316; border-color: #c2410c; }
+@media (max-width: 520px) { .progress-row { flex-wrap: wrap; row-gap: 2px; } .said-wrap { flex-basis: 100%; justify-content: flex-end; } }
 
 /* ===== 🗺️ 여행 길 ===== */
 .journey { position: relative; flex: 1; height: 66px; min-width: 0; }

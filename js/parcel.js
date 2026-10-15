@@ -7,10 +7,10 @@
 // 받는 길: 앱을 열면 홈에서 한 번 "📦 구호품이 왔어요!" → 아이가 [📦 받기]를 눌러야 가방에 들어간다.
 //   받기는 db.applyParcel 한 트랜잭션(받은 id를 함께 적음) — 두 창·두 번 눌러도 한 번만.
 //   누르기 전에 앱을 끄면 다음에 다시 온다. 저장이 안 되면 "못 받았어요" — 다음에 앱을 열면 다시 온다.
-// 🏁 같은 창으로 "끝까지 본 영상"의 🔶 영어스톤도 온다 (2026-10-06) — 규칙이 생기기 전에 90%를 넘긴 지난 영상과,
+// 🏁 같은 창으로 영상의 🔶 영어스톤도 온다 (2026-10-06 · v263부터 🎤 말해 본 문장 눈금 25·50·75·90%마다) — 규칙이 생기기 전에 눈금을 넘긴 지난 영상과,
 //   영상 화면에서 저장을 놓친 영상. 받기는 db.applyVideoStones 한 트랜잭션(받은 영상은 parcels에 'video:<id>').
 
-import { parcelOf, parcelGot, itemById, SHINY_CHARGE, SHINY_STONE, STONE_ENGLISH, VIDEO_STONE, videoStoneDue, videoParcelId, videoPlusId, videoGrant } from './items.js';
+import { parcelOf, parcelGot, itemById, SHINY_CHARGE, SHINY_STONE, STONE_ENGLISH, VIDEO_STONE, videoStoneDue, videoOwed } from './items.js';
 import { parcelsReceived, receiveParcel, receiveVideoStones, shinyLeft } from './xp.js';
 import { sfx } from './sfx.js';
 
@@ -61,37 +61,40 @@ export function onlyCoins(items) {
 }
 
 /**
- * 🏁 끝까지 본 영상들의 보상을 구호품 한 칸으로 (순수) — 영상 이름을 보여 준다(무엇 때문에 받는지 아이가 알게).
- * 💰·🔶은 영상마다 길이별(items.videoGrant) — v197에 🔶3만 받은 영상은 차액만
- * @param {Array<{id:string, title:string, total:number, base:boolean, plus:boolean}>} due items.videoStoneDue 결과
+ * 🎤 영상 보상을 구호품 한 칸으로 (순수) — 영상 이름을 보여 준다(무엇 때문에 받는지 아이가 알게).
+ * 💰·🔶은 영상마다 지금 받을 몫(items.videoOwed — 🎤 말해 본 문장 눈금마다 🔶, 90%에 💰, v263). 모두 90%를 넘은 영상이면 🏁, 아니면 🎤
+ * @param {Array<{id:string, title:string, total:number, pct:number, stones:number, coins:number}>} due items.videoStoneDue 결과
  */
 export function videoParcel(due) {
-  const list = Array.isArray(due) ? due : [];
+  const list = (Array.isArray(due) ? due : []).filter((d) => d && ((d.stones || 0) > 0 || (d.coins || 0) > 0));
   if (!list.length) return null;
   let coins = 0;
   let stones = 0;
-  for (const d of list) { const g = videoGrant(d); coins += g.coins; stones += g.stones; }
+  for (const d of list) { coins += d.coins || 0; stones += d.stones || 0; }
   const names = list.map((d) => `「${d.title}」`);
   const shown = names.slice(0, 3).join(' · ') + (names.length > 3 ? ` 외 ${names.length - 3}편` : '');
   const items = {};
   if (coins) items[COIN_ITEM] = coins;
   if (stones) items[STONE_ENGLISH.id] = stones;
+  const end = list.every((d) => Number(d.pct) >= VIDEO_STONE.pct);
   return {
-    kind: 'video', id: 'video', ids: list.map((d) => String(d.id)), icon: '🏁',
+    kind: 'video', id: 'video', ids: list.map((d) => String(d.id)), icon: end ? '🏁' : '🎤',
     items,
-    title: `🏁 끝까지 본 영상 ${list.length}편 — 상이 왔어요!`,
-    text: `${shown} — 문장의 ${VIDEO_STONE.pct}% 이상을 따라 했어요. 긴 영상일수록 💰·${STONE_ENGLISH.emoji}이 더 많아요!`,
+    title: end ? `🏁 끝까지 본 영상 ${list.length}편 — 상이 왔어요!` : `🎤 따라 말한 영상 ${list.length}편 — 상이 왔어요!`,
+    text: end
+      ? `${shown} — 문장의 ${VIDEO_STONE.pct}% 이상을 따라 했어요. 긴 영상일수록 💰·${STONE_ENGLISH.emoji}이 더 많아요!`
+      : `${shown} — 따라 말해 본 문장이 늘어 🎤 막대의 눈금을 넘었어요. 긴 영상일수록 ${STONE_ENGLISH.emoji}이 더 많아요!`, // 눈금마다 나온다고 하지 않는다 — 짧은 영상은 첫 눈금에 없다 (Codex 74차 #6)
     due: list,
   };
 }
 
-/** 띄우기 직전에 다시 거르기 (순수) — 다른 창에서 받은 구호품·영상은 빼고, 영상 칸은 남은 영상으로 다시 만든다 */
+/** 띄우기 직전에 다시 거르기 (순수) — 다른 창에서 받은 구호품·영상 몫은 빼고, 영상 칸은 남은 몫으로 다시 만든다 */
 export function stillDue(queue, got) {
   const out = [];
   for (const pc of Array.isArray(queue) ? queue : []) {
     if (pc && pc.kind === 'video') {
-      const left = (pc.due || []).map((d) => ({ ...d, base: d.base && !parcelGot(got, videoParcelId(d.id)), plus: d.plus && !parcelGot(got, videoPlusId(d.id)) }));
-      const vp = videoParcel(left.filter((d) => d.base || d.plus));
+      const left = (pc.due || []).map((d) => { const o = videoOwed(d, got); return { ...d, stones: o.stones, coins: o.coins }; });
+      const vp = videoParcel(left);
       if (vp) out.push(vp);
     } else if (pc && !parcelGot(got, pc.id)) out.push(pc);
   }
@@ -118,7 +121,7 @@ async function loadParcels() {
   } catch { return []; }
 }
 
-/** 🏁 90%를 넘겼는데 🔶을 아직 안 받은 영상 — 영상 기록을 못 읽으면 없음 (다음에 다시) */
+/** 🎤 말해 본 문장 눈금을 넘겼는데 아직 안 받은 몫이 있는 영상 (v263) — 영상 기록을 못 읽으면 없음 (다음에 다시) */
 async function loadVideoDue() {
   try {
     const db = await import('./db.js');
@@ -169,7 +172,7 @@ function render() {
   $('parcel-title').textContent = cur.title || '📦 아빠가 보낸 구호품이 왔어요!';
   // 🏁 영상 몫은 아빠가 보낸 것이 아니다 — 그림·버튼 말도 그에 맞게 (헤드리스: "고마워요, 아빠!"가 떴다)
   const icon = document.querySelector('#parcel .taken-lock');
-  if (icon) icon.textContent = cur.kind === 'video' ? '🏁' : '📦';
+  if (icon) icon.textContent = cur.kind === 'video' ? (cur.icon || '🏁') : '📦'; // 🎤 눈금 몫이면 🎤 (v263)
   const stage = $('parcel-stage');
   stage.innerHTML = '';
   for (const [id, n] of Object.entries(cur.items)) {
@@ -196,7 +199,7 @@ async function onButton() {
   step = 'busy';
   ok.disabled = true;
   let r;
-  try { r = cur.kind === 'video' ? await receiveVideoStones(cur.due.map((d) => ({ id: d.id, total: d.total }))) : await receiveParcel(cur); } catch { r = { ok: false, why: 'save' }; }
+  try { r = cur.kind === 'video' ? await receiveVideoStones(cur.due.map((d) => ({ id: d.id, total: d.total, pct: d.pct }))) : await receiveParcel(cur); } catch { r = { ok: false, why: 'save' }; }
   step = 'done';
   ok.disabled = false;
   if (r.ok) {

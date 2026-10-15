@@ -10,7 +10,7 @@ import { makeDictation } from '../js/dictation.js';
 import { pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds, REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH } from '../js/essay.js';
 import { pickMatchRound, shuffle as shuffleMons, PAIRS as MATCH_PAIRS, NEED_NEW as MATCH_NEED } from '../js/match.js';
 import { matchXp, XP as REAL_XP } from '../js/xp.js';
-import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, videoPct, videoGrant, SPEAK_COMBO } from '../js/items.js';
+import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoOwed, videoTier, SPEAK_COMBO } from '../js/items.js';
 import fsNode from 'node:fs';
 
 // 받아쓰기 오답은 실제 사전에서 만들어지므로 테스트도 진짜 사전을 쓴다
@@ -89,10 +89,12 @@ function loadPlayer() {
   const mushroomState = { today: 0, gained: 0 };
   const formState = { forms: {}, keystone: false, mega: {}, gmax: {} };
   const reviewState = { stats: [], sentences: 0, items: 0, words: 0, rounds: 0, golden: false, skips: 0, reviewed: [] };
-  // 🏁 영상 끝까지 → 🔶 (2026-10-06): done = 이 영상에서 한 문장 수(track.doneCount) · got = 받은 영상 · calls = 받기 트랜잭션을 부른 기록
+  // 🏁 영상 끝까지 → 🔶 (2026-10-06): done = 이 영상에서 한 문장 수(track.doneCount) · got = 받은 기록(profile.parcels처럼 video:·videoplus:·videostep: 열쇠, v263) · calls = 받기 트랜잭션을 부른 기록
   const videoState = { done: 0, got: {}, calls: [], fail: false };
   // 🎤 v253 영어 ⏭: said = 이 영상에서 말해 본 문장 수(track.saidCount — 🏁 셈) · saidCues = track.said를 부른 문장 · speaks = track.speak 기록 · combos = 연속 보너스 선점 수(cap)
-  const speakState = { said: 0, saidCues: [], speaks: [], combos: 0, comboCap: SPEAK_COMBO.maxPerDay, claimFail: false };
+  // 🔶 v263: first = 오늘 문장 목록에 적힌 수(track.claimSpeakFirst) · firstCalls = 적기를 부른 문장 · firstDup = 다른 창이 먼저 적음 ·
+  //   stones = 받은 🔶(xp.receiveSpeakStone — 가방과 한 트랜잭션 흉내) · stoneFail = 받기 저장 실패 · recv = 받기를 부른 날 · adopted = 보기값으로 받은 오늘 기록
+  const speakState = { said: 0, saidCues: [], speaks: [], combos: 0, comboCap: SPEAK_COMBO.maxPerDay, claimFail: false, first: 0, firstCalls: [], firstDup: false, stones: 0, stoneFail: false, recv: [], adopted: [] };
   const missedLog = [];
   const vocabViewsStub = [];
   const vocabReviewLog = [];
@@ -125,6 +127,11 @@ function loadPlayer() {
     // 하루 한 번(mark*)은 실제 코드에서 **트랜잭션 선점**이라 Promise<선점 성공 여부>를 준다 — 스텁도 같은 약속을 지킨다
     track: { open: async () => {}, close: async () => {}, flush: async () => {}, play() {}, listen() {}, done() {}, speak(cue, r) { speakState.speaks.push({ start: cue && cue.start, ...r }); }, said(cue) { speakState.saidCues.push(cue && cue.start); }, saidCount: () => speakState.said,
       async claimSpeakCombo(max) { if (speakState.claimFail || speakState.combos >= max) return false; speakState.combos++; return true; }, todaySpeakCombos: () => speakState.combos,
+      // 🔶 따라 말하기 (v263) — 오늘 문장 목록에 적기(다른 창이 먼저 적었으면 false) · 보기값 · 몫이 남았나(실제와 같은 조건)
+      async claimSpeakFirst(cue) { speakState.firstCalls.push(cue && cue.start); if (speakState.firstDup) return false; speakState.first++; return true; },
+      todaySpeakFirst: () => speakState.first, todaySpeakStones: () => speakState.stones,
+      speakStoneDue: (every, max) => speakState.stones < max && Math.floor(speakState.first / every) > speakState.stones,
+      dailyDate: () => '2026-09-14', adoptDaily(d) { speakState.adopted.push(d); },
       tick() {}, vocab() {}, isMastered: () => false, doneCount: () => videoState.done, todayDone: () => 0, todayKey: () => '2026-09-14', todayPuzzles: () => 1, goalRewarded: () => false, markGoalRewarded: async () => true, hpMissedApplied: () => false,
       claimSpeakReward: () => true, markHpMissed: async () => true, todayBattles: () => 0, markBattle: async () => true, MASTER_RATIO: 0.8, puzzle() {},
       todayRocketsEn: () => rocketState.claims,
@@ -220,15 +227,33 @@ function loadPlayer() {
     consumeItem: () => true, inventory: () => ({}), POTION: [], GOLDEN: { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', mult: 2, kind: 'ball' },
     STONE_ENGLISH: { id: 'stone_english', emoji: '🔶', ko: '영어스톤', subject: 'english', kind: 'stone' }, // 🧤 스톤 (2026-09-22)
     // 🏁 영상 끝까지 → 🔶 (2026-10-06) — 규칙(VIDEO_STONE·videoPct)은 실제 모듈, 받기는 트랜잭션 흉내(영상마다 한 번)
-    VIDEO_STONE, videoPct, videoState, SPEAK_COMBO, speakState,
-    videoStoneGot: (id) => !!videoState.got[id],
+    VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoState, SPEAK_COMBO, speakState,
+    // 🎤 받을 몫·받기는 실제 셈(videoOwed)으로 — 받은 기록은 videoState.got (v263 눈금)
+    videoStoneOwed: (v) => { const o = videoOwed(v, videoState.got); return o.stones > 0 || o.coins > 0; },
+    videoTier, // 🎤 막대에서 🔶이 안 나오는 눈금 숨기기 (Codex 74차 #6)
+    // 🔶 따라 말하기 받기 — 실제처럼 문턱·하루 상한을 다시 보고, 받으면 가방(itemLog)과 받은 수를 같이 (Codex 74차 #4 — addItem을 따로 부르지 않는다)
+    async receiveSpeakStone(date, every, max) {
+      speakState.recv.push(date);
+      if (speakState.stoneFail) return { ok: false, why: 'save' };
+      if (speakState.stones >= max || Math.floor(speakState.first / every) <= speakState.stones) return { ok: false, why: 'none', daily: { date, speakStones: speakState.stones } };
+      speakState.stones++;
+      itemLog.push('stone_english');
+      return { ok: true, daily: { date, speakStones: speakState.stones } };
+    },
     async receiveVideoStones(list) {
       videoState.calls.push(list.map((v) => ({ ...v })));
       if (videoState.fail) return { ok: false, why: 'save', ids: [], coins: 0 };
-      const fresh = list.filter((v) => !videoState.got[v.id]);
-      for (const v of fresh) videoState.got[v.id] = 1;
-      const g = fresh.map((v) => videoGrant({ total: v.total, base: true, plus: true }));
-      return fresh.length ? { ok: true, ids: fresh.map((v) => v.id), items: { stone_english: g.reduce((a, x) => a + x.stones, 0) }, coins: g.reduce((a, x) => a + x.coins, 0) } : { ok: false, why: 'done', ids: [], coins: 0 };
+      if (videoState.race) return { ok: false, why: 'done', ids: [], coins: 0 }; // 다른 창이 먼저 받았다 — 이 창의 메모리 프로필은 아직 모른다
+      let stones = 0;
+      let coins = 0;
+      const ids = [];
+      for (const v of list) {
+        const o = videoOwed(v, videoState.got);
+        if (!o.stones && !o.coins) continue;
+        for (const k of o.keys) videoState.got[k] = 1;
+        stones += o.stones; coins += o.coins; ids.push(v.id);
+      }
+      return ids.length ? { ok: true, ids, items: { stone_english: stones }, coins } : { ok: false, why: 'done', ids: [], coins: 0 };
     },
     // 🔁 복습 스텁: 열린 복습은 reviewCalls에 기록, 규칙(pickReviews 등)은 실제 모듈을 씀
     reviewCalls, reviewState,
@@ -1391,6 +1416,7 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 ❤️ 회복 (
   assert.deepEqual(reviewState.reviewed, [{ start: 1, passed: true }, { start: 2, passed: false }]);
   assert.equal(xpLog.length, 1, '통과한 문장만 XP');
   assert.equal(coinLog.length, 1);
+  o.onSentence({ start: 3, en: 'c' }, false); // 둘째로 못 넘김 — 하나까지만 괜찮다 (v263)
 
   const given = await o.onFinished(); // 🌟 황금 볼은 DB에서 선점한 뒤에 정해진다
   assert.ok(given.golden > 0, '하루 첫 완주 → 황금 볼');
@@ -1398,7 +1424,7 @@ test('🔁 문장을 통과하면 ⚡·💰, 회차를 끝내면 ❤️ 회복 (
   assert.equal(reviewState.rounds, 1);
   assert.equal(reviewState.golden, true);
   assert.ok(itemLog.includes('goldenball'), '가방에 황금 볼');
-  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 0, '🔶 영어스톤은 회차를 **전부** 통과해야 — 한 문장 못 넘겼으니 없음 (Codex 6차 #6)');
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 0, '🔶 영어스톤은 회차를 거의 다 통과해야 — 두 문장 못 넘겼으니 없음 (Codex 6차 #6 · 하나까지는 괜찮다 v263)');
   assert.ok(hpLog.some((d) => d > 0), 'HP 회복');
 
   // 같은 날 두 번째 회차: 황금 볼만 빠지고 ⚡·💰·❤️는 그대로 (하루에 여러 번 하게 바뀜)
@@ -2142,46 +2168,68 @@ test('💖 고르기: 지금 문장 칩이 💖로 · 다시 누르면 ♡ · �
 
 // ── 🔶 영어스톤 늘리기 (2026-10-06, 진우 "영어 스톤 구하기가 너무 힘들다 — 수학 스톤은 남아돈다" → 아버님 9/22 결정 되살림, "이대로 진행") ──
 
-test('🏁 영상 끝까지(🎤 말해 본 문장 90%, v253) → 🔶 영어스톤 3개 — 한 문장이 90%여도 말해 본 문장이 모자라면 없음 · 영상마다 한 번 · 마지막 문장만 끝내도 안 나온다 · 부모 모드 없음 · 저장을 못 하면 다음 문장에서 다시', async () => {
+test('🎤 영상 🔶 눈금마다(v263) — 말해 본 문장 25·50·75·90% · 짧은 영상은 25%에 없음 · 💰는 90%에 · 눈금마다 한 번 · 한 문장이 많아도 말해 본 문장으로 · 마지막 문장만 끝내도 안 나온다 · 부모 모드 없음 · 저장을 못 하면 다음 문장에서 다시', async () => {
   const { run, ctx, els, videoState, speakState } = loadPlayer();
   ctx.track.done = () => {};
   run('state.cues = Array.from({ length: 10 }, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a", ko: "" })); settings.listenFirst = 0; settings.dailyGoal = 0; state.journeyCelebrated = true; state.item = { id: "ep1", title: "피카츄의 모험" };');
-  run("$('player-msg').hidden = true;");
+  const said = async (n, i = 9) => { run("$('player-msg').hidden = true; $('player-msg').textContent = '';"); speakState.said = n; run(`markDone(state.cues[${i}])`); await tick(); };
   // 목록에서 마지막 줄만 눌러 끝냄(1/10) — 🏁 여행 끝은 뜰 수 있어도 🔶은 없다
-  speakState.said = 1; run('markDone(state.cues[9])'); await tick();
+  await said(1);
   assert.equal(videoState.calls.length, 0, '10%');
-  speakState.said = 8; run('markDone(state.cues[7])'); await tick();
-  assert.equal(videoState.calls.length, 0, '80%');
-  // ⏭로 넘긴 문장이 많으면 한 문장이 100%여도 없다 (🏁는 말해 본 문장으로, v253)
-  videoState.done = 10; speakState.said = 8; run('markDone(state.cues[9])'); await tick();
-  assert.equal(videoState.calls.length, 0, '한 문장 100% · 말해 본 문장 80%');
-  speakState.said = 9; run('markDone(state.cues[8])'); await tick();
-  assert.deepEqual(JSON.parse(JSON.stringify(videoState.calls)), [[{ id: 'ep1', total: 10 }]], '90% — 이 영상 id와 문장 수(길이별 보상)로 받기 트랜잭션 한 번');
+  await said(3);
+  assert.equal(videoState.calls.length, 0, '30% — 짧은 영상은 25% 눈금에 🔶이 없어 부르지 않는다');
+  await said(5, 4);
+  assert.deepEqual(JSON.parse(JSON.stringify(videoState.calls)), [[{ id: 'ep1', total: 10, pct: 50 }]], '50% — 이 영상 id·문장 수·말해 본 문장 %로 받기 트랜잭션');
+  assert.equal(els['player-msg'].textContent, '🎤 「피카츄의 모험」 문장의 50%를 따라 했어요! 🔶 영어스톤 +1');
+  await said(6, 5);
+  assert.equal(videoState.calls.length, 1, '같은 눈금은 다시 부르지 않는다');
+  // ⏭로 넘긴 문장이 많으면 한 문장이 100%여도 그 눈금까지만
+  videoState.done = 10; await said(8);
+  assert.equal(videoState.calls.length, 2, '75%');
+  assert.match(els['player-msg'].textContent, /문장의 75%를 따라 했어요! 🔶 영어스톤 \+1$/);
+  assert.doesNotMatch(els['player-msg'].textContent, /💰/, '💰는 90%에');
+  await said(9, 8);
+  assert.deepEqual(JSON.parse(JSON.stringify(videoState.calls[2])), [{ id: 'ep1', total: 10, pct: 90 }]);
   assert.match(els['player-msg'].textContent, /「피카츄의 모험」/, '어느 영상인지 이름으로');
-  assert.match(els['player-msg'].textContent, /💰 \+50 · 🔶 영어스톤 \+3/, '무엇을 몇 개 받았는지 (10문장 = 짧은 영상)');
+  assert.match(els['player-msg'].textContent, /^🏁 「피카츄의 모험」 영상 보상! 문장의 90% 이상을 따라 했어요 💰 \+50 · 🔶 영어스톤 \+1$/, '90% — 🏁 + 💰 + 마지막 눈금');
   assert.equal(els['player-msg'].hidden, false);
-  speakState.said = 10; run('markDone(state.cues[9])'); await tick();
-  assert.equal(videoState.calls.length, 1, '같은 영상은 다시 부르지 않는다');
-  // 이미 받은 영상(다른 창·📦 창에서) — 부르지도 않는다
-  videoState.got.ep2 = 1;
-  run('state.item = { id: "ep2", title: "둘째" };'); speakState.said = 10; run('markDone(state.cues[9])'); await tick();
-  assert.equal(videoState.calls.length, 1, '이미 받은 영상');
+  await said(10);
+  assert.equal(videoState.calls.length, 3, '다 받은 영상은 다시 부르지 않는다');
+  // 옛 규칙으로 다 받은 영상(다른 창·📦 창에서) — 부르지도 않는다
+  videoState.got['video:ep2'] = 1; videoState.got['videoplus:ep2'] = 1;
+  run('state.item = { id: "ep2", title: "둘째" };'); await said(10);
+  assert.equal(videoState.calls.length, 3, '이미 받은 영상');
+  // 긴 영화(1200문장)를 열어 처음 말한 문장에서 이미 55% — 50% 눈금까지 한 번에 🔶4
+  run('state.item = { id: "mv", title: "영화" }; state.cues = Array.from({ length: 1200 }, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a", ko: "" }));');
+  await said(660, 5);
+  assert.deepEqual(JSON.parse(JSON.stringify(videoState.calls[3])), [{ id: 'mv', total: 1200, pct: 55 }]);
+  assert.equal(els['player-msg'].textContent, '🎤 「영화」 문장의 50%를 따라 했어요! 🔶 영어스톤 +4');
+  run('state.cues = Array.from({ length: 10 }, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a", ko: "" }));');
   // 저장을 못 했다 — 말하지 않고, 다음 문장에서 다시 한다 (받았다고 적지 않는다)
-  run("state.item = { id: 'ep3', title: '셋째' }; $('player-msg').textContent = ''; $('player-msg').hidden = true;");
-  videoState.fail = true; speakState.said = 9; run('markDone(state.cues[8])'); await tick();
-  assert.equal(videoState.calls.length, 2);
+  run("state.item = { id: 'ep3', title: '셋째' };");
+  videoState.fail = true; await said(9, 8);
+  assert.equal(videoState.calls.length, 5);
   assert.equal(els['player-msg'].textContent, '', '못 받았으면 "받았어요"가 없다');
-  videoState.fail = false; run('markDone(state.cues[9])'); await tick();
-  assert.equal(videoState.calls.length, 3, '다음 문장에서 다시');
+  videoState.fail = false; await said(9);
+  assert.equal(videoState.calls.length, 6, '다음 문장에서 다시');
   assert.match(els['player-msg'].textContent, /「셋째」/);
+  assert.match(els['player-msg'].textContent, /🔶 영어스톤 \+3/, '50·75·90%를 한 번에');
   // 다른 말이 떠 있으면 바로 덮지 않는다 (말 칸은 하나)
   run("state.item = { id: 'ep4', title: '넷째' }; $('player-msg').textContent = '🔥 3일 연속 학습!'; $('player-msg').hidden = false;");
   speakState.said = 9; run('markDone(state.cues[8])'); await tick();
-  assert.equal(videoState.calls.length, 4);
+  assert.equal(videoState.calls.length, 7);
   assert.equal(els['player-msg'].textContent, '🔥 3일 연속 학습!', '떠 있던 말은 그대로 (조금 뒤에 🔶 말)');
+  // 다른 창이 먼저 받았다('done') — 이 창은 같은 눈금을 문장마다 다시 부르지 않는다 (메모리 프로필은 아직 몰라도)
+  run("state.item = { id: 'ep6', title: '여섯째' };"); videoState.race = true;
+  await said(5, 4);
+  assert.equal(videoState.calls.length, 8);
+  assert.equal(els['player-msg'].textContent, '', '받지 않았으면 말도 없다');
+  await said(6, 5);
+  assert.equal(videoState.calls.length, 8, "'done'을 받은 눈금은 다시 안 부른다");
+  videoState.race = false;
   // 👀 부모 모드는 아이 기록이 아니다
   run("state.item = { id: 'ep5', title: '다섯째' }; setParentMode(true);"); speakState.said = 10; run('markDone(state.cues[9])'); await tick();
-  assert.equal(videoState.calls.length, 4, '부모 모드는 없음');
+  assert.equal(videoState.calls.length, 8, '부모 모드는 없음');
 });
 
 test('🔁 🔶 받아쓰기·단어 만점 +1 — 따라 말하기에서 미끄러져도 받는다 · 전부 통과면 2개 · 받은 까닭을 끝 화면에 · 오늘 몫(2회차)을 다 받으면 그렇게', async () => {
@@ -2198,21 +2246,23 @@ test('🔁 🔶 받아쓰기·단어 만점 +1 — 따라 말하기에서 미끄
   o.onSentence({ start: 2, en: 'b' }, true);
   o.onWord(word, true); // 단어는 맞힘
   assert.deepEqual([run('state.reviewFails'), run('state.reviewDw'), run('state.reviewDwFails')], [1, 1, 0]);
+  assert.equal(run('state.reviewN'), Array.from(o.items).filter((it) => !it.extra).length, '💖 덤을 뺀 문항 수');
+  assert.ok(run('state.reviewN') >= 3);
   const g1 = await o.onFinished();
-  assert.equal(g1.stoneAll, 0, '전부 통과는 아니다');
+  assert.deepEqual([g1.stoneAll, g1.stoneNear], [1, true], '💪 셋 이상 회차에서 하나만 못 넘김 → 🔶 (하나 빼고 다 통과, v263)');
   assert.equal(g1.stoneDw, 1, '받아쓰기·단어 만점 +1');
-  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 1);
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 2);
   // 전부 통과 + 단어 만점 → 2개 (다른 회차)
   run('state.reviewFails = 0; state.reviewDw = 2; state.reviewDwFails = 0; state.reviewKey = "r2";');
   const g2 = await o.onFinished();
-  assert.deepEqual([g2.stoneAll, g2.stoneDw, g2.stone], [1, 1, 2]);
-  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 3, '가방에 2개 더');
+  assert.deepEqual([g2.stoneAll, g2.stoneDw, g2.stone, g2.stoneNear], [1, 1, 2, false]);
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 4, '가방에 2개 더');
   // 3회차째 — 오늘 몫은 2회차까지 (밀린 문장이 많아도 양으로 못 늘린다)
   run('state.reviewFails = 0; state.reviewDw = 1; state.reviewDwFails = 0; state.reviewKey = "r3";');
   const g3 = await o.onFinished();
   assert.equal(g3.stone, 0);
   assert.equal(g3.stoneCapped, true, '끝 화면이 "오늘 다 받았어요"라고 말한다');
-  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 3);
+  assert.equal(itemLog.filter((x) => x === 'stone_english').length, 4);
   // 단어를 틀리면 +1이 없다 · 받아쓰기·단어가 없는 회차도 +1이 없다
   run('state.reviewDw = 0; state.reviewDwFails = 0;');
   o.onWord(word, false);
@@ -2479,6 +2529,82 @@ test('🎤 연속 성공 — 오늘 첫 말하기 보상이 5번 연달아면 �
   run('state.parentMode = false;');
 });
 
+test('🔶 따라 말하기로 매일(v263) — 오늘 처음 통과한 문장 30개마다 🔶1 · 하루 2개 · ⏭·3번 넘어감·다시 말한 문장·다른 창이 먼저 적은 문장은 안 셈 · 받기가 안 되면 다음 문장이나 영상을 열 때 다시 · 부모 모드 없음 (Codex 74차 #3·#4)', async () => {
+  const { run, ctx, itemLog, speakState, els } = loadPlayerWithSpeak([]);
+  run(`settings.rereadMode = "off"; ${CUES5} $('player-msg').hidden = true;`);
+  const stones = () => itemLog.filter((x) => x === 'stone_english').length;
+  assert.deepEqual(SPEAK_STONE, { every: 30, maxPerDay: 2 });
+  for (let k = 0; k < 29; k++) sayAt(run, k % 12, PASS);
+  await tick();
+  assert.deepEqual([speakState.first, stones(), speakState.recv.length], [29, 0, 0], '29문장 — 아직 (받기를 부르지도 않는다)');
+  // ⏭ · 3번 해 보고 넘어감은 세지 않는다
+  run('state.idx = 5; resetSentenceState(); state.speakFails = 1; startSpeakWait(state.cues[5]);');
+  els['shadow-skip']._fire('click', { stopPropagation() {} }); run('cancelShadowWait()');
+  run(`state.idx = 6; resetSentenceState(); state.speakFails = 2; onSpeakResult(state.cues[6], ${JSON.stringify(FAIL)}); cancelShadowWait();`);
+  await tick();
+  assert.equal(speakState.firstCalls.length, 29, '⏭·3번 넘어감은 적지도 않는다');
+  // 다시 말한 문장(오늘 보상 이미 받음)은 적지 않는다
+  ctx.track.claimSpeakReward = () => false;
+  sayAt(run, 0, PASS); await tick();
+  assert.equal(speakState.firstCalls.length, 29, '◀▶로 같은 문장을 다시 말해도 안 는다');
+  ctx.track.claimSpeakReward = () => true;
+  // 다른 창이 먼저 적은 문장 — 목록에 이미 있으면 안 센다 (Codex 74차 #3)
+  speakState.firstDup = true; sayAt(run, 1, PASS); await tick(); speakState.firstDup = false;
+  assert.deepEqual([speakState.first, speakState.recv.length], [29, 0], '다른 창이 센 문장');
+  run("$('player-msg').hidden = true;");
+  sayAt(run, 1, PASS); await tick();
+  assert.deepEqual([speakState.first, speakState.stones, stones()], [30, 1, 1], '30문장 → 🔶1 (가방은 받기 트랜잭션이 넣는다)');
+  assert.equal(els['player-msg'].textContent, '🎤 오늘 처음 통과한 문장 30개! 🔶 영어스톤 +1', '까닭이 보이게 — 다시 말한 문장은 안 는다 (Codex 74차 PART 2)');
+  assert.deepEqual([speakState.recv[0], speakState.adopted.at(-1).speakStones], ['2026-09-14', 1], '오늘 기록의 날로 받고, 받은 기록을 보기값으로');
+  for (let k = 0; k < 29; k++) sayAt(run, k % 12, PASS);
+  await tick();
+  assert.equal(stones(), 1, '59문장 — 아직');
+  // 받기 저장이 안 되면 없다 — 셈은 저장된 채라 다음 문장 없이도(영상을 열 때) 다시 받는다 (Codex 74차 #4)
+  speakState.stoneFail = true;
+  sayAt(run, 2, PASS); await tick();
+  assert.deepEqual([speakState.first, stones()], [60, 1], '저장을 못 하면 안 준다');
+  speakState.stoneFail = false;
+  run("$('player-msg').hidden = true; checkSpeakStone();"); await tick();
+  assert.equal(stones(), 2, '놓친 몫 — 문장을 더 말하지 않아도');
+  assert.equal(els['player-msg'].textContent, '🎤 오늘 처음 통과한 문장 60개! 🔶 영어스톤 +1');
+  // 하루 2개까지
+  for (let k = 0; k < 40; k++) sayAt(run, k % 12, PASS);
+  await tick();
+  assert.equal(stones(), 2, '하루 2개');
+  const recv = speakState.recv.length;
+  run('checkSpeakStone();'); await tick();
+  assert.equal(speakState.recv.length, recv, '상한이면 받기를 부르지도 않는다');
+  // 부모 모드 — 적지도 받지도 않는다
+  const f = speakState.firstCalls.length;
+  speakState.stones = 0;
+  run('state.parentMode = true;'); sayAt(run, 0, PASS); run('checkSpeakStone(); state.parentMode = false;'); await tick();
+  assert.deepEqual([speakState.firstCalls.length, speakState.recv.length], [f, recv], '부모 모드는 없음');
+});
+
+test('🔶 따라 말하기 — 놓친 몫이 둘이면 하나 받고 또 본다 · 받는 중에는 겹쳐 부르지 않는다 · 다른 창이 먼저 받았으면(none) 말·가방 없이 보기값만 · 저장이 안 되면 되풀이하지 않는다 (Codex 74차 #4)', async () => {
+  const { run, ctx, itemLog, speakState, els } = loadPlayer();
+  run(`${CUES5} $('player-msg').hidden = true; $('player-msg').textContent = '';`);
+  const stones = () => itemLog.filter((x) => x === 'stone_english').length;
+  speakState.first = 65;
+  run('checkSpeakStone(); checkSpeakStone();');
+  assert.equal(speakState.recv.length, 1, '받는 중에는 하나만');
+  for (let k = 0; k < 5; k++) await tick();
+  assert.deepEqual([stones(), speakState.recv.length], [2, 2], '65문장 · 받은 것 0 → 둘 다 (하루 상한까지)');
+  // 다른 창이 먼저 받았다 — 저장된 기록으로 다시 보면 몫이 없다(none): 말·가방 없이 받은 오늘 기록만 보기값으로
+  speakState.first = 30; speakState.stones = 0;
+  const other = { date: '2026-09-14', speakStones: 1 };
+  ctx.receiveSpeakStone = async () => ({ ok: false, why: 'none', daily: other });
+  run("$('player-msg').hidden = true; $('player-msg').textContent = ''; checkSpeakStone();");
+  for (let k = 0; k < 3; k++) await tick();
+  assert.deepEqual([stones(), els['player-msg'].textContent, speakState.adopted.at(-1)], [2, '', other]);
+  // 저장이 안 되면(save) 그 자리에서 다시 부르지 않는다 — 다음 문장·영상을 열 때 다시
+  let n = 0;
+  ctx.receiveSpeakStone = async () => { n++; return { ok: false, why: 'save' }; };
+  run('checkSpeakStone();');
+  for (let k = 0; k < 3; k++) await tick();
+  assert.equal(n, 1);
+});
+
 test('🎤 말해 본 문장 칸 — 여행 길 옆 "🎤 말한 문장 n/전체" · 부모 모드는 숨김 · 한 번 더 읽기 기본값은 못 말한 단어가 있을 때만 (v253)', () => {
   const { run, els, speakState } = loadPlayer();
   run(`${CUES5} state.idx = 0;`);
@@ -2486,12 +2612,31 @@ test('🎤 말해 본 문장 칸 — 여행 길 옆 "🎤 말한 문장 n/전체
   run('updateProgress()');
   assert.equal(els['said-counter'].textContent, '🎤 말한 문장 7/12');
   assert.equal(els['said-counter'].hidden, false);
-  assert.match(els['said-counter'].title, /^따라 말해 본 문장\(말하기 확인을 안 하는 줄도 세요\) — 90% 이상이면 🏁 영상 보상 \(⏭로 넘긴 문장은 안 세요\)$/);
+  assert.match(els['said-counter'].title, /^따라 말해 본 문장\(말하기 확인을 안 하는 줄도 세요\) — 막대의 눈금을 넘을 때마다 🔶, 90% 이상이면 🏁 영상 보상 \(⏭로 넘긴 문장은 안 세요\)$/);
+  // 🔶 눈금 막대 (v263) — 7/12 = 58% → 25·50 켜짐
+  assert.equal(els['said-fill'].style.width, '58%');
+  assert.deepEqual(VIDEO_STEPS.map((p) => els[`said-tick-${p}`].classList.contains('on')), [true, true, false, false]);
+  assert.deepEqual([els['said-wrap'].hidden, els['said-bar'].hidden], [false, false]);
+  // 눈금에 딱 닿으면 켜진다 — 6/12 = 50%
+  speakState.said = 6; run('updateSaidCounter()');
+  assert.equal(els['said-fill'].style.width, '50%');
+  assert.deepEqual(VIDEO_STEPS.map((p) => els[`said-tick-${p}`].classList.contains('on')), [true, true, false, false], '50% — 50 눈금 켜짐');
+  // 🔶이 안 나오는 눈금은 숨긴다 — 짧은 영상(12문장)은 25%에 없다 · 중간·긴 영상은 넷 다 (Codex 74차 #6)
+  assert.deepEqual(VIDEO_STEPS.map((p) => els[`said-tick-${p}`].hidden), [true, false, false, false], '짧은 영상 — 25 눈금 숨김');
+  run('state.cues = Array.from({ length: 500 }, (_, i) => ({ start: i, end: i + 1, en: "a", ko: "" })); updateSaidCounter();');
+  assert.deepEqual(VIDEO_STEPS.map((p) => els[`said-tick-${p}`].hidden), [false, false, false, false], '중간 영상 — 넷 다');
+  run('state.cues = Array.from({ length: 1200 }, (_, i) => ({ start: i, end: i + 1, en: "a", ko: "" })); updateSaidCounter();');
+  assert.deepEqual(VIDEO_STEPS.map((p) => els[`said-tick-${p}`].hidden), [false, false, false, false], '긴 영상 — 넷 다');
+  run('state.cues = Array.from({ length: 12 }, (_, i) => ({ start: i, end: i + 1, en: "a", ko: "" })); updateSaidCounter();');
+  assert.equal(els['said-tick-25'].hidden, true, '다시 짧은 영상');
   run('state.parentMode = true; updateSaidCounter(); state.parentMode = false;');
   assert.equal(els['said-counter'].hidden, true, '부모 모드는 안 쌓이니 숨김');
+  assert.deepEqual([els['said-wrap'].hidden, els['said-bar'].hidden], [true, true], '막대도 같이 숨김');
   assert.equal(run('loadSettings().rereadMode'), 'missed', '새 기기 기본값');
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<span id="said-counter" class="said-counter" hidden>🎤 말한 문장 0\/0<\/span>/);
+  assert.match(html, /<span id="said-wrap" class="said-wrap" hidden>\s*<span id="said-counter"/, '칸과 막대를 한 묶음으로 — 좁은 화면에서 같은 줄 (v263)');
+  for (const p of VIDEO_STEPS) assert.match(html, new RegExp(`<i id="said-tick-${p}" class="said-tick" style="left:${p}%"></i>`), `눈금 ${p}`);
   assert.match(html, /<option value="missed">못 말한 단어가 있을 때만 \(기본\)<\/option>/);
 });
 
@@ -2512,7 +2657,7 @@ test('🔍 Codex 65차 #2 — 🔁 복습에서 따라 말하기를 통과하면
   o.onDone({ started: true, done: 3, passed: 2, finished: true });
   await tick();
   assert.equal(els['said-counter'].textContent, '🎤 말한 문장 4/4', '복습을 닫으면 칸을 새로');
-  assert.deepEqual(JSON.parse(JSON.stringify(videoState.calls)), [[{ id: 'ep1', total: 4 }]], '복습을 닫으면 🏁를 다시 본다');
+  assert.deepEqual(JSON.parse(JSON.stringify(videoState.calls)), [[{ id: 'ep1', total: 4, pct: 100 }]], '복습을 닫으면 🏁를 다시 본다');
   // 연습 복습(⚙ 지금 복습 해보기)은 기록이 없다
   run('startReview([{ type: "sentence", rec: ' + JSON.stringify(due(4)) + ', cue: state.cues[3] }], true)');
   reviewCalls[reviewCalls.length - 1].onSentence({ start: 4, en: 'd' }, true);

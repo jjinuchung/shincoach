@@ -241,7 +241,7 @@ export function parcelOf(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const id = typeof raw.id === 'string' ? raw.id.trim() : '';
   if (!id || id.length > 64) return null;
-  if (id.startsWith(VIDEO_PARCEL) || id.startsWith(VIDEO_PLUS)) return null; // 🏁 영상 보상 기록 자리 — 아빠 구호품이 이 이름이면 영상 몫과 섞인다
+  if (id.startsWith(VIDEO_PARCEL) || id.startsWith(VIDEO_PLUS) || id.startsWith(VIDEO_STEP)) return null; // 🏁 영상 보상 기록 자리 — 아빠 구호품이 이 이름이면 영상 몫과 섞인다
   const src = raw.items;
   if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
   const items = {};
@@ -272,9 +272,21 @@ export function parcelOf(raw) {
  *   📊 진행률·수학 이야기 세계는 그대로 한 문장(done)으로
  */
 export const VIDEO_STONE = { n: 3, pct: 90 };
+/**
+ * 🎤 영상 🔶을 나눠 받는 눈금 (2026-10-15 v263, 아버님 결정).
+ * 🎤 말해 본 문장이 눈금(25·50·75·90%)을 넘을 때마다 그 영상의 🔶(VIDEO_TIERS.steps)을 나눠 준다 — 전에는 90%에 한 번이라
+ * 긴 영화를 끝까지 봐도 말해 본 문장이 모자라면 🔶8이 통째로 0이었다. 💰는 그대로 90%에 한 번. 마지막 눈금 = VIDEO_STONE.pct
+ */
+export const VIDEO_STEPS = [25, 50, 75, 90];
+/**
+ * 🎤 따라 말하기 통과로 매일 🔶 (2026-10-15 v263) — 그 문장의 오늘 첫 말하기 보상(통과)이 every개 모일 때마다 🔶1, 하루 maxPerDay개.
+ * ⏭·3번 못 해 넘어감·◀▶로 다시 말한 문장은 안 센다 — 양이 아니라 "말해서 통과"한 문장만 (스톤은 질에서만)
+ */
+export const SPEAK_STONE = { every: 30, maxPerDay: 2 };
 /** 🔶 영어스톤이 생기는 곳 — 아이에게 보이는 안내(🛒 스톤 상점·🏪 5일장·도감·📊)가 같이 쓴다. 받는 곳을 바꾸면 여기 한 곳만 */
-export const ENGLISH_STONE_HOW = `복습을 다 맞히거나, 받아쓰기·단어를 다 맞히거나, 에세이를 쓰거나, 영상 문장의 ${VIDEO_STONE.pct}%를 따라 말해 보면`;
-export const ENGLISH_STONE_SHORT = '복습 다 맞힘·받아쓰기·단어 만점·에세이·영상 끝까지 따라 말하기';
+// 영상은 "눈금마다" — 짧은 영상은 첫 눈금에 🔶이 없고(VIDEO_TIERS.steps) 마지막 눈금은 90%라 %를 늘어놓지 않는다 (Codex 74차 #6)
+export const ENGLISH_STONE_HOW = `복습을 다 맞히거나(문제가 셋 이상이면 하나는 틀려도 돼요), 받아쓰기·단어를 다 맞히거나, 에세이를 쓰거나, 따라 말하기로 그날 처음 통과한 문장이 ${SPEAK_STONE.every}개 모이거나, 영상을 따라 말해 🎤 막대의 눈금을 넘을 때마다`;
+export const ENGLISH_STONE_SHORT = `복습 거의 다 맞힘·받아쓰기·단어 만점·에세이·따라 말하기 하루 ${SPEAK_STONE.every}문장·영상 따라 말하기 눈금마다`;
 
 /**
  * 🎤 연속 성공 보너스 (2026-10-14 v253, 영어 ⏭ 넘기기) — 그 문장의 오늘 첫 말하기 보상이 every번 연달아 나오면 💰coin.
@@ -291,45 +303,91 @@ export function videoParcelId(itemId) {
  * 🔶은 v197의 3개(video:)를 포함한 개수 — 나머지(💰 전부 + 🔶 차액)는 따로 받은 기록 videoplus:<id>에 적는다.
  * 그래서 v197에 🔶3만 받고 끝낸 지난 영상도 차액을 받는다 (📦 창, 규칙을 바꿀 때 이미 한 것도 정한다)
  */
+// steps: 눈금(VIDEO_STEPS)마다 받는 🔶 — 합이 stone (v263). 짧은 영상은 25%에 없음
 export const VIDEO_TIERS = [
-  { upto: 399, coin: 50, stone: 3, label: '짧은 영상' },       // 에피소드 20분쯤
-  { upto: 799, coin: 100, stone: 5, label: '중간 영상' },
-  { upto: Infinity, coin: 200, stone: 8, label: '긴 영상' },   // 영화 1~2시간
+  { upto: 399, coin: 50, stone: 3, steps: [0, 1, 1, 1], label: '짧은 영상' },       // 에피소드 20분쯤
+  { upto: 799, coin: 100, stone: 5, steps: [1, 1, 1, 2], label: '중간 영상' },
+  { upto: Infinity, coin: 200, stone: 8, steps: [2, 2, 2, 2], label: '긴 영상' },   // 영화 1~2시간
 ];
 export const VIDEO_PLUS = 'videoplus:';
 export function videoPlusId(itemId) {
   return `${VIDEO_PLUS}${itemId}`;
+}
+/**
+ * 🎤 눈금(25·50·75%)까지 받은 기록 이름 — videostep:<id>:<눈금>:<그때까지 이 영상에 준 🔶 누적> (v263). 90%는 옛 이름 video:·videoplus: 그대로.
+ * 누적을 이름에 적는 까닭: ⚙ 문장 합치기를 바꾸면 문장 수가 바뀌어 길이 칸(짧은·중간·긴)이 바뀔 수 있다 — 눈금만 적으면 지금 칸으로
+ * 다시 세어 덜 주거나 더 준다 (Codex 74차 #2). 받은 기록은 합집합으로 합쳐지니 누적은 가장 큰 것을 본다
+ */
+export const VIDEO_STEP = 'videostep:';
+export function videoStepId(itemId, pct, cum) {
+  return `${VIDEO_STEP}${itemId}:${pct}:${cum}`;
+}
+/** 눈금 기록이 말하는 이미 준 🔶 (순수) — 그 영상의 videostep: 열쇠 누적 중 가장 큰 것 (없으면 0) */
+export function videoStepPaid(got, itemId) {
+  const pre = `${VIDEO_STEP}${itemId}:`;
+  let paid = 0;
+  for (const k of Object.keys(got || {})) {
+    if (!k.startsWith(pre)) continue;
+    const m = /^\d+:(\d+)$/.exec(k.slice(pre.length)); // 다른 영상(id에 ':'가 있는 것)의 열쇠는 꼴이 안 맞아 빠진다
+    if (m) paid = Math.max(paid, Number(m[1]));
+  }
+  return paid;
 }
 /** 영상 길이(문장 수) → 보상 칸 (순수) — 모르는 길이는 짧은 영상 */
 export function videoTier(total) {
   const n = Math.max(0, Number(total) || 0);
   return VIDEO_TIERS.find((t) => n <= t.upto) || VIDEO_TIERS[0];
 }
-/**
- * 이 영상에서 받을 💰·🔶 (순수) — base: 🔶 3개(video:)를 아직 안 받음 · plus: 길이별 나머지(videoplus:)를 아직 안 받음.
- * db.videoStoneRule(받기)과 📦 창(보여 주기)이 같은 셈을 쓴다
- */
-export function videoGrant({ total, base, plus }) {
+/** 말해 본 문장 pct%까지 넘은 눈금의 🔶 합 (순수) */
+export function videoStepStones(total, pct) {
   const t = videoTier(total);
-  return { coins: plus ? t.coin : 0, stones: (base ? VIDEO_STONE.n : 0) + (plus ? Math.max(0, t.stone - VIDEO_STONE.n) : 0), tier: t };
+  const p = Number(pct) || 0;
+  return VIDEO_STEPS.reduce((n, s, i) => (p >= s ? n + t.steps[i] : n), 0);
+}
+/**
+ * 🎤 이 영상에서 지금 받을 💰·🔶 (순수, v263) — db.videoStoneRule(받기)·📦 창(보여 주기)·영상 화면이 같은 셈을 쓴다.
+ * 이미 받은 🔶 = 받은 기록이 말하는 가장 큰 양: 옛 video:(v197 🔶3) · videoplus:(그 영상 🔶 전부) · 눈금 기록(이름에 적힌 누적).
+ * 받을 🔶 = 지금 넘은 눈금까지의 합 − 이미 받은 양 → 옛 규칙으로 다 받은 영상은 더 없고, v197에 🔶3만 받은 영상은 차액만.
+ * 💰는 90%를 넘었고 videoplus:가 없을 때 한 번
+ * @param {{id:string|number, total:number, pct:number}} v pct: 🎤 말해 본 문장 %(saidPct)
+ * @param {object} got 받은 기록(profile.parcels)
+ * @returns {{stones:number, coins:number, keys:string[], step:number}} keys: 이번에 받으면 적을 기록 · step: 넘은 가장 높은 눈금(없으면 0)
+ */
+export function videoOwed(v, got) {
+  const id = String(v && v.id);
+  const total = v && v.total;
+  const p = Number(v && v.pct) || 0;
+  const t = videoTier(total);
+  const base = parcelGot(got, videoParcelId(id));
+  const plus = parcelGot(got, videoPlusId(id));
+  const had = Math.max(base ? VIDEO_STONE.n : 0, plus ? t.stone : 0, videoStepPaid(got, id));
+  const stones = Math.max(0, videoStepStones(total, p) - had);
+  const coins = p >= VIDEO_STONE.pct && !plus ? t.coin : 0;
+  const step = VIDEO_STEPS.filter((s) => p >= s).pop() || 0;
+  const keys = [];
+  if (p >= VIDEO_STONE.pct) { if (!base) keys.push(videoParcelId(id)); if (!plus) keys.push(videoPlusId(id)); }
+  else if (stones) keys.push(videoStepId(id, step, had + stones));
+  return { stones, coins, keys, step };
 }
 /** 진행률(%) — stats.contentSummary의 pct·saidPct와 같은 셈 (반올림) */
 export function videoPct(done, total) {
   return total > 0 ? Math.round((done / total) * 100) : 0;
 }
-/** 끝까지 보상을 받을 영상 (순수) — 깨진 영상·다 받은 영상은 빼고 🎤 말해 본 문장(saidPct)이 VIDEO_STONE.pct% 이상인 것만, 같은 id는 한 번 · base·plus = 아직 안 받은 몫 */
+/**
+ * 🎤 받을 몫이 있는 영상 (순수, v263) — 깨진 영상·문장 없는 영상은 빼고 🎤 말해 본 문장(saidPct)으로 videoOwed가 💰·🔶을 주는 것만, 같은 id는 한 번.
+ * pct·stones·coins·step = 지금 받을 몫 (📦 창이 보여 주고, [받기]는 id·total·pct로 다시 판정)
+ */
 export function videoStoneDue(summaries, received) {
   const out = [];
   const seen = new Set();
   for (const s of Array.isArray(summaries) ? summaries : []) {
     if (!s || s.broken || s.id === undefined || s.id === null || s.id === '') continue;
     const id = String(s.id);
-    const base = !parcelGot(received, videoParcelId(id));
-    const plus = !parcelGot(received, videoPlusId(id));
-    if (seen.has(id) || (!base && !plus)) continue;
-    if (!(Number(s.total) > 0) || !(Number(s.saidPct) >= VIDEO_STONE.pct)) continue;
+    if (seen.has(id) || !(Number(s.total) > 0) || !(Number(s.saidPct) >= VIDEO_STEPS[0])) continue;
+    const o = videoOwed({ id, total: Number(s.total), pct: Number(s.saidPct) }, received);
+    if (!o.stones && !o.coins) continue;
     seen.add(id);
-    out.push({ id, title: String(s.title || ''), total: Number(s.total), base, plus });
+    out.push({ id, title: String(s.title || ''), total: Number(s.total), pct: Number(s.saidPct), stones: o.stones, coins: o.coins, step: o.step });
   }
   return out;
 }

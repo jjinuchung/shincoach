@@ -63,10 +63,11 @@ test('🏁 contentSummary — said·saidPct(말해 본 문장)와 pct(한 문장
   const recs = Array.from({ length: 10 }, (_, i) => row({ key: `x|${i}`, start: i, v: 2, said: i < 8 ? 1 : 0 }));
   const [s] = contentSummary(items, recs, () => 10);
   assert.deepEqual([s.done, s.said, s.pct, s.saidPct], [10, 8, 100, 80]);
-  assert.deepEqual(videoStoneDue([s], {}), [], '한 문장 100%여도 말해 본 문장 80%면 없음');
+  // 한 문장 100%여도 말해 본 문장 80%면 🏁(90%·💰)는 없다 — 눈금 75%까지의 🔶만 (v263)
+  assert.deepEqual(videoStoneDue([s], {}).map((d) => [d.pct, d.step, d.stones, d.coins]), [[80, 75, 2, 0]]);
   recs[8].said = 1; recs[9].said = 1;
   const [s2] = contentSummary(items, recs, () => 10);
-  assert.equal(videoStoneDue([s2], {}).length, 1);
+  assert.deepEqual(videoStoneDue([s2], {}).map((d) => [d.pct, d.step, d.stones, d.coins]), [[100, 90, 3, 50]]);
   assert.equal(VIDEO_STONE.pct, 90);
   assert.match(read('js/math.js'), /worlds = seenWorlds\(contentSummary\(/, '수학 이야기 세계는 같은 요약의 pct');
   assert.match(read('js/mathprog.js'), /s\.pct/, '그대로 pct');
@@ -152,7 +153,7 @@ test('🔍 Codex 65차 #1 — 말해 본 문장은 지금 문장 열쇠의 기�
   assert.deepEqual([old.said, old.saidPct], [2, 100], '열쇠를 안 주면 옛 셈(부푼다)');
   const [s] = contentSummary([it], recs, cueCountOf, cueKeysOf);
   assert.deepEqual([s.total, s.said, s.saidPct, s.done], [2, 1, 50, 3], '지금 문장 2개 중 1개 · 한 문장(done)은 그대로');
-  assert.deepEqual(videoStoneDue([s], {}), [], '옛 조각으로 🏁가 나오지 않는다');
+  assert.deepEqual(videoStoneDue([s], {}).map((d) => [d.pct, d.coins]), [[50, 0]], '옛 조각으로 🏁(90%·💰)가 나오지 않는다 — 지금 문장으로 센 50%의 눈금만 (v263)');
   const [k] = contentSummary([it], [row({ key: 'x|10', start: 1, said: 0, v: 2, done: true }), row({ key: 'x|99', start: 9.9, v: 2, said: 1 })], cueCountOf, cueKeysOf);
   assert.equal(k.said, 0, '열쇠가 없는 기록(r.key 없음도 itemId·start로)');
   assert.equal(contentSummary([it], [{ itemId: 'x', start: 10, done: true, v: 2, said: 1 }], cueCountOf, cueKeysOf)[0].said, 1, 'key 칸이 없어도 itemId·start로 열쇠를 만든다');
@@ -161,8 +162,8 @@ test('🔍 Codex 65차 #1 — 말해 본 문장은 지금 문장 열쇠의 기�
   assert.ok(read('js/upload.js').includes('return st.contentSummary(items, records, st.cueCountOf, st.cueKeysOf);'), '📤');
   const pl = read('js/player.js');
   assert.ok(!/track\.saidCount\(\)/.test(pl), '플레이어는 늘 지금 문장 목록으로');
-  assert.match(pl, /if \(videoPct\(track\.saidCount\(state\.cues\), state\.cues\.length\) < VIDEO_STONE\.pct\) return;/);
-  assert.match(pl, /c\.textContent = `🎤 말한 문장 \$\{track\.saidCount\(state\.cues\)\}\/\$\{n\}`;/);
+  assert.match(pl, /const v = \{ id: it\.id, total: state\.cues\.length, pct: videoPct\(track\.saidCount\(state\.cues\), state\.cues\.length\) \};/);
+  assert.match(pl, /const said = track\.saidCount\(state\.cues\);\s*c\.hidden = !n \|\| state\.parentMode;\s*c\.textContent = `🎤 말한 문장 \$\{said\}\/\$\{n\}`;/);
 });
 
 test('🔍 Codex 65차 #5 — 📤 영어 요약: 복습·퍼즐·단어 잇기·영어 화면 시간만 있는 날도 그날 줄 · 🔁 복습 문장 수 · 기록이 하나도 없는 날만 "영어 기록 없음"', () => {
