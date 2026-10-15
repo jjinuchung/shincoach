@@ -262,6 +262,7 @@ function openCard(id) {
     t0: Date.now(), // ⏱️ 연 시각 — 📤 읽은 기록의 열쇠 (v258)
     sec: 0, // 읽은 초 (쉼 빼고 — tickRead)
     firstSec: -1, // 첫 답을 고를 때의 읽은 초
+    askAt: -1, // 📖 [문제 보기]를 누를 때의 읽은 초 — 그 전에는 물음을 숨긴다(readFirst, v260)
   };
   lastAct = Date.now();
   stopListening(); // 앞 카드에서 읽던 소리
@@ -448,6 +449,7 @@ function renderRead() {
   else {
     const p = passageEl(r.card);
     if (r.ls) p.insertBefore(el('p', 'kor-listen-textnote', '📄 글로 읽고 풀어요 — 🟩 국어스톤은 듣고 풀어서 한 번에 다 맞혔을 때 받아요'), p.firstChild);
+    if (readFirst(r)) p.appendChild(askGoEl(r.card)); // 📖 글 끝에 [문제 보기] (v260)
     body.appendChild(p);
   }
   const col = el('div', 'kor-qcol');
@@ -463,6 +465,35 @@ function renderRead() {
   const bar = document.querySelector('#view-korean .topbar');
   main.style.setProperty('--kor-top', `${Math.ceil(bar ? bar.getBoundingClientRect().height : 64) + 8}px`);
   renderQ();
+}
+
+/** 📖 글 먼저 (v260, 아버님 "이대로 진행") — 읽기 글은 [문제 보기]를 누르기 전에는 물음·보기를 숨긴다(보기부터 읽고 고르지 않게) ·
+ *   🎧 듣기 글은 따로("다 들은 뒤") · 다시 읽는 글도 같다 · 시간 제한은 없다(일부러 기다리게 하지 않는다) · 누른 때는 📤 읽은 기록에 */
+export function readFirst(r) {
+  return !!r && !r.ls && !(r.askAt >= 0);
+}
+
+/** 글 상자 맨 끝의 [문제 보기] — 글을 끝까지 지나야 닿는다 */
+function askGoEl(card) {
+  const box = el('div', 'kor-askgo');
+  box.appendChild(el('p', 'kor-askgo-note', '끝까지 읽었으면 물음을 열어요'));
+  const b = el('button', 'btn btn-primary btn-big-wide kor-askgo-btn', `📝 문제 보기 (물음 ${card.qs.length}개)`);
+  b.type = 'button';
+  b.addEventListener('click', showAsks);
+  box.appendChild(b);
+  return box;
+}
+
+/** [문제 보기]를 눌렀다 — 누른 때를 적고 단추를 거둔 뒤 첫 물음으로 (글 상자는 다시 그리지 않는다 — 읽던 자리 그대로) */
+function showAsks() {
+  const r = ui.read;
+  if (!readFirst(r)) return;
+  r.askAt = r.sec;
+  const go = document.querySelector('#korean-main .kor-askgo');
+  if (go) go.remove();
+  r.focus = 'head';
+  renderQ();
+  bringQ();
 }
 
 /** 화면에 다시 그린 뒤 다음에 누를 곳으로 초점(키보드) — 'opt' 남은 보기 · 'ev' 근거 줄 · 'next' 다음 단추 · 'head' 새 물음 · 'done' 끝 카드 */
@@ -503,6 +534,15 @@ function renderQ() {
     const wait = el('div', 'kor-q kor-listen-wait');
     wait.appendChild(el('p', 'kor-q-text', `🎧 처음부터 끝까지 들으면 물음 ${r.card.qs.length}개가 나와요`));
     wait.appendChild(el('p', 'kor-tnote', '▶ 듣기를 눌러요. 잘 안 들리면 🐢 천천히 들을 수 있어요.'));
+    col.appendChild(wait);
+    if (live) live.textContent = '';
+    if (focusTo) moveFocus(col, 'head');
+    return;
+  }
+  if (readFirst(r)) {
+    // 📖 글 먼저 (v260) — 물음은 글 끝의 [문제 보기]를 누른 뒤 (🎧 "다 들은 뒤"와 같은 꼴)
+    const wait = el('div', 'kor-q kor-listen-wait kor-read-wait');
+    wait.appendChild(el('p', 'kor-q-text', `📖 글을 끝까지 읽고, 글 상자 맨 아래 [문제 보기]를 눌러요 — 물음 ${r.card.qs.length}개`));
     col.appendChild(wait);
     if (live) live.textContent = '';
     if (focusTo) moveFocus(col, 'head');
@@ -729,6 +769,7 @@ export function readLog(r) {
     x: cnt((st, q) => st.wrong.length >= q.opts.length - 1), // 오답 보기를 모두 고른 물음
     e: cnt((st) => st.evFirst), h: cnt((st) => st.hint2),
     m: r.ls ? (r.ls.text ? 'text' : 'listen') : '',
+    ...(r.askAt >= 0 ? { q: r.askAt } : {}), // 📖 문제 보기까지 초 (v260 — 🎧는 없음)
   };
 }
 

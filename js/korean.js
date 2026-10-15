@@ -236,7 +236,8 @@ export function evRange(ev, n, pad = EV_RANGE_PAD) {
 // 글을 끝까지 읽을 때마다 한 줄: 읽은 시간(⏳ 시계처럼 쉼은 빼고) · 첫 답까지 걸린 시간 · 첫 번에 맞힌 물음 · 끝까지 고른 물음 ·
 // 근거 먼저 · 둘째 힌트를 쓴 수 — 막히면 어떻게 하는지 아빠·Claude가 본다. 별과 같은 트랜잭션(korFinishRule)에서 적는다.
 // 저장 = profile.korReads [{ c 카드, t 연 시각(ms — 열쇠는 c@t), d 다 읽은 날 번호, s 읽은 초, a 첫 답까지 초, n 물음 수, f 첫 번에 맞힘,
-//   x 오답 보기를 모두 고른 물음(요약 말 — "끝까지 고른"은 끝까지 푼 물음으로 읽혔다, Codex 69차 #4), e 근거 먼저, h 둘째 힌트, g 이번에 받은 별(0 = 별 없이 다시 읽음), m '' 글 · 'listen' 🎧 들음 · 'text' 🎧 글로 읽음 }]
+//   x 오답 보기를 모두 고른 물음(요약 말 — "끝까지 고른"은 끝까지 푼 물음으로 읽혔다, Codex 69차 #4), e 근거 먼저, h 둘째 힌트, g 이번에 받은 별(0 = 별 없이 다시 읽음), m '' 글 · 'listen' 🎧 들음 · 'text' 🎧 글로 읽음,
+//   q 📖 [문제 보기]를 누를 때까지 초(v260 글 먼저 — 그 전 줄과 🎧에는 없다) }]
 // 병합은 열쇠로 합집합(같은 열쇠는 한 줄) · 최근 READS_MAX줄
 export const READS_MAX = 120;
 /** 한 줄의 읽은 초 상한 (6시간 — 깨진 시계 값이 요약을 부풀리지 않게) */
@@ -254,11 +255,27 @@ export function readOf(x) {
   const n = int(x.n);
   if (!(t > 0) || !(d > 1) || !(n >= 1 && n <= 5)) return null;
   const s = clampInt(x.s, 0, READ_SEC_MAX);
+  const q = typeof x.q === 'number' ? int(x.q) : NaN;
   return {
     c: x.c, t, d, s, a: clampInt(x.a, 0, s), n,
     f: clampInt(x.f, 0, n), x: clampInt(x.x, 0, n), e: clampInt(x.e, 0, n), h: clampInt(x.h, 0, n),
     g: clampInt(x.g, 0, 3), m: READ_MODES.includes(x.m) ? x.m : '',
+    ...(q >= 0 ? { q: Math.min(q, s) } : {}), // 📖 문제 보기까지 — 없거나 깨졌으면 뺀다(옛 줄과 같게)
   };
+}
+/**
+ * 같은 열쇠 두 줄 가운데 남길 것 (순수) — q 말고 나머지를 견줘 큰 쪽 · 나머지가 같으면 q가 있는 쪽 · 그다음 전체 글
+ *   (v260 Codex 71차 #2: 전체 글로만 견주면 q가 없는 줄이 이겼다 — "…,\"q\"" < "…}" — 옛 앱을 거친 사본이 q를 지운 채 돌아오면 q가 사라졌다)
+ *   차례(누가 먼저 들어오든)와 상관없이 같은 줄이 남는다
+ */
+function betterRead(a, b) {
+  const { q: qa, ...ra } = a;
+  const { q: qb, ...rb } = b;
+  const sa = JSON.stringify(ra);
+  const sb = JSON.stringify(rb);
+  if (sa !== sb) return sa > sb ? a : b;
+  if ((qa === undefined) !== (qb === undefined)) return qa === undefined ? b : a;
+  return JSON.stringify(a) >= JSON.stringify(b) ? a : b;
 }
 /** 읽은 기록 고쳐 읽기 (순수) — 깨진 줄은 버리고 · 같은 열쇠는 한 줄(차례와 상관없이 같은 것이 남게) · 연 시각 차례로 최근 READS_MAX줄 */
 export function readsOf(list) {
@@ -268,7 +285,7 @@ export function readsOf(list) {
     if (!x) continue;
     const k = readKey(x);
     const had = by.get(k);
-    if (!had || JSON.stringify(x) > JSON.stringify(had)) by.set(k, x);
+    by.set(k, had ? betterRead(had, x) : x);
   }
   return [...by.values()].sort((a, b) => a.t - b.t || (a.c < b.c ? -1 : a.c > b.c ? 1 : 0)).slice(-READS_MAX);
 }
@@ -283,7 +300,7 @@ export function mergeReads(a, b) {
  * evMiss = 근거를 잘못 누른 수(잘못 읽기로는 안 세지만 🟩 "한 번에 다 맞힘"에는 든다) ·
  * opts.noStone = 🟩를 주지 않는다 — 🎧 듣기 카드를 글로 읽고 풀었다(별·💰·🎯는 같다, v245 아버님 "이대로 진행") ·
  * opts.qMiss = { 물음 id: 이번에 고른 틀린 보기 수 } — 이 카드의 물음만 korQMiss에 더한다(📤 국어 요약, v254) ·
- * opts.read = { t 연 시각, s 읽은 초, a 첫 답까지 초, n, f, x, e, h, m } — 읽은 기록 한 줄(📤, v258). 카드·날·별은 여기서 채운다(트랜잭션 안의 now) ·
+ * opts.read = { t 연 시각, s 읽은 초, a 첫 답까지 초, n, f, x, e, h, m, q? 문제 보기까지 초 } — 읽은 기록 한 줄(📤, v258 · q v260). 카드·날·별은 여기서 채운다(트랜잭션 안의 now) ·
  *   같은 열쇠(카드·연 시각)가 이미 있으면 더 적지 않는다 — [다시 저장하기]가 두 줄을 만들지 않게
  * why: 'unknown' 모르는 카드
  * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, next?:number, days?:number}}

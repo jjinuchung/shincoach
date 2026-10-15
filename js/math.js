@@ -12,7 +12,7 @@ import {
   dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
   applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, widenRound, rungSub, practiceNote, waitNote, LEARNING_MAX,
   sameDayRounds, repeatNote, roundPay, setLive, applyQuit, settleLives, liveKeep,
-  stemDueList, stemPickOrder, LATE, lateBonus, lateLeft, bridgeOf, bridgeOffers,
+  stemPickOrder, LATE, lateBonus, lateLeft, bridgeOf, bridgeOffers,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -239,9 +239,7 @@ function openStem(state, key) {
 /** 📚 이 줄기로 가는 단추 — "U 분수의 곱셈 줄기 (지금 2/9칸)" */
 function bridgeBtn(state, key, label) {
   const st = STEMS[key];
-  const rows = ladderOf(state, todayKey(), key);
-  const done = rows.filter((r) => r.state === 'done').length;
-  const b = el('button', 'btn btn-big-wide math-bridge-btn', `📚 ${label} — ${st.code} ${st.label} (지금 ${done}/${rows.length}칸)`);
+  const b = el('button', 'btn btn-big-wide math-bridge-btn', `📚 ${label} — ${st.code} ${st.label}`); // 몇 칸 했는지는 쓰지 않는다 (v260 Codex 71차 #1)
   b.type = 'button';
   b.addEventListener('click', () => openStem(state, key));
   return b;
@@ -574,17 +572,12 @@ function renderStemPicker(state) {
   const card = el('section', 'math-card');
   card.appendChild(el('h2', '', '🌳 어떤 줄기를 할까?'));
   card.appendChild(el('p', 'math-p muted', '줄기 하나가 개념 사다리 하나예요. 하던 줄기를 이어서 해도 되고, 새 줄기를 시작해도 돼요.'));
-  // ⏰ 밀린 복습 (v257) — 어느 줄기에 얼마나 오래 밀렸는지 보이고, 오래 밀린 줄기를 위로
+  // ⏰ 밀린 복습이 있는 줄기를 위로 (v257) — 얼마나 했고·얼마나 남았고·며칠 밀렸는지는 쓰지 않는다
+  //   (v260, 아버님 2026-10-15: 이런 문구는 압박되고 쫓기는 기분을 준다 — 밀린 복습은 ☀️가 알아서 가져온다)
   const today = todayKey();
-  const dues = new Map(stemDueList(state, today).map((x) => [x.key, x]));
-  const allDue = [...dues.values()].reduce((n, x) => n + x.due, 0);
-  if (allDue) card.appendChild(el('p', 'math-note math-due-sum', `🔁 다시 확인할 개념 ${allDue}개가 기다려요 — ☀️ 오늘의 수학이 복습 날짜가 가장 오래 지난 것부터 가져와요${lateLeft(state, today) ? ` · ⏰ 복습 날짜가 ${LATE.days}일 이상 지난 개념을 통과하면 💰+${LATE.coin} 더 · 하루 ${LATE.max}번까지` : ''}`));
   const list = el('div', 'math-stems');
   for (const key of stemPickOrder(state, today)) {
     const st = STEMS[key];
-    const rows = ladderOf(state, todayKey(), key);
-    const done = rows.filter((r) => r.state === 'done').length;
-    const crown = rows.filter((r) => r.crowned).length;
     const started = !needsPlacement(state, key);
     const b = el('button', 'math-stem-btn');
     b.type = 'button';
@@ -592,9 +585,7 @@ function renderStemPicker(state) {
     const body = el('span', 'math-stem-body');
     body.appendChild(el('span', 'math-stem-name', `${st.label} · ${st.range}`));
     // 줄기가 제 소개(pick)를 가지면 그것 — 소수는 앞 다섯 칸이 학교 진도라 "처음 배우는 줄기"가 맞지 않다
-    body.appendChild(el('span', 'math-stem-sub', started ? `개념 ${rows.length}개 중 ${done}개를 알아요 · 👑 ${crown}` : (st.pick || (st.lesson ? '처음 배우는 줄기 — 한 장씩 배우고 문제를 풀어요' : '📏 진단 5문제로 시작해요'))));
-    const dx = dues.get(key);
-    if (dx) body.appendChild(el('span', `math-stem-due${dx.late >= LATE.days ? ' is-late' : ''}`, `🔁 다시 확인 ${dx.due}개${dx.late ? ` · 복습 날짜가 ${dx.late}일 지난 것도 있어요` : ' · 오늘 차례'}`));
+    body.appendChild(el('span', 'math-stem-sub', started ? '하던 줄기 — 이어서 해요' : (st.pick || (st.lesson ? '처음 배우는 줄기 — 한 장씩 배우고 문제를 풀어요' : '📏 진단 5문제로 시작해요'))));
     b.appendChild(body);
     b.addEventListener('click', () => openStem(state, key));
     list.appendChild(b);
@@ -650,9 +641,7 @@ function renderLadder(state) {
   sw.addEventListener('click', () => renderStemPicker(state));
   eye.appendChild(sw);
   head.appendChild(eye);
-  const doneN = rows.filter((r) => r.state === 'done').length;
-  const crownN = rows.filter((r) => r.crowned).length;
-  head.appendChild(el('h2', '', `개념 ${rows.length}개 중 ${doneN}개를 알아요 · 👑 ${crownN}`));
+  head.appendChild(el('h2', '', '🪜 개념 사다리')); // 아는 칸 수·전체 칸 수는 쓰지 않는다 (v260 — 🌳 줄기 고르기와 같은 까닭)
   // 📬 아빠의 답장 — 사다리 맨 위, 읽어야 ☀️가 열린다 (아버님 결정 2026-09-21: 수학 전체는 안 막고 ☀️만)
   const unread = unreadAsks(state);
   if (unread.length) {
@@ -689,10 +678,10 @@ function renderLadder(state) {
     head.appendChild(db);
     const parts = [];
     if (preview.roundId) {
-      // ⏰ ☀️는 줄기와 상관없이 가장 오래 기다린 확인부터 (v257) — 다른 줄기면 그 줄기 이름을, 밀린 날 수와 ⏰ 보너스를 미리
+      // ⏰ ☀️는 줄기와 상관없이 가장 오래 기다린 확인부터 (v257) — 다른 줄기면 그 줄기 이름을, ⏰ 보너스를 미리 (밀린 날 수는 쓰지 않는다, v260)
       const ps = preview.roundStem && preview.roundStem !== ui.stem ? STEMS[preview.roundStem] : null;
-      const wait = preview.roundMode === 'review' && preview.late
-        ? ` (복습 날짜가 ${preview.late}일 지남${preview.late >= LATE.days && lateLeft(state, today) ? ` — 통과하면 ⏰ 💰+${LATE.coin}` : ''})` : '';
+      const wait = preview.roundMode === 'review' && preview.late >= LATE.days && lateLeft(state, today)
+        ? ` (통과하면 ⏰ 💰+${LATE.coin})` : '';
       parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${ps ? `${ps.code} ${ps.label}의 ` : ''}${nameOf(preview.roundId)}${wait}`);
     }
     else if (preview.waiting) parts.push('🥚 오늘 배운 건 다음 날 확인해요'); // "그때 새 칸이 열려요"는 🥚가 셋이면 거짓이다 — 잠금 안내는 사다리 위 배너가 (Codex 20차 #6)
@@ -709,14 +698,14 @@ function renderLadder(state) {
   const waiting = openAsks(state).length;
   const tryable = ((state && state.asks) || []).filter((x) => x && x.status === 'understood');
   if (tryable.length) {
-    const tb = el('button', 'btn btn-big-wide math-ask-try-btn', `🔁 아빠 답장 문제 풀어보기 ${tryable.length}개 — 맞히면 ⚡${ASK_REWARD.xp}`);
+    const tb = el('button', 'btn btn-big-wide math-ask-try-btn', `🔁 아빠 답장 문제 풀어보기 — 맞히면 ⚡${ASK_REWARD.xp}`); // 남은 수는 쓰지 않는다 (v260 Codex 71차 #1)
     tb.type = 'button';
     tb.addEventListener('click', () => guardStart('math', () => startAskTry(tryable[0])));
     head.appendChild(tb);
   }
   if (waiting) head.appendChild(el('p', 'math-note', `❓ 아빠 답을 기다리는 질문 ${waiting}개`));
   if (due.length) {
-    const b = el('button', 'btn btn-accent btn-big-wide', `🔁 오늘 다시 확인할 개념 ${due.length}개 — 정말 아는지 볼까?`);
+    const b = el('button', 'btn btn-accent btn-big-wide', '🔁 오늘 다시 확인하기 — 정말 아는지 볼까?'); // 남은 수는 쓰지 않는다 (v260)
     b.type = 'button';
     b.addEventListener('click', () => guardStart('math', () => startRound(due[0], 'review')));
     head.appendChild(b);
@@ -729,13 +718,13 @@ function renderLadder(state) {
   // 🤔 오답 노트 회차 — 어제 이전에 틀린 유형만 (개념 일정과 따로). 오늘 틀린 건 그 개념을 다시 열면 끼어 든다. 이 줄기의 것만
   const notesDue = dueNotes(state, today).filter((x) => { const s = stemOf(x.id); return s && s.key === ui.stem; });
   if (notesDue.length) {
-    const nb = el('button', 'btn btn-big-wide math-notes-btn', `🤔 틀렸던 유형 ${notesDue.length}개 다시 풀기 — 이번엔 맞혀서 지워요`);
+    const nb = el('button', 'btn btn-big-wide math-notes-btn', '🤔 틀렸던 유형 다시 풀기 — 이번엔 맞혀서 지워요'); // 남은 수는 쓰지 않는다 (v260)
     nb.type = 'button';
     nb.addEventListener('click', () => guardStart('math', () => startNotesRound(notesDue)));
     head.appendChild(nb);
   } else {
     const nc = countNotes(state, today);
-    if (nc.all) head.appendChild(el('p', 'math-note', `🤔 오늘 틀린 유형 ${nc.all}개는 내일부터 다시 풀 수 있어요.`));
+    if (nc.all) head.appendChild(el('p', 'math-note', '🤔 오늘 틀린 유형은 내일부터 다시 풀 수 있어요.'));
   }
   addChalButtons(head);
 
@@ -773,7 +762,8 @@ function renderLadder(state) {
     const body = el('span', 'math-rung-body');
     body.appendChild(el('span', 'math-rung-name', r.name));
     // 🥚 배우는 중 → 🐣 안다 (2026-10-01 ②) + 언제 확인하고 그때 🔷를 받는지 (③) — 문구 규칙은 mathprog.rungSub
-    body.appendChild(el('span', 'math-rung-sub', `${gradeLabel(r.grade)} · ${rungSub(r)}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`));
+    // 🤔 다시 볼 유형은 있다는 것만 — 몇 개인지는 쓰지 않는다(v260 Codex 71차 #1) · 👑까지 N번은 상을 향한 진행이라 그대로(아버님)
+    body.appendChild(el('span', 'math-rung-sub', `${gradeLabel(r.grade)} · ${rungSub(r)}${r.notes ? ' · 🤔 다시 볼 유형 있어요' : ''}`));
     btn.appendChild(body);
     if (r.state === 'locked' || r.state === 'wait') btn.disabled = true;
     else btn.addEventListener('click', () => guardStart('math', () => startRound(r.id, r.state === 'done' ? (r.due ? 'review' : 'practice') : 'learn')));

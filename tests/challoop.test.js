@@ -152,13 +152,14 @@ test('🔀 보기 섞기: 문장·수 보기만 · 같은 씨앗이면 같은 �
   }
 });
 
-test('🎯 사다리 한 줄: 다음이 틀렸던 문제면 🔁 · 남은 🔁 수', () => {
+test('🎯 사다리 한 줄: 틀렸던 문제가 있으면 "🔁 틀렸던 문제도 다시 나와요" — 번호·수는 쓰지 않는다(v260) · 다음은 틀렸던 문제', () => {
   const m = cloneMath(emptyMath());
   applyChalAnswer(m, 'u6', 11, false, U6);
-  assert.match(setNote(m, U6), /다음은 12번 · 🔁 틀렸던 문제 1개/);
+  assert.equal(setNote(m, U6), '이어서 풀어요 · 🔁 틀렸던 문제도 다시 나와요', '틀리기만 했어도 처음부터가 아니다');
   for (const it of U6.items.filter((x) => x.no !== 11)) applyChalAnswer(m, 'u6', it.no, true, U6);
   assert.equal(nextNo(U6, m), 11);
-  assert.match(setNote(m, U6), /다음은 🔁 11번/);
+  assert.equal(setNote(m, U6), '이어서 풀어요 · 🔁 틀렸던 문제도 다시 나와요');
+  assert.doesNotMatch(setNote(m, U6), /\d/, '수가 없다');
 });
 
 test('🎯 화면: 고른 답을 **저장한 뒤에** 정답 · 저장이 안 되면 💾 다시 저장(정답은 안 보임) · 회차 끝 저장 실패도 회차를 두고 💾 · 남의 회차를 닫지 않는다 · 보기 섞기 · 🔁 (Codex 59차 #1~#3)', () => {

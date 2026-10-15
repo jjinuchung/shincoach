@@ -304,10 +304,11 @@ test('★ 🎯 백업을 되돌려도 푼 문제가 사라지지 않는다 (키�
   assert.equal(Object.keys(back.chal.ok).filter((k) => back.chal.ok[k] > 0).length, 5);
 });
 
-test('🎯 사다리에 쓸 한 줄', () => {
+test('🎯 사다리에 쓸 한 줄 — 푼 수·다음 번호·남은 수는 쓰지 않는다(v260, 아이가 고르는 곳의 셈은 압박)', () => {
   const m = cloneMath(emptyMath());
-  assert.match(setNote(m, U3), /0\/20/);
-  assert.match(setNote(m, U3), /1번/);
+  assert.equal(setNote(m, U3), '처음부터 풀어요');
+  applyChalRound(m, 'u3', [{ no: U3.items[0].no, ok: true }], U3);
+  assert.equal(setNote(m, U3), '이어서 풀어요');
   for (const it of U3.items) applyChalRound(m, 'u3', [{ no: it.no, ok: true }], U3);
   assert.match(setNote(m, U3), /🏅/);
   assert.equal(ROUND_N, 5);

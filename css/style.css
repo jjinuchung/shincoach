@@ -586,9 +586,6 @@ button { font-family: inherit; }
 .math-stem-name { font-weight: 800; font-size: 1.05rem; }
 .math-stem-sub { color: var(--muted); font-size: 0.85rem; }
 /* ⏰ 밀린 복습 (v257) — 줄기마다 다시 확인할 수 · 7일 넘게 기다린 줄기는 진하게 */
-.math-stem-due { font-size: 0.85rem; font-weight: 700; color: var(--accent); }
-.math-stem-due.is-late { color: #c2410c; }
-.math-due-sum { margin: 0 0 10px; }
 .math-bridge-note { margin: 8px 0 4px; }
 .math-bridge-btn { margin-top: 6px; }
 .math-eyebrow-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -3412,6 +3409,9 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .kor-listen-text.is-big { min-height: 48px; font-size: 1.05rem; }
 .kor-listen-textnote { margin: 0 0 8px; font-size: 0.85rem; color: #1d4ed8; font-weight: 700; line-height: 1.5; word-break: keep-all; }
 .kor-listen-wait { border-style: dashed; }
+/* 📖 글 먼저 (v260) — 읽기 글은 글 상자 맨 끝 [문제 보기]를 누르면 물음이 나온다 */
+.kor-askgo { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--border); display: grid; gap: 6px; }
+.kor-askgo-note { margin: 0; font-size: 0.88rem; color: var(--muted); }
 .kor-slot.is-listen .kor-slot-kind { color: #1d4ed8; font-weight: 700; }
 .kor-script { margin-top: 10px; text-align: left; background: var(--kor-paper); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
 .kor-script summary { cursor: pointer; font-weight: 800; min-height: 32px; }

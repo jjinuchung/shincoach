@@ -159,7 +159,9 @@ test('⏰📚 화면 배선 — ☀️는 고른 줄기로 옮겨 연다 · 🌳
   const sd = src.slice(src.indexOf('function startDaily() {'), src.indexOf('\n}\n', src.indexOf('function startDaily() {')));
   assert.ok(sd.indexOf('ui.stem = plan.roundStem') > 0 && sd.indexOf('ui.stem = plan.roundStem') < sd.indexOf('startRound(plan.roundId'), '편을 열기 전에 줄기부터 옮긴다(G가 그 줄기 것)');
   const pk = src.slice(src.indexOf('function renderStemPicker(state) {'), src.indexOf('\n}\n', src.indexOf('function renderStemPicker(state) {')));
-  assert.ok(pk.includes('for (const key of stemPickOrder(state, today))') && pk.includes('stemDueList(state, today)') && pk.includes("b.addEventListener('click', () => openStem(state, key));"));
+  assert.ok(pk.includes('for (const key of stemPickOrder(state, today))') && pk.includes("b.addEventListener('click', () => openStem(state, key));"));
+  // v260 아버님: 🌳 화면에 얼마나 했고·남았고·며칠 밀렸는지 쓰지 않는다(압박) — 차례만 밀린 줄기가 위
+  assert.ok(!/stemDueList|개를 알아요|다시 확인 \$\{|일 지난|기다려요|오늘 차례/.test(pk), '🌳 화면에 셈·밀린 날 말이 없다');
   const fin = src.slice(src.indexOf('lucky = luckyCatch(s, {'), src.indexOf('} catch (err) {', src.indexOf('lucky = luckyCatch(s, {')));
   assert.ok(fin.includes('lateCoin = lateBonus(s, { mode: r.mode, result, today });'), '보너스는 개념 편 저장 트랜잭션 안');
   assert.ok(src.includes('rw.coin += lateCoin;'));
@@ -168,8 +170,8 @@ test('⏰📚 화면 배선 — ☀️는 고른 줄기로 옮겨 연다 · 🌳
   // Codex 68차 #1: 아이가 직접 다른 줄기를 열면 ☀️ 흐름을 끝낸다 — 📏 진단 안내는 renderLadder를 안 지나, 남은 흐름이 🎒 뒤에 섞어 풀기를 열었다
   const os = src.slice(src.indexOf('function openStem(state, key) {'), src.indexOf('\n}\n', src.indexOf('function openStem(state, key) {')));
   assert.ok(os.indexOf('ui.daily = null;') > 0 && os.indexOf('ui.daily = null;') < os.indexOf('renderDiagIntro()'), '진단 안내를 그리기 전에');
-  // Codex 68차 #4: 규칙은 "이상"이고 세는 것은 복습 날짜부터 지난 날 — 화면 말도 같게 · 하루 상한도
-  assert.ok(src.includes('⏰ 복습 날짜가 ${LATE.days}일 이상 지난 개념을 통과하면 💰+${LATE.coin} 더 · 하루 ${LATE.max}번까지'));
+  // Codex 68차 #4의 규칙 말(🌳 위 한 줄)은 v260에 셈·밀린 날 말과 함께 뺐다 — ☀️ 미리 보기는 보너스를 받을 수 있을 때만 "(통과하면 ⏰ 💰+5)"
+  assert.ok(src.includes("const wait = preview.roundMode === 'review' && preview.late >= LATE.days && lateLeft(state, today)\n        ? ` (통과하면 ⏰ 💰+${LATE.coin})` : '';") || src.includes("const wait = preview.roundMode === 'review' && preview.late >= LATE.days && lateLeft(state, today)\r\n        ? ` (통과하면 ⏰ 💰+${LATE.coin})` : '';"));
   assert.ok(!/일 넘게 기다린|일 기다림`|일 기다린 확인을 통과/.test(src), '"넘게·기다린" 말은 없다');
   assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1] >= 257);
 });

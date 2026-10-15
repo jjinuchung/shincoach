@@ -434,8 +434,9 @@ export function setNote(m, set) {
   const done = solvedCount(m, set);
   const total = (set.items || []).length;
   if (done >= total && total > 0) return `🏅 ${set.unit} — ${total}문제를 다 풀었어요!`;
-  const no = nextNo(set, m);
-  const again = (set.items || []).filter((it) => missed(m, set.id, it.no)).length;
-  // 🔁 틀렸던 문제는 새 문제를 다 낸 뒤에 나온다 (v247) — 남아 있다는 걸 사다리에서도 보이게
-  return `${done}/${total}문제 · 다음은 ${missed(m, set.id, no) ? '🔁 ' : ''}${no}번${again ? ` · 🔁 틀렸던 문제 ${again}개` : ''}`;
+  // 몇 문제를 풀었고·몇 번이 다음이고·틀린 문제가 몇 개인지는 쓰지 않는다 (v260, 아버님: 아이가 고르는 곳의 셈은 압박되고 쫓기는 기분) ·
+  //   🔁 틀렸던 문제는 새 문제를 다 낸 뒤에 나온다는 것만 (v247)
+  const again = (set.items || []).some((it) => missed(m, set.id, it.no));
+  if (!done && !again) return '처음부터 풀어요';
+  return `이어서 풀어요${again ? ' · 🔁 틀렸던 문제도 다시 나와요' : ''}`;
 }
