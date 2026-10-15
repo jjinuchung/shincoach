@@ -13,18 +13,32 @@
 // 저장: profile.korPuzzle { 퍼즐 id: { box 0|1, due, at, miss, d0 } } — 🔤 낱말 칸과 같은 꼴 · 병합은 따로(mergePuzzles — ⭐는 한쪽이라도) ·
 //       profile.korPuzzleDay { 날 번호: 1 | 2 } — 낱말 보상 날과 같은 꼴(wordDaysOf·mergeWordDays)
 // 퍼즐 내용을 크게 바꾸면 새 번호로 — ⭐는 번호에 묶여 있어 옛 ⭐가 새 내용에 그대로 남는다(puzzles.json about)
-import { dayNum, throwsOf, pendingOf, KOR_STONE } from './korean.js';
+//
+// 📍 글에 있나요?(intext, v259 국어 3단계 3-2 — Codex 69차 PART 3 조언대로): 읽은 글 하나(그 글에 ★이 있어야 열림) + 문장 4~6 ·
+//   문장마다 "글에 있어요"(그 내용이 나오는 줄까지 고른다) / "글에 없어요"(이 글에서는 확인할 수 없다) · 글은 푸는 동안 내내 보인다
+//   있어요 = 줄 번호 + 그 줄의 원문 조각(quote) — 원고 검사가 그 조각이 그 줄에만 있는지 대조한다(띄어쓰기·문장부호는 빼고 견줌 ·
+//   그 줄에는 글자 그대로도 있어야 — 화면이 굵게 칠하는 조각)
+//   없어요 = 까닭(why) — 글과 어울리지만 어디에도 없는 말 · 글을 그대로 옮긴 문장은 검사가 막는다 · 글이 반대로 말하는 것(수·때·이름만
+//   바꾼 것)은 "없는 말"이 아니라 "틀린 말"이라 넣지 않는다 — 이것과 낱말이 많이 겹치는 문장은 사람이 글 전체와 대조한다(겹침은 의심 표시일 뿐)
+//   real = 실제로는 맞는 말이지만 이 글에는 없는 문장(아는 것과 글에 있는 것을 가르는 연습)
+import { dayNum, throwsOf, pendingOf, KOR_STONE, circled } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
 
 export const PUZZLE_COINS = 10;
 export const PUZZLE_PERFECT_MIN = 3;
-/** 한 판 — 차례 맞추기 둘 + 사실·의견 한 묶음 */
-export const ORDER_PER_DAY = 2;
+/** 한 판 — 차례 맞추기 하나 + 글에 있나요 하나 + 사실·의견 한 묶음 (v259 — 그 전에는 차례 둘 + 사실·의견 하나) */
+export const ORDER_PER_DAY = 1;
+export const INTEXT_PER_DAY = 1;
 export const SORT_PER_DAY = 1;
+export const PUZZLES_PER_DAY = ORDER_PER_DAY + INTEXT_PER_DAY + SORT_PER_DAY;
 export const CHUNKS_MIN = 3;
 export const CHUNKS_MAX = 5;
 export const SORT_MIN = 4;
 export const SORT_MAX = 6;
+export const INTEXT_MIN = 4;
+export const INTEXT_MAX = 6;
+/** 있어요 문장의 원문 조각 — 띄어쓰기·문장부호를 뺀 글자 수 */
+export const QUOTE_MIN = 4;
 /** 다 맞힌 퍼즐(⭐)의 칸 */
 export const SOLVED = 1;
 /** 차례의 뜻 — 물음마다 하나 */
@@ -33,15 +47,22 @@ export const ASKS = {
   process: { icon: '🧩', ko: '하는 차례', prompt: '하는 차례대로 놓아 보세요.' },
 };
 export const FO = { fact: '사실', opinion: '의견' };
-export const KINDS = { order: { icon: '🧩', ko: '차례 맞추기' }, sort: { icon: '⚖️', ko: '사실·의견 가르기' } };
+export const IO = { in: '글에 있어요', out: '글에 없어요' };
+export const KINDS = { order: { icon: '🧩', ko: '차례 맞추기' }, sort: { icon: '⚖️', ko: '사실·의견 가르기' }, intext: { icon: '📍', ko: '글에 있나요?' } };
+/** 🧩 탭·📤 요약에 늘어놓는 차례 (새 꼴은 끝에) */
+export const KIND_LIST = ['order', 'sort', 'intext'];
+/** 한 판 안에서 내는 차례 — 같은 꼴이 붙지 않게 돌아가며 */
+export const PLAY_ORDER = ['order', 'intext', 'sort'];
 // ★ 사실·의견 라벨은 사람이 정한다 — 아래 두 정규식은 원고를 거르는 망일 뿐 판정기가 아니다(한국어는 활용형이 많아
 //   넓히면 사실 문장을 잡고 좁히면 놓친다 — Codex 55차: "최고 기온"을 잡고 "아름다운"·"만들어야 해요"·"~다고 말했다"·"~듯하다"를 놓쳤다)
 /** 생각 말 — 의견에는 하나 이상, 사실에는 없어야 한다 */
 export const OPINION_WORDS = /좋|재미|멋|맛있|예쁘|훌륭|최고(?:다|의|예)|싫|아름다|야 (?:한다|해|합)|즐겁|즐거|신나|귀엽|편하|낫다|지루/;
 /** 가르기 문장에 넣지 않는 꼴 — 옮긴 말 · 앞날 짐작 · 섞인 마음 · 물음 · 따옴표 */
 export const SORT_BANNED = /드디어|라고 |다고 한다|다고 했|다고 말|겠다|것 같다|듯하|듯 하|["'「『“‘]|\?/;
-const ID_RE = { order: /^O\d{1,3}$/, sort: /^F\d{1,3}$/ };
+const ID_RE = { order: /^O\d{1,3}$/, sort: /^F\d{1,3}$/, intext: /^I\d{1,3}$/ };
+const ID_HEAD = { order: 'O', sort: 'F', intext: 'I' };
 const LEN_MAX = 90;
+const WHY_MAX = 120;
 
 const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
 const isObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -70,17 +91,84 @@ export function checkPuzzles(data, cards) {
   if (!list || !list.length) return ['puzzles가 없어요'];
   const ids = new Set();
   const cardIds = Array.isArray(cards) ? new Set(cards.map((c) => c && c.id)) : null;
+  const cardMap = Array.isArray(cards) ? new Map(cards.filter(isObj).map((c) => [c.id, c])) : null;
   list.forEach((p, i) => {
     const at = (m) => errs.push(`puzzles[${i}] ${p && p.id ? p.id : ''}: ${m}`);
     if (!isObj(p)) { at('퍼즐이 객체가 아니에요'); return; }
-    if (!own(KINDS, p.kind)) { at('kind는 order 또는 sort'); return; }
-    if (typeof p.id !== 'string' || !ID_RE[p.kind].test(p.id)) at(`id는 ${p.kind === 'order' ? 'O' : 'F'}숫자`);
+    if (!own(KINDS, p.kind)) { at('kind는 order · sort · intext'); return; }
+    if (typeof p.id !== 'string' || !ID_RE[p.kind].test(p.id)) at(`id는 ${ID_HEAD[p.kind]}숫자`);
     else if (ids.has(p.id)) at('id가 겹쳐요');
     else ids.add(p.id);
     if (p.kind === 'order') checkOrder(p, at, cardIds);
+    else if (p.kind === 'intext') checkIntext(p, at, cardMap);
     else checkSort(p, at);
   });
   return errs;
+}
+
+/** 견줄 때 쓰는 꼴 — 띄어쓰기·문장부호·따옴표를 뺀다(글자는 그대로) · 수의 소수점(3.5)과 수 앞 빼기표(-3)는 뜻이 바뀌므로 남긴다(Codex 70차) */
+export function normText(s) {
+  const digit = (ch) => ch >= '0' && ch <= '9';
+  return String(s == null ? '' : s).normalize('NFC').replace(/[\s.,!?'"“”‘’「」『』()[\]…·~\-—–:;]/g, (ch, at, all) => (
+    (ch === '.' && digit(all[at - 1] || '') && digit(all[at + 1] || '')) || (ch === '-' && digit(all[at + 1] || '')) ? ch : ''));
+}
+/** 두 글의 겹침 0~1 — 두 글자씩 묶어 견준다(Dice) · 검수 페이지의 의심 표시용(판정이 아니다) */
+export function overlapScore(a, b) {
+  const grams = (s) => { const t = normText(s); const out = []; for (let i = 0; i + 1 < t.length; i++) out.push(t.slice(i, i + 2)); return out; };
+  const x = grams(a);
+  const y = grams(b);
+  if (!x.length || !y.length) return 0;
+  const left = new Map();
+  for (const g of y) left.set(g, (left.get(g) || 0) + 1);
+  let both = 0;
+  for (const g of x) { const k = left.get(g) || 0; if (k > 0) { both++; left.set(g, k - 1); } }
+  return (2 * both) / (x.length + y.length);
+}
+/** 문장과 가장 많이 겹치는 줄 { n 줄 번호(1부터), score } (검수 페이지) */
+export function bestOverlap(t, lines) {
+  let best = { n: 0, score: 0 };
+  (Array.isArray(lines) ? lines : []).forEach((line, i) => { const s = overlapScore(t, line); if (s > best.score) best = { n: i + 1, score: s }; });
+  return best;
+}
+
+/** 📍 글에 있나요? 검사 — 글 카드는 줄로 된 글(lines)이고 🎧 듣기 글이 아니어야 · 있어요는 줄 + 그 줄에만 있는 원문 조각 · 없어요는 까닭 */
+function checkIntext(p, at, cardMap) {
+  if (typeof p.card !== 'string' || !/^K\d{1,3}$/.test(p.card)) { at('card는 K숫자'); return; }
+  if (!cardMap) { at('글에 있나요는 글 카드와 함께 검사해요'); return; }
+  const c = cardMap.get(p.card);
+  if (!c) { at(`없는 카드 ${p.card}`); return; }
+  if (!Array.isArray(c.lines) || !c.lines.length || c.listen) { at(`${p.card}는 줄로 된 읽기 글이 아니에요(시·🎧 듣기 글은 안 돼요)`); return; }
+  const lines = c.lines.map(normText);
+  const ss = p.sents;
+  if (!Array.isArray(ss) || ss.length < INTEXT_MIN || ss.length > INTEXT_MAX) { at(`sents는 ${INTEXT_MIN}~${INTEXT_MAX}개`); return; }
+  const seen = new Set();
+  ss.forEach((s, k) => {
+    const sat = (m) => at(`문장 ${k + 1} ${m}`);
+    if (!isObj(s) || !nonEmpty(s.t)) { sat('글이 비었어요'); return; }
+    if (seen.has(normText(s.t))) sat('앞 문장과 같아요');
+    seen.add(normText(s.t));
+    if ([...s.t].length > LEN_MAX) sat(`${LEN_MAX}자까지`);
+    if (/\?/.test(s.t)) sat('물음은 안 돼요 — 글에 있는지 가릴 수 있는 문장으로');
+    if (!own(IO, s.io)) { sat('io는 in 또는 out'); return; }
+    if (s.real !== undefined && !(s.io === 'out' && s.real === true)) sat('real(실제로는 맞는 말)은 없어요 문장에만 true로');
+    if (s.io === 'in') {
+      if (s.why !== undefined) sat('있어요 문장은 why 없이 — 줄과 원문 조각으로 보여 줘요');
+      if (!Number.isInteger(s.line) || s.line < 1 || s.line > lines.length) { sat(`line은 1~${lines.length}`); return; }
+      const q = normText(s.quote);
+      if (!nonEmpty(s.quote) || [...q].length < QUOTE_MIN) { sat(`quote(원문 조각)는 띄어쓰기·문장부호 빼고 ${QUOTE_MIN}글자 이상`); return; }
+      if (!lines[s.line - 1].includes(q)) sat(`quote "${s.quote}"가 ${s.line}번 줄에 없어요`);
+      else if (!String(c.lines[s.line - 1]).includes(s.quote)) sat(`quote "${s.quote}"는 ${s.line}번 줄과 글자 그대로 같게 — 띄어쓰기·문장부호까지(화면에서 그 조각을 굵게 칠해요)`);
+      const elsewhere = lines.map((l, i) => i + 1).filter((n) => n !== s.line && lines[n - 1].includes(q));
+      if (elsewhere.length) sat(`quote "${s.quote}"가 다른 줄(${elsewhere.join(', ')})에도 있어요 — 줄 답이 하나뿐이게`);
+    } else {
+      if (s.line !== undefined || s.quote !== undefined) sat('없어요 문장에는 line·quote를 쓰지 않아요');
+      if (!nonEmpty(s.why)) sat('why(까닭)가 비었어요');
+      else if ([...s.why].length > WHY_MAX) sat(`why는 ${WHY_MAX}자까지`);
+      const t = normText(s.t);
+      if (lines.some((l) => l.includes(t) || t.includes(l))) sat('없어요 문장이 글을 그대로 옮겼어요');
+    }
+  });
+  if (!ss.some((s) => s && s.io === 'in') || !ss.some((s) => s && s.io === 'out')) at('있어요와 없어요가 하나 이상씩 있어야 해요');
 }
 function checkOrder(p, at, cardIds) {
   if (!own(ASKS, p.ask)) at('ask는 event 또는 process');
@@ -129,21 +217,29 @@ function checkSort(p, at) {
   if (!ss.some((s) => s && s.fo === 'fact') || !ss.some((s) => s && s.fo === 'opinion')) at('사실과 의견이 하나 이상씩 있어야 해요');
 }
 
-/** 쓸 수 있는 퍼즐 — 깨진 것은 빼고, 이야기 흐름에는 글 제목을 붙인다 */
+/** 쓸 수 있는 퍼즐 — 깨진 것은 빼고, 이야기 흐름에는 글 제목을 붙인다 · 📍 글에 있나요는 글 줄까지 함께(카드가 없으면 뺀다) */
 export function allPuzzles(data, cards) {
-  const byId = new Map((Array.isArray(cards) ? cards : []).map((c) => [c.id, c]));
+  const list = Array.isArray(cards) ? cards.filter(isObj) : [];
+  const byId = new Map(list.map((c) => [c.id, c]));
   const out = [];
   const seen = new Set();
   for (const p of (data && Array.isArray(data.puzzles) ? data.puzzles : [])) {
     const errs = [];
     if (!isObj(p) || !own(KINDS, p.kind) || typeof p.id !== 'string' || !ID_RE[p.kind].test(p.id) || seen.has(p.id)) continue;
     if (p.kind === 'order') checkOrder(p, (m) => errs.push(m), cards ? new Set(byId.keys()) : null);
+    else if (p.kind === 'intext') checkIntext(p, (m) => errs.push(m), Array.isArray(cards) ? byId : null);
     else checkSort(p, (m) => errs.push(m));
     if (errs.length) continue;
     seen.add(p.id);
     if (p.kind === 'order') {
       const c = p.card ? byId.get(p.card) : null;
       out.push({ id: p.id, kind: 'order', ask: p.ask, title: p.title, card: p.card || '', cardTitle: c ? c.title : '', icon: c ? c.icon : '🧩', chunks: p.chunks.slice(), need: p.need.map((r) => r.slice()) });
+    } else if (p.kind === 'intext') {
+      const c = byId.get(p.card);
+      out.push({
+        id: p.id, kind: 'intext', card: p.card, title: c.title, cardTitle: c.title, icon: c.icon || '📍', lines: c.lines.slice(),
+        sents: p.sents.map((s) => (s.io === 'in' ? { t: s.t, io: 'in', line: s.line, quote: s.quote } : { t: s.t, io: 'out', why: s.why, real: s.real === true })),
+      });
     } else {
       out.push({ id: p.id, kind: 'sort', title: p.topic, icon: p.icon, sents: p.sents.map((s) => ({ t: s.t, fo: s.fo, why: s.why })) });
     }
@@ -151,9 +247,10 @@ export function allPuzzles(data, cards) {
   return out;
 }
 
-/** 열린 퍼즐인가 — 이야기 흐름은 그 글에 ★이 있어야(읽은 글의 사건을 맞춘다) */
+/** 열린 퍼즐인가 — 이야기 흐름·글에 있나요는 그 글에 ★이 있어야(읽은 글로 푼다) */
 export function isOpen(p, korDone) {
   if (!p) return false;
+  if (p.kind === 'intext') return !!p.card && own(korDone, `${p.card}:1`);
   if (p.kind === 'order' && p.card) return own(korDone, `${p.card}:1`);
   return true;
 }
@@ -185,14 +282,15 @@ export function mergePuzzles(a, b) {
 
 /**
  * 🧩 오늘의 퍼즐 — [{ id, kind }] · 다시 볼 것(틀린 날 다음 날부터, 오래된 것부터) → 새 퍼즐(원고 차례) ·
- *   차례 ORDER_PER_DAY + 사실·의견 SORT_PER_DAY, 한쪽이 모자라면 다른 쪽으로 채운다 · practice면 ⭐ 퍼즐을 연습으로(오래 안 본 것부터)
+ *   차례 ORDER_PER_DAY + 글에 있나요 INTEXT_PER_DAY + 사실·의견 SORT_PER_DAY, 한 꼴이 모자라면 다른 꼴로 채운다 ·
+ *   practice면 ⭐ 퍼즐을 연습으로(오래 안 본 것부터)
  */
 export function planPuzzles(list, states, korDone, now, practice = false) {
   const today = dayNum(now);
   const st = wordsOf(states);
   const open = (list || []).filter((p) => isOpen(p, korDone));
-  const want = { order: ORDER_PER_DAY, sort: SORT_PER_DAY };
-  const total = ORDER_PER_DAY + SORT_PER_DAY;
+  const want = { order: ORDER_PER_DAY, intext: INTEXT_PER_DAY, sort: SORT_PER_DAY };
+  const total = PUZZLES_PER_DAY;
   let pool;
   if (practice) {
     pool = open.filter((p) => own(st, p.id) && st[p.id].box >= SOLVED).sort((a, b) => st[a.id].at - st[b.id].at);
@@ -202,13 +300,12 @@ export function planPuzzles(list, states, korDone, now, practice = false) {
     pool = [...due, ...fresh];
   }
   const take = [];
-  for (const kind of ['order', 'sort']) take.push(...pool.filter((p) => p.kind === kind).slice(0, want[kind]));
+  for (const kind of PLAY_ORDER) take.push(...pool.filter((p) => p.kind === kind).slice(0, want[kind]));
   for (const p of pool) { if (take.length >= total) break; if (!take.includes(p)) take.push(p); }
-  // 판 안 차례: 차례 맞추기 → 사실·의견 → 차례 맞추기 (같은 꼴이 붙지 않게)
-  const orders = take.filter((p) => p.kind === 'order');
-  const sorts = take.filter((p) => p.kind === 'sort');
+  // 판 안 차례: 차례 맞추기 → 글에 있나요 → 사실·의견 → … 돌아가며 (같은 꼴이 붙지 않게)
+  const queues = PLAY_ORDER.map((kind) => take.filter((p) => p.kind === kind));
   const out = [];
-  while (orders.length || sorts.length) { if (orders.length) out.push(orders.shift()); if (sorts.length) out.push(sorts.shift()); }
+  while (queues.some((q) => q.length)) for (const q of queues) if (q.length) out.push(q.shift());
   return out.slice(0, total).map((p) => ({ id: p.id, kind: p.kind }));
 }
 
@@ -251,6 +348,37 @@ export function gradeSort(p, labels) {
   let right = 0;
   for (let i = 0; i < n; i++) if (arr[i] === p.sents[i].fo) right++;
   return { valid: true, ok: right === n, right, n };
+}
+/**
+ * 📍 낸 답 채점 — picks = 문장마다 { io: 'in', line: 줄 번호 } | { io: 'out' } · 빈 칸·줄 없는 있어요·다른 값이 있으면 valid false ·
+ *   있어요 문장은 있어요 + 맞는 줄이어야 맞음 · 없어요 문장은 없어요면 맞음
+ */
+export function gradeIntext(p, picks) {
+  const n = p && Array.isArray(p.sents) ? p.sents.length : 0;
+  const m = p && Array.isArray(p.lines) ? p.lines.length : 0;
+  const arr = Array.isArray(picks) ? picks : [];
+  let valid = n > 0 && arr.length === n;
+  for (let i = 0; valid && i < n; i++) {
+    const x = arr[i];
+    valid = isObj(x) && (x.io === 'out' || (x.io === 'in' && Number.isInteger(x.line) && x.line >= 1 && x.line <= m));
+  }
+  if (!valid) return { valid: false, ok: false, right: 0, n };
+  let right = 0;
+  for (let i = 0; i < n; i++) {
+    const s = p.sents[i];
+    const x = arr[i];
+    if (x.io === s.io && (s.io !== 'in' || x.line === s.line)) right++;
+  }
+  return { valid: true, ok: right === n, right, n };
+}
+
+/** 📍 고쳐 볼 말 (순수) — 있어요는 바른 줄과 원문 조각 · 줄만 틀렸으면 그렇게 · 없어요는 "글에서는 확인할 수 없어요 — 까닭" */
+export function intextWhy(s, x, ok) {
+  const mark = ok ? '✓' : '✗';
+  if (s.io !== 'in') return `${mark} 글에서는 확인할 수 없어요 — ${s.why}`;
+  const quote = `“${s.quote}”`;
+  if (!ok && x && x.io === 'in' && x.line > 0) return `${mark} 글에 있는 내용은 맞아요. 그런데 ${circled(x.line)}번 줄이 아니라 ${circled(s.line)}번 줄에 있어요 — ${quote}`;
+  return `${mark} 글에 있어요 — ${circled(s.line)}번 줄 ${quote}`;
 }
 
 const cnt = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
@@ -318,7 +446,7 @@ export function korPuzzleRule(profile, answers, now, ids) {
 /** 꼴마다 { kind, total, open, solved, tried } (🧩 탭) — tried = 풀어 봤지만 아직 ⭐ 아님 */
 export function puzzleStats(list, states, korDone) {
   const st = wordsOf(states);
-  return ['order', 'sort'].map((kind) => {
+  return KIND_LIST.map((kind) => {
     const all = (list || []).filter((p) => p.kind === kind);
     const open = all.filter((p) => isOpen(p, korDone));
     return {

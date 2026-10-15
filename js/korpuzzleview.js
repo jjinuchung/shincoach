@@ -1,9 +1,11 @@
-// 🧩 국어 화면의 퍼즐 탭 — 🧩 차례 맞추기 · ⚖️ 사실·의견 가르기 (v242, 2026-10-12 아버님 "이대로 진행")
+// 🧩 국어 화면의 퍼즐 탭 — 🧩 차례 맞추기 · ⚖️ 사실·의견 가르기 (v242, 2026-10-12 아버님 "이대로 진행") · 📍 글에 있나요? (v259)
 // 규칙은 korpuzzle.js(순수), 저장은 xp.korPuzzleFinish(한 트랜잭션 — 퍼즐 칸과 💰·🎯·🟩가 같이).
 // koreanview가 🎯 잡기 단추·🥚 알 칸·탭 이동을 ctx로 건넨다(kortabs와 같은 꼴 — 서로 import하지 않게)
 //  · 판정은 퍼즐마다 **처음 낸 것** — 조각은 마음대로 놓았다 뺐다 하고 "확인"을 누를 때 한 번 채점(Codex 54차 PART 3 #6)
 //  · 판 중간에 나가면(🎒·📊) 그대로 이어서, "← 그만하기"는 한 것(낸 퍼즐·놓은 조각·고른 칸)이 있으면 두 번 눌러야 저장 없이 끝
-import { ASKS, FO, KINDS, allPuzzles, planPuzzles, puzzleStats, shuffledOrder, gradeOrder, gradeSort, isOpen, isSolved, puzzleFinishText, puzzleTodayLine } from './korpuzzle.js';
+//  · 📍 글은 푸는 동안·고쳐 볼 때 내내 보인다 — [글에 있어요]를 누르면 그 내용이 있는 줄을 글에서 고른다(문장은 가·나·다, 줄은 ①②③) ·
+//    다시 그려도 글 상자의 읽던 자리는 그대로 · 어느 문장의 줄을 고르는지 읽어 준다 · 확인 뒤 [글에서 보기] (Codex 70차)
+import { ASKS, FO, IO, KINDS, KIND_LIST, allPuzzles, planPuzzles, puzzleStats, shuffledOrder, gradeOrder, gradeSort, gradeIntext, intextWhy, isOpen, isSolved, puzzleFinishText, puzzleTodayLine } from './korpuzzle.js';
 import { wordsToday } from './korwords.js';
 import { korPuzzleFinish, korPuzzleMap, korPuzzleDayMap, korDoneMap } from './xp.js';
 import { circled } from './korean.js';
@@ -44,7 +46,9 @@ export function inSession() {
 }
 
 const byId = (id) => (S.list || []).find((p) => p.id === id) || null;
-const nameOf = (p) => (p ? (p.kind === 'order' ? `${ASKS[p.ask].ko} 「${p.title}」` : `${p.icon} ${p.title}`) : '');
+const nameOf = (p) => (!p ? '' : p.kind === 'order' ? `${ASKS[p.ask].ko} 「${p.title}」` : p.kind === 'intext' ? `${KINDS.intext.icon} 「${p.title}」` : `${p.icon} ${p.title}`);
+/** 📍 문장 이름 — 줄 번호(①②③)와 헷갈리지 않게 가·나·다 */
+const LETTERS = ['가', '나', '다', '라', '마', '바'];
 
 // ───────────────────── 🧩 퍼즐 탭 ─────────────────────
 
@@ -67,12 +71,14 @@ export async function renderPuzzleTab(box, ctx) {
   const plan = planPuzzles(list, states, done, now);
   const head = el('section', 'kor-head');
   head.appendChild(el('h2', 'kor-h', '🧩 오늘의 퍼즐'));
-  head.appendChild(el('p', 'kor-intro', '이야기의 흐름과 하는 차례를 맞추고, 사실과 의견을 가려요. 다 맞힌 퍼즐은 ⭐, 틀린 퍼즐은 다음 날 다시 나와요.'));
+  head.appendChild(el('p', 'kor-intro', '이야기의 흐름과 하는 차례를 맞추고, 글에 있는 내용인지 확인하고, 사실과 의견을 가려요. 다 맞힌 퍼즐은 ⭐, 틀린 퍼즐은 다음 날 다시 나와요.'));
   head.appendChild(el('p', 'kor-count', puzzleTodayLine(wordsToday(korPuzzleDayMap(), now))));
   if (plan.length) {
-    const o = plan.filter((p) => p.kind === 'order').length;
-    const s = plan.length - o;
-    const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', `🧩 오늘의 퍼즐 시작 (${[o ? `차례 ${o}` : '', s ? `사실·의견 ${s}` : ''].filter(Boolean).join(' · ')})`);
+    const cnt = (kind) => plan.filter((p) => p.kind === kind).length;
+    const o = cnt('order');
+    const t = cnt('intext');
+    const s = cnt('sort');
+    const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', `🧩 오늘의 퍼즐 시작 (${[o ? `차례 ${o}` : '', t ? `글에 있나요 ${t}` : '', s ? `사실·의견 ${s}` : ''].filter(Boolean).join(' · ')})`);
     b.type = 'button';
     b.addEventListener('click', () => guardStart('korean', () => startSession(ctx, false)));
     head.appendChild(b);
@@ -101,7 +107,7 @@ export async function renderPuzzleTab(box, ctx) {
   box.appendChild(decks);
   const det = el('details', 'kor-wlist');
   det.appendChild(el('summary', '', '📋 퍼즐 목록 보기'));
-  for (const kind of ['order', 'sort']) {
+  for (const kind of KIND_LIST) {
     det.appendChild(el('p', 'kor-wlist-h', `${KINDS[kind].icon} ${KINDS[kind].ko}`));
     const row = el('div', 'kor-chips');
     for (const p of list.filter((x) => x.kind === kind)) {
@@ -123,7 +129,7 @@ function startSession(ctx, practice) {
   if (!items.length) { ctx.rerender(); return; }
   // 판을 시작할 때 퍼즐마다 마지막으로 푼 때 — 저장할 때 그 사이 다른 판이 옮겼으면 연습으로 (🔤 낱말과 같다)
   const from = new Map(items.map((x) => [x.id, (states[x.id] && states[x.id].at) || 0]));
-  S.ps = { items, i: 0, first: new Map(), from, placed: [], labels: [], grade: null, saving: false, result: null, egg: null, quitAsk: false, focus: 'start' };
+  S.ps = { items, i: 0, first: new Map(), from, placed: [], labels: [], picks: [], lineFor: -1, pinTop: 0, grade: null, saving: false, result: null, egg: null, quitAsk: false, focus: 'start' };
   renderSession(ctx);
   window.scrollTo(0, 0);
 }
@@ -178,27 +184,96 @@ export function renderSession(ctx) {
   }
   const it = ps.items[ps.i];
   const p = byId(it.id);
-  const card = p && p.kind === 'order' ? orderEl(ctx, p, it) : sortEl(ctx, p);
+  const card = p && p.kind === 'order' ? orderEl(ctx, p, it) : p && p.kind === 'intext' ? intextEl(ctx, p) : sortEl(ctx, p);
   wrap.appendChild(card);
   wrap.appendChild(live);
   main.appendChild(wrap);
+  // 📍 글 상자는 위쪽 띠(sticky) 아래에 붙는다 — 읽기 화면과 같은 --kor-top
+  const bar = document.querySelector('#view-korean .topbar');
+  main.style.setProperty('--kor-top', `${Math.ceil(bar ? bar.getBoundingClientRect().height : 64) + 8}px`);
+  // 📍 글 상자는 다시 그려도 읽던 자리 그대로 (Codex 70차 — 고를 때마다 맨 위로 돌아갔다)
+  const pin = card.querySelector('.kor-pin-text');
+  const roll = pin ? pin.querySelector('.kor-pin-scroll') : null;
+  if (roll && ps.pinTop) roll.scrollTop = ps.pinTop;
   const fb = card.querySelector('.kor-fb');
-  live.textContent = fb ? fb.textContent : '';
+  // 읽어 주기 — 확인 뒤에는 결과 · 📍 줄을 고르는 중에는 어느 문장의 줄인지 (같은 말이면 그대로 두어 다시 읽지 않게)
+  const say = fb && fb.textContent ? fb.textContent
+    : pin && !ps.grade && ps.lineFor >= 0 ? `「${LETTERS[ps.lineFor]}」 문장 — 그 내용을 직접 말하는 줄을 글에서 골라 주세요` : '';
+  if (live.textContent !== say) live.textContent = say;
   const focusTo = ps.focus;
   ps.focus = '';
   // 다시 그리면 누른 단추가 사라지므로 초점을 같은 자리로 — 새 퍼즐(start·pool)은 첫 조각이나 첫 문장의 [사실]로 (Codex 55차)
-  const fo = /^fo:(\d+):(fact|opinion)$/.exec(focusTo);
+  //   📍 [글에 있어요]를 누르면 글의 줄(pline — 바꾸는 중이면 고른 줄, 아니면 상자에 보이는 첫 줄) · 줄을 고르면 그 문장의 줄 단추(chip:k)
+  const fo = /^fo:(\d+):(fact|opinion|in|out)$/.exec(focusTo);
+  const chip = /^chip:(\d+)$/.exec(focusTo);
   const t = focusTo === 'next' ? card.querySelector('.kor-next')
     : focusTo === 'quit' ? wrap.querySelector('.kor-wquit')
       : focusTo === 'start' || focusTo === 'pool' ? card.querySelector('.kor-pchunk:not(:disabled), .kor-pfo:not(:disabled), .kor-pcheck:not(:disabled)')
         : focusTo === 'check' ? card.querySelector('.kor-pcheck')
-          : fo ? (card.querySelectorAll('.kor-psort')[Number(fo[1])] || card).querySelector(`.kor-pfo.is-${fo[2]}`) : null;
-  if (t) { try { t.focus({ preventScroll: true }); } catch { /* 초점은 없어도 */ } }
+          : focusTo === 'pline' ? plineTarget(card, ps)
+            : chip ? (card.querySelectorAll('.kor-psort')[Number(chip[1])] || card).querySelector('.kor-pline-chip')
+              : fo ? (card.querySelectorAll('.kor-psort')[Number(fo[1])] || card).querySelector(`.kor-pfo.is-${fo[2]}`) : null;
+  if (t) {
+    try { t.focus({ preventScroll: true }); } catch { /* 초점은 없어도 */ }
+    if (pin) showFocused(t); // 📍 초점 간 것이 화면 밖이거나 붙어 있는 글 상자에 가리면 보이게
+  }
+}
+
+/** 📍 줄 고르기 초점 — 고른 줄을 바꾸는 중이면 그 줄, 아니면 글 상자에 보이는 첫 줄(읽던 자리를 지킨다) */
+function plineTarget(card, ps) {
+  const lines = [...card.querySelectorAll('button.kor-pline')];
+  const x = ps.picks[ps.lineFor];
+  const mine = x && x.line ? lines.find((b) => b.dataset.n === String(x.line)) : null;
+  if (mine) return mine;
+  const box = card.querySelector('.kor-pin-scroll');
+  const top = box ? box.getBoundingClientRect().top : -Infinity;
+  return lines.find((b) => b.getBoundingClientRect().top >= top - 2) || lines[0] || null; // 2px — 굴린 자리가 줄 테두리에 걸쳐도 그 줄
+}
+
+/** 글 상자 안에서 그 줄이 보이게 (상자만 굴린다) — mid면 가운데로 */
+function inBox(box, line, mid) {
+  const r = line.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  if (mid) box.scrollTop += r.top + r.height / 2 - (b.top + b.height / 2);
+  else if (r.top < b.top + 4) box.scrollTop -= b.top + 4 - r.top;
+  else if (r.bottom > b.bottom - 4) box.scrollTop += Math.min(r.bottom - b.bottom + 4, r.top - b.top - 4);
+}
+
+/** 📍 그것이 보이게 — 글 상자 안의 줄은 상자를 먼저 굴리고, 그래도 화면 밖이거나 위쪽 띠·붙어 있는 글 상자에 가리면 화면을 조금 굴린다 */
+function showFocused(t) {
+  const box = t.closest('.kor-pin-scroll');
+  if (box) inBox(box, t, false);
+  const r = t.getBoundingClientRect();
+  let top = 0;
+  const covers = [document.querySelector('#view-korean .topbar')];
+  if (!box) covers.push(document.querySelector('.kor-psess .kor-pin-text'));
+  for (const c of covers) {
+    if (!c) continue;
+    const b = c.getBoundingClientRect();
+    if (b.left < r.right && r.left < b.right && b.top <= r.top) top = Math.max(top, b.bottom);
+  }
+  const room = window.innerHeight;
+  if (r.top < top + 8) window.scrollBy(0, r.top - top - 8);
+  else if (r.bottom > room - 8) window.scrollBy(0, Math.min(r.bottom - room + 8, r.top - top - 8));
+}
+
+/** 📍 확인 뒤 [글에서 보기] — 글 상자를 그 줄로 굴리고 잠깐 반짝 · 읽어 주기에는 그 줄 글 (다시 그리지 않는다) */
+function showLine(from, p, n) {
+  const card = from.closest('.kor-pin');
+  const box = card ? card.querySelector('.kor-pin-scroll') : null;
+  const line = box ? box.querySelector(`.kor-pline[data-n="${n}"]`) : null;
+  if (!line) return;
+  inBox(box, line, true);
+  showFocused(line);
+  line.classList.remove('is-flash');
+  line.getBoundingClientRect(); // 다시 눌러도 다시 반짝이게
+  line.classList.add('is-flash');
+  if (S.live) S.live.textContent = `${circled(n)}번 줄: ${p.lines[n - 1]}`;
 }
 
 /** 이 판에서 한 것이 있나 — 낸 퍼즐 · 놓은 조각 · 고른 칸 (있으면 "그만하기"를 한 번 더 묻는다, Codex 55차) */
 function didWork(ps) {
-  return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean);
+  return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean) || ps.picks.some(Boolean);
 }
 
 /** 🧩 차례 맞추기 한 장 — 놓은 칸 · 남은 조각 · 하나 빼기·처음부터 · 확인 → 바른 차례와 실마리 */
@@ -322,6 +397,182 @@ function sortEl(ctx, p) {
   return box;
 }
 
+/** 📍 글에 있나요? 한 장 — 글(번호 붙은 줄)은 내내 보이고 · 문장마다 [글에 있어요] [글에 없어요] · 있어요면 그 줄을 글에서 고른다 ·
+ *   모두 고르면(있어요는 줄까지) 확인 → 바른 줄을 칠하고 원문 조각을 굵게 · 없어요는 "글에서는 확인할 수 없어요 — 까닭" */
+function intextEl(ctx, p) {
+  const ps = S.ps;
+  const g = ps.grade;
+  const box = el('div', 'kor-q kor-pq kor-pin');
+  const head = el('div', 'kor-q-head');
+  head.appendChild(el('span', 'kor-q-skill', `${KINDS.intext.icon} ${KINDS.intext.ko} · ${p.icon} 「${p.title}」`));
+  box.appendChild(head);
+  box.appendChild(el('p', 'kor-q-text', '문장마다 글에 나오는 내용인지 골라 보세요. 글에 있으면 그 내용을 직접 말하는 줄도 글에서 눌러요.'));
+  box.appendChild(el('p', 'kor-tnote', '있어요 = 글의 한 줄에 그 내용이 나와요 · 없어요 = 이 글에서는 확인할 수 없어요(실제로는 맞는 말이어도)'));
+  const body = el('div', 'kor-pin-body');
+  body.appendChild(intextTextEl(ctx, p));
+  const col = el('div', 'kor-pin-col');
+  const rows = el('ul', 'kor-psorts');
+  p.sents.forEach((s, k) => rows.appendChild(intextRowEl(ctx, p, s, k)));
+  col.appendChild(rows);
+  if (!g) {
+    const check = el('button', 'btn btn-primary kor-pcheck', '확인');
+    check.type = 'button';
+    check.disabled = !gradeIntext(p, p.sents.map((_, j) => ps.picks[j])).valid;
+    check.addEventListener('click', () => submit(ctx, p, gradeIntext(p, p.sents.map((_, j) => ps.picks[j]))));
+    col.appendChild(check);
+    if (check.disabled) col.appendChild(el('p', 'kor-tnote', '모든 문장을 고르고, 글에 있어요는 줄까지 고르면 확인할 수 있어요'));
+    col.appendChild(el('p', 'kor-fb'));
+  } else {
+    col.appendChild(el('p', `kor-fb ${g.ok ? 'is-ok' : 'is-no'}`, g.ok ? '맞아요! 글과 하나하나 맞춰 봤어요' : `아쉬워요 — ${g.right} / ${g.n}문장을 맞혔어요. 칠한 줄과 까닭을 읽어 보세요`));
+    col.appendChild(nextBtn(ctx));
+  }
+  body.appendChild(col);
+  box.appendChild(body);
+  return box;
+}
+
+/** 📍 글 상자 — 줄을 고를 때만 줄이 단추 · 줄 끝에 고른 문장 글자(확인 뒤에는 바른 줄 ✓ · 잘못 고른 줄 ✗) ·
+ *   제목·고르기 안내는 위에 늘 보이고 줄만 굴린다(안내가 생겨도 읽던 줄이 밀리지 않게) */
+function intextTextEl(ctx, p) {
+  const ps = S.ps;
+  const g = ps.grade;
+  const picking = !g && ps.lineFor >= 0;
+  const box = el('div', `kor-passage kor-pin-text${picking ? ' is-picking' : ''}`);
+  box.appendChild(el('h3', 'kor-passage-title', `「${p.title}」`));
+  if (picking) box.appendChild(el('p', 'kor-pin-pickhint', `👆 「${LETTERS[ps.lineFor]}」 문장의 내용을 직접 말하는 줄을 눌러요`));
+  const roll = el('div', 'kor-pin-scroll');
+  roll.addEventListener('scroll', () => { if (S.ps === ps) ps.pinTop = roll.scrollTop; }, { passive: true }); // 다시 그릴 때 이 자리로
+  const tags = new Map();
+  const tag = (n, text, cls) => { if (!tags.has(n)) tags.set(n, []); tags.get(n).push([text, cls]); };
+  p.sents.forEach((s, k) => {
+    const x = ps.picks[k];
+    const mine = !!x && x.io === 'in' && x.line > 0;
+    if (!g) { if (mine) tag(x.line, LETTERS[k], ''); return; }
+    if (s.io === 'in') tag(s.line, `${LETTERS[k]} ✓`, 'is-ok');
+    if (mine && !(s.io === 'in' && x.line === s.line)) tag(x.line, `${LETTERS[k]} ✗`, 'is-no');
+  });
+  const ol = el('ol', 'kor-plines');
+  p.lines.forEach((t, i) => {
+    const n = i + 1;
+    const li = el('li');
+    const b = el(picking ? 'button' : 'div', 'kor-pline');
+    b.dataset.n = String(n);
+    const quotes = g ? p.sents.filter((s) => s.io === 'in' && s.line === n).map((s) => s.quote) : [];
+    if (quotes.length) b.classList.add('is-mark');
+    b.appendChild(el('span', 'kor-num', circled(n)));
+    b.appendChild(quoteEl(t, quotes));
+    for (const [text, cls] of tags.get(n) || []) b.appendChild(el('span', `kor-ptag${cls ? ` ${cls}` : ''}`, text));
+    if (picking) {
+      b.type = 'button';
+      b.setAttribute('aria-label', `「${LETTERS[ps.lineFor]}」 문장의 줄로 ${n}번 줄 고르기: ${t}`);
+      b.addEventListener('click', () => pickLine(ctx, p, n));
+    }
+    li.appendChild(b);
+    ol.appendChild(li);
+  });
+  roll.appendChild(ol);
+  box.appendChild(roll);
+  return box;
+}
+
+/** 줄 글 — 확인 뒤에는 그 줄의 원문 조각을 굵게 */
+function quoteEl(text, quotes) {
+  const e = el('span', 'kor-pline-t');
+  const q = quotes.find((x) => x && text.includes(x));
+  const k = q ? text.indexOf(q) : -1;
+  if (k < 0) { e.textContent = text; return e; }
+  e.appendChild(document.createTextNode(text.slice(0, k)));
+  e.appendChild(el('b', 'kor-pclue', q));
+  e.appendChild(document.createTextNode(text.slice(k + q.length)));
+  return e;
+}
+
+/** 📍 문장 한 줄 — [글에 있어요] [글에 없어요] · 있어요면 고른 줄(바꾸기) · 확인 뒤 ✓/✗와 까닭 */
+function intextRowEl(ctx, p, s, k) {
+  const ps = S.ps;
+  const g = ps.grade;
+  const x = ps.picks[k];
+  const li = el('li', `kor-psort kor-pin-row${!g && ps.lineFor === k ? ' is-waiting' : ''}`);
+  const tp = el('p', 'kor-psort-t');
+  tp.appendChild(el('b', 'kor-pin-letter', LETTERS[k]));
+  tp.appendChild(document.createTextNode(` ${s.t}`));
+  li.appendChild(tp);
+  const btns = el('div', 'kor-psort-btns');
+  btns.setAttribute('role', 'group');
+  btns.setAttribute('aria-label', `${LETTERS[k]} 문장`);
+  for (const io of ['in', 'out']) {
+    const on = !!x && x.io === io;
+    const b = el('button', `kor-pfo is-${io}${on ? ' is-on' : ''}`, `${on ? '✔ ' : ''}${IO[io]}`);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(on));
+    b.disabled = !!g;
+    b.addEventListener('click', () => setIo(ctx, k, io));
+    btns.appendChild(b);
+  }
+  li.appendChild(btns);
+  if (!g && x && x.io === 'in') {
+    const row = el('div', 'kor-pin-line');
+    if (ps.lineFor === k) row.appendChild(el('span', 'kor-pin-wait', x.line ? `${circled(x.line)}번 줄 — 바꾸려면 글에서 다른 줄을 눌러요` : '👆 글에서 이 내용을 직접 말하는 줄을 눌러요'));
+    else {
+      const c = el('button', 'btn btn-small kor-pline-chip', x.line ? `${circled(x.line)}번 줄 · 바꾸기` : '몇 번 줄인지 고르기');
+      c.type = 'button';
+      c.addEventListener('click', () => { if (S.ps !== ps || ps.grade) return; ps.lineFor = k; ps.quitAsk = false; ps.focus = 'pline'; renderSession(ctx); });
+      row.appendChild(c);
+    }
+    li.appendChild(row);
+  }
+  if (g) {
+    const ok = !!x && x.io === s.io && (s.io !== 'in' || x.line === s.line);
+    li.classList.add(ok ? 'is-ok' : 'is-no');
+    li.appendChild(el('p', 'kor-psort-why', intextWhy(s, x, ok)));
+    if (s.io === 'in') {
+      const show = el('button', 'btn btn-small kor-pin-show', `🔎 글에서 보기 · ${circled(s.line)}번 줄`);
+      show.type = 'button';
+      show.addEventListener('click', () => showLine(show, p, s.line));
+      li.appendChild(show);
+    }
+  }
+  return li;
+}
+
+/** 줄을 기다리는 다른 문장(있어요인데 줄이 아직 없음) — 없으면 -1 */
+function waitingFrom(ps, skip) {
+  return ps.picks.findIndex((x, j) => j !== skip && !!x && x.io === 'in' && !x.line);
+}
+
+/** 📍 [글에 있어요]/[글에 없어요] — 있어요인데 줄이 없으면 그 문장이 줄을 기다린다(글의 줄이 단추가 된다) */
+function setIo(ctx, k, io) {
+  const ps = S.ps;
+  if (!ps || ps.grade) return;
+  const prev = ps.picks[k];
+  if (io === 'in') {
+    const line = prev && prev.io === 'in' ? prev.line : 0;
+    ps.picks[k] = { io: 'in', line };
+    if (!line) ps.lineFor = k;
+    ps.focus = line ? `fo:${k}:in` : 'pline';
+  } else {
+    ps.picks[k] = { io: 'out' };
+    if (ps.lineFor === k) ps.lineFor = waitingFrom(ps, k);
+    ps.focus = `fo:${k}:out`;
+  }
+  ps.quitAsk = false;
+  renderSession(ctx);
+}
+
+/** 📍 글의 줄을 눌렀다 — 기다리던 문장에 붙이고, 줄을 기다리는 다른 문장이 있으면 그 문장으로 */
+function pickLine(ctx, p, n) {
+  const ps = S.ps;
+  if (!ps || ps.grade || ps.lineFor < 0) return;
+  const k = ps.lineFor;
+  const x = ps.picks[k];
+  if (!x || x.io !== 'in') { ps.lineFor = -1; renderSession(ctx); return; }
+  ps.picks[k] = { io: 'in', line: n };
+  ps.lineFor = waitingFrom(ps, k);
+  ps.quitAsk = false;
+  ps.focus = ps.lineFor >= 0 ? 'pline' : gradeIntext(p, p.sents.map((_, j) => ps.picks[j])).valid ? 'check' : `chip:${k}`;
+  renderSession(ctx);
+}
+
 function nextBtn(ctx) {
   const ps = S.ps;
   const b = el('button', 'btn btn-primary kor-next', ps.i + 1 < ps.items.length ? '다음 퍼즐 →' : '끝내기');
@@ -348,6 +599,9 @@ function nextItem(ctx) {
   ps.i++;
   ps.placed = [];
   ps.labels = [];
+  ps.picks = [];
+  ps.lineFor = -1;
+  ps.pinTop = 0;
   ps.grade = null;
   ps.focus = 'pool';
   if (ps.i >= ps.items.length) { ps.focus = 'done'; finishSession(ctx); return; }

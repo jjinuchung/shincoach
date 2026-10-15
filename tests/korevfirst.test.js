@@ -288,5 +288,5 @@ test('🔍 화면 연결 (v258): 두 번 틀리면 보기 잠금 · 근거 먼�
   const css = read('css/style.css');
   assert.ok(css.includes('.kor-ev.is-first {') && css.includes('.kor-fb.kor-hint2 {') && css.includes('.kor-q > .kor-fb { scroll-margin-top: var(--kor-top, 72px); }') && css.includes('.kor-opts.is-locked .kor-opt:not(.is-no) { opacity: 0.55; }'));
   assert.ok(rq.includes("const opts = el('div', `kor-opts${evFirst ? ' is-locked' : ''}`);"), '잠긴 보기는 흐리게');
-  assert.match(read('sw.js'), /const CACHE_VERSION = 'v258';/);
+  assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1]) >= 258, 'sw는 v258 이상'); // 다음 판에서 다시 고치지 않게
 });

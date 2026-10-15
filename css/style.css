@@ -3355,6 +3355,39 @@ button { font-family: inherit; }
 .kor-pfo.is-opinion.is-on { border-color: #d97706; background: #fef3c7; color: #78350f; }
 .kor-pfo:disabled { cursor: default; }
 .kor-psort-why { margin: 0; font-size: 0.92rem; line-height: 1.5; word-break: keep-all; }
+/* 📍 글에 있나요? (v259) — 글은 푸는 동안·고쳐 볼 때 내내 보인다(세로 화면은 위에 붙고 안에서 굴림 · 가로 화면은 왼쪽) */
+.kor-pin-body { display: grid; gap: 12px; align-items: start; }
+.kor-pin-col { display: grid; gap: 10px; min-width: 0; }
+.kor-pin-text { position: sticky; top: var(--kor-top, 72px); z-index: 1; max-height: 42vh; display: flex; flex-direction: column; overflow: hidden; padding: 12px 14px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+@media (min-width: 900px) {
+  .kor-pin-body { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
+  .kor-pin-text { max-height: calc(100vh - var(--kor-top, 72px) - 12px); box-shadow: none; }
+}
+/* 제목·고르기 안내는 위에 늘 보이고 줄만 굴린다 (Codex 70차 — 다시 그려도 읽던 자리 그대로) · 안쪽 틈은 초점 테두리 자리 */
+.kor-pin-text > * { flex: none; }
+.kor-pin-scroll { flex: 0 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 6px; margin: 0 -6px; }
+.kor-pin-show { justify-self: start; }
+.kor-pline.is-flash { animation: kor-pin-flash 1.4s ease-out; }
+@keyframes kor-pin-flash { 0%, 35% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.8); } 100% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); } }
+@media (prefers-reduced-motion: reduce) { .kor-pline.is-flash { animation: none; outline: 3px solid #f59e0b; outline-offset: 1px; } }
+.kor-pin-text .kor-passage-title { margin: 0 0 6px; font-size: 1.1rem; }
+.kor-pin-pickhint { margin: 0 0 6px; font-weight: 800; color: var(--primary-dark); }
+.kor-plines { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.kor-pline { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; width: 100%; text-align: left; border: 2px solid transparent; border-radius: 8px; background: none; padding: 3px 6px; font: inherit; font-size: 1.04rem; line-height: 1.7; color: inherit; word-break: keep-all; }
+.kor-pline-t { flex: 1 1 12em; min-width: 0; }
+button.kor-pline { cursor: pointer; border-color: var(--border); background: #fff; min-height: 44px; }
+button.kor-pline:hover { border-color: var(--primary); }
+.kor-pline.is-mark { background: var(--kor-mark); }
+button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.kor-ptag { font-size: 0.8rem; font-weight: 800; border-radius: 999px; padding: 0 8px; background: #e0e7ff; color: #3730a3; white-space: nowrap; }
+.kor-ptag.is-ok { background: #d1fae5; color: #065f46; }
+.kor-ptag.is-no { background: #fee2e2; color: #991b1b; }
+.kor-pin-letter { display: inline-block; min-width: 1.6em; text-align: center; border-radius: 6px; background: #e0e7ff; color: #3730a3; font-weight: 800; }
+.kor-psort.is-waiting { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25); }
+.kor-pin-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.kor-pin-wait { font-weight: 700; color: var(--primary-dark); }
+.kor-pfo.is-in.is-on { border-color: #059669; background: #d1fae5; color: #064e3b; }
+.kor-pfo.is-out.is-on { border-color: #6b7280; background: #e5e7eb; color: #1f2937; }
 
 /* 🎧 듣고 답하기 (v245) — 글 상자 자리에 듣기 상자: 말하는 사람 칸 · 줄 점 · ▶ 듣기 / 🐢 천천히 / ⏹ 멈추기 · 📄 글로 읽고 풀기 */
 .kor-listen { background: #f3f7ff; border: 2px solid #c7d7fe; border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 10px; }
