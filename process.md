@@ -4344,5 +4344,25 @@
 
 ### TODO (다음 작업)
 - [x] 🔍 Codex 74차(73차 세션 이어서) → 판단 표 → 아버님 "표대로 진행" → #1~#4 · #6 · PART 2 ② 반영(#5 한계 · ①③ 그대로) · 검수 V2
-- [ ] 아버님: 검수 → "배포" (v263)
+- [x] 아버님: 검수 → "배포" (v263) — 배포 전 전체 2040 다시 통과 · `2fba0e6` feat · `89bd52c` docs · 라이브 v263 · 배포본 10개 같음(`.context/english_v263/live_check.sh`)
 - [ ] 아버님: 태블릿 v263 → 며칠 뒤 업로드 → "올라온 거 봐 줘"(🔶 늘었나 — 영상 눈금 · 따라 말하기)
+
+## 2026-10-16 — 🎬 주토피아 2 영어 자료 · 단어장 +364 (v264)
+
+### 진행 내용
+- 아버님 "주토피아 2 폴더의 영상을 가지고 영어 학습 컨텐츠를 만들자" → 겹치는 자료 없음 확인 · mkv에 **글자 자막(SRT)**이 들어 있었다(영어 보통 1,494 · 영어 SDH 2,114 · 그림 자막 SDH·프랑스어·스페인어 + 다른 나라 말) · 한글은 같이 온 .srt(1,532) → 스폰지밥과 같은 짧은 길(OCR 없음)
+- 영어 보통 트랙·SDH를 한 번에 뽑음(34초) → `tools/sdh_clean.py --text --known <기존 영어 자막 여섯>` — 바뀐 줄 0(보통 트랙이라 소리 설명·♪ 없음 · 노래는 가사 자막이 없다) · `<i>`·`{\an8}` 꼬리표만 지움(영어 506 · 한글 567 — 앱도 지우지만 파일을 스폰지밥과 같은 꼴로) · synccheck ✅(차이 중앙값 −0.02초 · 98%가 0.3초 안)
+- 영상: 1920×804 HEVC 10비트 → 1440×604 x264 faster crf23 maxrate 1200k(`-hwaccel d3d11va` · `-threads 6` · Idle) · 7.1 → 대사 가운데 채널 가중 스테레오 + loudnorm(평균 −20.1 dB · 최대 −1.5 dB) · 시험 1분 17.7초(3.4배속) 8.8 MB → 전체 23분 49초(4.5배속) · 890 MB(1:47:45 그대로) (`F:\per\mp3\zootopia2\encode.ps1` — PowerShell 5.1은 BOM 없는 UTF-8의 한글을 깨뜨려 BOM을 붙임)
+- 산출물 `F:\per\mp3\zootopia2\tablet\` = 「주토피아 2」.mp4 · .en.srt(1,494조각 → 합치면 1,316문장 · 따라 말하기 쓸 만한 문장 1,269 = 96%) · .ko.srt — 긴 영상 칸(🔶 2·2·2·2 · 💰200)
+- 단어장 `vocab/words.json` **+364(2,445 → 2,809)**: 후보 442를 영화 속 첫 문장과 함께 보고(`F:\per\mp3\zootopia2\vocab_context.tsv`) 이름·스페인어 노래 가사·억양 흉내(ze·zey·vill)·더듬는 소리는 빼고, 뜻은 영화 속 쓰임으로(frame "누명을 씌우다" · hustle "사기, 수작" · takes two to tango) · 말장난은 까닭을 붙여(snoutrage · ter-roar · zoogether · pawpsicles · apart-ners) · 불규칙은 `=기본형`(laid·tore·wove — 기본형이 words.json에 있는 것만) · 기본형이 기초 낱말이면 뜻을 바로(written·hurtin'·turnin'·somethin') · 스페인어·이탈리아어 낱말은 표시를 붙여(adios·hermano·nonno — 영어 문장 판단에서 빠짐)
+  - `.context/zootopia2/merge_vocab.mjs` — 앱처럼 `=`를 세 번까지 따라가 뜻이 비지 않는지 · **영화 속 꼴 386개가 모두 뜻을 찾는지**(bunnies·lynxes·mopped·fanging·studying …)
+  - `.context/zootopia2/stem_clash.mjs`(새) — stemWord는 짧은 후보를 먼저 봐서("rated" → rat보다 rate가 뒤) 새 낱말이 아는 말의 뜻 찾기를 빼앗을 수 있다 → 영어 자막 일곱 편의 낱말 꼴 5,047개를 더하기 전·뒤로 비교: 바뀐 꼴 1개(offer — 전에는 off로 잘못 찾던 것이 offer로, 나아짐)
+  - 따라 말하기 대상: 1,428 → 1,443조각(영어 대사 15줄이 영어로 읽힘) · 스페인어 노래 가사 줄은 그대로 빠짐 · vocab·dictation·essay·importfiles·player.logic 시험 통과
+- `sw.js` **v264**(단어장은 서비스 워커가 담아 둔다)
+
+### 변경 파일
+- `vocab/words.json`(+364) · `sw.js`(v264)
+
+### TODO (다음 작업)
+- [x] 아버님: "배포" (v264 — 단어장) — 배포 전 전체 2040 다시 통과
+- [ ] 아버님: 태블릿 📁 `F:\per\mp3\zootopia2\tablet` 넣기(긴 영화라 🔁 복습이 많이 쌓이면 📊 콘텐츠별 복습 끄기) → 진우 반응
