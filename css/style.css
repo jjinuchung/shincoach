@@ -3147,7 +3147,7 @@ button { font-family: inherit; }
 .kor-passage-badge { font-weight: 700; color: var(--primary-dark); }
 .kor-passage-title { margin: 6px 0 8px; font-size: 1.25rem; }
 .kor-prose { margin: 0; font-size: 1.12rem; line-height: 1.95; word-break: keep-all; }
-.kor-prose.is-rows .kor-sent { display: block; margin-bottom: 0.2em; } /* v261 layout rows — 극본의 대사·두 사람의 글·기사 제목은 문장마다 줄 */
+.kor-prose.is-rows .kor-sent { display: block; margin-bottom: 0.2em; } /* v261 layout rows — 극본의 대사·두 사람의 글·기사 제목은 문장마다 줄 · v266 토의·독서 모임 기록·🎧 대화를 글로 읽을 때도 */
 .kor-sent { border-radius: 4px; transition: background-color 0.25s; }
 .kor-num { color: var(--primary); font-weight: 800; margin-right: 3px; font-size: 0.95em; }
 .kor-sent.is-mark, .kor-line.is-mark { background: var(--kor-mark); }

@@ -54,8 +54,16 @@ export const KINDS = { practice: '📄 연습 카드', classic: '✨ 명작 카�
 /** ⭐ 미리보기 카드(pre) — 5학년 단원 밖, 다음 학교에서 만날 작품을 미리 (v244, 수학 M9 ⭐ 중1 미리보기처럼) ·
  *  도감 맨 뒤에 따로 · 잠그지 않고 보상은 같다 · 작품이 학년마다·출판사마다 달라 "중1"이 아니라 "중학교"로 */
 export const PRE = { '중학교': '⭐ 중학교 미리보기' };
-/** 글 꼴(layout, v261) — rows면 문장마다 줄을 바꾼다(극본의 대사 · 두 사람의 글 · 기사 제목처럼 줄이 나뉘어야 읽기 쉬운 글) · 없으면 이어 쓴 문단 */
+/** 글 꼴(layout, v261) — rows면 문장마다 줄을 바꾼다(극본의 대사 · 두 사람의 글 · 기사 제목처럼 줄이 나뉘어야 읽기 쉬운 글 · v266 토의·독서 모임 기록) · 없으면 이어 쓴 문단 */
 export const LAYOUTS = { rows: '문장마다 줄 바꿈' };
+/** 이름: 말 꼴처럼 보이는 줄 — 🎧 who가 빈 듣기 카드에서 막고(한 사람 글인데 사람 이름처럼 읽히지 않게) · 읽는 글은 rows를 요구한다(v266) */
+const LOOKS_SPEAKER = /^[가-힣]{1,6}: /;
+/** 글 상자를 문장마다 줄 바꿔 보일까 (v266) — layout rows이거나, 말하는 사람이 있는 🎧 듣기 카드(대화·토의)를 📄 글로 읽을 때 */
+export function rowsLayout(card) {
+  if (!card) return false;
+  if (card.layout === 'rows') return true;
+  return isListen(card) && Array.isArray(card.listen.who) && card.listen.who.length > 0;
+}
 /** 바탕 글(source, v265) — 신문 기사처럼 다른 글을 바탕으로 신코치가 다시 쓴 연습 글은 무엇을 바탕으로 했는지 글 아래에 작게 밝힌다 ·
  *  명작은 facts의 원문·저작권 줄로 밝히므로 연습 카드에만 */
 export const SOURCE_MAX = 120;
@@ -426,6 +434,8 @@ export function checkCard(c, ids = new Set()) {
   const hasStanzas = Array.isArray(c.stanzas);
   if (hasLines === hasStanzas) at('글은 lines 또는 stanzas 하나만');
   if (own(c, 'layout') && (!own(LAYOUTS, c.layout) || !hasLines)) at(`layout(글 꼴)은 ${Object.keys(LAYOUTS).join('·')}만 — 문장(lines)으로 된 글에`);
+  // 대사 꼴(이름: 말) 줄이 둘 이상인 읽는 글은 사람마다 줄 (v266 — 이어 쓴 문단이면 누가 한 말인지 놓친다 · 🎧 듣기 카드는 rowsLayout이 알아서)
+  if (hasLines && !isListen(c) && c.layout !== 'rows' && c.lines.filter((t) => LOOKS_SPEAKER.test(String(t))).length >= 2) at('대사 꼴(이름: 말) 줄이 있는 글은 layout rows로 — 사람마다 줄을 바꿔요');
   if (hasLines && (!c.lines.length || c.lines.length > 20 || !c.lines.every(nonEmpty))) at('lines는 1~20개의 문장');
   if (hasStanzas && (!c.stanzas.length || !c.stanzas.every((s) => Array.isArray(s) && s.length && s.every(nonEmpty)) || lineCount(c) > 20)) at('stanzas는 연마다 줄 하나 이상(모두 20줄까지)');
   if (c.kind === 'classic') {
@@ -516,8 +526,6 @@ export function checkCard(c, ids = new Set()) {
 
 /** 🎧 읽어 주기가 이상하게 읽는 글자 — 숫자(8시 → "팔 시"로 읽는 기기) · 가운뎃점 · 괄호 · 물결 · 빗금 */
 export const LISTEN_BAD_CHARS = /[0-9·()~/]/;
-/** 🎧 이름: 말 꼴처럼 보이는 줄 (who가 빈 카드에서 막는다 — 한 사람 글인데 사람 이름처럼 읽히지 않게) */
-const LOOKS_SPEAKER = /^[가-힣]{1,6}: /;
 
 /**
  * 🎧 듣기 카드 검사 (checkCard가 부른다 — 카드 id는 checkCard가 붙인다)

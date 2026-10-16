@@ -6,7 +6,7 @@
 //  · ⏳ 국어도 하루 1시간 30분(v232, 아버님) — 읽던 글은 끝까지, 새 글만 막는다
 //  · 🔍 근거 먼저 · 💡 둘째 힌트(v258) — 틀린 보기를 두 번 고르면 근거가 있는 물음은 남은 보기를 잠그고 답이 든 줄부터 찾게,
 //    근거가 없는 물음은 둘째 힌트(korean.evFirstNow·hint2Now) · ⏱️ 읽는 시계(쉼 빼고)와 함께 📤 읽은 기록 한 줄(korean.readOf)
-import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT } from './korean.js';
+import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT } from './korean.js';
 import { IDLE_SEC } from './timelimit.js'; // ⏱️ 읽는 시계는 ⏳ 시계와 같은 쉼 규칙(2분 넘게 손을 안 대면 안 센다)
 import { newListenState, playListen, haltListen, stopListening, listenBoxEl, scriptEl, confirmHeard, syncListenBox } from './korlistenview.js'; // 🎧 듣기 카드 (v245) — 이 파일을 import하지 않는다
 import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt, tickEgg } from './xp.js';
@@ -356,9 +356,9 @@ const listenAct = {
   },
 };
 
-/** 번호 붙은 문장 — 연습 글과 이야기 명작(「알에서 태어나다」)이 같이 쓴다 · layout rows면 문장마다 줄을 바꾼다(v261 극본·두 글·기사) */
+/** 번호 붙은 문장 — 연습 글과 이야기 명작(「알에서 태어나다」)이 같이 쓴다 · layout rows면 문장마다 줄을 바꾼다(v261 극본·두 글·기사 · v266 토의·독서 모임 · 🎧 대화·토의를 글로 읽을 때) */
 function proseEl(card) {
-  const prose = el('p', card.layout === 'rows' ? 'kor-prose is-rows' : 'kor-prose');
+  const prose = el('p', rowsLayout(card) ? 'kor-prose is-rows' : 'kor-prose');
   card.lines.forEach((t, i) => {
     const sp = el('span', 'kor-sent');
     sp.dataset.n = String(i + 1);
