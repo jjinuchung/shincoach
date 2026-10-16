@@ -145,8 +145,9 @@ export function isPuzzleOpen() {
 /**
  * 퍼즐 열기. onClose(result)는 아이가 맞추고(문장을 한 번 더 들려준 뒤) 또는 정답 공개 후 계속하기를 눌렀을 때 호출.
  * characters: [{ id, ko, url, look }] — 단어 수 이상 있으면 캐릭터가 단어를 말풍선에 들고 있는 모양으로 (없으면 단어 조각만). look = 장식·염색 (xp.getLook)
+ * must: 꼭 넣을 캐릭터 id (🐸 단골 — pokemon.favoriteFor, v274) · 없으면 null
  */
-export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
+export function openPuzzle(cue, { onPlay, onClose, characters, must = null } = {}) {
   bgm.play(); // 🎵 지난 이벤트에서 끊긴 자리부터 이어서
   closePuzzle();
   ui.open = true;
@@ -175,7 +176,7 @@ export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
   // 단어마다 고정된 "자리"를 만들고 그 안에 조각을 넣음 → 조각을 꺼내 가도 나머지 단어가 밀려오지 않음 (아이가 누르려던 단어가 움직이면 헷갈림)
   // 캐릭터가 충분하면 자리 = [말풍선(단어) + 캐릭터 그림 + 이름] 카드. 캐릭터를 눌러도 단어가 오간다
   const n = ui.answer.length;
-  const chars = characters && characters.length >= n ? pickSome(characters, n) : null;
+  const chars = characters && characters.length >= n ? pickSome(characters, n, must) : null;
   ui.chars = chars;
   ui.slots = {};
   const slots = [];
@@ -210,9 +211,15 @@ export function openPuzzle(cue, { onPlay, onClose, characters } = {}) {
   afterChange();
 }
 
-/** 배열에서 n개를 무작위로 (캐릭터 고르기) */
-function pickSome(arr, n) {
-  return shuffle(arr).slice(0, n);
+/** 배열에서 n개를 무작위로 (캐릭터 고르기) · must(id)가 목록에 있으면 그 캐릭터를 꼭 넣고 자리는 무작위로 (🐸 단골, v274) */
+export function pickSome(arr, n, must = null, rng = Math.random) {
+  const a = shuffle(arr, rng);
+  const k = must === null || must === undefined ? -1 : a.findIndex((c) => c && c.id === must);
+  if (k >= n) {
+    const j = Math.floor(rng() * n); // 앞 n자리 가운데 하나와 바꾼다 — 단골이 늘 같은 자리(첫 단어)에 서지 않게
+    const t = a[j]; a[j] = a[k]; a[k] = t;
+  }
+  return a.slice(0, n);
 }
 
 /** 캐릭터 카드(그림·이름·빈 말풍선)를 누름: 단어가 집에 있으면 정답 칸으로, 정답 칸에 있으면 다시 집으로 */

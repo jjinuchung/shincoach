@@ -181,6 +181,8 @@ function loadPlayer() {
     loadCharacters: async () => [{ id: 25, ko: '피카츄', url: 'x' }, { id: 4, ko: '파이리', url: 'y' }], downloadCharacters: async () => ({ ok: 0, fail: 0 }), ROSTER: [{ id: 25, ko: '피카츄' }, { id: 4, ko: '파이리' }], pickCharacters: (a, n) => (a || []).slice(0, n), isUnlocked: () => true, unlockCountAt: () => 0,
     // 과목 가르기(2026-09-22): 스텁 명단은 전부 영어 — forSubject('english')는 그대로, forPuzzle도 그대로
     forSubject: (a, subj) => (!subj || subj === 'english' ? (a || []).slice() : []), forPuzzle: (a) => (a || []).slice(), caughtCount: () => 0,
+    // 🐸 단골(v274) — 스텁은 늘 25(피카츄)를 꼭 넣으라고 한다: 잡기가 걸린 퍼즐에만 must가 가는지 본다
+    favoriteFor: (list) => ((list || []).some((c) => c.id === 25) ? 25 : null),
     // xp.js / catch.js 스텁: XP 획득과 잡기 화면 호출을 기록
     xpLog, catchCalls,
     initProfile: async () => ({}), getLevelInfo: () => ({ level: 1, into: 0, need: 100, xp: 0 }),
@@ -682,9 +684,12 @@ test('퍼즐: N문장을 "하면" 앞으로 넘어갈 때 퍼즐이 먼저 열�
   run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 2; state.idx = 1;');
   run('markDone(state.cues[0]); markDone(state.cues[1]); markDone(state.cues[1]);'); // 같은 문장 반복은 한 번만
   assert.equal(run('state.puzzlePool.length'), 2);
+  run('state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }];');
   run('goTo(2)');
   assert.equal(puzzleCalls.length, 1, '퍼즐이 열림');
   assert.equal(puzzleCalls[0].cue.en, 'a b c', '모아둔 문장 중에서 출제');
+  assert.equal(puzzleCalls[0].opts.must, 25, '🐸 잡기가 걸린 퍼즐은 단골(favoriteFor)을 must로 넘긴다 (v274)');
+  assert.equal(JSON.stringify(puzzleCalls[0].opts.characters.map((c) => c.id)), '[25,4]', '같은 목록에서');
   assert.equal(run('state.idx'), 1, '아직 이동 안 함');
   assert.equal(run('state.puzzleCue && state.puzzleCue.en'), 'a b c');
   assert.equal(run('state.puzzlePool.length'), 0, '출제하면서 비움');
@@ -693,6 +698,27 @@ test('퍼즐: N문장을 "하면" 앞으로 넘어갈 때 퍼즐이 먼저 열�
   assert.equal(run('state.idx'), 2, '퍼즐 뒤 원래 이동');
   run('goTo(3)');
   assert.equal(puzzleCalls.length, 1, '다시 차기 전에는 안 열림');
+});
+
+test('🐸 단골(v274): 😴 쉬는 중이거나 🕳 울트라홀이 닫힌 울트라비스트면 퍼즐 목록에서 먼저 빠져 must도 없다 (Codex 83차 E)', () => {
+  const open = (setup) => {
+    const { run, puzzleCalls, hpState, ctx } = loadPlayer();
+    run(FIVE_CUES + ' settings.listenFirst = 0; settings.puzzleEvery = 2; state.idx = 1;');
+    run('markDone(state.cues[0]); markDone(state.cues[1]);');
+    run('state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }];');
+    setup({ run, hpState, ctx });
+    run('goTo(2)');
+    assert.equal(puzzleCalls.length, 1);
+    return puzzleCalls[0].opts;
+  };
+  const tired = open(({ run, hpState }) => { run('settings.hp = true;'); hpState.partner = 4; hpState.hp[25] = 0; });
+  assert.equal(JSON.stringify(tired.characters.map((c) => c.id)), '[4]', '😴 쉬는 중이면 목록에 없다');
+  assert.equal(tired.must, null, '그래서 단골도 안 건다');
+  const ub = open(({ ctx }) => { ctx.isUltraBeast = (id) => id === 25; });
+  assert.equal(JSON.stringify(ub.characters.map((c) => c.id)), '[4]', '닫힌 홀의 울트라비스트는 목록에 없다');
+  assert.equal(ub.must, null);
+  const ok = open(() => {});
+  assert.equal(ok.must, 25, '그 밖엔 단골');
 });
 
 test('퍼즐: 뒤로 가기·퍼즐 끔·낼 만한 문장 없음이면 열리지 않음', () => {
@@ -755,8 +781,10 @@ test('퍼즐: ⚙ "지금 퍼즐 해보기"는 현재 문장으로 바로 열고
   let recorded = 0;
   ctx.track.puzzle = () => { recorded++; };
   run(FIVE_CUES + ' settings.puzzleEvery = 10; state.idx = 2; state.puzzlePool = [state.cues[0]];');
+  run('state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }];');
   run('startPuzzleNow()');
   assert.equal(puzzleCalls.length, 1);
+  assert.equal(puzzleCalls[0].opts.must, null, '🐸 연습 퍼즐(잡기 없음)엔 단골을 걸지 않는다 (v274)');
   assert.equal(puzzleCalls[0].cue.en, 'g h i', '현재 문장');
   assert.equal(run('state.puzzlePool.length'), 1, '모아둔 문장 유지');
   puzzleCalls[0].opts.onClose({ solved: true, wrong: 0 });

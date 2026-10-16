@@ -8,7 +8,7 @@ import { isSpeakable, loadVocab } from './vocab.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
-import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle, forHole, isUltraBeast } from './pokemon.js';
+import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle, forHole, isUltraBeast, favoriteFor } from './pokemon.js';
 // 🕳 울트라홀은 하나다 — 💎 스페셜 배지 8개(수학)로 열리고, 그 뒤에 영어 쪽 울트라비스트도 나온다 (아버님 결정 2026-09-28)
 import { gymClaimed } from './mathprog.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone } from './xp.js';
@@ -380,7 +380,7 @@ function startPuzzle(continueFn) {
       return;
     }
     continueFn();
-  });
+  }, { favorite: true }); // 🐸 잡기가 걸린 퍼즐 — 단골(개굴닌자)이 3번에 1번꼴로 꼭 나온다 (v274)
 }
 
 // ───────────────────── ⚡ 경험치·레벨 ─────────────────────
@@ -1377,18 +1377,20 @@ function startPuzzleNow() {
   showPuzzle(cue, () => { state.practiceOpen = false; restoreSpot(spot); });
 }
 
-/** 퍼즐 화면 열기 (재생 멈춤·따라 말하기 취소). 끝나면 onDone(result) */
-function showPuzzle(cue, onDone) {
+/** 퍼즐 화면 열기 (재생 멈춤·따라 말하기 취소). 끝나면 onDone(result) · opts.favorite = 잡기가 걸린 퍼즐 — 🐸 단골이 비율만큼 꼭 나온다 (v274) */
+function showPuzzle(cue, onDone, opts) {
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
   state.puzzleCue = cue;
   state.puzzlePlaying = false;
+  // 영어 것 + 이미 잡은 수학 포켓몬. 🌌 울트라비스트는 🕳 울트라홀이 열리기 전엔 퍼즐에도 안 나온다
+  // (이미 잡은 것은 어디든 놀러 온다 — 잡았다는 건 홀이 열렸었다는 뜻이다)
+  const characters = forPuzzle(unlockedCharacters(), (id) => caughtCount(id) > 0)
+    .filter((c) => holeOpen || !isUltraBeast(c.id) || caughtCount(c.id) > 0);
   openPuzzle(cue, {
-    // 영어 것 + 이미 잡은 수학 포켓몬. 🌌 울트라비스트는 🕳 울트라홀이 열리기 전엔 퍼즐에도 안 나온다
-    // (이미 잡은 것은 어디든 놀러 온다 — 잡았다는 건 홀이 열렸었다는 뜻이다)
-    characters: forPuzzle(unlockedCharacters(), (id) => caughtCount(id) > 0)
-      .filter((c) => holeOpen || !isUltraBeast(c.id) || caughtCount(c.id) > 0),
+    characters,
+    must: opts && opts.favorite ? favoriteFor(characters) : null, // 🐸 개굴닌자 3번에 1번꼴 (⚙ 지금 퍼즐 해보기는 잡기가 없어 안 건다)
     onPlay: (onEnd) => playPuzzleSentence(cue, onEnd),
     onClose: (result) => {
       state.puzzleCue = null;

@@ -820,6 +820,23 @@ export function forPuzzle(list, caught) {
   return (list || []).filter((c) => c && (subjectOf(c.id) === 'english' || (typeof caught === 'function' && caught(c.id))));
 }
 
+// ── 🐸 단골 포켓몬 (v274, 2026-10-16 아버님 "개굴닌자 비율 추천대로 하고 개굴닌자로 해") ──
+// 퍼즐 캐릭터는 영어 포켓몬 + 잡은 포켓몬(많으면 수백 종)에서 고르게 뽑으므로, 한 포켓몬이 한 퍼즐에 나올 확률은 몇 % 안 된다
+// → 아버님이 정한 단골은 잡기가 걸린 영어 퍼즐을 열 때 FAVORITE_RATE만큼 퍼즐 캐릭터 가운데 하나로 꼭 넣는다.
+// 맞히면 잡기 후보(영어 포켓몬)에 들고, 잡힐 확률·볼 규칙은 그대로 · 영어 퍼즐에서만(영어를 해야 모인다) · 😴 쉬는 중이면 지금처럼 안 나온다
+/** 단골 포켓몬 — 🐸 개굴닌자(영어 포켓몬) */
+export const FAVORITE_ID = 658;
+/** 잡기가 걸린 영어 퍼즐에서 단골이 꼭 나오는 비율 — 3번에 1번꼴 */
+export const FAVORITE_RATE = 1 / 3;
+/**
+ * 이번 퍼즐에 꼭 넣을 포켓몬 id (순수) — 퍼즐 캐릭터 목록(chars: 열림·안 쉼·그림 있음)에 단골이 있고 rng가 비율 안이면 FAVORITE_ID, 아니면 null
+ * (목록에 없으면 rng를 부르지 않는다)
+ */
+export function favoriteFor(chars, rng = Math.random) {
+  if (!(chars || []).some((c) => c && c.id === FAVORITE_ID && subjectOf(c.id) === 'english')) return null;
+  return rng() < FAVORITE_RATE ? FAVORITE_ID : null;
+}
+
 export function isUnlocked(id, level) {
   const r = ROSTER.find((m) => m.id === id);
   return !!r && (r.unlock || 1) <= level;

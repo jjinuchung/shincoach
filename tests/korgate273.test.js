@@ -1,5 +1,5 @@
-// 📚 국어 v273 (2026-10-16, 아버님 "니 추천대로 가자"): 🔍 처음 읽는 글은 근거부터
-//  · ★를 받기 전의 읽기 글(🎧 듣기 글·다시 읽는 글은 그대로)에서 근거가 있는 첫 물음 하나만, 보기를 고르기 전에 답이 든 줄부터 누른다
+// 📚 국어 v273 (2026-10-16, 아버님 "니 추천대로 가자"): 🔍 처음 읽는 글은 근거부터 → v274 별을 받을 수 있는 읽기마다 (아버님 "니 추천대로")
+//  · 이번에 별(★·★★·★★★)을 받을 수 있는 읽기 글(🎧 듣기 글 · 별 없이 다시 읽는 날은 그대로)에서 근거가 있는 첫 물음 하나만, 보기를 고르기 전에 답이 든 줄부터 누른다
 //  · 화면은 "두 번 틀리면 근거 먼저"와 같다(보기 잠금 · 틀린 줄을 두 번 누르면 범위) · 별·💰·🟩·🎯 규칙은 그대로
 //  · 📤 읽은 기록에 v(그 물음이 나온 뒤 찾기까지 초)·w(잘못 누른 줄)·k(찾은 뒤 첫 번에 맞혔나) — e(근거 먼저)는 두 번 틀린 것만
 import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  evFirstNow, gateAtOf, isListen, readOf, readsOf, mergeReads, READ_W_MAX, korFinishRule, validCards, dayNum, checkContent,
+  evFirstNow, gateAtOf, isListen, readOf, readsOf, mergeReads, READ_W_MAX, korFinishRule, validCards, dayNum, checkContent, nextStar, STAR3_DAYS,
 } from '../js/korean.js';
 import { emptyProfile, cloneProfile } from '../js/db.js';
 import { readLines } from '../js/korreport.js';
@@ -22,16 +22,51 @@ const D0 = dayNum(T0);
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const hasEv = (q) => Array.isArray(q.ev) && q.ev.length > 0;
 
-test('🔍 근거부터 자리 (gateAtOf, 순수): 별 0개 읽기 글의 근거가 있는 첫 물음 · 🎧 듣기 글 · 다시 읽는 글 · 근거 물음이 없으면 -1', () => {
+test('🔍 근거부터 자리 (gateAtOf, 순수 · v274): 이번에 받을 별이 1·2·3이면 근거가 있는 첫 물음 · 별을 못 받는 날(0) · 🎧 듣기 글 · 근거 물음이 없으면 -1', () => {
   const q = (ev) => ({ ev, opts: [{}, {}, {}, {}] });
   const card = { id: 'K1', qs: [q(null), q([]), q([4]), q([2])] };
-  assert.equal(gateAtOf(card, 0), 2, '근거가 없는 물음·빈 근거는 건너뛰고 첫 근거 물음');
-  assert.equal(gateAtOf({ ...card, qs: [q([1]), q([2])] }, 0), 0);
-  for (const s of [1, 2, 3]) assert.equal(gateAtOf(card, s), -1, `별 ${s}개 — 다시 읽는 글은 그대로`);
-  for (const s of [undefined, null, '0', -1, NaN]) assert.equal(gateAtOf(card, s), -1, `별 수가 깨졌으면(${String(s)}) 걸지 않는다`);
-  assert.equal(gateAtOf({ ...card, listen: { who: [] } }, 0), -1, '🎧 듣기 글은 그대로');
-  assert.equal(gateAtOf({ id: 'K2', qs: [q(null), q([])] }, 0), -1, '근거 물음이 없는 글');
-  for (const bad of [null, undefined, [], {}, { qs: 'x' }, { qs: [null, 7] }]) assert.equal(gateAtOf(bad, 0), -1, JSON.stringify(bad));
+  for (const star of [1, 2, 3]) assert.equal(gateAtOf(card, star), 2, `★${star} 받는 읽기 — 근거가 없는 물음·빈 근거는 건너뛰고 첫 근거 물음`);
+  assert.equal(gateAtOf({ ...card, qs: [q([1]), q([2])] }, 1), 0);
+  assert.equal(gateAtOf(card, 0), -1, '별을 못 받는 날(기다림·★★★ 다 받음)은 그대로');
+  for (const s of [undefined, null, '1', -1, 4, 1.5, NaN]) assert.equal(gateAtOf(card, s), -1, `받을 별이 깨졌으면(${String(s)}) 걸지 않는다`);
+  assert.equal(gateAtOf({ ...card, listen: { who: [] } }, 1), -1, '🎧 듣기 글은 그대로');
+  assert.equal(gateAtOf({ id: 'K2', qs: [q(null), q([])] }, 1), -1, '근거 물음이 없는 글');
+  for (const bad of [null, undefined, [], {}, { qs: 'x' }, { qs: [null, 7] }]) assert.equal(gateAtOf(bad, 1), -1, JSON.stringify(bad));
+});
+
+test('🔍 받을 별(nextStar)과 이어서 (v274): ★ 전 · 어제 ★ → ★★ · 일주일 뒤 ★★★ 은 걸고, 오늘 이미 받은 날·★★★ 다 받은 글은 안 건다', () => {
+  const card = CARDS.find((c) => c.id === 'K42');
+  const at = gateAtOf(card, 1);
+  assert.ok(at >= 0);
+  const day = dayNum(T0);
+  const gate = (done) => gateAtOf(card, nextStar(done, 'K42', T0).star);
+  assert.equal(gate({}), at, '★ 전');
+  assert.equal(gate({ 'K42:1': day - 1 }), at, '어제 ★ → 오늘 ★★');
+  assert.equal(gate({ 'K42:1': day }), -1, '오늘 ★를 받았다 — 별 없이 다시 읽기');
+  assert.equal(gate({ 'K42:1': day - STAR3_DAYS, 'K42:2': day - 1 }), at, '★★ 뒤 일주일 — ★★★');
+  assert.equal(gate({ 'K42:1': day - 2, 'K42:2': day - 1 }), -1, '★★★까지 기다리는 날');
+  assert.equal(gate({ 'K42:1': day - 30, 'K42:2': day - 20, 'K42:3': day - 10 }), -1, '★★★ 다 받은 글');
+  // 깨진 기록 — 보상 규칙과 같은 해석(nextStar): 날을 모르는 ★는 받은 것으로 · ★ 없이 ★★만 있으면 0개
+  assert.equal(gate({ 'K42:1': 'x' }), at, '날이 깨진 ★ → ★★ 받는 읽기');
+  assert.equal(gate({ 'K42:2': day - 1 }), at, '★ 없이 ★★만 — ★ 받는 읽기');
+});
+
+test('🔍 열 때와 끝낼 때 (Codex 83차 B — 정해 둔 경계): 근거부터는 연 때의 받을 별로, 별은 끝낼 때 다시 판정 — 어느 쪽이든 별을 두 번 주지 않는다', () => {
+  const card = CARDS.find((c) => c.id === 'K42');
+  const at = gateAtOf(card, 1);
+  const day = dayNum(T0);
+  const night = new Date(2026, 9, 16, 23, 59, 0).getTime();
+  const morning = night + 2 * 60 * 1000; // 자정을 넘김
+  // ① 오늘 ★를 받은 글을 밤에 열면 근거부터가 없고(별 없이 다시 읽기) — 자정을 넘겨 끝내면 ★★는 받는다
+  const done1 = { 'K42:1': dayNum(night) };
+  assert.equal(gateAtOf(card, nextStar(done1, 'K42', night).star), -1);
+  const p1 = pf({ korDone: { ...done1 } });
+  assert.equal(korFinishRule(p1, 'K42', morning, {}, IDS, 0).star, 2, '끝낼 때 다시 판정');
+  // ② 근거부터로 연 사이 다른 창이 같은 ★를 먼저 받았다 — 이 창은 별 없이(두 번 주지 않는다)
+  assert.equal(gateAtOf(card, nextStar({}, 'K42', T0).star), at);
+  const p2 = pf({ korDone: { 'K42:1': day } });
+  const r2 = korFinishRule(p2, 'K42', T0, {}, IDS, 0);
+  assert.deepEqual([r2.ok, r2.star], [true, 0]);
 });
 
 test('🔍 근거부터면 안 틀려도 보기 잠금 (evFirstNow): 근거를 찾거나 맞히면 풀림 · 근거가 없는 물음엔 안 걸림 · 옛 "두 번 틀림"은 그대로', () => {
@@ -49,17 +84,18 @@ test('🔍 근거부터면 안 틀려도 보기 잠금 (evFirstNow): 근거를 �
   assert.equal(evFirstNow(q, { wrong: [0, 1], answered: false, evDone: false }), true, 'gate가 없는 옛 상태');
 });
 
-test('📚 원고: 듣기 글 말고 근거 물음이 있는 글은 모두 근거부터 한 물음 — 근거가 있는 첫 물음 · 다시 읽으면 없음 · 근거 물음이 없는 글은 따로 적어 둠', () => {
+test('📚 원고: 듣기 글 말고 근거 물음이 있는 글은 모두 근거부터 한 물음 — 근거가 있는 첫 물음 · 별을 못 받는 날은 없음 · 근거 물음이 없는 글은 따로 적어 둠', () => {
   assert.deepEqual(checkContent(DATA), [], '원고는 그대로 깨끗');
   const noEv = [];
   let gated = 0;
   for (const c of CARDS) {
-    const at = gateAtOf(c, 0);
+    const at = gateAtOf(c, 1);
     if (isListen(c)) { assert.equal(at, -1, `${c.id} 🎧`); continue; }
     if (!c.qs.some(hasEv)) { assert.equal(at, -1); noEv.push(c.id); continue; }
     gated++;
     assert.ok(hasEv(c.qs[at]) && c.qs.slice(0, at).every((q) => !hasEv(q)), `${c.id} 근거가 있는 첫 물음`);
-    assert.equal(gateAtOf(c, 1), -1, `${c.id} 별을 받은 뒤엔 없음`);
+    assert.equal(gateAtOf(c, 0), -1, `${c.id} 별을 못 받는 날엔 없음`);
+    for (const star of [2, 3]) assert.equal(gateAtOf(c, star), at, `${c.id} ★${star} 받는 날도 같은 물음`);
   }
   assert.ok(gated >= 70, `근거부터가 걸리는 글 ${gated}`);
   // 근거 물음이 없는 글(글 전체를 보는 물음만) — 새로 생기면 여기서 알게
@@ -117,18 +153,18 @@ test('📤 읽은 기록 한 줄 (koreanview.readLog): 근거부터 물음은 v�
   assert.equal(readLog({ ...r, qs: [st({ gate: true, evFirst: true, from: -1, evAt: 12 }), r.qs[1], r.qs[2]] }).v, 12, '보인 때가 없으면 0부터');
 });
 
-test('📤 국어 요약: 머리말에 "근거 먼저"·"처음 근거" 뜻 · 모은 줄에 처음 근거(있는 줄만) · 줄마다 찾기까지·잘못 누른 줄·찾은 뒤에도 틀림', () => {
+test('📤 국어 요약: 머리말에 "근거 먼저"·"근거부터" 뜻 · 모은 줄에 근거부터(있는 줄만) · 줄마다 찾기까지·잘못 누른 줄·찾은 뒤에도 틀림', () => {
   const row = (o) => ({ c: 'K42', t: T0, d: D0, s: 90, a: 50, n: 4, f: 2, x: 0, e: 0, h: 0, g: 1, m: '', q: 20, ...o });
   const L = readLines([row({ v: 30, w: 0, k: 1 }), row({ t: T0 + 1, v: 50, w: 3, k: 0 }), row({ t: T0 + 2, g: 0 })], DATA.cards, '2026-10-16');
   assert.match(L[1], /🔍 근거 먼저 = 틀린 보기를 두 번 고른 뒤 근거 줄부터 찾은 물음/);
-  assert.match(L[1], /📍 처음 근거 = v273부터 처음 읽는 글\(★ 전, 🎧 빼고\)에서 근거가 있는 첫 물음 하나는 보기를 고르기 전에 근거 줄부터/);
+  assert.match(L[1], /📍 근거부터 = 별을 받을 수 있는 읽기\(v273은 ★ 전의 글만 · v274부터 ★·★★·★★★ 받는 날, 🎧 빼고\)에서 근거가 있는 첫 물음 하나는 보기를 고르기 전에 근거 줄부터/);
   assert.match(L[1], /\)\)$/, '머리말 괄호는 닫힌다');
-  assert.match(L[2], / · 📍 처음 근거 2번\(찾기까지 평균 40초 · 잘못 누른 줄 3 · 찾은 뒤 첫 번에 1\/2\)$/);
+  assert.match(L[2], / · 📍 근거부터 2번\(찾기까지 평균 40초 · 잘못 누른 줄 3 · 찾은 뒤 첫 번에 1\/2\)$/);
   const lines = L.slice(3);
-  assert.equal(lines.filter((x) => x.endsWith(' · 📍 처음 근거 찾기까지 30초')).length, 1);
-  assert.equal(lines.filter((x) => x.endsWith(' · 📍 처음 근거 찾기까지 50초(잘못 누른 줄 3) · 찾은 뒤에도 틀림')).length, 1);
+  assert.equal(lines.filter((x) => x.endsWith(' · 📍 근거부터 찾기까지 30초')).length, 1);
+  assert.equal(lines.filter((x) => x.endsWith(' · 📍 근거부터 찾기까지 50초(잘못 누른 줄 3) · 찾은 뒤에도 틀림')).length, 1);
   assert.equal(lines.filter((x) => !x.includes('📍')).length, 1, '다시 읽은 줄엔 없음');
-  assert.ok(!readLines([row({})], DATA.cards, '2026-10-16')[2].includes('📍'), '처음 근거 줄이 없으면 모은 말도 없다');
+  assert.ok(!readLines([row({})], DATA.cards, '2026-10-16')[2].includes('📍'), '근거부터 줄이 없으면 모은 말도 없다');
 });
 
 test('🔍 물음 아래 말 (qFeedback, 순수): 근거부터는 파란 안내 · 두 번 틀림은 빨강 · 찾은 직후만 "찾았어요!"(안 틀렸으면 "남은" 없이) · 찾은 뒤 새로 틀리면 그 보기 힌트 (Codex 82차 #1)', async () => {
@@ -176,7 +212,7 @@ test('🔍 화면 배선 (v273): 열 때 별 0개면 근거부터 자리(기록�
   const src = read('js/koreanview.js');
   const body = (head) => { const i = src.indexOf(head); assert.ok(i >= 0, head); return src.slice(i, src.indexOf('\n}\n', i)); };
   const open = body('function openCard(id) {');
-  assert.ok(open.includes('const gateAt = profileLoading() ? -1 : gateAtOf(card, starsOf(korDoneMap(), card.id));'), '별은 연 때의 받은 별로 · 다시 읽는 사이(별이 0으로 보임)는 안 걺');
+  assert.ok(open.includes('const gateAt = profileLoading() ? -1 : gateAtOf(card, nextStar(korDoneMap(), card.id, Date.now()).star);'), '연 때 이번에 받을 별로 · 다시 읽는 사이(받은 별이 비어 보임)는 안 걺');
   assert.ok(open.includes('gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1 })'), '물음마다 상태');
   const rq = body('function renderQ() {');
   assert.ok(rq.includes('if (st.gate && st.from < 0) st.from = r.sec;'), '처음 보인 때 한 번');

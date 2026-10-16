@@ -6,7 +6,7 @@
 //  · ⏳ 국어도 하루 1시간 30분(v232, 아버님) — 읽던 글은 끝까지, 새 글만 막는다
 //  · 🔍 근거 먼저 · 💡 둘째 힌트(v258) — 틀린 보기를 두 번 고르면 근거가 있는 물음은 남은 보기를 잠그고 답이 든 줄부터 찾게,
 //    근거가 없는 물음은 둘째 힌트(korean.evFirstNow·hint2Now) · ⏱️ 읽는 시계(쉼 빼고)와 함께 📤 읽은 기록 한 줄(korean.readOf)
-//  · 🔍 처음 읽는 글은 근거부터(v273) — ★ 전의 읽기 글에서 근거가 있는 첫 물음 하나는 안 틀려도 같은 화면으로(korean.gateAtOf)
+//  · 🔍 별을 받는 읽기는 근거부터(v273 ★ 전 → v274 별을 받을 수 있는 읽기마다) — 근거가 있는 첫 물음 하나는 안 틀려도 같은 화면으로(korean.gateAtOf)
 import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT, gateAtOf } from './korean.js';
 import { IDLE_SEC } from './timelimit.js'; // ⏱️ 읽는 시계는 ⏳ 시계와 같은 쉼 규칙(2분 넘게 손을 안 대면 안 센다)
 import { newListenState, playListen, haltListen, stopListening, listenBoxEl, scriptEl, confirmHeard, syncListenBox } from './korlistenview.js'; // 🎧 듣기 카드 (v245) — 이 파일을 import하지 않는다
@@ -249,14 +249,14 @@ function openCard(id) {
   const card = (ui.cards || []).find((c) => c.id === id);
   if (!card) return;
   sfxUnlock();
-  // 🔍 처음 읽는 글 — 근거가 있는 첫 물음은 근거부터 (v273). 프로필을 다시 읽는 사이(앱을 앞으로 가져온 순간)는 별이 0으로 보여
-  //   다시 읽는 글에도 걸렸다 → 그때는 걸지 않는다(처음 읽는 글에서 한 번 빠지는 것은 해가 없다)
-  const gateAt = profileLoading() ? -1 : gateAtOf(card, starsOf(korDoneMap(), card.id));
+  // 🔍 이번에 별을 받을 수 있는 읽기 — 근거가 있는 첫 물음은 근거부터 (v273 ★ 전 → v274 ★·★★·★★★ 받는 날). 프로필을 다시 읽는 사이
+  //   (앱을 앞으로 가져온 순간)는 받은 별이 비어 보여 잘못 걸 수 있다 → 그때는 걸지 않는다(한 번 빠지는 것은 해가 없다)
+  const gateAt = profileLoading() ? -1 : gateAtOf(card, nextStar(korDoneMap(), card.id, Date.now()).star);
   ui.read = {
     card,
     qi: 0,
     // evFirst = 맞히기 전에 🔍 근거를 먼저 찾았다 · hint2 = 💡 둘째 힌트를 보았다 (v258 📤 읽은 기록)
-    // gate = 처음 읽는 글의 근거부터 물음 · from = 그 물음이 처음 보인 때의 읽은 초 · evAt = 근거 줄을 찾은 때의 읽은 초 (v273 📤 찾기까지)
+    // gate = 근거부터 물음 · from = 그 물음이 처음 보인 때의 읽은 초 · evAt = 근거 줄을 찾은 때의 읽은 초 (v273 📤 찾기까지)
     // wrongAtEv = 맞히기 전에 근거를 찾을 때까지 틀린 보기 수 (그 뒤에 새로 틀리면 "찾았어요!" 대신 힌트, Codex 82차 #1)
     qs: card.qs.map((q, i) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false, gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1 })),
     misses: {},
@@ -558,7 +558,7 @@ function renderQ() {
   const q = r.card.qs[r.qi];
   const st = r.qs[r.qi];
   const unit = unitOf(r.card);
-  const evFirst = evFirstNow(q, st); // 🔍 두 번 틀렸다 — 근거부터 (v258) · 처음 읽는 글의 근거부터 물음 (v273)
+  const evFirst = evFirstNow(q, st); // 🔍 두 번 틀렸다 — 근거부터 (v258) · 근거부터 물음 (v273)
   if (st.gate && st.from < 0) st.from = r.sec; // 🔍 근거부터 물음이 처음 보인 때 (📤 찾기까지 초)
   const card = el('div', 'kor-q');
   const head = el('div', 'kor-q-head');
@@ -787,7 +787,7 @@ async function finishCard() {
 export function readLog(r) {
   const qs = r.card.qs;
   const cnt = (f) => r.qs.filter((st, i) => f(st, qs[i])).length;
-  const gs = r.qs.find((st) => st && st.gate && st.evAt >= 0); // 🔍 처음 읽는 글의 근거부터 물음 — 근거를 찾았으면 (v273)
+  const gs = r.qs.find((st) => st && st.gate && st.evAt >= 0); // 🔍 근거부터 물음 — 근거를 찾았으면 (v273)
   return {
     t: r.t0, s: r.sec, a: Math.max(0, r.firstSec), n: qs.length,
     f: cnt((st) => !st.wrong.length), // 첫 번에 맞힘
