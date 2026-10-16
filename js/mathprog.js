@@ -47,7 +47,7 @@ export const STEMS = {
   negative: { key: 'negative', code: 'E', label: '음수 줄기', range: '중1', list: negativeGen.NEGATIVE, gen: negativeGen, file: './coach/math/negative.json', lesson: true, intro: '음수 문제 5개를 먼저 풀어 볼게요. 처음 보는 거면 못 풀어도 돼요 — 그러면 첫 개념부터 차근차근 배워요.' },
   // B 혼합계산 — 진우가 직접 만들어 달라고 한 줄기 (2026-09-23). 초5 자연수 → 초6 분수·소수
   mixed: { key: 'mixed', code: 'B', label: '혼합계산 줄기', range: '초5 → 초6', list: mixedGen.MIXED, gen: mixedGen, file: './coach/math/mixed.json', lesson: true, intro: '섞인 계산 문제 5개를 먼저 풀어 볼게요. 어려운 게 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },
-  // C 소수 — 어머님 숙제(만점왕 4-2)의 지금 단원 · 🎯 도전 문제 3단원과 겹친다 (2026-09-30 아버님 결정). 초4 덧뺄 → 초6 나눗셈
+  // C 소수 — 어머님 숙제(만점왕 4-2)의 지금 단원 · 🎯 도전 문제 3단원과 겹친다 (2026-09-30 아버님 결정). 초4 덧뺄 → 초6 나눗셈 · v270 ⭐ 4학년 활용(뺄셈 칸 뒤 · 5학년 칸을 막지 않음 · 진단에서 뺌)
   decimal: { key: 'decimal', code: 'C', label: '소수 줄기', range: '초4 → 초6', list: decimalGen.DECIMAL, gen: decimalGen, file: './coach/math/decimal.json', lesson: true, pick: '📏 진단 5문제 → 모르는 칸부터 한 장씩 배워요 (학교 소수 단원)', intro: '소수 문제 5개를 먼저 풀어 볼게요. 학교에서 배운 것도, 아직 안 배운 것도 있어요 — 어디부터 하면 될지 보려는 거예요.' },
   // F 비와 비율 — 비율 = 분수 = 소수 = 백분율이라 A·C를 다시 쓰며 굳힌다 · 문제 이야기는 진우의 게임(잡힐 확률 %, 🛒 할인) (2026-09-30 아버님 "진행 순서 제안대로"). 초6 9칸
   ratio: { key: 'ratio', code: 'F', label: '비와 비율 줄기', range: '초6', list: ratioGen.RATIO, gen: ratioGen, file: './coach/math/ratio.json', lesson: true, intro: '비와 비율 문제 5개를 먼저 풀어 볼게요. 처음 보는 말이 나와도 괜찮아요 — 어디부터 배우면 될지 보려는 거예요.' },

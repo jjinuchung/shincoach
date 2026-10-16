@@ -239,7 +239,36 @@ export const TAGS = {
   divisorOnly: '나누는 수만 옮김',
   dividendOnly: '나누어지는 수만 옮김',
   divSmaller: '나누면 항상 작아진다',
+  // 4학년 활용 (dec.apply) — 어떤 수에서 멈춤·잘못 구한 수에서 다시 셈·옮긴 칸 수는 위의 stopMid·fromWrong·moves를 그대로 쓴다
+  unitShift: '단위를 바꿀 때 소수점을 잘못 옮김',
+  noUnit: '단위를 맞추지 않음',
+  addInstead: '빼지 않고 더함',
+  tenAsIs: '어떤 수를 구하지 않고 셈',
+  bigWrong: '가장 큰 수를 잘못 만듦',
+  smallWrong: '가장 작은 수를 잘못 만듦',
 };
+
+// ── 4학년 활용 재료 (dec.apply — ①과 ②가 같은 글·풀이를 쓴다) ──
+const plusD = (x, y) => { const P = Math.max(x.p, y.p); return { u: at(x, P) + at(y, P), p: P }; };
+const minusD = (x, y) => { const P = Math.max(x.p, y.p); return { u: at(x, P) - at(y, P), p: P }; };
+/** 0.ab — 첫째 자리도 0이 아닌 소수 두 자리 (0.06처럼 보이면 "한 칸 잘못 본 수"가 0.6이라 덜 헷갈린다) */
+const tenthsD = (r) => { let a = randD(r, 0, 0, 2); for (let i = 0; i < 40 && a.u < 10; i++) a = randD(r, 0, 0, 2); return a.u < 10 ? { u: a.u + 10, p: 2 } : a; };
+const PLACE_RULE = '잘못 계산한 값에서 어떤 수를 먼저 되찾고, 바르게 다시 계산해요.';
+const UNIT_RULE = '단위가 다르면 같은 단위로 바꾼 다음 계산해요 — 1 g = 0.001 kg, 1 cm = 0.01 m.';
+const TEN_RULE = '10배·1/10이 나오면 소수점을 옮겨 어떤 수부터 구해요.';
+const CARD_RULE = '가장 큰 수는 큰 숫자부터, 가장 작은 수는 작은 숫자부터 놓아요.';
+/** 🔄 자릿값을 잘못 보고 더함 — 어떤 수 x에 a(0.ab)를 더해야 하는데 b(a.b)를 더해 W */
+function placeAdd(r) {
+  const a = tenthsD(r); const b = { u: a.u, p: 1 }; const x = randD(r, 1, 9, 2); const W = plusD(x, b);
+  return { a, b, x, W, ans: plusD(x, a), fromWrong: plusD(W, a) };
+}
+/** 단위 — 빈 바구니 G g(0.ab kg), 사과를 담은 바구니 K kg */
+function unitKg(r) {
+  let G = int(r, 11, 95) * 10; if (G % 100 === 0) G += 10;
+  return { G, gk: { u: G / 10, p: 2 }, K: randD(r, 1, 5, 1) };
+}
+const kgText = (G, K) => `빈 바구니의 무게는 ${G} g이에요. 사과를 담은 바구니의 무게가 ${T(K)} kg일 때, 사과의 무게는 몇 kg일까요?`;
+const placeAddText = (a, b, W) => `어떤 수에 ${jn(T(a), '을', '를')} 더해야 할 것을 잘못하여 ${jn(T(b), '을', '를')} 더했더니 ${jn(T(W), '이', '가')} 되었어요. 바르게 계산하면 얼마일까요?`;
 
 const PLACE = ['', '첫째', '둘째', '셋째'];
 
@@ -745,6 +774,179 @@ export const DECIMAL = [
   },
 
   {
+    // ⭐ 4학년 활용 (v270, 2026-10-16 아버님 "이대로 진행") — 문제집 활용 수준의 두세 걸음 문제를 소수의 덧셈·뺄셈으로 (V의 ⭐ 4학년 활용과 같은 자리 규칙)
+    // · 5학년 칸으로 가는 길은 막지 않는다 — dec.frac는 그대로 dec.sub만 필요 · 진단 5문제에서는 뺀다(DIAG)
+    // · 💎 스페셜 문제는 분수만 — 소수 활용 꼴은 여기서 처음 · 초4는 소수 셋째 자리까지(답·오답 모두)
+    // · 틀 글의 수 모양(자연수·소수 자리)은 늘 같게 — 🔁 쌍둥이가 같은 틀(tplKey)로 온다 · 오답 목록에 없는 수의 도움말(whyAny)은 틀마다
+    // · 검산 재료는 probe.apply — 테스트가 문제 글을 따로 읽어 다시 푼다
+    id: 'dec.apply', grade: 4, name: '⭐ 소수의 덧셈과 뺄셈 활용', needs: ['dec.sub'],
+    idea: '두세 걸음으로 푸는 문제예요. 수를 **잘못 보고** 계산했으면 먼저 어떤 수를 되찾고 다시 계산해요. 단위가 다르면 **같은 단위로 바꾼 다음** 계산해요 — 350 g = 0.35 kg, 48 cm = 0.48 m. 10배·1/10이 나오면 소수점을 옮겨 **어떤 수부터** 구해요. 수 카드로 가장 큰 수는 큰 숫자부터, 가장 작은 수는 작은 숫자부터 놓아요.',
+    slip: '이 문제에서 무엇을 먼저 구해야 하는지, 풀이를 한 줄씩 따라가 봐요.',
+    calc(r, c) {
+      const famV = (variants) => ({ variants, pools: { pokemon: variants.map((v) => v.t) } });
+      // 🔄 자릿값을 잘못 보고 계산 — 더하기(0.36 대신 3.6을 더함) · 빼기(0.48 대신 4.8을 뺌)
+      const pa = placeAdd(r);
+      const sa = tenthsD(r); const sb = { u: sa.u, p: 1 }; const sW = randD(r, 1, 9, 2); const sx = plusD(sW, sb);
+      const place = famV([
+        {
+          kind: 'placeAdd', t: placeAddText(pa.a, pa.b, pa.W), ans: T(pa.ans),
+          wr: [{ text: T(pa.x), tag: TAGS.stopMid }, { text: T(pa.fromWrong), tag: TAGS.fromWrong }],
+          steps: [`어떤 수 — 잘못 더한 ${jn(T(pa.b), '을', '를')} 빼서 되찾아요: ${T(pa.W)} − ${T(pa.b)} = ${T(pa.x)}`, `바르게 계산 — ${T(pa.x)} + ${T(pa.a)} = ${T(pa.ans)}`],
+          why: {
+            [TAGS.stopMid]: `${jn(T(pa.x), '은', '는')} "어떤 수"예요. 한 걸음 더 — 어떤 수에 ${jn(T(pa.a), '을', '를')} 더해요.`,
+            [TAGS.fromWrong]: `잘못 계산한 ${T(pa.W)}에 바로 더했어요. 먼저 ${jn(T(pa.b), '을', '를')} 빼서 어떤 수를 되찾아요.`,
+          },
+          whyAny: '잘못 더한 수를 빼서 어떤 수를 되찾은 다음, 바르게 더해요.', rule: PLACE_RULE,
+        },
+        {
+          kind: 'placeSub', t: `어떤 수에서 ${jn(T(sa), '을', '를')} 빼야 할 것을 잘못하여 ${jn(T(sb), '을', '를')} 뺐더니 ${jn(T(sW), '이', '가')} 되었어요. 바르게 계산하면 얼마일까요?`,
+          ans: T(minusD(sx, sa)),
+          wr: [{ text: T(sx), tag: TAGS.stopMid }, { text: T(minusD(sW, sa)), tag: TAGS.fromWrong }],
+          steps: [`어떤 수 — 잘못 뺀 ${jn(T(sb), '을', '를')} 더해서 되찾아요: ${T(sW)} + ${T(sb)} = ${T(sx)}`, `바르게 계산 — ${T(sx)} − ${T(sa)} = ${T(minusD(sx, sa))}`],
+          why: {
+            [TAGS.stopMid]: `${jn(T(sx), '은', '는')} "어떤 수"예요. 한 걸음 더 — 어떤 수에서 ${jn(T(sa), '을', '를')} 빼요.`,
+            [TAGS.fromWrong]: `잘못 계산한 ${T(sW)}에서 바로 뺐어요. 먼저 ${jn(T(sb), '을', '를')} 더해서 어떤 수를 되찾아요.`,
+          },
+          whyAny: '잘못 뺀 수를 더해서 어떤 수를 되찾은 다음, 바르게 빼요.', rule: PLACE_RULE,
+        },
+      ]);
+      // ⚖️ 단위가 다른 양 — kg·g 빼기 · m·cm 더하기
+      const uk = unitKg(r);
+      const L = randD(r, 1, 4, 2); let cm = int(r, 11, 99); if (cm % 10 === 0) cm += 1; const cmM = { u: cm, p: 2 };
+      const unit = famV([
+        {
+          kind: 'kg', t: kgText(uk.G, uk.K), ans: T(minusD(uk.K, uk.gk)),
+          wr: [{ text: T(minusD(uk.K, { u: uk.G / 10, p: 3 })), tag: TAGS.unitShift }, { text: T(plusD(uk.K, uk.gk)), tag: TAGS.addInstead },
+            ...(minusD(uk.K, { u: uk.G / 10, p: 1 }).u > 0 ? [{ text: T(minusD(uk.K, { u: uk.G / 10, p: 1 })), tag: TAGS.unitShift }] : [])],
+          steps: [`단위를 kg으로 맞춰요 — 1 g = 0.001 kg이니까 ${uk.G} g = ${T(uk.gk)} kg`, `사과의 무게 — ${T(uk.K)} − ${T(uk.gk)} = ${T(minusD(uk.K, uk.gk))} kg`],
+          why: {
+            [TAGS.unitShift]: `${uk.G} g을 kg으로 바꿀 때 소수점을 잘못 옮겼어요. 1000 g = 1 kg이라서 ${uk.G} g = ${T(uk.gk)} kg이에요.`,
+            [TAGS.addInstead]: '사과를 담은 바구니의 무게에서 빈 바구니의 무게를 빼야 사과의 무게예요.',
+          },
+          whyAny: '먼저 g을 kg으로 바꿔 단위를 맞춘 다음, 바구니의 무게를 빼요.', rule: UNIT_RULE,
+        },
+        {
+          kind: 'cm', t: `리본 ${T(L)} m에 ${cm} cm를 겹치지 않게 더 이어 붙였어요. 이어 붙인 리본은 모두 몇 m일까요?`, ans: T(plusD(L, cmM)),
+          wr: [{ text: T(plusD(L, { u: cm, p: 0 })), tag: TAGS.noUnit }, { text: T(plusD(L, { u: cm, p: 1 })), tag: TAGS.unitShift }, { text: T(plusD(L, { u: cm, p: 3 })), tag: TAGS.unitShift }],
+          steps: [`단위를 m로 맞춰요 — 1 cm = 0.01 m이니까 ${cm} cm = ${T(cmM)} m`, `모두 — ${T(L)} + ${T(cmM)} = ${T(plusD(L, cmM))} m`],
+          why: {
+            [TAGS.noUnit]: `${cm} cm를 m로 바꾸지 않고 그대로 더했어요. 100 cm = 1 m라서 ${cm} cm = ${T(cmM)} m예요.`,
+            [TAGS.unitShift]: `${cm} cm를 m로 바꿀 때 소수점을 잘못 옮겼어요. 100 cm = 1 m라서 ${cm} cm = ${T(cmM)} m예요.`,
+          },
+          whyAny: '먼저 cm를 m로 바꿔 단위를 맞춘 다음 더해요.', rule: UNIT_RULE,
+        },
+      ]);
+      // 🔟 10배·1/10 다음에 셈 — 어떤 수부터 · 수 뒤 "이에요/예요"는 tplKey가 안 지워 쌍둥이 틀이 갈리므로 "…일 때,"로 묻는다
+      const x = randD(r, 1, 9, 2); const ten = { u: x.u, p: 1 }; const c1 = randD(r, 0, 2, 2);
+      const s = tenthsD(r); const sx10 = { u: s.u, p: 1 };
+      let c2 = randD(r, 0, 0, 2); for (let i = 0; i < 40 && c2.u >= s.u; i++) c2 = randD(r, 0, 0, 2);
+      if (c2.u >= s.u) c2 = { u: 1, p: 2 };
+      const tenF = famV([
+        {
+          kind: 'ten', t: `어떤 수의 10배가 ${T(ten)}일 때, 어떤 수보다 ${T(c1)} 큰 수는 얼마일까요?`, ans: T(plusD(x, c1)),
+          wr: [{ text: T(plusD(ten, c1)), tag: TAGS.tenAsIs }, { text: T(plusD({ u: x.u, p: 3 }, c1)), tag: TAGS.moves }],
+          steps: [`어떤 수 — 10배가 ${jn(T(ten), '이니까', '니까')} 소수점을 왼쪽으로 한 칸: ${T(x)}`, `${T(x)} + ${T(c1)} = ${T(plusD(x, c1))}`],
+          why: {
+            [TAGS.tenAsIs]: `${jn(T(ten), '은', '는')} 어떤 수의 10배예요. 먼저 소수점을 왼쪽으로 한 칸 옮겨 어떤 수를 구해요.`,
+            [TAGS.moves]: '소수점을 두 칸 옮겼어요. 10배를 되돌리려면 왼쪽으로 한 칸이에요.',
+          },
+          whyAny: '10배를 되돌려 어떤 수부터 구한 다음 더해요.', rule: TEN_RULE,
+        },
+        {
+          kind: 'tenth', t: `어떤 수의 1/10이 ${T(s)}일 때, 어떤 수에서 ${jn(T(c2), '을', '를')} 뺀 수는 얼마일까요?`, ans: T(minusD(sx10, c2)),
+          wr: [{ text: T(minusD(s, c2)), tag: TAGS.tenAsIs }, { text: T(minusD({ u: s.u, p: 0 }, c2)), tag: TAGS.moves }],
+          steps: [`어떤 수 — 1/10이 ${jn(T(s), '이니까', '니까')} 소수점을 오른쪽으로 한 칸: ${T(sx10)}`, `${T(sx10)} − ${T(c2)} = ${T(minusD(sx10, c2))}`],
+          why: {
+            [TAGS.tenAsIs]: `${jn(T(s), '은', '는')} 어떤 수의 1/10이에요. 먼저 소수점을 오른쪽으로 한 칸 옮겨 어떤 수를 구해요.`,
+            [TAGS.moves]: '소수점을 두 칸 옮겼어요. 1/10을 되돌리려면 오른쪽으로 한 칸이에요.',
+          },
+          whyAny: '1/10을 되돌려 어떤 수부터 구한 다음 빼요.', rule: TEN_RULE,
+        },
+      ]);
+      // 🃏 수 카드 세 장(1~9, 서로 다름)으로 소수 두 자리 수 — 가장 큰 수와 가장 작은 수의 합·차
+      // 세 숫자의 간격이 같으면(3·5·7) 차 문제의 두 오답이 같은 값이 되어 뺀다
+      let ds = [];
+      for (let i = 0; i < 60; i++) {
+        const set = new Set(); while (set.size < 3) set.add(int(r, 1, 9));
+        ds = [...set]; const [h, m, l] = [...ds].sort((p1, p2) => p2 - p1);
+        if (h - m !== m - l) break;
+      }
+      const [h, m, l] = [...ds].sort((p1, p2) => p2 - p1);
+      const big = { u: h * 100 + m * 10 + l, p: 2 }; const small = { u: l * 100 + m * 10 + h, p: 2 };
+      const big2 = { u: h * 100 + l * 10 + m, p: 2 }; const small2 = { u: l * 100 + h * 10 + m, p: 2 };
+      const cardsT = (what) => `수 카드 ${ds[0]}, ${ds[1]}, ${jn(ds[2], '을', '를')} 한 번씩 모두 써서 소수 두 자리 수를 만들어요. 만들 수 있는 가장 큰 수와 가장 작은 수의 ${what}`;
+      const cardWhy = {
+        [TAGS.bigWrong]: `가장 큰 수는 큰 숫자부터 차례로 놓아요 — ${ieyo(T(big))}.`,
+        [TAGS.smallWrong]: `가장 작은 수는 작은 숫자부터 차례로 놓아요 — ${ieyo(T(small))}.`,
+      };
+      const cardStep = `가장 큰 수 ${T(big)} · 가장 작은 수 ${T(small)} — 큰 숫자부터, 작은 숫자부터 차례로`;
+      const cards = famV([
+        {
+          kind: 'cardSum', t: cardsT('합은 얼마일까요?'), ans: T(plusD(big, small)),
+          wr: [{ text: T(plusD(big2, small)), tag: TAGS.bigWrong }, { text: T(plusD(big, small2)), tag: TAGS.smallWrong }],
+          steps: [cardStep, `${T(big)} + ${T(small)} = ${T(plusD(big, small))}`], why: cardWhy,
+          whyAny: '가장 큰 수와 가장 작은 수를 먼저 만든 다음 더해요.', rule: CARD_RULE,
+        },
+        {
+          kind: 'cardDiff', t: cardsT('차는 얼마일까요?'), ans: T(minusD(big, small)),
+          wr: [{ text: T(minusD(big2, small)), tag: TAGS.bigWrong }, { text: T(minusD(big, small2)), tag: TAGS.smallWrong }],
+          steps: [cardStep, `${T(big)} − ${T(small)} = ${T(minusD(big, small))}`], why: cardWhy,
+          whyAny: '가장 큰 수와 가장 작은 수를 먼저 만든 다음 빼요.', rule: CARD_RULE,
+        },
+      ]);
+      const f = pickFamily(r, c, [place, unit, tenF, cards]);
+      const t = worldPick(r, c, f.pools);
+      const v = f.variants.find((y) => y.t === t) || f.variants[0];
+      return {
+        ...ask(this.id, 'calc', fill(v.t, c), numChoices(r, v.ans, v.wr), {
+          solve: solve(v.steps.map((st, i) => step(i, st)), { why: v.why, whyAny: v.whyAny, rule: v.rule }),
+        }),
+        probe: { apply: v.kind, allWrong: v.wr },
+      };
+    },
+    misread(r, c) {
+      if (branchOf(r, c, ['place', 'unit']) === 'place') {
+        // 어떤 수에서 멈춘 풀이
+        const pa = placeAdd(r);
+        const shown = T(pa.x);
+        const q = `${placeAddText(pa.a, pa.b, pa.W)}\n\n${showWork(`바르게 계산한 값은 ${T(pa.W)} − ${T(pa.b)} = ${shown}`, '답했어요')}`;
+        const chs = textChoices(r, `${jn(shown, '은', '는')} 어떤 수예요 — 바르게 더하면 ${T(pa.x)} + ${T(pa.a)} = ${T(pa.ans)}`, [
+          { text: '맞게 답했어요', tag: RIGHT_AS_WRONG },
+          { text: `잘못 계산한 값에 더해서 ${T(pa.W)} + ${T(pa.a)} = ${T(pa.fromWrong)}`, tag: TAGS.fromWrong },
+          { text: '잘못 더한 수와 그 결과를 알아도 어떤 수는 구할 수 없어요', tag: OFF },
+        ]);
+        return {
+          ...misreadAsk(this.id, 'place', fill(q, c), chs, {
+            solve: solve([step(0, `어떤 수 — ${T(pa.W)} − ${T(pa.b)} = ${T(pa.x)}`), step(1, `바르게 계산 — ${T(pa.x)} + ${T(pa.a)} = ${T(pa.ans)}`)], {
+              whyAny: `${jn(shown, '은', '는')} 어떤 수예요. 문제는 어떤 수에 ${jn(T(pa.a), '을', '를')} 바르게 더한 값을 물었어요.`,
+              rule: PLACE_RULE,
+            }),
+          }),
+          probe: { calc: `${T(pa.W)} − ${T(pa.b)} + ${T(pa.a)}`, shown, apply: 'placeAdd' },
+        };
+      }
+      // 350 g을 0.035 kg으로 바꾼 풀이
+      const uk = unitKg(r);
+      const g3 = { u: uk.G / 10, p: 3 }; const shown = T(minusD(uk.K, g3)); const right = T(minusD(uk.K, uk.gk));
+      const q = `${kgText(uk.G, uk.K)}\n\n${showWork(`${uk.G} g = ${T(g3)} kg — ${T(uk.K)} − ${T(g3)} = ${shown}`)}`;
+      const chs = textChoices(r, `${uk.G} g = ${T(uk.gk)} kg이에요 — ${T(uk.K)} − ${T(uk.gk)} = ${right}`, [
+        { text: '맞게 계산했어요', tag: RIGHT_AS_WRONG },
+        { text: `바구니의 무게를 더해서 ${T(uk.K)} + ${T(uk.gk)} = ${T(plusD(uk.K, uk.gk))}`, tag: TAGS.addInstead },
+        { text: `1 kg은 100 g이라서 ${uk.G} g은 ${T({ u: uk.G / 10, p: 1 })} kg이에요`, tag: OFF },
+      ]);
+      return {
+        ...misreadAsk(this.id, 'unit', fill(q, c), chs, {
+          solve: solve([step(0, `1 g = 0.001 kg이니까 ${uk.G} g = ${T(uk.gk)} kg`), step(1, `${T(uk.K)} − ${T(uk.gk)} = ${right}`)], {
+            whyAny: `${uk.G} g을 kg으로 바꿀 때 소수점을 한 칸 더 옮겼어요. 1000 g = 1 kg이라서 ${uk.G} g = ${T(uk.gk)} kg이에요.`,
+            rule: UNIT_RULE,
+          }),
+        }),
+        probe: { calc: `${T(uk.K)} − ${T(uk.gk)}`, shown, apply: 'kg' },
+      };
+    },
+  },
+
+  {
     id: 'dec.frac', grade: 5, name: '분수와 소수 — 바꾸기·크기 비교', needs: ['dec.sub'],
     idea: '분모를 **10·100·1000**으로 만들면 소수로 바꿀 수 있어요 (3/4 = 75/100 = 0.75). 반대로 0.6 = 6/10 = 3/5.',
     slip: '분모를 10·100·1000으로 만드는 곱셈을 다시 확인해 봐요. 분자에도 같은 수를 곱해요.',
@@ -1222,9 +1424,10 @@ export function lessonOf(conceptId, seed, opts) {
   return { title: c.name, pages, rule: v.rule || c.idea };
 }
 
-/** 📏 진단 5문제 — 사다리에서 고르게 */
+/** 📏 진단 5문제 — 사다리에서 고르게 · ⭐ 4학년 활용(dec.apply)은 뺀다 — 진단은 그 전과 같은 다섯 칸 (v270) */
+const DIAG = DECIMAL.filter((c) => c.id !== 'dec.apply');
 export function diagnosticSet(seed, n = 5, opts) {
-  return diagnosticOf(DECIMAL, makeQuestion, seed, n, opts);
+  return diagnosticOf(DIAG, makeQuestion, seed, n, opts);
 }
 export function placeFrom(answers) {
   return placeFromOf(DECIMAL, answers);

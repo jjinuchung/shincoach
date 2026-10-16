@@ -104,6 +104,64 @@ function koRead(t) {
   return f ? `${head} 점 ${[...f].map((c) => NM[Number(c)]).join('')}` : head;
 }
 
+// ── ⭐ 4학년 활용(dec.apply, v270) 문제 글 읽기 — 생성기의 식(probe)을 쓰지 않고 글의 수로 다시 푼다 ──
+const NUM = '(\\d+(?:\\.\\d+)?)';
+const RQ = (t) => evalExpr(t);
+/** 세 숫자 카드로 만들 수 있는 소수 두 자리 수 전부 (자리 바꿈을 모두 늘어놓아 가장 큰·작은 수를 따로 찾는다) */
+function cardNumbers(ds) {
+  const out = [];
+  for (const i of [0, 1, 2]) for (const j of [0, 1, 2]) for (const k of [0, 1, 2]) if (new Set([i, j, k]).size === 3) out.push(RQ(`${ds[i]}.${ds[j]}${ds[k]}`));
+  return out;
+}
+/** 문제 글 → { kind, ans(분수 값), n(글의 수들) } · 못 읽으면 null */
+function solveApply(q) {
+  let m;
+  if ((m = new RegExp(`^어떤 수에 ${NUM}[을를] 더해야 할 것을 잘못하여 ${NUM}[을를] 더했더니 ${NUM}[이가] 되었어요\\. 바르게 계산하면 얼마일까요\\?`).exec(q))) {
+    const [a, b, W] = [m[1], m[2], m[3]].map(RQ); const x = sub(W, b); return { kind: 'placeAdd', ans: add(x, a), n: { a, b, W, x } };
+  }
+  if ((m = new RegExp(`^어떤 수에서 ${NUM}[을를] 빼야 할 것을 잘못하여 ${NUM}[을를] 뺐더니 ${NUM}[이가] 되었어요\\. 바르게 계산하면 얼마일까요\\?`).exec(q))) {
+    const [a, b, W] = [m[1], m[2], m[3]].map(RQ); const x = add(W, b); return { kind: 'placeSub', ans: sub(x, a), n: { a, b, W, x } };
+  }
+  if ((m = new RegExp(`^빈 바구니의 무게는 (\\d+) g이에요\\. 사과를 담은 바구니의 무게가 ${NUM} kg일 때, 사과의 무게는 몇 kg일까요\\?`).exec(q))) {
+    const G = RQ(m[1]); const K = RQ(m[2]); return { kind: 'kg', ans: sub(K, div(G, Q(1000))), n: { G, K } };
+  }
+  if ((m = new RegExp(`^리본 ${NUM} m에 (\\d+) cm를 겹치지 않게 더 이어 붙였어요\\. 이어 붙인 리본은 모두 몇 m일까요\\?`).exec(q))) {
+    const L = RQ(m[1]); const cm = RQ(m[2]); return { kind: 'cm', ans: add(L, div(cm, Q(100))), n: { L, cm } };
+  }
+  if ((m = new RegExp(`^어떤 수의 10배가 ${NUM}일 때, 어떤 수보다 ${NUM} 큰 수는 얼마일까요\\?`).exec(q))) {
+    const T10 = RQ(m[1]); const cc = RQ(m[2]); return { kind: 'ten', ans: add(div(T10, Q(10)), cc), n: { T10, cc } };
+  }
+  if ((m = new RegExp(`^어떤 수의 1/10이 ${NUM}일 때, 어떤 수에서 ${NUM}[을를] 뺀 수는 얼마일까요\\?`).exec(q))) {
+    const s = RQ(m[1]); const cc = RQ(m[2]); return { kind: 'tenth', ans: sub(mul(s, Q(10)), cc), n: { s, cc } };
+  }
+  if ((m = /^수 카드 (\d), (\d), (\d)[을를] 한 번씩 모두 써서 소수 두 자리 수를 만들어요\. 만들 수 있는 가장 큰 수와 가장 작은 수의 (합|차)[은는] 얼마일까요\?/.exec(q))) {
+    const all = cardNumbers([m[1], m[2], m[3]]);
+    const big = all.reduce((x, y) => (num(y) > num(x) ? y : x)); const small = all.reduce((x, y) => (num(y) < num(x) ? y : x));
+    const op = m[4] === '합' ? add : sub;
+    return { kind: m[4] === '합' ? 'cardSum' : 'cardDiff', ans: op(big, small), n: { all, big, small, op } };
+  }
+  return null;
+}
+/** 활용 오답 이름표의 뜻 — 그 틀린 생각을 글의 수로 다시 한다 */
+function applyTagHolds(sv, tag, text) {
+  const v = valueOf(text); const is = (w) => v !== null && eq(v, num(w)); const { n } = sv;
+  switch (sv.kind) {
+    case 'placeAdd': return (tag === TAGS.stopMid && is(n.x)) || (tag === TAGS.fromWrong && is(add(n.W, n.a)));
+    case 'placeSub': return (tag === TAGS.stopMid && is(n.x)) || (tag === TAGS.fromWrong && is(sub(n.W, n.a)));
+    case 'kg': return (tag === TAGS.unitShift && (is(sub(n.K, div(n.G, Q(10000)))) || is(sub(n.K, div(n.G, Q(100)))))) || (tag === TAGS.addInstead && is(add(n.K, div(n.G, Q(1000)))));
+    case 'cm': return (tag === TAGS.noUnit && is(add(n.L, n.cm))) || (tag === TAGS.unitShift && (is(add(n.L, div(n.cm, Q(10)))) || is(add(n.L, div(n.cm, Q(1000))))));
+    case 'ten': return (tag === TAGS.tenAsIs && is(add(n.T10, n.cc))) || (tag === TAGS.moves && is(add(div(n.T10, Q(100)), n.cc)));
+    case 'tenth': return (tag === TAGS.tenAsIs && is(sub(n.s, n.cc))) || (tag === TAGS.moves && is(sub(mul(n.s, Q(100)), n.cc)));
+    case 'cardSum': case 'cardDiff': {
+      const others = (best) => n.all.filter((y) => !eq(num(y), num(best)));
+      if (tag === TAGS.bigWrong) return others(n.big).some((y) => is(n.op(y, n.small)));
+      if (tag === TAGS.smallWrong) return others(n.small).some((y) => is(n.op(n.big, y)));
+      return false;
+    }
+    default: return false;
+  }
+}
+
 test('독립 계산기·흉내 자체 점검 (이게 틀리면 검산이 의미 없다)', () => {
   assert.equal(val('0.1 + 0.2'), 0.3);
   assert.equal(val('3.46 + 0.8'), 4.26);
@@ -136,17 +194,19 @@ test('소수 글자: 끝의 0을 지우고, 부동소수 찌꺼기가 없다', (
   assert.equal(D('abc'), null);
 });
 
-test('사다리: 10칸, id·이름·학년·needs가 이어진다', () => {
-  assert.equal(DECIMAL.length, 10);
+test('사다리: 11칸, id·이름·학년·needs가 이어진다 (5학년 첫 칸은 뺄셈 칸 — ⭐ 4학년 활용이 길을 막지 않는다, v270)', () => {
+  assert.equal(DECIMAL.length, 11);
   const ids = DECIMAL.map((c) => c.id);
-  assert.equal(new Set(ids).size, 10);
+  assert.equal(new Set(ids).size, 11);
   for (const [k, c] of DECIMAL.entries()) {
     assert.ok(/^dec\./.test(c.id), c.id);
     assert.ok(c.name && c.idea, c.id);
     assert.ok([4, 5, 6].includes(c.grade), `${c.id} 학년`);
-    assert.deepEqual(c.needs, k ? [ids[k - 1]] : [], `${c.id}: 바로 앞 칸이 선행`);
+    assert.deepEqual(c.needs, k ? [c.id === 'dec.frac' ? 'dec.sub' : ids[k - 1]] : [], `${c.id}: 바로 앞 칸이 선행`);
   }
-  assert.deepEqual(DECIMAL.map((c) => c.grade), [4, 4, 4, 4, 4, 5, 5, 5, 6, 6]);
+  assert.deepEqual(DECIMAL.map((c) => c.grade), [4, 4, 4, 4, 4, 4, 5, 5, 5, 6, 6]);
+  assert.equal(ids[5], 'dec.apply');
+  assert.match(DECIMAL[5].name, /^⭐ /);
   assert.equal(gradeLabel(4), '초4');
 });
 
@@ -173,6 +233,12 @@ function checkOk(c, s, q) {
     const v = val(p.cmpBase.calc); const b = val(p.cmpBase.base);
     const want = v < b ? '처음 수보다 작아져요' : v > b ? '처음 수보다 커져요' : '처음 수와 같아요';
     assert.equal(ok.text, want, `${where} — ${p.cmpBase.calc} = ${v}`);
+  } else if (p.apply) {
+    // ⭐ 4학년 활용 — probe의 식이 아니라 **문제 글**을 따로 읽어 푼다 (solveApply)
+    const sv = solveApply(q.q);
+    assert.ok(sv, `${where} — 못 읽는 활용 문제`);
+    assert.equal(sv.kind, p.apply, `${where} — 틀`);
+    assert.ok(eq(valueOf(ok.text), num(sv.ans)), `${where} — 따로 푼 답 ${num(sv.ans)} 인데 정답 보기는 ${ok.text}`);
   } else {
     assert.fail(`${where} — 검산 재료(probe)가 없다`);
   }
@@ -383,7 +449,10 @@ test('📏 진단: 5문제, 사다리에서 고르게 · 시작점', () => {
   for (const q of d) assert.equal(q.kind, 'calc');
   const pl = placeFrom([{ concept: 'dec.place', correct: true }, { concept: 'dec.relation', correct: true }, { concept: 'dec.frac', correct: false }]);
   assert.equal(pl.startId, 'dec.frac');
-  assert.deepEqual(pl.knownIds, ['dec.place', 'dec.compare', 'dec.relation', 'dec.add', 'dec.sub']);
+  // ⭐ 4학년 활용은 진단에 없지만 5학년 칸 앞이라, 5학년 칸에서 틀리면 앞 칸처럼 "안다"로 친다 (V와 같은 방식 — Codex 78차 #2)
+  assert.deepEqual(pl.knownIds, ['dec.place', 'dec.compare', 'dec.relation', 'dec.add', 'dec.sub', 'dec.apply']);
+  const pl2 = placeFrom([{ concept: 'dec.place', correct: true }, { concept: 'dec.relation', correct: false }]);
+  assert.ok(!pl2.knownIds.includes('dec.apply'), '4학년 칸에서 틀리면 ⭐는 아직');
   const lad = ladder(['dec.place', 'dec.compare']);
   assert.deepEqual(lad.slice(0, 4).map((x) => x.state), ['done', 'done', 'now', 'locked']);
 });
@@ -471,7 +540,7 @@ test('★ ② 갈래 요청: 🔁 쌍둥이·🤔 오답 노트가 요청한 갈
 
 test('★ 초4 칸은 소수 셋째 자리까지 — 문제 글·보기 어디에도 넷째 자리가 없다 (Codex 12차 #6: 0.1618)', () => {
   const G4 = DECIMAL.filter((c) => c.grade === 4);
-  assert.equal(G4.length, 5);
+  assert.equal(G4.length, 6);
   for (const c of G4) {
     for (const kind of ['calc', 'misread']) {
       for (let s = 1; s <= SEEDS; s++) {
@@ -499,8 +568,8 @@ test('📦 오프라인: 모든 줄기의 원고 파일이 sw.js APP_SHELL에 �
   for (const s of Object.values(STEMS)) assert.ok(sw.includes(`'${s.file}'`), `${s.key}: ${s.file}가 APP_SHELL에 없다`);
 });
 
-test('내용 검사(checkContent): 빈 파일은 10칸 모두 "내용 없음", 제대로 쓴 것은 통과, 값이 같은 보기는 잡는다', () => {
-  assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 10);
+test('내용 검사(checkContent): 빈 파일은 11칸 모두 "내용 없음", 제대로 쓴 것은 통과, 값이 같은 보기는 잡는다', () => {
+  assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 11);
   const good = {};
   for (const c of DECIMAL) {
     good[c.id] = {
@@ -533,4 +602,99 @@ test('❓16·17 (2026-10-03·04 진우 "보기 추가") — 후보가 보기에�
     }
   }
   assert.ok(n > 100 && story > 30, `후보가 보기에만 있는 문항 ${n} · 이야기 ${story}`);
+});
+
+// ───────────────────── ⭐ 4학년 활용 (dec.apply, v270) ─────────────────────
+
+const DONE4 = ['dec.place', 'dec.compare', 'dec.relation', 'dec.add', 'dec.sub'];
+test('⭐ 4학년 활용 자리: 뺄셈 칸 바로 뒤 · 초4 · 뺄셈 칸을 끝내면 ⭐가 "지금"이고 5학년 첫 칸도 열린다 · 진단 5문제에는 없다', () => {
+  const ids = DECIMAL.map((c) => c.id);
+  assert.equal(ids.indexOf('dec.apply'), ids.indexOf('dec.sub') + 1);
+  assert.deepEqual(conceptById('dec.apply').needs, ['dec.sub']);
+  assert.deepEqual(conceptById('dec.frac').needs, ['dec.sub'], '5학년 첫 칸은 ⭐ 없이도 열린다');
+  const L = Object.fromEntries(ladder(DONE4).map((x) => [x.id, x.state]));
+  assert.equal(L['dec.apply'], 'now');
+  assert.equal(L['dec.frac'], 'open');
+  assert.equal(Object.fromEntries(ladder(DONE4.slice(0, 4)).map((x) => [x.id, x.state]))['dec.apply'], 'locked');
+  for (let s = 1; s <= 60; s++) assert.ok(!diagnosticSet(s, 5, OPTS).some((q) => q.concept === 'dec.apply'), `진단 #${s}`);
+});
+
+const APPLY_KINDS = ['placeAdd', 'placeSub', 'kg', 'cm', 'ten', 'tenth', 'cardSum', 'cardDiff'];
+const APPLY_WANT = { placeAdd: /잘못 더한 수/, placeSub: /잘못 뺀 수/, kg: /g을 kg으로/, cm: /cm를 m로/, ten: /10배를 되돌려/, tenth: /1\/10을 되돌려/, cardSum: /만든 다음 더해요/, cardDiff: /만든 다음 빼요/ };
+test('⭐ 4학년 활용 ①: 네 가족 여덟 틀이 다 나온다 · 오답 이름표는 그 틀린 셈(글의 수로 다시) · 오답끼리·정답과 다른 값, 0보다 큼 · 풀이 셈식이 맞다 · 도움말(whyAny)은 틀마다 · 💎 꼴 아님', () => {
+  const seen = {}; const slip = conceptById('dec.apply').slip;
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = makeQuestion('dec.apply', 'calc', s * 389, OPTS);
+    const sv = solveApply(q.q);
+    assert.ok(sv, `#${s}: 못 읽는 문제 ${q.q}`);
+    seen[sv.kind] = (seen[sv.kind] || 0) + 1;
+    const where = `#${s} ${sv.kind}: ${q.q}`;
+    // 보기에 뜬 오답(계산 실수 빼고)과 화면에서 빠진 후보 모두 그 이름표의 뜻
+    for (const ch of q.choices.filter((x) => !x.ok && x.tag !== '계산 실수')) assert.ok(applyTagHolds(sv, ch.tag, ch.text), `${where}\n"${ch.text}" ≠ ${ch.tag}`);
+    const W = q.probe.allWrong;
+    assert.ok(W.length >= 2, `${where}: 오답 후보 ${W.length}`);
+    const vals = W.map((w) => valueOf(w.text));
+    for (const [k, w] of W.entries()) {
+      assert.ok(applyTagHolds(sv, w.tag, w.text), `${where}\n후보 "${w.text}" ≠ ${w.tag}`);
+      assert.ok(vals[k] > 0 && !eq(vals[k], num(sv.ans)), `${where}: 후보 ${w.text}`);
+      assert.ok(fracLen(w.text) <= 3, `${where}: 넷째 자리 ${w.text}`);
+      for (let j = k + 1; j < W.length; j++) assert.ok(!eq(vals[k], vals[j]), `${where}: 후보끼리 같은 값 ${w.text}`);
+    }
+    // 풀이의 "A ± B = C"는 모두 맞다
+    for (const st of q.solve.steps) for (const m of st.matchAll(/(\d+(?:\.\d+)?) ([+−]) (\d+(?:\.\d+)?) = (\d+(?:\.\d+)?)/g)) assert.ok(eq(val(`${m[1]} ${m[2]} ${m[3]}`), val(m[4])), `${where}: 풀이 ${m[0]}`);
+    assert.notEqual(q.solve.whyAny, slip, where);
+    assert.match(q.solve.whyAny, APPLY_WANT[sv.kind], where);
+    assert.ok(!/모두 더하면|씩 겹치게/.test(q.q), `${where}: 💎 스페셜 꼴`);
+    if (sv.kind === 'cardSum' || sv.kind === 'cardDiff') assert.ok(!/0/.test(/수 카드 ([\d, ]+)/.exec(q.q)[1]), `${where}: 0 카드`);
+  }
+  for (const k of APPLY_KINDS) assert.ok((seen[k] || 0) >= SEEDS / 20, `${k}: ${seen[k] || 0}`);
+});
+
+test('⭐ 4학년 활용 ②: 자릿값(어떤 수에서 멈춤)·단위(g을 0.0□□ kg으로) — 바른 값은 문제 글에서 · 보여 준 값은 틀림 · 고치는 말의 끝 수가 바른 값 · 이름표 보기도 그 틀린 셈 · 엉뚱한 지적은 틀린 말', () => {
+  const keys = {};
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = makeQuestion('dec.apply', 'misread', s * 263, OPTS);
+    keys[q.key] = (keys[q.key] || 0) + 1;
+    const sv = solveApply(q.q.split('\n\n')[0]);
+    const where = `#${s} ${q.key}: ${q.q}`;
+    assert.ok(sv, where);
+    const right = num(sv.ans);
+    const shownLine = /\*\*(.+?)\*\*/.exec(q.q)[1];
+    const shownV = valueOf(shownLine.split(' = ').pop());
+    assert.ok(!eq(shownV, right), `${where}: 보여 준 값이 맞는 값`);
+    const lastOf = (t) => valueOf([...String(t).matchAll(/\d+(?:\.\d+)?/g)].pop()[0]);
+    assert.ok(eq(lastOf(q.choices.find((x) => x.ok).text), right), `${where}: 고치는 말`);
+    for (const ch of q.choices.filter((x) => !x.ok && x.tag !== '틀린 줄 모름' && x.tag !== '엉뚱한 지적')) assert.ok(applyTagHolds(sv, ch.tag, String(lastOf(ch.text))), `${where}: "${ch.text}"`);
+    const off = q.choices.find((x) => x.tag === '엉뚱한 지적');
+    if (q.key === 'misread:place') {
+      assert.ok(eq(shownV, num(sv.n.x)), `${where}: 어떤 수에서 멈춘 풀이`);
+      assert.equal(off.text, '잘못 더한 수와 그 결과를 알아도 어떤 수는 구할 수 없어요');
+    } else {
+      assert.ok(eq(shownV, num(sub(sv.n.K, div(sv.n.G, Q(10000))))), `${where}: g을 0.0□□ kg으로 바꾼 풀이`);
+      assert.match(off.text, /^1 kg은 100 g이라서/, '1 kg = 1000 g — 틀린 말');
+    }
+  }
+  assert.ok(keys['misread:place'] > SEEDS / 3 && keys['misread:unit'] > SEEDS / 3, JSON.stringify(keys));
+});
+
+test('⭐ 4학년 활용 원고: 확인 질문을 글로 따로 풀어 정답이 하나 · 오답은 이름표 있는 틀린 셈 · 까닭에 정답·오답이 다 나온다', () => {
+  const v = CONTENT['dec.apply'];
+  assert.ok(v && v.lesson.length >= 4 && v.lesson.every((p) => p.check), '배움 4장·장마다 확인');
+  const kinds = new Set(); let eqs = 0;
+  for (const [i, p] of v.lesson.entries()) {
+    const sv = solveApply(p.check.q);
+    assert.ok(sv, `[${i}] 못 읽는 확인 질문 ${p.check.q}`);
+    kinds.add(sv.kind);
+    assert.ok(eq(valueOf(p.check.ok), num(sv.ans)), `[${i}] 정답 ${p.check.ok} ≠ ${num(sv.ans)}`);
+    for (const n of p.check.no) {
+      assert.ok(!eq(valueOf(n), num(sv.ans)), `[${i}] 오답 ${n}이 사실 정답`);
+      assert.ok(Object.values(TAGS).some((tg) => applyTagHolds(sv, tg, n)), `[${i}] 오답 ${n} — 어느 틀린 셈에서도 안 나온다`);
+      assert.ok(p.check.why.includes(n), `[${i}] 까닭에 오답 ${n}`);
+    }
+    assert.ok(p.check.why.includes(p.check.ok), `[${i}] 까닭에 정답`);
+    // 굵게(**)를 지우고 본다 — "2.22 + 0.36 = **2.58**"의 굵은 답도 검사에 들어오게 (🔍 Codex 79차 #1)
+    for (const m of `${p.say}\n${p.check.why}`.replace(/\*\*/g, '').matchAll(/(\d+(?:\.\d+)?) ([+−]) (\d+(?:\.\d+)?) = (\d+(?:\.\d+)?)/g)) { assert.ok(eq(val(`${m[1]} ${m[2]} ${m[3]}`), val(m[4])), `[${i}] 셈식 ${m[0]}`); eqs++; }
+  }
+  assert.ok(kinds.size >= 4, `확인 질문 틀 ${[...kinds]}`);
+  assert.ok(eqs >= 9, `원고에서 본 셈식 ${eqs} (굵은 답 포함 — 굵게를 안 지우면 6)`);
 });
