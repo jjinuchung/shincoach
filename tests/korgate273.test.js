@@ -240,6 +240,6 @@ test('🧤 도감 스톤 칩도 레벨업·상점 뒤에 다시 그린다 (2026-
   assert.ok(body('export async function openPokedex(opts) {').includes('card.appendChild(gauntletEl(p));'), '열 때도 같은 함수');
   assert.equal((src.match(/'pokedex-gauntlet'/g) || []).length, 1, '칩 줄을 만드는 곳은 한 곳');
   const shop = read('js/shop.js');
-  const lv = shop.slice(shop.indexOf('async function doLevelUp() {'), shop.indexOf('\n}\n', shop.indexOf('async function doLevelUp() {')));
+  const lv = shop.slice(shop.indexOf('async function doLevelUp('), shop.indexOf('\n}\n', shop.indexOf('async function doLevelUp('))); // 🍬 v275부터 doLevelUp(useCandy)
   assert.ok(lv.includes('if (r && r.ok) notify(id);'), '레벨업은 notify로 도감을 고친다');
 });

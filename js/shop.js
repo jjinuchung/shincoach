@@ -2,7 +2,7 @@
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, CATCH_SHOP, STONE_SHOP, STONES, SHINY_STONE, EXTENDERS, itemById, canBuy, priceText, setFigure, ENGLISH_STONE_HOW } from './items.js';
-import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone, shinyLeft, undoShiny, fusedCount, fledCount } from './xp.js';
+import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, candyLevelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone, shinyLeft, undoShiny, fusedCount, fledCount } from './xp.js';
 import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림
@@ -505,11 +505,21 @@ function renderGrow() {
     const btn = option('⬆️', `Lv${g.next.toLv}로`, `${em}${g.next.stones} · 💰${g.next.coins}`, false, 'mon-grow-btn', () => doLevelUp());
     btn.disabled = !g.canLevel || busy;
     box.appendChild(btn);
+    // 🍬 그 종의 사탕이 있으면 사탕으로도 — 스톤·코인 없이, 그 칸의 스톤 개수만큼 (5일장에서 팔 때 받는다, 2026-10-17)
+    if (g.candy.have > 0 && g.candy.next) {
+      const cb = option('🍬', `Lv${g.candy.next.toLv}로`, `🍬${g.candy.next.candies} · ${mon.ko}의 사탕 ${g.candy.have}개 있어요`, false, 'mon-grow-btn mon-candy-btn', () => doLevelUp(true));
+      cb.disabled = !g.candy.ok || busy;
+      box.appendChild(cb);
+    }
   }
+  // 🍬 끝 레벨까지 다 컸는데 그 종의 사탕이 남았으면 알려만 준다 — 스톤·💤로 끝까지 키우면 사탕 단추가 사라지는데
+  //    가방 줄엔 🍬×N이 그대로라 어디 갔는지 헷갈린다 (Codex 84차 · 바꿔 주거나 없애지는 않는다)
+  if (!g.next && g.candy.have > 0) box.appendChild(el('p', 'mon-empty', `🍬 ${mon.ko}의 사탕 ${g.candy.have}개는 이제 쓸 데가 없어요 (${mon.ko}${josaIga(mon.ko)} Lv${g.lv}까지 다 컸어요)`));
   const msg = $('mon-grow-msg');
   if (g.why === 'none') msg.textContent = fusedCount(mon.id) > 0 ? '지금 데리고 있는 포켓몬이 없어요 (🔀 퓨전에 들어가 있어요 — 🏪 5일장에서 나누면 돌아와요)' : takenCount(mon.id) > 0 ? '지금 데리고 있는 포켓몬이 없어요 (🔒 아빠가 데려갔어요 — 다시 잡으면 돌아와요)' : fledCount(mon.id) > 0 ? '지금 데리고 있는 포켓몬이 없어요 (💨 배틀에서 져서 떠났어요 — 다시 잡으면 돌아와요)' : '지금 데리고 있는 포켓몬이 없어요 (진화로 보냈어요)';
   else if (g.why === 'evolve') msg.textContent = `🧬 Lv${g.cap}까지 키웠어요 — 진화해야 더 클 수 있어요!`;
   else if (!g.next) msg.textContent = '🏆 더 올릴 수 없어요 — 가장 높은 레벨이에요!';
+  else if (g.candy.ok && (g.why === 'stone' || g.why === 'coins')) msg.textContent = `🍬 ${mon.ko}의 사탕으로 올릴 수 있어요 — 스톤·코인은 안 들어요`;
   else if (g.why === 'stone') msg.textContent = `${em} ${stone ? stone.ko : '스톤'}이 ${g.next.stones - g.stones}개 더 있어야 해요 — ${subject}를 하면 받아요 (지금 ${g.stones}개)`;
   else if (g.why === 'coins') msg.textContent = `💰 코인이 ${g.next.coins - g.coins} 더 있어야 해요 (지금 ${g.coins})`;
   else msg.textContent = `${em} ${stone ? stone.ko : '스톤'} ${g.stones}개 있어요 · ${subject}를 하면 더 받아요`;
@@ -552,14 +562,16 @@ function renderGrow() {
 
 let busy = false; // ⬆️🧬 저장이 끝나기 전에 또 누르지 않게 (두 번 치르는 것을 막는다)
 
-async function doLevelUp() {
+/** @param {boolean} [useCandy] 🍬 그 종의 사탕으로 (스톤·코인 없이) */
+async function doLevelUp(useCandy = false) {
   if (!mon || busy) return;
   busy = true;
   renderGrow();
   const id = mon.id;
+  const ko = mon.ko;
   let r;
   try {
-    r = await levelUpMon(id);
+    r = useCandy ? await candyLevelUpMon(id) : await levelUpMon(id);
   } finally {
     busy = false; // ★ 저장 중 다른 포켓몬을 열어도 그 팝업이 잠긴 채 남지 않게 (Codex 10차 #6)
   }
@@ -570,10 +582,12 @@ async function doLevelUp() {
     sfx.ding();
     unlock();
     const g = growInfo(id);
-    renderMon(g.ready ? `⬆️ Lv${r.to}! 🧬 이제 진화할 수 있어요!` : `⬆️ Lv${r.from} → Lv${r.to}!`, true);
+    const mark = useCandy ? `🍬 ${ko}의 사탕 ${r.candies}개로 ` : '⬆️ ';
+    renderMon(g.ready ? `${mark}Lv${r.to}! 🧬 이제 진화할 수 있어요!` : `${mark}Lv${r.from} → Lv${r.to}!`, true);
   } else {
     const why = r && r.why;
     renderMon(why === 'cost' ? '앗, 스톤이나 코인이 모자라요'
+      : why === 'candy' ? `앗, ${ko}의 사탕이 모자라요`
       : why === 'max' ? '이미 가장 높은 레벨이에요'
       : why === 'evolve' ? '🧬 진화해야 더 클 수 있어요'
       : why === 'caught' ? '지금 데리고 있는 포켓몬이 없어요'

@@ -411,12 +411,12 @@ export async function renderStats() {
   const sold = salesReport(salesByDay(), monKo, 3);
   if (sold.length) {
     const cs = card('🏪 5일장에서 판 것');
-    cs.appendChild(el('p', 'stats-note', `두 마리 이상 있는 포켓몬(한 마리는 남아요)과 가방 아이템만 팔 수 있어요. 장날마다 포켓몬은 ${SELL_MON_MAX}마리까지예요.`));
+    cs.appendChild(el('p', 'stats-note', `두 마리 이상 있는 포켓몬(한 마리는 남아요)과 가방 아이템만 팔 수 있어요. 장날마다 포켓몬은 ${SELL_MON_MAX}마리까지예요. 포켓몬은 코인 대신 🍬 그 종의 사탕(레벨 올리기에만 씀)으로도 받아요.`));
     for (const d of sold) {
       const row = el('div', 'stats-row');
       const [, m, dd] = d.day.split('-').map(Number);
-      row.appendChild(el('span', 'name', `${m}/${dd} · 💰 ${d.total}`));
-      row.appendChild(el('span', 'meta', d.list.map((x) => `${x.name} ${x.coins}`).join(' · ')));
+      row.appendChild(el('span', 'name', `${m}/${dd} · 💰 ${d.total}${d.candy ? ` · 🍬 ${d.candy}` : ''}`));
+      row.appendChild(el('span', 'meta', d.list.map((x) => `${x.name} ${x.candy ? `🍬${x.candy}` : x.coins}`).join(' · ')));
       cs.appendChild(row);
     }
     main.appendChild(cs);

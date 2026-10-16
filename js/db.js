@@ -4,7 +4,7 @@
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { mergeReviewFirst } from './mathchal.js'; // 🔍 🎯 까닭 고르기 첫 선택 합치기 (v252) — mathchal.js는 아무것도 import하지 않는다
-import { canEvolve, capReason, evoAt, haveOf, lvOf, nextCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
+import { canEvolve, capReason, evoAt, haveOf, lvOf, nextCost, candyCount, candyOf, candyCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
 import { SHINY_USES, SHINY_CHARGE, PARCEL_COIN, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, videoOwed } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
 import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; // 🤝 교환 상인 규칙 (순수 — fusion·evolve만 import)
@@ -1606,8 +1606,9 @@ export function applyTrade(req, makeCtx) {
  * 💰 5일장에서 팔기 (2026-10-05) — 판정(sell.sellCheck)과 코인·가방(또는 보유)·기록을 **한 트랜잭션**에서.
  * 포켓몬은 mons[id].sold 단조 카운터(도감 칸은 남는다, 마지막 한 마리는 못 판다), 아이템은 가방에서 하나.
  * 판 코인은 coins에만 — coinsEarned(공부로 번 코인 통계)에는 안 넣는다. 값은 여기서(저장된 프로필의 등급으로) 정한다
- * @param {{day:string, kind:'mon'|'item', id:number|string}} req
- * @returns {{ok:boolean, why?:string, kind?:string, id?:number|string, coins?:number}}
+ * 🍬 req.pay = 'candy'(2026-10-17)면 코인 대신 그 종의 사탕 1개 — mons[id].candy(받은 누적)에, 기록에는 coins 0 · candy 1
+ * @param {{day:string, kind:'mon'|'item', id:number|string, pay?:'coins'|'candy'}} req
+ * @returns {{ok:boolean, why?:string, kind?:string, id?:number|string, coins?:number, candy?:number}}
  */
 export function sellRule(profile, req, ctx, now = Date.now()) {
   const chk = sellCheck(profile, req, ctx);
@@ -1617,14 +1618,14 @@ export function sellRule(profile, req, ctx, now = Date.now()) {
   if (kind === 'mon') {
     profile.mons = profile.mons || {};
     const m = profile.mons[id] || {};
-    profile.mons[id] = { ...m, sold: (Number(m.sold) || 0) + 1 };
+    profile.mons[id] = { ...m, sold: (Number(m.sold) || 0) + 1, ...(chk.candy ? { candy: candyCount(m.candy) + chk.candy } : {}) };
   } else addCount(profile.items, id, -1);
   profile.coins = (Number(profile.coins) || 0) + chk.price;
   profile.sales = profile.sales || {};
   const today = { ...(profile.sales[day] || {}) };
-  today[saleKey(today, kind, id)] = { kind, id, coins: chk.price, at: now };
+  today[saleKey(today, kind, id)] = { kind, id, coins: chk.price, ...(chk.candy ? { candy: chk.candy } : {}), at: now };
   profile.sales[day] = today;
-  return { ok: true, kind, id, coins: chk.price };
+  return { ok: true, kind, id, coins: chk.price, ...(chk.candy ? { candy: chk.candy } : {}) };
 }
 /** @param {(stored:object) => object} makeCtx 저장된 프로필로 등급 ctx를 만든다 (아빠가 옮긴 등급까지) */
 export function applySell(req, makeCtx) {
@@ -1656,6 +1657,26 @@ export function levelUpRule(profile, monId, stoneId) {
 }
 export function applyLevelUp(monId, stoneId) {
   return mutateProfile((p) => levelUpRule(p, monId, stoneId));
+}
+
+/**
+ * 🍬 사탕으로 레벨업 (2026-10-17) — 그 종의 사탕을 그 칸의 스톤 개수만큼 쓰고 `mons[id].lv`를 한 칸. 스톤·코인은 안 든다. **한 트랜잭션**.
+ * 값은 여기서 계산한다 (levelUpRule과 같은 까닭 — 다른 창이 먼저 올렸으면 값이 다르다). 쓴 사탕은 candyUsed 단조 카운터에
+ * @returns {{ok:boolean, why?:string, from?:number, to?:number, candies?:number}} why: 'caught' | 'max' | 'evolve' | 'candy'
+ */
+export function candyLevelUpRule(profile, monId) {
+  const id = Number(monId);
+  const m = profile.mons[id] || {};
+  if (!id || haveOf((profile.caught || {})[id], m) < 1) return { ok: false, why: 'caught' }; // 사탕도 데리고 있어야 키운다
+  const from = lvOf(m);
+  const next = candyCost(from, id);
+  if (!next) return { ok: false, why: capReason(id, from) || 'max' };
+  if (candyOf(m) < next.candies) return { ok: false, why: 'candy', from, candies: next.candies };
+  profile.mons[id] = { ...m, lv: next.toLv, candyUsed: candyCount(m.candyUsed) + next.candies };
+  return { ok: true, from, to: next.toLv, candies: next.candies };
+}
+export function applyCandyLevelUp(monId) {
+  return mutateProfile((p) => candyLevelUpRule(p, monId));
 }
 
 /**
@@ -2085,6 +2106,11 @@ export function mergeStatRecord(name, cur, rec) {
         const v = Math.max(restCount(o[k]), restCount(cur[k]));
         if (v !== cur[k] && (v || cur[k] !== undefined)) patch[k] = v;
       }
+      // 🍬 사탕 — 받은 누적(candy)·쓴 누적(candyUsed) (2026-10-17) — max가 아니면 옛 백업이 쓴 사탕을 되살리거나 받은 사탕을 지운다 · 깨진 값은 0
+      for (const k of ['candy', 'candyUsed']) {
+        const v = Math.max(candyCount(o[k]), candyCount(cur[k]));
+        if (v !== cur[k] && (v || cur[k] !== undefined)) patch[k] = v;
+      }
       const taken = Math.max(Number(o.taken) || 0, Number(cur.taken) || 0);
       if (taken && taken !== (Number(cur.taken) || 0)) patch.taken = taken;
       const seen = Math.max(Number(o.takenSeen) || 0, Number(cur.takenSeen) || 0);
@@ -2148,7 +2174,8 @@ export function mergeStatRecord(name, cur, rec) {
  *   이 병합은 **같은 줄기**를 합치는 것이다 — 한 기기의 두 창, 또는 옛 백업을 그 후손 기기에 되돌리는 경우.
  *   그때는 단조 카운터(throws·evo·stonesSpent·tot)와 max/OR 규칙으로 답이 맞는다.
  *   **갈라진 줄기**(같은 백업을 두 기기에 넣고 각자 다르게 진화시킨 뒤 둘을 합치는 것)는 범위 밖이다:
- *   이브이 한 마리가 샤미드와 쥬피썬더 둘로 늘어난다. 고치려면 조작마다 고유 id가 필요한데,
+ *   이브이 한 마리가 샤미드와 쥬피썬더 둘로 늘어난다 · 🍬 같은 판매 차례를 한쪽은 사탕, 한쪽은 코인으로 받으면 한 마리로 둘 다 남는다
+ *   (Codex 84차 — 판 수·사탕은 max, 코인은 최근 쪽). 고치려면 조작마다 고유 id가 필요한데,
  *   집에서 태블릿 하나로 쓰는 앱에는 과한 구조다. 백업은 "한 기기의 안전망"으로만 쓴다.
  */
 /** 기록 가져오기 (mergeStatRecord 규칙으로 병합). 반환: 처리한 레코드 수 */

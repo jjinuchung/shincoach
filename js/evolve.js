@@ -356,6 +356,36 @@ export function costBetween(curLv, toLv) {
   return { stones: Math.max(0, b.stones - a.stones), coins: Math.max(0, b.coins - a.coins) };
 }
 
+// ── 🍬 그 종의 사탕 (2026-10-17, 아버님 "이대로 해") ──
+// 5일장에서 포켓몬을 팔 때 💰 대신 고르면 **그 종의 사탕 1개**(등급과 상관없이). 그 종의 레벨을 올리는 데만 쓴다(진화 줄기의 다른 모습엔 못 씀 —
+// 진화로 과목이 바뀌는 줄기에서 "수학 포켓몬은 수학으로 키운다"가 그대로). 한 칸에 드는 사탕 = 그 칸의 스톤 개수(Lv2~5 1 · Lv6~10 2 · Lv11~12 3),
+// 스톤·코인은 안 든다 — 1개에 1레벨이면 흔한 포켓몬 한 마리(💰10)가 스톤 3개 + 💰100짜리 칸이 되어 배워서 받는 스톤이 쓸모를 잃는다.
+// 저장은 받은 누적(mons[id].candy)·쓴 누적(candyUsed) 두 단조 카운터 — 남은 수를 두면 옛 백업(max)이 쓴 사탕을 되살린다
+
+/** 사탕 카운터 읽기 — 깨진 값("1e309"·음수·글)은 0 (무한대가 병합 max에서 이기지 않게, rest.restCount와 같은 까닭) */
+export function candyCount(v) {
+  const n = Math.floor(Number(v));
+  return Number.isSafeInteger(n) && n > 0 ? n : 0;
+}
+
+/** 지금 가진 그 종의 사탕 = 받은 누적 − 쓴 누적 */
+export function candyOf(mon) {
+  return Math.max(0, candyCount(mon && mon.candy) - candyCount(mon && mon.candyUsed));
+}
+
+/** 사탕으로 한 칸 올리는 값 → { toLv, candies } (더 못 올리면 null — 진화하는 종은 진화 레벨에서 멈춘다) */
+export function candyCost(curLv, id) {
+  const n = nextCost(curLv, id);
+  return n ? { toLv: n.toLv, candies: n.stones } : null;
+}
+
+/** 지금 레벨에서 이 종이 오를 수 있는 끝(진화 레벨·만렙)까지 드는 사탕 — 이보다 많이 가지면 남는 사탕은 쓸 데가 없다 */
+export function candyRoom(curLv, id) {
+  const lv = lvOf({ lv: curLv });
+  const cap = levelCapOf(id);
+  return cap > lv ? costBetween(lv, cap).stones : 0;
+}
+
 /** 이 포켓몬의 진화 갈래 목록 (못 하면 빈 배열) — 이브이만 8갈래, 나머지는 하나 */
 export function evoOf(id) {
   return EVO[Number(id)] || [];

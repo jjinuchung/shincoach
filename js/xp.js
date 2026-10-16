@@ -14,6 +14,7 @@ import {
   applyVideoStones, // 🏁 영상 끝까지 → 🔶 (2026-10-06)
   applySpeakStone, // 🎤 따라 말하기 → 🔶 (2026-10-15 v263)
   applySell, // 💰 5일장 팔기 (2026-10-05)
+  applyCandyLevelUp, // 🍬 사탕으로 레벨업 (2026-10-17)
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
   applyRocketSteal, applyRocketWin, applyRocketAdmit, applyRocketStep, // 🚀 로켓단 습격 (2026-10-09) — 저장이 안 되면 메모리로 잇지 않는다 (Codex 43차 #2)
   applyHouseRule, copyHouse, // 🏠 진우네 집 (2026-10-10)
@@ -30,7 +31,7 @@ import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, videoOwed, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
-import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, MAX_LV } from './evolve.js';
+import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, candyOf, candyCost, MAX_LV } from './evolve.js';
 import { stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER } from './pokemon.js';
 import { findVoucher } from './unlock.js';
@@ -1209,11 +1210,15 @@ export function growInfo(id) {
   else if (!next) why = capReason(id, lv) || 'max'; // 'max'(만렙) | 'evolve'(진화해야 더 큰다)
   else if (stones < next.stones) why = 'stone';
   else if ((profile.coins || 0) < next.coins) why = 'coins';
+  // 🍬 그 종의 사탕 (2026-10-17) — have: 가진 사탕 · next: 사탕으로 한 칸 { toLv, candies } · ok: 지금 사탕으로 올릴 수 있나
+  const candyHave = candyOf(profile.mons[id]);
+  const candyNext = candyCost(lv, id);
   return {
     lv, max: MAX_LV, cap: levelCapOf(id), have, next, stone, stones, coins: profile.coins || 0,
     canLevel: !why, why,
     evoAt: at, evo: evoOf(id),
     ready: at !== null && lv >= at && have > 0,
+    candy: { have: candyHave, next: candyNext, ok: have > 0 && !!candyNext && candyHave >= candyNext.candies },
   };
 }
 
@@ -1221,6 +1226,17 @@ export function growInfo(id) {
 export async function levelUpMon(id) {
   const r = await runProfileOp(() => applyLevelUp(id, growStone(id)), () => ({ ok: false, why: 'save' }));
   return r && r.ok ? { ok: true, from: r.from, to: r.to, cost: r.cost } : { ok: false, why: (r && r.why) || 'save' };
+}
+
+/** 🍬 사탕으로 레벨업 (2026-10-17) — 값은 트랜잭션 안에서 다시 계산한다 (levelUpMon과 같다) */
+export async function candyLevelUpMon(id) {
+  const r = await runProfileOp(() => applyCandyLevelUp(id), () => ({ ok: false, why: 'save' }));
+  return r && r.ok ? { ok: true, from: r.from, to: r.to, candies: r.candies } : { ok: false, why: (r && r.why) || 'save' };
+}
+
+/** 🍬 가진 사탕을 모두 더한 수 (도감의 가방 줄) */
+export function candyTotal() {
+  return Object.keys(profile.mons || {}).reduce((a, id) => a + candyOf(profile.mons[id]), 0);
 }
 
 /**

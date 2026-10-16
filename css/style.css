@@ -2816,6 +2816,13 @@ button { font-family: inherit; }
 .sl-pick:disabled { opacity: .55; cursor: default; }
 .sl-sold { font-weight: 700; }
 .sl-msg { margin: 0; padding: 8px 10px; border-radius: 10px; background: #fff3cd; color: #7a5b00; font-weight: 800; }
+/* 🍬 받을 것 고르기 (2026-10-17) — 누른 포켓몬 바로 아래 한 줄 전체 */
+.sl-pay { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 2px solid #d97706; border-radius: 12px; background: #fff7e0; }
+.sl-pay-btn { flex: 1 1 140px; min-height: 48px; padding: 8px 10px; border: 2px solid #ecdfc8; border-radius: 12px; background: #fff; color: #3b2a00; font: inherit; font-weight: 900; cursor: pointer; }
+.sl-pay-btn.coin { border-color: #d97706; }
+.sl-pay-btn.candy { border-color: #db2777; }
+.sl-pay-btn:disabled { opacity: .5; cursor: default; }
+.sl-pay-note { flex: 1 1 100%; margin: 0; font-size: 0.82rem; font-weight: 700; color: #7a5b00; }
 
 /* ───────── 🚀 로켓단 습격 (2026-10-09, 아버님 아이디어) — js/rocketview.js ───────── */
 .rocket { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 64; background: rgba(15, 12, 41, 0.78); display: flex; align-items: center; justify-content: center; padding: 10px; }

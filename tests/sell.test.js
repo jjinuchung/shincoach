@@ -187,7 +187,7 @@ test('📊 판 것 보고: 최근 장날부터 3번 · 장날마다 합계·이�
   };
   const r = salesReport(by, (id) => `몬${id}`, 3);
   assert.deepEqual(r.map((x) => x.day), ['2026-10-20', '2026-10-10', '2026-10-05']);
-  assert.deepEqual(r[2], { day: '2026-10-05', total: 75, mons: 1, items: 1, list: [{ name: '몬25', coins: 25 }, { name: '👑 왕관', coins: 50 }] });
+  assert.deepEqual(r[2], { day: '2026-10-05', total: 75, candy: 0, mons: 1, items: 1, list: [{ name: '몬25', coins: 25, candy: 0 }, { name: '👑 왕관', coins: 50, candy: 0 }] });
 });
 
 test('🎲 무작위 도감 1,000개 × 팔기 40번: 코인은 기록의 합만큼 · 보유는 늘 1 이상(판 종) · 도감 칸·가방은 음수가 안 된다 · 장날 한도', () => {
@@ -237,9 +237,10 @@ test('🔌 화면·저장 연결: 장날에만 가판대 · 두 번 눌러야 ·
   assert.match(src('js/db.js'), /out\.sales = mergeSales\(cur\.sales, rec\.sales\);/);
   const mv = src('js/marketview.js');
   assert.match(mv, /body\.appendChild\(tradeCard\(\)\);\s*body\.appendChild\(sellCard\(\)\);/, '장날에만 (교환 상인 다음) — 줄바꿈은 \\s로 (CRLF로 받아도)');
-  assert.match(mv, /if \(!sameSell\(ui\.slArm, day, kind, id, price, Date\.now\(\)\)\) \{\s*ui\.slArm = \{ day, kind, id, price, at: Date\.now\(\) \};/, '첫 번째 누름은 "한 번 더"만');
-  assert.match(mv, /return !!arm && arm\.day === day && arm\.kind === kind && arm\.id === id && arm\.price === price && now - arm\.at < 5000;/, '같은 것·같은 값을 5초 안에 (Codex 32차 #5)');
-  assert.match(mv, /async function doSell\(kind, id, price\) \{\s*if \(ui\.busy\) return;\s*const day = dayNow\(\);/, '누를 때마다 오늘을 다시 읽는다');
+  assert.match(mv, /if \(!sameSell\(ui\.slArm, day, kind, id, price, Date\.now\(\)\) \|\| \(kind === 'mon' && !pay\)\) \{\s*const text = kind === 'mon' \?[\s\S]{0,300}?ui\.slArm = \{ day, kind, id, price, at: Date\.now\(\), say: text \};/, '첫 번째 누름은 "한 번 더"만 · 🐾 포켓몬은 고른 단추(pay)가 있어야 판다 (v275)');
+  assert.match(mv, /return !!arm && arm\.day === day && arm\.kind === kind && arm\.id === id && arm\.price === price && now - arm\.at < armMs\(kind\);/, '같은 것·같은 값을 정해진 시간 안에 (Codex 32차 #5)');
+  assert.match(mv, /function armMs\(kind\) \{\s*return kind === 'mon' \? 15000 : 5000;\s*\}/, '아이템 5초 · 🐾 포켓몬은 받을 것을 고를 틈 15초 (v275)');
+  assert.match(mv, /async function doSell\(kind, id, price, pay\) \{\s*if \(ui\.busy\) return;\s*const day = dayNow\(\);/, '누를 때마다 오늘을 다시 읽는다');
   assert.match(mv, /if \(!stillOpen\(day\)\) \{ saySell\('🏪 장이 닫혔어요 — 다음 장날에 팔 수 있어요'\)/);
   assert.match(mv, /if \(ui\.slSay\) card\.appendChild\(el\('p', 'sl-msg', ui\.slSay\)\);/, '창 맨 위 알림 줄은 가판대에서 안 보인다 — 가판대 안에도 (헤드리스가 잡음)');
   assert.ok(!/say\(/.test(mv.slice(mv.indexOf('async function doSell'), mv.indexOf('async function doFuse'))), '팔기 말은 모두 saySell로');
@@ -328,7 +329,7 @@ test('🔍 Codex 32차 #5 — 두 번 누르는 사이 값이 바뀌면 안 판�
   assert.equal(sellRule(p, { day: OPEN, kind: 'item', id: 'crown', price: 50 }, CTX).ok, true);
   assert.equal(sellRule(p, { day: OPEN, kind: 'mon', id }, sellCtx(p)).coins, 10, '값을 안 주면 지금 값으로 (옛 호출)');
   const mv = src('js/marketview.js');
-  assert.match(mv, /const r = await sellThing\(\{ day, kind, id, price \}\);/);
+  assert.match(mv, /const r = await sellThing\(\{ day, kind, id, price, \.\.\.\(kind === 'mon' \? \{ pay \} : \{\}\) \}\);/, '보여 준 값과 함께 · 🐾 포켓몬은 고른 것 (v275)');
   assert.match(mv, /r\.why === 'price' \? `값이 바뀌었어요 \(지금 💰 \$\{r\.price\}\) — 다시 두 번 눌러요`/);
 });
 

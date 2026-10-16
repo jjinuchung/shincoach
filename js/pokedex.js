@@ -1,6 +1,6 @@
 // 🎒 내 포켓몬(도감) 화면: 레벨·경험치·💰 코인, 잡은 포켓몬(그림·마릿수, 누르면 장식·염색), 못 잡은 포켓몬(검은 실루엣 + ???), 🛒 상점
 import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf, isUltraBeast } from './pokemon.js';
-import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, RARITY_UB, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner } from './xp.js';
+import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, RARITY_UB, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner, candyTotal } from './xp.js';
 import { listDaily, getMath } from './db.js';
 import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES, SHINY_STONE, shinyUsesLeft, ENGLISH_STONE_SHORT } from './items.js';
@@ -103,6 +103,9 @@ function bagText() {
   // 🌈 이로치의 스톤은 개수가 아니라 남은 횟수로 (스톤 하나 = 3번, 뜯은 스톤의 남은 횟수 포함)
   const left = shinyUsesLeft(inv);
   if (left > 0) parts.push(`${SHINY_STONE.emoji}${left}번`);
+  // 🍬 사탕은 종마다라 가방엔 모두 더한 수만 (종마다의 수는 그 포켓몬 칸의 레벨업 옆에, 2026-10-17)
+  const candy = candyTotal();
+  if (candy > 0) parts.push(`🍬×${candy}`);
   return parts.length ? `가방: ${parts.join(' ')}` : '가방이 비어 있어요';
 }
 

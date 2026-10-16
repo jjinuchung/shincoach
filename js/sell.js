@@ -8,11 +8,13 @@
 //    못 파는 것: 🔷🔶 스톤 · 🌟 황금 볼 · 🌕 · 🍄 (돈으로 못 사는 것) · 🎟️ 교환권 · 🌈 남은 횟수 · 끼고 있는 장식(가방에 없다)
 //  · 장날마다 포켓몬은 SELL_MON_MAX마리까지 (한꺼번에 팔아 치우지 않게), 아이템은 한도 없음
 //  · 판 코인은 coinsEarned(공부로 번 코인 통계)에 안 넣는다
+//  · 🍬 (2026-10-17 아버님 "이대로 해") 포켓몬은 💰 대신 **그 종의 사탕 1개**로도 받는다(req.pay = 'candy') — 2마리 이상·장날 한도는 그대로(사탕도 한 마리로 센다).
+//    그 종이 더 오를 수 없거나(진화 레벨·만렙) 가진 사탕으로 이미 끝까지 오를 수 있으면 사탕은 못 고른다(쓸 데 없는 사탕을 받지 않게)
 //
 // 저장 (집 규칙 — 메모리 profile-merge-invariants): 판 마릿수는 mons[id].sold 단조 카운터(haveOf에서 빼고 병합 max),
 // 코인·가방(또는 보유)·기록 sales[장날][열쇠]를 한 트랜잭션에서. 기록은 합집합 — 열쇠가 "종류:id:그날 몇 번째"라 같은 판매는 같은 열쇠
 import { marketOpen } from './fusion.js';
-import { haveOf } from './evolve.js';
+import { haveOf, lvOf, levelCapOf, candyOf, candyRoom } from './evolve.js';
 import { itemById } from './items.js';
 
 /** 포켓몬 값 — 등급 번호(1 ⭐ · 2 ⭐⭐ · 3 ⭐⭐⭐ · 4 전설 · 5 🌌)로. ⭐ 하나가 퍼즐 두 개쯤 — 잡아서 파는 게 공부보다 나은 돈벌이가 되지 않게 */
@@ -36,7 +38,7 @@ export function itemSellPrice(id) {
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** 그 장날에 판 것 [{ key, kind, id, coins, at }] — 판 차례대로 */
+/** 그 장날에 판 것 [{ key, kind, id, coins, candy?, at }] — 판 차례대로 (🍬 사탕으로 받았으면 coins 0 · candy 1) */
 export function salesOn(sales, dateKey) {
   const day = (sales || {})[dateKey] || {};
   return Object.keys(day).map((key) => ({ key, ...day[key] })).filter((s) => s && (s.kind === 'mon' || s.kind === 'item'))
@@ -55,7 +57,19 @@ export function saleKey(day, kind, id) {
   return `${kind}:${id}:${n}`;
 }
 
-/** 팔 수 있는 포켓몬 [{ id, have, rarity, price }] — 2마리 이상 데리고 있는 종, 등급 낮은 것부터 */
+/**
+ * 🍬 이 종을 팔 때 사탕으로 받을 수 있나 (순수) → { have: 가진 사탕, room: 끝까지 드는 사탕, cap, ok, why }
+ * why: 'cap'(더 오를 수 없다 — 진화 레벨·만렙) | 'full'(가진 사탕으로 이미 끝까지 오를 수 있다) | null
+ */
+export function candyState(profile, id) {
+  const m = ((profile && profile.mons) || {})[id];
+  const have = candyOf(m);
+  const room = candyRoom(lvOf(m), id);
+  const why = room < 1 ? 'cap' : have >= room ? 'full' : null;
+  return { have, room, cap: levelCapOf(id), ok: !why, why };
+}
+
+/** 팔 수 있는 포켓몬 [{ id, have, rarity, price, candy }] — 2마리 이상 데리고 있는 종, 등급 낮은 것부터 · candy = candyState */
 export function sellableMons(profile, ctx) {
   const caught = (profile && profile.caught) || {};
   const mons = (profile && profile.mons) || {};
@@ -66,7 +80,7 @@ export function sellableMons(profile, ctx) {
     const have = haveOf(caught[k], mons[k]);
     if (have < 2) continue;
     const rarity = ctx.rarity(id);
-    out.push({ id, have, rarity, price: monPrice(rarity) });
+    out.push({ id, have, rarity, price: monPrice(rarity), candy: candyState(profile, id) });
   }
   return out.sort((a, b) => a.rarity - b.rarity || a.id - b.id);
 }
@@ -89,9 +103,10 @@ function quoteOk(req, price) {
 
 /**
  * 💰 팔기 판정 — 저장된 프로필로 (db.sellRule이 트랜잭션 안에서 부른다)
- * @param {{day:string, kind:'mon'|'item', id:number|string}} req
+ * @param {{day:string, kind:'mon'|'item', id:number|string, pay?:'coins'|'candy'}} req pay는 포켓몬만 (없으면 코인)
  * @param {{rarity:Function, known?:Function}} ctx
- * @returns {{ok:boolean, why?:string, price?:number}} why: 'closed' | 'bad' | 'have' | 'limit' | 'none' | 'price'(보여 준 값과 다름 — price는 지금 값)
+ * @returns {{ok:boolean, why?:string, price?:number, candy?:number}} why: 'closed' | 'bad' | 'have' | 'limit' | 'none' | 'price'(보여 준 값과 다름 — price는 지금 값)
+ *   | 'candy-cap'·'candy-full'(🍬 사탕을 쓸 데가 없다 — candyState) · 사탕으로 받으면 price 0 · candy 1
  */
 export function sellCheck(profile, req, ctx) {
   const day = req && req.day;
@@ -101,6 +116,12 @@ export function sellCheck(profile, req, ctx) {
     if (!id || (ctx.known && !ctx.known(id))) return { ok: false, why: 'bad' };
     if (haveOf((profile.caught || {})[id], (profile.mons || {})[id]) < 2) return { ok: false, why: 'have' };
     if (monsSoldOn(profile.sales, day) >= SELL_MON_MAX) return { ok: false, why: 'limit' };
+    const pay = req.pay === undefined || req.pay === null ? 'coins' : req.pay;
+    if (pay === 'candy') {
+      const c = candyState(profile, id);
+      return c.ok ? { ok: true, price: 0, candy: 1 } : { ok: false, why: `candy-${c.why}` }; // 사탕은 등급과 상관없이 1개라 보여 준 코인 값은 안 따진다
+    }
+    if (pay !== 'coins') return { ok: false, why: 'bad' };
     const price = monPrice(ctx.rarity(id));
     if (!quoteOk(req, price)) return { ok: false, why: 'price', price };
     return { ok: true, price };
@@ -135,7 +156,7 @@ export function mergeSales(cur, rec) {
 }
 
 /**
- * 📊 부모 화면 — 최근 장날 maxDays번의 판 것 [{ day, total, mons, items, list: [{ name, coins }] }] (최근 장날부터)
+ * 📊 부모 화면 — 최근 장날 maxDays번의 판 것 [{ day, total, candy, mons, items, list: [{ name, coins, candy }] }] (최근 장날부터) · candy = 🍬 사탕으로 받은 수
  * @param {Object<string, Array>} byDay salesOn으로 편 { 장날: [...] }
  * @param {(id:number) => string} monName
  */
@@ -145,16 +166,22 @@ export function salesReport(byDay, monName, maxDays = 3) {
       const list = byDay[day].map((s) => {
         const it = s.kind === 'item' ? itemById(s.id) : null;
         const name = s.kind === 'mon' ? monName(Number(s.id)) : (it ? `${it.emoji} ${it.ko}` : String(s.id));
-        return { name, coins: Number(s.coins) || 0 };
+        return { name, coins: Number(s.coins) || 0, candy: s.kind === 'mon' ? candyCount1(s.candy) : 0 };
       });
       return {
         day,
         total: list.reduce((a, x) => a + x.coins, 0),
+        candy: list.reduce((a, x) => a + x.candy, 0),
         mons: byDay[day].filter((s) => s.kind === 'mon').length,
         items: byDay[day].filter((s) => s.kind === 'item').length,
         list,
       };
     });
+}
+
+/** 판 기록의 사탕 수 — 1만 (깨진 값·옛 기록은 0) */
+function candyCount1(v) {
+  return Number(v) === 1 ? 1 : 0;
 }
 
 export function copySales(s) {
