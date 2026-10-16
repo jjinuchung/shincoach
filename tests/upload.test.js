@@ -188,7 +188,8 @@ test('📤 기기 기록을 못 읽으면 올릴 파일을 만들지 않는다 (
   assert.deepEqual(JSON.parse(none[3].text), []);
   const u = src('js/upload.js');
   assert.ok(!/getMath\(\)\.catch\(/.test(u) && !/listDaily\(\)\.catch\(/.test(u), '실패를 빈 기록으로 바꾸지 않는다');
-  assert.match(u, /try \{ files = await gatherFiles\(/, '보내기는 gatherFiles가 실패하면 아무것도 안 올린다');
+  // v272: try 안에서 🕒 사용 초를 먼저 적은 뒤 모은다 — 모으기가 실패하면 그대로 catch
+  assert.match(u, /try \{\n(?:[^\n]*\n){0,3}\s*files = await gatherFiles\([^\n]*\);\n  \} catch \{/, '보내기는 gatherFiles가 실패하면 아무것도 안 올린다');
 });
 
 /** 가짜 GitHub(읽기) — 파일 표 · 요청 기록 */

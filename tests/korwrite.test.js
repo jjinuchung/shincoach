@@ -203,7 +203,7 @@ test('📤 보내기: 국어 서술형도 올림 · 프로필을 못 읽으면 �
   assert.deepEqual(files.map((f) => f.path).slice(-2), ['korean/todo.md', 'korean/todo.json']);
   await assert.rejects(UP.gatherFiles({ ...fmt, getKorTodo: async () => { throw new Error('IDB 닫힘'); }, today: 'd' }));
   const u = read('js/upload.js');
-  assert.match(u, /getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, today/); // 🎤 영어 요약(v253) · 📚 국어 요약(v254)
+  assert.match(u, /getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: [^\n]*, today/); // 🎤 영어 요약(v253) · 📚 국어 요약(v254) · 🕒 사용 기록 자리 목록(v272)
   assert.match(u, /const text = KOR_LIVE\.has\(f\.path\) \? \(\) => koreanTextNow\(f\.path, today\) : f\.text;/, '답장 기다리는 글은 함수로 — 겹쳐서 다시 올릴 때도 새로');
   assert.match(u, /const KOR_LIVE = new Set\(\['korean\/todo\.md', 'korean\/todo\.json'\]\);/, '다시 만드는 것은 두 파일만 — 📚 국어 요약(korean/날짜.md)은 모은 글 그대로(v254)');
   assert.match(u, /message: `📤 진우 기록 \$\{today\} — \$\{f\.path\}` \}\);/, '메시지에는 파일 이름만');

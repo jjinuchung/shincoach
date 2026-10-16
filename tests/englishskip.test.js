@@ -122,7 +122,7 @@ test('📤 gatherFiles — getEnglish가 있으면 english/날짜.md를 함께 �
   assert.ok(en && /- 「영상」 한 문장 4\/4 · 🎤 말해 본 문장 2\/4 \(50%\)/.test(en.text));
   await assert.rejects(gatherFiles({ ...base, getEnglish: async () => { throw new Error('idb'); } }));
   const u = read('js/upload.js');
-  assert.ok(u.includes('collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, today }); } catch {'));
+  assert.match(u, /collectTodo: st\.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: [^\n]*, today \}\);\n  \} catch \{/); // v272: 🕒 사용 기록 자리 목록이 뒤에 붙음
   assert.ok(u.includes("return st.contentSummary(items, records, st.cueCountOf, st.cueKeysOf);"), '지금 문장 열쇠로 (Codex 65차 #1)');
 });
 

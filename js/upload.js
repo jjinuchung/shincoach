@@ -11,6 +11,7 @@
 //           korean/todo.md · korean/todo.json (✍️ 국어 서술형 — 답장 기다리는 글, 2026-10-11 v237 · 하나도 없으면 빈 목록도 올린다)
 //           english/YYYY-MM-DD.md (🎤 영어 기록 요약 — 최근 7일 넘김·말하기 · 영상별 말해 본 문장, 2026-10-14 v253 · 같은 날은 덮어쓴다)
 //           korean/YYYY-MM-DD.md (📚 국어 기록 요약 — 국어 시간 · 글마다 별·틀린 물음 · 잘못 읽기 · 낱말 · 퍼즐 · 생각 쓰기, 2026-10-14 v254 · korreport.js)
+//           usage/YYYY-MM-DD.md (🕒 앱 사용 기록 — 최근 7일 앱을 연 수 · 쓴 때 · 화면마다 머문 시간 · ⏳ 과목 시간, 2026-10-16 v272 · usage.js)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
@@ -107,6 +108,75 @@ export function englishFiles(days, summaries, today) {
   return [{ path: `english/${today}.md`, text: `${lines.join('\n').trim()}\n` }];
 }
 
+/** 초 → "1시간 12분" · "35분" · "1분 안" (순수) */
+export function fmtMin(sec) {
+  const s = Math.floor(Number(sec) || 0);
+  if (s <= 0) return '0분';
+  if (s < 60) return '1분 안';
+  const m = Math.round(s / 60);
+  return m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`;
+}
+
+/**
+ * 🕒 앱 사용 기록 (순수, 2026-10-16 v272 — usage.js) — Claude가 날마다 "앱을 켰는지 · 어디에 머물렀는지 · 언제 썼는지"를 본다.
+ * 최근 7일 날마다: 앱을 연 수 · 쓴 때(10분 칸을 이어 붙인 덩이) · 화면마다 머문 시간(0인 자리는 뺌) ·
+ *   ⏳ 과목 시간(시간 제한에 센 시간 — 🎯 도전 문제·잠긴 뒤는 안 셈) · 부모가 더 준 시간 · ⏳ 연장권
+ * @param {Array<object>} days listDaily 결과 · @param {Array<{key:string, field:string, ko:string}>} places usage.PLACES
+ */
+export function usageFiles(days, today, places) {
+  const num = (v) => Math.max(0, Math.floor(Number(v) || 0));
+  const byDate = new Map((Array.isArray(days) ? days : []).filter((d) => d && d.date).map((d) => [d.date, d]));
+  const list = Array.isArray(places) ? places : [];
+  const SUBJ = [['수학', 'mathTime', 'mathBonus', 'mathExt'], ['영어', 'enTime', 'enBonus', 'enExt'], ['국어', 'korTime', 'korBonus', 'korExt']];
+  // 읽는 법 — 숫자를 넘겨 읽지 않게 (🔍 Codex 81차 A·E)
+  const lines = [`🕒 앱 사용 기록 (${today}) — 머문 시간·쓴 때·앱을 연 수는 v272부터 셉니다 (그 전 날은 ⏳ 과목 시간만)`, '', '## 읽는 법',
+    '- 머문 시간 = 화면이 보이고 2분 안에 손을 댄 동안 — 영상을 보거나 긴 글을 읽으며 2분 넘게 손을 안 대면 그동안은 빠져요',
+    '- 쓴 때 = 센 초가 있는 10분 칸을 이은 것 (그 칸 내내 썼다는 뜻은 아니에요)',
+    '- 앱을 연 수 = 창을 새로 연 수 (내렸다 다시 올린 것은 안 셈 · 밤을 넘겨 켜 둔 날은 0일 수 있어요)',
+    '- 한 기기에서 두 창(홈 화면 앱·Chrome 탭)이 동시에 보이면 겹쳐 셀 수 있어요',
+    '- ⏳ 과목 시간 = 시간 제한에 센 시간 (🎯 도전 문제·잠긴 뒤는 안 셈)',
+    '- ⏱ 수학 문항마다 걸린 초는 math/latest.json 일지(log)의 qs[].s — 문제를 보인 때부터 처음 답할 때까지(앱을 내린 시간도 들어감, 쌍둥이 문제는 안 셈) · 600은 윗값 · 빠른 오답은 살펴볼 신호이지 찍었다는 증거는 아니에요',
+    '', '## 최근 7일'];
+  for (let k = 6; k >= 0; k--) {
+    const day = dayBefore(today, k);
+    const d = byDate.get(day);
+    // 하루 기록이 없다고 안 썼다고는 못 한다 — 옛 판·저장 실패·기록 지움일 수도 (🔍 Codex 81차 #5)
+    if (!d) { lines.push(`- ${day.slice(5)}: (이 기기에 저장된 기록 없음 — 앱을 안 썼는지·기록이 빠졌는지는 알 수 없어요)`); continue; }
+    const stay = list.map((p) => [p.ko, num(d[p.field])]).filter(([, s]) => s > 0);
+    const opens = num(d.appOpens);
+    const slots = slotRanges(d.useSlots);
+    const parts = [];
+    if (opens || stay.length || slots) {
+      parts.push(`앱을 연 수 ${opens}`);
+      parts.push(`쓴 때 ${slots || '(없음)'}`);
+      const all = stay.reduce((a, [, s]) => a + s, 0);
+      parts.push(stay.length ? `머문 시간 모두 ${fmtMin(all)} — ${stay.map(([ko, s]) => `${ko} ${fmtMin(s)}`).join(' · ')}` : '머문 시간 (없음)');
+    } else parts.push('(🕒 사용 기록 없음 — v272 전이거나 센 초가 없음)');
+    parts.push(`⏳ 과목 시간 ${SUBJ.map(([ko, f]) => `${ko} ${fmtMin(d[f])}`).join(' · ')}`);
+    const bonus = SUBJ.filter(([, , b]) => num(d[b]) > 0).map(([ko, , b]) => `${ko} +${fmtMin(d[b])}`);
+    if (bonus.length) parts.push(`부모가 더 준 시간 ${bonus.join(' · ')}`);
+    const ext = SUBJ.filter(([, , , e]) => num(d[e]) > 0).map(([ko, , , e]) => `${ko} ${num(d[e])}개`);
+    if (ext.length) parts.push(`⏳ 연장권 ${ext.join(' · ')}`);
+    lines.push(`- ${day.slice(5)}: ${parts.join(' · ')}`);
+  }
+  return [{ path: `usage/${today}.md`, text: `${lines.join('\n').trim()}\n` }];
+}
+
+/** 🕒 쓴 때 10분 칸 "HH:M"(usage.slotOf) → "07:40~08:20 · 21:30~21:50" (순수) — 이어진 칸은 한 덩이로, 끝은 마지막 칸 + 10분 */
+export function slotRanges(slots) {
+  const idx = [...new Set((Array.isArray(slots) ? slots : []).filter((s) => /^\d{2}:\d$/.test(s))
+    .map((s) => Number(s.slice(0, 2)) * 6 + Number(s[3])))].filter((n) => n >= 0 && n < 144).sort((a, b) => a - b);
+  const hm = (n) => `${String(Math.floor(n / 6)).padStart(2, '0')}:${n % 6}0`;
+  const out = [];
+  for (let i = 0; i < idx.length; i++) {
+    let j = i;
+    while (j + 1 < idx.length && idx[j + 1] === idx[j] + 1) j++;
+    out.push(`${hm(idx[i])}~${hm(idx[j] + 1)}`); // 마지막 칸(23:50)의 끝은 hm(144) = "24:00"
+    i = j;
+  }
+  return out.join(' · ');
+}
+
 /**
  * ✍️ 국어 서술형 — 답장 기다리는 글 (순수) — korwrite.writeTodo 목록 그대로. Claude는 card·id·at을 그대로 korean/replies.json에 적는다.
  * 하나도 없어도 빈 목록을 올린다 (다 답장한 뒤에도 옛 목록이 남아 있지 않게 — Codex 51차 PART 3 #6)
@@ -151,9 +221,10 @@ export function unb64(s) {
  * getKorTodo(있으면) = ✍️ 국어 서술형 답장 기다리는 글 — 프로필을 못 읽으면 실패해야 한다(빈 목록으로 덮어쓰지 않게)
  * getEnglish(있으면) = 🎤 영상 요약(stats.contentSummary) — 영상 기록을 못 읽으면 실패 (v253)
  * getKorReport(있으면) = 📚 국어 요약 글(today, days) — 프로필을 못 읽으면 실패 · 원고를 못 받거나 꼴이 틀리면 null(이번엔 국어 요약만 안 올림, v254)
- * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, today:string}} o
+ * usagePlaces(있으면) = 🕒 앱 사용 기록의 자리 목록(usage.PLACES) — 하루 기록(days)으로 만든다 (v272)
+ * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
@@ -165,6 +236,7 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(getKorTodo ? koreanFiles(kor, today) : []), // ✍️ 국어 서술형 (v237)
     ...(getEnglish ? englishFiles(days, en, today) : []), // 🎤 영어 요약 (v253)
     ...(typeof korRep === 'string' && korRep ? [{ path: `korean/${today}.md`, text: korRep }] : []), // 📚 국어 요약 (v254)
+    ...(usagePlaces ? usageFiles(days, today, usagePlaces) : []), // 🕒 앱 사용 기록 (v272)
   ];
 }
 
@@ -439,10 +511,15 @@ export function sendReport({ force = false } = {}) {
 async function sendOnce(force) {
   const token = getToken();
   if (!token) return { ok: false, skipped: true, why: '열쇠가 없어요' };
-  const [{ getMath, listDaily }, prog, ask, { todayKey }, st] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js')]);
+  // 🕒 사용 기록(v272)은 못 불러와도 나머지는 그대로 올린다 — 새 모듈 하나 때문에 📤 전체가 멈추지 않게
+  const [{ getMath, listDaily }, prog, ask, { todayKey }, st, usage] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js'), import('./usage.js').catch(() => null)]);
   const today = todayKey();
   let files;
-  try { files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, today }); } catch {
+  try {
+    // 🕒 모아 둔 사용 초를 먼저 적는다 — 앱을 내리는 순간에 올릴 때 마지막 몇 초가 빠지지 않게 (실패해도 그대로 올린다)
+    if (usage) await usage.flushUsage().catch(() => {});
+    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, today });
+  } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
     try { localStorage.setItem(STATE_KEY, JSON.stringify({ at: fail.at, ok: false, why: fail.why, hash: '', files: [] })); } catch { /* 저장 못 해도 */ }

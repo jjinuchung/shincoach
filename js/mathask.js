@@ -9,7 +9,7 @@
 // ask = { id, no, t, u, d, concept, k, key, q, expr, my, ans, tag, w, kid, status, replies:[{t,text}], again:[{t,kid}], readAt, tries, tryOk }
 // status: asked(아빠 기다림) → answered(답장 옴, 아직 안 읽음) → understood | again(다시 아빠에게) → fixed(문제 맞힘) / closed(아빠가 닫음)
 
-import { markCleared, nameOf, KIND_SHORT, WHY_LABEL } from './mathprog.js';
+import { markCleared, nameOf, KIND_SHORT, WHY_LABEL, secQ } from './mathprog.js';
 import { fixNumJosa } from './mathgen.js';
 
 /** 하루에 물어볼 수 있는 수 — 질문함이 잡동사니가 되지 않게 */
@@ -144,7 +144,7 @@ export function decideAsk(m, id, understood, kid = '', seenT = undefined) {
  * 이해한 뒤 같은 틀의 문제를 풀어 본 결과. 맞히면 fixed + 그 유형의 🤔 노트를 지운다(답장으로 고친 것). 틀리면 understood 그대로 — 다시 해 볼 수 있다.
  * 일지에 'ask' 한 줄 (📊 활동에 센다).
  */
-export function applyAskTry(m, id, ok, today, { sameKey = true } = {}) {
+export function applyAskTry(m, id, ok, today, { sameKey = true, s } = {}) {
   const ask = list(m).find((x) => x && x.id === id);
   if (!ask || !['understood', 'fixed'].includes(ask.status)) return { ok: false };
   const t = touch(ask);
@@ -165,7 +165,7 @@ export function applyAskTry(m, id, ok, today, { sameKey = true } = {}) {
     ask.sameKey = sameKey ? 1 : 0;
   }
   m.log = Array.isArray(m.log) ? m.log : [];
-  m.log.push({ d: today, t, id: 'ask', mode: 'ask', ok: ok ? 1 : 0, n: 1, qs: [{ k: ask.k, ok: ok ? 1 : 0, c: ask.concept, no: ask.no }] });
+  m.log.push({ d: today, t, id: 'ask', mode: 'ask', ok: ok ? 1 : 0, n: 1, qs: [{ k: ask.k, ok: ok ? 1 : 0, c: ask.concept, no: ask.no, ...secQ({ s }) }] }); // ⏱ 걸린 초 (v272)
   return { ok: true, fixed };
 }
 

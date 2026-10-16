@@ -18,6 +18,7 @@ import { initTaken, openTakeTool, showTakenNoticeIfAny } from './taken.js'; // �
 import { initGiftSettings } from './gift.js'; // 🎁 선물 교환권 사진 (⚙, 이 기기에만)
 import { initParcel, showParcelIfAny, retryParcel } from './parcel.js'; // 📦 아빠의 구호품 (coach/gifts.json으로 배포)
 import { autoSend } from './upload.js'; // 📤 Claude에게 기록 보내기 (비공개 저장소, 열쇠는 📊에서 — 없으면 아무것도 안 한다)
+import { initUsage, setUsageView } from './usage.js'; // 🕒 앱 사용 기록 — 화면마다 머문 초·쓴 때·연 수 (📤로만, v272)
 
 const views = {
   home: document.getElementById('view-home'),
@@ -45,6 +46,7 @@ export function showView(name) {
   }
   window.scrollTo(0, 0);
   setSubject(subjectOfView(name)); // ⏳ 과목이 바뀌면 그 전 과목의 초를 저장하고 시계를 옮긴다
+  setUsageView(name); // 🕒 머문 초는 화면마다 (⏳와 따로 — 홈·도감·기록도 센다)
   refreshChips();
   // 목록으로 돌아올 때마다 다시 그린다 — 🎟️ 다음 영상 조건이 방금 한 공부를 반영해야 한다
   if (name === 'library') refreshList().catch(() => {});
@@ -204,6 +206,7 @@ async function main() {
   });
   // ⏳ 하루 시간 제한 시계 — ⚙ 설정을 읽어 가고, 1초마다 칩을 갱신한다 (실패해도 학습은 계속)
   const timeReady = initTimeLimit({ conf: timeLimitConf, onTick: refreshChips }).catch(() => {});
+  try { initUsage(); } catch { /* 🕒 사용 기록이 안 돼도 학습은 계속 */ }
   // 🚀 끝나지 않은 로켓단 배틀이 있으면 그 과목 화면으로 — 수학 화면이 열리면 거기서 이어 간다 (아버님 결정 (다): 앱이 꺼져도
   //    다음에 열면 이어진다 — 도망칠 수도 억울할 수도 없게). 아직 홈에 있을 때만 · 그 과목 시간이 다 됐으면 다시 열 수 있을 때
   Promise.all([timeReady, profileReady()]).then(() => {

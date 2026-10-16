@@ -14,6 +14,7 @@ import {
   sameDayRounds, repeatNote, roundPay, setLive, applyQuit, settleLives, liveKeep,
   stemPickOrder, LATE, lateBonus, lateLeft, bridgeOf, bridgeOffers,
   keepLine, reviewKeep, rivalWrong, stageIcon,
+  answerSecOf,
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -1581,6 +1582,8 @@ function renderQuestion(restore = false) {
   const m = clearMain();
   const q = r.qs[r.at];
   if (!restore) { r.answered = false; r.chosenIdx = -1; }
+  // ⏱ 문제를 처음 보인 때 — 문항 번호가 바뀔 때만. 안 푼 문제에서 🎒·📊를 다녀오면 restore가 false로 다시 그려도 그대로 (🔍 Codex 81차 #2)
+  if (r.shownFor !== r.at) { r.shownFor = r.at; r.shownAt = Date.now(); }
   const card = el('section', 'math-card math-q');
 
   const top = el('div', 'math-q-top');
@@ -1736,6 +1739,7 @@ function answer(i, list, card, typed = null) {
     ...(sense && picked !== undefined ? { sn: picked === sense.ok ? 1 : 0 } : {}), // 🎯 감 잡기가 맞았나
     // 🔢 직접 쓴 답 — 친 그대로 남기고(10/64를 5/32로 바꿔 적지 않는다), 짐작한 값은 g로, 모르겠어요는 "잘 몰랐어요"로
     ...(typed ? { p: 1, chosen: typed.text, ...(typed.guess ? { g: typed.text } : {}), ...(typed.form ? { pf: typed.form } : {}), ...(typed.idk ? { w: 'u' } : {}), ...(typed.note ? { pn: typed.note } : {}) } : {}),
+    ...answerSec(r.shownAt), // ⏱ 문제를 보고 답할 때까지 걸린 초 — 📤 기록에만 (찍었는지·생각했는지를 시간으로도 보게, v272)
   });
   saveLive(); // ⏹ 앱을 닫아도 다음에 열 때 그만둔 편으로 남게 (v250)
   paintAnswer(i, list, card, false);
@@ -1744,8 +1748,10 @@ function answer(i, list, card, typed = null) {
   maybeCheer(!ch.ok); // ✨ 포켓몬이 지나가며 응원 (틀린 직후에 더 자주)
 }
 
-/** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
-const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.w === 's' && a.sv !== undefined ? { sv: a.sv ? 1 : 0 } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}), ...(a.pf ? { pf: a.pf } : {}) });
+/** ⏱ 문제를 보인 때부터 지금까지의 초 { s } — 보인 때가 없으면 빈 것 (mathprog.answerSecOf) */
+const answerSec = (shownAt) => { const s = answerSecOf(shownAt, Date.now()); return s === null ? {} : { s }; };
+/** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)·⏱ 걸린 초(s)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
+const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.w === 's' && a.sv !== undefined ? { sv: a.sv ? 1 : 0 } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}), ...(a.pf ? { pf: a.pf } : {}), ...(Number.isInteger(a.s) ? { s: a.s } : {}) });
 /** 개념 편의 문항 기록 — 끝낼 때(applyRound)와 푸는 중 기록(setLive·applyQuit)이 같은 꼴 */
 const conceptQs = (r) => r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
 
@@ -2842,7 +2848,7 @@ async function finishRound() {
     if (r.mode === 'diag') {
       state = await updateMath((s) => { placed = applyPlacement(s, r.answers, today, ui.stem, r.missTags); });
     } else if (r.mode === 'ask') {
-      state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false }); tally = tallyRound(s, { mode: r.mode, correct: r.correct, result }); });
+      state = await updateMath((s) => { result = applyAskTry(s, r.askId, r.correct > 0, today, { sameKey: r.askSameKey !== false, s: r.answers[0] && r.answers[0].s }); /* ⏱ 걸린 초도 (🔍 Codex 81차 #3) */ tally = tallyRound(s, { mode: r.mode, correct: r.correct, result }); });
     } else if (r.mode === 'special') {
       // 💎 맞힌 얼굴의 통과 횟수 +1 → 🏅 배지, 여덟 개면 🏆 챔피언.
       // ★ 진도와 **보상 지급이 한 트랜잭션**이다 — 따로 하면 배지만 남고 마스터볼·코인이 날아가는데,

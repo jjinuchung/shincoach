@@ -410,7 +410,7 @@ export function applyPlacement(m, answers, today, strand = 'fraction', missTags 
   const ok = (answers || []).filter((a) => a && a.correct).length;
   pushLog(m, { d: today, t: Date.now(), id: 'diag', mode: 'diag', ok, n: (answers || []).length,
     // 🔢 진단도 숫자판 — 짐작한 값이 제일 궁금한 자리. 🤷 모르겠어요(w)·꼴(pf)도 일반 편과 같은 logQ로 (Codex 18차 #5 — w가 빠졌다)
-    qs: (answers || []).map((a) => ({ ...logQ({ k: 'calc', ok: a.correct, tag: a.tag, w: a.w, p: a.p, g: a.g, pf: a.pf }), c: a.concept })) });
+    qs: (answers || []).map((a) => ({ ...logQ({ k: 'calc', ok: a.correct, tag: a.tag, w: a.w, p: a.p, g: a.g, pf: a.pf, s: a.s }), c: a.concept })) });
   return { startId, knownIds };
 }
 
@@ -447,13 +447,27 @@ function pushLog(m, entry) {
  * 5 × 5 모양 판의 두 구석만 칠해도 43자, 가장 큰 자리 판(5 × 14)을 넓게 칠하면 "바뀐 모양 …" 115자 (Codex 44차 #1 — 24자에서 둘째 칸이 사라졌다)
  */
 export const GUESS_MAX = 120;
+/**
+ * ⏱ 문항에 걸린 초의 윗값 (v272) — 문제를 띄워 두고 자리를 떴거나 앱을 내렸다 와도 이 값까지만 적는다.
+ * 📤 기록을 읽을 때 이 값이면 "오래 걸림(자리를 떴을 수 있음)"으로 본다
+ */
+export const Q_SEC_MAX = 600;
+/** 문제를 보인 때(shownAt)부터 now까지 걸린 초 (순수) — 0 ~ Q_SEC_MAX 정수, 보인 때가 없거나 이상하면 null */
+export function answerSecOf(shownAt, now) {
+  const a = Number(shownAt); const b = Number(now);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b < a) return null;
+  return Math.min(Q_SEC_MAX, Math.round((b - a) / 1000));
+}
+/** 일지에 남길 걸린 초 (순수) — 정수 0 ~ Q_SEC_MAX만, 아니면 { } (❓ 다시 풀기 mathask.applyAskTry도 이것으로) */
+export const secQ = (q) => (Number.isInteger(q.s) && q.s >= 0 && q.s <= Q_SEC_MAX ? { s: q.s } : {});
 function logQ(q) {
   return { k: q.k, ok: q.ok ? 1 : 0, ...(q.tag ? { tag: q.tag } : {}), ...(q.fx === undefined ? {} : { fx: q.fx ? 1 : 0 }), ...(q.sn === undefined ? {} : { sn: q.sn ? 1 : 0 }), ...(q.w ? { w: q.w } : {}),
     ...(q.w === 's' && q.sv !== undefined ? { sv: q.sv ? 1 : 0 } : {}), // 🙈 실수 확인 (v251)
     // 🔢 숫자판(2026-10-01) — p: 직접 쓴 답 · g: 어느 보기와도 다른 "짐작한 답"의 값 (오개념엔 안 넣고 부모가 보게)
     ...(q.p ? { p: 1 } : {}), ...(q.g ? { g: String(q.g).slice(0, GUESS_MAX) } : {}),
     // pf: 값은 맞는데 꼴('form' — 대분수로·소수로를 물었는데 다른 꼴) · 약분('reduce')만 틀림 — 짐작이 아니다 (Codex 18차 #4)
-    ...(q.pf === 'form' || q.pf === 'reduce' ? { pf: q.pf } : {}) };
+    ...(q.pf === 'form' || q.pf === 'reduce' ? { pf: q.pf } : {}),
+    ...secQ(q) }; // ⏱ 걸린 초 (v272)
 }
 export const WHY_LABEL = { s: '실수', c: '헷갈림', u: '몰랐음' };
 /**
@@ -1182,7 +1196,7 @@ export function applySpecialRound(m, qs, today, need = 3) {
   }
   sp.rounds = (Number(sp.rounds) || 0) + 1;
   if (list.length) {
-    pushLog(m, { d: today, t: Date.now(), id: 'special', mode: 'special', ok, n: list.length, qs: list.map((q) => ({ k: q.kind, ok: !!q.ok, ...(q.tag ? { tag: q.tag } : {}), ...(q.w ? { w: q.w } : {}), ...(q.w === 's' && q.sv !== undefined ? { sv: q.sv ? 1 : 0 } : {}) })) }); // 🙈 실수·확인 표시도 (Codex 63차 #1)
+    pushLog(m, { d: today, t: Date.now(), id: 'special', mode: 'special', ok, n: list.length, qs: list.map((q) => ({ k: q.kind, ok: !!q.ok, ...(q.tag ? { tag: q.tag } : {}), ...(q.w ? { w: q.w } : {}), ...(q.w === 's' && q.sv !== undefined ? { sv: q.sv ? 1 : 0 } : {}), ...secQ(q) })) }); // 🙈 실수·확인 표시도 (Codex 63차 #1) · ⏱ 걸린 초 (v272)
   }
   return { ok, total: list.length, got };
 }

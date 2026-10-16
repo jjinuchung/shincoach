@@ -352,12 +352,15 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // 🎤 ⏭ 직접 넘김 · 3번 해 보고 넘어감 · 연속 보너스를 받은 수 (2026-10-14 v253) — 연속 보너스는 claimDailyCount로 선점(하루 상한)
   'speakSkipBtn', 'speakGaveUp', 'speakCombos',
   // 🎤 따라 말하기로 받은 🔶 수 (2026-10-15 v263) — 셈은 문장 목록 speakFirstKeys의 길이, 받기는 applySpeakStone(가방과 한 트랜잭션)
-  'speakStones'];
+  'speakStones',
+  // 🕒 앱 사용 기록 (2026-10-16 v272, usage.js) — 앱을 연 수 · 화면마다 머문 초. 📤 usage/날짜.md로만 (아이 화면엔 안 보임)
+  'appOpens', 'uMath', 'uKor', 'uEn', 'uHome', 'uDex', 'uHouse', 'uShop', 'uCatch', 'uBattle', 'uStats', 'uLock'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 // 💖 덤으로 풀어 ⚡💰를 받은 문장 — 두 창이 같은 덤을 내도 한 번 (Codex 20차 #4)
 // 🎤 오늘 처음 통과한 문장(따라 말하기 🔶의 셈, v263) — 두 창이 같은 문장을 통과해도·다른 기기 기록과 합쳐도 한 번 (Codex 74차 #3)
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys'];
+// 🕒 앱을 쓴 10분 칸 "HH:M" (v272, usage.js) — 두 창이 같은 때를 세어도 한 번
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots'];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {

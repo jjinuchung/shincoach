@@ -126,8 +126,9 @@ test('🔶 화면 연결 — 오늘 첫 말하기 보상일 때만 문장을 적
   const t = read('js/track.js');
   assert.match(t, /const r = await claimDailyKey\(date, 'speakFirstKeys', key\);[\s\S]{0,80}\} catch \{ return false; \}/, '문장 목록에 트랜잭션으로 · 저장이 안 되면 안 센다');
   const db = read('js/db.js');
-  assert.match(db, /const DAILY_LISTS = \['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys'\];/, '합집합으로 합친다');
-  assert.match(db, /'speakSkipBtn', 'speakGaveUp', 'speakCombos',\s*\/\/[^\n]*\n\s*'speakStones'\];/, 'DAILY_SUMS — 받은 수만');
+  // 🕒 v272에서 뒤에 앱 사용 기록 칸이 붙었다 — 이 판의 칸이 그 자리에 그대로 있는지만 본다
+  assert.match(db, /const DAILY_LISTS = \['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys'[,\]]/, '합집합으로 합친다');
+  assert.match(db, /'speakSkipBtn', 'speakGaveUp', 'speakCombos',\s*\/\/[^\n]*\n\s*'speakStones'[,\]]/, 'DAILY_SUMS — 받은 수만');
   assert.match(db, /const tx = db\.transaction\(\['profile', 'daily'\], 'readwrite'\);\s*const ps = tx\.objectStore\('profile'\);\s*const ds = tx\.objectStore\('daily'\);[\s\S]{0,200}const r = speakStoneRule\(next, curD, date, every, max\);/, '한 트랜잭션');
 });
 

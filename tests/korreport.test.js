@@ -259,7 +259,7 @@ test('📤 보내기 (v254): korean/날짜.md를 모은 글 그대로 · 원고�
   assert.ok(fn.includes('return kr.korReportFromRaw(p, raw, today, days);'), '받은 원고는 꼴을 보고 나서 (Codex 66차)');
   assert.ok(!fn.includes('korReportText'), '꼴 검사를 건너뛰는 길이 없다');
   assert.ok(u.includes("const KOR_LIVE = new Set(['korean/todo.md', 'korean/todo.json']);") && u.includes('const text = KOR_LIVE.has(f.path) ? () => koreanTextNow(f.path, today) : f.text;'));
-  assert.ok(u.includes('getKorReport: korReportNow, today }); } catch {'), '앱이 국어 요약을 모은다');
+  assert.match(u, /getKorReport: korReportNow, usagePlaces: [^\n]*, today \}\);\n  \} catch \{/, '앱이 국어 요약을 모은다'); // v272: 🕒 사용 기록 자리 목록이 뒤에 붙음
   const sw = read('sw.js');
   assert.ok(sw.includes("'./js/korreport.js',"));
   assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1] >= 254, 'sw v254 이상');
