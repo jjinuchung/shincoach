@@ -25,7 +25,7 @@
 
 import { rng, shuffle, fill, castOf, worldPick, ask, solve, int, pick, pickFamily, humanQuestion, checkHuman, diagnosticOf, placeFromOf, ladderOf, josa, numJosa, tplKey } from './mathgen.js';
 import { gradeLabel } from './mathmix.js';
-import { figureSvg } from './mathdraw.js';
+import { figureSvg, chartGeom, parseChart } from './mathdraw.js';
 import { textVal } from './mathpad.js';
 
 export { gradeLabel };
@@ -197,6 +197,11 @@ export const TAGS = {
   pctAsCount: '백분율을 그대로 수로 봄',
   restCount: '나머지를 구함',
   wrongDiv: '100이 아니라 10으로 나눔',
+  // 4학년 활용 (dat.apply) — 합만 구함·하나를 빠뜨림·칸을 1로·그대로·늘어난 양만·0부터·큰 값만·값을 칸으로는 위의 이름표 그대로
+  sameCells: '칸 수를 그대로 둠',
+  scaleBackward: '눈금을 거꾸로 바꿈',
+  endsDiff: '처음과 끝의 차를 구함',
+  fallAsRise: '줄어든 양을 늘어난 양으로 봄',
 };
 
 // ───────────────────── 이야기 재료 ─────────────────────
@@ -228,6 +233,18 @@ const WAVE_THEMES = [
   { id: 'wvisit', topic: '포켓몬센터에 온 손님 수를 요일마다 세어', xs: ['월', '화', '수', '목', '금'], unit: '명', noun: '손님 수', base: [200, 250, 300], steps: [5] },
   { id: 'wtall', topic: '{me}의 키를 해마다 재어', xs: ['1학년', '2학년', '3학년', '4학년'], unit: 'cm', noun: '키', base: [110, 120], steps: [2] },
 ];
+
+/** ⭐ 4학년 활용 — 막대 합계 문장 (수 뒤 어미가 수마다 바뀌지 않게 "…일 때") */
+const TOTAL_OF = {
+  fruit: (n) => `조사한 학생이 모두 ${n}명일 때`,
+  type: (n) => `조사한 학생이 모두 ${n}명일 때`,
+  berry: (n) => `다섯 요일 동안 모은 나무열매가 모두 ${n}개일 때`,
+  book: (n) => `학급 문고의 책이 모두 ${n}권일 때`,
+  ball: (n) => `팔린 볼이 모두 ${n}개일 때`,
+};
+/** ⭐ 4학년 활용 — 늘어난 말 (온도는 "오른", 키는 "자란") */
+const RISE = { weight: ['늘어난', '늘었을까요'], bean: ['자란', '자랐을까요'], temp: ['오른', '올랐을까요'], visit: ['늘어난', '늘었을까요'], jump: ['늘어난', '늘었을까요'] };
+const WAVE_RISE = { wweight: '늘었어요', wvisit: '늘었어요', wtall: '자랐어요' };
 
 /** 평균 주제 — 자료 이름(회·요일)은 고정 */
 const MEAN_THEMES = [
@@ -346,6 +363,49 @@ function chanceTag(truth, picked) {
   if (picked === 4 - truth) return TAGS.oppositeChance;
   return TAGS.farChance;
 }
+
+// ───────────────────── ⭐ 4학년 활용 재료 (dat.apply — ①과 ②가 같은 글·그래프를 쓴다) ─────────────────────
+
+/**
+ * 지워진 값(?)이 그려질 그래프의 눈금 맨 위 안에 드는가 — 그래프 높이는 남은 값만으로 정해져
+ * 지운 막대·점이 그림 밖으로 나갈 수 있었다(눈금이 20까지인데 지운 막대가 22 — 🔍 Codex 80차 #1)
+ */
+function fitsAxis(directive, v) {
+  const m = /^\[(bgraph|lgraph) (.+)\]$/.exec(directive);
+  const G = m && chartGeom(parseChart(m[1], m[2]));
+  return !!G && v <= G.valueOfCells(G.cells);
+}
+/** 🧩 지워진 막대 — 모두 N에서 나머지 막대를 빼요 · 합계가 400을 넘지 않게 눈금 한 칸은 5 이하 · 물을 항목은 요청한 틀의 ? 자리 */
+function apSumSet(r, c) {
+  const T = pickFor(r, c, BAR_THEMES, (t, w) => w.includes(t.topic));
+  const sc = pick(r, BAR_SCALES.filter((x) => x.s <= 5));
+  const w = wantOf(c); const X = T.labels.find((l) => w.includes(`${l}:?`)) || pick(r, T.labels);
+  const xi = T.labels.indexOf(X);
+  // 지워진 막대가 나머지의 합과 같으면 "합만 구함"이 정답이 되고, 그려진 눈금보다 크면 그림과 어긋난다 — 다시 뽑는다
+  const bad = (vs) => 2 * vs[xi] === sum(vs) || !fitsAxis(bg(sc, T.unit, T.labels, vs, xi), vs[xi]);
+  let vals = distinctCells(r, T.labels.length, 1, 12).map((k) => k * sc.s);
+  for (let k = 0; k < 200 && bad(vals); k++) vals = distinctCells(r, T.labels.length, 1, 12).map((x) => x * sc.s);
+  // 예비 — 지울 막대를 가장 짧은 막대와 맞바꾼다(남은 막대 중 가장 긴 것이 그대로라 눈금 안 · 셋 이상이라 합과 같을 수 없다)
+  if (bad(vals)) { const lo = vals.indexOf(Math.min(...vals)); [vals[xi], vals[lo]] = [vals[lo], vals[xi]]; }
+  const N = sum(vals); const others = vals.filter((_, i) => i !== xi);
+  const t = `${T.topic} 막대그래프로 나타냈는데, 막대 하나가 지워졌어요.\n\n${bg(sc, T.unit, T.labels, vals, xi)}\n\n${TOTAL_OF[T.id](N)}, ${T.cnt(X)}는 몇 ${T.unit}일까요?`;
+  return { T, sc, vals, X, xi, N, others, S: N - vals[xi], v: vals[xi], t };
+}
+/** 📈 물결선 그래프의 지워진 점 — 앞 점의 값 + 늘어난 양 · ? 자리는 요청한 틀의 것 */
+function apRiseSet(r, c) {
+  const T = pickFor(r, c, WAVE_THEMES, (t, w) => w.includes(t.topic));
+  const s = pick(r, T.steps); const base = pick(r, T.base); const n = T.xs.length;
+  const ai = askIdx(c, 'lgraph'); const j = ai >= 1 && ai < n ? ai : int(r, 1, n - 1);
+  // 키는 해마다 줄어들지 않게 (up) — 다른 주제는 앞 점보다 오른 자리만 맞추면 된다 · 지운 점이 그려진 눈금 안에 들 때까지 다시 뽑는다(Codex 80차 #1)
+  const draw1 = () => lineCells(r, n, 1, 10, T.id === 'wtall' ? { up: true } : { rise: [j - 1, j] });
+  let cells = draw1();
+  for (let k = 0; k < 300 && !fitsAxis(lg(s, T.unit, T.xs, cells.map((x) => base + x * s), base, j), base + cells[j] * s); k++) cells = draw1();
+  const vals = cells.map((k) => base + k * s);
+  const d = vals[j] - vals[j - 1]; const prev = vals[j - 1];
+  const t = `${T.topic} 꺾은선그래프로 나타냈는데, ${T.xs[j]}의 점이 지워졌어요.\n\n${lg(s, T.unit, T.xs, vals, base, j)}\n\n${T.xs[j]}의 ${jw(T.noun, '은', '는')} ${T.xs[j - 1]}보다 ${nu(d, T.unit)} ${WAVE_RISE[T.id]}. ${T.xs[j]}의 ${jw(T.noun, '은', '는')} 몇 ${T.unit}일까요?`;
+  return { T, s, base, j, cells, vals, d, prev, v: vals[j], t };
+}
+const SCALE_THEMES = LINE_THEMES.filter((t) => t.id === 'visit' || t.id === 'jump');
 
 // ───────────────────── 개념 사다리 (K. 자료와 그래프 줄기) ─────────────────────
 
@@ -816,6 +876,121 @@ export const DATA = [
     },
   },
   {
+    // ⭐ 4학년 활용 (v271, 2026-10-16 아버님 "이대로 진행") — 문제집 활용 수준의 두세 걸음 문제를 막대·꺾은선그래프로 (V·C의 ⭐ 4학년 활용과 같은 자리 규칙)
+    // · 5학년 칸으로 가는 길은 막지 않는다 — dat.mean은 그대로 dat.choose만 필요 · 진단 5문제에서는 뺀다(DIAG)
+    // · 끝 말투가 막대 읽기("…는 몇 명일까요?")·꺾은선 읽기와 겹치므로 시험 해석기는 이 칸의 말투를 먼저 본다
+    // · 틀 글의 수 뒤에는 "…일 때"·단위만 — 수 뒤 "이에요/예요"는 tplKey가 묶지 않아 🔁 쌍둥이 틀이 갈린다
+    id: 'dat.apply', grade: 4, name: '⭐ 막대그래프와 꺾은선그래프 활용', needs: ['dat.choose'],
+    idea: '두세 걸음으로 푸는 그래프 문제예요. 막대가 지워졌으면 **모두에서 나머지 막대를 모두** 빼요. 점이 지워졌으면 **앞의 값에 늘어난 양**을 더하는데, 물결선이 있으면 물결선 위 첫 눈금부터 읽어요. 세로 눈금 한 칸을 바꾸면 **값 ÷ 새 눈금 한 칸**만큼 칸이 바뀌어요. 가장 많이 늘어난 양은 **구간마다 늘어난 양**을 구해서 견줘요.',
+    slip: '이 그래프에서 무엇을 먼저 읽어야 하는지, 풀이를 한 줄씩 따라가 봐요.',
+    calc(r, c) {
+      // 🧩 지워진 막대 — 합계로
+      const A = apSumSet(r, c); const kA = A.S / A.sc.s;
+      const famSum = { ans: String(A.v), near: A.sc.s,
+        wr: [{ text: String(A.S), tag: TAGS.sumOnly }, { text: String(A.v + A.others[A.others.length - 1]), tag: TAGS.dropOne }, { text: String(A.N - kA), tag: TAGS.cellAsOne }],
+        why: {
+          [TAGS.sumOnly]: `${jn(A.S, '은', '는')} 나머지 막대를 더한 값이에요. 모두 ${A.N}에서 빼야 지워진 막대의 값이에요.`,
+          [TAGS.dropOne]: '나머지 막대를 **모두** 빼야 해요 — 하나라도 빠뜨리면 지워진 막대가 커져요.',
+          [TAGS.cellAsOne]: `나머지 막대를 칸 수로 뺐어요. 눈금 한 칸이 ${jn(A.sc.s, '이니까', '니까')} 칸 수 × ${A.sc.s}가 막대의 값이에요.`,
+        },
+        steps: [`세로 눈금 한 칸: ${A.sc.s * A.sc.lab} ÷ ${A.sc.lab} = ${nu(A.sc.s, A.T.unit)}`, `나머지 막대: ${A.others.join(' + ')} = ${nu(A.S, A.T.unit)}`, `${A.N} − ${A.S} = ${nu(A.v, A.T.unit)}`],
+        whyAny: '모두에서 나머지 막대를 모두 빼면 지워진 막대의 값이에요.',
+        rule: '지워진 막대 = 모두 − 나머지 막대의 합.',
+        pools: { pokemon: [A.t] } };
+      // 📈 물결선 그래프의 지워진 점 — 앞의 값 + 늘어난 양
+      const B = apRiseSet(r, c);
+      const famRise = { ans: String(B.v), near: B.s,
+        wr: [{ text: String(B.prev), tag: TAGS.noChange }, { text: String(B.d), tag: TAGS.diffOnly }, { text: String(B.prev - B.base + B.d), tag: TAGS.fromZero }],
+        why: {
+          [TAGS.noChange]: `${jn(B.prev, '은', '는')} ${B.T.xs[B.j - 1]}의 값이에요. 늘어난 ${jn(B.d, '을', '를')} 더해야 해요.`,
+          [TAGS.diffOnly]: `${jn(B.d, '은', '는')} 늘어난 양이에요. ${B.T.xs[B.j - 1]}의 값에 더해요.`,
+          [TAGS.fromZero]: `물결선 아래는 줄인 부분이에요. 맨 아래 눈금이 0이 아니라 ${jn(B.base, '이에요', '예요')}.`,
+        },
+        steps: [`물결선 위 첫 눈금 ${nu(B.base, B.T.unit)}부터 — ${B.T.xs[B.j - 1]}의 점은 ${B.cells[B.j - 1]}칸 위: ${B.base} + ${B.cells[B.j - 1]} × ${B.s} = ${nu(B.prev, B.T.unit)}`, `${B.prev} + ${B.d} = ${nu(B.v, B.T.unit)}`],
+        whyAny: `${B.T.xs[B.j - 1]}의 값을 물결선 위 첫 눈금부터 읽은 다음, 늘어난 양을 더해요.`,
+        rule: '지워진 점 = 앞 점의 값 + 늘어난 양 · 물결선이 있으면 첫 눈금부터.',
+        pools: { pokemon: [B.t] } };
+      // 🔁 눈금 바꿔 다시 그리기 — 값 ÷ 새 눈금 한 칸
+      const TS = pickFor(r, c, SCALE_THEMES, (t, w) => w.includes(t.topic));
+      const [s0, s1] = pick(r, [[10, 5], [5, 10]]); const n = TS.xs.length;
+      // 열쇠에서는 "0에서"의 0도 #가 된다 — 이름까지만 본다
+      const X = pickFor(r, c, TS.xs, (x, w) => w.includes(`, ${x}의 점은 `)); const xi = TS.xs.indexOf(X);
+      let cells = lineCells(r, n, 1, 12);
+      for (let k = 0; k < 60 && s0 === 5 && cells[xi] % 2; k++) cells = lineCells(r, n, 1, 12);
+      if (s0 === 5 && cells[xi] % 2) cells[xi] = cells[xi] < 12 ? cells[xi] + 1 : cells[xi] - 1;
+      const vals = cells.map((k) => k * s0); const v = vals[xi]; const old = cells[xi]; const nc = v / s1;
+      const famScale = { ans: String(nc), near: 1,
+        wr: [{ text: String(old), tag: TAGS.sameCells }, { text: String(v), tag: TAGS.valueAsCells }, (s0 === 5 || old % 2 === 0) && { text: String((old * s1) / s0), tag: TAGS.scaleBackward }],
+        why: {
+          [TAGS.sameCells]: `눈금 한 칸의 크기가 바뀌면 같은 값도 칸 수가 달라져요. 값 ${jn(v, '을', '를')} 새 눈금 한 칸 ${ro(s1)} 나눠요.`,
+          [TAGS.valueAsCells]: `${jn(v, '은', '는')} 값이에요. 한 칸이 ${jn(s1, '이니까', '니까')} ${v} ÷ ${s1}칸이에요.`,
+          [TAGS.scaleBackward]: s1 < s0 ? '눈금 한 칸이 작아지면 같은 값을 나타내는 칸 수는 많아져요.' : '눈금 한 칸이 커지면 같은 값을 나타내는 칸 수는 적어져요.',
+        },
+        steps: [`${X}의 점은 ${old}칸 위: ${old} × ${s0} = ${nu(v, TS.unit)}`, `새 눈금 한 칸 ${nu(s1, TS.unit)}: ${v} ÷ ${s1} = ${nc}칸`],
+        whyAny: '먼저 그 점의 값을 읽고, 새 눈금 한 칸으로 나눠요.',
+        rule: '새 칸 수 = 값 ÷ 새 눈금 한 칸.',
+        pools: { pokemon: [`${TS.topic} 세로 눈금 한 칸을 ${s0}${TS.unit}으로 하여 꺾은선그래프로 나타냈어요.\n\n${lg(s0, TS.unit, TS.xs, vals)}\n\n세로 눈금 한 칸을 ${s1}${TS.unit}으로 바꿔 다시 그리면, ${X}의 점은 0에서 몇 칸 위에 찍어야 할까요?`] } };
+      // 📏 가장 많이 늘어난 양 — 구간마다 견줘요 (강낭콩의 키는 줄어들지 않게)
+      const TM = pickFor(r, c, LINE_THEMES, (t, w) => w.includes(t.topic));
+      const sm = pick(r, TM.steps); const nm = TM.xs.length;
+      let mv = null;
+      for (let k = 0; k < 80 && !mv; k++) {
+        const ck = lineCells(r, nm, 1, 12, TM.id === 'bean' ? { up: true } : { anyRise: true });
+        const vs = ck.map((x) => x * sm); const ds = vs.slice(1).map((x, i) => x - vs[i]);
+        const best = Math.max(...ds); const fall = Math.max(0, ...ds.map((x) => -x)); const ends = vs[nm - 1] - vs[0];
+        if (best > 0 && ends !== best && fall !== best) mv = { vs, ds, best, fall, ends };
+      }
+      if (!mv) { const vs = [1, 2, 5, 6, 8].map((x) => x * sm); mv = { vs, ds: [1, 3, 1, 2].map((x) => x * sm), best: 3 * sm, fall: 0, ends: 7 * sm }; }
+      const bi = mv.ds.indexOf(mv.best); const [riseW, riseQ] = RISE[TM.id];
+      const famMost = { ans: String(mv.best), near: sm,
+        wr: [{ text: String(Math.max(...mv.vs)), tag: TAGS.maxOnly }, mv.ends > 0 && { text: String(mv.ends), tag: TAGS.endsDiff }, mv.fall > 0 && { text: String(mv.fall), tag: TAGS.fallAsRise }, sm > 1 && { text: String(mv.best / sm), tag: TAGS.cellAsOne }],
+        why: {
+          [TAGS.maxOnly]: `${jn(Math.max(...mv.vs), '은', '는')} 값이 가장 큰 때의 값이에요. 물은 것은 **늘어난 양**이에요.`,
+          [TAGS.endsDiff]: `처음과 끝의 차는 모두 합해 늘어난 양이에요. 한 구간에서 가장 많이 ${riseW} 양을 물었어요.`,
+          [TAGS.fallAsRise]: '선이 내려간 곳은 줄어든 거예요. 선이 올라간 곳만 견줘요.',
+          [TAGS.cellAsOne]: `${mv.best / sm}칸 올라갔어요. 한 칸이 ${jn(sm, '이니까', '니까')} × ${sm}.`,
+        },
+        steps: [`구간마다 변한 양: ${mv.ds.map((d, i) => `${TM.xs[i]}→${TM.xs[i + 1]} ${d > 0 ? '+' : '−'}${Math.abs(d)}`).join(', ')}`, `가장 많이 ${riseW} 때: ${TM.xs[bi]}→${TM.xs[bi + 1]} — ${mv.vs[bi + 1]} − ${mv.vs[bi]} = ${nu(mv.best, TM.unit)}`],
+        whyAny: '구간마다 늘어난 양을 구해서 가장 큰 것을 찾아요 — 줄어든 구간은 빼고요.',
+        rule: '가장 많이 늘어난 양 = 구간마다 늘어난 양 중 가장 큰 것.',
+        pools: { pokemon: [`${TM.topic} 꺾은선그래프로 나타냈어요.\n\n${lg(sm, TM.unit, TM.xs, mv.vs)}\n\n${jw(TM.noun, '이', '가')} 가장 많이 ${riseW} 때는 몇 ${TM.unit} ${riseQ}?`] } };
+      return finish(this.id, r, c, pickFamily(r, c, [famSum, famRise, famScale, famMost]));
+    },
+    misread(r, c) {
+      if (branchOf(r, c, ['apsum', 'apwave']) === 'apsum') {
+        const A = apSumSet(r, c); const kA = A.S / A.sc.s;
+        return finishMis(this.id, 'apsum', r, c, {
+          q: `${A.t}\n\n${showWork(`${A.T.cnt(A.X)}는 ${nuj(A.S, A.T.unit, '이에요', '예요')} — 나머지 막대를 모두 더했어요`)}`,
+          ok: `모두 ${A.N}에서 나머지 ${jn(A.S, '을', '를')} 빼요 — ${A.N} − ${A.S} = ${nu(A.v, A.T.unit)}`,
+          wr: [
+            { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+            { text: `나머지 막대를 칸 수로 빼서 ${A.N} − ${kA} = ${nu(A.N - kA, A.T.unit)}`, tag: TAGS.cellAsOne },
+            { text: '막대가 지워지면 그 값은 알 수 없어요', tag: OFF },
+          ],
+          steps: [`나머지 막대: ${A.others.join(' + ')} = ${nu(A.S, A.T.unit)}`, `${A.N} − ${A.S} = ${nu(A.v, A.T.unit)}`],
+          whyAny: `${jn(A.S, '은', '는')} 나머지 막대를 더한 값이에요. 모두 ${A.N}에서 빼야 지워진 막대의 값이에요.`,
+          rule: '지워진 막대 = 모두 − 나머지 막대의 합.',
+          probe: { N: A.N, S: A.S, v: A.v },
+        });
+      }
+      const B = apRiseSet(r, c); const fz = B.prev - B.base + B.d;
+      const X = B.T.xs[B.j]; const P = B.T.xs[B.j - 1];
+      return finishMis(this.id, 'apwave', r, c, {
+        q: `${B.t}\n\n${showWork(`${X}의 ${jw(B.T.noun, '은', '는')} ${B.prev - B.base} + ${B.d} = ${nuj(fz, B.T.unit, '이에요', '예요')}`)}`,
+        ok: `물결선 위 첫 눈금이 ${jn(B.base, '이라서', '라서')} ${jw(P, '은', '는')} ${nu(B.prev, B.T.unit)} — ${B.prev} + ${B.d} = ${nu(B.v, B.T.unit)}`,
+        wr: [
+          { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+          { text: `${P}의 값 그대로 ${nu(B.prev, B.T.unit)}`, tag: TAGS.noChange },
+          { text: '점이 지워지면 그때의 값은 알 수 없어요', tag: OFF },
+        ],
+        steps: [`물결선 위 첫 눈금 ${nu(B.base, B.T.unit)}부터 — ${P}의 점: ${B.base} + ${B.cells[B.j - 1]} × ${B.s} = ${nu(B.prev, B.T.unit)}`, `${B.prev} + ${B.d} = ${nu(B.v, B.T.unit)}`],
+        whyAny: `물결선 아래는 줄인 부분이에요. 맨 아래 눈금이 0이 아니라 ${jn(B.base, '이에요', '예요')} — ${P}의 값부터 다시 읽어요.`,
+        rule: '물결선이 있으면 물결선 위 첫 눈금부터 센다.',
+        probe: { prev: B.prev, d: B.d, base: B.base, v: B.v },
+      });
+    },
+  },
+  {
     id: 'dat.mean', grade: 5, name: '평균 구하기', needs: ['dat.choose'],
     idea: '**평균**은 자료를 고르게 했을 때의 값이에요. **(자료를 모두 더한 값) ÷ (자료의 수)**. 0도 자료의 하나라서 수에 넣어요.',
     slip: '모두 더한 다음, 자료가 몇 개인지 세어 나눠요.',
@@ -1235,8 +1410,10 @@ export function lessonOf(conceptId, seed, opts) {
   return { title: c.name, pages, rule: v.rule || c.idea };
 }
 
+// ⭐ 4학년 활용(dat.apply)은 진단에서 뺀다 — 진단은 그 전과 같은 다섯 칸 (v271)
+const DIAG = DATA.filter((c) => c.id !== 'dat.apply');
 export function diagnosticSet(seed, n = 5, opts) {
-  return diagnosticOf(DATA, makeQuestion, seed, n, opts);
+  return diagnosticOf(DIAG, makeQuestion, seed, n, opts);
 }
 export function placeFrom(answers) {
   return placeFromOf(DATA, answers);

@@ -85,6 +85,29 @@ function solveText(q) {
   const p = plain(q);
   const ch = readChart(q); const pc = readPct(q);
   let m;
+  // ⭐ 4학년 활용 (dat.apply, v271) — 끝 말투가 막대 읽기·꺾은선 읽기와 겹쳐서 먼저 본다
+  if (ch && ch.kind === 'bgraph' && (m = /모두 (\d+)\S+ 때, (.+?수)는 몇 (\S+)일까요\?$/.exec(p))) {
+    const N = +m[1]; const X = labelIn(m[2], ch.items.map((x) => x.label));
+    const it = ch.items.find((x) => x.label === X); assert.equal(it.v, null, `물은 막대 ${X}가 ?가 아니다: ${q}`);
+    assert.equal(ch.items.filter((x) => x.v === null).length, 1);
+    const others = ch.items.filter((x) => x.v !== null).map((x) => x.v); const S = others.reduce((a, b) => a + b, 0);
+    return { v: N - S, ctx: { k: 'ap.sum', ch, N, others, S, v: N - S } };
+  }
+  if (ch && ch.kind === 'lgraph' && (m = /\n\n(\S+)의 (.+?)[은는] (\S+)보다 (\d+) ?\S+ (?:늘었어요|자랐어요)\. \1의 .+[은는] 몇 \S+일까요\?$/.exec(p))) {
+    const it = ch.items.find((x) => x.label === m[1]); assert.equal(it.v, null, `물은 점 ${m[1]}이 ?가 아니다: ${q}`);
+    const pi = ch.items.findIndex((x) => x.label === m[3]); assert.equal(ch.items[pi + 1], it, `${m[3]} 바로 다음이 ${m[1]}이어야: ${q}`);
+    const last = ch.items[pi].v; const d = +m[4];
+    return { v: last + d, ctx: { k: 'ap.rise', ch, last, d, v: last + d } };
+  }
+  if (ch && ch.kind === 'lgraph' && (m = /세로 눈금 한 칸을 (\d+)\S+ 하여 꺾은선그래프로 나타냈어요\.[\s\S]*\n\n세로 눈금 한 칸을 (\d+)\S+ 바꿔 다시 그리면, (\S+)의 점은 0에서 몇 칸 위에 찍어야 할까요\?$/.exec(p))) {
+    const s0 = +m[1]; const s1 = +m[2]; assert.equal(ch.s, s0, `글의 눈금 ${s0} ≠ 그래프 눈금 ${ch.s}`);
+    const val = ch.items.find((x) => x.label === m[3]).v;
+    return { v: val / s1, ctx: { k: 'ap.scale', ch, val, s0, s1, v: val / s1 } };
+  }
+  if (ch && ch.kind === 'lgraph' && /\n\n.+ 가장 많이 (?:늘어난|자란|오른) 때는 몇 \S+ (?:늘었을까요|자랐을까요|올랐을까요)\?$/.test(p)) {
+    const vs = ch.items.map((x) => x.v); const ds = vs.slice(1).map((v, i) => v - vs[i]);
+    return { v: Math.max(...ds), ctx: { k: 'ap.most', ch, vs, ds, v: Math.max(...ds) } };
+  }
   if (ch && /세로 눈금 한 칸은 몇/.test(p)) return { v: ch.s, ctx: { k: 'scale', ch } };
   if (ch && ch.kind === 'bgraph' && /막대가 가장 긴 것과 가장 짧은 것의 차/.test(p)) {
     const vs = ch.items.map((x) => x.v); return { v: Math.max(...vs) - Math.min(...vs), ctx: { k: 'diff', ch, mx: Math.max(...vs), mn: Math.min(...vs) } };
@@ -205,6 +228,35 @@ function solveText(q) {
   return null;
 }
 
+/** ⭐ 4학년 활용 이름표의 뜻 — 따로 읽은 문제(ctx)로 그 틀린 생각을 다시 한다 */
+function apTagHolds(x, tag, v) {
+  const s = x.ch.s;
+  switch (x.k) {
+    case 'ap.sum':
+      if (tag === TAGS.sumOnly) return v === x.S; // 나머지 막대의 합을 답함
+      if (tag === TAGS.dropOne) return x.others.some((o) => v === x.v + o); // 나머지 하나를 빼지 않음
+      if (tag === TAGS.cellAsOne) return v === x.N - x.S / s; // 나머지 막대를 칸 수로 뺌
+      return false;
+    case 'ap.rise':
+      if (tag === TAGS.noChange) return v === x.last;
+      if (tag === TAGS.diffOnly) return v === x.d;
+      if (tag === TAGS.fromZero) return v === x.last - x.ch.base + x.d; // 앞 점을 0부터 읽음
+      return false;
+    case 'ap.scale':
+      if (tag === TAGS.sameCells) return v === x.val / x.s0;
+      if (tag === TAGS.valueAsCells) return v === x.val;
+      if (tag === TAGS.scaleBackward) return v === (x.val / x.s0) * (x.s1 / x.s0); // 칸 수를 반대쪽으로 바꿈
+      return false;
+    case 'ap.most':
+      if (tag === TAGS.maxOnly) return v === Math.max(...x.vs);
+      if (tag === TAGS.endsDiff) return v === x.vs[x.vs.length - 1] - x.vs[0];
+      if (tag === TAGS.fallAsRise) return v === Math.max(...x.ds.map((d) => -d)) && v > 0;
+      if (tag === TAGS.cellAsOne) return v === x.v / s;
+      return false;
+    default: return false;
+  }
+}
+
 // ── SVG 재기 (그려진 그림에서 값으로) ──
 const attr = (tag, a) => { const m = new RegExp(`\\b${a}="([^"]*)"`).exec(tag); return m ? m[1] : null; };
 /** 막대·꺾은선 그림 → 이름 붙은 눈금으로 만든 자 + 막대 꼭대기·점의 값 */
@@ -225,6 +277,11 @@ function measureChart(svg) {
   return { valAt, bars, pts, gridY, texts, named, perPx };
 }
 const close = (a, b) => Math.abs(a - b) < 1e-6;
+/** 그려진 그래프의 눈금 맨 위 값 — SVG의 가장 위 눈금선을 자로 잰다 (그래프 높이를 정하는 코드를 쓰지 않는다) */
+function axisTopOf(directive) {
+  const M = measureChart(figureSvg(directive.slice(1, -1)));
+  return M.valAt(Math.min(...M.gridY));
+}
 
 // ───────────────────── 그림 ─────────────────────
 
@@ -260,15 +317,17 @@ test('그림: 띠그래프 칸 너비 = 백분율 · 원그래프 조각 각 = �
 
 // ───────────────────── 사다리 ─────────────────────
 
-test('사다리: 9칸, 초4 다섯 + 초5 셋 + 초6 하나, needs가 바로 앞 칸, id는 dat.', () => {
-  assert.equal(DATA.length, 9);
+test('사다리: 10칸, 초4 다섯 + ⭐ 4학년 활용 + 초5 셋 + 초6 하나, needs가 바로 앞 칸(평균은 꺾은선 나타내기 칸 — ⭐가 길을 막지 않는다, v271), id는 dat.', () => {
+  assert.equal(DATA.length, 10);
   const ids = DATA.map((c) => c.id);
-  assert.equal(new Set(ids).size, 9);
-  assert.deepEqual(DATA.map((c) => c.grade), [4, 4, 4, 4, 4, 5, 5, 5, 6]);
+  assert.equal(new Set(ids).size, 10);
+  assert.deepEqual(DATA.map((c) => c.grade), [4, 4, 4, 4, 4, 4, 5, 5, 5, 6]);
   for (const [k, c] of DATA.entries()) {
     assert.ok(/^dat\./.test(c.id) && c.name && c.idea && c.slip, c.id);
-    assert.deepEqual(c.needs, k ? [ids[k - 1]] : []);
+    assert.deepEqual(c.needs, k ? [c.id === 'dat.mean' ? 'dat.choose' : ids[k - 1]] : []);
   }
+  assert.equal(ids[5], 'dat.apply');
+  assert.match(DATA[5].name, /^⭐ /);
   assert.equal(gradeLabel(6), '초6');
   assert.equal(valueOf('35%'), 35);
   assert.equal(valueOf('1/2'), 0.5);
@@ -300,7 +359,8 @@ test('★ 독립 검산: ① 정답이 문제 글·그래프를 따로 읽어 �
   // 모든 문항 가족이 나온다 (개념마다 얼굴이 여럿)
   const want = ['dat.bar scale', 'dat.bar read', 'dat.bar diff', 'dat.bar times', 'dat.barmake cells', 'dat.barmake choose', 'dat.line lread', 'dat.line most', 'dat.line rise',
     'dat.wave wave', 'dat.wave mid', 'dat.wave next', 'dat.choose kind', 'dat.choose point', 'dat.choose base', 'dat.mean mean', 'dat.meanuse total', 'dat.meanuse missing', 'dat.meanuse group', 'dat.meanuse raise',
-    'dat.chance chanceW', 'dat.chance chanceN', 'dat.chance color', 'dat.percent pctRest', 'dat.percent pctCount', 'dat.percent pctDiff'];
+    'dat.chance chanceW', 'dat.chance chanceN', 'dat.chance color', 'dat.percent pctRest', 'dat.percent pctCount', 'dat.percent pctDiff',
+    'dat.apply ap.sum', 'dat.apply ap.rise', 'dat.apply ap.scale', 'dat.apply ap.most'];
   for (const k of want) assert.ok(kinds[k] >= 10, `${k} 가족이 드물다 (${kinds[k] || 0})`);
 });
 
@@ -435,6 +495,7 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다 (따로 읽은
         const where = `${c.id} seed ${s}: "${ch.tag}" 오답 ${ch.text} — ${q.q.replace(/\n/g, ' ')}`;
         const v = num(ch.text);
         const hit = (cond) => { seen[ch.tag] = (seen[ch.tag] || 0) + 1; assert.ok(cond, where); };
+        if (x.k.startsWith('ap.')) { hit(apTagHolds(x, ch.tag, v)); continue; }
         const ch2 = x.ch; const s2 = ch2 ? ch2.s : 0; const sab = ch2 ? ch2.s * ch2.lab : 0;
         switch (ch.tag) {
           case TAGS.cellAsOne:
@@ -555,6 +616,20 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답
         case 'misread:mid': { const h = /(\d+시) 30분/.exec(shown)[1]; const i = ch.items.findIndex((x) => x.label === h); const mid = (ch.items[i].v + ch.items[i + 1].v) / 2; assert.notEqual(lastNum(shown), mid, where); assert.equal(lastNum(ok), mid, where); break; }
         case 'misread:kind': assert.ok(/마다 (잰|적은) 것은 막대그래프/.test(shown) && /꺾은선그래프/.test(ok), where); break;
         case 'misread:wave': { const mn = +/가장 작은 값이 (\d+)/.exec(q.q)[1]; assert.ok(lastNum(shown) > mn, where); assert.ok(lastNum(ok) <= mn, where); break; }
+        // ⭐ 4학년 활용 — 바른 값은 보여 준 풀이를 뗀 문제 글에서 따로
+        case 'misread:apsum': case 'misread:apwave': {
+          const w = solveText(q.q.replace(/\n\n[^\n]+[이가] 이렇게 말했어요\.[\s\S]*$/, '')); // 출연진 이름에 띄어쓰기가 있다("탈라 할머니")
+          assert.ok(w && w.ctx.k === (q.key === 'misread:apsum' ? 'ap.sum' : 'ap.rise'), where);
+          assert.notEqual(lastNum(shown), w.v, `${where}: 보여 준 값이 맞는 값`);
+          assert.equal(lastNum(ok), w.v, `${where}: 고친 답`);
+          assert.ok(w.v <= axisTopOf(w.ctx.ch.raw) + 1e-9, `${where}: 지워진 값이 그려진 눈금 밖 (Codex 80차 #1)`);
+          if (q.key === 'misread:apsum') assert.equal(lastNum(shown), w.ctx.S, `${where}: 나머지 막대의 합을 답한 풀이`);
+          else assert.equal(lastNum(shown), w.ctx.last - w.ctx.ch.base + w.ctx.d, `${where}: 물결선을 무시한 풀이`);
+          for (const x of q.choices.filter((y) => !y.ok && !['틀린 줄 모름', '엉뚱한 지적'].includes(y.tag))) assert.ok(apTagHolds(w.ctx, x.tag, lastNum(x.text)), `${where}: "${x.text}"`);
+          // 엉뚱한 지적은 이 문제(모두·늘어난 양이 주어짐)에선 분명히 틀린 말 — "…를 모르면 알 수 없어요"처럼 참이 되는 말로 바뀌지 않게 글 그대로
+          assert.equal(q.choices.find((y) => y.tag === '엉뚱한 지적').text, q.key === 'misread:apsum' ? '막대가 지워지면 그 값은 알 수 없어요' : '점이 지워지면 그때의 값은 알 수 없어요', where);
+          break;
+        }
         default:
           if (c.id === 'dat.mean') {
             const list = /: (.+)\n/.exec(q.q)[1].split(' · ').map((x) => +/ (\d+)/.exec(x)[1]);
@@ -577,7 +652,8 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답
   }
   for (const [k, n] of Object.entries(branches)) assert.ok(n >= Math.min(100, SEEDS / 6), `${k} 갈래가 드물다 (${n})`);
   const want = ['dat.bar misread:scale', 'dat.bar misread:diff', 'dat.barmake misread:cells', 'dat.barmake misread:scale', 'dat.line misread:most', 'dat.line misread:cells', 'dat.wave misread:zero', 'dat.wave misread:mid',
-    'dat.choose misread:kind', 'dat.choose misread:wave', 'dat.mean misread:mid', 'dat.mean misread:zero', 'dat.meanuse misread:total', 'dat.meanuse misread:compare', 'dat.chance misread:likely', 'dat.chance misread:count', 'dat.percent misread:pct', 'dat.percent misread:sum'];
+    'dat.choose misread:kind', 'dat.choose misread:wave', 'dat.mean misread:mid', 'dat.mean misread:zero', 'dat.meanuse misread:total', 'dat.meanuse misread:compare', 'dat.chance misread:likely', 'dat.chance misread:count', 'dat.percent misread:pct', 'dat.percent misread:sum',
+    'dat.apply misread:apsum', 'dat.apply misread:apwave'];
   assert.deepEqual(Object.keys(branches).sort(), [...want].sort());
 });
 
@@ -633,7 +709,8 @@ test('★ 풀이 카드: 단계 2줄↑ · 기억할 것 · 오답마다 왜 · 
 });
 
 test('아직 안 배운 말을 앞 칸에서 쓰지 않는다 — 꺾은선 K3 · 물결선 K4 · 평균 K6 · 가능성 K8 · 띠·원그래프·백분율·% K9', () => {
-  const RULES = [[/꺾은선/, 2], [/물결선/, 3], [/평균/, 5], [/가능성|불가능|확실/, 7], [/띠그래프|원그래프|백분율|%/, 8]];
+  // 처음 가르치는 칸의 자리로 (⭐ 4학년 활용이 끼어 뒤 칸 번호가 하나씩 밀렸다, v271)
+  const RULES = [[/꺾은선/, IDX['dat.line']], [/물결선/, IDX['dat.wave']], [/평균/, IDX['dat.mean']], [/가능성|불가능|확실/, IDX['dat.chance']], [/띠그래프|원그래프|백분율|%/, IDX['dat.percent']]];
   for (const c of DATA) {
     const i = IDX[c.id];
     const texts = [c.name, c.idea, c.slip];
@@ -701,7 +778,7 @@ test('📏 진단·사다리·한 편·배움 예비·내용 검사', () => {
   const ls = lessonOf('dat.mean', 3, OPTS);
   assert.equal(ls.title, '평균 구하기'); assert.ok(ls.pages[0].say.includes('평균'));
   assert.equal(conceptById('dat.nope'), null);
-  assert.equal(checkContent({}).length, 9, '원고가 없으면 칸마다 하나씩');
+  assert.equal(checkContent({}).length, 10, '원고가 없으면 칸마다 하나씩');
   // 화면 연결용 — 한 줄 요약은 그래프를 (그래프)로
   assert.equal(figText('글 [bgraph 2x5 명 사과:12 배:20]', true), '글 (그래프)');
 });
@@ -748,7 +825,7 @@ test('✍️ 점 찍기 판(3단계): 그린 칸 수가 숫자판과 같은 채�
 
 // ───────────────────── 원고 coach/math/data.json (2단계) ─────────────────────
 
-test('원고(data.json)가 형식 검사를 통과한다 — 9칸 모두 배움 3장↑·확인 2개↑·아빠 카드 · 그림은 모두 그려진다', () => {
+test('원고(data.json)가 형식 검사를 통과한다 — 10칸 모두 배움 3장↑·확인 2개↑·아빠 카드 · 그림은 모두 그려진다', () => {
   assert.deepEqual(checkContent(CONTENT), []);
   for (const c of DATA) {
     const L = lessonOf(c.id, 3, { ...OPTS, content: CONTENT });
@@ -911,7 +988,8 @@ test('★ 원고의 셈식(괄호까지)·수 뒤 조사·% 뒤 조사·단위 �
 });
 
 test('원고도 아직 안 배운 말을 앞 칸에서 쓰지 않는다 (꺾은선 K3 · 물결선 K4 · 평균 K6 · 가능성 K8 · 띠·원그래프·백분율·% K9)', () => {
-  const RULES = [[/꺾은선/, 2], [/물결선/, 3], [/평균/, 5], [/가능성|불가능|확실/, 7], [/띠그래프|원그래프|백분율|%/, 8]];
+  // 처음 가르치는 칸의 자리로 (⭐ 4학년 활용이 끼어 뒤 칸 번호가 하나씩 밀렸다, v271)
+  const RULES = [[/꺾은선/, IDX['dat.line']], [/물결선/, IDX['dat.wave']], [/평균/, IDX['dat.mean']], [/가능성|불가능|확실/, IDX['dat.chance']], [/띠그래프|원그래프|백분율|%/, IDX['dat.percent']]];
   for (const c of DATA) {
     const i = IDX[c.id];
     for (const [re, from] of RULES) if (i < from) for (const t of strings(CONTENT[c.id])) assert.doesNotMatch(t.replace(/\[[a-z]+ [^\]]+\]/g, ''), re, `${c.id} 원고: ${t.slice(0, 120)}`);
@@ -934,4 +1012,47 @@ test('🧩 STEMS·화면 등록 전 — 생성기 모듈은 다른 줄기와 같
   for (const f of ['makeQuestion', 'makeRound', 'diagnosticSet', 'placeFrom', 'ladder', 'lessonOf', 'checkContent']) assert.equal(typeof mod[f], 'function', f);
   const src = readFileSync(new URL('../js/mathdata.js', import.meta.url), 'utf8');
   assert.ok(!/document\.|window\./.test(src), '순수 모듈 — 화면을 건드리지 않는다');
+});
+
+// ───────────────────── ⭐ 4학년 활용 (dat.apply, v271) ─────────────────────
+
+test('⭐ 4학년 활용 자리: 꺾은선 나타내기 칸 바로 뒤 · 초4 · 그 칸을 끝내면 ⭐가 "지금"이고 평균 칸도 열린다 · 진단 5문제에는 없다 · 진단 뒤 5학년 칸에서 틀리면 앞 칸처럼 안다', () => {
+  const ids = DATA.map((c) => c.id);
+  assert.equal(ids.indexOf('dat.apply'), ids.indexOf('dat.choose') + 1);
+  assert.deepEqual(conceptById('dat.apply').needs, ['dat.choose']);
+  assert.deepEqual(conceptById('dat.mean').needs, ['dat.choose'], '평균 칸은 ⭐ 없이도 열린다');
+  const done = ['dat.bar', 'dat.barmake', 'dat.line', 'dat.wave', 'dat.choose'];
+  const L = Object.fromEntries(ladder(done).map((x) => [x.id, x.state]));
+  assert.equal(L['dat.apply'], 'now'); assert.equal(L['dat.mean'], 'open');
+  assert.equal(Object.fromEntries(ladder(done.slice(0, 4)).map((x) => [x.id, x.state]))['dat.apply'], 'locked');
+  for (let s = 1; s <= 60; s++) assert.ok(!diagnosticSet(s, 5, OPTS).some((q) => q.concept === 'dat.apply'), `진단 #${s}`);
+  assert.ok(placeFrom([{ concept: 'dat.bar', correct: true }, { concept: 'dat.line', correct: true }, { concept: 'dat.choose', correct: true }, { concept: 'dat.meanuse', correct: false }]).knownIds.includes('dat.apply'));
+  assert.ok(!placeFrom([{ concept: 'dat.bar', correct: true }, { concept: 'dat.line', correct: false }]).knownIds.includes('dat.apply'));
+});
+
+test('⭐ 4학년 활용 ①: 네 가족이 다 나온다 · 이름표 붙은 오답이 둘 이상 · 도움말(whyAny)은 가족마다(칸의 일반 말 아님) · 지워진 값은 그래프에 ?로 · 강낭콩의 키·4학년까지의 키는 줄지 않는다', () => {
+  const WANT = { 'ap.sum': /나머지 막대를 모두 빼면/, 'ap.rise': /늘어난 양을 더해요/, 'ap.scale': /새 눈금 한 칸으로 나눠요/, 'ap.most': /구간마다 늘어난 양/ };
+  const slip = conceptById('dat.apply').slip; const seen = {};
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = makeQuestion('dat.apply', 'calc', s * 389, OPTS);
+    const w = solveText(q.q); const where = `#${s}: ${q.q.replace(/\n/g, ' ')}`;
+    assert.ok(w && w.ctx.k.startsWith('ap.'), where);
+    seen[w.ctx.k] = (seen[w.ctx.k] || 0) + 1;
+    assert.ok(q.choices.filter((x) => !x.ok && x.tag !== '계산 실수').length >= 2, `${where}: 이름표 붙은 오답`);
+    assert.notEqual(q.solve.whyAny, slip, where);
+    assert.match(q.solve.whyAny, WANT[w.ctx.k], where);
+    const ch = readChart(q.q);
+    if (w.ctx.k === 'ap.sum' || w.ctx.k === 'ap.rise') {
+      assert.equal(ch.items.filter((x) => x.v === null).length, 1, `${where}: ? 하나`);
+      assert.ok(w.v <= axisTopOf(ch.raw) + 1e-9, `${where}: 지워진 값 ${w.v}이 그려진 눈금(${axisTopOf(ch.raw)})보다 크다 (Codex 80차 #1)`);
+    }
+    else assert.ok(ch.items.every((x) => x.v !== null), `${where}: ? 없이`);
+    if (/강낭콩의 키|의 키를 해마다/.test(q.q)) { const vs = ch.items.map((x) => x.v).filter((x) => x !== null); assert.ok(vs.every((v, i) => !i || v > vs[i - 1]), `${where}: 키가 줄었다`); }
+    // 가장 많이 늘어난 양 — "처음과 끝의 차"·"가장 크게 줄어든 양"이 정답과 같으면 그 틀린 생각이 보기에서 조용히 빠진다 (v271 변이)
+    if (w.ctx.k === 'ap.most') {
+      const ends = w.ctx.vs[w.ctx.vs.length - 1] - w.ctx.vs[0]; const fall = Math.max(0, ...w.ctx.ds.map((d) => -d));
+      assert.notEqual(ends, w.v, `${where}: 처음과 끝의 차가 정답과 같다`); assert.notEqual(fall, w.v, `${where}: 줄어든 양이 정답과 같다`);
+    }
+  }
+  for (const k of Object.keys(WANT)) assert.ok((seen[k] || 0) >= SEEDS / 10, `${k}: ${seen[k] || 0}`);
 });
