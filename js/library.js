@@ -1,7 +1,7 @@
 // 라이브러리 화면: 콘텐츠 가져오기(mp4 + srt) / 목록 / 삭제 / 저장 공간 표시
 import { addItem, listItems, deleteItem, storageEstimate, getAllSentenceStats, getMath } from './db.js';
 import { parseSubtitle } from './srt.js';
-import { LOCKED, unlockState, totalsFrom, NEED, needOf, isGift, nextTarget, previewGift, ownedVoucherIds, pendingGifts } from './unlock.js';
+import { LOCKED, unlockState, totalsFrom, NEED, needOf, isGift, nextTarget, previewGift, ownedVoucherIds, pendingGifts, fileLabel } from './unlock.js';
 import { giftPoster } from './gift.js';
 import { classifyFiles, suggestTitle, describePick, listVideos } from './importfiles.js';
 import { coins, inventory, buyTicket, initProfile, unlockBase, ensureUnlockBase, giftsGiven } from './xp.js';
@@ -578,8 +578,12 @@ function waitingCard(c) {
     <div class="next-body">
       <p class="next-title"></p>
       <p class="next-msg">🎟️ 샀어요! <b>아빠에게 보여주세요</b> — 아빠가 영상을 넣어 주면 볼 수 있어요</p>
+      <p class="next-files" hidden></p>
     </div>`;
   el.querySelector('.next-title').textContent = `${c.emoji} ${c.ko}`;
+  // 📁 아빠가 넣을 파일 (2026-10-17 아버님 "앞으로 저 교환권에는 파일 이름도 같이 써놔줘") — 아이가 보여 주면 아빠가 바로 찾게
+  const f = fileLabel(c);
+  if (f) { const p = el.querySelector('.next-files'); p.textContent = `📁 아빠용: ${f}`; p.hidden = false; }
   return el;
 }
 

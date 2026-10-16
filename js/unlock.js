@@ -26,6 +26,8 @@ export const ticketId = (id) => `${TICKET_PREFIX}${id}`;
  * 수집이 목표인 아이에게는 "얘네가 나온다"가 장면 사진보다 직접적이다.
  *
  * cast  = 그 영상에 나오는 포켓몬 id (한국어 이름은 PokeAPI로 대조함)
+ * folder = 아빠 PC의 자료 폴더(F:\per\mp3 아래) — 교환권에 파일 이름을 같이 적는다 (2026-10-17 아버님 "앞으로 저 교환권에는 파일 이름도 같이 써놔줘").
+ *          폴더에는 `<id>.mp4` · `<id>.en.srt` · `<id>.ko.srt` — 영상 이름이 id와 같으면 가져오기에서 제목(ko)이 저절로 채워진다(importfiles.suggestTitle)
  * teaser = 영상에 실제로 나오는 대사 한 줄 (사면 배우게 될 문장)
  */
 // ★ **아빠가 영상을 넣어 준 것은 이 목록에서 뺀다.**
@@ -36,7 +38,7 @@ export const ticketId = (id) => `${TICKET_PREFIX}${id}`;
 export const LOCKED = [
   {
     id: 'iconic', ko: '지우와 피카츄 최고의 순간', en: "Ash & Pikachu's Iconic Moments",
-    poster: 25, emoji: '⚡', minutes: 10, sentences: 103, price: 2000,
+    poster: 25, emoji: '⚡', minutes: 10, sentences: 103, price: 2000, folder: '260918\\iconic',
     blurb: '10만볼트부터 1000만볼트까지, 지우와 피카츄의 명장면',
     cast: [
       { id: 25, ko: '피카츄' }, { id: 448, ko: '루카리오' },
@@ -46,7 +48,7 @@ export const LOCKED = [
   },
   {
     id: 'wild2', ko: '야생의 포켓몬 2', en: 'Wild Pokemon 2',
-    poster: 382, emoji: '🌊', minutes: 9, sentences: 46, price: 2000,
+    poster: 382, emoji: '🌊', minutes: 9, sentences: 46, price: 2000, folder: '260918\\wild2',
     blurb: '전설의 포켓몬 가이오가가 바다에서 나타나요',
     cast: [
       { id: 382, ko: '가이오가' }, { id: 184, ko: '마릴리' },
@@ -56,7 +58,7 @@ export const LOCKED = [
   },
   {
     id: 'prime_suspect', ko: '피카츄가 유력 용의자', en: 'Pikachu Is the Prime Suspect',
-    poster: 25, emoji: '🔍', minutes: 4, sentences: 65, price: 2000,
+    poster: 25, emoji: '🔍', minutes: 4, sentences: 65, price: 2000, folder: '260918\\prime_suspect',
     blurb: '피카츄가 전기 도둑으로 붙잡혔어요 — 누명을 벗겨 주세요',
     // 자막에는 피카츄만 이름이 나온다 — 나머지 둘은 영상 프레임을 직접 보고 확인했다
     // (흥나숭은 경찰서 장면, 가디는 제니 경관 옆. PokeAPI로 한국어 공식명 대조)
@@ -66,6 +68,14 @@ export const LOCKED = [
     teaser: 'What are you arresting Pikachu for?',
   },
 ];
+
+/**
+ * 🎟️ 그 영상 교환권의 파일 한 줄 → "\260918\prime_suspect — prime_suspect.mp4" (folder가 없으면 '')
+ * 아빠 PC의 F:\per\mp3 **다음부터**만, 파일은 영상 하나만 (아버님 "mp3까지는 내가 아니까 그 다음의 \260918\prime_suspect — prime_suspect.mp4 이것만")
+ */
+export function fileLabel(c) {
+  return c && c.folder ? `\\${c.folder} — ${c.id}.mp4` : '';
+}
 
 /**
  * 코인 말고 더 채워야 하는 조건.
@@ -106,6 +116,12 @@ export const GIFTS = [
   },
 ];
 
+/**
+ * 🎁 아빠가 실제로 건넸다고 **대화로** 알려 준 선물 { id: 날짜 } — 📊 "건네줬어요"를 안 눌러도 아이 화면·📊·⚙ 사진 칸에서 사라진다
+ * (xp.giftsGiven이 프로필 기록과 합친다). 🔔 벨: 2026-10-17 아버님 "사줬어. 더이상 앱에서 안보여도 돼"
+ */
+export const GIVEN_BY_DAD = { bell: '2026-10-17' };
+
 export const isGift = (c) => !!c && GIFTS.some((g) => g.id === c.id);
 /** 그 교환권의 학습 조건 (선물은 따로, 영상은 NEED) */
 export const needOf = (c) => ({ ...NEED, ...((c && c.need) || {}) });
@@ -132,19 +148,20 @@ export function ownedVoucherIds(inventory = {}) {
 }
 
 /** 지금 모으는 교환권 — 줄에서 아직 안 가진 첫 번째 (영상이든 선물이든) */
-export function nextTarget(ownedIds = []) {
+export function nextTarget(ownedIds = [], given = GIVEN_BY_DAD) {
   const owned = new Set([...ownedIds].map(String));
-  return voucherOrder().find((c) => !owned.has(c.id)) || null;
+  // 🎁 아빠가 이미 건넨 선물은 건너뛴다 — 그 교환권이 없는 기기(새 기기·옛 백업)에서 다시 목표로 서지 않게 (Codex 85차)
+  return voucherOrder().find((c) => !owned.has(c.id) && !(isGift(c) && given && given[c.id])) || null;
 }
 
 /**
  * 🔒 차례는 아직이지만 미리 보여 줄 선물 — 안 가졌고 지금 모으는 것도 아닌 첫 선물.
  * 영상 교환권을 모으는 동안 "이걸 받으면 다음은 진짜 선물"이 보이게 (아버님: 빨리 끝내고 싶게)
  */
-export function previewGift(ownedIds = []) {
+export function previewGift(ownedIds = [], given = GIVEN_BY_DAD) {
   const owned = new Set([...ownedIds].map(String));
-  const now = nextTarget(ownedIds);
-  return GIFTS.find((g) => !owned.has(g.id) && (!now || now.id !== g.id)) || null;
+  const now = nextTarget(ownedIds, given);
+  return GIFTS.find((g) => !owned.has(g.id) && !(given && given[g.id]) && (!now || now.id !== g.id)) || null;
 }
 
 /** 아이가 받았지만 아빠가 아직 안 건넨 선물 (📊에 알림 · 아이 화면엔 "아빠에게 보여 주세요") */

@@ -2211,6 +2211,9 @@ button { font-family: inherit; }
 .next-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 2px; }
 .next-blurb { font-size: .9rem; color: var(--muted); margin: 0 0 10px; }
 .next-msg { font-size: .95rem; margin: 4px 0 0; color: #92400e; }
+/* 📁 아빠가 넣을 파일 (2026-10-17) — 긴 경로가 폰 폭을 넘지 않게 아무 데서나 줄을 바꾼다 */
+.next-files { font-size: .78rem; margin: 6px 0 0; color: #6b7280; overflow-wrap: anywhere; }
+.ticket-files { overflow-wrap: anywhere; }
 .next-teaser {
   font-size: 1rem; font-weight: 700; font-style: italic; color: #4338ca;
   background: #fff; border-left: 4px solid var(--primary);

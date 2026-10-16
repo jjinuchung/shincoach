@@ -4,7 +4,7 @@
 // 피카츄가 들어간 상품 사진이라 공개 저장소(GitHub Pages)에 올리지 않는다 (unlock.js LOCKED 주석의 원칙).
 // 사진이 아직 없으면 포켓몬 그림(PokeAPI, 이미 기기에 받아 둔 것), 그것도 없으면 이모지로 보인다 — 카드는 늘 뜬다.
 import { getGiftPhoto, putGiftPhoto, deleteGiftPhoto } from './db.js';
-import { GIFTS } from './unlock.js';
+import { GIFTS, GIVEN_BY_DAD } from './unlock.js';
 import { characterUrl } from './pokemon.js';
 
 const urls = new Map(); // 선물 id → objectURL (없으면 null) — 화면을 다시 그릴 때마다 Blob을 새로 읽지 않게
@@ -70,7 +70,9 @@ export function initGiftSettings() {
   if (!btn) return;
   const del = document.getElementById('set-gift-photo-del');
   const note = document.getElementById('set-gift-photo-note');
-  const g = GIFTS[0]; // 지금 선물은 하나(🔔 자전거 벨) — 늘면 고르는 칸을 만든다
+  // 아직 안 건넨 첫 선물 (늘면 고르는 칸을 만든다) — 다 건넸으면 사진 칸을 숨긴다 (🔔 벨 2026-10-17 건넴)
+  const g = GIFTS.find((x) => !GIVEN_BY_DAD[x.id]);
+  if (!g) { const fs = btn.closest('fieldset'); if (fs) fs.hidden = true; return; }
   const say = (t) => { if (note) note.textContent = t; };
   const refresh = async () => {
     const u = await giftPhotoUrl(g.id);

@@ -13,7 +13,7 @@ import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED, favList, FAV_ICON } from './review.js';
 import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot, giftsGiven, markGiven, salesByDay, rocketRecord, rocketHideout } from './xp.js';
 import { salesReport, SELL_MON_MAX } from './sell.js'; // 💰 5일장에서 판 것 (2026-10-05)
-import { pendingTickets, pendingGifts } from './unlock.js';
+import { pendingTickets, pendingGifts, fileLabel } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
 import { ROSTER } from './pokemon.js';
 import { lvOf } from './evolve.js';
@@ -380,6 +380,9 @@ export async function renderStats() {
       row.appendChild(el('span', 'name', `${t.emoji} ${t.ko}`));
       row.appendChild(el('span', 'meta', `${t.en} · ${t.minutes}분 · ${t.sentences}문장`));
       c0.appendChild(row);
+      // 📁 아빠 PC의 어느 파일인지 (2026-10-17 아버님 "앞으로 저 교환권에는 파일 이름도 같이 써놔줘")
+      const f = fileLabel(t);
+      if (f) c0.appendChild(el('p', 'stats-note ticket-files', `📁 ${f}`));
     }
     main.appendChild(c0);
   }

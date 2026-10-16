@@ -34,7 +34,7 @@ import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, candyOf, candyCost, MAX_LV } from './evolve.js';
 import { stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER } from './pokemon.js';
-import { findVoucher } from './unlock.js';
+import { findVoucher, GIVEN_BY_DAD } from './unlock.js';
 
 // ── 경험치 ──
 export const XP = {
@@ -787,7 +787,7 @@ export function ensureUnlockBase(base) {
 
 /** 🎁 아빠가 건넨 선물 { id: 날짜 } */
 export function giftsGiven() {
-  return { ...(profile.giftsGiven || {}) };
+  return { ...GIVEN_BY_DAD, ...(profile.giftsGiven || {}) }; // 🎁 아빠가 대화로 알려 준 것도 (📊에서 누른 날이 있으면 그 날)
 }
 
 /** 🎁 선물을 건넸다고 표시 (📊, 비밀번호 뒤) — 한 번 표시하면 아이 화면의 "아빠에게 보여 주세요"와 📊 알림이 사라진다 */

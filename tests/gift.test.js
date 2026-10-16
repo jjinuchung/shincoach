@@ -29,15 +29,16 @@ test('🎁 자전거 벨: 아버님이 정한 조건 그대로 — 💰 2,000 ·
 
 test('🎁 줄: 지금 영상 → 🔔 벨 → 다음 영상들 · 지금 모으는 것은 하나, 벨은 차례 전부터 미리 보기', () => {
   assert.deepEqual(voucherOrder().map((c) => c.id), ['iconic', 'bell', 'wild2', 'prime_suspect']);
+  // (선물 줄의 짜임 시험 — 아빠가 건넨 선물 없이 {}. 🔔 벨은 2026-10-17 건넴 → 실제 기본값은 tests/voucher276)
   // 아무것도 안 가짐 → 영상(iconic)을 모으고, 벨은 미리 보기
-  assert.equal(nextTarget([]).id, 'iconic');
-  assert.equal(previewGift([]).id, 'bell');
+  assert.equal(nextTarget([], {}).id, 'iconic');
+  assert.equal(previewGift([], {}).id, 'bell');
   // 영상 교환권을 받음 → 이제 벨 차례 (미리 보기는 없음 — 그 카드가 곧 진짜 카드)
-  assert.equal(nextTarget(['iconic']).id, 'bell');
-  assert.equal(previewGift(['iconic']), null);
+  assert.equal(nextTarget(['iconic'], {}).id, 'bell');
+  assert.equal(previewGift(['iconic'], {}), null);
   // 벨도 받음 → 다음 영상, 미리 볼 선물 없음
-  assert.equal(nextTarget(['iconic', 'bell']).id, 'wild2');
-  assert.equal(previewGift(['iconic', 'bell']), null);
+  assert.equal(nextTarget(['iconic', 'bell'], {}).id, 'wild2');
+  assert.equal(previewGift(['iconic', 'bell'], {}), null);
   // 영상 교환권 목록(nextLocked)은 예전처럼 영상만 — 📊 "넣어줘야 할 영상"·제목 배달 판정은 그대로
   assert.equal(nextLocked(['iconic']).id, 'wild2');
 });

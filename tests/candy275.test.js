@@ -328,7 +328,7 @@ test('🔌 화면·저장 연결: 가판대 고르기 줄 · 사탕 단추는 �
   assert.ok(body(dex, 'function bagText() {').includes('const candy = candyTotal();'), '가방 줄에 🍬');
   const st = src('js/stats.js');
   assert.match(st, /x\.candy \? `🍬\$\{x\.candy\}` : x\.coins/, '📊 판 것에 🍬');
-  assert.match(src('sw.js'), /const CACHE_VERSION = 'v275';/);
+  assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(src('sw.js')) || [])[1]) >= 275, 'sw v275 이상 (판을 못 박으면 다음 판에서 깨진다)');
   // 사탕 수를 글에 숫자로 박지 않는다 — 값은 규칙(evolve.candyCost)에서
   assert.ok(!/사탕 [2-9]개/.test(mv + shop), '사탕 개수를 글에 숫자로');
 });
