@@ -108,6 +108,37 @@ export function englishFiles(days, summaries, today) {
   return [{ path: `english/${today}.md`, text: `${lines.join('\n').trim()}\n` }];
 }
 
+/** ms → 'YYYY-MM-DD' (이 기기 시간대) — 없거나 깨졌으면 '' */
+function dayOfMs(ms) {
+  const n = Number(ms);
+  if (!(n > 0)) return '';
+  const d = new Date(n);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (v) => String(v).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/**
+ * 📚 태블릿 영상 전체 목록 (v277, 2026-10-17 아버님 "이대로 해") — `english/library.md` 한 파일(날짜 없이 늘 최신 — 지난 것은 저장소 기록에).
+ * 영어 요약(english/날짜.md)은 최근에 연 EN_VIDEOS편뿐이라 오래 안 연 영상은 있는지 몰랐다 → Claude가 아빠 PC의 자료 폴더와
+ * 파일 이름으로 맞춰 "만들었지만 태블릿에 없는 자료"·"교환권 후보"·"다 배운 영상"을 알려 드린다. 영상 파일·자막 글은 안 올린다. 넣은 차례(오래된 것부터)
+ * @param {Array<object>} summaries stats.contentSummary 결과 (videoName·createdAt·duration 포함)
+ */
+export function libraryFiles(summaries, today) {
+  const num = (v) => Number(v) || 0;
+  const list = (Array.isArray(summaries) ? summaries : []).filter((x) => x && x.id)
+    .sort((a, b) => num(a.createdAt) - num(b.createdAt) || String(a.title || '').localeCompare(String(b.title || '')));
+  const lines = [`📚 태블릿 영상 전체 (${today}) — ${list.length}편 · 넣은 차례 · 파일 = 넣을 때 고른 영상 파일 이름`, ''];
+  for (const v of list) {
+    if (v.broken) { lines.push(`- 「${v.title || '?'}」 (영상 정보를 못 읽음)`); continue; }
+    const dur = num(v.duration);
+    const len = dur > 0 ? ` · ${dur >= 60 ? `${Math.round(dur / 60)}분` : '1분 안'}` : '';
+    lines.push(`- 「${v.title}」 · 파일 ${v.videoName || '(모름)'} · 넣은 날 ${dayOfMs(v.createdAt) || '(모름)'}${len} · 한 문장 ${num(v.done)}/${num(v.total)} · 🎤 말해 본 문장 ${num(v.said)}/${num(v.total)} (${num(v.saidPct)}%) · 마지막으로 연 날 ${dayOfMs(v.lastAt) || '안 엶'}`);
+  }
+  if (!list.length) lines.push('(영상 없음)');
+  return [{ path: 'english/library.md', text: `${lines.join('\n').trim()}\n` }];
+}
+
 /** 초 → "1시간 12분" · "35분" · "1분 안" (순수) */
 export function fmtMin(sec) {
   const s = Math.floor(Number(sec) || 0);
@@ -235,6 +266,7 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
     ...(getKorTodo ? koreanFiles(kor, today) : []), // ✍️ 국어 서술형 (v237)
     ...(getEnglish ? englishFiles(days, en, today) : []), // 🎤 영어 요약 (v253)
+    ...(getEnglish ? libraryFiles(en, today) : []), // 📚 태블릿 영상 전체 목록 (v277)
     ...(typeof korRep === 'string' && korRep ? [{ path: `korean/${today}.md`, text: korRep }] : []), // 📚 국어 요약 (v254)
     ...(usagePlaces ? usageFiles(days, today, usagePlaces) : []), // 🕒 앱 사용 기록 (v272)
   ];

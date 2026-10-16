@@ -121,7 +121,9 @@ export function contentSummary(items, records, cueCountOf, cueKeysOf) {
     const attempts = rs.reduce((a, r) => a + (r.speakAttempts || 0), 0);
     const pass = rs.reduce((a, r) => a + (r.speakPass || 0), 0);
     const lastAt = rs.reduce((a, r) => Math.max(a, r.lastAt || 0), 0);
-    return { id: it.id, title: it.title, broken: !!it.broken, total, done, said, mastered, seconds, attempts, pass, lastAt, pct: total ? Math.round((done / total) * 100) : 0, saidPct: total ? Math.round((said / total) * 100) : 0 };
+    return { id: it.id, title: it.title, broken: !!it.broken, total, done, said, mastered, seconds, attempts, pass, lastAt, pct: total ? Math.round((done / total) * 100) : 0, saidPct: total ? Math.round((said / total) * 100) : 0,
+      // 📚 태블릿 영상 전체 목록(v277)에 — 넣을 때 고른 영상 파일 이름 · 넣은 때 · 길이(초)
+      videoName: it.videoName || '', createdAt: Number(it.createdAt) || 0, duration: Number(it.duration) || 0 };
   });
 }
 
