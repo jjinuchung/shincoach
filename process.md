@@ -4773,5 +4773,25 @@
 ### TODO (다음 작업)
 - [x] 🔍 Codex 84차 → 아버님 "표대로" → P2·시험 보강 · P1 범위 주석
 - [x] 전체 시험 2109 통과 · check
-- [ ] 아버님 "배포" → feat + docs(v274 라이브 줄 포함) → 라이브 v275
+- [x] 아버님 "배포" → `9bf0d1a` feat · `5c5b0ca` docs → push → 라이브 v275 · 배포본 10개 같음(`.context/candy_v275/live_check.sh`)
 - [ ] 태블릿 v275 → 5일장(장날)에 사탕으로 팔기·도감에서 사탕 레벨업이 되는지
+
+## 2026-10-17 — 🎟️ 교환권에 파일 이름 · 🔔 자전거 벨 건넴 (v276)
+
+### 진행
+- 아버님: "피카츄 자전거 벨은 사줬어. 더이상 앱에서 안보여도 돼" · "'피카츄가 유력 용의자' 교환권 … 학습자료 파일 이름이 뭐야? … 앞으로 저 교환권에는 파일 이름도 같이 써놔줘"
+  - 답: `F:\per\mp3\260918\prime_suspect` — `prime_suspect.mp4` · `.en.srt` · `.ko.srt` (폴더째 고르면 whisper 파일이 섞여 있어도 .en/.ko가 잡히고, 영상 이름이 교환권 id라 제목이 저절로 "피카츄가 유력 용의자")
+- `js/unlock.js`: `LOCKED`마다 `folder`(아빠 PC `MEDIA_ROOT = F:\per\mp3` 아래) · `filesOf(c)` → 폴더 + `<id>.mp4 · <id>.en.srt · <id>.ko.srt` · 새 교환권은 폴더를 꼭 적게 시험으로 막음
+  - 📊 "🎟️ 넣어줘야 할 영상"에 📁 줄(`js/stats.js`) · 아이의 "🎟️ 샀어요! 아빠에게 보여주세요" 카드에 "📁 아빠용: …"(`js/library.js`) · 긴 경로 줄바꿈(css)
+- `GIVEN_BY_DAD = { bell: '2026-10-17' }` — 📊 "건네줬어요"를 안 눌러도 건넨 것: `xp.giftsGiven()`에 합침(누른 날이 있으면 그 날) · `nextTarget`/`previewGift`도 건넨 선물을 건너뜀(벨 교환권이 없는 기기에서도 다시 안 섬 — Codex 85차 P1) · ⚙ 선물 사진 칸은 다 건넸으면 숨김(`js/gift.js`) · 벨 정의(GIFTS)는 남김(교환권 줄·옛 기록)
+- sw v276 · 새 `tests/voucher276.test.js` 3 · `tests/gift.test.js` 줄 짜임 시험은 건넨 선물 없이(`{}`) · `tests/candy275.test.js`의 sw 판 고정을 "v275 이상"으로(판을 올리자 깨졌다)
+- 헤드리스 390(`.context/voucher_v276/walk276.sh`): 아이 카드 셋에 📁 줄 · 📊 카드 📁 줄 · 벨 카드 없음 · ⚙ 사진 칸 숨김 · 넘침 없음 · 콘솔 0
+- 🔍 Codex 85차(`.context/voucher_v276/codex85.md`): P1 벨 교환권이 없는 기기에서 미리 보기·다음 목표로 다시 섬 → 고침(아버님 요청 범위) · 병합·파일 이름·경로 줄바꿈·위생 괜찮음
+- 변이 `.context/voucher_v276/mutate_v276.mjs` **11 중 11**(`mut276c.log`) · 전체 시험 **2112 통과**(`.context/voucher_v276/full276.log`)
+
+- **표시 꼴 고침**(아버님 "mp3까지는 내가 아니까 그 다음의 °918\prime_suspect — prime_suspect.mp4 이것만 표시"): `filesOf`·`MEDIA_ROOT` → `fileLabel(c)` 한 줄(`\<날짜>\<id> — <id>.mp4`) · 📊의 "폴더를 통째로…" 안내도 뺌 · 변이 **12 중 12**(`mut276d.log`)
+- 아버님: 지우와 피카츄·야생 2는 예전에 넣었고 prime_suspect도 태블릿에 넣음 · 포켓몬 자료 7편(4K Video Downloader+의 7편 모두 만듦) 중 교환권으로 쓴 것 5편(ash_battles·gengar·iconic·wild2·prime_suspect) · **만들어만 두고 교환권 목록에 안 넣은 것 2편: beary_icy(260922, 29문장 3분) · arceus(260923, 67문장 8분)** — 태블릿에 있는지는 업로드(최근 연 10편만)로는 모른다
+
+### TODO (다음 작업)
+- [ ] 아버님 "배포" → feat + docs(v275 라이브 줄 포함) → 라이브 v276
+- [ ] 다음 교환권(beary_icy·arceus)과 📚 태블릿 영상 전체 목록 올리기 — 아버님께 여쭘
