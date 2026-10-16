@@ -68,7 +68,7 @@ test('🎧 단원 지도: 5-1 1단원(K36·K40) · 3단원(K38) · 5단원(K39) 
   const of = (id) => UNITS.units.find((u) => u.id === id).cards;
   assert.deepEqual(of('5-1-1'), ['K1', 'K4', 'K36', 'K40']);
   assert.deepEqual(of('5-1-3'), ['K13', 'K21', 'K38']);
-  assert.deepEqual(of('5-1-5'), ['K15', 'K23', 'K39', 'K63']); // v261 K63 두 관점의 글
+  assert.deepEqual(of('5-1-5'), ['K15', 'K23', 'K39', 'K63', 'K73']); // v261 K63 두 관점의 글 · v265 K73 성수동·인사동(문제 해결에 쓰기)
   assert.deepEqual(of('5-2-독서'), ['K16', 'K24', 'K41']);
   assert.deepEqual(of('5-2-1'), ['K7', 'K19', 'K31', 'K41', 'K48', 'K53', 'K71', 'K72']); // v254 「토끼전」 독서 모임 · 「흥부와 놀부」 · v261 옛이야기 둘
   assert.deepEqual(of('5-2-5'), ['K5', 'K15', 'K23', 'K39']);

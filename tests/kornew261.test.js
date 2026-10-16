@@ -77,8 +77,8 @@ const codesOf = (c) => c.meta.flatMap((m) => [...m.matchAll(/\[(6국0\d-0\d)\]/g
 
 test('📚 새 글 12편 (v261): 연습 여덟 + ✨ 명작 넷 · 물음 마흔여섯 · 원고 검사 통과 · 단원 지도 · ✍️ 둘', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS.slice(60), NEW);
-  assert.equal(validCards(DATA).length, 72);
+  assert.deepEqual(IDS.slice(60, 72), NEW);
+  assert.equal(validCards(DATA).length, 78); // v265 신문 글 여섯 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '기사문'], ['practice', '주장하는 글'], ['practice', '제안하는 글 두 편'], ['practice', '설명하는 글'], ['practice', '설명하는 글'],
     ['practice', '동화'], ['practice', '생활문'], ['practice', '극본'], ['classic', '동시'], ['classic', '동시'], ['classic', '옛이야기'], ['classic', '옛 소설']]);
@@ -182,7 +182,7 @@ test('📘 성취기준 문구 (v261): 원고의 [6국…] 뒤 문구는 2022 �
 
 test('📄 글 꼴 layout rows (v261): 극본의 대사·두 사람의 글·기사 제목은 문장마다 줄 — 그 세 카드에만 · 원고 검사가 잡는 것 · 화면은 is-rows', () => {
   assert.deepEqual(Object.keys(LAYOUTS), ['rows']);
-  assert.deepEqual(DATA.cards.filter((c) => Object.hasOwn(c, 'layout')).map((c) => [c.id, c.layout]), [['K61', 'rows'], ['K63', 'rows'], ['K68', 'rows']]);
+  assert.deepEqual(DATA.cards.filter((c) => Object.hasOwn(c, 'layout')).map((c) => [c.id, c.layout]), [['K61', 'rows'], ['K63', 'rows'], ['K68', 'rows'], ['K73', 'rows'], ['K74', 'rows'], ['K75', 'rows'], ['K76', 'rows'], ['K77', 'rows']]); // v265 신문 기사 다섯(제목 줄)
   const bad = (fix) => { const c = JSON.parse(JSON.stringify(card('K68'))); fix(c); return checkCard(c).join(' '); };
   assert.equal(bad(() => {}), '');
   assert.match(bad((c) => { c.layout = 'cols'; }), /layout\(글 꼴\)은 rows만/);

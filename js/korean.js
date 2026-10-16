@@ -56,6 +56,9 @@ export const KINDS = { practice: '📄 연습 카드', classic: '✨ 명작 카�
 export const PRE = { '중학교': '⭐ 중학교 미리보기' };
 /** 글 꼴(layout, v261) — rows면 문장마다 줄을 바꾼다(극본의 대사 · 두 사람의 글 · 기사 제목처럼 줄이 나뉘어야 읽기 쉬운 글) · 없으면 이어 쓴 문단 */
 export const LAYOUTS = { rows: '문장마다 줄 바꿈' };
+/** 바탕 글(source, v265) — 신문 기사처럼 다른 글을 바탕으로 신코치가 다시 쓴 연습 글은 무엇을 바탕으로 했는지 글 아래에 작게 밝힌다 ·
+ *  명작은 facts의 원문·저작권 줄로 밝히므로 연습 카드에만 */
+export const SOURCE_MAX = 120;
 
 /** ✍️ 서술형 답 글자 수 (공백 정리 뒤) — 규칙은 korwrite.js, 원고 검사(write.model)도 같은 값 (v237) */
 export const WRITE_MIN = 10;
@@ -418,6 +421,7 @@ export function checkCard(c, ids = new Set()) {
   if (own(c, 'pre') && !own(PRE, c.pre)) at(`pre(미리보기)는 ${Object.keys(PRE).join('·')}`);
   for (const k of ['title', 'genre', 'icon', 'skill']) if (!nonEmpty(c[k])) at(`${k}가 비었어요`);
   if (!Array.isArray(c.meta) || !c.meta.length || !c.meta.every(nonEmpty)) at('meta(만나는 곳·성취기준)가 비었어요');
+  if (own(c, 'source') && (c.kind !== 'practice' || !nonEmpty(c.source) || [...c.source].length > SOURCE_MAX)) at(`source(바탕 글)는 연습 카드에 ${SOURCE_MAX}자까지의 글로`);
   const hasLines = Array.isArray(c.lines);
   const hasStanzas = Array.isArray(c.stanzas);
   if (hasLines === hasStanzas) at('글은 lines 또는 stanzas 하나만');

@@ -414,6 +414,7 @@ function passageEl(card) {
   box.appendChild(el('h3', 'kor-passage-title', `「${card.title}」`));
   box.appendChild(proseEl(card));
   if (card.words) box.appendChild(wordsEl(card));
+  if (card.source) box.appendChild(el('p', 'kor-source', `📰 ${card.source}`)); // 바탕 글 (v265 — 신문 기사를 다시 쓴 글)
   return box;
 }
 

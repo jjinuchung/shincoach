@@ -3211,6 +3211,7 @@ button { font-family: inherit; }
 .kor-words { display: grid; gap: 2px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 0.88rem; line-height: 1.5; color: #4b5563; }
 .kor-classic .kor-words { margin-top: 0; border-top-color: var(--kor-gold-line); }
 .kor-words-h { font-weight: 800; color: var(--primary-dark); font-size: 0.82rem; }
+.kor-source { margin: 10px 0 0; font-size: 0.8rem; line-height: 1.5; color: #6b7280; }
 .kor-word { margin: 0; word-break: keep-all; }
 .kor-word b { color: var(--text); }
 .kor-next { justify-self: end; min-width: 150px; }
