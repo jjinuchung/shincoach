@@ -67,9 +67,9 @@ test('🎧 원고: 듣기 카드 여섯(K36 대화 · K37 안내 방송 · K38 �
 test('🎧 단원 지도: 5-1 1단원(K36·K40) · 3단원(K38) · 5단원(K39) · 5-2 독서(K41 오디오북처럼) · 1단원(K41) · 5단원(K39) — K37(3~4학년 성취기준)은 단원 지도 밖', () => {
   const of = (id) => UNITS.units.find((u) => u.id === id).cards;
   assert.deepEqual(of('5-1-1'), ['K1', 'K4', 'K36', 'K40']);
-  assert.deepEqual(of('5-1-3'), ['K13', 'K21', 'K38']);
+  assert.deepEqual(of('5-1-3'), ['K13', 'K21', 'K38', 'K81']); // v267 K81 발표 준비 모둠 대화
   assert.deepEqual(of('5-1-5'), ['K15', 'K23', 'K39', 'K63', 'K73']); // v261 K63 두 관점의 글 · v265 K73 성수동·인사동(문제 해결에 쓰기)
-  assert.deepEqual(of('5-2-독서'), ['K16', 'K24', 'K41']);
+  assert.deepEqual(of('5-2-독서'), ['K16', 'K24', 'K41', 'K84']); // v267 K84 여러 가지 모습의 책
   assert.deepEqual(of('5-2-1'), ['K7', 'K19', 'K31', 'K41', 'K48', 'K53', 'K71', 'K72']); // v254 「토끼전」 독서 모임 · 「흥부와 놀부」 · v261 옛이야기 둘
   assert.deepEqual(of('5-2-5'), ['K5', 'K15', 'K23', 'K39']);
   assert.ok(!UNITS.units.some((u) => u.cards.includes('K37')));

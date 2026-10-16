@@ -69,11 +69,11 @@ test('💡 원고 검사가 잡는다 (v258) — 한 곳만 틀리게: 근거 �
   }
 });
 
-test('💡 원고 (v258): 근거가 없는 물음 59개(v261 새 글 넷 · v265 신문 글 하나 더함)에 모두 둘째 힌트 · 근거가 있는 물음엔 없음 · 정답을 말하지 않음 · 🎧은 번호 없이 · 짧게', () => {
+test('💡 원고 (v258): 근거가 없는 물음 67개(v261 새 글 넷 · v265 신문 글 하나 · v267 호응 고쳐 쓰기 여덟 더함)에 모두 둘째 힌트 · 근거가 있는 물음엔 없음 · 정답을 말하지 않음 · 🎧은 번호 없이 · 짧게', () => {
   assert.deepEqual(checkContent(DATA), []);
   const all = DATA.cards.flatMap((c) => c.qs.map((q) => ({ c, q })));
   const noEv = all.filter(({ q }) => q.ev === null || q.ev === undefined);
-  assert.equal(noEv.length, 59, '글 41 · 🎧 18 (v261 K61-3·K67-1·K68-2·K69-3 · v265 K73-2 더함)');
+  assert.equal(noEv.length, 67, '글 49 · 🎧 18 (v261 K61-3·K67-1·K68-2·K69-3 · v265 K73-2 · v267 K79-1~4·K80-1~4 더함)');
   assert.equal(noEv.filter(({ c }) => c.listen).length, 18);
   for (const { c, q } of all) {
     if (q.ev === null || q.ev === undefined) {
@@ -94,7 +94,7 @@ test('💡 원고 (v258): 근거가 없는 물음 59개(v261 새 글 넷 · v265
 
 test('📚 새 시 일곱 (v258): 윤동주 셋 · 정지용 · 시조 둘 · 김소월 — 원문 대조 · 모두 근거가 있는 물음 셋(근거 먼저가 된다) · 저작권 해 · ⭐ 미리보기 둘 · 단원 지도', () => {
   assert.deepEqual(IDS.slice(53, 60), NEW);
-  assert.equal(validCards(DATA).length, 78); // v261 새 글 열둘 · v265 신문 글 여섯 더함
+  assert.equal(validCards(DATA).length, 84); // v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre, card(id).author]), [
     ['classic', '동시', '윤동주'], ['classic', '동시', '윤동주'], ['classic', '동시', '윤동주'], ['classic', '동시', '정지용'],
     ['classic', '시조', '남구만'], ['classic', '시조', '길재'], ['classic', '시', '김소월']]);
