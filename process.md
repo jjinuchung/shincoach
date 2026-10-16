@@ -4793,5 +4793,19 @@
 - 아버님: 지우와 피카츄·야생 2는 예전에 넣었고 prime_suspect도 태블릿에 넣음 · 포켓몬 자료 7편(4K Video Downloader+의 7편 모두 만듦) 중 교환권으로 쓴 것 5편(ash_battles·gengar·iconic·wild2·prime_suspect) · **만들어만 두고 교환권 목록에 안 넣은 것 2편: beary_icy(260922, 29문장 3분) · arceus(260923, 67문장 8분)** — 태블릿에 있는지는 업로드(최근 연 10편만)로는 모른다
 
 ### TODO (다음 작업)
-- [ ] 아버님 "배포" → feat + docs(v275 라이브 줄 포함) → 라이브 v276
-- [ ] 다음 교환권(beary_icy·arceus)과 📚 태블릿 영상 전체 목록 올리기 — 아버님께 여쭘
+- [x] 아버님 "배포" → `da3e3a9` feat · `8b50f10` docs → push → 라이브 v276 · 배포본 7개 같음(`.context/voucher_v276/live_check.sh`)
+- [x] 📚 태블릿 영상 전체 목록 → 아버님 "이대로 해" → v277 (아래)
+
+## 2026-10-17 — 📚 태블릿 영상 전체 목록 (v277)
+
+### 진행
+- 아버님 "이미 넣어서 아이가 학습했던 자료의 데이터도 너가 알 수 있는 방법은 없어? 앞으로 계속 늘어나게 되면 그게 관리하기 편할 것 같은데" → 기본안 둘 "이대로 해": ① 📤에 영상 전체 목록 ② "올라온 거 봐 줘" 때 Claude가 아빠 PC 자료 폴더와 맞춰 알림
+  - 왜: 영어 요약(english/날짜.md)은 최근에 연 10편뿐 — 오래 안 연 영상은 태블릿에 있는지 몰랐다. 태블릿 영상 항목엔 넣을 때 고른 파일 이름(`videoName`)·넣은 때(`createdAt`)가 이미 있다(db.addItem)
+- `js/upload.js` `libraryFiles` → `english/library.md` 한 파일(날짜 없이 늘 최신 — 지난 것은 저장소 기록에): 넣은 차례로 「제목」 · 파일 · 넣은 날 · 길이 · 한 문장 · 🎤 말해 본 문장 · 마지막으로 연 날 · 깨진 영상은 따로 · 영상 파일·자막 글은 안 올림 · 아이 화면 그대로
+- `js/stats.js` `contentSummary`가 `videoName`·`createdAt`·`duration`도 넘김 · sw v277 · 새 `tests/library277.test.js` 4("수/수 (%)" 꼴은 check가 공개 파일에서 막아 함수로 만들어 견줌 — 처음엔 업로드에서 본 실제 진도를 예시로 옮겨 써서 check가 잡았다 → 지어낸 숫자로)
+- 맞춰 보기 도구(저장소 밖) `.context/private/library_check.mjs <library.md>` — 학습 자료(옆에 .en.srt 또는 tablet 폴더)인데 태블릿에 없는 것 · 태블릿에 있는데 PC에서 못 찾은 것 · 영상 교환권마다 태블릿에 있는지
+- 변이 `.context/library_v277/mutate_v277.mjs` **6 중 6**
+
+### TODO (다음 작업)
+- [ ] 아버님 "배포" → feat + docs(v276 라이브 줄 포함) → 라이브 v277
+- [ ] 다음 업로드에서 english/library.md → library_check → beary_icy·arceus가 태블릿에 없으면 교환권 두 장 제안
