@@ -11,7 +11,8 @@
 //   · 2022 성취기준 [4수01-15] 분모가 같은 분수의 덧셈과 뺄셈 · [6수01-08] 분모가 다른 분수의 덧셈과 뺄셈의 계산 원리를 탐구하고 계산하기
 //   (고려사항: 기약분수를 요구하지 않으면 기약분수가 아닌 답도 허용 · 통분은 최소공배수뿐 아니라 두 분모의 곱도).
 //
-// 답의 꼴: 4학년 칸(V1~V5)은 **분모를 그대로 둔 꼴**(1 2/4 — 약분은 5학년, A 줄기 "같은 분모" 칸과 같은 결정),
+// ⭐ 4학년 활용(fadd.apply4, v269)은 받아내림 칸 바로 뒤 — 두세 걸음 문제(처음 양·겹친 부분·□ 두 걸음·전체를 1로), 5학년 칸으로 가는 길은 막지 않는다.
+// 답의 꼴: 4학년 칸(V1~V5·⭐ 4학년 활용)은 **분모를 그대로 둔 꼴**(1 2/4 — 약분은 5학년, A 줄기 "같은 분모" 칸과 같은 결정),
 //   5학년 칸(V6~V9)은 기약분수·대분수(교과서 예시 답). 숫자판은 어느 꼴이든 값이 같으면 맞음(2022 고려사항, T·U와 같다).
 // 오답은 아이가 실제로 하는 틀린 생각 흉내다 (A 줄기 이름표와 같은 말을 쓴다 — 📊에서 같은 오개념으로 모인다) — 지도서가 드는 흔한 오류:
 //   분모끼리 더함(261·275쪽) · 받아올림을 빠뜨림(271쪽 형성평가) · 받아내리고 자연수를 안 줄임(288쪽 5 5/12 − 3 7/8 = 2 13/24)
@@ -132,6 +133,16 @@ export const TAGS = {
   allAdd: '빼야 할 것까지 더함',
   dropLast: '앞의 두 수만 계산함',
   subAll: '더할 것까지 뺌',
+  // 4학년 활용 (fadd.apply4)
+  undoOne: '쓴 것을 하나만 되돌림',
+  usedOnly: '쓴 양만 더함',
+  undoSub: '되돌리지 않고 또 뺌',
+  lapOne: '전체 길이에서 한 장만 뺌',
+  lapSum: '두 장의 길이만 더함',
+  rightOnly: '오른쪽만 계산함',
+  boxSame: '□에 한 셈을 거꾸로 하지 않음',
+  restDone: '남은 것 대신 한 것을 답함',
+  restOne: '하나만 뺌',
 };
 
 // ───────────────────── 다른 분모 재료 ─────────────────────
@@ -146,6 +157,23 @@ function lcdLine(w1, a, b, w2, c, d) {
   if (d !== L) parts.push(`${MX(w2, c, d)} = ${MX(w2, C, L)}`);
   return `통분해요 — ${parts.join(', ')}`;
 }
+
+// ───────────────────── 4학년 활용 재료 (fadd.apply4 — ①과 ②가 같은 글·풀이를 쓴다) ─────────────────────
+
+const START_RULE = '처음 양은 남은 양에 쓴 양을 모두 되돌려 더해요.';
+const LAP_RULE = '겹친 부분은 두 장을 더한 길이에서 이어 붙인 전체 길이를 빼요.';
+const BOX_RULE = '□가 있는 식은 오른쪽부터 계산하고, □에 한 셈을 거꾸로 해요.';
+const REST_RULE = '전체를 1로 보고, 1에서 한 만큼을 모두 빼요.';
+/** 처음 리본 = 남은 리본 + 쓴 리본 (값은 분모 d의 분자 합) */
+const startSteps = (d, A, B, C) => [`쓴 리본 — ${S(A, d)} + ${S(B, d)} = ${S(A + B, d)} m`, `처음 리본 = 남은 리본 + 쓴 리본 — ${S(C, d)} + ${S(A + B, d)} = ${S(A + B + C, d)} m`];
+/**
+ * 겹친 부분 재료 — 두 장 A·B(대분수, 서로 다름) · 겹친 부분 L(진분수) · 이어 붙인 전체 A + B − L도 대분수(틀 글 모양이 늘 같게)
+ * · "한 장만 뺀" 값(B − L · A − L)이 다른 한 장의 길이와 같으면 ② 풀이가 "4 6/7 − 2 3/7 = 2 3/7"처럼 헷갈려 뺀다
+ */
+const pickLap = (r) => draw(() => { const d = int(r, 3, 9); return [d, int(r, 1, 3) * d + int(r, 1, d - 1), int(r, 1, 3) * d + int(r, 1, d - 1), int(r, 1, d - 1)]; },
+  ([d, A, B, L]) => A !== B && (A + B - L) % d !== 0 && B - L !== A && A - L !== B && distinct([L, d], [B - L, d], [A - L, d], [A + B, d]));
+const lapText = (d, A, B, T) => `${S(A, d)} m짜리 색 테이프와 ${S(B, d)} m짜리 색 테이프를 겹치게 이어 붙였어요. 이어 붙인 전체 길이를 재어 보니 ${S(T, d)} m였어요. 겹친 부분은 몇 m일까요?`;
+const lapSteps = (d, A, B, T) => [`두 장을 더한 길이 — ${S(A, d)} + ${S(B, d)} = ${S(A + B, d)} m`, `겹친 부분 = 두 장을 더한 길이 − 전체 길이 — ${S(A + B, d)} − ${S(T, d)} = ${S(A + B - T, d)} m`];
 
 // ───────────────────── 개념 사다리 (V. 분수의 덧셈·뺄셈 줄기) ─────────────────────
 
@@ -482,6 +510,144 @@ export const FADD = [
         steps: [`${MX(W1, n1, d)} = ${MX(W1 - 1, n1 + d, d)} — 자연수가 ${W1 - 1}`, `${MX(W1 - 1, n1 + d, d)} − ${MX(W2, n2, d)} = ${ans}`],
         whyAny: `1을 받아내려 분수 부분을 바꾸고(${n1 + d}/${d}) 자연수 ${W1}은 그대로 뒀어요. 받아내리면 자연수는 ${W1 - 1}이 돼요.`,
         probe: { ask: 'keep', W1, n1, W2, n2, d },
+      });
+    },
+  },
+
+  {
+    // ⭐ 4학년 활용 (v269, 2026-10-16 아버님 "이대로 진행") — 문제집 활용 수준의 두세 걸음 문제를 분모가 같은 분수로
+    // · 💎 스페셜 문제(잘못 계산 거꾸로·카드·□ 모두 더하기·겹쳐 잇기·합과 차 …)와 같은 꼴은 피한다
+    //   — 쓰고 남은 양 → 처음 양 · 겹친 부분 거꾸로 · □ 두 걸음(오른쪽부터) · 전체를 1로
+    // · 5학년 칸으로 가는 길은 막지 않는다 — fadd.diff는 그대로 fadd.borrow만 필요 · 진단 5문제에서는 뺀다(DIAG)
+    // · 틀 글의 수 모양(대분수·진분수 자리)은 늘 같게 — 🔁 쌍둥이가 같은 틀(tplKey)로 온다
+    id: 'fadd.apply4', grade: 4, name: '⭐ 분모가 같은 분수의 덧셈과 뺄셈 활용', needs: ['fadd.borrow'],
+    idea: '두세 걸음으로 푸는 문제예요. **처음 양**은 남은 양에 쓴 양을 모두 되돌려 더해요. 두 장을 겹치게 이어 붙였을 때 **겹친 부분**은 두 장을 더한 길이에서 이어 붙인 전체 길이를 빼요. □가 있는 식은 **오른쪽부터** 계산한 다음, □에 한 셈을 거꾸로 해요 — 뺐으면 더하고, 더했으면 빼요. 전체의 얼마가 남았는지는 **전체를 1로** 보고 1에서 한 만큼을 모두 빼요 — 1 = 9/9, 9/9 − 6/9 = 3/9.',
+    rule: '무엇을 먼저 구할지 정하고 한 걸음씩 — 거꾸로 셈할 때는 반대 셈으로 해요.',
+    slip: '이 문제에서 무엇을 먼저 구해야 하는지, 풀이를 한 줄씩 따라가 봐요.',
+    calc(r, c) {
+      const mixT = (d, lo, hi) => int(r, lo, hi) * d + int(r, 1, d - 1); // 대분수 (분수 부분이 늘 있다)
+      const prT = (d) => int(r, 1, d - 1); // 진분수
+      const fams = [];
+      // 🧶 처음 양 거꾸로 — 쓴 A(대분수)·B(진분수), 남은 C(대분수) → 처음 = A + B + C
+      {
+        const [d, A, B, C] = draw(() => { const d1 = int(r, 3, 9); return [d1, mixT(d1, 1, 2), prT(d1), mixT(d1, 1, 3)]; },
+          ([d1, A1, B1, C1]) => C1 !== A1 && distinct([A1 + B1 + C1, d1], [C1 + A1, d1], [C1 + B1, d1], [A1 + B1, d1], ...(C1 - A1 - B1 > 0 ? [[C1 - A1 - B1, d1]] : [])));
+        fams.push(famOf([{
+          t: `리본을 상자 포장에 ${S(A, d)} m, 꽃다발 포장에 ${S(B, d)} m 썼더니 ${S(C, d)} m 남았어요. 처음에 있던 리본은 몇 m일까요?`,
+          ans: S(A + B + C, d),
+          wr: [{ text: S(C + A, d), tag: TAGS.undoOne }, { text: S(A + B, d), tag: TAGS.usedOnly }, ...(C - A - B > 0 ? [{ text: S(C - A - B, d), tag: TAGS.undoSub }] : []), { text: S(C + B, d), tag: TAGS.undoOne }],
+          steps: startSteps(d, A, B, C),
+          why: {
+            [TAGS.undoOne]: '남은 리본에 쓴 리본을 하나만 더했어요. 상자 포장과 꽃다발 포장에 쓴 리본을 모두 더해요.',
+            [TAGS.usedOnly]: `쓴 리본만 더했어요 — 남은 ${S(C, d)} m도 더해야 처음 리본이에요.`,
+            [TAGS.undoSub]: '처음 리본을 구할 때는 쓴 리본을 빼지 않고 되돌려 더해요 — 처음 리본은 남은 리본보다 길어요.',
+          },
+          whyAny: '남은 리본에 쓴 리본을 모두 되돌려 더하면 처음 리본이에요.',
+          rule: START_RULE, fmt: S, probe: { ask: 'start' },
+        }]));
+      }
+      // 🎀 겹친 부분 거꾸로 — A·B(대분수 두 장), 이어 붙인 전체 T(대분수) → 겹친 부분 L = A + B − T (진분수)
+      {
+        const [d, A, B, L] = pickLap(r);
+        const T = A + B - L;
+        fams.push(famOf([{
+          t: lapText(d, A, B, T),
+          ans: S(L, d),
+          wr: [{ text: S(B - L, d), tag: TAGS.lapOne }, { text: S(A + B, d), tag: TAGS.lapSum }, { text: S(A - L, d), tag: TAGS.lapOne }],
+          steps: lapSteps(d, A, B, T),
+          why: {
+            [TAGS.lapOne]: '전체 길이에서 한 장만 뺐어요 — 그 값은 다른 한 장에서 겹친 부분을 뺀 길이예요. 두 장을 더한 길이에서 전체 길이를 빼요.',
+            [TAGS.lapSum]: '두 장의 길이를 더하기만 했어요. 거기서 이어 붙인 전체 길이를 빼야 겹친 부분이에요.',
+          },
+          whyAny: '두 장을 더한 길이는 겹친 부분만큼 전체 길이보다 길어요. 두 장의 합에서 전체 길이를 빼요.',
+          rule: LAP_RULE, fmt: S, probe: { ask: 'lap' },
+        }]));
+      }
+      // 🔲 □ 두 걸음 — 오른쪽부터 계산한 다음 거꾸로: □ − A = B + C · A + □ = B − C
+      {
+        const [d, A, B, C] = draw(() => { const d1 = int(r, 3, 9); return [d1, mixT(d1, 1, 2), mixT(d1, 1, 3), prT(d1)]; },
+          ([d1, A1, B1, C1]) => B1 + C1 - A1 > 0 && distinct([B1 + C1 + A1, d1], [B1 + C1, d1], [B1 + C1 - A1, d1]));
+        const R = B + C;
+        const [e, P, X, Y] = draw(() => { const d1 = int(r, 3, 9); return [d1, prT(d1), mixT(d1, 2, 4), mixT(d1, 1, 2)]; },
+          ([d1, P1, X1, Y1]) => X1 - Y1 - P1 > 0 && distinct([X1 - Y1 - P1, d1], [X1 - Y1, d1], [X1 - Y1 + P1, d1]));
+        const R2 = X - Y;
+        fams.push(famOf([
+          {
+            t: `**□ − ${S(A, d)} = ${S(B, d)} + ${S(C, d)}** — □에 알맞은 수는 얼마일까요?`,
+            ans: S(R + A, d),
+            wr: [{ text: S(R, d), tag: TAGS.rightOnly }, { text: S(R - A, d), tag: TAGS.boxSame }],
+            steps: [`먼저 오른쪽 — ${S(B, d)} + ${S(C, d)} = ${S(R, d)}`, `□는 ${S(A, d)}만큼 빼기 전의 수 — 거꾸로 더해요: □ = ${S(R, d)} + ${S(A, d)} = ${S(R + A, d)}`],
+            why: {
+              [TAGS.rightOnly]: `오른쪽만 계산했어요 — 그 수는 □에서 ${S(A, d)}만큼 뺀 수예요. 거꾸로 ${S(A, d)}만큼 더해요.`,
+              [TAGS.boxSame]: `□에서 ${S(A, d)}만큼 뺐으니, □를 구할 때는 거꾸로 더해요 — 또 빼면 안 돼요.`,
+            },
+            whyAny: '먼저 오른쪽을 계산하고, □에서 뺀 수를 거꾸로 더해요.',
+            rule: BOX_RULE, fmt: S, probe: { ask: 'boxSub' },
+          },
+          {
+            t: `**${S(P, e)} + □ = ${S(X, e)} − ${S(Y, e)}** — □에 알맞은 수는 얼마일까요?`,
+            ans: S(R2 - P, e),
+            wr: [{ text: S(R2, e), tag: TAGS.rightOnly }, { text: S(R2 + P, e), tag: TAGS.boxSame }],
+            steps: [`먼저 오른쪽 — ${S(X, e)} − ${S(Y, e)} = ${S(R2, e)}`, `□는 ${S(P, e)}만큼 더하기 전의 수 — 거꾸로 빼요: □ = ${S(R2, e)} − ${S(P, e)} = ${S(R2 - P, e)}`],
+            why: {
+              [TAGS.rightOnly]: `오른쪽만 계산했어요 — 그 수는 □에 ${S(P, e)}만큼 더한 수예요. 거꾸로 ${S(P, e)}만큼 빼요.`,
+              [TAGS.boxSame]: `□에 ${S(P, e)}만큼 더했으니, □를 구할 때는 거꾸로 빼요 — 또 더하면 안 돼요.`,
+            },
+            whyAny: '먼저 오른쪽을 계산하고, □에 더한 수를 거꾸로 빼요.',
+            rule: BOX_RULE, fmt: S, probe: { ask: 'boxAdd' },
+          },
+        ]));
+      }
+      // 🧩 전체를 1로 — 두 번 한 만큼(진분수 a·b, 같은 분모) → 남은 것 1 − a − b
+      {
+        const pickRest = () => draw(() => { const d1 = int(r, 5, 10); return [d1, int(r, 1, d1 - 2), int(r, 1, d1 - 2)]; },
+          ([d1, a1, b1]) => a1 !== b1 && a1 + b1 <= d1 - 1 && distinct([d1 - a1 - b1, d1], [a1 + b1, d1], [d1 - a1, d1], [d1 - b1, d1]));
+        const one = (kind) => {
+          const [d, a, b] = pickRest();
+          const book = kind === 'book';
+          return {
+            t: book
+              ? `책 한 권을 첫째 날에 전체의 ${a}/${d}만큼, 둘째 날에 전체의 ${b}/${d}만큼 읽었어요. 남은 부분은 책 전체의 얼마일까요?`
+              : `밭 전체의 ${a}/${d}만큼 감자를 심고, ${b}/${d}만큼 고구마를 심었어요. 아무것도 심지 않은 부분은 밭 전체의 얼마일까요?`,
+            ans: S(d - a - b, d),
+            wr: [{ text: S(a + b, d), tag: TAGS.restDone }, { text: S(d - a, d), tag: TAGS.restOne }, { text: S(d - b, d), tag: TAGS.restOne }],
+            steps: [`${book ? '이틀 동안 읽은 부분' : '감자와 고구마를 심은 부분'} — ${a}/${d} + ${b}/${d} = ${a + b}/${d}`, `${book ? '책' : '밭'} 전체는 1 = ${d}/${d} — ${d}/${d} − ${a + b}/${d} = ${d - a - b}/${d}`],
+            why: {
+              [TAGS.restDone]: book ? '이틀 동안 읽은 부분을 답했어요. 물은 것은 남은 부분 — 1에서 빼요.' : '감자와 고구마를 심은 부분을 답했어요. 물은 것은 아무것도 심지 않은 부분 — 1에서 빼요.',
+              [TAGS.restOne]: book ? '하루 동안 읽은 부분만 뺐어요. 이틀 동안 읽은 부분을 모두 빼요.' : '한 가지만 뺐어요. 감자와 고구마를 심은 부분을 모두 빼요.',
+            },
+            whyAny: book ? '책 전체를 1로 보고, 1에서 읽은 부분을 모두 빼요.' : '밭 전체를 1로 보고, 1에서 심은 부분을 모두 빼요.',
+            rule: REST_RULE, fmt: S, probe: { ask: kind },
+          };
+        };
+        fams.push(famOf([one('book'), one('field')]));
+      }
+      return askFam(r, c, this, fams);
+    },
+    misread(r, c) {
+      if (branchOf(r, c, ['ribbon', 'tape']) === 'ribbon') {
+        // 남은 리본에 상자 포장에 쓴 것만 되돌린 풀이 — 고치는 보기 "또 뺌"이 0보다 크게 (C > A + B)
+        const [d, A, B, C] = draw(() => { const d1 = int(r, 3, 9); return [d1, int(r, 1, 2) * d1 + int(r, 1, d1 - 1), int(r, 1, d1 - 1), int(r, 2, 4) * d1 + int(r, 1, d1 - 1)]; },
+          ([d1, A1, B1, C1]) => C1 > A1 + B1 && distinct([A1 + B1 + C1, d1], [C1 + A1, d1], [C1 - A1 - B1, d1]));
+        return misAsk(r, c, this, 'ribbon', {
+          q: `리본을 상자 포장에 ${S(A, d)} m, 꽃다발 포장에 ${S(B, d)} m 썼더니 ${S(C, d)} m 남았어요. 처음에 있던 리본은 몇 m일까요?\n\n${showWork(`${S(C, d)} + ${S(A, d)} = ${S(C + A, d)}`, '구했어요')}`,
+          ok: `꽃다발 포장에 쓴 ${S(B, d)} m도 더해요 — ${S(C, d)} + ${S(A, d)} + ${S(B, d)} = ${S(A + B + C, d)}`,
+          wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `쓴 리본은 빼야 해요 — ${S(C, d)} − ${S(A, d)} − ${S(B, d)} = ${S(C - A - B, d)}`, tag: TAGS.undoSub }, { text: '쓴 길이와 남은 길이를 모두 알아도 처음 리본의 길이는 구할 수 없어요', tag: OFF }], // "남은 리본만으로는 …"은 글자 그대로 맞는 말이라 바꿈 (🔍 Codex 78차 #1)
+          steps: startSteps(d, A, B, C),
+          whyAny: '상자 포장에 쓴 리본만 되돌려 더했어요. 꽃다발 포장에 쓴 리본까지 모두 더해야 처음 리본이에요.',
+          rule: START_RULE, probe: { ask: 'ribbon', d, A, B, C },
+        });
+      }
+      // 전체 길이에서 한 장만 뺀 풀이
+      const [d, A, B, L] = pickLap(r);
+      const T = A + B - L;
+      return misAsk(r, c, this, 'tape', {
+        q: `${lapText(d, A, B, T)}\n\n${showWork(`${S(T, d)} − ${S(A, d)} = ${S(B - L, d)}`, '구했어요')}`,
+        ok: `두 장을 더한 길이에서 전체 길이를 빼요 — ${S(A, d)} + ${S(B, d)} − ${S(T, d)} = ${S(L, d)}`,
+        wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `두 장의 길이를 더해서 ${S(A, d)} + ${S(B, d)} = ${S(A + B, d)}`, tag: TAGS.lapSum }, { text: '겹친 부분의 길이는 구할 수 없어요', tag: OFF }],
+        steps: lapSteps(d, A, B, T),
+        whyAny: '전체 길이에서 한 장만 뺐어요 — 그 값은 다른 한 장에서 겹친 부분을 뺀 길이예요.',
+        rule: LAP_RULE, probe: { ask: 'tape', d, A, B, L },
       });
     },
   },
@@ -871,8 +1037,10 @@ export function lessonOf(conceptId, seed, opts) {
   return { title: c.name, pages, rule: v.rule || c.idea };
 }
 
+// ⭐ 4학년 활용(fadd.apply4)은 진단에서 뺀다 — 받아내림 칸을 그대로 진단한다 (v269)
+const DIAG = FADD.filter((c) => c.id !== 'fadd.apply4');
 export function diagnosticSet(seed, n = 5, opts) {
-  return diagnosticOf(FADD, makeQuestion, seed, n, opts);
+  return diagnosticOf(DIAG, makeQuestion, seed, n, opts);
 }
 export function placeFrom(answers) {
   return placeFromOf(FADD, answers);

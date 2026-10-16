@@ -17,7 +17,7 @@ import { padSpec, readTyped, matchTyped, partsOf } from '../js/mathpad.js';
 const OPTS = { names: ['피카츄', '리자몽', '개굴닌자'], me: '진우', worlds: { pokemon: [], toystory: [], minions: [], moana: [] } };
 const SEEDS = Number(process.env.RNG_SEEDS) || 300;
 const IDS = FADD.map((c) => c.id);
-const GRADE4 = IDS.slice(0, 5); // 분모를 그대로 둔 꼴(약분 전)로 답하는 칸
+const GRADE4 = IDS.slice(0, 6); // 분모를 그대로 둔 꼴(약분 전)로 답하는 칸 — V1~V5 + ⭐ 4학년 활용(v269)
 
 // ───────────────────── 이 파일의 분수 셈 ─────────────────────
 
@@ -91,6 +91,13 @@ function splitOp(e) {
 function solveText(q) {
   let m;
   if (/^다음을 계산하면 얼마일까요\?/.test(q)) { const e = bolds(q)[0]; const so = splitOp(e); return { type: `calc${so.op}`, ans: evalExpr(e), f: so }; }
+  // ⭐ 4학년 활용 (v269) — 이 파일이 문제 글의 말대로 다시 푼다: □ 두 걸음은 오른쪽부터, 처음 양 = 남은 + 쓴 둘, 겹친 부분 = 두 장 − 전체, 남은 부분 = 1 − 한 둘
+  if ((m = /^\*\*□ − (.+?) = (.+?) \+ (.+?)\*\* — □에 알맞은 수/.exec(q))) { const [A, B, C] = [m[1], m[2], m[3]].map(val); return { type: 'boxSub', ans: add(add(B, C), A), f: { op: 'boxSub', ops: [m[1], m[2], m[3]] } }; }
+  if ((m = /^\*\*(.+?) \+ □ = (.+?) − (.+?)\*\* — □에 알맞은 수/.exec(q))) { const [P, X, Y] = [m[1], m[2], m[3]].map(val); return { type: 'boxAdd', ans: sub(sub(X, Y), P), f: { op: 'boxAdd', ops: [m[1], m[2], m[3]] } }; }
+  if ((m = /리본을 상자 포장에 (.+?) m, 꽃다발 포장에 (.+?) m 썼더니 (.+?) m 남았어요\. 처음에 있던 리본은 몇 m/.exec(q))) { const [A, B, C] = [m[1], m[2], m[3]].map(val); return { type: 'start', ans: add(C, add(A, B)), f: { op: 'start', ops: [m[1], m[2], m[3]] } }; }
+  if ((m = /^(.+?) m짜리 색 테이프와 (.+?) m짜리 색 테이프를 겹치게 이어 붙였어요\. 이어 붙인 전체 길이를 재어 보니 (.+?) m였어요\. 겹친 부분은 몇 m/.exec(q))) { const [A, B, T] = [m[1], m[2], m[3]].map(val); return { type: 'lap', ans: sub(add(A, B), T), f: { op: 'lap', ops: [m[1], m[2], m[3]] } }; }
+  if ((m = /^책 한 권을 첫째 날에 전체의 (\S+)만큼, 둘째 날에 전체의 (\S+)만큼 읽었어요\. 남은 부분은 책 전체의 얼마/.exec(q))) return { type: 'book', ans: sub(sub(Q(1), val(m[1])), val(m[2])), f: { op: 'rest', ops: [m[1], m[2]] } };
+  if ((m = /^밭 전체의 (\S+)만큼 감자를 심고, (\S+)만큼 고구마를 심었어요\. 아무것도 심지 않은 부분은 밭 전체의 얼마/.exec(q))) return { type: 'field', ans: sub(sub(Q(1), val(m[1])), val(m[2])), f: { op: 'rest', ops: [m[1], m[2]] } };
   if ((m = /^\*\*□ \+ (.+?) = (.+?)\*\* — □에 알맞은 수/.exec(q))) return { type: 'box', ans: sub(val(m[2]), val(m[1])), f: { op: '−', ops: [m[2], m[1]] } };
   if ((m = /물이 (.+?) L 있었어요\. (\S+) L만큼 더 붓고 (\S+) L만큼 썼다면/.exec(q))) { const [X, Y, Z] = [m[1], m[2], m[3]].map(val); return { type: 'water', ans: sub(add(X, Y), Z), f: { op: 'water', ops: [m[1], m[2], m[3]] } }; }
   const story = [
@@ -127,6 +134,38 @@ function tagHolds(f, tag, t) {
     if (tag === TAGS.allAdd) return is(add(add(X, Y), Z));
     if (tag === TAGS.dropLast) return is(add(X, Y));
     if (tag === TAGS.subAll) return is(sub(sub(X, Y), Z));
+    return false;
+  }
+  // ⭐ 4학년 활용 — 그 틀린 생각을 문제 글의 수로 다시 한다
+  if (f.op === 'start') { // ops: 상자 포장 A · 꽃다발 포장 B · 남은 C
+    const [A, B, C] = f.ops.map(val);
+    if (tag === TAGS.undoOne) return is(add(C, A)) || is(add(C, B));
+    if (tag === TAGS.usedOnly) return is(add(A, B));
+    if (tag === TAGS.undoSub) return is(sub(sub(C, A), B));
+    return false;
+  }
+  if (f.op === 'lap') { // ops: 두 장 A·B · 이어 붙인 전체 T
+    const [A, B, T] = f.ops.map(val);
+    if (tag === TAGS.lapOne) return is(sub(T, A)) || is(sub(T, B));
+    if (tag === TAGS.lapSum) return is(add(A, B));
+    return false;
+  }
+  if (f.op === 'boxSub') { // □ − A = B + C
+    const [A, B, C] = f.ops.map(val); const R = add(B, C);
+    if (tag === TAGS.rightOnly) return is(R);
+    if (tag === TAGS.boxSame) return is(sub(R, A));
+    return false;
+  }
+  if (f.op === 'boxAdd') { // P + □ = X − Y
+    const [P, X, Y] = f.ops.map(val); const R = sub(X, Y);
+    if (tag === TAGS.rightOnly) return is(R);
+    if (tag === TAGS.boxSame) return is(add(R, P));
+    return false;
+  }
+  if (f.op === 'rest') { // 전체 1에서 a · b
+    const [a, b] = f.ops.map(val);
+    if (tag === TAGS.restDone) return is(add(a, b));
+    if (tag === TAGS.restOne) return is(sub(Q(1), a)) || is(sub(Q(1), b));
     return false;
   }
   const [P0, P1] = f.ops.map(partsOfNum); const [V0, V1] = f.ops.map(val);
@@ -176,15 +215,16 @@ function* every(kinds = ['calc', 'misread'], n = SEEDS) {
 
 // ───────────────────── 사다리 ─────────────────────
 
-test('사다리: 9칸, V1~V5 초4 · V6~V9 초5, needs가 바로 앞 칸 · 맨 뒤는 ⭐ · 교과서 차시 순서', () => {
-  assert.deepEqual(IDS, ['fadd.same', 'fadd.mixadd', 'fadd.sub', 'fadd.whole', 'fadd.borrow', 'fadd.diff', 'fadd.dmixadd', 'fadd.dmixsub', 'fadd.apply']);
+test('사다리: 10칸, V1~V5·⭐ 4학년 활용 초4 · V6~V9 초5, needs가 바로 앞 칸(5학년 첫 칸만 받아내림 칸 — ⭐ 4학년 활용이 길을 막지 않는다) · 맨 뒤는 ⭐ · 교과서 차시 순서', () => {
+  assert.deepEqual(IDS, ['fadd.same', 'fadd.mixadd', 'fadd.sub', 'fadd.whole', 'fadd.borrow', 'fadd.apply4', 'fadd.diff', 'fadd.dmixadd', 'fadd.dmixsub', 'fadd.apply']);
   FADD.forEach((c, i) => {
-    assert.equal(c.grade, i < 5 ? 4 : 5, c.id);
-    assert.deepEqual(c.needs, i ? [IDS[i - 1]] : [], c.id);
+    assert.equal(c.grade, i < 6 ? 4 : 5, c.id);
+    assert.deepEqual(c.needs, i ? [c.id === 'fadd.diff' ? 'fadd.borrow' : IDS[i - 1]] : [], c.id);
     assert.ok(c.idea && c.rule && c.slip, c.id);
   });
   assert.equal(gradeLabel(4), '초4');
-  assert.match(FADD[8].name, /^⭐/);
+  assert.match(FADD[5].name, /^⭐/);
+  assert.match(FADD[9].name, /^⭐/);
 });
 
 test('계산기 자체 점검 — 대분수·받아내린 꼴(2 5/4)·끝의 수 · 이름표 판정의 몇 예 (지도서 271·288쪽 오답)', () => {
@@ -267,7 +307,7 @@ test('★ 오답끼리 같은 값·같은 글이 되지 않는다 — 보기에�
   }
 });
 
-test('★ 수 보기 꼴: 4학년 칸(V1~V5)은 분모를 그대로 둔 꼴(약분 전) · 5학년 칸(V6~V9)은 기약분수·대분수 · 분수 부분은 진분수', () => {
+test('★ 수 보기 꼴: 4학년 칸(V1~V5·⭐ 4학년 활용)은 분모를 그대로 둔 꼴(약분 전) · 5학년 칸(V6~V9)은 기약분수·대분수 · 분수 부분은 진분수', () => {
   let g4 = 0; let g5 = 0;
   for (const { c, s, q } of every(['calc'])) {
     const sv = solveText(q.q);
@@ -299,6 +339,8 @@ function misreadFacts(q) {
   if ((m = /^덧셈 (.+?) — 결과를 어림해요/.exec(q.q))) return { shown, right: evalExpr(m[1]), base: val(/결과는 (\d+)보다 작아요/.exec(shown)[1]), f: splitOp(m[1]) };
   if ((m = /^\*\*□ \+ (.+?) = (.+?)\*\* — □를 구해요/.exec(q.q))) return { shown, right: sub(val(m[2]), val(m[1])), base: null, f: { op: '−', ops: [m[2], m[1]] } };
   if ((m = /초록 로봇은 (.+?) m, 파란 로봇은 (.+?) m 움직였어요/.exec(q.q))) return { shown, right: sub(val(m[1]), val(m[2])), base: null, f: { op: '−', ops: [m[1], m[2]] } };
+  // ⭐ 4학년 활용 ② — 바른 값은 문제 글에서 (보여 준 식이 아니라)
+  if (/^리본을 상자 포장에/.test(q.q) || / m짜리 색 테이프와 /.test(q.q)) { const sv = solveText(q.q); return { shown, right: sv.ans, base: null, f: sv.f }; }
   const left = shown.split(' = ')[0];
   return { shown, right: evalExpr(left), base: null, f: splitOp(left) };
 }
@@ -502,7 +544,7 @@ test('🔢 숫자판: ① 모두 숫자판 · 분수·대분수 답도 칠 수 �
 
 // 🔍 Codex 37차 #2 — 4학년 칸 6/8 + 1/8에 14/16을 치면 맞음과 함께 "약분하면 7/8 — 다음엔 끝까지 약분해요"가 떴다.
 //   V1~V5는 분모를 그대로 둔 꼴로 답하고 "약분"은 V6부터 배운다 — 숫자판 말에도 안 배운 말·없는 요구를 넣지 않는다
-test('🔢 숫자판 말: 4학년 칸(V1~V5)은 같은 값의 다른 꼴을 쳐도 맞음 · "약분·통분·최소공배수"를 말하지 않는다 · 5학년 칸은 약분 안내 그대로', () => {
+test('🔢 숫자판 말: 4학년 칸(V1~V5·⭐ 4학년 활용)은 같은 값의 다른 꼴을 쳐도 맞음 · "약분·통분·최소공배수"를 말하지 않는다 · 5학년 칸은 약분 안내 그대로', () => {
   const q0 = makeQuestion('fadd.same', 'calc', 1, OPTS);
   const s0 = padSpec(q0, 'fracadd');
   const r0 = matchTyped(q0, readTyped('frac', { n: '14', d: '16' }, s0), s0);
@@ -630,6 +672,102 @@ test('칸마다 수의 꼴 — V1·V3 진분수끼리 · V2·V5·V7·V8 대분�
   }
 });
 
+// ───────────────────── ⭐ 4학년 활용 (fadd.apply4, v269) ─────────────────────
+
+const DONE4 = ['fadd.same', 'fadd.mixadd', 'fadd.sub', 'fadd.whole', 'fadd.borrow'];
+test('⭐ 4학년 활용 자리: 받아내림 칸 바로 뒤 · 초4 · 받아내림 칸을 끝내면 ⭐가 "지금"이고 5학년 첫 칸도 열린다 · 진단 5문제에는 없다(받아내림 칸을 그대로 진단) · 숫자판은 분모 그대로', () => {
+  const c = FADD.find((x) => x.id === 'fadd.apply4');
+  assert.equal(IDS.indexOf('fadd.apply4'), IDS.indexOf('fadd.borrow') + 1);
+  assert.equal(c.grade, 4);
+  assert.match(c.name, /^⭐ /);
+  assert.deepEqual(c.needs, ['fadd.borrow']);
+  assert.deepEqual(FADD.find((x) => x.id === 'fadd.diff').needs, ['fadd.borrow'], '5학년 첫 칸은 ⭐ 없이도 열린다');
+  const L = Object.fromEntries(ladder(DONE4).map((r) => [r.id, r.state]));
+  assert.equal(L['fadd.apply4'], 'now');
+  assert.equal(L['fadd.diff'], 'open');
+  assert.equal(Object.fromEntries(ladder(DONE4.slice(0, 4)).map((r) => [r.id, r.state]))['fadd.apply4'], 'locked', '받아내림 칸 전에는 잠김');
+  for (let s = 1; s <= 60; s++) {
+    assert.deepEqual(diagnosticSet(s, 5, OPTS).map((q) => q.concept), ['fadd.same', 'fadd.sub', 'fadd.borrow', 'fadd.dmixadd', 'fadd.apply'], `진단 #${s}`);
+  }
+  for (let s = 1; s <= 40; s++) assert.equal(makeQuestion('fadd.apply4', 'calc', s, OPTS).keepDen, true);
+  // 🔍 Codex 78차 #2 — 진단 뒤 "이미 안다"로 치는 칸: 받아내림 칸을 틀리면 ⭐는 남고, 그 뒤(5학년 칸)에서 틀리거나 다 맞히면 ⭐도 앞 칸처럼 안다로 친다(지금 정한 방식)
+  const D5 = ['fadd.same', 'fadd.sub', 'fadd.borrow', 'fadd.dmixadd', 'fadd.apply'];
+  const placed = (wrongAt) => placeFrom(D5.map((concept, i) => ({ concept, correct: wrongAt < 0 || i < wrongAt })));
+  { const p = placed(2); assert.equal(p.startId, 'fadd.borrow'); assert.ok(!p.knownIds.includes('fadd.apply4'), '받아내림을 틀리면 ⭐는 아직'); }
+  { const p = placed(3); assert.equal(p.startId, 'fadd.dmixadd'); assert.ok(p.knownIds.includes('fadd.apply4'), '5학년 칸에서 틀리면 ⭐는 앞 칸처럼 안다'); }
+  { const p = placed(-1); assert.equal(p.startId, 'fadd.apply'); assert.ok(p.knownIds.includes('fadd.apply4'), '다 맞히면 ⭐도 안다'); }
+});
+
+/** ⭐ 4학년 활용 틀마다 문제 글에 나오는 수의 모양 (대분수 mixed · 진분수 frac) — 쌍둥이 틀 열쇠가 늘 같게 */
+const APPLY4_SHAPE = { start: ['mixed', 'frac', 'mixed'], lap: ['mixed', 'mixed', 'mixed'], boxSub: ['mixed', 'mixed', 'frac'], boxAdd: ['frac', 'mixed', 'mixed'], book: ['frac', 'frac'], field: ['frac', 'frac'] };
+test('⭐ 4학년 활용 ①: 네 가족 여섯 틀이 다 나온다 · 틀마다 수 모양이 늘 같다 · 말이 되는 수(겹친 부분은 두 장보다 짧다 · 처음 리본은 남은 리본보다 길다 · 남은 부분은 0보다 크다) · 💎 스페셜 문제 꼴(잘못 계산·○장 ○씩 겹쳐)이 아니다', () => {
+  const seen = {};
+  for (let s = 1; s <= SEEDS * 2; s++) {
+    const q = makeQuestion('fadd.apply4', 'calc', s, OPTS);
+    const sv = solveText(q.q);
+    assert.ok(APPLY4_SHAPE[sv.type], `#${s}: 다른 꼴 ${sv.type}\n${q.q}`);
+    seen[sv.type] = (seen[sv.type] || 0) + 1;
+    assert.deepEqual(sv.f.ops.map((t) => partsOfNum(t).kind), APPLY4_SHAPE[sv.type], `#${s} ${sv.type}: 수 모양 ${sv.f.ops}`);
+    const V = sv.f.ops.map(val);
+    if (sv.type === 'lap') { assert.ok(cmpQ(sv.ans, V[0]) < 0 && cmpQ(sv.ans, V[1]) < 0, `#${s}: 겹친 부분 ${show(sv.ans)}이 테이프보다 길다`); assert.ok(cmpQ(V[2], V[0]) > 0 && cmpQ(V[2], V[1]) > 0, `#${s}: 이어 붙인 길이가 한 장보다 짧다`); }
+    if (sv.type === 'start') assert.ok(cmpQ(sv.ans, V[2]) > 0);
+    assert.ok(sv.ans.n > 0, `#${s}: 답 ${show(sv.ans)}`);
+    assert.ok(!/잘못하여|씩 겹치게|모두 더하면/.test(q.q), `#${s}: 💎 스페셜 문제 꼴\n${q.q}`);
+  }
+  for (const t of Object.keys(APPLY4_SHAPE)) assert.ok((seen[t] || 0) >= SEEDS / 10, `${t}: ${seen[t] || 0}`);
+});
+
+test('⭐ 4학년 활용 도움말은 가족마다 — 오답 목록에 없는 수를 쳤을 때의 말(whyAny)이 그 문제의 걸음을 말한다 · 칸의 일반 말(slip)이 아니다 (Codex 77차 교훈)', () => {
+  const WANT = { start: /리본/, lap: /두 장/, boxSub: /뺀 수를 거꾸로 더해요/, boxAdd: /더한 수를 거꾸로 빼요/, book: /읽은 부분/, field: /심은 부분/ };
+  const slip = FADD.find((x) => x.id === 'fadd.apply4').slip;
+  const seen = new Set();
+  for (let s = 1; s <= SEEDS; s++) {
+    const q = makeQuestion('fadd.apply4', 'calc', s, OPTS);
+    const { type } = solveText(q.q);
+    assert.notEqual(q.solve.whyAny, slip, `#${s} ${type}`);
+    assert.match(q.solve.whyAny, WANT[type], `#${s} ${type}: ${q.solve.whyAny}`);
+    seen.add(type);
+    // 숫자판으로 오답 목록에 없는 수를 치면 그 보기로 가지 않는다 — 화면은 whyAny를 보인다
+    const spec = padSpec(q, 'fracadd');
+    const off = add(sv0(q), Q(37)); // 오답 후보들(10보다 작다)과 겹치지 않는 수
+    const hit = matchTyped(q, readTyped('frac', { n: String(off.n), d: String(off.d) }, spec), spec);
+    assert.ok(!q.choices[hit.i] && !(hit.known && hit.known.tag), `#${s}: 없는 수가 보기로 갔다`);
+  }
+  assert.equal(seen.size, 6);
+  // ② 풀이도 갈래마다 그 갈래의 말
+  for (let s = 1; s <= 120; s++) {
+    const q = makeQuestion('fadd.apply4', 'misread', s, OPTS);
+    assert.match(q.solve.whyAny, q.key === 'misread:ribbon' ? /꽃다발 포장/ : /한 장만 뺐어요/, `② #${s}`);
+  }
+});
+const sv0 = (q) => solveText(q.q).ans;
+
+test('⭐ 4학년 활용 ②: 리본은 상자 포장에 쓴 것만 되돌린 풀이 · 테이프는 한 장만 뺀 풀이 — 보여 준 식의 결과가 문제에 나온 길이와 같지 않다(헷갈림 막기) · 고치는 보기 "또 뺌"은 0보다 크다', () => {
+  const keys = {};
+  for (let s = 1; s <= 600; s++) {
+    const q = makeQuestion('fadd.apply4', 'misread', s, OPTS);
+    keys[q.key] = (keys[q.key] || 0) + 1;
+    const sv = solveText(q.q);
+    const shown = bolds(q.q).pop();
+    const res = val(shown.split(' = ').pop());
+    if (q.key === 'misread:ribbon') {
+      const [A, , C] = sv.f.ops.map(val);
+      assert.ok(eq(res, add(C, A)), `#${s}: 리본 풀이 ${shown}`);
+      const w = q.choices.find((x) => x.tag === TAGS.undoSub);
+      assert.ok(w && lastNum(w.text).n > 0, `#${s}: "또 뺌" 보기`);
+      // 🔍 Codex 78차 #1 — 엉뚱한 지적은 문제 전체로 보아도 틀린 말이어야 한다("남은 리본만으로는 …"은 글자 그대로 맞는 말)
+      const off = q.choices.find((x) => x.tag === '엉뚱한 지적');
+      assert.equal(off.text, '쓴 길이와 남은 길이를 모두 알아도 처음 리본의 길이는 구할 수 없어요', `#${s}`);
+      assert.ok(!/만으로는/.test(off.text), `#${s}: ${off.text}`);
+    } else {
+      const [A, B, T] = sv.f.ops.map(val);
+      assert.ok(eq(res, sub(T, A)) || eq(res, sub(T, B)), `#${s}: 테이프 풀이 ${shown}`);
+      for (const x of [A, B, T]) assert.ok(!eq(res, x), `#${s}: 보여 준 결과가 문제의 길이와 같다 ${shown}\n${q.q}`);
+    }
+  }
+  assert.ok(keys['misread:ribbon'] > 200 && keys['misread:tape'] > 200, JSON.stringify(keys));
+});
+
 // ───────────────────── 2단계: 원고 (coach/math/fracadd.json) ─────────────────────
 
 const CONTENT = JSON.parse(readFileSync(new URL('../coach/math/fracadd.json', import.meta.url), 'utf8'));
@@ -649,7 +787,7 @@ function* checksOf() {
   for (const id of IDS) for (const [i, p] of CONTENT[id].lesson.entries()) yield { id, i, at: `${id}[${i}]`, p, sv: solveText(fillC(p.check.q)) };
 }
 
-test('원고(fracadd.json)가 형식 검사를 통과한다 — 9칸이 사다리 순서대로 · 배움 4~5장·장마다 확인 질문·아빠 카드(말 2개↑·함정 2개↑·통과 기준)', () => {
+test('원고(fracadd.json)가 형식 검사를 통과한다 — 10칸이 사다리 순서대로 · 배움 4~5장·장마다 확인 질문·아빠 카드(말 2개↑·함정 2개↑·통과 기준)', () => {
   assert.deepEqual(checkContent(CONTENT), []);
   assert.deepEqual(Object.keys(CONTENT).filter((k) => k !== '_'), IDS);
   for (const id of IDS) {
@@ -705,7 +843,7 @@ const SHAPE = {
   'fadd.dmixadd': (f, P) => f.op === '+' && P.every((p) => p.kind === 'mixed'),
   'fadd.dmixsub': (f, P) => f.op === '−' && P.every((p) => p.kind === 'mixed'),
 };
-test('★ 원고 보기 꼴 — 칸마다 그 칸의 셈 · 4학년 칸(V1~V5)은 분모가 같은 문제·분모를 그대로 둔 꼴 · V6~V8은 분모가 다른 문제 · 5학년 칸은 기약 · 분수 부분은 진분수', () => {
+test('★ 원고 보기 꼴 — 칸마다 그 칸의 셈 · 4학년 칸(V1~V5·⭐ 4학년 활용)은 분모가 같은 문제·분모를 그대로 둔 꼴 · V6~V8은 분모가 다른 문제 · 5학년 칸은 기약 · 분수 부분은 진분수', () => {
   let g4 = 0; let g5 = 0;
   for (const { id, at, p, sv } of checksOf()) {
     const P = sv.f.ops.map(partsOfNum);
