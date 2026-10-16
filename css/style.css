@@ -3185,6 +3185,7 @@ button { font-family: inherit; }
 .kor-fb { margin: 0; min-height: 1.2em; font-size: 0.98rem; line-height: 1.5; }
 .kor-fb.is-ok { color: var(--ok); font-weight: 700; }
 .kor-fb.is-no { color: var(--danger); }
+.kor-fb.is-gate { color: var(--primary-dark); font-weight: 700; } /* 🔍 처음 읽는 글은 근거부터 (v273) — 틀려서가 아니니 빨갛지 않게 */
 .kor-ev { display: grid; gap: 8px; border-top: 1px dashed var(--border); padding-top: 12px; }
 .kor-ev-title { margin: 0; font-weight: 800; line-height: 1.5; }
 /* 🔍 근거 먼저 (v258) — 두 번 틀린 뒤 답을 고르기 전에 · 💡 둘째 힌트 — 근거가 없는 물음 */

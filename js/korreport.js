@@ -43,29 +43,34 @@ export function secText(sec) {
 
 /**
  * 📤 최근 7일 읽은 글 (순수, v258) — profile.korReads(korean.readsOf)에서 today를 넣은 7일 · 연 차례
- * 맨 위 한 줄은 모은 수(글 몇 번 · 한 편 평균 · 📖 문제 보기까지 평균(v260, 누른 줄만) · 첫 번에 맞힌 물음 · 오답 보기를 모두 고른 물음 · 근거 먼저 · 둘째 힌트), 그 아래 READ_LINES줄까지(최근 것)
+ * 맨 위 한 줄은 모은 수(글 몇 번 · 한 편 평균 · 📖 문제 보기까지 평균(v260, 누른 줄만) · 첫 번에 맞힌 물음 · 오답 보기를 모두 고른 물음 · 근거 먼저 · 둘째 힌트 ·
+ * 📍 처음 근거(v273, 있는 줄만 — 찾기까지 평균 · 잘못 누른 줄 · 찾은 뒤 첫 번에)), 그 아래 READ_LINES줄까지(최근 것)
  * 기기에 저장된 최근 READS_MAX줄 안에서 센다 — 그보다 많이 읽은 주에는 앞의 것이 빠진다 (Codex 69차 #5)
  */
 export function readLines(reads, cards, today) {
   const title = new Map((Array.isArray(cards) ? cards : []).map((c) => [c.id, c.title]));
   const to = dayNumOf(today);
   const list = readsOf(reads).filter((x) => x.d <= to && x.d > to - 7);
-  const L = ['', `## 최근 7일 읽은 글 (v258부터 셈 — 끝까지 읽을 때마다 한 줄 · 기기에 저장된 최근 ${READS_MAX}줄 안에서 · 시간은 화면이 보이고 2분 안에 손을 댄 동안만 셈 — 오래 조용히 읽은 시간은 일부 빠질 수 있음 · 첫 답까지 = 글을 연 뒤 처음 보기를 고를 때까지 · 문제 보기까지 = 글을 연 뒤 📖 [문제 보기]를 누를 때까지(v260부터, 🎧 빼고))`];
+  const L = ['', `## 최근 7일 읽은 글 (v258부터 셈 — 끝까지 읽을 때마다 한 줄 · 기기에 저장된 최근 ${READS_MAX}줄 안에서 · 시간은 화면이 보이고 2분 안에 손을 댄 동안만 셈 — 오래 조용히 읽은 시간은 일부 빠질 수 있음 · 첫 답까지 = 글을 연 뒤 처음 보기를 고를 때까지 · 문제 보기까지 = 글을 연 뒤 📖 [문제 보기]를 누를 때까지(v260부터, 🎧 빼고) · 🔍 근거 먼저 = 틀린 보기를 두 번 고른 뒤 근거 줄부터 찾은 물음 · 📍 처음 근거 = v273부터 처음 읽는 글(★ 전, 🎧 빼고)에서 근거가 있는 첫 물음 하나는 보기를 고르기 전에 근거 줄부터 — 그 물음이 나온 뒤 찾기까지 · 잘못 누른 줄 · 찾은 뒤 첫 번에 맞혔나(그 물음도 "첫 번에 맞힌 물음"·"첫 답까지"에 든다))`];
   if (!list.length) { L.push('(아직 기록 없음)'); return L; }
   const sum = (k) => list.reduce((n, x) => n + x[k], 0);
   const qs = sum('n');
   const f = sum('f');
   const asked = list.filter((x) => x.q !== undefined);
+  const gated = list.filter((x) => x.v !== undefined); // 📍 처음 근거 (v273)
+  const gsum = (k) => gated.reduce((n, x) => n + x[k], 0);
   L.push(`- 모두 ${list.length}번 읽음 · 한 번 평균 ${secText(sum('s') / list.length)}` +
     `${asked.length ? ` · 📖 문제 보기까지 평균 ${secText(asked.reduce((n, x) => n + x.q, 0) / asked.length)}(${asked.length}번)` : ''}` +
     ` · 첫 번에 맞힌 물음 ${f}/${qs}${qs ? ` (${Math.round((f / qs) * 100)}%)` : ''}` +
-    ` · 오답 보기를 모두 고른 물음 ${sum('x')} · 🔍 근거 먼저 ${sum('e')} · 💡 둘째 힌트 ${sum('h')}`);
+    ` · 오답 보기를 모두 고른 물음 ${sum('x')} · 🔍 근거 먼저 ${sum('e')} · 💡 둘째 힌트 ${sum('h')}` +
+    `${gated.length ? ` · 📍 처음 근거 ${gated.length}번(찾기까지 평균 ${secText(gsum('v') / gated.length)} · 잘못 누른 줄 ${gsum('w')} · 찾은 뒤 첫 번에 ${gsum('k')}/${gated.length})` : ''}`);
   const shown = list.slice(-READ_LINES);
   if (shown.length < list.length) L.push(`- (앞의 ${list.length - shown.length}줄은 줄였어요)`);
   for (const x of shown) {
     const how = x.m === 'listen' ? ' 🎧 들음' : x.m === 'text' ? ' 🎧→📄 글로 읽음' : '';
     const star = x.g ? `${'★'.repeat(x.g)} 새로` : '별 없이 다시';
-    const more = [x.x ? `오답 보기를 모두 고른 물음 ${x.x}` : '', x.e ? `🔍 근거 먼저 ${x.e}` : '', x.h ? `💡 둘째 힌트 ${x.h}` : ''].filter(Boolean);
+    const gate = x.v !== undefined ? `📍 처음 근거 찾기까지 ${secText(x.v)}${x.w ? `(잘못 누른 줄 ${x.w})` : ''}${x.k ? '' : ' · 찾은 뒤에도 틀림'}` : '';
+    const more = [x.x ? `오답 보기를 모두 고른 물음 ${x.x}` : '', x.e ? `🔍 근거 먼저 ${x.e}` : '', x.h ? `💡 둘째 힌트 ${x.h}` : '', gate].filter(Boolean);
     L.push(`- ${dayLabel(x.d)} ${x.c} 「${title.get(x.c) || '?'}」${how} ${star} · ${secText(x.s)} (${x.q !== undefined ? `문제 보기까지 ${secText(x.q)} · ` : ''}첫 답까지 ${secText(x.a)}) · 첫 번에 ${x.f}/${x.n}${more.length ? ` · ${more.join(' · ')}` : ''}`);
   }
   return L;

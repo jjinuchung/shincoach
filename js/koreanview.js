@@ -6,7 +6,8 @@
 //  · ⏳ 국어도 하루 1시간 30분(v232, 아버님) — 읽던 글은 끝까지, 새 글만 막는다
 //  · 🔍 근거 먼저 · 💡 둘째 힌트(v258) — 틀린 보기를 두 번 고르면 근거가 있는 물음은 남은 보기를 잠그고 답이 든 줄부터 찾게,
 //    근거가 없는 물음은 둘째 힌트(korean.evFirstNow·hint2Now) · ⏱️ 읽는 시계(쉼 빼고)와 함께 📤 읽은 기록 한 줄(korean.readOf)
-import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT } from './korean.js';
+//  · 🔍 처음 읽는 글은 근거부터(v273) — ★ 전의 읽기 글에서 근거가 있는 첫 물음 하나는 안 틀려도 같은 화면으로(korean.gateAtOf)
+import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT, gateAtOf } from './korean.js';
 import { IDLE_SEC } from './timelimit.js'; // ⏱️ 읽는 시계는 ⏳ 시계와 같은 쉼 규칙(2분 넘게 손을 안 대면 안 센다)
 import { newListenState, playListen, haltListen, stopListening, listenBoxEl, scriptEl, confirmHeard, syncListenBox } from './korlistenview.js'; // 🎧 듣기 카드 (v245) — 이 파일을 import하지 않는다
 import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt, tickEgg } from './xp.js';
@@ -248,11 +249,16 @@ function openCard(id) {
   const card = (ui.cards || []).find((c) => c.id === id);
   if (!card) return;
   sfxUnlock();
+  // 🔍 처음 읽는 글 — 근거가 있는 첫 물음은 근거부터 (v273). 프로필을 다시 읽는 사이(앱을 앞으로 가져온 순간)는 별이 0으로 보여
+  //   다시 읽는 글에도 걸렸다 → 그때는 걸지 않는다(처음 읽는 글에서 한 번 빠지는 것은 해가 없다)
+  const gateAt = profileLoading() ? -1 : gateAtOf(card, starsOf(korDoneMap(), card.id));
   ui.read = {
     card,
     qi: 0,
     // evFirst = 맞히기 전에 🔍 근거를 먼저 찾았다 · hint2 = 💡 둘째 힌트를 보았다 (v258 📤 읽은 기록)
-    qs: card.qs.map((q) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false })),
+    // gate = 처음 읽는 글의 근거부터 물음 · from = 그 물음이 처음 보인 때의 읽은 초 · evAt = 근거 줄을 찾은 때의 읽은 초 (v273 📤 찾기까지)
+    // wrongAtEv = 맞히기 전에 근거를 찾을 때까지 틀린 보기 수 (그 뒤에 새로 틀리면 "찾았어요!" 대신 힌트, Codex 82차 #1)
+    qs: card.qs.map((q, i) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false, gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1 })),
     misses: {},
     evMiss: 0, // 근거를 잘못 누른 수 — 잘못 읽기로는 안 세고 🟩 "한 번에 다 맞힘"에만
     result: null,
@@ -552,13 +558,18 @@ function renderQ() {
   const q = r.card.qs[r.qi];
   const st = r.qs[r.qi];
   const unit = unitOf(r.card);
-  const evFirst = evFirstNow(q, st); // 🔍 두 번 틀렸다 — 근거부터 (v258)
+  const evFirst = evFirstNow(q, st); // 🔍 두 번 틀렸다 — 근거부터 (v258) · 처음 읽는 글의 근거부터 물음 (v273)
+  if (st.gate && st.from < 0) st.from = r.sec; // 🔍 근거부터 물음이 처음 보인 때 (📤 찾기까지 초)
   const card = el('div', 'kor-q');
   const head = el('div', 'kor-q-head');
   head.appendChild(el('span', 'kor-q-no', `문제 ${r.qi + 1} / ${r.card.qs.length}`));
   head.appendChild(el('span', 'kor-q-skill', q.skill));
   card.appendChild(head);
   card.appendChild(el('p', 'kor-q-text', q.q));
+  const said = qFeedback(q, st, unit, r);
+  const fb = el('p', `kor-fb${said.cls ? ` ${said.cls}` : ''}`, said.text);
+  // 🔍 근거부터 안내는 잠긴 보기 위에 — 좁은 세로 화면에서 눌리지 않는 보기만 먼저 보였다 (Codex 82차 #2)
+  if (said.cls === 'is-gate') card.appendChild(fb);
   const opts = el('div', `kor-opts${evFirst ? ' is-locked' : ''}`); // 🔍 근거 먼저 동안 남은 보기는 흐리게(잠김)
   st.order.forEach((k, pos) => {
     const o = q.opts[k];
@@ -574,13 +585,7 @@ function renderQ() {
     opts.appendChild(b);
   });
   card.appendChild(opts);
-  const fb = el('p', 'kor-fb');
-  const lastWrong = st.wrong.length ? q.opts[st.wrong[st.wrong.length - 1]] : null;
-  if (st.answered) { fb.classList.add('is-ok'); fb.textContent = q.ev && !st.evDone ? '맞아요! 이제 그렇게 생각한 까닭을 글에서 찾아볼까요?' : '맞아요!'; }
-  else if (evFirst) { fb.classList.add('is-no'); fb.textContent = `🔍 두 번 틀렸어요. 답을 고르기 전에, 답이 들어 있는 ${unit}을 글에서 먼저 찾아 눌러 봐요.`; }
-  else if (st.evFirst) { fb.classList.add('is-ok'); fb.textContent = `찾았어요! 칠한 ${unit}(${q.ev.map(circled).join(', ')})을 다시 읽고 남은 보기에서 골라 봐요.`; } // 번호 뒤 조사는 읽는 소리마다 달라 낱말 뒤에
-  else if (lastWrong) { fb.classList.add('is-no'); fb.textContent = `🤔 ${hintOf(lastWrong.type, r)}`; }
-  card.appendChild(fb);
+  if (said.cls !== 'is-gate') card.appendChild(fb);
   let say = fb.textContent;
   if (hint2Now(q, st)) {
     // 💡 근거가 없는 물음 — 두 번 틀리면 볼 곳을 짚는 둘째 힌트 (v258)
@@ -617,6 +622,23 @@ function renderQ() {
   col.appendChild(card);
   if (live) live.textContent = say;
   if (focusTo) moveFocus(col, focusTo === 'answer' ? (qDone ? 'next' : (st.answered || evFirst) ? 'ev' : 'opt') : focusTo);
+}
+
+/**
+ * 물음 아래 말 (순수) → { cls, text } — 앞의 것이 이긴다: 맞힘 · 🔍 근거부터(v273, 틀려서가 아니니 빨갛지 않게) · 🔍 두 번 틀림(v258) ·
+ *   근거를 찾은 **직후**(그 뒤에 새로 틀리면 방금 고른 보기의 힌트가 먼저 — 초록 "찾았어요!"가 힌트를 가렸다, Codex 82차 #1) · 틀린 보기 힌트
+ */
+export function qFeedback(q, st, unit, r) {
+  const lastWrong = st.wrong.length ? q.opts[st.wrong[st.wrong.length - 1]] : null;
+  if (st.answered) return { cls: 'is-ok', text: q.ev && !st.evDone ? '맞아요! 이제 그렇게 생각한 까닭을 글에서 찾아볼까요?' : '맞아요!' };
+  if (evFirstNow(q, st)) {
+    if (st.gate) return { cls: 'is-gate', text: `🔍 이 물음은 근거부터! 답을 고르기 전에, 답이 들어 있는 ${unit}을 글에서 먼저 찾아 눌러 봐요.` };
+    return { cls: 'is-no', text: `🔍 두 번 틀렸어요. 답을 고르기 전에, 답이 들어 있는 ${unit}을 글에서 먼저 찾아 눌러 봐요.` };
+  }
+  // 번호 뒤 조사는 읽는 소리마다 달라 낱말 뒤에 · 근거부터 물음은 아직 안 틀렸다("남은" 없이)
+  if (st.evFirst && st.wrong.length === st.wrongAtEv) return { cls: 'is-ok', text: `찾았어요! 칠한 ${unit}(${q.ev.map(circled).join(', ')})을 다시 읽고 ${st.wrong.length ? '남은 ' : ''}보기에서 골라 봐요.` };
+  if (lastWrong) return { cls: 'is-no', text: `🤔 ${hintOf(lastWrong.type, r)}` };
+  return { cls: '', text: '' };
 }
 
 /** 틀린 보기 힌트 (순수) — 🎧 듣고 푸는 중이면 "들은 말" 말투(hintL), 글로 읽고 풀면 글 말투 */
@@ -715,6 +737,7 @@ function evPick(n) {
   if (!(st.answered || evFirstNow(q, st)) || !q.ev || st.evDone || st.evWrong.includes(n)) return; // 맞힌 뒤 · 🔍 근거 먼저
   let reopen = false;
   if (q.ev.includes(n)) {
+    if (!st.answered) { st.wrongAtEv = st.wrong.length; if (st.gate) st.evAt = r.sec; } // 찾을 때까지 틀린 수(그 뒤 새로 틀리면 힌트, Codex 82차 #1) · 🔍 근거부터 물음은 찾은 때(📤 찾기까지 초, v273)
     if (!st.answered) { st.evFirst = true; reopen = true; } // 맞히기 전에 찾았다 — 보기가 다시 열린다(뒤의 근거 잡기는 건너뜀)
     st.evDone = true;
     try { sfx.ding(); } catch { /* 소리는 없어도 */ }
@@ -764,13 +787,16 @@ async function finishCard() {
 export function readLog(r) {
   const qs = r.card.qs;
   const cnt = (f) => r.qs.filter((st, i) => f(st, qs[i])).length;
+  const gs = r.qs.find((st) => st && st.gate && st.evAt >= 0); // 🔍 처음 읽는 글의 근거부터 물음 — 근거를 찾았으면 (v273)
   return {
     t: r.t0, s: r.sec, a: Math.max(0, r.firstSec), n: qs.length,
     f: cnt((st) => !st.wrong.length), // 첫 번에 맞힘
     x: cnt((st, q) => st.wrong.length >= q.opts.length - 1), // 오답 보기를 모두 고른 물음
-    e: cnt((st) => st.evFirst), h: cnt((st) => st.hint2),
+    e: cnt((st) => st.evFirst && !st.gate), h: cnt((st) => st.hint2), // 🔍 근거 먼저 = 두 번 틀려서만(근거부터 물음은 v·w·k)
     m: r.ls ? (r.ls.text ? 'text' : 'listen') : '',
     ...(r.askAt >= 0 ? { q: r.askAt } : {}), // 📖 문제 보기까지 초 (v260 — 🎧는 없음)
+    // 🔍 근거부터 (v273) — v 그 물음이 나온 뒤 근거 줄을 찾기까지 초 · w 그 전에 잘못 누른 줄 · k 찾은 뒤 첫 번에 맞혔나
+    ...(gs ? { v: Math.max(0, gs.evAt - Math.max(0, gs.from)), w: gs.evWrong.length, k: gs.wrong.length ? 0 : 1 } : {}),
   };
 }
 

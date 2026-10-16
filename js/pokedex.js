@@ -77,6 +77,22 @@ function renderCoins() {
   if (amt) amt.textContent = `💰 ${coins()} 코인`;
   const bag = $('pokedex-main').querySelector('.pokedex-bag');
   if (bag) bag.textContent = bagText();
+  // 🧤 스톤 칩도 — 코인·가방 줄만 고치던 때는 레벨업·상점에서 스톤을 쓴 뒤에도 칩이 도감을 연 때의 수 그대로라 가방 수와 달랐다 (2026-10-16)
+  const gl = $('pokedex-main').querySelector('.pokedex-gauntlet');
+  if (gl) gl.replaceWith(gauntletEl(getProfileSnapshot()));
+}
+
+/** 🧤 건틀릿 — 과목 스톤 (2026-09-22): 배워야만 생기고, 상점의 🧤 칸에서 코인과 같이 쓴다. 아직 없는 과목은 🔒 자리만 · 품는 알 */
+function gauntletEl(p) {
+  const gl = el('div', 'pokedex-gauntlet');
+  gl.appendChild(el('span', 'ttl', '🧤 스톤'));
+  for (const s of STONES) {
+    const n = p.items && p.items[s.id] ? p.items[s.id] : 0;
+    gl.appendChild(el('span', 'stone' + (n > 0 ? ' have' : ''), `${s.emoji} ${s.ko} ${n}`));
+  }
+  for (const f of FUTURE_STONES) gl.appendChild(el('span', 'stone locked', `🔒 ${f.emoji} ${f.ko}`));
+  for (const e of eggSummary(p)) gl.appendChild(el('span', 'egg', `🥚 ${EGG_SUBJECT_KO[e.subject] || '영어'} 알 ${e.done}/${e.need}일`)); // 품는 알 — 그 과목을 완주한 날 수
+  return gl;
 }
 
 /** 🎒 가방 한 줄 요약: "🎩×1 🔴×2" */
@@ -147,16 +163,7 @@ export async function openPokedex(opts) {
   hint.appendChild(el('span', 'streak', streak > 0 ? `🔥 ${streak}일 연속 학습 중` : `🔥 하루 ${STREAK_MIN_DONE}문장 이상 하면 연속 학습이 시작돼요`));
   if (nextLv) hint.appendChild(el('span', 'unlock', `🔒 Lv.${nextLv}에 새 포켓몬 ${unlockCountAt(nextLv)}마리 — ⚡${xpToReach(nextLv) - p.xp} 남음`));
   card.appendChild(hint);
-  // 🧤 건틀릿 — 과목 스톤 (2026-09-22): 배워야만 생기고, 상점의 🧤 칸에서 코인과 같이 쓴다. 아직 없는 과목은 🔒 자리만
-  const gl = el('div', 'pokedex-gauntlet');
-  gl.appendChild(el('span', 'ttl', '🧤 스톤'));
-  for (const s of STONES) {
-    const n = p.items && p.items[s.id] ? p.items[s.id] : 0;
-    gl.appendChild(el('span', 'stone' + (n > 0 ? ' have' : ''), `${s.emoji} ${s.ko} ${n}`));
-  }
-  for (const f of FUTURE_STONES) gl.appendChild(el('span', 'stone locked', `🔒 ${f.emoji} ${f.ko}`));
-  for (const e of eggSummary(p)) gl.appendChild(el('span', 'egg', `🥚 ${EGG_SUBJECT_KO[e.subject] || '영어'} 알 ${e.done}/${e.need}일`)); // 품는 알 — 그 과목을 완주한 날 수
-  card.appendChild(gl);
+  card.appendChild(gauntletEl(p));
   showHatchIfAny(); // 🐣 다른 화면에서 부화했는데 아직 못 본 것
   card.appendChild(el('div', 'pokedex-stats', `스톤은 배워야만 생겨요 — 🔷 개념 통과·👑 / 🔶 ${ENGLISH_STONE_SHORT} / 🟩 국어 글을 한 번에 다 맞혀 별 받기. 🛒 상점 🧤 칸에서 코인과 같이 써요`));
   // 💰 코인·🎒 가방·🛒 상점

@@ -375,7 +375,7 @@ test('🎧 화면 연결: 듣기 카드는 글 대신 듣기 상자 · 처음 �
   const rq = body('function renderQ() {');
   assert.ok(rq.indexOf('if (r.ls && !r.ls.heard && !r.ls.text) {') >= 0 && rq.indexOf('if (r.ls && !r.ls.heard && !r.ls.text) {') < rq.indexOf('const q = r.card.qs[r.qi];'), '들어야 물음');
   assert.ok(rq.indexOf('if (r.qi >= r.card.qs.length) {') < rq.indexOf('if (r.ls && !r.ls.heard'), '끝 카드는 그대로');
-  assert.ok(rq.includes('fb.textContent = `🤔 ${hintOf(lastWrong.type, r)}`;'));
+  assert.ok(rq.includes('const said = qFeedback(q, st, unit, r);') && body('export function qFeedback(q, st, unit, r) {').includes("return { cls: 'is-no', text: `🤔 ${hintOf(lastWrong.type, r)}` };"), '틀린 보기 힌트는 hintOf(🎧 말투) — 물음 아래 말은 qFeedback에서 (v273)');
   const fe = body('function finishEl() {');
   assert.ok(fe.includes('if (r.ls && !r.ls.text) box.appendChild(scriptEl(r.card));') && fe.includes('finishText(res, !!r.ls)'));
   assert.ok(view.includes("onHeard: () => { if (ui.read === r) { r.focus = 'head'; renderQ(); bringQ(); } }"), '들으면 물음이 나온다(화면 밖이면 데려온다)');
