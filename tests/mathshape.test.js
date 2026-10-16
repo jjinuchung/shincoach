@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  SHAPE, TAGS, makeQuestion, makeRound, conceptById, ladder, placeFrom, diagnosticSet, lessonOf, checkContent, gradeLabel, valueOf,
+  SHAPE, TAGS, makeQuestion, makeRound, conceptById, ladder, placeFrom, diagnosticSet, lessonOf, checkContent, gradeLabel, valueOf, ngonName,
 } from '../js/mathshape.js';
 import { figureSvg, figText } from '../js/mathdraw.js';
 
@@ -101,6 +101,16 @@ function sentTruth(t0, pr) {
   return null;
 }
 
+/** 다각형 이름 → 변의 수 (생성기의 ngonName과 따로 읽는다): 오각형 5 · 십각형 10 · 십사각형 14 · 이십칠각형 27 · 다른 글이면 null */
+function koSides(t) {
+  const D = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 };
+  const s = String(t).replace(/각형$/, '');
+  if (s === String(t) || !/^[일이삼사오육칠팔구십]+$/.test(s)) return null;
+  if (!s.includes('십')) return D[s] || null;
+  const [tens, ones] = s.split('십');
+  return (tens ? D[tens] : 1) * 10 + (ones ? D[ones] : 0);
+}
+
 /**
  * 문제 글 → 정답 (생성기와 따로). { v } 수 · { truth(choiceText) } 참인 보기가 딱 하나 · ctx: 이름표 확인용 재료
  */
@@ -114,6 +124,30 @@ function solveText(q0) {
     const o = (a, b, c) => Math.sign(cross(sub(b, a), sub(c, a)));
     return o(s.a, s.b, t.a) !== o(s.a, s.b, t.b) && o(t.a, t.b, s.a) !== o(t.a, t.b, s.b);
   };
+  // J10 ⭐ 활용 (v268) — 그림 없이 글만: 이등변삼각형·평행사변형 거꾸로 · 철사 바꾸기 · 대각선 수에서 다각형
+  if ((m = /세 변의 길이의 합이 (\d+) cm인 이등변삼각형이에요\. 길이가 다른 한 변이 (\d+) cm일 때, 길이가 같은 한 변은 몇 cm/.exec(q))) {
+    const P = +m[1]; const b = +m[2]; const a = (P - b) / 2;
+    assert.ok(Number.isInteger(a) && a > 0 && 2 * a > b && a !== b, `세 변으로 이등변삼각형이 안 된다: ${q}`);
+    return { v: a, ctx: { kind: 'isoBack', P, b } };
+  }
+  if ((m = /한 변이 (\d+) cm인 (정\S+형)을 만들었던 철사를 펴서, 남김없이 (정\S+형) 하나를 만들었어요\. \3의 한 변은 몇 cm/.exec(q))) {
+    const REG = { 정삼각형: 3, 정사각형: 4, 정오각형: 5, 정육각형: 6 };
+    const s = +m[1]; const n1 = REG[m[2]]; const n2 = REG[m[3]];
+    assert.ok(n1 && n2 && n1 !== n2 && (s * n1) % n2 === 0, `철사 문제: ${q}`);
+    return { v: (s * n1) / n2, ctx: { kind: 'wire', s, n1, n2 } };
+  }
+  if ((m = /네 변의 길이의 합이 (\d+) cm인 평행사변형 ㄱㄴㄷㄹ이에요\. 변 ㄱㄴ이 (\d+) cm일 때, 변 ㄴㄷ은 몇 cm/.exec(q))) {
+    const Q = +m[1]; const p = +m[2]; const b = (Q - 2 * p) / 2; // 마주 보는 변 ㄷㄹ = ㄱㄴ, ㄹㄱ = ㄴㄷ
+    assert.ok(Number.isInteger(b) && b > 0 && b !== p, `평행사변형이 안 되거나 마름모다: ${q}`);
+    return { v: b, ctx: { kind: 'paraBack', Q, p } };
+  }
+  if ((m = /어떤 다각형에 대각선을 모두 그었더니 (\d+)개였어요\. 이 다각형의 이름은 무엇/.exec(q))) {
+    // 대각선 = 꼭짓점 두 개를 고르는 쌍 − 변(이웃한 쌍) — 생성기의 n × (n − 3) ÷ 2 공식과 따로 센다 (Codex 77차)
+    const diagOf = (k) => (k * (k - 1)) / 2 - k;
+    const D = +m[1]; let n = 4; while (diagOf(n) < D) n++;
+    assert.equal(diagOf(n), D, `대각선 ${D}개인 다각형이 없다: ${q}`);
+    return { truth: (t) => { const k = koSides(t); return k === null ? null : diagOf(k) === D; }, ctx: { kind: 'diagBack', D, n, diagOf } };
+  }
   // J1 — 직선 ㉮에 수직인 직선
   if (/직선 ㉮에 (수직인 직선|대한 수선)은 어느 것/.test(q)) {
     const fig = F[0]; const base = line(fig, '㉮');
@@ -218,10 +252,13 @@ test('그림: J 지시문 다섯 가지를 그리고 — 그린 각·변이 글�
   assert.equal(figText('[gpoly ㄱ:0,0 ㄴ:6,0 ㄷ:7,3 ㄹ:1,3]', true), '(그림)');
 });
 
-test('사다리: 9칸, 모두 초4, needs가 바로 앞 칸', () => {
-  assert.equal(SHAPE.length, 9);
+test('사다리: 10칸(v268 ⭐ 활용 더함), 모두 초4, needs가 바로 앞 칸 · ⭐ 칸은 맨 뒤', () => {
+  assert.equal(SHAPE.length, 10);
   const ids = SHAPE.map((c) => c.id);
-  assert.equal(new Set(ids).size, 9);
+  assert.equal(new Set(ids).size, 10);
+  assert.equal(SHAPE[9].id, 'shp.apply'); assert.match(SHAPE[9].name, /^⭐ /);
+  assert.deepEqual(['오각형', '십각형', '십일각형', '십사각형', '이십각형', '이십칠각형', '삼십오각형'].map(koSides), [5, 10, 11, 14, 20, 27, 35]);
+  assert.deepEqual([5, 10, 11, 14, 20, 27, 35].map(ngonName), ['오각형', '십각형', '십일각형', '십사각형', '이십각형', '이십칠각형', '삼십오각형']);
   for (const [k, c] of SHAPE.entries()) {
     assert.ok(/^shp\./.test(c.id) && c.name && c.idea && c.slip, c.id);
     assert.equal(c.grade, 4);
@@ -345,6 +382,18 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다', () => {
           case TAGS.apexAsBase: hit(x.kind === 'isoAng' && v === Math.round(x.got[2])); break;
           case TAGS.sumNotEach: hit(v === (x.n - 2) * 180); break;
           case TAGS.centerAngle: hit(v === 360 / x.n); break;
+          // J10 ⭐ 활용 — 글에서 따로 읽은 수로
+          case TAGS.isoNoHalf: hit(x.kind === 'isoBack' && v === x.P - x.b); break;
+          case TAGS.isoWrongPair: hit(x.kind === 'isoBack' && v === x.P - 2 * x.b); break;
+          case TAGS.asEquilateral: hit(x.kind === 'isoBack' && v * 3 === x.P); break;
+          case TAGS.wirePerim: hit(x.kind === 'wire' && v === x.s * x.n1); break;
+          case TAGS.wireSame: hit(x.kind === 'wire' && v === x.s); break;
+          case TAGS.wireMulNew: hit(x.kind === 'wire' && v === x.s * x.n2); break;
+          case TAGS.paraOneSide: hit(x.kind === 'paraBack' && v === x.Q - x.p); break;
+          case TAGS.paraNoHalf: hit(x.kind === 'paraBack' && v === x.Q - 2 * x.p); break;
+          case TAGS.paraAsSquare: hit(x.kind === 'paraBack' && v * 4 === x.Q); break;
+          case TAGS.diagNear: { const k = koSides(t); hit(x.kind === 'diagBack' && k !== null && Math.abs(k - x.n) === 1 && x.diagOf(k) !== x.D); break; }
+          case TAGS.diagAsSides: hit(x.kind === 'diagBack' && koSides(t) === x.D); break;
           default: assert.fail(`${where}: 검사 없는 이름표`);
         }
       }
@@ -412,6 +461,14 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답
         const n = f.n; const right = (n * (n - 1)) / 2 - n;
         assert.notEqual(lastNum(shown), right, where); assert.equal(lastNum(ok), right, where);
         for (const w of wrongs) if (lastNum(w.text) !== null) assert.notEqual(lastNum(w.text), right, where);
+      } else if (c.id === 'shp.apply') {
+        // J10 — 그림 없는 글 문제: 글을 따로 풀어 보여 준 말은 틀리고 고친 답은 맞는지
+        const sol = solveText(plain(q.q));
+        assert.ok(sol && sol.v !== undefined, `${where}: 글을 못 읽었다`);
+        assert.equal(key, sol.ctx.kind === 'isoBack' ? 'iso' : 'wire', `${where}: 갈래와 글이 다르다`);
+        assert.notEqual(lastNum(shown), sol.v, `${where}: 보여 준 말이 사실 맞다`);
+        assert.equal(lastNum(ok), sol.v, `${where}: 고친 답이 틀렸다`);
+        for (const w of wrongs) if (lastNum(w.text) !== null) assert.notEqual(lastNum(w.text), sol.v, `${where}: 오답 "${w.text}"이 사실 맞다`);
       } else {
         // 모눈 위 사각형 — 보여 준 말(이름 주장)은 거짓, 고친 답의 이름은 참
         const pr = props(f.verts.map((v) => v.p));
@@ -421,11 +478,11 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답
         assert.equal(claims[k2], false, `${where}: 보여 준 말이 사실 맞다`);
       }
       // ② 오답의 이름표도 그 말의 뜻대로 — ①만 검사해서 "115°는 직각이라서"가 "직각을 둔각으로 봄"(거꾸로)으로 적히고 있었다 (Codex 17차 #2)
-      const pr4 = f.verts ? props(f.verts.map((u) => u.p)) : null;
-      const P4 = f.verts ? f.verts.map((u) => u.p) : null;
+      const pr4 = f && f.verts ? props(f.verts.map((u) => u.p)) : null; // J10은 그림이 없다
+      const P4 = f && f.verts ? f.verts.map((u) => u.p) : null;
       for (const w of wrongs) {
         if (w.tag === '엉뚱한 지적') continue;
-        const t = w.text; const v = lastNum(t); const base = f.items && lineOf('㉮');
+        const t = w.text; const v = lastNum(t); const base = f && f.items && lineOf('㉮');
         const named = (re) => { const mm = re.exec(t); return mm ? lineOf(mm[1]) : null; };
         let good = null;
         switch (w.tag) {
@@ -447,6 +504,8 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답
           case TAGS.tiltNotSquare: good = pr4.names.정사각형 && !P4.some((u, i) => u[1] === P4[(i + 1) % 4][1]) && t.includes('정사각형이 아니에요'); break;
           case TAGS.missParallel: good = pr4.pairs === 2 && t.includes('평행사변형은 아니에요'); break;
           case TAGS.oppFrom360: good = t.includes('360°') && v === 360 - Math.round(measured(f.raw)[f.mode.indexOf('val')]); break;
+          case TAGS.isoWrongPair: { const x = solveText(plain(q.q)).ctx; good = x.kind === 'isoBack' && v === x.P - 2 * x.b; break; }
+          case TAGS.wirePerim: { const x = solveText(plain(q.q)).ctx; good = x.kind === 'wire' && v === x.s * x.n1; break; }
           default: good = null;
         }
         // 보여 준 말이 셈식인데 "고친" 오답의 수가 그 셈의 답과 같으면 "맞게 말했어요"와 헷갈린다 (오각형 대각선: 5 + 5 = 5 × 2)
@@ -461,7 +520,30 @@ test('★ ② 오개념 문항: 보여 준 말은 정말 틀렸다 · 고친 답
   }
   for (const tag of MISREAD_ONLY) assert.ok((misSeen[tag] || 0) >= 100, `② 이름표 "${tag}"가 드물다 (${misSeen[tag] || 0})`);
   for (const [k, n] of Object.entries(branches)) assert.ok(n >= 100, `${k} 갈래가 드물다 (${n})`);
-  assert.equal(Object.keys(branches).length, 18, Object.keys(branches).join(', '));
+  assert.equal(Object.keys(branches).length, 20, Object.keys(branches).join(', ')); // v268 J10 iso·wire
+});
+
+test('J10 ⭐ 도움말이 그 문제의 길에 맞다 — 오답 목록에 없는 답을 쳤을 때의 whyAny가 가족마다 · 이등변삼각형·평행사변형을 일반으로 좁혀 말하지 않는다 (Codex 77차)', () => {
+  const FAM = [
+    [/^세 변의 길이의 합이/, /두 개.*(빼|뺀).*2로 나눠/],
+    [/^한 변이 \d+ cm인 정/, /철사의 길이.*곱셈.*나눠/],
+    [/^네 변의 길이의 합이/, /마주 보는 변.*두 번 빼.*2로 나눠/],
+    [/^어떤 다각형에 대각선을/, /꼭짓점의 수를 하나씩/],
+  ];
+  const seen = [0, 0, 0, 0];
+  for (let s = 1; s <= 400; s++) {
+    const q = makeQuestion('shp.apply', 'calc', s * 389, OPTS);
+    const k = FAM.findIndex(([re]) => re.test(q.q));
+    assert.ok(k >= 0, q.q);
+    seen[k]++;
+    assert.match(q.solve.whyAny, FAM[k][1], `seed ${s}: ${q.q.slice(0, 30)} — 도움말 "${q.solve.whyAny}"`);
+    for (const t of [q.solve.whyAny, ...Object.values(q.solve.why)]) assert.doesNotMatch(t, /이등변삼각형은 두 변만|빼고 나눠요$/, t);
+    if (k === 1) assert.doesNotMatch(q.solve.whyAny, /빼|뺀/, '철사 문제는 빼지 않는다');
+  }
+  assert.ok(seen.every((n) => n >= 40), `가족 ${seen.join('·')}`);
+  // 칸의 slip(남은 예비 말)은 어느 가족에도 틀리지 않게 일반적인 말 · 다른 칸의 도움말은 그대로 slip
+  assert.doesNotMatch(SHAPE[9].slip, /빼|나눠/);
+  assert.equal(makeQuestion('shp.angle', 'calc', 7, OPTS).solve.whyAny, SHAPE[8].slip);
 });
 
 test('★ 조사: 수 뒤 · ㄱ·ㄴ 자모 뒤(변 ㄱㄴ과·ㄷ은) · ㉮ 뒤(와·는) · ㉠ 뒤(과·은)', () => {
@@ -635,7 +717,7 @@ test('그림 이름표: 서로 겹치지 않고 · 도형 외곽선을 가로지
 
 test('📏 진단·사다리·한 편·배움 예비·내용 검사 · 가족 지어내지 않기', () => {
   const d = diagnosticSet(9, 5, OPTS);
-  assert.deepEqual(d.map((q) => q.concept), ['shp.perp', 'shp.isos', 'shp.trap', 'shp.relate', 'shp.angle']);
+  assert.deepEqual(d.map((q) => q.concept), ['shp.perp', 'shp.isos', 'shp.rhom', 'shp.poly', 'shp.apply']); // v268 10칸 — 사다리에서 고르게 다섯(마지막 ⭐ 칸 포함)
   const pl = placeFrom([{ concept: 'shp.perp', correct: true }, { concept: 'shp.isos', correct: false }]);
   assert.equal(pl.startId, 'shp.isos');
   assert.deepEqual(pl.knownIds, ['shp.perp', 'shp.para']);
@@ -646,11 +728,11 @@ test('📏 진단·사다리·한 편·배움 예비·내용 검사 · 가족 �
     for (let s = 1; s <= 200; s++) for (const kind of ['calc', 'misread']) assert.doesNotMatch(JSON.stringify(makeQuestion(c.id, kind, s * 57, OPTS)), /동생|누나|언니|엄마|아빠|할아버지/);
   }
   assert.equal(conceptById('shp.nope'), null);
-  assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 9);
+  assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 10);
 });
 
 // ── 사람이 쓴 원고 (coach/math/shape.json) ──
-test('원고(shape.json)가 형식 검사를 통과한다 — 9칸 모두 배움 3장↑·확인 2개↑·아빠 카드 · 그림은 모두 그려진다', () => {
+test('원고(shape.json)가 형식 검사를 통과한다 — 10칸 모두 배움 3장↑·확인 2개↑·아빠 카드 · 그림은 모두 그려진다', () => {
   assert.deepEqual(checkContent(CONTENT), []);
   for (const c of SHAPE) {
     const L = lessonOf(c.id, 3, { ...OPTS, content: CONTENT });

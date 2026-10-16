@@ -150,6 +150,18 @@ export const TAGS = {
   apexAsBase: '꼭짓각과 밑각이 같다고 봄',
   sumNotEach: '각의 합을 한 각으로 봄',
   centerAngle: '360°를 나눔 (한 각이 아니다)',
+  // J10 ⭐ 활용 (v268) — 두세 걸음 거꾸로 구하기
+  isoNoHalf: '같은 두 변의 합을 한 변으로 봄 (÷ 2를 빠뜨림)',
+  isoWrongPair: '다른 한 변을 두 번 뺌',
+  asEquilateral: '세 변이 모두 같다고 보고 3으로 나눔',
+  wirePerim: '철사 전체의 길이를 한 변으로 봄',
+  wireSame: '모양이 바뀌어도 한 변의 길이가 그대로라고 봄',
+  wireMulNew: '새 도형의 변의 수를 곱함',
+  paraOneSide: '마주 보는 변을 빼지 않음',
+  paraNoHalf: '나머지 두 변의 합을 한 변으로 봄 (÷ 2를 빠뜨림)',
+  paraAsSquare: '네 변이 모두 같다고 보고 4로 나눔',
+  diagNear: '대각선의 수를 맞춰 보지 않고 이웃한 다각형을 고름',
+  diagAsSides: '대각선의 수를 변의 수로 봄',
 };
 
 // ───────────────────── 도형 재료 ─────────────────────
@@ -224,6 +236,7 @@ function finish(id, r, c, f) {
       solve: solve(f.steps.map((t, i) => step(i, F(t))), {
         why: Object.fromEntries(Object.entries(f.why || {}).map(([k, v]) => [k, F(v)])),
         rule: f.rule,
+        whyAny: f.whyAny ? F(f.whyAny) : '', // 가족마다 다른 길일 때 (J10 — 칸 하나의 slip이 네 가족 모두에 맞지 않았다, Codex 77차)
       }),
     }),
   };
@@ -318,6 +331,25 @@ function quadAngles(r) {
 const POLYN = { 5: [[[2, 0], [6, 0], [8, 3], [4, 6], [0, 3]], [[1, 0], [6, 0], [7, 4], [3, 6], [0, 3]]], 6: [[[2, 0], [6, 0], [8, 3], [6, 6], [2, 6], [0, 3]], [[1, 0], [5, 0], [7, 2], [6, 5], [2, 6], [0, 3]]], 7: [[[2, 0], [6, 0], [8, 2], [8, 5], [5, 7], [1, 6], [0, 3]]], 8: [[[2, 0], [5, 0], [7, 2], [7, 5], [5, 7], [2, 7], [0, 5], [0, 2]]] };
 const NGON = { 3: '삼각형', 4: '사각형', 5: '오각형', 6: '육각형', 7: '칠각형', 8: '팔각형', 9: '구각형', 10: '십각형' };
 const REGN = { 3: '정삼각형', 4: '정사각형', 5: '정오각형', 6: '정육각형', 7: '정칠각형', 8: '정팔각형' };
+/** 변이 k개인 다각형 이름 — 11 이상은 한자어 수로 (십일각형 · 이십칠각형) · J10 대각선 거꾸로 */
+const KO_DIGIT = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+export function ngonName(k) {
+  if (NGON[k]) return NGON[k];
+  const t = Math.floor(k / 10); const o = k % 10;
+  return `${t > 1 ? KO_DIGIT[t] : ''}${t ? '십' : ''}${KO_DIGIT[o]}각형`;
+}
+/** J10 철사 바꾸기 — [처음 정다각형의 변 수, 새 정다각형의 변 수] */
+const WIRE_PAIRS = [[3, 4], [3, 5], [3, 6], [4, 3], [4, 5], [4, 6], [5, 3], [5, 4], [5, 6], [6, 3], [6, 4], [6, 5]];
+/** 처음 한 변으로 쓸 수 있는 길이 — 철사 길이가 새 변의 수로 나누어떨어지고 새 한 변이 2 cm 이상 (2~30 — 짝마다 다섯 가지 이상이라 🔁 쌍둥이 글이 덜 겹친다) */
+function wireSides(n1, n2) {
+  const out = [];
+  for (let s = 2; s <= 30; s++) if ((s * n1) % n2 === 0 && (s * n1) / n2 >= 2) out.push(s);
+  return out;
+}
+const ISO_RULE = '이등변삼각형의 세 변의 길이의 합 = 같은 한 변 × 2 + 다른 한 변 — 거꾸로는 합에서 다른 한 변을 빼고 2로 나눠요.';
+const WIRE_RULE = '철사를 펴서 다른 모양을 만들어도 철사의 길이는 그대로 — 처음 도형의 모든 변의 길이의 합을 구한 뒤 새 도형의 변의 수로 나눠요.';
+const PARA_RULE = '평행사변형은 마주 보는 두 변의 길이가 같아요 — 네 변의 길이의 합에서 아는 변을 두 번 빼고 2로 나눠요.';
+const DIAG_BACK_RULE = '대각선의 수 = 꼭짓점의 수 × (꼭짓점의 수 − 3) ÷ 2 — 거꾸로 구할 때는 꼭짓점의 수를 하나씩 넣어 맞춰 봐요.';
 
 // ───────────────────── 개념 사다리 (J. 삼각형·사각형 줄기) ─────────────────────
 
@@ -1004,6 +1036,101 @@ export const SHAPE = [
         steps: ['삼각형의 세 각의 합은 180°', `180° − ${a}° − ${b}° = ${cc}°`],
         whyAny: '아는 각을 하나 빠뜨렸어요. 아는 두 각을 모두 빼요.',
         rule: '삼각형의 세 각의 크기의 합은 180°.',
+      });
+    },
+  },
+
+  {
+    // ⭐ 활용 (v268, 2026-10-16 아버님 "이대로") — J에 한 걸음 문제뿐이라, 문제집 단원평가 LEVEL 2~3처럼 두세 걸음 거꾸로 구하는 문제
+    // · "둘레"는 5학년 말이라 "변의 길이의 합"으로(J3과 같게) · 각 문제는 Z ⭐(안쪽 각 → 일직선)와 겹치지 않게 변·대각선만
+    id: 'shp.apply', grade: 4, name: '⭐ 삼각형·사각형 활용', needs: ['shp.angle'],
+    idea: '두세 걸음 **거꾸로** 구하는 문제예요. 먼저 **같은 길이의 변이 몇 개인지** 떠올려요 — 다른 한 변이 있는 이등변삼각형은 두 개, 평행사변형은 마주 보는 두 쌍, 정다각형은 모두. 합에서 아는 길이를 **모두** 뺀 다음, 같은 변의 수로 **나눠요.** 철사를 펴서 다른 모양을 만들면 철사의 길이부터 구하고, 대각선의 수에서 다각형을 찾을 때는 꼭짓점 수를 하나씩 넣어 맞춰 봐요.',
+    slip: '이 문제에서 무엇을 먼저 구해야 하는지, 풀이를 한 줄씩 따라가 봐요.',
+    calc(r, c) {
+      // ① 이등변삼각형 — 세 변의 합 P · 다른 한 변 b → 같은 한 변 a (b ≠ a: 같으면 정삼각형이라 "3으로 나눔"이 맞는 값)
+      const a = int(r, 4, 15); let b = int(r, 2, 2 * a - 1); if (b === a) b = a > 2 ? a - 1 : a + 1;
+      const P = 2 * a + b;
+      // ② 철사 — 정n1각형(한 변 s)을 편 철사로 정n2각형 · 철사 길이가 n2로 나누어떨어지게 · 🔁 쌍둥이는 요청한 틀의 두 도형으로
+      const [n1, n2] = pickFor(r, c, WIRE_PAIRS, ([x, y], w) => w.includes(`인 ${REGN[x]}을`) && w.includes(`남김없이 ${REGN[y]} 하나`));
+      const s = pick(r, wireSides(n1, n2)); const L = s * n1; const s2 = L / n2;
+      // ③ 평행사변형 — 네 변의 합 Q · 변 ㄱㄴ = p → 변 ㄴㄷ = m (p ≠ m: 같으면 마름모라 "4로 나눔"이 맞는 값)
+      const p = int(r, 3, 15); let m = int(r, 2, 15); if (m === p) m = m === 15 ? 14 : m + 1;
+      const Q = 2 * (p + m);
+      // ④ 대각선 D개 → 꼭짓점 n개 (오각형은 대각선도 5개라 "대각선의 수를 변의 수로 봄"이 정답과 같아 뺀다)
+      const n = int(r, 6, 10); const D = (n * (n - 3)) / 2;
+      const fams = [
+        { ans: String(a), wr: [{ text: String(P - b), tag: TAGS.isoNoHalf }, { text: String(P - 2 * b), tag: TAGS.isoWrongPair }, P % 3 === 0 ? { text: String(P / 3), tag: TAGS.asEquilateral } : null],
+          why: {
+            [TAGS.isoNoHalf]: `${P} − ${b} = ${2 * a} cm는 길이가 같은 두 변을 합한 길이예요. 둘로 나눠요.`,
+            [TAGS.isoWrongPair]: `길이가 다른 변은 하나뿐이에요. ${b} cm는 한 번만 빼요.`,
+            [TAGS.asEquilateral]: '이 문제에는 길이가 다른 한 변이 있어요. 세 변이 모두 같지는 않으니 합을 3으로 나누면 안 돼요.',
+          },
+          steps: [`길이가 같은 두 변의 합: ${P} − ${b} = ${2 * a} cm`, `같은 한 변: ${2 * a} ÷ 2 = ${a} cm`],
+          rule: ISO_RULE,
+          whyAny: '길이가 같은 변이 두 개예요. 합에서 다른 한 변을 뺀 다음 2로 나눠요.',
+          pools: { pokemon: [`세 변의 길이의 합이 ${P} cm인 이등변삼각형이에요. 길이가 다른 한 변이 ${b} cm일 때, 길이가 같은 한 변은 몇 cm일까요?`] } },
+        { ans: String(s2), wr: [{ text: String(L), tag: TAGS.wirePerim }, { text: String(s), tag: TAGS.wireSame }, { text: String(s * n2), tag: TAGS.wireMulNew }],
+          why: {
+            [TAGS.wirePerim]: `${L} cm는 철사 전체의 길이예요. ${REGN[n2]}의 변 ${n2}개로 나눠요.`,
+            [TAGS.wireSame]: '철사의 길이는 그대로지만, 변의 수가 달라지면 한 변의 길이도 달라져요.',
+            [TAGS.wireMulNew]: `철사의 길이는 처음 도형의 변의 수 ${n1}${numJosa(n1, '을', '를')} 곱해서 구해요.`,
+          },
+          steps: [`철사의 길이 = ${REGN[n1]}의 모든 변의 길이의 합: ${s} × ${n1} = ${L} cm`, `${REGN[n2]}의 한 변: ${L} ÷ ${n2} = ${s2} cm`],
+          rule: WIRE_RULE,
+          whyAny: `먼저 ${REGN[n1]}의 모든 변의 길이의 합(철사의 길이)을 곱셈으로 구하고, ${REGN[n2]}의 변의 수로 나눠요.`,
+          pools: { pokemon: [`한 변이 ${s} cm인 ${REGN[n1]}을 만들었던 철사를 펴서, 남김없이 ${REGN[n2]} 하나를 만들었어요. ${REGN[n2]}의 한 변은 몇 cm일까요?`] } },
+        { ans: String(m), wr: [{ text: String(Q - p), tag: TAGS.paraOneSide }, { text: String(Q - 2 * p), tag: TAGS.paraNoHalf }, Q % 4 === 0 ? { text: String(Q / 4), tag: TAGS.paraAsSquare } : null],
+          why: {
+            [TAGS.paraOneSide]: `변 ㄱㄴ과 마주 보는 변 ㄷㄹ도 ${p} cm예요. 두 번 빼요.`,
+            [TAGS.paraNoHalf]: `${Q} − ${p} − ${p} = ${2 * m} cm는 변 ㄴㄷ과 변 ㄹㄱ을 합한 길이예요. 둘로 나눠요.`,
+            [TAGS.paraAsSquare]: '평행사변형이라고 해서 네 변이 모두 같은 것은 아니에요. 마주 보는 두 변끼리 같아요.',
+          },
+          steps: [`평행사변형은 마주 보는 두 변의 길이가 같아요: 변 ㄷㄹ도 ${p} cm`, `변 ㄴㄷ과 변 ㄹㄱ의 합: ${Q} − ${p} − ${p} = ${2 * m} cm`, `변 ㄴㄷ: ${2 * m} ÷ 2 = ${m} cm`],
+          rule: PARA_RULE,
+          whyAny: '마주 보는 변끼리 길이가 같아요. 아는 변을 두 번 빼고 2로 나눠요.',
+          pools: { pokemon: [`네 변의 길이의 합이 ${Q} cm인 평행사변형 ㄱㄴㄷㄹ이에요. 변 ㄱㄴ이 ${p} cm일 때, 변 ㄴㄷ은 몇 cm일까요?`] } },
+        { words: true, ans: ngonName(n), wr: [{ text: ngonName(n - 1), tag: TAGS.diagNear }, { text: ngonName(n + 1), tag: TAGS.diagNear }, { text: ngonName(D), tag: TAGS.diagAsSides }],
+          why: {
+            [TAGS.diagNear]: `대각선이 딱 ${D}개인 것은 ${ngonName(n)}이에요. 꼭짓점 수를 하나씩 넣어 맞춰 봐요.`,
+            [TAGS.diagAsSides]: `${D}개는 대각선의 수예요. 변의 수가 아니에요.`,
+          },
+          steps: [`꼭짓점이 ${n - 1}개이면 ${n - 1} × (${n - 1} − 3) ÷ 2 = ${((n - 1) * (n - 4)) / 2}개 — ${D}개보다 적어요`, `꼭짓점이 ${n}개이면 ${n} × (${n} − 3) ÷ 2 = ${D}개 → ${ngonName(n)}`],
+          rule: DIAG_BACK_RULE,
+          whyAny: '꼭짓점의 수를 하나씩 넣어 대각선의 수를 세어 보고, 딱 맞는 다각형을 찾아요.',
+          pools: { pokemon: [`어떤 다각형에 대각선을 모두 그었더니 ${D}개였어요. 이 다각형의 이름은 무엇일까요?`] } },
+      ];
+      return finish(this.id, r, c, pickFamily(r, c, fams));
+    },
+    misread(r, c) {
+      if (branchOf(r, c, ['iso', 'wire']) === 'iso') {
+        const a = int(r, 4, 15); let b = int(r, 2, 2 * a - 1); if (b === a) b = a > 2 ? a - 1 : a + 1;
+        const P = 2 * a + b;
+        return finishMis(this.id, 'iso', r, c, {
+          q: `세 변의 길이의 합이 ${P} cm인 이등변삼각형이에요. 길이가 다른 한 변이 ${b} cm일 때, 길이가 같은 한 변은 몇 cm일까요?\n\n${showWork(`같은 한 변은 ${P} − ${b} = ${2 * a} cm예요`)}`,
+          ok: `${2 * a} cm는 같은 두 변을 합한 길이예요 — ${2 * a} ÷ 2 = ${a} cm`,
+          wr: [
+            { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+            { text: `다른 한 변을 한 번 더 빼야 해요 — ${P} − ${b} − ${b} = ${P - 2 * b} cm`, tag: TAGS.isoWrongPair },
+            { text: '이등변삼각형은 세 변의 길이가 모두 달라요', tag: OFF },
+          ],
+          steps: [`길이가 같은 두 변의 합: ${P} − ${b} = ${2 * a} cm`, `같은 한 변: ${2 * a} ÷ 2 = ${a} cm`],
+          whyAny: '길이가 같은 변이 두 개라서, 합에서 다른 한 변을 뺀 길이는 같은 두 변을 합한 길이예요.',
+          rule: ISO_RULE,
+        });
+      }
+      const [n1, n2] = pickFor(r, c, WIRE_PAIRS, ([x, y], w) => w.includes(`인 ${REGN[x]}을`) && w.includes(`남김없이 ${REGN[y]} 하나`));
+      const s = pick(r, wireSides(n1, n2)); const L = s * n1; const s2 = L / n2;
+      return finishMis(this.id, 'wire', r, c, {
+        q: `한 변이 ${s} cm인 ${REGN[n1]}을 만들었던 철사를 펴서, 남김없이 ${REGN[n2]} 하나를 만들었어요. ${REGN[n2]}의 한 변은 몇 cm일까요?\n\n${showWork(`같은 철사로 만들었으니 ${REGN[n2]}도 한 변이 ${s} cm예요`)}`,
+        ok: `변의 수가 달라져요 — 철사 ${s} × ${n1} = ${L} cm를 ${n2}${numJosa(n2, '으로', '로')} 나누면 ${s2} cm`,
+        wr: [
+          { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+          { text: `철사의 길이 ${L} cm가 한 변이에요`, tag: TAGS.wirePerim },
+          { text: '철사를 펴면 길이가 줄어들어요', tag: OFF },
+        ],
+        steps: [`철사의 길이: ${s} × ${n1} = ${L} cm`, `${REGN[n2]}의 한 변: ${L} ÷ ${n2} = ${s2} cm`],
+        whyAny: '철사의 길이는 그대로지만, 변의 수가 달라지면 한 변의 길이도 달라져요.',
+        rule: WIRE_RULE,
       });
     },
   },
