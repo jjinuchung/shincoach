@@ -45,8 +45,8 @@ const STD = {
 
 test('📚 새 글 열둘 (v281): 연습 여덟 + ✨ 명작 넷 · 물음 마흔여섯 · 원고 검사 통과 · 네 편뿐이던 단원 여덟에 한 편씩 · 성취기준 공식 문구 · ✍️ 셋 · 대화 글은 줄마다 · ⭐ 미리보기는 확인된 둘만', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(DATA.cards.slice(84).map((c) => c.id), NEW);
-  assert.equal(validCards(DATA).length, 96);
+  assert.deepEqual(DATA.cards.slice(84, 96).map((c) => c.id), NEW);
+  assert.equal(validCards(DATA).length, 102); // v282 포켓몬 글 여섯 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '독서 대화'], ['practice', '문자 대화'], ['practice', '생활문'], ['practice', '발표 준비 메모'], ['practice', '생활문'], ['practice', '생활문'],
     ['practice', '생활문'], ['practice', '토의'], ['classic', '시'], ['classic', '시'], ['classic', '옛이야기'], ['classic', '고전 수필']]);
@@ -61,7 +61,8 @@ test('📚 새 글 열둘 (v281): 연습 여덟 + ✨ 명작 넷 · 물음 마�
     ['5-1-독서', '5-1-1', '5-1-2', '5-1-3', '5-1-매체', '5-2-독서', '5-2-4', '5-2-5', '5-2-6', '5-1-6', '5-2-3'].map(of),
     [['K85'], ['K86'], ['K87', 'K96'], ['K88'], ['K89'], ['K90'], ['K91'], ['K92'], ['K93'], ['K94'], ['K95']]);
   for (const id of NEW) assert.equal(UNITS.filter((u) => u.cards.includes(id)).length, 1, `${id} 단원 하나`);
-  for (const u of ['5-1-독서', '5-1-1', '5-1-3', '5-1-매체', '5-2-독서', '5-2-4', '5-2-5']) assert.equal(UNITS.find((x) => x.id === u).cards.length, 5, `${u} 네 편 → 다섯 편`);
+  // v282 포켓몬 글(K97~)은 빼고 센다 — 5-1-3·5-2-독서에 한 편씩 더 들어갔다
+  for (const u of ['5-1-독서', '5-1-1', '5-1-3', '5-1-매체', '5-2-독서', '5-2-4', '5-2-5']) assert.equal(UNITS.find((x) => x.id === u).cards.filter((id) => Number(id.slice(1)) <= 96).length, 5, `${u} 네 편 → 다섯 편`);
   // 성취기준 — 공식 문구 그대로 · 그 글의 단원과 이어진 것
   for (const id of NEW) {
     const found = card(id).meta.flatMap((m) => [...m.matchAll(/\[(6국0\d-0\d)\]\s*([^·[]*)/g)].map((x) => [x[1], x[2].trim()]));

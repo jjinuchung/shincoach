@@ -80,7 +80,7 @@ test('📍 원고 검사가 잡는 것 — 하나씩만 틀리게: card · 없�
   const bad = (edit, re, cards = CARDS) => { const d = clone(DATA); edit(d.puzzles); const e = checkPuzzles(d, cards); assert.ok(e.some((m) => re.test(m)), `${re} — ${e.join(' / ')}`); };
   const I1 = (ps) => raw(ps, 'I1');
   bad((ps) => { I1(ps).card = 'X2'; }, /card는 K숫자/);
-  bad((ps) => { I1(ps).card = 'K99'; }, /없는 카드 K99/);
+  bad((ps) => { I1(ps).card = 'K999'; }, /없는 카드 K999/);
   bad((ps) => { I1(ps).card = 'K3'; }, /K3는 줄로 된 읽기 글이 아니에요/); // 시
   bad((ps) => { I1(ps).card = 'K36'; }, /K36는 줄로 된 읽기 글이 아니에요/); // 🎧
   bad(() => {}, /글 카드와 함께 검사해요/, null); // undefined를 넘기면 기본값(CARDS)이 들어간다

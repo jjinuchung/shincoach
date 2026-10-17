@@ -61,7 +61,7 @@ test('🧩 원고 검사가 잡는 것: 바꿀 수 있는 조각(실마리 빠�
   bad((ps) => { o('O11')(ps).need = o('O11')(ps).need.map(([a, b, c, w]) => [b, a, c, w]); }, /원고 차례와 달라요/); // 실마리를 모두 거꾸로 — 맞는 차례는 하나지만 ④③②①
   bad((ps) => { o('O11')(ps).ask = 'time'; }, /ask는/);
   bad((ps) => { delete o('O1')(ps).card; }, /이야기 흐름은 읽은 글/);
-  bad((ps) => { o('O1')(ps).card = 'K99'; }, /없는 카드 K99/);
+  bad((ps) => { o('O1')(ps).card = 'K999'; }, /없는 카드 K999/);
   bad((ps) => { o('O11')(ps).chunks.splice(2); }, /chunks는 3~5개/);
   bad((ps) => { const c = o('O11')(ps).chunks; c[1] = c[0]; }, /같은 조각/);
   bad((ps) => { o('O11')(ps).id = 'F99'; }, /id는 O숫자/);

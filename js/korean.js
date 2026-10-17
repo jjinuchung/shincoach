@@ -18,6 +18,9 @@
  *  hintL 🎧 듣기 카드에서 주는 힌트(글이 안 보이니 "들은 말"로 — v245) */
 export const TYPES = {
   make: { name: '지어내기', what: '글에 없는 내용이나 마음을 만들어 냄', hint: '글에 그런 말이 있나요? 글에 있는 것만 가지고 짐작해요.', hintL: '들은 말에 그런 내용이 있었나요? 들은 것만 가지고 짐작해요.' },
+  // v282 (포켓몬 글 — 잘 아는 것일수록 글 대신 아는 것으로 답하기 쉽다): 사실로는 맞지만 그 글에는 없는 보기 · 아는 것을 먼저 인정해 준다
+  //  · "글에서 알 수 있는/쓰여 있는/나와 있는/글에 따르면" 물음에만(KNOW_ASK), 한 편에 하나까지(KNOW_MAX) — checkCard
+  know: { name: '아는 것으로 답하기', what: '사실로는 맞지만 글에 없는 것을 고름 — 글이 아니라 알고 있던 것으로 답함', hint: '알고 있는 게 맞아요! 그런데 이 글에 그 말이 있나요? 이 물음의 답은 글에서 찾아요.', hintL: '알고 있는 게 맞아요! 그런데 방금 들은 말에 그 내용이 있었나요? 들은 것에서 답을 찾아요.' },
   flip: { name: '거꾸로 읽기', what: '글과 반대로 읽음', hint: '글을 다시 읽어 보세요. 반대로 쓰여 있어요.', hintL: '다시 들어 보세요. 반대로 말했어요.' },
   time: { name: '때 헷갈리기', what: '다른 때에 일어난 일을 끌어옴', hint: '그건 다른 때에 일어난 일이에요. 언제 일어났는지 보세요.', hintL: '그건 다른 때의 일이에요. 언제라고 했는지 다시 들어 보세요.' },
   link: { name: '엉뚱한 연결', what: '묻는 것과 상관없는 내용을 이어 붙임', hint: '그 내용은 이 물음과 이어지지 않아요.', hintL: '들은 내용이지만 이 물음과는 이어지지 않아요.' },
@@ -227,6 +230,9 @@ export const EV_RANGE_AT = 2;
 export const EV_RANGE_PAD = 2;
 /** 둘째 힌트 글자 수 — 한두 문장 */
 export const HINT2_MAX = 90;
+/** 🧠 아는 것으로 답하기(v282) 보기를 둘 수 있는 물음 — 글을 근거로 묻는 말 · 한 편에 몇 개까지 */
+export const KNOW_ASK = /알 수 있는|쓰여 있는|나와 있는|따르면/;
+export const KNOW_MAX = 1;
 
 /** 지금 근거부터 찾아야 하나 (순수) — 근거가 있고 · 아직 못 맞혔고 · 근거를 아직 못 찾았고 ·
  *  틀린 보기를 EV_FIRST_AT번 이상 골랐다 — 또는 🔍 근거부터 물음이다(st.gate, v273 — 아직 안 틀려도) */
@@ -523,6 +529,8 @@ export function checkCard(c, ids = new Set()) {
       refs(o.why, `${qid} 보기 ${k + 1}`);
     });
     if (ok !== 1) qat(`정답은 하나(지금 ${ok})`);
+    // 🧠 아는 것으로 답하기(v282) — 글을 근거로 묻는 물음에서만 틀린 보기가 된다(다른 물음이면 맞는 사실을 틀렸다고 하게 된다)
+    if (q.opts.some((o) => isObj(o) && o.type === 'know') && !KNOW_ASK.test(String(q.q || ''))) qat("'아는 것으로 답하기' 보기는 \"글에서 알 수 있는·쓰여 있는·나와 있는·따르면\" 물음에만");
     if (q.ev === null || q.ev === undefined) {
       if (!nonEmpty(q.doneNote)) qat('근거 잡기가 없으면 doneNote(다 푼 뒤 풀이)가 있어야 해요');
       if (own(q, 'evQ') || own(q, 'evNote')) qat('근거 잡기가 없는데 evQ·evNote가 있어요');
@@ -547,6 +555,8 @@ export function checkCard(c, ids = new Set()) {
       refs(q.evNote, `${qid} 근거 풀이`);
     }
   });
+  const know = c.qs.reduce((m, q) => m + (isObj(q) && Array.isArray(q.opts) ? q.opts.filter((o) => isObj(o) && o.type === 'know').length : 0), 0);
+  if (know > KNOW_MAX) at(`'아는 것으로 답하기' 보기는 한 편에 ${KNOW_MAX}개까지(지금 ${know})`);
   return errs;
 }
 

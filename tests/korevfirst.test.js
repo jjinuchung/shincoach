@@ -69,11 +69,11 @@ test('💡 원고 검사가 잡는다 (v258) — 한 곳만 틀리게: 근거 �
   }
 });
 
-test('💡 원고 (v258): 근거가 없는 물음 69개(v261 새 글 넷 · v265 신문 글 하나 · v267 호응 고쳐 쓰기 여덟 · v281 둘 더함)에 모두 둘째 힌트 · 근거가 있는 물음엔 없음 · 정답을 말하지 않음 · 🎧은 번호 없이 · 짧게', () => {
+test('💡 원고 (v258): 근거가 없는 물음 72개(v261 새 글 넷 · v265 신문 글 하나 · v267 호응 고쳐 쓰기 여덟 · v281 둘 · v282 호응 고쳐 쓰기 셋 더함)에 모두 둘째 힌트 · 근거가 있는 물음엔 없음 · 정답을 말하지 않음 · 🎧은 번호 없이 · 짧게', () => {
   assert.deepEqual(checkContent(DATA), []);
   const all = DATA.cards.flatMap((c) => c.qs.map((q) => ({ c, q })));
   const noEv = all.filter(({ q }) => q.ev === null || q.ev === undefined);
-  assert.equal(noEv.length, 69, '글 51 · 🎧 18 (v261 K61-3·K67-1·K68-2·K69-3 · v265 K73-2 · v267 K79-1~4·K80-1~4 · v281 K87-1·K94-2 더함)');
+  assert.equal(noEv.length, 72, '글 54 · 🎧 18 (v261 K61-3·K67-1·K68-2·K69-3 · v265 K73-2 · v267 K79-1~4·K80-1~4 · v281 K87-1·K94-2 · v282 K101-1~3 더함)');
   assert.equal(noEv.filter(({ c }) => c.listen).length, 18);
   for (const { c, q } of all) {
     if (q.ev === null || q.ev === undefined) {
@@ -94,7 +94,7 @@ test('💡 원고 (v258): 근거가 없는 물음 69개(v261 새 글 넷 · v265
 
 test('📚 새 시 일곱 (v258): 윤동주 셋 · 정지용 · 시조 둘 · 김소월 — 원문 대조 · 모두 근거가 있는 물음 셋(근거 먼저가 된다) · 저작권 해 · ⭐ 미리보기 둘 · 단원 지도', () => {
   assert.deepEqual(IDS.slice(53, 60), NEW);
-  assert.equal(validCards(DATA).length, 96); // v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 더함
+  assert.equal(validCards(DATA).length, 102); // v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre, card(id).author]), [
     ['classic', '동시', '윤동주'], ['classic', '동시', '윤동주'], ['classic', '동시', '윤동주'], ['classic', '동시', '정지용'],
     ['classic', '시조', '남구만'], ['classic', '시조', '길재'], ['classic', '시', '김소월']]);
@@ -169,7 +169,7 @@ test('📤 다 읽을 때 한 줄 (korFinishRule opts.read): 카드·날·별은
   assert.deepEqual(p.korReads.map((r) => [r.g, r.x]), [[1, 0], [0, 1]], '같은 날 다시 읽음 — 별 없이(g 0)도 적는다');
   korFinishRule(p, 'K42', T0, {}, IDS, 0, { read: { ...rd, t: T0 + 5, n: 9 } });
   korFinishRule(p, 'K42', T0, {}, IDS, 0, { read: 'x' });
-  korFinishRule(p, 'K99', T0, {}, IDS, 0, { read: { ...rd, t: T0 + 7 } });
+  korFinishRule(p, 'K999', T0, {}, IDS, 0, { read: { ...rd, t: T0 + 7 } });
   korFinishRule(p, 'K43', T0, {}, IDS, 0);
   assert.equal(p.korReads.length, 2, '깨진 기록 · 모르는 카드 · read 없음은 안 적음');
   // 읽은 기록이 깨져 있어도 별·💰는 그대로

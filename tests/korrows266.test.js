@@ -31,7 +31,7 @@ test('📄 문장마다 줄 (v266): 토의 둘·독서 모임 기록은 layout r
 test('📄 원고 검사 (v266): 대사 꼴(이름: 말) 줄이 둘 이상인 읽는 글은 layout rows — 빠지면 잡는다 · 한 줄만이면 괜찮다 · 듣기 카드는 rowsLayout이 맡는다', () => {
   // 지금 원고에서 대사 꼴 읽는 글은 모두 rows
   const talk = DATA.cards.filter((c) => !isListen(c) && Array.isArray(c.lines) && c.lines.filter((t) => SPEAKER.test(t)).length >= 2);
-  assert.deepEqual(talk.map((c) => [c.id, c.layout]), [['K15', 'rows'], ['K23', 'rows'], ['K68', 'rows'], ['K81', 'rows'], ['K83', 'rows'], ['K85', 'rows'], ['K86', 'rows'], ['K92', 'rows']]); // v267 모둠 대화·독서 대화 · v281 독서 대화·문자 대화·토의
+  assert.deepEqual(talk.map((c) => [c.id, c.layout]), [['K15', 'rows'], ['K23', 'rows'], ['K68', 'rows'], ['K81', 'rows'], ['K83', 'rows'], ['K85', 'rows'], ['K86', 'rows'], ['K92', 'rows'], ['K99', 'rows']]); // v267 모둠 대화·독서 대화 · v281 독서 대화·문자 대화·토의 · v282 토의
   const bad = (id, fix) => { const c = JSON.parse(JSON.stringify(card(id))); fix(c); return checkCard(c).join(' '); };
   assert.equal(bad('K15', () => {}), '');
   assert.match(bad('K15', (c) => { delete c.layout; }), /대사 꼴\(이름: 말\) 줄이 있는 글은 layout rows로/);

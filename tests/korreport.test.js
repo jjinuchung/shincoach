@@ -32,7 +32,7 @@ test('📚 새 글 12편 (v254): 연습 여덟(체험·검색 결과·분류·�
     ['practice', '독서 모임 기록'], ['practice', '이야기'], ['classic', '시'], ['classic', '동시'], ['classic', '시조'], ['classic', '옛이야기']]);
   assert.equal(NEW.reduce((n, id) => n + card(id).qs.length, 0), 46, '연습은 넷씩 · 짧은 시 「눈」과 시조는 셋');
   assert.deepEqual(NEW.filter((id) => card(id).write), ['K44', 'K48', 'K53']);
-  assert.equal(validCards(DATA).length, 96, 'v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 더함');
+  assert.equal(validCards(DATA).length, 102, 'v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 더함');
   // 📘 단원 지도 — 새 글은 모두 단원에 · 두 편뿐이던 단원 일곱은 이제 세 편 이상
   for (const id of NEW) assert.ok(UNITS.some((u) => (u.cards || []).includes(id)), `${id} 단원`);
   for (const u of ['5-1-독서', '5-1-2', '5-1-매체', '5-1-4', '5-2-2', '5-2-매체', '5-2-4']) assert.ok(UNITS.find((x) => x.id === u).cards.length >= 3, `${u} 세 편 이상`);
@@ -145,7 +145,7 @@ test('📤 물음마다 틀린 수 (v254, profile.korQMiss): 고쳐 읽기 · �
   korFinishRule(p, 'K20', T0 + 3600000, {}, IDS, 0, { qMiss: { 'K20-2': 1 } });
   assert.deepEqual(p.korQMiss, { 'K20-2': 3, 'K20-4': 3 }, '같은 날 다시 읽어 별이 없어도 센다');
   korFinishRule(p, 'K20', T0, {}, IDS, 0, { qMiss: 'bad' });
-  korFinishRule(p, 'K99', T0, {}, IDS, 0, { qMiss: { 'K99-1': 1 } });
+  korFinishRule(p, 'K999', T0, {}, IDS, 0, { qMiss: { 'K999-1': 1 } });
   assert.deepEqual(p.korQMiss, { 'K20-2': 3, 'K20-4': 3 }, '깨진 값 · 모르는 카드는 그대로');
   // 빈 프로필 · 복사 · 병합(옛 백업이 늦게 저장된 척해도 줄지 않는다)
   assert.deepEqual(emptyProfile().korQMiss, {});
@@ -194,7 +194,7 @@ test('📤 국어 요약 글 (korreport.korReportText, v254): 7일 국어 시간
   const p = {
     korDone: { 'K1:1': D, 'K1:2': D + 1, 'K20:1': D + 3, 'K42:1': 1 },
     korMiss: { make: 3, flip: 1, zzz: 4 },
-    korQMiss: { 'K20-2': 2, 'K1-3': 1, 'K99-1': 9, 'K42-1': 5 },
+    korQMiss: { 'K20-2': 2, 'K1-3': 1, 'K999-1': 9, 'K42-1': 5 },
     korWords: { [cw.id]: { box: 5, at: 1 }, [wordId('idiom', 'x')]: { box: 1, at: 1 } },
     korPuzzle: { O1: { box: 1, at: 1 } },
     korWrites: {},
@@ -209,15 +209,15 @@ test('📤 국어 요약 글 (korreport.korReportText, v254): 7일 국어 시간
   assert.ok(t.includes('- 10-13: 25분 · ⏳ 연장권 1개\n') && t.includes('- 10-14: 1분\n') && t.includes('- 10-11: (국어 기록 없음)\n') && !t.includes('10-01'));
   // 경계 (Codex 66차): 29초 = 반올림 0분이지만 기록은 있다 → "1분 미만" · 30초 = 1분 · 0초 = 기록 없음(연장권만 있어도)
   assert.ok(t.includes('- 10-12: 1분 미만\n') && t.includes('- 10-10: 1분\n') && t.includes('- 10-09: (국어 기록 없음) · ⏳ 연장권 1개\n'));
-  assert.ok(t.includes('## 글 — 96편 중 별을 받은 글 3편 (★★★ 0 · ★★ 1 · ★ 2)'));
+  assert.ok(t.includes('## 글 — 102편 중 별을 받은 글 3편 (★★★ 0 · ★★ 1 · ★ 2)'));
   assert.ok(t.includes('- K1 「시든 강낭콩」 ★★ — 처음 10-11 · 틀린 물음 K1-3(1)\n'));
   assert.ok(t.includes('- K20 「처음 혼자 탄 버스」 ★ — 처음 10-14 · 틀린 물음 K20-2(2)\n'));
   assert.ok(t.includes('- K42 「도자기 마을 체험 학습」 ★ — 처음 ? · 틀린 물음 K42-1(5)\n'), '날을 모르는 별(1)은 ?');
-  assert.match(t, /- 완료 기록이 없는 글 93편: K2 「황제펭귄의 겨울나기」 · /, '읽다가 그만둔 글은 기록이 없어 "안 읽은 글"이라 하지 않는다 (Codex 66차)');
+  assert.match(t, /- 완료 기록이 없는 글 99편: K2 「황제펭귄의 겨울나기」 · /, '읽다가 그만둔 글은 기록이 없어 "안 읽은 글"이라 하지 않는다 (Codex 66차)');
   assert.ok(!t.includes('안 읽은 글'));
   assert.ok(t.includes('- 지어내기 3 · 거꾸로 읽기 1\n'), '아는 종류만, TYPES 차례로');
   const top = L.filter((l) => /^- K\d+-\d /.test(l));
-  assert.deepEqual(top.map((l) => l.split(' ')[1]), ['K42-1', 'K20-2', 'K1-3'], '많은 차례 · 카드에 없는 물음(K99-1)은 뺌');
+  assert.deepEqual(top.map((l) => l.split(' ')[1]), ['K42-1', 'K20-2', 'K1-3'], '많은 차례 · 카드에 없는 물음(K999-1)은 뺌');
   assert.ok(top[1].includes('「처음 혼자 탄 버스」 마음의 변화 — 2번 · 물음: 버스를 타고 가는 동안'));
   assert.ok(t.includes(`- 📘 국어 공부 말: 배우는 중 0 · ⭐ 1 · 열린 51 / 전체 51\n`));
   assert.ok(t.includes('- 🗣️ 관용 표현: 배우는 중 0 · ⭐ 0 · 열린 55 / 전체 55\n'), '없는 낱말 id는 세지 않는다');

@@ -16,12 +16,12 @@ const at = (days, h = 12) => new Date(2026, 9, 11 + days, h, 0, 0).getTime();
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('📚 원고: 형식 검사 통과 · 아흔여섯 편(연습 예순하나·명작 서른다섯 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯 · v254 새 글 열둘 · v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
+test('📚 원고: 형식 검사 통과 · 백두 편(연습 예순일곱·명작 서른다섯 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯 · v254 새 글 열둘 · v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, Array.from({ length: 96 }, (_, i) => `K${i + 1}`));
+  assert.deepEqual(IDS, Array.from({ length: 102 }, (_, i) => `K${i + 1}`));
   const P = 'practice'; const C = 'classic';
-  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C]);
-  assert.equal(validCards(DATA).length, 96);
+  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P]);
+  assert.equal(validCards(DATA).length, 102);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -33,8 +33,8 @@ test('📚 원고: 형식 검사 통과 · 아흔여섯 편(연습 예순하나�
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 339);
-  assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 여덟 가지(v236 짜임 놓치기 더함)가 모두 한 번 이상 쓰인다');
+  assert.equal(qn, 363);
+  assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 아홉 가지(v236 짜임 놓치기 · v282 🧠 아는 것으로 답하기 더함)가 모두 한 번 이상 쓰인다');
   // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남 · 또는 지은이를 알 수 없는 옛이야기를 다시 씀)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {
     const law = c.facts.find((f) => f[0] === '저작권')[1];
@@ -115,7 +115,7 @@ test('📚 별 규칙: 처음 ★ · 같은 날 다시는 별 없음(내일) · 
 
 test('📚 korFinishRule: 별마다 💰 한 번(번 코인에도) · 모르는 카드는 unknown · 잘못 읽기 횟수는 아는 종류만·한 번에 MISS_MAX까지 · 별이 없어도 횟수는 더함', () => {
   const p = pf({ coins: 5, coinsEarned: 40 });
-  assert.deepEqual(korFinishRule(p, 'K99', T0, {}, IDS), { ok: false, why: 'unknown' });
+  assert.deepEqual(korFinishRule(p, 'K999', T0, {}, IDS), { ok: false, why: 'unknown' });
   assert.deepEqual(korFinishRule(p, 'K1', T0, {}, null), { ok: false, why: 'unknown' });
   assert.equal(p.coins, 5);
   const r1 = korFinishRule(p, 'K1', T0, { make: 1, flip: 2, guess: 9, time: -3, link: 1e20 }, IDS);
@@ -383,7 +383,7 @@ test('★ 📚 저장 경로: 다 읽으면 별·💰가 저장된 프로필에 
   const ok = await korFinish('K5', {}, IDS);
   assert.deepEqual([ok.ok, ok.star, ok.coins], [true, 1, 12]);
   assert.equal(stored().coins, 10 + 12 + 12);
-  assert.deepEqual(await korFinish('K99', {}, IDS), { ok: false, why: 'unknown' });
+  assert.deepEqual(await korFinish('K999', {}, IDS), { ok: false, why: 'unknown' });
 });
 
 test('🔍 Codex 48차 #7: 다음 별을 받을 날을 직접 센다 — 시계를 되돌려 ★이 앞날이어도 남은 날이 맞다 · ★★가 앞날이면 ★★★도 그 뒤 · 깨진 날 병합은 차례와 상관없이 바른 날이 이긴다 · ★ 없이 ★★만 있던 기록은 ★을 채워도 ★★를 다시 주지 않는다', () => {
