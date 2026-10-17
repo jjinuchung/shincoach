@@ -517,10 +517,24 @@ export function rivalWrong(m, id, rid) {
  */
 export function keepLine(icon, step, left = 0) {
   if (!icon) return null;
+  if (step === 'start') return `💪 한 문제 틀려도 비슷한 문제를 맞히면 ${icon} 그대로예요`; // 첫 문제 위 (v279)
   // 결과 보기를 누르기 전에는 "그대로예요"라고 못 박지 않는다 — 그 전에 ←로 나가면 못 통과다 (Codex 73차 #4)
   if (step === 'wrong') return `💪 괜찮아요! 한 문제는 틀려도 비슷한 문제를 맞히고 끝까지 풀면 ${icon} 그대로예요.`;
   if (step === 'fixed') return left > 0 ? `💪 좋아요! 남은 문제도 끝까지 맞히면 ${icon} 그대로예요.` : `💪 좋아요! [결과 보기]를 누르면 ${icon} 그대로예요.`;
   if (step === 'kept') return `💪 틀린 문제와 비슷한 문제를 맞혀서 ${icon} 그대로예요 — 내일 한 번 더 확인해요.`;
+  return null;
+}
+
+/**
+ * 💪 처음 배우기·연습 편의 말 (v279 — 확인 차례가 아닌 편은 고친 실수 하나까지 통과, applyRound) · 셈 없이(남은 문제 수를 세지 않는다)
+ * step: 'start'(첫 문제 위) · 'wrong'(처음 틀린 직후 — 쌍둥이가 있을 때) · 'fixed'(쌍둥이를 맞힌 직후, left = 그 뒤 문제 수) · 'passed'(결과 카드)
+ */
+export function slipLine(step, left = 0) {
+  if (step === 'start') return '💪 한 문제 틀려도 비슷한 문제를 맞히면 통과해요';
+  // 결과 보기를 누르기 전에는 "통과했어요"라고 못 박지 않는다 — 그 전에 ←로 나가면 그만둠이다 (keepLine과 같은 까닭)
+  if (step === 'wrong') return '💪 괜찮아요! 비슷한 문제를 맞히고 다른 문제도 끝까지 맞히면 이 편은 통과예요.'; // "끝까지 풀면"은 뒤에서 또 틀려도 되는 것처럼 읽혔다 (Codex 87차 P3)
+  if (step === 'fixed') return left > 0 ? '💪 좋아요! 남은 문제도 끝까지 맞히면 통과예요.' : '💪 좋아요! [결과 보기]를 누르면 통과예요.';
+  if (step === 'passed') return '💪 틀린 문제와 비슷한 문제를 맞혀서 통과했어요!';
   return null;
 }
 
@@ -661,8 +675,14 @@ export function applyRound(m, id, r, today) {
   m.concepts = m.concepts || {};
   m.miss = m.miss || {};
   const rec = m.concepts[id] || { done: false, box: 0, dueAt: '', passes: 0, fails: 0, lastAt: 0 };
-  const passed = r.total > 0 && r.correct === r.total;
+  const all = r.total > 0 && r.correct === r.total;
+  // 🔁 고친 실수 하나 (v279, 2026-10-17 아버님 "니 제안대로") — 틀린 것이 하나뿐이고 그 문제의 쌍둥이를 맞혔다(keptReview와 같은 판정).
+  //   "다 맞혀야 통과"라 첫 오답 뒤엔 그 편에 받을 것이 없어 바로 그만두고 다시 뽑는 편이 이득이었다 →
+  //   처음 배우기·연습은 고친 실수 하나까지 통과(진짜 시험은 다음 날 확인), 확인 차례는 v262 💪 칸 지키기 그대로(+ ☀️ 안이면 🎯, roundCatches)
+  const slip = r.total > 0 && r.total - r.correct === 1 && keptReview(r.qs);
   const wasDone = !!rec.done;
+  const dueReview = wasDone && isDue(rec, today) && !rivalWrong(m, id, r.rid); // 💪 다른 창이 이 칸 확인 편에서 이미 틀렸으면 연습 (Codex 73차 #2)
+  const passed = all || (slip && !dueReview);
   const wasCrowned = wasDone && (rec.box || 0) >= GRADUATED;
   const wasStage = stageOf(rec);
   let review = false;
@@ -673,11 +693,11 @@ export function applyRound(m, id, r, today) {
   //   lastAt은 "마지막 활동"이라 연습·섞어 풀기도 올리는데, 그걸로 일정을 고르면 옛 상태의 기기가 나중에 연습만 해도 👑이 되돌아간다 (Codex 3차 #1)
   if (!wasDone) {
     if (passed) { rec.done = true; Object.assign(rec, enroll(today)); rec.schedAt = Date.now(); }
-  } else if (isDue(rec, today) && !rivalWrong(m, id, r.rid)) { // 💪 다른 창이 이 칸 확인 편에서 이미 틀렸으면 연습 (Codex 73차 #2)
+  } else if (dueReview) {
     review = true;
     late = Math.max(0, daysBetween(rec.dueAt, today));
     // 💪 정답 수와 문항 기록이 둘 다 "하나만 틀림"일 때만 — 통과는 아니라 실패 +1, 칸(box)·📏은 그대로 내일 다시 (v262)
-    kept = !passed && r.total - r.correct === 1 && keptReview(r.qs);
+    kept = !passed && slip;
     if (kept) rec.dueAt = addDays(today, 1);
     else Object.assign(rec, schedule(rec.box || 0, passed, today));
     rec.schedAt = Date.now();
@@ -697,11 +717,12 @@ export function applyRound(m, id, r, today) {
   // rid: 화면이 편을 열 때 붙인 번호 — 그날 편 수(sameDayRounds)가 같은 편을 두 번 세지 않고, 적어 둔 푸는 중 편(m.lives[rid])을 여기서 닫는다 (v250)
   // sd: 자정을 넘겨 끝냈으면 시작한 날 — 편 수는 시작한 날로 센다(일정·☀️는 끝낸 날 today 그대로, Codex 62차 #2)
   if (r.rid) dropLive(m, r.rid);
-  pushLog(m, { d: today, t: Date.now(), ...(r.rid ? { rid: r.rid } : {}), ...(r.day && r.day !== today ? { sd: r.day } : {}), id, mode, ok: r.correct, n: r.total, ...(kept ? { kp: 1 } : {}), qs: (r.qs || []).map(logQ) });
+  // sl: 🔁 고친 실수 하나로 통과한 편 (v279 — 주간 보고가 그만두기가 줄었는지 견줄 때)
+  pushLog(m, { d: today, t: Date.now(), ...(r.rid ? { rid: r.rid } : {}), ...(r.day && r.day !== today ? { sd: r.day } : {}), id, mode, ok: r.correct, n: r.total, ...(kept ? { kp: 1 } : {}), ...(passed && !all ? { sl: 1 } : {}), qs: (r.qs || []).map(logQ) });
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
   // 🐣 방금 "안다"가 됐나 — 🥚 배우는 중·📏 진단으로 친 칸이 다음 날 이후 확인을 통과한 순간 (결과 카드가 축하한다)
   const known = (wasStage === 'learning' || wasStage === 'placed') && stageOf(rec) === 'known';
-  return { passed, first: !wasDone && passed, crowned, review, practice, known, late, kept };
+  return { passed, first: !wasDone && passed, crowned, review, practice, known, late, kept, slip: passed && !all };
 }
 
 /** 이 편의 문항 ⚡💰 몫 (1 · 0.5 · 0) — 화면이 결과 카드에 까닭을 보여 줄 때도 */
@@ -1058,7 +1079,8 @@ export function roundCatches({ mode, result, inDaily, dailyFirst }) {
   let n = 0;
   if ((mode === 'learn' || mode === 'review') && result && !result.practice) {
     if (result.first) n = 1;
-    if (inDaily && result.passed) n = Math.max(n, 1);
+    // 💪 확인 차례에서 고친 실수 하나로 칸을 지킨 편(kept)도 ☀️ 안이면 1 (v279, 아버님 "니 제안대로" — 9/22 "통과한 편에만"을 넓힘: 끝까지 풀면 받는 것이 있게)
+    if (inDaily && (result.passed || result.kept)) n = Math.max(n, 1);
   }
   if (dailyFirst) n += 1;
   return n;
@@ -1314,7 +1336,8 @@ export function conceptReport(m, limit = 8) {
     // 🤔 노트 회차(id 'notes')·🎲 섞어 풀기(id 'mix')의 이 개념 문항들 — 편의 통과/실패 흔적(trail)에는 안 넣고, 바로 고침·활동에만 센다
     const noteQs = log.filter((e) => e.id === 'notes' || e.id === 'mix' || e.id === 'ask').flatMap((e) => (e.qs || []).filter((q) => q.c === id));
     // ⏹ 그만둔 편(v250)은 답한 것을 다 맞혔어도 통과가 아니다 · 💪 kept: 확인 편에서 칸을 지킴 · rf: 확인 차례에 틀린 뒤 그만둬 못 통과로 침 (v262)
-    const trail = mine.slice(-limit).map((e) => ({ d: e.d, ok: e.ok, n: e.n, pass: e.mode !== 'quit' && e.n > 0 && e.ok === e.n, mode: e.mode, ...(e.mode === 'quit' ? { quit: 1, of: e.of || e.n } : {}), ...(e.kp ? { kept: 1 } : {}), ...(e.mode === 'quit' && e.rf ? { rf: 1 } : {}) }));
+    // 💪 sl: 고친 실수 하나로 통과한 편(v279) — 통과로 세고 표시는 따로(정답 수는 그대로 3/4 — Codex 87차)
+    const trail = mine.slice(-limit).map((e) => ({ d: e.d, ok: e.ok, n: e.n, pass: e.mode !== 'quit' && e.n > 0 && (e.ok === e.n || e.sl === 1), mode: e.mode, ...(e.mode === 'quit' ? { quit: 1, of: e.of || e.n } : {}), ...(e.kp ? { kept: 1 } : {}), ...(e.mode !== 'quit' && e.sl === 1 ? { slip: 1 } : {}), ...(e.mode === 'quit' && e.rf ? { rf: 1 } : {}) }));
     const kinds = Object.entries(rec.kinds || {}).map(([k, v]) => ({ k, label: KIND_SHORT[k] || k, ok: v[0], n: v[1], rate: v[1] ? v[0] / v[1] : 1 }));
     const weak = kinds.filter((x) => x.n >= 2).sort((a, b) => a.rate - b.rate)[0] || null;
     const miss = Object.entries(rec.miss || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag, n]) => ({ tag, n }));
@@ -1437,7 +1460,7 @@ export function mathReportText(m, today) {
   const s = mathSummary(m);
   const lines = [`🔢 신코치 수학 기록 (${today}) — 개념 ${s.total}개 중 🐣 안다 ${s.known} · 🥚 배우는 중 ${s.learning} · 📏 진단으로 침 ${s.placed} · 👑 ${s.crowned} · 지금까지 ${s.rounds}편`];
   for (const r of conceptReport(m, 12)) {
-    const trail = r.trail.map((t) => (t.quit ? `⏹${t.rf ? '✘' : ''}${t.ok}/${t.n}` : t.pass ? '✔' : `✘${t.ok}/${t.n}${t.kept ? '💪' : ''}`)).join(' '); // 💪 칸 지킴 · ⏹✘ 틀린 뒤 그만둬 못 통과 (v262)
+    const trail = r.trail.map((t) => (t.quit ? `⏹${t.rf ? '✘' : ''}${t.ok}/${t.n}` : t.pass ? (t.slip ? `✔💪${t.ok}/${t.n}` : '✔') : `✘${t.ok}/${t.n}${t.kept ? '💪' : ''}`)).join(' '); // 💪 칸 지킴 · ⏹✘ 틀린 뒤 그만둬 못 통과 (v262) · ✔💪 고쳐서 통과 (v279)
     const kinds = r.kinds.map((k) => `${k.label} ${k.ok}/${k.n}`).join(', ');
     const miss = r.miss.map((x) => `${x.tag}×${x.n}`).join(', ');
     lines.push(`- ${r.name}${r.stage ? ` ${STAGE_MARK[r.stage]}` : ''}: ${r.passes}통과/${r.fails}실패 · ${trail}${kinds ? ` · ${kinds}` : ''}${miss ? ` · 헷갈림: ${miss}` : ''}${r.fixed ? ` · 바로 고침 ${r.fixed}` : ''}${r.sense[1] ? ` · 감 잡기 ${r.sense[0]}/${r.sense[1]}` : ''}${(r.why.s + r.why.c + r.why.u) ? ` · 틀린 이유: 실수 ${r.why.s}·헷갈림 ${r.why.c}·몰랐음 ${r.why.u}` : ''}${r.pad[1] ? ` · ✍️ 직접 쓴 답 ${r.pad[0]}/${r.pad[1]}${r.guesses.length ? ` (짐작: ${r.guesses.join(', ')})` : ''}` : ''}${r.notes ? ` · 🤔 다시 볼 유형 ${r.notes}` : ''}`);

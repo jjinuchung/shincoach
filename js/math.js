@@ -15,6 +15,7 @@ import {
   stemPickOrder, LATE, lateBonus, lateLeft, bridgeOf, bridgeOffers,
   keepLine, reviewKeep, rivalWrong, stageIcon,
   answerSecOf,
+  slipLine, // 💪 처음 배우기·연습 편의 "고친 실수 하나까지 통과" 말 (v279)
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -1308,7 +1309,7 @@ function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0
   const card = el('section', 'math-card math-result math-daily-done');
   card.appendChild(el('h2', '', '☀️ 오늘의 수학 끝!'));
   const ul = el('ul', 'math-daily-list');
-  if (info) ul.appendChild(el('li', '', `${info.mode === 'review' ? '🔁' : '▶'} ${nameOf(info.id)} — ${info.passed ? '✅ 다 맞았어요' : `${info.correct}/${info.total} 맞았어요`}`));
+  if (info) ul.appendChild(el('li', '', `${info.mode === 'review' ? '🔁' : '▶'} ${nameOf(info.id)} — ${info.passed ? (info.slip ? '✅ 통과했어요 (💪 비슷한 문제로 고쳤어요)' : '✅ 다 맞았어요') : `${info.correct}/${info.total} 맞았어요`}`));
   if (result && result.total) ul.appendChild(el('li', '', `🎲 섞어 풀기 — ${result.total}개 중 ${result.ok}개 맞았어요${result.ok < result.total ? ' · 헷갈린 유형은 🤔 노트에 남겨 다음에 다시 풀어요' : ''}`));
   card.appendChild(ul);
   card.appendChild(el('p', 'math-p', daily && daily.first
@@ -1599,6 +1600,11 @@ function renderQuestion(restore = false) {
   }
   // 🔁 같은 날 둘째 편부터 — 문항 ⚡💰가 줄어드는 것을 풀기 전에 말한다 (v250)
   if (r.rep && r.rep.text && r.at === 0) card.appendChild(el('p', 'math-practice-note math-repeat-note', r.rep.text));
+  // 💪 규칙을 미리 — 한 문제 틀려도 비슷한 문제를 맞히면 통과(처음 배우기·연습) / 칸 그대로(확인 차례) (v279 — 틀리면 바로 그만두던 것)
+  if (r.at === 0) {
+    const sl = r.keep ? keepLine(r.keep, 'start') : slipRound(r) ? slipLine('start') : null;
+    if (sl) card.appendChild(el('p', 'math-practice-note math-slip-note', sl));
+  }
 
   // 🔢 수가 답인 ① 계산은 숫자판, ✍️ 그리기 문항은 점 찍기 판 (판이 그래프를 그리므로 글에서는 뺀다)
   const done = restore && r.answered ? ((r.answers[r.at] || {}).p ? 'typed' : 'choice') : null; // 답한 뒤 복원은 답할 때 방식으로
@@ -1759,6 +1765,8 @@ const conceptQs = (r) => r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1
 // 한 문제라도 답한 개념 편(learn·review·practice — 사다리의 아는 칸은 practice로 연다, ☀️ 개념 편 포함)을 ←로 나가거나 앱을 닫으면 일지에 "그만둠" + 이미 틀린 문항은 🤔 노트.
 // 🎒·📊 다녀오기는 멈춤(ui.round가 그대로). 노트 회차·섞어 풀기·💎·❓·진단은 그대로
 const isConceptRound = (r) => !!(r && r.id && r.rid && (r.mode === 'learn' || r.mode === 'review' || r.mode === 'practice'));
+// 💪 고친 실수 하나까지 통과하는 편 (v279) — 개념 편 중 확인 차례(r.keep — v262 칸 지키기)가 아닌 것 = 처음 배우기·연습 (판정은 저장소의 applyRound)
+const slipRound = (r) => isConceptRound(r) && !r.keep && !light(r);
 // due: 연 날 확인 차례였나(r.keep) — 그만둘 때 못 통과로 칠지는 정리하는 날이 아니라 이 표시로 (Codex 73차 #1)
 const liveOf = (r) => ({ rid: r.rid, id: r.id, mode: r.mode, d: r.day || todayKey(), n: r.qs.length, ...(r.keep ? { due: 1 } : {}), qs: conceptQs(r) });
 // 🔒 지금 이 편을 쥔 창 (Codex 62차 #1) — 편마다 브라우저 잠금(Web Locks)을 쥐고, 수학을 여는 다른 창은 쥔 편을 그만둠으로 닫지 않는다.
@@ -2158,7 +2166,8 @@ function paintAnswer(i, list, card, restoring) {
     p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : ch.idk ? '괜찮아요 — 풀이를 천천히 읽어 봐요.' : '아쉬워요.'));
     fb.appendChild(p);
     // 💪 오늘 확인 차례인 칸에서 처음 틀렸고 비슷한 문제가 나오면 — 그만두지 않아도 된다는 걸 풀이보다 먼저 (v262)
-    const kl = canTwin && r.answers.slice(0, r.at).every((x) => x && x.correct) ? keepLine(r.keep, 'wrong') : null;
+    //    처음 배우기·연습 편은 "비슷한 문제를 맞히고 끝까지 풀면 통과" (v279)
+    const kl = canTwin && r.answers.slice(0, r.at).every((x) => x && x.correct) ? (r.keep ? keepLine(r.keep, 'wrong') : slipRound(r) ? slipLine('wrong') : null) : null;
     if (kl) fb.appendChild(el('p', 'math-keep', kl));
     rv = light(r) ? null : { st: a, seed: (r.seed || 0) + r.at * 7919 };
     scrollTo = solveCard(q, shown, rv); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (2026-09-21)
@@ -2799,7 +2808,8 @@ function paintTwin(i, list, card, restoring) {
   if (ch.ok) {
     fb.appendChild(el('p', 'math-fb ok', slip ? slipOk : `고쳤어요! 같은 방법으로 잘 풀었어요 ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`));
     // 💪 확인 차례 칸에서 틀린 것이 이 문제 하나뿐이면 — 칸을 지켰다고 (남은 문제가 있으면 끝까지) (v262)
-    const kl = r.answers.slice(0, t.of).every((x) => x && x.correct) ? keepLine(r.keep, 'fixed', r.qs.length - t.of - 1) : null;
+    const left = r.qs.length - t.of - 1;
+    const kl = r.answers.slice(0, t.of).every((x) => x && x.correct) ? (r.keep ? keepLine(r.keep, 'fixed', left) : slipRound(r) ? slipLine('fixed', left) : null) : null; // 💪 처음 배우기·연습은 통과 (v279)
     if (kl) fb.appendChild(el('p', 'math-keep', kl));
   } else {
     fb.appendChild(el('p', 'math-fb no', slip ? '🙈 확인 문제도 틀렸어요 — 노트에 남겨 두고 다음에 다시 풀어 봐요. 풀이를 한 번 더 읽어요.' : '아직 헷갈리나 봐요. 풀이를 한 번 더 읽어요.'));
@@ -2915,7 +2925,7 @@ async function finishRound() {
   ui.state = state; // 🤔 오답 노트가 바뀌었을 수 있다
   // ☀️ 흐름의 다음 단계는 화면을 그리든 말든 저장 성공 직후에 정한다 — 🎒에 가 있어도 돌아오면 섞어 풀기로 이어진다 (Codex 3차 #2)
   if (d && lastOfDaily) d.marked = true;
-  if (d && d.step === 'round' && result) d.roundInfo = { id: r.id, mode: r.mode, passed: result.passed, correct: r.correct, total: r.qs.length };
+  if (d && d.step === 'round' && result) d.roundInfo = { id: r.id, mode: r.mode, passed: result.passed, slip: !!result.slip, correct: r.correct, total: r.qs.length }; // 💪 slip: 고쳐서 통과 (v279 — 완주 카드가 "다 맞았어요"라고 하지 않게, Codex 87차)
 
   // 보상은 화면과 상관없이 지급 (나가 있어도 번 것은 번 것)
   const rw = r.mode === 'diag'
@@ -3079,8 +3089,9 @@ async function finishRound() {
   const card = el('section', 'math-card math-result');
   const all = result.passed;
   card.appendChild(el('h2', '', all
-    ? (result.crowned ? '👑 이해 완료!' : result.first ? '🥚 오늘 배웠어요!' : result.known ? '🐣 이제 알아요!' : result.practice ? '✅ 다 맞았어요!' : '✅ 다시 확인해도 맞았어요!')
+    ? (result.crowned ? '👑 이해 완료!' : result.first ? '🥚 오늘 배웠어요!' : result.known ? '🐣 이제 알아요!' : result.practice ? (result.slip ? '✅ 통과했어요!' : '✅ 다 맞았어요!') : '✅ 다시 확인해도 맞았어요!')
     : `${r.qs.length}개 중 ${r.correct}개 맞았어요`));
+  if (result.slip) card.appendChild(el('p', 'math-keep', slipLine('passed'))); // 💪 고친 실수 하나로 통과 (v279)
   // 🥚가 다 차서 이 줄기의 새 칸이 잠겼나 (2026-10-01 ②) — 첫 통과 카드에서 미리 알려 준다
   const sx = stemOf(r.id);
   const waitNow = !!result.first && ladderOf(state, today, (sx && sx.key) || ui.stem).some((x) => x.state === 'wait');
@@ -3114,7 +3125,7 @@ async function finishRound() {
   if (result.repeat > 0) {
     const pay = roundPay(result);
     card.appendChild(el('p', 'math-practice-note math-repeat-note', pay >= 1
-      ? `🔁 오늘 이 개념 ${result.repeat + 1}번째 편이지만 다 맞혀 통과해서 ⚡💰를 다 받았어요`
+      ? `🔁 오늘 이 개념 ${result.repeat + 1}번째 편이지만 ${result.slip ? '' : '다 맞혀 '}통과해서 ⚡💰를 다 받았어요` // 💪 고쳐서 통과면 "다 맞혀"를 빼고 (v279, Codex 87차)
       : `🔁 오늘 이 개념 ${result.repeat + 1}번째 편이라 문항 ⚡💰가 ${pay ? '반이에요' : '없어요'}`));
   }
   if (rw.egg && rw.egg.ok) card.appendChild(el('p', 'math-note math-egg', rw.egg.hatched ? '🐣 수학 알이 부화했어요!' : `🥚 수학 알 ${eggProgress(rw.egg.egg).done}/${eggProgress(rw.egg.egg).need}일 — 완주한 날이 쌓여요`));

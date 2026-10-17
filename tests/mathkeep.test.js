@@ -104,10 +104,11 @@ test('💪 applyRound: 📏 진단 칸을 지키면 📏 그대로(🐣 "안다"
   const p = withRec(dueRec({ dueAt: T1 }));
   const rp = round(p, [ok('A'), no('B', { fx: 1 }), ok('C'), ok('D')]);
   assert.deepEqual([rp.practice, rp.kept, p.concepts[ID].box, p.concepts[ID].dueAt, p.concepts[ID].schedAt], [true, false, 2, T1, 1]);
-  // 처음 배우기 — 다 맞혀야 배움
+  // 처음 배우기 — v262엔 다 맞혀야 배움 → v279부터 고친 실수 하나까지 통과(지킴이 아니라 통과 — tests/mathslip279)
   const l = emptyMath();
   const rl = applyRound(l, ID, { correct: 3, total: 4, missTags: [], qs: [ok('A'), no('B', { fx: 1 }), ok('C'), ok('D')], mode: 'learn' }, T);
-  assert.deepEqual([rl.kept, !!l.concepts[ID].done], [false, false]);
+  assert.deepEqual([rl.kept, !!l.concepts[ID].done, rl.passed, rl.slip], [false, true, true, true]);
+  assert.equal(rp.slip, true, '연습도 고친 실수 하나는 통과 — 일정은 그대로');
 });
 
 test('💪 지킨 편의 보상은 못 통과한 확인 편과 같다 — 확인 통과 보너스·🎟️ 복습·🔷·⏰ 없음', () => {
@@ -306,11 +307,11 @@ test('💪 화면 배선: 편을 열 때 keep · 처음 틀린 문제(쌍둥이�
   const pa = fn('paintAnswer');
   const ct = pa.indexOf("const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && !light(r) && q.key;");
   assert.ok(ct > 0 && ct < pa.indexOf('if (ch.ok) {'), 'canTwin은 맞음/틀림 갈래보다 먼저');
-  const kl = pa.indexOf("const kl = canTwin && r.answers.slice(0, r.at).every((x) => x && x.correct) ? keepLine(r.keep, 'wrong') : null;");
+  const kl = pa.indexOf("const kl = canTwin && r.answers.slice(0, r.at).every((x) => x && x.correct) ? (r.keep ? keepLine(r.keep, 'wrong') : slipRound(r) ? slipLine('wrong') : null) : null;"); // v279: 처음 배우기·연습은 slipLine
   assert.ok(kl > 0 && kl < pa.indexOf('scrollTo = solveCard(q, shown, rv);'), '풀이 카드보다 먼저');
   assert.ok(pa.includes("if (kl) fb.appendChild(el('p', 'math-keep', kl));"));
   const pt = fn('paintTwin');
-  const fx = pt.indexOf("const kl = r.answers.slice(0, t.of).every((x) => x && x.correct) ? keepLine(r.keep, 'fixed', r.qs.length - t.of - 1) : null;");
+  const fx = pt.indexOf("const kl = r.answers.slice(0, t.of).every((x) => x && x.correct) ? (r.keep ? keepLine(r.keep, 'fixed', left) : slipRound(r) ? slipLine('fixed', left) : null) : null;"); // v279
   assert.ok(fx > pt.indexOf('if (ch.ok) {') && fx < pt.indexOf('} else {'), '쌍둥이를 맞혔을 때만');
   // 쌍둥이를 맞힌 말은 다 알았다고 대답하게 하지 않고 한 일을 짚는다 (Codex 73차 PART 2)
   assert.ok(pt.includes('`고쳤어요! 같은 방법으로 잘 풀었어요 ⚡+${REWARD.fix.xp} — 내일 한 번 더 물어볼게요`') && !src.includes('이제 알겠죠'));

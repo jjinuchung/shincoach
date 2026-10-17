@@ -237,7 +237,7 @@ test('⏹ 📊: 그만둔 편은 답한 것을 다 맞혔어도 통과가 아니
   assert.ok(txt.includes(' · ⏹1/1'), txt);
   assert.ok(txt.includes('⏹그만둠 1/1 (5문제 중)'), txt);
   const st = read('js/stats.js');
-  assert.ok(st.includes("t.quit ? `dot quit${t.rf ? ' rf' : ''}` : t.pass ? 'dot ok' : `dot no${t.kept ? ' kept' : ''}`, t.quit ? '⏹'")); // 💪 v262: 빨간 ⏹ · 노란 점
+  assert.ok(st.includes("t.quit ? `dot quit${t.rf ? ' rf' : ''}` : t.pass ? `dot ok${t.slip ? ' slip' : ''}` : `dot no${t.kept ? ' kept' : ''}`, t.quit ? '⏹'")); // 💪 v262: 빨간 ⏹ · 노란 점 · v279: 고쳐서 통과는 초록 💪
   assert.ok(read('css/style.css').includes('.math-report .dot.quit {'));
   // 두 창: 한 편(rid 81)이 그만둠으로도, 끝냄으로도 남았다 → 📊는 끝낸 줄만, 편 수는 하나 (Codex 62차 #3)
   m.log.push({ d: T, t: Date.now() + 5, rid: 81, id: ID, mode: 'learn', ok: 4, n: 5, qs: [] });
@@ -322,7 +322,8 @@ test('🔁⏹ 화면 배선(math.js): 편 번호·시작한 날·미리 안내·
   assert.ok(fr.indexOf('if (r.rid) releaseRoundLock(r.rid);') > fr.indexOf('ui.round = null; // 저장이 됐으니'), '저장이 된 뒤에 잠금을 놓는다');
   assert.ok(fr.includes('const qs = conceptQs(r);'));
   assert.ok(fr.includes('if (result.repeat > 0) {\n    const pay = roundPay(result);'), '둘째 편부터 결과 카드에 까닭');
-  assert.ok(fr.includes("번째 편이지만 다 맞혀 통과해서 ⚡💰를 다 받았어요") && fr.includes("번째 편이라 문항 ⚡💰가 ${pay ? '반이에요' : '없어요'}"));
+  // v279: 고쳐서 통과면 "다 맞혀"를 뺀다
+  assert.ok(fr.includes("번째 편이지만 ${result.slip ? '' : '다 맞혀 '}통과해서 ⚡💰를 다 받았어요") && fr.includes("번째 편이라 문항 ⚡💰가 ${pay ? '반이에요' : '없어요'}"));
   assert.ok(fr.includes('const nx = repeatNote(state, r.id, today);') && fr.includes("`🤔 한 번 더 (문항 ⚡💰 ${nx.pay ? '반' : '없음'}${nx.practice ? '' : ' · 통과하면 다'})`"));
   const rq = fn('renderQuestion');
   assert.ok(rq.includes("if (r.rep && r.rep.text && r.at === 0) card.appendChild(el('p', 'math-practice-note math-repeat-note', r.rep.text));"));
