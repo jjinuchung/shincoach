@@ -28,10 +28,11 @@ import { sfx, unlock as sfxUnlock } from './sfx.js';
 import { avatarOf, partnerSpot, avatarMoveRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수, 2026-10-17)
 import { avatarSvg } from './avatarart.js';
 import { closetBox, closetReset, tagOf } from './avatarview.js'; // 👕 옷장 탭
-import { PLAYS, playSpot, bondOf, chainOf } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
+import { PLAYS, playSpot, bondOf, chainOf, bondTier, palHome } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
 import { SCENE_OF, playLines } from './playart.js';
 import { showPlay, closePlay } from './playshow.js'; // 🎮 장면
 import { dayNum } from './korean.js'; // 📰 TV 소식은 날마다 바뀐다 (순수)
+import { FURN_ART } from './furnart.js'; // 🖍️ 코드로 그린 가구 그림 (순수 자료)
 
 // 🎮 일상 행동(2026-10-18, 아버님 "이대로 해"): 놓인 📺·🎮·💻·🎹를 누르면 도구 줄 맨 앞에 놀기 단추 → 💗를 먼저 저장(homePlay 트랜잭션) →
 //   🧑·🤝가 기기 옆 칸으로 걸어가고(이 방에 서 있을 때만 · transform만 · 저장 안 함) → 장면(playshow) → 제자리로 돌아와 다시 그린다
@@ -58,34 +59,18 @@ function jong(w) {
 }
 const eul = (w) => (jong(w) > 0 ? '을' : '를');
 
-// ── 🖍️ 이모지가 없는 가구의 그림 (v252 책상) — 파일 없이 코드로, 크기는 글자 크기(1em)를 따른다 ──
+// ── 🖍️ 이모지가 없는 가구의 그림 — 그림 자료는 furnart.js(순수 · v252 책상 · ③ 가구 더하기) · 크기는 글자 크기(1em)를 따른다 ──
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const ART = {
-  // 책상 — 위판·앞 모서리·왼쪽 다리·오른쪽 서랍 셋(손잡이)·위에 책 두 권
-  desk: [
-    ['rect', { x: 20, y: 8, width: 16, height: 6, rx: 1, fill: '#3fa34d' }],
-    ['rect', { x: 22, y: 4, width: 13, height: 4, rx: 1, fill: '#e0533d' }],
-    ['rect', { x: 4, y: 14, width: 92, height: 8, rx: 2, fill: '#c08446' }],
-    ['rect', { x: 4, y: 20, width: 92, height: 3, fill: '#8a5a2b' }],
-    ['rect', { x: 10, y: 23, width: 6, height: 37, fill: '#8a5a2b' }],
-    ['rect', { x: 60, y: 23, width: 30, height: 37, fill: '#a86f38', stroke: '#7a4c22', 'stroke-width': 1.5 }],
-    ['line', { x1: 60, y1: 35, x2: 90, y2: 35, stroke: '#7a4c22', 'stroke-width': 1.5 }],
-    ['line', { x1: 60, y1: 47, x2: 90, y2: 47, stroke: '#7a4c22', 'stroke-width': 1.5 }],
-    ['circle', { cx: 75, cy: 29, r: 2, fill: '#f2d07a' }],
-    ['circle', { cx: 75, cy: 41, r: 2, fill: '#f2d07a' }],
-    ['circle', { cx: 75, cy: 53, r: 2, fill: '#f2d07a' }],
-  ],
-};
-/** 가구 그림 하나 — art가 있으면 그린 그림, 없으면 이모지 글자 */
+/** 가구 그림 하나 — art가 있으면 그린 그림(모양마다 크기 is-wide·is-tall…), 없으면 이모지 글자 */
 function artEl(d, tag, cls) {
   const box = el(tag, cls);
-  const parts = d && d.art && ART[d.art];
-  if (!parts) { box.textContent = d ? d.emoji : ''; return box; }
+  const art = d && d.art && Object.prototype.hasOwnProperty.call(FURN_ART, d.art) ? FURN_ART[d.art] : null;
+  if (!art) { box.textContent = d ? d.emoji : ''; return box; }
   const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 100 64');
-  svg.setAttribute('class', 'house-art');
+  svg.setAttribute('viewBox', art.vb);
+  svg.setAttribute('class', `house-art is-${art.shape}`);
   svg.setAttribute('aria-hidden', 'true');
-  for (const [name, attrs] of parts) {
+  for (const [name, attrs] of art.parts) {
     const n = document.createElementNS(SVG_NS, name);
     for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
     svg.appendChild(n);
@@ -372,7 +357,7 @@ function roomBox() {
   if (here) {
     box.appendChild(meEl(me));
     const pid = getPartner();
-    const ps = pid ? partnerSpot(pf, me.spot) : null;
+    const ps = pid ? palHome(pf, me.spot) : null; // 🐾 쿠션이 있으면 그 위
     if (ps) box.appendChild(palEl(pid, ps));
     if (ui.meSel) box.appendChild(meToolsEl(me));
   } else ui.meSel = false;
@@ -413,6 +398,9 @@ function palEl(monId, spot) {
   e.appendChild(monFace(monId, 'house-pal-img'));
   const n = ui.bondHold !== null ? ui.bondHold : bondOf(getProfileSnapshot().homePlay, monId); // 🎮 💗 사이좋음 — 진화 전 모습의 💗도 이어서
   if (n > 0) e.appendChild(el('span', 'house-pal-bond', `💗 ${n.toLocaleString('ko-KR')}`));
+  const tier = bondTier(n); // 💗가 쌓이면 테두리 (꾸밈만)
+  if (tier) e.classList.add(`is-bond${tier}`);
+  if (spot.cushion) e.classList.add('is-sit');
   return e;
 }
 /** 🧑 캐릭터를 눌렀을 때 — 👕 옷 갈아입기 */
@@ -509,11 +497,13 @@ async function walk(me, spot) {
     node.style.transition = `transform ${WALK_MS}ms ease-in-out`;
     node.style.transform = `translate(${((b.left - a.left) / 100) * W}px, ${((b.top - a.top) / 100) * H}px)`;
     node.style.zIndex = String(10 + to.y);
+    // 🐾 쿠션에서 일어나면 앉은 높이 보정을 뗀다 (Codex 92차 — 돌아온 뒤에는 render가 다시 붙인다)
+    node.classList.remove('is-sit');
     moved.push(node);
   };
   go(meN, me.spot, spot.me);
   const pid = getPartner();
-  go(box.querySelector('.house-pal'), pid ? partnerSpot(getProfileSnapshot(), me.spot) : null, spot.pal);
+  go(box.querySelector('.house-pal'), pid ? palHome(getProfileSnapshot(), me.spot) : null, spot.pal);
   if (!moved.length) return stay;
   await wait(WALK_MS + 60);
   return async () => {
@@ -560,7 +550,7 @@ async function playAt(it) {
       await showPlay(scene, {
         look: me.look, name: me.name, mon,
         wall: (paintById(rm && rm.wall) || PAINT_BASE.wall).color, floor: (paintById(rm && rm.floor) || PAINT_BASE.floor).color,
-        lv: r.mon ? monLv(r.mon) : 0, bond: r.bond, chain: r.mon ? chainOf(r.mon).map(rosterKo).filter(Boolean) : [],
+        lv: r.mon ? monLv(r.mon) : 0, bond: r.bond, tier: bondTier(r.bond), chain: r.mon ? chainOf(r.mon).map(rosterKo).filter(Boolean) : [],
         heart: r.heart, day: dayNum(Date.now()),
       });
       if (!live()) return;

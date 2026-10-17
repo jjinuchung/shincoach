@@ -6,7 +6,7 @@
 //  · 날은 트랜잭션 안의 시각으로 센다 · 지난 날보다 **뒤인 날**에만 준다(시계를 되돌려도 또 받지 않게 — 기록은 늘 큰 쪽)
 //  · 💗는 늘기만 한다 — 병합은 칸마다 큰 쪽(두 창·옛 백업을 합쳐도 늘어나지 않는다)
 //  · 진화하면 💗를 이어받는다 — 읽을 때 진화 전 모습들의 💗 중 가장 큰 것(bondOf), 주면 그 수 + 1을 지금 모습에 적는다(옛 칸은 지우지 않음 — 단조)
-import { houseOf, houseShape, takenCells, furnById } from './house.js';
+import { houseOf, houseShape, takenCells, furnById, CUSHION } from './house.js';
 import { avatarOf, partnerSpot } from './avatar.js';
 import { evoFrom, evoOf, haveOf } from './evolve.js';
 import { dayNum } from './korean.js';
@@ -17,6 +17,7 @@ export const PLAYS = {
   f_game: { emoji: '🎮', btn: '🎮 게임하기', did: '게임을 했어요' },
   f_pc: { emoji: '💻', btn: '💻 컴퓨터 하기', did: '컴퓨터를 했어요' },
   f_piano: { emoji: '🎹', btn: '🎹 피아노 치기', did: '피아노를 쳤어요' },
+  f_table: { emoji: '🍽️', btn: '🍚 밥 먹기', did: '밥을 먹었어요' }, // ③ 가구 더하기 (2026-10-18) — 식탁은 가구지만 놀 수 있다
 };
 export const PLAY_IDS = Object.keys(PLAYS);
 /** 💗 한 칸의 끝 (깨진 큰 수가 끝없이 커지지 않게) · 💗 칸 수의 끝 */
@@ -91,6 +92,23 @@ export function chainOf(monId) {
     c = n[0].to;
   }
   return [...back, id, ...fwd];
+}
+
+/** 💗 단계 — 쌓이면 방·장면의 파트너에게 테두리(꾸밈만 — 💰·스톤·다른 보상과 안 이어짐) · 다음 단계까지 남은 수는 아이 화면에 쓰지 않는다 */
+export const BOND_TIERS = [10, 25, 50];
+export function bondTier(n) {
+  const v = cnt(n, BOND_MAX);
+  return BOND_TIERS.filter((t) => v >= t).length;
+}
+
+/** 🐾 파트너가 쉬는 칸 (순수) — 캐릭터가 선 방에 파트너 쿠션이 있으면 그 위(먼저 놓은 쿠션 — 번호가 작은 것), 없으면 캐릭터 옆(avatar.partnerSpot) · spot = avatarOf().spot */
+export function palHome(profile, spot) {
+  if (!spot) return null;
+  const room = houseOf(profile).rooms.find((r) => r.id === spot.room);
+  // 먼저 놓은 쿠션 = 번호(u)가 작은 것 — 방의 물건 차례(houseOf가 고쳐 읽은 차례)에 기대지 않는다
+  const c = room && room.items.filter((i) => i.id === CUSHION).sort((a, b) => a.u - b.u)[0];
+  if (c) return { room: room.id, x: c.x, y: c.y, cushion: true };
+  return partnerSpot(profile, spot);
 }
 
 /** 🤝 지금 파트너 — 데리고 있을 때만 id, 아니면 null */

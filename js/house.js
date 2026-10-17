@@ -49,6 +49,8 @@ const st = (m, e) => ({ stone_math: m * MATH_RATE, stone_english: e });
 /** 💊 회복 캡슐 id · 가질 수 있는 수 (2층이 있어도 — 한 대마다 행운이 있으니 많으면 너무 쉽다) */
 export const HEAL = 'f_heal';
 export const HEAL_MAX = 2;
+/** 🐾 파트너 쿠션 — 캐릭터가 선 방에 있으면 🤝 파트너가 그 위에 앉는다 */
+export const CUSHION = 'f_cushion';
 /** 놓는 번호의 끝 — 번호(seq·u)가 이보다 크거나 안전한 정수가 아니면 읽을 때 1부터 다시 매긴다
  *  (Codex 45차 #3: 깨진 백업의 아주 큰 번호로 두 번 놓으면 둘 다 "놓았어요"인데 번호가 겹쳐 하나가 사라졌다) */
 export const SEQ_MAX = 1e9;
@@ -67,6 +69,11 @@ export const FURN = [
   { id: 'f_frame', emoji: '🖼️', ko: '액자', w: 1, at: 'wall', price: 200, group: 'small' },
   { id: 'f_clock', emoji: '🕰️', ko: '시계', w: 1, at: 'wall', price: 200, group: 'small' },
   { id: 'f_lamp', emoji: '💡', ko: '전등', w: 1, at: 'wall', price: 200, group: 'small' },
+  // ③ 가구 더하기 (2026-10-18, 아버님 "이대로 해") — 🪴🪟는 Emoji 13이라 태블릿에 없다 → 코드로 그린 그림(art · furnart.js), emoji는 알림 글에만
+  { id: 'f_plant', emoji: '🌿', art: 'plant', ko: '큰 화분', w: 1, at: 'floor', price: 200, group: 'small' },
+  { id: 'f_window', emoji: '🌤️', art: 'window', ko: '창문', w: 1, at: 'wall', price: 300, group: 'small' },
+  // 🐾 방에 놓으면 🤝 파트너가 그 위에 앉는다 (homeplay.palHome)
+  { id: 'f_cushion', emoji: '🐾', art: 'cushion', ko: '파트너 쿠션', w: 1, at: 'floor', price: 300, group: 'small' },
   // 가구 — 2~3일
   { id: 'f_chair', emoji: '🪑', ko: '의자', w: 1, at: 'floor', price: 500, group: 'furn' },
   { id: 'f_drawer', emoji: '🗄️', ko: '서랍장', w: 1, at: 'floor', price: 700, group: 'furn' },
@@ -74,11 +81,16 @@ export const FURN = [
   { id: 'f_sofa', emoji: '🛋️', ko: '소파', w: 2, at: 'floor', price: 1000, group: 'furn' },
   // ✏️ 책상 (2026-10-13 아버님 v252) — 책상 이모지가 없어 방·서랍·가게에는 코드로 그린 그림(art), 알림 글에는 ✏️
   { id: 'f_desk', emoji: '✏️', art: 'desk', ko: '책상', w: 2, at: 'floor', price: 800, group: 'furn' },
+  { id: 'f_toybox', emoji: '🧩', art: 'toybox', ko: '장난감 상자', w: 1, at: 'floor', price: 600, group: 'furn' },
+  { id: 'f_shelf', emoji: '📖', art: 'shelf', ko: '책장', w: 1, at: 'floor', price: 800, group: 'furn' },
+  // 🍽️ 놓으면 [🍚 밥 먹기] — 🎮 일상 행동 (homeplay.PLAYS)
+  { id: 'f_table', emoji: '🍽️', art: 'table', ko: '식탁', w: 2, at: 'floor', price: 900, group: 'furn' },
   // 기기 — 1~2주 + 스톤 (코인만으로는 못 산다) · 🔷는 MATH_RATE배 (아버님 ⑥)
   { id: 'f_tv', emoji: '📺', ko: 'TV', w: 1, at: 'floor', price: 2500, stones: st(1, 1), group: 'device' },
   { id: 'f_game', emoji: '🎮', ko: '게임기', w: 1, at: 'floor', price: 3000, stones: st(2, 1), group: 'device' },
   { id: 'f_pc', emoji: '💻', ko: '컴퓨터', w: 1, at: 'floor', price: 3000, stones: st(1, 2), group: 'device' },
   { id: 'f_piano', emoji: '🎹', ko: '피아노', w: 2, at: 'floor', price: 3500, stones: st(2, 2), group: 'device' },
+  { id: 'f_fridge', emoji: '🧊', art: 'fridge', ko: '냉장고', w: 1, at: 'floor', price: 2500, stones: st(1, 1), group: 'device' },
   // 💊 포켓몬이 들어가 1시간 쉬는 기계 — max = 이 가구만의 한도 (furnMax)
   { id: HEAL, emoji: '💊', ko: '회복 캡슐', w: 2, at: 'floor', price: 3000, stones: st(2, 2), group: 'device', max: HEAL_MAX },
 ];

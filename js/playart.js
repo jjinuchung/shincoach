@@ -5,7 +5,7 @@
 import { avatarSvg } from './avatarart.js';
 
 /** 기기 id → 장면 이름 */
-export const SCENE_OF = { f_tv: 'tv', f_game: 'game', f_pc: 'pc', f_piano: 'piano' };
+export const SCENE_OF = { f_tv: 'tv', f_game: 'game', f_pc: 'pc', f_piano: 'piano', f_table: 'meal' };
 /** 🎹 건반 여덟 (도~높은 도) — 이름 · 주파수(Hz) */
 export const KEYS = [
   { ko: '도', hz: 262 }, { ko: '레', hz: 294 }, { ko: '미', hz: 330 }, { ko: '파', hz: 349 },
@@ -45,8 +45,8 @@ export function playLines(scene, ctx = {}, day = 0) {
     return out;
   };
   const withM = M ? `${M}${wa(M)} ` : '';
-  const did = { tv: 'TV를 봤어요', game: '게임을 했어요', pc: '컴퓨터를 했어요', piano: '피아노를 쳤어요' }[scene] || '놀았어요';
-  const icon = { tv: '📺', game: '🎮', pc: '💻', piano: '🎹' }[scene] || '🏠';
+  const did = { tv: 'TV를 봤어요', game: '게임을 했어요', pc: '컴퓨터를 했어요', piano: '피아노를 쳤어요', meal: '밥을 먹었어요' }[scene] || '놀았어요';
+  const icon = { tv: '📺', game: '🎮', pc: '💻', piano: '🎹', meal: '🍚' }[scene] || '🏠';
   const end = ctx.heart && M ? `💗 ${M}${wa(M)} 더 친해졌어요` : `${icon} ${withM}${did}`;
   let start = [];
   if (scene === 'tv') {
@@ -64,6 +64,8 @@ export function playLines(scene, ctx = {}, day = 0) {
   } else if (scene === 'pc') {
     const chain = Array.isArray(ctx.chain) && ctx.chain.length > 1 ? `🧬 ${ctx.chain.join(' → ')}` : '';
     start = M ? [`💻 ${M} 도감을 열었어요`, ...(ctx.lv ? [`⭐ ${M} Lv ${ctx.lv}`] : []), ...(chain ? [chain] : [])] : ['💻 포켓몬 도감을 열었어요'];
+  } else if (scene === 'meal') {
+    start = [M ? `🍚 ${M}${wa(M)} 같이 밥 먹어요` : '🍚 밥 먹어요', '😋 냠냠 — 맛있다!'];
   } else if (scene === 'piano') {
     start = [M ? `🎹 건반을 눌러 ${M}에게 들려줘요` : '🎹 건반을 눌러 봐요'];
   }
@@ -176,8 +178,24 @@ export function pianoSvg() {
     + '</svg>';
 }
 
+/** 🍚 밥상 — 식탁을 가까이서: 내 밥그릇 · 달걀 접시 · 파트너 밥그릇(포켓몬 먹이) · 김(.pv-steam) · 먹으면 줄어드는 음식(.pv-food) */
+export function mealSvg() {
+  const steam = (x) => `<path class="pv-steam" d="M${x} 20 q-3 -4 0 -8 q3 -4 0 -8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity="0.85"/>`;
+  return `<svg class="pv pv-meal" viewBox="0 0 140 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`
+    + `<rect x="10" y="44" width="8" height="20" fill="#8a5a2b"/><rect x="122" y="44" width="8" height="20" fill="#8a5a2b"/>`
+    + `<rect x="2" y="30" width="136" height="12" rx="5" fill="#d9a066" stroke="${LINE}" stroke-width="1.4"/><rect x="4" y="40" width="132" height="5" fill="#a86f38"/>`
+    + `<g class="pv-on">${steam(36)}${steam(44)}${steam(104)}</g>`
+    + `<ellipse class="pv-food" cx="40" cy="27" rx="11.5" ry="6" fill="#fffdf5" stroke="#d8ccb6" stroke-width="0.8"/>`
+    + `<path d="M28 27 Q40 41 52 27 Z" fill="#e5484d" stroke="#a61e22" stroke-width="1.2"/>`
+    + `<line x1="56" y1="12" x2="60" y2="30" stroke="#8a5a2b" stroke-width="1.6" stroke-linecap="round"/><line x1="60" y1="11" x2="62" y2="30" stroke="#8a5a2b" stroke-width="1.6" stroke-linecap="round"/>`
+    + `<ellipse cx="76" cy="32" rx="12" ry="3.4" fill="#fff" stroke="#c9bba6" stroke-width="0.9"/><g class="pv-food"><ellipse cx="76" cy="30.4" rx="7" ry="2.6" fill="#fff" stroke="#e9e2d4" stroke-width="0.6"/><circle cx="76" cy="30.2" r="2.1" fill="#fcc419"/></g>`
+    + `<g class="pv-food">${[[98, 26], [103, 24], [108, 26], [101, 28], [106, 28], [104, 26.5]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.5" fill="#b9722f" stroke="#7a4c22" stroke-width="0.6"/>`).join('')}</g>`
+    + `<path d="M92 28 Q104 40 116 28 Z" fill="#4dabf7" stroke="#1c7ed6" stroke-width="1.2"/><circle cx="104" cy="33" r="1.6" fill="#fff"/>`
+    + '</svg>';
+}
+
 /**
- * 장면 무대 (순수 HTML 글자) — o = { look, name, mon: { ko, url } | null, wall, floor, lv, bond, uid }
+ * 장면 무대 (순수 HTML 글자) — o = { look, name, mon: { ko, url } | null, wall, floor, lv, bond, tier, uid }
  * 자리(왼쪽·폭)는 css가 장면마다(.pshow-stage.is-tv …) 정한다
  */
 export function stageHtml(scene, o = {}) {
@@ -185,14 +203,16 @@ export function stageHtml(scene, o = {}) {
   const color = (c, d) => (typeof c === 'string' && /^#[0-9a-f]{3,8}$/i.test(c) ? c : d);
   const mon = o.mon && typeof o.mon === 'object' ? o.mon : null;
   const url = mon ? safeUrl(mon.url) : '';
+  const tier = [1, 2, 3].includes(o.tier) ? o.tier : 0; // 💗 단계 테두리 (homeplay.bondTier)
   let dev = '';
   if (scene === 'tv') dev = tvSvg(url, uid);
   else if (scene === 'game') dev = gameSvg(url, uid);
   else if (scene === 'pc') dev = pcSvg(url, mon ? { name: mon.ko, lv: o.lv, bond: o.bond } : {});
   else if (scene === 'piano') dev = pianoSvg();
+  else if (scene === 'meal') dev = mealSvg();
   const me = avatarSvg(o.look, { uid: `play-${uid}`, cls: 'pshow-me-art', title: whoOf(o.name).bare });
   const pal = mon
-    ? `<div class="pshow-pal">${url ? `<img class="pshow-pal-img" src="${esc(url)}" alt="${esc(mon.ko || '')}" draggable="false">` : '<span class="pshow-pal-img is-emoji">🐾</span>'}${scene === 'game' ? padSvg('pshow-pad is-pal') : ''}</div>`
+    ? `<div class="pshow-pal${tier ? ` is-bond${tier}` : ''}">${url ? `<img class="pshow-pal-img" src="${esc(url)}" alt="${esc(mon.ko || '')}" draggable="false">` : '<span class="pshow-pal-img is-emoji">🐾</span>'}${scene === 'game' ? padSvg('pshow-pad is-pal') : ''}</div>`
     : '';
   return `<div class="pshow-stage is-${esc(scene)}" style="--pw:${color(o.wall, '#fbf3e4')};--pf:${color(o.floor, '#e2c79f')}">`
     + '<div class="pshow-wall"></div><div class="pshow-floor"></div>'

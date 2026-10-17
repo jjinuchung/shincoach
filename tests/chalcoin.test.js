@@ -110,6 +110,9 @@ test('🏠 책상: 바닥 2칸 · 💰800 코인만 · 가구 무리 · 그린 �
   assert.ok(v.includes("const it = d.kind === 'move' ? ((room() || {}).items || []).find((x) => x.u === d.u) : null;"));
   assert.ok(/\.house-ghost-art\.is-flip \{ transform: scaleX\(-1\); \}/.test(read('css/style.css')));
   assert.ok(!/el\('span', 'house-(emoji|drawer-emoji|shop-emoji)', (d|it)\.emoji\)/.test(v), '이모지 글자로만 그리는 곳이 남지 않게');
-  for (const f of FURN.filter((x) => x.art)) assert.ok(v.includes(`  ${f.art}: [`), `${f.id} 그림이 ART에`);
+  // 그림 자료는 ③ 가구 더하기(v285)부터 js/furnart.js(FURN_ART) — houseview는 그것을 import해 그린다
+  const fa = read('js/furnart.js');
+  assert.ok(v.includes("import { FURN_ART } from './furnart.js';"));
+  for (const f of FURN.filter((x) => x.art)) assert.ok(fa.includes(`  ${f.art}: {`), `${f.id} 그림이 FURN_ART에`);
   assert.ok(read('css/style.css').includes('.house-art {'));
 });

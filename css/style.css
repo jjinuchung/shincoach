@@ -2944,6 +2944,11 @@ button { font-family: inherit; }
 .house-emoji { font-size: calc(var(--cell) * 0.86); line-height: 1; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.25)); pointer-events: none; }
 /* 🖍️ 코드로 그린 가구(✏️ 책상, v252) — 이모지 글자처럼 글자 크기를 따른다(가로 100 : 세로 64) */
 .house-art { display: inline-block; width: 1.4em; height: 0.9em; vertical-align: bottom; overflow: visible; }
+/* ③ 가구 더하기 — 그림 모양마다 크기 (furnart.js shape) · wide는 위 그대로 */
+.house-art.is-tall { width: 0.85em; height: 1.4em; }
+.house-art.is-box { width: 1.12em; height: 0.92em; }
+.house-art.is-flat { width: 1.1em; height: 0.7em; }
+.house-art.is-wall { width: 1.12em; height: 0.85em; }
 .house-item.is-wide .house-emoji { font-size: calc(var(--cell) * 1.45); }
 .house-item.is-flip .house-emoji { transform: scaleX(-1); }
 .house-item.is-sel { outline: 3px dashed var(--primary); outline-offset: -2px; }
@@ -3174,6 +3179,27 @@ button { font-family: inherit; }
 .pshow-stage.is-piano .pshow-dev { left: 5%; bottom: 3%; width: 50%; }
 .pshow-stage.is-piano .pshow-me { left: 55%; bottom: 3%; }
 .pshow-stage.is-piano .pshow-pal { left: 78%; bottom: 5%; }
+/* 🍚 밥 먹기 — 식탁이 앞(z 2), 둘은 식탁 뒤에 앉은 듯 */
+.pshow-stage.is-meal .pshow-dev { left: 6%; bottom: 0; width: 88%; z-index: 2; }
+.pshow-stage.is-meal .pshow-me { left: 16%; bottom: 34%; }
+.pshow-stage.is-meal .pshow-pal { left: 63%; bottom: 37%; }
+.pshow-stage.is-on .pv-steam { animation: pv-steam 1.7s ease-out infinite; }
+.pshow-stage.is-on .pv-steam:nth-child(2) { animation-delay: 0.5s; }
+.pshow-stage.is-on .pv-steam:nth-child(3) { animation-delay: 0.9s; }
+.pv-food { transform-box: fill-box; transform-origin: 50% 100%; }
+.pshow-stage.is-on .pv-food { animation: pv-eat 4.6s ease-in 0.6s forwards; }
+.pshow-stage.is-done .pv-food { animation: none; transform: scaleY(0.2); }
+/* 💗 단계 테두리 (homeplay.bondTier — 꾸밈만) · 방의 파트너와 장면의 파트너 */
+/* isolation — 테두리(::before z -1)가 무대·방 바닥 뒤로 숨지 않고 파트너 그림 바로 뒤에 그려지게 */
+.house-pal, .pshow-pal { isolation: isolate; }
+.house-pal.is-bond1::before, .house-pal.is-bond2::before, .house-pal.is-bond3::before,
+.pshow-pal.is-bond1::before, .pshow-pal.is-bond2::before, .pshow-pal.is-bond3::before { content: ""; position: absolute; left: -12%; right: -12%; bottom: -6%; height: 110%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 143, 171, 0.6), rgba(255, 143, 171, 0)); z-index: -1; pointer-events: none; }
+.house-pal.is-bond2::before, .pshow-pal.is-bond2::before, .house-pal.is-bond3::before, .pshow-pal.is-bond3::before { animation: bond-pulse 2.2s ease-in-out infinite; }
+.house-pal.is-bond3::before, .pshow-pal.is-bond3::before { background: radial-gradient(closest-side, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%), conic-gradient(#ff8787, #ffd43b, #69db7c, #74c0fc, #b197fc, #ff8787); opacity: 0.55; }
+.house-pal.is-bond2::after, .pshow-pal.is-bond2::after, .house-pal.is-bond3::after, .pshow-pal.is-bond3::after { content: "✨"; position: absolute; right: -6%; top: 2%; font-size: max(10px, calc(var(--cell, 40px) * 0.32)); line-height: 1; pointer-events: none; animation: bond-twinkle 1.8s ease-in-out infinite; }
+.pshow-pal.is-bond2::after, .pshow-pal.is-bond3::after { font-size: 1.1rem; }
+/* 🐾 쿠션 위에 앉은 파트너 — 쿠션보다 조금 위로 */
+.house-pal.is-sit .house-pal-img { margin-bottom: calc(var(--cell) * 0.22); }
 /* 기기 — 켜지면(.is-on) 화면 */
 .pv .pv-on { opacity: 0; transition: opacity 0.45s ease-out; }
 .pshow-stage.is-on .pv-on { opacity: 1; }
@@ -3200,7 +3226,8 @@ button { font-family: inherit; }
 .pshow-me.is-hop, .pshow-pal.is-hop { animation: pshow-hop 0.45s ease-out; }
 .pshow-stage.is-on .pshow-pal-img { animation: pshow-sway 1.8s ease-in-out infinite; }
 /* 떠오르는 것 — ♪ · ⭐ · 💗 */
-.pshow-fx { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+.pshow-fx { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 3; pointer-events: none; }
+.pshow-fly.is-yum { color: #e8590c; font-size: 1.15rem; }
 .pshow-fly { position: absolute; font-size: 1.6rem; font-weight: 900; line-height: 1; white-space: nowrap; animation: pshow-fly 1.5s ease-out forwards; }
 .pshow-fly.is-note { color: #7048e8; }
 .pshow-fly.is-heart { padding: 2px 10px; border: 2px solid #f06595; border-radius: 999px; background: #fff; color: #c2255c; font-size: 1.25rem; animation-duration: 1.9s; }
@@ -3212,6 +3239,10 @@ button { font-family: inherit; }
 .pshow-key { height: 96px; padding: 0 0 10px; display: flex; align-items: flex-end; justify-content: center; border: 2px solid #3b302b; border-top: 9px solid var(--kc); border-radius: 0 0 12px 12px; background: #fffdf7; color: #3b302b; font: inherit; font-weight: 800; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 .pshow-key.is-hit { background: #ffe08a; transform: translateY(3px); }
 .pshow-ok { justify-self: center; min-width: 9em; }
+@keyframes pv-steam { 0% { opacity: 0; transform: translateY(2px); } 30% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-7px); } }
+@keyframes pv-eat { from { transform: scaleY(1); } to { transform: scaleY(0.2); } }
+@keyframes bond-pulse { 0%, 100% { opacity: 0.7; transform: scale(0.96); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes bond-twinkle { 0%, 100% { opacity: 0.25; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
 @keyframes pv-tick { from { transform: translateX(0); } to { transform: translateX(-96px); } }
 @keyframes pv-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes pv-stars { from { transform: translateX(0); } to { transform: translateX(-120px); } }

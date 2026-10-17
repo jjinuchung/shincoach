@@ -2,7 +2,7 @@
 // 💗는 이미 트랜잭션(homeplay.playRule)에서 끝났다 — 이 화면은 보여 주기만 한다 (✨ restshow.js와 같은 자리).
 //
 // 📺 TV: 켜지면 화면에 파트너 · 소식 띠가 흐르고 소식 두 줄 → 💗 · 🎮 게임: 별이 흘러오고 점수가 오르다 CLEAR! → 💗 ·
-// 💻 컴퓨터: 파트너 도감 쪽이 한 줄씩 → 💗 · 🎹 피아노: 진우가 건반 여덟을 직접 누른다(시간 제한 없음) — 처음 누르면 💗, [다 쳤어요]로 닫는다
+// 💻 컴퓨터: 파트너 도감 쪽이 한 줄씩 → 💗 · 🍚 밥 먹기(③ 가구 더하기): 김이 나고 밥이 줄며 "냠" → 💗 · 🎹 피아노: 진우가 건반 여덟을 직접 누른다(시간 제한 없음) — 처음 누르면 💗, [다 쳤어요]로 닫는다
 // 구형 태블릿을 생각해 **움직이는 것은 transform·opacity만**(css .pshow-…) · 화면을 누르면 건너뛰고 끝 모습으로 · 무엇이 터져도 닫힌다
 import { sfx } from './sfx.js';
 import { stageHtml, playLines, KEYS } from './playart.js';
@@ -148,6 +148,25 @@ async function runPc(stage, L) {
   await pause(1500);
 }
 
+async function runMeal(stage, L) {
+  stage.classList.add('is-on');
+  sfx.tick();
+  const pal = $q('.pshow-pal');
+  const me = $q('.pshow-me');
+  for (const [i, line] of L.start.entries()) {
+    say(line);
+    for (let k = 0; k < 3; k++) {
+      await pause(650);
+      if (skip) return;
+      // 파트너가 없으면 늘 나 — 빈자리에서 "냠"이 뜨지 않게 (Codex 92차)
+      const who = pal && (i + k) % 2 ? pal : me;
+      hop(who);
+      fly('냠', who === me ? 24 : 66, 34, 'is-yum');
+    }
+    await pause(500);
+  }
+}
+
 /** 🎹 건반 여덟 — 누르면 소리 · 그림의 같은 건반이 노랗게 · ♪가 떠오르고 파트너가 톡 · 처음 누르면 💗 */
 function pianoKeys(stage) {
   const keys = $q('.pshow-keys');
@@ -206,7 +225,7 @@ function close() {
 
 /**
  * 장면 보이기 → Promise(닫으면 풀린다). scene = 'tv' | 'game' | 'pc' | 'piano'
- * o = { look, name, mon: { ko, url } | null, wall, floor, lv, bond, chain, heart, day }
+ * scene에 'meal'(🍚 식탁)도 · o = { look, name, mon: { ko, url } | null, wall, floor, lv, bond, tier, chain, heart, day }
  * 이미 떠 있으면 새로 띄우지 않고 바로 풀린다(두 번 눌러도 겹치지 않게)
  */
 export function showPlay(scene, o = {}) {
@@ -238,7 +257,7 @@ export function showPlay(scene, o = {}) {
       if (first) { try { first.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } }
       return;
     }
-    const go = scene === 'tv' ? runTv : scene === 'game' ? runGame : runPc;
+    const go = scene === 'tv' ? runTv : scene === 'game' ? runGame : scene === 'meal' ? runMeal : runPc;
     (async () => {
       try {
         await pause(450);

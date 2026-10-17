@@ -28,13 +28,14 @@ const TV = { u: 1, id: 'f_tv', x: 3, y: 2 };
 
 // ───────────────────── 목록 ─────────────────────
 
-test('🎮 기기 넷 = 집 기기(device) 가운데 💊 캡슐 빼고 · 모두 바닥 가구 · 장면 이름 · 🎹 건반 여덟은 도~높은 도', () => {
-  const devices = FURN.filter((f) => f.group === 'device' && f.id !== HEAL).map((f) => f.id).sort();
-  assert.deepEqual([...PLAY_IDS].sort(), devices);
+test('🎮 놀 수 있는 것 = 📺🎮💻🎹 + 🍽️ 식탁(③ 가구 더하기) · 💊 캡슐·🧊 냉장고는 아님 · 모두 바닥 가구 · 장면 이름 · 🎹 건반 여덟은 도~높은 도', () => {
+  assert.deepEqual([...PLAY_IDS].sort(), ['f_game', 'f_pc', 'f_piano', 'f_table', 'f_tv']);
+  for (const id of PLAY_IDS) assert.ok(furnById(id), id);
+  assert.equal(PLAYS.f_fridge, undefined);
   for (const id of PLAY_IDS) {
     assert.equal(furnById(id).at, 'floor', id);
-    assert.ok(PLAYS[id].btn.startsWith(PLAYS[id].emoji), id);
-    assert.ok(['tv', 'game', 'pc', 'piano'].includes(SCENE_OF[id]), id);
+    assert.match(PLAYS[id].btn, /^\S+ \S/, id); // 그림 글자 + 말 (🍽️ 식탁은 🍚 밥 먹기)
+    assert.ok(['tv', 'game', 'pc', 'piano', 'meal'].includes(SCENE_OF[id]), id);
   }
   assert.equal(PLAYS[HEAL], undefined);
   assert.deepEqual(KEYS.map((k) => k.ko), ['도', '레', '미', '파', '솔', '라', '시', '도']);
