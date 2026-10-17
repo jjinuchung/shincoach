@@ -12,6 +12,9 @@
 //           english/YYYY-MM-DD.md (🎤 영어 기록 요약 — 최근 7일 넘김·말하기 · 영상별 말해 본 문장, 2026-10-14 v253 · 같은 날은 덮어쓴다)
 //           korean/YYYY-MM-DD.md (📚 국어 기록 요약 — 국어 시간 · 글마다 별·틀린 물음 · 잘못 읽기 · 낱말 · 퍼즐 · 생각 쓰기, 2026-10-14 v254 · korreport.js)
 //           usage/YYYY-MM-DD.md (🕒 앱 사용 기록 — 최근 7일 앱을 연 수 · 쓴 때 · 화면마다 머문 시간 · ⏳ 과목 시간, 2026-10-16 v272 · usage.js)
+//           english/library.md (📚 태블릿 영상 전체 — 제목·넣을 때 고른 파일 이름·넣은 날·진도, v277 · 날짜 없이 늘 최신)
+//           reward/YYYY-MM-DD.md (🎮 보상 쪽 — 지금 가진 것 · 최근 7일 날마다 누적의 차이, v278 · rewardlog.js)
+//           usage/upload-log.md (📤 올리기 실패 — 최근 14일, 실패는 이 기기에 적어 두었다가 다음에 올릴 때, v278)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
@@ -34,6 +37,8 @@ export const PRIVATE_MAX_BYTES = 1000 * 1000;
 const TOKEN_KEY = 'shincoach.dataToken';
 const STATE_KEY = 'shincoach.dataUpload';
 const READ_KEY = 'shincoach.dataRead'; // 📥 받기 결과 (파일마다) — Codex 36차 #4
+const LOG_KEY = 'shincoach.dataUploadLog'; // 📤 올리기 실패 기록 (v278) — 다음에 올릴 때 usage/upload-log.md로
+const SNAP_KEY = 'shincoach.rewardSnaps'; // 🎮 보상 쪽 누적을 날마다 (v278, rewardlog.putSnap)
 const API = 'https://api.github.com';
 
 // ───────────────────── 순수 ─────────────────────
@@ -106,6 +111,48 @@ export function englishFiles(days, summaries, today) {
   for (const v of vids) lines.push(`- 「${v.title}」 한 문장 ${num(v.done)}/${num(v.total)} · 🎤 말해 본 문장 ${num(v.said)}/${num(v.total)} (${num(v.saidPct)}%)`);
   if (!vids.length) lines.push('(연 영상 없음)');
   return [{ path: `english/${today}.md`, text: `${lines.join('\n').trim()}\n` }];
+}
+
+// ── 📤 올리기 실패 기록 (v278, 2026-10-17 아버님 "빠져 있는 기록 두 가지에 대해서도 진행하자") ──
+// 기록이 비어 있으면 진우가 안 한 것인지 태블릿이 못 올린 것인지 구분할 수 없었다(마지막 시도 하나만 남았다) →
+// 실패할 때마다 이 기기에 적어 두었다가 다음에 올릴 때 usage/upload-log.md로. 같은 날 같은 까닭은 한 줄(처음·마지막 시각·시도 수)
+
+/** 실패 기록을 남기는 날 수 */
+export const LOG_DAYS = 14;
+/** 실패 줄 수 상한 */
+const LOG_MAX = 30;
+
+/** 실패 하나를 더한다 (순수 — 새 객체) · 같은 날 같은 까닭이면 그 줄의 마지막 시각·시도 수만 · 최근 LOG_DAYS일 · LOG_MAX줄 */
+export function addFail(log, at, why) {
+  const day = dayOfMs(at);
+  if (!day) return { fails: [] };
+  const w = String(why || '까닭 모름').slice(0, 120);
+  const list = (log && Array.isArray(log.fails) ? log.fails : [])
+    .filter((f) => f && /^\d{4}-\d{2}-\d{2}$/.test(f.day) && typeof f.why === 'string')
+    .map((f) => ({ day: f.day, why: f.why, first: Number(f.first) || 0, last: Number(f.last) || 0, n: Math.max(1, Math.floor(Number(f.n) || 1)) }));
+  const hit = list.find((f) => f.day === day && f.why === w);
+  if (hit) { hit.last = Math.max(hit.last, at); hit.n += 1; } else list.push({ day, why: w, first: at, last: at, n: 1 });
+  const from = dayBefore(day, LOG_DAYS - 1);
+  return { fails: list.filter((f) => f.day >= from).sort((a, b) => a.first - b.first).slice(-LOG_MAX) };
+}
+
+/** ms → 'HH:MM' (이 기기 시간대) */
+function hmOf(ms) {
+  const d = new Date(Number(ms) || 0);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** usage/upload-log.md 글 (순수) — 실패가 새로 생길 때만 글이 바뀐다(마지막 성공 시각은 안 적는다 — 적으면 올릴 때마다 바뀌어 늘 다시 올린다) */
+export function uploadLogText(log, today) {
+  const from = dayBefore(today, LOG_DAYS - 1);
+  const list = (log && Array.isArray(log.fails) ? log.fails : []).filter((f) => f && typeof f.day === 'string' && typeof f.why === 'string' && f.day >= from && f.day <= today);
+  const lines = [`📤 올리기 실패 기록 (최근 ${LOG_DAYS}일 · 이 태블릿) — 실패는 이 기기에 적어 두었다가 다음에 올릴 때 같이 · 성공한 올리기는 저장소 기록(커밋)에 남는다`, ''];
+  for (const f of list) {
+    const span = f.first && f.last && hmOf(f.first) !== hmOf(f.last) ? `${hmOf(f.first)}~${hmOf(f.last)}` : hmOf(f.first || f.last);
+    lines.push(`- ${f.day.slice(5)} ${span} ${f.why}${f.n > 1 ? ` (시도 ${f.n}번)` : ''}`);
+  }
+  if (!list.length) lines.push(`(최근 ${LOG_DAYS}일 실패 없음)`);
+  return `${lines.join('\n').trim()}\n`;
 }
 
 /** ms → 'YYYY-MM-DD' (이 기기 시간대) — 없거나 깨졌으면 '' */
@@ -255,12 +302,14 @@ export function unb64(s) {
  * usagePlaces(있으면) = 🕒 앱 사용 기록의 자리 목록(usage.PLACES) — 하루 기록(days)으로 만든다 (v272)
  * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, uploadLog, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
   const en = getEnglish ? await getEnglish() : null;
   const korRep = getKorReport ? await getKorReport(today, days || []) : null;
+  // 🎮 보상 쪽 기록(v278)은 못 만들어도 나머지는 그대로 올린다 — 새 기록 하나 때문에 📤 전체가 멈추지 않게 (🕒 사용 기록과 같은 원칙)
+  const reward = getReward ? await Promise.resolve().then(() => getReward(today, days || [])).catch(() => null) : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
@@ -269,7 +318,29 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(getEnglish ? libraryFiles(en, today) : []), // 📚 태블릿 영상 전체 목록 (v277)
     ...(typeof korRep === 'string' && korRep ? [{ path: `korean/${today}.md`, text: korRep }] : []), // 📚 국어 요약 (v254)
     ...(usagePlaces ? usageFiles(days, today, usagePlaces) : []), // 🕒 앱 사용 기록 (v272)
+    ...(typeof reward === 'string' && reward ? [{ path: `reward/${today}.md`, text: reward }] : []), // 🎮 보상 쪽 기록 (v278)
+    ...(typeof uploadLog === 'string' && uploadLog ? [{ path: 'usage/upload-log.md', text: uploadLog }] : []), // 📤 올리기 실패 기록 (v278)
   ];
+}
+
+/** 🎮 보상 쪽 기록 글 — 저장된 프로필의 누적을 오늘 것으로 이 기기에 적어 두고(최근 SNAP_DAYS일), 날마다 차이를 글로. 프로필이 없으면 null */
+async function rewardNow(today, days) {
+  const [{ getProfile }, rl] = await Promise.all([import('./db.js'), import('./rewardlog.js')]);
+  const p = await getProfile();
+  if (!p) return null;
+  const snaps = rl.putSnap(readJson(SNAP_KEY), today, rl.rewardSnap(p));
+  try { localStorage.setItem(SNAP_KEY, JSON.stringify(snaps)); } catch { /* 못 적어도 이번 글은 그대로 */ }
+  return rl.rewardText({ profile: p, snaps, days, today });
+}
+
+/** 📤 올리기 실패 글 — 적어 둔 것이 깨져 있어도 던지지 않는다(이 글 하나 때문에 나머지 기록까지 못 올리지 않게) */
+function logTextNow(today) {
+  try { return uploadLogText(readJson(LOG_KEY), today); } catch { return null; }
+}
+
+/** 📤 실패 하나를 이 기기에 적는다 (못 적어도 그만) */
+function noteFail(why, at = Date.now()) {
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(addFail(readJson(LOG_KEY), at, why))); } catch { /* 못 적어도 */ }
 }
 
 /**
@@ -542,7 +613,7 @@ export function sendReport({ force = false } = {}) {
 /** 한 번 보내기 — 다른 창과 겹치지 않는 자리(withUploadLock 안)에서 모으고 올린다 */
 async function sendOnce(force) {
   const token = getToken();
-  if (!token) return { ok: false, skipped: true, why: '열쇠가 없어요' };
+  if (!token) { noteFail('열쇠가 없어요'); return { ok: false, skipped: true, why: '열쇠가 없어요' }; } // 📤 열쇠를 다시 넣으면 그동안 못 올린 날이 보인다
   // 🕒 사용 기록(v272)은 못 불러와도 나머지는 그대로 올린다 — 새 모듈 하나 때문에 📤 전체가 멈추지 않게
   const [{ getMath, listDaily }, prog, ask, { todayKey }, st, usage] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js'), import('./usage.js').catch(() => null)]);
   const today = todayKey();
@@ -550,15 +621,21 @@ async function sendOnce(force) {
   try {
     // 🕒 모아 둔 사용 초를 먼저 적는다 — 앱을 내리는 순간에 올릴 때 마지막 몇 초가 빠지지 않게 (실패해도 그대로 올린다)
     if (usage) await usage.flushUsage().catch(() => {});
-    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, today });
+    // 🎮 저장을 기다리는 프로필 증분도 먼저 — 보상 쪽 누적(rewardNow)이 저장된 프로필을 읽는다 (Codex 86차 B · 실패해도 그대로 올린다)
+    await import('./xp.js').then((xp) => xp.flushProfile()).catch(() => {});
+    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, getReward: rewardNow, uploadLog: logTextNow(today), today });
   } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
     try { localStorage.setItem(STATE_KEY, JSON.stringify({ at: fail.at, ok: false, why: fail.why, hash: '', files: [] })); } catch { /* 저장 못 해도 */ }
+    noteFail(fail.why, fail.at);
     return fail;
   }
   const hash = hashOf(files);
   const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+  // 📤 인터넷이 없어 못 올린 것도 적는다 — 올릴 것이 있을 때만(지난번에 같은 글을 올렸으면 못 올린 게 아니다) ·
+  //    저절로 보낼 때만: 📊 "지금 보내기"(force)는 아래에서 실제로 보내 보고 실패하면 거기서 한 번 적는다 (Codex 86차 — 한 번 누름이 두 번으로 세였다)
+  if (!online && !force) { const s = uploadState(); if (!(s && s.ok && s.hash === hash)) noteFail('인터넷이 안 돼요'); }
   if (!force && !shouldAuto({ token, online, now: Date.now(), state: uploadState(), hash })) return { ok: false, skipped: true };
   const at = Date.now();
   let res;
@@ -572,6 +649,7 @@ async function sendOnce(force) {
     res = { ok: true, at };
   } catch (e) {
     res = { ok: false, at, why: (e && e.message) || String(e) };
+    noteFail(res.why, at); // 📤 다음에 올릴 때 usage/upload-log.md로
   }
   try { localStorage.setItem(STATE_KEY, JSON.stringify({ at, ok: res.ok, why: res.why || '', hash: res.ok ? hash : '', files: files.map((f) => f.path) })); } catch { /* 저장 못 해도 */ }
   return res;
