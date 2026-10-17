@@ -16,12 +16,12 @@ const at = (days, h = 12) => new Date(2026, 9, 11 + days, h, 0, 0).getTime();
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('📚 원고: 형식 검사 통과 · 여든네 편(연습 쉰셋·명작 서른하나 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯 · v254 새 글 열둘 · v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
+test('📚 원고: 형식 검사 통과 · 아흔여섯 편(연습 예순하나·명작 서른다섯 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯 · v254 새 글 열둘 · v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, Array.from({ length: 84 }, (_, i) => `K${i + 1}`));
+  assert.deepEqual(IDS, Array.from({ length: 96 }, (_, i) => `K${i + 1}`));
   const P = 'practice'; const C = 'classic';
-  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P]);
-  assert.equal(validCards(DATA).length, 84);
+  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C]);
+  assert.equal(validCards(DATA).length, 96);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -33,7 +33,7 @@ test('📚 원고: 형식 검사 통과 · 여든네 편(연습 쉰셋·명작 �
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 293);
+  assert.equal(qn, 339);
   assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 여덟 가지(v236 짜임 놓치기 더함)가 모두 한 번 이상 쓰인다');
   // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남 · 또는 지은이를 알 수 없는 옛이야기를 다시 씀)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {
@@ -607,7 +607,7 @@ test('🔍 Codex 49차 원고·말: 좋은 근거를 다 받음(K7-3 ③~⑦ · 
 test('⭐ 중학교 미리보기 (v244, 아버님 "이대로 진행"): 명작 넷 K32 「홍길동전」·K33 「양반전」(다시 씀) · K34 「하여가」·「단심가」·K35 「오우가」(『청구영언』·『산중신곡』 원문을 오늘 글자로) · pre 표시 · 도감 맨 뒤 · 저작권 해 · 물음 4·4·3·4', async () => {
   const card = (id) => DATA.cards.find((c) => c.id === id);
   const PREV = ['K32', 'K33', 'K34', 'K35'];
-  assert.deepEqual(DATA.cards.filter((c) => c.pre).map((c) => c.id), [...PREV, 'K59', 'K60'], '미리보기는 이 넷 + v258 시조 「오백 년 도읍지를」·김소월 「진달래꽃」');
+  assert.deepEqual(DATA.cards.filter((c) => c.pre).map((c) => c.id), [...PREV, 'K59', 'K60', 'K93', 'K96'], '미리보기는 이 넷 + v258 시조 「오백 년 도읍지를」·김소월 「진달래꽃」 + v281 윤동주 「서시」·이규보 「이옥설」');
   for (const id of PREV) assert.deepEqual([card(id).kind, card(id).pre], ['classic', '중학교'], id);
   assert.deepEqual(PREV.map((id) => card(id).qs.length), [4, 4, 3, 4]);
   // 원문 대조 — 시조는 옛 글자를 오늘 글자로만(위키문헌: 『청구영언』 216·8, 『산중신곡』 오우가 첫째·둘째 수)
