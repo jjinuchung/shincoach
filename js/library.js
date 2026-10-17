@@ -536,6 +536,18 @@ async function renderNextVideo(items, records, seq = renderSeq) {
 
 /** 받아 온 그림을 자리에 끼운다 (아직 없으면 ❔ 그대로) */
 function fillCast(root, c) {
+  // 🖼️ 표지가 아직 이모지면 — 명단 밖 포켓몬(🔥 히드런)은 캐릭터 그림이 없어 출연 그림을 받은 뒤에 끼운다 (v280)
+  const poster = root.querySelector('.next-poster');
+  if (poster && c.poster && !poster.querySelector('img')) {
+    const pu = characterUrl(c.poster) || artUrl(c.poster);
+    if (pu) {
+      const img = document.createElement('img');
+      img.src = pu;
+      img.alt = '';
+      poster.textContent = '';
+      poster.appendChild(img);
+    }
+  }
   for (const m of (c.cast || [])) {
     const fig = root.querySelector(`.next-cast-mon[data-id="${m.id}"]`);
     if (!fig || fig.querySelector('img')) continue;
@@ -590,7 +602,7 @@ function waitingCard(c) {
 function lockedCard(c, st) {
   const el = document.createElement('div');
   el.className = 'next-card' + (st.ready ? ' ready' : '');
-  const url = characterUrl(c.poster);
+  const url = characterUrl(c.poster) || artUrl(c.poster);
   el.innerHTML = `
     <div class="next-poster">${url ? `<img src="${url}" alt="">` : c.emoji}</div>
     <div class="next-body">

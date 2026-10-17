@@ -38,7 +38,8 @@ test('🎁 아빠가 건넨 벨: 📊 "건네줬어요"를 안 눌러도 건넨 
   // 벨 교환권을 가진 기기에선 미리 보기·지금 모으는 것으로도 안 나온다
   const owned = ['iconic', 'bell', 'wild2', 'prime_suspect'];
   assert.equal(previewGift(owned), null);
-  assert.equal(nextTarget(owned), null);
+  // v280부터는 그 뒤에 🔥 arceus가 선다 (벨이 아니라 다음 영상 — tests/voucher280)
+  assert.equal(nextTarget(owned).id, 'arceus');
   // 벨 교환권이 **없는** 기기(새 기기·옛 백업)에서도 다시 목표·미리 보기로 서지 않는다 (Codex 85차 P1)
   assert.equal(previewGift([]), null, '미리 보기에 벨 없음');
   assert.equal(nextTarget([]).id, 'iconic');

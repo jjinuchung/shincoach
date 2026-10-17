@@ -67,6 +67,29 @@ export const LOCKED = [
     ],
     teaser: 'What are you arresting Pikachu for?',
   },
+  // ↓ 2026-10-17 아버님 "이대로 해" — 만들어 두고 교환권 밖이던 두 편(태블릿 영상 목록으로 태블릿에 없음을 확인)
+  {
+    id: 'arceus', ko: '아르세우스 연대기 최고의 기술', en: 'Best Moves in Pokémon The Arceus Chronicles',
+    poster: 485, emoji: '🔥', minutes: 9, sentences: 67, price: 2000, folder: '260923\\arceus',
+    blurb: '갤럭시단에게서 히드런을 구해요 — 불꽃과 전기를 두른 공으로 물의 벽을 뚫어요',
+    // 제목과 달리 아르세우스는 거의 안 나오고 히드런 구출 이야기라 표지는 히드런 (장면을 뽑아 확인 · PokeAPI 대조)
+    // 히드런은 포켓몬 명단 밖이라 표지는 출연 그림(artUrl)으로 채운다 (library.fillCast)
+    cast: [
+      { id: 485, ko: '히드런' }, { id: 815, ko: '에이스번' },
+      { id: 818, ko: '인텔리레온' }, { id: 393, ko: '팽도리' },
+    ],
+    teaser: 'Pikachu, use Thunderbolt on the whirlpool!',
+  },
+  {
+    id: 'beary_icy', ko: '툰베어의 얼음 고민', en: 'A Bear-y Icy Problem!',
+    poster: 614, emoji: '❄️', minutes: 3, sentences: 29, price: 2000, folder: '260922\\beary_icy',
+    blurb: '놀라면 뭐든 얼려 버리는 툰베어 — 지우·이슬·웅이와 특별 훈련을 해요',
+    cast: [
+      { id: 614, ko: '툰베어' }, { id: 143, ko: '잠만보' },
+      { id: 727, ko: '어흥염' }, { id: 663, ko: '파이어로' },
+    ],
+    teaser: 'Even Kyurem would be shocked to see it!',
+  },
 ];
 
 /**

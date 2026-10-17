@@ -28,7 +28,8 @@ test('🎁 자전거 벨: 아버님이 정한 조건 그대로 — 💰 2,000 ·
 });
 
 test('🎁 줄: 지금 영상 → 🔔 벨 → 다음 영상들 · 지금 모으는 것은 하나, 벨은 차례 전부터 미리 보기', () => {
-  assert.deepEqual(voucherOrder().map((c) => c.id), ['iconic', 'bell', 'wild2', 'prime_suspect']);
+  // v280: 🔥 arceus · ❄️ beary_icy가 뒤에 붙었다 (tests/voucher280)
+  assert.deepEqual(voucherOrder().map((c) => c.id), ['iconic', 'bell', 'wild2', 'prime_suspect', 'arceus', 'beary_icy']);
   // (선물 줄의 짜임 시험 — 아빠가 건넨 선물 없이 {}. 🔔 벨은 2026-10-17 건넴 → 실제 기본값은 tests/voucher276)
   // 아무것도 안 가짐 → 영상(iconic)을 모으고, 벨은 미리 보기
   assert.equal(nextTarget([], {}).id, 'iconic');
@@ -45,7 +46,7 @@ test('🎁 줄: 지금 영상 → 🔔 벨 → 다음 영상들 · 지금 모으
 
 test('🎁 앞선 영상을 배달하고 목록에서 빼도(unlock.js 규칙) 벨은 줄 맨 앞에 남는다', () => {
   const order = voucherOrder(LOCKED.filter((c) => c.id !== 'iconic'));
-  assert.deepEqual(order.map((c) => c.id), ['bell', 'wild2', 'prime_suspect']);
+  assert.deepEqual(order.map((c) => c.id), ['bell', 'wild2', 'prime_suspect', 'arceus', 'beary_icy']);
 });
 
 test('🎁 가방에서 가진 교환권 · 받았지만 아직 안 건넨 선물', () => {

@@ -346,7 +346,16 @@ button { font-family: inherit; }
 
 /* ===== 🔢 수학 화면 ===== */
 .math-main { flex: 1; padding: 14px; max-width: 760px; width: 100%; margin: 0 auto; }
-.math-chip { flex: 0 0 auto; }
+/* 수학 칩(Lv·⚡·💰·🔷)은 다른 화면 칩보다 길어 폰 폭에서 📊가 화면 밖으로 밀렸다 (v280).
+   단추·⏳은 줄지 않게, 칩은 끝까지 길면 … 으로 줄고, 좁은 폭에선 칩만 둘째 줄로 내린다 */
+.math-chip { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#view-math .topbar > .btn-icon, #view-math .topbar > .time-chip { flex-shrink: 0; }
+@media (max-width: 560px) {
+  #view-math .topbar { flex-wrap: wrap; row-gap: 0; }
+  /* 줄을 끊는 빈 칸 — 칩이 📊 오른쪽에 붙지 않고 늘 아래 줄로 */
+  #view-math .topbar::after { content: ''; order: 1; flex-basis: 100%; }
+  #view-math .math-chip { order: 2; margin: 6px auto 0; }
+}
 .math-loading { text-align: center; color: var(--muted); margin-top: 40px; }
 .math-card {
   background: var(--card);
