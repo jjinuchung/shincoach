@@ -21,6 +21,7 @@ import {
   evolveRule, copyRestsDone, // 💊 회복 캡슐 — 깜짝 진화 · 받은 휴식 (2026-10-10)
 } from './db.js';
 import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진우네 집 규칙 (순수)
+import { copyAvatar } from './avatar.js'; // 🧑 진우 캐릭터 (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule } from './korean.js'; // 📚 국어 별·💰 규칙 (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
@@ -367,7 +368,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */

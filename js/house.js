@@ -190,8 +190,8 @@ function inRoom(size, def, x, y) {
   if (def.at === 'wall') return y === 0 && x >= 0 && x + def.w <= size.WALL;
   return x >= 0 && y >= 0 && x + def.w <= size.W && y < size.H;
 }
-/** 방에서 차지한 칸 (skipU는 빼고 — 옮길 때 제자리와 겹쳐도 되게) */
-function takenCells(room, skipU) {
+/** 방에서 차지한 칸 (skipU는 빼고 — 옮길 때 제자리와 겹쳐도 되게) · 🧑 캐릭터가 설 빈 칸을 찾을 때도(avatar.js) */
+export function takenCells(room, skipU) {
   const set = new Set();
   for (const it of room.items) {
     if (it.u === skipU) continue;

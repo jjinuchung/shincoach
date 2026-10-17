@@ -25,6 +25,9 @@ import { showRestDone } from './restshow.js'; // ✨ 다 쉰 포켓몬 받기 �
 import { ROSTER, characterUrl, artUrl, ensureArt } from './pokemon.js';
 import { ENGLISH_STONE_HOW } from './items.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
+import { avatarOf, partnerSpot, avatarMoveRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수, 2026-10-17)
+import { avatarSvg } from './avatarart.js';
+import { closetBox, closetReset, tagOf } from './avatarview.js'; // 👕 옷장 탭
 
 /** 벽 줄 높이 = 칸 × WALL_RATIO */
 export const WALL_RATIO = 1.3;
@@ -129,13 +132,21 @@ export function shapeKeyOf(shape, floor) {
 /** 층 이름 */
 const FLOOR_KO = { [FIRST_ROOM]: '1층', [SECOND_ROOM]: '2층' };
 /**
- * 탭 목록 (순수) — 방이 하나면 [🏠 꾸미기][🛒 가구 상점], 🏗️ 2층이 있으면 [🏠 1층][🏠 2층][🛒 가구 상점]
+ * 탭 목록 (순수) — 방이 하나면 [🏠 꾸미기][👕 옷장][🛒 가구 상점], 🏗️ 2층이 있으면 [🏠 1층][🏠 2층][👕 옷장][🛒 가구 상점]
+ * 👕 옷장 = 🧑 진우 캐릭터 만들기·갈아입기·👕 옷 가게 (2026-10-17)
  * @param {string[]} rooms houseShape().rooms
- * @returns {{tab:'room'|'shop', floor?:string, label:string}[]}
+ * @returns {{tab:'room'|'closet'|'shop', floor?:string, label:string}[]}
  */
 export function houseTabs(rooms) {
   const list = rooms.length > 1 ? rooms.map((id) => ({ tab: 'room', floor: id, label: `🏠 ${FLOOR_KO[id] || id}` })) : [{ tab: 'room', floor: rooms[0], label: '🏠 꾸미기' }];
-  return [...list, { tab: 'shop', label: '🛒 가구 상점' }];
+  return [...list, { tab: 'closet', label: '👕 옷장' }, { tab: 'shop', label: '🛒 가구 상점' }];
+}
+
+/** 🧑 캐릭터를 끌 때 칸 셈에 쓰는 한 칸 바닥 가구 — 캐릭터는 바닥 한 칸에 선다(dropSpot·canPlace가 가구 id로 셈한다) */
+export const ME_CELL = 'f_teddy';
+/** 🧑 캐릭터 그림의 자리(방에 대한 %) — 바닥 한 칸 (순수, size는 맨 앞) */
+export function meBoxOf(size, x, y) {
+  return boxOf(size, ME_CELL, x, y);
 }
 
 /**
@@ -153,7 +164,8 @@ export function growProgress(profile, id) {
 // ───────────────────── 화면 ─────────────────────
 
 // tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다) · drawn: 그린 집 모양(shapeKey)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0 };
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false };
+// 🧑 meSel: 방에서 캐릭터를 눌러 도구(👕 옷 갈아입기)가 떠 있다
 // 💊 pick: 고르기 창을 연 캡슐 번호 · evoAsk: 깜짝 진화 물음 { u, mon, choices } · outArm: ⏏️ 꺼내기를 한 번 누른 캡슐 · tick: 남은 시간 시계
 /** 지금 보는 방 id — 그 층이 없어졌으면(2층 없는 백업으로 합쳐짐) 1층 */
 const roomId = () => {
@@ -192,8 +204,9 @@ export function openHouse(opts = {}) {
   ui.open = true;
   ui.onClose = opts.onClose || null;
   ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.buyArm = ''; ui.floor = FIRST_ROOM;
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0;
-  ui.tab = opts.tab === 'shop' ? 'shop' : 'room';
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  ui.tab = opts.tab === 'shop' || opts.tab === 'closet' ? opts.tab : 'room';
+  closetReset();
   $('house').hidden = false;
   if (!ui.tick) ui.tick = setInterval(tickRests, 1000);
   render();
@@ -221,7 +234,8 @@ function onReloaded() {
   cancelDrag();
   const moved = ui.drawn && ui.drawn !== shapeKey();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  closetReset();
   ui.floor = roomId();
   if (moved) ui.msg = WHY.changed;
   render();
@@ -233,7 +247,7 @@ function stale() {
   if (ui.drawn === shapeKey()) return false;
   cancelDrag();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
   ui.floor = roomId();
   ui.msg = WHY.changed;
   render();
@@ -282,8 +296,9 @@ function render() {
   const body = $('house-body');
   body.innerHTML = '';
   const panel = ui.tab === 'room' && (ui.evoAsk || ui.pick);
-  body.classList.toggle('is-shop', ui.tab === 'shop' || !!panel); // 한 칸(가로 화면에서도)
+  body.classList.toggle('is-shop', ui.tab === 'shop' || ui.tab === 'closet' || !!panel); // 한 칸(가로 화면에서도)
   if (ui.tab === 'shop') body.appendChild(shopBox());
+  else if (ui.tab === 'closet') body.appendChild(closetBox({ profile: getProfileSnapshot(), run, say, redraw: render, goTab }));
   else if (ui.evoAsk) body.appendChild(evoAskBox());
   else if (ui.pick) body.appendChild(pickBox());
   else {
@@ -302,7 +317,7 @@ function renderTabs() {
   tabs.innerHTML = '';
   const cur = roomId();
   for (const t of houseTabs(houseShapeNow().rooms)) {
-    const on = ui.tab === t.tab && (t.tab === 'shop' || t.floor === cur);
+    const on = ui.tab === t.tab && (t.tab !== 'room' || t.floor === cur);
     const b = el('button', `btn house-tab${on ? ' is-on' : ''}`, t.label);
     b.type = 'button';
     b.dataset.tab = t.tab;
@@ -317,7 +332,8 @@ function goTab(key, floor) {
   if (ui.tab === key && (!floor || floor === roomId())) return;
   cancelDrag();
   ui.tab = key; ui.sel = 0; ui.arm = ''; ui.buyArm = ''; ui.msg = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  closetReset();
   if (floor) ui.floor = floor;
   render();
 }
@@ -339,6 +355,17 @@ function roomBox() {
   box.appendChild(wall);
   box.appendChild(floor);
   for (const it of rm.items) box.appendChild(itemEl(it));
+  // 🧑 내 캐릭터 + 🤝 파트너 — 이 방에 서 있으면 (선 칸은 avatarOf가 가구를 피해 고쳐 읽는다)
+  const pf = getProfileSnapshot();
+  const me = avatarOf(pf);
+  const here = me.made && me.spot && me.spot.room === rm.id;
+  if (here) {
+    box.appendChild(meEl(me));
+    const pid = getPartner();
+    const ps = pid ? partnerSpot(pf, me.spot) : null;
+    if (ps) box.appendChild(palEl(pid, ps));
+    if (ui.meSel) box.appendChild(meToolsEl(me));
+  } else ui.meSel = false;
   const hint = el('div', 'house-hint');
   hint.hidden = true;
   box.appendChild(hint);
@@ -349,11 +376,54 @@ function roomBox() {
   if (ui.arm) box.classList.add('is-arming');
   // 빈 곳을 누르면: 서랍에서 고른 가구를 거기에 놓거나, 고른 가구를 놓아준다
   box.addEventListener('click', (e) => {
-    if (e.target.closest('.house-item') || e.target.closest('.house-tools')) return;
+    if (e.target.closest('.house-item') || e.target.closest('.house-tools') || e.target.closest('.house-me')) return;
     if (ui.arm) { placeAt(ui.arm, box.getBoundingClientRect(), e.clientX, e.clientY); return; }
-    if (ui.sel) { ui.sel = 0; render(); }
+    if (ui.sel || ui.meSel) { ui.sel = 0; ui.meSel = false; render(); }
   });
   return box;
+}
+
+/** 🧑 방에 선 내 캐릭터 — 바닥 한 칸, 그림은 칸보다 크게 서 있다 · 끌어서 옮기고 누르면 도구 */
+function meEl(me) {
+  const b = meBoxOf(sz(), me.spot.x, me.spot.y);
+  const e = el('div', `house-me${ui.meSel ? ' is-sel' : ''}`);
+  e.setAttribute('role', 'button');
+  e.setAttribute('aria-label', `${tagOf(me.name)} — 끌어서 옮겨요`);
+  Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(10 + me.spot.y) });
+  e.insertAdjacentHTML('beforeend', avatarSvg(me.look, { uid: 'room', cls: 'house-me-art' }));
+  e.appendChild(el('span', 'house-me-tag', tagOf(me.name)));
+  e.addEventListener('pointerdown', (ev) => startDrag(ev, { kind: 'me', id: ME_CELL, src: e }));
+  return e;
+}
+/** 🤝 파트너 포켓몬 — 캐릭터 옆 칸에 (누르기는 방이 받는다) */
+function palEl(monId, spot) {
+  const b = meBoxOf(sz(), spot.x, spot.y);
+  const e = el('div', 'house-pal');
+  Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(10 + spot.y) });
+  e.appendChild(monFace(monId, 'house-pal-img'));
+  return e;
+}
+/** 🧑 캐릭터를 눌렀을 때 — 👕 옷 갈아입기 */
+function meToolsEl(me) {
+  const b = meBoxOf(sz(), me.spot.x, me.spot.y);
+  const t = el('div', 'house-tools is-me');
+  t.dataset.cx = String(b.left + b.width / 2);
+  Object.assign(t.style, { left: `${b.left + b.width / 2}%`, top: `${Math.max(0, b.top - b.height * 0.6)}%` });
+  const go = el('button', 'btn house-tool', '👕 옷 갈아입기');
+  go.type = 'button';
+  go.addEventListener('click', () => goTab('closet'));
+  t.appendChild(go);
+  return t;
+}
+/** 🧑 아직 캐릭터가 없으면 꾸미기 화면에서 알려 준다 */
+function meMakeCard() {
+  const card = el('div', 'house-gift house-me-card');
+  card.appendChild(el('p', 'house-gift-text', '🧑 나를 만들어 볼까요? 👕 옷장에서 내 모습을 골라요'));
+  const go = el('button', 'btn btn-primary house-gift-btn', '🧑 만들러 가기');
+  go.type = 'button';
+  go.addEventListener('click', () => goTab('closet'));
+  card.appendChild(go);
+  return card;
 }
 
 function itemEl(it) {
@@ -397,6 +467,7 @@ function toolsEl(it) {
 function drawerBox() {
   const sec = el('div', 'house-sec');
   sec.appendChild(el('h3', 'house-h', '🗄️ 서랍'));
+  if (!avatarOf(getProfileSnapshot()).made) sec.appendChild(meMakeCard()); // 🧑 캐릭터가 아직 없으면 (2026-10-17)
   // 🎁 이사 선물 — 처음 집에 한 번 (houseStartRule: 저장된 집의 started로 판정, 두 창·백업에서도 한 번)
   if (!houseNow().started) {
     const g = furnById(START_GIFT);
@@ -494,6 +565,13 @@ const WHY = {
   already: '이사 선물은 벌써 받았어요',
   resting: '쉬는 중이라 서랍에 못 넣어요 — 먼저 ⏏️ 꺼내요',
   gift: '먼저 🎁 이사 선물을 받아요 — 🏠 꾸미기의 서랍에 와 있어요',
+  // 🧑 진우 캐릭터 (avatarview가 alias로 고른다 — 가구 말과 겹치는 why)
+  wearNone: '그 옷이 없어요 — 👕 옷 가게에서 먼저 사요',
+  wearOwned: '이미 있는 옷이에요 — 옷장에서 골라 입어요',
+  meAlready: '벌써 만들었어요 — 👕 옷장에서 옷을 갈아입어요',
+  meMade: '먼저 👕 옷장에서 내 캐릭터를 만들어요',
+  meUnknown: '고를 수 없는 모습이에요 — 다시 골라 봐요',
+  meSpot: '거기는 설 수 없어요 — 가구가 있거나 방 밖이에요',
 };
 /** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다
  *  alias = 이 물건에서 다르게 말할 why ({ owned: 'grown' } — 늦은 창의 넓히기가 "칠할 수 있어요"로 나왔다, Codex 46차 #3) */
@@ -981,16 +1059,24 @@ function unbind() {
 function beginDrag(d) {
   d.moved = true;
   const f = furnById(d.id);
-  // 뒤집어 놓은 가구는 끄는 그림도 뒤집어서 — 바깥 transform은 onMove가 손가락 자리로 쓰니 안쪽 그림에 (Codex 64차)
-  const it = d.kind === 'move' ? ((room() || {}).items || []).find((x) => x.u === d.u) : null;
-  const g = el('div', `house-ghost${f.w > 1 ? ' is-wide' : ''}`);
-  g.appendChild(artEl(f, 'span', `house-ghost-art${it && it.f ? ' is-flip' : ''}`));
   const cell = (document.querySelector('#house-body .house-room') || { clientWidth: 320 }).clientWidth / sz().W;
-  g.style.fontSize = `${cell * (f.w > 1 ? 1.5 : 0.95)}px`;
+  let g;
+  if (d.kind === 'me') {
+    // 🧑 캐릭터 — 끄는 동안 손가락 아래에 캐릭터 그림
+    g = el('div', 'house-ghost is-me');
+    g.insertAdjacentHTML('beforeend', avatarSvg(avatarOf(getProfileSnapshot()).look, { uid: 'ghost', shadow: false }));
+    g.style.width = `${cell * 1.15}px`;
+  } else {
+    // 뒤집어 놓은 가구는 끄는 그림도 뒤집어서 — 바깥 transform은 onMove가 손가락 자리로 쓰니 안쪽 그림에 (Codex 64차)
+    const it = d.kind === 'move' ? ((room() || {}).items || []).find((x) => x.u === d.u) : null;
+    g = el('div', `house-ghost${f.w > 1 ? ' is-wide' : ''}`);
+    g.appendChild(artEl(f, 'span', `house-ghost-art${it && it.f ? ' is-flip' : ''}`));
+    g.style.fontSize = `${cell * (f.w > 1 ? 1.5 : 0.95)}px`;
+  }
   document.body.appendChild(g);
   d.ghost = g;
   if (d.src) d.src.classList.add('is-lifted');
-  ui.sel = 0;
+  ui.sel = 0; ui.meSel = false;
   const tools = document.querySelector('#house-body .house-tools');
   if (tools) tools.remove();
 }
@@ -1042,7 +1128,8 @@ function onUp(e) {
   endDrag(d);
   const f = furnById(d.id);
   if (!d.spot) { ui.msg = ''; render(); return; } // 방 밖에서 손을 떼면 없던 일 (서랍 물건은 서랍에, 놓인 가구는 제자리에)
-  if (!d.ok) { say(WHY.spot); render(); return; }
+  if (!d.ok) { say(d.kind === 'me' ? WHY.meSpot : WHY.spot); render(); return; }
+  if (d.kind === 'me') { run((p) => avatarMoveRule(p, d.room, d.spot.x, d.spot.y, Date.now()), '🚶 옮겼어요', { spot: 'meSpot', made: 'meMade' }); return; } // 🧑 캐릭터
   if (d.kind === 'new') { ui.arm = ''; run((p) => placeRule(p, d.room, d.id, d.spot.x, d.spot.y), placedText(f)); }
   else run((p) => moveRule(p, d.room, d.u, d.spot.x, d.spot.y), `${f.emoji} ${f.ko}${eul(f.ko)} 옮겼어요`);
 }
@@ -1064,10 +1151,11 @@ function cancelDrag() {
 
 /** 끌지 않고 눌렀을 때 — 놓인 가구는 고르기(도구가 뜬다), 서랍 물건은 "방을 눌러 놓기" */
 function tap(d) {
+  if (d.kind === 'me') { ui.meSel = !ui.meSel; ui.sel = 0; ui.arm = ''; ui.msg = ''; render(); return; } // 🧑 캐릭터 — 👕 옷 갈아입기 도구
   if (d.kind === 'move') {
     const it = d.id === HEAL && room() ? room().items.find((i) => i.u === d.u) : null;
     if (it && it.rest && restLeft(it.rest, Date.now()) === 0) { claimAt(it.u, undefined, it.rest.id); return; } // 💊 다 쉰 캡슐 — 누르면 바로 ✨ 받기
-    ui.sel = ui.sel === d.u ? 0 : d.u; ui.arm = ''; ui.outArm = 0;
+    ui.sel = ui.sel === d.u ? 0 : d.u; ui.arm = ''; ui.outArm = 0; ui.meSel = false;
     if (it && it.rest && ui.sel) { const ko = monKo(it.rest.mon); ui.msg = `💤 ${ko}${iga(ko)} 쉬는 중이에요 — ${minsLeft(restLeft(it.rest, Date.now()))}`; } else ui.msg = '';
     render(); return;
   }

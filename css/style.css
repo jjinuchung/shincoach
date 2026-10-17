@@ -3107,6 +3107,43 @@ button { font-family: inherit; }
   .rshow-mon.is-pop { animation: none; opacity: 1; transform: none; }
 }
 
+/* ===== 🧑 진우 캐릭터 1단계 (2026-10-17) — 방 바닥 한 칸에 선 인형(그림은 칸보다 크게) · 🤝 파트너는 옆 칸 · 🪞 옷장 탭 ===== */
+.house-me { position: absolute; touch-action: none; cursor: grab; border-radius: 8px; }
+.house-me-art { position: absolute; left: 50%; bottom: 2%; width: 118%; height: auto; transform: translateX(-50%); pointer-events: none; overflow: visible; }
+.house-me-tag { position: absolute; left: 50%; bottom: calc(100% + var(--cell) * 0.5); transform: translateX(-50%); padding: 0 calc(var(--cell) * 0.16); border: 2px solid #2b2420; border-radius: 999px; background: #fff; color: #2b2420; font-size: max(10px, calc(var(--cell) * 0.26)); font-weight: 800; line-height: 1.45; white-space: nowrap; pointer-events: none; }
+.house-me.is-sel { outline: 3px dashed var(--primary); outline-offset: -2px; }
+.house-me.is-lifted { opacity: 0.35; }
+.house-pal { position: absolute; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+.house-pal-img { width: calc(var(--cell) * 1.1); height: calc(var(--cell) * 1.1); object-fit: contain; margin-bottom: calc(var(--cell) * 0.05); filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.2)); }
+.house-pal-img.is-emoji { width: auto; height: auto; font-size: calc(var(--cell) * 0.8); line-height: 1; }
+.house-ghost.is-me svg { display: block; width: 100%; height: auto; }
+.house-me-card { margin-bottom: 2px; }
+.closet { display: grid; grid-template-columns: minmax(0, 230px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.closet-intro { grid-column: 1 / -1; }
+.closet-mirror { position: sticky; top: 0; display: grid; justify-items: center; gap: 8px; padding: 10px; border: 1px solid #ecdfc8; border-radius: 14px; background: #fffaf2; }
+.closet-stage { display: grid; justify-items: center; width: 100%; padding: 8px 0 4px; border-radius: 12px; background: #fff; }
+.closet-stage svg { display: block; width: min(170px, 46vw); height: auto; }
+.closet-tag { min-height: 1.5em; padding: 0 12px; border: 2px solid #2b2420; border-radius: 999px; background: #fff; color: #2b2420; font-weight: 800; line-height: 1.5; }
+.closet-name { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--muted); }
+.closet-name-input { width: 8.5em; padding: 4px 8px; border: 2px solid var(--border); border-radius: 10px; font: inherit; color: var(--text); background: #fff; }
+.closet-make { width: 100%; }
+.closet-home { width: 100%; }
+.closet-groups { display: grid; gap: 10px; min-width: 0; }
+.closet-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.closet-opt { display: grid; justify-items: center; align-content: start; gap: 2px; width: 74px; padding: 4px 2px 6px; border: 2px solid var(--border); border-radius: 12px; background: #fff; font: inherit; color: inherit; }
+.closet-opt svg { display: block; width: 52px; height: 64px; }
+.closet-opt.is-on { border-color: var(--primary); background: #eef2ff; }
+.closet-opt.is-none { align-content: center; }
+.closet-x { font-size: 1.3rem; line-height: 64px; }
+.closet-opt-name { font-size: 0.72rem; font-weight: 700; line-height: 1.2; text-align: center; }
+.closet-shop-art { display: block; width: 64px; height: 80px; }
+@media (max-width: 640px) {
+  .closet { grid-template-columns: minmax(0, 1fr); }
+  .closet-mirror { position: static; }
+}
+/* 🧑 탭 넷(2층이 있으면) — 폰에서는 글자를 줄여 한 줄로 */
+@media (max-width: 480px) { .house-tab { padding: 8px 4px; font-size: 0.82rem; white-space: nowrap; } }
+
 /* ===== 📚 국어 (2026-10-11, koreanview.js) — 작품 도감 카드 목록 → 글 읽기(공책 같은 글 상자 · 명작은 금빛 카드) + 한 문제씩 · 근거는 형광펜 ===== */
 .kor-main {
   --kor-mark: #fff0a0;

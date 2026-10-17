@@ -15,6 +15,7 @@ import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows, qMissOf, mergeQMis
 import { wordsOf, mergeWords, wordDaysOf, mergeWordDays } from './korwords.js'; // 🔤 국어 낱말 칸·보상 받은 날 (순수, korean.js만 import)
 import { writesOf, mergeWrites } from './korwrite.js'; // ✍️ 국어 서술형 글·답장·보상 한도 (순수, korean.js만 import)
 import { mergePuzzles } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 (순수 — korean·korwords만 import)
+import { copyAvatar, mergeAvatar } from './avatar.js'; // 🧑 진우 캐릭터 복사·병합 (순수 — house만 import)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -868,7 +869,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korWrites: writesOf(cur.korWrites), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korWrites: writesOf(cur.korWrites), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2165,6 +2166,10 @@ export function mergeStatRecord(name, cur, rec) {
       out.house.started = !!((lh && lh.started) || (oh && oh.started));
       out.house.seq = Math.max(Number(lh && lh.seq) || 0, Number(oh && oh.seq) || 0); // 깨진 큰 번호는 읽을 때 house.houseOf가 다시 매긴다
     } else delete out.house;
+    // 🧑 진우 캐릭터 — 만들었나·첫 선물은 OR(옛 백업이 "아직"으로 되돌려 🎁를 또 받지 않게) · 모습·이름·선 자리는 바꾼 시각이 나중인 쪽
+    //    (산 옷은 위 가방과 같은 쪽 — 안 가진 옷을 입은 모습이 이겨도 읽을 때 avatar.avatarOf가 벗긴다) · 깨진 쪽은 없는 것으로
+    const av = mergeAvatar(cur.avatar, rec.avatar);
+    if (av) out.avatar = av; else delete out.avatar;
   }
   return out;
 }

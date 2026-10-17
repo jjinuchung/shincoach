@@ -59,8 +59,8 @@ test('🏠 등록부: 가구는 f_ · 벽지 w_ · 바닥 fl_ · 넓히기 x_ ·
   assert.equal(paintById('f_bed'), null);
 });
 
-test('🏠 그림은 태블릿이 그리는 이모지(Emoji 12 이하)만 — 13 이후 집 물건 이모지(🪴🪟🪞🛖🪜🪣🪤🪥🪠🪦🪧) 금지', () => {
-  const newer = ['🪴', '🪟', '🪞', '🛖', '🪜', '🪣', '🪤', '🪥', '🪠', '🪦', '🪧', '🪨', '🪵', '🛻', '🪆', '🪅'];
+test('🏠 그림은 태블릿이 그리는 이모지(Emoji 12 이하)만 — 13 이후 집 물건 이모지(🪴🪟👕🛖🪜🪣🪤🪥🪠🪦🪧) 금지', () => {
+  const newer = ['🪴', '🪟', '👕', '🛖', '🪜', '🪣', '🪤', '🪥', '🪠', '🪦', '🪧', '🪨', '🪵', '🛻', '🪆', '🪅'];
   for (const f of [...FURN, ...GROW]) for (const e of newer) assert.ok(!f.emoji.includes(e), `${f.id} ${f.emoji}`);
 });
 
@@ -761,9 +761,10 @@ test('🏗️ 화면도 집 모양으로: houseview의 canPlace는 모두 houseS
 
 test('🏗️ 화면 (넓히기 2단계): 탭 — 방 하나면 [🏠 꾸미기][🛒], 2층이 있으면 [🏠 1층][🏠 2층][🛒] · 넓히기 카드의 💰·🔷·🔶 모은 만큼 · 상점 맨 위 🏗️ 집 넓히기 · 화면은 넓히기 전 크기를 직접 안 씀', async () => {
   const v = await import('../js/houseview.js');
-  assert.deepEqual(v.houseTabs([R]), [{ tab: 'room', floor: R, label: '🏠 꾸미기' }, { tab: 'shop', label: '🛒 가구 상점' }]);
-  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.label), ['🏠 1층', '🏠 2층', '🛒 가구 상점']);
-  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.floor), [R, R2, undefined]);
+  // 👕 옷장(🧑 진우 캐릭터, v283)이 가구 상점 앞에
+  assert.deepEqual(v.houseTabs([R]), [{ tab: 'room', floor: R, label: '🏠 꾸미기' }, { tab: 'closet', label: '👕 옷장' }, { tab: 'shop', label: '🛒 가구 상점' }]);
+  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.label), ['🏠 1층', '🏠 2층', '👕 옷장', '🛒 가구 상점']);
+  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.floor), [R, R2, undefined, undefined]);
   const w = growById(WIDE);
   const pr = v.growProgress(pf(w.price + 1, { stone_math: w.stones.stone_math - 3, stone_english: w.stones.stone_english }), WIDE);
   assert.deepEqual(pr.map((x) => [x.emoji, x.have, x.need, x.ok]), [
