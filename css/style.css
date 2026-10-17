@@ -3144,6 +3144,92 @@ button { font-family: inherit; }
 /* 🧑 탭 넷(2층이 있으면) — 폰에서는 글자를 줄여 한 줄로 */
 @media (max-width: 480px) { .house-tab { padding: 8px 4px; font-size: 0.82rem; white-space: nowrap; } }
 
+/* ===== 🎮 일상 행동 (2026-10-18) — 방의 📺·🎮·💻·🎹를 눌러 캐릭터·🤝 파트너와 함께 노는 장면(playshow.js · 그림 playart.js) ===== */
+/* 움직이는 것은 transform·opacity만(구형 태블릿) · 무대 = 그 방의 벽지(--pw)·바닥(--pf) · 자리는 장면마다 */
+/* 방의 🤝 파트너 아래 💗 사이좋음 */
+.house-pal-bond { position: absolute; left: 50%; bottom: calc(var(--cell) * -0.22); transform: translateX(-50%); padding: 0 calc(var(--cell) * 0.12); border: 2px solid #f06595; border-radius: 999px; background: #fff; color: #c2255c; font-size: max(10px, calc(var(--cell) * 0.24)); font-weight: 800; line-height: 1.4; white-space: nowrap; pointer-events: none; }
+.pshow { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 64; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15, 23, 42, 0.72); }
+.pshow[hidden] { display: none; }
+.pshow-card { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; display: grid; gap: 10px; padding: 14px; border-radius: 22px; background: #fffaf2; text-align: center; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35); }
+.pshow-stage { position: relative; width: 100%; aspect-ratio: 16 / 10; overflow: hidden; border: 2px solid #ecdfc8; border-radius: 16px; background: var(--pw); }
+.pshow-wall { position: absolute; top: 0; right: 0; bottom: 42%; left: 0; background: var(--pw); }
+.pshow-wall::after { content: ""; position: absolute; right: 0; bottom: 0; left: 0; height: 7%; background: rgba(0, 0, 0, 0.07); }
+.pshow-floor { position: absolute; top: 58%; right: 0; bottom: 0; left: 0; background-color: var(--pf); background-image: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 2px, transparent 2px 12.5%); }
+.pshow-dev, .pshow-me, .pshow-pal { position: absolute; }
+.pshow-dev svg, .pshow-me-art { display: block; width: 100%; height: auto; overflow: visible; }
+.pshow-me { width: 22%; }
+.pshow-pal { width: 17%; height: 27%; display: flex; align-items: flex-end; justify-content: center; }
+.pshow-pal-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.2)); transform-origin: 50% 100%; }
+.pshow-pal-img.is-emoji { width: auto; height: auto; font-size: 2.4rem; line-height: 1; }
+/* 자리 — 아래(바닥)에 붙여 세운다 */
+.pshow-stage.is-tv .pshow-dev { left: 53%; bottom: 8%; width: 42%; }
+.pshow-stage.is-tv .pshow-me { left: 6%; bottom: 4%; }
+.pshow-stage.is-tv .pshow-pal { left: 30%; bottom: 5%; }
+.pshow-stage.is-game .pshow-dev { left: 31%; bottom: 13%; width: 38%; }
+.pshow-stage.is-game .pshow-me { left: 6%; bottom: 3%; }
+.pshow-stage.is-game .pshow-pal { left: 76%; bottom: 5%; }
+.pshow-stage.is-pc .pshow-dev { left: 40%; bottom: 3%; width: 52%; }
+.pshow-stage.is-pc .pshow-me { left: 4%; bottom: 3%; }
+.pshow-stage.is-pc .pshow-pal { left: 25%; bottom: 4%; }
+.pshow-stage.is-piano .pshow-dev { left: 5%; bottom: 3%; width: 50%; }
+.pshow-stage.is-piano .pshow-me { left: 55%; bottom: 3%; }
+.pshow-stage.is-piano .pshow-pal { left: 78%; bottom: 5%; }
+/* 기기 — 켜지면(.is-on) 화면 */
+.pv .pv-on { opacity: 0; transition: opacity 0.45s ease-out; }
+.pshow-stage.is-on .pv-on { opacity: 1; }
+.pv-led { fill: #ff6b6b; }
+.pshow-stage.is-on .pv-led { fill: #51cf66; }
+.pshow-stage.is-on .pv-tick { animation: pv-tick 7s linear infinite; }
+.pshow-stage.is-on .pv-onmon { transform-box: fill-box; transform-origin: 50% 100%; animation: pv-bob 1.3s ease-in-out infinite; }
+.pshow-stage.is-on .pv-stars { animation: pv-stars 2.6s linear infinite; }
+.pshow-stage.is-on .pv-jump { animation: pv-jump 0.9s ease-in-out infinite; }
+.pv-clear { opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; }
+.pshow-stage.is-clear .pv-clear { animation: pv-pop 0.5s ease-out forwards; }
+.pshow-stage.is-clear .pv-stars, .pshow-stage.is-clear .pv-jump { animation-play-state: paused; }
+.pv-line { opacity: 0; }
+.pshow-stage.is-on .pv-line { animation: pv-type 0.35s ease-out forwards; animation-delay: calc(0.5s + var(--i) * 1.1s); }
+.pshow-stage.is-done .pv-line { animation: none; opacity: 1; }
+.pshow-stage.is-on .pv-caret { animation: pv-blink 1s steps(2, start) infinite; }
+.pv-white.is-hit { fill: #ffe08a; }
+/* 🎮 손에 든 조종기 */
+.pshow-pad { position: absolute; width: 48%; height: auto; transform-origin: 50% 50%; }
+.pshow-pad.is-me { left: 26%; top: 63%; }
+.pshow-pad.is-pal { left: 26%; top: 56%; width: 56%; }
+.pshow-stage.is-on:not(.is-clear) .pshow-pad { animation: pv-mash 0.3s steps(2, start) infinite; }
+/* 캐릭터·파트너 */
+.pshow-me.is-hop, .pshow-pal.is-hop { animation: pshow-hop 0.45s ease-out; }
+.pshow-stage.is-on .pshow-pal-img { animation: pshow-sway 1.8s ease-in-out infinite; }
+/* 떠오르는 것 — ♪ · ⭐ · 💗 */
+.pshow-fx { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+.pshow-fly { position: absolute; font-size: 1.6rem; font-weight: 900; line-height: 1; white-space: nowrap; animation: pshow-fly 1.5s ease-out forwards; }
+.pshow-fly.is-note { color: #7048e8; }
+.pshow-fly.is-heart { padding: 2px 10px; border: 2px solid #f06595; border-radius: 999px; background: #fff; color: #c2255c; font-size: 1.25rem; animation-duration: 1.9s; }
+/* 말 · 도움말 · 건반 · 단추 */
+.pshow-cap { min-height: 2.9em; margin: 0; display: flex; align-items: center; justify-content: center; color: var(--text); font-size: 1.05rem; font-weight: 800; line-height: 1.4; word-break: keep-all; }
+.pshow-tip { margin: 0; color: var(--muted); font-size: 0.85rem; word-break: keep-all; }
+.pshow-tip[hidden], .pshow-keys[hidden], .pshow-ok[hidden] { display: none; }
+.pshow-keys { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.pshow-key { height: 96px; padding: 0 0 10px; display: flex; align-items: flex-end; justify-content: center; border: 2px solid #3b302b; border-top: 9px solid var(--kc); border-radius: 0 0 12px 12px; background: #fffdf7; color: #3b302b; font: inherit; font-weight: 800; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.pshow-key.is-hit { background: #ffe08a; transform: translateY(3px); }
+.pshow-ok { justify-self: center; min-width: 9em; }
+@keyframes pv-tick { from { transform: translateX(0); } to { transform: translateX(-96px); } }
+@keyframes pv-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes pv-stars { from { transform: translateX(0); } to { transform: translateX(-120px); } }
+@keyframes pv-jump { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-13px); } }
+@keyframes pv-pop { 0% { opacity: 0; transform: scale(0.3); } 70% { opacity: 1; transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes pv-type { from { opacity: 0; transform: translateX(-3px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pv-blink { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes pv-mash { 0% { transform: rotate(-6deg); } 100% { transform: rotate(6deg); } }
+@keyframes pshow-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-12%); } }
+@keyframes pshow-sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes pshow-fly { 0% { opacity: 0; transform: translateY(0) scale(0.6); } 15% { opacity: 1; transform: translateY(-8px) scale(1); } 100% { opacity: 0; transform: translateY(-64px) scale(1.05); } }
+@media (max-width: 480px) {
+  .pshow { padding: 10px; }
+  .pshow-card { padding: 10px; }
+  .pshow-cap { font-size: 0.95rem; }
+  .pshow-key { height: 80px; font-size: 0.85rem; }
+  .pshow-fly { font-size: 1.25rem; }
+}
 /* ===== 📚 국어 (2026-10-11, koreanview.js) — 작품 도감 카드 목록 → 글 읽기(공책 같은 글 상자 · 명작은 금빛 카드) + 한 문제씩 · 근거는 형광펜 ===== */
 .kor-main {
   --kor-mark: #fff0a0;

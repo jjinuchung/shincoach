@@ -1,0 +1,161 @@
+// 🎮 일상 행동 (2026-10-18, 아버님 "이대로 해") — 방에 놓은 📺 TV · 🎮 게임기 · 💻 컴퓨터 · 🎹 피아노를 누르면 캐릭터와 🤝 파트너가 함께 논다
+// 규칙(순수) — 저장은 xp.houseDo(저장된 프로필로 한 트랜잭션), 장면은 playshow.js · 그림은 playart.js
+//
+// 보상은 💰·🔷·🔶·경험치가 **아니다**(공부보다 쉬운 벌이가 되지 않게) — 기기마다 하루 한 번 파트너에게 💗 사이좋음 +1, 같은 날 두 번째부터는 장면만.
+// 저장: profile.homePlay = { days: { 기기 id: 마지막으로 💗를 받은 날 번호 }, bond: { 포켓몬 id: 💗 } }
+//  · 날은 트랜잭션 안의 시각으로 센다 · 지난 날보다 **뒤인 날**에만 준다(시계를 되돌려도 또 받지 않게 — 기록은 늘 큰 쪽)
+//  · 💗는 늘기만 한다 — 병합은 칸마다 큰 쪽(두 창·옛 백업을 합쳐도 늘어나지 않는다)
+//  · 진화하면 💗를 이어받는다 — 읽을 때 진화 전 모습들의 💗 중 가장 큰 것(bondOf), 주면 그 수 + 1을 지금 모습에 적는다(옛 칸은 지우지 않음 — 단조)
+import { houseOf, houseShape, takenCells, furnById } from './house.js';
+import { avatarOf, partnerSpot } from './avatar.js';
+import { evoFrom, evoOf, haveOf } from './evolve.js';
+import { dayNum } from './korean.js';
+
+/** 놀 수 있는 기기 — btn = 도구 줄 단추 · did = 장면 끝 말("개굴닌자와 ○○") */
+export const PLAYS = {
+  f_tv: { emoji: '📺', btn: '📺 TV 보기', did: 'TV를 봤어요' },
+  f_game: { emoji: '🎮', btn: '🎮 게임하기', did: '게임을 했어요' },
+  f_pc: { emoji: '💻', btn: '💻 컴퓨터 하기', did: '컴퓨터를 했어요' },
+  f_piano: { emoji: '🎹', btn: '🎹 피아노 치기', did: '피아노를 쳤어요' },
+};
+export const PLAY_IDS = Object.keys(PLAYS);
+/** 💗 한 칸의 끝 (깨진 큰 수가 끝없이 커지지 않게) · 💗 칸 수의 끝 */
+export const BOND_MAX = 1e6;
+const BOND_KEYS_MAX = 2000;
+/** 날 번호의 끝 — 깨진 큰 날이 영영 "오늘보다 뒤"가 되지 않게(서기 9999년쯤) */
+const DAY_MAX = 3e6;
+
+const isObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const cnt = (v, max) => (Number.isSafeInteger(v) && v > 0 ? Math.min(v, max) : 0);
+
+/** 저장된 놀이 기록 고쳐 읽기 (새 객체) — 모르는 기기·깨진 값은 뺀다 */
+export function playOf(raw) {
+  const out = { days: {}, bond: {} };
+  if (!isObj(raw)) return out;
+  if (isObj(raw.days)) for (const id of PLAY_IDS) { const d = own(raw.days, id) ? cnt(raw.days[id], DAY_MAX) : 0; if (d) out.days[id] = d; }
+  if (isObj(raw.bond)) {
+    const keys = Object.keys(raw.bond).filter((k) => /^\d{1,6}$/.test(k) && cnt(raw.bond[k], BOND_MAX)).slice(0, BOND_KEYS_MAX);
+    for (const k of keys) out.bond[k] = cnt(raw.bond[k], BOND_MAX);
+  }
+  return out;
+}
+/** 복사 (프로필 복사용) — 객체가 아니면 null */
+export function copyPlay(raw) {
+  return isObj(raw) ? playOf(raw) : null;
+}
+/** 백업 병합 (순수) — 날·💗 모두 칸마다 큰 쪽 · 둘 다 없으면 null */
+export function mergePlay(a, b) {
+  if (!isObj(a) && !isObj(b)) return null;
+  const x = playOf(a);
+  const y = playOf(b);
+  for (const id of Object.keys(y.days)) x.days[id] = Math.max(x.days[id] || 0, y.days[id]);
+  for (const k of Object.keys(y.bond)) x.bond[k] = Math.max(x.bond[k] || 0, y.bond[k]);
+  return playOf(x);
+}
+
+/** 💗 사이좋음 — 이 포켓몬과 진화 전 모습들 가운데 가장 큰 것 (진화해도 이어진다) */
+export function bondOf(raw, monId) {
+  const p = isObj(raw) && isObj(raw.bond) ? raw : playOf(raw);
+  const seen = new Set();
+  let best = 0;
+  const walk = (id) => {
+    const k = String(Number(id));
+    if (seen.has(k)) return;
+    seen.add(k);
+    best = Math.max(best, cnt(p.bond[k], BOND_MAX));
+    for (const f of evoFrom(Number(k))) walk(f);
+  };
+  walk(monId);
+  return best;
+}
+
+/** 🧬 진화 줄 (순수 — 💻 도감 쪽) — 진화 전 모습들 → 이 포켓몬 → (갈래가 하나뿐이면) 다음 모습들 · id 목록 */
+export function chainOf(monId) {
+  const id = Number(monId);
+  const seen = new Set([id]);
+  const back = [];
+  for (let c = id; ;) {
+    const f = evoFrom(c).find((x) => !seen.has(x));
+    if (!f) break;
+    back.unshift(f);
+    seen.add(f);
+    c = f;
+  }
+  const fwd = [];
+  for (let c = id; ;) {
+    const n = evoOf(c);
+    if (n.length !== 1 || seen.has(n[0].to)) break;
+    fwd.push(n[0].to);
+    seen.add(n[0].to);
+    c = n[0].to;
+  }
+  return [...back, id, ...fwd];
+}
+
+/** 🤝 지금 파트너 — 데리고 있을 때만 id, 아니면 null */
+export function partnerOf(profile) {
+  const id = Number(profile && profile.partner);
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+  return haveOf((profile.caught || {})[id], (profile.mons || {})[id]) > 0 ? id : null;
+}
+
+/** 오늘 이 기기로 💗를 받을 수 있나 (순수 — 화면 말에만 · 판정은 playRule이 트랜잭션 안에서) */
+export function heartReady(profile, id, now) {
+  const day = dayNum(now);
+  return !!PLAYS[id] && day > 0 && day <= DAY_MAX && day > (playOf(profile && profile.homePlay).days[id] || 0);
+}
+
+/**
+ * 🚶 놀러 갈 칸 (순수) — 기기 옆 빈 바닥 칸: 왼쪽 → 오른쪽 → 앞줄 → 가장 가까운 빈 칸. 🤝 파트너도 옆에 설 수 있는 칸을 먼저 고른다.
+ * 캐릭터가 서 있는 칸은 비어 있는 것으로 본다(거기서 걸어 나가니까) · 없으면 null
+ * → { me: { room, x, y }, pal: { room, x, y } | null }
+ */
+export function playSpot(profile, roomId, u) {
+  const h = houseOf(profile);
+  const room = h.rooms.find((r) => r.id === roomId);
+  const it = room && room.items.find((i) => i.u === u);
+  if (!it) return null;
+  const d = furnById(it.id);
+  if (!d || d.at !== 'floor') return null;
+  const size = houseShape(profile).size;
+  const taken = takenCells(room);
+  const free = (x, y) => x >= 0 && y >= 0 && x < size.W && y < size.H && !taken.has(`${x},${y}`);
+  const cand = [{ x: it.x - 1, y: it.y }, { x: it.x + d.w, y: it.y }];
+  for (let dx = 0; dx < d.w; dx++) cand.push({ x: it.x + dx, y: it.y + 1 });
+  // 그다음은 가장 가까운 빈 칸 (거리가 같으면 위·왼쪽 먼저)
+  const rest = [];
+  for (let y = 0; y < size.H; y++) for (let x = 0; x < size.W; x++) rest.push({ x, y, k: Math.abs(x - it.x) + Math.abs(y - it.y) });
+  rest.sort((a, b) => a.k - b.k || a.y - b.y || a.x - b.x);
+  const all = [...cand, ...rest].filter((c) => free(c.x, c.y));
+  if (!all.length) return null;
+  const hasPal = !!partnerOf(profile);
+  const palAt = (c) => partnerSpot(profile, { room: room.id, x: c.x, y: c.y });
+  const pick = (hasPal && all.find((c) => palAt(c))) || all[0];
+  return { me: { room: room.id, x: pick.x, y: pick.y }, pal: hasPal ? palAt(pick) : null };
+}
+
+/**
+ * ▶️ 놀기 — 캐릭터를 만들었고 그 방에 그 기기가 놓여 있으면 언제든 장면은 본다.
+ * 🤝 파트너가 있고 그 기기로 오늘 아직 💗를 안 받았으면 💗 +1 (그 기기의 날을 오늘로).
+ * why: 'made' 캐릭터를 먼저 · 'gone' 그 기기가 그 방에 없음(다른 창에서 치움) · 'play' 놀 수 없는 가구
+ * → { ok, kind, heart, mon, bond }  (bond = 놀고 난 뒤의 💗 · 파트너가 없으면 mon null)
+ */
+export function playRule(profile, roomId, u, now) {
+  if (!avatarOf(profile).made) return { ok: false, why: 'made' };
+  const room = houseOf(profile).rooms.find((r) => r.id === roomId);
+  const it = room && room.items.find((i) => i.u === u);
+  if (!it) return { ok: false, why: 'gone' };
+  if (!PLAYS[it.id]) return { ok: false, why: 'play' };
+  const mon = partnerOf(profile);
+  const hp = playOf(profile.homePlay);
+  if (!mon) return { ok: true, kind: it.id, heart: false, mon: null, bond: 0 };
+  const before = bondOf(hp, mon);
+  const day = dayNum(now);
+  // 🔍 Codex 91차 #1: 먼 앞날(DAY_MAX 넘음 — 깨진 시계)엔 주지 않는다 — 적을 때만 줄이면 그날 내내 "지난 날보다 뒤"라 계속 받았다
+  if (!(day > 0 && day <= DAY_MAX && day > (hp.days[it.id] || 0))) return { ok: true, kind: it.id, heart: false, mon, bond: before };
+  hp.days[it.id] = day;
+  hp.bond[String(mon)] = Math.min(BOND_MAX, before + 1);
+  profile.homePlay = hp;
+  return { ok: true, kind: it.id, heart: true, mon, bond: hp.bond[String(mon)] };
+}

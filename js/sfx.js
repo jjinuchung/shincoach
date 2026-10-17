@@ -158,6 +158,14 @@ export const sfx = {
     s.stop(t0 + 0.85);
     tone(c, { freq: 140, freqEnd: 40, type: 'sine', dur: 0.6, gain: 0.25 });
   },
+  /** 🎹 피아노 건반 한 음 (🏠 일상 행동, 2026-10-18) — hz는 건반 주파수 · 맑은 배음을 조금 얹는다 */
+  key(hz) {
+    const c = ac(); if (!c) return;
+    const f = Number(hz);
+    if (!(f >= 100 && f <= 2000)) return;
+    tone(c, { freq: f, type: 'triangle', dur: 0.55, gain: 0.2 });
+    tone(c, { freq: f * 2, type: 'sine', dur: 0.3, gain: 0.04 });
+  },
   /** ✨ 반짝: 높은 음 셋 (하늘 저편의 별) */
   twinkle() {
     const c = ac(); if (!c) return;

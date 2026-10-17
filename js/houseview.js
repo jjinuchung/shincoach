@@ -19,7 +19,7 @@
 // 🔍 Codex 46차 #1: 다른 창에서 돌아와 프로필을 다시 읽으면(app.js visibilitychange) 열린 집을 새로 그린다 — 화면은 옛 2층 10 × 7인데
 //   누르면 새 1층 8 × 6으로 셈해 다른 칸·다른 층에 놓였다. 그린 모양(ui.drawn)과 지금 모양이 다르면 놓기·끌기·칠하기·도구는 하지 않고 다시 그린다(stale)
 import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, storeRule, paintRule, restsOf } from './house.js';
-import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading, restStart, restCancel, restClaim, ownedMonIds, monExp, houseFurnMax, hpOf, monLv, getPartner } from './xp.js';
+import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading, restStart, restCancel, restClaim, ownedMonIds, monExp, houseFurnMax, hpOf, monLv, getPartner, homePlay } from './xp.js';
 import { REST_EXP, REST_MS, CAP_KO, restLeft } from './rest.js';
 import { showRestDone } from './restshow.js'; // ✨ 다 쉰 포켓몬 받기 연출 (3단계)
 import { ROSTER, characterUrl, artUrl, ensureArt } from './pokemon.js';
@@ -28,7 +28,13 @@ import { sfx, unlock as sfxUnlock } from './sfx.js';
 import { avatarOf, partnerSpot, avatarMoveRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수, 2026-10-17)
 import { avatarSvg } from './avatarart.js';
 import { closetBox, closetReset, tagOf } from './avatarview.js'; // 👕 옷장 탭
+import { PLAYS, playSpot, bondOf, chainOf } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
+import { SCENE_OF, playLines } from './playart.js';
+import { showPlay, closePlay } from './playshow.js'; // 🎮 장면
+import { dayNum } from './korean.js'; // 📰 TV 소식은 날마다 바뀐다 (순수)
 
+// 🎮 일상 행동(2026-10-18, 아버님 "이대로 해"): 놓인 📺·🎮·💻·🎹를 누르면 도구 줄 맨 앞에 놀기 단추 → 💗를 먼저 저장(homePlay 트랜잭션) →
+//   🧑·🤝가 기기 옆 칸으로 걸어가고(이 방에 서 있을 때만 · transform만 · 저장 안 함) → 장면(playshow) → 제자리로 돌아와 다시 그린다
 /** 벽 줄 높이 = 칸 × WALL_RATIO */
 export const WALL_RATIO = 1.3;
 /** 방 전체 높이(칸 단위) — size = houseShape().size */
@@ -164,7 +170,9 @@ export function growProgress(profile, id) {
 // ───────────────────── 화면 ─────────────────────
 
 // tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다) · drawn: 그린 집 모양(shapeKey)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false };
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0 };
+// 🎮 playRun: 놀기 번호 — 집을 닫으면 올려서 걷던·보던 놀기를 무효로(닫은 뒤에 장면이 뜨지 않게, Codex 91차 #2)
+// 🎮 bondHold: 노는 동안 방의 💗 칩에 보일 수(놀기 전 수) — 💗는 먼저 저장되지만 칩은 장면이 끝난 뒤에 오르게 · null이면 저장된 수
 // 🧑 meSel: 방에서 캐릭터를 눌러 도구(👕 옷 갈아입기)가 떠 있다
 // 💊 pick: 고르기 창을 연 캡슐 번호 · evoAsk: 깜짝 진화 물음 { u, mon, choices } · outArm: ⏏️ 꺼내기를 한 번 누른 캡슐 · tick: 남은 시간 시계
 /** 지금 보는 방 id — 그 층이 없어졌으면(2층 없는 백업으로 합쳐짐) 1층 */
@@ -216,6 +224,8 @@ export function closeHouse() {
   if (!ui.open) return;
   cancelDrag();
   ui.open = false;
+  ui.playRun += 1; // 🎮 걷던·보던 놀기는 여기서 끝 (💗는 저장된 대로)
+  closePlay();
   if (ui.tick) { clearInterval(ui.tick); ui.tick = 0; }
   $('house').hidden = true;
   markReady();
@@ -401,6 +411,8 @@ function palEl(monId, spot) {
   const e = el('div', 'house-pal');
   Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(10 + spot.y) });
   e.appendChild(monFace(monId, 'house-pal-img'));
+  const n = ui.bondHold !== null ? ui.bondHold : bondOf(getProfileSnapshot().homePlay, monId); // 🎮 💗 사이좋음 — 진화 전 모습의 💗도 이어서
+  if (n > 0) e.appendChild(el('span', 'house-pal-bond', `💗 ${n.toLocaleString('ko-KR')}`));
   return e;
 }
 /** 🧑 캐릭터를 눌렀을 때 — 👕 옷 갈아입기 */
@@ -458,9 +470,107 @@ function toolsEl(it) {
   store.type = 'button';
   store.addEventListener('click', () => { if (stale()) return; ui.sel = 0; run((p) => storeRule(p, rid, it.u), `${d.emoji} ${d.ko}${eul(d.ko)} 서랍에 넣었어요`); });
   if (it.id === HEAL) t.appendChild(restTool(it)); // 💊 캡슐 — 🐾 쉬게 하기 · ⏏️ 꺼내기 · ✨ 받기
+  if (PLAYS[it.id]) { // 🎮 일상 행동 — 맨 앞에 놀기 단추
+    const go = el('button', 'btn btn-primary house-tool', PLAYS[it.id].btn);
+    go.type = 'button';
+    go.addEventListener('click', () => playAt(it));
+    t.appendChild(go);
+  }
   t.appendChild(flip);
   t.appendChild(store);
   return t;
+}
+
+// ───────────────────── 🎮 일상 행동 (2026-10-18) ─────────────────────
+
+/** 🚶 걸어가는 시간(ms) */
+const WALK_MS = 600;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+/** 진화 줄 이름 — 명단에 없는 모습은 뺀다 */
+const rosterKo = (id) => (ROSTER.find((x) => x.id === id) || {}).ko || '';
+
+/**
+ * 🚶 캐릭터·파트너를 놀 칸으로 (transform만 — 구형 태블릿 · 저장 안 함) → 돌아오는 함수.
+ * 캐릭터가 이 방에 없거나(다른 층) 갈 칸이 없으면 걷지 않는다
+ */
+async function walk(me, spot) {
+  const box = document.querySelector('#house-body .house-room');
+  const meN = box && box.querySelector('.house-me');
+  const stay = async () => {};
+  if (!box || !meN || !spot || !me.spot || me.spot.room !== spot.me.room) return stay;
+  const size = sz();
+  const W = box.clientWidth;
+  const H = box.clientHeight;
+  const moved = [];
+  const go = (node, from, to) => {
+    if (!node || !from || !to) return;
+    const a = meBoxOf(size, from.x, from.y);
+    const b = meBoxOf(size, to.x, to.y);
+    node.style.transition = `transform ${WALK_MS}ms ease-in-out`;
+    node.style.transform = `translate(${((b.left - a.left) / 100) * W}px, ${((b.top - a.top) / 100) * H}px)`;
+    node.style.zIndex = String(10 + to.y);
+    moved.push(node);
+  };
+  go(meN, me.spot, spot.me);
+  const pid = getPartner();
+  go(box.querySelector('.house-pal'), pid ? partnerSpot(getProfileSnapshot(), me.spot) : null, spot.pal);
+  if (!moved.length) return stay;
+  await wait(WALK_MS + 60);
+  return async () => {
+    if (!ui.open) return;
+    for (const n of moved) if (n.isConnected) n.style.transform = '';
+    await wait(WALK_MS + 60);
+  };
+}
+
+/**
+ * ▶️ 놀기 — 💗는 먼저 저장(저장된 프로필로 한 트랜잭션 — 두 창이 같은 날 두 번 받지 못하게) → 걸어가기 → 장면 → 돌아오기 → 다시 그리기.
+ * 노는 동안(ui.busy)은 끌기·다른 단추를 받지 않는다 · 장면이 깨져도 방은 다시 그린다
+ */
+async function playAt(it) {
+  if (ui.busy || stale()) return;
+  sfxUnlock();
+  if (!avatarOf(getProfileSnapshot()).made) { say(WHY.meMade); return; }
+  const rid = roomId();
+  const run = ++ui.playRun;
+  // 이 놀기가 아직 살아 있나 — 집을 닫으면(closeHouse가 번호를 올림) 걷기·장면을 이어 가지 않는다 (Codex 91차 #2)
+  const live = () => ui.open && ui.playRun === run;
+  ui.busy = true;
+  try {
+    let r = null;
+    try { r = await homePlay(rid, it.u); } catch { r = null; }
+    if (!live()) return; // 💗는 저장된 대로 둔다
+    if (!r || !r.ok) {
+      const why = r && r.why;
+      ui.msg = WHY[why === 'made' ? 'meMade' : why] || WHY.save;
+      return;
+    }
+    ui.sel = 0; ui.meSel = false; ui.msg = '';
+    ui.bondHold = r.heart ? r.bond - 1 : null;
+    render();
+    const pf = getProfileSnapshot();
+    const me = avatarOf(pf);
+    const rm = room();
+    const scene = SCENE_OF[r.kind];
+    const mon = r.mon ? { ko: monKo(r.mon), url: characterUrl(r.mon) || artUrl(r.mon) || '' } : null;
+    ui.msg = playLines(scene, { mon: mon ? mon.ko : '', name: me.name, heart: r.heart }).end;
+    try {
+      const back = await walk(me, playSpot(pf, rid, it.u));
+      if (!live()) return;
+      await showPlay(scene, {
+        look: me.look, name: me.name, mon,
+        wall: (paintById(rm && rm.wall) || PAINT_BASE.wall).color, floor: (paintById(rm && rm.floor) || PAINT_BASE.floor).color,
+        lv: r.mon ? monLv(r.mon) : 0, bond: r.bond, chain: r.mon ? chainOf(r.mon).map(rosterKo).filter(Boolean) : [],
+        heart: r.heart, day: dayNum(Date.now()),
+      });
+      if (!live()) return;
+      await back();
+    } catch { /* 장면이 깨져도 아래(finally)에서 다시 그린다 */ }
+  } finally {
+    ui.busy = false;
+    ui.bondHold = null;
+    if (ui.open) render();
+  }
 }
 
 /** 🗄️ 서랍 — 가졌지만 안 놓은 가구 (끌어다 놓거나, 누른 뒤 방을 눌러 놓는다) */
@@ -572,6 +682,7 @@ const WHY = {
   meMade: '먼저 👕 옷장에서 내 캐릭터를 만들어요',
   meUnknown: '고를 수 없는 모습이에요 — 다시 골라 봐요',
   meSpot: '거기는 설 수 없어요 — 가구가 있거나 방 밖이에요',
+  play: '그 가구로는 놀 수 없어요', // 🎮 일상 행동
 };
 /** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다
  *  alias = 이 물건에서 다르게 말할 why ({ owned: 'grown' } — 늦은 창의 넓히기가 "칠할 수 있어요"로 나왔다, Codex 46차 #3) */

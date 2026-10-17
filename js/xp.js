@@ -22,6 +22,7 @@ import {
 } from './db.js';
 import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진우네 집 규칙 (순수)
 import { copyAvatar } from './avatar.js'; // 🧑 진우 캐릭터 (순수)
+import { copyPlay, playRule } from './homeplay.js'; // 🎮 일상 행동 (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule } from './korean.js'; // 📚 국어 별·💰 규칙 (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
@@ -368,7 +369,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -881,6 +882,10 @@ export function restCancel(u, want) {
  *  want = 진우가 본 휴식 id(다르면 'changed' — 옛 창의 "그대로 두기"가 새 휴식을 받지 않게, Codex 47차 #2) */
 export function restClaim(u, decide, want) {
   return houseDo((p) => restClaimRule(p, u, Date.now(), decide, HP.max, evolveRule, want));
+}
+/** 🎮 방의 기기로 놀기 — 💗는 저장된 프로필로 한 트랜잭션에서(두 창이 같은 날 두 번 받지 못하게) · 날은 트랜잭션 안의 시각으로 */
+export function homePlay(roomId, u) {
+  return houseDo((p) => playRule(p, roomId, u, Date.now()));
 }
 /** 📚 국어 글 한 편을 다 읽었다 — 잘못 읽기 횟수 + 받을 별이 있으면 별·💰를 저장된 프로필로 한 트랜잭션에서(houseDo = applyHouseRule = mutateProfile)
  *  ids = 지금 있는 카드 id · 날은 트랜잭션 안의 시각으로 센다(창을 연 날이 아니라) */
