@@ -3,7 +3,7 @@ import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
   applyEssayFixes, getMath, updateMath, updateItem, saidOf, sentenceKey,
 } from './db.js';
-import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK } from './mathprog.js';
+import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK, LOG_MAX } from './mathprog.js';
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes, essayKey } from './essay.js';
 import { countPlayableCues, playableStarts } from './srt.js';
@@ -23,6 +23,7 @@ import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport, rea
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
 import { writeTodo } from './korwrite.js'; // ✍️ 국어 서술형 — 답장 기다리는 글 수 (v237)
 import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질문 카드도 화면·복사문처럼 (v256)
+import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
 
 const $ = (id) => document.getElementById(id);
 
@@ -439,6 +440,16 @@ export async function renderStats() {
     cr.appendChild(row);
     main.appendChild(cr);
   }
+
+  // 📈 주간 흐름 (2026-10-18 v287, 아버님 "이대로 진행") — 과목마다 최근 7일씩 4주 · 지난주와 견준 ↑↓ · 📤에도 같은 표(usage/weekly.md)
+  //    표 하나 못 그려도 나머지 기록은 그대로 (새 칸 하나 때문에 📊가 비지 않게)
+  try {
+    const cw = card('📈 주간 흐름');
+    cw.insertAdjacentHTML('beforeend', weeklyHtml(weeklyModel({ daily, math, profile: getProfileSnapshot(), logMax: LOG_MAX }, today)));
+    main.appendChild(cw);
+    // 폰처럼 좁으면 표가 옆으로 밀린다 — 처음엔 최근 주(오른쪽 끝)가 보이게
+    for (const s of cw.querySelectorAll('.wk-scroll')) s.scrollLeft = s.scrollWidth;
+  } catch (e) { console.warn('📈 주간 흐름 못 그림:', e); }
 
   const c1 = card('이번 주 (최근 7일)');
   const sum = el('div', 'stats-summary');

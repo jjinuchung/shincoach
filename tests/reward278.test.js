@@ -139,7 +139,8 @@ test('📤 gatherFiles: 보상 글·실패 글을 주면 reward/날짜.md · usa
 test('🔌 연결: 보내기가 보상 글·실패 글을 넘김 · 실패를 적는 네 곳(열쇠 없음·기록 못 읽음·인터넷 없음·GitHub 실패) · 앱 셸', () => {
   const u = src('js/upload.js');
   const send = u.slice(u.indexOf('async function sendOnce(force) {'), u.indexOf('/** 저절로 보내기'));
-  assert.ok(send.includes('getReward: rewardNow, uploadLog: logTextNow(today), today });'));
+  // v287부터 📈 주간 흐름(getWeekly)이 보상 글과 실패 글 사이에 든다
+  assert.ok(send.includes('getReward: rewardNow, getWeekly: weeklyNow, uploadLog: logTextNow(today), today });'));
   assert.match(u, /function logTextNow\(today\) \{\s*try \{ return uploadLogText\(readJson\(LOG_KEY\), today\); \} catch \{ return null; \}/, '실패 글이 깨져도 나머지는 올린다');
   // 깨진 실패 기록도 글로는 던지지 않는다
   assert.doesNotThrow(() => uploadLogText({ fails: [{ day: 5, why: 'a' }, { day: T, why: {} }, { day: T, why: '좋은 줄', first: 'x' }] }, T));

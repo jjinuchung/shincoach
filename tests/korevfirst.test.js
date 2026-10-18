@@ -162,16 +162,22 @@ test('📤 다 읽을 때 한 줄 (korFinishRule opts.read): 카드·날·별은
   const p = pf();
   const rd = { t: T0 - 300000, s: 240, a: 60, n: 4, f: 3, x: 0, e: 1, h: 0, m: '' };
   korFinishRule(p, 'K42', T0, {}, IDS, 0, { read: rd });
-  assert.deepEqual(p.korReads, [{ c: 'K42', t: T0 - 300000, d: D0, s: 240, a: 60, n: 4, f: 3, x: 0, e: 1, h: 0, g: 1, m: '' }]);
+  // y = 🧠 아는 것으로 답하기 고른 수 (v287 📈 주간 흐름 — 안 골랐어도 0을 적는다: 적기 시작한 뒤의 읽기라는 표시)
+  assert.deepEqual(p.korReads, [{ c: 'K42', t: T0 - 300000, d: D0, s: 240, a: 60, n: 4, f: 3, x: 0, e: 1, h: 0, g: 1, m: '', y: 0 }]);
   korFinishRule(p, 'K42', T0 + 1000, {}, IDS, 0, { read: rd });
   assert.equal(p.korReads.length, 1, '같은 열쇠는 한 줄 — [다시 저장하기]');
   korFinishRule(p, 'K42', T0 + 3600000, { make: 1 }, IDS, 0, { read: { ...rd, t: T0 + 3000000, f: 2, x: 1 } });
   assert.deepEqual(p.korReads.map((r) => [r.g, r.x]), [[1, 0], [0, 1]], '같은 날 다시 읽음 — 별 없이(g 0)도 적는다');
+  assert.deepEqual(p.korReads.map((r) => r.y), [0, 0], 'make만 골랐으면 🧠은 0');
+  korFinishRule(p, 'K42', T0 + 7200000, { know: 1, make: 1 }, IDS, 0, { read: { ...rd, t: T0 + 6000000 } });
+  assert.equal(p.korReads[p.korReads.length - 1].y, 1, '🧠 아는 것으로 답하기를 고른 수');
+  korFinishRule(p, 'K42', T0 + 7300000, {}, IDS, 0, { read: { ...rd, t: T0 + 6000000 } }); // 같은 열쇠 — 줄 수 그대로
+  assert.equal(p.korReads.length, 3);
   korFinishRule(p, 'K42', T0, {}, IDS, 0, { read: { ...rd, t: T0 + 5, n: 9 } });
   korFinishRule(p, 'K42', T0, {}, IDS, 0, { read: 'x' });
   korFinishRule(p, 'K999', T0, {}, IDS, 0, { read: { ...rd, t: T0 + 7 } });
   korFinishRule(p, 'K43', T0, {}, IDS, 0);
-  assert.equal(p.korReads.length, 2, '깨진 기록 · 모르는 카드 · read 없음은 안 적음');
+  assert.equal(p.korReads.length, 3, '깨진 기록 · 모르는 카드 · read 없음은 안 적음 (🧠 줄까지 셋)');
   // 읽은 기록이 깨져 있어도 별·💰는 그대로
   const q = pf({ korReads: 'bad' });
   const r = korFinishRule(q, 'K44', T0, {}, IDS, 0, { read: rd });

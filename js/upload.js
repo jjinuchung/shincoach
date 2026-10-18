@@ -302,7 +302,7 @@ export function unb64(s) {
  * usagePlaces(있으면) = 🕒 앱 사용 기록의 자리 목록(usage.PLACES) — 하루 기록(days)으로 만든다 (v272)
  * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, uploadLog, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, uploadLog, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
@@ -310,6 +310,8 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
   const korRep = getKorReport ? await getKorReport(today, days || []) : null;
   // 🎮 보상 쪽 기록(v278)은 못 만들어도 나머지는 그대로 올린다 — 새 기록 하나 때문에 📤 전체가 멈추지 않게 (🕒 사용 기록과 같은 원칙)
   const reward = getReward ? await Promise.resolve().then(() => getReward(today, days || [])).catch(() => null) : null;
+  // 📈 주간 흐름(v287)도 못 만들면 빼고 나머지는 그대로
+  const weekly = getWeekly ? await Promise.resolve().then(() => getWeekly(today, days || [], math)).catch(() => null) : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
@@ -319,8 +321,16 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(typeof korRep === 'string' && korRep ? [{ path: `korean/${today}.md`, text: korRep }] : []), // 📚 국어 요약 (v254)
     ...(usagePlaces ? usageFiles(days, today, usagePlaces) : []), // 🕒 앱 사용 기록 (v272)
     ...(typeof reward === 'string' && reward ? [{ path: `reward/${today}.md`, text: reward }] : []), // 🎮 보상 쪽 기록 (v278)
+    ...(typeof weekly === 'string' && weekly ? [{ path: 'usage/weekly.md', text: weekly }] : []), // 📈 주간 흐름 — 📊 카드와 같은 표 (v287)
     ...(typeof uploadLog === 'string' && uploadLog ? [{ path: 'usage/upload-log.md', text: uploadLog }] : []), // 📤 올리기 실패 기록 (v278)
   ];
+}
+
+/** 📈 주간 흐름 글 (v287) — 📊 카드와 같은 표 · 국어 기록은 저장된 프로필에서 · 프로필이 없으면 국어 칸은 — */
+async function weeklyNow(today, days, math) {
+  const [{ getProfile }, wk, prog] = await Promise.all([import('./db.js'), import('./weekly.js'), import('./mathprog.js')]);
+  const p = await getProfile();
+  return wk.weeklyMd(wk.weeklyModel({ daily: days, math, profile: p || {}, logMax: prog.LOG_MAX }, today));
 }
 
 /** 🎮 보상 쪽 기록 글 — 저장된 프로필의 누적을 오늘 것으로 이 기기에 적어 두고(최근 SNAP_DAYS일), 날마다 차이를 글로. 프로필이 없으면 null */
@@ -623,7 +633,7 @@ async function sendOnce(force) {
     if (usage) await usage.flushUsage().catch(() => {});
     // 🎮 저장을 기다리는 프로필 증분도 먼저 — 보상 쪽 누적(rewardNow)이 저장된 프로필을 읽는다 (Codex 86차 B · 실패해도 그대로 올린다)
     await import('./xp.js').then((xp) => xp.flushProfile()).catch(() => {});
-    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, getReward: rewardNow, uploadLog: logTextNow(today), today });
+    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, getReward: rewardNow, getWeekly: weeklyNow, uploadLog: logTextNow(today), today });
   } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
