@@ -3,7 +3,8 @@
 // 만든 뒤에는 갈아입기(누르면 바로 저장) · 📛 이름표 · 👕 옷 가게(두 번 눌러 사면 바로 입는다 — 되팔지 않으니 두 번)
 // 규칙은 avatar.js(순수), 저장은 houseview의 run(= xp.houseDo, 저장된 프로필로 한 트랜잭션) — 이 파일은 그리고 잇기만.
 // 방 안의 캐릭터(서기·끌기·🤝 파트너)는 houseview가 그린다 — 끌기가 가구와 한 줄기라서.
-import { SKINS, HAIRS, HAIR_COLORS, EYES, WEAR, SLOT_KO, SLOT_EMPTY_OK, LOOK_BASE, NAME_MAX, wearById, avatarOf, wearBuyCheck, wearCost, avatarMakeRule, avatarLookRule, avatarNameRule, wearBuyRule } from './avatar.js';
+// 🧢 v293: 🧤 장갑 칸 · [🧢 트레이너 차림 한 번에 입기] — 진우가 누를 때만(앱이 모습을 바꾸지 않는다) · 이미 그 차림이면 숨김
+import { SKINS, HAIRS, HAIR_COLORS, EYES, WEAR, SLOT_KO, SLOT_EMPTY_OK, LOOK_BASE, NAME_MAX, OUTFITS, wearById, avatarOf, wearBuyCheck, wearCost, avatarMakeRule, avatarLookRule, avatarNameRule, wearBuyRule, outfitRule, wearingOutfit } from './avatar.js';
 import { avatarSvg } from './avatarart.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 
@@ -17,7 +18,7 @@ const LOOK_GROUPS = [
   { key: 'eyes', ko: '눈', list: EYES },
 ];
 /** 옷 고르기 칸 차례 */
-const WEAR_SLOTS = ['top', 'bottom', 'shoes', 'hat', 'bag', 'cape'];
+const WEAR_SLOTS = ['top', 'bottom', 'shoes', 'gloves', 'hat', 'bag', 'cape'];
 
 // draft: 만들기 화면에서 고르는 중인 모습(저장 전) · buyArm: 한 번 누른 가게 옷 · uid: 그림마다 다른 번호
 const cs = { draft: null, buyArm: '', uid: 0 };
@@ -65,9 +66,9 @@ export function wearShortText(c) {
   return parts.join(', ');
 }
 /** 입었을 때의 말 — 모자는 썼어요 · 신발은 신었어요 · 가방은 멨어요 · 망토는 둘렀어요 (순수) */
-export const WEAR_VERB = { top: '입었어요', bottom: '입었어요', shoes: '신었어요', hat: '썼어요', bag: '멨어요', cape: '둘렀어요' };
+export const WEAR_VERB = { top: '입었어요', bottom: '입었어요', shoes: '신었어요', gloves: '꼈어요', hat: '썼어요', bag: '멨어요', cape: '둘렀어요' };
 /** 벗었을 때의 말 (비울 수 있는 곳만) */
-export const OFF_VERB = { hat: '벗었어요', bag: '내려놓았어요', cape: '벗었어요' };
+export const OFF_VERB = { gloves: '벗었어요', hat: '벗었어요', bag: '내려놓았어요', cape: '벗었어요' };
 const euro = (w) => (jong(w) > 0 && jong(w) !== 8 ? '으로' : '로');
 /** 이름표에 보일 말 — 비었으면 "나" */
 export const tagOf = (name) => name || '나';
@@ -156,7 +157,7 @@ function makeBox(ctx) {
   done.addEventListener('click', async () => {
     sfxUnlock();
     const chosen = {};
-    for (const k of ['skin', 'hair', 'hairColor', 'eyes', 'top', 'bottom', 'shoes', 'hat', 'bag', 'cape']) chosen[k] = look[k];
+    for (const k of ['skin', 'hair', 'hairColor', 'eyes', 'top', 'bottom', 'shoes', 'gloves', 'hat', 'bag', 'cape']) chosen[k] = look[k];
     const r = await runQ(ctx, (p) => avatarMakeRule(p, chosen, inp.value, Date.now()),
       (res) => (res.gift ? `🎉 내 캐릭터가 생겼어요! 🎁 첫 선물 ${wearById(res.gift).ko}${eul(wearById(res.gift).ko)} 받아서 신었어요 — 🏠 방에 서 있어요` : '🎉 내 캐릭터가 생겼어요! 🏠 방에 서 있어요'));
     if (r && r.ok) { cs.draft = null; sfx.ding(); }
@@ -170,7 +171,7 @@ function makeBox(ctx) {
     const ids = WEAR.filter((w) => w.slot === slot && w.free).map((w) => w.id);
     groups.appendChild(group(SLOT_KO[slot], ids.map((id) => optBtn(look, slot, id, wearById(id).ko, look[slot] === id, pick(slot)))));
   }
-  groups.appendChild(el('p', 'house-note', '모자·가방·망토 같은 옷은 만든 뒤에 👕 옷 가게에서 살 수 있어요.'));
+  groups.appendChild(el('p', 'house-note', '다 만들면 옷장에 🧢 트레이너 차림이 있어요. 다른 모자·가방·망토는 👕 옷 가게에서 살 수 있어요.'));
   wrap.appendChild(groups);
   return wrap;
 }
@@ -185,6 +186,15 @@ function dressBox(ctx, pf, a) {
   home.type = 'button';
   home.addEventListener('click', () => ctx.goTab('room', a.spot ? a.spot.room : undefined)); // 캐릭터가 선 층으로 (Codex 90차)
   box.appendChild(home);
+  // 🧢 한 번에 입기 — 옷만 바꾼다(얼굴은 그대로) · 이미 그 차림이면 숨긴다 (v293)
+  for (const o of OUTFITS) {
+    if (wearingOutfit(pf, look, o.id)) continue;
+    const b = el('button', 'btn closet-outfit', `${o.emoji} ${o.ko} 한 번에 입기`);
+    b.type = 'button';
+    // 입힐 옷은 저장하는 순간의 프로필로 고른다 — 그린 때와 운동화가 달라도 차림 전체가 입혀지게 (🔍 Codex 99차 #1)
+    b.addEventListener('click', () => { sfxUnlock(); runQ(ctx, (p) => outfitRule(p, o.id, Date.now()), `${o.emoji} ${o.ko}${euro(o.ko)} 갈아입었어요`); });
+    box.appendChild(b);
+  }
   wrap.appendChild(box);
   const groups = el('div', 'closet-groups');
   for (const g of LOOK_GROUPS) {

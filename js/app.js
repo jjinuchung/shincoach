@@ -20,6 +20,7 @@ import { initParcel, showParcelIfAny, retryParcel } from './parcel.js'; // 📦 
 import { autoSend } from './upload.js'; // 📤 Claude에게 기록 보내기 (비공개 저장소, 열쇠는 📊에서 — 없으면 아무것도 안 한다)
 import { initUsage, setUsageView } from './usage.js'; // 🕒 앱 사용 기록 — 화면마다 머문 초·쓴 때·연 수 (📤로만, v272)
 import { initBlackbox } from './blackbox.js'; // 🛑 앱이 저절로 꺼진 때 남기기 — 📤 usage/crash-log.md로만 (v292)
+import { loadHatMarks } from './hatmarks.js'; // 🧢 받아 둔 지우 모자 무늬를 그림에 (v293)
 
 const views = {
   home: document.getElementById('view-home'),
@@ -161,6 +162,7 @@ window.addEventListener('shincoach:dbversionchange', () => showError('새 버전
 window.addEventListener('unhandledrejection', (e) => showError(`오류: ${(e.reason && e.reason.message) || e.reason}`));
 
 async function main() {
+  try { loadHatMarks(); } catch { /* 무늬가 없어도 모자는 앞판까지 그린다 */ }
   // 버튼 연결을 가장 먼저 — 뒤의 어떤 단계가 실패해도 UI는 동작해야 함
   initPlayer({ showView, onTakeTool: openTakeTool });
   initStats({ showView, requirePin });

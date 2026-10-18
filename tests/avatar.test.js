@@ -29,9 +29,9 @@ const SPECIAL = WEAR.filter((w) => w.special);
 
 // ───────────────────── 목록 ─────────────────────
 
-test('🧑 목록: 처음 만들기는 피부 4 · 머리 모양 4 · 머리색 5 · 눈 3 · 기본 윗옷 3 · 바지 3(무료) · 옷은 a_ · 겹치는 id 없음 · ITEMS 등록부 밖 · 집 물건과 안 겹침', () => {
+test('🧑 목록: 처음 만들기는 피부 4 · 머리 모양 4 · 머리색 5 · 눈 3 · 기본 윗옷 3 + 🧢 트레이너 조끼 · 바지 3(무료) · 트레이너 모자·장갑·배낭도 무료(v293) · 옷은 a_ · 겹치는 id 없음 · ITEMS 등록부 밖 · 집 물건과 안 겹침', () => {
   assert.deepEqual([SKINS.length, HAIRS.length, HAIR_COLORS.length, EYES.length], [4, 4, 5, 3]);
-  assert.deepEqual(['top', 'bottom', 'shoes'].map((s) => FREE.filter((w) => w.slot === s).length), [3, 3, 1]);
+  assert.deepEqual(['top', 'bottom', 'shoes', 'gloves', 'hat', 'bag', 'cape'].map((s) => FREE.filter((w) => w.slot === s).length), [4, 3, 1, 1, 1, 1, 0]);
   const ids = WEAR.map((w) => w.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const w of WEAR) {
@@ -47,7 +47,7 @@ test('🧑 목록: 처음 만들기는 피부 4 · 머리 모양 4 · 머리색 
   for (const list of [SKINS, HAIR_COLORS]) for (const x of list) assert.match(x.color, /^#[0-9a-f]{6}$/i);
   // 처음 모습은 무료로만
   for (const slot of SLOTS) if (LOOK_BASE[slot]) assert.ok(wearById(LOOK_BASE[slot]).free, slot);
-  assert.deepEqual(SLOTS.filter((s) => !LOOK_BASE[s]), SLOT_EMPTY_OK, '모자·가방·망토만 비운 채로 시작');
+  assert.deepEqual(SLOTS.filter((s) => !LOOK_BASE[s]), SLOT_EMPTY_OK, '장갑·모자·가방·망토만 비운 채로 시작');
 });
 
 test('👕 값 (아버님 기본안): 윗옷 무늬 💰300~500 · 모자 💰400~600 · 신발·가방 💰400~800 · ✨ 특별 셋은 💰 + 🔷·🔶(🔷는 집처럼 MATH_RATE배) · 🎁 첫 운동화도 가게에 있다', () => {
@@ -264,13 +264,14 @@ test('👕 옷장 (avatarview 순수 부분): 저장은 차례대로 — 앞 일
   assert.equal(await q(() => 'c'), 'c', '앞 일이 실패해도 다음 일은 한다');
   // 옷장·가게
   const p = pf(0, { a_hat_cap: 1, a_cape: 1 });
-  assert.deepEqual(closetOf(p, 'hat'), ['', 'a_hat_cap']);
+  assert.deepEqual(closetOf(p, 'hat'), ['', 'a_hat_trainer', 'a_hat_cap'], '🧢 트레이너 모자는 처음부터 (v293)');
   assert.deepEqual(closetOf(p, 'top'), WEAR.filter((w) => w.slot === 'top' && w.free).map((w) => w.id), '윗옷은 비울 수 없다');
-  assert.deepEqual(closetOf(pf(), 'bag'), ['']);
+  assert.deepEqual(closetOf(pf(), 'bag'), ['', 'a_bag_trainer']);
+  assert.deepEqual(closetOf(pf(), 'gloves'), ['', 'a_glove_green']);
   const shop = shopOf(p);
   assert.ok(!shop.plain.includes('a_hat_cap') && !shop.special.includes('a_cape') && shop.special.includes('a_crown'));
   assert.ok(![...shop.plain, ...shop.special].some((id) => wearById(id).free), '처음부터 있는 옷은 가게에 없다');
-  assert.deepEqual(SLOTS.map((s) => WEAR_VERB[s]), ['입었어요', '입었어요', '신었어요', '썼어요', '멨어요', '둘렀어요']);
+  assert.deepEqual(SLOTS.map((s) => WEAR_VERB[s]), ['입었어요', '입었어요', '신었어요', '꼈어요', '썼어요', '멨어요', '둘렀어요']);
 });
 
 // ───────────────────── 진짜 저장 경로 (fakeidb) ─────────────────────

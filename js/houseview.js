@@ -28,6 +28,7 @@ import { sfx, unlock as sfxUnlock } from './sfx.js';
 import { avatarOf, partnerSpot, avatarMoveRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수, 2026-10-17)
 import { avatarSvg } from './avatarart.js';
 import { closetBox, closetReset, tagOf } from './avatarview.js'; // 👕 옷장 탭
+import { syncHatMarks } from './hatmarks.js'; // 🧢 지우 모자 무늬 받기 (v293)
 import { PLAYS, playSpot, bondOf, chainOf, bondTier, palHome } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
 import { SCENE_OF, playLines } from './playart.js';
 import { showPlay, closePlay } from './playshow.js'; // 🎮 장면
@@ -203,6 +204,8 @@ export function openHouse(opts = {}) {
   $('house').hidden = false;
   if (!ui.tick) ui.tick = setInterval(tickRests, 1000);
   render();
+  // 🧢 지우 모자 무늬 받기 (v293 — 비공개 저장소에서 10분에 한 번까지) · 새로 받았으면 다시 그린다
+  syncHatMarks().then((changed) => { if (changed && ui.open) render(); }).catch(() => {});
 }
 
 export function closeHouse() {

@@ -3134,6 +3134,7 @@ button { font-family: inherit; }
 .closet-name-input { width: 8.5em; padding: 4px 8px; border: 2px solid var(--border); border-radius: 10px; font: inherit; color: var(--text); background: #fff; }
 .closet-make { width: 100%; }
 .closet-home { width: 100%; }
+.closet-outfit { width: 100%; border-color: #e5484d; background: #fff1f1; color: #b4232a; font-weight: 800; } /* 🧢 한 번에 입기 (v293) */
 .closet-groups { display: grid; gap: 10px; min-width: 0; }
 .closet-opts { display: flex; flex-wrap: wrap; gap: 6px; }
 .closet-opt { display: grid; justify-items: center; align-content: start; gap: 2px; width: 74px; padding: 4px 2px 6px; border: 2px solid var(--border); border-radius: 12px; background: #fff; font: inherit; color: inherit; }

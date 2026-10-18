@@ -7,6 +7,9 @@
 //  ③ 👕 옷 가게: 윗옷 무늬 💰300~500 · 모자 💰400~600 · 신발·가방 💰400~800 · ✨ 특별한 옷 셋은 💰 + 🔷·🔶(집 기기처럼 공부로만)
 //  ④ 가구처럼 두 번 눌러 사고 되팔지 않는다 · 산 옷은 몇 번이든 무료로 갈아입는다 · 🎁 처음 만들면 첫 운동화 하나
 //  ⑤ 아이 화면에 모은 수·남은 수 셈은 없다
+// 🧢 v293 (2026-10-18 아버님 "포켓몬 주인공처럼" → 지우(애니) 느낌 · 처음부터 무료 · 진우가 직접 입게):
+//  트레이너 모자·조끼·손가락 장갑·배낭을 free로 · 장갑 칸(gloves) 새로 · OUTFITS "한 번에 입기"는 진우가 누를 때만(앱이 모습을 바꾸지 않는다)
+//  모자 앞 무늬는 아버님 "만화에 있는 무늬 중 하나로 · 여러 무늬를 사게" → 무늬 그림은 공개 저장소에 두지 않고 비공개 저장소에서 받는다(hatmarks.js · avatarart 「지우 모자 무늬」)
 import { houseOf, houseShape, takenCells } from './house.js'; // 🏠 서 있을 빈 칸 (순수 — house.js는 avatar.js를 import하지 않는다)
 
 /** 피부색 */
@@ -39,11 +42,11 @@ export const EYES = [
 ];
 
 /** 입는 곳 — 그리는 차례와는 다르다(그림은 avatarart.js) */
-export const SLOTS = ['top', 'bottom', 'shoes', 'hat', 'bag', 'cape'];
+export const SLOTS = ['top', 'bottom', 'shoes', 'gloves', 'hat', 'bag', 'cape'];
 /** 입는 곳 이름 */
-export const SLOT_KO = { top: '윗옷', bottom: '바지', shoes: '신발', hat: '모자', bag: '가방', cape: '망토' };
+export const SLOT_KO = { top: '윗옷', bottom: '바지', shoes: '신발', gloves: '장갑', hat: '모자', bag: '가방', cape: '망토' };
 /** 비워 둘 수 있는 곳(안 입어도 된다) — 윗옷·바지·신발은 늘 하나 */
-export const SLOT_EMPTY_OK = ['hat', 'bag', 'cape'];
+export const SLOT_EMPTY_OK = ['gloves', 'hat', 'bag', 'cape'];
 
 /** 집 값과 같은 꼴의 스톤 — 🔷는 MATH_RATE(house.js 5)배: 🔷가 🔶보다 훨씬 쉽게 모인다(아버님 집 넓히기 결정과 같게) */
 const st = (m, e) => ({ stone_math: m * 5, stone_english: e });
@@ -61,6 +64,11 @@ export const WEAR = [
   { id: 'a_bot_jean', slot: 'bottom', ko: '청바지', free: true, art: { color: '#4f7cc2' } },
   { id: 'a_bot_beige', slot: 'bottom', ko: '베이지 바지', free: true, art: { color: '#c9b48a' } },
   { id: 'a_shoe_basic', slot: 'shoes', ko: '기본 신발', free: true, art: { color: '#8b909a' } },
+  // 🧢 트레이너 차림 (v293 — 처음부터 무료 · 지우 느낌의 색과 모양 · mark 모자 앞 무늬 · trim 깃·소매 띠)
+  { id: 'a_hat_trainer', slot: 'hat', ko: '관동 모자', free: true, art: { kind: 'ash', color: '#cc3a30', panel: '#f0f2ee', button: '#cc3a30', mark: 'kanto' } },
+  { id: 'a_top_trainer', slot: 'top', ko: '트레이너 조끼', free: true, art: { color: '#26292f', ink: '#2f6fd6', trim: '#ffffff', pattern: 'vest' } },
+  { id: 'a_glove_green', slot: 'gloves', ko: '손가락 장갑', free: true, art: { color: '#22a06b', ink: '#157a50' } },
+  { id: 'a_bag_trainer', slot: 'bag', ko: '트레이너 배낭', free: true, art: { color: '#3f9a5b', ink: '#2c6e41' } },
   // 🎁 첫 선물 (가게에서도 산다)
   { id: 'a_shoe_run', slot: 'shoes', ko: '빨간 운동화', price: 400, gift: true, art: { color: '#ffffff', ink: '#e5484d' } },
   // 👕 옷 가게
@@ -73,6 +81,13 @@ export const WEAR = [
   { id: 'a_hat_straw', slot: 'hat', ko: '밀짚모자', price: 600, art: { color: '#e9c46a', ink: '#e5484d' } },
   { id: 'a_shoe_boots', slot: 'shoes', ko: '장화', price: 400, art: { color: '#ffd23f', ink: '#c99a00' } },
   { id: 'a_bag_back', slot: 'bag', ko: '배낭', price: 700, art: { color: '#f08c00', ink: '#b35f00' } },
+  // 🧢 지우 모자 — 시리즈마다 하나 (v293 · 관동 모자는 처음부터) · 색은 애니 캡처·공식 아트에서 잰 값 · 무늬는 이름만(그림은 비공개 저장소)
+  { id: 'a_hat_hoenn', slot: 'hat', ko: '호연 모자', price: 600, art: { kind: 'ash', color: '#cc4b40', panel: '#433f47', button: '#433f47', mark: 'hoenn' } },
+  { id: 'a_hat_sinnoh', slot: 'hat', ko: '신오 모자', price: 600, art: { kind: 'ash', color: '#cc4b40', panel: '#433f49', panelShape: 'wide', button: '#433f49', mark: 'sinnoh' } },
+  { id: 'a_hat_unova', slot: 'hat', ko: '하나 모자', price: 600, art: { kind: 'ash', color: '#cc4b40', panel: '#e4f4f0', button: '#cc4b40', mark: 'unova' } },
+  { id: 'a_hat_kalos', slot: 'hat', ko: '칼로스 모자', price: 600, art: { kind: 'ash', color: '#dc543c', bill: '#e6eef2', button: '#dc543c', mark: 'kalos' } },
+  { id: 'a_hat_alola', slot: 'hat', ko: '알로라 모자', price: 600, art: { kind: 'ash', color: '#d9504a', bill: '#f4f6f8', billEdge: '#3a7cc6', button: '#d9504a', mark: 'alola' } },
+  { id: 'a_hat_world', slot: 'hat', ko: '월드 모자', price: 600, art: { kind: 'ash', color: '#e0504a', bill: '#eeeeee', button: '#e0504a', mark: 'world' } },
   // ✨ 특별한 옷 — 💰 + 🔷·🔶 (집 기기처럼 "제대로 배웠나"에서만 나오는 스톤)
   { id: 'a_cape', slot: 'cape', ko: '영웅 망토', price: 2000, stones: st(1, 1), special: true, art: { color: '#7c3aed', ink: '#facc15' } },
   { id: 'a_top_galaxy', slot: 'top', ko: '별빛 티셔츠', price: 2000, stones: st(2, 1), special: true, art: { color: '#1e1b4b', ink: '#fde68a', pattern: 'galaxy' } },
@@ -92,7 +107,15 @@ export function wearById(id) {
   return typeof id === 'string' && own(WEAR_BY, id) ? WEAR_BY[id] : null;
 }
 /** 처음 모습 — 만들기 화면이 여기서 시작한다 */
-export const LOOK_BASE = Object.freeze({ skin: 's2', hair: 'short', hairColor: 'black', eyes: 'dot', top: 'a_top_blue', bottom: 'a_bot_navy', shoes: 'a_shoe_basic', hat: '', bag: '', cape: '' });
+export const LOOK_BASE = Object.freeze({ skin: 's2', hair: 'short', hairColor: 'black', eyes: 'dot', top: 'a_top_blue', bottom: 'a_bot_navy', shoes: 'a_shoe_basic', gloves: '', hat: '', bag: '', cape: '' });
+
+/**
+ * 🧢 한 번에 입기 (v293) — 칸마다 입을 옷 · 배열이면 가진 것 중 앞의 것(빨간 운동화가 없으면 기본 신발) · ''는 벗기(망토).
+ * 머리·피부·눈은 건드리지 않는다 — 진우가 만든 얼굴 그대로 옷만
+ */
+export const OUTFITS = [
+  { id: 'trainer', ko: '트레이너 차림', emoji: '🧢', wear: { top: 'a_top_trainer', bottom: 'a_bot_jean', shoes: ['a_shoe_run', 'a_shoe_basic'], gloves: 'a_glove_green', hat: 'a_hat_trainer', bag: 'a_bag_trainer', cape: '' } },
+];
 
 /**
  * 그릴 모습 (순수 · 새 객체) — 모르는 값은 처음 모습으로, 입는 곳이 다른 옷은 빼고. 가졌는지는 보지 않는다(그림만 — 가졌는지는 규칙이 본다).
@@ -137,6 +160,34 @@ const ownedOf = (profile, id) => {
 export function canWear(profile, id) {
   const w = wearById(id);
   return !!w && (!!w.free || ownedOf(profile, id) > 0);
+}
+/** 🧢 한 번에 입기의 바꿀 칸 (순수 · v293) — 모르는 차림이면 null · 칸마다 입을 수 있는 첫 옷(아무것도 못 입으면 그 칸은 그대로) · ''는 벗기 */
+export function outfitPatch(profile, id) {
+  const o = OUTFITS.find((x) => x.id === id);
+  if (!o) return null;
+  const patch = {};
+  for (const slot of SLOTS) {
+    if (!own(o.wear, slot)) continue;
+    const want = o.wear[slot];
+    if (want === '') { patch[slot] = ''; continue; }
+    const pick = (Array.isArray(want) ? want : [want]).find((w) => canWear(profile, w));
+    if (pick) patch[slot] = pick;
+  }
+  return patch;
+}
+/** 지금 그 차림을 다 입고 있나 — 옷장이 단추를 숨긴다 */
+export function wearingOutfit(profile, look, id) {
+  const p = outfitPatch(profile, id);
+  return !!p && Object.keys(p).every((k) => (look && look[k] ? look[k] : '') === p[k]);
+}
+/**
+ * 🧢 한 번에 입기 (규칙 · 🔍 Codex 99차 #1) — 입힐 옷은 저장하는 순간의 프로필로 고른다(그린 때와 운동화가 달라도 차림 전체가 입혀지게).
+ * why: 'unknown' 모르는 차림 · 그 밖은 avatarLookRule('made' 등)
+ */
+export function outfitRule(profile, id, now) {
+  const patch = outfitPatch(profile, id);
+  if (!patch) return { ok: false, why: 'unknown' };
+  return avatarLookRule(profile, patch, now);
 }
 /** 이름표 고쳐 읽기 — 글자만 · 앞뒤 빈칸 없이 · NAME_MAX자까지 (그림 글자도 한 자) */
 export function nameOf(raw) {

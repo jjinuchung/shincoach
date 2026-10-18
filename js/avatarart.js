@@ -1,5 +1,7 @@
 // 🧑 진우 캐릭터 그림 — 코드로 그린 2등신 인형 (SVG 글자 · 순수 함수 · DOM 없음 → node에서 그림 시안 페이지도 이것으로 만든다)
-// 앞에서 본 모습 · viewBox 0 0 100 124 · 그리는 차례: 망토(뒤) → 가방(뒤) → 다리·신발 → 팔 → 몸통(윗옷·무늬) → 가방끈·망토 고리 → 귀·얼굴 → 머리카락 → 모자
+// 앞에서 본 모습 · viewBox 0 0 100 124 · 그리는 차례: 망토(뒤) → 가방(뒤) → 다리·신발 → 팔(소매·장갑) → 몸통(윗옷·무늬) → 가방끈·망토 고리 → 귀·얼굴 → 머리카락 → 모자
+// 🧢 v293 트레이너 차림: 조끼(무늬 vest — 검은 티 위 파란 조끼·흰 깃 · 소매도 조끼 색) · 손가락 장갑 · 지우 모자(art.kind 'ash' — 크라운·앞판·챙·단추 색은 여기,
+//   앞 무늬는 비공개 저장소에서 받은 것만 — 아래 「지우 모자 무늬」)
 // 모습은 avatar.js lookOf()로 고쳐 읽은 것 — 모르는 값이면 처음 모습으로 그린다(그림이 깨지지 않게)
 import { lookOf, wearById, skinById, hairColorById } from './avatar.js';
 
@@ -34,6 +36,66 @@ function starPts(cx, cy, R, r) {
   return pts.join(' ');
 }
 
+// ───────────────────── 🧢 지우 모자 무늬 (v293) ─────────────────────
+// 애니의 공식 모자 무늬는 공개 저장소에 그림으로 두지 않는다 → 비공개 저장소에서 📤 열쇠로 받아 이 기기에만(hatmarks.js가 setHatMarks로 넣는다).
+// 무늬가 없으면 모자는 앞판까지만 그린다. 받은 것은 그림에 들어가므로 허용한 도형·숫자·색만 통과(hatMarksOf) — 글자·주소·스크립트가 섞일 수 없다.
+// 무늬 칸: 모자 크라운 전체 — 가로 0~54 · 세로 0~26 (그림의 x 23~77 · y 12~38) · 무늬마다 자리가 다르다(관동은 챙 바로 위 · 하나는 위쪽)
+const MARK_ID = /^[a-z0-9_]{1,24}$/;
+const HEX = /^#[0-9a-f]{6}$/i;
+const PATH_D = /^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]{1,800}$/;
+const POINTS = /^[0-9 .,-]{1,400}$/;
+const numIn = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+let HAT_MARKS = {};
+
+/** 도형 하나 고쳐 읽기 (순수) — 허용한 꼴이 아니면 null */
+function markShapeOf(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) return null;
+  const paint = {};
+  if (s.fill !== undefined) { if (s.fill !== 'none' && !(typeof s.fill === 'string' && HEX.test(s.fill))) return null; paint.fill = s.fill; }
+  if (s.stroke !== undefined) { if (!(typeof s.stroke === 'string' && HEX.test(s.stroke))) return null; paint.stroke = s.stroke; }
+  if (s.sw !== undefined) { if (!numIn(s.sw, 0, 4)) return null; paint.sw = s.sw; }
+  if (s.t === 'path' && typeof s.d === 'string' && PATH_D.test(s.d)) return { t: 'path', d: s.d, ...paint };
+  if (s.t === 'polygon' && typeof s.points === 'string' && POINTS.test(s.points)) return { t: 'polygon', points: s.points, ...paint };
+  if (s.t === 'circle' && numIn(s.cx, -5, 60) && numIn(s.cy, -5, 32) && numIn(s.r, 0, 30)) return { t: 'circle', cx: s.cx, cy: s.cy, r: s.r, ...paint };
+  if (s.t === 'ellipse' && numIn(s.cx, -5, 60) && numIn(s.cy, -5, 32) && numIn(s.rx, 0, 30) && numIn(s.ry, 0, 30)) return { t: 'ellipse', cx: s.cx, cy: s.cy, rx: s.rx, ry: s.ry, ...paint };
+  if (s.t === 'rect' && numIn(s.x, -5, 60) && numIn(s.y, -5, 32) && numIn(s.w, 0, 60) && numIn(s.h, 0, 32) && (s.rx === undefined || numIn(s.rx, 0, 30))) return { t: 'rect', x: s.x, y: s.y, w: s.w, h: s.h, rx: s.rx || 0, ...paint };
+  return null;
+}
+/**
+ * 받은 무늬 목록 → { 무늬 id: [도형] } (순수) — [{ id, shapes: [{ t, …, fill, stroke, sw }] }] ·
+ * 도형 하나라도 틀리면 그 무늬는 통째로 버린다(반쯤 그린 무늬가 나오지 않게) · 무늬 40 · 도형 30까지
+ */
+export function hatMarksOf(list) {
+  const out = {};
+  for (const m of Array.isArray(list) ? list.slice(0, 40) : []) {
+    if (!m || typeof m !== 'object' || typeof m.id !== 'string' || !MARK_ID.test(m.id) || !Array.isArray(m.shapes) || !m.shapes.length || m.shapes.length > 30) continue;
+    const shapes = m.shapes.map(markShapeOf);
+    if (shapes.every(Boolean)) out[m.id] = shapes;
+  }
+  return out;
+}
+/** 무늬를 넣는다(hatmarks.js) — 고쳐 읽은 수를 돌려준다 */
+export function setHatMarks(list) {
+  HAT_MARKS = hatMarksOf(list);
+  return Object.keys(HAT_MARKS).length;
+}
+/** 지금 그 무늬를 가졌나 (그림 시안·시험) */
+export function hasHatMark(id) {
+  return Object.prototype.hasOwnProperty.call(HAT_MARKS, id);
+}
+function markSvg(id) {
+  if (!id || !hasHatMark(id)) return '';
+  const paint = (s) => `fill="${s.fill === undefined ? 'none' : s.fill}"${s.stroke ? ` stroke="${s.stroke}" stroke-width="${s.sw === undefined ? 1 : s.sw}" stroke-linejoin="round" stroke-linecap="round"` : ''}`;
+  const one = (s) => {
+    if (s.t === 'path') return `<path d="${s.d}" ${paint(s)}/>`;
+    if (s.t === 'polygon') return `<polygon points="${s.points}" ${paint(s)}/>`;
+    if (s.t === 'circle') return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" ${paint(s)}/>`;
+    if (s.t === 'ellipse') return `<ellipse cx="${s.cx}" cy="${s.cy}" rx="${s.rx}" ry="${s.ry}" ${paint(s)}/>`;
+    return `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.rx}" ${paint(s)}/>`;
+  };
+  return `<g transform="translate(23 12)">${HAT_MARKS[id].map(one).join('')}</g>`;
+}
+
 /** 몸통 모양 (윗옷) — 어깨 66 · 아래 98 */
 const TORSO = 'M35 69 Q35 65 41 65 L59 65 Q65 65 65 69 L67 98 L33 98 Z';
 
@@ -66,9 +128,14 @@ function shoes(w) {
   const stripe = w.art.ink ? (x) => `<path d="M${x - 5} 114.5 Q${x} 112 ${x + 5} 114.5" fill="none" stroke="${w.art.ink}" stroke-width="2.2" stroke-linecap="round"/>` : () => '';
   return [42.5, 57.5].map((x) => `<ellipse cx="${x}" cy="115" rx="8.5" ry="4.8" ${fillLine(c)}/>${stripe(x)}`).join('');
 }
-function arms(skin, top) {
-  const c = top.art.color;
-  const arm = (x, rot) => `<g transform="rotate(${rot} ${x} 70)"><rect x="${x - 4.5}" y="69" width="9" height="26" rx="4.5" ${fillLine(skin)}/><rect x="${x - 5}" y="67" width="10" height="12" rx="4" ${fillLine(c)}/></g>`;
+function arms(skin, top, gloves) {
+  const a = top.art;
+  const vest = a.pattern === 'vest';
+  const c = vest ? a.ink : a.color; // 조끼는 소매도 조끼 색
+  const cuff = (x) => (vest && a.trim ? `<rect x="${x - 5}" y="76.2" width="10" height="2.6" rx="1.3" fill="${a.trim}"/>` : '');
+  // 🧤 손가락 장갑 — 손등을 덮고 손가락 끝만 보인다 · 손목 띠는 짙은 색
+  const glove = (x) => (gloves ? `<rect x="${x - 5.2}" y="84" width="10.4" height="9.6" rx="4" ${fillLine(gloves.art.color)}/><rect x="${x - 5.4}" y="84" width="10.8" height="3" rx="1.5" fill="${gloves.art.ink}"/><rect x="${x - 3.6}" y="92.4" width="7.2" height="3.4" rx="1.7" ${fillLine(skin)}/>` : '');
+  const arm = (x, rot) => `<g transform="rotate(${rot} ${x} 70)"><rect x="${x - 4.5}" y="69" width="9" height="26" rx="4.5" ${fillLine(skin)}/>${glove(x)}<rect x="${x - 5}" y="67" width="10" height="12" rx="4" ${fillLine(c)}/>${cuff(x)}</g>`;
   return arm(30, 14) + arm(70, -14);
 }
 function torso(top, uid) {
@@ -79,6 +146,9 @@ function torso(top, uid) {
   else if (a.pattern === 'star') pat = `<polygon points="${starPts(50, 81, 8, 3.4)}" fill="${a.ink}"/>`;
   else if (a.pattern === 'bolt') pat = `<polygon points="53,71 43,84 49.5,84 45,96 58,80 51.5,80 56,71" fill="${a.ink}"/>`;
   else if (a.pattern === 'dots') pat = [[41, 72], [55, 74], [47, 81], [61, 84], [39, 88], [53, 91]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2" fill="${a.ink}"/>`).join('');
+  // 🦺 조끼 — 몸통 양쪽을 덮는 판 둘(가운데로 검은 티가 보인다) · 앞섶을 따라 흰 깃
+  else if (a.pattern === 'vest') pat = `<path d="M33 64 L45.5 64 L44.5 99 L31 99 Z" fill="${a.ink}" stroke="${LINE}" stroke-width="1.2"/><path d="M54.5 64 L67 64 L69 99 L55.5 99 Z" fill="${a.ink}" stroke="${LINE}" stroke-width="1.2"/>`
+    + (a.trim ? `<path d="M43.6 65 L45.6 66 L44.8 82" fill="none" stroke="${a.trim}" stroke-width="2.6" stroke-linecap="round"/><path d="M56.4 65 L54.4 66 L55.2 82" fill="none" stroke="${a.trim}" stroke-width="2.6" stroke-linecap="round"/>` : '');
   else if (a.pattern === 'galaxy') pat = `<polygon points="${starPts(50, 80, 6.5, 2.7)}" fill="${a.ink}"/>` + [[40, 72, 1.3], [60, 74, 1.1], [42, 90, 1.2], [58, 92, 1.4], [37, 82, 0.9], [63, 85, 1]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${a.ink}"/>`).join('');
   const neck = `<path d="M44 65 Q50 70 56 65" fill="none" stroke="${shade(a.color, 0.25)}" stroke-width="1.6"/>`;
   return `<clipPath id="${clip}"><path d="${TORSO}"/></clipPath><path d="${TORSO}" ${fillLine(a.color)}/>${pat ? `<g clip-path="url(#${clip})">${pat}</g>` : ''}${neck}`;
@@ -111,6 +181,17 @@ function hat(w) {
   const c = w.art.color;
   const k = w.art.ink;
   if (w.id === 'a_hat_cap') return `<path d="M47 36 Q70 32 89 37 Q90 42 81 42 Q64 40 47 41 Z" ${fillLine(shade(c, 0.15))}/><path d="M23 38 Q23 12 50 12 Q77 12 77 38 Z" ${fillLine(c)}/><circle cx="50" cy="12.5" r="2.2" fill="${k}"/><path d="M43 26 L50 20 L57 26" fill="none" stroke="${k}" stroke-width="2.4" stroke-linecap="round"/>`;
+  // 🧢 지우 모자 — 크라운·앞판(없으면 한 색 · wide = 앞을 거의 다 덮는 각진 판)·챙(billEdge = 챙 가장자리 띠)·단추 색은 art,
+  //   앞 무늬는 받아 둔 것(없으면 앞판까지만)
+  if (w.art.kind === 'ash') {
+    const a = w.art;
+    const panel = !a.panel ? ''
+      : a.panelShape === 'wide' ? `<path d="M27.5 38 L27.5 26 Q28 18 34 15.6 L66 15.6 Q72 18 72.5 26 L72.5 38 Z" ${fillLine(a.panel)}/>`
+        : `<path d="M31.5 38 Q32 17.5 50 17 Q68 17.5 68.5 38 Z" ${fillLine(a.panel)}/>`;
+    const edge = a.billEdge ? `<path d="M88.4 38.2 Q89 40.9 81 41 Q64 39.2 48.5 40" fill="none" stroke="${a.billEdge}" stroke-width="1.8" stroke-linecap="round"/>` : '';
+    return `<path d="M47 36 Q70 32 89 37 Q90 42 81 42 Q64 40 47 41 Z" ${fillLine(a.bill || shade(c, 0.15))}/>${edge}<path d="M23 38 Q23 12 50 12 Q77 12 77 38 Z" ${fillLine(c)}/>`
+      + panel + markSvg(a.mark) + `<circle cx="50" cy="12.5" r="2.2" fill="${a.button || shade(c, 0.2)}"/>`;
+  }
   if (w.id === 'a_hat_beanie') return `<path d="M22 40 Q22 10 50 10 Q78 10 78 40 Z" ${fillLine(c)}/><rect x="21" y="33" width="58" height="9" rx="4.5" ${fillLine(k)}/><circle cx="50" cy="9" r="5" ${fillLine(k)}/>`;
   if (w.id === 'a_hat_straw') return `<ellipse cx="50" cy="32" rx="37" ry="7.5" ${fillLine(c)}/><path d="M31 32 Q31 12 50 12 Q69 12 69 32 Z" ${fillLine(c)}/><rect x="31" y="25" width="38" height="5.5" fill="${k}"/>`;
   if (w.id === 'a_crown') return `<path d="M29 27 L32 8 L41 18 L50 4 L59 18 L68 8 L71 27 Z" ${fillLine(c)}/><circle cx="50" cy="20" r="2.8" fill="${k}"/><circle cx="38.5" cy="22" r="1.9" fill="#3b82f6"/><circle cx="61.5" cy="22" r="1.9" fill="#22a06b"/>`;
@@ -132,11 +213,12 @@ export function avatarSvg(look, opts = {}) {
   const cape = L.cape ? wearById(L.cape) : null;
   const bag = L.bag ? wearById(L.bag) : null;
   const ht = L.hat ? wearById(L.hat) : null;
+  const gl = L.gloves ? wearById(L.gloves) : null;
   const title = opts.title ? `<title>${esc(opts.title)}</title>` : '';
   const cls = opts.cls ? ` class="${esc(opts.cls)}"` : '';
   // 발밑 그림자 — 방 바닥에 서 있게 (opts.shadow === false면 뺀다: 작은 고르기 칸)
   const ground = opts.shadow === false ? '' : '<ellipse cx="50" cy="119.5" rx="23" ry="3.4" fill="#000" opacity="0.13"/>';
   return `<svg${cls} viewBox="0 0 100 124" xmlns="http://www.w3.org/2000/svg" role="img"${opts.title ? '' : ' aria-hidden="true"'}>${title}`
-    + ground + capeBack(cape) + bagBack(bag) + legs(bottom) + shoes(sh) + arms(skin, top) + torso(top, uid) + bagFront(bag) + capeFront(cape)
+    + ground + capeBack(cape) + bagBack(bag) + legs(bottom) + shoes(sh) + arms(skin, top, gl) + torso(top, uid) + bagFront(bag) + capeFront(cape)
     + head(skin) + face(L.eyes) + hair(L.hair, hc) + hat(ht) + '</svg>';
 }
