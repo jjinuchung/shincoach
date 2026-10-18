@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  PUZZLE_COINS, PUZZLE_PERFECT_MIN, ORDER_PER_DAY, INTEXT_PER_DAY, SORT_PER_DAY, PUZZLES_PER_DAY, SOLVED, ASKS, OPINION_WORDS, SORT_BANNED,
+  PUZZLE_COINS, PUZZLE_PERFECT_MIN, ORDER_PER_DAY, INTEXT_PER_DAY, SORT_PER_DAY, AGREE_PER_DAY, PUZZLES_PER_DAY, SOLVED, ASKS, OPINION_WORDS, SORT_BANNED,
   permutations, validOrders, checkPuzzles, allPuzzles, isOpen, isSolved, planPuzzles, shuffledOrder, gradeOrder, gradeSort,
   korPuzzleRule, puzzleStats, puzzleFinishText, puzzleTodayLine, mergePuzzles,
 } from '../js/korpuzzle.js';
@@ -129,9 +129,9 @@ test('🧩 차례 셈·채점: 모든 차례(4! = 24) · need에 맞는 차례 �
 
 test('🧩 오늘의 판: 이야기 흐름은 그 글에 ★이 있어야 열림 · 차례 1 + 글에 있나요 1 + 사실·의견 1(v259 — 같은 꼴이 붙지 않게, 모자라면 다른 꼴로) · 틀린 퍼즐은 다음 날부터 먼저 · ⭐ 퍼즐은 안 나옴 · 연습은 ⭐ 퍼즐만 · 꼴마다 셈', () => {
   const none = planPuzzles(LIST, {}, {}, T0);
-  assert.deepEqual([ORDER_PER_DAY, INTEXT_PER_DAY, SORT_PER_DAY, PUZZLES_PER_DAY], [1, 1, 1, 3]);
+  assert.deepEqual([ORDER_PER_DAY, INTEXT_PER_DAY, SORT_PER_DAY, AGREE_PER_DAY, PUZZLES_PER_DAY], [1, 1, 1, 1, 4]); // v294 🔗 앞뒤 어울리기 하나 더
   assert.equal(none.length, PUZZLES_PER_DAY);
-  assert.deepEqual(none.map((p) => p.id), ['O11', 'F1', 'O12'], '★이 없으면 하는 차례만(글에 있나요는 안 열림) — 차례·가르기·차례(모자란 글에 있나요 자리를 차례로)');
+  assert.deepEqual(none.map((p) => p.id), ['O11', 'F1', 'H1', 'O12'], '★이 없으면 하는 차례만(글에 있나요는 안 열림) — 차례·가르기·앞뒤·차례(모자란 글에 있나요 자리를 차례로)');
   assert.ok(!isOpen(byId('O10'), {}) && isOpen(byId('O10'), { 'K31:1': D0 }) && isOpen(byId('O11'), {}) && isOpen(byId('F1'), {}));
   const withK31 = planPuzzles(LIST, {}, { 'K31:1': D0 }, T0);
   assert.ok(withK31.some((p) => p.id === 'O10'), '「토끼전」을 읽으면 토끼전 흐름이 열린다');
@@ -143,9 +143,9 @@ test('🧩 오늘의 판: 이야기 흐름은 그 글에 ★이 있어야 열림
   // 한쪽이 모자라면 다른 쪽으로 채운다
   const allSortsDone = {};
   for (const p of LIST.filter((x) => x.kind === 'sort')) allSortsDone[p.id] = { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 };
-  assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'order', 'order']);
+  assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'agree', 'order', 'order']);
   assert.ok(isSolved({ box: 1 }) && !isSolved({ box: 0 }) && !isSolved(null));
-  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 23, 4, 0, 1], ['sort', 14, 14, 1, 0], ['intext', 12, 0, 0, 0]]); // v265 차례 둘 · v291 하나 더함
+  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 23, 4, 0, 1], ['sort', 14, 14, 1, 0], ['intext', 12, 0, 0, 0], ['agree', 10, 10, 0, 0]]); // v265 차례 둘 · v291 하나 더함 · v294 🔗 열
 });
 
 test('🧩 보상 규칙: 그날 첫 판만 💰·🎯 · 3개 모두 한 번에 → 🟩 · 같은 날 둘째 판은 보상 없음(⭐는 모임) · 틀리면 다음 날 · ⭐는 되돌리지 않음 · 낡은 판은 연습 · 모르는 퍼즐은 안 셈 · 빈 판은 empty', () => {
@@ -183,7 +183,7 @@ test('🧩 보상 규칙: 그날 첫 판만 💰·🎯 · 3개 모두 한 번에
   assert.equal(puzzleFinishText({ ok: true, first: false, n: 1, okN: 0, solved: [] }).title, '🧩 퍼즐 연습 끝!');
   assert.equal(puzzleFinishText({ ok: true, first: false, n: 1, okN: 1, solved: ['F2'] }).title, '🧩 퍼즐 더 풀기 끝!', '새로 ⭐를 받은 판은 연습이 아니다');
   assert.match(puzzleFinishText({ ok: false, why: 'save' }).title, /저장이 안 됐어요/);
-  assert.match(puzzleTodayLine(0), /💰10 · 🎯 국어 포켓몬 잡기 1번 · 퍼즐 3개를 모두 한 번에/);
+  assert.match(puzzleTodayLine(0), /💰10 · 🎯 국어 포켓몬 잡기 1번 · 퍼즐 3개 이상을 모두 한 번에/);
   assert.match(puzzleTodayLine(2), /🟩까지/);
   assert.equal(ASKS.event.prompt, '일이 일어난 차례대로 놓아 보세요.');
 });
@@ -275,7 +275,7 @@ test('🧩 화면 연결: 퍼즐 판은 처음 낸 것만 · 시작할 때 상�
   const fin = pv.slice(pv.indexOf('async function finishSession(ctx) {'), pv.indexOf('function finishEl(ctx) {'));
   const between = fin.slice(fin.indexOf('res = await korPuzzleFinish('), fin.indexOf('const egg = await ctx.tickKorDay();'));
   assert.ok(between.length > 0 && !/\breturn\b/.test(between), '🥚 칸은 화면이 바뀌어도');
-  assert.ok(pv.includes("deal: p.kind === 'order' ? shuffledOrder(p.chunks.length) : null"), '조각은 섞어서(바른 차례 아님)');
+  assert.ok(pv.includes("deal: p.kind === 'order' ? shuffledOrder(p.chunks.length) : p.kind === 'agree' ? dealChoices(p) : null"), '조각은 섞어서(바른 차례 아님) · 🔗 끝 보기도 섞어서(v294)');
   const sw = read('sw.js');
   for (const f of ['./js/korpuzzle.js', './js/korpuzzleview.js', './coach/korean/puzzles.json']) assert.ok(sw.includes(`'${f}',`), f);
   assert.match(read('tools/check.mjs'), /checkPuzzles\(puzzles, cards\)/);
@@ -289,7 +289,7 @@ test('🧩 화면 연결: 퍼즐 판은 처음 낸 것만 · 시작할 때 상�
 test('🧩 화면(Codex 55차): 그만하기 — 놓은 조각·고른 칸도 한 것 · 다시 풀면 확인을 거둠 · 초점 — 누른 [사실]/[의견] 단추 · 새 퍼즐은 첫 조각이나 첫 [사실]', () => {
   const pv = read('js/korpuzzleview.js');
   assert.ok(pv.includes('if (!didWork(ps) || ps.quitAsk) { S.ps = null; ctx.toPuzzle(); return; }'), '한 것이 있으면 한 번 더 묻는다');
-  assert.ok(pv.includes('return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean) || ps.picks.some(Boolean);'), '놓은 조각·고른 칸(📍 있어요·없어요도)도 한 것');
+  assert.ok(pv.includes('return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean) || ps.picks.some(Boolean) || ps.ends.some((c) => c !== undefined);'), '놓은 조각·고른 칸(📍 있어요·없어요 · 🔗 고른 끝도)도 한 것');
   const chunk = pv.slice(pv.indexOf("const b = el('button', 'kor-pchunk'"), pv.indexOf('pool.appendChild(b);'));
   const undo = pv.slice(pv.indexOf("undo.addEventListener('click'"), pv.indexOf('tools.appendChild(undo);'));
   const reset = pv.slice(pv.indexOf("reset.addEventListener('click'"), pv.indexOf('tools.appendChild(reset);'));

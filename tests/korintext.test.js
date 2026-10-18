@@ -160,16 +160,16 @@ test('📍 열림·한 판: 그 글에 ★이 있어야 열림 · 판 = 차례 �
   const p = byId('I1');
   assert.ok(!isOpen(p, {}) && !isOpen(p, { 'K11:1': D0 }) && isOpen(p, { 'K2:1': D0 }));
   assert.ok(!isOpen({ ...p, card: '' }, ALL_STAR), 'card 없는 글에 있나요는 열지 않는다');
-  assert.deepEqual(PLAY_ORDER, ['order', 'intext', 'sort']);
-  assert.deepEqual(KIND_LIST, ['order', 'sort', 'intext']);
-  assert.deepEqual(planPuzzles(LIST, {}, ALL_STAR, T0).map((x) => x.id), ['O1', 'I1', 'F1']);
-  assert.deepEqual(planPuzzles(LIST, {}, { 'K2:1': D0 }, T0).map((x) => x.id), ['O11', 'I1', 'F1'], '★ 하나뿐 — 그 글의 글에 있나요만');
+  assert.deepEqual(PLAY_ORDER, ['order', 'intext', 'sort', 'agree']); // v294 🔗 앞뒤 어울리기는 끝에
+  assert.deepEqual(KIND_LIST, ['order', 'sort', 'intext', 'agree']);
+  assert.deepEqual(planPuzzles(LIST, {}, ALL_STAR, T0).map((x) => x.id), ['O1', 'I1', 'F1', 'H1']);
+  assert.deepEqual(planPuzzles(LIST, {}, { 'K2:1': D0 }, T0).map((x) => x.id), ['O11', 'I1', 'F1', 'H1'], '★ 하나뿐 — 그 글의 글에 있나요만');
   const done = (kinds) => Object.fromEntries(LIST.filter((x) => kinds.includes(x.kind)).map((x) => [x.id, { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 }]));
-  assert.deepEqual(planPuzzles(LIST, done(['order', 'sort']), ALL_STAR, T0).map((x) => x.id), ['I1', 'I2', 'I3'], '다른 꼴을 다 풀면 글에 있나요로 채움');
-  assert.deepEqual(planPuzzles(LIST, done(['intext', 'sort']), ALL_STAR, T0).map((x) => x.kind), ['order', 'order', 'order']);
+  assert.deepEqual(planPuzzles(LIST, done(['order', 'sort']), ALL_STAR, T0).map((x) => x.id), ['I1', 'H1', 'I2', 'I3'], '다른 꼴을 다 풀면 글에 있나요로 채움(🔗 하나는 그대로)');
+  assert.deepEqual(planPuzzles(LIST, done(['intext', 'sort']), ALL_STAR, T0).map((x) => x.kind), ['order', 'agree', 'order', 'order']);
   const st = { I3: { box: 0, due: D0 + 1, at: 5, miss: 1, d0: D0 }, I1: { box: SOLVED, due: 0, at: 2, miss: 0, d0: D0 } };
-  assert.deepEqual(planPuzzles(LIST, st, ALL_STAR, T0).map((x) => x.id), ['O1', 'I2', 'F1'], '오늘은 틀린 I3·⭐ I1이 안 나온다');
-  assert.deepEqual(planPuzzles(LIST, st, ALL_STAR, T0 + 86400000).map((x) => x.id), ['O1', 'I3', 'F1'], '다음 날 — 틀린 퍼즐이 먼저');
+  assert.deepEqual(planPuzzles(LIST, st, ALL_STAR, T0).map((x) => x.id), ['O1', 'I2', 'F1', 'H1'], '오늘은 틀린 I3·⭐ I1이 안 나온다');
+  assert.deepEqual(planPuzzles(LIST, st, ALL_STAR, T0 + 86400000).map((x) => x.id), ['O1', 'I3', 'F1', 'H1'], '다음 날 — 틀린 퍼즐이 먼저');
   assert.deepEqual(planPuzzles(LIST, st, ALL_STAR, T0, true).map((x) => x.id), ['I1'], '연습은 ⭐만');
   assert.deepEqual(puzzleStats(LIST, st, ALL_STAR).find((x) => x.kind === 'intext'), { kind: 'intext', total: 12, open: 12, solved: 1, tried: 1 });
   assert.deepEqual(puzzleStats(LIST, st, { 'K2:1': D0 }).find((x) => x.kind === 'intext'), { kind: 'intext', total: 12, open: 1, solved: 1, tried: 0 });

@@ -21,16 +21,22 @@
 //   없어요 = 까닭(why) — 글과 어울리지만 어디에도 없는 말 · 글을 그대로 옮긴 문장은 검사가 막는다 · 글이 반대로 말하는 것(수·때·이름만
 //   바꾼 것)은 "없는 말"이 아니라 "틀린 말"이라 넣지 않는다 — 이것과 낱말이 많이 겹치는 문장은 사람이 글 전체와 대조한다(겹침은 의심 표시일 뿐)
 //   real = 실제로는 맞는 말이지만 이 글에는 없는 문장(아는 것과 글에 있는 것을 가르는 연습)
+//
+// 🔗 앞뒤 어울리기(agree, v294 — 2026-10-19 아버님 "문장 호응 짧은 퍼즐 가자"): 문장 호응(짜임 놓치기 — 앞뒤가 어울리나)은
+//   원고에 연습할 물음이 열 개 남짓이라 한 문장짜리로 넓힌다 · 한 묶음 = 문장 4~6 · 문장마다 앞부분(짝 말 key는 굵게)을 보고 알맞은 끝을 고른다 ·
+//   바른 끝(end) 하나 + 어울리지 않는 끝(no) 1~2 — 화면이 섞는다(바른 끝이 늘 같은 자리에 있지 않게) · 확인 뒤 바른 문장(짝 말과 짝 조각 mate를 굵게)과 까닭 ·
+//   읽은 글 없이 늘 열린다 · 5-2 「올바른 문장으로 글을 써요」 [6국04-04] — 원고의 호응 물음(K17·K25·K45·K79·K80·K101)과 같은 짝들
 import { dayNum, throwsOf, pendingOf, KOR_STONE, circled } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
 
 export const PUZZLE_COINS = 10;
 export const PUZZLE_PERFECT_MIN = 3;
-/** 한 판 — 차례 맞추기 하나 + 글에 있나요 하나 + 사실·의견 한 묶음 (v259 — 그 전에는 차례 둘 + 사실·의견 하나) */
+/** 한 판 — 차례 맞추기 하나 + 글에 있나요 하나 + 사실·의견 한 묶음 + 앞뒤 어울리기 한 묶음 (v294 · v259 — 그 전에는 차례 둘 + 사실·의견 하나) */
 export const ORDER_PER_DAY = 1;
 export const INTEXT_PER_DAY = 1;
 export const SORT_PER_DAY = 1;
-export const PUZZLES_PER_DAY = ORDER_PER_DAY + INTEXT_PER_DAY + SORT_PER_DAY;
+export const AGREE_PER_DAY = 1;
+export const PUZZLES_PER_DAY = ORDER_PER_DAY + INTEXT_PER_DAY + SORT_PER_DAY + AGREE_PER_DAY;
 export const CHUNKS_MIN = 3;
 export const CHUNKS_MAX = 5;
 export const SORT_MIN = 4;
@@ -39,6 +45,23 @@ export const INTEXT_MIN = 4;
 export const INTEXT_MAX = 6;
 /** 있어요 문장의 원문 조각 — 띄어쓰기·문장부호를 뺀 글자 수 */
 export const QUOTE_MIN = 4;
+export const AGREE_MIN = 4;
+export const AGREE_MAX = 6;
+/** 어울리지 않는 끝은 1~2개 (보기는 2~3개) */
+export const AGREE_NO_MAX = 2;
+/** 🔗 짝의 갈래 — 확인 뒤 "짝" 줄 · 검수 페이지 */
+export const AGREE_TYPES = {
+  neg: "'결코·전혀·별로·도무지'와 '~지 않다'",
+  time: '때를 나타내는 말과 끝',
+  honor: "'께서'와 높이는 끝",
+  thing: '음료·값은 높이지 않아요', // 간접 높임이 있어 "사람만"으로 넓히지 않는다 (Codex 100차)
+  must: "'반드시'와 '~해야 한다'",
+  guess: "'아마'와 짐작하는 끝",
+  like: "'마치'와 '~ 같다·~처럼'",
+  because: "'왜냐하면·까닭은'과 '~ 때문이다'",
+  subj: '주어와 서술어',
+  obj: '목적어와 서술어',
+};
 /** 다 맞힌 퍼즐(⭐)의 칸 */
 export const SOLVED = 1;
 /** 차례의 뜻 — 물음마다 하나 */
@@ -48,19 +71,19 @@ export const ASKS = {
 };
 export const FO = { fact: '사실', opinion: '의견' };
 export const IO = { in: '글에 있어요', out: '글에 없어요' };
-export const KINDS = { order: { icon: '🧩', ko: '차례 맞추기' }, sort: { icon: '⚖️', ko: '사실·의견 가르기' }, intext: { icon: '📍', ko: '글에 있나요?' } };
+export const KINDS = { order: { icon: '🧩', ko: '차례 맞추기' }, sort: { icon: '⚖️', ko: '사실·의견 가르기' }, intext: { icon: '📍', ko: '글에 있나요?' }, agree: { icon: '🔗', ko: '앞뒤 어울리기' } };
 /** 🧩 탭·📤 요약에 늘어놓는 차례 (새 꼴은 끝에) */
-export const KIND_LIST = ['order', 'sort', 'intext'];
+export const KIND_LIST = ['order', 'sort', 'intext', 'agree'];
 /** 한 판 안에서 내는 차례 — 같은 꼴이 붙지 않게 돌아가며 */
-export const PLAY_ORDER = ['order', 'intext', 'sort'];
+export const PLAY_ORDER = ['order', 'intext', 'sort', 'agree'];
 // ★ 사실·의견 라벨은 사람이 정한다 — 아래 두 정규식은 원고를 거르는 망일 뿐 판정기가 아니다(한국어는 활용형이 많아
 //   넓히면 사실 문장을 잡고 좁히면 놓친다 — Codex 55차: "최고 기온"을 잡고 "아름다운"·"만들어야 해요"·"~다고 말했다"·"~듯하다"를 놓쳤다)
 /** 생각 말 — 의견에는 하나 이상, 사실에는 없어야 한다 */
 export const OPINION_WORDS = /좋|재미|멋|맛있|예쁘|훌륭|최고(?:다|의|예)|싫|아름다|야 (?:한다|해|합)|즐겁|즐거|신나|귀엽|편하|낫다|지루/;
 /** 가르기 문장에 넣지 않는 꼴 — 옮긴 말 · 앞날 짐작 · 섞인 마음 · 물음 · 따옴표 */
 export const SORT_BANNED = /드디어|라고 |다고 한다|다고 했|다고 말|겠다|것 같다|듯하|듯 하|["'「『“‘]|\?/;
-const ID_RE = { order: /^O\d{1,3}$/, sort: /^F\d{1,3}$/, intext: /^I\d{1,3}$/ };
-const ID_HEAD = { order: 'O', sort: 'F', intext: 'I' };
+const ID_RE = { order: /^O\d{1,3}$/, sort: /^F\d{1,3}$/, intext: /^I\d{1,3}$/, agree: /^H\d{1,3}$/ };
+const ID_HEAD = { order: 'O', sort: 'F', intext: 'I', agree: 'H' };
 const LEN_MAX = 90;
 const WHY_MAX = 120;
 
@@ -95,12 +118,13 @@ export function checkPuzzles(data, cards) {
   list.forEach((p, i) => {
     const at = (m) => errs.push(`puzzles[${i}] ${p && p.id ? p.id : ''}: ${m}`);
     if (!isObj(p)) { at('퍼즐이 객체가 아니에요'); return; }
-    if (!own(KINDS, p.kind)) { at('kind는 order · sort · intext'); return; }
+    if (!own(KINDS, p.kind)) { at('kind는 order · sort · intext · agree'); return; }
     if (typeof p.id !== 'string' || !ID_RE[p.kind].test(p.id)) at(`id는 ${ID_HEAD[p.kind]}숫자`);
     else if (ids.has(p.id)) at('id가 겹쳐요');
     else ids.add(p.id);
     if (p.kind === 'order') checkOrder(p, at, cardIds);
     else if (p.kind === 'intext') checkIntext(p, at, cardMap);
+    else if (p.kind === 'agree') checkAgree(p, at);
     else checkSort(p, at);
   });
   return errs;
@@ -196,6 +220,38 @@ function checkOrder(p, at, cardIds) {
   if (vs.length !== 1) at(`실마리에 맞는 차례가 ${vs.length}가지예요 — 하나뿐이어야 해요`);
   else if (vs[0].join(',') !== ident) at('실마리에 맞는 차례가 원고 차례와 달라요');
 }
+/** 🔗 앞뒤 어울리기 검사 — 문장마다 앞부분(짝 말이 꼭 한 번) · 바른 끝 하나 · 어울리지 않는 끝 1~2(서로·바른 끝과 다르게) ·
+ *  짝 조각(mate)은 바른 끝에만 · 끝에는 문장부호 없이(화면이 마침표를 붙인다) · 바른 끝이 하나뿐인지는 사람이 검수 페이지로 */
+function checkAgree(p, at) {
+  if (!nonEmpty(p.topic)) at('topic이 비었어요');
+  if (!nonEmpty(p.icon)) at('icon이 비었어요');
+  const its = p.items;
+  if (!Array.isArray(its) || its.length < AGREE_MIN || its.length > AGREE_MAX) { at(`items는 ${AGREE_MIN}~${AGREE_MAX}개`); return; }
+  const seen = new Set();
+  its.forEach((x, k) => {
+    const sat = (m) => at(`문장 ${k + 1} ${m}`);
+    if (!isObj(x) || !nonEmpty(x.pre) || !nonEmpty(x.key) || !nonEmpty(x.end)) { sat('pre·key·end가 있어야 해요'); return; }
+    if (seen.has(normText(x.pre))) sat('앞 문장과 앞부분이 같아요');
+    seen.add(normText(x.pre));
+    if (x.pre !== x.pre.trim() || x.end !== x.end.trim()) sat('pre·end 앞뒤에 빈칸이 있어요');
+    if (x.pre.split(x.key).length !== 2) sat(`짝 말 "${x.key}"가 앞부분에 꼭 한 번 있어야 해요`);
+    const no = x.no;
+    if (!Array.isArray(no) || no.length < 1 || no.length > AGREE_NO_MAX || !no.every(nonEmpty)) { sat(`no(어울리지 않는 끝)는 1~${AGREE_NO_MAX}개의 글`); return; }
+    const ends = [x.end, ...no];
+    if (new Set(ends.map((e) => normText(e))).size !== ends.length) sat('끝이 서로 같아요');
+    if (ends.some((e) => /[.!?。]$/.test(e.trim()))) sat('끝에는 문장부호를 쓰지 않아요 — 화면이 마침표를 붙여요');
+    if (/\?/.test(x.pre) || ends.some((e) => /\?/.test(e))) sat('물음은 안 돼요');
+    if (x.mate !== undefined) {
+      if (!nonEmpty(x.mate)) sat('mate가 비었어요');
+      else if (!x.end.includes(x.mate)) sat(`짝 조각 "${x.mate}"가 바른 끝에 없어요`);
+      else if (no.some((e) => e.includes(x.mate))) sat(`짝 조각 "${x.mate}"가 어울리지 않는 끝에도 있어요`);
+    }
+    if (!own(AGREE_TYPES, x.type)) sat(`type은 ${Object.keys(AGREE_TYPES).join(' · ')}`);
+    if (!nonEmpty(x.why)) sat('why(까닭)가 비었어요');
+    else if ([...x.why].length > WHY_MAX) sat(`why는 ${WHY_MAX}자까지`);
+    if (Math.max(...ends.map((e) => [...`${x.pre} ${e}.`].length)) > LEN_MAX) sat(`문장은 ${LEN_MAX}자까지`);
+  });
+}
 function checkSort(p, at) {
   if (!nonEmpty(p.topic)) at('topic이 비었어요');
   if (!nonEmpty(p.icon)) at('icon이 비었어요');
@@ -228,6 +284,7 @@ export function allPuzzles(data, cards) {
     if (!isObj(p) || !own(KINDS, p.kind) || typeof p.id !== 'string' || !ID_RE[p.kind].test(p.id) || seen.has(p.id)) continue;
     if (p.kind === 'order') checkOrder(p, (m) => errs.push(m), cards ? new Set(byId.keys()) : null);
     else if (p.kind === 'intext') checkIntext(p, (m) => errs.push(m), Array.isArray(cards) ? byId : null);
+    else if (p.kind === 'agree') checkAgree(p, (m) => errs.push(m));
     else checkSort(p, (m) => errs.push(m));
     if (errs.length) continue;
     seen.add(p.id);
@@ -240,6 +297,9 @@ export function allPuzzles(data, cards) {
         id: p.id, kind: 'intext', card: p.card, title: c.title, cardTitle: c.title, icon: c.icon || '📍', lines: c.lines.slice(),
         sents: p.sents.map((s) => (s.io === 'in' ? { t: s.t, io: 'in', line: s.line, quote: s.quote } : { t: s.t, io: 'out', why: s.why, real: s.real === true })),
       });
+    } else if (p.kind === 'agree') {
+      // choices[0]이 바른 끝 — 화면은 dealChoices로 섞어 놓는다
+      out.push({ id: p.id, kind: 'agree', title: p.topic, icon: p.icon, items: p.items.map((x) => ({ pre: x.pre, key: x.key, choices: [x.end, ...x.no], mate: x.mate || '', type: x.type, why: x.why })) });
     } else {
       out.push({ id: p.id, kind: 'sort', title: p.topic, icon: p.icon, sents: p.sents.map((s) => ({ t: s.t, fo: s.fo, why: s.why })) });
     }
@@ -282,14 +342,14 @@ export function mergePuzzles(a, b) {
 
 /**
  * 🧩 오늘의 퍼즐 — [{ id, kind }] · 다시 볼 것(틀린 날 다음 날부터, 오래된 것부터) → 새 퍼즐(원고 차례) ·
- *   차례 ORDER_PER_DAY + 글에 있나요 INTEXT_PER_DAY + 사실·의견 SORT_PER_DAY, 한 꼴이 모자라면 다른 꼴로 채운다 ·
+ *   차례 ORDER_PER_DAY + 글에 있나요 INTEXT_PER_DAY + 사실·의견 SORT_PER_DAY + 앞뒤 어울리기 AGREE_PER_DAY, 한 꼴이 모자라면 다른 꼴로 채운다 ·
  *   practice면 ⭐ 퍼즐을 연습으로(오래 안 본 것부터)
  */
 export function planPuzzles(list, states, korDone, now, practice = false) {
   const today = dayNum(now);
   const st = wordsOf(states);
   const open = (list || []).filter((p) => isOpen(p, korDone));
-  const want = { order: ORDER_PER_DAY, intext: INTEXT_PER_DAY, sort: SORT_PER_DAY };
+  const want = { order: ORDER_PER_DAY, intext: INTEXT_PER_DAY, sort: SORT_PER_DAY, agree: AGREE_PER_DAY };
   const total = PUZZLES_PER_DAY;
   let pool;
   if (practice) {
@@ -302,7 +362,7 @@ export function planPuzzles(list, states, korDone, now, practice = false) {
   const take = [];
   for (const kind of PLAY_ORDER) take.push(...pool.filter((p) => p.kind === kind).slice(0, want[kind]));
   for (const p of pool) { if (take.length >= total) break; if (!take.includes(p)) take.push(p); }
-  // 판 안 차례: 차례 맞추기 → 글에 있나요 → 사실·의견 → … 돌아가며 (같은 꼴이 붙지 않게)
+  // 판 안 차례: 차례 맞추기 → 글에 있나요 → 사실·의견 → 앞뒤 어울리기 → … 돌아가며 (같은 꼴이 붙지 않게)
   const queues = PLAY_ORDER.map((kind) => take.filter((p) => p.kind === kind));
   const out = [];
   while (queues.some((q) => q.length)) for (const q of queues) if (q.length) out.push(q.shift());
@@ -370,6 +430,31 @@ export function gradeIntext(p, picks) {
     if (x.io === s.io && (s.io !== 'in' || x.line === s.line)) right++;
   }
   return { valid: true, ok: right === n, right, n };
+}
+
+/** 🔗 보기 차례 (순수) — 문장마다 끝 번호(0 = 바른 끝)를 고르게 섞는다 · 바른 차례도 나올 수 있다(두 개뿐이라 늘 피하면 바른 끝이 늘 둘째가 된다) */
+export function dealChoices(p, rng = Math.random) {
+  return (p && Array.isArray(p.items) ? p.items : []).map((x) => {
+    const a = (Array.isArray(x.choices) ? x.choices : []).map((_, i) => i);
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.max(0, Math.min(i, Math.floor((Number(rng()) || 0) * (i + 1)))); [a[i], a[j]] = [a[j], a[i]]; } // 0 아래도 막는다 (Codex 100차)
+    return a;
+  });
+}
+/** 🔗 낸 끝 채점 — picks = 문장마다 고른 끝 번호(choices의 번호 · 0이 바른 끝) · 빈 칸·모르는 번호가 있으면 valid false */
+export function gradeAgree(p, picks) {
+  const its = p && Array.isArray(p.items) ? p.items : [];
+  const n = its.length;
+  const arr = Array.isArray(picks) ? picks : [];
+  let valid = n > 0 && arr.length === n;
+  for (let i = 0; valid && i < n; i++) valid = Number.isInteger(arr[i]) && arr[i] >= 0 && arr[i] < its[i].choices.length;
+  if (!valid) return { valid: false, ok: false, right: 0, n };
+  let right = 0;
+  for (let i = 0; i < n; i++) if (arr[i] === 0) right++;
+  return { valid: true, ok: right === n, right, n };
+}
+/** 🔗 한 문장 (순수) — 앞부분 + 고른 끝 + 마침표 */
+export function agreeSentence(x, c) {
+  return `${x.pre} ${x.choices[c]}.`;
 }
 
 /** 📍 고쳐 볼 말 (순수) — 있어요는 바른 줄과 원문 조각 · 줄만 틀렸으면 그렇게 · 없어요는 "글에서는 확인할 수 없어요 — 까닭" */
@@ -477,5 +562,5 @@ export function puzzleFinishText(res, nameOf = (id) => id) {
 export function puzzleTodayLine(today) {
   if (today >= 2) return '오늘의 퍼즐 끝 ✅ 🟩까지 받았어요';
   if (today === 1) return '오늘의 퍼즐 끝 ✅ — 더 풀어도 ⭐는 모여요';
-  return `오늘 처음 끝내면 💰${PUZZLE_COINS} · 🎯 국어 포켓몬 잡기 1번 · 퍼즐 ${PUZZLE_PERFECT_MIN}개를 모두 한 번에 맞히면 🟩 국어스톤`;
+  return `오늘 처음 끝내면 💰${PUZZLE_COINS} · 🎯 국어 포켓몬 잡기 1번 · 퍼즐 ${PUZZLE_PERFECT_MIN}개 이상을 모두 한 번에 맞히면 🟩 국어스톤`; // v294 — 판이 넷이 되어 "3개를"이 틀린 말이 됐다
 }

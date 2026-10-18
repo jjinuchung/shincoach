@@ -3639,6 +3639,11 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .kor-pin-wait { font-weight: 700; color: var(--primary-dark); }
 .kor-pfo.is-in.is-on { border-color: #059669; background: #d1fae5; color: #064e3b; }
 .kor-pfo.is-out.is-on { border-color: #6b7280; background: #e5e7eb; color: #1f2937; }
+/* 🔗 앞뒤 어울리기 (v294) — 끝 보기 · 빈칸 · 고른 끝 · 짝 줄 */
+.kor-pfo.kor-pend.is-on { border-color: #7c3aed; background: #ede9fe; color: #4c1d95; }
+.kor-pblank { display: inline-block; min-width: 4.5em; border-bottom: 2px solid #a78bfa; }
+.kor-pfill { font-weight: 800; color: #5b21b6; border-bottom: 2px solid #c4b5fd; }
+.kor-pmate { color: #5b21b6; }
 
 /* 🎧 듣고 답하기 (v245) — 글 상자 자리에 듣기 상자: 말하는 사람 칸 · 줄 점 · ▶ 듣기 / 🐢 천천히 / ⏹ 멈추기 · 📄 글로 읽고 풀기 */
 .kor-listen { background: #f3f7ff; border: 2px solid #c7d7fe; border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 10px; }

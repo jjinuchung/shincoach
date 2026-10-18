@@ -5,7 +5,8 @@
 //  · 판 중간에 나가면(🎒·📊) 그대로 이어서, "← 그만하기"는 한 것(낸 퍼즐·놓은 조각·고른 칸)이 있으면 두 번 눌러야 저장 없이 끝
 //  · 📍 글은 푸는 동안·고쳐 볼 때 내내 보인다 — [글에 있어요]를 누르면 그 내용이 있는 줄을 글에서 고른다(문장은 가·나·다, 줄은 ①②③) ·
 //    다시 그려도 글 상자의 읽던 자리는 그대로 · 어느 문장의 줄을 고르는지 읽어 준다 · 확인 뒤 [글에서 보기] (Codex 70차)
-import { ASKS, FO, IO, KINDS, KIND_LIST, allPuzzles, planPuzzles, puzzleStats, shuffledOrder, gradeOrder, gradeSort, gradeIntext, intextWhy, isOpen, isSolved, puzzleFinishText, puzzleTodayLine } from './korpuzzle.js';
+//  · 🔗 앞뒤 어울리기(v294): 문장마다 끝 보기를 섞어 놓고(판을 시작할 때 한 번) · 고르면 문장이 이어져 보인다 · 확인 뒤 바른 문장과 짝·까닭
+import { ASKS, FO, IO, KINDS, KIND_LIST, AGREE_TYPES, allPuzzles, planPuzzles, puzzleStats, shuffledOrder, dealChoices, gradeOrder, gradeSort, gradeIntext, gradeAgree, intextWhy, isOpen, isSolved, puzzleFinishText, puzzleTodayLine } from './korpuzzle.js';
 import { wordsToday } from './korwords.js';
 import { korPuzzleFinish, korPuzzleMap, korPuzzleDayMap, korDoneMap } from './xp.js';
 import { circled } from './korean.js';
@@ -71,14 +72,15 @@ export async function renderPuzzleTab(box, ctx) {
   const plan = planPuzzles(list, states, done, now);
   const head = el('section', 'kor-head');
   head.appendChild(el('h2', 'kor-h', '🧩 오늘의 퍼즐'));
-  head.appendChild(el('p', 'kor-intro', '이야기의 흐름과 하는 차례를 맞추고, 글에 있는 내용인지 확인하고, 사실과 의견을 가려요. 다 맞힌 퍼즐은 ⭐, 틀린 퍼즐은 다음 날 다시 나와요.'));
+  head.appendChild(el('p', 'kor-intro', '이야기의 흐름과 하는 차례를 맞추고, 글에 있는 내용인지 확인하고, 사실과 의견을 가리고, 문장의 앞뒤가 어울리게 끝을 골라요. 다 맞힌 퍼즐은 ⭐, 틀린 퍼즐은 다음 날 다시 나와요.'));
   head.appendChild(el('p', 'kor-count', puzzleTodayLine(wordsToday(korPuzzleDayMap(), now))));
   if (plan.length) {
     const cnt = (kind) => plan.filter((p) => p.kind === kind).length;
     const o = cnt('order');
     const t = cnt('intext');
     const s = cnt('sort');
-    const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', `🧩 오늘의 퍼즐 시작 (${[o ? `차례 ${o}` : '', t ? `글에 있나요 ${t}` : '', s ? `사실·의견 ${s}` : ''].filter(Boolean).join(' · ')})`);
+    const a = cnt('agree');
+    const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', `🧩 오늘의 퍼즐 시작 (${[o ? `차례 ${o}` : '', t ? `글에 있나요 ${t}` : '', s ? `사실·의견 ${s}` : '', a ? `앞뒤 어울리기 ${a}` : ''].filter(Boolean).join(' · ')})`);
     b.type = 'button';
     b.addEventListener('click', () => guardStart('korean', () => startSession(ctx, false)));
     head.appendChild(b);
@@ -125,11 +127,11 @@ function startSession(ctx, practice) {
   sfxUnlock();
   const states = korPuzzleMap();
   const plan = planPuzzles(S.list, states, korDoneMap(), Date.now(), practice);
-  const items = plan.map((x) => byId(x.id)).filter(Boolean).map((p) => ({ id: p.id, kind: p.kind, deal: p.kind === 'order' ? shuffledOrder(p.chunks.length) : null }));
+  const items = plan.map((x) => byId(x.id)).filter(Boolean).map((p) => ({ id: p.id, kind: p.kind, deal: p.kind === 'order' ? shuffledOrder(p.chunks.length) : p.kind === 'agree' ? dealChoices(p) : null }));
   if (!items.length) { ctx.rerender(); return; }
   // 판을 시작할 때 퍼즐마다 마지막으로 푼 때 — 저장할 때 그 사이 다른 판이 옮겼으면 연습으로 (🔤 낱말과 같다)
   const from = new Map(items.map((x) => [x.id, (states[x.id] && states[x.id].at) || 0]));
-  S.ps = { items, i: 0, first: new Map(), from, placed: [], labels: [], picks: [], lineFor: -1, pinTop: 0, grade: null, saving: false, result: null, egg: null, quitAsk: false, focus: 'start' };
+  S.ps = { items, i: 0, first: new Map(), from, placed: [], labels: [], picks: [], ends: [], lineFor: -1, pinTop: 0, grade: null, saving: false, result: null, egg: null, quitAsk: false, focus: 'start' };
   renderSession(ctx);
   window.scrollTo(0, 0);
 }
@@ -184,7 +186,7 @@ export function renderSession(ctx) {
   }
   const it = ps.items[ps.i];
   const p = byId(it.id);
-  const card = p && p.kind === 'order' ? orderEl(ctx, p, it) : p && p.kind === 'intext' ? intextEl(ctx, p) : sortEl(ctx, p);
+  const card = p && p.kind === 'order' ? orderEl(ctx, p, it) : p && p.kind === 'intext' ? intextEl(ctx, p) : p && p.kind === 'agree' ? agreeEl(ctx, p, it) : sortEl(ctx, p);
   wrap.appendChild(card);
   wrap.appendChild(live);
   main.appendChild(wrap);
@@ -206,13 +208,15 @@ export function renderSession(ctx) {
   //   📍 [글에 있어요]를 누르면 글의 줄(pline — 바꾸는 중이면 고른 줄, 아니면 상자에 보이는 첫 줄) · 줄을 고르면 그 문장의 줄 단추(chip:k)
   const fo = /^fo:(\d+):(fact|opinion|in|out)$/.exec(focusTo);
   const chip = /^chip:(\d+)$/.exec(focusTo);
+  const end = /^end:(\d+):(\d+)$/.exec(focusTo);
   const t = focusTo === 'next' ? card.querySelector('.kor-next')
     : focusTo === 'quit' ? wrap.querySelector('.kor-wquit')
       : focusTo === 'start' || focusTo === 'pool' ? card.querySelector('.kor-pchunk:not(:disabled), .kor-pfo:not(:disabled), .kor-pcheck:not(:disabled)')
         : focusTo === 'check' ? card.querySelector('.kor-pcheck')
           : focusTo === 'pline' ? plineTarget(card, ps)
             : chip ? (card.querySelectorAll('.kor-psort')[Number(chip[1])] || card).querySelector('.kor-pline-chip')
-              : fo ? (card.querySelectorAll('.kor-psort')[Number(fo[1])] || card).querySelector(`.kor-pfo.is-${fo[2]}`) : null;
+              : fo ? (card.querySelectorAll('.kor-psort')[Number(fo[1])] || card).querySelector(`.kor-pfo.is-${fo[2]}`)
+                : end ? (card.querySelectorAll('.kor-psort')[Number(end[1])] || card).querySelector(`.kor-pend[data-c="${end[2]}"]`) : null;
   if (t) {
     try { t.focus({ preventScroll: true }); } catch { /* 초점은 없어도 */ }
     if (pin) showFocused(t); // 📍 초점 간 것이 화면 밖이거나 붙어 있는 글 상자에 가리면 보이게
@@ -273,7 +277,7 @@ function showLine(from, p, n) {
 
 /** 이 판에서 한 것이 있나 — 낸 퍼즐 · 놓은 조각 · 고른 칸 (있으면 "그만하기"를 한 번 더 묻는다, Codex 55차) */
 function didWork(ps) {
-  return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean) || ps.picks.some(Boolean);
+  return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean) || ps.picks.some(Boolean) || ps.ends.some((c) => c !== undefined);
 }
 
 /** 🧩 차례 맞추기 한 장 — 놓은 칸 · 남은 조각 · 하나 빼기·처음부터 · 확인 → 바른 차례와 실마리 */
@@ -393,6 +397,82 @@ function sortEl(ctx, p) {
     return box;
   }
   box.appendChild(el('p', `kor-fb ${g.ok ? 'is-ok' : 'is-no'}`, g.ok ? '맞아요! 모두 바르게 가렸어요' : `아쉬워요 — ${g.right} / ${g.n}문장을 맞혔어요. 까닭을 읽어 보세요`));
+  box.appendChild(nextBtn(ctx));
+  return box;
+}
+
+/** 글 안의 한 말을 굵게 (처음 나온 곳 하나) — 없으면 글 그대로 · whole이면 그 말이 걸친 낱말(띄어 쓴 덩이) 전체를("않" → "않을") */
+function boldIn(parent, text, word, whole = false) {
+  let k = word ? text.indexOf(word) : -1;
+  if (k < 0) { parent.appendChild(document.createTextNode(text)); return; }
+  let e = k + word.length;
+  if (whole) { k = text.lastIndexOf(' ', k) + 1; const sp = text.indexOf(' ', e); e = sp < 0 ? text.length : sp; }
+  parent.appendChild(document.createTextNode(text.slice(0, k)));
+  parent.appendChild(el('b', 'kor-pclue', text.slice(k, e)));
+  parent.appendChild(document.createTextNode(text.slice(e)));
+}
+
+/** 🔗 앞뒤 어울리기 한 장 — 문장마다 앞부분(짝 말 굵게) + 끝 보기(판을 시작할 때 섞은 차례) · 고르면 빈칸에 이어져 보인다 ·
+ *  확인 → 문장마다 ✓/✗와 바른 문장(짝 말·짝 조각 굵게) · 🔗 짝과 까닭 */
+function agreeEl(ctx, p, it) {
+  const ps = S.ps;
+  const g = ps.grade;
+  const box = el('div', 'kor-q kor-pq');
+  const head = el('div', 'kor-q-head');
+  head.appendChild(el('span', 'kor-q-skill', `${KINDS.agree.icon} ${KINDS.agree.ko} · ${p.icon} ${p.title}`));
+  box.appendChild(head);
+  box.appendChild(el('p', 'kor-q-text', '문장의 앞과 어울리는 끝을 골라 보세요.'));
+  box.appendChild(el('p', 'kor-tnote', '굵은 말을 보고, 문장의 처음과 끝만 이어 읽어 보세요.'));
+  const rows = el('ul', 'kor-psorts');
+  p.items.forEach((x, k) => {
+    const li = el('li', 'kor-psort kor-pagree');
+    const c = ps.ends[k];
+    const t = el('p', 'kor-psort-t');
+    t.appendChild(document.createTextNode(`${circled(k + 1)} `));
+    boldIn(t, x.pre, x.key);
+    t.appendChild(document.createTextNode(' '));
+    t.appendChild(c === undefined ? el('span', 'kor-pblank', '　　　　') : el('span', 'kor-pfill', x.choices[c]));
+    t.appendChild(document.createTextNode('.'));
+    li.appendChild(t);
+    const btns = el('div', 'kor-psort-btns');
+    btns.setAttribute('role', 'group');
+    btns.setAttribute('aria-label', `${k + 1}번 문장의 끝`);
+    for (const j of it.deal[k]) {
+      const on = c === j;
+      const b = el('button', `kor-pfo kor-pend${on ? ' is-on' : ''}`, `${on ? '✔ ' : ''}${x.choices[j]}`);
+      b.type = 'button';
+      b.dataset.c = String(j);
+      b.setAttribute('aria-pressed', String(on));
+      b.disabled = !!g;
+      b.addEventListener('click', () => { if (S.ps !== ps || ps.grade) return; ps.ends[k] = j; ps.quitAsk = false; ps.focus = `end:${k}:${j}`; renderSession(ctx); });
+      btns.appendChild(b);
+    }
+    li.appendChild(btns);
+    if (g) {
+      const ok = c === 0;
+      li.classList.add(ok ? 'is-ok' : 'is-no');
+      const right = el('p', 'kor-psort-why');
+      right.appendChild(document.createTextNode(`${ok ? '✓ 바른 문장' : '✗ 바르게 고치면'}: `));
+      boldIn(right, x.pre, x.key);
+      right.appendChild(document.createTextNode(' '));
+      boldIn(right, x.choices[0], x.mate, true);
+      right.appendChild(document.createTextNode('.'));
+      li.appendChild(right);
+      li.appendChild(el('p', 'kor-psort-why kor-pmate', `🔗 ${AGREE_TYPES[x.type] || ''} — ${x.why}`));
+    }
+    rows.appendChild(li);
+  });
+  box.appendChild(rows);
+  if (!g) {
+    const check = el('button', 'btn btn-primary kor-pcheck', '확인');
+    check.type = 'button';
+    check.disabled = !gradeAgree(p, p.items.map((_, k) => ps.ends[k])).valid;
+    check.addEventListener('click', () => submit(ctx, p, gradeAgree(p, p.items.map((_, k) => ps.ends[k]))));
+    box.appendChild(check);
+    box.appendChild(el('p', 'kor-fb'));
+    return box;
+  }
+  box.appendChild(el('p', `kor-fb ${g.ok ? 'is-ok' : 'is-no'}`, g.ok ? '맞아요! 앞뒤가 모두 어울려요' : `아쉬워요 — ${g.right} / ${g.n}문장을 맞혔어요. 바른 문장과 짝을 읽어 보세요`));
   box.appendChild(nextBtn(ctx));
   return box;
 }
@@ -600,6 +680,7 @@ function nextItem(ctx) {
   ps.placed = [];
   ps.labels = [];
   ps.picks = [];
+  ps.ends = [];
   ps.lineFor = -1;
   ps.pinTop = 0;
   ps.grade = null;
