@@ -1,6 +1,8 @@
 // 말하기 확인: 가능하면 음성 인식으로 "비슷하게 말했는지", 안 되는 기기에서는 마이크 소리 에너지로 "말했는지"만 판정
 // 구형 브라우저 호환을 위해 최신 문법(?., ??, ||=)은 쓰지 않는다.
 
+import { isSoundWord } from './sounds.js';
+
 const RMS_MIN = 0.012;        // 말소리 판정 문턱의 하한 (조용한 마이크 고려)
 const RMS_MAX_THRESHOLD = 0.022; // 문턱의 상한 — 태블릿 마이크가 작아(최대 RMS ~0.03) 이보다 높으면 아이 목소리를 놓침
 const NOISE_MULT = 2.5;       // 배경 소음의 몇 배 이상이면 말소리
@@ -83,6 +85,14 @@ export function normalizeWords(text) {
     .filter((w) => /[a-z0-9]/.test(w));
 }
 
+/**
+ * 채점할 원문 단어 — 소리 낱말(whoa·huh·hmm…, sounds.js)은 뺀다 (v292).
+ * 인식기가 글자로 못 바꾸는 소리라 "Whoa, whoa, whoa! Wait!"에서 wait만 말해도 맞게 들은 것이다
+ */
+function targetWords(text) {
+  return normalizeWords(text).filter((w) => !isSoundWord(w));
+}
+
 /** 두 단어가 "비슷한" 발음/철자인지 (아이 발음 오차 허용) */
 function similarWord(a, b) {
   if (a === b) return true;
@@ -150,17 +160,20 @@ function alignHits(tw, sw) {
  * text는 원문 그대로("Where", "going?") — 아이가 자막에서 본 모습과 같아야 한다.
  * 토큰은 공백 기준이라 srt.wordTimings와 자리가 1:1로 맞는다 (단어 하나만 다시 듣기에 쓴다).
  * "well-known"처럼 한 토큰이 비교용으로는 두 단어가 되는 경우, 둘 다 맞아야 ok.
+ * 소리 낱말("Whoa!" "Huh?")은 채점하지 않는다 — skip·sound (화면에서 흐리게, v292)
  */
 export function wordResults(target, transcript) {
-  const tw = normalizeWords(target);
+  const tw = targetWords(target);
   const sw = normalizeWords(transcript);
   const hits = alignHits(tw, sw); // 통과 판정과 달리 자리를 지키는 정렬
   const out = [];
   let i = 0;
   const raws = String(target).split(/\s+/).filter(Boolean);
   for (const raw of raws) {
-    const norm = normalizeWords(raw);
-    if (norm.length === 0) { out.push({ text: raw, ok: true, skip: true, missed: [] }); continue; } // 구두점·화자 표시 등
+    const all = normalizeWords(raw);
+    const norm = all.filter((w) => !isSoundWord(w));
+    if (all.length === 0) { out.push({ text: raw, ok: true, skip: true, missed: [] }); continue; } // 구두점·화자 표시 등
+    if (norm.length === 0) { out.push({ text: raw, ok: true, skip: true, sound: true, missed: [] }); continue; } // 🎤 소리 낱말 (v292)
     const missed = [];
     for (let k = 0; k < norm.length; k++) { if (!hits[i + k]) missed.push(norm[k]); }
     i += norm.length;
@@ -177,9 +190,10 @@ export function wordResults(target, transcript) {
  *  - 그 외: 일치율 ≥ 40%  또는  (2단어 이상 일치 + 그중 내용어 1개 이상, 6단어 이하 문장)
  *           또는 (3단어 이상 일치 + 내용어 1개 이상)
  *  → "I you" 같은 대명사 나열만으로는 긴 문장을 통과할 수 없음
+ * 소리 낱말(whoa·huh·hmm…)은 원문에서 빼고 센다 (v292) — 소리만 있는 줄은 total 0
  */
 export function scoreTranscript(target, transcript) {
-  const tw = normalizeWords(target);
+  const tw = targetWords(target);
   const sw = normalizeWords(transcript);
   const used = new Array(sw.length).fill(false);
   const matchedWords = [];

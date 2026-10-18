@@ -20,6 +20,7 @@ const VOCAB_KNOWN = new Set([
 ]);
 import { wordTimings as realWordTimings } from '../js/srt.js';
 import { isSpeakable as realIsSpeakable, createVocab as realCreateVocab } from '../js/vocab.js';
+import { soundOnly as realSoundOnly } from '../js/sounds.js';
 // 외국어 표시(미니언 말·스페인어…)까지 있어야 제대로 판정된다 → 진짜 단어장을 쓴다
 const REAL_VOCAB = realCreateVocab({
   basic: JSON.parse(fsNode.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8')),
@@ -112,7 +113,7 @@ function loadPlayer() {
     parseSubtitle: () => [], mergeSubtitles: (a) => a, mergeIntoSentences: (a) => a,
     wordTimings: () => [], findCueIndex: (cues, t) => cues.findIndex((c) => t >= c.start && t < c.end),
     getItem: async () => null, getVideoBlob: async () => null, updateItem: async () => null, listDaily: async () => [],
-    loadVocab: async () => ({ lookup: () => [] }), isSpeakable: realIsSpeakable,
+    loadVocab: async () => ({ lookup: () => [] }), isSpeakable: realIsSpeakable, soundOnly: realSoundOnly, // 🎤 감탄사 판정은 진짜 (v292)
     initDiag() {}, renderDiag() {},
     // ⏳ timelimit.js 스텁 — player.js는 기본값과 ⚙ 설정 표시에만 쓴다
     TIME_MIN: { weekday: 60, weekend: 120 },
@@ -2714,4 +2715,169 @@ test('🔍 Codex 65차 #6 — 보상 알림(sayWhenFree)은 말 칸이 빌 때 �
   const pl = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
   assert.ok(!pl.includes("if ($('player-msg').hidden) say(); else setTimeout(say, 3000);"), '덮을 수 있는 옛 꼴이 남지 않게');
   assert.match(pl, /sayWhenFree\(`🎤 \$\{n\}문장 연속 성공! 💰\+\$\{c\}`, 3500\);/);
+});
+
+// 🎤 v292 감탄사 줄 (2026-10-18 아버님 "진행하자") — "Huh?" "Whoa!"는 인식기가 글자로 못 바꿔 아무리 따라 해도 "다시 한번!"이었다
+test('🎤 v292 감탄사만 있는 줄은 미니언즈어 줄처럼 — 마이크를 안 켜고 따라 말하기 대기만 · 끝까지 들으면 말해 본 문장(🏁) · 진짜 낱말이 있는 줄은 그대로 확인', () => {
+  const { run, ctx, speakState } = loadPlayerWithSpeak([]);
+  let calls = 0;
+  ctx.runSpeakCheck = () => { calls++; return { promise: new Promise(() => {}), stop() {}, cancel() {} }; };
+  ctx.REAL_VOCAB = REAL_VOCAB;
+  run('state.vocab = REAL_VOCAB;');
+  for (const s of ['Huh?', 'Whoa, whoa, whoa!', 'Hmm.', 'Ow! Ow! Ow!', 'Oh, Gengar!']) assert.equal(run(`speakableCue({ en: ${JSON.stringify(s)} })`), false, s);
+  for (const s of ['Uh, Sheriff?', 'Uh… No?', 'Whoa! Look at that!', 'Hey!', 'Wow!']) assert.equal(run(`speakableCue({ en: ${JSON.stringify(s)} })`), true, s);
+  run('state.cues = [{start:0,end:1,en:"Huh?",ko:""},{start:2,end:4,en:"Whoa! Look at that!",ko:""}]; state.idx = 0; state.speakPassed = false;');
+  run('startShadowWait(state.cues[0])');
+  assert.equal(calls, 0, '감탄사 줄 — 마이크(인식)를 안 켠다');
+  assert.equal(run('!!state.speakRun'), false);
+  assert.equal(run('!!state.shadowTimer'), true, '따라 말하기 대기 시간만');
+  run('cancelShadowWait(); markDone(state.cues[0]);');
+  assert.deepEqual(speakState.saidCues, [0], '끝까지 들으면 🎤 말해 본 문장 (확인하지 않는 줄)');
+  run('state.idx = 1; state.speakPassed = false; startShadowWait(state.cues[1])');
+  assert.equal(calls, 1, '섞인 줄은 그대로 확인');
+  run('cancelShadowWait(); markDone(state.cues[1]);');
+  assert.deepEqual(speakState.saidCues, [0], '확인하는 줄은 통과해야 말해 본 문장');
+});
+
+test('🎤 v292 🔁 복습·⚔️ 배틀의 따라 말하기(speakSentence) — 확인하지 않는 줄은 마이크 없이 기다렸다가 통과(quiet) · 다 말했어요·닫기 · 확인하는 줄은 그대로 인식', async () => {
+  const { run, ctx } = loadPlayer();
+  let calls = 0;
+  ctx.runSpeakCheck = () => { calls++; let res; const promise = new Promise((r) => { res = r; }); return { promise, stop() { res({ passed: true, method: 'speech', transcript: 'look at that', score: { matched: 3, total: 3, ratio: 1 } }); }, cancel() {} }; };
+  await tick(); // 켤 때 단어장 읽기(스텁)가 끝난 뒤에 진짜 단어장을 넣는다 — 안 그러면 스텁이 덮는다
+  ctx.REAL_VOCAB = REAL_VOCAB;
+  run('state.vocab = REAL_VOCAB; settings.shadowFactor = 0;');
+  // ① 감탄사 줄 — 듣기 → (다 말했어요) → 통과
+  let stop = null;
+  let got = null;
+  run('speakSentence')({ start: 0, end: 1, en: 'Huh?' }, { register(s) { stop = s; }, onListening() {} }).then((r) => { got = r; });
+  assert.equal(run('state.puzzlePlaying'), true, '먼저 문장을 들려준다');
+  stop(); // 듣기 건너뛰기 → 따라 하기
+  assert.equal(calls, 0, '인식을 안 켠다');
+  assert.equal(got, null, '바로 넘어가지 않는다 — 따라 해 볼 시간');
+  stop(); // 다 말했어요
+  await tick();
+  assert.deepEqual([got.passed, got.method, got.score], [true, 'quiet', null]);
+  // ② 시간이 지나도 통과 (shadowFactor 0 → 1.5초)
+  got = null;
+  run('speakSentence')({ start: 0, end: 1, en: 'Whoa!' }, { register(s) { stop = s; } }).then((r) => { got = r; });
+  stop();
+  await new Promise((r) => setTimeout(r, 1600));
+  assert.equal(got && got.method, 'quiet', '기다리면 저절로');
+  // ③ 닫기 — 결과 없음(cancelled)
+  got = null;
+  run('speakSentence')({ start: 0, end: 1, en: 'Hmm.' }, { register(s) { stop = s; } }).then((r) => { got = r; });
+  stop(); stop('cancel');
+  await tick();
+  assert.equal(got && got.method, 'cancelled');
+  // ④ 확인하는 줄은 인식
+  got = null;
+  run('speakSentence')({ start: 2, end: 4, en: 'Whoa! Look at that!' }, { register(s) { stop = s; } }).then((r) => { got = r; });
+  stop(); stop();
+  await tick();
+  assert.deepEqual([calls, got.method], [1, 'speech']);
+});
+
+test('🎤 v292 🔁 복습 — 확인하지 않는 줄을 통과해도 ⚡💰는 없다(일정·말해 본 문장만) · 확인하는 줄은 그대로 · ⚔️ 배틀 문장은 확인하는 줄에서만 고른다', () => {
+  const { run, ctx, reviewCalls, reviewState, speakState, xpLog, coinLog } = loadPlayer();
+  ctx.REAL_VOCAB = REAL_VOCAB;
+  reviewState.stats = [due(1, { en: 'Oh, Gengar!' }), due(2, { en: 'I like it.' })];
+  run('state.vocab = REAL_VOCAB; state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:2,end:3,en:"I like it.",ko:""}]; settings.reviewCount = 2; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
+  const o = reviewCalls[0];
+  assert.ok(o, '복습이 열림');
+  o.onSentence({ start: 1, en: 'Oh, Gengar!' }, true);
+  assert.deepEqual([xpLog.length, coinLog.length], [0, 0], '확인하지 않는 줄 — 보상 없음');
+  assert.deepEqual(speakState.saidCues, [1], '일정·말해 본 문장은 넘긴다');
+  o.onSentence({ start: 2, en: 'I like it.' }, true);
+  assert.equal(xpLog.length, 1, '확인하는 줄은 ⚡');
+  assert.equal(coinLog.length, 1, '확인하는 줄은 💰');
+  // ⚔️ 배틀 — 모아 둔 문장 맨 앞이 감탄사 줄이어도 확인하는 줄을 고른다 (스텁 pickPuzzle은 맨 앞)
+  run('state.cues = [{start:0,end:1,en:"Whoa, whoa, whoa!",ko:""},{start:2,end:4,en:"We have to go now.",ko:""}]; state.idx = 1; state.puzzlePool = [state.cues[0]]; state.battleLastCue = null;');
+  assert.equal(run('battleCue().en'), 'We have to go now.');
+  // 모아 둔 문장이 방금 것뿐이면 근처 문장에서 — 그때도 감탄사 줄은 안 고른다
+  run('state.puzzlePool = []; state.cues = [{start:0,end:1,en:"Huh?",ko:""},{start:2,end:4,en:"We have to go now.",ko:""}]; state.idx = 1; state.battleLastCue = state.cues[1];');
+  assert.equal(run('battleCue().en'), 'We have to go now.', '근처 문장 대비 길');
+});
+
+test('🎤 v292 ⚙ 지금 복습 해보기(연습) — 확인하지 않는 줄(이름 외침·미니언즈어)은 빼고 고른다', () => {
+  const { run, ctx, reviewCalls, reviewState } = loadPlayer();
+  ctx.REAL_VOCAB = REAL_VOCAB;
+  reviewState.stats = [due(1, { en: 'Oh, Gengar!', lastAt: 9 }), due(2, { en: 'I like it.', lastAt: 1 })];
+  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:2,end:3,en:"I like it.",ko:""}]; settings.reviewCount = 5; state.item = { id: "x", title: "t" }; openPracticeReview();');
+  assert.deepEqual(reviewCalls[reviewCalls.length - 1].items.map((it) => it.cue.en), ['I like it.']);
+});
+
+test('🎤 v292 단어 칩 — 감탄사는 흐리게(sound) · 누를 수 없다 · 맞은 낱말·놓친 낱말은 전처럼', () => {
+  const { run, els } = loadPlayer();
+  run('renderSpeakWords({ start: 0, end: 2, en: "Whoa! Look at that!" }, { method: "speech", transcript: "look at", score: { matched: 2, total: 3, ratio: 0.67 } })');
+  assert.deepEqual(els['shadow-words'].children.map((b) => [b.textContent, b.className, !!b.disabled]), [
+    ['Whoa!', 'sw-word sound', true], ['Look', 'sw-word ok', true], ['at', 'sw-word ok', true], ['that!', 'sw-word miss', false],
+  ]);
+});
+
+// 🔍 Codex 98차 (아버님 "모두 반영해") — 확인하지 않는 줄의 "조용히 통과"가 보상으로 이어지던 길 · 단어장이 없을 때
+test('🔍 Codex 98차 ① ⚔️ 배틀 — 낼 만한 문장이 없어도 마지막 대비로 감탄사 줄을 고르지 않는다(가장 가까운 확인하는 줄) · 확인하는 줄이 하나도 없을 때만 지금 줄', () => {
+  const { run, ctx } = loadPlayer();
+  ctx.REAL_VOCAB = REAL_VOCAB;
+  ctx.pickPuzzle = () => null; // 진짜 pickPuzzle은 3~8단어만 — 짧은 줄뿐이면 마지막 대비로 간다
+  run('state.vocab = REAL_VOCAB; state.cues = [{start:0,end:1,en:"We have to go now.",ko:""},{start:2,end:3,en:"Huh?",ko:""},{start:4,end:5,en:"Whoa!",ko:""}]; state.idx = 2; state.puzzlePool = []; state.battleLastCue = null;');
+  assert.equal(run('battleCue().en'), 'We have to go now.');
+  run('state.cues = [{start:0,end:1,en:"Huh?",ko:""},{start:2,end:3,en:"Whoa!",ko:""},{start:4,end:5,en:"Stop right there!",ko:""}]; state.idx = 1;');
+  assert.equal(run('battleCue().en'), 'Stop right there!', '앞에 없으면 뒤에서');
+  run('state.cues = [{start:0,end:1,en:"Huh?",ko:""},{start:2,end:3,en:"Whoa!",ko:""}]; state.idx = 1;');
+  assert.equal(run('battleCue().en'), 'Whoa!', '확인하는 줄이 하나도 없으면 지금 줄 (배틀이 멈추지 않게)');
+});
+
+test('🔍 Codex 98차 ② 🔁 복습 — 확인하지 않는 줄만 있는 회차는 끝내도 완주 보상(⚡💰·🌟·🍄·🔶)이 없다(일정만) · 섞인 회차의 🔶 셈은 확인하는 줄만', async () => {
+  const { run, ctx, reviewCalls, reviewState, xpLog, coinLog, itemLog, mushroomState } = loadPlayer();
+  await tick();
+  ctx.REAL_VOCAB = REAL_VOCAB;
+  reviewState.stats = [due(1, { en: 'Oh, Gengar!' }), due(2, { en: 'Huh? Gengar?' })];
+  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:2,end:3,en:"Huh? Gengar?",ko:""}]; settings.reviewCount = 5; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
+  let o = reviewCalls[reviewCalls.length - 1];
+  assert.equal(o.items.length, 2, '회차에는 들어간다 (일정이 넘어가야 홈 숫자가 준다)');
+  o.onSentence(o.items[0].cue, true, o.items[0]);
+  o.onSentence(o.items[1].cue, true, o.items[1]);
+  await o.onFinished();
+  await tick();
+  assert.deepEqual([xpLog.length, coinLog.length, itemLog.length, reviewState.rounds, mushroomState.today, (reviewState.stoneKeys || []).length], [0, 0, 0, 0, 0, 0], '말하지 않은 회차 — 보상 없음');
+  // 섞인 회차: 확인하지 않는 줄 셋 + 확인하는 줄 하나를 못 함 → 🔶 셈은 확인하는 줄 하나뿐(하나까지 봐주기는 셋 이상일 때)
+  reviewState.stats = [due(1, { en: 'Oh, Gengar!' }), due(2, { en: 'Huh? Gengar?' }), due(3, { en: 'Oh, Pikachu!' }), due(4, { en: 'I like it.' })];
+  reviewState.items = 0; reviewState.sentences = 0; // 오늘 복습 수를 비운다 — 안 그러면 회차 길이가 남은 수로 준다
+  run('state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:2,end:3,en:"Huh? Gengar?",ko:""},{start:3,end:4,en:"Oh, Pikachu!",ko:""},{start:4,end:5,en:"I like it.",ko:""}]; state.reviewOpen = false; state.reviewCooldown = 0; state.reviewDone = false; maybeReview();');
+  o = reviewCalls[reviewCalls.length - 1];
+  assert.equal(o.items.length, 4);
+  for (const it of o.items) o.onSentence(it.cue, it.cue.en !== 'I like it.', it);
+  await o.onFinished();
+  await tick();
+  assert.equal(reviewState.rounds, 1, '말한 줄이 있으면 완주');
+  assert.equal(xpLog.length > 0, true);
+  assert.deepEqual(reviewState.stoneKeys || [], [], '확인하는 줄을 못 했으니 🔶 없음 (전엔 넷 중 하나 못 함으로 봐줬다)');
+  // 끝 화면은 보상이 없는 까닭을 말한다 — ⚡💰 칩 대신
+  const rv = fs.readFileSync(new URL('../js/review.js', import.meta.url), 'utf8');
+  assert.match(rv, /given\.quietOnly\) box\.appendChild\(el\('div', 'review-done-note', '🗣 이번엔 따라 해 보는 문장만 있어서 보상은 없어요'\)\);\s*else if \(!o\.practice && given\) \{/);
+});
+
+test('🔍 Codex 98차 ③ 💖 덤 — 확인하지 않는 줄은 통과해도 ⚡💰 없음(오늘 덤으로 푼 것만 적음) · 확인하는 줄은 그대로', async () => {
+  const { run, ctx, reviewCalls, reviewState, xpLog, coinLog } = loadPlayer();
+  await tick();
+  ctx.REAL_VOCAB = REAL_VOCAB;
+  reviewState.stats = [due(4, { en: 'I like it.' })];
+  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:4,end:5,en:"I like it.",ko:""}]; settings.reviewCount = 5; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
+  const o = reviewCalls[reviewCalls.length - 1];
+  o.onSentence({ start: 1, end: 2, en: 'Oh, Gengar!' }, true, { type: 'sentence', extra: true });
+  await tick();
+  assert.deepEqual([xpLog.length, coinLog.length], [0, 0], '말하지 않은 덤');
+  assert.deepEqual(reviewState.favDone, [1], '덤으로 푼 날은 적는다');
+  o.onSentence({ start: 4, end: 5, en: 'I like it.' }, true, { type: 'sentence', extra: true });
+  await tick();
+  assert.deepEqual([xpLog.length, coinLog.length], [1, 1]);
+});
+
+test('🔍 Codex 98차 ⑤ 단어장을 못 읽어도 감탄사만 있는 줄은 확인하지 않는다 — 다른 줄은 평소대로', () => {
+  const { run } = loadPlayerWithSpeak([]);
+  run('state.vocab = null;');
+  assert.equal(run('speakableCue({ en: "Huh?" })'), false);
+  assert.equal(run('speakableCue({ en: "Whoa, whoa, whoa!" })'), false);
+  assert.equal(run('speakableCue({ en: "Wait!" })'), true);
+  assert.equal(run('speakableCue({ en: "Bello! Poopaye!" })'), true, '판단할 근거가 없으면 막지 않는다 (옛 규칙 그대로)');
 });

@@ -1933,6 +1933,7 @@ button { font-family: inherit; }
 }
 .sw-word.miss::after { content: ' 🔊'; font-size: 0.8em; }
 .sw-word.miss:active { background: rgba(253, 224, 71, 0.35); transform: scale(0.96); }
+.sw-word.sound { opacity: 0.55; } /* 🎤 감탄사(whoa·huh…) — 채점하지 않는 소리 (v292) */
 .sw-word[disabled] { cursor: default; }
 
 /* 📊 자주 놓치는 단어 */

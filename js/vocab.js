@@ -3,6 +3,8 @@
 //         vocab/phrases.json (표현 → 뜻, '*'는 단어 하나 와일드카드)
 // 브라우저(fetch)와 Node(직접 import) 양쪽에서 쓰는 순수 함수 위주.
 
+import { isSoundToken } from './sounds.js';
+
 const CONTRACTIONS = ["n't", "'ll", "'re", "'ve", "'d", "'m", "'s"];
 
 const SPECIAL = { "can't": 'can', "won't": 'will', "ain't": 'be', "shan't": 'shall', "let's": 'let', "y'all": "y'all", "ma'am": "ma'am", "o'clock": "o'clock" };
@@ -209,6 +211,10 @@ const FOREIGN_TAG = /미니언 말|일본어|이탈리아어|스페인어|프랑
  * 사전에 없는 게 당연하므로 **아예 세지 않는다**. 그러지 않으면 "James and Henry!" 같은
  * 멀쩡한 영어가 걸러진다.
  *
+ * 🎤 감탄사(v292, sounds.js): "Huh?" "Whoa, whoa!"처럼 소리만 있는 줄도 따라 말하기를 확인하지 않는다 —
+ * whoa·huh는 단어장에 뜻이 있어 영어로 세어졌지만 인식기가 글자로 못 바꾼다. 섞인 줄에서는 소리 낱말을
+ * 영어로도 영어 아닌 것으로도 세지 않는다 ("Oh, bello!"는 미니언즈어 · "Whoa, look at that!"은 영어).
+ *
  * @param {string} text 영어 자막 한 줄
  * @param {Set<string>} known 아는 단어 집합 (createVocab().known)
  * @param {number} min 이 비율보다 낮으면 영어가 아닌 것으로 본다
@@ -224,8 +230,10 @@ export function isSpeakable(text, vocab, min = 0.4) {
     const w = tok.toLowerCase().replace(/[^a-z']/g, '');
     if (!w) continue; // 문장부호·다른 문자만 있는 조각
     // 문장 맨 앞이 아닌 대문자 낱말 = 이름 → 세지 않는다 (사전에 없는 게 당연하다)
-    const midSentenceName = i > 0 && /^[A-Z]/.test(tok) && !/^[.!?]$/.test(raw[i - 1].slice(-1));
+    // 단, 감탄사 바로 뒤는 문장을 다시 시작한 것으로 본다 — 자막은 "Uh… No?" "Uh, Sheriff?"처럼 쓴다 (v292)
+    const midSentenceName = i > 0 && /^[A-Z]/.test(tok) && !/^[.!?]$/.test(raw[i - 1].slice(-1)) && !isSoundToken(raw[i - 1]);
     if (midSentenceName) continue;
+    if (isSoundToken(tok)) continue; // 🎤 소리 낱말은 어느 쪽으로도 안 센다 (v292) — 감탄사만 있는 줄은 셀 낱말이 없어 아래에서 false
     counted++;
     if (foreign.has(w)) continue; // 외국어로 적어 둔 낱말은 영어로 세지 않는다
     if ((known && (known.has ? known.has(w) : false)) || stemWord(w, known) !== w || ENGLISH_TAIL.test(w)) english++;

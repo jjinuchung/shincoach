@@ -15,6 +15,7 @@
 //           english/library.md (📚 태블릿 영상 전체 — 제목·넣을 때 고른 파일 이름·넣은 날·진도, v277 · 날짜 없이 늘 최신)
 //           reward/YYYY-MM-DD.md (🎮 보상 쪽 — 지금 가진 것 · 최근 7일 날마다 누적의 차이, v278 · rewardlog.js)
 //           usage/upload-log.md (📤 올리기 실패 — 최근 14일, 실패는 이 기기에 적어 두었다가 다음에 올릴 때, v278)
+//           usage/crash-log.md (🛑 앱이 저절로 꺼진 기록 — 최근 14일, 다음에 켤 때 이 기기에 적어 두었다가, v292 · blackbox.js)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
@@ -300,9 +301,10 @@ export function unb64(s) {
  * getEnglish(있으면) = 🎤 영상 요약(stats.contentSummary) — 영상 기록을 못 읽으면 실패 (v253)
  * getKorReport(있으면) = 📚 국어 요약 글(today, days) — 프로필을 못 읽으면 실패 · 원고를 못 받거나 꼴이 틀리면 null(이번엔 국어 요약만 안 올림, v254)
  * usagePlaces(있으면) = 🕒 앱 사용 기록의 자리 목록(usage.PLACES) — 하루 기록(days)으로 만든다 (v272)
+ * crashLog(있으면) = 🛑 앱이 저절로 꺼진 기록 글(blackbox.crashLogNow) — 못 만들면 null이라 이 파일만 빠진다 (v292)
  * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, uploadLog, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, uploadLog, crashLog, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
@@ -326,6 +328,7 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(typeof weekly === 'string' && weekly ? [{ path: 'usage/weekly.md', text: weekly }] : []), // 📈 주간 흐름 — 📊 카드와 같은 표 (v287)
     ...(typeof family === 'string' && family ? [{ path: 'family/read.md', text: family }] : []), // 💌 한 줄 메시지 — 무엇이 왔고 언제 읽었나 (v288)
     ...(typeof uploadLog === 'string' && uploadLog ? [{ path: 'usage/upload-log.md', text: uploadLog }] : []), // 📤 올리기 실패 기록 (v278)
+    ...(typeof crashLog === 'string' && crashLog ? [{ path: 'usage/crash-log.md', text: crashLog }] : []), // 🛑 앱이 저절로 꺼진 기록 (v292)
   ];
 }
 
@@ -645,7 +648,8 @@ async function sendOnce(force) {
     if (usage) await usage.flushUsage().catch(() => {});
     // 🎮 저장을 기다리는 프로필 증분도 먼저 — 보상 쪽 누적(rewardNow)이 저장된 프로필을 읽는다 (Codex 86차 B · 실패해도 그대로 올린다)
     await import('./xp.js').then((xp) => xp.flushProfile()).catch(() => {});
-    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, uploadLog: logTextNow(today), today });
+    const crashLog = await import('./blackbox.js').then((bb) => bb.crashLogNow(today)).catch(() => null); // 🛑 앱이 저절로 꺼진 기록(v292) — 못 만들면 이것만 빠진다
+    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, uploadLog: logTextNow(today), today });
   } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };

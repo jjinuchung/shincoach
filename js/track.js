@@ -4,6 +4,7 @@ import {
   sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, bumpVocabViews,
   emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey, mergeEssayEntry, saidOf, saidFlag } from './db.js';
 import { enroll, schedule, GRADUATED } from './review.js';
+import { soundOnly } from './sounds.js';
 
 export const MASTER_RATIO = 0.8; // 발음 점수 80% 이상이면 ⭐ 정복
 
@@ -172,8 +173,8 @@ export function done(cue) {
   const r = rec(cue); if (!r) return;
   r.done = true;
   // 🔁 처음 "한" 문장은 내일부터 복습 큐에 들어간다
-  // (이미 복습 중인 문장이나 👑 졸업한 문장의 진도는 건드리지 않음)
-  if (!r.dueAt && (r.box || 0) < GRADUATED) Object.assign(r, enroll(todayKey()));
+  // (이미 복습 중인 문장이나 👑 졸업한 문장의 진도는 건드리지 않음) · 🎤 감탄사만 있는 줄("Huh?")은 넣지 않는다 (v292 — review.isDue도 뺀다)
+  if (!r.dueAt && (r.box || 0) < GRADUATED && !soundOnly(cue.en)) Object.assign(r, enroll(todayKey()));
   if (t.daily && !t.daily.doneKeys.includes(r.key)) {
     t.daily.doneKeys.push(r.key);
     t.dailyDelta.doneKeys.push(r.key);

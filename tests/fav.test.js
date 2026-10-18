@@ -86,7 +86,7 @@ test('🖥 화면 배선: 💖 칩·📜 줄 버튼(줄 클릭으로 안 번짐)
   assert.match(src, /\$\('btn-fav'\)\.addEventListener\('click', \(\) => toggleFav\(state\.idx\)\)/);
   assert.match(src, /fav\.addEventListener\('click', \(e\) => \{ e\.stopPropagation\(\); toggleFav\(i\); \}\);/);
   assert.match(src, /function highlightScript\(\) \{\s*updateFavChip\(\);/);
-  assert.match(src, /onSentence: \(cue, passed, item\) => \{\s*if \(item && item\.extra\) return favExtraDone\(cue, passed, practice\);/);
+  assert.match(src, /onSentence: \(cue, passed, item\) => \{\s*const said = speakableCue\(\(item && item\.cue\) \|\| cue\);[^\n]*\n\s*\/\/[^\n]*\n\s*if \(item && item\.extra\) return favExtraDone\(cue, passed && said, practice\);/, '확인하지 않는 줄의 덤은 보상 없음 (v292 Codex 98차 ③)');
   assert.match(src, /onDictation: \(item, passed\) => \{\s*if \(item && item\.extra\) return favExtraDone\(item\.cue, passed, practice\);/);
   assert.match(src, /function favExtraDone\(cue, passed, practice\) \{\s*if \(practice\) return null;\s*track\.favPractice\(cue\);/);
   assert.ok(!/function favExtraDone[\s\S]{0,300}track\.review\(/.test(src), '덤은 track.review(일정)를 부르지 않는다');

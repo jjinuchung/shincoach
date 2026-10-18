@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { enroll, schedule, GRADUATED, addDays } from '../js/review.js';
+import { soundOnly } from '../js/sounds.js';
 // 오늘 기록 합치기 규칙은 **실제 db.js 함수**를 그대로 쓴다 (스텁이 진짜 규칙과 어긋나지 않게)
 import { emptyDaily, mergeDailyDelta, saidOf, saidFlag } from '../js/db.js';
 
@@ -51,8 +52,8 @@ function stub() {
       store.days.set(date, next);
       return { won: true, count: next[field], daily: next };
     },
-    // 🔁 복습 규칙은 실제 모듈을 그대로 씀 (vm에는 import가 없으므로 주입)
-    enroll, schedule, GRADUATED,
+    // 🔁 복습 규칙은 실제 모듈을 그대로 씀 (vm에는 import가 없으므로 주입) · 🎤 감탄사 판정도 (v292)
+    enroll, schedule, GRADUATED, soundOnly,
   };
 }
 
@@ -136,6 +137,16 @@ test('🔁 문장을 "했다"고 인정하면 내일부터 복습 큐에 들어�
   assert.equal(r.done, true);
   assert.equal(r.box, 0);
   assert.equal(r.dueAt, addDays(today, 1), '완료한 다음 날');
+});
+
+test('🎤 v292 감탄사만 있는 줄("Huh?")은 끝내도 복습 큐에 안 들어간다 — 한 문장·오늘 목표에는 그대로 센다 · 섞인 줄은 들어간다', async () => {
+  const { run } = loadTrack(stub());
+  await run('open({ id: "x", title: "X" })');
+  run('done({ start: 1, end: 2, en: "Huh?" }); done({ start: 3, end: 4, en: "Whoa! Look at that!" })');
+  const [quiet, real] = run('statsList()').slice().sort((a, b) => a.start - b.start);
+  assert.deepEqual([quiet.done, quiet.dueAt], [true, ''], '감탄사 줄 — 했다고는 치지만 복습은 아니다');
+  assert.equal(real.dueAt, addDays(run('todayKey()'), 1), '섞인 줄은 내일 복습');
+  assert.equal(run('todayDone()'), 2, '오늘 한 문장에는 둘 다');
 });
 
 test('🔁 이미 복습 중인 문장을 다시 완료해도 진도가 초기화되지 않는다', async () => {

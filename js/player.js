@@ -5,6 +5,7 @@ import {
   wordTimings, findCueIndex,
 } from './srt.js';
 import { isSpeakable, loadVocab } from './vocab.js';
+import { soundOnly } from './sounds.js';
 import { initDiag, renderDiag } from './diag.js';
 import { runSpeakCheck, prepareMic, releaseMic, resetRecognition, wordResults, micFailReason } from './speak.js';
 import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZLE_MAX_WORDS } from './puzzle.js';
@@ -507,13 +508,32 @@ function potionList() {
   return POTION.filter((p) => inv[p.id] > 0).map((p) => ({ id: p.id, n: inv[p.id] }));
 }
 
-/** 배틀에서 따라 말할 문장: 모아둔 문장·근처 문장 중 퍼즐 낼 만한 것(3~8단어), 방금 것과 다른 것 */
+/** 배틀에서 따라 말할 문장: 모아둔 문장·근처 문장 중 퍼즐 낼 만한 것(3~8단어), 방금 것과 다른 것 · 따라 말하기를 확인하는 줄만 (v292 — 감탄사 줄로 공짜 공격이 되지 않게) */
 function battleCue() {
-  const near = state.cues.slice(Math.max(0, state.idx - 12), state.idx + 1);
-  const pool = [...state.puzzlePool, ...near].filter((c) => c !== state.battleLastCue);
-  const cue = pickPuzzle(pool) || pickPuzzle(near) || state.cues[state.idx] || null;
+  const near = state.cues.slice(Math.max(0, state.idx - 12), state.idx + 1).filter(speakableCue);
+  const pool = [...state.puzzlePool, ...near].filter((c) => c !== state.battleLastCue && speakableCue(c));
+  const cue = pickPuzzle(pool) || pickPuzzle(near) || nearestSpeakable() || state.cues[state.idx] || null;
   state.battleLastCue = cue;
   return cue;
+}
+
+/**
+ * ⚔️ 낼 만한 문장이 없을 때 — 지금 자리에서 가장 가까운 확인하는 줄 (앞 먼저, 방금 것은 뒤로) (🔍 Codex 98차 ①).
+ * 지금 줄이 감탄사면 말하지 않아도 통과(quietRun)해 공짜 공격이 된다. 확인하는 줄이 하나도 없으면 null (지금 줄로)
+ */
+function nearestSpeakable() {
+  const n = state.cues.length;
+  const at = Math.max(0, Math.min(state.idx, n - 1));
+  let fallback = null;
+  for (let d = 0; d < n; d++) {
+    for (const i of [at - d, at + d]) {
+      const c = state.cues[i];
+      if (!c || !speakableCue(c)) continue;
+      if (c !== state.battleLastCue) return c;
+      if (!fallback) fallback = c;
+    }
+  }
+  return fallback;
 }
 
 /**
@@ -545,10 +565,27 @@ function speakSentence(cue, hooks) {
     playPuzzleSentence(cue, () => {
       if (done) return;
       if (hooks.onListening) hooks.onListening();
-      run = runSpeakCheck({ target: cue.en, durationSec: cue.end - cue.start, onInterim: hooks.onInterim, onLevel: hooks.onLevel });
+      // 🎤 확인하지 않는 줄(감탄사·영어가 아닌 대사, v292) — 마이크 없이 따라 해 볼 시간만 주고 통과 (🔁 복습 보상은 onSentence에서 뺀다)
+      run = speakableCue(cue) ? runSpeakCheck({ target: cue.en, durationSec: cue.end - cue.start, onInterim: hooks.onInterim, onLevel: hooks.onLevel }) : quietRun(cue);
       run.promise.then(finishWith);
     });
   });
+}
+
+/**
+ * 🎤 마이크 없이 따라 해 보기 (v292) — runSpeakCheck와 같은 손잡이 { promise, stop, cancel }.
+ * 따라 말하기 대기와 같은 시간(⚙ shadowFactor)이 지나거나 "다 말했어요"를 누르면 통과 (method 'quiet' — 듣고 따라 해 본 것).
+ * 감탄사("Huh?")·미니언즈어처럼 인식기가 글자로 못 바꾸는 줄에서 아이가 "다시 한번!"만 듣지 않게
+ */
+function quietRun(cue) {
+  let resolveOuter = null;
+  let over = false;
+  let timer = null;
+  const promise = new Promise((r) => { resolveOuter = r; });
+  const end = (r) => { if (over) return; over = true; clearTimeout(timer); resolveOuter(r); };
+  const ok = () => end({ passed: true, method: 'quiet', transcript: '', score: null, spokenMs: 0, reason: 'quiet', srError: '' });
+  timer = setTimeout(ok, Math.max(1.5, (cue.end - cue.start) * settings.shadowFactor + 0.5) * 1000);
+  return { promise, stop: ok, cancel: () => end({ passed: false, method: 'cancelled', transcript: '', score: null, spokenMs: 0, reason: 'cancel', srError: '' }) };
 }
 
 /** 배틀 열림/닫힘 표시: 키보드 단축키 차단 + 뒤 화면을 inert (Tab으로 뒤 버튼이 눌리지 않게, Codex #6) */
@@ -1141,6 +1178,7 @@ async function dropMushroom(why) {
 
 /** 회차 완주 보상: ⚡·💰 + (하루 첫 완주만) 🌟 황금 볼·❤️ 회복 */
 async function grantReviewRound() {
+  if (!(state.reviewN > 0)) return { quietOnly: true }; // 🗣 따라 해 보는 줄만 있었다 — 일정만 넘기고 완주·🌟·🔶·🍄 없음 (🔍 Codex 98차 ②, 끝 화면이 까닭을 말한다)
   track.markReviewRound();
   // 🌟 황금 볼은 하루 1개 — 트랜잭션 안에서 선점한 창만 받는다 (두 창을 열어도 2개가 안 나옴)
   const golden = await track.markReviewGolden();
@@ -1195,7 +1233,8 @@ function startReview(items, practice, after) {
   hidePlayerMessage();
   if (!video.paused) video.pause();
   state.reviewFails = 0; // 🔶 이 회차에서 못 넘긴 문항 수 — 0이어야(문항이 셋 이상이면 하나까지, v263) 영어스톤
-  state.reviewN = (items || []).filter((x) => x && !x.extra).length; // 🔶 💖 덤을 뺀 문항 수 (v263)
+  // 🔶 💖 덤을 뺀 문항 수 (v263) · 확인하지 않는 줄(이름 외침·미니언즈어 — 말하지 않고 넘어간다)도 뺀다 (🔍 Codex 98차 ② — 그런 줄만 있는 회차는 완주 보상이 없다)
+  state.reviewN = (items || []).filter((x) => x && !x.extra && !(x.type === 'sentence' && !speakableCue(x.cue))).length;
   state.reviewDw = 0; state.reviewDwFails = 0; // 🔶 +1 — 받아쓰기·단어 문항 수와 그중 못 넘긴 수 (💖 덤 빼고)
   state.reviewKey = reviewKeyOf(items); // 회차의 정체 — 같은 묶음은 스톤 한 번 (Codex 8차 #9)
   const p = practice ? null : partnerInfo();
@@ -1215,13 +1254,16 @@ function startReview(items, practice, after) {
     unlock,
     speak: speakSentence,
     onSentence: (cue, passed, item) => {
-      if (item && item.extra) return favExtraDone(cue, passed, practice);
+      const said = speakableCue((item && item.cue) || cue); // 확인하는 줄인가 — 문항의 cue로 (review.js가 넘기는 cue와 같다)
+      // 💖 덤도 확인하지 않는 줄은 들은 것으로만 — ⚡💰 없음 (🔍 Codex 98차 ③)
+      if (item && item.extra) return favExtraDone(cue, passed && said, practice);
       if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
       if (practice) return null;
       const info = track.review(cue, passed);
       // 🎤 복습에서 따라 말하기를 통과하면 말해 본 문장 — 전에 ⏭로 넘긴 문장도 🏁 칸이 찬다 (Codex 65차 #2, 받아쓰기는 아님)
       if (passed) track.said(cue);
-      if (passed) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
+      // ⚡💰는 확인한 줄만 — 확인하지 않는 줄(감탄사·영어가 아닌 대사)은 듣고 따라 해 본 것으로 일정만 넘긴다 (v292, 본 학습과 같은 규칙)
+      if (passed && said) { awardXp(REVIEW_REWARD.xp); awardCoins(REVIEW_REWARD.coin); }
       return info;
     },
     // ✍️ 받아쓰기: 그 문장만 들려준다. state.puzzleCue가 있어야 onTick이 문장 끝에서 멈춘다
@@ -1305,7 +1347,7 @@ function openPracticeReview() {
     .map((rec) => ({ type: 'word', rec, word: rec.word, meaning: rec.meaning, choices: quizChoices(rec, state.vocabViews) }))
     .filter((it) => it.choices.length >= 2);
   const items = track.statsList()
-    .filter((r) => r.done && cueForStart(r.start)) // 자막에 없는 기록을 먼저 제외 (Codex #7)
+    .filter((r) => r.done && cueForStart(r.start) && speakableCue(cueForStart(r.start))) // 자막에 없는 기록을 먼저 제외 (Codex #7) · 확인하지 않는 줄도 (v292)
     .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0))
     .slice(0, Math.max(1, per - w.length))
     .map((rec) => ({ type: 'sentence', rec, cue: cueForStart(rec.start) }));
@@ -2225,6 +2267,7 @@ function replayCurrent() {
  */
 function speakableCue(cue) {
   if (!cue || !cue.en) return false;
+  if (soundOnly(cue.en)) return false; // 🎤 감탄사만 있는 줄 — 단어장 없이도 안다 (🔍 Codex 98차 ⑤)
   if (!state.vocab || !state.vocab.known || !state.vocab.known.size) return true; // 단어장을 못 읽었으면 평소대로
   return isSpeakable(cue.en, state.vocab);
 }
@@ -2602,7 +2645,7 @@ function renderSpeakWords(cue, result) {
   words.forEach((w, i) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = `sw-word${w.ok ? ' ok' : ' miss'}`;
+    b.className = `sw-word${w.sound ? ' sound' : w.ok ? ' ok' : ' miss'}`; // 🎤 감탄사는 채점 안 함 — 흐리게 (v292)
     b.textContent = w.text;
     if (!w.ok && !w.skip) {
       for (const n of w.missed) missedNorm.push(n);

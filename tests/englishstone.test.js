@@ -276,7 +276,7 @@ test('🔶 화면 연결 — 📦 창이 지난 영상을 챙긴다(앱을 열 �
   assert.ok(!/videoPct\(track\.doneCount\(\)/.test(pl), '한 문장 수로 세는 곳이 남지 않게');
   assert.match(src('js/parcel.js'), /return videoStoneDue\(st\.contentSummary\(items, records, st\.cueCountOf, st\.cueKeysOf\), parcelsReceived\(\)\);/, '📦 창도 contentSummary(saidPct)로');
   assert.match(pl, /const st = reviewStones\(\{ fails: state\.reviewFails \|\| 0, n: state\.reviewN \|\| 0, dw: state\.reviewDw \|\| 0, dwFails: state\.reviewDwFails \|\| 0 \}\);/);
-  assert.match(pl, /state\.reviewN = \(items \|\| \[\]\)\.filter\(\(x\) => x && !x\.extra\)\.length;/, '💖 덤을 뺀 문항 수 (v263)');
+  assert.match(pl, /state\.reviewN = \(items \|\| \[\]\)\.filter\(\(x\) => x && !x\.extra && !\(x\.type === 'sentence' && !speakableCue\(x\.cue\)\)\)\.length;/, '💖 덤을 뺀 문항 수 (v263) · 확인하지 않는 줄도 뺀다 (v292 Codex 98차 ②)');
   assert.match(pl, /stoneLeft: practice \? null : track\.reviewStoneRoundsLeft\(\),/);
   const t = src('js/track.js');
   assert.match(t, /claimDailyKey\(date, 'reviewStoneKeys', String\(roundKey \|\| ''\), REVIEW_STONE_ROUNDS\)/, '하루 몇 회차인지 한 곳');

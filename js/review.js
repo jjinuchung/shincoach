@@ -5,7 +5,18 @@
 //
 // 이 파일 앞부분은 순수 로직(테스트 대상)이고, 뒷부분은 오버레이 UI다.
 
+import { soundOnly } from './sounds.js';
+
 // ── 규칙 ──
+
+/**
+ * 🎤 감탄사만 있는 문장 기록("Huh?" "Whoa, whoa!") — 복습에 안 쓴다 (v292).
+ * 따라 말하기를 확인하지 않는 줄이라 복습에서 말하라고 할 것도 없다. 문장 기록에 남은 영어(en)로 정하므로
+ * 홈·목록의 "밀린 복습" 수와 실제 회차가 같은 판정을 쓴다. 수학 개념 기록(en 없음)은 그대로
+ */
+function quietRec(rec) {
+  return !!(rec && typeof rec.en === 'string' && soundOnly(rec.en));
+}
 
 /** box 단계별 "다음 복습까지 며칠" (box 0 → 1일 뒤, 1 → 2일 뒤 …) */
 export const REVIEW_INTERVALS = [1, 2, 4, 7, 14];
@@ -83,6 +94,7 @@ export function schedule(box, passed, today) {
 export function isDue(rec, today) {
   if (!rec || !rec.dueAt) return false;
   if ((rec.box || 0) >= GRADUATED) return false;
+  if (quietRec(rec)) return false; // 🎤 감탄사만 있는 문장 (v292)
   return rec.dueAt <= today;
 }
 
@@ -131,7 +143,7 @@ export function pickReviews(records, today, count = DEFAULT_COUNT) {
  */
 export function pickFavExtra(records, today, takenKeys = []) {
   const taken = new Set(takenKeys);
-  const pool = (records || []).filter((r) => r && r.fav && r.done && !taken.has(r.key) && !isDue(r, today) && r.favDay !== today);
+  const pool = (records || []).filter((r) => r && r.fav && r.done && !taken.has(r.key) && !isDue(r, today) && r.favDay !== today && !quietRec(r));
   pool.sort((a, b) => (a.favDay || '').localeCompare(b.favDay || '') || (a.lastAt || 0) - (b.lastAt || 0));
   return pool[0] || null;
 }
@@ -224,7 +236,7 @@ export function reviewSummary(records, today) {
   let graduated = 0;
   (records || []).forEach((r) => {
     if ((r.box || 0) >= GRADUATED) { graduated++; return; }
-    if (!r.dueAt) return;
+    if (!r.dueAt || quietRec(r)) return; // 🎤 감탄사만 있는 문장은 복습 대상이 아니다 (v292 — isDue와 같은 판정)
     if (r.dueAt <= today) dueCount++;
     else waiting++;
   });
@@ -830,7 +842,9 @@ function showDone() {
     : `${total}문장 중 ${ui.passed}문장을 잘 말했어요`));
   // 보상은 마지막 문장을 확정할 때 이미 지급됐다 (settleSentence) — 여기서는 그 내용만 보여준다
   const given = ui.reward;
-  if (!o.practice && given) {
+  // 🗣 따라 해 보는 줄만 있던 회차 — 보상이 없는 까닭을 말한다 (말없이 비어 있으면 아이는 못 받은 줄 모른다, 🔍 Codex 98차 ②)
+  if (!o.practice && given && given.quietOnly) box.appendChild(el('div', 'review-done-note', '🗣 이번엔 따라 해 보는 문장만 있어서 보상은 없어요'));
+  else if (!o.practice && given) {
     const rw = el('div', 'review-done-reward');
     if (given.golden) rw.appendChild(el('span', 'review-chip gold', '🌟 황금 몬스터볼 +1'));
     if (given.hp) rw.appendChild(el('span', 'review-chip hp', `❤️ +${given.hp}`));
