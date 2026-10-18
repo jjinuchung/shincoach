@@ -451,8 +451,7 @@ function newTagOk(tag, ch, x, w) {
     case TAGS.keepGrows: return x.kind === 'keep' && x.t > 0 && (v === w.v + x.t || v === w.v + 4 * x.t);
     case TAGS.resultAsBox:                                                    // 등호 바로 뒤(□ 자리)에 계산 결과
       if (x.kind === 'box') return v === OPS[x.op](x.a, x.b);
-      if (x.kind === 'grpAdd') return v === x.a + x.b + x.c;
-      if (x.kind === 'grpSub') return v === x.a - x.b - x.c;
+      if (x.kind === 'grpAdd') return v === x.a + x.b + x.c;                   // □가 등호 뒤 (a + b + c = □ + T)
       if (x.kind === 'judge') return !!p && p.c === x.L && p.op2 === '+' && sideVal(p) !== x.L;
       if (x.kind === 'story') return !!p && p.c === x.a + x.b && p.op2 === '+' && sideVal(p) !== x.a + x.b;
       return false;
@@ -479,6 +478,7 @@ function newTagOk(tag, ch, x, w) {
       const same = (u, y, a, b) => (u === a && y === b) || (u === b && y === a);
       return four === given && !same(p.a, p.b, x.a, x.b) && !same(p.a, p.b, x.c, x.d) && p.a + p.b !== p.c + p.d;
     }
+    case TAGS.resultMoved: return x.kind === 'grpSub' && v === x.a - x.b - x.c; // □가 등호 앞 (a − □ = a − b − c) — Codex 96차
     case TAGS.lastDiff: return x.kind === 'grow' && x.n === 7 && v === x.seq[4] + 2 * (x.seq[4] - x.seq[3]);
     case TAGS.digitAsOrder:                                                   // 한 칸 밀린 값(n ± 1)과도 달라야 이름표가 하나로 정해진다
       if (x.kind === 'orderRow') return v === Number(String(x.X)[0]) && Math.abs(v - x.n) > 1;
@@ -993,6 +993,81 @@ test('v289 등호 칸 — 뺄셈 □는 빼는 수와 같은 쪽 · 덧셈 □�
     }
   }
   assert.ok(n > 500, `${n}건`);
+});
+
+test('🔍 Codex 96차 P1: 등호 문항은 양쪽이 나타내는 양까지 두 자리 — 정답 식·② 고친 풀이 (일부러 만든 오답 값만 넘을 수 있다)', () => {
+  let n = 0;
+  for (const id of ['cor.equal', 'cor.apply4']) {
+    for (let s = 1; s <= 3000; s++) {
+      const q = makeQuestion(id, 'calc', s * 211, OPTS);
+      const x = solveText(q.q).ctx;
+      const where = `${id} seed ${s}: ${q.q.replace(/\n/g, ' ')}`;
+      let L = null;
+      if (x.kind === 'box' || x.kind === 'judge') L = OPS[x.op](x.a, x.b);
+      else if (x.kind === 'story') L = x.a + x.b;
+      else if (x.kind === 'grpAdd') L = x.a + x.b + x.c;
+      else if (x.kind === 'grpSub') L = x.a;
+      if (L === null) continue;
+      n++;
+      assert.ok(L >= 10 && L <= 99, `${where} — 양쪽의 양 ${L}`);
+      if (x.kind === 'box') for (const t of q.solve.steps) for (const v of nums(t)) assert.ok(v <= 99, `${where} — 풀이 속 ${v}: ${t}`);
+    }
+  }
+  assert.ok(n > 2000, `${n}건`);
+  for (let s = 1; s <= 1500; s++) {
+    for (const want of ['misread:result', 'misread:chain']) {
+      const q = makeQuestion('cor.equal', 'misread', s * 223, { ...OPTS, want: { k: 'misread', key: want } });
+      const ok = q.choices.find((c) => c.ok).text;
+      for (const v of [...nums(q.q), ...nums(ok), ...q.solve.steps.flatMap(nums)]) assert.ok(v <= 99, `${want} seed ${s}: ${v} — ${q.q.replace(/\n/g, ' ')}`);
+    }
+  }
+});
+
+test('🔍 Codex 96차 P2: 노린 오답 값은 정답과 다르고 서로 다르다 — 보기에서 조용히 빠지지 않는다 (문제 글에서 다시 계산)', () => {
+  const rep = (s) => /^(\d)\1*$/.test(s);
+  let n = 0;
+  for (const c of CORRESPOND.filter((cc) => NEW4.includes(cc.id))) {
+    for (let s = 1; s <= 3000; s++) {
+      const q = makeQuestion(c.id, 'calc', s * 307, OPTS);
+      const w = solveText(q.q); const x = w.ctx;
+      let want = null;
+      if (x.kind === 'box') want = x.op === '+'
+        ? [x.a + x.b, x.a + x.b + x.other, 2 * (x.pos === 'L' ? x.a : x.b) - w.v]
+        : [x.a - x.b, 2 * x.a - w.v, x.a];
+      else if (x.kind === 'grpAdd') want = [x.a + x.b + x.c, x.a + x.b + x.c + x.T];
+      else if (x.kind === 'grpSub') want = [x.a - x.b - x.c, x.b];
+      else if (x.kind === 'grow') want = [growAt(x.seq, 5), x.seq[4] + 2 * (x.seq[4] - x.seq[3])];
+      else if (x.kind === 'orderRow' || x.kind === 'orderAdd') want = [x.kind === 'orderRow' ? Number(String(x.X)[0]) : Math.floor(x.R.x / 100), x.n - 1, x.n + 1];
+      else if (x.kind === 'keep') want = [w.v + x.t, w.v + 4 * x.t];
+      else if (x.kind === 'rowRes' && rep(String(w.v))) {
+        const d = Number(String(w.v)[0]); const len = String(w.v).length;
+        want = [Number(String(d).repeat(len - 1)), Number(String(d).repeat(len + 1))];
+        if (x.n === 6) want.push(rowAt(x.rows, 5).z); else if (d + 1 <= 9) want.push(rowAt(x.rows, 6).z);
+      }
+      if (!want) continue;
+      n++;
+      const where = `${c.id} seed ${s}: ${q.q.replace(/\n/g, ' ')}`;
+      assert.equal(new Set(want).size, want.length, `${where} — 노린 오답끼리 같다 ${want}`);
+      for (const v of want) {
+        assert.notEqual(v, w.v, `${where} — 노린 오답 ${v}이 정답과 같다`);
+        assert.ok(q.choices.some((ch) => !ch.ok && Number(ch.text) === v && ch.tag !== '계산 실수'), `${where} — 노린 오답 ${v}이 보기에 없다 (${q.choices.map((ch) => ch.text).join(' / ')})`);
+      }
+    }
+  }
+  assert.ok(n > 4000, `${n}건`);
+});
+
+test('🔍 Codex 96차 P2: "등호로 이어 쓰면 안 된다"가 아니라 "이은 식은 모두 크기가 같아야" — 36 + 25 + 3 = 61 + 3 = 64는 옳다', () => {
+  const page = CONTENT['cor.equal'].lesson[3].say;
+  assert.doesNotMatch(page, /줄줄이 붙이면 안/);
+  assert.match(page, /등호로 이은 식은 \*\*모두 크기가 같아야\*\*/);
+  assert.match(page, /36 \+ 25 \+ 3 = 61 \+ 3 = 64/);
+  for (let s = 1; s <= 200; s++) {
+    const q = makeQuestion('cor.equal', 'misread', s * 17, { ...OPTS, want: { k: 'misread', key: 'misread:chain' } });
+    assert.match(q.solve.rule, /이은 식은 모두 크기가 같아야/);
+    const mis = q.choices.find((c) => c.tag === '오개념을 옳다고 함').text;
+    assert.match(mis, /^크기가 달라도/, '오개념 보기는 글자 그대로 틀린 말이어야');
+  }
 });
 
 test('화면 연결: 한 줄 요약은 표·도형 배열을 글로 · 문제 글 그림은 qtNode로 네 자리 · 📊 ❓는 figText', async () => {

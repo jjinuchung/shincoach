@@ -151,6 +151,7 @@ export const TAGS = {
   pairMix: '짝을 잘못 지음',                     // 두 친구의 수를 섞어 더함
   lastDiff: '마지막 차이만 봄',                  // 1, 3, 6, 10 → 14
   digitAsOrder: '자리 숫자를 순서로 봄',          // 9999 ÷ 99 = 101 → 아홉째
+  resultMoved: '계산 결과를 □에 그대로 옮김',      // 79 − □ = 79 − 50 − 8 → 21 (□가 등호 앞이라 "등호 뒤에"가 아니다 — Codex 96차)
 };
 
 // ───────────────────── 이야기 재료 ─────────────────────
@@ -313,7 +314,8 @@ const moreLess = (k, dir) => `${k} ${dir > 0 ? '커요' : '작아요'}`;
 
 /** H4 ㉮ a + b = □ + d (side 'L') · a + b = c + □ ('R') — 두 자리 수, 한쪽이 k 변한 만큼 □는 반대로 */
 function boxAddFam(r, side) {
-  const a = int(r, 15, 79); const b = int(r, 15, 79); const k = int(r, 1, 5); const dir = pick(r, [1, -1]);
+  // 양쪽이 나타내는 양(a + b)도 두 자리 — "동치 관계는 두 자리 수의 범위" (Codex 96차 P1: 61 + 42 = 66 + □는 양쪽이 103)
+  const a = int(r, 15, 70); const b = int(r, 15, 99 - a); const k = int(r, 1, 5); const dir = pick(r, [1, -1]);
   // L: d = b − dir·k (더하는 수가 k 작아지면 □는 a보다 k 크다) · R: c = a + dir·k (더해지는 수가 k 커지면 □는 b보다 k 작다)
   const L = side === 'L';
   const shownN = L ? b - dir * k : a + dir * k;
@@ -438,7 +440,8 @@ function orderAddFam(r) {
 function groupAddFam(r) {
   const T = pick(r, [30, 40, 50, 60]); let b = int(r, 11, T - 11); if (b % 10 === 0) b += 1; const c = T - b;
   // 같은 수가 두 번 나오면(18 + 18 + 42) 어느 둘을 묶는지 헷갈린다 — a는 b·c와 다르게
-  let a = int(r, 12, 69); for (let t = 0; t < 30 && (a === b || a === c); t++) a = int(r, 12, 69);
+  // 왼쪽의 양 a + T도 두 자리 (Codex 96차 P1: 63 + 37 + 13 = □ + 50은 113)
+  let a = int(r, 12, 99 - T); for (let t = 0; t < 30 && (a === b || a === c); t++) a = int(r, 12, 99 - T);
   if (a === b || a === c) a = [12, 13, 14].find((v) => v !== b && v !== c);
   return { ans: String(a), wr: [{ text: String(a + T), tag: TAGS.resultAsBox }, { text: String(a + 2 * T), tag: TAGS.sumAll }],
     why: {
@@ -450,10 +453,15 @@ function groupAddFam(r) {
     pools: { pokemon: [`**${a} + ${b} + ${c} = □ + ${T}**\n\n□에 알맞은 수는 얼마일까요?`] } };
 }
 function groupSubFam(r) {
-  const b = pick(r, [20, 30, 40, 50]); const c = int(r, 1, 9); const a = int(r, b + c + 12, 99);
-  return { ans: String(b + c), wr: [{ text: String(a - b - c), tag: TAGS.resultAsBox }, { text: String(b), tag: TAGS.copyOne }],
+  const b = pick(r, [20, 30, 40, 50]); const c = int(r, 1, 9);
+  // 노린 오답이 정답·서로와 같아지면 보기에서 조용히 빠진다 (Codex 96차: 88 − □ = 88 − 40 − 4 → 44 = 44)
+  //  · a − b − c = b + c (a = 2(b + c)) · a − b − c = b (a = 2b + c) 인 a는 뽑지 않는다
+  const bad = (v) => v === 2 * (b + c) || v === 2 * b + c;
+  let a = int(r, b + c + 12, 99); for (let t = 0; t < 30 && bad(a); t++) a = int(r, b + c + 12, 99);
+  if (bad(a)) a = [99, 98, 97].find((v) => !bad(v));
+  return { ans: String(b + c), wr: [{ text: String(a - b - c), tag: TAGS.resultMoved }, { text: String(b), tag: TAGS.copyOne }],
     why: {
-      [TAGS.resultAsBox]: `${jn(a - b - c, '은', '는')} 오른쪽의 계산 결과예요. ${a}에서 □를 한 번 빼서 그 수가 되는 □를 찾아요.`,
+      [TAGS.resultMoved]: `${jn(a - b - c, '은', '는')} 오른쪽의 계산 결과예요. □에 그대로 옮기지 말고, ${a}에서 □를 한 번 빼서 그 수가 되는 □를 찾아요.`,
       [TAGS.copyOne]: `${b}만 빼면 ${jn(c, '을', '를')} 덜 빼요 — ${jn(b, '과', '와')} ${jn(c, '을', '를')} 모두 빼야 해요.`,
     },
     steps: [`오른쪽: ${a}에서 ${jn(b, '을', '를')} 빼고 또 ${jn(c, '을', '를')} 빼요`, `${jn(b, '과', '와')} ${jn(c, '을', '를')} 한꺼번에 빼는 것과 같아요 — ${b} + ${c} = ${b + c}`, `□는 ${b + c}`],
@@ -692,7 +700,7 @@ export const CORRESPOND = [
     misread(r, c) {
       const br = branchOf(r, c, ['result', 'sub', 'chain']);
       if (br === 'result') {
-        const a = int(r, 15, 79); const b = int(r, 15, 79); const k = int(r, 1, 5); const d = b - k;
+        const a = int(r, 15, 70); const b = int(r, 15, 99 - a); const k = int(r, 1, 5); const d = b - k; // 양쪽의 양도 두 자리 (Codex 96차)
         return finishMis(this.id, 'result', r, c, {
           q: showWork(`${a} + ${b} = □ + ${d}에서 □는 ${jn(a + b, '이에요', '예요')}`),
           ok: `등호는 양쪽 크기가 같다는 뜻 — ${jn(d, '은', '는')} ${b}보다 ${k} 작으니 □는 ${a + k}`,
@@ -723,19 +731,20 @@ export const CORRESPOND = [
           probe: { right: a - k, shown: a + k },
         });
       }
-      // 등호로 계산을 이어 씀 (박만구 지도서 98 − 55 = 43 + 29 = 72 · 비상 135쪽 17 + 54 = 71 + 4 = 75)
-      const a = int(r, 15, 60); const b = int(r, 15, 39); const x = int(r, 2, 9); const S = a + b; const T = S + x;
+      // 크기가 다른 식을 등호로 이음 (박만구 지도서 98 − 55 = 43 + 29 = 72 · 비상 135쪽 17 + 54 = 71 + 4 = 75)
+      // · 등호를 잇는 것 자체가 틀린 게 아니다 — 36 + 25 + 3 = 61 + 3 = 64는 옳다 (Codex 96차) · 끝 수 T도 두 자리
+      const x = int(r, 2, 9); const a = int(r, 15, 60); const b = int(r, 15, Math.min(39, 99 - a - x)); const S = a + b; const T = S + x;
       return finishMis(this.id, 'chain', r, c, {
         q: `{mon/이/가} ${a} + ${b} + ${jn(x, '을', '를')} 계산하며 이렇게 썼어요.\n\n**${a} + ${b} = ${S} + ${x} = ${T}**\n\n어디가 틀렸을까요?`,
         ok: `${a} + ${jn(b, '과', '와')} ${S} + ${jn(x, '은', '는')} 크기가 달라서 등호로 이을 수 없어요 — ${a} + ${b} = ${S}, ${S} + ${x} = ${T}`,
         wr: [
           { text: '맞게 썼어요', tag: RIGHT_AS_WRONG },
-          { text: '계산한 차례대로 등호로 이어 쓰면 돼요', tag: MIS_OK },
+          { text: '크기가 달라도 계산한 차례대로면 등호로 이어 써도 돼요', tag: MIS_OK }, // "차례대로 이어 쓰면 돼요"는 글자 그대로 참일 수 있다 (Codex 96차)
           { text: `${a} + ${b} + ${x}의 계산 결과는 ${jn(S, '이에요', '예요')}`, tag: OFF },
         ],
         steps: [`${a} + ${b} = ${S}`, `${S} + ${x} = ${T}`, `${a} + ${jn(b, '은', '는')} ${jn(S, '이고', '고')} ${S} + ${jn(x, '은', '는')} ${jn(T, '이라서', '라서')} 크기가 달라요`],
-        whyAny: '등호로 계산을 이어 썼어요. 등호 양쪽은 늘 크기가 같아야 해요 — 계산은 식을 나누어 써요.',
-        rule: '등호(=) 양쪽은 늘 크기가 같아야 한다 — 계산을 이어 갈 때는 식을 나누어 쓴다.',
+        whyAny: `크기가 다른 식을 등호로 이었어요. 등호로 이은 식은 모두 크기가 같아야 해요 — ${jn(S, '과', '와')} ${jn(T, '은', '는')} 달라요.`,
+        rule: '등호(=)로 이은 식은 모두 크기가 같아야 한다 — 크기가 다르면 식을 나누어 쓴다.',
         probe: { chain: [a, b, x] },
       });
     },
