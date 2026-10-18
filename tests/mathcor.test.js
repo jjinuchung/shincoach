@@ -99,12 +99,117 @@ function relTruth(t, X, Y, k) {
   return null;
 }
 
+// ── 4학년 「규칙 찾기」 새 칸(v289) 읽기 — 계산식 줄 · 등호 식 · 차이가 커지는 배열 (생성기와 따로 짠다) ──
+const NEW4 = ['cor.calcseq', 'cor.equal', 'cor.apply4'];
+const ORDW = ['첫째', '둘째', '셋째', '넷째', '다섯째', '여섯째', '일곱째', '여덟째', '아홉째', '열째'];
+const ordNum = (w) => { const n = ORDW.indexOf(w) + 1; assert.ok(n > 0, `차례 말을 못 읽었다: ${w}`); return n; };
+/** 차례 말 하나 (옛 칸의 "10번째"는 안 잡는다) */
+const ORD_RE = `(${ORDW.join('|')})`;
+const OPS = { '+': (a, b) => a + b, '−': (a, b) => a - b, '×': (a, b) => a * b, '÷': (a, b) => a / b };
+/** 계산식 줄 "**201 + 11 = 212**" — 줄 전체가 식 하나인 줄만 (□가 든 다섯째 식은 안 읽힌다) */
+function readRows(q) {
+  const rows = [...String(q).matchAll(/^\*\*(\d+) ([+−×÷]) (\d+) = (\d+)\*\*$/gm)].map((m) => ({ x: +m[1], op: m[2], y: +m[3], z: +m[4] }));
+  return rows.length >= 4 ? rows : null;
+}
+/** 줄마다 같은 수만큼 변하는 칸 → n째 값 */
+function colAt(rows, key, n) {
+  const v = rows.map((r) => r[key]); const d = v[1] - v[0];
+  assert.ok(v.every((x, i) => x === v[0] + i * d), `계산식 배열의 ${key} 칸이 늘 같은 수만큼 변하지 않는다: ${v}`);
+  return v[0] + (n - 1) * d;
+}
+/** n째 계산식 — 칸마다 따로 늘리고, 셈이 맞는지 이 파일이 다시 계산한다 */
+function rowAt(rows, n) {
+  const { op } = rows[0];
+  assert.ok(rows.every((r) => r.op === op && OPS[op](r.x, r.y) === r.z), `보여 준 계산식이 틀렸다: ${JSON.stringify(rows)}`);
+  const R = { x: colAt(rows, 'x', n), op, y: colAt(rows, 'y', n), z: colAt(rows, 'z', n) };
+  assert.equal(OPS[op](R.x, R.y), R.z, `${n}째 계산식의 셈이 규칙과 안 맞는다: ${JSON.stringify(R)}`);
+  return R;
+}
+/** "a + b = c − d" · "a + b = c" · "a + b" → { a, op, b, c, op2, d } (못 읽으면 null) */
+function parseCalc(t) {
+  const m = /^(\d+) ([+−×÷]) (\d+)(?: = (\d+)(?: ([+−×÷]) (\d+))?)?$/.exec(String(t).trim());
+  if (!m) return null;
+  return { a: +m[1], op: m[2], b: +m[3], c: m[4] === undefined ? null : +m[4], op2: m[5] || null, d: m[6] === undefined ? null : +m[6] };
+}
+const sideVal = (p) => (p.op2 ? OPS[p.op2](p.c, p.d) : p.c);
+/** 차이가 늘 같은 수만큼 커지는 배열 → i(0부터)째 값 */
+function growAt(seq, i) {
+  const d1 = seq.slice(1).map((v, k) => v - seq[k]); const e = d1[1] - d1[0];
+  assert.ok(e !== 0 && d1.every((v, k) => v === d1[0] + k * e), `차이가 늘 같은 수만큼 커지지 않는다: ${seq}`);
+  let v = seq[0]; for (let k = 0; k < i; k++) v += d1[0] + k * e;
+  return v;
+}
+/** 새 칸 문제 글 → 정답 (못 읽는 꼴이면 null — 옛 칸 해석기로 넘어간다) */
+function solveNew(q) {
+  let m;
+  if ((m = new RegExp(String.raw`\*\*([\d, ]+), …\*\*\n\n이 규칙대로라면 ` + ORD_RE + ' 수는 얼마').exec(q))) { // ⭐ 차이가 커지는 배열
+    const seq = m[1].split(', ').map(Number); const n = ordNum(m[2]);
+    return { v: growAt(seq, n - 1), ctx: { kind: 'grow', seq, n } };
+  }
+  const rows = readRows(q);
+  if (rows) {
+    if ((m = new RegExp(ORD_RE + '에 알맞은 덧셈식은 어느 것').exec(q))) {
+      const n = ordNum(m[1]); const R = rowAt(rows, n);
+      return { sent: (t) => { const p = parseCalc(t); if (!p || p.c === null || p.op2) return null; return p.a === R.x && p.op === R.op && p.b === R.y && p.c === R.z; }, ctx: { kind: 'nextRow', rows, n, R } };
+    }
+    if ((m = new RegExp(ORD_RE + ' 계산식의 계산 결과는 얼마').exec(q))) { const n = ordNum(m[1]); return { v: rowAt(rows, n).z, ctx: { kind: 'rowRes', rows, n } }; }
+    if ((m = /다섯째 (?:뺄셈식|덧셈식) \*\*(\d+) ([+−]) (\d+) = □\*\*에서 □/.exec(q))) {
+      const R = rowAt(rows, 5);
+      assert.deepEqual([+m[1], m[2], +m[3]], [R.x, R.op, R.y], `다섯째 식이 규칙과 다르다: ${q}`);
+      return { v: OPS[m[2]](+m[1], +m[3]), ctx: { kind: 'keep', rows, t: rows[1].x - rows[0].x } };
+    }
+    if ((m = /계산 결과가 (\d+)인 덧셈식은 (어느 것|몇째)/.exec(q))) {
+      const S = +m[1]; let n = 1; while (colAt(rows, 'z', n) < S && n < 30) n++;
+      assert.equal(colAt(rows, 'z', n), S, `결과가 ${S}인 줄이 없다: ${q}`);
+      const R = rowAt(rows, n);
+      if (m[2] === '몇째') return { v: n, ctx: { kind: 'orderAdd', rows, n, R } };
+      return { sent: (t) => { const p = parseCalc(t); if (!p || p.c !== null) return null; return p.a === R.x && p.op === '+' && p.b === R.y; }, ctx: { kind: 'findRow', rows, n, R, S } };
+    }
+    if ((m = /몇째 계산식이 \*\*(\d+) ([+−×÷]) (\d+) = (\d+)\*\*일까요/.exec(q))) {
+      const X = +m[1]; let n = 1; while (colAt(rows, 'x', n) < X && n < 30) n++;
+      const R = rowAt(rows, n);
+      assert.deepEqual([R.x, R.op, R.y, R.z], [X, m[2], +m[3], +m[4]], `그 계산식이 규칙에 없다: ${q}`);
+      return { v: n, ctx: { kind: 'orderRow', rows, n, X } };
+    }
+    return null;
+  }
+  // 등호 — □가 든 식
+  if ((m = /^\*\*(\d+) ([+−]) (\d+) = (□|\d+) ([+−]) (□|\d+)\*\*\n\n□에 알맞은 수/.exec(q))) {
+    const L = OPS[m[2]](+m[1], +m[3]); const op2 = m[5]; const boxL = m[4] === '□';
+    assert.ok(boxL !== (m[6] === '□'), `□는 한 자리만: ${q}`);
+    const v = boxL ? (op2 === '+' ? L - +m[6] : L + +m[6]) : (op2 === '+' ? L - +m[4] : +m[4] - L);   // □ ± d = L · c ± □ = L
+    return { v, ctx: { kind: 'box', a: +m[1], op: m[2], b: +m[3], op2, other: boxL ? +m[6] : +m[4], pos: boxL ? 'L' : 'R' } };
+  }
+  if ((m = /^\*\*(\d+) \+ (\d+) \+ (\d+) = □ \+ (\d+)\*\*/.exec(q))) { const [a, b, c, T] = m.slice(1).map(Number); return { v: a + b + c - T, ctx: { kind: 'grpAdd', a, b, c, T } }; }
+  if ((m = /^\*\*(\d+) − □ = (\d+) − (\d+) − (\d+)\*\*/.exec(q))) {
+    const [a, a2, b, c] = m.slice(1).map(Number); assert.equal(a, a2, q);
+    return { v: a - (a2 - b - c), ctx: { kind: 'grpSub', a, b, c } };
+  }
+  if ((m = /^(\d+) ([+−]) (\d+)[과와] 크기가 같은 것을 등호로 바르게 나타낸 식은/.exec(q))) {
+    const a = +m[1]; const op = m[2]; const b = +m[3]; const L = OPS[op](a, b);
+    return { sent: (t) => { const p = parseCalc(t); if (!p || p.c === null || !p.op2 || p.a !== a || p.op !== op || p.b !== b) return null; return sideVal(p) === L; }, ctx: { kind: 'judge', a, op, b, L } };
+  }
+  if ((m = /스티커를 (\d+)장과 (\d+)장 모았고, .+? (\d+)장과 (\d+)장 모았어요\. 둘이 모은 스티커 수는 같아요/.exec(q))) { // 이름에 띄어쓰기("탈라 할머니")
+    const [a, b, c, d] = m.slice(1).map(Number); assert.equal(a + b, c + d, q);
+    const pair = (x, y, p, r) => (x === p && y === r) || (x === r && y === p);
+    return { sent: (t) => {
+      if (/^\d+ \+ \d+ \+ \d+ \+ \d+$/.test(t)) return false;                                     // 등호가 없는 식 — 같다는 것을 못 나타낸다
+      const p = parseCalc(t); if (!p || p.c === null || !p.op2 || p.op !== '+' || p.op2 !== '+') return null;
+      const sides = (pair(p.a, p.b, a, b) && pair(p.c, p.d, c, d)) || (pair(p.a, p.b, c, d) && pair(p.c, p.d, a, b));
+      return sides && p.a + p.b === p.c + p.d;
+    }, ctx: { kind: 'story', a, b, c, d } };
+  }
+  return null;
+}
+
 /**
  * 문제 글 → 정답 (생성기와 따로)
  * { v } 수 · { eqs: 짝, lhs } 표에 맞는 식이 딱 하나 · { sent: 참거짓 } 참인 문장이 딱 하나 — ctx: 이름표 확인용 재료
  */
 function solveText(q0) {
   const q = plain(q0);
+  const nw = solveNew(String(q0));
+  if (nw) return nw;
   let m;
   // 식이 주어진 문항 (앞으로·거꾸로)
   if ((m = /^([△□] = [△□](?: [×÷+−] \d+)+)에서 ([□△])가 (\d+)일 때 ([□△])는 얼마/.exec(q))) {
@@ -237,15 +342,17 @@ test('그림: [steps]는 블록 수만큼 칸을 그리고, [table]은 칸마다
   assert.doesNotMatch(tableSvg([{ label: '<b>', vals: [1, 2] }, { label: 'x', vals: [3, 4] }]), /<b>/);
 });
 
-test('사다리: 8칸, 초4 둘 + 초5 여섯, needs가 바로 앞 칸', () => {
-  assert.equal(CORRESPOND.length, 8);
+test('사다리: 11칸, 초4 다섯(4-1 「규칙 찾기」 새 칸 셋 v289) + 초5 여섯 · needs가 바로 앞 칸 — 5학년 첫 칸만 그대로 도형 배열(새 칸이 길을 막지 않게)', () => {
+  assert.equal(CORRESPOND.length, 11);
   const ids = CORRESPOND.map((c) => c.id);
-  assert.equal(new Set(ids).size, 8);
+  assert.equal(new Set(ids).size, 11);
+  assert.deepEqual(ids.slice(0, 5), ['cor.numseq', 'cor.shapeseq', 'cor.calcseq', 'cor.equal', 'cor.apply4']);
   for (const [k, c] of CORRESPOND.entries()) {
     assert.ok(/^cor\./.test(c.id) && c.name && c.idea && c.slip, c.id);
-    assert.equal(c.grade, k < 2 ? 4 : 5, c.id);
-    assert.deepEqual(c.needs, k ? [ids[k - 1]] : []);
+    assert.equal(c.grade, k < 5 ? 4 : 5, c.id);
+    assert.deepEqual(c.needs, c.id === 'cor.pair' ? ['cor.shapeseq'] : k ? [ids[k - 1]] : [], c.id);
   }
+  assert.match(conceptById('cor.apply4').name, /^⭐ /);
   assert.equal(gradeLabel(4), '초4');
   assert.equal(valueOf('△ = □ × 4'), null);
   assert.equal(valueOf('5부터 시작해서 3씩 커져요'), null);
@@ -300,14 +407,86 @@ test('★ 보기: 정답 하나, 글자 겹침 없음, 나오면 안 되는 글�
         const all = `${q.q} ${q.expr} ${JSON.stringify(q.solve)} ${JSON.stringify(q.choices)}`;
         assert.ok(!/undefined|NaN|null|\{(me|mon)/.test(all), `${where}: 글에 새는 것 — ${all.slice(0, 160)}`);
         // ① 문제 글은 200까지 — ②는 "64 × 7 = 448"처럼 틀린 셈을 보여 주는 게 문제라 500까지
-        for (const n of nums(q.q)) assert.ok(n <= (kind === 'calc' ? 200 : 500), `${where}: 너무 큰 수 ${n} — ${q.q}`);
-        for (const ch of q.choices) for (const n of nums(ch.text)) assert.ok(n <= 5000, `${where}: 보기에 너무 큰 수 ${n}`);
+        // 계산식 배열(H3·⭐)은 교과서처럼 네 자리 수까지(101 × 99 = 9999) — 보기는 자리 수를 잘못 센 다섯 자리까지
+        const big = c.id === 'cor.calcseq' || c.id === 'cor.apply4';
+        for (const n of nums(q.q)) assert.ok(n <= (big ? 9999 : kind === 'calc' ? 200 : 500), `${where}: 너무 큰 수 ${n} — ${q.q}`);
+        for (const ch of q.choices) for (const n of nums(ch.text)) assert.ok(n <= (big ? 99999 : 5000), `${where}: 보기에 너무 큰 수 ${n}`);
+        // 등호 칸은 두 자리 수 (성취기준 적용 시 고려 사항 — 동치 관계는 두 자리 수의 범위) · 오답 값(모든 수를 더함)만 세 자리가 될 수 있다
+        if (c.id === 'cor.equal' && kind === 'calc') for (const n of nums(q.q)) assert.ok(n >= 10 && n <= 99, `${where}: 등호 칸에 두 자리가 아닌 수 ${n} — ${q.q}`);
         // 글 속 그림 지시문은 모두 그려진다 (못 그리면 화면에서 조용히 사라진다)
         for (const f of q.q.match(/\[[a-z]+ [^\]]+\]/g) || []) assert.ok(figureSvg(f.slice(1, -1)), `${where}: 못 그리는 그림 ${f}`);
       }
     }
   }
 });
+
+const NEW_KINDS = new Set(['grow', 'nextRow', 'rowRes', 'keep', 'findRow', 'orderAdd', 'orderRow', 'box', 'grpAdd', 'grpSub', 'judge', 'story']);
+/** v289 새 칸 오답 이름표 → 그 실수가 맞나 (true/false) · 새 칸에 나오면 안 되는 이름표면 undefined */
+function newTagOk(tag, ch, x, w) {
+  const t = String(ch.text); const v = Number(t); const p = parseCalc(t);
+  const rep = (s) => /^(\d)\1*$/.test(s);
+  switch (tag) {
+    case TAGS.ruleIgnored:                                                    // 셈은 맞고 결과도 같은데 규칙의 줄이 아니다
+      if (x.kind === 'nextRow') return !!p && p.c !== null && !p.op2 && OPS[p.op](p.a, p.b) === p.c && p.c === x.R.z && (p.a !== x.R.x || p.b !== x.R.y);
+      if (x.kind === 'findRow') return !!p && p.c === null && p.a + p.b === x.S && (p.a !== x.R.x || p.b !== x.R.y);
+      return false;
+    case TAGS.oneSide: {                                                      // 한 수만 이번 줄 · 다른 수는 앞 줄 그대로
+      if (x.kind === 'nextRow') { const P = rowAt(x.rows, x.n - 1); return !!p && !p.op2 && p.a === x.R.x && p.b === P.y && p.c === p.a + p.b; }
+      if (x.kind === 'findRow') { const P = rowAt(x.rows, x.n - 1); return !!p && p.a === x.R.x && p.b === P.y; }
+      if (x.kind === 'judge') return !!p && p.op2 === x.op && sideVal(p) !== x.L && ((p.c !== x.a && p.d === x.b) || (p.c === x.a && p.d !== x.b));
+      return false;
+    }
+    case TAGS.offByOne:
+      if (x.kind === 'nextRow') { const N = rowAt(x.rows, x.n + 1); return !!p && p.a === N.x && p.b === N.y && p.c === N.z; }
+      if (x.kind === 'findRow') { const P = rowAt(x.rows, x.n - 1); return !!p && p.a === P.x && p.b === P.y; }
+      if (x.kind === 'rowRes') return v === rowAt(x.rows, x.n + 1).z;
+      if (x.kind === 'orderRow' || x.kind === 'orderAdd') return Math.abs(v - x.n) === 1;
+      return false;
+    case TAGS.nextOnly:                                                       // 물은 줄 바로 앞 줄(·여섯째 수)
+      if (x.kind === 'nextRow') { const P = rowAt(x.rows, x.n - 1); return !!p && p.a === P.x && p.b === P.y && p.c === P.z; }
+      if (x.kind === 'rowRes') return v === rowAt(x.rows, x.n - 1).z;
+      if (x.kind === 'grow') return v === growAt(x.seq, x.n - 2);
+      return false;
+    case TAGS.digitCount: { const ans = String(w.v); return x.kind === 'rowRes' && rep(ans) && rep(t) && t[0] === ans[0] && Math.abs(t.length - ans.length) === 1; }
+    case TAGS.keepGrows: return x.kind === 'keep' && x.t > 0 && (v === w.v + x.t || v === w.v + 4 * x.t);
+    case TAGS.resultAsBox:                                                    // 등호 바로 뒤(□ 자리)에 계산 결과
+      if (x.kind === 'box') return v === OPS[x.op](x.a, x.b);
+      if (x.kind === 'grpAdd') return v === x.a + x.b + x.c;
+      if (x.kind === 'grpSub') return v === x.a - x.b - x.c;
+      if (x.kind === 'judge') return !!p && p.c === x.L && p.op2 === '+' && sideVal(p) !== x.L;
+      if (x.kind === 'story') return !!p && p.c === x.a + x.b && p.op2 === '+' && sideVal(p) !== x.a + x.b;
+      return false;
+    case TAGS.sumAll:
+      if (x.kind === 'box') return v === x.a + x.b + x.other;
+      if (x.kind === 'grpAdd') return v === x.a + x.b + x.c + x.T;
+      if (x.kind === 'story') return /^\d+ \+ \d+ \+ \d+ \+ \d+$/.test(t) && nums(t).sort((m, n) => m - n).join() === [x.a, x.b, x.c, x.d].sort((m, n) => m - n).join();
+      return false;
+    case TAGS.sameWay:                                                        // 덧셈인데 □(오른쪽 두 수)를 같은 쪽으로
+      if (x.kind === 'box') { const orig = x.pos === 'L' ? x.a : x.b; return x.op === '+' && w.v !== orig && v === 2 * orig - w.v; }
+      if (x.kind === 'judge') return x.op === '+' && !!p && p.op2 === '+' && p.c - x.a === p.d - x.b && p.c > x.a;
+      return false;
+    case TAGS.addLogicSub:                                                    // 뺄셈인데 덧셈처럼 반대쪽으로
+      if (x.kind === 'box') return x.op === '−' && w.v !== x.a && v === 2 * x.a - w.v;
+      if (x.kind === 'judge') return x.op === '−' && !!p && p.op2 === '−' && p.c - x.a === x.b - p.d && p.c > x.a;
+      return false;
+    case TAGS.copyOne:
+      if (x.kind === 'box') return x.op === '−' && v === x.a;
+      if (x.kind === 'grpSub') return v === x.b || v === x.c;
+      return false;
+    case TAGS.pairMix: {                                                      // 네 수는 맞는데 짝을 섞음 (그래서 틀린 식)
+      if (x.kind !== 'story' || !p || !p.op2) return false;
+      const four = [p.a, p.b, p.c, p.d].sort((m, n) => m - n).join(); const given = [x.a, x.b, x.c, x.d].sort((m, n) => m - n).join();
+      const same = (u, y, a, b) => (u === a && y === b) || (u === b && y === a);
+      return four === given && !same(p.a, p.b, x.a, x.b) && !same(p.a, p.b, x.c, x.d) && p.a + p.b !== p.c + p.d;
+    }
+    case TAGS.lastDiff: return x.kind === 'grow' && x.n === 7 && v === x.seq[4] + 2 * (x.seq[4] - x.seq[3]);
+    case TAGS.digitAsOrder:                                                   // 한 칸 밀린 값(n ± 1)과도 달라야 이름표가 하나로 정해진다
+      if (x.kind === 'orderRow') return v === Number(String(x.X)[0]) && Math.abs(v - x.n) > 1;
+      if (x.kind === 'orderAdd') return v === Math.floor(x.R.x / 100) && Math.abs(v - x.n) > 1;
+      return false;
+    default: return undefined;
+  }
+}
 
 test('★ 오개념 이름표: 그 오답이 정말 그 실수다 — 값과 방향까지', () => {
   const seen = {};
@@ -320,6 +499,13 @@ test('★ 오개념 이름표: 그 오답이 정말 그 실수다 — 값과 방
         const where = `${c.id} seed ${s}: "${ch.tag}" 오답 ${ch.text} — ${q.q.replace(/\n/g, ' ')}`;
         const v = Number(ch.text);
         const hit = (cond) => { seen[ch.tag] = (seen[ch.tag] || 0) + 1; assert.ok(cond, where); };
+        // 4학년 「규칙 찾기」 새 칸(v289) — 지도서 오류 표의 실수 그대로인지
+        if (NEW_KINDS.has(x.kind)) {
+          const good = newTagOk(ch.tag, ch, x, w);
+          assert.notEqual(good, undefined, `${where}: 새 칸에 검사 없는 이름표`);
+          hit(good);
+          continue;
+        }
         // 식 보기 — 표·이야기의 참 규칙 R과 견준다
         if (x.kind === 'eq') {
           const eq = parseEq(ch.text); const R = x.R; const P = w.eqs;
@@ -430,6 +616,7 @@ test('★ ② 오개념 문항: 보여 준 것은 정말 틀렸다 · 고친 답
       assert.ok(/^misread:/.test(q.key || ''), where);
       branches[`${c.id} ${q.key}`] = (branches[`${c.id} ${q.key}`] || 0) + 1;
       assert.ok(/\*\*.+\*\*/.test(q.q), where);
+      if (NEW4.includes(c.id)) { newMisCheck(c.id, q, where); continue; }
       const shown = /\*\*(.+)\*\*/.exec(q.q)[1];
       const ok = q.choices.find((x) => x.ok).text;
       const wrongs = q.choices.filter((x) => !x.ok && x.tag !== '틀린 줄 모름');
@@ -482,9 +669,58 @@ test('★ ② 오개념 문항: 보여 준 것은 정말 틀렸다 · 고친 답
   }
   for (const [k, n] of Object.entries(branches)) assert.ok(n >= 100, `${k} 갈래가 드물다 (${n})`);
   const want = ['cor.numseq misread:mul', 'cor.numseq misread:nth', 'cor.shapeseq misread:nth', 'cor.shapeseq misread:step', 'cor.pair misread:add', 'cor.table misread:step',
-    'cor.symbol misread:swap', 'cor.symbol misread:step', 'cor.value misread:inv', 'cor.value misread:fwd', 'cor.life misread:prop', 'cor.life misread:fence', 'cor.twostep misread:drop', 'cor.twostep misread:first'];
+    'cor.symbol misread:swap', 'cor.symbol misread:step', 'cor.value misread:inv', 'cor.value misread:fwd', 'cor.life misread:prop', 'cor.life misread:fence', 'cor.twostep misread:drop', 'cor.twostep misread:first',
+    'cor.calcseq misread:keep', 'cor.calcseq misread:one', 'cor.equal misread:result', 'cor.equal misread:sub', 'cor.equal misread:chain', 'cor.apply4 misread:grow', 'cor.apply4 misread:order'];
   assert.deepEqual(Object.keys(branches).sort(), [...want].sort());
 });
+
+/** v289 새 칸 ② — 보여 준 말은 정말 틀렸고, 고친 답은 문제 글을 따로 읽어 푼 값이다 */
+function newMisCheck(id, q, where) {
+  const bolds = [...q.q.matchAll(/\*\*(.+?)\*\*/g)].map((m) => m[1]);
+  const shown = bolds[bolds.length - 1];                                        // 계산식 줄도 굵어서 — 말한 것은 마지막 굵은 글
+  const ok = q.choices.find((x) => x.ok).text;
+  const wrongs = q.choices.filter((x) => !x.ok && x.tag !== '틀린 줄 모름');
+  const key = q.key.slice('misread:'.length);
+  let m;
+  if (id === 'cor.calcseq' && key === 'keep') {
+    const rows = readRows(q.q); const D = rowAt(rows, 5).z;
+    assert.ok(rows.every((r) => r.z === D), `${where}: 차가 그대로인 배열이어야`);
+    assert.notEqual(nums(shown)[0], D, `${where}: 보여 준 결과가 사실 맞다`);
+    assert.equal(lastNum(ok), D, where);
+  } else if (id === 'cor.calcseq' && key === 'one') {
+    const rows = readRows(q.q); const R = rowAt(rows, 5);
+    const sp = parseCalc(/덧셈식은 (.+?)(?:이에요|예요) —/.exec(shown)[1]);
+    assert.ok(sp && sp.a + sp.b === sp.c, `${where}: 보여 준 식의 셈은 맞아야 한다(틀린 것은 규칙)`);
+    assert.ok(!(sp.a === R.x && sp.b === R.y), `${where}: 보여 준 식이 사실 다섯째`);
+    const fixed = parseCalc(/— (.+)$/.exec(ok)[1]);
+    assert.deepEqual([fixed.a, fixed.b, fixed.c], [R.x, R.y, R.z], where);
+    for (const w of wrongs) if ((m = /결과가 (\d+)인 식이면/.exec(w.text))) assert.equal(+m[1], R.z, `${where}: 결과만 맞으면 된다는 오답의 결과가 다섯째와 달라 말이 안 된다`);
+  } else if (id === 'cor.equal' && (key === 'result' || key === 'sub')) {
+    m = /^(\d+) ([+−]) (\d+) = □ ([+−]) (\d+)에서 □는 (\d+)/.exec(shown);
+    const right = m[4] === '+' ? OPS[m[2]](+m[1], +m[3]) - +m[5] : OPS[m[2]](+m[1], +m[3]) + +m[5];
+    assert.notEqual(+m[6], right, `${where}: 보여 준 □가 사실 맞다`);
+    assert.equal(lastNum(ok), right, where);
+    for (const w of wrongs) if (/□는 (\d+)/.test(w.text)) assert.notEqual(+/□는 (\d+)/.exec(w.text)[1], right, `${where}: 오답 "${w.text}"이 사실 맞다`);
+  } else if (id === 'cor.equal' && key === 'chain') {
+    m = /^(\d+) \+ (\d+) = (\d+) \+ (\d+) = (\d+)$/.exec(shown);
+    const [a, b, S, x, T] = m.slice(1).map(Number);
+    assert.ok(S === a + b && T === S + x && a + b !== S + x, `${where}: 계산은 맞는데 등호로 이어 틀린 식이어야`);
+    assert.ok(ok.endsWith(`${a} + ${b} = ${S}, ${S} + ${x} = ${T}`), `${where}: 고친 답은 식을 나눠 쓴다`);
+    const off = wrongs.find((w) => /계산 결과는/.test(w.text));
+    assert.notEqual(lastNum(off.text), a + b + x, `${where}: 엉뚱한 지적이 사실 맞는 말`);
+  } else if (id === 'cor.apply4' && key === 'grow') {
+    const seq = /늘어놓았어요: ([\d, ]+), …/.exec(q.q)[1].split(', ').map(Number); const right = growAt(seq, 6);
+    assert.equal(nums(shown)[0], seq[4] + 2 * (seq[4] - seq[3]), `${where}: 보여 준 값은 마지막 차이를 두 번 더한 것`);
+    assert.notEqual(nums(shown)[0], right, where);
+    assert.equal(lastNum(ok), right, where);
+  } else if (id === 'cor.apply4' && key === 'order') {
+    const rows = readRows(q.q); m = new RegExp(String.raw`^(\d+) ÷ (\d+) = (\d+)은 ` + ORD_RE + ' 계산식이에요').exec(shown);
+    let n = 1; while (colAt(rows, 'x', n) < +m[1] && n < 30) n++;
+    assert.equal(rowAt(rows, n).x, +m[1], where);
+    assert.notEqual(ordNum(m[4]), n, `${where}: 보여 준 차례가 사실 맞다`);
+    assert.ok(ok.endsWith(ORDW[n - 1]), `${where}: 고친 답 ${ok}`);
+  } else assert.fail(`${where}: 이 ② 모양을 모른다 (${key})`);
+}
 
 test('★ 조사: 수 뒤(12는·36은·8과·3으로·7로·6이에요·9예요) · □·△ 뒤(가·를·는·와·라고)', () => {
   const BAT = new Set(['0', '1', '3', '6', '7', '8']);
@@ -553,17 +789,23 @@ test('🔁 쌍둥이·🤔 노트: 요청한 틀·갈래로 온다 (표 칸 수�
 test('📏 진단·사다리·한 편·배움 예비·내용 검사', () => {
   const d = diagnosticSet(9, 5, OPTS);
   assert.deepEqual(d.map((q) => q.concept), ['cor.numseq', 'cor.pair', 'cor.symbol', 'cor.value', 'cor.twostep']);
+  // v289 새 칸 셋은 진단에서 뺀다 — 씨앗이 달라도 진단 칸은 그 전 다섯 그대로
+  for (let s = 1; s <= 50; s++) assert.deepEqual(diagnosticSet(s, 5, OPTS).map((q) => q.concept), ['cor.numseq', 'cor.pair', 'cor.symbol', 'cor.value', 'cor.twostep']);
   const pl = placeFrom([{ concept: 'cor.numseq', correct: true }, { concept: 'cor.pair', correct: false }]);
   assert.equal(pl.startId, 'cor.pair');
-  assert.deepEqual(pl.knownIds, ['cor.numseq', 'cor.shapeseq']);
+  // 5학년 칸에서 틀리면 그 앞 4학년 칸(새 칸 셋 포함)은 안다로 친다 — ⭐ 칸을 끼운 다른 줄기(V·C·K)와 같은 규칙
+  assert.deepEqual(pl.knownIds, ['cor.numseq', 'cor.shapeseq', 'cor.calcseq', 'cor.equal', 'cor.apply4']);
   assert.deepEqual(ladder(['cor.numseq']).slice(0, 3).map((x) => x.state), ['done', 'now', 'locked']);
+  // 옛 8칸을 다 끝낸 아이(진우) — 새 칸 첫째가 바로 ▶ 지금, 나머지 둘은 차례로 잠김 · 5학년 칸은 그대로 끝남
+  const old8 = CORRESPOND.filter((c) => !NEW4.includes(c.id)).map((c) => c.id);
+  assert.deepEqual(ladder(old8).map((x) => x.state), ['done', 'done', 'now', 'locked', 'locked', 'done', 'done', 'done', 'done', 'done', 'done']);
   for (const c of CORRESPOND) {
     assert.deepEqual(makeRound(c.id, 5, OPTS).map((q) => q.kind), ['calc', 'misread']);
     assert.equal(lessonOf(c.id, 1, OPTS).pages.length, 1);
   }
   assert.equal(conceptById('cor.nope'), null);
   assert.equal(makeQuestion('cor.nope', 'calc', 1, OPTS), null);
-  assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 8);
+  assert.equal(checkContent({}).filter((x) => /내용 없음/.test(x)).length, 11);
 });
 
 test('문제 이야기에 가족을 지어내지 않는다 (진우에게는 동생이 없다)', () => {
@@ -592,7 +834,9 @@ function badArith(text) {
   const bad = [];
   const s = plain(text);
   // □·△ 뒤에 붙은 수("□ × 6 = 72")에서 시작하지 않게 — 앞이 수·연산 기호면 건너뛴다
-  for (const m of s.matchAll(/(?<![\d.])(?<![+−×÷] )\d+(?: [+−×÷] \d+)*(?: = \d+(?: [+−×÷] \d+)*)+/g)) {
+  // 뒤에 "+ □"가 이어지면 아직 다 쓰지 않은 식이다 (v289 등호 칸 "34 + 59 = 31 + □") — 수 중간에서 끊어 읽지도 않게.
+  // 문장 끝 마침표("= 206.")는 소수점이 아니다 — 마침표 뒤에 숫자가 올 때만 소수 (변이 검사가 잡음)
+  for (const m of s.matchAll(/(?<![\d.])(?<![+−×÷] )\d+(?: [+−×÷] \d+)*(?: = \d+(?: [+−×÷] \d+)*)+(?!\d)(?!\.\d)(?! [+−×÷] □)/g)) {
     const parts = m[0].split(' = ').map(evalArith);
     if (parts.some((v) => v !== parts[0])) bad.push(m[0]);
   }
@@ -603,12 +847,30 @@ test('★ 글 속 셈식이 모두 맞다 — 생성기 문제·보기·풀이',
   assert.deepEqual(badArith('5 + 3 × 9 = 5 + 27 = 32'), []);
   assert.deepEqual(badArith('2 × 3 = 6, 6 × 3 = 19'), ['6 × 3 = 19']);
   assert.deepEqual(badArith('□ × 6 = 72 → □ = 72 ÷ 6 = 12'), []);
-  let checked = 0;
+  assert.deepEqual(badArith('**34 + 59 = 31 + □**'), [], '뒤에 □가 이어지는 식은 아직 다 쓴 식이 아니다');
+  assert.deepEqual(badArith('34 + 59 = 31 + 63'), ['34 + 59 = 31 + 63'], '□가 아니면 그대로 검산한다');
+  assert.deepEqual(badArith('36 + 25 = 61 + 3 = 64'), ['36 + 25 = 61 + 3 = 64']);
+  assert.deepEqual(badArith('다섯째는 150 + 55 = 206. 다음'), ['150 + 55 = 206'], '문장 끝 마침표 앞의 식도 검산한다');
+  let checked = 0; let wrongShown = 0;
   for (const c of CORRESPOND) {
     for (let s = 1; s <= 500; s++) {
       for (const kind of ['calc', 'misread']) {
         const q = makeQuestion(c.id, kind, s * 2027, OPTS);
-        for (const t of [q.q, ...q.choices.map((x) => x.text), ...q.solve.steps, q.solve.whyAny, ...Object.values(q.solve.why)]) {
+        // 일부러 틀린 식을 보여 주는 자리는 셈 검사 대신 "정말 틀렸나"를 본다:
+        //  · v289 등호 칸 "옳은 식 고르기"·"등호로 나타내기"의 오답 보기 (정답 하나만 참 — 독립 검산이 따로 본다)
+        //  · ② "등호로 계산을 이어 씀"의 굵은 식 (36 + 25 = 61 + 3 = 64)
+        let qText = q.q; let choices = q.choices;
+        const w = kind === 'calc' ? solveText(q.q) : null;
+        if (w && w.ctx && (w.ctx.kind === 'judge' || w.ctx.kind === 'story')) {
+          for (const ch of q.choices.filter((x) => !x.ok && / = /.test(x.text))) { assert.equal(badArith(ch.text).length, 1, `${c.id} seed ${s}: 틀린 식이어야 — ${ch.text}`); wrongShown++; }
+          choices = q.choices.filter((x) => x.ok);
+        }
+        if (q.key === 'misread:chain') {
+          const chain = /\*\*(.+)\*\*/.exec(q.q)[1];
+          assert.equal(badArith(chain).length, 1, `${c.id} seed ${s}: 이어 쓴 식은 틀린 식이어야 — ${chain}`); wrongShown++;
+          qText = q.q.replace(chain, '');
+        }
+        for (const t of [qText, ...choices.map((x) => x.text), ...q.solve.steps, q.solve.whyAny, ...Object.values(q.solve.why)]) {
           checked++;
           assert.deepEqual(badArith(t), [], `${c.id}/${kind} seed ${s}: ${t}`);
         }
@@ -616,6 +878,7 @@ test('★ 글 속 셈식이 모두 맞다 — 생성기 문제·보기·풀이',
     }
   }
   assert.ok(checked > 10000, `${checked}건`);
+  assert.ok(wrongShown > 200, `일부러 틀린 식 검사 ${wrongShown}건`);
 });
 
 // ── 사람이 쓴 원고 (coach/math/correspond.json) ──
@@ -699,6 +962,37 @@ test('아직 안 배운 말을 앞 칸에서 쓰지 않는다 — △ 기호와 
       }
     }
   }
+});
+
+test('v289 새 4학년 칸은 △와 □·△ 식을 쓰지 않는다 — □는 교과서처럼 빈칸으로만 (원고·생성기 모두)', () => {
+  for (const id of NEW4) {
+    for (const t of strings(CONTENT[id] || {})) assert.doesNotMatch(t, /△/, `${id} 원고: ${t}`);
+    for (let s = 1; s <= 300; s++) {
+      for (const kind of ['calc', 'misread']) {
+        const q = makeQuestion(id, kind, s * 883, OPTS);
+        const kid = [q.q, ...q.choices.map((x) => x.text), ...q.solve.steps, q.solve.whyAny, q.solve.rule, ...Object.values(q.solve.why)].join(' / ');
+        // "□ = 식"(□를 구하는 식) 꼴은 5학년부터 — "79 − □ = 79 − 50 − 8"처럼 셈 기호 뒤 빈칸은 교과서 그대로
+        assert.doesNotMatch(kid, /△|(?<![+−×÷] )□ =/, `${id}/${kind} seed ${s}: ${kid.slice(0, 160)}`);
+      }
+    }
+  }
+});
+
+test('v289 등호 칸 — 뺄셈 □는 빼는 수와 같은 쪽 · 덧셈 □는 반대쪽 (문제 글을 따로 읽어 바뀐 방향을 본다)', () => {
+  let n = 0;
+  for (let s = 1; s <= 2000; s++) {
+    const q = makeQuestion('cor.equal', 'calc', s * 409, OPTS);
+    const w = solveText(q.q); const x = w.ctx;
+    if (x.kind !== 'box') continue;
+    n++;
+    if (x.op === '+') {                                                        // a + b = □ + d → □ − a 와 d − b 는 부호가 반대
+      const moved = x.pos === 'L' ? x.other - x.b : x.other - x.a; const boxMove = w.v - (x.pos === 'L' ? x.a : x.b);
+      assert.ok(moved !== 0 && boxMove === -moved, `seed ${s}: ${q.q}`);
+    } else {                                                                   // a − b = □ − d → □ − a 와 d − b 는 같다
+      assert.ok(x.other !== x.b && w.v - x.a === x.other - x.b, `seed ${s}: ${q.q}`);
+    }
+  }
+  assert.ok(n > 500, `${n}건`);
 });
 
 test('화면 연결: 한 줄 요약은 표·도형 배열을 글로 · 문제 글 그림은 qtNode로 네 자리 · 📊 ❓는 figText', async () => {

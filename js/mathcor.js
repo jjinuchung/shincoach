@@ -1,5 +1,6 @@
 // 🔢 수학 — H 규칙과 대응 줄기 (초4 「규칙 찾기」 → 초5 1학기 「규칙과 대응」):
 // 개념 사다리 + 문제 생성기 + 내용 형식 검사. 순수 함수만 — 화면 없음 (node 테스트에서 그대로 돈다).
+// v289 (2026-10-18): 4-1 「규칙 찾기」에서 비어 있던 계산식 배열 · 등호 · ⭐ 활용 세 칸을 4학년 칸 뒤에 더했다 (아래 "4학년 「규칙 찾기」 새 칸").
 //
 // 왜 이 줄기인가 (2026-09-30, 아버님 "다음 줄기로 규칙과 대응 만들어보자"): F 비례식, 중1 정비례, D 문자와 식(x·y)이
 // "두 양의 대응 관계를 식으로 쓴다"를 안다고 치는데 가르치는 칸이 없었다. 글자 D는 문자와 식 몫, G까지 썼으므로 H.
@@ -137,6 +138,19 @@ export const TAGS = {
   sameCount: '두 양이 같다고 봄',                // 도막 12개 → 12번 자름
   dropAdd: '더하는 수를 빠뜨림',                 // △ = □ × 2 + 1을 □ × 2
   firstAsMul: '1번째 모양 수를 곱함',            // 1번째가 3개 → 10번째 30개
+  // 4학년 「규칙 찾기」 새 칸 (v289) — 2022 4-1 지도서의 오류 표 그대로 (천재 박만구 379쪽·한대희 306쪽·비상 410쪽)
+  ruleIgnored: '규칙은 안 보고 결과만 맞춤',      // 32 × 12 = 384 … 넷째에 16 × 24 = 384를 씀 (결과가 같은 식을 고름)
+  oneSide: '한쪽 수만 바꿈',                     // 더해지는 수만 바꾸고 더하는 수는 그대로
+  digitCount: '자리 수를 잘못 셈',               // 37 × 15 = 5555
+  keepGrows: '두 수가 함께 변해도 결과가 변한다고 봄', // 100 − 1, 101 − 2 … 차도 커진다고
+  resultAsBox: '등호 뒤에 계산 결과를 씀',        // 8 + 4 = □ + 5 → 12 (등호를 "답을 쓰라"는 표시로)
+  sumAll: '모든 수를 더함',                      // 8 + 4 = □ + 5 → 17
+  sameWay: '두 수를 같은 쪽으로 고침',            // 38 + 17 = □ + 15 → 36 (덧셈은 반대쪽으로 고쳐야)
+  addLogicSub: '덧셈 논리를 뺄셈에 씀',           // 97 − 63 = □ − 62 → 98
+  copyOne: '한 수를 그대로 옮김',                // □에 보이는 수 하나를 그대로
+  pairMix: '짝을 잘못 지음',                     // 두 친구의 수를 섞어 더함
+  lastDiff: '마지막 차이만 봄',                  // 1, 3, 6, 10 → 14
+  digitAsOrder: '자리 숫자를 순서로 봄',          // 9999 ÷ 99 = 101 → 아홉째
 };
 
 // ───────────────────── 이야기 재료 ─────────────────────
@@ -196,6 +210,255 @@ function finishMis(id, branch, r, c, m) {
     key: `misread:${branch}`,
     probe: m.probe,
   };
+}
+
+// ───────────────────── 4학년 「규칙 찾기」 새 칸 재료 (v289 — 계산식 배열 · 등호 · ⭐ 활용) ─────────────────────
+// 2022 개정 4-1 (천재 한대희 6단원·박만구 5단원·비상 6단원 — 세 종 모두 4-1) [4수02-02]·[4수02-03].
+// 성취기준 적용 시 고려 사항대로: 등호(동치 관계)는 **두 자리 수**, 덧셈·뺄셈만(천재 두 종과 같게) · 혼합 계산식·일반항 식은 쓰지 않는다.
+// 차례 말은 교과서대로 "첫째 … 다섯째 · 몇째" (H1·H2의 "10번째"와 다르다) — 틀 글에서는 물을 차례를 틀마다 고정(쌍둥이 열쇠).
+// 오답은 지도서의 오류 표 그대로: 등호를 "답을 쓰라"는 표시로 봄(8 + 4 = □ + 5에 12) · 모든 수를 더함(17) ·
+// 덧셈 논리를 뺄셈에(97 − 63 = □ − 62에 98) · 등호로 계산을 이어 씀(98 − 55 = 43 + 29 = 72) · 규칙 대신 결과만 맞는 식 · 마지막 차이만 봄(1, 3, 6, 10 → 14).
+
+const ORD = ['첫째', '둘째', '셋째', '넷째', '다섯째', '여섯째', '일곱째', '여덟째', '아홉째', '열째'];
+/** 1 → 첫째 */
+const ord = (n) => ORD[n - 1];
+/** 계산식 줄 — 한 줄에 하나씩 굵게 */
+const rowsText = (rows) => rows.map((t) => `**${t}**`).join('\n');
+const CALC_HEAD = '규칙적인 계산식을 늘어놓았어요.\n\n';
+const CALC_RULE = '계산식의 배열은 수마다 따로 — 한 줄에 얼마씩 변하는지, 변하지 않는 수는 무엇인지 본다.';
+
+/** 백의 자리 수가 1씩, 더하는 수가 1씩 커지는 덧셈식 (천재 140쪽 101 + 10 = 111 꼴) — i줄(0부터): (h + i)·100 + u + (b + i) */
+function addRows(r, hLo = 1, hHi = 3) {
+  const h = int(r, hLo, hHi); const u = int(r, 1, 9); const b = int(r, 11, 38);
+  const x = (i) => (h + i) * 100 + u; const y = (i) => b + i;
+  return { h, u, b, x, y, s: (i) => x(i) + y(i), line: (i) => `${x(i)} + ${y(i)} = ${x(i) + y(i)}` };
+}
+/** 같은 숫자로 된 곱 — 37 × 3 = 111 · 101 × 11 = 1111 (k줄의 곱은 숫자 k가 len개) */
+const REP = [{ a: 37, m: 3, len: 3 }, { a: 101, m: 11, len: 4 }];
+const repOf = (k, len) => Number(String(k).repeat(len));
+
+/** H3 ㉮ 다섯째(여섯째)에 알맞은 덧셈식 — 오답도 셈은 맞는 식(결과만 맞음 · 한쪽만 바꿈 · 한 줄 밀림) */
+function nextAddFam(r, n) {
+  const R = addRows(r); const i = n - 1;
+  const ok = R.line(i);
+  const shiftI = n === 5 ? i + 1 : i - 1;
+  return { words: true, ans: ok, wr: [
+      { text: `${R.x(i) + 1} + ${R.y(i) - 1} = ${R.s(i)}`, tag: TAGS.ruleIgnored },
+      { text: `${R.x(i)} + ${R.y(i - 1)} = ${R.x(i) + R.y(i - 1)}`, tag: TAGS.oneSide },
+      { text: R.line(shiftI), tag: n === 5 ? TAGS.offByOne : TAGS.nextOnly }],
+    why: {
+      [TAGS.ruleIgnored]: `계산 결과 ${jn(R.s(i), '은', '는')} 맞지만 규칙에 맞는 식이 아니에요. 더해지는 수의 일의 자리는 늘 ${jn(R.u, '이고', '고')}, ${ord(n)} 더하는 수는 ${jn(R.y(i), '이에요', '예요')}.`,
+      [TAGS.oneSide]: `더해지는 수만 바꿨어요. 더하는 수도 한 줄마다 1씩 커지니까 ${ord(n)}에는 ${jn(R.y(i), '을', '를')} 더해요.`,
+      [TAGS.offByOne]: '그건 여섯째 덧셈식이에요. 넷째 바로 다음이 다섯째예요.',
+      [TAGS.nextOnly]: '그건 다섯째 덧셈식이에요. 여섯째까지 한 줄 더 가야 해요.',
+    },
+    steps: [`더해지는 수: ${R.x(0)} → ${R.x(1)} → ${R.x(2)} — 백의 자리 수가 1씩 커져요`, `더하는 수: ${R.y(0)} → ${R.y(1)} → ${R.y(2)} — 1씩 커져요`, `${ord(n)}: ${ok}`],
+    rule: CALC_RULE,
+    pools: { pokemon: [`${CALC_HEAD}${rowsText([0, 1, 2, 3].map(R.line))}\n\n${ord(n)}에 알맞은 덧셈식은 어느 것일까요?`] } };
+}
+/** H3 ㉯ 같은 숫자로 된 곱 — 다섯째(여섯째) 계산 결과 짐작 (37 × 3 = 111 · 101 × 11 = 1111) */
+function repFam(r, n) {
+  const P = pick(r, REP); const s = int(r, 1, 10 - n); // k = s … s + n − 1 ≤ 9
+  const line = (i) => `${P.a} × ${P.m * (s + i)} = ${repOf(s + i, P.len)}`;
+  const K = s + n - 1; const ans = repOf(K, P.len);
+  const shift = n === 5 ? (K + 1 <= 9 ? { text: String(repOf(K + 1, P.len)), tag: TAGS.offByOne } : null) : { text: String(repOf(K - 1, P.len)), tag: TAGS.nextOnly };
+  return { ans: String(ans), wr: [{ text: String(repOf(K, P.len - 1)), tag: TAGS.digitCount }, { text: String(repOf(K, P.len + 1)), tag: TAGS.digitCount }, shift],
+    why: {
+      [TAGS.digitCount]: `계산 결과는 늘 같은 숫자 ${P.len}개예요 — ${P.len}자리 그대로, 숫자만 한 줄마다 1씩 커져요.`,
+      [TAGS.offByOne]: '그건 여섯째 계산 결과예요. 넷째 바로 다음이 다섯째예요.',
+      [TAGS.nextOnly]: '그건 다섯째 계산 결과예요. 여섯째까지 한 줄 더 가야 해요.',
+    },
+    steps: [`곱하는 수: ${P.m * s} → ${P.m * (s + 1)} → ${P.m * (s + 2)} — ${P.m}씩 커져요`, `계산 결과: 같은 숫자 ${P.len}개 — 그 숫자가 1씩 커져요`, `${ord(n)}: ${P.a} × ${P.m * K} = ${ans}`],
+    rule: CALC_RULE,
+    pools: { pokemon: [`${CALC_HEAD}${rowsText([0, 1, 2, 3].map(line))}\n\n${ord(n)} 계산식의 계산 결과는 얼마일까요?`] } };
+}
+/** H3 ㉰ 차(합)가 그대로인 배열 — 다섯째 식의 □ (비상 100 − 1 = 99, 101 − 2 = 99 … · 박만구 200 + 150 = 350, 210 + 140 = 350 …) */
+function keepFam(r, op) {
+  const t = pick(r, [1, 2, 5, 10]); const A = int(r, 120, 480);
+  const B = op === '−' ? int(r, 11, 99) : int(r, 10 + 4 * t, 99);
+  const keep = op === '−' ? A - B : A + B;
+  const bOf = (i) => (op === '−' ? B + t * i : B - t * i);
+  const rows = [0, 1, 2, 3].map((i) => `${A + t * i} ${op} ${bOf(i)} = ${keep}`);
+  const fifth = `${A + 4 * t} ${op} ${bOf(4)}`;
+  const sub = op === '−';
+  return { ans: String(keep), wr: [{ text: String(keep + 4 * t), tag: TAGS.keepGrows }, { text: String(keep + t), tag: TAGS.keepGrows }],
+    why: { [TAGS.keepGrows]: sub
+      ? `빼지는 수와 빼는 수가 똑같이 ${t}씩 커지면 차는 변하지 않아요 — 늘 ${jn(keep, '이에요', '예요')}.`
+      : `더해지는 수가 ${t}씩 커지는 만큼 더하는 수가 ${t}씩 작아져서 합은 변하지 않아요 — 늘 ${jn(keep, '이에요', '예요')}.` },
+    steps: [`${sub ? '빼지는' : '더해지는'} 수: ${A} → ${A + t} → ${A + 2 * t} — ${t}씩 커져요`, `${sub ? '빼는' : '더하는'} 수: ${bOf(0)} → ${bOf(1)} → ${bOf(2)} — ${t}씩 ${sub ? '커져요' : '작아져요'}`, `${sub ? '차' : '합'}는 늘 그대로: ${fifth} = ${keep}`],
+    rule: sub ? '빼지는 수와 빼는 수가 똑같이 커지면 차는 그대로다.' : '더해지는 수가 커진 만큼 더하는 수가 작아지면 합은 그대로다.',
+    pools: { pokemon: [`${CALC_HEAD}${rowsText(rows)}\n\n다섯째 ${sub ? '뺄셈식' : '덧셈식'} **${fifth} = □**에서 □에 알맞은 수는 얼마일까요?`] } };
+}
+/** H3 ㉱ 거꾸로 — 계산 결과가 ○○이 되는 덧셈식 (천재 140쪽 "계산 결과가 616이 되는 덧셈식") · 보기는 식의 왼쪽만 */
+function findAddFam(r) {
+  const R = addRows(r); const i = pick(r, [5, 6]); const S = R.s(i);
+  const ok = `${R.x(i)} + ${R.y(i)}`;
+  return { words: true, ans: ok, wr: [
+      { text: `${R.x(i) + 1} + ${R.y(i) - 1}`, tag: TAGS.ruleIgnored },
+      { text: `${R.x(i)} + ${R.y(i - 1)}`, tag: TAGS.oneSide },
+      { text: `${R.x(i - 1)} + ${R.y(i - 1)}`, tag: TAGS.offByOne }],
+    why: {
+      [TAGS.ruleIgnored]: `두 수의 합은 ${jn(S, '이지만', '지만')} 규칙에 맞는 식이 아니에요. 더해지는 수의 일의 자리는 늘 ${jn(R.u, '이에요', '예요')}.`,
+      [TAGS.oneSide]: `${R.x(i)} + ${R.y(i - 1)} = ${jn(R.x(i) + R.y(i - 1), '이라서', '라서')} ${jn(S, '이', '가')} 아니에요. 더하는 수도 한 줄마다 1씩 커져요.`,
+      [TAGS.offByOne]: `그건 ${ord(i)} 덧셈식이라 계산 결과가 ${jn(R.s(i - 1), '이에요', '예요')}.`,
+    },
+    steps: [`계산 결과: ${R.s(0)} → ${R.s(1)} → ${R.s(2)} — 101씩 커져요`, `${jn(S, '은', '는')} ${ord(i + 1)} 계산 결과예요`, `${ord(i + 1)} 덧셈식: ${ok} = ${S}`],
+    rule: CALC_RULE,
+    pools: { pokemon: [`${CALC_HEAD}${rowsText([0, 1, 2, 3].map(R.line))}\n\n규칙에 따라 계산 결과가 ${S}인 덧셈식은 어느 것일까요?`] } };
+}
+
+const EQ_RULE = '등호(=)는 양쪽의 크기가 같다는 뜻 — 덧셈은 한 수가 커진 만큼 다른 수가 작아져야, 뺄셈은 두 수가 같은 쪽으로 변해야 그대로다.';
+/** 수 n과 차이 k를 말로 — "5 작아요" · "5 커요" */
+const moreLess = (k, dir) => `${k} ${dir > 0 ? '커요' : '작아요'}`;
+
+/** H4 ㉮ a + b = □ + d (side 'L') · a + b = c + □ ('R') — 두 자리 수, 한쪽이 k 변한 만큼 □는 반대로 */
+function boxAddFam(r, side) {
+  const a = int(r, 15, 79); const b = int(r, 15, 79); const k = int(r, 1, 5); const dir = pick(r, [1, -1]);
+  // L: d = b − dir·k (더하는 수가 k 작아지면 □는 a보다 k 크다) · R: c = a + dir·k (더해지는 수가 k 커지면 □는 b보다 k 작다)
+  const L = side === 'L';
+  const shownN = L ? b - dir * k : a + dir * k;
+  const ans = L ? a + dir * k : b - dir * k;
+  const keep = L ? b : a; const boxed = L ? a : b;          // 바뀐 수의 원래 값 · □ 자리의 원래 값
+  const eq = L ? `${a} + ${b} = □ + ${shownN}` : `${a} + ${b} = ${shownN} + □`;
+  const moved = L ? -dir : dir;                              // 보이는 수가 원래보다 커졌나(1) 작아졌나(−1)
+  return { ans: String(ans), wr: [{ text: String(a + b), tag: TAGS.resultAsBox }, { text: String(a + b + shownN), tag: TAGS.sumAll }, { text: String(boxed - (ans - boxed)), tag: TAGS.sameWay }],
+    why: {
+      [TAGS.resultAsBox]: `${jn(a + b, '은', '는')} 왼쪽 ${a} + ${b}의 계산 결과예요. 등호는 "답을 쓰라"는 표시가 아니라 양쪽 크기가 같다는 뜻이에요.`,
+      [TAGS.sumAll]: `보이는 수를 모두 더했어요. 오른쪽 식의 크기가 ${a} + ${jn(b, '과', '와')} 같아지는 □를 찾아요.`,
+      [TAGS.sameWay]: `${jn(shownN, '은', '는')} ${keep}보다 ${moreLess(k, moved)}. 덧셈에서 합이 그대로이려면 □는 ${boxed}보다 ${k} ${moved > 0 ? '작아야' : '커야'} 해요 — 같은 쪽으로 고치면 합이 ${2 * k}만큼 달라져요.`,
+    },
+    steps: [`${jn(shownN, '은', '는')} ${keep}보다 ${moreLess(k, moved)}`, `크기가 같으려면 □는 ${boxed}보다 ${k} ${moved > 0 ? '작아야' : '커야'} 해요 — □는 ${boxed} ${moved > 0 ? '−' : '+'} ${k} = ${ans}`, `확인: ${a} + ${b} = ${a + b}, ${L ? `${ans} + ${shownN}` : `${shownN} + ${ans}`} = ${a + b}`],
+    rule: EQ_RULE,
+    pools: { pokemon: [`**${eq}**\n\n□에 알맞은 수는 얼마일까요?`] } };
+}
+/** H4 ㉯ a − b = □ − d — 빼는 수가 k 변한 만큼 □도 같은 쪽으로 (덧셈 논리를 뺄셈에 쓰면 98) */
+function boxSubFam(r) {
+  const a = int(r, 40, 94); const b = int(r, 15, a - 20); const k = int(r, 1, 5); const dir = pick(r, [1, -1]);
+  const d = b + dir * k; const ans = a + dir * k;
+  return { ans: String(ans), wr: [{ text: String(a - b), tag: TAGS.resultAsBox }, { text: String(a - dir * k), tag: TAGS.addLogicSub }, { text: String(a), tag: TAGS.copyOne }],
+    why: {
+      [TAGS.resultAsBox]: `${jn(a - b, '은', '는')} 왼쪽 ${a} − ${b}의 계산 결과예요. 등호는 양쪽 크기가 같다는 뜻 — □ − ${jn(d, '이', '가')} ${jn(a - b, '이', '가')} 되는 수를 찾아요.`,
+      [TAGS.addLogicSub]: `덧셈처럼 반대쪽으로 고쳤어요. 뺄셈은 빼는 수가 ${k} ${dir > 0 ? '커지면' : '작아지면'} 빼지는 수도 ${k} ${dir > 0 ? '커져야' : '작아져야'} 차가 그대로예요.`,
+      [TAGS.copyOne]: `${jn(a, '을', '를')} 그대로 옮겼어요. 빼는 수가 ${b}에서 ${ro(d)} 바뀌었으니 빼지는 수도 바뀌어야 해요.`,
+    },
+    steps: [`${jn(d, '은', '는')} ${b}보다 ${moreLess(k, dir)}`, `차가 같으려면 빼지는 수도 ${k} ${dir > 0 ? '커져야' : '작아져야'} 해요 — □는 ${a} ${dir > 0 ? '+' : '−'} ${k} = ${ans}`, `확인: ${a} − ${b} = ${a - b}, ${ans} − ${d} = ${a - b}`],
+    rule: EQ_RULE,
+    pools: { pokemon: [`**${a} − ${b} = □ − ${d}**\n\n□에 알맞은 수는 얼마일까요?`] } };
+}
+/** H4 ㉰ 옳은 식 고르기 — 정답 하나만 참, 오답 셋은 일부러 틀린 식(같은 쪽으로 · 한쪽만 · 결과 뒤에 붙임 / 뺄셈은 덧셈 논리) */
+function judgeFam(r, op) {
+  const k = int(r, 1, 5); const c = int(r, 1, 9);
+  let a; let b;
+  if (op === '+') { a = int(r, 15, 60); b = int(r, 15, 99 - a); if (b < 15) b = 15; } else { a = int(r, 40, 94); b = int(r, 15, a - 20); }
+  const sub = op === '−';
+  const left = `${a} ${op} ${b}`; const val = sub ? a - b : a + b;
+  const ok = sub ? `${left} = ${a + k} − ${b + k}` : `${left} = ${a + k} + ${b - k}`;
+  const wr = sub
+    ? [{ text: `${left} = ${a + k} − ${b - k}`, tag: TAGS.addLogicSub }, { text: `${left} = ${a + k} − ${b}`, tag: TAGS.oneSide }, { text: `${left} = ${val} + ${c}`, tag: TAGS.resultAsBox }]
+    : [{ text: `${left} = ${a + k} + ${b + k}`, tag: TAGS.sameWay }, { text: `${left} = ${a + k} + ${b}`, tag: TAGS.oneSide }, { text: `${left} = ${val} + ${c}`, tag: TAGS.resultAsBox }];
+  return { words: true, ans: ok, wr,
+    why: {
+      [TAGS.sameWay]: `두 수를 모두 ${k}씩 키우면 합이 ${2 * k}만큼 커져요 — ${a + k} + ${b + k} = ${jn(a + b + 2 * k, '이에요', '예요')}.`,
+      [TAGS.addLogicSub]: `빼는 수를 ${k} 줄이고 빼지는 수를 ${k} 늘리면 차가 ${2 * k}만큼 커져요 — ${a + k} − ${b - k} = ${jn(a - b + 2 * k, '이에요', '예요')}.`,
+      [TAGS.oneSide]: sub ? `빼지는 수만 ${k} 키우면 차도 ${k} 커져요 — ${a + k} − ${b} = ${jn(a - b + k, '이에요', '예요')}.` : `한 수만 ${k} 키우면 합도 ${k} 커져요 — ${a + k} + ${b} = ${jn(a + b + k, '이에요', '예요')}.`,
+      [TAGS.resultAsBox]: `등호 바로 뒤에 왼쪽의 계산 결과 ${jn(val, '을', '를')} 쓰고 수를 더 붙였어요. 그러면 오른쪽은 ${val} + ${c} = ${jn(val + c, '이라서', '라서')} 왼쪽과 크기가 달라요.`,
+    },
+    steps: [`왼쪽: ${left} = ${val}`, sub ? `${a + k} − ${b + k} = ${val} — 두 수가 똑같이 ${k}씩 커지면 차는 그대로예요` : `${a + k} + ${b - k} = ${val} — 한 수가 ${k} 커진 만큼 다른 수가 ${k} 작아졌어요`, `옳은 식: ${ok}`],
+    rule: EQ_RULE,
+    pools: { pokemon: [`${a} ${op} ${jn(b, '과', '와')} 크기가 같은 것을 등호로 바르게 나타낸 식은 어느 것일까요?`] } };
+}
+/** H4 ㉱ 이야기 속 크기가 같은 두 양을 등호로 (천재 "같은 값을 나타내는 두 카드" · 비상 짧은 글) */
+function storyFam(r) {
+  const a = int(r, 12, 45); const b = int(r, 12, 45); const S = a + b;
+  // 다른 짝 c + d — c가 a·b면 같은 짝이 된다 (S ≥ 24라 10 … S − 10에 늘 다른 수가 남는다)
+  let c = int(r, 10, S - 10);
+  for (let t = 0; t < 30 && (c === a || c === b); t++) c = int(r, 10, S - 10);
+  if (c === a || c === b) c = [10, 11, 12].find((v) => v !== a && v !== b);
+  const d = S - c; const x = int(r, 1, 9);
+  const ok = `${a} + ${b} = ${c} + ${d}`;
+  return { words: true, ans: ok, wr: [
+      { text: `${a} + ${c} = ${b} + ${d}`, tag: TAGS.pairMix },
+      { text: `${a} + ${b} = ${S} + ${x}`, tag: TAGS.resultAsBox },
+      { text: `${a} + ${b} + ${c} + ${d}`, tag: TAGS.sumAll }],
+    why: {
+      [TAGS.pairMix]: '{mon}의 스티커끼리, {mon2}의 스티커끼리 더해야 해요 — 두 친구의 스티커를 섞어 더했어요.',
+      [TAGS.resultAsBox]: `등호 바로 뒤에 왼쪽의 계산 결과 ${jn(S, '을', '를')} 썼어요. 오른쪽에는 {mon2/이/가} 모은 ${c}장과 ${d}장을 더한 식이 와야 해요.`,
+      [TAGS.sumAll]: '넷을 모두 더하면 둘이 모은 스티커를 합친 수예요. "수가 같다"는 것은 등호로 양쪽을 이어야 나타낼 수 있어요.',
+    },
+    steps: [`{mon}: ${a} + ${b} = ${S}`, `{mon2}: ${c} + ${d} = ${S}`, `크기가 같으니 등호로 이어요: ${ok}`],
+    rule: '크기가 같은 두 양은 등호(=)로 이어 하나의 식으로 나타낸다.',
+    pools: { pokemon: [`{mon/은/는} 스티커를 ${a}장과 ${b}장 모았고, {mon2/은/는} ${c}장과 ${d}장 모았어요. 둘이 모은 스티커 수는 같아요.\n\n이것을 등호를 써서 바르게 나타낸 식은 어느 것일까요?`] } };
+}
+
+/** ⭐ ㉮ 차이가 점점 커지는 수 배열 — 일곱째 수 (박만구 지도서 1, 3, 6, 10 → 14 오류) */
+function growFam(r) {
+  const a = int(r, 1, 9); const d = int(r, 1, 4); const e = pick(r, [1, 1, 2]);
+  const vs = [a]; for (let i = 0; i < 6; i++) vs.push(vs[i] + d + e * i);
+  const last = d + 3 * e;
+  return { ans: String(vs[6]), wr: [{ text: String(vs[5]), tag: TAGS.nextOnly }, { text: String(vs[4] + 2 * last), tag: TAGS.lastDiff }],
+    why: {
+      [TAGS.nextOnly]: `${jn(vs[5], '은', '는')} 바로 다음 여섯째 수예요. 일곱째까지 한 번 더 가야 해요.`,
+      [TAGS.lastDiff]: `마지막 차이 ${jn(last, '을', '를')} 두 번 더했어요. 차이가 ${e}씩 커지니까 다음 차이는 ${d + 4 * e}, 그다음은 ${jn(d + 5 * e, '이에요', '예요')}.`,
+    },
+    steps: [`이웃한 수의 차이: ${L([0, 1, 2, 3].map((i) => d + e * i))} — 차이가 ${e}씩 커져요`, `여섯째: ${vs[4]} + ${d + 4 * e} = ${vs[5]}`, `일곱째: ${vs[5]} + ${d + 5 * e} = ${vs[6]}`],
+    rule: '차이가 점점 커지는 수 배열은 차이의 규칙부터 찾는다.',
+    pools: { pokemon: [`규칙에 따라 수를 늘어놓았어요.\n\n**${L(vs.slice(0, 5))}, …**\n\n이 규칙대로라면 일곱째 수는 얼마일까요?`] } };
+}
+/** 나눗셈 배열 둘 — 1111 × k ÷ 11 × k = 101 (비상 142쪽) · 111 × k ÷ 37 = 3 × k (지도서 37 × 3 = 111을 거꾸로) */
+const DIVROWS = [
+  { line: (k) => `${1111 * k} ÷ ${11 * k} = 101`, lead: (k) => 1111 * k },
+  { line: (k) => `${111 * k} ÷ 37 = ${3 * k}`, lead: (k) => 111 * k },
+];
+/** ⭐ ㉯ 몇째 계산식일까 — 첫째가 k = s(3·4)부터라 앞의 숫자 K ≠ 차례 (비상 "9999 ÷ 99 = 101은 몇째?") */
+function orderDivFam(r) {
+  const P = pick(r, DIVROWS); const s = pick(r, [3, 4]); const K = int(r, s + 5, 9); const n = K - s + 1;
+  return { ans: String(n), wr: [{ text: String(K), tag: TAGS.digitAsOrder }, { text: String(n - 1), tag: TAGS.offByOne }, { text: String(n + 1), tag: TAGS.offByOne }],
+    why: {
+      [TAGS.digitAsOrder]: `${ro(K)} 된 수라서 ${ord(K)}라고 봤어요. 첫째가 ${P.lead(s)}에서 시작하니까 첫째부터 세어요.`,
+      [TAGS.offByOne]: `첫째부터 한 줄씩 세어 봐요 — ${jn(P.line(s), '이', '가')} 첫째예요.`,
+    },
+    steps: [`첫째는 ${P.line(s)} — 앞의 수가 ${P.lead(1)}씩 커져요`, `${P.lead(s)}에서 ${P.lead(K)}까지 ${K - s}줄 더 가요`, `첫째에서 ${K - s}줄 뒤 → ${ord(n)} (${n})`],
+    rule: '몇째인지는 첫째가 무엇인지부터 보고 센다.',
+    // 굵은 식 뒤에 조사를 붙이지 않는다 — "**…**은/는"은 틀 열쇠(tplKey)가 지우지 못해 🔁 쌍둥이가 다른 틀로 간다
+    pools: { pokemon: [`${CALC_HEAD}${rowsText([0, 1, 2, 3].map((i) => P.line(s + i)))}\n\n규칙에 따라 계산식을 계속 늘어놓을 때, 몇째 계산식이 **${P.line(K)}**일까요?`] } };
+}
+/** ⭐ ㉰ 계산 결과가 ○○인 덧셈식은 몇째 — 백의 자리 숫자 ≠ 차례 (첫째가 3백·4백부터) */
+function orderAddFam(r) {
+  const R = addRows(r, 3, 4); const i = int(r, 5, 9 - R.h); const S = R.s(i); const n = i + 1;
+  return { ans: String(n), wr: [{ text: String(R.h + i), tag: TAGS.digitAsOrder }, { text: String(n - 1), tag: TAGS.offByOne }, { text: String(n + 1), tag: TAGS.offByOne }],
+    why: {
+      [TAGS.digitAsOrder]: `더해지는 수의 백의 자리 숫자 ${jn(R.h + i, '을', '를')} 차례로 봤어요. 첫째의 백의 자리 숫자가 ${jn(R.h, '이라서', '라서')} 차례와 달라요.`,
+      [TAGS.offByOne]: `첫째부터 한 줄씩 세어 봐요 — 계산 결과가 101씩 커지니까 ${R.s(0)}에서 ${S}까지 ${i}줄이에요.`,
+    },
+    steps: [`계산 결과: ${R.s(0)} → ${R.s(1)} → ${R.s(2)} — 101씩 커져요`, `${S} − ${R.s(0)} = ${S - R.s(0)}, 101이 ${i}번 → 첫째에서 ${i}줄 뒤`, `${ord(n)} (${n}) — ${R.line(i)}`],
+    rule: '몇째인지는 첫째가 무엇인지부터 보고 센다.',
+    pools: { pokemon: [`${CALC_HEAD}${rowsText([0, 1, 2, 3].map(R.line))}\n\n규칙에 따라 덧셈식을 계속 늘어놓을 때, 계산 결과가 ${S}인 덧셈식은 몇째일까요?`] } };
+}
+/** ⭐ ㉱ 등호 두 걸음 — 같은 부분 찾기 (비상 지도서 심화 58 + 13 + 17 = □ + 30 · 79 − □ = 79 − 50 − 8) */
+function groupAddFam(r) {
+  const T = pick(r, [30, 40, 50, 60]); let b = int(r, 11, T - 11); if (b % 10 === 0) b += 1; const c = T - b;
+  // 같은 수가 두 번 나오면(18 + 18 + 42) 어느 둘을 묶는지 헷갈린다 — a는 b·c와 다르게
+  let a = int(r, 12, 69); for (let t = 0; t < 30 && (a === b || a === c); t++) a = int(r, 12, 69);
+  if (a === b || a === c) a = [12, 13, 14].find((v) => v !== b && v !== c);
+  return { ans: String(a), wr: [{ text: String(a + T), tag: TAGS.resultAsBox }, { text: String(a + 2 * T), tag: TAGS.sumAll }],
+    why: {
+      [TAGS.resultAsBox]: `${jn(a + T, '은', '는')} 왼쪽의 계산 결과예요. 오른쪽 □ + ${jn(T, '이', '가')} 그만큼이 되는 □를 찾아요.`,
+      [TAGS.sumAll]: `보이는 수를 모두 더했어요. ${b} + ${c} = ${jn(T, '이라서', '라서')} 왼쪽은 ${a} + ${jn(T, '과', '와')} 크기가 같아요.`,
+    },
+    steps: [`같은 부분 찾기: ${b} + ${c} = ${T}`, `왼쪽은 ${a} + ${jn(T, '과', '와')} 크기가 같아요`, `${a} + ${T} = □ + ${T} → □는 ${a}`],
+    rule: '등호 양쪽에서 같은 부분을 먼저 찾으면 계산이 짧아진다.',
+    pools: { pokemon: [`**${a} + ${b} + ${c} = □ + ${T}**\n\n□에 알맞은 수는 얼마일까요?`] } };
+}
+function groupSubFam(r) {
+  const b = pick(r, [20, 30, 40, 50]); const c = int(r, 1, 9); const a = int(r, b + c + 12, 99);
+  return { ans: String(b + c), wr: [{ text: String(a - b - c), tag: TAGS.resultAsBox }, { text: String(b), tag: TAGS.copyOne }],
+    why: {
+      [TAGS.resultAsBox]: `${jn(a - b - c, '은', '는')} 오른쪽의 계산 결과예요. ${a}에서 □를 한 번 빼서 그 수가 되는 □를 찾아요.`,
+      [TAGS.copyOne]: `${b}만 빼면 ${jn(c, '을', '를')} 덜 빼요 — ${jn(b, '과', '와')} ${jn(c, '을', '를')} 모두 빼야 해요.`,
+    },
+    steps: [`오른쪽: ${a}에서 ${jn(b, '을', '를')} 빼고 또 ${jn(c, '을', '를')} 빼요`, `${jn(b, '과', '와')} ${jn(c, '을', '를')} 한꺼번에 빼는 것과 같아요 — ${b} + ${c} = ${b + c}`, `□는 ${b + c}`],
+    rule: '등호 양쪽에서 같은 부분을 먼저 찾으면 계산이 짧아진다.',
+    pools: { pokemon: [`**${a} − □ = ${a} − ${b} − ${c}**\n\n□에 알맞은 수는 얼마일까요?`] } };
 }
 
 // ───────────────────── 개념 사다리 (H. 규칙과 대응 줄기) ─────────────────────
@@ -366,6 +629,159 @@ export const CORRESPOND = [
         whyAny: `${s + d}개는 2번째 모양의 블록 수예요. 늘어나는 수는 두 모양의 차이예요.`,
         rule: '늘어나는 수 = 이웃한 두 모양의 블록 수 차이.',
         probe: { steps: cs, shownStep: s + d },
+      });
+    },
+  },
+
+  // ── 4학년 「규칙 찾기」 새 칸 셋 (v289, 2026-10-18 아버님 "이대로 진행") — 4-1 계산식의 배열 · 등호 · ⭐ 활용 ──
+  // · 5학년 칸(cor.pair)으로 가는 길은 막지 않는다 — cor.pair는 그대로 cor.shapeseq만 필요 · 📏 진단 5문제에서는 뺀다(DIAG)
+  // · △와 □·△ 식은 여전히 5학년 칸부터 — 여기의 □는 교과서처럼 빈칸으로만 쓴다
+  {
+    id: 'cor.calcseq', grade: 4, name: '계산식 배열의 규칙', needs: ['cor.shapeseq'],
+    idea: '계산식이 줄지어 있으면 **변하는 수**와 **변하지 않는 수**를 나눠 봐요. 수마다 한 줄에 얼마씩 변하는지 찾으면 다음 계산식과 계산 결과를 계산하기 전에 짐작할 수 있어요.',
+    slip: '위아래 계산식에서 수마다 한 줄에 얼마씩 변하는지 먼저 짚어 봐요.',
+    calc(r, c) {
+      const fams = [nextAddFam(r, 5), nextAddFam(r, 6), repFam(r, 5), repFam(r, 6), keepFam(r, '−'), keepFam(r, '+'), findAddFam(r)];
+      return finish(this.id, r, c, pickFamily(r, c, fams));
+    },
+    misread(r, c) {
+      if (branchOf(r, c, ['keep', 'one']) === 'keep') {
+        const t = pick(r, [1, 2, 5, 10]); const A = int(r, 120, 480); const B = int(r, 11, 99); const D = A - B;
+        const rows = [0, 1, 2, 3].map((i) => `${A + t * i} − ${B + t * i} = ${D}`);
+        const shown = D + t;
+        return finishMis(this.id, 'keep', r, c, {
+          q: `${CALC_HEAD}${rowsText(rows)}\n\n${showWork(`다섯째 계산 결과는 ${jn(shown, '이에요', '예요')} — 빼지는 수가 ${t}씩 커지니까요`)}`,
+          ok: `빼는 수도 ${t}씩 커져서 차는 그대로예요 — ${D}`,
+          wr: [
+            { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+            { text: '두 수가 커지면 계산 결과도 언제나 커져요', tag: MIS_OK },
+            { text: '뺄셈식의 배열에는 규칙이 없어요', tag: OFF },
+          ],
+          steps: [`빼지는 수: ${A} → ${A + t} → ${A + 2 * t} — ${t}씩 커져요`, `빼는 수: ${B} → ${B + t} → ${B + 2 * t} — ${t}씩 커져요`, `똑같이 커지니까 차는 늘 ${D}`],
+          whyAny: `빼지는 수만 봤어요. 빼는 수도 똑같이 ${t}씩 커지면 차는 변하지 않아요.`,
+          rule: '빼지는 수와 빼는 수가 똑같이 커지면 차는 그대로다.',
+          probe: { keep: D, shown },
+        });
+      }
+      const R = addRows(r);
+      const shownEq = `${R.x(4)} + ${R.y(3)} = ${R.x(4) + R.y(3)}`;
+      return finishMis(this.id, 'one', r, c, {
+        q: `${CALC_HEAD}${rowsText([0, 1, 2, 3].map(R.line))}\n\n${showWork(`다섯째 덧셈식은 ${jn(shownEq, '이에요', '예요')} — 백의 자리 수가 1 커지니까요`)}`,
+        ok: `더하는 수도 1씩 커져요 — ${R.line(4)}`,
+        wr: [
+          { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+          { text: '계산 결과만 맞으면 어떤 식이든 다섯째가 될 수 있어요', tag: MIS_OK }, // 결과 수를 보기에 쓰면 정답의 결과를 미리 알려 준다
+          { text: '다섯째 덧셈식은 넷째와 같아요', tag: OFF },
+        ],
+        steps: ['더해지는 수: 백의 자리 수가 1씩 커져요', `더하는 수: ${R.y(0)} → ${R.y(1)} → ${R.y(2)} — 1씩 커져요`, `다섯째: ${R.line(4)}`],
+        whyAny: '더해지는 수만 바꾸고 더하는 수는 넷째 그대로 두었어요. 더하는 수도 한 줄마다 1씩 커져요.',
+        rule: CALC_RULE,
+        probe: { shown: shownEq },
+      });
+    },
+  },
+
+  {
+    id: 'cor.equal', grade: 4, name: '등호(=)와 크기가 같은 두 양', needs: ['cor.calcseq'],
+    idea: '등호(=)는 **왼쪽과 오른쪽의 크기가 같다**는 뜻이에요. "답을 쓰세요"라는 표시가 아니에요. 덧셈에서 한 수가 커진 만큼 다른 수가 작아지면 크기가 그대로예요 — 38 + 17과 40 + 15는 크기가 같아서 38 + 17 = 40 + 15.',
+    slip: '등호 양쪽을 따로 계산해서 크기가 같은지 견주어 봐요.',
+    calc(r, c) {
+      const fams = [boxAddFam(r, 'L'), boxAddFam(r, 'R'), boxSubFam(r), judgeFam(r, '+'), judgeFam(r, '−'), storyFam(r)];
+      return finish(this.id, r, c, pickFamily(r, c, fams));
+    },
+    misread(r, c) {
+      const br = branchOf(r, c, ['result', 'sub', 'chain']);
+      if (br === 'result') {
+        const a = int(r, 15, 79); const b = int(r, 15, 79); const k = int(r, 1, 5); const d = b - k;
+        return finishMis(this.id, 'result', r, c, {
+          q: showWork(`${a} + ${b} = □ + ${d}에서 □는 ${jn(a + b, '이에요', '예요')}`),
+          ok: `등호는 양쪽 크기가 같다는 뜻 — ${jn(d, '은', '는')} ${b}보다 ${k} 작으니 □는 ${a + k}`,
+          wr: [
+            { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+            { text: `보이는 수를 모두 더해서 □는 ${jn(a + b + d, '이에요', '예요')}`, tag: TAGS.sumAll },
+            { text: '등호 바로 뒤에는 늘 계산 결과를 써요', tag: MIS_OK },
+          ],
+          steps: [`${a} + ${b} = ${a + b}`, `□ + ${d}도 ${jn(a + b, '이', '가')} 되어야 해요 — □는 ${a + b} − ${d} = ${a + k}`],
+          whyAny: '등호를 "답을 쓰라"는 표시로 봤어요. 등호는 양쪽 크기가 같다는 뜻이에요.',
+          rule: EQ_RULE,
+          probe: { right: a + k, shown: a + b },
+        });
+      }
+      if (br === 'sub') {
+        const a = int(r, 40, 94); const b = int(r, 15, a - 20); const k = int(r, 1, 5); const d = b - k;
+        return finishMis(this.id, 'sub', r, c, {
+          q: showWork(`${a} − ${b} = □ − ${d}에서 □는 ${jn(a + k, '이에요', '예요')} — ${jn(d, '이', '가')} ${b}보다 ${k} 작으니까 □는 ${a}보다 ${k} 커야 해요`),
+          ok: `빼는 수가 ${k} 작아지면 빼지는 수도 ${k} 작아져야 차가 같아요 — □는 ${a - k}`,
+          wr: [
+            { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+            { text: `□는 ${jn(a - b, '이에요', '예요')} — ${a} − ${b}의 계산 결과니까요`, tag: TAGS.resultAsBox },
+            { text: '뺄셈식에는 등호를 쓸 수 없어요', tag: OFF },
+          ],
+          steps: [`${a} − ${b} = ${a - b}`, `□ − ${d}도 ${jn(a - b, '이', '가')} 되어야 해요 — □는 ${a - b} + ${d} = ${a - k}`],
+          whyAny: '덧셈처럼 반대쪽으로 고쳤어요. 뺄셈은 빼는 수와 빼지는 수가 같은 쪽으로 변해야 차가 그대로예요.',
+          rule: EQ_RULE,
+          probe: { right: a - k, shown: a + k },
+        });
+      }
+      // 등호로 계산을 이어 씀 (박만구 지도서 98 − 55 = 43 + 29 = 72 · 비상 135쪽 17 + 54 = 71 + 4 = 75)
+      const a = int(r, 15, 60); const b = int(r, 15, 39); const x = int(r, 2, 9); const S = a + b; const T = S + x;
+      return finishMis(this.id, 'chain', r, c, {
+        q: `{mon/이/가} ${a} + ${b} + ${jn(x, '을', '를')} 계산하며 이렇게 썼어요.\n\n**${a} + ${b} = ${S} + ${x} = ${T}**\n\n어디가 틀렸을까요?`,
+        ok: `${a} + ${jn(b, '과', '와')} ${S} + ${jn(x, '은', '는')} 크기가 달라서 등호로 이을 수 없어요 — ${a} + ${b} = ${S}, ${S} + ${x} = ${T}`,
+        wr: [
+          { text: '맞게 썼어요', tag: RIGHT_AS_WRONG },
+          { text: '계산한 차례대로 등호로 이어 쓰면 돼요', tag: MIS_OK },
+          { text: `${a} + ${b} + ${x}의 계산 결과는 ${jn(S, '이에요', '예요')}`, tag: OFF },
+        ],
+        steps: [`${a} + ${b} = ${S}`, `${S} + ${x} = ${T}`, `${a} + ${jn(b, '은', '는')} ${jn(S, '이고', '고')} ${S} + ${jn(x, '은', '는')} ${jn(T, '이라서', '라서')} 크기가 달라요`],
+        whyAny: '등호로 계산을 이어 썼어요. 등호 양쪽은 늘 크기가 같아야 해요 — 계산은 식을 나누어 써요.',
+        rule: '등호(=) 양쪽은 늘 크기가 같아야 한다 — 계산을 이어 갈 때는 식을 나누어 쓴다.',
+        probe: { chain: [a, b, x] },
+      });
+    },
+  },
+
+  {
+    // ⭐ 4학년 활용 — 교과서 심화·마무리 꼴의 두세 걸음 (차이가 커지는 배열 · 몇째 계산식 · 등호의 같은 부분)
+    id: 'cor.apply4', grade: 4, name: '⭐ 규칙 찾기 활용', needs: ['cor.equal'],
+    idea: '두세 걸음으로 푸는 규칙 문제예요. **차이가 점점 커지는** 수 배열은 차이의 규칙부터 찾고, 계산식이 **몇째**인지는 첫째가 무엇인지부터 봐요. 등호 문제는 양쪽에서 **같은 부분**을 먼저 찾아요.',
+    slip: '이 문제에서 무엇을 먼저 찾아야 하는지, 풀이를 한 줄씩 따라가 봐요.',
+    calc(r, c) {
+      const fams = [growFam(r), orderDivFam(r), orderAddFam(r), groupAddFam(r), groupSubFam(r)];
+      return finish(this.id, r, c, pickFamily(r, c, fams));
+    },
+    misread(r, c) {
+      if (branchOf(r, c, ['grow', 'order']) === 'grow') {
+        const a = int(r, 1, 9); const d = int(r, 1, 4); const e = pick(r, [1, 1, 2]);
+        const vs = [a]; for (let i = 0; i < 6; i++) vs.push(vs[i] + d + e * i);
+        const last = d + 3 * e; const shown = vs[4] + 2 * last;
+        return finishMis(this.id, 'grow', r, c, {
+          q: `규칙에 따라 수를 늘어놓았어요: ${L(vs.slice(0, 5))}, …\n\n${showWork(`일곱째 수는 ${jn(shown, '이에요', '예요')} — 마지막 차이 ${jn(last, '을', '를')} 두 번 더했어요`)}`,
+          ok: `차이가 ${e}씩 커져요 — 여섯째 ${vs[5]}, 일곱째 ${vs[6]}`,
+          wr: [
+            { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+            { text: '차이는 늘 같아서 마지막 차이를 계속 더하면 돼요', tag: MIS_OK },
+            { text: '일곱째 수는 늘어놓지 않아서 알 수 없어요', tag: OFF },
+          ],
+          steps: [`이웃한 수의 차이: ${L([0, 1, 2, 3].map((i) => d + e * i))} — ${e}씩 커져요`, `여섯째 ${vs[4]} + ${d + 4 * e} = ${vs[5]}, 일곱째 ${vs[5]} + ${d + 5 * e} = ${vs[6]}`],
+          whyAny: `차이가 ${e}씩 커지는데 마지막 차이를 그대로 더했어요. 다음 차이도 ${e}만큼 커져요.`,
+          rule: '차이가 점점 커지는 수 배열은 차이의 규칙부터 찾는다.',
+          probe: { seq: vs.slice(0, 5), shown, right: vs[6] },
+        });
+      }
+      const P = DIVROWS[0]; const s = pick(r, [3, 4]); const K = int(r, s + 5, 9); const n = K - s + 1;
+      return finishMis(this.id, 'order', r, c, {
+        q: `${CALC_HEAD}${rowsText([0, 1, 2, 3].map((i) => P.line(s + i)))}\n\n${showWork(`${P.line(K)}은 ${ord(K)} 계산식이에요 — ${K}로 된 수니까요`)}`,
+        ok: `첫째가 ${jn(P.line(s), '이에요', '예요')} — ${P.line(K)}은 ${ord(n)}`,
+        wr: [
+          { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
+          { text: '계산식이 몇째인지는 늘 앞의 수의 숫자와 같아요', tag: MIS_OK },
+          { text: '나눗셈식은 몇째인지 셀 수 없어요', tag: OFF },
+        ],
+        steps: [`첫째는 ${P.line(s)}`, `${P.lead(s)}에서 ${P.lead(K)}까지 ${K - s}줄 더 → ${ord(n)}`],
+        whyAny: `앞의 수의 숫자 ${jn(K, '을', '를')} 차례로 봤어요. 첫째가 ${P.lead(s)}부터라서 첫째부터 세어야 해요.`,
+        rule: '몇째인지는 첫째가 무엇인지부터 보고 센다.',
+        probe: { s, K, n },
       });
     },
   },
@@ -865,8 +1281,11 @@ export function lessonOf(conceptId, seed, opts) {
   return { title: c.name, pages, rule: v.rule || c.idea };
 }
 
+// 4학년 「규칙 찾기」 새 칸 셋(v289)은 진단에서 뺀다 — 그 전과 같은 다섯 칸(수 배열 · 두 양 · 식 · 값 · 두 번 셈)을 진단한다
+const NEW4 = ['cor.calcseq', 'cor.equal', 'cor.apply4'];
+const DIAG = CORRESPOND.filter((c) => !NEW4.includes(c.id));
 export function diagnosticSet(seed, n = 5, opts) {
-  return diagnosticOf(CORRESPOND, makeQuestion, seed, n, opts);
+  return diagnosticOf(DIAG, makeQuestion, seed, n, opts);
 }
 export function placeFrom(answers) {
   return placeFromOf(CORRESPOND, answers);
