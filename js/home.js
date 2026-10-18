@@ -11,6 +11,7 @@ import { dailyDone } from './mathprog.js';
 import { todayKey } from './track.js';
 import { homePalOf } from './homeplay.js'; // 🤝 홈 화면 파트너 — 누구를 보일지 (순수)
 import { mountHomePal } from './homepal.js'; // 🤝 홈 화면 파트너 — 그리기·걷기
+import { letterBox, refreshLetter } from './familyview.js'; // 💌 아빠·엄마 한 줄 메시지 (v288)
 
 const $ = (id) => document.getElementById(id);
 
@@ -208,6 +209,8 @@ export async function renderHome(showView) {
   list.appendChild(frag);
   hint.hidden = true;
   if (pal) pal.refresh(); // 🤝 그 사이 💗·파트너가 바뀌었을 수 있다
+  // 💌 맨 위 편지 — 가진 것으로 바로 그리고, 받아 와서 바뀌면 다시 (못 받아도 홈은 그대로)
+  refreshLetter(letterBox()).catch(() => {});
 }
 
 /** 영어 화면의 ← 버튼만 여기서 맡는다 (🎒·📊·🚪는 각자의 모듈이 이미 맡고 있다) */

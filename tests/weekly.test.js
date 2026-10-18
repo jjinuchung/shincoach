@@ -175,7 +175,7 @@ test('🔌 잇기 — 📊 카드(이번 주 요약 위 · 못 그려도 나머�
   assert.ok(st.includes("for (const s of cw.querySelectorAll('.wk-scroll')) s.scrollLeft = s.scrollWidth;"), '폰에서는 최근 주가 먼저 보이게');
   assert.ok(read('css/style.css').includes('.wk-t th[scope="row"], .wk-t thead th:first-child { position: sticky; left: 0;'), '항목 이름은 왼쪽에 붙어 있게');
   const up = read('js/upload.js');
-  assert.ok(up.includes('getWeekly: weeklyNow'));
+  assert.ok(up.includes('getWeekly: weeklyNow,'));
   assert.ok(read('sw.js').includes("'./js/weekly.js'"));
   assert.ok(read('js/korean.js').includes('y: add.know || 0'));
 });

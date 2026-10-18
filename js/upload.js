@@ -302,7 +302,7 @@ export function unb64(s) {
  * usagePlaces(있으면) = 🕒 앱 사용 기록의 자리 목록(usage.PLACES) — 하루 기록(days)으로 만든다 (v272)
  * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, uploadLog, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, uploadLog, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
@@ -312,6 +312,8 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
   const reward = getReward ? await Promise.resolve().then(() => getReward(today, days || [])).catch(() => null) : null;
   // 📈 주간 흐름(v287)도 못 만들면 빼고 나머지는 그대로
   const weekly = getWeekly ? await Promise.resolve().then(() => getWeekly(today, days || [], math)).catch(() => null) : null;
+  // 💌 한 줄 메시지를 읽었나(v288)도 못 만들면 빼고 나머지는 그대로
+  const family = getFamily ? await Promise.resolve().then(() => getFamily(today)).catch(() => null) : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
@@ -322,8 +324,15 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(usagePlaces ? usageFiles(days, today, usagePlaces) : []), // 🕒 앱 사용 기록 (v272)
     ...(typeof reward === 'string' && reward ? [{ path: `reward/${today}.md`, text: reward }] : []), // 🎮 보상 쪽 기록 (v278)
     ...(typeof weekly === 'string' && weekly ? [{ path: 'usage/weekly.md', text: weekly }] : []), // 📈 주간 흐름 — 📊 카드와 같은 표 (v287)
+    ...(typeof family === 'string' && family ? [{ path: 'family/read.md', text: family }] : []), // 💌 한 줄 메시지 — 무엇이 왔고 언제 읽었나 (v288)
     ...(typeof uploadLog === 'string' && uploadLog ? [{ path: 'usage/upload-log.md', text: uploadLog }] : []), // 📤 올리기 실패 기록 (v278)
   ];
+}
+
+/** 💌 한 줄 메시지 읽었나 (v288) — 이 기기에 받아 둔 것·쓴 것 + 읽은 시각 */
+async function familyNow(today) {
+  const fv = await import('./familyview.js');
+  return fv.familyReadMd(today);
 }
 
 /** 📈 주간 흐름 글 (v287) — 📊 카드와 같은 표 · 국어 기록은 저장된 프로필에서 · 프로필이 없으면 국어 칸은 — */
@@ -507,7 +516,9 @@ export function readStatus(kind, n = 0, at = Date.now()) {
   if (kind === 403) return { at, ok: false, why: '이 열쇠로는 저장소를 읽을 수 없어요 — 열쇠의 저장소·권한(Contents)을 확인해 주세요' };
   return { at, ok: false, why: whyOf(kind) };
 }
-const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장' };
+/** 💌 한 줄 메시지 (v288 — familymsg.MSG_PATH와 같은 경로) */
+export const PRIVATE_FAMILY = 'family/messages.json';
+const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장', [PRIVATE_FAMILY]: '💌 메시지' };
 /**
  * 📊 📤 카드의 받기 한 줄 (순수) — "📥 받기: ✍️ 교정 ✅ 10/07 10:32 (3개) · ❓ 답장 · 아직 없음"
  * check(국어 답장 — 붙여 본 뒤의 수, noteReadCheck)가 있으면: 너무 많아 통째로 안 받음 ❌ · 받지 않은 줄·맞는 글 없음·판 다름 ⚠️
@@ -523,7 +534,8 @@ export function readSummary(state, fmt) {
     const c = r.check;
     if (c && c.over) return `${name} ❌ ${fmt(r.at)} 답장이 너무 많아(${c.rows}줄) 하나도 안 받았어요 — Claude에게 오래된 줄을 지워 달라고 해 주세요`;
     const warn = c ? [c.bad ? `받지 않은 줄 ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : '', c.stale ? `판 다름 ${c.stale}` : ''].filter(Boolean).join(' · ') : '';
-    return warn ? `${name} ⚠️ ${fmt(r.at)} (${r.n}개 — ${warn} · Claude에게 "국어 답장 확인해 줘")` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
+    const ask = p === PRIVATE_FAMILY ? '메시지 확인해 줘' : '국어 답장 확인해 줘';
+    return warn ? `${name} ⚠️ ${fmt(r.at)} (${r.n}개 — ${warn} · Claude에게 "${ask}")` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
   });
   return parts.length ? `📥 받기: ${parts.join(' · ')}` : '📥 받기: 아직 받아 본 적이 없어요 (앱을 열 때·수학을 열 때 저절로)';
 }
@@ -633,7 +645,7 @@ async function sendOnce(force) {
     if (usage) await usage.flushUsage().catch(() => {});
     // 🎮 저장을 기다리는 프로필 증분도 먼저 — 보상 쪽 누적(rewardNow)이 저장된 프로필을 읽는다 (Codex 86차 B · 실패해도 그대로 올린다)
     await import('./xp.js').then((xp) => xp.flushProfile()).catch(() => {});
-    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, getReward: rewardNow, getWeekly: weeklyNow, uploadLog: logTextNow(today), today });
+    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, uploadLog: logTextNow(today), today });
   } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };

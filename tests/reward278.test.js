@@ -140,7 +140,7 @@ test('🔌 연결: 보내기가 보상 글·실패 글을 넘김 · 실패를 �
   const u = src('js/upload.js');
   const send = u.slice(u.indexOf('async function sendOnce(force) {'), u.indexOf('/** 저절로 보내기'));
   // v287부터 📈 주간 흐름(getWeekly)이 보상 글과 실패 글 사이에 든다
-  assert.ok(send.includes('getReward: rewardNow, getWeekly: weeklyNow, uploadLog: logTextNow(today), today });'));
+  assert.ok(send.includes('getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, uploadLog: logTextNow(today), today });'));
   assert.match(u, /function logTextNow\(today\) \{\s*try \{ return uploadLogText\(readJson\(LOG_KEY\), today\); \} catch \{ return null; \}/, '실패 글이 깨져도 나머지는 올린다');
   // 깨진 실패 기록도 글로는 던지지 않는다
   assert.doesNotThrow(() => uploadLogText({ fails: [{ day: 5, why: 'a' }, { day: T, why: {} }, { day: T, why: '좋은 줄', first: 'x' }] }, T));

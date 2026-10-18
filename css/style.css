@@ -3304,6 +3304,27 @@ button { font-family: inherit; }
 .wk-t .wk-tr.is-good { color: #0f9d58; }
 .wk-t .wk-tr.is-bad { color: #e8590c; }
 .wk-note { margin: 0; color: var(--muted); font-size: 0.78rem; }
+/* ===== 💌 한 줄 메시지 (2026-10-18, familymsg.js · familyview.js) — 과목 고르기 맨 위 편지지 카드 · 📊 한 줄 쓰기(부모) ===== */
+#home-letter { width: 100%; }
+#home-letter:empty { display: none; }
+.letter, .letter-past-box { position: relative; display: grid; gap: 8px; padding: 16px 16px 12px; border: 2px solid #f6c48f; border-radius: 16px; background-color: #fffaf0; background-image: repeating-linear-gradient(transparent 0 30px, rgba(240, 160, 90, 0.16) 30px 31px); box-shadow: var(--shadow); animation: letter-in 0.45s ease-out; }
+.letter::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px; border-radius: 14px 14px 0 0; background: repeating-linear-gradient(90deg, #f06595 0 14px, #ffffff 14px 20px, #4dabf7 20px 34px, #ffffff 34px 40px); }
+.letter-from { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; color: #b5541b; font-weight: 800; }
+.letter-from span { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.letter-text { margin: 0; color: var(--text); font-size: 1.2rem; font-weight: 700; line-height: 1.55; word-break: keep-all; overflow-wrap: anywhere; }
+.letter-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.letter-chip { display: block; margin: 0 auto; padding: 6px 14px; min-height: 36px; font-size: 0.9rem; }
+.letter-list { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--text); overflow-wrap: anywhere; }
+.letter-who { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.letter-empty { margin: 0; color: var(--muted); }
+.letter-close { justify-self: end; }
+.letter-write { display: grid; gap: 8px; }
+.letter-write-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.letter-write .radio { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 2px solid var(--border); border-radius: 999px; font-weight: 600; cursor: pointer; }
+.letter-write-text { flex: 1 1 220px; min-width: 0; padding: 8px 10px; border: 2px solid var(--border); border-radius: 10px; color: var(--text); background: #fff; font: inherit; }
+.letter-sent { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: 0.88rem; overflow-wrap: anywhere; }
+@keyframes letter-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .letter, .letter-past-box { animation: none; } }
 /* ===== 📚 국어 (2026-10-11, koreanview.js) — 작품 도감 카드 목록 → 글 읽기(공책 같은 글 상자 · 명작은 금빛 카드) + 한 문제씩 · 근거는 형광펜 ===== */
 .kor-main {
   --kor-mark: #fff0a0;

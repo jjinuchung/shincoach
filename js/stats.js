@@ -24,6 +24,8 @@ import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-1
 import { writeTodo } from './korwrite.js'; // ✍️ 국어 서술형 — 답장 기다리는 글 수 (v237)
 import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질문 카드도 화면·복사문처럼 (v256)
 import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
+import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
+import { allMsgs, addLocal, seenNow } from './familyview.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -372,6 +374,7 @@ export async function renderStats() {
   renderRestoreOffer(main);
   renderBackupReminder(main);
   renderUploadCard(main); // 📤 Claude에게 기록 보내기
+  renderLetterCard(main); // 💌 진우에게 한 줄 (v288)
 
   // 0) 🎟️ 아이가 산 영상 — 아빠가 파일을 넣어 줘야 볼 수 있다 (제일 위에, 놓치지 않게)
   const tickets = pendingTickets(inventory(), items).filter((t) => !t.delivered);
@@ -933,6 +936,69 @@ function renderRestoreOffer(main) {
  * 📤 Claude에게 기록 보내기 (2026-10-06) — 열쇠(GitHub fine-grained token)를 넣고, 마지막으로 보낸 때를 보고, 바로 보낸다.
  * 열쇠는 이 기기에만 (📊는 비밀번호 뒤). 저장소는 비공개 — 공개 저장소(신코치)에는 아이 기록을 올리지 않는다.
  */
+/**
+ * 💌 진우에게 한 줄 (2026-10-18 v288, 아버님 "이대로 진행") — 집에 계실 때 태블릿에서 바로 남긴다(이 기기에만).
+ * 밖에서는 Claude에게 "진우에게: …"라고 하면 비공개 저장소로 온다. 보낸 말마다 읽었나(진우가 [💗 고마워요]를 누른 때)를 보여 준다
+ */
+function renderLetterCard(main) {
+  const box = card('💌 진우에게 한 줄');
+  // 🔍 Codex 95차 #4: "이 기기에만"이라고 했는데 📤에는 메시지와 읽은 때가 함께 간다 — 실제와 맞춘다
+  box.appendChild(el('p', 'stats-note', `집에서 바로 남겨요 — 이 태블릿에 저장되고, 진우가 홈(과목 고르기)에 가면 맨 위에 보여요. 📤 기록 보내기에는 메시지와 읽은 때가 함께 가요(비공개 저장소). 밖에서는 Claude에게 "진우에게: …"라고 말하면 보내 줘요. ${MSG_LEN}자까지 · 보상은 없어요.`));
+  const wrap = el('div', 'letter-write');
+  const who = el('div', 'letter-write-row');
+  let from = '아빠';
+  for (const f of Object.keys(FROM)) {
+    const lab = el('label', 'radio');
+    const r = document.createElement('input');
+    r.type = 'radio';
+    r.name = 'letter-from';
+    r.checked = f === from;
+    r.addEventListener('change', () => { if (r.checked) from = f; });
+    lab.appendChild(r);
+    lab.appendChild(document.createTextNode(` ${FROM[f]} ${f}`));
+    who.appendChild(lab);
+  }
+  const row = el('div', 'letter-write-row');
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'letter-write-text';
+  input.maxLength = MSG_LEN;
+  input.placeholder = `진우에게 한 줄 (${MSG_LEN}자까지)`;
+  const go = el('button', 'btn btn-primary', '💌 남기기');
+  go.type = 'button';
+  row.appendChild(input);
+  row.appendChild(go);
+  const say = el('p', 'stats-note', '');
+  const sent = el('ul', 'letter-sent');
+  const p2 = (n) => String(n).padStart(2, '0');
+  const fmt = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+  const draw = () => {
+    sent.innerHTML = '';
+    const seen = seenNow();
+    const list = allMsgs().slice(-5).reverse();
+    if (!list.length) sent.appendChild(el('li', '', '아직 보낸 말이 없어요'));
+    for (const m of list) {
+      const short = [...m.text].length > 18 ? `${[...m.text].slice(0, 18).join('')}…` : m.text;
+      sent.appendChild(el('li', '', `${fmt(m.at)} ${FROM[m.from]} ${m.from}${m.id.startsWith('l') ? '' : '(Claude로)'}: "${short}" — ${seen[m.id] ? `💗 읽음 ${fmt(seen[m.id])}` : '아직'}`));
+    }
+  };
+  go.addEventListener('click', () => {
+    const r = addLocal(from, input.value);
+    if (!r.ok) { say.textContent = r.why === 'save' ? '이 기기에 저장이 안 됐어요 — 글은 그대로 두었으니 다시 눌러 주세요' : '한 줄을 써 주세요'; return; }
+    input.value = '';
+    say.textContent = '💌 남겼어요 — 진우가 홈에 가면 맨 위에 보여요';
+    draw();
+  });
+  wrap.appendChild(who);
+  wrap.appendChild(row);
+  wrap.appendChild(say);
+  wrap.appendChild(el('p', 'stats-note', '보낸 말 · 읽었나 (최근 5개)'));
+  wrap.appendChild(sent);
+  box.appendChild(wrap);
+  draw();
+  main.appendChild(box);
+}
+
 function renderUploadCard(main) {
   const box = card('📤 Claude에게 기록 보내기');
   const token = getToken();
