@@ -32,12 +32,12 @@ test('📚 새 글 12편 (v254): 연습 여덟(체험·검색 결과·분류·�
     ['practice', '독서 모임 기록'], ['practice', '이야기'], ['classic', '시'], ['classic', '동시'], ['classic', '시조'], ['classic', '옛이야기']]);
   assert.equal(NEW.reduce((n, id) => n + card(id).qs.length, 0), 46, '연습은 넷씩 · 짧은 시 「눈」과 시조는 셋');
   assert.deepEqual(NEW.filter((id) => card(id).write), ['K44', 'K48', 'K53']);
-  assert.equal(validCards(DATA).length, 102, 'v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 더함');
+  assert.equal(validCards(DATA).length, 106, 'v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 더함');
   // 📘 단원 지도 — 새 글은 모두 단원에 · 두 편뿐이던 단원 일곱은 이제 세 편 이상
   for (const id of NEW) assert.ok(UNITS.some((u) => (u.cards || []).includes(id)), `${id} 단원`);
   for (const u of ['5-1-독서', '5-1-2', '5-1-매체', '5-1-4', '5-2-2', '5-2-매체', '5-2-4']) assert.ok(UNITS.find((x) => x.id === u).cards.length >= 3, `${u} 세 편 이상`);
   const of = (u) => UNITS.find((x) => x.id === u).cards;
-  assert.deepEqual([of('5-2-3'), of('5-2-6').filter((id) => NEW.includes(id)), of('5-1-6').filter((id) => NEW.includes(id))], [['K1', 'K2', 'K4', 'K49', 'K77', 'K95'], ['K50', 'K52'], ['K51']]); // v258 시는 그 뒤에 · v265 K77 정조 능행차(추론) · v281 K95 견우와 직녀(유래 짐작)
+  assert.deepEqual([of('5-2-3'), of('5-2-6').filter((id) => NEW.includes(id)), of('5-1-6').filter((id) => NEW.includes(id))], [['K1', 'K2', 'K4', 'K49', 'K77', 'K95', 'K103'], ['K50', 'K52'], ['K51']]); // v291 K103 호상놀이(추론) · v258 시는 그 뒤에 · v265 K77 정조 능행차(추론) · v281 K95 견우와 직녀(유래 짐작)
   // 아이 이름 없이 (공개 저장소)
   assert.ok(!NEW.some((id) => JSON.stringify(card(id)).includes(String.fromCharCode(0xC9C4, 0xC6B0))));
 });
@@ -209,11 +209,11 @@ test('📤 국어 요약 글 (korreport.korReportText, v254): 7일 국어 시간
   assert.ok(t.includes('- 10-13: 25분 · ⏳ 연장권 1개\n') && t.includes('- 10-14: 1분\n') && t.includes('- 10-11: (국어 기록 없음)\n') && !t.includes('10-01'));
   // 경계 (Codex 66차): 29초 = 반올림 0분이지만 기록은 있다 → "1분 미만" · 30초 = 1분 · 0초 = 기록 없음(연장권만 있어도)
   assert.ok(t.includes('- 10-12: 1분 미만\n') && t.includes('- 10-10: 1분\n') && t.includes('- 10-09: (국어 기록 없음) · ⏳ 연장권 1개\n'));
-  assert.ok(t.includes('## 글 — 102편 중 별을 받은 글 3편 (★★★ 0 · ★★ 1 · ★ 2)'));
+  assert.ok(t.includes('## 글 — 106편 중 별을 받은 글 3편 (★★★ 0 · ★★ 1 · ★ 2)'));
   assert.ok(t.includes('- K1 「시든 강낭콩」 ★★ — 처음 10-11 · 틀린 물음 K1-3(1)\n'));
   assert.ok(t.includes('- K20 「처음 혼자 탄 버스」 ★ — 처음 10-14 · 틀린 물음 K20-2(2)\n'));
   assert.ok(t.includes('- K42 「도자기 마을 체험 학습」 ★ — 처음 ? · 틀린 물음 K42-1(5)\n'), '날을 모르는 별(1)은 ?');
-  assert.match(t, /- 완료 기록이 없는 글 99편: K2 「황제펭귄의 겨울나기」 · /, '읽다가 그만둔 글은 기록이 없어 "안 읽은 글"이라 하지 않는다 (Codex 66차)');
+  assert.match(t, /- 완료 기록이 없는 글 103편: K2 「황제펭귄의 겨울나기」 · /, '읽다가 그만둔 글은 기록이 없어 "안 읽은 글"이라 하지 않는다 (Codex 66차)');
   assert.ok(!t.includes('안 읽은 글'));
   assert.ok(t.includes('- 지어내기 3 · 거꾸로 읽기 1\n'), '아는 종류만, TYPES 차례로');
   const top = L.filter((l) => /^- K\d+-\d /.test(l));

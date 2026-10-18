@@ -61,8 +61,8 @@ const namesIn = (s) => EEVEELUTIONS.filter((n) => s.includes(n));
 
 test('📚 포켓몬 글 여섯 (v282): 연습 카드 · 물음 스물넷 · 원고 검사 통과 · 다섯 편이던 단원에 한 편씩(5-1-4 분류는 여덟이어도) · 성취기준 공식 문구 · ✍️ 하나 · 메모·토의·광고는 줄마다', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS.slice(96), NEW);
-  assert.equal(validCards(DATA).length, 102);
+  assert.deepEqual(IDS.slice(96, 102), NEW);
+  assert.equal(validCards(DATA).length, 106); // v291 호상놀이 글 넷 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '설명하는 글'], ['practice', '발표 준비 메모'], ['practice', '토의'], ['practice', '광고'], ['practice', '소개하는 글'], ['practice', '독서 일기'],
   ]);
@@ -73,7 +73,7 @@ test('📚 포켓몬 글 여섯 (v282): 연습 카드 · 물음 스물넷 · 원
   const unitOf = (id) => UNITS.filter((u) => u.cards.includes(id)).map((u) => u.id);
   assert.deepEqual(NEW.map(unitOf), [['5-1-4'], ['5-1-3'], ['5-1-5'], ['5-2-매체'], ['5-2-2'], ['5-2-독서']]);
   for (const u of ['5-1-3', '5-1-5', '5-2-매체', '5-2-2', '5-2-독서']) assert.equal(UNITS.find((x) => x.id === u).cards.length, 6, `${u} 다섯 편 → 여섯 편`);
-  assert.equal(UNITS.find((x) => x.id === '5-1-4').cards.length, 9);
+  assert.equal(UNITS.find((x) => x.id === '5-1-4').cards.length, 11); // v291 K104·K105 더함
   // 성취기준 — 공식 문구 그대로 · 그 글의 단원
   for (const id of NEW) {
     const found = card(id).meta.flatMap((m) => [...m.matchAll(/\[(6국0\d-0\d)\]\s*([^·[]*)/g)].map((x) => [x[1], x[2].trim()]));
