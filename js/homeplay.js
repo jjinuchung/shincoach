@@ -101,6 +101,15 @@ export function bondTier(n) {
   return BOND_TIERS.filter((t) => v >= t).length;
 }
 
+/** 🤝 홈 화면에 나올 파트너 (순수 — homepal · 2026-10-18) — 데리고 있는 파트너의 💗가 첫 테두리(10)부터 → { id, tier } | null
+ *  ("몇 개 더 모으면 나와요" 같은 말은 아이 화면에 쓰지 않는다 — 조용히 나타난다) */
+export function homePalOf(profile) {
+  const id = partnerOf(profile);
+  if (!id) return null;
+  const tier = bondTier(bondOf(profile && profile.homePlay, id));
+  return tier >= 1 ? { id, tier } : null;
+}
+
 /** 🐾 파트너가 쉬는 칸 (순수) — 캐릭터가 선 방에 파트너 쿠션이 있으면 그 위(먼저 놓은 쿠션 — 번호가 작은 것), 없으면 캐릭터 옆(avatar.partnerSpot) · spot = avatarOf().spot */
 export function palHome(profile, spot) {
   if (!spot) return null;

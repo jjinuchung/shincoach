@@ -4,13 +4,26 @@
 // 도감·코인·레벨·기록은 과목이 함께 쓰고(그래야 "수학을 해서 마스터볼을 산다"가 성립한다),
 // 학습 화면만 여기서 갈라진다. 새 과목이 생기면 SUBJECTS에 한 줄을 더한다.
 
-import { ROSTER, loadCharacters } from './pokemon.js';
+import { ROSTER, loadCharacters, characterUrl, artUrl } from './pokemon.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
-import { getLook } from './xp.js';
+import { getLook, getProfileSnapshot, onProfileReload } from './xp.js';
 import { dailyDone } from './mathprog.js';
 import { todayKey } from './track.js';
+import { homePalOf } from './homeplay.js'; // 🤝 홈 화면 파트너 — 누구를 보일지 (순수)
+import { mountHomePal } from './homepal.js'; // 🤝 홈 화면 파트너 — 그리기·걷기
 
 const $ = (id) => document.getElementById(id);
+
+/** 🤝 홈 화면 파트너 (2026-10-18) — 💗 10부터 화면 아래를 걸어 다닌다 · mountHomePal의 { refresh } */
+let pal = null;
+/** 지금 보일 파트너와 그림 — 🌈 이로치로 만들었으면 그 그림(과목 카드와 같은 규칙) · 그림이 없으면 url '' (🐾) */
+function palNow() {
+  const p = homePalOf(getProfileSnapshot());
+  if (!p) return null;
+  const look = getLook(p.id);
+  const r = ROSTER.find((x) => x.id === p.id);
+  return { ...p, url: (look && look.shinyUrl) || characterUrl(p.id) || artUrl(p.id) || '', ko: r ? r.ko : '' };
+}
 
 /**
  * 과목 카드.
@@ -194,10 +207,17 @@ export async function renderHome(showView) {
   list.innerHTML = '';
   list.appendChild(frag);
   hint.hidden = true;
+  if (pal) pal.refresh(); // 🤝 그 사이 💗·파트너가 바뀌었을 수 있다
 }
 
 /** 영어 화면의 ← 버튼만 여기서 맡는다 (🎒·📊·🚪는 각자의 모듈이 이미 맡고 있다) */
 export function initHome({ showView }) {
   const back = $('btn-library-back');
   if (back) back.addEventListener('click', () => showView('home'));
+  // 🤝 홈 화면 파트너 — 한 번만 붙이고, 다른 창에서 돌아와 프로필을 다시 읽으면 다시 본다
+  const view = $('view-home');
+  if (view && !pal) {
+    pal = mountHomePal(view, { getPal: palNow });
+    onProfileReload(() => pal.refresh());
+  }
 }
