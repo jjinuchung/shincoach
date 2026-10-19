@@ -23,7 +23,7 @@ test('📖 읽은 기록 q(문제 보기까지 초): readLog는 [문제 보기]�
   const card = { qs: [{ opts: [1, 2, 3, 4] }, { opts: [1, 2, 3, 4] }] };
   const st = { wrong: [], evFirst: false, hint2: false };
   const r = { card, qs: [st, st], t0: 5000, sec: 90, firstSec: 40, askAt: 35, ls: null };
-  assert.deepEqual(readLog(r), { t: 5000, s: 90, a: 40, n: 2, f: 2, x: 0, e: 0, h: 0, m: '', q: 35 });
+  assert.deepEqual(readLog(r), { t: 5000, s: 90, a: 40, n: 2, f: 2, x: 0, e: 0, h: 0, p: 0, m: '', q: 35 });
   assert.ok(!('q' in readLog({ ...r, askAt: -1 })), '안 눌렀으면 q 없음');
   assert.ok(!('q' in readLog({ ...r, askAt: -1, ls: { text: false } })), '🎧 들음은 q 없음');
   // 글 먼저는 읽기 글에서 [문제 보기]를 누르기 전까지만

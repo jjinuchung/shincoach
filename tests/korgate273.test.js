@@ -143,7 +143,7 @@ test('📤 읽은 기록 한 줄 (koreanview.readLog): 근거부터 물음은 v�
   const card = { qs: [{ opts: [1, 2, 3, 4] }, { opts: [1, 2, 3, 4] }, { opts: [1, 2, 3, 4] }] };
   const st = (o) => ({ wrong: [], answered: true, evDone: true, evWrong: [], evFirst: false, hint2: false, gate: false, from: -1, evAt: -1, ...o });
   const r = { card, t0: 5000, sec: 200, firstSec: 60, askAt: 20, ls: null, qs: [st({ gate: true, evFirst: true, from: 20, evAt: 55, evWrong: [4, 9] }), st({ wrong: [0, 1], evFirst: true }), st({ wrong: [2] })] };
-  assert.deepEqual(readLog(r), { t: 5000, s: 200, a: 60, n: 3, f: 1, x: 0, e: 1, h: 0, m: '', q: 20, v: 35, w: 2, k: 1 });
+  assert.deepEqual(readLog(r), { t: 5000, s: 200, a: 60, n: 3, f: 1, x: 0, e: 1, h: 0, p: 0, m: '', q: 20, v: 35, w: 2, k: 1 });
   const missed = { ...r, qs: [st({ gate: true, evFirst: true, from: 20, evAt: 55, wrong: [3] }), r.qs[1], r.qs[2]] };
   assert.deepEqual([readLog(missed).k, readLog(missed).w, readLog(missed).f], [0, 0, 0], '찾은 뒤에도 틀림');
   const noGate = { ...r, qs: r.qs.map((s) => ({ ...s, gate: false })) };
@@ -212,7 +212,8 @@ test('🔍 화면 배선 (v273): 열 때 별 0개면 근거부터 자리(기록�
   const src = read('js/koreanview.js');
   const body = (head) => { const i = src.indexOf(head); assert.ok(i >= 0, head); return src.slice(i, src.indexOf('\n}\n', i)); };
   const open = body('function openCard(id) {');
-  assert.ok(open.includes('const gateAt = profileLoading() ? -1 : gateAtOf(card, nextStar(korDoneMap(), card.id, Date.now()).star);'), '연 때 이번에 받을 별로 · 다시 읽는 사이(받은 별이 비어 보임)는 안 걺');
+  // v300: 받을 별을 한 번 세어 🎯 다시 읽기 안내와 같이 쓴다 — 다시 읽는 사이엔 0(gateAtOf(card, 0)은 -1)
+  assert.ok(open.includes('const starNow = profileLoading() ? 0 : nextStar(korDoneMap(), card.id, Date.now()).star;') && open.includes('const gateAt = gateAtOf(card, starNow);'), '연 때 이번에 받을 별로 · 다시 읽는 사이(받은 별이 비어 보임)는 안 걺');
   assert.ok(open.includes('gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1 })'), '물음마다 상태');
   const rq = body('function renderQ() {');
   assert.ok(rq.includes('if (st.gate && st.from < 0) st.from = r.sec;'), '처음 보인 때 한 번');

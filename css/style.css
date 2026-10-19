@@ -3526,6 +3526,9 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .kor-ev-row.is-mark { background: var(--kor-mark); border-color: var(--kor-gold-line); }
 .kor-ev-row.is-no { border-color: var(--danger); background: var(--kor-no-bg); animation: korShake 0.3s; }
 .kor-ev-row:disabled { cursor: default; }
+/* 🔍 두 줄로 좁히기 (v300) — 남은 두 줄은 굵은 테두리, 나머지는 흐리게(못 누름) */
+.kor-ev-row.is-pair { border: 2px solid var(--primary); }
+.kor-ev-row.is-far { opacity: 0.35; }
 @keyframes korShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .kor-note { display: grid; gap: 6px; background: #eef2ff; border-radius: 10px; padding: 10px 14px; line-height: 1.6; word-break: keep-all; }
 .kor-note p { margin: 0; }
@@ -3565,6 +3568,7 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .kor-tab.is-on { border-color: var(--primary); color: var(--primary-dark); background: #eef2ff; }
 .kor-tab:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 .kor-tnote { font-size: 0.82rem; color: var(--muted); margin: 0; line-height: 1.5; word-break: keep-all; }
+.kor-tnote.kor-catch-rule { color: var(--primary-dark); font-weight: 700; } /* 🎯 다시 읽기 안내 (v300) */
 .kor-wstart { justify-self: start; }
 .kor-decks { display: grid; gap: 8px; margin-bottom: 12px; }
 .kor-deck { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 12px 14px; }
@@ -3763,6 +3767,7 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 /* 📖 글 먼저 (v260) — 읽기 글은 글 상자 맨 끝 [문제 보기]를 누르면 물음이 나온다 */
 .kor-askgo { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--border); display: grid; gap: 6px; }
 .kor-askgo-note { margin: 0; font-size: 0.88rem; color: var(--muted); }
+.kor-askgo-note.kor-catch-rule { color: var(--primary-dark); font-weight: 700; } /* 🎯 다시 읽기 안내 (v300) */
 .kor-slot.is-listen .kor-slot-kind { color: #1d4ed8; font-weight: 700; }
 .kor-script { margin-top: 10px; text-align: left; background: var(--kor-paper); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
 .kor-script summary { cursor: pointer; font-weight: 800; min-height: 32px; }

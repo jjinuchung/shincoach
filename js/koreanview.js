@@ -7,7 +7,8 @@
 //  · 🔍 근거 먼저 · 💡 둘째 힌트(v258) — 틀린 보기를 두 번 고르면 근거가 있는 물음은 남은 보기를 잠그고 답이 든 줄부터 찾게,
 //    근거가 없는 물음은 둘째 힌트(korean.evFirstNow·hint2Now) · ⏱️ 읽는 시계(쉼 빼고)와 함께 📤 읽은 기록 한 줄(korean.readOf)
 //  · 🔍 별을 받는 읽기는 근거부터(v273 ★ 전 → v274 별을 받을 수 있는 읽기마다) — 근거가 있는 첫 물음 하나는 안 틀려도 같은 화면으로(korean.gateAtOf)
-import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT, gateAtOf } from './korean.js';
+//  · v300: 🔍 근거 먼저에서 줄을 세 번 잘못 누르면 두 줄만 남긴다(korean.evPair) · 🎯 다시 읽기(★★·★★★)는 처음 고른 답이 반 이상일 때만(korean.catchFirstOk) — 안내는 규칙만
+import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT, evPair, EV_PAIR_AT, gateAtOf, CATCH_FIRST_STAR } from './korean.js';
 import { IDLE_SEC } from './timelimit.js'; // ⏱️ 읽는 시계는 ⏳ 시계와 같은 쉼 규칙(2분 넘게 손을 안 대면 안 센다)
 import { newListenState, playListen, haltListen, stopListening, listenBoxEl, scriptEl, confirmHeard, syncListenBox } from './korlistenview.js'; // 🎧 듣기 카드 (v245) — 이 파일을 import하지 않는다
 import { korFinish, korDoneMap, onProfileReload, profileLoading, korTakeThrow, korGiveBackThrow, korThrowsLeft, getLevelInfo, isTired, getLook, inventory, catchAttempt, tickEgg } from './xp.js';
@@ -81,7 +82,8 @@ export function finishText(r, listen = false) {
     return { title: '저장이 안 됐어요', lines: ['[다시 저장하기]를 눌러 주세요 — 푼 것은 그대로예요'] };
   }
   const v = listen ? '들으면' : '읽으면';
-  const got = `💰 +${r.coins}${r.stone ? ' · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!)' : ''} · 🎯 국어 포켓몬 잡기 1번`;
+  // 🎯 별은 받았지만 처음 고른 답이 반이 안 됐다(★★·★★★, v300) — 셈 없이 규칙만
+  const got = `💰 +${r.coins}${r.stone ? ' · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!)' : ''} · ${r.noCatch ? '🎯 포켓몬은 처음 고른 답이 반 이상 맞을 때 나와요' : '🎯 국어 포켓몬 잡기 1번'}`;
   // 다음 별까지 남은 날은 규칙이 센 것(r.days) — ★★ 뒤 "일주일이 지나면"은 ★★를 늦게 받으면 틀렸다 (Codex 49차)
   if (r.star === 1) return { title: '📚 도감 등록!', lines: [got, `${whenText(r.next === 2 ? r.days : 1)} 다시 ${v} ★★ 💰${KOR_COINS[2]}`] };
   if (r.star === 2) return { title: '★★ 두 번째 별!', lines: [got, r.next === 3 ? `${whenText(r.days)} 다시 ${v} ★★★ 💰${KOR_COINS[3]}` : `처음 ${listen ? '들은' : '읽은'} 날부터 일주일이 지나 다시 ${v} ★★★ 💰${KOR_COINS[3]}`] };
@@ -90,6 +92,12 @@ export function finishText(r, listen = false) {
     return { title: r.next === 2 ? `오늘도 잘 ${listen ? '들었어요' : '읽었어요'}` : `또 ${listen ? '들었어요' : '읽었어요'}!`, lines: [`${whenText(r.days)} 다시 ${v} ${'★'.repeat(r.next)} 💰${KOR_COINS[r.next]}`] };
   }
   return { title: `또 ${listen ? '들어' : '읽어'} 줘서 고마워요`, lines: ['★★★를 다 모은 글이에요'] };
+}
+
+/** 🎯 다시 읽기 안내 한 줄 (순수, v300) — star = 연 때 이번에 받을 별(nextStar) · ★★·★★★를 받을 수 있는 읽기면 규칙만(셈 없이) · 아니면 '' */
+export function catchRuleLine(star, listen = false) {
+  if (!(star >= CATCH_FIRST_STAR)) return '';
+  return `🎯 다시 ${listen ? '들을' : '읽을'} 때는 처음 고른 답이 반 이상 맞으면 포켓몬을 만나요`;
 }
 
 async function loadCards() {
@@ -251,14 +259,18 @@ function openCard(id) {
   sfxUnlock();
   // 🔍 이번에 별을 받을 수 있는 읽기 — 근거가 있는 첫 물음은 근거부터 (v273 ★ 전 → v274 ★·★★·★★★ 받는 날). 프로필을 다시 읽는 사이
   //   (앱을 앞으로 가져온 순간)는 받은 별이 비어 보여 잘못 걸 수 있다 → 그때는 걸지 않는다(한 번 빠지는 것은 해가 없다)
-  const gateAt = profileLoading() ? -1 : gateAtOf(card, nextStar(korDoneMap(), card.id, Date.now()).star);
+  //   🎯 같은 받을 별로 다시 읽기 안내 한 줄(v300 — 다시 읽는 사이엔 0: 안내만 빠지고, 🎯 판정은 끝낼 때 규칙이 한다)
+  const starNow = profileLoading() ? 0 : nextStar(korDoneMap(), card.id, Date.now()).star;
+  const gateAt = gateAtOf(card, starNow);
   ui.read = {
     card,
     qi: 0,
+    starNow,
     // evFirst = 맞히기 전에 🔍 근거를 먼저 찾았다 · hint2 = 💡 둘째 힌트를 보았다 (v258 📤 읽은 기록)
+    // pairSide = 두 줄로 좁힐 때 옆 줄을 위(0)·아래(1) 어느 쪽부터 · pair = 좁힌 두 줄(한 번 정하면 그대로) (v300)
     // gate = 근거부터 물음 · from = 그 물음이 처음 보인 때의 읽은 초 · evAt = 근거 줄을 찾은 때의 읽은 초 (v273 📤 찾기까지)
     // wrongAtEv = 맞히기 전에 근거를 찾을 때까지 틀린 보기 수 (그 뒤에 새로 틀리면 "찾았어요!" 대신 힌트, Codex 82차 #1)
-    qs: card.qs.map((q, i) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false, gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1 })),
+    qs: card.qs.map((q, i) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false, pairSide: Math.random() < 0.5 ? 0 : 1, pair: null, gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1 })),
     misses: {},
     evMiss: 0, // 근거를 잘못 누른 수 — 잘못 읽기로는 안 세고 🟩 "한 번에 다 맞힘"에만
     result: null,
@@ -484,6 +496,9 @@ export function readFirst(r) {
 function askGoEl(card) {
   const box = el('div', 'kor-askgo');
   box.appendChild(el('p', 'kor-askgo-note', '끝까지 읽었으면 물음을 열어요'));
+  // 🎯 다시 읽기 안내(v300) — 세로 화면에선 기다림 상자가 글 아래라 누르기 전에 안 보였다(헤드리스 390) → 단추 바로 위에도
+  const rule = catchRuleLine(ui.read ? ui.read.starNow : 0);
+  if (rule) box.appendChild(el('p', 'kor-askgo-note kor-catch-rule', rule));
   const b = el('button', 'btn btn-primary btn-big-wide kor-askgo-btn', `📝 문제 보기 (물음 ${card.qs.length}개)`);
   b.type = 'button';
   b.addEventListener('click', showAsks);
@@ -541,6 +556,8 @@ function renderQ() {
     const wait = el('div', 'kor-q kor-listen-wait');
     wait.appendChild(el('p', 'kor-q-text', `🎧 처음부터 끝까지 들으면 물음 ${r.card.qs.length}개가 나와요`));
     wait.appendChild(el('p', 'kor-tnote', '▶ 듣기를 눌러요. 잘 안 들리면 🐢 천천히 들을 수 있어요.'));
+    const rule = catchRuleLine(r.starNow, true); // 🎯 다시 듣기 (v300)
+    if (rule) wait.appendChild(el('p', 'kor-tnote kor-catch-rule', rule));
     col.appendChild(wait);
     if (live) live.textContent = '';
     if (focusTo) moveFocus(col, 'head');
@@ -550,6 +567,8 @@ function renderQ() {
     // 📖 글 먼저 (v260) — 물음은 글 끝의 [문제 보기]를 누른 뒤 (🎧 "다 들은 뒤"와 같은 꼴)
     const wait = el('div', 'kor-q kor-listen-wait kor-read-wait');
     wait.appendChild(el('p', 'kor-q-text', `📖 글을 끝까지 읽고, 글 상자 맨 아래 [문제 보기]를 눌러요 — 물음 ${r.card.qs.length}개`));
+    const rule = catchRuleLine(r.starNow); // 🎯 다시 읽기 (v300)
+    if (rule) wait.appendChild(el('p', 'kor-tnote kor-catch-rule', rule));
     col.appendChild(wait);
     if (live) live.textContent = '';
     if (focusTo) moveFocus(col, 'head');
@@ -667,13 +686,15 @@ function evidenceEl(q, st, unit) {
   box.appendChild(el('p', 'kor-ev-title', first ? `🔍 근거 먼저 — 답이 들어 있는 ${unit}을 눌러 보세요` : `🔍 근거 잡기 — ${q.evQ}`));
   const rows = el('div', 'kor-ev-rows');
   const card = ui.read.card;
+  const pair = first && !st.evDone ? st.pair : null; // 🔍 두 줄로 좁혔다(v300) — 그 밖의 줄은 흐리게 · 못 누름
   for (let n = 1; n <= lineCount(card); n++) {
     const hit = st.evDone && q.ev.includes(n);
     const miss = st.evWrong.includes(n);
-    const b = el('button', `kor-ev-row${hit ? ' is-mark' : ''}${miss ? ' is-no' : ''}`);
+    const far = !!pair && !pair.includes(n) && !miss;
+    const b = el('button', `kor-ev-row${hit ? ' is-mark' : ''}${miss ? ' is-no' : ''}${far ? ' is-far' : ''}${pair && !far && !miss ? ' is-pair' : ''}`);
     b.type = 'button';
     b.dataset.n = String(n);
-    b.disabled = st.evDone || miss;
+    b.disabled = st.evDone || miss || far;
     b.appendChild(el('span', 'kor-num', circled(n)));
     b.appendChild(el('span', '', lineText(card, n)));
     b.addEventListener('click', () => evPick(n));
@@ -682,6 +703,7 @@ function evidenceEl(q, st, unit) {
   box.appendChild(rows);
   const msg = el('p', 'kor-fb');
   if (st.evDone) { msg.classList.add('is-ok'); msg.textContent = `찾았어요! 근거 ${unit}: ${q.ev.map(circled).join(', ')}`; }
+  else if (pair) { msg.classList.add('is-no'); msg.textContent = evPairSay(pair, st.evWrong, unit); }
   // "까닭이 없어요"는 너무 단정적 — 그 문장도 조금은 관계있을 수 있다 (Codex 48차 #2)
   else if (first && st.evWrong.length >= EV_RANGE_AT && evRange(q.ev, lineCount(card))) {
     // 근거 먼저에서 두 번 잘못 눌렀다 — 근거 둘레 범위만 (답 줄은 알려 주지 않는다)
@@ -693,6 +715,14 @@ function evidenceEl(q, st, unit) {
   if (first) { if (msg.textContent) box.insertBefore(msg, rows); } // 할 말이 없으면 빈 줄을 두지 않는다
   else box.appendChild(msg);
   return box;
+}
+
+/** 🔍 두 줄로 좁힌 뒤의 말 (순수, v300) — 둘 다 남았으면 두 줄을 읽고 고르게 · 하나를 잘못 눌렀으면 남은 줄 ·
+ *  번호 뒤 조사는 읽는 소리마다 달라 "문장(④)을"처럼 낱말 뒤에 */
+export function evPairSay(pair, wrong, unit) {
+  const left = pair.filter((n) => !(wrong || []).includes(n));
+  if (left.length === 1) return `🔍 남은 ${unit}(${circled(left[0])})을 읽고 눌러 봐요.`;
+  return `🔍 두 ${unit}(${pair.map(circled).join(', ')}) 가운데 하나예요. 둘 다 읽고 답을 받쳐 주는 ${unit}을 눌러요.`;
 }
 
 function pick(k) {
@@ -744,6 +774,8 @@ function evPick(n) {
   } else {
     st.evWrong.push(n);
     r.evMiss += 1;
+    // 🔍 답을 고르기 전에 EV_PAIR_AT번 잘못 눌렀다 — 두 줄로 좁힌다(v300). 한 번 정하면 그대로(하나를 또 잘못 누르면 남은 줄 하나)
+    if (!st.answered && !st.pair && st.evWrong.length >= EV_PAIR_AT) st.pair = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);
     try { sfx.wrong(); } catch { /* 소리는 없어도 */ }
   }
   r.focus = 'answer';
@@ -793,6 +825,7 @@ export function readLog(r) {
     f: cnt((st) => !st.wrong.length), // 첫 번에 맞힘
     x: cnt((st, q) => st.wrong.length >= q.opts.length - 1), // 오답 보기를 모두 고른 물음
     e: cnt((st) => st.evFirst && !st.gate), h: cnt((st) => st.hint2), // 🔍 근거 먼저 = 두 번 틀려서만(근거부터 물음은 v·w·k)
+    p: cnt((st) => !!st.pair), // 🔍 두 줄로 좁힌 물음 (v300 — 근거부터·두 번 틀려 근거 먼저 모두 · 0도 적는다, Codex 106차)
     m: r.ls ? (r.ls.text ? 'text' : 'listen') : '',
     ...(r.askAt >= 0 ? { q: r.askAt } : {}), // 📖 문제 보기까지 초 (v260 — 🎧는 없음)
     // 🔍 근거부터 (v273) — v 그 물음이 나온 뒤 근거 줄을 찾기까지 초 · w 그 전에 잘못 누른 줄 · k 찾은 뒤 첫 번에 맞혔나
@@ -863,7 +896,7 @@ function finishEl() {
 }
 
 // ───────────────────── 🎯 국어 포켓몬 잡기 (2026-10-11) ─────────────────────
-// 별을 새로 받을 때마다 한 번(korean.korFinishRule이 korThrow.earned +1). 수학 runCatches와 같은 안전:
+// 별을 새로 받을 때마다 한 번(korean.korFinishRule이 korThrow.earned +1 — ★★·★★★는 처음 고른 답이 반 이상일 때만, v300). 수학 runCatches와 같은 안전:
 //  화면을 띄우기 **전에** 기회를 하나 빼고(xp.korTakeThrow — 두 창이 같은 기회를 두 번 던지지 못하게),
 //  한 번도 안 던지고 닫으면 돌려준다(korGiveBackThrow). 후보는 📚 국어 전용 150마리 중 그림이 있는 것 — 4마리 안 되면 몇 마리 받아 온다
 

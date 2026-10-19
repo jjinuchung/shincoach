@@ -257,6 +257,27 @@ export function gateAtOf(card, star) {
 export function hint2Now(q, st) {
   return !!q && nonEmpty(q.hint2) && !!st && !st.answered && Array.isArray(st.wrong) && st.wrong.length >= EV_FIRST_AT;
 }
+// ── 🔍 두 줄로 좁히기 (v300, 2026-10-19 아버님 "모두 추천대로") ──
+// 근거부터에서 잘못 누른 줄이 한 번에 몇 개씩 — 줄을 눌러 보며 찾았다. 범위(EV_RANGE_AT) 뒤에도 못 찾으면 근거 줄 하나와 그 옆 줄 하나만 남겨
+// 두 줄을 읽고 고르게 한다(나머지 줄은 못 누름). 답을 고르기 전의 근거 찾기(🔍 근거부터 · 두 번 틀려 근거 먼저)에만 — 맞힌 뒤의 근거 잡기는 그대로
+/** 근거 먼저에서 줄을 이만큼 잘못 누르면 두 줄로 좁힌다 ("둘을 넘으면") */
+export const EV_PAIR_AT = 3;
+/** 두 줄 [작은 번호, 큰 번호] (순수) — 근거 가운데 첫 줄(evRange와 같은 기준) + 그 옆의 근거 아닌 · 아직 안 누른 줄 하나 ·
+ *  옆 줄은 side 쪽 먼저(0 위 · 1 아래 — 화면이 물음마다 한 번 무작위로 정해 둔다: 늘 위 줄이 답이면 읽지 않고 맞힌다) ·
+ *  바로 옆이 막혔으면 다음으로 가까운 줄 · n = 글의 줄 수 · wrong = 이미 잘못 누른 줄 · 고를 줄이 없거나 근거가 깨졌으면 null */
+export function evPair(ev, n, wrong, side = 0) {
+  const xs = (Array.isArray(ev) ? ev : []).filter((x) => Number.isInteger(x) && x >= 1 && x <= n);
+  if (!xs.length) return null;
+  const at = Math.min(...xs);
+  const no = new Set([...xs, ...(Array.isArray(wrong) ? wrong : [])]);
+  for (let d = 1; d < n; d++) {
+    for (const m of side === 1 ? [at + d, at - d] : [at - d, at + d]) {
+      if (m >= 1 && m <= n && !no.has(m)) return m < at ? [m, at] : [at, m];
+    }
+  }
+  return null;
+}
+
 /** 근거 둘레 줄 범위 [처음, 끝] (순수) — 근거 가운데 **첫 줄** 앞뒤로 pad줄 (근거는 하나만 눌러도 맞다 — 근거가 ③⑤⑨처럼 흩어져 있으면
  *  모두를 감싼 범위가 글 거의 전체가 되어 도움이 안 됐다, 헤드리스 v258) · n = 글의 줄 수 · 근거가 없거나 깨졌으면 null */
 export function evRange(ev, n, pad = EV_RANGE_PAD) {
@@ -274,15 +295,17 @@ export function evRange(ev, n, pad = EV_RANGE_PAD) {
 //   q 📖 [문제 보기]를 누를 때까지 초(v260 글 먼저 — 그 전 줄과 🎧에는 없다),
 //   v·w·k 🔍 근거부터 물음(v273 — 근거부터가 걸린 줄에만 있다 · v273은 ★ 전의 글만, v274부터 별을 받을 수 있는 읽기마다): v 그 물음이 나온 뒤 근거 줄을 찾을 때까지 초 · w 그 전에 잘못 누른 줄 수 ·
 //   k 찾은 뒤 첫 번에 맞혔나(1/0 — f에도 그 물음이 든다) · e는 "두 번 틀려 근거 먼저"만,
-//   y 🧠 아는 것으로 답하기(사실이지만 글에 없는 보기)를 고른 수(v287 📈 주간 흐름 — 그 전 줄에는 없다 · korMiss는 날짜 없는 합계뿐이라) }]
+//   y 🧠 아는 것으로 답하기(사실이지만 글에 없는 보기)를 고른 수(v287 📈 주간 흐름 — 그 전 줄에는 없다 · korMiss는 날짜 없는 합계뿐이라),
+//   p 🔍 두 줄로 좁힌 물음 수(v300 — 답을 고르기 전 근거 찾기에서 두 줄을 남긴 물음 · 근거부터·두 번 틀려 근거 먼저 모두 · 0도 적는다 —
+//     w만으로는 못 안다: 남길 옆 줄이 없으면 안 좁히고 w는 근거부터 물음만이라, Codex 106차 · 그 전 줄에는 없다) }]
 // 병합은 열쇠로 합집합(같은 열쇠는 한 줄) · 최근 READS_MAX줄
 export const READS_MAX = 120;
 /** 한 줄의 읽은 초 상한 (6시간 — 깨진 시계 값이 요약을 부풀리지 않게) */
 export const READ_SEC_MAX = 6 * 3600;
 /** 근거부터에서 잘못 누른 줄 수 상한 (글 줄 수보다 넉넉히, v273) */
 export const READ_W_MAX = 99;
-/** 뒤에 더한 칸 — 옛 앱을 거친 사본에는 없을 수 있다 (q v260 · v·w·k v273 · y v287) */
-const READ_OPT = ['q', 'v', 'w', 'k', 'y'];
+/** 뒤에 더한 칸 — 옛 앱을 거친 사본에는 없을 수 있다 (q v260 · v·w·k v273 · y v287 · p v300) */
+const READ_OPT = ['q', 'v', 'w', 'k', 'y', 'p'];
 const READ_MODES = ['', 'listen', 'text'];
 const int = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) ? n : NaN; };
 const clampInt = (v, lo, hi) => { const n = int(v); return Number.isNaN(n) ? lo : Math.min(hi, Math.max(lo, n)); };
@@ -299,6 +322,7 @@ export function readOf(x) {
   const q = typeof x.q === 'number' ? int(x.q) : NaN;
   const v = typeof x.v === 'number' ? int(x.v) : NaN;
   const y = typeof x.y === 'number' ? int(x.y) : NaN;
+  const p = typeof x.p === 'number' ? int(x.p) : NaN;
   return {
     c: x.c, t, d, s, a: clampInt(x.a, 0, s), n,
     f: clampInt(x.f, 0, n), x: clampInt(x.x, 0, n), e: clampInt(x.e, 0, n), h: clampInt(x.h, 0, n),
@@ -308,6 +332,8 @@ export function readOf(x) {
     ...(v >= 0 ? { v: Math.min(v, s), w: clampInt(x.w, 0, READ_W_MAX), k: clampInt(x.k, 0, 1) } : {}),
     // 🧠 아는 것으로 답하기 고른 수(v287) — 없거나 깨졌으면 뺀다(옛 줄과 같게) · 물음 수 × 보기 수보다 넉넉히 READ_W_MAX까지
     ...(y >= 0 ? { y: Math.min(y, READ_W_MAX) } : {}),
+    // 🔍 두 줄로 좁힌 물음 수(v300) — 없거나 깨졌으면 뺀다(옛 줄과 같게) · 물음 수까지
+    ...(p >= 0 ? { p: Math.min(p, n) } : {}),
   };
 }
 /**
@@ -343,17 +369,29 @@ export function mergeReads(a, b) {
   return readsOf([...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]);
 }
 
+// ── 🎯 다시 읽기의 잡기 조건 (v300, 2026-10-19 아버님 "모두 추천대로") ──
+// 다시 읽기(★★·★★★)가 한 편 몇십 초 · [문제 보기]까지 몇 초 · 처음 고른 답이 반도 안 맞는데도 별과 🎯가 나왔다 = 빨리 끝내기.
+// 그래서 ★★·★★★의 🎯는 처음 고른 답으로 물음의 반 이상을 맞혔을 때만 — "처음 고른 답으로 맞힘" = 📤 읽은 기록의 f(보기를 한 번에 맞힌 물음)와 같은 값.
+// ★(처음 읽기)는 그대로 · 별·💰·🟩·🥚는 그대로 · 못 받은 🎯는 그 별의 것이 없다(★★ 뒤에는 ★★★에서 다시) · 이미 가진 🎯는 그대로
+/** 🎯 조건이 걸리는 별 — ★★부터 */
+export const CATCH_FIRST_STAR = 2;
+/** 이번 별에 🎯를 주나 (순수) — star 이번에 받는 별 · f 처음 고른 답으로 맞힌 물음 · n 물음 수 (반 이상 = f × 2 ≥ n — 2물음 1 · 3물음 2 · 4물음 2) */
+export function catchFirstOk(star, f, n) {
+  return !(star >= CATCH_FIRST_STAR) || f * 2 >= n;
+}
+
 /**
  * 글 한 편을 다 읽었다 — 한 트랜잭션에서: 잘못 읽기 횟수 더하기 · 받을 별이 있으면 별 + 💰.
  * ids = 지금 있는 카드 id들(모르는 카드로 💰를 받지 못하게) · misses = { 종류: 이번에 고른 수 } · now = 트랜잭션 안의 시각 ·
  * evMiss = 근거를 잘못 누른 수(잘못 읽기로는 안 세지만 🟩 "한 번에 다 맞힘"에는 든다) ·
  * opts.noStone = 🟩를 주지 않는다 — 🎧 듣기 카드를 글로 읽고 풀었다(별·💰·🎯는 같다, v245 아버님 "이대로 진행") ·
  * opts.qMiss = { 물음 id: 이번에 고른 틀린 보기 수 } — 이 카드의 물음만 korQMiss에 더한다(📤 국어 요약, v254) ·
- * opts.read = { t 연 시각, s 읽은 초, a 첫 답까지 초, n, f, x, e, h, m, q? 문제 보기까지 초, v·w·k? 근거부터 } — 읽은 기록 한 줄(📤, v258 · q v260 · v·w·k v273). 카드·날·별은 여기서 채운다(트랜잭션 안의 now) ·
+ * opts.read = { t 연 시각, s 읽은 초, a 첫 답까지 초, n, f, x, e, h, m, q? 문제 보기까지 초, v·w·k? 근거부터, p 두 줄로 좁힌 물음 } — 읽은 기록 한 줄(📤, v258 · q v260 · v·w·k v273 · p v300). 카드·날·별은 여기서 채운다(트랜잭션 안의 now) ·
  *   같은 열쇠(카드·연 시각)가 이미 있으면 더 적지 않는다 — [다시 저장하기]가 두 줄을 만들지 않게
  * why: 'unknown' 모르는 카드
  * @returns {{ok:boolean, why?:string, star?:number, coins?:number, stars?:number, wait?:string, next?:number, days?:number}}
- *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날) — 별을 받았을 때도 다음 별이 남았으면 next·days
+ *   star 0이면 wait('wait'|'full') · next(다음 별)·days(남은 날) — 별을 받았을 때도 다음 별이 남았으면 next·days ·
+ *   noCatch 'first' — 별은 받았지만 처음 고른 답이 반이 안 돼 🎯가 없다(★★·★★★, v300)
  */
 export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opts = {}) {
   if (typeof cardId !== 'string' || !Array.isArray(ids) || !ids.includes(cardId)) return { ok: false, why: 'unknown' };
@@ -381,8 +419,10 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
   }
   done[starKey(cardId, next.star)] = dayNum(now) || 1;
   // 🎯 별을 새로 받을 때마다 국어 포켓몬 잡기 한 번 (아버님 2026-10-11 — 다음 날 다시 읽어 ★★를 받아도 잡을 수 있게)
+  //   ★★·★★★는 처음 고른 답이 반 이상일 때만(v300) — 읽은 기록 줄과 같은 f·n으로(줄이 없는 옛 부름은 예전처럼)
   const tw = throwsOf(profile.korThrow);
-  tw.earned = Math.min(Number.MAX_SAFE_INTEGER, tw.earned + 1);
+  const caught = !rd || catchFirstOk(next.star, rd.f, rd.n);
+  if (caught) tw.earned = Math.min(Number.MAX_SAFE_INTEGER, tw.earned + 1);
   profile.korThrow = tw;
   profile.korDone = done;
   const coins = KOR_COINS[next.star];
@@ -393,7 +433,7 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
   profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   // 다음 별까지 남은 날 — ★★ 뒤 "처음 읽은 날부터 일주일"은 ★★를 늦게 받으면 틀렸다(10/1 ★ · 10/11 ★★ → ★★★는 10/12, Codex 49차)
   const after = nextStar(done, cardId, now);
-  return { ok: true, star: next.star, coins, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId), ...(after.why === 'wait' ? { next: after.next, days: after.days } : {}) };
+  return { ok: true, star: next.star, coins, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId), ...(caught ? {} : { noCatch: 'first' }), ...(after.why === 'wait' ? { next: after.next, days: after.days } : {}) };
 }
 
 // ── 🎯 국어 잡기 기회 (2026-10-11, 아버님 "국어에서만 나오는 포켓몬 150") ──
