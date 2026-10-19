@@ -1,10 +1,10 @@
-// 📚 국어 화면의 두 탭 — 🔤 낱말(오늘의 낱말) · 📘 단원(5학년 국어 단원 지도) (2026-10-11, 아버님 "니 제안대로 하자")
+// 📚 국어 화면의 두 탭 — 🔤 낱말(오늘의 낱말) · 📘 단원(국어 단원 지도 — 5학년 · v298부터 4학년 2학기를 맨 위에) (2026-10-11, 아버님 "니 제안대로 하자")
 // 규칙은 korwords.js·korunits.js(순수), 저장은 xp.korWordsFinish(한 트랜잭션 — 낱말 칸과 💰·🎯·🟩가 같이).
 // koreanview가 탭 막대·🎯 잡기 단추·🥚 알 칸·글 열기를 ctx로 건넨다(서로 import하면 돌고 돈다)
 //  · 판정은 낱말마다 **처음 고른 것** — 틀린 낱말은 그 판 끝에 한 번 더 보지만(연습) 칸은 처음 것으로 옮긴다
 //  · 판 중간에 나가면(🎒·📊) 그대로 이어서, "← 그만하기"를 두 번 누르면 저장 없이 끝
 import { DECKS, DECK_ORDER, NEW_PER_DAY, WORD_COINS, PERFECT_MIN, MASTER_BOX, allWords, planToday, makeQuestion, deckStats, wordsToday, isOpen } from './korwords.js';
-import { unitsOf, unitLabel, unitProgress, TERMS } from './korunits.js';
+import { unitsOf, unitLabel, unitProgress, TERMS, TERM_LABEL } from './korunits.js';
 import { korWordsFinish, korWordsMap, korWordDayMap, korDoneMap } from './xp.js';
 import { starsOf, circled } from './korean.js';
 import { guardStart } from './timeup.js';
@@ -369,8 +369,8 @@ export async function renderUnitsTab(box, ctx) {
   const done = korDoneMap();
   const states = korWordsMap();
   const head = el('section', 'kor-head');
-  head.appendChild(el('h2', 'kor-h', '📘 5학년 국어 단원 지도'));
-  head.appendChild(el('p', 'kor-intro', '내년 5학년 국어책의 단원이에요. 단원마다 이어진 글 카드와 낱말을 미리 익혀 두면 수업이 쉬워져요.'));
+  head.appendChild(el('h2', 'kor-h', '📘 국어 단원 지도'));
+  head.appendChild(el('p', 'kor-intro', '지금 배우는 4학년 2학기와 내년 5학년 국어책의 단원이에요. 단원마다 이어진 글 카드와 낱말을 익혀 두면 수업이 쉬워져요.'));
   const ready = units.filter((u) => !unitProgress(u, done, states).empty).length;
   head.appendChild(el('p', 'kor-count', `준비된 단원 ${ready} / ${units.length}`));
   if (S.unitsData && typeof S.unitsData.source === 'string') head.appendChild(el('p', 'kor-tnote', S.unitsData.source));
@@ -378,7 +378,7 @@ export async function renderUnitsTab(box, ctx) {
   for (const term of TERMS) {
     const list = units.filter((u) => u.term === term);
     if (!list.length) continue;
-    box.appendChild(el('h3', 'kor-term', `5학년 ${term === '5-1' ? '1' : '2'}학기`));
+    box.appendChild(el('h3', 'kor-term', TERM_LABEL[term] || term));
     const grid = el('div', 'kor-units');
     for (const u of list) grid.appendChild(unitEl(u, done, states, ctx));
     box.appendChild(grid);

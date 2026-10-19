@@ -1,10 +1,13 @@
-// 📘 5학년 국어 단원 지도 (2026-10-11, 아버님 "니 제안대로 하자") — 순수 규칙
+// 📘 국어 단원 지도 (2026-10-11 5학년, 아버님 "니 제안대로 하자" · v298 4학년 2학기를 맨 위에 — 지금 학교에서 배우는 학기) — 순수 규칙
 // 단원마다 이어진 📚 글 카드(units.json의 cards)와 🔤 국어 공부 말(words.json의 unit) · 진행(★ · ⭐ 익힌 낱말)
 // 이어진 것이 없는 단원은 "준비 중" — 다음 글을 고를 때 빈 단원부터 채운다
 import { starsOf } from './korean.js';
 import { MASTER_BOX, wordsOf } from './korwords.js';
 
-export const TERMS = ['5-1', '5-2'];
+/** 학기 — 보여 주는 차례(지금 배우는 4-2가 맨 위) */
+export const TERMS = ['4-2', '5-1', '5-2'];
+/** 학기 이름표 (📘 탭의 학기 머리) */
+export const TERM_LABEL = { '4-2': '4학년 2학기 — 지금 배우는 학기', '5-1': '5학년 1학기', '5-2': '5학년 2학기' };
 
 /**
  * 단원 고쳐 읽기 — 형식이 깨진 단원은 빼고, 없는 카드·낱말은 버린다
@@ -58,7 +61,7 @@ export function checkUnits(data, cards, wordsData) {
     if (!u || typeof u.id !== 'string' || !u.id) { at('id가 없어요'); return; }
     if (ids.has(u.id)) at('id가 겹쳐요');
     ids.add(u.id);
-    if (!TERMS.includes(u.term)) at('term은 5-1 또는 5-2');
+    if (!TERMS.includes(u.term)) at(`term은 ${TERMS.join(' · ')}`);
     if (typeof u.title !== 'string' || !u.title) at('title이 없어요');
     if (typeof u.goal !== 'string' || !u.goal) at('goal(배울 것)이 없어요');
     for (const c of (Array.isArray(u.cards) ? u.cards : [])) if (!cardIds.has(c)) at(`없는 카드 ${c}`);

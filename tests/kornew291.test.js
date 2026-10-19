@@ -34,8 +34,8 @@ const STD = {
 
 test('📚 호상놀이 글 넷 (v291): 연습 카드 · 물음 열여섯 · 원고 검사 통과 · 단원 지도(5-2-3 · 5-1-4 둘 · 5-1-6) · 성취기준 공식 문구 · ✍️ 하나 · 노랫말은 줄마다 · 바탕 글 밝힘', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS.slice(102), NEW);
-  assert.equal(validCards(DATA).length, 106);
+  assert.deepEqual(IDS.slice(102, 106), NEW);
+  assert.equal(validCards(DATA).length, 118); // v298 4학년 2학기 글 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [['practice', '설명하는 글'], ['practice', '설명하는 글'], ['practice', '설명하는 글'], ['practice', '노래(민요)']]);
   assert.equal(QS.length, 16);
   assert.deepEqual(NEW.map((id) => lineCount(card(id))), [11, 9, 10, 11], '지금 글과 비슷한 길이(20줄 안)');

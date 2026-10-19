@@ -30,7 +30,7 @@ test('🔤 원고: 검사 통과 · 📘 51 · 🗣️ 55 · 🐢 35 · 🀄 20(
   assert.deepEqual(checkUnits(UNITS, CARDS, WORDS), []);
   const by = {};
   for (const w of ALL) by[w.deck] = (by[w.deck] || 0) + 1;
-  assert.deepEqual(by, { concept: 51, idiom: 55, proverb: 35, saja: 20, passage: 386 }, 'v258 시 일곱의 낱말 35 · v261 새 글 열둘의 46 · v265 신문 글 여섯의 36 · v267 단원 채우기 여섯의 31 · v281 새 글 열둘의 67 · v282 포켓몬 글 여섯의 24 · v291 호상놀이 글 넷의 20 더함');
+  assert.deepEqual(by, { concept: 51, idiom: 55, proverb: 35, saja: 20, passage: 428 }, 'v258 시 일곱의 낱말 35 · v261 새 글 열둘의 46 · v265 신문 글 여섯의 36 · v267 단원 채우기 여섯의 31 · v281 새 글 열둘의 67 · v282 포켓몬 글 여섯의 24 · v291 호상놀이 글 넷의 20 · v298 4학년 2학기 글 열둘의 42 더함');
   for (const w of ALL.filter((x) => x.deck === 'passage')) {
     assert.equal(w.ex, '', `${w.w}: 📖은 빈칸 문제 없음 — 다른 글의 낱말이 빈칸에 같이 들어갈 수 있다`);
     assert.ok(w.src.includes(w.w), `${w.w}: 나온 글 문장`);
@@ -404,10 +404,10 @@ test('🔍 Codex 51차: 앞날 기록 400개 + 오늘 받음 — 진짜 저장 �
   assert.ok(p.korWords[ids[0]].at > 5000, '고친 때는 늘 앞으로');
 });
 
-test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이름표 · 진행(★·⭐) · 모두 준비됨(v236) · 검사가 잡는 것', () => {
+test('📘 단원 지도: 단원 24(v298 4-2 여덟이 맨 위 · 5-1·5-2) · 이어진 카드·낱말 · 이름표 · 진행(★·⭐) · 5학년은 모두 준비됨(v236) · 4-2 매체는 준비 중 · 검사가 잡는 것', () => {
   const units = unitsOf(UNITS, CARDS, ALL);
-  assert.equal(units.length, 16);
-  assert.deepEqual([...new Set(units.map((u) => u.term))], ['5-1', '5-2']);
+  assert.equal(units.length, 24);
+  assert.deepEqual([...new Set(units.map((u) => u.term))], ['4-2', '5-1', '5-2']);
   const six = units.find((u) => u.id === '5-1-6');
   assert.equal(unitLabel(six), '6단원 「빗대어 표현해요」');
   assert.deepEqual(six.cards.map((c) => c.id), ['K3', 'K6', 'K27', 'K28', 'K51', 'K54', 'K55', 'K69', 'K94', 'K106'], 'v241: 윤동주 「해바라기 얼굴」·정지용 「호수」 · v254: 윤동주 「눈」 · v258: 윤동주 「참새」·「햇비」 · v261: 윤동주 「봄」 · v281: 한용운 「알 수 없어요」 · v291: 달구질 소리 더함');
@@ -416,7 +416,8 @@ test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이
   assert.equal(unitLabel(units.find((u) => u.id === '5-1-독서')), '📖 독서 단원 「책을 읽고 함께 이야기해요」');
   const st = { [six.words[0].id]: { box: MASTER_BOX, due: 0, at: 1, miss: 0 }, [six.words[1].id]: { box: 3, due: D0 + 7, at: 1, miss: 0 } };
   assert.deepEqual(unitProgress(six, { 'K3:1': D0, 'K3:2': D0 + 1, 'K6:1': D0 }, st), { stars: 3, starMax: 30, words: 3, mastered: 1, empty: false }); // 카드 열(v254 K51 · v258 K54·K55 · v261 K69 · v281 K94 · v291 K106) × 3
-  assert.ok(units.every((u) => !unitProgress(u, {}, {}).empty), 'v236: 단원 열여섯 모두 글이 있다(준비 중 없음)');
+  assert.ok(units.filter((u) => u.term !== '4-2').every((u) => !unitProgress(u, {}, {}).empty), 'v236: 5학년 단원 열여섯 모두 글이 있다(준비 중 없음)');
+  assert.deepEqual(units.filter((u) => unitProgress(u, {}, {}).empty).map((u) => u.id), ['4-2-매체'], 'v298: 4-2 매체 단원만 준비 중');
   assert.equal(unitProgress({ cards: [], words: [] }, {}, {}).empty, true, '이어진 것이 없는 단원은 준비 중');
   // 모든 📘 낱말은 어느 단원에 있다
   for (const w of ALL.filter((x) => x.deck === 'concept')) assert.ok(units.some((u) => u.words.includes(w)), `${w.w} 단원`);
@@ -429,7 +430,7 @@ test('📘 단원 지도: 단원 16(5-1·5-2) · 이어진 카드·낱말 · 이
   const ws = JSON.parse(JSON.stringify(WORDS));
   ws.words[0].unit = '9-9';
   assert.ok(checkUnits(UNITS, CARDS, ws).some((e) => /없는 단원 9-9/.test(e)));
-  assert.deepEqual(deckStats(ALL, {}, {}).map((s) => [s.deck, s.total, s.open]), [['concept', 51, 51], ['idiom', 55, 55], ['proverb', 35, 35], ['saja', 20, 20], ['passage', 386, 0]]); // v291 호상놀이 글 넷의 20 · v258 시 일곱의 낱말 35 · v261 새 글 열둘의 46 · v265 신문 글 여섯의 36 · v267 단원 채우기 여섯의 31 · v281 새 글 열둘의 67 · v282 포켓몬 글 여섯의 24
+  assert.deepEqual(deckStats(ALL, {}, {}).map((s) => [s.deck, s.total, s.open]), [['concept', 51, 51], ['idiom', 55, 55], ['proverb', 35, 35], ['saja', 20, 20], ['passage', 428, 0]]); // v298 4학년 2학기 글 열둘의 42 · v291 호상놀이 글 넷의 20 ·v258 시 일곱의 낱말 35 · v261 새 글 열둘의 46 · v265 신문 글 여섯의 36 · v267 단원 채우기 여섯의 31 · v281 새 글 열둘의 67 · v282 포켓몬 글 여섯의 24
   assert.equal(Object.keys(DECKS).length, 5);
 });
 
