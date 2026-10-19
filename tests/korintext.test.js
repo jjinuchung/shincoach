@@ -161,12 +161,12 @@ test('📍 열림·한 판: 그 글에 ★이 있어야 열림 · 판 = 차례 �
   assert.ok(!isOpen(p, {}) && !isOpen(p, { 'K11:1': D0 }) && isOpen(p, { 'K2:1': D0 }));
   assert.ok(!isOpen({ ...p, card: '' }, ALL_STAR), 'card 없는 글에 있나요는 열지 않는다');
   assert.deepEqual(PLAY_ORDER, ['order', 'intext', 'sort', 'agree']); // v294 🔗 앞뒤 어울리기는 끝에
-  assert.deepEqual(KIND_LIST, ['order', 'sort', 'intext', 'agree']);
+  assert.deepEqual(KIND_LIST, ['order', 'sort', 'intext', 'agree', 'exp']); // v295 ⚖️ 겪은 일·생각
   assert.deepEqual(planPuzzles(LIST, {}, ALL_STAR, T0).map((x) => x.id), ['O1', 'I1', 'F1', 'H1']);
   assert.deepEqual(planPuzzles(LIST, {}, { 'K2:1': D0 }, T0).map((x) => x.id), ['O11', 'I1', 'F1', 'H1'], '★ 하나뿐 — 그 글의 글에 있나요만');
   const done = (kinds) => Object.fromEntries(LIST.filter((x) => kinds.includes(x.kind)).map((x) => [x.id, { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 }]));
-  assert.deepEqual(planPuzzles(LIST, done(['order', 'sort']), ALL_STAR, T0).map((x) => x.id), ['I1', 'H1', 'I2', 'I3'], '다른 꼴을 다 풀면 글에 있나요로 채움(🔗 하나는 그대로)');
-  assert.deepEqual(planPuzzles(LIST, done(['intext', 'sort']), ALL_STAR, T0).map((x) => x.kind), ['order', 'agree', 'order', 'order']);
+  assert.deepEqual(planPuzzles(LIST, done(['order', 'sort']), ALL_STAR, T0).map((x) => x.id), ['I1', 'E1', 'H1', 'I2'], '다른 꼴을 다 풀면 글에 있나요로 채움(🔗 하나는 그대로 · v295 가르기 칸은 겪은 일·생각)');
+  assert.deepEqual(planPuzzles(LIST, done(['intext', 'sort']), ALL_STAR, T0).map((x) => x.kind), ['order', 'exp', 'agree', 'order'], '사실·의견을 다 풀면 가르기 칸은 겪은 일·생각(v295)');
   const st = { I3: { box: 0, due: D0 + 1, at: 5, miss: 1, d0: D0 }, I1: { box: SOLVED, due: 0, at: 2, miss: 0, d0: D0 } };
   assert.deepEqual(planPuzzles(LIST, st, ALL_STAR, T0).map((x) => x.id), ['O1', 'I2', 'F1', 'H1'], '오늘은 틀린 I3·⭐ I1이 안 나온다');
   assert.deepEqual(planPuzzles(LIST, st, ALL_STAR, T0 + 86400000).map((x) => x.id), ['O1', 'I3', 'F1', 'H1'], '다음 날 — 틀린 퍼즐이 먼저');
@@ -205,7 +205,7 @@ test('📍 화면 연결: 확인은 모두 골랐을 때만(gradeIntext) · 판�
   assert.ok(pv.includes("const b = el(picking ? 'button' : 'div', 'kor-pline');"), '줄은 고를 때만 단추');
   assert.ok(pv.includes('const picking = !g && ps.lineFor >= 0;'), '확인 뒤에는 줄을 못 고른다');
   assert.ok(pv.includes("const LETTERS = ['가', '나', '다', '라', '마', '바'];") && LETTERS_OK(pv));
-  assert.ok(pv.includes('const fo = /^fo:(\\d+):(fact|opinion|in|out)$/.exec(focusTo);'), '누른 [있어요]/[없어요]에 초점');
+  assert.ok(pv.includes('const fo = /^fo:(\\d+):(fact|opinion|did|felt|in|out)$/.exec(focusTo);'), '누른 [있어요]/[없어요]에 초점 (v295 [겪은 일]/[생각·느낌]도)');
   assert.ok(pv.includes("focusTo === 'pline' ? plineTarget(card, ps)"), '[있어요] 뒤 글의 줄에 초점');
   // Codex 70차 — 글 상자 읽던 자리 · 바꾸기는 고른 줄 · 초점 간 것이 보이게 · 어느 문장의 줄인지 읽어 줌 · 확인 뒤 [글에서 보기]
   const target = pv.slice(pv.indexOf('function plineTarget(card, ps) {'), pv.indexOf('function inBox('));

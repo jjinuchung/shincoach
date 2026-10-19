@@ -143,9 +143,9 @@ test('🧩 오늘의 판: 이야기 흐름은 그 글에 ★이 있어야 열림
   // 한쪽이 모자라면 다른 쪽으로 채운다
   const allSortsDone = {};
   for (const p of LIST.filter((x) => x.kind === 'sort')) allSortsDone[p.id] = { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 };
-  assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'agree', 'order', 'order']);
+  assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'exp', 'agree', 'order'], '사실·의견을 다 풀면 가르기 칸은 겪은 일·생각(v295)');
   assert.ok(isSolved({ box: 1 }) && !isSolved({ box: 0 }) && !isSolved(null));
-  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 23, 4, 0, 1], ['sort', 14, 14, 1, 0], ['intext', 12, 0, 0, 0], ['agree', 10, 10, 0, 0]]); // v265 차례 둘 · v291 하나 더함 · v294 🔗 열
+  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 23, 4, 0, 1], ['sort', 14, 14, 1, 0], ['intext', 12, 0, 0, 0], ['agree', 10, 10, 0, 0], ['exp', 10, 10, 0, 0]]); // v265 차례 둘 · v291 하나 더함 · v294 🔗 열 · v295 ⚖️ 겪은 일·생각 열
 });
 
 test('🧩 보상 규칙: 그날 첫 판만 💰·🎯 · 3개 모두 한 번에 → 🟩 · 같은 날 둘째 판은 보상 없음(⭐는 모임) · 틀리면 다음 날 · ⭐는 되돌리지 않음 · 낡은 판은 연습 · 모르는 퍼즐은 안 셈 · 빈 판은 empty', () => {

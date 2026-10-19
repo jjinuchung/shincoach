@@ -120,7 +120,7 @@ test('🔗 보기 섞기 — 문장마다 끝 번호를 고르게 섞는다 · �
 test('🔗 한 판 — 읽은 글 없이 늘 열림 · 하루 하나(판은 넷) · 원고 차례로 새 묶음 · 틀리면 다음 날 먼저 · ⭐는 연습으로만 · 다 풀면 다른 꼴로 채움 · 꼴마다 셈', () => {
   assert.deepEqual([AGREE_PER_DAY, PUZZLES_PER_DAY], [1, 4]);
   assert.deepEqual(KINDS.agree, { icon: '🔗', ko: '앞뒤 어울리기' });
-  assert.equal(KIND_LIST[KIND_LIST.length - 1], 'agree');
+  assert.ok(KIND_LIST.includes('agree'), '꼴 목록에 🔗 (v295부터 ⚖️ 겪은 일·생각이 그 뒤)');
   assert.equal(PLAY_ORDER[PLAY_ORDER.length - 1], 'agree');
   for (const p of AGS) assert.ok(isOpen(p, {}), `${p.id} 늘 열림`);
   const none = planPuzzles(LIST, {}, {}, T0);

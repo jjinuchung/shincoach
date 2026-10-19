@@ -3639,6 +3639,9 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .kor-pin-wait { font-weight: 700; color: var(--primary-dark); }
 .kor-pfo.is-in.is-on { border-color: #059669; background: #d1fae5; color: #064e3b; }
 .kor-pfo.is-out.is-on { border-color: #6b7280; background: #e5e7eb; color: #1f2937; }
+/* ⚖️ 겪은 일·생각 가르기 (v295) */
+.kor-pfo.is-did.is-on { border-color: #0d9488; background: #ccfbf1; color: #134e4a; }
+.kor-pfo.is-felt.is-on { border-color: #db2777; background: #fce7f3; color: #831843; }
 /* 🔗 앞뒤 어울리기 (v294) — 끝 보기 · 빈칸 · 고른 끝 · 짝 줄 */
 .kor-pfo.kor-pend.is-on { border-color: #7c3aed; background: #ede9fe; color: #4c1d95; }
 .kor-pblank { display: inline-block; min-width: 4.5em; border-bottom: 2px solid #a78bfa; }

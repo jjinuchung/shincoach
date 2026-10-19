@@ -26,6 +26,10 @@
 //   원고에 연습할 물음이 열 개 남짓이라 한 문장짜리로 넓힌다 · 한 묶음 = 문장 4~6 · 문장마다 앞부분(짝 말 key는 굵게)을 보고 알맞은 끝을 고른다 ·
 //   바른 끝(end) 하나 + 어울리지 않는 끝(no) 1~2 — 화면이 섞는다(바른 끝이 늘 같은 자리에 있지 않게) · 확인 뒤 바른 문장(짝 말과 짝 조각 mate를 굵게)과 까닭 ·
 //   읽은 글 없이 늘 열린다 · 5-2 「올바른 문장으로 글을 써요」 [6국04-04] — 원고의 호응 물음(K17·K25·K45·K79·K80·K101)과 같은 짝들
+//
+// ⚖️ 겪은 일·생각 가르기(exp, v295 — 2026-10-19 아버님 고름): 사실·의견 가르기와 같은 꼴(문장마다 두 단추) · 체험한 일을 쓴 문장 4~6을
+//   겪은 일(did — 한 일·본 일·들은 일) / 생각·느낌(felt — 느낀 마음·생각·바람·다짐)으로 · 5-1 「체험한 일을 써요」 [6국03-03] — 원고의 K20·K67·K87 물음과 같은 가르기 ·
+//   오늘의 판에서는 사실·의견과 한 칸(가르기)을 번갈아 쓴다 — 새 퍼즐은 오래 안 한 꼴부터(SLOT_OF · 판은 그대로 넷) · 늘 열린다
 import { dayNum, throwsOf, pendingOf, KOR_STONE, circled } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
 
@@ -70,20 +74,29 @@ export const ASKS = {
   process: { icon: '🧩', ko: '하는 차례', prompt: '하는 차례대로 놓아 보세요.' },
 };
 export const FO = { fact: '사실', opinion: '의견' };
+/** ⚖️ 겪은 일·생각 가르기의 두 단추 (v295) */
+export const EF = { did: '겪은 일', felt: '생각·느낌' };
 export const IO = { in: '글에 있어요', out: '글에 없어요' };
-export const KINDS = { order: { icon: '🧩', ko: '차례 맞추기' }, sort: { icon: '⚖️', ko: '사실·의견 가르기' }, intext: { icon: '📍', ko: '글에 있나요?' }, agree: { icon: '🔗', ko: '앞뒤 어울리기' } };
+export const KINDS = { order: { icon: '🧩', ko: '차례 맞추기' }, sort: { icon: '⚖️', ko: '사실·의견 가르기' }, intext: { icon: '📍', ko: '글에 있나요?' }, agree: { icon: '🔗', ko: '앞뒤 어울리기' }, exp: { icon: '⚖️', ko: '겪은 일·생각 가르기' } };
 /** 🧩 탭·📤 요약에 늘어놓는 차례 (새 꼴은 끝에) */
-export const KIND_LIST = ['order', 'sort', 'intext', 'agree'];
+export const KIND_LIST = ['order', 'sort', 'intext', 'agree', 'exp'];
 /** 한 판 안에서 내는 차례 — 같은 꼴이 붙지 않게 돌아가며 */
 export const PLAY_ORDER = ['order', 'intext', 'sort', 'agree'];
+/** 판의 한 칸을 나눠 쓰는 꼴 — 겪은 일·생각은 사실·의견 칸(가르기)에서 번갈아 (v295 · 없는 꼴은 제 이름이 칸) */
+export const SLOT_OF = { exp: 'sort' };
 // ★ 사실·의견 라벨은 사람이 정한다 — 아래 두 정규식은 원고를 거르는 망일 뿐 판정기가 아니다(한국어는 활용형이 많아
 //   넓히면 사실 문장을 잡고 좁히면 놓친다 — Codex 55차: "최고 기온"을 잡고 "아름다운"·"만들어야 해요"·"~다고 말했다"·"~듯하다"를 놓쳤다)
 /** 생각 말 — 의견에는 하나 이상, 사실에는 없어야 한다 */
 export const OPINION_WORDS = /좋|재미|멋|맛있|예쁘|훌륭|최고(?:다|의|예)|싫|아름다|야 (?:한다|해|합)|즐겁|즐거|신나|귀엽|편하|낫다|지루/;
 /** 가르기 문장에 넣지 않는 꼴 — 옮긴 말 · 앞날 짐작 · 섞인 마음 · 물음 · 따옴표 */
 export const SORT_BANNED = /드디어|라고 |다고 한다|다고 했|다고 말|겠다|것 같다|듯하|듯 하|["'「『“‘]|\?/;
-const ID_RE = { order: /^O\d{1,3}$/, sort: /^F\d{1,3}$/, intext: /^I\d{1,3}$/, agree: /^H\d{1,3}$/ };
-const ID_HEAD = { order: 'O', sort: 'F', intext: 'I', agree: 'H' };
+// ★ 겪은 일·생각 라벨도 사람이 정한다 — 아래 정규식은 거르는 망 (v295 · Codex 101차: "신기"는 '신을 신기'와 겹쳐 꼴을 좁히고 "좋다·좋아"를 더함)
+/** 마음 말 — 생각·느낌 문장에는 하나 이상, 겪은 일 문장에는 없어야 한다("재미있게 놀았다"처럼 섞인 문장이 나가지 않게) */
+export const FELT_WORDS = /재미|즐거|즐겁|신기했|신기한|신기하|신기해|신나|신이 나|뿌듯|기뻤|기쁘|기뻐|슬펐|슬프|무서|무섭|떨렸|떨리|설레|설렜|아쉬|좋았|좋다|좋아|고마|싶다|싶었|싶어|생각했|생각이 들|느꼈|놀랐|부끄|자랑스|행복|걱정|궁금|마음먹|야겠|속상|긴장|두근|기억에 남|것 같|것처럼|멋|감동|미안|섭섭|외로|답답|화가 났/;
+/** 겪은 일·생각 문장에 넣지 않는 꼴 — 옮긴 말(따옴표) · 물음 · 마음이 섞인 "드디어" */
+export const EXP_BANNED = /드디어|["'「『“‘]|\?/;
+const ID_RE = { order: /^O\d{1,3}$/, sort: /^F\d{1,3}$/, intext: /^I\d{1,3}$/, agree: /^H\d{1,3}$/, exp: /^E\d{1,3}$/ };
+const ID_HEAD = { order: 'O', sort: 'F', intext: 'I', agree: 'H', exp: 'E' };
 const LEN_MAX = 90;
 const WHY_MAX = 120;
 
@@ -118,13 +131,14 @@ export function checkPuzzles(data, cards) {
   list.forEach((p, i) => {
     const at = (m) => errs.push(`puzzles[${i}] ${p && p.id ? p.id : ''}: ${m}`);
     if (!isObj(p)) { at('퍼즐이 객체가 아니에요'); return; }
-    if (!own(KINDS, p.kind)) { at('kind는 order · sort · intext · agree'); return; }
+    if (!own(KINDS, p.kind)) { at('kind는 order · sort · intext · agree · exp'); return; }
     if (typeof p.id !== 'string' || !ID_RE[p.kind].test(p.id)) at(`id는 ${ID_HEAD[p.kind]}숫자`);
     else if (ids.has(p.id)) at('id가 겹쳐요');
     else ids.add(p.id);
     if (p.kind === 'order') checkOrder(p, at, cardIds);
     else if (p.kind === 'intext') checkIntext(p, at, cardMap);
     else if (p.kind === 'agree') checkAgree(p, at);
+    else if (p.kind === 'exp') checkExp(p, at);
     else checkSort(p, at);
   });
   return errs;
@@ -252,6 +266,28 @@ function checkAgree(p, at) {
     if (Math.max(...ends.map((e) => [...`${x.pre} ${e}.`].length)) > LEN_MAX) sat(`문장은 ${LEN_MAX}자까지`);
   });
 }
+/** ⚖️ 겪은 일·생각 가르기 검사 — 한 묶음 = 체험한 일 문장 4~6 · 겪은 일과 생각·느낌이 하나 이상씩 · 마음 말은 생각·느낌에만 */
+function checkExp(p, at) {
+  if (!nonEmpty(p.topic)) at('topic이 비었어요');
+  if (!nonEmpty(p.icon)) at('icon이 비었어요');
+  const ss = p.sents;
+  if (!Array.isArray(ss) || ss.length < SORT_MIN || ss.length > SORT_MAX) { at(`sents는 ${SORT_MIN}~${SORT_MAX}개`); return; }
+  const seen = new Set();
+  ss.forEach((s, k) => {
+    const sat = (m) => at(`문장 ${k + 1} ${m}`);
+    if (!isObj(s) || !nonEmpty(s.t)) { sat('글이 비었어요'); return; }
+    if (seen.has(s.t.trim())) sat('앞 문장과 같아요');
+    seen.add(s.t.trim());
+    if (!own(EF, s.ef)) sat('ef는 did 또는 felt');
+    if (!nonEmpty(s.why)) sat('why(까닭)가 비었어요');
+    else if ([...s.why].length > WHY_MAX) sat(`why는 ${WHY_MAX}자까지`);
+    if ([...s.t].length > LEN_MAX) sat(`${LEN_MAX}자까지`);
+    if (EXP_BANNED.test(s.t)) sat('옮긴 말(따옴표)·물음·"드디어"는 이 퍼즐에서는 쓰지 않아요');
+    if (s.ef === 'did' && FELT_WORDS.test(s.t)) sat('겪은 일 문장에 마음 말(신기·무서·싶다·것 같다 …)이 있어요');
+    if (s.ef === 'felt' && !FELT_WORDS.test(s.t)) sat('생각·느낌 문장에 마음 말이 없어요 — 느낀 마음이나 생각이 드러나게');
+  });
+  if (!ss.some((s) => s && s.ef === 'did') || !ss.some((s) => s && s.ef === 'felt')) at('겪은 일과 생각·느낌이 하나 이상씩 있어야 해요');
+}
 function checkSort(p, at) {
   if (!nonEmpty(p.topic)) at('topic이 비었어요');
   if (!nonEmpty(p.icon)) at('icon이 비었어요');
@@ -285,6 +321,7 @@ export function allPuzzles(data, cards) {
     if (p.kind === 'order') checkOrder(p, (m) => errs.push(m), cards ? new Set(byId.keys()) : null);
     else if (p.kind === 'intext') checkIntext(p, (m) => errs.push(m), Array.isArray(cards) ? byId : null);
     else if (p.kind === 'agree') checkAgree(p, (m) => errs.push(m));
+    else if (p.kind === 'exp') checkExp(p, (m) => errs.push(m));
     else checkSort(p, (m) => errs.push(m));
     if (errs.length) continue;
     seen.add(p.id);
@@ -300,6 +337,8 @@ export function allPuzzles(data, cards) {
     } else if (p.kind === 'agree') {
       // choices[0]이 바른 끝 — 화면은 dealChoices로 섞어 놓는다
       out.push({ id: p.id, kind: 'agree', title: p.topic, icon: p.icon, items: p.items.map((x) => ({ pre: x.pre, key: x.key, choices: [x.end, ...x.no], mate: x.mate || '', type: x.type, why: x.why })) });
+    } else if (p.kind === 'exp') {
+      out.push({ id: p.id, kind: 'exp', title: p.topic, icon: p.icon, sents: p.sents.map((s) => ({ t: s.t, ef: s.ef, why: s.why })) });
     } else {
       out.push({ id: p.id, kind: 'sort', title: p.topic, icon: p.icon, sents: p.sents.map((s) => ({ t: s.t, fo: s.fo, why: s.why })) });
     }
@@ -342,7 +381,8 @@ export function mergePuzzles(a, b) {
 
 /**
  * 🧩 오늘의 퍼즐 — [{ id, kind }] · 다시 볼 것(틀린 날 다음 날부터, 오래된 것부터) → 새 퍼즐(원고 차례) ·
- *   차례 ORDER_PER_DAY + 글에 있나요 INTEXT_PER_DAY + 사실·의견 SORT_PER_DAY + 앞뒤 어울리기 AGREE_PER_DAY, 한 꼴이 모자라면 다른 꼴로 채운다 ·
+ *   차례 ORDER_PER_DAY + 글에 있나요 INTEXT_PER_DAY + 가르기 SORT_PER_DAY + 앞뒤 어울리기 AGREE_PER_DAY, 한 칸이 모자라면 다른 칸으로 채운다 ·
+ *   가르기 칸은 사실·의견과 겪은 일·생각이 나눠 쓴다(SLOT_OF) — 새 퍼즐은 마지막으로 푼 때가 오래된 꼴부터(같으면 원고 차례) → 번갈아 나온다 ·
  *   practice면 ⭐ 퍼즐을 연습으로(오래 안 본 것부터)
  */
 export function planPuzzles(list, states, korDone, now, practice = false) {
@@ -351,6 +391,9 @@ export function planPuzzles(list, states, korDone, now, practice = false) {
   const open = (list || []).filter((p) => isOpen(p, korDone));
   const want = { order: ORDER_PER_DAY, intext: INTEXT_PER_DAY, sort: SORT_PER_DAY, agree: AGREE_PER_DAY };
   const total = PUZZLES_PER_DAY;
+  const slotOf = (p) => SLOT_OF[p.kind] || p.kind;
+  const last = {};
+  for (const p of list || []) if (own(st, p.id)) last[p.kind] = Math.max(last[p.kind] || 0, st[p.id].at);
   let pool;
   if (practice) {
     pool = open.filter((p) => own(st, p.id) && st[p.id].box >= SOLVED).sort((a, b) => st[a.id].at - st[b.id].at);
@@ -360,10 +403,16 @@ export function planPuzzles(list, states, korDone, now, practice = false) {
     pool = [...due, ...fresh];
   }
   const take = [];
-  for (const kind of PLAY_ORDER) take.push(...pool.filter((p) => p.kind === kind).slice(0, want[kind]));
+  const inSlot = (slot) => {
+    const c = pool.filter((p) => slotOf(p) === slot);
+    if (practice) return c;
+    const fresh = c.filter((p) => !own(st, p.id)).map((p, i) => [p, i]).sort((a, b) => (last[a[0].kind] || 0) - (last[b[0].kind] || 0) || a[1] - b[1]).map(([p]) => p);
+    return [...c.filter((p) => own(st, p.id)), ...fresh];
+  };
+  for (const slot of PLAY_ORDER) take.push(...inSlot(slot).slice(0, want[slot]));
   for (const p of pool) { if (take.length >= total) break; if (!take.includes(p)) take.push(p); }
-  // 판 안 차례: 차례 맞추기 → 글에 있나요 → 사실·의견 → 앞뒤 어울리기 → … 돌아가며 (같은 꼴이 붙지 않게)
-  const queues = PLAY_ORDER.map((kind) => take.filter((p) => p.kind === kind));
+  // 판 안 차례: 차례 맞추기 → 글에 있나요 → 가르기 → 앞뒤 어울리기 → … 돌아가며 (같은 칸이 붙지 않게)
+  const queues = PLAY_ORDER.map((slot) => take.filter((p) => slotOf(p) === slot));
   const out = [];
   while (queues.some((q) => q.length)) for (const q of queues) if (q.length) out.push(q.shift());
   return out.slice(0, total).map((p) => ({ id: p.id, kind: p.kind }));
@@ -398,15 +447,17 @@ export function gradeOrder(p, picked) {
   for (let i = 0; i < n; i++) if (arr[i] === i) right++;
   return { valid: true, ok: right === n, right, n };
 }
-/** ⚖️ 낸 가르기 채점 — labels = 문장마다 글자 'fact' | 'opinion' · 빈 칸·다른 값이 있으면 valid false */
+/** ⚖️ 낸 가르기 채점 — labels = 문장마다 글자(사실·의견 'fact' | 'opinion' · 겪은 일·생각 'did' | 'felt') · 빈 칸·다른 값이 있으면 valid false */
 export function gradeSort(p, labels) {
+  const exp = !!p && p.kind === 'exp';
+  const keys = exp ? EF : FO;
   const n = p && Array.isArray(p.sents) ? p.sents.length : 0;
   const arr = Array.isArray(labels) ? labels : [];
   let valid = n > 0 && arr.length === n;
-  for (let i = 0; valid && i < n; i++) valid = arr[i] === 'fact' || arr[i] === 'opinion';
+  for (let i = 0; valid && i < n; i++) valid = typeof arr[i] === 'string' && own(keys, arr[i]);
   if (!valid) return { valid: false, ok: false, right: 0, n };
   let right = 0;
-  for (let i = 0; i < n; i++) if (arr[i] === p.sents[i].fo) right++;
+  for (let i = 0; i < n; i++) if (arr[i] === (exp ? p.sents[i].ef : p.sents[i].fo)) right++;
   return { valid: true, ok: right === n, right, n };
 }
 /**
