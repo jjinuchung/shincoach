@@ -7,6 +7,7 @@
 
 import { schedule, isDue, enroll, addDays, daysBetween, GRADUATED, STAGES } from './review.js';
 import * as fractionGen from './mathgen.js';
+import { puzzleReport } from './mathpuzzle.js'; // 🧩 수학 퍼즐 요약 줄 (v296 — import 없는 파일)
 import * as negativeGen from './mathneg.js';
 import * as mixedGen from './mathmix.js';
 import * as decimalGen from './mathdec.js';
@@ -1468,6 +1469,7 @@ export function mathReportText(m, today) {
   }
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
   lines.push('', ...guardLines(guardReport(m, today))); // 🛡️ 📊와 같은 줄 (v252)
+  lines.push('', puzzleReport(m && m.puzzle, today)); // 🧩 수학 퍼즐 단계·판 (v296)
   const log = shownLog((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);

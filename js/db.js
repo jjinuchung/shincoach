@@ -4,6 +4,7 @@
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { mergeReviewFirst } from './mathchal.js'; // 🔍 🎯 까닭 고르기 첫 선택 합치기 (v252) — mathchal.js는 아무것도 import하지 않는다
+import { mergePuzzle, puzzleOf } from './mathpuzzle.js'; // 🧩 수학 퍼즐 기록 (v296) — mathpuzzle.js도 아무것도 import하지 않는다
 import { canEvolve, capReason, evoAt, haveOf, lvOf, nextCost, candyCount, candyOf, candyCost } from './evolve.js'; // 🧬 레벨업·진화 규칙 (순수) — evolve.js도 아무것도 import하지 않는다
 import { SHINY_USES, SHINY_CHARGE, PARCEL_COIN, parcelOf, parcelGot, itemById, MEGASTONE, STONE_ENGLISH, videoOwed } from './items.js'; // 🌈 이로치 스톤 3회 · 📦 구호품 — items.js는 아무것도 import하지 않는다 (순환 없음)
 import { marketOpen, fusionId, parseFusionId, fusionHeld, cleanName, mergeFusions, copyFusions, FUSION_COST } from './fusion.js'; // 🔀 퓨전 규칙 (순수, import 없음)
@@ -939,6 +940,7 @@ export function cloneMath(m) {
   const out = { ...emptyMath(), ...m, concepts: {}, placed: { ...(m.placed || {}) }, miss: { ...(m.miss || {}) }, log: [...(Array.isArray(m.log) ? m.log : [])], ...(m.tot ? { tot: { ...m.tot } } : {}), ...(m.sp ? { sp: { ...m.sp, pass: { ...(m.sp.pass || {}) } } } : {}) };
   // 🎯 도전 문제도 sp와 같은 이유로 안쪽 맵까지 새 객체로
   if (m.chal) out.chal = { ...m.chal, ok: { ...(m.chal.ok || {}) }, tries: { ...(m.chal.tries || {}) }, done: { ...(m.chal.done || {}) }, ...(m.chal.rf ? { rf: { ...m.chal.rf } } : {}) };
+  if (m.puzzle) out.puzzle = puzzleOf(m.puzzle); // 🧩 수학 퍼즐(v296) — 안쪽 맵까지 새 객체로
   for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
   if (Array.isArray(m.asks)) out.asks = m.asks.map(cloneAsk); // ❓ 질문은 안쪽에 답장 배열이 있어 따로 복사
   return out;
@@ -1149,6 +1151,8 @@ export function mergeMath(cur, rec) {
       ...(Object.keys(rf).length ? { rf } : {}),
     };
   }
+  // 🧩 수학 퍼즐(v296) — 단계·판 수는 큰 쪽 · 보상 받은 날은 날마다 큰 쪽 · 같은 날의 처음 답은 틀린 쪽 (mathpuzzle.mergePuzzle)
+  if ((rec && rec.puzzle) || out.puzzle) out.puzzle = mergePuzzle(out.puzzle, rec && rec.puzzle);
   // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편.
   // 편 번호(rid, v250)가 있으면 시각 + 번호로 — 두 기기에서 같은 밀리초에 끝낸 다른 편이 하나로 줄지 않게 (Codex 62차 #3)
   const lineKey = (e) => `${e.t}|${e.rid || ''}`;

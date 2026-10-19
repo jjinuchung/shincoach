@@ -25,6 +25,7 @@ import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKin
 // 🎯 도전 문제 — 문제집에 있는 그 문제 그대로 (2026-09-28)
 import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, applyChalAnswer, applyReviewFirsts, chalReward, setNote as chalNote, solvedCount, setCleared, notesFor, missed as chalMissed, solved as chalSolved, shuffleChoices } from './mathchal.js';
 import { figureEl, inputEl } from './chalview.js';
+import { puzzleButton, puzzleActive, resumePuzzle, endPuzzle } from './mathpuzzleview.js'; // 🧩 수학 퍼즐 (v296 — 화면은 따로, ctx로 잇는다)
 // 📖 풀이 돌아보기 — 틀린 문제의 풀이를 한 줄씩 · 🔍 내 답은 왜 틀렸을까 (v248)
 import { splitLines, conceptQuiz, chalQuiz } from './lookback.js';
 import { lineReveal, reviewQuizEl } from './lookview.js';
@@ -529,6 +530,7 @@ export async function renderMath() {
   // 답을 고른 뒤였으면 다음 문항으로 — 같은 문항을 다시 그리면 두 번 답해 두 번 세어진다.
   // 🎯 도전 문제를 풀다 🎒·📊를 다녀온 것이면 — 풀던 문제로 (사다리로 떨어지면 이어 풀 길이 없고 ⏳ 예외도 켜진 채였다, Codex 20차 #1)
   if (ui.chal) { ui.run++; resumeChal(); return; }
+  if (puzzleActive()) { ui.run++; resumePuzzle(puzzleCtx()); return; } // 🧩 수학 퍼즐을 풀다 🎒·📊를 다녀왔으면 그 퍼즐로 (v296)
   const r = ui.round;
   // 저장 중에 🎒를 다녀온 것이면 — 기다린다. 사다리 로딩으로 내려가면 run이 바뀌어 저장을 끝낸 finishRound가 결과·☀️ 다음 단계를
   // 못 그리고, renderLadder가 ui.daily를 지운다 (Codex 3차 #2). run은 그대로 두어 finishRound가 이어서 그린다
@@ -595,6 +597,7 @@ function renderStemPicker(state) {
   }
   card.appendChild(list);
   addChalButtons(card);   // 🎯 줄기를 아직 안 골랐어도 문제집 숙제는 할 수 있어야 한다
+  card.appendChild(puzzleButton(puzzleCtx())); // 🧩 수학 퍼즐도 줄기와 상관없이 (v296)
   m.appendChild(card);
 }
 
@@ -624,12 +627,18 @@ function startDiag() {
   renderQuestion();
 }
 
+/** 🧩 수학 퍼즐 화면에 건네는 것 (v296 — mathpuzzleview는 math.js를 import하지 않는다) */
+function puzzleCtx() {
+  return { clearMain, back: () => renderLadder(ui.state), getState: () => ui.state, setState: (s) => { ui.state = s; }, updateChip };
+}
+
 // ── 사다리
 
 function renderLadder(state) {
   const m = clearMain();
   ui.daily = null; // 사다리로 나오면 ☀️ 흐름은 끝
   if (ui.chal) endChal(); // 🎯 도전 문제도 — 사다리로 나오는 길은 전부 여기를 지난다 (⏳ 예외 끄기)
+  endPuzzle(); // 🧩 수학 퍼즐 판도 (v296)
   ui.battlePending = null; // 걸어 둔 배틀도 버린다 — 편 밖에서 갑자기 열리면 아이가 당황한다 (Codex 9차 #1)
   showHatchIfAny(); // 🐣 다른 화면(영어)에서 부화했는데 아직 못 본 것
   const today = todayKey();
@@ -697,6 +706,7 @@ function renderLadder(state) {
     const egg = eggFor('math');
     if (egg) { const pg = eggProgress(egg); head.appendChild(el('p', 'math-note math-egg', `🥚 수학 알 ${pg.done}/${pg.need}일 — ☀️ 완주한 날마다 하루씩 (${pg.need - pg.done}일 더)`)); }
   }
+  head.appendChild(puzzleButton(puzzleCtx())); // 🧩 오늘의 수학 퍼즐 — ☀️ 오늘의 수학 아래 (v296)
   // ❓ 아빠 답을 기다리는 질문 · 😄 이해했는데 아직 안 풀어 본 문제
   const waiting = openAsks(state).length;
   const tryable = ((state && state.asks) || []).filter((x) => x && x.status === 'understood');
@@ -3171,7 +3181,7 @@ export function initMath({ showView }) {
   ui.showView = showView;
   const back = $('btn-math-back');
   // 🎯 도전 문제도 여기서 끝낸다 — 안 끄면 ⏳ 예외가 켜진 채 남아 수학 시간이 안 세어졌다 (Codex 20차 #1)
-  if (back) back.addEventListener('click', () => { quitLive(); ui.round = null; ui.daily = null; endChal(); ui.run++; showView('home'); });
+  if (back) back.addEventListener('click', () => { quitLive(); ui.round = null; ui.daily = null; endChal(); endPuzzle(); ui.run++; showView('home'); }); // 🧩 퍼즐 판도 버린다(낸 답은 저장됐다, v296)
 }
 
 /** 홈에서 진우가 본 영상 세계를 미리 알고 싶을 때 (표시용) */

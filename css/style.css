@@ -2555,6 +2555,47 @@ button { font-family: inherit; }
 /* ── 🎯 도전 문제 (2026-09-28, 문제집에 있는 그 문제 그대로) ── */
 .math-chal-slot { display: flex; flex-direction: column; gap: 2px; margin: 0 0 10px; }
 .math-chal-btn { background: #fff3e6; border: 2px solid #f0a35e; color: #8a4b00; font-weight: 800; }
+/* 🧩 수학 퍼즐 (v296) — 단추 · 판(마방진 3×3 · 피라미드) · 숫자판 · 카드 · 끝 화면 */
+.mpz-slot { display: grid; gap: 4px; margin-top: 8px; }
+.mpz-btn { background: #eef2ff; border: 2px solid #818cf8; color: #3730a3; font-weight: 800; }
+.mpz-btn.is-done { background: #f5f3ff; border-color: #c4b5fd; color: #5b21b6; }
+.mpz-card { display: grid; gap: 12px; }
+.mpz-top { display: flex; justify-content: flex-start; min-height: 0; }
+.mpz-board { display: grid; gap: 8px; justify-content: center; }
+.mpz-row { display: flex; gap: 8px; justify-content: center; }
+.mpz-cell { min-width: 52px; height: 52px; padding: 0 6px; border-radius: 12px; border: 2px solid var(--border); background: #f8f9fc; display: grid; place-items: center; font-family: inherit; font-weight: 800; font-size: 1.25rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--text); box-sizing: border-box; }
+.mpz-board.is-pyramid .mpz-cell { min-width: 60px; }
+button.mpz-cell.is-blank { border-style: dashed; border-color: #6366f1; background: #fff; color: #4338ca; cursor: pointer; }
+button.mpz-cell.is-sel { border-style: solid; background: #fde68a; color: #1f2937; }
+button.mpz-cell.is-ok { border-style: solid; border-color: #059669; background: #d1fae5; color: #065f46; }
+button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: #fee2e2; color: #991b1b; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.mpz-old { font-size: 0.7em; font-weight: 600; opacity: 0.75; }
+.mpz-pad { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; max-width: 420px; width: 100%; justify-self: center; }
+.mpz-key { min-height: 48px; border-radius: 12px; border: 2px solid var(--border); background: #fff; font-family: inherit; font-weight: 800; font-size: 1.15rem; color: var(--text); cursor: pointer; }
+.mpz-key.is-back { background: #f3f4f6; }
+.mpz-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.mpz-tools .btn { flex: 1 1 auto; }
+.mpz-cards-wrap { display: grid; gap: 10px; justify-items: center; }
+.mpz-cards { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.mpz-card-btn { width: 52px; height: 66px; border-radius: 10px; border: 2px solid #6366f1; background: #eef2ff; font-family: inherit; font-weight: 800; font-size: 1.5rem; color: #3730a3; cursor: pointer; }
+.mpz-card-btn:disabled { opacity: 0.3; cursor: default; }
+.mpz-slots { display: flex; gap: 6px; justify-content: center; }
+.mpz-slot-d { width: 46px; height: 58px; border-radius: 10px; border: 2px dashed var(--border); display: grid; place-items: center; font-family: inherit; font-weight: 800; font-size: 1.5rem; }
+.mpz-slots.is-ok .mpz-slot-d { border-style: solid; border-color: #059669; background: #d1fae5; }
+.mpz-slots.is-no .mpz-slot-d { border-style: solid; border-color: #dc2626; background: #fee2e2; }
+.mpz-right { font-weight: 800; color: #065f46; }
+.mpz-fb { min-height: 1.4em; font-weight: 800; }
+.mpz-fb.is-ok { color: #059669; }
+.mpz-fb.is-no { color: #dc2626; }
+.mpz-why { color: var(--muted, #555); }
+.mpz-up { font-weight: 800; color: #4338ca; }
+.mpz-done { display: grid; gap: 8px; justify-items: center; text-align: center; }
+.mpz-done-icon { font-size: 2.6rem; margin: 0; }
+.mpz-done-title { font-size: 1.3rem; font-weight: 800; margin: 0; }
+.mpz-done-line { margin: 0; }
+.mpz-done .mpz-tools { width: 100%; }
+.mpz-cell:focus-visible, .mpz-key:focus-visible, .mpz-card-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+@media (max-width: 420px) { .mpz-cell { min-width: 44px; height: 46px; font-size: 1.1rem; } .mpz-board.is-pyramid .mpz-cell { min-width: 50px; } }
 .math-chal-btn.is-done { background: #e9f7ee; border-color: #6fbf8b; color: #17603a; }
 .math-chal-note { margin: 2px 0 6px; }
 
