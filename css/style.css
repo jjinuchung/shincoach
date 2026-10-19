@@ -2596,6 +2596,49 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .mpz-done .mpz-tools { width: 100%; }
 .mpz-cell:focus-visible, .mpz-key:focus-visible, .mpz-card-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 @media (max-width: 420px) { .mpz-cell { min-width: 44px; height: 46px; font-size: 1.1rem; } .mpz-board.is-pyramid .mpz-cell { min-width: 50px; } }
+/* 🕵️ 나옹의 숙제 봐 주기 (v299) — 줄 친 공책 위 나옹의 풀이 · 처음 틀린 줄은 빨간 줄 · 고친 줄은 빨간 펜 */
+.dtv-slot { display: grid; gap: 4px; margin-top: 8px; }
+.dtv-btn { background: #fff1f2; border: 2px solid #fb7185; color: #9f1239; font-weight: 800; }
+.dtv-btn.is-done { background: #fdf2f8; border-color: #f9a8d4; color: #9d174d; }
+.dtv-card { display: grid; gap: 12px; }
+.dtv-top { display: flex; justify-content: flex-start; min-height: 0; }
+.dtv-who { display: flex; align-items: center; gap: 10px; }
+.dtv-face { flex: none; width: 56px; height: 56px; display: grid; place-items: center; }
+.dtv-meowth { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
+.dtv-meowth-alt { font-size: 2.2rem; line-height: 1; }
+.dtv-bubble { margin: 0; background: #eef2ff; border-radius: 14px; padding: 8px 12px; font-weight: 700; color: #3730a3; min-width: 0; }
+.dtv-q { margin: 0; font-weight: 700; }
+.dtv-q-lab { color: var(--muted); font-weight: 800; }
+.dtv-note { position: relative; display: grid; border: 1px solid #d6dcea; border-radius: 12px; padding: 6px 10px 6px 42px; background-color: #fff; background-image: repeating-linear-gradient(#fff 0 47px, #dbe4f5 47px 48px); }
+.dtv-note::before { content: ""; position: absolute; top: 0; bottom: 0; left: 32px; width: 2px; background: #f2b8b5; }
+.dtv-ln { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 48px; padding: 4px 8px; margin: 0; border: 0; border-radius: 8px; background: transparent; color: var(--text); font-family: inherit; font-size: 1.12rem; font-weight: 700; line-height: 1.4; text-align: left; font-variant-numeric: tabular-nums; cursor: pointer; }
+.dtv-ln:hover:not(:disabled) { background: #eef2ff; }
+.dtv-ln:disabled { cursor: default; }
+.dtv-no { position: absolute; left: -34px; width: 26px; text-align: center; font-size: 0.85rem; color: var(--muted); }
+.dtv-ln.is-okline { background: #dff4ea; }
+.dtv-ln.is-tapped { background: #f3f4f6; }
+.dtv-ln.is-wrong .dtv-t, .dtv-ln.is-follow .dtv-t { text-decoration: line-through; text-decoration-color: #c62828; text-decoration-thickness: 2px; color: var(--muted); }
+.dtv-fix { color: #c62828; font-weight: 800; }
+.dtv-fb { margin: 0; min-height: 1.4em; font-weight: 700; color: var(--muted); }
+.dtv-fb.is-ok { color: #13795b; }
+.dtv-fb.is-no { color: #c62828; }
+.dtv-opts { display: grid; gap: 8px; }
+.dtv-opt { min-height: 48px; padding: 8px 12px; border: 2px solid var(--border); border-radius: 12px; background: #fff; color: var(--text); font-family: inherit; font-size: 1.05rem; font-weight: 700; line-height: 1.4; text-align: left; font-variant-numeric: tabular-nums; cursor: pointer; }
+.dtv-opt.is-no { border-color: #dc2626; background: #fee2e2; color: #991b1b; }
+.dtv-opt.is-ok { border-color: #059669; background: #d1fae5; color: #065f46; }
+.dtv-opt:disabled { cursor: default; }
+.dtv-wrapup { display: grid; gap: 8px; border-top: 2px dashed var(--border); padding-top: 10px; }
+.dtv-say { margin: 0; color: #c62828; font-weight: 700; }
+.dtv-rule { margin: 0; background: #eef2ff; border-radius: 10px; padding: 8px 10px; font-weight: 700; color: #3730a3; }
+.dtv-actions { display: grid; gap: 6px; }
+.dtv-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.dtv-tools .btn { flex: 1 1 auto; }
+.dtv-done { display: grid; gap: 8px; justify-items: center; text-align: center; }
+.dtv-done-title { font-size: 1.3rem; font-weight: 800; margin: 0; }
+.dtv-done-line { margin: 0; }
+.dtv-done .dtv-tools { width: 100%; }
+.dtv-ln:focus-visible, .dtv-opt:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+@media (max-width: 420px) { .dtv-ln { font-size: 1.02rem; } .dtv-note { padding-left: 38px; } .dtv-note::before { left: 28px; } .dtv-no { left: -32px; } }
 .math-chal-btn.is-done { background: #e9f7ee; border-color: #6fbf8b; color: #17603a; }
 .math-chal-note { margin: 2px 0 6px; }
 

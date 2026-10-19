@@ -106,6 +106,18 @@ try {
   const puzzles = JSON.parse(readFileSync('coach/korean/puzzles.json', 'utf8'));
   for (const msg of checkPuzzles(puzzles, cards)) { bad++; console.error(`내용 오류: coach/korean/puzzles.json: ${msg}`); }
 } catch (e) { bad++; console.error(`JSON 오류: coach/korean/puzzles.json: ${e.message}`); }
+// 🕵️ 나옹의 숙제(coach/math/detective.json, v299) — 틀린 줄 앞은 그대로·보기 셋·흔한 실수 번호가 칸 원고에 있는지 배포 전에
+//   깨진 문제는 앱이 조용히 빼므로(detective.validItems) 여기서 막는다 · 정답을 따로 다시 푸는 검사는 tests/detective299
+try {
+  const { checkDetective } = await import('../js/detective.js');
+  const cells = {};
+  for (const f of readdirSync('coach/math').filter((x) => x.endsWith('.json') && x !== 'detective.json')) {
+    const d = JSON.parse(readFileSync(`coach/math/${f}`, 'utf8'));
+    for (const [k, v] of Object.entries(d)) if (v && v.dad) cells[k] = { rule: v.rule, traps: v.dad.traps };
+  }
+  const data = JSON.parse(readFileSync('coach/math/detective.json', 'utf8'));
+  for (const msg of checkDetective(data, cells)) { bad++; console.error(`내용 오류: coach/math/detective.json: ${msg}`); }
+} catch (e) { bad++; console.error(`JSON 오류: coach/math/detective.json: ${e.message}`); }
 // 📦 아빠의 구호품(coach/gifts.json) — [{ id, items: { 아이템id: 1~10 }, title?, text? }], 틀린 줄은 앱이 조용히 건너뛰므로 여기서 잡는다
 try {
   const { parcelOf } = await import('../js/items.js');

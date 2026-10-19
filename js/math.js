@@ -26,6 +26,7 @@ import { KINDS as SP_KINDS, KIND_IDS as SP_KIND_IDS, BADGE_NEED, kindOf as spKin
 import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, applyChalAnswer, applyReviewFirsts, chalReward, setNote as chalNote, solvedCount, setCleared, notesFor, missed as chalMissed, solved as chalSolved, shuffleChoices } from './mathchal.js';
 import { figureEl, inputEl } from './chalview.js';
 import { puzzleButton, puzzleActive, resumePuzzle, endPuzzle } from './mathpuzzleview.js'; // 🧩 수학 퍼즐 (v296 — 화면은 따로, ctx로 잇는다)
+import { detectButton, detectActive, resumeDetect, endDetect } from './detectiveview.js'; // 🕵️ 나옹의 숙제 봐 주기 (v299 — 화면은 따로, ctx로 잇는다)
 // 📖 풀이 돌아보기 — 틀린 문제의 풀이를 한 줄씩 · 🔍 내 답은 왜 틀렸을까 (v248)
 import { splitLines, conceptQuiz, chalQuiz } from './lookback.js';
 import { lineReveal, reviewQuizEl } from './lookview.js';
@@ -531,6 +532,7 @@ export async function renderMath() {
   // 🎯 도전 문제를 풀다 🎒·📊를 다녀온 것이면 — 풀던 문제로 (사다리로 떨어지면 이어 풀 길이 없고 ⏳ 예외도 켜진 채였다, Codex 20차 #1)
   if (ui.chal) { ui.run++; resumeChal(); return; }
   if (puzzleActive()) { ui.run++; resumePuzzle(puzzleCtx()); return; } // 🧩 수학 퍼즐을 풀다 🎒·📊를 다녀왔으면 그 퍼즐로 (v296)
+  if (detectActive()) { ui.run++; resumeDetect(detectCtx()); return; } // 🕵️ 나옹의 숙제를 보다 🎒·📊를 다녀왔으면 그 숙제로 (v299)
   const r = ui.round;
   // 저장 중에 🎒를 다녀온 것이면 — 기다린다. 사다리 로딩으로 내려가면 run이 바뀌어 저장을 끝낸 finishRound가 결과·☀️ 다음 단계를
   // 못 그리고, renderLadder가 ui.daily를 지운다 (Codex 3차 #2). run은 그대로 두어 finishRound가 이어서 그린다
@@ -598,6 +600,7 @@ function renderStemPicker(state) {
   card.appendChild(list);
   addChalButtons(card);   // 🎯 줄기를 아직 안 골랐어도 문제집 숙제는 할 수 있어야 한다
   card.appendChild(puzzleButton(puzzleCtx())); // 🧩 수학 퍼즐도 줄기와 상관없이 (v296)
+  card.appendChild(detectButton(detectCtx())); // 🕵️ 나옹의 숙제도 줄기와 상관없이 (v299)
   m.appendChild(card);
 }
 
@@ -631,6 +634,15 @@ function startDiag() {
 function puzzleCtx() {
   return { clearMain, back: () => renderLadder(ui.state), getState: () => ui.state, setState: (s) => { ui.state = s; }, updateChip };
 }
+/** 🕵️ 나옹의 숙제 화면에 건네는 것 (v299) — 글은 richNode로(세로 분수·숫자 뒤 조사) · 칸 이름 · 칸 원고(규칙·흔한 실수)는 받아 둔 줄기 내용에서 */
+function detectCtx() {
+  return { ...puzzleCtx(), rich: richNode, label: (id) => { const s = stemOf(id); return s ? `${s.code}. ${nameOf(id)}` : id; }, cells: detectCells };
+}
+function detectCells() {
+  const out = {};
+  for (const key of STEM_ORDER) for (const [k, v] of Object.entries(ui.contents[key] || {})) if (v && v.dad) out[k] = { rule: v.rule, traps: v.dad.traps };
+  return out;
+}
 
 // ── 사다리
 
@@ -639,6 +651,7 @@ function renderLadder(state) {
   ui.daily = null; // 사다리로 나오면 ☀️ 흐름은 끝
   if (ui.chal) endChal(); // 🎯 도전 문제도 — 사다리로 나오는 길은 전부 여기를 지난다 (⏳ 예외 끄기)
   endPuzzle(); // 🧩 수학 퍼즐 판도 (v296)
+  endDetect(); // 🕵️ 나옹의 숙제 판도 (v299 — 처음 답은 이미 저장했다)
   ui.battlePending = null; // 걸어 둔 배틀도 버린다 — 편 밖에서 갑자기 열리면 아이가 당황한다 (Codex 9차 #1)
   showHatchIfAny(); // 🐣 다른 화면(영어)에서 부화했는데 아직 못 본 것
   const today = todayKey();
@@ -707,6 +720,7 @@ function renderLadder(state) {
     if (egg) { const pg = eggProgress(egg); head.appendChild(el('p', 'math-note math-egg', `🥚 수학 알 ${pg.done}/${pg.need}일 — ☀️ 완주한 날마다 하루씩 (${pg.need - pg.done}일 더)`)); }
   }
   head.appendChild(puzzleButton(puzzleCtx())); // 🧩 오늘의 수학 퍼즐 — ☀️ 오늘의 수학 아래 (v296)
+  head.appendChild(detectButton(detectCtx())); // 🕵️ 나옹의 숙제 봐 주기 — 🧩 아래 (v299)
   // ❓ 아빠 답을 기다리는 질문 · 😄 이해했는데 아직 안 풀어 본 문제
   const waiting = openAsks(state).length;
   const tryable = ((state && state.asks) || []).filter((x) => x && x.status === 'understood');
@@ -3181,7 +3195,7 @@ export function initMath({ showView }) {
   ui.showView = showView;
   const back = $('btn-math-back');
   // 🎯 도전 문제도 여기서 끝낸다 — 안 끄면 ⏳ 예외가 켜진 채 남아 수학 시간이 안 세어졌다 (Codex 20차 #1)
-  if (back) back.addEventListener('click', () => { quitLive(); ui.round = null; ui.daily = null; endChal(); endPuzzle(); ui.run++; showView('home'); }); // 🧩 퍼즐 판도 버린다(낸 답은 저장됐다, v296)
+  if (back) back.addEventListener('click', () => { quitLive(); ui.round = null; ui.daily = null; endDetect(); endChal(); endPuzzle(); ui.run++; showView('home'); }); // 🧩 퍼즐 판도 버린다(낸 답은 저장됐다, v296)
 }
 
 /** 홈에서 진우가 본 영상 세계를 미리 알고 싶을 때 (표시용) */
