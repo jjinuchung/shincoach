@@ -145,7 +145,7 @@ test('🧩 오늘의 판: 이야기 흐름은 그 글에 ★이 있어야 열림
   for (const p of LIST.filter((x) => x.kind === 'sort')) allSortsDone[p.id] = { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 };
   assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'exp', 'agree', 'order'], '사실·의견을 다 풀면 가르기 칸은 겪은 일·생각(v295)');
   assert.ok(isSolved({ box: 1 }) && !isSolved({ box: 0 }) && !isSolved(null));
-  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 23, 4, 0, 1], ['sort', 14, 14, 1, 0], ['intext', 12, 0, 0, 0], ['agree', 10, 10, 0, 0], ['exp', 10, 10, 0, 0]]); // v265 차례 둘 · v291 하나 더함 · v294 🔗 열 · v295 ⚖️ 겪은 일·생각 열
+  assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 23, 4, 0, 1], ['sort', 14, 14, 1, 0], ['intext', 12, 0, 0, 0], ['agree', 10, 10, 0, 0], ['exp', 10, 10, 0, 0], ['time', 10, 10, 0, 0]]); // v265 차례 둘 · v291 하나 더함 · v294 🔗 열 · v295 ⚖️ 겪은 일·생각 열 · v297 ⏰ 일어난 차례 열
 });
 
 test('🧩 보상 규칙: 그날 첫 판만 💰·🎯 · 3개 모두 한 번에 → 🟩 · 같은 날 둘째 판은 보상 없음(⭐는 모임) · 틀리면 다음 날 · ⭐는 되돌리지 않음 · 낡은 판은 연습 · 모르는 퍼즐은 안 셈 · 빈 판은 empty', () => {
@@ -275,7 +275,7 @@ test('🧩 화면 연결: 퍼즐 판은 처음 낸 것만 · 시작할 때 상�
   const fin = pv.slice(pv.indexOf('async function finishSession(ctx) {'), pv.indexOf('function finishEl(ctx) {'));
   const between = fin.slice(fin.indexOf('res = await korPuzzleFinish('), fin.indexOf('const egg = await ctx.tickKorDay();'));
   assert.ok(between.length > 0 && !/\breturn\b/.test(between), '🥚 칸은 화면이 바뀌어도');
-  assert.ok(pv.includes("deal: p.kind === 'order' ? shuffledOrder(p.chunks.length) : p.kind === 'agree' ? dealChoices(p) : null"), '조각은 섞어서(바른 차례 아님) · 🔗 끝 보기도 섞어서(v294)');
+  assert.ok(pv.includes("deal: p.kind === 'order' ? shuffledOrder(p.chunks.length) : p.kind === 'time' ? p.told.slice() : p.kind === 'agree' ? dealChoices(p) : null"), '조각은 섞어서(바른 차례 아님) · ⏰ 일어난 차례는 글 차례 그대로(v297) · 🔗 끝 보기도 섞어서(v294)');
   const sw = read('sw.js');
   for (const f of ['./js/korpuzzle.js', './js/korpuzzleview.js', './coach/korean/puzzles.json']) assert.ok(sw.includes(`'${f}',`), f);
   assert.match(read('tools/check.mjs'), /checkPuzzles\(puzzles, cards\)/);

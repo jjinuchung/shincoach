@@ -7,6 +7,8 @@
 //    다시 그려도 글 상자의 읽던 자리는 그대로 · 어느 문장의 줄을 고르는지 읽어 준다 · 확인 뒤 [글에서 보기] (Codex 70차)
 //  · 🔗 앞뒤 어울리기(v294): 문장마다 끝 보기를 섞어 놓고(판을 시작할 때 한 번) · 고르면 문장이 이어져 보인다 · 확인 뒤 바른 문장과 짝·까닭
 //  · ⚖️ 겪은 일·생각 가르기(v295): 사실·의견 가르기 화면(sortEl)을 같이 쓴다 — 단추만 [겪은 일] [생각·느낌]
+//  · ⏰ 일어난 차례(v297): 차례 맞추기 화면(orderEl)을 같이 쓴다 — 위에 글(쓰인 차례 그대로 · 때 말 굵게) · 카드는 글 차례로 놓여 시작 ·
+//    확인 뒤 조각마다 "글에서 몇째 문장"
 import { ASKS, FO, EF, IO, KINDS, KIND_LIST, AGREE_TYPES, allPuzzles, planPuzzles, puzzleStats, shuffledOrder, dealChoices, gradeOrder, gradeSort, gradeIntext, gradeAgree, intextWhy, isOpen, isSolved, puzzleFinishText, puzzleTodayLine } from './korpuzzle.js';
 import { wordsToday } from './korwords.js';
 import { korPuzzleFinish, korPuzzleMap, korPuzzleDayMap, korDoneMap } from './xp.js';
@@ -73,7 +75,7 @@ export async function renderPuzzleTab(box, ctx) {
   const plan = planPuzzles(list, states, done, now);
   const head = el('section', 'kor-head');
   head.appendChild(el('h2', 'kor-h', '🧩 오늘의 퍼즐'));
-  head.appendChild(el('p', 'kor-intro', '이야기의 흐름과 하는 차례를 맞추고, 글에 있는 내용인지 확인하고, 사실과 의견·겪은 일과 생각을 가리고, 문장의 앞뒤가 어울리게 끝을 골라요. 다 맞힌 퍼즐은 ⭐, 틀린 퍼즐은 다음 날 다시 나와요.'));
+  head.appendChild(el('p', 'kor-intro', '이야기의 흐름과 하는 차례·일이 실제로 일어난 차례를 맞추고, 글에 있는 내용인지 확인하고, 사실과 의견·겪은 일과 생각을 가리고, 문장의 앞뒤가 어울리게 끝을 골라요. 다 맞힌 퍼즐은 ⭐, 틀린 퍼즐은 다음 날 다시 나와요.'));
   head.appendChild(el('p', 'kor-count', puzzleTodayLine(wordsToday(korPuzzleDayMap(), now))));
   if (plan.length) {
     const cnt = (kind) => plan.filter((p) => p.kind === kind).length;
@@ -82,7 +84,8 @@ export async function renderPuzzleTab(box, ctx) {
     const s = cnt('sort');
     const a = cnt('agree');
     const e = cnt('exp');
-    const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', `🧩 오늘의 퍼즐 시작 (${[o ? `차례 ${o}` : '', t ? `글에 있나요 ${t}` : '', s ? `사실·의견 ${s}` : '', e ? `겪은 일·생각 ${e}` : '', a ? `앞뒤 어울리기 ${a}` : ''].filter(Boolean).join(' · ')})`);
+    const tm = cnt('time');
+    const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', `🧩 오늘의 퍼즐 시작 (${[o ? `차례 ${o}` : '', tm ? `일어난 차례 ${tm}` : '', t ? `글에 있나요 ${t}` : '', s ? `사실·의견 ${s}` : '', e ? `겪은 일·생각 ${e}` : '', a ? `앞뒤 어울리기 ${a}` : ''].filter(Boolean).join(' · ')})`);
     b.type = 'button';
     b.addEventListener('click', () => guardStart('korean', () => startSession(ctx, false)));
     head.appendChild(b);
@@ -129,7 +132,8 @@ function startSession(ctx, practice) {
   sfxUnlock();
   const states = korPuzzleMap();
   const plan = planPuzzles(S.list, states, korDoneMap(), Date.now(), practice);
-  const items = plan.map((x) => byId(x.id)).filter(Boolean).map((p) => ({ id: p.id, kind: p.kind, deal: p.kind === 'order' ? shuffledOrder(p.chunks.length) : p.kind === 'agree' ? dealChoices(p) : null }));
+  // ⏰ 일어난 차례는 섞지 않고 글에 쓰인 차례 그대로 놓는다(그 차례에서 일어난 차례를 찾는 퍼즐 — told는 원고 검사가 일어난 차례와 다르게 막음)
+  const items = plan.map((x) => byId(x.id)).filter(Boolean).map((p) => ({ id: p.id, kind: p.kind, deal: p.kind === 'order' ? shuffledOrder(p.chunks.length) : p.kind === 'time' ? p.told.slice() : p.kind === 'agree' ? dealChoices(p) : null }));
   if (!items.length) { ctx.rerender(); return; }
   // 판을 시작할 때 퍼즐마다 마지막으로 푼 때 — 저장할 때 그 사이 다른 판이 옮겼으면 연습으로 (🔤 낱말과 같다)
   const from = new Map(items.map((x) => [x.id, (states[x.id] && states[x.id].at) || 0]));
@@ -188,7 +192,7 @@ export function renderSession(ctx) {
   }
   const it = ps.items[ps.i];
   const p = byId(it.id);
-  const card = p && p.kind === 'order' ? orderEl(ctx, p, it) : p && p.kind === 'intext' ? intextEl(ctx, p) : p && p.kind === 'agree' ? agreeEl(ctx, p, it) : sortEl(ctx, p);
+  const card = p && (p.kind === 'order' || p.kind === 'time') ? orderEl(ctx, p, it) : p && p.kind === 'intext' ? intextEl(ctx, p) : p && p.kind === 'agree' ? agreeEl(ctx, p, it) : sortEl(ctx, p);
   wrap.appendChild(card);
   wrap.appendChild(live);
   main.appendChild(wrap);
@@ -282,15 +286,35 @@ function didWork(ps) {
   return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean) || ps.picks.some(Boolean) || ps.ends.some((c) => c !== undefined);
 }
 
-/** 🧩 차례 맞추기 한 장 — 놓은 칸 · 남은 조각 · 하나 빼기·처음부터 · 확인 → 바른 차례와 실마리 */
+/** ⏰ 글에서 몇째 문장 */
+const NTH = ['첫째', '둘째', '셋째', '넷째', '다섯째'];
+
+/** ⏰ 글 — 쓰인 차례 그대로 한 문단 · 때 말 굵게 (카드를 옮겨도 글은 그대로 보인다) */
+function toldEl(p) {
+  const box = el('div', 'kor-ptold');
+  box.appendChild(el('p', 'kor-ptold-h', `📄 ${p.form} — 글에 쓰인 차례`));
+  const t = el('p', 'kor-ptold-t');
+  p.told.forEach((k, i) => { if (i) t.appendChild(document.createTextNode(' ')); boldIn(t, p.chunks[k], p.keys[k]); });
+  box.appendChild(t);
+  return box;
+}
+
+/** 🧩 차례 맞추기 한 장 (⏰ 일어난 차례도 — v297) — 놓은 칸 · 남은 조각 · 하나 빼기·처음부터 · 확인 → 바른 차례와 실마리 ·
+ *  ⏰는 위에 글(쓰인 차례 · 때 말 굵게) · 조각에도 때 말 굵게 · 확인 뒤 조각마다 글에서 몇째 문장인지 */
 function orderEl(ctx, p, it) {
   const ps = S.ps;
   const g = ps.grade;
+  const time = p.kind === 'time';
+  const key = (k) => (time ? p.keys[k] : '');
   const box = el('div', 'kor-q kor-pq');
   const head = el('div', 'kor-q-head');
-  head.appendChild(el('span', 'kor-q-skill', `${KINDS.order.icon} ${ASKS[p.ask].ko} · ${p.card ? `${p.icon} 「${p.title}」` : p.title}`));
+  head.appendChild(el('span', 'kor-q-skill', time ? `${KINDS.time.icon} ${KINDS.time.ko} · ${p.icon} ${p.title}` : `${KINDS.order.icon} ${ASKS[p.ask].ko} · ${p.card ? `${p.icon} 「${p.title}」` : p.title}`));
   box.appendChild(head);
-  box.appendChild(el('p', 'kor-q-text', ASKS[p.ask].prompt));
+  box.appendChild(el('p', 'kor-q-text', time ? '글은 쓰인 차례예요. 일이 실제로 일어난 차례대로 놓아 보세요.' : ASKS[p.ask].prompt));
+  if (time) {
+    box.appendChild(el('p', 'kor-tnote', '굵은 때 말을 보고, 맨 먼저 일어난 일부터 ①에 놓아요.'));
+    box.appendChild(toldEl(p));
+  }
   const slots = el('ol', 'kor-pslots');
   p.chunks.forEach((_, k) => {
     const li = el('li', 'kor-pslot');
@@ -298,7 +322,7 @@ function orderEl(ctx, p, it) {
     li.appendChild(el('span', 'kor-pslot-no', circled(k + 1)));
     if (at === undefined) li.appendChild(el('span', 'kor-pslot-empty', '여기에 놓아요'));
     else {
-      li.appendChild(el('span', 'kor-pslot-t', p.chunks[at]));
+      li.appendChild(clueEl('span', 'kor-pslot-t', p.chunks[at], key(at)));
       if (g) { li.classList.add(at === k ? 'is-ok' : 'is-no'); li.appendChild(el('span', 'kor-pslot-mark', at === k ? '✓' : '✗')); }
     }
     slots.appendChild(li);
@@ -308,7 +332,8 @@ function orderEl(ctx, p, it) {
     const pool = el('div', 'kor-ppool');
     for (const k of it.deal) {
       if (ps.placed.includes(k)) continue;
-      const b = el('button', 'kor-pchunk', p.chunks[k]);
+      const b = el('button', 'kor-pchunk');
+      boldIn(b, p.chunks[k], key(k));
       b.type = 'button';
       b.setAttribute('aria-label', `${ps.placed.length + 1}번째에 놓기: ${p.chunks[k]}`);
       b.addEventListener('click', () => { if (S.ps !== ps || ps.grade) return; ps.placed.push(k); ps.quitAsk = false; ps.focus = ps.placed.length === p.chunks.length ? 'check' : 'pool'; renderSession(ctx); });
@@ -335,12 +360,18 @@ function orderEl(ctx, p, it) {
     box.appendChild(el('p', 'kor-fb'));
     return box;
   }
-  const fb = el('p', `kor-fb ${g.ok ? 'is-ok' : 'is-no'}`, g.ok ? '맞아요! 차례가 딱 맞아요' : `아쉬워요 — ${g.right} / ${g.n}칸이 맞았어요. 바른 차례를 보세요`);
+  const fb = el('p', `kor-fb ${g.ok ? 'is-ok' : 'is-no'}`, g.ok ? (time ? '맞아요! 일이 일어난 차례를 찾았어요' : '맞아요! 차례가 딱 맞아요') : `아쉬워요 — ${g.right} / ${g.n}칸이 맞았어요. 바른 차례를 보세요`);
   box.appendChild(fb);
   const note = el('div', 'kor-note kor-pnote');
-  note.appendChild(el('p', 'kor-pnote-h', '바른 차례와 실마리'));
+  note.appendChild(el('p', 'kor-pnote-h', time ? '일어난 차례와 실마리' : '바른 차례와 실마리'));
   const right = el('ol', 'kor-pright');
   p.chunks.forEach((t, k) => {
+    if (time) {
+      const li = clueEl('li', '', t, p.keys[k]);
+      li.appendChild(el('span', 'kor-porder-tag', `· 글에서 ${NTH[p.told.indexOf(k)] || ''} 문장`));
+      right.appendChild(li);
+      return;
+    }
     const r = p.need.find((x) => x[1] === k && t.includes(x[2])) || p.need.find((x) => x[0] === k && t.includes(x[2]));
     right.appendChild(clueEl('li', '', t, r ? r[2] : ''));
   });

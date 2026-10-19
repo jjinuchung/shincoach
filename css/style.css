@@ -3636,6 +3636,11 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .kor-pright { margin: 0; padding-left: 1.4em; display: grid; gap: 4px; line-height: 1.6; word-break: keep-all; }
 .kor-pclue { background: var(--kor-mark); border-radius: 4px; padding: 0 2px; }
 .kor-pwhy { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; font-size: 0.92rem; color: #4b5563; word-break: keep-all; }
+/* ⏰ 일어난 차례 (v297) — 글은 쓰인 차례 그대로(카드를 옮겨도) · 확인 뒤 조각마다 글에서 몇째 문장인지 */
+.kor-ptold { border: 2px solid var(--border); border-left: 6px solid #f59e0b; border-radius: 12px; padding: 10px 14px; background: var(--kor-paper); display: grid; gap: 4px; }
+.kor-ptold-h { margin: 0; font-size: 0.85rem; font-weight: 800; color: var(--muted); }
+.kor-ptold-t { margin: 0; font-size: 1.05rem; line-height: 1.75; word-break: keep-all; }
+.kor-porder-tag { margin-left: 6px; font-size: 0.82rem; color: var(--muted); white-space: nowrap; }
 .kor-psorts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .kor-psort { border: 2px solid var(--border); border-radius: 12px; padding: 10px 12px; display: grid; gap: 8px; background: #fff; }
 .kor-psort.is-ok { border-color: var(--ok); background: var(--kor-ok-bg); }

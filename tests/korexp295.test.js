@@ -90,7 +90,7 @@ test('⚖️ 채점 — 겪은 일·생각은 did·felt만 · 사실·의견은 
 test('⚖️ 한 판 — 판은 넷 그대로 · 가르기 칸을 사실·의견과 번갈아(오래 안 한 꼴부터 · 같으면 원고 차례) · 늘 열림 · 틀리면 다음 날 먼저 · 한쪽을 다 풀면 다른 쪽 · 연습은 ⭐ 둘 다', () => {
   assert.equal(PUZZLES_PER_DAY, 4);
   assert.deepEqual(KINDS.exp, { icon: '⚖️', ko: '겪은 일·생각 가르기' });
-  assert.equal(KIND_LIST[KIND_LIST.length - 1], 'exp');
+  assert.ok(KIND_LIST.includes('exp'), '꼴 목록에 ⚖️ 겪은 일·생각 (v297부터 ⏰ 일어난 차례가 그 뒤)');
   assert.deepEqual(PLAY_ORDER, ['order', 'intext', 'sort', 'agree'], '판의 칸은 그대로');
   assert.equal(SLOT_OF.exp, 'sort');
   for (const p of EXPS) assert.ok(isOpen(p, {}));
@@ -146,7 +146,7 @@ test('🔍 Codex 101차 — 가르기 칸 둘 다 틀린 것이 있으면 기한
   assert.equal(planPuzzles(LIST, due2, {}, T0).find((x) => x.kind === 'sort' || x.kind === 'exp').id, 'F1');
   const tie = { ...solvedAt(['F1'], 100), ...solvedAt(['E1'], 100) };
   assert.equal(planPuzzles(LIST, tie, {}, T0).find((x) => x.kind === 'sort' || x.kind === 'exp').id, 'F2', '같으면 원고 차례');
-  const others = solvedAt(LIST.filter((p) => p.kind === 'order' || p.kind === 'agree' || p.kind === 'intext').map((p) => p.id), 1);
+  const others = solvedAt(LIST.filter((p) => p.kind === 'order' || p.kind === 'agree' || p.kind === 'intext' || p.kind === 'time').map((p) => p.id), 1); // v297 ⏰도 차례 칸
   const plan = planPuzzles(LIST, others, {}, T0);
   assert.equal(plan.length, 4);
   assert.equal(new Set(plan.map((x) => x.id)).size, 4, '같은 퍼즐 두 번 없음');

@@ -30,6 +30,13 @@
 // ⚖️ 겪은 일·생각 가르기(exp, v295 — 2026-10-19 아버님 고름): 사실·의견 가르기와 같은 꼴(문장마다 두 단추) · 체험한 일을 쓴 문장 4~6을
 //   겪은 일(did — 한 일·본 일·들은 일) / 생각·느낌(felt — 느낀 마음·생각·바람·다짐)으로 · 5-1 「체험한 일을 써요」 [6국03-03] — 원고의 K20·K67·K87 물음과 같은 가르기 ·
 //   오늘의 판에서는 사실·의견과 한 칸(가르기)을 번갈아 쓴다 — 새 퍼즐은 오래 안 한 꼴부터(SLOT_OF · 판은 그대로 넷) · 늘 열린다
+//
+// ⏰ 일어난 차례(time, v297 — 2026-10-19 아버님 "1부터"): 잘못 읽기 '때 헷갈리기'(다른 때의 일을 끌어옴)를 따로 연습 — 🧩 차례 맞추기는
+//   글 차례와 일어난 차례가 늘 같다 · 한 묶음 = 짧은 글(일기·이야기·기사·편지) 4~5조각 · 조각은 원고에 **일어난 차례로** 적고(chunks),
+//   글에 쓰인 차례는 told(조각 번호 — 일어난 차례와 달라야) · 화면은 글을 쓰인 차례 그대로 보여 주고 카드도 그 차례로 놓는다 →
+//   일어난 차례로 다시 놓는다 · 조각마다 때 말(keys — 그 조각에 꼭 한 번, 굵게) · need는 차례 맞추기와 같고 실마리는 두 조각 가운데 하나의 때 말 ·
+//   한 조각엔 한 때만 — "~하기로 했다"·"~하려고 한다"처럼 정한 때와 할 때가 섞이는 꼴은 원고 검사가 막는다 ·
+//   오늘의 판에서는 차례 칸을 🧩 차례 맞추기와 번갈아 쓴다(SLOT_OF · 판은 그대로 넷) · 늘 열린다
 import { dayNum, throwsOf, pendingOf, KOR_STONE, circled } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
 
@@ -53,6 +60,13 @@ export const AGREE_MIN = 4;
 export const AGREE_MAX = 6;
 /** 어울리지 않는 끝은 1~2개 (보기는 2~3개) */
 export const AGREE_NO_MAX = 2;
+/** ⏰ 일어난 차례 — 한 묶음 4~5조각 · 글의 갈래 */
+export const TIME_MIN = 4;
+export const TIME_MAX = CHUNKS_MAX;
+export const TIME_FORMS = ['일기', '이야기', '기사', '편지'];
+/** ⏰ 조각에 넣지 않는 꼴 — 정한 때와 할 때가 섞임("~하기로 했다"·"~하려고 한다"·"~하기로/~하려고 마음먹었다·결심했다") · 물음 · 큰따옴표(옮긴 말은 말한 때와 그 일의 때가 갈린다) ·
+ *  목적을 말하는 "~려고 문을 닫았다"는 한 때라 막지 않는다 (Codex 103차) */
+export const TIME_BANNED = /기로 (?:했|하였|정했|약속|마음먹|결심)|려고 (?:한다|했|해요|합니다|하였|마음먹|결심)|\?|["“”]/;
 /** 🔗 짝의 갈래 — 확인 뒤 "짝" 줄 · 검수 페이지 */
 export const AGREE_TYPES = {
   neg: "'결코·전혀·별로·도무지'와 '~지 않다'",
@@ -77,13 +91,13 @@ export const FO = { fact: '사실', opinion: '의견' };
 /** ⚖️ 겪은 일·생각 가르기의 두 단추 (v295) */
 export const EF = { did: '겪은 일', felt: '생각·느낌' };
 export const IO = { in: '글에 있어요', out: '글에 없어요' };
-export const KINDS = { order: { icon: '🧩', ko: '차례 맞추기' }, sort: { icon: '⚖️', ko: '사실·의견 가르기' }, intext: { icon: '📍', ko: '글에 있나요?' }, agree: { icon: '🔗', ko: '앞뒤 어울리기' }, exp: { icon: '⚖️', ko: '겪은 일·생각 가르기' } };
+export const KINDS = { order: { icon: '🧩', ko: '차례 맞추기' }, sort: { icon: '⚖️', ko: '사실·의견 가르기' }, intext: { icon: '📍', ko: '글에 있나요?' }, agree: { icon: '🔗', ko: '앞뒤 어울리기' }, exp: { icon: '⚖️', ko: '겪은 일·생각 가르기' }, time: { icon: '⏰', ko: '일어난 차례' } };
 /** 🧩 탭·📤 요약에 늘어놓는 차례 (새 꼴은 끝에) */
-export const KIND_LIST = ['order', 'sort', 'intext', 'agree', 'exp'];
+export const KIND_LIST = ['order', 'sort', 'intext', 'agree', 'exp', 'time'];
 /** 한 판 안에서 내는 차례 — 같은 꼴이 붙지 않게 돌아가며 */
 export const PLAY_ORDER = ['order', 'intext', 'sort', 'agree'];
-/** 판의 한 칸을 나눠 쓰는 꼴 — 겪은 일·생각은 사실·의견 칸(가르기)에서 번갈아 (v295 · 없는 꼴은 제 이름이 칸) */
-export const SLOT_OF = { exp: 'sort' };
+/** 판의 한 칸을 나눠 쓰는 꼴 — 겪은 일·생각은 사실·의견 칸(가르기)에서 · 일어난 차례는 차례 맞추기 칸에서 번갈아 (v295 · v297 · 없는 꼴은 제 이름이 칸) */
+export const SLOT_OF = { exp: 'sort', time: 'order' };
 // ★ 사실·의견 라벨은 사람이 정한다 — 아래 두 정규식은 원고를 거르는 망일 뿐 판정기가 아니다(한국어는 활용형이 많아
 //   넓히면 사실 문장을 잡고 좁히면 놓친다 — Codex 55차: "최고 기온"을 잡고 "아름다운"·"만들어야 해요"·"~다고 말했다"·"~듯하다"를 놓쳤다)
 /** 생각 말 — 의견에는 하나 이상, 사실에는 없어야 한다 */
@@ -95,8 +109,8 @@ export const SORT_BANNED = /드디어|라고 |다고 한다|다고 했|다고 �
 export const FELT_WORDS = /재미|즐거|즐겁|신기했|신기한|신기하|신기해|신나|신이 나|뿌듯|기뻤|기쁘|기뻐|슬펐|슬프|무서|무섭|떨렸|떨리|설레|설렜|아쉬|좋았|좋다|좋아|고마|싶다|싶었|싶어|생각했|생각이 들|느꼈|놀랐|부끄|자랑스|행복|걱정|궁금|마음먹|야겠|속상|긴장|두근|기억에 남|것 같|것처럼|멋|감동|미안|섭섭|외로|답답|화가 났/;
 /** 겪은 일·생각 문장에 넣지 않는 꼴 — 옮긴 말(따옴표) · 물음 · 마음이 섞인 "드디어" */
 export const EXP_BANNED = /드디어|["'「『“‘]|\?/;
-const ID_RE = { order: /^O\d{1,3}$/, sort: /^F\d{1,3}$/, intext: /^I\d{1,3}$/, agree: /^H\d{1,3}$/, exp: /^E\d{1,3}$/ };
-const ID_HEAD = { order: 'O', sort: 'F', intext: 'I', agree: 'H', exp: 'E' };
+const ID_RE = { order: /^O\d{1,3}$/, sort: /^F\d{1,3}$/, intext: /^I\d{1,3}$/, agree: /^H\d{1,3}$/, exp: /^E\d{1,3}$/, time: /^T\d{1,3}$/ };
+const ID_HEAD = { order: 'O', sort: 'F', intext: 'I', agree: 'H', exp: 'E', time: 'T' };
 const LEN_MAX = 90;
 const WHY_MAX = 120;
 
@@ -131,7 +145,7 @@ export function checkPuzzles(data, cards) {
   list.forEach((p, i) => {
     const at = (m) => errs.push(`puzzles[${i}] ${p && p.id ? p.id : ''}: ${m}`);
     if (!isObj(p)) { at('퍼즐이 객체가 아니에요'); return; }
-    if (!own(KINDS, p.kind)) { at('kind는 order · sort · intext · agree · exp'); return; }
+    if (!own(KINDS, p.kind)) { at('kind는 order · sort · intext · agree · exp · time'); return; }
     if (typeof p.id !== 'string' || !ID_RE[p.kind].test(p.id)) at(`id는 ${ID_HEAD[p.kind]}숫자`);
     else if (ids.has(p.id)) at('id가 겹쳐요');
     else ids.add(p.id);
@@ -139,6 +153,7 @@ export function checkPuzzles(data, cards) {
     else if (p.kind === 'intext') checkIntext(p, at, cardMap);
     else if (p.kind === 'agree') checkAgree(p, at);
     else if (p.kind === 'exp') checkExp(p, at);
+    else if (p.kind === 'time') checkTime(p, at);
     else checkSort(p, at);
   });
   return errs;
@@ -220,19 +235,56 @@ function checkOrder(p, at, cardIds) {
   if (!Array.isArray(ch) || ch.length < CHUNKS_MIN || ch.length > CHUNKS_MAX || !ch.every(nonEmpty)) { at(`chunks는 ${CHUNKS_MIN}~${CHUNKS_MAX}개의 글`); return; }
   if (new Set(ch.map((t) => t.trim())).size !== ch.length) at('같은 조각이 있어요');
   ch.forEach((t, k) => { if ([...t].length > LEN_MAX) at(`조각 ${k + 1}은 ${LEN_MAX}자까지`); });
-  const need = p.need;
-  if (!Array.isArray(need) || !need.length) { at('need(앞뒤 실마리)가 비었어요'); return; }
+  checkNeed(ch, p.need, at);
+}
+/** need 검사 (차례 맞추기·일어난 차례) — [앞, 뒤, 실마리, 까닭] 꼴 · 실마리는 두 조각 가운데 하나에 · 모든 차례를 넣어 보아 원고 차례 하나뿐 · 꼴이 맞으면 true */
+function checkNeed(ch, need, at) {
+  if (!Array.isArray(need) || !need.length) { at('need(앞뒤 실마리)가 비었어요'); return false; }
   let shapeOk = true;
   need.forEach((r, k) => {
     const okShape = Array.isArray(r) && r.length === 4 && Number.isInteger(r[0]) && Number.isInteger(r[1]) && r[0] >= 0 && r[1] >= 0 && r[0] < ch.length && r[1] < ch.length && r[0] !== r[1] && nonEmpty(r[2]) && nonEmpty(r[3]);
     if (!okShape) { at(`need ${k + 1}은 [앞 번호, 뒤 번호, 실마리 말, 까닭]`); shapeOk = false; return; }
     if (!ch[r[0]].includes(r[2]) && !ch[r[1]].includes(r[2])) at(`need ${k + 1}의 실마리 "${r[2]}"가 두 조각에 없어요`);
   });
-  if (!shapeOk) return;
+  if (!shapeOk) return false;
   const vs = validOrders(ch.length, need);
   const ident = ch.map((_, i) => i).join(',');
   if (vs.length !== 1) at(`실마리에 맞는 차례가 ${vs.length}가지예요 — 하나뿐이어야 해요`);
   else if (vs[0].join(',') !== ident) at('실마리에 맞는 차례가 원고 차례와 달라요');
+  return true;
+}
+/** ⏰ 일어난 차례 검사 — 조각 4~5(일어난 차례) · told는 조각 번호를 한 번씩, 일어난 차례와 달라야 · 때 말은 조각마다 꼭 한 번 ·
+ *  실마리는 두 조각 가운데 하나의 때 말 · 한 조각엔 한 때만(정한 때와 할 때가 섞이는 꼴·물음·큰따옴표 없음) · 차례가 하나뿐인지는 need로 */
+function checkTime(p, at) {
+  if (!nonEmpty(p.title)) at('title이 비었어요');
+  else if (/[「」『』]/.test(p.title)) at('title에 낫표를 쓰지 않아요 — 화면이 감싸요');
+  if (!nonEmpty(p.icon)) at('icon이 비었어요');
+  if (!TIME_FORMS.includes(p.form)) at(`form은 ${TIME_FORMS.join(' · ')}`);
+  const ch = p.chunks;
+  if (!Array.isArray(ch) || ch.length < TIME_MIN || ch.length > TIME_MAX || !ch.every(nonEmpty)) { at(`chunks는 ${TIME_MIN}~${TIME_MAX}개의 글`); return; }
+  if (new Set(ch.map((t) => normText(t))).size !== ch.length) at('같은 조각이 있어요');
+  ch.forEach((t, k) => {
+    if ([...t].length > LEN_MAX) at(`조각 ${k + 1}은 ${LEN_MAX}자까지`);
+    if (t !== t.trim()) at(`조각 ${k + 1} 앞뒤에 빈칸이 있어요`);
+    if (TIME_BANNED.test(t)) at(`조각 ${k + 1}에 정한 때와 할 때가 섞이는 꼴("~하기로 했다"·"~하려고 한다")·물음·큰따옴표가 있어요 — 한 조각엔 한 때만`);
+  });
+  const told = p.told;
+  const n = ch.length;
+  const toldOk = Array.isArray(told) && told.length === n && told.every((x) => Number.isInteger(x) && x >= 0 && x < n) && new Set(told).size === n;
+  if (!toldOk) at(`told는 0~${n - 1}을 한 번씩 — 글에 쓰인 차례`);
+  else if (told.every((x, i) => x === i)) at('told가 일어난 차례와 같아요 — 글 차례와 일어난 차례가 다른 글이어야 해요');
+  const keys = p.keys;
+  if (!Array.isArray(keys) || keys.length !== n || !keys.every(nonEmpty)) { at(`keys는 조각마다 때 말 하나(${n}개)`); return; }
+  keys.forEach((w, k) => {
+    if (ch[k].split(w).length !== 2) at(`때 말 "${w}"가 조각 ${k + 1}에 꼭 한 번 있어야 해요`);
+    ch.forEach((t, j) => { if (j !== k && t.includes(w)) at(`조각 ${k + 1}의 때 말 "${w}"가 조각 ${j + 1}에도 있어요 — 굵은 말이 조각마다 하나이게`); });
+  });
+  if (new Set(keys).size !== n) at('때 말이 서로 같아요');
+  if (!checkNeed(ch, p.need, at)) return;
+  p.need.forEach((r, k) => {
+    if (r[2] !== keys[r[0]] && r[2] !== keys[r[1]]) at(`need ${k + 1}의 실마리 "${r[2]}"는 두 조각 가운데 하나의 때 말이어야 해요(굵게 보이는 말)`);
+    if ([...r[3]].length > WHY_MAX) at(`need ${k + 1}의 까닭은 ${WHY_MAX}자까지`);
+  });
 }
 /** 🔗 앞뒤 어울리기 검사 — 문장마다 앞부분(짝 말이 꼭 한 번) · 바른 끝 하나 · 어울리지 않는 끝 1~2(서로·바른 끝과 다르게) ·
  *  짝 조각(mate)은 바른 끝에만 · 끝에는 문장부호 없이(화면이 마침표를 붙인다) · 바른 끝이 하나뿐인지는 사람이 검수 페이지로 */
@@ -322,6 +374,7 @@ export function allPuzzles(data, cards) {
     else if (p.kind === 'intext') checkIntext(p, (m) => errs.push(m), Array.isArray(cards) ? byId : null);
     else if (p.kind === 'agree') checkAgree(p, (m) => errs.push(m));
     else if (p.kind === 'exp') checkExp(p, (m) => errs.push(m));
+    else if (p.kind === 'time') checkTime(p, (m) => errs.push(m));
     else checkSort(p, (m) => errs.push(m));
     if (errs.length) continue;
     seen.add(p.id);
@@ -339,6 +392,9 @@ export function allPuzzles(data, cards) {
       out.push({ id: p.id, kind: 'agree', title: p.topic, icon: p.icon, items: p.items.map((x) => ({ pre: x.pre, key: x.key, choices: [x.end, ...x.no], mate: x.mate || '', type: x.type, why: x.why })) });
     } else if (p.kind === 'exp') {
       out.push({ id: p.id, kind: 'exp', title: p.topic, icon: p.icon, sents: p.sents.map((s) => ({ t: s.t, ef: s.ef, why: s.why })) });
+    } else if (p.kind === 'time') {
+      // chunks는 일어난 차례(채점은 차례 맞추기와 같은 gradeOrder) · told = 글에 쓰인 차례(화면이 글과 처음 카드를 이 차례로)
+      out.push({ id: p.id, kind: 'time', title: p.title, icon: p.icon, form: p.form, chunks: p.chunks.slice(), told: p.told.slice(), keys: p.keys.slice(), need: p.need.map((r) => r.slice()) });
     } else {
       out.push({ id: p.id, kind: 'sort', title: p.topic, icon: p.icon, sents: p.sents.map((s) => ({ t: s.t, fo: s.fo, why: s.why })) });
     }
@@ -382,7 +438,7 @@ export function mergePuzzles(a, b) {
 /**
  * 🧩 오늘의 퍼즐 — [{ id, kind }] · 다시 볼 것(틀린 날 다음 날부터, 오래된 것부터) → 새 퍼즐(원고 차례) ·
  *   차례 ORDER_PER_DAY + 글에 있나요 INTEXT_PER_DAY + 가르기 SORT_PER_DAY + 앞뒤 어울리기 AGREE_PER_DAY, 한 칸이 모자라면 다른 칸으로 채운다 ·
- *   가르기 칸은 사실·의견과 겪은 일·생각이 나눠 쓴다(SLOT_OF) — 새 퍼즐은 마지막으로 푼 때가 오래된 꼴부터(같으면 원고 차례) → 번갈아 나온다 ·
+ *   가르기 칸은 사실·의견과 겪은 일·생각이, 차례 칸은 차례 맞추기와 일어난 차례가 나눠 쓴다(SLOT_OF) — 새 퍼즐은 마지막으로 푼 때가 오래된 꼴부터(같으면 원고 차례) → 번갈아 나온다 ·
  *   practice면 ⭐ 퍼즐을 연습으로(오래 안 본 것부터)
  */
 export function planPuzzles(list, states, korDone, now, practice = false) {
@@ -431,7 +487,7 @@ export function shuffledOrder(n, rng = Math.random) {
 }
 
 // 채점은 칸마다 번호로 직접 본다 — every·filter는 빈 칸(희소 배열)을 건너뛰어 [0, , 2, 3]도 다 채운 답이 됐다(Codex 55차)
-/** 🧩 낸 차례 채점 — picked = 놓은 조각 번호(원고 번호) 차례 · 빈 칸·겹침·모르는 번호가 있으면 valid false */
+/** 🧩 낸 차례 채점 (⏰ 일어난 차례도) — picked = 놓은 조각 번호(원고 번호) 차례 · 빈 칸·겹침·모르는 번호가 있으면 valid false */
 export function gradeOrder(p, picked) {
   const n = p && Array.isArray(p.chunks) ? p.chunks.length : 0;
   const arr = Array.isArray(picked) ? picked : [];
