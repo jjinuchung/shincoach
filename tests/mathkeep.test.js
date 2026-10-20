@@ -300,7 +300,7 @@ test('💪 화면 배선: 편을 열 때 keep · 처음 틀린 문제(쌍둥이�
   const fn = (name) => { const i = src.indexOf(`function ${name}(`); assert.ok(i >= 0, name); return src.slice(i, src.indexOf('\n}\n', i)); };
   assert.ok(src.includes('keepLine, reviewKeep, rivalWrong, stageIcon,'), 'import');
   const sr = fn('startRound');
-  assert.ok(sr.includes('const keep = rivalWrong(ui.state, id, ui.lastRid) ? null : reviewKeep(ui.state && ui.state.concepts && ui.state.concepts[id], day);') && sr.includes('rid: ui.lastRid, day, rep, keep };'));
+  assert.ok(sr.includes('const keep = rivalWrong(ui.state, id, ui.lastRid) ? null : reviewKeep(ui.state && ui.state.concepts && ui.state.concepts[id], day, isResting(ui.state, id));') && sr.includes('rid: ui.lastRid, day, rep, keep };')); // v301 🌱 쉬는 칸은 확인 편이 아니다
   assert.ok(sr.indexOf('ui.lastRid = Math.max(') < sr.indexOf('const keep = '), '새 편 번호를 정한 뒤에 다른 창 편을 본다');
   // 푸는 중 기록에 연 날 확인 표시 — 그만둠·다음 정리가 이 표시로 (Codex 73차 #1)
   assert.ok(src.includes("const liveOf = (r) => ({ rid: r.rid, id: r.id, mode: r.mode, d: r.day || todayKey(), n: r.qs.length, ...(r.keep ? { due: 1 } : {}), qs: conceptQs(r) });"));

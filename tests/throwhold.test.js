@@ -255,7 +255,9 @@ test('🎯 화면 연결: 📚 국어·🔢 수학 잡기가 장부를 쓴다 �
   assert.ok(body(m, 'function settleLostMathCatch() {').includes('return st.threw ? null : st.hold.refund(mathGiveBack);'));
   assert.ok(body(m, 'async function mathGiveBack() {').includes("return 'ok'; } catch { return 'fail'; }"));
   const rm = body(m, 'export async function renderMath() {');
-  assert.ok(rm.indexOf('await settleMathThrows()') >= 0 && rm.indexOf('await settleMathThrows()') < rm.indexOf('getMath()'), '사다리를 읽기 전에 돌려준다');
+  // ☀️ 이어하기도 getMath를 읽지만(섞어 풀기 학년 거르기 — v301) 사다리를 그리지 않으니, 사다리를 읽는 줄로 본다
+  const iLadder = rm.indexOf('let [state] = await Promise.all([getMath(), buildOpts()]);');
+  assert.ok(iLadder >= 0 && rm.indexOf('await settleMathThrows()') >= 0 && rm.indexOf('await settleMathThrows()') < iLadder, '사다리를 읽기 전에 돌려준다');
   assert.ok(!m.includes('settleOwedThrows'), '옛 정리는 새 정리 안으로');
   // sw
   assert.match(read('sw.js'), /'\.\/js\/throwhold\.js',/);

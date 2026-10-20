@@ -136,6 +136,67 @@ export function stemOf(id) {
 export function gradeLabel(g) {
   return g >= 7 ? `중${g - 6}` : `초${g}`;
 }
+let GRADES = null;
+/** 개념 id → 학년 (줄기 원고의 grade · 모르는 칸은 0) */
+export function gradeOf(id) {
+  if (!GRADES) {
+    GRADES = new Map();
+    for (const s of Object.values(STEMS)) for (const c of s.list) GRADES.set(c.id, Number(c.grade) || 0);
+  }
+  return GRADES.get(id) || 0;
+}
+
+// ── 🌱 학교 진도 먼저 · 선행 칸 쉬기 (v301, 2026-10-19 아버님 "니 추천대로 진행해보자") ──
+// ☀️가 줄기와 상관없이 가장 오래 밀린 복습부터 내면(v257), 빠르게 연 선행 칸(6학년·중1)의 복습이 밀렸을 때 ☀️가 늘 가장 어려운 칸부터 낸다.
+// 그래서 m.rest가 켜져 있으면:
+//   · ☀️ 오늘의 수학은 6학년·중1 칸을 내지 않는다(복습·새로 배우기·섞어 풀기·🤔 노트 모두) — 사다리에서 진우가 열 때만
+//   · ☀️ 복습은 4학년(SCHOOL_GRADE — 지금 학교에서 배우는 학년) 칸 먼저 → 통과가 실패보다 많은 칸 → 나머지 · 같은 무리 안에서는 오래 밀린 것부터
+//   · ☀️ 새로 배우기는 낮은 학년의 ▶ 칸 먼저(지금 줄기 · 진단한 줄기)
+//   · 켤 때 이미 일정이 잡혀 있던 6학년·중1 칸은 쉰다(isResting) — 복습 차례가 아니다: 사다리에 🔁가 안 뜨고, 열면 연습(칸 그대로), 🥚 잠금에도 안 센다.
+//     기록(box·dueAt·통과·실패)은 그대로라 끄면 그대로 돌아온다. 켠 뒤에 새로 배우거나 확인한 칸은 예전처럼(다음 날 확인 — 사다리에서)
+// 끄면 예전 그대로(☀️는 가장 오래 밀린 칸부터). 켜고 끄는 것은 📊(아버님) — m.rest { on, at 바꾼 시각 } · 없으면 꺼짐(수학을 처음 열 때 restInit이 켠다)
+/** 쉬는 학년 — 이 학년부터 (6학년 · 7 = 중1) */
+export const REST_GRADE = 6;
+/** ☀️ 복습에서 먼저 낼 학년 — 진우가 지금 다니는 학년 (학년이 바뀌면 고친다) */
+export const SCHOOL_GRADE = 4;
+const restVal = (r) => (r && typeof r === 'object' && typeof r.on === 'boolean' && Number.isSafeInteger(r.at) && r.at > 0 ? { on: r.on, at: r.at } : null);
+/** 학교 진도 먼저 설정 고쳐 읽기 (순수) — 없거나 꼴이 틀리면 꺼짐 */
+export function restOf(m) {
+  return restVal(m && m.rest) || { on: false, at: 0 };
+}
+/**
+ * 이 칸이 쉬는 중인가 (순수) — 켜져 있고 · REST_GRADE 이상 · 배운 칸이고 · 일정이 켜기 전에 잡혔다
+ * (일정 시각 schedAt만 — 일정이 바뀌는 곳은 늘 schedAt을 다니 없는 옛 기록은 켜기 전. lastAt은 연습·그만두기도 올려서
+ *  그걸로 보면 쉬는 칸을 한 번 풀기만 해도 쉼이 풀려 밀린 복습·🥚 잠금으로 돌아온다 — Codex 107차 #2)
+ */
+export function isResting(m, id, rec = m && m.concepts ? m.concepts[id] : null) {
+  const rs = restOf(m);
+  if (!rs.on || !rec || !rec.done || gradeOf(id) < REST_GRADE) return false;
+  return (Number(rec.schedAt) || 0) < rs.at;
+}
+/** 켜거나 끈다 (📊 아버님) — 바꾼 시각은 늘 앞으로(병합은 늦게 바꾼 쪽이 이긴다) */
+export function setRest(m, on, now = Date.now()) {
+  m.rest = { on: !!on, at: Math.max(Math.floor(Number(now) || 0), restOf(m).at + 1) };
+  return m.rest;
+}
+/** 처음 한 번 켠다 — 설정이 없거나 깨졌을 때만 (v301을 받고 수학을 처음 열 때 · 📊를 처음 열 때) · 바꿨으면 true */
+export function restInit(m, now = Date.now()) {
+  if (restVal(m && m.rest)) return false;
+  setRest(m, true, now);
+  return true;
+}
+/** ☀️에 낼 수 있는 칸인가 — 켜져 있으면 REST_GRADE 아래만 */
+export function dailyOk(m, id) {
+  return !restOf(m).on || gradeOf(id) < REST_GRADE;
+}
+/** 📊·📤 한 줄 — 켜짐/꺼짐 · 쉬는 칸 수 (아이 화면에는 안 쓴다) */
+export function restLine(m) {
+  const rs = restOf(m);
+  if (!restVal(m && m.rest)) return '🌱 학교 진도 먼저 — 아직 안 켬 (v301을 받고 수학을 열면 켜져요)';
+  if (!rs.on) return '🌱 학교 진도 먼저 꺼짐 — ☀️는 줄기와 상관없이 가장 오래 밀린 복습부터 (6학년·중1 칸도)';
+  const n = Object.keys((m && m.concepts) || {}).filter((id) => isResting(m, id)).length;
+  return `🌱 학교 진도 먼저 켜짐 — ☀️는 ${SCHOOL_GRADE}학년 칸 복습 → 통과가 실패보다 많은 칸 · 6학년·중1 칸은 ☀️에 안 냄 · 켤 때 이미 배운 6학년·중1 칸 ${n}개는 복습 쉼(사다리에서 열면 연습)`;
+}
 
 /** 보상 — 영어 쪽 규모에 맞춤 (문장 완료 +2, 퍼즐 정답 30, 복습 회차 30) */
 export const REWARD = {
@@ -213,23 +274,26 @@ export function ladderOf(m, today, stem = 'fraction') {
   const S = STEMS[stem] || STEMS.fraction;
   const concepts = (m && m.concepts) || {};
   const base = S.gen.ladder(done);
-  // 🥚가 LEARNING_MAX개면 새로 배울 칸(▶·○)을 잠근다 — 진단으로 친 칸(📏)은 세지 않는다
-  const full = base.filter((row) => stageOf(concepts[row.id]) === 'learning').length >= LEARNING_MAX;
+  // 🥚가 LEARNING_MAX개면 새로 배울 칸(▶·○)을 잠근다 — 진단으로 친 칸(📏)과 🌱 쉬는 칸(확인할 수 없다, v301)은 세지 않는다
+  const full = base.filter((row) => stageOf(concepts[row.id]) === 'learning' && !isResting(m, row.id, concepts[row.id])).length >= LEARNING_MAX;
   return base.map((row) => {
     const rec = concepts[row.id] || null;
     const box = rec ? (rec.box || 0) : 0;
     const state = full && (row.state === 'now' || row.state === 'open') ? 'wait' : row.state;
     const stage = stageOf(rec);
+    const crowned = !!rec && rec.done && box >= GRADUATED;
+    const rest = !crowned && isResting(m, row.id, rec); // 🌱 쉬는 칸 — 복습 차례가 아니다 (v301)
     return {
       ...row,
       state,
       stage,
       box,
       left: Math.max(0, GRADUATED - box), // 👑까지 남은 확인 횟수
-      crowned: !!rec && rec.done && box >= GRADUATED,
-      due: !!rec && rec.done && isDue(rec, today),
-      // 다음 확인까지 며칠 (오늘이면 0, 👑·못 배움은 null) — 사다리 칸이 "🔁 3일 뒤 확인하면 🔷"라고 말한다 (③)
-      dueIn: rec && rec.done && rec.dueAt && box < GRADUATED ? Math.max(0, daysBetween(today, rec.dueAt)) : null,
+      crowned,
+      due: !!rec && rec.done && !rest && isDue(rec, today),
+      // 다음 확인까지 며칠 (오늘이면 0, 👑·못 배움·🌱 쉬는 칸은 null) — 사다리 칸이 "🔁 3일 뒤 확인하면 🔷"라고 말한다 (③)
+      dueIn: rec && rec.done && rec.dueAt && box < GRADUATED && !rest ? Math.max(0, daysBetween(today, rec.dueAt)) : null,
+      ...(rest ? { rest: true } : {}),
       notes: rec && Array.isArray(rec.notes) ? rec.notes.length : 0, // 🤔 다시 볼 유형 수
       // 📏 진단으로 친 칸은 box 1로 시작해 🐣로 보였다 — 확인 전이라 📏로
       icon: stage === 'placed' ? '📏' : rec && rec.done ? STAGES[Math.min(box, STAGES.length - 1)] : (state === 'now' ? '▶' : state === 'open' ? '○' : '🔒'),
@@ -256,6 +320,7 @@ export function rungSub(r) {
   if (r.state === 'locked') return '앞 개념을 먼저 알아야 열려요';
   if (r.state === 'wait') return `🥚 배우는 중인 칸 ${LEARNING_MAX}개를 먼저 확인하면 열려요`;
   if (r.crowned) return '이해 완료!';
+  if (r.rest) return '🌱 잠깐 쉬는 칸 — 풀면 연습이에요 (틀려도 칸은 그대로)'; // v301 — 날짜·셈 없이
   const fresh = r.stage === 'learning' || r.stage === 'placed'; // 확인을 통과하면 🐣 "안다"가 되는 칸
   const st = stonesText(r);
   if (r.due) {
@@ -274,12 +339,13 @@ export function rungSub(r) {
  * 🍀는 오늘 LUCKY.max번을 다 받았으면 말하지 않는다.
  * @returns {string|null}
  */
-export function practiceNote(rec, today, luck, pay = 1) {
-  if (!rec || !rec.done || isDue(rec, today)) return null;
+export function practiceNote(rec, today, luck, pay = 1, rest = false) {
+  if (!rec || !rec.done || (isDue(rec, today) && !rest)) return null;
   const clover = luck && luck.d === today && (Number(luck.n) || 0) >= LUCKY.max ? '' : ' (🍀 가끔 몬스터볼)';
   // 🔁 같은 날 둘째 편부터는 문항 ⚡💰가 줄어든다(repeatPay, v250) — "⚡💰만"이라 해 놓고 안 주지 않게
   const get = pay >= 1 ? '⚡💰만' : pay > 0 ? '⚡💰 반만' : '⚡💰 없이';
   if ((rec.box || 0) >= GRADUATED) return `👑 이해 완료한 칸이라 연습이에요 — ${get}${clover}`;
+  if (rest) return `🌱 잠깐 쉬는 칸이라 연습이에요 — 틀려도 칸은 그대로 · ${get}${clover}`; // v301 — 확인 날을 말하지 않는다(쉬는 동안 안 온다)
   const n = rec.dueAt ? Math.max(1, daysBetween(today, rec.dueAt)) : 1;
   return `연습이에요 — ${get}${clover}. 🔷는 ${whenText(n)} 확인 날에`;
 }
@@ -325,7 +391,7 @@ export function repeatNote(m, id, day) {
   const k = sameDayRounds(m, id, day);
   const pay = repeatPay(k);
   const rec = m && m.concepts && m.concepts[id];
-  const practice = !!(rec && rec.done && !isDue(rec, day));
+  const practice = !!(rec && rec.done && (!isDue(rec, day) || isResting(m, id, rec))); // 🌱 쉬는 칸은 연습 (v301)
   const text = pay >= 1 ? null : practice
     ? `🔁 오늘 이 개념 ${k + 1}번째 편이라 문항 ⚡💰가 ${pay ? '반이에요' : '없어요'}`
     : `🔁 오늘 이 개념 ${k + 1}번째 편 — 다 맞혀 통과하면 ⚡💰를 다 받고, 아니면 문항 ⚡💰는 ${pay ? '반만 받아요' : '없어요'}`;
@@ -338,7 +404,7 @@ export function repeatNote(m, id, day) {
  */
 export function waitNote(rows) {
   if (!(rows || []).some((r) => r.state === 'wait')) return null;
-  const eggs = rows.filter((r) => r.stage === 'learning');
+  const eggs = rows.filter((r) => r.stage === 'learning' && !r.rest); // 🌱 쉬는 칸은 잠금에 안 센다 (v301 — ladderOf와 같게)
   // 몇 칸을 확인해야 열리나 — 🥚가 LEARNING_MAX보다 적어져야 한다. 확인에서 틀리면 🥚가 셋이 될 수 있어 "하나 확인하면"이 아니다.
   // "☀️에서"라고 하지 않는다 — ☀️는 한 칸만 확인하고, 🐣 칸이 먼저 뽑히기도 한다 (Codex 20차 #6)
   const need = Math.max(1, eggs.length - (LEARNING_MAX - 1));
@@ -502,8 +568,8 @@ export function stageIcon(rec) {
 }
 /** 오늘 확인 차례인 칸이면 그 그림, 아니면 null — 화면이 편을 열 때 적어 두고 💪 말을 보일지 정한다(편 이름 'review'는 "🤔 한 번 더"에도 붙는다).
  *  푸는 중 기록에도 due로 남아, 그만둘 때 "확인 편이었나"를 정리하는 날이 아니라 연 날로 본다 (Codex 73차 #1) */
-export function reviewKeep(rec, today) {
-  return rec && rec.done && isDue(rec, today) ? stageIcon(rec) : null;
+export function reviewKeep(rec, today, rest = false) {
+  return rec && rec.done && !rest && isDue(rec, today) ? stageIcon(rec) : null; // 🌱 쉬는 칸은 확인 편이 아니다 (v301)
 }
 /**
  * 💪 같은 칸을 다른 창이 확인 편으로 열어 이미 틀린 채 풀고 있나(푸는 중 기록 due + 틀린 문항) — 그러면 이 편은 확인이 아니라 연습이다.
@@ -640,7 +706,7 @@ export function applyQuit(m, live, today, o = {}) {
   m.concepts = m.concepts || {};
   const rec = m.concepts[live.id] || { done: false, box: 0, dueAt: '', passes: 0, fails: 0, lastAt: 0 };
   // 💪 확인 차례에 연 편에서 틀린 뒤 그만둠 = 못 통과 (연 날의 표시 + applyRound가 확인 편을 가르는 것과 같은 조건 — 저장소에서 읽은 rec로)
-  const failed = !o.evict && !!live.due && !!rec.done && isDue(rec, today) && qs.some((q) => !q.ok);
+  const failed = !o.evict && !!live.due && !!rec.done && isDue(rec, today) && !isResting(m, live.id, rec) && qs.some((q) => !q.ok); // 🌱 쉬는 칸은 못 통과로 안 친다 (v301)
   if (failed) {
     Object.assign(rec, schedule(rec.box || 0, false, today));
     rec.schedAt = Date.now();
@@ -672,7 +738,7 @@ export function applyQuit(m, live, today, o = {}) {
  * @param {string} id 개념
  * @param {{correct:number, total:number, missTags:string[], qs?:Array<{k:string, ok:0|1, tag?:string}>, mode?:string}} r
  *   qs: 문항별 결과(얼굴·정오·고른 오개념) — 개념별 누적(kinds·miss)과 일지(log)에 남는다
- * @returns {{passed:boolean, first:boolean, crowned:boolean, review:boolean, practice:boolean, kept:boolean}} kept: 💪 확인 편에서 칸을 지킴 (v262)
+ * @returns {{passed:boolean, first:boolean, crowned:boolean, review:boolean, practice:boolean, kept:boolean, rest?:true}} kept: 💪 확인 편에서 칸을 지킴 (v262) · rest: 🌱 쉬는 칸이라 연습 (v301)
  */
 export function applyRound(m, id, r, today) {
   m.concepts = m.concepts || {};
@@ -684,7 +750,9 @@ export function applyRound(m, id, r, today) {
   //   처음 배우기·연습은 고친 실수 하나까지 통과(진짜 시험은 다음 날 확인), 확인 차례는 v262 💪 칸 지키기 그대로(+ ☀️ 안이면 🎯, roundCatches)
   const slip = r.total > 0 && r.total - r.correct === 1 && keptReview(r.qs);
   const wasDone = !!rec.done;
-  const dueReview = wasDone && isDue(rec, today) && !rivalWrong(m, id, r.rid); // 💪 다른 창이 이 칸 확인 편에서 이미 틀렸으면 연습 (Codex 73차 #2)
+  // 💪 다른 창이 이 칸 확인 편에서 이미 틀렸으면 연습 (Codex 73차 #2) · 🌱 쉬는 칸도 연습 — 일정은 그대로 (v301)
+  const rest = wasDone && isResting(m, id, rec);
+  const dueReview = wasDone && isDue(rec, today) && !rest && !rivalWrong(m, id, r.rid);
   const passed = all || (slip && !dueReview);
   const wasCrowned = wasDone && (rec.box || 0) >= GRADUATED;
   const wasStage = stageOf(rec);
@@ -725,7 +793,8 @@ export function applyRound(m, id, r, today) {
   const crowned = rec.done && (rec.box || 0) >= GRADUATED && !wasCrowned;
   // 🐣 방금 "안다"가 됐나 — 🥚 배우는 중·📏 진단으로 친 칸이 다음 날 이후 확인을 통과한 순간 (결과 카드가 축하한다)
   const known = (wasStage === 'learning' || wasStage === 'placed') && stageOf(rec) === 'known';
-  return { passed, first: !wasDone && passed, crowned, review, practice, known, late, kept, slip: passed && !all };
+  // rest: 🌱 쉬는 칸이라 연습 — 결과 카드가 오지 않는 확인 날을 약속하지 않게 (Codex 107차 #1)
+  return { passed, first: !wasDone && passed, crowned, review, practice, known, late, kept, slip: passed && !all, ...(rest ? { rest: true } : {}) };
 }
 
 /** 이 편의 문항 ⚡💰 몫 (1 · 0.5 · 0) — 화면이 결과 카드에 까닭을 보여 줄 때도 */
@@ -898,6 +967,44 @@ export function oldestDue(m, today, prefer) {
   return best ? { ...best, late: Math.max(0, daysBetween(best.dueAt, today)) } : null;
 }
 
+/**
+ * 🌱 학교 진도 먼저일 때 ☀️가 고를 복습 (v301) — 6학년·중1 칸은 빼고(dailyOk) 무리 차례로:
+ *   0 SCHOOL_GRADE 이하 칸 → 1 통과가 실패보다 많은 칸 → 2 나머지 · 같은 무리 안에서는 dueAt이 이른 것(oldestDue와 같은 차례 — 지금 줄기 먼저, 그다음 STEM_ORDER·사다리)
+ * @returns {{id:string, stem:string, dueAt:string, late:number, tier:number}|null}
+ */
+export function schoolDue(m, today, prefer) {
+  const concepts = (m && m.concepts) || {};
+  const keys = [...(STEMS[prefer] ? [prefer] : []), ...STEM_ORDER.filter((k) => k !== prefer)];
+  let best = null;
+  for (const key of keys) {
+    for (const r of ladderOf(m, today, key)) {
+      if (!r.due || !dailyOk(m, r.id)) continue;
+      const rec = concepts[r.id] || {};
+      const tier = gradeOf(r.id) <= SCHOOL_GRADE ? 0 : (Number(rec.passes) || 0) > (Number(rec.fails) || 0) ? 1 : 2;
+      const dueAt = rec.dueAt || today;
+      if (!best || tier < best.tier || (tier === best.tier && dueAt < best.dueAt)) best = { id: r.id, stem: key, dueAt, tier };
+    }
+  }
+  return best ? { ...best, late: Math.max(0, daysBetween(best.dueAt, today)) } : null;
+}
+/**
+ * 🌱 학교 진도 먼저일 때 ☀️가 새로 배울 칸 (v301) — 지금 줄기와 진단한 줄기(m.placed)의 ▶ 칸 가운데 학년이 가장 낮은 것 · 같으면 지금 줄기 먼저, 그다음 STEM_ORDER
+ *   6학년·중1 칸은 빼고(dailyOk) · 🥚로 잠긴 줄기(▶가 없다)는 건너뛴다
+ * @returns {{id:string, stem:string}|null}
+ */
+export function schoolNow(m, today, prefer) {
+  const placed = (m && m.placed) || {};
+  const keys = [...(STEMS[prefer] ? [prefer] : []), ...STEM_ORDER.filter((k) => k !== prefer && placed[k])];
+  let best = null;
+  for (const key of keys) {
+    const r = ladderOf(m, today, key).find((x) => x.state === 'now');
+    if (!r || !dailyOk(m, r.id)) continue;
+    const g = gradeOf(r.id);
+    if (!best || g < best.g) best = { id: r.id, stem: key, g };
+  }
+  return best ? { id: best.id, stem: best.stem } : null;
+}
+
 /** ⏰ 오래 밀린 복습 보너스 — 복습 날짜가 days일 이상 지난 칸을 확인 차례에 통과하면 💰coin, 하루 max번 (🍀처럼 하루 횟수는 m.late = {d, n}) */
 export const LATE = { days: 7, coin: 5, max: 3 };
 
@@ -958,25 +1065,29 @@ export function bridgeOffers(m, today, stem) {
  *  2) 🎲 섞어 풀기 — 개념 편 줄기(roundStem)의 아는 개념(done) 중 **안 본 지 오래된**(lastAt) 것부터 MIX_CONCEPTS개, 각각 약한 얼굴 순서
  *     + 🤔 노트(어제 이전에 틀린 유형, 그 줄기, 개념 편의 개념은 제외 — 그 편에 이미 한 문제 끼어 든다) 하나. 순서는 섞는다.
  * 아는 개념이 없으면 mix는 비고 개념 편만 — 그것도 오늘의 수학이다. 화면은 roundStem으로 줄기를 옮겨 편을 연다.
+ * 🌱 학교 진도 먼저(m.rest 켜짐, v301)면 1)은 schoolDue → schoolNow, 그리고 1)·2) 모두 6학년·중1 칸을 뺀다(dailyOk)
  * @returns {{ roundId: string|null, roundMode: 'review'|'learn'|null, roundStem: string, late: number, mix: Array<{id:string, kinds:string[], note?:object}> }}
  */
 export function dailyPlan(m, today, stem = 'fraction', seed = 0) {
-  const pick = oldestDue(m, today, stem);
-  const roundStem = pick ? pick.stem : (STEMS[stem] ? stem : 'fraction');
+  const school = restOf(m).on;
+  const ok = (id) => !school || dailyOk(m, id);
+  const pick = school ? schoolDue(m, today, stem) : oldestDue(m, today, stem);
+  const fresh = !pick && school ? schoolNow(m, today, stem) : null;
+  const roundStem = pick ? pick.stem : fresh ? fresh.stem : (STEMS[stem] ? stem : 'fraction');
   const rows = ladderOf(m, today, roundStem);
-  const now = rows.find((x) => x.state === 'now');
+  const now = school ? (fresh ? rows.find((x) => x.id === fresh.id) : null) : rows.find((x) => x.state === 'now');
   const roundId = pick ? pick.id : now ? now.id : null;
   const roundMode = pick ? 'review' : now ? 'learn' : null;
   const r = fractionGen.rng(seed);
   const concepts = (m && m.concepts) || {};
-  const known = rows.filter((x) => x.state === 'done' && x.id !== roundId)
+  const known = rows.filter((x) => x.state === 'done' && x.id !== roundId && ok(x.id))
     .map((x, i) => ({ id: x.id, rec: concepts[x.id] || {}, i }))
     .sort((a, b) => ((a.rec.lastAt || 0) - (b.rec.lastAt || 0)) || (a.i - b.i))
     .slice(0, MIX_CONCEPTS)
     .map((x) => ({ id: x.id, kinds: weakKinds(x.rec, r) }));
   const stemKey = STEMS[roundStem].key;
   // 전부 받아서 줄기·개념 편 개념을 거른 뒤 가장 오래된 하나 — 개수 제한을 먼저 걸면 다른 줄기의 노트가 자리를 다 차지한다 (Codex 3차 #6)
-  const note = dueNotes(m, today, Infinity).find((x) => x.id !== roundId && (stemOf(x.id) || {}).key === stemKey) || null;
+  const note = dueNotes(m, today, Infinity).find((x) => x.id !== roundId && (stemOf(x.id) || {}).key === stemKey && ok(x.id)) || null;
   const mix = fractionGen.shuffle(r, [...known, ...(note ? [{ id: note.id, kinds: [note.note.k], note: note.note }] : [])]);
   // 🥚가 다 차서 새 칸이 잠겼다 — 화면이 "오늘 배운 건 내일 확인해요"라고 알린다
   const waiting = !roundId && rows.some((x) => x.state === 'wait');
@@ -1470,6 +1581,7 @@ export function mathReportText(m, today) {
   }
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
   lines.push('', ...guardLines(guardReport(m, today))); // 🛡️ 📊와 같은 줄 (v252)
+  lines.push(restLine(m)); // 🌱 학교 진도 먼저 (v301)
   lines.push('', puzzleReport(m && m.puzzle, today)); // 🧩 수학 퍼즐 단계·판 (v296)
   lines.push(detectReport(m && m.detect, today, nameOf)); // 🕵️ 나옹의 숙제 — 판·처음 답·처음에 놓친 칸 (v299)
   const log = shownLog((m && m.log) || []).slice(-30);

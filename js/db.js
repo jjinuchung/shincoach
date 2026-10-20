@@ -943,6 +943,7 @@ export function cloneMath(m) {
   if (m.chal) out.chal = { ...m.chal, ok: { ...(m.chal.ok || {}) }, tries: { ...(m.chal.tries || {}) }, done: { ...(m.chal.done || {}) }, ...(m.chal.rf ? { rf: { ...m.chal.rf } } : {}) };
   if (m.puzzle) out.puzzle = puzzleOf(m.puzzle); // 🧩 수학 퍼즐(v296) — 안쪽 맵까지 새 객체로
   if (m.detect) out.detect = detectOf(m.detect); // 🕵️ 나옹의 숙제(v299) — 안쪽 맵까지 새 객체로
+  if (m.rest && typeof m.rest === 'object') out.rest = { ...m.rest }; // 🌱 학교 진도 먼저(v301) — 새 객체로
   for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
   if (Array.isArray(m.asks)) out.asks = m.asks.map(cloneAsk); // ❓ 질문은 안쪽에 답장 배열이 있어 따로 복사
   return out;
@@ -1157,6 +1158,12 @@ export function mergeMath(cur, rec) {
   if ((rec && rec.puzzle) || out.puzzle) out.puzzle = mergePuzzle(out.puzzle, rec && rec.puzzle);
   // 🕵️ 나옹의 숙제(v299) — 받은 날은 날마다 큰 쪽 · 센 수는 큰 쪽 · 같은 날 처음 답은 틀린 쪽 · 본 날은 나중 (detective.mergeDetect)
   if ((rec && rec.detect) || out.detect) out.detect = mergeDetect(out.detect, rec && rec.detect);
+  // 🌱 학교 진도 먼저(v301) — 늦게 바꾼 쪽(아버님이 끄거나 켠 것이 옛 백업으로 되돌아가지 않게) · 같은 시각이면 켜진 쪽 · 꼴이 틀린 쪽은 없는 것으로(mathprog.restOf와 같은 검사)
+  const restVal = (r) => (r && typeof r === 'object' && typeof r.on === 'boolean' && Number.isSafeInteger(r.at) && r.at > 0 ? { on: r.on, at: r.at } : null);
+  const ra = restVal(out.rest);
+  const rb = restVal(rec && rec.rest);
+  if (ra || rb) out.rest = !ra ? rb : !rb ? ra : (rb.at > ra.at || (rb.at === ra.at && rb.on && !ra.on)) ? rb : ra;
+  else delete out.rest;
   // 📒 일지는 시각(t)으로 합집합 — 같은 편이 두 기기에 있으면 하나만, 최근 400편.
   // 편 번호(rid, v250)가 있으면 시각 + 번호로 — 두 기기에서 같은 밀리초에 끝낸 다른 편이 하나로 줄지 않게 (Codex 62차 #3)
   const lineKey = (e) => `${e.t}|${e.rid || ''}`;

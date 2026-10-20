@@ -16,6 +16,7 @@ import {
   keepLine, reviewKeep, rivalWrong, stageIcon,
   answerSecOf,
   slipLine, // 💪 처음 배우기·연습 편의 "고친 실수 하나까지 통과" 말 (v279)
+  isResting, restOf, restInit, dailyOk, // 🌱 학교 진도 먼저 · 선행 칸 쉬기 (v301)
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -552,7 +553,15 @@ export async function renderMath() {
     return;
   }
   // ☀️ 개념 편 결과 카드에서 🎒(🎯 잡은 걸 보러)를 다녀온 것이면 — 섞어 풀기가 남아 있으니 사다리 대신 거기로
-  if (ui.daily && ui.daily.step === 'round' && ui.daily.roundInfo && ui.daily.plan.mix.length) { ui.run++; startMixRound(); return; }
+  // 🌱 📊에서 학교 진도 먼저를 켜고 왔을 수 있어 최신 기록을 읽고 간다 — 섞어 풀기가 6학년·중1 칸을 거른다 (Codex 107차 #3)
+  if (ui.daily && ui.daily.step === 'round' && ui.daily.roundInfo && ui.daily.plan.mix.length) {
+    const run = ++ui.run;
+    const fresh = await getMath().catch(() => null);
+    if (run !== ui.run || !ui.daily || ui.daily.step !== 'round' || ui.round) return; // 그 사이에 다른 화면·섞어 풀기로 갔다
+    if (fresh) ui.state = fresh;
+    startMixRound();
+    return;
+  }
   const run = ++ui.run;
   const m = main();
   if (!m) return;
@@ -562,6 +571,7 @@ export async function renderMath() {
   let [state] = await Promise.all([getMath(), buildOpts()]);
   state = await syncMathReplies(state); // 📬 비공개 저장소의 아빠 답장이 있으면 붙인다
   state = await settleLive(state); // ⏹ 앱을 닫아 못 끝낸 개념 편 → 그만둠 (v250)
+  state = await ensureRest(state); // 🌱 학교 진도 먼저 — 설정이 없으면 한 번 켠다 (v301)
   if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다
   updateChip();
   ui.state = state;
@@ -570,6 +580,15 @@ export async function renderMath() {
   else if (needsPlacement(state, ui.stem)) renderDiagIntro();
   else renderLadder(state);
   resumeRocketIfAny(); // 🚀 끝나지 않은 로켓단 배틀
+}
+
+/**
+ * 🌱 학교 진도 먼저 (v301) — 설정이 없으면(v301을 받고 처음 연 날) 한 번 켠다. 그때까지 일정이 잡힌 6학년·중1 칸이 쉰다(mathprog.isResting).
+ * 저장이 안 되면 이번에는 예전 ☀️ 그대로 — 다음에 열 때 다시 (아버님이 📊에서 끈 뒤에는 설정이 있으니 다시 켜지 않는다)
+ */
+async function ensureRest(state) {
+  if (restOf(state).at > 0) return state;
+  try { return await updateMath((m) => { restInit(m, Date.now()); }); } catch { return state; }
 }
 
 // ── 🌳 줄기 고르기
@@ -832,7 +851,8 @@ function startRound(id, mode, o = {}) {
   const rep = repeatNote(ui.state, id, day);
   // 💪 오늘 확인 차례인 칸이면 그 그림(🐥 등) — 한 번 틀렸을 때 "비슷한 문제를 맞히면 🐥 그대로"를 보인다 (v262)
   //    다른 창이 이 칸 확인 편에서 이미 틀린 채 풀고 있으면 이 편은 연습이라 안 보인다 (Codex 73차 #2)
-  const keep = rivalWrong(ui.state, id, ui.lastRid) ? null : reviewKeep(ui.state && ui.state.concepts && ui.state.concepts[id], day);
+  //    🌱 쉬는 칸은 확인 편이 아니라 연습 (v301 — applyRound와 같은 판정)
+  const keep = rivalWrong(ui.state, id, ui.lastRid) ? null : reviewKeep(ui.state && ui.state.concepts && ui.state.concepts[id], day, isResting(ui.state, id));
   ui.round = { id, mode, qs, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed, page: 0, phase: o.again ? 'retry' : mode === 'learn' ? first : 'q', wrong: o.again ? (o.wrong || []) : [], rid: ui.lastRid, day, rep, keep };
   for (const k of Object.keys(ui.locks)) if (Number(k) !== ui.lastRid) releaseRoundLock(k); // 앞 편 잠금은 놓고
   holdRoundLock(ui.lastRid); // 🔒 이 편은 이 창이 푼다 — 다른 창이 그만둠으로 닫지 않게
@@ -1300,6 +1320,7 @@ function startMixRound() {
   const noteKeys = {};
   for (const x of d.plan.mix) if (x.note && x.note.key) (noteKeys[x.id] = noteKeys[x.id] || []).push(x.note.key);
   d.plan.mix.forEach((x, i) => {
+    if (!dailyOk(ui.state, x.id)) return; // 🌱 계획을 세운 뒤 📊에서 켰으면 6학년·중1 칸은 뺀다 (Codex 107차 #3)
     const sx = stemOf(x.id);
     if (!sx) return;
     const recent = ui.recent[x.id] || [];
@@ -1619,7 +1640,7 @@ function renderQuestion(restore = false) {
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
   // 🔁 확인 차례가 아닌 아는 칸 = 연습 — 첫 문항에서 받는 것을 미리 말한다 (③, 막지는 않는다). '🤔 한 번 더'는 mode가 learn이라 기록으로 판정
   if ((r.mode === 'practice' || r.mode === 'learn') && r.at === 0) {
-    const pn = practiceNote(ui.state && ui.state.concepts && ui.state.concepts[r.id], todayKey(), ui.state && ui.state.luck, r.rep ? r.rep.pay : 1);
+    const pn = practiceNote(ui.state && ui.state.concepts && ui.state.concepts[r.id], todayKey(), ui.state && ui.state.luck, r.rep ? r.rep.pay : 1, isResting(ui.state, r.id)); // 🌱 쉬는 칸 (v301)
     if (pn) card.appendChild(el('p', 'math-practice-note', pn));
   }
   // 🔁 같은 날 둘째 편부터 — 문항 ⚡💰가 줄어드는 것을 풀기 전에 말한다 (v250)
@@ -3123,7 +3144,7 @@ async function finishRound() {
     ? (result.crowned ? `${nameOf(r.id)} — 다섯 번 확인을 다 통과했어요. 정말 이해한 거예요.`
       : result.first ? `내일 한 번 더 맞히면 🐣 "안다"가 돼요. 며칠에 걸쳐 다섯 번 맞히면 👑!${waitNow ? ` 🥚가 ${LEARNING_MAX}개라 다음 칸은 확인한 뒤에 열려요.` : ''}`
         : result.known ? '하루가 지나도 맞혔어요 — 이제 진짜 아는 거예요. 다음 확인은 며칠 뒤예요.'
-          : result.practice ? '연습이라 👑 확인은 안 올라가요 — 다음 확인 날에 다시 물어볼게요.'
+          : result.practice ? (result.rest ? '🌱 잠깐 쉬는 칸이라 연습했어요 — 칸은 그대로예요.' : '연습이라 👑 확인은 안 올라가요 — 다음 확인 날에 다시 물어볼게요.') // 🌱 쉬는 동안엔 확인 날이 안 온다 (Codex 107차 #1)
             : '다음 확인은 며칠 뒤예요.')
     : (result.practice
       ? '연습이라 기록은 그대로예요. 이야기를 다시 읽어 봐요.'

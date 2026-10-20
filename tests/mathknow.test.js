@@ -265,6 +265,6 @@ test('③ 화면 배선: 칸 부제는 rungSub · 잠긴 날 안내는 사다리
   const src = fs.readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
   assert.match(src, /'math-rung-sub', `\$\{gradeLabel\(r\.grade\)\} · \$\{rungSub\(r\)\}/);
   assert.match(src, /const wn = waitNote\(rows\);\s*if \(wn\) m\.appendChild\(el\('p', 'math-wait-note', wn\)\);\s*const list = el\('ul', 'math-ladder'\);/);
-  assert.match(src, /\(r\.mode === 'practice' \|\| r\.mode === 'learn'\) && r\.at === 0\) \{\s*const pn = practiceNote\(ui\.state && ui\.state\.concepts && ui\.state\.concepts\[r\.id\], todayKey\(\), ui\.state && ui\.state\.luck, r\.rep \? r\.rep\.pay : 1\);/); // v250: 같은 날 둘째 편부터 줄어든 몫
+  assert.match(src, /\(r\.mode === 'practice' \|\| r\.mode === 'learn'\) && r\.at === 0\) \{\s*const pn = practiceNote\(ui\.state && ui\.state\.concepts && ui\.state\.concepts\[r\.id\], todayKey\(\), ui\.state && ui\.state\.luck, r\.rep \? r\.rep\.pay : 1, isResting\(ui\.state, r\.id\)\);/); // v250: 같은 날 둘째 편부터 줄어든 몫 · v301 🌱 쉬는 칸
   assert.ok(!src.includes("'오늘 다시 확인하기'"), '옛 부제 문구가 남지 않았다');
 });

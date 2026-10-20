@@ -3,7 +3,7 @@ import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
   applyEssayFixes, getMath, updateMath, updateItem, saidOf, sentenceKey,
 } from './db.js';
-import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK, LOG_MAX } from './mathprog.js';
+import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK, LOG_MAX, restOf, setRest, restLine } from './mathprog.js';
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes, essayKey } from './essay.js';
 import { countPlayableCues, playableStarts } from './srt.js';
@@ -652,6 +652,19 @@ export async function renderStats() {
     const q = weekMath.reduce((a, d) => a + (Number(d.mathQ) || 0), 0);
     const ok = weekMath.reduce((a, d) => a + (Number(d.mathOk) || 0), 0);
     cM.appendChild(el('p', 'stats-sub', `이번 주 ${q}문항 중 ${ok}개 정답 · 지금까지 ${ms.rounds}편`));
+    // 🌱 학교 진도 먼저 · 선행 칸 쉬기 (v301) — 아버님이 끄고 켠다 (아이 화면에는 셈 없이 "잠깐 쉬는 칸"만)
+    const restBox = el('div', 'stats-actions math-rest');
+    restBox.appendChild(el('p', 'stats-sub', restLine(math)));
+    restBox.appendChild(el('p', 'stats-note', '켜져 있으면 ☀️ 오늘의 수학은 4학년 칸 복습 → 통과가 실패보다 많은 칸 순서로 내고, 6학년·중1 칸은 내지 않아요. 켤 때 이미 배운 6학년·중1 칸은 복습을 쉬어요 — 사다리에서 열면 연습이고 기록은 그대로예요. 켠 뒤에 사다리에서 새로 배운 칸은 예전처럼 다음 날 확인해요. 끄면 예전처럼 ☀️가 가장 오래 밀린 복습부터 내요.'));
+    const restBtn = el('button', 'btn', restOf(math).on ? '🌱 끄기 — 6학년·중1 칸도 ☀️에 다시' : '🌱 켜기 — 학교 진도 먼저');
+    restBtn.type = 'button';
+    restBtn.addEventListener('click', async () => {
+      restBtn.disabled = true;
+      try { await updateMath((m) => { setRest(m, !restOf(m).on, Date.now()); }); } catch { /* 다시 그리면 저장된 대로 보인다 */ }
+      renderStats();
+    });
+    restBox.appendChild(restBtn);
+    cM.appendChild(restBox);
     // 줄기마다 사다리 — 시작한 줄기(진단을 한 것)만 (2026-09-21: 분수 + 음수)
     for (const st of ms.stems.filter((s) => s.started)) {
       cM.appendChild(el('p', 'stats-sub', `${st.code}. ${st.label} — 🐣 ${st.known} · 🥚 ${st.learning}${st.placed ? ` · 📏 ${st.placed}` : ''} / ${st.total} · 👑 ${st.crowned}`));
@@ -661,6 +674,7 @@ export async function renderStats() {
         const chip = el('span', 'stats-missed-chip' + (r.state === 'done' ? ' done' : ''));
         chip.appendChild(el('b', '', `${r.icon} ${r.name}`));
         if (r.due) chip.appendChild(el('span', 'n', ' 오늘 확인'));
+        else if (r.rest) chip.appendChild(el('span', 'n', ' 🌱 쉼')); // v301
         lad.appendChild(chip);
       }
       cM.appendChild(lad);
