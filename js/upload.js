@@ -388,6 +388,8 @@ async function korReportNow(today, days) {
   try {
     raw = await Promise.all(['reading', 'words', 'puzzles'].map((n) => fetch(`./coach/korean/${n}.json`).then((r) => { if (!r.ok) throw new Error(n); return r.json(); })));
   } catch { return null; }
+  // 🖊️ 논술 원고는 따로 — 못 받아도 국어 요약은 올린다 (v303)
+  try { const res = await fetch('./coach/korean/nonsul.json'); raw.push(res.ok ? await res.json() : null); } catch { raw.push(null); }
   return kr.korReportFromRaw(p, raw, today, days);
 }
 

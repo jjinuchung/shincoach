@@ -5,12 +5,13 @@ import { getCharacters, putCharacter } from './db.js';
 
 /**
  * 명단: 처음 40마리(Lv1) + 레벨 마일스톤에서 열리는 20마리씩(Lv5·10·15) + 2026-09-20에 더한 60마리(Lv1)
- *       + 2026-09-22 🔢 수학 전용 150마리(`subject: 'math'`, Lv1) + 2026-10-11 📚 국어 전용 150마리(`subject: 'korean'`, Lv1). unlock 없으면 1.
+ *       + 2026-09-22 🔢 수학 전용 150마리(`subject: 'math'`, Lv1) + 2026-10-11 📚 국어 전용 150마리(`subject: 'korean'`, Lv1)
+ *       + 2026-10-20 🖊️ 논술 전용 100마리(`subject: 'nonsul'`, Lv1). unlock 없으면 1.
  * 여기에 추가하면 ⚙ "받기"가 없는 것만 받아옴. ★ 늘릴 때 battle.TYPE_OF(타입)·xp.RARITY_IDS(등급)도 같이 — 빠지면 조용히 노말·보통이 된다
  * 이름·타입·등급은 tools/roster_candidates.mjs·tools/math_roster.mjs(PokeAPI)로 받은 것만 쓴다 (기억으로 쓰면 틀린다)
  *
  * subject — 🎯 **어디서 잡히나**만 가른다: 없으면 영어(퍼즐 정답 뒤 잡기), 'math'면 수학(☀️ 완주·개념 편 통과 뒤 잡기),
- *           'korean'이면 📚 국어(글을 다 읽고 별을 새로 받을 때).
+ *           'korean'이면 📚 국어(글을 다 읽고 별을 새로 받을 때), 'nonsul'이면 🖊️ 논술(그날 처음 끝낸 논술 판).
  * 도감·파트너·배틀·꾸미기·상점·레벨·코인은 과목이 한 몸이다 (아버님 2026-09-22: "모으는 곳은 한 곳이어야 재미가 안 반감된다").
  * 왜 새 150을 더했나: 아이가 영어(쉬움·🎯 하루 4회)만 골라서, 수학에서만 만나는 얼굴이 있어야 수학으로 간다.
  */
@@ -535,6 +536,107 @@ export const ROSTER = [
   { id: 788, ko: '카푸느지느', en: 'Tapu Fini', subject: 'korean' },
   { id: 801, ko: '마기아나', en: 'Magearna', subject: 'korean' },
   { id: 802, ko: '마샤도', en: 'Marshadow', subject: 'korean' },
+  // 🖊️ 논술 전용 100 (2026-10-20) — tools/roster_candidates.mjs(PokeAPI)로 받은 이름 · 흔함 40 · 보통 30 · 희귀 20 · 전설 10 · 진화 가족째
+  { id: 69, ko: '모다피', en: 'Bellsprout', subject: 'nonsul' },
+  { id: 70, ko: '우츠동', en: 'Weepinbell', subject: 'nonsul' },
+  { id: 71, ko: '우츠보트', en: 'Victreebel', subject: 'nonsul' },
+  { id: 108, ko: '내루미', en: 'Lickitung', subject: 'nonsul' },
+  { id: 463, ko: '내룸벨트', en: 'Lickilicky', subject: 'nonsul' },
+  { id: 114, ko: '덩쿠리', en: 'Tangela', subject: 'nonsul' },
+  { id: 465, ko: '덩쿠림보', en: 'Tangrowth', subject: 'nonsul' },
+  { id: 193, ko: '왕자리', en: 'Yanma', subject: 'nonsul' },
+  { id: 469, ko: '메가자리', en: 'Yanmega', subject: 'nonsul' },
+  { id: 198, ko: '니로우', en: 'Murkrow', subject: 'nonsul' },
+  { id: 430, ko: '돈크로우', en: 'Honchkrow', subject: 'nonsul' },
+  { id: 207, ko: '글라이거', en: 'Gligar', subject: 'nonsul' },
+  { id: 472, ko: '글라이온', en: 'Gliscor', subject: 'nonsul' },
+  { id: 240, ko: '마그비', en: 'Magby', subject: 'nonsul' },
+  { id: 126, ko: '마그마', en: 'Magmar', subject: 'nonsul' },
+  { id: 467, ko: '마그마번', en: 'Magmortar', subject: 'nonsul' },
+  { id: 265, ko: '개무소', en: 'Wurmple', subject: 'nonsul' },
+  { id: 266, ko: '실쿤', en: 'Silcoon', subject: 'nonsul' },
+  { id: 267, ko: '뷰티플라이', en: 'Beautifly', subject: 'nonsul' },
+  { id: 268, ko: '카스쿤', en: 'Cascoon', subject: 'nonsul' },
+  { id: 269, ko: '독케일', en: 'Dustox', subject: 'nonsul' },
+  { id: 406, ko: '꼬몽울', en: 'Budew', subject: 'nonsul' },
+  { id: 315, ko: '로젤리아', en: 'Roselia', subject: 'nonsul' },
+  { id: 407, ko: '로즈레이드', en: 'Roserade', subject: 'nonsul' },
+  { id: 439, ko: '흉내내', en: 'Mime Jr.', subject: 'nonsul' },
+  { id: 122, ko: '마임맨', en: 'Mr. Mime', subject: 'nonsul' },
+  { id: 866, ko: '마임꽁꽁', en: 'Mr. Rime', subject: 'nonsul' },
+  { id: 441, ko: '페라페', en: 'Chatot', subject: 'nonsul' },
+  { id: 458, ko: '타만타', en: 'Mantyke', subject: 'nonsul' },
+  { id: 226, ko: '만타인', en: 'Mantine', subject: 'nonsul' },
+  { id: 636, ko: '활화르바', en: 'Larvesta', subject: 'nonsul' },
+  { id: 637, ko: '불카모스', en: 'Volcarona', subject: 'nonsul' },
+  { id: 774, ko: '메테노', en: 'Minior', subject: 'nonsul' },
+  { id: 222, ko: '코산호', en: 'Corsola', subject: 'nonsul' },
+  { id: 864, ko: '산호르곤', en: 'Cursola', subject: 'nonsul' },
+  { id: 227, ko: '무장조', en: 'Skarmory', subject: 'nonsul' },
+  { id: 369, ko: '시라칸', en: 'Relicanth', subject: 'nonsul' },
+  { id: 23, ko: '아보', en: 'Ekans', subject: 'nonsul' },
+  { id: 24, ko: '아보크', en: 'Arbok', subject: 'nonsul' },
+  { id: 46, ko: '파라스', en: 'Paras', subject: 'nonsul' },
+  { id: 47, ko: '파라섹트', en: 'Parasect', subject: 'nonsul' },
+  { id: 48, ko: '콘팡', en: 'Venonat', subject: 'nonsul' },
+  { id: 49, ko: '도나리', en: 'Venomoth', subject: 'nonsul' },
+  { id: 72, ko: '왕눈해', en: 'Tentacool', subject: 'nonsul' },
+  { id: 73, ko: '독파리', en: 'Tentacruel', subject: 'nonsul' },
+  { id: 84, ko: '두두', en: 'Doduo', subject: 'nonsul' },
+  { id: 85, ko: '두트리오', en: 'Dodrio', subject: 'nonsul' },
+  { id: 86, ko: '쥬쥬', en: 'Seel', subject: 'nonsul' },
+  { id: 87, ko: '쥬레곤', en: 'Dewgong', subject: 'nonsul' },
+  { id: 88, ko: '질퍽이', en: 'Grimer', subject: 'nonsul' },
+  { id: 89, ko: '질뻐기', en: 'Muk', subject: 'nonsul' },
+  { id: 98, ko: '크랩', en: 'Krabby', subject: 'nonsul' },
+  { id: 99, ko: '킹크랩', en: 'Kingler', subject: 'nonsul' },
+  { id: 109, ko: '또가스', en: 'Koffing', subject: 'nonsul' },
+  { id: 110, ko: '또도가스', en: 'Weezing', subject: 'nonsul' },
+  { id: 118, ko: '콘치', en: 'Goldeen', subject: 'nonsul' },
+  { id: 119, ko: '왕콘치', en: 'Seaking', subject: 'nonsul' },
+  { id: 278, ko: '갈모매', en: 'Wingull', subject: 'nonsul' },
+  { id: 279, ko: '패리퍼', en: 'Pelipper', subject: 'nonsul' },
+  { id: 285, ko: '버섯꼬', en: 'Shroomish', subject: 'nonsul' },
+  { id: 286, ko: '버섯모', en: 'Breloom', subject: 'nonsul' },
+  { id: 307, ko: '요가랑', en: 'Meditite', subject: 'nonsul' },
+  { id: 308, ko: '요가램', en: 'Medicham', subject: 'nonsul' },
+  { id: 309, ko: '썬더라이', en: 'Electrike', subject: 'nonsul' },
+  { id: 310, ko: '썬더볼트', en: 'Manectric', subject: 'nonsul' },
+  { id: 325, ko: '피그점프', en: 'Spoink', subject: 'nonsul' },
+  { id: 326, ko: '피그킹', en: 'Grumpig', subject: 'nonsul' },
+  { id: 333, ko: '파비코', en: 'Swablu', subject: 'nonsul' },
+  { id: 334, ko: '파비코리', en: 'Altaria', subject: 'nonsul' },
+  { id: 343, ko: '오뚝군', en: 'Baltoy', subject: 'nonsul' },
+  { id: 344, ko: '점토도리', en: 'Claydol', subject: 'nonsul' },
+  { id: 353, ko: '어둠대신', en: 'Shuppet', subject: 'nonsul' },
+  { id: 354, ko: '다크펫', en: 'Banette', subject: 'nonsul' },
+  { id: 360, ko: '마자', en: 'Wynaut', subject: 'nonsul' },
+  { id: 202, ko: '마자용', en: 'Wobbuffet', subject: 'nonsul' },
+  { id: 517, ko: '몽나', en: 'Munna', subject: 'nonsul' },
+  { id: 518, ko: '몽얌나', en: 'Musharna', subject: 'nonsul' },
+  { id: 605, ko: '리그레', en: 'Elgyem', subject: 'nonsul' },
+  { id: 606, ko: '벰크', en: 'Beheeyem', subject: 'nonsul' },
+  { id: 296, ko: '마크탕', en: 'Makuhita', subject: 'nonsul' },
+  { id: 297, ko: '하리뭉', en: 'Hariyama', subject: 'nonsul' },
+  { id: 322, ko: '둔타', en: 'Numel', subject: 'nonsul' },
+  { id: 323, ko: '폭타', en: 'Camerupt', subject: 'nonsul' },
+  { id: 341, ko: '가재군', en: 'Corphish', subject: 'nonsul' },
+  { id: 342, ko: '가재장군', en: 'Crawdaunt', subject: 'nonsul' },
+  { id: 504, ko: '보르쥐', en: 'Patrat', subject: 'nonsul' },
+  { id: 505, ko: '보르그', en: 'Watchog', subject: 'nonsul' },
+  { id: 684, ko: '나룸퍼프', en: 'Swirlix', subject: 'nonsul' },
+  { id: 685, ko: '나루림', en: 'Slurpuff', subject: 'nonsul' },
+  { id: 327, ko: '얼루기', en: 'Spinda', subject: 'nonsul' },
+  { id: 377, ko: '레지락', en: 'Regirock', subject: 'nonsul' },
+  { id: 378, ko: '레지아이스', en: 'Regice', subject: 'nonsul' },
+  { id: 486, ko: '레지기가스', en: 'Regigigas', subject: 'nonsul' },
+  { id: 641, ko: '토네로스', en: 'Tornadus', subject: 'nonsul' },
+  { id: 642, ko: '볼트로스', en: 'Thundurus', subject: 'nonsul' },
+  { id: 647, ko: '케르디오', en: 'Keldeo', subject: 'nonsul' },
+  { id: 718, ko: '지가르데', en: 'Zygarde', subject: 'nonsul' },
+  { id: 719, ko: '디안시', en: 'Diancie', subject: 'nonsul' },
+  { id: 720, ko: '후파', en: 'Hoopa', subject: 'nonsul' },
+  { id: 721, ko: '볼케니온', en: 'Volcanion', subject: 'nonsul' },
 ];
 
 /** 이 레벨에서 열려 있는 명단 */
@@ -559,6 +661,9 @@ export const LEGENDARY = [
   484, 487, 493, 643, 644, 716, 888, 889, 380, 381, 386, 645,
   646, 800, 890, 243, 244, 245, 379, 385, 491, 492, 494, 717,
   791, 792, 807, 893, 1007, 1008,
+  // 📚 국어 전용 전설·환상 15 — v232에서 빠졌다(국어 알에서 나올 수 있었다) · 🖊️ 논술 전용 10 (2026-10-20 PokeAPI 실측 · Codex 109차 #4)
+  480, 481, 482, 488, 490, 648, 638, 639, 640, 785, 786, 787, 788, 801, 802,
+  377, 378, 486, 641, 642, 647, 718, 719, 720, 721,
 ];
 const legendSet = new Set(LEGENDARY);
 
@@ -794,9 +899,9 @@ export function unlockedRoster(level) {
   return ROSTER.filter((r) => (r.unlock || 1) <= level);
 }
 
-const subjectById = new Map(ROSTER.map((r) => [r.id, r.subject === 'math' || r.subject === 'korean' ? r.subject : 'english']));
+const subjectById = new Map(ROSTER.map((r) => [r.id, r.subject === 'math' || r.subject === 'korean' || r.subject === 'nonsul' ? r.subject : 'english']));
 
-/** 이 포켓몬은 어느 과목에서 잡히나 — 'math' | 'english' | 'korean' (명단에 없으면 영어) · 📚 국어 150마리는 2026-10-11 */
+/** 이 포켓몬은 어느 과목에서 잡히나 — 'math' | 'english' | 'korean' | 'nonsul' (명단에 없으면 영어) · 📚 국어 150마리는 2026-10-11 · 🖊️ 논술 100마리는 2026-10-20 */
 export function subjectOf(id) {
   return subjectById.get(id) || 'english';
 }

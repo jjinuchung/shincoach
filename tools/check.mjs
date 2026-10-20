@@ -106,6 +106,12 @@ try {
   const puzzles = JSON.parse(readFileSync('coach/korean/puzzles.json', 'utf8'));
   for (const msg of checkPuzzles(puzzles, cards)) { bad++; console.error(`내용 오류: coach/korean/puzzles.json: ${msg}`); }
 } catch (e) { bad++; console.error(`JSON 오류: coach/korean/puzzles.json: ${e.message}`); }
+// 🖊️ 논술 원고(nonsul.json, v303) — 편마다 이유 셋·상관없는 말 둘·의견 "나는 …"·정리 "그래도 나는 …" (앱은 깨진 주제를 조용히 빼므로 여기서 막는다)
+try {
+  const { checkNonsul } = await import('../js/nonsul.js');
+  const nonsul = JSON.parse(readFileSync('coach/korean/nonsul.json', 'utf8'));
+  for (const msg of checkNonsul(nonsul)) { bad++; console.error(`내용 오류: coach/korean/nonsul.json: ${msg}`); }
+} catch (e) { bad++; console.error(`JSON 오류: coach/korean/nonsul.json: ${e.message}`); }
 // 🕵️ 나옹의 숙제(coach/math/detective.json, v299) — 틀린 줄 앞은 그대로·보기 셋·흔한 실수 번호가 칸 원고에 있는지 배포 전에
 //   깨진 문제는 앱이 조용히 빼므로(detective.validItems) 여기서 막는다 · 정답을 따로 다시 푸는 검사는 tests/detective299
 try {

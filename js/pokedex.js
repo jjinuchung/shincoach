@@ -160,8 +160,9 @@ export async function openPokedex(opts) {
   const en = bySubj('english');
   const ma = bySubj('math');
   const ko = bySubj('korean');
+  const ns = bySubj('nonsul');
   const got = (list) => list.filter((m) => p.caught[m.id] > 0).length;
-  card.appendChild(el('div', 'pokedex-stats pokedex-subjects', `🎤 영어 퍼즐에서 잡아요 ${got(en)}/${en.length} · 🔢 수학에서 잡아요 ${got(ma)}/${ma.length}${ko.length ? ` · 📚 국어에서 잡아요 ${got(ko)}/${ko.length}` : ''}`));
+  card.appendChild(el('div', 'pokedex-stats pokedex-subjects', `🎤 영어 퍼즐에서 잡아요 ${got(en)}/${en.length} · 🔢 수학에서 잡아요 ${got(ma)}/${ma.length}${ko.length ? ` · 📚 국어에서 잡아요 ${got(ko)}/${ko.length}` : ''}${ns.length ? ` · 🖊️ 논술에서 잡아요 ${got(ns)}/${ns.length}` : ''}`));
   const hint = el('div', 'pokedex-hint');
   hint.appendChild(el('span', 'streak', streak > 0 ? `🔥 ${streak}일 연속 학습 중` : `🔥 하루 ${STREAK_MIN_DONE}문장 이상 하면 연속 학습이 시작돼요`));
   if (nextLv) hint.appendChild(el('span', 'unlock', `🔒 Lv.${nextLv}에 새 포켓몬 ${unlockCountAt(nextLv)}마리 — ⚡${xpToReach(nextLv) - p.xp} 남음`));
@@ -259,6 +260,7 @@ export async function openPokedex(opts) {
       if (isUltraBeast(m.id)) cell.appendChild(el('div', 'subj ub', '🌌'));
       else if (subjectOf(m.id) === 'math') cell.appendChild(el('div', 'subj', '🔢')); // 수학에서만 잡히는 얼굴 — 못 잡은 칸에도 붙어 "수학 가면 있다"가 보인다
       else if (subjectOf(m.id) === 'korean') cell.appendChild(el('div', 'subj', '📚')); // 📚 국어에서만 (2026-10-11)
+      else if (subjectOf(m.id) === 'nonsul') cell.appendChild(el('div', 'subj', '🖊️')); // 🖊️ 논술에서만 (2026-10-20)
       if (n > 0 && getPartner() === m.id) cell.appendChild(el('div', 'partner', '🤝'));
       // 못 잡은 포켓몬도 누를 수 있다 — 등급은 **잡기 전에** 맞아야 의미가 있다 (전설이 흔함에 있으면 쉽게 잡힌다)
       cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url, caught: n > 0 }));

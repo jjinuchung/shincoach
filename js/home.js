@@ -62,6 +62,16 @@ export const SUBJECTS = [
     view: 'korean',
     ready: true,
   },
+  {
+    key: 'nonsul',
+    title: 'Opinion',
+    ko: '논술',
+    desc: '내 의견과 이유 말하기',
+    emoji: '🖊️',
+    mascot: 441,  // 페라페 — 사람 말을 따라 하는 포켓몬 · 논술 전용 100마리 중 하나 (2026-10-20)
+    view: 'nonsul',
+    ready: true,
+  },
 ];
 
 /**

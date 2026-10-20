@@ -8,6 +8,7 @@ import { initHatch } from './hatch.js';
 import { initEvolveShow } from './evolveshow.js';
 import { initHome, renderHome } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
+import { initNonsul, enterNonsul } from './nonsulview.js'; // 🖊️ 논술 (v303)
 import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
@@ -30,6 +31,7 @@ const views = {
   pokedex: document.getElementById('view-pokedex'),
   math: document.getElementById('view-math'),
   korean: document.getElementById('view-korean'),
+  nonsul: document.getElementById('view-nonsul'),
 };
 
 /** 지금 화면이 어느 과목의 시간을 쓰는가 — 🎒 도감·📊 기록·🏠 홈은 **안 센다** (아버님 결정 2026-09-27)
@@ -37,6 +39,7 @@ const views = {
 function subjectOfView(name) {
   if (name === 'math') return 'math';
   if (name === 'korean') return 'korean';
+  if (name === 'nonsul') return 'korean'; // 🖊️ 논술은 국어 시간 안 (아버님 2026-10-20)
   if (name === 'library' || name === 'player') return 'english';
   return null;
 }
@@ -64,6 +67,7 @@ export function showView(name) {
   if (name === 'korean') enterKorean().catch(() => {});
   else stopCheer(); // ✨ 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)
   if (name !== 'korean') leaveKorean(); // 🎧 듣기 카드 소리는 국어 화면에서만 (v245)
+  if (name === 'nonsul') enterNonsul().catch(() => {}); // 🖊️ 논술 — 푸는 판이 있으면 이어서, 없으면 첫 화면 (v303)
 }
 
 /** 전체 화면 로딩 표시 (영상 열기/저장처럼 수 초 이상 걸리는 작업용) */
@@ -173,6 +177,7 @@ async function main() {
   initHome({ showView });
   initMath({ showView });
   initKorean({ showView });  // 📚 국어 — ← 버튼 · 다시 읽으면 도감 다시 그리기
+  initNonsul({ showView });  // 🖊️ 논술 — ← 버튼 (v303)
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
   initTaken({ requirePin });  // 🔒 포켓몬 데려가기 (부모) + "아빠가 데려갔어요" 알림 (아이)
   initGiftSettings();         // 🎁 ⚙ 선물 교환권 사진 (이 기기에만)

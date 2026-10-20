@@ -181,5 +181,5 @@ test('🎯 화면 연결: 다 읽은 카드·도감 머리에 잡기 단추 · �
   assert.match(read('js/pokedex.js'), /else if \(subjectOf\(m\.id\) === 'korean'\) cell\.appendChild\(el\('div', 'subj', '📚'\)\);/);
   assert.match(read('js/pokedex.js'), /📚 국어에서 잡아요/);
   assert.match(read('js/shop.js'), /korean: ' · 📚 국어에서 만나요'/);
-  assert.match(read('js/shop.js'), /\{ math: '🔢 수학', korean: '📚 국어' \}\[subjectOf\(mon\.id\)\] \|\| '🎤 영어'/);
+  assert.match(read('js/shop.js'), /const giver = \{ stone_math: '🔢 수학을', stone_korean: '📚 국어를', stone_english: '🎤 영어를' \}\[g\.stone\]/); // 🟩는 국어에서 (v303 — 스톤을 주는 활동으로)
 });

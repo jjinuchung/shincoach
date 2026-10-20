@@ -472,7 +472,7 @@ function traderBox(o) {
   box.appendChild(el('div', 'tr-say', `“내 ${X} 줄게! 네 ${RARITY[o.tier].stars} 포켓몬 하나랑 바꿀래?”`));
   if (o.subject === 'math') box.appendChild(el('p', 'market-note', '🔢 수학 포켓몬이라 수학 포켓몬끼리만 바꿔요'));
   if (!o.gives.length) {
-    box.appendChild(el('p', 'market-note tr-cant', `${RARITY[o.tier].stars} ${{ math: '수학', korean: '국어' }[o.subject] || '영어'} 포켓몬을 두 마리 이상 데리고 있으면 바꿀 수 있어요`)); // 영어 쪽도 과목을 말한다 (Codex 31차 #6) · 📚 국어 (v234)
+    box.appendChild(el('p', 'market-note tr-cant', `${RARITY[o.tier].stars} ${{ math: '수학', korean: '국어', nonsul: '논술' }[o.subject] || '영어'} 포켓몬을 두 마리 이상 데리고 있으면 바꿀 수 있어요`)); // 영어 쪽도 과목을 말한다 (Codex 31차 #6) · 📚 국어 (v234)
     return box;
   }
 

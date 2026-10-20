@@ -326,7 +326,7 @@ function renderMon(msg, pop) {
     ? `${RARITY[r].stars} ${RARITY[r].label} · Lv${monLv(mon.id)} · ${haveCount(mon.id) > 0 ? `데리고 있어요 ×${haveCount(mon.id)}` : (fusedCount(mon.id) > 0 ? '🔀 퓨전에 들어가 있어요 — 🏪 5일장에서 나누면 돌아와요' : takenCount(mon.id) > 0 ? '🔒 아빠가 데려갔어요 — 다시 잡으면 돌아와요' : fledCount(mon.id) > 0 ? '💨 배틀에서 져서 떠났어요 — 다시 잡으면 돌아와요' : '🧬 진화로 보냈어요')}`
       + (caughtCount(mon.id) > haveCount(mon.id) ? ` (도감 ×${caughtCount(mon.id)})` : '')
       + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '')
-    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${{ math: ' · 🔢 수학에서 만나요', korean: ' · 📚 국어에서 만나요' }[subjectOf(mon.id)] || ' · 🎤 영어 퍼즐에서 만나요'}`;
+    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${{ math: ' · 🔢 수학에서 만나요', korean: ' · 📚 국어에서 만나요', nonsul: ' · 🖊️ 논술에서 만나요' }[subjectOf(mon.id)] || ' · 🎤 영어 퍼즐에서 만나요'}`;
   const fig = $('mon-figure');
   setFigure(fig, mon.url || '', got ? look : null);
   fig.classList.toggle('unknown', !got); // 실루엣 (도감과 같은 모습)
@@ -493,7 +493,8 @@ function renderGrow() {
   const g = growInfo(mon.id);
   const stone = itemById(g.stone);
   const em = stone ? stone.emoji : '🔷';
-  const subject = { math: '🔢 수학', korean: '📚 국어' }[subjectOf(mon.id)] || '🎤 영어';
+  // 스톤을 주는 활동 — 포켓몬이 어디서 잡히는지가 아니라 그 스톤이 어디서 생기는지(🖊️ 논술 포켓몬은 🟩 — 📚 국어에서 받는다, Codex 109차 #2) · 조사까지(수학은 "을")
+  const giver = { stone_math: '🔢 수학을', stone_korean: '📚 국어를', stone_english: '🎤 영어를' }[g.stone] || '공부를';
 
   $('mon-lv-text').textContent = `Lv${g.lv}${g.lv >= g.max ? ' · 만렙!' : ` / ${g.max}`}`;
   $('mon-lv-fill').style.width = `${Math.round((g.lv / g.max) * 100)}%`;
@@ -520,9 +521,9 @@ function renderGrow() {
   else if (g.why === 'evolve') msg.textContent = `🧬 Lv${g.cap}까지 키웠어요 — 진화해야 더 클 수 있어요!`;
   else if (!g.next) msg.textContent = '🏆 더 올릴 수 없어요 — 가장 높은 레벨이에요!';
   else if (g.candy.ok && (g.why === 'stone' || g.why === 'coins')) msg.textContent = `🍬 ${mon.ko}의 사탕으로 올릴 수 있어요 — 스톤·코인은 안 들어요`;
-  else if (g.why === 'stone') msg.textContent = `${em} ${stone ? stone.ko : '스톤'}이 ${g.next.stones - g.stones}개 더 있어야 해요 — ${subject}를 하면 받아요 (지금 ${g.stones}개)`;
+  else if (g.why === 'stone') msg.textContent = `${em} ${stone ? stone.ko : '스톤'}이 ${g.next.stones - g.stones}개 더 있어야 해요 — ${giver} 하면 받아요 (지금 ${g.stones}개)`;
   else if (g.why === 'coins') msg.textContent = `💰 코인이 ${g.next.coins - g.coins} 더 있어야 해요 (지금 ${g.coins})`;
-  else msg.textContent = `${em} ${stone ? stone.ko : '스톤'} ${g.stones}개 있어요 · ${subject}를 하면 더 받아요`;
+  else msg.textContent = `${em} ${stone ? stone.ko : '스톤'} ${g.stones}개 있어요 · ${giver} 하면 더 받아요`;
 
   // 🧬 진화
   const eb = $('mon-evo');

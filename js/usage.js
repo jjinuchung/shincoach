@@ -34,6 +34,7 @@ const FIELD_OF = Object.fromEntries(PLACES.map((p) => [p.key, p.field]));
 /** 화면 이름(app.js showView) → 자리 — 🎤 영어는 목록·플레이어 둘 다 */
 export function placeOfView(view) {
   if (view === 'library' || view === 'player') return 'english';
+  if (view === 'nonsul') return 'korean'; // 🖊️ 논술은 국어 시간 안 — 사용 기록도 국어 자리로 (v303 · Codex 109차 #3)
   return FIELD_OF[view] ? view : null;
 }
 

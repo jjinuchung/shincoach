@@ -33,6 +33,7 @@ let openSeq = 0;        // 창을 열고 닫을 때마다 +1 — 느린 저장�
 const CHIPS = [
   { id: 'time-chip-math', subject: 'math' },
   { id: 'time-chip-korean', subject: 'korean' },
+  { id: 'time-chip-nonsul', subject: 'korean' }, // 🖊️ 논술은 국어 시간 (v303)
   { id: 'time-chip-library', subject: 'english' },
   { id: 'time-chip-player', subject: 'english' },
 ];

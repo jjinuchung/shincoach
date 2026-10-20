@@ -3785,3 +3785,36 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   .kor-listen-btns, .kor-listen-text { display: none; }
 }
+
+/* 🖊️ 논술 (v303) — 국어 보기 단추(.kor-opt)·잡기 단추(.kor-catch)를 그대로 쓰고, 그 색 낱말을 이 화면에도 둔다 */
+.ns-main { --kor-ok-bg: #e4f5ea; --kor-no-bg: #fcebea; flex: 1; padding: 14px; max-width: 760px; width: 100%; margin: 0 auto; display: grid; gap: 12px; align-content: start; }
+.ns-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 16px; display: grid; gap: 12px; }
+.ns-title { margin: 0; font-size: 1.3rem; line-height: 1.4; word-break: keep-all; }
+.ns-how { margin: 0; padding-left: 1.3em; display: grid; gap: 4px; color: var(--muted); line-height: 1.55; }
+.ns-today { margin: 0; font-weight: 700; color: var(--primary-dark); }
+.ns-note, .ns-err { margin: 0; line-height: 1.55; }
+.ns-err { color: var(--danger); }
+.ns-q { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
+.ns-q-icon { font-size: 2rem; line-height: 1; }
+.ns-q-text { margin: 0; font-size: 1.15rem; line-height: 1.5; word-break: keep-all; }
+.ns-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ns-steps li { border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 0.85rem; color: var(--muted); background: #f8f9fc; }
+.ns-steps li.is-done { color: var(--ok); border-color: var(--ok); }
+.ns-steps li.is-now { color: #fff; background: var(--primary); border-color: var(--primary); font-weight: 700; }
+.ns-ask { margin: 0; font-weight: 800; font-size: 1.05rem; line-height: 1.5; }
+.ns-mine { margin: 0; color: var(--muted); }
+.ns-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 420px) { .ns-sides { grid-template-columns: 1fr; } }
+.ns-side { min-height: 64px; font-size: 1.05rem; font-weight: 700; word-break: keep-all; white-space: normal; }
+.ns-built { display: grid; gap: 6px; border: 2px dashed var(--border); border-radius: 12px; padding: 10px; background: #fbfcfe; }
+.ns-built-empty { margin: 0; color: var(--muted); text-align: center; }
+.ns-pool { display: grid; gap: 8px; }
+.ns-piece { margin: 0; line-height: 1.55; word-break: keep-all; }
+.ns-piece.is-placed { padding: 6px 10px; border-left: 4px solid var(--ok); background: var(--kor-ok-bg); border-radius: 8px; }
+.ns-quit { justify-self: start; }
+.ns-done { display: grid; gap: 8px; justify-items: center; text-align: center; }
+.ns-done p { margin: 0; }
+.ns-done-label { font-weight: 800; color: var(--primary-dark); }
+.ns-essay { text-align: left; display: grid; gap: 4px; background: #fffdf7; border: 1px solid #e9eef5; border-radius: 12px; padding: 12px 14px; line-height: 1.7; word-break: keep-all; width: 100%; box-sizing: border-box; }
+.ns-done-title { font-size: 1.2rem; font-weight: 800; }
+.ns-done-btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }

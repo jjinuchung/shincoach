@@ -143,6 +143,22 @@ export const TYPE_OF = {
   782: 'dragon', 783: 'dragon', 784: 'dragon',
   859: 'dark', 860: 'dark', 861: 'dark', 434: 'dark', 435: 'dark', 452: 'dark',
   935: 'fire', 936: 'fire', 937: 'fire', 218: 'fire', 219: 'fire', 513: 'fire', 514: 'fire',
+  // 🖊️ 논술 전용 100 (2026-10-20) — 첫 타입이 기술표에 없으면(벌레·독·비행) 두 번째 타입, 그것도 없으면 노말 (tools/math_roster.mjs와 같은 규칙)
+  69: 'grass', 70: 'grass', 71: 'grass', 114: 'grass', 465: 'grass', 406: 'grass', 315: 'grass', 407: 'grass', 46: 'grass', 47: 'grass', 285: 'grass', 286: 'grass',
+  108: 'normal', 463: 'normal', 193: 'normal', 469: 'normal', 265: 'normal', 266: 'normal', 267: 'normal', 268: 'normal', 269: 'normal', 441: 'normal', 23: 'normal', 24: 'normal', 48: 'normal', 49: 'normal', 84: 'normal', 85: 'normal', 88: 'normal', 89: 'normal', 109: 'normal', 110: 'normal', 333: 'normal', 504: 'normal', 505: 'normal', 327: 'normal', 486: 'normal', 641: 'normal',
+  198: 'dark', 430: 'dark',
+  207: 'ground', 472: 'ground', 343: 'ground', 344: 'ground',
+  240: 'fire', 126: 'fire', 467: 'fire', 636: 'fire', 637: 'fire', 322: 'fire', 323: 'fire', 721: 'fire',
+  439: 'psychic', 122: 'psychic', 325: 'psychic', 326: 'psychic', 360: 'psychic', 202: 'psychic', 517: 'psychic', 518: 'psychic', 605: 'psychic', 606: 'psychic', 720: 'psychic',
+  866: 'ice', 378: 'ice',
+  458: 'water', 226: 'water', 222: 'water', 369: 'water', 72: 'water', 73: 'water', 86: 'water', 87: 'water', 98: 'water', 99: 'water', 118: 'water', 119: 'water', 278: 'water', 279: 'water', 341: 'water', 342: 'water', 647: 'water',
+  774: 'rock', 377: 'rock', 719: 'rock',
+  864: 'ghost', 353: 'ghost', 354: 'ghost',
+  227: 'steel',
+  307: 'fighting', 308: 'fighting', 296: 'fighting', 297: 'fighting',
+  309: 'electric', 310: 'electric', 642: 'electric',
+  334: 'dragon', 718: 'dragon',
+  684: 'fairy', 685: 'fairy',
 };
 
 export function typeOf(id) {

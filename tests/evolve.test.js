@@ -11,9 +11,9 @@ import { battleLossRule, cloneProfile, emptyProfile, evolveRule, gearRule, level
 const ids = new Set(ROSTER.map((r) => r.id));
 const links = Object.entries(EVO).flatMap(([from, list]) => list.map((e) => ({ from: Number(from), ...e })));
 
-test('🧬 진화표: 191링크·178종, 양쪽이 모두 명단에 있다', () => {
-  assert.equal(links.length, 191, '🧬 줄기 중간 20을 채워 66 → 107 (2026-09-27) · 📚 국어 150의 진화 84를 더해 191 (2026-10-11)');
-  assert.equal(Object.keys(EVO).length, 178);
+test('🧬 진화표: 237링크·223종, 양쪽이 모두 명단에 있다', () => {
+  assert.equal(links.length, 237, '🧬 줄기 중간 20을 채워 66 → 107 (2026-09-27) · 📚 국어 150의 진화 84를 더해 191 (2026-10-11) · 🖊️ 논술 100의 진화 46을 더해 237 (2026-10-20)');
+  assert.equal(Object.keys(EVO).length, 223);
   for (const l of links) {
     assert.ok(ids.has(l.from), `진화 전 ${l.from}이 명단에 없다`);
     assert.ok(ids.has(l.to), `진화 후 ${l.to}이 명단에 없다`);
@@ -38,9 +38,10 @@ test('🧬 진화 레벨은 5 아니면 10 — 명단에서 시작인 종은 5, 
   assert.equal(soleEvo(8), 9);
 });
 
-test('🧬 한 종에서 갈래가 여럿인 것: 이브이(8갈래) + 📚 국어 다섯(토중몬·진주몽·도롱충이·카르본 2갈래 · 과사삭벌레 3갈래) — 그 밖은 고를 것이 없다', () => {
+test('🧬 한 종에서 갈래가 여럿인 것: 이브이(8갈래) + 📚 국어 다섯(토중몬·진주몽·도롱충이·카르본 2갈래 · 과사삭벌레 3갈래) + 🖊️ 개무소(2갈래) — 그 밖은 고를 것이 없다', () => {
   const many = Object.keys(EVO).filter((k) => EVO[k].length > 1).map(Number);
-  assert.deepEqual(many, [133, 290, 366, 412, 840, 935]);
+  assert.deepEqual(many, [133, 265, 290, 366, 412, 840, 935]);
+  assert.deepEqual([evoOf(265).length, needsChoice(265)], [2, true], '🖊️ 개무소 → 실쿤·카스쿤');
   assert.deepEqual([290, 366, 412, 840, 935].map((id) => [evoOf(id).length, needsChoice(id)]), [[2, true], [2, true], [2, true], [3, true], [2, true]], '상점이 갈래마다 단추를 그린다(이브이와 같은 화면)');
   assert.equal(evoOf(133).length, 8);
   assert.equal(needsChoice(133), true);

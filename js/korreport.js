@@ -8,6 +8,7 @@ import { TYPES, starsOf, missOf, qMissOf, readsOf, READS_MAX, validCards } from 
 import { deckStats, DECKS, DECK_ORDER, allWords } from './korwords.js';
 import { puzzleStats, KINDS as PUZZLE_KINDS, allPuzzles } from './korpuzzle.js';
 import { writesOf, cardWriteState } from './korwrite.js';
+import { allTopics, nonsulReport } from './nonsul.js'; // 🖊️ 논술 (v303)
 
 /** 자주 틀린 물음을 몇 개까지 싣나 */
 export const KOR_TOP = 12;
@@ -152,6 +153,11 @@ export function korReportText(p, data, today, days) {
   L.push('', '## ✍️ 생각 쓰기', entries.length
     ? `- 쓴 글 ${entries.length}개 (카드 ${wcards.length}장) · 답장 받은 글 ${entries.filter((e) => e.grade).length}개 · 답장 기다리는 글 ${entries.filter((e) => !e.grade).length}개 · ✅까지 간 카드 ${okCards}장`
     : '(아직 쓴 글 없음)');
+  // 🖊️ 논술 (v303) — 원고를 못 받았으면 이 절만 빠진다
+  if (Array.isArray(data && data.nonsul) && data.nonsul.length) {
+    const now = new Date(`${today}T12:00:00`).getTime();
+    L.push('', '## 🖊️ 논술', `- ${nonsulReport(data.nonsul, prof.nonsul, prof.nonsulDay, Number.isFinite(now) ? now : Date.now())}`);
+  }
   return `${L.join('\n').trim()}\n`;
 }
 
@@ -162,10 +168,10 @@ export function korReportText(p, data, today, days) {
  * @param {string} today · @param {Array<object>} days
  */
 export function korReportFromRaw(p, raw, today, days) {
-  const [r, w, z] = Array.isArray(raw) ? raw : [];
+  const [r, w, z, ns] = Array.isArray(raw) ? raw : []; // ns = 🖊️ 논술 원고(v303 · 없거나 깨지면 논술 절만 빠진다)
   const listOf = (o, k) => (o && typeof o === 'object' && Array.isArray(o[k]) && o[k].length ? o[k] : null);
   if (!listOf(r, 'cards') || !listOf(w, 'words') || !listOf(z, 'puzzles')) return null;
   const cards = validCards(r);
   if (!cards.length) return null;
-  return korReportText(p || {}, { cards, words: allWords(w, cards), puzzles: allPuzzles(z, cards) }, today, days);
+  return korReportText(p || {}, { cards, words: allWords(w, cards), puzzles: allPuzzles(z, cards), nonsul: allTopics(ns) }, today, days);
 }
