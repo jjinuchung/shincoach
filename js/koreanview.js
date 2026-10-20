@@ -121,7 +121,7 @@ export async function enterKorean() {
   Promise.resolve(settleLostCatch()).catch(() => {}).then(() => settleKorThrows());
   // 📥 ✍️ 서술형 아빠 답장 — 비공개 저장소에서 받아 그 글에 한 번만 붙인다(보상도 한 트랜잭션) · 못 받으면 조용히
   loadCards().then((cards) => (cards ? syncWrites(cards) : null)).then((r) => {
-    const line = appliedLine(r);
+    const line = appliedLine(r, 'K'); // 🖊️ 논술 글 답장(v304)은 논술 첫 화면에서
     if (!line) return;
     ui.writeNote = line;
     if (!ui.read && !anySession() && !ui.wview && ui.tab === 'cards') renderList().catch(() => {});

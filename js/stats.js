@@ -1032,8 +1032,11 @@ function renderUploadCard(main) {
     // 📥 아빠 교정·❓ 답장 받기 결과 — 못 받았으면 까닭 (아이 화면은 조용히, 여기서만 — Codex 36차 #4)
     box.appendChild(el('p', 'stats-sub', readSummary(readState(), fmt)));
     // ✍️ 국어 생각 쓰기 — 답장 기다리는 글이 있으면 Claude에게 "국어 답 봐 줘" (v237)
-    const waiting = writeTodo((getProfileSnapshot() || {}).korWrites, []).length;
-    box.appendChild(el('p', 'stats-sub', waiting ? `✍️ 국어 생각 쓰기: 답장 기다리는 글 ${waiting}개 — Claude에게 "국어 답 봐 줘"` : '✍️ 국어 생각 쓰기: 답장 기다리는 글 없음'));
+    // 🖊️ 논술 짧은 글(v304, N##)도 같은 목록 — 몇 개가 논술인지 덧붙인다
+    const wtodo = writeTodo((getProfileSnapshot() || {}).korWrites, []);
+    const waiting = wtodo.length;
+    const nsWait = wtodo.filter((t) => String(t.card).startsWith('N')).length;
+    box.appendChild(el('p', 'stats-sub', waiting ? `✍️ 국어 생각 쓰기: 답장 기다리는 글 ${waiting}개${nsWait ? ` (🖊️ 논술 짧은 글 ${nsWait}개 포함)` : ''} — Claude에게 "국어 답 봐 줘"` : '✍️ 국어 생각 쓰기: 답장 기다리는 글 없음'));
     const row = el('div', 'stats-actions');
     const send = el('button', 'btn btn-primary', '📤 지금 보내기');
     send.type = 'button';

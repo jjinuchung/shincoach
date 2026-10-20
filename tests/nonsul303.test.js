@@ -50,8 +50,9 @@ test('🖊️ 원고: 주제 12 · 검사 통과 · 편마다 이유 셋 · 상�
 
 test('🖊️ checkNonsul: 깨진 원고를 하나씩 잡는다 · allTopics는 깨진 주제를 조용히 뺀다', () => {
   const good = JSON.parse(JSON.stringify(RAW.topics[0]));
-  const bad = (f) => { const t = JSON.parse(JSON.stringify(good)); f(t); return checkNonsul({ topics: [t] }); };
-  assert.deepEqual(checkNonsul({ topics: [good] }), []);
+  // v304부터 원고에 ✍️ 짧은 글 채점 기준(write)이 꼭 있다 — 주제 검사는 그 칸을 둔 채로
+  const bad = (f) => { const t = JSON.parse(JSON.stringify(good)); f(t); return checkNonsul({ write: RAW.write, topics: [t] }); };
+  assert.deepEqual(checkNonsul({ write: RAW.write, topics: [good] }), []);
   for (const [name, f] of [
     ['번호', (t) => { t.id = 'X1'; }],
     ['물음 꼴', (t) => { t.q = '카드 교환'; }],
@@ -278,7 +279,7 @@ test('🖊️ 화면 연결: 홈 카드 · 화면 · ⏳ 국어 시간 · 시간
   assert.ok(app.includes("  if (name === 'nonsul') enterNonsul().catch(() => {});") && app.includes('  initNonsul({ showView });'));
   assert.ok(read('js/timeup.js').includes("  { id: 'time-chip-nonsul', subject: 'korean' },"));
   const v = read('js/nonsulview.js');
-  assert.equal((v.match(/guardStart\('korean', /g) || []).length, 3, '판을 열 때마다 국어 시간을 본다(시작·연습·다음 주제)');
+  assert.equal((v.match(/guardStart\('korean', /g) || []).length, 6, '판을 열 때마다 국어 시간을 본다(시작·연습·다음 주제) + v304 ✍️ 짧은 글을 여는 세 곳(첫 화면 목록·판 끝·📬 띠 — Codex 110차 #2)');
   const fin = body(v, 'async function finishRound() {');
   assert.ok(fin.includes('res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from }, S.list.map((t) => t.id));'), '판 끝에 한 번 저장 · ok = 한 번도 안 틀림');
   const run = body(v, 'export async function runCatch() {');

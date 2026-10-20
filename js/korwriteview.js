@@ -4,9 +4,11 @@
 // · 쓰던 글은 이 기기에 남긴다(다른 화면을 다녀와도·다시 그려도) — 한글 입력 중에는 자르지 않고, 보낼 때만 글자 수를 본다
 // · 📬 답장은 화면에 실제로 보였을 때만 "읽음"(watchSeen — Codex 52차 #9: 그리기만 해도 읽음이 되어, 끝 카드 아래로 밀린 답장을 못 보고 나가도 📬가 사라졌다)
 // · 생각 쓰기 도우미(v240): 🧩 문장 틀(늘 글 끝에 — 빈자리를 채운 뒤 커서가 문장 가운데 있어도, ~ 자리에 커서) · 🔢 글 번호 ①…(커서 자리에) · ✔️ 보내기 전 스스로 확인(채점·막기·저장 없음)
+// · 🖊️ 논술 짧은 글(v304)도 이 칸을 쓴다 — 쓰기 칸만 ctx.form(칸마다 머리말 채우기)·말은 ctx.words로 바꾸고, 답장·기다림·다시 쓰기·읽음은 그대로
 import { korWritesMap, korWriteAdd, korWriteRead, korWriteApply } from './xp.js';
-import { cardWriteState, unreadReplies, replyStats, writeCheck, textLen, ownLen, questionOf, GRADES, WRITE_MIN, WRITE_MAX, WRITE_COINS, FRAME_GAP, OWN_MIN } from './korwrite.js';
-import { circled, lineCount } from './korean.js';
+import { cardWriteState, unreadReplies, replyStats, rowsOfFams, writeCheck, textLen, ownLen, questionOf, GRADES, WRITE_MIN, WRITE_MAX, WRITE_COINS, FRAME_GAP, OWN_MIN } from './korwrite.js';
+import { circled, lineCount, validCards } from './korean.js';
+import { nonsulWriteCards } from './nonsul.js';
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -30,14 +32,16 @@ function setDraft(id, text) {
   try { if (text) localStorage.setItem(DRAFT_KEY(id), text); else localStorage.removeItem(DRAFT_KEY(id)); } catch { /* 이 기기에 못 적어도 메모리에는 */ }
 }
 
-/** 글자 수 줄 (순수) — 짧음·김·틀만·괜찮음 (frames = 그 카드의 🧩 틀 — 틀·번호·문장부호를 뺀 내 말이 OWN_MIN자) */
+/**
+ * 글 상태 줄 (순수) — 짧음·김·틀만·괜찮음 (frames = 그 카드의 🧩 틀 — 틀·번호·문장부호를 뺀 내 말이 OWN_MIN자)
+ * 글자 수 숫자는 띄우지 않는다 (v304 Codex 110차 #3 — 아이 화면에 셈 없이, 2026-10-15) · 상한·하한은 규칙(writeCheck)이 그대로 본다
+ */
 export function countLine(text, frames) {
   const n = textLen(text);
-  if (n > WRITE_MAX) return { text: `${WRITE_MAX}자까지예요 — 조금 줄여 볼까요? (지금 ${n}자)`, ok: false, warn: true };
-  if (n < WRITE_MIN) return { text: n ? `${WRITE_MIN}자는 넘게 써 볼까요? (지금 ${n}자)` : `한두 문장이면 돼요 (${WRITE_MAX}자까지)`, ok: false, warn: false };
-  const o = ownLen(text, frames);
-  if (o < OWN_MIN) return { text: `틀 말고 내 말을 조금 더 써 볼까요? (내 말 ${o}자)`, ok: false, warn: false };
-  return { text: `${n} / ${WRITE_MAX}자`, ok: true, warn: false };
+  if (n > WRITE_MAX) return { text: '글이 조금 길어요 — 조금 줄여 볼까요?', ok: false, warn: true };
+  if (n < WRITE_MIN) return { text: n ? '조금만 더 써 볼까요?' : '한두 문장이면 돼요', ok: false, warn: false };
+  if (ownLen(text, frames) < OWN_MIN) return { text: '틀 말고 내 말을 조금 더 써 볼까요?', ok: false, warn: false };
+  return { text: '✉️ 보낼 수 있어요', ok: true, warn: false };
 }
 /**
  * 🧩 틀·🔢 번호 끼워 넣기 (순수) — 고른 곳(없으면 커서 자리)을 piece로 바꾼다 · 앞이 글자면 빈칸 하나 · piece의 첫 ~ 자리에 커서(없으면 끝)
@@ -75,9 +79,9 @@ export function sendWhy(r) {
   return ({
     pending: '이미 보낸 글이 있어요 — 아빠 답장을 기다려요',
     done: '✅ 이 생각 쓰기는 벌써 끝났어요',
-    short: `${WRITE_MIN}자는 넘게 써 볼까요?`,
+    short: '조금만 더 써 볼까요?',
     own: '틀 말고 내 말을 조금 더 써 볼까요?',
-    long: `${WRITE_MAX}자까지예요 — 조금 줄여 볼까요?`,
+    long: '글이 조금 길어요 — 조금 줄여 볼까요?',
     unknown: '이 글에는 생각 쓰기가 없어요',
   })[r.why] || '저장을 못 했어요 — 한 번 더 눌러 주세요 (쓴 글은 그대로 있어요)';
 }
@@ -291,19 +295,30 @@ export function watchSeen(box, onSeen, g = globalThis) {
   if (listen) doc.addEventListener('visibilitychange', onVis);
 }
 
+/** 칸의 말 — 📚 국어 카드(기본) · 🖊️ 논술 짧은 글은 ctx.words로 바꾼다 (v304) */
+export const WRITE_WORDS = {
+  label: '생각 쓰기',
+  head: '✍️ 생각 쓰기',
+  wait: '✉️ 아빠에게 보낸 글이에요 — 답장을 기다리고 있어요. 다른 글을 읽어도 돼요.',
+  done: '✅ 이 생각 쓰기는 끝! 잘했어요',
+  where: '📚 도감 위에',
+};
+
 /**
  * ✍️ 카드의 생각 쓰기 칸 — 상태에 따라: 쓰기 · 답장 기다림 · 답장(🔸·🔁면 다시 써 보기) · ✅ 끝
  * 답장은 안 읽은 것을 모두 보인다(병합으로 앞 글의 답장이 따로 있어도 — Codex 52차 #4) · 보통은 하나
  * @param {object} card write가 있는 카드
- * @param {{cards:Function}} ctx
+ * @param {{cards:Function, form?:Function, words?:object}} ctx form(card, ctx, onSent) = 쓰기 칸을 바꿀 때(🖊️ 논술) · words = WRITE_WORDS 중 바꿀 말
  */
 export function writeBoxEl(card, ctx) {
+  const W = { ...WRITE_WORDS, ...(ctx.words || {}) };
+  const form = (onSent) => (typeof ctx.form === 'function' ? ctx.form(card, ctx, onSent) : formEl(card, ctx, onSent));
   const sec = el('section', 'kor-write');
-  sec.setAttribute('aria-label', '생각 쓰기');
+  sec.setAttribute('aria-label', W.label);
   const draw = (note) => {
     sec.textContent = '';
     const st = cardWriteState(korWritesMap(), card.id);
-    sec.appendChild(el('h3', 'kor-wh', '✍️ 생각 쓰기'));
+    sec.appendChild(el('h3', 'kor-wh', W.head));
     if (note) sec.appendChild(el('p', 'kor-wnote', note));
     const dated = st.shown.length + st.pendings.length > 1; // 글이 둘 이상 보이면 어느 글인지 날짜
     for (const e of st.shown) {
@@ -316,7 +331,7 @@ export function writeBoxEl(card, ctx) {
       // 이 기기 원고에 그 판이 없으면(다른 기기가 새 판으로 쓴 글이 병합으로 옴) 지금 물음을 대신 보이지 않는다 (Codex 56차)
       const qs = st.pendings.map((p) => { const ed = questionOf(card.write, p.v); return ed ? ed.q : NO_EDITION_Q; });
       sec.appendChild(el('p', 'kor-wq-text', qs[0]));
-      sec.appendChild(el('p', 'kor-wwait', '✉️ 아빠에게 보낸 글이에요 — 답장을 기다리고 있어요. 다른 글을 읽어도 돼요.'));
+      sec.appendChild(el('p', 'kor-wwait', W.wait));
       st.pendings.forEach((p, k) => {
         const mine = el('div', 'kor-wmine');
         if (k > 0 && qs[k] !== qs[0]) mine.appendChild(el('p', 'kor-wq-text', qs[k])); // 판이 다른 글(두 기기)
@@ -326,17 +341,17 @@ export function writeBoxEl(card, ctx) {
       });
       return;
     }
-    if (st.done) { sec.appendChild(el('p', 'kor-wdone', '✅ 이 생각 쓰기는 끝! 잘했어요')); return; }
+    if (st.done) { sec.appendChild(el('p', 'kor-wdone', W.done)); return; }
     if (st.lastGraded) {
       const again = el('button', 'btn kor-wagain', '✍️ 다시 써 보기');
       again.type = 'button';
-      again.addEventListener('click', () => { again.replaceWith(formEl(card, ctx, onSent)); const t = sec.querySelector('textarea'); if (t) t.focus(); });
+      again.addEventListener('click', () => { again.replaceWith(form(onSent)); const t = sec.querySelector('textarea'); if (t) t.focus(); });
       sec.appendChild(again);
       return;
     }
-    sec.appendChild(formEl(card, ctx, onSent));
+    sec.appendChild(form(onSent));
   };
-  const onSent = (r) => draw(`✉️ 보냈어요!${r.coins ? ` 💰 +${r.coins}` : ''} 아빠 답장이 오면 📚 도감 위에 📬가 떠요.`);
+  const onSent = (r) => draw(`✉️ 보냈어요!${r.coins ? ` 💰 +${r.coins}` : ''} 아빠 답장이 오면 ${W.where} 📬가 떠요.`);
   draw('');
   return sec;
 }
@@ -381,29 +396,70 @@ export function renderReplyView(cardId, ctx) {
   window.scrollTo(0, 0);
 }
 
+// ── 서술형 카드 — 📚 국어 카드(reading.json) + 🖊️ 논술 주제(nonsul.json) (v304: 같은 장부·같은 답장 파일) ──
+const famCache = { K: null, N: null };
+const FAM_URL = { K: './coach/korean/reading.json', N: './coach/korean/nonsul.json' };
+/** 한 원고의 카드 — 받으면 이 기기 메모리에 두고 다시 쓴다 · 못 받으면 null(다음에 다시) */
+async function famCards(fam) {
+  if (famCache[fam]) return famCache[fam];
+  try {
+    const res = await fetch(FAM_URL[fam]);
+    if (!res.ok) throw new Error(String(res.status));
+    const json = await res.json();
+    const cards = fam === 'K' ? validCards(json) : nonsulWriteCards(json);
+    if (!cards.length) return null;
+    famCache[fam] = cards;
+    return cards;
+  } catch {
+    return null;
+  }
+}
+/**
+ * 답장 붙이기에 넘길 카드 — 그 화면이 이미 받은 카드(given)에 다른 원고의 카드를 더한다 · fams = 카드를 가진 원고(K·N)
+ * (한 화면의 카드만 넘기면 다른 원고의 답장이 "서술형이 있는 카드가 아님"으로 📊에 ⚠️가 떴다)
+ */
+export async function writeCardsNow(given) {
+  const cards = (Array.isArray(given) ? given : []).filter((c) => c && typeof c.id === 'string');
+  const fams = new Set(cards.map((c) => c.id[0]));
+  for (const fam of ['K', 'N']) {
+    if (fams.has(fam)) continue;
+    const more = await famCards(fam);
+    if (more) { cards.push(...more); fams.add(fam); }
+  }
+  return { cards, fams };
+}
+
 // ── 📥 비공개 저장소의 답장 받기 ──
 let syncing = null;
 /**
  * 📥 korean/replies.json → 그 글에 한 번만 붙이고 보상 (한 트랜잭션) · 열쇠가 없거나 못 받으면 조용히 그대로
  * 붙인 뒤 📊 받기 줄에 "받지 않은 줄 · 맞는 글 없음" 수를 적는다(글은 안 적는다 — Codex 52차 #5: 줄 수만 보고 다 받은 줄 알았다)
- * @param {Array} cards 지금 있는 카드
+ * 국어·논술 어느 화면에서 불러도 두 원고의 카드를 함께 — 이번에 못 받은 원고의 줄은 빼고 다음에(rowsOfFams, v304)
+ * @param {Array} given 그 화면이 가진 카드
  * @returns {Promise<{ok:boolean, coins?:number, stone?:number, applied?:Array}>}
  */
-export function syncWrites(cards) {
+export function syncWrites(given) {
   if (syncing) return syncing;
   syncing = (async () => {
     const { readPrivateList, noteReadCheck, PRIVATE_KOR_REPLIES } = await import('./upload.js');
-    const list = await readPrivateList(PRIVATE_KOR_REPLIES);
-    if (!list.length) return { ok: false };
+    const raw = await readPrivateList(PRIVATE_KOR_REPLIES);
+    if (!raw.length) return { ok: false };
+    const { cards, fams } = await writeCardsNow(given);
+    const list = rowsOfFams(raw, fams);
+    if (!list.length) return { ok: false }; // 모두 못 받은 원고의 줄 — 📊 받기 줄은 그대로 두고 다음에
     const r = await korWriteApply(list, cards);
     noteReadCheck(PRIVATE_KOR_REPLIES, replyStats(korWritesMap(), list, cards));
     return r;
   })().catch(() => ({ ok: false })).finally(() => { syncing = null; });
   return syncing;
 }
-/** 답장이 붙었을 때 도감 위 한 줄 (순수) */
-export function appliedLine(r) {
+/** 답장이 붙었을 때 도감 위 한 줄 (순수) — fam('K'·'N')을 주면 그 원고의 답장만 세고 보상도 그만큼 (국어 화면에 논술 답장 수가 섞이지 않게, v304) */
+export function appliedLine(r, fam) {
   if (!r || !r.ok || !r.applied || !r.applied.length) return '';
-  const gain = [r.coins ? `💰 +${r.coins}` : '', r.stone ? `🟩 국어스톤 +${r.stone}` : ''].filter(Boolean).join(' · ');
-  return `📬 아빠 답장이 ${r.applied.length}개 왔어요${gain ? ` — ${gain}` : ''}`;
+  const mine = fam ? r.applied.filter((a) => a && String(a.card).startsWith(fam)) : r.applied;
+  if (!mine.length) return '';
+  const coins = fam ? mine.reduce((s, a) => s + (Number(a.coins) || 0), 0) : r.coins;
+  const stone = fam ? mine.reduce((s, a) => s + (Number(a.stone) || 0), 0) : r.stone;
+  const gain = [coins ? `💰 +${coins}` : '', stone ? `🟩 국어스톤 +${stone}` : ''].filter(Boolean).join(' · ');
+  return `📬 아빠 답장이 ${mine.length}개 왔어요${gain ? ` — ${gain}` : ''}`;
 }

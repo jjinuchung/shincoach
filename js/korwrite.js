@@ -25,10 +25,21 @@
 //  · korean/todo.json에는 그 글을 쓴 판의 물음(지금 원고의 물음이 아니라)과 지금 판(vNow) · 진우 화면의 "답장 기다리는 글" 위 물음도 그 판으로
 //  · 답장은 채점한 판 v를 적는다 — 그 글의 판과 같아야 붙는다 · v가 없는 줄은 1판(v243 전 답장은 모두 1판) · 그 카드에 없는 판은 받지 않는다
 //  · 판이 달라 안 붙은 답장은 📊 받기 줄에 "판 다름 N"(replyStats.stale)
+// 🖊️ 논술 짧은 글 (v304, 2026-10-20 — 아버님 물음 넷 모두 추천안): 같은 장부·같은 왕복·같은 보상 — 카드 열쇠에 논술 주제 N## ·
+//  카드마다 글 길이 상한(write.max — 논술은 머리말이 들어가 300자) · 카드 목록은 부르는 쪽이 국어 카드 + 논술 주제(nonsul.nonsulWriteCards)를 함께
 import { dayNum, KOR_STONE, WRITE_MIN, WRITE_MAX, FRAME_GAP } from './korean.js';
 
 /** 글자 수(공백 정리 뒤) 10~200 — 짧은 한 문장 "엄마가 걱정하실까 봐요."도 받는다 (값은 korean.js — 원고 검사도 같은 값) */
 export { WRITE_MIN, WRITE_MAX, FRAME_GAP };
+/** 카드가 write.max로 늘릴 수 있는 글 길이의 끝 (🖊️ 논술 짧은 글 300자, v304) */
+export const WRITE_MAX_HI = 300;
+/** 그 카드의 글 길이 상한 — write.max가 WRITE_MAX~WRITE_MAX_HI면 그 값, 아니면 WRITE_MAX */
+export function writeMaxOf(write) {
+  const m = isObj(write) ? Math.floor(Number(write.max)) : 0;
+  return m >= WRITE_MAX && m <= WRITE_MAX_HI ? m : WRITE_MAX;
+}
+/** 서술형 카드 열쇠 — 📚 국어 카드 K## · 🖊️ 논술 주제 N## (v304) */
+export const WRITE_CARD_RE = /^[KN]\d{1,3}$/;
 /** 답장 글 길이 상한 */
 export const REPLY_MAX = 600;
 /** 답장 파일 줄 수 상한 — 넘으면 하나도 받지 않는다(잘라 받지 않는다 — 잘린 뒤쪽의 "같은 글에 다른 답장"을 못 보니까, Codex 52차 #5) */
@@ -48,7 +59,7 @@ export const GRADES = {
 };
 const CARDS_MAX = 100;
 const RAW_LIST_MAX = 200; // 깨진 파일 막이 — 보통은 닿지 않는다(답장 받은 글 KEEP_DONE개 + 사본마다 기다리는 글 하나)
-const RAW_TEXT_MAX = WRITE_MAX * 2; // 저장된 글을 고쳐 읽을 때의 상한 (붙여 넣은 긴 글이 저장소를 키우지 않게)
+const RAW_TEXT_MAX = WRITE_MAX_HI * 2; // 저장된 글을 고쳐 읽을 때의 상한 (붙여 넣은 긴 글이 저장소를 키우지 않게)
 
 const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
 const isObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -81,11 +92,11 @@ export function ownLen(text, frames) {
   for (const p of frameParts(frames)) t = t.split(p).join(' ');
   return [...t.replace(/\s/g, '')].length; // 뼈대엔 글자·숫자·빈칸만 남아 있다
 }
-/** 보낼 수 있나 — { ok, n, why: 'short' | 'long' | 'own' } · own = 틀·번호·문장부호 말고 내 말이 OWN_MIN자 안 됨 */
-export function writeCheck(text, frames) {
+/** 보낼 수 있나 — { ok, n, why: 'short' | 'long' | 'own' } · own = 틀·번호·문장부호 말고 내 말이 OWN_MIN자 안 됨 · max = 그 카드의 상한(writeMaxOf) */
+export function writeCheck(text, frames, max = WRITE_MAX) {
   const n = textLen(text);
   if (n < WRITE_MIN) return { ok: false, n, why: 'short' };
-  if (n > WRITE_MAX) return { ok: false, n, why: 'long' };
+  if (n > max) return { ok: false, n, why: 'long' };
   if (ownLen(text, frames) < OWN_MIN) return { ok: false, n, why: 'own' };
   return { ok: true, n };
 }
@@ -166,7 +177,7 @@ export function writesOf(raw) {
   const out = {};
   if (!isObj(raw)) return out;
   for (const id of Object.keys(raw).slice(0, CARDS_MAX)) {
-    if (!/^K\d{1,3}$/.test(id)) continue;
+    if (!WRITE_CARD_RE.test(id)) continue;
     const c = isObj(raw[id]) ? raw[id] : {};
     const list = tidy((Array.isArray(c.list) ? c.list.slice(0, RAW_LIST_MAX) : []).map(entryOf).filter(Boolean));
     out[id] = { last: Math.max(cnt(c.last), ...list.map((e) => e.at), 0), list, paid: paidOf(c.paid) };
@@ -225,7 +236,7 @@ export function unreadReplies(writes) {
 export function writeAddRule(profile, cardId, text, now, cards) {
   const card = (Array.isArray(cards) ? cards : []).find((c) => c && c.id === cardId && isObj(c.write));
   if (!card) return { ok: false, why: 'unknown' };
-  const chk = writeCheck(text, card.write.frames);
+  const chk = writeCheck(text, card.write.frames, writeMaxOf(card.write));
   if (!chk.ok) return { ok: false, why: chk.why, n: chk.n };
   const all = writesOf(profile.korWrites);
   const w = all[cardId] || emptyCard();
@@ -290,6 +301,17 @@ export function checkReplies(list, cards) {
     else good.push(r);
   }
   return { good, bad, over: false };
+}
+/**
+ * 받을 줄 고르기 (순수, v304) — 카드를 못 받은 원고(K 국어·N 논술)의 줄은 이번엔 뺀다(다음에 원고를 받으면 그때 붙는다 —
+ * 📊에 "받지 않은 줄"로 거짓 ⚠️가 뜨지 않게) · 다른 꼴의 줄은 그대로(checkReplies가 까닭을 적는다) ·
+ * REPLY_ROWS_MAX를 넘는 파일은 그대로 넘긴다(골라서 받지 않는다 — 줄 수 상한의 뜻)
+ * @param {Array} list 답장 파일 그대로 · @param {Set<string>} fams 카드를 가진 원고의 머리 글자
+ */
+export function rowsOfFams(list, fams) {
+  const rows = Array.isArray(list) ? list : [];
+  if (rows.length > REPLY_ROWS_MAX) return rows;
+  return rows.filter((e) => !(isObj(e) && typeof e.card === 'string' && WRITE_CARD_RE.test(e.card) && !fams.has(e.card[0])));
 }
 /** 답장 r이 가리키는 글 (id가 같고, at을 적었으면 at도 같은 글) — 판은 아직 안 본다 */
 const pointed = (w, r) => (w ? w.list.find((x) => x.id === r.id && (!r.at || x.at === r.at)) : undefined) || null;

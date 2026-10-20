@@ -263,11 +263,13 @@ export function slotRanges(slots) {
  */
 export function koreanFiles(todo, today) {
   const list = Array.isArray(todo) ? todo : [];
-  const lines = [`✍️ 진우가 쓴 국어 서술형 — 답장 기다리는 글 ${list.length}개 (${today}) · 답장은 korean/replies.json에 { card, id, at, v, grade(ok·near·again), text } (card·id·at·v는 아래 그대로 — v는 채점한 판, 그 판의 rubric으로)`, ''];
+  const lines = [`✍️ 진우가 쓴 국어 서술형 — 답장 기다리는 글 ${list.length}개 (${today}) · 답장은 korean/replies.json에 { card, id, at, v, grade(ok·near·again), text } (card·id·at·v는 아래 그대로 — v는 채점한 판, 그 판의 rubric으로)`,
+    '(N## = 🖊️ 논술 짧은 글 — 채점 기준은 coach/korean/nonsul.json의 write 하나를 모든 주제가 같이, 「」는 주제 · K## = 📚 국어 카드 — coach/korean/reading.json 카드의 write)', ''];
   for (const e of list) {
     // 원고를 고친 뒤의 옛 글 — 그 판의 물음·기준으로 (Codex 52차 #8)
     const old = e.vNow && e.vNow !== e.v ? ` (지금 원고는 v${e.vNow} — 이 글은 v${e.v} 물음·기준으로, 원고 write.past)` : '';
-    lines.push(`[${e.card} · id ${e.id} · at ${e.at} · v ${e.v}] ${e.date} 「${e.title}」 · 채점 기준 v${e.v}${old}`);
+    const ns = /^N/.test(String(e.card)) ? '🖊️ 논술 짧은 글 ' : ''; // v304
+    lines.push(`[${e.card} · id ${e.id} · at ${e.at} · v ${e.v}] ${e.date} ${ns}「${e.title}」 · 채점 기준 v${e.v}${old}`);
     lines.push(e.vNow && !e.q ? `    ⚠️ v${e.v} 물음을 원고(write.past)에서 못 찾았어요 — 원고를 확인해 주세요` : `    물음: ${e.q}`);
     lines.push(`    진우: ${e.text}`);
     for (const b of (Array.isArray(e.before) ? e.before : [])) lines.push(`    (전에 ${b.date} · ${b.grade}) ${b.text} → 답장: ${b.reply}`);
@@ -367,14 +369,16 @@ function noteFail(why, at = Date.now()) {
 
 /**
  * ✍️ 국어 서술형 답장 기다리는 글 — 이 기기 프로필 + 원고(제목·물음). 프로필을 못 읽으면 실패(위와 같은 까닭) ·
- * 원고를 못 받으면 카드 id만으로(제목·물음 없이) — Claude는 원고를 저장소에서 따로 읽는다
+ * 원고를 못 받으면 카드 id만으로(제목·물음 없이) — Claude는 원고를 저장소에서 따로 읽는다 · 🖊️ 논술 짧은 글(v304)도 같은 목록(주제 원고는 nonsul.json)
  */
 async function korTodoNow() {
-  const [{ getProfile }, { writeTodo }, { validCards }] = await Promise.all([import('./db.js'), import('./korwrite.js'), import('./korean.js')]);
+  const [{ getProfile }, { writeTodo }, { validCards }, { nonsulWriteCards }] = await Promise.all([import('./db.js'), import('./korwrite.js'), import('./korean.js'), import('./nonsul.js')]);
   const p = await getProfile();
   let cards = [];
   try { cards = validCards(await (await fetch('./coach/korean/reading.json')).json()); } catch { cards = []; }
-  return writeTodo(p && p.korWrites, cards);
+  let ns = [];
+  try { ns = nonsulWriteCards(await (await fetch('./coach/korean/nonsul.json')).json()); } catch { ns = []; }
+  return writeTodo(p && p.korWrites, [...cards, ...ns]);
 }
 
 /**

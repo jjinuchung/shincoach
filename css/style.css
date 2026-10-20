@@ -3787,7 +3787,7 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 }
 
 /* 🖊️ 논술 (v303) — 국어 보기 단추(.kor-opt)·잡기 단추(.kor-catch)를 그대로 쓰고, 그 색 낱말을 이 화면에도 둔다 */
-.ns-main { --kor-ok-bg: #e4f5ea; --kor-no-bg: #fcebea; flex: 1; padding: 14px; max-width: 760px; width: 100%; margin: 0 auto; display: grid; gap: 12px; align-content: start; }
+.ns-main { --kor-ok-bg: #e4f5ea; --kor-no-bg: #fcebea; --kor-gold-bg: #fbf2d8; --kor-gold-line: #e2c066; --kor-paper: #fffdf7; --kor-rule: #e9eef5; flex: 1; padding: 14px; max-width: 760px; width: 100%; margin: 0 auto; display: grid; gap: 12px; align-content: start; }
 .ns-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 16px; display: grid; gap: 12px; }
 .ns-title { margin: 0; font-size: 1.3rem; line-height: 1.4; word-break: keep-all; }
 .ns-how { margin: 0; padding-left: 1.3em; display: grid; gap: 4px; color: var(--muted); line-height: 1.55; }
@@ -3818,3 +3818,24 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .ns-essay { text-align: left; display: grid; gap: 4px; background: #fffdf7; border: 1px solid #e9eef5; border-radius: 12px; padding: 12px 14px; line-height: 1.7; word-break: keep-all; width: 100%; box-sizing: border-box; }
 .ns-done-title { font-size: 1.2rem; font-weight: 800; }
 .ns-done-btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+/* ✍️ 논술 짧은 글 (v304) — 칸마다 머리말 채우기 · 첫 화면 목록 · 판 끝 단추 */
+.ns-wlink { width: 100%; display: grid; }
+.ns-wlink-btn { white-space: normal; word-break: keep-all; min-height: 52px; font-weight: 700; border: 2px dashed var(--primary); background: #f5f8ff; }
+.ns-wback { margin-bottom: -4px; }
+.ns-wbanner { justify-self: stretch; white-space: normal; word-break: keep-all; }
+.ns-essays { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 16px; }
+.ns-essays[open] { display: grid; gap: 8px; }
+.ns-essays-sum { cursor: pointer; font-weight: 800; font-size: 1.05rem; padding: 6px 0; min-height: 32px; }
+.ns-essay-btn { display: grid; gap: 2px; text-align: left; justify-items: start; white-space: normal; word-break: keep-all; min-height: 52px; }
+.ns-essay-q { line-height: 1.5; }
+.ns-essay-tag { font-size: 0.85rem; font-weight: 700; color: var(--primary-dark); }
+.ns-whint { margin: 0; color: var(--muted); line-height: 1.55; word-break: keep-all; }
+.ns-wrow { display: grid; gap: 4px; }
+.ns-wrow .kor-wlabel { margin: 4px 0 0; }
+.ns-wline { display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 8px; align-items: start; } /* 머리말 칸 폭을 같게 — 쓰는 칸이 한 줄로 서게 (가장 긴 머리말 「그래도 나는」) */
+.ns-whead { font-weight: 800; color: var(--primary-dark); padding-top: 10px; white-space: nowrap; }
+.ns-w-more { margin-top: -2px; }
+.ns-wtext { min-height: 4.6em; }
+.ns-wpreview { line-height: 1.7; word-break: keep-all; }
+.ns-wpreview.is-empty .kor-wbody { color: var(--muted); }
+.ns-write [tabindex="-1"]:focus { outline: none; } /* 쓰기 화면을 열 때 제목으로 옮긴 포커스(읽어 주기용) — 테두리는 안 띄운다 */

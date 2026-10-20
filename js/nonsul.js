@@ -4,9 +4,12 @@
 // 2022 [4국03-03] "대상에 대한 자신의 의견과 그렇게 생각한 이유가 드러나게 글을 쓴다" — 아이 화면 말은 4학년 교과서 말 "의견·이유"
 // 칸은 🧩 국어 퍼즐과 같은 꼴(주제마다 { box, due, at, miss, d0 } · 병합도 korpuzzle.mergePuzzles) ·
 // 그날 처음 끝낸 판에 💰 + 🎯 논술 포켓몬 잡기 한 번 — 잡기 기회는 국어(korThrow)와 따로 센다(nonsulThrow, 같은 세 카운터 꼴)
-import { dayNum, throwsOf, pendingOf } from './korean.js';
+// ✍️ 짧은 글 (v304 — 아버님 물음 넷 모두 추천안): 판을 끝낸 주제를 칸마다 머리말(나는 · 왜냐하면 · 또 · 물론 · 그래도 나는) 채우기로 →
+//   국어 ✍️ 생각 쓰기와 같은 장부·왕복·보상(korwrite.js — 카드 열쇠 N## · 주제마다 평생 한도) · 채점 기준은 원고의 write 하나를 모든 주제가 같이 쓴다
+import { dayNum, throwsOf, pendingOf, PAST_MAX, FRAME_GAP } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
 import { shuffledOrder } from './korpuzzle.js';
+import { normText, bareText, writesOf, cardWriteState, writeCheck, WRITE_MAX_HI } from './korwrite.js';
 
 /** 그날 처음 끝낸 판의 💰 */
 export const NONSUL_COINS = 10;
@@ -61,11 +64,44 @@ function topicProblems(t) {
   return bad;
 }
 
+/**
+ * ✍️ 짧은 글 채점 기준 검사 (원고 write 하나 — 모든 주제가 같이 쓴다) → 틀린 곳 목록
+ * { v 판 번호(물음·rubric을 고치면 올린다), q 물음(주제마다 같은 말 — 주제는 todo의 제목), rubric { must ≥1, ok, miss }, past [{ v, q, rubric }] 옛 판 }
+ * rubric은 공개 원고(앱은 보여 주지 않는다) — Claude가 세션이 바뀌어도 같은 잣대로 (국어 ✍️와 같다)
+ */
+export function checkNonsulWrite(w) {
+  if (!isObj(w)) return ['write는 { v, q, rubric }'];
+  const bad = [];
+  const strs = (a) => Array.isArray(a) && a.every(str);
+  const edition = (x, name) => {
+    if (!str(x.q)) bad.push(`${name}.q(물음)가 비었어요`);
+    if (!isObj(x.rubric) || !strs(x.rubric.must) || !x.rubric.must.length) bad.push(`${name}.rubric.must(꼭 들어갈 것)가 하나 이상`);
+    else if (!strs(x.rubric.ok) || !strs(x.rubric.miss)) bad.push(`${name}.rubric.ok·miss는 글 목록`);
+  };
+  const vOk = Number.isInteger(w.v) && w.v > 0;
+  if (!vOk) bad.push('write.v(채점 기준 판 번호)는 1부터');
+  edition(w, 'write');
+  if (w.past !== undefined) {
+    if (!Array.isArray(w.past) || w.past.length > PAST_MAX) bad.push(`write.past(옛 판)는 ${PAST_MAX}개까지의 목록`);
+    else {
+      const seen = new Set();
+      w.past.forEach((x, k) => {
+        const name = `write.past ${k + 1}`;
+        if (!isObj(x)) { bad.push(`${name}은 { v, q, rubric }`); return; }
+        if (!Number.isInteger(x.v) || x.v <= 0 || (vOk && x.v >= w.v) || seen.has(x.v)) bad.push(`${name}의 v는 1부터, 지금 판보다 작게, 겹치지 않게`);
+        seen.add(x.v);
+        edition(x, name);
+      });
+    }
+  }
+  return bad;
+}
+
 /** 원고(coach/korean/nonsul.json) 형식 검사 → 틀린 곳 목록(비면 통과) — check.mjs가 배포 전에, 화면은 allTopics로 깨진 주제를 뺀다 */
 export function checkNonsul(json) {
   const list = isObj(json) && Array.isArray(json.topics) ? json.topics : null;
   if (!list || !list.length) return ['topics가 없음'];
-  const bad = [];
+  const bad = [...checkNonsulWrite(json.write)];
   const ids = new Set();
   for (const t of list) {
     bad.push(...topicProblems(t));
@@ -241,4 +277,86 @@ export function nonsulReport(list, states, days, now) {
   const dd = wordDaysOf(days, today);
   const week = Object.keys(dd).filter((k) => Number(k) > today - 7 && Number(k) <= today).length;
   return `🖊️ 논술: ⭐ 처음부터 다 맞힌 주제 ${solved}/${ls.length} · 다시 볼 주제 ${again} · 해 본 주제 ${tried} · 최근 7일 중 판을 끝낸 날 ${week}`;
+}
+
+// ───────────────────── ✍️ 짧은 글 (v304) ─────────────────────
+
+/** 짧은 글 길이 상한 — 머리말 넷이 들어가 국어 ✍️(200자)보다 길게 */
+export const NONSUL_WRITE_MAX = WRITE_MAX_HI;
+/** 꼭 채울 칸(의견·이유)의 글자·숫자 수 하한 — 머리말만 두고 보내지 않게 */
+export const ESSAY_FIELD_MIN = 2;
+/**
+ * ✍️ 짧은 글 칸 — 머리말(head)은 고정, 아이는 뒤만 쓴다 (판에서 익힌 순서 그대로) ·
+ * need = 이 칸을 채워야 보낸다(의견·이유 — 나머지 빈 칸은 글에서 빠지고 답장에서 다음 걸음으로) · 「또」는 이유 하나 더(안 써도 된다)
+ */
+export const ESSAY_HEADS = [
+  { k: 'claim', icon: '💭', label: '내 의견', head: '나는', ph: '… 생각해요.', need: true },
+  { k: 'why', icon: '💡', label: '이유', head: '왜냐하면', ph: '… 때문이에요.', need: true },
+  { k: 'more', icon: '', label: '', head: '또', ph: '이유를 하나 더 (안 써도 돼요)', need: false },
+  { k: 'counter', icon: '🙋', label: '반대 의견', head: '물론', ph: '… 말하는 친구도 있을 거예요.', need: false },
+  { k: 'close', icon: '🏁', label: '정리', head: '그래도 나는', ph: '… 생각해요.', need: false },
+];
+/** 머리말을 문장 틀 꼴로 — korwrite.ownLen이 머리말을 "내 말"로 세지 않게 · 「또」는 한 글자라 뺀다(다른 낱말 속 「또」까지 지우지 않게) */
+export const ESSAY_FRAMES = ESSAY_HEADS.filter((h) => h.k !== 'more').map((h) => `${h.head} ${FRAME_GAP}`);
+const ENDS = /[.!?…]$/u;
+/** 칸 하나 다듬기 — 공백 정리 · 아이가 머리말을 다시 쓴 것은 한 번만(「나는 나는 …」이 되지 않게) */
+function fieldText(h, v) {
+  const t = normText(v);
+  if (t === h.head) return '';
+  return t.startsWith(`${h.head} `) ? t.slice(h.head.length + 1).trim() : t;
+}
+const ownChars = (t) => [...bareText(t).replace(/\s/g, '')].length;
+
+/** ✍️ 칸들 → 보낼 글 (순수) — 채운 칸만 「머리말 + 글」로 · 끝에 마침표·물음표가 없으면 마침표 · 빈 칸(문장부호만 있는 칸도)은 글에서 빠진다 */
+export function composeEssay(fields) {
+  const f = isObj(fields) ? fields : {};
+  const out = [];
+  for (const h of ESSAY_HEADS) {
+    const t = fieldText(h, f[h.k]);
+    if (!ownChars(t)) continue;
+    out.push(`${h.head} ${t}${ENDS.test(t) ? '' : '.'}`);
+  }
+  return out.join(' ');
+}
+/** ✍️ 보낼 수 있나 (순수) — { ok, n, why } · why: 'claim'·'why'(그 칸이 비었음) · 'short'·'long'·'own'(korwrite.writeCheck — 상한 NONSUL_WRITE_MAX) */
+export function essayCheck(fields) {
+  const f = isObj(fields) ? fields : {};
+  for (const h of ESSAY_HEADS) if (h.need && ownChars(fieldText(h, f[h.k])) < ESSAY_FIELD_MIN) return { ok: false, n: 0, why: h.k };
+  return writeCheck(composeEssay(f), ESSAY_FRAMES, NONSUL_WRITE_MAX);
+}
+
+/**
+ * ✍️ 서술형 카드 (순수) — 쓸 수 있는 주제마다 { id, icon, title: 주제 물음, write } (korwrite가 국어 카드와 같은 꼴로 받는다) ·
+ * 채점 기준(write)이 깨졌으면 [] — 그땐 짧은 글을 열지 않는다(답장을 받을 기준이 없다)
+ */
+export function nonsulWriteCards(json) {
+  const w = isObj(json) ? json.write : null;
+  if (checkNonsulWrite(w).length) return [];
+  const write = { v: w.v, q: w.q, rubric: w.rubric, past: Array.isArray(w.past) ? w.past : [], frames: ESSAY_FRAMES, max: NONSUL_WRITE_MAX };
+  return allTopics(json).map((t) => ({ id: t.id, icon: t.icon, title: t.q, write }));
+}
+
+/** 주제 하나의 짧은 글 표시 (순수 · 셈 없이) — 📬 답장 · ✉️ 기다림 · ✅ 끝 · ✍️ 다시 써 보기 · '' 아직 안 씀 */
+export function essayTag(w) {
+  if (!w) return '';
+  if (w.unread) return '📬 아빠 답장이 왔어요';
+  if (w.pending) return '✉️ 답장 기다리는 중';
+  if (w.done) return '✅ 끝';
+  if (w.lastGraded) return '✍️ 다시 써 볼 수 있어요';
+  return '';
+}
+/** ✍️ 첫 화면 목록 (순수) — 판을 끝낸 주제만(원고 차례) [{ id, icon, q, tag }] */
+export function essayTopics(list, states, writes) {
+  const st = wordsOf(states);
+  return (Array.isArray(list) ? list : []).filter((t) => own(st, t.id)).map((t) => ({ id: t.id, icon: t.icon, q: t.q, tag: essayTag(cardWriteState(writes, t.id)) }));
+}
+
+/** 📤 국어 요약 🖊️ 절의 짧은 글 줄 (순수 · 아빠 화면) — 논술 주제(N##) 글만 */
+export function essayReport(writes) {
+  const w = writesOf(writes);
+  const ids = Object.keys(w).filter((id) => ID_RE.test(id) && w[id].list.length);
+  const entries = ids.flatMap((id) => w[id].list);
+  if (!entries.length) return '✍️ 짧은 글: (아직 쓴 글 없음)';
+  const ok = ids.filter((id) => cardWriteState(w, id).done).length;
+  return `✍️ 짧은 글: 쓴 글 ${entries.length}개 (주제 ${ids.length}개) · 답장 받은 글 ${entries.filter((e) => e.grade).length}개 · 답장 기다리는 글 ${entries.filter((e) => !e.grade).length}개 · ✅까지 간 주제 ${ok}개`;
 }

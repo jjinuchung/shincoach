@@ -8,7 +8,7 @@ import { TYPES, starsOf, missOf, qMissOf, readsOf, READS_MAX, validCards } from 
 import { deckStats, DECKS, DECK_ORDER, allWords } from './korwords.js';
 import { puzzleStats, KINDS as PUZZLE_KINDS, allPuzzles } from './korpuzzle.js';
 import { writesOf, cardWriteState } from './korwrite.js';
-import { allTopics, nonsulReport } from './nonsul.js'; // 🖊️ 논술 (v303)
+import { allTopics, nonsulReport, essayReport } from './nonsul.js'; // 🖊️ 논술 (v303 · ✍️ 짧은 글 v304)
 
 /** 자주 틀린 물음을 몇 개까지 싣나 */
 export const KOR_TOP = 12;
@@ -147,7 +147,7 @@ export function korReportText(p, data, today, days) {
   }
   // 생각 쓰기
   const w = writesOf(prof.korWrites);
-  const wcards = Object.keys(w).filter((id) => w[id].list.length);
+  const wcards = Object.keys(w).filter((id) => id.startsWith('K') && w[id].list.length); // 📚 국어 카드만 — 🖊️ 논술 짧은 글(N##)은 논술 절에 (v304)
   const entries = wcards.flatMap((id) => w[id].list);
   const okCards = wcards.filter((id) => cardWriteState(w, id).done).length;
   L.push('', '## ✍️ 생각 쓰기', entries.length
@@ -156,7 +156,7 @@ export function korReportText(p, data, today, days) {
   // 🖊️ 논술 (v303) — 원고를 못 받았으면 이 절만 빠진다
   if (Array.isArray(data && data.nonsul) && data.nonsul.length) {
     const now = new Date(`${today}T12:00:00`).getTime();
-    L.push('', '## 🖊️ 논술', `- ${nonsulReport(data.nonsul, prof.nonsul, prof.nonsulDay, Number.isFinite(now) ? now : Date.now())}`);
+    L.push('', '## 🖊️ 논술', `- ${nonsulReport(data.nonsul, prof.nonsul, prof.nonsulDay, Number.isFinite(now) ? now : Date.now())}`, `- ${essayReport(prof.korWrites)}`);
   }
   return `${L.join('\n').trim()}\n`;
 }

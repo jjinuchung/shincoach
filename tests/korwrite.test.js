@@ -425,8 +425,11 @@ test('★ ✍️ 저장 경로: 두 창이 같이 보내도 글 하나·💰5 �
 });
 
 test('✍️ 화면 말(순수)·연결: 글자 수 줄 · 보상 안내(남은 것만) · 보내기 결과 말 · 칸 한 줄 · 답장 붙은 한 줄 · 글은 textContent로만 · 끝 카드·들어올 때 받기·답장 화면 가드 · 받은 수 적기 · sw', () => {
-  assert.equal(countLine('').text, `한두 문장이면 돼요 (${WRITE_MAX}자까지)`);
-  assert.deepEqual([countLine('가나다').ok, countLine('가'.repeat(12)).text, countLine('가'.repeat(201)).warn], [false, `12 / ${WRITE_MAX}자`, true]);
+  // v304 (Codex 110차 #3): 글자 수 숫자는 아이 화면에 안 띄운다 — 상한·하한은 규칙이 그대로 본다
+  assert.equal(countLine('').text, '한두 문장이면 돼요');
+  assert.deepEqual([countLine('가나다').ok, countLine('가나다').text, countLine('가'.repeat(12)).text, countLine('가'.repeat(201)).warn, countLine('가'.repeat(201)).text], [false, '조금만 더 써 볼까요?', '✉️ 보낼 수 있어요', true, '글이 조금 길어요 — 조금 줄여 볼까요?']);
+  for (const t of ['', '가나다', '가'.repeat(12), '가'.repeat(201)]) assert.ok(!/\d/.test(countLine(t).text), `글 상태 줄에 숫자 없음: ${countLine(t).text}`);
+  assert.deepEqual([sendWhy({ why: 'short' }), sendWhy({ why: 'long' })], ['조금만 더 써 볼까요?', '글이 조금 길어요 — 조금 줄여 볼까요?']);
   assert.equal(rewardLine({}), '처음 보내면 💰5 · 아빠가 ✅를 주면 💰20 + 🟩');
   assert.equal(rewardLine({ first: 3, coins: 10 }), '아빠가 ✅를 주면 💰10 + 🟩');
   assert.equal(rewardLine({ first: 3, coins: 20, stone: 4 }), '');
@@ -501,7 +504,7 @@ test('✍️ 도우미: 틀·번호만 눌러서는 못 보냄 — 틀 조각·�
   const r = writeAddRule(p, 'K19', only, T0, CARDS);
   assert.deepEqual([r.ok, r.why, p.coins, !!(p.korWrites && p.korWrites.K19)], [false, 'own', 0, false], '규칙에서도 막는다 — 저장·💰5 없음');
   assert.equal(writeAddRule(p, 'K19', good, T0, CARDS).ok, true);
-  assert.deepEqual(countLine(only, f19), { text: '틀 말고 내 말을 조금 더 써 볼까요? (내 말 0자)', ok: false, warn: false });
+  assert.deepEqual(countLine(only, f19), { text: '틀 말고 내 말을 조금 더 써 볼까요?', ok: false, warn: false }); // v304: 「(내 말 N자)」 숫자는 뺐다
   assert.equal(countLine(good, f19).ok, true);
   assert.equal(sendWhy({ why: 'own' }), '틀 말고 내 말을 조금 더 써 볼까요?');
 });
@@ -532,7 +535,7 @@ test('✍️ 도우미 화면 연결: 🧩 틀은 쓰기 칸 위(누르면 늘 �
   assert.ok(form.includes('frames.map((f) => ({ label: f, piece: f, atEnd: true }))') && form.includes('const here = touched && !it.atEnd;'), '틀은 늘 끝에 · 번호만 커서 자리에');
   const chk = wv.slice(wv.indexOf('function checksEl('), wv.indexOf('/** 쓰기 칸'));
   assert.ok(chk.length > 100 && !/korWrite|setDraft|localStorage|disabled/.test(chk), '✔️ 확인은 저장도·막기도 안 한다');
-  assert.match(read('js/korwrite.js'), /const chk = writeCheck\(text, card\.write\.frames\);/, '규칙도 카드의 틀로');
+  assert.match(read('js/korwrite.js'), /const chk = writeCheck\(text, card\.write\.frames, writeMaxOf\(card\.write\)\);/, '규칙도 카드의 틀로 (v304부터 카드의 글 길이 상한도)');
   assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1] >= 240, 'sw 버전 v240 이상');
   const css = read('css/style.css');
   for (const k of ['.kor-whbtn {', '.kor-wchk-row {', '.kor-wnums .kor-whbtn {']) assert.ok(css.includes(k), k);
