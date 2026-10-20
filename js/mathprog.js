@@ -536,6 +536,7 @@ function logQ(q) {
     ...(q.p ? { p: 1 } : {}), ...(q.g ? { g: String(q.g).slice(0, GUESS_MAX) } : {}),
     // pf: 값은 맞는데 꼴('form' — 대분수로·소수로를 물었는데 다른 꼴) · 약분('reduce')만 틀림 — 짐작이 아니다 (Codex 18차 #4)
     ...(q.pf === 'form' || q.pf === 'reduce' ? { pf: q.pf } : {}),
+    ...(q.rl ? { rl: 1 } : {}), // 📚 틀린 뒤 배움 한 장을 봤다 (v302)
     ...secQ(q) }; // ⏱ 걸린 초 (v272)
 }
 export const WHY_LABEL = { s: '실수', c: '헷갈림', u: '몰랐음' };
@@ -546,6 +547,35 @@ export const WHY_LABEL = { s: '실수', c: '헷갈림', u: '몰랐음' };
  */
 export function slipExempt(q) {
   return !!q && !q.ok && q.w === 's' && q.sv !== 0;
+}
+
+// ── 📚 틀리면 배움 한 장 (2026-10-20, v302 — 아버님 "진행해") ──
+// 틀린 바로 그 자리에서 🔍 까닭 고르기·▶ 한 줄씩 열기·🙈 이유 대신 그 칸의 📚 배움 한 장 → 🔁 비슷한 문제.
+// 그 길은 다 지나야 다음이 열려 길었다 — 틀린 순간을 짧게 한다(방금 문제 풀이는 접어 두고 열면 그대로). 일지에는 rl만
+/** 배움 한 장이 나오는 편 — 처음 배우기·확인·연습(☀️ 개념 편 포함) · 🎲 섞어 풀기 (🤔 노트 회차·💎·📏 진단·❓ 답장 뒤 풀기는 그대로) */
+export const RELEARN_MODES = new Set(['learn', 'review', 'practice', 'mix']);
+/** 글의 한글 두 글자 묶음 — 그림 표시([place …])·굵게(**)는 뺀다 */
+function pageGrams(t) {
+  const out = new Set();
+  for (const w of String(t || '').replace(/\[[a-z]+[^\]]*\]/g, ' ').replace(/\*\*/g, '').match(/[가-힣]{2,}/g) || []) {
+    for (let i = 0; i + 1 < w.length; i++) out.add(w.slice(i, i + 2));
+  }
+  return out;
+}
+/**
+ * 틀린 문제와 가장 닮은 배움 장 (순수) — 0부터 센 장 번호.
+ * 장마다 설명·✋ 확인 글의 두 글자 묶음 가운데 문제 글에도 있는 것을 센다 — 「나타내는」·「나타내요」처럼 끝이 달라도 맞게 낱말 대신 묶음으로.
+ * 가장 많은 장 · 같으면 앞 장 · 하나도 없으면 첫 장 (모든 장에 있는 묶음은 모든 장에 똑같이 더해져 고르는 장을 안 바꾼다)
+ */
+export function relearnPage(qText, pages) {
+  const list = Array.isArray(pages) ? pages : [];
+  if (list.length < 2) return 0;
+  const pg = list.map((p) => pageGrams(`${(p && p.say) || ''} ${(p && p.check && p.check.q) || ''}`));
+  const qg = [...pageGrams(qText)];
+  let best = 0;
+  let at = 0;
+  pg.forEach((s, i) => { const n = qg.filter((g) => s.has(g)).length; if (n > best) { best = n; at = i; } });
+  return at;
 }
 
 // ── 💪 확인 편에서 한 번 틀려도 괜찮게 (2026-10-15, v262 — 아버님 "이대로 진행") ──
@@ -1493,7 +1523,8 @@ export const GUARD_LIST = 6;
  *   kept: 💪 확인 편에서 하나만 틀리고 쌍둥이를 맞혀 칸을 지킨 편 [{ id, name, d }] · quits의 rf: 확인 차례에 틀린 뒤 그만둬 못 통과로 친 편 (v262)
  * 날은 편을 시작한 날(sd || d). 일지는 최근 LOG_MAX편까지라 그보다 많이 풀면 오래된 날이 빠진다
  */
-export function guardReport(m, today, days = GUARD_DAYS) {
+/** 최근 days일의 일지 줄 { span, from, inWin, log } — 🛡️ 꼼수 막기 기록과 📚 배움 한 장 줄이 같은 기간·같은 편 셈 */
+function guardLog(m, today, days) {
   const span = Math.max(1, Math.trunc(Number(days) || GUARD_DAYS));
   const from = addDays(today, -(span - 1));
   const inWin = (d) => typeof d === 'string' && d >= from && d <= today;
@@ -1501,6 +1532,11 @@ export function guardReport(m, today, days = GUARD_DAYS) {
   const seen = new Set();
   const log = shownLog((m && Array.isArray(m.log)) ? m.log : [])
     .filter((e) => e && inWin(e.sd || e.d) && (e.rid === undefined || (!seen.has(e.rid) && !!seen.add(e.rid))));
+  return { span, from, inWin, log };
+}
+
+export function guardReport(m, today, days = GUARD_DAYS) {
+  const { span, from, inWin, log } = guardLog(m, today, days);
   const quits = log.filter((e) => e.mode === 'quit').reverse()
     .map((e) => ({ id: e.id, name: nameOf(e.id), d: e.d, ok: Number(e.ok) || 0, n: Number(e.n) || 0, of: Number(e.of || e.n) || 0, ...(e.rf ? { rf: 1 } : {}) }));
   // 💪 확인 편에서 하나만 틀리고 쌍둥이를 맞혀 칸을 지킨 편 (v262)
@@ -1567,6 +1603,28 @@ export function guardLines(g) {
 }
 
 /**
+ * 📊·📤 한 줄 — 최근 days일에 틀린 뒤 📚 배움 한 장을 본 문항과 그 뒤 비슷한 문제 (순수 · 아이 화면에는 안 쓴다, v302).
+ * 맞힘 fx 1 · 또 틀림 fx 0 · fx가 없으면 그만둔 편은 "비슷한 문제에 답하기 전에 그만둠", 끝낸 편은 "비슷한 문제가 안 나옴".
+ * 🎲 섞어 풀기는 푸는 중 기록(setLive)이 없어 끝낸 편만 잡힌다 — 줄에 그렇게 밝힌다 (Codex 108차 #1)
+ */
+export function relearnLine(m, today, days = GUARD_DAYS) {
+  const { span, log } = guardLog(m, today, days);
+  const n = { all: 0, ok: 0, again: 0, left: 0, none: 0 };
+  for (const e of log) {
+    for (const q of (e.qs || [])) {
+      if (!q || q.ok || !q.rl) continue;
+      n.all += 1;
+      if (q.fx === 1) n.ok += 1;
+      else if (q.fx === 0) n.again += 1;
+      else if (e.mode === 'quit') n.left += 1;
+      else n.none += 1;
+    }
+  }
+  if (!n.all) return `📚 틀린 뒤 배움 한 장 — 최근 ${span}일 아직 없음`;
+  return `📚 틀린 뒤 배움 한 장 ${n.all}번(최근 ${span}일 · 🎲 섞어 풀기는 끝낸 편만): 비슷한 문제 맞힘 ${n.ok} · 또 틀림 ${n.again} · 비슷한 문제에 답하기 전에 그만둠 ${n.left}${n.none ? ` · 비슷한 문제가 안 나옴 ${n.none}` : ''}`;
+}
+
+/**
  * 📋 아빠가 Claude에게 붙여 넣을 글 — 개념별 요약 + 최근 일지. JSON보다 짧고 사람이 읽을 수 있다.
  * (내보내기 JSON에도 math 레코드가 통째로 들어가지만, 폰에서 대화창에 붙이기엔 이게 낫다)
  */
@@ -1582,13 +1640,14 @@ export function mathReportText(m, today) {
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
   lines.push('', ...guardLines(guardReport(m, today))); // 🛡️ 📊와 같은 줄 (v252)
   lines.push(restLine(m)); // 🌱 학교 진도 먼저 (v301)
+  lines.push(relearnLine(m, today)); // 📚 틀린 뒤 배움 한 장 (v302)
   lines.push('', puzzleReport(m && m.puzzle, today)); // 🧩 수학 퍼즐 단계·판 (v296)
   lines.push(detectReport(m && m.detect, today, nameOf)); // 🕵️ 나옹의 숙제 — 판·처음 답·처음에 놓친 칸 (v299)
   const log = shownLog((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
-      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}${q.w === 's' && q.sv !== undefined ? (q.sv ? '✓' : '✗') : ''}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
+      const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.rl ? '📚' : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}${q.w === 's' && q.sv !== undefined ? (q.sv ? '✓' : '✗') : ''}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
       const res = e.mode === 'quit' ? `⏹그만둠 ${e.ok}/${e.n}${e.of ? ` (${e.of}문제 중)` : ''}${e.rf ? ' → 확인 못 통과로 침' : ''}` : `${e.mode || ''} ${e.ok}/${e.n}${e.kp ? ' 💪칸 그대로' : ''}`; // ⏹ 그만둔 편 (v250) · 💪 (v262)
       lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? '🎲섞어풀기' : e.id === 'ask' ? '❓답장뒤풀기' : nameOf(e.id)} ${res} ${qs}`);
     }

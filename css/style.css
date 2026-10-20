@@ -633,6 +633,12 @@ button { font-family: inherit; }
 .math-sense-verdict.no { color: #b45309; }
 .math-why { margin: 10px 0 4px; padding: 12px; border-radius: 14px; background: #fffbeb; border: 1px dashed #fcd34d; }
 .math-keep { color: #065f46; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 8px 12px; font-size: 0.95rem; font-weight: 700; margin: 6px 0 8px; line-height: 1.6; } /* 💪 확인 편에서 한 번 틀려도 (v262) */
+/* 📚 틀리면 배움 한 장 (v302) — 틀린 바로 그 자리에 그 칸의 한 장 */
+.math-relearn-page { margin: 10px 0 8px; padding: 12px; border-radius: 14px; background: #eff6ff; border: 1px solid #bfdbfe; }
+.math-relearn-page .math-q-top { margin-bottom: 6px; }
+.math-relearn-title { font-size: 1.05rem; margin: 2px 0 6px; }
+.math-relearn-nav { display: flex; gap: 8px; margin-top: 10px; }
+.math-relearn-nav .btn { flex: 1; }
 .math-why-picked { color: #92400e; background: #fffbeb; border-radius: 12px; padding: 8px 12px; font-size: 0.92rem; font-weight: 700; margin: 8px 0; line-height: 1.6; }
 
 /* ===== 종료 인사 화면 ===== */

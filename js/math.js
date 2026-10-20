@@ -17,6 +17,7 @@ import {
   answerSecOf,
   slipLine, // 💪 처음 배우기·연습 편의 "고친 실수 하나까지 통과" 말 (v279)
   isResting, restOf, restInit, dailyOk, // 🌱 학교 진도 먼저 · 선행 칸 쉬기 (v301)
+  RELEARN_MODES, relearnPage, // 📚 틀리면 배움 한 장 (v302)
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
 import { askContext, addAsk, unreadAsks, openAsks, markAskRead, decideAsk, applyAskTry, applyReply, askedToday, pendingAskFor, ASK_REWARD, ASK_DAILY_MAX } from './mathask.js';
@@ -1522,10 +1523,10 @@ function renderLesson(id, seed, page) {
 
 const fmtInt = (v) => String(v).replace('-', '−');
 
-/** ✋ 확인 — 고르기 또는 끌어 보기. 맞히면 onPass(). 틀리면 why를 보여 주고 다시 해 본다 */
-function checkBlock(check, seed, onPass) {
+/** ✋ 확인 — 고르기 또는 끌어 보기. 맞히면 onPass(). 틀리면 why를 보여 주고 다시 해 본다 (title: 📚 배움 한 장은 건너뛰어도 되는 확인) */
+function checkBlock(check, seed, onPass, title = '✋ 확인해 봐요') {
   const box = el('div', 'math-lesson-check');
-  box.appendChild(el('div', 'math-solve-h', '✋ 확인해 봐요'));
+  box.appendChild(el('div', 'math-solve-h', title));
   const qt = el('div', 'math-qt'); qt.appendChild(qtNode(check.q)); box.appendChild(qt);
   const fb = el('div', 'math-feedback');
   let passed = false;
@@ -1802,7 +1803,7 @@ function answer(i, list, card, typed = null) {
 /** ⏱ 문제를 보인 때부터 지금까지의 초 { s } — 보인 때가 없으면 빈 것 (mathprog.answerSecOf) */
 const answerSec = (shownAt) => { const s = answerSecOf(shownAt, Date.now()); return s === null ? {} : { s }; };
 /** 저장할 문항 기록에 🎯 감 잡기(sn)·🙈 이유(w)·⏱ 걸린 초(s)를 붙인다 — 실수(w:s)는 mathprog가 오개념·노트에서 뺀다 */
-const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.w === 's' && a.sv !== undefined ? { sv: a.sv ? 1 : 0 } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}), ...(a.pf ? { pf: a.pf } : {}), ...(Number.isInteger(a.s) ? { s: a.s } : {}) });
+const extraQ = (a) => ({ ...(a.sn === undefined ? {} : { sn: a.sn }), ...(a.w ? { w: a.w } : {}), ...(a.w === 's' && a.sv !== undefined ? { sv: a.sv ? 1 : 0 } : {}), ...(a.p ? { p: 1 } : {}), ...(a.g ? { g: a.g } : {}), ...(a.pf ? { pf: a.pf } : {}), ...(a.rl ? { rl: 1 } : {}), ...(Number.isInteger(a.s) ? { s: a.s } : {}) }); // 📚 rl: 틀린 뒤 배움 한 장 (v302)
 /** 개념 편의 문항 기록 — 끝낼 때(applyRound)와 푸는 중 기록(setLive·applyQuit)이 같은 꼴 */
 const conceptQs = (r) => r.answers.map((a, i) => ({ k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i] && r.qs[i].key ? { key: r.qs[i].key } : {}), ...extraQ(a) }));
 
@@ -1929,6 +1930,82 @@ function slipWayOf(r, q, canTwin) {
 }
 function whyPicked(a, way = 'twin') {
   return el('p', 'math-why-picked', a.w === 's' ? (SLIP_SAID[way] || SLIP_SAID.twin) : (WHY_SAID[a.w] || ''));
+}
+
+// ───────────────────── 📚 틀리면 배움 한 장 (v302) ─────────────────────
+// 틀린 화면은 🔍·▶ 한 줄씩·🙈를 다 지나야 다음이 열려 틀린 순간이 길었다 →
+// 처음 배우기·확인·연습·☀️ 편과 🎲 섞어 풀기에서 비슷한 문제가 나오는 문항은 그 칸의 배움 한 장 → 바로 비슷한 문제 (mathprog RELEARN_MODES)
+
+/**
+ * 틀린 문항 칸의 배움 글 { title, pages, rule, story } — 단계식 배움(lessonOf)이 있는 줄기는 그 장들, 없으면(A 분수) 📖 이야기 한 장.
+ * 줄기는 문항의 칸에서 찾는다(stemOf — ☀️ 섞어 풀기도 지금 줄기와 같지만 화면 상태에 기대지 않게). 못 만들면 null(예전 풀이 길)
+ */
+function relearnOf(q, r) {
+  const sx = stemOf(q.concept);
+  if (!sx || !sx.gen) return null;
+  const opts = optsFor(sx.key);
+  try {
+    if (sx.lesson && sx.gen.lessonOf) {
+      const L = sx.gen.lessonOf(q.concept, r.seed || 0, opts);
+      return L && Array.isArray(L.pages) && L.pages.length ? { title: L.title, pages: L.pages, rule: L.rule || '', story: false } : null;
+    }
+    if (sx.gen.conceptStory) {
+      const st = sx.gen.conceptStory(q.concept, r.seed || 0, opts);
+      const c = conceptOf(q.concept);
+      return st && st.text ? { title: st.title, pages: [{ say: st.text, check: null }], rule: (c && c.idea) || '', story: true } : null;
+    }
+  } catch { /* 글을 못 만들면 예전 풀이 길 */ }
+  return null;
+}
+
+/**
+ * 📚 배움 한 장 — 틀린 바로 그 자리에. 그 문제와 가장 닮은 장부터(relearnPage) · ◀ ▶로 다른 장 · ✋ 확인은 건너뛰어도 된다(비슷한 문제가 확인).
+ * 방금 문제 풀이는 접어 두고 열면 그대로(한 줄씩·🔍 없이). 보던 장은 이 답의 기록(a.rp — 저장 안 함)에 — 🎒·📊에 다녀와도 그 장
+ */
+function relearnBox(q, shown, a, L, kl) {
+  const box = el('div', 'math-relearn');
+  box.appendChild(el('p', 'math-fb no', shown.idk ? '괜찮아요 — 배운 것 한 장만 보고 비슷한 문제로 해 봐요.' : '아쉬워요 — 괜찮아요. 배운 것 한 장만 보고 비슷한 문제로 다시 해 봐요.'));
+  if (kl) box.appendChild(el('p', 'math-keep', kl));
+  const n = L.pages.length;
+  if (!Number.isInteger(a.rp) || a.rp < 0 || a.rp >= n) a.rp = relearnPage(q.q, L.pages);
+  const slot = el('div', 'math-relearn-page');
+  const draw = () => {
+    slot.innerHTML = '';
+    const p = L.pages[a.rp];
+    const top = el('div', 'math-q-top');
+    top.appendChild(el('span', 'math-eyebrow', `📚 다시 보기 · ${nameOf(q.concept)}`)); // 몇 장 중 몇째는 안 띄운다 — 다 읽어야 하는 것처럼 보이지 않게
+    slot.appendChild(top);
+    if (L.story && L.title) slot.appendChild(el('h3', 'math-relearn-title', L.title));
+    slot.appendChild(storyBody(p.say));
+    if (p.check) slot.appendChild(checkBlock(p.check, ((ui.round && ui.round.seed) || 0) + a.rp * 31, () => {}, '✋ 해 볼래요? (건너뛰어도 돼요)'));
+    if (L.rule) {
+      const rule = el('p', 'math-idea');
+      rule.appendChild(document.createTextNode(L.story ? '💡 ' : '📏 한 줄로: '));
+      rule.appendChild(richNode(L.rule));
+      slot.appendChild(rule);
+    }
+    if (n > 1) {
+      const nav = el('div', 'math-relearn-nav');
+      const prev = el('button', 'btn', '◀ 앞 장');
+      prev.type = 'button';
+      prev.disabled = a.rp === 0;
+      prev.addEventListener('click', () => { a.rp = Math.max(0, a.rp - 1); draw(); });
+      const fwd = el('button', 'btn', '다음 장 ▶');
+      fwd.type = 'button';
+      fwd.disabled = a.rp === n - 1;
+      fwd.addEventListener('click', () => { a.rp = Math.min(n - 1, a.rp + 1); draw(); });
+      nav.appendChild(prev);
+      nav.appendChild(fwd);
+      slot.appendChild(nav);
+    }
+  };
+  draw();
+  box.appendChild(slot);
+  const t = el('button', 'btn math-solve-toggle', '📖 방금 문제 풀이 보기');
+  t.type = 'button';
+  t.addEventListener('click', () => { t.replaceWith(solveCard(q, shown)); });
+  box.appendChild(t);
+  return box;
 }
 
 // ───────────────────── ❓ 아빠에게 묻기 (2026-09-21, 아버님 제안) ─────────────────────
@@ -2196,6 +2273,8 @@ function paintAnswer(i, list, card, restoring) {
   // 🎲 섞어 풀기는 답하기 전엔 개념 이름을 숨긴다("어떤 개념인지 알아내기"가 목적) — 답한 뒤에 알려 준다 (Codex 3차 #8)
   if (r.mode === 'mix') fb.appendChild(el('p', 'math-mix-concept', `📚 ${nameOf(q.concept)} 문제였어요`));
   const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && !light(r) && q.key;
+  // 📚 틀린 순간을 짧게 — 그 칸의 배움 한 장 → 비슷한 문제 (v302). 비슷한 문제가 나오는 문항만 · 배움 글을 못 만들면 예전 풀이 길
+  const relearn = canTwin && RELEARN_MODES.has(r.mode) ? relearnOf(q, r) : null;
   if (ch.ok) {
     fb.appendChild(el('p', 'math-fb ok', ['맞았어요! 🎉', '정확해요! ⭐', '바로 그거예요! 👍'][r.at % 3]));
     // 맞혀도 풀이는 접어 두고 볼 수 있게 — "왜 맞았는지"도 개념이다
@@ -2206,17 +2285,25 @@ function paintAnswer(i, list, card, restoring) {
       fb.appendChild(t);
     }
   } else {
-    const p = el('p', 'math-fb no');
-    const showTag = ch.tag && !META_TAGS.has(ch.tag);
-    p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : ch.idk ? '괜찮아요 — 풀이를 천천히 읽어 봐요.' : '아쉬워요.'));
-    fb.appendChild(p);
     // 💪 오늘 확인 차례인 칸에서 처음 틀렸고 비슷한 문제가 나오면 — 그만두지 않아도 된다는 걸 풀이보다 먼저 (v262)
     //    처음 배우기·연습 편은 "비슷한 문제를 맞히고 끝까지 풀면 통과" (v279)
     const kl = canTwin && r.answers.slice(0, r.at).every((x) => x && x.correct) ? (r.keep ? keepLine(r.keep, 'wrong') : slipRound(r) ? slipLine('wrong') : null) : null;
-    if (kl) fb.appendChild(el('p', 'math-keep', kl));
-    rv = light(r) ? null : { st: a, seed: (r.seed || 0) + r.at * 7919 };
-    scrollTo = solveCard(q, shown, rv); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (2026-09-21)
-    fb.appendChild(scrollTo);
+    if (relearn) {
+      if (!a.rl) { a.rl = 1; saveLive(); } // 📚 본 표시 — 여기서 그만두거나 앱을 닫아도 일지에 남게
+      scrollTo = relearnBox(q, shown, a, relearn, kl);
+      fb.appendChild(scrollTo);
+      const offer = askOffer(q, a); // ❓ 🤔 노트 문항·🤷 모르겠어요는 아빠에게 묻기 그대로
+      if (offer) fb.appendChild(offer);
+    } else {
+      const p = el('p', 'math-fb no');
+      const showTag = ch.tag && !META_TAGS.has(ch.tag);
+      p.appendChild(document.createTextNode(showTag ? `아쉬워요 — 이건 "${ch.tag}"이에요.` : ch.idk ? '괜찮아요 — 풀이를 천천히 읽어 봐요.' : '아쉬워요.'));
+      fb.appendChild(p);
+      if (kl) fb.appendChild(el('p', 'math-keep', kl));
+      rv = light(r) ? null : { st: a, seed: (r.seed || 0) + r.at * 7919 };
+      scrollTo = solveCard(q, shown, rv); // 틀린 직후가 가르치기 제일 좋은 순간 — 이름표만 붙이고 넘어가지 않는다 (2026-09-21)
+      fb.appendChild(scrollTo);
+    }
   }
   // 🎯 감 잡기 결과 — 답을 본 뒤에야 알려 준다
   if (sense && a.sn !== undefined) {
@@ -2227,12 +2314,13 @@ function paintAnswer(i, list, card, restoring) {
     s.appendChild(document.createTextNode(a.sn ? '' : `${numTail(noun) ? numJosa(noun, '이었어요', '였어요') : josa(noun, '이었어요', '였어요')}. 계산 전에 어느 쪽일지 한 번 더 생각해요.`));
     fb.appendChild(s);
   }
-  const next = el('button', 'btn btn-primary btn-big-wide', canTwin ? '알겠어요, 비슷한 문제 하나 더 →' : r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
+  const next = el('button', 'btn btn-primary btn-big-wide', canTwin ? (relearn ? '비슷한 문제 풀어 볼게요 →' : '알겠어요, 비슷한 문제 하나 더 →') : r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
   next.addEventListener('click', () => { if (canTwin) startTwin(); else advance(); });
   // 🙈 틀린 이유 — 고를 때까지 다음이 잠긴다 (진단 제외). 복원이면 고른 것을 보여 준다
   // v248: 📖 풀이를 다 열고 🔍 돌아보기를 마친 **뒤에** 나온다 — 그때까지 다음도 잠김
-  if (!ch.ok && !light(r)) {
+  // 📚 배움 한 장 길은 🔍·한 줄씩·🙈 없이 바로 비슷한 문제로 (v302)
+  if (!ch.ok && !light(r) && !relearn) {
     const slot = el('div', 'math-why-slot');
     fb.appendChild(slot);
     next.disabled = true;
@@ -2752,10 +2840,12 @@ function startTwin() {
   if (!r) return;
   const q = r.qs[r.at];
   const base = ((Date.now() % 1000000) | 0) + 17;
+  // 줄기는 문항의 칸에서 찾는다 (v302 · Codex 108차 F) — 지금 편·🤔 노트 회차·☀️ 섞어 풀기는 모두 지금 줄기 것만 내지만, 다른 줄기 칸이 오면 지금 줄기(G)로는 null이라 다음 문항으로 넘어갔다
+  const sx = stemOf(q.concept) || S();
   let tq = null;
   // 새 씨앗이 새 숫자를 보장하지 않는다 (Codex #6) — 같은 문장이면 다른 씨앗으로 다시, 그래도 같으면 그냥 낸다
   for (let i = 0; i < 8; i++) {
-    const cand = G().makeQuestion(q.concept, q.kind, base + i * 7919, { ...optsFor(), want: { k: q.kind, key: q.key } });
+    const cand = sx.gen.makeQuestion(q.concept, q.kind, base + i * 7919, { ...optsFor(sx.key), want: { k: q.kind, key: q.key } });
     if (!cand) break;
     tq = cand;
     if (numSig(cand) !== numSig(q)) break; // 이름만 바뀌고 숫자가 같으면 쌍둥이가 아니다 (Codex 2차 — #6 후속)

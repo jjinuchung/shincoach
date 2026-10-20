@@ -3,7 +3,7 @@ import {
   listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
   applyEssayFixes, getMath, updateMath, updateItem, saidOf, sentenceKey,
 } from './db.js';
-import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK, LOG_MAX, restOf, setRest, restLine } from './mathprog.js';
+import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK, LOG_MAX, restOf, setRest, restLine, relearnLine } from './mathprog.js';
 import { activeAsks, openAsks, askSummary, asksText, parseReplies, applyReply, closeAsk, STATUS_LABEL, OPEN as ASK_OPEN } from './mathask.js';
 import { exportText, parseFixes, essayKey } from './essay.js';
 import { countPlayableCues, playableStarts } from './srt.js';
@@ -747,6 +747,7 @@ export async function renderStats() {
     cM.appendChild(el('p', 'stats-sub', guard[0]));
     const gl = el('ul', 'stats-guard');
     for (const t of guard.slice(1)) gl.appendChild(el('li', '', t));
+    gl.appendChild(el('li', '', relearnLine(math, today))); // 📚 틀린 뒤 배움 한 장 · 그 뒤 비슷한 문제 (v302 — 📋 복사 글과 같은 줄)
     cM.appendChild(gl);
     // 📋 Claude에게 보여 줄 글 — 폰에서 복사해 대화창에 붙인다 (내보내기 JSON은 크고 사람이 못 읽는다)
     const copyRow = el('div', 'stats-actions');
