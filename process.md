@@ -5582,5 +5582,47 @@
 ### TODO (다음 작업)
 - [x] 🔍 Codex 108차 → 지적 표 → 아버님 "추천대로 진행" → 반영(시험 9 · 변이 39/39)
 - [x] 반영 뒤 헤드리스 390·1280(`walk302_390c.log`·`walk302_1280c.log` — 비슷한 문제 그대로 · 📊 새 문구 · 넘침 0 · 콘솔 0) · 전체 **2334** 통과(`.context/v302/full302c.log`)
-- [ ] 아버님 "배포" → feat(v302) + docs(이 절 · v301 라이브 줄 함께) → push → 라이브 v302(`.context/v302/live_check302.sh`)
+- [x] 아버님 "배포" → `8178aaa` feat(v302) + `8be2533` docs(이 절 · v301 라이브 줄 함께) → push → 라이브 v302(`.context/v302/live_check302.sh` — sw v302 · 배포본 5개 같음 · RELEARN_MODES · paintAnswer 배움 길)
 - [ ] 배포 뒤 "올라온 거 봐 줘": 틀린 뒤 그만두기가 줄었나 · 📚 줄(비슷한 문제 맞힘·그만둠) · 주 단위
+
+## 2026-10-20 — 🖊️ 논술 과목 1단계 · 논술 전용 포켓몬 100 (v303 — 아버님 "논술 과목을 한 번 만들어볼까?")
+
+### 진행 내용
+- 물음 넷(한 번에 하나씩) — 형태 A 고르며 익히는 연습 + 가끔 짧은 글 · 주제 A 생활 속 찬반 · 시간 A 국어 90분을 같이 씀 · 피드백 A 국어 ✍️ 왕복(v304) → 한 판 방식 셋 견주기(① 주제 한 판 추천) → **"이 설계로 진행하자"**
+- 학교: 2022 [4국03-03] 「대상에 대한 자신의 의견과 그렇게 생각한 이유가 드러나게 글을 쓴다」(→ 5~6 [6국03-02] 주장하는 글) — 아이 화면 말은 4학년 교과서 말 「의견·이유」
+- 원고 `coach/korean/nonsul.json` 주제 12(포켓몬 카드 희귀도 교환 · 게임 시간 · 급식 반찬 · 쉬는 시간 · 숙제 · 용돈 · 교실 반려동물 · 휴대폰 · 학교에 카드 · 애니메이션과 공부 · 교실 청소 · 배틀의 전설) — 편마다 의견 「나는 …」·이유 셋·정리 「그래도 나는 …」 · 상관없는 말 둘(+까닭) · 가족·우리 학교를 지어내지 않음 · 포켓몬 사실은 PokeAPI → 폰 검수 페이지 4kHJ5buhhrtjBoPKLJHPe4 → **"이대로"**
+- 아버님 "논술에서만 나오는 포켓몬 등급별 100마리" → 기본안(흔함 40·보통 30·희귀 20·전설 10 — 국어 150과 같은 비율·규칙 · 진화 가족째 · 논술 자체 🎯 · 진화·레벨업은 🟩 국어스톤) → **"추천대로"** → 명단과 한 마리도 안 겹치는 가족(PokeAPI) 중 1~5세대·움직이는 그림 먼저 + 말하고 생각하는 포켓몬(페라페·요가랑·몽나·리그레·마임맨·메테노) · 전설 10(레지락·레지아이스·레지기가스·토네로스·볼트로스·케르디오·지가르데·디안시·후파·볼케니온) → 그림 넣은 검수 페이지 ScjMjUUo9Qi775omEfcGPC → **"이대로"**
+- **🖊️ 한 판 = 주제 하나**: ① 내 의견(정답 없음) ② 내 의견에 맞는 이유 둘(보기 넷 — 내 편 둘 · 반대편 하나 · 상관없는 말 하나 · 틀리면 까닭 한 줄) ③ 친구가 반대 의견이라면(반대편 이유 · 내 편 이유 · 상관없는 말 — ②에 안 나온 문장만) ④ 글 순서(내 의견 → 첫째·둘째 → 물론 … → 그래도 나는 … · 틀리면 실마리) → 「내가 만든 글」
+  - 판 끝에 한 번 저장(그만두면 안 남음 — 🧩 퍼즐과 같다) · 한 번도 안 틀리면 ⭐(연습으로만) · 틀린 걸음이 있으면 다음 날 다시 · 아이 화면에 셈·진행 수 없음
+  - 그날 처음 끝낸 판 💰10 + 🎯 논술 포켓몬 잡기 1번(🧩 국어 퍼즐과 같게 · 잡기 기회는 국어와 따로 — nonsulThrow) · 잡기는 국어와 같은 길(띄우기 전에 빼고 · 안 던지면 돌려주고 · 장부 shincoach.nonsul.throwHolds)
+  - 홈 🖊️ Opinion 카드(마스코트 페라페) · view-nonsul · ⏳ 국어 시간(subjectOfView → korean · 시간 칩) · 판을 열 때마다 guardStart('korean')
+- 포켓몬: `js/pokemon.js` ROSTER 100(subject nonsul — 명단 592) · `js/battle.js` TYPE_OF · `js/xp.js` RARITY_IDS · subjectOf · `js/evolve.js` stoneIdFor(nonsul → 🟩) · `js/catch.js` 머리말 · `js/pokedex.js` 🖊️ 배지·잡는 곳 줄 · `js/shop.js` 말
+- `js/nonsul.js`(새 · 순수) checkNonsul·allTopics·planTopic·dealTopic·essayParts·nonsulRule·nonsulTakeRule·nonsulGiveBackRule·nonsulFinishText·nonsulTodayLine·nonsulReport · `js/nonsulview.js`(새) · 프로필 nonsul·nonsulDay·nonsulThrow(db emptyProfile·cloneProfile·병합 · xp EMPTY·fromStored) · xp nonsulFinish·nonsulTakeThrow·nonsulGiveBackThrow·nonsulThrowsLeft·nonsulMap·nonsulDayMap · `tools/check.mjs` 원고 검사 · 📤 국어 요약 「🖊️ 논술」 절(korreport · upload — 원고를 못 받아도 국어 요약은 올림) · index.html·app.js·home.js·timeup.js · css .ns-* · sw v303
+- 시험: 새 `tests/nonsul303.test.js` 13(원고·깨진 원고 하나씩·판 고르기·보기 — 모든 주제·두 편·씨앗 300·글 조각·판 끝 규칙·잡기 기회·병합·가짜 IndexedDB 저장 경로·말·📤·포켓몬 100·배선) · 옛 시험은 마릿수만(pokemon·xp 492 → 592 · 논술 등급 40·30·20·10 더함 · korpokemon 가게 말 정규식) · 변이 `.context/v303/mutate_v303.mjs` **51/51**(처음 50/52 — 「이유 넷」 시험 더함 · xp.fromStored 논술 정리는 읽을 때마다 다시 정리해 같은 결과라 뺌)
+- 헤드리스 390·1280(`.context/v303/walk303.sh` + `hh303.js`): 홈 카드 → 첫 화면 → ① → ② 반대편 이유 ✗(까닭) → 내 편 ✓ → 🎒 다녀와도 이어짐 → ③ 상관없는 말 ✗ → 정답 → ④ 틀린 조각(실마리) → 차례대로 → 끝(내가 만든 글 · 💰+10 · 🎯) · 저장(틀린 주제 내일 · 국어 잡기 기회 그대로) · 🎯 머리말 「🖊️ 논술에서만…」 후보 넷 모두 논술 포켓몬 · 던짐 → 기회 줄어듦 · 둘째 판 ⭐·보상 없음 · ⏳ 칩은 국어 시간 · 넘침 0 · 콘솔 0
+- 전체 시험 2347 중 2 실패(korean·timelimit 배선 시험이 app.js 「if (name === 'korean') return 'korean';」 줄을 글자 그대로 봄) → 그 줄은 두고 논술 줄을 따로 → 다시 **2347** 통과(`.context/v303/full303b.log`)
+- 🔍 **Codex 109차**(`.context/v303/codex109.md` — 91만 토큰 · 지정 시험 11파일 162 통과) — P1 둘 · P2 둘 → 원문 + 판단 표 → 아버님 **"추천대로"**
+  - #1(P1) 논술 포켓몬이 진화하지 않음(진화표에 가족이 없음) → `tools/evo_table.mjs`(PokeAPI)로 논술 가족 진화 46링크(45종 — 개무소는 두 갈래) · 도구가 글로 못 만드는 원작 조건 다섯(기술을 배우고 · 함께 레벨업)은 PokeAPI 한국어 기술·종 이름으로 도구 ORIG_FIX와 진화표에
+  - #2(P1) 가게 스톤 안내가 「🖊️ 논술를 하면 받아요」 — 논술은 🟩를 안 준다 → 안내는 스톤을 주는 활동으로(🟩 「📚 국어를」 · 수학은 「🔢 수학을」 — 조사까지) · 어디서 잡히나는 그대로 「🖊️ 논술에서 만나요」
+  - #3(P2) 📤 화면별 사용 기록에서 논술 시간이 빠짐 → usage.placeOfView(nonsul) → 국어 자리
+  - #4(P2) 논술 전설·환상 10이 원작 전설 목록(pokemon.LEGENDARY — 🥚 알 목표·교환에서 뺀다)에 없음 → 넣음 · **반영하며 찾음: 국어 전설·환상 15도 v232부터 빠져 있었다(국어 알에서 나올 수 있었다)** → 명단 592 전체를 PokeAPI와 대조해 빠진 것이 이 25뿐임을 확인하고 함께 넣음
+  - 반영하며 찾음: 🏪 5일장 상인이 논술 포켓몬을 「영어 포켓몬」이라 함 → 과목 이름표에 논술
+  - 시험 14(진화·원작 조건·전설 25·교환 제한·사용 기록·가게 말·5일장) · 옛 시험(evolve 링크 237·종 223·갈래에 개무소 · korpokemon·trade 안내 줄) · 변이 **58/58** · 헤드리스 상세 창(「🟩 국어스톤이 1개 더 있어야 해요 — 📚 국어를 하면 받아요」 · 「🧬 Lv5에서 진화」) · 전체 **2348** 통과(`.context/v303/full303d.log`)
+
+### 변경 파일
+- `js/nonsul.js`(새) · `js/nonsulview.js`(새) · `coach/korean/nonsul.json`(새) · `js/pokemon.js` · `js/battle.js` · `js/xp.js` · `js/db.js` · `js/evolve.js` · `js/catch.js` · `js/pokedex.js` · `js/shop.js` · `js/korreport.js` · `js/upload.js` · `js/app.js` · `js/home.js` · `js/timeup.js` · `index.html` · `css/style.css` · `tools/check.mjs` · `sw.js`
+- `js/usage.js` · `js/marketview.js` · `tools/evo_table.mjs`(ORIG_FIX) — Codex 109차
+- `tests/nonsul303.test.js`(새) · `tests/pokemon.test.js` · `tests/xp.test.js` · `tests/korpokemon.test.js` · `tests/evolve.test.js` · `tests/trade.test.js`
+- (저장소 밖) `.context/nonsul/`(원고 초안·검사·검수 페이지·포켓몬 후보·명단 넣기 스크립트) · `.context/v303/`(hh303.js · walk303.sh · mutate_v303.mjs)
+
+### 결정사항 / 메모
+- 첫 걸음 「내 의견」에는 정답이 없다 — 겁 없이 시작 · 뒤 걸음은 「내 편에 맞나」로 논리를 연습
+- 잡기 기회를 국어와 따로 센다 — 논술 포켓몬은 논술 화면에서만 · 국어 화면의 🎯는 국어 포켓몬
+- 🟩 국어스톤을 같이 쓴다 — 새 화폐를 만들지 않는다
+- 논술 원고는 공개 저장소 · 진우 기록은 넣지 않는다(검수 페이지·원고 모두)
+
+### TODO (다음 작업)
+- [x] 🔍 Codex 109차 → 지적 표 → 아버님 "추천대로" → 반영(시험 14 · 변이 58/58 · 헤드리스 · 전체 2348)
+- [ ] 아버님 "배포" → feat(v303) + docs(이 절 · v302 라이브 줄 함께) → push → 라이브 v303(`.context/v303/live_check303.sh`)
+- [ ] v304 ✍️ 짧은 글(3~5문장 틀 채우기) + 국어 ✍️ 왕복(논술 채점 기준 — 주장·근거·반대 생각·짜임)
+- [ ] 배포 뒤 "올라온 거 봐 줘": 🖊️ 논술 줄(⭐·다시 볼 주제·판을 끝낸 날) · 논술 포켓몬 잡기
