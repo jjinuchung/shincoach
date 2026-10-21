@@ -19,7 +19,7 @@ const SEEDS = [1, 7, 42, 2026, 99999, 31337, 5, 777];
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
 test('🎮 v311 게임 목록 — 🗼 몬스터볼 탑 쌓기 30초 · 화면(RUNNERS)·준비(prep 없음 — 볼은 CSS 무늬)', () => {
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower']);
+  assert.deepEqual(GAMES.map((g) => g.id).slice(0, 7), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower'], '일곱째까지 (v312부터 더 늘어난다 — minigame312)');
   assert.equal(gameById('tower').sec, TOWER_SEC);
   assert.equal(TOWER_SEC, 30);
   for (const g of GAMES) assert.ok(!/\d/.test(g.how), `${g.id}: 아이가 보는 설명에 숫자 없음`);

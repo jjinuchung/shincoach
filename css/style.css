@@ -3871,6 +3871,7 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gm-end { margin: 6px 0 0; text-align: center; font-size: 2rem; font-weight: 900; }
 .gm-best { margin: 0; text-align: center; color: #ffd43b; font-size: 1.3rem; font-weight: 800; animation: gm-pop 0.35s ease-out both; }
 .gm-best-old { margin: 0; text-align: center; opacity: 0.8; }
+.gm-line { margin: 0; text-align: center; font-size: 1.1rem; font-weight: 800; word-break: keep-all; } /* 🤼 「🏆 진우 2 : 1 아빠 — 진우 승!」 (v312) */
 .gm-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .gm-toast { position: fixed; left: 50%; top: 64px; z-index: 90; max-width: calc(100vw - 32px); padding: 10px 18px; border-radius: 999px; background: #2b2d42; color: #fff; font-weight: 800; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); pointer-events: none; transform: translateX(-50%); }
 .gm-toast[hidden] { display: none; }
@@ -4060,3 +4061,40 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes gt-roll-r { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translate(170%, 260%) rotate(360deg); } }
 @keyframes gt-fade { 0% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .gt-world { transition: none; } .gt-ball.is-land .gt-ball-in, .gt-ball.is-perfect .gt-ball-in { animation: none; } .gt-ball.is-miss.is-l .gt-ball-in, .gt-ball.is-miss.is-r .gt-ball-in { animation: gt-fade 0.3s ease-in forwards; } } /* 굴러떨어짐도 돌지 않고 사라지기만 (🔍 Codex 117차 접근성) */
+
+/* 🤼 아빠랑 줄다리기 (v312 · gametug.js) — 마당 너비 100칸 · 리본 자리 p칸 = p% · 줄·리본·두 쪽(.gu-team)을 통째로 옮김 · 아래 큰 단추 둘(손가락마다 따로) */
+.gu-field { position: relative; overflow: hidden; aspect-ratio: 100 / 50; border-radius: 18px; background-color: #a5d8ff; background-image: linear-gradient(180deg, #74c0fc 0%, #d0ebff 100%); -webkit-user-select: none; user-select: none; }
+.gu-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 30%; border-top: 3px solid #3d7a33; background-color: #74c365; }
+.gu-line { position: absolute; top: 30%; bottom: 0; width: 0; border-left: 3px dashed #fff; opacity: 0.9; }
+.gu-line.is-l { left: 20%; }
+.gu-line.is-r { left: 80%; }
+.gu-team { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; transition: transform 0.1s linear; will-change: transform; }
+.gu-rope { position: absolute; left: -40%; right: -40%; top: 60%; height: 7px; border-radius: 4px; background-color: #b08850; background-image: repeating-linear-gradient(135deg, #c9a46a 0 6px, #a37b45 6px 12px); }
+.gu-flag { position: absolute; left: 50%; top: 60%; width: 14px; height: 28px; border-radius: 2px 2px 7px 7px; background-color: #e03131; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2); transform: translate(-50%, -4px); }
+.gu-me, .gu-foe { position: absolute; bottom: 24%; display: flex; align-items: flex-end; justify-content: center; width: 17%; height: 50%; }
+.gu-me { left: 5%; }
+.gu-foe { right: 5%; }
+.gu-me .gd-pal-emoji { font-size: 2.4rem; line-height: 1; }
+.gu-foe-emoji { font-size: 2.8rem; line-height: 1; }
+.gu-foe-img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; image-rendering: pixelated; -webkit-user-drag: none; }
+.gu-me.is-pull { animation: gu-pull-l 0.18s ease-out; }
+.gu-foe.is-pull { animation: gu-pull-r 0.18s ease-out; }
+.gu-board { position: absolute; top: 6px; left: 50%; padding: 2px 10px; border-radius: 999px; background-color: rgba(43, 45, 66, 0.75); color: #fff; font-size: 0.95rem; font-weight: 800; white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
+.gu-pick { display: grid; gap: 8px; }
+.gu-pick[hidden], .gu-pad[hidden] { display: none; } /* display:grid가 hidden을 덮지 않게 */
+.gu-pick-q { margin: 0; text-align: center; font-size: 1.15rem; font-weight: 800; }
+.gu-pick-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.gu-who { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 84px; padding: 6px; border: 0; border-radius: 16px; background-color: #fff; color: #2b2d42; box-shadow: 0 4px 0 #8d99ae; font-size: 0.95rem; font-weight: 800; cursor: pointer; touch-action: manipulation; word-break: keep-all; }
+.gu-who-face { font-size: 2rem; line-height: 1; }
+.gu-who:active { transform: translateY(3px); box-shadow: 0 1px 0 #8d99ae; }
+.gu-pad { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.gu-btn { min-height: 96px; padding: 8px; border: 0; border-radius: 20px; color: #fff; font-size: 1.25rem; font-weight: 900; cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; word-break: keep-all; }
+.gu-btn.is-me { background-color: #339af0; box-shadow: 0 5px 0 #1971c2; }
+.gu-btn.is-foe { background-color: #f03e3e; box-shadow: 0 5px 0 #c92a2a; }
+.gu-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3); }
+.gu-btn:disabled { cursor: default; opacity: 0.55; }
+.gu-hint { margin: 0; text-align: center; font-size: 0.85rem; opacity: 0.8; word-break: keep-all; }
+.gd.is-paused .gu-me, .gd.is-paused .gu-foe { animation-play-state: paused; }
+@keyframes gu-pull-l { 0%, 100% { transform: none; } 40% { transform: translateX(-8%) rotate(-6deg); } }
+@keyframes gu-pull-r { 0%, 100% { transform: none; } 40% { transform: translateX(8%) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) { .gu-team { transition: none; } .gu-me.is-pull, .gu-foe.is-pull { animation: none; } }

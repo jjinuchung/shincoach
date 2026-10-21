@@ -95,7 +95,7 @@ export function playLimit(conf) {
 }
 
 /**
- * 🎮 게임 목록 — 차례대로 만든다(아버님 2026-10-21): v307 디그다 → v308 달리기·그림자 → v309 짝 맞추기·나무열매 → v310 열기구 → v311 탑 → 그다음 줄다리기
+ * 🎮 게임 목록 — 차례대로 만들었다(아버님 2026-10-21): v307 디그다 → v308 달리기·그림자 → v309 짝 맞추기·나무열매 → v310 열기구 → v311 탑 → v312 줄다리기(여덟 모두)
  * id는 소문자(최고 기록 열쇠 — homeplay.GAME_KEY) · sec = 한 판 길이 · ★ 새 게임은 gameview.RUNNERS에도
  */
 export const GAMES = [
@@ -106,6 +106,7 @@ export const GAMES = [
   { id: 'berry', emoji: '🍓', ko: '나무열매 받기', how: '끌어서 열매를 받아요 · 찌리리공은 피해요', sec: 30 },
   { id: 'balloon', emoji: '🎈', ko: '로켓단 열기구', how: '톡! 파트너 기술로 열기구를 터뜨려요 · 큰 열기구는 여러 번', sec: 30 },
   { id: 'tower', emoji: '🗼', ko: '몬스터볼 탑 쌓기', how: '톡! 몬스터볼을 떨어뜨려 높이 쌓아요 · 딱 맞으면 별이 더', sec: 30 },
+  { id: 'tug', emoji: '🤼', ko: '아빠랑 줄다리기', how: '톡톡! 빨리 눌러 줄을 당겨요 · 혼자면 나옹이랑', sec: 30 },
 ];
 export function gameById(id) {
   return GAMES.find((g) => g.id === id) || null;

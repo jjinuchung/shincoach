@@ -13,6 +13,7 @@ import { runPair, PAIR_PAIRS } from './gamepair.js'; // 🃏 포켓몬 짝 맞�
 import { runBerry, BERRY_KINDS } from './gameberry.js'; // 🍓 나무열매 받기 (v309)
 import { runBalloon, BAL_MEOWTH } from './gameballoon.js'; // 🎈 로켓단 열기구 (v310)
 import { runTower } from './gametower.js'; // 🗼 몬스터볼 탑 쌓기 (v311)
+import { runTug } from './gametug.js'; // 🤼 아빠랑 줄다리기 (v312)
 import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
@@ -39,6 +40,7 @@ const RUNNERS = {
   berry: { run: runBerry, prep: async () => ({ art: await artFor([BERRY_KINDS.voltorb.id]) }) },
   balloon: { run: runBalloon, prep: () => balloonPrep() },
   tower: { run: runTower, prep: async () => ({}) }, // 볼은 CSS 무늬 — 받을 그림이 없다
+  tug: { run: runTug, prep: async () => ({ meowth: (await balloonPrep()).meowth }) }, // 혼자일 때 상대 😼 나옹 — 🎈와 같은 그림
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -304,6 +306,12 @@ async function startRound(id) {
     ui.run = run;
     const res = await run.done;
     if (ui.run === run) ui.run = null;
+    if (res && res.unplayed) { // 🤼 「누구랑?」에서 그만둠 — 한 판도 안 했으니 판을 돌려주고 고르기로 (v312 · 💗·최고 기록도 없음)
+      started = false;
+      await giveBack();
+      if (live()) { ui.busy = false; renderPick(); }
+      return;
+    }
     // 여기부터는 닫혔어도 이 판을 정산한다 (집을 닫아 끝난 판도 점수·💗를 남긴다)
     sum.played += 1;
     sum.score = Math.max(sum.score, res.score); // 방 장면엔 이번에 가장 잘한 판 (도중에 그만둔 마지막 판이 아니라)
@@ -334,6 +342,7 @@ function renderResult(g, res, end) {
   const b = body();
   b.innerHTML = '';
   b.appendChild(el('p', 'gm-end', `끝! ⭐ ${res.score}`));
+  if (res.line) b.appendChild(el('p', 'gm-line', res.line)); // 🤼 「🏆 진우 2 : 1 아빠 — 진우 승!」 (v312 · 다른 게임은 없음)
   if (end && end.ok && end.newBest) {
     b.appendChild(el('p', 'gm-best', end.prevBest > 0 ? '🎉 새 기록!' : '⭐ 첫 기록!'));
     sfx.ding();
