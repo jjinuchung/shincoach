@@ -4030,3 +4030,33 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes gl-shoot { 0%, 100% { transform: translateX(-50%); } 40% { transform: translateX(-50%) translateY(-12%); } }
 @keyframes gl-shot { from { transform: translate(-50%, -50%) scale(0.8); } to { transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(1.25); } }
 @media (prefers-reduced-motion: reduce) { .gl-bal.is-pop > * { animation-duration: 0.2s; } .gl-me.is-shoot { animation: none; } }
+
+/* 🗼 몬스터볼 탑 쌓기 (v311 · gametower.js) — 마당 너비 100칸 × 높이 75칸 · 자리는 JS가 마당에 대한 %로(돌려도 다시 잴 것 없음) · 볼 무늬는 🃏 카드 뒷면과 같게 */
+.gt-floor { font-size: 0.95rem; font-weight: 800; white-space: nowrap; }
+.gt-field { position: relative; overflow: hidden; aspect-ratio: 100 / 75; border-radius: 18px; background-color: #a5d8ff; background-image: linear-gradient(180deg, #4dabf7 0%, #d0ebff 100%); cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.gt-field:focus { outline: none; }
+.gt-field:focus-visible { outline: 3px solid #ffd43b; outline-offset: 2px; }
+.gt-world, .gt-sky { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+.gt-world { transition: transform 0.25s ease-out; will-change: transform; }
+.gt-cloud { position: absolute; width: 30%; height: 9%; border-radius: 999px; background-color: #fff; opacity: 0.75; }
+.gt-ground { position: absolute; left: 0; right: 0; height: 40%; border-top: 3px solid #3d7a33; background-color: #74c365; }
+.gt-base { position: absolute; border-radius: 6px 6px 2px 2px; background-color: #868e96; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.2); }
+.gt-ball { position: absolute; top: 0; left: 0; width: 12%; height: 16%; }
+.gt-sky .gt-ball { will-change: transform; }
+.gt-ball-in { position: relative; display: block; box-sizing: border-box; width: 100%; height: 100%; border: 2px solid #2b2d42; border-radius: 50%; background-color: #e8413b; background-image: linear-gradient(180deg, #e8413b 0, #e8413b 44%, #2b2d42 44%, #2b2d42 56%, #fff 56%, #fff 100%); }
+.gt-ball-in::after { content: ""; position: absolute; left: 50%; top: 50%; box-sizing: border-box; width: 34%; height: 34%; border: 3px solid #2b2d42; border-radius: 50%; background-color: #fff; transform: translate(-50%, -50%); }
+.gt-ball.is-land .gt-ball-in { transform-origin: 50% 100%; animation: gt-land 0.25s ease-out; }
+.gt-ball.is-perfect .gt-ball-in { animation: gt-land 0.25s ease-out, gt-glow 0.7s ease-out; }
+.gt-ball.is-miss.is-l .gt-ball-in { animation: gt-roll-l 0.7s ease-in forwards; }
+.gt-ball.is-miss.is-r .gt-ball-in { animation: gt-roll-r 0.7s ease-in forwards; }
+.gt-hint { margin: 0; text-align: center; font-size: 0.85rem; opacity: 0.8; word-break: keep-all; }
+.gt .gd-fly { color: #2b2d42; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7); }
+.gt .gd-fly.is-big { color: #e67700; }
+.gt .gd-fly.is-roll { color: #495057; font-size: 1rem; }
+.gd.is-paused .gt-ball-in { animation-play-state: paused; }
+@keyframes gt-land { 0% { transform: scale(1.12, 0.84); } 100% { transform: none; } }
+@keyframes gt-glow { 0% { box-shadow: 0 0 0 0 rgba(255, 212, 59, 0.95); } 100% { box-shadow: 0 0 0 12px rgba(255, 212, 59, 0); } }
+@keyframes gt-roll-l { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translate(-170%, 260%) rotate(-360deg); } }
+@keyframes gt-roll-r { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translate(170%, 260%) rotate(360deg); } }
+@keyframes gt-fade { 0% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gt-world { transition: none; } .gt-ball.is-land .gt-ball-in, .gt-ball.is-perfect .gt-ball-in { animation: none; } .gt-ball.is-miss.is-l .gt-ball-in, .gt-ball.is-miss.is-r .gt-ball-in { animation: gt-fade 0.3s ease-in forwards; } } /* 굴러떨어짐도 돌지 않고 사라지기만 (🔍 Codex 117차 접근성) */

@@ -18,7 +18,7 @@ const SEEDS = [1, 7, 42, 2026, 99999, 31337, 5, 777];
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
 test('🎮 v310 게임 목록 — 🎈 로켓단 열기구 30초 · 화면(RUNNERS)·준비(prep): 나옹 그림 · 파트너 기술', () => {
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon']);
+  assert.deepEqual(GAMES.map((g) => g.id).slice(0, 6), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon'], '여섯째까지 (v311부터 더 늘어난다 — minigame311)');
   assert.equal(gameById('balloon').sec, BAL_SEC);
   assert.equal(BAL_SEC, 30);
   for (const g of GAMES) assert.ok(!/\d/.test(g.how), `${g.id}: 아이가 보는 설명에 숫자 없음`);

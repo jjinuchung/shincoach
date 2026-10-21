@@ -12,6 +12,7 @@ import { runShadow, shadowPoolOf, shadowShuffle, SHADOW_MIN } from './gameshadow
 import { runPair, PAIR_PAIRS } from './gamepair.js'; // 🃏 포켓몬 짝 맞추기 (v309)
 import { runBerry, BERRY_KINDS } from './gameberry.js'; // 🍓 나무열매 받기 (v309)
 import { runBalloon, BAL_MEOWTH } from './gameballoon.js'; // 🎈 로켓단 열기구 (v310)
+import { runTower } from './gametower.js'; // 🗼 몬스터볼 탑 쌓기 (v311)
 import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
@@ -37,6 +38,7 @@ const RUNNERS = {
   pair: { run: runPair, prep: () => pairPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' },
   berry: { run: runBerry, prep: async () => ({ art: await artFor([BERRY_KINDS.voltorb.id]) }) },
   balloon: { run: runBalloon, prep: () => balloonPrep() },
+  tower: { run: runTower, prep: async () => ({}) }, // 볼은 CSS 무늬 — 받을 그림이 없다
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
