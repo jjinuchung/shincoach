@@ -125,9 +125,11 @@ async function runGame(stage, L) {
   const sc = stage.querySelector('.pv-score');
   const pal = $q('.pshow-pal');
   const me = $q('.pshow-me');
-  for (let n = 1; n <= cur.score; n++) {
+  // 🎮 진짜 게임 점수(v307)가 커도 12걸음(3초쯤)에 다 오른다
+  const step = Math.max(1, Math.ceil(cur.score / 12));
+  for (let n = 1; n <= Math.ceil(cur.score / step); n++) {
     if (skip) return;
-    if (sc) sc.textContent = `⭐ ${n}`;
+    if (sc) sc.textContent = `⭐ ${Math.min(cur.score, n * step)}`;
     if (n % 3 === 0) { fly('⭐', 38 + ((n * 7) % 24), 22, 'is-star'); hop(n % 2 ? me : pal); sfx.tick(); }
     await pause(260);
   }
@@ -225,7 +227,7 @@ function close() {
 
 /**
  * 장면 보이기 → Promise(닫으면 풀린다). scene = 'tv' | 'game' | 'pc' | 'piano'
- * scene에 'meal'(🍚 식탁)도 · o = { look, name, mon: { ko, url } | null, wall, floor, lv, bond, tier, chain, heart, day }
+ * scene에 'meal'(🍚 식탁)도 · o = { look, name, mon: { ko, url } | null, wall, floor, lv, bond, tier, chain, heart, day, score? (🎮 미니 게임 점수 — v307) }
  * 이미 떠 있으면 새로 띄우지 않고 바로 풀린다(두 번 눌러도 겹치지 않게)
  */
 export function showPlay(scene, o = {}) {
@@ -236,7 +238,9 @@ export function showPlay(scene, o = {}) {
     skip = false;
     hearted = false;
     const lines = playLines(scene, { mon: o.mon ? o.mon.ko : '', name: o.name, heart: !!o.heart, lv: o.lv, chain: o.chain }, o.day);
-    cur = { scene, o, lines, score: 12 + ((Math.abs(Number(o.day) || 0) * 5) % 9) };
+    // 🎮 점수 — 미니 게임(v307)을 하고 왔으면 그 점수, 아니면 날마다 다른 장면용 수
+    const score = Number.isSafeInteger(o.score) && o.score >= 0 ? o.score : 12 + ((Math.abs(Number(o.day) || 0) * 5) % 9);
+    cur = { scene, o, lines, score };
     $q('.pshow-slot').innerHTML = stageHtml(scene, { ...o, uid: 'show' });
     const tip = $q('.pshow-tip');
     tip.textContent = lines.tip;

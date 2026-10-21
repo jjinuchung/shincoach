@@ -358,7 +358,10 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // 🎤 따라 말하기로 받은 🔶 수 (2026-10-15 v263) — 셈은 문장 목록 speakFirstKeys의 길이, 받기는 applySpeakStone(가방과 한 트랜잭션)
   'speakStones',
   // 🕒 앱 사용 기록 (2026-10-16 v272, usage.js) — 앱을 연 수 · 화면마다 머문 초. 📤 usage/날짜.md로만 (아이 화면엔 안 보임)
-  'appOpens', 'uMath', 'uKor', 'uEn', 'uHome', 'uDex', 'uHouse', 'uShop', 'uCatch', 'uBattle', 'uStats', 'uLock'];
+  'appOpens', 'uMath', 'uKor', 'uEn', 'uHome', 'uDex', 'uHouse', 'uShop', 'uCatch', 'uBattle', 'uStats', 'uLock',
+  // 🎮 게임기 미니 게임 (2026-10-21 v307, minigame.js) — 오늘 쓴 판(시작할 때 claimDailyCount로 선점 · 끝은 그날 공부 시간에서 셈) ·
+  //   🔒 부모가 더 준 판 · 게임 화면에 머문 초(🕒 사용 기록). 병합 maxOf라 옛 백업으로 쓴 판을 되살리지 못한다
+  'gamePlays', 'gameBonus', 'uGame'];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 // 💖 덤으로 풀어 ⚡💰를 받은 문장 — 두 창이 같은 덤을 내도 한 번 (Codex 20차 #4)
@@ -456,6 +459,7 @@ export async function applyDailyDelta(date, delta) {
  * 플래그(하루 한 번)도 max 1로 같이 쓴다 — mergeDailyDelta가 DAILY_FLAGS를 boolean으로
  * 되돌리고 Number(true)는 1이라, 세는 규칙 하나로 둘 다 맞는다.
  * max를 안 주면 상한 없이 세기만 한다 (증분이 사라지지 않게).
+ * max가 함수면 저장된 오늘 기록으로 상한을 셈한다 — 🎮 게임 판(v307)은 그날 공부 시간이 상한이라 같은 트랜잭션에서 다시 본다
  * @returns {Promise<{won:boolean, count:number, daily:object}>}
  */
 export async function claimDailyCount(date, field, max) {
@@ -464,11 +468,30 @@ export async function claimDailyCount(date, field, max) {
   const store = tx.objectStore('daily');
   const cur = await promisify(store.get(date));
   const have = (cur && Number(cur[field])) || 0;
-  if (max !== undefined && have >= max) { await txDone(tx); return { won: false, count: have, daily: cur || emptyDaily(date) }; }
+  const lim = typeof max === 'function' ? max(cur || emptyDaily(date)) : max;
+  if (lim !== undefined && have >= lim) { await txDone(tx); return { won: false, count: have, daily: cur || emptyDaily(date) }; }
   const next = mergeDailyDelta(cur, date, { [field]: 1 });
   store.put(next);
   await txDone(tx);
   return { won: true, count: next[field], daily: next };
+}
+
+/**
+ * 선점한 것 하나를 돌려준다 — 🎮 게임 판을 썼는데 판이 시작도 못 했을 때(그 사이 닫힘·게임이 깨짐, 🔍 Codex 113차 #1).
+ * 0 아래로는 안 내려간다(다른 창·옛 기록과 섞여도) · 한 트랜잭션에서 읽고 쓴다
+ * @returns {Promise<{released:boolean, count:number, daily:object}>}
+ */
+export async function releaseDailyCount(date, field) {
+  const db = await openDb();
+  const tx = db.transaction('daily', 'readwrite');
+  const store = tx.objectStore('daily');
+  const cur = await promisify(store.get(date));
+  const have = (cur && Number(cur[field])) || 0;
+  if (!(have > 0)) { await txDone(tx); return { released: false, count: Math.max(0, have), daily: cur || emptyDaily(date) }; }
+  const next = mergeDailyDelta(cur, date, { [field]: -1 });
+  store.put(next);
+  await txDone(tx);
+  return { released: true, count: next[field], daily: next };
 }
 
 /**

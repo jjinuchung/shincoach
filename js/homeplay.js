@@ -2,7 +2,8 @@
 // 규칙(순수) — 저장은 xp.houseDo(저장된 프로필로 한 트랜잭션), 장면은 playshow.js · 그림은 playart.js
 //
 // 보상은 💰·🔷·🔶·경험치가 **아니다**(공부보다 쉬운 벌이가 되지 않게) — 기기마다 하루 한 번 파트너에게 💗 사이좋음 +1, 같은 날 두 번째부터는 장면만.
-// 저장: profile.homePlay = { days: { 기기 id: 마지막으로 💗를 받은 날 번호 }, bond: { 포켓몬 id: 💗 } }
+// 저장: profile.homePlay = { days: { 기기 id: 마지막으로 💗를 받은 날 번호 }, bond: { 포켓몬 id: 💗 }, best?: { 게임 id: 최고 점수 } }
+//  · 🎮 미니 게임(v307 — minigame.js)의 최고 기록은 best — 늘기만 한다(병합은 칸마다 큰 쪽) · 한 번도 안 했으면 칸이 없다
 //  · 날은 트랜잭션 안의 시각으로 센다 · 지난 날보다 **뒤인 날**에만 준다(시계를 되돌려도 또 받지 않게 — 기록은 늘 큰 쪽)
 //  · 💗는 늘기만 한다 — 병합은 칸마다 큰 쪽(두 창·옛 백업을 합쳐도 늘어나지 않는다)
 //  · 진화하면 💗를 이어받는다 — 읽을 때 진화 전 모습들의 💗 중 가장 큰 것(bondOf), 주면 그 수 + 1을 지금 모습에 적는다(옛 칸은 지우지 않음 — 단조)
@@ -25,12 +26,16 @@ export const BOND_MAX = 1e6;
 const BOND_KEYS_MAX = 2000;
 /** 날 번호의 끝 — 깨진 큰 날이 영영 "오늘보다 뒤"가 되지 않게(서기 9999년쯤) */
 const DAY_MAX = 3e6;
+/** 🎮 미니 게임 최고 점수의 끝 · 게임 열쇠 꼴(minigame.GAMES의 id — 소문자) · 칸 수의 끝 */
+export const SCORE_MAX = 99999;
+const GAME_KEY = /^[a-z]{2,12}$/;
+const BEST_KEYS_MAX = 40;
 
 const isObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const cnt = (v, max) => (Number.isSafeInteger(v) && v > 0 ? Math.min(v, max) : 0);
 
-/** 저장된 놀이 기록 고쳐 읽기 (새 객체) — 모르는 기기·깨진 값은 뺀다 */
+/** 저장된 놀이 기록 고쳐 읽기 (새 객체) — 모르는 기기·깨진 값은 뺀다 · 🎮 최고 기록(best)은 있을 때만 칸을 둔다 */
 export function playOf(raw) {
   const out = { days: {}, bond: {} };
   if (!isObj(raw)) return out;
@@ -38,6 +43,10 @@ export function playOf(raw) {
   if (isObj(raw.bond)) {
     const keys = Object.keys(raw.bond).filter((k) => /^\d{1,6}$/.test(k) && cnt(raw.bond[k], BOND_MAX)).slice(0, BOND_KEYS_MAX);
     for (const k of keys) out.bond[k] = cnt(raw.bond[k], BOND_MAX);
+  }
+  if (isObj(raw.best)) {
+    const keys = Object.keys(raw.best).filter((k) => GAME_KEY.test(k) && cnt(raw.best[k], SCORE_MAX)).slice(0, BEST_KEYS_MAX);
+    if (keys.length) { out.best = {}; for (const k of keys) out.best[k] = cnt(raw.best[k], SCORE_MAX); }
   }
   return out;
 }
@@ -52,7 +61,14 @@ export function mergePlay(a, b) {
   const y = playOf(b);
   for (const id of Object.keys(y.days)) x.days[id] = Math.max(x.days[id] || 0, y.days[id]);
   for (const k of Object.keys(y.bond)) x.bond[k] = Math.max(x.bond[k] || 0, y.bond[k]);
+  if (y.best) { x.best = x.best || {}; for (const k of Object.keys(y.best)) x.best[k] = Math.max(x.best[k] || 0, y.best[k]); }
   return playOf(x);
+}
+
+/** 🎮 그 게임의 최고 점수 (없으면 0) */
+export function bestOf(raw, gameId) {
+  const b = playOf(raw).best;
+  return b && own(b, gameId) ? b[gameId] : 0;
 }
 
 /** 💗 사이좋음 — 이 포켓몬과 진화 전 모습들 가운데 가장 큰 것 (진화해도 이어진다) */
@@ -185,4 +201,25 @@ export function playRule(profile, roomId, u, now) {
   hp.bond[String(mon)] = Math.min(BOND_MAX, before + 1);
   profile.homePlay = hp;
   return { ok: true, kind: it.id, heart: true, mon, bond: hp.bond[String(mon)] };
+}
+
+/**
+ * 🎮 미니 게임 한 판이 끝났다 (v307) — 그 기기로 놀기(playRule — 💗 하루 한 번) + 그 게임의 최고 점수.
+ * 판은 시작할 때 이미 썼다(gameview — daily gamePlays) · 점수는 게임이 센 것(0 ~ SCORE_MAX로 자름 — 💰·스톤과 안 이어진다)
+ * why: playRule과 같고 + 'game' 모르는 게임 · 최고 점수는 늘기만 한다(파트너가 없어도 적는다)
+ * → { ...playRule 결과, best, prevBest, newBest }
+ */
+export function gameEndRule(profile, roomId, u, gameId, score, now) {
+  if (!GAME_KEY.test(String(gameId))) return { ok: false, why: 'game' };
+  const r = playRule(profile, roomId, u, now);
+  if (!r.ok) return r;
+  const hp = playOf(profile.homePlay);
+  const prevBest = bestOf(hp, gameId);
+  const s = Number.isSafeInteger(score) && score > 0 ? Math.min(score, SCORE_MAX) : 0;
+  const newBest = s > prevBest;
+  if (newBest) {
+    hp.best = { ...(hp.best || {}), [gameId]: s };
+    profile.homePlay = hp;
+  }
+  return { ...r, best: Math.max(prevBest, s), prevBest, newBest };
 }

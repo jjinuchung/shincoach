@@ -121,6 +121,9 @@ function loadPlayer() {
     statusOf: () => ({ used: 0, limit: 3600, bonus: 0, total: 3600, left: 3600, locked: false, warn: false, off: false }),
     fmtUsed: (sec) => `${Math.floor((Number(sec) || 0) / 60)}분`, todayDaily: () => null,
     EXTEND_MAX: 2, EXTEND_MIN: 15, extMaxOf: (v) => (Number.isFinite(Math.floor(Number(v))) && Number(v) >= 0 ? Math.min(3, Math.floor(Number(v))) : 2), // ⏳ 연장권 (2026-10-01)
+    // 🎮 게임기 미니 게임 판 (v307) — ⚙ 설정 칸·오늘 한 줄·🔒 +1판은 화면 쪽(tests/minigame307)
+    GAME_MIN: 20, GAME_CAP: 2, gameMinOf: (v) => Number(v) || 20, gameCapOf: (v) => (Number.isFinite(Number(v)) ? Number(v) : 2),
+    grantPlay: async () => null, gameTodayLine: () => '',
     // 🕳 울트라홀 게이트 스텁 (2026-09-28) — 테스트 명단엔 울트라비스트가 없으니 걸러도 그대로다
     forHole: (list) => (list || []).slice(), isUltraBeast: () => false,
     gymClaimed: () => false, getMath: async () => ({}),

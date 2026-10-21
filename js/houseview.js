@@ -32,6 +32,7 @@ import { syncHatMarks } from './hatmarks.js'; // 🧢 지우 모자 무늬 받�
 import { PLAYS, playSpot, bondOf, chainOf, bondTier, palHome } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
 import { SCENE_OF, playLines } from './playart.js';
 import { showPlay, closePlay } from './playshow.js'; // 🎮 장면
+import { openGames, closeGames, GAME_DEVICE } from './gameview.js'; // 🎮 게임기 미니 게임 (v307)
 import { dayNum } from './korean.js'; // 📰 TV 소식은 날마다 바뀐다 (순수)
 import { FURN_ART } from './furnart.js'; // 🖍️ 코드로 그린 가구 그림 (순수 자료)
 
@@ -213,6 +214,7 @@ export function closeHouse() {
   cancelDrag();
   ui.open = false;
   ui.playRun += 1; // 🎮 걷던·보던 놀기는 여기서 끝 (💗는 저장된 대로)
+  closeGames(); // 🎮 게임기 화면도 (돌던 판은 그 자리에서 끝 — v307)
   closePlay();
   if (ui.tick) { clearInterval(ui.tick); ui.tick = 0; }
   $('house').hidden = true;
@@ -531,7 +533,16 @@ async function playAt(it) {
   ui.busy = true;
   try {
     let r = null;
-    try { r = await homePlay(rid, it.u); } catch { r = null; }
+    let score;
+    if (it.id === GAME_DEVICE) {
+      // 🎮 미니 게임 (v307) — 게임기 화면에서 판을 하고 오면(💗·최고 기록은 판마다 이미 저장) 그 점수로 방 장면 · 판 없이 닫으면 그대로
+      const g = await openGames({ roomId: rid, u: it.u, hero: heroOf() });
+      if (!live() || !g || !g.played) return;
+      r = g.r || { ok: false, why: g.why || 'save' };
+      score = g.score;
+    } else {
+      try { r = await homePlay(rid, it.u); } catch { r = null; }
+    }
     if (!live()) return; // 💗는 저장된 대로 둔다
     if (!r || !r.ok) {
       const why = r && r.why;
@@ -554,7 +565,7 @@ async function playAt(it) {
         look: me.look, name: me.name, mon,
         wall: (paintById(rm && rm.wall) || PAINT_BASE.wall).color, floor: (paintById(rm && rm.floor) || PAINT_BASE.floor).color,
         lv: r.mon ? monLv(r.mon) : 0, bond: r.bond, tier: bondTier(r.bond), chain: r.mon ? chainOf(r.mon).map(rosterKo).filter(Boolean) : [],
-        heart: r.heart, day: dayNum(Date.now()),
+        heart: r.heart, day: dayNum(Date.now()), score,
       });
       if (!live()) return;
       await back();
@@ -564,6 +575,14 @@ async function playAt(it) {
     ui.bondHold = null;
     if (ui.open) render();
   }
+}
+
+/** 🎮 게임에서 응원하는 쪽 — 🤝 파트너 그림(받아 둔 것), 없으면 내 캐릭터 */
+function heroOf() {
+  const pid = getPartner();
+  const url = pid ? characterUrl(pid) || artUrl(pid) : '';
+  if (url) return { html: `<img class="gd-pal-img" src="${String(url).replace(/[&"<>]/g, '')}" alt="" draggable="false">` };
+  return { html: avatarSvg(avatarOf(getProfileSnapshot()).look, { uid: 'game', cls: 'gd-me-art' }) };
 }
 
 /** 🗄️ 서랍 — 가졌지만 안 놓은 가구 (끌어다 놓거나, 누른 뒤 방을 눌러 놓는다) */

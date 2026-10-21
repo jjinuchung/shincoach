@@ -303,6 +303,14 @@
     </div>
   </div>
 
+  <!-- ===== 🎮 게임기 미니 게임 (v307) — 집 위에 뜬다 · 게임 고르기·한 판·끝 화면은 gameview.js가 그린다 ===== -->
+  <div id="game" class="gm" role="dialog" aria-label="게임기" hidden>
+    <div class="gm-card">
+      <div class="gm-head"><span class="gm-title">🎮 게임기</span><button type="button" class="btn btn-icon gm-x" aria-label="닫기">✕</button></div>
+      <div class="gm-body"></div>
+    </div>
+  </div>
+
   <!-- ===== 포켓몬 상세: 장식 장착·염색 ===== -->
   <div id="mon" class="modal" hidden>
     <div class="modal-card">
@@ -745,6 +753,27 @@
           </select>
         </label>
         <p id="set-time-today" class="field-note"></p>
+      </fieldset>
+
+      <fieldset class="field set-group">
+        <legend class="field-label">🎮 게임기 미니 게임 <small>— 🏡 집의 🎮 게임기. 과목마다 공부한 시간으로 판이 생겨요(그날만). 💰·스톤은 안 줘요</small></legend>
+        <label class="field field-inline">
+          <span class="field-label">공부 몇 분에 1판 <small>— 과목마다 따로 셈</small></span>
+          <input type="number" id="set-game-min" min="5" max="120" step="5" inputmode="numeric">
+        </label>
+        <label class="field field-inline">
+          <span class="field-label">과목마다 하루 최대</span>
+          <select id="set-game-cap">
+            <option value="0">0판 (공부로는 안 생김)</option>
+            <option value="1">1판</option>
+            <option value="2">2판</option>
+            <option value="3">3판</option>
+            <option value="4">4판</option>
+            <option value="5">5판</option>
+          </select>
+        </label>
+        <button type="button" id="set-game-bonus" class="btn">🎮 오늘 +1판 주기</button>
+        <p id="set-game-today" class="field-note"></p>
       </fieldset>
 
       <fieldset class="field set-group">

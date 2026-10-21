@@ -23,6 +23,7 @@ export const PLACES = [
   { key: 'home', field: 'uHome', ko: '🏠 홈' },
   { key: 'pokedex', field: 'uDex', ko: '🎒 도감' },
   { key: 'house', field: 'uHouse', ko: '🏡 집' },
+  { key: 'game', field: 'uGame', ko: '🎮 게임기' }, // 🎮 미니 게임 (v307) — 집 위에 뜬 게임기 화면
   { key: 'shop', field: 'uShop', ko: '🛒 상점' },
   { key: 'catch', field: 'uCatch', ko: '🎯 잡기·진화·부화' },
   { key: 'battle', field: 'uBattle', ko: '⚔️ 배틀' },
@@ -46,6 +47,7 @@ export const OVERLAYS = [
   { place: 'lock', ids: ['timeup'] },
   { place: 'battle', ids: ['battle', 'rocket'] },
   { place: 'catch', ids: ['catch', 'evolve', 'hatch'] },
+  { place: 'game', ids: ['game'] }, // 🎮 게임기 화면은 집 위에 뜬다 (v307)
   { place: 'house', ids: ['house'] },
   { place: 'shop', ids: ['shop', 'market'] },
 ];

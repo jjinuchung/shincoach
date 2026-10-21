@@ -32,6 +32,8 @@ import { ensureAnims, loadAnims, animUrl } from './sprite.js';
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import { DEFAULT_MIN as TIME_MIN, KOREAN_MIN, EXTEND_MAX, EXTEND_MIN, extMaxOf, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
+import { GAME_MIN, GAME_CAP, gameMinOf, gameCapOf } from './minigame.js'; // 🎮 게임기 미니 게임 판 (v307)
+import { grantPlay, gameTodayLine } from './gameview.js'; // 🎮 ⚙ 오늘 한 줄 · 🔒 +1판 (v307)
 import { setBgmEnabled } from './bgm.js';
 import * as track from './track.js';
 import { rocketPick, rocketAdmit, rocketCurrent, rocketTargets, rocketLastAt } from './xp.js'; // 🚀 로켓단 습격 — 영어 (2026-10-09)
@@ -3128,6 +3130,8 @@ function loadSettings() {
     timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend, timeKorean: KOREAN_MIN.weekday,
     // ⏳ 시간 연장권 — 과목마다 하루 최대 (2026-10-01, 아버님 "이대로 진행"). 0이면 아이가 못 쓴다
     timeExtMax: EXTEND_MAX,
+    // 🎮 게임기 미니 게임 판 (2026-10-21 v307, 아버님) — 과목마다 공부 20분에 1판 · 하루 2판까지
+    gameMin: GAME_MIN, gameCap: GAME_CAP,
     // 🔢 수학 숫자판 (2026-10-01) — 켜짐이 기본. math.js가 같은 localStorage에서 읽는다
     mathPad: true };
   let saved = {};
@@ -3160,6 +3164,7 @@ export function timeLimitConf() {
     min: { weekday: Number(settings.timeWeekday), weekend: Number(settings.timeWeekend) },
     minKorean: { weekday: Number(settings.timeKorean), weekend: Number(settings.timeKorean) }, // 📚 국어 — 날마다 같은 값
     extMax: extMaxOf(settings.timeExtMax),
+    gameMin: gameMinOf(settings.gameMin), gameCap: gameCapOf(settings.gameCap), // 🎮 게임 판 (v307)
   };
 }
 
@@ -3189,6 +3194,13 @@ function renderTimeToday() {
   p.textContent = `오늘 — ${parts.join(' · ')}`;
 }
 
+/** 🎮 ⚙ 설정 아래 게임 판 한 줄 (v307) — 지금 칸에 적힌 분·판으로 셈한다(저장 전에도 바로 보이게) */
+function renderGameToday() {
+  const p = $('set-game-today');
+  if (!p) return;
+  try { p.textContent = gameTodayLine({ min: gameMinOf($('set-game-min').value), cap: gameCapOf($('set-game-cap').value) }); } catch { p.textContent = ''; }
+}
+
 function initSettingsDialog() {
   $('set-merge').checked = settings.mergeSentences;
   $('set-shadow-factor').value = String(Number(settings.shadowFactor)); // 옵션 value와 표기를 맞춘다 ("2.0"이면 선택이 안 됨)
@@ -3209,6 +3221,13 @@ function initSettingsDialog() {
   $('set-speak').checked = settings.speakCheck;
   $('set-hide-en').checked = settings.hideEnWhileSpeaking;
   $('set-close').addEventListener('click', () => $('dlg-settings').close());
+  // 🎮 게임 판 (v307) — 칸을 바꾸면 한 줄을 바로 다시 · 🔒 오늘 +1판(이미 비밀번호를 지나 설정에 들어왔다 · 두 번 눌러 두 판 주지 않게 끈다)
+  for (const id of ['set-game-min', 'set-game-cap']) $(id).addEventListener('change', renderGameToday);
+  $('set-game-bonus').addEventListener('click', async () => {
+    const b = $('set-game-bonus');
+    b.disabled = true;
+    try { await grantPlay(); } catch { /* 저장 실패 — 한 줄이 그대로 */ } finally { b.disabled = false; renderGameToday(); }
+  });
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
   $('set-review-try').addEventListener('click', () => { $('dlg-settings').close(); startReviewNow(); });
   $('set-essay-try').addEventListener('click', () => { $('dlg-settings').close(); startEssayNow(); });
@@ -3263,6 +3282,8 @@ function initSettingsDialog() {
     settings.timeWeekend = clampMin($('set-time-weekend').value, TIME_MIN.weekend);
     settings.timeKorean = clampMin($('set-time-korean').value, KOREAN_MIN.weekday);
     settings.timeExtMax = extMaxOf($('set-time-ext').value);
+    settings.gameMin = gameMinOf($('set-game-min').value); // 🎮 게임 판 (v307)
+    settings.gameCap = gameCapOf($('set-game-cap').value);
     settings.mathPad = $('set-mathpad').checked;
     if (!settings.hideEnWhileSpeaking) state.speakHideEn = 'none'; // 끄면 대기 중이던 숨김도 해제
     if (settings.listenFirst === 0) state.enRevealed = true;
@@ -3326,8 +3347,11 @@ function openSettings() {
     $('set-time-weekend').value = String(Number(settings.timeWeekend));
     $('set-time-korean').value = String(Number(settings.timeKorean ?? KOREAN_MIN.weekday));
     $('set-time-ext').value = String(extMaxOf(settings.timeExtMax));
+    $('set-game-min').value = String(gameMinOf(settings.gameMin)); // 🎮 게임 판 (v307)
+    $('set-game-cap').value = String(gameCapOf(settings.gameCap));
     $('set-mathpad').checked = settings.mathPad !== false;
     renderTimeToday();
+    renderGameToday();
     ttsSeq++; // 🔊 아직 안 끝난 지난 확인은 결과를 적지 않는다
     $('set-tts-note').textContent = ''; // 🔊 지난번 확인 결과는 지운다
     $('set-tts-try').disabled = false;

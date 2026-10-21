@@ -198,6 +198,7 @@ const clock = {
   exempt: false,        // 🎯 도전 문제처럼 **제한 밖**인 것을 푸는 동안 (아버님 결정 2026-09-28)
   onTick: null,         // 화면(칩·잠금)에 알리는 콜백
   conf: null,           // () => ({ off, min })
+  ready: false,         // 오늘 기록을 한 번 읽었나 — 🎮 판이 생겼다는 알림(v307)이 읽기 전의 0분을 기준으로 삼지 않게
 };
 
 const now = () => Date.now();
@@ -231,9 +232,21 @@ export function initTimeLimit({ conf, onTick } = {}) {
 /** 오늘 기록을 읽어 둔다 (날짜가 바뀌면 다시) */
 export async function loadToday() {
   clock.today = dayKey();
+  clock.ready = false;
   try { clock.daily = await getDaily(clock.today); } catch { clock.daily = null; }
+  clock.ready = true;
   if (clock.onTick) clock.onTick();
   return clock.daily;
+}
+
+/** 오늘 기록을 읽었나 (날이 바뀌어 다시 읽는 동안은 false) */
+export function isReady() {
+  return clock.ready;
+}
+
+/** ⚙ 설정 그대로 (🎮 게임 판 gameMin·gameCap도 여기로 — v307) */
+export function limitConf() {
+  return confNow();
 }
 
 /**
