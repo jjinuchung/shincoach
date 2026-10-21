@@ -104,6 +104,7 @@ export const GAMES = [
   { id: 'shadow', emoji: '👤', ko: '그림자 포켓몬', how: '까만 그림자는 누구일까? 이름을 골라요', sec: 40 },
   { id: 'pair', emoji: '🃏', ko: '포켓몬 짝 맞추기', how: '카드를 뒤집어 같은 포켓몬을 찾아요', sec: 60 },
   { id: 'berry', emoji: '🍓', ko: '나무열매 받기', how: '끌어서 열매를 받아요 · 찌리리공은 피해요', sec: 30 },
+  { id: 'balloon', emoji: '🎈', ko: '로켓단 열기구', how: '톡! 파트너 기술로 열기구를 터뜨려요 · 큰 열기구는 여러 번', sec: 30 },
 ];
 export function gameById(id) {
   return GAMES.find((g) => g.id === id) || null;

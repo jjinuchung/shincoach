@@ -11,11 +11,13 @@ import { runRun } from './gamerun.js'; // 🏃 파트너 달리기 (v308)
 import { runShadow, shadowPoolOf, shadowShuffle, SHADOW_MIN } from './gameshadow.js'; // 👤 그림자 포켓몬 (v308)
 import { runPair, PAIR_PAIRS } from './gamepair.js'; // 🃏 포켓몬 짝 맞추기 (v309)
 import { runBerry, BERRY_KINDS } from './gameberry.js'; // 🍓 나무열매 받기 (v309)
+import { runBalloon, BAL_MEOWTH } from './gameballoon.js'; // 🎈 로켓단 열기구 (v310)
+import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
-import { gameEnd, gameBest, itemCount, ownedMonIds } from './xp.js';
+import { gameEnd, gameBest, itemCount, ownedMonIds, getPartner } from './xp.js';
 import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl } from './pokemon.js';
-import { typeOf } from './battle.js';
+import { typeOf, movesOf } from './battle.js';
 import { sfx, unlock } from './sfx.js';
 
 /** 🎮 게임기 가구 id (house.js) */
@@ -34,6 +36,7 @@ const RUNNERS = {
   shadow: { run: runShadow, prep: () => shadowPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' },
   pair: { run: runPair, prep: () => pairPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' },
   berry: { run: runBerry, prep: async () => ({ art: await artFor([BERRY_KINDS.voltorb.id]) }) },
+  balloon: { run: runBalloon, prep: () => balloonPrep() },
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -201,6 +204,19 @@ async function shadowPrep() {
     pool = shadowPool();
   }
   return shadowPoolOf(pool).length >= SHADOW_MIN ? { pool } : null;
+}
+/**
+ * 🎈 나옹 얼굴(⚔️ 로켓단과 같은 움직이는 그림 — ART_WAIT_MS까지 · 없으면 일러스트 · 그것도 없으면 😼) ·
+ * 파트너 기술(⚔️ 배틀과 같은 강한 기술 — 개굴닌자는 💧 물수리검 · 파트너가 없으면 ⭐ 별 던지기)
+ */
+async function balloonPrep() {
+  await Promise.race([ensureAnim(BAL_MEOWTH).catch(() => null), wait(ART_WAIT_MS)]);
+  const pid = getPartner();
+  const m = pid ? movesOf(pid)[0] : null;
+  return {
+    meowth: animUrl(BAL_MEOWTH) || characterUrl(BAL_MEOWTH) || artUrl(BAL_MEOWTH) || null,
+    move: m ? { name: m.name, emoji: m.emoji } : null,
+  };
 }
 /**
  * 🃏 짝 카드 — **진우가 잡은 포켓몬**(mine)을 먼저(아버님 2026-10-21) · 그림이 없는 잡은 포켓몬은 몇 장 받아 본다(ART_WAIT_MS까지만)

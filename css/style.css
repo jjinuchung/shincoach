@@ -3856,11 +3856,12 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gm-mood { margin: 0; text-align: center; font-size: 1.05rem; font-weight: 700; }
 .gm-msg { margin: 0; text-align: center; color: #ffd43b; font-size: 0.92rem; }
 .gm-list { display: grid; gap: 8px; }
+@media (min-width: 720px) { .gm-list { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } } /* 게임이 늘어도 낮은 가로 화면에 한눈에 (v310 — 여섯째부터 · 긴 설명도 칸을 안 밀게 minmax) */
 .gm-game { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px; border: 0; border-radius: 16px; background: #fff; color: #2b2d42; font: inherit; text-align: left; box-shadow: 0 4px 0 #8d99ae; cursor: pointer; }
 .gm-game:active { transform: translateY(2px); box-shadow: 0 2px 0 #8d99ae; }
 .gm-game:disabled { opacity: 0.45; cursor: default; transform: none; }
 .gm-game-emoji { font-size: 2rem; line-height: 1; }
-.gm-game-txt { display: grid; gap: 2px; }
+.gm-game-txt { display: grid; gap: 2px; min-width: 0; }
 .gm-game-name { font-size: 1.1rem; font-weight: 800; }
 .gm-game-how { font-size: 0.85rem; color: #555; word-break: keep-all; }
 .gm-game-best { font-size: 0.85rem; font-weight: 700; color: #e67700; }
@@ -3997,3 +3998,35 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gb .gd-fly.is-big { color: #e67700; }
 .gb .gd-fly.is-zap { color: #495057; }
 .gd.is-paused .gb-me-in { animation-play-state: paused; }
+
+/* 🎈 로켓단 열기구 (v310 · gameballoon.js) — 하늘 너비 100칸 × 높이 70칸 · 열기구는 ⚔️ 로켓단과 같은 노란 열기구(나옹 · R) · 자리는 JS가 transform으로 */
+.gl-field { position: relative; overflow: hidden; aspect-ratio: 100 / 70; border-radius: 18px; background-color: #a5d8ff; background-image: linear-gradient(180deg, #74c0fc 0%, #d0ebff 100%); touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.gl-cloud { position: absolute; top: 14%; left: 8%; width: 20%; height: 9%; border-radius: 999px; background: #fff; opacity: 0.8; pointer-events: none; }
+.gl-cloud.is-b { top: 34%; left: 66%; width: 14%; height: 7%; }
+.gl-layer { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.gl-bal { position: absolute; top: 0; left: 0; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; will-change: transform; }
+.gl-bal:disabled { cursor: default; }
+.gl-bal.is-pop { pointer-events: none; } /* 터져 날아가는 동안 아래 열기구를 가리지 않는다 (🔍 Codex 116차 #1) */
+.gl-env { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 76%; border-radius: 50% 50% 46% 46%; background-color: #fde68a; border: 3px solid #b45309; box-shadow: inset -6px -8px 0 rgba(180, 83, 9, 0.18); }
+.gl-meowth { width: 76%; height: 76%; object-fit: contain; image-rendering: pixelated; pointer-events: none; -webkit-user-drag: none; }
+.gl-meowth-alt { font-size: 1.6rem; line-height: 1; }
+.gl-bal.is-big .gl-meowth-alt { font-size: 2.4rem; }
+.gl-r { position: absolute; right: -6%; bottom: -4%; display: flex; align-items: center; justify-content: center; width: 34%; aspect-ratio: 1; border: 2px solid #fff; border-radius: 50%; background-color: #dc2626; color: #fff; font-size: 0.75rem; font-weight: 900; }
+.gl-bal.is-big .gl-r { font-size: 1rem; }
+.gl-basket { width: 40%; height: 16%; margin-top: 8%; border-radius: 3px 3px 6px 6px; background-color: #8a5a2b; box-shadow: 0 -10px 0 -8px #8a5a2b; }
+.gl-hp { position: absolute; top: -16%; left: 50%; font-size: 0.8rem; line-height: 1; white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
+.gl-bal.is-hit .gl-env { animation: rocket-shake 0.45s ease-in-out; }
+.gl-bal.is-pop > * { animation: gl-pop 0.7s ease-in forwards; }
+.gl-me { position: absolute; left: 50%; bottom: 2%; width: 16%; height: 22%; pointer-events: none; transform: translateX(-50%); }
+.gl-me .gd-pal-emoji { display: block; font-size: 2rem; line-height: 1; text-align: center; }
+.gl-me.is-shoot { animation: gl-shoot 0.3s ease-out; }
+.gl-shot { position: absolute; z-index: 3; font-size: 1.6rem; line-height: 1; pointer-events: none; transform: translate(-50%, -50%); animation: gl-shot 0.25s ease-in forwards; }
+.gl-hint { margin: 0; text-align: center; font-size: 0.85rem; opacity: 0.8; word-break: keep-all; }
+.gl .gd-fly { color: #2b2d42; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7); }
+.gl .gd-fly.is-big { color: #e67700; }
+.gl .gd-fly.is-blast { max-width: 60%; color: #fff; font-size: 1rem; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45); white-space: nowrap; }
+.gd.is-paused .gl-bal > *, .gd.is-paused .gl-shot { animation-play-state: paused; }
+@keyframes gl-pop { 0% { opacity: 1; transform: none; } 30% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0; transform: translate(40%, -140%) rotate(300deg) scale(0.2); } }
+@keyframes gl-shoot { 0%, 100% { transform: translateX(-50%); } 40% { transform: translateX(-50%) translateY(-12%); } }
+@keyframes gl-shot { from { transform: translate(-50%, -50%) scale(0.8); } to { transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .gl-bal.is-pop > * { animation-duration: 0.2s; } .gl-me.is-shoot { animation: none; } }

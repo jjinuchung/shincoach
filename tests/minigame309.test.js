@@ -22,7 +22,7 @@ const POOL = (n = 20, mineN = 8) => Array.from({ length: n }, (_, i) => ({ id: i
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
 test('🎮 v309 게임 목록 — 🃏 짝 맞추기 60초 · 🍓 나무열매 받기 30초 · 화면(RUNNERS)·준비(prep)', () => {
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig', 'run', 'shadow', 'pair', 'berry']);
+  assert.deepEqual(GAMES.map((g) => g.id).slice(0, 5), ['dig', 'run', 'shadow', 'pair', 'berry'], '다섯째까지 (v310부터 더 늘어난다 — minigame310)');
   assert.deepEqual([gameById('pair').sec, gameById('berry').sec], [PAIR_SEC, BERRY_SEC]);
   assert.deepEqual([PAIR_SEC, BERRY_SEC, PAIR_PAIRS, PEEK_MS], [60, 30, 6, 2000], '아버님 고른 60초 · 2초 앞면');
   for (const g of GAMES) {
