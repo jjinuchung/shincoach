@@ -3909,3 +3909,52 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes gd-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } }
 @keyframes gd-fly { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -48px); } }
 @keyframes gd-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+/* 🏃 파트너 달리기 (v308 · gamerun.js) — 마당은 너비 100칸 × 높이 64칸(땅 8칸 = 12.5%) · 자리는 JS가 transform으로 */
+.gr-field { position: relative; overflow: hidden; aspect-ratio: 100 / 64; border-radius: 18px; background: #a5d8ff; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.gr-field:focus { outline: none; }
+.gr-field:focus-visible { outline: 3px solid #ffd43b; outline-offset: 2px; }
+.gr-cloud { position: absolute; top: 10%; left: 60%; width: 18%; height: 9%; border-radius: 999px; background: #fff; opacity: 0.85; pointer-events: none; }
+.gr-cloud.is-b { top: 24%; left: 24%; width: 12%; height: 7%; }
+.gr-ground { position: absolute; left: 0; bottom: 0; width: 125%; height: 12.5%; border-top: 3px solid #3d7a33; background-color: #74c365; background-image: linear-gradient(90deg, #74c365 50%, #65b356 50%); background-size: 30px 100%; will-change: transform; }
+.gr-layer { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+.gr-obj { position: absolute; left: 0; bottom: 12.5%; display: block; will-change: transform; }
+.gr-obj svg { display: block; width: 100%; height: 100%; }
+.gr-obj.is-got svg { animation: gr-got 0.35s ease-out forwards; }
+.gr-obj.is-knock svg { animation: gr-knock 0.4s ease-in forwards; }
+.gr-dot { position: absolute; left: 16%; bottom: calc(12.5% - 4px); width: 11%; height: 8px; border-radius: 50%; background: rgba(0, 0, 0, 0.2); pointer-events: none; }
+/* 그림은 닿는 칸(왼쪽 16칸 · 11×13칸 — gamerun ME)보다 크게 — 가운데·발끝을 맞춰서 (작으면 파트너가 안 보인다) */
+.gr-me { position: absolute; left: 12.5%; bottom: 12.5%; width: 18%; height: 30%; pointer-events: none; will-change: transform; }
+.gr-me-in { width: 100%; height: 100%; transform-origin: 50% 100%; }
+.gr-me .gd-pal-img { transform: scaleX(-1); } /* 포켓몬 그림은 대개 왼쪽을 본다 — 달리는 쪽(오른쪽)으로 */
+.gr-me .gd-pal-emoji { display: block; font-size: 2rem; line-height: 1; text-align: center; }
+.gr.is-go .gr-me:not(.is-air) .gr-me-in { animation: gr-bob 0.3s ease-in-out infinite alternate; }
+.gr.is-go .gr-me.is-flip .gr-me-in { animation: gr-flip 0.4s ease-out; }
+.gr.is-go .gr-me.is-bonk .gr-me-in { animation: gr-bonk 1s ease-out; }
+.gr-hint { margin: 0; text-align: center; font-size: 0.85rem; opacity: 0.8; }
+.gr .gd-fly { color: #2b2d42; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7); } /* 하늘색 위에서 보이게 */
+.gr .gd-fly.is-big { color: #e67700; }
+.gr .gd-fly.is-zap { color: #495057; }
+.gd.is-paused .gr-me-in, .gd.is-paused .gr-obj svg { animation-play-state: paused; }
+@keyframes gr-bob { from { transform: translateY(0); } to { transform: translateY(-6%) rotate(-3deg); } }
+@keyframes gr-flip { from { transform: rotate(0); } to { transform: rotate(-360deg); } }
+@keyframes gr-bonk { 0% { transform: none; } 15%, 70% { transform: translateY(6%) rotate(-30deg); } 100% { transform: none; } }
+@keyframes gr-got { to { opacity: 0; transform: translateY(-40%) scale(1.4); } }
+@keyframes gr-knock { to { opacity: 0; transform: translate(60%, -60%) rotate(60deg); } }
+@media (prefers-reduced-motion: reduce) { .gr.is-go .gr-me:not(.is-air) .gr-me-in, .gr.is-go .gr-me.is-flip .gr-me-in { animation: none; } }
+
+/* 👤 그림자 포켓몬 (v308 · gameshadow.js) — 그림자는 filter 하나(구형 태블릿) · 보여 줄 때만 부드럽게 */
+.gs-pic { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 18px; background-color: #ffe8a3; background-image: radial-gradient(circle at 50% 45%, #fff9db 0, #fff9db 35%, #ffe8a3 70%, #fcc419 100%); }
+.gs-frame { display: flex; align-items: center; justify-content: center; width: 70%; height: 84%; }
+.gs-img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; filter: none; transition: filter 0.35s ease-out, transform 0.35s ease-out; }
+.gs-img.is-dark { filter: brightness(0); transition: none; }
+.gs-img.is-wait { visibility: hidden; } /* 다 뜨기 전엔 감춘다 — 보기도 꺼져 있다 (🔍 Codex 114차 #1) */
+.gs-img:not(.is-dark) { transform: scale(1.06); }
+.gs-name { position: absolute; left: 50%; bottom: 6%; max-width: 92%; padding: 4px 14px; overflow: hidden; border-radius: 999px; background: #2b2d42; color: #fff; font-size: 1.15rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; transform: translateX(-50%); animation: gm-pop 0.25s ease-out both; }
+.gs-name:empty { display: none; }
+.gs-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gs-btn { min-height: 52px; padding: 8px 6px; border: 0; border-radius: 14px; background: #fff; color: #2b2d42; font: inherit; font-size: 1.05rem; font-weight: 800; word-break: keep-all; box-shadow: 0 4px 0 #8d99ae; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.gs-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #8d99ae; }
+.gs-btn:disabled { cursor: default; }
+.gs-btn.is-right { background: #51cf66; color: #fff; box-shadow: 0 4px 0 #2b8a3e; }
+.gs-btn.is-picked { opacity: 0.55; }

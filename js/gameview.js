@@ -7,20 +7,30 @@
 //   공부하는 동안 판이 생기면 한 줄(🎮 게임 1판이 생겼어요!) — 🎮 게임기를 가졌을 때만
 import { GAMES, gameById, playState, playLimit, gameConfOf, subjectPlays, earnedPlays, usedPlays } from './minigame.js';
 import { runDig, DIG_KINDS } from './gamedig.js';
+import { runRun } from './gamerun.js'; // 🏃 파트너 달리기 (v308)
+import { runShadow, shadowPoolOf, shadowShuffle, SHADOW_MIN } from './gameshadow.js'; // 👤 그림자 포켓몬 (v308)
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
 import { gameEnd, gameBest, itemCount } from './xp.js';
-import { ensureArt, artUrl } from './pokemon.js';
+import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl } from './pokemon.js';
+import { typeOf } from './battle.js';
 import { sfx, unlock } from './sfx.js';
 
 /** 🎮 게임기 가구 id (house.js) */
 export const GAME_DEVICE = 'f_game';
-/** 게임마다 돌리는 것 · 미리 받아 둘 그림 */
-const RUNNERS = {
-  dig: { run: runDig, art: Object.values(DIG_KINDS).map((k) => k.id) },
-};
 /** 그림을 기다리는 끝(ms) — 못 받으면 코드로 그린 모습으로 */
 const ART_WAIT_MS = 2500;
+/** 👤 그림자 — 기기에 그림이 이보다 적으면(처음 켠 기기) 몇 장 더 받아 본다 */
+const SHADOW_FEW = 12;
+/**
+ * 게임마다 — run: 돌리는 것 · prep: **판을 쓰기 전에** 준비할 것(→ run에 넘길 것 · null이면 지금은 못 함 — 판을 안 쓴다) · none: 못 할 때 한 줄
+ * ★ 새 게임은 minigame.GAMES와 여기에 함께 (시험이 둘을 맞춰 본다)
+ */
+const RUNNERS = {
+  dig: { run: runDig, prep: async () => ({ art: await artFor(Object.values(DIG_KINDS).map((k) => k.id)) }) },
+  run: { run: runRun, prep: async () => ({}) },
+  shadow: { run: runShadow, prep: () => shadowPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' },
+};
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 function el(tag, cls, text) {
@@ -168,10 +178,32 @@ async function artFor(ids) {
   return out;
 }
 
+/** 👤 그림자 문제 — 명단(ROSTER) 가운데 기기에 그림이 있는 포켓몬 (아버님 2026-10-21 "앱 포켓몬 전체") */
+function shadowPool() {
+  const out = [];
+  for (const r of ROSTER) {
+    const url = characterUrl(r.id) || artUrl(r.id);
+    if (url) out.push({ id: r.id, ko: r.ko, type: typeOf(r.id), url });
+  }
+  return out;
+}
+/** 그림이 적으면 몇 장 더 받아 본다(ART_WAIT_MS까지만) → { pool } · 그래도 보기 넷이 안 되면 null */
+async function shadowPrep() {
+  let pool = shadowPool();
+  if (pool.length < SHADOW_FEW) {
+    const have = new Set(pool.map((p) => p.id));
+    const want = shadowShuffle(ROSTER.filter((r) => !have.has(r.id))).slice(0, SHADOW_FEW).map((r) => r.id);
+    await Promise.race([ensureCast(want).catch(() => []), wait(ART_WAIT_MS)]);
+    pool = shadowPool();
+  }
+  return shadowPoolOf(pool).length >= SHADOW_MIN ? { pool } : null;
+}
+
 /**
- * 게임 하나 고름 → 그림 준비 → 판 쓰기(트랜잭션) → 한 판 → 💗·최고 기록 저장 → 끝 화면
+ * 게임 하나 고름 → 준비(그림 · 👤 문제 포켓몬) → 판 쓰기(트랜잭션) → 한 판 → 💗·최고 기록 저장 → 끝 화면
  * 🔍 Codex 113차:
  *   #1 그림은 **판을 쓰기 전에** 준비하고, 판을 쓰기 바로 앞에서 아직 열려 있는지 본다 — 기다리다 닫아도 판이 안 없어진다.
+ *      준비가 안 되면(👤 그림이 넷이 안 됨) 판을 쓰지 않고 한 줄만 (v308)
  *      판을 쓰는 그 짧은 사이에 닫혔거나 판이 시작도 못 하고 깨지면 그 판을 돌려준다(releaseDailyCount — finally)
  *   #2 이 판의 화면 기록(sum)·자리(ctx)는 여기서 붙잡는다 — **시작한 판은 닫혀도 꼭 한 번 저장**하고(💗·최고 기록),
  *      닫고 다시 연 뒤 늦게 끝난 저장이 새 화면 기록에 섞이지 않게 · 저장하는 동안 ✕는 안 먹는다(gm-x)
@@ -198,8 +230,14 @@ async function startRound(id) {
     for (const c of body().querySelectorAll('.gm-game')) c.disabled = true; // 두 번 눌러 두 판 쓰지 않게
     await ensureToday(); // 자정을 넘겼으면 오늘 기록으로
     await flushTime().catch(() => {});
-    const art = await artFor(R.art);
-    if (!live()) return; // 그림을 기다리다 닫았다 — 판을 안 쓴다
+    const prep = await R.prep();
+    if (!live()) return; // 준비하다 닫았다 — 판을 안 쓴다
+    if (!prep) {
+      ui.msg = R.none || '';
+      ui.busy = false;
+      renderPick();
+      return;
+    }
     day = clockDay();
     let r = null;
     try { r = await claimDailyCount(day, 'gamePlays', playLimit(gameConf())); } catch { r = null; }
@@ -219,7 +257,7 @@ async function startRound(id) {
     b.appendChild(el('p', 'gm-play-title', `${g.emoji} ${g.ko}`));
     const stage = el('div', 'gm-stage');
     b.appendChild(stage);
-    const run = R.run(stage, { art, hero: ctx.hero });
+    const run = R.run(stage, { ...prep, hero: ctx.hero });
     started = true;
     ui.run = run;
     const res = await run.done;

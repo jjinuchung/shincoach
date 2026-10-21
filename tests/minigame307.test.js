@@ -44,7 +44,7 @@ test('🎮 아버님이 정한 값: 공부 20분에 1판(처음 제안 15분 →
   assert.equal(GAME_CAP, 2);
   assert.equal(GAME_DEVICE, 'f_game');
   assert.ok(furnById(GAME_DEVICE), '집 가구에 있다');
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig']);
+  assert.equal(GAMES[0].id, 'dig', '첫 게임은 디그다 (v308부터 더 늘어난다 — minigame308)');
   assert.equal(gameById('dig').sec, DIG_SEC);
   assert.equal(DIG_SEC, 30);
   assert.equal(gameById('nope'), null);
@@ -307,7 +307,7 @@ test('🎮 ⚙ 설정·서비스워커·📤 사용 기록', () => {
   assert.match(pl, /gameMin: gameMinOf\(settings\.gameMin\), gameCap: gameCapOf\(settings\.gameCap\)/, 'timeLimitConf로 시계에');
   assert.match(pl, /settings\.gameMin = gameMinOf\(\$\('set-game-min'\)\.value\)/);
   const sw = src('sw.js');
-  assert.match(sw, /CACHE_VERSION = 'v307'/);
+  assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1]) >= 307, 'sw v307 이상 (판을 못 박으면 다음 판에서 깨진다)');
   for (const f of ['minigame.js', 'gameview.js', 'gamedig.js']) assert.ok(sw.includes(`'./js/${f}'`), f);
   // 🕒 사용 기록 — 게임기 화면은 집 위에 뜬다(집보다 먼저 본다)
   assert.ok(PLACES.some((p) => p.key === 'game' && p.field === 'uGame'));
@@ -352,12 +352,13 @@ test('🔍 Codex 113차 #1·#2 — 게임기 흐름: 그림은 판을 쓰기 전
   const body = gv.slice(gv.indexOf('async function startRound('), gv.indexOf('/** 끝 화면'));
   assert.ok(body.length > 200);
   const at = (s) => { const i = body.indexOf(s); assert.ok(i >= 0, s); return i; };
-  assert.ok(at('await artFor(R.art);') < at('await claimDailyCount('), '그림 → 판 쓰기 차례');
-  assert.match(body, /const art = await artFor\(R\.art\);\n\s*if \(!live\(\)\) return;[^\n]*\n\s*day = clockDay\(\);\n\s*let r = null;\n\s*try \{ r = await claimDailyCount\(day,/, '판을 쓰기 바로 앞에서 열려 있나');
+  // v308부터 그림 준비는 게임마다의 prep(디그다는 artFor) — 차례는 그대로
+  assert.ok(at('await R.prep();') < at('await claimDailyCount('), '그림 → 판 쓰기 차례');
+  assert.match(body, /const prep = await R\.prep\(\);\n\s*if \(!live\(\)\) return;[^\n]*\n[\s\S]{0,160}?day = clockDay\(\);\n\s*let r = null;\n\s*try \{ r = await claimDailyCount\(day,/, '판을 쓰기 바로 앞에서 열려 있나');
   assert.match(body, /spent = !!\(r && r\.won\);\n\s*if \(!live\(\)\) return;/, '쓰는 사이에 닫혔으면 돌아간다(finally가 돌려줌)');
   assert.match(body, /if \(!spent \|\| started\) return;/, '시작한 판은 안 돌려준다');
   assert.match(body, /\} finally \{\n\s*await giveBack\(\);\n\s*\}/);
-  assert.match(body, /const run = R\.run\(stage, \{ art, hero: ctx\.hero \}\);\n\s*started = true;/);
+  assert.match(body, /const run = R\.run\(stage, \{ \.\.\.prep, hero: ctx\.hero \}\);\n\s*started = true;/);
   // 시작한 판은 닫혀도 정산 — run.done과 gameEnd 사이에 "닫혔으면 돌아감"이 없다
   const settle = body.slice(at('const res = await run.done;'), at('await gameEnd('));
   assert.ok(!/live\(\)/.test(settle), '정산 전에 돌아가지 않는다');

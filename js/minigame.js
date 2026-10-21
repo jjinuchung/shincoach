@@ -96,10 +96,12 @@ export function playLimit(conf) {
 
 /**
  * 🎮 게임 목록 — 차례대로 만든다(아버님 2026-10-21): v307 디그다 → v308 달리기·그림자 → v309 짝 맞추기·나무열매 → v310 열기구·탑 → v311 줄다리기
- * id는 소문자(최고 기록 열쇠 — homeplay.GAME_KEY) · sec = 한 판 길이
+ * id는 소문자(최고 기록 열쇠 — homeplay.GAME_KEY) · sec = 한 판 길이 · ★ 새 게임은 gameview.RUNNERS에도
  */
 export const GAMES = [
   { id: 'dig', emoji: '🕳️', ko: '디그다 잡기', how: '톡! 쏙 나온 디그다를 잡아요 · 찌리리공은 누르지 마요', sec: 30 },
+  { id: 'run', emoji: '🏃', ko: '파트너 달리기', how: '톡! 폴짝 뛰어 나무열매를 먹어요 · 돌은 넘어요', sec: 30 },
+  { id: 'shadow', emoji: '👤', ko: '그림자 포켓몬', how: '까만 그림자는 누구일까? 이름을 골라요', sec: 40 },
 ];
 export function gameById(id) {
   return GAMES.find((g) => g.id === id) || null;

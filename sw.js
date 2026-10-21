@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v307';
+const CACHE_VERSION = 'v308';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -36,6 +36,8 @@ const APP_SHELL = [
   './js/minigame.js', // 🎮 게임기 미니 게임 — 판 규칙 · 게임기 화면 · 🕳️ 디그다 잡기 (v307)
   './js/gameview.js',
   './js/gamedig.js',
+  './js/gamerun.js', // 🏃 파트너 달리기 · 👤 그림자 포켓몬 (v308)
+  './js/gameshadow.js',
   './coach/korean/nonsul.json',
   './js/mathdraw.js',
   './js/mathgen.js',
