@@ -243,9 +243,9 @@ test('⭐ 거다이맥스: 🍄 다이버섯 10개로 🍲 다이스프 (돈으�
   assert.equal(await makeSoup(25), false, '이미 먹은 포켓몬에게 또 먹이지 않는다');
 });
 
-test('⭐ 변신 표: 30마리, 그림 id는 겹치지 않는다', () => {
+test('⭐ 변신 표: 74마리(v313 — 모든 과목), 그림 id는 겹치지 않는다', () => {
   const ids = Object.keys(FORMS).map(Number);
-  assert.equal(ids.length, 30);
+  assert.equal(ids.length, 74, '명단 100마리 때 30종 + v313 수학·국어·논술·영어 44종 (forms313.test.js · 플라엣테·지가르데 메가는 뺌)');
   const arts = [];
   for (const id of ids) {
     const f = FORMS[id];

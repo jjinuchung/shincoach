@@ -689,6 +689,9 @@ function renderForms() {
     }
   }
 
+  // 국어·논술 화면엔 배틀이 없다 — 변신은 영어·수학 배틀에서 (배틀에 내보낼 포켓몬은 과목을 안 가린다 · 🔍 Codex 119차)
+  const subj = subjectOf(mon.id);
+  if (subj === 'korean' || subj === 'nonsul') notes.push('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요');
   if (!box.children.length && !notes.length) notes.push('이 포켓몬은 변신할 수 없어요');
   $('mon-form-msg').textContent = notes.join('  ·  ');
 }

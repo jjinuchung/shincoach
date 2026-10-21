@@ -39,7 +39,7 @@ import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, 
 import { unlockState, MATH_PTS, nextTarget, previewGift, ownedVoucherIds, needOf, isGift } from './unlock.js';
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
-import { eggFor, tickEgg, haveCount, monLv } from './xp.js';
+import { eggFor, tickEgg, haveCount, monLv, hasKeystone, hasMegaStone, hasGmax } from './xp.js';
 import { rocketPick, rocketAdmit, rocketCurrent, rocketLastAt, profileReady } from './xp.js'; // 🚀 로켓단 습격 (2026-10-09)
 import { ROCKET, shouldRocket, rocketNew } from './rocket.js';
 import { isRocketOpen } from './rocketview.js';
@@ -49,7 +49,7 @@ import { showHatchIfAny } from './hatch.js';
 // ⏳ 하루 시간 제한 — **새로 시작하는 자리에만** 관문을 단다. 풀던 회차는 끝까지 간다 (아버님 결정 2026-09-27)
 import { guardStart } from './timeup.js';
 import { setExempt, status as timeStatus, isLocked } from './timelimit.js'; // ⏳ 도전 문제 동안은 시간을 안 센다 · 🚀 남은 시간(로켓단은 5분 미만이면 안 나온다)
-import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole } from './pokemon.js';
+import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole, formsOf, formUrl } from './pokemon.js';
 import { openCatch, isCatchOpen } from './catch.js';
 import { holdStore } from './throwhold.js'; // 🎯 뺀 던지기 예약 장부 (Codex 49차 #1·#2)
 import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
@@ -2507,7 +2507,10 @@ function pickBattleOpponent() {
   return pickOpponent(chars, caught);
 }
 
-/** 내가 내보낼 수 있는 포켓몬: 잡은 것 중 파트너·😴 제외 (수학 화면에는 ⭐ 변신을 안 붙인다 — 영어 쪽 장치) */
+/**
+ * 내가 내보낼 수 있는 포켓몬: 잡은 것 중 파트너·😴 제외 · ⭐ 변신은 영어 배틀(player.js myBattleMons)과 같은 규칙
+ * (v313 — 그 전엔 수학 화면에선 변신을 늘 꺼 두어 다이스프를 먹인 포켓몬도 영어 화면 배틀에서만 거다이맥스했다 · 진우 발견 2026-10-21)
+ */
 function myBattleMons() {
   const caught = getProfileSnapshot().caught;
   // 🧬 다 진화시켜 보낸 종은 못 내보낸다 — 도감 누적이 아니라 **지금 데리고 있는 수**로 고른다
@@ -2516,7 +2519,16 @@ function myBattleMons() {
   return ok.map((id) => {
     const r = ROSTER.find((m) => m.id === id);
     const c = (ui.chars || []).find((x) => x.id === id);
-    return { id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), lv: monLv(id), canMega: false, canGmax: false };
+    // ⭐ 변신: 메가는 🔑 키스톤 + 💠 메가스톤, 거다이맥스는 🍲 다이스프를 먹은 포켓몬만
+    const f = formsOf(id) || {};
+    const canMega = !!(f.mega && hasKeystone() && hasMegaStone(id));
+    const canGmax = !!(f.gmax && hasGmax(id));
+    return {
+      id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), lv: monLv(id),
+      canMega, canGmax,
+      megaUrl: canMega ? formUrl(id, 'mega') : null,
+      gmaxUrl: canGmax ? formUrl(id, 'gmax') : null,
+    };
   });
 }
 
