@@ -27,7 +27,7 @@ const SEEDS = [1, 7, 42, 2026, 99999, 31337, 5, 777];
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
 test('🎮 v308 게임 목록 — 🕳️ 디그다 · 🏃 파트너 달리기 30초 · 👤 그림자 포켓몬 40초 · 화면(RUNNERS)과 짝이 맞다', () => {
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig', 'run', 'shadow']);
+  assert.deepEqual(GAMES.map((g) => g.id).slice(0, 3), ['dig', 'run', 'shadow'], '셋째까지 (v309부터 더 늘어난다 — minigame309)');
   assert.equal(gameById('run').sec, RUN_SEC);
   assert.equal(gameById('shadow').sec, SHADOW_SEC);
   assert.deepEqual([RUN_SEC, SHADOW_SEC], [30, 40], '아버님 고른 40초(그림자)');
@@ -678,6 +678,28 @@ test('👤 화면 — 그림이 너무 늦으면(1.5초) 깨진 것으로 넘김
   assert.notEqual(imgOf(), a, '1.5초가 넘으면 다음 문제');
   imgOf().fire('load');
   assert.ok(w.stage.children[0].children[2].children.every((x) => !x.disabled));
+});
+
+test('👤 화면 — 그림을 기다리다 앱을 오래 내린 동안 그림이 깨져도, 돌아오면 다음 문제로 (🔍 Codex 115차 #1)', async (t) => {
+  const w = world(t, (stage) => runShadow(stage, { pool: POOL6, rng: seeded(5) }));
+  w.adv(850);
+  const root = w.stage.children[0];
+  const pic = root.children[1];
+  const btns = root.children[2].children;
+  const imgOf = () => pic.children[0].children[0];
+  const a = imgOf();
+  w.hide(true);
+  w.adv(60000); // 원래 끝 시각(40초)을 넘김
+  a.fire('error'); // 내려 둔 동안 깨짐
+  assert.equal(imgOf(), a, '내려 둔 동안엔 넘기지 않고 미뤄 둔다');
+  w.hide(false);
+  const b = imgOf();
+  assert.notEqual(b, a, '돌아오면 다음 문제');
+  b.fire('load');
+  assert.ok(btns.every((x) => !x.disabled), '보기를 누를 수 있다');
+  await w.flush();
+  assert.equal(w.st.over, null, '남은 시간 그대로');
+  w.h.stop();
 });
 
 test('👤 화면 — 보기가 넷이 안 되면 빈 판으로 바로 끝 (판은 gameview가 쓰기 전에 막는다)', async (t) => {

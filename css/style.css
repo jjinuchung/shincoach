@@ -3958,3 +3958,42 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gs-btn:disabled { cursor: default; }
 .gs-btn.is-right { background: #51cf66; color: #fff; box-shadow: 0 4px 0 #2b8a3e; }
 .gs-btn.is-picked { opacity: 0.55; }
+
+/* 🃏 포켓몬 짝 맞추기 (v309 · gamepair.js) — 4×3 · 뒤집기는 rotateY 하나(뒷면 감춤) · 처음 2초는 grid.is-peek로 앞면 */
+.gp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.gp-card { position: relative; aspect-ratio: 5 / 6; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; perspective: 600px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.gp-card:disabled { cursor: default; }
+.gp-in { position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform-style: preserve-3d; transition: transform 0.25s ease-out; }
+.gp-back, .gp-front { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.gp-back { background-color: #e8413b; background-image: linear-gradient(180deg, #e8413b 0, #e8413b 46%, #2b2d42 46%, #2b2d42 54%, #fff 54%, #fff 100%); box-shadow: 0 3px 0 #8d99ae; }
+.gp-back::after { content: ""; width: 26%; aspect-ratio: 1; border-radius: 50%; background: #fff; border: 4px solid #2b2d42; }
+.gp-front { padding: 6%; background: #fff; box-shadow: 0 3px 0 #8d99ae; transform: rotateY(180deg); }
+.gp-img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.gp-name { color: #2b2d42; font-size: 0.85rem; font-weight: 800; text-align: center; word-break: keep-all; }
+.gp-front .gp-img { display: none; } /* 이름을 먼저 — 그림이 뜨면(is-ready) 그림으로 (🔍 Codex 115차 #3) */
+.gp-front.is-ready .gp-img { display: block; }
+.gp-front.is-ready .gp-name { display: none; }
+.gp-card.is-open .gp-in, .gp-grid.is-peek .gp-in { transform: rotateY(180deg); }
+.gp-card.is-done .gp-front { background: #ebfbee; box-shadow: 0 0 0 3px #51cf66; }
+.gp-card.is-done .gp-in { animation: gp-done 0.35s ease-out; }
+@keyframes gp-done { 0% { transform: rotateY(180deg) scale(1); } 50% { transform: rotateY(180deg) scale(1.08); } 100% { transform: rotateY(180deg) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .gp-in { transition: none; } .gp-card.is-done .gp-in { animation: none; } }
+
+/* 🍓 나무열매 받기 (v309 · gameberry.js) — 마당은 너비 100칸 × 높이 75칸(y는 위에서 아래로) · 끌 때 화면이 안 밀리게 touch-action: none */
+.gb-field { position: relative; overflow: hidden; aspect-ratio: 100 / 75; border-radius: 18px; background: #c5f6fa; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.gb-field:focus { outline: none; }
+.gb-field:focus-visible { outline: 3px solid #ffd43b; outline-offset: 2px; }
+.gb-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 8%; border-top: 3px solid #3d7a33; background: #74c365; pointer-events: none; }
+.gb-layer { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+.gb-obj { position: absolute; top: 0; left: 0; display: block; width: 8%; aspect-ratio: 1; will-change: transform; }
+.gb-obj svg, .gb-obj img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.gb-obj.is-got svg, .gb-obj.is-got img { animation: gr-got 0.3s ease-out forwards; }
+.gb-me { position: absolute; left: 0; bottom: 4%; width: 20%; height: 24%; pointer-events: none; will-change: transform; }
+.gb-me-in { width: 100%; height: 100%; transform-origin: 50% 100%; }
+.gb-me .gd-pal-emoji { display: block; font-size: 2rem; line-height: 1; text-align: center; }
+.gb-me.is-zap .gb-me-in { animation: gd-shake 0.3s linear infinite; filter: drop-shadow(0 0 6px #ffe066); }
+.gb-hint { margin: 0; text-align: center; font-size: 0.85rem; opacity: 0.8; }
+.gb .gd-fly { color: #2b2d42; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7); }
+.gb .gd-fly.is-big { color: #e67700; }
+.gb .gd-fly.is-zap { color: #495057; }
+.gd.is-paused .gb-me-in { animation-play-state: paused; }

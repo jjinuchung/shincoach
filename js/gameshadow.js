@@ -188,6 +188,7 @@ export function runShadow(stage, o = {}) {
   let waitN = 0;      // 그림이 뜨기를 기다리는 문제 번호 (0 = 안 기다림)
   let waitAt = 0;
   let refocus = false; // 보기 단추에 있던 포커스를 다음 문제 첫 보기로 (🔍 Codex 114차 — 접근성)
+  let brokenLater = false; // 앱을 내려 둔 동안 깨진 그림 — 돌아와 시간을 맞춘 뒤 넘긴다 (🔍 Codex 115차 #1)
   let resolveDone;
   const done = new Promise((r) => { resolveDone = r; });
 
@@ -226,6 +227,7 @@ export function runShadow(stage, o = {}) {
   /** 그림이 깨졌다(또는 너무 늦다) → 셈 없이 다음 문제 · 보기를 못 만들 만큼 줄면 끝 (🔍 Codex 114차 #2) */
   const broken = (n, im) => {
     if (!s || finished || im !== img || !s.q || s.q.n !== n || waitN !== n) return;
+    if (pausedAt) { brokenLater = true; return; } // 내려 둔 동안엔 끝 시각이 아직 안 밀렸다 — 지금 넘기면 「끝났다」로 보고 아무것도 안 한다
     waitN = 0;
     const q = shadowSkip(s, now(), rng);
     if (q) { ask(q); return; }
@@ -296,6 +298,7 @@ export function runShadow(stage, o = {}) {
       waitAt += d; // 내려 둔 동안은 그림 기다림에 안 센다
       pausedAt = 0;
       root.classList.remove('is-paused');
+      if (brokenLater) { brokenLater = false; broken(waitN, img); }
     }
   }
 

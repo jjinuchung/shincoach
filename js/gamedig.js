@@ -99,8 +99,8 @@ export function digShift(s, ms) {
 
 // ───────────────────── 화면 (여기부터 브라우저) ─────────────────────
 
-/** 그림을 못 받았을 때의 모습 (코드로 그린 것 — 인터넷 없이도) */
-const FALLBACK = {
+/** 그림을 못 받았을 때의 모습 (코드로 그린 것 — 인터넷 없이도 · 🍓 나무열매 받기의 찌리리공도 이것) */
+export const FALLBACK = {
   diglett: '<svg viewBox="0 0 60 72" aria-hidden="true"><path d="M8 72V32a22 22 0 0 1 44 0v40z" fill="#a0673a"/><ellipse cx="22" cy="31" rx="3.2" ry="5.5" fill="#222"/><ellipse cx="38" cy="31" rx="3.2" ry="5.5" fill="#222"/><ellipse cx="30" cy="44" rx="9" ry="5.5" fill="#f29bb3"/></svg>',
   dugtrio: '<svg viewBox="0 0 90 72" aria-hidden="true"><g fill="#a0673a"><path d="M2 72V42a14 14 0 0 1 28 0v30z"/><path d="M60 72V42a14 14 0 0 1 28 0v30z"/><path d="M29 72V26a16 16 0 0 1 32 0v46z"/></g><g fill="#222"><ellipse cx="11" cy="42" rx="2" ry="3.5"/><ellipse cx="21" cy="42" rx="2" ry="3.5"/><ellipse cx="69" cy="42" rx="2" ry="3.5"/><ellipse cx="79" cy="42" rx="2" ry="3.5"/><ellipse cx="39" cy="26" rx="2.4" ry="4"/><ellipse cx="51" cy="26" rx="2.4" ry="4"/></g><g fill="#f29bb3"><ellipse cx="16" cy="51" rx="6" ry="3.6"/><ellipse cx="74" cy="51" rx="6" ry="3.6"/><ellipse cx="45" cy="36" rx="7" ry="4.2"/></g></svg>',
   voltorb: '<svg viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="27" fill="#fff" stroke="#333" stroke-width="2"/><path d="M3 30a27 27 0 0 1 54 0z" fill="#e8413b" stroke="#333" stroke-width="2"/><path d="M13 19l11 6M47 19l-11 6" stroke="#222" stroke-width="3" stroke-linecap="round"/><ellipse cx="21" cy="27" rx="3" ry="2.6" fill="#222"/><ellipse cx="39" cy="27" rx="3" ry="2.6" fill="#222"/></svg>',

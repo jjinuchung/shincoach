@@ -9,9 +9,11 @@ import { GAMES, gameById, playState, playLimit, gameConfOf, subjectPlays, earned
 import { runDig, DIG_KINDS } from './gamedig.js';
 import { runRun } from './gamerun.js'; // 🏃 파트너 달리기 (v308)
 import { runShadow, shadowPoolOf, shadowShuffle, SHADOW_MIN } from './gameshadow.js'; // 👤 그림자 포켓몬 (v308)
+import { runPair, PAIR_PAIRS } from './gamepair.js'; // 🃏 포켓몬 짝 맞추기 (v309)
+import { runBerry, BERRY_KINDS } from './gameberry.js'; // 🍓 나무열매 받기 (v309)
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
-import { gameEnd, gameBest, itemCount } from './xp.js';
+import { gameEnd, gameBest, itemCount, ownedMonIds } from './xp.js';
 import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl } from './pokemon.js';
 import { typeOf } from './battle.js';
 import { sfx, unlock } from './sfx.js';
@@ -30,6 +32,8 @@ const RUNNERS = {
   dig: { run: runDig, prep: async () => ({ art: await artFor(Object.values(DIG_KINDS).map((k) => k.id)) }) },
   run: { run: runRun, prep: async () => ({}) },
   shadow: { run: runShadow, prep: () => shadowPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' },
+  pair: { run: runPair, prep: () => pairPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' },
+  berry: { run: runBerry, prep: async () => ({ art: await artFor([BERRY_KINDS.voltorb.id]) }) },
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -197,6 +201,26 @@ async function shadowPrep() {
     pool = shadowPool();
   }
   return shadowPoolOf(pool).length >= SHADOW_MIN ? { pool } : null;
+}
+/**
+ * 🃏 짝 카드 — **진우가 잡은 포켓몬**(mine)을 먼저(아버님 2026-10-21) · 그림이 없는 잡은 포켓몬은 몇 장 받아 본다(ART_WAIT_MS까지만)
+ * 모자라면 앱 포켓몬 그림으로 채움(gamepair.pairPick) → { pool } · 그래도 여섯이 안 되면 null(판을 안 쓴다)
+ */
+async function pairPrep() {
+  const mine = new Set(ownedMonIds());
+  const withMine = () => shadowPool().map((p) => ({ ...p, mine: mine.has(p.id) }));
+  let pool = withMine();
+  const haveMine = pool.filter((p) => p.mine).length;
+  const gap = [...mine].filter((id) => ROSTER.some((r) => r.id === id) && !(characterUrl(id) || artUrl(id)));
+  if (haveMine < PAIR_PAIRS && gap.length) {
+    await Promise.race([ensureCast(shadowShuffle(gap).slice(0, PAIR_PAIRS * 2)).catch(() => []), wait(ART_WAIT_MS)]);
+    pool = withMine();
+  }
+  if (pool.length < PAIR_PAIRS) {
+    const extra = await shadowPrep(); // 기기 그림이 거의 없을 때 — 👤와 같이 몇 장 더 받아 본다
+    if (extra) pool = withMine();
+  }
+  return pool.length >= PAIR_PAIRS ? { pool } : null;
 }
 
 /**

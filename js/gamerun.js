@@ -198,8 +198,8 @@ export function runShift(s, ms) {
 
 // ───────────────────── 화면 (여기부터 브라우저) ─────────────────────
 
-/** 돌 · 나무열매 · 황금 열매 (코드로 그린 것 — 인터넷 없이도) */
-const ART = {
+/** 돌 · 나무열매 · 황금 열매 (코드로 그린 것 — 인터넷 없이도 · 🍓 나무열매 받기도 같은 열매) */
+export const ART = {
   rock: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M3 39 8 17 18 5 30 9 37 23 38 39Z" fill="#8d99ae" stroke="#4a5160" stroke-width="2.5" stroke-linejoin="round"/><path d="M12 19l7-8M24 15l6 6" stroke="#c4cad6" stroke-width="2.5" stroke-linecap="round"/></svg>',
   berry: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 10c-3-5-9-6-12-4 2 4 7 6 12 4zM20 10c3-5 9-6 12-4-2 4-7 6-12 4z" fill="#40c057"/><circle cx="20" cy="24" r="14" fill="#e8413b" stroke="#a61e1e" stroke-width="2"/><circle cx="14" cy="19" r="3.5" fill="#fff" opacity=".7"/></svg>',
   gold: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 8c-2-4-6-5-9-3 2 3 6 4 9 3z" fill="#40c057"/><circle cx="20" cy="23" r="15" fill="#ffd43b" stroke="#e67700" stroke-width="2.5"/><path d="M20 13l3 7 7 .6-5.4 4.6 1.7 7-6.3-3.9-6.3 3.9 1.7-7L10 20.6l7-.6z" fill="#fff3bf"/></svg>',
