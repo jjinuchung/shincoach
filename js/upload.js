@@ -490,6 +490,27 @@ export async function getFile({ fetchFn, token, path, repo = DATA_REPO }) {
 }
 
 /**
+ * 그림 파일 하나를 그대로 받기 (v306 🐸 기술 그림) — raw 머리글이면 1 MB 넘는 파일도 내용째 온다(getFile의 JSON은 1 MB까지).
+ * 없으면(404) null · 못 받으면 까닭과 함께 실패 · maxBytes를 넘으면(머리글 길이 또는 받은 크기) 'big' (열쇠는 머리글에만)
+ * signal을 주면 끊을 수 있다(받기 시간을 넘으면 — 🔍 Codex 112차 #2)
+ * @param {{fetchFn:Function, token:string, path:string, maxBytes:number, repo?:string, signal?:AbortSignal}} o
+ * @returns {Promise<Blob|null>}
+ */
+export async function getRawFile({ fetchFn, token, path, maxBytes, repo = DATA_REPO, signal }) {
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw', 'X-GitHub-Api-Version': '2022-11-28' };
+  let g;
+  try { g = await fetchFn(`${API}/repos/${repo}/contents/${path}?ref=${DATA_BRANCH}`, { headers, cache: 'no-store', ...(signal ? { signal } : {}) }); } catch { throw httpError(0); }
+  if (g.status === 404) return null;
+  if (g.status !== 200) throw httpError(g.status);
+  const len = Number(g.headers && typeof g.headers.get === 'function' ? g.headers.get('content-length') : 0);
+  if (len > maxBytes) throw httpError('big'); // 받기 전에
+  let blob;
+  try { blob = await g.blob(); } catch { throw httpError(0); }
+  if (!blob || !(blob.size > 0) || blob.size > maxBytes) throw httpError('big');
+  return blob;
+}
+
+/**
  * 📥 비공개 저장소의 목록 파일(JSON 배열) — 아빠 교정 essay/fixes.json · ❓ 답장 math/replies.json (Codex 35차 #1: 공개 배포 대신).
  * 열쇠가 없으면 묻지도 않고, 없거나·못 읽거나·배열이 아니면 빈 목록 (앱은 그대로 — 다음에 다시).
  * @param {string} path
@@ -529,7 +550,9 @@ export function readStatus(kind, n = 0, at = Date.now()) {
 export const PRIVATE_FAMILY = 'family/messages.json';
 /** 🧢 지우 모자 무늬 (v293 — hatmarks.MARKS_PATH와 같은 경로) */
 export const PRIVATE_HATMARKS = 'avatar/hatmarks.json';
-const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장', [PRIVATE_FAMILY]: '💌 메시지', [PRIVATE_HATMARKS]: '🧢 모자 무늬' };
+/** 🐸 기술 그림 목록 (v306 — battlefx.FX_PATH와 같은 경로) */
+export const PRIVATE_FX = 'fx/fx.json';
+const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장', [PRIVATE_FAMILY]: '💌 메시지', [PRIVATE_HATMARKS]: '🧢 모자 무늬', [PRIVATE_FX]: '🐸 기술 그림' };
 /**
  * 📊 📤 카드의 받기 한 줄 (순수) — "📥 받기: ✍️ 교정 ✅ 10/07 10:32 (3개) · ❓ 답장 · 아직 없음"
  * check(국어 답장 — 붙여 본 뒤의 수, noteReadCheck)가 있으면: 너무 많아 통째로 안 받음 ❌ · 받지 않은 줄·맞는 글 없음·판 다름 ⚠️
@@ -544,8 +567,8 @@ export function readSummary(state, fmt) {
     if (r.missing) return `${name} · 아직 없음`;
     const c = r.check;
     if (c && c.over) return `${name} ❌ ${fmt(r.at)} 답장이 너무 많아(${c.rows}줄) 하나도 안 받았어요 — Claude에게 오래된 줄을 지워 달라고 해 주세요`;
-    const warn = c ? [c.bad ? `받지 않은 ${p === PRIVATE_HATMARKS ? '무늬' : '줄'} ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : '', c.stale ? `판 다름 ${c.stale}` : ''].filter(Boolean).join(' · ') : '';
-    const ask = p === PRIVATE_FAMILY ? '메시지 확인해 줘' : p === PRIVATE_HATMARKS ? '모자 무늬 확인해 줘' : '국어 답장 확인해 줘';
+    const warn = c ? [c.bad ? `받지 않은 ${p === PRIVATE_HATMARKS ? '무늬' : p === PRIVATE_FX ? '그림' : '줄'} ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : '', c.stale ? `판 다름 ${c.stale}` : ''].filter(Boolean).join(' · ') : '';
+    const ask = p === PRIVATE_FAMILY ? '메시지 확인해 줘' : p === PRIVATE_HATMARKS ? '모자 무늬 확인해 줘' : p === PRIVATE_FX ? '기술 그림 확인해 줘' : '국어 답장 확인해 줘';
     return warn ? `${name} ⚠️ ${fmt(r.at)} (${r.n}개 — ${warn} · Claude에게 "${ask}")` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
   });
   return parts.length ? `📥 받기: ${parts.join(' · ')}` : '📥 받기: 아직 받아 본 적이 없어요 (앱을 열 때·수학을 열 때 저절로)';

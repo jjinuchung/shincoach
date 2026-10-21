@@ -2987,6 +2987,10 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .rocket-twinkle-text { font-size: 1rem; font-weight: 900; color: #fef08a; text-shadow: 0 0 6px #facc15; opacity: 0; }
 .rocket-twinkle.go .rocket-star { animation: rocket-star 1.2s ease-out forwards; }
 .rocket-twinkle.go .rocket-twinkle-text { animation: rocket-star-text 1.2s ease-out forwards; }
+/* 🐸 기술 그림 (v306) — ⚔️ 배틀 무대·🚀 하늘 칸을 덮고 한 번 튼다 · 누르면 넘어간다 */
+.fx-play { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; display: flex; align-items: center; justify-content: center; margin: 0; padding: 4px; border: 0; border-radius: 14px; background-color: rgba(15, 23, 42, 0.86); cursor: pointer; animation: fx-in 0.18s ease-out; }
+.fx-play img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 10px; pointer-events: none; }
+@keyframes fx-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
 .rocket-panel { padding: 12px 14px 14px; }
 .rocket-msg { font-weight: 800; color: #b91c1c; text-align: center; line-height: 1.4; }
 .rocket-score { margin-top: 4px; font-size: 0.85rem; color: var(--muted); text-align: center; }

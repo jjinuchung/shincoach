@@ -22,6 +22,7 @@ import { autoSend } from './upload.js'; // 📤 Claude에게 기록 보내기 (�
 import { initUsage, setUsageView } from './usage.js'; // 🕒 앱 사용 기록 — 화면마다 머문 초·쓴 때·연 수 (📤로만, v272)
 import { initBlackbox } from './blackbox.js'; // 🛑 앱이 저절로 꺼진 때 남기기 — 📤 usage/crash-log.md로만 (v292)
 import { loadHatMarks } from './hatmarks.js'; // 🧢 받아 둔 지우 모자 무늬를 그림에 (v293)
+import { loadFx, syncFx } from './battlefx.js'; // 🐸 받아 둔 기술 그림을 메모리에 · 받기 (v306)
 
 const views = {
   home: document.getElementById('view-home'),
@@ -167,6 +168,8 @@ window.addEventListener('unhandledrejection', (e) => showError(`오류: ${(e.rea
 
 async function main() {
   try { loadHatMarks(); } catch { /* 무늬가 없어도 모자는 앞판까지 그린다 */ }
+  // 🐸 기술 그림 — 받아 둔 것을 올리고, 앱이 자리 잡은 뒤 받기(10분에 한 번까지 · 열쇠가 없으면 묻지도 않는다)
+  loadFx().catch(() => 0).then(() => setTimeout(() => { syncFx().catch(() => {}); }, 8000));
   // 버튼 연결을 가장 먼저 — 뒤의 어떤 단계가 실패해도 UI는 동작해야 함
   initPlayer({ showView, onTakeTool: openTakeTool });
   initStats({ showView, requirePin });

@@ -9,6 +9,7 @@ import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
 import { ensureForm, isUltraBeast } from './pokemon.js'; // ⭐ 변신 그림 · 🌌 울트라비스트는 상대로 안 나온다
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림 (5세대 스프라이트)
+import { playFx, syncFx, stopFx } from './battlefx.js'; // 🐸 기술 그림 (v306 — 비공개 저장소에서 받아 둔 장면)
 
 // ── 규칙 ──
 import { lvMult } from './evolve.js'; // 🧬 포켓몬 레벨 배수 (evolve.js는 아무것도 import하지 않는다 — 순환 없음)
@@ -167,12 +168,14 @@ export function typeOf(id) {
 
 /**
  * ⚔️ 전용 기술 — 그 포켓몬만 쓰는 강한 기술이 타입 공용 기술을 대신한다 (진우 요청, 2026-09-20).
- * 이름은 PokeAPI 한국어명으로 확인한 것만 (거수참 = behemoth-blade 781, 거수탄 = behemoth-bash 782 — 둘 다 강철 기술).
+ * 이름은 PokeAPI 한국어명으로 확인한 것만 (거수참 = behemoth-blade 781, 거수탄 = behemoth-bash 782 — 둘 다 강철 기술 ·
+ * 물수리검 = water-shuriken 594 — 물 기술, v306 🐸 기술 그림과 함께 · 아버님 "이대로 진행").
  * 데미지 표는 그대로다 — 이름과 이모지만 그 포켓몬 것이 된다.
  */
 export const SIGNATURE = {
   888: { strong: '거수참', emoji: '⚔️' }, // 자시안 — 검
   889: { strong: '거수탄', emoji: '🛡️' }, // 자마젠타 — 방패
+  658: { strong: '물수리검', emoji: '💧' }, // 개굴닌자 — 지우개굴닌자의 큰 물수리검
 };
 
 /** 포켓몬의 기술 2개 → [{ key:'strong'|'safe', name, emoji }]. 전용 기술이 있으면 강한 기술 자리에 */
@@ -319,6 +322,7 @@ export function openBattle(o) {
   $('battle-continue').hidden = true;
   $('battle-note').textContent = o.practice ? '연습이라 결과가 남지 않아요' : `이기면 ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려와요. 지면 내보낸 포켓몬의 패배가 1 늘어요 (${BATTLE.lossesToLose}번 지면 떠나요)`;
   $('battle').hidden = false;
+  syncFx().catch(() => {}); // 🐸 기술 그림 받기(10분에 한 번까지 — 첫 공격 전에 오면 그때부터 나온다)
 }
 
 export function closeBattle() {
@@ -327,6 +331,7 @@ export function closeBattle() {
   ui.open = false;
   ui.run++;
   if (ui.speakStop) { try { ui.speakStop('cancel'); } catch (e) { /* 무시 */ } ui.speakStop = null; }
+  stopFx(); // 🐸 틀던 기술 그림도 바로 끝 — 다시 연 배틀 무대에 남지 않게 (기다리던 턴은 alive()로 멈춘다)
   $('battle').hidden = true;
   ui.o = null;
 }
@@ -557,6 +562,7 @@ async function quizTurn(moveKey) {
   }
   const tierMsg = { star: `🌟 ${ui.streak}연속 정답!`, pass: '🎯 정답!', fail: '🔁 아쉬워요', none: '😶 안 풀었어요' }[tier];
   $('battle-msg').textContent = `${tierMsg} → ${mv.name} 데미지 ${dmg}`;
+  if (dmg > 0) { await moveFx(tier === 'star'); if (!alive()) return; } // 🐸 기술 그림 (v306)
   if (dmg > 0) {
     ui.enemyHp = Math.max(0, ui.enemyHp - dmg);
     hitFx('enemy', dmg, tier === 'star');
@@ -619,6 +625,7 @@ async function playerTurn(moveKey) {
   const tierMsg = { star: '🌟 완벽해요!', pass: '🎯 잘했어요!', fail: '🔁 조금 아쉬워요', none: '😶 말소리가 없었어요' }[tier];
   const heard = result && result.transcript ? ` "${result.transcript}"` : '';
   $('battle-msg').textContent = `${tierMsg}${heard} → ${mv.name} 데미지 ${dmg}`;
+  if (dmg > 0) { await moveFx(tier === 'star'); if (!alive()) return; } // 🐸 기술 그림 (v306)
   if (dmg > 0) {
     ui.enemyHp = Math.max(0, ui.enemyHp - dmg);
     hitFx('enemy', dmg, tier === 'star');
@@ -672,6 +679,14 @@ async function enemyTurn() {
   sfx.hit(); vibrate(40);
   renderHp();
   await sleep(1100);
+}
+
+/**
+ * 🐸 기술 그림 (v306) — 내 포켓몬의 장면 그림을 받아 두었으면 공격이 들어가기 전에 무대 위에 한 번(누르면 바로 넘어감) ·
+ * 🌟면 🌟 장면 · 그림이 없으면 바로 끝(지금 연출 그대로). 공격이 안 나간 턴(데미지 0)은 부르지 않는다
+ */
+function moveFx(star) {
+  return playFx($('battle-stage'), ui.my && ui.my.id, star).catch(() => false);
 }
 
 function hitFx(side, dmg, big) {

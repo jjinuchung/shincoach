@@ -9,8 +9,9 @@
 // ★ 구호·날아갈 때 대사는 한국판 표현을 진우·아버님께 확인받을 것 (MOTTO·BLAST — 틀리면 여기만 고치면 된다)
 import { sfx, vibrate as buzz, unlock } from './sfx.js';
 import { josa } from './catch.js';
-import { typeOf, MOVES } from './battle.js';
+import { movesOf } from './battle.js';
 import { animUrl, ensureAnim } from './sprite.js';
+import { playFx, syncFx } from './battlefx.js'; // 🐸 기술 그림 (v306)
 import { ROCKET } from './rocket.js';
 
 /** 🎤 구호 — [누가, 말] (한국판, 확인 필요) */
@@ -139,13 +140,18 @@ async function motto(lines) {
   ui.skip = null;
 }
 
-/** 맞힌 순간 — 파트너가 튀어나가고 기술 이모지가 열기구로 날아가 맞는다 */
+/**
+ * 맞힌 순간 — 파트너가 튀어나가고 기술 이모지가 열기구로 날아가 맞는다 · 기술 이름은 ⚔️ 배틀과 같게(전용 기술이 있으면 그 이름) ·
+ * 🐸 기술 그림을 받아 두었으면 먼저 하늘 칸에 한 번(누르면 바로 넘어감, v306)
+ */
 async function attack(partner) {
-  const mv = MOVES[typeOf(partner.id)] || MOVES.normal;
+  const mv = movesOf(partner.id)[0];
+  msg(`${partner.ko}의 ${mv.name}!`);
+  await playFx($('.rocket-sky'), partner.id, false).catch(() => false);
+  if (!ui.open) return;
   replay($('.rocket-partner'), 'lunge');
   const shot = el('span', 'rocket-shot', mv.emoji);
   $('.rocket-fx').appendChild(shot);
-  msg(`${partner.ko}의 ${mv.strong}!`);
   sfx.zap(); vibrate(30);
   await sleep(550);
   shot.remove();
@@ -260,6 +266,7 @@ export async function openRocket(o) {
   if (ui.open) return;
   ui.open = true;
   if (touched()) unlock();
+  syncFx().catch(() => {}); // 🐸 기술 그림 받기(10분에 한 번까지)
   root.hidden = false;
   root.className = 'rocket';
   root.querySelectorAll('.blast, .flee, .taken, .drop, .go').forEach((n) => n.classList.remove('blast', 'flee', 'taken', 'drop', 'go'));
