@@ -11,6 +11,7 @@ import { initHome, renderHome } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
 import { initNonsul, enterNonsul } from './nonsulview.js'; // 🖊️ 논술 (v303)
 import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
+import { initCalm, enterCalm, leaveCalm } from './calm.js'; // 🌿 국어·논술 잔잔한 배경 음악 (v317)
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
 import { initTimeLimit, setSubject, flushTime, isLocked } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
@@ -70,6 +71,9 @@ export function showView(name) {
   else stopCheer(); // ✨ 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)
   if (name !== 'korean') leaveKorean(); // 🎧 듣기 카드 소리는 국어 화면에서만 (v245)
   if (name === 'nonsul') enterNonsul().catch(() => {}); // 🖊️ 논술 — 푸는 판이 있으면 이어서, 없으면 첫 화면 (v303)
+  // 🌿 잔잔한 음악은 국어·논술에서만 — 둘 사이를 오가면 끊기지 않고 이어진다 (v317)
+  if (name === 'korean' || name === 'nonsul') enterCalm();
+  else leaveCalm();
 }
 
 /** 전체 화면 로딩 표시 (영상 열기/저장처럼 수 초 이상 걸리는 작업용) */
@@ -182,6 +186,7 @@ async function main() {
   initMath({ showView });
   initKorean({ showView });  // 📚 국어 — ← 버튼 · 다시 읽으면 도감 다시 그리기
   initNonsul({ showView });  // 🖊️ 논술 — ← 버튼 (v303)
+  initCalm();                // 🌿 국어·논술 머리줄 🎵 단추 (v317)
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
   initTaken({ requirePin });  // 🔒 포켓몬 데려가기 (부모) + "아빠가 데려갔어요" 알림 (아이)
   initGiftSettings();         // 🎁 ⚙ 선물 교환권 사진 (이 기기에만)

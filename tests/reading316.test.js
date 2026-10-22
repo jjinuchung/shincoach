@@ -109,5 +109,5 @@ test('📖 화면 잇기 — 논술 판에 한 줄 소개·글 다시 보기 · 
   assert.ok(!/\d+\s*\/\s*\d+|남은|개 중/.test(fn), '아이 화면에 셈 문구 없음');
   const css = read('css/style.css');
   assert.ok(css.includes('.kor-ns-link:empty { display: none; }'), '주제가 없으면 빈 자리를 안 남긴다');
-  assert.equal((/const CACHE_VERSION = '(v\d+)';/.exec(read('sw.js')) || [])[1], 'v316');
+  assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1]) >= 316, 'sw v316 이상 (판을 못 박으면 다음 판에서 깨진다)');
 });

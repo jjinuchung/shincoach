@@ -220,6 +220,7 @@ export function usageFiles(days, today, places, verLine = '') {
     '- 앱을 연 수 = 창을 새로 연 수 (내렸다 다시 올린 것은 안 셈 · 밤을 넘겨 켜 둔 날은 0일 수 있어요)',
     '- 한 기기에서 두 창(홈 화면 앱·Chrome 탭)이 동시에 보이면 겹쳐 셀 수 있어요',
     '- ⏳ 과목 시간 = 시간 제한에 센 시간 (🎯 도전 문제·잠긴 뒤는 안 셈)',
+    '- 🌿 잔잔한 음악 = 국어·논술 화면에서 배경 음악을 틀어 둔 시간 (v317부터 · 기기 음량·음소거는 알 수 없고 곡 사이 쉼은 들어감 · 🎵로 꺼 두었거나 ⏳ 잠금·배틀·잡기 같은 창이 떠 있거나 🎧 듣기 카드가 읽는 동안은 안 셈) · 끔·다시 켬 = 진우가 🎵 단추를 누른 수',
     '- ⏱ 수학 문항마다 걸린 초는 math/latest.json 일지(log)의 qs[].s — 문제를 보인 때부터 처음 답할 때까지(앱을 내린 시간도 들어감, 쌍둥이 문제는 안 셈) · 600은 윗값 · 빠른 오답은 살펴볼 신호이지 찍었다는 증거는 아니에요',
     '', '## 최근 7일'];
   for (let k = 6; k >= 0; k--) {
@@ -244,6 +245,8 @@ export function usageFiles(days, today, places, verLine = '') {
     if (ext.length) parts.push(`⏳ 연장권 ${ext.join(' · ')}`);
     // 🎮 게임기 미니 게임 (v307) — 쓴 판 · 🔒 부모가 더 준 판 (받은 판은 그날 과목 시간에서 셈 — 20분에 1판·과목마다 2판이 기본)
     if (num(d.gamePlays) || num(d.gameBonus)) parts.push(`🎮 게임 ${num(d.gamePlays)}판${num(d.gameBonus) ? ` (🔒 부모 +${num(d.gameBonus)}판)` : ''}`);
+    // 🌿 국어·논술 잔잔한 음악 (v317) — 틀어 둔 시간 · 진우가 🎵로 끈 수·다시 켠 수
+    if (num(d.calmSec) || num(d.calmOff) || num(d.calmOn)) parts.push(`🌿 잔잔한 음악 ${fmtMin(d.calmSec)}${num(d.calmOff) ? ` · 🎵 끔 ${num(d.calmOff)}번` : ''}${num(d.calmOn) ? ` · 다시 켬 ${num(d.calmOn)}번` : ''}`);
     lines.push(`- ${day.slice(5)}: ${parts.join(' · ')}`);
   }
   return [{ path: `usage/${today}.md`, text: `${lines.join('\n').trim()}\n` }];

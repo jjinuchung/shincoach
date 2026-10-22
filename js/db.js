@@ -362,6 +362,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // 🎮 게임기 미니 게임 (2026-10-21 v307, minigame.js) — 오늘 쓴 판(시작할 때 claimDailyCount로 선점 · 끝은 그날 공부 시간에서 셈) ·
   //   🔒 부모가 더 준 판 · 게임 화면에 머문 초(🕒 사용 기록). 병합 maxOf라 옛 백업으로 쓴 판을 되살리지 못한다
   'gamePlays', 'gameBonus', 'uGame',
+  // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
+  'calmSec', 'calmOff', 'calmOn',
   // 📈 국어 읽기 날마다 합계 (2026-10-22 v314, korean.korDayDelta) — 읽은 글 · 처음/다시 읽기 첫 번 맞힘 · 📍 근거 · 🧠 (읽은 기록 줄이 새로 생길 때만 더함)
   ...KOR_DAY_SUMS];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];

@@ -57,9 +57,11 @@
   <section id="view-korean" class="view" hidden>
     <header class="topbar">
       <button id="btn-korean-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
-      <h1 class="topbar-title">📚 신코치 국어</h1>
+      <h1 class="topbar-title">📚 <span class="hide-narrow">신코치 </span>국어</h1>
       <!-- ⏳ 오늘 남은 시간 — 국어는 날마다 1시간 30분 (2026-10-11) -->
       <button type="button" id="time-chip-korean" class="time-chip" hidden></button>
+      <!-- 🌿 잔잔한 음악 켜기·끄기 (v317) — calm.js -->
+      <button type="button" class="btn btn-icon" data-calm aria-label="잔잔한 음악" aria-pressed="true">🎵</button>
       <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
     </header>
@@ -70,8 +72,9 @@
   <section id="view-nonsul" class="view" hidden>
     <header class="topbar">
       <button id="btn-nonsul-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
-      <h1 class="topbar-title">🖊️ 신코치 논술</h1>
+      <h1 class="topbar-title">🖊️ <span class="hide-narrow">신코치 </span>논술</h1>
       <button type="button" id="time-chip-nonsul" class="time-chip" hidden></button>
+      <button type="button" class="btn btn-icon" data-calm aria-label="잔잔한 음악" aria-pressed="true">🎵</button>
       <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
     </header>

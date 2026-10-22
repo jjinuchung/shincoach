@@ -12,11 +12,17 @@ export function setVibrateEnabled(on) { vibrateOn = !!on; }
 /** 사용자 제스처 안에서 호출: 오디오 컨텍스트 생성/재개 */
 export function unlock() {
   if (!soundOn) return;
+  unlockMusic();
+}
+
+/** 🌿 잔잔한 배경 음악(calm.js, v317)용 — 효과음 설정과 상관없이 컨텍스트를 만들고 깨운다 (음악은 🎵 단추가 정한다) */
+export function unlockMusic() {
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    if (!ctx) ctx = new AC();
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (!ctx || ctx.state === 'closed') ctx = new AC();
+    // 'suspended'뿐 아니라 'interrupted'(전화·다른 앱이 소리를 가져감)도 누를 때 다시 깨운다 (🔍 Codex 123차 #2)
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
   } catch { /* 오디오 불가 */ }
 }
 

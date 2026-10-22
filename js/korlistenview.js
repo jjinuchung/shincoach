@@ -23,6 +23,8 @@ export function newListenState() {
 }
 
 let seq = 0; // 지금 읽기 번호 — 바뀌면 앞의 읽기는 그만
+/** 누른 뒤 첫 말까지(ms) — 🌿 음악이 빠지는 시간(calm.js CALM.ttsFade 0.25초)보다 짧지 않게 (v317 — 전에는 80) */
+export const TTS_LEAD_MS = 250;
 let voiceP = null; // 한국어 음성 (찾은 것을 쓰되 누를 때마다 아직 목록에 있나 본다 · 못 찾았으면 다음에 다시)
 
 function synthOf() {
@@ -80,11 +82,13 @@ export async function playListen(card, ls, slow, hooks) {
   stopListening(); // 앞의 읽기를 끊는다
   const my = ++seq;
   const alive = () => my === seq && hooks.alive();
+  // 🌿 잔잔한 음악(calm.js, v317)에게 먼저 알린다 — 첫 말이 음악에 묻히지 않게 음악이 빠질 틈을 둔다 (🔍 Codex 123차 #1)
+  if (typeof window !== 'undefined' && window.dispatchEvent) window.dispatchEvent(new CustomEvent('shincoach:ttsstart'));
   Object.assign(ls, { playing: true, prep: true, slow: !!slow, res: null, at: -1, who: '' });
   hooks.onChange();
   const synth = synthOf();
   const voice = synth ? await koVoice(synth) : null;
-  if (synth) await new Promise((r) => setTimeout(r, 80)); // 끊은 바로 뒤의 말을 놓치는 기기가 있다
+  if (synth) await new Promise((r) => setTimeout(r, TTS_LEAD_MS)); // 끊은 바로 뒤의 말을 놓치는 기기가 있다 · 음악이 빠지는 동안
   if (!alive()) return;
   ls.prep = false;
   const res = await runPlan(listenPlan(card, slow), {
