@@ -135,9 +135,12 @@ test('⏰ 한 판 — 판은 넷 그대로 · 차례 칸을 차례 맞추기와 
   assert.deepEqual(PLAY_ORDER, ['order', 'intext', 'sort', 'agree'], '판의 칸은 그대로');
   assert.deepEqual(SLOT_OF, { exp: 'sort', time: 'order' });
   for (const p of TIMES) assert.ok(isOpen(p, {}));
-  const slot = (st, now = T0) => planPuzzles(LIST, st, {}, now).filter((x) => x.kind === 'order' || x.kind === 'time').map((x) => x.id)[0];
+  // v315: 처음 보는 꼴은 하루 한 꼴만(원고 꼴 차례) — 번갈아 나오는 것을 보려고 다른 꼴(사실·의견·앞뒤·겪은 일)은 이미 해 본 상태에서
+  const BASE = solvedAt(['F1', 'H1', 'E1'], 1);
+  const slot = (st, now = T0) => planPuzzles(LIST, { ...BASE, ...st }, {}, now).filter((x) => x.kind === 'order' || x.kind === 'time').map((x) => x.id)[0];
   assert.equal(slot({}), 'O11', '둘 다 안 했으면 원고 차례(차례 맞추기 먼저)');
-  assert.equal(slot(solvedAt(['O11'], 100)), 'T1', '차례 맞추기를 했으면 일어난 차례');
+  const firstTime = planPuzzles(LIST, { ...BASE, ...solvedAt(['O11'], 100) }, {}, T0);
+  assert.deepEqual(firstTime.at(-1), { id: 'T1', kind: 'time' }, '차례 맞추기를 했으면 일어난 차례 — 처음 보는 꼴이라 판 맨 뒤(v315)');
   assert.equal(slot({ ...solvedAt(['O11'], 100), ...solvedAt(['T1'], 200) }), 'O12', '일어난 차례를 더 나중에 했으면 차례 맞추기');
   const wrong = { O11: { box: 0, due: D0 + 1, at: 300, miss: 1, d0: D0 }, T1: { box: SOLVED, due: 0, at: 100, miss: 0, d0: D0 } };
   assert.equal(slot(wrong), 'T2', '오늘은 틀린 O11이 안 나오고, 차례 맞추기를 더 나중에 했으니 일어난 차례');

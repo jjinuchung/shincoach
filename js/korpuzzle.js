@@ -48,6 +48,49 @@ export const INTEXT_PER_DAY = 1;
 export const SORT_PER_DAY = 1;
 export const AGREE_PER_DAY = 1;
 export const PUZZLES_PER_DAY = ORDER_PER_DAY + INTEXT_PER_DAY + SORT_PER_DAY + AGREE_PER_DAY;
+/** 🆕 하루 판에 넣는 처음 보는 꼴의 수 (v315 — planPuzzles) */
+export const FRESH_KIND_PER_DAY = 1;
+
+// ── 🧩 오늘의 퍼즐 판 기록 (v315, 📤 국어 요약에만 — 아이 화면엔 안 보임) ──
+// 새 퍼즐 꼴을 더한 뒤 판을 끝낸 날이 끊겼는데, 판을 열었다 그만둔 것인지 안 연 것인지 기록으로 가를 수 없었다 →
+// 하루 기록(daily)에 판을 시작한 것 · 끝낸 것 · 그만둔 자리(몇째 퍼즐 · 어느 꼴)를 판마다(이름표 = 판을 시작한 시각 — 같은 판은 한 번) · 연습 판은 안 센다
+/** 하루 기록 목록 칸 (db.DAILY_LISTS) — 시작 "시각" · 끝냄 "시각" · 그만둠 "시각:몇째:꼴" */
+export const PUZZLE_DAY_LISTS = ['korPzStarts', 'korPzDone', 'korPzQuits'];
+/** 그만둔 자리 한 칸 */
+export function quitKey(t0, n, kind) {
+  return `${t0}:${n}:${kind}`;
+}
+/**
+ * 판 기록 모으기 (순수) — days = 하루 기록 여럿 → { start, done, quit, left, quitAt: [['1째 ⏰', 2], …] }
+ * · 끝낸 판은 그만둠에서 뺀다(같은 판을 두 창에서 — 한쪽은 끝냄) · left = 시작했지만 끝난 기록(끝냄·그만둠)이 없는 판 —
+ *   지금 풀고 있는 판·다른 화면으로 가 둔 판·앱을 닫은 판·끝냄 기록 저장 실패가 다 든다(까닭을 단정하지 않는다, 🔍 Codex 121차 #1) ·
+ * · 받은 날들 안의 일을 따로 센다 — 경계를 넘긴 판은 시작이나 끝냄 한쪽만 들 수 있다
+ */
+export function puzzleSessions(days) {
+  const starts = new Set();
+  const done = new Set();
+  const quits = new Map();
+  for (const d of Array.isArray(days) ? days : []) {
+    if (!d) continue;
+    for (const k of Array.isArray(d.korPzStarts) ? d.korPzStarts : []) starts.add(String(k));
+    for (const k of Array.isArray(d.korPzDone) ? d.korPzDone : []) done.add(String(k));
+    for (const q of Array.isArray(d.korPzQuits) ? d.korPzQuits : []) {
+      const m = /^(\d+):(\d+):([a-z]+)$/.exec(String(q));
+      if (m && !quits.has(m[1])) quits.set(m[1], { n: Number(m[2]), kind: m[3] });
+    }
+  }
+  const quit = [...quits.entries()].filter(([k]) => !done.has(k));
+  const at = new Map();
+  for (const [, q] of quit) {
+    const label = `${q.n}째 ${(KINDS[q.kind] || {}).icon || q.kind}`;
+    at.set(label, (at.get(label) || 0) + 1);
+  }
+  return {
+    start: starts.size, done: done.size, quit: quit.length,
+    left: [...starts].filter((k) => !done.has(k) && !quits.has(k)).length,
+    quitAt: [...at.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)),
+  };
+}
 export const CHUNKS_MIN = 3;
 export const CHUNKS_MAX = 5;
 export const SORT_MIN = 4;
@@ -439,6 +482,7 @@ export function mergePuzzles(a, b) {
  * 🧩 오늘의 퍼즐 — [{ id, kind }] · 다시 볼 것(틀린 날 다음 날부터, 오래된 것부터) → 새 퍼즐(원고 차례) ·
  *   차례 ORDER_PER_DAY + 글에 있나요 INTEXT_PER_DAY + 가르기 SORT_PER_DAY + 앞뒤 어울리기 AGREE_PER_DAY, 한 칸이 모자라면 다른 칸으로 채운다 ·
  *   가르기 칸은 사실·의견과 겪은 일·생각이, 차례 칸은 차례 맞추기와 일어난 차례가 나눠 쓴다(SLOT_OF) — 새 퍼즐은 마지막으로 푼 때가 오래된 꼴부터(같으면 원고 차례) → 번갈아 나온다 ·
+ *   🆕 처음 보는 꼴(그 꼴의 퍼즐을 하나도 안 푼 꼴)은 하루 판에 한 꼴만 · 판 맨 뒤에 (v315 — FRESH_KIND_PER_DAY) ·
  *   practice면 ⭐ 퍼즐을 연습으로(오래 안 본 것부터)
  */
 export function planPuzzles(list, states, korDone, now, practice = false) {
@@ -458,20 +502,32 @@ export function planPuzzles(list, states, korDone, now, practice = false) {
     const fresh = open.filter((p) => !own(st, p.id));
     pool = [...due, ...fresh];
   }
+  // 🆕 처음 보는 꼴은 하루 한 꼴만, 판 맨 뒤에 (v315, 2026-10-22 아버님 "이대로 진행") — 퍼즐 꼴 셋을 한꺼번에 더했더니(v294~v297)
+  //   "오래 안 한 꼴부터" 규칙 때문에 판 넷 중 셋이 처음 보는 꼴(맨 앞부터)이 됐고, 그날부터 판을 한 번도 끝내지 않았다(그만두면 저장이 안 돼 다음 날도 같은 판).
+  //   익숙한 꼴로 판을 채우고 처음 보는 꼴은 원고 꼴 차례(KIND_LIST)로 하루 하나씩 — 한 번 해 본 꼴은 예전처럼 번갈아 나온다 ·
+  //   아무 꼴도 안 풀었으면(처음 쓰는 기기) 예전 그대로 · 연습은 ⭐ 퍼즐뿐이라 상관없다
+  const tried = new Set((list || []).filter((p) => own(st, p.id)).map((p) => p.kind));
+  const unfamiliar = (p) => !practice && tried.size > 0 && !tried.has(p.kind);
+  const newKinds = KIND_LIST.filter((k) => pool.some((p) => p.kind === k && unfamiliar(p))).slice(0, FRESH_KIND_PER_DAY);
+  const novel = pool.filter((p) => unfamiliar(p) && newKinds.includes(p.kind));
+  const base = pool.filter((p) => !unfamiliar(p));
   const take = [];
   const inSlot = (slot) => {
-    const c = pool.filter((p) => slotOf(p) === slot);
+    const c = base.filter((p) => slotOf(p) === slot);
     if (practice) return c;
     const fresh = c.filter((p) => !own(st, p.id)).map((p, i) => [p, i]).sort((a, b) => (last[a[0].kind] || 0) - (last[b[0].kind] || 0) || a[1] - b[1]).map(([p]) => p);
     return [...c.filter((p) => own(st, p.id)), ...fresh];
   };
-  for (const slot of PLAY_ORDER) take.push(...inSlot(slot).slice(0, want[slot]));
-  for (const p of pool) { if (take.length >= total) break; if (!take.includes(p)) take.push(p); }
-  // 판 안 차례: 차례 맞추기 → 글에 있나요 → 가르기 → 앞뒤 어울리기 → … 돌아가며 (같은 칸이 붙지 않게)
+  const tail = newKinds.map((k) => novel.find((p) => p.kind === k)); // 처음 보는 꼴마다 첫 퍼즐 — 그 칸에서 하나를 대신한다
+  for (const slot of PLAY_ORDER) take.push(...inSlot(slot).slice(0, Math.max(0, want[slot] - tail.filter((p) => slotOf(p) === slot).length)));
+  for (const p of base) { if (take.length + tail.length >= total) break; if (!take.includes(p)) take.push(p); }
+  // 익숙한 것이 모자라면 같은 새 꼴로 채운다 (하루에 처음 보는 꼴의 수는 그대로)
+  for (const p of novel) { if (take.length + tail.length >= total) break; if (!tail.includes(p)) tail.push(p); }
+  // 판 안 차례: 차례 맞추기 → 글에 있나요 → 가르기 → 앞뒤 어울리기 → … 돌아가며 (같은 칸이 붙지 않게) · 처음 보는 꼴은 맨 뒤
   const queues = PLAY_ORDER.map((slot) => take.filter((p) => slotOf(p) === slot));
   const out = [];
   while (queues.some((q) => q.length)) for (const q of queues) if (q.length) out.push(q.shift());
-  return out.slice(0, total).map((p) => ({ id: p.id, kind: p.kind }));
+  return [...out, ...tail].slice(0, total).map((p) => ({ id: p.id, kind: p.kind }));
 }
 
 /** 화면에 처음 놓을 조각 차례 — 바른 차례(0,1,2…)는 피한다(n ≥ 2) */

@@ -16,7 +16,7 @@ import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 —
 import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows, qMissOf, mergeQMiss, readsOf, mergeReads, KOR_DAY_SUMS, KOR_DAY_LISTS } from './korean.js'; // 📚 국어 잘못 읽기 횟수 · 📈 읽기 날마다 합계 칸(v314) (순수, import 없음)
 import { wordsOf, mergeWords, wordDaysOf, mergeWordDays } from './korwords.js'; // 🔤 국어 낱말 칸·보상 받은 날 (순수, korean.js만 import)
 import { writesOf, mergeWrites } from './korwrite.js'; // ✍️ 국어 서술형 글·답장·보상 한도 (순수, korean.js만 import)
-import { mergePuzzles } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 (순수 — korean·korwords만 import)
+import { mergePuzzles, PUZZLE_DAY_LISTS } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 · 판 기록 칸(v315) (순수 — korean·korwords만 import)
 import { copyAvatar, mergeAvatar } from './avatar.js'; // 🧑 진우 캐릭터 복사·병합 (순수 — house만 import)
 import { copyPlay, mergePlay } from './homeplay.js'; // 🎮 일상 행동 💗·놀이 날 복사·병합 (순수 — house·avatar·evolve·korean만 import)
 const DB_NAME = 'shincoach';
@@ -370,7 +370,8 @@ const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🎤 오늘 처음 통과한 문장(따라 말하기 🔶의 셈, v263) — 두 창이 같은 문장을 통과해도·다른 기기 기록과 합쳐도 한 번 (Codex 74차 #3)
 // 🕒 앱을 쓴 10분 칸 "HH:M" (v272, usage.js) — 두 창이 같은 때를 세어도 한 번
 // 📍 국어 근거 찾기 초 "카드@연 시각:초" (v314, korean.korDayDelta) — 주간 가운데값을 내려고 하나씩 · 같은 읽기는 한 번
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', ...KOR_DAY_LISTS];
+// 🧩 오늘의 퍼즐 판 시작·끝냄·그만둔 자리 (v315, korpuzzle.puzzleSessions) — 판마다 한 칸(같은 판은 한 번)
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {

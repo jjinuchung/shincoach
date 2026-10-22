@@ -9,10 +9,11 @@
 //  · ⚖️ 겪은 일·생각 가르기(v295): 사실·의견 가르기 화면(sortEl)을 같이 쓴다 — 단추만 [겪은 일] [생각·느낌]
 //  · ⏰ 일어난 차례(v297): 차례 맞추기 화면(orderEl)을 같이 쓴다 — 위에 글(쓰인 차례 그대로 · 때 말 굵게) · 카드는 글 차례로 놓여 시작 ·
 //    확인 뒤 조각마다 "글에서 몇째 문장"
-import { ASKS, FO, EF, IO, KINDS, KIND_LIST, AGREE_TYPES, allPuzzles, planPuzzles, puzzleStats, shuffledOrder, dealChoices, gradeOrder, gradeSort, gradeIntext, gradeAgree, intextWhy, isOpen, isSolved, puzzleFinishText, puzzleTodayLine } from './korpuzzle.js';
+import { ASKS, FO, EF, IO, KINDS, KIND_LIST, AGREE_TYPES, allPuzzles, quitKey, planPuzzles, puzzleStats, shuffledOrder, dealChoices, gradeOrder, gradeSort, gradeIntext, gradeAgree, intextWhy, isOpen, isSolved, puzzleFinishText, puzzleTodayLine } from './korpuzzle.js';
 import { wordsToday } from './korwords.js';
 import { korPuzzleFinish, korPuzzleMap, korPuzzleDayMap, korDoneMap } from './xp.js';
-import { circled } from './korean.js';
+import { circled, dayNum, dayKeyOf } from './korean.js';
+import { applyDailyDelta } from './db.js'; // 🧩 판 기록(v315) — 하루 기록 목록 칸에 (아이 화면엔 안 보임)
 import { guardStart } from './timeup.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 
@@ -127,6 +128,11 @@ export async function renderPuzzleTab(box, ctx) {
   box.appendChild(det);
 }
 
+/** 🧩 판 기록 한 칸 (v315 — 📤 국어 요약의 "오늘의 퍼즐 판" 줄 · 못 적어도 그만) */
+function notePlay(delta) {
+  applyDailyDelta(dayKeyOf(dayNum(Date.now())), delta).catch(() => {});
+}
+
 function startSession(ctx, practice) {
   if (!S.list) return;
   sfxUnlock();
@@ -137,7 +143,9 @@ function startSession(ctx, practice) {
   if (!items.length) { ctx.rerender(); return; }
   // 판을 시작할 때 퍼즐마다 마지막으로 푼 때 — 저장할 때 그 사이 다른 판이 옮겼으면 연습으로 (🔤 낱말과 같다)
   const from = new Map(items.map((x) => [x.id, (states[x.id] && states[x.id].at) || 0]));
-  S.ps = { items, i: 0, first: new Map(), from, placed: [], labels: [], picks: [], ends: [], lineFor: -1, pinTop: 0, grade: null, saving: false, result: null, egg: null, quitAsk: false, focus: 'start' };
+  const t0 = Date.now();
+  S.ps = { items, i: 0, first: new Map(), from, placed: [], labels: [], picks: [], ends: [], lineFor: -1, pinTop: 0, grade: null, saving: false, result: null, egg: null, quitAsk: false, focus: 'start', practice: !!practice, t0 };
+  if (!practice) notePlay({ korPzStarts: [String(t0)] });
   renderSession(ctx);
   window.scrollTo(0, 0);
 }
@@ -165,7 +173,11 @@ export function renderSession(ctx) {
     const quit = el('button', 'btn btn-small kor-wquit', ps.quitAsk ? '정말 그만할까요? (푼 것은 저장 안 돼요)' : '← 그만하기');
     quit.type = 'button';
     quit.addEventListener('click', () => {
-      if (!didWork(ps) || ps.quitAsk) { S.ps = null; ctx.toPuzzle(); return; }
+      if (!didWork(ps) || ps.quitAsk) {
+        // 🧩 그만둔 자리 — 몇째 퍼즐 · 어느 꼴 (v315)
+        if (!ps.practice) notePlay({ korPzQuits: [quitKey(ps.t0, ps.i + 1, (ps.items[ps.i] || {}).kind || '')] });
+        S.ps = null; ctx.toPuzzle(); return;
+      }
       ps.quitAsk = true;
       ps.focus = 'quit';
       renderSession(ctx);
@@ -744,6 +756,7 @@ async function finishSession(ctx) {
     renderSession(ctx);
   }
   if (res && res.ok) {
+    if (!ps.practice) notePlay({ korPzDone: [String(ps.t0)] }); // 🧩 끝낸 판 (v315 · [다시 저장하기]로 두 번 와도 같은 칸)
     if (live && (res.stone || (res.solved && res.solved.length))) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
     const egg = await ctx.tickKorDay(); // 🥚 오늘의 퍼즐을 끝낸 날 = 국어 알 하루 칸
     if (S.ps === ps && egg && egg.ok) { ps.egg = egg; renderSession(ctx); }

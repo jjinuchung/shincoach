@@ -94,7 +94,9 @@ test('⚖️ 한 판 — 판은 넷 그대로 · 가르기 칸을 사실·의견
   assert.deepEqual(PLAY_ORDER, ['order', 'intext', 'sort', 'agree'], '판의 칸은 그대로');
   assert.equal(SLOT_OF.exp, 'sort');
   for (const p of EXPS) assert.ok(isOpen(p, {}));
-  const slot = (st, now = T0) => planPuzzles(LIST, st, {}, now).filter((x) => x.kind === 'sort' || x.kind === 'exp').map((x) => x.id);
+  // v315: 처음 보는 꼴은 하루 한 꼴만(원고 꼴 차례) — 번갈아 나오는 것을 보려고 다른 꼴(차례·앞뒤·일어난 차례)은 이미 해 본 상태에서
+  const BASE = solvedAt(['O11', 'H1', 'T1'], 1);
+  const slot = (st, now = T0) => planPuzzles(LIST, { ...BASE, ...st }, {}, now).filter((x) => x.kind === 'sort' || x.kind === 'exp').map((x) => x.id);
   assert.deepEqual(slot({}), ['F1'], '둘 다 안 했으면 원고 차례(사실·의견 먼저)');
   assert.deepEqual(slot(solvedAt(['F1'], 100)), ['E1'], '사실·의견을 했으면 겪은 일·생각');
   assert.deepEqual(slot({ ...solvedAt(['F1'], 100), ...solvedAt(['E1'], 200) }), ['F2'], '겪은 일·생각을 더 나중에 했으면 사실·의견');

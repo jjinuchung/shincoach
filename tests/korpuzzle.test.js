@@ -143,7 +143,7 @@ test('🧩 오늘의 판: 이야기 흐름은 그 글에 ★이 있어야 열림
   // 한쪽이 모자라면 다른 쪽으로 채운다
   const allSortsDone = {};
   for (const p of LIST.filter((x) => x.kind === 'sort')) allSortsDone[p.id] = { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 };
-  assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'exp', 'agree', 'order'], '사실·의견을 다 풀면 가르기 칸은 겪은 일·생각(v295)');
+  assert.deepEqual(planPuzzles(LIST, allSortsDone, {}, T0).map((p) => p.kind), ['order', 'order', 'order', 'order'], '사실·의견만 해 봤으면 처음 보는 꼴은 하루 하나(차례)로 채운다 (v315)');
   assert.ok(isSolved({ box: 1 }) && !isSolved({ box: 0 }) && !isSolved(null));
   assert.deepEqual(puzzleStats(LIST, st, {}).map((s) => [s.kind, s.total, s.open, s.solved, s.tried]), [['order', 23, 4, 0, 1], ['sort', 14, 14, 1, 0], ['intext', 12, 0, 0, 0], ['agree', 10, 10, 0, 0], ['exp', 10, 10, 0, 0], ['time', 10, 10, 0, 0]]); // v265 차례 둘 · v291 하나 더함 · v294 🔗 열 · v295 ⚖️ 겪은 일·생각 열 · v297 ⏰ 일어난 차례 열
 });
@@ -288,7 +288,8 @@ test('🧩 화면 연결: 퍼즐 판은 처음 낸 것만 · 시작할 때 상�
 
 test('🧩 화면(Codex 55차): 그만하기 — 놓은 조각·고른 칸도 한 것 · 다시 풀면 확인을 거둠 · 초점 — 누른 [사실]/[의견] 단추 · 새 퍼즐은 첫 조각이나 첫 [사실]', () => {
   const pv = read('js/korpuzzleview.js');
-  assert.ok(pv.includes('if (!didWork(ps) || ps.quitAsk) { S.ps = null; ctx.toPuzzle(); return; }'), '한 것이 있으면 한 번 더 묻는다');
+  const quitAt = pv.indexOf('if (!didWork(ps) || ps.quitAsk) {'); // v315: 그만둔 자리를 적는 줄이 사이에
+  assert.ok(quitAt > 0 && pv.slice(quitAt, quitAt + 400).includes('S.ps = null; ctx.toPuzzle(); return;'), '한 것이 있으면 한 번 더 묻는다');
   assert.ok(pv.includes('return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean) || ps.picks.some(Boolean) || ps.ends.some((c) => c !== undefined);'), '놓은 조각·고른 칸(📍 있어요·없어요 · 🔗 고른 끝도)도 한 것');
   const chunk = pv.slice(pv.indexOf("const b = el('button', 'kor-pchunk'"), pv.indexOf('pool.appendChild(b);'));
   const undo = pv.slice(pv.indexOf("undo.addEventListener('click'"), pv.indexOf('tools.appendChild(undo);'));
@@ -298,7 +299,7 @@ test('🧩 화면(Codex 55차): 그만하기 — 놓은 조각·고른 칸도 �
   assert.ok(fo.includes('ps.focus = `fo:${k}:${fo}`;'), '누른 단추에 초점');
   assert.ok(pv.includes("fo ? (card.querySelectorAll('.kor-psort')[Number(fo[1])] || card).querySelector(`.kor-pfo.is-${fo[2]}`)"));
   assert.ok(pv.includes("focusTo === 'start' || focusTo === 'pool' ? card.querySelector('.kor-pchunk:not(:disabled), .kor-pfo:not(:disabled), .kor-pcheck:not(:disabled)')"), '새 퍼즐 — 첫 조각·첫 [사실]');
-  assert.ok(pv.includes("quitAsk: false, focus: 'start' };"), '판을 시작하면 첫 퍼즐에 초점');
+  assert.ok(pv.includes("quitAsk: false, focus: 'start', practice: !!practice, t0 };"), '판을 시작하면 첫 퍼즐에 초점 (v315 — 연습 판인지·시작 시각도)');
 });
 
 test('🧩 v244 이야기 흐름 둘 — 「홍길동전」(O15)·「양반전」(O16)은 그 글에 ★이 있어야 열림 · 실마리에 맞는 차례가 하나뿐', () => {

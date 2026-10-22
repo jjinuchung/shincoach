@@ -6,7 +6,7 @@
 // ★ 공개 저장소에는 올리지 않는다 — upload.js가 비공개 저장소로만 (아이 기록)
 import { TYPES, starsOf, missOf, qMissOf, readsOf, READS_MAX, validCards } from './korean.js';
 import { deckStats, DECKS, DECK_ORDER, allWords } from './korwords.js';
-import { puzzleStats, KINDS as PUZZLE_KINDS, allPuzzles } from './korpuzzle.js';
+import { puzzleStats, KINDS as PUZZLE_KINDS, allPuzzles, puzzleSessions } from './korpuzzle.js';
 import { writesOf, cardWriteState } from './korwrite.js';
 import { allTopics, nonsulReport, essayReport } from './nonsul.js'; // 🖊️ 논술 (v303 · ✍️ 짧은 글 v304)
 
@@ -145,6 +145,11 @@ export function korReportText(p, data, today, days) {
     const k = PUZZLE_KINDS[x.kind];
     L.push(`- ${k.icon} ${k.ko}: ⭐ ${x.solved} · 풀어 봤지만 아직 ⭐ 아님 ${x.tried} · 열린 ${x.open} / 전체 ${x.total}`);
   }
+  // 🧩 오늘의 퍼즐 판 — 시작·끝냄·그만둔 자리 (v315부터 셈 · 연습 판은 안 셈) — 판을 열었다 그만둔 것인지 안 연 것인지 가른다
+  //   기간 안에 일어난 일을 따로 센다(7일 경계를 넘긴 판은 시작이나 끝냄 한쪽만 들 수 있다 — 끝냄 ÷ 시작으로 나누지 않기) ·
+  //   끝난 기록이 없는 판은 까닭을 단정하지 않는다 — 지금 풀고 있는 판·다른 화면으로 가 둔 판·앱을 닫은 판·기록 저장 실패가 다 든다 (🔍 Codex 121차 #1)
+  const ps = puzzleSessions(Array.from({ length: 7 }, (_, k) => byDate.get(dayBefore(today, k))));
+  L.push(`- 🧩 최근 7일 오늘의 퍼즐 판(v315부터 · 이 기간에 일어난 일을 따로 셈): 시작 ${ps.start} · 끝냄 ${ps.done} · 그만둠 ${ps.quit}${ps.quitAt.length ? ` (그만둔 자리: ${ps.quitAt.map(([at, n]) => `${at} ${n}번`).join(' · ')})` : ''} · 끝난 기록이 없는 판 ${ps.left}(풀고 있는 판·다른 화면으로 가 둔 판·앱을 닫은 판·기록 실패가 다 들어요)`);
   // 생각 쓰기
   const w = writesOf(prof.korWrites);
   const wcards = Object.keys(w).filter((id) => id.startsWith('K') && w[id].list.length); // 📚 국어 카드만 — 🖊️ 논술 짧은 글(N##)은 논술 절에 (v304)
