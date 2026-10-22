@@ -12,6 +12,8 @@ export const DEFAULT_MINUTES = 30;   // 이만큼 공부하면 에세이가 열�
 export const DEFAULT_COUNT = 3;      // 한 번에 쓸 문장 수
 export const REWARD = { xp: 10, coin: 5 };        // 문장 하나 완성
 export const FINISH_REWARD = { xp: 50, coin: 20 }; // 전부 완성 (하루 1번)
+// 🔶 고친 문장을 🎤로 따라 읽어 통과하면 영어스톤 (v318 — 내 에세이·아빠 교정 함께 · 문장마다 한 번 · 하루 이만큼까지 · db.applyEssaySayStone)
+export const SAY_STONE = { maxPerDay: 2 };
 
 // 5단어짜리("I know, right? She's adorable.")를 내면 아이가 채울 게 2단어뿐이라
 // 에세이가 아니라 빈칸 채우기가 된다 (아버님이 실제 결과를 보고 지적).
@@ -427,6 +429,29 @@ export function looksEnglish(text) {
   return /[a-z]/i.test(s);
 }
 
+/**
+ * ✍️ 바뀐 곳 (순수, v318) — 고친 글의 낱말마다 [{ w: 낱말, chg: 내 글에서 그대로 오지 않은 낱말인가 }]
+ * 낱말 앞뒤 문장부호·따옴표만 빼고 견준다 (마침표 하나·'hello' → hello는 안 칠하고, i → I · cat → cats는 칠한다) · 차례를 지키는 가장 긴 공통 부분(LCS)이 그대로 온 것
+ */
+export function diffMarks(written, fixed) {
+  const toks = (s) => String(s || '').trim().split(/\s+/).filter(Boolean);
+  // 앞뒤의 글자·숫자가 아닌 것(문장부호·따옴표)만 뗀다 — café·Pokémon의 악센트는 남긴다 (🔍 Codex 124차 #5)
+  const key = (w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  const a = toks(written).map(key);
+  const words = toks(fixed);
+  const b = words.map(key);
+  if (!a.length || a.length > 200 || b.length > 200) return words.map((w) => ({ w, chg: false }));
+  const L = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  }
+  const same = new Array(b.length).fill(false);
+  for (let i = 0, j = 0; i < a.length && j < b.length;) {
+    if (a[i] === b[j]) { same[j] = true; i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++;
+  }
+  return words.map((w, k) => ({ w, chg: !same[k] }));
+}
+
 /** 읽어 줄 때 쓸 대략의 길이(초) — 영상이 없으므로 단어 수로 어림잡는다 */
 export function readSeconds(text) {
   const n = String(text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -438,6 +463,7 @@ export function readSeconds(text) {
 const ui = {
   open: false, o: null, i: 0, started: false, granted: false, busy: false,
   finished: false, speakStop: null, run: 0,
+  readTok: 0, // 🔊 고친 문장 첫 읽어 주기 번호 — 끝나야 「다음 문장 →」 (v318)
 };
 
 function playSfx(name) {
@@ -500,7 +526,10 @@ export function initEssay() {
   $('essay-read').addEventListener('click', (e) => {
     e.stopPropagation();
     const it = ui.o && ui.o.prompts[ui.i];
-    if (it && it.result) readAloud(it.result.fixed);
+    if (!it || !it.result) return;
+    // 아직 첫 듣기를 기다리는 중이면 다시 읽는 것이 새 기다림 — 앞 읽기가 끊기며 단추가 먼저 열리지 않게 (🔍 Codex 124차 #4)
+    if ($('essay-next').disabled) readGate(it.result.fixed);
+    else readAloud(it.result.fixed);
   });
   $('essay-say').addEventListener('click', (e) => { e.stopPropagation(); startSpeaking(); });
   $('essay-next').addEventListener('click', (e) => { e.stopPropagation(); nextPrompt(); });
@@ -523,6 +552,8 @@ export function isEssayOpen() {
  * @param {(text:string, hooks:object) => Promise<object>} o.speak 고친 문장 따라 말하기
  * @param {(item:object) => void} o.onWritten 문장 하나 완성 (기록·보상)
  * @param {(item:object) => void} [o.onShown] 문장이 화면에 떴다 — 한 번 나온 문장은 다시 안 내려고 적는다 (연습·아빠 교정 회차는 안 부름)
+ * @param {(item:object) => Promise<string|null>} [o.onPass] 고친 문장을 🎤로 통과 — 문장마다 한 번 · 받은 것의 이름(🔶)을 돌려주면 말 칸에 붙인다 · null = 저장 실패(다시 통과하면 다시) (v318)
+ * @param {(item:object) => void} [o.onSaid] 내 에세이 문장에서 넘어갈 때 — item.said(pass·try·없음)로 🎤를 했나 적는다 (v318)
  * @param {() => object} o.onFinished 전부 완성
  * @param {(summary:object) => void} o.onDone
  */
@@ -549,11 +580,13 @@ export function openEssay(o) {
   rw.innerHTML = '';
   if (o.practice) rw.appendChild(el('span', 'review-chip', '연습이라 기록이 남지 않아요'));
   else {
-    rw.appendChild(el('span', 'review-chip', `문장마다 ⚡+${REWARD.xp} 💰+${REWARD.coin}`));
+    // 👨‍👩‍👦 아빠 교정은 🎤로 읽어 봐야 ⚡💰 (v318 — 그냥 넘기면 보상 없이 넘어간다)
+    rw.appendChild(el('span', 'review-chip', coach ? `🎤 읽어 보면 문장마다 ⚡+${REWARD.xp} 💰+${REWARD.coin}` : `문장마다 ⚡+${REWARD.xp} 💰+${REWARD.coin}`));
     if (!coach) rw.appendChild(el('span', 'review-chip gold', `다 쓰면 ⚡+${o.reward.xp} 💰+${o.reward.coin}`));
+    rw.appendChild(el('span', 'review-chip', '🎤 따라 읽어 통과하면 🔶'));
   }
   $('essay-note').textContent = coach
-    ? '내가 쓴 글을 아빠가 읽고 고쳐 줬어요. 소리 내어 읽어 볼까요?'
+    ? '내가 쓴 글을 아빠가 읽고 고쳐 줬어요. 바뀐 곳은 색으로 보여요 — 듣고 🎤로 소리 내어 읽어 봐요!'
     : '틀린 곳은 신코치가 고쳐 줄 거예요. 편하게 써 보세요!';
 
   $('essay-intro').hidden = false;
@@ -650,7 +683,7 @@ function showResult(it) {
   $('essay-write').hidden = true;
   $('essay-result').hidden = false;
   $('essay-written').textContent = it.result.raw;
-  $('essay-fixed').textContent = it.result.fixed;
+  fixedLine($('essay-fixed'), it.result.raw, it.result.fixed);
 
   const notes = $('essay-notes');
   notes.innerHTML = '';
@@ -673,9 +706,35 @@ function showResult(it) {
     }
   }
   $('essay-read').hidden = !canReadAloud();
-  $('essay-next').textContent = ui.i + 1 >= ui.o.prompts.length ? '다 썼어요!' : '다음 문장 →';
-  // 고친 문장을 한 번 읽어 준다 (되면)
-  readAloud(it.result.fixed);
+  // 고친 문장을 한 번 끝까지 들려준 뒤에 「다음 문장 →」 (v318 — 읽어 주기가 시작되자마자 끊고 넘어가지 않게) · 소리가 안 나는 기기는 바로
+  // 읽어 주기는 끝 소식이 안 오는 기기도 있어 readAloud가 글 길이 + 3초 뒤에 스스로 끝낸다 · 🎤를 누르면 바로 (startSpeaking)
+  setNext(!canReadAloud());
+  readGate(it.result.fixed);
+}
+
+/** 읽어 주고, 그 읽기가 끝나면 「다음 문장 →」을 연다 — 번호가 바뀌었으면(새 문장·다시 읽기·🎤) 그 끝 소식은 아무것도 안 한다 */
+function readGate(text) {
+  const tok = ++ui.readTok;
+  readAloud(text).then(() => { if (ui.open && tok === ui.readTok) setNext(true); });
+}
+
+/** 「다음 문장 →」 — 첫 읽어 주기가 끝나기 전엔 누를 수 없고 "듣는 중"이라고 보인다 */
+function setNext(ready) {
+  const b = $('essay-next');
+  b.disabled = !ready;
+  b.textContent = !ready ? '🔊 듣는 중…' : ui.i + 1 >= ui.o.prompts.length ? '다 썼어요!' : '다음 문장 →';
+}
+
+/** 고친 글 — 내 글에서 바뀐 낱말만 색으로 (v318 · 글자는 textContent로만 — 아이·아빠 글을 HTML로 넣지 않는다) */
+function fixedLine(box, written, fixed) {
+  box.textContent = '';
+  const marks = diffMarks(written, fixed);
+  // 다 같거나 다 다르면 칠할 것이 없다 (다 칠하면 아무것도 안 알려 준다)
+  if (!marks.some((x) => x.chg) || marks.every((x) => x.chg)) { box.textContent = fixed; return; }
+  marks.forEach((x, k) => {
+    if (k) box.appendChild(document.createTextNode(' '));
+    box.appendChild(x.chg ? el('mark', 'essay-chg', x.w) : document.createTextNode(x.w));
+  });
 }
 
 function startSpeaking() {
@@ -683,10 +742,13 @@ function startSpeaking() {
   const it = ui.o.prompts[ui.i];
   if (!it || !it.result || !ui.o.speak) return;
   stopReading(); // 말하기와 읽어주기가 겹치면 인식이 제 소리를 듣는다
+  ui.readTok++; // 🎤를 눌렀으면 다 들을 때까지 기다리지 않는다 — 돌아오면 「다음 문장 →」을 바로 누를 수 있다
+  setNext(true);
   ui.busy = true;
-  // 📬 🎤를 누른 순간 "해 봄" — 듣는 중에 "다음 문장"을 눌러도 "🎤 없이 넘김"으로 적히지 않게 (v314 · 🔍 Codex 120차 #5)
-  if (ui.o.mode === 'coach' && !it.said) it.said = 'try';
+  // 📬 🎤를 누른 순간 "해 봄" — 듣는 중에 "다음 문장"을 눌러도 "🎤 없이 넘김"으로 적히지 않게 (v314 · 🔍 Codex 120차 #5) · 내 에세이도 (v318)
+  if (!it.said) it.said = 'try';
   const run = ui.run;
+  const at = ui.i;
   $('essay-result').hidden = true;
   $('essay-speak').hidden = false;
   $('essay-speak-text').textContent = it.result.fixed;
@@ -709,11 +771,19 @@ function startSpeaking() {
       return;
     }
     const ok = !!(res && res.passed); // runSpeakCheck는 passed/score를 준다 (ratio라는 필드는 없다 — Codex #10)
-    // 📬 아빠 교정문을 🎤로 읽어 봤다 (v314 — 넘어갈 때 onRead가 함께 적는다 · 한 번이라도 통과했으면 통과)
-    if (ui.o.mode === 'coach') it.said = ok || it.said === 'pass' ? 'pass' : 'try';
+    // 📬 🎤로 읽어 봤다 (v314 아빠 교정 · v318 내 에세이 — 넘어갈 때 onRead·onSaid가 함께 적는다 · 한 번이라도 통과했으면 통과)
+    it.said = ok || it.said === 'pass' ? 'pass' : 'try';
     $('essay-speak-msg').textContent = ok ? '좋아요! 잘 읽었어요 👏' : '읽어 봤어요! 👍';
     playSfx(ok ? 'success' : 'ding');
-    const at = ui.i;
+    // 🔶 통과 — 문장마다 한 번 (받았으면 무엇을 받았는지 이름으로 · 하루 몫이 찼으면 말 없이)
+    // onPass가 null이면 저장 실패 — 같은 문장을 다시 통과하면 다시 해 본다 (🔍 Codex 124차 #2 · 넘어간 뒤는 player가 창을 닫을 때 다시)
+    if (ok && !ui.o.practice && ui.o.onPass && !it.passAsked) {
+      it.passAsked = true;
+      Promise.resolve(ui.o.onPass(it)).then((got) => {
+        if (got === null) { it.passAsked = false; return; }
+        if (got && ui.open && run === ui.run && ui.i === at && !$('essay-speak').hidden) $('essay-speak-msg').textContent += ` ${got}`;
+      }).catch(() => { it.passAsked = false; });
+    }
     setTimeout(() => {
       // 아이가 그 사이에 "다음 문장"을 직접 눌렀으면 여기서 또 넘기지 않는다 (문장을 건너뛰게 된다)
       if (!ui.open || run !== ui.run || ui.i !== at || $('essay-speak').hidden) return;
@@ -733,6 +803,11 @@ function nextPrompt() {
     cur.marked = true;
     if (!ui.o.practice && ui.o.onRead) ui.o.onRead(cur);
   }
+  // ✍️ 내 에세이 — 고친 문장을 🎤로 읽었나를 넘어갈 때 한 번 (v318 · 📤 usage/feedback.md)
+  if (ui.o.mode !== 'coach' && cur && cur.result && !cur.sayMarked) {
+    cur.sayMarked = true;
+    if (!ui.o.practice && ui.o.onSaid) ui.o.onSaid(cur);
+  }
   ui.i++;
   if (ui.i >= ui.o.prompts.length) { showDone(); return; }
   showPrompt();
@@ -748,10 +823,13 @@ async function showDone() {
   renderDots();
 
   let reward = null;
+  const run = ui.run;
   if (!ui.o.practice && !ui.granted && ui.o.onFinished) {
     ui.granted = true;
     reward = await ui.o.onFinished(); // 하루 한 번 선점 결과를 기다림 (다른 창이 먼저면 null)
   }
+  // 기다리는 사이 닫혔거나 다른 회차가 열렸으면 그 화면을 건드리지 않는다 (v318 시험이 찾음 — ui.o가 비어 오류가 났다)
+  if (!ui.open || run !== ui.run) return;
   $('essay-done-msg').textContent = ui.o.mode === 'coach'
     ? `아빠가 고쳐준 문장 ${ui.o.prompts.length}개를 다 읽었어요 👏`
     : ui.o.practice

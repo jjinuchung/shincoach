@@ -312,7 +312,7 @@ test('🔍 Codex 32차 #3 — 저장 시각은 늘 직전보다 크다: 시계�
     assert.deepEqual([m.coins, monsSoldOn(m.sales, OPEN), haveOf(m.caught[id], m.mons[id])], [10, 1, 1], '코인·판 기록·보유가 함께');
   }
   const db = src('js/db.js');
-  assert.equal((db.match(/updatedAt = nextStamp\(/g) || []).length, 7, 'mutateProfile · applyExtend · updateMath · updateMathAndProfile(수학·프로필) · 🚀 applyRocketAdmit(Codex 43차) · 🎤 applySpeakStone(v263 Codex 74차)');
+  assert.equal((db.match(/updatedAt = nextStamp\(/g) || []).length, 8, 'mutateProfile · applyExtend · updateMath · updateMathAndProfile(수학·프로필) · 🚀 applyRocketAdmit(Codex 43차) · 🎤 applySpeakStone(v263 Codex 74차) · ✍️ applyEssaySayStone(v318)');
   assert.ok(!/(next|p|m)\.updatedAt = Date\.now\(\);/.test(db), 'Date.now()를 그대로 쓰는 프로필 저장이 남지 않았다');
 });
 

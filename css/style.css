@@ -2060,6 +2060,8 @@ button { font-family: inherit; }
 .essay-box.mine { background: #f8fafc; border: 1px solid var(--border); }
 .essay-box.coach { background: #ecfdf5; border: 2px solid #6ee7b7; }
 .essay-line { font-size: 1.05rem; font-weight: 700; line-height: 1.5; word-break: break-word; }
+/* ✍️ 고친 글에서 내 글과 달라진 낱말 (v318) — 형광펜처럼 (색만이 아니라 밑줄도 — 색을 못 가려도 보이게) */
+.essay-chg { background: #fde68a; color: inherit; border-radius: 4px; padding: 0 2px; text-decoration: underline; text-decoration-color: #d97706; text-underline-offset: 3px; }
 .essay-notes { margin: 8px 0 0; padding-left: 18px; font-size: 0.9rem; line-height: 1.7; }
 .essay-notes li { margin-bottom: 2px; }
 .essay-from { color: var(--danger); text-decoration: line-through; }
@@ -2067,7 +2069,7 @@ button { font-family: inherit; }
 .essay-why { color: var(--muted); font-size: 0.85rem; }
 .essay-note-ok { list-style: none; margin-left: -18px; color: #047857; font-weight: 700; }
 .essay-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.essay-actions .btn { flex: 1 1 100px; }
+.essay-actions .btn { flex: 1 1 100px; white-space: nowrap; } /* 폰 폭에서 글자를 쪼개지 말고 단추가 다음 줄로 (v318 「🔊 듣는 중…」) */
 
 .essay-speak { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 0; }
 .essay-speak .essay-line { text-align: center; }

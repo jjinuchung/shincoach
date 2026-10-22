@@ -284,6 +284,18 @@ function loadPlayer() {
     formUrl: (id, kind) => `url:${id}:${kind}`,
     hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
+    // ✍️ v318 — 내 에세이 🎤 기록 · 고친 문장 🎤 통과 → 🔶 (기록은 essayState.said · 받기는 essayState.sayKeys — 하루 2개 · 문장마다 한 번)
+    syncCoachFixes: async () => 0, ESSAY_SAY_STONE: { maxPerDay: 2 },
+    async markEssaySaid(id, date, how) { (essayState.said ||= []).push({ id, date, how }); return true; },
+    async receiveEssaySayStone(date, key, max, entry) {
+      (essayState.sayEntries ||= []).push(entry);
+      if (essayState.sayFail) return { ok: false, why: 'save' }; // 저장 실패 흉내 (Codex 124차 #2)
+      const keys = (essayState.sayKeys ||= []);
+      if (keys.includes(key) || keys.length >= max) return { ok: false, why: 'none', daily: { date, essaySayStones: keys.length } };
+      keys.push(key);
+      itemLog.push('stone_english');
+      return { ok: true, daily: { date, essaySayStones: keys.length } };
+    },
     pickReviews, pickWordReviews, quizChoices, reviewSummary, wordSummary, isWordDue, roundReward, reviewStones, reviewSchedule, reviewable, makeDictation, VOCAB_KNOWN, REAL_VOCAB, pickFavExtra, FAV_ICON,
     REVIEW_GRADUATED, MAX_WORD_ITEMS, REVIEW_REWARD: REWARD, DEFAULT_COUNT: 5, REVIEW_COUNT: 5,
     listVocabViews: async () => vocabViewsStub, updateVocabReview: async (w, updater) => { const cur = vocabViewsStub.find((x) => x.word === w) || { word: w }; const next = { ...cur, ...updater(cur) }; vocabReviewLog.push(next); return next; },
@@ -1794,6 +1806,73 @@ test('자리 되돌리기: 그 사이 콘텐츠가 바뀌었으면 건드리지 
   run(`restoreSpot(${JSON.stringify({ itemId: 'A', idx: 1, time: 11 })})`);
   assert.equal(run('state.idx'), 0, '다른 콘텐츠면 그대로');
   assert.equal(spot.itemId, 'A');
+});
+
+test('✍️ v318 아빠 교정: ⚡💰는 🎤를 해 봤을 때만 · 🎤 통과 🔶는 문장마다 한 번·하루 2개 · 내 에세이: 넘어갈 때 🎤 했나 기록 · 통과 🔶', async () => {
+  const { run, essayCalls, essayState, xpLog, coinLog, itemLog, ctx } = loadPlayer();
+  const marks = [];
+  ctx.listEssays = async () => [
+    { id: 'e1', date: '2026-10-20', written: 'i like cat', coachFix: 'I like cats.', readAt: 0 },
+    { id: 'e2', date: '2026-10-20', written: 'he go school', coachFix: 'He goes to school.', readAt: 0 },
+    { id: 'e3', date: '2026-10-21', written: 'me happy', coachFix: 'I am happy.', readAt: 0 },
+  ];
+  ctx.markEssayRead = async (id, date, how) => { marks.push({ id, date, how }); return true; };
+  assert.equal(await run('maybeCoachFix()'), true);
+  const o = essayCalls.at(-1);
+  assert.equal(o.mode, 'coach');
+  const [x0, c0] = [xpLog.length, coinLog.length];
+  o.onRead({ ...o.prompts[0] }); // 🎤를 안 누르고 넘김
+  assert.deepEqual(marks.at(-1), { id: 'e1', date: '2026-10-20', how: 'skip' });
+  assert.deepEqual([xpLog.length, coinLog.length], [x0, c0], '그냥 넘기면 ⚡💰 없음');
+  o.onRead({ ...o.prompts[1], said: 'try' });
+  assert.equal(marks.at(-1).how, 'try');
+  assert.deepEqual([xpLog.length, coinLog.length], [x0 + 1, c0 + 1], '🎤를 해 봤으면 ⚡💰');
+  // 🔶 — 문장마다 한 번 · 하루 2개 · 받은 것은 이름으로
+  const stones = () => itemLog.filter((x) => x === 'stone_english').length;
+  const s0 = stones();
+  assert.equal(await o.onPass(o.prompts[0]), '🔶 영어스톤 +1');
+  assert.equal(await o.onPass(o.prompts[0]), '', '같은 문장은 한 번');
+  assert.equal(await o.onPass(o.prompts[1]), '🔶 영어스톤 +1');
+  assert.equal(await o.onPass(o.prompts[2]), '', '하루 2개까지');
+  assert.equal(stones(), s0 + 2);
+  assert.deepEqual(essayState.sayKeys, ['coach|2026-10-20|e1', 'coach|2026-10-20|e2']);
+  assert.equal(JSON.stringify(essayState.sayEntries[0]), JSON.stringify({ date: '2026-10-20', id: 'e1' }), '그 글의 받은 표시를 남기도록 글을 넘긴다 (Codex 124차 #1)');
+  // 저장 실패 → null(같은 문장을 다시 통과하면 다시) · 창을 닫을 때 한 번 더 (Codex 124차 #2)
+  essayState.sayKeys = [];
+  essayState.sayFail = true;
+  assert.equal(await o.onPass(o.prompts[2]), null);
+  assert.equal(JSON.stringify(run('state.essaySayRetry').map((x) => x.key)), JSON.stringify(['coach|2026-10-21|e3']));
+  assert.equal(await o.onPass(o.prompts[2]), null);
+  assert.equal(run('state.essaySayRetry').length, 1, '같은 몫은 한 번만 적어 둔다');
+  essayState.sayFail = false;
+  const s1 = stones();
+  o.onDone({});
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(stones(), s1 + 1, '창을 닫을 때 다시 받는다');
+  assert.equal(run('state.essaySayRetry').length, 0);
+  // 내 에세이 — 넘어갈 때 🎤 했나를 오늘 날짜로 · 통과 🔶 열쇠는 self|날짜|글 id
+  const cues = [
+    { start: 0, end: 3, en: "I can't believe I just caught a Gengar in the tall grass!", ko: '내가 팬텀을 잡다니!' },
+    { start: 10, end: 13, en: 'I want to play with my best friend at the playground today.', ko: '오늘 친구와 놀고 싶어.' },
+    { start: 20, end: 23, en: 'We will go to the park after school and play soccer.', ko: '방과 후에 공원에 갈 거야.' },
+  ];
+  ctx.track.statsList = () => cues.map((c) => ({ ...c, done: true, box: 1, lastAt: 1 }));
+  run(`state.cues = ${JSON.stringify(cues)}; state.idx = 0; startEssay(false, null);`);
+  const e = essayCalls.at(-1);
+  assert.notEqual(e.mode, 'coach');
+  const it = { rec: e.prompts[0].rec, frame: e.prompts[0].frame, result: { raw: 'x', fixed: 'X.', notes: [] } };
+  e.onWritten(it); // 글이 적힌 날을 들고 있다
+  assert.equal(it.essayDay, '2026-09-14');
+  ctx.track.dailyDate = () => '2026-09-15'; // 쓰고 나서 자정을 넘겼다 — 기록·🔶 표시는 쓴 날로 (Codex 124차)
+  e.onSaid({ ...it });
+  e.onSaid({ ...it, said: 'pass' });
+  assert.deepEqual(essayState.said.map((s) => [s.date, s.how]), [['2026-09-14', 'skip'], ['2026-09-14', 'pass']]);
+  assert.ok(essayState.said.every((s) => s.id && s.id === essayState.said[0].id));
+  essayState.sayKeys = [];
+  assert.equal(await e.onPass(it), '🔶 영어스톤 +1');
+  assert.ok(essayState.sayKeys[0].startsWith('self|2026-09-14|'));
+  assert.equal(essayState.sayEntries.at(-1).date, '2026-09-14');
+  e.onDone({});
 });
 
 test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (하루 1번, 부모 모드 제외, 보상은 ⚡·💰)', async () => {

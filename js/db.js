@@ -364,6 +364,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'gamePlays', 'gameBonus', 'uGame',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
+  // ✍️ 에세이 고친 문장을 🎤로 따라 읽어 통과해 받은 🔶 수 (2026-10-22 v318) — 받기는 applyEssaySayStone(가방과 한 트랜잭션)
+  'essaySayStones',
   // 📈 국어 읽기 날마다 합계 (2026-10-22 v314, korean.korDayDelta) — 읽은 글 · 처음/다시 읽기 첫 번 맞힘 · 📍 근거 · 🧠 (읽은 기록 줄이 새로 생길 때만 더함)
   ...KOR_DAY_SUMS];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
@@ -373,7 +375,8 @@ const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🕒 앱을 쓴 10분 칸 "HH:M" (v272, usage.js) — 두 창이 같은 때를 세어도 한 번
 // 📍 국어 근거 찾기 초 "카드@연 시각:초" (v314, korean.korDayDelta) — 주간 가운데값을 내려고 하나씩 · 같은 읽기는 한 번
 // 🧩 오늘의 퍼즐 판 시작·끝냄·그만둔 자리 (v315, korpuzzle.puzzleSessions) — 판마다 한 칸(같은 판은 한 번)
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
+// ✍️ 에세이 🎤로 🔶를 받은 문장 (v318, applyEssaySayStone) — 같은 문장을 두 번 통과해도·두 창이 같이 받아도 한 번
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', 'essaySayKeys', ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {
@@ -393,7 +396,7 @@ const sameText = (a, b) => String(a || '').trim() === String(b || '').trim();
 export function mergeEssayEntry(old, e) {
   const out = { ...(old || {}), ...(e || {}) };
   if (old && e && 'written' in e && !sameText(old.written, e.written)) {
-    for (const k of ['coachFix', 'fixedAt', 'readAt', 'readHow']) if (!(k in e)) delete out[k];
+    for (const k of ['coachFix', 'fixedAt', 'readAt', 'readHow', 'sayHow']) if (!(k in e)) delete out[k];
   }
   return out;
 }
@@ -421,11 +424,26 @@ function mergeRead(win, lose) {
  */
 export function mergeEssayCopies(a, b) {
   if (!a || !b || !sameText(a.written, b.written)) return a || b;
+  return withSay(pickCopy(a, b), a, b);
+}
+
+function pickCopy(a, b) {
   if (!b.coachFix) return a;
   if (!a.coachFix) return b;
   const win = (Number(b.fixedAt) || 0) > (Number(a.fixedAt) || 0) ? b : a;
   const lose = win === a ? b : a;
   return sameText(win.coachFix, lose.coachFix) ? mergeRead(win, lose) : win;
+}
+
+/** 같은 글의 두 사본 — 내 에세이 🎤(sayHow)는 더 해 본 쪽 · 🔶 받은 표시(sayPaid)는 하나라도 있으면 (v318 · 🔍 Codex 124차 #3 — 아빠 교정 쪽을 고르며 잃었다) */
+function withSay(out, a, b) {
+  const how = howRank(b.sayHow) > howRank(a.sayHow) ? b.sayHow : a.sayHow;
+  const paid = !!(a.sayPaid || b.sayPaid);
+  if ((howRank(how) < 0 || out.sayHow === how) && (!paid || out.sayPaid)) return out;
+  const o = { ...out };
+  if (howRank(how) >= 0) o.sayHow = how;
+  if (paid) o.sayPaid = true;
+  return o;
 }
 
 /**
@@ -590,6 +608,47 @@ export async function applySpeakStone(date, every, max) {
 }
 
 /**
+ * 🔶 에세이 🎤 영어스톤 규칙 (순수, 2026-10-22 v318) — 고친 문장(내 에세이·아빠 교정)을 🎤로 따라 읽어 통과하면 그 문장(key)에 한 번, 하루 max개.
+ * 받을 만하면 받은 수·받은 문장과 가방 🔶 +1을 **같은 자리에서** (따라 말하기 speakStoneRule과 같은 모양 — 선점과 가방을 따로 쓰면 그 사이에 꺼질 때 잃는다)
+ * @returns {{ok:boolean, why?:'none', daily:object}}
+ */
+export function essaySayStoneRule(profile, curDaily, date, key, max, rec = null) {
+  const have = (curDaily && Number(curDaily.essaySayStones)) || 0;
+  const keys = curDaily && Array.isArray(curDaily.essaySayKeys) ? curDaily.essaySayKeys : [];
+  // rec = 그 글(하루 기록 essays의 한 줄) — 받은 표시(sayPaid)는 글에 남아 날을 넘어도 한 번 (🔍 Codex 124차 #1: 그날 목록만 보면 다음 날 같은 교정에서 또 받았다)
+  if (!key || have >= Number(max) || keys.includes(key) || (rec && rec.sayPaid)) return { ok: false, why: 'none', daily: curDaily || emptyDaily(date) };
+  addCount(profile.items, STONE_ENGLISH.id, 1);
+  return { ok: true, daily: mergeDailyDelta(curDaily, date, { essaySayStones: 1, essaySayKeys: [key] }) };
+}
+
+/**
+ * 🔶 에세이 🎤 영어스톤 받기 — 가방 · 오늘 기록(받은 수·받은 문장) · 그 글의 받은 표시를 **한 트랜잭션에서** (applySpeakStone과 같은 모양)
+ * entry = { date: 그 글이 적힌 날, id } — 아빠 교정은 쓴 날이 오늘과 다를 수 있다 · 글을 못 찾으면 오늘 목록만으로 (받을 몫을 잃지 않게)
+ */
+export async function applyEssaySayStone(date, key, max, entry = null) {
+  const db = await openDb();
+  const tx = db.transaction(['profile', 'daily'], 'readwrite');
+  const ps = tx.objectStore('profile');
+  const ds = tx.objectStore('daily');
+  const curP = (await promisify(ps.get('me'))) || emptyProfile();
+  const curD = await promisify(ds.get(date));
+  const sameDay = !entry || !entry.date || entry.date === date;
+  const curE = sameDay ? null : await promisify(ds.get(entry.date));
+  const find = (d) => (entry && d && Array.isArray(d.essays) ? d.essays.find((x) => x && x.id === entry.id) || null : null);
+  const next = cloneProfile(curP);
+  const r = essaySayStoneRule(next, curD, date, key, max, find(sameDay ? curD : curE));
+  if (!r.ok) { await txDone(tx); return { ...r, profile: curP }; }
+  const mark = find(sameDay ? r.daily : curE);
+  if (mark) mark.sayPaid = true;
+  next.updatedAt = nextStamp(curP);
+  ps.put(next);
+  ds.put(r.daily);
+  if (mark && !sameDay) ds.put(curE);
+  await txDone(tx);
+  return { ...r, profile: next };
+}
+
+/**
  * "이 열쇠는 오늘 한 번, 열쇠 종류는 하루 max개" — 트랜잭션 선점 (🔶 영어스톤: 같은 복습 회차를 두 창이 끝내도 한쪽만, 하루 2회차까지).
  * @returns {Promise<{won:boolean, daily:object}>}
  */
@@ -720,6 +779,23 @@ export async function markEssayRead(id, date, how) {
     if (await markReadIn(day.date, id, how)) return true;
   }
   return false;
+}
+
+/**
+ * ✍️ 내 에세이를 쓰고 나서 고친 문장을 🎤로 따라 읽었나 (v318, 📤 usage/feedback.md) — how는 READ_HOW(pass·try·skip) · 더 해 본 쪽
+ * 오늘 쓴 글이라 날짜를 넘긴다 · 글을 다시 쓰면(mergeEssayEntry) 지워진다 · 못 찾으면 false
+ */
+export async function markEssaySaid(id, date, how) {
+  if (!date || howRank(how) < 0) return false;
+  let ok = false;
+  await editDaily(date, (d) => {
+    const e = (d.essays || []).find((x) => x && x.id === id);
+    if (!e) return null;
+    if (howRank(how) > howRank(e.sayHow)) e.sayHow = how;
+    ok = true;
+    return d;
+  });
+  return ok;
 }
 
 /** 단어 조회 기록 누적 (views: 패널이 열린 채 보임, taps: 직접 눌러서 펼침) */

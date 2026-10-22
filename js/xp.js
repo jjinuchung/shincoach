@@ -13,6 +13,7 @@ import {
   applyParcel, // 📦 아빠의 구호품 (2026-10-05)
   applyVideoStones, // 🏁 영상 끝까지 → 🔶 (2026-10-06)
   applySpeakStone, // 🎤 따라 말하기 → 🔶 (2026-10-15 v263)
+  applyEssaySayStone, // ✍️ 에세이 고친 문장 🎤 통과 → 🔶 (2026-10-22 v318)
   applySell, // 💰 5일장 팔기 (2026-10-05)
   applyCandyLevelUp, // 🍬 사탕으로 레벨업 (2026-10-17)
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
@@ -1101,6 +1102,15 @@ export async function receiveVideoStones(list) {
  */
 export async function receiveSpeakStone(date, every, max) {
   const r = await runProfileOp(() => applySpeakStone(date, every, max), () => ({ ok: false, why: 'save' }));
+  return r || { ok: false, why: 'save' };
+}
+
+/**
+ * ✍️ 에세이 고친 문장을 🎤로 따라 읽어 통과 → 🔶 받기 (v318) — 문장(key)마다 한 번 · 하루 max개 · 가방과 오늘 기록과 그 글(entry {date, id})의 받은 표시를 한 트랜잭션에서 (db.applyEssaySayStone)
+ * @returns {Promise<{ok:boolean, why?:string, daily?:object}>} why: 'none'(이미 받은 문장·하루 상한) | 'save'
+ */
+export async function receiveEssaySayStone(date, key, max, entry = null) {
+  const r = await runProfileOp(() => applyEssaySayStone(date, key, max, entry), () => ({ ok: false, why: 'save' }));
   return r || { ok: false, why: 'save' };
 }
 

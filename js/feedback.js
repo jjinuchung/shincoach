@@ -65,6 +65,25 @@ export function essayItems(days, now) {
   return keep(out);
 }
 
+/**
+ * ✍️ 내 에세이 — 쓰고 나서 고친 문장을 🎤로 읽었나 (순수, v318) — 최근 FEEDBACK_DAYS일 날마다 한 줄 (글이 있는 날만)
+ * sayHow 없음 = v318 전에 쓴 글이거나 넘어가지 않고 닫은 글
+ */
+export function selfItems(days, now) {
+  const from = now - FEEDBACK_DAYS * DAY_MS;
+  const out = [];
+  for (const d of Array.isArray(days) ? days : []) {
+    if (!d || typeof d.date !== 'string') continue;
+    const t = new Date(`${d.date}T12:00:00`).getTime();
+    if (!(t >= from)) continue;
+    const list = (Array.isArray(d.essays) ? d.essays : []).filter((e) => e && e.written);
+    if (!list.length) continue;
+    const n = (h) => list.filter((e) => (h ? e.sayHow === h : !HOW_KO[e.sayHow])).length;
+    out.push({ date: d.date, text: `- ${d.date.slice(5)}: 글 ${list.length} · 🎤 통과 ${n('pass')} · 해 봄 ${n('try')} · 🎤 없이 넘김 ${n('skip')} · 기록 없음 ${n('')}` });
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
 /** 📚 국어 답장 줄들 (순수) — writes는 저장 꼴 { 카드: { list:[{ at, grade, rAt, read, rdAt? }] } } · 그 뒤 같은 카드에 다시 쓴 글이 있으면 그 등급까지 */
 export function korItems(writes, now) {
   const out = [];
@@ -137,6 +156,7 @@ function tally(items) {
 export function feedbackMd({ days, writes, asks, today, now, conceptName } = {}) {
   const t = num(now) || Date.now();
   const en = essayItems(days, t);
+  const self = selfItems(days, t);
   const ko = korItems(writes, t);
   const ma = askItems(asks, t, conceptName);
   const lines = [
@@ -145,8 +165,11 @@ export function feedbackMd({ days, writes, asks, today, now, conceptName } = {})
     `요약: ✍️ 영어 교정 ${tally(en)} · 📚 국어 답장 ${tally(ko)} · 🔢 수학 답장 ${tally(ma)}`,
     '읽는 법: 붙은 때 = 태블릿이 비공개 저장소에서 받아 붙인 때 · 본 때 = 진우 화면에 떠서 읽고 넘어간 때 · 그 뒤 = 진우가 해 본 것 · 💌 한 줄 메시지는 family/read.md',
     '',
-    '## ✍️ 영어 교정 — 영어 영상을 열 때 떠요(내 글 · 아빠 글 → 🔊 → 🎤 읽어보기)',
+    '## ✍️ 영어 교정 — 영어 영상을 열 때 떠요(내 글 · 아빠 글(바뀐 곳 색) → 🔊 끝까지 들은 뒤 넘어감 → 🎤 읽어보기 · v318부터 ⚡💰는 🎤를 해 봤을 때만)',
     ...(en.length ? en.map((x) => x.text) : ['(없음)']),
+    '',
+    '## ✍️ 내 에세이 — 쓰고 나서 고친 문장을 🎤로 읽었나 (v318부터 · 기록 없음 = 그 전 글이거나 넘어가지 않고 닫음 · 🎤로 통과하면 🔶 하루 2개까지)',
+    ...(self.length ? self.map((x) => x.text) : ['(없음)']),
     '',
     '## 📚 국어 답장 — 국어를 열면 📬로 떠요 (그 뒤 = 같은 카드에 다시 쓴 글)',
     ...(ko.length ? ko.map((x) => x.text) : ['(없음)']),

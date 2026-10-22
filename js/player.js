@@ -1,5 +1,5 @@
 // 플레이어 화면: 문장 단위 이동 / 반복 / 속도 / 이중 자막 / 섀도잉 / 단어 하이라이트 / 이어보기
-import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, markVocabMatched, listEssays, markEssayRead, syncCoachFixes, getMath } from './db.js';
+import { getItem, getVideoBlob, updateItem, listDaily, listVocabViews, updateVocabReview, markVocabMatched, listEssays, markEssayRead, markEssaySaid, syncCoachFixes, getMath } from './db.js';
 import {
   parseSubtitle, mergeSubtitles, mergeIntoSentences,
   wordTimings, findCueIndex,
@@ -12,7 +12,7 @@ import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZ
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle, forHole, isUltraBeast, favoriteFor } from './pokemon.js';
 // 🕳 울트라홀은 하나다 — 💎 스페셜 배지 8개(수학)로 열리고, 그 뒤에 영어 쪽 울트라비스트도 나온다 (아버님 결정 2026-09-28)
 import { gymClaimed } from './mathprog.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone, receiveEssaySayStone } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { STONE_ENGLISH, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoTier, SPEAK_COMBO, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
@@ -22,7 +22,7 @@ import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWor
 import {
   initEssay, openEssay, abortEssay, pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds,
   DEFAULT_MINUTES as ESSAY_MINUTES, DEFAULT_COUNT as ESSAY_COUNT,
-  REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH,
+  REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH, SAY_STONE as ESSAY_SAY_STONE,
 } from './essay.js';
 
 /** 👨‍👩‍👦 한 번에 보여줄 아빠 교정문 수 (많이 쌓여도 아이가 지치지 않게) */
@@ -97,6 +97,7 @@ const state = {
   essaySuggested: false, // 이번에 콘텐츠를 연 뒤로 한 번 제안했는지 (계속 묻지 않기)
   essayUsed: new Set(), // ✍️ 이 영상에서 이미 에세이로 쓴·나온 문장 id (한 번 나온 문장은 다시 안 낸다)
   coachFixDone: false, // 👨‍👩‍👦 아빠 교정문을 이번 콘텐츠에서 이미 보여줬는지
+  essaySayRetry: [],   // ✍️ 🎤 통과했는데 저장이 안 돼 못 받은 🔶 [{key, entry}] — 에세이 창을 닫을 때 다시 (v318 · 🔍 Codex 124차 #2)
   battleOpen: false,   // ⚔️ 배틀 화면이 열려 있음 (키보드 무시)
   battleLastCue: null, // 배틀에서 방금 따라 말한 문장 (연달아 같은 문장 안 나오게)
   sentenceSpeakStop: null, // ⚔️ 배틀·🔁 복습에서 진행 중인 듣기·말하기를 밖에서 중단하는 함수 (화면 꺼짐 → 그 턴 무효)
@@ -925,6 +926,7 @@ function startEssay(practice, cont) {
     onShown: (it) => { if (it.cue) track.essayShown(it.cue); state.essayUsed.add(essayIdOf(it.rec)); },
     onWritten: (it) => {
       const id = essayIdOf(it.rec);
+      it.essayDay = track.dailyDate(); // 🎤 기록·🔶 표시는 글이 적힌 날로 (자정을 넘겨 넘어가도 — 🔍 Codex 124차)
       const first = track.markEssayWritten({
         id,
         origin: it.frame.full, keep: it.frame.keep,
@@ -935,6 +937,12 @@ function startEssay(practice, cont) {
       if (!first) return;
       awardXp(ESSAY_REWARD.xp);
       awardCoins(ESSAY_REWARD.coin);
+    },
+    // ✍️ 고친 문장을 🎤로 읽었나 (v318 · 📤 usage/feedback.md) · 통과하면 🔶
+    onSaid: (it) => { markEssaySaid(essayIdOf(it.rec), it.essayDay || track.dailyDate(), it.said || 'skip').catch(() => {}); },
+    onPass: (it) => {
+      const day = it.essayDay || track.dailyDate();
+      return essaySayStone(`self|${day}|${essayIdOf(it.rec)}`, { date: day, id: essayIdOf(it.rec) });
     },
     onFinished: async () => {
       // 다른 창이 이미 오늘 몫을 끝냈으면 완주 보상은 없다 (글은 이미 문장마다 저장됨)
@@ -948,6 +956,7 @@ function startEssay(practice, cont) {
     onDone: () => {
       setEssayOpen(false);
       state.practiceOpen = false;
+      retryEssaySay();
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
       restoreSpot(spot);
       if (!practice) track.flush();
@@ -975,6 +984,36 @@ async function maybeCoachFix() {
   return true;
 }
 
+/**
+ * 🔶 에세이 고친 문장을 🎤로 따라 읽어 통과 (v318) — 문장(key)마다 한 번 · 하루 ESSAY_SAY_STONE.maxPerDay개 ·
+ * 가방 · 오늘 기록 · 그 글(entry {date, id})의 받은 표시를 한 트랜잭션에서 (날을 넘어도 같은 글은 한 번 — 🔍 Codex 124차 #1)
+ * @returns {Promise<string|null>} 받았으면 보여 줄 이름 ("🔶 영어스톤 +1") · 받을 몫이 없으면 '' · 저장 실패면 null(다시 해 볼 목록에 — Codex 124차 #2)
+ */
+function essaySayStone(key, entry) {
+  if (state.parentMode) return Promise.resolve('');
+  const failed = () => {
+    const list = (state.essaySayRetry ||= []);
+    if (!list.some((x) => x.key === key) && list.length < 6) list.push({ key, entry });
+    return null;
+  };
+  return receiveEssaySayStone(track.dailyDate(), key, ESSAY_SAY_STONE.maxPerDay, entry).then((r) => {
+    if (r && r.daily) track.adoptDaily(r.daily);
+    if (r && r.ok) return `${STONE_ENGLISH.emoji} ${STONE_ENGLISH.ko} +1`;
+    return r && r.why === 'save' ? failed() : '';
+  }).catch(failed);
+}
+
+/** 🔶 저장이 안 돼 못 받은 몫을 에세이 창을 닫을 때 한 번 더 (받으면 말 칸에) — 또 실패하면 목록에 남는다 */
+function retryEssaySay() {
+  const list = state.essaySayRetry || [];
+  state.essaySayRetry = [];
+  for (const { key, entry } of list) {
+    essaySayStone(key, entry).then((got) => {
+      if (got) sayWhenFree(`✍️ 🎤 잘 읽었어요! ${got}`, 3500, () => sfx.success());
+    });
+  }
+}
+
 /** 아빠 교정문 회차: 쓰기 없이 "내 글 / 아빠 글"을 보고 소리 내어 읽는다 */
 function startCoachFix(entries) {
   cancelShadowWait();
@@ -995,11 +1034,15 @@ function startCoachFix(entries) {
     speak: speakText,
     onRead: (it) => {
       markEssayRead(it.id, it.date, it.said || 'skip').catch(() => {}); // 한 번 읽으면 다시 안 뜬다 (날짜를 주면 그 날만 연다) · 📬 🎤로 읽었나(v314)
+      // ⚡💰는 🎤로 읽어 봤을 때만 (v318 아버님 "이대로 진행" — 그냥 넘기면 보상 없이 넘어간다 · 넘기는 것 자체는 막지 않는다)
+      if (!it.said) return;
       awardXp(ESSAY_REWARD.xp);
       awardCoins(ESSAY_REWARD.coin);
     },
+    onPass: (it) => essaySayStone(`coach|${it.date || ''}|${it.id}`, { date: it.date, id: it.id }),
     onDone: () => {
       setEssayOpen(false);
+      retryEssaySay();
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
       restoreSpot(spot);
       track.flush();

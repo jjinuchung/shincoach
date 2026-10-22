@@ -193,10 +193,10 @@ test('📬 영어 교정 — 진짜 길: markEssayRead가 시각과 읽은 꼴�
   assert.ok(await markEssayRead('v|1', date, 'pass'));
   assert.equal((await getDaily(date)).essays[0].readHow, 'pass', '더 해 본 쪽은 올라간다');
   const es = read('js/essay.js');
-  assert.ok(es.includes("if (ui.o.mode === 'coach') it.said = ok || it.said === 'pass' ? 'pass' : 'try';"), '🎤 결과 — 한 번이라도 통과면 통과');
+  assert.ok(es.includes("it.said = ok || it.said === 'pass' ? 'pass' : 'try';"), '🎤 결과 — 한 번이라도 통과면 통과 (v318부터 내 에세이도)');
   // 🎤를 누른 순간 try — 듣는 중에 "다음 문장"을 눌러도 skip이 아니다 (🔍 Codex 120차 #5)
   const sp = es.slice(es.indexOf('function startSpeaking()'), es.indexOf('ui.o.speak(it.result.fixed'));
-  assert.ok(sp.includes("if (ui.o.mode === 'coach' && !it.said) it.said = 'try';"), '🎤를 부르기 전에 try');
+  assert.ok(sp.includes("if (!it.said) it.said = 'try';"), '🎤를 부르기 전에 try (v318부터 내 에세이도)');
   assert.ok(read('js/player.js').includes("markEssayRead(it.id, it.date, it.said || 'skip')"), '🎤를 안 누르고 넘기면 skip');
 });
 
@@ -283,7 +283,7 @@ test('📬 feedback.md 전체 — 요약 줄 · 세 갈래 · 빈 갈래는 (없
   const md = feedbackMd({ days: [], writes: {}, asks: [], today: '2026-10-22', now: NOW });
   assert.ok(md.startsWith('# 📬 피드백이 닿았나 (2026-10-22 · 이 기기 기준)'));
   assert.ok(md.includes('요약: ✍️ 영어 교정 0 · 📚 국어 답장 0 · 🔢 수학 답장 0'));
-  assert.equal((md.match(/\(없음\)/g) || []).length, 3);
+  assert.equal((md.match(/\(없음\)/g) || []).length, 4, '세 갈래 + v318 ✍️ 내 에세이');
   const md2 = feedbackMd({ days: [{ date: '2026-10-20', essays: [{ id: 'c', written: 'w', coachFix: 'W.', fixedAt: NOW - DAY }] }], writes: {}, asks: [], today: '2026-10-22', now: NOW });
   assert.ok(md2.includes('✍️ 영어 교정 1 (본 것 0 · 안 본 것 1)'));
   const base = { getMath: async () => ({ asks: [] }), listDaily: async () => [], mathReportText: () => '', asksText: () => '', collectTodo: () => [], today: '2026-10-22' };
