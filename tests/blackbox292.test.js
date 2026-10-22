@@ -168,7 +168,7 @@ test('🛑 📤 잇기 — gatherFiles에 crashLog를 주면 usage/crash-log.md 
   assert.equal(files.find((f) => f.path === 'usage/crash-log.md').text, '🛑 기록\n');
   const up = readFileSync(new URL('../js/upload.js', import.meta.url), 'utf8');
   assert.match(up, /const crashLog = await import\('\.\/blackbox\.js'\)\.then\(\(bb\) => bb\.crashLogNow\(today\)\)\.catch\(\(\) => null\);/, '못 만들어도 나머지는 올린다');
-  assert.ok(up.includes('usagePlaces: usage ? usage.PLACES : undefined, crashLog, getReward: rewardNow,'));
+  assert.ok(up.includes('usagePlaces: usage ? usage.PLACES : undefined, crashLog, verLine, getReward: rewardNow,')); // v314 🏷️ 앱 판 줄이 사이에
   const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   assert.ok(app.includes("import { initBlackbox } from './blackbox.js';"));
   assert.match(app, /\n {2}initBlackbox\(\);/);

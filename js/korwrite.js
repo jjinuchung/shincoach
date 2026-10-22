@@ -138,24 +138,29 @@ export function writeIdOf(at, text) {
   }
   return `w${h1.toString(36).padStart(7, '0')}${h2.toString(36).padStart(7, '0')}`;
 }
-/** 글 하나 고쳐 읽기 — 깨졌으면 null · 답장이 없으면 reply·rAt·read도 없음 · id는 늘 다시 만든다 */
+/** 글 하나 고쳐 읽기 — 깨졌으면 null · 답장이 없으면 reply·rAt·read도 없음 · id는 늘 다시 만든다 ·
+ *  rdAt = 📬 답장을 읽은 시각(v314 — 📤 usage/feedback.md · 읽었을 때만 · 그 전에 읽은 글은 0 = 읽었지만 때를 모름) */
 function entryOf(e) {
   if (!isObj(e) || !cnt(e.at) || typeof e.text !== 'string') return null;
   const grade = own(GRADES, e.grade) ? e.grade : '';
   const text = e.text.slice(0, RAW_TEXT_MAX);
+  const read = !!grade && e.read === true;
   return {
     id: writeIdOf(cnt(e.at), text), at: cnt(e.at), day: cnt(e.day), v: cnt(e.v), text, grade,
     reply: grade && typeof e.reply === 'string' ? e.reply.slice(0, REPLY_MAX) : '',
     rAt: grade ? cnt(e.rAt) : 0,
-    read: !!grade && e.read === true,
+    read,
+    ...(read && cnt(e.rdAt) ? { rdAt: cnt(e.rdAt) } : {}), // 때를 아는 읽음만 칸을 만든다(옛 글의 꼴 그대로)
   };
 }
-/** 같은 id 둘(같은 at·같은 글) — 답장 붙은 쪽 · 둘 다면 먼저 붙은 쪽(rAt 작은 쪽) · 그래도 같으면 등급·답장 글로 (어느 차례로 합쳐도 같게) · 읽음은 OR */
+/** 같은 id 둘(같은 at·같은 글) — 답장 붙은 쪽 · 둘 다면 먼저 붙은 쪽(rAt 작은 쪽) · 그래도 같으면 등급·답장 글로 (어느 차례로 합쳐도 같게) · 읽음은 OR · 읽은 시각은 이른 쪽(v314) */
 function better(a, b) {
   if (!!a.grade !== !!b.grade) return a.grade ? a : b;
   if (!a.grade) return (a.day - b.day || a.v - b.v) <= 0 ? a : b;
   const w = a.rAt !== b.rAt ? (a.rAt < b.rAt ? a : b) : (`${a.grade}\u0000${a.reply}` <= `${b.grade}\u0000${b.reply}` ? a : b);
-  return { ...w, read: a.read || b.read };
+  const { rdAt: _r, ...rest } = w;
+  const rdAt = minPos(a.read ? cnt(a.rdAt) : 0, b.read ? cnt(b.rdAt) : 0);
+  return { ...rest, read: a.read || b.read, ...(rdAt ? { rdAt } : {}) };
 }
 /** 글 목록 정리 — at 차례(같은 at은 id 차례) · 같은 id는 하나로 · 답장 기다리는 글은 모두(전체 상한으로 자르지 않는다) · 답장 받은 글은 최근 KEEP_DONE개 */
 function tidy(list) {
@@ -369,12 +374,13 @@ export function writeReplyRule(profile, replies, now, cards) {
   return { ok: true, applied, coins, stone };
 }
 
-/** 📬 답장을 읽었다 (그 글의 id) — why 'none'(그 글이 없거나 답장이 없음 · 이미 읽음) */
-export function writeReadRule(profile, cardId, id) {
+/** 📬 답장을 읽었다 (그 글의 id) — why 'none'(그 글이 없거나 답장이 없음 · 이미 읽음) · now = 읽은 시각(v314 rdAt — 📤 usage/feedback.md) */
+export function writeReadRule(profile, cardId, id, now = 0) {
   const all = writesOf(profile.korWrites);
   const e = all[cardId] && all[cardId].list.find((x) => x.id === id);
   if (!e || !e.grade || e.read) return { ok: false, why: 'none' };
   e.read = true;
+  if (cnt(now)) e.rdAt = cnt(now);
   profile.korWrites = all;
   return { ok: true };
 }

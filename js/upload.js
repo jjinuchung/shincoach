@@ -16,6 +16,8 @@
 //           reward/YYYY-MM-DD.md (🎮 보상 쪽 — 지금 가진 것 · 최근 7일 날마다 누적의 차이, v278 · rewardlog.js)
 //           usage/upload-log.md (📤 올리기 실패 — 최근 14일, 실패는 이 기기에 적어 두었다가 다음에 올릴 때, v278)
 //           usage/crash-log.md (🛑 앱이 저절로 꺼진 기록 — 최근 14일, 다음에 켤 때 이 기기에 적어 두었다가, v292 · blackbox.js)
+//           usage/feedback.md (📬 교정·답장이 닿았나 — 붙은 때·진우가 본 때·해 본 것, v314 · feedback.js · 날짜 없이 늘 최신)
+//           usage/날짜.md 머리에 🏷️ 앱 판 줄 (v314 · version.js)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
@@ -26,6 +28,9 @@
 //   다른 창(같은 주소)은 Web Locks(withUploadLock) · 국어 목록은 올리는 순간마다 다시 만든다(겹쳐서 다시 올릴 때도 — 옛 목록으로 덮지 않게)
 
 import { VIDEO_STONE } from './items.js'; // 🏁 영상 보상 기준 (🎤 영어 요약, v253) — items.js는 아무것도 import하지 않는다
+// 🏷️ 앱 판(v314) — 앱을 켤 때(app.js가 이 파일을 부를 때) 함께 묶는다. 올릴 때 처음 불러오면, 앱을 연 채 새 서비스워커가 들어온 뒤엔
+//   새 판 파일을 받아 "지금 도는 코드"를 새 판으로 적었다 (🔍 Codex 120차 #6) · version.js도 아무것도 import하지 않는다
+import { APP_VERSION, cachedVersion, versionLine } from './version.js';
 
 export const DATA_REPO = 'jjinuchung/shincoach-data';
 export const PRIVATE_FIXES = 'essay/fixes.json';
@@ -200,15 +205,16 @@ export function fmtMin(sec) {
  * 🕒 앱 사용 기록 (순수, 2026-10-16 v272 — usage.js) — Claude가 날마다 "앱을 켰는지 · 어디에 머물렀는지 · 언제 썼는지"를 본다.
  * 최근 7일 날마다: 앱을 연 수 · 쓴 때(10분 칸을 이어 붙인 덩이) · 화면마다 머문 시간(0인 자리는 뺌) ·
  *   ⏳ 과목 시간(시간 제한에 센 시간 — 🎯 도전 문제·잠긴 뒤는 안 셈) · 부모가 더 준 시간 · ⏳ 연장권
+ * 🏷️ verLine(있으면) = 앱 판 줄(version.versionLine — v314) — 제목 바로 아래 한 줄. 태블릿이 새 판을 받았는지 기록으로 본다
  * @param {Array<object>} days listDaily 결과 · @param {Array<{key:string, field:string, ko:string}>} places usage.PLACES
  */
-export function usageFiles(days, today, places) {
+export function usageFiles(days, today, places, verLine = '') {
   const num = (v) => Math.max(0, Math.floor(Number(v) || 0));
   const byDate = new Map((Array.isArray(days) ? days : []).filter((d) => d && d.date).map((d) => [d.date, d]));
   const list = Array.isArray(places) ? places : [];
   const SUBJ = [['수학', 'mathTime', 'mathBonus', 'mathExt'], ['영어', 'enTime', 'enBonus', 'enExt'], ['국어', 'korTime', 'korBonus', 'korExt']];
   // 읽는 법 — 숫자를 넘겨 읽지 않게 (🔍 Codex 81차 A·E)
-  const lines = [`🕒 앱 사용 기록 (${today}) — 머문 시간·쓴 때·앱을 연 수는 v272부터 셉니다 (그 전 날은 ⏳ 과목 시간만)`, '', '## 읽는 법',
+  const lines = [`🕒 앱 사용 기록 (${today}) — 머문 시간·쓴 때·앱을 연 수는 v272부터 셉니다 (그 전 날은 ⏳ 과목 시간만)`, ...(verLine ? [`🏷️ ${verLine}`] : []), '', '## 읽는 법',
     '- 머문 시간 = 화면이 보이고 2분 안에 손을 댄 동안 — 영상을 보거나 긴 글을 읽으며 2분 넘게 손을 안 대면 그동안은 빠져요',
     '- 쓴 때 = 센 초가 있는 10분 칸을 이은 것 (그 칸 내내 썼다는 뜻은 아니에요)',
     '- 앱을 연 수 = 창을 새로 연 수 (내렸다 다시 올린 것은 안 셈 · 밤을 넘겨 켜 둔 날은 0일 수 있어요)',
@@ -306,9 +312,11 @@ export function unb64(s) {
  * getKorReport(있으면) = 📚 국어 요약 글(today, days) — 프로필을 못 읽으면 실패 · 원고를 못 받거나 꼴이 틀리면 null(이번엔 국어 요약만 안 올림, v254)
  * usagePlaces(있으면) = 🕒 앱 사용 기록의 자리 목록(usage.PLACES) — 하루 기록(days)으로 만든다 (v272)
  * crashLog(있으면) = 🛑 앱이 저절로 꺼진 기록 글(blackbox.crashLogNow) — 못 만들면 null이라 이 파일만 빠진다 (v292)
+ * verLine(있으면) = 🏷️ 앱 판 줄 — 🕒 사용 기록 머리에 (v314)
+ * getFeedback(있으면) = 📬 피드백이 닿았나 글(today, days, math) — 못 만들면 이 파일만 빠진다 (v314)
  * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, uploadLog, crashLog, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, getFeedback, uploadLog, crashLog, verLine, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
@@ -320,6 +328,8 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
   const weekly = getWeekly ? await Promise.resolve().then(() => getWeekly(today, days || [], math)).catch(() => null) : null;
   // 💌 한 줄 메시지를 읽었나(v288)도 못 만들면 빼고 나머지는 그대로
   const family = getFamily ? await Promise.resolve().then(() => getFamily(today)).catch(() => null) : null;
+  // 📬 피드백이 닿았나(v314)도 못 만들면 빼고 나머지는 그대로
+  const feedback = getFeedback ? await Promise.resolve().then(() => getFeedback(today, days || [], math)).catch(() => null) : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
@@ -327,10 +337,11 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(getEnglish ? englishFiles(days, en, today) : []), // 🎤 영어 요약 (v253)
     ...(getEnglish ? libraryFiles(en, today) : []), // 📚 태블릿 영상 전체 목록 (v277)
     ...(typeof korRep === 'string' && korRep ? [{ path: `korean/${today}.md`, text: korRep }] : []), // 📚 국어 요약 (v254)
-    ...(usagePlaces ? usageFiles(days, today, usagePlaces) : []), // 🕒 앱 사용 기록 (v272)
+    ...(usagePlaces ? usageFiles(days, today, usagePlaces, verLine) : []), // 🕒 앱 사용 기록 (v272) · 🏷️ 앱 판 줄 (v314)
     ...(typeof reward === 'string' && reward ? [{ path: `reward/${today}.md`, text: reward }] : []), // 🎮 보상 쪽 기록 (v278)
     ...(typeof weekly === 'string' && weekly ? [{ path: 'usage/weekly.md', text: weekly }] : []), // 📈 주간 흐름 — 📊 카드와 같은 표 (v287)
     ...(typeof family === 'string' && family ? [{ path: 'family/read.md', text: family }] : []), // 💌 한 줄 메시지 — 무엇이 왔고 언제 읽었나 (v288)
+    ...(typeof feedback === 'string' && feedback ? [{ path: 'usage/feedback.md', text: feedback }] : []), // 📬 교정·답장이 닿았나 — 붙은 때·본 때·해 본 것 (v314)
     ...(typeof uploadLog === 'string' && uploadLog ? [{ path: 'usage/upload-log.md', text: uploadLog }] : []), // 📤 올리기 실패 기록 (v278)
     ...(typeof crashLog === 'string' && crashLog ? [{ path: 'usage/crash-log.md', text: crashLog }] : []), // 🛑 앱이 저절로 꺼진 기록 (v292)
   ];
@@ -340,6 +351,13 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
 async function familyNow(today) {
   const fv = await import('./familyview.js');
   return fv.familyReadMd(today);
+}
+
+/** 📬 피드백이 닿았나 (v314) — ✍️ 영어 교정(하루 기록) · 📚 국어 답장(저장된 프로필) · 🔢 수학 답장(수학 기록) */
+async function feedbackNow(today, days, math) {
+  const [{ getProfile }, fb, prog, kw] = await Promise.all([import('./db.js'), import('./feedback.js'), import('./mathprog.js'), import('./korwrite.js')]);
+  const p = await getProfile();
+  return fb.feedbackMd({ days, writes: kw.writesOf(p && p.korWrites), asks: math && math.asks, today, now: Date.now(), conceptName: prog.nameOf });
 }
 
 /** 📈 주간 흐름 글 (v287) — 📊 카드와 같은 표 · 국어 기록은 저장된 프로필에서 · 프로필이 없으면 국어 칸은 — */
@@ -675,6 +693,8 @@ async function sendOnce(force) {
   // 🕒 사용 기록(v272)은 못 불러와도 나머지는 그대로 올린다 — 새 모듈 하나 때문에 📤 전체가 멈추지 않게
   const [{ getMath, listDaily }, prog, ask, { todayKey }, st, usage] = await Promise.all([import('./db.js'), import('./mathprog.js'), import('./mathask.js'), import('./track.js'), import('./stats.js'), import('./usage.js').catch(() => null)]);
   const today = todayKey();
+  // 🏷️ 앱 판 줄(v314) — 지금 도는 코드(켤 때 묶은 판) · 받아 둔 판 (못 알면 줄만 빠진다 — 던지지 않는다)
+  const verLine = await cachedVersion().then((c) => versionLine(APP_VERSION, c)).catch(() => '');
   let files;
   try {
     // 🕒 모아 둔 사용 초를 먼저 적는다 — 앱을 내리는 순간에 올릴 때 마지막 몇 초가 빠지지 않게 (실패해도 그대로 올린다)
@@ -682,7 +702,7 @@ async function sendOnce(force) {
     // 🎮 저장을 기다리는 프로필 증분도 먼저 — 보상 쪽 누적(rewardNow)이 저장된 프로필을 읽는다 (Codex 86차 B · 실패해도 그대로 올린다)
     await import('./xp.js').then((xp) => xp.flushProfile()).catch(() => {});
     const crashLog = await import('./blackbox.js').then((bb) => bb.crashLogNow(today)).catch(() => null); // 🛑 앱이 저절로 꺼진 기록(v292) — 못 만들면 이것만 빠진다
-    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, uploadLog: logTextNow(today), today });
+    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, verLine, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, getFeedback: feedbackNow, uploadLog: logTextNow(today), today });
   } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };

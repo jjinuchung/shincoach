@@ -25,6 +25,15 @@ for (const f of readdirSync('js').filter((f) => f.endsWith('.js'))) {
     console.error(`sw.js APP_SHELL 누락: js/${f} — 오프라인에서 이 기능이 동작하지 않습니다`);
   }
 }
+// 🏷️ 앱 판(js/version.js APP_VERSION)은 sw.js CACHE_VERSION과 같아야 한다 (v314) — 📤 usage/날짜.md에 적는 판이 거짓이 되지 않게
+{
+  const swVer = (/const CACHE_VERSION = '(v\d+)';/.exec(sw) || [])[1];
+  const appVer = (/export const APP_VERSION = '(v\d+)';/.exec(readFileSync('js/version.js', 'utf8')) || [])[1];
+  if (!swVer || swVer !== appVer) {
+    bad++;
+    console.error(`앱 판이 다름: sw.js CACHE_VERSION ${swVer || '(못 찾음)'} · js/version.js APP_VERSION ${appVer || '(못 찾음)'} — 배포할 때 둘을 같이 올리세요`);
+  }
+}
 // ★ 공개 저장소 파일(앱 js·sw.js는 빌드 없이 주석까지 그대로 배포되고, 도구·테스트·검수 페이지도 누구나 본다)에
 //   아이 기록의 점수 꼴 "맞힌 수/푼 수(정답률%)"를 적지 않는다 (Codex 36차 #1) — 기록 수치는 비공개 저장소에만
 //   수치가 없어도 기록을 옮겨 적는 말투(📊 기록 뒤에 "에서"나 쌍점, 첫 진단 뒤에 쌍점)는 그 아이의 성적 묘사다 — 진행 기록(process.md)·README도 본다 (Codex 37차 #1)

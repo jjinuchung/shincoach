@@ -994,7 +994,7 @@ function startCoachFix(entries) {
     unlock,
     speak: speakText,
     onRead: (it) => {
-      markEssayRead(it.id, it.date).catch(() => {}); // 한 번 읽으면 다시 안 뜬다 (날짜를 주면 그 날만 연다)
+      markEssayRead(it.id, it.date, it.said || 'skip').catch(() => {}); // 한 번 읽으면 다시 안 뜬다 (날짜를 주면 그 날만 연다) · 📬 🎤로 읽었나(v314)
       awardXp(ESSAY_REWARD.xp);
       awardCoins(ESSAY_REWARD.coin);
     },

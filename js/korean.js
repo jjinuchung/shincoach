@@ -409,13 +409,16 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
   // 📤 읽은 기록 한 줄 — 별을 받든 안 받든(다시 읽기도 읽기다) · 같은 열쇠는 한 번
   // y = 이번 읽기에서 🧠 아는 것으로 답하기를 고른 수 (📈 주간 흐름 v287 — 0도 적는다: 적기 시작한 뒤의 읽기라는 표시)
   const rd = opts && isObj(opts.read) ? readOf({ ...opts.read, c: cardId, d: dayNum(now), g: next.star || 0, y: add.know || 0 }) : null;
+  // 📈 이번에 새로 적은 줄 — 부르는 쪽이 그날 하루 기록에도 더한다(korDayDelta, v314) · 같은 열쇠가 이미 있으면 없음([다시 저장하기]가 두 번 세지 않게)
+  let newRead = null;
   if (rd) {
     const cur = readsOf(profile.korReads);
-    profile.korReads = cur.some((x) => readKey(x) === readKey(rd)) ? cur : readsOf([...cur, rd]);
+    if (!cur.some((x) => readKey(x) === readKey(rd))) { profile.korReads = readsOf([...cur, rd]); newRead = rd; } else profile.korReads = cur;
   }
+  const fresh = newRead ? { newRead } : {};
   if (!next.star) {
     profile.korDone = done;
-    return { ok: true, star: 0, coins: 0, stars: starsOf(done, cardId), wait: next.why, ...(next.days ? { next: next.next, days: next.days } : {}) };
+    return { ok: true, star: 0, coins: 0, stars: starsOf(done, cardId), wait: next.why, ...fresh, ...(next.days ? { next: next.next, days: next.days } : {}) };
   }
   done[starKey(cardId, next.star)] = dayNum(now) || 1;
   // 🎯 별을 새로 받을 때마다 국어 포켓몬 잡기 한 번 (아버님 2026-10-11 — 다음 날 다시 읽어 ★★를 받아도 잡을 수 있게)
@@ -433,7 +436,37 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
   profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   // 다음 별까지 남은 날 — ★★ 뒤 "처음 읽은 날부터 일주일"은 ★★를 늦게 받으면 틀렸다(10/1 ★ · 10/11 ★★ → ★★★는 10/12, Codex 49차)
   const after = nextStar(done, cardId, now);
-  return { ok: true, star: next.star, coins, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId), ...(caught ? {} : { noCatch: 'first' }), ...(after.why === 'wait' ? { next: after.next, days: after.days } : {}) };
+  return { ok: true, star: next.star, coins, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId), ...fresh, ...(caught ? {} : { noCatch: 'first' }), ...(after.why === 'wait' ? { next: after.next, days: after.days } : {}) };
+}
+
+// ── 📈 국어 읽기 날마다 합계 (v314, 2026-10-22 아버님 "2와 3번 진행하자") ──
+// 읽은 기록(korReads)은 최근 READS_MAX줄뿐이라, 하루 30편 넘게 읽으면 나흘이면 차서 📈 주간 흐름 국어 줄이 이번 주까지 모두 —였다 →
+// 읽은 기록 줄이 새로 생길 때마다 그날 하루 기록(daily)에도 더한다(db.DAILY_SUMS·DAILY_LISTS — 병합 규칙도 거기 것 그대로). 주간 흐름은 이 합계로 4주를 본다.
+// 처음 읽기 = 이번에 ★를 받은 판(g 1 — 그 글을 처음 끝까지 읽은 판) · 다시 읽기 = ★★·★★★를 받은 판(g 2~3, v300 🎯 규칙이 걸리는 판) ·
+// 별 없이 다시 읽은 판(g 0)은 읽은 글 수와 근거·🧠에만
+/** 하루 기록에 더하는 국어 칸 — 수 · 목록(📍 근거 찾기 초 "카드@연 시각:초" — 가운데값을 내려고 하나씩, 같은 읽기는 한 번) */
+export const KOR_DAY_SUMS = ['korReads', 'korNewF', 'korNewN', 'korReF', 'korReN', 'korEvN', 'korEvK', 'korKnow'];
+export const KOR_DAY_LISTS = ['korEvSecs'];
+/** 날 번호 → 'YYYY-MM-DD' (dayNum의 거꾸로 — 하루 기록의 열쇠) */
+export function dayKeyOf(n) {
+  const d = new Date(Number(n) * 86400000);
+  if (!(Number(n) > 0) || Number.isNaN(d.getTime())) return '';
+  const p = (v) => String(v).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+}
+/** 📈 읽은 기록 한 줄 → 그날 하루 기록에 더할 것 (순수) — { date, delta } · 줄이 깨졌으면 null */
+export function korDayDelta(rd) {
+  const x = readOf(rd);
+  if (!x) return null;
+  const delta = { korReads: 1, korKnow: x.y || 0 };
+  if (x.g === 1) { delta.korNewF = x.f; delta.korNewN = x.n; } else if (x.g >= 2) { delta.korReF = x.f; delta.korReN = x.n; }
+  if (x.v !== undefined) { delta.korEvN = 1; delta.korEvK = x.k; delta.korEvSecs = [`${readKey(x)}:${x.v}`]; }
+  return { date: dayKeyOf(x.d), delta };
+}
+/** 📍 근거 찾기 초 목록 칸 하나 → 초 (꼴이 틀리면 NaN) */
+export function evSecOf(s) {
+  const m = /^K\d{1,3}@\d+:(\d+)$/.exec(String(s || ''));
+  return m ? Number(m[1]) : NaN;
 }
 
 // ── 🎯 국어 잡기 기회 (2026-10-11, 아버님 "국어에서만 나오는 포켓몬 150") ──

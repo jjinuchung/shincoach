@@ -684,6 +684,8 @@ function startSpeaking() {
   if (!it || !it.result || !ui.o.speak) return;
   stopReading(); // 말하기와 읽어주기가 겹치면 인식이 제 소리를 듣는다
   ui.busy = true;
+  // 📬 🎤를 누른 순간 "해 봄" — 듣는 중에 "다음 문장"을 눌러도 "🎤 없이 넘김"으로 적히지 않게 (v314 · 🔍 Codex 120차 #5)
+  if (ui.o.mode === 'coach' && !it.said) it.said = 'try';
   const run = ui.run;
   $('essay-result').hidden = true;
   $('essay-speak').hidden = false;
@@ -707,6 +709,8 @@ function startSpeaking() {
       return;
     }
     const ok = !!(res && res.passed); // runSpeakCheck는 passed/score를 준다 (ratio라는 필드는 없다 — Codex #10)
+    // 📬 아빠 교정문을 🎤로 읽어 봤다 (v314 — 넘어갈 때 onRead가 함께 적는다 · 한 번이라도 통과했으면 통과)
+    if (ui.o.mode === 'coach') it.said = ok || it.said === 'pass' ? 'pass' : 'try';
     $('essay-speak-msg').textContent = ok ? '좋아요! 잘 읽었어요 👏' : '읽어 봤어요! 👍';
     playSfx(ok ? 'success' : 'ding');
     const at = ui.i;

@@ -18,13 +18,14 @@ import {
   applyUnmega, unmegaRule, applyDyeTx, dyeRule, // 💠 메가스톤 빼기 · 🎨 염색 — 저장된 기록으로 (Codex 32차 #1·#2)
   applyRocketSteal, applyRocketWin, applyRocketAdmit, applyRocketStep, // 🚀 로켓단 습격 (2026-10-09) — 저장이 안 되면 메모리로 잇지 않는다 (Codex 43차 #2)
   applyHouseRule, copyHouse, // 🏠 진우네 집 (2026-10-10)
+  applyDailyDelta, // 📈 국어 읽기 날마다 합계 (2026-10-22 v314)
   evolveRule, copyRestsDone, // 💊 회복 캡슐 — 깜짝 진화 · 받은 휴식 (2026-10-10)
 } from './db.js';
 import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진우네 집 규칙 (순수)
 import { copyAvatar } from './avatar.js'; // 🧑 진우 캐릭터 (순수)
 import { copyPlay, playRule, gameEndRule, bestOf } from './homeplay.js'; // 🎮 일상 행동 · 미니 게임 끝(v307) (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
-import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule } from './korean.js'; // 📚 국어 별·💰 규칙 (순수)
+import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
 import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·보상 (순수 — 낱말 칸과 같은 꼴)
 import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule } from './nonsul.js'; // 🖊️ 논술 칸·보상·잡기 기회 (v303 — 퍼즐과 같은 꼴, 잡기 기회는 따로)
@@ -906,8 +907,12 @@ export function gameBest(gameId) {
 }
 /** 📚 국어 글 한 편을 다 읽었다 — 잘못 읽기 횟수 + 받을 별이 있으면 별·💰를 저장된 프로필로 한 트랜잭션에서(houseDo = applyHouseRule = mutateProfile)
  *  ids = 지금 있는 카드 id · 날은 트랜잭션 안의 시각으로 센다(창을 연 날이 아니라) */
-export function korFinish(cardId, misses, ids, evMiss = 0, opts = {}) {
-  return houseDo((p) => korFinishRule(p, cardId, Date.now(), misses, ids, evMiss, opts)); // evMiss — 🟩 "한 번에 다 맞힘" 판정 · opts.noStone 🎧 글로 읽고 풀었다
+export async function korFinish(cardId, misses, ids, evMiss = 0, opts = {}) {
+  const r = await houseDo((p) => korFinishRule(p, cardId, Date.now(), misses, ids, evMiss, opts)); // evMiss — 🟩 "한 번에 다 맞힘" 판정 · opts.noStone 🎧 글로 읽고 풀었다
+  // 📈 읽은 기록 줄이 새로 생겼으면 그날 하루 기록에도 (v314 — 📈 주간 흐름 국어 줄) · 프로필 저장 뒤 따로라 드물게 못 적으면 그 한 편만 빠진다(별·💰와는 상관없다 — 수학 푼 문제 수와 같은 꼴)
+  const dd = r && r.ok && r.newRead ? korDayDelta(r.newRead) : null;
+  if (dd && dd.date) await applyDailyDelta(dd.date, dd.delta).catch(() => {});
+  return r;
 }
 /** 🎯 국어 잡기 기회 하나 빼기 — 잡기 화면을 띄우기 전에(두 창이 같은 기회를 두 번 던지지 못하게) */
 export function korTakeThrow() {
@@ -963,7 +968,7 @@ export function korWriteApply(replies, cards) {
 }
 /** 📬 답장을 읽었다 (그 글의 id — 화면에 실제로 보였을 때만, korwriteview.watchRead) */
 export function korWriteRead(cardId, id) {
-  return houseDo((p) => writeReadRule(p, cardId, id));
+  return houseDo((p) => writeReadRule(p, cardId, id, Date.now())); // 📬 읽은 시각(v314) — 트랜잭션 안의 규칙이 적는다
 }
 /** ✍️ 서술형 기록 (그리기용 복사본) */
 export function korWritesMap() {

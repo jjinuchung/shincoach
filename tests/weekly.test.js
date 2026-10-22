@@ -91,18 +91,20 @@ test('🔢 수학 — 푼 문제·정답률은 daily · 개념 편은 시작한 
   assert.deepEqual(trendOf(rowOf(m, 'math', '그만두기')), { mark: '↑', tone: 'bad' }, '그만두기가 늘면 덜함');
 });
 
-test('📚 국어 — 읽은 글 · 처음 읽을 때(일지에서 그 카드의 첫 줄) 첫 번에 맞힘 · 📍 근거(v·k) · 🧠 적기 전 주는 — · 별·낱말·퍼즐 한 날 · 잘린 일지는 —', () => {
+test('📚 국어 — 읽은 글 · 처음 읽을 때(★를 받은 판, v314) · 다시 읽을 때(★★·★★★) 첫 번에 맞힘 · 📍 근거(v·k) · 🧠 적기 전 주는 — · 별·낱말·퍼즐 한 날 · 잘린 일지는 —', () => {
   const N = (k) => T - k;
   const reads = [
-    { c: 'K1', t: 1000, d: N(9), n: 4, f: 2, s: 100 }, // 지난주 첫 읽기
-    { c: 'K1', t: 2000, d: N(2), n: 4, f: 4, s: 100 }, // 다시 읽기 — 처음 읽기 셈에서 빠짐
-    { c: 'K2', t: 3000, d: N(1), n: 4, f: 3, s: 100, v: 10, w: 1, k: 1, y: 0 },
-    { c: 'K3', t: 4000, d: N(0), n: 2, f: 1, s: 100, v: 30, w: 0, k: 0, y: 2 },
+    { c: 'K1', t: 1000, d: N(9), n: 4, f: 2, s: 100, g: 1 }, // 지난주 첫 읽기(★)
+    { c: 'K1', t: 2000, d: N(2), n: 4, f: 4, s: 100, g: 2 }, // 다시 읽기(★★) — 처음 읽기 셈에서 빠짐
+    { c: 'K2', t: 3000, d: N(1), n: 4, f: 3, s: 100, g: 1, v: 10, w: 1, k: 1, y: 0 },
+    { c: 'K3', t: 4000, d: N(0), n: 2, f: 1, s: 100, g: 1, v: 30, w: 0, k: 0, y: 2 },
+    { c: 'K4', t: 5000, d: N(0), n: 4, f: 0, s: 100, g: 0 }, // 별 없이 다시 읽음 — 읽은 글에만
   ];
   const profile = { korReads: reads, korDone: { 'K1:1': N(9), 'K2:1': N(1), 'K3:1': N(0) }, korWordDay: { [N(0)]: 1, [N(10)]: 2 }, korPuzzleDay: { [N(1)]: 1 } };
   const m = weeklyModel({ profile }, TODAY);
-  assert.deepEqual(vals(m, 'kor', '읽은 글'), [0, 0, 1, 3]);
+  assert.deepEqual(vals(m, 'kor', '읽은 글'), [0, 0, 1, 4]);
   assert.deepEqual(vals(m, 'kor', '처음 읽을 때 첫 번에 맞힘'), [null, null, 0.5, 4 / 6]);
+  assert.deepEqual(vals(m, 'kor', '다시 읽을 때 첫 번에 맞힘(★★·★★★)'), [null, null, null, 1], '★★·★★★를 받은 판만 (별 없이 다시 읽은 K4는 빠짐)');
   assert.deepEqual(vals(m, 'kor', '📍 근거 찾는 데 걸린 시간(가운데값)'), [null, null, null, 20]);
   assert.deepEqual(vals(m, 'kor', '📍 근거 찾은 뒤 첫 번에 맞힘'), [null, null, null, 0.5]);
   assert.deepEqual(vals(m, 'kor', '🧠 아는 것으로 답하기'), [null, null, null, null], '적기 전 읽기(K1 다시 읽기)가 섞인 주는 —');
@@ -121,7 +123,7 @@ test('📚 국어 — 읽은 글 · 처음 읽을 때(일지에서 그 카드의
   // 🧠 적기 전 읽기가 한 편이라도 섞인 주는 — (일부만 더한 0을 그 주 전체처럼 보이지 않게, Codex 94차 #2)
   const mixed = weeklyModel({ profile: { korReads: [{ c: 'K5', t: 1, d: N(2), n: 4, f: 4, s: 10 }, { c: 'K6', t: 2, d: N(1), n: 4, f: 4, s: 10, y: 0 }] } }, TODAY);
   assert.deepEqual(vals(mixed, 'kor', '🧠 아는 것으로 답하기'), [null, null, null, null]);
-  assert.match(m.groups.find((g) => g.key === 'kor').note, /남아 있는 읽기 일지/, '"처음 읽을 때"의 기준을 밝힌다 (Codex 94차 #3)');
+  assert.match(m.groups.find((g) => g.key === 'kor').note, /처음 읽을 때 = 그 글로 ★를 받은 판 · 다시 읽을 때 = ★★·★★★를 받은 판 · 읽기 일지/, '"처음 읽을 때"의 기준과 어디로 셌는지를 밝힌다 (Codex 94차 #3 · v314)');
   assert.deepEqual(vals(cut, 'kor', '새로 받은 별'), [0, 0, 0, 0], '별 받은 날은 일지와 따로');
 });
 

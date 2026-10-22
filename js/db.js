@@ -13,7 +13,7 @@ import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; //
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
 import { ROCKET, rocketGapOk, stealables, hideout, rocketStep, copyRocketCur, mergeRocketDone } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수 — evolve만 import)
 import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 — house·evolve만 import)
-import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows, qMissOf, mergeQMiss, readsOf, mergeReads } from './korean.js'; // 📚 국어 잘못 읽기 횟수 (순수, import 없음)
+import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows, qMissOf, mergeQMiss, readsOf, mergeReads, KOR_DAY_SUMS, KOR_DAY_LISTS } from './korean.js'; // 📚 국어 잘못 읽기 횟수 · 📈 읽기 날마다 합계 칸(v314) (순수, import 없음)
 import { wordsOf, mergeWords, wordDaysOf, mergeWordDays } from './korwords.js'; // 🔤 국어 낱말 칸·보상 받은 날 (순수, korean.js만 import)
 import { writesOf, mergeWrites } from './korwrite.js'; // ✍️ 국어 서술형 글·답장·보상 한도 (순수, korean.js만 import)
 import { mergePuzzles } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 (순수 — korean·korwords만 import)
@@ -361,13 +361,16 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'appOpens', 'uMath', 'uKor', 'uEn', 'uHome', 'uDex', 'uHouse', 'uShop', 'uCatch', 'uBattle', 'uStats', 'uLock',
   // 🎮 게임기 미니 게임 (2026-10-21 v307, minigame.js) — 오늘 쓴 판(시작할 때 claimDailyCount로 선점 · 끝은 그날 공부 시간에서 셈) ·
   //   🔒 부모가 더 준 판 · 게임 화면에 머문 초(🕒 사용 기록). 병합 maxOf라 옛 백업으로 쓴 판을 되살리지 못한다
-  'gamePlays', 'gameBonus', 'uGame'];
+  'gamePlays', 'gameBonus', 'uGame',
+  // 📈 국어 읽기 날마다 합계 (2026-10-22 v314, korean.korDayDelta) — 읽은 글 · 처음/다시 읽기 첫 번 맞힘 · 📍 근거 · 🧠 (읽은 기록 줄이 새로 생길 때만 더함)
+  ...KOR_DAY_SUMS];
 const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🔶 영어스톤을 받은 복습 회차(문장 묶음) — 같은 회차를 두 창이 끝내도 한 번 (합집합)
 // 💖 덤으로 풀어 ⚡💰를 받은 문장 — 두 창이 같은 덤을 내도 한 번 (Codex 20차 #4)
 // 🎤 오늘 처음 통과한 문장(따라 말하기 🔶의 셈, v263) — 두 창이 같은 문장을 통과해도·다른 기기 기록과 합쳐도 한 번 (Codex 74차 #3)
 // 🕒 앱을 쓴 10분 칸 "HH:M" (v272, usage.js) — 두 창이 같은 때를 세어도 한 번
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots'];
+// 📍 국어 근거 찾기 초 "카드@연 시각:초" (v314, korean.korDayDelta) — 주간 가운데값을 내려고 하나씩 · 같은 읽기는 한 번
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', ...KOR_DAY_LISTS];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {
@@ -387,13 +390,30 @@ const sameText = (a, b) => String(a || '').trim() === String(b || '').trim();
 export function mergeEssayEntry(old, e) {
   const out = { ...(old || {}), ...(e || {}) };
   if (old && e && 'written' in e && !sameText(old.written, e.written)) {
-    for (const k of ['coachFix', 'fixedAt', 'readAt']) if (!(k in e)) delete out[k];
+    for (const k of ['coachFix', 'fixedAt', 'readAt', 'readHow']) if (!(k in e)) delete out[k];
   }
   return out;
 }
 
 /**
- * ✍️ 백업 되돌리기에서 같은 날·같은 id 사본 둘 (순수) — 같은 글이면 아빠 교정이 있는 쪽·나중 교정을, 같은 교정이면 읽은 시각은 큰 쪽을 (Codex 35차 #7:
+ * 📬 아빠 교정을 어떻게 읽고 넘어갔나 (v314, 📤 usage/feedback.md) — 'pass' 🎤 따라 읽어 통과 ·
+ * 'try' 🎤를 눌러 해 봄(통과 기록 없음 — 듣는 중에 넘긴 것도, 🔍 Codex 120차 #5) · 'skip' 🎤를 안 누르고 넘김(고친 문장은 소리로 들려준 뒤)
+ * 두 사본·두 창은 더 해 본 쪽(pass > try > skip)
+ */
+export const READ_HOW = ['skip', 'try', 'pass'];
+const howRank = (h) => READ_HOW.indexOf(h);
+/** 양수 둘 가운데 이른 것 (하나만 있으면 그것 · 없으면 0) */
+const firstPos = (a, b) => { const x = Number(a) || 0; const y = Number(b) || 0; return x > 0 && y > 0 ? Math.min(x, y) : x > 0 ? x : y > 0 ? y : 0; };
+/** 읽은 시각·읽은 꼴 합치기 (순수) — 같은 교정의 두 사본에서: 시각은 처음 본 때(이른 쪽, v314 — 전엔 큰 쪽) · 꼴은 더 해 본 쪽 (없으면 칸을 안 만든다) */
+function mergeRead(win, lose) {
+  const out = { ...win, readAt: firstPos(win.readAt, lose.readAt) };
+  const how = howRank(lose.readHow) > howRank(win.readHow) ? lose.readHow : win.readHow;
+  if (howRank(how) >= 0) out.readHow = how; else delete out.readHow;
+  return out;
+}
+
+/**
+ * ✍️ 백업 되돌리기에서 같은 날·같은 id 사본 둘 (순수) — 같은 글이면 아빠 교정이 있는 쪽·나중 교정을, 같은 교정이면 읽은 시각은 처음 본 때·읽은 꼴은 더 해 본 쪽을 (Codex 35차 #7:
  * 먼저 나온 사본만 남겨, 교정 전 사본이 있는 기기에 백업을 넣으면 교정이 사라졌다). 글이 다르면 지금 기기의 것(a)을 그대로.
  */
 export function mergeEssayCopies(a, b) {
@@ -402,7 +422,7 @@ export function mergeEssayCopies(a, b) {
   if (!a.coachFix) return b;
   const win = (Number(b.fixedAt) || 0) > (Number(a.fixedAt) || 0) ? b : a;
   const lose = win === a ? b : a;
-  return sameText(win.coachFix, lose.coachFix) ? { ...win, readAt: Math.max(Number(win.readAt) || 0, Number(lose.readAt) || 0) } : win;
+  return sameText(win.coachFix, lose.coachFix) ? mergeRead(win, lose) : win;
 }
 
 /**
@@ -415,6 +435,7 @@ export function fixEssayEntry(e, fixed, now = Date.now()) {
   e.coachFix = String(fixed).trim();
   e.fixedAt = now;
   e.readAt = 0; // 아이가 아직 안 읽음
+  delete e.readHow; // 앞 교정을 읽은 꼴이다 (v314)
   return true;
 }
 
@@ -670,12 +691,13 @@ export async function syncCoachFixes() {
 }
 
 /** 하루치 기록에서 에세이 하나에 readAt을 찍는다 (트랜잭션 안에서) */
-async function markReadIn(date, id) {
+async function markReadIn(date, id, how) {
   let ok = false;
   await editDaily(date, (d) => {
     const e = (d.essays || []).find((x) => x && x.id === id);
     if (!e) return null;
-    e.readAt = Date.now();
+    if (!(Number(e.readAt) > 0)) e.readAt = Date.now(); // 처음 본 때 — 두 창이 함께 띄웠으면 먼저 넘긴 쪽 (v314)
+    if (howRank(how) > howRank(e.readHow)) e.readHow = how; // 📬 어떻게 읽고 넘어갔나 — 더 해 본 쪽 (v314 · 모르는 값은 순위 -1이라 안 적음)
     ok = true;
     return d;
   });
@@ -686,12 +708,13 @@ async function markReadIn(date, id) {
  * ✍️ 아이가 아빠 교정문을 읽었다고 표시 (한 번만 보여주기 위해).
  * `listEssays()`가 항목마다 날짜를 붙여 주므로 부르는 쪽이 date를 넘기면 바로 그 날만 연다.
  * (안 넘기면 날짜를 찾느라 기록 전체를 훑는다)
+ * how = 📬 어떻게 읽고 넘어갔나 READ_HOW (v314 — 📤 usage/feedback.md · 모르는 값이면 시각만)
  */
-export async function markEssayRead(id, date) {
-  if (date) return markReadIn(date, id);
+export async function markEssayRead(id, date, how) {
+  if (date) return markReadIn(date, id, how);
   for (const day of await listDaily()) {
     if (!(day.essays || []).some((x) => x && x.id === id)) continue;
-    if (await markReadIn(day.date, id)) return true;
+    if (await markReadIn(day.date, id, how)) return true;
   }
   return false;
 }
@@ -996,6 +1019,12 @@ export function mergeAsks(cur, rec) {
     const merged = { ...later, replies: uni(mine.replies, x.replies), again: uni(mine.again, x.again), tries: Math.max(Number(mine.tries) || 0, Number(x.tries) || 0) };
     const readAt = Math.max(Number(mine.readAt) || 0, Number(x.readAt) || 0);
     if (readAt) merged.readAt = readAt; else delete merged.readAt;
+    // 📬 마지막으로 본 답장(v314) — 더 나중 답장을 본 쪽 · 같은 답장이면 먼저 본 때 (차례와 상관없이 같게)
+    const seenAtOf = (a) => (Number(a.seenAt) > 0 ? Number(a.seenAt) : Number.MAX_SAFE_INTEGER);
+    const seen = [mine, x].filter((a) => (Number(a.seenT) || 0) > 0)
+      .sort((a, b) => (Number(b.seenT) || 0) - (Number(a.seenT) || 0) || seenAtOf(a) - seenAtOf(b))[0];
+    delete merged.seenT; delete merged.seenAt;
+    if (seen) { merged.seenT = Number(seen.seenT); if (Number(seen.seenAt) > 0) merged.seenAt = Number(seen.seenAt); }
     byId.set(x.id, merged);
   }
   const asks = [...byId.values()].sort((a, b) => a.t - b.t);

@@ -6,7 +6,8 @@
 // 같은 틀의 문제 하나 → 맞히면 보상 + 🤔 노트에서 지움. 답장은 **아빠 이름**으로 간다 — 이 앱의 차별점은 아빠가 루프 안에 있는 것.
 //
 // 저장은 math 레코드 안(m.asks) — 🛟 백업·두 창(updateMath RMW)·병합(mergeMath → mergeAsks)이 한 번에 해결된다.
-// ask = { id, no, t, u, d, concept, k, key, q, expr, my, ans, tag, w, kid, status, replies:[{t,text}], again:[{t,kid}], readAt, tries, tryOk }
+// ask = { id, no, t, u, d, concept, k, key, q, expr, my, ans, tag, w, kid, status, replies:[{t,text}], again:[{t,kid}], readAt, tries, tryOk,
+//         seenT·seenAt (v314 — 마지막으로 본 답장의 시각과 본 때, 📤 usage/feedback.md) }
 // status: asked(아빠 기다림) → answered(답장 옴, 아직 안 읽음) → understood | again(다시 아빠에게) → fixed(문제 맞힘) / closed(아빠가 닫음)
 
 import { markCleared, nameOf, KIND_SHORT, WHY_LABEL, secQ } from './mathprog.js';
@@ -113,11 +114,26 @@ export function applyReply(m, no, text) {
   return true;
 }
 
+/** 마지막 답장의 시각 (없으면 0) */
+const lastReplyT = (ask) => Math.max(0, ...(Array.isArray(ask.replies) ? ask.replies : []).map((r) => Number(r && r.t) || 0));
+/**
+ * 📬 마지막 답장을 봤다 (v314 — 📤 usage/feedback.md · 🔍 Codex 120차 #1) — seenT 본 답장의 시각 · seenAt 그것을 본 때
+ * readAt은 처음 답장을 연 때라 두 번째 답장이 붙어도 그대로다 — 그것만 보면 아직 안 본 두 번째 답장이 "본 것"으로 셌다
+ * 이미 그 답장을 봤으면 아무것도 안 바꾼다(화면을 열 때마다 기록이 바뀌어 다시 올리지 않게)
+ */
+function seeLast(ask, at) {
+  const last = lastReplyT(ask);
+  if (!last || (Number(ask.seenT) || 0) >= last) return;
+  ask.seenT = last;
+  ask.seenAt = at || touch(ask);
+}
+
 /** 아이가 답장 화면을 열었다 */
 export function markAskRead(m, id) {
   const ask = list(m).find((x) => x && x.id === id);
   if (!ask) return false;
   if (!ask.readAt) ask.readAt = touch(ask);
+  seeLast(ask);
   return true;
 }
 
@@ -137,6 +153,7 @@ export function decideAsk(m, id, understood, kid = '', seenT = undefined) {
   if (understood) ask.status = 'understood';
   else { ask.status = 'again'; ask.again = Array.isArray(ask.again) ? ask.again : []; ask.again.push({ t, kid: String(kid || '').trim().slice(0, 200) }); }
   ask.readAt = ask.readAt || t;
+  seeLast(ask, t); // 😄/😶를 골랐으면 마지막 답장을 본 것 (v314)
   return true;
 }
 
