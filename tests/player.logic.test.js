@@ -286,6 +286,7 @@ function loadPlayer() {
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
     // ✍️ v318 — 내 에세이 🎤 기록 · 고친 문장 🎤 통과 → 🔶 (기록은 essayState.said · 받기는 essayState.sayKeys — 하루 2개 · 문장마다 한 번)
     syncCoachFixes: async () => 0, ESSAY_SAY_STONE: { maxPerDay: 2 },
+    STOCK_CAP: 30, stockCapOf: (v) => ([10, 20, 30, 50].includes(Number(v)) ? Number(v) : 30), // 🏦 증권시장 설정 (v319)
     async markEssaySaid(id, date, how) { (essayState.said ||= []).push({ id, date, how }); return true; },
     async receiveEssaySayStone(date, key, max, entry) {
       (essayState.sayEntries ||= []).push(entry);

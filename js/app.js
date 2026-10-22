@@ -1,6 +1,6 @@
 // 앱 진입점: 화면 전환, 서비스워커 등록, 모듈 초기화
 import { initLibrary, refreshList } from './library.js';
-import { initPlayer, requirePin, timeLimitConf, resumeEnglishRocket } from './player.js';
+import { initPlayer, requirePin, timeLimitConf, resumeEnglishRocket, stockConf } from './player.js';
 import { initStats } from './stats.js';
 import { initPokedex } from './pokedex.js';
 import { initHouse } from './houseview.js'; // 🏠 진우네 집 (2026-10-10)
@@ -12,6 +12,7 @@ import { initMath, renderMath, stopCheer } from './math.js';
 import { initNonsul, enterNonsul } from './nonsulview.js'; // 🖊️ 논술 (v303)
 import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
 import { initCalm, enterCalm, leaveCalm } from './calm.js'; // 🌿 국어·논술 잔잔한 배경 음악 (v317)
+import { initStock, refreshStockBtn } from './stockview.js'; // 🏦 포켓몬 증권시장 (v319)
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
 import { initTimeLimit, setSubject, flushTime, isLocked } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
@@ -60,6 +61,8 @@ export function showView(name) {
   if (name === 'library') refreshList().catch(() => {});
   // 🏠 과목 카드도 다시 그린다 — 그 사이에 마스코트 그림을 받아 왔을 수 있다
   if (name === 'home') renderHome(showView).catch(() => {});
+  // 🏦 부모가 ⚙에서 껐으면 홈의 🏦를 숨긴다 (설정을 바꾸고 돌아올 때 — v319)
+  if (name === 'home') refreshStockBtn();
   // 📦 다른 창 때문에 미뤄 둔 구호품이 있으면 홈으로 돌아왔을 때 다시 (Codex 32차 #7)
   if (name === 'home') retryParcel().catch(() => {});
   // 📤 홈으로 돌아올 때(앱을 열 때 포함) 기록을 비공개 저장소로 — 10분에 한 번까지, 내용이 그대로면 안 올린다. 시작을 늦추지 않게 조금 뒤에
@@ -187,6 +190,7 @@ async function main() {
   initKorean({ showView });  // 📚 국어 — ← 버튼 · 다시 읽으면 도감 다시 그리기
   initNonsul({ showView });  // 🖊️ 논술 — ← 버튼 (v303)
   initCalm();                // 🌿 국어·논술 머리줄 🎵 단추 (v317)
+  initStock({ conf: stockConf }); // 🏦 홈의 🏦 — 🔒 부모 설정(켜기·투자 한도)은 player.stockConf (v319)
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
   initTaken({ requirePin });  // 🔒 포켓몬 데려가기 (부모) + "아빠가 데려갔어요" 알림 (아이)
   initGiftSettings();         // 🎁 ⚙ 선물 교환권 사진 (이 기기에만)

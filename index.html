@@ -22,6 +22,8 @@
     <header class="topbar">
       <h1 class="topbar-title">🏫 신코치</h1>
       <button id="btn-house" class="btn btn-icon" data-open="house" aria-label="진우네 집">🏠</button>
+      <!-- 🏦 포켓몬 증권시장 (v319) — 🔒 부모 설정에서 끄면 숨는다 · stockview.js -->
+      <button id="btn-stock" class="btn btn-icon" data-open="stock" aria-label="포켓몬 증권시장">🏦</button>
       <button id="btn-pokedex" class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
       <button id="btn-stats" class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
     </header>
@@ -303,6 +305,19 @@
       <div id="house-tabs" class="house-tabs" role="tablist"></div>
       <div id="house-msg" class="modal-msg" aria-live="polite"></div>
       <div id="house-body" class="house-body"></div>
+    </div>
+  </div>
+
+  <!-- ===== 🏦 포켓몬 증권시장 (v319) — 값은 하루 한 번 · 주문은 다음 장 · 그리기는 stockview.js ===== -->
+  <div id="stock" class="modal" hidden>
+    <div class="modal-card stock-card">
+      <div class="modal-head">
+        <span class="modal-title">🏦 포켓몬 증권시장</span>
+        <span id="stock-coins" class="coin-chip">💰 0</span>
+        <button type="button" id="stock-close" class="btn btn-icon" aria-label="닫기">✕</button>
+      </div>
+      <div id="stock-msg" class="modal-msg" aria-live="polite"></div>
+      <div id="stock-body" class="stock-body"></div>
     </div>
   </div>
 
@@ -777,6 +792,23 @@
         </label>
         <button type="button" id="set-game-bonus" class="btn">🎮 오늘 +1판 주기</button>
         <p id="set-game-today" class="field-note"></p>
+      </fieldset>
+
+      <fieldset class="field set-group">
+        <legend class="field-label">🏦 포켓몬 증권시장 <small>— 홈의 🏦. 코인으로 가상의 주식을 사고팔아요. 장은 그날 공부를 15분 한 날에만 열려요(값은 하루 한 번) · 주문은 다음 장 · 산 뒤 장 3번은 못 팔아요. 기록은 📤 usage/stock.md</small></legend>
+        <label class="field-row">
+          <input type="checkbox" id="set-stock-on">
+          <span class="field-label">켜기 <small>— 끄면 🏦가 숨고 새 주문을 못 내요 (가진 주식은 그대로 · 기다리던 주문에 묶인 코인은 다시 켤 때까지 묶여 있어요)</small></span>
+        </label>
+        <label class="field field-inline">
+          <span class="field-label">투자 한도 <small>— 가진 것(코인 + 주식)의 몇 %까지</small></span>
+          <select id="set-stock-cap">
+            <option value="10">10%</option>
+            <option value="20">20%</option>
+            <option value="30">30%</option>
+            <option value="50">50%</option>
+          </select>
+        </label>
       </fieldset>
 
       <fieldset class="field set-group">

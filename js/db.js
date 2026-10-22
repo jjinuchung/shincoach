@@ -19,6 +19,7 @@ import { writesOf, mergeWrites } from './korwrite.js'; // ✍️ 국어 서술�
 import { mergePuzzles, PUZZLE_DAY_LISTS } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 · 판 기록 칸(v315) (순수 — korean·korwords만 import)
 import { copyAvatar, mergeAvatar } from './avatar.js'; // 🧑 진우 캐릭터 복사·병합 (순수 — house만 import)
 import { copyPlay, mergePlay } from './homeplay.js'; // 🎮 일상 행동 💗·놀이 날 복사·병합 (순수 — house·avatar·evolve·korean만 import)
+import { copyStock } from './stock.js'; // 🏦 포켓몬 증권시장 복사 (순수 — 아무것도 import하지 않는다, v319)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -362,6 +363,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // 🎮 게임기 미니 게임 (2026-10-21 v307, minigame.js) — 오늘 쓴 판(시작할 때 claimDailyCount로 선점 · 끝은 그날 공부 시간에서 셈) ·
   //   🔒 부모가 더 준 판 · 게임 화면에 머문 초(🕒 사용 기록). 병합 maxOf라 옛 백업으로 쓴 판을 되살리지 못한다
   'gamePlays', 'gameBonus', 'uGame',
+  // 🏦 증권시장 화면에 머문 초 (2026-10-22 v319 — 🕒 사용 기록)
+  'uStock',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
   // ✍️ 에세이 고친 문장을 🎤로 따라 읽어 통과해 받은 🔶 수 (2026-10-22 v318) — 받기는 applyEssaySayStone(가방과 한 트랜잭션)
@@ -997,7 +1000,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2324,6 +2327,11 @@ export function mergeStatRecord(name, cur, rec) {
     // 🎮 일상 행동 — 기기마다 💗를 받은 날·포켓몬마다 💗는 칸마다 큰 쪽(합쳐도 늘어나지 않고, 옛 백업이 날을 되돌려 또 받지 않게) · 깨진 쪽은 없는 것으로
     const hp = mergePlay(cur.homePlay, rec.homePlay);
     if (hp) out.homePlay = hp; else delete out.homePlay;
+    // 🏦 포켓몬 증권시장(v319) — 코인과 같은 쪽(최근에 저장된 쪽)에서만 통째로: 주문에 묶은 코인·판 코인과 가진 주식이 갈라지지 않게 ·
+    //    최근 쪽에 없거나 깨졌으면(객체가 아닌 값) 시장도 없는 것으로 — 옛 쪽 시장을 붙이면 묶인 코인이 복제됐다
+    //    (옛 쪽 💰888 + 묶음 112 · 최근 쪽 💰1,000 → 합친 뒤 취소하면 💰1,112 — 🔍 Codex 125차 #1) · 읽을 때 stock.stockOf가 칸마다 다시 고친다
+    const sk = latest.stock;
+    if (sk && typeof sk === 'object' && !Array.isArray(sk)) out.stock = copyStock(sk); else delete out.stock;
   }
   return out;
 }

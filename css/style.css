@@ -4108,3 +4108,48 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes gu-pull-l { 0%, 100% { transform: none; } 40% { transform: translateX(-8%) rotate(-6deg); } }
 @keyframes gu-pull-r { 0%, 100% { transform: none; } 40% { transform: translateX(8%) rotate(6deg); } }
 @media (prefers-reduced-motion: reduce) { .gu-team { transition: none; } .gu-me.is-pull, .gu-foe.is-pull { animation: none; } }
+
+/* ===== 🏦 포켓몬 증권시장 (v319) — 담담하게: 깜빡임 없음 · 오른 것 빨강·내린 것 파랑(차분한 색) ===== */
+.stock-card { max-width: 640px; }
+.stock-card .modal-title { white-space: nowrap; }
+.stock-body { display: grid; gap: 10px; max-height: 72vh; overflow-y: auto; padding: 2px; word-break: keep-all; } /* 낱말이 "없어 / 요"로 갈리지 않게 */
+.stock-sub { font-weight: 800; font-size: 0.92rem; color: var(--muted); margin: 2px 0 4px; }
+.stock-note { font-size: 0.85rem; color: var(--muted); }
+.stock-h { margin: 0 0 6px; font-size: 1.1rem; }
+.stock-rules { margin: 0; padding-left: 18px; line-height: 1.6; font-size: 0.92rem; }
+.stock-intro, .stock-summary, .stock-news, .stock-events { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.stock-start { width: 100%; margin-top: 10px; }
+.stock-events { background: #f8fafc; }
+.stock-event { font-size: 0.92rem; padding: 2px 0; }
+.stock-sum-row { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-weight: 800; font-size: 1.05rem; }
+.stock-sum-room { font-size: 0.88rem; color: var(--muted); margin-top: 4px; }
+.stock-order { display: flex; gap: 8px; align-items: center; justify-content: space-between; font-size: 0.9rem; padding: 3px 0; }
+.stock-cancel { padding: 4px 10px; font-size: 0.85rem; }
+.stock-day { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.stock-news-line { display: flex; gap: 6px; align-items: baseline; font-size: 0.9rem; padding: 2px 0; }
+.stock-news-tag { flex: none; font-size: 0.75rem; font-weight: 800; border-radius: 6px; padding: 1px 6px; background: #f1f5f9; color: var(--muted); }
+.stock-news-line.is-good .stock-news-tag { background: #fef2f2; color: #b91c1c; }
+.stock-news-line.is-bad .stock-news-tag { background: #eff6ff; color: #1d4ed8; }
+.stock-list { display: grid; gap: 8px; }
+.stock-asset { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }
+.stock-asset.is-fund { border-style: dashed; }
+.stock-asset-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.stock-asset-name { display: grid; min-width: 0; }
+.stock-asset-name small { color: var(--muted); font-size: 0.8rem; }
+.stock-asset-px { text-align: right; display: grid; justify-items: end; font-variant-numeric: tabular-nums; }
+.stock-asset-px b { font-size: 1.1rem; }
+.stock-pct { font-size: 0.85rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stock-pct.is-up { color: #b91c1c; }
+.stock-pct.is-down { color: #1d4ed8; }
+.stock-spark { width: 100%; height: 30px; color: #94a3b8; }
+.stock-own { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 0.9rem; font-weight: 700; }
+.stock-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.stock-acts .btn { flex: 1 1 90px; white-space: nowrap; }
+.stock-panel { border-top: 1px dashed var(--border); margin-top: 6px; padding-top: 8px; display: grid; gap: 6px; }
+.stock-n { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.92rem; }
+.stock-n-val { min-width: 3em; text-align: center; font-variant-numeric: tabular-nums; }
+.stock-est { font-size: 0.9rem; font-weight: 700; }
+.stock-whys { display: flex; gap: 6px; flex-wrap: wrap; }
+.stock-why { font-size: 0.85rem; padding: 6px 10px; }
+.stock-why.is-on { border-color: var(--primary); color: var(--primary); font-weight: 800; }
+.stock-help summary { cursor: pointer; font-weight: 800; color: var(--muted); padding: 4px 0; }

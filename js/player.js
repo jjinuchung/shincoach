@@ -33,6 +33,7 @@ import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import { DEFAULT_MIN as TIME_MIN, KOREAN_MIN, EXTEND_MAX, EXTEND_MIN, extMaxOf, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
 import { GAME_MIN, GAME_CAP, gameMinOf, gameCapOf } from './minigame.js'; // 🎮 게임기 미니 게임 판 (v307)
+import { STOCK_CAP, stockCapOf } from './stock.js'; // 🏦 포켓몬 증권시장 투자 한도 (v319)
 import { grantPlay, gameTodayLine } from './gameview.js'; // 🎮 ⚙ 오늘 한 줄 · 🔒 +1판 (v307)
 import { setBgmEnabled } from './bgm.js';
 import * as track from './track.js';
@@ -3175,6 +3176,7 @@ function loadSettings() {
     timeExtMax: EXTEND_MAX,
     // 🎮 게임기 미니 게임 판 (2026-10-21 v307, 아버님) — 과목마다 공부 20분에 1판 · 하루 2판까지
     gameMin: GAME_MIN, gameCap: GAME_CAP,
+    stockOn: true, stockCap: STOCK_CAP, // 🏦 포켓몬 증권시장 (v319) — 🔒 부모가 끄기·투자 한도
     // 🔢 수학 숫자판 (2026-10-01) — 켜짐이 기본. math.js가 같은 localStorage에서 읽는다
     mathPad: true };
   let saved = {};
@@ -3209,6 +3211,11 @@ export function timeLimitConf() {
     extMax: extMaxOf(settings.timeExtMax),
     gameMin: gameMinOf(settings.gameMin), gameCap: gameCapOf(settings.gameCap), // 🎮 게임 판 (v307)
   };
+}
+
+/** 🏦 포켓몬 증권시장 설정 (v319) — 꺼 두면 홈의 🏦가 숨고 주문을 못 낸다(가진 주식은 그대로) · 투자 한도 %는 정한 보기 가운데서만 */
+export function stockConf() {
+  return { on: settings.stockOn !== false, cap: stockCapOf(settings.stockCap) };
 }
 
 /** ⏳ 분 입력 — 0~600만 받고, 비었거나 이상하면 기본값 */
@@ -3327,6 +3334,8 @@ function initSettingsDialog() {
     settings.timeExtMax = extMaxOf($('set-time-ext').value);
     settings.gameMin = gameMinOf($('set-game-min').value); // 🎮 게임 판 (v307)
     settings.gameCap = gameCapOf($('set-game-cap').value);
+    settings.stockOn = $('set-stock-on').checked; // 🏦 증권시장 (v319)
+    settings.stockCap = stockCapOf($('set-stock-cap').value);
     settings.mathPad = $('set-mathpad').checked;
     if (!settings.hideEnWhileSpeaking) state.speakHideEn = 'none'; // 끄면 대기 중이던 숨김도 해제
     if (settings.listenFirst === 0) state.enRevealed = true;
@@ -3392,6 +3401,8 @@ function openSettings() {
     $('set-time-ext').value = String(extMaxOf(settings.timeExtMax));
     $('set-game-min').value = String(gameMinOf(settings.gameMin)); // 🎮 게임 판 (v307)
     $('set-game-cap').value = String(gameCapOf(settings.gameCap));
+    $('set-stock-on').checked = settings.stockOn !== false; // 🏦 증권시장 (v319)
+    $('set-stock-cap').value = String(stockCapOf(settings.stockCap));
     $('set-mathpad').checked = settings.mathPad !== false;
     renderTimeToday();
     renderGameToday();

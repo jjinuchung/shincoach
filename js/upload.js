@@ -319,7 +319,7 @@ export function unb64(s) {
  * getFeedback(있으면) = 📬 피드백이 닿았나 글(today, days, math) — 못 만들면 이 파일만 빠진다 (v314)
  * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, getFeedback, uploadLog, crashLog, verLine, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, getFeedback, getStock, uploadLog, crashLog, verLine, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
@@ -333,6 +333,8 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
   const family = getFamily ? await Promise.resolve().then(() => getFamily(today)).catch(() => null) : null;
   // 📬 피드백이 닿았나(v314)도 못 만들면 빼고 나머지는 그대로
   const feedback = getFeedback ? await Promise.resolve().then(() => getFeedback(today, days || [], math)).catch(() => null) : null;
+  // 🏦 포켓몬 증권시장(v319)도 못 만들면 빼고 나머지는 그대로
+  const stock = getStock ? await Promise.resolve().then(() => getStock(today)).catch(() => null) : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
@@ -345,6 +347,7 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(typeof weekly === 'string' && weekly ? [{ path: 'usage/weekly.md', text: weekly }] : []), // 📈 주간 흐름 — 📊 카드와 같은 표 (v287)
     ...(typeof family === 'string' && family ? [{ path: 'family/read.md', text: family }] : []), // 💌 한 줄 메시지 — 무엇이 왔고 언제 읽었나 (v288)
     ...(typeof feedback === 'string' && feedback ? [{ path: 'usage/feedback.md', text: feedback }] : []), // 📬 교정·답장이 닿았나 — 붙은 때·본 때·해 본 것 (v314)
+    ...(typeof stock === 'string' && stock ? [{ path: 'usage/stock.md', text: stock }] : []), // 🏦 증권시장 — 가진 것·주문·까닭·떨어진 뒤 더 산 수 (v319)
     ...(typeof uploadLog === 'string' && uploadLog ? [{ path: 'usage/upload-log.md', text: uploadLog }] : []), // 📤 올리기 실패 기록 (v278)
     ...(typeof crashLog === 'string' && crashLog ? [{ path: 'usage/crash-log.md', text: crashLog }] : []), // 🛑 앱이 저절로 꺼진 기록 (v292)
   ];
@@ -361,6 +364,13 @@ async function feedbackNow(today, days, math) {
   const [{ getProfile }, fb, prog, kw] = await Promise.all([import('./db.js'), import('./feedback.js'), import('./mathprog.js'), import('./korwrite.js')]);
   const p = await getProfile();
   return fb.feedbackMd({ days, writes: kw.writesOf(p && p.korWrites), asks: math && math.asks, today, now: Date.now(), conceptName: prog.nameOf });
+}
+
+/** 🏦 포켓몬 증권시장 글 (v319) — 저장된 프로필에서 · 시작 전이면 null(파일을 안 만든다) */
+async function stockNow(today) {
+  const [{ getProfile }, sk] = await Promise.all([import('./db.js'), import('./stock.js')]);
+  const p = await getProfile();
+  return p && sk.stockOf(p.stock) ? sk.stockMd(p.stock, p.coins, today) : null;
 }
 
 /** 📈 주간 흐름 글 (v287) — 📊 카드와 같은 표 · 국어 기록은 저장된 프로필에서 · 프로필이 없으면 국어 칸은 — */
@@ -705,7 +715,7 @@ async function sendOnce(force) {
     // 🎮 저장을 기다리는 프로필 증분도 먼저 — 보상 쪽 누적(rewardNow)이 저장된 프로필을 읽는다 (Codex 86차 B · 실패해도 그대로 올린다)
     await import('./xp.js').then((xp) => xp.flushProfile()).catch(() => {});
     const crashLog = await import('./blackbox.js').then((bb) => bb.crashLogNow(today)).catch(() => null); // 🛑 앱이 저절로 꺼진 기록(v292) — 못 만들면 이것만 빠진다
-    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, verLine, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, getFeedback: feedbackNow, uploadLog: logTextNow(today), today });
+    files = await gatherFiles({ getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, verLine, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, getFeedback: feedbackNow, getStock: stockNow, uploadLog: logTextNow(today), today });
   } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };
