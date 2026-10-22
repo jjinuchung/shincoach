@@ -25,7 +25,7 @@ import * as puzzles from './korpuzzleview.js'; // 🧩 퍼즐 탭 (v242) — 같
 import { writeBoxEl, replyBannerEl, renderReplyView, slotWriteText, syncWrites, appliedLine } from './korwriteview.js'; // ✍️ 서술형 (v237) — 이 파일을 import하지 않는다(ctx로 건넴)
 import { cardWriteState } from './korwrite.js';
 import { korWritesMap, korDripMap, korDripStart } from './xp.js';
-import { visibleCards, hasLocked } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
+import { visibleCards, hasLocked, freshIds, needsStart, withFirst } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -104,9 +104,27 @@ export function catchRuleLine(star, listen = false) {
 /** 읽은 글 id — 별 기록('카드id:별')이 하나라도 있는 글 (📦 이미 읽은 글은 잠그지 않는다) */
 const readIds = () => new Set(Object.keys(korDoneMap()).map((k) => k.split(':')[0]));
 
+// 📦 묶음 시작 날 (Codex 126차 #3) — dripFirst = 이 실행에서 처음 국어 글을 받은 날(시작 날을 못 적었을 때 그 날로 다시 적고, 그사이 화면도 그 날로 센다) · dripSaving = 적는 중
+let dripFirst = '';
+let dripSaving = null;
+
+/** 화면이 셀 묶음 시작 날 — 적힌 날 · 아직 못 적은 묶음은 이 실행에서 처음 받은 날 */
+const dripState = () => withFirst(korDripMap(), dripFirst);
+
+/**
+ * 📦 묶음 시작 날 적기 — 원고에 묶음 글이 있고 적힌 날이 없으면 이 실행에서 처음 받은 날로(v320 → Codex 126차 #3)
+ *   저장이 안 되면 목록을 부를 때마다 다시 · 적는 중이면 겹쳐 부르지 않는다 · 첫날 몫은 적기 전과 같아 다시 그리지 않는다
+ */
+function ensureDripStart() {
+  const ids = ui.all ? ui.all.map((c) => c.id) : [];
+  if (dripSaving || !needsStart(korDripMap(), ids)) return;
+  if (!dripFirst) dripFirst = todayKey();
+  dripSaving = Promise.resolve(korDripStart(ids, dripFirst)).catch(() => null).finally(() => { dripSaving = null; });
+}
+
 /**
  * 원고를 한 번 받아 두고(ui.all), 아이 화면에 보일 글(ui.cards)은 부를 때마다 오늘 날짜로 다시 거른다 —
- * 📦 새 글 묶음은 하루에 두 편씩 열린다(v320 kordrip) · 앱을 켜 둔 채 날이 바뀌어도 다음에 부를 때 열린다
+ * 📦 새 글 묶음은 하루에 두 편씩 열린다(v320 kordrip) · 앱을 켜 둔 채 날이 바뀌어도 다음에 부를 때 열린다 · 시작 날이 없으면 여기서 적는다
  */
 async function loadCards() {
   if (!ui.all) {
@@ -120,7 +138,8 @@ async function loadCards() {
       ui.all = null;
     }
   }
-  ui.cards = ui.all ? visibleCards(ui.all, korDripMap(), todayKey(), readIds()) : null;
+  if (ui.all) ensureDripStart();
+  ui.cards = ui.all ? visibleCards(ui.all, dripState(), todayKey(), readIds()) : null;
   return ui.cards;
 }
 
@@ -129,8 +148,7 @@ export async function enterKorean() {
   topUpKorChars(); // 🎯 국어 포켓몬 그림을 조금씩 먼저
   // 🎯 소식 없이 닫힌 창부터 정리한 뒤 장부 정리 — 지난번에 뺐는데 판정 전에 꺼진 기회·돌려주다 실패한 기회 (Codex 49차 #1·#2 · 50차 #1 차례대로)
   Promise.resolve(settleLostCatch()).catch(() => {}).then(() => settleKorThrows());
-  // 📦 새 글 묶음 시작 날 — 원고에 묶음 글이 들어 있고 아직 시작 날이 없으면 오늘로(v320) · 첫날 몫은 그 전과 같아 다시 그리지 않는다 · 못 적으면 다음에 들어올 때
-  loadCards().then(() => (ui.all ? korDripStart(ui.all.map((c) => c.id), todayKey()) : null)).catch(() => {});
+  // 📦 새 글 묶음 시작 날은 loadCards가 적는다(ensureDripStart — 못 적으면 목록을 부를 때마다 다시, Codex 126차 #3)
   // 📥 ✍️ 서술형 아빠 답장 — 비공개 저장소에서 받아 그 글에 한 번만 붙인다(보상도 한 트랜잭션) · 못 받으면 조용히
   loadCards().then((cards) => (cards ? syncWrites(cards) : null)).then((r) => {
     const line = appliedLine(r, 'K'); // 🖊️ 논술 글 답장(v304)은 논술 첫 화면에서
@@ -231,8 +249,10 @@ export async function renderList() {
   head.appendChild(el('h2', 'kor-h', '📚 작품 도감'));
   head.appendChild(el('p', 'kor-intro', '글을 읽고 문제를 풀면 카드가 모여요. 다른 날 다시 읽으면 ★★, 처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★!'));
   head.appendChild(el('p', 'kor-count', `모은 카드 ${got} / ${total} · ★ ${stars} / ${total * 3}`));
+  const fresh = freshEl(cards); // 🌱 오늘 새로 열린 글 바로가기 (Codex 126차 #6)
+  if (fresh) head.appendChild(fresh);
   // 📦 아직 열리지 않은 새 글이 있으면 한 줄 — 몇 편 남았는지 셈 없이 (v320)
-  if (ui.all && hasLocked(ui.all, korDripMap(), todayKey(), readIds())) head.appendChild(el('p', 'kor-drip', '📦 내일 새 글이 와요'));
+  if (ui.all && hasLocked(ui.all, dripState(), todayKey(), readIds())) head.appendChild(el('p', 'kor-drip', '📦 내일 새 글이 와요'));
   const cb = catchBtnEl(); // 🎯 남은 국어 잡기 기회 — 다 읽은 카드에서 안 던지고 나왔어도 여기서
   if (cb) head.appendChild(cb);
   if (ui.writeNote) { head.appendChild(el('p', 'kor-wnote', ui.writeNote)); ui.writeNote = ''; } // 📬 답장이 붙었다 — 한 번
@@ -265,6 +285,24 @@ export async function renderList() {
     grid.appendChild(b);
   });
   main.appendChild(grid);
+}
+
+/**
+ * 🌱 오늘 새로 열린 글 가운데 안 읽은 것 — 「🌱 새 글 · 제목」 단추 (Codex 126차 #6) · 새 글은 도감 뒤쪽이라 찾기 어렵다
+ *   셈 없이 · 읽으면(별을 받으면) 사라진다 · 어제까지 열린 글은 도감에만(밀린 목록이 되지 않게) · 없으면 null
+ */
+function freshEl(cards) {
+  const list = freshIds(dripState(), todayKey(), readIds()).map((id) => cards.find((c) => c.id === id)).filter(Boolean);
+  if (!list.length) return null;
+  const box = el('div', 'kor-fresh');
+  for (const c of list) {
+    const b = el('button', 'btn', `🌱 새 글 · ${c.title}`);
+    b.type = 'button';
+    b.dataset.card = c.id;
+    b.addEventListener('click', () => guardStart('korean', () => openCard(c.id)));
+    box.appendChild(b);
+  }
+  return box;
 }
 
 function openCard(id) {

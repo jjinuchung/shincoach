@@ -5,6 +5,7 @@
 // · 아이 화면(도감·단원 지도·낱말·퍼즐)에서만 잠긴 글을 뺀다 — 아빠 보고(📤 국어 요약)는 모든 글을 센다
 // · 이미 읽은 글은 잠그지 않는다(두 기기·옛 백업에서 온 기록) · 묶음에 없는 글은 늘 보인다
 // · 시작 날은 프로필 korDrip { 묶음: 'YYYY-MM-DD' } — 병합은 이른 날(늦은 날이 이기면 열린 글이 다시 잠긴다)
+// · 시작 날을 못 적었으면 목록을 부를 때마다 다시 적는다 — 그사이 화면은 이 실행에서 처음 받은 날로 센다(withFirst, Codex 126차 #3)
 // · 시계를 앞으로 돌리면 일찍 열릴 뿐 받을 별·💰는 같다(글마다 정해져 있다) · 뒤로 돌리면 첫날 몫만
 // ★ 아무것도 import하지 않는다 — 시험이 그대로 부른다
 
@@ -75,6 +76,43 @@ export function visibleCards(cards, state, today, read = []) {
 export function hasLocked(cards, state, today, read = []) {
   const locked = lockedIds(state, today, read);
   return (cards || []).some((c) => c && locked.has(c.id));
+}
+
+/**
+ * 🌱 오늘 새로 열린 글 가운데 아직 안 읽은 것 (묶음 차례대로) — 도감 머리 바로가기(셈 없이 · 읽으면 사라진다, Codex 126차 #6)
+ *   새 글이 도감 뒤쪽에 놓여 찾기 어렵다 · 어제까지 열린 글은 넣지 않는다(못 읽은 날이 쌓여 밀린 목록이 되지 않게)
+ *   시작 날이 없거나 시계를 뒤로 돌렸으면 첫날 몫
+ */
+export function freshIds(state, today, read = [], perDay = DRIP.perDay) {
+  const st = dripOf(state);
+  const seen = new Set(read);
+  const out = [];
+  for (const b of DRIP.bundles) {
+    const s = st[b.key];
+    const d = s && dayOk(today) ? daysBetween(s, today) : 0;
+    const from = Math.min(b.order.length, perDay * Math.max(0, d));
+    const to = openCount(s, today, b.order.length, perDay);
+    for (const id of b.order.slice(from, to)) if (!seen.has(id)) out.push(id);
+  }
+  return out;
+}
+
+/** 원고에 글이 들어 있는데 시작 날이 없는 묶음이 있나 — 시작 날을 (다시) 적어야 하나 (Codex 126차 #3) */
+export function needsStart(state, ids) {
+  const have = new Set(ids || []);
+  const st = dripOf(state);
+  return DRIP.bundles.some((b) => !st[b.key] && b.order.some((id) => have.has(id)));
+}
+
+/**
+ * 화면이 셀 시작 날 — 적힌 날은 그대로, 시작 날이 없는 묶음은 first(이 실행에서 처음 국어 글을 받은 날)로 (Codex 126차 #3)
+ *   시작 날을 못 적은 채 날이 바뀌어도 첫날 몫으로 되돌아가지 않게 · first가 바른 날이 아니면 적힌 날만
+ */
+export function withFirst(state, first) {
+  const st = dripOf(state);
+  if (!dayOk(first)) return st;
+  for (const b of DRIP.bundles) if (!st[b.key]) st[b.key] = first;
+  return st;
 }
 
 /**

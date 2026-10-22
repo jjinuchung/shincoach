@@ -7,7 +7,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { checkContent, validCards, lineCount } from '../js/korean.js';
-import { DRIP } from '../js/kordrip.js';
+import { DRIP, dripOf } from '../js/kordrip.js';
 import { cloneProfile, mergeStatRecord, getProfile } from '../js/db.js';
 import { initProfile, korDripStart, korDripMap } from '../js/xp.js';
 
@@ -106,6 +106,25 @@ test('📘 물음 (v320): 물음마다 지어내기 보기 · 정답만 유난�
   assert.ok(know[0][1].why.startsWith('맞는 말이에요.'));
 });
 
+test('🔍 근거 줄 (Codex 126차 #1·#2·#5): 정답을 직접 받치는 줄만 — 대상·상황 소개·결과만 말하는 줄은 빼고 · 글의 결론 줄은 넣는다 · 풀이 글도 그 줄만 · K125 ⑧은 거리와 살아남기를 늘 비례로 읽히지 않게', () => {
+  const want = {
+    'K123-3': [6], // ⑤ 「별나라 사람」은 대상만 — 궁금한 마음은 ⑥의 묻는 말에서
+    'K124-1': [4], // ① 카드를 빌려준 상황 — 마음은 ④ 얼굴이 빨개져 말없이
+    'K128-2': [6], // ⑤ 아쉬웠다는 말만 — 까닭(한 달 연습)은 ⑥
+    'K129-2': [5], // ⑥ 고양이를 받은 것은 결과 — 원인은 ⑤
+    'K125-1': [5, 6, 9], // ⑨ 도는 것이 씨를 멀리 퍼뜨린다 — ④의 물음에 바로 답한다
+    'K125-3': [6, 9], // ⑥ 바람이 어미나무에서 멀리 실어 나른다 — 중심 생각을 받친다
+  };
+  for (const [id, e] of Object.entries(want)) {
+    const q = QS.find((x) => x.id === id);
+    assert.deepEqual(q.ev, e, `${id} 근거`);
+    assert.deepEqual(nums(q.evNote).sort((a, b) => a - b), e, `${id} 풀이 글도 그 줄만`);
+  }
+  assert.match(QS.find((x) => x.id === 'K129-2').evNote, /까닭.*결과/, 'K129-2 원인과 결과를 갈라 말한다');
+  assert.equal(lines('K125')[7], '어미나무와 떨어진 곳에 내려앉은 씨는 햇볕, 물, 양분을 두고 덜 다투니 싹을 틔우기가 더 쉽다.');
+  assert.ok(!/일수록|살아남/.test(body('K125')), 'K125 「멀리 날아간 씨일수록 살아남기 쉽다」는 뺐다');
+});
+
 test('🏛️ 사실 대조 (v320): 윤동주 원문(1955년 판) · 단풍나무 열매(시과) · 「좁쌀 한 알」 줄거리 · 잠만보 한국어 도감 · 꼬부기 물 타입 — 쓰지 않기로 한 것은 정말 빠졌나 · 집 식구를 지어내지 않음 · 옛 한글 없음', () => {
   // 윤동주 「무얼 먹고 사나」 — 1955년 판 150쪽을 오늘 맞춤법으로(잡아먹고 · 구워) · 「산골엣」은 원문 그대로 · 1948 초판에는 없음
   assert.deepEqual(card('K123').stanzas, [['바닷가 사람', '물고기 잡아먹고 살고'], ['산골엣 사람', '감자 구워 먹고 살고'], ['별나라 사람', '무얼 먹고 사나.']]);
@@ -148,37 +167,57 @@ test('🏛️ 사실 대조 (v320): 윤동주 원문(1955년 판) · 단풍나�
   assert.ok(!/인터넷에서/.test(body('K122')), '발표 사진은 직접 찍어 둔 것에서 고른다');
 });
 
-test('📦 하루 두 편 (v320): 묶음 b320 = 새 글 열둘 · 지금 배우는 단원부터 · 화면은 보이는 글만(도감·단원·낱말·퍼즐) · 📤 보고는 모든 글 · 시작은 국어를 열 때 · 「📦 내일 새 글이 와요」(셈 없이) · 앱 셸', () => {
+test('📦 하루 두 편 (v320 · Codex 126차 #3·#6): 묶음 b320 = 새 글 열둘 · 지금 배우는 단원부터 · 화면은 보이는 글만(도감·단원·낱말·퍼즐) · 📤 보고는 모든 글 · 시작은 목록을 부를 때(못 적었으면 다시 · 이 실행에서 처음 받은 날로) · 「📦 내일 새 글이 와요」·「🌱 새 글 · 제목」(셈 없이) · 앱 셸', () => {
   const b = DRIP.bundles.find((x) => x.key === 'b320');
   assert.deepEqual(b.order.slice().sort(), NEW.slice().sort(), '묶음 = 이번 글 열둘');
   assert.deepEqual(b.order.slice(0, 2), ['K121', 'K123'], '첫날 — 포켓몬 타입 발표 · 윤동주 동시(4단원·매체)');
   assert.deepEqual(b.order.slice(-2), ['K129', 'K130'], '마지막 날 — 6단원(12월) · 잠만보');
   const v = read('js/koreanview.js');
-  assert.ok(v.includes("import { visibleCards, hasLocked } from './kordrip.js';"));
-  assert.ok(v.includes('ui.cards = ui.all ? visibleCards(ui.all, korDripMap(), todayKey(), readIds()) : null;'), '부를 때마다 오늘 날짜로 다시 거른다');
-  assert.ok(v.includes('korDripStart(ui.all.map((c) => c.id), todayKey())'), '국어에 들어올 때 시작 날');
+  assert.ok(v.includes("import { visibleCards, hasLocked, freshIds, needsStart, withFirst } from './kordrip.js';"));
+  assert.ok(v.includes('ui.cards = ui.all ? visibleCards(ui.all, dripState(), todayKey(), readIds()) : null;'), '부를 때마다 오늘 날짜로 다시 거른다');
+  // 시작 날 — 목록을 부를 때마다 없으면 적는다(저장이 안 됐으면 다음에 부를 때 다시) · 이 실행에서 처음 받은 날로 · 화면도 그 날로 센다 (126차 #3)
+  assert.ok(v.includes('  if (ui.all) ensureDripStart();\n  ui.cards = '), '목록을 부를 때 시작 날');
+  assert.ok(v.includes('if (dripSaving || !needsStart(korDripMap(), ids)) return;'));
+  assert.ok(v.includes('if (!dripFirst) dripFirst = todayKey();') && v.includes('korDripStart(ids, dripFirst)'), '처음 받은 날로 적는다');
+  assert.ok(v.includes('.finally(() => { dripSaving = null; })'), '실패해도 다음에 부를 때 다시');
+  assert.ok(v.includes('const dripState = () => withFirst(korDripMap(), dripFirst);'));
+  assert.ok(!/korDripMap\(\), todayKey\(\)/.test(v), '화면은 dripState로만 센다');
   assert.ok(v.includes("head.appendChild(el('p', 'kor-drip', '📦 내일 새 글이 와요'));"));
+  // 🌱 오늘 새로 열린 글 바로가기 — 제목만(셈 없이) · 여는 길은 도감 칸과 같다(⏳ guardStart) (126차 #6)
+  assert.ok(v.includes('freshIds(dripState(), todayKey(), readIds())'));
+  assert.ok(v.includes('  const fresh = freshEl(cards); // 🌱') && v.includes('  if (fresh) head.appendChild(fresh);'), '도감 머리에');
+  assert.ok(v.includes("el('button', 'btn', `🌱 새 글 · ${c.title}`)"));
+  assert.ok(v.includes("b.addEventListener('click', () => guardStart('korean', () => openCard(c.id)));\n    box.appendChild(b);"));
+  assert.ok(/\.kor-fresh \{/.test(read('css/style.css')));
   assert.ok(!/남은 \d|\d+편 남/.test(v), '아이 화면에 셈 없이');
   for (const f of ['js/korreport.js', 'js/upload.js']) assert.ok(!read(f).includes('kordrip'), `${f} — 아빠 보고는 모든 글`);
   assert.ok(read('sw.js').includes("'./js/kordrip.js'"), '앱 셸');
   assert.ok(/\.kor-drip \{/.test(read('css/style.css')));
 });
 
-test('📦 시작 날 저장·병합 (v320): 저장소 길로 한 번만 · 복사는 깊게 · 두 기기는 이른 날 · 깨진 값은 버림', async () => {
+test('📦 시작 날 저장·병합 (v320 · Codex 126차 #4): 저장이 안 되면 없던 일 → 다시 적으면 된다 · 저장소 길로 한 번만 · 복사는 깊게 · 두 기기는 이른 날 · 깨진 값은 버림', async () => {
   const t = '2026-10-23';
   const ids = DATA.cards.map((c) => c.id);
-  const r = await korDripStart(ids, t);
+  // 실패 경로를 진짜로 — 시작 날 없는 프로필에서 쓰기 하나를 막는다
+  const stored = async () => dripOf(((await getProfile()) || {}).korDrip); // 아직 한 번도 안 썼으면 저장된 프로필이 없다
+  assert.deepEqual(await stored(), {}, '아직 시작 전');
+  fakeIdb.failNext('profile');
+  const f = await korDripStart(ids, t);
+  assert.deepEqual([f.ok, f.why], [false, 'save']);
+  assert.equal(fakeIdb.failsLeft(), 0, '막은 쓰기는 이 시작 날 쓰기');
+  assert.deepEqual(korDripMap(), {}, '메모리 프로필에도 없다');
+  assert.deepEqual(await stored(), {}, '저장소에도 없다');
+  const r = await korDripStart(ids, t); // 다시 — 이번엔 적힌다
   assert.equal(r.ok, true);
   assert.deepEqual((await getProfile()).korDrip, { b320: t });
   assert.deepEqual(korDripMap(), { b320: t }, '메모리 프로필도 같이');
   assert.equal((await korDripStart(ids, '2026-10-25')).why, 'same', '다시 열어도 그대로');
   assert.deepEqual((await getProfile()).korDrip, { b320: t });
-  fakeIdb.failNext('profile');
   const p = cloneProfile({ korDrip: { b320: t, zz: 1 } });
   assert.deepEqual(p.korDrip, { b320: t }, '모르는 묶음은 버림');
   const m = mergeStatRecord('profile', { id: 'me', updatedAt: 20, korDrip: { b320: '2026-10-25' } }, { id: 'me', updatedAt: 10, korDrip: { b320: '2026-10-23' } });
   assert.deepEqual(m.korDrip, { b320: '2026-10-23' }, '옛 쪽이 이르면 옛 쪽 — 이미 열린 글이 다시 잠기지 않게');
   const n = mergeStatRecord('profile', { id: 'me', updatedAt: 20, korDrip: 'x' }, { id: 'me', updatedAt: 10 });
   assert.ok(!('korDrip' in n));
-  await getProfile(); // failNext는 다음 쓰기에만 — 남은 실패를 비운다
+  assert.equal(fakeIdb.failsLeft(), 0, '남은 실패 예약 없음');
 });
