@@ -34,7 +34,7 @@ const STD = {
 test('📰 신문 글 6편 (v265): 연습 카드 여섯 · 물음 스물넷 · 원고 검사 통과 · 기사 다섯은 제목 줄과 줄마다 꼴 · 단원 지도 · ✍️ 둘 · 🧩 차례 둘 · sw v265', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(DATA.cards.slice(72, 78).map((c) => c.id), NEW);
-  assert.equal(validCards(DATA).length, 118); // v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 더함
+  assert.equal(validCards(DATA).length, 130); // v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '기사문'], ['practice', '기사문'], ['practice', '기사문'], ['practice', '기사문'], ['practice', '기사문'], ['practice', '설명하는 글']]);
   assert.deepEqual(NEW.map((id) => card(id).qs.length), [4, 4, 4, 4, 4, 4]);

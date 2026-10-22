@@ -29,6 +29,7 @@ import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from '.
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
 import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·보상 (순수 — 낱말 칸과 같은 꼴)
+import { dripOf, dripStartRule } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (v320, 순수)
 import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule } from './nonsul.js'; // 🖊️ 논술 칸·보상·잡기 기회 (v303 — 퍼즐과 같은 꼴, 잡기 기회는 따로)
 import { writeAddRule, writeReplyRule, writeReadRule, writesOf } from './korwrite.js'; // ✍️ 국어 서술형 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
@@ -994,6 +995,14 @@ export function korPuzzleDayMap() {
 /** 📚 받은 별 { '카드id:별': 날 } (그리기용 복사본) */
 export function korDoneMap() {
   return copyRestsDone(profile.korDone);
+}
+/** 📦 새 국어 글 묶음 시작 날 { 묶음: 'YYYY-MM-DD' } (그리기용 복사본, v320) */
+export function korDripMap() {
+  return dripOf(profile.korDrip);
+}
+/** 📦 묶음 시작 날 정하기 — 원고에 묶음 글이 있고 아직 시작 날이 없을 때만 오늘로 · 저장된 프로필로 한 트랜잭션 (v320) */
+export function korDripStart(ids, today) {
+  return houseDo((p) => dripStartRule(p, today, ids));
 }
 /** 💊 고르기 창 — 데리고 있는 포켓몬 id (한 마리 이상) */
 export function ownedMonIds() {

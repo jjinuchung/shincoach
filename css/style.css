@@ -3440,6 +3440,7 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .kor-h { margin: 0; font-size: 1.35rem; }
 .kor-intro { margin: 0; color: var(--muted); line-height: 1.6; }
 .kor-count { margin: 0; font-weight: 700; color: var(--primary-dark); font-variant-numeric: tabular-nums; }
+.kor-drip { margin: 0; color: var(--muted); word-break: keep-all; } /* 📦 내일 새 글이 와요 (v320) — 담담하게 한 줄 */
 .kor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 12px; }
 .kor-slot {
   position: relative; display: grid; justify-items: center; gap: 4px; text-align: center;

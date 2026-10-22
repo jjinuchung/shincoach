@@ -24,7 +24,8 @@ import * as tabs from './kortabs.js'; // 🔤 낱말 · 📘 단원 탭 (v234) �
 import * as puzzles from './korpuzzleview.js'; // 🧩 퍼즐 탭 (v242) — 같은 꼴(ctx로 건넴)
 import { writeBoxEl, replyBannerEl, renderReplyView, slotWriteText, syncWrites, appliedLine } from './korwriteview.js'; // ✍️ 서술형 (v237) — 이 파일을 import하지 않는다(ctx로 건넴)
 import { cardWriteState } from './korwrite.js';
-import { korWritesMap } from './xp.js';
+import { korWritesMap, korDripMap, korDripStart } from './xp.js';
+import { visibleCards, hasLocked } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -38,7 +39,7 @@ const el = (tag, cls, text) => {
 export const CONTENT_URL = './coach/korean/reading.json';
 
 // cards: 쓸 수 있는 카드(validCards) · read: 읽는 중인 글 { card, qi, qs: [물음 상태], misses, result, saving }
-const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards', wview: '', writeNote: '', showView: null };
+const ui = { all: null, cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards', wview: '', writeNote: '', showView: null };
 // wview = 📬 답장 화면을 보고 있는 카드 id (그동안 목록이 덮지 않게) · writeNote = 답장이 붙었을 때 도감 위 한 줄(한 번)
 // tab = 📚 도감(cards) · 🔤 낱말(words) · 📘 단원(units) — 글을 읽고 돌아오면 그 탭으로
 // catchState = 지금 열어 둔 잡기 창 { threw, hold } — 창이 바깥에서 닫혀(catch.closeCatch는 부른 쪽에 안 알린다) 소식이 없을 때 안 던진 기회를 돌려주려고
@@ -100,17 +101,26 @@ export function catchRuleLine(star, listen = false) {
   return `🎯 다시 ${listen ? '들을' : '읽을'} 때는 처음 고른 답이 반 이상 맞으면 포켓몬을 만나요`;
 }
 
+/** 읽은 글 id — 별 기록('카드id:별')이 하나라도 있는 글 (📦 이미 읽은 글은 잠그지 않는다) */
+const readIds = () => new Set(Object.keys(korDoneMap()).map((k) => k.split(':')[0]));
+
+/**
+ * 원고를 한 번 받아 두고(ui.all), 아이 화면에 보일 글(ui.cards)은 부를 때마다 오늘 날짜로 다시 거른다 —
+ * 📦 새 글 묶음은 하루에 두 편씩 열린다(v320 kordrip) · 앱을 켜 둔 채 날이 바뀌어도 다음에 부를 때 열린다
+ */
 async function loadCards() {
-  if (ui.cards) return ui.cards;
-  try {
-    const res = await fetch(CONTENT_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    ui.cards = validCards(await res.json());
-    ui.loadErr = '';
-  } catch (e) {
-    ui.loadErr = String((e && e.message) || e);
-    ui.cards = null;
+  if (!ui.all) {
+    try {
+      const res = await fetch(CONTENT_URL);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      ui.all = validCards(await res.json());
+      ui.loadErr = '';
+    } catch (e) {
+      ui.loadErr = String((e && e.message) || e);
+      ui.all = null;
+    }
   }
+  ui.cards = ui.all ? visibleCards(ui.all, korDripMap(), todayKey(), readIds()) : null;
   return ui.cards;
 }
 
@@ -119,6 +129,8 @@ export async function enterKorean() {
   topUpKorChars(); // 🎯 국어 포켓몬 그림을 조금씩 먼저
   // 🎯 소식 없이 닫힌 창부터 정리한 뒤 장부 정리 — 지난번에 뺐는데 판정 전에 꺼진 기회·돌려주다 실패한 기회 (Codex 49차 #1·#2 · 50차 #1 차례대로)
   Promise.resolve(settleLostCatch()).catch(() => {}).then(() => settleKorThrows());
+  // 📦 새 글 묶음 시작 날 — 원고에 묶음 글이 들어 있고 아직 시작 날이 없으면 오늘로(v320) · 첫날 몫은 그 전과 같아 다시 그리지 않는다 · 못 적으면 다음에 들어올 때
+  loadCards().then(() => (ui.all ? korDripStart(ui.all.map((c) => c.id), todayKey()) : null)).catch(() => {});
   // 📥 ✍️ 서술형 아빠 답장 — 비공개 저장소에서 받아 그 글에 한 번만 붙인다(보상도 한 트랜잭션) · 못 받으면 조용히
   loadCards().then((cards) => (cards ? syncWrites(cards) : null)).then((r) => {
     const line = appliedLine(r, 'K'); // 🖊️ 논술 글 답장(v304)은 논술 첫 화면에서
@@ -197,7 +209,7 @@ export async function renderList() {
     if (ui.loadErr) box.appendChild(el('p', 'kor-small', ui.loadErr));
     const again = el('button', 'btn btn-primary', '다시 불러오기');
     again.type = 'button';
-    again.addEventListener('click', () => { ui.cards = null; renderList(); });
+    again.addEventListener('click', () => { ui.all = null; ui.cards = null; renderList(); });
     box.appendChild(again);
     main.appendChild(box);
     return;
@@ -219,6 +231,8 @@ export async function renderList() {
   head.appendChild(el('h2', 'kor-h', '📚 작품 도감'));
   head.appendChild(el('p', 'kor-intro', '글을 읽고 문제를 풀면 카드가 모여요. 다른 날 다시 읽으면 ★★, 처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★!'));
   head.appendChild(el('p', 'kor-count', `모은 카드 ${got} / ${total} · ★ ${stars} / ${total * 3}`));
+  // 📦 아직 열리지 않은 새 글이 있으면 한 줄 — 몇 편 남았는지 셈 없이 (v320)
+  if (ui.all && hasLocked(ui.all, korDripMap(), todayKey(), readIds())) head.appendChild(el('p', 'kor-drip', '📦 내일 새 글이 와요'));
   const cb = catchBtnEl(); // 🎯 남은 국어 잡기 기회 — 다 읽은 카드에서 안 던지고 나왔어도 여기서
   if (cb) head.appendChild(cb);
   if (ui.writeNote) { head.appendChild(el('p', 'kor-wnote', ui.writeNote)); ui.writeNote = ''; } // 📬 답장이 붙었다 — 한 번
