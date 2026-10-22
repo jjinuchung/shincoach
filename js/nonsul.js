@@ -37,6 +37,42 @@ const str = (v) => typeof v === 'string' && v.trim().length > 0;
 
 export const otherSide = (side) => (side === 'yes' ? 'no' : 'yes');
 
+// ── 📖 독서 논술 (v316, 2026-10-22 아버님 "이대로") — 진우가 ★를 받은 이야기로 만든 주제 ──
+// 칸 card = 이어진 국어 글(K##) · intro = 📖 한 줄 소개 · 편마다 ev = 이유마다 근거 줄 번호(글에 없는 내 생각으로 드는 이유는 []) ·
+// off = 글에 있지만 상관없는 말 하나(ev) + 글에 없는 지어낸 말 하나(made — 진우가 국어에서 가장 많이 하는 잘못 읽기 "지어내기"를 같이 연습)
+// 판의 흐름·보상·짧은 글은 다른 주제와 같다 · 줄 번호가 그 글 안에 있는지는 시험이 국어 원고와 맞춰 본다(이 파일은 국어 원고를 모른다)
+/** 📖 한 줄 소개 글자 수 상한 */
+export const INTRO_MAX = 70;
+const CARD_RE = /^K\d{1,3}$/;
+const EV_MAX = 99;
+const evOk = (ev) => Array.isArray(ev) && ev.every((k) => Number.isInteger(k) && k >= 1 && k <= EV_MAX);
+/** 독서 논술 칸의 틀린 곳 */
+function readingProblems(t, id) {
+  const bad = [];
+  if (typeof t.card !== 'string' || !CARD_RE.test(t.card)) bad.push(`${id}: card는 국어 글 K##`);
+  if (!str(t.intro) || !t.intro.endsWith('요.') || [...t.intro].length > INTRO_MAX) bad.push(`${id}: 한 줄 소개(intro)는 "…요." ${INTRO_MAX}자까지`);
+  for (const side of SIDES) {
+    const s = t[side];
+    if (!isObj(s) || !Array.isArray(s.ev) || s.ev.length !== REASONS || !s.ev.every(evOk)) bad.push(`${id} ${side}: ev는 이유마다 근거 줄 번호 목록(${REASONS}칸 · 생각 이유는 [])`);
+    else if (!s.ev.some((e) => e.length)) bad.push(`${id} ${side}: 글에 근거가 있는 이유가 하나는 있어야 해요`);
+  }
+  if (Array.isArray(t.off) && t.off.length === OFFS) {
+    const made = t.off.filter((o) => isObj(o) && o.made === true);
+    const real = t.off.filter((o) => isObj(o) && o.made !== true);
+    if (made.length !== 1 || real.length !== 1) bad.push(`${id}: 상관없는 말은 글에 있는 말 하나(ev) + 지어낸 말 하나(made)`);
+    else {
+      if (!evOk(real[0].ev) || !real[0].ev.length) bad.push(`${id}: 글에 있는 상관없는 말에 근거 줄(ev)`);
+      if (made[0].ev !== undefined) bad.push(`${id}: 지어낸 말에는 근거 줄이 없어요`);
+      if (!String(made[0].why).startsWith('글에 없는 이야기예요')) bad.push(`${id}: 지어낸 말의 까닭은 "글에 없는 이야기예요"로 시작`);
+    }
+  }
+  return bad;
+}
+/** 📖 그 국어 글로 만든 독서 논술 주제 (순수 — 없으면 null) */
+export function readingTopicOf(list, cardId) {
+  return (Array.isArray(list) ? list : []).find((t) => t && t.card === cardId) || null;
+}
+
 /** 주제 하나의 틀린 곳 목록 (비면 통과) */
 function topicProblems(t) {
   const bad = [];
@@ -57,6 +93,7 @@ function topicProblems(t) {
   }
   if (!Array.isArray(t.off) || t.off.length !== OFFS) bad.push(`${id}: 상관없는 말은 ${OFFS}개`);
   else for (const o of t.off) if (!isObj(o) || !str(o.t) || !str(o.why) || o.t.length > SENT_MAX) bad.push(`${id}: 상관없는 말은 { t, why } — ${o && o.t}`);
+  if (t.card !== undefined) bad.push(...readingProblems(t, id));
   if (!bad.length) {
     const all = [...t.yes.reasons, ...t.no.reasons, ...t.off.map((o) => o.t)];
     if (new Set(all).size !== all.length) bad.push(`${id}: 겹치는 문장`);

@@ -38,7 +38,7 @@ const el = (tag, cls, text) => {
 export const CONTENT_URL = './coach/korean/reading.json';
 
 // cards: 쓸 수 있는 카드(validCards) · read: 읽는 중인 글 { card, qi, qs: [물음 상태], misses, result, saving }
-const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards', wview: '', writeNote: '' };
+const ui = { cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards', wview: '', writeNote: '', showView: null };
 // wview = 📬 답장 화면을 보고 있는 카드 id (그동안 목록이 덮지 않게) · writeNote = 답장이 붙었을 때 도감 위 한 줄(한 번)
 // tab = 📚 도감(cards) · 🔤 낱말(words) · 📘 단원(units) — 글을 읽고 돌아오면 그 탭으로
 // catchState = 지금 열어 둔 잡기 창 { threw, hold } — 창이 바깥에서 닫혀(catch.closeCatch는 부른 쪽에 안 알린다) 소식이 없을 때 안 던진 기회를 돌려주려고
@@ -892,7 +892,25 @@ function finishEl() {
   const cb = catchBtnEl(); // 🎯 별을 받았으면 국어 포켓몬 잡기
   if (cb) box.appendChild(cb);
   if (res.ok && r.card.write) box.appendChild(writeBoxEl(r.card, writeCtx)); // ✍️ 생각 쓰기 — 객관식 뒤, 건너뛰어도 별은 그대로
+  if (res.ok) box.appendChild(storyNonsulEl(r.card.id));
   return box;
+}
+
+/**
+ * 🖊️ 이 이야기로 생각해 보기 (v316 📖 독서 논술) — 그 글로 만든 논술 주제가 있고 아직 ⭐가 아니면 단추 하나(셈 문구 없음) ·
+ * 원고는 논술 화면 쪽이 받는다(그동안은 빈 자리 — 받으면 그 자리에 단추) · 누르면 그 주제 판을 준비하고 논술 화면으로(⏳ 국어 시간 안)
+ */
+function storyNonsulEl(cardId) {
+  const slot = el('div', 'kor-ns-link');
+  import('./nonsulview.js').then((ns) => ns.readingTopicFor(cardId).then((t) => {
+    if (!t || !slot.isConnected || !ui.showView) return;
+    slot.appendChild(el('p', 'kor-ns-q', `${t.icon} ${t.q}`));
+    const b = el('button', 'btn btn-primary kor-ns-btn', '🖊️ 이 이야기로 생각해 보기');
+    b.type = 'button';
+    b.addEventListener('click', () => guardStart('korean', () => { if (ns.openTopic(t.id)) ui.showView('nonsul'); }));
+    slot.appendChild(b);
+  })).catch(() => {});
+  return slot;
 }
 
 // ───────────────────── 🎯 국어 포켓몬 잡기 (2026-10-11) ─────────────────────
@@ -1053,6 +1071,7 @@ function tickRead() {
 export function initKorean({ showView }) {
   if (ui.wired) return;
   ui.wired = true;
+  ui.showView = showView; // 🖊️ 이 이야기로 생각해 보기 → 논술 화면 (v316)
   const back = $('btn-korean-back');
   if (back) back.addEventListener('click', () => showView('home'));
   // 🎧 앱을 내리면(다른 앱·화면 끔) 읽던 소리를 멈춘다 — 돌아오면 ▶ 다시 듣기

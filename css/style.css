@@ -3834,6 +3834,14 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .ns-essay-q { line-height: 1.5; }
 .ns-essay-tag { font-size: 0.85rem; font-weight: 700; color: var(--primary-dark); }
 .ns-whint { margin: 0; color: var(--muted); line-height: 1.55; word-break: keep-all; }
+/* 📖 독서 논술 (v316) — 판 위 한 줄 소개 · 글 다시 보기 (들은 글 보기 kor-script와 같은 꼴) · 국어 글을 다 읽은 화면의 단추 */
+.ns-story { display: grid; gap: 8px; }
+.ns-story-intro { margin: 0; background: var(--kor-paper); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; line-height: 1.6; word-break: keep-all; }
+.ns-story-text { margin-top: 0; }
+.kor-ns-link { display: grid; gap: 6px; justify-items: center; margin-top: 10px; }
+.kor-ns-link:empty { display: none; }
+.kor-ns-q { margin: 0; font-weight: 700; line-height: 1.5; text-align: center; word-break: keep-all; }
+.kor-ns-btn { white-space: normal; word-break: keep-all; }
 .ns-wrow { display: grid; gap: 4px; }
 .ns-wrow .kor-wlabel { margin: 4px 0 0; }
 .ns-wline { display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 8px; align-items: start; } /* 머리말 칸 폭을 같게 — 쓰는 칸이 한 줄로 서게 (가장 긴 머리말 「그래도 나는」) */

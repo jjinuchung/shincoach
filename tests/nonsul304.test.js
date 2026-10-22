@@ -67,7 +67,7 @@ test('✍️ 원고: 채점 기준 write 하나 · 판 1 · 꼭 들어갈 것 �
 
 test('✍️ 주제 → 서술형 카드: 쓸 수 있는 주제마다 N## · 제목은 주제 물음 · 물음·기준은 공통 · 300자 · 머리말이 틀 · 기준이 깨지면 [](짧은 글을 안 연다)', () => {
   assert.deepEqual(NCARDS.map((c) => c.id), allTopics(RAW).map((t) => t.id));
-  assert.equal(NCARDS.length, 32);
+  assert.equal(NCARDS.length, 42); // v316 📖 독서 논술 10
   for (const c of NCARDS) {
     assert.ok(WRITE_CARD_RE.test(c.id));
     assert.equal(c.title, allTopics(RAW).find((t) => t.id === c.id).q);
@@ -303,7 +303,7 @@ test('✍️ 화면 연결: 논술 화면 — 판 끝(저장된 뒤)·첫 화면
   const enter = body(v, 'export async function enterNonsul() {');
   assert.ok(enter.includes('syncWrites(S.wcards).then((r) => {') && enter.includes("const line = appliedLine(r, 'N');") && enter.includes('else if (S.w) renderWrite();'));
   assert.ok(body(v, 'function refreshAfterCatch() {').includes('else if (!S.w) renderHome();'), '잡은 뒤 쓰기 화면을 다시 그려 쓰던 칸을 날리지 않는다');
-  assert.ok(body(v, 'function startRound(practice) {').includes("S.w = '';"));
+  assert.ok(body(v, "function startRound(practice, want = '') {").includes("S.w = '';")); // v316: 주제를 정해 시작(📖 독서 논술)
   assert.ok(read('js/koreanview.js').includes("const line = appliedLine(r, 'K');"), '국어 화면엔 국어 답장 수만');
   const kw = read('js/korwriteview.js');
   const box = body(kw, 'export function writeBoxEl(card, ctx) {');

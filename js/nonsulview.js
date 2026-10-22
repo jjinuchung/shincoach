@@ -5,7 +5,8 @@
 // 아이 화면에는 셈·진행 수를 띄우지 않는다 (2026-10-15)
 // ✍️ 짧은 글 (v304): 판을 끝낸 주제 — 판 끝 「✍️ 이번엔 내 말로 써 볼까요?」 · 첫 화면 「✍️ 내 말로 짧은 글 쓰기」 목록 · 📬 아빠 답장 띠 ·
 //   쓰기 화면(S.w)은 korwriteview.writeBoxEl에 칸마다 머리말 채우기(nonsulwriteview.essayFormEl)를 끼운다 · 들어올 때 비공개 저장소 답장 받기
-import { allTopics, planTopic, dealTopic, essayParts, nonsulFinishText, nonsulTodayLine, ORDER_HINTS, nonsulWriteCards, essayTopics } from './nonsul.js';
+import { allTopics, planTopic, dealTopic, essayParts, nonsulFinishText, nonsulTodayLine, ORDER_HINTS, nonsulWriteCards, essayTopics, readingTopicOf, isSolved } from './nonsul.js';
+import { circled } from './korean.js';
 import { wordsToday } from './korwords.js';
 import { nonsulFinish, nonsulMap, nonsulDayMap, nonsulTakeThrow, nonsulGiveBackThrow, nonsulThrowsLeft, profileReady, getLevelInfo, isTired, getLook, inventory, catchAttempt, korWritesMap } from './xp.js';
 import { cardWriteState, unreadReplies } from './korwrite.js';
@@ -29,7 +30,8 @@ const ding = (ok) => { try { sfxUnlock(); if (ok) sfx.ding(); else sfx.wrong(); 
 
 // data: 원고 · list: 쓸 수 있는 주제 · r: 푸는 판(화면을 떠나도 남아 돌아오면 이어서) · 잡기 상태는 국어 화면과 같은 꼴
 // wcards: ✍️ 짧은 글 카드(채점 기준이 깨졌으면 [] — 짧은 글을 안 연다) · w: 쓰기 화면의 주제 id(돌아오면 그대로) · writeNote: 답장이 붙었다는 한 줄(한 번)
-const S = { data: null, list: [], wcards: [], loadErr: '', r: null, w: '', writeNote: '', catching: false, catchState: null, catchMsg: '', wired: false, charBusy: false };
+// stories: 📖 독서 논술 주제의 국어 글(카드 id → { title, lines }, v316 — 못 받으면 한 줄 소개만)
+const S = { data: null, list: [], wcards: [], loadErr: '', r: null, w: '', writeNote: '', catching: false, catchState: null, catchMsg: '', wired: false, charBusy: false, stories: null };
 const STEP_NAMES = ['① 내 의견', '② 이유', '③ 반대 의견', '④ 글 순서'];
 const STEP_OF = { side: 0, reasons: 1, counter: 2, order: 3, done: 4 };
 
@@ -55,6 +57,40 @@ async function loadData() {
   } catch {
     S.loadErr = '주제를 받지 못했어요 — 인터넷이 되는 곳에서 다시 들어와 주세요';
   }
+}
+
+/** 📖 독서 논술 주제의 국어 글 (v316) — 한 번 받아 둔다 · 못 받으면 빈 칸(📖 한 줄 소개만 보인다 — 다음에 들어올 때 다시) */
+async function loadStories() {
+  if (S.stories) return;
+  const want = new Set(S.list.map((t) => t.card).filter(Boolean));
+  if (!want.size) return;
+  try {
+    const res = await fetch('./coach/korean/reading.json');
+    if (!res.ok) throw new Error(String(res.status));
+    const cards = (await res.json()).cards;
+    S.stories = new Map((Array.isArray(cards) ? cards : []).filter((c) => c && want.has(c.id) && Array.isArray(c.lines)).map((c) => [c.id, { title: String(c.title || ''), lines: c.lines }]));
+  } catch { S.stories = null; }
+}
+/** 글 한 줄 (극본 대사 {who, t}도) */
+const storyLine = (l) => (typeof l === 'string' ? l : l && typeof l === 'object' ? `${l.who ? `${l.who}: ` : ''}${l.t || l.text || ''}` : '');
+
+/**
+ * 📖 독서 논술 머리 (v316) — 「이야기 제목」 한 줄 소개 + [📖 글 다시 보기](접어 둠 · 판 안에서는 펼친 채로 다시 그린다)
+ * 글을 못 받았으면 한 줄 소개만
+ */
+function storyEl(t, r) {
+  const box = el('div', 'ns-story');
+  const st = S.stories && S.stories.get(t.card);
+  box.appendChild(el('p', 'ns-story-intro', `📖 ${st ? `「${st.title}」 ` : ''}${t.intro}`));
+  if (st) {
+    const det = el('details', 'kor-script ns-story-text');
+    det.open = !!(r && r.storyOpen);
+    det.addEventListener('toggle', () => { if (r) r.storyOpen = det.open; });
+    det.appendChild(el('summary', '', '📖 글 다시 보기'));
+    st.lines.forEach((l, i) => det.appendChild(el('p', 'kor-script-line', `${circled(i + 1)} ${storyLine(l)}`)));
+    box.appendChild(det);
+  }
+  return box;
 }
 
 // ───────────────────── 첫 화면 ─────────────────────
@@ -168,8 +204,9 @@ function renderWrite() {
 
 // ───────────────────── 한 판 ─────────────────────
 
-function startRound(practice) {
-  const id = planTopic(S.list, nonsulMap(), Date.now(), practice);
+/** 판 시작 — want(주제 id)를 주면 그 주제로(📖 국어 글을 다 읽은 화면에서, v316) · 아니면 오늘 할 주제(planTopic) */
+function startRound(practice, want = '') {
+  const id = want || planTopic(S.list, nonsulMap(), Date.now(), practice);
   const t = byId(id);
   if (!t) { renderHome(); return; }
   const cur = nonsulMap()[id];
@@ -198,6 +235,7 @@ function renderRound() {
   head.appendChild(el('span', 'ns-q-icon', r.t.icon));
   head.appendChild(el('h2', 'ns-q-text', r.t.q));
   card.appendChild(head);
+  if (r.t.card) card.appendChild(storyEl(r.t, r)); // 📖 독서 논술 — 한 줄 소개 · 글 다시 보기 (v316)
   card.appendChild(stepsEl(r.step));
   if (r.step === 'side') sideEl(card, r);
   else if (r.step === 'reasons') reasonsEl(card, r);
@@ -482,6 +520,12 @@ export async function enterNonsul() {
   settleThrows();
   topUpChars();
   await loadData();
+  // 📖 국어 글(v316)은 기다리지 않는다 — 화면을 먼저 그리고, 받으면 글이 아직 안 붙은 독서 논술 판만 다시 그린다(고른 것·펼친 상태는 판에 남아 있다) (🔍 Codex 122차 #2)
+  loadStories().then(() => {
+    const r = S.r;
+    const m = mainEl();
+    if (r && r.t.card && S.stories && S.stories.has(r.t.card) && nonsulVisible() && m && !m.querySelector('.ns-story-text')) renderRound();
+  }).catch(() => {});
   try { await profileReady(); } catch { /* 못 읽어도 빈 칸으로 그린다 */ }
   // 📥 ✍️ 짧은 글 아빠 답장 — 국어와 같은 파일에서 받아 그 글에 한 번만 붙인다(보상도 한 트랜잭션) · 못 받으면 조용히
   syncWrites(S.wcards).then((r) => {
@@ -494,6 +538,26 @@ export async function enterNonsul() {
   if (S.r) renderRound();
   else if (S.w) renderWrite();
   else renderHome();
+}
+
+// ───────────────────── 📖 국어 글에서 들어오기 (v316) ─────────────────────
+
+/**
+ * 그 국어 글로 만든 독서 논술 주제 — 아직 ⭐가 아니면 { id, icon, q }, 없거나 ⭐면 null (국어 글을 다 읽은 화면이 단추를 띄울지)
+ * 원고를 못 받으면 null (단추가 안 뜰 뿐)
+ */
+export async function readingTopicFor(cardId) {
+  await loadData();
+  const t = readingTopicOf(S.list, cardId);
+  if (!t) return null;
+  try { await profileReady(); } catch { /* 못 읽으면 ⭐인지 모른다 — 단추를 띄운다(판은 연습이면 연습으로 저장) */ }
+  return isSolved(nonsulMap()[t.id]) ? null : { id: t.id, icon: t.icon, q: t.q };
+}
+/** 그 주제로 판을 준비한다 — 부르는 쪽이 이어서 논술 화면을 연다(enterNonsul이 이 판을 그린다) · 푸는 판·쓰기 화면은 버린다 */
+export function openTopic(id) {
+  if (!byId(id)) return false;
+  startRound(false, id);
+  return true;
 }
 
 /** 배선 — ← 과목 고르기 */
