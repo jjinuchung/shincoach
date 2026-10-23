@@ -101,7 +101,7 @@ export function subjectTarget(subject) {
 
 function cardEl(subject, mascot, onPick) {
   const li = document.createElement('li');
-  li.className = 'home-card' + (subject.ready ? '' : ' soon');
+  li.className = `home-card is-${subject.key}` + (subject.ready ? '' : ' soon'); // 과목 색은 키로 (v323 — 차례로 달면 새 과목이 색 없이 나온다)
 
   const btn = document.createElement('button');
   btn.type = 'button';

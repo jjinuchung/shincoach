@@ -254,9 +254,12 @@ button { font-family: inherit; }
   50% { transform: translateY(-5px) scale(1.03); }
 }
 
-/* 과목별 색 — 아이가 글자를 안 읽어도 색으로 구별한다 */
-.home-card:nth-child(1) .home-card-btn { border-color: #a5b4fc; background: linear-gradient(180deg, #eef2ff 0%, #ffffff 55%); }
-.home-card:nth-child(2) .home-card-btn { border-color: #fcd34d; background: linear-gradient(180deg, #fffbeb 0%, #ffffff 55%); }
+/* 과목별 색 — 아이가 글자를 안 읽어도 색으로 구별한다
+   카드 차례(nth-child)가 아니라 과목 이름(is-키)으로 단다 — 차례로 달았더니 셋째·넷째(국어·논술)는 테두리가 없었다 (v323, 2026-10-23 진우 「국어는 초록색으로」) */
+.home-card.is-english .home-card-btn { border-color: #a5b4fc; background: linear-gradient(180deg, #eef2ff 0%, #ffffff 55%); }
+.home-card.is-math .home-card-btn { border-color: #fcd34d; background: linear-gradient(180deg, #fffbeb 0%, #ffffff 55%); }
+.home-card.is-korean .home-card-btn { border-color: #86efac; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 55%); }
+.home-card.is-nonsul .home-card-btn { border-color: #7dd3fc; background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 55%); }
 
 /* ✨ 오늘의 보너스 (수학 카드) — 아직 안 받은 날은 카드가 반짝인다 (아버님 2026-09-22: 아이가 반짝이는 걸 좋아함).
    움직이는 건 opacity·transform만 — 구형 태블릿에서 box-shadow를 계속 그리면 버벅인다 */
