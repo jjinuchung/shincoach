@@ -2496,6 +2496,12 @@ button { font-family: inherit; }
 .battle-quiz-choice.no { background: #fee2e2; border-color: #dc2626; color: #7f1d1d; }
 .battle-quiz-skip { margin-top: 8px; width: 100%; font-size: 0.9rem; color: var(--muted); }
 @media (max-width: 420px) { .battle-quiz-choices { grid-template-columns: 1fr; } }
+/* ⚔️ 국어·논술 배틀 (v325) — 보기가 뜻·이유 글이라 한 줄에 하나, 왼쪽 맞춤 */
+.battle-quiz-choices.is-text { grid-template-columns: 1fr; }
+.battle-quiz-choices.is-text .battle-quiz-choice { text-align: left; font-size: 1rem; line-height: 1.45; }
+.kor-battle-offer { margin: 14px auto 0; padding: 12px 14px; max-width: 420px; border-radius: 14px; background: #fff7ed; border: 2px solid #fdba74; text-align: center; }
+.kor-battle-line { margin: 0 0 8px; font-weight: 800; color: #9a3412; }
+.kor-battle-btn { width: 100%; }
 
 /* 잠깐 떴다 사라지는 알림 (배틀 결과 등) */
 .math-toast {

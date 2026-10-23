@@ -188,6 +188,16 @@ export function movesOf(id) {
   ];
 }
 
+/** 기술 단추 밑 말 — 문제 풀기 턴(수학·⚔️ 국어·논술)이면 "잘 풀면" (v325 — 전엔 수학 배틀에도 "잘 말하면 세게!"가 나왔다) */
+export function moveHint(mv, quiz) {
+  return quiz && mv.key === 'strong' ? '잘 풀면 세게!' : mv.hint;
+}
+
+/** 졌을 때 다음 걸음 한마디 — 따라 말하기는 또렷하게, 문제 풀기는 차근차근 (v325 — 전엔 수학 배틀에도 "또렷하게 말해봐요"가 나왔다) */
+export function loseTip(quiz) {
+  return quiz ? '다음엔 차근차근 풀어 봐요' : '다음엔 더 또렷하게 말해봐요';
+}
+
 /** 말하기 결과 → 등급: star | pass | fail | none */
 export function speakTier(result) {
   if (!result || result.method === 'cancelled') return 'none';
@@ -303,7 +313,7 @@ export function palButton({ count = 0, used = false, myHp = PAL.hp, hasPal = fal
 // ── 화면 ──
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const TRAINERS = ['🧢', '👧', '👦', '🤠', '🧙', '🧝', '🕵️', '👮']; // ZWJ 조합·최신 이모지 없이 (안드로이드 10)
+export const TRAINERS = ['🧢', '👧', '👦', '🤠', '🧙', '🧝', '🕵️', '👮']; // ZWJ 조합·최신 이모지 없이 (안드로이드 10) · ⚔️ 국어·논술 단추가 미리 고른다(o.trainer)
 // 📣 pal = 불러온 동료(물러나도 기록은 남는다) · palHp = 동료 HP(0이면 물러남) · palUsed = 이번 배틀에 불렀나
 const ui = { open: false, run: 0, o: null, my: null, myHp: 0, enemyHp: 0, turn: 0, busy: false, result: null, pal: null, palHp: 0, palUsed: false };
 
@@ -337,6 +347,8 @@ export function isBattleOpen() {
  * @param {() => object|null} o.nextCue 이번 턴에 따라 말할 문장
  * @param {(cue:object, hooks:{onInterim:(t:string)=>void, onLevel:()=>void, register:(stop:()=>void)=>void}) => Promise<object>} o.speak 문장 들려주고 따라 말하기 → 말하기 결과
  * @param {boolean} [o.practice] 연습(결과 반영 없음)
+ * @param {(box:HTMLElement, hooks:object) => Promise<{correct:boolean, skipped:boolean, interrupted:boolean}>} [o.quiz] 🔢 문제 풀기 턴(수학·⚔️ 국어·논술) — 있으면 따라 말하기 대신
+ * @param {string} [o.trainer] 트레이너 이모지 (없으면 무작위)
  * @param {(result:{outcome:'win'|'lose'|'declined'|'quit', my?:object, opponent:object, turns:number}) => void} o.onDone
  */
 export function openBattle(o) {
@@ -351,7 +363,7 @@ export function openBattle(o) {
   ui.result = null;
   ui.speakStop = null;
   ui.streak = 0; // 🔢 수학 턴의 연속 정답 (🌟 판정)
-  const trainer = TRAINERS[Math.floor(Math.random() * TRAINERS.length)];
+  const trainer = o.trainer || TRAINERS[Math.floor(Math.random() * TRAINERS.length)]; // ⚔️ 국어·논술은 단추에 보인 그 트레이너
   $('battle-title').textContent = o.practice ? '⚔️ 배틀 연습' : '⚔️ 배틀!';
   $('battle-trainer').textContent = trainer;
   $('battle-msg').textContent = `"${o.opponent.ko}${josa(o.opponent.ko, '이', '가')} 나랑 있어. 배틀 할래?"`;
@@ -576,7 +588,7 @@ function renderActions() {
     btn.type = 'button';
     btn.appendChild(el('span', 'em', mv.emoji));
     btn.appendChild(el('span', 'nm', mv.name));
-    btn.appendChild(el('span', 'hint', mv.hint));
+    btn.appendChild(el('span', 'hint', moveHint(mv, !!ui.o.quiz)));
     btn.addEventListener('click', () => playerTurn(mv.key));
     box.appendChild(btn);
   }
@@ -917,8 +929,9 @@ function endFight(outcome) {
     $('battle-my-fig').classList.add('down');
     $('battle-msg').textContent = '😢 졌어요…';
     const losses = (ui.my.losses || 0) + 1;
+    const tip = loseTip(!!o.quiz);
     res.textContent = o.practice ? '(연습) 진짜 배틀이면 패배가 1 늘어요'
-      : losses >= BATTLE.lossesToLose ? `${ui.my.ko}${josa(ui.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요… 다음엔 더 또렷하게 말해봐요` : `${ui.my.ko} 패배 ${losses}/${BATTLE.lossesToLose} — 다음엔 더 또렷하게 말해봐요`;
+      : losses >= BATTLE.lossesToLose ? `${ui.my.ko}${josa(ui.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요… ${tip}` : `${ui.my.ko} 패배 ${losses}/${BATTLE.lossesToLose} — ${tip}`;
     sfx.fail(); vibrate(200);
   }
   // 📣 pal = 불러온 동료(id·ko) — 결과 반영(패배·보상)은 my만 본다. 동료는 패배가 늘지 않는다

@@ -17,6 +17,9 @@ import { openCatch, isCatchOpen } from './catch.js';
 import { holdStore, refundOutcome } from './throwhold.js';
 import { guardStart } from './timeup.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
+import { nonsulBattleQ } from './korbattle.js';
+import { rollOffer, offerEl } from './korbattleview.js'; // ⚔️ 논술 배틀 (v325) — 이 파일을 import하지 않는다
+import { isBattleOpen } from './battle.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -361,6 +364,12 @@ async function finishRound() {
   r.result = res;
   if (res && res.ok && (res.first || res.solved)) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
   if (S.r === r && nonsulVisible()) renderRound();
+  // ⚔️ 논술 배틀 (v325) — 저장된 한 판 끝에 가끔 단추 하나(턴 문제는 이 의견에 알맞은 이유 — 원고 문장 그대로) · 그 사이 다음 판으로 갔으면 안 붙인다
+  if (res && res.ok) {
+    rollOffer('nonsul', () => (seen) => nonsulBattleQ(S.list, nonsulMap(), seen)).then((b) => {
+      if (b && S.r === r && r.result === res) { r.battle = b; if (nonsulVisible()) renderRound(); }
+    }).catch(() => {});
+  }
 }
 
 function finishEl(r) {
@@ -383,6 +392,10 @@ function finishEl(r) {
   box.appendChild(row);
   const cb = catchBtnEl(); // 🎯 그날 처음 끝냈으면 논술 포켓몬 잡기
   if (cb) box.appendChild(cb);
+  if (res.ok && r.battle) { // ⚔️ 배틀 단추 (v325) — 이 끝 화면이 떠 있을 때만 열린다 · 🎯 잡기를 준비하는 동안은 안 눌린다 (🔍 Codex 129차 #1·#4)
+    const offer = r.battle;
+    box.appendChild(offerEl(offer, 'view-nonsul', () => { r.battle = null; if (S.r === r && nonsulVisible()) renderRound(); }, { live: () => S.r === r && r.battle === offer, busy: () => !!S.catching }));
+  }
   return box;
 }
 
@@ -490,6 +503,7 @@ export async function runCatch() {
   if (!taken || !taken.ok) { S.catchMsg = taken && taken.why === 'none' ? '' : CATCH_WHY.save; done(); return; }
   const st = { threw: false, hold: holds.track() }; // 뺀 기회를 장부에 — 판정 전에 앱이 꺼져도 다음에 돌려준다
   if (!nonsulVisible()) { await st.hold.refund(giveBack); S.catching = false; return; } // 뺀 사이 나갔다 — 돌려준다
+  if (isBattleOpen()) { await st.hold.refund(giveBack); done(); return; } // 뺀 사이 ⚔️ 배틀이 열렸다 — 겹쳐 열지 않고 돌려준다 (🔍 Codex 129차 #4)
   S.catchState = st;
   try {
     openCatch({

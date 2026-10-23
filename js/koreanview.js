@@ -26,6 +26,8 @@ import { writeBoxEl, replyBannerEl, renderReplyView, slotWriteText, syncWrites, 
 import { cardWriteState } from './korwrite.js';
 import { korWritesMap, korDripMap, korDripStart } from './xp.js';
 import { visibleCards, hasLocked, opensTomorrow, freshIds, needsStart, withFirst } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
+import { rollOffer, offerEl, korWordsSource } from './korbattleview.js'; // ⚔️ 국어 배틀 (v325) — 이 파일을 import하지 않는다
+import { isBattleOpen } from './battle.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -864,6 +866,12 @@ async function finishCard() {
     try { sfx.success(); } catch { /* 소리는 없어도 */ }
     import('./catch.js').then((m) => m.burstConfetti(res.star === 3 ? 90 : 50)).catch(() => {});
   }
+  // ⚔️ 국어 배틀 (v325) — 저장된 글 한 편 끝에 가끔 단추 하나(턴 문제는 🔤 배운 낱말 뜻) · 그 사이 다른 글로 갔으면 안 붙인다
+  if (res && res.ok) {
+    rollOffer('korean', () => korWordsSource()).then((b) => {
+      if (b && ui.read === r && r.result === res) { r.battle = b; renderQ(); }
+    }).catch(() => {});
+  }
   if (eggP) {
     const egg = await eggP;
     if (ui.read === r && egg && egg.ok) { r.egg = egg; renderQ(); }
@@ -946,6 +954,10 @@ function finishEl() {
   box.appendChild(row);
   const cb = catchBtnEl(); // 🎯 별을 받았으면 국어 포켓몬 잡기
   if (cb) box.appendChild(cb);
+  if (res.ok && r.battle) { // ⚔️ 배틀 단추 (v325) — 이 끝 화면이 떠 있을 때만 열린다 · 🎯 잡기를 준비하는 동안은 안 눌린다 (🔍 Codex 129차 #1·#4)
+    const offer = r.battle;
+    box.appendChild(offerEl(offer, 'view-korean', () => { r.battle = null; if (ui.read === r) renderQ(); }, { live: () => ui.read === r && r.battle === offer, busy: () => !!ui.catching }));
+  }
   if (res.ok && r.card.write) box.appendChild(writeBoxEl(r.card, writeCtx)); // ✍️ 생각 쓰기 — 객관식 뒤, 건너뛰어도 별은 그대로
   if (res.ok) box.appendChild(storyNonsulEl(r.card.id));
   return box;
@@ -1087,6 +1099,7 @@ export async function runKorCatch() {
   if (!taken || !taken.ok) { ui.catchMsg = taken && taken.why === 'none' ? '' : CATCH_WHY.save; done(); return; }
   const st = { threw: false, hold: holds.track() }; // 뺀 기회를 장부에 — 판정 전에 앱이 꺼져도 다음에 돌려준다 (Codex 49차 #1)
   if (!koreanVisible()) { await st.hold.refund(korGiveBack); ui.catching = false; return; } // 뺀 사이 나갔다 — 돌려준다
+  if (isBattleOpen()) { await st.hold.refund(korGiveBack); done(); return; } // 뺀 사이 ⚔️ 배틀이 열렸다 — 겹쳐 열지 않고 돌려준다 (🔍 Codex 129차 #4)
   ui.catchState = st;
   try {
     openCatch({
