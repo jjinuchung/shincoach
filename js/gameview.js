@@ -5,7 +5,7 @@
 //   두 창이 같은 판을 두 번 쓰지 못하고, 다른 창이 공부 시간을 아직 못 적었으면 판이 없다고 나온다(늘 적게 — 많게는 안 된다)
 // 아이 화면 규칙(아버님 2026-10-21): 판은 게임기 화면에만 🎮 그림으로 · "몇 분 더" 같은 셈은 어디에도 안 쓴다 ·
 //   공부하는 동안 판이 생기면 한 줄(🎮 게임 1판이 생겼어요!) — 🎮 게임기를 가졌을 때만
-import { GAMES, gameById, playState, playLimit, gameConfOf, subjectPlays, earnedPlays, usedPlays } from './minigame.js';
+import { GAMES, gameById, playState, playLimit, gameConfOf, studyPlays, studySec, earnedPlays, usedPlays } from './minigame.js';
 import { runDig, DIG_KINDS } from './gamedig.js';
 import { runRun } from './gamerun.js'; // 🏃 파트너 달리기 (v308)
 import { runShadow, shadowPoolOf, shadowShuffle, SHADOW_MIN } from './gameshadow.js'; // 👤 그림자 포켓몬 (v308)
@@ -15,7 +15,7 @@ import { runBalloon, BAL_MEOWTH } from './gameballoon.js'; // 🎈 로켓단 열
 import { runTower } from './gametower.js'; // 🗼 몬스터볼 탑 쌓기 (v311)
 import { runTug } from './gametug.js'; // 🤼 아빠랑 줄다리기 (v312)
 import { animUrl, ensureAnim } from './sprite.js';
-import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf } from './timelimit.js';
+import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf, usedSec } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
 import { gameEnd, gameBest, itemCount, ownedMonIds, getPartner } from './xp.js';
 import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl } from './pokemon.js';
@@ -138,7 +138,7 @@ export function isGamesOpen() {
   return ui.open;
 }
 
-/** 게임기 첫 화면 말 (순수) — 셈 없이 */
+/** 게임기 첫 화면 말 (순수) — 셈 없이 (몇 분·몇 판은 아래 설명 줄이 맡는다) */
 export const MOOD_LINE = {
   ready: '🎮 하고 싶은 게임을 골라요!',
   study: '📚 공부하고 오면 게임기가 켜져요',
@@ -146,16 +146,63 @@ export const MOOD_LINE = {
   rest: '💤 게임기가 쉬는 중이에요',
 };
 
+/**
+ * 🎮 판이 생기는 규칙 (순수 — v328, 아버님: 아이가 얼마나 공부해야 하는지 몰라 헷갈렸다) · 0판(게임기 쉼)이면 [] (공부로는 안 생긴다)
+ * @param {{min:number, cap:number}} conf
+ */
+export function ruleLines(conf) {
+  const c = gameConfOf(conf);
+  if (c.cap <= 0) return [];
+  return [
+    `공부 ${c.min}분마다 한 판 (수학·영어·국어·논술 모두 세요)`,
+    `하루 ${c.cap}판까지 · 받은 판은 오늘만 (밤 12시가 지나면 없어져요)`,
+    '공부 화면을 켜 두기만 하고 가만히 있으면 안 세요',
+  ];
+}
+
+/**
+ * 오늘 형편 두 줄 (순수 — v328) — "오늘 공부 37분 → 🎮 2판 받았어요 (1판 했어요)" · "📚 8분 더 공부하면 한 판이 생겨요"
+ * 🔒 부모가 준 판은 "🎁 선물 N판"으로 따로(공부로 받은 판과 섞으면 "공부 0분 → 1판"·"하루 12판인데 13판"이 된다, 🔍 Codex 132차 #3) ·
+ * 다 받았으면 "🌙 오늘 공부로 받을 판은 다 받았어요"(남은 판이 있을 때만 — 다 썼으면 MOOD_LINE.done이 말한다) ·
+ * 게임기 쉼(⚙ 0판)이면 [] — 🔒 부모 판이 남아 있어도 공부로는 안 생기니 셈을 말하지 않는다
+ * @param {{mood:string, left:number, sec:number, study:number, bonus:number, used:number, next:number, cap:number}} st playState
+ */
+export function statusLines(st) {
+  if (!st || st.mood === 'rest' || !(st.cap > 0)) return [];
+  const m = Math.floor((Number(st.sec) || 0) / 60);
+  const out = [`오늘 공부 ${m}분${st.study > 0 ? ` → 🎮 ${st.study}판 받았어요` : ''}${st.bonus > 0 ? ` · 🎁 선물 ${st.bonus}판` : ''}${st.used > 0 ? ` (${st.used}판 했어요)` : ''}`];
+  if (st.next > 0) out.push(`📚 ${Math.max(1, Math.ceil(st.next / 60))}분 더 공부하면 한 판이 생겨요`);
+  else if (st.mood !== 'done') out.push('🌙 오늘 공부로 받을 판은 다 받았어요');
+  return out;
+}
+
 function renderPick() {
   ui.view = 'pick';
   const b = body();
   b.innerHTML = '';
-  const st = playState(dailyNow(), gameConf());
+  const conf = gameConf();
+  const st = playState(dailyNow(), conf);
   const plays = el('div', 'gm-plays');
   plays.setAttribute('aria-hidden', 'true');
   for (let i = 0; i < st.left; i++) plays.appendChild(el('span', 'gm-coin', '🎮'));
   if (st.left) b.appendChild(plays);
   b.appendChild(el('p', 'gm-mood', MOOD_LINE[st.mood] || ''));
+  // 📚 오늘 형편 · 규칙 (v328) — 몇 분 더 하면 한 판인지 게임기 화면에서만 (공부 화면엔 셈을 안 띄운다)
+  const now = statusLines(st);
+  if (now.length) {
+    const box = el('div', 'gm-now');
+    for (const t of now) box.appendChild(el('p', 'gm-now-line', t));
+    b.appendChild(box);
+  }
+  const rules = ruleLines(conf);
+  if (rules.length) {
+    const box = el('div', 'gm-rule');
+    box.appendChild(el('p', 'gm-rule-title', '🎮 미니 게임은 이렇게 생겨요'));
+    const ul = el('ul', 'gm-rule-list');
+    for (const t of rules) ul.appendChild(el('li', '', t));
+    box.appendChild(ul);
+    b.appendChild(box);
+  }
   if (ui.msg) b.appendChild(el('p', 'gm-msg', ui.msg));
   const list = el('div', 'gm-list');
   for (const g of GAMES) {
@@ -366,7 +413,7 @@ function renderResult(g, res, end) {
 
 // ───────────────────── 공부하는 동안 — 🎮 판이 생겼어요 ─────────────────────
 
-const seen = { day: '', n: {} };
+const seen = { day: '', n: null, key: '' };
 let toastEl = null;
 let toastTimer = 0;
 
@@ -389,23 +436,31 @@ function toast(text) {
 }
 
 /**
- * ⏳ 시계가 1초마다 부른다(app.js onTick) — 지금 과목에서 판이 하나 늘었으면 한 줄.
- * 기준은 그 과목을 처음 본 때의 판(앱을 켜자마자·과목을 옮기자마자 울리지 않게) · 오늘 기록을 읽기 전엔 기준을 잡지 않는다
+ * ⏳ 시계가 1초마다 부른다(app.js onTick) — 공부하는 동안 판이 하나 늘었으면 한 줄 (판은 과목을 합친 오늘 공부 시간으로 — v328).
+ * 기준은 처음 본 때의 판(앱을 켜자마자 울리지 않게) · 오늘 기록을 읽기 전엔 기준을 잡지 않는다 · 공부 화면에서만
  */
 export function noteStudyPlays() {
   if (!isReady()) return;
-  const s = currentSubject();
-  if (!s) return;
-  const st = status(s);
-  if (!st) return;
-  const day = clockDay();
-  if (seen.day !== day) { seen.day = day; seen.n = {}; }
-  const n = subjectPlays(st.used, gameConf());
-  if (!(s in seen.n)) { seen.n[s] = n; return; }
-  if (n > seen.n[s]) {
-    seen.n[s] = n;
-    if (itemCount(GAME_DEVICE) > 0) { toast('🎮 게임 1판이 생겼어요!'); sfx.ding(); }
-  } else if (n < seen.n[s]) seen.n[s] = n; // ⚙에서 분을 늘렸다
+  if (!currentSubject()) return;
+  const conf = gameConf();
+  const n = studyPlays(studySec(dailyNow()), conf);
+  if (playNoteStep(seen, clockDay(), `${conf.min}:${conf.cap}`, n) && itemCount(GAME_DEVICE) > 0) {
+    toast(`🎮 게임 1판이 생겼어요! (공부 ${conf.min}분마다 한 판)`);
+    sfx.ding();
+  }
+}
+
+/**
+ * 🎮 알림을 울릴까 (순수) — seen = { day, key, n }을 고쳐 쓰고, 공부로 받은 판(n)이 기준보다 늘었을 때만 true
+ *   · 날이 바뀌었거나 ⚙ 분·상한(key)을 바꿨으면 기준을 새로 잡는다(그때는 안 울린다 — 앱을 켜자마자도)
+ *   · 기준은 내리지 않는다 — 과목을 옮길 때 flushTime이 모아 둔 초를 먼저 비우고 저장을 기다리는 사이 합친 시간이 잠깐 줄었다가
+ *     되돌아오면, 내렸던 기준 때문에 같은 판을 또 알린다 (🔍 Codex 132차 #2) · 공부 시간은 하루 안에서 줄지 않는다(병합도 큰 쪽)
+ */
+export function playNoteStep(seen, day, key, n) {
+  if (seen.day !== day || seen.key !== key) { seen.day = day; seen.key = key; seen.n = null; }
+  if (seen.n === null) { seen.n = n; return false; }
+  if (n > seen.n) { seen.n = n; return true; }
+  return false;
 }
 
 // ───────────────────── ⚙ 부모 ─────────────────────
@@ -418,10 +473,10 @@ export async function grantPlay() {
   return d;
 }
 
-/** ⚙ 아래 한 줄 (부모만 봄) — 받은 판(과목별 · 🔒) · 쓴 판 */
+/** ⚙ 아래 한 줄 (부모만 봄) — 오늘 공부 분(과목별) · 받은 판(🔒 포함) · 쓴 판 */
 export function gameTodayLine(conf) {
   const d = dailyNow();
   const e = earnedPlays(d, conf || gameConf());
-  const by = SUBJECTS.map((s) => `${KO[s]} ${e[s]}`).join(' · ');
-  return `오늘 — 받은 판 ${e.total} (${by}${e.bonus ? ` · 🔒 +${e.bonus}` : ''}) · 쓴 판 ${usedPlays(d)}`;
+  const by = SUBJECTS.map((s) => `${KO[s]} ${Math.floor(usedSec(d, s) / 60)}분`).join(' · ');
+  return `오늘 — 공부 ${Math.floor(e.sec / 60)}분 (${by}) · 받은 판 ${e.total}${e.bonus ? ` (🔒 +${e.bonus})` : ''} · 쓴 판 ${usedPlays(d)}`;
 }

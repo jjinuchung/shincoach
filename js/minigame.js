@@ -3,9 +3,11 @@
 // 아버님 결정 (2026-10-21):
 //   ① 판은 **과목별 공부 시간**으로 생긴다 — ⏳가 이미 재는 그 과목 화면에 머문 초(mathTime·enTime·korTime · 2분 손 안 대면 안 셈)
 //      정답 점수로 걸지 않는다: 틀리면 게임을 못 하게 되면 틀림이 무서워지고 찍기를 부른다
-//   ② **20분에 1판 · 과목마다 하루 2판**(처음 15분 제안 → 아버님이 20분으로) → 하루 최대 6판 · 한 과목만 오래 해도 그 과목 몫까지만(골고루)
+//   ② **공부 15분에 1판 · 과목을 합친 오늘 공부 시간으로 · 하루 12판까지** (v328, 2026-10-23 아버님 — 처음 v307은 과목마다 20분에 1판·
+//      과목마다 하루 2판이었는데 "너무 적다" · 과목을 나눠 하면 시간이 버려져 아이가 헷갈렸다 · 한 과목만 오래 하는 것은 ⏳ 과목별 하루 시간이 막는다)
 //   ③ **그날만** — 자정이 지나면 없어진다(모아 두었다 주말에 몰아 하지 않게)
-//   ④ 아이 화면: 게임기 화면에만 🎮 그림(코인처럼) · 공부 화면엔 "몇 분 더" 같은 셈 없이 판이 생길 때 한 줄만
+//   ④ 아이 화면: 게임기 화면에 🎮 그림(코인처럼) + 규칙 설명과 "오늘 공부 N분 · M분 더 하면 한 판"(v328 — 아이가 얼마나 해야 하는지 몰라 헷갈려서) ·
+//      공부 화면엔 셈 없이 판이 생길 때 한 줄만
 //   ⑤ 💰·스톤·경험치는 주지 않는다(v284 일상 행동 그대로 — 💗 사이좋음만 하루 한 번) · 🔒 부모가 오늘만 +1판 · ⚙에서 분·상한
 //
 // 저장 자리 (db.js `daily` 기록 — DAILY_SUMS라 백업 병합이 큰 쪽):
@@ -16,13 +18,13 @@
 // ★ 이 파일은 순수 규칙만 — timelimit.js(규칙 쪽)만 쓴다. 화면은 gameview.js, 게임 하나하나는 game*.js
 import { SUBJECTS, usedSec } from './timelimit.js';
 
-/** 공부 이만큼(분)에 1판 — 아버님 2026-10-21 */
-export const GAME_MIN = 20;
-/** 과목마다 하루 이만큼(판)까지 */
-export const GAME_CAP = 2;
-/** ⚙에서 고를 수 있는 끝 — 분은 5~120 · 판은 0(게임기 쉼)~5 */
+/** 공부 이만큼(분)에 1판 — 아버님 2026-10-23 (v307 20분 → v328 15분) */
+export const GAME_MIN = 15;
+/** 하루 이만큼(판)까지 — 과목을 합쳐 (v307 과목마다 2판 → v328 하루 12판) */
+export const GAME_CAP = 12;
+/** ⚙에서 고를 수 있는 끝 — 분은 5~120 · 판은 0(게임기 쉼)~20 */
 const MIN_RANGE = [5, 120];
-const CAP_MAX = 5;
+const CAP_MAX = 20;
 /** 🔒 부모가 더 준 판의 끝 (깨진 큰 수가 끝없는 판이 되지 않게) */
 export const BONUS_MAX = 20;
 
@@ -31,13 +33,13 @@ const nz = (v) => {
   return n > 0 ? n : 0;
 };
 
-/** ⚙ "몇 분에 1판" — 비었거나 이상하면 20 · 5~120으로 자른다 */
+/** ⚙ "몇 분에 1판" — 비었거나 이상하면 15 · 5~120으로 자른다 */
 export function gameMinOf(v) {
   const n = Math.floor(Number(v));
   if (v === '' || v === null || v === undefined || !Number.isFinite(n) || n <= 0) return GAME_MIN;
   return Math.min(MIN_RANGE[1], Math.max(MIN_RANGE[0], n));
 }
-/** ⚙ "과목마다 하루 몇 판" — 비었거나 이상하면 2 · 0~5 (0이면 공부로 판이 안 생긴다 — 🔒 부모 판만) */
+/** ⚙ "하루 몇 판" — 비었거나 이상하면 12 · 0~20 (0이면 공부로 판이 안 생긴다 — 🔒 부모 판만) */
 export function gameCapOf(v) {
   const n = Math.floor(Number(v));
   if (v === '' || v === null || v === undefined || !Number.isFinite(n) || n < 0) return GAME_CAP;
@@ -48,25 +50,31 @@ export function gameConfOf(c) {
   return { min: gameMinOf(c && c.min), cap: gameCapOf(c && c.cap) };
 }
 
-/** 한 과목에서 생긴 판 (순수) — usedSec = 그 과목에 쓴 초 */
-export function subjectPlays(sec, conf) {
+/** 오늘 공부한 초 (순수) — 과목을 합쳐(📚 국어 시간에 🖊️ 논술도 들어 있다) · extra = 아직 저장 안 한 초(⏳ 시계의 pending) */
+export function studySec(daily, extra = {}) {
+  return SUBJECTS.reduce((a, s) => a + usedSec(daily, s) + nz(extra && extra[s]), 0);
+}
+
+/** 공부 시간으로 생긴 판 (순수) — sec = 오늘 과목을 합친 공부 초 · 하루 cap판에서 멈춘다 */
+export function studyPlays(sec, conf) {
   const c = gameConfOf(conf);
   return Math.min(c.cap, Math.floor(nz(sec) / (c.min * 60)));
 }
 
 /**
- * 오늘 받은 판 (순수) → { math, english, korean, bonus, total, max }
+ * 오늘 받은 판 (순수) → { sec, study, bonus, total, max, next }
  * @param {object} daily 오늘 기록 · @param {{min?:number, cap?:number}} conf ⚙ 설정
  * @param {{math?:number, english?:number, korean?:number}} [extra] 아직 저장 안 한 초(⏳ 시계의 pending)
- * max = 오늘 공부로 받을 수 있는 끝 + 🔒 부모 판 (다 받았으면 "오늘 게임은 끝"이라고 말할 때)
+ * sec = 오늘 공부한 초 · study = 공부로 받은 판 · total = study + 🔒 부모 판 · max = 오늘 받을 수 있는 끝(다 받았으면 "오늘 게임은 끝") ·
+ * next = 공부로 다음 판을 받기까지 남은 초 (하루 끝까지 받았거나 0판(쉼)이면 0 — 쓴 판은 안 본다: 아이에게 말할 때는 playState.next)
  */
 export function earnedPlays(daily, conf, extra = {}) {
   const c = gameConfOf(conf);
-  const out = { bonus: Math.min(BONUS_MAX, nz(daily && daily.gameBonus)), total: 0, max: 0 };
-  for (const s of SUBJECTS) out[s] = subjectPlays(usedSec(daily, s) + nz(extra && extra[s]), c);
-  out.total = SUBJECTS.reduce((a, s) => a + out[s], 0) + out.bonus;
-  out.max = SUBJECTS.length * c.cap + out.bonus;
-  return out;
+  const sec = studySec(daily, extra);
+  const study = studyPlays(sec, c);
+  const bonus = Math.min(BONUS_MAX, nz(daily && daily.gameBonus));
+  const next = study < c.cap ? (study + 1) * c.min * 60 - sec : 0;
+  return { sec, study, bonus, total: study + bonus, max: c.cap + bonus, next };
 }
 
 /** 오늘 쓴 판 */
@@ -75,17 +83,23 @@ export function usedPlays(daily) {
 }
 
 /**
- * 게임기 화면의 형편 (순수) → { left, mood }
- *   mood: 'ready' 남은 판이 있다 · 'study' 공부하고 오면 생긴다 · 'done' 오늘 받을 판을 다 받아 다 썼다 · 'rest' 부모가 0판으로(게임기 쉼)
- * (아이 화면에는 left를 🎮 그림으로만 — 몇 분 더 하면 생기는지는 말하지 않는다)
+ * 게임기 화면의 형편 (순수) → { left, mood, sec, study, bonus, total, used, next, cap }
+ *   mood: 'ready' 남은 판이 있다 · 'study' 공부하고 오면 생긴다 · 'done' 오늘 더 놀 판이 없다(다 받아 다 썼거나 쓴 판이 끝을 넘음) · 'rest' 부모가 0판으로(게임기 쉼)
+ *   left는 🎮 그림으로 · 나머지는 설명 줄로(gameview.statusLines — v328)
+ *   next = **실제로 놀 수 있는 판이 하나 더 생기기까지** 남은 공부 초 — 쓴 판이 받은 판보다 많으면(⚙에서 분을 늘림 · 다른 기기)
+ *   그만큼 더 받아야 놀 수 있다(받은 판만 세면 "30분 더"라고 해 놓고 또 못 논다, 🔍 Codex 132차 #1) · 오늘 더 못 받으면 0
  */
 export function playState(daily, conf, extra = {}) {
   const c = gameConfOf(conf);
   const e = earnedPlays(daily, c, extra);
-  const left = Math.max(0, e.total - usedPlays(daily));
-  if (left > 0) return { left, mood: 'ready' };
-  if (c.cap <= 0) return { left, mood: 'rest' };
-  return { left, mood: e.total >= e.max ? 'done' : 'study' };
+  const used = usedPlays(daily);
+  const left = Math.max(0, e.total - used);
+  const need = Math.max(e.study + 1, used - e.bonus + 1); // 공부로 받아야 하는 판 수
+  const next = c.cap > 0 && need <= c.cap ? need * c.min * 60 - e.sec : 0;
+  const info = { left, sec: e.sec, study: e.study, bonus: e.bonus, total: e.total, used, next, cap: c.cap };
+  if (left > 0) return { ...info, mood: 'ready' };
+  if (c.cap <= 0) return { ...info, mood: 'rest' };
+  return { ...info, mood: e.total >= e.max || used >= e.max ? 'done' : 'study' };
 }
 
 /** 판을 쓸 때 트랜잭션 안에서 보는 끝 (db.claimDailyCount의 max) — 저장된 오늘 기록으로 다시 셈한다 */

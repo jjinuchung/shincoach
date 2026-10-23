@@ -243,7 +243,7 @@ export function usageFiles(days, today, places, verLine = '') {
     if (bonus.length) parts.push(`부모가 더 준 시간 ${bonus.join(' · ')}`);
     const ext = SUBJ.filter(([, , , e]) => num(d[e]) > 0).map(([ko, , , e]) => `${ko} ${num(d[e])}개`);
     if (ext.length) parts.push(`⏳ 연장권 ${ext.join(' · ')}`);
-    // 🎮 게임기 미니 게임 (v307) — 쓴 판 · 🔒 부모가 더 준 판 (받은 판은 그날 과목 시간에서 셈 — 20분에 1판·과목마다 2판이 기본)
+    // 🎮 게임기 미니 게임 (v307) — 쓴 판 · 🔒 부모가 더 준 판 (받은 판은 그날 과목을 합친 공부 시간에서 셈 — 15분에 1판·하루 12판이 기본, v328)
     if (num(d.gamePlays) || num(d.gameBonus)) parts.push(`🎮 게임 ${num(d.gamePlays)}판${num(d.gameBonus) ? ` (🔒 부모 +${num(d.gameBonus)}판)` : ''}`);
     // 🌿 국어·논술 잔잔한 음악 (v317) — 틀어 둔 시간 · 진우가 🎵로 끈 수·다시 켠 수
     if (num(d.calmSec) || num(d.calmOff) || num(d.calmOn)) parts.push(`🌿 잔잔한 음악 ${fmtMin(d.calmSec)}${num(d.calmOff) ? ` · 🎵 끔 ${num(d.calmOff)}번` : ''}${num(d.calmOn) ? ` · 다시 켬 ${num(d.calmOn)}번` : ''}`);

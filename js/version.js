@@ -4,7 +4,7 @@
 // 아무것도 import하지 않는다 · upload.js가 앱을 켤 때 함께 불러 판을 묶는다(올릴 때 처음 불러오면 새로 들어온 판을 적을 수 있다 — 🔍 Codex 120차 #6)
 
 /** 지금 돌고 있는 코드의 판 */
-export const APP_VERSION = 'v327';
+export const APP_VERSION = 'v328';
 
 /** 판 글자 → 수 ('v314' → 314) · 꼴이 틀리면 0 */
 export function versionNum(v) {

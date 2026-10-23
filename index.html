@@ -781,20 +781,22 @@
       </fieldset>
 
       <fieldset class="field set-group">
-        <legend class="field-label">🎮 게임기 미니 게임 <small>— 🏡 집의 🎮 게임기. 과목마다 공부한 시간으로 판이 생겨요(그날만). 💰·스톤은 안 줘요</small></legend>
+        <legend class="field-label">🎮 게임기 미니 게임 <small>— 🏡 집의 🎮 게임기. 오늘 공부한 시간(과목을 합쳐)으로 판이 생겨요(그날만). 💰·스톤은 안 줘요</small></legend>
         <label class="field field-inline">
-          <span class="field-label">공부 몇 분에 1판 <small>— 과목마다 따로 셈</small></span>
+          <span class="field-label">공부 몇 분에 1판 <small>— 수학·영어·국어·논술을 합쳐 셈</small></span>
           <input type="number" id="set-game-min" min="5" max="120" step="5" inputmode="numeric">
         </label>
         <label class="field field-inline">
-          <span class="field-label">과목마다 하루 최대</span>
+          <span class="field-label">하루 최대</span>
           <select id="set-game-cap">
             <option value="0">0판 (공부로는 안 생김)</option>
-            <option value="1">1판</option>
-            <option value="2">2판</option>
-            <option value="3">3판</option>
             <option value="4">4판</option>
-            <option value="5">5판</option>
+            <option value="6">6판</option>
+            <option value="8">8판</option>
+            <option value="10">10판</option>
+            <option value="12">12판</option>
+            <option value="16">16판</option>
+            <option value="20">20판</option>
           </select>
         </label>
         <button type="button" id="set-game-bonus" class="btn">🎮 오늘 +1판 주기</button>

@@ -3893,6 +3893,13 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gm-coin { font-size: 1.7rem; line-height: 1; animation: gm-pop 0.3s ease-out both; }
 .gm-mood { margin: 0; text-align: center; font-size: 1.05rem; font-weight: 700; }
 .gm-msg { margin: 0; text-align: center; color: #ffd43b; font-size: 0.92rem; }
+/* 📚 오늘 형편 · 🎮 규칙 (v328 — 아이가 얼마나 공부해야 판이 생기는지 몰라 헷갈렸다) */
+.gm-now { display: grid; gap: 2px; padding: 8px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.1); text-align: center; }
+.gm-now-line { margin: 0; font-size: 0.95rem; line-height: 1.45; word-break: keep-all; }
+.gm-now-line + .gm-now-line { color: #ffd43b; font-weight: 700; }
+.gm-rule { padding: 8px 12px; border: 1px dashed rgba(255, 255, 255, 0.35); border-radius: 14px; }
+.gm-rule-title { margin: 0 0 4px; font-size: 0.92rem; font-weight: 800; }
+.gm-rule-list { margin: 0; padding-left: 1.1em; display: grid; gap: 2px; font-size: 0.86rem; line-height: 1.45; color: #e9ecef; word-break: keep-all; }
 .gm-list { display: grid; gap: 8px; }
 @media (min-width: 720px) { .gm-list { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } } /* 게임이 늘어도 낮은 가로 화면에 한눈에 (v310 — 여섯째부터 · 긴 설명도 칸을 안 밀게 minmax) */
 .gm-game { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px; border: 0; border-radius: 16px; background: #fff; color: #2b2d42; font: inherit; text-align: left; box-shadow: 0 4px 0 #8d99ae; cursor: pointer; }

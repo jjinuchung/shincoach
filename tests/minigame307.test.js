@@ -5,7 +5,7 @@ import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { GAME_MIN, GAME_CAP, BONUS_MAX, GAMES, gameById, gameMinOf, gameCapOf, gameConfOf, subjectPlays, earnedPlays, usedPlays, playState, playLimit } from '../js/minigame.js';
+import { GAME_MIN, GAME_CAP, BONUS_MAX, GAMES, gameById, gameMinOf, gameCapOf, gameConfOf, earnedPlays, usedPlays, playState, playLimit } from '../js/minigame.js';
 import { DIG_SEC, DIG_HOLES, ZAP_MS, DIG_KINDS, digPace, digKind, digStart, digTick, digTap, digShift, runDig } from '../js/gamedig.js';
 import { MOOD_LINE, GAME_DEVICE } from '../js/gameview.js';
 import { playOf, copyPlay, mergePlay, bestOf, gameEndRule, playRule, SCORE_MAX } from '../js/homeplay.js';
@@ -39,9 +39,9 @@ function seeded(seed = 7) {
 
 // ───────────────────── 판 규칙 ─────────────────────
 
-test('🎮 아버님이 정한 값: 공부 20분에 1판(처음 제안 15분 → 20분) · 과목마다 하루 2판 · 게임기 가구는 f_game · 첫 게임은 🕳️ 디그다 잡기 30초', () => {
-  assert.equal(GAME_MIN, 20);
-  assert.equal(GAME_CAP, 2);
+test('🎮 아버님이 정한 값: 공부 15분에 1판 · 하루 12판(v307 과목마다 20분·2판 → v328 과목 합쳐 15분·하루 12판) · 게임기 가구는 f_game · 첫 게임은 🕳️ 디그다 잡기 30초', () => {
+  assert.equal(GAME_MIN, 15);
+  assert.equal(GAME_CAP, 12);
   assert.equal(GAME_DEVICE, 'f_game');
   assert.ok(furnById(GAME_DEVICE), '집 가구에 있다');
   assert.equal(GAMES[0].id, 'dig', '첫 게임은 디그다 (v308부터 더 늘어난다 — minigame308)');
@@ -51,58 +51,48 @@ test('🎮 아버님이 정한 값: 공부 20분에 1판(처음 제안 15분 →
   for (const g of GAMES) assert.match(g.id, /^[a-z]{2,12}$/, '최고 기록 열쇠 꼴(homeplay GAME_KEY)과 같게');
 });
 
-test('🎮 한 과목의 판 — 20분마다 1판, 2판에서 멈춘다 · 깨진 값은 0', () => {
-  const c = { min: 20, cap: 2 };
-  assert.equal(subjectPlays(0, c), 0);
-  assert.equal(subjectPlays(20 * MIN - 1, c), 0, '19분 59초는 아직');
-  assert.equal(subjectPlays(20 * MIN, c), 1);
-  assert.equal(subjectPlays(40 * MIN - 1, c), 1);
-  assert.equal(subjectPlays(40 * MIN, c), 2);
-  assert.equal(subjectPlays(300 * MIN, c), 2, '오래 해도 그 과목은 2판까지');
-  for (const bad of [-5, NaN, 'x', null, undefined]) assert.equal(subjectPlays(bad, c), 0, String(bad));
-  assert.equal(subjectPlays(30 * MIN, { min: 15, cap: 2 }), 2, '⚙에서 분을 바꾸면 그대로');
-  assert.equal(subjectPlays(300 * MIN, { min: 20, cap: 0 }), 0, '0판이면 공부로는 안 생긴다');
-});
+// v328 판 규칙(과목 합쳐 15분 · 하루 12판 · 설명 줄)의 자세한 시험은 tests/minigame328.test.js
 
-test('🎮 하루에 받은 판 — 과목마다 따로(골고루) · 🔒 부모 판 · 아직 저장 안 한 초까지 · 끝(max)', () => {
+test('🎮 하루에 받은 판 — 과목을 합친 공부 시간 · 🔒 부모 판 · 아직 저장 안 한 초까지 · 끝(max)', () => {
   const c = { min: 20, cap: 2 };
-  assert.deepEqual(earnedPlays(day({ en: 120 }), c), { bonus: 0, total: 2, max: 6, math: 0, english: 2, korean: 0 }, '영어만 2시간이어도 2판');
-  assert.equal(earnedPlays(day({ math: 40, en: 40, kor: 40 }), c).total, 6, '세 과목 40분씩 = 하루 최대 6판');
-  assert.deepEqual(earnedPlays(day({ math: 25, bonus: 2 }), c), { bonus: 2, total: 3, max: 8, math: 1, english: 0, korean: 0 });
-  assert.equal(earnedPlays(day({ math: 19 }), c, { math: 60 }).math, 1, '⏳ 시계가 아직 저장 안 한 1분이 더해져 20분');
+  assert.deepEqual(earnedPlays(day({ en: 120 }), c), { sec: 120 * MIN, study: 2, bonus: 0, total: 2, max: 2, next: 0 }, '⚙ 상한 2판이면 2시간이어도 2판');
+  assert.deepEqual(earnedPlays(day({ math: 25, bonus: 2 }), c), { sec: 25 * MIN, study: 1, bonus: 2, total: 3, max: 4, next: 15 * MIN });
+  assert.equal(earnedPlays(day({ math: 19 }), c, { math: 60 }).study, 1, '⏳ 시계가 아직 저장 안 한 1분이 더해져 20분');
   assert.equal(earnedPlays(day({ bonus: 999 }), c).bonus, BONUS_MAX, '깨진 큰 부모 판은 끝에서 자른다');
   assert.equal(earnedPlays(null, c).total, 0, '오늘 기록이 없으면 0');
   assert.equal(usedPlays(day({ used: 3 })), 3);
   assert.equal(usedPlays({ gamePlays: -2 }), 0);
 });
 
-test('🎮 게임기 첫 화면의 형편 — 남은 판 · 공부하고 오면 · 오늘은 끝 · 쉬는 중 (셈 말 없이)', () => {
+test('🎮 게임기 첫 화면의 형편 — 남은 판 · 공부하고 오면 · 오늘은 끝 · 쉬는 중 (맨 위 말에는 셈 없이 — 셈은 설명 줄이)', () => {
   const c = { min: 20, cap: 2 };
-  assert.deepEqual(playState(day({ math: 45 }), c), { left: 2, mood: 'ready' });
-  assert.deepEqual(playState(day({ math: 45, used: 2 }), c), { left: 0, mood: 'study' }, '다른 과목을 하면 더 생긴다');
-  assert.deepEqual(playState(day({ math: 45, en: 45, kor: 45, used: 6 }), c), { left: 0, mood: 'done' });
-  assert.deepEqual(playState(day({ math: 45, en: 45, kor: 45, used: 9 }), c), { left: 0, mood: 'done' }, '쓴 판이 더 많아도(다른 기기) 음수 없음');
-  assert.deepEqual(playState(day({ math: 100 }), { min: 20, cap: 0 }), { left: 0, mood: 'rest' });
-  assert.deepEqual(playState(day({ bonus: 1 }), { min: 20, cap: 0 }), { left: 1, mood: 'ready' }, '쉬는 중이어도 부모 판은 쓴다');
-  // 아이 화면 말에는 숫자(남은 판·몇 분 더)가 없다
+  const pick = (st) => ({ left: st.left, mood: st.mood });
+  assert.deepEqual(pick(playState(day({ math: 45 }), c)), { left: 2, mood: 'ready' });
+  assert.deepEqual(pick(playState(day({ math: 25, used: 1 }), c)), { left: 0, mood: 'study' }, '더 하면 더 생긴다');
+  assert.deepEqual(pick(playState(day({ math: 45, used: 2 }), c)), { left: 0, mood: 'done' });
+  assert.deepEqual(pick(playState(day({ math: 45, used: 9 }), c)), { left: 0, mood: 'done' }, '쓴 판이 더 많아도(다른 기기) 음수 없음');
+  assert.deepEqual(pick(playState(day({ math: 100 }), { min: 20, cap: 0 })), { left: 0, mood: 'rest' });
+  assert.deepEqual(pick(playState(day({ bonus: 1 }), { min: 20, cap: 0 })), { left: 1, mood: 'ready' }, '쉬는 중이어도 부모 판은 쓴다');
+  // 맨 위 한 줄(MOOD_LINE)에는 숫자가 없다 — 몇 분·몇 판은 v328 설명 줄(statusLines·ruleLines)이
   for (const [k, line] of Object.entries(MOOD_LINE)) assert.ok(!/\d/.test(line), `${k}: ${line}`);
   assert.deepEqual(Object.keys(MOOD_LINE).sort(), ['done', 'ready', 'rest', 'study']);
 });
 
-test('🎮 ⚙ 값 고쳐 읽기 — 분 5~120(비었으면 20) · 판 0~5(비었으면 2)', () => {
-  assert.equal(gameMinOf(undefined), 20);
-  assert.equal(gameMinOf(''), 20);
-  assert.equal(gameMinOf('abc'), 20);
-  assert.equal(gameMinOf(0), 20, '0분은 끝없는 판이 되니 기본값으로');
+test('🎮 ⚙ 값 고쳐 읽기 — 분 5~120(비었으면 15) · 판 0~20(비었으면 12)', () => {
+  assert.equal(gameMinOf(undefined), 15);
+  assert.equal(gameMinOf(''), 15);
+  assert.equal(gameMinOf('abc'), 15);
+  assert.equal(gameMinOf(0), 15, '0분은 끝없는 판이 되니 기본값으로');
   assert.equal(gameMinOf(3), 5);
   assert.equal(gameMinOf('30'), 30);
   assert.equal(gameMinOf(999), 120);
-  assert.equal(gameCapOf(undefined), 2);
-  assert.equal(gameCapOf(''), 2);
-  assert.equal(gameCapOf(-1), 2);
+  assert.equal(gameCapOf(undefined), 12);
+  assert.equal(gameCapOf(''), 12);
+  assert.equal(gameCapOf(-1), 12);
   assert.equal(gameCapOf(0), 0, '0판은 뜻이 있다(게임기 쉼)');
-  assert.equal(gameCapOf('9'), 5);
-  assert.deepEqual(gameConfOf(null), { min: 20, cap: 2 });
+  assert.equal(gameCapOf('9'), 9);
+  assert.equal(gameCapOf('99'), 20);
+  assert.deepEqual(gameConfOf(null), { min: 15, cap: 12 });
 });
 
 // ───────────────────── 판 쓰기 (진짜 저장 경로 — 오늘 기록 트랜잭션) ─────────────────────
@@ -110,13 +100,13 @@ test('🎮 ⚙ 값 고쳐 읽기 — 분 5~120(비었으면 20) · 판 0~5(비�
 test('★ 🎮 판 쓰기: 끝은 저장된 오늘 공부 시간으로 다시 셈 · 두 창이 동시에 눌러도 받은 판만큼 · 옛 백업으로 쓴 판을 되살리지 못함', async () => {
   await getDaily('2026-01-01'); // 저장소 열기
   const D = '2026-10-21';
-  fakeIdb.put('daily', { ...emptyDaily(D), mathTime: 45 * MIN });
-  const lim = playLimit({ min: 20, cap: 2 });
+  fakeIdb.put('daily', { ...emptyDaily(D), mathTime: 30 * MIN });
+  const lim = playLimit({ min: 15, cap: 12 });
   const rs = await Promise.all([1, 2, 3].map(() => claimDailyCount(D, 'gamePlays', lim)));
-  assert.deepEqual(rs.map((r) => r.won).sort(), [false, true, true], '받은 판(2)만큼만');
+  assert.deepEqual(rs.map((r) => r.won).sort(), [false, true, true], '받은 판(30분 → 2판)만큼만');
   assert.equal(fakeIdb.get('daily', D).gamePlays, 2);
-  // 다른 창이 공부 시간을 더 적었으면 그다음 판은 된다 (끝을 트랜잭션 안에서 다시 셈)
-  fakeIdb.put('daily', { ...fakeIdb.get('daily', D), enTime: 21 * MIN });
+  // 다른 창이 공부 시간을 더 적었으면 그다음 판은 된다 (끝을 트랜잭션 안에서 다시 셈 · 과목을 합쳐 30 + 16 = 46분 → 3판)
+  fakeIdb.put('daily', { ...fakeIdb.get('daily', D), enTime: 16 * MIN });
   assert.equal((await claimDailyCount(D, 'gamePlays', lim)).won, true);
   assert.equal((await claimDailyCount(D, 'gamePlays', lim)).won, false);
   // 오늘 기록이 없는 날 — 공부 0분이면 판 없음
@@ -287,7 +277,7 @@ test('🎮 화면 연결 — 🎮 게임하기는 게임기 화면으로 · 판 
   assert.equal((gv.match(/await claimDailyCount\(/g) || []).length, 1, '판을 쓰는 곳은 하나');
   assert.match(gv, /day = clockDay\(\);\n\s*let r = null;\n\s*try \{ r = await claimDailyCount\(day, 'gamePlays', playLimit\(gameConf\(\)\)\)/);
   assert.match(gv, /await ensureToday\(\);[\s\S]{0,120}await flushTime\(\)/, '판을 쓰기 전에 날 바꾸기·모아 둔 초 저장');
-  assert.match(gv, /if \(itemCount\(GAME_DEVICE\) > 0\) \{ toast\('🎮 게임 1판이 생겼어요!'\)/, '게임기를 가졌을 때만 알림');
+  assert.ok(gv.includes("playNoteStep(seen, clockDay(), `${conf.min}:${conf.cap}`, n) && itemCount(GAME_DEVICE) > 0) {\n    toast(`🎮 게임 1판이 생겼어요! (공부 ${conf.min}분마다 한 판)`);"), '게임기를 가졌을 때만 알림');
   assert.match(gv, /if \(!isReady\(\)\) return;/, '오늘 기록을 읽기 전엔 기준을 안 잡는다');
   const app = src('js/app.js');
   assert.match(app, /onTick: \(\) => \{ refreshChips\(\); noteStudyPlays\(\); \}/);

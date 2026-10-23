@@ -3181,7 +3181,7 @@ function loadSettings() {
     timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend, timeKorean: KOREAN_MIN.weekday,
     // ⏳ 시간 연장권 — 과목마다 하루 최대 (2026-10-01, 아버님 "이대로 진행"). 0이면 아이가 못 쓴다
     timeExtMax: EXTEND_MAX,
-    // 🎮 게임기 미니 게임 판 (2026-10-21 v307, 아버님) — 과목마다 공부 20분에 1판 · 하루 2판까지
+    // 🎮 게임기 미니 게임 판 (v307 → 2026-10-23 v328, 아버님) — 과목을 합친 공부 15분에 1판 · 하루 12판까지
     gameMin: GAME_MIN, gameCap: GAME_CAP,
     stockOn: true, stockCap: STOCK_CAP, // 🏦 포켓몬 증권시장 (v319) — 🔒 부모가 끄기·투자 한도
     // 🔢 수학 숫자판 (2026-10-01) — 켜짐이 기본. math.js가 같은 localStorage에서 읽는다
@@ -3195,6 +3195,14 @@ function loadSettings() {
   if (!s.reviewBumped) {
     if (s.reviewCount === 3) s.reviewCount = 5;
     s.reviewBumped = true;
+    try { localStorage.setItem('shincoach.settings', JSON.stringify(s)); } catch { /* 무시 */ }
+  }
+  // 🎮 게임 판 규칙을 바꾼다 (2026-10-23 v328, 아버님 "15분에 한 판 · 하루 12판") — 옛 기본값(20분 · 과목마다 2판)이 저장된 태블릿도 **한 번만** 새 값으로.
+  //   분은 옛 기본값 20일 때만(일부러 고친 값은 그대로) · 상한은 뜻이 바뀌어(과목마다 → 하루) 0판(게임기 쉼)만 두고 새 값으로
+  if (!s.gameRule328) {
+    if (Number(s.gameMin) === 20) s.gameMin = GAME_MIN;
+    if (Number(s.gameCap) !== 0) s.gameCap = GAME_CAP;
+    s.gameRule328 = true;
     try { localStorage.setItem('shincoach.settings', JSON.stringify(s)); } catch { /* 무시 */ }
   }
   return s;
