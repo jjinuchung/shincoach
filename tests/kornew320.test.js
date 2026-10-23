@@ -41,8 +41,8 @@ before(async () => {
 
 test('📘 둘째 묶음 열둘 (v320): 연습 열 + ✨ 명작 둘 · 물음 서른여섯(셋씩) · 원고 검사 통과 · 짧게(7~12줄, 원문 여섯 줄 동시만 예외) · ✍️ 둘 · 두 사람의 글·메시지는 줄마다', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS.slice(118), NEW);
-  assert.equal(validCards(DATA).length, 130);
+  assert.deepEqual(IDS.slice(118, 130), NEW);
+  assert.equal(validCards(DATA).length, 142); // v322 셋째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '의견을 제시하는 글 두 편'], ['practice', '제안하는 글'], ['practice', '발표하는 글'], ['practice', '일기'], ['classic', '동시'], ['practice', '이야기'],
     ['practice', '설명하는 글'], ['practice', '메시지 대화'], ['practice', '편지'], ['practice', '일기'], ['classic', '옛이야기'], ['practice', '설명하는 글']]);
@@ -75,7 +75,7 @@ test('📘 단원 (v320): 새 글은 4-2 단원 하나씩 · 만나는 곳은 �
     assert.ok(codes.some((k) => LINK4[u.id].includes(k)), `${id} 단원 ${u.id}와 이어진 성취기준`);
     assert.ok(!card(id).meta.some((m) => /\[6국/.test(m)), `${id} 5~6학년 성취기준 없음`);
   }
-  assert.deepEqual(UNITS.find((u) => u.id === '4-2-매체').cards, ['K122', 'K121'], '자료를 고르고 만들기 → 자료를 보여 주며 발표');
+  assert.deepEqual(UNITS.find((u) => u.id === '4-2-매체').cards, ['K122', 'K121', 'K135'], '자료를 고르고 만들기 → 자료를 보여 주며 발표 → (v322) 카드 뉴스');
   assert.match(UNITS.find((u) => u.id === '4-2-1').goal, /비교/);
 });
 
@@ -173,7 +173,7 @@ test('📦 하루 두 편 (v320 · Codex 126차 #3·#6): 묶음 b320 = 새 글 �
   assert.deepEqual(b.order.slice(0, 2), ['K121', 'K123'], '첫날 — 포켓몬 타입 발표 · 윤동주 동시(4단원·매체)');
   assert.deepEqual(b.order.slice(-2), ['K129', 'K130'], '마지막 날 — 6단원(12월) · 잠만보');
   const v = read('js/koreanview.js');
-  assert.ok(v.includes("import { visibleCards, hasLocked, freshIds, needsStart, withFirst } from './kordrip.js';"));
+  assert.ok(v.includes("import { visibleCards, hasLocked, opensTomorrow, freshIds, needsStart, withFirst } from './kordrip.js';"));
   assert.ok(v.includes('ui.cards = ui.all ? visibleCards(ui.all, dripState(), todayKey(), readIds()) : null;'), '부를 때마다 오늘 날짜로 다시 거른다');
   // 시작 날 — 목록을 부를 때마다 없으면 적는다(저장이 안 됐으면 다음에 부를 때 다시) · 이 실행에서 처음 받은 날로 · 화면도 그 날로 센다 (126차 #3)
   assert.ok(v.includes('  if (ui.all) ensureDripStart();\n  ui.cards = '), '목록을 부를 때 시작 날');
@@ -182,7 +182,9 @@ test('📦 하루 두 편 (v320 · Codex 126차 #3·#6): 묶음 b320 = 새 글 �
   assert.ok(v.includes('.finally(() => { dripSaving = null; })'), '실패해도 다음에 부를 때 다시');
   assert.ok(v.includes('const dripState = () => withFirst(korDripMap(), dripFirst);'));
   assert.ok(!/korDripMap\(\), todayKey\(\)/.test(v), '화면은 dripState로만 센다');
-  assert.ok(v.includes("head.appendChild(el('p', 'kor-drip', '📦 내일 새 글이 와요'));"));
+  // 「내일」은 내일 정말 열릴 때만 — 아니면 셈 없이 「차례로 열려요」 (Codex 127차 #4 · 규칙은 tests/kordrip322.test.js)
+  assert.ok(v.includes('if (ui.all && hasLocked(ui.all, dripState(), todayKey(), readIds())) {\n    const soon = opensTomorrow(ui.all, dripState(), todayKey(), readIds());'));
+  assert.ok(v.includes("head.appendChild(el('p', 'kor-drip', soon ? '📦 내일 새 글이 와요' : '📦 새 글이 차례로 열려요'));"));
   // 🌱 오늘 새로 열린 글 바로가기 — 제목만(셈 없이) · 여는 길은 도감 칸과 같다(⏳ guardStart) (126차 #6)
   assert.ok(v.includes('freshIds(dripState(), todayKey(), readIds())'));
   assert.ok(v.includes('  const fresh = freshEl(cards); // 🌱') && v.includes('  if (fresh) head.appendChild(fresh);'), '도감 머리에');
@@ -209,10 +211,10 @@ test('📦 시작 날 저장·병합 (v320 · Codex 126차 #4): 저장이 안 �
   assert.deepEqual(await stored(), {}, '저장소에도 없다');
   const r = await korDripStart(ids, t); // 다시 — 이번엔 적힌다
   assert.equal(r.ok, true);
-  assert.deepEqual((await getProfile()).korDrip, { b320: t });
-  assert.deepEqual(korDripMap(), { b320: t }, '메모리 프로필도 같이');
+  assert.deepEqual((await getProfile()).korDrip, { b320: t, b322: t }, 'v322 — 셋째 묶음도 처음 받은 날을 적는다(열리는 날은 b320 다음 날부터 — kordrip322)');
+  assert.deepEqual(korDripMap(), { b320: t, b322: t }, '메모리 프로필도 같이');
   assert.equal((await korDripStart(ids, '2026-10-25')).why, 'same', '다시 열어도 그대로');
-  assert.deepEqual((await getProfile()).korDrip, { b320: t });
+  assert.deepEqual((await getProfile()).korDrip, { b320: t, b322: t });
   const p = cloneProfile({ korDrip: { b320: t, zz: 1 } });
   assert.deepEqual(p.korDrip, { b320: t }, '모르는 묶음은 버림');
   const m = mergeStatRecord('profile', { id: 'me', updatedAt: 20, korDrip: { b320: '2026-10-25' } }, { id: 'me', updatedAt: 10, korDrip: { b320: '2026-10-23' } });

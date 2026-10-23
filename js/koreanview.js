@@ -25,7 +25,7 @@ import * as puzzles from './korpuzzleview.js'; // 🧩 퍼즐 탭 (v242) — 같
 import { writeBoxEl, replyBannerEl, renderReplyView, slotWriteText, syncWrites, appliedLine } from './korwriteview.js'; // ✍️ 서술형 (v237) — 이 파일을 import하지 않는다(ctx로 건넴)
 import { cardWriteState } from './korwrite.js';
 import { korWritesMap, korDripMap, korDripStart } from './xp.js';
-import { visibleCards, hasLocked, freshIds, needsStart, withFirst } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
+import { visibleCards, hasLocked, opensTomorrow, freshIds, needsStart, withFirst } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -251,8 +251,11 @@ export async function renderList() {
   head.appendChild(el('p', 'kor-count', `모은 카드 ${got} / ${total} · ★ ${stars} / ${total * 3}`));
   const fresh = freshEl(cards); // 🌱 오늘 새로 열린 글 바로가기 (Codex 126차 #6)
   if (fresh) head.appendChild(fresh);
-  // 📦 아직 열리지 않은 새 글이 있으면 한 줄 — 몇 편 남았는지 셈 없이 (v320)
-  if (ui.all && hasLocked(ui.all, dripState(), todayKey(), readIds())) head.appendChild(el('p', 'kor-drip', '📦 내일 새 글이 와요'));
+  // 📦 아직 열리지 않은 새 글이 있으면 한 줄 — 몇 편 남았는지 셈 없이 (v320) · 「내일」은 내일 정말 열릴 때만 (Codex 127차 #4)
+  if (ui.all && hasLocked(ui.all, dripState(), todayKey(), readIds())) {
+    const soon = opensTomorrow(ui.all, dripState(), todayKey(), readIds());
+    head.appendChild(el('p', 'kor-drip', soon ? '📦 내일 새 글이 와요' : '📦 새 글이 차례로 열려요'));
+  }
   const cb = catchBtnEl(); // 🎯 남은 국어 잡기 기회 — 다 읽은 카드에서 안 던지고 나왔어도 여기서
   if (cb) head.appendChild(cb);
   if (ui.writeNote) { head.appendChild(el('p', 'kor-wnote', ui.writeNote)); ui.writeNote = ''; } // 📬 답장이 붙었다 — 한 번

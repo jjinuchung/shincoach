@@ -16,12 +16,12 @@ const at = (days, h = 12) => new Date(2026, 9, 11 + days, h, 0, 0).getTime();
 const pf = (o = {}) => cloneProfile({ ...emptyProfile(), ...o });
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('📚 원고: 형식 검사 통과 · 백서른 편(연습 아흔하나·명작 서른아홉 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯 · v254 새 글 열둘 · v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
+test('📚 원고: 형식 검사 통과 · 백마흔두 편(연습 백하나·명작 마흔하나 — v244 ⭐ 중학교 미리보기 넷 · v245 🎧 듣기 여섯 · v254 새 글 열둘 · v258 시 일곱 · v261 새 글 열둘 · v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘) · 물음마다 보기 넷·정답 하나·틀린 보기마다 잘못 읽기와 까닭 · 근거 번호는 글 안 · 쓸 수 있는 카드 = 전부', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS, Array.from({ length: 130 }, (_, i) => `K${i + 1}`));
+  assert.deepEqual(IDS, Array.from({ length: 142 }, (_, i) => `K${i + 1}`));
   const P = 'practice'; const C = 'classic';
-  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, P, P, P, P, C, P, P, P, P, P, C, P, P, P, P, P, C, P]);
-  assert.equal(validCards(DATA).length, 130);
+  assert.deepEqual(DATA.cards.map((c) => c.kind), [P, P, C, P, P, C, C, C, C, P, P, P, P, P, P, P, P, C, C, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, C, C, C, C, C, C, C, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, C, C, C, P, P, P, P, P, P, P, P, P, P, P, P, P, P, P, C, P, P, P, P, C, P, P, P, P, P, C, P, P, P, P, P, C, P, P, P, P, P, P, C, P, P, P, P, C, P]);
+  assert.equal(validCards(DATA).length, 142);
   let qn = 0;
   const used = new Set();
   for (const c of DATA.cards) {
@@ -33,7 +33,7 @@ test('📚 원고: 형식 검사 통과 · 백서른 편(연습 아흔하나·�
       if (q.ev) for (const n of q.ev) assert.ok(n >= 1 && n <= lineCount(c), `${q.id} ev ${n}`);
     }
   }
-  assert.equal(qn, 451); // v291 물음 열여섯 · v298 물음 서른여섯 · v320 물음 서른여섯 더함
+  assert.equal(qn, 487); // v291 물음 열여섯 · v298 물음 서른여섯 · v320 물음 서른여섯 · v322 물음 서른여섯 더함
   assert.deepEqual([...used].sort(), Object.keys(TYPES).sort(), '잘못 읽기 아홉 가지(v236 짜임 놓치기 · v282 🧠 아는 것으로 답하기 더함)가 모두 한 번 이상 쓰인다');
   // 명작은 지은이·저작권 줄 — 저작권이 끝난 작품만(지은이가 1963년 전에 세상을 떠남 · 또는 지은이를 알 수 없는 옛이야기를 다시 씀)
   for (const c of DATA.cards.filter((x) => x.kind === 'classic')) {

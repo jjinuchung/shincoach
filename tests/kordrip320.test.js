@@ -2,7 +2,7 @@
 //  📦 새 국어 글은 하루에 두 편씩 — 처음 국어를 연 날부터 차례대로 · 아이 화면에서만 잠긴 글을 뺀다 · 읽은 글은 잠그지 않는다 · 시작 날 병합은 이른 날
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DRIP, dripOf, mergeDrip, openCount, lockedIds, visibleCards, hasLocked, dripStartRule, freshIds, needsStart, withFirst } from '../js/kordrip.js';
+import { DRIP, dripOf, mergeDrip, openCount, lockedIds, visibleCards, hasLocked, dripStartRule, freshIds as freshIdsAll, needsStart, withFirst } from '../js/kordrip.js';
 
 const ORDER = DRIP.bundles.find((b) => b.key === 'b320').order;
 const CARDS = ['K1', 'K118', ...ORDER.slice().sort()].map((id) => ({ id }));
@@ -13,7 +13,7 @@ test('📦 묶음 — 열둘 · 하루 두 편 · 지금 배우는 단원부터 
   assert.equal(DRIP.perDay, 2);
   assert.deepEqual(ORDER, ['K121', 'K123', 'K124', 'K125', 'K122', 'K119', 'K126', 'K127', 'K128', 'K120', 'K129', 'K130']);
   assert.equal(new Set(ORDER).size, 12);
-  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320'], '저장 열쇠는 바꾸지 않는다');
+  assert.deepEqual(DRIP.bundles[0], { key: 'b320', order: ORDER }, '저장 열쇠는 바꾸지 않는다 · 첫 묶음(이어 여는 앞 묶음 없음)');
 });
 
 test('📅 날마다 두 편씩 차례대로 열린다 · 묶음에 없는 글은 늘 보인다 · 엿새면 모두', () => {
@@ -56,6 +56,7 @@ test('📅 달·해가 바뀌어도 하루 두 편씩 (Codex 126차 #4) — 10/3
 });
 
 test('🌱 오늘 새로 열린 글 (Codex 126차 #6) — 오늘 몫 두 편만 · 읽으면 빠짐 · 어제까지 열린 글은 안 넣음(밀린 목록 없음) · 다 열린 뒤엔 없음', () => {
+  const freshIds = (...a) => freshIdsAll(...a).filter((id) => ORDER.includes(id)); // 이 묶음만 (이어 여는 b322는 kordrip322)
   assert.deepEqual(freshIds(S, '2026-10-23'), ['K121', 'K123'], '첫날');
   assert.deepEqual(freshIds(S, '2026-10-24'), ['K124', 'K125'], '둘째 날 — 어제 글은 도감에만');
   assert.deepEqual(freshIds(S, '2026-10-24', ['K124']), ['K125'], '읽은 글은 빠진다');
@@ -81,8 +82,8 @@ test('🔁 시작 날을 못 적었을 때 (Codex 126차 #3) — 적어야 하�
   assert.equal(needsStart(S, ['K121']), false, '이미 적힘');
   assert.equal(needsStart({}, ['K1', 'K118']), false, '묶음 글이 아직 원고에 없으면 적지 않는다');
   assert.equal(needsStart({}, null), false);
-  assert.deepEqual(withFirst({}, '2026-10-23'), { b320: '2026-10-23' });
-  assert.deepEqual(withFirst({ b320: '2026-10-20' }, '2026-10-23'), { b320: '2026-10-20' }, '적힌 날이 먼저');
+  assert.equal(withFirst({}, '2026-10-23').b320, '2026-10-23');
+  assert.equal(withFirst({ b320: '2026-10-20' }, '2026-10-23').b320, '2026-10-20', '적힌 날이 먼저');
   assert.deepEqual(withFirst({}, ''), {}, '처음 받은 날이 아직 없음');
   assert.deepEqual(withFirst({ zz: '2026-10-01' }, 'bad'), {});
   // 10/23에 못 적고 켜 둔 채 10/24 — 첫날 몫으로 되돌아가지 않고 넷 · 다시 적을 때도 10/23으로
@@ -90,7 +91,7 @@ test('🔁 시작 날을 못 적었을 때 (Codex 126차 #3) — 적어야 하�
   assert.equal(ids(st, '2026-10-24').filter((id) => ORDER.includes(id)).length, 4);
   const p = {};
   dripStartRule(p, '2026-10-23', ['K121']);
-  assert.deepEqual(p.korDrip, st);
+  assert.deepEqual(p.korDrip, { b320: st.b320 });
 });
 
 test('🚩 시작 규칙 — 원고에 묶음 글이 있고 시작 날이 없을 때만 오늘로 · 다시 열어도 그대로', () => {

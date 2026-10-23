@@ -62,7 +62,7 @@ const namesIn = (s) => EEVEELUTIONS.filter((n) => s.includes(n));
 test('📚 포켓몬 글 여섯 (v282): 연습 카드 · 물음 스물넷 · 원고 검사 통과 · 다섯 편이던 단원에 한 편씩(5-1-4 분류는 여덟이어도) · 성취기준 공식 문구 · ✍️ 하나 · 메모·토의·광고는 줄마다', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(IDS.slice(96, 102), NEW);
-  assert.equal(validCards(DATA).length, 130); // v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 142); // v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '설명하는 글'], ['practice', '발표 준비 메모'], ['practice', '토의'], ['practice', '광고'], ['practice', '소개하는 글'], ['practice', '독서 일기'],
   ]);
