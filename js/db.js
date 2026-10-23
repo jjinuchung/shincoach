@@ -354,7 +354,9 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // ⏳ 오늘 쓴 시간 연장권 수 (2026-10-01) — 하루 한도 판정용. 병합이 maxOf라 옛 백업으로 한도를 되살리지 못한다
   'mathExt', 'enExt', 'korExt',
   // 🚀 오늘 로켓단이 나온 수 (2026-10-09) — 과목마다 하루 3번(아버님), claimDailyCount로 선점. 병합 maxOf라 옛 백업으로 한도를 되살리지 못한다
-  'rocketMath', 'rocketEn',
+  'rocketMath', 'rocketEn', 'rocketKor', // v327 📚 국어·논술 합쳐 하루 3번(영어·수학과 따로)
+  // 🖊️ 오늘 끝낸 논술 판 수 (v327) — 🚀 국어 로켓단 등장 조건(ROCKET.minDone.kor = 국어 글 korReads + 논술 판 nsRounds)
+  'nsRounds',
   // 🎤 ⏭ 직접 넘김 · 3번 해 보고 넘어감 · 연속 보너스를 받은 수 (2026-10-14 v253) — 연속 보너스는 claimDailyCount로 선점(하루 상한)
   'speakSkipBtn', 'speakGaveUp', 'speakCombos',
   // 🎤 따라 말하기로 받은 🔶 수 (2026-10-15 v263) — 셈은 문장 목록 speakFirstKeys의 길이, 받기는 applySpeakStone(가방과 한 트랜잭션)

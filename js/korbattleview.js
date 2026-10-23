@@ -111,9 +111,9 @@ export function offerEl(offer, viewId, after, ctx) {
   return box;
 }
 
-/** 다른 창(잡기·부화·⏳ 잠금·상점·진화 …)이 떠 있나 — 그 위에 배틀을 겹쳐 열지 않는다 (hatch.anyModalOpen과 같은 목록 + 부화) */
-function overlayOpen() {
-  return ['catch', 'hatch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'take', 'taken', 'timeup', 'market', 'parcel']
+/** 다른 창(잡기·부화·⏳ 잠금·상점·진화·🚀 …)이 떠 있나 — 그 위에 배틀·🚀 로켓단(korrocket)을 겹쳐 열지 않는다 (hatch.anyModalOpen과 같은 목록 + 부화·로켓단) */
+export function overlayOpen() {
+  return ['catch', 'hatch', 'shop', 'mon', 'battle', 'rocket', 'puzzle', 'review', 'essay', 'match', 'evolve', 'take', 'taken', 'timeup', 'market', 'parcel']
     .some((id) => { const e = document.getElementById(id); return !!e && !e.hidden; });
 }
 

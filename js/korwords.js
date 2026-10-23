@@ -12,7 +12,7 @@
 //   틀리면 0 → 다음 날 다시. 판정은 그 판에서 **처음 고른 것**으로(같은 판에서 한 번 더 보는 것은 연습)
 // 오늘의 낱말: 복습할 것(오래 기다린 것부터) + 새 낱말 NEW_PER_DAY, 한 번에 SESSION_MAX
 // 보상(그날 처음 끝낸 판만): 💰 WORD_COINS + 🎯 국어 포켓몬 잡기 1번 · PERFECT_MIN개 이상을 모두 한 번에 맞히면 🟩 1
-import { dayNum, throwsOf, pendingOf, KOR_STONE } from './korean.js';
+import { dayNum, throwsOf, pendingOf, KOR_STONE, KOR_XP } from './korean.js';
 
 export const NEW_PER_DAY = 5;
 export const SESSION_MAX = 10;
@@ -284,6 +284,8 @@ export function korWordsRule(profile, answers, now, ids) {
   const mastered = [];
   let n = 0;
   let okN = 0;
+  let moved = 0; // ⚡ (v327) — 칸을 옮긴 낱말 · 그중 맞힌 것 (연습·낡은 판·[다시 저장]은 안 옮겨 0)
+  let okMoved = 0;
   for (const a of (Array.isArray(answers) ? answers : []).slice(0, SESSION_MAX * 4)) {
     const id = a && typeof a.id === 'string' ? a.id : '';
     if (!id || seen.has(id) || !valid.has(id) || !idOpen(id, profile.korDone)) continue;
@@ -293,6 +295,8 @@ export function korWordsRule(profile, answers, now, ids) {
     if (a.ok === true) okN++;
     const stale = a.from !== undefined && Number(a.from) !== cur.at; // 판을 시작한 뒤 다른 판이 이 낱말을 옮겼다
     if (stale || cur.box >= MASTER_BOX) continue; // 연습 — ⭐ 익힌 낱말은 더 안 옮긴다(낡은 판의 오답으로도 되돌리지 않음)
+    moved++;
+    if (a.ok === true) okMoved++;
     const d0 = st[id] && cur.d0 ? cur.d0 : today; // 처음 배운 날 — 하루 새 낱말 수를 센다
     // 고친 때는 늘 앞으로 — 시계가 멈췄거나 같은 ms에 두 판이 저장돼도 from(시작할 때 본 때)이 어긋나게 (같은 시각이면 낡은 판이 칸을 또 옮겼다, Codex 51차)
     const wat = Math.min(Number.MAX_SAFE_INTEGER, Math.max(at, cur.at + 1));
@@ -325,7 +329,8 @@ export function korWordsRule(profile, answers, now, ids) {
     profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   }
   profile.korWordDay = wordDaysOf(days, today);
-  return { ok: true, first, coins, stone, throws: pendingOf(profile.korThrow), n, okN, mastered };
+  const xp = moved ? okMoved * KOR_XP.word + KOR_XP.words : 0;
+  return { ok: true, first, coins, xp, stone, throws: pendingOf(profile.korThrow), n, okN, mastered };
 }
 
 /** 묶음마다 { deck, total, open, learning, mastered } (🔤 탭·📘 단원 지도) */

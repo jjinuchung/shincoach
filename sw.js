@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v326';
+const CACHE_VERSION = 'v327';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -35,6 +35,9 @@ const APP_SHELL = [
   './js/nonsulwriteview.js', // ✍️ 논술 짧은 글 (v304)
   './js/korbattle.js', // ⚔️ 국어·논술 배틀 (v325)
   './js/korbattleview.js',
+  './js/korxp.js', // ⚡ 국어·논술 경험치 · 🚀 로켓단 · 📣 응원 (v327)
+  './js/korrocket.js',
+  './js/korcheer.js',
   './js/battlefx.js', // 🐸 기술 그림 — 비공개 저장소에서 받아 둔 장면 (v306)
   './js/minigame.js', // 🎮 게임기 미니 게임 — 판 규칙 · 게임기 화면 · 🕳️ 디그다 잡기 (v307)
   './js/gameview.js',

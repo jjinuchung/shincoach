@@ -12,6 +12,7 @@ import { initMath, renderMath, stopCheer } from './math.js';
 import { initNonsul, enterNonsul } from './nonsulview.js'; // 🖊️ 논술 (v303)
 import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
 import { initCalm, enterCalm, leaveCalm } from './calm.js'; // 🌿 국어·논술 잔잔한 배경 음악 (v317)
+import { stopKorCheer } from './korcheer.js'; // 📣 국어·논술 응원 포켓몬 (v327)
 import { initStock, refreshStockBtn } from './stockview.js'; // 🏦 포켓몬 증권시장 (v319)
 import { getDaily, syncCoachFixes } from './db.js';
 import { todayKey, byeSummary, flush as flushTrack } from './track.js';
@@ -71,7 +72,8 @@ export function showView(name) {
   if (name === 'math') renderMath().catch(() => {});
   // 📚 국어는 읽던 글이 있으면 그대로(🎒·📊에서 돌아옴), 없으면 도감을 다시 그린다(다른 창에서 받은 별)
   if (name === 'korean') enterKorean().catch(() => {});
-  else stopCheer(); // ✨ 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)
+  if (name !== 'math') stopCheer(); // ✨ 수학 응원 포켓몬은 수학 화면에서만 (나가면 걷던 것도 지운다)
+  if (name !== 'korean' && name !== 'nonsul') stopKorCheer(); // 📣 국어·논술 응원 포켓몬은 그 두 화면에서만 (v327)
   if (name !== 'korean') leaveKorean(); // 🎧 듣기 카드 소리는 국어 화면에서만 (v245)
   if (name === 'nonsul') enterNonsul().catch(() => {}); // 🖊️ 논술 — 푸는 판이 있으면 이어서, 없으면 첫 화면 (v303)
   // 🌿 잔잔한 음악은 국어·논술에서만 — 둘 사이를 오가면 끊기지 않고 이어진다 (v317)

@@ -6,7 +6,7 @@
 // 그날 처음 끝낸 판에 💰 + 🎯 논술 포켓몬 잡기 한 번 — 잡기 기회는 국어(korThrow)와 따로 센다(nonsulThrow, 같은 세 카운터 꼴)
 // ✍️ 짧은 글 (v304 — 아버님 물음 넷 모두 추천안): 판을 끝낸 주제를 칸마다 머리말(나는 · 왜냐하면 · 또 · 물론 · 그래도 나는) 채우기로 →
 //   국어 ✍️ 생각 쓰기와 같은 장부·왕복·보상(korwrite.js — 카드 열쇠 N## · 주제마다 평생 한도) · 채점 기준은 원고의 write 하나를 모든 주제가 같이 쓴다
-import { dayNum, throwsOf, pendingOf, PAST_MAX, FRAME_GAP } from './korean.js';
+import { dayNum, throwsOf, pendingOf, PAST_MAX, FRAME_GAP, KOR_XP } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
 import { shuffledOrder } from './korpuzzle.js';
 import { normText, bareText, writesOf, cardWriteState, writeCheck, WRITE_MAX_HI } from './korwrite.js';
@@ -243,6 +243,8 @@ export function nonsulRule(profile, ans, now, ids) {
   const cur = st[id] || stateOf(null);
   const stale = ans.from !== undefined && Number(ans.from) !== cur.at;
   const practice = stale || cur.box >= SOLVED;
+  // ⚡ (v327) — 연습(⭐ 주제·낡은 판·[다시 저장])은 0 · 같은 주제는 하루 한 번(오늘 이미 푼 주제면 0) · 한 번도 안 틀리면 더
+  const xp = !practice && dayNum(cur.at) !== today ? KOR_XP.nonsul + (ans.ok === true ? KOR_XP.nonsulClean : 0) : 0;
   let solved = false;
   if (!practice) {
     const d0 = st[id] && cur.d0 ? cur.d0 : today;
@@ -264,7 +266,7 @@ export function nonsulRule(profile, ans, now, ids) {
     profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   }
   profile.nonsulDay = wordDaysOf(days, today);
-  return { ok: true, first, coins, throws: pendingOf(profile.nonsulThrow), solved, practice };
+  return { ok: true, first, coins, xp, throws: pendingOf(profile.nonsulThrow), solved, practice };
 }
 
 /** 🎯 논술 잡기 기회 하나 빼기 (잡기 화면을 띄우기 전, 한 트랜잭션) — why 'none' 남은 기회 없음 */

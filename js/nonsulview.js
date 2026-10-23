@@ -18,8 +18,12 @@ import { holdStore, refundOutcome } from './throwhold.js';
 import { guardStart } from './timeup.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 import { nonsulBattleQ } from './korbattle.js';
-import { rollOffer, offerEl } from './korbattleview.js'; // ⚔️ 논술 배틀 (v325) — 이 파일을 import하지 않는다
+import { rollOffer, offerEl, overlayOpen } from './korbattleview.js'; // ⚔️ 논술 배틀 (v325) — 이 파일을 import하지 않는다
 import { isBattleOpen } from './battle.js';
+import { korGainXp } from './korxp.js'; // ⚡ 논술 경험치 (v327)
+import { loadKorRocketToday, korRocketDone, korRocketTally, korRocketPending, korRocketClear, korRocketAt, resumeKorRocketIfAny } from './korrocket.js'; // 🚀 논술 로켓단 (v327)
+import { korCheer, warmKorCheer } from './korcheer.js'; // 📣 응원 포켓몬 (v327)
+import { tickKorDay, eggLine } from './koreanview.js'; // 🥚 논술 판도 국어 알 하루 칸 (v327 — 국어 글·낱말·퍼즐과 같은 칸)
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -248,7 +252,7 @@ function renderRound() {
   m.appendChild(card);
   if (r.step !== 'done') {
     // 그만두기 — 판을 버린다(저장 안 함 · 손해 없음)
-    m.appendChild(btn('btn ns-quit', '← 그만하고 처음으로', () => { S.r = null; renderHome(); window.scrollTo(0, 0); }));
+    m.appendChild(btn('btn ns-quit', '← 그만하고 처음으로', () => { if (korRocketPending('nonsul')) korRocketClear(); S.r = null; renderHome(); window.scrollTo(0, 0); }));
   }
 }
 
@@ -292,6 +296,7 @@ function reasonsEl(card, r) {
       r.tapped.push(i);
       if (o.k === 'mine') r.picks.push(o.t);
       else r.miss = true;
+      onAnswer(r, o.k === 'mine');
       ding(o.k === 'mine');
       renderRound();
     }));
@@ -300,7 +305,7 @@ function reasonsEl(card, r) {
   if (why) card.appendChild(el('p', 'kor-fb is-no', `✗ ${why}`));
   if (r.picks.length >= 2) {
     card.appendChild(el('p', 'kor-fb is-ok', '✓ 내 의견에 맞는 이유를 둘 다 찾았어요!'));
-    card.appendChild(btn('btn btn-primary btn-big-wide ns-next', '다음 →', () => { r.step = 'counter'; renderRound(); }));
+    card.appendChild(nextBtn(r, 'counter'));
   }
 }
 
@@ -318,6 +323,7 @@ function counterEl(card, r) {
       r.ctapped.push(i);
       if (o.k === 'other') r.counter = o.t;
       else r.miss = true;
+      onAnswer(r, o.k === 'other');
       ding(o.k === 'other');
       renderRound();
     }));
@@ -326,8 +332,40 @@ function counterEl(card, r) {
   if (why) card.appendChild(el('p', 'kor-fb is-no', `✗ ${why}`));
   if (r.counter) {
     card.appendChild(el('p', 'kor-fb is-ok', '✓ 맞아요 — 반대 의견의 이유예요.'));
-    card.appendChild(btn('btn btn-primary btn-big-wide ns-next', '다음 →', () => { r.step = 'order'; renderRound(); }));
+    card.appendChild(nextBtn(r, 'order'));
   }
+}
+
+/** 🚀 논술 로켓단의 문제 원천 — 의견에 알맞은 이유(배틀과 같은 것 · 원고를 받은 뒤) */
+const nsMakeQ = async () => { await loadData(); return (seen) => nonsulBattleQ(S.list, nonsulMap(), seen); };
+
+/** 🚀·📣 ② 이유 · ③ 반대 의견에서 고른 답 하나 (v327) — 로켓단 이어진 수(처음 고른 답 — 틀리면 0부터) · 응원 포켓몬 */
+function onAnswer(r, ok) {
+  korRocketTally(ok, 'nonsul');
+  korCheer(!ok, { subject: 'nonsul', visible: () => S.r === r && nonsulVisible(), busy: () => !!S.catching || overlayOpen() || korRocketPending('nonsul') });
+}
+
+/**
+ * 다음 걸음으로 — 🚀 로켓단이 걸려 있으면 그 전에 (v327 · ④ 글 순서 뒤 판 끝에는 안 — 다 한 판을 먼저 저장) · 끝나면 그 판의 그 걸음이 아직 떠 있을 때만 한 번 이어서
+ * 기다리는 동안은 다시 그린 「다음 →」도 잠긴다(nextBtn — 🔍 Codex 131차 #2, 국어와 같다)
+ */
+function stepNext(r, step, button) {
+  if (r.rocketWait) return;
+  const from = r.step;
+  const go = () => { r.step = step; renderRound(); };
+  if (korRocketPending('nonsul')) {
+    if (button) button.disabled = true; // 연달아 눌러 건너뛰지 않게
+    korRocketAt(r, from, { kind: 'nonsul', visible: () => S.r === r && nonsulVisible(), makeQ: nsMakeQ, next: () => { if (S.r === r && r.step === from) go(); } });
+    return;
+  }
+  go();
+}
+
+/** ② ③ 끝의 「다음 →」 — 🚀 로켓단을 기다리는 동안이면 잠긴 채 */
+function nextBtn(r, step) {
+  const b = btn('btn btn-primary btn-big-wide ns-next', '다음 →', (e) => stepNext(r, step, e.currentTarget));
+  b.disabled = !!r.rocketWait;
+  return b;
 }
 
 function orderEl(card, r) {
@@ -364,6 +402,13 @@ async function finishRound() {
   r.result = res;
   if (res && res.ok && (res.first || res.solved)) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
   if (S.r === r && nonsulVisible()) renderRound();
+  if (korRocketPending('nonsul')) korRocketClear(); // 🚀 판 끝 뒤에는 열지 않는다 — 걸린 채 남지 않게 (v327)
+  if (res && res.ok) {
+    korGainXp(res.xp); // ⚡ (v327) — 같은 주제는 하루 한 번 · 연습·[다시 저장]은 0(규칙이 정함) · 화면이 바뀌었어도 준다
+    korRocketDone('nonsul'); // 🚀 오늘 끝낸 판 (로켓단 등장 조건 — 하루 기록 nsRounds)
+    // 🥚 논술 판을 끝낸 날 = 국어 알 하루 칸 (국어 글·낱말·퍼즐과 같은 칸 — 5일째면 그 트랜잭션에서 부화)
+    tickKorDay().then((egg) => { if (egg && egg.ok && S.r === r) { r.egg = egg; if (nonsulVisible()) renderRound(); } }).catch(() => {});
+  }
   // ⚔️ 논술 배틀 (v325) — 저장된 한 판 끝에 가끔 단추 하나(턴 문제는 이 의견에 알맞은 이유 — 원고 문장 그대로) · 그 사이 다음 판으로 갔으면 안 붙인다
   if (res && res.ok) {
     rollOffer('nonsul', () => (seen) => nonsulBattleQ(S.list, nonsulMap(), seen)).then((b) => {
@@ -383,6 +428,9 @@ function finishEl(r) {
   const t = nonsulFinishText(res);
   box.appendChild(el('p', 'ns-done-title', t.title));
   for (const line of t.lines) box.appendChild(el('p', 'ns-done-line', line));
+  if (res.ok && res.xp > 0) box.appendChild(el('p', 'ns-done-line kor-xp', `⚡ 경험치 +${res.xp}`)); // v327
+  const eg = eggLine(r.egg); // 🥚 (v327)
+  if (eg) box.appendChild(el('p', 'ns-done-line kor-egg', eg));
   const wl = res.ok ? writeLinkEl(r.id) : null; // ✍️ 이 주제로 짧은 글 (v304 · 저장이 된 뒤에만)
   if (wl) box.appendChild(wl);
   const row = el('div', 'ns-done-btns');
@@ -552,6 +600,10 @@ export async function enterNonsul() {
   if (S.r) renderRound();
   else if (S.w) renderWrite();
   else renderHome();
+  // 📣 응원 포켓몬 그림 · 🚀 오늘 끝낸 글·판 수 · 끝나지 않은 논술 로켓단이 있으면 이어 간다 — 풀던 판·쓰던 글이 있으면 그것을 마친 뒤 (v327)
+  warmKorCheer();
+  loadKorRocketToday().catch(() => {});
+  resumeKorRocketIfAny({ kind: 'nonsul', visible: nonsulVisible, busy: () => !!(S.r && S.r.step !== 'done') || !!S.w || !!S.catching, makeQ: nsMakeQ });
 }
 
 // ───────────────────── 📖 국어 글에서 들어오기 (v316) ─────────────────────

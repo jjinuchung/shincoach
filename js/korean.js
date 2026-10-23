@@ -84,6 +84,14 @@ export const PAST_MAX = 5;
 
 /** 별마다 💰 — 수학 개념 편과 같은 크기(처음 다 맞힘 12 · 복습 통과 8 · 👑 이해 완료 20, mathprog.REWARD) */
 export const KOR_COINS = { 1: 12, 2: 8, 3: 20 };
+/**
+ * ⚡ 국어·논술 경험치 (v327, 2026-10-23 아버님 "이대로" — 그 전엔 국어·논술이 ⚡를 하나도 안 줘 국어만 해서는 레벨이 안 올랐다).
+ * 얼마는 저장 규칙이 **같은 트랜잭션에서** 정해 돌려주고(xp — 같은 글·주제는 하루 한 번 · [다시 저장하기]·낡은 판은 0), 주기·🎉 레벨 업은 화면(korxp.js)
+ *   📚 글 한 편 = 처음 고른 답이 맞은 물음 × q + card · 🔤 낱말 판 = 처음 맞혀 칸을 옮긴 낱말 × word + words ·
+ *   🧩 퍼즐 판 = 처음 맞혀 ⭐가 된 퍼즐 × puzzle + puzzles · 🖊️ 논술 판 = nonsul (+ nonsulClean 한 번도 안 틀리면)
+ * 보통 날(글 둘·낱말·퍼즐·논술) ⚡90쯤 — 수학 개념 한 편 ⚡30~70 · 영어 하루 ⚡50~70 사이
+ */
+export const KOR_XP = { q: 3, card: 10, word: 2, words: 5, puzzle: 3, puzzles: 5, nonsul: 15, nonsulClean: 10 };
 /** 🟩 국어스톤 아이템 id (items.STONE_KOREAN과 같아야 한다 — 테스트로 고정) · 별을 새로 받을 때 **보기·근거를 모두 한 번에** 맞혔으면 하나
  *  (아버님 2026-10-11 "국어 스톤도 만들자" — 다른 스톤처럼 "제대로 배웠나"에서만, 글마다 많아야 별 수만큼 3개) */
 export const KOR_STONE = 'stone_korean';
@@ -411,14 +419,19 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
   const rd = opts && isObj(opts.read) ? readOf({ ...opts.read, c: cardId, d: dayNum(now), g: next.star || 0, y: add.know || 0 }) : null;
   // 📈 이번에 새로 적은 줄 — 부르는 쪽이 그날 하루 기록에도 더한다(korDayDelta, v314) · 같은 열쇠가 이미 있으면 없음([다시 저장하기]가 두 번 세지 않게)
   let newRead = null;
+  let xp = 0; // ⚡ (v327) — 새로 적은 줄일 때만([다시 저장하기]는 0) · 같은 글은 하루 한 번(외운 글을 거듭 읽어 쌓지 않게)
   if (rd) {
     const cur = readsOf(profile.korReads);
-    if (!cur.some((x) => readKey(x) === readKey(rd))) { profile.korReads = readsOf([...cur, rd]); newRead = rd; } else profile.korReads = cur;
+    if (!cur.some((x) => readKey(x) === readKey(rd))) {
+      if (!cur.some((x) => x.c === cardId && x.d === rd.d)) xp = rd.f * KOR_XP.q + KOR_XP.card;
+      profile.korReads = readsOf([...cur, rd]);
+      newRead = rd;
+    } else profile.korReads = cur;
   }
   const fresh = newRead ? { newRead } : {};
   if (!next.star) {
     profile.korDone = done;
-    return { ok: true, star: 0, coins: 0, stars: starsOf(done, cardId), wait: next.why, ...fresh, ...(next.days ? { next: next.next, days: next.days } : {}) };
+    return { ok: true, star: 0, coins: 0, xp, stars: starsOf(done, cardId), wait: next.why, ...fresh, ...(next.days ? { next: next.next, days: next.days } : {}) };
   }
   done[starKey(cardId, next.star)] = dayNum(now) || 1;
   // 🎯 별을 새로 받을 때마다 국어 포켓몬 잡기 한 번 (아버님 2026-10-11 — 다음 날 다시 읽어 ★★를 받아도 잡을 수 있게)
@@ -436,7 +449,7 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
   profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   // 다음 별까지 남은 날 — ★★ 뒤 "처음 읽은 날부터 일주일"은 ★★를 늦게 받으면 틀렸다(10/1 ★ · 10/11 ★★ → ★★★는 10/12, Codex 49차)
   const after = nextStar(done, cardId, now);
-  return { ok: true, star: next.star, coins, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId), ...fresh, ...(caught ? {} : { noCatch: 'first' }), ...(after.why === 'wait' ? { next: after.next, days: after.days } : {}) };
+  return { ok: true, star: next.star, coins, xp, stone: perfect ? 1 : 0, throws: pendingOf(tw), stars: starsOf(done, cardId), ...fresh, ...(caught ? {} : { noCatch: 'first' }), ...(after.why === 'wait' ? { next: after.next, days: after.days } : {}) };
 }
 
 // ── 📈 국어 읽기 날마다 합계 (v314, 2026-10-22 아버님 "2와 3번 진행하자") ──

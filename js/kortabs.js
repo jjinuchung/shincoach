@@ -9,6 +9,7 @@ import { korWordsFinish, korWordsMap, korWordDayMap, korDoneMap } from './xp.js'
 import { starsOf, circled } from './korean.js';
 import { guardStart } from './timeup.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
+import { korGainXp } from './korxp.js'; // ⚡ 국어 경험치 (v327)
 
 export const WORDS_URL = './coach/korean/words.json';
 export const UNITS_URL = './coach/korean/units.json';
@@ -309,6 +310,7 @@ async function finishSession(ctx) {
     renderSession(ctx);
   }
   if (res && res.ok) {
+    korGainXp(res.xp); // ⚡ (v327) — 칸을 옮긴 판만(규칙이 정함) · 화면이 바뀌었어도 준다
     if (live && (res.stone || (res.mastered && res.mastered.length))) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
     const egg = await ctx.tickKorDay(); // 🥚 오늘의 낱말을 끝낸 날 = 국어 알 하루 칸
     if (S.ws === ws && egg && egg.ok) { ws.egg = egg; renderSession(ctx); }
@@ -338,6 +340,7 @@ function finishEl(ctx) {
   box.appendChild(el('p', 'kor-done-icon', '🔤'));
   box.appendChild(el('p', 'kor-done-title', t.title));
   for (const line of t.lines) box.appendChild(el('p', 'kor-done-line', line));
+  if (res.ok && res.xp > 0) box.appendChild(el('p', 'kor-done-line kor-xp', `⚡ 경험치 +${res.xp}`)); // v327
   const eg = ctx.eggLine(ws.egg);
   if (eg) box.appendChild(el('p', 'kor-done-line kor-egg', eg));
   const row = el('div', 'kor-done-btns');

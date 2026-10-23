@@ -16,6 +16,7 @@ import { circled, dayNum, dayKeyOf } from './korean.js';
 import { applyDailyDelta } from './db.js'; // 🧩 판 기록(v315) — 하루 기록 목록 칸에 (아이 화면엔 안 보임)
 import { guardStart } from './timeup.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
+import { korGainXp } from './korxp.js'; // ⚡ 국어 경험치 (v327)
 
 export const PUZZLES_URL = './coach/korean/puzzles.json';
 
@@ -756,6 +757,7 @@ async function finishSession(ctx) {
     renderSession(ctx);
   }
   if (res && res.ok) {
+    korGainXp(res.xp); // ⚡ (v327) — ⭐가 된 퍼즐이 있는 판만(규칙이 정함) · 화면이 바뀌었어도 준다
     if (!ps.practice) notePlay({ korPzDone: [String(ps.t0)] }); // 🧩 끝낸 판 (v315 · [다시 저장하기]로 두 번 와도 같은 칸)
     if (live && (res.stone || (res.solved && res.solved.length))) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
     const egg = await ctx.tickKorDay(); // 🥚 오늘의 퍼즐을 끝낸 날 = 국어 알 하루 칸
@@ -773,6 +775,7 @@ function finishEl(ctx) {
   box.appendChild(el('p', 'kor-done-icon', '🧩'));
   box.appendChild(el('p', 'kor-done-title', t.title));
   for (const line of t.lines) box.appendChild(el('p', 'kor-done-line', line));
+  if (res.ok && res.xp > 0) box.appendChild(el('p', 'kor-done-line kor-xp', `⚡ 경험치 +${res.xp}`)); // v327
   const eg = ctx.eggLine(ps.egg);
   if (eg) box.appendChild(el('p', 'kor-done-line kor-egg', eg));
   const row = el('div', 'kor-done-btns');

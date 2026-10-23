@@ -28,6 +28,13 @@ import { korWritesMap, korDripMap, korDripStart } from './xp.js';
 import { visibleCards, hasLocked, opensTomorrow, freshIds, needsStart, withFirst } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
 import { rollOffer, offerEl, korWordsSource } from './korbattleview.js'; // ⚔️ 국어 배틀 (v325) — 이 파일을 import하지 않는다
 import { isBattleOpen } from './battle.js';
+import { korGainXp } from './korxp.js'; // ⚡ 국어 경험치 (v327)
+import { loadKorRocketToday, korRocketDone, korRocketTally, korRocketPending, korRocketClear, korRocketAt, resumeKorRocketIfAny } from './korrocket.js'; // 🚀 국어 로켓단 (v327)
+import { korCheer, warmKorCheer } from './korcheer.js'; // 📣 응원 포켓몬 (v327)
+import { overlayOpen } from './korbattleview.js';
+
+/** 🚀 국어 로켓단의 문제 원천 — 🔤 낱말 뜻(배틀과 같은 것) */
+const korMakeQ = () => korWordsSource();
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -148,6 +155,10 @@ async function loadCards() {
 /** 📚 국어 화면에 들어올 때 (app.showView) — 읽던 글이 있으면 그대로(🎒·📊에서 돌아옴), 아니면 도감 */
 export async function enterKorean() {
   topUpKorChars(); // 🎯 국어 포켓몬 그림을 조금씩 먼저
+  warmKorCheer(); // 📣 응원 포켓몬 그림 (v327)
+  // 🚀 오늘 끝낸 글·판 수를 읽고, 끝나지 않은 국어 로켓단이 있으면 이어 간다 — 읽던 글·판이 있으면 그것을 마친 뒤 (v327)
+  loadKorRocketToday().catch(() => {});
+  resumeKorRocketIfAny({ kind: 'korean', visible: koreanVisible, busy: () => !!ui.read || anySession() || !!ui.catching || !!ui.wview, makeQ: korMakeQ });
   // 🎯 소식 없이 닫힌 창부터 정리한 뒤 장부 정리 — 지난번에 뺐는데 판정 전에 꺼진 기회·돌려주다 실패한 기회 (Codex 49차 #1·#2 · 50차 #1 차례대로)
   Promise.resolve(settleLostCatch()).catch(() => {}).then(() => settleKorThrows());
   // 📦 새 글 묶음 시작 날은 loadCards가 적는다(ensureDripStart — 못 적으면 목록을 부를 때마다 다시, Codex 126차 #3)
@@ -347,6 +358,7 @@ function openCard(id) {
 
 function backToList() {
   if (ui.read) haltListen(ui.read.ls);
+  if (korRocketPending('korean')) korRocketClear(); // 🚀 읽던 글을 두고 나간다 — 걸어 둔 로켓단은 그 글과 함께 (v327)
   ui.read = null;
   renderList();
   window.scrollTo(0, 0);
@@ -692,7 +704,21 @@ function renderQ() {
     const last = r.qi === r.card.qs.length - 1;
     const next = el('button', 'btn btn-primary kor-next', last ? '다 풀었어요! →' : '다음 문제 →');
     next.type = 'button';
-    next.addEventListener('click', () => { r.qi++; r.focus = 'head'; if (r.qi >= r.card.qs.length) finishCard(); else renderQ(); bringQ(); });
+    // 🚀 로켓단을 기다리는 물음 — 다시 그려도(🎧 「글로 읽고 풀기」 등) 잠긴 채 (🔍 Codex 131차 #2)
+    next.disabled = r.rocketWait === r.qi;
+    const go = () => { r.qi++; r.focus = 'head'; if (r.qi >= r.card.qs.length) finishCard(); else renderQ(); bringQ(); };
+    next.addEventListener('click', () => {
+      if (r.rocketWait === r.qi) return;
+      // 🚀 로켓단이 걸려 있으면 다음 물음 전에 (마지막 물음 뒤에는 안 — 다 푼 글을 먼저 저장, v327) · 끝나면 그 글의 그 물음이 아직 떠 있을 때만 한 번 이어서
+      if (!last && korRocketPending('korean')) {
+        next.disabled = true; // 연달아 눌러 물음을 건너뛰지 않게
+        const qi0 = r.qi;
+        korRocketAt(r, qi0, { kind: 'korean', visible: () => ui.read === r && koreanVisible(), makeQ: korMakeQ, next: () => { if (ui.read === r && r.qi === qi0) go(); } });
+        return;
+      }
+      if (last) korRocketClear(); // 마지막 물음 뒤에는 열지 않는다 — 걸린 채 남지 않게 지운다
+      go();
+    });
     card.appendChild(next);
   }
   col.appendChild(card);
@@ -791,14 +817,17 @@ function pick(k) {
   const o = q.opts[k];
   if (r.firstSec < 0) r.firstSec = r.sec; // ⏱️ 첫 답까지 (📤)
   if (o.ok) {
+    if (!st.wrong.length) korRocketTally(true, 'korean'); // 🚀 처음 고른 답이 맞았다 — 이어진 수 (v327)
     st.answered = true;
     try { sfx.ding(); } catch { /* 소리는 없어도 */ }
   } else {
+    if (!st.wrong.length) korRocketTally(false, 'korean'); // 🚀 처음 고른 답이 틀렸다 — 0부터 (같은 물음의 두 번째 오답은 세지 않는다)
     st.wrong.push(k);
     r.misses[o.type] = (r.misses[o.type] || 0) + 1; // 잘못 읽기 종류를 센다 — 다 읽을 때 한 번에 저장
     if (hint2Now(q, st)) st.hint2 = true; // 💡 둘째 힌트가 나왔다
     try { sfx.wrong(); } catch { /* 소리는 없어도 */ }
   }
+  korCheer(!o.ok, { subject: 'korean', visible: () => ui.read === r && koreanVisible(), busy: () => !!ui.catching || overlayOpen() || korRocketPending('korean') }); // 📣 (v327)
   r.focus = 'answer';
   renderQ();
   if (evFirstNow(q, st)) bringEvFirst(); // 🔍 방금 근거 먼저로 바뀌었다 — 초점이 간 근거 줄이 화면 밖일 수 있다 (Codex 69차 #2)
@@ -854,6 +883,8 @@ async function finishCard() {
     r.card.qs.forEach((q, i) => { const n = (r.qs[i] && r.qs[i].wrong.length) || 0; if (n) qMiss[q.id] = n; });
     res = await korFinish(r.card.id, r.misses, (ui.cards || []).map((c) => c.id), r.evMiss, { noStone: !!(r.ls && r.ls.text), qMiss, read: readLog(r) });
   } catch { res = { ok: false, why: 'save' }; }
+  if (res && res.ok) korGainXp(res.xp); // ⚡ (v327) — 같은 글은 하루 한 번 · [다시 저장하기]는 0(규칙이 정함) · 화면이 바뀌었어도 준다
+  if (res && res.ok && res.newRead) korRocketDone('korean'); // 🚀 오늘 끝낸 글 (로켓단 등장 조건 — 하루 기록 korReads는 korFinish가 적는다)
   // 🥚 글 한 편을 끝까지 읽은 날 — 별이 없어도(다시 읽기도 공부). ★ 저장이 됐으면 화면과 상관없이 칸을 채운다
   //   (저장하는 사이 ← 도감을 누르면 그날 칸이 빠졌다, Codex 51차 — 🔤 낱말 판과 같은 꼴)
   const eggP = res && res.ok ? tickKorDay() : null;
@@ -928,6 +959,7 @@ function finishEl() {
   box.appendChild(el('p', 'kor-done-title', t.title));
   box.appendChild(el('p', 'kor-done-stars', '★'.repeat(stars) + '☆'.repeat(3 - stars)));
   for (const line of t.lines) box.appendChild(el('p', 'kor-done-line', line));
+  if (res.ok && res.xp > 0) box.appendChild(el('p', 'kor-done-line kor-xp', `⚡ 경험치 +${res.xp}`)); // v327
   if (res.ok && res.star && r.ls && r.ls.text) box.appendChild(el('p', 'kor-done-line', '🟩 국어스톤은 듣고 풀어서 한 번에 다 맞혔을 때 받아요')); // 🎧 글로 읽고 풀었다
   const eg = eggLine(r.egg);
   if (eg) box.appendChild(el('p', 'kor-done-line kor-egg', eg));

@@ -119,21 +119,21 @@ test('📚 korFinishRule: 별마다 💰 한 번(번 코인에도) · 모르는 
   assert.deepEqual(korFinishRule(p, 'K1', T0, {}, null), { ok: false, why: 'unknown' });
   assert.equal(p.coins, 5);
   const r1 = korFinishRule(p, 'K1', T0, { make: 1, flip: 2, guess: 9, time: -3, link: 1e20 }, IDS);
-  assert.deepEqual(r1, { ok: true, star: 1, coins: 12, stone: 0, throws: 1, stars: 1, next: 2, days: 1 }, '다음 별(★★)은 내일');
+  assert.deepEqual(r1, { ok: true, star: 1, coins: 12, xp: 0, stone: 0, throws: 1, stars: 1, next: 2, days: 1 }, '다음 별(★★)은 내일 · 읽은 줄(opts.read)이 없으면 ⚡ 0(v327)');
   assert.deepEqual([p.coins, p.coinsEarned, p.korDone], [17, 52, { 'K1:1': dayNum(T0) }]);
   assert.deepEqual(p.korMiss, { make: 1, flip: 2 }, '모르는 종류·음수·아주 큰 수는 버린다');
   const again = korFinishRule(p, 'K1', at(0, 18), { make: 99 }, IDS);
-  assert.deepEqual(again, { ok: true, star: 0, coins: 0, stars: 1, wait: 'wait', next: 2, days: 1 });
+  assert.deepEqual(again, { ok: true, star: 0, coins: 0, xp: 0, stars: 1, wait: 'wait', next: 2, days: 1 });
   assert.deepEqual([p.coins, p.korMiss.make], [17, 1 + MISS_MAX], '같은 날은 💰 없음 · 횟수는 MISS_MAX까지');
-  assert.deepEqual(korFinishRule(p, 'K1', at(1), {}, IDS), { ok: true, star: 2, coins: 8, stone: 1, throws: 2, stars: 2, next: 3, days: 6 }, '★★ 뒤 ★★★까지 남은 날');
-  assert.deepEqual(korFinishRule(p, 'K1', at(3), {}, IDS), { ok: true, star: 0, coins: 0, stars: 2, wait: 'wait', next: 3, days: 4 });
-  assert.deepEqual(korFinishRule(p, 'K1', at(7), {}, IDS), { ok: true, star: 3, coins: 20, stone: 1, throws: 3, stars: 3 });
-  assert.deepEqual(korFinishRule(p, 'K1', at(40), {}, IDS), { ok: true, star: 0, coins: 0, stars: 3, wait: 'full' });
+  assert.deepEqual(korFinishRule(p, 'K1', at(1), {}, IDS), { ok: true, star: 2, coins: 8, xp: 0, stone: 1, throws: 2, stars: 2, next: 3, days: 6 }, '★★ 뒤 ★★★까지 남은 날');
+  assert.deepEqual(korFinishRule(p, 'K1', at(3), {}, IDS), { ok: true, star: 0, coins: 0, xp: 0, stars: 2, wait: 'wait', next: 3, days: 4 });
+  assert.deepEqual(korFinishRule(p, 'K1', at(7), {}, IDS), { ok: true, star: 3, coins: 20, xp: 0, stone: 1, throws: 3, stars: 3 });
+  assert.deepEqual(korFinishRule(p, 'K1', at(40), {}, IDS), { ok: true, star: 0, coins: 0, xp: 0, stars: 3, wait: 'full' });
   assert.equal(p.coins, 5 + 12 + 8 + 20);
   assert.equal(p.coinsEarned, 40 + 12 + 8 + 20);
   // 깨진 기록에서도 멈추지 않는다
   const q = pf({ korDone: 'bad', korMiss: [1, 2], coins: 'x' });
-  assert.deepEqual(korFinishRule(q, 'K2', T0, { detail: 1 }, IDS), { ok: true, star: 1, coins: 12, stone: 0, throws: 1, stars: 1, next: 2, days: 1 });
+  assert.deepEqual(korFinishRule(q, 'K2', T0, { detail: 1 }, IDS), { ok: true, star: 1, coins: 12, xp: 0, stone: 0, throws: 1, stars: 1, next: 2, days: 1 });
   assert.deepEqual([q.coins, q.korMiss], [12, { detail: 1 }]);
   assert.deepEqual([missOf({ make: '3', fo: 2.7, x: 1 }), missOf('x')], [{ make: 3, fo: 2 }, {}]);
 });
@@ -403,7 +403,7 @@ test('🔍 Codex 48차 #7: 다음 별을 받을 날을 직접 센다 — 시계�
   }
   // ★ 없이 ★★만 있던 깨진 기록 — ★을 채우면 별 둘이 되고, ★★를 다시 주지 않는다
   const p = pf({ coins: 0, korDone: { 'K1:2': v } });
-  assert.deepEqual(korFinishRule(p, 'K1', T0, {}, IDS), { ok: true, star: 1, coins: KOR_COINS[1], stone: 1, throws: 1, stars: 2, next: 3, days: 7 });
+  assert.deepEqual(korFinishRule(p, 'K1', T0, {}, IDS), { ok: true, star: 1, coins: KOR_COINS[1], xp: 0, stone: 1, throws: 1, stars: 2, next: 3, days: 7 });
   assert.equal(korFinishRule(p, 'K1', at(1), {}, IDS).star, 0, '★★는 이미 있다 — ★★★는 7일 뒤');
   assert.equal(p.coins, KOR_COINS[1]);
 });

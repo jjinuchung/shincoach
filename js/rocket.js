@@ -14,10 +14,11 @@ export const ROCKET = {
   //   (틀리고 기운 빠졌을 때 나타나 빼앗으면 공부가 싫어진다 — 잘 풀리는 흐름에 나타나야 이기는 경험이 쌓인다)
   chance: 0.3,
   streak: 3,
-  minDone: { math: 5, en: 10 }, // 오늘 그 과목에서 푼 문항(수학)·끝낸 문장(영어)
-  maxPerDay: 3,                 // 과목마다 (아버님: 수학·영어 따로 각각 3번)
+  // 오늘 그 과목에서 푼 문항(수학)·끝낸 문장(영어)·끝낸 국어 글과 논술 판(국어 — v327, 하루 기록 korReads + nsRounds)
+  minDone: { math: 5, en: 10, kor: 2 },
+  maxPerDay: 3,                 // 과목마다 (아버님: 수학·영어 따로 각각 3번 · v327 국어·논술 합쳐 3번 따로)
   gapMin: 20,                   // 그 과목에서 나온 뒤 20분이 지나야 다시 (2026-10-09 저녁 아버님: "너무 빠른 간격으로 나와서 벌써 영어에서 3번 다 나왔어")
-  field: { math: 'rocketMath', en: 'rocketEn' }, // 📅 오늘 기록(daily)의 하루 횟수 칸 — DAILY_SUMS
+  field: { math: 'rocketMath', en: 'rocketEn', kor: 'rocketKor' }, // 📅 오늘 기록(daily)의 하루 횟수 칸 — DAILY_SUMS
   minLeftSec: 300,              // ⏳ 남은 공부 시간이 5분도 안 되면 안 나온다 (배틀 도중 잠기지 않게)
   // 배틀 — 문제 최대 5개, 3번 맞히면 쫓아냄 · 3번 틀리면 빼앗김 (5문제 안에 반드시 끝난다)
   questions: 5,
@@ -32,7 +33,7 @@ export const STEAL_WEIGHT = { 1: 50, 2: 35, 3: 15 };
 
 /**
  * 로켓단이 나올 차례인지 — 쉼표(수학 문항 사이·영어 문장 끝)마다 부른다. 정답이 이어질 때마다(3, 4, 5 … 연속) 다시 굴린다
- * @param {{subject:'math'|'en', doneToday:number, streak:number, todayCount:number, leftSec?:number|null, lastAt?:number, now?:number, rng?:() => number}} o
+ * @param {{subject:'math'|'en'|'kor', doneToday:number, streak:number, todayCount:number, leftSec?:number|null, lastAt?:number, now?:number, rng?:() => number}} o
  *   leftSec: 남은 공부 시간(초) — 시간 제한이 꺼져 있으면 null · lastAt: 그 과목에서 마지막으로 나온 시각(ms, 없으면 0)
  */
 /**

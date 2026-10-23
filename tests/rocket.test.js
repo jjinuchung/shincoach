@@ -49,7 +49,7 @@ test('명단에 등급마다 종이 있다 (테스트 재료 점검)', () => {
 
 test('🚀 아버님 결정 그대로 — 과목마다 하루 3번 · 흔함 50 · 보통 35 · 희귀 15(전설·🌌 없음) · 5문제 3승 3패 · 💰20 · ⚡는 야생 배틀과 같게', () => {
   assert.equal(ROCKET.maxPerDay, 3);
-  assert.deepEqual(ROCKET.field, { math: 'rocketMath', en: 'rocketEn' }, '수학·영어 따로 센다');
+  assert.deepEqual(ROCKET.field, { math: 'rocketMath', en: 'rocketEn', kor: 'rocketKor' }, '수학·영어·국어(논술 포함, v327) 따로 센다');
   assert.deepEqual(STEAL_WEIGHT, { 1: 50, 2: 35, 3: 15 });
   assert.deepEqual([ROCKET.questions, ROCKET.winAt, ROCKET.loseAt], [5, 3, 3]);
   assert.ok(ROCKET.winAt + ROCKET.loseAt - 1 <= ROCKET.questions, '5문제 안에 반드시 승패가 난다');

@@ -37,7 +37,7 @@
 //   일어난 차례로 다시 놓는다 · 조각마다 때 말(keys — 그 조각에 꼭 한 번, 굵게) · need는 차례 맞추기와 같고 실마리는 두 조각 가운데 하나의 때 말 ·
 //   한 조각엔 한 때만 — "~하기로 했다"·"~하려고 한다"처럼 정한 때와 할 때가 섞이는 꼴은 원고 검사가 막는다 ·
 //   오늘의 판에서는 차례 칸을 🧩 차례 맞추기와 번갈아 쓴다(SLOT_OF · 판은 그대로 넷) · 늘 열린다
-import { dayNum, throwsOf, pendingOf, KOR_STONE, circled } from './korean.js';
+import { dayNum, throwsOf, pendingOf, KOR_STONE, KOR_XP, circled } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
 
 export const PUZZLE_COINS = 10;
@@ -649,6 +649,8 @@ export function korPuzzleRule(profile, answers, now, ids) {
   const solved = [];
   let n = 0;
   let okN = 0;
+  let moved = 0; // ⚡ (v327) — 칸을 옮긴 퍼즐 · 그중 맞혀 ⭐가 된 것 (연습·낡은 판·[다시 저장]은 0)
+  let okMoved = 0;
   for (const a of (Array.isArray(answers) ? answers : []).slice(0, 20)) {
     const id = a && typeof a.id === 'string' ? a.id : '';
     if (!id || seen.has(id) || !valid.has(id)) continue;
@@ -658,6 +660,8 @@ export function korPuzzleRule(profile, answers, now, ids) {
     if (a.ok === true) okN++;
     const stale = a.from !== undefined && Number(a.from) !== cur.at;
     if (stale || cur.box >= SOLVED) continue; // 연습 — ⭐ 퍼즐은 더 안 옮긴다(낡은 판의 오답으로 되돌리지 않음)
+    moved++;
+    if (a.ok === true) okMoved++;
     const d0 = st[id] && cur.d0 ? cur.d0 : today;
     const wat = Math.min(Number.MAX_SAFE_INTEGER, Math.max(at, cur.at + 1)); // 고친 때는 늘 앞으로
     if (a.ok === true) {
@@ -688,7 +692,8 @@ export function korPuzzleRule(profile, answers, now, ids) {
     profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   }
   profile.korPuzzleDay = wordDaysOf(days, today);
-  return { ok: true, first, coins, stone, throws: pendingOf(profile.korThrow), n, okN, solved };
+  const xp = moved ? okMoved * KOR_XP.puzzle + KOR_XP.puzzles : 0;
+  return { ok: true, first, coins, xp, stone, throws: pendingOf(profile.korThrow), n, okN, solved };
 }
 
 /** 꼴마다 { kind, total, open, solved, tried } (🧩 탭) — tried = 풀어 봤지만 아직 ⭐ 아님 */
