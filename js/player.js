@@ -14,7 +14,7 @@ import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockC
 import { gymClaimed } from './mathprog.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone, receiveEssaySayStone } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
-import { STONE_ENGLISH, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoTier, SPEAK_COMBO, COIN, HP, POTION, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
+import { STONE_ENGLISH, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoTier, SPEAK_COMBO, COIN, HP, POTION, CALL_PAL, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
@@ -512,6 +512,11 @@ function potionList() {
   return POTION.filter((p) => inv[p.id] > 0).map((p) => ({ id: p.id, n: inv[p.id] }));
 }
 
+/** 📣 가방의 동료 부르기 개수 (v324) */
+function palCount() {
+  return inventory()[CALL_PAL.id] || 0;
+}
+
 /** 배틀에서 따라 말할 문장: 모아둔 문장·근처 문장 중 퍼즐 낼 만한 것(3~8단어), 방금 것과 다른 것 · 따라 말하기를 확인하는 줄만 (v292 — 감탄사 줄로 공짜 공격이 되지 않게) */
 function battleCue() {
   const near = state.cues.slice(Math.max(0, state.idx - 12), state.idx + 1).filter(speakableCue);
@@ -615,6 +620,8 @@ async function startBattle(continueFn) {
     mine: myBattleMons(false),
     potions: potionList,
     usePotion: (id) => consumeItem(id),
+    palCount, // 📣 동료 부르기 (v324)
+    usePal: () => consumeItem(CALL_PAL.id),
     nextCue: battleCue,
     speak: speakSentence,
     onDone: (r) => {
@@ -1435,7 +1442,7 @@ function startBattlePractice() {
   state.practiceOpen = true;
   const spot = rememberSpot();
   openBattle({
-    opponent, mine, potions: potionList, usePotion: () => true, nextCue: battleCue, speak: speakSentence, practice: true,
+    opponent, mine, potions: potionList, usePotion: () => true, palCount, usePal: () => true, nextCue: battleCue, speak: speakSentence, practice: true,
     onDone: () => { setBattleOpen(false); state.practiceOpen = false; state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null; restoreSpot(spot); },
   });
 }

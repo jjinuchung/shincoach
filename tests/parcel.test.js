@@ -132,7 +132,7 @@ test('📦 화면 연결 — 앱을 열면(🔒 알림 뒤) 한 번 · [받기]�
 test('🔍 Codex 32차 #4 — 🥚 알은 구호품으로 못 보낸다 (가방이 아니라 profile.eggs에서 품는다) · 받을 수 있는 것은 모두 가방에서 쓰는 것', () => {
   assert.equal(parcelOf({ id: 'egg-gift', items: { egg_math: 1 } }), null);
   assert.equal(parcelOf({ id: 'egg-gift', items: { egg_english: 1, potion: 1 } }), null, '하나라도 알이면 통째로');
-  const usable = new Set(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool', 'extend']);
+  const usable = new Set(['gear', 'dye', 'potion', 'ball', 'mega', 'mushroom', 'stone', 'tool', 'extend', 'battle']); // battle = 📣 동료 부르기 (v324 — 배틀에서 쓴다)
   for (const it of ITEMS) if (parcelOf({ id: 'x', items: { [it.id]: 1 } })) assert.ok(usable.has(it.kind), `${it.id} (${it.kind})는 받아도 쓸 곳이 있어야`);
 });
 

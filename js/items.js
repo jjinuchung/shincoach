@@ -69,6 +69,14 @@ export const POTION = [
   { id: 'potion_big', emoji: '⚗️', ko: '큰 물약', price: 25, heal: 100 },
 ];
 
+/**
+ * 📣 동료 부르기 (v324, 2026-10-23 진우 아이디어 → 아버님 "진행해") — 배틀 소모품. 원작에서 야생 포켓몬이 "동료를 불렀다!" 하는 것을 진우 쪽에서.
+ * 배틀 중 내 포켓몬 HP가 바닥날 무렵(battle.PAL.at 이하) 쓰면, 내 포켓몬 가운데 **레벨이 같은**(없으면 가장 가까운) 동료가 달려와
+ * 대신 맞아 주고 함께 공격한다 — 규칙은 battle.js(pickPal·palDamage). 한 배틀에 한 번.
+ * 물약(HP만 채움)보다 비싸게 — 동료는 HP 100짜리 방패이자 함께 싸우는 공격이다
+ */
+export const CALL_PAL = { id: 'callpal', emoji: '📣', ko: '동료 부르기', price: 60, kind: 'battle', hint: '⚔️ 배틀에서 내 포켓몬 HP가 30 이하가 되면 "📣 동료 부르기"를 눌러요 — 레벨이 같은 동료(없으면 레벨이 가장 가까운 동료)가 달려와 대신 맞아 주고 함께 싸워요' };
+
 // ── ❤️ HP: 파트너 한 마리에게만. "틀림"이 아니라 "대충 넘김·안 함"에만 깎임 (틀리는 건 배움의 과정) ──
 export const HP = {
   max: 100,
@@ -196,6 +204,7 @@ export const ITEMS = [
   ...GEAR.map((g) => ({ ...g, kind: 'gear' })),
   ...DYE.map((d) => ({ ...d, kind: 'dye' })),
   ...POTION.map((p) => ({ ...p, kind: 'potion' })),
+  CALL_PAL,
   POKEBALL,
   GREATBALL,
   ULTRABALL,

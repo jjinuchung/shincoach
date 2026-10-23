@@ -4,7 +4,7 @@
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 화면(DOM)
 import { rarityOf, RARITY } from './xp.js';
 import * as bgm from './bgm.js';
-import { POTION, itemById, makeFigure, setFigure } from './items.js';
+import { POTION, CALL_PAL, itemById, makeFigure, setFigure } from './items.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
 import { ensureForm, isUltraBeast } from './pokemon.js'; // ⭐ 변신 그림 · 🌌 울트라비스트는 상대로 안 나온다
@@ -221,6 +221,14 @@ export function damageFor(moveKey, result) {
   return damageForTier(moveKey, speakTier(result));
 }
 
+/**
+ * 📣 동료의 함께 공격 — 그 턴 내 등급(따라 말하기·문제 풀기)으로 동료의 확실한 기술 × 동료 레벨.
+ * 진우가 잘 말하고 잘 풀수록 동료도 세게 — 동료에게 맡겨 두기만 해서는 이기지 못한다
+ */
+export function palDamage(tier, lv) {
+  return Math.round(damageForTier('safe', tier) * lvMult(lv));
+}
+
 export function enemyDamage(rng = Math.random) {
   return BATTLE.enemyMin + Math.floor(rng() * (BATTLE.enemyMax - BATTLE.enemyMin + 1));
 }
@@ -256,11 +264,48 @@ export function eligibleMine(caughtIds, partnerId, isTiredFn) {
   return caughtIds.filter((id) => id !== partnerId && !(isTiredFn && isTiredFn(id)));
 }
 
+/**
+ * 📣 동료 부르기 (v324, 2026-10-23 진우 아이디어 → 아버님 "진행해") — 아이템은 items.CALL_PAL.
+ * · 내 포켓몬 HP가 at 이하(막대가 빨개질 때 — renderHp의 low와 같은 선)일 때만, 한 배틀에 한 번
+ * · 동료는 HP hp를 가지고 내 포켓몬 옆에 서서 상대 공격을 대신 맞고, 내가 공격할 때마다 함께 공격한다(palDamage)
+ * · 동료가 쓰러지면 물러난다 — 도와주러 온 친구라 패배는 늘지 않는다(승패·패배는 처음 내보낸 포켓몬만, 지금 규칙 그대로)
+ */
+export const PAL = { at: 30, hp: 100 };
+
+/**
+ * 누가 올까 — 내보낼 수 있는 포켓몬(o.mine: 파트너·😴 지친 포켓몬은 이미 빠짐) 가운데 지금 싸우는 포켓몬을 빼고
+ * **레벨이 같은** 동료, 없으면 레벨 차이가 가장 작은 동료. 여럿이면 그 가운데 하나를 고르게 (아버님 "같은 레벨의 급의 동료")
+ * @param {Array<{id:number, lv?:number}>} mine
+ * @param {{id:number, lv?:number}} my 지금 싸우는 포켓몬
+ * @returns {object|null} 부를 동료가 없으면 null
+ */
+export function pickPal(mine, my, rng = Math.random) {
+  const lvOfMon = (c) => Math.max(1, Number(c && c.lv) || 1);
+  const pool = (mine || []).filter((c) => c && my && c.id !== my.id);
+  if (!pool.length) return null;
+  const gap = (c) => Math.abs(lvOfMon(c) - lvOfMon(my));
+  const best = Math.min(...pool.map(gap));
+  const near = pool.filter((c) => gap(c) === best);
+  return near[Math.min(near.length - 1, Math.floor(rng() * near.length))];
+}
+
+/**
+ * 📣 단추 상태 — show: 가방에 있고 이번 배틀에 아직 안 불렀으면 보인다 · ok: 지금 누를 수 있나 · why: 못 누르는 까닭
+ *   'hp' HP가 아직 넉넉함 · 'none' 부를 동료가 없음
+ */
+export function palButton({ count = 0, used = false, myHp = PAL.hp, hasPal = false } = {}) {
+  if (!(count > 0) || used) return { show: false, ok: false, why: used ? 'used' : 'bag' };
+  if (!hasPal) return { show: true, ok: false, why: 'none' };
+  if (myHp > PAL.at) return { show: true, ok: false, why: 'hp' };
+  return { show: true, ok: true, why: '' };
+}
+
 // ── 화면 ──
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const TRAINERS = ['🧢', '👧', '👦', '🤠', '🧙', '🧝', '🕵️', '👮']; // ZWJ 조합·최신 이모지 없이 (안드로이드 10)
-const ui = { open: false, run: 0, o: null, my: null, myHp: 0, enemyHp: 0, turn: 0, busy: false, result: null };
+// 📣 pal = 불러온 동료(물러나도 기록은 남는다) · palHp = 동료 HP(0이면 물러남) · palUsed = 이번 배틀에 불렀나
+const ui = { open: false, run: 0, o: null, my: null, myHp: 0, enemyHp: 0, turn: 0, busy: false, result: null, pal: null, palHp: 0, palUsed: false };
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -287,6 +332,8 @@ export function isBattleOpen() {
  * @param {Array<{id:number, ko:string, url:string, look:object, losses:number}>} o.mine 내보낼 수 있는 내 포켓몬
  * @param {() => {id:string, n:number}[]} o.potions 가방의 물약 목록 (매번 새로 읽음)
  * @param {(potionId:string) => boolean} o.usePotion 물약 소모 (프로필에서 빼기)
+ * @param {() => number} [o.palCount] 📣 동료 부르기가 가방에 몇 개 (없으면 단추가 안 나온다)
+ * @param {() => boolean} [o.usePal] 📣 동료 부르기 소모 (연습은 늘 true — 줄지 않는다)
  * @param {() => object|null} o.nextCue 이번 턴에 따라 말할 문장
  * @param {(cue:object, hooks:{onInterim:(t:string)=>void, onLevel:()=>void, register:(stop:()=>void)=>void}) => Promise<object>} o.speak 문장 들려주고 따라 말하기 → 말하기 결과
  * @param {boolean} [o.practice] 연습(결과 반영 없음)
@@ -399,6 +446,10 @@ function startFight(c) {
   ui.myHp = BATTLE.hp;
   ui.enemyHp = BATTLE.hp;
   ui.turn = 0;
+  ui.pal = null;         // 📣 아직 아무도 안 불렀다
+  ui.palHp = 0;
+  ui.palUsed = false;
+  palBox(false);
   $('battle-pick').hidden = true;
   const stage = $('battle-stage');
   stage.hidden = false;
@@ -423,6 +474,29 @@ function renderHp() {
   $('battle-my-hp').classList.toggle('low', ui.myHp <= 30);
   $('battle-enemy-hpt').textContent = ui.enemyHp;
   $('battle-my-hpt').textContent = ui.myHp;
+  const ph = $('battle-pal-hp');
+  if (ph && ui.pal) {
+    ph.style.width = `${(ui.palHp / PAL.hp) * 100}%`;
+    ph.classList.toggle('low', ui.palHp <= PAL.at);
+    $('battle-pal-hpt').textContent = ui.palHp;
+  }
+}
+
+/** 📣 동료가 지금 옆에 서 있나 (불렀고 아직 안 쓰러졌다) */
+function palOn() {
+  return !!ui.pal && ui.palHp > 0;
+}
+
+/** 📣 동료 자리 보이기·숨기기 — 숨길 때는 지난 배틀의 흔적(쓰러진 모습·이름)을 지운다 */
+function palBox(on) {
+  const box = $('battle-pal');
+  if (!box) return;
+  box.hidden = !on;
+  $('battle-my').classList.toggle('with-pal', on);
+  if (!on) {
+    $('battle-pal-fig').className = 'mon-figure battle-fig pal';
+    $('battle-pal-name').textContent = '';
+  }
 }
 
 /** ⭐ 변신! (배틀당 한 번, 턴을 쓰지 않는다 — 원작처럼 "이번 턴에 변신하고 바로 공격") */
@@ -518,6 +592,73 @@ function renderActions() {
     btn.addEventListener('click', () => potionTurn(pt.id));
     box.appendChild(btn);
   }
+  // 📣 동료 부르기 — 가방에 있으면 보이고, HP가 PAL.at 이하일 때만 눌린다 (한 배틀에 한 번)
+  const n = ui.o.palCount ? ui.o.palCount() : 0;
+  const pb = palButton({ count: n, used: ui.palUsed, myHp: ui.myHp, hasPal: !!pickPal(ui.o.mine, ui.my, () => 0) });
+  if (pb.show) {
+    const btn = el('button', 'btn battle-move pal');
+    btn.type = 'button';
+    btn.appendChild(el('span', 'em', CALL_PAL.emoji));
+    btn.appendChild(el('span', 'nm', CALL_PAL.ko));
+    btn.appendChild(el('span', 'hint', pb.ok ? `가방 ${n}개` : pb.why === 'none' ? '부를 동료가 없어요' : `HP ${PAL.at} 이하일 때`));
+    btn.disabled = !pb.ok;
+    btn.addEventListener('click', () => palTurn());
+    box.appendChild(btn);
+  }
+}
+
+/**
+ * 📣 동료 부르기 턴 — 동료를 골라(같은 레벨 → 가장 가까운 레벨) 내 포켓몬 옆에 세우고, 상대 공격은 동료가 맞는다.
+ * 물약처럼 턴을 하나 쓴다. 누가 왔는지 이름·레벨로 보여 준다 (아이가 쓰는 순간엔 무엇이 일어났는지 이름으로)
+ */
+async function palTurn() {
+  if (!ui.open || ui.busy || ui.palUsed) return;
+  const run = ui.run;
+  const alive = () => ui.open && ui.run === run;
+  const pal = pickPal(ui.o.mine, ui.my);
+  if (!pal || ui.myHp > PAL.at || !ui.o.usePal || !ui.o.usePal()) return;
+  ui.busy = true;
+  ui.palUsed = true;
+  ui.pal = pal;
+  ui.palHp = PAL.hp;
+  ui.turn++;
+  $('battle-actions').hidden = true;
+  palBox(true);
+  $('battle-pal-name').textContent = `${pal.ko}${pal.lv > 1 ? ` Lv${pal.lv}` : ''}`;
+  const fig = $('battle-pal-fig');
+  showBattleMon(fig, pal, pal.look);
+  fetchDot(fig, pal, pal.look, true);
+  fig.classList.add('pal-in');
+  setTimeout(() => fig.classList.remove('pal-in'), 700);
+  renderHp();
+  $('battle-msg').textContent = `${CALL_PAL.emoji} "도와줘!" — ${pal.ko}${josa(pal.ko, '이', '가')} 달려왔어요! 이제 ${pal.ko}${josa(pal.ko, '이', '가')} 대신 맞고 함께 싸워요`;
+  sfx.whoosh();
+  await sleep(1500); if (!alive()) return;
+  await enemyTurn(); if (!alive()) return;
+  if (ui.myHp <= 0) { endFight('lose'); return; }
+  if (ui.turn >= BATTLE.maxTurns) { endFight(ui.myHp >= ui.enemyHp ? 'win' : 'lose'); return; }
+  ui.busy = false;
+  $('battle-msg').textContent = '기술을 골라요';
+  renderActions();
+}
+
+/**
+ * 📣 동료의 함께 공격 — 내 공격 뒤에(상대가 아직 서 있으면). 데미지 0이면 건너뛴다
+ * @param {'star'|'pass'|'fail'|'none'} tier 그 턴 내 등급
+ */
+async function palAttack(tier) {
+  if (!palOn() || ui.enemyHp <= 0) return;
+  const run = ui.run;
+  const alive = () => ui.open && ui.run === run;
+  const dmg = palDamage(tier, ui.pal.lv);
+  if (dmg <= 0) return;
+  const t = MOVES[typeOf(ui.pal.id)] || MOVES.normal;
+  $('battle-msg').textContent = `${CALL_PAL.emoji} ${ui.pal.ko}도 함께! ${t.emoji} ${t.safe} 데미지 ${dmg}`;
+  ui.enemyHp = Math.max(0, ui.enemyHp - dmg);
+  hitFx('enemy', dmg, false, 'pal');
+  sfx.hit(); vibrate(20);
+  renderHp();
+  await sleep(1000); if (!alive()) return;
 }
 
 /**
@@ -570,6 +711,8 @@ async function quizTurn(moveKey) {
   } else { sfx.wrong(); }
   renderHp();
   await sleep(1300); if (!alive()) return;
+  if (ui.enemyHp <= 0) { endFight('win'); return; }
+  await palAttack(tier); if (!alive()) return; // 📣 동료가 옆에 있으면 함께 공격
   if (ui.enemyHp <= 0) { endFight('win'); return; }
   await enemyTurn(); if (!alive()) return;
   ui.busy = false;
@@ -634,6 +777,8 @@ async function playerTurn(moveKey) {
   renderHp();
   await sleep(1300); if (!alive()) return;
   if (ui.enemyHp <= 0) { endFight('win'); return; }
+  await palAttack(tier); if (!alive()) return; // 📣 동료가 옆에 있으면 함께 공격
+  if (ui.enemyHp <= 0) { endFight('win'); return; }
   await enemyTurn(); if (!alive()) return;
   if (ui.myHp <= 0) { endFight('lose'); return; }
   if (ui.turn >= BATTLE.maxTurns) { endFight(ui.myHp >= ui.enemyHp ? 'win' : 'lose'); return; }
@@ -672,13 +817,25 @@ async function enemyTurn() {
   const o = ui.o;
   const t = MOVES[typeOf(o.opponent.id)];
   const dmg = enemyDamage();
-  $('battle-msg').textContent = `상대 ${o.opponent.ko}의 ${t.emoji} ${t.safe}!`;
+  const pal = palOn() ? ui.pal : null; // 📣 동료가 서 있으면 동료가 대신 맞는다
+  $('battle-msg').textContent = `상대 ${o.opponent.ko}의 ${t.emoji} ${t.safe}!${pal ? ` ${pal.ko}${josa(pal.ko, '이', '가')} 막아요!` : ''}`;
   await sleep(700); if (!alive()) return;
-  ui.myHp = Math.max(0, ui.myHp - dmg);
-  hitFx('my', dmg, false);
+  if (pal) {
+    ui.palHp = Math.max(0, ui.palHp - dmg);
+    hitFx('pal', dmg, false);
+  } else {
+    ui.myHp = Math.max(0, ui.myHp - dmg);
+    hitFx('my', dmg, false);
+  }
   sfx.hit(); vibrate(40);
   renderHp();
-  await sleep(1100);
+  await sleep(1100); if (!alive()) return;
+  if (pal && ui.palHp <= 0) {
+    // 동료는 물러난다 — 패배는 늘지 않는다 (도와주러 온 친구) · 모습은 흐리게 남겨 누가 도왔는지 보이게
+    $('battle-pal-fig').classList.add('down');
+    $('battle-msg').textContent = `${pal.ko}${josa(pal.ko, '이', '가')} 힘을 다해 돌아갔어요. 고마워, ${pal.ko}!`;
+    await sleep(1200);
+  }
 }
 
 /**
@@ -689,16 +846,20 @@ function moveFx(star) {
   return playFx($('battle-stage'), ui.my && ui.my.id, star).catch(() => false);
 }
 
-function hitFx(side, dmg, big) {
-  lunge(side); // 때린 쪽이 먼저 튀어나간다
-  const bar = $(side === 'enemy' ? 'battle-enemy-hp' : 'battle-my-hp').parentElement;
+/**
+ * 맞는 연출 — side = 맞는 쪽 'enemy' | 'my' | 'pal'(📣 동료) · by = 때린 쪽을 따로 정할 때('pal' — 동료의 함께 공격)
+ */
+function hitFx(side, dmg, big, by) {
+  lunge(side, by); // 때린 쪽이 먼저 튀어나간다
+  const ids = { enemy: ['battle-enemy-hp', 'battle-enemy-fig', 'battle-enemy'], my: ['battle-my-hp', 'battle-my-fig', 'battle-my'], pal: ['battle-pal-hp', 'battle-pal-fig', 'battle-pal'] }[side];
+  const bar = $(ids[0]).parentElement;
   if (bar) { bar.classList.remove('shake'); void bar.offsetWidth; bar.classList.add('shake'); }
-  const fig = $(side === 'enemy' ? 'battle-enemy-fig' : 'battle-my-fig');
+  const fig = $(ids[1]);
   fig.classList.remove('hit');
   void fig.offsetWidth;
   fig.classList.add('hit');
   const fx = el('span', 'battle-dmg' + (big ? ' big' : ''), `-${dmg}`);
-  const box = $(side === 'enemy' ? 'battle-enemy' : 'battle-my');
+  const box = $(ids[2]);
   box.appendChild(fx);
   setTimeout(() => fx.remove(), 1200);
 }
@@ -717,11 +878,12 @@ function showBattleMon(fig, mon, look) {
 }
 
 /** 도트를 아직 안 받았으면 받아서 바꿔 끼운다 (배틀을 세우지 않는다 — 오면 그때 바뀐다) */
-function fetchDot(fig, mon, look) {
+function fetchDot(fig, mon, look, anyForm = false) {
   if (animUrl(mon.id)) return;
   const run = ui.run;
   ensureAnim(mon.id).then((u) => {
-    if (u && ui.open && ui.run === run && !ui.form) showBattleMon(fig, mon, look); // 변신 중이면 건드리지 않는다
+    // 변신 중이면 내 포켓몬 그림은 건드리지 않는다 · 📣 동료(anyForm)는 내 변신과 상관없이
+    if (u && ui.open && ui.run === run && (anyForm || !ui.form)) showBattleMon(fig, mon, look);
   }).catch(() => {});
 }
 
@@ -729,8 +891,8 @@ function fetchDot(fig, mon, look) {
  * ⚔️ 때리는 순간 — 맞는 쪽은 흔들리고, **때린 쪽은 앞으로 돌진**한다.
  * 돌진이 없으면 "누가 때렸는지"가 안 보여서 숫자만 뜨는 화면이 된다.
  */
-function lunge(side) {
-  const fig = $(side === 'enemy' ? 'battle-my-fig' : 'battle-enemy-fig'); // 맞는 쪽의 반대가 때린 쪽
+function lunge(side, by) {
+  const fig = by === 'pal' ? $('battle-pal-fig') : $(side === 'enemy' ? 'battle-my-fig' : 'battle-enemy-fig'); // 맞는 쪽의 반대가 때린 쪽 (📣 동료가 때리면 동료가)
   if (!fig) return;
   const cls = side === 'enemy' ? 'lunge-up' : 'lunge-down';
   fig.classList.remove('lunge-up', 'lunge-down');
@@ -747,6 +909,7 @@ function endFight(outcome) {
   if (outcome === 'win') {
     $('battle-enemy-fig').classList.add('down');
     $('battle-my-fig').classList.add('win-jump'); // 🏆 이겼으면 폴짝
+    if (palOn()) $('battle-pal-fig').classList.add('win-jump'); // 📣 서 있던 동료도 같이
     $('battle-msg').textContent = '🏆 이겼다!';
     res.textContent = o.practice ? `(연습) ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려왔을 거예요` : `🎉 ${o.opponent.ko}${josa(o.opponent.ko, '이', '가')} 우리 편이 됐어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`;
     sfx.success(); vibrate([40, 60, 40, 60, 160]); burstConfetti();
@@ -758,6 +921,7 @@ function endFight(outcome) {
       : losses >= BATTLE.lossesToLose ? `${ui.my.ko}${josa(ui.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요… 다음엔 더 또렷하게 말해봐요` : `${ui.my.ko} 패배 ${losses}/${BATTLE.lossesToLose} — 다음엔 더 또렷하게 말해봐요`;
     sfx.fail(); vibrate(200);
   }
-  ui.result = { outcome, my: ui.my, opponent: o.opponent, turns: ui.turn };
+  // 📣 pal = 불러온 동료(id·ko) — 결과 반영(패배·보상)은 my만 본다. 동료는 패배가 늘지 않는다
+  ui.result = { outcome, my: ui.my, opponent: o.opponent, turns: ui.turn, pal: ui.pal ? { id: ui.pal.id, ko: ui.pal.ko } : null };
   $('battle-continue').hidden = false;
 }

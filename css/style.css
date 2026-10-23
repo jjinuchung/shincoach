@@ -1392,6 +1392,22 @@ button { font-family: inherit; }
   60% { transform: translateX(4px); }
 }
 .battle-info .hpt { font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+/* 📣 동료 부르기 (v324) — 내 포켓몬 옆에 작게 선다 · 폰 폭에서 한 줄에 들어가게 내 이름 칸을 좁힌다 */
+.battle-pal { display: flex; flex-direction: column; align-items: center; width: 84px; position: relative; flex: none; }
+.battle-pal[hidden] { display: none; }
+.battle-pal .nm { font-weight: 800; font-size: 0.72rem; text-align: center; line-height: 1.2; max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.battle-pal .battle-hpbar { width: 76px; height: 8px; }
+.battle-pal .hpt { font-size: 0.7rem; color: var(--muted); font-weight: 700; }
+.battle-fig.pal, .battle-fig.pal.dot { width: 72px; height: 72px; }
+.battle-side.mine.with-pal { gap: 6px; }
+.battle-side.mine.with-pal .battle-info { min-width: 108px; }
+.battle-fig.pal-in { animation: pal-in .6s ease-out; }
+@keyframes pal-in {
+  0% { transform: translateX(-40px) scale(0.6); opacity: 0; }
+  70% { transform: translateX(4px) scale(1.08); opacity: 1; }
+  100% { transform: translateX(0) scale(1); }
+}
+.battle-move.pal { border-color: #fcd34d; }
 .battle-vs { text-align: center; font-weight: 900; color: #c7d2fe; font-size: 0.9rem; letter-spacing: 0.2em; }
 .battle-dmg { position: absolute; top: 0; left: 50%; transform: translateX(-50%); color: #dc2626; font-weight: 900; font-size: 1.3rem; animation: battle-dmg 1.2s ease-out forwards; pointer-events: none; text-shadow: 0 1px 0 #fff; }
 .battle-dmg.big { font-size: 1.8rem; color: #b91c1c; }

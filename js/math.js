@@ -37,7 +37,7 @@ import { padBox, padAnswered } from './padview.js';
 import { drawBox, drawAnswered, canDraw } from './drawview.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound } from './xp.js';
 import { unlockState, MATH_PTS, nextTarget, previewGift, ownedVoucherIds, needOf, isGift } from './unlock.js';
-import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, setFigure } from './items.js';
+import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, CALL_PAL, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { eggFor, tickEgg, haveCount, monLv, hasKeystone, hasMegaStone, hasGmax } from './xp.js';
 import { rocketPick, rocketAdmit, rocketCurrent, rocketLastAt, profileReady } from './xp.js'; // 🚀 로켓단 습격 (2026-10-09)
@@ -2623,6 +2623,8 @@ async function startMathBattle(after) {
     mine: myBattleMons(),
     potions: mathPotions,
     usePotion: (id) => consumeItem(id),
+    palCount: () => inventory()[CALL_PAL.id] || 0, // 📣 동료 부르기 (v324 — 영어와 같은 것)
+    usePal: () => consumeItem(CALL_PAL.id),
     quiz: battleQuiz,
     onDone: (r) => {
       ui.battleOpen = false;
