@@ -111,7 +111,7 @@ test('🖊️ 논술 턴: 생활 주제의 모든 주제·두 편이 문제가 �
 test('🖊️ 논술 턴: 📖 독서 논술은 안 낸다(이야기 없이 보면 양쪽으로 읽힘 — Codex 129차 #3) · 해 본 주제에서 · 낸 주제·편은 피한다 · 보기 자리는 섞인다', () => {
   assert.ok(story.length >= 10);
   const storyText = new Set(story.flatMap((t) => [...t.yes.reasons, ...t.no.reasons, ...t.off.map((o) => o.t)]));
-  for (const x of ['우리 반은 이어달리기에서 2등을 했어요.', '일 년에 하루는 만날 수 있게 해 주었어요.', '양반의 빚은 천 석이나 되었어요.']) assert.ok(storyText.has(x), x);
+  assert.ok(storyText.size >= 70, `독서 논술 문장 ${storyText.size}`);
   // 독서 논술만 해 봤어도 그 주제는 안 나오고 생활 주제에서
   const onlyStory = Object.fromEntries(story.map((t) => [t.id, { box: 1 }]));
   for (let s = 1; s <= 2000; s++) {

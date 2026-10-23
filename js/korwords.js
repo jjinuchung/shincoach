@@ -6,6 +6,7 @@
 // 문제 두 꼴: mean(뜻 고르기) · use(빈칸 채우기 — 관용 표현·속담(sit 묶음)은 "이럴 때 어울리는 말")
 //   · 보기는 같은 묶음의 다른 낱말 — 헷갈리는 짝(pair: 직유·은유, 사실·의견 …)은 뜻 고르기에 일부러 같이,
 //     빈칸 채우기에는 빼고(둘 다 들어갈 수 있다), 넓은 말·좁은 말(avoid: 비유 ⊃ 직유)은 어느 꼴에도 같이 안 낸다
+//   · 📖 글에서 만난 낱말은 words.json apart 무리(뜻이 같은 짝·넓은 말 좁은 말, v326)를 avoid로 — 보기 넷 어느 둘도 같은 무리가 아니다
 //   · 빈칸 바로 뒤에 받침 따라 바뀌는 조사(을/를·이/가·은/는·와/과·로/으로·예요 …)를 두지 않는다 — 조사가 답을 알려 주지 않게
 // 복습 칸(box): 맞히면 +1 — 1 → 다음 날 · 2 → 3일 뒤 · 3 → 7일 뒤 · 4 → 14일 뒤 · 5 = ⭐ 익힌 낱말(더 안 나온다)
 //   틀리면 0 → 다음 날 다시. 판정은 그 판에서 **처음 고른 것**으로(같은 판에서 한 번 더 보는 것은 연습)
@@ -86,7 +87,22 @@ export function passageWords(cards) {
   return out;
 }
 
-/** 모든 낱말 — words.json(📘·🗣️) + 글에서 만난 낱말(📖). 형식이 깨진 것은 뺀다(검사는 checkWords) */
+/**
+ * 📖 한 문제에 같이 안 낼 무리(words.json apart, v326) → { 낱말: [같은 무리의 다른 낱말] } —
+ * 글마다 따로 뜻을 적어 뜻이 같은 짝(횡단보도·건널목)·넓은 말 좁은 말(도구·물뿌리개)이 생겼다: 틀린 보기로 나오면 정답이 둘
+ * (🔍 Codex 129차 #2 → 아버님 검수 "이대로"). 한 낱말이 여러 무리에 있으면 모두 합친다 · 깨진 무리는 건너뛴다(검사는 checkWords)
+ */
+export function apartMap(groups) {
+  const out = {};
+  for (const g of (Array.isArray(groups) ? groups : [])) {
+    if (!Array.isArray(g)) continue;
+    const ws = [...new Set(g.filter((v) => typeof v === 'string' && v))];
+    for (const w of ws) out[w] = [...new Set([...(own(out, w) ? out[w] : []), ...ws.filter((x) => x !== w)])];
+  }
+  return out;
+}
+
+/** 모든 낱말 — words.json(📘·🗣️) + 글에서 만난 낱말(📖 — 같이 안 낼 무리는 avoid로). 형식이 깨진 것은 뺀다(검사는 checkWords) */
 export function allWords(data, cards) {
   const out = [];
   for (const x of (data && Array.isArray(data.words) ? data.words : [])) {
@@ -96,7 +112,8 @@ export function allWords(data, cards) {
     if (x.deck === 'saja' && typeof x.han === 'string' && SAJA_HAN.test(x.han) && typeof x.lit === 'string' && x.lit.trim()) { w.han = x.han; w.lit = x.lit; }
     out.push(w);
   }
-  return out.concat(passageWords(cards));
+  const apart = apartMap(data && data.apart);
+  return out.concat(passageWords(cards).map((w) => (own(apart, w.w) ? { ...w, avoid: apart[w.w] } : w)));
 }
 
 /** 📖 낱말은 그 글에 ★이 있어야 열린다 */
@@ -208,6 +225,7 @@ function shuffle(list, rng) {
 /**
  * 문제 하나 — { kind, id, w, prompt, sentence, opts: [{ t, ok, id }] } (보기 넷, 차례는 섞음). 보기가 모자라면 null
  * mean: 뜻 넷 중 고르기 — 헷갈리는 짝을 먼저 보기로 · use: 낱말 넷 중 고르기 — 짝은 빼고(둘 다 들어갈 수 있다)
+ * 넷 가운데 어느 둘도 같은 낱말이 아니다 · 📖 낱말은 어느 둘도 같은 무리(apart)가 아니다 (v326)
  */
 export function makeQuestion(word, kind, pool, rng = Math.random) {
   if (!word) return null;
@@ -217,9 +235,9 @@ export function makeQuestion(word, kind, pool, rng = Math.random) {
   if (k === 'mean') {
     const pref = shuffle(same.filter((x) => pairs(word, x)), rng);
     const rest = shuffle(same.filter((x) => !pairs(word, x)), rng);
-    picks = uniqBy([...pref, ...rest], (x) => x.mean).filter((x) => x.mean !== word.mean).slice(0, 3);
+    picks = pickApart(uniqBy([...pref, ...rest], (x) => x.mean).filter((x) => x.mean !== word.mean), 3);
   } else {
-    picks = uniqBy(shuffle(same.filter((x) => !pairs(word, x)), rng), (x) => x.w).slice(0, 3);
+    picks = pickApart(uniqBy(shuffle(same.filter((x) => !pairs(word, x)), rng), (x) => x.w), 3);
   }
   if (picks.length < 3) return null;
   const opts = shuffle([{ t: k === 'mean' ? word.mean : word.w, ok: true, id: word.id }, ...picks.map((x) => ({ t: k === 'mean' ? x.mean : x.w, ok: false, id: x.id }))], rng);
@@ -231,6 +249,20 @@ export function makeQuestion(word, kind, pool, rng = Math.random) {
 function uniqBy(list, key) {
   const seen = new Set();
   return list.filter((x) => { const v = key(x); if (seen.has(v)) return false; seen.add(v); return true; });
+}
+/**
+ * 틀린 보기 n개 — 차례대로, 이미 고른 보기와 같은 낱말(다른 글의 📖 같은 낱말)이면 건너뛰고, 📖 글에서 만난 낱말은 같은 무리(apart)여도 건너뛴다 (v326) —
+ * 묻는 낱말과만 거르면 틀린 보기 둘이 같은 뜻(안내판·표지판)으로 나란히 나와 둘 다 지우면 되는 문제가 됐다.
+ * 📘·🗣️·🐢·🀄은 그대로: 원고가 헷갈리는 짝을 일부러 함께 낸다(근거 → 주장·의견·사실 — 주장·의견이 서로 avoid여도 둘 다 분명히 틀린 보기)
+ */
+function pickApart(list, n) {
+  const out = [];
+  for (const x of list) {
+    if (out.length >= n) break;
+    if (out.some((y) => y.w === x.w || (x.deck === 'passage' && avoids(x, y)))) continue;
+    out.push(x);
+  }
+  return out;
 }
 
 /**
@@ -373,6 +405,18 @@ export function checkWords(data, cards) {
       const w = Array.isArray(p) ? p[0] : '';
       if (seen.has(w)) errs.push(`${c.id} 📖 같은 낱말 두 번 — ${w}`);
       seen.add(w);
+    }
+  }
+  // 📖 한 문제에 같이 안 낼 무리 (v326) — 낱말 둘 이상 · 무리 안에 같은 낱말 없이 · 모두 글에서 만난 낱말(오타면 조용히 안 걸러진다)
+  if (data.apart !== undefined) {
+    if (!Array.isArray(data.apart)) errs.push('apart는 무리 배열이어야 해요');
+    else {
+      const pw = new Set(passageWords(cards).map((w) => w.w));
+      data.apart.forEach((g, i) => {
+        if (!Array.isArray(g) || g.length < 2 || !g.every((v) => typeof v === 'string' && v)) { errs.push(`apart[${i}]: 낱말 둘 이상의 배열`); return; }
+        if (new Set(g).size !== g.length) errs.push(`apart[${i}]: 같은 낱말 두 번`);
+        for (const v of g) if (!pw.has(v)) errs.push(`apart[${i}]: "${v}"가 📖 글에서 만난 낱말에 없어요`);
+      });
     }
   }
   return errs;
