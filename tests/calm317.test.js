@@ -62,8 +62,10 @@ test('🎼 곡 셋 — 이름 · 32마디(A A′ B A′) · 마디마다 박 합
   assert.equal(SONGS.length, 3);
   assert.equal(new Set(SONGS.map((s) => s.id)).size, 3);
   for (const s of SONGS) {
-    assert.ok(s.title && s.bpm >= 50 && s.bpm <= 100, `${s.id} 잔잔한 빠르기`);
+    // v330 진우 "너무 느리고 음산해 — 밝고 경쾌하고 빠르게" → 110~140 (v317은 66~84)
+    assert.ok(s.title && s.bpm >= 110 && s.bpm <= 140, `${s.id} 경쾌한 빠르기 ${s.bpm}`);
     assert.ok([3, 4].includes(s.beats));
+    assert.ok(['bounce', 'skip', 'alberti'].includes(s.lh) && ['bell', 'piano'].includes(s.voice), `${s.id} 반주·소리`);
     assert.deepEqual(s.form, ['A', 'A2', 'B', 'A2']);
     assert.equal(songBars(s).length, 32);
     for (const [part, bars] of Object.entries(s.parts)) {
@@ -75,7 +77,8 @@ test('🎼 곡 셋 — 이름 · 32마디(A A′ B A′) · 마디마다 박 합
         assert.ok(mel.every((n) => n.d > 0 && (n.n === '' ? n.f === 0 : n.f > 0)), `${s.id} ${part}${i + 1} 음이름`);
         const ch = parseChords(c, s.beats);
         assert.ok(ch.length === 1 || ch.length === 2);
-        assert.ok(ch.every((x) => x.tones.length >= 3 && x.tones.every((f) => f > 0)), `${s.id} ${part}${i + 1} 화음`);
+        // 반주 꼴에 맞는 음 수 — 알베르티 = 뿌리 + 위 화음 셋 · 쿵-짝·뒷박 = 뿌리 + 5도 + 위 화음 셋
+        assert.ok(ch.every((x) => x.tones.length === (s.lh === 'alberti' ? 4 : 5) && x.tones.every((f) => f > 0)), `${s.id} ${part}${i + 1} 화음`);
         // 왼손은 낮은 음부터 (펼침이 위로 올라간다)
         assert.ok(ch.every((x) => x.tones.every((f, k) => k === 0 || f > x.tones[k - 1])), `${s.id} ${part}${i + 1} 낮은 음부터`);
       });
@@ -83,56 +86,93 @@ test('🎼 곡 셋 — 이름 · 32마디(A A′ B A′) · 마디마다 박 합
   }
 });
 
-test('🎼 음역 — 멜로디는 G4~E6(오르골·피아노가 맑게) · 왼손은 B1~G4', () => {
+test('🎼 음역 — 멜로디는 C5~E6(밝게 · v330) · 왼손은 B1~G4 · 끝 마디는 으뜸화음(단조로 끝맺지 않음)', () => {
   for (const s of SONGS) {
     for (const bar of songBars(s)) {
-      for (const n of bar.mel) if (n.f) assert.ok(n.f >= noteFreq('G4') - 1e-6 && n.f <= noteFreq('E6') + 1e-6, `${s.id} 멜로디 ${n.n}`);
+      for (const n of bar.mel) if (n.f) assert.ok(n.f >= noteFreq('C5') - 1e-6 && n.f <= noteFreq('E6') + 1e-6, `${s.id} 멜로디 ${n.n}`);
       for (const c of bar.chords) for (const f of c.tones) assert.ok(f >= noteFreq('B1') - 1e-6 && f <= noteFreq('G4') + 1e-6, `${s.id} 왼손 ${f}`);
     }
+    // 곡 끝(A′ 마지막 마디)과 첫 마디의 뿌리가 같다 — 으뜸화음으로 끝 (v317은 단조 iv로 끝맺어 음산했다)
+    const bars = songBars(s);
+    const root = (b) => b.chords[b.chords.length - 1].tones[0];
+    const pc = (f) => Math.round(12 * Math.log2(f / 440) + 120) % 12;
+    assert.equal(pc(root(bars[bars.length - 1])), pc(bars[0].chords[0].tones[0]), `${s.id} 으뜸화음으로 끝`);
   }
 });
 
-test('🎹 한 마디의 소리 — 멜로디 · 왼손 8분음표 펼침 · 배경 · 모두 마디 안 · 홀수 번째 돌기는 멜로디 소리를 바꾼다', () => {
+test('🎹 한 마디의 소리 — 멜로디(살짝 떼어) · 반주(1·3박 베이스 · 꼴마다 화음) · 🥁 톡 · 배경 웅~ 없음 · 모두 마디 안 · 홀수 번째 돌기는 멜로디 소리를 바꾼다', () => {
   for (const s of SONGS) {
     const bars = songBars(s);
     bars.forEach((bar, i) => {
       const ev = barEvents(s, i, 0);
       const mel = ev.filter((e) => e.voice === s.voice && e.vel === 0.9);
       assert.equal(mel.length, bar.mel.filter((n) => n.f).length, `${s.id} ${i} 멜로디 수`);
-      const lh = ev.filter((e) => e.voice === 'piano' && e.vel !== 0.9);
-      assert.equal(lh.length, s.beats * 2, `${s.id} ${i} 왼손 8분음표`);
-      const pads = ev.filter((e) => e.voice === 'pad');
-      assert.equal(pads.length, bar.chords.reduce((a, c) => a + c.tones.length - 1, 0));
-      assert.ok(pads.every((e) => e.f >= 130), '배경은 C3 위');
+      const bass = ev.filter((e) => e.voice === 'bass');
+      assert.equal(bass.length, bar.chords.reduce((a, c) => a + Math.ceil(c.d / 2), 0), `${s.id} ${i} 베이스는 1·3박`);
+      assert.ok(bass.every((e) => e.t % 2 === 0), `${s.id} ${i} 베이스 자리`);
+      const acc = ev.filter((e) => e.voice === 'piano' && e.vel !== 0.9);
+      // 4박 마디 — 알베르티 8분마다 하나(8) · 뒷박 4번 × 위 화음 셋(12) · 쿵-짝 2·4박 2번 × 셋(6) (반 마디 화음이어도 같다)
+      assert.equal(acc.length, { alberti: 8, skip: 12, bounce: 6 }[s.lh], `${s.id} ${i} 반주 수`);
+      assert.ok(ev.some((e) => e.voice === 'tick'), `${s.id} ${i} 🥁 톡`);
+      assert.ok(!ev.some((e) => e.voice === 'pad' || e.voice === 'box'), '웅~ 배경·오르골 없음');
       assert.ok(ev.every((e) => e.t >= 0 && e.d > 0 && e.t + e.d <= s.beats + 1e-9 && e.f > 0 && e.vel > 0 && e.vel <= 1), `${s.id} ${i} 마디 안`);
     });
-    const other = s.voice === 'box' ? 'piano' : 'box';
+    const other = s.voice === 'bell' ? 'piano' : 'bell';
     assert.equal(barEvents(s, 0, 1).filter((e) => e.vel === 0.9).every((e) => e.voice === other), true, `${s.id} 둘째 돌기는 ${other}`);
     assert.equal(barEvents(s, 0, 2).filter((e) => e.vel === 0.9).every((e) => e.voice === s.voice), true);
   }
-  // 반 마디씩 화음이 바뀌면 왼손도 그 자리에서 다시 낮은 음부터 (여름 오후 7마디 Bm7 | E7)
-  const summer = SONGS.find((s) => s.id === 'summer');
-  const lh = barEvents(summer, 6, 0).filter((e) => e.voice === 'piano' && e.vel !== 0.9);
-  assert.ok(near(lh.find((e) => e.t === 0).f, noteFreq('B1')));
-  assert.ok(near(lh.find((e) => e.t === 2).f, noteFreq('E2')));
-  assert.ok(lh.filter((e) => e.t < 2).every((e) => e.t + e.d <= 2 + 1e-9), '앞 화음은 반 마디에서 끝');
+  // 반 마디씩 화음이 바뀌면 베이스도 그 자리에서 그 화음 뿌리 (아침 산책 A′ 7마디 Dm | G)
+  const walk = SONGS.find((s) => s.id === 'walk');
+  const bass = barEvents(walk, 14, 0).filter((e) => e.voice === 'bass');
+  assert.ok(near(bass.find((e) => e.t === 0).f, noteFreq('D2')));
+  assert.ok(near(bass.find((e) => e.t === 2).f, noteFreq('G2')));
+  assert.ok(bass.filter((e) => e.t < 2).every((e) => e.t + e.d <= 2 + 1e-9), '앞 화음은 반 마디에서 끝');
+  // 쿵-짝 — 3박 베이스는 5도 · 2·4박 화음 콕
+  const b0 = barEvents(walk, 0, 0);
+  assert.ok(near(b0.find((e) => e.voice === 'bass' && e.t === 2).f, noteFreq('G2')), '3박은 5도');
+  assert.deepEqual([...new Set(b0.filter((e) => e.voice === 'piano' && e.vel !== 0.9).map((e) => e.t))], [1, 3]);
+  // 알베르티 — 위 화음을 아래-위-가운데-위로 (종이비행기 1마디 G: G3 B3 D4 → G3 D4 B3 D4 G3 D4 B3 D4)
+  const plane = SONGS.find((s) => s.id === 'plane');
+  const alb = barEvents(plane, 0, 0).filter((e) => e.voice === 'piano' && e.vel !== 0.9).sort((a, b) => a.t - b.t);
+  assert.deepEqual(alb.map((e) => e.t), [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]);
+  ['G3', 'D4', 'B3', 'D4', 'G3', 'D4', 'B3', 'D4'].forEach((n, k) => assert.ok(near(alb[k].f, noteFreq(n)), `알베르티 ${k + 1}번째 ${n}`));
 });
 
-test('🎹 소리 예약 — 시작은 at 뒤 · 멈춤은 시작 뒤 · 지수 램프가 0을 향하지 않는다 · 세기 윗값 · 잔향은 컨텍스트마다 한 번', () => {
+test('🥁 톡 자리 — 쿵-짝·알베르티는 8분 뒷박(0.5·1.5·2.5·3.5) · 뒷박 꼴은 2·4박 · 반 마디 화음이어도 같다 · 쿵-짝은 화음과 안 겹치고 알베르티는 피아노와 겹친다(들으신 소리 그대로 — 🔍 Codex 134차 #1)', () => {
+  const want = { bounce: [0.5, 1.5, 2.5, 3.5], alberti: [0.5, 1.5, 2.5, 3.5], skip: [1, 3] };
   for (const s of SONGS) {
-    for (const pass of [0, 1]) {
-      const ctx = new FakeCtx();
-      const input = makeBus(ctx, ctx.destination);
-      const at = 1.25;
-      const live = scheduleBar(ctx, input, s, 3, pass, at, () => 0.5);
-      assert.ok(live.length > 0 && live.length === ctx.oscs.length);
-      for (const o of ctx.oscs) {
-        assert.ok(o.t0 >= at - 1e-9, '시작은 at 뒤');
-        assert.ok(o.t1 > o.t0, '멈춤은 시작 뒤');
+    songBars(s).forEach((bar, i) => {
+      const ev = barEvents(s, i, 0);
+      const ticks = ev.filter((e) => e.voice === 'tick').map((e) => e.t).sort((a, b) => a - b);
+      assert.deepEqual(ticks, want[s.lh], `${s.id} ${i + 1}마디${bar.chords.length > 1 ? '(반 마디 화음)' : ''}`);
+      const acc = new Set(ev.filter((e) => e.voice === 'piano' && e.vel !== 0.9).map((e) => e.t));
+      const overlap = ticks.filter((t) => acc.has(t)).length;
+      if (s.lh === 'alberti') assert.equal(overlap, 4, `${s.id} ${i + 1} 알베르티는 겹침`);
+      else assert.equal(overlap, 0, `${s.id} ${i + 1} 화음이 안 치는 칸`);
+    });
+  }
+});
+
+test('🎹 소리 예약 — 시작은 at 뒤 · 멈춤은 시작 뒤 · 지수 램프가 0을 향하지 않는다 · 세기 윗값 · 잔향은 컨텍스트마다 한 번 · 반 마디 화음 마디·흔들림 양 끝값까지', () => {
+  for (const s of SONGS) {
+    const half = songBars(s).findIndex((b) => b.chords.length > 1); // 반 마디 화음 마디 (세 곡 모두 있다)
+    assert.ok(half >= 0, `${s.id} 반 마디 화음 마디`);
+    for (const [bar, rand] of [[3, () => 0.5], [half, () => 0], [half, () => 0.999999], [31, () => 0.999999]]) {
+      for (const pass of [0, 1]) {
+        const ctx = new FakeCtx();
+        const input = makeBus(ctx, ctx.destination);
+        const at = 1.25;
+        const live = scheduleBar(ctx, input, s, bar, pass, at, rand);
+        assert.ok(live.length > 0 && live.length === ctx.oscs.length);
+        for (const o of ctx.oscs) {
+          assert.ok(o.t0 >= at - 1e-9, '시작은 at 뒤');
+          assert.ok(o.t1 > o.t0, '멈춤은 시작 뒤');
+          assert.ok(o.t1 <= at + barSec(s) + 1.7, `${s.id} ${bar} 멈춤이 마디 끝 뒤 1.7초 안(마림바가 가장 길다)`);
+        }
+        assert.ok(live.every(({ o, end }) => near(o.t1, end)));
+        // 소리마다 가장 큰 세기 (첫 몸통 세기) — 흔들림 윗값(rand → 1)이어도
+        for (const g of ctx.gains) for (const e of g.gain.ev) if (e[0] === 'lin') assert.ok(e[1] <= 0.25, `세기 ${e[1]}`);
       }
-      assert.ok(live.every(({ o, end }) => near(o.t1, end)));
-      // 소리마다 가장 큰 세기 (첫 몸통 세기)
-      for (const g of ctx.gains) for (const e of g.gain.ev) if (e[0] === 'lin') assert.ok(e[1] <= 0.25, `세기 ${e[1]}`);
     }
   }
   const ctx = new FakeCtx();
@@ -143,8 +183,8 @@ test('🎹 소리 예약 — 시작은 at 뒤 · 멈춤은 시작 뒤 · 지수 
   assert.equal(ctx.convolvers[0].buffer.numberOfChannels, 2);
   // 낮은 음일수록 길게 울린다 · 윗값·아랫값
   assert.ok(decayOf(noteFreq('G2')) > decayOf(noteFreq('C4')) && decayOf(noteFreq('C4')) > decayOf(noteFreq('A5')));
-  assert.equal(decayOf(20), 1.3);
-  assert.equal(decayOf(20000), 0.35);
+  assert.equal(decayOf(20), 0.9); // v330 — 전보다 짧게(경쾌하게 · v317은 1.3·0.35)
+  assert.equal(decayOf(20000), 0.25);
 });
 
 test('🎼 calmsong.js는 아무것도 import하지 않는다 (시험 듣기 페이지가 그대로 붙여 쓴다) · 곡은 새로 쓴 것이라고 적혀 있다', () => {

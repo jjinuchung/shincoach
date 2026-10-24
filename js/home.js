@@ -100,7 +100,8 @@ export function subjectTarget(subject) {
   return { view: null, hint: `${subject.emoji} ${subject.ko}은 아빠랑 만드는 중이에요 — 조금만 기다려 줘!` };
 }
 
-function cardEl(subject, mascot, onPick) {
+/** 과목 카드 하나 (그리기 — 시험이 가짜 화면으로 부른다, v330) */
+export function cardEl(subject, mascot, onPick) {
   const li = document.createElement('li');
   li.className = `home-card is-${subject.key}` + (subject.ready ? '' : ' soon'); // 과목 색은 키로 (v323 — 차례로 달면 새 과목이 색 없이 나온다)
 
@@ -173,6 +174,18 @@ export function mathBonusFor(m, today) {
   } catch { return null; }
 }
 
+/**
+ * 카드 하나에 얹을 것 (순수) — 수학: ✨·📬 · 영어: 🔁 복습 · 국어·논술: ✨
+ * 🔁 복습 칩은 영어 카드에만 — 영어 문장 복습 수라서(예전엔 수학을 뺀 모든 카드에 넘겨 국어·논술 카드에도 「복습 N문장」이 붙었다, v330)
+ * @param {object} s SUBJECTS 한 줄 · @param {{bonus?:object, unread?:number, reviewDue?:number, korBonus?:object}} x
+ */
+export function cardSubject(s, { bonus = null, unread = 0, reviewDue = 0, korBonus = {} } = {}) {
+  if (s.key === 'math') return { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) };
+  if (s.key === 'english') return { ...s, reviewDue };
+  const kb = korBonus && Object.hasOwn(korBonus, s.key) ? korBonus[s.key] : null;
+  return kb ? { ...s, bonus: kb } : { ...s };
+}
+
 /** 홈 카드를 그린 날 — ✨ 칩은 그날 보너스라 자정이 지나면 다시 그린다 (v329 🔍 Codex 133차 #3 — 수학 칩도 같이) */
 let homeDay = '';
 /** 홈을 그린 뒤 날짜가 바뀌었나 (그린 적이 없으면 아니다) */
@@ -231,12 +244,7 @@ export async function renderHome(showView) {
   } catch { /* 칩 없이 */ }
   const frag = document.createDocumentFragment();
   const shinyOf = (id) => { const l = getLook(id); return l && l.shinyUrl ? l.shinyUrl : null; };
-  const withExtra = (s) => {
-    if (s.key === 'math') return { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) };
-    if (korBonus[s.key]) return { ...s, reviewDue, bonus: korBonus[s.key] };
-    return { ...s, reviewDue };
-  };
-  for (const s of SUBJECTS) frag.appendChild(cardEl(withExtra(s), pickMascot(s.mascot, chars, shinyOf), pick));
+  for (const s of SUBJECTS) frag.appendChild(cardEl(cardSubject(s, { bonus, unread, reviewDue, korBonus }), pickMascot(s.mascot, chars, shinyOf), pick));
   list.innerHTML = '';
   list.appendChild(frag);
   hint.hidden = true;
