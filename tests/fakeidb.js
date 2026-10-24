@@ -7,9 +7,11 @@
 //  · 트랜잭션은 하나씩 차례로 (두 쓰기가 같은 옛 값을 읽고 서로 덮지 않게)
 //  · fakeIdb.failNext('profile') — 그 저장소를 쓰는 다음 쓰기 트랜잭션 하나를 중단한다 (저장 실패 흉내)
 //  · fakeIdb.get / fakeIdb.put — 저장된 값을 직접 읽고 쓴다 (다른 창이 쓴 것 흉내)
+//  · fakeIdb.failNextRead('daily') — 그 저장소의 다음 getAll 하나가 오류 (목록 읽기 실패 흉내, v329 🔥)
 const data = new Map(); // 저장소 이름 → Map(열쇠 → 값)
 const keyPaths = new Map();
 const fails = [];
+const readFails = [];
 let chain = Promise.resolve();
 
 const copy = (v) => (v === undefined ? undefined : structuredClone(v));
@@ -63,7 +65,11 @@ function makeTx(names) {
     const kp = keyPaths.get(n);
     return {
       get: (k) => request(() => copy(m.get(k))),
-      getAll: () => request(() => [...m.values()].map(copy)),
+      getAll: () => request(() => {
+        const fi = readFails.indexOf(n);
+        if (fi >= 0) { readFails.splice(fi, 1); throw new Error(`읽기 실패 흉내: ${n}`); }
+        return [...m.values()].map(copy);
+      }),
       put: (v) => { const c = copy(v); writes.push(() => m.set(c[kp], c)); return request(() => c[kp]); },
       delete: (k) => { writes.push(() => m.delete(k)); return request(() => undefined); },
       createIndex() {},
@@ -100,6 +106,8 @@ export const fakeIdb = {
   put: (store, value) => { const c = copy(value); data.get(store).set(c[keyPaths.get(store)], c); },
   /** 그 저장소를 쓰는 다음 쓰기 트랜잭션 하나를 중단한다 */
   failNext: (store) => { fails.push(store); },
+  /** 그 저장소의 다음 getAll 하나를 오류로 */
+  failNextRead: (store) => { readFails.push(store); },
   /** 걸어 둔 실패가 아직 남았나 (테스트가 엉뚱한 연산에 실패를 쓰지 않았는지 확인) */
-  failsLeft: () => fails.length,
+  failsLeft: () => fails.length + readFails.length,
 };

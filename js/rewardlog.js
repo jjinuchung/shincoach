@@ -106,7 +106,10 @@ export function rewardText({ profile, snaps, days, today }) {
   for (let k = 6; k >= 0; k--) {
     const day = dayBefore(today, k);
     const d = byDate.get(day) || {};
-    const extra = [num(d.battles) ? `⚔️ 배틀 ${num(d.battles)}번` : '', num(d.rocketMath) + num(d.rocketEn) + num(d.rocketKor) ? `🚀 로켓단 나옴 ${num(d.rocketMath) + num(d.rocketEn) + num(d.rocketKor)}번` : ''].filter(Boolean);
+    const extra = [num(d.battles) ? `⚔️ 배틀 ${num(d.battles)}번` : '', num(d.rocketMath) + num(d.rocketEn) + num(d.rocketKor) ? `🚀 로켓단 나옴 ${num(d.rocketMath) + num(d.rocketEn) + num(d.rocketKor)}번` : '',
+      // v329 국어·논술 — 🔥 받은 날 · ✨ 받은 과목 수 · 🔤 낱말 이어 주기 판
+      num(d.korStreak) ? '🔥 국어·논술 연속' : '', num(d.korDayBonus) + num(d.nsDayBonus) ? `✨ 국어·논술 보너스 ${num(d.korDayBonus) + num(d.nsDayBonus)}번` : '',
+      num(d.korMatches) ? `🔤 낱말 이어 주기 ${num(d.korMatches)}판` : ''].filter(Boolean);
     const cur = sn[day];
     if (!cur) { lines.push(`- ${day.slice(5)}: (기록 없음)${extra.length ? ` · ${extra.join(' · ')}` : ''}`); continue; }
     const prev = dates.filter((x) => x < day).pop();

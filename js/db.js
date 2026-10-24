@@ -20,6 +20,7 @@ import { mergePuzzles, PUZZLE_DAY_LISTS } from './korpuzzle.js'; // 🧩 국어 
 import { copyAvatar, mergeAvatar } from './avatar.js'; // 🧑 진우 캐릭터 복사·병합 (순수 — house만 import)
 import { copyPlay, mergePlay } from './homeplay.js'; // 🎮 일상 행동 💗·놀이 날 복사·병합 (순수 — house·avatar·evolve·korean만 import)
 import { copyStock } from './stock.js'; // 🏦 포켓몬 증권시장 복사 (순수 — 아무것도 import하지 않는다, v319)
+import { matchedOf, mergeMatched } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329)
 import { dripOf, mergeDrip } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (순수 — 아무것도 import하지 않는다, v320)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
@@ -357,6 +358,9 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'rocketMath', 'rocketEn', 'rocketKor', // v327 📚 국어·논술 합쳐 하루 3번(영어·수학과 따로)
   // 🖊️ 오늘 끝낸 논술 판 수 (v327) — 🚀 국어 로켓단 등장 조건(ROCKET.minDone.kor = 국어 글 korReads + 논술 판 nsRounds)
   'nsRounds',
+  // 🔥 국어·논술 연속 학습 · ✨ 국어·논술 오늘의 보너스 · 🔤 국어 낱말 이어 주기 판 (v329, korday.KOR_DAY) — 모두 claimDailyCount로 선점(두 창이어도 한 번 · 하루 3판)
+  //   ★ korBonus(⏳ 국어 부모 추가 시간)와 다른 칸이다
+  'korStreak', 'korDayBonus', 'nsDayBonus', 'korMatches',
   // 🎤 ⏭ 직접 넘김 · 3번 해 보고 넘어감 · 연속 보너스를 받은 수 (2026-10-14 v253) — 연속 보너스는 claimDailyCount로 선점(하루 상한)
   'speakSkipBtn', 'speakGaveUp', 'speakCombos',
   // 🎤 따라 말하기로 받은 🔶 수 (2026-10-15 v263) — 셈은 문장 목록 speakFirstKeys의 길이, 받기는 applySpeakStone(가방과 한 트랜잭션)
@@ -1003,7 +1007,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2299,6 +2303,8 @@ export function mergeStatRecord(name, cur, rec) {
     // 📦 새 국어 글 묶음 시작 날 — 묶음마다 이른 날(늦은 날이 이기면 이미 열린 글이 다시 잠긴다, v320) · 없으면 칸을 두지 않는다
     const kd = mergeDrip(cur.korDrip, rec.korDrip);
     if (Object.keys(kd).length) out.korDrip = kd; else delete out.korDrip;
+    // 🔤 이은 낱말 — 합집합(이른 날 — 옛 백업이 이은 낱말을 "아직"으로 되돌려 같은 판이 또 열리지 않게, v329)
+    out.korMatch = mergeMatched(cur.korMatch, rec.korMatch);
     // 🖊️ 논술 칸 — 🧩 퍼즐과 같은 꼴(한쪽이라도 ⭐면 ⭐) · 보상 받은 날은 날마다 큰 쪽 · 잡기 기회는 세 카운터마다 max (v303)
     out.nonsul = mergePuzzles(cur.nonsul, rec.nonsul);
     out.nonsulDay = mergeWordDays(cur.nonsulDay, rec.nonsulDay);

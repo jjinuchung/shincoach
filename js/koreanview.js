@@ -32,6 +32,8 @@ import { korGainXp } from './korxp.js'; // ⚡ 국어 경험치 (v327)
 import { loadKorRocketToday, korRocketDone, korRocketTally, korRocketPending, korRocketClear, korRocketAt, resumeKorRocketIfAny } from './korrocket.js'; // 🚀 국어 로켓단 (v327)
 import { korCheer, warmKorCheer } from './korcheer.js'; // 📣 응원 포켓몬 (v327)
 import { overlayOpen } from './korbattleview.js';
+import { korDayDone, korMatchOffer, korMatchEl } from './kordayview.js'; // 🔥 연속 학습 · ✨ 오늘의 보너스 · 🔤 낱말 이어 주기 (v329)
+import { streakLine, bonusLine } from './korday.js';
 
 /** 🚀 국어 로켓단의 문제 원천 — 🔤 낱말 뜻(배틀과 같은 것) */
 const korMakeQ = () => korWordsSource();
@@ -885,6 +887,12 @@ async function finishCard() {
   } catch { res = { ok: false, why: 'save' }; }
   if (res && res.ok) korGainXp(res.xp); // ⚡ (v327) — 같은 글은 하루 한 번 · [다시 저장하기]는 0(규칙이 정함) · 화면이 바뀌었어도 준다
   if (res && res.ok && res.newRead) korRocketDone('korean'); // 🚀 오늘 끝낸 글 (로켓단 등장 조건 — 하루 기록 korReads는 korFinish가 적는다)
+  // 🔥·✨ (v329) — 새로 읽은 글일 때(다시 읽기·🎧 포함 · [다시 저장하기]는 아님) · 준 것은 화면과 상관없이 · 줄은 그 끝 화면이 떠 있을 때만
+  if (res && res.ok && res.newRead) {
+    korDayDone('korean').then((day) => {
+      if ((day.streak || day.bonus) && ui.read === r && r.result === res) { r.day = day; renderQ(); }
+    }).catch(() => {});
+  }
   // 🥚 글 한 편을 끝까지 읽은 날 — 별이 없어도(다시 읽기도 공부). ★ 저장이 됐으면 화면과 상관없이 칸을 채운다
   //   (저장하는 사이 ← 도감을 누르면 그날 칸이 빠졌다, Codex 51차 — 🔤 낱말 판과 같은 꼴)
   const eggP = res && res.ok ? tickKorDay() : null;
@@ -901,6 +909,10 @@ async function finishCard() {
   if (res && res.ok) {
     rollOffer('korean', () => korWordsSource()).then((b) => {
       if (b && ui.read === r && r.result === res) { r.battle = b; renderQ(); }
+    }).catch(() => {});
+    // 🔤 낱말 이어 주기 (v329) — 아직 이어 보지 않은 📖 낱말이 모였고 오늘 판이 남았으면 단추 하나
+    korMatchOffer(ui.cards || []).then((round) => {
+      if (round && ui.read === r && r.result === res) { r.match = { round }; renderQ(); }
     }).catch(() => {});
   }
   if (eggP) {
@@ -960,6 +972,10 @@ function finishEl() {
   box.appendChild(el('p', 'kor-done-stars', '★'.repeat(stars) + '☆'.repeat(3 - stars)));
   for (const line of t.lines) box.appendChild(el('p', 'kor-done-line', line));
   if (res.ok && res.xp > 0) box.appendChild(el('p', 'kor-done-line kor-xp', `⚡ 경험치 +${res.xp}`)); // v327
+  const sl = res.ok && r.day ? streakLine(r.day.streak) : ''; // 🔥 (v329)
+  if (sl) box.appendChild(el('p', 'kor-done-line kor-streak', sl));
+  const bl = res.ok && r.day ? bonusLine(r.day.bonus) : ''; // ✨ (v329)
+  if (bl) box.appendChild(el('p', 'kor-done-line kor-bonus', bl));
   if (res.ok && res.star && r.ls && r.ls.text) box.appendChild(el('p', 'kor-done-line', '🟩 국어스톤은 듣고 풀어서 한 번에 다 맞혔을 때 받아요')); // 🎧 글로 읽고 풀었다
   const eg = eggLine(r.egg);
   if (eg) box.appendChild(el('p', 'kor-done-line kor-egg', eg));
@@ -989,6 +1005,10 @@ function finishEl() {
   if (res.ok && r.battle) { // ⚔️ 배틀 단추 (v325) — 이 끝 화면이 떠 있을 때만 열린다 · 🎯 잡기를 준비하는 동안은 안 눌린다 (🔍 Codex 129차 #1·#4)
     const offer = r.battle;
     box.appendChild(offerEl(offer, 'view-korean', () => { r.battle = null; if (ui.read === r) renderQ(); }, { live: () => ui.read === r && r.battle === offer, busy: () => !!ui.catching }));
+  }
+  if (res.ok && r.match) { // 🔤 낱말 이어 주기 (v329) — 이 끝 화면이 떠 있을 때만 · 🎯·⚔️·🚀가 열려 있으면 안 눌린다
+    const m = r.match;
+    box.appendChild(korMatchEl(m, { viewId: 'view-korean', live: () => ui.read === r && r.match === m, busy: () => !!ui.catching || overlayOpen() || korRocketPending('korean'), redraw: () => { if (ui.read === r) renderQ(); } }));
   }
   if (res.ok && r.card.write) box.appendChild(writeBoxEl(r.card, writeCtx)); // ✍️ 생각 쓰기 — 객관식 뒤, 건너뛰어도 별은 그대로
   if (res.ok) box.appendChild(storyNonsulEl(r.card.id));

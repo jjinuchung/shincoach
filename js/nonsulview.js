@@ -24,6 +24,8 @@ import { korGainXp } from './korxp.js'; // ⚡ 논술 경험치 (v327)
 import { loadKorRocketToday, korRocketDone, korRocketTally, korRocketPending, korRocketClear, korRocketAt, resumeKorRocketIfAny } from './korrocket.js'; // 🚀 논술 로켓단 (v327)
 import { korCheer, warmKorCheer } from './korcheer.js'; // 📣 응원 포켓몬 (v327)
 import { tickKorDay, eggLine } from './koreanview.js'; // 🥚 논술 판도 국어 알 하루 칸 (v327 — 국어 글·낱말·퍼즐과 같은 칸)
+import { korDayDone } from './kordayview.js'; // 🔥 연속 학습(국어와 합쳐 하나) · ✨ 논술 오늘의 보너스 (v329)
+import { streakLine, bonusLine } from './korday.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -406,6 +408,10 @@ async function finishRound() {
   if (res && res.ok) {
     korGainXp(res.xp); // ⚡ (v327) — 같은 주제는 하루 한 번 · 연습·[다시 저장]은 0(규칙이 정함) · 화면이 바뀌었어도 준다
     korRocketDone('nonsul'); // 🚀 오늘 끝낸 판 (로켓단 등장 조건 — 하루 기록 nsRounds)
+    // 🔥·✨ (v329) — ⭐ 연습 판도 · 준 것은 화면과 상관없이 · 줄은 그 끝 화면이 떠 있을 때만
+    korDayDone('nonsul').then((day) => {
+      if ((day.streak || day.bonus) && S.r === r && r.result === res) { r.day = day; if (nonsulVisible()) renderRound(); }
+    }).catch(() => {});
     // 🥚 논술 판을 끝낸 날 = 국어 알 하루 칸 (국어 글·낱말·퍼즐과 같은 칸 — 5일째면 그 트랜잭션에서 부화)
     tickKorDay().then((egg) => { if (egg && egg.ok && S.r === r) { r.egg = egg; if (nonsulVisible()) renderRound(); } }).catch(() => {});
   }
@@ -429,6 +435,10 @@ function finishEl(r) {
   box.appendChild(el('p', 'ns-done-title', t.title));
   for (const line of t.lines) box.appendChild(el('p', 'ns-done-line', line));
   if (res.ok && res.xp > 0) box.appendChild(el('p', 'ns-done-line kor-xp', `⚡ 경험치 +${res.xp}`)); // v327
+  const sl = res.ok && r.day ? streakLine(r.day.streak) : ''; // 🔥 (v329)
+  if (sl) box.appendChild(el('p', 'ns-done-line kor-streak', sl));
+  const bl = res.ok && r.day ? bonusLine(r.day.bonus) : ''; // ✨ (v329)
+  if (bl) box.appendChild(el('p', 'ns-done-line kor-bonus', bl));
   const eg = eggLine(r.egg); // 🥚 (v327)
   if (eg) box.appendChild(el('p', 'ns-done-line kor-egg', eg));
   const wl = res.ok ? writeLinkEl(r.id) : null; // ✍️ 이 주제로 짧은 글 (v304 · 저장이 된 뒤에만)

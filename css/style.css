@@ -2403,6 +2403,11 @@ button { font-family: inherit; }
 /* 도트 그림을 아직 못 받아 평소 일러스트로 대신 세운 춤꾼 */
 .match-dancer.still { image-rendering: auto; width: 64px; height: 64px; }
 .match-actions .btn { min-width: 160px; min-height: 48px; }
+/* 📚 국어 낱말 이어 주기 (v329) — 낱말은 짧고(8자 안) 뜻이 길어(24자 안) 뜻 칸을 넓히고 줄 사이를 좁힌다 · 뜻은 왼쪽 맞춤(두 줄이어도 읽히게) */
+.match.is-kor .match-board { gap: clamp(28px, 9vw, 72px); }
+.match.is-kor #match-left { flex: 0 0 30%; }
+.match.is-kor .match-cell { padding: 8px 10px; word-break: keep-all; } /* 「감싼 / 다」처럼 낱말 가운데서 끊기지 않게 */
+.match.is-kor .match-right-cell { text-align: left; font-size: 0.95rem; line-height: 1.3; }
 
 /* ===== 🕺 그림에 움직임 주기 (지금 쓰는 일러스트 그대로, 파일 0개) ===== */
 /* 도감·퍼즐·잡기처럼 그림을 크게 보는 자리는 도트로 바꾸지 않고 여기서 생기를 준다 */
@@ -3631,6 +3636,14 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .kor-note .kor-wsent { font-size: 0.98rem; background: transparent; border: 0; padding: 0; }
 .kor-note-ex { font-size: 0.92rem; color: #4b5563; }
 .kor-egg { font-weight: 700; color: #7c5a00; }
+/* 🔥 연속 학습 · ✨ 오늘의 보너스 · 🔤 낱말 이어 주기 (v329) — 끝 화면 한 줄씩 · 단추는 ⚔️ 배틀 단추와 같은 꼴(색만 초록) */
+.kor-streak { font-weight: 800; color: #b45309; }
+.kor-bonus { font-weight: 800; color: #92400e; background: #fef3c7; border-radius: 12px; padding: 6px 10px; }
+.kor-match-offer { margin: 14px auto 0; padding: 12px 14px; max-width: 420px; border-radius: 14px; background: #ecfdf5; border: 2px solid #6ee7b7; text-align: center; }
+.kor-match-offer:has(.kor-match-done) { padding: 8px 12px; }
+.kor-match-line { margin: 0 0 8px; font-weight: 800; color: #065f46; }
+.kor-match-btn { width: 100%; }
+.kor-match-done { margin: 0; font-weight: 800; color: #065f46; }
 .kor-term { margin: 16px 0 8px; font-size: 1.1rem; }
 .kor-units { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .kor-unit { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }

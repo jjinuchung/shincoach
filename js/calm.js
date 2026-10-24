@@ -87,9 +87,13 @@ export function calmState() {
 
 // ── 멈춰야 하나 ──
 
+/** 🕒 사용 기록 칸은 따로 없지만 제 음악(bgm.js)이 있는 창 — 🔤 낱말 이어 주기(v329) */
+const QUIET_IDS = ['match'];
+
 function overlayShown() {
   if (typeof document === 'undefined') return false;
-  return OVERLAYS.some((o) => o.ids.some((id) => { const e = document.getElementById(id); return !!(e && !e.hidden); }));
+  const shown = (id) => { const e = document.getElementById(id); return !!(e && !e.hidden); };
+  return OVERLAYS.some((o) => o.ids.some(shown)) || QUIET_IDS.some(shown);
 }
 
 /** 🎧 한국어 읽어 주기가 말하는 중이거나 막 끝났나 */

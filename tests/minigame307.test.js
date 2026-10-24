@@ -280,7 +280,7 @@ test('🎮 화면 연결 — 🎮 게임하기는 게임기 화면으로 · 판 
   assert.ok(gv.includes("playNoteStep(seen, clockDay(), `${conf.min}:${conf.cap}`, n) && itemCount(GAME_DEVICE) > 0) {\n    toast(`🎮 게임 1판이 생겼어요! (공부 ${conf.min}분마다 한 판)`);"), '게임기를 가졌을 때만 알림');
   assert.match(gv, /if \(!isReady\(\)\) return;/, '오늘 기록을 읽기 전엔 기준을 안 잡는다');
   const app = src('js/app.js');
-  assert.match(app, /onTick: \(\) => \{ refreshChips\(\); noteStudyPlays\(\); \}/);
+  assert.match(app, /onTick: \(\) => \{ refreshChips\(\); noteStudyPlays\(\);( homeDayTick\(\);)? \}/); // v329: 홈 ✨ 칩 자정 다시 그리기도 같은 시계에
   const ps = src('js/playshow.js');
   assert.match(ps, /Number\.isSafeInteger\(o\.score\) && o\.score >= 0 \? o\.score :/);
   // 💰·스톤과 안 이어진다 — 게임 파일들은 코인·가방을 만지지 않는다

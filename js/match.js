@@ -9,6 +9,7 @@
 // 탭은 그 구멍이 아예 없다.
 //
 // 위쪽은 순수 로직(테스트 가능), 아래쪽은 화면.
+// v329: 📚 국어 글에서 만난 낱말도 같은 화면으로(openMatch kind 'kor' — 규칙은 kormatch.js, 열기는 kordayview.js)
 import { animUrl } from './sprite.js';
 import { sfx, unlock, vibrate } from './sfx.js';
 import * as bgm from './bgm.js';
@@ -112,6 +113,7 @@ const ui = {
   mons: [],       // 무대에 세운 포켓몬 (늦게 도착한 그림으로 다시 그릴 때 씀)
   token: 0,       // 판 번호 — 늦게 온 그림이 다음 판을 건드리지 못하게
   reward: null,   // [{xp, coin} × 3] 틀린 횟수 단계별 보상 (화면에 보여 주려고 받는다)
+  onClose: null,  // 판이 어떻게 닫히든 한 번 부르는 정리 (v329 — 📚 국어 판이 막아 둔 뒤 화면 되살리기)
 };
 
 export function isMatchOpen() {
@@ -282,13 +284,21 @@ export function refreshStage(mons, token) {
   fillStage(mons);
 }
 
+/** 판의 꼴 — 영어(기본) · 📚 국어 낱말(v329 — 뜻이 길어 뜻 칸을 넓힌다) */
+const KINDS = {
+  en: { title: '🔤 단어 이어 주기', left: '영어 단어', right: '한글 뜻' },
+  kor: { title: '🔤 낱말 이어 주기', left: '낱말', right: '뜻' },
+};
+
 /**
  * 게임 열기.
- * @param {{items:Array, mons:Array<{id,anim,art,ko}>, reward:Array<{xp,coin}>, onDone:Function}} o
+ * @param {{items:Array, mons:Array<{id,anim,art,ko}>, reward:Array<{xp,coin}>, onDone:Function, onClose?:Function, kind?:'en'|'kor'}} o
+ *   onClose = 판이 **어떻게 닫히든** 한 번(계속하기 · 다른 판으로 바뀜 · closeMatch) — 뒤 화면 되살리기 같은 정리 (v329 🔍 Codex 133차 #4)
  * @returns {number} 판 번호 (늦게 받은 그림을 refreshStage에 넘길 때 쓴다)
  */
-export function openMatch({ items, mons = [], reward = null, onDone = null } = {}) {
+export function openMatch({ items, mons = [], reward = null, onDone = null, onClose = null, kind = 'en' } = {}) {
   closeMatch();
+  ui.onClose = typeof onClose === 'function' ? onClose : null;
   bgm.play(); // 🎵 지난 이벤트에서 끊긴 자리부터 이어서
   ui.open = true;
   ui.items = (items || []).map((it) => ({ ...it, _ok: false }));
@@ -318,21 +328,33 @@ export function openMatch({ items, mons = [], reward = null, onDone = null } = {
   const btn = $('match-continue');
   if (btn) btn.hidden = true;
   const root = $('match');
+  const k = kind === 'kor' ? 'kor' : 'en';
   root.classList.remove('solved');
+  root.classList.toggle('is-kor', k === 'kor');
+  const title = $('match-title');
+  if (title) title.textContent = KINDS[k].title;
+  left.setAttribute('aria-label', KINDS[k].left);
+  right.setAttribute('aria-label', KINDS[k].right);
   root.hidden = false;
   window.addEventListener('resize', redrawLines);
   return ui.token;
 }
 
 export function closeMatch() {
-  if (!ui.open) return;
-  ui.open = false;
-  ui.locked = true;
-  clearPick();
-  window.removeEventListener('resize', redrawLines);
-  const root = $('match');
-  if (root) { root.hidden = true; root.classList.remove('solved'); }
-  bgm.stop();
+  const cleanup = ui.onClose;
+  ui.onClose = null;
+  try {
+    if (!ui.open) return;
+    ui.open = false;
+    ui.locked = true;
+    clearPick();
+    window.removeEventListener('resize', redrawLines);
+    const root = $('match');
+    if (root) { root.hidden = true; root.classList.remove('solved'); }
+    bgm.stop();
+  } finally {
+    if (cleanup) { try { cleanup(); } catch { /* 정리가 깨져도 닫기는 끝낸다 */ } }
+  }
 }
 
 /** 화면 배선 (앱 시작 때 한 번) */

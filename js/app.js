@@ -7,7 +7,7 @@ import { initHouse } from './houseview.js'; // 🏠 진우네 집 (2026-10-10)
 import { noteStudyPlays } from './gameview.js'; // 🎮 게임기 미니 게임 — 판이 생겼어요 (v307)
 import { initHatch } from './hatch.js';
 import { initEvolveShow } from './evolveshow.js';
-import { initHome, renderHome } from './home.js';
+import { initHome, renderHome, homeStale } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
 import { initNonsul, enterNonsul } from './nonsulview.js'; // 🖊️ 논술 (v303)
 import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
@@ -229,7 +229,9 @@ async function main() {
   });
   // ⏳ 하루 시간 제한 시계 — ⚙ 설정을 읽어 가고, 1초마다 칩을 갱신한다 (실패해도 학습은 계속)
   // 🎮 공부하는 동안 게임 판이 생기면 한 줄 (v307 — 1초마다 · 셈 없이)
-  const timeReady = initTimeLimit({ conf: timeLimitConf, onTick: () => { refreshChips(); noteStudyPlays(); } }).catch(() => {});
+  // ✨ 홈을 켜 둔 채 자정이 지나면(앱을 내렸다 다음 날 다시 열어도) 홈 카드를 다시 — 어제 보너스 칩이 남지 않게 (v329 🔍 Codex 133차 #3)
+  const homeDayTick = () => { if (!views.home.hidden && homeStale()) renderHome(showView).catch(() => {}); };
+  const timeReady = initTimeLimit({ conf: timeLimitConf, onTick: () => { refreshChips(); noteStudyPlays(); homeDayTick(); } }).catch(() => {});
   try { initUsage(); } catch { /* 🕒 사용 기록이 안 돼도 학습은 계속 */ }
   initBlackbox(); // 🛑 몇 초마다 지금 자리를 이 기기에 · 정상으로 닫히면 지움 → 다음에 켤 때 남은 것 = 저절로 꺼진 창 (안에서 오류를 삼킨다)
   // 🚀 끝나지 않은 로켓단 배틀이 있으면 그 과목 화면으로 — 수학 화면이 열리면 거기서 이어 간다 (아버님 결정 (다): 앱이 꺼져도

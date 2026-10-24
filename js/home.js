@@ -6,6 +6,7 @@
 
 import { ROSTER, loadCharacters, characterUrl, artUrl } from './pokemon.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
+import { korBonusFor } from './korday.js'; // ✨ 국어·논술 카드 오늘의 보너스 (v329)
 import { getLook, getProfileSnapshot, onProfileReload } from './xp.js';
 import { dailyDone } from './mathprog.js';
 import { todayKey } from './track.js';
@@ -150,7 +151,7 @@ function cardEl(subject, mascot, onPick) {
       li.classList.add('sparkle');
       const tip = document.createElement('span');
       tip.className = 'home-card-bonus-tip';
-      tip.textContent = '☀️ 오늘의 수학 완주하면 받아요';
+      tip.textContent = subject.bonus.tip || '☀️ 오늘의 수학 완주하면 받아요'; // 📚·🖊️ 카드는 제 말(v329 korday.BONUS_TIP)
       btn.appendChild(tip);
       for (let i = 0; i < 4; i++) { const sp = document.createElement('i'); sp.className = `spark s${i + 1}`; sp.textContent = '✨'; sp.setAttribute('aria-hidden', 'true'); btn.appendChild(sp); }
     }
@@ -172,6 +173,13 @@ export function mathBonusFor(m, today) {
   } catch { return null; }
 }
 
+/** 홈 카드를 그린 날 — ✨ 칩은 그날 보너스라 자정이 지나면 다시 그린다 (v329 🔍 Codex 133차 #3 — 수학 칩도 같이) */
+let homeDay = '';
+/** 홈을 그린 뒤 날짜가 바뀌었나 (그린 적이 없으면 아니다) */
+export function homeStale(today = todayKey()) {
+  return !!homeDay && homeDay !== today;
+}
+
 /**
  * 카드를 그린다. 그림은 기기에 받아둔 것만 쓰므로 인터넷이 없어도 화면은 항상 뜬다.
  * @param {(view:string)=>void} showView
@@ -180,6 +188,7 @@ export async function renderHome(showView) {
   const list = $('home-subjects');
   const hint = $('home-hint');
   if (!list) return;
+  homeDay = todayKey(); // 먼저 적는다 — 그리는 동안 1초 시계가 또 부르지 않게
   let chars = [];
   try { chars = await loadCharacters(); } catch { chars = []; } // 그림이 없어도 카드는 떠야 한다
 
@@ -212,9 +221,22 @@ export async function renderHome(showView) {
     // 밀린 전체가 아니라 **지금 풀 문항 수** (목록 버튼과 같은 숫자여야 한다)
     reviewDue = pickDue ? Math.min(pickDue.due, reviewRoundSize()) : 0;
   } catch { reviewDue = 0; }
+  // ✨ 국어·논술 카드도 제 보너스 (v329 — 그 과목 그날 첫 끝냄에 받음 · 받았나는 오늘 하루 기록) · 못 읽으면 칩 없이
+  const korBonus = {};
+  try {
+    const { getDaily } = await import('./db.js');
+    const day = todayKey();
+    const d = await getDaily(day);
+    for (const k of ['korean', 'nonsul']) korBonus[k] = korBonusFor(d, day, k);
+  } catch { /* 칩 없이 */ }
   const frag = document.createDocumentFragment();
   const shinyOf = (id) => { const l = getLook(id); return l && l.shinyUrl ? l.shinyUrl : null; };
-  for (const s of SUBJECTS) frag.appendChild(cardEl(s.key === 'math' ? { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) } : { ...s, reviewDue }, pickMascot(s.mascot, chars, shinyOf), pick));
+  const withExtra = (s) => {
+    if (s.key === 'math') return { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) };
+    if (korBonus[s.key]) return { ...s, reviewDue, bonus: korBonus[s.key] };
+    return { ...s, reviewDue };
+  };
+  for (const s of SUBJECTS) frag.appendChild(cardEl(withExtra(s), pickMascot(s.mascot, chars, shinyOf), pick));
   list.innerHTML = '';
   list.appendChild(frag);
   hint.hidden = true;
