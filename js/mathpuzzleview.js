@@ -331,5 +331,8 @@ function finishEl(ctx) {
   more.addEventListener('click', () => guardStart('math', () => startPuzzle(ctx)));
   row.appendChild(more);
   box.appendChild(row);
+  // ☀️ 오늘의 수학으로 잇기 (v331) — 오늘 ☀️를 아직 끝내지 않았으면 단추 하나(math.js가 정함) · 누르면 이 판을 닫고 ☀️로
+  const sun = ctx.sunEl ? ctx.sunEl('puzzle', () => { S.ps = null; }) : null;
+  if (sun) box.appendChild(sun);
   return box;
 }

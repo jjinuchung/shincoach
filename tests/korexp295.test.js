@@ -28,7 +28,8 @@ const errsOf = (mut) => {
   mut(p);
   return checkPuzzles({ puzzles: [p] }, CARDS);
 };
-const solvedAt = (ids, at) => Object.fromEntries(ids.map((id) => [id, { box: SOLVED, due: 0, at, miss: 0, d0: D0 }]));
+// 처음 푼 날 d0는 어제 — 「이미 해 본 꼴」 (v331부터 오늘 처음 들인 꼴은 하루 한 꼴에 센다 · tests/one331)
+const solvedAt = (ids, at) => Object.fromEntries(ids.map((id) => [id, { box: SOLVED, due: 0, at, miss: 0, d0: D0 - 1 }]));
 
 test('⚖️ 원고: 열 묶음 E1~E10 · 문장 쉰 · 검사 통과 · 묶음마다 겪은 일과 생각·느낌이 함께 · 마음 말은 생각·느낌에만 · 지어낸 형제 없음', () => {
   assert.deepEqual(checkPuzzles(DATA, CARDS), []);

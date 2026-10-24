@@ -336,7 +336,7 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
   // 🏦 포켓몬 증권시장(v319)도 못 만들면 빼고 나머지는 그대로
   const stock = getStock ? await Promise.resolve().then(() => getStock(today)).catch(() => null) : null;
   return [
-    ...reportFiles(math, today, math ? mathReportText(math, today) : '(수학 기록 없음)', math ? asksText(math, today) : ''),
+    ...reportFiles(math, today, math ? mathReportText(math, today, days || []) : '(수학 기록 없음)', math ? asksText(math, today) : ''), // ☀️ 줄은 하루 기록으로 (v331)
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
     ...(getKorTodo ? koreanFiles(kor, today) : []), // ✍️ 국어 서술형 (v237)
     ...(getEnglish ? englishFiles(days, en, today) : []), // 🎤 영어 요약 (v253)

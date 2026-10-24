@@ -30,7 +30,8 @@ const errsOf = (mut, base = RAW[0]) => {
   mut(p);
   return checkPuzzles({ puzzles: [p] }, CARDS);
 };
-const solvedAt = (ids, at) => Object.fromEntries(ids.map((id) => [id, { box: SOLVED, due: 0, at, miss: 0, d0: D0 }]));
+// 처음 푼 날 d0는 어제 — 「이미 해 본 꼴」 (v331부터 오늘 처음 들인 꼴은 하루 한 꼴에 센다 · tests/one331)
+const solvedAt = (ids, at) => Object.fromEntries(ids.map((id) => [id, { box: SOLVED, due: 0, at, miss: 0, d0: D0 - 1 }]));
 
 // 박아 둔 표 — 글에 쓰인 차례(조각 번호 · 조각은 일어난 차례로 적혀 있다) · 갈래 · 조각 수 (원고를 바꾸면 여기도 손으로)
 const EXPECT = {

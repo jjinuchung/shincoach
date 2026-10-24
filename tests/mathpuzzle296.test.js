@@ -189,7 +189,8 @@ test('🧩 화면 연결 — 사다리 머리(☀️ 아래)·줄기 고르기�
   assert.ok(math.includes("import { puzzleButton, puzzleActive, resumePuzzle, endPuzzle } from './mathpuzzleview.js';"));
   // v299부터 🧩 바로 아래에 🕵️ 나옹의 숙제 단추가 한 줄 끼어든다 (tests/detective299)
   assert.ok(math.includes('  head.appendChild(puzzleButton(puzzleCtx())); // 🧩 오늘의 수학 퍼즐 — ☀️ 오늘의 수학 아래 (v296)\n  head.appendChild(detectButton(detectCtx())); // 🕵️ 나옹의 숙제 봐 주기 — 🧩 아래 (v299)\n  // ❓ 아빠 답을 기다리는 질문'));
-  assert.ok(math.indexOf('head.appendChild(puzzleButton(puzzleCtx()))') > math.indexOf("'☀️ 오늘의 수학 — 한 번에 다 하기'"), '☀️ 아래');
+  // v331 — ☀️ 단추 글에서 「— 한 번에 다 하기」를 뺐다 (없는 글을 찾으면 -1이라 늘 통과했다 — 새 글로 · tests/sun331)
+  assert.ok(math.indexOf("'☀️ 오늘의 수학');") > 0 && math.indexOf('head.appendChild(puzzleButton(puzzleCtx()))') > math.indexOf("'☀️ 오늘의 수학');"), '☀️ 아래');
   assert.ok(math.includes('  card.appendChild(puzzleButton(puzzleCtx())); // 🧩 수학 퍼즐도 줄기와 상관없이 (v296)'));
   assert.ok(math.includes('  if (puzzleActive()) { ui.run++; resumePuzzle(puzzleCtx()); return; }'));
   assert.ok(math.includes('  endPuzzle(); // 🧩 수학 퍼즐 판도 (v296)'));

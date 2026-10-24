@@ -164,13 +164,14 @@ test('📍 열림·한 판: 그 글에 ★이 있어야 열림 · 판 = 차례 �
   assert.deepEqual(KIND_LIST, ['order', 'sort', 'intext', 'agree', 'exp', 'time']); // v295 ⚖️ 겪은 일·생각 · v297 ⏰ 일어난 차례
   assert.deepEqual(planPuzzles(LIST, {}, ALL_STAR, T0).map((x) => x.id), ['O1', 'I1', 'F1', 'H1']);
   assert.deepEqual(planPuzzles(LIST, {}, { 'K2:1': D0 }, T0).map((x) => x.id), ['O11', 'I1', 'F1', 'H1'], '★ 하나뿐 — 그 글의 글에 있나요만');
-  const done = (kinds) => Object.fromEntries(LIST.filter((x) => kinds.includes(x.kind)).map((x) => [x.id, { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 }]));
+  const done = (kinds) => Object.fromEntries(LIST.filter((x) => kinds.includes(x.kind)).map((x) => [x.id, { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 - 1 }])); // d0 어제 — 이미 해 본 꼴 (v331)
   // v315: 처음 보는 꼴은 하루 한 꼴만 — 해 본 꼴을 다 풀었으면 그 한 꼴로 판을 채운다(원고 꼴 차례: 차례 → 사실·의견 → 글에 있나요 → 앞뒤 → 겪은 일 → 일어난 차례)
   assert.deepEqual(planPuzzles(LIST, done(['order', 'sort', 'time']), ALL_STAR, T0).map((x) => x.id), ['I1', 'I2', 'I3', 'I4'], '다른 꼴을 다 풀면 글에 있나요로 채움(처음 보는 꼴은 하루 하나 — 🔗·겪은 일은 다음 날부터)');
   assert.deepEqual(planPuzzles(LIST, done(['intext', 'sort']), ALL_STAR, T0).map((x) => x.kind), ['order', 'order', 'order', 'order'], '사실·의견·글에 있나요를 다 풀면 처음 보는 꼴 하나(차례)로 (v315)');
-  const fam = { ...done(['intext', 'sort']), O1: { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 }, H1: { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 }, T1: { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 } };
+  // 해 본 꼴은 어제 처음 푼 것으로(d0 — v331부터 오늘 처음 들인 꼴은 하루 한 꼴에 센다 · tests/one331)
+  const fam = { ...done(['intext', 'sort']), O1: { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 - 1 }, H1: { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 - 1 }, T1: { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 - 1 } };
   assert.deepEqual(planPuzzles(LIST, fam, ALL_STAR, T0).map((x) => x.kind), ['order', 'agree', 'order', 'exp'], '사실·의견을 다 풀었으면 가르기 칸은 겪은 일·생각(v295) — 처음 보는 꼴이라 맨 뒤(v315) · 빈 글에 있나요 자리는 해 본 꼴로');
-  const st = { I3: { box: 0, due: D0 + 1, at: 5, miss: 1, d0: D0 }, I1: { box: SOLVED, due: 0, at: 2, miss: 0, d0: D0 } };
+  const st = { I3: { box: 0, due: D0 + 1, at: 5, miss: 1, d0: D0 }, I1: { box: SOLVED, due: 0, at: 2, miss: 0, d0: D0 - 1 } }; // I1은 어제 처음 — 글에 있나요는 이미 해 본 꼴 (v331)
   // 다른 꼴은 이미 해 본 상태에서(v315 — 처음 보는 꼴은 하루 하나라) · 각 꼴의 마지막 퍼즐 하나씩 ⭐
   const seen = Object.fromEntries(['O23', 'F14', 'H10', 'E10', 'T10'].map((id) => [id, { box: SOLVED, due: 0, at: 1, miss: 0, d0: D0 }]));
   assert.deepEqual(planPuzzles(LIST, { ...seen, ...st }, ALL_STAR, T0).map((x) => x.id), ['O1', 'I2', 'F1', 'H1'], '오늘은 틀린 I3·⭐ I1이 안 나온다');

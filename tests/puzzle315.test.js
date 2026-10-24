@@ -127,7 +127,8 @@ test('🧩 📤 국어 요약에 판 줄 — 최근 7일만 · 그만둔 자리 
 test('🧩 화면 잇기 — 판 시작(연습 빼고)·그만두기(몇째·꼴)·끝냄을 하루 기록에 · 아이 화면 글은 그대로', () => {
   const v = read('js/korpuzzleview.js');
   assert.ok(v.includes("if (!practice) notePlay({ korPzStarts: [String(t0)] });"));
-  assert.ok(v.includes("if (!ps.practice) notePlay({ korPzQuits: [quitKey(ps.t0, ps.i + 1, (ps.items[ps.i] || {}).kind || '')] });"));
+  // v331 — 글 끝 퍼즐 하나(ps.one)는 판 기록에 안 넣는다 (tests/one331)
+  assert.ok(v.includes("if (!ps.practice && !ps.one) notePlay({ korPzQuits: [quitKey(ps.t0, ps.i + 1, (ps.items[ps.i] || {}).kind || '')] });"));
   assert.ok(v.includes("if (!ps.practice) notePlay({ korPzDone: [String(ps.t0)] });"));
   assert.ok(v.includes("'정말 그만할까요? (푼 것은 저장 안 돼요)'"), '아이 화면 말은 그대로');
   const db = read('js/db.js');

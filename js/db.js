@@ -2,7 +2,7 @@
 // items 스토어: 메타데이터(제목, 자막, 진행) / blobs 스토어: 영상 Blob (목록 조회 시 무거운 Blob을 안 읽기 위해 분리)
 
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
-import { normThrows } from './mathprog.js'; // 🎯 던지기 카운터 정규화 (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
+import { normThrows, SUN_DAY_LISTS } from './mathprog.js'; // 🎯 던지기 카운터 정규화 · ☀️ 시작·완주 기록 칸(v331) (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
 import { mergeReviewFirst } from './mathchal.js'; // 🔍 🎯 까닭 고르기 첫 선택 합치기 (v252) — mathchal.js는 아무것도 import하지 않는다
 import { mergePuzzle, puzzleOf } from './mathpuzzle.js'; // 🧩 수학 퍼즐 기록 (v296) — mathpuzzle.js도 아무것도 import하지 않는다
 import { mergeDetect, detectOf } from './detective.js'; // 🕵️ 나옹의 숙제 기록 (v299) — detective.js도 아무것도 import하지 않는다
@@ -16,7 +16,7 @@ import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 —
 import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows, qMissOf, mergeQMiss, readsOf, mergeReads, KOR_DAY_SUMS, KOR_DAY_LISTS } from './korean.js'; // 📚 국어 잘못 읽기 횟수 · 📈 읽기 날마다 합계 칸(v314) (순수, import 없음)
 import { wordsOf, mergeWords, wordDaysOf, mergeWordDays } from './korwords.js'; // 🔤 국어 낱말 칸·보상 받은 날 (순수, korean.js만 import)
 import { writesOf, mergeWrites } from './korwrite.js'; // ✍️ 국어 서술형 글·답장·보상 한도 (순수, korean.js만 import)
-import { mergePuzzles, PUZZLE_DAY_LISTS } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 · 판 기록 칸(v315) (순수 — korean·korwords만 import)
+import { mergePuzzles, PUZZLE_DAY_LISTS, ONE_DAY_LISTS } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 · 판 기록 칸(v315) · 글 끝 퍼즐 하나 기록 칸(v331) (순수 — korean·korwords만 import)
 import { copyAvatar, mergeAvatar } from './avatar.js'; // 🧑 진우 캐릭터 복사·병합 (순수 — house만 import)
 import { copyPlay, mergePlay } from './homeplay.js'; // 🎮 일상 행동 💗·놀이 날 복사·병합 (순수 — house·avatar·evolve·korean만 import)
 import { copyStock } from './stock.js'; // 🏦 포켓몬 증권시장 복사 (순수 — 아무것도 import하지 않는다, v319)
@@ -386,7 +386,9 @@ const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 📍 국어 근거 찾기 초 "카드@연 시각:초" (v314, korean.korDayDelta) — 주간 가운데값을 내려고 하나씩 · 같은 읽기는 한 번
 // 🧩 오늘의 퍼즐 판 시작·끝냄·그만둔 자리 (v315, korpuzzle.puzzleSessions) — 판마다 한 칸(같은 판은 한 번)
 // ✍️ 에세이 🎤로 🔶를 받은 문장 (v318, applyEssaySayStone) — 같은 문장을 두 번 통과해도·두 창이 같이 받아도 한 번
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', 'essaySayKeys', ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
+// ☀️ 오늘의 수학 시작 "시각:누른 곳:다시 시작 판" · 완주 "시각" (v331, mathprog.sunReport) — 흐름마다 한 칸
+// 🧩 글 끝 퍼즐 하나 누름·끝냄 "시각:꼴" (v331, korpuzzle.oneSessions) — 끝낸 수가 하루 단추 상한(ONE_PER_DAY)이기도 하다
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', 'essaySayKeys', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {

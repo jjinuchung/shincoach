@@ -2632,6 +2632,10 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .mpz-done-title { font-size: 1.3rem; font-weight: 800; margin: 0; }
 .mpz-done-line { margin: 0; }
 .mpz-done .mpz-tools { width: 100%; }
+/* ☀️ 오늘의 수학으로 잇기 (v331) — 🧩·🕵️ 끝 화면 */
+.math-sun-offer { width: 100%; display: grid; gap: 6px; margin-top: 6px; padding: 10px 12px; border-radius: 14px; background: #fffbeb; border: 2px solid #fcd34d; text-align: center; }
+.math-sun-offer .math-note { margin: 0; }
+.math-sun-btn { background: #fde68a; border: 2px solid #f59e0b; color: #78350f; font-weight: 800; }
 .mpz-cell:focus-visible, .mpz-key:focus-visible, .mpz-card-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 @media (max-width: 420px) { .mpz-cell { min-width: 44px; height: 46px; font-size: 1.1rem; } .mpz-board.is-pyramid .mpz-cell { min-width: 50px; } }
 /* 🕵️ 나옹의 숙제 봐 주기 (v299) — 줄 친 공책 위 나옹의 풀이 · 처음 틀린 줄은 빨간 줄 · 고친 줄은 빨간 펜 */
@@ -3644,6 +3648,10 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .kor-match-line { margin: 0 0 8px; font-weight: 800; color: #065f46; }
 .kor-match-btn { width: 100%; }
 .kor-match-done { margin: 0; font-weight: 800; color: #065f46; }
+/* 🧩 글 끝 퍼즐 하나 (v331) — 🔤 아래, 같은 모양에 보라 */
+.kor-one-offer { margin: 14px auto 0; padding: 12px 14px; max-width: 420px; border-radius: 14px; background: #f5f3ff; border: 2px solid #c4b5fd; text-align: center; }
+.kor-one-offer .kor-match-line { color: #5b21b6; }
+.kor-one-btn { width: 100%; }
 .kor-term { margin: 16px 0 8px; font-size: 1.1rem; }
 .kor-units { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .kor-unit { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }

@@ -289,7 +289,8 @@ test('🧩 화면 연결: 퍼즐 판은 처음 낸 것만 · 시작할 때 상�
 test('🧩 화면(Codex 55차): 그만하기 — 놓은 조각·고른 칸도 한 것 · 다시 풀면 확인을 거둠 · 초점 — 누른 [사실]/[의견] 단추 · 새 퍼즐은 첫 조각이나 첫 [사실]', () => {
   const pv = read('js/korpuzzleview.js');
   const quitAt = pv.indexOf('if (!didWork(ps) || ps.quitAsk) {'); // v315: 그만둔 자리를 적는 줄이 사이에
-  assert.ok(quitAt > 0 && pv.slice(quitAt, quitAt + 400).includes('S.ps = null; ctx.toPuzzle(); return;'), '한 것이 있으면 한 번 더 묻는다');
+  // v331 — 글 끝 퍼즐 하나(ps.one)는 그만두면 도감으로 (tests/one331)
+  assert.ok(quitAt > 0 && /S\.ps = null;\s+if \(ps\.one\) ctx\.toCards\(\); else ctx\.toPuzzle\(\);\s+return;/.test(pv.slice(quitAt, quitAt + 500)), '한 것이 있으면 한 번 더 묻는다');
   assert.ok(pv.includes('return ps.first.size > 0 || ps.placed.length > 0 || ps.labels.some(Boolean) || ps.picks.some(Boolean) || ps.ends.some((c) => c !== undefined);'), '놓은 조각·고른 칸(📍 있어요·없어요 · 🔗 고른 끝도)도 한 것');
   const chunk = pv.slice(pv.indexOf("const b = el('button', 'kor-pchunk'"), pv.indexOf('pool.appendChild(b);'));
   const undo = pv.slice(pv.indexOf("undo.addEventListener('click'"), pv.indexOf('tools.appendChild(undo);'));
@@ -299,7 +300,8 @@ test('🧩 화면(Codex 55차): 그만하기 — 놓은 조각·고른 칸도 �
   assert.ok(fo.includes('ps.focus = `fo:${k}:${fo}`;'), '누른 단추에 초점');
   assert.ok(pv.includes("fo ? (card.querySelectorAll('.kor-psort')[Number(fo[1])] || card).querySelector(`.kor-pfo.is-${fo[2]}`)"));
   assert.ok(pv.includes("focusTo === 'start' || focusTo === 'pool' ? card.querySelector('.kor-pchunk:not(:disabled), .kor-pfo:not(:disabled), .kor-pcheck:not(:disabled)')"), '새 퍼즐 — 첫 조각·첫 [사실]');
-  assert.ok(pv.includes("quitAsk: false, focus: 'start', practice: !!practice, t0 };"), '판을 시작하면 첫 퍼즐에 초점 (v315 — 연습 판인지·시작 시각도)');
+  // v331 — 판 상태는 newSession이 만든다(글 끝 퍼즐 하나 one도)
+  assert.ok(pv.includes("quitAsk: false, focus: 'start', practice: !!practice, one: !!one, t0: Date.now() };"), '판을 시작하면 첫 퍼즐에 초점 (v315 — 연습 판인지·시작 시각도)');
 });
 
 test('🧩 v244 이야기 흐름 둘 — 「홍길동전」(O15)·「양반전」(O16)은 그 글에 ★이 있어야 열림 · 실마리에 맞는 차례가 하나뿐', () => {

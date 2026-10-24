@@ -359,11 +359,15 @@ function openCard(id) {
 }
 
 function backToList() {
+  closeRead();
+  renderList();
+  window.scrollTo(0, 0);
+}
+/** 읽던 글을 닫는다 — 📚 도감으로 · 🧩 퍼즐 하나(v331)가 같이 쓴다 */
+function closeRead() {
   if (ui.read) haltListen(ui.read.ls);
   if (korRocketPending('korean')) korRocketClear(); // 🚀 읽던 글을 두고 나간다 — 걸어 둔 로켓단은 그 글과 함께 (v327)
   ui.read = null;
-  renderList();
-  window.scrollTo(0, 0);
 }
 
 /** 🎧 국어 화면을 떠난다(app.showView — 🎒·📊·홈) · 앱을 내렸다 — 읽던 소리를 멈추고 상자를 "멈춤"으로 (돌아오면 ▶ 다시 듣기) */
@@ -914,6 +918,10 @@ async function finishCard() {
     korMatchOffer(ui.cards || []).then((round) => {
       if (round && ui.read === r && r.result === res) { r.match = { round }; renderQ(); }
     }).catch(() => {});
+    // 🧩 퍼즐 하나 (v331) — 🔗·⚖️ 겪은 일·⏰ 가운데 하나(korpuzzle.pickOne) · 오늘 끝낸 퍼즐 하나가 셋보다 적으면 단추 하나
+    puzzles.oneOffer(tabCtx).then((one) => {
+      if (one && ui.read === r && r.result === res) { r.one = one; renderQ(); }
+    }).catch(() => {});
   }
   if (eggP) {
     const egg = await eggP;
@@ -1010,8 +1018,32 @@ function finishEl() {
     const m = r.match;
     box.appendChild(korMatchEl(m, { viewId: 'view-korean', live: () => ui.read === r && r.match === m, busy: () => !!ui.catching || overlayOpen() || korRocketPending('korean'), redraw: () => { if (ui.read === r) renderQ(); } }));
   }
+  if (res.ok && r.one) box.appendChild(onePuzzleEl(r, r.one)); // 🧩 퍼즐 하나 (v331) — 🔤 아래
   if (res.ok && r.card.write) box.appendChild(writeBoxEl(r.card, writeCtx)); // ✍️ 생각 쓰기 — 객관식 뒤, 건너뛰어도 별은 그대로
   if (res.ok) box.appendChild(storyNonsulEl(r.card.id));
+  return box;
+}
+
+/**
+ * 🧩 퍼즐 하나 (v331, 2026-10-24 아버님 "이대로") — 한 줄 + 단추 하나(셈 문구 없음) · 이 끝 화면이 떠 있고 🎯·⚔️·🔤·🚀가 열려 있지 않을 때만 눌린다 ·
+ * 누르면 읽던 글을 닫고(📚 도감으로와 같다) 🧩 퍼즐 탭에서 그 퍼즐 하나로 판을 연다 — 못 열면(다른 판·모르는 퍼즐) 퍼즐 탭
+ */
+function onePuzzleEl(r, one) {
+  const box = el('div', 'kor-one-offer');
+  box.appendChild(el('p', 'kor-match-line', '🧩 퍼즐 하나 풀어 볼까요?'));
+  const b = el('button', 'btn btn-primary kor-one-btn', `🧩 퍼즐 하나 · ${one.label}`);
+  b.type = 'button';
+  const ok = () => ui.read === r && r.one === one && !ui.catching && !overlayOpen() && !korRocketPending('korean');
+  b.addEventListener('click', () => {
+    if (!ok()) return;
+    guardStart('korean', () => {
+      if (!ok()) return;
+      closeRead();
+      ui.tab = 'puzzle';
+      if (!puzzles.startOne(tabCtx, one.id)) { renderList(); window.scrollTo(0, 0); }
+    });
+  });
+  box.appendChild(b);
   return box;
 }
 

@@ -91,6 +91,90 @@ export function puzzleSessions(days) {
     quitAt: [...at.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)),
   };
 }
+
+// ── 🧩 글 끝 화면의 퍼즐 하나 (v331, 2026-10-24 아버님 "이대로") ──
+// 🧩 퍼즐 탭은 따로 찾아 들어가야 해서 새 꼴 셋(🔗·⚖️ 겪은 일·⏰)이 잘 안 풀린다 · 글 끝 화면에서 꺼낸 🔤 단추는 잘 눌린다 →
+// 국어 글을 다 읽은 화면에 세 꼴 가운데 퍼즐 하나를 꺼내 준다 · 푸는 화면·채점·저장은 오늘의 퍼즐과 같다(한 개짜리 판 — korPuzzleRule) ·
+// 보상은 오늘의 퍼즐과 하루 한 번을 나눈다(그날 처음 끝낸 퍼즐이면 💰·🎯 · 🟩는 퍼즐 셋 이상 판에서만) · 끝낸 것이 하루 ONE_PER_DAY개면 단추가 안 뜬다
+/** 꺼내 주는 꼴 (KIND_LIST 차례) */
+export const ONE_KINDS = ['agree', 'exp', 'time'];
+/** 글 끝 화면에서 하루에 끝낼 수 있는 퍼즐 하나 수 (🔤 낱말 이어 주기와 같게) — 보상은 이 수와 상관없다(⭐·하루 첫 퍼즐은 korPuzzleRule이) */
+export const ONE_PER_DAY = 3;
+/** 하루 기록 목록 칸 (db.DAILY_LISTS) — 누름 "시각:꼴" · 끝냄 "시각:꼴" (오늘의 퍼즐 판 기록과 따로 · 📤 국어 요약에만) */
+export const ONE_DAY_LISTS = ['korPzOneStarts', 'korPzOneDone'];
+/** 퍼즐 하나 기록 한 칸 */
+export function oneKey(t0, kind) {
+  return `${t0}:${kind}`;
+}
+/** 오늘 끝낸 퍼즐 하나 수 (순수) — 하루 기록 하나 */
+export function oneDoneCount(d) {
+  return new Set((d && Array.isArray(d.korPzOneDone) ? d.korPzOneDone : []).map(String)).size;
+}
+/**
+ * 글 끝 화면에 꺼낼 퍼즐 (순수) → { id, kind } | null
+ *   1) 안 해 본 꼴(ONE_KINDS 차례)의 첫 퍼즐 — 오늘 처음 들인 꼴이 아직 없을 때만(하루 한 꼴 · v315 FRESH_KIND_PER_DAY와 같은 규칙 ·
+ *      들인 날 = 그 꼴의 가장 이른 처음 날 d0 · 오늘의 퍼즐 판에서 들였어도 센다)
+ *   2) 틀려서 다시 볼 차례인 것(틀린 다음 날부터 · 오래된 것부터)
+ *   3) 해 본 꼴의 새 퍼즐 — 마지막으로 푼 때가 오래된 꼴부터(같으면 원고 차례) → 꼴이 번갈아 나온다
+ *   ⭐ 퍼즐은 안 낸다 · 셋 다 없으면 null(단추가 안 뜬다)
+ */
+export function pickOne(list, states, now) {
+  const today = dayNum(now);
+  const st = wordsOf(states);
+  const all = (list || []).filter((p) => p && ONE_KINDS.includes(p.kind));
+  const tried = new Set();
+  const last = {};
+  for (const p of list || []) {
+    if (!p || !own(st, p.id)) continue;
+    tried.add(p.kind);
+    last[p.kind] = Math.max(last[p.kind] || 0, st[p.id].at);
+  }
+  const pick = (p) => (p ? { id: p.id, kind: p.kind } : null);
+  if (kindsNewToday(list, st, today) < FRESH_KIND_PER_DAY) {
+    for (const k of ONE_KINDS) if (!tried.has(k)) { const p = all.find((x) => x.kind === k); if (p) return pick(p); }
+  }
+  const due = all.filter((p) => own(st, p.id) && st[p.id].box < SOLVED && st[p.id].due <= today).sort((a, b) => st[a.id].due - st[b.id].due);
+  if (due.length) return pick(due[0]);
+  const fresh = all.map((p, i) => [p, i]).filter(([p]) => !own(st, p.id) && tried.has(p.kind))
+    .sort((a, b) => (last[a[0].kind] || 0) - (last[b[0].kind] || 0) || a[1] - b[1]);
+  return fresh.length ? pick(fresh[0][0]) : null;
+}
+/**
+ * 오늘 처음 들인 꼴의 수 (순수) — 그 꼴의 가장 이른 처음 날 d0가 오늘인 꼴 · d0가 없는 옛 칸은 안 센다 ·
+ *   오늘의 퍼즐 판(planPuzzles)과 글 끝 퍼즐 하나(pickOne)가 같이 써서 두 길을 합쳐 하루 한 꼴 (🔍 Codex 135차 #3)
+ */
+export function kindsNewToday(list, states, today) {
+  const st = wordsOf(states);
+  const firstDay = {};
+  for (const p of list || []) {
+    if (!p || !own(st, p.id)) continue;
+    const d0 = Number(st[p.id].d0) || 0;
+    if (d0 > 0) firstDay[p.kind] = Math.min(own(firstDay, p.kind) ? firstDay[p.kind] : Infinity, d0);
+  }
+  return Object.values(firstDay).filter((d) => d === today).length;
+}
+/**
+ * 퍼즐 하나 기록 모으기 (순수) — days = 하루 기록 여럿 → { start, done, kinds: [['🔗', 끝낸 수], …] } ·
+ *   받은 날들 안의 일을 따로 센다(puzzleSessions와 같다) · 같은 칸은 한 번
+ */
+export function oneSessions(days) {
+  const starts = new Set();
+  const done = new Map();
+  for (const d of Array.isArray(days) ? days : []) {
+    if (!d) continue;
+    for (const k of Array.isArray(d.korPzOneStarts) ? d.korPzOneStarts : []) starts.add(String(k));
+    for (const k of Array.isArray(d.korPzOneDone) ? d.korPzOneDone : []) {
+      const m = /^(\d+):([a-z]+)$/.exec(String(k));
+      if (m) done.set(m[0], m[2]);
+    }
+  }
+  const at = new Map();
+  for (const kind of done.values()) {
+    const label = (KINDS[kind] || {}).icon || kind;
+    at.set(label, (at.get(label) || 0) + 1);
+  }
+  return { start: starts.size, done: done.size, kinds: [...at.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)) };
+}
 export const CHUNKS_MIN = 3;
 export const CHUNKS_MAX = 5;
 export const SORT_MIN = 4;
@@ -508,9 +592,12 @@ export function planPuzzles(list, states, korDone, now, practice = false) {
   //   아무 꼴도 안 풀었으면(처음 쓰는 기기) 예전 그대로 · 연습은 ⭐ 퍼즐뿐이라 상관없다
   const tried = new Set((list || []).filter((p) => own(st, p.id)).map((p) => p.kind));
   const unfamiliar = (p) => !practice && tried.size > 0 && !tried.has(p.kind);
-  const newKinds = KIND_LIST.filter((k) => pool.some((p) => p.kind === k && unfamiliar(p))).slice(0, FRESH_KIND_PER_DAY);
-  const novel = pool.filter((p) => unfamiliar(p) && newKinds.includes(p.kind));
   const base = pool.filter((p) => !unfamiliar(p));
+  //   오늘 이미 들인 꼴(글 끝 퍼즐 하나 · 앞서 끝낸 판)도 센다 — 두 길을 합쳐 하루 한 꼴 (v331 · 🔍 Codex 135차 #3) ·
+  //   단 익숙한 꼴만으로 판을 못 채우면 예전처럼 하나는 들인다(판이 비지 않게)
+  const room = base.length >= total ? Math.max(0, FRESH_KIND_PER_DAY - kindsNewToday(list, st, today)) : FRESH_KIND_PER_DAY;
+  const newKinds = KIND_LIST.filter((k) => pool.some((p) => p.kind === k && unfamiliar(p))).slice(0, room);
+  const novel = pool.filter((p) => unfamiliar(p) && newKinds.includes(p.kind));
   const take = [];
   const inSlot = (slot) => {
     const c = base.filter((p) => slotOf(p) === slot);
@@ -693,7 +780,7 @@ export function korPuzzleRule(profile, answers, now, ids) {
   }
   profile.korPuzzleDay = wordDaysOf(days, today);
   const xp = moved ? okMoved * KOR_XP.puzzle + KOR_XP.puzzles : 0;
-  return { ok: true, first, coins, xp, stone, throws: pendingOf(profile.korThrow), n, okN, solved };
+  return { ok: true, first, coins, xp, stone, throws: pendingOf(profile.korThrow), n, okN, solved, moved };
 }
 
 /** 꼴마다 { kind, total, open, solved, tried } (🧩 탭) — tried = 풀어 봤지만 아직 ⭐ 아님 */
@@ -712,11 +799,18 @@ export function puzzleStats(list, states, korDone) {
   });
 }
 
-/** 판을 끝낸 말 (순수) — korPuzzleRule 결과 → { title, lines } */
-export function puzzleFinishText(res, nameOf = (id) => id) {
+/** 판을 끝낸 말 (순수) — korPuzzleRule 결과 → { title, lines } · one = 글 끝 화면의 퍼즐 하나 (v331 — 맞힌 수 대신 한 줄, 틀렸으면 내일 다시) */
+export function puzzleFinishText(res, nameOf = (id) => id, one = false) {
   if (!res || !res.ok) {
     if (res && res.why === 'empty') return { title: '저장할 퍼즐이 없어요', lines: ['🧩 퍼즐 탭으로 돌아가 다시 시작해 주세요'] };
     return { title: '저장이 안 됐어요', lines: ['[다시 저장하기]를 눌러 주세요 — 푼 것은 그대로예요'] };
+  }
+  if (one) {
+    // 칸을 안 옮긴 답(그 사이 다른 판이 ⭐로 만든 퍼즐 · 다른 창이 먼저 푼 퍼즐)은 연습 — "내일 다시"는 약속하지 않는다 (🔍 Codex 135차 #1)
+    const lines = [res.okN === res.n ? '한 번에 맞혔어요!' : res.moved === 0 ? '이번 풀이는 연습이었어요 — 기록은 그대로예요' : '틀린 퍼즐은 내일 다시 나와요 — 그때 또 풀어 봐요'];
+    if (res.first) lines.push(`💰 +${res.coins} · 🎯 국어 포켓몬 잡기 1번`);
+    if (res.solved && res.solved.length) lines.push(`⭐ 새로 푼 퍼즐: ${res.solved.map(nameOf).join(', ')}`);
+    return { title: '🧩 퍼즐 하나 끝!', lines };
   }
   const lines = [`한 번에 맞힌 퍼즐 ${res.okN} / ${res.n}`];
   if (res.first) lines.push(`💰 +${res.coins} · 🎯 국어 포켓몬 잡기 1번${res.stone ? ' · 🟩 국어스톤 +1 (모두 한 번에 맞혔어요!)' : ''}`);
@@ -729,6 +823,6 @@ export function puzzleFinishText(res, nameOf = (id) => id) {
 /** 오늘 보상 말 (순수) — wordsToday(korPuzzleDay) 값 0·1·2 → 한 줄 */
 export function puzzleTodayLine(today) {
   if (today >= 2) return '오늘의 퍼즐 끝 ✅ 🟩까지 받았어요';
-  if (today === 1) return '오늘의 퍼즐 끝 ✅ — 더 풀어도 ⭐는 모여요';
+  if (today === 1) return '오늘 퍼즐 보상은 받았어요 ✅ — 더 풀어도 ⭐는 모여요'; // v331 — 글 끝 퍼즐 하나로도 받으니 "판 끝"이라 하지 않는다
   return `오늘 처음 끝내면 💰${PUZZLE_COINS} · 🎯 국어 포켓몬 잡기 1번 · 퍼즐 ${PUZZLE_PERFECT_MIN}개 이상을 모두 한 번에 맞히면 🟩 국어스톤`; // v294 — 판이 넷이 되어 "3개를"이 틀린 말이 됐다
 }

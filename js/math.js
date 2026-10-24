@@ -17,6 +17,7 @@ import {
   answerSecOf,
   slipLine, // 💪 처음 배우기·연습 편의 "고친 실수 하나까지 통과" 말 (v279)
   isResting, restOf, restInit, dailyOk, // 🌱 학교 진도 먼저 · 선행 칸 쉬기 (v301)
+  sunKey, // ☀️ 시작·완주 기록 (v331)
   RELEARN_MODES, relearnPage, // 📚 틀리면 배움 한 장 (v302)
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
@@ -652,7 +653,7 @@ function startDiag() {
 
 /** 🧩 수학 퍼즐 화면에 건네는 것 (v296 — mathpuzzleview는 math.js를 import하지 않는다) */
 function puzzleCtx() {
-  return { clearMain, back: () => renderLadder(ui.state), getState: () => ui.state, setState: (s) => { ui.state = s; }, updateChip };
+  return { clearMain, back: () => renderLadder(ui.state), getState: () => ui.state, setState: (s) => { ui.state = s; }, updateChip, sunEl: sunOfferEl };
 }
 /** 🕵️ 나옹의 숙제 화면에 건네는 것 (v299) — 글은 richNode로(세로 분수·숫자 뒤 조사) · 칸 이름 · 칸 원고(규칙·흔한 실수)는 받아 둔 줄기 내용에서 */
 function detectCtx() {
@@ -716,19 +717,13 @@ function renderLadder(state) {
   const preview = dailyPlan(state, today, ui.stem, 0);
   if (preview.roundId || preview.mix.length) {
     const dn = dailyDone(state, today);
-    const db = el('button', `btn btn-big-wide math-daily-btn${dn || unread.length ? '' : ' btn-primary'}`, dn ? `☀️ 오늘의 수학 완주 ✅ — 한 번 더 할래요?` : '☀️ 오늘의 수학 — 한 번에 다 하기');
+    const db = el('button', `btn btn-big-wide math-daily-btn${dn || unread.length ? '' : ' btn-primary'}`, dn ? `☀️ 오늘의 수학 완주 ✅ — 한 번 더 할래요?` : '☀️ 오늘의 수학'); // v331 「— 한 번에 다 하기」를 뺌(무거워 보였다)
     db.type = 'button';
     if (unread.length) db.disabled = true; // 📬를 읽으면 열린다
-    db.addEventListener('click', () => guardStart('math', () => startDaily()));
+    db.addEventListener('click', () => guardStart('math', () => startDaily('ladder')));
     head.appendChild(db);
     const parts = [];
-    if (preview.roundId) {
-      // ⏰ ☀️는 줄기와 상관없이 가장 오래 기다린 확인부터 (v257) — 다른 줄기면 그 줄기 이름을, ⏰ 보너스를 미리 (밀린 날 수는 쓰지 않는다, v260)
-      const ps = preview.roundStem && preview.roundStem !== ui.stem ? STEMS[preview.roundStem] : null;
-      const wait = preview.roundMode === 'review' && preview.late >= LATE.days && lateLeft(state, today)
-        ? ` (통과하면 ⏰ 💰+${LATE.coin})` : '';
-      parts.push(`${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${ps ? `${ps.code} ${ps.label}의 ` : ''}${nameOf(preview.roundId)}${wait}`);
-    }
+    if (preview.roundId) parts.push(sunRoundText(state, preview, today));
     else if (preview.waiting) parts.push('🥚 오늘 배운 건 다음 날 확인해요'); // "그때 새 칸이 열려요"는 🥚가 셋이면 거짓이다 — 잠금 안내는 사다리 위 배너가 (Codex 20차 #6)
     if (preview.mix.length) parts.push(`🎲 배운 것 섞어 풀기 ${preview.mix.length}문제`);
     head.appendChild(el('p', 'math-note math-daily-sub', unread.length ? `📬 답장을 읽으면 열려요 · ${parts.join(' → ')}` : parts.join(' → ')));
@@ -1295,15 +1290,53 @@ function startNotesRound(list) {
  * ☀️ 오늘의 수학 — 개념 편 하나(🔁 복습 차례가 있으면 그것, 없으면 ▶ 새 개념) → 🎲 섞어 풀기(아는 개념 3개 × 1문항 + 🤔 노트 1문항).
  * 흐름은 ui.daily에, 편은 평소처럼 ui.round에 — 🎒 다녀와도 편이 복원되고 흐름도 남는다. 사다리로 나가면 흐름은 끝.
  */
-function startDaily() {
+function startDaily(from = 'ladder') {
   const today = todayKey();
   const seed = (Date.now() % 1000000) | 0;
   const plan = dailyPlan(ui.state, today, ui.stem, seed);
   // ⏰ 가장 오래 기다린 확인이 다른 줄기면 그 줄기로 옮겨 연다 — 편의 문제는 그 줄기의 만들기(G)가 만든다 (v257)
   if (plan.roundStem && plan.roundStem !== ui.stem && STEMS[plan.roundStem]) { ui.stem = plan.roundStem; rememberStem(ui.stem); }
-  ui.daily = { plan, step: plan.roundId ? 'round' : 'mix', roundInfo: null };
+  const t0 = Date.now();
+  ui.daily = { plan, step: plan.roundId ? 'round' : 'mix', roundInfo: null, t0 };
+  noteSun({ sunStarts: [sunKey(t0, from, plan.comeback)] }); // ☀️ 누른 곳·다시 시작 판 (v331 — 📤에만)
   if (plan.roundId) startRound(plan.roundId, plan.roundMode);
   else startMixRound();
+}
+
+/** ☀️ 기록 한 칸 (v331 — 📤 수학 요약의 ☀️ 줄 · 못 적어도 그만) */
+function noteSun(delta) {
+  applyDailyDelta(todayKey(), delta).catch(() => {});
+}
+
+/**
+ * ☀️ 개념 편 미리 보기 한 줄 — 사다리 머리와 🧩·🕵️ 끝 화면이 같이 쓴다
+ * ⏰ ☀️는 줄기와 상관없이 가장 오래 기다린 확인부터 (v257) — 다른 줄기면 그 줄기 이름을, ⏰ 보너스를 미리 (밀린 날 수는 쓰지 않는다, v260) ·
+ * ☀️ 다시 시작 판이면 「오늘은 이것 하나면 끝」(v331 — 문제 수는 칸마다 달라 쓰지 않는다)
+ */
+function sunRoundText(state, preview, today) {
+  const ps = preview.roundStem && preview.roundStem !== ui.stem ? STEMS[preview.roundStem] : null;
+  const wait = preview.roundMode === 'review' && preview.late >= LATE.days && lateLeft(state, today)
+        ? ` (통과하면 ⏰ 💰+${LATE.coin})` : '';
+  return `${preview.roundMode === 'review' ? '🔁 다시 확인' : '▶ 새로 배우기'} · ${ps ? `${ps.code} ${ps.label}의 ` : ''}${nameOf(preview.roundId)}${wait}${preview.comeback ? ' — 오늘은 이것 하나면 ☀️ 끝!' : ''}`;
+}
+
+/**
+ * ☀️ 잇기 (v331) — 🧩 수학 퍼즐·🕵️ 나옹의 숙제 끝 화면에 단추 하나 · 오늘 ☀️를 아직 끝내지 않았고 낼 것이 있고 📬 답장을 다 읽었을 때만 · 셈 문구 없음
+ * @param {'puzzle'|'detect'} from 누른 곳(📤 ☀️ 줄) · @param {() => void} leave 그 판을 닫는다(누를 때)
+ */
+function sunOfferEl(from, leave) {
+  const state = ui.state;
+  const today = todayKey();
+  if (!state || dailyDone(state, today) || unreadAsks(state).length) return null;
+  const preview = dailyPlan(state, today, ui.stem, 0);
+  if (!preview.roundId && !preview.mix.length) return null;
+  const box = el('div', 'math-sun-offer');
+  box.appendChild(el('p', 'math-note', preview.roundId ? sunRoundText(state, preview, today) : `🎲 배운 것 섞어 풀기 ${preview.mix.length}문제`));
+  const b = el('button', 'btn btn-big-wide math-sun-btn', '☀️ 오늘의 수학 해 볼까요?');
+  b.type = 'button';
+  b.addEventListener('click', () => guardStart('math', () => { leave(); startDaily(from); }));
+  box.appendChild(b);
+  return box;
 }
 
 /**
@@ -3073,7 +3106,10 @@ async function finishRound() {
   if (r.rid) releaseRoundLock(r.rid); // 🔒 끝낸 편 — 잠금을 놓는다
   ui.state = state; // 🤔 오답 노트가 바뀌었을 수 있다
   // ☀️ 흐름의 다음 단계는 화면을 그리든 말든 저장 성공 직후에 정한다 — 🎒에 가 있어도 돌아오면 섞어 풀기로 이어진다 (Codex 3차 #2)
-  if (d && lastOfDaily) d.marked = true;
+  if (d && lastOfDaily) {
+    d.marked = true;
+    if (d.t0) noteSun({ sunDone: [String(d.t0)] }); // ☀️ 완주 (v331 — 📤에만 · 시작한 시각으로 같은 흐름은 한 번)
+  }
   if (d && d.step === 'round' && result) d.roundInfo = { id: r.id, mode: r.mode, passed: result.passed, slip: !!result.slip, correct: r.correct, total: r.qs.length }; // 💪 slip: 고쳐서 통과 (v279 — 완주 카드가 "다 맞았어요"라고 하지 않게, Codex 87차)
 
   // 보상은 화면과 상관없이 지급 (나가 있어도 번 것은 번 것)
@@ -3293,7 +3329,8 @@ async function finishRound() {
     row.appendChild(again);
   }
   let dailyNext = null;
-  if (inDaily && !lastOfDaily) {
+  // 이미 완주한 흐름(marked)·섞어 풀기가 없는 계획은 [사다리로] — ☀️ 다시 시작 판에서 못 통과 → 🤔 한 번 더를 끝내면 「섞어 풀기 0문제」가 떴다 (v331 · 🔍 Codex 135차 #2)
+  if (inDaily && !lastOfDaily && !d.marked && d.plan.mix.length) {
     dailyNext = el('button', 'btn btn-primary btn-big-wide math-daily-next', `다음 → 🎲 배운 것 섞어 풀기 ${d.plan.mix.length}문제`);
     dailyNext.type = 'button';
     dailyNext.disabled = rw.catches > 0; // 🎯 후보를 받는 동안은 잠근다 — 섞어 풀기 위에 잡기가 뒤늦게 뜨지 않게 (Codex 3차 B)

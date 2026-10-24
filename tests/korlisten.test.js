@@ -368,7 +368,7 @@ test('🎧 화면 연결: 듣기 카드는 글 대신 듣기 상자 · 처음 �
   const view = read('js/koreanview.js');
   const body = (head) => { const i = view.indexOf(head); assert.ok(i >= 0, head); return view.slice(i, view.indexOf('\n}\n', i)); };
   assert.ok(body('function openCard(id) {').includes('ls: isListen(card) ? newListenState() : null,') && body('function openCard(id) {').includes('stopListening();'));
-  assert.ok(body('function backToList() {').includes('haltListen(ui.read.ls)'));
+  assert.ok(body('function backToList() {').includes('closeRead();') && body('function closeRead() {').includes('haltListen(ui.read.ls)')); // v331 — 🧩 퍼즐 하나와 같이 쓰려고 closeRead로 뗌
   const rr = body('function renderRead() {');
   assert.ok(rr.includes('if (r.ls && !r.ls.text) body.appendChild(listenBoxEl(r.card, r.ls, listenAct));'), '글 대신 듣기 상자');
   assert.ok(rr.includes("el('p', 'kor-listen-textnote'"), '글로 읽을 때 🟩 안내');

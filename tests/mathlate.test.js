@@ -156,7 +156,7 @@ test('📚 그림 배움 줄기로 잇기 — 옛 분수 칸 여섯 · 오늘 �
 
 test('⏰📚 화면 배선 — ☀️는 고른 줄기로 옮겨 연다 · 🌳 화면은 stemPickOrder·밀린 수 · ⏰ 보너스는 저장 트랜잭션 안에서 정하고 💰에 더함 · 못 통과한 편에 📚 단추 · sw', () => {
   const src = read('js/math.js');
-  const sd = src.slice(src.indexOf('function startDaily() {'), src.indexOf('\n}\n', src.indexOf('function startDaily() {')));
+  const sd = src.slice(src.indexOf("function startDaily(from = 'ladder') {"), src.indexOf('\n}\n', src.indexOf("function startDaily(from = 'ladder') {"))); // v331 — 누른 곳(from)을 받는다
   assert.ok(sd.indexOf('ui.stem = plan.roundStem') > 0 && sd.indexOf('ui.stem = plan.roundStem') < sd.indexOf('startRound(plan.roundId'), '편을 열기 전에 줄기부터 옮긴다(G가 그 줄기 것)');
   const pk = src.slice(src.indexOf('function renderStemPicker(state) {'), src.indexOf('\n}\n', src.indexOf('function renderStemPicker(state) {')));
   assert.ok(pk.includes('for (const key of stemPickOrder(state, today))') && pk.includes("b.addEventListener('click', () => openStem(state, key));"));

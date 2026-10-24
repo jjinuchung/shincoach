@@ -932,6 +932,49 @@ function recordNoteQ(m, rec, q, today) {
 
 /** 🎲 섞어 풀기에 낼 아는 개념 수 (각 1문항) — 개념 편 4 + 여기 4 = 하루 10분 안팎 */
 export const MIX_CONCEPTS = 3;
+
+// ── ☀️ 다시 시작 판 · ☀️ 기록 (v331, 2026-10-24 아버님 "이대로") ──
+// ☀️를 며칠 쉬면 다시 시작하기가 무겁다(개념 편 + 섞어 풀기) · 🌱 학교 진도 먼저(v301)·📚 틀리면 배움 한 장(v302)으로 쉬워진 ☀️를 다시 만나게 →
+// 🧩 수학 퍼즐·🕵️ 나옹의 숙제는 즐겨 한다 → 돌아오는 날의 ☀️를 짧게(개념 편 하나만) · 🧩·🕵️ 끝 화면에서 ☀️로 잇기 · 📤에 ☀️ 줄
+/** 마지막 ☀️ 완주가 이 날 수보다 **넘게** 지났으면 그날 ☀️는 개념 편 하나만 */
+export const COMEBACK_DAYS = 3;
+/**
+ * ☀️ 다시 시작 판인가 (순수) — 완주한 적이 있고(m.daily.d) 마지막 완주가 COMEBACK_DAYS일 넘게 전 ·
+ *   완주한 적이 없는 기록(처음 쓰는 기기)은 예전 그대로 · 적힌 날이 오늘보다 뒤면(시계·병합) 아님
+ */
+export function isComeback(m, today) {
+  const d = m && m.daily && typeof m.daily.d === 'string' ? m.daily.d : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !/^\d{4}-\d{2}-\d{2}$/.test(String(today || ''))) return false;
+  return daysBetween(d, today) > COMEBACK_DAYS;
+}
+/** ☀️를 누른 곳 — 사다리 머리 · 🧩 수학 퍼즐 끝 화면 · 🕵️ 나옹의 숙제 끝 화면 */
+export const SUN_FROM = ['ladder', 'puzzle', 'detect'];
+/** 하루 기록 목록 칸 (db.DAILY_LISTS) — 시작 "시각:누른 곳:다시 시작 판 1|0" · 완주 "시각"(시작한 시각 — 같은 흐름은 한 번) */
+export const SUN_DAY_LISTS = ['sunStarts', 'sunDone'];
+/** ☀️ 시작 한 칸 */
+export function sunKey(t0, from, comeback) {
+  return `${t0}:${SUN_FROM.includes(from) ? from : 'ladder'}:${comeback ? 1 : 0}`;
+}
+/**
+ * 📤 ☀️ 줄 (순수) — days = 하루 기록(listDaily) · 오늘부터 7일 · 받은 날들 안의 일을 따로 센다(경계를 넘긴 흐름은 시작이나 완주 한쪽만) ·
+ *   완주는 그 흐름의 시작 시각으로 센다(두 창·[다시 저장하기]여도 한 번)
+ */
+export function sunReport(days, today, m) {
+  const want = new Set(Array.from({ length: 7 }, (_, k) => addDays(today, -k)));
+  const starts = new Map();
+  const done = new Set();
+  for (const d of Array.isArray(days) ? days : []) {
+    if (!d || !want.has(d.date)) continue;
+    for (const k of Array.isArray(d.sunStarts) ? d.sunStarts : []) {
+      const x = /^(\d+):([a-z]+):([01])$/.exec(String(k));
+      if (x && !starts.has(x[1])) starts.set(x[1], { from: x[2], cb: x[3] === '1' });
+    }
+    for (const k of Array.isArray(d.sunDone) ? d.sunDone : []) if (/^\d+$/.test(String(k))) done.add(String(k));
+  }
+  const by = (f) => [...starts.values()].filter((s) => s.from === f).length;
+  const last = m && m.daily && m.daily.d ? m.daily.d : '없음';
+  return `☀️ 최근 7일 오늘의 수학(v331부터 · 이 기간에 일어난 일을 따로 셈): 시작 ${starts.size}(사다리 ${by('ladder')} · 🧩 끝 화면 ${by('puzzle')} · 🕵️ 끝 화면 ${by('detect')} · 그중 다시 시작 판 ${[...starts.values()].filter((s) => s.cb).length}) · 완주 ${done.size} · 마지막 완주 ${last}`;
+}
 export const KINDS = ['calc', 'misread', 'why', 'special'];
 
 /** 이 정답률부터는 "튼튼한 얼굴" — 약한 얼굴이 없으면 튼튼한 것끼리는 씨앗으로 돌린다 (3문항 미만은 이 사이 값이 나올 수 없다) */
@@ -1095,8 +1138,10 @@ export function bridgeOffers(m, today, stem) {
  *  2) 🎲 섞어 풀기 — 개념 편 줄기(roundStem)의 아는 개념(done) 중 **안 본 지 오래된**(lastAt) 것부터 MIX_CONCEPTS개, 각각 약한 얼굴 순서
  *     + 🤔 노트(어제 이전에 틀린 유형, 그 줄기, 개념 편의 개념은 제외 — 그 편에 이미 한 문제 끼어 든다) 하나. 순서는 섞는다.
  * 아는 개념이 없으면 mix는 비고 개념 편만 — 그것도 오늘의 수학이다. 화면은 roundStem으로 줄기를 옮겨 편을 연다.
- * 🌱 학교 진도 먼저(m.rest 켜짐, v301)면 1)은 schoolDue → schoolNow, 그리고 1)·2) 모두 6학년·중1 칸을 뺀다(dailyOk)
- * @returns {{ roundId: string|null, roundMode: 'review'|'learn'|null, roundStem: string, late: number, mix: Array<{id:string, kinds:string[], note?:object}> }}
+ * 🌱 학교 진도 먼저(m.rest 켜짐, v301)면 1)은 schoolDue → schoolNow, 그리고 1)·2) 모두 6학년·중1 칸을 뺀다(dailyOk) ·
+ *   2)의 아는 개념은 SCHOOL_GRADE 이하 칸으로 먼저 채우고 모자라면 5학년 (v331)
+ * ☀️ 다시 시작 판(isComeback, v331)이면 개념 편이 있을 때 2)를 비운다 — 개념 편 하나로 완주(섞어 풀기가 없는 날과 같은 길)
+ * @returns {{ roundId: string|null, roundMode: 'review'|'learn'|null, roundStem: string, late: number, mix: Array<{id:string, kinds:string[], note?:object}>, waiting: boolean, comeback: boolean }}
  */
 export function dailyPlan(m, today, stem = 'fraction', seed = 0) {
   const school = restOf(m).on;
@@ -1110,18 +1155,22 @@ export function dailyPlan(m, today, stem = 'fraction', seed = 0) {
   const roundMode = pick ? 'review' : now ? 'learn' : null;
   const r = fractionGen.rng(seed);
   const concepts = (m && m.concepts) || {};
-  const known = rows.filter((x) => x.state === 'done' && x.id !== roundId && ok(x.id))
+  // ☀️ 다시 시작 판 — 개념 편이 있는 날만(없으면 섞어 풀기가 그날 ☀️의 전부라 그대로 둔다)
+  const comeback = !!roundId && isComeback(m, today);
+  // 🌱 켜져 있으면 SCHOOL_GRADE 이하 칸 먼저 (v331 — 아버님 10-19 "수학이 너무 어렵대" → 4학년 다지기) · 같은 무리 안에서는 예전처럼 안 본 지 오래된 것부터
+  const tier = (id) => (school && gradeOf(id) > SCHOOL_GRADE ? 1 : 0);
+  const known = comeback ? [] : rows.filter((x) => x.state === 'done' && x.id !== roundId && ok(x.id))
     .map((x, i) => ({ id: x.id, rec: concepts[x.id] || {}, i }))
-    .sort((a, b) => ((a.rec.lastAt || 0) - (b.rec.lastAt || 0)) || (a.i - b.i))
+    .sort((a, b) => (tier(a.id) - tier(b.id)) || ((a.rec.lastAt || 0) - (b.rec.lastAt || 0)) || (a.i - b.i))
     .slice(0, MIX_CONCEPTS)
     .map((x) => ({ id: x.id, kinds: weakKinds(x.rec, r) }));
   const stemKey = STEMS[roundStem].key;
   // 전부 받아서 줄기·개념 편 개념을 거른 뒤 가장 오래된 하나 — 개수 제한을 먼저 걸면 다른 줄기의 노트가 자리를 다 차지한다 (Codex 3차 #6)
-  const note = dueNotes(m, today, Infinity).find((x) => x.id !== roundId && (stemOf(x.id) || {}).key === stemKey && ok(x.id)) || null;
+  const note = comeback ? null : dueNotes(m, today, Infinity).find((x) => x.id !== roundId && (stemOf(x.id) || {}).key === stemKey && ok(x.id)) || null;
   const mix = fractionGen.shuffle(r, [...known, ...(note ? [{ id: note.id, kinds: [note.note.k], note: note.note }] : [])]);
   // 🥚가 다 차서 새 칸이 잠겼다 — 화면이 "오늘 배운 건 내일 확인해요"라고 알린다
   const waiting = !roundId && rows.some((x) => x.state === 'wait');
-  return { roundId, roundMode, roundStem, late: pick ? pick.late : 0, mix, waiting };
+  return { roundId, roundMode, roundStem, late: pick ? pick.late : 0, mix, waiting, comeback };
 }
 
 /**
@@ -1628,7 +1677,7 @@ export function relearnLine(m, today, days = GUARD_DAYS) {
  * 📋 아빠가 Claude에게 붙여 넣을 글 — 개념별 요약 + 최근 일지. JSON보다 짧고 사람이 읽을 수 있다.
  * (내보내기 JSON에도 math 레코드가 통째로 들어가지만, 폰에서 대화창에 붙이기엔 이게 낫다)
  */
-export function mathReportText(m, today) {
+export function mathReportText(m, today, days) {
   const s = mathSummary(m);
   const lines = [`🔢 신코치 수학 기록 (${today}) — 개념 ${s.total}개 중 🐣 안다 ${s.known} · 🥚 배우는 중 ${s.learning} · 📏 진단으로 침 ${s.placed} · 👑 ${s.crowned} · 지금까지 ${s.rounds}편`];
   for (const r of conceptReport(m, 12)) {
@@ -1643,6 +1692,7 @@ export function mathReportText(m, today) {
   lines.push(relearnLine(m, today)); // 📚 틀린 뒤 배움 한 장 (v302)
   lines.push('', puzzleReport(m && m.puzzle, today)); // 🧩 수학 퍼즐 단계·판 (v296)
   lines.push(detectReport(m && m.detect, today, nameOf)); // 🕵️ 나옹의 숙제 — 판·처음 답·처음에 놓친 칸 (v299)
+  if (Array.isArray(days)) lines.push(sunReport(days, today, m)); // ☀️ 누른 곳·다시 시작 판·완주 (v331 — 하루 기록을 받은 📤에서만)
   const log = shownLog((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
