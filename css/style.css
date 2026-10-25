@@ -3081,6 +3081,9 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .house-art.is-flat { width: 1.1em; height: 0.7em; }
 .house-art.is-wall { width: 1.12em; height: 0.85em; }
 .house-item.is-wide .house-emoji { font-size: calc(var(--cell) * 1.45); }
+/* 🔄 세로로 놓은 두 칸 가구 (v334) — 1칸 × 2칸 · 세로 그림(furnart FURN_ART_TURN) */
+.house-art.is-turn { width: 0.9em; height: 1.4em; }
+.house-item.is-turn .house-emoji { font-size: calc(var(--cell) * 1.38); }
 .house-item.is-flip .house-emoji { transform: scaleX(-1); }
 .house-item.is-sel { outline: 3px dashed var(--primary); outline-offset: -2px; }
 .house-item.is-lifted { opacity: 0.35; }

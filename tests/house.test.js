@@ -895,7 +895,7 @@ test('🔍 Codex 46차 화면: 다시 읽으면 열린 집을 새로 그림 · �
   assert.ok(/if \(!d\.moved\) \{ endDrag\(d\); tap\(d\); return; \}\n {2}if \(stale\(\)\) \{ endDrag\(d\); return; \}/.test(fn('function onUp(')), '끌어 놓기·옮기기');
   assert.ok(/addEventListener\('click', \(\) => \{ if \(stale\(\)\) return; if \(rm\[part\] !== o\.id\)/.test(fn('function paintBox() {')), '칠하기');
   const tools = fn('function toolsEl(');
-  assert.equal((tools.match(/if \(stale\(\)\) return;/g) || []).length, 2, '↔️·📦');
+  assert.equal((tools.match(/if \(stale\(\)\) return;/g) || []).length, 3, '↔️·🔄(v334)·📦');
   assert.ok(/if \(ui\.busy \|\| profileLoading\(\)\) return;/.test(fn('function startDrag(')), '다시 읽는 중엔 끌기 시작 안 함');
   // #3 늦은 창: 저장소가 owned라고 해도 넓히기면 "벌써 했어요"
   assert.ok(src.includes('const GROW_WHY = { owned: \'grown\' };'));

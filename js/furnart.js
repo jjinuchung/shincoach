@@ -122,6 +122,79 @@ export const FURN_ART = {
   },
 };
 
+// 🔄 세로로 놓은 두 칸 가구의 그림 (v334 · 2026-10-25 진우 "소파를 세로로도") — 가구 id로 고른다 · viewBox 64×100 · shape 'turn'(0.9em × 1.4em)
+// 이모지를 그냥 90도 돌리면 소파가 옆으로 넘어진 것처럼 보여서 세로 모습을 새로 그렸다:
+//   소파 = 옆에서 본 모습(등받이가 한쪽 · 팔걸이 위아래) · 침대 = 위에서 본 모습(머리판·베개가 위) · 책상·식탁 = 위에서 본 위판 · 피아노 = 건반이 세로로 · 캡슐 = 세로로 선 몬스터볼 캡슐
+const pianoTurn = () => {
+  const parts = [
+    ['rect', { x: 4, y: 3, width: 56, height: 94, rx: 5, fill: '#343a40' }],
+    ['rect', { x: 9, y: 26, width: 15, height: 48, rx: 2, fill: '#495057' }], // 악보대
+    ['rect', { x: 11, y: 32, width: 11, height: 14, fill: '#fffdf5' }],
+    ['rect', { x: 32, y: 8, width: 24, height: 84, fill: '#ffffff', stroke: '#868e96', 'stroke-width': 1 }],
+  ];
+  for (let k = 1; k < 12; k++) parts.push(['line', { x1: 32, y1: 8 + k * 7, x2: 56, y2: 8 + k * 7, stroke: '#adb5bd', 'stroke-width': 0.8 }]);
+  for (const k of [0, 1, 3, 4, 5, 7, 8, 10]) parts.push(['rect', { x: 32, y: 12.5 + k * 7, width: 13, height: 4, fill: '#212529' }]);
+  return parts;
+};
+export const FURN_ART_TURN = {
+  f_sofa: {
+    vb: '0 0 64 100', shape: 'turn', parts: [
+      ['rect', { x: 9, y: 95, width: 6, height: 5, fill: '#3b2a1e' }],
+      ['rect', { x: 47, y: 95, width: 6, height: 5, fill: '#3b2a1e' }],
+      ['rect', { x: 6, y: 8, width: 18, height: 84, rx: 7, fill: '#6e1f2a' }], // 등받이
+      ['rect', { x: 18, y: 12, width: 38, height: 76, rx: 6, fill: '#8f2a36' }], // 앉는 자리
+      ['rect', { x: 24, y: 17, width: 27, height: 31, rx: 6, fill: '#a63a46' }], // 쿠션 둘
+      ['rect', { x: 24, y: 52, width: 27, height: 31, rx: 6, fill: '#a63a46' }],
+      ['rect', { x: 4, y: 3, width: 54, height: 13, rx: 6, fill: '#7a2430' }], // 팔걸이 위아래
+      ['rect', { x: 4, y: 84, width: 54, height: 13, rx: 6, fill: '#7a2430' }],
+    ],
+  },
+  f_bed: {
+    vb: '0 0 64 100', shape: 'turn', parts: [
+      ['rect', { x: 6, y: 6, width: 52, height: 91, rx: 4, fill: '#b07a45', stroke: '#7a4c22', 'stroke-width': 1.5 }],
+      ['rect', { x: 3, y: 2, width: 58, height: 13, rx: 4, fill: '#8a5a2b' }], // 머리판
+      ['rect', { x: 10, y: 14, width: 44, height: 78, rx: 4, fill: '#f8f9fa' }], // 매트리스
+      ['rect', { x: 15, y: 18, width: 34, height: 15, rx: 7, fill: '#ffffff', stroke: '#ced4da', 'stroke-width': 1.2 }], // 베개
+      ['rect', { x: 10, y: 40, width: 44, height: 52, rx: 4, fill: '#4dabf7' }], // 이불
+      ['rect', { x: 10, y: 40, width: 44, height: 7, rx: 3, fill: '#74c0fc' }],
+    ],
+  },
+  f_desk: {
+    vb: '0 0 64 100', shape: 'turn', parts: [
+      ['rect', { x: 8, y: 4, width: 48, height: 92, rx: 3, fill: '#c08446', stroke: '#8a5a2b', 'stroke-width': 1.5 }],
+      ['rect', { x: 14, y: 10, width: 20, height: 15, rx: 1, fill: '#e0533d' }], // 책 두 권
+      ['rect', { x: 16, y: 25, width: 17, height: 6, rx: 1, fill: '#3fa34d' }],
+      ['rect', { x: 18, y: 44, width: 28, height: 34, fill: '#fffdf5', stroke: '#ced4da', 'stroke-width': 1 }], // 공책
+      ['line', { x1: 22, y1: 52, x2: 42, y2: 52, stroke: '#adb5bd', 'stroke-width': 1 }],
+      ['line', { x1: 22, y1: 60, x2: 42, y2: 60, stroke: '#adb5bd', 'stroke-width': 1 }],
+      ['line', { x1: 22, y1: 68, x2: 36, y2: 68, stroke: '#adb5bd', 'stroke-width': 1 }],
+      ['rect', { x: 45, y: 46, width: 4, height: 26, rx: 1, fill: '#ffd43b' }], // 연필
+      ['rect', { x: 8, y: 90, width: 48, height: 6, fill: '#8a5a2b' }],
+    ],
+  },
+  f_table: {
+    vb: '0 0 64 100', shape: 'turn', parts: [
+      ['rect', { x: 8, y: 4, width: 48, height: 92, rx: 7, fill: '#d9a066', stroke: '#8a5a2b', 'stroke-width': 1.5 }],
+      ['ellipse', { cx: 32, cy: 25, rx: 11, ry: 9, fill: '#fffdf5', stroke: '#c9bba6', 'stroke-width': 1 }], // 밥그릇
+      ['ellipse', { cx: 32, cy: 24, rx: 7, ry: 5, fill: '#ffffff' }],
+      ['circle', { cx: 32, cy: 54, r: 11, fill: '#fffdf5', stroke: '#c9bba6', 'stroke-width': 1 }], // 달걀 접시
+      ['circle', { cx: 32, cy: 54, r: 7, fill: '#ffffff' }],
+      ['circle', { cx: 32, cy: 54, r: 3.4, fill: '#ffd43b' }],
+      ['circle', { cx: 32, cy: 81, r: 6.5, fill: '#a5d8ff', stroke: '#4dabf7', 'stroke-width': 1.5 }], // 컵
+    ],
+  },
+  f_piano: { vb: '0 0 64 100', shape: 'turn', parts: pianoTurn() },
+  f_heal: {
+    vb: '0 0 64 100', shape: 'turn', parts: [
+      ['rect', { x: 12, y: 4, width: 40, height: 92, rx: 20, fill: '#ffffff', stroke: '#495057', 'stroke-width': 2 }],
+      ['path', { d: 'M12 50V24a20 20 0 0 1 40 0V50z', fill: '#e8413b' }],
+      ['rect', { x: 12, y: 47, width: 40, height: 6, fill: '#495057' }],
+      ['rect', { x: 21, y: 60, width: 22, height: 26, rx: 9, fill: '#a5d8ff', opacity: 0.85 }], // 창
+      ['circle', { cx: 32, cy: 50, r: 6, fill: '#ffffff', stroke: '#495057', 'stroke-width': 2 }],
+    ],
+  },
+};
+
 const attr = (o) => Object.entries(o).map(([k, v]) => `${k}="${String(v).replace(/[&<>"]/g, '')}"`).join(' ');
 
 /** 그림 하나를 SVG 글자로 (순수 — 시안 페이지·시험) · 모르는 이름이면 '' */

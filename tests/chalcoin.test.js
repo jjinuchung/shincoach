@@ -105,14 +105,15 @@ test('🏠 책상: 바닥 2칸 · 💰800 코인만 · 가구 무리 · 그린 �
   assert.deepEqual(houseCost('f_desk'), { coins: 800, items: {} });
   assert.equal(FURN.find((f) => f.at === 'floor' && f.w === 2).id, 'f_bed');
   const v = read('js/houseview.js');
-  for (const s of ["e.appendChild(artEl(d, 'span', 'house-emoji'));", "b.appendChild(artEl(d, 'span', 'house-drawer-emoji'));", "else b.appendChild(artEl(it, 'span', 'house-shop-emoji'));", "g.appendChild(artEl(f, 'span', `house-ghost-art${it && it.f ? ' is-flip' : ''}`));"]) assert.ok(v.includes(s), s);
+  // 놓인 가구·끄는 그림은 🔄 세로(v334)도 넘긴다 — turn · d.r
+  for (const s of ["e.appendChild(artEl(d, 'span', 'house-emoji', turn));", "b.appendChild(artEl(d, 'span', 'house-drawer-emoji'));", "else b.appendChild(artEl(it, 'span', 'house-shop-emoji'));", "g.appendChild(artEl(f, 'span', `house-ghost-art${it && it.f ? ' is-flip' : ''}`, d.r));"]) assert.ok(v.includes(s), s);
   // 뒤집어 놓은 가구를 끌 때도 뒤집힌 그림 — 놓인 가구(u)의 f를 안쪽 그림에 (바깥은 onMove가 transform을 쓴다, Codex 64차)
   assert.ok(v.includes("const it = d.kind === 'move' ? ((room() || {}).items || []).find((x) => x.u === d.u) : null;"));
   assert.ok(/\.house-ghost-art\.is-flip \{ transform: scaleX\(-1\); \}/.test(read('css/style.css')));
   assert.ok(!/el\('span', 'house-(emoji|drawer-emoji|shop-emoji)', (d|it)\.emoji\)/.test(v), '이모지 글자로만 그리는 곳이 남지 않게');
   // 그림 자료는 ③ 가구 더하기(v285)부터 js/furnart.js(FURN_ART) — houseview는 그것을 import해 그린다
   const fa = read('js/furnart.js');
-  assert.ok(v.includes("import { FURN_ART } from './furnart.js';"));
+  assert.ok(v.includes("import { FURN_ART, FURN_ART_TURN } from './furnart.js';"), '🔄 세로 그림(v334)도 함께');
   for (const f of FURN.filter((x) => x.art)) assert.ok(fa.includes(`  ${f.art}: {`), `${f.id} 그림이 FURN_ART에`);
   assert.ok(read('css/style.css').includes('.house-art {'));
 });

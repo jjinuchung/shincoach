@@ -191,34 +191,47 @@ export function emptyHouse() {
 }
 
 /** 그 가구가 차지하는 칸 열쇠 — 바닥 "x,y" · 벽 "w:x" */
-function cellsOf(def, x, y) {
+/**
+ * 🔄 세로로 돌릴 수 있는 가구인가 — 바닥에 놓는 두 칸 가구(소파·침대·책상·식탁·피아노·회복 캡슐) (v334 · 2026-10-25 진우 "소파를 세로로도 놓고 싶다")
+ * 놓인 가구의 r = 1이면 세로(1칸 × w칸 — 위에서 아래로) · 없거나 0이면 가로(예전 그대로)
+ */
+export function canTurn(def) {
+  return !!def && def.at === 'floor' && def.w > 1;
+}
+/** 세로로 놓였나 (깨진 값·돌릴 수 없는 가구는 가로) */
+export function turnOf(def, r) {
+  return r === 1 && canTurn(def) ? 1 : 0;
+}
+function cellsOf(def, x, y, r = 0) {
   const out = [];
-  for (let i = 0; i < def.w; i++) out.push(def.at === 'wall' ? `w:${x + i}` : `${x + i},${y}`);
+  const down = turnOf(def, r) === 1;
+  for (let i = 0; i < def.w; i++) out.push(def.at === 'wall' ? `w:${x + i}` : down ? `${x},${y + i}` : `${x + i},${y}`);
   return out;
 }
-/** 방 안인가 — 바닥은 0 ≤ x, x + w ≤ W, 0 ≤ y < H · 벽은 y 0, x + w ≤ WALL (size = houseShape().size) */
-function inRoom(size, def, x, y) {
+/** 방 안인가 — 바닥은 0 ≤ x, x + w ≤ W, 0 ≤ y < H (세로면 x < W, y + w ≤ H) · 벽은 y 0, x + w ≤ WALL (size = houseShape().size) */
+function inRoom(size, def, x, y, r = 0) {
   if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
   if (def.at === 'wall') return y === 0 && x >= 0 && x + def.w <= size.WALL;
+  if (turnOf(def, r) === 1) return x >= 0 && y >= 0 && x < size.W && y + def.w <= size.H;
   return x >= 0 && y >= 0 && x + def.w <= size.W && y < size.H;
 }
-/** 방에서 차지한 칸 (skipU는 빼고 — 옮길 때 제자리와 겹쳐도 되게) · 🧑 캐릭터가 설 빈 칸을 찾을 때도(avatar.js) */
+/** 방에서 차지한 칸 (skipU는 빼고 — 옮길 때 제자리와 겹쳐도 되게) · 🧑 캐릭터가 설 빈 칸을 찾을 때도(avatar.js) · 🔄 세로 가구는 세로 칸 */
 export function takenCells(room, skipU) {
   const set = new Set();
   for (const it of room.items) {
     if (it.u === skipU) continue;
     const d = furnById(it.id);
-    if (d) for (const c of cellsOf(d, it.x, it.y)) set.add(c);
+    if (d) for (const c of cellsOf(d, it.x, it.y, it.r)) set.add(c);
   }
   return set;
 }
 /** 그 자리에 놓을 수 있나 — 방 안이고 다른 가구와 겹치지 않으면 (화면이 끄는 동안 빨갛게 보일지 정할 때도 쓴다)
  *  size는 맨 앞 — 넓힌 집에서 크기를 빠뜨리면 조용히 8 × 6으로 재지 않고 바로 틀리게 */
-export function canPlace(size, room, id, x, y, skipU) {
+export function canPlace(size, room, id, x, y, skipU, r = 0) {
   const d = furnById(id);
-  if (!d || !room || !size || !inRoom(size, d, x, y)) return false;
+  if (!d || !room || !size || !inRoom(size, d, x, y, r)) return false;
   const taken = takenCells(room, skipU);
-  return cellsOf(d, x, y).every((c) => !taken.has(c));
+  return cellsOf(d, x, y, r).every((c) => !taken.has(c));
 }
 
 /**
@@ -274,12 +287,13 @@ export function houseOf(profile) {
     const d = furnById(it.id);
     if (!d) continue;
     if ((placed[it.id] || 0) >= ownedOf(profile, it.id)) continue;
-    if (!canPlace(shape.size, room, it.id, it.x, it.y)) continue;
+    const r = turnOf(d, it.r); // 🔄 세로 (v334) — 깨진 값·돌릴 수 없는 가구는 가로
+    if (!canPlace(shape.size, room, it.id, it.x, it.y, undefined, r)) continue;
     uSeen.add(it.u);
     placed[it.id] = (placed[it.id] || 0) + 1;
     if (!(Number.isSafeInteger(it.u) && it.u <= SEQ_MAX)) renumber = true;
     else seq = Math.max(seq, it.u);
-    const fixedItem = { u: it.u, id: it.id, x: it.x, y: it.y, f: it.f ? 1 : 0 };
+    const fixedItem = { u: it.u, id: it.id, x: it.x, y: it.y, f: it.f ? 1 : 0, ...(r ? { r: 1 } : {}) };
     const rest = it.id === HEAL ? restCopy(it.rest) : null;
     if (rest && !own(done, rest.id) && !resting.has(rest.mon)) {
       resting.add(rest.mon);
@@ -425,11 +439,35 @@ export function moveRule(profile, roomId, u, x, y) {
   if (!room) return { ok: false, why: 'room' };
   const it = room.items.find((i) => i.u === u);
   if (!it) return { ok: false, why: 'gone' };
-  if (!canPlace(houseShape(profile).size, room, it.id, x, y, u)) return { ok: false, why: 'spot' };
+  if (!canPlace(houseShape(profile).size, room, it.id, x, y, u, it.r)) return { ok: false, why: 'spot' };
   it.x = x;
   it.y = y;
   profile.house = h;
   return { ok: true };
+}
+
+/**
+ * 🔄 가로 ↔ 세로 돌리기 (v334) — 왼쪽 위 칸을 그대로 두고 돌린다 · 거기서 안 되면 세로는 한 칸 위로, 가로는 한 칸 왼쪽으로 한 번 더 본다
+ * (방 맨 아래 줄·맨 오른쪽 칸의 가구도 돌릴 수 있게) · why: 'room' · 'gone' · 'turn' 돌릴 수 없는 가구 · 'turnSpot' 돌릴 자리가 없음
+ */
+export function turnRule(profile, roomId, u) {
+  const h = houseOf(profile);
+  const room = roomIn(h, roomId);
+  if (!room) return { ok: false, why: 'room' };
+  const it = room.items.find((i) => i.u === u);
+  if (!it) return { ok: false, why: 'gone' };
+  const d = furnById(it.id);
+  if (!canTurn(d)) return { ok: false, why: 'turn' };
+  const r = it.r === 1 ? 0 : 1;
+  const size = houseShape(profile).size;
+  const spots = [{ x: it.x, y: it.y }, r ? { x: it.x, y: it.y - 1 } : { x: it.x - 1, y: it.y }];
+  const at = spots.find((p) => canPlace(size, room, it.id, p.x, p.y, u, r));
+  if (!at) return { ok: false, why: 'turnSpot' };
+  it.x = at.x;
+  it.y = at.y;
+  if (r) it.r = 1; else delete it.r;
+  profile.house = h;
+  return { ok: true, r };
 }
 
 /** ↔️ 좌우 뒤집기 */

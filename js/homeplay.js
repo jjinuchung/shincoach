@@ -7,7 +7,7 @@
 //  · 날은 트랜잭션 안의 시각으로 센다 · 지난 날보다 **뒤인 날**에만 준다(시계를 되돌려도 또 받지 않게 — 기록은 늘 큰 쪽)
 //  · 💗는 늘기만 한다 — 병합은 칸마다 큰 쪽(두 창·옛 백업을 합쳐도 늘어나지 않는다)
 //  · 진화하면 💗를 이어받는다 — 읽을 때 진화 전 모습들의 💗 중 가장 큰 것(bondOf), 주면 그 수 + 1을 지금 모습에 적는다(옛 칸은 지우지 않음 — 단조)
-import { houseOf, houseShape, takenCells, furnById, CUSHION } from './house.js';
+import { houseOf, houseShape, takenCells, furnById, turnOf, CUSHION } from './house.js';
 import { avatarOf, partnerSpot } from './avatar.js';
 import { evoFrom, evoOf, haveOf } from './evolve.js';
 import { dayNum } from './korean.js';
@@ -164,8 +164,14 @@ export function playSpot(profile, roomId, u) {
   const size = houseShape(profile).size;
   const taken = takenCells(room);
   const free = (x, y) => x >= 0 && y >= 0 && x < size.W && y < size.H && !taken.has(`${x},${y}`);
-  const cand = [{ x: it.x - 1, y: it.y }, { x: it.x + d.w, y: it.y }];
-  for (let dx = 0; dx < d.w; dx++) cand.push({ x: it.x + dx, y: it.y + 1 });
+  const cand = [];
+  if (turnOf(d, it.r)) { // 🔄 세로로 놓인 가구 (v334) — 양옆을 위에서부터, 그다음 아래
+    for (let dy = 0; dy < d.w; dy++) cand.push({ x: it.x - 1, y: it.y + dy }, { x: it.x + 1, y: it.y + dy });
+    cand.push({ x: it.x, y: it.y + d.w });
+  } else {
+    cand.push({ x: it.x - 1, y: it.y }, { x: it.x + d.w, y: it.y });
+    for (let dx = 0; dx < d.w; dx++) cand.push({ x: it.x + dx, y: it.y + 1 });
+  }
   // 그다음은 가장 가까운 빈 칸 (거리가 같으면 위·왼쪽 먼저)
   const rest = [];
   for (let y = 0; y < size.H; y++) for (let x = 0; x < size.W; x++) rest.push({ x, y, k: Math.abs(x - it.x) + Math.abs(y - it.y) });

@@ -18,7 +18,7 @@
 //   남은 시간 · ⏏️ 꺼내기(두 번 — 보상 없음) · 다 쉬면 캡슐을 눌러 ✨ 받기 · 깜짝 진화면 진우가 갈래를 고르거나 그대로 둔다. 규칙은 rest.js
 // 🔍 Codex 46차 #1: 다른 창에서 돌아와 프로필을 다시 읽으면(app.js visibilitychange) 열린 집을 새로 그린다 — 화면은 옛 2층 10 × 7인데
 //   누르면 새 1층 8 × 6으로 셈해 다른 칸·다른 층에 놓였다. 그린 모양(ui.drawn)과 지금 모양이 다르면 놓기·끌기·칠하기·도구는 하지 않고 다시 그린다(stale)
-import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, storeRule, paintRule, restsOf } from './house.js';
+import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, turnRule, canTurn, turnOf, storeRule, paintRule, restsOf } from './house.js';
 import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading, restStart, restCancel, restClaim, ownedMonIds, monExp, houseFurnMax, hpOf, monLv, getPartner, homePlay } from './xp.js';
 import { REST_EXP, REST_MS, CAP_KO, restLeft } from './rest.js';
 import { lvMarkCrossed } from './evolve.js'; // 🎖️ 축하 레벨 (v332 · 순수)
@@ -35,7 +35,7 @@ import { SCENE_OF, playLines } from './playart.js';
 import { showPlay, closePlay } from './playshow.js'; // 🎮 장면
 import { openGames, closeGames, GAME_DEVICE } from './gameview.js'; // 🎮 게임기 미니 게임 (v307)
 import { dayNum } from './korean.js'; // 📰 TV 소식은 날마다 바뀐다 (순수)
-import { FURN_ART } from './furnart.js'; // 🖍️ 코드로 그린 가구 그림 (순수 자료)
+import { FURN_ART, FURN_ART_TURN } from './furnart.js'; // 🖍️ 코드로 그린 가구 그림 (순수 자료) · 🔄 세로 그림(v334)
 
 // 🎮 일상 행동(2026-10-18, 아버님 "이대로 해"): 놓인 📺·🎮·💻·🎹를 누르면 도구 줄 맨 앞에 놀기 단추 → 💗를 먼저 저장(homePlay 트랜잭션) →
 //   🧑·🤝가 기기 옆 칸으로 걸어가고(이 방에 서 있을 때만 · transform만 · 저장 안 함) → 장면(playshow) → 제자리로 돌아와 다시 그린다
@@ -64,10 +64,11 @@ const eul = (w) => (jong(w) > 0 ? '을' : '를');
 
 // ── 🖍️ 이모지가 없는 가구의 그림 — 그림 자료는 furnart.js(순수 · v252 책상 · ③ 가구 더하기) · 크기는 글자 크기(1em)를 따른다 ──
 const SVG_NS = 'http://www.w3.org/2000/svg';
-/** 가구 그림 하나 — art가 있으면 그린 그림(모양마다 크기 is-wide·is-tall…), 없으면 이모지 글자 */
-function artEl(d, tag, cls) {
+/** 가구 그림 하나 — art가 있으면 그린 그림(모양마다 크기 is-wide·is-tall…), 없으면 이모지 글자 · turn이면 🔄 세로 그림(v334) */
+function artEl(d, tag, cls, turn = 0) {
   const box = el(tag, cls);
-  const art = d && d.art && Object.prototype.hasOwnProperty.call(FURN_ART, d.art) ? FURN_ART[d.art] : null;
+  const art = turn && d && Object.prototype.hasOwnProperty.call(FURN_ART_TURN, d.id) ? FURN_ART_TURN[d.id]
+    : d && d.art && Object.prototype.hasOwnProperty.call(FURN_ART, d.art) ? FURN_ART[d.art] : null;
   if (!art) { box.textContent = d ? d.emoji : ''; return box; }
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', art.vb);
@@ -91,7 +92,7 @@ const eun = (w) => (jong(w) > 0 ? '은' : '는');
  * 가구 가운데가 손가락 아래에 오게 왼쪽 칸을 고르고, 방 가장자리에서는 방 안으로 당긴다(아이가 끝에 놓기 쉽게).
  * 벽 물건은 벽 줄(y 0)로만 · 바닥 가구는 바닥으로 — 방 밖이거나(바닥 가구가 벽 줄 한가운데 위) 모르는 가구면 null
  */
-export function dropSpot(size, rect, id, px, py) {
+export function dropSpot(size, rect, id, px, py, r = 0) {
   const d = furnById(id);
   if (!d || !size || !rect || !(rect.width > 0)) return null;
   const cell = rect.width / size.W;
@@ -99,6 +100,11 @@ export function dropSpot(size, rect, id, px, py) {
   const rx = px - rect.left;
   const ry = py - rect.top;
   if (rx < 0 || ry < 0 || rx > rect.width || ry > wallH + cell * size.H) return null;
+  if (turnOf(d, r)) { // 🔄 세로 — 손가락이 가구 가운데에 오게 (v334)
+    if (ry < wallH - cell * 0.4) return null;
+    const x = Math.min(size.W - 1, Math.max(0, Math.floor(rx / cell)));
+    return { x, y: Math.min(size.H - d.w, Math.max(0, Math.round((ry - wallH) / cell - d.w / 2))) };
+  }
   const span = d.at === 'wall' ? size.WALL : size.W;
   const x = Math.min(span - d.w, Math.max(0, Math.round(rx / cell - d.w / 2)));
   if (d.at === 'wall') return ry <= wallH + cell * 0.5 ? { x, y: 0 } : null; // 벽 바로 아래 반 칸까지는 벽으로 봐준다
@@ -106,13 +112,14 @@ export function dropSpot(size, rect, id, px, py) {
   return { x, y: Math.min(size.H - 1, Math.max(0, Math.floor((ry - wallH) / cell))) };
 }
 
-/** 가구 하나의 자리(방에 대한 %) — 화면이 그릴 때 · 끄는 동안 칸 표시 (size는 맨 앞) */
-export function boxOf(size, id, x, y) {
+/** 가구 하나의 자리(방에 대한 %) — 화면이 그릴 때 · 끄는 동안 칸 표시 (size는 맨 앞) · r = 1이면 🔄 세로(1칸 × w칸) */
+export function boxOf(size, id, x, y, r = 0) {
   const d = furnById(id);
   if (!d || !size) return null;
   const rows = rowsOf(size);
   const top = d.at === 'wall' ? (WALL_RATIO - 1) / 2 : WALL_RATIO + y;
-  return { left: (x / size.W) * 100, top: (top / rows) * 100, width: ((d.w) / size.W) * 100, height: (1 / rows) * 100 };
+  const down = turnOf(d, r) === 1;
+  return { left: (x / size.W) * 100, top: (top / rows) * 100, width: ((down ? 1 : d.w) / size.W) * 100, height: ((down ? d.w : 1) / rows) * 100 };
 }
 
 /**
@@ -432,16 +439,21 @@ function meMakeCard() {
   return card;
 }
 
+/** 놓인 가구의 읽어 주는 이름 — 🔄 세로면 「(세로)」 (쉬는 캡슐 문구도 이것으로 — Codex 138차 #1) */
+export const itemName = (d, r) => (turnOf(d, r) ? `${d.ko} (세로)` : d.ko);
+
 function itemEl(it) {
   const d = furnById(it.id);
-  const b = boxOf(sz(), it.id, it.x, it.y);
-  const e = el('div', `house-item is-${d.at}${it.u === ui.sel ? ' is-sel' : ''}${it.f ? ' is-flip' : ''}${d.w > 1 ? ' is-wide' : ''}`);
+  const turn = turnOf(d, it.r); // 🔄 세로 (v334)
+  const b = boxOf(sz(), it.id, it.x, it.y, turn);
+  const e = el('div', `house-item is-${d.at}${it.u === ui.sel ? ' is-sel' : ''}${it.f ? ' is-flip' : ''}${turn ? ' is-turn' : d.w > 1 ? ' is-wide' : ''}`);
   e.setAttribute('role', 'button');
-  e.setAttribute('aria-label', d.ko);
+  e.setAttribute('aria-label', itemName(d, it.r));
   e.dataset.u = String(it.u);
   e.dataset.id = it.id;
-  Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(d.at === 'wall' ? 5 : 10 + it.y) });
-  e.appendChild(artEl(d, 'span', 'house-emoji'));
+  // 앞뒤 겹침은 가구의 아래 끝 줄로 (세로 가구는 아래 칸)
+  Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(d.at === 'wall' ? 5 : 10 + it.y + (turn ? d.w - 1 : 0)) });
+  e.appendChild(artEl(d, 'span', 'house-emoji', turn));
   if (it.id === HEAL) restDecor(e, it);
   e.addEventListener('pointerdown', (ev) => startDrag(ev, { kind: 'move', id: it.id, u: it.u, src: e }));
   return e;
@@ -450,7 +462,7 @@ function itemEl(it) {
 /** 고른 가구 위의 도구 — ↔️ 방향 바꾸기 · 📦 서랍에 넣기 */
 function toolsEl(it) {
   const d = furnById(it.id);
-  const b = boxOf(sz(), it.id, it.x, it.y);
+  const b = boxOf(sz(), it.id, it.x, it.y, it.r);
   // 벽 물건은 도구를 아래에(위에 두면 방 밖으로 잘린다) · 가로는 sizeRoom이 버튼 폭을 재어 방 안으로 당긴다(양 끝 가구에서 잘리지 않게)
   const below = d.at === 'wall';
   const t = el('div', `house-tools${below ? ' is-below' : ''}`);
@@ -471,6 +483,12 @@ function toolsEl(it) {
     t.appendChild(go);
   }
   t.appendChild(flip);
+  if (canTurn(d)) { // 🔄 가로 ↔ 세로 (v334 — 진우 "소파를 세로로도 놓고 싶다")
+    const turn = el('button', 'btn house-tool', it.r ? '🔄 가로로' : '🔄 세로로');
+    turn.type = 'button';
+    turn.addEventListener('click', () => { if (stale()) return; run((p) => turnRule(p, rid, it.u), (r) => `${d.emoji} ${d.ko}${eul(d.ko)} ${r.r ? '세로' : '가로'}로 놓았어요`); });
+    t.appendChild(turn);
+  }
   t.appendChild(store);
   return t;
 }
@@ -687,6 +705,8 @@ const WHY = {
   room: '그 방이 없어요 — 다른 화면에서 집이 바뀌었나 봐요',
   already: '이사 선물은 벌써 받았어요',
   resting: '쉬는 중이라 서랍에 못 넣어요 — 먼저 ⏏️ 꺼내요',
+  turnSpot: '여기서는 못 돌려요 — 둘레를 비우거나 빈 곳으로 옮긴 뒤 돌려요', // 🔄 (v334)
+  turn: '이 가구는 돌릴 수 없어요',
   gift: '먼저 🎁 이사 선물을 받아요 — 🏠 꾸미기의 서랍에 와 있어요',
   // 🧑 진우 캐릭터 (avatarview가 alias로 고른다 — 가구 말과 겹치는 why)
   wearNone: '그 옷이 없어요 — 👕 옷 가게에서 먼저 사요',
@@ -983,7 +1003,7 @@ function restDecor(e, it) {
   if (!left) e.classList.add('is-ready');
   e.dataset.at = String(it.rest.at);
   e.dataset.mon = String(it.rest.mon);
-  e.setAttribute('aria-label', `${furnById(it.id).ko} — ${monKo(it.rest.mon)} ${left ? '쉬는 중' : '다 쉼'}`);
+  e.setAttribute('aria-label', `${itemName(furnById(it.id), it.r)} — ${monKo(it.rest.mon)} ${left ? '쉬는 중' : '다 쉼'}`);
   e.style.setProperty('--rest-p', String(restDone(left)));
   const box = el('span', 'house-rest');
   box.appendChild(el('span', 'house-rest-ring')); // 남은 시간 링 — 찬 만큼(--rest-p) 파랗게
@@ -1195,8 +1215,9 @@ function beginDrag(d) {
   } else {
     // 뒤집어 놓은 가구는 끄는 그림도 뒤집어서 — 바깥 transform은 onMove가 손가락 자리로 쓰니 안쪽 그림에 (Codex 64차)
     const it = d.kind === 'move' ? ((room() || {}).items || []).find((x) => x.u === d.u) : null;
-    g = el('div', `house-ghost${f.w > 1 ? ' is-wide' : ''}`);
-    g.appendChild(artEl(f, 'span', `house-ghost-art${it && it.f ? ' is-flip' : ''}`));
+    d.r = it ? turnOf(f, it.r) : 0; // 🔄 세로 가구는 세로 그대로 옮긴다 (v334) — 서랍에서 꺼내 놓는 것은 가로
+    g = el('div', `house-ghost${d.r ? ' is-turn' : f.w > 1 ? ' is-wide' : ''}`);
+    g.appendChild(artEl(f, 'span', `house-ghost-art${it && it.f ? ' is-flip' : ''}`, d.r));
     g.style.fontSize = `${cell * (f.w > 1 ? 1.5 : 0.95)}px`;
   }
   document.body.appendChild(g);
@@ -1211,10 +1232,10 @@ function showHint(d) {
   const box = document.querySelector('#house-body .house-room');
   const hint = box && box.querySelector('.house-hint');
   if (!hint) return;
-  d.spot = dropSpot(sz(), box.getBoundingClientRect(), d.id, d.x, d.y);
-  d.ok = !!(d.spot && canPlace(houseShapeNow().size, room(), d.id, d.spot.x, d.spot.y, d.kind === 'move' ? d.u : undefined));
+  d.spot = dropSpot(sz(), box.getBoundingClientRect(), d.id, d.x, d.y, d.r);
+  d.ok = !!(d.spot && canPlace(houseShapeNow().size, room(), d.id, d.spot.x, d.spot.y, d.kind === 'move' ? d.u : undefined, d.r));
   if (!d.spot) { hint.hidden = true; return; }
-  const b = boxOf(sz(), d.id, d.spot.x, d.spot.y);
+  const b = boxOf(sz(), d.id, d.spot.x, d.spot.y, d.r);
   Object.assign(hint.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%` });
   hint.classList.toggle('is-bad', !d.ok);
   hint.hidden = false;
