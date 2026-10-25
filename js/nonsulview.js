@@ -122,9 +122,9 @@ function renderHome() {
     return;
   }
   const today = wordsToday(nonsulDayMap(), Date.now());
-  card.appendChild(el('p', 'ns-today', nonsulTodayLine(today)));
   const st = nonsulMap();
   const next = planTopic(S.list, st, Date.now());
+  card.appendChild(el('p', 'ns-today', nonsulTodayLine(today, !!next))); // ⭐와 🎯는 오늘 할 주제가 있을 때만 말한다 (v338)
   const practice = next ? null : planTopic(S.list, st, Date.now(), true);
   if (next) card.appendChild(btn('btn btn-primary btn-big-wide ns-start', today ? '🖊️ 다음 주제 하기' : '🖊️ 오늘의 논술 시작', () => guardStart('korean', () => startRound(false))));
   else if (practice) card.appendChild(btn('btn btn-primary btn-big-wide ns-start', '⭐ 주제 다시 해 보기 (연습)', () => guardStart('korean', () => startRound(true))));
@@ -391,7 +391,7 @@ function orderEl(card, r) {
   if (r.hint) card.appendChild(el('p', 'kor-fb is-no', `✗ 아직이에요 — ${r.hint}`));
 }
 
-/** 판 끝 — 한 번 저장(그날 처음이면 💰·🎯 논술 잡기 기회) · 실패하면 [다시 저장하기] */
+/** 판 끝 — 한 번 저장(그날 처음이면 💰·🎯 논술 잡기 기회 · 처음 ⭐면 🎯 하나 더) · 실패하면 [다시 저장하기] */
 async function finishRound() {
   const r = S.r;
   if (!r || r.saving) return;
@@ -448,7 +448,7 @@ function finishEl(r) {
   if (res.ok && planTopic(S.list, nonsulMap(), Date.now())) row.appendChild(btn('btn btn-primary', '🖊️ 다음 주제', () => guardStart('korean', () => startRound(false))));
   row.appendChild(btn('btn', '🖊️ 논술 처음으로', () => { S.r = null; renderHome(); window.scrollTo(0, 0); }));
   box.appendChild(row);
-  const cb = catchBtnEl(); // 🎯 그날 처음 끝냈으면 논술 포켓몬 잡기
+  const cb = catchBtnEl(); // 🎯 논술 잡기 기회가 있으면(그날 첫 판 · 처음 ⭐ — v338) 논술 포켓몬 잡기
   if (cb) box.appendChild(cb);
   if (res.ok && r.battle) { // ⚔️ 배틀 단추 (v325) — 이 끝 화면이 떠 있을 때만 열린다 · 🎯 잡기를 준비하는 동안은 안 눌린다 (🔍 Codex 129차 #1·#4)
     const offer = r.battle;
