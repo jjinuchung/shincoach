@@ -9,6 +9,7 @@ import { loadToday, clockDay } from '../js/timelimit.js';
 import { initProfile, houseDo, gameBest } from '../js/xp.js';
 import { LOOK_BASE } from '../js/avatar.js';
 import { openGames, closeGames } from '../js/gameview.js';
+import { gameMusicState } from '../js/gamebgm.js'; // 🎵 게임 음악 (v335)
 
 // ───────────────────── 가짜 화면 (gameview·gametug가 쓰는 만큼) ─────────────────────
 
@@ -188,4 +189,25 @@ test('🎮 상대를 고른 뒤 「준비!」 때 ✕ — 돌려주지 않고 �
   closeGames();
   const sum = await p;
   assert.equal(sum.played, 1);
+});
+
+test('🎵 게임 음악(v335) — 판이 시작되면 그 게임으로(run.music) · 판 도중 상태는 play · 끝 화면엔 없음 · 「한 판 더」에 다시 · 판 도중 닫으면 없음', async () => {
+  await day();
+  const p = openGames(CTX);
+  assert.equal(gameMusicState().game, '', '고르기 화면엔 음악 없음');
+  await toChooser();
+  assert.equal(gameMusicState().game, 'tug', '판이 시작되면 그 게임');
+  gmBody.querySelector('.gu-who.is-meowth').fire('click');
+  await until(() => gmBody.querySelector('.gu.is-go'), 3000, '시작');
+  assert.equal(gameMusicState().game, 'tug');
+  xBtn.fire('click'); // 판 도중 그만둠
+  await until(() => gmBody.querySelector('.gm-end'), 4000, '끝 화면');
+  assert.deepEqual([gameMusicState().game, gameMusicState().timer], ['', false], '끝 화면엔 음악 없음 · 타이머도 지움');
+  gmBody.querySelector('.gm-again').fire('click');
+  await until(() => gmBody.querySelector('.gu-pick'), 6000, '한 판 더 — 누구랑?');
+  assert.equal(gameMusicState().game, 'tug', '한 판 더에 다시');
+  closeGames(); // 판 도중 닫기
+  await p;
+  for (let k = 0; k < 20; k++) await tick();
+  assert.deepEqual([gameMusicState().game, gameMusicState().timer], ['', false], '닫으면 없음');
 });

@@ -3911,6 +3911,8 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gm[hidden] { display: none; }
 .gm-card { width: min(560px, 100%); max-height: calc(100vh - 24px); overflow-y: auto; display: grid; gap: 10px; padding: 12px 14px 16px; border-radius: 22px; background: #2b2d42; color: #fff; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4); }
 .gm-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gm-music { margin-left: auto; } /* 🎵 게임 음악(v335) — ✕ 바로 옆에 */
+.gm-music[hidden] { display: none; }
 .gm-body { display: grid; gap: 10px; }
 .gm-title { font-size: 1.2rem; font-weight: 800; }
 .gm-plays { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }

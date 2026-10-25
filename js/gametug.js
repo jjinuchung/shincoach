@@ -8,6 +8,7 @@
 // 위쪽(엔진)은 순수 — 시각(ms)과 rng만 받아 상태를 바꾼다(node 시험이 가짜 시계로 끝까지) · 아래쪽(runTug)이 화면
 // 리본 자리 p(칸): 0 가운데 · 음수 = 진우 쪽(왼쪽) · 양수 = 상대 쪽(오른쪽) · 마당 너비 100칸이라 p칸 = p% · 움직이는 것은 transform만 · 앱을 내리면 멈췄다가 이어서
 import { sfx } from './sfx.js';
+import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 · 순수)
 
 /** 한 판(초) · 승리선(가운데에서 칸) · 한 번 당김(칸) · 따라잡기(승리선 바로 앞에서 1 + 이만큼 배) · 판 사이 쉼 · 시간이 끝날 때 마지막 판을 가져가는 앞섬 */
 export const TUG_SEC = 30;
@@ -348,5 +349,6 @@ export function runTug(stage, o = {}) {
   foeFace('dad');
   try { pickRow.children[0].focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ }
 
-  return { done, stop: () => finish(true) };
+  // 🎵 게임 음악(v335) — 끝나면 stop · 마지막 10초면 hurry (내려 둔 동안은 멈춘 때로 셈)
+  return { done, stop: () => finish(true), music: () => musicMode({ over: finished, left: s ? s.end - (pausedAt || now()) : null }) };
 }

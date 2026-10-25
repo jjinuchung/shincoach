@@ -5,6 +5,7 @@
 // 위쪽(엔진)은 순수 — 시각(ms)과 rng만 받아 상태를 바꾼다(node 시험이 가짜 시계로 끝까지) · 아래쪽(runBerry)이 화면
 // 자리는 "칸": 마당 너비 100 · 높이 75(y는 위에서 아래로) · 움직이는 것은 transform만(구형 태블릿) · 앱을 내리면 멈췄다가 이어서
 import { sfx, vibrate } from './sfx.js';
+import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 · 순수)
 import { ART as RUN_ART } from './gamerun.js'; // 🍓·✨ 열매 그림은 🏃 달리기와 같게
 import { FALLBACK as DIG_FALLBACK } from './gamedig.js'; // ⚡ 찌리리공 그림을 못 받았을 때
 
@@ -322,5 +323,6 @@ export function runBerry(stage, o = {}) {
   measure();
   sfx.tick();
 
-  return { done, stop: () => finish(true) };
+  // 🎵 게임 음악(v335) — 끝나면 stop · 마지막 10초면 hurry (내려 둔 동안은 멈춘 때로 셈)
+  return { done, stop: () => finish(true), music: () => musicMode({ over: finished, left: s ? s.end - (pausedAt || now()) : null }) };
 }

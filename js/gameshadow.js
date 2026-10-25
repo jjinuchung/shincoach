@@ -5,6 +5,7 @@
 //
 // 위쪽(엔진)은 순수 — 시각(ms)과 rng만 받아 상태를 바꾼다(node 시험이 가짜 시계로 끝까지) · 아래쪽(runShadow)이 화면 · 앱을 내리면 멈췄다가 이어서
 import { sfx } from './sfx.js';
+import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 · 순수)
 
 /** 한 판(초) · 보기 수 · 맞힌 뒤·틀린 뒤 그림을 보여 주는 동안(ms) */
 export const SHADOW_SEC = 40;
@@ -317,5 +318,6 @@ export function runShadow(stage, o = {}) {
   banner.classList.add('is-on');
   sfx.tick();
 
-  return { done, stop: () => finish(true) };
+  // 🎵 게임 음악(v335) — 끝나면 stop · 마지막 10초면 hurry (내려 둔 동안은 멈춘 때로 셈)
+  return { done, stop: () => finish(true), music: () => musicMode({ over: finished, left: s ? s.end - (pausedAt || now()) : null }) };
 }

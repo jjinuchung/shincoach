@@ -36,6 +36,7 @@ import { GAME_MIN, GAME_CAP, gameMinOf, gameCapOf } from './minigame.js'; // �
 import { STOCK_CAP, stockCapOf } from './stock.js'; // 🏦 포켓몬 증권시장 투자 한도 (v319)
 import { grantPlay, gameTodayLine } from './gameview.js'; // 🎮 ⚙ 오늘 한 줄 · 🔒 +1판 (v307)
 import { setBgmEnabled } from './bgm.js';
+import { setGameBgmEnabled } from './gamebgm.js'; // 🎮 미니 게임 음악도 ⚙ 이벤트 배경음악을 따른다 (v335)
 import * as track from './track.js';
 import { rocketPick, rocketAdmit, rocketCurrent, rocketTargets, rocketLastAt } from './xp.js'; // 🚀 로켓단 습격 — 영어 (2026-10-09)
 import { ROCKET, shouldRocket, rocketNew } from './rocket.js';
@@ -3282,6 +3283,7 @@ function initSettingsDialog() {
   $('set-hp').checked = settings.hp;
   setSfxEnabled(settings.sfx);
   setBgmEnabled(settings.bgm);
+  setGameBgmEnabled(settings.bgm);
   setVibrateEnabled(settings.vibrate);
   $('set-speak').checked = settings.speakCheck;
   $('set-hide-en').checked = settings.hideEnWhileSpeaking;
@@ -3338,6 +3340,8 @@ function initSettingsDialog() {
     settings.vibrate = $('set-vibrate').checked;
     settings.hp = $('set-hp').checked;
     setSfxEnabled(settings.sfx);
+    setBgmEnabled(settings.bgm); // 저장하면 바로 (전에는 앱을 다시 켜야 들었다 — v335에서 함께)
+    setGameBgmEnabled(settings.bgm);
     setVibrateEnabled(settings.vibrate);
     settings.speakCheck = $('set-speak').checked;
     settings.hideEnWhileSpeaking = $('set-hide-en').checked;

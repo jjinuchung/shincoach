@@ -7,6 +7,7 @@
 // 위쪽(엔진)은 순수 — 시각(ms)과 rng만 받아 상태를 바꾼다(node 시험이 가짜 시계로 끝까지) · 아래쪽(runBalloon)이 화면
 // 자리는 "칸": 하늘 너비 100 · 높이 70(y는 위에서 아래로) · 움직이는 것은 transform만(구형 태블릿) · 앱을 내리면 멈췄다가 이어서
 import { sfx } from './sfx.js';
+import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 · 순수)
 import { BLAST } from './rocketview.js'; // 「불쌍한 내 인생~」 — 아버님이 고르신 말 (2026-10-09)
 
 /** 한 판(초) · 하늘(칸) */
@@ -381,5 +382,6 @@ export function runBalloon(stage, o = {}) {
   measure();
   sfx.tick();
 
-  return { done, stop: () => finish(true) };
+  // 🎵 게임 음악(v335) — 끝나면 stop · 마지막 10초면 hurry (내려 둔 동안은 멈춘 때로 셈)
+  return { done, stop: () => finish(true), music: () => musicMode({ over: finished, left: s ? s.end - (pausedAt || now()) : null }) };
 }

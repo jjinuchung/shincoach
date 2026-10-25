@@ -9,6 +9,7 @@
 // 자리는 "칸": 마당 너비 100 · 높이 75 · 탑은 땅에서 잰 높이 h(위로) · 화면 y = FLOOR_Y − (h − cam)
 // 화면 자리는 마당 크기에 대한 %로만 — 돌리거나 크기가 바뀌어도 다시 잴 것이 없다 · 움직이는 볼은 transform만(구형 태블릿) · 앱을 내리면 멈췄다가 이어서
 import { sfx } from './sfx.js';
+import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 · 순수)
 
 /** 한 판(초) · 마당(칸) */
 export const TOWER_SEC = 30;
@@ -373,5 +374,6 @@ export function runTower(stage, o = {}) {
   banner.classList.add('is-on');
   sfx.tick();
 
-  return { done, stop: () => finish(true) };
+  // 🎵 게임 음악(v335) — 끝나면 stop · 마지막 10초면 hurry (내려 둔 동안은 멈춘 때로 셈)
+  return { done, stop: () => finish(true), music: () => musicMode({ over: finished, left: s ? s.end - (pausedAt || now()) : null }) };
 }

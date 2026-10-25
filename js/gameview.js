@@ -22,6 +22,7 @@ import { gameEnd, gameBest, itemCount, ownedMonIds, getPartner } from './xp.js';
 import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl } from './pokemon.js';
 import { typeOf, movesOf } from './battle.js';
 import { sfx, unlock } from './sfx.js';
+import { gameMusicStart, gameMusicStop, gameMusicWake, toggleGameMusic, gameMusicOn, gameMusicAllowed } from './gamebgm.js'; // 🎵 게임 음악 (v335)
 
 /** 🎮 게임기 가구 id (house.js) */
 export const GAME_DEVICE = 'f_game';
@@ -84,6 +85,7 @@ function ensureBox() {
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-label', '게임기');
     box.innerHTML = '<div class="gm-card"><div class="gm-head"><span class="gm-title">🎮 게임기</span>'
+      + '<button type="button" class="btn btn-icon gm-music" aria-label="게임 음악" aria-pressed="true">🎵</button>'
       + '<button type="button" class="btn btn-icon gm-x" aria-label="닫기">✕</button></div><div class="gm-body"></div></div>';
     document.body.appendChild(box);
   }
@@ -92,10 +94,24 @@ function ensureBox() {
     if (ui.view === 'play') return; // 끝난 판을 저장하는 잠깐 — 다 저장하고 끝 화면이 뜬다 (🔍 Codex 113차 #2)
     closeGames();
   });
+  // 🎵 진우가 끄고 켬 — 판 도중에도 바로 (이 기기에 기억)
+  const mb = box.querySelector('.gm-music');
+  if (mb) mb.addEventListener('click', () => { toggleGameMusic(); syncMusicBtn(); });
   ui.box = box;
   return box;
 }
 const body = () => ui.box.querySelector('.gm-body');
+
+/** 🎵 단추 모양 — 켬 🎵 · 끔 🔇 · ⚙ 이벤트 배경음악을 끄면 단추도 없음 (v335) */
+function syncMusicBtn() {
+  const b = ui.box && ui.box.querySelector('.gm-music');
+  if (!b) return;
+  const on = gameMusicOn();
+  b.hidden = !gameMusicAllowed();
+  b.textContent = on ? '🎵' : '🔇';
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.title = on ? '게임 음악 끄기' : '게임 음악 켜기';
+}
 
 /**
  * 🎮 게임기 열기 → Promise<{ played, score, r }> (닫으면 풀린다) · score = 이번에 가장 잘한 판
@@ -115,6 +131,7 @@ export function openGames(ctx = {}) {
   ui.sum = { played: 0, score: 0, r: null };
   ui.lastFocus = document.activeElement;
   ui.box.hidden = false;
+  syncMusicBtn();
   renderPick();
   return new Promise((resolve) => { ui.resolve = resolve; });
 }
@@ -126,6 +143,7 @@ export function closeGames() {
   ui.seq += 1;
   ui.busy = false;
   if (ui.run) { try { ui.run.stop(); } catch { /* 이미 끝남 */ } ui.run = null; }
+  gameMusicStop();
   ui.box.hidden = true;
   body().innerHTML = '';
   const back = ui.lastFocus;
@@ -311,9 +329,11 @@ async function startRound(id) {
   const ctx = ui.ctx || {};
   ui.busy = true;
   unlock();
+  gameMusicWake(); // 🎵 누른 손길 안에서 미리 (효과음을 꺼 두었어도)
   let day = '';
   let spent = false;   // 판을 썼나
   let started = false; // 판이 시작됐나 — 시작한 판은 돌려주지 않는다(오락실 동전처럼)
+  let tune = 0;        // 🎵 이 판의 음악 번호표 — 끝낼 때 내 판 음악만 (늦게 끝난 앞 판이 새 판 음악을 끄지 않게, 🔍 Codex 139차 #1)
   const giveBack = async () => {
     if (!spent || started) return;
     spent = false;
@@ -353,7 +373,9 @@ async function startRound(id) {
     const run = R.run(stage, { ...prep, hero: ctx.hero });
     started = true;
     ui.run = run;
+    tune = gameMusicStart(id, typeof run.music === 'function' ? run.music : null); // 🎵 (v335) — 끝·⏰는 run.music()이 알린다
     const res = await run.done;
+    gameMusicStop(tune);
     if (ui.run === run) ui.run = null;
     if (res && res.unplayed) { // 🤼 「누구랑?」에서 그만둠 — 한 판도 안 했으니 판을 돌려주고 고르기로 (v312 · 💗·최고 기록도 없음)
       started = false;
@@ -373,6 +395,7 @@ async function startRound(id) {
     renderResult(g, res, end);
   } catch {
     // 판이 깨져도 게임기 첫 화면으로 — 시작도 못 했으면 판을 돌려주고 나서 (멈춘 채 두지 않는다)
+    if (tune) gameMusicStop(tune);
     await giveBack();
     if (live()) {
       if (ui.run) { try { ui.run.stop(); } catch { /* 이미 끝남 */ } ui.run = null; }

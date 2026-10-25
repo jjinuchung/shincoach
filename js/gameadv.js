@@ -10,6 +10,7 @@
 // 자리는 "칸": 화면 너비 100칸 · 높이 64칸(y는 아래에서 위로 · 땅 윗면 8) · 한 칸 = 마당 너비의 1%(정사각)
 // 가만히 있는 것은 %로 한 번 놓고, 움직이는 것(길 전체·나·메카)만 transform — 구형 태블릿 · 앱을 내리면 멈췄다가 이어서
 import { sfx, vibrate } from './sfx.js';
+import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 · 순수)
 import { ART as RUN_ART } from './gamerun.js'; // 🍓·✨ 열매 그림은 🏃 달리기와 같게
 import { FALLBACK as DIG_FALLBACK } from './gamedig.js'; // ⚡ 찌리리공 그림을 못 받았을 때
 
@@ -97,12 +98,12 @@ export function chunkLevel(i) {
 }
 
 /**
- * 길 하나 만들기 (순수) → { len, poleX, pits, ground, solids, qs, fruits(🍓·✨ 열매), mechas, volts, chunks, stars }
+ * 길 하나 만들기 (순수) → { len, poleX, stairX(끝 계단 첫 칸), pits, ground, solids, qs, fruits(🍓·✨ 열매), mechas, volts, chunks, stars }
  * 처음 평지 → 조각 18개(같은 조각이 잇달아 나오지 않게 · 그 어려움의 조각을 두 배로 자주) → 끝 계단 셋 → 평지 → 🚩 → 🏥 포켓몬센터
  * ids를 주면 그 조각들로만(시험이 조각 하나씩 넘을 수 있는지 볼 때)
  */
 export function advStage(rng = Math.random, ids = null) {
-  const st = { len: 0, poleX: 0, pits: [], ground: [], solids: [], qs: [], fruits: [], mechas: [], volts: [], chunks: [], stars: 0 };
+  const st = { len: 0, poleX: 0, stairX: 0, pits: [], ground: [], solids: [], qs: [], fruits: [], mechas: [], volts: [], chunks: [], stars: 0 };
   let seq = 0;
   const maker = (x0) => ({
     item: (kind, dx, y) => { const k = ADV_KINDS[kind]; st.fruits.push({ n: ++seq, kind, x: x0 + dx, y, w: k.w, h: k.h }); },
@@ -132,6 +133,7 @@ export function advStage(rng = Math.random, ids = null) {
   }
   // 끝 — 계단 셋(높이 5·10·15) → 평지 14칸 → 🚩 (계단 꼭대기에서 꾹 뛰면 깃대 높이)
   const end = maker(x);
+  st.stairX = x + 8; // 끝 계단 첫 칸 — 화면에 보이면 🎵 음악이 서두른다(advHurry · v335)
   end.solid(8, 6, 5);
   end.solid(14, 6, 10);
   end.solid(20, 6, 15);
@@ -167,6 +169,11 @@ export function advStart(now, rng = Math.random, ids = null) {
 /** 화면 왼쪽 끝(칸) (순수) — 나를 왼쪽에서 22칸에 두고 따라간다 · 길 밖은 안 보인다 */
 export function advCam(s) {
   return Math.max(0, Math.min(s.stage.len - ADV_W, s.x - ME.screen));
+}
+
+/** 🎵 음악이 서두를 때인가 (순수 · v335) — 끝 계단 첫 칸이 화면 오른쪽 끝에 들어왔고 아직 깃대 전 */
+export function advHurry(s) {
+  return !!s && !s.done && advCam(s) + ADV_W >= s.stage.stairX;
 }
 
 /** 깃대 ⭐ (순수) — 잡은 높이(땅에서 칸) → 1~5 */
@@ -757,5 +764,6 @@ export function runAdv(stage, o = {}) {
   measure();
   sfx.tick();
 
-  return { done, stop: () => finish(true) };
+  // 🎵 게임 음악(v335) — 깃대에 닿으면 stop(🚩 띠링이 들리게) · 끝 계단이 보이면 hurry
+  return { done, stop: () => finish(true), music: () => musicMode({ over: finished || !!(s && s.done), hurry: !!s && advHurry(s) }) };
 }
