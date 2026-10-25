@@ -14,6 +14,7 @@ import { runBerry, BERRY_KINDS } from './gameberry.js'; // 🍓 나무열매 받
 import { runBalloon, BAL_MEOWTH } from './gameballoon.js'; // 🎈 로켓단 열기구 (v310)
 import { runTower } from './gametower.js'; // 🗼 몬스터볼 탑 쌓기 (v311)
 import { runTug } from './gametug.js'; // 🤼 아빠랑 줄다리기 (v312)
+import { runAdv, ADV_ART } from './gameadv.js'; // 🗺️ 파트너 대모험 (v333)
 import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf, usedSec } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
@@ -41,6 +42,7 @@ const RUNNERS = {
   balloon: { run: runBalloon, prep: () => balloonPrep() },
   tower: { run: runTower, prep: async () => ({}) }, // 볼은 CSS 무늬 — 받을 그림이 없다
   tug: { run: runTug, prep: async () => ({ meowth: (await balloonPrep()).meowth }) }, // 혼자일 때 상대 😼 나옹 — 🎈와 같은 그림
+  adv: { run: runAdv, prep: async () => ({ art: await artFor([ADV_ART.volt, ADV_ART.bird]) }) }, // ⚡ 찌리리공 · 🐦 피죤 — 못 받으면 코드로 그린 모습
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

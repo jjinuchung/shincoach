@@ -20,7 +20,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
 test('🎮 v312 게임 목록 — 여덟 모두 · 🤼 아빠랑 줄다리기 30초 · 화면(RUNNERS)·준비(나옹 그림 — 🎈와 같게) · 끝 화면에 「🏆 진우 n : n 아빠」 한 줄', () => {
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower', 'tug']);
+  assert.deepEqual(GAMES.map((g) => g.id).slice(0, 8), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower', 'tug'], '여덟째까지 (v333부터 더 늘어난다 — minigame333)');
   assert.equal(gameById('tug').sec, TUG_SEC);
   assert.equal(TUG_SEC, 30);
   assert.equal(gameById('tug').ko, '아빠랑 줄다리기');

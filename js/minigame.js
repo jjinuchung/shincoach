@@ -121,6 +121,7 @@ export const GAMES = [
   { id: 'balloon', emoji: '🎈', ko: '로켓단 열기구', how: '톡! 파트너 기술로 열기구를 터뜨려요 · 클수록 여러 번 · 꼬마 열기구는 빨라요', sec: 30 },
   { id: 'tower', emoji: '🗼', ko: '몬스터볼 탑 쌓기', how: '톡! 몬스터볼을 떨어뜨려 높이 쌓아요 · 딱 맞으면 별이 더', sec: 30 },
   { id: 'tug', emoji: '🤼', ko: '아빠랑 줄다리기', how: '톡톡! 빨리 눌러 줄을 당겨요 · 혼자면 나옹이랑', sec: 30 },
+  { id: 'adv', emoji: '🗺️', ko: '파트너 대모험', how: '톡 하면 낮게 · 꾹 누르면 높이 폴짝 · 메카는 밟고 찌리리공은 피해 깃대까지', sec: 45 }, // v333 — sec은 보통 걸리는 시간(끝은 깃대)
 ];
 export function gameById(id) {
   return GAMES.find((g) => g.id === id) || null;

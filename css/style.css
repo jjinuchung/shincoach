@@ -4105,6 +4105,51 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes gl-shoot { 0%, 100% { transform: translateX(-50%); } 40% { transform: translateX(-50%) translateY(-12%); } }
 @keyframes gl-shot { from { transform: translate(-50%, -50%) scale(0.8); } to { transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(1.25); } }
 @media (prefers-reduced-motion: reduce) { .gl-bal.is-pop > * { animation-duration: 0.2s; } .gl-me.is-shoot { animation: none; } }
+/* 🗺️ 파트너 대모험 (v333) — 길 전체(ga-world)·나·메카만 transform으로 움직이고, 가만히 있는 것은 %로 한 번 놓는다(구형 태블릿) · 한 칸 = 마당 너비의 1% */
+.ga-prog { position: relative; flex: 1; height: 12px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.18); }
+.ga-prog i { display: block; height: 100%; background: #51cf66; transform-origin: 0 50%; transform: scaleX(0); }
+.ga-prog-flag { position: absolute; right: 3px; top: 50%; font-size: 0.7rem; line-height: 1; transform: translateY(-50%); }
+.ga-field { position: relative; overflow: hidden; aspect-ratio: 100 / 64; border-radius: 18px; background-color: #a5d8ff; background-image: linear-gradient(180deg, #74c0fc 0%, #d0ebff 87.5%, #343a40 87.5%, #212529 100%); cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.ga-field:focus { outline: none; }
+.ga-field:focus-visible { outline: 3px solid #ffd43b; outline-offset: 2px; }
+.ga-far { position: absolute; left: 0; bottom: 12.5%; width: 200%; height: 38%; background-image: radial-gradient(ellipse 50% 100% at 50% 100%, #b2f2bb 97%, transparent 100%); background-repeat: repeat-x; background-position: 0 100%; pointer-events: none; will-change: transform; }
+.ga-near { position: absolute; left: 0; bottom: 12.5%; width: 200%; height: 22%; background-image: radial-gradient(circle at 50% 38%, #51cf66 0 30%, transparent 31%), linear-gradient(90deg, transparent 47%, #8a5a2b 47% 53%, transparent 53%); background-repeat: repeat-x; background-position: 0 100%; opacity: 0.85; pointer-events: none; will-change: transform; }
+.ga-world { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; will-change: transform; }
+.ga-world > * { position: absolute; display: block; box-sizing: border-box; }
+.ga-world > [hidden] { display: none; }
+.ga-ground { border-top: 3px solid #3d7a33; background-color: #a0673a; background-image: linear-gradient(180deg, #74c365 0 30%, #a0673a 30%); }
+.ga-solid { border: 2px solid #5c3d1e; border-radius: 5px 5px 0 0; background-color: #a0673a; background-image: linear-gradient(180deg, #74c365 0 5px, #a0673a 5px); }
+.ga-q svg, .ga-obj svg, .ga-obj img, .ga-mecha svg, .ga-center svg { display: block; width: 100%; height: 100%; }
+.ga-obj img { object-fit: contain; image-rendering: pixelated; }
+.ga-q.is-bump { animation: ga-bump 0.25s ease-out; }
+.ga-obj.is-got svg { animation: gr-got 0.35s ease-out forwards; }
+.ga-obj.is-zap > *, .ga-mecha.is-knock svg { animation: gr-knock 0.4s ease-in forwards; }
+.ga-mecha.is-squash svg { transform-origin: 50% 100%; animation: ga-squash 0.35s ease-out forwards; }
+.ga-obj.is-roll > * { animation: ga-roll 0.45s linear forwards; }
+.ga-mecha { will-change: transform; }
+.ga-mecha.is-r svg { transform: scaleX(-1); }
+.ga-pole { border-radius: 2px; background-color: #868e96; }
+.ga-flag { position: absolute; left: 100%; top: 2%; width: 650%; height: 9%; background-color: #51cf66; clip-path: polygon(0 0, 100% 50%, 0 100%); transition: top 0.8s ease-in; }
+.ga-flag.is-down { top: 80%; }
+.ga-me { will-change: transform; }
+.ga-me-in { position: absolute; left: -30%; bottom: 0; width: 160%; height: 150%; transform-origin: 50% 100%; } /* 그림은 부딪히는 몸(9×11칸)보다 크게 — 작은 폰에서도 보이게 (달리기처럼) */
+.ga-me .gd-pal-img { transform: scaleX(-1); } /* 포켓몬 그림은 대개 왼쪽을 본다 — 달리는 쪽(오른쪽)으로 */
+.ga-me .gd-pal-emoji { display: block; font-size: 2rem; line-height: 1; text-align: center; }
+.ga.is-go .ga-me:not(.is-air) .ga-me-in { animation: gr-bob 0.3s ease-in-out infinite alternate; }
+.ga.is-go .ga-me.is-bonk .ga-me-in { animation: ga-bonk 1s ease-out; }
+.ga-me.is-star .ga-me-in { filter: drop-shadow(0 0 3px #ffd43b) drop-shadow(0 0 6px #ff922b); } /* ⭐ 반짝 별 — 잠깐 무적 */
+.ga-bird { z-index: 2; font-size: 2rem; line-height: 1; text-align: center; will-change: transform; }
+.ga-bird img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.ga-hint { margin: 0; text-align: center; font-size: 0.85rem; opacity: 0.8; word-break: keep-all; }
+.ga .gd-fly { color: #2b2d42; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7); } /* 하늘색 위에서 보이게 */
+.ga .gd-fly.is-big { color: #e67700; }
+.ga .gd-fly.is-zap { color: #495057; }
+.gd.is-paused .ga-me-in, .gd.is-paused .ga-world svg { animation-play-state: paused; }
+@keyframes ga-bump { 0% { transform: translateY(0); } 40% { transform: translateY(-30%); } 100% { transform: translateY(0); } }
+@keyframes ga-bonk { 0% { transform: none; } 15%, 70% { transform: translateY(6%) rotate(-30deg); } 100% { transform: none; } }
+@keyframes ga-squash { to { opacity: 0; transform: scaleY(0.2); } }
+@keyframes ga-roll { to { opacity: 0; transform: translateX(220%) rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ga.is-go .ga-me .ga-me-in { animation: none; } .ga-flag { transition: none; } }
 
 /* 🗼 몬스터볼 탑 쌓기 (v311 · gametower.js) — 마당 너비 100칸 × 높이 75칸 · 자리는 JS가 마당에 대한 %로(돌려도 다시 잴 것 없음) · 볼 무늬는 🃏 카드 뒷면과 같게 */
 .gt-floor { font-size: 0.95rem; font-weight: 800; white-space: nowrap; }
