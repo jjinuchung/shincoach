@@ -82,7 +82,7 @@ function hop(holdMs) {
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
 test('🎮 v333 게임 목록 — 아홉째 🗺️ 파트너 대모험 · 화면(RUNNERS)·준비(⚡ 찌리리공 · 🐦 피죤 그림) · 저장·가방을 안 만진다', () => {
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower', 'tug', 'adv']);
+  assert.deepEqual(GAMES.map((g) => g.id).slice(0, 9), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower', 'tug', 'adv'], '아홉째까지 (v339부터 더 늘어난다 — minigame339)');
   const g = gameById('adv');
   assert.deepEqual([g.emoji, g.ko, g.sec], ['🗺️', '파트너 대모험', ADV_SEC]);
   assert.equal(g.how, '톡 하면 낮게 · 꾹 누르면 높이 폴짝 · 메카는 밟고 찌리리공은 피해 깃대까지');

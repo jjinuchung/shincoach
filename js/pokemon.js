@@ -918,6 +918,30 @@ function byKo(id) {
   return r ? r.ko : `art:${id}`;
 }
 
+/**
+ * 🖼️ 그림 맞추기(v339) — 원본 크기 그림(475px)을 받아 **메모리에만** (저장한 그림은 256px로 줄여 둬서 판 크기로 펴면 흐리다)
+ * ms까지 못 받으면 null(게임이 저장한 그림으로) · 한 번 받은 것은 앱을 닫을 때까지 다시 안 받는다
+ */
+const fullUrls = new Map();
+export async function fullArt(id, ms = 2500) {
+  const key = Number(id);
+  if (!Number.isSafeInteger(key) || key <= 0) return null;
+  if (fullUrls.has(key)) return fullUrls.get(key);
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), ms) : 0;
+  try {
+    const res = await fetch(ART_URL(key), ctl ? { signal: ctl.signal } : {});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const url = URL.createObjectURL(await res.blob());
+    fullUrls.set(key, url);
+    return url;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** 여러 장을 한꺼번에 (실패한 건 조용히 건너뜀) */
 export async function ensureCast(ids = []) {
   await Promise.all(ids.map((id) => ensureArt(id).catch(() => null)));

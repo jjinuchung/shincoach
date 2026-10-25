@@ -354,7 +354,7 @@ test('🔍 Codex 113차 #1·#2 — 게임기 흐름: 그림은 판을 쓰기 전
   const unplayedEnd = body.indexOf('\n    }\n', at('if (res && res.unplayed) {'));
   const settle = body.slice(unplayedEnd, at('await gameEnd('));
   assert.ok(unplayedEnd > at('const res = await run.done;') && !/live\(\)/.test(settle), '정산 전에 돌아가지 않는다');
-  assert.match(body, /await gameEnd\(ctx\.roomId, ctx\.u, id, res\.score\)/);
+  assert.match(body, /await gameEnd\(ctx\.roomId, ctx\.u, id, res\.score(\)|, g\.clock \? res\.sec \|\| 0 : 0\))/); // v339 — ⏱️ 게임은 걸린 시간도 (minigame339)
   assert.ok(!/ui\.sum\b/.test(body.slice(body.indexOf('const sum = ui.sum;') + 20)), '판을 시작한 뒤로는 그 판의 기록(sum)만 — 다시 연 화면의 ui.sum을 안 건드린다');
   assert.ok(!/ui\.ctx\b/.test(body.slice(body.indexOf('const ctx = ui.ctx') + 20)));
   // ✕ — 판 도중엔 여기까지 · 저장하는 잠깐은 안 먹음

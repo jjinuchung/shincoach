@@ -5,7 +5,7 @@
 //   두 창이 같은 판을 두 번 쓰지 못하고, 다른 창이 공부 시간을 아직 못 적었으면 판이 없다고 나온다(늘 적게 — 많게는 안 된다)
 // 아이 화면 규칙(아버님 2026-10-21): 판은 게임기 화면에만 🎮 그림으로 · "몇 분 더" 같은 셈은 어디에도 안 쓴다 ·
 //   공부하는 동안 판이 생기면 한 줄(🎮 게임 1판이 생겼어요!) — 🎮 게임기를 가졌을 때만
-import { GAMES, gameById, playState, playLimit, gameConfOf, studyPlays, studySec, earnedPlays, usedPlays } from './minigame.js';
+import { GAMES, gameById, playState, playLimit, gameConfOf, studyPlays, studySec, earnedPlays, usedPlays, clockText } from './minigame.js';
 import { runDig, DIG_KINDS } from './gamedig.js';
 import { runRun } from './gamerun.js'; // 🏃 파트너 달리기 (v308)
 import { runShadow, shadowPoolOf, shadowShuffle, SHADOW_MIN } from './gameshadow.js'; // 👤 그림자 포켓몬 (v308)
@@ -15,11 +15,12 @@ import { runBalloon, BAL_MEOWTH } from './gameballoon.js'; // 🎈 로켓단 열
 import { runTower } from './gametower.js'; // 🗼 몬스터볼 탑 쌓기 (v311)
 import { runTug } from './gametug.js'; // 🤼 아빠랑 줄다리기 (v312)
 import { runAdv, ADV_ART } from './gameadv.js'; // 🗺️ 파트너 대모험 (v333)
+import { runJig, JIG_CHOICES } from './gamejig.js'; // 🖼️ 포켓몬 그림 맞추기 (v339)
 import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf, usedSec } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
-import { gameEnd, gameBest, itemCount, ownedMonIds, getPartner } from './xp.js';
-import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl } from './pokemon.js';
+import { gameEnd, gameBest, gameFast, itemCount, ownedMonIds, getPartner } from './xp.js';
+import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl, fullArt } from './pokemon.js';
 import { typeOf, movesOf } from './battle.js';
 import { sfx, unlock } from './sfx.js';
 import { gameMusicStart, gameMusicStop, gameMusicWake, toggleGameMusic, gameMusicOn, gameMusicAllowed } from './gamebgm.js'; // 🎵 게임 음악 (v335)
@@ -44,6 +45,7 @@ const RUNNERS = {
   tower: { run: runTower, prep: async () => ({}) }, // 볼은 CSS 무늬 — 받을 그림이 없다
   tug: { run: runTug, prep: async () => ({ meowth: (await balloonPrep()).meowth }) }, // 혼자일 때 상대 😼 나옹 — 🎈와 같은 그림
   adv: { run: runAdv, prep: async () => ({ art: await artFor([ADV_ART.volt, ADV_ART.bird]) }) }, // ⚡ 찌리리공 · 🐦 피죤 — 못 받으면 코드로 그린 모습
+  jig: { run: runJig, prep: () => jigPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🖼️ 잡은 포켓몬 셋 가운데 고르기 · 원본 크기 그림은 고르는 동안(fullArt)
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -144,6 +146,7 @@ export function closeGames() {
   ui.busy = false;
   if (ui.run) { try { ui.run.stop(); } catch { /* 이미 끝남 */ } ui.run = null; }
   gameMusicStop();
+  wideCard(false);
   ui.box.hidden = true;
   body().innerHTML = '';
   const back = ui.lastFocus;
@@ -198,6 +201,7 @@ export function statusLines(st) {
 
 function renderPick() {
   ui.view = 'pick';
+  wideCard(false);
   const b = body();
   b.innerHTML = '';
   const conf = gameConf();
@@ -233,8 +237,8 @@ function renderPick() {
     const txt = el('span', 'gm-game-txt');
     txt.appendChild(el('span', 'gm-game-name', g.ko));
     txt.appendChild(el('span', 'gm-game-how', g.how));
-    const best = gameBest(g.id);
-    if (best > 0) txt.appendChild(el('span', 'gm-game-best', `최고 ⭐ ${best}`));
+    const rec = recordText(g);
+    if (rec) txt.appendChild(el('span', 'gm-game-best', rec));
     card.appendChild(txt);
     card.addEventListener('click', () => { startRound(g.id).catch(() => {}); });
     list.appendChild(card);
@@ -246,6 +250,16 @@ function renderPick() {
   b.appendChild(close);
   const first = list.querySelector('.gm-game:not([disabled])') || close;
   try { first.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ }
+}
+
+/** 고르기 카드의 최고 기록 한 줄 — ⭐ 점수 · ⏱️ 다 맞추면 끝나는 게임(GAMES clock — v339)은 가장 빠른 시간 · 기록이 없으면 '' */
+function recordText(g) {
+  if (g.clock) {
+    const t = clockText(gameFast(g.id));
+    return t ? `최고 ⏱️ ${t}` : '';
+  }
+  const best = gameBest(g.id);
+  return best > 0 ? `최고 ⭐ ${best}` : '';
 }
 
 /** 그림 미리 받기 — ART_WAIT_MS까지만 기다리고, 그때까지 받은 것만 쓴다 */
@@ -309,6 +323,31 @@ async function pairPrep() {
   }
   return pool.length >= PAIR_PAIRS ? { pool } : null;
 }
+/**
+ * 🖼️ 그림 맞추기(v339) — 🃏 짝 카드와 같은 그림 모음(**잡은 포켓몬 먼저** · 그림 없는 잡은 포켓몬은 몇 장 받아 봄 · ART_WAIT_MS까지만) ·
+ * 고를 그림이 하나도 없으면 null(판을 안 쓴다) → { pool, big } — big = 원본 크기 그림(고르는 동안 받아 본다 · 못 받으면 게임이 저장한 그림으로)
+ */
+async function jigPrep() {
+  const mine = new Set(ownedMonIds());
+  const withMine = () => shadowPool().map((p) => ({ ...p, mine: mine.has(p.id) }));
+  let pool = withMine();
+  const gap = [...mine].filter((id) => ROSTER.some((r) => r.id === id) && !(characterUrl(id) || artUrl(id)));
+  if (pool.filter((p) => p.mine).length < JIG_CHOICES && gap.length) {
+    await Promise.race([ensureCast(shadowShuffle(gap).slice(0, JIG_CHOICES * 2)).catch(() => []), wait(ART_WAIT_MS)]);
+    pool = withMine();
+  }
+  if (pool.length < JIG_CHOICES) {
+    await shadowPrep(); // 기기 그림이 거의 없을 때 — 👤와 같이 몇 장 더 받아 본다
+    pool = withMine();
+  }
+  return pool.length ? { pool, big: (id) => fullArt(id) } : null;
+}
+
+/** 넓은 게임기 카드 (🖼️ 그림 맞추기처럼 판이 큰 게임 — GAMES wide · v339) — 판 동안만 */
+function wideCard(on) {
+  const card = ui.box && ui.box.querySelector('.gm-card');
+  if (card) card.classList.toggle('is-wide', !!on);
+}
 
 /**
  * 게임 하나 고름 → 준비(그림 · 👤 문제 포켓몬) → 판 쓰기(트랜잭션) → 한 판 → 💗·최고 기록 저장 → 끝 화면
@@ -365,6 +404,7 @@ async function startRound(id) {
     }
     ui.msg = '';
     ui.view = 'play';
+    wideCard(g.wide);
     const b = body();
     b.innerHTML = '';
     b.appendChild(el('p', 'gm-play-title', `${g.emoji} ${g.ko}`));
@@ -377,9 +417,10 @@ async function startRound(id) {
     const res = await run.done;
     gameMusicStop(tune);
     if (ui.run === run) ui.run = null;
-    if (res && res.unplayed) { // 🤼 「누구랑?」에서 그만둠 — 한 판도 안 했으니 판을 돌려주고 고르기로 (v312 · 💗·최고 기록도 없음)
+    if (res && res.unplayed) { // 🤼 「누구랑?」·🖼️ 「어떤 포켓몬?」에서 그만둠 — 한 판도 안 했으니 판을 돌려주고 고르기로 (v312 · 💗·최고 기록도 없음)
       started = false;
       await giveBack();
+      if (live() && res.msg) ui.msg = res.msg; // 🖼️ 그림을 못 펼쳤으면 고르기 화면에 한 줄 (v339)
       if (live()) { ui.busy = false; renderPick(); }
       return;
     }
@@ -387,7 +428,7 @@ async function startRound(id) {
     sum.played += 1;
     sum.score = Math.max(sum.score, res.score); // 방 장면엔 이번에 가장 잘한 판 (도중에 그만둔 마지막 판이 아니라)
     let end = null;
-    try { end = await gameEnd(ctx.roomId, ctx.u, id, res.score); } catch { end = null; }
+    try { end = await gameEnd(ctx.roomId, ctx.u, id, res.score, g.clock ? res.sec || 0 : 0); } catch { end = null; } // ⏱️ 다 맞춘 시간 (v339 — 그만둔 판은 sec 없음)
     if (end && end.ok) sum.r = { ...end, heart: !!(end.heart || (sum.r && sum.r.heart)) };
     else sum.why = (end && end.why) || 'save';
     if (!live()) return;
@@ -408,17 +449,40 @@ async function startRound(id) {
   }
 }
 
+/**
+ * 끝 말 (순수) — { head, rec, recNew } · head = 큰 글씨 · rec = 기록 한 줄 · recNew = 새 기록인가(소리)
+ *   ⭐ 게임: 「끝! ⭐ 12」 · 새 기록 「🎉 새 기록!」(처음이면 「⭐ 첫 기록!」) · 아니면 「최고 ⭐ 20」
+ *   ⏱️ 다 맞추면 끝나는 게임(GAMES clock — v339): 다 맞췄으면 「완성! ⏱️ 2분 13초」 · 그만둔 판은 「끝! ⭐ 7」(맞춘 조각) ·
+ *   새 기록 「🎉 새 기록!」(처음이면 「⏱️ 첫 기록!」) · 아니면 「최고 ⏱️ 1분 50초」 — 저장을 못 했으면 기록 줄 없음
+ */
+export function resultLines(g, res, end) {
+  const r = res || {};
+  const ok = !!(end && end.ok);
+  if (g && g.clock) {
+    const t = clockText(r.sec);
+    const head = t ? `완성! ⏱️ ${t}` : `끝! ⭐ ${Number(r.score) || 0}`;
+    if (ok && end.newFast) return { head, rec: end.prevFast > 0 ? '🎉 새 기록!' : '⏱️ 첫 기록!', recNew: true };
+    const old = ok ? clockText(end.fast) : '';
+    return { head, rec: old ? `최고 ⏱️ ${old}` : '', recNew: false };
+  }
+  const head = `끝! ⭐ ${Number(r.score) || 0}`;
+  if (ok && end.newBest) return { head, rec: end.prevBest > 0 ? '🎉 새 기록!' : '⭐ 첫 기록!', recNew: true };
+  return { head, rec: ok && end.best > 0 ? `최고 ⭐ ${end.best}` : '', recNew: false };
+}
+
 /** 끝 화면 — 점수 · 새 기록 · [🎮 한 판 더](판이 남았을 때만) · [그만하기] */
 function renderResult(g, res, end) {
   ui.view = 'result';
+  wideCard(false);
   const b = body();
   b.innerHTML = '';
-  b.appendChild(el('p', 'gm-end', `끝! ⭐ ${res.score}`));
+  const L = resultLines(g, res, end);
+  b.appendChild(el('p', 'gm-end', L.head));
   if (res.line) b.appendChild(el('p', 'gm-line', res.line)); // 🤼 「🏆 진우 2 : 1 아빠 — 진우 승!」 (v312 · 다른 게임은 없음)
-  if (end && end.ok && end.newBest) {
-    b.appendChild(el('p', 'gm-best', end.prevBest > 0 ? '🎉 새 기록!' : '⭐ 첫 기록!'));
+  if (L.recNew) {
+    b.appendChild(el('p', 'gm-best', L.rec));
     sfx.ding();
-  } else if (end && end.ok && end.best > 0) b.appendChild(el('p', 'gm-best-old', `최고 ⭐ ${end.best}`));
+  } else if (L.rec) b.appendChild(el('p', 'gm-best-old', L.rec));
   if (!end || end.why === 'save') b.appendChild(el('p', 'gm-msg', '앗, 기록을 저장하지 못했어요.'));
   const row = el('div', 'gm-row');
   const st = playState(dailyNow(), gameConf());

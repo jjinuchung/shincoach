@@ -110,6 +110,7 @@ export function playLimit(conf) {
 
 /**
  * 🎮 게임 목록 — 차례대로 만들었다(아버님 2026-10-21): v307 디그다 → v308 달리기·그림자 → v309 짝 맞추기·나무열매 → v310 열기구 → v311 탑 → v312 줄다리기(여덟 모두)
+ *   → v333 대모험 → v339 그림 맞추기
  * id는 소문자(최고 기록 열쇠 — homeplay.GAME_KEY) · sec = 한 판 길이 · ★ 새 게임은 gameview.RUNNERS에도
  */
 export const GAMES = [
@@ -122,7 +123,19 @@ export const GAMES = [
   { id: 'tower', emoji: '🗼', ko: '몬스터볼 탑 쌓기', how: '톡! 몬스터볼을 떨어뜨려 높이 쌓아요 · 딱 맞으면 별이 더', sec: 30 },
   { id: 'tug', emoji: '🤼', ko: '아빠랑 줄다리기', how: '톡톡! 빨리 눌러 줄을 당겨요 · 혼자면 나옹이랑', sec: 30 },
   { id: 'adv', emoji: '🗺️', ko: '파트너 대모험', how: '톡 하면 낮게 · 꾹 누르면 높이 폴짝 · 메카는 밟고 찌리리공은 피해 깃대까지', sec: 45 }, // v333 — sec은 보통 걸리는 시간(끝은 깃대)
+  // v339 — 시간 제한 없이 다 맞추면 끝(sec은 보통 걸리는 시간) · clock = 최고 기록이 ⭐가 아니라 가장 빠른 시간(homeplay fast) · wide = 넓은 게임기 카드
+  { id: 'jig', emoji: '🖼️', ko: '포켓몬 그림 맞추기', how: '조각을 끌어다 제자리에 놓아 그림을 완성해요 · 시간 제한은 없어요', sec: 150, clock: true, wide: true },
 ];
 export function gameById(id) {
   return GAMES.find((g) => g.id === id) || null;
+}
+
+/** ⏱️ 걸린 시간 말 (순수 — 🖼️ 그림 맞추기 v339) — 45 → '45초' · 133 → '2분 13초' · 120 → '2분' · 깨진 값은 '' */
+export function clockText(sec) {
+  const n = Math.floor(Number(sec));
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const m = Math.floor(n / 60);
+  const r = n % 60;
+  if (!m) return `${r}초`;
+  return r ? `${m}분 ${r}초` : `${m}분`;
 }

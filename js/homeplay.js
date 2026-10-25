@@ -4,6 +4,7 @@
 // 보상은 💰·🔷·🔶·경험치가 **아니다**(공부보다 쉬운 벌이가 되지 않게) — 기기마다 하루 한 번 파트너에게 💗 사이좋음 +1, 같은 날 두 번째부터는 장면만.
 // 저장: profile.homePlay = { days: { 기기 id: 마지막으로 💗를 받은 날 번호 }, bond: { 포켓몬 id: 💗 }, best?: { 게임 id: 최고 점수 } }
 //  · 🎮 미니 게임(v307 — minigame.js)의 최고 기록은 best — 늘기만 한다(병합은 칸마다 큰 쪽) · 한 번도 안 했으면 칸이 없다
+//  · ⏱️ 다 맞추면 끝나는 게임(v339 🖼️ 그림 맞추기 — GAMES clock)의 최고 기록은 fast: { 게임 id: 가장 빠른 초 } — 줄기만 한다(병합은 칸마다 작은 쪽) · 끝까지 한 판만
 //  · 날은 트랜잭션 안의 시각으로 센다 · 지난 날보다 **뒤인 날**에만 준다(시계를 되돌려도 또 받지 않게 — 기록은 늘 큰 쪽)
 //  · 💗는 늘기만 한다 — 병합은 칸마다 큰 쪽(두 창·옛 백업을 합쳐도 늘어나지 않는다)
 //  · 진화하면 💗를 이어받는다 — 읽을 때 진화 전 모습들의 💗 중 가장 큰 것(bondOf), 주면 그 수 + 1을 지금 모습에 적는다(옛 칸은 지우지 않음 — 단조)
@@ -30,6 +31,8 @@ const DAY_MAX = 3e6;
 export const SCORE_MAX = 99999;
 const GAME_KEY = /^[a-z]{2,12}$/;
 const BEST_KEYS_MAX = 40;
+/** ⏱️ 가장 빠른 시간(초)의 끝 — 하루 (v339) */
+export const FAST_MAX = 86400;
 
 const isObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -48,6 +51,10 @@ export function playOf(raw) {
     const keys = Object.keys(raw.best).filter((k) => GAME_KEY.test(k) && cnt(raw.best[k], SCORE_MAX)).slice(0, BEST_KEYS_MAX);
     if (keys.length) { out.best = {}; for (const k of keys) out.best[k] = cnt(raw.best[k], SCORE_MAX); }
   }
+  if (isObj(raw.fast)) { // ⏱️ (v339) — 하루보다 긴 시간·깨진 값은 뺀다(자르면 「24시간」이 기록이 된다)
+    const keys = Object.keys(raw.fast).filter((k) => GAME_KEY.test(k) && cnt(raw.fast[k], FAST_MAX) && raw.fast[k] <= FAST_MAX).slice(0, BEST_KEYS_MAX);
+    if (keys.length) { out.fast = {}; for (const k of keys) out.fast[k] = raw.fast[k]; }
+  }
   return out;
 }
 /** 복사 (프로필 복사용) — 객체가 아니면 null */
@@ -62,6 +69,7 @@ export function mergePlay(a, b) {
   for (const id of Object.keys(y.days)) x.days[id] = Math.max(x.days[id] || 0, y.days[id]);
   for (const k of Object.keys(y.bond)) x.bond[k] = Math.max(x.bond[k] || 0, y.bond[k]);
   if (y.best) { x.best = x.best || {}; for (const k of Object.keys(y.best)) x.best[k] = Math.max(x.best[k] || 0, y.best[k]); }
+  if (y.fast) { x.fast = x.fast || {}; for (const k of Object.keys(y.fast)) x.fast[k] = own(x.fast, k) ? Math.min(x.fast[k], y.fast[k]) : y.fast[k]; }
   return playOf(x);
 }
 
@@ -69,6 +77,11 @@ export function mergePlay(a, b) {
 export function bestOf(raw, gameId) {
   const b = playOf(raw).best;
   return b && own(b, gameId) ? b[gameId] : 0;
+}
+/** ⏱️ 그 게임의 가장 빠른 시간(초 · 없으면 0 — v339) */
+export function fastOf(raw, gameId) {
+  const f = playOf(raw).fast;
+  return f && own(f, gameId) ? f[gameId] : 0;
 }
 
 /** 💗 사이좋음 — 이 포켓몬과 진화 전 모습들 가운데 가장 큰 것 (진화해도 이어진다) */
@@ -213,9 +226,10 @@ export function playRule(profile, roomId, u, now) {
  * 🎮 미니 게임 한 판이 끝났다 (v307) — 그 기기로 놀기(playRule — 💗 하루 한 번) + 그 게임의 최고 점수.
  * 판은 시작할 때 이미 썼다(gameview — daily gamePlays) · 점수는 게임이 센 것(0 ~ SCORE_MAX로 자름 — 💰·스톤과 안 이어진다)
  * why: playRule과 같고 + 'game' 모르는 게임 · 최고 점수는 늘기만 한다(파트너가 없어도 적는다)
- * → { ...playRule 결과, best, prevBest, newBest }
+ * sec = ⏱️ 다 맞추는 데 걸린 초(v339 🖼️ 그림 맞추기 — 끝까지 한 판만 · 없으면 0) — 가장 빠른 시간은 줄기만 한다
+ * → { ...playRule 결과, best, prevBest, newBest, fast, prevFast, newFast }
  */
-export function gameEndRule(profile, roomId, u, gameId, score, now) {
+export function gameEndRule(profile, roomId, u, gameId, score, now, sec = 0) {
   if (!GAME_KEY.test(String(gameId))) return { ok: false, why: 'game' };
   const r = playRule(profile, roomId, u, now);
   if (!r.ok) return r;
@@ -223,9 +237,11 @@ export function gameEndRule(profile, roomId, u, gameId, score, now) {
   const prevBest = bestOf(hp, gameId);
   const s = Number.isSafeInteger(score) && score > 0 ? Math.min(score, SCORE_MAX) : 0;
   const newBest = s > prevBest;
-  if (newBest) {
-    hp.best = { ...(hp.best || {}), [gameId]: s };
-    profile.homePlay = hp;
-  }
-  return { ...r, best: Math.max(prevBest, s), prevBest, newBest };
+  if (newBest) hp.best = { ...(hp.best || {}), [gameId]: s };
+  const prevFast = fastOf(hp, gameId);
+  const t = Number.isSafeInteger(sec) && sec > 0 && sec <= FAST_MAX ? sec : 0;
+  const newFast = t > 0 && (!prevFast || t < prevFast);
+  if (newFast) hp.fast = { ...(hp.fast || {}), [gameId]: t };
+  if (newBest || newFast) profile.homePlay = hp;
+  return { ...r, best: Math.max(prevBest, s), prevBest, newBest, fast: newFast ? t : prevFast, prevFast, newFast };
 }
