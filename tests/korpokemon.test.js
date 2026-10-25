@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { ROSTER, subjectOf, forSubject, forPuzzle } from '../js/pokemon.js';
 import { RARITY_IDS, initProfile, flushProfile, reloadProfile, korTakeThrow, korGiveBackThrow, korThrowsLeft, korFinish } from '../js/xp.js';
 import { TYPE_OF } from '../js/battle.js';
-import { EVO, evoOf, levelCapOf, stoneIdFor } from '../js/evolve.js';
+import { EVO, MAX_LV, evoOf, levelCapOf, stoneIdFor } from '../js/evolve.js';
 import { throwsOf, pendingOf, mergeThrows, korTakeRule, korGiveBackRule, korFinishRule } from '../js/korean.js';
 import { emptyProfile, cloneProfile, mergeStatRecord, applyHouseRule } from '../js/db.js';
 
@@ -59,7 +59,8 @@ test('📚 국어 포켓몬 진화: 가족 안에서만 이어진다(과목이 �
   }
   assert.ok(links >= 80, `국어 진화 ${links}갈래`);
   assert.deepEqual(evoOf(495), [{ to: 496, at: 5, orig: 'Lv17' }]);
-  assert.deepEqual([levelCapOf(495), levelCapOf(496), levelCapOf(497)], [5, 10, 12]);
+  assert.deepEqual([levelCapOf(495), levelCapOf(496), levelCapOf(497)], [5, 10, MAX_LV], '최종 진화형은 만렙까지 (v332부터 100)');
+  assert.equal(MAX_LV, 100);
   assert.deepEqual(evoOf(840).map((e) => e.to).sort((a, b) => a - b), [841, 842, 1011], '과사삭벌레는 세 갈래');
 });
 

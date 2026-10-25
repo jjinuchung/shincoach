@@ -8,6 +8,7 @@
 import { sfx } from './sfx.js';
 import { showEvolve } from './evolveshow.js';
 import { EXP_LV, CAP_KO } from './rest.js';
+import { lvMarkCrossed } from './evolve.js'; // 🎖️ 축하 레벨 (v332 · 순수)
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let box = null;
@@ -202,6 +203,13 @@ export async function showRestDone(o) {
       try { sfx.success(); } catch { /* 소리는 없어도 */ }
       import('./catch.js').then((m) => m.burstConfetti(60)).catch(() => {});
       await pause(600);
+    }
+    // 6) 🎖️ Lv25·50·75·100에 닿았다 (v332)
+    const medal = lvMarkCrossed(r.lv.from, r.lv.to);
+    if (medal) {
+      badge(badges, `🎖️ Lv${medal} 축하해요!`, 'is-level');
+      try { sfx.success(); } catch { /* 소리는 없어도 */ }
+      await pause(500);
     }
     if (r.kept) badge(badges, `🙂 ${name} 그대로`, 'is-kept');
     if (r.evo && r.evo.ok) badge(badges, '✨ 그런데… 몸이 빛나기 시작해요!', 'is-evo');

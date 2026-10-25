@@ -6,7 +6,7 @@ import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFo
 import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase } from './pokemon.js';
 import { pickHatch, eggProgress } from './egg.js';
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림
-import { costBetween, baseOf } from './evolve.js';
+import { costBetween, baseOf, lvMarkCrossed, lvMarksOf } from './evolve.js';
 import { showEvolve } from './evolveshow.js';
 import { sfx, unlock } from './sfx.js';
 
@@ -498,7 +498,8 @@ function renderGrow() {
   // 스톤을 주는 활동 — 포켓몬이 어디서 잡히는지가 아니라 그 스톤이 어디서 생기는지(🖊️ 논술 포켓몬은 🟩 — 📚 국어에서 받는다, Codex 109차 #2) · 조사까지(수학은 "을")
   const giver = { stone_math: '🔢 수학을', stone_korean: '📚 국어를', stone_english: '🎤 영어를' }[g.stone] || '공부를';
 
-  $('mon-lv-text').textContent = `Lv${g.lv}${g.lv >= g.max ? ' · 만렙!' : ` / ${g.max}`}`;
+  const marks = lvMarksOf(g.lv); // 🎖️ Lv25·50·75·100에 닿은 만큼 (v332)
+  $('mon-lv-text').textContent = `Lv${g.lv}${g.lv >= g.max ? ' · 만렙!' : ` / ${g.max}`}${marks ? ` ${'🎖️'.repeat(marks)}` : ''}`;
   $('mon-lv-fill').style.width = `${Math.round((g.lv / g.max) * 100)}%`;
 
   // ⬆️ 레벨업 버튼 하나 (값은 다음 한 칸 것)
@@ -586,7 +587,9 @@ async function doLevelUp(useCandy = false) {
     unlock();
     const g = growInfo(id);
     const mark = useCandy ? `🍬 ${ko}의 사탕 ${r.candies}개로 ` : '⬆️ ';
-    renderMon(g.ready ? `${mark}Lv${r.to}! 🧬 이제 진화할 수 있어요!` : `${mark}Lv${r.from} → Lv${r.to}!`, true);
+    const medal = lvMarkCrossed(r.from, r.to); // 🎖️ Lv25·50·75·100에 닿았다 (v332)
+    if (medal) sfx.success();
+    renderMon(g.ready ? `${mark}Lv${r.to}! 🧬 이제 진화할 수 있어요!` : `${mark}Lv${r.from} → Lv${r.to}!${medal ? ` 🎖️ Lv${medal} 축하해요!` : ''}`, true);
   } else {
     const why = r && r.why;
     renderMon(why === 'cost' ? '앗, 스톤이나 코인이 모자라요'

@@ -1,6 +1,7 @@
 // 🎈 로켓단 열기구 — 🎮 게임기 미니 게임 여섯째 (v310 · 2026-10-21 아버님 "로켓단 열기구 진행하자" → 물음 추천안)
 // 하늘에 로켓단 나옹 열기구(⚔️ 로켓단 배틀과 같은 노란 열기구 · R)가 둥실둥실 — 톡 누르면 🤝 파트너 기술(⚔️ 배틀과 같은 강한 기술)이 날아가 펑 ⭐1
 // 가끔 나오는 **큰 나옹 열기구는 ❤️ 세 번 맞혀야 펑 ⭐5**(로켓단 배틀처럼) · 터지면 「불쌍한 내 인생~」 하며 하늘 저편으로 ✨
+// v332(아버님 "너무 쉬운 것 같으니"): 1.5배 빠르게 · 🆕 거대 열기구 ❤️ 여섯 번 ⭐12 · 🆕 꼬마 열기구(작고 아주 빠름) ⭐2
 // 한 판 30초 · 목숨·게임 오버 없이 늘 끝까지 · 빈 하늘·놓친 열기구는 감점 없음 · 끝으로 갈수록 빨라지고 많아진다 · 점수는 최고 기록만(homeplay.best)
 //
 // 위쪽(엔진)은 순수 — 시각(ms)과 rng만 받아 상태를 바꾼다(node 시험이 가짜 시계로 끝까지) · 아래쪽(runBalloon)이 화면
@@ -12,16 +13,31 @@ import { BLAST } from './rocketview.js'; // 「불쌍한 내 인생~」 — 아�
 export const BAL_SEC = 30;
 export const BAL_W = 100;
 export const BAL_H = 70;
-/** 열기구 — 크기(칸) · 맞혀야 할 수 · ⭐ */
+/**
+ * 열기구 — 크기(칸) · 맞혀야 할 수 · ⭐
+ * v332(2026-10-25 아버님 "너무 쉬운 것 같으니 열기구가 더 큰 것도 있고 더 빠르게"): 🆕 꼬마(작고 아주 빠름 ⭐2) · 거대(큰 것의 1.4배 · 여섯 번 ⭐12)
+ */
 export const BAL_KINDS = {
   small: { w: 14, h: 17, hp: 1, pts: 1 },
   big: { w: 22, h: 27, hp: 3, pts: 5 },
+  tiny: { w: 10, h: 12, hp: 1, pts: 2 },
+  huge: { w: 31, h: 38, hp: 6, pts: 12 },
 };
+/** 이름 (읽어 주는 말) */
+const BAL_KO = { small: '로켓단 열기구', big: '큰 로켓단 열기구', tiny: '꼬마 로켓단 열기구', huge: '거대한 로켓단 열기구' };
+/** 빠르기 배 — 꼬마는 빠르게 · 클수록 느리게 */
+const SPEED_OF = { small: 1, big: 0.6, tiny: 1.6, huge: 0.45 };
 /** 나옹 (열기구 얼굴 — ⚔️ 로켓단과 같은 움직이는 그림) */
 export const BAL_MEOWTH = 52;
 /** 큰 열기구 — 이 뒤부터(ms) · 나올 때마다 이만큼 · 한 번에 하나만 */
 export const BIG_FROM = 5000;
 export const BIG_RATE = 0.12;
+/** 거대 열기구 (v332) — 이 뒤부터(ms) · 나올 때마다 이만큼 · 한 번에 하나만 */
+export const HUGE_FROM = 12000;
+export const HUGE_RATE = 0.08;
+/** 꼬마 열기구 (v332) — 이 뒤부터(ms) · 나올 때마다 이만큼 (처음 몇 초는 작은 열기구만 — 손을 풀 틈) */
+export const TINY_FROM = 4000;
+export const TINY_RATE = 0.18;
 const FIRST_MS = 600;
 const BOB = 3;          // 위아래로 흔들리는 칸
 const BOB_MS = 2400;    // 한 번 흔들리는 데
@@ -32,15 +48,32 @@ const nz = (v) => {
   return n > 0 ? n : 0;
 };
 
-/** 빠르기 (순수) — 지난 시간 ms → { most: 한 번에 떠 있는 끝, speed: 칸/초, gap: 다음 열기구까지 ms } · 끝으로 갈수록 많이·빨리 */
+/**
+ * 빠르기 (순수) — 지난 시간 ms → { most: 한 번에 떠 있는 끝, speed: 칸/초, gap: 다음 열기구까지 ms } · 끝으로 갈수록 많이·빨리
+ * v332: 1.5배 빠르게(12→24칸/초였다) · 더 자주(0.9→0.45초였다) · 한 번에 하나 더(2~4였다)
+ */
 export function balPace(ms) {
   const k = Math.min(1, Math.max(0, (Number(ms) || 0) / (BAL_SEC * 1000)));
-  return { most: k < 0.35 ? 2 : k < 0.7 ? 3 : 4, speed: 12 + 12 * k, gap: Math.round(900 - 450 * k) };
+  return { most: k < 0.35 ? 3 : k < 0.7 ? 4 : 5, speed: 18 + 18 * k, gap: Math.round(750 - 400 * k) };
 }
 
 /** 새 판 (순수) */
 export function balStart(now) {
-  return { t0: now, end: now + BAL_SEC * 1000, last: now, next: now + FIRST_MS, bals: [], seq: 0, score: 0, pops: 0, bigs: 0, hits: 0, escaped: 0 };
+  return { t0: now, end: now + BAL_SEC * 1000, last: now, next: now + FIRST_MS, bals: [], seq: 0, score: 0, pops: 0, bigs: 0, huges: 0, tinies: 0, hits: 0, escaped: 0 };
+}
+
+/** 다음 열기구의 종류 (순수) — 거대·큰 것은 한 번에 하나씩 · 처음 몇 초는 작은 것만 */
+export function balKind(s, ms, rng) {
+  const has = (kind) => s.bals.some((it) => it.kind === kind);
+  if (ms >= HUGE_FROM && !has('huge') && rng() < HUGE_RATE) return 'huge';
+  if (ms >= BIG_FROM && !has('big') && rng() < BIG_RATE) return 'big';
+  if (ms >= TINY_FROM && rng() < TINY_RATE) return 'tiny';
+  return 'small';
+}
+
+/** 이름 (순수) — 화면이 읽어 주는 말 */
+export function balKo(kind) {
+  return BAL_KO[kind] || BAL_KO.small;
 }
 
 /** 열기구의 지금 높이 (순수) — 가운데 높이에서 둥실둥실 */
@@ -51,11 +84,10 @@ export function balY(it, t) {
 function spawn(s, t, rng) {
   const ms = t - s.t0;
   const pace = balPace(ms);
-  const big = ms >= BIG_FROM && !s.bals.some((it) => it.kind === 'big') && rng() < BIG_RATE;
-  const kind = big ? 'big' : 'small';
+  const kind = balKind(s, ms, rng);
   const k = BAL_KINDS[kind];
   const fromLeft = rng() < 0.5;
-  const speed = pace.speed * (big ? 0.6 : 1) * (0.8 + rng() * 0.4);
+  const speed = pace.speed * SPEED_OF[kind] * (0.8 + rng() * 0.4);
   const it = {
     n: ++s.seq, kind, hp: k.hp, w: k.w, h: k.h,
     x: fromLeft ? -k.w / 2 : BAL_W + k.w / 2, vx: fromLeft ? speed : -speed,
@@ -110,6 +142,8 @@ export function balTap(s, n, now) {
   s.score += pts;
   s.pops += 1;
   if (it.kind === 'big') s.bigs += 1;
+  if (it.kind === 'huge') s.huges += 1;
+  if (it.kind === 'tiny') s.tinies += 1;
   return { kind: 'pop', it, pts };
 }
 
@@ -194,7 +228,7 @@ export function runBalloon(stage, o = {}) {
   const make = (it) => {
     const b = el('button', `gl-bal is-${it.kind}`);
     b.type = 'button';
-    b.setAttribute('aria-label', it.kind === 'big' ? '큰 로켓단 열기구' : '로켓단 열기구');
+    b.setAttribute('aria-label', balKo(it.kind));
     b.style.width = `${it.w}%`;
     b.style.height = `${(it.h / BAL_H) * 100}%`;
     const env = el('span', 'gl-env');
@@ -208,7 +242,7 @@ export function runBalloon(stage, o = {}) {
     } else env.innerHTML = '<span class="gl-meowth-alt">😼</span>';
     env.appendChild(el('span', 'gl-r', 'R'));
     b.append(env, el('span', 'gl-basket'));
-    if (it.kind === 'big') b.appendChild(el('span', 'gl-hp', '❤️'.repeat(it.hp)));
+    if (it.hp > 1) b.appendChild(el('span', 'gl-hp', '❤️'.repeat(it.hp))); // 큰·거대 열기구
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); tap(it.n); });
     b.addEventListener('click', (e) => { if (e.detail === 0) tap(it.n); }); // ⌨️ Enter·스페이스(포인터 없이 누른 click)도
     layer.appendChild(b);
@@ -276,14 +310,14 @@ export function runBalloon(stage, o = {}) {
       if (e) {
         replay(e, 'is-hit');
         hearts(e, r.hp);
-        e.setAttribute('aria-label', `큰 로켓단 열기구 ${'❤️'.repeat(r.hp)}`); // 남은 ❤️도 읽힌다
+        e.setAttribute('aria-label', `${balKo(r.it.kind)} ${'❤️'.repeat(r.hp)}`); // 남은 ❤️도 읽힌다
       }
       sfx.hit();
     } else {
       drop(r.it, 'is-pop');
       scoreEl.textContent = `⭐ ${s.score}`;
       fly(`+${r.pts}`, at.x, at.y - 4, r.pts > 1 ? 'is-big' : '');
-      if (r.it.kind === 'big') { fly(BLAST, at.x, at.y + 6, 'is-blast'); sfx.boom(); }
+      if (r.it.kind === 'big' || r.it.kind === 'huge') { fly(BLAST, at.x, at.y + 6, 'is-blast'); sfx.boom(); }
       else sfx.hit();
       setTimeout(() => { if (!finished) sfx.twinkle(); }, 450);
     }

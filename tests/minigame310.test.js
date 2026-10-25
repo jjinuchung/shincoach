@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { GAMES, gameById } from '../js/minigame.js';
-import { BAL_SEC, BAL_W, BAL_H, BAL_KINDS, BAL_MEOWTH, BIG_FROM, BIG_RATE, balPace, balStart, balY, balTick, balTap, balShift, ro, runBalloon } from '../js/gameballoon.js';
+import { BAL_SEC, BAL_W, BAL_H, BAL_KINDS, BAL_MEOWTH, BIG_FROM, BIG_RATE, HUGE_FROM, HUGE_RATE, TINY_FROM, TINY_RATE, balKind, balKo, balPace, balStart, balY, balTick, balTap, balShift, ro, runBalloon } from '../js/gameballoon.js';
 import { BLAST } from '../js/rocketview.js';
 import { movesOf } from '../js/battle.js';
 
@@ -49,10 +49,10 @@ test('🎮 서비스워커 v310 · 새 파일 · css (열기구는 로켓단 배
 
 // ───────────────────── 🎈 엔진 ─────────────────────
 
-test('🎈 빠르기 — 한 번에 떠 있는 끝 2 → 3 → 4 · 빨라짐 12 → 24칸/초 · 다음 열기구까지 0.9 → 0.45초 · 크기·⭐', () => {
-  assert.deepEqual(balPace(0), { most: 2, speed: 12, gap: 900 });
-  assert.deepEqual(balPace(BAL_SEC * 1000), { most: 4, speed: 24, gap: 450 });
-  assert.equal(balPace(BAL_SEC * 1000 * 0.5).most, 3);
+test('🎈 빠르기 (v332 — 아버님 "너무 쉬운 것 같으니") — 한 번에 떠 있는 끝 3 → 4 → 5 · 빨라짐 18 → 36칸/초 · 다음 열기구까지 0.75 → 0.35초 · 크기·⭐', () => {
+  assert.deepEqual(balPace(0), { most: 3, speed: 18, gap: 750 });
+  assert.deepEqual(balPace(BAL_SEC * 1000), { most: 5, speed: 36, gap: 350 });
+  assert.equal(balPace(BAL_SEC * 1000 * 0.5).most, 4);
   assert.deepEqual(balPace(99e9), balPace(BAL_SEC * 1000));
   assert.deepEqual(balPace(NaN), balPace(0));
   for (let ms = 0; ms < BAL_SEC * 1000; ms += 1000) {
@@ -60,8 +60,29 @@ test('🎈 빠르기 — 한 번에 떠 있는 끝 2 → 3 → 4 · 빨라짐 12
     const b = balPace(ms + 1000);
     assert.ok(b.most >= a.most && b.speed >= a.speed && b.gap <= a.gap);
   }
-  assert.deepEqual(Object.fromEntries(Object.entries(BAL_KINDS).map(([k, v]) => [k, [v.hp, v.pts]])), { small: [1, 1], big: [3, 5] }, '큰 열기구는 세 번 · ⭐5');
-  assert.deepEqual([BAL_W, BAL_H, BIG_FROM, BIG_RATE], [100, 70, 5000, 0.12]);
+  assert.deepEqual(Object.fromEntries(Object.entries(BAL_KINDS).map(([k, v]) => [k, [v.hp, v.pts]])), { small: [1, 1], big: [3, 5], tiny: [1, 2], huge: [6, 12] }, '큰 열기구는 세 번 · ⭐5 · 거대는 여섯 번 · ⭐12 · 꼬마는 ⭐2');
+  assert.deepEqual([BAL_W, BAL_H, BIG_FROM, BIG_RATE, HUGE_FROM, HUGE_RATE, TINY_FROM, TINY_RATE], [100, 70, 5000, 0.12, 12000, 0.08, 4000, 0.18]);
+  // 거대 = 큰 것의 1.4배(반올림) · 꼬마는 작은 것보다 작다 · 거대도 하늘 안(파트너 위)에 들어간다
+  assert.deepEqual([BAL_KINDS.huge.w, BAL_KINDS.huge.h], [Math.round(BAL_KINDS.big.w * 1.4), Math.round(BAL_KINDS.big.h * 1.4)]);
+  assert.ok(BAL_KINDS.tiny.w < BAL_KINDS.small.w && BAL_KINDS.tiny.h < BAL_KINDS.small.h);
+  assert.ok(BAL_H * 0.72 - BAL_KINDS.huge.h - 6 > 0, '거대 열기구가 들어갈 높이');
+  assert.deepEqual(['small', 'big', 'tiny', 'huge', 'nope'].map(balKo), ['로켓단 열기구', '큰 로켓단 열기구', '꼬마 로켓단 열기구', '거대한 로켓단 열기구', '로켓단 열기구']);
+});
+
+test('🎈 종류 고르기 (v332) — 처음 4초는 작은 것만 · 큰 것 5초 · 거대 12초부터 · 큰 것·거대는 하늘에 이미 있으면 안 나옴 · 뽑는 차례', () => {
+  const s = balStart(0);
+  const r = (...xs) => { let i = 0; return () => xs[i++]; };
+  assert.equal(balKind(s, 3999, r(0)), 'small', '처음 4초는 rng를 안 써도 작은 것');
+  assert.equal(balKind(s, 4000, r(0.1)), 'tiny');
+  assert.equal(balKind(s, 4000, r(0.18)), 'small', '꼬마 확률 경계');
+  assert.equal(balKind(s, 5000, r(0.11)), 'big');
+  assert.equal(balKind(s, 5000, r(0.12, 0.5)), 'small', '큰 것 경계 → 꼬마도 아님');
+  assert.equal(balKind(s, 11999, r(0.01)), 'big', '거대는 12초 전엔 안 나온다');
+  assert.equal(balKind(s, 12000, r(0.07)), 'huge');
+  assert.equal(balKind(s, 12000, r(0.08, 0.11)), 'big', '거대 경계 → 큰 것');
+  s.bals.push({ n: 1, kind: 'huge' }, { n: 2, kind: 'big' });
+  assert.equal(balKind(s, 20000, r(0.01, 0.5)), 'tiny', '거대·큰 것이 이미 있으면 그다음 꼬마 뽑기로');
+  assert.equal(balKind(s, 20000, r(0.5)), 'small');
 });
 
 test('🎈 「으로/로」 — 받침이 없거나 ㄹ이면 「로」', () => {
@@ -80,13 +101,14 @@ test('🎈 「으로/로」 — 받침이 없거나 ㄹ이면 「로」', () => 
 function playAll(seed, play) {
   const rng = seeded(seed);
   const s = balStart(0);
-  const out = { s, added: [], maxUp: 0, bigsAtOnce: 0 };
+  const out = { s, added: [], maxUp: 0, bigsAtOnce: 0, hugesAtOnce: 0 };
   let prev = 0;
   for (let t = 0; t <= BAL_SEC * 1000 + 1000; t += 50) {
     const ev = balTick(s, t, rng);
     out.added.push(...ev.added.map((it) => ({ ...it, at: s.last })));
     out.maxUp = Math.max(out.maxUp, s.bals.length);
     out.bigsAtOnce = Math.max(out.bigsAtOnce, s.bals.filter((it) => it.kind === 'big').length);
+    out.hugesAtOnce = Math.max(out.hugesAtOnce, s.bals.filter((it) => it.kind === 'huge').length);
     assert.ok(s.bals.length <= balPace(s.last - s.t0).most, '떠 있는 수는 끝을 안 넘는다');
     assert.ok(s.score >= prev, '점수는 줄지 않는다');
     prev = s.score;
@@ -95,25 +117,44 @@ function playAll(seed, play) {
   return out;
 }
 
-test('🎈 열기구가 나오는 모양 — 0.6초에 첫 열기구 · 하늘 옆에서 들어와 건너감 · 하늘 안 높이 · 큰 열기구는 5초 뒤에 하나씩만', () => {
+test('🎈 열기구가 나오는 모양 — 0.6초에 첫 열기구 · 하늘 옆에서 들어와 건너감 · 하늘 안 높이 · 큰 열기구는 5초 뒤 · 거대는 12초 뒤 · 꼬마는 4초 뒤 · 큰 것·거대는 하나씩만', () => {
   let bigSeeds = 0;
+  let hugeSeeds = 0;
+  let tinySeeds = 0;
+  const speeds = { small: [], big: [], tiny: [], huge: [] };
   for (const seed of SEEDS) {
     const r = playAll(seed);
     assert.equal(r.added[0].at, 600, '첫 열기구');
+    assert.equal(r.added[0].kind, 'small', '첫 열기구는 작은 것');
     for (const it of r.added) {
       const k = BAL_KINDS[it.kind];
       assert.ok(it.x === -k.w / 2 || it.x === BAL_W + k.w / 2, '옆에서 들어온다');
       assert.ok((it.x < 0) === (it.vx > 0), '들어온 쪽에서 건너간다');
-      assert.ok(it.y0 - k.h / 2 - 3 >= 0 && it.y0 + k.h / 2 + 3 <= BAL_H * 0.72, `하늘 안 (${it.y0})`);
+      assert.ok(it.y0 - k.h / 2 - 3 >= 0 && it.y0 + k.h / 2 + 3 <= BAL_H * 0.72, `하늘 안 (${it.kind} ${it.y0})`);
+      assert.equal(it.hp, k.hp);
       if (it.kind === 'big') assert.ok(it.at >= BIG_FROM, '큰 열기구는 5초 뒤');
+      if (it.kind === 'huge') assert.ok(it.at >= HUGE_FROM, '거대 열기구는 12초 뒤');
+      if (it.kind === 'tiny') assert.ok(it.at >= TINY_FROM, '꼬마 열기구는 4초 뒤');
+      // 그때 빠르기 대비 — 꼬마는 빠르게, 클수록 느리게 (흔들림 0.8~1.2배)
+      speeds[it.kind].push(Math.abs(it.vx) / balPace(it.at).speed);
     }
     assert.ok(r.bigsAtOnce <= 1, '큰 열기구는 한 번에 하나');
+    assert.ok(r.hugesAtOnce <= 1, '거대 열기구는 한 번에 하나');
     if (r.added.some((it) => it.kind === 'big')) bigSeeds += 1;
+    if (r.added.some((it) => it.kind === 'huge')) hugeSeeds += 1;
+    if (r.added.some((it) => it.kind === 'tiny')) tinySeeds += 1;
     assert.equal(r.s.score, 0, '안 누르면 0');
     assert.ok(r.s.escaped > 0, '놓친 열기구는 하늘 밖으로 — 감점 없음');
     assert.equal(r.s.last, r.s.end, '판 끝에서 멈춘다');
   }
   assert.ok(bigSeeds >= 4, `큰 열기구가 나오는 판이 흔하다 (${bigSeeds}/8)`);
+  assert.ok(hugeSeeds >= 3, `거대 열기구가 나오는 판도 꽤 있다 (${hugeSeeds}/8)`);
+  assert.equal(tinySeeds, SEEDS.length, '꼬마 열기구는 판마다');
+  const span = (xs) => [Math.min(...xs), Math.max(...xs)];
+  for (const [kind, mul] of [['small', 1], ['big', 0.6], ['tiny', 1.6], ['huge', 0.45]]) {
+    const [lo, hi] = span(speeds[kind]);
+    assert.ok(lo >= mul * 0.8 - 1e-9 && hi <= mul * 1.2 + 1e-9, `${kind} 빠르기 ×${mul} (${lo.toFixed(2)}~${hi.toFixed(2)})`);
+  }
 });
 
 test('🎈 누르기 — 작은 열기구 펑 ⭐1 · 큰 열기구는 ❤️ 세 번째에 펑 ⭐5(앞의 두 번은 셈 없음) · 없는 열기구 · 끝난 뒤', () => {
@@ -131,7 +172,7 @@ test('🎈 누르기 — 작은 열기구 펑 ⭐1 · 큰 열기구는 ❤️ �
   assert.equal(balTap(s, 1, s.end).kind, 'over');
 });
 
-test('🎈 30초 한 판(가짜 시계 · 씨앗 여덟) — 빠른 손이 느린 손의 두 배 넘게 · 점수 = 작은 것 + 큰 것×5', () => {
+test('🎈 30초 한 판(가짜 시계 · 씨앗 여덟) — 빠른 손이 느린 손의 두 배 넘게 · 점수 = 작은 것 + 꼬마×2 + 큰 것×5 + 거대×12', () => {
   for (const seed of SEEDS) {
     const res = {};
     for (const [mode, every] of [['fast', 300], ['slow', 1500]]) {
@@ -142,7 +183,7 @@ test('🎈 30초 한 판(가짜 시계 · 씨앗 여덟) — 빠른 손이 느�
         if (vis.length) balTap(s, vis[0].n, t);
         next = t + every;
       });
-      assert.equal(r.s.score, r.s.pops - r.s.bigs + 5 * r.s.bigs);
+      assert.equal(r.s.score, r.s.pops - r.s.bigs - r.s.huges - r.s.tinies + 2 * r.s.tinies + 5 * r.s.bigs + 12 * r.s.huges);
       res[mode] = r.s.score;
     }
     assert.ok(res.fast >= 35 && res.fast > res.slow * 2, `seed ${seed}: 빠름 ${res.fast} · 느림 ${res.slow}`);
@@ -276,6 +317,45 @@ test('🎈 화면 — 기술 이름 안내(으로/로) · 「준비!」 때 내�
   assert.ok(w.st.over && w.st.over.quit === false);
   assert.match(top.children[0].textContent, new RegExp(`^⭐ ${w.st.over.score}$`));
   assert.equal((w.doc.listeners.visibilitychange || []).length, 0, '끝나면 듣기를 뗀다');
+});
+
+test('🎈 화면 (v332) — 꼬마 열기구 ⭐2 · 거대 열기구는 ❤️ 여섯(읽는 말도) · 다섯 번까지 셈 없음 · 여섯 번째 펑 ⭐12 · 「불쌍한 내 인생~」', async (t) => {
+  // rng가 늘 0.01이면: 4초부터 꼬마 · 5초부터 큰 것 · 12초부터 거대가 나온다(이미 떠 있지 않을 때)
+  const w = world(t, (stage) => runBalloon(stage, { rng: () => 0.01, move: MOVE }));
+  const root = w.stage.children[0];
+  const [top, field, , fx] = root.children;
+  const layer = field.children[2];
+  const score = () => Number(top.children[0].textContent.replace('⭐ ', ''));
+  const live = (cls) => layer.children.find((e) => e.className.includes(cls) && !e.className.includes('is-pop'));
+  let tiny = null;
+  let k = 0;
+  while (!tiny && k++ < 400) { w.adv(50); tiny = live('is-tiny'); }
+  assert.ok(tiny, '꼬마 열기구가 나온다');
+  assert.equal(tiny.attrs['aria-label'], '꼬마 로켓단 열기구');
+  assert.equal(tiny.querySelector('.gl-hp'), null, '꼬마는 ❤️ 없이 한 번');
+  const a = score();
+  tiny.fire('pointerdown');
+  assert.equal(score(), a + 2, '꼬마는 ⭐2');
+  assert.ok(!fx.children.some((f) => f.textContent === BLAST), '꼬마는 「불쌍한 내 인생~」 없음');
+  let huge = null;
+  k = 0;
+  while (!huge && k++ < 400) { w.adv(50); huge = live('is-huge'); }
+  assert.ok(huge, '거대 열기구가 나온다');
+  assert.equal(huge.attrs['aria-label'], '거대한 로켓단 열기구');
+  assert.equal(huge.querySelector('.gl-hp').textContent, '❤️'.repeat(6));
+  assert.equal(huge.style.width, `${BAL_KINDS.huge.w}%`);
+  const b = score();
+  for (let i = 5; i >= 1; i--) {
+    huge.fire('pointerdown');
+    assert.equal(huge.querySelector('.gl-hp').textContent, '❤️'.repeat(i));
+    assert.equal(huge.attrs['aria-label'], `거대한 로켓단 열기구 ${'❤️'.repeat(i)}`);
+  }
+  assert.equal(score(), b, '다섯 번까지는 그대로');
+  huge.fire('pointerdown');
+  assert.equal(score(), b + 12, '여섯 번째에 ⭐12');
+  assert.ok(huge.classList.contains('is-pop'));
+  assert.ok(fx.children.some((f) => f.textContent === BLAST), '거대도 「불쌍한 내 인생~」');
+  w.h.stop();
 });
 
 test('🎈 화면 — 나옹 그림이 없거나 깨지면 😼 · 파트너가 없으면 ⭐ 별 던지기로', async (t) => {

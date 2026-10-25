@@ -1,7 +1,7 @@
 // 🧬 레벨업 · 진화 규칙: node --test tests/evolve.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EVO, MAX_LV, COST, STONE_ID, LV_ATK, haveOf, levelCapOf, capReason, stoneIdFor, lvOf, costTo, nextCost, totalTo, costBetween, evoOf, evoAt, evoTo, evoFrom, needsChoice, soleEvo, canEvolve, lvMult } from '../js/evolve.js';
+import { EVO, MAX_LV, COST, STONE_ID, LV_ATK, LV_ATK_HIGH, LV_MARKS, lvMarkCrossed, lvMarksOf, haveOf, levelCapOf, capReason, stoneIdFor, lvOf, costTo, nextCost, totalTo, costBetween, evoOf, evoAt, evoTo, evoFrom, needsChoice, soleEvo, canEvolve, lvMult } from '../js/evolve.js';
 import { ROSTER, subjectOf } from '../js/pokemon.js';
 import { STONE_MATH, STONE_ENGLISH } from '../js/items.js';
 import { TYPE_OF, attackMult, DAMAGE, BATTLE } from '../js/battle.js';
@@ -100,25 +100,40 @@ test('🧬 진화로 얻는 종도 등급·타입이 채워져 있다 (빠지면
   }
 });
 
-test('⬆️ 레벨업 비용: 구간마다 스톤이 늘어난다 (1개 → 2개 → 3개)', () => {
-  assert.equal(MAX_LV, 12);
-  assert.deepEqual(COST.map((c) => c.stones), [1, 2, 3]);
+test('⬆️ 레벨업 비용: Lv1~12는 예전 그대로(1개 → 2개 → 3개) · v332 만렙 100 — 13~20 1개 · 21~40 2개 · 41~70 3개 · 71~100 4개', () => {
+  assert.equal(MAX_LV, 100);
+  assert.deepEqual(COST.map((c) => [c.upto, c.stones, c.coins]), [[5, 1, 30], [10, 2, 60], [12, 3, 100], [20, 1, 50], [40, 2, 80], [70, 3, 120], [100, 4, 150]], '아버님이 승인한 표 (2026-10-25)');
   assert.deepEqual(costTo(2), { stones: 1, coins: 30 });
   assert.deepEqual(costTo(5), { stones: 1, coins: 30 });
   assert.deepEqual(costTo(6), { stones: 2, coins: 60 });
   assert.deepEqual(costTo(10), { stones: 2, coins: 60 });
   assert.deepEqual(costTo(11), { stones: 3, coins: 100 });
   assert.deepEqual(costTo(12), { stones: 3, coins: 100 });
+  // 구간 경계 — 한 칸씩 손으로
+  assert.deepEqual(costTo(13), { stones: 1, coins: 50 }, '12를 넘자마자 쑥쑥');
+  assert.deepEqual(costTo(20), { stones: 1, coins: 50 });
+  assert.deepEqual(costTo(21), { stones: 2, coins: 80 });
+  assert.deepEqual(costTo(40), { stones: 2, coins: 80 });
+  assert.deepEqual(costTo(41), { stones: 3, coins: 120 });
+  assert.deepEqual(costTo(70), { stones: 3, coins: 120 });
+  assert.deepEqual(costTo(71), { stones: 4, coins: 150 });
+  assert.deepEqual(costTo(100), { stones: 4, coins: 150 });
   assert.equal(costTo(1), null, 'Lv1은 시작이라 값이 없다');
-  assert.equal(costTo(13), null, '만렙을 넘을 수 없다');
+  assert.equal(costTo(101), null, '만렙을 넘을 수 없다');
   assert.equal(costTo(0), null);
 });
 
-test('⬆️ 누적: 첫 진화(Lv5) 스톤 4개 · 최종 진화(Lv10) 14개 · 만렙(Lv12) 20개', () => {
+test('⬆️ 누적: 첫 진화(Lv5) 스톤 4개 · 최종 진화(Lv10) 14개 · 옛 만렙(Lv12) 20개 · 만렙(Lv100) 278개', () => {
   assert.deepEqual(totalTo(5), { stones: 4, coins: 120 });
   assert.deepEqual(totalTo(10), { stones: 14, coins: 420 });
-  assert.deepEqual(totalTo(MAX_LV), { stones: 20, coins: 620 });
+  assert.deepEqual(totalTo(12), { stones: 20, coins: 620 }, '예전 만렙까지는 그대로');
+  assert.deepEqual(totalTo(20), { stones: 28, coins: 1020 });
+  assert.deepEqual(totalTo(40), { stones: 68, coins: 2620 });
+  assert.deepEqual(totalTo(70), { stones: 158, coins: 6220 });
+  assert.deepEqual(totalTo(MAX_LV), { stones: 278, coins: 10720 });
+  assert.deepEqual(costBetween(12, MAX_LV), { stones: 258, coins: 10100 }, '기본안에 적은 값: 12에서 100까지 스톤 258 · 💰10,100');
   assert.deepEqual(totalTo(1), { stones: 0, coins: 0 });
+  assert.deepEqual(totalTo(500), totalTo(MAX_LV), '만렙 위는 만렙까지만');
   // 하루에 버는 스톤이 과목당 1~3개다 → 첫 진화 이틀·최종 진화 일주일 선을 넘지 않아야
   assert.ok(totalTo(5).stones <= 4, '첫 진화가 이틀을 넘으면 아이가 포기한다');
   assert.ok(totalTo(10).stones <= 15, '최종 진화가 일주일을 크게 넘으면 안 된다');
@@ -128,6 +143,8 @@ test('⬆️ nextCost·costBetween: 지금 레벨에서 다음 한 칸 / 목표�
   assert.deepEqual(nextCost(1), { toLv: 2, stones: 1, coins: 30 });
   assert.deepEqual(nextCost(5), { toLv: 6, stones: 2, coins: 60 });
   assert.equal(nextCost(MAX_LV), null, '만렙이면 더 올릴 수 없다');
+  assert.deepEqual(nextCost(12), { toLv: 13, stones: 1, coins: 50 }, '옛 만렙에서도 이어서 (v332)');
+  assert.deepEqual(nextCost(99), { toLv: 100, stones: 4, coins: 150 });
   assert.deepEqual(costBetween(1, 5), { stones: 4, coins: 120 });
   assert.deepEqual(costBetween(5, 10), { stones: 10, coins: 300 });
   assert.deepEqual(costBetween(10, 5), { stones: 0, coins: 0 }, '이미 지난 레벨은 0');
@@ -142,6 +159,26 @@ test('⬆️ lvOf: 기록이 없거나 깨졌으면 Lv1, 만렙을 넘지 않는
   assert.equal(lvOf({ lv: 7 }), 7);
   assert.equal(lvOf({ lv: 7.8 }), 7);
   assert.equal(lvOf({ lv: 999 }), MAX_LV);
+  assert.equal(lvOf({ lv: 100 }), 100);
+  assert.equal(lvOf({ lv: 13 }), 13, '옛 만렙 12 위도 그대로 읽는다 (v332)');
+  // 무한대는 깨진 값 — 만렙(100)으로 읽으면 깨진 값 하나가 배틀 가장 센 레벨이 된다 (v332)
+  assert.equal(lvOf({ lv: '1e309' }), 1);
+  assert.equal(lvOf({ lv: Infinity }), 1);
+  assert.equal(lvOf({ lv: -Infinity }), 1);
+});
+
+test('🎖️ 축하 레벨 (v332): Lv25·50·75·100 — 새로 닿은 것 중 가장 높은 것 · 닿은 수', () => {
+  assert.deepEqual(LV_MARKS, [25, 50, 75, 100]);
+  assert.equal(lvMarkCrossed(24, 25), 25);
+  assert.equal(lvMarkCrossed(25, 26), null, '이미 지난 것은 다시 축하하지 않는다');
+  assert.equal(lvMarkCrossed(24, 24), null);
+  assert.equal(lvMarkCrossed(49, 51), 50);
+  assert.equal(lvMarkCrossed(20, 60), 50, '여럿을 한 번에 넘으면 가장 높은 것 하나');
+  assert.equal(lvMarkCrossed(99, 100), 100);
+  assert.equal(lvMarkCrossed(1, 12), null);
+  assert.equal(lvMarkCrossed(30, 20), null, '내려가면 없음');
+  assert.equal(lvMarkCrossed(undefined, '1e309'), null, '깨진 값은 Lv1');
+  assert.deepEqual([1, 24, 25, 49, 50, 75, 99, 100, 999].map(lvMarksOf), [0, 0, 1, 1, 2, 3, 3, 4, 4]);
 });
 
 test('🧬 canEvolve: 레벨·마릿수·갈래를 모두 본다', () => {
@@ -167,13 +204,19 @@ test('🧬 evoFrom: 무엇이 진화해서 이 모습이 되는가 (도감 설�
   assert.deepEqual(evoFrom(7), [], '꼬부기는 진화해서 되는 모습이 아니다 (피츄 같은 앞 단계가 명단에 없다)');
 });
 
-test('⚔️ 레벨이 주는 힘: 레벨당 +3%, 메가진화(×1.4)보다 작다', () => {
+test('⚔️ 레벨이 주는 힘: Lv12까지 레벨당 +3%(×1.33 — 메가진화보다 작다) · 그 위로 +0.2%(Lv100 ×1.506, v332)', () => {
   assert.equal(LV_ATK, 0.03);
+  assert.equal(LV_ATK_HIGH, 0.002);
   assert.equal(lvMult(1), 1);
-  assert.equal(Number(lvMult(MAX_LV).toFixed(2)), 1.33);
-  assert.ok(lvMult(MAX_LV) < 1.4, '만렙이어도 메가진화보다 세면 안 된다');
+  assert.equal(Number(lvMult(12).toFixed(2)), 1.33);
+  assert.ok(lvMult(12) < 1.4, '옛 만렙(12)은 예전처럼 메가진화보다 작다');
+  assert.equal(Number(lvMult(13).toFixed(3)), 1.332);
+  assert.equal(Number(lvMult(50).toFixed(3)), 1.406);
+  assert.equal(Number(lvMult(MAX_LV).toFixed(3)), 1.506, '아버님이 승인한 끝 ×1.5');
   // 레벨이 오르면 반드시 더 세진다 (같거나 줄면 키울 이유가 없다)
   for (let lv = 2; lv <= MAX_LV; lv++) assert.ok(lvMult(lv) > lvMult(lv - 1), `Lv${lv}`);
+  assert.equal(lvMult(999), lvMult(MAX_LV));
+  assert.equal(lvMult('1e309'), 1, '깨진 값은 Lv1');
 });
 
 test('🔷🔶 스톤 id가 가방 아이템과 같다 (달라지면 값을 못 치른다)', () => {
@@ -344,9 +387,11 @@ test('💾 백업 병합: 레벨 기록이 아예 없는 옛 백업도 깨지지
 
 test('⚔️ attackMult: ⭐ 변신 × 🧬 레벨 — 둘 다 곱해진다', () => {
   assert.equal(attackMult(null, 0, 1), 1);
-  assert.equal(Number(attackMult(null, 0, MAX_LV).toFixed(2)), 1.33);
+  assert.equal(Number(attackMult(null, 0, 12).toFixed(2)), 1.33);
+  assert.equal(Number(attackMult(null, 0, MAX_LV).toFixed(2)), 1.51);
   assert.equal(Number(attackMult('mega', 0, 1).toFixed(2)), 1.4);
-  assert.equal(Number(attackMult('mega', 0, MAX_LV).toFixed(2)), 1.86, '메가 × 만렙');
+  assert.equal(Number(attackMult('mega', 0, 12).toFixed(2)), 1.86, '메가 × 옛 만렙');
+  assert.equal(Number(attackMult('mega', 0, MAX_LV).toFixed(2)), 2.11, '메가 × 만렙');
   assert.equal(Number(attackMult('gmax', 3, 1).toFixed(2)), 1.6);
   assert.equal(attackMult('gmax', 0, 1), 1, '거다이맥스는 턴이 끝나면 사라진다');
   // 레벨을 모르면(옛 기록·후보에 lv가 없음) Lv1로 본다 — 조용히 세지면 안 된다
@@ -391,7 +436,7 @@ test('📊 growReport: 기록이 없거나 깨져도 안 터진다', () => {
 // ── Codex 10차에서 나온 것들 ──
 
 test('🧬 #7 진화 레벨에서 멈춘다 — 한 과목 스톤만으로 체인 끝까지 갈 수 없다', () => {
-  // 꼬부기 Lv5 → (진화) 어니부기 Lv10 → (진화) 거북왕 Lv12
+  // 꼬부기 Lv5 → (진화) 어니부기 Lv10 → (진화) 거북왕 Lv100
   assert.equal(levelCapOf(7), 5);
   assert.equal(levelCapOf(8), 10);
   assert.equal(levelCapOf(9), MAX_LV, '거북왕은 더 진화하지 않으니 만렙까지');
@@ -400,8 +445,9 @@ test('🧬 #7 진화 레벨에서 멈춘다 — 한 과목 스톤만으로 체�
   assert.equal(capReason(7, 5), 'evolve');
   assert.equal(capReason(9, MAX_LV), 'max');
   assert.deepEqual(nextCost(5, 8), { toLv: 6, stones: 2, coins: 60 }, '어니부기는 이어서 올라간다');
-  // 누적 비용은 그대로 20개 — 단계가 끊겼을 뿐이다
-  assert.equal(totalTo(5).stones + costBetween(5, 10).stones + costBetween(10, MAX_LV).stones, 20);
+  // 누적 비용은 끊기지 않은 길과 같다(만렙 100까지 278개) — 단계가 끊겼을 뿐이다
+  assert.equal(totalTo(5).stones + costBetween(5, 10).stones + costBetween(10, MAX_LV).stones, totalTo(MAX_LV).stones);
+  assert.equal(totalTo(MAX_LV).stones, 278);
   // 케이시(영어) → 윤겔라(수학) → 후딘(영어): 어느 한 과목만으로는 못 간다
   assert.equal(levelCapOf(63), 5, '캐이시');
   assert.equal(subjectOf(63), 'english');

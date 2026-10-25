@@ -33,21 +33,23 @@ const sellMon = (p, id, pay, day = OPEN, now = 1000, price) => sellRule(p, { day
 // ── 이 파일이 따로 세운 사실 ──
 /** 그 레벨에 **도달하는** 한 칸에 드는 사탕 (아버님이 승인한 표 — 스톤 개수와 같다) */
 const CANDY_TO = { 2: 1, 3: 1, 4: 1, 5: 1, 6: 2, 7: 2, 8: 2, 9: 2, 10: 2, 11: 3, 12: 3 };
+// v332 만렙 100 (2026-10-25 아버님 승인 표) — 13~20 1 · 21~40 2 · 41~70 3 · 71~100 4
+for (let lv = 13; lv <= 100; lv += 1) CANDY_TO[lv] = lv <= 20 ? 1 : lv <= 40 ? 2 : lv <= 70 ? 3 : 4;
 const candiesBetween = (a, b) => { let n = 0; for (let lv = a + 1; lv <= b; lv += 1) n += CANDY_TO[lv]; return n; };
 const SQUIRTLE = 7;   // 꼬부기 → Lv5에서 어니부기
 const WARTORTLE = 8;  // 어니부기 → Lv10에서 거북왕
-const GRENINJA = 658; // 개굴닌자 — 진화 없음, Lv12까지
+const GRENINJA = 658; // 개굴닌자 — 진화 없음, 만렙(v332부터 Lv100)까지
 
 test('🍬 진화 레벨 가정 — 시험이 쓰는 종의 끝 레벨 (명단이 바뀌면 여기서 먼저 알린다)', () => {
   assert.equal(evoAt(SQUIRTLE), 5);
   assert.equal(evoAt(WARTORTLE), 10);
   assert.equal(evoAt(GRENINJA), null);
   assert.equal(levelCapOf(GRENINJA), MAX_LV);
-  assert.equal(MAX_LV, 12);
+  assert.equal(MAX_LV, 100);
   for (const id of [SQUIRTLE, WARTORTLE, GRENINJA]) assert.ok(IDS.has(id), `${id} 명단`);
 });
 
-test('🍬 한 칸 값 = 손으로 적은 표 (Lv2~5 1 · Lv6~10 2 · Lv11~12 3) · 스톤·코인은 값에 없다 · 진화 레벨·만렙에서 멈춘다', () => {
+test('🍬 한 칸 값 = 손으로 적은 표 (Lv2~5 1 · Lv6~10 2 · Lv11~12 3 · v332 13~20 1 · 21~40 2 · 41~70 3 · 71~100 4) · 스톤·코인은 값에 없다 · 진화 레벨·만렙에서 멈춘다', () => {
   for (let lv = 1; lv < MAX_LV; lv += 1) {
     const c = candyCost(lv, GRENINJA);
     assert.deepEqual(c, { toLv: lv + 1, candies: CANDY_TO[lv + 1] }, `개굴닌자 Lv${lv}`);
@@ -57,13 +59,15 @@ test('🍬 한 칸 값 = 손으로 적은 표 (Lv2~5 1 · Lv6~10 2 · Lv11~12 3)
   assert.equal(candyCost(10, WARTORTLE), null);
   assert.deepEqual(candyCost(5, WARTORTLE), { toLv: 6, candies: 2 });
   // 끝까지 드는 사탕
-  assert.equal(candyRoom(1, GRENINJA), candiesBetween(1, 12));
-  assert.equal(candyRoom(1, GRENINJA), 20, '스톤으로 만렙까지와 같은 20개');
+  assert.equal(candyRoom(1, GRENINJA), candiesBetween(1, 100));
+  assert.equal(candyRoom(1, GRENINJA), 278, '스톤으로 만렙까지와 같은 278개');
+  assert.equal(candyRoom(12, GRENINJA), 258, '옛 만렙에서 이어서 (v332)');
+  assert.deepEqual(candyCost(12, GRENINJA), { toLv: 13, candies: 1 });
   assert.equal(candyRoom(1, SQUIRTLE), 4);
   assert.equal(candyRoom(3, SQUIRTLE), 2);
   assert.equal(candyRoom(5, SQUIRTLE), 0);
   assert.equal(candyRoom(5, WARTORTLE), candiesBetween(5, 10));
-  assert.equal(candyRoom(12, GRENINJA), 0);
+  assert.equal(candyRoom(MAX_LV, GRENINJA), 0);
   assert.equal(candyRoom(undefined, SQUIRTLE), 4, '레벨 기록이 없으면 Lv1');
 });
 
@@ -125,7 +129,7 @@ test('🍬 사탕으로 받아도 규칙은 그대로: 마지막 한 마리 · �
 
 test('🍬 쓸 데 없는 사탕은 못 받는다: 더 못 오르는 종(만렙·진화 레벨) → candy-cap · 가진 사탕으로 이미 끝까지 → candy-full · 아무것도 안 바뀜', () => {
   const capped = [
-    [GRENINJA, 12], [SQUIRTLE, 5], [WARTORTLE, 10],
+    [GRENINJA, MAX_LV], [SQUIRTLE, 5], [WARTORTLE, 10],
   ];
   for (const [id, lv] of capped) {
     const p = prof({ caught: { [id]: 3 }, mons: { [id]: { lv } } });
@@ -144,10 +148,11 @@ test('🍬 쓸 데 없는 사탕은 못 받는다: 더 못 오르는 종(만렙�
   assert.deepEqual(sellMon(p, SQUIRTLE, 'candy', OPEN, 10), { ok: false, why: 'candy-full' });
   // 상태 함수가 같은 답 (가판대가 단추를 막는 데 쓴다)
   assert.deepEqual(candyState(p, SQUIRTLE), { have: 3, room: 3, cap: 5, ok: false, why: 'full' });
-  assert.deepEqual(candyState(prof({ mons: { [GRENINJA]: { lv: 12 } } }), GRENINJA), { have: 0, room: 0, cap: 12, ok: false, why: 'cap' });
-  assert.deepEqual(candyState(prof({}), GRENINJA), { have: 0, room: 20, cap: 12, ok: true, why: null });
+  assert.deepEqual(candyState(prof({ mons: { [GRENINJA]: { lv: MAX_LV } } }), GRENINJA), { have: 0, room: 0, cap: 100, ok: false, why: 'cap' });
+  assert.deepEqual(candyState(prof({}), GRENINJA), { have: 0, room: 278, cap: 100, ok: true, why: null });
+  assert.deepEqual(candyState(prof({ mons: { [GRENINJA]: { lv: 12 } } }), GRENINJA), { have: 0, room: 258, cap: 100, ok: true, why: null }, '옛 만렙 12면 이제 사탕을 받을 수 있다 (v332)');
   // 팔 수 있는 목록에도 같은 값
-  const list = sellableMons(prof({ caught: { [SQUIRTLE]: 3, [GRENINJA]: 2 }, mons: { [GRENINJA]: { lv: 12 } } }), CTX);
+  const list = sellableMons(prof({ caught: { [SQUIRTLE]: 3, [GRENINJA]: 2 }, mons: { [GRENINJA]: { lv: MAX_LV } } }), CTX);
   assert.deepEqual(list.map((m) => [m.id, m.candy.ok, m.candy.why]).sort((a, b) => a[0] - b[0]), [[SQUIRTLE, true, null], [GRENINJA, false, 'cap']]);
 });
 
@@ -176,7 +181,8 @@ test('🍬 사탕으로 레벨업: 그 칸의 스톤 개수만큼 · 스톤·코
   assert.deepEqual(candyLevelUpRule(q, WARTORTLE), { ok: false, why: 'candy', from: 5, candies: 2 });
   assert.equal(JSON.stringify(q), before);
   // 만렙
-  assert.deepEqual(candyLevelUpRule(prof({ caught: { [GRENINJA]: 1 }, mons: { [GRENINJA]: { lv: 12, candy: 9 } } }), GRENINJA), { ok: false, why: 'max' });
+  assert.deepEqual(candyLevelUpRule(prof({ caught: { [GRENINJA]: 1 }, mons: { [GRENINJA]: { lv: MAX_LV, candy: 9 } } }), GRENINJA), { ok: false, why: 'max' });
+  assert.deepEqual(candyLevelUpRule(prof({ caught: { [GRENINJA]: 1 }, mons: { [GRENINJA]: { lv: 12, candy: 9 } } }), GRENINJA), { ok: true, from: 12, to: 13, candies: 1 }, '옛 만렙 12에서 이어서 (v332)');
   // 데리고 있지 않으면(다 진화시켰거나 판 것) 못 쓴다
   assert.deepEqual(candyLevelUpRule(prof({ caught: { [SQUIRTLE]: 1 }, mons: { [SQUIRTLE]: { evo: 1, candy: 3 } } }), SQUIRTLE), { ok: false, why: 'caught' });
 });

@@ -248,15 +248,27 @@ export const EVO = {
   684: [{ to: 685, at: 5, orig: '휘핑팝을 지니고 통신교환' }],     // 나룸퍼프 → 나루림
 };
 
-/** 포켓몬이 오를 수 있는 가장 높은 레벨 */
-export const MAX_LV = 12;
+/**
+ * 포켓몬이 오를 수 있는 가장 높은 레벨 — v332(2026-10-25 아버님 "100레벨이 만렙으로 설정하자" → 기본안 "이대로")에 12 → 100.
+ * Lv1~12(진화 5·10 · 값)는 그대로 두고 뒤에 13~100을 이어 붙였다 — 저장된 레벨을 옮기지 않는다.
+ * 진화하는 종은 전처럼 진화 레벨에서 멈추고, 마지막 모습·진화 없는 종만 100까지 간다
+ */
+export const MAX_LV = 100;
 
-/** 레벨업 비용 — 구간마다 스톤이 늘어난다 (upto = 이 레벨까지 도달할 때 드는 값) */
+/** 레벨업 비용 (upto = 이 레벨까지 도달할 때 드는 값) */
 export const COST = [
   { upto: 5, stones: 1, coins: 30 },    // Lv2~5   : 첫 진화까지 스톤 4개 (하루 2개면 이틀)
   { upto: 10, stones: 2, coins: 60 },   // Lv6~10  : 최종 진화까지 누적 14개 (일주일)
-  { upto: MAX_LV, stones: 3, coins: 100 }, // Lv11~12 : 만렙까지 누적 20개
+  { upto: 12, stones: 3, coins: 100 },  // Lv11~12 : 옛 만렙까지 누적 20개
+  // v332 — 12를 넘으면 처음엔 쑥쑥(한 칸 스톤 1) 크다가 갈수록 무거워지는 긴 길 · 12에서 100까지 스톤 258 · 💰10,100
+  { upto: 20, stones: 1, coins: 50 },   // Lv13~20 : 구간 8개
+  { upto: 40, stones: 2, coins: 80 },   // Lv21~40 : 구간 40개
+  { upto: 70, stones: 3, coins: 120 },  // Lv41~70 : 구간 90개
+  { upto: MAX_LV, stones: 4, coins: 150 }, // Lv71~100 : 구간 120개
 ];
+
+/** 🎖️ 축하 레벨 (v332) — 여기에 닿으면 축하하고, 레벨 옆에 닿은 만큼 🎖️ */
+export const LV_MARKS = [25, 50, 75, 100];
 
 /** 스톤 아이템 id (items.js STONE_MATH/STONE_ENGLISH/STONE_KOREAN과 같아야 한다 — 테스트로 고정) */
 export const STONE_ID = { math: 'stone_math', english: 'stone_english', korean: 'stone_korean' };
@@ -339,10 +351,29 @@ export function takenUnseen(mon) {
   return Math.max(0, takenOf(mon) - Math.max(0, Math.floor(Number(mon && mon.takenSeen) || 0)));
 }
 
-/** mons[id] 레코드 → 지금 레벨 (기록이 없으면 1) */
+/**
+ * mons[id] 레코드 → 지금 레벨 (기록이 없으면 1)
+ * 무한대("1e309")는 깨진 값이라 1 — 예전엔 만렙(12)으로 읽혔는데 만렙이 100이 되자 깨진 값 하나가 배틀 가장 센 레벨이 된다 (v332)
+ */
 export function lvOf(mon) {
-  const lv = Math.floor(Number(mon && mon.lv) || 0);
+  const n = Number(mon && mon.lv);
+  const lv = Number.isFinite(n) ? Math.floor(n) : 0;
   return Math.max(1, Math.min(MAX_LV, lv || 1));
+}
+
+/** 🎖️ from → to로 오르며 새로 닿은 축하 레벨 중 가장 높은 것 (없으면 null) */
+export function lvMarkCrossed(from, to) {
+  const a = lvOf({ lv: from });
+  const b = lvOf({ lv: to });
+  let hit = null;
+  for (const m of LV_MARKS) if (a < m && m <= b) hit = m;
+  return hit;
+}
+
+/** 🎖️ 지금 레벨까지 닿은 축하 레벨 수 (0~4) */
+export function lvMarksOf(lv) {
+  const l = lvOf({ lv });
+  return LV_MARKS.filter((m) => l >= m).length;
 }
 
 /** toLv에 **도달하는** 한 번의 값 → { stones, coins } (오를 수 없는 레벨이면 null) */
@@ -358,8 +389,8 @@ export function costTo(toLv) {
  *
  * ★ 진화하는 종은 **진화 레벨에서 멈춘다**(아버님 결정 2026-09-25). 안 그러면 두 과목 요구가 뚫린다 —
  *   케이시(영어)를 🔶만으로 Lv10까지 올려 두면 윤겔라(수학)가 Lv10을 그대로 물려받아 🔷 한 개도 없이
- *   후딘까지 간다(Codex 10차 #7이 재현). 지금은 꼬부기 Lv5 → 어니부기 Lv10 → 거북왕 Lv12로 단계마다 끊긴다.
- *   누적 비용(20개)은 그대로고, 과목이 갈리는 줄기는 두 과목을 다 해야 끝까지 간다.
+ *   후딘까지 간다(Codex 10차 #7이 재현). 지금은 꼬부기 Lv5 → 어니부기 Lv10 → 거북왕 Lv100으로 단계마다 끊긴다.
+ *   과목이 갈리는 줄기는 두 과목을 다 해야 끝까지 간다.
  */
 export function levelCapOf(id) {
   const at = evoAt(id);
@@ -404,7 +435,7 @@ export function costBetween(curLv, toLv) {
 
 // ── 🍬 그 종의 사탕 (2026-10-17, 아버님 "이대로 해") ──
 // 5일장에서 포켓몬을 팔 때 💰 대신 고르면 **그 종의 사탕 1개**(등급과 상관없이). 그 종의 레벨을 올리는 데만 쓴다(진화 줄기의 다른 모습엔 못 씀 —
-// 진화로 과목이 바뀌는 줄기에서 "수학 포켓몬은 수학으로 키운다"가 그대로). 한 칸에 드는 사탕 = 그 칸의 스톤 개수(Lv2~5 1 · Lv6~10 2 · Lv11~12 3),
+// 진화로 과목이 바뀌는 줄기에서 "수학 포켓몬은 수학으로 키운다"가 그대로). 한 칸에 드는 사탕 = 그 칸의 스톤 개수(Lv2~5 1 · Lv6~10 2 · Lv11~12 3 · v332부터 13~100은 COST 표대로),
 // 스톤·코인은 안 든다 — 1개에 1레벨이면 흔한 포켓몬 한 마리(💰10)가 스톤 3개 + 💰100짜리 칸이 되어 배워서 받는 스톤이 쓸모를 잃는다.
 // 저장은 받은 누적(mons[id].candy)·쓴 누적(candyUsed) 두 단조 카운터 — 남은 수를 두면 옛 백업(max)이 쓴 사탕을 되살린다
 
@@ -480,12 +511,16 @@ export function soleEvo(id) {
 }
 
 /**
- * ⚔️ 배틀에서 레벨이 주는 힘 — 레벨당 +3% (Lv1 = 1.0, Lv12 = 1.33).
- * 메가진화(×1.4)와 비슷한 크기로 맞췄다. 더 키우면 배틀이 시시해진다.
+ * ⚔️ 배틀에서 레벨이 주는 힘 — Lv12까지 한 칸에 +3% (Lv1 = 1.0, Lv12 = 1.33) · 그 위로는 한 칸에 +0.2% (Lv100 = 1.506, v332).
+ * 처음엔 메가진화(×1.4)와 비슷한 크기로 맞췄다. 만렙이 100이 되어도 배틀이 한 방에 끝나지 않게 —
+ * 거다이맥스(×1.6)에 만렙, 가장 센 공격(40)이 겹쳐도 96이라 상대 HP 100을 못 넘는다.
  */
 export const LV_ATK = 0.03;
+export const LV_ATK_HIGH = 0.002;
+const LV_SOFT = 12;
 export function lvMult(lv) {
-  return 1 + (lvOf({ lv }) - 1) * LV_ATK;
+  const l = lvOf({ lv });
+  return 1 + (Math.min(l, LV_SOFT) - 1) * LV_ATK + Math.max(0, l - LV_SOFT) * LV_ATK_HIGH;
 }
 
 /** 이 종이 다른 무엇으로부터 진화해 온 것인가 (도감에서 "무엇이 진화한 모습" 을 보여 줄 때) → [id…] */

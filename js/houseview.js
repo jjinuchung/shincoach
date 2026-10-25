@@ -21,6 +21,7 @@
 import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, storeRule, paintRule, restsOf } from './house.js';
 import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading, restStart, restCancel, restClaim, ownedMonIds, monExp, houseFurnMax, hpOf, monLv, getPartner, homePlay } from './xp.js';
 import { REST_EXP, REST_MS, CAP_KO, restLeft } from './rest.js';
+import { lvMarkCrossed } from './evolve.js'; // 🎖️ 축하 레벨 (v332 · 순수)
 import { showRestDone } from './restshow.js'; // ✨ 다 쉰 포켓몬 받기 연출 (3단계)
 import { ROSTER, characterUrl, artUrl, ensureArt } from './pokemon.js';
 import { ENGLISH_STONE_HOW } from './items.js';
@@ -887,6 +888,8 @@ export function claimLines(r, ko) {
   if (lucky > 0) out.push('🍀 행운의 레벨 +1');
   if (r.coins) out.push(`🍀 ${CAP_KO[r.cap] || CAP_KO.max} 대신 💰${r.coins}`); // 진화 레벨에서 멈췄으면 "진화할 때가 되어서" (Codex 47차 D)
   if (r.lv && r.lv.to > r.lv.from) out.push(`Lv ${r.lv.from} → ${r.lv.to}`);
+  const medal = r.lv ? lvMarkCrossed(r.lv.from, r.lv.to) : null; // 🎖️ Lv25·50·75·100 (v332)
+  if (medal) out.push(`🎖️ Lv${medal} 축하해요!`);
   if (r.evo && r.evo.ok) {
     const t = ko(r.evo.to);
     out.push(`✨ ${t}${euro(t)} 진화!`);

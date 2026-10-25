@@ -4080,6 +4080,14 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gl-bal.is-big .gl-meowth-alt { font-size: 2.4rem; }
 .gl-r { position: absolute; right: -6%; bottom: -4%; display: flex; align-items: center; justify-content: center; width: 34%; aspect-ratio: 1; border: 2px solid #fff; border-radius: 50%; background-color: #dc2626; color: #fff; font-size: 0.75rem; font-weight: 900; }
 .gl-bal.is-big .gl-r { font-size: 1rem; }
+/* v332 — 거대 열기구(❤️ 여섯 번 · 테두리를 굵고 진하게) · 꼬마 열기구(작고 빠름) */
+.gl-bal.is-huge .gl-env { background-color: #fcd34d; border-width: 4px; }
+.gl-bal.is-huge .gl-meowth-alt { font-size: 3.2rem; }
+.gl-bal.is-huge .gl-r { font-size: 1.3rem; }
+.gl-bal.is-huge .gl-hp { top: 3%; z-index: 1; font-size: 0.7rem; } /* 키가 커서 하늘 맨 위에 뜨면 위에 단 ❤️가 하늘 밖으로 잘린다 — 열기구 안쪽 위에 */
+.gl-bal.is-tiny .gl-env { border-width: 2px; }
+.gl-bal.is-tiny .gl-meowth-alt { font-size: 1.1rem; }
+.gl-bal.is-tiny .gl-r { font-size: 0.55rem; border-width: 1px; }
 .gl-basket { width: 40%; height: 16%; margin-top: 8%; border-radius: 3px 3px 6px 6px; background-color: #8a5a2b; box-shadow: 0 -10px 0 -8px #8a5a2b; }
 .gl-hp { position: absolute; top: -16%; left: 50%; font-size: 0.8rem; line-height: 1; white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
 .gl-bal.is-hit .gl-env { animation: rocket-shake 0.45s ease-in-out; }

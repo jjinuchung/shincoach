@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FURN, FIRST_ROOM, SECOND_ROOM, FURN_MAX, FURN_MAX_2F, MATH_RATE, HEAL, HEAL_MAX, furnById, furnMax, houseOf, houseBuyCheck, houseBuyRule, placeRule, moveRule, flipRule, storeRule, restsOf } from '../js/house.js';
 import { REST_MS, REST_EXP, EXP_LV, LUCK, LUCK_COINS, CAP_KO, rollLuck, restLeft, expOf, restCount, rxOf, restStartRule, restCancelRule, restClaimRule } from '../js/rest.js';
-import { lvOf, haveOf, evoOf, levelCapOf } from '../js/evolve.js';
+import { lvOf, haveOf, evoOf, levelCapOf, MAX_LV } from '../js/evolve.js';
 import { emptyProfile, cloneProfile, mergeStatRecord, evolveRule, applyHouseRule } from '../js/db.js';
 import { initProfile, flushProfile, reloadProfile, houseNow, restStart, restCancel, restClaim, getProfileSnapshot } from '../js/xp.js';
 
@@ -202,10 +202,45 @@ test('💊 5% 레벨 행운: 스톤 없이 +1 · 진화 레벨·만렙이면 대
   restStartRule(edge, 1, SQUIRTLE, T0, 'lv');
   const e = claim(edge, 1, DONE);
   assert.deepEqual([e.exp.lvUp, e.lv, e.coins], [1, { from: 4, to: 5 }, LUCK_COINS]);
-  // 진화 없는 종은 만렙(12)까지 · 만렙이면 코인
-  const ditto = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: 12 } } });
+  // 진화 없는 종은 만렙(v332부터 100)까지 · 만렙이면 코인
+  const ditto = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: MAX_LV } } });
   restStartRule(ditto, 1, DITTO, T0, 'lv');
   assert.equal(claim(ditto, 1, DONE).coins, LUCK_COINS);
+  // 옛 만렙 12는 이제 만렙이 아니다 — 행운이 레벨로 (v332)
+  const old = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: 12 } } });
+  restStartRule(old, 1, DITTO, T0, 'lv');
+  const o = claim(old, 1, DONE);
+  assert.deepEqual([o.lv, o.coins], [{ from: 12, to: 13 }, 0]);
+});
+
+test('💊 v332 만렙 100: 옛 만렙(12)에서 쌓여 있던 💤 경험치는 다음 쉼에 레벨이 된다 (멈춰 있던 막대가 풀린다)', () => {
+  // 💤 290 · 💤로 오른 레벨 0 — 12에서 멈춰 쌓인 것 + 이번 쉼 10 = 300 → 세 칸
+  const p = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: 12, rx: 290, rxLv: 0 } } });
+  restStartRule(p, 1, DITTO, T0, ''); // 행운 없이
+  const r = claim(p, 1, DONE);
+  assert.deepEqual([r.exp.lvUp, r.lv, r.coins, lvOf(p.mons[DITTO])], [3, { from: 12, to: 15 }, 0, 15]);
+  // 🔍 Codex 136차 보탬: 풀린 뒤 다음 쉼은 💤 10만 — 같은 경험치로 두 번 오르지 않는다(rxLv도 같이 올랐다)
+  assert.equal(restStartRule(p, 1, DITTO, DONE + 10, '').ok, true);
+  const r2 = claim(p, 1, DONE + 10 + REST_MS);
+  assert.deepEqual([r2.exp.lvUp, r2.lv], [0, { from: 15, to: 15 }]);
+});
+
+test('💊 v332 경계 (🔍 Codex 136차 보탬): 💤 경험치 + 🍀 행운으로 24 → 26이면 🎖️25 · 99 → 100 뒤 행운은 💰 · 큰 💤도 100에서 멈춤', async () => {
+  const v = await import('../js/houseview.js');
+  const p = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: 24, rx: 90, rxLv: 0 } } });
+  restStartRule(p, 1, DITTO, T0, 'lv');
+  const a = claim(p, 1, DONE);
+  assert.deepEqual([a.exp.lvUp, a.lv, a.coins], [1, { from: 24, to: 26 }, 0]);
+  assert.ok(v.claimLines(a, () => '메타몽').includes('🎖️ Lv25 축하해요!'));
+  const q = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: 99, rx: 90, rxLv: 0 } } });
+  restStartRule(q, 1, DITTO, T0, 'lv');
+  const b = claim(q, 1, DONE);
+  assert.deepEqual([b.exp.lvUp, b.lv, b.coins, b.cap], [1, { from: 99, to: 100 }, LUCK_COINS, 'max']);
+  assert.ok(v.claimLines(b, () => '메타몽').includes('🎖️ Lv100 축하해요!'));
+  const big = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: 12, rx: 1e6, rxLv: 0 } } });
+  restStartRule(big, 1, DITTO, T0, '');
+  const c = claim(big, 1, DONE);
+  assert.deepEqual([c.lv.to, lvOf(big.mons[DITTO])], [MAX_LV, MAX_LV], '아무리 쌓여도 만렙에서 멈춘다');
 });
 
 test('💊 0.5% 깜짝 진화: 진우가 정한다(decide) — 안 정하면 decide와 갈래 · 0이면 그대로 두기 · 고르면 **레벨이 모자라도** 진화(한 마리 씀·레벨 이어짐·❤️ 가득) · 이브이는 여덟 갈래 중에서 · 진화 없는 종은 레벨 행운으로', () => {
@@ -435,7 +470,7 @@ test('🔍 Codex 47차 D: 레벨 행운이 💰가 된 까닭(cap) — 진화 �
   const r = claim(p, 1, DONE);
   assert.deepEqual([r.coins, r.cap], [LUCK_COINS, 'evolve']);
   assert.deepEqual(v.claimLines(r, () => '꼬부기').filter((l) => l.includes('💰')), ['🍀 진화할 때가 되어서 대신 💰100']);
-  const q = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: 12 } } });
+  const q = withCapsule({ caught: { [DITTO]: 1 }, mons: { [DITTO]: { lv: MAX_LV } } });
   restStartRule(q, 1, DITTO, T0, 'lv');
   const s = claim(q, 1, DONE);
   assert.deepEqual([s.coins, s.cap], [LUCK_COINS, 'max']);

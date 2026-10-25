@@ -2249,8 +2249,12 @@ export function mergeStatRecord(name, cur, rec) {
       const oAt = Number(o.shinyAt) || 0;
       const cAt = Number(cur.shinyAt) || 0;
       if (oAt > cAt) { patch.shiny = !!o.shiny; patch.shinyAt = oAt; } else if (!oAt && !cAt && o.shiny && !cur.shiny) patch.shiny = true;
-      const lv = Math.max(Number(o.lv) || 0, Number(cur.lv) || 0);
-      if (lv && lv !== (Number(cur.lv) || 0)) patch.lv = lv;
+      // ⬆️ 레벨은 두 쪽 다 lvOf로 읽고 큰 쪽 — 원값끼리 max면 깨진 무한대("1e309")가 정상 Lv50을 이기고 그 값은 Lv1로 읽힌다 (🔍 Codex 136차 #1)
+      //    둘 다 레벨 기록이 없으면 그대로 둔다
+      if (o.lv !== undefined || cur.lv !== undefined) {
+        const lv = Math.max(lvOf(o), lvOf(cur));
+        if (lv !== cur.lv) patch.lv = lv;
+      }
       const evo = Math.max(Number(o.evo) || 0, Number(cur.evo) || 0);
       if (evo && evo !== (Number(cur.evo) || 0)) patch.evo = evo;
       // 🔒 부모가 데려간 수·알려 준 수도 단조 카운터 (2026-09-28) — max가 아니면

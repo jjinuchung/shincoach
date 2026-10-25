@@ -23,10 +23,10 @@ const P = {
 
 test('🎮 누적 한 벌: 프로필이 이미 쌓는 값만 — 도감 종(0마리는 뺌)·레벨 칸 합·진화·판 수·교환·사탕 받음/씀 · 깨진 값은 0', () => {
   assert.deepEqual(rewardSnap(P), {
-    throws: 20, catches: 8, kinds: 2, coinsEarned: 500, coins: 300, stonesSpent: 4, lvSum: 2 + 4 + 11, evoSum: 2,
+    throws: 20, catches: 8, kinds: 2, coinsEarned: 500, coins: 300, stonesSpent: 4, lvSum: 2 + 4 + 0, evoSum: 2,
     rocketWon: 1, rocketLost: 2, sold: 1, traded: 1, candyGot: 2, candyUsed: 1,
   });
-  // (lv '1e309'는 lvOf가 만렙 12로 읽는다 — 레벨은 원래 그렇게 읽힌다 · 사탕 '1e309'는 0)
+  // (lv '1e309'는 깨진 값이라 lvOf가 Lv1로 읽는다 — v332 전엔 만렙 12로 읽혔다 · 사탕 '1e309'도 0)
   assert.deepEqual(Object.keys(rewardSnap({})).sort(), SNAP_KEYS.map(([k]) => k).sort(), '보여 줄 칸과 같은 열쇠');
   assert.ok(Object.values(rewardSnap(null)).every((v) => v === 0));
 });
@@ -51,15 +51,15 @@ test('🎮 지금 가진 것: 💰·과목 스톤·🍬·교환권·품는 알 �
   const lines = holdingLines(P);
   assert.equal(lines[0], '- 💰 300 · 🔷 2 · 🔶 1 · 🟩 0 · 🍬 1 · 🎟️ 교환권 2장 · 🥚 품는 알 1');
   assert.equal(lines[1], '- 가방: 🔵×3');
-  assert.equal(lines[2], '- 도감 2종 · 데리고 있는 포켓몬 2마리 · 레벨 칸 합 17 · 진화 2번', '꼬부기 3 − 판 1 − 교환 1 = 1 · 피카츄 1');
+  assert.equal(lines[2], '- 도감 2종 · 데리고 있는 포켓몬 2마리 · 레벨 칸 합 6 · 진화 2번', '꼬부기 3 − 판 1 − 교환 1 = 1 · 피카츄 1');
   assert.equal(holdingLines({})[1], '- 가방: (비어 있음)');
 });
 
 test('🎮 최근 7일 줄: 기록 없는 날 · 첫 기록 날 · 앞 기록이 며칠 전이면 그날부터 · 💰 남은 돈은 ± · 0인 칸은 뺌 · 배틀·로켓단은 하루 기록에서', () => {
   const s0 = rewardSnap(P);
-  let snaps = putSnap({}, '2026-10-14', { ...s0, throws: 5, catches: 1, coins: 100, coinsEarned: 200, lvSum: 15 });
-  snaps = putSnap(snaps, '2026-10-15', { ...s0, throws: 5, catches: 1, coins: 100, coinsEarned: 200, lvSum: 15 });
-  snaps = putSnap(snaps, '2026-10-16', { ...s0, throws: 12, catches: 4, coins: 380, coinsEarned: 420, lvSum: 15 });
+  let snaps = putSnap({}, '2026-10-14', { ...s0, throws: 5, catches: 1, coins: 100, coinsEarned: 200, lvSum: 4 });
+  snaps = putSnap(snaps, '2026-10-15', { ...s0, throws: 5, catches: 1, coins: 100, coinsEarned: 200, lvSum: 4 });
+  snaps = putSnap(snaps, '2026-10-16', { ...s0, throws: 12, catches: 4, coins: 380, coinsEarned: 420, lvSum: 4 });
   snaps = putSnap(snaps, T, s0);
   const days = [{ date: '2026-10-18', battles: 2, rocketMath: 1, rocketEn: 1 }, { date: '2026-10-13', battles: 1 }];
   const text = rewardText({ profile: P, snaps, days, today: T });
