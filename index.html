@@ -942,6 +942,15 @@
         <input type="checkbox" id="set-bgm">
         <span class="field-label">🎵 이벤트 배경음악 <small>— 🧩 퍼즐·⚔️ 배틀·🎯 잡기·🎮 미니 게임에 깔려요. 끊긴 자리부터 이어서 나오고, 따라 말할 때는 잠깐 멈춰요 · 끄면 게임기의 🎵 단추도 없어요</small></span>
       </label>
+      <fieldset class="field set-group">
+        <legend class="field-label">🌿 국어·논술 배경음 곡 <small>— 고른 곡을 국어·논술 화면에서 늘 섞어서 틀어요 (앱을 켤 때마다 다른 곡부터). 곡은 이 태블릿에만 저장되고 인터넷에 올라가지 않아요 · 곡이 없으면 음악이 안 나와요</small></legend>
+        <div class="field-actions">
+          <button type="button" id="set-calm-folder" class="btn">📁 음악 폴더 고르기</button>
+          <button type="button" id="set-calm-files" class="btn">🎵 곡 파일 고르기</button>
+          <button type="button" id="set-calm-del" class="btn" hidden>곡 지우기</button>
+        </div>
+        <p id="set-calm-note" class="field-note" aria-live="polite"></p>
+      </fieldset>
       <label class="field field-row">
         <input type="checkbox" id="set-vibrate">
         <span class="field-label">📳 진동 <small>— 볼이 흔들릴 때 (지원 기기만)</small></span>

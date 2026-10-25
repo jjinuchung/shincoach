@@ -21,6 +21,7 @@ import { profileReady, rocketCurrent } from './xp.js'; // 🚀 끝나지 않은 
 import { initTimeUp, refreshChips } from './timeup.js';
 import { initTaken, openTakeTool, showTakenNoticeIfAny } from './taken.js'; // 🔒 부모가 포켓몬 데려가기
 import { initGiftSettings } from './gift.js'; // 🎁 선물 교환권 사진 (⚙, 이 기기에만)
+import { initCalmMusicSettings } from './calmfiles.js'; // 🌿 국어·논술 배경음 곡 고르기 (⚙, 이 기기에만 · v340)
 import { initParcel, showParcelIfAny, retryParcel } from './parcel.js'; // 📦 아빠의 구호품 (coach/gifts.json으로 배포)
 import { autoSend } from './upload.js'; // 📤 Claude에게 기록 보내기 (비공개 저장소, 열쇠는 📊에서 — 없으면 아무것도 안 한다)
 import { initUsage, setUsageView } from './usage.js'; // 🕒 앱 사용 기록 — 화면마다 머문 초·쓴 때·연 수 (📤로만, v272)
@@ -196,6 +197,7 @@ async function main() {
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
   initTaken({ requirePin });  // 🔒 포켓몬 데려가기 (부모) + "아빠가 데려갔어요" 알림 (아이)
   initGiftSettings();         // 🎁 ⚙ 선물 교환권 사진 (이 기기에만)
+  initCalmMusicSettings();    // 🌿 ⚙ 국어·논술 배경음 곡 (이 기기에만 · v340)
   initParcel();               // 📦 아빠의 구호품 [📦 받기]
   // 📦 🔒 알림을 닫은 뒤에 구호품을 띄운다 — 두 창이 겹쳐 뜨지 않게 하나씩 (initTaken이 먼저 붙인 닫기가 먼저 돈다)
   document.getElementById('taken-ok')?.addEventListener('click', () => { setTimeout(() => { showParcelIfAny().catch(() => {}); }, 300); });

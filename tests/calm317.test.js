@@ -1,5 +1,6 @@
 // v317 (2026-10-22 아버님 "부드럽게 지브리 느낌의 새 곡을 직접 만들어서 넣어봐") — node --test tests/calm317.test.js
 //  🌿 국어·논술 잔잔한 배경 음악 — 새로 쓴 곡 셋(calmsong.js) · 틀고 멈추기(calm.js) · 🎵 단추 · 📤 usage 한 줄
+//  ▶ v340: 소리는 ⚙에서 고른 곡 파일(calmfiles.js) — 새로 쓴 곡 시험(🎼·🎹)은 시험 듣기 페이지·되돌릴 때를 위해 그대로 · 틀고 멈추기 시험은 가짜 <audio>로
 import { fakeIdb } from './fakeidb.js'; // ★ db.js보다 먼저
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -194,6 +195,8 @@ test('🎼 calmsong.js는 아무것도 import하지 않는다 (시험 듣기 페
 });
 
 // ───────────────────── 틀고 멈추기 (calm.js) ─────────────────────
+// v340부터 소리는 ⚙에서 고른 곡 파일(calmfiles.js — <audio> 하나) · 여기 시험은 가짜 <audio>·곡 목록으로 "언제 틀고 멈추나"를 본다
+// (곡 고르기·섞기·깨진 곡 자체는 tests/calm340.test.js)
 
 const mem = new Map();
 const els = {};
@@ -207,12 +210,30 @@ function fakeBtn() {
   return b;
 }
 const buttons = [fakeBtn(), fakeBtn()];
+/** 가짜 <audio> — play()는 막혔으면(block) 거절 · 아니면 곧 재생 */
+class FakeAudio {
+  constructor() { this.src = ''; this.paused = true; this.volume = 1; this.preload = ''; this.l = {}; this.plays = 0; this.pauses = 0; }
+  addEventListener(t, f) { (this.l[t] ||= []).push(f); }
+  fire(t) { for (const f of this.l[t] || []) f(); }
+  play() {
+    this.plays += 1;
+    if (FakeAudio.block) return Promise.reject(Object.assign(new Error('막힘'), { name: 'NotAllowedError' }));
+    this.paused = false;
+    return Promise.resolve();
+  }
+  pause() { this.paused = true; this.pauses += 1; }
+  removeAttribute(k) { if (k === 'src') this.src = ''; }
+  load() {}
+}
+FakeAudio.block = false;
+const audios = [];
+const ITEMS = [1, 2, 3, 4, 5].map((n) => ({ id: `music:${n}`, name: `0${n} 곡${n}.m4a`, size: 1000 }));
 let calm;
-let sfx;
+let files;
 
 before(async () => {
   globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); }, removeItem: (k) => { mem.delete(k); } };
-  mem.set('shincoach.calmPos', JSON.stringify({ s: 0, b: 6, p: 0 })); // 지난번에 첫 곡 7마디에서 끊겼다
+  mem.set('shincoach.calmTrack', 'music:3'); // 지난번 마지막 곡
   globalThis.window = { AudioContext: FakeCtx, speechSynthesis: synth, addEventListener: (t, fn) => { winL[t] = fn; } };
   globalThis.document = {
     hidden: false,
@@ -221,66 +242,73 @@ before(async () => {
     addEventListener: (t, fn) => { docL[t] = fn; },
   };
   await getDaily('2000-01-01'); // 가짜 저장소 열기
-  sfx = await import('../js/sfx.js');
+  files = await import('../js/calmfiles.js');
+  files.setCalmMusicDeps({
+    makeAudio: () => { const a = new FakeAudio(); audios.push(a); return a; },
+    loadList: async () => ({ id: 'music:list', items: ITEMS, at: 1 }),
+    loadBlob: async (id) => ({ id, size: 1000 }),
+    makeUrl: (b) => `blob:${b.id}`,
+    revokeUrl: () => {},
+  });
   calm = await import('../js/calm.js');
   calm.CALM.tick = 0; // 저절로 돌지 않게 — calmTick을 직접 부른다
   calm.initCalm();
+  await settle(); // 곡 목록 읽기
 });
 
-const ctxNow = () => sfx.audioContext();
+const aud = () => audios[0];
 const today = () => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
-const settle = () => new Promise((r) => setTimeout(r, 30));
+const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 // 🎧 "마지막으로 읽던 때"를 10초 전으로 — 뒤 시험이 진짜 시계로 3초 쉬는 시간에 걸리지 않게
 const quiet = () => { synth.speaking = true; calm.calmTick(Date.now() - 10_000); synth.speaking = false; synth.pending = false; calm.calmTick(); };
 
-test('🌿 국어·논술에 들어오면 튼다 — 지난번 그 4마디 덩이 처음부터 · 천천히 들어온다 · 🎵 단추는 켬', () => {
+test('🌿 국어·논술에 들어오면 튼다 — 넣어 둔 곡을 무작위 차례로 · 지난번 마지막 곡은 맨 앞이 아님 · 천천히 들어온다 · 🎵 단추는 켬 (v340)', async () => {
   assert.equal(calm.calmState().playing, false);
   assert.equal(calm.calmBlock(), 'view');
+  assert.equal(audios.length, 0, '들어오기 전엔 <audio>도 없다');
   calm.enterCalm();
   const st = calm.calmState();
   assert.equal(st.playing, true);
   assert.equal(st.timer, false, '시험에서는 타이머 없이');
-  assert.equal(st.pos.s, 0);
-  assert.equal(st.pos.b, 5, '7마디(6)에서 끊겼으면 5마디(4)부터 — 한 마디를 예약해 다음은 5');
-  const ctx = ctxNow();
-  assert.ok(ctx && ctx.oscs.length > 0);
-  // 전체 음량은 0에서 천천히 CALM.volume으로
-  const master = ctx.gains.find((g) => g.out[0] === ctx.destination);
-  assert.deepEqual(master.gain.ev.slice(0, 2).map((e) => e[0]), ['set', 'exp']);
-  assert.ok(near(master.gain.ev[1][1], calm.CALM.volume) && master.gain.ev[1][2] - master.gain.ev[0][2] >= 2);
+  await settle();
+  const m = calm.calmState().music;
+  assert.equal(m.count, 5);
+  assert.notEqual(m.order[0], 2, '지난번 마지막 곡(music:3)은 맨 앞에 안 온다');
+  assert.equal(m.track, ITEMS[m.order[0]].name);
+  assert.equal(aud().src, `blob:${ITEMS[m.order[0]].id}`);
+  assert.equal(aud().paused, false);
+  assert.ok(aud().volume < files.CALM_FILE.volume, '천천히 들어온다(아직 다 안 올라옴)');
+  assert.equal(mem.get('shincoach.calmTrack'), ITEMS[m.order[0]].id, '지금 곡을 이 기기에 — 다음에 켤 때 맨 앞에 안 오게');
   assert.ok(buttons.every((b) => b.textContent === '🎵' && b.attrs['aria-pressed'] === 'true'));
-  assert.equal(JSON.parse(mem.get('shincoach.calmPos')).b, 5, '자리는 마디마다 이 기기에');
+  await settle(calm.CALM.fadeIn * 1000 + 150);
+  assert.ok(Math.abs(aud().volume - files.CALM_FILE.volume) < 1e-9, '다 들어오면 정한 음량');
 });
 
-test('🌿 앞 마디 예약 — 시간이 가면 다음 마디 · 타이머가 오래 멈췄다 돌아도 놓친 마디를 한꺼번에 쌓지 않는다', () => {
-  const ctx = ctxNow();
-  const s0 = SONGS[0];
-  const before = ctx.oscs.length;
-  ctx.currentTime += barSec(s0);
-  calm.calmTick();
-  assert.ok(ctx.oscs.length > before, '다음 마디');
-  const b1 = calm.calmState().pos.b;
-  const n1 = ctx.oscs.length;
-  ctx.currentTime += 100; // 100초 동안 타이머가 못 돌았다
-  calm.calmTick();
-  assert.equal(calm.calmState().pos.b, b1 + 1, '한 마디만 — 쌓인 마디를 한꺼번에 내지 않는다');
-  const fresh = ctx.oscs.slice(n1);
-  assert.ok(fresh.length > 0 && fresh.every((o) => o.t0 >= ctx.currentTime), '지금부터');
+test('🌿 곡이 끝나면 다음 곡 — 한 바퀴 안에선 겹치지 않음 · 다 돌면 다시 섞고 바로 앞 곡은 맨 앞에 안 옴 · 넘어간 곡은 정한 음량으로 바로', async () => {
+  const seen = [calm.calmState().music.track];
+  for (let k = 0; k < 4; k++) { aud().fire('ended'); await settle(); seen.push(calm.calmState().music.track); }
+  assert.equal(new Set(seen).size, 5, '다섯 곡이 한 번씩');
+  const last = seen[4];
+  aud().fire('ended');
+  await settle();
+  assert.notEqual(calm.calmState().music.track, last, '다시 섞어도 같은 곡이 연달아 오지 않는다');
+  assert.equal(aud().paused, false);
+  assert.ok(Math.abs(aud().volume - files.CALM_FILE.volume) < 1e-9, '곡 사이엔 천천히 들어오지 않는다(곡마다 제 도입부)');
+  assert.equal(audios.length, 1, '<audio>는 하나');
 });
 
-test('🌿 곡이 끝나면 한 마디 쉬고 다음 곡 — 마지막 곡 뒤면 첫 곡 · 돌기 +1', () => {
-  const ctx = ctxNow();
-  let guard = 0;
-  while (calm.calmState().pos.s === 0 && guard++ < 60) { ctx.currentTime += barSec(SONGS[0]); calm.calmTick(); }
-  assert.equal(calm.calmState().pos.s, 1, '오르골 정원');
-  guard = 0;
-  while (calm.calmState().pos.s !== 0 && guard++ < 200) { ctx.currentTime += barSec(SONGS[calm.calmState().pos.s]); calm.calmTick(); }
-  assert.equal(calm.calmState().pos.s, 0);
-  assert.equal(calm.calmState().pos.p, 1, '한 바퀴 돌면 돌기 +1 (멜로디 소리가 바뀐다)');
+test('🌿 깨진 곡(error)은 건너뛰고 다음 곡 · 비운 주소의 늦은 오류는 무시', async () => {
+  const before = calm.calmState().music.track;
+  aud().fire('error');
+  await settle();
+  const m = calm.calmState().music;
+  assert.equal(m.bad, 1);
+  assert.notEqual(m.track, before);
+  assert.equal(aud().paused, false);
+  assert.equal(calm.calmState().playing, true);
 });
 
-test('🌿 위에 창이 뜨면(🎯 잡기·⏳ 잠금 …) 빼고 예약한 음을 끈다 · 닫히면 다시', () => {
-  const ctx = ctxNow();
+test('🌿 위에 창이 뜨면(🎯 잡기·⏳ 잠금 …) 빼고 멈춤 · 닫히면 그 곡 그 자리에서 다시', async () => {
   for (const id of ['catch', 'timeup', 'battle', 'shop']) {
     els[id] = { hidden: false };
     calm.calmTick();
@@ -290,36 +318,62 @@ test('🌿 위에 창이 뜨면(🎯 잡기·⏳ 잠금 …) 빼고 예약한 �
     calm.calmTick();
     assert.equal(calm.calmState().playing, true, `${id} 닫힘`);
   }
-  // 뺄 때: 전체 음량을 0 쪽으로 · 예약해 둔 음은 그 뒤에 멈춤
+  const track = calm.calmState().music.track;
+  const src = aud().src;
   els.catch.hidden = false;
-  const n = ctx.oscs.length;
   calm.calmTick();
-  const last = ctx.oscs.slice(n - 3, n);
-  assert.ok(last.every((o) => o.stops >= 2 && o.t1 <= ctx.currentTime + calm.CALM.fadeOut + 0.06), '예약한 음을 끈다');
+  await settle(calm.CALM.fadeOut * 1000 + 150);
+  assert.equal(aud().paused, true, '빠진 뒤 멈춘다');
+  assert.equal(aud().volume, 0);
   els.catch.hidden = true;
   calm.calmTick();
   assert.equal(calm.calmState().playing, true);
+  assert.equal(aud().paused, false);
+  assert.equal(aud().src, src, '같은 곡');
+  assert.equal(calm.calmState().music.track, track);
 });
 
-test('🌿 🎧 ▶를 누르는 순간(ttsstart) 0.25초 만에 뺀다 — 들어오던 음량에서(cancelAndHold) · 말이 시작되기 전 · 말이 안 나오면 3초 뒤 다시 (Codex 123차 #1)', () => {
-  const ctx = ctxNow();
+test('🌿 🎧 ▶를 누르는 순간(ttsstart) 0.25초 만에 뺀다 · 말이 시작되기 전 · 말이 안 나오면 3초 뒤 다시 (Codex 123차 #1)', async () => {
   assert.equal(calm.calmState().playing, true);
-  const master = ctx.gains.filter((g) => g.out[0] === ctx.destination).at(-1);
-  const t = ctx.currentTime;
-  const pending = ctx.oscs.filter((o) => o.stops === 1 && o.t1 > t); // 이번에 틀어 아직 울리는 음
   winL['shincoach:ttsstart']();
   assert.equal(calm.calmState().playing, false, '타이머를 기다리지 않는다');
-  const ev = master.gain.ev.slice(-2);
-  assert.deepEqual(ev.map((e) => e[0]), ['hold', 'exp'], '취소한 뒤의 value에 기대지 않는다');
-  assert.ok(near(ev[1][2], t + calm.CALM.ttsFade) && ev[1][1] === 0.0001);
-  assert.ok(pending.length > 0 && pending.every((o) => o.stops === 2 && o.t1 <= t + calm.CALM.ttsFade + 0.06), '예약한 음도 그때 끈다');
   const now = Date.now();
   assert.equal(calm.calmBlock(now), 'tts', 'speechSynthesis가 아직 말하기 전에도');
+  await settle(calm.CALM.ttsFade * 1000 + 120);
+  assert.equal(aud().paused, true, '0.25초 만에 빠지고 멈춤');
   calm.calmTick(now + 500);
   assert.equal(calm.calmState().playing, false);
   calm.calmTick(now + calm.CALM.ttsRest + 50);
   assert.equal(calm.calmState().playing, true, '말이 안 나왔으면 3초 뒤 다시');
+  assert.equal(aud().paused, false);
   quiet();
+});
+
+test('★ 🌿 0.6초 빠지는 도중에 온 🎧 ▶·앱 내림은 멈춤을 앞당긴다 (🔍 Codex 144차 #1)', async () => {
+  quiet();
+  assert.equal(calm.calmState().playing, true);
+  // 창이 떠서 0.6초에 걸쳐 빠지는 중 → 🎧 ▶ → 0.25초 안에 멈춤
+  els.catch.hidden = false;
+  calm.calmTick();
+  await settle(60);
+  winL['shincoach:ttsstart']();
+  await settle(calm.CALM.ttsFade * 1000 + 100);
+  assert.equal(aud().paused, true, '0.6초를 다 기다리지 않는다');
+  els.catch.hidden = true;
+  quiet();
+  assert.equal(calm.calmState().playing, true);
+  // 다시 빠지는 중 → 앱을 내림 → 바로 멈춤
+  els.catch.hidden = false;
+  calm.calmTick();
+  await settle(60);
+  globalThis.document.hidden = true;
+  docL.visibilitychange();
+  assert.equal(aud().paused, true, '내리면 바로');
+  globalThis.document.hidden = false;
+  els.catch.hidden = true;
+  calm.calmTick();
+  assert.equal(calm.calmState().playing, true);
+  assert.equal(aud().paused, false);
 });
 
 test('🔗 🎧 듣기 카드는 첫 말 전에 ttsstart를 보내고, 음악이 빠지는 동안 기다린다', () => {
@@ -380,44 +434,39 @@ test('🌿 🎤 말하기 확인 동안 멈춤 — 끝 신호 · 끝 신호를 �
   assert.equal(calm.calmState().playing, true);
 });
 
-test('🌿 앱을 내리면 바로 뺀다 · 돌아오면 다시 · 소리가 잠들어 있으면(태블릿) 화면을 누를 때 깨운다', () => {
+test('🌿 앱을 내리면 바로 뺀다 · 돌아오면 다시 · 태블릿이 소리를 막았으면(play 거절) 화면을 누를 때 다시', async () => {
   globalThis.document.hidden = true;
   docL.visibilitychange();
   assert.equal(calm.calmState().playing, false, '타이머를 기다리지 않는다');
+  assert.equal(aud().paused, true, '내리면 빠지는 시간 없이 바로 멈춤(뒤로 간 화면은 타이머가 느리다)');
   calm.calmTick();
   assert.equal(calm.calmState().playing, false, '내린 동안 따져도 다시 틀지 않는다');
   assert.equal(calm.calmBlock(), 'hidden');
+  // 돌아왔는데 태블릿이 소리를 막았다 — 누르는 순간 다시
+  FakeAudio.block = true;
   globalThis.document.hidden = false;
   calm.calmTick();
-  assert.equal(calm.calmState().playing, true);
-  const ctx = ctxNow();
-  ctx.state = 'suspended';
-  calm.calmTick();
-  assert.equal(calm.calmState().playing, false);
+  await settle();
+  assert.equal(calm.calmState().playing, true, '틀라고는 했다');
+  assert.equal(aud().paused, true, '막혀서 소리는 안 난다');
+  assert.equal(calm.calmState().music.blocked, true);
+  FakeAudio.block = false;
   docL.pointerdown();
-  assert.equal(ctx.state, 'running', '누르면 깨운다');
-  calm.calmTick();
-  assert.equal(calm.calmState().playing, true);
-  // 전화·다른 앱이 소리를 가져가 'interrupted' — 누르면 다시 깨운다 (Codex 123차 #2)
-  ctx.state = 'interrupted';
-  calm.calmTick();
-  assert.equal(calm.calmState().playing, false);
+  await settle();
+  assert.equal(aud().paused, false, '누르면 다시');
+  assert.equal(calm.calmState().music.blocked, false);
+  // 🎵를 꺼 두었으면 눌러도 안 튼다
+  buttons[0].click();
+  await settle(calm.CALM.fadeOut * 1000 + 150);
+  const plays = aud().plays;
   docL.pointerdown();
-  assert.equal(ctx.state, 'running', 'interrupted도 깨운다');
-  calm.calmTick();
-  assert.equal(calm.calmState().playing, true);
-  // ⚙ 효과음을 꺼 두어도 음악은 🎵가 정한다
-  sfx.setSfxEnabled(false);
-  ctx.state = 'suspended';
-  calm.calmTick();
-  docL.pointerdown();
-  assert.equal(ctx.state, 'running', '효과음을 꺼도 음악 때문에 깨운다');
-  calm.calmTick();
-  assert.equal(calm.calmState().playing, true);
-  sfx.setSfxEnabled(true);
+  assert.equal(aud().plays, plays, '꺼 두면 누름으로 깨우지 않는다');
+  buttons[0].click();
+  assert.equal(aud().paused, false);
 });
 
 test('🌿 🎵 진우가 끄고 켬 — 단추 모양·aria-pressed · 이 기기에 기억 · 📤 끈 수·켠 수', async () => {
+  const d0 = await getDaily(today());
   buttons[0].click();
   assert.equal(calm.calmState().on, false);
   assert.equal(calm.calmState().playing, false);
@@ -431,31 +480,35 @@ test('🌿 🎵 진우가 끄고 켬 — 단추 모양·aria-pressed · 이 기�
   assert.equal(mem.get('shincoach.calmOn'), '1');
   await settle();
   const d = await getDaily(today());
-  assert.equal(d.calmOff, 1);
-  assert.equal(d.calmOn, 1);
+  assert.equal((d.calmOff || 0) - (d0.calmOff || 0), 1);
+  assert.equal((d.calmOn || 0) - (d0.calmOn || 0), 1);
 });
 
-test('🌿 📤 소리가 난 초를 모아 하루 기록에 — 1분마다 · 멈출 때 남은 것도 · 멈춘 동안은 안 셈', async () => {
+test('🌿 📤 소리가 난 초를 모아 하루 기록에 — 1분마다 · 멈출 때 남은 것도 · 멈춘 동안·소리가 막힌 동안은 안 셈', async () => {
   const before = (await getDaily(today())).calmSec || 0;
   let t = Date.now();
   for (let k = 0; k < 61; k++) { t += 1000; calm.calmTick(t); }
   await settle();
   const mid = (await getDaily(today())).calmSec || 0;
   assert.ok(mid - before >= 59 && mid - before <= 61, `1분 모아 ${mid - before}초`);
-  // 타이머가 100초 멈췄다 돌아도 100초로 세지 않는다 (그동안 예약이 없어 소리가 끊겼다) · 꺼 둔 동안은 셈이 늘지 않는다
+  // 타이머가 100초 멈췄다 돌아도 100초로 세지 않는다 · 꺼 둔 동안은 셈이 늘지 않는다
   t += 100_000;
   calm.calmTick(t);
   buttons[0].click();
   for (let k = 0; k < 70; k++) { t += 1000; calm.calmTick(t); }
   buttons[0].click();
+  // 소리가 막혀(play 거절) 실제로는 안 나는 동안도 안 셈 (v340 — <audio>가 재생 중일 때만)
+  aud().pause();
+  for (let k = 0; k < 30; k++) { t += 1000; calm.calmTick(t); }
   calm.leaveCalm();
   await settle();
   const after = (await getDaily(today())).calmSec || 0;
-  assert.ok(after - mid <= 3, `꺼 둔 70초는 안 셈 (+${after - mid})`);
+  assert.ok(after - mid <= 3, `꺼 둔 70초·막힌 30초는 안 셈 (+${after - mid})`);
 });
 
 test('🌿 📤 자정을 넘기면 쌓인 시간은 전날로 먼저 (Codex 123차 #4)', async () => {
   calm.enterCalm();
+  await settle();
   assert.equal(calm.calmState().playing, true);
   const t0 = new Date(2030, 0, 1, 23, 59, 30).getTime();
   for (let k = 0; k < 60; k++) calm.calmTick(t0 + k * 1000);
@@ -479,26 +532,44 @@ test('🌿 기기 시계가 뒤로 가도 🎧·🎤 멈춤이 몇 시간씩 이
   calm.leaveCalm();
 });
 
-test('🌿 국어·논술을 떠나면 멈춤 · 다시 들어오면 덩이 처음부터 이어서', () => {
+test('🌿 국어·논술을 떠나면 멈춤 · 다시 들어오면 그 곡 그 자리에서 (새 곡으로 바꾸지 않음)', async () => {
   calm.enterCalm();
+  await settle();
   assert.equal(calm.calmState().playing, true);
+  const src = aud().src;
   calm.leaveCalm();
   const st = calm.calmState();
   assert.equal(st.playing, false);
   assert.equal(st.want, false);
   assert.equal(calm.calmBlock(), 'view');
-  const saved = JSON.parse(mem.get('shincoach.calmPos'));
-  assert.deepEqual(saved, st.pos);
+  await settle(calm.CALM.fadeOut * 1000 + 150);
+  assert.equal(aud().paused, true);
   calm.enterCalm();
-  const again = calm.calmState().pos;
-  assert.equal(again.s, saved.s);
-  assert.equal(again.b, saved.b - (saved.b % calm.CALM.phrase) + 1, '덩이 처음 한 마디를 예약');
+  assert.equal(aud().src, src, '같은 곡');
+  assert.equal(aud().paused, false);
+  calm.leaveCalm();
+});
+
+test('🌿 곡이 없으면 소리 없음 — 합성 곡을 대신 틀지 않는다 · 곡을 넣으면 그때부터', async () => {
+  files.setCalmMusicDeps({ loadList: async () => null });
+  await files.loadCalmMusic();
+  calm.enterCalm();
+  assert.equal(calm.calmState().playing, false, '틀 곡이 없다');
+  assert.equal(calm.calmBlock(), '', '막을 까닭은 없는데');
+  assert.equal(aud().paused, true);
+  assert.equal(aud().src, '', '옛 곡 주소도 놓았다');
+  files.setCalmMusicDeps({ loadList: async () => ({ id: 'music:list', items: ITEMS, at: 2 }) });
+  await files.loadCalmMusic();
+  calm.calmTick();
+  await settle();
+  assert.equal(calm.calmState().playing, true);
+  assert.equal(aud().paused, false);
   calm.leaveCalm();
 });
 
 // ───────────────────── 잇기 · 기록 ─────────────────────
 
-test('🔗 잇기 — app.showView 국어·논술에서만 · initCalm은 첫 화면 전에 · 머리줄 🎵 둘 · 앱 셸 · sfx 효과음을 꺼도 음악은 깨운다', () => {
+test('🔗 잇기 — app.showView 국어·논술에서만 · initCalm은 첫 화면 전에 · 머리줄 🎵 둘 · 앱 셸 · calm은 합성 곡·소리 장치를 안 만짐', () => {
   const app = read('js/app.js');
   assert.ok(app.includes("import { initCalm, enterCalm, leaveCalm } from './calm.js';"));
   assert.ok(app.includes("if (name === 'korean' || name === 'nonsul') enterCalm();\n  else leaveCalm();"));
@@ -511,12 +582,11 @@ test('🔗 잇기 — app.showView 국어·논술에서만 · initCalm은 첫 �
   }
   assert.equal((html.match(/data-calm/g) || []).length, 2, '다른 화면에는 없다');
   const sw = read('sw.js');
-  assert.ok(sw.includes("'./js/calmsong.js'") && sw.includes("'./js/calm.js'"));
-  assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1]) >= 317);
-  const sfxSrc = read('js/sfx.js');
-  assert.ok(/export function unlock\(\) \{\n {2}if \(!soundOn\) return;\n {2}unlockMusic\(\);\n\}/.test(sfxSrc), '효과음 끔은 효과음만');
+  assert.ok(sw.includes("'./js/calmfiles.js',") && sw.includes("'./js/calm.js'"));
+  assert.ok(sw.includes("'./js/calmsong.js',"), 'js/의 파일은 모두 앱 셸에 (tools/check.mjs) — 합성 곡은 앱이 안 틀어도 남겨 둔다');
+  assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1]) >= 340);
   const calmSrc = read('js/calm.js');
-  assert.ok(calmSrc.includes("from './sfx.js'") && !/\bunlock\(\)/.test(calmSrc), 'calm은 unlockMusic만');
+  assert.ok(calmSrc.includes("from './calmfiles.js'") && !calmSrc.includes("from './calmsong.js'") && !calmSrc.includes("from './sfx.js'"), 'calm은 곡 파일 재생기만');
   assert.ok(!/\d+\s*\/\s*\d+|남은|개 중/.test(calmSrc.slice(calmSrc.indexOf('function syncButtons'), calmSrc.indexOf('export function initCalm'))), '아이 화면에 셈 문구 없음');
 });
 
@@ -529,21 +599,9 @@ test('📤 하루 기록 칸 · usage/날짜.md 한 줄 — 소리가 난 시간
   const line = f.text.split('\n').find((l) => l.startsWith('- 10-22:'));
   assert.ok(line.includes('🌿 잔잔한 음악 10분 · 🎵 끔 2번 · 다시 켬 1번'), line);
   assert.ok(f.text.includes('- 🌿 잔잔한 음악 = 국어·논술 화면에서 배경 음악을 틀어 둔 시간 (v317부터 · 기기 음량·음소거는 알 수 없고'), '읽는 법 — 실제로 들린 소리는 모른다고');
+  assert.ok(f.text.includes('v340부터는 ⚙에서 고른 곡 파일이 실제로 재생된 시간 — 곡이 없으면 0'), '곡 파일로 바뀐 날을 읽는 법');
   const [g] = usageFiles([{ date: day, appOpens: 1, uKor: 900 }], day, PLACES);
   assert.ok(!g.text.split('\n').find((l) => l.startsWith('- 10-22:')).includes('🌿'), '없으면 줄도 없음');
   const [h] = usageFiles([{ date: day, appOpens: 1, calmOff: 1 }], day, PLACES);
   assert.ok(h.text.includes('🌿 잔잔한 음악 0분 · 🎵 끔 1번'), '바로 끈 날도 보인다');
-});
-
-test('🌿 마지막 마디에서 닫았다 다시 열면 다음 곡 처음 · 마지막 곡이면 첫 곡·돌기 +1 · 넘친 값은 처음부터 (Codex 123차 #5)', async () => {
-  const len = (s) => songBars(SONGS[s]).length;
-  const load = async (pos, tag) => {
-    mem.set('shincoach.calmPos', JSON.stringify(pos));
-    return (await import(`../js/calm.js?pos=${tag}`)).calmState().pos;
-  };
-  assert.deepEqual(await load({ s: 0, b: len(0), p: 3 }, 'a'), { s: 1, b: 0, p: 3 }, '첫 곡으로 버리지 않는다');
-  assert.deepEqual(await load({ s: 2, b: len(2), p: 3 }, 'b'), { s: 0, b: 0, p: 4 });
-  assert.deepEqual(await load({ s: 1, b: len(1) + 1, p: 3 }, 'c'), { s: 0, b: 0, p: 0 });
-  assert.deepEqual(await load({ s: 1, b: 7, p: 3 }, 'd'), { s: 1, b: 7, p: 3 });
-  assert.deepEqual(await load({ s: 3, b: 0, p: 0 }, 'e'), { s: 0, b: 0, p: 0 });
 });

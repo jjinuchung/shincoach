@@ -244,6 +244,53 @@ export async function deleteGiftPhoto(giftId) {
   await txDone(tx);
 }
 
+/**
+ * 🌿 국어·논술 배경음 곡 (v340 · 아버님이 고른 곡 파일) — 저작물이라 공개 저장소에 두지 않고 **이 기기의 blobs에만** · 백업에 안 들어간다
+ * 'music:list' = { id, items: [{ id, name, size }], at } (고른 차례) · 곡마다 'music:<n>' = { id, blob, name, at } — 영상 id·'gift:'·합체 그림과 겹치지 않는다
+ * blobs는 id로만 넣고 꺼내고 지운다(칸 전체를 훑는 곳이 없다) — 새로 고르면 옛 곡을 같은 트랜잭션에서 지우고 바꿔 넣는다
+ */
+export const MUSIC_LIST_ID = 'music:list';
+
+export async function getMusicList() {
+  const db = await openDb();
+  const rec = await promisify(db.transaction('blobs', 'readonly').objectStore('blobs').get(MUSIC_LIST_ID));
+  return rec && Array.isArray(rec.items) ? rec : null;
+}
+
+export async function getMusicBlob(id) {
+  if (!/^music:\d+$/.test(String(id))) return null;
+  const db = await openDb();
+  const rec = await promisify(db.transaction('blobs', 'readonly').objectStore('blobs').get(id));
+  return rec ? rec.blob : null;
+}
+
+/** 곡 묶음을 통째로 바꾼다 — files = [{ name, blob }] (고른 차례) → 새 목록 */
+export async function putMusicSet(files) {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readwrite');
+  const store = tx.objectStore('blobs');
+  const old = await promisify(store.get(MUSIC_LIST_ID));
+  for (const it of (old && Array.isArray(old.items) ? old.items : [])) store.delete(it.id);
+  const at = Date.now();
+  const items = (files || []).map((f, k) => ({ id: `music:${k + 1}`, name: String((f && f.name) || ''), size: Number(f && f.blob && f.blob.size) || 0 }));
+  items.forEach((it, k) => store.put({ id: it.id, blob: files[k].blob, name: it.name, at }));
+  const list = { id: MUSIC_LIST_ID, items, at };
+  store.put(list);
+  await txDone(tx);
+  return list;
+}
+
+/** 곡을 모두 지운다 (태블릿의 원래 파일은 그대로) */
+export async function clearMusicSet() {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readwrite');
+  const store = tx.objectStore('blobs');
+  const old = await promisify(store.get(MUSIC_LIST_ID));
+  for (const it of (old && Array.isArray(old.items) ? old.items : [])) store.delete(it.id);
+  store.delete(MUSIC_LIST_ID);
+  await txDone(tx);
+}
+
 /** 일부 필드만 갱신 (진행 위치, 제목, 자막 교체 등) */
 export async function updateItem(id, patch) {
   const db = await openDb();
