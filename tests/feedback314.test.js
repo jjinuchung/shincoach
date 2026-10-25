@@ -235,7 +235,7 @@ test('📬 feedback.md — 영어: 14일 안에 붙은 것 + 안 본 것은 늘 
   ];
   const it = essayItems(days, NOW);
   assert.equal(it.length, 4, '안 본 옛것 1 + 14일 안 3 · 14일 넘은 읽은 것·교정 없는 글은 빠짐');
-  assert.ok(it[0].text.includes('아직 안 봄 — 영어 영상을 열면 맨 먼저 떠요') && !it[0].seen);
+  assert.ok(it[0].text.includes('아직 안 봄 — 그날 에세이를 다 쓰면 가장 최근 것부터 하루 한 문장씩 떠요') && !it[0].seen); // v336
   const all = it.map((x) => x.text).join('\n');
   assert.ok(all.includes('🎤 따라 읽어 통과') && all.includes('🎤 결과 없이 넘김') && all.includes('봄 (🎤로 읽었는지는 v314부터 적어요)'));
   assert.ok(all.includes('  진우: I eat ckicken') && all.includes('  아빠: I eat chicken.'));

@@ -54,7 +54,7 @@ export function essayItems(days, now) {
       if (!e || !e.coachFix || !e.written) continue;
       const seen = num(e.readAt) > 0;
       if (!shown(e.fixedAt, seen, now)) continue;
-      const how = !seen ? '아직 안 봄 — 영어 영상을 열면 맨 먼저 떠요' : (HOW_KO[e.readHow] || '봄 (🎤로 읽었는지는 v314부터 적어요)');
+      const how = !seen ? '아직 안 봄 — 그날 에세이를 다 쓰면 가장 최근 것부터 하루 한 문장씩 떠요' : (HOW_KO[e.readHow] || '봄 (🎤로 읽었는지는 v314부터 적어요)');
       out.push({
         at: num(e.fixedAt), seen,
         text: [`- ${d.date.slice(5)}에 쓴 글 · 붙은 때 ${fmtAt(e.fixedAt) || '(모름)'} · 본 때 ${seen ? fmtAt(e.readAt) : '—'} · ${how}`,
@@ -165,7 +165,7 @@ export function feedbackMd({ days, writes, asks, today, now, conceptName } = {})
     `요약: ✍️ 영어 교정 ${tally(en)} · 📚 국어 답장 ${tally(ko)} · 🔢 수학 답장 ${tally(ma)}`,
     '읽는 법: 붙은 때 = 태블릿이 비공개 저장소에서 받아 붙인 때 · 본 때 = 진우 화면에 떠서 읽고 넘어간 때 · 그 뒤 = 진우가 해 본 것 · 💌 한 줄 메시지는 family/read.md',
     '',
-    '## ✍️ 영어 교정 — 영어 영상을 열 때 떠요(내 글 · 아빠 글(바뀐 곳 색) → 🔊 끝까지 들은 뒤 넘어감 → 🎤 읽어보기 · v318부터 ⚡💰는 🎤를 해 봤을 때만)',
+    '## ✍️ 영어 교정 — v336부터 그날 에세이를 다 쓴 바로 뒤에 가장 최근 것 한 문장(그 전엔 영어 영상을 열 때 3개까지 · 앞의 것은 밀려 "아직 안 봄"으로 남을 수 있어요)(내 글 · 아빠 글(바뀐 곳 색) → 🔊 끝까지 들은 뒤 넘어감 → 🎤 읽어보기 · v318부터 ⚡💰는 🎤를 해 봤을 때만)',
     ...(en.length ? en.map((x) => x.text) : ['(없음)']),
     '',
     '## ✍️ 내 에세이 — 쓰고 나서 고친 문장을 🎤로 읽었나 (v318부터 · 기록 없음 = 그 전 글이거나 넘어가지 않고 닫음 · 🎤로 통과하면 🔶 하루 2개까지)',

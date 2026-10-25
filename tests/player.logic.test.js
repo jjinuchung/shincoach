@@ -1812,13 +1812,14 @@ test('자리 되돌리기: 그 사이 콘텐츠가 바뀌었으면 건드리지 
 test('✍️ v318 아빠 교정: ⚡💰는 🎤를 해 봤을 때만 · 🎤 통과 🔶는 문장마다 한 번·하루 2개 · 내 에세이: 넘어갈 때 🎤 했나 기록 · 통과 🔶', async () => {
   const { run, essayCalls, essayState, xpLog, coinLog, itemLog, ctx } = loadPlayer();
   const marks = [];
-  ctx.listEssays = async () => [
+  const entries = [
     { id: 'e1', date: '2026-10-20', written: 'i like cat', coachFix: 'I like cats.', readAt: 0 },
     { id: 'e2', date: '2026-10-20', written: 'he go school', coachFix: 'He goes to school.', readAt: 0 },
     { id: 'e3', date: '2026-10-21', written: 'me happy', coachFix: 'I am happy.', readAt: 0 },
   ];
   ctx.markEssayRead = async (id, date, how) => { marks.push({ id, date, how }); return true; };
-  assert.equal(await run('maybeCoachFix()'), true);
+  // 보상 규칙은 회차 안에서 문장마다 — 세 문장 회차를 바로 연다 (v336부터 maybeCoachFix는 한 문장만 고른다 — 아래 v336 시험)
+  run(`startCoachFix(${JSON.stringify(entries)})`);
   const o = essayCalls.at(-1);
   assert.equal(o.mode, 'coach');
   const [x0, c0] = [xpLog.length, coinLog.length];
@@ -1874,6 +1875,161 @@ test('✍️ v318 아빠 교정: ⚡💰는 🎤를 해 봤을 때만 · 🎤 �
   assert.ok(essayState.sayKeys[0].startsWith('self|2026-09-14|'));
   assert.equal(essayState.sayEntries.at(-1).date, '2026-09-14');
   e.onDone({});
+});
+
+test('👨‍👩‍👦 v336 아빠 교정은 그날 에세이를 다 쓴 바로 뒤에 한 문장 — 가장 최근에 고친 안 읽은 글 · 읽은 글·교정 없는 글은 안 고름 · 닫으면 보던 것을 이어 감 · 없으면 바로 이어 감 · 한 콘텐츠에 한 번', async () => {
+  const { run, essayCalls, ctx } = loadPlayer();
+  const list = [
+    { id: 'e1', date: '2026-10-20', written: 'i like cat', coachFix: 'I like cats.', readAt: 0 },
+    { id: 'e2', date: '2026-10-21', written: 'he go school', coachFix: 'He goes to school.', readAt: 0 },
+    { id: 'e3', date: '2026-10-22', written: 'me happy', coachFix: 'I am happy.', readAt: 5 },
+    { id: 'e4', date: '2026-10-22', written: 'no fix yet', readAt: 0 },
+  ];
+  ctx.listEssays = async () => list;
+  let cont = 0;
+  ctx.__then = () => { cont += 1; };
+  assert.equal(await run('maybeCoachFix(__then)'), true);
+  const o = essayCalls.at(-1);
+  assert.equal(o.mode, 'coach');
+  assert.deepEqual(o.prompts.map((p) => p.id), ['e2'], '한 문장 — 가장 최근에 고친 안 읽은 글(읽은 e3·교정 없는 e4는 빼고)');
+  assert.equal(cont, 0, '읽는 동안은 안 이어 감');
+  o.onDone({});
+  assert.equal(cont, 1, '닫으면 보던 것을 이어 감');
+  assert.equal(await run('maybeCoachFix(__then)'), false, '한 콘텐츠에 한 번');
+  assert.equal(cont, 2, '안 열면 바로 이어 감');
+  const n = essayCalls.length;
+  run('state.coachFixDone = false;');
+  ctx.listEssays = async () => list.map((e) => ({ ...e, readAt: 9 }));
+  assert.equal(await run('maybeCoachFix(__then)'), false);
+  assert.deepEqual([essayCalls.length, cont], [n, 3], '안 읽은 교정이 없으면 열지 않고 이어 감');
+  ctx.listEssays = async () => { throw new Error('막힘'); };
+  assert.equal(await run('maybeCoachFix(__then)'), false);
+  assert.equal(cont, 4, '기록을 못 읽어도 이어 감');
+  // 영상을 열 때는 받아만 두고 띄우지 않는다
+  const src = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const open = src.slice(src.indexOf('    const myItem = state.item;\n    // 👨‍👩‍👦 아빠 교정은 받아만 둔다'), src.indexOf("  video.addEventListener('loadedmetadata', state.onMeta, { once: true });"));
+  assert.ok(open.includes('syncCoachFixes().catch(() => {});') && open.includes('maybeReview();'));
+  assert.ok(!open.includes('maybeCoachFix('), '영상을 열 때는 안 띄운다');
+  assert.equal((src.match(/maybeCoachFix\(/g) || []).length, 2, '부르는 곳은 에세이 끝 하나(+ 정의)');
+});
+
+// v336 에세이 흐름 시험 틀 — 바꿔 쓸 문장 셋 · 안 읽은 아빠 교정 하나 · __cont = 에세이 뒤 영상 이어 가기(센다)
+const CUES336 = [
+  { start: 0, end: 3, en: "I can't believe I just caught a Gengar in the tall grass!", ko: '내가 팬텀을 잡다니!' },
+  { start: 10, end: 13, en: 'I want to play with my best friend at the playground today.', ko: '오늘 친구와 놀고 싶어.' },
+  { start: 20, end: 23, en: 'We will go to the park after school and play soccer.', ko: '방과 후에 공원에 갈 거야.' },
+];
+const FIX336 = [{ id: 'x1', date: '2026-10-24', written: 'i go park', coachFix: 'I went to the park.', readAt: 0 }];
+function essayFlow336() {
+  const p = loadPlayer();
+  p.ctx.track.statsList = () => CUES336.map((c) => ({ ...c, done: true, box: 1, lastAt: 1 }));
+  p.ctx.listEssays = async () => FIX336;
+  p.ctx.__cont = () => { p.conts = (p.conts || 0) + 1; };
+  p.run(`state.cues = ${JSON.stringify(CUES336)}; state.idx = 0; state.item = { id: 'vid' };`);
+  return p;
+}
+const settle336 = () => new Promise((r) => setTimeout(r, 10));
+
+test('👨‍👩‍👦 v336 에세이 흐름 — 오늘 몫을 다 쓰고 닫으면 아빠 교정 한 문장 → 닫으면 영상 이어 감 · 중간에 그만두면·다른 창이 먼저 끝냈으면·연습이면 교정 없이 바로 이어 감', async () => {
+  const setup = essayFlow336;
+  const settle = settle336;
+  // ① 다 씀 → 닫음 → 교정 한 문장 → 닫음 → 이어 감
+  const a = setup();
+  a.run('startEssay(false, __cont);');
+  const e1 = a.essayCalls.at(-1);
+  assert.notEqual(e1.mode, 'coach');
+  assert.ok(await e1.onFinished(), '오늘 몫 완주(하루 한 번 선점)');
+  e1.onDone({});
+  await settle();
+  const c1 = a.essayCalls.at(-1);
+  assert.equal(c1.mode, 'coach', '에세이를 닫자마자 아빠 교정');
+  assert.deepEqual(c1.prompts.map((p) => p.id), ['x1']);
+  assert.equal(a.conts || 0, 0, '교정을 읽는 동안은 영상 안 이어 감');
+  c1.onDone({});
+  assert.equal(a.conts, 1, '교정을 닫으면 영상 이어 감');
+  // ② 중간에 그만둠(onFinished 없음) → 교정 없이 이어 감
+  const b = setup();
+  b.run('startEssay(false, __cont);');
+  const n = b.essayCalls.length;
+  b.essayCalls.at(-1).onDone({});
+  await settle();
+  assert.deepEqual([b.essayCalls.length, b.conts], [n, 1], '그만두면 교정 없이');
+  // ③ 다른 창이 오늘 몫을 먼저 끝냄(선점 실패) → 교정 없이 이어 감
+  const c = setup();
+  c.run('startEssay(false, __cont);');
+  const e3 = c.essayCalls.at(-1);
+  c.essayState.done = true;
+  assert.equal(await e3.onFinished(), null);
+  e3.onDone({});
+  await settle();
+  assert.equal(c.essayCalls.at(-1), e3, '교정 안 뜸');
+  assert.equal(c.conts, 1);
+  // ④ ⚙ 연습 — 기록·보상·교정 없음
+  const d = setup();
+  d.run('startEssay(true, __cont);');
+  const e4 = d.essayCalls.at(-1);
+  e4.onDone({});
+  await settle();
+  assert.equal(d.essayCalls.at(-1), e4, '연습 뒤엔 교정 안 뜸');
+  assert.equal(d.conts, 1);
+});
+
+test('🔍 Codex 140차: 교정 목록을 읽는 사이 같은 영상을 다시 열면(새 회차) 교정도 이어 가기도 없음 · 다른 학습 창이 떴으면 그 창이 맡음 · 끝 화면을 선점 전에 닫아도 선점이 되면 교정(안 되면 그냥 이어 감)', async () => {
+  // #1 목록을 읽는 사이 새 회차 — 새 영상 위에 교정이 떠 멈춘 채 남지 않게
+  const slow = (p) => { p.ctx.listEssays = () => new Promise((r) => { p.release = () => r(FIX336); }); };
+  const a = essayFlow336();
+  slow(a);
+  a.run('startEssay(false, __cont);');
+  const e1 = a.essayCalls.at(-1);
+  await e1.onFinished();
+  e1.onDone({});
+  await settle336();
+  assert.equal(typeof a.release, 'function', '교정 목록을 읽는 중');
+  a.run("state.item = { id: 'vid' };"); // 같은 영상을 닫았다 다시 열었다 — 새 회차
+  a.release();
+  await settle336();
+  assert.equal(a.essayCalls.at(-1), e1, '새 회차 위에 교정 안 뜸');
+  assert.equal(a.conts || 0, 0, '옛 회차의 이어 가기 없음');
+  // 그사이 다른 학습 창(복습)이 떴다 — 그 창이 화면을 맡는다(이어 가기로 영상을 틀지 않는다)
+  const b = essayFlow336();
+  slow(b);
+  b.run('startEssay(false, __cont);');
+  const e2 = b.essayCalls.at(-1);
+  await e2.onFinished();
+  e2.onDone({});
+  await settle336();
+  b.run('state.reviewOpen = true;');
+  b.release();
+  await settle336();
+  assert.deepEqual([b.essayCalls.at(-1) === e2, b.conts || 0], [true, 0]);
+  // #2 끝 화면을 선점 전에 닫음 → 선점 결과를 보고 한 번만 정한다
+  const c = essayFlow336();
+  let claim;
+  c.ctx.track.markEssayDone = () => new Promise((r) => { claim = r; });
+  c.run('startEssay(false, __cont);');
+  const e3 = c.essayCalls.at(-1);
+  const f = e3.onFinished();
+  e3.onDone({});
+  await settle336();
+  assert.deepEqual([c.essayCalls.at(-1) === e3, c.conts || 0], [true, 0], '선점을 기다리는 동안은 아무것도 안 함');
+  claim(true);
+  assert.deepEqual(await f, { xp: 50, coin: 20 });
+  await settle336();
+  const k = c.essayCalls.at(-1);
+  assert.equal(k.mode, 'coach', '선점이 되면 교정 한 문장');
+  k.onDone({});
+  assert.equal(c.conts, 1, '교정을 닫으면 한 번 이어 감');
+  const d = essayFlow336();
+  let claim2;
+  d.ctx.track.markEssayDone = () => new Promise((r) => { claim2 = r; });
+  d.run('startEssay(false, __cont);');
+  const e4 = d.essayCalls.at(-1);
+  const f2 = e4.onFinished();
+  e4.onDone({});
+  claim2(false); // 다른 창이 먼저
+  assert.equal(await f2, null);
+  await settle336();
+  assert.deepEqual([d.essayCalls.at(-1) === e4, d.conts], [true, 1], '선점이 안 되면 교정 없이 한 번 이어 감');
 });
 
 test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (하루 1번, 부모 모드 제외, 보상은 ⚡·💰)', async () => {
@@ -1934,6 +2090,7 @@ test('✍️ 에세이: 공부 시간을 채우면 다음 전환에서 열림 (�
 
   o.onDone({ started: true, done: 3, finished: true });
   assert.equal(run('state.essayOpen'), false);
+  await new Promise((r) => setTimeout(r, 10)); // (v336) 다 쓴 날은 아빠 교정이 있는지 저장소를 한 번 보고 나서 이어 간다
   assert.equal(run('state.idx'), 2, '끝나면 원래 가려던 문장으로 이어감');
 
   // 하루 1번 — 이미 썼으면 다시 예약되지 않는다

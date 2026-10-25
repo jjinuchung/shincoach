@@ -25,8 +25,8 @@ import {
   REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH, SAY_STONE as ESSAY_SAY_STONE,
 } from './essay.js';
 
-/** 👨‍👩‍👦 한 번에 보여줄 아빠 교정문 수 (많이 쌓여도 아이가 지치지 않게) */
-const COACH_FIX_MAX = 3;
+/** 👨‍👩‍👦 한 번에 보여줄 아빠 교정문 수 — 그날 에세이를 다 쓴 뒤 한 문장 (v336 — 전에는 영상을 열 때 3개까지였다) */
+const COACH_FIX_MAX = 1;
 import { initMatch, openMatch, closeMatch, refreshStage, pickMatchRound, shuffle as shuffleMons } from './match.js';
 import { ensureAnims, loadAnims, animUrl } from './sprite.js';
 import { makeDictation } from './dictation.js';
@@ -915,6 +915,8 @@ function startEssay(practice, cont) {
   setEssayOpen(true);
   state.practiceOpen = !!practice;
   const myItem = state.item ? state.item.id : null;
+  let coachNext = false; // 👨‍👩‍👦 오늘 몫을 다 써서(하루 한 번 선점) 닫으면 아빠 교정 한 문장 (v336)
+  let finishing = null;  // 오늘 몫 선점을 기다리는 Promise (끝 화면을 선점 전에 닫아도 결과를 보고 정한다)
   openEssay({
     prompts,
     practice,
@@ -953,14 +955,19 @@ function startEssay(practice, cont) {
       const day = it.essayDay || track.dailyDate();
       return essaySayStone(`self|${day}|${essayIdOf(it.rec)}`, { date: day, id: essayIdOf(it.rec) });
     },
-    onFinished: async () => {
-      // 다른 창이 이미 오늘 몫을 끝냈으면 완주 보상은 없다 (글은 이미 문장마다 저장됨)
-      if (!await track.markEssayDone()) return null;
-      awardXp(ESSAY_FINISH.xp);
-      awardCoins(ESSAY_FINISH.coin);
-      addItem(STONE_ENGLISH.id, 1); // 🔶 영어스톤 — 에세이 완주(하루 1번, markEssayDone이 선점)
-      track.flush();
-      return ESSAY_FINISH;
+    onFinished: () => {
+      // 선점을 기다리는 Promise를 붙잡아 둔다 — 끝 화면을 바로 닫아도 결과를 보고 교정을 정한다 (🔍 Codex 140차 #2)
+      finishing = (async () => {
+        // 다른 창이 이미 오늘 몫을 끝냈으면 완주 보상은 없다 (글은 이미 문장마다 저장됨)
+        if (!await track.markEssayDone()) return null;
+        coachNext = !practice;
+        awardXp(ESSAY_FINISH.xp);
+        awardCoins(ESSAY_FINISH.coin);
+        addItem(STONE_ENGLISH.id, 1); // 🔶 영어스톤 — 에세이 완주(하루 1번, markEssayDone이 선점)
+        track.flush();
+        return ESSAY_FINISH;
+      })();
+      return finishing;
     },
     onDone: () => {
       setEssayOpen(false);
@@ -970,26 +977,40 @@ function startEssay(practice, cont) {
       restoreSpot(spot);
       if (!practice) track.flush();
       // 콘텐츠를 닫는 중이면 이어가지 않는다 — 정리 중에 goTo가 재생을 건드린다 (Codex #12)
-      if (cont && state.open && (state.item ? state.item.id : null) === myItem) cont();
+      const here = () => state.open && (state.item ? state.item.id : null) === myItem;
+      const next = () => { if (cont && here()) cont(); };
+      // 👨‍👩‍👦 오늘 에세이를 다 쓰고 🎤로 읽은 바로 뒤 — 아빠가 고쳐 준 글 한 문장, 다 읽고 닫으면 보던 것을 이어 간다 (v336)
+      const after = () => { if (coachNext && here()) { maybeCoachFix(next); return; } next(); };
+      if (finishing) finishing.then(after, after); else after();
     },
   });
 }
 
 /**
- * 👨‍👩‍👦 아빠가 고쳐 준 글 보여주기 (콘텐츠를 열 때 한 번, 복습 제안보다 먼저)
+ * 👨‍👩‍👦 아빠가 고쳐 준 글 보여주기 — 그날 에세이를 다 쓴 바로 뒤에 **한 문장** (v336 · 2026-10-25 아버님 "이대로")
+ * 전에는 영상을 열 때 3개까지 떴다 — 보고 싶은 영상과 겹쳐 🎤 없이 넘기기 쉬웠다. 에세이 끝은 이미 🎤로 읽는 흐름이다.
+ * 가장 최근에 고친 안 읽은 글 하나(listEssays는 날짜 순) · 앞의 것은 밀려도 화면엔 셈 없이 그대로(📊·📬에는 남는다)
+ * 받아 오기(syncCoachFixes)는 앱을 켤 때·영상을 열 때 해 둔다 — 여기서 인터넷을 기다리며 멈춘 화면을 두지 않는다
+ * @param {() => void} [then] 다 읽고 닫았을 때 · 보여 줄 게 없으면 바로
  * @returns {Promise<boolean>} 열었으면 true
  */
-async function maybeCoachFix() {
-  if (state.parentMode || state.coachFixDone || state.essayOpen || state.reviewOpen) return false;
-  state.coachFixDone = true;
+async function maybeCoachFix(then) {
+  const go = () => { if (typeof then === 'function') then(); };
+  if (state.parentMode || state.coachFixDone || state.essayOpen || state.reviewOpen) { go(); return false; }
+  const item = state.item; // 이 회차 — 같은 영상을 닫았다 다시 열어도 새 객체라 갈린다
   let list = [];
   try {
-    await syncCoachFixes();            // 비공개 저장소의 아빠 교정문이 있으면 먼저 반영
     list = await listEssays();
-  } catch (e) { return false; }        // 기록을 못 읽어도 학습은 계속
+  } catch (e) { list = []; }           // 기록을 못 읽어도 학습은 계속 (아래에서 이어 간다)
+  // 기다리는 사이 다른 영상(또는 같은 영상을 다시)을 열었으면 그 회차는 건드리지 않는다 —
+  // 새 영상 위에 교정이 떠 영상을 멈추고, 닫아도 옛 영상 것이라 이어 가지 않았다 (🔍 Codex 140차 #1)
+  if (!state.open || state.item !== item) return false;
+  // 그사이 다른 학습 창이 떴으면 그 창이 화면을 맡는다 — 이어 가기(영상 재생)도 하지 않는다
+  if (state.essayOpen || state.reviewOpen) return false;
   const unread = list.filter((e) => e.coachFix && !e.readAt).slice(-COACH_FIX_MAX);
-  if (!unread.length || !state.open) return false;
-  startCoachFix(unread);
+  if (!unread.length || state.parentMode || state.coachFixDone) { go(); return false; }
+  state.coachFixDone = true;
+  startCoachFix(unread, then);
   return true;
 }
 
@@ -1023,8 +1044,8 @@ function retryEssaySay() {
   }
 }
 
-/** 아빠 교정문 회차: 쓰기 없이 "내 글 / 아빠 글"을 보고 소리 내어 읽는다 */
-function startCoachFix(entries) {
+/** 아빠 교정문 회차: 쓰기 없이 "내 글 / 아빠 글"을 보고 소리 내어 읽는다 · then = 닫은 뒤 이어 갈 것(에세이 뒤 보던 영상) */
+function startCoachFix(entries, then) {
   cancelShadowWait();
   hidePlayerMessage();
   if (!video.paused) video.pause();
@@ -1055,6 +1076,7 @@ function startCoachFix(entries) {
       state.puzzleCue = null; state.puzzlePlaying = false; state.puzzleOnEnd = null;
       restoreSpot(spot);
       track.flush();
+      if (typeof then === 'function') then();
     },
   });
 }
@@ -1818,13 +1840,13 @@ export async function openPlayer(id, opts = {}) {
     goTo(startIdx, { play: false });
     // 🔤 단어 문항을 만들려면 본 단어 기록이 필요하다 — 읽고 나서 복습을 제안
     const myItem = state.item;
-    // 👨‍👩‍👦 아빠가 고쳐 준 글이 있으면 그것부터, 없으면 🔁 복습 제안
-    refreshVocabViews().then(async () => {
+    // 👨‍👩‍👦 아빠 교정은 받아만 둔다 — 보여 주기는 그날 에세이를 다 쓴 바로 뒤에 한 문장(v336 · maybeCoachFix)
+    syncCoachFixes().catch(() => {});
+    refreshVocabViews().then(() => {
       if (!(state.open && state.item === myItem)) return;
       // 🔁 "오늘의 복습"으로 들어온 것 — 아이가 직접 고른 것이므로 확률·거절 횟수를 묻지 않고 바로 연다
       if (opts.review) { startReviewNow(true); return; }
-      const shown = await maybeCoachFix();
-      if (!shown && state.open && state.item === myItem) maybeReview();
+      maybeReview();
     });
   };
   video.addEventListener('loadedmetadata', state.onMeta, { once: true });
