@@ -1,11 +1,18 @@
 // v335 (2026-10-25 아버님 "미니게임을 할 때 긴박감이 있고 신난 음악" → 기본안 "이대로" → 시험 듣기 2판 "이대로") — node --test tests/minigame335.test.js
 //  🎵 게임 음악 — 새로 쓴 8비트 곡 셋(gamesong.js) · 게임마다 지금 음악 상태(run.music → musicMode · 🗺️ advHurry) · 틀고 멈추기(gamebgm.js) · 게임기 🎵 단추 · ⚙ 이벤트 배경음악
+//  📤 v337 — 소리가 난 초 · 🔇 끈 수·다시 켠 수 → usage/날짜.md 한 줄
+import { fakeIdb } from './fakeidb.js'; // ★ db.js보다 먼저 (v337 — 게임 음악 기록)
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { GAME_SONGS, HURRY, HURRY_SEC, LEVEL, noteFreq, parseMelody, songFor, barSec, barEvents, scheduleBar, makeBus, hurryLeft, musicMode } from '../js/gamesong.js';
 import { GAMES } from '../js/minigame.js';
 import { advStart, advCam, advHurry, ADV_W, GROUND } from '../js/gameadv.js';
+import { getDaily, mergeDailyDelta, emptyDaily } from '../js/db.js';
+import { usageFiles } from '../js/upload.js';
+import { PLACES } from '../js/usage.js';
+
+void fakeIdb;
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const near = (a, b) => Math.abs(a - b) < 1e-6;
@@ -201,6 +208,7 @@ before(async () => {
   mem.set('shincoach.gameMusicPos', JSON.stringify({ busy: 6, run: 'x', think: -1 })); // 지난번에 바쁘다 바빠 7마디에서 끊겼다 · 깨진 값은 버림
   globalThis.window = { AudioContext: FakeCtx, addEventListener: (t, fn) => { winL[t] = fn; } };
   globalThis.document = { hidden: false, addEventListener: (t, fn) => { docL[t] = fn; } };
+  await getDaily('2000-01-01'); // 가짜 저장소 열기 (v337 기록)
   sfx = await import('../js/sfx.js');
   gb = await import('../js/gamebgm.js');
   gb.GAME_BGM.tick = 0; // 저절로 돌지 않게 — gameMusicTick을 직접 부른다
@@ -404,6 +412,127 @@ test('🎵 타이머 — 판이 시작되면 0.1초 따지기 하나(node 시험
   }
   const src = read('js/gamebgm.js');
   assert.ok(src.includes("if (st.timer && typeof st.timer.unref === 'function') st.timer.unref();"));
+});
+
+// ───────────────────── 📤 기록 (v337) ─────────────────────
+
+const todayKey337 = () => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+const wait337 = () => new Promise((r) => setTimeout(r, 30));
+
+test('📤 v337 게임 음악 기록 — 소리가 난 초는 소리 장치 시계로 뺄 때 한 번에(한 번에 600초까지) · 🔇 끈 수·다시 켠 수 · 소리가 안 났으면(⚙ 끔) 초 없음 · 기기 시계는 상관없음 (Codex 141차)', async () => {
+  const day = todayKey337();
+  const val = async (k) => Number((await getDaily(day))[k]) || 0;
+  await wait337();
+  const s0 = await val('gameMusicSec');
+  const off0 = await val('gameMusicOff');
+  const on0 = await val('gameMusicOn');
+  const ctx = ctxNow();
+  ctx.state = 'running';
+  const realNow = Date.now;
+  try {
+    gb.gameMusicStart('dig', probe);
+    assert.equal(gb.gameMusicState().playing, true);
+    ctx.currentTime += 42.5;
+    Date.now = () => realNow() + 3_600_000; // 기기 시계가 건너뛰어도 셈은 소리 장치 시계로
+    gb.gameMusicStop();
+    Date.now = realNow;
+    await wait337();
+    assert.equal(await val('gameMusicSec'), s0 + 42, '틀어 둔 42.5초 → 42');
+    gb.gameMusicStart('dig', probe);
+    ctx.currentTime += 3600;
+    gb.gameMusicStop();
+    await wait337();
+    assert.equal(await val('gameMusicSec'), s0 + 42 + 600, '한 번에 600초까지');
+    gb.setGameBgmEnabled(false);
+    gb.gameMusicStart('dig', probe);
+    assert.equal(gb.gameMusicState().playing, false);
+    ctx.currentTime += 30;
+    gb.gameMusicStop();
+    gb.setGameBgmEnabled(true);
+    await wait337();
+    assert.equal(await val('gameMusicSec'), s0 + 642, '소리가 안 났으면 안 셈');
+    gb.gameMusicStart('pair', probe);
+    ctx.currentTime += 10;
+    assert.equal(gb.toggleGameMusic(), false); // 🔇 — 빼면서 10초를 센다
+    await wait337();
+    assert.deepEqual([await val('gameMusicOff'), await val('gameMusicOn')], [off0 + 1, on0], '끄면 끈 수만');
+    ctx.currentTime += 20; // 꺼 둔 동안은 안 셈
+    assert.equal(gb.toggleGameMusic(), true);
+    ctx.currentTime += 5;
+    gb.gameMusicStop();
+    await wait337();
+    assert.deepEqual([await val('gameMusicOff'), await val('gameMusicOn')], [off0 + 1, on0 + 1], '끈 수·다시 켠 수');
+    assert.equal(await val('gameMusicSec'), s0 + 642 + 15, '켜 둔 동안만(10 + 5)');
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('📤 v337 끝나는 길마다 초를 한 번만 — 판 끝(stop) · 게임 바꿈 · 앱 내림 · pagehide · 장치 잠듦(잠든 동안은 시계도 멈춤) · 다시 틀면 새로 셈 (Codex 141차)', async () => {
+  const day = todayKey337();
+  const val = async () => Number((await getDaily(day)).gameMusicSec) || 0;
+  await wait337();
+  const s0 = await val();
+  const ctx = ctxNow();
+  ctx.state = 'running';
+  // 판 끝 — 빼고 나서는 더 안 센다
+  gb.gameMusicStart('tower', probe);
+  ctx.currentTime += 3;
+  mode = 'stop';
+  gb.gameMusicTick();
+  ctx.currentTime += 50;
+  gb.gameMusicTick();
+  mode = 'play';
+  gb.gameMusicStop();
+  await wait337();
+  assert.equal(await val(), s0 + 3, '판 끝 3초 · 끝난 뒤 50초는 안 셈');
+  // 게임 바꿈 — 앞 곡 4초 · 뒤 곡 6초
+  gb.gameMusicStart('dig', probe);
+  ctx.currentTime += 4;
+  gb.gameMusicStart('run', probe);
+  ctx.currentTime += 6;
+  gb.gameMusicStop();
+  await wait337();
+  assert.equal(await val(), s0 + 13);
+  // 앱 내림 → 다시 보임 → 새로 틀면 그때부터
+  gb.gameMusicStart('dig', probe);
+  ctx.currentTime += 5;
+  document.hidden = true;
+  docL.visibilitychange();
+  ctx.currentTime += 100; // 내려 둔 동안
+  gb.gameMusicTick();
+  document.hidden = false;
+  gb.gameMusicTick();
+  ctx.currentTime += 2;
+  winL.pagehide();
+  await wait337();
+  assert.equal(await val(), s0 + 20, '내림 5초 + 다시 튼 뒤 2초(pagehide) · 내려 둔 100초는 안 셈');
+  // 장치 잠듦 — 그 전 7초 · 깨어나 3초
+  gb.gameMusicTick();
+  ctx.currentTime += 7;
+  ctx.state = 'suspended';
+  gb.gameMusicTick();
+  ctx.state = 'running';
+  gb.gameMusicTick();
+  ctx.currentTime += 3;
+  gb.gameMusicStop();
+  await wait337();
+  assert.equal(await val(), s0 + 30, '잠들기 전 7초 + 깨어나 3초');
+});
+
+test('📤 v337 하루 기록 칸 · usage/날짜.md 한 줄 — 🎮🎵 게임 음악(소리가 난 시간 · 🔇 끔 · 다시 켬) · 읽는 법 · 없으면 줄도 없음 · 바로 끈 날도 보임', () => {
+  assert.equal(emptyDaily('2026-10-25').gameMusicSec, 0);
+  const m = mergeDailyDelta(mergeDailyDelta(null, '2026-10-25', { gameMusicSec: 40, gameMusicOff: 1 }), '2026-10-25', { gameMusicSec: 25, gameMusicOn: 1 });
+  assert.deepEqual([m.gameMusicSec, m.gameMusicOff, m.gameMusicOn], [65, 1, 1]);
+  const day = '2026-10-25';
+  const [f] = usageFiles([{ date: day, appOpens: 1, uGame: 300, gamePlays: 3, gameMusicSec: 125, gameMusicOff: 1, gameMusicOn: 1 }], day, PLACES);
+  const line = f.text.split('\n').find((l) => l.startsWith('- 10-25:'));
+  assert.ok(line.includes('🎮 게임 3판 · 🎮🎵 게임 음악 2분 · 🔇 끔 1번 · 다시 켬 1번'), line);
+  assert.ok(f.text.includes('- 🎮🎵 게임 음악 = 게임기에서 한 판 동안 음악이 나온 시간 (v337부터 · 기기 음량·음소거는 알 수 없음'), '읽는 법');
+  const [g] = usageFiles([{ date: day, appOpens: 1, gamePlays: 2 }], day, PLACES);
+  assert.ok(!g.text.split('\n').find((l) => l.startsWith('- 10-25:')).includes('게임 음악'), '없으면 줄도 없음');
+  const [h] = usageFiles([{ date: day, appOpens: 1, gameMusicOff: 1 }], day, PLACES);
+  assert.ok(h.text.includes('🎮🎵 게임 음악 0분 · 🔇 끔 1번'), '바로 끈 날도 보인다');
 });
 
 // ───────────────────── 화면 잇기 ─────────────────────

@@ -9,9 +9,12 @@
 //   · 효과음(sfx 한 음 0.14~0.2)보다 작게 — 곡 전체 최고점 ≈ 0.7 × GAME_BGM.volume
 // ★ 지킴이: "멈춰야 하나"는 0.1초마다 처음부터 다시 따진다 (calm.js와 같이 — 켜는 신호·끄는 신호의 짝을 맞추지 않는다)
 // ★ 화면(DOM)을 만지지 않는다 — 🎵 단추 모양은 gameview가 gameMusicOn()으로 그린다
+// 📤 기록(v337 · calm.js와 같은 꼴): 소리가 난 초(gameMusicSec — 틀 때부터 뺄 때까지 소리 장치 시계로 · 기기 음량·음소거는 모름) · 🎵로 끈 수(gameMusicOff)·켠 수(gameMusicOn)
+//   → usage/날짜.md 한 줄 — 게임 음악을 진우가 좋아하는지 "올라온 거 봐 줘"에서 본다(아이 화면엔 셈이 안 보인다)
 
 import { songFor, barSec, makeBus, scheduleBar } from './gamesong.js';
 import { audioContext, unlockMusic } from './sfx.js';
+import { applyDailyDelta } from './db.js';
 
 const ON_KEY = 'shincoach.gameMusicOn';
 const POS_KEY = 'shincoach.gameMusicPos';
@@ -24,6 +27,7 @@ export const GAME_BGM = {
   tick: 100,     // 따지기·예약 주기(ms)
   ahead: 0.25,   // 이만큼 앞의 마디까지 미리 예약(초) — 짧게 두어 ⏰가 바로 다음 마디부터
   phrase: 4,     // 이어서 틀 때 이 마디 덩이의 처음부터
+  secMax: 600,   // 한 번 틀어 둔 동안 세는 윗값(초) — 판은 길어야 2분 남짓 · 무엇이 꼬여도 몇 시간이 들어가지 않게
 };
 
 const st = {
@@ -55,6 +59,16 @@ function loadPos() {
 
 function savePos() {
   try { localStorage.setItem(POS_KEY, JSON.stringify(st.pos)); } catch { /* 저장 못 해도 음악은 나온다 */ }
+}
+
+function todayKey(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** 📤 하루 기록에 더하기 — 못 적어도 음악은 그대로 */
+function note(delta) {
+  applyDailyDelta(todayKey(), delta).catch(() => {});
 }
 
 /** 지금 상태 (시험·진단용) */
@@ -99,7 +113,7 @@ function start(ctx, song) {
   master.connect(ctx.destination);
   const b = (st.pos[song.id] || 0) % song.bars.length;
   st.pos[song.id] = b - (b % GAME_BGM.phrase); // 덩이 가운데서 시작하면 어색하다
-  st.run = { ctx, master, bus: makeBus(ctx, master), song, nextAt: t0 + 0.02, live: [], hurry: false };
+  st.run = { ctx, master, bus: makeBus(ctx, master), song, nextAt: t0 + 0.02, live: [], hurry: false, c0: ctx.currentTime };
 }
 
 /** 앞으로 ahead초 안에 시작할 마디를 예약 — hurry면 그 마디는 빠르게 + 째깍 · 곡 끝이면 처음으로 */
@@ -123,6 +137,10 @@ function fadeOut(sec = GAME_BGM.fadeOut) {
   const r = st.run;
   if (!r) return;
   st.run = null;
+  // 📤 틀어 둔 초 — 뺄 때 한 번에 (판 하나는 짧아 모아 둘 까닭이 없다 · 윗값 secMax)
+  //   소리 장치의 시계(currentTime)로 잰다 — 장치가 잠든(suspended) 동안은 이 시계도 멈춰 조용한 시간이 안 들어가고, 기기 시계가 건너뛰어도 상관없다 (🔍 Codex 141차)
+  const played = Math.floor(Math.min(GAME_BGM.secMax, r.ctx.currentTime - r.c0));
+  if (played > 0) note({ gameMusicSec: played });
   const t = r.ctx.currentTime;
   try {
     const g = r.master.gain;
@@ -201,6 +219,7 @@ export function gameMusicStop(tune) {
 export function toggleGameMusic() {
   st.on = !st.on;
   try { localStorage.setItem(ON_KEY, st.on ? '1' : '0'); } catch { /* 이번만 */ }
+  note(st.on ? { gameMusicOn: 1 } : { gameMusicOff: 1 });
   if (st.on && st.allowed) unlockMusic(); // 누른 손길 안 — 판 도중에 다시 켜도 소리가 나게
   gameMusicTick();
   return st.on;

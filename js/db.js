@@ -374,6 +374,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'uStock',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
+  // 🎵 게임기 음악 (2026-10-25 v337, gamebgm.js) — 소리가 난 초 · 게임기 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
+  'gameMusicSec', 'gameMusicOff', 'gameMusicOn',
   // ✍️ 에세이 고친 문장을 🎤로 따라 읽어 통과해 받은 🔶 수 (2026-10-22 v318) — 받기는 applyEssaySayStone(가방과 한 트랜잭션)
   'essaySayStones',
   // 📈 국어 읽기 날마다 합계 (2026-10-22 v314, korean.korDayDelta) — 읽은 글 · 처음/다시 읽기 첫 번 맞힘 · 📍 근거 · 🧠 (읽은 기록 줄이 새로 생길 때만 더함)
