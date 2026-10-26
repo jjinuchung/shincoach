@@ -13,7 +13,7 @@ const seenA = (state, today, read) => visibleCards(ALL, state, today, read).map(
 const day = (m, d) => `2026-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
 test('📦 셋째 묶음 b322 — 열둘 K131~K142 · b320 다음에 이어서 · 포켓몬 글이 첫날 · 6단원 이어질 내용은 끝 무렵', () => {
-  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320', 'b322'], '저장 열쇠는 바꾸지 않는다');
+  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320', 'b322', 'b347'], '저장 열쇠는 바꾸지 않는다 (v347 넷째 묶음 b347 — kordrip347)');
   const b = DRIP.bundles[1];
   assert.equal(b.after, 'b320');
   assert.deepEqual(B.slice().sort(), Array.from({ length: 12 }, (_, i) => `K${131 + i}`));
@@ -24,7 +24,7 @@ test('📦 셋째 묶음 b322 — 열둘 K131~K142 · b320 다음에 이어서 �
 
 test('🔗 이어서 열림 — b320 시작 10/23 → b320 10/28에 다 열림 → b322는 10/29부터 두 편씩 · 11/3에 모두', () => {
   const S = { b320: day(10, 23), b322: day(10, 24) }; // b322를 b320 이튿날 받음
-  assert.deepEqual(startsOf(S, day(10, 24)), { b320: day(10, 23), b322: day(10, 29) });
+  assert.deepEqual(startsOf(S, day(10, 24)), { b320: day(10, 23), b322: day(10, 29), b347: day(11, 4) }, 'v347 b347은 b322가 다 열린 다음 날');
   for (let d = 23; d <= 28; d++) assert.deepEqual(seenB(S, day(10, d)), [], `10/${d} b322는 아직`);
   assert.equal(seenA(S, day(10, 28)).length, 12);
   assert.deepEqual(seenB(S, day(10, 29)), ['K142', 'K137']);
@@ -52,7 +52,7 @@ test('📅 b320을 다 연 지 오래 뒤에 b322를 받으면 받은 날부터 
   assert.deepEqual(seenB(both, day(11, 1)), [], '하루 네 편 아님');
   assert.deepEqual(seenB(both, day(11, 7)), ['K142', 'K137']);
   // 시작 날이 하나도 없음 — b320은 오늘 첫날 몫 · b322는 엿새 뒤
-  assert.deepEqual(startsOf({}, day(11, 1)), { b322: day(11, 7) });
+  assert.deepEqual(startsOf({}, day(11, 1)), { b322: day(11, 7), b347: day(11, 13) });
   assert.deepEqual(seenA({}, day(11, 1)), ['K121', 'K123']);
   assert.deepEqual(seenB({}, day(11, 1)), []);
   assert.deepEqual(startsOf({}, 'nope'), {}, '날이 깨지면 이어 셀 수 없음');
@@ -73,7 +73,7 @@ test('🌱 오늘 새로 열린 글 — b322 첫날은 b322 두 편만 · 그 �
   assert.deepEqual(freshIds(S, day(10, 29)), ['K142', 'K137']);
   assert.deepEqual(freshIds(S, day(10, 30), ['K138']), ['K136']);
   assert.deepEqual(freshIds(S, day(11, 3)), ['K141', 'K135']);
-  assert.deepEqual(freshIds(S, day(11, 4)), []);
+  assert.deepEqual(freshIds(S, day(11, 4)), ['K150', 'K151'], 'v347 — 11/4는 b347 첫날 두 편');
   assert.deepEqual(freshIds(S, day(10, 1)), ['K121', 'K123'], '시계를 뒤로 — b320 첫날 몫만');
   assert.deepEqual(freshIds({}, day(11, 1)), ['K121', 'K123'], '시작 날이 없으면 b320 첫날 몫만');
   for (let d = 23; d <= 31; d++) {
@@ -91,7 +91,7 @@ test('🚩 시작 날 적기·병합 — b322도 원고에 글이 들어오면 �
   assert.deepEqual(p.korDrip, { b320: day(10, 23), b322: day(10, 24) });
   assert.equal(dripStartRule(p, day(10, 25), ['K142']).why, 'same');
   assert.deepEqual(mergeDrip({ b322: day(10, 26) }, { b322: day(10, 24) }), { b322: day(10, 24) });
-  assert.deepEqual(withFirst({ b320: day(10, 23) }, day(10, 24)), { b320: day(10, 23), b322: day(10, 24) });
+  assert.deepEqual(withFirst({ b320: day(10, 23) }, day(10, 24)), { b320: day(10, 23), b322: day(10, 24), b347: day(10, 24) });
   assert.equal(startsOf(withFirst({ b320: day(10, 23) }, day(10, 24)), day(10, 24)).b322, day(10, 29));
 });
 
@@ -100,7 +100,7 @@ test('🔀 두 기기 병합 — b320 시작이 서로 다르면 이른 날 · b
   const pc = { b320: day(10, 20) }; // 다른 기기가 먼저 받음
   const M = mergeDrip(tab, pc);
   assert.deepEqual(M, { b320: day(10, 20), b322: day(10, 24) });
-  assert.deepEqual(startsOf(M, day(10, 26)), { b320: day(10, 20), b322: day(10, 26) });
+  assert.deepEqual(startsOf(M, day(10, 26)), { b320: day(10, 20), b322: day(10, 26), b347: day(11, 1) });
   assert.equal(seenA(M, day(10, 25)).length, 12, '10/25 b320 모두');
   assert.deepEqual(seenB(M, day(10, 25)), [], '10/25 b322는 아직');
   assert.deepEqual(seenB(M, day(10, 26)), ['K142', 'K137'], '10/26 b322 첫날 몫');

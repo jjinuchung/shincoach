@@ -78,7 +78,7 @@ const codesOf = (c) => c.meta.flatMap((m) => [...m.matchAll(/\[(6국0\d-0\d)\]/g
 test('📚 새 글 12편 (v261): 연습 여덟 + ✨ 명작 넷 · 물음 마흔여섯 · 원고 검사 통과 · 단원 지도 · ✍️ 둘', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(IDS.slice(60, 72), NEW);
-  assert.equal(validCards(DATA).length, 142); // v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 154); // v265 신문 글 여섯 · v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 · v347 4학년 2학기 글 넷째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '기사문'], ['practice', '주장하는 글'], ['practice', '제안하는 글 두 편'], ['practice', '설명하는 글'], ['practice', '설명하는 글'],
     ['practice', '동화'], ['practice', '생활문'], ['practice', '극본'], ['classic', '동시'], ['classic', '동시'], ['classic', '옛이야기'], ['classic', '옛 소설']]);
@@ -182,7 +182,7 @@ test('📘 성취기준 문구 (v261): 원고의 [6국…] 뒤 문구는 2022 �
 
 test('📄 글 꼴 layout rows (v261): 극본의 대사·두 사람의 글·기사 제목은 문장마다 줄 — 그 세 카드에만 · 원고 검사가 잡는 것 · 화면은 is-rows', () => {
   assert.deepEqual(Object.keys(LAYOUTS), ['rows']);
-  assert.deepEqual(DATA.cards.filter((c) => Object.hasOwn(c, 'layout')).map((c) => [c.id, c.layout]), [['K15', 'rows'], ['K23', 'rows'], ['K48', 'rows'], ['K61', 'rows'], ['K63', 'rows'], ['K68', 'rows'], ['K73', 'rows'], ['K74', 'rows'], ['K75', 'rows'], ['K76', 'rows'], ['K77', 'rows'], ['K79', 'rows'], ['K81', 'rows'], ['K83', 'rows'], ['K85', 'rows'], ['K86', 'rows'], ['K88', 'rows'], ['K92', 'rows'], ['K98', 'rows'], ['K99', 'rows'], ['K100', 'rows'], ['K106', 'rows'], ['K107', 'rows'], ['K111', 'rows'], ['K114', 'rows'], ['K119', 'rows'], ['K126', 'rows'], ['K131', 'rows'], ['K135', 'rows'], ['K137', 'rows'], ['K138', 'rows']]); // v322 독서 대화·카드 뉴스·전화 대화·단체 대화 // v298 두 친구의 글·학급 회의·댓글 · v291 달구질 소리(노랫말은 줄마다) · v265 신문 기사 다섯(제목 줄) · v266 토의 둘·독서 모임 기록 · v267 안내문·모둠 대화·독서 대화 · v281 독서 대화·문자 대화·발표 준비 메모·토의 · v282 발표 준비 메모·토의·광고
+  assert.deepEqual(DATA.cards.filter((c) => Object.hasOwn(c, 'layout')).map((c) => [c.id, c.layout]), [['K15', 'rows'], ['K23', 'rows'], ['K48', 'rows'], ['K61', 'rows'], ['K63', 'rows'], ['K68', 'rows'], ['K73', 'rows'], ['K74', 'rows'], ['K75', 'rows'], ['K76', 'rows'], ['K77', 'rows'], ['K79', 'rows'], ['K81', 'rows'], ['K83', 'rows'], ['K85', 'rows'], ['K86', 'rows'], ['K88', 'rows'], ['K92', 'rows'], ['K98', 'rows'], ['K99', 'rows'], ['K100', 'rows'], ['K106', 'rows'], ['K107', 'rows'], ['K111', 'rows'], ['K114', 'rows'], ['K119', 'rows'], ['K126', 'rows'], ['K131', 'rows'], ['K135', 'rows'], ['K137', 'rows'], ['K138', 'rows'], ['K146', 'rows'], ['K147', 'rows'], ['K149', 'rows']]); // v347 두 친구의 글·학급 회의·모둠 대화 · v322 독서 대화·카드 뉴스·전화 대화·단체 대화 // v298 두 친구의 글·학급 회의·댓글 · v291 달구질 소리(노랫말은 줄마다) · v265 신문 기사 다섯(제목 줄) · v266 토의 둘·독서 모임 기록 · v267 안내문·모둠 대화·독서 대화 · v281 독서 대화·문자 대화·발표 준비 메모·토의 · v282 발표 준비 메모·토의·광고
   const bad = (fix) => { const c = JSON.parse(JSON.stringify(card('K68'))); fix(c); return checkCard(c).join(' '); };
   assert.equal(bad(() => {}), '');
   assert.match(bad((c) => { c.layout = 'cols'; }), /layout\(글 꼴\)은 rows만/);

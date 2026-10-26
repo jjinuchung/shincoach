@@ -34,7 +34,7 @@ const STD = {
 test('📰 신문 글 6편 (v265): 연습 카드 여섯 · 물음 스물넷 · 원고 검사 통과 · 기사 다섯은 제목 줄과 줄마다 꼴 · 단원 지도 · ✍️ 둘 · 🧩 차례 둘 · sw v265', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(DATA.cards.slice(72, 78).map((c) => c.id), NEW);
-  assert.equal(validCards(DATA).length, 142); // v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 154); // v267 단원 채우기 여섯 · v281 새 글 열둘 · v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 · v347 4학년 2학기 글 넷째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '기사문'], ['practice', '기사문'], ['practice', '기사문'], ['practice', '기사문'], ['practice', '기사문'], ['practice', '설명하는 글']]);
   assert.deepEqual(NEW.map((id) => card(id).qs.length), [4, 4, 4, 4, 4, 4]);
@@ -117,7 +117,7 @@ test('📰 바탕 글 (v265): 신문 기사를 다시 쓴 글은 source에 밝�
     assert.match(s, /신코치가 쉬운 말로 다시 썼어요\.$/, id);
     assert.ok([...s].length <= SOURCE_MAX, id);
   }
-  assert.deepEqual(DATA.cards.filter((c) => c.source).map((c) => c.id), [...NEW, 'K103', 'K104', 'K105', 'K106', 'K131', 'K133', 'K135'], 'source는 바탕 글이 있는 새 글에만 (v291 호상놀이 글 넷 — 보존회 책자 · v322 이솝 독서 대화·글자·손 씻기 카드 뉴스)');
+  assert.deepEqual(DATA.cards.filter((c) => c.source).map((c) => c.id), [...NEW, 'K103', 'K104', 'K105', 'K106', 'K131', 'K133', 'K135', 'K143', 'K144', 'K150', 'K153'], 'source는 바탕 글이 있는 새 글에만 (v291 호상놀이 글 넷 — 보존회 책자 · v322 이솝 독서 대화·글자·손 씻기 카드 뉴스 · v347 뼈 독서 일기·이솝 감상문·잉어킹 발표·동파 설명 글)');
   // 원고 검사가 잡는 것 — 빈 글 · 너무 긴 글 · 명작 카드
   const bad = (fix, base = 'K73') => { const c = JSON.parse(JSON.stringify(card(base))); fix(c); return checkCard(c).join(' '); };
   assert.equal(bad(() => {}), '');
