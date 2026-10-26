@@ -22,6 +22,7 @@ import { ENGLISH_STONE_HOW, VIDEO_TIERS } from './items.js'; // 🔶 영어스�
 import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport, readState, readSummary } from './upload.js'; // 📤 Claude에게 기록 보내기 (2026-10-06)
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
 import { writeTodo } from './korwrite.js'; // ✍️ 국어 서술형 — 답장 기다리는 글 수 (v237)
+import { journeyRows, rowText, journeyOf, qLine, STOPS as JR_STOPS } from './journey.js'; // 🎒 포켓몬 대여행 (v341 — 순수)
 import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질문 카드도 화면·복사문처럼 (v256)
 import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
 import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
@@ -443,6 +444,30 @@ export async function renderStats() {
     cr.appendChild(row);
     main.appendChild(cr);
   }
+
+  // 🎒 포켓몬 대여행 (v341) — 주마다 결과·과목별 맞힌 수·잃은 것 (📤 usage/journey.md와 같은 말) · 한 번도 안 떠났으면 카드 없음
+  try {
+    const jRaw = getProfileSnapshot().journey;
+    const jRows = journeyRows(jRaw).slice(0, 8);
+    const jCur = journeyOf(jRaw).cur;
+    if (jRows.length || jCur) {
+      const cj = card('🎒 포켓몬 대여행');
+      cj.appendChild(el('p', 'stats-note', '토요일에 열려 다음 금요일까지 한 번 — 데리고 있는 6마리와 만남 9번, 이미 배운 문제로 배틀해요(공부 기록엔 안 남겨요). ❤️ 5개를 다 쓰면 스톤 20%·코인 30%를 잃고, 끝까지 가면 💰500·스톤·레벨 +1·야생 포켓몬 하나.'));
+      if (jCur) {
+        const row = el('div', 'stats-row');
+        row.appendChild(el('span', 'name', `${jCur.week} 주 · 지금 여행`));
+        row.appendChild(el('span', 'meta', `${jCur.phase === 'pick' ? '끝까지 감 — 데려올 포켓몬 고르는 중' : `만남 ${jCur.at + 1}/${JR_STOPS} · ❤️ ${jCur.hearts}`} · ${qLine(jCur.q)}`));
+        cj.appendChild(row);
+      }
+      for (const r of jRows) {
+        const row = el('div', 'stats-row');
+        row.appendChild(el('span', 'name', `${r.week} 주`));
+        row.appendChild(el('span', 'meta', rowText(r, monKo)));
+        cj.appendChild(row);
+      }
+      main.appendChild(cj);
+    }
+  } catch { /* 이 카드 하나 때문에 📊가 비지 않게 */ }
 
   // 📈 주간 흐름 (2026-10-18 v287, 아버님 "이대로 진행") — 과목마다 최근 7일씩 4주 · 지난주와 견준 ↑↓ · 📤에도 같은 표(usage/weekly.md)
   //    표 하나 못 그려도 나머지 기록은 그대로 (새 칸 하나 때문에 📊가 비지 않게)

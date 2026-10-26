@@ -1078,7 +1078,8 @@ test('화면 연결: 한 줄 요약은 표·도형 배열을 글로 · 문제 �
   const src = readFileSync('js/math.js', 'utf8');
   // 문항·쌍둥이·배틀·배움 확인 질문·📬 답장 — 문제 글을 richNode로 바로 그리는 자리가 남지 않았다
   // (문항·쌍둥이는 📊 K 그리기 문항이면 그래프를 뺀 글 — qtNode(qTextOf(q, draw)), 2026-10-01)
-  assert.equal((src.match(/qtNode\((?:q\.q|check\.q|ask\.q|qTextOf\(q, draw\))\)/g) || []).length, 5);
+  // (+ 🎒 포켓몬 대여행 수학 원천 journeyMathSource — 배틀과 같은 계산 문제, v341)
+  assert.equal((src.match(/qtNode\((?:q\.q|check\.q|ask\.q|qTextOf\(q, draw\))\)/g) || []).length, 6);
   assert.doesNotMatch(src, /richNode\((?:q\.q|check\.q|ask\.q)\)/);
   assert.match(src, /const oneLine = \(t\) => figText\(t, true\)\.replace\(\/\\\*\\\*\/g, ''\)/, '한 줄 요약은 ** 를 뺀다 (잘리면 반쪽 ** 가 보인다)');
   assert.equal(figText('[table □:1, 2 / △:3, 4] 식은?', true), '(표) 식은?', '한 줄 요약은 표를 짧게 — ❓ 버튼 26자를 표가 다 먹지 않게');

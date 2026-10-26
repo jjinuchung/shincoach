@@ -2593,6 +2593,36 @@ function battleQuestion(seed, stemKey = null) {
 }
 
 /**
+ * 🎒 포켓몬 대여행(v341) 수학 문제 원천 — **모든 줄기**에서 ✅ 다 배운 개념만(배우는 중인 칸은 안 낸다) · 배틀과 같은 계산 문제 ·
+ * **기록하지 않는다**(배틀과 같다 — 얼굴별 누적·오개념·🤔 노트를 안 건드린다)
+ * → { keys: 개념 id들, make(id, seed) → { id, label, qNode(), choices: [{ text, ok, node() }] } | null } · 다 배운 개념이 없으면 null
+ */
+export async function journeyMathSource() {
+  try {
+    if (!ui.opts) await buildOpts();
+    const st = await getMath();
+    const today = todayKey();
+    const keys = [];
+    for (const key of STEM_ORDER) for (const x of ladderOf(st, today, key)) if (x.state === 'done' && !keys.includes(x.id)) keys.push(x.id);
+    if (!keys.length) return null;
+    return {
+      keys,
+      make(id, seed) {
+        const sx = stemOf(id);
+        if (!sx) return null;
+        for (let t = 0; t < 6; t++) {
+          const q = sx.gen.makeQuestion(id, 'calc', ((Number(seed) || 0) + t * 7919) % 2147483647, { ...optsFor(sx.key), recent: [] });
+          if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.some((c) => c.ok)) {
+            return { id: `m:${id}`, label: `🔢 ${nameOf(id)}`, qNode: () => qtNode(q.q), choices: q.choices.map((c) => ({ text: String(c.text), ok: !!c.ok, node: () => richNode(c.text) })) };
+          }
+        }
+        return null;
+      },
+    };
+  } catch { return null; }
+}
+
+/**
  * 배틀의 한 턴을 그린다 — battle.js가 자리를 주고, 문제·보기·판정은 여기서.
  * @returns {Promise<{correct:boolean, skipped:boolean, interrupted:boolean}>}
  */

@@ -108,7 +108,8 @@ let failed = false; // 이번에 저장을 못 했다 — 다음에 앱을 열 �
 let deferred = false; // 다른 창이 열려 있어 미뤘다 — 홈으로 돌아오면 다시 (Codex 32차 #7)
 
 function anyModalOpen() {
-  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'hatch', 'timeup', 'take', 'taken', 'market']
+  // 🎒 대여행 창(v341) 위에도
+  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'hatch', 'timeup', 'take', 'taken', 'market', 'jr-trip']
     .some((id) => { const e = $(id); return e && !e.hidden; });
 }
 

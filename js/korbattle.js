@@ -43,17 +43,28 @@ export function offerRoll({ todayBattles = 0, max = 0, rng = Math.random } = {})
  * @param {Set<string>} [seen] 이번 배틀에 낸 문제 id
  */
 export function korBattleQ(words, states, seen = new Set(), rng = Math.random) {
-  const pool = (Array.isArray(words) ? words : []).filter((w) => w && w.deck !== 'passage' && own(DECKS, w.deck));
+  const pool = korPool(words);
   const learned = pool.filter((w) => own(states, w.id));
   const base = learned.length ? learned : pool;
   const fresh = base.filter((w) => !seen.has(w.id));
   for (const w of shuffle(fresh.length ? fresh : base, rng)) {
-    const q = makeQuestion(w, 'mean', pool, rng);
-    if (!q) continue;
-    const d = DECKS[w.deck];
-    return { id: w.id, label: `🔤 ${d ? `${d.icon} ${d.ko}` : '낱말'}`, q: q.prompt, choices: q.opts.map((o) => ({ text: o.t, ok: !!o.ok })) };
+    const q = korQFor(w, pool, rng);
+    if (q) return q;
   }
   return null;
+}
+
+/** 배틀에 쓰는 낱말 — 손질한 네 묶음만(📖 글에서 만난 낱말은 뺌 · 🎒 대여행 v341도 같은 것) */
+export function korPool(words) {
+  return (Array.isArray(words) ? words : []).filter((w) => w && w.deck !== 'passage' && own(DECKS, w.deck));
+}
+
+/** 낱말 하나로 뜻 고르기 → { id, label, q, choices } · 보기를 못 만들면 null (korBattleQ·🎒 대여행 v341) */
+export function korQFor(w, pool, rng = Math.random) {
+  const q = makeQuestion(w, 'mean', pool, rng);
+  if (!q) return null;
+  const d = DECKS[w.deck];
+  return { id: w.id, label: `🔤 ${d ? `${d.icon} ${d.ko}` : '낱말'}`, q: q.prompt, choices: q.opts.map((o) => ({ text: o.t, ok: !!o.ok })) };
 }
 
 /**
@@ -78,7 +89,7 @@ function topicOk(t) {
  * @param {Array} topics nonsul.allTopics · @param {object} played 주제 칸(nonsulMap)
  */
 export function nonsulBattleQ(topics, played, seen = new Set(), rng = Math.random) {
-  const list = (Array.isArray(topics) ? topics : []).filter(topicOk);
+  const list = nonsulPool(topics);
   const tried = list.filter((t) => own(played, t.id));
   const base = tried.length ? tried : list;
   const pairs = [];
@@ -86,6 +97,16 @@ export function nonsulBattleQ(topics, played, seen = new Set(), rng = Math.rando
   if (!pairs.length) return null;
   const fresh = pairs.filter(([t, side]) => !seen.has(`${t.id}:${side}`));
   const [t, side] = pick(fresh.length ? fresh : pairs, rng);
+  return nonsulQFor(t, side, rng);
+}
+
+/** 배틀에 쓸 수 있는 생활 주제 (🎒 대여행 v341도 같은 것) */
+export function nonsulPool(topics) {
+  return (Array.isArray(topics) ? topics : []).filter(topicOk);
+}
+
+/** 주제 하나·편 하나로 이유 고르기 → { id: '주제:편', label, q, choices } (nonsulBattleQ·🎒 대여행 v341) */
+export function nonsulQFor(t, side, rng = Math.random) {
   const other = side === 'yes' ? 'no' : 'yes';
   const choices = shuffle([
     { text: pick(t[side].reasons, rng), ok: true },
