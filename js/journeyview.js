@@ -362,7 +362,7 @@ function renderPrep() {
   stakes.appendChild(win);
   stakes.appendChild(lose);
   b.appendChild(stakes);
-  b.appendChild(el('p', 'jr-sub', '포켓몬은 잃지 않아요. 언제든 🏃 집으로 돌아올 수 있어요(그땐 보상도 없어요).'));
+  b.appendChild(el('p', 'jr-sub', `포켓몬은 잃지 않아요. 스톤은 과목마다 최대 ${JOURNEY.loseMax.stone}개, 💰은 최대 ${JOURNEY.loseMax.coins}까지만 잃어요. 언제든 🏃 집으로 돌아올 수 있어요(그땐 보상도 없어요).`));
   b.appendChild(note);
   go.addEventListener('click', () => start(party.slice(), run, go));
   b.appendChild(go);

@@ -22,7 +22,7 @@ import { ENGLISH_STONE_HOW, VIDEO_TIERS } from './items.js'; // 🔶 영어스�
 import { DATA_REPO, getToken, setToken, clearToken, uploadState, sendReport, readState, readSummary } from './upload.js'; // 📤 Claude에게 기록 보내기 (2026-10-06)
 import { EXTEND_MIN } from './timelimit.js'; // ⏳ 오늘 쓴 연장권 (2026-10-01)
 import { writeTodo } from './korwrite.js'; // ✍️ 국어 서술형 — 답장 기다리는 글 수 (v237)
-import { journeyRows, rowText, journeyOf, qLine, STOPS as JR_STOPS } from './journey.js'; // 🎒 포켓몬 대여행 (v341 — 순수)
+import { journeyRows, rowText, journeyOf, qLine, STOPS as JR_STOPS, JOURNEY } from './journey.js'; // 🎒 포켓몬 대여행 (v341 — 순수)
 import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질문 카드도 화면·복사문처럼 (v256)
 import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
 import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
@@ -452,7 +452,7 @@ export async function renderStats() {
     const jCur = journeyOf(jRaw).cur;
     if (jRows.length || jCur) {
       const cj = card('🎒 포켓몬 대여행');
-      cj.appendChild(el('p', 'stats-note', '토요일에 열려 다음 금요일까지 한 번 — 데리고 있는 6마리와 만남 9번, 이미 배운 문제로 배틀해요(공부 기록엔 안 남겨요). ❤️ 5개를 다 쓰면 스톤 20%·코인 30%를 잃고, 끝까지 가면 💰500·스톤·레벨 +1·야생 포켓몬 하나.'));
+      cj.appendChild(el('p', 'stats-note', `토요일에 열려 다음 금요일까지 한 번 — 데리고 있는 6마리와 만남 9번, 이미 배운 문제로 배틀해요(공부 기록엔 안 남겨요). ❤️ 5개를 다 쓰면 스톤 20%(과목마다 최대 ${JOURNEY.loseMax.stone}개)·코인 30%(최대 ${JOURNEY.loseMax.coins})를 잃고, 끝까지 가면 💰500·스톤·레벨 +1·야생 포켓몬 하나.`));
       if (jCur) {
         const row = el('div', 'stats-row');
         row.appendChild(el('span', 'name', `${jCur.week} 주 · 지금 여행`));

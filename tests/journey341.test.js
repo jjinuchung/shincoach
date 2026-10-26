@@ -268,29 +268,70 @@ test('🎉 끝까지 — 💰500·공부로 번 💰 · 스톤 1개씩 · 6마�
   assert.equal(stateOf(p.journey, '2026-10-26').mode, 'done');
 });
 
-test('💔 ❤️를 다 잃으면 — 스톤 20%·코인 30%(버림) · 포켓몬은 그대로 · 그 주 끝 · 미리 보기와 같은 셈', () => {
+test('💔 ❤️를 다 잃으면 — 스톤 20%·코인 30%(버림 · v343 상한 스톤 5·💰200) · 포켓몬은 그대로 · 그 주 끝 · 미리 보기와 같은 셈', () => {
   const p = pf({ coins: 999 });
   p.items.stone_math = 12; p.items.stone_english = 8; p.items.stone_korean = 4;
   const pv = lossPreview(p);
-  assert.deepEqual(pv, { items: { stone_math: [12, 10], stone_english: [8, 7], stone_korean: [4, 4] }, coins: [999, 700] });
+  assert.deepEqual(pv, { items: { stone_math: [12, 10], stone_english: [8, 7], stone_korean: [4, 4] }, coins: [999, 799] });
   const { cur } = started(p);
   const caught0 = { ...p.caught };
   const mons0 = JSON.stringify(p.mons);
   let r = null;
   for (let k = 0; k < JOURNEY.hearts; k++) { const c = journeyOf(p.journey).cur; r = answerRule(p, { id: c.id, qn: c.qn, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf); }
   assert.equal(r.end, 'lost');
-  assert.deepEqual(r.lost, { items: { stone_math: 2, stone_english: 1 }, coins: 299 });
-  assert.deepEqual([p.items.stone_math, p.items.stone_english, p.items.stone_korean, p.coins], [10, 7, 4, 700]);
+  assert.deepEqual(r.lost, { items: { stone_math: 2, stone_english: 1 }, coins: 200 });
+  assert.deepEqual([p.items.stone_math, p.items.stone_english, p.items.stone_korean, p.coins], [10, 7, 4, 799]);
   assert.deepEqual(p.caught, caught0);
   assert.equal(JSON.stringify(p.mons), mons0);
   const j = journeyOf(p.journey);
   assert.equal(j.cur, null);
-  assert.deepEqual(j.done['2026-10-24'].lost, { items: { stone_math: 2, stone_english: 1 }, coins: 299 });
+  assert.deepEqual(j.done['2026-10-24'].lost, { items: { stone_math: 2, stone_english: 1 }, coins: 200 });
   assert.deepEqual(j.done['2026-10-24'].q.korean, [0, 5]);
   assert.equal(answerRule(p, { id: cur.id, qn: 5, mon: 25, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed');
   // 셈: 버림 · 정수 셈이라 소수 오차 없음
-  for (const [c, left] of [[0, 0], [3, 3], [7, 5], [10, 7], [20, 14], [100, 70], [1001, 701]]) assert.equal(lossPreview({ coins: c, items: {} }).coins[1], left, `코인 ${c}`);
-  for (const [n, left] of [[0, 0], [4, 4], [5, 4], [9, 8], [10, 8], [15, 12], [100, 80]]) assert.equal(lossPreview({ coins: 0, items: { stone_math: n } }).items.stone_math[1], left, `스톤 ${n}`);
+  // 상한 경계(v343): 💰 666 → 199 잃음 · 667부터 200 · 스톤 29 → 5 · 30 → 6이지만 5
+  for (const [c, left] of [[0, 0], [3, 3], [7, 5], [10, 7], [20, 14], [100, 70], [396, 278], [666, 467], [667, 467], [670, 470], [1001, 801], [5000, 4800]]) assert.equal(lossPreview({ coins: c, items: {} }).coins[1], left, `코인 ${c}`);
+  for (const [n, left] of [[0, 0], [4, 4], [5, 4], [9, 8], [10, 8], [15, 12], [25, 20], [29, 24], [30, 25], [37, 32], [211, 206]]) assert.equal(lossPreview({ coins: 0, items: { stone_math: n } }).items.stone_math[1], left, `스톤 ${n}`);
+  assert.deepEqual(JOURNEY.loseMax, { stone: 5, coins: 200 }, '아버님이 정한 상한');
+  // 많이 모은 프로필: 잃기 뒤에도 상한만큼만 줄고 미리 보기와 같다
+  const rich = pf({ coins: 5000 });
+  Object.assign(rich.items, { stone_math: 211, stone_english: 3, stone_korean: 37 });
+  const rv = lossPreview(rich);
+  started(rich);
+  let rr = null;
+  for (let k = 0; k < JOURNEY.hearts; k++) { const c = journeyOf(rich.journey).cur; rr = answerRule(rich, { id: c.id, qn: c.qn, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf); }
+  assert.deepEqual(rr.lost, { items: { stone_math: 5, stone_korean: 5 }, coins: 200 });
+  assert.deepEqual([rich.items.stone_math, rich.items.stone_english, rich.items.stone_korean, rich.coins], [rv.items.stone_math[1], 3, rv.items.stone_korean[1], rv.coins[1]]);
+});
+
+// 🔍 Codex 147차 시험 둘 — 출발 화면을 본 뒤 잔액이 바뀌면 · 진 뒤 옛 백업과 병합
+test('🔍 Codex 147차: 출발 화면 뒤 잔액이 바뀌어도 마지막 오답 때 잔액으로 셈(상한·가진 것 안) · 진 기록은 옛 백업과 어느 쪽으로 합쳐도 그대로', () => {
+  const p = pf({ coins: 666 });
+  p.items.stone_math = 211;
+  assert.deepEqual([lossPreview(p).coins, lossPreview(p).items.stone_math], [[666, 467], [211, 206]], '출발 화면');
+  const { cur } = started(p);
+  const wrong = (q) => { const c = journeyOf(q.journey).cur; return answerRule(q, { id: c.id, qn: c.qn, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf); };
+  for (let k = 1; k < JOURNEY.hearts; k++) wrong(p);
+  assert.equal(journeyOf(p.journey).cur.hearts, 1);
+  // 여행 중에 코인을 많이 벌고(다른 과목) 수학스톤은 다른 창에서 거의 다 씀
+  p.coins = 5000; p.items.stone_math = 3;
+  const older = { ...cloneProfile(p), updatedAt: 1 }; // ❤️ 1 남은 옛 백업
+  const r = wrong(p);
+  assert.equal(r.end, 'lost');
+  assert.deepEqual(r.lost, { items: { stone_english: 1 }, coins: 200 }, '💰은 상한 200 · 🔷 3개는 20%가 0이라 안 잃음 · 🔶 8 → 1');
+  assert.deepEqual([p.coins, p.items.stone_math, p.items.stone_english, p.items.stone_korean], [4800, 3, 7, 4]);
+  // 병합(db.mergeStatRecord) — 최근 쪽 잔액 · 여행은 닫힘 · 잃은 기록 그대로 · 같은 답을 다시 보내도 안 받음
+  const recent = { ...cloneProfile(p), updatedAt: 9 };
+  for (const m of [mergeStatRecord('profile', recent, older), mergeStatRecord('profile', older, recent)]) {
+    assert.equal(m.coins, 4800, '코인은 최근 쪽');
+    assert.equal(m.items.stone_english, 7);
+    const j = journeyOf(m.journey);
+    assert.equal(j.cur, null, '❤️ 1의 옛 여행이 되살아나지 않는다');
+    assert.equal(j.done['2026-10-24'].r, 'lost');
+    assert.deepEqual(j.done['2026-10-24'].lost, { items: { stone_english: 1 }, coins: 200 });
+    assert.equal(answerRule(m, { id: cur.id, qn: JOURNEY.hearts - 1, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf).why, 'changed', '두 번 잃지 않는다');
+    assert.equal(m.coins, 4800);
+  }
 });
 
 test('🏃 집으로 — 잃는 것도 보상도 없이 그 주 끝 · ⏰ 다음 주가 된 뒤 답하면 집으로 닫힘(expired)', () => {
@@ -427,6 +468,7 @@ test('📊📤 글 — 결과·과목별 맞힌 수·데려온 포켓몬·잃은
   const md = journeyMd(raw, '2026-10-26', ko);
   assert.match(md, /# 🎒 포켓몬 대여행/);
   assert.match(md, /- 2026-10-24 주: 🎉 끝까지 감/);
+  assert.match(md, /❤️를 다 잃으면 스톤 20%\(과목마다 최대 5\)·💰 30%\(최대 200\)/, 'v343 상한을 아빠 기록에도');
   const { p } = started();
   assert.match(journeyMd(p.journey, '2026-10-26', ko), /## 지금 여행 \(2026-10-24 주\)\n\n- 만남 1\/9 · ❤️ 5/);
 });
@@ -465,6 +507,36 @@ test('★ 저장 경로 — 떠나기·답·데려오기가 저장된 프로필�
   assert.equal((await journeyPick({ id: 'savetrip1', mon: 25 })).why, 'changed');
 });
 
+// 🔍 Codex 147차: ❤️ 1에서 마지막 오답 — 저장이 실패하면 없던 일 · 두 창이 동시에 보내도 상한만큼 한 번만
+test('★ 🔍 Codex 147차 저장 경로 — ❤️ 1의 마지막 오답: 저장 실패면 잔액·❤️·기록 그대로 · 동시에 두 번 보내도 한 번만 잃음(💰200 · 스톤 5)', async () => {
+  await initProfile();
+  await flushProfile();
+  const cur0 = stored() || emptyProfile();
+  const rich = pf({ coins: 5000 });
+  Object.assign(rich.items, { stone_math: 211, stone_english: 3, stone_korean: 37 });
+  fakeIdb.put('profile', { ...rich, updatedAt: (cur0.updatedAt || 0) + 1 });
+  await reloadProfile();
+  assert.equal((await journeyStart({ id: 'savetrip2', party: PARTY, route: makeRoute(cands(), seeded(22)) })).ok, true);
+  const wrongReq = () => { const c = journeyOf(stored().journey).cur; return { id: 'savetrip2', qn: c.qn, mon: 1, subj: 'math', correct: false }; };
+  for (let k = 1; k < JOURNEY.hearts; k++) assert.equal((await journeyAnswer(wrongReq())).ok, true);
+  assert.equal(journeyOf(stored().journey).cur.hearts, 1);
+  const week = journeyOf(stored().journey).cur.week;
+  const before = JSON.stringify([stored().coins, stored().items, stored().journey]);
+  fakeIdb.failNext('profile');
+  assert.deepEqual(await journeyAnswer(wrongReq()), { ok: false, why: 'save' });
+  assert.equal(JSON.stringify([stored().coins, stored().items, stored().journey]), before, '저장 실패 — 잔액·❤️·기록 그대로');
+  assert.equal(getProfileSnapshot().coins, 5000, '창의 프로필도');
+  const req = wrongReq();
+  const rs = await Promise.all([journeyAnswer(req), journeyAnswer(req)]);
+  assert.deepEqual(rs.map((r) => r.ok).sort(), [false, true]);
+  assert.equal(rs.find((r) => r.ok).end, 'lost');
+  assert.equal(rs.find((r) => !r.ok).why, 'changed');
+  const s = stored();
+  assert.deepEqual([s.coins, s.items.stone_math, s.items.stone_english, s.items.stone_korean], [4800, 206, 3, 32], '한 번만 · 상한만큼');
+  assert.deepEqual(journeyOf(s.journey).done[week].lost, { items: { stone_math: 5, stone_korean: 5 }, coins: 200 });
+  assert.equal(journeyOf(s.journey).cur, null);
+});
+
 test('🔤 대사창 글꼴에 든 글자 — 포켓몬 이름·기술·여행 글은 모두 자주 쓰는 한글 2,350자 안 (fonts/galmuri11.woff)', () => {
   const dec = new TextDecoder('euc-kr');
   const ks = new Set();
@@ -488,6 +560,9 @@ test('🔗 배선 — 홈 카드 자리 · 앱 셸 · 글꼴 · 다른 창이 �
   assert.match(src('js/usage.js'), /\{ place: 'journey', ids: \['jr-trip'\] \}/);
   // 창 id는 페이지에 하나뿐 — 'journey'는 영어 플레이어의 여행 길 막대가 쓴다(겹치면 겹침 목록이 그 막대를 「떠 있는 창」으로 본다 · 진짜 화면 시험이 잡음)
   assert.match(src('js/journeyview.js'), /root\.id = 'jr-trip';/);
+  // v343 상한은 아이 안내·📊 설명에도 같은 값으로 (🔍 Codex 147차 — 「스톤은 5개」가 합계처럼 읽혔다)
+  assert.ok(src('js/journeyview.js').includes('스톤은 과목마다 최대 ${JOURNEY.loseMax.stone}개, 💰은 최대 ${JOURNEY.loseMax.coins}까지만 잃어요'), '출발 안내');
+  assert.ok(src('js/stats.js').includes('스톤 20%(과목마다 최대 ${JOURNEY.loseMax.stone}개)·코인 30%(최대 ${JOURNEY.loseMax.coins})를 잃고'), '📊 설명');
   assert.doesNotMatch(src('index.html'), /id="jr-trip"/);
   assert.match(src('index.html'), /id="journey" class="journey"/);
   assert.match(src('js/db.js'), /'uJourney',/);

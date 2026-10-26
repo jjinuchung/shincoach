@@ -2,7 +2,7 @@
 // 일주일에 한 번(토요일에 열려 다음 금요일까지 한 번) 데리고 있는 포켓몬 6마리와 산 → 바다 → 🏥 → 하늘 → 우주 → 🚀 로켓단을 여행한다.
 // 만남(야생·트레이너·로켓단)마다 6마리 중 하나를 내보내고 이미 배운 문제(수학·영어·국어·논술 — 배틀과 같은 꼴)를 푼다:
 //   맞히면 상대 HP 1칸(타입이 유리하면 2칸) · 틀리면 ❤️ 1개 · 바다를 지나 🏥에서 ❤️ 2개(최대 5) · 만남마다 🔄 다른 문제 한 번
-//   ❤️를 다 잃으면 🔷🔶🟩 스톤은 가진 것의 20%·💰 30%(버림) — 포켓몬은 안 잃는다 · 🏃 집으로는 잃는 것도 보상도 없이 그 주 끝
+//   ❤️를 다 잃으면 🔷🔶🟩 스톤은 가진 것의 20%·💰 30%(버림) — 상한 스톤 과목마다 5 · 💰 200(v343) — 포켓몬은 안 잃는다 · 🏃 집으로는 잃는 것도 보상도 없이 그 주 끝
 //   끝까지 가면 💰500 · 스톤 1개씩 · 함께 간 6마리 레벨 +1(못 올리면 그 포켓몬을 키우는 스톤 1개) · 이긴 야생 포켓몬 넷 중 하나를 데려온다
 // 저장: profile.journey = { cur: 지금 여행 | null, done: { 그 주 토요일 'YYYY-MM-DD': { r: 'won'|'lost'|'home', at, q, pick?, lost?, lv?, sub? } } }
 //   · 바꾸기는 모두 xp.houseDo(저장된 프로필로 한 트랜잭션 — 두 창·두 번 누름이 두 번 잃거나 두 번 받지 않게) · 답은 qn(몇 번째 문제)이 맞아야 받는다
@@ -20,6 +20,8 @@ export const JOURNEY = {
   heal: 2, // 🏥 포켓몬센터
   hp: { wild: 2, trainer: 3, rocket: 4 },
   coins: 500, // 아버님 (100 + 400)
+  // ❤️를 다 잃었을 때 잃는 양의 상한 (v343, 2026-10-26 아버님 "상한을 두자 · 코인은 200") — 모은 게 많을수록 한 번에 크게 잃지 않게
+  loseMax: { stone: 5, coins: 200 },
   doneKeep: 26, // 지난 여행 기록을 몇 주까지 (반년)
 };
 
@@ -338,12 +340,12 @@ function rewardRule(p, c, subjectOf) {
 /** 잃을 것 셈 (순수 · 바꾸지 않음) → { items: { 스톤 id: [가진 수, 남는 수] }, coins: [가진 수, 남는 수] } — 출발 준비 화면에 */
 export function lossPreview(p) {
   const items = {};
-  for (const id of STONE_IDS) { const n = cnt(p && p.items && p.items[id]); items[id] = [n, n - Math.floor(n / 5)]; }
+  for (const id of STONE_IDS) { const n = cnt(p && p.items && p.items[id]); items[id] = [n, n - Math.min(JOURNEY.loseMax.stone, Math.floor(n / 5))]; }
   const c = Math.max(0, Math.floor(Number(p && p.coins) || 0));
-  return { items, coins: [c, c - Math.floor((c * 3) / 10)] };
+  return { items, coins: [c, c - Math.min(JOURNEY.loseMax.coins, Math.floor((c * 3) / 10))] };
 }
 
-/** ❤️를 다 잃었다 — 스톤은 가진 수의 20%·코인 30%(버림) → 잃은 것 { items, coins } */
+/** ❤️를 다 잃었다 — 스톤은 가진 수의 20%·코인 30%(버림 · 상한 JOURNEY.loseMax) → 잃은 것 { items, coins } */
 function loseRule(p) {
   const pv = lossPreview(p);
   const items = {};
@@ -567,7 +569,7 @@ export function journeyMd(raw, today, monKo) {
   if (!rows.length && !j.cur) return null;
   const lines = [`# 🎒 포켓몬 대여행 — ${today} 기준`, '',
     '- 토요일에 열려 다음 금요일까지 한 번 · 만남 9번(산·바다·하늘·우주·🚀) · ❤️ 5개 · 문제는 이미 배운 것(배틀과 같은 꼴 · 공부 기록엔 안 남김)',
-    '- 「집으로」·지난주에 못 끝낸 여행은 잃는 것도 보상도 없음', ''];
+    `- ❤️를 다 잃으면 스톤 20%(과목마다 최대 ${JOURNEY.loseMax.stone})·💰 30%(최대 ${JOURNEY.loseMax.coins}) · 「집으로」·지난주에 못 끝낸 여행은 잃는 것도 보상도 없음`, ''];
   if (j.cur) lines.push(`## 지금 여행 (${j.cur.week} 주)`, '', `- ${j.cur.phase === 'pick' ? '끝까지 감 — 데려올 포켓몬을 아직 안 고름' : `만남 ${j.cur.at + 1}/${STOPS} · ❤️ ${j.cur.hearts}`} · ${qLine(j.cur.q)}`, '');
   if (rows.length) {
     lines.push('## 지난 여행', '');
