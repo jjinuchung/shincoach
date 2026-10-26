@@ -110,8 +110,8 @@ export function playLimit(conf) {
 
 /**
  * 🎮 게임 목록 — 차례대로 만들었다(아버님 2026-10-21): v307 디그다 → v308 달리기·그림자 → v309 짝 맞추기·나무열매 → v310 열기구 → v311 탑 → v312 줄다리기(여덟 모두)
- *   → v333 대모험 → v339 그림 맞추기
- * id는 소문자(최고 기록 열쇠 — homeplay.GAME_KEY) · sec = 한 판 길이 · ★ 새 게임은 gameview.RUNNERS에도
+ *   → v333 대모험 → v339 그림 맞추기 → v344 던지기·낚시 → v345 타입 나누기·다른 그림 → v346 따라 하기
+ * id는 소문자(최고 기록 열쇠 — homeplay.GAME_KEY) · sec = 한 판 길이 · ★ 새 게임은 gameview.RUNNERS에도 · 곡(gamesong GAME_SONGS)에도(quiet 게임만 빼고)
  */
 export const GAMES = [
   { id: 'dig', emoji: '🕳️', ko: '디그다 잡기', how: '톡! 쏙 나온 디그다를 잡아요 · 찌리리공은 누르지 마요', sec: 30 },
@@ -131,6 +131,8 @@ export const GAMES = [
   // v345 (2026-10-26 아버님 "다음 미니 게임 진행하자" → 기본안 "이대로") — 🔍는 다 찾으면 끝(가장 빠른 시간 · 🖼️와 같게) · 넓은 카드
   { id: 'sort', emoji: '🔀', ko: '타입 나누기', how: '내려오는 포켓몬을 맞는 타입 상자에 톡! 빨리 맞히면 별이 더', sec: 40 },
   { id: 'diff', emoji: '🔍', ko: '우리 집 다른 그림 찾기', how: '두 방 그림에서 다른 곳을 찾아 톡! 시간 제한은 없어요', sec: 90, clock: true, wide: true },
+  // v346 (2026-10-26 아버님 "다음 미니 게임 가자" → 기본안 "이대로") — quiet = 배경 음악 없음(자리마다 제 음이 노래 대신 · 게임기 🎵 단추도 판 동안 숨김)
+  { id: 'simon', emoji: '🧠', ko: '포켓몬 따라 하기', how: '포켓몬이 반짝인 차례대로 톡! 다 맞히면 한 마리씩 늘어요', sec: 60, quiet: true },
 ];
 export function gameById(id) {
   return GAMES.find((g) => g.id === id) || null;

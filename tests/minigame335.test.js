@@ -63,8 +63,9 @@ class FakeCtx {
 test('🎼 곡 셋 — 달려라 파트너(D 160)·바쁘다 바빠(Am 172)·두근두근 생각(Em 132) · 게임 아홉이 곡 하나씩에 · 모르는 게임은 첫 곡', () => {
   assert.deepEqual(GAME_SONGS.map((s) => [s.id, s.title, s.bpm]), [['run', '달려라 파트너', 160], ['busy', '바쁘다 바빠', 172], ['think', '두근두근 생각', 132]]);
   const all = GAME_SONGS.flatMap((s) => s.games);
-  assert.deepEqual([...all].sort(), GAMES.map((g) => g.id).sort(), '게임마다 곡 하나 (빠지거나 겹치지 않게 — 새 게임은 여기에도)');
-  for (const g of GAMES) assert.equal(songFor(g.id).games.includes(g.id), true, g.id);
+  const sung = GAMES.filter((g) => !g.quiet); // quiet = 배경 음악 없는 게임 (🧠 따라 하기 v346 — 자리마다 제 음이 노래 대신)
+  assert.deepEqual([...all].sort(), sung.map((g) => g.id).sort(), '게임마다 곡 하나 (빠지거나 겹치지 않게 — 새 게임은 여기에도 · quiet 게임만 빼고)');
+  for (const g of sung) assert.equal(songFor(g.id).games.includes(g.id), true, g.id);
   assert.equal(songFor('adv').id, 'run', '🗺️ 대모험은 달려라 파트너');
   assert.equal(songFor('nope'), GAME_SONGS[0]);
   assert.equal(songFor(undefined), GAME_SONGS[0]);
@@ -543,15 +544,15 @@ test('🔗 잇기 — 게임 카드를 누른 손길 안에서 깨움 · 판이 
   const fn = (head) => gv.slice(gv.indexOf(head), gv.indexOf('\n}\n', gv.indexOf(head)));
   const round = fn('async function startRound(');
   assert.ok(round.indexOf('gameMusicWake();') > 0 && round.indexOf('gameMusicWake();') < round.indexOf('await '), '처음 await 전 — 누른 손길 안');
-  assert.ok(round.includes("tune = gameMusicStart(id, typeof run.music === 'function' ? run.music : null);"));
+  assert.ok(round.includes("tune = g.quiet ? 0 : gameMusicStart(id, typeof run.music === 'function' ? run.music : null);"), 'quiet 게임(🧠 v346)은 안 튼다');
   assert.ok(round.indexOf('const run = R.run(') < round.indexOf('gameMusicStart(') && round.indexOf('gameMusicStart(') < round.indexOf('await run.done'));
-  assert.ok(/const res = await run\.done;\n {4}gameMusicStop\(tune\);/.test(round), '판이 끝나면 — 내 판 음악만(번호표)');
+  assert.ok(/const res = await run\.done;\n {4}if \(tune\) gameMusicStop\(tune\);/.test(round), '판이 끝나면 — 내 판 음악만(번호표)');
   assert.ok(/\} catch \{\n[^\n]*\n {4}if \(tune\) gameMusicStop\(tune\);/.test(round), '판이 깨지면 — 시작한 판만');
   assert.equal((round.match(/gameMusicStop\(\)/g) || []).length, 0, '판 안에서는 번호표 없이 끄지 않는다 (Codex 139차 #1)');
   assert.ok(fn('export function closeGames(').includes('gameMusicStop();'), '닫으면');
   assert.ok(fn('export function openGames(').includes('syncMusicBtn();'), '열 때 단추 모양(⚙가 바뀌었을 수 있다)');
   const sync = fn('function syncMusicBtn(');
-  assert.ok(sync.includes('b.hidden = !gameMusicAllowed();') && sync.includes("b.textContent = on ? '🎵' : '🔇';") && sync.includes("b.setAttribute('aria-pressed', on ? 'true' : 'false');"));
+  assert.ok(sync.includes("b.hidden = !gameMusicAllowed() || (ui.quiet && ui.view === 'play');") && sync.includes("b.textContent = on ? '🎵' : '🔇';") && sync.includes("b.setAttribute('aria-pressed', on ? 'true' : 'false');"));
   assert.ok(gv.includes("if (mb) mb.addEventListener('click', () => { toggleGameMusic(); syncMusicBtn(); });"));
   const btn = '<button type="button" class="btn btn-icon gm-music" aria-label="게임 음악" aria-pressed="true">🎵</button><button type="button" class="btn btn-icon gm-x" aria-label="닫기">✕</button>';
   assert.ok(read('index.html').includes(btn), 'index.html 머리줄 — ✕ 바로 앞');

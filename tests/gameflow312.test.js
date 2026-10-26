@@ -287,6 +287,26 @@ test('🔀 v345 — 포켓몬 그림이 모자라면 한 줄만 나오고 판을
   await p;
 });
 
+test('🧠 v346 — 네 자리(불꽃·물·풀·전기) 포켓몬 그림이 없으면 대신할 포켓몬을 받아 보고, 못 받으면 한 줄만 · 판을 안 씀', async () => {
+  await day();
+  const asked = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => { asked.push(String(url)); throw new Error('offline (시험)'); };
+  const p = openGames(CTX);
+  try {
+    card('포켓몬 따라 하기').fire('click');
+    await until(() => gmBody.querySelector('.gm-msg'), 9000, '그림 없음 한 줄');
+    assert.equal(gmBody.querySelector('.gm-msg').textContent, '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.');
+    assert.equal(plays(), 0);
+    const got = asked.map((u) => Number((/official-artwork\/(\d+)\.png$/.exec(u) || [])[1])).filter(Boolean);
+    for (const id of [4, 7, 1, 25]) assert.ok(got.includes(id), `대신할 포켓몬 ${id}를 받으러 감`);
+  } finally {
+    globalThis.fetch = realFetch;
+    closeGames();
+  }
+  await p;
+});
+
 test('🔍 v345 — 진우 1층 방(게임기만 있는 방)으로 한 판 · 하나 찾고 ✕ → 끝 화면 「끝! ⭐ 1」(시간 기록 없음) · 판 한 번 · 진짜 방·도감·코인은 그대로', async () => {
   await day();
   const houseBefore = houseNowJson();
@@ -344,4 +364,40 @@ test('🔀 v345 — 그림이 열둘이어도 타입이 모두 달라 상자 넷
     closeGames();
   }
   await p;
+});
+
+// 앞 시험이 기기에 넣은 그림 열둘(파이리·꼬부기·피카츄·덩쿠리 …)로 — 🧠 한 판을 진짜 시계로
+test('🧠 v346 — 한 판(진짜 시계): 네 자리 포켓몬 → 반짝인 셋을 보고 그대로 톡 → ⭐ 5 → ✕ → 「끝! ⭐ 5」·「🧠 가장 긴 줄 3마리」 · 배경 음악 없음 · 최고 기록만 · 도감·코인·가방 그대로 · 판 한 번', async () => {
+  await day();
+  const before = wallet();
+  const p = openGames(CTX);
+  try {
+    card('포켓몬 따라 하기').fire('click');
+    await until(() => gmBody.querySelector('.gc.is-go'), 9000, '시작');
+    assert.equal(plays(), 1);
+    assert.equal(gameMusicState().game, '', '배경 음악을 틀지 않는다 (quiet)');
+    const root = gmBody.querySelector('.gc');
+    const pads = gmBody.querySelectorAll('.gc-pad');
+    assert.deepEqual(pads.map((b) => b.querySelector('.gc-name').textContent), ['파이리', '꼬부기', '덩쿠리', '피카츄'], '기기에 그림이 있는 그 타입 포켓몬');
+    const seq = [];
+    let prev = -1;
+    await until(() => {
+      const i = root.dataset.phase === 'show' ? pads.findIndex((b) => b.classList.contains('is-lit')) : -1;
+      if (i >= 0 && i !== prev) seq.push(i);
+      prev = i;
+      return root.dataset.phase === 'input';
+    }, 8000, '따라 할 차례');
+    assert.equal(seq.length, 3, `본 반짝 ${seq}`);
+    for (const i of seq) pads[i].fire('pointerdown');
+    assert.equal(gmBody.querySelector('.gd-score').textContent, '⭐ 5');
+    xBtn.fire('click');
+    await until(() => gmBody.querySelector('.gm-end'), 4000, '끝 화면');
+    assert.equal(gmBody.querySelector('.gm-end').textContent, '끝! ⭐ 5');
+    assert.equal(gmBody.querySelector('.gm-line').textContent, '🧠 가장 긴 줄 3마리');
+    assert.equal(gameBest('simon'), 5);
+    assert.equal(plays(), 1);
+    assert.equal(wallet(), before, '도감·코인·가방 그대로');
+  } finally { closeGames(); }
+  const sum = await p;
+  assert.equal(sum.played, 1);
 });

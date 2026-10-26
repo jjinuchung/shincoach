@@ -20,6 +20,7 @@ import { runThrow, THR_FEW } from './gamethrow.js'; // 🎯 몬스터볼 던지�
 import { runFish, FISH } from './gamefish.js'; // 🎣 잉어킹 낚시 (v344)
 import { runSort, sortReady, SORT_FEW } from './gamesort.js'; // 🔀 타입 나누기 (v345)
 import { runDiff } from './gamediff.js'; // 🔍 우리 집 다른 그림 찾기 (v345)
+import { runSimon, simonPick, SIMON_PADS, STAND_IN } from './gamesimon.js'; // 🧠 포켓몬 따라 하기 (v346)
 import { MON_TYPES } from './montypes.js'; // 🔀 타입 (대여행 때 PokeAPI에서 받은 표 · 순수)
 import { PAINT_BASE, paintById } from './house.js'; // 🔍 진우 방 벽지·바닥 색 (순수)
 import { animUrl, ensureAnim } from './sprite.js';
@@ -56,6 +57,7 @@ const RUNNERS = {
   fish: { run: runFish, prep: async () => ({ art: await artFor(Object.values(FISH).map((f) => f.id).filter(Boolean)) }) }, // 🎣 물 포켓몬 다섯 — 못 받으면 🐟 · 낚싯대는 파트너(ctx.hero)
   sort: { run: runSort, prep: () => sortPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🔀 그림 있는 포켓몬 + 타입 표 (잡은 포켓몬 표시)
   diff: { run: runDiff, prep: async () => ({ scene: diffScene() }) }, // 🔍 진우 1층 방 그대로 (그림은 코드·이모지라 받을 것이 없다)
+  simon: { run: runSimon, prep: () => simonPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🧠 불꽃·물·풀·전기 자리에 잡은 포켓몬 (배경 음악 없음 — GAMES quiet)
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -84,7 +86,8 @@ function dailyNow() {
 // ───────────────────── 게임기 화면 ─────────────────────
 
 // seq: 열 때마다 +1 — 닫은 뒤에 끝난 판·저장이 화면을 다시 그리지 않게 · run: 돌고 있는 판 { done, stop } · sum: 이번에 논 것(방 장면에 넘긴다)
-const ui = { box: null, open: false, seq: 0, busy: false, view: 'pick', msg: '', ctx: null, resolve: null, run: null, sum: null, lastFocus: null };
+// quiet: 배경 음악 없는 게임(GAMES quiet — 🧠)을 하는 중 — 🎵 단추를 숨긴다 (v346)
+const ui = { box: null, open: false, seq: 0, busy: false, view: 'pick', msg: '', ctx: null, resolve: null, run: null, sum: null, lastFocus: null, quiet: false };
 
 /** index.html의 #game (없으면 만든다) */
 function ensureBox() {
@@ -119,7 +122,7 @@ function syncMusicBtn() {
   const b = ui.box && ui.box.querySelector('.gm-music');
   if (!b) return;
   const on = gameMusicOn();
-  b.hidden = !gameMusicAllowed();
+  b.hidden = !gameMusicAllowed() || (ui.quiet && ui.view === 'play'); // 🧠처럼 음악 없는 판 동안은 눌러도 소용없으니 숨긴다 (v346)
   b.textContent = on ? '🎵' : '🔇';
   b.setAttribute('aria-pressed', on ? 'true' : 'false');
   b.title = on ? '게임 음악 끄기' : '게임 음악 켜기';
@@ -211,6 +214,7 @@ export function statusLines(st) {
 
 function renderPick() {
   ui.view = 'pick';
+  syncMusicBtn();
   wideCard(false);
   const b = body();
   b.innerHTML = '';
@@ -393,6 +397,26 @@ async function sortPrep() {
   }
   return sortReady(pool) ? { pool } : null;
 }
+/**
+ * 🧠 따라 하기(v346) — 🔥 불꽃 · 💧 물 · 🌿 풀 · ⚡ 전기 자리에 그 타입 포켓몬(잡은 포켓몬 먼저 · 파트너가 맞으면 반쯤은 파트너 — simonPick) ·
+ * 못 채운 자리가 있으면 몇 장 받아 본다(그 타입의 잡은 포켓몬 둘까지 + 대신할 포켓몬 STAND_IN · ART_WAIT_MS까지만) · 그래도 못 채우면 null(판을 안 쓴다) → { pads }
+ */
+async function simonPrep() {
+  const mine = new Set(ownedMonIds());
+  const make = () => shadowPool().filter((p) => Array.isArray(MON_TYPES[p.id])).map((p) => ({ id: p.id, ko: p.ko, url: p.url, types: MON_TYPES[p.id].slice(), mine: mine.has(p.id) }));
+  let pads = simonPick(make(), getPartner());
+  if (!pads) {
+    const have = new Set(make().map((p) => p.id));
+    const want = [];
+    for (const t of SIMON_PADS) {
+      want.push(...[...mine].filter((id) => !have.has(id) && ROSTER.some((r) => r.id === id) && (MON_TYPES[id] || []).includes(t)).slice(0, 2));
+      if (!have.has(STAND_IN[t])) want.push(STAND_IN[t]);
+    }
+    await Promise.race([ensureCast([...new Set(want)]).catch(() => []), wait(ART_WAIT_MS)]);
+    pads = simonPick(make(), getPartner());
+  }
+  return pads ? { pads } : null;
+}
 /** 🔍 다른 그림 찾기(v345) — 진우 1층 방(고쳐 읽은 집 · 방 크기 · 벽지·바닥 색) · 가구가 모자라면 게임이 그림에만 채운다(저장 안 함) */
 function diffScene() {
   const h = houseNow();
@@ -467,6 +491,8 @@ async function startRound(id) {
     ui.msg = '';
     ui.view = 'play';
     wideCard(g.wide);
+    ui.quiet = !!g.quiet;
+    syncMusicBtn();
     const b = body();
     b.innerHTML = '';
     b.appendChild(el('p', 'gm-play-title', `${g.emoji} ${g.ko}`));
@@ -475,9 +501,9 @@ async function startRound(id) {
     const run = R.run(stage, { ...prep, hero: ctx.hero });
     started = true;
     ui.run = run;
-    tune = gameMusicStart(id, typeof run.music === 'function' ? run.music : null); // 🎵 (v335) — 끝·⏰는 run.music()이 알린다
+    tune = g.quiet ? 0 : gameMusicStart(id, typeof run.music === 'function' ? run.music : null); // 🎵 (v335) — 끝·⏰는 run.music()이 알린다 · quiet 게임(🧠)은 틀지 않는다 (v346)
     const res = await run.done;
-    gameMusicStop(tune);
+    if (tune) gameMusicStop(tune);
     if (ui.run === run) ui.run = null;
     if (res && res.unplayed) { // 🤼 「누구랑?」·🖼️ 「어떤 포켓몬?」에서 그만둠 — 한 판도 안 했으니 판을 돌려주고 고르기로 (v312 · 💗·최고 기록도 없음)
       started = false;
@@ -535,6 +561,7 @@ export function resultLines(g, res, end) {
 /** 끝 화면 — 점수 · 새 기록 · [🎮 한 판 더](판이 남았을 때만) · [그만하기] */
 function renderResult(g, res, end) {
   ui.view = 'result';
+  syncMusicBtn();
   wideCard(false);
   const b = body();
   b.innerHTML = '';
