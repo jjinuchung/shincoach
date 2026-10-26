@@ -1,0 +1,4634 @@
+{
+ "v": 1,
+ "types": {
+  "bepick": {
+   "name": "am·is·are 고르기",
+   "what": "누가(I·you·he·여럿)에 맞는 am·is·are를 고르지 못함 (I is · They is)"
+  },
+  "bedrop": {
+   "name": "am·is·are 빠뜨리기",
+   "what": "있어야 할 am·is·are를 빠뜨림 (We Pokémon Trainers · He running)"
+  },
+  "beplus": {
+   "name": "am·is·are 덧붙이기",
+   "what": "움직임 낱말 앞에 am·is·are를 붙이거나, is 뒤에 원래 모양을 씀 (I am like · He is run)"
+  },
+  "sextra": {
+   "name": "-s 붙이기 지나침",
+   "what": "I·you·we·they인데 움직임 낱말에 -s를 붙임 (I likes · They lives)"
+  },
+  "base": {
+   "name": "원래 모양 자리",
+   "what": "can·will·Don't·Let's·Do·Does·Did 뒤나 going to 뒤, 시키는 말 처음의 원래 모양 자리에 -s·-ed·-ing·to를 붙이거나 지난 모양을 씀 (can swims · Does he likes · didn't went · will goes)"
+  },
+  "plural": {
+   "name": "하나와 여럿",
+   "what": "여럿인데 -s를 빼거나 this·these를 바꿔 씀 (three badge · This are)"
+  },
+  "aan": {
+   "name": "a·an 쓰기",
+   "what": "하나를 나타내는 a·an을 잘못 씀 (a egg · one a ball)"
+  },
+  "apos": {
+   "name": "따옴표(') 빠뜨리기",
+   "what": "It's·don't·can't의 따옴표를 빠뜨림 (its는 「그것의」라는 다른 낱말)"
+  },
+  "expr": {
+   "name": "정해진 말 꼴",
+   "what": "o'clock·What time is it?처럼 정해진 말의 꼴을 바꿈 (seven clock)"
+  },
+  "not": {
+   "name": "「아니다·안 하다」 자리",
+   "what": "not 대신 no·don't를 쓰거나 not 자리를 바꿈 (I'm no hungry · I not am)"
+  },
+  "order": {
+   "name": "묻는 말 차례",
+   "what": "물을 때 Is·Are·Can·Do를 맨 앞으로 보내지 않음"
+  },
+  "reply": {
+   "name": "묻는 말과 대답 짝",
+   "what": "Is~? → it is · Can~? → I can · Do~? → I do 짝을 맞추지 못함"
+  },
+  "dodoes": {
+   "name": "Do·Does 고르기",
+   "what": "누가에 맞는 Do·Does를 고르지 못함 (Does you)"
+  },
+  "ing": {
+   "name": "-ing 철자",
+   "what": "-ing를 붙일 때 바뀌는 철자를 놓침 (swiming · makeing)"
+  },
+  "it": {
+   "name": "It 표현",
+   "what": "날씨·때를 말할 때 It을 빼거나 다른 말을 씀 (Is cold today · I'm rainy)"
+  },
+  "time": {
+   "name": "때 맞추기",
+   "what": "날마다·지금·어제 같은 때에 맞는 모양을 고르지 못함"
+  },
+  "sense": {
+   "name": "뜻 맞추기",
+   "what": "문장 모양은 맞지만 우리말 뜻과 다름 (can ↔ can't · 요일 ↔ 날씨)"
+  },
+  "sdrop": {
+   "name": "-s 빠뜨리기",
+   "what": "he·she·it·한 마리·한 사람이 늘 하는 일인데 움직임 낱말에 -s를 빠뜨림 (He like · Pikachu have)"
+  },
+  "spell": {
+   "name": "-s·-ed·-er 철자",
+   "what": "-s·-es·-ed·-er을 붙일 때 바뀌는 철자를 놓침 (watchs · haves · studyed · stoped · biger)"
+  },
+  "irreg": {
+   "name": "모양이 바뀌는 지난 말",
+   "what": "went·ate·saw처럼 모양이 바뀌는 말에 -ed를 붙임 (goed · eated · seed)"
+  },
+  "there": {
+   "name": "There is · There are",
+   "what": "어디에 무엇이 있다고 알려 줄 때 There 대신 It·has를 쓰거나, 물을 때 Is there 차례를 놓침 (It is a cat in the box · There has · Do there)"
+  },
+  "poss": {
+   "name": "누구의 것",
+   "what": "「~의」(my·her)와 「~의 것」(mine·hers), Whose와 Who's를 섞어 씀 (It's my · her shoes ↔ hers · Who's bag)"
+  },
+  "comp": {
+   "name": "견주는 말 꼴",
+   "what": "견줄 때 -er을 빼거나 more와 -er을 같이 쓰고, than 대신 then을 씀 (big than · more smaller · gooder · faster then)"
+  },
+  "conj": {
+   "name": "and·but·because 고르기",
+   "what": "같은 쪽(and)·반대(but)·까닭(because)을 가르지 못하거나, because 뒤에 까닭이 아닌 말을 씀"
+  }
+ },
+ "units": [
+  {
+   "id": "G1",
+   "band": "review",
+   "title": "am · is · are",
+   "short": "나는 am, 너·여럿은 are, 하나는 is",
+   "say": [
+    "「~이에요(지우예요)」「어때요(빨라요·귀여워요)」「~에 있어요」를 말할 때 am · is · are를 써요. 좋아해요·먹어요 같은 움직임에는 안 써요.",
+    "I(나)는 am, you(너)와 여럿(we·they·피카츄와 이브이)은 are를 써요.",
+    "한 사람·한 마리·한 개(he·she·it·Pikachu)는 is를 써요. I'm은 I am을 줄인 말이에요."
+   ],
+   "term": "중학교에서는 am·is·are를 be동사라고 불러요.",
+   "ex": [
+    [
+     "I am Ash.",
+     "나는 지우예요."
+    ],
+    [
+     "Pikachu is yellow.",
+     "피카츄는 노란색이에요."
+    ],
+    [
+     "Pikachu and Eevee are cute.",
+     "피카츄와 이브이는 귀여워요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "I ___ hungry.",
+     "ko": "나는 배고파요.",
+     "opts": [
+      {
+       "t": "am",
+       "ok": true
+      },
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "am·is·are 가운데 I(나)의 짝은 am이에요."
+      },
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "are는 너나 여럿일 때예요. I(나)는 am."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Pikachu ___ fast.",
+     "ko": "피카츄는 빨라요.",
+     "opts": [
+      {
+       "t": "am",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      },
+      {
+       "t": "is",
+       "ok": true
+      },
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "피카츄는 한 마리라 is예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "You ___ my best friend.",
+     "ko": "너는 내 가장 친한 친구야.",
+     "opts": [
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "you(너)는 한 사람이어도 are를 써요."
+      },
+      {
+       "t": "am",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      },
+      {
+       "t": "are",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Squirtle and Bulbasaur ___ small.",
+     "ko": "꼬부기와 이상해씨는 작아요.",
+     "opts": [
+      {
+       "t": "are",
+       "ok": true
+      },
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "꼬부기와 이상해씨, 둘이라 여럿이에요. 여럿은 are."
+      },
+      {
+       "t": "am",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "She ___ my teacher.",
+     "ko": "그분은 우리 선생님이에요.",
+     "opts": [
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "she(그분)는 한 사람이라 is예요."
+      },
+      {
+       "t": "is",
+       "ok": true
+      },
+      {
+       "t": "am",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "우리는 포켓몬 트레이너예요.",
+     "opts": [
+      {
+       "t": "We is Pokémon Trainers.",
+       "type": "bepick",
+       "why": "we(우리)는 여럿이라 are예요."
+      },
+      {
+       "t": "We Pokémon Trainers.",
+       "type": "bedrop",
+       "why": "「~예요」를 나타내는 are가 빠졌어요."
+      },
+      {
+       "t": "We am Pokémon Trainers.",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      },
+      {
+       "t": "We are Pokémon Trainers.",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "I'm hungry. 에서 'm은 무엇을 줄인 말일까요?",
+     "ko": "나는 배고파요.",
+     "opts": [
+      {
+       "t": "am",
+       "ok": true
+      },
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "I(나)와 짝인 말은 am이에요. I'm = I am."
+      },
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "I(나)와 짝인 말은 am이에요. I'm = I am."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "They ___ in the park.",
+     "ko": "그들은 공원에 있어요.",
+     "opts": [
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "they(그들)는 여럿이라 are예요. 「~에 있어요」도 are로 말해요."
+      },
+      {
+       "t": "are",
+       "ok": true
+      },
+      {
+       "t": "am",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "Eevee ___ cute.",
+     "ko": "이브이는 귀여워요.",
+     "hint": "am · is · are",
+     "ans": [
+      "is"
+     ],
+     "traps": {
+      "are": [
+       "bepick",
+       "이브이는 한 마리라 are가 아니라 is예요."
+      ],
+      "am": [
+       "bepick",
+       "am은 I(나)하고만 써요."
+      ]
+     },
+     "why": "이브이는 한 마리라 is예요."
+    },
+    {
+     "kind": "type",
+     "en": "We ___ ready!",
+     "ko": "우리는 준비됐어요!",
+     "hint": "am · is · are",
+     "ans": [
+      "are"
+     ],
+     "traps": {
+      "is": [
+       "bepick",
+       "we(우리)는 여럿이라 is가 아니라 are예요."
+      ],
+      "am": [
+       "bepick",
+       "am은 I(나)하고만 써요."
+      ]
+     },
+     "why": "we(우리)는 여럿이라 are예요."
+    },
+    {
+     "kind": "order",
+     "ko": "나는 열 살이에요.",
+     "tiles": [
+      "I",
+      "am",
+      "ten",
+      "years",
+      "old",
+      "."
+     ],
+     "ans": "I am ten years old."
+    },
+    {
+     "kind": "order",
+     "ko": "우리 선생님은 친절하세요.",
+     "tiles": [
+      "My",
+      "teacher",
+      "is",
+      "kind",
+      "."
+     ],
+     "ans": "My teacher is kind."
+    }
+   ]
+  },
+  {
+   "id": "G2",
+   "band": "review",
+   "title": "Is it ~? · isn't",
+   "short": "물을 때는 Is·Are를 앞으로, 아니면 not",
+   "say": [
+    "물어볼 때는 am · is · are를 맨 앞으로 보내요. It is red. → Is it red?",
+    "대답은 Yes, it is. 또는 No, it isn't. 처럼 물은 말로 해요. (Yes, it's. 처럼 줄이지는 않아요.)",
+    "「~이 아니에요」는 am · is · are 뒤에 not을 붙여요. is not = isn't, are not = aren't, am not은 I'm not으로 줄여요."
+   ],
+   "term": "중학교에서는 이것을 be동사의 의문문·부정문이라고 불러요.",
+   "ex": [
+    [
+     "Is it your Poké Ball?",
+     "그거 네 몬스터볼이니?"
+    ],
+    [
+     "No, it isn't.",
+     "아니, 아니야."
+    ],
+    [
+     "Slowpoke is not fast.",
+     "야돈은 빠르지 않아요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "그거 네 모자니?",
+     "opts": [
+      {
+       "t": "Is it your hat?",
+       "ok": true
+      },
+      {
+       "t": "It is your hat.",
+       "type": "order",
+       "why": "「그건 네 모자야」라는 말이에요. 물을 때는 Is가 맨 앞으로 가요."
+      },
+      {
+       "t": "Are it your hat?",
+       "type": "bepick",
+       "why": "it(그것)은 하나라 Is예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Is Pikachu yellow?",
+      "B: Yes, it ___."
+     ],
+     "ko": "응, 맞아.",
+     "opts": [
+      {
+       "t": "isn't",
+       "type": "sense",
+       "why": "「응(Yes)」이라고 했으니 is예요. isn't는 「아니야」."
+      },
+      {
+       "t": "is",
+       "ok": true
+      },
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "it(그것 — 피카츄)은 한 마리라 is예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Are you hungry?",
+      "B: No, I'm ___."
+     ],
+     "ko": "아니, 안 고파.",
+     "opts": [
+      {
+       "t": "not",
+       "ok": true
+      },
+      {
+       "t": "no",
+       "type": "not",
+       "why": "am 뒤에서 「아니다」는 not이에요. No는 No, I'm not.처럼 대답 맨 앞에 와요."
+      },
+      {
+       "t": "don't",
+       "type": "not",
+       "why": "don't는 like·have 같은 움직임 낱말 앞에 써요. am 뒤에는 not."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Pikachu ___ blue. It is yellow.",
+     "ko": "피카츄는 파란색이 아니에요. 노란색이에요.",
+     "opts": [
+      {
+       "t": "aren't",
+       "type": "bepick",
+       "why": "피카츄는 한 마리라 is not = isn't예요."
+      },
+      {
+       "t": "don't",
+       "type": "not",
+       "why": "blue 같은 생김새 앞에서는 don't가 아니라 isn't예요."
+      },
+      {
+       "t": "isn't",
+       "ok": true
+      },
+      {
+       "t": "not",
+       "type": "bedrop",
+       "why": "is가 빠졌어요. is not을 줄이면 isn't."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ they your cards?",
+     "ko": "그것들 네 카드니?",
+     "opts": [
+      {
+       "t": "Is",
+       "type": "bepick",
+       "why": "they(그것들)는 여럿이라 Are예요."
+      },
+      {
+       "t": "Am",
+       "type": "bepick",
+       "why": "Am은 I(나)하고만 써요."
+      },
+      {
+       "t": "Are",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "나는 졸리지 않아요.",
+     "opts": [
+      {
+       "t": "I not am sleepy.",
+       "type": "not",
+       "why": "not은 am 뒤에 와요. I am not."
+      },
+      {
+       "t": "I am not sleepy.",
+       "ok": true
+      },
+      {
+       "t": "I am no sleepy.",
+       "type": "not",
+       "why": "「아니다」는 no가 아니라 not이에요."
+      },
+      {
+       "t": "I don't sleepy.",
+       "type": "not",
+       "why": "sleepy 같은 낱말 앞의 「아니다」는 don't가 아니라 am not이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Is it a Pikachu?",
+      "B: No, it ___. It's a Pichu."
+     ],
+     "ko": "아니, 아니야. 피츄야.",
+     "opts": [
+      {
+       "t": "isn't",
+       "ok": true
+      },
+      {
+       "t": "is",
+       "type": "sense",
+       "why": "피츄라고 했으니 「아니야」 — isn't예요."
+      },
+      {
+       "t": "aren't",
+       "type": "bepick",
+       "why": "it(그것)은 하나라 isn't예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "We ___ not tired.",
+     "ko": "우리는 피곤하지 않아요.",
+     "opts": [
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "we(우리)는 여럿이라 are예요."
+      },
+      {
+       "t": "are",
+       "ok": true
+      },
+      {
+       "t": "do",
+       "type": "not",
+       "why": "tired 같은 낱말 앞의 「아니다」는 are not이에요. do not은 움직임 낱말 앞에."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "___ it your bag?",
+     "ko": "그거 네 가방이니?",
+     "hint": "Am · Is · Are",
+     "ans": [
+      "Is"
+     ],
+     "traps": {
+      "are": [
+       "bepick",
+       "it(그것)은 하나라 Are가 아니라 Is예요."
+      ],
+      "am": [
+       "bepick",
+       "Am은 I(나)하고만 써요."
+      ]
+     },
+     "why": "it(그것)은 하나라 Is예요. 물을 때는 Is가 맨 앞으로."
+    },
+    {
+     "kind": "type",
+     "en": "They ___ my shoes.",
+     "ko": "그건 내 신발이 아니에요.",
+     "hint": "isn't · aren't",
+     "ans": [
+      "aren't",
+      "are not"
+     ],
+     "traps": {
+      "isn't": [
+       "bepick",
+       "they(그것들 — 신발)는 여럿이라 aren't예요."
+      ],
+      "is not": [
+       "bepick",
+       "they(그것들 — 신발)는 여럿이라 aren't예요."
+      ]
+     },
+     "why": "they(그것들 — 신발)는 여럿이라 aren't예요."
+    },
+    {
+     "kind": "order",
+     "ko": "이거 네 공책이니?",
+     "tiles": [
+      "Is",
+      "this",
+      "your",
+      "notebook",
+      "?"
+     ],
+     "ans": "Is this your notebook?"
+    },
+    {
+     "kind": "order",
+     "ko": "잠만보는 작지 않아요.",
+     "tiles": [
+      "Snorlax",
+      "is",
+      "not",
+      "small",
+      "."
+     ],
+     "ans": "Snorlax is not small."
+    }
+   ]
+  },
+  {
+   "id": "G3",
+   "band": "review",
+   "title": "하나와 여럿",
+   "short": "여럿은 -s · 가까운 하나 this, 여럿 these",
+   "say": [
+    "여럿을 말할 때는 대부분 끝에 -s를 붙여요(a ball → two balls). box·bus·dish·watch처럼 x·s·sh·ch로 끝나면 -es(boxes).",
+    "가까운 하나는 this, 가까운 여럿은 these예요. 먼 것은 that · those.",
+    "하나일 때는 앞에 a를 써요. apple·egg·orange처럼 첫소리가 「애·에·오」 같은 모음 소리면 an이에요. 글자가 아니라 소리로 봐요!"
+   ],
+   "term": "중학교에서는 여럿 모양을 복수형이라고 불러요.",
+   "ex": [
+    [
+     "I have two Poké Balls.",
+     "나는 몬스터볼이 두 개 있어요."
+    ],
+    [
+     "These are my stickers.",
+     "이것들은 내 스티커예요."
+    ],
+    [
+     "How many cards do you have?",
+     "카드를 몇 장 가지고 있니?"
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "I have three ___.",
+     "ko": "나는 배지가 세 개 있어요.",
+     "opts": [
+      {
+       "t": "badge",
+       "type": "plural",
+       "why": "세 개니까 여럿 — 끝에 -s를 붙여 badges."
+      },
+      {
+       "t": "badges",
+       "ok": true
+      },
+      {
+       "t": "a badge",
+       "type": "plural",
+       "why": "a는 하나일 때예요. 세 개는 badges."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ is my bike.",
+     "ko": "이것은 내 자전거예요.",
+     "opts": [
+      {
+       "t": "This",
+       "ok": true
+      },
+      {
+       "t": "These",
+       "type": "plural",
+       "why": "these는 여럿일 때예요. 자전거 하나는 This."
+      },
+      {
+       "t": "Those",
+       "type": "plural",
+       "why": "those는 먼 여럿이에요. 가까운 하나는 This."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ are my cards.",
+     "ko": "이것들은 내 카드예요.",
+     "opts": [
+      {
+       "t": "This",
+       "type": "plural",
+       "why": "cards는 여럿이라 These예요."
+      },
+      {
+       "t": "That",
+       "type": "plural",
+       "why": "that은 먼 하나예요. 가까운 여럿은 These."
+      },
+      {
+       "t": "These",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "How many ___ can you see?",
+     "ko": "새가 몇 마리 보이니?",
+     "opts": [
+      {
+       "t": "birds",
+       "ok": true
+      },
+      {
+       "t": "bird",
+       "type": "plural",
+       "why": "How many(몇 개·몇 마리) 뒤에는 여럿 모양 birds."
+      },
+      {
+       "t": "a bird",
+       "type": "plural",
+       "why": "How many 뒤에는 여럿 모양 birds. a는 하나일 때예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I have one ___.",
+     "ko": "나는 공이 하나 있어요.",
+     "opts": [
+      {
+       "t": "balls",
+       "type": "plural",
+       "why": "one은 하나라 -s 없이 ball."
+      },
+      {
+       "t": "ball",
+       "ok": true
+      },
+      {
+       "t": "a ball",
+       "type": "aan",
+       "why": "one과 a는 둘 다 「하나」라서 같이 쓰지 않아요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "저것들은 루카리오 카드예요.",
+     "opts": [
+      {
+       "t": "That are Lucario cards.",
+       "type": "plural",
+       "why": "저것들(여럿)은 That이 아니라 Those예요."
+      },
+      {
+       "t": "Those is Lucario cards.",
+       "type": "bepick",
+       "why": "those(저것들)는 여럿이라 are예요."
+      },
+      {
+       "t": "Those are Lucario cards.",
+       "ok": true
+      },
+      {
+       "t": "Those are Lucario card.",
+       "type": "plural",
+       "why": "카드도 여럿이라 cards예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I have two ___.",
+     "ko": "나는 상자가 두 개 있어요.",
+     "opts": [
+      {
+       "t": "boxs",
+       "type": "plural",
+       "why": "x로 끝나는 말은 -es를 붙여 boxes."
+      },
+      {
+       "t": "box",
+       "type": "plural",
+       "why": "두 개니까 여럿 — boxes."
+      },
+      {
+       "t": "boxes",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I have ___ egg.",
+     "ko": "나는 알이 하나 있어요.",
+     "opts": [
+      {
+       "t": "an",
+       "ok": true
+      },
+      {
+       "t": "a",
+       "type": "aan",
+       "why": "egg는 e 소리로 시작해서 an이에요."
+      },
+      {
+       "t": "two",
+       "type": "plural",
+       "why": "하나라고 했고, two면 eggs가 돼야 해요."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "I have five ___.",
+     "ko": "나는 카드가 다섯 장 있어요.",
+     "hint": "card",
+     "ans": [
+      "cards"
+     ],
+     "traps": {
+      "card": [
+       "plural",
+       "다섯 장이니까 여럿 — 끝에 -s를 붙여 cards."
+      ]
+     },
+     "why": "다섯 장이니까 여럿 — cards예요."
+    },
+    {
+     "kind": "type",
+     "en": "___ is my hat.",
+     "ko": "이것은 내 모자예요.",
+     "hint": "This · These",
+     "ans": [
+      "This"
+     ],
+     "traps": {
+      "these": [
+       "plural",
+       "모자 하나는 These가 아니라 This예요."
+      ]
+     },
+     "why": "가까운 하나는 This예요."
+    },
+    {
+     "kind": "order",
+     "ko": "이것들은 내 신발이에요.",
+     "tiles": [
+      "These",
+      "are",
+      "my",
+      "shoes",
+      "."
+     ],
+     "ans": "These are my shoes."
+    },
+    {
+     "kind": "order",
+     "ko": "너는 공을 몇 개 가지고 있니?",
+     "tiles": [
+      "How",
+      "many",
+      "balls",
+      "do",
+      "you",
+      "have",
+      "?"
+     ],
+     "ans": "How many balls do you have?"
+    }
+   ]
+  },
+  {
+   "id": "G4",
+   "band": "review",
+   "title": "can · can't",
+   "short": "할 수 있다 can, 없다 can't — 뒤는 원래 모양",
+   "say": [
+    "「~할 수 있어요」는 can, 「~할 수 없어요」는 can't(cannot)예요.",
+    "can 뒤에는 움직임 낱말의 원래 모양을 그대로 써요. can swims ✗ · can swimming ✗ → can swim ✓",
+    "물을 때는 Can을 맨 앞에: Can you swim? — Yes, I can. / No, I can't."
+   ],
+   "term": "중학교에서는 can 같은 말을 조동사라고 불러요.",
+   "ex": [
+    [
+     "Squirtle can swim.",
+     "꼬부기는 헤엄칠 수 있어요."
+    ],
+    [
+     "Charmander can't fly.",
+     "파이리는 날 수 없어요."
+    ],
+    [
+     "Can you ride a bike?",
+     "너는 자전거를 탈 수 있니?"
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "Magikarp can ___.",
+     "ko": "잉어킹은 헤엄칠 수 있어요.",
+     "opts": [
+      {
+       "t": "swims",
+       "type": "base",
+       "why": "can 뒤에는 -s 없이 원래 모양 swim."
+      },
+      {
+       "t": "swim",
+       "ok": true
+      },
+      {
+       "t": "swimming",
+       "type": "base",
+       "why": "can 뒤에는 -ing 없이 원래 모양 swim."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Pidgey ___ fly.",
+     "ko": "구구는 날 수 있어요.",
+     "opts": [
+      {
+       "t": "can",
+       "ok": true
+      },
+      {
+       "t": "can't",
+       "type": "sense",
+       "why": "날 수 「있어요」니까 can이에요. can't는 「없어요」."
+      },
+      {
+       "t": "cans",
+       "type": "base",
+       "why": "can에는 -s가 붙지 않아요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Snorlax ___ run fast.",
+     "ko": "잠만보는 빨리 달릴 수 없어요.",
+     "opts": [
+      {
+       "t": "can",
+       "type": "sense",
+       "why": "달릴 수 「없어요」니까 can't예요."
+      },
+      {
+       "t": "don't can",
+       "type": "not",
+       "why": "「할 수 없다」는 can't 하나로 말해요."
+      },
+      {
+       "t": "can't",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Can you jump rope?",
+      "B: Yes, I ___."
+     ],
+     "ko": "응, 할 수 있어.",
+     "opts": [
+      {
+       "t": "do",
+       "type": "reply",
+       "why": "Can으로 물었으니 Yes, I can으로 대답해요."
+      },
+      {
+       "t": "can",
+       "ok": true
+      },
+      {
+       "t": "can't",
+       "type": "sense",
+       "why": "「응(Yes)」이라고 했으니 can이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "너는 피아노를 칠 수 있니?",
+     "opts": [
+      {
+       "t": "Can you play the piano?",
+       "ok": true
+      },
+      {
+       "t": "You can play the piano.",
+       "type": "order",
+       "why": "「너는 피아노를 칠 수 있어」라는 말이에요. 물을 때는 Can이 맨 앞으로."
+      },
+      {
+       "t": "Can you plays the piano?",
+       "type": "base",
+       "why": "can 뒤에는 -s 없이 play."
+      },
+      {
+       "t": "Do you can play the piano?",
+       "type": "order",
+       "why": "can이 있으면 Do 없이 Can을 맨 앞으로 보내요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I can ___ a picture.",
+     "ko": "나는 그림을 그릴 수 있어요.",
+     "opts": [
+      {
+       "t": "to draw",
+       "type": "base",
+       "why": "can 뒤에는 to 없이 원래 모양 draw."
+      },
+      {
+       "t": "drawing",
+       "type": "base",
+       "why": "can 뒤에는 -ing 없이 원래 모양 draw."
+      },
+      {
+       "t": "draw",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "She can ___ very well.",
+     "ko": "그 아이는 노래를 아주 잘 부를 수 있어요.",
+     "opts": [
+      {
+       "t": "sing",
+       "ok": true
+      },
+      {
+       "t": "sings",
+       "type": "base",
+       "why": "she(한 사람)여도 can 뒤에는 -s 없이 원래 모양 sing."
+      },
+      {
+       "t": "singing",
+       "type": "base",
+       "why": "can 뒤에는 -ing 없이 원래 모양 sing."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Can I ___ your eraser?",
+     "ko": "네 지우개 좀 써도 돼?",
+     "opts": [
+      {
+       "t": "using",
+       "type": "base",
+       "why": "can 뒤에는 -ing 없이 원래 모양 use."
+      },
+      {
+       "t": "use",
+       "ok": true
+      },
+      {
+       "t": "uses",
+       "type": "base",
+       "why": "can 뒤에는 -s 없이 원래 모양 use."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "Pikachu can ___ fast.",
+     "ko": "피카츄는 빨리 달릴 수 있어요.",
+     "hint": "run",
+     "ans": [
+      "run"
+     ],
+     "traps": {
+      "runs": [
+       "base",
+       "can 뒤에는 -s 없이 run."
+      ],
+      "running": [
+       "base",
+       "can 뒤에는 -ing 없이 run."
+      ]
+     },
+     "why": "can 뒤에는 원래 모양 run이에요."
+    },
+    {
+     "kind": "type",
+     "en": "Psyduck ___ fly.",
+     "ko": "고라파덕은 날 수 없어요.",
+     "hint": "can · can't",
+     "ans": [
+      "can't",
+      "cannot",
+      "can not"
+     ],
+     "traps": {
+      "can": [
+       "sense",
+       "날 수 「없어요」니까 can't예요."
+      ]
+     },
+     "why": "날 수 「없어요」니까 can't예요."
+    },
+    {
+     "kind": "order",
+     "ko": "너는 수영할 수 있니?",
+     "tiles": [
+      "Can",
+      "you",
+      "swim",
+      "?"
+     ],
+     "ans": "Can you swim?"
+    },
+    {
+     "kind": "order",
+     "ko": "나는 자전거를 탈 수 있어요.",
+     "tiles": [
+      "I",
+      "can",
+      "ride",
+      "a",
+      "bike",
+      "."
+     ],
+     "ans": "I can ride a bike."
+    }
+   ]
+  },
+  {
+   "id": "G5",
+   "band": "review",
+   "title": "시키는 말 · Don't · Let's",
+   "short": "원래 모양으로 시작 · 하지 마 Don't · 하자 Let's",
+   "say": [
+    "「~하세요」라고 시킬 때는 움직임 낱말의 원래 모양으로 시작해요. Stand up, please. (please는 맨 앞이나 맨 뒤에 붙여요)",
+    "「~하지 마세요」는 앞에 Don't를 붙여요. Don't run. 「조용히 해」처럼 am·is·are 자리는 Be로 시작해요. Be quiet.",
+    "「같이 ~하자」는 앞에 Let's를 붙여요. Let's 바로 뒤의 움직임 낱말은 원래 모양이에요. Let's play soccer."
+   ],
+   "term": "중학교에서는 시키는 말을 명령문, Let's 문장을 청유문이라고 불러요.",
+   "ex": [
+    [
+     "Open the door, please.",
+     "문 좀 열어 주세요."
+    ],
+    [
+     "Don't run in the classroom.",
+     "교실에서 뛰지 마세요."
+    ],
+    [
+     "Let's catch Eevee!",
+     "같이 이브이를 잡자!"
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "___ down, please.",
+     "ko": "앉으세요.",
+     "opts": [
+      {
+       "t": "Sits",
+       "type": "base",
+       "why": "시키는 말은 -s 없이 원래 모양으로 시작해요. Sit."
+      },
+      {
+       "t": "Sitting",
+       "type": "base",
+       "why": "시키는 말은 -ing 없이 원래 모양으로 시작해요. Sit."
+      },
+      {
+       "t": "Sit",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ touch the stove!",
+     "ko": "가스레인지를 만지지 마!",
+     "opts": [
+      {
+       "t": "Don't",
+       "ok": true
+      },
+      {
+       "t": "Not",
+       "type": "not",
+       "why": "「~하지 마」는 Don't로 시작해요."
+      },
+      {
+       "t": "No",
+       "type": "not",
+       "why": "「~하지 마」는 Don't로 시작해요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Let's ___ soccer.",
+     "ko": "같이 축구하자.",
+     "opts": [
+      {
+       "t": "plays",
+       "type": "base",
+       "why": "Let's 뒤에는 -s 없이 원래 모양 play."
+      },
+      {
+       "t": "play",
+       "ok": true
+      },
+      {
+       "t": "playing",
+       "type": "base",
+       "why": "Let's 뒤에는 -ing 없이 원래 모양 play."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "같이 노래 부르자!",
+     "opts": [
+      {
+       "t": "Let's sings!",
+       "type": "base",
+       "why": "Let's 뒤에는 -s 없이 sing."
+      },
+      {
+       "t": "We sing!",
+       "type": "sense",
+       "why": "「우리는 노래해요」라는 말이에요. 「같이 ~하자」는 Let's."
+      },
+      {
+       "t": "Let's sing!",
+       "ok": true
+      },
+      {
+       "t": "Don't sing!",
+       "type": "sense",
+       "why": "「노래하지 마!」라는 말이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ quiet, please.",
+     "ko": "조용히 해 주세요.",
+     "opts": [
+      {
+       "t": "Be",
+       "ok": true
+      },
+      {
+       "t": "Is",
+       "type": "base",
+       "why": "시키는 말은 원래 모양으로 시작해요. am·is·are의 원래 모양은 Be."
+      },
+      {
+       "t": "Are",
+       "type": "base",
+       "why": "시키는 말은 원래 모양으로 시작해요. am·is·are의 원래 모양은 Be."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "수업 시간에 떠들지 마세요.",
+     "opts": [
+      {
+       "t": "Don't talks in class.",
+       "type": "base",
+       "why": "Don't 뒤에는 -s 없이 talk."
+      },
+      {
+       "t": "Not talk in class.",
+       "type": "not",
+       "why": "「~하지 마세요」는 Don't로 시작해요."
+      },
+      {
+       "t": "Don't talking in class.",
+       "type": "base",
+       "why": "Don't 뒤에는 -ing 없이 talk."
+      },
+      {
+       "t": "Don't talk in class.",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Let's ___ to the beach!",
+     "ko": "같이 바다에 가자!",
+     "opts": [
+      {
+       "t": "goes",
+       "type": "base",
+       "why": "Let's 뒤에는 -s 없이 go."
+      },
+      {
+       "t": "go",
+       "ok": true
+      },
+      {
+       "t": "going",
+       "type": "base",
+       "why": "Let's 뒤에는 -ing 없이 go."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Let's play a game!",
+      "B: ___"
+     ],
+     "ko": "좋아!",
+     "opts": [
+      {
+       "t": "Yes, I am.",
+       "type": "reply",
+       "why": "「~하자」에는 좋다·싫다로 대답해요. Okay! / Sounds good!"
+      },
+      {
+       "t": "Sounds good!",
+       "ok": true
+      },
+      {
+       "t": "No, it isn't.",
+       "type": "reply",
+       "why": "Is it~?에 하는 대답이에요. 「좋아!」는 Sounds good!"
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "___ your hands, please.",
+     "ko": "손을 씻으세요.",
+     "hint": "wash",
+     "ans": [
+      "Wash"
+     ],
+     "traps": {
+      "washes": [
+       "base",
+       "시키는 말은 -es 없이 원래 모양 Wash로 시작해요."
+      ],
+      "washing": [
+       "base",
+       "시키는 말은 -ing 없이 원래 모양 Wash로 시작해요."
+      ]
+     },
+     "why": "시키는 말은 원래 모양 Wash로 시작해요."
+    },
+    {
+     "kind": "type",
+     "en": "___ run in the hall.",
+     "ko": "복도에서 뛰지 마세요.",
+     "hint": "Don't · Let's",
+     "ans": [
+      "Don't",
+      "Do not"
+     ],
+     "traps": {
+      "let's": [
+       "sense",
+       "Let's는 「같이 ~하자」예요. 「~하지 마세요」는 Don't."
+      ]
+     },
+     "why": "「~하지 마세요」는 Don't예요."
+    },
+    {
+     "kind": "order",
+     "ko": "같이 공원에 가자.",
+     "tiles": [
+      "Let's",
+      "go",
+      "to",
+      "the",
+      "park",
+      "."
+     ],
+     "ans": "Let's go to the park."
+    },
+    {
+     "kind": "order",
+     "ko": "창문을 열어.",
+     "tiles": [
+      "Open",
+      "the",
+      "window",
+      "."
+     ],
+     "ans": "Open the window."
+    }
+   ]
+  },
+  {
+   "id": "G6",
+   "band": "review",
+   "title": "움직임 낱말 · Do you ~?",
+   "short": "like·have는 am 없이 · 물을 때 Do · 안 하면 don't",
+   "say": [
+    "like(좋아하다)·have(가지고 있다)·play(놀다)처럼 움직임이나 마음을 나타내는 말은 am·is·are 없이 바로 써요. I like pizza.",
+    "물을 때는 Do를 맨 앞에 써요. Do you like pizza? — Yes, I do. / No, I don't.",
+    "「안 해요」는 앞에 don't를 붙여요. I don't like carrots."
+   ],
+   "term": "중학교에서는 이런 낱말을 일반동사라고 불러요.",
+   "ex": [
+    [
+     "I like Greninja.",
+     "나는 개굴닌자를 좋아해요."
+    ],
+    [
+     "Do you have a Poké Ball?",
+     "너 몬스터볼 있니?"
+    ],
+    [
+     "I don't like carrots.",
+     "나는 당근을 안 좋아해요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "I ___ ice cream.",
+     "ko": "나는 아이스크림을 좋아해요.",
+     "opts": [
+      {
+       "t": "like",
+       "ok": true
+      },
+      {
+       "t": "am like",
+       "type": "beplus",
+       "why": "like 같은 움직임 낱말 앞에는 am을 쓰지 않아요."
+      },
+      {
+       "t": "likes",
+       "type": "sextra",
+       "why": "I(나)일 때는 -s 없이 like."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ you have a pencil?",
+     "ko": "너 연필 있니?",
+     "opts": [
+      {
+       "t": "Are",
+       "type": "beplus",
+       "why": "have 같은 움직임 낱말로 물을 때는 Do를 써요."
+      },
+      {
+       "t": "Do",
+       "ok": true
+      },
+      {
+       "t": "Is",
+       "type": "beplus",
+       "why": "have 같은 움직임 낱말로 물을 때는 Do를 써요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Do you like dogs?",
+      "B: Yes, I ___."
+     ],
+     "ko": "응, 좋아해.",
+     "opts": [
+      {
+       "t": "am",
+       "type": "reply",
+       "why": "Do로 물었으니 Yes, I do로 대답해요."
+      },
+      {
+       "t": "can",
+       "type": "reply",
+       "why": "Can으로 물을 때의 대답이에요. Do로 물었으니 I do."
+      },
+      {
+       "t": "do",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "We ___ soccer after school.",
+     "ko": "우리는 방과 후에 축구를 해요.",
+     "opts": [
+      {
+       "t": "are play",
+       "type": "beplus",
+       "why": "play 앞에는 are를 쓰지 않아요."
+      },
+      {
+       "t": "play",
+       "ok": true
+      },
+      {
+       "t": "plays",
+       "type": "sextra",
+       "why": "we(우리)일 때는 -s 없이 play."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I ___ like onions.",
+     "ko": "나는 양파를 안 좋아해요.",
+     "opts": [
+      {
+       "t": "don't",
+       "ok": true
+      },
+      {
+       "t": "am not",
+       "type": "beplus",
+       "why": "like 같은 움직임 낱말의 「안」은 am not이 아니라 don't예요."
+      },
+      {
+       "t": "not",
+       "type": "not",
+       "why": "like 앞의 「안」은 not 혼자가 아니라 don't(do not)예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "너는 포켓몬 카드를 모으니?",
+     "opts": [
+      {
+       "t": "Are you collect Pokémon cards?",
+       "type": "beplus",
+       "why": "collect 같은 움직임 낱말로 물을 때는 Are가 아니라 Do예요."
+      },
+      {
+       "t": "Do you collects Pokémon cards?",
+       "type": "base",
+       "why": "Do 뒤에는 -s 없이 collect."
+      },
+      {
+       "t": "Does you collect Pokémon cards?",
+       "type": "dodoes",
+       "why": "you(너)일 때는 Does가 아니라 Do예요."
+      },
+      {
+       "t": "Do you collect Pokémon cards?",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "They ___ in Seoul.",
+     "ko": "그들은 서울에 살아요.",
+     "opts": [
+      {
+       "t": "lives",
+       "type": "sextra",
+       "why": "they(그들)는 여럿이라 -s 없이 live."
+      },
+      {
+       "t": "are live",
+       "type": "beplus",
+       "why": "live 앞에는 are를 쓰지 않아요."
+      },
+      {
+       "t": "live",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Do you have a pet?",
+      "B: No, I ___."
+     ],
+     "ko": "아니, 없어.",
+     "opts": [
+      {
+       "t": "don't",
+       "ok": true
+      },
+      {
+       "t": "am not",
+       "type": "reply",
+       "why": "Do로 물었으니 No, I don't로 대답해요."
+      },
+      {
+       "t": "do",
+       "type": "sense",
+       "why": "「아니(No)」라고 했으니 don't예요."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "I ___ apples every day.",
+     "ko": "나는 날마다 사과를 먹어요.",
+     "hint": "eat",
+     "ans": [
+      "eat"
+     ],
+     "traps": {
+      "eats": [
+       "sextra",
+       "I(나)일 때는 -s 없이 eat."
+      ],
+      "eating": [
+       "bedrop",
+       "-ing는 am과 함께 써야 해요(am eating). 날마다 하는 일은 eat."
+      ],
+      "ate": [
+       "time",
+       "ate는 「먹었다」(지난 일)예요. 날마다 하는 일은 eat."
+      ]
+     },
+     "why": "I(나)가 날마다 하는 일은 eat이에요."
+    },
+    {
+     "kind": "type",
+     "en": "___ you like Pikachu?",
+     "ko": "너 피카츄 좋아하니?",
+     "hint": "Do · Are",
+     "ans": [
+      "Do"
+     ],
+     "traps": {
+      "are": [
+       "beplus",
+       "like 같은 움직임 낱말로 물을 때는 Are가 아니라 Do예요."
+      ]
+     },
+     "why": "like로 물을 때는 Do가 맨 앞이에요."
+    },
+    {
+     "kind": "order",
+     "ko": "나는 만화책을 좋아해요.",
+     "tiles": [
+      "I",
+      "like",
+      "comic",
+      "books",
+      "."
+     ],
+     "ans": "I like comic books."
+    },
+    {
+     "kind": "order",
+     "ko": "너 개 좋아하니?",
+     "tiles": [
+      "Do",
+      "you",
+      "like",
+      "dogs",
+      "?"
+     ],
+     "ans": "Do you like dogs?"
+    }
+   ]
+  },
+  {
+   "id": "G7",
+   "band": "review",
+   "title": "지금 하는 중 (am·is·are + -ing)",
+   "short": "am·is·are + 움직임 낱말-ing",
+   "say": [
+    "「지금 ~하는 중이에요」는 am · is · are 뒤에 움직임 낱말 + -ing를 써요. I am cooking.",
+    "am · is · are를 빼면 안 돼요. He running ✗ → He is running ✓",
+    "-ing를 붙이면 모양이 바뀌는 말이 있어요. make → making (e를 빼요) · swim·run·sit처럼 짧은 말은 끝 글자를 하나 더(swimming). eat·sleep·play·read는 그냥 -ing."
+   ],
+   "term": "중학교에서는 이것을 현재진행형이라고 불러요.",
+   "ex": [
+    [
+     "Snorlax is sleeping now.",
+     "잠만보는 지금 자고 있어요."
+    ],
+    [
+     "I am cooking.",
+     "나는 요리하는 중이에요."
+    ],
+    [
+     "We are watching TV.",
+     "우리는 TV를 보고 있어요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "Pikachu is ___ now.",
+     "ko": "피카츄는 지금 자고 있어요.",
+     "opts": [
+      {
+       "t": "sleep",
+       "type": "beplus",
+       "why": "is 뒤에서 「~하는 중」은 sleeping이에요."
+      },
+      {
+       "t": "sleeping",
+       "ok": true
+      },
+      {
+       "t": "sleeps",
+       "type": "beplus",
+       "why": "is 뒤에서 「~하는 중」은 sleeping이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I ___ reading a book.",
+     "ko": "나는 책을 읽는 중이에요.",
+     "opts": [
+      {
+       "t": "am",
+       "ok": true
+      },
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "I(나)는 am이에요."
+      },
+      {
+       "t": "do",
+       "type": "beplus",
+       "why": "「~하는 중」은 do가 아니라 am + -ing예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "They ___ playing tag.",
+     "ko": "그들은 술래잡기를 하고 있어요.",
+     "opts": [
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "they(그들)는 여럿이라 are예요."
+      },
+      {
+       "t": "am",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      },
+      {
+       "t": "are",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "그 아이는 지금 달리고 있어요.",
+     "opts": [
+      {
+       "t": "He running now.",
+       "type": "bedrop",
+       "why": "is가 빠졌어요. He is running."
+      },
+      {
+       "t": "He is runing now.",
+       "type": "ing",
+       "why": "run은 n을 하나 더 붙여 running이에요."
+      },
+      {
+       "t": "He is running now.",
+       "ok": true
+      },
+      {
+       "t": "He is run now.",
+       "type": "beplus",
+       "why": "is 뒤에서 「~하는 중」은 running이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "She is ___ a cake.",
+     "ko": "그분은 케이크를 만들고 있어요.",
+     "opts": [
+      {
+       "t": "making",
+       "ok": true
+      },
+      {
+       "t": "makeing",
+       "type": "ing",
+       "why": "e로 끝나는 make는 e를 빼고 -ing — making."
+      },
+      {
+       "t": "make",
+       "type": "beplus",
+       "why": "is 뒤에서 「~하는 중」은 making이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: What are you doing?",
+      "B: I'm ___ a picture."
+     ],
+     "ko": "나 그림 그리고 있어.",
+     "opts": [
+      {
+       "t": "draw",
+       "type": "beplus",
+       "why": "I'm(I am) 뒤에서 「~하는 중」은 drawing이에요."
+      },
+      {
+       "t": "drawing",
+       "ok": true
+      },
+      {
+       "t": "draws",
+       "type": "beplus",
+       "why": "I'm(I am) 뒤에서 「~하는 중」은 drawing이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Squirtle is ___ in the lake.",
+     "ko": "꼬부기가 호수에서 헤엄치고 있어요.",
+     "opts": [
+      {
+       "t": "swiming",
+       "type": "ing",
+       "why": "swim은 m을 하나 더 붙여 swimming이에요."
+      },
+      {
+       "t": "swims",
+       "type": "beplus",
+       "why": "is 뒤에서 「~하는 중」은 swimming이에요."
+      },
+      {
+       "t": "swimming",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Is Eevee eating?",
+      "B: Yes, it ___."
+     ],
+     "ko": "응, 먹고 있어.",
+     "opts": [
+      {
+       "t": "is",
+       "ok": true
+      },
+      {
+       "t": "does",
+       "type": "reply",
+       "why": "Is로 물었으니 Yes, it is로 대답해요."
+      },
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "it(이브이)은 한 마리라 is예요."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "We are ___ a movie.",
+     "ko": "우리는 영화를 보고 있어요.",
+     "hint": "watch",
+     "ans": [
+      "watching"
+     ],
+     "traps": {
+      "watch": [
+       "beplus",
+       "are 뒤에서 「~하는 중」은 watching이에요."
+      ],
+      "watches": [
+       "beplus",
+       "are 뒤에서 「~하는 중」은 watching이에요."
+      ]
+     },
+     "why": "are 뒤에서 「~하는 중」은 watching이에요."
+    },
+    {
+     "kind": "type",
+     "en": "Jigglypuff ___ singing.",
+     "ko": "푸린이 노래하고 있어요.",
+     "hint": "am · is · are",
+     "ans": [
+      "is"
+     ],
+     "traps": {
+      "are": [
+       "bepick",
+       "푸린은 한 마리라 are가 아니라 is예요."
+      ],
+      "am": [
+       "bepick",
+       "am은 I(나)하고만 써요."
+      ]
+     },
+     "why": "푸린은 한 마리라 is예요."
+    },
+    {
+     "kind": "order",
+     "ko": "나는 숙제를 하고 있어요.",
+     "tiles": [
+      "I",
+      "am",
+      "doing",
+      "my",
+      "homework",
+      "."
+     ],
+     "ans": "I am doing my homework."
+    },
+    {
+     "kind": "order",
+     "ko": "그들은 축구를 하고 있니?",
+     "tiles": [
+      "Are",
+      "they",
+      "playing",
+      "soccer",
+      "?"
+     ],
+     "ans": "Are they playing soccer?"
+    }
+   ]
+  },
+  {
+   "id": "G8",
+   "band": "review",
+   "title": "It's sunny · What time is it?",
+   "short": "날씨·시각·요일은 It으로",
+   "say": [
+    "날씨·시각·요일을 말할 때는 It으로 시작해요. 여기서 It은 「그것」이라는 뜻이 아니에요.",
+    "It's sunny. (해가 쨍쨍해요) · It's four o'clock. (4시예요) · It's Friday. (금요일이에요)",
+    "물을 때: How's the weather? (날씨 어때?) · What time is it? (몇 시야?) · What day is it? (무슨 요일이야?)"
+   ],
+   "term": "중학교에서는 이 It을 비인칭 주어라고 불러요.",
+   "ex": [
+    [
+     "It's rainy today.",
+     "오늘은 비가 와요."
+    ],
+    [
+     "What time is it? — It's three thirty.",
+     "몇 시야? — 3시 30분이야."
+    ],
+    [
+     "It's Monday.",
+     "월요일이에요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "___ sunny today.",
+     "ko": "오늘은 해가 쨍쨍해요.",
+     "opts": [
+      {
+       "t": "It's",
+       "ok": true
+      },
+      {
+       "t": "This",
+       "type": "it",
+       "why": "날씨는 It으로 말해요. It's sunny."
+      },
+      {
+       "t": "They're",
+       "type": "it",
+       "why": "날씨는 It으로 말해요. It's sunny."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "What time ___ it?",
+     "ko": "몇 시예요?",
+     "opts": [
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "it은 하나라 is예요. What time is it?"
+      },
+      {
+       "t": "is",
+       "ok": true
+      },
+      {
+       "t": "do",
+       "type": "beplus",
+       "why": "몇 시인지 물을 때는 do가 아니라 is — What time is it? 이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: What time is it?",
+      "B: It's ___."
+     ],
+     "ko": "7시야.",
+     "opts": [
+      {
+       "t": "seven clock",
+       "type": "expr",
+       "why": "「~시 정각」은 o'clock이에요. seven o'clock."
+      },
+      {
+       "t": "clock seven",
+       "type": "expr",
+       "why": "시각은 숫자 다음에 o'clock — seven o'clock."
+      },
+      {
+       "t": "seven o'clock",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: How's the weather?",
+      "B: ___"
+     ],
+     "ko": "비가 와.",
+     "opts": [
+      {
+       "t": "I'm rainy.",
+       "type": "it",
+       "why": "「내가 비가 와」라는 말이 돼요. 날씨는 It's rainy."
+      },
+      {
+       "t": "It's rainy.",
+       "ok": true
+      },
+      {
+       "t": "It rainy.",
+       "type": "bedrop",
+       "why": "is가 빠졌어요. It's = It is."
+      },
+      {
+       "t": "They're rainy.",
+       "type": "it",
+       "why": "날씨는 It으로 말해요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: What day is it today?",
+      "B: It's ___."
+     ],
+     "ko": "금요일이야.",
+     "opts": [
+      {
+       "t": "Friday",
+       "ok": true
+      },
+      {
+       "t": "sunny",
+       "type": "sense",
+       "why": "「무슨 요일」을 물었어요. sunny는 날씨예요."
+      },
+      {
+       "t": "five o'clock",
+       "type": "sense",
+       "why": "「무슨 요일」을 물었어요. five o'clock은 시각이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "오늘은 날씨가 추워요.",
+     "opts": [
+      {
+       "t": "Is cold today.",
+       "type": "it",
+       "why": "It이 빠졌어요. 시키는 말이 아니면 영어 문장에는 「누가·무엇이」 자리가 꼭 있어요."
+      },
+      {
+       "t": "It cold today.",
+       "type": "bedrop",
+       "why": "is가 빠졌어요. It's = It is."
+      },
+      {
+       "t": "I'm cold today.",
+       "type": "sense",
+       "why": "「나는 오늘 추워요」 — 내 몸이 춥다는 말이에요. 날씨는 It."
+      },
+      {
+       "t": "It's cold today.",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ snowing outside!",
+     "ko": "밖에 눈이 오고 있어!",
+     "opts": [
+      {
+       "t": "This is",
+       "type": "it",
+       "why": "날씨는 It으로 말해요. It's snowing."
+      },
+      {
+       "t": "It's",
+       "ok": true
+      },
+      {
+       "t": "There",
+       "type": "it",
+       "why": "날씨는 It으로 말해요. It's snowing."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Is it windy?",
+      "B: Yes, ___."
+     ],
+     "ko": "응, 바람 불어.",
+     "opts": [
+      {
+       "t": "I am",
+       "type": "reply",
+       "why": "Is it~?으로 물었으니 Yes, it is로 대답해요."
+      },
+      {
+       "t": "it does",
+       "type": "reply",
+       "why": "Is로 물었으니 it is로 대답해요."
+      },
+      {
+       "t": "it is",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "___ hot today.",
+     "ko": "오늘은 날씨가 더워요.",
+     "hint": "It's · I'm",
+     "ans": [
+      "It's",
+      "It is"
+     ],
+     "traps": {
+      "i'm": [
+       "it",
+       "I'm hot은 「내 몸이 더워요」예요. 날씨는 It's."
+      ],
+      "i am": [
+       "it",
+       "I am hot은 「내 몸이 더워요」예요. 날씨는 It's."
+      ],
+      "its": [
+       "apos",
+       "its는 「그것의」라는 다른 낱말이에요. 따옴표를 넣어 It's."
+      ]
+     },
+     "why": "날씨는 It's로 말해요."
+    },
+    {
+     "kind": "type",
+     "en": "What ___ is it?",
+     "ko": "몇 시예요?",
+     "hint": "time · day",
+     "ans": [
+      "time"
+     ],
+     "traps": {
+      "day": [
+       "sense",
+       "What day is it?은 「무슨 요일이야?」예요. 몇 시는 time."
+      ]
+     },
+     "why": "「몇 시」는 What time이에요."
+    },
+    {
+     "kind": "order",
+     "ko": "오늘은 바람이 불어요.",
+     "tiles": [
+      "It's",
+      "windy",
+      "today",
+      "."
+     ],
+     "ans": "It's windy today."
+    },
+    {
+     "kind": "order",
+     "ko": "지금 몇 시예요?",
+     "tiles": [
+      "What",
+      "time",
+      "is",
+      "it",
+      "now",
+      "?"
+     ],
+     "ans": "What time is it now?"
+    }
+   ]
+  },
+  {
+   "id": "G9",
+   "band": "new",
+   "title": "He likes · Does he ~?",
+   "short": "한 사람·한 마리가 늘 하는 일은 -s · 물을 때 Does",
+   "say": [
+    "he·she·it·한 사람(지우)·한 마리(피카츄)가 늘 하는 일이나 좋아하는 것을 말할 때는 움직임 낱말 끝에 -s를 붙여요. I eat → Pikachu eats. (I·you·we·they는 그대로)",
+    "-es를 붙이는 말: ch·sh·s·x·o로 끝나면 -es (watch → watches · go → goes). y로 끝나면 앞 글자를 봐요 — a·e·o·u면 그대로 -s(play → plays), 아니면 y를 i로 바꾸고 -es(study → studies). have는 has로 바뀌어요.",
+    "물을 때와 「안 해요」는 Does·doesn't를 쓰고, 그 뒤는 -s 없이 원래 모양이에요. Does he like pizza? — Yes, he does. / He doesn't like carrots."
+   ],
+   "term": "중학교에서는 이것을 3인칭 단수 현재형이라고 불러요.",
+   "ex": [
+    [
+     "Ash likes Pikachu.",
+     "지우는 피카츄를 좋아해요."
+    ],
+    [
+     "Bulbasaur has a seed on its back.",
+     "이상해씨는 등에 씨앗이 있어요."
+    ],
+    [
+     "Does Snorlax sleep a lot? — Yes, it does.",
+     "잠만보는 잠을 많이 자니? — 응, 그래."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "Pikachu ___ apples every morning.",
+     "ko": "피카츄는 아침마다 사과를 먹어요.",
+     "opts": [
+      {
+       "t": "eat",
+       "type": "sdrop",
+       "why": "피카츄는 한 마리예요. 한 마리가 늘 하는 일은 eats."
+      },
+      {
+       "t": "eats",
+       "ok": true
+      },
+      {
+       "t": "eating",
+       "type": "bedrop",
+       "why": "-ing는 혼자 못 써요. is eating처럼 is와 함께 — 아침마다 하는 일은 eats."
+      },
+      {
+       "t": "is eat",
+       "type": "beplus",
+       "why": "is와 eat는 한 문장에 같이 안 써요. 아침마다 하는 일은 eats."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Misty ___ Water-type Pokémon.",
+     "ko": "이슬이는 물 타입 포켓몬을 좋아해요.",
+     "opts": [
+      {
+       "t": "like",
+       "type": "sdrop",
+       "why": "이슬이는 한 사람이라 likes예요."
+      },
+      {
+       "t": "is like",
+       "type": "beplus",
+       "why": "like 같은 움직임 낱말 앞에는 is를 쓰지 않아요."
+      },
+      {
+       "t": "likes",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "She ___ soccer every Saturday.",
+     "ko": "그 아이는 토요일마다 축구를 해요.",
+     "opts": [
+      {
+       "t": "plays",
+       "ok": true
+      },
+      {
+       "t": "playes",
+       "type": "spell",
+       "why": "play는 y 앞이 a라 -s만 붙여요 — plays."
+      },
+      {
+       "t": "play",
+       "type": "sdrop",
+       "why": "she(그 아이)는 한 사람이라 plays예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Charmander ___ a flame on its tail.",
+     "ko": "파이리는 꼬리에 불꽃이 있어요.",
+     "opts": [
+      {
+       "t": "have",
+       "type": "sdrop",
+       "why": "파이리는 한 마리라 have가 has로 바뀌어요."
+      },
+      {
+       "t": "haves",
+       "type": "spell",
+       "why": "have는 -s를 붙이지 않고 has로 바뀌어요."
+      },
+      {
+       "t": "has",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ he play the piano?",
+     "ko": "그 아이는 피아노를 치니?",
+     "opts": [
+      {
+       "t": "Does",
+       "ok": true
+      },
+      {
+       "t": "Do",
+       "type": "dodoes",
+       "why": "he(그 아이)는 한 사람이라 Does예요."
+      },
+      {
+       "t": "Is",
+       "type": "beplus",
+       "why": "play 같은 움직임 낱말로 물을 때는 Is가 아니라 Does예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Does Ash have a Pikachu?",
+      "B: Yes, he ___."
+     ],
+     "ko": "응, 있어.",
+     "opts": [
+      {
+       "t": "is",
+       "type": "reply",
+       "why": "Does로 물었으니 Yes, he does로 대답해요."
+      },
+      {
+       "t": "does",
+       "ok": true
+      },
+      {
+       "t": "has",
+       "type": "reply",
+       "why": "Does로 물었으니 대답도 does — Yes, he does."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Does Lapras ___ in the sea?",
+     "ko": "라프라스는 바다에 사니?",
+     "opts": [
+      {
+       "t": "lives",
+       "type": "base",
+       "why": "Does가 -s 몫을 가져가서, 뒤에는 -s 없이 live."
+      },
+      {
+       "t": "living",
+       "type": "base",
+       "why": "Does 뒤에는 원래 모양 live."
+      },
+      {
+       "t": "live",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "우리 선생님은 영어를 가르치세요.",
+     "opts": [
+      {
+       "t": "My teacher teachs English.",
+       "type": "spell",
+       "why": "ch로 끝나는 teach는 -es — teaches."
+      },
+      {
+       "t": "My teacher teach English.",
+       "type": "sdrop",
+       "why": "선생님은 한 사람이라 -es를 붙여 teaches."
+      },
+      {
+       "t": "My teacher is teach English.",
+       "type": "beplus",
+       "why": "teach 앞에는 is를 쓰지 않아요."
+      },
+      {
+       "t": "My teacher teaches English.",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "She ___ TV after dinner.",
+     "ko": "그 아이는 저녁을 먹고 TV를 봐요.",
+     "hint": "watch",
+     "ans": [
+      "watches"
+     ],
+     "traps": {
+      "watch": [
+       "sdrop",
+       "she(그 아이)는 한 사람이라 -es를 붙여 watches."
+      ],
+      "watchs": [
+       "spell",
+       "ch로 끝나는 watch는 -es — watches."
+      ]
+     },
+     "why": "ch로 끝나는 watch에 -es — watches."
+    },
+    {
+     "kind": "type",
+     "en": "He ___ like snakes.",
+     "ko": "그 아이는 뱀을 안 좋아해요.",
+     "hint": "don't · doesn't",
+     "ans": [
+      "doesn't",
+      "does not"
+     ],
+     "traps": {
+      "don't": [
+       "dodoes",
+       "he(그 아이)는 한 사람이라 don't가 아니라 doesn't예요."
+      ],
+      "do not": [
+       "dodoes",
+       "he(그 아이)는 한 사람이라 does not(doesn't)이에요."
+      ]
+     },
+     "why": "he(그 아이)의 「안 해요」는 doesn't예요."
+    },
+    {
+     "kind": "order",
+     "ko": "지우는 모자를 써요.",
+     "tiles": [
+      "Ash",
+      "wears",
+      "a",
+      "cap",
+      "."
+     ],
+     "ans": "Ash wears a cap."
+    },
+    {
+     "kind": "order",
+     "ko": "피카츄는 케첩을 좋아하니?",
+     "tiles": [
+      "Does",
+      "Pikachu",
+      "like",
+      "ketchup",
+      "?"
+     ],
+     "ans": "Does Pikachu like ketchup?"
+    }
+   ]
+  },
+  {
+   "id": "G10",
+   "band": "new",
+   "title": "지난 일 -ed",
+   "short": "이미 한 일은 움직임 낱말 + -ed",
+   "say": [
+    "이미 지난 일(어제·지난주에 한 일)은 대부분의 움직임 낱말 끝에 -ed를 붙여요. play → played · I played with Pikachu yesterday. (went처럼 아예 다른 모양이 되는 말은 다음 단원)",
+    "-ed는 누가(I·he·they)여도 모양이 같아요. he·she·한 마리가 늘 하는 일에 붙는 -s와 달라요.",
+    "붙일 때 철자가 바뀌는 말: e로 끝나면 -d만(like → liked) · y는 앞 글자가 a·e·o·u면 그대로(play → played), 아니면 y를 i로(study → studied) · 끝이 「a·e·i·o·u 하나 + 다른 글자 하나」인 짧은 말은 끝 글자를 하나 더(stop → stopped). jump·look·rain은 그냥 -ed."
+   ],
+   "term": "중학교에서는 이것을 과거형(과거 시제)이라고 불러요.",
+   "ex": [
+    [
+     "I played with Pikachu yesterday.",
+     "나는 어제 피카츄와 놀았어요."
+    ],
+    [
+     "We watched a Pokémon movie last night.",
+     "우리는 어젯밤에 포켓몬 영화를 봤어요."
+    ],
+    [
+     "Pikachu tried a new berry.",
+     "피카츄가 새 나무열매를 먹어 봤어요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "I ___ to school yesterday.",
+     "ko": "나는 어제 학교에 걸어갔어요.",
+     "opts": [
+      {
+       "t": "walk",
+       "type": "time",
+       "why": "어제 한 일이라 -ed를 붙여 walked."
+      },
+      {
+       "t": "walked",
+       "ok": true
+      },
+      {
+       "t": "walks",
+       "type": "time",
+       "why": "walks는 he·she가 늘 하는 일이에요. 어제 한 일은 walked."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Pikachu ___ at me.",
+     "ko": "피카츄가 나를 보고 웃었어요.",
+     "opts": [
+      {
+       "t": "smileed",
+       "type": "spell",
+       "why": "e로 끝나는 smile은 -d만 — smiled."
+      },
+      {
+       "t": "smile",
+       "type": "time",
+       "why": "웃었다(지난 일)라서 smiled."
+      },
+      {
+       "t": "smiled",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "They ___ in the park last Sunday.",
+     "ko": "그들은 지난 일요일에 공원에서 놀았어요.",
+     "opts": [
+      {
+       "t": "played",
+       "ok": true
+      },
+      {
+       "t": "plaied",
+       "type": "spell",
+       "why": "play는 y 앞이 a라 그대로 -ed — played."
+      },
+      {
+       "t": "are playing",
+       "type": "time",
+       "why": "「지금 노는 중」이에요. 지난 일요일에 한 일은 played."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "She ___ math last night.",
+     "ko": "그 아이는 어젯밤에 수학을 공부했어요.",
+     "opts": [
+      {
+       "t": "studyed",
+       "type": "spell",
+       "why": "study는 y 앞이 d라 y를 i로 바꿔 studied."
+      },
+      {
+       "t": "studied",
+       "ok": true
+      },
+      {
+       "t": "studies",
+       "type": "time",
+       "why": "studies는 늘 하는 일이에요. 어젯밤 한 일은 studied."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "기차가 역에서 멈췄어요.",
+     "opts": [
+      {
+       "t": "The train stoped at the station.",
+       "type": "spell",
+       "why": "stop은 끝이 o + p라 p를 하나 더 — stopped."
+      },
+      {
+       "t": "The train stops at the station.",
+       "type": "time",
+       "why": "「기차는 역에서 멈춰요(늘)」라는 말이에요. 멈췄다는 stopped."
+      },
+      {
+       "t": "The train stopped at the station.",
+       "ok": true
+      },
+      {
+       "t": "The train is stop at the station.",
+       "type": "beplus",
+       "why": "stop 앞에는 is를 쓰지 않아요. 멈췄다는 stopped."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Ash ___ Pikachu.",
+     "ko": "지우가 피카츄를 불렀어요.",
+     "opts": [
+      {
+       "t": "called",
+       "ok": true
+      },
+      {
+       "t": "calls",
+       "type": "time",
+       "why": "불렀다(지난 일)라서 called."
+      },
+      {
+       "t": "call",
+       "type": "time",
+       "why": "불렀다(지난 일)라서 called."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Yesterday, it ___ all day.",
+     "ko": "어제는 하루 종일 비가 왔어요.",
+     "opts": [
+      {
+       "t": "rained",
+       "ok": true
+      },
+      {
+       "t": "rains",
+       "type": "time",
+       "why": "어제 일이라 rained."
+      },
+      {
+       "t": "raining",
+       "type": "bedrop",
+       "why": "-ing는 혼자 못 써요. 어제 온 비는 rained."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Eevee ___ into my arms.",
+     "ko": "이브이가 내 품으로 뛰어들었어요.",
+     "opts": [
+      {
+       "t": "jumpped",
+       "type": "spell",
+       "why": "jump는 끝이 m·p 두 글자라 그대로 -ed — jumped."
+      },
+      {
+       "t": "jump",
+       "type": "time",
+       "why": "뛰어들었다(지난 일)라서 jumped."
+      },
+      {
+       "t": "jumped",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "I ___ my room yesterday.",
+     "ko": "나는 어제 내 방을 청소했어요.",
+     "hint": "clean",
+     "ans": [
+      "cleaned"
+     ],
+     "traps": {
+      "clean": [
+       "time",
+       "어제 한 일이라 -ed를 붙여 cleaned."
+      ],
+      "cleans": [
+       "time",
+       "cleans는 he·she가 늘 하는 일이에요. 어제 한 일은 cleaned."
+      ]
+     },
+     "why": "어제 한 일이라 cleaned."
+    },
+    {
+     "kind": "type",
+     "en": "The baby ___ all night.",
+     "ko": "아기가 밤새 울었어요.",
+     "hint": "cry",
+     "ans": [
+      "cried"
+     ],
+     "traps": {
+      "cryed": [
+       "spell",
+       "cry는 y 앞이 r이라 y를 i로 바꿔 cried."
+      ],
+      "cry": [
+       "time",
+       "울었다(지난 일)라서 cried."
+      ],
+      "cries": [
+       "time",
+       "울었다(지난 일)라서 cried."
+      ]
+     },
+     "why": "cry는 y를 i로 바꿔 -ed — cried."
+    },
+    {
+     "kind": "order",
+     "ko": "우리는 어제 숙제를 끝냈어요.",
+     "tiles": [
+      "We",
+      "finished",
+      "our",
+      "homework",
+      "yesterday",
+      "."
+     ],
+     "ans": "We finished our homework yesterday."
+    },
+    {
+     "kind": "order",
+     "ko": "그 아이는 문 앞에서 기다렸어요.",
+     "tiles": [
+      "He",
+      "waited",
+      "at",
+      "the",
+      "door",
+      "."
+     ],
+     "ans": "He waited at the door."
+    }
+   ]
+  },
+  {
+   "id": "G11",
+   "band": "new",
+   "title": "went · ate · saw · didn't",
+   "short": "모양이 바뀌는 지난 말 · 물을 때 Did · 안 했으면 didn't",
+   "say": [
+    "-ed를 붙이지 않고 모양이 아예 바뀌는 말이 있어요. go → went · eat → ate · see → saw · have → had · make → made · come → came — 하나씩 익혀요.",
+    "went·ate 같은 움직임 낱말로 지난 일을 물을 때는 Did를 맨 앞에, 「안 했어요」는 didn't를 써요. Did you see Pikachu? — Yes, I did. / No, I didn't.",
+    "Did·didn't 뒤에는 원래 모양을 써요. 지난 일이라는 건 did가 이미 말해 줘요. I didn't went ✗ → I didn't go ✓"
+   ],
+   "term": "중학교에서는 went처럼 -ed 없이 아예 다른 모양이 되는 말을 불규칙 동사라고 불러요.",
+   "ex": [
+    [
+     "Snorlax ate ten berries.",
+     "잠만보가 나무열매 열 개를 먹었어요."
+    ],
+    [
+     "Did you see Mew? — No, I didn't.",
+     "뮤 봤어? — 아니, 못 봤어."
+    ],
+    [
+     "We went to the beach.",
+     "우리는 바닷가에 갔어요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "I ___ to school by bus yesterday.",
+     "ko": "나는 어제 버스를 타고 학교에 갔어요.",
+     "opts": [
+      {
+       "t": "goed",
+       "type": "irreg",
+       "why": "go는 -ed를 붙이지 않고 went로 바뀌어요."
+      },
+      {
+       "t": "went",
+       "ok": true
+      },
+      {
+       "t": "go",
+       "type": "time",
+       "why": "어제 간 일이라 went."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Munchlax ___ all the cookies.",
+     "ko": "먹고자가 쿠키를 다 먹었어요.",
+     "opts": [
+      {
+       "t": "eats",
+       "type": "time",
+       "why": "다 먹었다(지난 일)라서 ate."
+      },
+      {
+       "t": "eated",
+       "type": "irreg",
+       "why": "eat는 -ed를 붙이지 않고 ate로 바뀌어요."
+      },
+      {
+       "t": "ate",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "We ___ a rainbow after the rain.",
+     "ko": "비가 그친 뒤 우리는 무지개를 봤어요.",
+     "opts": [
+      {
+       "t": "saw",
+       "ok": true
+      },
+      {
+       "t": "seed",
+       "type": "irreg",
+       "why": "see는 -ed를 붙이지 않고 saw로 바뀌어요."
+      },
+      {
+       "t": "see",
+       "type": "time",
+       "why": "봤다(지난 일)라서 saw."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I ___ go to the party.",
+     "ko": "나는 파티에 안 갔어요.",
+     "opts": [
+      {
+       "t": "don't",
+       "type": "time",
+       "why": "don't는 늘·지금 「안 해요」예요. 안 갔다(지난 일)는 didn't."
+      },
+      {
+       "t": "didn't",
+       "ok": true
+      },
+      {
+       "t": "not",
+       "type": "not",
+       "why": "go 앞의 「안」은 not 혼자가 아니라 didn't(did not)예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Did you ___ the movie?",
+     "ko": "그 영화 봤니?",
+     "opts": [
+      {
+       "t": "saw",
+       "type": "base",
+       "why": "Did가 지난 일을 이미 말해 줘요. 뒤에는 원래 모양 see."
+      },
+      {
+       "t": "seeing",
+       "type": "base",
+       "why": "Did 뒤에는 원래 모양 see."
+      },
+      {
+       "t": "see",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Did Pikachu win the battle?",
+      "B: Yes, it ___."
+     ],
+     "ko": "응, 이겼어.",
+     "opts": [
+      {
+       "t": "did",
+       "ok": true
+      },
+      {
+       "t": "was",
+       "type": "reply",
+       "why": "Did로 물었으니 Yes, it did로 대답해요."
+      },
+      {
+       "t": "does",
+       "type": "reply",
+       "why": "Did(지난 일)로 물었으니 대답도 did예요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "그 아이는 아침을 안 먹었어요.",
+     "opts": [
+      {
+       "t": "He didn't ate breakfast.",
+       "type": "base",
+       "why": "didn't 뒤에는 원래 모양 eat."
+      },
+      {
+       "t": "He didn't eat breakfast.",
+       "ok": true
+      },
+      {
+       "t": "He not ate breakfast.",
+       "type": "not",
+       "why": "「안 먹었다」는 not 혼자가 아니라 didn't eat."
+      },
+      {
+       "t": "He doesn't eat breakfast.",
+       "type": "time",
+       "why": "「그 아이는 (늘) 아침을 안 먹어요」라는 말이에요. 안 먹었다는 didn't eat."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "She ___ a cake for me.",
+     "ko": "그분이 나에게 케이크를 만들어 줬어요.",
+     "opts": [
+      {
+       "t": "maked",
+       "type": "irreg",
+       "why": "make는 -ed를 붙이지 않고 made로 바뀌어요."
+      },
+      {
+       "t": "makes",
+       "type": "time",
+       "why": "만들어 줬다(지난 일)라서 made."
+      },
+      {
+       "t": "made",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "They ___ home late.",
+     "ko": "그들은 늦게 집에 왔어요.",
+     "hint": "come",
+     "ans": [
+      "came"
+     ],
+     "traps": {
+      "comed": [
+       "irreg",
+       "come은 -ed를 붙이지 않고 came으로 바뀌어요."
+      ],
+      "come": [
+       "time",
+       "왔다(지난 일)라서 came."
+      ],
+      "comes": [
+       "time",
+       "왔다(지난 일)라서 came."
+      ]
+     },
+     "why": "come은 모양이 바뀌어 came이에요."
+    },
+    {
+     "kind": "type",
+     "en": "I ___ watch TV last night.",
+     "ko": "나는 어젯밤에 TV를 안 봤어요.",
+     "hint": "don't · didn't",
+     "ans": [
+      "didn't",
+      "did not"
+     ],
+     "traps": {
+      "don't": [
+       "time",
+       "don't는 늘·지금 「안 해요」예요. 어젯밤(지난 일)은 didn't."
+      ],
+      "do not": [
+       "time",
+       "어젯밤(지난 일)은 did not(didn't)."
+      ]
+     },
+     "why": "어젯밤에 안 한 일은 didn't예요."
+    },
+    {
+     "kind": "order",
+     "ko": "너 공원에 갔니?",
+     "tiles": [
+      "Did",
+      "you",
+      "go",
+      "to",
+      "the",
+      "park",
+      "?"
+     ],
+     "ans": "Did you go to the park?"
+    },
+    {
+     "kind": "order",
+     "ko": "우리는 동물원에 안 갔어요.",
+     "tiles": [
+      "We",
+      "didn't",
+      "go",
+      "to",
+      "the",
+      "zoo",
+      "."
+     ],
+     "ans": "We didn't go to the zoo."
+    }
+   ]
+  },
+  {
+   "id": "G12",
+   "band": "new",
+   "title": "will · be going to",
+   "short": "앞으로 할 일은 will 또는 am·is·are going to + 원래 모양",
+   "say": [
+    "앞으로 할 일은 will 뒤에 원래 모양을 써요. I will call you. (I'll로 줄여요) · 안 할 거면 won't(will not을 줄인 말).",
+    "am·is·are + going to + 원래 모양으로도 말해요. 이미 하기로 정해 둔 일에 자주 써요. We're going to visit the gym tomorrow.",
+    "will 뒤, going to 뒤에는 늘 원래 모양이에요 — will goes ✗ · going to visited ✗. 물을 때는 Will을 앞으로: Will it rain? — Yes, it will. · When will you come?"
+   ],
+   "term": "중학교에서는 이것을 미래 시제(미래를 나타내는 말)라고 불러요.",
+   "ex": [
+    [
+     "I will catch Mewtwo someday.",
+     "나는 언젠가 뮤츠를 잡을 거예요."
+    ],
+    [
+     "We're going to visit the gym.",
+     "우리는 체육관에 갈 거예요."
+    ],
+    [
+     "It won't rain tomorrow.",
+     "내일은 비가 안 올 거예요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "Don't worry. I ___ help you.",
+     "ko": "걱정 마. 내가 도와줄게.",
+     "opts": [
+      {
+       "t": "will",
+       "ok": true
+      },
+      {
+       "t": "am",
+       "type": "beplus",
+       "why": "am 뒤에 help를 바로 쓸 수 없어요. 「~할게」는 will help."
+      },
+      {
+       "t": "did",
+       "type": "time",
+       "why": "did는 지난 일이에요. 앞으로 할 일은 will."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Pikachu will ___ Thunderbolt.",
+     "ko": "피카츄가 10만볼트를 쓸 거예요.",
+     "opts": [
+      {
+       "t": "uses",
+       "type": "base",
+       "why": "will 뒤에는 -s 없이 원래 모양 use."
+      },
+      {
+       "t": "use",
+       "ok": true
+      },
+      {
+       "t": "using",
+       "type": "base",
+       "why": "will 뒤에는 원래 모양 use."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "We are going to ___ lunch together.",
+     "ko": "우리는 같이 점심을 먹을 거예요.",
+     "opts": [
+      {
+       "t": "had",
+       "type": "base",
+       "why": "going to 뒤에는 원래 모양 have."
+      },
+      {
+       "t": "having",
+       "type": "base",
+       "why": "going to 뒤에는 원래 모양 have."
+      },
+      {
+       "t": "have",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "She ___ going to play the piano.",
+     "ko": "그 아이는 피아노를 칠 거예요.",
+     "opts": [
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "she(그 아이)는 한 사람이라 is예요."
+      },
+      {
+       "t": "is",
+       "ok": true
+      },
+      {
+       "t": "will",
+       "type": "expr",
+       "why": "will과 going to는 같이 쓰지 않아요. She is going to ~ 또는 She will ~."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Will it snow tomorrow?",
+      "B: Yes, it ___."
+     ],
+     "ko": "응, 올 거야.",
+     "opts": [
+      {
+       "t": "does",
+       "type": "reply",
+       "why": "Will로 물었으니 Yes, it will로 대답해요."
+      },
+      {
+       "t": "is",
+       "type": "reply",
+       "why": "Will로 물었으니 Yes, it will로 대답해요."
+      },
+      {
+       "t": "will",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I ___ be late. See you soon!",
+     "ko": "늦지 않을게. 곧 봐!",
+     "opts": [
+      {
+       "t": "won't",
+       "ok": true
+      },
+      {
+       "t": "willn't",
+       "type": "expr",
+       "why": "will not을 줄이면 won't예요. willn't라는 말은 없어요."
+      },
+      {
+       "t": "don't",
+       "type": "time",
+       "why": "don't는 늘·지금의 「안 해요」예요. 앞으로 안 할 일은 won't."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "나는 내일 도서관에 갈 거예요.",
+     "opts": [
+      {
+       "t": "I going to go to the library tomorrow.",
+       "type": "bedrop",
+       "why": "am이 빠졌어요. I am going to ~."
+      },
+      {
+       "t": "I will going to the library tomorrow.",
+       "type": "base",
+       "why": "will 뒤에는 원래 모양 go — I will go to the library."
+      },
+      {
+       "t": "I am going to go to the library tomorrow.",
+       "ok": true
+      },
+      {
+       "t": "I am go to the library tomorrow.",
+       "type": "beplus",
+       "why": "am 뒤에 go를 바로 쓸 수 없어요. am going to go."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "When ___ you come back?",
+     "ko": "너 언제 돌아올 거니?",
+     "opts": [
+      {
+       "t": "will",
+       "ok": true
+      },
+      {
+       "t": "are",
+       "type": "beplus",
+       "why": "are 뒤에 come을 바로 쓸 수 없어요. 「~할 거니?」는 will."
+      },
+      {
+       "t": "did",
+       "type": "time",
+       "why": "did는 지난 일이에요(언제 돌아왔니?). 앞으로 할 일은 will."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "Charmander will ___ into Charmeleon.",
+     "ko": "파이리는 리자드로 진화할 거예요.",
+     "hint": "evolve",
+     "ans": [
+      "evolve"
+     ],
+     "traps": {
+      "evolves": [
+       "base",
+       "will 뒤에는 -s 없이 evolve."
+      ],
+      "evolved": [
+       "base",
+       "will 뒤에는 원래 모양 evolve."
+      ],
+      "evolving": [
+       "base",
+       "will 뒤에는 원래 모양 evolve."
+      ]
+     },
+     "why": "will 뒤에는 원래 모양 evolve예요."
+    },
+    {
+     "kind": "type",
+     "en": "They are going to ___ a sandcastle.",
+     "ko": "그들은 모래성을 쌓을 거예요.",
+     "hint": "build",
+     "ans": [
+      "build"
+     ],
+     "traps": {
+      "builds": [
+       "base",
+       "going to 뒤에는 -s 없이 build."
+      ],
+      "built": [
+       "base",
+       "going to 뒤에는 원래 모양 build."
+      ],
+      "building": [
+       "base",
+       "going to 뒤에는 원래 모양 build."
+      ]
+     },
+     "why": "going to 뒤에는 원래 모양 build예요."
+    },
+    {
+     "kind": "order",
+     "ko": "나는 내일 일찍 일어날 거예요.",
+     "tiles": [
+      "I",
+      "will",
+      "get",
+      "up",
+      "early",
+      "tomorrow",
+      "."
+     ],
+     "ans": "I will get up early tomorrow."
+    },
+    {
+     "kind": "order",
+     "ko": "너는 내일 무엇을 할 거니?",
+     "tiles": [
+      "What",
+      "will",
+      "you",
+      "do",
+      "tomorrow",
+      "?"
+     ],
+     "ans": "What will you do tomorrow?"
+    }
+   ]
+  },
+  {
+   "id": "G13",
+   "band": "new",
+   "title": "There is · There are",
+   "short": "「~이 있어요」 — 하나면 is, 여럿이면 are",
+   "say": [
+    "어디에 무엇이 있다고 알려 줄 때는 There is / There are로 말해요. 여기서 there는 「거기」라는 뜻이 아니에요. (내가 가진 것 — 「나는 개가 있어요」는 I have a dog.)",
+    "뒤에 오는 것이 하나면 There is, 여럿이면 There are. There is a Pikachu. · There are three Poké Balls.",
+    "물을 때는 Is there ~? / Are there ~?, 없으면 There isn't ~ / There aren't ~. 어디에 있는지는 끝에 붙여요: in the box · on the desk · under the bed."
+   ],
+   "term": "중학교에서는 이 there를 유도부사라고 불러요.",
+   "ex": [
+    [
+     "There is a Pikachu under the tree.",
+     "나무 아래에 피카츄가 한 마리 있어요."
+    ],
+    [
+     "There are three Poké Balls in my bag.",
+     "내 가방에 몬스터볼이 세 개 있어요."
+    ],
+    [
+     "Is there a Pokémon Center near here?",
+     "이 근처에 포켓몬센터가 있나요?"
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "There ___ a cat on the sofa.",
+     "ko": "소파 위에 고양이가 한 마리 있어요.",
+     "opts": [
+      {
+       "t": "are",
+       "type": "bepick",
+       "why": "고양이 한 마리 — 하나라서 is예요."
+      },
+      {
+       "t": "is",
+       "ok": true
+      },
+      {
+       "t": "am",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "There ___ five apples in the basket.",
+     "ko": "바구니에 사과가 다섯 개 있어요.",
+     "opts": [
+      {
+       "t": "are",
+       "ok": true
+      },
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "사과 다섯 개 — 여럿이라 are예요."
+      },
+      {
+       "t": "has",
+       "type": "there",
+       "why": "has는 「(누가) 가지고 있어요」예요(Pikachu has a ball). 바구니 안처럼 어디에 무엇이 있다고 할 때는 There are."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "상자 안에 피카츄 인형이 있어요.",
+     "opts": [
+      {
+       "t": "It is a Pikachu doll in the box.",
+       "type": "there",
+       "why": "「그건 상자 안의 피카츄 인형이에요」라는 말이에요. 있다고 할 때는 There is."
+      },
+      {
+       "t": "There are a Pikachu doll in the box.",
+       "type": "bepick",
+       "why": "인형 하나 — There is예요."
+      },
+      {
+       "t": "There a Pikachu doll in the box.",
+       "type": "bedrop",
+       "why": "is가 빠졌어요 — There is ~."
+      },
+      {
+       "t": "There is a Pikachu doll in the box.",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "___ there a park near your house?",
+     "ko": "너희 집 근처에 공원이 있니?",
+     "opts": [
+      {
+       "t": "Are",
+       "type": "bepick",
+       "why": "공원 하나 — Is there예요."
+      },
+      {
+       "t": "Do",
+       "type": "there",
+       "why": "There is로 물을 때는 Is를 맨 앞으로 — Is there ~?"
+      },
+      {
+       "t": "Is",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Are there any cookies in the jar?",
+      "B: Yes, there ___."
+     ],
+     "ko": "응, 있어.",
+     "opts": [
+      {
+       "t": "are",
+       "ok": true
+      },
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "cookies(쿠키들)는 여럿이라 are예요."
+      },
+      {
+       "t": "do",
+       "type": "reply",
+       "why": "Are there로 물었으니 Yes, there are로 대답해요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "There ___ any cars on the road.",
+     "ko": "길에 차가 한 대도 없어요.",
+     "opts": [
+      {
+       "t": "isn't",
+       "type": "bepick",
+       "why": "cars(차들)는 여럿이라 aren't예요."
+      },
+      {
+       "t": "aren't",
+       "ok": true
+      },
+      {
+       "t": "don't",
+       "type": "not",
+       "why": "「없어요」는 don't가 아니라 There aren't로 말해요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "There are two ___ on the table.",
+     "ko": "탁자 위에 컵이 두 개 있어요.",
+     "opts": [
+      {
+       "t": "cup",
+       "type": "plural",
+       "why": "두 개 — 여럿이라 cups예요."
+      },
+      {
+       "t": "cupes",
+       "type": "spell",
+       "why": "cup은 -s만 붙여요 — cups."
+      },
+      {
+       "t": "cups",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Is there a bank near here?",
+      "B: No, there ___."
+     ],
+     "ko": "아니요, 없어요.",
+     "opts": [
+      {
+       "t": "isn't",
+       "ok": true
+      },
+      {
+       "t": "aren't",
+       "type": "bepick",
+       "why": "Is there(하나)로 물었으니 there isn't예요."
+      },
+      {
+       "t": "doesn't",
+       "type": "reply",
+       "why": "Is there로 물었으니 No, there isn't로 대답해요."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "There ___ a Poké Ball under the bed.",
+     "ko": "침대 밑에 몬스터볼이 하나 있어요.",
+     "hint": "is · are",
+     "ans": [
+      "is"
+     ],
+     "traps": {
+      "are": [
+       "bepick",
+       "몬스터볼 하나 — is예요."
+      ]
+     },
+     "why": "몬스터볼 하나라 There is예요."
+    },
+    {
+     "kind": "type",
+     "en": "There ___ many stars in the sky.",
+     "ko": "하늘에 별이 많아요.",
+     "hint": "is · are",
+     "ans": [
+      "are"
+     ],
+     "traps": {
+      "is": [
+       "bepick",
+       "stars(별들)는 여럿이라 are예요."
+      ]
+     },
+     "why": "별이 여럿이라 There are예요."
+    },
+    {
+     "kind": "order",
+     "ko": "정원에 고양이가 두 마리 있어요.",
+     "tiles": [
+      "There",
+      "are",
+      "two",
+      "cats",
+      "in",
+      "the",
+      "garden",
+      "."
+     ],
+     "ans": "There are two cats in the garden."
+    },
+    {
+     "kind": "order",
+     "ko": "나무에 새가 있니?",
+     "tiles": [
+      "Is",
+      "there",
+      "a",
+      "bird",
+      "in",
+      "the",
+      "tree",
+      "?"
+     ],
+     "ans": "Is there a bird in the tree?"
+    }
+   ]
+  },
+  {
+   "id": "G14",
+   "band": "new",
+   "title": "Whose ~? · mine",
+   "short": "누구 거? — Whose · 내 거 — mine",
+   "say": [
+    "「누구의 것?」은 Whose로 물어요. Whose Poké Ball is this? (이건 누구 몬스터볼이니?)",
+    "「~의」(my·your·his·her·our·their)는 뒤에 물건이 꼭 와요 — my cap. 「~의 것」(mine·yours·his·hers·ours·theirs)은 뒤에 아무것도 안 붙여요 — It's mine. (his는 둘 다 his)",
+    "이름 뒤에는 's를 붙여요: Ash's cap(지우의 모자) · It's Ash's.(지우 거예요) mine·hers·yours에는 따옴표가 없어요. Whose와 Who's(=Who is, 누구야?)는 소리가 같아도 다른 말이에요."
+   ],
+   "term": "중학교에서는 my·your를 소유격, mine·yours를 소유대명사라고 불러요.",
+   "ex": [
+    [
+     "Whose Poké Ball is this? — It's mine.",
+     "이건 누구 몬스터볼이니? — 내 거야."
+    ],
+    [
+     "This is Ash's cap.",
+     "이건 지우의 모자예요."
+    ],
+    [
+     "Those cards are his.",
+     "저 카드들은 그 아이 거예요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "___ bag is this?",
+     "ko": "이건 누구 가방이니?",
+     "opts": [
+      {
+       "t": "Who's",
+       "type": "poss",
+       "why": "Who's는 Who is — 「누구야?」예요. 「누구의」는 Whose."
+      },
+      {
+       "t": "Whose",
+       "ok": true
+      },
+      {
+       "t": "Who",
+       "type": "poss",
+       "why": "Who는 「누구」예요. 「누구의 가방」은 Whose bag."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Whose cap is this?",
+      "B: It's ___."
+     ],
+     "ko": "내 거야.",
+     "opts": [
+      {
+       "t": "my",
+       "type": "poss",
+       "why": "my 뒤에는 물건이 와야 해요(my cap). 「내 거」는 mine."
+      },
+      {
+       "t": "me",
+       "type": "poss",
+       "why": "It's me는 「나야」라는 말이에요. 「내 거」는 mine."
+      },
+      {
+       "t": "mine",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "This is ___ bike.",
+     "ko": "이건 그 아이의 자전거예요.",
+     "opts": [
+      {
+       "t": "his",
+       "ok": true
+      },
+      {
+       "t": "he",
+       "type": "poss",
+       "why": "he는 「그 아이는」이에요. 「그 아이의」는 his."
+      },
+      {
+       "t": "him",
+       "type": "poss",
+       "why": "him은 「그 아이를」이에요. 「그 아이의」는 his."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "That cap is ___.",
+     "ko": "저 모자는 지우 거예요.",
+     "opts": [
+      {
+       "t": "Ash",
+       "type": "poss",
+       "why": "「저 모자는 지우예요」가 돼요. 「지우 거」는 Ash's."
+      },
+      {
+       "t": "Ashs",
+       "type": "apos",
+       "why": "따옴표가 빠졌어요 — Ash's."
+      },
+      {
+       "t": "Ash's",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "이 공책은 네 거니?",
+     "opts": [
+      {
+       "t": "Is this notebook your?",
+       "type": "poss",
+       "why": "your 뒤에는 물건이 와요. 「네 거」는 yours."
+      },
+      {
+       "t": "Is this notebook yours?",
+       "ok": true
+      },
+      {
+       "t": "Is this notebook you?",
+       "type": "poss",
+       "why": "「이 공책은 너니?」가 돼요. 「네 거」는 yours."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "These are ___ shoes.",
+     "ko": "이건 그분의 신발이에요.",
+     "opts": [
+      {
+       "t": "hers",
+       "type": "poss",
+       "why": "hers는 「그분의 것」 — 뒤에 물건을 안 붙여요. 「그분의 신발」은 her shoes."
+      },
+      {
+       "t": "she",
+       "type": "poss",
+       "why": "she는 「그분은」이에요. 「그분의」는 her."
+      },
+      {
+       "t": "her",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Is this your umbrella?",
+      "B: No, it isn't ___. It's Misty's."
+     ],
+     "ko": "아니, 내 거 아니야. 이슬이 거야.",
+     "opts": [
+      {
+       "t": "mine",
+       "ok": true
+      },
+      {
+       "t": "my",
+       "type": "poss",
+       "why": "my 뒤에는 물건이 와야 해요. 「내 거」는 mine."
+      },
+      {
+       "t": "I",
+       "type": "poss",
+       "why": "I는 「나는」이에요. 「내 거」는 mine."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Whose gloves are these?",
+      "B: They're ___."
+     ],
+     "ko": "우리 거야.",
+     "opts": [
+      {
+       "t": "our",
+       "type": "poss",
+       "why": "our 뒤에는 물건이 와요(our gloves). 「우리 거」는 ours."
+      },
+      {
+       "t": "ours",
+       "ok": true
+      },
+      {
+       "t": "us",
+       "type": "poss",
+       "why": "us는 「우리를」이에요. 「우리 거」는 ours."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "This cap is ___.",
+     "ko": "이 모자는 그분 거예요.",
+     "hint": "she · her · hers",
+     "ans": [
+      "hers"
+     ],
+     "traps": {
+      "her": [
+       "poss",
+       "her 뒤에는 물건이 와요(her cap). 「그분 거」는 hers."
+      ],
+      "she": [
+       "poss",
+       "she는 「그분은」이에요. 「그분 거」는 hers."
+      ],
+      "her's": [
+       "poss",
+       "hers에는 따옴표를 넣지 않아요. 따옴표는 Ash's처럼 이름 뒤에만."
+      ]
+     },
+     "why": "「그분 거」는 hers예요."
+    },
+    {
+     "kind": "type",
+     "en": "This ball is ___.",
+     "ko": "이 공은 그들 거예요.",
+     "hint": "their · theirs",
+     "ans": [
+      "theirs"
+     ],
+     "traps": {
+      "their": [
+       "poss",
+       "their 뒤에는 물건이 와요(their ball). 「그들 거」는 theirs."
+      ],
+      "their's": [
+       "poss",
+       "theirs에는 따옴표를 넣지 않아요. 따옴표는 Ash's처럼 이름 뒤에만."
+      ]
+     },
+     "why": "「그들 거」는 theirs예요."
+    },
+    {
+     "kind": "order",
+     "ko": "그거 누구 책이니?",
+     "tiles": [
+      "Whose",
+      "book",
+      "is",
+      "it",
+      "?"
+     ],
+     "ans": "Whose book is it?"
+    },
+    {
+     "kind": "order",
+     "ko": "그 빨간 가방은 내 거예요.",
+     "tiles": [
+      "The",
+      "red",
+      "bag",
+      "is",
+      "mine",
+      "."
+     ],
+     "ans": "The red bag is mine."
+    }
+   ]
+  },
+  {
+   "id": "G15",
+   "band": "new",
+   "title": "-er than",
+   "short": "둘을 견줄 때 — big → bigger than",
+   "say": [
+    "둘을 견줄 때는 「어때요?」를 말하는 낱말(크다·빠르다·행복하다) 끝에 -er을 붙이고 than(~보다)을 써요. Onix is bigger than Pikachu. (롱스톤은 피카츄보다 커요)",
+    "붙일 때 철자가 바뀌는 말: e로 끝나면 -r만(large → larger) · y는 앞 글자가 a·e·o·u가 아니면 y를 i로(heavy → heavier) · 끝이 「a·e·i·o·u 하나 + 다른 글자 하나」인 짧은 말은 끝 글자를 하나 더(big → bigger · hot → hotter). tall·fast·long은 그냥 -er.",
+    "good은 better로 바뀌어요. -er과 more는 같이 쓰지 않아요 — more bigger ✗. (beautiful처럼 긴 말은 more beautiful — 중학교에서 더 배워요)"
+   ],
+   "term": "중학교에서는 이것을 비교급이라고 불러요.",
+   "ex": [
+    [
+     "Onix is bigger than Pikachu.",
+     "롱스톤은 피카츄보다 커요."
+    ],
+    [
+     "Wailord is longer than a bus.",
+     "고래왕은 버스보다 길어요."
+    ],
+    [
+     "It's colder today than yesterday.",
+     "오늘은 어제보다 추워요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "Snorlax is ___ than Pikachu.",
+     "ko": "잠만보는 피카츄보다 무거워요.",
+     "opts": [
+      {
+       "t": "heavyer",
+       "type": "spell",
+       "why": "heavy는 y 앞이 v라 y를 i로 — heavier."
+      },
+      {
+       "t": "heavier",
+       "ok": true
+      },
+      {
+       "t": "heavy",
+       "type": "comp",
+       "why": "둘을 견줄 때는 -er을 붙여요 — heavier than."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Jolteon is faster ___ Eevee.",
+     "ko": "쥬피썬더는 이브이보다 빨라요.",
+     "opts": [
+      {
+       "t": "than",
+       "ok": true
+      },
+      {
+       "t": "then",
+       "type": "comp",
+       "why": "then은 「그때·그다음」이에요. 「~보다」는 than."
+      },
+      {
+       "t": "that",
+       "type": "comp",
+       "why": "「~보다」는 than이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "An elephant is ___ than a mouse.",
+     "ko": "코끼리는 쥐보다 커요.",
+     "opts": [
+      {
+       "t": "bigger",
+       "ok": true
+      },
+      {
+       "t": "biger",
+       "type": "spell",
+       "why": "big은 끝이 i + g라 g를 하나 더 — bigger."
+      },
+      {
+       "t": "big",
+       "type": "comp",
+       "why": "둘을 견줄 때는 -er — bigger than."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Pikachu is ___ than Raichu.",
+     "ko": "피카츄는 라이츄보다 작아요.",
+     "opts": [
+      {
+       "t": "more smaller",
+       "type": "comp",
+       "why": "-er과 more는 같이 쓰지 않아요 — smaller."
+      },
+      {
+       "t": "small",
+       "type": "comp",
+       "why": "둘을 견줄 때는 -er — smaller than."
+      },
+      {
+       "t": "smaller",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "네 그림이 내 것보다 나아.",
+     "opts": [
+      {
+       "t": "Your picture is gooder than mine.",
+       "type": "comp",
+       "why": "good은 -er을 붙이지 않고 better로 바뀌어요."
+      },
+      {
+       "t": "Your picture is better than mine.",
+       "ok": true
+      },
+      {
+       "t": "Your picture is more better than mine.",
+       "type": "comp",
+       "why": "better에 more를 또 붙이지 않아요."
+      },
+      {
+       "t": "Your picture is better then mine.",
+       "type": "comp",
+       "why": "「~보다」는 then이 아니라 than이에요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Summer is ___ than spring.",
+     "ko": "여름은 봄보다 더워요.",
+     "opts": [
+      {
+       "t": "hotter",
+       "ok": true
+      },
+      {
+       "t": "hoter",
+       "type": "spell",
+       "why": "hot은 끝이 o + t라 t를 하나 더 — hotter."
+      },
+      {
+       "t": "more hotter",
+       "type": "comp",
+       "why": "-er과 more는 같이 쓰지 않아요 — hotter."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "This tree is ___ than our school.",
+     "ko": "이 나무는 우리 학교보다 오래됐어요.",
+     "opts": [
+      {
+       "t": "old",
+       "type": "comp",
+       "why": "둘을 견줄 때는 -er — older than."
+      },
+      {
+       "t": "oldder",
+       "type": "spell",
+       "why": "old는 끝이 l·d 두 글자라 그대로 -er — older."
+      },
+      {
+       "t": "older",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Which is faster, a car or a bike?",
+      "B: A car is ___."
+     ],
+     "ko": "자동차가 더 빨라.",
+     "opts": [
+      {
+       "t": "fastter",
+       "type": "spell",
+       "why": "fast는 끝이 s·t 두 글자라 그대로 -er — faster."
+      },
+      {
+       "t": "fast",
+       "type": "comp",
+       "why": "「더 빨라」 — 견줄 때는 faster."
+      },
+      {
+       "t": "faster",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "I am ___ today than yesterday.",
+     "ko": "나는 어제보다 오늘 더 행복해요.",
+     "hint": "happy",
+     "ans": [
+      "happier"
+     ],
+     "traps": {
+      "happyer": [
+       "spell",
+       "happy는 y 앞이 p라 y를 i로 — happier."
+      ],
+      "happy": [
+       "comp",
+       "「더 행복해요」 — 견줄 때는 happier."
+      ]
+     },
+     "why": "happy는 y를 i로 바꿔 -er — happier."
+    },
+    {
+     "kind": "type",
+     "en": "This box is ___ than that box.",
+     "ko": "이 상자가 저 상자보다 커요.",
+     "hint": "large",
+     "ans": [
+      "larger",
+      "bigger"
+     ],
+     "traps": {
+      "largeer": [
+       "spell",
+       "e로 끝나는 large는 -r만 — larger."
+      ],
+      "large": [
+       "comp",
+       "둘을 견줄 때는 -er — larger than."
+      ]
+     },
+     "why": "e로 끝나는 large는 -r만 — larger."
+    },
+    {
+     "kind": "order",
+     "ko": "이 연필이 저 연필보다 길어요.",
+     "tiles": [
+      "This",
+      "pencil",
+      "is",
+      "longer",
+      "than",
+      "that",
+      "pencil",
+      "."
+     ],
+     "ans": "This pencil is longer than that pencil."
+    },
+    {
+     "kind": "order",
+     "ko": "거북이는 토끼보다 느려요.",
+     "tiles": [
+      "A",
+      "turtle",
+      "is",
+      "slower",
+      "than",
+      "a",
+      "rabbit",
+      "."
+     ],
+     "ans": "A turtle is slower than a rabbit."
+    }
+   ]
+  },
+  {
+   "id": "G16",
+   "band": "new",
+   "title": "and · but · because",
+   "short": "같은 쪽 and · 반대 but · 까닭 because",
+   "say": [
+    "and(그리고·~와·~하고) — 이야기를 덧붙이거나 차례로 이어요. I like Pikachu and Eevee.",
+    "but(하지만·그런데) — 반대되는 이야기를 이어요. Magikarp is weak, but Gyarados is strong.",
+    "because(~해서·왜냐하면) — 까닭을 이어요. because 바로 뒤에 까닭이 와요. I'm happy because I caught Eevee. (까닭 = 이브이를 잡았어요)"
+   ],
+   "term": "중학교에서는 이런 말을 접속사라고 불러요.",
+   "ex": [
+    [
+     "I like Pikachu and Eevee.",
+     "나는 피카츄와 이브이를 좋아해요."
+    ],
+    [
+     "Magikarp is weak, but Gyarados is strong.",
+     "잉어킹은 약하지만 갸라도스는 강해요."
+    ],
+    [
+     "I'm happy because I caught Eevee.",
+     "나는 이브이를 잡아서 기뻐요."
+    ]
+   ],
+   "qs": [
+    {
+     "kind": "pick",
+     "en": "I have a cat ___ a dog.",
+     "ko": "나는 고양이와 개가 있어요.",
+     "opts": [
+      {
+       "t": "and",
+       "ok": true
+      },
+      {
+       "t": "but",
+       "type": "conj",
+       "why": "but은 반대되는 이야기를 이어요. 「~와」는 and."
+      },
+      {
+       "t": "because",
+       "type": "conj",
+       "why": "because 뒤에는 까닭이 와요. 「~와」는 and."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I like apples, ___ I don't like bananas.",
+     "ko": "나는 사과는 좋아하지만 바나나는 안 좋아해요.",
+     "opts": [
+      {
+       "t": "and",
+       "type": "conj",
+       "why": "좋아한다 ↔ 안 좋아한다, 반대되는 이야기라 but."
+      },
+      {
+       "t": "because",
+       "type": "conj",
+       "why": "바나나를 안 좋아하는 게 사과를 좋아하는 까닭은 아니에요. 「~지만」은 but."
+      },
+      {
+       "t": "but",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I'm tired ___ I played soccer all day.",
+     "ko": "하루 종일 축구를 해서 피곤해요.",
+     "opts": [
+      {
+       "t": "but",
+       "type": "conj",
+       "why": "「~해서」 — 까닭을 이을 때는 because."
+      },
+      {
+       "t": "because",
+       "ok": true
+      },
+      {
+       "t": "and",
+       "type": "conj",
+       "why": "「~해서」 — 축구를 한 게 피곤한 까닭이라 because."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "This bag is old, ___ I love it.",
+     "ko": "이 가방은 낡았지만 나는 이게 정말 좋아요.",
+     "opts": [
+      {
+       "t": "but",
+       "ok": true
+      },
+      {
+       "t": "because",
+       "type": "conj",
+       "why": "「내가 좋아해서 가방이 낡았어요」가 돼요. 우리말은 「낡았지만」 — 반대되는 이야기라 but."
+      },
+      {
+       "t": "and",
+       "type": "conj",
+       "why": "「낡았지만」 — 반대되는 이야기라 but."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "ask": "우리말에 맞는 문장을 고르세요.",
+     "ko": "나는 피곤해서 일찍 자요.",
+     "opts": [
+      {
+       "t": "I am tired because I go to bed early.",
+       "type": "conj",
+       "why": "「일찍 자서 피곤해요」가 돼요. because 바로 뒤에 까닭(피곤해서)이 와요."
+      },
+      {
+       "t": "I go to bed early because I am tired.",
+       "ok": true
+      },
+      {
+       "t": "I go to bed early but I am tired.",
+       "type": "conj",
+       "why": "「일찍 자지만 피곤해요」가 돼요. 까닭은 because."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "talk": [
+      "A: Why do you like Greninja?",
+      "B: ___ it is cool and fast."
+     ],
+     "ko": "멋지고 빨라서.",
+     "opts": [
+      {
+       "t": "But",
+       "type": "conj",
+       "why": "Why(왜)로 물었으니 까닭 — Because로 대답해요."
+      },
+      {
+       "t": "And",
+       "type": "conj",
+       "why": "Why(왜)로 물었으니 까닭 — Because로 대답해요."
+      },
+      {
+       "t": "Because",
+       "ok": true
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "Ash and Pikachu ___ best friends.",
+     "ko": "지우와 피카츄는 가장 친한 친구예요.",
+     "opts": [
+      {
+       "t": "is",
+       "type": "bepick",
+       "why": "지우와 피카츄, 둘이라 여럿 — are예요."
+      },
+      {
+       "t": "are",
+       "ok": true
+      },
+      {
+       "t": "am",
+       "type": "bepick",
+       "why": "am은 I(나)하고만 써요."
+      }
+     ]
+    },
+    {
+     "kind": "pick",
+     "en": "I washed my hands ___ ate lunch.",
+     "ko": "나는 손을 씻고 점심을 먹었어요.",
+     "opts": [
+      {
+       "t": "and",
+       "ok": true
+      },
+      {
+       "t": "because",
+       "type": "conj",
+       "why": "점심을 먹은 게 손을 씻은 까닭이 아니에요. 「~하고」는 and."
+      },
+      {
+       "t": "but",
+       "type": "conj",
+       "why": "반대되는 이야기가 아니에요. 「~하고」는 and."
+      }
+     ]
+    },
+    {
+     "kind": "type",
+     "en": "I like summer ___ I can swim.",
+     "ko": "나는 수영을 할 수 있어서 여름이 좋아요.",
+     "hint": "and · but · because",
+     "ans": [
+      "because"
+     ],
+     "traps": {
+      "and": [
+       "conj",
+       "「~해서」 — 까닭을 이을 때는 because."
+      ],
+      "but": [
+       "conj",
+       "「~해서」 — 까닭을 이을 때는 because."
+      ]
+     },
+     "why": "수영을 할 수 있다는 게 까닭이라 because."
+    },
+    {
+     "kind": "type",
+     "en": "Slowpoke is slow, ___ Jolteon is fast.",
+     "ko": "야돈은 느리지만 쥬피썬더는 빨라요.",
+     "hint": "and · but · because",
+     "ans": [
+      "but"
+     ],
+     "traps": {
+      "and": [
+       "conj",
+       "「느리지만」 — 반대되는 이야기를 이을 때는 but."
+      ],
+      "because": [
+       "conj",
+       "쥬피썬더가 빠른 게 야돈이 느린 까닭은 아니에요. 「~지만」은 but."
+      ]
+     },
+     "why": "느리다 ↔ 빠르다, 반대되는 이야기라 but."
+    },
+    {
+     "kind": "order",
+     "ko": "나는 배가 고파서 빵을 먹어요.",
+     "tiles": [
+      "I",
+      "eat",
+      "bread",
+      "because",
+      "I",
+      "am",
+      "hungry",
+      "."
+     ],
+     "ans": "I eat bread because I am hungry."
+    },
+    {
+     "kind": "order",
+     "ko": "피카츄는 작지만 강해요.",
+     "tiles": [
+      "Pikachu",
+      "is",
+      "small",
+      "but",
+      "strong",
+      "."
+     ],
+     "ans": "Pikachu is small but strong."
+    }
+   ]
+  }
+ ],
+ "diag": [
+  {
+   "unit": "G1",
+   "kind": "pick",
+   "en": "Squirtle and Pichu ___ small.",
+   "ko": "꼬부기와 피츄는 작아요.",
+   "opts": [
+    {
+     "t": "is",
+     "type": "bepick",
+     "why": "둘이라 여럿 — are예요."
+    },
+    {
+     "t": "are",
+     "ok": true
+    },
+    {
+     "t": "am",
+     "type": "bepick",
+     "why": "am은 I(나)하고만 써요."
+    }
+   ]
+  },
+  {
+   "unit": "G2",
+   "kind": "pick",
+   "ask": "우리말에 맞는 문장을 고르세요.",
+   "ko": "그거 네 공이니?",
+   "opts": [
+    {
+     "t": "Are it your ball?",
+     "type": "bepick",
+     "why": "it(그것)은 하나라 Is예요."
+    },
+    {
+     "t": "It is your ball.",
+     "type": "order",
+     "why": "「그건 네 공이야」라는 말이에요. 물을 때는 Is가 맨 앞으로."
+    },
+    {
+     "t": "Is it your ball?",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "unit": "G3",
+   "kind": "pick",
+   "en": "___ are my pencils.",
+   "ko": "이것들은 내 연필이에요.",
+   "opts": [
+    {
+     "t": "These",
+     "ok": true
+    },
+    {
+     "t": "This",
+     "type": "plural",
+     "why": "pencils는 여럿이라 These예요."
+    },
+    {
+     "t": "That",
+     "type": "plural",
+     "why": "that은 먼 하나예요. 가까운 여럿은 These."
+    }
+   ]
+  },
+  {
+   "unit": "G4",
+   "kind": "pick",
+   "en": "He can ___ a bike.",
+   "ko": "그 아이는 자전거를 탈 수 있어요.",
+   "opts": [
+    {
+     "t": "rides",
+     "type": "base",
+     "why": "he(한 사람)여도 can 뒤에는 -s 없이 ride."
+    },
+    {
+     "t": "ride",
+     "ok": true
+    },
+    {
+     "t": "riding",
+     "type": "base",
+     "why": "can 뒤에는 -ing 없이 ride."
+    }
+   ]
+  },
+  {
+   "unit": "G5",
+   "kind": "pick",
+   "en": "___ eat in the library.",
+   "ko": "도서관에서 먹지 마세요.",
+   "opts": [
+    {
+     "t": "Not",
+     "type": "not",
+     "why": "「~하지 마세요」는 Don't로 시작해요."
+    },
+    {
+     "t": "No",
+     "type": "not",
+     "why": "「~하지 마세요」는 Don't로 시작해요."
+    },
+    {
+     "t": "Don't",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "unit": "G6",
+   "kind": "pick",
+   "en": "___ you play the piano?",
+   "ko": "너 피아노 치니?",
+   "opts": [
+    {
+     "t": "Do",
+     "ok": true
+    },
+    {
+     "t": "Are",
+     "type": "beplus",
+     "why": "play 같은 움직임 낱말로 물을 때는 Do예요."
+    },
+    {
+     "t": "Is",
+     "type": "beplus",
+     "why": "play 같은 움직임 낱말로 물을 때는 Do예요."
+    }
+   ]
+  },
+  {
+   "unit": "G7",
+   "kind": "pick",
+   "en": "Bulbasaur is ___ in the sun.",
+   "ko": "이상해씨가 햇볕 아래에서 쉬고 있어요.",
+   "opts": [
+    {
+     "t": "rest",
+     "type": "beplus",
+     "why": "is 뒤에서 「~하는 중」은 resting이에요."
+    },
+    {
+     "t": "resting",
+     "ok": true
+    },
+    {
+     "t": "rests",
+     "type": "beplus",
+     "why": "is 뒤에서 「~하는 중」은 resting이에요."
+    }
+   ]
+  },
+  {
+   "unit": "G8",
+   "kind": "pick",
+   "en": "___ cloudy today.",
+   "ko": "오늘은 구름이 꼈어요.",
+   "opts": [
+    {
+     "t": "I'm",
+     "type": "it",
+     "why": "「내가 구름이 꼈어요」라는 말이 돼요. 날씨는 It's."
+    },
+    {
+     "t": "This",
+     "type": "it",
+     "why": "날씨는 It's로 말해요."
+    },
+    {
+     "t": "It's",
+     "ok": true
+    }
+   ]
+  }
+ ]
+}

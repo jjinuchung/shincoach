@@ -121,6 +121,13 @@ try {
   const nonsul = JSON.parse(readFileSync('coach/korean/nonsul.json', 'utf8'));
   for (const msg of checkNonsul(nonsul)) { bad++; console.error(`내용 오류: coach/korean/nonsul.json: ${msg}`); }
 } catch (e) { bad++; console.error(`JSON 오류: coach/korean/nonsul.json: ${e.message}`); }
+// 📝 영어 문법 원고(coach/english/grammar.json, v348) — 단원마다 개념 세 줄·예문 셋·문제 12(고르기 8·쳐 넣기 2·순서 2)·정답 하나·오개념 이름표·
+//   순서 카드를 이으면 답과 같은지 · 진단은 복습 단원 하나씩 (앱은 깨진 단원을 조용히 빼므로 여기서 막는다 — 원고는 .context/grammar → make_json)
+try {
+  const { checkGrammar } = await import('../js/grammar.js');
+  const grammar = JSON.parse(readFileSync('coach/english/grammar.json', 'utf8'));
+  for (const msg of checkGrammar(grammar)) { bad++; console.error(`내용 오류: coach/english/grammar.json: ${msg}`); }
+} catch (e) { bad++; console.error(`JSON 오류: coach/english/grammar.json: ${e.message}`); }
 // 🕵️ 나옹의 숙제(coach/math/detective.json, v299) — 틀린 줄 앞은 그대로·보기 셋·흔한 실수 번호가 칸 원고에 있는지 배포 전에
 //   깨진 문제는 앱이 조용히 빼므로(detective.validItems) 여기서 막는다 · 정답을 따로 다시 푸는 검사는 tests/detective299
 try {

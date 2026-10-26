@@ -23,6 +23,7 @@ import { copyStock } from './stock.js'; // 🏦 포켓몬 증권시장 복사 (�
 import { matchedOf, mergeMatched } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329)
 import { dripOf, mergeDrip } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (순수 — 아무것도 import하지 않는다, v320)
 import { copyJourney, mergeJourney } from './journey.js'; // 🎒 포켓몬 대여행 복사·병합 (v341 — 순수, evolve·items·montypes만 import)
+import { knownOf, mergeKnown, seenOf, mergeSeen, gMissOf, mergeGMiss, diagOf, mergeDiag, giftOf, mergeGift } from './grammar.js'; // 📝 영어 문법 기록 (v348 — 순수, korean·korwords만 import)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
 
@@ -1045,7 +1046,7 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
 }
 
 /** 🏠 진우네 집 복사 — 방·놓은 가구까지 (규칙이 고쳐도 원본이 안 바뀌게) · 없으면 undefined */
@@ -1061,7 +1062,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2367,7 +2368,17 @@ export function mergeStatRecord(name, cur, rec) {
     out.nonsul = mergePuzzles(cur.nonsul, rec.nonsul);
     out.nonsulDay = mergeWordDays(cur.nonsulDay, rec.nonsulDay);
     out.nonsulThrow = mergeThrows(cur.nonsulThrow, rec.nonsulThrow);
-    out.korWrites = mergeWrites(cur.korWrites, rec.korWrites); // ✍️ 글은 (카드, at)로 합집합 · 답장 붙은 쪽이 이김 · 보상 한도는 큰 쪽(옛 백업이 받은 보상을 되살리지 못하게)
+    // 📝 문법 칸 — 🖊️ 논술과 같은 꼴(한쪽이라도 ⭐면 ⭐ · 보상 받은 날은 날마다 큰 쪽) · 진단 ✅는 합집합(이른 날) ·
+    //   오개념 수는 열쇠마다 큰 쪽(늘어나기만) · 진단 날은 이른 날 · 🎁 깜짝 포켓몬은 받은 수가 큰 쪽·날은 늦은 쪽(옛 백업이 하루에 두 번 나오게 하지 않게) (v348) ·
+    //   본 문제는 단원마다 최근 쪽(아래)
+    out.grammar = mergePuzzles(cur.grammar, rec.grammar);
+    out.grammarDay = mergeWordDays(cur.grammarDay, rec.grammarDay);
+    out.grammarKnown = mergeKnown(cur.grammarKnown, rec.grammarKnown);
+    out.grammarSeen = mergeSeen(latest.grammarSeen, older.grammarSeen); // 본 문제는 단원마다 최근 쪽 (🔍 Codex 152차 #4 — 옛 백업이 다 본 주기를 되살리지 않게)
+    out.grammarMiss = mergeGMiss(cur.grammarMiss, rec.grammarMiss);
+    out.grammarDiag = mergeDiag(cur.grammarDiag, rec.grammarDiag);
+    out.grammarGift = mergeGift(cur.grammarGift, rec.grammarGift);
+    out.korWrites =mergeWrites(cur.korWrites, rec.korWrites); // ✍️ 글은 (카드, at)로 합집합 · 답장 붙은 쪽이 이김 · 보상 한도는 큰 쪽(옛 백업이 받은 보상을 되살리지 못하게)
     // 💰 5일장에서 판 기록 — 장날·열쇠마다 합집합 (장날 한도를 옛 백업이 되돌리지 않게, 📊에 판 것이 남게)
     out.sales = mergeSales(cur.sales, rec.sales);
     // 🚀 끝난 로켓단 배틀 — 합집합(옛 백업이 끝난 배틀을 "진행 중"으로 되살려 두 번 빼앗거나 두 번 보상하지 않게).

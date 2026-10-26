@@ -33,6 +33,7 @@ import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·�
 import { matchedOf, korMatchRule } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329, 순수)
 import { dripOf, dripStartRule } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (v320, 순수)
 import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule } from './nonsul.js'; // 🖊️ 논술 칸·보상·잡기 기회 (v303 — 퍼즐과 같은 꼴, 잡기 기회는 따로)
+import { grammarRule, diagRule, knownOf, seenOf, gMissOf, diagOf, giftOf, rngFrom } from './grammar.js'; // 📝 영어 문법 칸·💰·진단·🎁 깜짝 포켓몬 (v348 — 순수)
 import { writeAddRule, writeReplyRule, writeReadRule, writesOf } from './korwrite.js'; // ✍️ 국어 서술형 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
@@ -351,7 +352,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -383,7 +384,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -990,6 +991,38 @@ export function nonsulMap() {
 /** 🖊️ 논술 보상 받은 날 { 날 번호: 1 } (그리기용 복사본) */
 export function nonsulDayMap() {
   return wordDaysOf(profile.nonsulDay);
+}
+/**
+ * 📝 문법 한 판을 끝냈다 — 그 단원 칸·본 문제·오개념 수 + 그날 처음이면 💰 · 처음 ⭐면 💰 더 · 🎁 깜짝 포켓몬 (한 트랜잭션, v348)
+ * ans = { id, ok, from, qs, miss } · ids = 지금 있는 단원 id · pool = 깜짝 포켓몬 후보(영어 명단 — 못 잡은 것은 규칙이 고른다) ·
+ * rolls = 판을 시작할 때 뽑아 둔 수(다시 저장해도 같은 추첨 — 🔍 Codex 152차 #2 · 난수는 규칙이 불릴 때마다 새로 만든다)
+ */
+export function grammarFinish(ans, ids, pool, rolls) {
+  return houseDo((p) => grammarRule(p, ans, Date.now(), ids, { pool, rng: rngFrom(rolls) }));
+}
+/** 📝 「🔍 어디까지 알까?」를 끝냈다 — 맞힌 단원 ✅ · 진단 날 · 오개념 수 (보상 없음) · ans = { ok: [단원 id], miss } */
+export function grammarDiagFinish(ans, ids) {
+  return houseDo((p) => diagRule(p, ans, Date.now(), ids));
+}
+/** 📝 문법 칸 (그리기용 복사본) */
+export function grammarMap() {
+  return wordsOf(profile.grammar);
+}
+/** 📝 문법 보상 받은 날 (그리기용 복사본) */
+export function grammarDayMap() {
+  return wordDaysOf(profile.grammarDay);
+}
+/** 📝 진단으로 건너뛴 단원 (그리기용 복사본) */
+export function grammarKnownMap() {
+  return knownOf(profile.grammarKnown);
+}
+/** 📝 단원마다 본 문제 (그리기용 복사본) */
+export function grammarSeenMap() {
+  return seenOf(profile.grammarSeen);
+}
+/** 📝 「🔍 어디까지 알까?」를 끝낸 날 (0 = 아직) */
+export function grammarDiagDay() {
+  return diagOf(profile.grammarDiag);
 }
 /** ✍️ 서술형 글 보내기 — 한 트랜잭션에서 "답장 기다리는 글 하나"를 저장된 프로필로 다시 보고, 이름표(at)를 정하고, 첫 글이면 💰5 (두 창이 같이 눌러도 하나) · cards = 지금 있는 카드 */
 export function korWriteAdd(cardId, text, cards) {

@@ -73,6 +73,16 @@ export const SUBJECTS = [
     view: 'nonsul',
     ready: true,
   },
+  {
+    key: 'grammar',
+    title: 'Grammar',
+    ko: '영어 문법',
+    desc: '문장 규칙 익히기',
+    emoji: '📝',
+    mascot: 132,  // 메타몽 — 모습을 바꾸는 포켓몬이라 go가 went로 바뀌는 문법과 어울린다 (영어 명단 · 2026-10-26 기본안)
+    view: 'grammar',
+    ready: true,
+  },
 ];
 
 /**

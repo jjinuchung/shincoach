@@ -10,6 +10,7 @@ import { initEvolveShow } from './evolveshow.js';
 import { initHome, renderHome, homeStale } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
 import { initNonsul, enterNonsul } from './nonsulview.js'; // 🖊️ 논술 (v303)
+import { initGrammar, enterGrammar } from './grammarview.js'; // 📝 영어 문법 (v348)
 import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
 import { initCalm, enterCalm, leaveCalm } from './calm.js'; // 🌿 국어·논술 잔잔한 배경 음악 (v317)
 import { stopKorCheer } from './korcheer.js'; // 📣 국어·논술 응원 포켓몬 (v327)
@@ -38,6 +39,7 @@ const views = {
   math: document.getElementById('view-math'),
   korean: document.getElementById('view-korean'),
   nonsul: document.getElementById('view-nonsul'),
+  grammar: document.getElementById('view-grammar'),
 };
 
 /** 지금 화면이 어느 과목의 시간을 쓰는가 — 🎒 도감·📊 기록·🏠 홈은 **안 센다** (아버님 결정 2026-09-27)
@@ -47,6 +49,7 @@ function subjectOfView(name) {
   if (name === 'korean') return 'korean';
   if (name === 'nonsul') return 'korean'; // 🖊️ 논술은 국어 시간 안 (아버님 2026-10-20)
   if (name === 'library' || name === 'player') return 'english';
+  if (name === 'grammar') return 'english'; // 📝 문법은 영어 시간 안 (아버님 2026-10-26)
   return null;
 }
 
@@ -77,6 +80,7 @@ export function showView(name) {
   if (name !== 'korean' && name !== 'nonsul') stopKorCheer(); // 📣 국어·논술 응원 포켓몬은 그 두 화면에서만 (v327)
   if (name !== 'korean') leaveKorean(); // 🎧 듣기 카드 소리는 국어 화면에서만 (v245)
   if (name === 'nonsul') enterNonsul().catch(() => {}); // 🖊️ 논술 — 푸는 판이 있으면 이어서, 없으면 첫 화면 (v303)
+  if (name === 'grammar') enterGrammar().catch(() => {}); // 📝 문법 — 푸는 판·진단이 있으면 이어서, 없으면 첫 화면 (v348)
   // 🌿 잔잔한 음악은 국어·논술에서만 — 둘 사이를 오가면 끊기지 않고 이어진다 (v317)
   if (name === 'korean' || name === 'nonsul') enterCalm();
   else leaveCalm();
@@ -192,6 +196,7 @@ async function main() {
   initMath({ showView });
   initKorean({ showView });  // 📚 국어 — ← 버튼 · 다시 읽으면 도감 다시 그리기
   initNonsul({ showView });  // 🖊️ 논술 — ← 버튼 (v303)
+  initGrammar({ showView }); // 📝 영어 문법 — ← 버튼 (v348)
   initCalm();                // 🌿 국어·논술 머리줄 🎵 단추 (v317)
   initStock({ conf: stockConf }); // 🏦 홈의 🏦 — 🔒 부모 설정(켜기·투자 한도)은 player.stockConf (v319)
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)
