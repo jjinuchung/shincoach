@@ -125,6 +125,9 @@ export const GAMES = [
   { id: 'adv', emoji: '🗺️', ko: '파트너 대모험', how: '톡 하면 낮게 · 꾹 누르면 높이 폴짝 · 메카는 밟고 찌리리공은 피해 깃대까지', sec: 45 }, // v333 — sec은 보통 걸리는 시간(끝은 깃대)
   // v339 — 시간 제한 없이 다 맞추면 끝(sec은 보통 걸리는 시간) · clock = 최고 기록이 ⭐가 아니라 가장 빠른 시간(homeplay fast) · wide = 넓은 게임기 카드
   { id: 'jig', emoji: '🖼️', ko: '포켓몬 그림 맞추기', how: '조각을 끌어다 제자리에 놓아 그림을 완성해요 · 시간 제한은 없어요', sec: 150, clock: true, wide: true },
+  // v344 (2026-10-26 아버님 "추천 순서대로" → 기본안 "이대로") — 맞혀도·낚아도 도감엔 안 들어간다(공부 없이 도감이 늘지 않게)
+  { id: 'throw', emoji: '🎯', ko: '몬스터볼 던지기', how: '볼을 끌어서 위로 휙! 원이 작을 때 맞히면 별이 더 · 도감엔 안 들어가요', sec: 30 },
+  { id: 'fish', emoji: '🎣', ko: '잉어킹 낚시', how: '찌가 쏙 들어가면 톡! 걸리면 꾹 눌러 초록 칸 안에 · 도감엔 안 들어가요', sec: 45 },
 ];
 export function gameById(id) {
   return GAMES.find((g) => g.id === id) || null;

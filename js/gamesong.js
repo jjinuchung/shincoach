@@ -51,7 +51,7 @@ export const GAME_SONGS = [
   },
   {
     id: 'busy', title: '바쁘다 바빠', bpm: 172, bass: 'octave', drums: 'K.hhS.hhK.hhS.hS',
-    games: ['dig', 'berry', 'balloon', 'tug'],
+    games: ['dig', 'berry', 'balloon', 'tug', 'throw'],
     bars: [
       ['A1 A3 C4 E4', 'E5:0.25 E5:0.25 r:0.25 E5:0.25 C5:0.5 E5:0.5 A5:0.5 G5:0.5 E5:1'],
       ['F1 F3 A3 C4', 'F5:0.25 F5:0.25 r:0.25 F5:0.25 C5:0.5 F5:0.5 A5:0.5 G5:0.5 F5:1'],
@@ -73,7 +73,7 @@ export const GAME_SONGS = [
   },
   {
     id: 'think', title: '두근두근 생각', bpm: 132, bass: 'pulse', drums: 'K.K.h.h.K.K.h.h.',
-    games: ['shadow', 'pair', 'tower', 'jig'],
+    games: ['shadow', 'pair', 'tower', 'jig', 'fish'],
     bars: [
       ['E2 E4 G4 B4', 'G5:1 B5:1 E5:1 r:1'],
       ['C2 C4 E4 G4', 'E5:1 G5:1 C6:1 r:1'],

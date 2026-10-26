@@ -40,7 +40,7 @@ const POOL = (n = 10, mineN = 4) => Array.from({ length: n }, (_, i) => ({ id: i
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
 test('🖼️ 게임 목록 — 열째 · 시간 제한 없음(clock — 최고 기록은 가장 빠른 시간) · 넓은 카드(wide) · 설명에 숫자 없음 · 음악은 두근두근 생각', () => {
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower', 'tug', 'adv', 'jig']);
+  assert.deepEqual(GAMES.map((g) => g.id).slice(0, 10), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower', 'tug', 'adv', 'jig'], '열째까지 (v344부터 더 늘어난다 — minigame344)');
   const g = gameById('jig');
   assert.deepEqual([g.emoji, g.ko, g.sec, g.clock, g.wide], ['🖼️', '포켓몬 그림 맞추기', JIG_SEC, true, true]);
   assert.equal(g.how, '조각을 끌어다 제자리에 놓아 그림을 완성해요 · 시간 제한은 없어요');

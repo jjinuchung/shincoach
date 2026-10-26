@@ -16,6 +16,8 @@ import { runTower } from './gametower.js'; // 🗼 몬스터볼 탑 쌓기 (v311
 import { runTug } from './gametug.js'; // 🤼 아빠랑 줄다리기 (v312)
 import { runAdv, ADV_ART } from './gameadv.js'; // 🗺️ 파트너 대모험 (v333)
 import { runJig, JIG_CHOICES } from './gamejig.js'; // 🖼️ 포켓몬 그림 맞추기 (v339)
+import { runThrow, THR_FEW } from './gamethrow.js'; // 🎯 몬스터볼 던지기 (v344)
+import { runFish, FISH } from './gamefish.js'; // 🎣 잉어킹 낚시 (v344)
 import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf, usedSec } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
@@ -46,6 +48,8 @@ const RUNNERS = {
   tug: { run: runTug, prep: async () => ({ meowth: (await balloonPrep()).meowth }) }, // 혼자일 때 상대 😼 나옹 — 🎈와 같은 그림
   adv: { run: runAdv, prep: async () => ({ art: await artFor([ADV_ART.volt, ADV_ART.bird]) }) }, // ⚡ 찌리리공 · 🐦 피죤 — 못 받으면 코드로 그린 모습
   jig: { run: runJig, prep: () => jigPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🖼️ 잡은 포켓몬 셋 가운데 고르기 · 원본 크기 그림은 고르는 동안(fullArt)
+  throw: { run: runThrow, prep: () => throwPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🎯 잡은 포켓몬 그림 먼저 (도감과는 따로)
+  fish: { run: runFish, prep: async () => ({ art: await artFor(Object.values(FISH).map((f) => f.id).filter(Boolean)) }) }, // 🎣 물 포켓몬 다섯 — 못 받으면 🐟 · 낚싯대는 파트너(ctx.hero)
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -341,6 +345,29 @@ async function jigPrep() {
     pool = withMine();
   }
   return pool.length ? { pool, big: (id) => fullArt(id) } : null;
+}
+
+/**
+ * 🎯 던지기(v344) — 🃏 짝 카드와 같은 그림 모음 · **잡은 포켓몬이 THR_FEW 이상이면 그것만**(진우 포켓몬을 맞히는 놀이) · 모자라면 앱 포켓몬으로 채움 ·
+ * 그림 없는 잡은 포켓몬은 몇 장 받아 본다(ART_WAIT_MS까지만) · 하나도 없으면 null(판을 안 쓴다) → { pool: [{ id, ko, url }] }
+ * 맞혀도 도감·잡기와는 따로 — 그림만 쓴다
+ */
+async function throwPrep() {
+  const mine = new Set(ownedMonIds());
+  const withMine = () => shadowPool().map((p) => ({ ...p, mine: mine.has(p.id) }));
+  let pool = withMine();
+  const gap = [...mine].filter((id) => ROSTER.some((r) => r.id === id) && !(characterUrl(id) || artUrl(id)));
+  if (pool.filter((p) => p.mine).length < THR_FEW && gap.length) {
+    await Promise.race([ensureCast(shadowShuffle(gap).slice(0, THR_FEW * 2)).catch(() => []), wait(ART_WAIT_MS)]);
+    pool = withMine();
+  }
+  if (!pool.length) {
+    await shadowPrep(); // 기기 그림이 거의 없을 때 — 👤와 같이 몇 장 더 받아 본다
+    pool = withMine();
+  }
+  const own = pool.filter((p) => p.mine);
+  const use = own.length >= THR_FEW ? own : pool;
+  return use.length ? { pool: use.map((p) => ({ id: p.id, ko: p.ko, url: p.url })) } : null;
 }
 
 /** 넓은 게임기 카드 (🖼️ 그림 맞추기처럼 판이 큰 게임 — GAMES wide · v339) — 판 동안만 */

@@ -4186,6 +4186,70 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes gt-fade { 0% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .gt-world { transition: none; } .gt-ball.is-land .gt-ball-in, .gt-ball.is-perfect .gt-ball-in { animation: none; } .gt-ball.is-miss.is-l .gt-ball-in, .gt-ball.is-miss.is-r .gt-ball-in { animation: gt-fade 0.3s ease-in forwards; } } /* 굴러떨어짐도 돌지 않고 사라지기만 (🔍 Codex 117차 접근성) */
 
+/* 🎯 몬스터볼 던지기 (v344 · gamethrow.js) — 마당 너비 100칸 · 높이 70칸 · 포켓몬·볼은 transform만 · 끌기는 마당 어디서나(touch-action none — 끄는 동안 화면이 안 밀리게) */
+.gx-field { position: relative; overflow: hidden; aspect-ratio: 100 / 70; border-radius: 18px; background-color: #8ce99a; background-image: linear-gradient(180deg, #b2f2bb 0%, #69db7c 100%); touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; cursor: grab; }
+.gx-field:focus-visible, .gf-field:focus-visible { outline: 3px solid #fab005; outline-offset: 2px; }
+.gx-bush { position: absolute; left: 4%; bottom: 30%; width: 18%; height: 12%; border-radius: 999px 999px 40% 40%; background-color: #40c057; opacity: 0.85; pointer-events: none; }
+.gx-bush.is-b { left: auto; right: 6%; bottom: 44%; width: 14%; height: 10%; }
+.gx-mon { position: absolute; top: 0; left: 0; width: 16%; aspect-ratio: 1; pointer-events: none; will-change: transform; }
+.gx-art { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; }
+.gx-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.gx-alt { font-size: 2rem; line-height: 1; }
+.gx-ring { position: absolute; top: -6%; right: -6%; bottom: -6%; left: -6%; box-sizing: border-box; border: 4px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(43, 45, 66, 0.35), inset 0 0 0 1px rgba(43, 45, 66, 0.35); pointer-events: none; } /* 연한 풀밭에서도 보이게 가는 테두리 그림자 */
+.gx-ring.is-great { border-color: #ffd43b; }
+.gx-ring.is-excellent { border-color: #ff922b; border-width: 5px; }
+.gx-mon.is-shiny .gx-img { filter: drop-shadow(0 0 6px #fff3bf); }
+.gx-spark { position: absolute; right: -8%; top: -8%; font-size: 1.1rem; animation: gx-spark 0.8s ease-in-out infinite alternate; }
+.gx-mon.is-in { opacity: 0; transition: opacity 0.15s ease-in; }
+.gx-ball { position: absolute; top: 0; left: 0; width: 6.4%; aspect-ratio: 1; pointer-events: none; will-change: transform; }
+.gx-ball-in { position: relative; display: block; box-sizing: border-box; width: 100%; height: 100%; border: 2px solid #2b2d42; border-radius: 50%; background-color: #e8413b; background-image: linear-gradient(180deg, #e8413b 0, #e8413b 44%, #2b2d42 44%, #2b2d42 56%, #fff 56%, #fff 100%); }
+.gx-ball-in::after { content: ""; position: absolute; left: 50%; top: 50%; box-sizing: border-box; width: 34%; height: 34%; border: 2px solid #2b2d42; border-radius: 50%; background-color: #fff; transform: translate(-50%, -50%); }
+.gx-ball.is-fly { transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.4, 1); }
+.gx-ball.is-catch .gx-ball-in { transform-origin: 50% 100%; animation: gx-wobble 0.3s ease-in-out 3; }
+.gx-ball.is-miss { opacity: 0; transition: opacity 0.35s ease-in; }
+.gx-hint, .gf-hint { margin: 0; text-align: center; font-size: 0.85rem; opacity: 0.8; word-break: keep-all; }
+.gx-hint.is-nudge { animation: gd-shake 0.3s ease-in-out; }
+.gx .gd-fly, .gf .gd-fly { color: #2b2d42; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7); }
+.gx .gd-fly.is-big, .gf .gd-fly.is-big { color: #e67700; }
+.gd.is-paused .gx-ball-in, .gd.is-paused .gx-spark { animation-play-state: paused; }
+@keyframes gx-wobble { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-18deg); } 70% { transform: rotate(18deg); } }
+@keyframes gx-spark { from { opacity: 0.4; transform: scale(0.8); } to { opacity: 1; transform: scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .gx-ball.is-fly { transition-duration: 0.2s; } .gx-ball.is-catch .gx-ball-in, .gx-spark { animation: none; } }
+
+/* 🎣 잉어킹 낚시 (v344 · gamefish.js) — 마당 너비 100칸 · 높이 70칸 · 물 윗면 26칸(37.14%) · 찌는 (64, 40)칸 · 줄은 낚싯대 끝(26, 18)칸에서 JS가 돌려 긋는다 · 힘겨루기 막대는 오른쪽(아래 0 ~ 위 100) */
+.gf-field { position: relative; overflow: hidden; aspect-ratio: 100 / 70; border-radius: 18px; background-color: #d0ebff; background-image: linear-gradient(180deg, #a5d8ff 0%, #e7f5ff 37%); touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.gf-field::before { content: ""; position: absolute; left: 0; top: 34%; bottom: 0; width: 24%; z-index: 1; border-radius: 0 60% 0 0; background-color: #69db7c; pointer-events: none; }
+.gf-water { position: absolute; left: 0; right: 0; top: 37.14%; bottom: 0; background-color: #339af0; background-image: linear-gradient(180deg, #4dabf7 0%, #1c7ed6 100%); pointer-events: none; }
+.gf-me { position: absolute; left: 2%; top: 17%; z-index: 2; width: 18%; height: 24%; pointer-events: none; }
+.gf-me .gd-pal-emoji { display: block; font-size: 2rem; line-height: 1; text-align: center; }
+.gf-rod { position: absolute; left: 15%; top: 37.14%; z-index: 2; width: 13.6%; height: 4px; border-radius: 2px; background-color: #8a5a2b; transform-origin: 0 50%; transform: rotate(-36deg); pointer-events: none; }
+.gf-line { position: absolute; top: 0; left: 0; z-index: 2; height: 2px; background-color: rgba(255, 255, 255, 0.9); transform-origin: 0 50%; pointer-events: none; }
+.gf-float { position: absolute; left: 61.5%; top: 53.6%; z-index: 2; width: 5%; aspect-ratio: 1; box-sizing: border-box; border: 2px solid #2b2d42; border-radius: 50%; background-color: #fff; background-image: linear-gradient(180deg, #fa5252 0, #fa5252 50%, #fff 50%, #fff 100%); pointer-events: none; transition: opacity 0.2s ease-out; }
+.gf.is-idle .gf-float, .gf.is-got .gf-float { opacity: 0; }
+.gf.is-wait .gf-float { animation: gf-bob 1.6s ease-in-out infinite; }
+.gf.is-bite .gf-float { animation: gf-dip 0.3s ease-in-out infinite alternate; }
+.gf.is-reel .gf-float { transform: translateY(45%); }
+.gf-ripple { position: absolute; left: 58%; top: 55%; width: 12%; aspect-ratio: 2 / 1; box-sizing: border-box; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 50%; opacity: 0; pointer-events: none; }
+.gf.is-bite .gf-ripple { animation: gf-ripple 0.6s ease-out infinite; }
+.gf-catch { position: absolute; left: 52%; top: 16%; z-index: 2; display: none; width: 24%; aspect-ratio: 1; align-items: center; justify-content: center; pointer-events: none; }
+.gf-catch.is-on { display: flex; animation: gf-jump 0.6s ease-out; }
+.gf-catch.is-gyarados { left: 44%; top: 2%; width: 36%; }
+.gf-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.gf-alt { font-size: 2.6rem; line-height: 1; }
+.gf-gauge { position: absolute; right: 3%; top: 8%; bottom: 8%; z-index: 2; display: none; width: 11%; overflow: hidden; box-sizing: border-box; border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 12px; background-color: rgba(0, 0, 0, 0.28); pointer-events: none; }
+.gf.is-reel .gf-gauge { display: block; }
+.gf-zone { position: absolute; left: 30%; right: 6%; bottom: 40%; height: 30%; border-radius: 8px; background-color: rgba(81, 207, 102, 0.9); }
+.gf-bar { position: absolute; left: 63%; bottom: 20%; font-size: 1.2rem; line-height: 1; transform: translate(-50%, 50%); }
+.gf-bar.is-in { filter: drop-shadow(0 0 4px #fff); }
+.gf-prog { position: absolute; left: 0; top: 0; bottom: 0; width: 22%; overflow: hidden; background-color: rgba(255, 255, 255, 0.3); }
+.gf-prog i { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background-color: #ffd43b; transform-origin: 50% 100%; transform: scaleY(0); }
+.gd.is-paused .gf-float, .gd.is-paused .gf-ripple, .gd.is-paused .gf-catch { animation-play-state: paused; }
+@keyframes gf-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(12%); } }
+@keyframes gf-dip { from { transform: translateY(10%); } to { transform: translateY(70%); } }
+@keyframes gf-ripple { from { opacity: 0.9; transform: scale(0.5); } to { opacity: 0; transform: scale(1.6); } }
+@keyframes gf-jump { 0% { opacity: 0; transform: translateY(60%) scale(0.6); } 60% { opacity: 1; transform: translateY(-8%) scale(1.05); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .gf.is-wait .gf-float, .gf.is-bite .gf-ripple, .gf-catch.is-on { animation: none; } .gf.is-bite .gf-float { animation: none; transform: translateY(60%); } } /* 입질은 움직임 없이도 찌가 내려가 있어 보이게 */
+
 /* 🤼 아빠랑 줄다리기 (v312 · gametug.js) — 마당 너비 100칸 · 리본 자리 p칸 = p% · 줄·리본·두 쪽(.gu-team)을 통째로 옮김 · 아래 큰 단추 둘(손가락마다 따로) */
 .gu-field { position: relative; overflow: hidden; aspect-ratio: 100 / 50; border-radius: 18px; background-color: #a5d8ff; background-image: linear-gradient(180deg, #74c0fc 0%, #d0ebff 100%); -webkit-user-select: none; user-select: none; }
 .gu-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 30%; border-top: 3px solid #3d7a33; background-color: #74c365; }

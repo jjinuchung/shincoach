@@ -6,7 +6,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { getDaily, emptyDaily } from '../js/db.js';
 import { loadToday, clockDay } from '../js/timelimit.js';
-import { initProfile, houseDo, gameBest } from '../js/xp.js';
+import { initProfile, houseDo, gameBest, getProfileSnapshot } from '../js/xp.js';
 import { LOOK_BASE } from '../js/avatar.js';
 import { openGames, closeGames } from '../js/gameview.js';
 import { gameMusicState } from '../js/gamebgm.js'; // 🎵 게임 음악 (v335)
@@ -210,4 +210,64 @@ test('🎵 게임 음악(v335) — 판이 시작되면 그 게임으로(run.musi
   await p;
   for (let k = 0; k < 20; k++) await tick();
   assert.deepEqual([gameMusicState().game, gameMusicState().timer], ['', false], '닫으면 없음');
+});
+
+// 🔍 Codex 148차 #4 (v344) — 새 게임을 게임기에서 진짜로: 그림을 못 받으면·준비 중 닫으면 판을 안 쓰고, 끝나면 최고 기록만(도감·코인·가방 그대로)
+const wallet = () => { const p = getProfileSnapshot(); return JSON.stringify({ caught: p.caught, coins: p.coins, items: p.items, partner: p.partner }); };
+
+test('🎯 v344 — 준비 중(그림 받는 중)에 닫으면 판을 안 씀 · 그림이 하나도 없으면 한 줄만 나오고 판을 안 씀', async () => {
+  await day();
+  const p1 = openGames(CTX);
+  card('몬스터볼 던지기').fire('click');
+  closeGames(); // 그림을 받으러 간 사이
+  await p1;
+  await new Promise((r) => setTimeout(r, 3000)); // 준비가 끝날 만큼(시험은 인터넷이 없어 그림 받기가 곧바로 실패한다 · 기다림 끝은 2.5초)
+  assert.equal(plays(), 0, '준비 중 닫으면 판을 안 쓴다');
+  const p2 = openGames(CTX);
+  card('몬스터볼 던지기').fire('click');
+  await until(() => gmBody.querySelector('.gm-msg'), 9000, '그림 없음 한 줄');
+  assert.equal(gmBody.querySelector('.gm-msg').textContent, '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.');
+  assert.equal(plays(), 0, '그림이 없으면 판을 안 쓴다');
+  assert.equal(gameBest('throw'), 0);
+  closeGames();
+  await p2;
+});
+
+test('🎣 v344 — 한 판(진짜 시계): 던지기 → 쏙 → 챔 → 힘겨루기 → 낚았다 → ✕ → 끝 화면 · 최고 기록만 · 도감·코인·가방 그대로 · 판 한 번', async () => {
+  await day();
+  const before = wallet();
+  const p = openGames(CTX);
+  card('잉어킹 낚시').fire('click');
+  await until(() => gmBody.querySelector('.gf.is-go'), 9000, '시작');
+  assert.equal(plays(), 1);
+  const root = gmBody.querySelector('.gf');
+  const field = gmBody.querySelector('.gf-field');
+  const bar = gmBody.querySelector('.gf-bar');
+  const zone = gmBody.querySelector('.gf-zone');
+  const up = () => { for (const f of [...(document.listeners.pointerup || [])]) f({ pointerId: 1 }); };
+  field.fire('pointerdown', { pointerId: 1 });
+  up();
+  await until(() => root.classList.contains('is-bite'), 6000, '쏙');
+  field.fire('pointerdown', { pointerId: 1 });
+  let pressing = true;
+  await until(() => {
+    if (root.classList.contains('is-reel') && bar.style.bottom && zone.style.bottom) {
+      const b = parseFloat(bar.style.bottom);
+      const z = parseFloat(zone.style.bottom) + parseFloat(zone.style.height) / 2;
+      if (b < z && !pressing) { field.fire('pointerdown', { pointerId: 1 }); pressing = true; }
+      if (b >= z && pressing) { up(); pressing = false; }
+    }
+    return root.classList.contains('is-got') || root.classList.contains('is-idle');
+  }, 15000, '낚았다');
+  if (pressing) up();
+  assert.ok(root.classList.contains('is-got'), '낚았다 (도망 아님)');
+  xBtn.fire('click'); // 판 도중 그만둠 — 그때까지 점수로 정산
+  await until(() => gmBody.querySelector('.gm-end'), 4000, '끝 화면');
+  assert.match(gmBody.querySelector('.gm-end').textContent, /^끝! ⭐ [0-8]$/);
+  assert.equal(gameBest('fish'), Number(gmBody.querySelector('.gm-end').textContent.replace('끝! ⭐ ', '')), '최고 기록 저장');
+  assert.equal(plays(), 1, '판은 한 번');
+  assert.equal(wallet(), before, '도감·코인·가방은 그대로 (낚아도 도감엔 안 들어간다)');
+  closeGames();
+  const sum = await p;
+  assert.equal(sum.played, 1);
 });
