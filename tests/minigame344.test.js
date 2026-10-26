@@ -24,7 +24,7 @@ const SEEDS = [1, 7, 42, 2026, 99999, 31337, 5, 777];
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
 test('🎮 v344 게임 목록 — 🎯 던지기 30초 · 🎣 낚시 45초 · 설명에 숫자 없음 · 「도감엔 안 들어가요」 · 화면(RUNNERS)·준비(prep) · 음악', () => {
-  assert.deepEqual(GAMES.map((g) => g.id), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower', 'tug', 'adv', 'jig', 'throw', 'fish']);
+  assert.deepEqual(GAMES.map((g) => g.id).slice(0, 12), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower', 'tug', 'adv', 'jig', 'throw', 'fish'], '열둘째까지 (v345부터 더 늘어난다 — minigame345)');
   assert.deepEqual([gameById('throw').emoji, gameById('throw').ko, gameById('throw').sec], ['🎯', '몬스터볼 던지기', THR_SEC]);
   assert.deepEqual([gameById('fish').emoji, gameById('fish').ko, gameById('fish').sec], ['🎣', '잉어킹 낚시', FISH_SEC]);
   assert.deepEqual([THR_SEC, FISH_SEC], [30, 45]);

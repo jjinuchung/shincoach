@@ -45,7 +45,7 @@ test('🖼️ 게임 목록 — 열째 · 시간 제한 없음(clock — 최고 
   assert.deepEqual([g.emoji, g.ko, g.sec, g.clock, g.wide], ['🖼️', '포켓몬 그림 맞추기', JIG_SEC, true, true]);
   assert.equal(g.how, '조각을 끌어다 제자리에 놓아 그림을 완성해요 · 시간 제한은 없어요');
   for (const x of GAMES) assert.ok(!/\d/.test(x.how), `${x.id}: 아이가 보는 설명에 숫자 없음`);
-  assert.equal(GAMES.filter((x) => x.clock).map((x) => x.id).join(), 'jig', '⏱️ 기록은 그림 맞추기만');
+  assert.equal(GAMES.filter((x) => x.clock).map((x) => x.id).join(), 'jig,diff', '⏱️ 기록은 그림 맞추기 · v345 🔍 다른 그림 찾기');
   assert.deepEqual([JIG_COLS, JIG_ROWS, JIG_N, JIG_CHOICES], [5, 4, 20, 3], '아버님 「20피스 정도」 · 셋 가운데 고르기');
   assert.equal(songFor('jig').id, 'think');
   const gv = src('js/gameview.js');

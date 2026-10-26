@@ -18,10 +18,14 @@ import { runAdv, ADV_ART } from './gameadv.js'; // 🗺️ 파트너 대모험 (
 import { runJig, JIG_CHOICES } from './gamejig.js'; // 🖼️ 포켓몬 그림 맞추기 (v339)
 import { runThrow, THR_FEW } from './gamethrow.js'; // 🎯 몬스터볼 던지기 (v344)
 import { runFish, FISH } from './gamefish.js'; // 🎣 잉어킹 낚시 (v344)
+import { runSort, sortReady, SORT_FEW } from './gamesort.js'; // 🔀 타입 나누기 (v345)
+import { runDiff } from './gamediff.js'; // 🔍 우리 집 다른 그림 찾기 (v345)
+import { MON_TYPES } from './montypes.js'; // 🔀 타입 (대여행 때 PokeAPI에서 받은 표 · 순수)
+import { PAINT_BASE, paintById } from './house.js'; // 🔍 진우 방 벽지·바닥 색 (순수)
 import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf, usedSec } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
-import { gameEnd, gameBest, gameFast, itemCount, ownedMonIds, getPartner } from './xp.js';
+import { gameEnd, gameBest, gameFast, itemCount, ownedMonIds, getPartner, houseNow, houseShapeNow } from './xp.js';
 import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl, fullArt } from './pokemon.js';
 import { typeOf, movesOf } from './battle.js';
 import { sfx, unlock } from './sfx.js';
@@ -50,6 +54,8 @@ const RUNNERS = {
   jig: { run: runJig, prep: () => jigPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🖼️ 잡은 포켓몬 셋 가운데 고르기 · 원본 크기 그림은 고르는 동안(fullArt)
   throw: { run: runThrow, prep: () => throwPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🎯 잡은 포켓몬 그림 먼저 (도감과는 따로)
   fish: { run: runFish, prep: async () => ({ art: await artFor(Object.values(FISH).map((f) => f.id).filter(Boolean)) }) }, // 🎣 물 포켓몬 다섯 — 못 받으면 🐟 · 낚싯대는 파트너(ctx.hero)
+  sort: { run: runSort, prep: () => sortPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🔀 그림 있는 포켓몬 + 타입 표 (잡은 포켓몬 표시)
+  diff: { run: runDiff, prep: async () => ({ scene: diffScene() }) }, // 🔍 진우 1층 방 그대로 (그림은 코드·이모지라 받을 것이 없다)
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -368,6 +374,35 @@ async function throwPrep() {
   const own = pool.filter((p) => p.mine);
   const use = own.length >= THR_FEW ? own : pool;
   return use.length ? { pool: use.map((p) => ({ id: p.id, ko: p.ko, url: p.url })) } : null;
+}
+
+/**
+ * 🔀 타입 나누기(v345) — 앱 포켓몬 가운데 기기에 그림이 있고 타입 표(montypes)에 있는 것 · 잡은 포켓몬은 mine(먼저 나온다) ·
+ * 한 판을 못 열면(sortReady — 그림이 SORT_FEW보다 적거나, 열둘이어도 타입이 고루 없어 상자 넷을 못 만들면 · 🔍 Codex 149차 #1)
+ * 기기에 없는 포켓몬 그림을 몇 장 더 받아 본다(ART_WAIT_MS까지만) · 그래도 못 열면 null(판을 안 쓴다) → { pool: [{ id, ko, url, types, mine }] }
+ */
+async function sortPrep() {
+  const mine = new Set(ownedMonIds());
+  const make = () => shadowPool().filter((p) => Array.isArray(MON_TYPES[p.id])).map((p) => ({ id: p.id, ko: p.ko, url: p.url, types: MON_TYPES[p.id].slice(), mine: mine.has(p.id) }));
+  let pool = make();
+  if (!sortReady(pool)) {
+    const have = new Set(pool.map((p) => p.id));
+    const want = shadowShuffle(ROSTER.filter((r) => !have.has(r.id) && Array.isArray(MON_TYPES[r.id]))).slice(0, SORT_FEW).map((r) => r.id);
+    await Promise.race([ensureCast(want).catch(() => []), wait(ART_WAIT_MS)]);
+    pool = make();
+  }
+  return sortReady(pool) ? { pool } : null;
+}
+/** 🔍 다른 그림 찾기(v345) — 진우 1층 방(고쳐 읽은 집 · 방 크기 · 벽지·바닥 색) · 가구가 모자라면 게임이 그림에만 채운다(저장 안 함) */
+function diffScene() {
+  const h = houseNow();
+  const room = (h && h.rooms && h.rooms[0]) || { items: [] };
+  return {
+    size: { ...houseShapeNow().size },
+    wall: (paintById(room.wall) || PAINT_BASE.wall).color,
+    floor: (paintById(room.floor) || PAINT_BASE.floor).color,
+    items: (room.items || []).map((it) => ({ ...it })),
+  };
 }
 
 /** 넓은 게임기 카드 (🖼️ 그림 맞추기처럼 판이 큰 게임 — GAMES wide · v339) — 판 동안만 */

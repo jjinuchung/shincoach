@@ -10,11 +10,12 @@ import { initProfile, houseDo, gameBest, getProfileSnapshot } from '../js/xp.js'
 import { LOOK_BASE } from '../js/avatar.js';
 import { openGames, closeGames } from '../js/gameview.js';
 import { gameMusicState } from '../js/gamebgm.js'; // 🎵 게임 음악 (v335)
+import { loadCharacters, characterUrl } from '../js/pokemon.js';
 
 // ───────────────────── 가짜 화면 (gameview·gametug가 쓰는 만큼) ─────────────────────
 
 class FakeEl {
-  constructor(tag) { this.tagName = String(tag).toUpperCase(); this.className = ''; this.children = []; this.listeners = {}; this.style = { setProperty(k, v) { this[k] = v; } }; this.attrs = {}; this.own = ''; this.html = ''; this.hidden = false; this.disabled = false; }
+  constructor(tag) { this.tagName = String(tag).toUpperCase(); this.className = ''; this.children = []; this.listeners = {}; this.style = { setProperty(k, v) { this[k] = v; } }; this.attrs = {}; this.dataset = {}; this.own = ''; this.html = ''; this.hidden = false; this.disabled = false; }
   get textContent() { return this.own + this.children.map((c) => c.textContent).join(''); }
   set textContent(v) { this.own = String(v); this.children = []; }
   get classList() {
@@ -270,4 +271,77 @@ test('🎣 v344 — 한 판(진짜 시계): 던지기 → 쏙 → 챔 → 힘겨
   closeGames();
   const sum = await p;
   assert.equal(sum.played, 1);
+});
+
+// v345 — 🔀 그림이 없으면 판을 안 씀 · 🔍 진우 방을 그림에만 쓰고 진짜 방(집)은 그대로
+const houseNowJson = () => JSON.stringify(getProfileSnapshot().house);
+
+test('🔀 v345 — 포켓몬 그림이 모자라면 한 줄만 나오고 판을 안 씀', async () => {
+  await day();
+  const p = openGames(CTX);
+  card('타입 나누기').fire('click');
+  await until(() => gmBody.querySelector('.gm-msg'), 9000, '그림 없음 한 줄');
+  assert.equal(gmBody.querySelector('.gm-msg').textContent, '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.');
+  assert.equal(plays(), 0);
+  closeGames();
+  await p;
+});
+
+test('🔍 v345 — 진우 1층 방(게임기만 있는 방)으로 한 판 · 하나 찾고 ✕ → 끝 화면 「끝! ⭐ 1」(시간 기록 없음) · 판 한 번 · 진짜 방·도감·코인은 그대로', async () => {
+  await day();
+  const houseBefore = houseNowJson();
+  const before = wallet();
+  const p = openGames(CTX);
+  try { // 실패해도 게임기를 닫는다 — 열린 판의 힌트 시계가 시험 프로세스를 붙잡지 않게
+  card('우리 집 다른 그림 찾기').fire('click');
+  await until(() => gmBody.querySelector('.gq.is-go'), 9000, '시작');
+  assert.equal(plays(), 1);
+  const pics = gmBody.querySelectorAll('.gq-pic');
+  assert.equal(pics.length, 2);
+  // 왼쪽 그림에 진우 방의 🎮 게임기가 있다 (가구가 적어 나머지는 게임 그림에만 채움)
+  assert.ok(pics[0].querySelectorAll('.gq-item').length >= 7);
+  // 다른 곳 하나 찾기 — 두 그림의 가구를 견줘 다른 칸을 찾아 누른다
+  const pos = (e) => `${e.style.left}|${e.style.top}|${e.textContent}|${e.querySelector('.house-emoji').innerHTML}`;
+  const L = new Set(pics[0].querySelectorAll('.gq-item').map(pos));
+  const odd = pics[1].querySelectorAll('.gq-item').find((e) => !L.has(pos(e)));
+  assert.ok(odd, '오른쪽에만 있는 모습');
+  const x = parseFloat(odd.style.left) + parseFloat(odd.style.width) / 2;
+  const y = parseFloat(odd.style.top) + parseFloat(odd.style.height) / 2;
+  pics[1].fire('pointerdown', { clientX: x, clientY: y / 2 }); // 가짜 화면 그림은 100 × 50
+  assert.equal(gmBody.querySelector('.gd-score').textContent, '⭐ 1'); // 가짜 화면은 '.a .b'를 못 읽는다
+  xBtn.fire('click');
+  await until(() => gmBody.querySelector('.gm-end'), 4000, '끝 화면');
+  assert.equal(gmBody.querySelector('.gm-end').textContent, '끝! ⭐ 1');
+  assert.equal(plays(), 1);
+  assert.equal(houseNowJson(), houseBefore, '진짜 방은 그대로');
+  assert.equal(wallet(), before, '도감·코인·가방 그대로');
+  } finally { closeGames(); }
+  const sum = await p;
+  assert.equal(sum.played, 1);
+});
+
+// 🔍 Codex 149차 #1 — 이 시험은 기기에 그림을 넣으니 맨 끝에 (앞 시험들은 그림이 없는 기기)
+test('🔀 v345 — 그림이 열둘이어도 타입이 모두 달라 상자 넷을 못 만들면 — 기기에 없는 그림을 몇 장 더 받아 보고, 못 받으면 한 줄만 · 판을 안 씀', async () => {
+  const ONE_EACH = [4, 7, 25, 35, 50, 52, 63, 66, 88, 114, 127, 147]; // 모두 다른 홑 타입
+  for (const id of ONE_EACH) fakeIdb.put('characters', { id, ko: '', en: '', blob: new Blob(['x']), anchor: { x: 0.5, y: 0.2 }, savedAt: 0 });
+  await loadCharacters(true);
+  assert.deepEqual(ONE_EACH.filter((id) => characterUrl(id)), ONE_EACH, '기기에 그림 열둘');
+  const asked = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => { asked.push(String(url)); throw new Error('offline (시험)'); };
+  await day();
+  const p = openGames(CTX);
+  try {
+    card('타입 나누기').fire('click');
+    await until(() => gmBody.querySelector('.gm-msg'), 9000, '한 줄');
+    assert.equal(gmBody.querySelector('.gm-msg').textContent, '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.');
+    assert.equal(plays(), 0, '판을 안 쓴다');
+    const got = asked.map((u) => Number((/official-artwork\/(\d+)\.png$/.exec(u) || [])[1])).filter(Boolean);
+    assert.ok(got.length >= 1 && got.length <= 12, `그림을 더 받아 봄 ${got.length}장`);
+    assert.ok(got.every((id) => !ONE_EACH.includes(id)), '받으러 간 것은 기기에 없는 그림');
+  } finally {
+    globalThis.fetch = realFetch;
+    closeGames();
+  }
+  await p;
 });

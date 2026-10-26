@@ -4250,6 +4250,49 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes gf-jump { 0% { opacity: 0; transform: translateY(60%) scale(0.6); } 60% { opacity: 1; transform: translateY(-8%) scale(1.05); } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .gf.is-wait .gf-float, .gf.is-bite .gf-ripple, .gf-catch.is-on { animation: none; } .gf.is-bite .gf-float { animation: none; transform: translateY(60%); } } /* 입질은 움직임 없이도 찌가 내려가 있어 보이게 */
 
+/* 🔀 타입 나누기 (v345 · gamesort.js) — 마당 너비 100칸 · 높이 70칸 · 카드는 위에서 내려오고(transform만) 아래에 타입 상자 셋·넷 · 카드를 끌 때 화면이 안 밀리게 */
+.gk-field { position: relative; overflow: hidden; aspect-ratio: 100 / 70; border-radius: 18px; background-color: #e7f5ff; background-image: linear-gradient(180deg, #d0ebff 0%, #f8f9fa 100%); touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.gk-card { position: absolute; top: 0; left: 50%; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 20%; padding: 4px; box-sizing: border-box; border: 3px solid #2b2d42; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 0 rgba(43, 45, 66, 0.25); opacity: 0; transform: translate3d(-50%, 0, 0); will-change: transform; touch-action: none; cursor: grab; }
+.gk-card.is-on, .gk-card.is-right, .gk-card.is-wrong { opacity: 1; }
+.gk-card.is-drag { opacity: 1; z-index: 4; cursor: grabbing; box-shadow: 0 8px 14px rgba(43, 45, 66, 0.35); }
+.gk-card.is-right { border-color: #2f9e44; }
+.gk-card.is-wrong { border-color: #e03131; }
+.gk-card.is-drop { opacity: 0; transition: opacity 0.25s ease-in; }
+.gk-art { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 1; }
+.gk-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.gk-alt { font-size: 2rem; line-height: 1; }
+.gk-name { max-width: 100%; overflow: hidden; color: #2b2d42; font-size: 0.8rem; font-weight: 800; white-space: nowrap; text-overflow: ellipsis; }
+.gk-boxes { position: absolute; left: 3%; right: 3%; bottom: 3%; z-index: 3; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.gk-boxes.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.gk-box { min-height: 52px; padding: 4px; border: 3px solid rgba(43, 45, 66, 0.3); border-radius: 14px; color: #fff; font-size: 1.05rem; font-weight: 900; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; word-break: keep-all; }
+.gk-box.is-dark { color: #2b2d42; text-shadow: none; }
+.gk-box:focus-visible { outline: 3px solid #fab005; outline-offset: 2px; }
+.gk-box.is-ok { animation: gk-ok 0.4s ease-out; }
+.gk-box.is-no { animation: gd-shake 0.3s ease-in-out; }
+.gk-hint, .gq-hint { margin: 0; text-align: center; font-size: 0.85rem; opacity: 0.8; word-break: keep-all; }
+.gk .gd-fly, .gq .gd-fly { color: #2b2d42; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.75); }
+.gk .gd-fly.is-big { color: #e67700; }
+.gk-say { white-space: nowrap; font-size: 1.15rem; }
+.gk .gd-fx { z-index: 5; } /* 「○○는 △ 타입!」이 카드에 가려지지 않게 */
+@keyframes gk-ok { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .gk-box.is-ok, .gk-box.is-no { animation: none; } }
+
+/* 🔍 우리 집 다른 그림 찾기 (v345 · gamediff.js) — 방 그림은 🏠 집 꾸미기와 같은 칸(.house-room · --cell은 JS가 그림 너비로) · 가로면 옆으로 둘, 세로 화면이면 위아래로 둘(높이에 맞춰 줄임) */
+.gq-pics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+@media (max-aspect-ratio: 1/1) { .gq-pics { grid-template-columns: minmax(0, 1fr); justify-items: center; } .gq-pic { width: min(100%, calc((100vh - 300px) / 2 * var(--ar, 1.1))); } }
+.gq-pic { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.gq-pic .house-item { cursor: inherit; touch-action: auto; pointer-events: none; }
+.gq-marks { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 40; pointer-events: none; }
+.gq-ring { position: absolute; box-sizing: border-box; border: 4px solid #fa5252; border-radius: 50%; box-shadow: 0 0 0 2px #fff; }
+.gq-ring.is-found { animation: gq-pop 0.35s ease-out; }
+.gq-ring.is-hint { display: flex; align-items: center; justify-content: center; border: 3px dashed #fab005; box-shadow: none; font-size: 1.2rem; animation: gq-twinkle 0.9s ease-in-out infinite alternate; }
+.gq-miss { position: absolute; color: #e03131; font-size: 1.2rem; font-weight: 900; transform: translate(-50%, -50%); animation: gt-fade 0.7s ease-in forwards; }
+.gq-left { font-weight: 800; opacity: 0.85; }
+.gd.is-paused .gq-ring.is-hint { animation-play-state: paused; }
+@keyframes gq-pop { 0% { transform: scale(1.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes gq-twinkle { from { opacity: 0.45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gq-ring.is-found, .gq-ring.is-hint, .gq-miss { animation: none; } }
+
 /* 🤼 아빠랑 줄다리기 (v312 · gametug.js) — 마당 너비 100칸 · 리본 자리 p칸 = p% · 줄·리본·두 쪽(.gu-team)을 통째로 옮김 · 아래 큰 단추 둘(손가락마다 따로) */
 .gu-field { position: relative; overflow: hidden; aspect-ratio: 100 / 50; border-radius: 18px; background-color: #a5d8ff; background-image: linear-gradient(180deg, #74c0fc 0%, #d0ebff 100%); -webkit-user-select: none; user-select: none; }
 .gu-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 30%; border-top: 3px solid #3d7a33; background-color: #74c365; }
