@@ -67,7 +67,7 @@ test('✍️ 원고: 채점 기준 write 하나 · 판 1 · 꼭 들어갈 것 �
 
 test('✍️ 주제 → 서술형 카드: 쓸 수 있는 주제마다 N## · 제목은 주제 물음 · 물음·기준은 공통 · 300자 · 머리말이 틀 · 기준이 깨지면 [](짧은 글을 안 연다)', () => {
   assert.deepEqual(NCARDS.map((c) => c.id), allTopics(RAW).map((t) => t.id));
-  assert.equal(NCARDS.length, 42); // v316 📖 독서 논술 10
+  assert.equal(NCARDS.length, 62); // v316 📖 독서 논술 10 · v342 생활 셋째 묶음 20
   for (const c of NCARDS) {
     assert.ok(WRITE_CARD_RE.test(c.id));
     assert.equal(c.title, allTopics(RAW).find((t) => t.id === c.id).q);
@@ -231,6 +231,9 @@ test('✍️ 첫 화면 목록(순수): 판을 끝낸 주제만 · 원고 차례
   const items = essayTopics(list, st, p.korWrites);
   assert.deepEqual(items.map((i) => [i.id, i.tag]), [['N1', ''], ['N2', '✉️ 답장 기다리는 중'], ['N3', '📬 아빠 답장이 왔어요']]);
   assert.deepEqual(essayTopics(list, {}, p.korWrites), [], '판을 안 끝낸 주제는 안 나온다');
+  // 🔍 Codex 146차: v342부터 원고 차례와 번호 차례가 다르다 — 목록은 번호가 아니라 원고 차례(N33 📖 → N43 → N44 → N34 📖)
+  const mixed = { N34: st.N1, N44: st.N1, N33: st.N1, N43: st.N1 };
+  assert.deepEqual(essayTopics(list, mixed, {}).map((i) => i.id), ['N33', 'N43', 'N44', 'N34']);
   assert.equal(essayTag({ lastGraded: {}, done: false }), '✍️ 다시 써 볼 수 있어요');
   assert.equal(essayTag({ done: true }), '✅ 끝');
   assert.equal(essayTag(null), '');
