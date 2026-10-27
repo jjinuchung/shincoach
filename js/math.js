@@ -36,7 +36,7 @@ import { lineReveal, reviewQuizEl } from './lookview.js';
 import { padSpec, matchTyped } from './mathpad.js';
 import { padBox, padAnswered } from './padview.js';
 import { drawBox, drawAnswered, canDraw } from './drawview.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound } from './xp.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound, megaReady, zygBattle } from './xp.js';
 import { unlockState, MATH_PTS, nextTarget, previewGift, ownedVoucherIds, needOf, isGift } from './unlock.js';
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, CALL_PAL, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
@@ -58,6 +58,7 @@ import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN } from 
 import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
 import { contentSummary, cueCountOf } from './stats.js';
 import { sfx } from './sfx.js';
+import { addCell } from './zygview.js'; // 🟢 지가르데 셀 — 끝 화면 구석 (v352)
 
 const $ = (id) => document.getElementById(id);
 
@@ -653,7 +654,7 @@ function startDiag() {
 
 /** 🧩 수학 퍼즐 화면에 건네는 것 (v296 — mathpuzzleview는 math.js를 import하지 않는다) */
 function puzzleCtx() {
-  return { clearMain, back: () => renderLadder(ui.state), getState: () => ui.state, setState: (s) => { ui.state = s; }, updateChip, sunEl: sunOfferEl };
+  return { clearMain, back: () => renderLadder(ui.state), getState: () => ui.state, setState: (s) => { ui.state = s; }, updateChip, sunEl: sunOfferEl, addCell: (box) => addCell(box, 'math') }; // 🟢 지가르데 셀 (v352)
 }
 /** 🕵️ 나옹의 숙제 화면에 건네는 것 (v299) — 글은 richNode로(세로 분수·숫자 뒤 조사) · 칸 이름 · 칸 원고(규칙·흔한 실수)는 받아 둔 줄기 내용에서 */
 function detectCtx() {
@@ -1232,6 +1233,7 @@ async function finishChal() {
   card.appendChild(more);
 
   m.appendChild(card);
+  addCell(card, 'math', { live: () => card.isConnected }); // 🟢 숨은 셀 (v352)
 }
 
 /**
@@ -1405,6 +1407,7 @@ function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0
   b.addEventListener('click', () => renderLadder(state));
   card.appendChild(b);
   m.appendChild(card);
+  addCell(card, 'math', { live: () => card.isConnected }); // 🟢 숨은 셀 (v352)
 }
 
 /**
@@ -2554,11 +2557,11 @@ function myBattleMons() {
     const c = (ui.chars || []).find((x) => x.id === id);
     // ⭐ 변신: 메가는 🔑 키스톤 + 💠 메가스톤, 거다이맥스는 🍲 다이스프를 먹은 포켓몬만
     const f = formsOf(id) || {};
-    const canMega = !!(f.mega && hasKeystone() && hasMegaStone(id));
+    const canMega = megaReady(id); // 🟢 지가르데는 셀 100(퍼펙트폼)일 때만 (v352)
     const canGmax = !!(f.gmax && hasGmax(id));
     return {
       id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), lv: monLv(id),
-      canMega, canGmax,
+      canMega, canGmax, zyg: zygBattle(id), // 🟢 지가르데 퍼펙트폼 — 배틀에서 HP 절반 아래면 스웜체인지 (v352)
       megaUrl: canMega ? formUrl(id, 'mega') : null,
       gmaxUrl: canGmax ? formUrl(id, 'gmax') : null,
     };
@@ -3374,6 +3377,7 @@ async function finishRound() {
   }
   card.appendChild(row);
   m.appendChild(card);
+  addCell(card, 'math', { live: () => card.isConnected }); // 🟢 숨은 셀 (v352) — 통과 못 한 편도 끝낸 공부
 
   // 🎯 몬스터볼 — 영어 퍼즐 정답과 같은 보상 경로(후보만 🔢 수학 포켓몬). 2번이면 한 번 끝난 뒤 이어서. 끝나야 "다음 → 🎲"가 열린다. 그 뒤 🐣
   runCatches(rw.catches, { g, c, run, onAll: () => { if (dailyNext) dailyNext.disabled = false; showHatchIfAny(); } });

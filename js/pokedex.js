@@ -9,7 +9,7 @@ import { gymClaimed } from './mathprog.js'; // 🕳 울트라홀 = 💎 스페�
 import { haveOf, lvOf, fusedOf, fledOf, rocketHeldOf } from './evolve.js';
 import { initMarket, openMarket, fusionFigure, fusionName } from './marketview.js'; // 🏪 5일장 · 🔀 퓨전 (2026-10-04)
 import { marketOpen, nextMarket } from './fusion.js';
-import { fusionList } from './xp.js';
+import { fusionList, zygMap } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { initShop, openShop, openMon } from './shop.js';
 
@@ -106,6 +106,9 @@ function bagText() {
   // 🍬 사탕은 종마다라 가방엔 모두 더한 수만 (종마다의 수는 그 포켓몬 칸의 레벨업 옆에, 2026-10-17)
   const candy = candyTotal();
   if (candy > 0) parts.push(`🍬×${candy}`);
+  // 🧊 지가르데 큐브(v352) — 코어를 찾으면 생기고 모인 셀 수를 보여 준다(해야 할 일이 아니라 모은 것 — 기본안 「추천대로」)
+  const z = zygMap();
+  if (z.core) parts.push(`🧊 지가르데 큐브 셀 ${z.cells}`);
   return parts.length ? `가방: ${parts.join(' ')}` : '가방이 비어 있어요';
 }
 

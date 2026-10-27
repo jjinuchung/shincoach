@@ -306,6 +306,8 @@ function loadPlayer() {
     formsOf: (id) => formState.forms[id] || null,
     formUrl: (id, kind) => `url:${id}:${kind}`,
     hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
+    // 🟢 v352 — 메가 판정은 xp.megaReady 한 곳(변신 표 + 🔑 + 💠 · 지가르데는 셀 100) · 배틀의 지가르데 칸 · 끝 화면 셀
+    megaReady: (id) => !!((formState.forms[id] || {}).mega && formState.keystone && formState.mega[id]), zygBattle: () => null, addCell: () => null,
     COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
     // ✍️ v318 — 내 에세이 🎤 기록 · 고친 문장 🎤 통과 → 🔶 (기록은 essayState.said · 받기는 essayState.sayKeys — 하루 2개 · 문장마다 한 번)
     syncCoachFixes: async () => 0, ESSAY_SAY_STONE: { maxPerDay: 2 },

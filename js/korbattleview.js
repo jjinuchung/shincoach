@@ -9,7 +9,7 @@ import { allWords } from './korwords.js';
 import { getDaily, claimDailyCount, releaseDailyCount } from './db.js';
 import { todayKey } from './track.js';
 import { guardStart } from './timeup.js'; // ⏳ 국어 하루 시간 — 배틀은 새로 시작하는 것 (🔍 Codex 129차 #5)
-import { getProfileSnapshot, getPartner, isTired, getLook, lossesOf, haveCount, monLv, hasKeystone, hasMegaStone, hasGmax, battleWin, battleLoss, gainXp, gainCoins, consumeItem, inventory, getLevelInfo, korWordsMap } from './xp.js';
+import { getProfileSnapshot, getPartner, isTired, getLook, lossesOf, haveCount, monLv, hasKeystone, hasMegaStone, hasGmax, battleWin, battleLoss, gainXp, gainCoins, consumeItem, inventory, getLevelInfo, korWordsMap, megaReady, zygBattle } from './xp.js';
 import { ROSTER, loadCharacters, isUnlocked, formsOf, formUrl } from './pokemon.js';
 import { POTION, CALL_PAL } from './items.js';
 import { josa } from './catch.js';
@@ -42,11 +42,11 @@ export function battleMons(chars) {
     const r = ROSTER.find((m) => m.id === id);
     const c = (chars || []).find((x) => x.id === id);
     const f = formsOf(id) || {};
-    const canMega = !!(f.mega && hasKeystone() && hasMegaStone(id));
+    const canMega = megaReady(id); // 🟢 지가르데는 셀 100(퍼펙트폼)일 때만 (v352)
     const canGmax = !!(f.gmax && hasGmax(id));
     return {
       id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), lv: monLv(id),
-      canMega, canGmax,
+      canMega, canGmax, zyg: zygBattle(id), // 🟢 지가르데 퍼펙트폼 — 배틀에서 HP 절반 아래면 스웜체인지 (v352)
       megaUrl: canMega ? formUrl(id, 'mega') : null,
       gmaxUrl: canGmax ? formUrl(id, 'gmax') : null,
     };

@@ -24,7 +24,7 @@ const P = {
 test('🎮 누적 한 벌: 프로필이 이미 쌓는 값만 — 도감 종(0마리는 뺌)·레벨 칸 합·진화·판 수·교환·사탕 받음/씀 · 깨진 값은 0', () => {
   assert.deepEqual(rewardSnap(P), {
     throws: 20, catches: 8, kinds: 2, coinsEarned: 500, coins: 300, stonesSpent: 4, lvSum: 2 + 4 + 0, evoSum: 2,
-    rocketWon: 1, rocketLost: 2, sold: 1, traded: 1, candyGot: 2, candyUsed: 1,
+    rocketWon: 1, rocketLost: 2, sold: 1, traded: 1, candyGot: 2, candyUsed: 1, zygCells: 0, // 🟢 큐브 셀 (v352)
   });
   // (lv '1e309'는 깨진 값이라 lvOf가 Lv1로 읽는다 — v332 전엔 만렙 12로 읽혔다 · 사탕 '1e309'도 0)
   assert.deepEqual(Object.keys(rewardSnap({})).sort(), SNAP_KEYS.map(([k]) => k).sort(), '보여 줄 칸과 같은 열쇠');

@@ -396,3 +396,37 @@ test('🔗 잇기 — 고친 글은 textContent로만(HTML로 넣지 않음) · 
   const pl = read('js/player.js');
   assert.ok(pl.includes("if (!it.said) return;\n      awardXp(ESSAY_REWARD.xp);"), '아빠 교정 ⚡💰는 🎤를 해 봤을 때만');
 });
+
+test('🟢 v352 지난 회차에 안 누른 지가르데 셀·찾은 줄은 끝 화면을 띄울 때 걷는다 — 연습·아빠 교정 끝에 다시 보이지 않게 (Codex 157차)', async () => {
+  const done = $('essay-done');
+  const zygs = () => done.children.filter((c) => /\bzyg-/.test(c.className)).map((c) => c.className);
+  const part = (cls) => { const e = fakeEl('button'); e.className = cls; e.remove = () => { done.children = done.children.filter((c) => c !== e); }; return e; };
+  const keep = part('essay-keep');
+  done.appendChild(keep);
+  let shown = 0;
+  const finish = async (practice) => {
+    openEssay({
+      prompts: [{ rec: { ko: '' }, frame: { full: 'I like apples because they are sweet and red', keep: 'I like', blankWords: 6 }, cue: null }],
+      practice, reward: { xp: 50, coin: 20 }, known: new Set(), sfx: {},
+      speak: async () => ({}), onWritten: () => {}, onSaid: () => {}, onFinished: async () => null, onDone: () => {},
+      // player.js가 붙이는 것처럼: 안 누른 셀 + 지난번에 찾은 줄
+      onDoneShown: (host) => { shown++; host.appendChild(part('zyg-cell zyg-tl')); host.appendChild(part('zyg-found')); },
+    });
+    $('essay-start').click();
+    $('essay-input').value = 'bananas because they are yellow and soft';
+    $('essay-submit').click();
+    finishTalk();
+    await tick();
+    $('essay-next').click();
+    await tick(6);
+  };
+  await finish(false);
+  assert.equal(shown, 1);
+  assert.deepEqual(zygs(), ['zyg-cell zyg-tl', 'zyg-found']);
+  closeEssay();
+  await finish(true); // 연습 — 셀을 붙이지 않는다
+  assert.equal(shown, 1);
+  assert.deepEqual(zygs(), [], '지난 셀·찾은 줄이 남지 않는다');
+  assert.ok(done.children.includes(keep), '다른 것은 그대로');
+  closeEssay();
+});

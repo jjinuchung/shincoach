@@ -825,12 +825,22 @@ export function formsOf(id) {
   return FORMS[id] || null;
 }
 
+// 🟢 지가르데 모습 (v352 — 셀을 모아 바뀌는 모습 · zygarde.js) — FORMS(변신 표)와 따로 둔다: 메가는 퍼펙트폼이 된 뒤에만이라
+//   formsOf(718)은 그대로 null(⭐ 변신 칸은 shop.js가 지가르데만 따로 그린다) · 그림 id는 PokeAPI zygarde-10·complete·mega에서 확인
+export const ZYG_FORMS = { ten: 10181, perfect: 10120, mega: 10301 };
+
+/** 모습 그림 id — 변신 표 → 지가르데 모습 (없으면 0) */
+export function formIdOf(monId, kind) {
+  const f = FORMS[monId];
+  if (f && f[kind]) return f[kind];
+  return Number(monId) === 718 ? (ZYG_FORMS[kind] || 0) : 0;
+}
+
 const formUrls = new Map(); // 폼 그림 id → object URL (받아둔 것만)
 
 /** 받아둔 변신 그림 주소 (없으면 null) */
 export function formUrl(monId, kind) {
-  const f = FORMS[monId];
-  const fid = f && f[kind];
+  const fid = formIdOf(monId, kind);
   return fid ? (formUrls.get(fid) || null) : null;
 }
 
@@ -839,8 +849,7 @@ export function formUrl(monId, kind) {
  * **메가스톤을 끼우거나 다이스프를 먹일 때** 그때 한 장만 받는다. 실패하면 null(원래 그림으로 보여줌).
  */
 export async function ensureForm(monId, kind) {
-  const f = FORMS[monId];
-  const fid = f && f[kind];
+  const fid = formIdOf(monId, kind);
   if (!fid) return null;
   if (formUrls.has(fid)) return formUrls.get(fid);
   const saved = (await getCharacters().catch(() => [])).find((c) => c.id === fid && c.blob);
@@ -995,6 +1004,7 @@ function readAllOnce() {
 export async function loadForms() {
   const known = new Set();
   for (const f of Object.values(FORMS)) { if (f.mega) known.add(f.mega); if (f.gmax) known.add(f.gmax); }
+  for (const fid of Object.values(ZYG_FORMS)) known.add(fid); // 🟢 지가르데 모습 (v352)
   const recs = await readAllOnce();
   for (const r of recs) {
     if (!r.blob || !known.has(r.id) || formUrls.has(r.id)) continue;

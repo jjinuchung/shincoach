@@ -105,7 +105,7 @@ test('프로필: 코인 획득·구매·가방', async () => {
 });
 
 test('프로필: 장식 장착·교체·벗기 (가방 개수 보존) — 이제 한 트랜잭션이라 await', async () => {
-  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null, shiny: false, shinyUrl: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리, shiny = 🌈 이로치
+  assert.deepEqual(getLook(25), { gear: null, dye: null, hp: 100, anchor: null, gearPos: null, shiny: false, shinyUrl: null, formUrl: null }); // anchor = 자동 머리 위치, gearPos = 아이가 옮긴 자리, shiny = 🌈 이로치 · formUrl = 🟢 지가르데 10%폼 그림(v352 — 다른 포켓몬은 늘 null)
   assert.equal(await equipGear(25, 'crown'), false, '가방에 없음');
   assert.equal(await equipGear(25, 'ribbon'), true);
   assert.equal(getLook(25).gear, 'ribbon');

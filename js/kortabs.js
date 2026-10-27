@@ -361,6 +361,7 @@ function finishEl(ctx) {
   box.appendChild(row);
   const cb = ctx.catchBtnEl(); // 🎯 그날 처음 끝냈으면 국어 포켓몬 잡기
   if (cb) box.appendChild(cb);
+  if (res.ok && ctx.addCell) ctx.addCell(box); // 🟢 숨은 지가르데 셀 (v352)
   return box;
 }
 

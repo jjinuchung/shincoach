@@ -12,6 +12,7 @@ import { videoRows, videoList, pickVideoQ } from './grammarvideo.js';
 import { dayNum } from './korean.js';
 import { ROSTER, subjectOf, isUnlocked, LEGENDARY } from './pokemon.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
+import { addCell } from './zygview.js'; // 🟢 지가르데 셀 — 쪽지 끝 구석 (v352)
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -392,5 +393,6 @@ function finishEl(r) {
     if (typeof done === 'function') done();
   }));
   box.appendChild(row);
+  if (res.ok) addCell(box, 'english', { live: () => S.r === r }); // 🟢 숨은 셀 (v352)
   return box;
 }

@@ -4706,3 +4706,23 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @media (max-width: 480px) {
   .lt-en { padding-right: 0; padding-top: 84px; }
 }
+
+/* 🟢 지가르데 셀 (v352) — 공부를 끝낸 화면 위 구석에 숨은 셀(처음엔 🔴 코어) · 누르면 큐브로 날아간다 */
+.zyg-host { position: relative; }
+.zyg-cell { position: absolute; top: 4px; width: 44px; height: 44px; padding: 5px; border: 0; background: transparent; border-radius: 50%; cursor: pointer; z-index: 2; opacity: .82; animation: zyg-peek 3.2s ease-in-out infinite; -webkit-tap-highlight-color: transparent; }
+.zyg-cell.zyg-tl { left: 4px; }
+.zyg-cell.zyg-tr { right: 4px; }
+.zyg-cell svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 3px rgba(74, 222, 128, .55)); }
+.zyg-cell.core svg { filter: drop-shadow(0 0 4px rgba(239, 68, 68, .6)); }
+.zyg-cell:focus-visible { outline: 3px solid #4ade80; outline-offset: 1px; opacity: 1; }
+.zyg-cell:disabled { cursor: default; }
+.zyg-cell.got { animation: zyg-got .6s ease-in forwards; }
+@keyframes zyg-peek { 0%, 100% { transform: translateY(0) rotate(0); } 45% { transform: translateY(-3px) rotate(-6deg); } 55% { transform: translateY(-3px) rotate(6deg); } }
+@keyframes zyg-got { 0% { transform: scale(1); opacity: 1; } 40% { transform: scale(1.5); opacity: 1; } 100% { transform: scale(.2) translateY(-40px); opacity: 0; } }
+.zyg-found { margin: 10px 0 0; padding: 8px 12px; border-radius: 12px; background: #ecfdf3; border: 2px solid #86efac; color: #14532d; font-weight: 800; word-break: keep-all; text-align: center; }
+@media (prefers-reduced-motion: reduce) {
+  .zyg-cell, .zyg-cell.got { animation: none; }
+}
+@media print {
+  .zyg-cell { display: none; }
+}

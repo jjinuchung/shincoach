@@ -127,7 +127,7 @@ test('☀️ 화면 잇기 — 단추 글 · 다시 시작 판 한 줄 · startD
   assert.ok(so.includes('if (!preview.roundId && !preview.mix.length) return null;'));
   assert.ok(so.includes("b.addEventListener('click', () => guardStart('math', () => { leave(); startDaily(from); }));"), '⏳ · 판을 닫고 · 누른 곳');
   assert.ok(!/남은|밀린|\d+일/.test(so), '셈·밀린 날 말 없음');
-  assert.ok(m.includes('updateChip, sunEl: sunOfferEl };'), '🧩·🕵️ ctx');
+  assert.ok(m.includes('updateChip, sunEl: sunOfferEl, addCell: (box) => addCell(box, \'math\') };'), '🧩·🕵️ ctx (v352 🟢 셀도 함께)');
   const pz = read('js/mathpuzzleview.js');
   assert.ok(pz.includes("const sun = ctx.sunEl ? ctx.sunEl('puzzle', () => { S.ps = null; }) : null;"));
   const dt = read('js/detectiveview.js');

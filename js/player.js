@@ -12,7 +12,7 @@ import { initPuzzle, openPuzzle, closePuzzle, pickPuzzle, PUZZLE_MIN_WORDS, PUZZ
 import { loadCharacters, downloadCharacters, pickCharacters, isUnlocked, unlockCountAt, ROSTER, formsOf, formUrl, forSubject, forPuzzle, forHole, isUltraBeast, favoriteFor } from './pokemon.js';
 // 🕳 울트라홀은 하나다 — 💎 스페셜 배지 8개(수학)로 열리고, 그 뒤에 영어 쪽 울트라비스트도 나온다 (아버님 결정 2026-09-28)
 import { gymClaimed } from './mathprog.js';
-import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone, receiveEssaySayStone } from './xp.js';
+import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone, receiveEssaySayStone, megaReady, zygBattle } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { STONE_ENGLISH, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoTier, SPEAK_COMBO, COIN, HP, POTION, CALL_PAL, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
 import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
@@ -46,6 +46,7 @@ import { isRocketOpen } from './rocketview.js';
 import { noteDue, NOTE as GRAMMAR_NOTE } from './grammar.js'; // 📝 문법 쪽지 — 언제 낼까 (v349)
 import { loadGrammar, prepareNote, openGrammarNote, closeGrammarNote } from './grammarnote.js'; // 📝 문법 쪽지 창 (v349)
 import { syncVideoQs, videoList, normSay } from './grammarvideo.js'; // 🎬 영상 문장 문제 — 비공개 원고 받기 · 받아 둔 원고 · 대사 맞추기 (v350)
+import { addCell } from './zygview.js'; // 🟢 지가르데 셀 — 에세이·복습 끝 화면 구석 (v352)
 import { getAllSentenceStats, listItems, sentenceKey } from './db.js'; // 🎬 끝낸 문장·영상 이름 (v350 — 쪽지에 끼울 영상 문제를 고를 때)
 // ⏳ 남은 시간 · 홈에서 이어 간 영어 배틀도 영어 시간으로 (Codex 43차 #7) — 마지막 import 줄 끝에는 주석을 달지 않는다(player.logic 테스트가 import를 줄 끝 ';'로 걸러 낸다)
 import { status as rocketTimeStatus, setSubject as rocketTimeSubject, currentSubject as rocketTimeNow } from './timelimit.js';
@@ -502,11 +503,11 @@ function myBattleMons(includePartner) {
     const c = state.characters.find((x) => x.id === id);
     // ⭐ 변신: 메가는 🔑 키스톤 + 💠 메가스톤, 거다이맥스는 🍲 다이스프를 먹은 포켓몬만
     const f = formsOf(id) || {};
-    const canMega = !!(f.mega && hasKeystone() && hasMegaStone(id));
+    const canMega = megaReady(id); // 🟢 지가르데는 셀 100(퍼펙트폼)일 때만 (v352)
     const canGmax = !!(f.gmax && hasGmax(id));
     return {
       id, ko: r ? r.ko : String(id), url: c ? c.url : '', look: getLook(id), losses: lossesOf(id), lv: monLv(id),
-      canMega, canGmax,
+      canMega, canGmax, zyg: zygBattle(id), // 🟢 지가르데 퍼펙트폼 — 배틀에서 HP 절반 아래면 스웜체인지 (v352)
       megaUrl: canMega ? formUrl(id, 'mega') : null,
       gmaxUrl: canGmax ? formUrl(id, 'gmax') : null,
     };
@@ -941,6 +942,7 @@ function startEssay(practice, cont) {
     // 문장을 쓰는 즉시 저장한다 — 중간에 그만둬도 글이 남고, 같은 문장으로 보상을 두 번 받지 않는다
     // ✍️ 문장이 화면에 떴다 — 다음부터 다른 문장 (연습은 essay.js가 안 부른다)
     onShown: (it) => { if (it.cue) track.essayShown(it.cue); state.essayUsed.add(essayIdOf(it.rec)); },
+    onDoneShown: (host) => { addCell(host, 'english', { live: () => !host.hidden }); }, // 🟢 숨은 지가르데 셀 (v352)
     onWritten: (it) => {
       const id = essayIdOf(it.rec);
       it.essayDay = track.dailyDate(); // 🎤 기록·🔶 표시는 글이 적힌 날로 (자정을 넘겨 넘어가도 — 🔍 Codex 124차)
@@ -1492,6 +1494,7 @@ function startReview(items, practice, after) {
       return { box: shown.box, graduated: shown.box >= REVIEW_GRADUATED };
     },
     onFinished: () => (practice ? null : grantReviewRound()),
+    onDoneShown: (host) => { addCell(host, 'english', { live: () => !host.hidden }); }, // 🟢 숨은 지가르데 셀 (v352)
     onDone: (s) => {
       setReviewOpen(false);
       state.practiceOpen = false;

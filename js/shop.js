@@ -3,7 +3,9 @@
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, CALL_PAL, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, CATCH_SHOP, STONE_SHOP, STONES, SHINY_STONE, EXTENDERS, itemById, canBuy, priceText, setFigure, ENGLISH_STONE_HOW } from './items.js';
 import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, candyLevelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone, shinyLeft, undoShiny, fusedCount, fledCount } from './xp.js';
-import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase } from './pokemon.js';
+import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase, ZYG_FORMS } from './pokemon.js';
+import { zygMap, zygForm } from './xp.js';
+import { ZYG_ID, STEP as ZYG_STEP, CELL_MAX, zygFormOf, zygFormOpen, zygPerfect } from './zygarde.js'; // 🟢 지가르데 모습 칸 (v352)
 import { pickHatch, eggProgress } from './egg.js';
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림
 import { costBetween, baseOf, lvMarkCrossed, lvMarksOf } from './evolve.js';
@@ -306,13 +308,13 @@ function fetchDot(id) {
 }
 
 const formRetry = new Set();
-async function retryFormArt(id, kind) {
+async function retryFormArt(id, kind, doneMsg) {
   const key = `${id}:${kind}`;
   if (formRetry.has(key)) return;
   formRetry.add(key);
   try {
     const url = await ensureForm(id, kind);
-    if (url && mon && mon.id === id) renderMon(kind === 'mega' ? '💠 메가진화 모습 그림을 받았어요!' : '🍲 거다이맥스 모습 그림을 받았어요!');
+    if (url && mon && mon.id === id) renderMon(doneMsg || (kind === 'mega' ? '💠 메가진화 모습 그림을 받았어요!' : '🍲 거다이맥스 모습 그림을 받았어요!'));
   } catch { /* 다음에 열 때 또 */ } finally { formRetry.delete(key); }
 }
 
@@ -635,26 +637,32 @@ async function doEvolve(toId) {
 
 function renderForms() {
   const sec = $('mon-form-section');
-  const forms = mon && mon.caught !== false ? formsOf(mon.id) : null;
+  // 🟢 지가르데(v352)는 변신 표(FORMS)에 없다 — 셀로 바뀌는 모습 칸 + 셀 100(퍼펙트폼) 뒤에만 💠 메가
+  const isZyg = !!mon && mon.caught !== false && Number(mon.id) === ZYG_ID;
+  const z = isZyg ? zygMap() : null;
+  const forms = isZyg ? { mega: zygPerfect(z) ? ZYG_FORMS.mega : 0 } : mon && mon.caught !== false ? formsOf(mon.id) : null;
   if (!forms) { sec.hidden = true; return; }
   sec.hidden = false;
 
   const megaOn = hasMegaStone(mon.id);
   const gmaxOn = hasGmax(mon.id);
   const shrooms = itemCount(MUSHROOM.id);
-  $('mon-form-now').textContent = megaOn ? '💠 메가진화 준비 완료' : gmaxOn ? '🍲 거다이맥스 준비 완료' : '아직 변신할 수 없어요';
+  $('mon-form-now').textContent = megaOn && forms.mega ? '💠 메가진화 준비 완료' : gmaxOn ? '🍲 거다이맥스 준비 완료'
+    : isZyg ? `${zygFormOf(z)}%폼` : '아직 변신할 수 없어요';
 
   // 변신한 모습 미리보기 (받아둔 그림이 있을 때만)
   const fig = $('mon-form-figure');
-  const shown = megaOn ? 'mega' : gmaxOn ? 'gmax' : null;
+  // 🟢 지가르데는 퍼펙트폼을 미리 보여 준다(배틀에서 바뀔 모습) — 메가를 끼웠으면 메가
+  const shown = megaOn && forms.mega ? 'mega' : gmaxOn ? 'gmax' : isZyg && zygPerfect(z) ? 'perfect' : null;
   const url = shown ? formUrl(mon.id, shown) : null;
   if (url) { setFigure(fig, url, null); fig.hidden = false; } else fig.hidden = true;
   // 끼워는 뒀는데 그림이 없다(끼울 때 인터넷이 안 됐다) → 지금 다시 받아 본다. 안 그러면 배틀에서 모습이 안 바뀐다
-  if (shown && !url) retryFormArt(mon.id, shown);
+  if (shown && !url) retryFormArt(mon.id, shown, shown === 'perfect' ? '🟢 퍼펙트폼 그림을 받았어요!' : '');
 
   const box = $('mon-form');
   box.innerHTML = '';
   const notes = [];
+  if (isZyg) zygOptions(box, z, notes);
 
   if (forms.mega) {
     // 💠 끼워 둔 메가스톤은 키스톤이 없어도 뺄 수 있다 — 키스톤을 팔면 스톤이 갇혔다 (Codex 32차 #8)
@@ -696,9 +704,34 @@ function renderForms() {
 
   // 국어·논술 화면엔 배틀이 없다 — 변신은 영어·수학 배틀에서 (배틀에 내보낼 포켓몬은 과목을 안 가린다 · 🔍 Codex 119차)
   const subj = subjectOf(mon.id);
-  if (subj === 'korean' || subj === 'nonsul') notes.push('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요');
+  if (!isZyg && (subj === 'korean' || subj === 'nonsul')) notes.push('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요');
   if (!box.children.length && !notes.length) notes.push('이 포켓몬은 변신할 수 없어요');
   $('mon-form-msg').textContent = notes.join('  ·  ');
+}
+
+/** 🟢 지가르데 모습 고르기 칸 (v352) — 10%·50% · 셀 수와 퍼펙트폼 안내 · 💠는 셀 100 뒤(아래 메가 칸이 그린다) */
+function zygOptions(box, z, notes) {
+  const caught = getProfileSnapshot().caught;
+  const now = zygFormOf(z);
+  for (const [form, need, sub] of [['10', ZYG_STEP.ten, '빠른 모습'], ['50', ZYG_STEP.fifty, '균형 잡힌 모습']]) {
+    const open = zygFormOpen(z, caught, form);
+    const btn = option('🟢', `${form}%폼`, open ? sub : `셀 ${need}개가 모이면`, now === form, '', async () => {
+      const here = mon; // 기다리는 사이 도감을 닫거나 다른 포켓몬을 열면 글을 띄우지 않는다 (저장은 그대로 · Codex 157차)
+      const r = await zygForm(form);
+      if (mon !== here) return;
+      if (!r.ok) { renderMon(`🟢 셀 ${need}개가 모이면 ${form}%폼이 될 수 있어요`); return; }
+      const art = form === '10' ? await ensureForm(ZYG_ID, 'ten').catch(() => null) : true;
+      if (mon !== here) return;
+      change(true, `🟢 ${mon.ko}${josaIga(mon.ko)} ${form}%폼이 됐어요!` + (art ? '' : ' (모습 그림은 인터넷이 될 때 받을게요)'));
+    });
+    if (!open) btn.disabled = true;
+    box.appendChild(btn);
+  }
+  // 10%폼인데 그림이 없다(그때 인터넷이 안 됐다) → 다시 받아 본다 (안 그러면 도감·배틀에서 50%폼 그림 그대로)
+  if (now === '10' && !formUrl(ZYG_ID, 'ten')) retryFormArt(ZYG_ID, 'ten', '🟢 10%폼 그림을 받았어요!');
+  notes.push(z.core ? `🧊 지가르데 큐브 셀 ${z.cells}/${CELL_MAX}` : '🔴 공부를 끝낸 화면에서 지가르데 코어를 찾아보세요');
+  if (zygPerfect(z)) notes.push('⚔️ 배틀에서 HP가 절반 아래로 떨어지면 퍼펙트폼으로 변신해요 — 그 뒤에 💠 메가진화');
+  else notes.push(`셀 ${ZYG_STEP.perfect}개를 모으면 배틀에서 퍼펙트폼이 될 수 있어요 · 💠 메가진화는 퍼펙트폼만`);
 }
 
 function option(emoji, name, sub, on, extraCls, onClick) {

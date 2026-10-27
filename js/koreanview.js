@@ -34,6 +34,7 @@ import { korCheer, warmKorCheer } from './korcheer.js'; // 📣 응원 포켓몬
 import { overlayOpen } from './korbattleview.js';
 import { korDayDone, korMatchOffer, korMatchEl } from './kordayview.js'; // 🔥 연속 학습 · ✨ 오늘의 보너스 · 🔤 낱말 이어 주기 (v329)
 import { streakLine, bonusLine } from './korday.js';
+import { addCell } from './zygview.js'; // 🟢 지가르데 셀 — 끝 화면 구석 (v352)
 
 /** 🚀 국어 로켓단의 문제 원천 — 🔤 낱말 뜻(배틀과 같은 것) */
 const korMakeQ = () => korWordsSource();
@@ -197,6 +198,7 @@ const tabCtx = {
   toPuzzle: () => { ui.tab = 'puzzle'; renderList(); window.scrollTo(0, 0); },
   toCards: () => { ui.tab = 'cards'; renderList(); window.scrollTo(0, 0); },
   rerender: () => { renderList(); },
+  addCell: (box) => addCell(box, 'korean'), // 🟢 지가르데 셀 (v352)
 };
 /** 🔤 낱말 판 · 🧩 퍼즐 판을 푸는 중인가 — 다시 그릴 때 목록이 판을 덮지 않게 (v242: 퍼즐 판도 같은 다섯 자리에서 본다) */
 function anySession() {
@@ -1021,6 +1023,7 @@ function finishEl() {
   if (res.ok && r.one) box.appendChild(onePuzzleEl(r, r.one)); // 🧩 퍼즐 하나 (v331) — 🔤 아래
   if (res.ok && r.card.write) box.appendChild(writeBoxEl(r.card, writeCtx)); // ✍️ 생각 쓰기 — 객관식 뒤, 건너뛰어도 별은 그대로
   if (res.ok) box.appendChild(storyNonsulEl(r.card.id));
+  if (res.ok) addCell(box, 'korean', { live: () => ui.read === r }); // 🟢 숨은 셀 (v352)
   return box;
 }
 

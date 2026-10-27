@@ -380,5 +380,6 @@ function finishEl(ctx) {
   // ☀️ 오늘의 수학으로 잇기 (v331) — 오늘 ☀️를 아직 끝내지 않았으면 단추 하나(math.js가 정함) · 누르면 이 판을 닫고 ☀️로
   const sun = ctx.sunEl ? ctx.sunEl('detect', () => endDetect()) : null;
   if (sun) box.appendChild(sun);
+  if (ctx.addCell) ctx.addCell(box); // 🟢 숨은 지가르데 셀 (v352)
   return box;
 }

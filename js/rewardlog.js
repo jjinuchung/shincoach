@@ -4,9 +4,10 @@
 // 어떻게: 프로필이 이미 쌓는 **누적**(던진 공·잡은 수·공부로 번 코인·쓴 스톤·레벨·진화·로켓단·판 수·교환·사탕)을 올릴 때마다
 //   "그날의 마지막 값"으로 이 기기에 적어 두고(upload.js — localStorage), 하루 줄 = 그날 값 − 그 앞에 기록이 있는 날의 값.
 //   보상 화면 곳곳에 새 셈을 끼우지 않는다 — 셀 곳을 하나라도 빠뜨리면 조용히 틀린다(잡기·배틀·알·레이더·로켓단…).
-// 순수 — 화면·저장소 없음 (evolve·items만 import, 둘 다 아무것도 import하지 않는다)
+// 순수 — 화면·저장소 없음 (evolve·items·zygarde만 import — 앞 둘은 아무것도, zygarde는 korean.js 날 번호만)
 import { haveOf, lvOf, candyCount, candyOf } from './evolve.js';
 import { itemById } from './items.js';
+import { zygOf, zygLine } from './zygarde.js'; // 🟢 지가르데 큐브 (v352)
 
 /**
  * 하루 줄에 보여 줄 누적 칸 [열쇠, 이름] — coins만 잔액(줄 수 있다), 나머지는 늘어나기만 하는 누적.
@@ -15,7 +16,7 @@ import { itemById } from './items.js';
 export const SNAP_KEYS = [
   ['throws', '공 던짐'], ['catches', '잡음'], ['kinds', '새 도감'], ['coinsEarned', '공부로 번 💰'], ['coins', '💰 남은 돈'],
   ['stonesSpent', '레벨업에 쓴 스톤'], ['lvSum', '레벨 칸'], ['evoSum', '진화'], ['rocketWon', '🚀 이김'], ['rocketLost', '🚀 짐'],
-  ['sold', '🏪 판 포켓몬'], ['traded', '🤝 교환'], ['candyGot', '🍬 받음'], ['candyUsed', '🍬 씀'],
+  ['sold', '🏪 판 포켓몬'], ['traded', '🤝 교환'], ['candyGot', '🍬 받음'], ['candyUsed', '🍬 씀'], ['zygCells', '🟢 지가르데 셀'],
 ];
 /** 이 기기에 적어 두는 날 수 */
 export const SNAP_DAYS = 10;
@@ -42,6 +43,7 @@ export function rewardSnap(p) {
     throws: num(pf.throws), catches: num(pf.catches), kinds: Object.keys(caught).filter((k) => num(caught[k]) > 0).length,
     coinsEarned: num(pf.coinsEarned), coins: num(pf.coins), stonesSpent: num(pf.stonesSpent), lvSum, evoSum,
     rocketWon: num(pf.rocketWon), rocketLost: num(pf.rocketLost), sold, traded, candyGot, candyUsed,
+    zygCells: zygOf(pf.zyg).cells, // 🟢 큐브 셀 (v352 — 늘기만)
   };
 }
 
@@ -81,6 +83,7 @@ export function holdingLines(p) {
     `- 💰 ${num(pf.coins)} · ${stones} · 🍬 ${candy} · 🎟️ 교환권 ${tickets}장 · 🥚 품는 알 ${eggs}`,
     `- 가방: ${bag.length ? bag.join(' ') : '(비어 있음)'}`,
     `- 도감 ${snap.kinds}종 · 데리고 있는 포켓몬 ${have}마리 · 레벨 칸 합 ${snap.lvSum} · 진화 ${snap.evoSum}번`,
+    ...(zygLine(pf.zyg, Date.now()) ? [`- ${zygLine(pf.zyg, Date.now())}`] : []), // 🟢 셀 수 · 오늘 찾은 과목 (v352 — 셀이 과목을 끌어오는지)
   ];
 }
 

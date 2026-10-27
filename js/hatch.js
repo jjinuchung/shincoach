@@ -32,9 +32,10 @@ export function openHatch(o) {
   stage.innerHTML = '';
   if (o.url) stage.appendChild(makeFigure(o.url, o.ko, o.look || null, 'hatch-mon'));
   else { const em = document.createElement('div'); em.className = 'hatch-emoji'; em.textContent = '🐣'; stage.appendChild(em); }
-  showDot($('hatch-dot'), o.id); // 🕺 갓 태어난 모습이 움직인다
-  $('hatch-title').textContent = `🐣 ${EGG_SUBJECT_KO[o.subject] || '영어'} 알이 부화했어요!`;
-  $('hatch-text').textContent = `${o.ko}${josa(o.ko, '이', '가')} 태어났어요 — 도감에 들어갔어요. 잘 배운 5일의 선물이에요!`;
+  showDot($('hatch-dot'), o.dot === false ? 0 : o.id); // 🕺 갓 태어난 모습이 움직인다 (dot:false — 도트와 다른 모습을 보여 줄 때 · 🟢 v352)
+  // title·text — 알이 아닌 곳(🟢 지가르데 큐브 v352)이 같은 창을 쓸 때 제 글로
+  $('hatch-title').textContent = o.title || `🐣 ${EGG_SUBJECT_KO[o.subject] || '영어'} 알이 부화했어요!`;
+  $('hatch-text').textContent = o.text || `${o.ko}${josa(o.ko, '이', '가')} 태어났어요 — 도감에 들어갔어요. 잘 배운 5일의 선물이에요!`;
   // 🧬 알은 원작대로 **시작형**으로 부화한다. 그래서 "자라면 무엇이 되는지"를 여기서 알려 준다 —
   //    안 알려 주면 아이에겐 그냥 작은 포켓몬이 나온 것이 된다 (진우 지적 2026-09-27)
   showGrow($('hatch-grow'), o.id, o.target);
@@ -88,7 +89,7 @@ let showing = false;
  * 그림은 있으면 받아 오고(ensureCast), 못 받으면 🐣로. 한 번에 하나, 열려 있으면 다음 기회에.
  */
 /** 다른 모달(잡기·상점·포켓몬 팝업·배틀·퍼즐·복습·에세이·단어·🧬 진화 연출)이 열려 있나 — 그 위에 겹치지 않는다 */
-function anyModalOpen() {
+export function anyModalOpen() {
   // 📦 구호품·🔒 데려감 알림·🏪 5일장·⏳ 잠금 위에도 겹치지 않는다 (Codex 32차 #6)
   return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'take', 'taken', 'timeup', 'market', 'parcel', 'jr-trip'].some((id) => { const e = $(id); return e && !e.hidden; }); // 🎒 대여행 창 위에도 (v341)
 }

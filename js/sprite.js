@@ -22,8 +22,16 @@ const failedAt = new Map(); // id → 마지막으로 실패한 시각 (와이�
 /** 실패한 id를 다시 시도하기까지 (v70·v80 교훈: 모듈 전역 상태는 스스로 풀려야 한다) */
 const RETRY_AFTER_MS = 5 * 60 * 1000;
 
+// 🟢 도트를 쓰지 않는 때 (v352 — 지가르데 10%폼: 5세대 도트는 50%폼뿐이라 일러스트로 보여 준다) ·
+//   xp.js가 건다(이 파일은 xp를 모른다) — 도트를 쓰는 곳(배틀·잡기·무대·🐣·도감 팝업·로켓단…)이 많아 여기 한 곳에서
+let noDot = () => false;
+export function setNoDot(fn) {
+  noDot = typeof fn === 'function' ? fn : () => false;
+}
+
 /** 받아둔 움직이는 그림 주소 (없으면 null) */
 export function animUrl(id) {
+  if (noDot(Number(id))) return null;
   return urls.get(Number(id)) || null;
 }
 
@@ -48,7 +56,7 @@ export async function loadAnims() {
  */
 export async function ensureAnim(id) {
   const key = Number(id);
-  if (!key) return null;
+  if (!key || noDot(key)) return null;
   if (urls.has(key)) return urls.get(key);
   // 실패 기록이 있어도 시간이 지났으면 다시 시도한다 — 와이파이가 잠깐 끊긴 것을
   // "이 포켓몬은 그림이 없다"로 굳히면 앱을 껐다 켤 때까지 무대가 빈 채로 남는다

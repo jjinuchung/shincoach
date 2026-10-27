@@ -43,7 +43,9 @@ import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUS
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, candyOf, candyCost, MAX_LV } from './evolve.js';
 import { stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
-import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER, isLetterMon } from './pokemon.js';
+import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER, isLetterMon, formsOf, formUrl } from './pokemon.js';
+import { ZYG_ID, zygOf, zygFindRule, zygFormRule, zygFormOf, zygPerfect } from './zygarde.js'; // 🟢 지가르데 셀 모으기 (v352 — 순수)
+import { setNoDot } from './sprite.js'; // 🟢 10%폼 지가르데는 도트 대신 일러스트 (5세대 도트는 50%폼뿐 — v352)
 import { findVoucher, GIVEN_BY_DAD } from './unlock.js';
 
 // ── 경험치 ──
@@ -359,8 +361,9 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, letters: { start: 0, seen: {}, sent: [], star: 0 }, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, letters: { start: 0, seen: {}, sent: [], star: 0 }, zyg: zygOf(null), updatedAt: 0 });
 let profile = EMPTY();
+setNoDot((id) => id === ZYG_ID && zygFormOf(profile.zyg) === '10'); // 🟢 지금 프로필을 그때그때 본다
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
 // 수치(xp·coins…)와 개수(caught·items)는 더하고, mons는 포켓몬별로 덮어씀, partner는 정해지면 그 값으로
@@ -391,7 +394,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -1159,7 +1162,33 @@ export function getLook(monId) {
   const m = profile.mons[monId] || {};
   // anchor = 그림에서 자동으로 찾은 머리 위치 / gearPos = 아이가 직접 끌어다 놓은 자리(있으면 우선)
   // shiny = 🌈 이로치(영구) · shinyUrl = 받아 둔 이로치 그림(없으면 null → 일반 그림 + ✨ 배지)
-  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId), gearPos: m.gearPos || null, shiny: !!m.shiny, shinyUrl: m.shiny ? shinyUrl(monId) : null };
+  // formUrl = 🟢 지가르데 10%폼 그림(v352 — 받아 둔 것만 · 없으면 null → 50%폼 그림) — setFigure가 이로치보다 먼저 본다
+  const formArt = Number(monId) === ZYG_ID && zygFormOf(profile.zyg) === '10' ? formUrl(ZYG_ID, 'ten') : null;
+  return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId), gearPos: m.gearPos || null, shiny: !!m.shiny, shinyUrl: m.shiny ? shinyUrl(monId) : null, formUrl: formArt };
+}
+
+/** 🟢 지가르데 큐브 장부 (그리기용 복사본, v352) */
+export function zygMap() {
+  return zygOf(profile.zyg);
+}
+/** 🟢 셀(또는 코어) 찾기 — 저장된 프로필로 그날 몫·과목을 다시 본다 (두 창이 같이 눌러도 하나) */
+export function zygFind(sub) {
+  return houseDo((p) => zygFindRule(p, sub, Date.now()));
+}
+/** 🟢 도감에서 지가르데 모습 고르기 ('10' | '50') */
+export function zygForm(form) {
+  return houseDo((p) => zygFormRule(p, form, Date.now()));
+}
+/** 💠 배틀에서 메가진화할 수 있나 — 🔑 + 💠를 낀 포켓몬 · 지가르데는 셀 100(퍼펙트폼)일 때만 (원작 규칙 · v352) */
+export function megaReady(id) {
+  const f = formsOf(id);
+  const has = f && f.mega ? true : Number(id) === ZYG_ID && zygPerfect(profile.zyg);
+  return !!(has && hasKeystone() && hasMegaStone(id));
+}
+/** 🟢 배틀의 지가르데 — { perfect } (지가르데가 아니면 null) · 퍼펙트폼 = 셀 100 → HP 절반 아래에서 스웜체인지 */
+export function zygBattle(id) {
+  if (Number(id) !== ZYG_ID) return null;
+  return { perfect: zygPerfect(profile.zyg), perfectUrl: formUrl(ZYG_ID, 'perfect') };
 }
 
 /** 🌈 이로치를 입힐 수 있는 남은 횟수 (스톤 하나 = 3번) */

@@ -820,6 +820,8 @@ async function showDone() {
   $('essay-result').hidden = true;
   $('essay-speak').hidden = true;
   $('essay-done').hidden = false;
+  // 🟢 늘 있는 화면이라 지난 회차에 안 누른 셀·찾은 줄이 남아 있다 — 먼저 걷는다(연습·아빠 교정 끝에 다시 보이지 않게 · Codex 157차)
+  for (const old of Array.from($('essay-done').children || [])) if (/\bzyg-(cell|found)\b/.test(String(old.className || ''))) old.remove();
   renderDots();
 
   let reward = null;
@@ -839,4 +841,8 @@ async function showDone() {
   box.innerHTML = '';
   if (reward) box.appendChild(el('span', 'review-chip gold', `⚡+${reward.xp} 💰+${reward.coin}`));
   playSfx('levelUp');
+  // 🟢 끝 화면이 떴다 — 부르는 쪽(player.js)이 숨은 지가르데 셀을 붙인다 (v352 · 이 파일은 xp를 모른다 — node 시험이 그대로 부른다)
+  if (!ui.o.practice && typeof ui.o.onDoneShown === 'function') {
+    try { ui.o.onDoneShown($('essay-done')); } catch (e) { console.warn('끝 화면 덧붙이기 실패:', e); }
+  }
 }

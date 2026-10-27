@@ -81,7 +81,9 @@ test('⚔️ 수학 화면 배틀도 변신 — 영어 배틀(player.js)과 같�
     const a = s.indexOf('function myBattleMons(');
     return s.slice(a, s.indexOf('\n}\n', a));
   };
-  const rule = /const f = formsOf\(id\) \|\| \{\};\n\s+const canMega = !!\(f\.mega && hasKeystone\(\) && hasMegaStone\(id\)\);\n\s+const canGmax = !!\(f\.gmax && hasGmax\(id\)\);/;
+  // v352: 메가 판정은 xp.megaReady 한 곳으로(변신 표 + 🔑 + 💠 — 🟢 지가르데는 셀 100일 때만) · 세 벌이 같이 부른다
+  const rule = /const f = formsOf\(id\) \|\| \{\};\n\s+const canMega = megaReady\(id\);[^\n]*\n\s+const canGmax = !!\(f\.gmax && hasGmax\(id\)\);/;
+  assert.match(src('js/xp.js'), /const f = formsOf\(id\);\n\s+const has = f && f\.mega \? true : Number\(id\) === ZYG_ID && zygPerfect\(profile\.zyg\);\n\s+return !!\(has && hasKeystone\(\) && hasMegaStone\(id\)\);/, '메가는 키스톤+메가스톤 그대로');
   for (const file of ['js/math.js', 'js/player.js']) {
     const body = pick(file);
     assert.match(body, rule, `${file}: 같은 규칙`);
@@ -91,16 +93,18 @@ test('⚔️ 수학 화면 배틀도 변신 — 영어 배틀(player.js)과 같�
   assert.ok(!/canMega: false, canGmax: false/.test(pick('js/math.js')), '늘 꺼 두지 않는다');
   const m = src('js/math.js');
   assert.match(m, /import \{[^}]*\bhasKeystone, hasMegaStone, hasGmax \} from '\.\/xp\.js';/);
+  assert.match(m, /import \{[^}]*\bmegaReady, zygBattle \} from '\.\/xp\.js';/, 'v352 — 메가 판정 한 곳 · 🟢 지가르데 칸');
   assert.match(m, /import \{[^}]*\bformsOf, formUrl \} from '\.\/pokemon\.js';/);
 });
 
 test('🎒 도감 창 「⭐ 변신」 칸은 변신 표에 있는 잡은 포켓몬이면 과목 상관없이 (shop.js renderForms)', () => {
   const s = src('js/shop.js');
   const body = s.slice(s.indexOf('function renderForms('), s.indexOf('function option('));
-  assert.match(body, /const forms = mon && mon\.caught !== false \? formsOf\(mon\.id\) : null;/);
+  // v352: 🟢 지가르데만 변신 표 밖에서 따로(셀로 바뀌는 모습 칸 · 셀 100 뒤 💠) — 나머지는 그대로 변신 표
+  assert.match(body, /const forms = isZyg \? \{ mega: zygPerfect\(z\) \? ZYG_FORMS\.mega : 0 \} : mon && mon\.caught !== false \? formsOf\(mon\.id\) : null;/);
   const head = body.slice(0, body.indexOf('if (!forms)'));
   assert.ok(!/subjectOf|forSubject|english/.test(head), '변신 칸을 보일지는 과목으로 거르지 않는다');
-  assert.match(body, /if \(subj === 'korean' \|\| subj === 'nonsul'\) notes\.push\('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요'\);/, '국어·논술 포켓몬엔 어디서 쓰는지 한 줄 (🔍 Codex 119차) — 과목은 이 안내에만');
+  assert.match(body, /if \(!isZyg && \(subj === 'korean' \|\| subj === 'nonsul'\)\) notes\.push\('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요'\);/, '국어·논술 포켓몬엔 어디서 쓰는지 한 줄 (🔍 Codex 119차) — 과목은 이 안내에만');
   assert.ok(formsOf(815).gmax && formsOf(812).gmax && formsOf(99).gmax && formsOf(36).mega, '수학·국어·논술 포켓몬도 표에');
 });
 

@@ -57,6 +57,14 @@ export const FORM = {
   gmaxTurns: 3,    // 거다이맥스는 3턴만 (원작처럼)
 };
 
+/** 🟢 지가르데 스웜체인지 (v352) — 셀 100을 모은 지가르데는 HP가 절반 아래로 떨어지면 한 배틀에 한 번 퍼펙트폼으로 · HP가 오른다 */
+export const ZYG = { perfectHp: 50 };
+
+/** 스웜체인지가 일어나나 — 퍼펙트폼이 열렸고 · 이번 배틀에 아직 안 했고 · 살아 있고 HP가 절반 아래 */
+export function swarmDue(zyg, done, hp) {
+  return !!(zyg && zyg.perfect) && !done && hp > 0 && hp <= BATTLE.hp / 2;
+}
+
 /** 이번 턴 내 공격에 곱할 배율 (변신 안 했으면 1) */
 export function formMult(form, turnsLeft) {
   if (form === 'mega') return FORM.megaMult;
@@ -458,7 +466,8 @@ function showPick() {
     btn.appendChild(el('span', 'rr', `${t.emoji} ${t.ko}`));
     if (c.lv > 1) btn.appendChild(el('span', 'own lv', `Lv${c.lv} · 공격 ×${lvMult(c.lv).toFixed(2)}`));
     if (c.losses) btn.appendChild(el('span', 'own lose', `패배 ${c.losses}/${BATTLE.lossesToLose}`));
-    if (c.canMega) btn.appendChild(el('span', 'own mega', '💠 메가진화'));
+    if (c.zyg && c.zyg.perfect) btn.appendChild(el('span', 'own mega', c.canMega ? '🟢 퍼펙트폼 · 💠 메가진화' : '🟢 퍼펙트폼'));
+    else if (c.canMega) btn.appendChild(el('span', 'own mega', '💠 메가진화'));
     else if (c.canGmax) btn.appendChild(el('span', 'own mega', '🍲 거다이맥스'));
     btn.addEventListener('click', () => startFight(c));
     pick.appendChild(btn);
@@ -470,6 +479,7 @@ function startFight(c) {
   ui.my = c;
   ui.form = null;        // ⭐ 이번 배틀에서 변신했는지 ('mega' | 'gmax')
   ui.gmaxLeft = 0;       // 거다이맥스 남은 턴
+  ui.zPerfect = false;   // 🟢 지가르데 퍼펙트폼이 됐는지 (v352 — 변신(form)과 따로: 퍼펙트폼 뒤에 💠 메가가 열린다)
   ui.myHp = BATTLE.hp;
   ui.enemyHp = BATTLE.hp;
   ui.turn = 0;
@@ -570,6 +580,36 @@ async function transform(kind) {
     : `🍲 ${my.ko} 거다이맥스! ${FORM.gmaxTurns}턴 동안 아주 강해져요${url ? '' : ' (모습 그림을 아직 못 받았어요)'}`;
 }
 
+/**
+ * 🟢 스웜체인지 (v352) — 셀이 모여들어 퍼펙트폼으로: 모습 그림(없으면 3초만 받아 봄 · 못 받아도 번쩍하는 연출은 한다) · HP +ZYG.perfectHp ·
+ * 그 뒤로 💠 메가진화 단추가 열린다(renderActions — 부르는 쪽이 턴 끝에 다시 그린다)
+ */
+async function swarmChange(run) {
+  const my = ui.my;
+  const z = my.zyg;
+  ui.zPerfect = true;
+  const fig = $('battle-my-fig');
+  $('battle-msg').textContent = `🟢 셀이 모여들어요… ${my.ko}, 퍼펙트폼!`;
+  try { if (ui.o.sfx) ui.o.sfx.levelUp(); } catch { /* 소리는 없어도 */ }
+  fig.classList.add('morphing');
+  let url = z.perfectUrl;
+  if (!url) {
+    url = await Promise.race([
+      ensureForm(my.id, 'perfect').catch(() => null),
+      new Promise((res) => setTimeout(() => res(null), 3000)),
+    ]).catch(() => null);
+    if (url) z.perfectUrl = url;
+  }
+  if (!ui.open || ui.run !== run) return;
+  if (url && !ui.form) { fig.classList.remove('dot'); setFigure(fig, url, null); }
+  fig.classList.add('formed');
+  setTimeout(() => fig.classList.remove('morphing'), 900);
+  ui.myHp = Math.min(BATTLE.hp, ui.myHp + ZYG.perfectHp);
+  renderHp();
+  $('battle-msg').textContent = `🟢 ${my.ko} 퍼펙트폼! HP가 ${ZYG.perfectHp} 올랐어요${url ? '' : ' (모습 그림을 아직 못 받았어요)'}`;
+  await sleep(1300);
+}
+
 /** 거다이맥스 3턴이 끝나면 원래 모습으로 */
 function revertForm() {
   ui.form = null;
@@ -585,7 +625,7 @@ function renderActions() {
   // ⭐ 아직 변신 안 했으면 변신 버튼을 맨 앞에
   if (!ui.form) {
     for (const [kind, ok, emoji, name, hint] of [
-      ['mega', ui.my.canMega, '💠', '메가진화!', `공격 ×${FORM.megaMult}`],
+      ['mega', ui.my.canMega && (!ui.my.zyg || ui.zPerfect), '💠', '메가진화!', `공격 ×${FORM.megaMult}`], // 🟢 지가르데는 퍼펙트폼이 된 뒤에만 (원작 · v352)
       ['gmax', ui.my.canGmax, '🍲', '거다이맥스!', `${FORM.gmaxTurns}턴 동안 ×${FORM.gmaxMult}`],
     ]) {
       if (!ok) continue;
@@ -857,6 +897,7 @@ async function enemyTurn() {
   sfx.hit(); vibrate(40);
   renderHp();
   await sleep(1100); if (!alive()) return;
+  if (!pal && swarmDue(ui.my.zyg, ui.zPerfect, ui.myHp)) await swarmChange(run);
   if (pal && ui.palHp <= 0) {
     // 동료는 물러난다 — 패배는 늘지 않는다 (도와주러 온 친구) · 모습은 흐리게 남겨 누가 도왔는지 보이게
     $('battle-pal-fig').classList.add('down');
@@ -909,8 +950,8 @@ function fetchDot(fig, mon, look, anyForm = false) {
   if (animUrl(mon.id)) return;
   const run = ui.run;
   ensureAnim(mon.id).then((u) => {
-    // 변신 중이면 내 포켓몬 그림은 건드리지 않는다 · 📣 동료(anyForm)는 내 변신과 상관없이
-    if (u && ui.open && ui.run === run && (anyForm || !ui.form)) showBattleMon(fig, mon, look);
+    // 변신 중이면(🟢 퍼펙트폼도 — 늦게 온 50%폼 도트가 덮지 않게 · Codex 157차) 내 포켓몬 그림은 건드리지 않는다 · 📣 동료(anyForm)는 내 변신과 상관없이
+    if (u && ui.open && ui.run === run && (anyForm || (!ui.form && !ui.zPerfect))) showBattleMon(fig, mon, look);
   }).catch(() => {});
 }
 

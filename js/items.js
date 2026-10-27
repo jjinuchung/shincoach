@@ -452,7 +452,8 @@ export function makeFigure(url, alt, look, cls) {
 export function setFigure(fig, url, look) {
   const img = fig.querySelector('img');
   // 🌈 이로치: look.shinyUrl(받아 둔 이로치 그림)이 있으면 그것을 — 변신 그림처럼 url을 통째로 주는 곳(배틀 메가·거다이맥스)은 look이 null이라 그대로 (변신 > 이로치 > 일반)
-  const src = look && look.shinyUrl ? look.shinyUrl : url;
+  // 🟢 지가르데 10%폼(v352): look.formUrl이 있으면 그 모습이 먼저 (이로치면 ✨ 배지만 — 10%폼 이로치 그림은 안 받는다)
+  const src = look && look.formUrl ? look.formUrl : look && look.shinyUrl ? look.shinyUrl : url;
   if (src !== undefined) {
     if (img.getAttribute('src') !== src) img.src = src;
     img.hidden = !src; // 그림을 아직 못 받았으면 깨진 아이콘 대신 빈 자리

@@ -857,4 +857,8 @@ function showDone() {
     if (given.golden) box.appendChild(el('div', 'review-done-note', '황금 볼은 잡힐 확률이 2배! 🎯 잡기에서 써 봐요'));
   }
   $('review-continue').hidden = false;
+  // 🟢 숨은 지가르데 셀 — 부르는 쪽(player.js)이 붙인다 (v352)
+  if (!o.practice && typeof o.onDoneShown === 'function') {
+    try { o.onDoneShown(box); } catch (e) { console.warn('끝 화면 덧붙이기 실패:', e); }
+  }
 }

@@ -26,6 +26,7 @@ import { korCheer, warmKorCheer } from './korcheer.js'; // 📣 응원 포켓몬
 import { tickKorDay, eggLine } from './koreanview.js'; // 🥚 논술 판도 국어 알 하루 칸 (v327 — 국어 글·낱말·퍼즐과 같은 칸)
 import { korDayDone } from './kordayview.js'; // 🔥 연속 학습(국어와 합쳐 하나) · ✨ 논술 오늘의 보너스 (v329)
 import { streakLine, bonusLine } from './korday.js';
+import { addCell } from './zygview.js'; // 🟢 지가르데 셀 — 끝 화면 구석 (v352)
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -454,6 +455,7 @@ function finishEl(r) {
     const offer = r.battle;
     box.appendChild(offerEl(offer, 'view-nonsul', () => { r.battle = null; if (S.r === r && nonsulVisible()) renderRound(); }, { live: () => S.r === r && r.battle === offer, busy: () => !!S.catching }));
   }
+  if (res.ok) addCell(box, 'nonsul', { live: () => S.r === r }); // 🟢 숨은 셀 (v352)
   return box;
 }
 
