@@ -7372,3 +7372,31 @@
 - [ ] 아버님 "배포" → feat + docs → push → 라이브 v350 확인 → 비공개 저장소에 grammar/video.json
 - [ ] 태블릿: 영상을 열면 원고 받기(📊 📥 🎬 줄) · 쪽지 둘째 🎬 · 🔊 그 장면 · 다음 "올라온 거 봐 줘"에서 grammar/날짜.md 🎬 줄
 - [ ] 📮 포켓몬 편지 원고 30통 → 논술 넷째 묶음
+- 라이브 확인(10-27 · 4fa471a·8e09a03): sw v350(3번째 확인) · 배포본 12개 커밋과 같음(grammar·grammarnote·grammarvideo·player·track·db·xp·upload·style 포함) · 앱 판 v350 · 공개 사이트에 원고 없음(grammar/video.json 404) (`.context/v350/live_check350.sh`) · 비공개 저장소 grammar/video.json 148문제 올림(52876236 · 다시 받아 같음)
+
+## 2026-10-27 — 📮 포켓몬 편지 · 🎮 미니 게임 15개 조금씩 어렵게 · 🏦 투자 한도 기본 40% (v351 — 원고 30통 「이대로」 · 기본안 「추천대로」 · Codex 155·156차 반영)
+
+### 변경 파일
+- 📮 `js/letters.js`(새 — 순수: 차례 letterNow · 봉투 셈 · 보내기·답장 검사·붙이기·선물·읽음 · 병합 · 📤 todo·md) · `js/lettersview.js`(새 — 우체통 화면·영어 목록 띠·홈 줄·답장 받기) · `coach/english/letters.json`(새 — 편지 30통 + 판단 기준 grades · 공개, 진우 기록 아님)
+- 📮 `js/pokemon.js`(편지 전용 30 · isLetterMon · subjectOf 'letter') · `js/xp.js`(등급 9·20·1 · letters 칸·트랜잭션 다섯 · 5일장 게이트) · `js/battle.js`(기술 타입 · 배틀 상대 게이트) · `js/journeyview.js`(대여행 게이트) · `js/montypes.js`(622 — 도구로) · `js/db.js`(letters 칸·병합)
+- 📮 `js/upload.js`(letters/todo.md·json 올리는 순간 다시 · 📥 letters/replies.json · 받기 줄) · `index.html`(view-letters · #library-mail) · `js/app.js`·`js/timeup.js`·`js/usage.js`(⏳ 영어 시간) · `js/home.js`(「📮 편지가 왔어요」) · `js/pokedex.js`·`js/shop.js`(📮) · `css/style.css`(.lt-*) · `tools/check.mjs`(원고 검사 · 공개 차단 목록)
+- 🎮 `js/game*.js` 15개 값 · `js/homeplay.js`(recKey — 새 난이도 기록 id+h) · `js/xp.js`(gameBest·gameFast = 새 열쇠 · gameEasyBest·gameEasyFast) · `js/gameview.js`(카드 「최고」 + 「쉬울 때」 작게) · `css/style.css`(그림자 세 칸 · 그림 맞추기 판 · .gm-game-easy)
+- 🏦 `js/stock.js`(capPct 40 · CAP_CHOICES 40) · `index.html`(⚙ 40%) · `js/player.js`(옛 기본 30 → 40 한 번만 stockCap351)
+- 시험: `tests/letters351.test.js`(새 20) · `tests/games351.test.js`(새 3) · 게임 시험 12개 새 값(따라 하기는 START_LEN으로) · `pokemon`·`xp` 622 · `stock319`·`player.logic` 40% · 원문 대조 넷(home330·englishskip·korwrite·korreport·reward278·blackbox292 — 배선 자리) · `sw.js`·`js/version.js` v351
+- (저장소 밖) `.context/letters/` — impl_plan.md · make_letters_json.mjs · walk351.sh · mutate_v351.mjs · codex155·156 · scratchpad games/ harder·records·fix_tests
+
+### 확인
+- 시험: 전체 **3005 통과** · 변이 **53/53**(mut351.log 49 → 놓친 넷 중 셋은 시험 더해 잡음 · 하나는 minigame339가 잡음)
+- 헤드리스 390·1024(walk351.sh — 처음 연 날 기다림 → 다음 날 새 편지·빨간 점·홈 줄 → 우리말 · 봉투 21%→100% · 보내기 → 🌟 답장 루브도 친구 💰+30 → 다 읽었어요 → 내일 · 넘침 0 · 콘솔 0) · 게임 그림자(보기 여섯 · 넘침 0) · 그림 맞추기(24/24 · fast jigh)
+- Codex 155차(편지 — P1 없음 · P2 셋 고침) · 156차(게임 — P1·P2 없음 · P3 「쉬울 때」 작게 고침)
+
+### 결정사항 / 메모
+- 편지 선물은 앱이 정한다 — Claude 답장 글에 선물 이야기 쓰지 않기 · 🌟 2주 안·이미 도감이면 👍 상자(from star) · todo의 starOpen
+- 새 난이도 기록을 새 칸(best2)이 아니라 같은 best·fast 칸의 id+h 열쇠에 둔 까닭: 옛 판 앱(v350)의 playOf는 모르는 칸을 버린다
+- 투자 한도 기본 40%는 옛 기본 30이 저장된 태블릿도 한 번만 올림(다른 값·그 뒤 되돌린 값은 그대로)
+
+### TODO (다음 작업)
+- [ ] 라이브 v351 확인
+- [ ] 태블릿: 영어 목록 우체통 띠 → 다음 날 첫 편지(루브도) · 🔊 「Zzz」 건너뜀 · 키보드가 답장 칸을 가리지 않는지 · 게임 카드 「쉬울 때 ⭐」 · ⚙ 투자 한도 40%
+- [ ] "올라온 거 봐 줘"에서 letters/todo.md 판단 → letters/replies.json(add_private.sh)
+- [ ] 🟢 지가르데 셀 v352(기본안 55hXEcqCkZZ4HENPAfuBVX 「추천대로」) → 논술 넷째 묶음
