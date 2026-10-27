@@ -7400,3 +7400,50 @@
 - [ ] 태블릿: 영어 목록 우체통 띠 → 다음 날 첫 편지(루브도) · 🔊 「Zzz」 건너뜀 · 키보드가 답장 칸을 가리지 않는지 · 게임 카드 「쉬울 때 ⭐」 · ⚙ 투자 한도 40%
 - [ ] "올라온 거 봐 줘"에서 letters/todo.md 판단 → letters/replies.json(add_private.sh)
 - [ ] 🟢 지가르데 셀 v352(기본안 55hXEcqCkZZ4HENPAfuBVX 「추천대로」) → 논술 넷째 묶음
+- 라이브 확인(10-27 · b25bde4·5b87d77): sw v351(5번째 확인) · 배포본 18개 커밋과 같음(letters·lettersview·letters.json·pokemon·xp·db·upload·homeplay·gameview·gamejig·gameshadow·gamesimon·stock·player·style·index 포함) · 앱 판 v351 · 공개 사이트에 편지 답장 없음(letters/todo·replies 404) (`.context/letters/live_check351.sh`)
+
+## 2026-10-27 — 세션 마무리 (v350 → v351 사이 · /ress)
+
+### 진행 내용
+- 📮 편지 원고 30통: PokeAPI 도감 설명 30마리 → 원고(letters_text.mjs 판 2) → check_letters 통과 → 독립 검토(🔴 3 · 🟡 16 · ⚪ 9 반영) → 검수 Ej95PSUckAVw4UVnVQJqd3 → 아버님 「이대로」 → v351 구현·배포(위 절)
+- 🎮·🟢 진우 의견 둘(「미니 게임이 너무 쉬워요」 · 「셀을 모아 모습이 바뀌는 지가르데」) → 게임 15개 난이도 값 조사(에이전트) → 기본안 55hXEcqCkZZ4HENPAfuBVX(지가르데 그림·셀 수는 PokeAPI zygarde-10·50·complete·mega로 확인) → 아버님 「추천대로」 → 게임은 v351, 지가르데는 v352로
+- 🏦 아버님 「투자 한도를 가진 것의 40%로 늘려 기본값으로」 → v351에 함께
+- 아버님 물음 「지브리 음악에 포뇨가 있었나」 → 있음(지브리 OST 15곡 중 7번 「벼랑 위의 포뇨」 · PC 폴더에만 · 태블릿은 ⚙ 곡 수로 확인)
+
+### 변경 파일
+- (저장소 밖) `.context/letters/` — letters_text.mjs(판 2) · check_letters.mjs · make_letters_review.mjs · impl_plan.md · make_letters_json.mjs · walk351.sh · mutate_v351.mjs · codex155·156 · live_check351.sh
+- (저장소 밖) scratchpad `zyg/` — build_page.mjs(기본안 페이지 · 지가르데 네 모습 그림 webp) · `games/` — harder·records·fix_tests·stock40 스크립트
+
+### 결정사항 / 메모
+- 지가르데 v352 답(모두 추천): 🔴 코어 먼저 → 공부를 끝낸 화면에 숨은 셀을 눌러 모음 · 하루 3개 · 셀 10 → 10%폼(논술에서 못 잡았어도) · 50 → 50%폼 · 100 → 퍼펙트폼(배틀 HP 절반 아래 스웜체인지) · 퍼펙트 + 💠 지가르데나이트 → 메가(v313에서 막아 둔 것을 원작대로 연다) · 🎒 큐브에 셀 수
+- 작업 폴더에 `js/.claude/`가 생긴 적 있음(셸이 js 폴더에 있을 때 도구 기록이 그 자리에 생김) → scratchpad로 옮겨 tools/check.mjs 「문법 오류: js/.claude」를 풂
+
+### TODO (다음 작업)
+- [ ] 다음 세션 첫 일: 「올라온 거 봐 줘」(영어 에세이 · 수학 ❓ · 국어 ✍️ · 📮 letters/todo.md — 첫 편지는 v351을 처음 연 다음 날이라 아직 없을 수 있음)
+- [ ] 🟢 지가르데 셀 v352 — 셀이 나오는 「공부 끝 화면」 자리부터 전부 세고(수학·영어·국어·논술) · 코어·셀·큐브·모습 바꾸기·스웜체인지·메가 열기 · 셀 게이트
+- [ ] process.md의 v351 라이브 확인 줄은 다음 docs 커밋에 함께
+
+## 2026-10-28 — 🟢 지가르데 셀 모으기 (v352 — 진우 의견 · 기본안 「추천대로」 · Codex 157차 반영)
+
+### 변경 파일
+- 🟢 `js/zygarde.js`(새 — 순수: 찾기 zygFindRule · 과목마다 하루 하나·모두 합쳐 하루 3 · 맨 처음은 🔴 코어 · 셀 10·50·100 문턱(처리한 문턱 seen) · 모습 고르기 zygFormRule · 병합 mergeZyg(찾은 열쇠 「날:과목」 합집합) · 📤 한 줄) · `js/zygview.js`(새 — 끝 화면 위 구석의 셀·코어 단추 · 찾은 줄 · 셀 10·50·100 🐣 창)
+- 끝 화면 13곳: `js/koreanview.js`(📚 글 끝 · 탭 ctx) · `js/kortabs.js`(🔤 오늘의 낱말) · `js/korpuzzleview.js`(🧩 퍼즐 판) · `js/nonsulview.js`(🖊️ 판 끝) · `js/math.js`(개념 한 편·☀️·🎯 · 퍼즐·숙제 ctx) · `js/mathpuzzleview.js`(🧩) · `js/detectiveview.js`(🕵️) · `js/grammarnote.js`(📝 쪽지) · `js/player.js`(✍️ 에세이·🔁 복습 onDoneShown) · `js/essay.js`·`js/review.js`(onDoneShown · 에세이 끝 화면은 지난 셀·찾은 줄을 먼저 걷음)
+- 모습·배틀: `js/pokemon.js`(ZYG_FORMS 10%·퍼펙트·메가 · formIdOf) · `js/xp.js`(zygFind·zygForm 트랜잭션 · megaReady · zygBattle · getLook formUrl · 10%폼이면 도트 끔) · `js/sprite.js`(setNoDot) · `js/items.js`(setFigure — 모습 그림 > 이로치 그림 > 일반 그림) · `js/battle.js`(스웜체인지 · 💠는 퍼펙트폼 뒤에만 · 늦게 온 도트가 퍼펙트폼 그림을 안 덮음) · `js/korbattleview.js`(배틀 고르기 세 벌 중 하나) · `js/hatch.js`(제목·글·도트 끄기 · anyModalOpen)
+- 저장·기록: `js/db.js`(빈 프로필·복사·병합에 zyg) · `js/rewardlog.js`(📤 셀 칸 · 한 줄) · `js/pokedex.js`(🎒 「🧊 지가르데 큐브 셀 N」) · `js/shop.js`(도감 지가르데 모습 칸 10%·50% · 셀 수·퍼펙트폼 안내 · 그림 다시 받기 · 기다리는 사이 닫힌 창엔 글을 안 띄움) · `css/style.css`(.zyg-*) · `sw.js`·`js/version.js` v352
+- 시험: `tests/zygarde352.test.js`(새 16) · `tests/essay318.test.js`(+1 지난 셀) · 옛 시험 맞춤(forms313 · sun331 · items · reward278 · player.logic — 글귀·결과 모양) · grammarnote349·grammarvideo350이 잡은 것(가짜 화면에 classList.contains 없음)은 zygview.js 쪽을 고침(try로 감쌈 · className 정규식)
+- (저장소 밖) `.context/v352/` — plan.md · walk352.sh · hh352.js · shot352.sh · mutate_v352.mjs · codex157
+
+### 확인
+- 시험: 전체 **3022 통과**(check.mjs 통과 · JS 220) · 변이 **62/62**(mut352b.log — Codex 157차 변이 13개 더 · 첫 판 mut352.log 48/49 → 「배틀마다 안 풀림」 시험 보강)
+- 헤드리스 390·1024(walk352.sh — 🔴 코어 → 🟢 셀 → 셀 10 🐣(10%폼 그림) → 🎒 가방 줄 → 도감 모습 칸(50% 잠김) → 셀 100 배틀 스웜체인지(퍼펙트폼 그림 · HP +50) → 💠 메가 → 이김 · 넘침 0 · 콘솔 0) · 걷다가 10%폼 그림 아래 50%폼 도트가 함께 보이던 것을 sprite.js 한 곳에서 막음
+- Codex 157차: P1 하나(같은 백업에서 따로 진행한 두 사본을 합치면 셀 하나가 빠짐 → 찾은 열쇠 합집합) · P2 셋(늦게 온 도트가 퍼펙트폼을 덮음 · 에세이 고정 화면에 지난 셀이 남음 · 도감을 닫은 뒤 글을 띄우다 오류) — 아버님 「추천대로」 → 모두 고침
+
+### 결정사항 / 메모
+- 세부(아버님께 알림): 과목마다 하루 하나·모두 합쳐 3 · 첫 찾기는 코어(셀 수 안 셈) · 셀 100이면 더 안 숨음 · 셀 10에 지가르데가 없으면 10%폼으로 도감에(처음 얻은 포켓몬이면 파트너 — 편지 🌟와 같은 꼴) · 셀 50에 10%폼이면 50%폼으로 · 50%폼 고르기 = 셀 50 또는 논술에서 잡은 지가르데 · 💠는 앱 메가스톤 + 🔑 키스톤 · 스웜체인지 = 내 HP 50 이하·살아 있음·📣 동료가 안 맞음·한 배틀 한 번·HP +50 · 🏁 영상 한 편은 끝 카드가 없어 그날 에세이·복습·쪽지 끝으로 · 10%폼이면 5세대 도트(50%폼 모습)를 끔
+- 셀 문턱을 「딱 그 수」가 아니라 처리한 문턱(seen)으로 둔 까닭: 병합이 셀 9 → 10을 건너뛰면 선물이 영영 안 나온다 · 지가르데를 팔아 도감이 0이 돼도 다시 주지 않는다
+- 오늘 찾은 과목은 따로 적지 않고 열쇠에서 읽는다(날 번호가 오늘인 것) — 옛 day·subs 칸은 없앰(배포 전이라 옮길 것 없음)
+
+### TODO (다음 작업)
+- [ ] 아버님 "배포" → feat·docs 커밋 → push → 라이브 확인
+- [ ] 태블릿: 끝 화면 구석 셀이 보이고 눌리는지 · 셀 10 🐣 창 · 도감 모습 칸 · 배틀 스웜체인지
+- [ ] 다음: 🖊️ 논술 넷째 묶음
