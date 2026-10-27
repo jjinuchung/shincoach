@@ -7342,3 +7342,33 @@
 ### TODO (다음 작업)
 - [ ] 아버님 "배포" → feat + docs → push → 라이브 v349 확인
 - [ ] v350 🎬 영상 문장 쪽지 원고(PC 자막 · 단원마다 10개 안팎 · 검수 두 번) → 📮 편지 원고 30통 → 논술 넷째 묶음
+- 라이브 확인(10-27 · bfc2e98·faddf4e): sw v349(3번째 확인) · 배포본 12개 커밋과 같음(grammar·grammarnote·player·track·style 포함) · 걷은 grammarview.js 404 · 앱 판 v349 (`.context/v349/live_check349.sh`)
+
+## 2026-10-27 — 🎬 영상 문장 문제 — 📝 문법 쪽지의 고르기 하나를 따라 한 영상 대사로 (v350 — 원고 두 번 검수 「이대로」 · 쪽지 안 자리 ① · Codex 154차 반영)
+
+### 변경 파일
+- `js/grammarvideo.js`(새) — 비공개 원고 grammar/video.json 받기(📤 열쇠 · 영상을 열 때·쪽지가 걸릴 때 · 10분에 한 번까지 · 빈 목록이면 받아 둔 것 그대로 · 30초 제한) · localStorage에 두기(🐸 battlefx와 같은 꼴) · normSay · videoRows(깨진 줄·같은 번호·같은 (대사, 영상)·600줄 넘침은 빼고 셈) · pickVideoQ(배운 단원 · 쉬는 문제 건너뜀 · 방금(지금 영상에서 오늘 끝낸 것, 최근 것부터) → 전에(안 낸 것 먼저 → 최근에 말한 것) · 대사와 영상 이름이 둘 다 맞아야)
+- `js/grammar.js` — checkVideoQ(단원 문제 꼴 + 빈칸에 정답 = 대사 · 「우리말에 맞는 문장」 정답 = 대사) · VIDEO_REST(맞힘 14일 · 틀림 2일) · videoSeenOf·mergeVideoSeen·videoResting · dealNote 고르기 수 · dealVideo(i -1) · grammarRule이 낸 기록 grammarVideo를 병합 규칙으로 · 📤 grammar/날짜.md 🎬 줄(번호만)
+- `js/grammarnote.js` — prepareNote(now, src): 맞는 영상 문제가 있으면 고르기 1 + 🎬 + 꼬리(쪽지는 그대로 셋) · 🎬 머리(「방금 따라 한 문장」/「「영상 이름」에서 따라 한 문장」 · 쪽지 단원과 다르면 그 단원 이름 · 🔊 그 장면 다시 듣기) · ⭐는 단원 문제만(r.miss ↔ r.vMiss) · 계단 틀린 수·오개념 수에는 영상 문제도 · 본 문제 비트는 단원 문제만
+- `js/player.js` — grammarVideoSources(오늘 끝낸 열쇠 ∩ 지금 영상 · 이 기기의 끝낸 기록 + 영상 이름 · 지금 자막 글이 같을 때만 🔊) · listenGrammarCue/stopGrammarCue(🧩 퍼즐 🔊 길 — state.puzzleCue를 잡아 둬 onTick·seeked가 지금 문장을 안 옮김 · 쪽지를 닫을 때 놓음) · 영상 열 때·쪽지가 걸릴 때 받기
+- `js/track.js`(todayDoneKeys — 사본 · 자정 넘김이면 빈 목록) · `js/db.js`·`js/xp.js`(grammarVideo 칸 · 병합) · `js/upload.js`(📥 「🎬 영상 문장 문제」 줄) · `css/style.css`(.gnote-video 호박색 띠) · `sw.js`·`js/version.js` v350
+- `tests/grammarvideo350.test.js`(새 14 — 지어낸 문장만) · `tests/player.logic.test.js`(🎬 4 + 가짜 함수) · `tests/track.test.js`(🎬 1)
+- (저장소 밖) `.context/v350/` — cands.mjs(앱 규칙으로 태블릿 11편 문장 나눔 — 문장 수 모두 같음) · ko_merge.mjs(앱처럼 한글 자막 붙이기) · ctx.mjs(맥락) · video1.mjs·video2.mjs(원고 73 + 75) · check_video.mjs · make_review.mjs · make_video_json.mjs(→ out/video.json 148줄) · mutate_v350.mjs · walk350.sh · codex154
+
+### 확인
+- 원고: 1회차 G1~G8 73(검수 Xg8igerCByDg5ByoFrwZi5 「이대로」) · 2회차 G9~G16 75(독립 검토 🔴 3 · 🟡 14 반영 → 검수 7dHpeSTaykCbz4B4iKspiT 「이대로」) · check_video 148 통과 · 앱 videoRows 148/148
+- 시험: 새 🎬 19 통과 · 변이 **73/74**(mut350.log 61/71 → 놓친 7은 시험 더해 잡음 · 같은 뜻 둘은 코드를 줄임 · Codex 반영 6/6 · 「시간 넘음 없음」은 시험이 멈춰 세지 않음 · 방어용 try 하나는 지금 던질 길이 없어 같은 뜻)
+- 헤드리스 390·1024(walk350.sh — 실제 화면 위 쪽지: 🎬 머리·🔊·쳐 넣기 틀림 풀이·⭐ 단원만·계단 1·낸 기록 저장 · 「전에」 꼴 🔊 없음 · 넘침 0 · 콘솔 0)
+- Codex 154차(`.context/v350/codex154.md` — P1 없음 · P2 7) → 판단 표 → 아버님 「모두 추천대로」 → 고침: ① 자정 넘김이면 「방금」 없음 ② 옛 기록 🔊는 자막 글이 같을 때만 ③ 깨진 줄은 그 줄만 빼고 셈 ④ 오개념 목록 받기도 30초 ⑤ 저장 공간이 차면 받아 둔 것 그대로 + 📥 ⚠️ ⑥ 같은 날 두 창이면 틀림이 남음(병합 규칙) · 그대로: 영상 목록을 자막 전문까지 읽음(하루 3번까지 — 태블릿에서 느리면) · 주석의 아이 이름(원래 쓰던 꼴 — 기록 아님) · 시험 보탬(기록 읽는 사이 닫기 · 🔊 중 닫기 · 저장 실패 뒤 다시 저장)
+- 전체 시험 **2982 통과**(`.context/v350/full350.log`) — 첫 번에 🧢 하나 실패: app.js를 git checkout으로 되돌리며 CRLF가 됨 → LF로(app.js·blackbox.js는 줄바꿈만 달라 커밋 안 함)
+
+### 결정사항 / 메모
+- 원고는 진우가 본 영상 대사라 공개 저장소에 두지 않는다 — 비공개 grammar/video.json · 배포 없이 더하고 고친다 · 열쇠가 없는 기기는 v349 그대로
+- 2회차 우리말 뜻은 PC 한글 자막이 있는 영상이면 앱이 붙이는 자막 글을 먼저(24/38 그대로) · 1회차는 Claude 번역(자막 그대로 6/44 — 자막으로 맞출지는 제안만)
+- 포켓몬 기술 공식 이름은 자막을 믿지 말 것(G-Max Volt Crash = 거다이만뢰)
+- app.js에는 「문법 배선 없음」 시험이 있어 받기는 player.js에
+
+### TODO (다음 작업)
+- [ ] 아버님 "배포" → feat + docs → push → 라이브 v350 확인 → 비공개 저장소에 grammar/video.json
+- [ ] 태블릿: 영상을 열면 원고 받기(📊 📥 🎬 줄) · 쪽지 둘째 🎬 · 🔊 그 장면 · 다음 "올라온 거 봐 줘"에서 grammar/날짜.md 🎬 줄
+- [ ] 📮 포켓몬 편지 원고 30통 → 논술 넷째 묶음
