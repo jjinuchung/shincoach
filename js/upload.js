@@ -614,7 +614,9 @@ export const PRIVATE_FAMILY = 'family/messages.json';
 export const PRIVATE_HATMARKS = 'avatar/hatmarks.json';
 /** 🐸 기술 그림 목록 (v306 — battlefx.FX_PATH와 같은 경로) */
 export const PRIVATE_FX = 'fx/fx.json';
-const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장', [PRIVATE_FAMILY]: '💌 메시지', [PRIVATE_HATMARKS]: '🧢 모자 무늬', [PRIVATE_FX]: '🐸 기술 그림' };
+/** 🎬 영상 문장 문제 원고 (v350 — grammarvideo.VIDEO_PATH와 같은 경로) */
+export const PRIVATE_GRAMMAR_VIDEO = 'grammar/video.json';
+const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장', [PRIVATE_FAMILY]: '💌 메시지', [PRIVATE_HATMARKS]: '🧢 모자 무늬', [PRIVATE_FX]: '🐸 기술 그림', [PRIVATE_GRAMMAR_VIDEO]: '🎬 영상 문장 문제' };
 /**
  * 📊 📤 카드의 받기 한 줄 (순수) — "📥 받기: ✍️ 교정 ✅ 10/07 10:32 (3개) · ❓ 답장 · 아직 없음"
  * check(국어 답장 — 붙여 본 뒤의 수, noteReadCheck)가 있으면: 너무 많아 통째로 안 받음 ❌ · 받지 않은 줄·맞는 글 없음·판 다름 ⚠️
@@ -629,8 +631,8 @@ export function readSummary(state, fmt) {
     if (r.missing) return `${name} · 아직 없음`;
     const c = r.check;
     if (c && c.over) return `${name} ❌ ${fmt(r.at)} 답장이 너무 많아(${c.rows}줄) 하나도 안 받았어요 — Claude에게 오래된 줄을 지워 달라고 해 주세요`;
-    const warn = c ? [c.bad ? `받지 않은 ${p === PRIVATE_HATMARKS ? '무늬' : p === PRIVATE_FX ? '그림' : '줄'} ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : '', c.stale ? `판 다름 ${c.stale}` : ''].filter(Boolean).join(' · ') : '';
-    const ask = p === PRIVATE_FAMILY ? '메시지 확인해 줘' : p === PRIVATE_HATMARKS ? '모자 무늬 확인해 줘' : p === PRIVATE_FX ? '기술 그림 확인해 줘' : '국어 답장 확인해 줘';
+    const warn = c ? [c.bad ? `받지 않은 ${p === PRIVATE_HATMARKS ? '무늬' : p === PRIVATE_FX ? '그림' : p === PRIVATE_GRAMMAR_VIDEO ? '문제' : '줄'} ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : '', c.stale ? `판 다름 ${c.stale}` : ''].filter(Boolean).join(' · ') : '';
+    const ask = p === PRIVATE_FAMILY ? '메시지 확인해 줘' : p === PRIVATE_HATMARKS ? '모자 무늬 확인해 줘' : p === PRIVATE_FX ? '기술 그림 확인해 줘' : p === PRIVATE_GRAMMAR_VIDEO ? '영상 문장 문제 확인해 줘' : '국어 답장 확인해 줘';
     return warn ? `${name} ⚠️ ${fmt(r.at)} (${r.n}개 — ${warn} · Claude에게 "${ask}")` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
   });
   return parts.length ? `📥 받기: ${parts.join(' · ')}` : '📥 받기: 아직 받아 본 적이 없어요 (앱을 열 때·수학을 열 때 저절로)';

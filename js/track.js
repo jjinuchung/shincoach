@@ -575,6 +575,14 @@ export function markMatch(max) {
 }
 
 /** 📝 오늘 끝낸 문법 쪽지 수 / 쪽지 하나를 끝냄 — 하루 max장까지 선점 (v349 · 두 창이 같이 끝내도 상한을 넘지 않는다) */
+/**
+ * 오늘 끝낸 문장 열쇠 (끝낸 차례 · 모든 영상 — 📝 🎬 영상 문장 문제가 「방금 따라 한 문장」을 찾을 때, v350) · 사본 ·
+ * 자정을 넘겨 아직 어제 기록이면 빈 목록 (어제 문장을 「방금」이라 하지 않게 — 🔍 Codex 154차)
+ */
+export function todayDoneKeys() {
+  if (!t.daily || t.daily.date !== todayKey() || !Array.isArray(t.daily.doneKeys)) return [];
+  return [...t.daily.doneKeys];
+}
 export function todayGrammarNotes() {
   return t.daily ? (t.daily.grammarNotes || 0) : 0;
 }

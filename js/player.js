@@ -45,6 +45,8 @@ import { wordQuiz, wordQuestion } from './rocketquiz.js';
 import { isRocketOpen } from './rocketview.js';
 import { noteDue, NOTE as GRAMMAR_NOTE } from './grammar.js'; // 📝 문법 쪽지 — 언제 낼까 (v349)
 import { loadGrammar, prepareNote, openGrammarNote, closeGrammarNote } from './grammarnote.js'; // 📝 문법 쪽지 창 (v349)
+import { syncVideoQs, videoList, normSay } from './grammarvideo.js'; // 🎬 영상 문장 문제 — 비공개 원고 받기 · 받아 둔 원고 · 대사 맞추기 (v350)
+import { getAllSentenceStats, listItems, sentenceKey } from './db.js'; // 🎬 끝낸 문장·영상 이름 (v350 — 쪽지에 끼울 영상 문제를 고를 때)
 // ⏳ 남은 시간 · 홈에서 이어 간 영어 배틀도 영어 시간으로 (Codex 43차 #7) — 마지막 import 줄 끝에는 주석을 달지 않는다(player.logic 테스트가 import를 줄 끝 ';'로 걸러 낸다)
 import { status as rocketTimeStatus, setSubject as rocketTimeSubject, currentSubject as rocketTimeNow } from './timelimit.js';
 
@@ -1257,6 +1259,7 @@ function maybeGrammar(todayDone) {
   if (!noteDue(todayDone, track.todayGrammarNotes())) return;
   state.grammarPending = true;
   loadGrammar().catch(() => {}); // 원고를 미리 받아 둔다 (열 때도 못 받았으면 그냥 이어 간다)
+  syncVideoQs().catch(() => {}); // 🎬 영상 문장 문제 원고도 (📤 열쇠가 있을 때 · 10분에 한 번까지 — v350)
 }
 
 /**
@@ -1272,15 +1275,59 @@ function startGrammar(continueFn) {
   const myItem = state.item;
   const go = () => { if (continueFn) continueFn(); else restoreSpot(spot); };
   setGrammarOpen(true);
-  loadGrammar().then((ok) => {
+  loadGrammar().then(async (ok) => {
     if (!state.open || state.item !== myItem || !state.grammarOpen) return; // 그 사이 영상을 닫았다 (closeMedia가 정리했다)
-    const note = ok ? prepareNote() : null;
+    const src = ok ? await grammarVideoSources(myItem) : null; // 🎬 진우가 끝낸 문장 (받아 둔 원고가 없으면 기록을 안 읽는다 — v350)
+    if (!state.open || state.item !== myItem || !state.grammarOpen) return; // 기록을 읽는 사이 영상을 닫았다
+    const note = ok ? prepareNote(Date.now(), src) : null;
     const opened = !!note && openGrammarNote(note, {
       onReward: grantGrammarReward,
-      onDone: () => { setGrammarOpen(false); go(); },
+      onListen: listenGrammarCue,
+      onDone: () => { stopGrammarCue(); setGrammarOpen(false); go(); },
     });
     if (!opened) { setGrammarOpen(false); go(); }
-  }).catch(() => { closeGrammarNote(); setGrammarOpen(false); go(); }); // 그리다 깨져도 반쯤 열린 창을 남기지 않는다 (🔍 Codex 153차 #3)
+  }).catch(() => { closeGrammarNote(); stopGrammarCue(); setGrammarOpen(false); go(); }); // 그리다 깨져도 반쯤 열린 창을 남기지 않는다 (🔍 Codex 153차 #3)
+}
+
+/**
+ * 🎬 진우가 끝낸 문장 (v350) — 📝 쪽지에 끼울 영상 문장 문제를 고를 때 · 받아 둔 원고가 없으면 기록을 읽지 않는다(null) ·
+ * now = 이 영상에서 오늘 끝낸 문장(최근 것부터 · 🔊 그 장면) · before = 이 기기에 남은 끝낸 문장 전부(영상 이름 · 마지막에 말한 때 · 이 영상이면 cue) ·
+ * 기록을 못 읽으면 before 없이 (쪽지는 그대로 열린다)
+ */
+async function grammarVideoSources(item) {
+  if (!item || !videoList().length) return null;
+  const cueOf = new Map(state.cues.map((c) => [sentenceKey(item.id, c.start), c]));
+  const now = track.todayDoneKeys().reverse().filter((k) => cueOf.has(k)).map((k) => ({ en: cueOf.get(k).en, title: item.title, cue: cueOf.get(k) }));
+  let before = [];
+  try {
+    const [recs, items] = await Promise.all([getAllSentenceStats(), listItems()]);
+    const title = new Map((items || []).filter((it) => it && it.id).map((it) => [it.id, it.title]));
+    before = (recs || []).filter((r) => r && r.done && title.has(r.itemId))
+      .map((r) => {
+        // 열쇠에 영상 id가 들어 있어 지금 영상 문장만 cue가 있다 · 자막을 바꿔 같은 때의 글이 달라졌으면 🔊 없이 (🔍 Codex 154차 — 다른 장면을 틀지 않게)
+        const c = cueOf.get(r.key);
+        return { en: r.en, title: title.get(r.itemId), at: Number(r.lastAt) || 0, cue: c && normSay(c.en) === normSay(r.en) ? c : null };
+      });
+  } catch { before = []; }
+  return { now, before };
+}
+
+/**
+ * 🎬 「🔊 그 장면 다시 듣기」 (v350) — 🧩 퍼즐 🔊와 같은 길: 그 구간만 틀고 끝에서 멈춘다 ·
+ * puzzleCue를 잡아 두어 onTick·seeked가 지금 문장을 그 장면으로 옮기지 않게 한다 — 쪽지를 닫을 때 stopGrammarCue가 놓는다
+ */
+function listenGrammarCue(cue) {
+  if (!state.open || !state.grammarOpen || !cue || !state.cues.includes(cue)) return;
+  state.puzzleCue = cue;
+  playPuzzleSentence(cue, null);
+}
+/** 🎬 쪽지를 닫을 때 — 듣던 장면을 멈추고 잡아 둔 문장을 놓는다 (그다음 go가 제자리·다음 문장으로) */
+function stopGrammarCue() {
+  if (!state.puzzleCue) return;
+  state.puzzleCue = null;
+  state.puzzlePlaying = false;
+  state.puzzleOnEnd = null;
+  if (!video.paused) video.pause();
 }
 
 /**
@@ -1866,6 +1913,7 @@ export async function openPlayer(id, opts = {}) {
   hidePlayerMessage();
 
   $('player-title').textContent = item.title;
+  if (!state.parentMode && settings.grammarNote !== false) syncVideoQs().catch(() => {}); // 🎬 영상 문장 문제 원고 받기 — 첫 쪽지(8문장) 전에 (📤 열쇠가 있을 때 · 10분에 한 번까지, v350)
   state.objectUrl = URL.createObjectURL(blob);
   video.src = state.objectUrl;
   video.defaultPlaybackRate = SPEEDS[state.speedIdx];

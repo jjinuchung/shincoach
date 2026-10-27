@@ -11,6 +11,7 @@ import { pickPrompts as pickEssayPrompts, readSeconds as essayReadSeconds, REWAR
 import { pickMatchRound, shuffle as shuffleMons, PAIRS as MATCH_PAIRS, NEED_NEW as MATCH_NEED } from '../js/match.js';
 import { matchXp, XP as REAL_XP } from '../js/xp.js';
 import { noteDue as realNoteDue, NOTE as REAL_NOTE } from '../js/grammar.js'; // 📝 문법 쪽지 규칙은 진짜 (v349)
+import { normSay as realNormSay } from '../js/grammarvideo.js'; // 🎬 대사 맞추기는 진짜 (v350)
 import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoOwed, videoTier, SPEAK_COMBO } from '../js/items.js';
 import fsNode from 'node:fs';
 
@@ -177,6 +178,7 @@ function loadPlayer() {
       async markMatch() { matchState.today++; return true; },
       // 📝 문법 쪽지 하루 장 수 (v349 — 실제는 claimDailyCount 선점)
       todayGrammarNotes: () => grammarState.today,
+      todayDoneKeys: () => [...(grammarState.doneKeys || [])], // 🎬 오늘 끝낸 문장 열쇠 (v350)
       async markGrammarNote(max) { if (grammarState.full || grammarState.today >= max) return false; grammarState.today++; return true; },
       // 💖 내 문장 (2026-10-01) — 기록은 reviewState.stats의 fav, 덤으로 푼 문장은 reviewState.favDone
       isFav: (cue) => !!((reviewState.stats || []).find((r) => r.start === cue.start) || {}).fav,
@@ -278,7 +280,14 @@ function loadPlayer() {
     // 📝 문법 쪽지 스텁 (v349) — 규칙(noteDue·NOTE)은 진짜, 창은 grammarCalls에 기록
     grammarCalls, grammarState, noteDue: realNoteDue, GRAMMAR_NOTE: REAL_NOTE,
     loadGrammar: async () => { grammarState.loads++; return grammarState.load; },
-    prepareNote: () => (grammarState.note === undefined ? { u: { id: 'G1', title: 't', qs: [] }, id: 'G1', from: 0, concept: true, deal: [{ i: 0, kind: 'pick', opts: [0] }], rolls: [0.5, 0.5] } : grammarState.note),
+    prepareNote: (now, src) => { grammarState.src = src; return grammarState.note === undefined ? { u: { id: 'G1', title: 't', qs: [] }, id: 'G1', from: 0, concept: true, deal: [{ i: 0, kind: 'pick', opts: [0] }], rolls: [0.5, 0.5] } : grammarState.note; },
+    // 🎬 영상 문장 문제 (v350): videoList = 받아 둔 원고 · stats·items = 이 기기의 문장 기록·영상 · syncs = 받기를 부른 수 · statReads = 기록을 읽은 수
+    syncVideoQs: async () => { grammarState.syncs = (grammarState.syncs || 0) + 1; return 0; },
+    videoList: () => grammarState.videoList || [],
+    getAllSentenceStats: async () => { grammarState.statReads = (grammarState.statReads || 0) + 1; if (grammarState.statWait) await grammarState.statWait; if (grammarState.statFail) throw new Error('기록 못 읽음 (시험)'); return grammarState.stats || []; },
+    normSay: realNormSay,
+    listItems: async () => grammarState.items || [],
+    sentenceKey: (id, start) => `${id}|${Math.round(start * 10)}`,
     openGrammarNote(note, opts) { if (grammarState.throwOpen) throw new Error('그리다 깨짐 (시험)'); if (!note) return false; grammarCalls.push({ note, ...opts }); return true; },
     closeGrammarNote() { grammarState.closed++; },
     pickMatchRound, shuffleMons, matchXp, matchCoins,
@@ -3305,6 +3314,106 @@ test('📝 쪽지를 끝내면 force로 이어 간다 — 같이 걸린 에세�
   assert.deepEqual([grammarCalls.length, essayCalls.length], [1, 0], '쪽지가 먼저(goTo 순서 — 배틀 다음 · 퍼즐·에세이보다 먼저)');
   grammarCalls[0].onDone();
   assert.deepEqual([run('state.idx'), essayCalls.length, run('state.essayPending')], [2, 0, true], '에세이는 다음 전환에');
+});
+
+// ───────────────────── 🎬 영상 문장 문제 (v350) ─────────────────────
+// 쪽지를 열 때 진우가 끝낸 문장을 모아 prepareNote에 넘긴다 — 받아 둔 원고가 없으면 기록을 안 읽는다 · 🔊는 그 구간만 · 닫으면 제자리
+// (고르기 규칙은 tests/grammarvideo350.test.js)
+
+test('🎬 받아 둔 원고가 없으면 기록을 안 읽고 src 없이 — 있으면 지금 영상에서 오늘 끝낸 문장(최근 것부터 · cue)과 다른 기록(영상 이름 · 지금 영상이면 cue)', async () => {
+  const { run, grammarCalls, grammarState } = loadGrammarPlayer();
+  run(`${cues5} state.item = { id: 'v1', title: '영상1' }; state.idx = 1; state.grammarPending = true; goTo(2);`);
+  await tick(); await tick();
+  assert.equal(grammarCalls.length, 1);
+  assert.equal(grammarState.src, null, '원고가 없으면 src 없음');
+  assert.equal(grammarState.statReads || 0, 0, '기록을 읽지 않는다');
+  grammarCalls[0].onDone();
+  grammarState.videoList = [{ id: 'V001' }];
+  grammarState.doneKeys = ['v1|10', 'v9|5', 'v1|30', 'v1|99'];
+  grammarState.items = [{ id: 'v1', title: '영상1' }, { id: 'v2', title: '영상2' }];
+  grammarState.stats = [
+    { key: 'v1|20', itemId: 'v1', en: 'b', done: true, lastAt: 5 },
+    { key: 'v2|10', itemId: 'v2', en: 'x', done: true, lastAt: 9 },
+    { key: 'v2|20', itemId: 'v2', en: 'y', done: false, lastAt: 9 },
+    { key: 'v3|10', itemId: 'v3', en: 'z', done: true, lastAt: 9 },
+  ];
+  run('state.grammarPending = true; goTo(3);');
+  await tick(); await tick();
+  assert.equal(grammarCalls.length, 2);
+  const src = grammarState.src;
+  assert.deepEqual(src.now.map((x) => [x.en, x.title, x.cue && x.cue.start]), [['c', '영상1', 3], ['a', '영상1', 1]], '이 영상에서 오늘 끝낸 것 — 최근 것부터 · 다른 영상·없는 문장은 뺀다');
+  assert.deepEqual(src.before.map((x) => [x.en, x.title, x.at, x.cue ? x.cue.start : null]), [['b', '영상1', 5, 2], ['x', '영상2', 9, null]], '끝낸 기록만 · 목록에 없는 영상은 뺀다 · 지금 영상이면 cue');
+  grammarCalls[1].onDone();
+  grammarState.statFail = true;
+  run('state.grammarPending = true; goTo(4);');
+  await tick(); await tick();
+  assert.equal(grammarCalls.length, 3, '기록을 못 읽어도 쪽지는 열린다');
+  assert.equal(grammarState.src.before.length, 0, 'before 없이');
+});
+
+test('🎬 🔊 그 장면 다시 듣기 — 그 구간만 틀고(지금 문장은 그대로) · 닫으면 멈추고 제자리로 · 지금 영상의 문장이 아니면 안 튼다 · 영상을 열 때 원고 받기', async () => {
+  const { run, ctx, grammarCalls, grammarState, els } = loadGrammarPlayer();
+  run(`${cues5} state.item = { id: 'v1', title: '영상1' }; state.idx = 1; video.currentTime = 2.5; state.grammarPending = true; startGrammar(null);`);
+  await tick(); await tick();
+  const call = grammarCalls[0];
+  assert.equal(typeof call.onListen, 'function', '🔊 길을 넘긴다');
+  call.onListen({ start: 9, end: 10, en: 'nope' });
+  assert.equal(run('state.puzzleCue'), null, '지금 영상의 문장이 아니면 안 튼다');
+  run('globalThis.__cue = state.cues[3];');
+  call.onListen(ctx.__cue);
+  assert.equal(run('state.puzzleCue === state.cues[3]'), true, 'onTick·seeked가 지금 문장을 옮기지 않게 잡아 둔다');
+  assert.equal(run('video.currentTime'), 4, '그 장면 처음부터');
+  assert.equal(run('video.paused'), false, '튼다');
+  assert.equal(run('state.idx'), 1, '지금 문장은 그대로');
+  run('video.currentTime = 4.99; onTick();');
+  assert.equal(run('video.paused'), true, '구간 끝에서 멈춘다');
+  assert.equal(run('state.idx'), 1);
+  call.onDone();
+  assert.equal(run('state.puzzleCue'), null, '닫으면 놓는다');
+  assert.equal(run('state.idx'), 1);
+  assert.equal(run('video.currentTime'), 2.5, '제자리로');
+  assert.equal(run('state.grammarOpen'), false);
+  assert.equal(els['view-player'].inert, false);
+  const src = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
+  assert.ok(/if \(!state\.parentMode && settings\.grammarNote !== false\) syncVideoQs\(\)\.catch/.test(src), '영상을 열 때 원고 받기 (아빠 보기·⚙ 끔이면 안 받음)');
+  assert.ok(/state\.grammarPending = true;\s*loadGrammar\(\)\.catch\(\(\) => \{\}\);[^\n]*\n\s*syncVideoQs\(\)\.catch/.test(src), '쪽지가 걸릴 때도 받기');
+  run('maybeGrammar(8);');
+  assert.ok(grammarState.syncs >= 1);
+});
+
+test('🎬 옛 기록의 🔊는 지금 자막 글이 같을 때만 (자막을 바꿨으면 다른 장면을 틀지 않게 — 🔍 Codex 154차)', async () => {
+  const { run, grammarCalls, grammarState } = loadGrammarPlayer();
+  grammarState.videoList = [{ id: 'V001' }];
+  grammarState.items = [{ id: 'v1', title: '영상1' }];
+  grammarState.stats = [{ key: 'v1|20', itemId: 'v1', en: 'B!', done: true, lastAt: 5 }, { key: 'v1|30', itemId: 'v1', en: 'other line', done: true, lastAt: 6 }];
+  run(`${cues5} state.item = { id: 'v1', title: '영상1' }; state.idx = 0; state.grammarPending = true; goTo(1);`);
+  await tick(); await tick();
+  assert.equal(grammarCalls.length, 1);
+  const b = grammarState.src.before;
+  assert.deepEqual(b.map((x) => [x.en, x.cue ? x.cue.start : null]), [['B!', 2], ['other line', null]], '글이 같으면(대소문자·문장부호 무시) cue · 다르면 없음');
+});
+
+test('🎬 기록을 읽는 사이 영상을 닫으면 쪽지를 열지 않는다 · 🔊 중에 닫아도 잡아 둔 문장을 놓는다 (🔍 Codex 154차)', async () => {
+  const { run, grammarCalls, grammarState } = loadGrammarPlayer();
+  grammarState.videoList = [{ id: 'V001' }];
+  let release;
+  grammarState.statWait = new Promise((r) => { release = r; });
+  run(`${cues5} state.item = { id: 'v1', title: '영상1' }; state.idx = 1; state.grammarPending = true; goTo(2);`);
+  await tick(); await tick();
+  assert.equal(grammarState.statReads, 1, '기록을 읽는 중');
+  run('closeMedia();');
+  release();
+  await tick(); await tick(); await tick();
+  assert.equal(grammarCalls.length, 0, '닫은 뒤엔 열지 않는다');
+  assert.deepEqual([run('state.grammarOpen'), run('state.grammarPending')], [false, false]);
+  grammarState.statWait = null;
+  run(`state.open = true; ${cues5} state.item = { id: 'v2', title: '영상2' }; state.idx = 1; state.grammarPending = true; goTo(2);`);
+  await tick(); await tick();
+  assert.equal(grammarCalls.length, 1);
+  grammarCalls[0].onListen(run('state.cues[0]'));
+  assert.equal(run('state.puzzleCue === state.cues[0]'), true);
+  run('closeMedia();');
+  assert.deepEqual([run('state.puzzleCue'), run('state.puzzlePlaying'), run('state.grammarOpen')], [null, false, false], '영상을 닫으면 다 놓는다');
 });
 
 test('📝 배선: 오늘 쪽지 수는 track의 grammarNotes 선점 · 영상을 열 때도 걸린 쪽지를 지운다 · ⚙ 저장', () => {

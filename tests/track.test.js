@@ -95,6 +95,18 @@ test('done/todayDone: 같은 문장은 하루에 한 번만 셈', async () => {
   assert.equal(run('todayDone()'), 2);
 });
 
+test('🎬 todayDoneKeys: 오늘 끝낸 차례 그대로 · 사본이라 뒤집어도 오늘 기록은 그대로 (v350 — 「방금 따라 한 문장」 찾기)', async () => {
+  const s = stub();
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  run('done({ start: 1, end: 2, en: "a" }); done({ start: 5, end: 6, en: "b" }); done({ start: 1, end: 2, en: "a" });');
+  assert.equal(run('JSON.stringify(todayDoneKeys().reverse())'), '["x|50","x|10"]');
+  assert.equal(run('JSON.stringify(todayDoneKeys())'), '["x|10","x|50"]', '뒤집어도 기록은 그대로');
+  assert.equal(run('todayDone()'), 2);
+  run('t.daily.date = "2000-01-01";'); // 자정을 넘겼는데 아직 새 기록을 안 쓴 때
+  assert.equal(run('JSON.stringify(todayDoneKeys())'), '[]', '어제 문장을 「방금」이라 하지 않는다 (🔍 Codex 154차)');
+});
+
 test('puzzle: 문장별·세션·일별 퍼즐 횟수/정답 누적 (옛 기록에 필드가 없어도 됨)', async () => {
   const s = stub();
   const { run } = loadTrack(s);

@@ -4602,6 +4602,11 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gnote-paper { border-top: 6px solid var(--gr-ink); }
 .gnote-peek { justify-self: start; font-size: 0.92rem; }
 .gnote-go { min-width: 12em; }
+/* 🎬 영상 문장 문제 머리 (v350) — 필름 띠 호박색 · 어디서 따라 한 문장인지 · 🔊 그 장면 */
+.gnote-video { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; background: #fff4dc; border-left: 4px solid #b7791f; border-radius: 0 12px 12px 0; padding: 8px 12px; }
+.gnote-video-from { margin: 0; font-weight: 800; color: #7a4a00; line-height: 1.4; word-break: keep-all; overflow-wrap: anywhere; }
+.gnote-video-unit { margin: 0; font-size: 0.88rem; color: var(--gr-ink); font-weight: 700; word-break: keep-all; }
+.gnote-listen { margin-left: auto; font-size: 0.92rem; }
 .gr-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 16px; display: grid; gap: 12px; min-width: 0; }
 .gr-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .gr-head-title { margin: 0; font-size: 1.15rem; line-height: 1.4; overflow-wrap: anywhere; }

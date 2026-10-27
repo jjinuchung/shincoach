@@ -3,8 +3,13 @@
 //   첫 화면 카드·단원 지도·🔍 진단은 걷었다 (기본안 https://claude.ai/artifact/82H7QD9oZpRHU5m1VjNtjM "모두 추천대로")
 // 쪽지 한 장 = (새 단원·다시 볼 단원이면 📘 개념 한 장) → 문제 3(고르기 2 · 쳐 넣기나 순서 하나) → 끝(⚡💰 → 저장 → [계속하기 ▶])
 //   영상을 닫으면 그냥 접는다(남는 것 없음 — 끝낸 게 아니다) · 틀려도 하트·감점 없음 · 아이 화면엔 셈 없음(점 세 개만)
-import { allUnits, planUnit, dealNote, judgeType, judgeOrder, joinTiles, grammarFinishText, unitMark, giftPoolOf } from './grammar.js';
-import { grammarFinish, grammarMap, grammarKnownMap, grammarSeenMap, getLevelInfo } from './xp.js';
+// ★ v350 🎬 영상 문장 문제 (10-27 아버님 「이대로」 — 쪽지 안 자리 ①): 진우가 끝낸 대사로 만든 문제가 있으면 둘째 고르기 자리에 끼운다
+//   (고르기 1 + 🎬 하나 + 꼬리 하나 — 쪽지는 그대로 문제 3) · 방금 이 영상에서 끝낸 문장이면 「🔊 그 장면 다시 듣기」 · ⭐는 단원 문제로만
+//   (영상 문제는 다른 단원일 수 있어서) · 고르기는 grammarvideo.js · 문장을 모으는 것과 🔊는 player.js
+import { allUnits, planUnit, dealNote, dealVideo, NOTE_SHAPE, judgeType, judgeOrder, joinTiles, grammarFinishText, unitMark, giftPoolOf } from './grammar.js';
+import { grammarFinish, grammarMap, grammarKnownMap, grammarSeenMap, grammarVideoMap, getLevelInfo } from './xp.js';
+import { videoRows, videoList, pickVideoQ } from './grammarvideo.js';
+import { dayNum } from './korean.js';
 import { ROSTER, subjectOf, isUnlocked, LEGENDARY } from './pokemon.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
 
@@ -56,8 +61,10 @@ const monName = (id) => { const m = ROSTER.find((x) => x.id === id); return m ? 
 /**
  * 다음 쪽지 고르기 (원고를 받은 뒤) — 다시 볼 단원(다음 날부터) → 차례로 새 단원 → 다 ⭐면 오래 안 본 단원으로 연습 · 낼 단원이 없으면 null
  * from = 지금 그 단원의 at(그 사이 다른 창이 옮겼으면 연습 — grammarRule) · rolls = 🎁 추첨 수(쪽지마다 한 번 — [다시 저장하기]도 같은 추첨)
+ * src = 🎬 진우가 끝낸 문장 { now: 지금 영상에서 오늘 끝낸 것(최근 것부터 · cue), before: 그 밖(at · 지금 영상이면 cue), list?: 원고(시험용 — 없으면 받아 둔 것) } ·
+ *   배운 단원의 영상 문제가 맞으면 둘째 고르기 자리에 끼운다(없으면 지금 쪽지 그대로)
  */
-export function prepareNote(now = Date.now()) {
+export function prepareNote(now = Date.now(), src = null) {
   if (!S.units.length) return null;
   const st = grammarMap();
   const kn = grammarKnownMap();
@@ -65,7 +72,21 @@ export function prepareNote(now = Date.now()) {
   const u = id ? unitById(id) : null;
   if (!u) return null;
   const mark = unitMark(id, st, kn);
-  return { u, id, from: st[id] ? st[id].at : 0, concept: mark === 'new' || mark === 'again', deal: dealNote(u, grammarSeenMap()[id] || 0), rolls: [Math.random(), Math.random()] };
+  const vq = src ? videoFor(src, st, kn, now) : null;
+  const deal = dealNote(u, grammarSeenMap()[id] || 0, Math.random, vq ? NOTE_SHAPE.pick - 1 : NOTE_SHAPE.pick);
+  if (vq) deal.splice(Math.min(1, deal.length), 0, dealVideo(vq.q, vq));
+  return { u, id, from: st[id] ? st[id].at : 0, concept: mark === 'new' || mark === 'again', deal, rolls: [Math.random(), Math.random()] };
+}
+
+/** 🎬 이번 쪽지에 끼울 영상 문제 — 받아 둔 원고 가운데 지금 원고에 있는 단원 · 배운 단원(쪽지로 본 단원) · 쉬지 않는 문제 · 진우가 끝낸 문장 */
+function videoFor(src, st, kn, now) {
+  try {
+    const list = Array.isArray(src.list) ? src.list : videoList();
+    if (!list.length) return null;
+    const rows = videoRows(list, S.data && S.data.types).rows;
+    const learned = S.units.filter((u) => st[u.id] || kn[u.id]).map((u) => u.id); // 지금 원고에 있는 단원만 — 없는 단원의 영상 문제는 저절로 빠진다
+    return pickVideoQ({ rows, learned, now: src.now, before: src.before, seen: grammarVideoMap(), today: dayNum(now) });
+  } catch { return null; } // 영상 문제를 못 골라도 쪽지는 그대로
 }
 
 export function isGrammarNoteOpen() {
@@ -74,12 +95,12 @@ export function isGrammarNoteOpen() {
 
 /**
  * 쪽지 열기 — onReward(wrong) = ⚡💰 계단을 주고 { xp, coin }을 돌려준다(하루 몫이 없으면 null — 쪽지마다 한 번만 부른다) ·
- * onDone() = [계속하기 ▶]를 눌렀을 때(창은 이미 닫혔다)
+ * onDone() = [계속하기 ▶]를 눌렀을 때(창은 이미 닫혔다) · onListen(cue) = 🎬 영상 문제의 「🔊 그 장면 다시 듣기」(없으면 단추를 안 보인다)
  */
-export function openGrammarNote(note, { onReward = null, onDone = null } = {}) {
+export function openGrammarNote(note, { onReward = null, onDone = null, onListen = null } = {}) {
   closeGrammarNote();
   if (!note || !note.u || !Array.isArray(note.deal) || !note.deal.length) return false;
-  S.r = { ...note, step: note.concept ? 'concept' : 'q', k: 0, miss: false, missTypes: {}, wrong: 0, q: null, saving: false, result: null, reward: undefined, giftName: '', showConcept: false, onReward, onDone };
+  S.r = { ...note, step: note.concept ? 'concept' : 'q', k: 0, miss: false, vMiss: false, missTypes: {}, wrong: 0, q: null, saving: false, result: null, reward: undefined, giftName: '', showConcept: false, onReward, onDone, onListen };
   const root = rootEl();
   if (root) root.hidden = false;
   render();
@@ -100,9 +121,10 @@ function qState(r) {
   if (!r.q || r.q.k !== r.k) r.q = { k: r.k, tapped: [], done: false, input: '', fb: null, tries: 0, placed: [], bad: -1 };
   return r.q;
 }
-/** 틀림 — ⭐(한 번도 안 틀림)와 ⚡💰 계단(틀린 수)에 함께 쓴다 */
-function noteMiss(r, type) {
-  r.miss = true;
+/** 틀림 — ⭐(단원 문제를 한 번도 안 틀림)와 ⚡💰 계단(틀린 수 — 🎬 영상 문제도)에 함께 쓴다 · video = 🎬 영상 문제에서 틀림(⭐는 그대로) */
+function noteMiss(r, type, video = false) {
+  if (video) r.vMiss = true;
+  else r.miss = true;
   r.wrong += 1;
   if (type) r.missTypes[type] = (r.missTypes[type] || 0) + 1;
 }
@@ -132,9 +154,10 @@ function render() {
       else card.appendChild(btn('btn gnote-peek', '📘 개념 다시 보기', () => { r.showConcept = true; render(); }));
     }
     const d = r.deal[r.k];
-    const q = r.u.qs[d.i];
+    const q = d.v || r.u.qs[d.i];
+    if (d.v) card.appendChild(videoTagEl(r, d));
     if (d.kind === 'pick') pickEl(card, r, d, q);
-    else if (d.kind === 'type') typeEl(card, r, q);
+    else if (d.kind === 'type') typeEl(card, r, d, q);
     else orderEl(card, r, d, q);
   } else card.appendChild(finishEl(r));
   m.appendChild(card);
@@ -163,6 +186,16 @@ function conceptEl(card, r, first) {
   box.appendChild(el('p', 'gr-term', u.term));
   card.appendChild(box);
   if (first) card.appendChild(btn('btn btn-primary btn-big-wide gr-next', '문제 풀기 →', () => { r.step = 'q'; r.k = 0; render(); toTop(); }));
+}
+
+/** 🎬 영상 문제 머리 — 어디서 따라 한 문장인지 · 다른 단원이면 그 단원 이름 · 🔊 그 장면 (지금 영상의 문장이고 들려줄 길이 있을 때만) */
+function videoTagEl(r, d) {
+  const box = el('div', 'gnote-video');
+  box.appendChild(el('p', 'gnote-video-from', d.tier === 'now' ? '🎬 방금 따라 한 문장' : `🎬 「${d.title}」에서 따라 한 문장`));
+  const u = unitById(d.v.unit);
+  if (u && u.id !== r.id) box.appendChild(el('p', 'gnote-video-unit', `📘 ${u.title}`));
+  if (d.cue && typeof r.onListen === 'function') box.appendChild(btn('btn gnote-listen', '🔊 그 장면 다시 듣기', () => { try { r.onListen(d.cue); } catch { /* 못 들려줘도 문제는 그대로 */ } }));
+  return box;
 }
 
 /** 문제 머리 — 할 일 · 우리말 뜻 · 빈칸 문장(또는 대화·물음) */
@@ -224,7 +257,7 @@ function pickEl(card, r, d, q) {
       if (s.done) return;
       s.tapped.push(k);
       if (o.ok) s.done = true;
-      else noteMiss(r, o.type);
+      else noteMiss(r, o.type, !!d.v);
       ding(!!o.ok);
       render();
     }));
@@ -234,7 +267,7 @@ function pickEl(card, r, d, q) {
   else if (why) card.appendChild(el('p', 'kor-fb is-no', `✗ ${why}`));
 }
 
-function typeEl(card, r, q) {
+function typeEl(card, r, d, q) {
   const s = qState(r);
   questionHead(card, q, s.done ? q.ans[0] : '');
   if (!s.done) {
@@ -260,7 +293,7 @@ function typeEl(card, r, q) {
       if (j.kind === 'empty') { input.focus(); return; }
       s.tries += 1;
       if (j.ok) s.done = true;
-      else noteMiss(r, j.type);
+      else noteMiss(r, j.type, !!d.v);
       s.fb = j;
       ding(j.ok);
       render();
@@ -333,7 +366,9 @@ async function finishNote() {
     }
   }
   let res;
-  try { res = await grammarFinish({ id: r.id, ok: !r.miss, from: r.from, qs: r.deal.map((d) => d.i), miss: r.missTypes }, S.units.map((u) => u.id), giftPool(), r.rolls); } catch { res = { ok: false, why: 'save' }; }
+  const vd = r.deal.find((d) => d.v);
+  const ans = { id: r.id, ok: !r.miss, from: r.from, qs: r.deal.filter((d) => !d.v).map((d) => d.i), miss: r.missTypes, ...(vd ? { video: { id: vd.v.id, w: r.vMiss } } : {}) };
+  try { res = await grammarFinish(ans, S.units.map((u) => u.id), giftPool(), r.rolls); } catch { res = { ok: false, why: 'save' }; }
   r.saving = false;
   r.result = res;
   r.giftName = res && res.gift ? monName(res.gift) : '';

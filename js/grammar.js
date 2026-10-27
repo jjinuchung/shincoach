@@ -13,6 +13,9 @@
 //   🎁 깜짝 포켓몬 — 쪽지를 끝낼 때 GIFT_CHANCE·하루 한 번까지 · 미리 말하지 않는다 · 아직 못 잡은 영어 포켓몬 하나를 도감에 바로(알 부화와 같은 caught +1)
 // 기록: 단원 칸 grammar { G#: { box, due, at, miss, d0 } }(korwords 꼴) · grammarDay(쪽지를 푼 날) · grammarKnown(v348 진단으로 건너뛴 단원) ·
 //   grammarSeen(단원마다 본 문제 12비트) · grammarMiss(오개념마다 틀린 수 — 늘어나기만) · grammarDiag(v348 진단을 끝낸 날) · grammarGift { n, day, id } — 아이 화면엔 셈 없음
+// ★ v350 🎬 영상 문장 문제(10-27 아버님 「이대로」 — 쪽지 안 자리 ①): 진우가 따라 한 영상 대사로 만든 문제가 있으면 고르기 하나를 그것으로 바꾼다
+//   (원고는 비공개 저장소 grammar/video.json — 받기·맞추기는 grammarvideo.js) · ⭐는 단원 문제로만 · ⚡💰 계단·오개념 수에는 들어간다 ·
+//   낸 기록 grammarVideo { V###: { d 낸 날, w 틀렸나 } } — 맞힌 문제는 VIDEO_REST.ok일, 틀린 문제는 VIDEO_REST.miss일 쉬었다가 다시
 import { dayNum } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf } from './korwords.js';
 
@@ -103,6 +106,30 @@ function orderProblems(q, where) {
   const words = q.tiles.filter((t) => !PUNCT.has(t));
   if (!words.length || !/^[A-Z]/.test(words[0])) bad.push(`${where}: 첫 낱말은 대문자로`);
   if (q.tiles.filter((t) => PUNCT.has(t)).length !== 1 || !PUNCT.has(q.tiles[q.tiles.length - 1])) bad.push(`${where}: 문장부호는 맨 끝에 하나`);
+  return bad;
+}
+
+const VIDEO_ID_RE = /^V\d{3,4}$/;
+const MATCH_ASK = '우리말에 맞는 문장을 고르세요.';
+/**
+ * 🎬 영상 문장 문제 하나의 틀린 곳 (v350 — 비공개 grammar/video.json 한 줄) — 단원 문제 꼴(고르기·쳐 넣기)에 더해
+ * id V### · unit G# · say(따라 한 대사 글 그대로) · from(태블릿 영상 이름) · 빈칸 문장이면 빈칸에 정답을 넣으면 say와 같아야 한다
+ */
+export function checkVideoQ(q, types) {
+  if (!isObj(q)) return ['줄이 객체가 아님'];
+  const where = str(q.id) ? q.id : '?';
+  const bad = [];
+  if (!VIDEO_ID_RE.test(where)) bad.push(`${where}: 번호는 V숫자`);
+  if (!str(q.unit) || !UNIT_RE.test(q.unit)) bad.push(`${where}: unit은 G숫자`);
+  if (!str(q.say) || !str(q.from)) bad.push(`${where}: say·from`);
+  if (q.kind === 'pick') bad.push(...pickProblems(q, where, types));
+  else if (q.kind === 'type') bad.push(...typeProblems(q, where, types));
+  else { bad.push(`${where}: kind는 pick·type`); return bad; }
+  if (bad.length) return bad;
+  const ans = q.kind === 'pick' ? q.opts.find((o) => o.ok === true).t : q.ans[0];
+  if (str(q.en) && q.en.replace('___', ans) !== q.say) bad.push(`${where}: 빈칸에 정답을 넣으면 say와 달라요`);
+  if (!str(q.en) && q.ask === MATCH_ASK && ans !== q.say) bad.push(`${where}: 「우리말에 맞는 문장」의 정답이 say와 달라요`);
+  if (q.talk !== undefined) bad.push(`${where}: 영상 문제에 talk는 안 써요`);
   return bad;
 }
 
@@ -236,6 +263,37 @@ export function mergeGift(a, b) {
   const w = y.n > x.n || (y.n === x.n && y.day > x.day) ? y : x;
   return { n: w.n, day: Math.max(x.day, y.day), id: w.id };
 }
+/** 🎬 낸 영상 문제가 쉬는 날 수 — 맞힌 문제 ok일 · 틀린 문제 miss일 뒤에 다시 (v350 계획 「같은 문장은 한동안 다시 안 나와요 — 틀린 문장은 며칠 뒤」) */
+export const VIDEO_REST = { ok: 14, miss: 2 };
+/** 낸 기록은 이만큼까지 (원고가 몇백 줄이어도 넉넉 — 부풀린 기록이 프로필을 키우지 않게) */
+const VIDEO_SEEN_MAX = 600;
+/** 🎬 낸 영상 문제 { V###: { d 낸 날, w 1 = 틀림 · 0 = 맞힘 } } */
+export function videoSeenOf(raw) {
+  const out = {};
+  if (!isObj(raw)) return out;
+  for (const k of Object.keys(raw).slice(0, VIDEO_SEEN_MAX)) {
+    const v = raw[k];
+    const d = cnt(isObj(v) ? v.d : 0);
+    if (VIDEO_ID_RE.test(k) && d) out[k] = { d, w: isObj(v) && v.w ? 1 : 0 };
+  }
+  return out;
+}
+/** 병합 — 문제마다 늦은 날 · 같은 날이면 틀림이 이긴다(틀린 문제가 일찍 돌아오게) */
+export function mergeVideoSeen(a, b) {
+  const x = videoSeenOf(a);
+  const y = videoSeenOf(b);
+  for (const k of Object.keys(y)) {
+    if (!x[k] || y[k].d > x[k].d) x[k] = y[k];
+    else if (y[k].d === x[k].d) x[k] = { d: x[k].d, w: x[k].w || y[k].w };
+  }
+  return x;
+}
+/** 이 영상 문제가 오늘 쉬는 중인가 (순수) — seen = videoSeenOf 꼴 */
+export function videoResting(seen, id, today) {
+  const s = isObj(seen) && isObj(seen[id]) ? seen[id] : null;
+  if (!s) return false;
+  return cnt(today) - cnt(s.d) < (s.w ? VIDEO_REST.miss : VIDEO_REST.ok);
+}
 
 // ───────────────────── 쪽지 고르기·내기 ─────────────────────
 
@@ -287,11 +345,12 @@ export function shuffleTiles(tiles, rng = Math.random) {
 }
 
 /**
- * 쪽지 한 장에 낼 문제 (순수) — 고르기 NOTE_SHAPE.pick개 + 꼬리 하나(쳐 넣기·순서 가운데 이 단원에서 안 본 것이 더 많은 쪽 — 같으면 rng) ·
- * 안 본 것(seen 비트가 꺼진 것) 먼저 → 네 장이면 12문제를 다 본다 · 차례는 고르기 → 꼬리 · 고르기는 보기 차례를, 순서는 카드 차례를 섞는다
+ * 쪽지 한 장에 낼 문제 (순수) — 고르기 picks개(보통 NOTE_SHAPE.pick · 🎬 영상 문제가 하나 끼면 하나 적게) + 꼬리 하나(쳐 넣기·순서 가운데
+ * 이 단원에서 안 본 것이 더 많은 쪽 — 같으면 rng) · 안 본 것(seen 비트가 꺼진 것) 먼저 → 네 장이면 12문제를 다 본다 · 차례는 고르기 → 꼬리 ·
+ * 고르기는 보기 차례를, 순서는 카드 차례를 섞는다
  * @returns {Array<{i:number, kind:string, opts?:number[], tiles?:number[]}>}
  */
-export function dealNote(unit, seenMask, rng = Math.random) {
+export function dealNote(unit, seenMask, rng = Math.random, picks = NOTE_SHAPE.pick) {
   const qs = Array.isArray(unit && unit.qs) ? unit.qs : [];
   let mask = cnt(seenMask) & FULL;
   if (mask === FULL) mask = 0;
@@ -303,12 +362,23 @@ export function dealNote(unit, seenMask, rng = Math.random) {
   let tail = ft > fo ? 'type' : fo > ft ? 'order' : (Number(rng()) || 0) < 0.5 ? 'type' : 'order';
   if (!ids(tail).length) tail = tail === 'type' ? 'order' : 'type';
   const out = [];
-  for (const i of ordered('pick').slice(0, NOTE_SHAPE.pick)) out.push({ i, kind: 'pick', opts: shuffle(qs[i].opts.map((_, k) => k), rng) });
+  const np = Math.max(0, Math.min(NOTE_SHAPE.pick, Math.floor(Number(picks)) || 0));
+  for (const i of ordered('pick').slice(0, np)) out.push({ i, kind: 'pick', opts: shuffle(qs[i].opts.map((_, k) => k), rng) });
   for (const i of ordered(tail).slice(0, NOTE_SHAPE.tail)) {
     if (tail === 'order') out.push({ i, kind: 'order', tiles: shuffleTiles(qs[i].tiles, rng) });
     else out.push({ i, kind: 'type' });
   }
   return out;
+}
+
+/**
+ * 🎬 영상 문제 한 칸 (순수) — 쪽지의 고르기 하나 자리(둘째)에 끼운다 · 고르기면 보기 차례를 섞는다 ·
+ * i = -1(단원 문제 번호가 아니다 — 본 문제 비트에 안 들어간다) · v = 원고 줄 · how = { tier 'now' 방금 · 'before' 전에, title 영상 이름, cue 🔊 }
+ */
+export function dealVideo(q, how = {}, rng = Math.random) {
+  const d = { i: -1, kind: q.kind, v: q, tier: how.tier === 'now' ? 'now' : 'before', title: String(how.title || ''), cue: how.cue || null };
+  if (q.kind === 'pick') d.opts = shuffle(q.opts.map((_, k) => k), rng);
+  return d;
 }
 
 /** 📝 지금 쪽지를 낼 차례인가 (순수) — done = 그날 끝낸 문장 수 · notes = 그날 끝낸 쪽지 수 */
@@ -379,8 +449,9 @@ function addMiss(profile, raw) {
  *   🎁 깜짝 포켓몬(오늘 아직 안 받았고 rng() < GIFT_CHANCE면 pool 가운데 한 번도 안 잡은 것 하나 — 없으면 안 준다)
  *   (⚡·💰 계단은 여기서 안 준다 — player.js가 하루 몫을 선점하고 🔤 단어 이어 주기와 같은 계단으로 · v348 「그날 첫 판 💰」은 v349에서 없앰)
  * @param {object} profile 저장된 프로필 (mutateProfile 안)
- * @param {{id:string, ok:boolean, from?:number, qs?:number[], miss?:object}} ans ok = 처음부터 한 번도 안 틀렸나 ·
- *   from = 쪽지를 열 때 그 단원의 at(새 단원이면 0) — 그 사이 다른 창이 그 단원을 옮겼으면 이 쪽지는 연습 · qs = 이 쪽지에 낸 문제 번호 · miss = 오개념마다 틀린 수
+ * @param {{id:string, ok:boolean, from?:number, qs?:number[], miss?:object, video?:{id:string, w:boolean}}} ans ok = 처음부터 한 번도 안 틀렸나(단원 문제만 — 🎬 영상 문제는 ⭐에 안 든다) ·
+ *   from = 쪽지를 열 때 그 단원의 at(새 단원이면 0) — 그 사이 다른 창이 그 단원을 옮겼으면 이 쪽지는 연습 · qs = 이 쪽지에 낸 단원 문제 번호 · miss = 오개념마다 틀린 수(영상 문제 것도) ·
+ *   video = 끼워 낸 🎬 영상 문제 { id, w 틀렸나 }
  * @param {number} now @param {string[]} ids 지금 있는 단원 id (모르는 단원은 안 받는다)
  * @param {{pool?:number[], rng?:() => number}} [opt] pool = 깜짝 포켓몬 후보(못 잡은 영어 포켓몬 — 부르는 쪽이 명단에서) · rng = 확률(시험용)
  */
@@ -405,6 +476,10 @@ export function grammarRule(profile, ans, now, ids, opt = {}) {
   seen[id] = seenAfter(seen[id], ans.qs); // 다 보면 0 — 0도 남긴다(병합 때 최근 쪽이 「처음부터」를 지키게)
   profile.grammarSeen = seen;
   addMiss(profile, ans.miss);
+  // 🎬 이 쪽지에 낸 영상 문제 — 낸 날·틀렸나 (v350 · 쉬는 날은 videoResting) · 번호 꼴이 아니면 안 적는다
+  const vd = isObj(ans.video) && typeof ans.video.id === 'string' && VIDEO_ID_RE.test(ans.video.id) ? ans.video : null;
+  // 병합 규칙 그대로 — 같은 날 다른 창이 먼저 틀림으로 적었으면 맞힘이 덮지 않는다 (🔍 Codex 154차: 2일 → 14일로 밀렸다)
+  if (vd) profile.grammarVideo = mergeVideoSeen(profile.grammarVideo, { [vd.id]: { d: today, w: vd.w ? 1 : 0 } });
   // ⭐ 💰 — 처음 ⭐ = 연습이 아닌 쪽지 · 같은 날 틀린 뒤 바로 다시 푼 ⭐는 안 준다(🖊️ 논술 v338 🎯와 같은 조건)
   const starCoins = solved && dayNum(cur.at) !== today ? STAR_COINS : 0;
   const days = wordDaysOf(profile.grammarDay, today);
@@ -520,6 +595,12 @@ export function grammarMd({ units, types, profile, today, now }) {
   const ks = Object.keys(miss).sort((a, b) => miss[b] - miss[a] || (a < b ? -1 : 1));
   for (const k of ks) lines.push(`- ${typeName(types, k)} (${k}): ${miss[k]}`);
   if (!ks.length) lines.push('(아직 없음)');
+  // 🎬 영상 문장 문제 (v350) — 번호만(대사는 비공개 원고에) · 마지막에 틀린 문제는 다음 원고를 고칠 때 본다
+  const vs = videoSeenOf(p.grammarVideo);
+  const vk = Object.keys(vs).sort();
+  const vw = vk.filter((k) => vs[k].w);
+  lines.push('', '## 🎬 영상 문장 문제');
+  lines.push(vk.length ? `- 낸 문제 ${vk.length} · 최근 7일 ${vk.filter((k) => vs[k].d > d - 7).length} · 마지막에 틀린 문제 ${vw.length}${vw.length ? ` (${vw.join(' ')})` : ''}` : '(아직 없음 — 📤 열쇠가 있고 비공개 grammar/video.json을 받은 기기에서만 나와요)');
   lines.push('', '## 최근 7일 쪽지를 푼 날');
   const dd = wordDaysOf(p.grammarDay, d);
   for (let k = 6; k >= 0; k--) lines.push(`- ${dateOf(d - k).slice(5)}: ${dd[d - k] ? '✅' : '—'}`);
