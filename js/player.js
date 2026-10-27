@@ -43,6 +43,8 @@ import { ROCKET, shouldRocket, rocketNew } from './rocket.js';
 import { playRocket } from './rocketplay.js';
 import { wordQuiz, wordQuestion } from './rocketquiz.js';
 import { isRocketOpen } from './rocketview.js';
+import { noteDue, NOTE as GRAMMAR_NOTE } from './grammar.js'; // 📝 문법 쪽지 — 언제 낼까 (v349)
+import { loadGrammar, prepareNote, openGrammarNote, closeGrammarNote } from './grammarnote.js'; // 📝 문법 쪽지 창 (v349)
 // ⏳ 남은 시간 · 홈에서 이어 간 영어 배틀도 영어 시간으로 (Codex 43차 #7) — 마지막 import 줄 끝에는 주석을 달지 않는다(player.logic 테스트가 import를 줄 끝 ';'로 걸러 낸다)
 import { status as rocketTimeStatus, setSubject as rocketTimeSubject, currentSubject as rocketTimeNow } from './timelimit.js';
 
@@ -115,6 +117,8 @@ const state = {
   matchPending: null,  // 🔤 다음 문장으로 넘어갈 때 열 단어 이어 주기 ({ items, consumed, mons })
   matchCooldown: 0,    // 🔤 한 판 뒤 이만큼 문장은 안 나옴 (연달아 뜨면 학습이 끊긴다)
   matchOpen: false,    // 🔤 단어 이어 주기가 열려 있음 (키보드 무시)
+  grammarPending: false, // 📝 다음 문장으로 넘어갈 때 열 문법 쪽지가 걸려 있는지 (v349 — 🔁·🔤와 같은 방식)
+  grammarOpen: false,  // 📝 문법 쪽지를 받는 중이거나 열려 있음 (키보드·이동 무시)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -1113,7 +1117,7 @@ function maybeReview() {
 function maybeReviewDuring() {
   if (state.reviewCooldown > 0) { state.reviewCooldown--; return; }
   if (state.reviewPending || state.reviewOpen) return;
-  if (state.battlePending || state.rocketPending || state.essayPending) return; // 한 번에 하나만 (🚀 로켓단도)
+  if (state.battlePending || state.rocketPending || state.essayPending || state.grammarPending) return; // 한 번에 하나만 (🚀 로켓단 · 📝 쪽지도)
   if (track.todayReviewSkips() >= REVIEW_MAX_SKIPS) return;
   if (Math.random() >= REVIEW_CHANCE) return;
   if (!reviewItems().length) return; // 복습할 문장이 없으면 조용히 (확률을 뽑은 뒤에 확인 — 매 문장 훑지 않게)
@@ -1141,7 +1145,7 @@ const MATCH_MAX_PER_DAY = 3;
  */
 function maybeMatch() {
   if (state.parentMode || state.matchPending || state.matchOpen) return;
-  if (state.battlePending || state.rocketPending || state.essayPending || state.reviewPending) return; // 한 번에 하나만 (🚀 로켓단도)
+  if (state.battlePending || state.rocketPending || state.essayPending || state.reviewPending || state.grammarPending) return; // 한 번에 하나만 (🚀 로켓단 · 📝 쪽지도)
   if (state.matchCooldown > 0) { state.matchCooldown--; return; }
   if (track.todayMatches() >= MATCH_MAX_PER_DAY) return;
   const myItem = state.item;
@@ -1149,7 +1153,7 @@ function maybeMatch() {
     // 읽는 사이에 콘텐츠가 닫혔거나 다른 이벤트가 걸렸으면 없던 일로
     if (!state.open || state.item !== myItem) return;
     if (state.matchPending || state.matchOpen) return;
-    if (state.battlePending || state.rocketPending || state.essayPending || state.reviewPending) return;
+    if (state.battlePending || state.rocketPending || state.essayPending || state.reviewPending || state.grammarPending) return;
     const round = pickMatchRound(state.vocabViews, { foreign: state.vocab && state.vocab.foreign });
     if (!round) return;
     round.mons = stageMons();
@@ -1235,6 +1239,63 @@ function grantMatchReward(wrong) {
 
 function setMatchOpen(on) {
   state.matchOpen = on;
+  const view = $('view-player');
+  if (view) view.inert = on;
+}
+
+// ───────────────────── 📝 문법 쪽지 (v349) ─────────────────────
+
+/**
+ * 📝 그날 끝낸 문장이 8개 → 첫 쪽지, 그 뒤 15문장마다 · 하루 3장 (grammar.noteDue) — 다음 문장으로 넘어갈 때 열린다.
+ * ★ 아버님 2026-10-27 "문법 문제를 만들자는 건 과목을 새롭게 만들자는 게 아니었다 — 기존 영어 과목 중간중간에" →
+ *   🔁 복습·🔤 단어 이어 주기와 같은 자리 · 한 번에 하나만. 다른 것이 걸려 있으면 비켜 준다 — 조건이 "몇 문장 이상"이라 다음 문장에서 다시 걸린다.
+ */
+function maybeGrammar(todayDone) {
+  if (state.parentMode || settings.grammarNote === false) return;
+  if (state.grammarPending || state.grammarOpen) return;
+  if (state.battlePending || state.rocketPending || state.essayPending || state.reviewPending || state.matchPending) return;
+  if (!noteDue(todayDone, track.todayGrammarNotes())) return;
+  state.grammarPending = true;
+  loadGrammar().catch(() => {}); // 원고를 미리 받아 둔다 (열 때도 못 받았으면 그냥 이어 간다)
+}
+
+/**
+ * 📝 쪽지 열기 — 원고를 받고 낼 쪽지를 고른다(못 받았거나 낼 단원이 없으면 바로 이어 감) · [계속하기 ▶]를 누르면 원래 하려던 이동을 이어감.
+ * 받는 사이에도 grammarOpen — 다른 이동·단축키가 끼지 않게 (🚀 로켓단을 준비할 때와 같다)
+ */
+function startGrammar(continueFn) {
+  state.grammarPending = false;
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  const spot = rememberSpot();
+  const myItem = state.item;
+  const go = () => { if (continueFn) continueFn(); else restoreSpot(spot); };
+  setGrammarOpen(true);
+  loadGrammar().then((ok) => {
+    if (!state.open || state.item !== myItem || !state.grammarOpen) return; // 그 사이 영상을 닫았다 (closeMedia가 정리했다)
+    const note = ok ? prepareNote() : null;
+    const opened = !!note && openGrammarNote(note, {
+      onReward: grantGrammarReward,
+      onDone: () => { setGrammarOpen(false); go(); },
+    });
+    if (!opened) { setGrammarOpen(false); go(); }
+  }).catch(() => { closeGrammarNote(); setGrammarOpen(false); go(); }); // 그리다 깨져도 반쯤 열린 창을 남기지 않는다 (🔍 Codex 153차 #3)
+}
+
+/**
+ * 📝 ⚡💰 — 🔤 단어 이어 주기와 같은 계단(틀림 0 / 1~2 / 3 이상) · 오늘 몫(3장)을 선점한 쪽지만 (두 창이 같이 끝내도 넘지 않는다) ·
+ * 받은 { xp, coin }을 돌려준다(쪽지 끝 화면에 한 줄) · 몫이 없으면 null
+ */
+async function grantGrammarReward(wrong) {
+  if (!await track.markGrammarNote(GRAMMAR_NOTE.max)) return null;
+  const xp = awardXp(matchXp(wrong)).gained;
+  const coin = awardCoins(matchCoins(wrong));
+  return { xp, coin };
+}
+
+function setGrammarOpen(on) {
+  state.grammarOpen = on;
   const view = $('view-player');
   if (view) view.inert = on;
 }
@@ -1620,6 +1681,7 @@ function markDone(cue) {
     maybeBattle(after); // ⚔️ 아주 가끔 트레이너가 걸어옴 (다음 문장으로 넘어갈 때 열림)
     maybeRocketEn(after); // 🚀 문장을 연달아 끝내면 로켓단이 탐을 낸다 (다음 문장으로 넘어갈 때 열림)
     maybeEssay();       // ✍️ 오늘 공부 시간을 채웠으면 에세이 (다음 문장으로 넘어갈 때 열림)
+    maybeGrammar(after); // 📝 그날 8문장 → 첫 쪽지, 그 뒤 15문장마다 · 하루 3장 (다음 문장으로 넘어갈 때 열림, v349)
     maybeReviewDuring(); // 🔁 복습도 학습 중에 (열 때 한 번만 묻던 것을 바꿈)
     maybeMatch();       // 🔤 새 단어가 20개 모였으면 단어 이어 주기 (맨 마지막 순서)
     // 🔥 오늘 5문장을 채우면 연속 학습일에 들어가고 보너스 (연속일수록 큼)
@@ -1789,6 +1851,8 @@ export async function openPlayer(id, opts = {}) {
   state.matchPending = null;
   state.matchOpen = false;
   state.matchCooldown = 0;
+  state.grammarPending = false; // 📝 걸어 둔 쪽지도 (다른 영상에서 열리지 않게 — 조건은 그날 문장 수라 곧 다시 걸린다)
+  state.grammarOpen = false;
   state.reviewPending = false;
   state.reviewCooldown = 0;
   state.essayPending = false;
@@ -1875,8 +1939,11 @@ function closeMedia() {
   abortReview();
   abortEssay();
   closeMatch();      // 🔤 단어 잇기 중에 콘텐츠를 닫으면 그냥 접는다 (보상 없음 — 끝낸 게 아니다)
+  closeGrammarNote(); // 📝 쪽지도 그냥 접는다 (저장·보상 없음 — 끝낸 게 아니다, v349)
   setReviewOpen(false);
   setMatchOpen(false);
+  setGrammarOpen(false);
+  state.grammarPending = false;
   state.matchPending = null;
   state.battlePending = null;
   state.rocketPending = false; // 🚀 닫는 중에 걸어 둔 로켓단은 없던 것으로 (열린 배틀은 저장돼 있어 다음에 이어 간다)
@@ -1976,6 +2043,8 @@ function goTo(i, { play = true, force = false } = {}) {
   }
   // 🚀 로켓단을 준비하거나 여는 중에는 넘어가지 않는다 — 끝나면 로켓단이 가려던 문장으로 데려간다(force) (Codex 43차 #4)
   if (!force && state.rocketOpen) return;
+  // 📝 문법 쪽지를 받거나 푸는 중에도 (v349 — [계속하기 ▶]가 가려던 문장으로 데려간다)
+  if (!force && state.grammarOpen) return;
   // 🚀 로켓단이 걸려 있으면 앞으로 넘어가기 전에 먼저 (배틀보다 먼저 — 따라 말하기 흐름은 이 goTo를 탄다)
   if (!force && i > state.idx && state.rocketPending) {
     startRocketEn(() => goTo(i, { play, force: true }));
@@ -1984,6 +2053,11 @@ function goTo(i, { play = true, force = false } = {}) {
   // ⚔️ 배틀이 걸려 있으면 앞으로 넘어가기 전에 먼저 (퍼즐보다 먼저, 퍼즐은 다음 전환에)
   if (!force && i > state.idx && state.battlePending) {
     startBattle(() => goTo(i, { play, force: true })); // 배틀 뒤에는 같은 전환에서 퍼즐을 또 내지 않음 (다음 전환에)
+    return;
+  }
+  // 📝 문법 쪽지가 걸려 있으면 (배틀 다음 · 퍼즐보다 먼저 — 끝나면 force로 이어 가 퍼즐·에세이·복습은 다음 전환에, v349)
+  if (!force && i > state.idx && state.grammarPending) {
+    startGrammar(() => goTo(i, { play, force: true }));
     return;
   }
   // 🧩 앞으로 넘어갈 때 N문장이 차 있으면 먼저 퍼즐 → 끝나면 이 이동을 이어감 (퍼즐이 열리면서 모아둔 문장은 비워짐)
@@ -2243,6 +2317,7 @@ function onCueEnd() {
     video.pause();
     if (state.rocketPending) startRocketEn(() => {}); // 🚀 로켓단이 먼저 (함께 걸린 것은 다음 기회에)
     else if (state.battlePending) startBattle(() => {});
+    else if (state.grammarPending) startGrammar(null); // 📝 끝났으니 제자리로 돌아오면 된다 (v349)
     else if (puzzleReady()) startPuzzle(() => {});
     else if (state.essayPending) { state.essayPending = false; startEssay(false, null); }
     else if (state.reviewPending) {
@@ -2265,6 +2340,13 @@ function onCueEnd() {
   if (state.battlePending) {
     const nextIdx = state.idx + 1;
     startBattle(() => goTo(nextIdx, { force: true }));
+    return;
+  }
+
+  // 📝 문법 쪽지가 걸려 있으면 다음 문장으로 가기 전에 (배틀 다음 · 퍼즐보다 먼저 — goTo와 같은 순서, v349)
+  if (state.grammarPending) {
+    const nextIdx = state.idx + 1;
+    startGrammar(() => goTo(nextIdx, { force: true }));
     return;
   }
 
@@ -2391,6 +2473,7 @@ function afterShadowWait() {
   if (state.idx >= state.cues.length - 1) { // 마지막 문장: 배틀이 걸려 있으면 배틀, 아니면 퍼즐 (Codex #4)
     if (state.rocketPending) startRocketEn(() => {}); // 🚀 로켓단이 먼저 — onCueEnd 마지막 문장과 같게 (따라 말하기 길에 빠져 있었다, Codex 43차 #5)
     else if (state.battlePending) startBattle(() => {});
+    else if (state.grammarPending) startGrammar(null); // 📝 onCueEnd 마지막 문장과 같게 (v349)
     else if (puzzleReady()) startPuzzle(() => {});
     else if (state.reviewPending) {
       state.reviewPending = false;
@@ -3151,7 +3234,7 @@ function updateChips() {
 
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
-  if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen || state.essayOpen || state.matchOpen) return; // 퍼즐·잡기·배틀·복습·에세이·단어 잇기 화면 중에는 플레이어 단축키 무시
+  if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen || state.essayOpen || state.matchOpen || state.grammarOpen) return; // 퍼즐·잡기·배틀·복습·에세이·단어 잇기·📝 쪽지 화면 중에는 플레이어 단축키 무시
   // 버튼·요약·링크에 포커스가 있으면 그 요소의 기본 동작(Space/Enter로 누르기)을 살린다 (Codex #5)
   const tag = e.target && e.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SUMMARY' || tag === 'A') return;
@@ -3199,7 +3282,7 @@ function releaseWakeLock() {
 // ───────────────────── 설정 ─────────────────────
 
 function loadSettings() {
-  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'missed',
+  const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, grammarNote: true, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'missed',
     // ⏳ 하루 과목별 시간 제한 (2026-09-27, 아버님) — 켜짐이 기본. 지워도 이 값으로 돌아올 뿐 시간이 늘지 않는다
     timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend, timeKorean: KOREAN_MIN.weekday,
     // ⏳ 시간 연장권 — 과목마다 하루 최대 (2026-10-01, 아버님 "이대로 진행"). 0이면 아이가 못 쓴다
@@ -3296,6 +3379,7 @@ function initSettingsDialog() {
   $('set-listen-first').value = String(settings.listenFirst);
   $('set-goal').value = String(settings.dailyGoal);
   $('set-puzzle').value = String(settings.puzzleEvery);
+  $('set-grammar').checked = settings.grammarNote !== false;
   $('set-review').value = String(settings.reviewCount);
   $('set-essay').value = String(Number(settings.essayMinutes));
   $('set-reread').value = String(settings.rereadMode);
@@ -3353,6 +3437,8 @@ function initSettingsDialog() {
     settings.dailyGoal = Number($('set-goal').value);
     updateGoalChip();
     settings.puzzleEvery = Number($('set-puzzle').value);
+    settings.grammarNote = $('set-grammar').checked; // 📝 문법 쪽지 (v349)
+    if (!settings.grammarNote) state.grammarPending = false;
     settings.reviewCount = Number($('set-review').value);
     settings.essayMinutes = Number($('set-essay').value);
     settings.rereadMode = $('set-reread').value;

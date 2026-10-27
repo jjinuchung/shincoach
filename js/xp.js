@@ -33,7 +33,7 @@ import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·�
 import { matchedOf, korMatchRule } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329, 순수)
 import { dripOf, dripStartRule } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (v320, 순수)
 import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule } from './nonsul.js'; // 🖊️ 논술 칸·보상·잡기 기회 (v303 — 퍼즐과 같은 꼴, 잡기 기회는 따로)
-import { grammarRule, diagRule, knownOf, seenOf, gMissOf, diagOf, giftOf, rngFrom } from './grammar.js'; // 📝 영어 문법 칸·💰·진단·🎁 깜짝 포켓몬 (v348 — 순수)
+import { grammarRule, knownOf, seenOf, gMissOf, diagOf, giftOf, rngFrom } from './grammar.js'; // 📝 영어 문법 칸·💰·🎁 깜짝 포켓몬 (v348 — 순수 · v349 영상 사이 쪽지 — 진단 칸은 옛 기록 병합에만)
 import { writeAddRule, writeReplyRule, writeReadRule, writesOf } from './korwrite.js'; // ✍️ 국어 서술형 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
@@ -993,36 +993,24 @@ export function nonsulDayMap() {
   return wordDaysOf(profile.nonsulDay);
 }
 /**
- * 📝 문법 한 판을 끝냈다 — 그 단원 칸·본 문제·오개념 수 + 그날 처음이면 💰 · 처음 ⭐면 💰 더 · 🎁 깜짝 포켓몬 (한 트랜잭션, v348)
+ * 📝 문법 쪽지 한 장을 끝냈다 — 그 단원 칸·본 문제·오개념 수 · 처음 ⭐면 💰 · 🎁 깜짝 포켓몬 (한 트랜잭션, v348 → v349 ⚡💰 계단은 player.js)
  * ans = { id, ok, from, qs, miss } · ids = 지금 있는 단원 id · pool = 깜짝 포켓몬 후보(영어 명단 — 못 잡은 것은 규칙이 고른다) ·
- * rolls = 판을 시작할 때 뽑아 둔 수(다시 저장해도 같은 추첨 — 🔍 Codex 152차 #2 · 난수는 규칙이 불릴 때마다 새로 만든다)
+ * rolls = 쪽지를 열 때 뽑아 둔 수(다시 저장해도 같은 추첨 — 🔍 Codex 152차 #2 · 난수는 규칙이 불릴 때마다 새로 만든다)
  */
 export function grammarFinish(ans, ids, pool, rolls) {
   return houseDo((p) => grammarRule(p, ans, Date.now(), ids, { pool, rng: rngFrom(rolls) }));
-}
-/** 📝 「🔍 어디까지 알까?」를 끝냈다 — 맞힌 단원 ✅ · 진단 날 · 오개념 수 (보상 없음) · ans = { ok: [단원 id], miss } */
-export function grammarDiagFinish(ans, ids) {
-  return houseDo((p) => diagRule(p, ans, Date.now(), ids));
 }
 /** 📝 문법 칸 (그리기용 복사본) */
 export function grammarMap() {
   return wordsOf(profile.grammar);
 }
-/** 📝 문법 보상 받은 날 (그리기용 복사본) */
-export function grammarDayMap() {
-  return wordDaysOf(profile.grammarDay);
-}
-/** 📝 진단으로 건너뛴 단원 (그리기용 복사본) */
+/** 📝 v348 진단으로 건너뛴 단원 (그리기용 복사본 — 쪽지 단원 고르기가 건너뛴다) */
 export function grammarKnownMap() {
   return knownOf(profile.grammarKnown);
 }
 /** 📝 단원마다 본 문제 (그리기용 복사본) */
 export function grammarSeenMap() {
   return seenOf(profile.grammarSeen);
-}
-/** 📝 「🔍 어디까지 알까?」를 끝낸 날 (0 = 아직) */
-export function grammarDiagDay() {
-  return diagOf(profile.grammarDiag);
 }
 /** ✍️ 서술형 글 보내기 — 한 트랜잭션에서 "답장 기다리는 글 하나"를 저장된 프로필로 다시 보고, 이름표(at)를 정하고, 첫 글이면 💰5 (두 창이 같이 눌러도 하나) · cards = 지금 있는 카드 */
 export function korWriteAdd(cardId, text, cards) {

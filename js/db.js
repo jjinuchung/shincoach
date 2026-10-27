@@ -423,6 +423,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'uStock',
   // 🎒 포켓몬 대여행 창에 머문 초 (2026-10-26 v341 — 🕒 사용 기록)
   'uJourney',
+  // 📝 오늘 끝낸 문법 쪽지 수 (2026-10-27 v349 — 영상 따라 하기 사이 · 하루 3장 · claimDailyCount로 선점, 병합 maxOf라 옛 백업으로 되살리지 못한다)
+  'grammarNotes',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
   // 🎵 게임기 음악 (2026-10-25 v337, gamebgm.js) — 소리가 난 초 · 게임기 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)

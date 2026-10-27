@@ -447,3 +447,37 @@ test('🔍 Codex 65차 #4 — 연속 보너스 칸 선점이 저장소에서 실
   assert.equal(await run('claimSpeakCombo(6)'), false);
   assert.equal(run('todaySpeakCombos()'), 0, '메모리에도 안 늘림');
 });
+
+// ── 📝 문법 쪽지 하루 몫 (v349 · 🔍 Codex 153차) ──
+test('📝 문법 쪽지 하루 몫 — markGrammarNote(max)는 선점, 상한이면 false · 저장소에서 실패하면 false(메모리로 성공 처리하지 않음 — 두 창이 마지막 몫을 둘 다 받지 않게)', async () => {
+  const s = stub();
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  for (let i = 0; i < 3; i++) assert.equal(await run('markGrammarNote(3)'), true);
+  assert.equal(await run('markGrammarNote(3)'), false, '하루 3장');
+  assert.equal(run('todayGrammarNotes()'), 3);
+  assert.equal(s.store.days.get(run('todayKey()')).grammarNotes, 3, '저장소에 선점');
+  const f = stub();
+  f.claimDailyCount = async () => { throw new Error('저장 실패 (테스트가 일부러)'); }; // loadTrack 전에
+  const { run: run2 } = loadTrack(f);
+  await run2('open({ id: "x", title: "X" })');
+  assert.equal(await run2('markGrammarNote(3)'), false, '🔍 Codex 153차 #1 — 저장이 안 되면 ⚡💰를 안 준다');
+  assert.equal(run2('todayGrammarNotes()'), 0, '메모리에도 안 늘림');
+});
+
+test('📝 쪽지를 연 채 자정을 넘겨 끝내면 오늘(새 날) 몫으로 센다 (🔍 Codex 153차 #2)', async () => {
+  const clock = { t: new Date(2026, 9, 27, 23, 59).getTime() };
+  class FakeDate extends Date {
+    constructor(...a) { if (a.length) super(...a); else super(clock.t); }
+    static now() { return clock.t; }
+  }
+  const s = { ...stub(), Date: FakeDate };
+  const { run } = loadTrack(s);
+  await run('open({ id: "x", title: "X" })');
+  assert.equal(run('todayKey()'), '2026-10-27');
+  clock.t = new Date(2026, 9, 28, 0, 1).getTime();
+  assert.equal(await run('markGrammarNote(3)'), true);
+  assert.equal((s.store.days.get('2026-10-28') || {}).grammarNotes, 1, '새 날에');
+  assert.ok(!(s.store.days.get('2026-10-27') || {}).grammarNotes, '어제 몫에 들어가지 않는다');
+  assert.equal(run('todayGrammarNotes()'), 1);
+});

@@ -1,29 +1,33 @@
 // 📝 영어 문법 (v348, 2026-10-27 — 아버님 "한국 초·중 교과를 따라가려면 문법도" → 기본안 "이대로") — 규칙만 (화면 없음 · check.mjs·시험이 같이 쓴다)
-// 원고 coach/english/grammar.json = { v, types: { 오개념: { name, what } }, units: [16단원], diag: [「🔍 어디까지 알까?」 8문제] }
+// ★ v349(10-27 아버님 "과목을 새롭게 만들자는 게 아니었다 — 기존 영어 과목 중간중간에") — 과목 카드·문법 화면·🔍 진단을 걷고
+//   🎬 영상 따라 하기 문장 사이에 「📝 문법 쪽지」로 나온다(화면은 grammarnote.js · 거는 자리는 player.js) — 기본안 "모두 추천대로"
+// 원고 coach/english/grammar.json = { v, types: { 오개념: { name, what } }, units: [16단원], diag: [v348 진단 8문제 — 화면에선 안 씀] }
 //   단원 = 📘 개념 한 장(short · say 세 줄 · term 중학교 용어 다리 · ex 예문 셋) + 문제 12(고르기 8 · 쳐 넣기 2 · 순서 맞추기 2)
 //   원고는 .context/grammar/review8.mjs·units16.mjs에서 만든다(검수 "이대로" — json을 손으로 고치지 않는다)
-// 한 판 = 개념 한 장 → 문제 6(고르기 4 · 쳐 넣기 1 · 순서 1) — 단원의 12문제 가운데 안 본 것부터(두 판이면 다 본다) ·
-//   틀려도 하트·감점 없음, 틀린 보기는 ✗와 왜 한 줄을 보고 다시 · 판을 끝낼 때 한 번 저장(그만두면 안 남는다 — 🖊️ 논술과 같다)
-// 보상은 💰만 (10-27 아버님 "문법 학습에서 포켓몬을 왜 줘야 하지? … 코인 같은 보상만으로 충분" — 포켓몬은 📮 편지에서 아주 가끔):
-//   그날 처음 끝낸 판 💰 · 단원을 처음 ⭐(한 번도 안 틀림)로 끝내면 💰 더(단원마다 한 번) · 🎯 잡기 없음 · 문법 전용 포켓몬 명단 없음
-//   🎁 깜짝 포켓몬 — 판을 끝낼 때 GIFT_CHANCE·하루 한 번까지 · 미리 말하지 않는다(오늘 줄·홈에 없음) · 아직 못 잡은 영어 포켓몬 하나를 도감에 바로(알 부화와 같은 caught +1)
-// 기록: 단원 칸 grammar { G#: { box, due, at, miss, d0 } }(korwords 꼴) · grammarDay · grammarKnown(진단으로 건너뛴 단원) ·
-//   grammarSeen(단원마다 본 문제 12비트) · grammarMiss(오개념마다 틀린 수 — 늘어나기만) · grammarDiag(진단을 끝낸 날) · grammarGift { n, day, id } — 아이 화면엔 셈 없음
+// 쪽지 한 장 = (새 단원·다시 볼 단원이면 개념 한 장) → 문제 3(고르기 2 · 쳐 넣기나 순서 하나) — 단원의 12문제 가운데 안 본 것부터(네 장이면 다 본다) ·
+//   틀려도 하트·감점 없음, 틀린 보기는 ✗와 왜 한 줄을 보고 다시 · 쪽지를 끝낼 때 한 번 저장(영상을 닫으면 안 남는다)
+//   언제: 그날 끝낸 문장이 NOTE.first개 → 첫 쪽지, 그 뒤 NOTE.every문장마다 · 하루 NOTE.max장까지 (noteDue)
+// 보상 (10-27 아버님 "문법은 코인 같은 보상만으로 충분" → v349 "다른 영어 문제처럼"):
+//   ⚡·💰는 🔤 단어 이어 주기와 같은 계단(player.js가 matchXp·matchCoins로 — 하루 몫을 선점한 쪽지만) ·
+//   단원을 처음 ⭐(한 번도 안 틀림)로 끝내면 💰 더(단원마다 한 번 — 여기 grammarRule) · 🎯 잡기 없음 · 문법 전용 포켓몬 명단 없음
+//   🎁 깜짝 포켓몬 — 쪽지를 끝낼 때 GIFT_CHANCE·하루 한 번까지 · 미리 말하지 않는다 · 아직 못 잡은 영어 포켓몬 하나를 도감에 바로(알 부화와 같은 caught +1)
+// 기록: 단원 칸 grammar { G#: { box, due, at, miss, d0 } }(korwords 꼴) · grammarDay(쪽지를 푼 날) · grammarKnown(v348 진단으로 건너뛴 단원) ·
+//   grammarSeen(단원마다 본 문제 12비트) · grammarMiss(오개념마다 틀린 수 — 늘어나기만) · grammarDiag(v348 진단을 끝낸 날) · grammarGift { n, day, id } — 아이 화면엔 셈 없음
 import { dayNum } from './korean.js';
-import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
+import { stateOf, wordsOf, wordDaysOf } from './korwords.js';
 
-/** 그날 처음 끝낸 판의 💰 */
-export const GRAMMAR_COINS = 10;
 /** 단원을 처음 ⭐로 끝냈을 때 더 주는 💰 (단원마다 한 번 — 아버님 10-27 "처음 ⭐에 💰10 더") */
 export const STAR_COINS = 10;
-/** 🎁 깜짝 포켓몬 확률 (판을 끝낼 때마다 · 하루 한 번까지 — 아버님 10-27 "거의 1%") */
+/** 🎁 깜짝 포켓몬 확률 (쪽지를 끝낼 때마다 · 하루 한 번까지 — 아버님 10-27 "거의 1%") */
 export const GIFT_CHANCE = 0.01;
-/** ⭐ — 판을 처음부터 한 번도 안 틀리고 끝낸 단원 (그 뒤엔 연습으로만) */
+/** ⭐ — 쪽지를 처음부터 한 번도 안 틀리고 끝낸 단원 (그 뒤엔 연습으로만) */
 export const SOLVED = 1;
-/** 단원 문제 꼴 · 한 판에 내는 수 */
+/** 단원 문제 꼴 · 쪽지 한 장 = 고르기 2 + 꼬리 하나(쳐 넣기나 순서 — 그 단원에서 덜 본 쪽) */
 export const UNIT_SHAPE = { pick: 8, type: 2, order: 2 };
-export const ROUND_SHAPE = { pick: 4, type: 1, order: 1 };
+export const NOTE_SHAPE = { pick: 2, tail: 1 };
 export const UNIT_QS = 12;
+/** 📝 쪽지가 나오는 때 (v349 기본안 "추천대로") — 그날 끝낸 문장 first개에 첫 장 · 그 뒤 every문장마다 · 하루 max장 */
+export const NOTE = { first: 8, every: 15, max: 3 };
 const FULL = (1 << UNIT_QS) - 1;
 export const KINDS = ['pick', 'type', 'order'];
 /** 쳐 넣기에서 따옴표만 빠졌을 때 (오개념 apos) */
@@ -162,14 +166,6 @@ export function allUnits(json) {
   const seen = new Set();
   return list.filter((u) => !unitProblems(u, types).length && !seen.has(u.id) && !!seen.add(u.id));
 }
-/** 쓸 수 있는 진단 문제만 (단원이 있는 것) */
-export function allDiag(json, units) {
-  const types = typesOf(json);
-  const ids = new Set((Array.isArray(units) ? units : []).filter((u) => u.band === 'review').map((u) => u.id));
-  const list = isObj(json) && Array.isArray(json.diag) ? json.diag : [];
-  const seen = new Set();
-  return list.filter((q) => isObj(q) && q.kind === 'pick' && ids.has(q.unit) && !pickProblems(q, '', types).length && !seen.has(q.unit) && !!seen.add(q.unit));
-}
 /** 오개념 이름표 (없는 열쇠면 열쇠 그대로) */
 export function typeName(types, k) {
   return isObj(types) && isObj(types[k]) && str(types[k].name) ? types[k].name : String(k);
@@ -177,7 +173,7 @@ export function typeName(types, k) {
 
 // ───────────────────── 기록 고쳐 읽기·병합 (db·xp가 같이 쓴다) ─────────────────────
 
-/** 진단으로 건너뛴 단원 { G#: 날 } */
+/** v348 진단으로 건너뛴 단원 { G#: 날 } — v349에서 진단은 걷었지만 옛 기록은 병합·단원 고르기에 남긴다 */
 export function knownOf(raw) {
   const out = {};
   if (!isObj(raw)) return out;
@@ -225,7 +221,7 @@ export function mergeGMiss(a, b) {
   for (const k of Object.keys(y)) x[k] = Math.max(x[k] || 0, y[k]);
   return x;
 }
-/** 진단을 끝낸 날 (0 = 아직) · 병합은 이른 날 */
+/** v348 진단을 끝낸 날 (0 = 안 함) · 병합은 이른 날 */
 export const diagOf = (v) => cnt(v);
 export const mergeDiag = (a, b) => { const x = cnt(a); const y = cnt(b); return x && y ? Math.min(x, y) : x || y; };
 /** 🎁 깜짝 포켓몬 기록 { n 받은 수, day 마지막 날, id 마지막 포켓몬 } */
@@ -241,7 +237,7 @@ export function mergeGift(a, b) {
   return { n: w.n, day: Math.max(x.day, y.day), id: w.id };
 }
 
-// ───────────────────── 판 고르기·내기 ─────────────────────
+// ───────────────────── 쪽지 고르기·내기 ─────────────────────
 
 /** ⭐ 단원인가 */
 export function isSolved(st) {
@@ -291,29 +287,37 @@ export function shuffleTiles(tiles, rng = Math.random) {
 }
 
 /**
- * 한 판에 낼 문제 (순수) — 단원의 12문제 가운데 kind마다 ROUND_SHAPE만큼, 안 본 것(seen 비트가 꺼진 것) 먼저 ·
- * 차례는 고르기 → 쳐 넣기 → 순서 · 고르기는 보기 차례를, 순서는 카드 차례를 섞는다
+ * 쪽지 한 장에 낼 문제 (순수) — 고르기 NOTE_SHAPE.pick개 + 꼬리 하나(쳐 넣기·순서 가운데 이 단원에서 안 본 것이 더 많은 쪽 — 같으면 rng) ·
+ * 안 본 것(seen 비트가 꺼진 것) 먼저 → 네 장이면 12문제를 다 본다 · 차례는 고르기 → 꼬리 · 고르기는 보기 차례를, 순서는 카드 차례를 섞는다
  * @returns {Array<{i:number, kind:string, opts?:number[], tiles?:number[]}>}
  */
-export function dealRound(unit, seenMask, rng = Math.random) {
+export function dealNote(unit, seenMask, rng = Math.random) {
   const qs = Array.isArray(unit && unit.qs) ? unit.qs : [];
   let mask = cnt(seenMask) & FULL;
   if (mask === FULL) mask = 0;
+  const ids = (kind) => qs.map((q, i) => (q && q.kind === kind ? i : -1)).filter((i) => i >= 0);
+  const fresh = (kind) => ids(kind).filter((i) => !(mask & (1 << i)));
+  const ordered = (kind) => [...shuffle(fresh(kind), rng), ...shuffle(ids(kind).filter((i) => mask & (1 << i)), rng)];
+  const ft = fresh('type').length;
+  const fo = fresh('order').length;
+  let tail = ft > fo ? 'type' : fo > ft ? 'order' : (Number(rng()) || 0) < 0.5 ? 'type' : 'order';
+  if (!ids(tail).length) tail = tail === 'type' ? 'order' : 'type';
   const out = [];
-  for (const kind of KINDS) {
-    const ids = qs.map((q, i) => (q && q.kind === kind ? i : -1)).filter((i) => i >= 0);
-    const fresh = shuffle(ids.filter((i) => !(mask & (1 << i))), rng);
-    const old = shuffle(ids.filter((i) => mask & (1 << i)), rng);
-    for (const i of [...fresh, ...old].slice(0, ROUND_SHAPE[kind])) {
-      const q = qs[i];
-      if (kind === 'pick') out.push({ i, kind, opts: shuffle(q.opts.map((_, k) => k), rng) });
-      else if (kind === 'order') out.push({ i, kind, tiles: shuffleTiles(q.tiles, rng) });
-      else out.push({ i, kind });
-    }
+  for (const i of ordered('pick').slice(0, NOTE_SHAPE.pick)) out.push({ i, kind: 'pick', opts: shuffle(qs[i].opts.map((_, k) => k), rng) });
+  for (const i of ordered(tail).slice(0, NOTE_SHAPE.tail)) {
+    if (tail === 'order') out.push({ i, kind: 'order', tiles: shuffleTiles(qs[i].tiles, rng) });
+    else out.push({ i, kind: 'type' });
   }
   return out;
 }
-/** 이 판에서 낸 문제를 본 것으로 (다 보면 0 — 다음 판은 처음부터) */
+
+/** 📝 지금 쪽지를 낼 차례인가 (순수) — done = 그날 끝낸 문장 수 · notes = 그날 끝낸 쪽지 수 */
+export function noteDue(done, notes) {
+  const d = cnt(done);
+  const n = cnt(notes);
+  return n < NOTE.max && d >= NOTE.first + NOTE.every * n;
+}
+/** 이 쪽지에서 낸 문제를 본 것으로 (다 보면 0 — 다음 쪽지는 처음부터) */
 export function seenAfter(mask, idx) {
   let m = cnt(mask) & FULL;
   if (m === FULL) m = 0;
@@ -351,9 +355,9 @@ export function judgeOrder(q, placed) {
   return { ok: false, at };
 }
 
-// ───────────────────── 판 끝·진단·잡기 ─────────────────────
+// ───────────────────── 쪽지 끝·🎁 ─────────────────────
 
-/** 한 판에서 오개념마다 틀린 수 다듬기 — 아는 꼴의 열쇠만 · 한 판에 열쇠마다 ROUND_MISS_MAX까지 (부풀린 기록이 📤를 흐리지 않게) */
+/** 쪽지 한 장에서 오개념마다 틀린 수 다듬기 — 아는 꼴의 열쇠만 · 한 장에 열쇠마다 ROUND_MISS_MAX까지 (부풀린 기록이 📤를 흐리지 않게) */
 export const ROUND_MISS_MAX = 12;
 function roundMiss(raw) {
   const out = {};
@@ -370,12 +374,13 @@ function addMiss(profile, raw) {
 }
 
 /**
- * 문법 한 판을 끝냈다 — 한 트랜잭션에서: 그 단원 칸 · 본 문제 · 오개념 수 · 그날 처음 끝낸 판이면 💰 ·
- *   단원을 처음 ⭐로 끝냈으면 💰 더(starCoins — 그 단원을 오늘 앞서 푼 적이 없을 때만 · ⭐는 한 번뿐이라 단원마다 한 번) ·
+ * 📝 쪽지 한 장을 끝냈다 — 한 트랜잭션에서: 그 단원 칸 · 본 문제 · 오개념 수 · 쪽지를 푼 날 ·
+ *   단원을 처음 ⭐로 끝냈으면 💰(starCoins — 그 단원을 오늘 앞서 푼 적이 없을 때만 · ⭐는 한 번뿐이라 단원마다 한 번) ·
  *   🎁 깜짝 포켓몬(오늘 아직 안 받았고 rng() < GIFT_CHANCE면 pool 가운데 한 번도 안 잡은 것 하나 — 없으면 안 준다)
+ *   (⚡·💰 계단은 여기서 안 준다 — player.js가 하루 몫을 선점하고 🔤 단어 이어 주기와 같은 계단으로 · v348 「그날 첫 판 💰」은 v349에서 없앰)
  * @param {object} profile 저장된 프로필 (mutateProfile 안)
  * @param {{id:string, ok:boolean, from?:number, qs?:number[], miss?:object}} ans ok = 처음부터 한 번도 안 틀렸나 ·
- *   from = 판을 시작할 때 그 단원의 at(새 단원이면 0) — 그 사이 다른 창이 그 단원을 옮겼으면 이 판은 연습 · qs = 이 판에 낸 문제 번호 · miss = 오개념마다 틀린 수
+ *   from = 쪽지를 열 때 그 단원의 at(새 단원이면 0) — 그 사이 다른 창이 그 단원을 옮겼으면 이 쪽지는 연습 · qs = 이 쪽지에 낸 문제 번호 · miss = 오개념마다 틀린 수
  * @param {number} now @param {string[]} ids 지금 있는 단원 id (모르는 단원은 안 받는다)
  * @param {{pool?:number[], rng?:() => number}} [opt] pool = 깜짝 포켓몬 후보(못 잡은 영어 포켓몬 — 부르는 쪽이 명단에서) · rng = 확률(시험용)
  */
@@ -400,19 +405,17 @@ export function grammarRule(profile, ans, now, ids, opt = {}) {
   seen[id] = seenAfter(seen[id], ans.qs); // 다 보면 0 — 0도 남긴다(병합 때 최근 쪽이 「처음부터」를 지키게)
   profile.grammarSeen = seen;
   addMiss(profile, ans.miss);
-  // ⭐ 💰 — 처음 ⭐ = 연습이 아닌 판 · 같은 날 틀린 뒤 바로 다시 푼 ⭐는 안 준다(🖊️ 논술 v338 🎯와 같은 조건)
+  // ⭐ 💰 — 처음 ⭐ = 연습이 아닌 쪽지 · 같은 날 틀린 뒤 바로 다시 푼 ⭐는 안 준다(🖊️ 논술 v338 🎯와 같은 조건)
   const starCoins = solved && dayNum(cur.at) !== today ? STAR_COINS : 0;
-  const first = !wordsToday(profile.grammarDay, now);
   const days = wordDaysOf(profile.grammarDay, today);
-  if (first) days[today] = 1;
-  const coins = (first ? GRAMMAR_COINS : 0) + starCoins;
-  if (coins) {
-    profile.coins = (Number(profile.coins) || 0) + coins;
-    profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
+  days[today] = 1; // 쪽지를 푼 날 (📤 최근 7일 줄)
+  if (starCoins) {
+    profile.coins = (Number(profile.coins) || 0) + starCoins;
+    profile.coinsEarned = (Number(profile.coinsEarned) || 0) + starCoins;
   }
   profile.grammarDay = wordDaysOf(days, today);
   const gift = giftRoll(profile, today, opt);
-  return { ok: true, first, coins, starCoins, solved, practice, gift };
+  return { ok: true, coins: starCoins, starCoins, solved, practice, gift };
 }
 
 /**
@@ -425,7 +428,7 @@ export function giftPoolOf(roster, subjectOf, legendary, unlocked) {
 }
 
 /**
- * 🎁 판마다 한 번 뽑아 둔 수로 만든 난수 (순수) — 저장이 실패해 [다시 저장하기]를 눌러도 같은 판은 같은 추첨 (🔍 Codex 152차 #2) ·
+ * 🎁 쪽지마다 한 번 뽑아 둔 수로 만든 난수 (순수) — 저장이 실패해 [다시 저장하기]를 눌러도 같은 쪽지는 같은 추첨 (🔍 Codex 152차 #2) ·
  * 트랜잭션 규칙이 불릴 때마다 새로 만든다(규칙이 다시 불려도 같은 차례) · rolls가 없거나 깨졌으면 Math.random
  */
 export function rngFrom(rolls) {
@@ -450,38 +453,19 @@ function giftRoll(profile, today, opt) {
   return id;
 }
 
-/**
- * 「🔍 어디까지 알까?」를 끝냈다 — 맞힌 단원(처음 고른 답이 맞은 것)을 ✅로 · 진단을 끝낸 날 · 오개념 수 (보상 없음)
- * @param {{ok:string[], miss?:object}} ans ok = 맞힌 단원 id · @param {string[]} ids 진단 문제가 있는 단원 id
- */
-export function diagRule(profile, ans, now, ids) {
-  const allow = new Set(Array.isArray(ids) ? ids : []);
-  if (!allow.size) return { ok: false, why: 'empty' };
-  const today = dayNum(now);
-  const kn = knownOf(profile.grammarKnown);
-  const got = [...new Set((ans && Array.isArray(ans.ok) ? ans.ok : []).filter((x) => allow.has(x)))];
-  for (const k of got) if (!kn[k]) kn[k] = today;
-  profile.grammarKnown = kn;
-  // 「처음 한 번」 — 이미 끝낸 기록이 있으면(다른 창에서 같이 열어 끝냄) ✅만 합치고 틀린 수는 다시 더하지 않는다 (🔍 Codex 152차 F)
-  const again = diagOf(profile.grammarDiag) > 0;
-  profile.grammarDiag = mergeDiag(profile.grammarDiag, today);
-  if (!again) addMiss(profile, ans && ans.miss);
-  return { ok: true, known: got, again };
-}
-
 // ───────────────────── 말 (아이 화면 — 셈 없이) ─────────────────────
 
 /**
- * 판을 끝낸 말 (순수) — grammarRule 결과 → { title, lines } · giftName = 🎁 깜짝 포켓몬 이름(받았을 때만 — 그때만 말한다)
+ * 쪽지를 끝낸 말 (순수) — grammarRule 결과 → { title, lines } · giftName = 🎁 깜짝 포켓몬 이름(받았을 때만 — 그때만 말한다) ·
+ * reward = player.js가 준 ⚡·💰 계단 { xp, coin } (하루 몫이 없었으면 null — 줄을 안 쓴다)
  */
-export function grammarFinishText(res, giftName = '') {
+export function grammarFinishText(res, giftName = '', reward = null) {
+  const got = reward && (cnt(reward.xp) || cnt(reward.coin)) ? `⚡+${cnt(reward.xp)} 💰+${cnt(reward.coin)}` : '';
   if (!res || !res.ok) {
-    if (res && res.why === 'empty') return { title: '저장할 단원이 없어요', lines: ['📝 문법 처음으로 돌아가 다시 시작해 주세요'] };
-    return { title: '저장이 안 됐어요', lines: ['[다시 저장하기]를 눌러 주세요 — 푼 것은 그대로예요'] };
+    if (res && res.why === 'empty') return { title: '저장할 단원이 없어요', lines: [...(got ? [got] : []), '[계속하기]를 누르면 영상으로 돌아가요'] };
+    return { title: '저장이 안 됐어요', lines: [...(got ? [got] : []), '[다시 저장하기]를 눌러 주세요 — 푼 것은 그대로예요'] };
   }
-  const lines = [];
-  if (res.first) lines.push(`💰 +${GRAMMAR_COINS}`);
-  else lines.push('오늘의 💰는 이미 받았어요 — 한 것은 기록에 들어갔어요');
+  const lines = got ? [got] : [];
   if (res.solved) lines.push(res.starCoins ? `⭐ 처음부터 다 맞혔어요! · 💰 +${res.starCoins} 더` : '⭐ 처음부터 다 맞혔어요!');
   else if (!res.practice) lines.push(`다음에 이 단원을 처음부터 다 맞히면 ⭐와 💰${STAR_COINS}!`);
   if (res.gift) {
@@ -490,18 +474,12 @@ export function grammarFinishText(res, giftName = '') {
     const eul = c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0 ? '을' : '를';
     lines.push(`🎁 깜짝 선물! 메타몽이 ${name}${eul} 데려왔어요 — 도감에 들어갔어요`);
   }
-  const title = res.first ? '📝 오늘의 문법 끝!' : res.practice ? '📝 문법 연습 끝!' : '📝 문법 더 하기 끝!';
-  return { title, lines };
-}
-/** 오늘 보상 말 (순수) — wordsToday(grammarDay) 0·1 · canStar = 오늘 ⭐를 받을 수 있는 단원이 남았나 · 🎁는 말하지 않는다 */
-export function grammarTodayLine(today, canStar = true) {
-  if (today >= 1) return canStar ? `오늘의 문법 끝 ✅ — 처음부터 다 맞히면 ⭐와 💰${STAR_COINS}!` : '오늘의 문법 끝 ✅';
-  return `오늘 처음 끝내면 💰${GRAMMAR_COINS}${canStar ? ` · 처음부터 다 맞히면 ⭐와 💰${STAR_COINS} 더` : ''}`;
+  return { title: res.practice ? '📝 연습 쪽지 끝!' : '📝 문법 쪽지 끝!', lines };
 }
 
 // ───────────────────── 📊·📤 (아빠 화면) ─────────────────────
 
-/** 📊 한 줄 (순수) — ⭐ 단원 · 진단 ✅ · 다시 볼 단원 · 최근 7일 판을 끝낸 날 */
+/** 📊 한 줄 (순수) — ⭐ 단원 · (v348 진단 ✅) · 다시 볼 단원 · 최근 7일 쪽지를 푼 날 */
 export function grammarReport(units, states, known, days, now) {
   const st = wordsOf(states);
   const kn = knownOf(known);
@@ -512,7 +490,7 @@ export function grammarReport(units, states, known, days, now) {
   const skip = ls.filter((u) => own(kn, u.id) && !own(st, u.id)).length;
   const dd = wordDaysOf(days, today);
   const week = Object.keys(dd).filter((k) => Number(k) > today - 7 && Number(k) <= today).length;
-  return `📝 문법: ⭐ 처음부터 다 맞힌 단원 ${solved}/${ls.length} · 🔍 진단으로 건너뛴 단원 ${skip} · 다시 볼 단원 ${again} · 최근 7일 중 판을 끝낸 날 ${week}`;
+  return `📝 문법 쪽지: ⭐ 처음부터 다 맞힌 단원 ${solved}/${ls.length}${skip ? ` · 🔍 v348 진단으로 건너뛴 단원 ${skip}` : ''} · 다시 볼 단원 ${again} · 최근 7일 중 쪽지를 푼 날 ${week}`;
 }
 
 const dateOf = (n) => new Date(n * 86400000).toISOString().slice(0, 10);
@@ -528,21 +506,21 @@ export function grammarMd({ units, types, profile, today, now }) {
   const miss = gMissOf(p.grammarMiss);
   const d = dayNum(now);
   const diag = diagOf(p.grammarDiag);
-  const lines = [`📝 영어 문법 기록 (${today})`, '', grammarReport(ls, p.grammar, p.grammarKnown, p.grammarDay, now),
-    `🔍 어디까지 알까?: ${diag ? `${dateOf(diag)}에 끝냄 — ✅ ${Object.keys(kn).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))).join(' ') || '없음'}` : '아직 안 함'}`,
+  const lines = [`📝 영어 문법 쪽지 기록 (${today})`, '', grammarReport(ls, p.grammar, p.grammarKnown, p.grammarDay, now),
+    ...(diag ? [`🔍 v348 어디까지 알까?: ${dateOf(diag)}에 끝냄 — ✅ ${Object.keys(kn).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))).join(' ') || '없음'}`] : []),
     `🎁 깜짝 포켓몬: ${(() => { const g = giftOf(p.grammarGift); return g.n ? `${g.n}번 · 마지막 ${dateOf(g.day)} No.${g.id}` : '아직 없음'; })()}`, '', '## 단원'];
   const MARK = { star: '⭐', again: '🔁 다시 볼 단원', known: '✅ 진단으로 건너뜀', new: '(아직)' };
   for (const u of ls) {
     const mk = unitMark(u.id, p.grammar, p.grammarKnown);
     const s = st[u.id];
-    const extra = s ? ` · 틀린 판 ${s.miss} · 처음 ${dateOf(s.d0 || d)} · 마지막 ${dateOf(dayNum(s.at))}${s.box < SOLVED && s.due ? ` · 다시 볼 날 ${dateOf(s.due)}` : ''}` : '';
+    const extra = s ? ` · 틀린 쪽지 ${s.miss} · 처음 ${dateOf(s.d0 || d)} · 마지막 ${dateOf(dayNum(s.at))}${s.box < SOLVED && s.due ? ` · 다시 볼 날 ${dateOf(s.due)}` : ''}` : '';
     lines.push(`- ${u.id} ${u.title}: ${MARK[mk]}${extra}`);
   }
   lines.push('', '## 오개념마다 틀린 수 (많은 차례)');
   const ks = Object.keys(miss).sort((a, b) => miss[b] - miss[a] || (a < b ? -1 : 1));
   for (const k of ks) lines.push(`- ${typeName(types, k)} (${k}): ${miss[k]}`);
   if (!ks.length) lines.push('(아직 없음)');
-  lines.push('', '## 최근 7일 판을 끝낸 날');
+  lines.push('', '## 최근 7일 쪽지를 푼 날');
   const dd = wordDaysOf(p.grammarDay, d);
   for (let k = 6; k >= 0; k--) lines.push(`- ${dateOf(d - k).slice(5)}: ${dd[d - k] ? '✅' : '—'}`);
   return `${lines.join('\n')}\n`;

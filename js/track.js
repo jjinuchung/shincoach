@@ -574,6 +574,16 @@ export function markMatch(max) {
   return claim('matches', max);
 }
 
+/** 📝 오늘 끝낸 문법 쪽지 수 / 쪽지 하나를 끝냄 — 하루 max장까지 선점 (v349 · 두 창이 같이 끝내도 상한을 넘지 않는다) */
+export function todayGrammarNotes() {
+  return t.daily ? (t.daily.grammarNotes || 0) : 0;
+}
+export function markGrammarNote(max) {
+  // 쪽지를 연 채 자정을 넘겨 끝내도 오늘 몫으로 (쪽지 중엔 영상이 멈춰 문장 기록이 날짜를 넘기지 않는다 — 🔍 Codex 153차 #2)
+  rollDailyIfNeeded();
+  return claim('grammarNotes', max, true); // ⚡💰라 저장이 안 되면 안 준다 — 메모리로 성공 처리하면 두 창이 마지막 몫을 둘 다 받는다 (🔍 Codex 153차 #1 · 65차 #4와 같다)
+}
+
 /** 🔁 오늘 복습한 문장 수 / 완주한 회차 수 (모든 콘텐츠 합산) */
 export function todayReviewSentences() {
   return t.daily ? (t.daily.reviewSentences || 0) : 0;

@@ -36,7 +36,6 @@ const CHIPS = [
   { id: 'time-chip-nonsul', subject: 'korean' }, // 🖊️ 논술은 국어 시간 (v303)
   { id: 'time-chip-library', subject: 'english' },
   { id: 'time-chip-player', subject: 'english' },
-  { id: 'time-chip-grammar', subject: 'english' }, // 📝 문법은 영어 시간 (v348)
 ];
 
 export function initTimeUp({ requirePin } = {}) {

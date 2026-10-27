@@ -85,18 +85,6 @@
     <main id="nonsul-main" class="ns-main"></main>
   </section>
 
-  <!-- 📝 영어 문법 (v348) — ⏳는 영어 시간 안 (아버님 2026-10-26) · 보상은 💰만 -->
-  <section id="view-grammar" class="view" hidden>
-    <header class="topbar">
-      <button id="btn-grammar-back" class="btn btn-icon" aria-label="과목 고르기">←</button>
-      <h1 class="topbar-title">📝 <span class="hide-narrow">신코치 </span>영어 문법</h1>
-      <button type="button" id="time-chip-grammar" class="time-chip" hidden></button>
-      <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
-      <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
-    </header>
-    <main id="grammar-main" class="gr-main"></main>
-  </section>
-
   <!-- ✨ 응원 포켓몬 — 수학을 푸는 동안 화면 아래를 가로질러 지나간다 (탭은 통과, 조작을 막지 않는다) -->
   <div id="cheer" class="cheer" aria-hidden="true" hidden>
     <div class="cheer-bubble"><b class="cheer-ko"></b><span class="cheer-en"></span></div>
@@ -603,6 +591,11 @@
     </div>
   </div>
 
+  <!-- 📝 문법 쪽지 (v349) — 🎬 영상 따라 하기 문장 사이에 (아버님 2026-10-27 "과목이 아니라 영어 과목 중간중간에") · 그리는 건 grammarnote.js -->
+  <div id="grammar-note" class="gnote" role="dialog" aria-modal="true" aria-label="문법 쪽지" hidden>
+    <div id="grammar-note-main" class="gnote-card"></div>
+  </div>
+
   <!-- ===== 🔁 복습 (배운 문장을 며칠에 걸쳐 다시 만나기) ===== -->
   <div id="review" class="review" hidden>
     <div class="review-card">
@@ -889,6 +882,11 @@
       <div class="field-actions">
         <button type="button" id="set-puzzle-try" class="btn">🧩 지금 퍼즐 해보기 <small>— 현재 문장으로 바로 (기록 안 함)</small></button>
       </div>
+
+      <label class="field field-row">
+        <input type="checkbox" id="set-grammar">
+        <span class="field-label">📝 문법 쪽지 <small>— 그날 8문장을 끝내면 첫 장, 그 뒤 15문장마다 문법 문제 3개 (하루 3장까지)</small></span>
+      </label>
 
       <label class="field">
         <span class="field-label">🔁 복습 <small>— 배운 문장을 1·2·4·7·14일 뒤에 다시 따라 말하기. 영화를 열 때 먼저 물어봐요. 다 하면 🌟 황금 몬스터볼(하루 1개)과 ❤️ 회복</small></span>

@@ -73,16 +73,7 @@ export const SUBJECTS = [
     view: 'nonsul',
     ready: true,
   },
-  {
-    key: 'grammar',
-    title: 'Grammar',
-    ko: '영어 문법',
-    desc: '문장 규칙 익히기',
-    emoji: '📝',
-    mascot: 132,  // 메타몽 — 모습을 바꾸는 포켓몬이라 go가 went로 바뀌는 문법과 어울린다 (영어 명단 · 2026-10-26 기본안)
-    view: 'grammar',
-    ready: true,
-  },
+  // 📝 영어 문법 카드(v348)는 v349에서 걷었다 — 아버님 10-27 "과목을 새롭게 만들자는 게 아니었다" → 🎬 영상 따라 하기 사이 📝 문법 쪽지(grammarnote.js)
 ];
 
 /**
