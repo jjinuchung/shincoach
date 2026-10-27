@@ -42,6 +42,7 @@ test('🏦 회사 다섯 + 📦 펀드 · 처음 값 100.0 · 까닭 보기 넷�
   assert.deepEqual([BUY_WHY.length, SELL_WHY.length], [4, 4]);
   assert.deepEqual([stockCapOf(20), stockCapOf(35), stockCapOf('50'), stockCapOf(undefined)], [20, STOCK.capPct, 50, STOCK.capPct]);
   assert.ok(CAP_CHOICES.includes(STOCK.capPct));
+  assert.deepEqual([STOCK.capPct, CAP_CHOICES], [40, [10, 20, 30, 40, 50]], '기본 40% (v351 아버님 — 30이었다)');
   for (const a of ASSETS) assert.ok(!/[\u{1FAA8}\u{1FAB4}\u{1FA9F}\u{1FAB5}]/u.test(a.emoji), `${a.name} 이모지 ${a.emoji}`);
 });
 
@@ -143,10 +144,12 @@ test('💰 수수료 1%(올림 · 최소 💰1) · 더 투자할 수 있는 코�
   const st = newStock(1, D0);
   st.hold.pika = [{ n: 10, s: 0, cost: 1010 }]; // 주식 값 1000
   assert.equal(holdValue(st), 1000);
-  assert.equal(roomOf(st, 2000), 0, '(2000 + 1000) × 30% = 900 < 주식 값 1000');
-  assert.equal(roomOf(st, 6000), 1100, '(6000 + 1000) × 30% − 1000');
+  assert.equal(roomOf(st, 2000, 30), 0, '(2000 + 1000) × 30% = 900 < 주식 값 1000');
+  assert.equal(roomOf(st, 2000), 200, '기본 40%(v351 아버님): (2000 + 1000) × 40% − 1000');
+  assert.equal(roomOf(st, 6000, 30), 1100, '(6000 + 1000) × 30% − 1000');
   st.orders.push({ id: 1, kind: 'buy', co: 'onix', n: 1, at: 0, reserve: 100, why: 'good', drop: false });
-  assert.equal(roomOf(st, 6000), Math.floor(7100 * 0.3) - 1100, '묶인 코인도 투자에 든다');
+  assert.equal(roomOf(st, 6000, 30), Math.floor(7100 * 0.3) - 1100, '묶인 코인도 투자에 든다');
+  assert.equal(roomOf(st, 6000), Math.floor(7100 * 0.4) - 1100, '기본 40%');
   assert.equal(roomOf(st, 6000, 50), Math.min(6000, Math.floor(7100 * 0.5) - 1100), '부모가 고른 한도');
   assert.equal(roomOf(newStock(1, D0), 100, 50), 50);
 });
@@ -198,9 +201,11 @@ test('🛒 사기 — 다음 장 값으로 · 지금 코인을 묶고 남으면 
   assert.equal(stockBuyRule(p, D0, { co: 'nope', n: 1, why: 'good' }, FULL).why, 'bad');
   assert.equal(stockBuyRule(p, D0, { co: 'pika', n: 0, why: 'good' }, FULL).why, 'bad');
   assert.equal(stockBuyRule(p, D0, { co: 'pika', n: 3, why: 'good', on: false }, FULL).why, 'off');
-  // 한도: 가진 것 1000의 30% = 300 → 3주(예약 💰330+수수료)는 넘고 2주는 된다
-  assert.equal(roomOf(p.stock, p.coins), 300);
-  assert.equal(stockBuyRule(p, D0, { co: 'pika', n: 3, why: 'good' }, FULL).why, 'cap');
+  // 한도: 가진 것 1000의 40%(기본 — v351) = 400 → 4주(예약 💰440+수수료)는 넘는다 · 30%를 고르면 300 → 3주(💰330+수수료)도 넘는다
+  assert.equal(roomOf(p.stock, p.coins), 400);
+  assert.equal(roomOf(p.stock, p.coins, 30), 300);
+  assert.equal(stockBuyRule(p, D0, { co: 'pika', n: 4, why: 'good' }, FULL).why, 'cap');
+  assert.equal(stockBuyRule(p, D0, { co: 'pika', n: 3, why: 'good', capPct: 30 }, FULL).why, 'cap');
   const r = stockBuyRule(p, D0, { co: 'pika', n: 2, why: 'good' }, FULL);
   assert.equal(r.ok, true);
   assert.equal(r.reserve, reserveFor(STOCK.startPx, 2));
@@ -503,4 +508,11 @@ test('🗣️ 말 — ▲▼ 지난 장보다 · 가진 것의 오른 % · 체�
   assert.equal(q.value, Math.floor((p.stock.px.squirtle * 2) / 10));
   assert.equal(changePct(newStock(1, D0), 'pika'), 0);
   assert.equal(holdValue(newStock(1, D0)), 0);
+});
+
+test('🏦 v351 기본 한도 40% — 옛 기본값 30이 저장된 태블릿도 한 번만 40으로(다른 값은 그대로 · 그 뒤 30으로 되돌려도 그대로)', () => {
+  const pl = read('js/player.js');
+  assert.match(pl, /if \(!s\.stockCap351\) \{\n\s*if \(Number\(s\.stockCap\) === 30\) s\.stockCap = STOCK_CAP;\n\s*s\.stockCap351 = true;\n\s*try \{ localStorage\.setItem\('shincoach\.settings', JSON\.stringify\(s\)\); \} catch/);
+  assert.equal(stockCapOf(40), 40);
+  assert.ok(readFileSync(new URL('../index.html', import.meta.url), 'utf8').includes('<option value="40">40%</option>'));
 });

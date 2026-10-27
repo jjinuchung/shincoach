@@ -27,7 +27,7 @@ export const GAP_MS = 550;
 export const FIRST_SET = ['fire', 'water', 'grass'];
 export const FIRST_CARDS = 5;
 export const SET_CARDS = 6;
-export const FOUR_FROM = 25000;
+export const FOUR_FROM = 18000; // 25초였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 /** 빨리 맞힌 ⭐2 — 내려온 몫이 이보다 적을 때 */
 export const FAST = 0.5;
 /** 같은 포켓몬이 이만큼 안에 다시 안 나온다 */
@@ -55,10 +55,10 @@ const nz = (v) => {
 };
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
-/** 빠르기 (순수) — 지난 시간 ms → 카드가 다 내려오는 데(ms) · 5.2초 → 2.8초 */
+/** 빠르기 (순수) — 지난 시간 ms → 카드가 다 내려오는 데(ms) · 4.4초 → 2.4초 (5.2→2.8이었다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)) */
 export function sortFall(ms) {
   const k = clamp((Number(ms) || 0) / (SORT_SEC * 1000), 0, 1);
-  return Math.round(5200 - 2400 * k);
+  return Math.round(4400 - 2000 * k);
 }
 
 /** 쓸 수 있는 카드 (순수) — [{ id, types, mine }] 가운데 타입이 있는 것만 · 같은 번호는 하나 */

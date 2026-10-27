@@ -16,7 +16,7 @@
 
 /** 정해 둔 값 (가격은 10배 정수로 — 102.4 → 1024) */
 export const STOCK = {
-  capPct: 30,       // 가진 것(코인 + 주식 값 + 주문에 묶인 코인)의 몇 %까지 투자하나 (🔒 부모 설정 CAP_CHOICES)
+  capPct: 40,       // 가진 것(코인 + 주식 값 + 주문에 묶인 코인)의 몇 %까지 투자하나 (🔒 부모 설정 CAP_CHOICES) · v351 아버님 「40%로 늘려서 기본값」(30이었다)
   feePct: 1,        // 사고팔 때 수수료 % (최소 💰1)
   holdDays: 3,      // 산 뒤 몇 장 지나야 팔 수 있나
   divEvery: 5,      // 몇 장마다 배당
@@ -31,7 +31,7 @@ export const STOCK = {
   dayClamp: 0.08,   // 한 장에 ±8%까지만
   reserve: 0.10,    // 사기 주문에 묶어 두는 덤(다음 장 값이 올라도 모자라지 않게 — 한 장 ±8% + 수수료 1%보다 크게)
 };
-export const CAP_CHOICES = [10, 20, 30, 50];
+export const CAP_CHOICES = [10, 20, 30, 40, 50];
 /** 🔒 부모 설정의 투자 한도 기본값 · 고른 값 → 보기 가운데 하나(아니면 기본값) */
 export const STOCK_CAP = STOCK.capPct;
 export function stockCapOf(v) {

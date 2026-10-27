@@ -15,16 +15,17 @@ import { sfx } from './sfx.js';
 import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 · 순수)
 
 /** 판(칸 수) · 고를 포켓몬 수 · 보통 걸리는 시간(초 — minigame.GAMES sec · 끝은 다 맞출 때) */
-export const JIG_COLS = 5;
+export const JIG_COLS = 6; // 5 × 4 = 20조각이었다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 export const JIG_ROWS = 4;
 export const JIG_N = JIG_COLS * JIG_ROWS;
 export const JIG_CHOICES = 3;
 export const JIG_SEC = 150;
 /** 한 칸(마당 %) · 판 왼쪽 위(마당 %) */
-export const CELL_W = 10;
-export const CELL_H = 20;
-export const BOARD_X = 25;
-export const BOARD_Y = 10;
+// 24조각(v351) — 칸을 조금 줄여(10×20 → 9×18) 판(54%×72%)이 가운데에 오고 양옆에 두 줄씩 여섯 칸이 남게
+export const CELL_W = 9;
+export const CELL_H = 18;
+export const BOARD_X = 23;
+export const BOARD_Y = 14;
 /** 조각 둘레 여유(칸에 대한 비 — 볼록한 꼭지가 들어갈 자리) · 제자리에서 이만큼(칸에 대한 비) 안에 놓으면 붙는다 */
 export const TAB = 0.25;
 export const SNAP = 0.35;
@@ -35,9 +36,9 @@ export const X_MIN = TAB * CELL_W;
 export const X_MAX = 100 - CELL_W - TAB * CELL_W;
 export const Y_MIN = TAB * CELL_H;
 export const Y_MAX = 100 - CELL_H - TAB * CELL_H;
-/** 처음 흩어 놓는 자리 — 판 왼쪽 두 줄 · 오른쪽 두 줄 × 다섯 칸 */
+/** 처음 흩어 놓는 자리 — 판 왼쪽 두 줄 · 오른쪽 두 줄 × 여섯 칸 (v351 — 다섯 칸이었다) */
 const SLOT_X = [X_MIN, X_MIN + CELL_W, 100 - TAB * CELL_W - 2 * CELL_W, X_MAX];
-const SLOT_Y = [0, 1, 2, 3, 4].map((k) => Y_MIN + ((Y_MAX - Y_MIN) * k) / 4);
+const SLOT_Y = [0, 1, 2, 3, 4, 5].map((k) => Y_MIN + ((Y_MAX - Y_MIN) * k) / 5);
 const JITTER_Y = 1.5;
 
 const nz = (v) => {

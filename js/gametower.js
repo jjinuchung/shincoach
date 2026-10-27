@@ -26,7 +26,7 @@ export const BASE_H = 8;
 export const BASE_W = 28;
 /** 맞음 — 떨어진 볼 가운데와 맨 위 볼 가운데의 거리(칸) · 딱 · 받침돌 위 첫 볼은 넓게 */
 export const PERFECT_D = 2;
-export const OK_D = 8;
+export const OK_D = 7; // 8칸이었다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 export const BASE_OK_D = 12;
 /** 볼이 좌우로 가는 끝(가운데 x) — 탑도 이 안에서만 쌓인다(비뚤게 쌓여도 마당 밖으로 안 나간다) */
 export const X_MIN = BALL / 2 + 1;
@@ -45,9 +45,9 @@ const nz = (v) => {
   return n > 0 ? n : 0;
 };
 
-/** 볼 빠르기 (순수) — 쌓은 층 → 칸/초 · 높이 쌓을수록 조금씩(32 → 64) · 놓쳐도 느린 채로(못 쌓아도 어려워지지 않는다) */
+/** 볼 빠르기 (순수) — 쌓은 층 → 칸/초 · 높이 쌓을수록 조금씩(36 → 64 · 32에서 시작했다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)) · 놓쳐도 느린 채로(못 쌓아도 어려워지지 않는다) */
 export function towerSpeed(floors) {
-  return Math.min(64, 32 + 2 * nz(floors));
+  return Math.min(64, 36 + 2 * nz(floors));
 }
 /** 꼭대기 높이 (순수) — 받침돌 + 층 */
 export function topH(floors) {

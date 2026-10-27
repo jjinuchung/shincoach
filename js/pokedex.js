@@ -261,6 +261,7 @@ export async function openPokedex(opts) {
       else if (subjectOf(m.id) === 'math') cell.appendChild(el('div', 'subj', '🔢')); // 수학에서만 잡히는 얼굴 — 못 잡은 칸에도 붙어 "수학 가면 있다"가 보인다
       else if (subjectOf(m.id) === 'korean') cell.appendChild(el('div', 'subj', '📚')); // 📚 국어에서만 (2026-10-11)
       else if (subjectOf(m.id) === 'nonsul') cell.appendChild(el('div', 'subj', '🖊️')); // 🖊️ 논술에서만 (2026-10-20)
+      else if (subjectOf(m.id) === 'letter') cell.appendChild(el('div', 'subj', '📮')); // 📮 편지에서만 친구가 된다 (2026-10-27 — 잡는 곳 줄의 셈에는 안 넣는다: 「친구 몇 마리」 셈 없이)
       if (n > 0 && getPartner() === m.id) cell.appendChild(el('div', 'partner', '🤝'));
       // 못 잡은 포켓몬도 누를 수 있다 — 등급은 **잡기 전에** 맞아야 의미가 있다 (전설이 흔함에 있으면 쉽게 잡힌다)
       cell.addEventListener('click', () => openMon({ id: m.id, ko: m.ko, url, caught: n > 0 }));

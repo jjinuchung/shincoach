@@ -37,7 +37,7 @@ export const MIN_LEN = 5;
 export const REACH_K = 2.6;
 export const REACH_MAX = 95;
 /** 볼 가운데가 포켓몬 가운데에서 이만큼 안이면 명중 (칸) — 4학년 손가락에 너그럽게 */
-export const HIT_R = MON.w * 0.38 + BALL.r;
+export const HIT_R = MON.w * 0.32 + BALL.r; // 0.38이었다 — 15% 좁게 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 /** ✨ 반짝이는 포켓몬 — 이 뒤부터(ms) · 나올 때마다 이만큼 · ⭐ 두 배 */
 export const SHINY_FROM = 5000;
 export const SHINY_RATE = 0.1;

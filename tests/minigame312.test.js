@@ -95,18 +95,18 @@ test('🤼 당기기 — 진우 쪽은 왼쪽(−)·⭐ · 상대는 오른쪽(+
   assert.equal(tugPull(s, 'me', s.end).kind, 'over');
 });
 
-test('🤼 나옹 — 처음 0.5초 · 초당 세 번 남짓(±25%) · 진우가 이긴 판마다 빨라짐(끝 다섯) · 쉬는 동안은 안 당김', () => {
-  assert.deepEqual(BOT, { rate: 3, step: 0.5, max: 5, first: 500 });
+test('🤼 나옹 — 처음 0.5초 · 초당 세 번 반(±25%) · 진우가 이긴 판마다 빨라짐(끝 다섯 번 반) · 쉬는 동안은 안 당김 (v351 — 진우 「너무 쉬워요」 — 3→5였다)', () => {
+  assert.deepEqual(BOT, { rate: 3.5, step: 0.5, max: 5.5, first: 500 });
   const s = tugStart(0, 'meowth');
   const gaps = [];
   const g = seeded(11);
   for (let k = 0; k < 200; k++) gaps.push(botGap(s, g)); // 한 줄기에서 이어 뽑기 (씨앗마다 첫 수는 서로 비슷하다)
-  assert.ok(Math.min(...gaps) >= 250 && Math.max(...gaps) <= 417, `${Math.min(...gaps)}~${Math.max(...gaps)}`);
+  assert.ok(Math.min(...gaps) >= 214 && Math.max(...gaps) <= 358, `${Math.min(...gaps)}~${Math.max(...gaps)}`);
   assert.ok(Math.max(...gaps) - Math.min(...gaps) > 100, '사람처럼 들쭉날쭉 (늘 같은 박자가 아니게)');
   s.wins.me = 2;
-  assert.ok(botGap(s, () => 0.5) === 250, '두 판 지면 초당 네 번');
+  assert.ok(botGap(s, () => 0.5) === 222, '두 판 지면 초당 네 번 반');
   s.wins.me = 99;
-  assert.equal(botGap(s, () => 0.5), 200, '끝은 초당 다섯 번');
+  assert.equal(botGap(s, () => 0.5), 182, '끝은 초당 다섯 번 반');
   // 진우가 가만히 있으면 — 나옹이 판을 가져가고, 쉬는 동안은 안 당긴다
   for (const seed of SEEDS) {
     const t = tugStart(0, 'meowth');
@@ -440,7 +440,7 @@ test('🤼 화면 — 늦은 프레임: 나옹의 승리와 다음 판 시작이
   const runFrames = () => { const fs = [...frames.values()]; frames.clear(); for (const f of fs) f(); };
   w.who[2].fire('click');
   w.adv(850); // 시작 — 그림 한 장 예약됨
-  w.adv(6000); // 그림이 6초 멈춤 — 그 사이 나옹이 한 판 이기고(4.5초쯤) 쉼(1.2초)도 끝남
+  w.adv(5400); // 그림이 5.4초 멈춤 — 그 사이 나옹이 한 판 이기고(초당 세 번 반이라 4초쯤 — v351) 쉼(1.2초)도 끝남
   runFrames(); // 한 번에 따라잡음
   assert.equal(w.board.textContent, '진우 🏆 0 : 1 🏆 나옹', '점수판엔 나옹 한 판');
   assert.ok(!w.banner.className.includes('is-on'), '지난 판 「나옹 이겼다!」는 내려감');

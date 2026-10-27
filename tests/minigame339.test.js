@@ -46,7 +46,7 @@ test('🖼️ 게임 목록 — 열째 · 시간 제한 없음(clock — 최고 
   assert.equal(g.how, '조각을 끌어다 제자리에 놓아 그림을 완성해요 · 시간 제한은 없어요');
   for (const x of GAMES) assert.ok(!/\d/.test(x.how), `${x.id}: 아이가 보는 설명에 숫자 없음`);
   assert.equal(GAMES.filter((x) => x.clock).map((x) => x.id).join(), 'jig,diff', '⏱️ 기록은 그림 맞추기 · v345 🔍 다른 그림 찾기');
-  assert.deepEqual([JIG_COLS, JIG_ROWS, JIG_N, JIG_CHOICES], [5, 4, 20, 3], '아버님 「20피스 정도」 · 셋 가운데 고르기');
+  assert.deepEqual([JIG_COLS, JIG_ROWS, JIG_N, JIG_CHOICES], [6, 4, 24, 3], '아버님 「20피스 정도」 → 24조각(v351 — 진우 「너무 쉬워요」) · 셋 가운데 고르기');
   assert.equal(songFor('jig').id, 'think');
   const gv = src('js/gameview.js');
   assert.match(gv, /import \{ runJig, JIG_CHOICES \} from '\.\/gamejig\.js';/);
@@ -65,7 +65,7 @@ test('🖼️ 게임 목록 — 열째 · 시간 제한 없음(clock — 최고 
   }
   // 끝 → 걸린 시간을 저장으로 (⏱️ 게임만 · 그만둔 판은 sec 없음) · 고르기 카드의 기록 줄
   assert.ok(gv.includes('await gameEnd(ctx.roomId, ctx.u, id, res.score, g.clock ? res.sec || 0 : 0);'));
-  assert.match(gv, /const rec = recordText\(g\);\n\s+if \(rec\) txt\.appendChild\(el\('span', 'gm-game-best', rec\)\);/);
+  assert.match(gv, /const rec = recordText\(g\);\n\s+if \(rec\.best\) txt\.appendChild\(el\('span', 'gm-game-best', rec\.best\)\);/); // v351 — 쉬울 때 기록은 따로 작게(games351)
   // 그림을 못 펼쳐 돌려받은 판 — 고르기 화면에 한 줄
   assert.ok(gv.includes('if (live() && res.msg) ui.msg = res.msg;'));
   assert.ok(!/coins|addCoins|applyPurchase|items\[|itemCount|xp\.js|db\.js|pokemon\.js/.test(src('js/gamejig.js')), '저장·가방을 안 만진다');
@@ -88,16 +88,17 @@ test('🖼️ 서비스워커 v339 · 새 파일 · css (넓은 카드 · 마당
   assert.match(css, /\.gm-card\.is-wide \{ width: min\(1000px, 100%\); \}/);
   assert.match(css, /\.gm-card\.is-wide \.gm-stage \{ max-width: calc\(\(100vh - 220px\) \* 2\); \}/);
   assert.match(css, /\.gj-field \{[^}]*isolation: isolate;[^}]*aspect-ratio: 2 \/ 1;[^}]*touch-action: none;/);
-  assert.match(css, /\.gj-board \{[^}]*left: 25%; top: 10%; width: 50%; height: 80%;/, '판 자리 = BOARD_X·BOARD_Y·5칸·4칸');
-  assert.match(css, /\.gj-full \{[^}]*left: 25%; top: 10%; width: 50%; height: 80%;/);
-  assert.match(css, /\.gj-pc \{[^}]*width: 15%; height: 30%; pointer-events: none;/, '칸 + 둘레 여유 = 1.5칸');
+  assert.match(css, /\.gj-board \{[^}]*left: 23%; top: 14%; width: 54%; height: 72%;/, '판 자리 = BOARD_X·BOARD_Y·6칸·4칸');
+  assert.match(css, /\.gj-full \{[^}]*left: 23%; top: 14%; width: 54%; height: 72%;/);
+  assert.match(css, /\.gj-pc \{[^}]*width: 13\.5%; height: 27%; pointer-events: none;/, '칸 + 둘레 여유 = 1.5칸');
   assert.match(css, /\.gj-hit \{[^}]*top: 16\.667%; right: 16\.667%; bottom: 16\.667%; left: 16\.667%; pointer-events: auto; touch-action: none;/);
   assert.ok(css.includes('.gj-pick[hidden] { display: none; }') && css.includes('.gj-peek[hidden] { display: none; }'));
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.gj-pc\.is-snap \{ animation: none; \} \.gj-full \{ transition: none; \} \}/);
   // css 숫자와 엔진 숫자가 같다
-  assert.deepEqual([BOARD_X, BOARD_Y, JIG_COLS * CELL_W, JIG_ROWS * CELL_H], [25, 10, 50, 80]);
-  assert.equal(CELL_W * (1 + 2 * TAB), 15);
-  assert.equal(CELL_H * (1 + 2 * TAB), 30);
+  assert.deepEqual([BOARD_X, BOARD_Y, JIG_COLS * CELL_W, JIG_ROWS * CELL_H], [23, 14, 54, 72]);
+  assert.deepEqual([BOARD_X * 2 + JIG_COLS * CELL_W, BOARD_Y * 2 + JIG_ROWS * CELL_H], [100, 100], '판은 가운데');
+  assert.equal(CELL_W * (1 + 2 * TAB), 13.5);
+  assert.equal(CELL_H * (1 + 2 * TAB), 27);
   assert.equal(Number(((TAB / (1 + 2 * TAB)) * 100).toFixed(3)), 16.667);
   assert.equal(CELL_W * 2, CELL_H, '마당이 2:1이라 한 칸이 화면에서 정사각형');
 });
@@ -183,8 +184,8 @@ test('🖼️ 조각 테두리 — 이웃 조각은 같은 경계를 거꾸로 �
   }
 });
 
-test('🖼️ 처음 자리 — 판 양옆 20자리(겹치지 않게 섞음) · 꼭지까지 마당 안 · 판에 걸치지 않음 · 어느 조각도 처음부터 제자리 가까이 아님', () => {
-  assert.deepEqual([X_MIN, X_MAX, Y_MIN, Y_MAX], [2.5, 87.5, 5, 75]);
+test('🖼️ 처음 자리 — 판 양옆 24자리(v351 — 20자리였다)(겹치지 않게 섞음) · 꼭지까지 마당 안 · 판에 걸치지 않음 · 어느 조각도 처음부터 제자리 가까이 아님', () => {
+  assert.deepEqual([X_MIN, X_MAX, Y_MIN, Y_MAX], [2.25, 88.75, 4.5, 77.5]);
   for (const seed of SEEDS) {
     const sl = jigSlots(seeded(seed));
     assert.equal(sl.length, JIG_N);
@@ -194,7 +195,7 @@ test('🖼️ 처음 자리 — 판 양옆 20자리(겹치지 않게 섞음) · 
       assert.ok(p.x + CELL_W <= BOARD_X || p.x >= BOARD_X + JIG_COLS * CELL_W, `판에 걸침 ${p.x}`);
       cols.set(p.x, (cols.get(p.x) || 0) + 1);
     }
-    assert.deepEqual([...cols.values()], [5, 5, 5, 5], '네 줄에 다섯씩');
+    assert.deepEqual([...cols.values()], [6, 6, 6, 6], '네 줄에 여섯씩');
     const s = jigStart(1000, seeded(seed));
     for (const p of s.pieces) {
       assert.deepEqual([p.tx, p.ty], [BOARD_X + p.c * CELL_W, BOARD_Y + p.r * CELL_H]);
@@ -250,9 +251,9 @@ test('🖼️ 다 맞춤 — 마지막 조각에서 done(걸린 시간) · 그 �
       last = jigDrop(s, i, p.tx + 1, p.ty + 1, 40_000 + (k + 1) * 4_000);
       assert.equal(last.kind, k < JIG_N - 1 ? 'snap' : 'done');
     });
-    assert.deepEqual(last, { kind: 'done', i: order[JIG_N - 1], pts: 1, sec: 80 });
-    assert.deepEqual([s.placed, s.score, s.sec, s.doneAt], [JIG_N, JIG_N, 80, 120_000]);
-    assert.equal(jigSec(s, 999_999), 80, '다 맞춘 뒤엔 시간이 안 간다');
+    assert.deepEqual(last, { kind: 'done', i: order[JIG_N - 1], pts: 1, sec: JIG_N * 4 });
+    assert.deepEqual([s.placed, s.score, s.sec, s.doneAt], [JIG_N, JIG_N, JIG_N * 4, 40_000 + JIG_N * 4_000]);
+    assert.equal(jigSec(s, 999_999), JIG_N * 4, '다 맞춘 뒤엔 시간이 안 간다');
     assert.deepEqual(jigDrop(s, 0, 0, 0, 200_000), { kind: 'over' });
     jigShift(s, 5000);
     assert.equal(s.t0, 40_000, '다 맞춘 뒤엔 밀지 않는다');
@@ -316,8 +317,8 @@ test('⏱️ 한 판 끝 규칙 — 처음은 첫 기록 · 더 빠르면 새 �
   assert.deepEqual([d.fast, d.prevFast, d.newFast], [95, 130, true]);
   const e = gameEndRule(p, R, 2, 'jig', 7, T + 4000);
   assert.deepEqual([e.fast, e.newFast, e.best], [95, false, 20], '그만둔 판(sec 없음)은 시간 기록을 안 건드린다');
-  assert.deepEqual(p.homePlay.fast, { jig: 95 });
-  assert.deepEqual(p.homePlay.best, { jig: 20 });
+  assert.deepEqual(p.homePlay.fast, { jigh: 95 }, '새 난이도 기록 열쇠 (v351)');
+  assert.deepEqual(p.homePlay.best, { jigh: 20 });
   for (const bad of [-3, 2.5, NaN, '9', FAST_MAX + 1, 0]) {
     const q = pf();
     const r = gameEndRule(q, R, 2, 'jig', 20, T, bad);
@@ -329,7 +330,7 @@ test('⏱️ 한 판 끝 규칙 — 처음은 첫 기록 · 더 빠르면 새 �
   assert.deepEqual([g.best, g.newBest, g.fast, g.newFast], [15, true, 0, false]);
   // 파트너가 없어도 기록 (💗만 없음) · 못 하는 경우는 그대로
   const n = pf({ partner: null });
-  assert.deepEqual([gameEndRule(n, R, 2, 'jig', 20, T, 88).newFast, n.homePlay.fast.jig], [true, 88]);
+  assert.deepEqual([gameEndRule(n, R, 2, 'jig', 20, T, 88).newFast, n.homePlay.fast.jigh], [true, 88]);
   assert.equal(gameEndRule(pf(), R, 9, 'jig', 20, T, 88).why, 'gone');
   assert.deepEqual([p.coins, p.items.f_game], [500, 1], '경제는 그대로');
 });
@@ -343,21 +344,22 @@ test('★ ⏱️ 저장 경로: 가장 빠른 시간이 저장된 프로필에 �
   await reloadProfile();
   const rs = await Promise.all([gameEnd(R, 2, 'jig', 20, 140), gameEnd(R, 2, 'jig', 20, 110)]);
   assert.deepEqual(rs.map((r) => r.heart).sort(), [false, true]);
-  assert.equal(stored().homePlay.fast.jig, 110);
+  assert.equal(stored().homePlay.fast.jigh, 110);
   assert.equal(gameFast('jig'), 110, '창의 프로필도');
   assert.equal(gameBest('jig'), 20);
   await gameEnd(R, 2, 'jig', 20, 125);
-  assert.equal(stored().homePlay.fast.jig, 110, '느린 판은 기록을 안 바꾼다');
+  assert.equal(stored().homePlay.fast.jigh, 110, '느린 판은 기록을 안 바꾼다');
   await gameEnd(R, 2, 'jig', 5);
-  assert.equal(stored().homePlay.fast.jig, 110, '그만둔 판');
+  assert.equal(stored().homePlay.fast.jigh, 110, '그만둔 판');
   const s0 = stored();
   fakeIdb.failNext('profile');
   const f = await gameEnd(R, 2, 'jig', 20, 60);
   assert.deepEqual(f, { ok: false, why: 'save' });
   assert.deepEqual(stored().homePlay, s0.homePlay);
-  assert.equal(getProfileSnapshot().homePlay.fast.jig, 110, '메모리로 성공한 척하지 않는다');
-  assert.equal(fastOf(stored().homePlay, 'jig'), 110);
-  assert.equal(bestOf(stored().homePlay, 'jig'), 20);
+  assert.equal(getProfileSnapshot().homePlay.fast.jigh, 110, '메모리로 성공한 척하지 않는다');
+  assert.equal(fastOf(stored().homePlay, 'jigh'), 110, '새 난이도 열쇠');
+  assert.equal(bestOf(stored().homePlay, 'jigh'), 20);
+  assert.deepEqual([fastOf(stored().homePlay, 'jig'), bestOf(stored().homePlay, 'jig')], [0, 0], '쉬울 때 열쇠는 그대로(없음)');
 });
 
 test('⏱️ 끝 말(resultLines) — 다 맞춤 「완성! ⏱️ 2분 13초」 · 첫·새 기록 · 아니면 최고 시간 · 그만둔 판 「끝! ⭐ 7」 · ⭐ 게임은 예전 그대로', () => {

@@ -9,7 +9,7 @@ import {
   subjectFor, orderOf, slotOf, questionSeed, rngOf, crispPx, lossPreview, ownedIds,
 } from './journey.js';
 import { journeyRaw, journeyStart, journeyAnswer, journeySwap, journeyHome, journeyPick, getProfileSnapshot, getLevelInfo, rarityOf, monLv, getLook, korWordsMap, nonsulMap, profileReady, profileLoading, onProfileReload } from './xp.js';
-import { ROSTER, loadCharacters, ensureCast, isUnlocked, isLegendary, isUltraBeast } from './pokemon.js';
+import { ROSTER, loadCharacters, ensureCast, isUnlocked, isLegendary, isUltraBeast, isLetterMon } from './pokemon.js';
 import { TRAINERS, MOVES, SIGNATURE } from './battle.js';
 import { STONES } from './items.js';
 import { todayKey } from './track.js';
@@ -379,7 +379,7 @@ function rowEl(k, v) {
 function candidates() {
   const level = getLevelInfo().level;
   const caught = getProfileSnapshot().caught || {};
-  const ok = (id) => id !== 52 && !isLegendary(id) && !isUltraBeast(id) && rarityOf(id) <= 3;
+  const ok = (id) => id !== 52 && !isLegendary(id) && !isUltraBeast(id) && !isLetterMon(id) && rarityOf(id) <= 3; // 📮 편지 포켓몬은 데려올 수 없다 (2026-10-27)
   return ZONES.map((z) => {
     const fit = ROSTER.filter((r) => ok(r.id) && typesOf(r.id).some((t) => z.types.includes(t)));
     const withArt = fit.filter((r) => ui.chars.has(r.id) && isUnlocked(r.id, level));

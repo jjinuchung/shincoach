@@ -26,7 +26,7 @@ import { PAINT_BASE, paintById } from './house.js'; // 🔍 진우 방 벽지·�
 import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf, usedSec } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
-import { gameEnd, gameBest, gameFast, itemCount, ownedMonIds, getPartner, houseNow, houseShapeNow } from './xp.js';
+import { gameEnd, gameBest, gameFast, gameEasyBest, gameEasyFast, itemCount, ownedMonIds, getPartner, houseNow, houseShapeNow } from './xp.js';
 import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl, fullArt } from './pokemon.js';
 import { typeOf, movesOf } from './battle.js';
 import { sfx, unlock } from './sfx.js';
@@ -252,7 +252,8 @@ function renderPick() {
     txt.appendChild(el('span', 'gm-game-name', g.ko));
     txt.appendChild(el('span', 'gm-game-how', g.how));
     const rec = recordText(g);
-    if (rec) txt.appendChild(el('span', 'gm-game-best', rec));
+    if (rec.best) txt.appendChild(el('span', 'gm-game-best', rec.best));
+    if (rec.easy) txt.appendChild(el('span', 'gm-game-easy', rec.easy)); // 쉬울 때 기록은 따로 작게 (v351 · 🔍 Codex 156차)
     card.appendChild(txt);
     card.addEventListener('click', () => { startRound(g.id).catch(() => {}); });
     list.appendChild(card);
@@ -266,14 +267,19 @@ function renderPick() {
   try { first.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ }
 }
 
-/** 고르기 카드의 최고 기록 한 줄 — ⭐ 점수 · ⏱️ 다 맞추면 끝나는 게임(GAMES clock — v339)은 가장 빠른 시간 · 기록이 없으면 '' */
-function recordText(g) {
+/**
+ * 고르기 카드의 최고 기록 — { best, easy } · ⭐ 점수 · ⏱️ 다 맞추면 끝나는 게임(GAMES clock — v339)은 가장 빠른 시간 · 기록이 없으면 '' ·
+ * v351 — 어렵게 바꾼 뒤의 기록이 「최고」(best) · 쉬울 때 기록(easy)은 그 아래 작게(아버님 「추천대로」)
+ */
+export function recordText(g) {
   if (g.clock) {
     const t = clockText(gameFast(g.id));
-    return t ? `최고 ⏱️ ${t}` : '';
+    const e = clockText(gameEasyFast(g.id));
+    return { best: t ? `최고 ⏱️ ${t}` : '', easy: e ? `쉬울 때 ⏱️ ${e}` : '' };
   }
   const best = gameBest(g.id);
-  return best > 0 ? `최고 ⭐ ${best}` : '';
+  const easy = gameEasyBest(g.id);
+  return { best: best > 0 ? `최고 ⭐ ${best}` : '', easy: easy > 0 ? `쉬울 때 ⭐ ${easy}` : '' };
 }
 
 /** 그림 미리 받기 — ART_WAIT_MS까지만 기다리고, 그때까지 받은 것만 쓴다 */

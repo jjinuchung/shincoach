@@ -21,7 +21,7 @@ export const WATER_Y = 26;
 export const CAST_MS = 500;
 export const BITE_MIN = 1000;
 export const BITE_SPAN = 3000;
-export const BITE_MS = 1000;
+export const BITE_MS = 800; // 1초였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 export const AGAIN_MIN = 800;
 export const AGAIN_SPAN = 2500;
 /** 낚은 뒤 보여 주는 데 (ms) */

@@ -3,16 +3,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ROSTER, pickCharacters, unlockedRoster, isUnlocked, nextUnlockLevel, unlockCountAt, headAnchor, subjectOf, forSubject, forPuzzle } from '../js/pokemon.js';
 
-test('ROSTER: 592마리(영어 177 / 🔢 수학 전용 165 / 📚 국어 전용 150 / 🖊️ 논술 전용 100), id 중복 없음, 한글·영문 이름 있음', () => {
-  assert.equal(ROSTER.length, 592);
-  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 592);
+test('ROSTER: 622마리(영어 177 / 🔢 수학 전용 165 / 📚 국어 전용 150 / 🖊️ 논술 전용 100 / 📮 편지 전용 30), id 중복 없음, 한글·영문 이름 있음', () => {
+  assert.equal(ROSTER.length, 622);
+  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 622);
+  assert.equal(ROSTER.filter((r) => r.subject === 'letter').length, 30, '📮 편지 전용 (2026-10-27)');
   assert.equal(ROSTER.filter((r) => r.subject === 'korean').length, 150, '📚 국어 전용 (2026-10-11)');
   assert.equal(ROSTER.filter((r) => r.subject === 'nonsul').length, 100, '🖊️ 논술 전용 (2026-10-20)');
   assert.equal(ROSTER.filter((r) => r.subject === 'math').length, 165, '수학 150 + 🌌 8 + 🧬 줄기 중간 7 (🌌 셋은 2026-09-28 영어로)');
-  assert.equal(unlockedRoster(1).length, 531, '처음 40 + 추가 60 + 수학 165 + 🌌 영어 3 + 중간 13 + 📚 국어 150 + 🖊️ 논술 100은 바로 (🌌는 울트라홀이 따로 막는다)');
-  assert.equal(unlockedRoster(5).length, 551);
-  assert.equal(unlockedRoster(14).length, 571);
-  assert.equal(unlockedRoster(15).length, 592);
+  assert.equal(unlockedRoster(1).length, 561, '처음 40 + 추가 60 + 수학 165 + 🌌 영어 3 + 중간 13 + 📚 국어 150 + 🖊️ 논술 100 + 📮 편지 30은 바로 (🌌는 울트라홀이 따로 막는다)');
+  assert.equal(unlockedRoster(5).length, 581);
+  assert.equal(unlockedRoster(14).length, 601);
+  assert.equal(unlockedRoster(15).length, 622);
   assert.equal(ROSTER.find((r) => r.id === 889).ko, '자마젠타', '진우 요청 — 자시안의 짝');
   assert.equal(isUnlocked(25, 1), true, '피카츄는 처음부터');
   assert.equal(isUnlocked(129, 4), false, '잉어킹은 Lv5');
@@ -31,7 +32,7 @@ test('pickCharacters: n마리를 겹치지 않게, 부족하면 있는 만큼, �
   const picked = pickCharacters(chars, 8, () => 0.5);
   assert.equal(picked.length, 8);
   assert.equal(new Set(picked.map((c) => c.id)).size, 8, '중복 없음');
-  assert.equal(chars.length, 592, '원본 유지');
+  assert.equal(chars.length, 622, '원본 유지');
   assert.equal(pickCharacters(chars.slice(0, 3), 8).length, 3, '부족하면 있는 만큼');
   assert.deepEqual(pickCharacters([], 5), []);
   assert.deepEqual(pickCharacters(null, 5), []);

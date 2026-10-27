@@ -44,10 +44,10 @@ const nz = (v) => {
   return n > 0 ? n : 0;
 };
 
-/** 빠르기 (순수) — 지난 시간 ms → 칸/초 · 40에서 끝으로 갈수록 60까지 */
+/** 빠르기 (순수) — 지난 시간 ms → 칸/초 · 46에서 끝으로 갈수록 69까지 (40→60이었다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)) */
 export function runSpeed(ms) {
   const k = Math.min(1, Math.max(0, (Number(ms) || 0) / (RUN_SEC * 1000)));
-  return 40 + 20 * k;
+  return 46 + 23 * k;
 }
 
 /**

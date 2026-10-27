@@ -3936,6 +3936,7 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gm-game-name { font-size: 1.1rem; font-weight: 800; }
 .gm-game-how { font-size: 0.85rem; color: #555; word-break: keep-all; }
 .gm-game-best { font-size: 0.85rem; font-weight: 700; color: #e67700; }
+.gm-game-easy { font-size: 0.72rem; font-weight: 600; color: #8a8f98; } /* 쉬울 때 기록 — 작고 흐리게 (v351) */
 .gm-close { justify-self: center; }
 .gm-play-title { margin: 0; text-align: center; font-weight: 800; }
 .gm-stage { width: 100%; max-width: calc((100vh - 220px) * 1.05); justify-self: center; } /* 낮은 가로 화면에서도 판이 한 화면에(누르는 동안 카드가 안 밀리게) */
@@ -4025,8 +4026,8 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gs-img:not(.is-dark) { transform: scale(1.06); }
 .gs-name { position: absolute; left: 50%; bottom: 6%; max-width: 92%; padding: 4px 14px; overflow: hidden; border-radius: 999px; background: #2b2d42; color: #fff; font-size: 1.15rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; transform: translateX(-50%); animation: gm-pop 0.25s ease-out both; }
 .gs-name:empty { display: none; }
-.gs-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.gs-btn { min-height: 52px; padding: 8px 6px; border: 0; border-radius: 14px; background: #fff; color: #2b2d42; font: inherit; font-size: 1.05rem; font-weight: 800; word-break: keep-all; box-shadow: 0 4px 0 #8d99ae; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.gs-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; } /* 보기 여섯 — 세 칸 두 줄 (v351) */
+.gs-btn { min-height: 52px; padding: 8px 6px; border: 0; border-radius: 14px; background: #fff; color: #2b2d42; font: inherit; font-size: 0.98rem; font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; box-shadow: 0 4px 0 #8d99ae; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .gs-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #8d99ae; }
 .gs-btn:disabled { cursor: default; }
 .gs-btn.is-right { background: #51cf66; color: #fff; box-shadow: 0 4px 0 #2b8a3e; }
@@ -4361,15 +4362,15 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gj-peek { width: 80px; height: 64px; border-radius: 8px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5); }
 .gj-peek[hidden] { display: none; }
 .gj-field { position: relative; isolation: isolate; aspect-ratio: 2 / 1; border-radius: 18px; background-color: #3d405b; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
-.gj-board { position: absolute; left: 25%; top: 10%; width: 50%; height: 80%; box-sizing: border-box; border: 2px dashed rgba(255, 255, 255, 0.45); border-radius: 6px; background-color: rgba(0, 0, 0, 0.2); }
-.gj-pc { position: absolute; width: 15%; height: 30%; pointer-events: none; }
+.gj-board { position: absolute; left: 23%; top: 14%; width: 54%; height: 72%; box-sizing: border-box; border: 2px dashed rgba(255, 255, 255, 0.45); border-radius: 6px; background-color: rgba(0, 0, 0, 0.2); }
+.gj-pc { position: absolute; width: 13.5%; height: 27%; pointer-events: none; }
 .gj-pc canvas { display: block; width: 100%; height: 100%; }
 .gj-hit { position: absolute; top: 16.667%; right: 16.667%; bottom: 16.667%; left: 16.667%; pointer-events: auto; touch-action: none; cursor: grab; }
 .gj-pc.is-drag { filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.45)); }
 .gj-pc.is-drag .gj-hit { cursor: grabbing; }
 .gj-pc.is-done .gj-hit { pointer-events: none; cursor: default; }
 .gj-pc.is-snap { animation: gj-snap 0.25s ease-out; }
-.gj-full { position: absolute; left: 25%; top: 10%; width: 50%; height: 80%; z-index: 100000; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity 0.6s ease-out; }
+.gj-full { position: absolute; left: 23%; top: 14%; width: 54%; height: 72%; z-index: 100000; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity 0.6s ease-out; }
 .gj-full.is-on { opacity: 1; }
 .gj-pick { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 100001; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 12px; border-radius: 18px; background-color: rgba(43, 45, 66, 0.94); }
 .gj-pick[hidden] { display: none; }
@@ -4648,3 +4649,60 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gr-done-line.is-gift { font-weight: 800; color: var(--gr-ink); background: var(--gr-soft); border: 2px solid var(--gr-line); border-radius: 12px; padding: 8px 12px; }
 .gr-done-btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .gr-done-btns .btn { white-space: normal; word-break: keep-all; }
+
+/* ───────── 📮 포켓몬 편지 (v351) — 항공우편 봉투: 빨강·파랑 사선 테두리는 편지지에만, 나머지는 조용히 ───────── */
+.library-mail { margin-bottom: 14px; }
+.lt-strip {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; position: relative;
+  padding: 14px 18px; border-radius: 18px; border: 3px solid #93b4ea; background: #f2f6fd; color: #1e3a6e;
+  font-size: 1.08rem; font-weight: 800;
+}
+.lt-strip.is-new { border-color: #d64545; background: #fff5f5; color: #8a1f1f; }
+.lt-strip-text { min-width: 0; word-break: keep-all; }
+.lt-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: #e53935; box-shadow: 0 0 0 3px #fff; margin-left: auto; }
+.lt-main { max-width: 760px; margin: 0 auto; padding: 16px 16px 40px; display: grid; gap: 14px; }
+.lt-head { font-size: 1.3rem; margin: 4px 0 0; word-break: keep-all; }
+.lt-note, .lt-empty { margin: 0; color: var(--muted); word-break: keep-all; }
+.lt-empty { padding: 24px 4px; text-align: center; font-size: 1.05rem; }
+.lt-air { padding: 6px; border-radius: 16px; background: repeating-linear-gradient(135deg, #d64545 0 14px, #fffdf6 14px 22px, #2f5fb3 22px 36px, #fffdf6 36px 44px); }
+.lt-air.is-friend { box-shadow: 0 0 0 4px #f5c84b; }
+.lt-paper { background: #fffdf6; border-radius: 11px; padding: 16px; display: grid; gap: 10px; position: relative; min-width: 0; }
+.lt-stamp { position: absolute; top: 10px; right: 10px; width: 74px; height: 80px; border: 2px dashed #d64545; border-radius: 6px; display: grid; place-items: center; background: #fff; font-size: 2rem; }
+.lt-stamp img { width: 64px; height: 64px; object-fit: contain; }
+.lt-en { padding-right: 86px; font-size: 1.2rem; line-height: 1.55; color: #1d2433; min-width: 0; overflow-wrap: anywhere; }
+.lt-line { margin: 0; border-radius: 6px; transition: background .2s; }
+.lt-line.is-say { background: #fff1b8; }
+.lt-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.lt-tools .btn { min-height: 44px; }
+.lt-say.is-on { border-color: #d64545; color: #b42318; }
+.lt-ko { margin: 0; border-top: 1px dashed var(--border); padding-top: 10px; color: #4b5563; word-break: keep-all; line-height: 1.6; }
+.lt-help { background: #fff8e6; border: 2px solid #f6d58e; border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; }
+.lt-help p { margin: 0; word-break: keep-all; }
+.lt-starter b { font-size: 1.08rem; overflow-wrap: anywhere; }
+.lt-form { display: grid; gap: 10px; }
+.lt-write { background: var(--card); border: 2px solid var(--border); border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; }
+.lt-fixed { color: var(--muted); font-size: 1.1rem; }
+.lt-text { width: 100%; min-height: 9em; resize: vertical; font: inherit; font-size: 1.15rem; line-height: 1.55; border: 2px solid #c7d2fe; border-radius: 10px; padding: 10px 12px; background: #fff; color: var(--text); }
+.lt-text:focus { outline: 3px solid #a5b4fc; outline-offset: 1px; }
+.lt-env { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.lt-env-icon { font-size: 1.5rem; }
+.lt-env-bar { height: 16px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+.lt-env-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2f5fb3, #d64545); transition: width .25s; }
+.lt-env.is-full .lt-env-icon { animation: lt-pop .5s ease; }
+@keyframes lt-pop { 50% { transform: scale(1.35) rotate(-8deg); } }
+.lt-env-text, .lt-msg { margin: 0; word-break: keep-all; }
+.lt-msg { color: #b42318; }
+.lt-send, .lt-done { min-height: 52px; font-size: 1.1rem; }
+.lt-reply { display: grid; gap: 12px; }
+.lt-gift { margin: 0; padding: 12px 14px; border-radius: 14px; background: #eef6ff; border: 2px solid #b9d3f7; font-weight: 800; font-size: 1.08rem; word-break: keep-all; }
+.lt-gift.is-friend { background: #fff8db; border-color: #f5c84b; }
+.lt-mine { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 14px; padding: 12px 14px; font-size: 1.1rem; line-height: 1.5; overflow-wrap: anywhere; }
+.lt-fold { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 8px 12px; }
+.lt-fold > summary { cursor: pointer; font-weight: 700; min-height: 36px; display: flex; align-items: center; }
+.lt-fold[open] > summary { margin-bottom: 8px; }
+.lt-past { display: grid; gap: 12px; }
+.lt-past-item { display: grid; gap: 6px; }
+.lt-past-name { margin: 0; font-weight: 800; }
+@media (max-width: 480px) {
+  .lt-en { padding-right: 0; padding-top: 84px; }
+}

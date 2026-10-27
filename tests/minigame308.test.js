@@ -74,12 +74,12 @@ test('🎮 서비스워커 v308 · 새 파일 둘 · css', () => {
 
 // ───────────────────── 🏃 파트너 달리기 — 엔진 ─────────────────────
 
-test('🏃 빠르기 40 → 60칸/초 (끝으로 갈수록) · 묶음 비율', () => {
-  assert.equal(runSpeed(0), 40);
-  assert.equal(runSpeed(RUN_SEC * 1000), 60);
-  assert.equal(runSpeed(99e9), 60);
-  assert.equal(runSpeed(-5), 40);
-  assert.equal(runSpeed(NaN), 40);
+test('🏃 빠르기 46 → 69칸/초 (끝으로 갈수록 · v351 — 진우 「너무 쉬워요」 — 40→60이었다) · 묶음 비율', () => {
+  assert.equal(runSpeed(0), 46);
+  assert.equal(runSpeed(RUN_SEC * 1000), 69);
+  assert.equal(runSpeed(99e9), 69);
+  assert.equal(runSpeed(-5), 46);
+  assert.equal(runSpeed(NaN), 46);
   for (let ms = 0; ms < RUN_SEC * 1000; ms += 1000) assert.ok(runSpeed(ms + 1000) >= runSpeed(ms));
   assert.deepEqual([0, 0.29, 0.3, 0.54, 0.55, 0.74, 0.75, 0.91, 0.92, 0.999].map(runChunk),
     ['rock', 'rock', 'rockBerry', 'rockBerry', 'row', 'row', 'arc', 'arc', 'gold', 'gold']);
@@ -205,7 +205,7 @@ test('🏃 잘 뛰는 한 판(가짜 시계 · 씨앗 여덟) — 꽈당 0 · �
     assert.equal(s.score, s.berries + 3 * s.golds);
     assert.equal(s.score, r.gotPts);
     assert.ok(s.score >= 20 && s.score <= 80, `seed ${seed}: ⭐ ${s.score}`);
-    assert.ok(s.dist > 1400 && s.dist < 1600, `seed ${seed}: 달린 거리 ${s.dist}`);
+    assert.ok(s.dist > 1600 && s.dist < 1850, `seed ${seed}: 달린 거리 ${s.dist}`); // 평균 57.5칸/초 × 30초 (v351)
     assert.ok(s.objs.length <= 12 && s.objs.every((o) => o.x + o.w >= -4), `seed ${seed}: 지나간 물건은 지운다 (${s.objs.length})`);
     for (const o of r.added) {
       assert.ok(['rock', 'berry', 'gold'].includes(o.kind));
@@ -290,41 +290,42 @@ test('🏃 시계 — 깨진 때·뒤로 간 때는 안 움직임 · 앱을 내�
 // ───────────────────── 👤 그림자 포켓몬 — 엔진 ─────────────────────
 
 const mon = (id, ko, type) => ({ id, ko, type, url: `u${id}` });
-const FAKE = [mon(1, '하나', 'fire'), mon(2, '둘', 'fire'), mon(3, '셋', 'fire'), mon(4, '넷', 'fire'), mon(5, '다섯', 'water'), mon(6, '여섯', 'water')];
+// 보기 여섯(v351) — 불꽃 여섯 · 물 둘
+const FAKE = [mon(1, '하나', 'fire'), mon(2, '둘', 'fire'), mon(3, '셋', 'fire'), mon(4, '넷', 'fire'), mon(5, '다섯', 'fire'), mon(6, '여섯', 'fire'), mon(7, '일곱', 'water'), mon(8, '여덟', 'water')];
 
 test('👤 문제 포켓몬 고쳐 읽기 — id·이름 있는 것만 · 같은 id·같은 이름은 하나 · 타입 없으면 노말', () => {
   const p = shadowPoolOf([mon(1, '피카츄', 'electric'), mon(1, '또', 'x'), mon(2, '피카츄', 'x'), { id: 3, ko: ' 파이리 ' }, { id: -1, ko: 'a' }, { id: 4 }, null, { id: 2.5, ko: 'b' }, { id: '7', ko: '꼬부기', type: 'water' }]);
   assert.deepEqual(p.map((x) => [x.id, x.ko, x.type]), [[1, '피카츄', 'electric'], [3, '파이리', 'normal'], [7, '꼬부기', 'water']]);
   assert.deepEqual(shadowPoolOf(null), []);
   assert.equal(SHADOW_MIN, SHADOW_CHOICES);
-  assert.equal(SHADOW_CHOICES, 4);
+  assert.equal(SHADOW_CHOICES, 6, 'v351 — 진우 「너무 쉬워요」 — 넷이었다');
 });
 
-test('👤 보기 넷 — 정답 하나 + 같은 타입에서 셋(모자라면 다른 타입) · 이름이 다 다르다 · 진짜 명단 전체에서도', () => {
+test('👤 보기 여섯(v351 — 넷이었다) — 정답 하나 + 같은 타입에서 다섯(모자라면 다른 타입) · 이름이 다 다르다 · 진짜 명단 전체에서도', () => {
   const rng = seeded(11);
   for (let k = 0; k < 50; k++) {
     const c = shadowChoices(FAKE, FAKE[0], rng);
-    assert.equal(c.length, 4);
-    assert.equal(new Set(c.map((x) => x.id)).size, 4);
+    assert.equal(c.length, 6);
+    assert.equal(new Set(c.map((x) => x.id)).size, 6);
     assert.ok(c.some((x) => x.id === 1));
-    assert.ok(c.every((x) => x.type === 'fire'), '불꽃이 넷이면 다 불꽃');
-    const w = shadowChoices(FAKE, FAKE[4], rng);
+    assert.ok(c.every((x) => x.type === 'fire'), '불꽃이 여섯이면 다 불꽃');
+    const w = shadowChoices(FAKE, FAKE[6], rng);
     assert.equal(w.filter((x) => x.type === 'water').length, 2, '물은 둘뿐 — 나머지는 다른 타입에서');
-    assert.equal(new Set(w.map((x) => x.id)).size, 4);
+    assert.equal(new Set(w.map((x) => x.id)).size, 6);
   }
   // 정답 자리가 고르게 섞인다
-  const where = [0, 0, 0, 0];
+  const where = [0, 0, 0, 0, 0, 0];
   for (let k = 0; k < 400; k++) where[shadowChoices(FAKE, FAKE[2], rng).findIndex((x) => x.id === 3)] += 1;
-  assert.ok(where.every((n) => n > 60), `정답 자리 ${where}`);
-  // 진짜 명단 — 모든 포켓몬이 문제가 될 수 있고, 보기는 다 같은 타입(타입마다 넷 넘게 있다)
+  assert.ok(where.every((n) => n > 40), `정답 자리 ${where}`); // 400번 ÷ 여섯 ≈ 67
+  // 진짜 명단 — 모든 포켓몬이 문제가 될 수 있고, 보기는 다 같은 타입(타입마다 여섯 넘게 있다)
   const pool = shadowPoolOf(ROSTER.map((r) => ({ id: r.id, ko: r.ko, type: typeOf(r.id) })));
   assert.equal(pool.length, ROSTER.length, '명단에 이름이 겹치는 포켓몬이 없다');
   const byType = {};
   for (const p of pool) byType[p.type] = (byType[p.type] || 0) + 1;
-  assert.ok(Object.values(byType).every((n) => n >= 4), JSON.stringify(byType));
+  assert.ok(Object.values(byType).every((n) => n >= SHADOW_CHOICES), JSON.stringify(byType));
   for (const ans of pool) {
     const c = shadowChoices(pool, ans, rng);
-    assert.equal(new Set(c.map((x) => x.ko)).size, 4, ans.ko);
+    assert.equal(new Set(c.map((x) => x.ko)).size, SHADOW_CHOICES, ans.ko);
     assert.ok(c.every((x) => x.type === ans.type), ans.ko);
   }
 });
@@ -412,9 +413,9 @@ test('👤 그림이 깨지면 셈 없이 다음 문제 — 깨진 포켓몬은 
     assert.notEqual(n.id, first, '다시 문제로 안 나온다');
     assert.ok(!n.choices.includes(first), '보기에도 안 나온다');
   }
-  assert.ok(shadowSkip(s, 30, rng), '다섯 → 넷: 아직 낼 수 있다');
-  assert.equal(s.pool.length, 4);
-  assert.equal(shadowSkip(s, 40, rng), null, '셋만 남으면 문제를 못 낸다');
+  assert.ok(shadowSkip(s, 30, rng), '일곱 → 여섯: 아직 낼 수 있다');
+  assert.equal(s.pool.length, 6);
+  assert.equal(shadowSkip(s, 40, rng), null, '다섯만 남으면 문제를 못 낸다');
   assert.equal(s.q, null, '그림 없는 문제를 내지 않는다');
   assert.deepEqual([s.score, s.miss, s.skips, s.bad.length], [0, 0, 3, 3]);
   assert.equal(shadowSkip(s, 50, rng), null, '문제가 없으면 그대로');
@@ -567,9 +568,9 @@ test('🏃 화면 — 「준비!」 때 그만두면 판이 안 열린다', asyn
   assert.equal((w.doc.listeners.visibilitychange || []).length, 0);
 });
 
-const POOL6 = FAKE;
-test('👤 화면 — 이름 넷 · 맞히면 그림이 밝아지고 ⭐ · 틀리면 「정답은 ○○!」(점수 그대로) · 다음 문제 · 40초 뒤 끝', async (t) => {
-  const w = world(t, (stage) => runShadow(stage, { pool: POOL6, rng: seeded(8), hero: { html: '<b>파트너</b>' } }));
+const POOL8 = FAKE;
+test('👤 화면 — 이름 여섯 · 맞히면 그림이 밝아지고 ⭐ · 틀리면 「정답은 ○○!」(점수 그대로) · 다음 문제 · 40초 뒤 끝', async (t) => {
+  const w = world(t, (stage) => runShadow(stage, { pool: POOL8, rng: seeded(8), hero: { html: '<b>파트너</b>' } }));
   const root = w.stage.children[0];
   const [top, pic, list, pal] = root.children;
   const name = pic.children[1];
@@ -579,15 +580,15 @@ test('👤 화면 — 이름 넷 · 맞히면 그림이 밝아지고 ⭐ · 틀�
   assert.ok(btns.every((b) => b.disabled), '「준비!」 동안은 못 누름');
   w.adv(850);
   const img = imgOf();
-  assert.ok(btns.every((b) => b.textContent), '시작하면 이름 넷');
-  assert.equal(new Set(btns.map((b) => b.textContent)).size, 4);
+  assert.ok(btns.every((b) => b.textContent), '시작하면 이름 여섯');
+  assert.equal(new Set(btns.map((b) => b.textContent)).size, 6);
   assert.ok(btns.every((b) => b.disabled) && img.classList.contains('is-wait'), '그림이 뜨기 전엔 감추고 못 누름 (🔍 Codex 114차 #1)');
   img.fire('load');
   assert.ok(btns.every((b) => !b.disabled) && !img.classList.contains('is-wait'), '그림이 뜨면 누를 수 있다');
   assert.ok(img.classList.contains('is-dark'), '처음엔 그림자');
   assert.match(img.src, /^u\d$/);
   const id = Number(img.src.slice(1));
-  const ko = POOL6.find((p) => p.id === id).ko;
+  const ko = POOL8.find((p) => p.id === id).ko;
   btns.find((b) => b.textContent === ko).fire('click');
   assert.equal(img.classList.contains('is-dark'), false, '맞히면 그림이 짠');
   assert.equal(name.textContent, `${ko}!`);
@@ -600,7 +601,7 @@ test('👤 화면 — 이름 넷 · 맞히면 그림이 밝아지고 ⭐ · 틀�
   assert.ok(img2.classList.contains('is-dark') && img2.classList.contains('is-wait'), '다음 문제는 감춘 그림자부터');
   assert.equal(name.textContent, '');
   const id2 = Number(img2.src.slice(1));
-  const ko2 = POOL6.find((p) => p.id === id2).ko;
+  const ko2 = POOL8.find((p) => p.id === id2).ko;
   // 그림이 뜨기 전에 누르면 아무 일도 없다
   btns.find((b) => b.textContent === ko2).fire('click');
   assert.equal(top.children[0].textContent, '⭐ 1', '뜨기 전 누름은 안 셈');
@@ -633,8 +634,8 @@ test('👤 화면 — 이름 넷 · 맞히면 그림이 밝아지고 ⭐ · 틀�
   assert.equal((w.doc.listeners.visibilitychange || []).length, 0);
 });
 
-test('👤 화면 — 그림이 깨지면 셈 없이 다음 문제 · 넷이 안 되게 깨지면 「그림을 불러오지 못했어요」로 한 번만 끝 (🔍 Codex 114차 #2)', async (t) => {
-  const w = world(t, (stage) => runShadow(stage, { pool: POOL6.slice(0, 5), rng: seeded(8) }));
+test('👤 화면 — 그림이 깨지면 셈 없이 다음 문제 · 여섯이 안 되게 깨지면 「그림을 불러오지 못했어요」로 한 번만 끝 (🔍 Codex 114차 #2)', async (t) => {
+  const w = world(t, (stage) => runShadow(stage, { pool: POOL8.slice(0, 7), rng: seeded(8) }));
   w.adv(850);
   const root = w.stage.children[0];
   const pic = root.children[1];
@@ -650,7 +651,7 @@ test('👤 화면 — 그림이 깨지면 셈 없이 다음 문제 · 넷이 안
   assert.equal(root.children[0].children[0].textContent, '⭐ 0');
   let resolved = 0;
   w.h.done.then(() => { resolved += 1; });
-  b.fire('error'); // 다섯 → 넷 → 셋: 더는 못 낸다
+  b.fire('error'); // 일곱 → 여섯 → 다섯: 더는 못 낸다
   assert.equal(pic.children[0].children.length, 0, '그림 없는 문제를 내지 않는다');
   assert.equal(pic.children[1].textContent, '그림을 불러오지 못했어요');
   assert.ok(btns.every((x) => x.disabled), '찍을 단추도 없다');
@@ -663,7 +664,7 @@ test('👤 화면 — 그림이 깨지면 셈 없이 다음 문제 · 넷이 안
 });
 
 test('👤 화면 — 그림이 너무 늦으면(1.5초) 깨진 것으로 넘김 · 앱을 내려 둔 동안은 기다림에 안 셈', async (t) => {
-  const w = world(t, (stage) => runShadow(stage, { pool: POOL6, rng: seeded(3) }));
+  const w = world(t, (stage) => runShadow(stage, { pool: POOL8, rng: seeded(3) }));
   w.adv(850);
   const pic = w.stage.children[0].children[1];
   const imgOf = () => pic.children[0].children[0];
@@ -681,7 +682,7 @@ test('👤 화면 — 그림이 너무 늦으면(1.5초) 깨진 것으로 넘김
 });
 
 test('👤 화면 — 그림을 기다리다 앱을 오래 내린 동안 그림이 깨져도, 돌아오면 다음 문제로 (🔍 Codex 115차 #1)', async (t) => {
-  const w = world(t, (stage) => runShadow(stage, { pool: POOL6, rng: seeded(5) }));
+  const w = world(t, (stage) => runShadow(stage, { pool: POOL8, rng: seeded(5) }));
   w.adv(850);
   const root = w.stage.children[0];
   const pic = root.children[1];
@@ -703,7 +704,7 @@ test('👤 화면 — 그림을 기다리다 앱을 오래 내린 동안 그림�
 });
 
 test('👤 화면 — 보기가 넷이 안 되면 빈 판으로 바로 끝 (판은 gameview가 쓰기 전에 막는다)', async (t) => {
-  const v = world(t, (stage) => runShadow(stage, { pool: POOL6.slice(0, 3), rng: seeded(8) }));
+  const v = world(t, (stage) => runShadow(stage, { pool: POOL8.slice(0, 3), rng: seeded(8) }));
   v.adv(850);
   await v.flush();
   v.adv(1000);

@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v350';
+const CACHE_VERSION = 'v351';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -36,7 +36,10 @@ const APP_SHELL = [
   './js/grammar.js', // 📝 영어 문법 (v348) → 영상 사이 📝 문법 쪽지 (v349)
   './js/grammarnote.js',
   './js/grammarvideo.js', // 🎬 영상 문장 문제 (v350 — 원고는 비공개 저장소에서 받는다)
+  './js/letters.js', // 📮 포켓몬 편지 규칙 (v351)
+  './js/lettersview.js', // 📮 포켓몬 편지 화면 (v351)
   './coach/english/grammar.json',
+  './coach/english/letters.json', // 📮 편지 원고 30통 (v351 — 공개 · 진우 기록 아님)
   './js/korbattle.js', // ⚔️ 국어·논술 배틀 (v325)
   './js/korbattleview.js',
   './js/korxp.js', // ⚡ 국어·논술 경험치 · 🚀 로켓단 · 📣 응원 (v327)

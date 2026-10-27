@@ -73,11 +73,11 @@ test('🔀 타입 자료 — 열여덟 타입마다 색 · 이름(대여행과 �
   assert.equal(josaNeun('잉어킹'), '은');
 });
 
-test('🔀 빠르기·카드 모음 — 다 내려오는 데 5.2 → 2.8초 · 높이 4 → 30칸 · 깨진 카드·모르는 타입·같은 번호는 뺀다', () => {
-  assert.equal(sortFall(0), 5200);
-  assert.equal(sortFall(SORT_SEC * 1000), 2800);
-  assert.equal(sortFall(-9), 5200);
-  assert.equal(sortFall(9e9), 2800);
+test('🔀 빠르기·카드 모음 — 다 내려오는 데 4.4 → 2.4초(v351 — 5.2→2.8이었다) · 높이 4 → 30칸 · 깨진 카드·모르는 타입·같은 번호는 뺀다', () => {
+  assert.equal(sortFall(0), 4400);
+  assert.equal(sortFall(SORT_SEC * 1000), 2400);
+  assert.equal(sortFall(-9), 4400);
+  assert.equal(sortFall(9e9), 2400);
   const card = { born: 1000, fall: 4000 };
   assert.deepEqual([sortProg(card, 1000), sortProg(card, 3000), sortProg(card, 9000), sortY(card, 1000), sortY(card, 5000)], [0, 0.5, 1, TOP_Y, BOT_Y]);
   assert.deepEqual(sortPool([{ id: 25, types: ['electric'] }, { id: 25, types: ['electric'] }, { id: 7, types: ['water', 'mystery'] }, { id: 'x', types: ['fire'] }, { id: 9, types: [] }, null, { id: 4 }]),
@@ -614,7 +614,7 @@ test('🔍 화면 — 방 그림 둘(벽지·바닥 색 · 가구) · 다른 곳
   pl.fire('pointerdown', { clientX: miss[0], clientY: miss[1] * 0.7 });
   assert.ok(marks(pl).children.some((m) => m.textContent === '✕'));
   assert.equal(top.children[0].textContent, '⭐ 0');
-  // 20초 동안 못 찾으면 ✨
+  // 30초 동안 못 찾으면 ✨ (v351 — 20초였다)
   w.adv(HINT_MS + 300);
   assert.ok(marks(pr).children.some((m) => m.className.includes('is-hint')), '힌트');
   for (const [k, sp] of made.spots.entries()) {
@@ -632,7 +632,7 @@ test('🔍 화면 — 방 그림 둘(벽지·바닥 색 · 가구) · 다른 곳
   await w.flush();
   assert.equal(w.st.over.quit, false);
   assert.equal(w.st.over.score, DIFF_N);
-  assert.equal(w.st.over.sec, 24, '「준비!」 뒤부터 마지막을 찾을 때까지 24.4초'); // 시작 1.8초 · 틀린 곳 · 힌트까지 20.3초 · 다섯을 1초마다 → 26.2초
+  assert.equal(w.st.over.sec, 34, '「준비!」 뒤부터 마지막을 찾을 때까지 34.4초'); // 시작 1.8초 · 틀린 곳 · 힌트까지 30.3초 · 다섯을 1초마다 → 36.2초
   assert.equal((w.doc.listeners.visibilitychange || []).length, 0);
 });
 

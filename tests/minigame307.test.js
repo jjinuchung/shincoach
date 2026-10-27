@@ -153,7 +153,8 @@ test('🎮 한 판 끝 규칙 — 💗는 게임기로 하루 한 번(playRule �
   assert.deepEqual([b.heart, b.best, b.prevBest, b.newBest], [false, 15, 15, false], '같은 날 두 번째 💗 없음 · 낮은 점수는 기록을 안 내림');
   const c = gameEndRule(p, R, 2, 'dig', 22, T + DAY);
   assert.deepEqual([c.heart, c.best, c.newBest], [true, 22, true], '다음 날은 또 💗');
-  assert.equal(p.homePlay.best.dig, 22);
+  assert.equal(p.homePlay.best.digh, 22, '새 난이도 기록 열쇠 (v351)');
+  assert.equal(p.homePlay.best.dig, undefined, '쉬울 때 열쇠는 안 건드린다');
   assert.deepEqual([p.coins, p.items.f_game, p.xp || 0], [500, 1, 0], '경제는 그대로');
   // 점수 자르기
   assert.equal(gameEndRule(pf(), R, 2, 'dig', 1e9, T).best, SCORE_MAX);
@@ -162,7 +163,7 @@ test('🎮 한 판 끝 규칙 — 💗는 게임기로 하루 한 번(playRule �
   const q = pf({ partner: null });
   const r = gameEndRule(q, R, 2, 'dig', 8, T);
   assert.deepEqual([r.ok, r.heart, r.mon, r.best], [true, false, null, 8]);
-  assert.equal(q.homePlay.best.dig, 8);
+  assert.equal(q.homePlay.best.digh, 8);
   // 못 하는 경우 — 모르는 게임 · 캐릭터 없음 · 게임기가 그 방에 없음
   assert.deepEqual(gameEndRule(pf(), R, 2, 'Dig!', 5, T), { ok: false, why: 'game' });
   assert.equal(gameEndRule(pf({ avatar: undefined }), R, 2, 'dig', 5, T).why, 'made');
@@ -180,7 +181,7 @@ test('★ 🎮 한 판 끝 저장 경로: 💗·최고 기록이 저장된 프�
   await reloadProfile();
   const rs = await Promise.all([gameEnd(R, 2, 'dig', 12), gameEnd(R, 2, 'dig', 20)]);
   assert.deepEqual(rs.map((r) => r.heart).sort(), [false, true]);
-  assert.equal(stored().homePlay.best.dig, 20);
+  assert.equal(stored().homePlay.best.digh, 20);
   assert.equal(stored().homePlay.bond[FROG], 1);
   assert.equal(gameBest('dig'), 20, '창의 프로필도');
   const s0 = stored();
@@ -188,21 +189,22 @@ test('★ 🎮 한 판 끝 저장 경로: 💗·최고 기록이 저장된 프�
   const f = await gameEnd(R, 2, 'dig', 99);
   assert.deepEqual(f, { ok: false, why: 'save' });
   assert.deepEqual(stored().homePlay, s0.homePlay);
-  assert.equal(getProfileSnapshot().homePlay.best.dig, 20, '메모리로 성공한 척하지 않는다');
+  assert.equal(getProfileSnapshot().homePlay.best.digh, 20, '메모리로 성공한 척하지 않는다');
   assert.deepEqual([stored().coins, stored().items.f_game], [500, 1], '경제는 그대로');
 });
 
 // ───────────────────── 🕳️ 디그다 엔진 ─────────────────────
 
-test('🕳️ 빠르기 — 끝으로 갈수록 빨라진다 · 나오는 것: 닥트리오 12% · 찌리리공은 3초 뒤부터 15%', () => {
-  assert.deepEqual(digPace(0), { gap: 850, stay: 1300 });
-  assert.deepEqual(digPace(DIG_SEC * 1000), { gap: 500, stay: 800 });
+test('🕳️ 빠르기 — 끝으로 갈수록 빨라진다 · 나오는 것: 닥트리오 12% · 찌리리공은 3초 뒤부터 20% (v351 — 진우 「너무 쉬워요」 — 나와 있는 동안 1.3→0.8초 · 15%였다)', () => {
+  assert.deepEqual(digPace(0), { gap: 850, stay: 1100 });
+  assert.deepEqual(digPace(DIG_SEC * 1000), { gap: 500, stay: 650 });
   assert.deepEqual(digPace(99e9), digPace(DIG_SEC * 1000), '끝을 넘어도 그대로');
   for (let ms = 0; ms < DIG_SEC * 1000; ms += 1000) assert.ok(digPace(ms + 1000).gap <= digPace(ms).gap);
   assert.equal(digKind(0.05, 0), 'dugtrio');
   assert.equal(digKind(0.2, 2999), 'diglett', '3초 전엔 찌리리공 없음');
   assert.equal(digKind(0.2, 3000), 'voltorb');
   assert.equal(digKind(0.5, 9000), 'diglett');
+  assert.deepEqual([digKind(0.3199, 9000), digKind(0.32, 9000)], ['voltorb', 'diglett'], '찌리리공 20% 경계');
   assert.deepEqual(Object.fromEntries(Object.entries(DIG_KINDS).map(([k, v]) => [k, [v.id, v.pts, !!v.zap]])), { diglett: [50, 1, false], dugtrio: [51, 3, false], voltorb: [100, 0, true] });
 });
 

@@ -333,7 +333,7 @@ test('🎣 던지기·입질·챔 — 톡 → 1.5~4.5초 뒤 쏙 · 일찍 누�
   assert.deepEqual([s.reel.b, s.reel.p], [BAR0, 0]);
   assert.equal(fishTap(s, s.last + 400).kind, 'busy', '힘겨루기 중 톡은 아무것도');
   assert.deepEqual([s.casts, s.bites, s.slips, s.hooks], [1, 2, 1, 1]);
-  assert.equal(BITE_MS, 1000);
+  assert.equal(BITE_MS, 800, 'v351 — 진우 「너무 쉬워요」 — 1초였다');
 });
 
 /** 막대가 칸 가운데보다 아래면 꾹 — 잘하는 손 */

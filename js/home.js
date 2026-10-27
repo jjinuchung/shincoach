@@ -176,13 +176,13 @@ export function mathBonusFor(m, today) {
 }
 
 /**
- * 카드 하나에 얹을 것 (순수) — 수학: ✨·📬 · 영어: 🔁 복습 · 국어·논술: ✨
+ * 카드 하나에 얹을 것 (순수) — 수학: ✨·📬 · 영어: 🔁 복습 · 📮 편지(새 편지·안 읽은 답장이면 설명 줄을 바꾼다, v351) · 국어·논술: ✨
  * 🔁 복습 칩은 영어 카드에만 — 영어 문장 복습 수라서(예전엔 수학을 뺀 모든 카드에 넘겨 국어·논술 카드에도 「복습 N문장」이 붙었다, v330)
- * @param {object} s SUBJECTS 한 줄 · @param {{bonus?:object, unread?:number, reviewDue?:number, korBonus?:object}} x
+ * @param {object} s SUBJECTS 한 줄 · @param {{bonus?:object, unread?:number, reviewDue?:number, korBonus?:object, mail?:boolean}} x
  */
-export function cardSubject(s, { bonus = null, unread = 0, reviewDue = 0, korBonus = {} } = {}) {
+export function cardSubject(s, { bonus = null, unread = 0, reviewDue = 0, korBonus = {}, mail = false } = {}) {
   if (s.key === 'math') return { ...s, bonus, ...(unread ? { desc: `📬 아빠 답장 ${unread}개 — 먼저 읽어요` } : {}) };
-  if (s.key === 'english') return { ...s, reviewDue };
+  if (s.key === 'english') return { ...s, reviewDue, ...(mail ? { desc: '📮 편지가 왔어요' } : {}) };
   const kb = korBonus && Object.hasOwn(korBonus, s.key) ? korBonus[s.key] : null;
   return kb ? { ...s, bonus: kb } : { ...s };
 }
@@ -243,9 +243,15 @@ export async function renderHome(showView) {
     const d = await getDaily(day);
     for (const k of ['korean', 'nonsul']) korBonus[k] = korBonusFor(d, day, k);
   } catch { /* 칩 없이 */ }
+  // 📮 영어 카드에 「편지가 왔어요」 (v351) — 원고를 못 받거나 늦으면 줄 없이(홈을 오래 붙잡지 않게)
+  let mail = false;
+  try {
+    const lv = await import('./lettersview.js');
+    mail = await Promise.race([lv.homeLetterDot(), new Promise((r) => setTimeout(() => r(false), 1500))]);
+  } catch { mail = false; }
   const frag = document.createDocumentFragment();
   const shinyOf = (id) => { const l = getLook(id); return l && l.shinyUrl ? l.shinyUrl : null; };
-  for (const s of SUBJECTS) frag.appendChild(cardEl(cardSubject(s, { bonus, unread, reviewDue, korBonus }), pickMascot(s.mascot, chars, shinyOf), pick));
+  for (const s of SUBJECTS) frag.appendChild(cardEl(cardSubject(s, { bonus, unread, reviewDue, korBonus, mail }), pickMascot(s.mascot, chars, shinyOf), pick));
   list.innerHTML = '';
   list.appendChild(frag);
   hint.hidden = true;

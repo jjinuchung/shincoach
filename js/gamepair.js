@@ -10,7 +10,7 @@ import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 ·
 /** 한 판(초) · 한 번에 까는 짝 수 · 앞면 보여 주기 · 틀린 짝을 보여 주는 동안 · 다 맞힌 뒤 새 카드까지 (ms) */
 export const PAIR_SEC = 60;
 export const PAIR_PAIRS = 6;
-export const PEEK_MS = 2000;
+export const PEEK_MS = 1500; // 2초였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 export const MISS_MS = 800;
 export const CLEAR_MS = 700;
 

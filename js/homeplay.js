@@ -73,7 +73,20 @@ export function mergePlay(a, b) {
   return playOf(x);
 }
 
-/** 🎮 그 게임의 최고 점수 (없으면 0) */
+/**
+ * 🎮 기록 판 (v351 — 진우 「너무 쉬워요」 → 게임 15개를 조금씩 어렵게 · 아버님 「추천대로」) — 새 난이도 기록은 게임 id 뒤에 h를 붙인 열쇠(dig → digh)에
+ * 따로 적고, 옛 열쇠(쉬울 때 기록)는 그대로 둔다(게임 카드에 「쉬울 때 ⭐」로 작게).
+ * 새 칸(best2 같은)을 두지 않은 까닭: 옛 판 앱(v350)의 playOf는 모르는 칸을 버리지만 best·fast 안의 GAME_KEY 열쇠는 남긴다
+ * — 태블릿이 옛 판으로 한 번 더 켜져 게임을 해도(옛 판은 옛 열쇠에 적는다) 새 기록이 안 사라진다
+ */
+export const REC_SUFFIX = 'h';
+/** 새 난이도 기록 열쇠 — 열쇠 꼴(GAME_KEY · 12자까지)에 맞지 않으면 '' */
+export function recKey(gameId) {
+  const k = `${gameId}${REC_SUFFIX}`;
+  return GAME_KEY.test(String(gameId)) && GAME_KEY.test(k) ? k : '';
+}
+
+/** 🎮 그 게임의 최고 점수 (없으면 0) — 열쇠 그대로(새 난이도 기록은 recKey로 부른다) */
 export function bestOf(raw, gameId) {
   const b = playOf(raw).best;
   return b && own(b, gameId) ? b[gameId] : 0;
@@ -223,25 +236,26 @@ export function playRule(profile, roomId, u, now) {
 }
 
 /**
- * 🎮 미니 게임 한 판이 끝났다 (v307) — 그 기기로 놀기(playRule — 💗 하루 한 번) + 그 게임의 최고 점수.
+ * 🎮 미니 게임 한 판이 끝났다 (v307) — 그 기기로 놀기(playRule — 💗 하루 한 번) + 그 게임의 최고 점수(v351부터 새 난이도 열쇠 recKey).
  * 판은 시작할 때 이미 썼다(gameview — daily gamePlays) · 점수는 게임이 센 것(0 ~ SCORE_MAX로 자름 — 💰·스톤과 안 이어진다)
  * why: playRule과 같고 + 'game' 모르는 게임 · 최고 점수는 늘기만 한다(파트너가 없어도 적는다)
  * sec = ⏱️ 다 맞추는 데 걸린 초(v339 🖼️ 그림 맞추기 — 끝까지 한 판만 · 없으면 0) — 가장 빠른 시간은 줄기만 한다
  * → { ...playRule 결과, best, prevBest, newBest, fast, prevFast, newFast }
  */
 export function gameEndRule(profile, roomId, u, gameId, score, now, sec = 0) {
-  if (!GAME_KEY.test(String(gameId))) return { ok: false, why: 'game' };
+  const key = recKey(gameId); // 🎮 새 난이도 기록 열쇠 (v351)
+  if (!key) return { ok: false, why: 'game' };
   const r = playRule(profile, roomId, u, now);
   if (!r.ok) return r;
   const hp = playOf(profile.homePlay);
-  const prevBest = bestOf(hp, gameId);
+  const prevBest = bestOf(hp, key);
   const s = Number.isSafeInteger(score) && score > 0 ? Math.min(score, SCORE_MAX) : 0;
   const newBest = s > prevBest;
-  if (newBest) hp.best = { ...(hp.best || {}), [gameId]: s };
-  const prevFast = fastOf(hp, gameId);
+  if (newBest) hp.best = { ...(hp.best || {}), [key]: s };
+  const prevFast = fastOf(hp, key);
   const t = Number.isSafeInteger(sec) && sec > 0 && sec <= FAST_MAX ? sec : 0;
   const newFast = t > 0 && (!prevFast || t < prevFast);
-  if (newFast) hp.fast = { ...(hp.fast || {}), [gameId]: t };
+  if (newFast) hp.fast = { ...(hp.fast || {}), [key]: t };
   if (newBest || newFast) profile.homePlay = hp;
   return { ...r, best: Math.max(prevBest, s), prevBest, newBest, fast: newFast ? t : prevFast, prevFast, newFast };
 }

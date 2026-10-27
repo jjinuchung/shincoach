@@ -3359,6 +3359,13 @@ function loadSettings() {
     s.gameRule328 = true;
     try { localStorage.setItem('shincoach.settings', JSON.stringify(s)); } catch { /* 무시 */ }
   }
+  // 🏦 투자 한도 기본값 30 → 40% (v351, 아버님 「가진 것의 40%로 늘려서 디폴트 값으로」) — 옛 기본값 30이 저장된 태블릿도 **한 번만** 40으로
+  //   (다른 값을 고른 것은 그대로 · 그 뒤 아버님이 ⚙에서 30으로 되돌리면 그대로 30)
+  if (!s.stockCap351) {
+    if (Number(s.stockCap) === 30) s.stockCap = STOCK_CAP;
+    s.stockCap351 = true;
+    try { localStorage.setItem('shincoach.settings', JSON.stringify(s)); } catch { /* 무시 */ }
+  }
   return s;
 }
 

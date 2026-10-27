@@ -1,0 +1,629 @@
+{
+ "v": 1,
+ "grades": {
+  "star": {
+   "icon": "🌟",
+   "ko": "정말 잘 썼어요",
+   "rule": "편지 물음에 답한 완성 문장(누가 + 움직임)이 다섯 개 넘고, 포켓몬 사실이 맞고, 고칠 곳이 거의 없다 — 앱이 2주에 한 번까지만 그 포켓몬을 주고, 그 안이면 👍 상자로 바꾼다(todo의 starOpen)"
+  },
+  "good": {
+   "icon": "👍",
+   "ko": "잘 썼어요",
+   "rule": "편지 물음에 답한 완성 문장이 있고, 포켓몬 사실이 대체로 맞다 (고칠 곳이 조금 있어도 된다)"
+  },
+  "ok": {
+   "icon": "🙂",
+   "ko": "애썼어요",
+   "rule": "문장이 짧거나 고칠 곳이 많지만 진우가 제 말로 쓴 영어다"
+  },
+  "again": {
+   "icon": "✉️",
+   "ko": "다시 써 볼까?",
+   "rule": "영어가 아니거나, 뜻 없는 글자를 늘어놓았거나, 편지 문장을 거의 그대로 베꼈다 — 선물 없이 같은 편지에 다시 쓴다"
+  }
+ },
+ "reply": {
+  "en": "포켓몬의 답장 영어 2~3문장 — 진우가 쓴 내용에 대답한다 · 쉬운 낱말 · 선물 이야기는 쓰지 않는다(앱이 붙인다) · 「Dear Jinwoo,」·「From, 이름」은 앱이 붙인다",
+  "ko": "en의 우리말",
+  "ps": "P.S. 고칠 문장 하나 — 진우 문장을 고친 꼴 + 까닭 짧게(영어) · 고칠 곳이 없으면 빈칸 · 고칠 문장은 선물과 상관없다",
+  "psKo": "ps의 우리말 — 까닭은 문법 단원의 말로"
+ },
+ "letters": [
+  {
+   "id": 235,
+   "en": "Smeargle",
+   "ko": "루브도",
+   "focus": "G4",
+   "body": [
+    "Hi! I am Smeargle.",
+    "I am a Normal-type Pokémon.",
+    "I can paint with the tip of my tail.",
+    "My paint gets darker or lighter with my feelings.",
+    "I heard you know a lot about Pokémon!",
+    "I want to be your friend and study English with you.",
+    "What is your favorite Pokémon? What can it do?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 루브도야. 노말 타입 포켓몬이야. 나는 꼬리 끝으로 그림을 그릴 수 있어. 내 물감 색은 기분에 따라 진해지기도 하고 옅어지기도 해. 네가 포켓몬을 아주 많이 안다고 들었어! 너랑 친구가 되고 영어도 같이 공부하고 싶어. 네가 가장 좋아하는 포켓몬은 누구야? 그 포켓몬은 무엇을 할 수 있어? 답장해 줘!",
+   "ask": "좋아하는 포켓몬 · 할 수 있는 것(기술 — can 뒤에는 원래 모양)",
+   "starter": "My favorite Pokémon is ___. It can ___."
+  },
+  {
+   "id": 213,
+   "en": "Shuckle",
+   "ko": "단단지",
+   "focus": "G9",
+   "body": [
+    "Hi! I am Shuckle.",
+    "I am a Bug- and Rock-type Pokémon.",
+    "I keep berries inside my hard shell.",
+    "After a while, the berries turn into sweet juice!",
+    "When I am scared, I hide under a rock and stay very still.",
+    "I want to share my berry juice with you.",
+    "What food do you like? What does your favorite Pokémon eat?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 단단지야. 벌레·바위 타입 포켓몬이야. 나는 단단한 껍질 속에 나무열매를 모아 둬. 시간이 지나면 나무열매가 달콤한 주스가 돼! 무서울 때는 바위 밑에 숨어서 꼼짝하지 않아. 내 나무열매 주스를 너랑 나눠 마시고 싶어. 너는 어떤 음식을 좋아해? 네가 좋아하는 포켓몬은 무엇을 먹어? 답장해 줘!",
+   "ask": "좋아하는 음식 · 좋아하는 포켓몬이 먹는 것(그 포켓몬은 한 마리라 eats처럼 -s)",
+   "starter": "I like ___. My favorite Pokémon eats ___."
+  },
+  {
+   "id": 313,
+   "en": "Volbeat",
+   "ko": "볼비트",
+   "focus": "G6",
+   "body": [
+    "Hi! I am Volbeat.",
+    "I am a Bug-type Pokémon.",
+    "At night, my tail lights up like a lightbulb.",
+    "I talk to my friends by flashing my light.",
+    "I live near clean ponds.",
+    "My best friend is Illumise. She has a sweet smell.",
+    "I want to be your friend, too!",
+    "Who is your best friend? What do you do together?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 볼비트야. 벌레 타입 포켓몬이야. 밤이 되면 내 꼬리가 전구처럼 빛나. 나는 빛을 깜박여서 친구들과 이야기해. 나는 깨끗한 연못 근처에 살아. 내 가장 친한 친구는 네오비트야. 네오비트에게서는 달콤한 향기가 나. 너랑도 친구가 되고 싶어! 너의 가장 친한 친구는 누구야? 너희는 함께 무엇을 해? 답장해 줘!",
+   "ask": "가장 친한 친구(사람이든 포켓몬이든) · 함께 하는 것",
+   "starter": "My best friend is ___. We ___ together."
+  },
+  {
+   "id": 314,
+   "en": "Illumise",
+   "ko": "네오비트",
+   "focus": "G6",
+   "body": [
+    "Hi! I am Illumise.",
+    "I am a Bug-type Pokémon.",
+    "I wake up when the sun goes down.",
+    "My sweet smell calls Volbeat to me.",
+    "Then we draw pictures with light in the night sky.",
+    "We can draw more than 200 different patterns!",
+    "Let's draw a picture together someday!",
+    "Do you like drawing? What do you draw?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 네오비트야. 벌레 타입 포켓몬이야. 나는 해가 지면 깨어나. 볼비트는 내 달콤한 향기를 맡고 나에게 와. 그러면 우리는 밤하늘에 빛으로 그림을 그려. 우리는 200가지가 넘는 무늬를 그릴 수 있어! 언젠가 우리 같이 그림 그리자! 너는 그림 그리기를 좋아해? 무엇을 그려? 답장해 줘!",
+   "ask": "그림 그리기를 좋아하는지 · 무엇을 그리는지(좋아하는 포켓몬 그림도 좋아요)",
+   "starter": "Yes, I do. I draw ___. / No, I don't. I like ___."
+  },
+  {
+   "id": 351,
+   "en": "Castform",
+   "ko": "캐스퐁",
+   "focus": "G8",
+   "body": [
+    "Hi! I am Castform.",
+    "I am a Normal-type Pokémon.",
+    "My body changes with the weather.",
+    "When it is sunny, I look like the sun.",
+    "When it is rainy, I look like a raindrop.",
+    "When it is snowy, I look like a snow cloud.",
+    "My type changes, too!",
+    "Let's be friends!",
+    "How is the weather in your town today? What weather do you like?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 캐스퐁이야. 노말 타입 포켓몬이야. 내 몸은 날씨에 따라 바뀌어. 맑은 날에는 태양처럼 보여. 비 오는 날에는 빗방울처럼 보여. 눈 오는 날에는 눈구름처럼 보여. 내 타입도 바뀌어! 우리 친구 하자! 오늘 네가 사는 곳 날씨는 어때? 너는 어떤 날씨를 좋아해? 답장해 줘!",
+   "ask": "오늘 날씨(날씨는 It으로 — It is sunny.) · 좋아하는 날씨와 까닭",
+   "starter": "It is ___ today. I like ___ days because ___."
+  },
+  {
+   "id": 352,
+   "en": "Kecleon",
+   "ko": "켈리몬",
+   "focus": "G16",
+   "body": [
+    "Hi! I am Kecleon.",
+    "I am a Normal-type Pokémon.",
+    "I can change the color of my body.",
+    "But I can't change the red zigzag on my belly!",
+    "My color also changes when I am happy or sad.",
+    "If nobody looks at me for a long time, I get grumpy.",
+    "Please don't forget me. Let's be friends!",
+    "What color do you like? Why do you like it?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 켈리몬이야. 노말 타입 포켓몬이야. 나는 몸 색을 바꿀 수 있어. 하지만 배에 있는 빨간 톱니무늬는 못 바꿔! 기쁘거나 슬플 때도 내 색이 바뀌어. 아무도 오랫동안 나를 안 보면 나는 삐져. 나를 잊지 마. 우리 친구 하자! 너는 무슨 색을 좋아해? 왜 좋아해? 답장해 줘!",
+   "ask": "좋아하는 색 · 까닭(because 뒤에 까닭)",
+   "starter": "I like ___ because ___."
+  },
+  {
+   "id": 357,
+   "en": "Tropius",
+   "ko": "트로피우스",
+   "focus": "G4",
+   "body": [
+    "Hi! I am Tropius.",
+    "I am a Grass- and Flying-type Pokémon.",
+    "I fly by flapping the big leaves on my back.",
+    "Sweet fruit grows around my neck two times a year.",
+    "Long ago, I ate the same fruit every day. Then fruit started to grow on me!",
+    "Children love my fruit, so I share it with them.",
+    "I want to share my fruit with you, too!",
+    "What is your favorite fruit? Which Pokémon can fly like me?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 트로피우스야. 풀·비행 타입 포켓몬이야. 나는 등에 있는 큰 잎사귀를 펄럭여서 날아. 내 목에는 1년에 두 번 달콤한 과일이 열려. 옛날에 나는 매일 같은 과일을 먹었어. 그랬더니 내 몸에 과일이 열리기 시작했어! 아이들이 내 과일을 아주 좋아해서 나는 아이들에게 과일을 나눠 줘. 너에게도 내 과일을 나눠 주고 싶어! 네가 가장 좋아하는 과일은 뭐야? 어떤 포켓몬이 나처럼 날 수 있어? 답장해 줘!",
+   "ask": "좋아하는 과일 · 날 수 있는 포켓몬(can 뒤에는 fly 그대로)",
+   "starter": "My favorite fruit is ___. ___ can fly."
+  },
+  {
+   "id": 370,
+   "en": "Luvdisc",
+   "ko": "사랑동이",
+   "focus": "G16",
+   "body": [
+    "Hi! I am Luvdisc.",
+    "I am a Water-type Pokémon.",
+    "My body looks like a heart.",
+    "I live in warm seas with coral reefs.",
+    "I like to sleep between the branches of Corsola.",
+    "When many of us swim together, the sea turns pink!",
+    "I feel sad when I am alone. Let's be friends!",
+    "Who makes you happy? Why?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 사랑동이야. 물 타입 포켓몬이야. 내 몸은 하트처럼 생겼어. 나는 산호초가 있는 따뜻한 바다에 살아. 나는 코산호의 가지 사이에서 자는 걸 좋아해. 우리가 많이 모여 헤엄치면 바다가 분홍색이 돼! 나는 혼자 있으면 슬퍼. 우리 친구 하자! 누가 너를 기쁘게 해? 왜? 답장해 줘!",
+   "ask": "나를 기쁘게 하는 사람이나 포켓몬 · 까닭",
+   "starter": "___ makes me happy because ___."
+  },
+  {
+   "id": 479,
+   "en": "Rotom",
+   "ko": "로토무",
+   "focus": "G13",
+   "body": [
+    "Hi! I am Rotom.",
+    "I am an Electric- and Ghost-type Pokémon.",
+    "My body is made of plasma.",
+    "I can go inside machines and make them move!",
+    "Sometimes I go into a washing machine or a fan.",
+    "I love to surprise people. Boo!",
+    "I want to be your friend. I won't surprise you too much!",
+    "What machines are there in your house? Which one is your favorite?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 로토무야. 전기·고스트 타입 포켓몬이야. 내 몸은 플라스마로 되어 있어. 나는 기계 속에 들어가서 기계를 움직일 수 있어! 가끔 세탁기나 선풍기 속에 들어가. 나는 사람들을 깜짝 놀라게 하는 걸 아주 좋아해. 왁! 너랑 친구가 되고 싶어. 너무 많이 놀라게 하지는 않을게! 너희 집에는 어떤 기계들이 있어? 어느 게 가장 좋아? 답장해 줘!",
+   "ask": "집에 있는 기계(There is ~ · There are ~) · 가장 좋아하는 기계",
+   "starter": "There is a ___ in my house. There are ___."
+  },
+  {
+   "id": 337,
+   "en": "Lunatone",
+   "ko": "루나톤",
+   "focus": "G16",
+   "body": [
+    "Hi! I am Lunatone.",
+    "I am a Rock- and Psychic-type Pokémon.",
+    "A meteorite fell to the ground, and people found me there.",
+    "Some people think I came from space!",
+    "I do not walk. I float in the air.",
+    "I am very strong on the night of a full moon.",
+    "I want to meet you on a full moon night!",
+    "Do you like the moon or the sun? Why?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 루나톤이야. 바위·에스퍼 타입 포켓몬이야. 운석이 땅에 떨어졌는데, 사람들이 거기서 나를 발견했어. 내가 우주에서 왔다고 생각하는 사람들도 있어! 나는 걷지 않아. 공중에 떠다녀. 나는 보름달이 뜬 밤에 아주 강해. 보름달 뜨는 밤에 너를 만나고 싶어! 너는 달이 좋아, 해가 좋아? 왜? 답장해 줘!",
+   "ask": "달과 해 가운데 좋아하는 것 · 까닭",
+   "starter": "I like the ___ because ___."
+  },
+  {
+   "id": 338,
+   "en": "Solrock",
+   "ko": "솔록",
+   "focus": "G6",
+   "body": [
+    "Hi! I am Solrock.",
+    "I am a Rock- and Psychic-type Pokémon.",
+    "I get my power from the sun.",
+    "On sunny days, I line up with other Solrock and face the sun.",
+    "When I spin, my body shines like the sun.",
+    "People say I can read the feelings of others.",
+    "I want to be your friend.",
+    "What do you like to do on sunny days?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 솔록이야. 바위·에스퍼 타입 포켓몬이야. 나는 해에서 힘을 얻어. 맑은 날에는 다른 솔록들과 줄을 서서 해를 바라봐. 내가 빙글빙글 돌면 내 몸이 해처럼 빛나. 사람들은 내가 다른 사람의 마음을 읽을 수 있다고 해. 너랑 친구가 되고 싶어. 너는 맑은 날에 무엇을 하는 걸 좋아해? 답장해 줘!",
+   "ask": "맑은 날에 즐겨 하는 것(like to 뒤에는 원래 모양)",
+   "starter": "On sunny days, I like to ___."
+  },
+  {
+   "id": 335,
+   "en": "Zangoose",
+   "ko": "쟝고",
+   "focus": "G15",
+   "body": [
+    "Hi! I am Zangoose.",
+    "I am a Normal-type Pokémon.",
+    "My sharp claws are my best weapon.",
+    "My rival is Seviper.",
+    "We were rivals long, long ago, and we are still rivals now!",
+    "When I smell Seviper, all my fur stands up!",
+    "But I am kind to my friends. Let's be friends!",
+    "Which other Pokémon are rivals? Which one is stronger?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 쟝고야. 노말 타입 포켓몬이야. 날카로운 발톱이 내 최고의 무기야. 내 라이벌은 세비퍼야. 우리는 아주아주 옛날에도 라이벌이었고, 지금도 라이벌이야! 세비퍼 냄새를 맡으면 내 털이 모두 곤두서! 하지만 나는 친구에게는 다정해. 우리 친구 하자! 또 어떤 포켓몬들이 라이벌이야? 누가 더 강해? 답장해 줘!",
+   "ask": "라이벌 포켓몬 두 마리 · 누가 더 강한지(-er than)",
+   "starter": "___ and ___ are rivals. ___ is stronger than ___."
+  },
+  {
+   "id": 556,
+   "en": "Maractus",
+   "ko": "마라카치",
+   "focus": "G4",
+   "body": [
+    "Hi! I am Maractus.",
+    "I am a Grass-type Pokémon.",
+    "I live in the dry desert.",
+    "When I dance, my body makes a sound like maracas. Shake, shake!",
+    "My dance scares away bird Pokémon.",
+    "Once a year, I scatter my seeds. They are good food in the desert.",
+    "Let's dance together!",
+    "Can you dance? What song do you like?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 마라카치야. 풀 타입 포켓몬이야. 나는 메마른 사막에 살아. 내가 춤을 추면 몸에서 마라카스 같은 소리가 나. 찰찰! 내 춤은 새 포켓몬들을 쫓아 버려. 1년에 한 번 나는 씨를 뿌려. 내 씨는 사막에서 좋은 먹이야. 우리 같이 춤추자! 너는 춤출 수 있어? 어떤 노래를 좋아해? 답장해 줘!",
+   "ask": "춤출 수 있는지(Yes, I can. / No, I can't.) · 좋아하는 노래",
+   "starter": "Yes, I can. I like ___."
+  },
+  {
+   "id": 594,
+   "en": "Alomomola",
+   "ko": "맘복치",
+   "focus": "G16",
+   "body": [
+    "Hi! I am Alomomola.",
+    "I am a Water-type Pokémon.",
+    "I float in the big, open sea.",
+    "When I find a hurt Pokémon, I hold it gently with my fins.",
+    "My body can help heal its wounds.",
+    "Many Water-type Pokémon like to stay near me.",
+    "I want to take care of you, too.",
+    "Which Pokémon is a good helper? Why?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 맘복치야. 물 타입 포켓몬이야. 나는 넓은 바다를 떠다녀. 다친 포켓몬을 찾으면 지느러미로 살며시 안아 줘. 내 몸은 그 상처가 낫도록 도울 수 있어. 많은 물 타입 포켓몬이 내 곁에 있는 걸 좋아해. 너도 내가 돌봐 주고 싶어. 어떤 포켓몬이 좋은 도우미야? 왜? 답장해 줘!",
+   "ask": "남을 잘 돕는 포켓몬 · 까닭(어떤 기술이나 특성으로 돕는지)",
+   "starter": "___ is a good helper because it ___."
+  },
+  {
+   "id": 618,
+   "en": "Stunfisk",
+   "ko": "메더",
+   "focus": "G9",
+   "body": [
+    "Hi! I am Stunfisk.",
+    "I am a Ground- and Electric-type Pokémon.",
+    "I hide in the mud by the sea and wait.",
+    "If someone touches me, zap! I send out electricity.",
+    "My skin is very hard, so I do not get hurt when someone steps on me.",
+    "When I use my electricity, I smile. Hee hee!",
+    "Let's play hide-and-seek together!",
+    "Which Pokémon hides like me? Where does it hide?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 메더야. 땅·전기 타입 포켓몬이야. 나는 바닷가 진흙 속에 숨어서 기다려. 누가 나를 건드리면 찌릿! 전기를 내보내. 내 피부는 아주 단단해서 누가 밟아도 다치지 않아. 전기를 쓸 때 나는 웃어. 히히! 우리 같이 숨바꼭질하자! 나처럼 숨는 포켓몬은 누구야? 어디에 숨어? 답장해 줘!",
+   "ask": "숨는 포켓몬 · 숨는 곳(한 마리라 hides처럼 -s)",
+   "starter": "___ hides in ___."
+  },
+  {
+   "id": 621,
+   "en": "Druddigon",
+   "ko": "크리만",
+   "focus": "G11",
+   "body": [
+    "Hi! I am Druddigon.",
+    "I am a Dragon-type Pokémon.",
+    "I live in caves, and I run fast through narrow tunnels.",
+    "The skin on my face is harder than a rock!",
+    "Every day, I warm my body in the sun with my wings.",
+    "If my body gets too cold, I can't move.",
+    "Let's play outside in the sun together!",
+    "What did you do yesterday? Did you play outside?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 크리만이야. 드래곤 타입 포켓몬이야. 나는 동굴에 살고, 좁은 굴 속을 빠르게 달려. 내 얼굴 피부는 바위보다 단단해! 나는 날마다 날개로 햇빛을 받아 몸을 따뜻하게 해. 몸이 너무 차가워지면 나는 움직일 수 없어. 우리 같이 햇볕 쬐며 밖에서 놀자! 너는 어제 무엇을 했어? 밖에서 놀았어? 답장해 줘!",
+   "ask": "어제 한 일(지난 일 — played · went · ate처럼)",
+   "starter": "Yesterday, I ___."
+  },
+  {
+   "id": 631,
+   "en": "Heatmor",
+   "ko": "앤티골",
+   "focus": "G4",
+   "body": [
+    "Hi! I am Heatmor.",
+    "I am a Fire-type Pokémon.",
+    "There is a hole in my tail. I breathe in air through it.",
+    "I use a flame like a tongue!",
+    "Durant has a hard steel body.",
+    "But my hot flame is strong against Steel types!",
+    "I want to be your friend.",
+    "What is your favorite Fire-type Pokémon? What moves can it use?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 앤티골이야. 불꽃 타입 포켓몬이야. 내 꼬리에는 구멍이 있어. 나는 그 구멍으로 공기를 들이마셔. 나는 불꽃을 혀처럼 써! 아이앤트는 몸이 단단한 강철이야. 하지만 내 뜨거운 불꽃은 강철 타입에 강해! 너랑 친구가 되고 싶어. 네가 가장 좋아하는 불꽃 타입 포켓몬은 누구야? 그 포켓몬은 어떤 기술을 쓸 수 있어? 답장해 줘!",
+   "ask": "좋아하는 불꽃 타입 포켓몬 · 쓸 수 있는 기술(can 뒤에는 use 그대로)",
+   "starter": "My favorite Fire-type Pokémon is ___. It can use ___."
+  },
+  {
+   "id": 676,
+   "en": "Furfrou",
+   "ko": "트리미앙",
+   "focus": "G9",
+   "body": [
+    "Hi! I am Furfrou.",
+    "I am a Normal-type Pokémon.",
+    "Long ago in the Kalos region, Furfrou guarded the king.",
+    "My fur is soft and fluffy.",
+    "When someone trims my fur, I look nice and I can move faster.",
+    "But only my good friends can cut my fur.",
+    "Will you be my friend?",
+    "What does your favorite Pokémon look like?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 트리미앙이야. 노말 타입 포켓몬이야. 옛날 칼로스지방에서는 트리미앙이 왕을 지켰어. 내 털은 부드럽고 복슬복슬해. 누가 내 털을 다듬어 주면 나는 멋져 보이고 더 빨리 움직일 수 있어. 하지만 내 털은 내가 믿는 친구만 깎을 수 있어. 나랑 친구 할래? 네가 좋아하는 포켓몬은 어떻게 생겼어? 답장해 줘!",
+   "ask": "좋아하는 포켓몬의 생김새(색 · 몸에 있는 것 — It has ~)",
+   "starter": "My favorite Pokémon is ___. It has ___. It is ___."
+  },
+  {
+   "id": 703,
+   "en": "Carbink",
+   "ko": "멜리시",
+   "focus": "G14",
+   "body": [
+    "Hi! I am Carbink.",
+    "I am a Rock- and Fairy-type Pokémon.",
+    "I was born deep under the ground.",
+    "I slept there for hundreds of millions of years!",
+    "My friends and I polish our jewels with our soft hair.",
+    "When enemies come, I shoot beams from my jewels.",
+    "I want to show you my jewels!",
+    "This shiny jewel is mine! What is your treasure?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 멜리시야. 바위·페어리 타입 포켓몬이야. 나는 땅속 깊은 곳에서 태어났어. 나는 그곳에서 수억 년 동안 잠들어 있었어! 친구들과 나는 부드러운 털로 서로의 보석을 닦아. 적이 오면 나는 보석에서 빔을 쏴. 너에게 내 보석을 보여 주고 싶어! 이 반짝이는 보석은 내 거야! 너의 보물은 뭐야? 답장해 줘!",
+   "ask": "나의 보물 · 왜 좋은지(내 거 — mine)",
+   "starter": "My treasure is ___. It is mine. I love it because ___."
+  },
+  {
+   "id": 707,
+   "en": "Klefki",
+   "ko": "클레피",
+   "focus": "G6",
+   "body": [
+    "Hi! I am Klefki.",
+    "I am a Steel- and Fairy-type Pokémon.",
+    "I collect keys because I love them!",
+    "When an enemy comes, I shake my keys loudly. Jingle, jingle!",
+    "I never let go of my favorite keys.",
+    "People give me important keys, and I keep them safe.",
+    "I want to keep your keys safe, too!",
+    "Do you collect anything? What is in your collection?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 클레피야. 강철·페어리 타입 포켓몬이야. 나는 열쇠가 너무 좋아서 열쇠를 모아! 적이 오면 열쇠를 세게 흔들어. 짤랑짤랑! 마음에 드는 열쇠는 절대 놓지 않아. 사람들이 소중한 열쇠를 맡기면 나는 안전하게 지켜. 네 열쇠도 내가 안전하게 지켜 주고 싶어! 너도 무언가를 모아? 네 모음에는 무엇이 있어? 답장해 줘!",
+   "ask": "모으는 것(포켓몬 카드도 좋아요) · 모음에 있는 것",
+   "starter": "I collect ___. I have ___."
+  },
+  {
+   "id": 741,
+   "en": "Oricorio",
+   "ko": "춤추새",
+   "focus": "G12",
+   "body": [
+    "Hi! I am Oricorio.",
+    "I am a Fire- and Flying-type Pokémon.",
+    "I drank red nectar from flowers, so now I am a Fire type.",
+    "I love to dance! When I beat my wings together, I make fire.",
+    "I dance with beautiful steps.",
+    "If a Trainer gives me the wrong order, I get really angry!",
+    "Will you dance with me? Which Pokémon will you bring?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 춤추새야. 불꽃·비행 타입 포켓몬이야. 나는 꽃에서 빨간 꿀(다홍꿀)을 마셔서 지금은 불꽃 타입이야. 나는 춤추는 걸 아주 좋아해! 날개를 맞부딪치면 불이 생겨. 나는 아름다운 스텝으로 춤을 춰. 트레이너가 틀린 지시를 하면 나는 아주 화가 나! 나랑 같이 춤출래? 어떤 포켓몬을 데려올 거야? 답장해 줘!",
+   "ask": "같이 춤출지 · 데려올 포켓몬(will 뒤에는 원래 모양 — bring)",
+   "starter": "Yes, I will. I will bring ___."
+  },
+  {
+   "id": 764,
+   "en": "Comfey",
+   "ko": "큐아링",
+   "focus": "G12",
+   "body": [
+    "Hi! I am Comfey.",
+    "I am a Fairy-type Pokémon.",
+    "I pick flowers with my vine and put them on my body.",
+    "My flowers stay fresh and pretty.",
+    "They smell very nice, and the smell helps you feel better.",
+    "Without flowers, I feel nervous.",
+    "I will make a flower ring for you. What will you make for me?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 큐아링이야. 페어리 타입 포켓몬이야. 나는 덩굴로 꽃을 따서 내 몸에 붙여. 내 꽃은 시들지 않고 싱싱하고 예뻐. 꽃에서 아주 좋은 향기가 나고, 그 향기를 맡으면 기분이 나아져. 꽃이 없으면 나는 불안해. 너에게 꽃반지를 만들어 줄게. 너는 나에게 무엇을 만들어 줄 거야? 답장해 줘!",
+   "ask": "큐아링에게 만들어 줄 것(will 뒤에는 원래 모양)",
+   "starter": "I will make ___ for you."
+  },
+  {
+   "id": 765,
+   "en": "Oranguru",
+   "ko": "하랑우탄",
+   "focus": "G10",
+   "body": [
+    "Hi! I am Oranguru.",
+    "I am a Normal- and Psychic-type Pokémon.",
+    "I am very smart. I think quietly in the treetops.",
+    "I give orders to other Pokémon with my leaf fan.",
+    "If a Pokémon is hurt, I find herbs for it.",
+    "Sometimes I go to the beach and play thinking games with Slowking.",
+    "I want to learn with you.",
+    "What did you learn today? Tell me one new thing!",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 하랑우탄이야. 노말·에스퍼 타입 포켓몬이야. 나는 아주 똑똑해. 나무 꼭대기에서 조용히 생각에 잠겨. 나는 나뭇잎 부채로 다른 포켓몬들에게 지시를 내려. 다친 포켓몬이 있으면 약초를 찾아 줘. 가끔은 바닷가에 가서 야도킹과 머리 쓰는 놀이를 해. 너랑 같이 배우고 싶어. 너는 오늘 무엇을 배웠어? 새로 안 것 하나를 알려 줘! 답장해 줘!",
+   "ask": "오늘 배운 것 하나(지난 일 -ed — learned · played · watched처럼)",
+   "starter": "Today, I learned ___."
+  },
+  {
+   "id": 771,
+   "en": "Pyukumuku",
+   "ko": "해무기",
+   "focus": "G11",
+   "body": [
+    "Hi! I am Pyukumuku.",
+    "I am a Water-type Pokémon.",
+    "I live on beaches near warm, shallow seas.",
+    "My body is covered in slime. It keeps my skin wet.",
+    "If you step on me, you will slip! Then I will get angry.",
+    "People often throw me back into the sea to help me.",
+    "Let's play on the beach together!",
+    "Did you go to the beach last summer? What did you see there?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 해무기야. 물 타입 포켓몬이야. 나는 따뜻하고 얕은 바다 근처 바닷가에 살아. 내 몸은 끈적끈적한 점액으로 덮여 있어. 그 점액이 내 피부를 촉촉하게 해 줘. 나를 밟으면 너는 미끄러질 거야! 그러면 나는 화가 날 거야. 사람들은 나를 도우려고 바다로 자주 던져서 돌려보내 줘. 우리 같이 바닷가에서 놀자! 너는 지난여름에 바닷가에 갔어? 거기서 무엇을 봤어? 답장해 줘!",
+   "ask": "바닷가에 간 일(지난 일 — went · saw처럼) · 안 갔으면 가고 싶은 곳",
+   "starter": "Yes, I did. I saw ___. / No, I didn't. I want to go to ___."
+  },
+  {
+   "id": 775,
+   "en": "Komala",
+   "ko": "자말라",
+   "focus": "G8",
+   "body": [
+    "Hi! I am Komala.",
+    "I am a Normal-type Pokémon.",
+    "I am always asleep. I was asleep when I was born, and I am still asleep now!",
+    "I always hug my log. My parents gave it to me.",
+    "Sometimes I hug a kind Trainer's arm, too.",
+    "Maybe I will hug your arm someday!",
+    "I am writing this letter in my dream. Zzz...",
+    "What time do you go to bed? What time do you get up?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 자말라야. 노말 타입 포켓몬이야. 나는 늘 잠들어 있어. 태어날 때도 자고 있었고, 지금도 자고 있어! 나는 늘 통나무를 안고 있어. 우리 부모님이 주신 거야. 가끔은 다정한 트레이너의 팔도 꼭 안아. 언젠가는 네 팔도 안을지 몰라! 나는 이 편지를 꿈속에서 쓰고 있어. 쿨쿨… 너는 몇 시에 자? 몇 시에 일어나? 답장해 줘!",
+   "ask": "자는 시각과 일어나는 시각(at nine — 몇 시는 o'clock도 좋아요)",
+   "starter": "I go to bed at ___. I get up at ___."
+  },
+  {
+   "id": 780,
+   "en": "Drampa",
+   "ko": "할비롱",
+   "focus": "G6",
+   "body": [
+    "Hi! I am Drampa.",
+    "I am a Normal- and Dragon-type Pokémon.",
+    "I live high in the mountains.",
+    "I love children very much!",
+    "Sometimes I come down to town and play with them.",
+    "I always keep the children safe.",
+    "I want to play with you, too!",
+    "What games do you like to play with your friends? Where do you play?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 할비롱이야. 노말·드래곤 타입 포켓몬이야. 나는 높은 산속에 살아. 나는 아이들을 아주 많이 좋아해! 가끔 마을로 내려가서 아이들과 놀아. 나는 늘 아이들을 안전하게 지켜. 너랑도 놀고 싶어! 너는 친구들과 어떤 놀이를 하는 걸 좋아해? 어디서 놀아? 답장해 줘!",
+   "ask": "친구들과 하는 놀이 · 노는 곳(in the park · at school처럼)",
+   "starter": "I like to play ___ with my friends. We play ___."
+  },
+  {
+   "id": 845,
+   "en": "Cramorant",
+   "ko": "윽우지",
+   "focus": "G16",
+   "body": [
+    "Hi! I am Cramorant.",
+    "I am a Flying- and Water-type Pokémon.",
+    "I am always hungry!",
+    "I catch Arrokuda in my big mouth. Gulp!",
+    "Sometimes I catch a different Pokémon by mistake. Oops!",
+    "I am very strong, but I often forget things in the middle of a battle.",
+    "Let's go fishing together!",
+    "Which Pokémon is funny? Why?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 윽우지야. 비행·물 타입 포켓몬이야. 나는 늘 배가 고파! 나는 큰 입으로 찌로꼬치를 덥석 잡아. 꿀꺽! 가끔은 실수로 다른 포켓몬을 잡아. 앗! 나는 아주 강하지만, 배틀하다가 무엇을 하고 있었는지 자주 잊어버려. 우리 같이 낚시하러 가자! 어떤 포켓몬이 웃겨? 왜? 답장해 줘!",
+   "ask": "웃긴 포켓몬 · 까닭",
+   "starter": "___ is funny because ___."
+  },
+  {
+   "id": 875,
+   "en": "Eiscue",
+   "ko": "빙큐보",
+   "focus": "G7",
+   "body": [
+    "Hi! I am Eiscue.",
+    "I am an Ice-type Pokémon.",
+    "I came here on the ocean waves from a very cold place.",
+    "I do not like heat, so I keep my head cool with ice.",
+    "Right now, I am fishing with the one hair on my head!",
+    "Let's be friends!",
+    "What are you doing now? Where are you?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 빙큐보야. 얼음 타입 포켓몬이야. 나는 아주 추운 곳에서 바다 물결을 타고 여기로 왔어. 나는 더위를 싫어해서 얼음으로 머리를 차갑게 해. 지금 나는 머리털 한 가닥으로 낚시하고 있어! 우리 친구 하자! 너는 지금 뭐 하고 있어? 어디에 있어? 답장해 줘!",
+   "ask": "지금 하고 있는 것(am + -ing — I am reading.) · 있는 곳",
+   "starter": "I am ___ now. I am in ___."
+  },
+  {
+   "id": 931,
+   "en": "Squawkabilly",
+   "ko": "시비꼬",
+   "focus": "G13",
+   "body": [
+    "Hi! I am Squawkabilly.",
+    "I am a Normal- and Flying-type Pokémon.",
+    "I live in a big city with my flock.",
+    "Birds with the same feather color fly together.",
+    "My feathers are green, and the green flock is the boss!",
+    "In the morning and evening, we look for food. We are very noisy then. Squawk!",
+    "Come and visit my city!",
+    "Is your town big or small? What is there in your town?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 시비꼬야. 노말·비행 타입 포켓몬이야. 나는 무리와 함께 큰 도시에 살아. 깃털 색이 같은 새들끼리 함께 날아. 내 깃털은 초록색인데, 초록 무리가 대장이야! 아침과 저녁에 우리는 먹이를 찾아. 그때 우리는 아주 시끄러워. 꽥꽥! 우리 도시에 놀러 와! 네가 사는 동네는 커, 작아? 너희 동네에는 무엇이 있어? 답장해 줘!",
+   "ask": "사는 동네의 크기 · 동네에 있는 것(There is ~ · There are ~)",
+   "starter": "My town is ___. There is a ___ in my town."
+  },
+  {
+   "id": 962,
+   "en": "Bombirdier",
+   "ko": "떨구새",
+   "focus": "G12",
+   "body": [
+    "Hi! I am Bombirdier.",
+    "I am a Flying- and Dark-type Pokémon.",
+    "I have an apron made of feathers on my chest.",
+    "I carry food in my apron and fly back to my nest.",
+    "I like dropping things from high places. They make loud noises!",
+    "Tomorrow, I will carry some berries back to my nest.",
+    "I want to be your friend.",
+    "What will you do tomorrow?",
+    "Please write back to me!"
+   ],
+   "koText": "안녕! 나는 떨구새야. 비행·악 타입 포켓몬이야. 내 가슴에는 깃털로 된 앞치마가 있어. 나는 앞치마에 먹이를 담아 둥지로 날아가. 나는 높은 곳에서 물건을 떨어뜨리는 걸 좋아해. 물건이 떨어지면 큰 소리가 나! 내일 나는 나무열매를 둥지로 날라 갈 거야. 너랑 친구가 되고 싶어. 너는 내일 무엇을 할 거야? 답장해 줘!",
+   "ask": "내일 할 일(will 뒤에는 원래 모양)",
+   "starter": "Tomorrow, I will ___."
+  }
+ ]
+}

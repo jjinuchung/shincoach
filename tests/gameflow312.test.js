@@ -367,7 +367,7 @@ test('🔀 v345 — 그림이 열둘이어도 타입이 모두 달라 상자 넷
 });
 
 // 앞 시험이 기기에 넣은 그림 열둘(파이리·꼬부기·피카츄·덩쿠리 …)로 — 🧠 한 판을 진짜 시계로
-test('🧠 v346 — 한 판(진짜 시계): 네 자리 포켓몬 → 반짝인 셋을 보고 그대로 톡 → ⭐ 5 → ✕ → 「끝! ⭐ 5」·「🧠 가장 긴 줄 3마리」 · 배경 음악 없음 · 최고 기록만 · 도감·코인·가방 그대로 · 판 한 번', async () => {
+test('🧠 v346 — 한 판(진짜 시계): 네 자리 포켓몬 → 반짝인 넷을 보고 그대로 톡(v351 — 셋이었다) → ⭐ 6 → ✕ → 「끝! ⭐ 6」·「🧠 가장 긴 줄 4마리」 · 배경 음악 없음 · 최고 기록만 · 도감·코인·가방 그대로 · 판 한 번', async () => {
   await day();
   const before = wallet();
   const p = openGames(CTX);
@@ -387,14 +387,14 @@ test('🧠 v346 — 한 판(진짜 시계): 네 자리 포켓몬 → 반짝인 �
       prev = i;
       return root.dataset.phase === 'input';
     }, 8000, '따라 할 차례');
-    assert.equal(seq.length, 3, `본 반짝 ${seq}`);
+    assert.equal(seq.length, 4, `본 반짝 ${seq}`);
     for (const i of seq) pads[i].fire('pointerdown');
-    assert.equal(gmBody.querySelector('.gd-score').textContent, '⭐ 5');
+    assert.equal(gmBody.querySelector('.gd-score').textContent, '⭐ 6');
     xBtn.fire('click');
     await until(() => gmBody.querySelector('.gm-end'), 4000, '끝 화면');
-    assert.equal(gmBody.querySelector('.gm-end').textContent, '끝! ⭐ 5');
-    assert.equal(gmBody.querySelector('.gm-line').textContent, '🧠 가장 긴 줄 3마리');
-    assert.equal(gameBest('simon'), 5);
+    assert.equal(gmBody.querySelector('.gm-end').textContent, '끝! ⭐ 6');
+    assert.equal(gmBody.querySelector('.gm-line').textContent, '🧠 가장 긴 줄 4마리');
+    assert.equal(gameBest('simon'), 6);
     assert.equal(plays(), 1);
     assert.equal(wallet(), before, '도감·코인·가방 그대로');
   } finally { closeGames(); }

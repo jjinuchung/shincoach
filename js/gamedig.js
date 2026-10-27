@@ -28,13 +28,13 @@ const nz = (v) => {
 /** 빠르기 (순수) — 지난 시간 ms → { gap: 다음 디그다까지, stay: 나와 있는 동안 } · 끝으로 갈수록 빨라진다 */
 export function digPace(ms) {
   const k = Math.min(1, Math.max(0, (Number(ms) || 0) / (DIG_SEC * 1000)));
-  return { gap: Math.round(850 - 350 * k), stay: Math.round(1300 - 500 * k) };
+  return { gap: Math.round(850 - 350 * k), stay: Math.round(1100 - 450 * k) }; // 나와 있는 동안 1.3→0.8초였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 }
 
-/** 무엇이 나오나 (순수) — r = rng() 하나 · 닥트리오 12% · 3초 뒤부터 찌리리공 15% · 나머지 디그다 */
+/** 무엇이 나오나 (순수) — r = rng() 하나 · 닥트리오 12% · 3초 뒤부터 찌리리공 20%(15%였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)) · 나머지 디그다 */
 export function digKind(r, ms) {
   if (r < 0.12) return 'dugtrio';
-  if (ms >= VOLT_FROM && r < 0.27) return 'voltorb';
+  if (ms >= VOLT_FROM && r < 0.32) return 'voltorb';
   return 'diglett';
 }
 

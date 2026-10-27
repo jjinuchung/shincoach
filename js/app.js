@@ -10,6 +10,7 @@ import { initEvolveShow } from './evolveshow.js';
 import { initHome, renderHome, homeStale } from './home.js';
 import { initMath, renderMath, stopCheer } from './math.js';
 import { initNonsul, enterNonsul } from './nonsulview.js'; // 🖊️ 논술 (v303)
+import { initLetters, enterLetters, leaveLetters, refreshLetterStrip } from './lettersview.js'; // 📮 포켓몬 편지 (v351)
 import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
 import { initCalm, enterCalm, leaveCalm } from './calm.js'; // 🌿 국어·논술 잔잔한 배경 음악 (v317)
 import { stopKorCheer } from './korcheer.js'; // 📣 국어·논술 응원 포켓몬 (v327)
@@ -38,6 +39,7 @@ const views = {
   math: document.getElementById('view-math'),
   korean: document.getElementById('view-korean'),
   nonsul: document.getElementById('view-nonsul'),
+  letters: document.getElementById('view-letters'), // 📮 포켓몬 편지 (v351)
 };
 
 /** 지금 화면이 어느 과목의 시간을 쓰는가 — 🎒 도감·📊 기록·🏠 홈은 **안 센다** (아버님 결정 2026-09-27)
@@ -47,6 +49,7 @@ function subjectOfView(name) {
   if (name === 'korean') return 'korean';
   if (name === 'nonsul') return 'korean'; // 🖊️ 논술은 국어 시간 안 (아버님 2026-10-20)
   if (name === 'library' || name === 'player') return 'english';
+  if (name === 'letters') return 'english'; // 📮 편지는 영어 시간 안 (기본안 「추천대로」 2026-10-27)
   return null;
 }
 
@@ -61,6 +64,10 @@ export function showView(name) {
   refreshChips();
   // 목록으로 돌아올 때마다 다시 그린다 — 🎟️ 다음 영상 조건이 방금 한 공부를 반영해야 한다
   if (name === 'library') refreshList().catch(() => {});
+  // 📮 우체통 띠 — 처음 연 날을 적고(첫 편지는 그다음 날) · 기다리는 답장이 있으면 받아 온다 (v351)
+  if (name === 'library') refreshLetterStrip().catch(() => {});
+  if (name === 'letters') enterLetters().catch(() => {});
+  else leaveLetters(); // 🔊 읽어 주던 편지 소리는 우체통에서만
   // 🏠 과목 카드도 다시 그린다 — 그 사이에 마스코트 그림을 받아 왔을 수 있다
   if (name === 'home') renderHome(showView).catch(() => {});
   // 🏦 부모가 ⚙에서 껐으면 홈의 🏦를 숨긴다 (설정을 바꾸고 돌아올 때 — v319)
@@ -192,6 +199,7 @@ async function main() {
   initMath({ showView });
   initKorean({ showView });  // 📚 국어 — ← 버튼 · 다시 읽으면 도감 다시 그리기
   initNonsul({ showView });  // 🖊️ 논술 — ← 버튼 (v303)
+  initLetters({ showView }); // 📮 포켓몬 편지 — ← 버튼·우체통 띠 (v351)
   initCalm();                // 🌿 국어·논술 머리줄 🎵 단추 (v317)
   initStock({ conf: stockConf }); // 🏦 홈의 🏦 — 🔒 부모 설정(켜기·투자 한도)은 player.stockConf (v319)
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)

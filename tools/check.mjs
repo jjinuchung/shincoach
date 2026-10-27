@@ -79,7 +79,7 @@ for (const f of Object.keys(MATH_CHECK)) {
 const { figureSvg } = await import('../js/mathdraw.js');
 // ★ 아이 기록(✍️ 아빠 교정·❓ 아빠 답장)은 공개 저장소에 두지 않는다 (2026-10-07 Codex 35차 #1) —
 //   비공개 저장소 shincoach-data의 essay/fixes.json · math/replies.json에 올리고, 앱은 이 기기 📤 열쇠로 읽는다
-const PUBLIC_PRIVATE = ['coach/fixes.json', 'coach/math/replies.json', 'coach/korean/replies.json', 'coach/korean/todo.json'];
+const PUBLIC_PRIVATE = ['coach/fixes.json', 'coach/math/replies.json', 'coach/korean/replies.json', 'coach/korean/todo.json', 'coach/letters/todo.json', 'coach/letters/replies.json', 'coach/english/letters/todo.json', 'coach/english/letters/replies.json', 'letters/todo.json', 'letters/replies.json']; // 📮 편지 답장·판단도 (v351 · 🔍 Codex 155차)
 for (const f of PUBLIC_PRIVATE) if (existsSync(f)) { bad++; console.error(`공개 저장소에 아이 기록: ${f} — 비공개 저장소(shincoach-data)에 올려 주세요`); }
 // 비공개 저장소에 올리기 전 검사: node tools/check.mjs --private <폴더> (그 안의 essay/fixes.json · math/replies.json 중 있는 것)
 // 없는 폴더·빈 폴더·폴더 이름 빠짐은 실패 (Codex 36차 #5) — tools/privcheck.mjs
@@ -128,6 +128,14 @@ try {
   const grammar = JSON.parse(readFileSync('coach/english/grammar.json', 'utf8'));
   for (const msg of checkGrammar(grammar)) { bad++; console.error(`내용 오류: coach/english/grammar.json: ${msg}`); }
 } catch (e) { bad++; console.error(`JSON 오류: coach/english/grammar.json: ${e.message}`); }
+// 📮 포켓몬 편지 원고(coach/english/letters.json, v351) — 편지 포켓몬(명단 subject 'letter')마다 한 통 · 첫 문장 「Hi! I am 이름.」 ·
+//   끝 「Please write back to me!」 · 우리말·도움·본보기 · 판단 기준 넷 (앱은 깨진 편지를 조용히 빼므로 여기서 막는다 — 원고는 .context/letters → make_letters_json)
+try {
+  const { checkLetters } = await import('../js/letters.js');
+  const { ROSTER } = await import('../js/pokemon.js');
+  const letters = JSON.parse(readFileSync('coach/english/letters.json', 'utf8'));
+  for (const msg of checkLetters(letters, ROSTER.filter((r) => r.subject === 'letter').map((r) => r.id))) { bad++; console.error(`내용 오류: coach/english/letters.json: ${msg}`); }
+} catch (e) { bad++; console.error(`JSON 오류: coach/english/letters.json: ${e.message}`); }
 // 🕵️ 나옹의 숙제(coach/math/detective.json, v299) — 틀린 줄 앞은 그대로·보기 셋·흔한 실수 번호가 칸 원고에 있는지 배포 전에
 //   깨진 문제는 앱이 조용히 빼므로(detective.validItems) 여기서 막는다 · 정답을 따로 다시 푸는 검사는 tests/detective299
 try {

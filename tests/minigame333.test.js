@@ -166,10 +166,10 @@ test('🗺️ 발판 끝에서 떨어진 바로 뒤도 뛴다(0.1초) · 내려�
 
 // ───────────────────── 🗺️ 길 ─────────────────────
 
-test('🗺️ 길 만들기 — 같은 씨앗 같은 길 · 조각 18개(처음 넷 쉬움 · 열째까지 보통) · 같은 조각 잇달아 없음 · 땅 = 구덩이 밖 · ⭐ 별은 많아야 하나 · 끝 계단 셋 → 🚩', () => {
+test('🗺️ 길 만들기 — 같은 씨앗 같은 길 · 조각 18개(처음 셋 쉬움 · 일곱째까지 보통 — v351 넷·열째였다) · 같은 조각 잇달아 없음 · 땅 = 구덩이 밖 · ⭐ 별은 많아야 하나 · 끝 계단 셋 → 🚩', () => {
   assert.deepEqual([ADV_W, ADV_H, GROUND, START_LEN, CHUNK_N, START_X, POLE_H, FLAG_STEP], [100, 64, 8, 40, 18, 10, 44, 4]);
   assert.deepEqual(ME, { w: 9, h: 11, screen: 22 });
-  assert.deepEqual([0, 3, 4, 9, 10, 17].map(chunkLevel), [0, 0, 1, 1, 2, 2]);
+  assert.deepEqual([0, 2, 3, 6, 7, 17].map(chunkLevel), [0, 0, 1, 1, 2, 2]);
   assert.deepEqual(JSON.stringify(advStage(seeded(9))), JSON.stringify(advStage(seeded(9))));
   const lv = Object.fromEntries(CHUNKS.map((c) => [c.id, c.lv]));
   let withStar = 0;
@@ -236,7 +236,7 @@ test('🗺️ 한 판 끝까지(가짜 시계 · 씨앗 200) — 안 눌러도 �
     assert.ok(wild.done && wild.flagPts >= 1, `${seed}: 아무렇게나 눌러도 깃대까지`);
   }
   assert.ok(slowMax < 90000, `안 눌러도 90초 안 (${(slowMax / 1000).toFixed(1)}초)`);
-  assert.ok(botBumps <= SEEDS.length * 0.05, `잘하는 손 꽈당 ${botBumps}번`);
+  assert.ok(botBumps <= SEEDS.length * 0.15, `잘하는 손 꽈당 ${botBumps}번`); // v351 어려운 길이 늘어 드물게 꽈당(0.05였다) — 조각 하나하나는 꽈당 없이 넘는다(위 시험)
 });
 
 // ───────────────────── 🗺️ 하나하나 ─────────────────────

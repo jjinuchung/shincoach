@@ -24,7 +24,7 @@ import {
 } from './db.js';
 import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진우네 집 규칙 (순수)
 import { copyAvatar } from './avatar.js'; // 🧑 진우 캐릭터 (순수)
-import { copyPlay, playRule, gameEndRule, bestOf, fastOf } from './homeplay.js'; // 🎮 일상 행동 · 미니 게임 끝(v307) · ⏱️ 가장 빠른 시간(v339) (순수)
+import { copyPlay, playRule, gameEndRule, bestOf, fastOf, recKey } from './homeplay.js'; // 🎮 일상 행동 · 미니 게임 끝(v307) · ⏱️ 가장 빠른 시간(v339) (순수)
 import { copyJourney, startRule as jrStartRule, answerRule as jrAnswerRule, swapRule as jrSwapRule, homeRule as jrHomeRule, pickRule as jrPickRule } from './journey.js'; // 🎒 포켓몬 대여행 (v341, 순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
@@ -33,6 +33,7 @@ import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·�
 import { matchedOf, korMatchRule } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329, 순수)
 import { dripOf, dripStartRule } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (v320, 순수)
 import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule } from './nonsul.js'; // 🖊️ 논술 칸·보상·잡기 기회 (v303 — 퍼즐과 같은 꼴, 잡기 기회는 따로)
+import { lettersOf, letterStartRule, letterSeenRule, letterSendRule, letterReplyRule, letterReadRule } from './letters.js'; // 📮 포켓몬 편지 (v351 — 순수)
 import { grammarRule, knownOf, seenOf, gMissOf, diagOf, giftOf, rngFrom, videoSeenOf } from './grammar.js'; // 📝 영어 문법 칸·💰·🎁 깜짝 포켓몬 (v348 — 순수 · v349 영상 사이 쪽지 — 진단 칸은 옛 기록 병합에만)
 import { writeAddRule, writeReplyRule, writeReadRule, writesOf } from './korwrite.js'; // ✍️ 국어 서술형 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
@@ -42,7 +43,7 @@ import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUS
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, candyOf, candyCost, MAX_LV } from './evolve.js';
 import { stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
-import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER } from './pokemon.js';
+import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER, isLetterMon } from './pokemon.js';
 import { findVoucher, GIVEN_BY_DAD } from './unlock.js';
 
 // ── 경험치 ──
@@ -151,7 +152,9 @@ export const RARITY_IDS = {
       // 📚 국어 전용 (2026-10-11) 흔함 60
       270, 271, 273, 274, 363, 364, 355, 290, 291, 366, 412, 532, 535, 536, 540, 541, 543, 544, 577, 574, 582, 583, 599, 602, 524, 525, 664, 665, 669, 670, 824, 825, 837, 838, 859, 860, 840, 928, 929, 932, 933, 13, 14, 29, 30, 165, 167, 177, 218, 223, 401, 422, 425, 434, 436, 451, 456, 459, 511, 513,
       // 🖊️ 논술 전용 (2026-10-20) 흔함 40
-      69, 70, 265, 266, 268, 406, 315, 439, 23, 46, 48, 72, 84, 86, 88, 98, 109, 118, 278, 285, 307, 309, 325, 333, 343, 353, 360, 517, 605, 296, 297, 322, 323, 341, 342, 504, 505, 684, 685, 327],
+      69, 70, 265, 266, 268, 406, 315, 439, 23, 46, 48, 72, 84, 86, 88, 98, 109, 118, 278, 285, 307, 309, 325, 333, 343, 353, 360, 517, 605, 296, 297, 322, 323, 341, 342, 504, 505, 684, 685, 327,
+      // 📮 편지 전용 (2026-10-27) 흔함 9
+      213, 313, 314, 352, 357, 370, 556, 676, 931],
   2: [25, 133, 175, 143, 131, 94, 26, 95, 113,
       2, 5, 8, 447, 12, 147, 246, 123, 125, 137, 148, 91,
       212, 257, 260,
@@ -166,7 +169,9 @@ export const RARITY_IDS = {
       // 📚 국어 전용 (2026-10-11) 보통 45
       495, 496, 650, 651, 810, 811, 356, 292, 367, 368, 413, 414, 533, 578, 575, 600, 603, 782, 783, 841, 842, 1011, 935, 166, 168, 178, 219, 224, 402, 423, 426, 435, 437, 452, 457, 460, 512, 514, 138, 139, 140, 141, 408, 409, 225,
       // 🖊️ 논술 전용 (2026-10-20) 보통 30
-      108, 114, 193, 207, 240, 126, 122, 636, 222, 24, 47, 49, 73, 85, 87, 89, 99, 110, 119, 279, 286, 308, 310, 326, 334, 344, 354, 202, 518, 606],
+      108, 114, 193, 207, 240, 126, 122, 636, 222, 24, 47, 49, 73, 85, 87, 89, 99, 110, 119, 279, 286, 308, 310, 326, 334, 344, 354, 202, 518, 606,
+      // 📮 편지 전용 (2026-10-27) 보통 20
+      235, 351, 479, 337, 338, 335, 594, 618, 621, 631, 703, 707, 741, 764, 765, 771, 775, 780, 845, 875],
   3: [6, 9, 3, 130, 448, 658, 778, 248, 282, 445, 149, 373, 376, 887, // 149 망나뇽은 전설이 아니라 600족(마기라스·한카리아스급) — 아이 지적으로 수정
       // 전설조(3신조·기타 전설) — 전설만큼은 아니어도 귀하게
       144, 145, 146, 251, 483, 484, 487, 643, 644, 716,
@@ -176,7 +181,9 @@ export const RARITY_IDS = {
       // 📚 국어 전용 (2026-10-11) 희귀 30
       497, 652, 812, 272, 275, 365, 477, 534, 537, 542, 545, 579, 576, 584, 601, 604, 526, 666, 671, 784, 826, 839, 861, 1019, 930, 934, 936, 937, 15, 31,
       // 🖊️ 논술 전용 (2026-10-20) 희귀 20
-      71, 463, 465, 469, 198, 430, 472, 467, 267, 269, 407, 866, 441, 458, 226, 637, 774, 864, 227, 369
+      71, 463, 465, 469, 198, 430, 472, 467, 267, 269, 407, 866, 441, 458, 226, 637, 774, 864, 227, 369,
+      // 📮 편지 전용 (2026-10-27) 희귀 1
+      962
 ],
   // 🌌 울트라비스트 11 (2026-09-27) — ⭐ 등급 밖의 제 등급. 원작에서도 전설이 아니다(is_legendary: false)
   5: [793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806],
@@ -352,7 +359,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, letters: { start: 0, seen: {}, sent: [], star: 0 }, updatedAt: 0 });
 let profile = EMPTY();
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
@@ -384,7 +391,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -648,7 +655,7 @@ export function tradeCtx(pf, art) {
   return {
     rarity: (id) => rarityIn(pf, Number(id)),
     subject: (id) => subjectOf(Number(id)),
-    allowed: (id) => rosterSet.has(Number(id)) && !isLegendary(id) && !isUltraBeast(id),
+    allowed: (id) => rosterSet.has(Number(id)) && !isLegendary(id) && !isUltraBeast(id) && !isLetterMon(id), // 📮 편지 포켓몬은 상인이 안 가져오고 진우도 못 준다 (2026-10-27)
     unlocked: (id) => isUnlocked(Number(id), level),
     ...(art ? { art } : {}),
   };
@@ -906,12 +913,19 @@ export function homePlay(roomId, u) {
 export function gameEnd(roomId, u, gameId, score, sec = 0) {
   return houseDo((p) => gameEndRule(p, roomId, u, gameId, score, Date.now(), sec));
 }
-/** 🎮 그 게임의 최고 점수 (게임기 화면용 — 지금 프로필) */
+/** 🎮 그 게임의 최고 점수 (게임기 화면용 — 지금 프로필 · v351부터 새 난이도 기록) */
 export function gameBest(gameId) {
+  return bestOf(profile && profile.homePlay, recKey(gameId));
+}
+/** ⏱️ 그 게임의 가장 빠른 시간(초 · 없으면 0 — v339 🖼️ 그림 맞추기 · v351부터 새 난이도 기록) */
+export function gameFast(gameId) {
+  return fastOf(profile && profile.homePlay, recKey(gameId));
+}
+/** 🎮 쉬울 때(v350까지) 세운 최고 점수·가장 빠른 시간 — 게임 카드에 작게 (v351) */
+export function gameEasyBest(gameId) {
   return bestOf(profile && profile.homePlay, gameId);
 }
-/** ⏱️ 그 게임의 가장 빠른 시간(초 · 없으면 0 — v339 🖼️ 그림 맞추기) */
-export function gameFast(gameId) {
+export function gameEasyFast(gameId) {
   return fastOf(profile && profile.homePlay, gameId);
 }
 // 🎒 포켓몬 대여행 (v341) — 바꾸기는 모두 저장된 프로필로 한 트랜잭션(houseDo — 저장이 안 되면 없던 일 { ok:false, why:'save' }) · 시각은 트랜잭션 안에서
@@ -1015,6 +1029,30 @@ export function grammarSeenMap() {
 /** 🎬 낸 영상 문제 { V###: { d, w } } (그리기용 복사본 — 쉬는 문제를 건너뛸 때, v350) */
 export function grammarVideoMap() {
   return videoSeenOf(profile.grammarVideo);
+}
+/** 📮 편지 장부 (그리기용 복사본, v351) */
+export function lettersMap() {
+  return lettersOf(profile.letters);
+}
+/** 📮 이 판을 처음 연 날 적기 (첫 편지는 그다음 날 — 이미 있으면 그대로) */
+export function letterStart() {
+  return houseDo((p) => letterStartRule(p, Date.now()));
+}
+/** 📮 편지를 열었다 (빨간 점 끄기 — 그 편지가 저장된 프로필에서도 지금 편지일 때만) · list = 원고 편지 목록 */
+export function letterSeen(mon, list) {
+  return houseDo((p) => letterSeenRule(p, mon, Date.now(), list));
+}
+/** ✉️ 답장 보내기 — 한 트랜잭션에서 지금 편지·봉투를 다시 보고 이름표(at)를 정한다 (두 창이 같이 눌러도 하나) */
+export function letterSend(mon, text, list) {
+  return houseDo((p) => letterSendRule(p, mon, text, Date.now(), list));
+}
+/** 📮 비공개 저장소의 답장 붙이기 — 그 글에 한 번만 · 🌟·👍·🙂 선물까지 (한 트랜잭션) */
+export function letterApply(rows, list) {
+  return houseDo((p) => letterReplyRule(p, rows, Date.now(), list));
+}
+/** 📮 답장을 읽었다 (그 글의 id — 화면에서 [다 읽었어요]를 눌렀을 때) */
+export function letterRead(id) {
+  return houseDo((p) => letterReadRule(p, id, Date.now()));
 }
 /** ✍️ 서술형 글 보내기 — 한 트랜잭션에서 "답장 기다리는 글 하나"를 저장된 프로필로 다시 보고, 이름표(at)를 정하고, 첫 글이면 💰5 (두 창이 같이 눌러도 하나) · cards = 지금 있는 카드 */
 export function korWriteAdd(cardId, text, cards) {

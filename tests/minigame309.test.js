@@ -24,7 +24,7 @@ const POOL = (n = 20, mineN = 8) => Array.from({ length: n }, (_, i) => ({ id: i
 test('🎮 v309 게임 목록 — 🃏 짝 맞추기 60초 · 🍓 나무열매 받기 30초 · 화면(RUNNERS)·준비(prep)', () => {
   assert.deepEqual(GAMES.map((g) => g.id).slice(0, 5), ['dig', 'run', 'shadow', 'pair', 'berry'], '다섯째까지 (v310부터 더 늘어난다 — minigame310)');
   assert.deepEqual([gameById('pair').sec, gameById('berry').sec], [PAIR_SEC, BERRY_SEC]);
-  assert.deepEqual([PAIR_SEC, BERRY_SEC, PAIR_PAIRS, PEEK_MS], [60, 30, 6, 2000], '아버님 고른 60초 · 2초 앞면');
+  assert.deepEqual([PAIR_SEC, BERRY_SEC, PAIR_PAIRS, PEEK_MS], [60, 30, 6, 1500], '아버님 고른 60초 · 앞면 1.5초 (v351 — 진우 「너무 쉬워요」 — 2초였다)');
   for (const g of GAMES) {
     assert.match(g.id, /^[a-z]{2,12}$/);
     assert.ok(!/\d/.test(g.how), `${g.id}: 아이가 보는 설명에 숫자 없음`);
@@ -205,7 +205,7 @@ test('🃏 앱을 내렸다 돌아오면(pairShift) 남은 시간·앞면·덮�
   const s = pairStart(1000, POOL(), seeded(2));
   s.lock = 1500; s.dealAt = 1700;
   pairShift(s, 4000);
-  assert.deepEqual([s.t0, s.end, s.peekUntil, s.lock, s.dealAt], [5000, 5000 + PAIR_SEC * 1000, 7000, 5500, 5700]);
+  assert.deepEqual([s.t0, s.end, s.peekUntil, s.lock, s.dealAt], [5000, 5000 + PAIR_SEC * 1000, 5000 + PEEK_MS, 5500, 5700]);
   const b = JSON.stringify(s);
   pairShift(s, 0); pairShift(s, -1); pairShift(s, NaN);
   assert.equal(JSON.stringify(s), b);
@@ -218,7 +218,7 @@ test('🃏 앱을 내렸다 돌아오면(pairShift) 남은 시간·앞면·덮�
 
 test('🍓 빠르기 — 끝으로 갈수록 자주·빨리 · 떨어지는 것: 황금 8% · 찌리리공은 3초 뒤부터 22% · 마당 크기', () => {
   assert.deepEqual(berryPace(0), { gap: 900, vy: 32 });
-  assert.deepEqual(berryPace(BERRY_SEC * 1000), { gap: 450, vy: 55 });
+  assert.deepEqual(berryPace(BERRY_SEC * 1000), { gap: 390, vy: 63 }); // v351 — 진우 「너무 쉬워요」 — 0.45초·55였다
   assert.deepEqual(berryPace(99e9), berryPace(BERRY_SEC * 1000));
   for (let ms = 0; ms < BERRY_SEC * 1000; ms += 1000) assert.ok(berryPace(ms + 1000).gap <= berryPace(ms).gap && berryPace(ms + 1000).vy >= berryPace(ms).vy);
   assert.equal(berryKind(0.05, 0), 'gold');

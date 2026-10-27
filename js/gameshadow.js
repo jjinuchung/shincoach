@@ -9,10 +9,10 @@ import { musicMode } from './gamesong.js'; // 🎵 게임 음악 상태 (v335 ·
 
 /** 한 판(초) · 보기 수 · 맞힌 뒤·틀린 뒤 그림을 보여 주는 동안(ms) */
 export const SHADOW_SEC = 40;
-export const SHADOW_CHOICES = 4;
+export const SHADOW_CHOICES = 6; // 넷이었다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 export const RIGHT_MS = 700;
 export const WRONG_MS = 1500;
-/** 보기 넷을 만들 수 있는 끝 — 이보다 적으면 판을 쓰지 않는다(gameview) */
+/** 보기를 다 만들 수 있는 끝 — 이보다 적으면 판을 쓰지 않는다(gameview) */
 export const SHADOW_MIN = SHADOW_CHOICES;
 /** 그림이 이만큼(ms) 안 뜨면 깨진 그림으로 친다 (🔍 Codex 114차 #1) */
 export const LOAD_MS = 1500;

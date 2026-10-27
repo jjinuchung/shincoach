@@ -22,7 +22,7 @@ export const STAND_IN = { fire: 4, water: 7, grass: 1, electric: 25 };
 /** 파트너가 그 자리 타입이면 이만큼은 파트너가 (개굴닌자는 물 자리에 자주) */
 export const PAL_RATE = 0.5;
 /** 처음 줄 · 가장 짧은 줄 · 한 줄을 끝까지 맞힌 ⭐ · 같은 줄에서 이만큼 틀리면 한 마리 줄임 */
-export const START_LEN = 3;
+export const START_LEN = 4; // 셋이었다 — 가장 짧은 줄(MIN_LEN)은 그대로 셋 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 export const MIN_LEN = 3;
 export const LINE_BONUS = 2;
 export const MISS_MAX = 2;

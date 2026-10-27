@@ -63,14 +63,14 @@ test('🧠 자리 · 음 · 빛나는 동안 — 불꽃·물·풀·전기(🔀 �
   assert.deepEqual(STAND_IN, { fire: 4, water: 7, grass: 1, electric: 25 });
   for (const t of SIMON_PADS) assert.ok(MON_TYPES[STAND_IN[t]].includes(t), `대신할 포켓몬 ${STAND_IN[t]}는 ${t}`);
   assert.deepEqual([simonOn(3), simonOn(4), simonOn(6), simonOn(8), simonOn(20), simonOn(0), simonOn(NaN)], [700, 650, 550, 450, 450, 700, 700]);
-  assert.deepEqual([START_LEN, MIN_LEN, LINE_BONUS, MISS_MAX, IDLE_MS], [3, 3, 2, 2, 8000]);
+  assert.deepEqual([START_LEN, MIN_LEN, LINE_BONUS, MISS_MAX, IDLE_MS], [4, 3, 2, 2, 8000]); // 처음 줄 넷 (v351 — 진우 「너무 쉬워요」 — 셋이었다)
 });
 
-test('🧠 줄 — 처음 셋 · 한 마리씩 늘 때 앞 줄 그대로 · 같은 자리가 셋 잇달아 안 나옴(씨앗 여덟 × 2000) · 자리는 0~3', () => {
+test('🧠 줄 — 처음 넷(v351) · 한 마리씩 늘 때 앞 줄 그대로 · 같은 자리가 셋 잇달아 안 나옴(씨앗 여덟 × 2000) · 자리는 0~3', () => {
   for (const seed of SEEDS) {
     const rng = seeded(seed);
     let seq = simonFresh(START_LEN, rng);
-    assert.equal(seq.length, 3);
+    assert.equal(seq.length, 4);
     for (let k = 0; k < 2000; k++) {
       const next = simonAdd(seq, rng);
       assert.deepEqual(next.slice(0, seq.length), seq, '앞 줄 그대로');
@@ -125,39 +125,42 @@ function toInput(s, t, dt = 10) {
   return t;
 }
 
-test('🧠 한 줄 — 「잘 봐!」 0.9초 뒤 셋이 0.95초마다 반짝(빛남 0.7초) → 따라 할 차례 · 맞으면 ⭐1씩 · 줄 끝 ⭐2 더 · 한 마리 늘림(앞 줄 그대로) · 0.8초 뒤 다시 보여 줌', () => {
+test('🧠 한 줄 — 「잘 봐!」 0.9초 뒤 처음 넷이 0.9초마다 반짝(빛남 0.65초 — v351 셋이었다) → 따라 할 차례 · 맞으면 ⭐1씩 · 줄 끝 ⭐2 더 · 한 마리 늘림(앞 줄 그대로) · 0.8초 뒤 다시 보여 줌', () => {
   const rng = seeded(11);
   const s = simonStart(1000, rng);
   const seq0 = s.seq.slice();
-  assert.deepEqual([s.phase, s.seq.length, simonSay(s)], ['wait', 3, '잘 봐!']);
+  const N = START_LEN;
+  const STEP = simonOn(N) + GAP_MS; // 처음 넷 — 0.65초 + 0.25초 (v351)
+  assert.deepEqual([s.phase, s.seq.length, simonSay(s)], ['wait', N, '잘 봐!']);
   const ev0 = simonTick(s, 1000 + FIRST_MS - 1);
   assert.deepEqual([s.phase, ev0.flashes.length], ['wait', 0]);
   const ev1 = simonTick(s, 1000 + FIRST_MS);
   assert.deepEqual([s.phase, ev1.flashes], ['show', [{ pad: seq0[0], at: 1900 }]], '첫 반짝은 바로');
   assert.deepEqual(simonLit(s, 1900), { pad: seq0[0], kind: 'show' });
-  assert.equal(simonLit(s, 1900 + 699).pad, seq0[0]);
-  assert.equal(simonLit(s, 1900 + 700), null, '반짝 사이');
-  assert.equal(simonLit(s, 1900 + 950).pad, seq0[1]);
-  const ev2 = simonTick(s, 1900 + 950 * 2);
-  assert.deepEqual(ev2.flashes.map((f) => [f.pad, f.at]), [[seq0[1], 2850], [seq0[2], 3800]], '지나간 반짝도 차례로');
-  assert.equal(simonTap(s, seq0[0], 3850, rng).kind, 'none', '보여 주는 동안은 안 셈');
-  assert.equal(simonShowEnd(s), 1900 + 3 * 950 - GAP_MS);
+  assert.equal(simonLit(s, 1900 + simonOn(N) - 1).pad, seq0[0]);
+  assert.equal(simonLit(s, 1900 + simonOn(N)), null, '반짝 사이');
+  assert.equal(simonLit(s, 1900 + STEP).pad, seq0[1]);
+  const ev2 = simonTick(s, 1900 + STEP * (N - 1));
+  assert.deepEqual(ev2.flashes.map((f) => [f.pad, f.at]), seq0.slice(1).map((p, k) => [p, 1900 + STEP * (k + 1)]), '지나간 반짝도 차례로');
+  assert.equal(simonTap(s, seq0[0], 1900 + STEP * (N - 1) + 50, rng).kind, 'none', '보여 주는 동안은 안 셈');
+  assert.equal(simonShowEnd(s), 1900 + N * STEP - GAP_MS);
   const ev3 = simonTick(s, simonShowEnd(s));
   assert.deepEqual([ev3.input, s.phase, s.turn, simonSay(s)], [true, 'input', 1, '따라 해 봐!']);
   const t0 = simonShowEnd(s);
   assert.deepEqual(simonTap(s, seq0[0], t0 + 400, rng), { kind: 'right', pad: seq0[0], pts: 1 });
   assert.deepEqual(simonLit(s, t0 + 400), { pad: seq0[0], kind: 'tap' });
   assert.equal(simonLit(s, t0 + 400 + TAP_MS), null);
-  assert.equal(simonTap(s, seq0[1], t0 + 800, rng).pts, 1);
-  const r = simonTap(s, seq0[2], t0 + 1200, rng);
-  assert.deepEqual(r, { kind: 'line', pad: seq0[2], pts: 1 + LINE_BONUS, len: 3 });
-  assert.deepEqual([s.score, s.lines, s.best, s.right, s.wrong], [5, 1, 3, 3, 0]);
-  assert.equal(s.seq.length, 4);
-  assert.deepEqual(s.seq.slice(0, 3), seq0, '앞 줄 그대로 + 하나');
-  assert.deepEqual([s.phase, simonSay(s)], ['wait', '잘했어! 이번엔 4마리']);
-  simonTick(s, t0 + 1200 + PAUSE_MS);
-  assert.deepEqual([s.phase, simonSay(s), s.step], ['show', '잘 봐!', 0], '0.8초 뒤 넷을 보여 줌');
-  assert.equal(simonShowEnd(s) - s.at, 4 * (simonOn(4) + GAP_MS) - GAP_MS, '넷은 조금 빨리');
+  for (let k = 1; k < N - 1; k++) assert.equal(simonTap(s, seq0[k], t0 + 400 * (k + 1), rng).pts, 1);
+  const tEnd = t0 + 400 * N;
+  const r = simonTap(s, seq0[N - 1], tEnd, rng);
+  assert.deepEqual(r, { kind: 'line', pad: seq0[N - 1], pts: 1 + LINE_BONUS, len: N });
+  assert.deepEqual([s.score, s.lines, s.best, s.right, s.wrong], [N + LINE_BONUS, 1, N, N, 0]);
+  assert.equal(s.seq.length, N + 1);
+  assert.deepEqual(s.seq.slice(0, N), seq0, '앞 줄 그대로 + 하나');
+  assert.deepEqual([s.phase, simonSay(s)], ['wait', `잘했어! 이번엔 ${N + 1}마리`]);
+  simonTick(s, tEnd + PAUSE_MS);
+  assert.deepEqual([s.phase, simonSay(s), s.step], ['show', '잘 봐!', 0], '0.8초 뒤 다섯을 보여 줌');
+  assert.equal(simonShowEnd(s) - s.at, (N + 1) * (simonOn(N + 1) + GAP_MS) - GAP_MS, '다섯은 조금 빨리');
 });
 
 test('🧠 틀림 — 감점 없음 · 맞는 자리를 0.7초 · 1.1초 뒤 같은 줄을 처음부터 · 다시 볼 때 이미 ⭐를 받은 자리는 0 · 같은 줄에서 두 번이면 한 마리 줄인 새 줄(셋 아래로는 안 줄임)', () => {
@@ -419,29 +422,31 @@ test('🧠 화면 — 「준비!」 뒤 칸 넷(포켓몬 그림·이름 · 타�
   assert.equal(g.say.textContent, '잘 봐!');
   g.pads[0].fire('pointerdown'); // 보여 주기 전·도중엔 안 셈
   const seq1 = g.watch();
-  assert.equal(seq1.length, 3, `반짝 셋 ${seq1}`);
+  assert.equal(seq1.length, 4, `반짝 넷 ${seq1}`);
   assert.equal(g.score(), '⭐ 0', '보여 주는 동안 누른 것은 안 셈');
   assert.equal(g.say.textContent, '따라 해 봐!');
-  assert.equal(g.dots.children.length, 3);
+  assert.equal(g.dots.children.length, 4);
   g.pads[seq1[0]].fire('pointerdown');
   assert.equal(g.score(), '⭐ 1');
   assert.ok(g.pads[seq1[0]].classList.contains('is-lit'), '누른 칸이 빛남');
-  assert.equal(g.dots.children.filter((d) => d.className === 'is-on').length, 1, '● ○ ○');
+  assert.equal(g.dots.children.filter((d) => d.className === 'is-on').length, 1, '● ○ ○ ○');
   w.doc.fire('keydown', { key: String(seq1[1] + 1), preventDefault() {} }); // ⌨️ 숫자
   assert.equal(g.score(), '⭐ 2');
-  g.pads[seq1[2]].fire('click', { detail: 0 }); // ⌨️ Enter
-  assert.equal(g.score(), '⭐ 5', '줄 끝 ⭐2 더');
+  g.pads[seq1[2]].fire('pointerdown');
+  assert.equal(g.score(), '⭐ 3');
+  g.pads[seq1[3]].fire('click', { detail: 0 }); // ⌨️ Enter
+  assert.equal(g.score(), '⭐ 6', '줄 끝 ⭐2 더');
   assert.ok(g.fx.children.some((f) => f.textContent === '+3 잘했어!'));
-  assert.equal(g.say.textContent, '잘했어! 이번엔 4마리');
+  assert.equal(g.say.textContent, '잘했어! 이번엔 5마리');
   g.pads[0].fire('click', { detail: 1 }); // 손가락 뒤의 click은 안 셈
   const seq2 = g.watch();
-  assert.equal(seq2.length, 4);
-  assert.deepEqual(seq2.slice(0, 3), seq1, '앞 줄 그대로 + 하나');
+  assert.equal(seq2.length, 5);
+  assert.deepEqual(seq2.slice(0, 4), seq1, '앞 줄 그대로 + 하나');
   // 틀림 — 둘째 칸에서
   g.pads[seq2[0]].fire('pointerdown');
   const bad = (seq2[1] + 1) % 4;
   g.pads[bad].fire('pointerdown');
-  assert.equal(g.score(), '⭐ 6', '틀려도 그대로');
+  assert.equal(g.score(), '⭐ 7', '틀려도 그대로');
   assert.ok(g.pads[bad].classList.contains('is-no'), '누른 칸이 흔들림');
   assert.ok(g.pads[seq2[1]].classList.contains('is-hint'), '맞는 칸을 살짝');
   assert.equal(g.say.textContent, '앗! 다시 볼까?');
@@ -450,10 +455,10 @@ test('🧠 화면 — 「준비!」 뒤 칸 넷(포켓몬 그림·이름 · 타�
   const seq3 = g.watch();
   assert.deepEqual(seq3, seq2, '같은 줄을 처음부터');
   for (const p of seq3) g.pads[p].fire('pointerdown');
-  assert.equal(g.score(), '⭐ 11', '앞 칸은 이미 받음 — 셋(둘째부터 넷째) + 2');
+  assert.equal(g.score(), '⭐ 13', '앞 칸은 이미 받음 — 넷(둘째부터 다섯째) + 2');
   w.adv(SIMON_SEC * 1000);
   await w.flush();
-  assert.deepEqual(w.st.over, { score: 11, quit: false, line: '🧠 가장 긴 줄 4마리' });
+  assert.deepEqual(w.st.over, { score: 13, quit: false, line: '🧠 가장 긴 줄 5마리' });
   for (const ty of ['visibilitychange', 'keydown']) assert.equal((w.doc.listeners[ty] || []).length, 0, ty);
   assert.ok(g.pads.every((b) => b.disabled && !b.classList.contains('is-lit')));
 });
@@ -502,15 +507,15 @@ test('🧠 화면 — 보여 주는 중 화면이 멈췄다 오면(2초 · 0.3�
   assert.equal(g.root.dataset.phase, 'show');
   const first = g.litNow();
   assert.ok(first >= 0);
-  w.jump(2000); // 2초 멈춤 — 둘째·셋째 반짝을 못 그림
+  w.jump(2000); // 2초 멈춤 — 뒤 반짝들을 못 그림
   w.adv(50);
   assert.equal(g.root.dataset.phase, 'show', '못 본 줄로 따라 하기가 안 됨');
   assert.equal(g.say.textContent, '한 번 더 볼게요 — 잘 봐!');
   const seq = g.watch();
-  assert.equal(seq.length, 3, `셋을 처음부터 다 봄 ${seq}`);
+  assert.equal(seq.length, 4, `넷을 처음부터 다 봄 ${seq}`);
   assert.equal(seq[0], first);
   for (const p of seq) g.pads[p].fire('pointerdown');
-  assert.equal(g.score(), '⭐ 5');
+  assert.equal(g.score(), '⭐ 6');
   // 다음 줄 — 첫 반짝 뒤 0.3초 멈춤(같은 칸 두 번 사이 틈을 건너뛸 만큼)
   for (let k = 0; k < 60 && !(g.root.dataset.phase === 'show' && g.litNow() >= 0); k++) w.adv(50); // 누른 칸의 빛은 말고 보여 주기의 첫 반짝
   assert.equal(g.root.dataset.phase, 'show');
@@ -518,13 +523,13 @@ test('🧠 화면 — 보여 주는 중 화면이 멈췄다 오면(2초 · 0.3�
   w.adv(50);
   assert.equal(g.say.textContent, '한 번 더 볼게요 — 잘 봐!');
   const seq2 = g.watch();
-  assert.equal(seq2.length, 4);
-  assert.deepEqual(seq2.slice(0, 3), seq);
+  assert.equal(seq2.length, 5);
+  assert.deepEqual(seq2.slice(0, 4), seq);
   // ⌨️ 꾹 누르면 — 처음 한 번만 · 자동 반복(repeat)은 안 셈
   w.doc.fire('keydown', { key: String(seq2[0] + 1), preventDefault() {} });
-  assert.equal(g.score(), '⭐ 6');
+  assert.equal(g.score(), '⭐ 7');
   for (const k of [seq2[0], seq2[1], (seq2[1] + 1) % 4]) w.doc.fire('keydown', { key: String(k + 1), repeat: true, preventDefault() {} });
-  assert.equal(g.score(), '⭐ 6', '자동 반복은 안 셈');
+  assert.equal(g.score(), '⭐ 7', '자동 반복은 안 셈');
   assert.equal(g.root.dataset.phase, 'input', '틀린 것으로도 안 셈');
   assert.equal(g.dots.children.filter((d) => d.className === 'is-on').length, 1, '● 하나 그대로');
   w.h.stop();
@@ -538,14 +543,14 @@ test('🧠 화면 — 마지막 반짝 끝 무렵에 누른 톡은(화면엔 아
   let n = 0;
   let prev = -1;
   let seq0 = -1;
-  for (let k = 0; k < 200 && n < 3; k++) { // 셋째 반짝이 켜질 때까지
+  for (let k = 0; k < 200 && n < START_LEN; k++) { // 마지막(넷째 — v351) 반짝이 켜질 때까지
     w.adv(50);
     const p = g.root.dataset.phase === 'show' ? g.litNow() : -1;
     if (p >= 0 && p !== prev) { n += 1; if (n === 1) seq0 = p; }
     prev = p;
   }
-  assert.equal(n, 3);
-  w.adv(550); // 셋째 반짝 0.6초쯤 — 아직 보여 주는 중
+  assert.equal(n, START_LEN);
+  w.adv(550); // 마지막 반짝 0.6초쯤(빛남 0.65초) — 아직 보여 주는 중
   assert.equal(g.root.dataset.phase, 'show');
   w.jump(150); // 0.15초(멈춤 문턱 아래) 뒤 누름 — 그 사이 보여 주기가 끝남
   g.pads[seq0].fire('pointerdown');

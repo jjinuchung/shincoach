@@ -39,7 +39,7 @@ const clampX = (x) => Math.min(X_MAX, Math.max(X_MIN, Number(x)));
 /** 빠르기 (순수) — 지난 시간 ms → { gap: 다음 것까지 ms, vy: 떨어지는 빠르기 칸/초 } · 끝으로 갈수록 자주·빨리 */
 export function berryPace(ms) {
   const k = Math.min(1, Math.max(0, (Number(ms) || 0) / (BERRY_SEC * 1000)));
-  return { gap: Math.round(900 - 450 * k), vy: 32 + 23 * k };
+  return { gap: Math.round(900 - 510 * k), vy: 32 + 31 * k }; // 끝 0.45초·55였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 }
 
 /** 무엇이 떨어지나 (순수) — r = rng() 하나 · 황금 8% · 3초 뒤부터 찌리리공 22% · 나머지 나무열매 */

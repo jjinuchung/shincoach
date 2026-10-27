@@ -33,10 +33,12 @@ test('puzzleXp: 틀린 횟수 0/1/2 → 30/20/10, 정답 공개 → 3', () => {
   assert.equal(puzzleXp(null), 3);
 });
 
-test('희귀도: 명단 592마리 전부 등급이 있고 겹치지 않음 — 🔢 수학 165는 흔함 61·보통 51·희귀 30·전설 15·🌌 8 · 📚 국어 150은 60·45·30·15 · 🖊️ 논술 100은 40·30·20·10', () => {
+test('희귀도: 명단 622마리 전부 등급이 있고 겹치지 않음 — 🔢 수학 165는 흔함 61·보통 51·희귀 30·전설 15·🌌 8 · 📚 국어 150은 60·45·30·15 · 🖊️ 논술 100은 40·30·20·10 · 📮 편지 30은 9·20·1', () => {
   const all = Object.values(RARITY_IDS).flat();
-  assert.equal(all.length, 592);
-  assert.equal(new Set(all).size, 592, '겹침 없음');
+  assert.equal(all.length, 622);
+  assert.equal(new Set(all).size, 622, '겹침 없음');
+  const lt = new Set(ROSTER.filter((r) => r.subject === 'letter').map((r) => r.id));
+  assert.deepEqual([1, 2, 3, 4, 5].map((r) => RARITY_IDS[r].filter((id) => lt.has(id)).length), [9, 20, 1, 0, 0], '📮 편지 — PokeAPI 포획률대로 (2026-10-27 기본안)');
   const ns = new Set(ROSTER.filter((r) => r.subject === 'nonsul').map((r) => r.id));
   assert.deepEqual([1, 2, 3, 4, 5].map((r) => RARITY_IDS[r].filter((id) => ns.has(id)).length), [40, 30, 20, 10, 0], '🖊️ 논술 — 국어와 같은 비율 (2026-10-20)');
   const kor = new Set(ROSTER.filter((r) => r.subject === 'korean').map((r) => r.id));

@@ -104,6 +104,8 @@
 
     <main class="library-main">
       <!-- 🔁 오늘의 복습 — 밀린 문장이 제일 많은 영상을 앱이 골라서 열고 바로 시작한다 -->
+      <!-- 📮 포켓몬 편지 우체통 (v351) — 새 편지·답장이 오면 빨간 점 -->
+      <div id="library-mail" class="library-mail" hidden></div>
       <div id="library-review" class="library-review" hidden></div>
       <ul id="library-list" class="library-list"></ul>
       <!-- 🎟️ 아직 태블릿에 없는 영상 (조건을 채우면 아이가 직접 연다) -->
@@ -117,6 +119,18 @@
     <footer class="storage-info">
       <span id="storage-text">저장 공간 확인 중...</span>
     </footer>
+  </section>
+
+  <!-- ===== 📮 포켓몬 편지 (v351) — 영어 목록의 우체통에서 연다 · ⏳ 영어 시간 안 ===== -->
+  <section id="view-letters" class="view" hidden>
+    <header class="topbar">
+      <button id="btn-letters-back" class="btn btn-icon" aria-label="영상 목록으로">←</button>
+      <h1 class="topbar-title">📮 우체통</h1>
+      <button type="button" id="time-chip-letters" class="time-chip" hidden></button>
+      <button class="btn btn-icon" data-open="pokedex" aria-label="내 포켓몬">🎒</button>
+      <button class="btn btn-icon" data-open="stats" aria-label="학습 기록">📊</button>
+    </header>
+    <main id="letters-main" class="lt-main"></main>
   </section>
 
   <!-- ===== 가져오기 대화상자 ===== -->
@@ -822,6 +836,7 @@
             <option value="10">10%</option>
             <option value="20">20%</option>
             <option value="30">30%</option>
+            <option value="40">40%</option>
             <option value="50">50%</option>
           </select>
         </label>

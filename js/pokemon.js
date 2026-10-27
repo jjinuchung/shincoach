@@ -6,12 +6,13 @@ import { getCharacters, putCharacter } from './db.js';
 /**
  * 명단: 처음 40마리(Lv1) + 레벨 마일스톤에서 열리는 20마리씩(Lv5·10·15) + 2026-09-20에 더한 60마리(Lv1)
  *       + 2026-09-22 🔢 수학 전용 150마리(`subject: 'math'`, Lv1) + 2026-10-11 📚 국어 전용 150마리(`subject: 'korean'`, Lv1)
- *       + 2026-10-20 🖊️ 논술 전용 100마리(`subject: 'nonsul'`, Lv1). unlock 없으면 1.
+ *       + 2026-10-20 🖊️ 논술 전용 100마리(`subject: 'nonsul'`, Lv1) + 2026-10-27 📮 편지 전용 30마리(`subject: 'letter'`, Lv1). unlock 없으면 1.
  * 여기에 추가하면 ⚙ "받기"가 없는 것만 받아옴. ★ 늘릴 때 battle.TYPE_OF(타입)·xp.RARITY_IDS(등급)도 같이 — 빠지면 조용히 노말·보통이 된다
  * 이름·타입·등급은 tools/roster_candidates.mjs·tools/math_roster.mjs(PokeAPI)로 받은 것만 쓴다 (기억으로 쓰면 틀린다)
  *
  * subject — 🎯 **어디서 잡히나**만 가른다: 없으면 영어(퍼즐 정답 뒤 잡기), 'math'면 수학(☀️ 완주·개념 편 통과 뒤 잡기),
- *           'korean'이면 📚 국어(글을 다 읽고 별을 새로 받을 때), 'nonsul'이면 🖊️ 논술(그날 처음 끝낸 논술 판).
+ *           'korean'이면 📚 국어(글을 다 읽고 별을 새로 받을 때), 'nonsul'이면 🖊️ 논술(그날 처음 끝낸 논술 판),
+ *           'letter'면 📮 편지(정말 잘 쓴 영어 답장 — letters.js · 잡히지 않고 친구가 된다).
  * 도감·파트너·배틀·꾸미기·상점·레벨·코인은 과목이 한 몸이다 (아버님 2026-09-22: "모으는 곳은 한 곳이어야 재미가 안 반감된다").
  * 왜 새 150을 더했나: 아이가 영어(쉬움·🎯 하루 4회)만 골라서, 수학에서만 만나는 얼굴이 있어야 수학으로 간다.
  */
@@ -637,6 +638,38 @@ export const ROSTER = [
   { id: 719, ko: '디안시', en: 'Diancie', subject: 'nonsul' },
   { id: 720, ko: '후파', en: 'Hoopa', subject: 'nonsul' },
   { id: 721, ko: '볼케니온', en: 'Volcanion', subject: 'nonsul' },
+  // 📮 편지 전용 30 (2026-10-27 아버님 「추천대로」 — 기본안 CeH6P2mTGrrL9WW3uEMxmb) — 편지에서만 친구가 된다(잡기·알·교환·배틀·대여행·문법 🎁에서 안 나온다)
+  //   진화 없는 한 단계 · 메가·거다이맥스 없음 · 전설 아님 · 이름·타입·등급은 PokeAPI(.context/letters/pick30.mjs) · 차례 = 편지가 오는 차례(coach/letters.json)
+  { id: 235, ko: '루브도', en: 'Smeargle', subject: 'letter' }, // 보통 g2
+  { id: 213, ko: '단단지', en: 'Shuckle', subject: 'letter' }, // 흔함 g2
+  { id: 313, ko: '볼비트', en: 'Volbeat', subject: 'letter' }, // 흔함 g3
+  { id: 314, ko: '네오비트', en: 'Illumise', subject: 'letter' }, // 흔함 g3
+  { id: 351, ko: '캐스퐁', en: 'Castform', subject: 'letter' }, // 보통 g3
+  { id: 352, ko: '켈리몬', en: 'Kecleon', subject: 'letter' }, // 흔함 g3
+  { id: 357, ko: '트로피우스', en: 'Tropius', subject: 'letter' }, // 흔함 g3
+  { id: 370, ko: '사랑동이', en: 'Luvdisc', subject: 'letter' }, // 흔함 g3
+  { id: 479, ko: '로토무', en: 'Rotom', subject: 'letter' }, // 보통 g4
+  { id: 337, ko: '루나톤', en: 'Lunatone', subject: 'letter' }, // 보통 g3
+  { id: 338, ko: '솔록', en: 'Solrock', subject: 'letter' }, // 보통 g3
+  { id: 335, ko: '쟝고', en: 'Zangoose', subject: 'letter' }, // 보통 g3
+  { id: 556, ko: '마라카치', en: 'Maractus', subject: 'letter' }, // 흔함 g5
+  { id: 594, ko: '맘복치', en: 'Alomomola', subject: 'letter' }, // 보통 g5
+  { id: 618, ko: '메더', en: 'Stunfisk', subject: 'letter' }, // 보통 g5
+  { id: 621, ko: '크리만', en: 'Druddigon', subject: 'letter' }, // 보통 g5
+  { id: 631, ko: '앤티골', en: 'Heatmor', subject: 'letter' }, // 보통 g5
+  { id: 676, ko: '트리미앙', en: 'Furfrou', subject: 'letter' }, // 흔함 g6
+  { id: 703, ko: '멜리시', en: 'Carbink', subject: 'letter' }, // 보통 g6
+  { id: 707, ko: '클레피', en: 'Klefki', subject: 'letter' }, // 보통 g6
+  { id: 741, ko: '춤추새', en: 'Oricorio', subject: 'letter' }, // 보통 g7
+  { id: 764, ko: '큐아링', en: 'Comfey', subject: 'letter' }, // 보통 g7
+  { id: 765, ko: '하랑우탄', en: 'Oranguru', subject: 'letter' }, // 보통 g7
+  { id: 771, ko: '해무기', en: 'Pyukumuku', subject: 'letter' }, // 보통 g7
+  { id: 775, ko: '자말라', en: 'Komala', subject: 'letter' }, // 보통 g7
+  { id: 780, ko: '할비롱', en: 'Drampa', subject: 'letter' }, // 보통 g7
+  { id: 845, ko: '윽우지', en: 'Cramorant', subject: 'letter' }, // 보통 g8
+  { id: 875, ko: '빙큐보', en: 'Eiscue', subject: 'letter' }, // 보통 g8
+  { id: 931, ko: '시비꼬', en: 'Squawkabilly', subject: 'letter' }, // 흔함 g9
+  { id: 962, ko: '떨구새', en: 'Bombirdier', subject: 'letter' }, // 희귀 g9
 ];
 
 /** 이 레벨에서 열려 있는 명단 */
@@ -974,11 +1007,19 @@ export function unlockedRoster(level) {
   return ROSTER.filter((r) => (r.unlock || 1) <= level);
 }
 
-const subjectById = new Map(ROSTER.map((r) => [r.id, r.subject === 'math' || r.subject === 'korean' || r.subject === 'nonsul' ? r.subject : 'english']));
+const subjectById = new Map(ROSTER.map((r) => [r.id, r.subject === 'math' || r.subject === 'korean' || r.subject === 'nonsul' || r.subject === 'letter' ? r.subject : 'english']));
 
-/** 이 포켓몬은 어느 과목에서 잡히나 — 'math' | 'english' | 'korean' | 'nonsul' (명단에 없으면 영어) · 📚 국어 150마리는 2026-10-11 · 🖊️ 논술 100마리는 2026-10-20 */
+/** 이 포켓몬은 어느 과목에서 잡히나 — 'math' | 'english' | 'korean' | 'nonsul' | 'letter' (명단에 없으면 영어) · 📚 국어 150마리는 2026-10-11 · 🖊️ 논술 100마리는 2026-10-20 · 📮 편지 30마리는 2026-10-27 */
 export function subjectOf(id) {
   return subjectById.get(id) || 'english';
+}
+
+/**
+ * 📮 편지에서만 친구가 되는 포켓몬인가 (2026-10-27) — 잡기 후보·알은 과목으로 저절로 빠지지만,
+ * 과목을 안 보는 길(⚔️ 배틀 상대 battle.pickOpponent · 🤝 5일장 xp.tradeCtx · 🎒 대여행 후보)은 이것으로 뺀다
+ */
+export function isLetterMon(id) {
+  return subjectById.get(Number(id)) === 'letter';
 }
 
 /**

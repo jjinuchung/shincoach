@@ -16,7 +16,7 @@ export const DIFF_SEC = 90;
 /** 다른 곳 수 · 그림에 있어야 할 가구 수(모자라면 게임 그림에만 채움) · 힌트까지(ms) · 누른 곳 둘레 너그러움(% — 그림에 대해) */
 export const DIFF_N = 5;
 export const FILL_MIN = 7;
-export const HINT_MS = 20000;
+export const HINT_MS = 30000; // 20초였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 export const PAD = 3;
 /** 벽 줄 높이 = 칸 × WALL_RATIO (houseview와 같은 값 — 시험이 맞춰 본다) */
 export const WALL_RATIO = 1.3;

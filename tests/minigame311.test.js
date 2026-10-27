@@ -47,9 +47,9 @@ test('🎮 서비스워커 v311 · 새 파일 · css (볼 무늬는 🃏 카드 
 
 // ───────────────────── 🗼 엔진 ─────────────────────
 
-test('🗼 빠르기·높이·마당 — 쌓을수록 32 → 64칸/초 · 꼭대기 높이 · 마당은 꼭대기가 TOP_Y를 넘으면 한 층씩 내려간다', () => {
-  assert.deepEqual([towerSpeed(0), towerSpeed(1), towerSpeed(16), towerSpeed(99)], [32, 34, 64, 64]);
-  assert.deepEqual([towerSpeed(NaN), towerSpeed(-3), towerSpeed(undefined)], [32, 32, 32]);
+test('🗼 빠르기·높이·마당 — 쌓을수록 36 → 64칸/초 (v351 — 진우 「너무 쉬워요」 — 32에서 시작했다) · 꼭대기 높이 · 마당은 꼭대기가 TOP_Y를 넘으면 한 층씩 내려간다', () => {
+  assert.deepEqual([towerSpeed(0), towerSpeed(1), towerSpeed(14), towerSpeed(99)], [36, 38, 64, 64]);
+  assert.deepEqual([towerSpeed(NaN), towerSpeed(-3), towerSpeed(undefined)], [36, 36, 36]);
   for (let f = 0; f < 40; f++) assert.ok(towerSpeed(f + 1) >= towerSpeed(f));
   assert.deepEqual([topH(0), topH(1), topH(3)], [BASE_H, BASE_H + STEP, BASE_H + 3 * STEP]);
   assert.deepEqual([camFor(0), camFor(1), camFor(2)], [0, 0, 0], '낮을 때는 그대로');
@@ -62,14 +62,14 @@ test('🗼 빠르기·높이·마당 — 쌓을수록 32 → 64칸/초 · 꼭대
   assert.ok(TOP_Y - HANG_Y > BALL, '매달린 볼 아래로 한 볼 넘게 빈 자리');
 });
 
-test('🗼 판정 — 맨 위 볼 가운데와의 거리: 딱(2칸 안) · 올라감(8칸 안 · 받침돌 위 첫 볼은 12칸) · 그 밖은 굴러떨어짐', () => {
+test('🗼 판정 — 맨 위 볼 가운데와의 거리: 딱(2칸 안) · 올라감(7칸 안 — v351 8칸이었다 · 받침돌 위 첫 볼은 12칸) · 그 밖은 굴러떨어짐', () => {
   const s = towerStart(0);
   assert.equal(topX(s), 50, '처음은 받침돌 가운데');
   assert.deepEqual([50, 52, 48, 52.01, 62, 38, 62.01, 37.99, NaN].map((x) => towerJudge(s, x)), ['perfect', 'perfect', 'perfect', 'stack', 'stack', 'stack', 'miss', 'miss', 'miss']);
   s.tower.push({ n: 1, x: 30, perfect: false });
   assert.equal(topX(s), 30);
-  assert.deepEqual([30, 32, 32.01, 38, 22, 38.01, 21.99].map((x) => towerJudge(s, x)), ['perfect', 'perfect', 'stack', 'stack', 'stack', 'miss', 'miss']);
-  assert.deepEqual([PERFECT_D, OK_D, BASE_OK_D], [2, 8, 12]);
+  assert.deepEqual([30, 32, 32.01, 37, 23, 37.01, 22.99].map((x) => towerJudge(s, x)), ['perfect', 'perfect', 'stack', 'stack', 'stack', 'miss', 'miss']);
+  assert.deepEqual([PERFECT_D, OK_D, BASE_OK_D], [2, 7, 12]);
 });
 
 test('🗼 볼이 나오는 모양 — 0.4초에 첫 볼 · 마당 옆 끝에서 안쪽으로(왼쪽·오른쪽 둘 다) · 안 누르면 끝까지 좌우로만(볼 하나 · 끝 밖으로 안 나감) · 점수 0', () => {
@@ -87,7 +87,7 @@ test('🗼 볼이 나오는 모양 — 0.4초에 첫 볼 · 마당 옆 끝에서
       if (s.ball) assert.ok(s.ball.x >= X_MIN && s.ball.x <= X_MAX, `끝 안 (${s.ball.x})`);
     }
     assert.equal(first.at, 400, '첫 볼');
-    assert.ok((first.x === X_MIN && first.vx === 32) || (first.x === X_MAX && first.vx === -32), '옆 끝에서 안쪽으로');
+    assert.ok((first.x === X_MIN && first.vx === 36) || (first.x === X_MAX && first.vx === -36), '옆 끝에서 안쪽으로');
     sides.add(first.x);
     assert.equal(first.h, FLOOR_Y - HANG_Y, '매달린 높이');
     assert.deepEqual([s.score, s.tower.length, s.misses, s.phase], [0, 0, 0, 'slide']);

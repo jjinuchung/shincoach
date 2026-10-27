@@ -32,7 +32,7 @@ const SPEED_OF = { small: 1, big: 0.6, tiny: 1.6, huge: 0.45 };
 export const BAL_MEOWTH = 52;
 /** 큰 열기구 — 이 뒤부터(ms) · 나올 때마다 이만큼 · 한 번에 하나만 */
 export const BIG_FROM = 5000;
-export const BIG_RATE = 0.12;
+export const BIG_RATE = 0.15; // 12%였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 /** 거대 열기구 (v332) — 이 뒤부터(ms) · 나올 때마다 이만큼 · 한 번에 하나만 */
 export const HUGE_FROM = 12000;
 export const HUGE_RATE = 0.08;
@@ -55,7 +55,7 @@ const nz = (v) => {
  */
 export function balPace(ms) {
   const k = Math.min(1, Math.max(0, (Number(ms) || 0) / (BAL_SEC * 1000)));
-  return { most: k < 0.35 ? 3 : k < 0.7 ? 4 : 5, speed: 18 + 18 * k, gap: Math.round(750 - 400 * k) };
+  return { most: k < 0.35 ? 3 : k < 0.7 ? 4 : 5, speed: 21 + 20 * k, gap: Math.round(750 - 400 * k) }; // 18→36이었다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 }
 
 /** 새 판 (순수) */

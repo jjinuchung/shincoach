@@ -24,7 +24,7 @@ export const FOES = {
   meowth: { ko: '나옹', emoji: '😼', bot: true },
 };
 /** 나옹 — 초당 당김 · 진우가 이긴 판마다 이만큼 빨라짐 · 끝 · 처음 당기기까지(ms) */
-export const BOT = { rate: 3, step: 0.5, max: 5, first: 500 };
+export const BOT = { rate: 3.5, step: 0.5, max: 5.5, first: 500 }; // 3→5였다 (v351 — 진우 「너무 쉬워요」 → 아버님 「추천대로」)
 
 const nz = (v) => {
   const n = Math.floor(Number(v) || 0);

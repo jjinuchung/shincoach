@@ -7,7 +7,7 @@ import * as bgm from './bgm.js';
 import { POTION, CALL_PAL, itemById, makeFigure, setFigure } from './items.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
-import { ensureForm, isUltraBeast } from './pokemon.js'; // ⭐ 변신 그림 · 🌌 울트라비스트는 상대로 안 나온다
+import { ensureForm, isUltraBeast, isLetterMon } from './pokemon.js'; // ⭐ 변신 그림 · 🌌 울트라비스트·📮 편지 포켓몬은 상대로 안 나온다
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림 (5세대 스프라이트)
 import { playFx, syncFx, stopFx } from './battlefx.js'; // 🐸 기술 그림 (v306 — 비공개 저장소에서 받아 둔 장면)
 
@@ -160,6 +160,19 @@ export const TYPE_OF = {
   309: 'electric', 310: 'electric', 642: 'electric',
   334: 'dragon', 718: 'dragon',
   684: 'fairy', 685: 'fairy',
+  // 📮 편지 전용 30 (2026-10-27) — 같은 규칙
+  235: 'normal', 313: 'normal', 314: 'normal', 351: 'normal', 352: 'normal', 335: 'normal', 676: 'normal', 765: 'normal', 775: 'normal', 780: 'normal', 931: 'normal',
+  213: 'rock', 337: 'rock', 338: 'rock', 703: 'rock',
+  357: 'grass', 556: 'grass',
+  370: 'water', 594: 'water', 771: 'water', 845: 'water',
+  479: 'electric',
+  618: 'ground',
+  621: 'dragon',
+  631: 'fire', 741: 'fire',
+  707: 'steel',
+  764: 'fairy',
+  875: 'ice',
+  962: 'dark',
 };
 
 export function typeOf(id) {
@@ -262,6 +275,8 @@ export function pickOpponent(unlocked, caught, rng = Math.random) {
     // 🌌 울트라비스트는 배틀 상대가 되지 않는다 — 이기면 그냥 얻게 되어 ⚪ 비스트볼 규칙이 무너진다
     //    (영어 배틀에서도 나오던 구멍, Codex 11차 #3)
     if (isUltraBeast(m.id)) continue;
+    // 📮 편지 포켓몬도 — 이기면 얻게 되어 「편지에서만 친구가 된다」가 무너진다 (2026-10-27)
+    if (isLetterMon(m.id)) continue;
     const w = [0, 6, 4, 2, 1][rarityOf(m.id)] || 2; // 흔함 6 : 보통 4 : 희귀 2 : 전설 1
     for (let i = 0; i < w; i++) pool.push(m);
   }

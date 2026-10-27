@@ -50,8 +50,8 @@ test('🎮 서비스워커 v310 · 새 파일 · css (열기구는 로켓단 배
 // ───────────────────── 🎈 엔진 ─────────────────────
 
 test('🎈 빠르기 (v332 — 아버님 "너무 쉬운 것 같으니") — 한 번에 떠 있는 끝 3 → 4 → 5 · 빨라짐 18 → 36칸/초 · 다음 열기구까지 0.75 → 0.35초 · 크기·⭐', () => {
-  assert.deepEqual(balPace(0), { most: 3, speed: 18, gap: 750 });
-  assert.deepEqual(balPace(BAL_SEC * 1000), { most: 5, speed: 36, gap: 350 });
+  assert.deepEqual(balPace(0), { most: 3, speed: 21, gap: 750 }); // v351 — 진우 「너무 쉬워요」 — 18→36이었다
+  assert.deepEqual(balPace(BAL_SEC * 1000), { most: 5, speed: 41, gap: 350 });
   assert.equal(balPace(BAL_SEC * 1000 * 0.5).most, 4);
   assert.deepEqual(balPace(99e9), balPace(BAL_SEC * 1000));
   assert.deepEqual(balPace(NaN), balPace(0));
@@ -61,7 +61,7 @@ test('🎈 빠르기 (v332 — 아버님 "너무 쉬운 것 같으니") — 한 
     assert.ok(b.most >= a.most && b.speed >= a.speed && b.gap <= a.gap);
   }
   assert.deepEqual(Object.fromEntries(Object.entries(BAL_KINDS).map(([k, v]) => [k, [v.hp, v.pts]])), { small: [1, 1], big: [3, 5], tiny: [1, 2], huge: [6, 12] }, '큰 열기구는 세 번 · ⭐5 · 거대는 여섯 번 · ⭐12 · 꼬마는 ⭐2');
-  assert.deepEqual([BAL_W, BAL_H, BIG_FROM, BIG_RATE, HUGE_FROM, HUGE_RATE, TINY_FROM, TINY_RATE], [100, 70, 5000, 0.12, 12000, 0.08, 4000, 0.18]);
+  assert.deepEqual([BAL_W, BAL_H, BIG_FROM, BIG_RATE, HUGE_FROM, HUGE_RATE, TINY_FROM, TINY_RATE], [100, 70, 5000, 0.15, 12000, 0.08, 4000, 0.18]); // 큰 열기구 12% → 15% (v351)
   // 거대 = 큰 것의 1.4배(반올림) · 꼬마는 작은 것보다 작다 · 거대도 하늘 안(파트너 위)에 들어간다
   assert.deepEqual([BAL_KINDS.huge.w, BAL_KINDS.huge.h], [Math.round(BAL_KINDS.big.w * 1.4), Math.round(BAL_KINDS.big.h * 1.4)]);
   assert.ok(BAL_KINDS.tiny.w < BAL_KINDS.small.w && BAL_KINDS.tiny.h < BAL_KINDS.small.h);
@@ -75,8 +75,8 @@ test('🎈 종류 고르기 (v332) — 처음 4초는 작은 것만 · 큰 것 5
   assert.equal(balKind(s, 3999, r(0)), 'small', '처음 4초는 rng를 안 써도 작은 것');
   assert.equal(balKind(s, 4000, r(0.1)), 'tiny');
   assert.equal(balKind(s, 4000, r(0.18)), 'small', '꼬마 확률 경계');
-  assert.equal(balKind(s, 5000, r(0.11)), 'big');
-  assert.equal(balKind(s, 5000, r(0.12, 0.5)), 'small', '큰 것 경계 → 꼬마도 아님');
+  assert.equal(balKind(s, 5000, r(0.14)), 'big');
+  assert.equal(balKind(s, 5000, r(0.15, 0.5)), 'small', '큰 것 경계 → 꼬마도 아님');
   assert.equal(balKind(s, 11999, r(0.01)), 'big', '거대는 12초 전엔 안 나온다');
   assert.equal(balKind(s, 12000, r(0.07)), 'huge');
   assert.equal(balKind(s, 12000, r(0.08, 0.11)), 'big', '거대 경계 → 큰 것');
@@ -149,7 +149,7 @@ test('🎈 열기구가 나오는 모양 — 0.6초에 첫 열기구 · 하늘 �
   }
   assert.ok(bigSeeds >= 4, `큰 열기구가 나오는 판이 흔하다 (${bigSeeds}/8)`);
   assert.ok(hugeSeeds >= 3, `거대 열기구가 나오는 판도 꽤 있다 (${hugeSeeds}/8)`);
-  assert.equal(tinySeeds, SEEDS.length, '꼬마 열기구는 판마다');
+  assert.ok(tinySeeds >= SEEDS.length - 1, `꼬마 열기구는 거의 판마다 (${tinySeeds}/8 — v351 큰 열기구가 늘어 한 판쯤은 없을 수 있다)`);
   const span = (xs) => [Math.min(...xs), Math.max(...xs)];
   for (const [kind, mul] of [['small', 1], ['big', 0.6], ['tiny', 1.6], ['huge', 0.45]]) {
     const [lo, hi] = span(speeds[kind]);
