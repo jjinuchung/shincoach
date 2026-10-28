@@ -19,7 +19,8 @@
 //           usage/feedback.md (📬 교정·답장이 닿았나 — 붙은 때·진우가 본 때·해 본 것, v314 · feedback.js · 날짜 없이 늘 최신)
 //           usage/날짜.md 머리에 🏷️ 앱 판 줄 (v314 · version.js)
 //           grammar/YYYY-MM-DD.md (📝 영어 문법 — 단원마다 ⭐·✅·다시 · 오개념별 틀린 수 · 🎁 깜짝 포켓몬 · 최근 7일, v348 · grammar.grammarMd · 한 번도 안 했으면 안 만든다)
-//           letters/todo.md · letters/todo.json (📮 포켓몬 편지 — 판단 기다리는 답장, v351 · letters.letterTodo · 하나도 없으면 빈 목록도 올린다)
+//           letters/todo.md · letters/todo.json (📮 포켓몬 편지 — 판단 기다리는 답장, v351 · letters.letterTodo · 하나도 없으면 빈 목록도 올린다
+//             · todo.md 머리에 📮 지금 우체통 한 줄 — 처음 연 날·지금 편지·띠 글·🌟, v357 · letters.letterStatusLine)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
@@ -483,8 +484,11 @@ async function letterTodoNow(today) {
   const p = await getProfile();
   let data = null;
   try { data = await (await fetch('./coach/english/letters.json')).json(); } catch { data = null; }
-  const todo = lt.letterTodo(p && p.letters, lt.lettersList(data), Date.now());
-  return { todo, md: lt.letterTodoMd(todo, today, data && data.grades) };
+  const list = lt.lettersList(data);
+  const now = Date.now();
+  const todo = lt.letterTodo(p && p.letters, list, now);
+  // 📮 지금 우체통 한 줄 (v357) — 처음 연 날·지금 편지·띠 글 · 원고를 못 받았으면 「모름」
+  return { todo, md: lt.letterTodoMd(todo, today, data && data.grades, lt.letterStatusLine(p && p.letters, p && p.caught, list, now)) };
 }
 
 /**

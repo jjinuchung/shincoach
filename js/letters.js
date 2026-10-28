@@ -424,6 +424,48 @@ function ymd(t) {
   const d = new Date(t);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+/** 날 번호 → YYYY-MM-DD (dayNum의 거꾸로 — 날 번호는 기기 날짜를 UTC 자정으로 센 것) */
+const dayYmd = (n) => new Date(n * 86400000).toISOString().slice(0, 10);
+
+/**
+ * 📤 지금 우체통 한 줄 (순수 — letters/todo.md 머리, v357) — 「편지 언제 와?」에 기록으로 답하려고 (전엔 처음 연 날이 안 올라와 첫 편지가 왔는지 몰랐다)
+ * 판 연 날 · 지금(letterNow 차례 그대로) · 태블릿 띠 글 그대로 · 끝난 편지 수 · 🌟 마지막 날과 다음 날 — 진우 글은 넣지 않는다(글은 아래 목록에)
+ * 원고를 못 받으면(list 비어 있음) 지금 편지는 모른다고 쓴다 — letterNow는 원고가 없으면 「남은 편지 없음」으로 읽는다
+ */
+export function letterStatusLine(raw, caught, list, now) {
+  const L = lettersOf(raw);
+  if (!L.start) return '📮 지금 우체통 — 판을 아직 안 엶 · 영어 영상 목록을 처음 연 다음 날 첫 편지';
+  const has = Array.isArray(list) && list.length > 0;
+  const st = letterNow(L, caught, has ? list : [], now);
+  const name = (x, mon) => (x ? `${x.ko}(${x.en})` : `mon ${mon}`);
+  // 안 읽은 답장을 지금 읽으면 무엇이 오나 — 등급으로 짐작하지 않고 letterReadRule·letterNow를 복사본에 그대로 불러 본다
+  //   (마지막 편지였거나 남은 포켓몬이 병합으로 도감에 있으면 새 편지가 안 온다 · ✉️도 그 편지가 원고에 있어야 — 🔍 Codex 162차 #1)
+  const afterRead = () => {
+    const q = { letters: L };
+    if (!letterReadRule(q, st.entry.id, now).ok) return '';
+    const a = letterNow(q.letters, caught, list, now);
+    if (a.kind === 'wait') return a.from <= (dayNum(now) || 1) + 1 ? '읽은 다음 날 새 편지' : `읽으면 ${dayYmd(a.from)}부터 새 편지`;
+    if (a.kind === 'letter' && a.again) return `읽으면 ${name(a.letter, a.mon)}의 같은 편지에 다시 쓸 차례`;
+    if (a.kind === 'letter') return `읽으면 ${name(a.letter, a.mon)}의 편지`;
+    if (a.kind === 'reply') return `읽으면 다음은 ${name(a.letter, a.mon)}의 답장(안 읽음)`;
+    if (a.kind === 'sent') return `읽으면 다음은 ${name(a.letter, a.mon)}에게 보낸 답장(판단 기다림)`;
+    return '읽으면 남은 편지 없음';
+  };
+  let cur;
+  if (!has) cur = '원고를 못 받아 지금 편지는 모름';
+  else if (st.kind === 'reply') { const next = afterRead(); cur = `${name(st.letter, st.mon)}의 답장 붙음(${GRADE_ICON[st.entry.r.g]}) — 진우가 아직 안 읽음${next ? ` · ${next}` : ''}`; }
+  else if (st.kind === 'sent') cur = `${name(st.letter, st.mon)}에게 답장 보냄(${ymd(st.entry.at)}) — 판단 기다림(아래)`;
+  else if (st.kind === 'letter' && st.again) cur = `✉️ 다시 쓰기 — ${name(st.letter, st.mon)}의 같은 편지에 다시 쓸 차례(기다리지 않음)`;
+  else if (st.kind === 'letter') cur = `${name(st.letter, st.mon)}의 편지가 와 있음 · ${L.seen[st.mon] ? `${dayYmd(L.seen[st.mon])}에 열어 봄 · 답장 아직` : '아직 안 엶'}`;
+  else if (st.kind === 'wait') cur = `다음 편지는 ${dayYmd(st.from)}부터`;
+  else cur = '남은 편지 없음(편지 포켓몬이 모두 끝났거나 도감에 있음)';
+  const strip = has ? stripText(st) : '';
+  const done = new Set(L.sent.filter((e) => e.r && e.r.g !== 'again').map((e) => e.mon)).size;
+  const star = L.star
+    ? `🌟 마지막 ${dayYmd(L.star)} · 다음 🌟 ${starOpen(L, dayNum(now)) ? '지금 줄 수 있음' : `${dayYmd(L.star + STAR_GAP)}부터`}`
+    : '🌟 아직 없음(지금 줄 수 있음)';
+  return [`📮 지금 우체통 — 판 연 날 ${dayYmd(L.start)}`, `지금: ${cur}`, ...(strip ? [`띠 「${strip}」`] : []), `끝난 편지 ${done}통`, star].join(' · ');
+}
 /**
  * 📤 답장 기다리는 글 (순수) — 비공개 저장소 letters/todo.json · Claude는 mon·id를 그대로 letters/replies.json에 적는다
  * starOpen = 지금 🌟(그 포켓몬)를 줄 수 있나(2주) — 아니면 🌟로 판단해도 앱이 👍 상자로 바꾼다 · before = 그 편지에 전에 쓴 글
@@ -441,10 +483,11 @@ export function letterTodo(raw, list, now) {
     };
   });
 }
-/** 📤 사람이 읽는 글 (letters/todo.md) — 맨 위에 판단 기준(원고 grades) */
-export function letterTodoMd(todo, today, grades) {
+/** 📤 사람이 읽는 글 (letters/todo.md) — 맨 위에 지금 우체통 한 줄(status — letterStatusLine, v357)과 판단 기준(원고 grades) */
+export function letterTodoMd(todo, today, grades, status) {
   const list = Array.isArray(todo) ? todo : [];
   const L = [`📮 진우의 포켓몬 편지 답장 — 판단 기다리는 글 ${list.length}개 (${today})`,
+    ...(typeof status === 'string' && status ? [status] : []),
     '답장은 letters/replies.json에 { mon, id, grade(star·good·ok·again), en, ko, ps, psKo } — mon·id는 아래 그대로 · 선물은 앱이 정한다(답장 글에 선물 이야기 쓰지 않기)', ''];
   if (isObj(grades)) for (const k of GRADES) if (isObj(grades[k])) L.push(`- ${GRADE_ICON[k]} ${k} ${grades[k].ko || ''}: ${grades[k].rule || ''}`);
   L.push('');
