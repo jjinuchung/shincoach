@@ -1,5 +1,6 @@
 // 🔒 비공개 저장소(shincoach-data)에 올리기 전 검사 — node tools/check.mjs --private <폴더>
-//   폴더 안의 essay/fixes.json(✍️ 아빠 교정) · math/replies.json(❓ 아빠 답장) · korean/replies.json(✍️ 국어 서술형 답장, v237) 중 **있는 것**을 검사한다
+//   폴더 안의 essay/fixes.json(✍️ 아빠 교정) · math/replies.json(❓ 아빠 답장) · korean/replies.json(✍️ 국어 서술형 답장, v237) ·
+//   letters/replies.json(📮 포켓몬 편지 답장 — fix 칸까지, v360) 중 **있는 것**을 검사한다
 //   (교정만 올릴 때는 답장 파일이 없어도 된다).
 // ★ 없는 폴더·검사할 파일이 하나도 없는 폴더·폴더 이름 빠짐은 실패다 (Codex 36차 #5 — 전엔 "검사 통과"로 끝나
 //   경로를 잘못 쳐도 검사한 줄 알았다). 검사한 파일 이름을 돌려줘 check.mjs가 찍는다.
@@ -8,8 +9,9 @@ import { checkReplies } from '../js/korwrite.js';
 import { validCards } from '../js/korean.js';
 import { nonsulWriteCards, nonsulReasonCards } from '../js/nonsul.js';
 import { PRIVATE_MAX_BYTES } from '../js/upload.js';
+import { checkLetterReplies, lettersList } from '../js/letters.js';
 
-export const PRIVATE_FILES = ['essay/fixes.json', 'math/replies.json', 'korean/replies.json'];
+export const PRIVATE_FILES = ['essay/fixes.json', 'math/replies.json', 'korean/replies.json', 'letters/replies.json'];
 
 /** argv → { dir } (--private을 안 쓰면 dir null) · --private 뒤에 폴더 이름이 없으면 { error } */
 export function privateArg(argv) {
@@ -43,6 +45,12 @@ export function checkPrivateDir(dir, figureSvg) {
       const nj = src('nonsul.json');
       const cards = [...validCards(src('reading.json')), ...nonsulWriteCards(nj), ...nonsulReasonCards(nj)];
       for (const b of checkReplies(list, cards).bad) errors.push(`내용 오류: ${b.i < 0 ? f : `${f}[${b.i}]`}: ${b.why}`);
+      continue;
+    }
+    if (rel === 'letters/replies.json') {
+      // 📮 포켓몬 편지 답장 — [{ mon, id, grade, en, ko, ps, psKo, fix }] · 앱이 받을 때와 같은 검사(letters.checkLetterReplies — 편지 포켓몬·id·등급·길이·fix·따라 읽을 문장 수 · v360 🔍 Codex 164차)
+      const L = lettersList(JSON.parse(readFileSync(new URL('../coach/english/letters.json', import.meta.url), 'utf8')));
+      for (const b of checkLetterReplies(list, L).bad) errors.push(`내용 오류: ${b.i < 0 ? f : `${f}[${b.i}]`}: ${b.why}`);
       continue;
     }
     if (rel === 'essay/fixes.json') {

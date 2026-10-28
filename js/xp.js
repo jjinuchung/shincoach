@@ -34,7 +34,7 @@ import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·�
 import { matchedOf, korMatchRule } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329, 순수)
 import { dripOf, dripStartRule } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (v320, 순수)
 import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule, reasonAddRule } from './nonsul.js'; // 🖊️ 논술 칸·보상·잡기 기회 (v303 — 퍼즐과 같은 꼴, 잡기 기회는 따로) · 💡 내 이유 한 줄 (v355)
-import { lettersOf, letterStartRule, letterSeenRule, letterSendRule, letterReplyRule, letterReadRule } from './letters.js'; // 📮 포켓몬 편지 (v351 — 순수)
+import { lettersOf, letterStartRule, letterSeenRule, letterSendRule, letterReplyRule, letterReadRule, letterOpenRule } from './letters.js'; // 📮 포켓몬 편지 (v351 — 순수 · v360 선물 열기)
 import { grammarRule, knownOf, seenOf, gMissOf, diagOf, giftOf, rngFrom, videoSeenOf } from './grammar.js'; // 📝 영어 문법 칸·💰·🎁 깜짝 포켓몬 (v348 — 순수 · v349 영상 사이 쪽지 — 진단 칸은 옛 기록 병합에만)
 import { writeAddRule, writeReplyRule, writeReadRule, writesOf } from './korwrite.js'; // ✍️ 국어 서술형 (순수)
 import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
@@ -1077,6 +1077,10 @@ export function letterApply(rows, list) {
 /** 📮 답장을 읽었다 (그 글의 id — 화면에서 [다 읽었어요]를 눌렀을 때) */
 export function letterRead(id) {
   return houseDo((p) => letterReadRule(p, id, Date.now()));
+}
+/** 🎁 고친 글을 따라 읽고 선물 열기 (v360 — 선물·읽음을 한 트랜잭션 · 두 창이 같이 눌러도 한 번) · say = { n, ok } */
+export function letterOpen(id, say) {
+  return houseDo((p) => letterOpenRule(p, id, Date.now(), say));
 }
 /** ✍️ 서술형 글 보내기 — 한 트랜잭션에서 "답장 기다리는 글 하나"를 저장된 프로필로 다시 보고, 이름표(at)를 정하고, 첫 글이면 💰5 (두 창이 같이 눌러도 하나) · cards = 지금 있는 카드 */
 export function korWriteAdd(cardId, text, cards) {

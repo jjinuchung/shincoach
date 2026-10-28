@@ -50,6 +50,8 @@ export const LETTER_ID_RE = /^l[0-9a-z]{14}$/;
 /** 읽을 때 받아들이는 글 줄의 끝 — 깨진 큰 장부만 막는다(정리한 장부 둘을 합쳐도 이보다 훨씬 작아 차례에 따라 갈리지 않는다 — 🔍 Codex 155차 #2) */
 const RAW_SENT_MAX = 4000;
 const SEEN_MAX = 200;
+/** 🎤 따라 읽을 문장 끝 (v360 — 고친 답장을 문장으로 나눈 수) */
+export const SAY_MAX = 20;
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const cnt = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
@@ -161,7 +163,14 @@ function replyOf(r) {
   const en = str(r.en, REPLY_TEXT_MAX);
   if (!en) return null;
   const gift = giftOf(r.gift);
-  return { g: r.g, en, ko: str(r.ko, REPLY_TEXT_MAX), ps: str(r.ps, PS_MAX), psKo: str(r.psKo, PS_MAX), at: cnt(r.at) || 1, ...(gift ? { gift } : {}) };
+  const fix = str(r.fix, LETTER_MAX); // ✏️ 고친 답장 전체 (v360 — 있으면 선물은 따라 읽은 뒤)
+  const say = sayOf(r.say); // 🎤 따라 읽기 결과 { n 문장, ok 통과 } (v360)
+  return { g: r.g, en, ko: str(r.ko, REPLY_TEXT_MAX), ps: str(r.ps, PS_MAX), psKo: str(r.psKo, PS_MAX), at: cnt(r.at) || 1, ...(fix ? { fix } : {}), ...(gift ? { gift } : {}), ...(say ? { say } : {}) };
+}
+function sayOf(s) {
+  if (!isObj(s)) return null;
+  const n = Math.min(SAY_MAX, cnt(s.n));
+  return n ? { n, ok: Math.min(n, cnt(s.ok)) } : null;
 }
 function giftOf(g) {
   if (!isObj(g)) return null;
@@ -181,7 +190,9 @@ function sentOf(e) {
 function better(a, b) {
   if (!!a.r !== !!b.r) return a.r ? a : b;
   if (!a.r) return a;
-  const w = a.r.at !== b.r.at ? (a.r.at < b.r.at ? a : b) : (JSON.stringify(a.r) <= JSON.stringify(b.r) ? a : b);
+  // 🎁 선물을 연 쪽 먼저 (v360 — 고친 글이 있는 답장은 따라 읽은 뒤 열어서, 연 사본과 안 연 사본이 갈린다) · 아니면 먼저 붙은 쪽
+  const w = !!a.r.gift !== !!b.r.gift ? (a.r.gift ? a : b)
+    : a.r.at !== b.r.at ? (a.r.at < b.r.at ? a : b) : (JSON.stringify(a.r) <= JSON.stringify(b.r) ? a : b);
   const { rd: _rd, ...rest } = w;
   const rd = minPos(cnt(a.rd), cnt(b.rd));
   return { ...rest, ...(rd ? { rd } : {}) };
@@ -300,7 +311,7 @@ export function letterSendRule(p, mon, text, now, list) {
 }
 
 /**
- * 답장 파일 검사 (순수) → { good: [{ mon, id, g, en, ko, ps, psKo }], bad: [{ i, why }], over }
+ * 답장 파일 검사 (순수) → { good: [{ mon, id, g, en, ko, ps, psKo, fix? }], bad: [{ i, why }], over }
  * 같은 글에 다른 답장이 둘이면 둘 다 버린다 · 같은 답장 두 줄은 하나로
  */
 export function checkLetterReplies(rows, list) {
@@ -321,7 +332,16 @@ export function checkLetterReplies(rows, list) {
     const ps = typeof e.ps === 'string' ? e.ps.trim() : '';
     const psKo = typeof e.psKo === 'string' ? e.psKo.trim() : '';
     if (ps.length > PS_MAX || psKo.length > PS_MAX || (e.ps !== undefined && typeof e.ps !== 'string') || (e.psKo !== undefined && typeof e.psKo !== 'string')) { bad.push({ i, why: `ps·psKo는 ${PS_MAX}자까지의 글` }); return; }
-    const r = { mon: e.mon, id: e.id, g, en, ko, ps, psKo };
+    // ✏️ fix = 진우 답장을 고친 전체 글 (v360 · 없으면 옛 꼴 — 붙는 순간 선물) · 있으면 1~LETTER_MAX자
+    const fix = e.fix === undefined ? '' : typeof e.fix === 'string' ? normLetter(e.fix) : null;
+    if (fix === null || (e.fix !== undefined && !fix) || [...fix].length > LETTER_MAX) { bad.push({ i, why: `fix는 1~${LETTER_MAX}자의 글(진우 답장을 고친 전체 글)` }); return; }
+    // 🎤 따라 읽을 영어 문장이 있어야 (없으면 🎤 없이 선물이 열린다) · SAY_MAX를 넘으면 뒤가 잘린다 — 그 줄은 안 받는다 (🔍 Codex 164차)
+    if (fix && g !== 'again') {
+      const n = sayParts(fix).length;
+      if (!n) { bad.push({ i, why: 'fix에 따라 읽을 영어 문장이 없어요' }); return; }
+      if (n > SAY_MAX) { bad.push({ i, why: `fix가 ${SAY_MAX}문장을 넘어요(${n}문장) — 따라 읽기는 ${SAY_MAX}문장까지` }); return; }
+    }
+    const r = { mon: e.mon, id: e.id, g, en, ko, ps, psKo, ...(fix ? { fix } : {}) };
     const p = seen.get(e.id);
     if (!p) { seen.set(e.id, { r, i, clash: false }); return; }
     if (JSON.stringify(p.r) !== JSON.stringify(r)) { p.clash = true; bad.push({ i, why: `같은 글(${e.id})에 다른 답장` }); }
@@ -344,7 +364,8 @@ export function letterReplyStats(raw, rows, list) {
 
 /**
  * 📮 답장 붙이기 (한 트랜잭션) — 그 글(mon, id)이 있고 아직 답장이 없을 때만 · 선물은 앱이 정한다
- * @returns {{ok:boolean, why?:string, applied?:Array<{mon,id,g,gift}>}} why 'none' 붙일 것 없음
+ * v360: 고친 글(fix)이 있으면 선물을 아직 안 준다 — 진우가 고친 글을 듣고 🎤 따라 읽은 뒤 letterOpenRule이 연다 (fix 없는 옛 꼴은 붙는 순간)
+ * @returns {{ok:boolean, why?:string, applied?:Array<{mon,id,g,gift,later?}>}} why 'none' 붙일 것 없음
  */
 export function letterReplyRule(p, rows, now, list) {
   const { good } = checkLetterReplies(rows, list);
@@ -354,30 +375,37 @@ export function letterReplyRule(p, rows, now, list) {
   for (const r of good) {
     const e = L.sent.find((x) => x.id === r.id && x.mon === r.mon);
     if (!e || e.r) continue; // 없는 글(다른 사본 — 병합으로 오면 그때) · 이미 붙음
-    let gift = null;
-    const caught = isObj(p.caught) ? p.caught : {};
-    if (r.g === 'star' && starOpen(L, today) && !(Number(caught[r.mon]) > 0)) {
-      gift = { k: 'friend', mon: r.mon, n: STAR_COINS };
-      p.caught = { ...caught, [r.mon]: 1 };
-      if (!p.partner) p.partner = r.mon; // 🤝 처음 얻은 포켓몬이면 파트너 (잡기와 같은 규칙)
-      L.star = today;
-      addCoins(p, STAR_COINS);
-    } else if (r.g === 'star' || r.g === 'good') {
-      const b = boxOf(e.id);
-      gift = { ...b, ...(r.g === 'star' ? { from: 'star' } : {}) };
-      if (b.k === 'coins') addCoins(p, b.n);
-      else p.items = { ...(isObj(p.items) ? p.items : {}), [b.id]: Math.min(Number.MAX_SAFE_INTEGER, (Math.floor(Number((p.items || {})[b.id])) || 0) + b.n) };
-    } else if (r.g === 'ok') {
-      gift = { k: 'coins', n: OK_COINS };
-      addCoins(p, OK_COINS);
-    }
-    e.r = { g: r.g, en: r.en, ko: r.ko, ps: r.ps, psKo: r.psKo, at: cnt(now) || 1, ...(gift ? { gift } : {}) };
-    applied.push({ mon: r.mon, id: e.id, g: r.g, gift });
+    const later = !!r.fix && r.g !== 'again'; // ✏️ 고친 글이 있으면 선물은 따라 읽은 뒤 (letterOpenRule · v360)
+    const gift = later ? null : payGift(p, L, e.id, r.mon, r.g, today);
+    e.r = { g: r.g, en: r.en, ko: r.ko, ps: r.ps, psKo: r.psKo, ...(r.fix ? { fix: r.fix } : {}), at: cnt(now) || 1, ...(gift ? { gift } : {}) };
+    applied.push({ mon: r.mon, id: e.id, g: r.g, gift, ...(later ? { later: true } : {}) });
   }
   if (!applied.length) return { ok: false, why: 'none' };
   L.sent = tidy(L.sent);
   p.letters = L;
   return { ok: true, applied };
+}
+/** 선물 주기 (letterReplyRule·letterOpenRule 공용 — 프로필·장부를 고친다) → 준 선물 · ✉️면 null */
+function payGift(p, L, id, mon, g, today) {
+  const caught = isObj(p.caught) ? p.caught : {};
+  if (g === 'star' && starOpen(L, today) && !(Number(caught[mon]) > 0)) {
+    p.caught = { ...caught, [mon]: 1 };
+    if (!p.partner) p.partner = mon; // 🤝 처음 얻은 포켓몬이면 파트너 (잡기와 같은 규칙)
+    L.star = today;
+    addCoins(p, STAR_COINS);
+    return { k: 'friend', mon, n: STAR_COINS };
+  }
+  if (g === 'star' || g === 'good') {
+    const b = boxOf(id);
+    if (b.k === 'coins') addCoins(p, b.n);
+    else p.items = { ...(isObj(p.items) ? p.items : {}), [b.id]: Math.min(Number.MAX_SAFE_INTEGER, (Math.floor(Number((p.items || {})[b.id])) || 0) + b.n) };
+    return { ...b, ...(g === 'star' ? { from: 'star' } : {}) };
+  }
+  if (g === 'ok') {
+    addCoins(p, OK_COINS);
+    return { k: 'coins', n: OK_COINS };
+  }
+  return null;
 }
 function addCoins(p, n) {
   p.coins = (Number(p.coins) || 0) + n;
@@ -391,6 +419,56 @@ export function letterReadRule(p, id, now) {
   e.rd = cnt(now) || 1;
   p.letters = L;
   return { ok: true };
+}
+/** 🎁 선물이 따라 읽기를 기다리나 (v360) — 고친 글이 있고 · ✉️가 아니고 · 아직 선물도 읽음도 없음 */
+export function giftWaits(e) {
+  return !!(e && e.r && e.r.fix && e.r.g !== 'again' && !e.r.gift && !e.rd);
+}
+/**
+ * 🎁 고친 글을 따라 읽고 선물 열기 (한 트랜잭션 · v360) — 그 글에 답장이 있고 아직 안 읽었을 때 · 연 순간이 읽은 시각(다음 편지는 다음 날)
+ * 선물은 연 때 정한다(🌟 2주·도감) · 옛 꼴(이미 준 선물)·✉️는 읽음만 · say = { n 문장, ok 통과 } (📤 기록)
+ * @returns {{ok:boolean, why?:'none', gift?:object|null, fresh?:boolean}} fresh = 이번에 준 선물
+ */
+export function letterOpenRule(p, id, now, say) {
+  const L = lettersOf(p.letters);
+  const e = L.sent.find((x) => x.id === id);
+  if (!e || !e.r || e.rd) return { ok: false, why: 'none' };
+  const fresh = giftWaits(e);
+  const gift = fresh ? payGift(p, L, e.id, e.mon, e.r.g, dayNum(now) || 1) : e.r.gift || null;
+  const s = sayOf(say);
+  e.r = { ...e.r, ...(gift ? { gift } : {}), ...(s ? { say: s } : {}) };
+  e.rd = cnt(now) || 1;
+  p.letters = L;
+  return { ok: true, gift, fresh };
+}
+/** 고친 글을 줄·문장(. ! ? 뒤 빈칸)으로 나눔 · 영어 글자 없는 조각은 뺌 (끝 없이 — 답장 검사가 수를 센다) */
+function sayParts(text) {
+  const out = [];
+  for (const line of normLetter(text).split('\n')) {
+    for (const part of line.split(/(?<=[.!?])\s+(?=\S)/)) {
+      const t = part.trim();
+      if (/[a-z]/i.test(t)) out.push(t);
+    }
+  }
+  return out;
+}
+/** 🎤 따라 읽을 문장 (순수 · v360) — sayParts를 SAY_MAX까지 (답장 검사가 넘는 줄을 막아 보통은 잘리지 않는다) */
+export function fixLines(text) {
+  return sayParts(text).slice(0, SAY_MAX);
+}
+/**
+ * 📒 편지 도감 (순수 · v360) — 원고 차례 그대로 칸마다 { no, mon, letter, state, grade, entries }
+ * state: empty(아직 편지를 못 봄 — 실루엣) · open(편지를 받았거나 답장 중) · done(✉️ 아닌 답장을 받아 읽음 · grade = 그 등급)
+ * entries = 그 포켓몬에게 보낸 글 모두(쓴 차례 · 답장 붙은 것·기다리는 것)
+ */
+export function letterAlbum(raw, list) {
+  const L = lettersOf(raw);
+  return (Array.isArray(list) ? list : []).map((x, i) => {
+    const entries = L.sent.filter((e) => e.mon === x.id);
+    const fin = [...entries].reverse().find((e) => e.r && e.r.g !== 'again' && e.rd);
+    const state = fin ? 'done' : L.seen[x.id] || entries.length ? 'open' : 'empty';
+    return { no: i + 1, mon: x.id, letter: x, state, grade: fin ? fin.r.g : '', entries };
+  });
 }
 
 // ───────────────────── 말 (아이 화면 — 셈 없이) ─────────────────────
@@ -453,7 +531,7 @@ export function letterStatusLine(raw, caught, list, now) {
   };
   let cur;
   if (!has) cur = '원고를 못 받아 지금 편지는 모름';
-  else if (st.kind === 'reply') { const next = afterRead(); cur = `${name(st.letter, st.mon)}의 답장 붙음(${GRADE_ICON[st.entry.r.g]}) — 진우가 아직 안 읽음${next ? ` · ${next}` : ''}`; }
+  else if (st.kind === 'reply') { const next = afterRead(); cur = `${name(st.letter, st.mon)}의 답장 붙음(${GRADE_ICON[st.entry.r.g]}) — 진우가 아직 ${giftWaits(st.entry) ? '따라 읽지 않음(🎁 선물은 따라 읽은 뒤)' : '안 읽음'}${next ? ` · ${next}` : ''}`; }
   else if (st.kind === 'sent') cur = `${name(st.letter, st.mon)}에게 답장 보냄(${ymd(st.entry.at)}) — 판단 기다림(아래)`;
   else if (st.kind === 'letter' && st.again) cur = `✉️ 다시 쓰기 — ${name(st.letter, st.mon)}의 같은 편지에 다시 쓸 차례(기다리지 않음)`;
   else if (st.kind === 'letter') cur = `${name(st.letter, st.mon)}의 편지가 와 있음 · ${L.seen[st.mon] ? `${dayYmd(L.seen[st.mon])}에 열어 봄 · 답장 아직` : '아직 안 엶'}`;
@@ -464,7 +542,10 @@ export function letterStatusLine(raw, caught, list, now) {
   const star = L.star
     ? `🌟 마지막 ${dayYmd(L.star)} · 다음 🌟 ${starOpen(L, dayNum(now)) ? '지금 줄 수 있음' : `${dayYmd(L.star + STAR_GAP)}부터`}`
     : '🌟 아직 없음(지금 줄 수 있음)';
-  return [`📮 지금 우체통 — 판 연 날 ${dayYmd(L.start)}`, `지금: ${cur}`, ...(strip ? [`띠 「${strip}」`] : []), `끝난 편지 ${done}통`, star].join(' · ');
+  // 🎤 마지막 따라 읽기 (v360 — 「올라온 거 봐 줘」 때 효과를 본다)
+  const said = [...L.sent].reverse().find((e) => e.rd && e.r && e.r.say);
+  const say = said ? [`🎤 마지막 따라 읽기 ${name(has ? list.find((x) => x.id === said.mon) : null, said.mon)} 통과 ${said.r.say.ok}/${said.r.say.n}(${ymd(said.rd)})`] : [];
+  return [`📮 지금 우체통 — 판 연 날 ${dayYmd(L.start)}`, `지금: ${cur}`, ...(strip ? [`띠 「${strip}」`] : []), `끝난 편지 ${done}통`, star, ...say].join(' · ');
 }
 /**
  * 📤 답장 기다리는 글 (순수) — 비공개 저장소 letters/todo.json · Claude는 mon·id를 그대로 letters/replies.json에 적는다
@@ -488,7 +569,8 @@ export function letterTodoMd(todo, today, grades, status) {
   const list = Array.isArray(todo) ? todo : [];
   const L = [`📮 진우의 포켓몬 편지 답장 — 판단 기다리는 글 ${list.length}개 (${today})`,
     ...(typeof status === 'string' && status ? [status] : []),
-    '답장은 letters/replies.json에 { mon, id, grade(star·good·ok·again), en, ko, ps, psKo } — mon·id는 아래 그대로 · 선물은 앱이 정한다(답장 글에 선물 이야기 쓰지 않기)', ''];
+    '답장은 letters/replies.json에 { mon, id, grade(star·good·ok·again), en, ko, ps, psKo, fix } — mon·id는 아래 그대로 · 선물은 앱이 정한다(답장 글에 선물 이야기 쓰지 않기)',
+    '✏️ fix = 진우 답장을 고친 전체 글(고칠 곳이 없으면 진우 글 그대로 · ✉️ again이면 빼도 됨) — 진우가 듣고 🎤 따라 읽은 뒤에 선물이 열린다(v360) · 📤 앱 판이 v360 전이면 올리지 말 것(옛 판은 fix를 모르고 바로 선물)', ''];
   if (isObj(grades)) for (const k of GRADES) if (isObj(grades[k])) L.push(`- ${GRADE_ICON[k]} ${k} ${grades[k].ko || ''}: ${grades[k].rule || ''}`);
   L.push('');
   for (const e of list) {
