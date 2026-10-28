@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { KOR_BATTLE, offerRoll, korBattleQ, nonsulBattleQ } from '../js/korbattle.js';
+import { KOR_BATTLE, offerRoll, korBattleQ, nonsulBattleQ, nonsulQFor } from '../js/korbattle.js';
 import { moveHint, loseTip, movesOf, BATTLE } from '../js/battle.js';
 import { allWords } from '../js/korwords.js';
 import { validCards } from '../js/korean.js';
@@ -196,4 +196,24 @@ test('⚔️ 화면 연결: 끝 화면에 가끔 단추 · ⏳ 국어 시간 · 
   // 오프라인 — 앱 셸에 두 파일
   const sw = read('sw.js');
   for (const f of ['./js/korbattle.js', './js/korbattleview.js']) assert.ok(sw.includes(`'${f}',`), f);
+});
+
+test('🖊️ 논술 턴: 두 편으로 읽히던 이유·틀린 말은 원고에 다시 오지 않는다 · N83 「스스로 덜어 먹어요」 문제의 오답 = 정해진 양 편 이유 (🔍 Codex 158차)', () => {
+  // 편 이름만 보이는 배틀에서 반대편 이유가 이 편 이유로도 읽히면 정답이 둘이 된다 — 고치기 전 문장
+  const both = ['좋아하는 반찬만 많이 덜어 갈 수 있어요.', '받는 사람에게 꼭 필요한 물건을 줄 수 있어요.', '친구가 즐거워하면 나도 함께 즐거워요.', '포켓몬은 기술을 한 번에 네 개까지 쓸 수 있어요.'];
+  const text = new Set(topics.flatMap((x) => [...x.yes.reasons, ...x.no.reasons, ...x.off.map((o) => o.t)]));
+  for (const s of both) assert.ok(!text.has(s), `되돌아옴: ${s}`);
+  const t = life.find((x) => x.id === 'N83');
+  const fixed = '좋아하는 반찬만 덜다 보면 음식을 골고루 먹기 어려워요.';
+  assert.equal(t.no.reasons[0], fixed);
+  let shown = 0;
+  for (let s = 1; s <= 200; s++) {
+    const q = nonsulQFor(t, 'yes', seeded(s));
+    assert.equal(q.q, '「스스로 덜어 먹어요」라는 의견에 알맞은 이유는 무엇인가요?');
+    const wrong = q.choices.filter((c) => !c.ok).map((c) => c.text);
+    for (const w of wrong) assert.ok(t.no.reasons.includes(w) || t.off.some((o) => o.t === w), `${w}`);
+    if (wrong.includes(fixed)) shown++;
+  }
+  assert.ok(shown > 0, '고친 반대 이유가 오답으로 나온다');
+  assert.ok(Array.from({ length: 50 }, (_, s) => nonsulQFor(t, 'no', seeded(s + 1))).some((q) => q.choices.find((c) => c.ok).text === fixed), '「나눠 주는 게 좋아요」 쪽에선 정답');
 });

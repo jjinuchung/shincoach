@@ -67,7 +67,7 @@ test('✍️ 원고: 채점 기준 write 하나 · 판 1 · 꼭 들어갈 것 �
 
 test('✍️ 주제 → 서술형 카드: 쓸 수 있는 주제마다 N## · 제목은 주제 물음 · 물음·기준은 공통 · 300자 · 머리말이 틀 · 기준이 깨지면 [](짧은 글을 안 연다)', () => {
   assert.deepEqual(NCARDS.map((c) => c.id), allTopics(RAW).map((t) => t.id));
-  assert.equal(NCARDS.length, 62); // v316 📖 독서 논술 10 · v342 생활 셋째 묶음 20
+  assert.equal(NCARDS.length, 92); // v316 📖 독서 논술 10 · v342 생활 셋째 묶음 20 · v353 넷째 묶음 30
   for (const c of NCARDS) {
     assert.ok(WRITE_CARD_RE.test(c.id));
     assert.equal(c.title, allTopics(RAW).find((t) => t.id === c.id).q);

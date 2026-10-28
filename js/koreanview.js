@@ -1051,7 +1051,7 @@ function onePuzzleEl(r, one) {
 }
 
 /**
- * 🖊️ 이 이야기로 생각해 보기 (v316 📖 독서 논술) — 그 글로 만든 논술 주제가 있고 아직 ⭐가 아니면 단추 하나(셈 문구 없음) ·
+ * 🖊️ 이 글로 생각해 보기 (v316 📖 독서 논술 · v353부터 기사문·토의 글도 있어 「이야기로」에서 바꿈) — 그 글로 만든 논술 주제가 있고 아직 ⭐가 아니면 단추 하나(셈 문구 없음) ·
  * 원고는 논술 화면 쪽이 받는다(그동안은 빈 자리 — 받으면 그 자리에 단추) · 누르면 그 주제 판을 준비하고 논술 화면으로(⏳ 국어 시간 안)
  */
 function storyNonsulEl(cardId) {
@@ -1059,7 +1059,7 @@ function storyNonsulEl(cardId) {
   import('./nonsulview.js').then((ns) => ns.readingTopicFor(cardId).then((t) => {
     if (!t || !slot.isConnected || !ui.showView) return;
     slot.appendChild(el('p', 'kor-ns-q', `${t.icon} ${t.q}`));
-    const b = el('button', 'btn btn-primary kor-ns-btn', '🖊️ 이 이야기로 생각해 보기');
+    const b = el('button', 'btn btn-primary kor-ns-btn', '🖊️ 이 글로 생각해 보기');
     b.type = 'button';
     b.addEventListener('click', () => guardStart('korean', () => { if (ns.openTopic(t.id)) ui.showView('nonsul'); }));
     slot.appendChild(b);
@@ -1226,7 +1226,7 @@ function tickRead() {
 export function initKorean({ showView }) {
   if (ui.wired) return;
   ui.wired = true;
-  ui.showView = showView; // 🖊️ 이 이야기로 생각해 보기 → 논술 화면 (v316)
+  ui.showView = showView; // 🖊️ 이 글로 생각해 보기 → 논술 화면 (v316)
   const back = $('btn-korean-back');
   if (back) back.addEventListener('click', () => showView('home'));
   // 🎧 앱을 내리면(다른 앱·화면 끔) 읽던 소리를 멈춘다 — 돌아오면 ▶ 다시 듣기
