@@ -7,6 +7,9 @@
 //     논술에서 못 잡았어도 셀 10이면 10%폼 지가르데가 생긴다 · 큐브에 셀 수
 // 세부(v352): 과목마다 하루 하나 · 모두 합쳐 하루 3(기본안의 「과목마다 나와서 여러 과목을 하게」) · 맨 처음 찾기는 코어(셀 수에는 안 셈) ·
 //   셀 100이면 더는 안 나온다
+// v359 (2026-10-28 아버님 「도감에 50%부터 시작되는 것처럼 나와 — 첫 단계 셀 모습부터」 → 기본안 「이대로」):
+//   모습은 셀 수로만 열린다 — 1%폼(앱이 그린 🔴 코어 + 🟢 셀 · 원작 폼이 아니다 · 처음부터) · 셀 10 10%폼 · 셀 50 50%폼 ·
+//   논술에서 잡은 지가르데도 같다(전에는 50%로 시작) · 셀 10·50 문턱에서 저절로 그 모습으로 · 열린 모습끼리는 도감에서 고른다
 // 저장의 집 규칙:
 //  · 찾기·모습 바꾸기는 저장된 프로필로 한 트랜잭션(xp.houseDo) — 두 창이 같은 과목 셀을 둘 다 받지 않게
 //  · 찾은 것은 「날:과목」 열쇠(keys)로 남긴다 — 병합은 열쇠 합집합이라 따로 진행한 두 사본의 셀이 모두 남는다(Codex 157차) ·
@@ -29,7 +32,21 @@ export const STEP = { ten: 10, fifty: 50, perfect: 100 };
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const cnt = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
 const minPos = (a, b) => (a && b ? Math.min(a, b) : a || b);
-const formOk = (f) => (f === '10' || f === '50' ? f : '');
+/** 고를 수 있는 모습 — 1%폼(v359) · 10%폼 · 50%폼 (퍼펙트폼은 배틀에서만) */
+export const FORM_LIST = ['1', '10', '50'];
+const formOk = (f) => (FORM_LIST.includes(f) ? f : '');
+/** 그 모습이 열리는 셀 수 */
+const formNeed = (f) => (f === '50' ? STEP.fifty : f === '10' ? STEP.ten : 0);
+
+// 1%폼 그림 — 끝 화면의 🔴 코어(짙은 초록 육각형 + 붉은 핵)에 🟢 셀(초록 덩어리 + 눈 하나)이 붙은 모습 (zygview.js의 CORE_ART·CELL_ART와 같은 꼴 ·
+//   그림 파일 없이 data: 주소라 인터넷이 없어도 · 도트도 없다)
+const CORE_FORM_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="240" height="240">'
+  + '<g transform="translate(10 8) scale(2)"><path d="M20 3L35 11.5V28.5L20 37L5 28.5V11.5Z" fill="#14532d" stroke="#4ade80" stroke-width="2.5"/>'
+  + '<circle cx="20" cy="20" r="8" fill="#ef4444" stroke="#fecaca" stroke-width="2"/><circle cx="17.5" cy="17.5" r="2.2" fill="#fee2e2"/></g>'
+  + '<g transform="translate(70 68) scale(1.2)"><path d="M20 4C30 4 36 12 35 21C34 31 27 36 20 36C12 36 5 30 5 21C5 12 10 4 20 4Z" fill="#4ade80" stroke="#166534" stroke-width="2.5"/>'
+  + '<circle cx="20" cy="19" r="5.5" fill="#14532d"/><circle cx="18.3" cy="17.4" r="1.8" fill="#bbf7d0"/></g></svg>';
+/** 1%폼 그림 주소 (v359) */
+export const CORE_FORM_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(CORE_FORM_SVG)}`;
 /** 찾은 것 열쇠 「날 번호:과목」 */
 const keyOk = (k) => typeof k === 'string' && /^\d+:[a-z]+$/.test(k) && SUBJECTS.includes(k.slice(k.indexOf(':') + 1));
 
@@ -88,7 +105,7 @@ export function zygNext(raw) {
 /**
  * 셀(또는 코어) 찾기 — 저장된 프로필로 한 트랜잭션 (xp.zygFind → houseDo)
  * @returns {{ok:boolean, why?:'sub'|'full'|'subject'|'day', found?:'core'|'cell', cells?:number, ev?:'gift'|'ten'|'fifty'|'perfect'|null, form?:string}}
- *   ev — gift: 셀 10에 지가르데가 생김(10%폼) · ten: 이미 있어서 10%폼을 고를 수 있게 · fifty: 셀 50(10%폼이었으면 50%폼으로) · perfect: 셀 100
+ *   ev — gift: 셀 10에 지가르데가 생김(10%폼) · ten: 이미 있어서 10%폼으로(v359 — 전에는 고를 수 있게만) · fifty: 셀 50(50%폼으로) · perfect: 셀 100
  */
 export function zygFindRule(p, sub, now) {
   if (!SUBJECTS.includes(sub)) return { ok: false, why: 'sub' };
@@ -112,8 +129,11 @@ export function zygFindRule(p, sub, now) {
     z.seen = n;
     if (n === STEP.ten) {
       const caught = isObj(p.caught) ? p.caught : {};
-      if (cnt(caught[ZYG_ID]) > 0) ev = 'ten';
-      else {
+      if (cnt(caught[ZYG_ID]) > 0) {
+        z.form = '10'; // 1%폼에서 저절로 (v359)
+        z.formAt = at;
+        ev = 'ten';
+      } else {
         // 논술에서 못 잡았어도 큐브가 지가르데를 만든다 — 편지 🌟와 같은 꼴(도감 +1 · 처음 얻은 포켓몬이면 파트너)
         p.caught = { ...caught, [ZYG_ID]: 1 };
         if (!p.partner) p.partner = ZYG_ID;
@@ -123,7 +143,8 @@ export function zygFindRule(p, sub, now) {
         ev = 'gift';
       }
     } else if (n === STEP.fifty) {
-      if (z.form === '10') { z.form = '50'; z.formAt = at; }
+      z.form = '50'; // 1%·10%폼에서 저절로 (v359 — 고른 적 없던 지가르데도 이제 50%폼이 처음 열리는 때)
+      z.formAt = at;
       ev = 'fifty';
     } else ev = 'perfect';
   }
@@ -131,30 +152,31 @@ export function zygFindRule(p, sub, now) {
   return { ok: true, found: 'cell', cells: z.cells, ev, form: z.form };
 }
 
-/** 지금 모습 — '10' | '50' (고른 적 없으면 앱의 지금 모습 50%) */
+/**
+ * 지금 모습 — '1' | '10' | '50' · 고른 모습이 셀 수로 열려 있으면 그것 · 아니면(고른 적 없거나 잠김) 열린 가장 큰 모습
+ * (v359 — 전에는 고른 적 없으면 50% · 그래서 논술에서 잡은 지가르데가 셀 1개에도 50%폼이었다)
+ */
 export function zygFormOf(raw) {
-  return zygOf(raw).form || '50';
-}
-
-/** 50%폼을 고를 수 있나 — 셀 50 이상 · 또는 논술에서 잡은 지가르데가 있다(도감 수가 큐브가 준 수보다 많다) */
-export function zygCan50(raw, caught) {
   const z = zygOf(raw);
-  const have = cnt(isObj(caught) ? caught[ZYG_ID] : 0);
-  return z.cells >= STEP.fifty || have > z.gave;
+  if (z.form && z.cells >= formNeed(z.form)) return z.form;
+  return z.cells >= STEP.fifty ? '50' : z.cells >= STEP.ten ? '10' : '1';
 }
 
-/** 이 모습을 고를 수 있나 */
+/** 50%폼이 열렸나 — 셀 50 이상 (v359 — 논술에서 잡은 지가르데도 같다) */
+export function zygCan50(raw) {
+  return zygOf(raw).cells >= STEP.fifty;
+}
+
+/** 이 모습을 고를 수 있나 — 지가르데가 도감에 있고 그 모습의 셀 수가 모였다 (1%폼은 처음부터) */
 export function zygFormOpen(raw, caught, form) {
   const z = zygOf(raw);
   if (!cnt(isObj(caught) ? caught[ZYG_ID] : 0)) return false;
-  if (form === '10') return z.cells >= STEP.ten;
-  if (form === '50') return zygCan50(z, caught);
-  return false;
+  return !!formOk(form) && z.cells >= formNeed(form);
 }
 
 /** 도감에서 모습 고르기 — 한 트랜잭션 */
 export function zygFormRule(p, form, now) {
-  if (form !== '10' && form !== '50') return { ok: false, why: 'form' };
+  if (!formOk(form)) return { ok: false, why: 'form' };
   const z = zygOf(p.zyg);
   if (!zygFormOpen(z, p.caught, form)) return { ok: false, why: 'locked' };
   if (zygFormOf(z) === form) return { ok: true, same: true, form };

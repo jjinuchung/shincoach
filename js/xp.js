@@ -45,7 +45,7 @@ import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, candyOf, candyCost, MAX_LV } from './evolve.js';
 import { stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
 import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER, isLetterMon, formsOf, formUrl } from './pokemon.js';
-import { ZYG_ID, zygOf, zygFindRule, zygFormRule, zygFormOf, zygPerfect } from './zygarde.js'; // 🟢 지가르데 셀 모으기 (v352 — 순수)
+import { ZYG_ID, zygOf, zygFindRule, zygFormRule, zygFormOf, zygPerfect, CORE_FORM_URL } from './zygarde.js'; // 🟢 지가르데 셀 모으기 (v352 — 순수)
 import { setNoDot } from './sprite.js'; // 🟢 10%폼 지가르데는 도트 대신 일러스트 (5세대 도트는 50%폼뿐 — v352)
 import { findVoucher, GIVEN_BY_DAD } from './unlock.js';
 
@@ -364,7 +364,11 @@ export function rollCatch(chance, rng = Math.random) {
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
 const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, letters: { start: 0, seen: {}, sent: [], star: 0 }, zyg: zygOf(null), updatedAt: 0 });
 let profile = EMPTY();
-setNoDot((id) => id === ZYG_ID && zygFormOf(profile.zyg) === '10'); // 🟢 지금 프로필을 그때그때 본다
+/** 🟢 진우가 가진 지가르데의 모습 — '1' | '10' | '50' · 도감에 없으면 '50'(야생·상대 지가르데는 원작 그대로 · v359) */
+function myZygForm() {
+  return Number(profile.caught && profile.caught[ZYG_ID]) > 0 ? zygFormOf(profile.zyg) : '50';
+}
+setNoDot((id) => id === ZYG_ID && myZygForm() !== '50'); // 🟢 지금 프로필을 그때그때 본다 (5세대 도트는 50%폼뿐 — 1%·10%폼은 그림으로)
 let loaded = false;
 // 저장은 "증분"으로: 메모리에는 바로 반영하고, 아직 안 쓴 증분을 모아 한 트랜잭션에서 최신 저장값에 더함 (다른 창이 쓴 것도 보존)
 // 수치(xp·coins…)와 개수(caught·items)는 더하고, mons는 포켓몬별로 덮어씀, partner는 정해지면 그 값으로
@@ -1183,8 +1187,9 @@ export function getLook(monId) {
   const m = profile.mons[monId] || {};
   // anchor = 그림에서 자동으로 찾은 머리 위치 / gearPos = 아이가 직접 끌어다 놓은 자리(있으면 우선)
   // shiny = 🌈 이로치(영구) · shinyUrl = 받아 둔 이로치 그림(없으면 null → 일반 그림 + ✨ 배지)
-  // formUrl = 🟢 지가르데 10%폼 그림(v352 — 받아 둔 것만 · 없으면 null → 50%폼 그림) — setFigure가 이로치보다 먼저 본다
-  const formArt = Number(monId) === ZYG_ID && zygFormOf(profile.zyg) === '10' ? formUrl(ZYG_ID, 'ten') : null;
+  // formUrl = 🟢 지가르데 모습 그림 — 10%폼(v352 — 받아 둔 것만 · 없으면 null → 50%폼 그림) · 1%폼(v359 — 앱이 그린 코어 그림) — setFigure가 이로치보다 먼저 본다
+  const zf = Number(monId) === ZYG_ID ? myZygForm() : '50';
+  const formArt = zf === '10' ? formUrl(ZYG_ID, 'ten') : zf === '1' ? CORE_FORM_URL : null;
   return { gear: m.gear || null, dye: m.dye || null, hp: hpOf(monId), anchor: anchorFor(monId), gearPos: m.gearPos || null, shiny: !!m.shiny, shinyUrl: m.shiny ? shinyUrl(monId) : null, formUrl: formArt };
 }
 

@@ -24,7 +24,7 @@ function palNow() {
   if (!p) return null;
   const look = getLook(p.id);
   const r = ROSTER.find((x) => x.id === p.id);
-  return { ...p, url: (look && look.shinyUrl) || characterUrl(p.id) || artUrl(p.id) || '', ko: r ? r.ko : '' };
+  return { ...p, url: (look && (look.formUrl || look.shinyUrl)) || characterUrl(p.id) || artUrl(p.id) || '', ko: r ? r.ko : '' }; // 🟢 지가르데 모습 그림이 먼저 (v359)
 }
 
 /**
@@ -253,7 +253,7 @@ export async function renderHome(showView) {
     mail = await Promise.race([lv.homeLetterDot(), new Promise((r) => setTimeout(() => r(false), 1500))]);
   } catch { mail = false; }
   const frag = document.createDocumentFragment();
-  const shinyOf = (id) => { const l = getLook(id); return l && l.shinyUrl ? l.shinyUrl : null; };
+  const shinyOf = (id) => { const l = getLook(id); return (l && (l.formUrl || l.shinyUrl)) || null; }; // 🟢 지가르데 모습 그림이 먼저 (v359)
   for (const s of SUBJECTS) frag.appendChild(cardEl(cardSubject(s, { bonus, unread, reviewDue, korBonus, mail, quick }), pickMascot(s.mascot, chars, shinyOf), pick));
   list.innerHTML = '';
   list.appendChild(frag);

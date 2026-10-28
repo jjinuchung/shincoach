@@ -109,12 +109,12 @@ async function reveal(r) {
     text = '지가르데 10%폼이 도감에 들어갔어요. 셀을 더 모으면 모습이 바뀌어요!';
     url = await within(ensureForm(ZYG_ID, 'ten'), 5000);
   } else if (r.ev === 'ten') {
-    title = '🟢 셀 10개! 10%폼이 열렸어요';
-    text = '🎒 도감의 지가르데에서 10%폼을 골라 볼 수 있어요.';
+    title = '🟢 셀 10개! 10%폼이 됐어요'; // v359 — 1%폼에서 저절로 (전에는 「고를 수 있어요」)
+    text = '지가르데가 10%폼이 됐어요! 🎒 도감에서 1%폼으로 바꿀 수도 있어요.';
     url = await within(ensureForm(ZYG_ID, 'ten'), 5000);
   } else if (r.ev === 'fifty') {
     title = '🟢 셀 50개! 50%폼';
-    text = r.form === '50' ? '지가르데가 50%폼이 됐어요! 도감에서 10%폼으로 바꿀 수도 있어요.' : '이제 50%폼과 10%폼을 언제든 골라요.';
+    text = r.form === '50' ? '지가르데가 50%폼이 됐어요! 도감에서 1%폼·10%폼으로 바꿀 수도 있어요.' : '이제 50%폼도 골라요.';
     url = characterUrl(ZYG_ID) || await within(ensureArt(ZYG_ID), 5000);
   } else if (r.ev === 'perfect') {
     title = `🟢 셀 ${CELL_MAX}개! 큐브가 가득 찼어요`;

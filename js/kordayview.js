@@ -80,6 +80,7 @@ function stageMons(chars) {
   return shuffle(ids.length ? ids : [25]).slice(0, 3).map((id) => {
     const c = (chars || []).find((x) => x && x.id === id);
     const look = getLook(id);
+    if (look && look.formUrl) return { id, ko: c ? c.ko : '', art: look.formUrl, anim: null }; // 🟢 지가르데 모습 그림 (v359)
     if (look && look.shiny) return { id, ko: c ? c.ko : '', art: look.shinyUrl || (c && c.url) || '', anim: null };
     return { id, ko: c ? c.ko : '', art: (c && c.url) || '', anim: animUrl(id) };
   });

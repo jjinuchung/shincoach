@@ -2,7 +2,7 @@
 // 규칙은 fusion.js(순수)와 db.js(트랜잭션), 화면은 여기. 🎒 도감의 "🏪 5일장" 버튼에서 연다 (장이 안 서는 날도 열려 다음 장날을 알려 준다)
 import { marketOpen, nextMarket, blendName, fusionId, recolor, FUSION_COST, NAME_MAX } from './fusion.js';
 import { ROSTER, loadCharacters } from './pokemon.js';
-import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList, tradeOffers, tradeMon, RARITY, coins, sellOffers, sellThing } from './xp.js';
+import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList, tradeOffers, tradeMon, RARITY, coins, sellOffers, sellThing, getLook } from './xp.js';
 import { STONE_MATH, STONE_ENGLISH, itemById, ENGLISH_STONE_HOW } from './items.js';
 import { SELL_MON_MAX } from './sell.js';
 import { getFusionArt, putFusionArt } from './db.js';
@@ -651,7 +651,7 @@ function sellCard() {
       const b = el('button', 'fz-pick sl-pick' + (armed ? ' armed' : ''));
       b.type = 'button';
       b.disabled = ui.busy || !of.left;
-      const u = ui.urlById.get(m.id);
+      const u = getLook(m.id).formUrl || ui.urlById.get(m.id); // 🟢 내 지가르데는 지금 모습 그림 (v359 · Codex 163차 #1)
       if (u) { const img = el('img'); img.src = u; img.alt = ''; img.loading = 'lazy'; img.draggable = false; b.appendChild(img); } else b.appendChild(el('span', 'sl-emoji', '?'));
       b.appendChild(el('span', 'nm', nameOf(m.id)));
       b.appendChild(el('span', 'cnt', `×${m.have}`));

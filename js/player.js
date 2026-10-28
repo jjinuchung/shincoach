@@ -1185,6 +1185,7 @@ function stageMons() {
     const ch = (state.characters || []).find((c) => c.id === id);
     const look = getLook(id);
     // 🌈 이로치는 이로치 정지 그림으로 (도트 GIF는 일반 색이라 다른 모습이 된다 — Codex 8차 #4)
+    if (look.formUrl) return { id, ko: ch ? ch.ko : '', art: look.formUrl, anim: null }; // 🟢 지가르데 모습 그림 (v359)
     if (look.shiny) return { id, ko: ch ? ch.ko : '', art: look.shinyUrl || (ch && ch.url) || '', anim: null };
     return { id, ko: ch ? ch.ko : '', art: (ch && ch.url) || '', anim: animUrl(id) };
   });
@@ -1193,6 +1194,7 @@ function stageMons() {
 /** 무대에 올릴 모습 — 🌈 이로치면 도트 GIF 대신 정지 그림 (GIF는 일반 색이라 다른 포켓몬처럼 보인다) */
 function withAnim(m) {
   const look = getLook(m.id);
+  if (look && look.formUrl) return { ...m, art: look.formUrl, anim: null }; // 🟢 지가르데 모습 그림 (v359)
   if (look && look.shiny) return { ...m, art: look.shinyUrl || m.art, anim: null };
   return { ...m, anim: animUrl(m.id) };
 }

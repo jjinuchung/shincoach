@@ -19,7 +19,7 @@ export function warmKorCheer() {
 
 function topUpDots(n = 6) {
   if (C.dotBusy) return;
-  const need = cheerMons().filter((m) => !m.dot && !(m.look && m.look.shinyUrl)).slice(0, n).map((m) => m.id);
+  const need = cheerMons().filter((m) => !m.dot && !(m.look && (m.look.formUrl || m.look.shinyUrl))).slice(0, n).map((m) => m.id);
   if (!need.length) return;
   C.dotBusy = true;
   ensureAnims(need).catch(() => {}).finally(() => { C.dotBusy = false; });
@@ -32,7 +32,7 @@ function cheerMons() {
     const r = ROSTER.find((m) => m.id === id);
     const c = (C.chars || []).find((x) => x.id === id);
     const look = getLook(id);
-    const shiny = look && look.shinyUrl;
+    const shiny = look && (look.formUrl || look.shinyUrl); // 🟢 지가르데 모습 그림도 (v359 — 도트는 50%폼뿐)
     return { id, ko: r ? r.ko : String(id), url: shiny || (c ? c.url : ''), dot: shiny ? null : animUrl(id), look };
   }).filter((m) => m.url || m.dot);
 }

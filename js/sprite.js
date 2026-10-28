@@ -69,7 +69,7 @@ export async function ensureAnim(id) {
     const url = URL.createObjectURL(saved.blob);
     urls.set(key, url);
     failedAt.delete(key);
-    return url;
+    return noDot(key) ? null : url; // 받는 사이 모습이 바뀌었으면(🟢 지가르데 1%·10%폼) 늦은 도트를 안 준다 (v359 · Codex 163차 #4)
   }
   try {
     const res = await fetch(ANIM_URL(key), { cache: 'no-store' });
@@ -79,7 +79,7 @@ export async function ensureAnim(id) {
     const url = URL.createObjectURL(blob);
     urls.set(key, url);
     failedAt.delete(key);
-    return url;
+    return noDot(key) ? null : url; // 받는 사이 모습이 바뀌었으면 늦은 도트를 안 준다 (v359 · Codex 163차 #4)
   } catch (e) {
     failedAt.set(key, Date.now());
     console.warn('움직이는 그림 받기 실패:', key, e);

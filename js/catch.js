@@ -1,6 +1,6 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
-import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold, spendBall, refundBall } from './xp.js';
+import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold, spendBall, refundBall, getLook } from './xp.js';
 import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
@@ -565,6 +565,8 @@ async function throwBall(c) {
     burstConfetti();
     result.innerHTML = '';
     mon.classList.remove('captured');
+    // 🟢 잡은 뒤 모습으로 다시 — 처음 잡은 지가르데는 잡기 전엔 야생(50%) 그림이라 「잡았다!」만 50%였다 (v359 · Codex 163차 #2) · 연습은 도감에 안 들어가니 그대로
+    if (!ui.practice) setFigure(mon, c.url, getLook(c.id));
     mon.classList.add('caughtpop'); // 잡은 포켓몬이 볼 위로 뿅 나타남 (기뻐하는 느낌)
     result.appendChild(document.createTextNode(`🎉 잡았다! ${c.ko}!`));
     const sub = document.createElement('small');

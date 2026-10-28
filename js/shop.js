@@ -709,11 +709,11 @@ function renderForms() {
   $('mon-form-msg').textContent = notes.join('  ·  ');
 }
 
-/** 🟢 지가르데 모습 고르기 칸 (v352) — 10%·50% · 셀 수와 퍼펙트폼 안내 · 💠는 셀 100 뒤(아래 메가 칸이 그린다) */
+/** 🟢 지가르데 모습 고르기 칸 (v352) — 1%(v359)·10%·50% · 셀 수와 퍼펙트폼 안내 · 💠는 셀 100 뒤(아래 메가 칸이 그린다) */
 function zygOptions(box, z, notes) {
   const caught = getProfileSnapshot().caught;
   const now = zygFormOf(z);
-  for (const [form, need, sub] of [['10', ZYG_STEP.ten, '빠른 모습'], ['50', ZYG_STEP.fifty, '균형 잡힌 모습']]) {
+  for (const [form, need, sub] of [['1', 0, '코어에 셀이 붙은 첫 모습'], ['10', ZYG_STEP.ten, '빠른 모습'], ['50', ZYG_STEP.fifty, '균형 잡힌 모습']]) {
     const open = zygFormOpen(z, caught, form);
     const btn = option('🟢', `${form}%폼`, open ? sub : `셀 ${need}개가 모이면`, now === form, '', async () => {
       const here = mon; // 기다리는 사이 도감을 닫거나 다른 포켓몬을 열면 글을 띄우지 않는다 (저장은 그대로 · Codex 157차)

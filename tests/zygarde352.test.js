@@ -90,7 +90,7 @@ test('🟢 찾기: 맨 처음은 🔴 코어(셀 수에는 안 셈) → 그다�
   assert.equal(zygCanFind(p.zyg, 'game', T0 + DAY), false);
 });
 
-test('🟢 셀 10: 지가르데가 없으면 큐브가 10%폼 지가르데를 만든다(도감 +1 · 처음이면 파트너) · 있으면 10%폼만 열린다', () => {
+test('🟢 셀 10: 지가르데가 없으면 큐브가 10%폼 지가르데를 만든다(도감 +1 · 처음이면 파트너) · 있으면 1%폼에서 10%폼으로(v359)', () => {
   const p = withCells(9);
   const r = zygFindRule(p, 'math', T0);
   assert.equal(r.ev, 'gift');
@@ -105,18 +105,22 @@ test('🟢 셀 10: 지가르데가 없으면 큐브가 10%폼 지가르데를 �
   zygFindRule(q, 'math', T0);
   assert.equal(q.partner, 25);
   assert.deepEqual(q.caught, { 25: 2, 718: 1 });
-  // 논술에서 이미 잡았다 → 도감은 그대로 · 모습도 그대로(50%) · 10%폼을 고를 수 있게만
+  // 논술에서 이미 잡았다 → 도감은 그대로 · 셀 9까지 1%폼 → 셀 10에 10%폼으로 (v359 — 전에는 50% 그대로 · 고를 수 있게만)
   const h = withCells(9, { caught: { 718: 1 } });
+  assert.equal(zygFormOf(h.zyg), '1');
   const s = zygFindRule(h, 'math', T0);
   assert.equal(s.ev, 'ten');
+  assert.equal(s.form, '10');
   assert.equal(h.caught[718], 1);
-  assert.equal(h.zyg.form, '');
+  assert.equal(h.zyg.form, '10');
+  assert.ok(h.zyg.formAt >= T0);
   assert.equal(h.zyg.gave, 0);
-  assert.equal(zygFormOf(h.zyg), '50');
+  assert.equal(zygFormOf(h.zyg), '10');
   assert.equal(zygFormOpen(h.zyg, h.caught, '10'), true);
+  assert.equal(zygFormOpen(h.zyg, h.caught, '1'), true, '1%폼으로 돌아갈 수 있다');
 });
 
-test('🟢 셀 50: 10%폼이었으면 50%폼으로 · 100: 퍼펙트폼 · 그 뒤로는 안 나온다', () => {
+test('🟢 셀 50: 50%폼으로(1%·10%·고른 적 없음 모두 — v359) · 100: 퍼펙트폼 · 그 뒤로는 안 나온다', () => {
   const p = withCells(49, { caught: { 718: 1 }, zyg: { core: 1, cells: 49, form: '10', formAt: T0 + DAY * 99, gave: 1, seen: STEP.ten } });
   const r = zygFindRule(p, 'korean', T0);
   assert.equal(r.ev, 'fifty');
@@ -125,7 +129,9 @@ test('🟢 셀 50: 10%폼이었으면 50%폼으로 · 100: 퍼펙트폼 · 그 �
   assert.ok(p.zyg.formAt > T0 + DAY * 99, '바꾼 시각은 늘 앞으로 (시계가 뒤로 가도)');
   const q = withCells(49, { caught: { 718: 1 } });
   assert.equal(zygFindRule(q, 'korean', T0).ev, 'fifty');
-  assert.equal(q.zyg.form, '', '고른 적 없으면 그대로(50%)');
+  assert.equal(q.zyg.form, '50', '고른 적 없어도 50%폼으로 (v359)');
+  const one = withCells(49, { caught: { 718: 1 }, zyg: { core: 1, cells: 49, form: '1', formAt: 5, seen: STEP.ten } });
+  assert.equal(zygFindRule(one, 'korean', T0).form, '50', '1%폼을 골라 두었어도 셀 50에 저절로');
   const z = withCells(99, { caught: { 718: 1 } });
   const t = zygFindRule(z, 'nonsul', T0);
   assert.equal(t.ev, 'perfect');
@@ -138,25 +144,36 @@ test('🟢 셀 50: 10%폼이었으면 50%폼으로 · 100: 퍼펙트폼 · 그 �
   assert.equal(zygFindRule(m, 'math', T0).ev, null);
 });
 
-test('🟢 모습 고르기: 10%는 셀 10 · 50%는 셀 50 또는 논술에서 잡은 지가르데 · 없는 모습·잠긴 모습은 안 됨', () => {
+test('🟢 모습 고르기(v359): 1%는 처음부터 · 10%는 셀 10 · 50%는 셀 50(논술에서 잡은 지가르데도) · 없는 모습·잠긴 모습은 안 됨', () => {
   const cube = withCells(12, { caught: { 718: 1 }, zyg: { core: 1, cells: 12, form: '10', formAt: 5, gave: 1, seen: STEP.ten } });
-  assert.equal(zygCan50(cube.zyg, cube.caught), false, '큐브가 만든 지가르데뿐이면 셀 50까지 10%');
+  assert.equal(zygCan50(cube.zyg), false, '셀 50까지는 10%까지');
   assert.deepEqual(zygFormRule(cube, '50', T0), { ok: false, why: 'locked' });
   assert.deepEqual(zygFormRule(cube, '10', T0), { ok: true, same: true, form: '10' });
   assert.deepEqual(zygFormRule(cube, 'perfect', T0), { ok: false, why: 'form' }, '퍼펙트폼은 배틀에서만');
-  // 논술에서 한 마리 더 잡았다 → 50%를 고를 수 있다
-  cube.caught[718] = 2;
-  assert.equal(zygCan50(cube.zyg, cube.caught), true);
-  const r = zygFormRule(cube, '50', T0);
-  assert.deepEqual(r, { ok: true, form: '50' });
-  assert.equal(cube.zyg.form, '50');
+  assert.deepEqual(zygFormRule(cube, '30', T0), { ok: false, why: 'form' });
+  // 1%폼으로 돌아가기 → 바꾼 시각 · 다시 10%
+  assert.deepEqual(zygFormRule(cube, '1', T0), { ok: true, form: '1' });
+  assert.equal(zygFormOf(cube.zyg), '1');
   assert.ok(cube.zyg.formAt >= T0);
-  // 셀 9에 논술 지가르데 → 10%는 아직
+  assert.deepEqual(zygFormRule(cube, '10', T0 + 1), { ok: true, form: '10' });
+  // 논술에서 한 마리 더 잡아도 50%는 셀 50부터 (v359 — 전에는 바로 열렸다)
+  cube.caught[718] = 2;
+  assert.equal(zygCan50(cube.zyg), false);
+  assert.deepEqual(zygFormRule(cube, '50', T0), { ok: false, why: 'locked' });
+  // 셀 9에 논술 지가르데 → 1%폼만 (아버님 10-28: 이미 잡은 지가르데는 1%폼)
   const nat = withCells(9, { caught: { 718: 1 } });
+  assert.equal(zygFormOf(nat.zyg), '1');
   assert.deepEqual(zygFormRule(nat, '10', T0), { ok: false, why: 'locked' });
-  assert.equal(zygFormOpen(nat.zyg, nat.caught, '50'), true);
+  assert.equal(zygFormOpen(nat.zyg, nat.caught, '50'), false);
+  assert.equal(zygFormOpen(nat.zyg, nat.caught, '1'), true);
+  assert.deepEqual(zygFormRule(nat, '1', T0), { ok: true, same: true, form: '1' });
+  // 셀 50 → 50%를 고를 수 있다
+  const big = withCells(55, { caught: { 718: 1 }, zyg: { core: 1, cells: 55, form: '10', formAt: 5, seen: STEP.fifty } });
+  assert.equal(zygCan50(big.zyg), true);
+  assert.deepEqual(zygFormRule(big, '50', T0), { ok: true, form: '50' });
   // 지가르데가 없으면 아무 모습도
   assert.equal(zygFormOpen(withCells(60).zyg, {}, '50'), false);
+  assert.equal(zygFormOpen(withCells(60).zyg, {}, '1'), false);
   assert.deepEqual(zygFormRule(withCells(60), '10', T0), { ok: false, why: 'locked' });
 });
 
@@ -423,7 +440,7 @@ test('🟢 배선: 배틀 고르기 세 벌 · 끝 화면 열세 곳 · 가방 �
   // 5세대 도트는 50%폼뿐 — 10%폼이면 도트를 쓰는 모든 곳(배틀·잡기·무대·🐣·도감 팝업·로켓단)이 일러스트로 (sprite.js 한 곳)
   const sp = read('js/sprite.js');
   assert.ok(sp.includes('if (noDot(Number(id))) return null;') && sp.includes('if (!key || noDot(key)) return null;'));
-  assert.ok(read('js/xp.js').includes("setNoDot((id) => id === ZYG_ID && zygFormOf(profile.zyg) === '10');"));
+  assert.ok(read('js/xp.js').includes("setNoDot((id) => id === ZYG_ID && myZygForm() !== '50');"), '1%·10%폼이면 도트 끔 (v359)');
   assert.ok(ht.includes("showDot($('hatch-dot'), o.dot === false ? 0 : o.id);"));
   assert.ok(zv.includes("dot: r.ev === 'fifty' && r.form !== '10'"), '🐣 창은 50%폼일 때만 도트');
 });
@@ -438,6 +455,6 @@ test('🟢 📤 보상 기록: 셀 칸(늘기만) · 코어를 찾았으면 지�
   const now = Date.now();
   const lines = holdingLines({ zyg: { core: 1, cells: 23, keys: [`${dayNum(now)}:math`, `${dayNum(now)}:korean`], form: '10', gave: 1 } });
   assert.ok(lines.includes('- 🟢 지가르데 큐브: 셀 23/100 · 오늘 찾은 곳 수학·국어 · 모습 10% · 큐브가 만든 지가르데'), lines.join('\n'));
-  assert.equal(zygLine({ core: 1, cells: 5, keys: [`${D0 - 1}:math`] }, T0), '🟢 지가르데 큐브: 셀 5/100 · 오늘 찾은 곳 없음 · 모습 50%');
+  assert.equal(zygLine({ core: 1, cells: 5, keys: [`${D0 - 1}:math`] }, T0), '🟢 지가르데 큐브: 셀 5/100 · 오늘 찾은 곳 없음 · 모습 1%', '셀 10 전엔 1% (v359)');
   assert.equal(zygLine(null, T0), '');
 });

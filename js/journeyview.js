@@ -254,7 +254,7 @@ function buildQuestion(c) {
 
 function urlOf(id) {
   const look = getLook(id);
-  if (look && look.shinyUrl) return look.shinyUrl;
+  if (look && (look.formUrl || look.shinyUrl)) return look.formUrl || look.shinyUrl; // 🟢 지가르데 모습 그림이 먼저 (v359)
   return ui.chars.get(Number(id)) || '';
 }
 /** 포켓몬 동그라미 (그림이 없으면 타입 색 바탕에 첫 글자) */

@@ -1,7 +1,7 @@
 // 🚀 로켓단 배틀 실행 — 수학·영어 공통 (2026-10-09, 3단계). 과목이 주는 것은 문제(quiz)뿐이고,
 // 저장(한 문제씩·빼앗기·이기기 — 그 배틀 id로 한 번만)과 화면(rocketview)은 여기서 묶는다.
 import { ROSTER } from './pokemon.js';
-import { getPartner, rocketSaveStep, rocketLose, rocketWin, rocketHideout } from './xp.js';
+import { getPartner, rocketSaveStep, rocketLose, rocketWin, rocketHideout, getLook } from './xp.js';
 import { openRocket } from './rocketview.js';
 
 /** 포켓몬 하나를 화면용으로 { id, ko, url } — chars: loadCharacters의 목록(그림 주소) */
@@ -9,7 +9,7 @@ export function monView(id, chars) {
   const n = Number(id);
   const r = ROSTER.find((m) => m.id === n);
   const c = (chars || []).find((x) => x && x.id === n);
-  return { id: n, ko: r ? r.ko : String(n), url: c ? c.url : '' };
+  return { id: n, ko: r ? r.ko : String(n), url: getLook(n).formUrl || (c ? c.url : '') }; // 🟢 내 지가르데는 지금 모습 그림 (v359 · Codex 163차 #1)
 }
 
 /**

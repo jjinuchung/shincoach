@@ -325,7 +325,7 @@ const MATH_CHAR_BATCH = 8;
 let cheerDotBusy = false;
 function topUpCheerDots(n = 6) {
   if (cheerDotBusy) return;
-  const need = myCheerMons().filter((m) => !m.dot && !(m.look && m.look.shinyUrl)).slice(0, n).map((m) => m.id);
+  const need = myCheerMons().filter((m) => !m.dot && !(m.look && (m.look.formUrl || m.look.shinyUrl))).slice(0, n).map((m) => m.id);
   if (!need.length) return;
   cheerDotBusy = true;
   ensureAnims(need).catch(() => {}).finally(() => { cheerDotBusy = false; });
@@ -2507,7 +2507,7 @@ function myCheerMons() {
     const look = getLook(id);
     // 🕺 움직이는 도트가 있으면 그걸로 걷는다 (정지 그림이 미끄러지면 "걸어간다"가 안 된다).
     //    🌈 이로치는 일러스트 그대로 — 도트엔 이로치 그림이 없고, 그 색이 볼거리다
-    const shiny = look && look.shinyUrl;
+    const shiny = look && (look.formUrl || look.shinyUrl); // 🟢 지가르데 모습 그림도 (v359 — 도트는 50%폼뿐)
     return { id, ko: r ? r.ko : String(id), url: shiny || (c ? c.url : ''), dot: shiny ? null : animUrl(id), look };
   }).filter((m) => m.url || m.dot);
 }
