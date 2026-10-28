@@ -4619,6 +4619,18 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gnote-video-from { margin: 0; font-weight: 800; color: #7a4a00; line-height: 1.4; word-break: keep-all; overflow-wrap: anywhere; }
 .gnote-video-unit { margin: 0; font-size: 0.88rem; color: var(--gr-ink); font-weight: 700; word-break: keep-all; }
 .gnote-listen { margin-left: auto; font-size: 0.92rem; }
+/* 🔤 내 철자 쪽지 (v356) — 📝 쪽지 창(gnote·gr-*)을 그대로 쓰고 · 🔊 단추 · 글자 칸 빈칸 · 내가 쓴 것 ↔ 바른 철자(바뀐 글자에 색) */
+.sp-card { border-top-color: #0f766e; }
+.sp-listen { justify-self: start; margin-left: 0; }
+.sp-blank { letter-spacing: 0.08em; white-space: nowrap; }
+.sp-compare { display: grid; gap: 6px; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 12px; padding: 10px 12px; }
+.sp-row { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.sp-label { font-size: 0.88rem; font-weight: 700; color: var(--muted); min-width: 5.5em; }
+.sp-word { font-size: 1.35rem; font-weight: 800; letter-spacing: 0.06em; overflow-wrap: anywhere; }
+.sp-word.is-mine { color: #9a3412; }
+.sp-word.is-right { color: #0f766e; }
+.sp-chg { background: #fde68a; border-radius: 4px; padding: 0 1px; }
+.sp-word.is-right .sp-chg { background: #99f6e4; }
 .gr-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 16px; display: grid; gap: 12px; min-width: 0; }
 .gr-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .gr-head-title { margin: 0; font-size: 1.15rem; line-height: 1.4; overflow-wrap: anywhere; }

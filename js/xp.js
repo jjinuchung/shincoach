@@ -29,6 +29,7 @@ import { copyJourney, startRule as jrStartRule, answerRule as jrAnswerRule, swap
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
+import { spellFinishRule, spellSeenOf } from './spell.js'; // 🔤 진우 철자 노트 — 진도·💰 (v356 · 순수)
 import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·보상 (순수 — 낱말 칸과 같은 꼴)
 import { matchedOf, korMatchRule } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329, 순수)
 import { dripOf, dripStartRule } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (v320, 순수)
@@ -1008,6 +1009,22 @@ export function nonsulMap() {
 /** 🖊️ 논술 보상 받은 날 { 날 번호: 1 } (그리기용 복사본) */
 export function nonsulDayMap() {
   return wordDaysOf(profile.nonsulDay);
+}
+/** 🔤 철자 노트 진도 { 낱말: { box, due, at, miss, d0 } } (그리기용 복사본, v356) */
+export function spellMap() {
+  return wordsOf(profile.spell);
+}
+/** 🔤 마지막으로 풀 때 본 틀린 수 { 낱말: n } (그리기용 복사본, v356 · Codex 161차 #3) */
+export function spellSeenMap() {
+  return spellSeenOf(profile.spellSeen);
+}
+/** 🔤 철자 쪽지 보상 받은 날 { 날 번호: 1 } (그리기용 복사본, v356) */
+export function spellDayMap() {
+  return wordDaysOf(profile.spellDay);
+}
+/** 🔤 철자 쪽지 끝 (v356) — 낱말마다 진도 + 그날 처음 끝낸 쪽지 💰10을 한 트랜잭션에서(두 창·다시 저장에도 💰 한 번) · rows = 받아 둔 낱말 */
+export function spellFinish(results, rows) {
+  return houseDo((p) => spellFinishRule(p, results, Date.now(), rows));
 }
 /**
  * 📝 문법 쪽지 한 장을 끝냈다 — 그 단원 칸·본 문제·오개념 수 · 처음 ⭐면 💰 · 🎁 깜짝 포켓몬 (한 트랜잭션, v348 → v349 ⚡💰 계단은 player.js)

@@ -45,6 +45,10 @@ import { wordQuiz, wordQuestion } from './rocketquiz.js';
 import { isRocketOpen } from './rocketview.js';
 import { noteDue, NOTE as GRAMMAR_NOTE } from './grammar.js'; // 📝 문법 쪽지 — 언제 낼까 (v349)
 import { loadGrammar, prepareNote, openGrammarNote, closeGrammarNote } from './grammarnote.js'; // 📝 문법 쪽지 창 (v349)
+import { spellReady, spellSlot, grammarCount } from './spell.js'; // 🔤 진우 철자 노트 — 언제 낼까 (v356)
+import { syncSpellRows, spellRowsNow, spellWordsNow, openSpellNote, closeSpellNote } from './spellnote.js'; // 🔤 철자 쪽지 창 · 받아 둔 낱말 (v356)
+import { spellMap, spellDayMap, spellSeenMap } from './xp.js'; // 🔤 철자 노트 진도·쪽지 💰 받은 날 (v356)
+import { wordsToday } from './korwords.js';
 import { syncVideoQs, videoList, normSay } from './grammarvideo.js'; // 🎬 영상 문장 문제 — 비공개 원고 받기 · 받아 둔 원고 · 대사 맞추기 (v350)
 import { addCell } from './zygview.js'; // 🟢 지가르데 셀 — 에세이·복습 끝 화면 구석 (v352)
 import { getAllSentenceStats, listItems, sentenceKey } from './db.js'; // 🎬 끝낸 문장·영상 이름 (v350 — 쪽지에 끼울 영상 문제를 고를 때)
@@ -121,7 +125,8 @@ const state = {
   matchCooldown: 0,    // 🔤 한 판 뒤 이만큼 문장은 안 나옴 (연달아 뜨면 학습이 끊긴다)
   matchOpen: false,    // 🔤 단어 이어 주기가 열려 있음 (키보드 무시)
   grammarPending: false, // 📝 다음 문장으로 넘어갈 때 열 문법 쪽지가 걸려 있는지 (v349 — 🔁·🔤와 같은 방식)
-  grammarOpen: false,  // 📝 문법 쪽지를 받는 중이거나 열려 있음 (키보드·이동 무시)
+  grammarOpen: false,  // 📝 문법 쪽지를 받는 중이거나 열려 있음 (키보드·이동 무시) — 🔤 철자 쪽지도 같은 깃발 (v356)
+  spellPending: false, // 🔤 걸어 둔 쪽지가 철자 쪽지인지 (grammarPending과 함께 · maybeGrammar가 정한다, v356)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -1258,7 +1263,12 @@ function maybeGrammar(todayDone) {
   if (state.parentMode || settings.grammarNote === false) return;
   if (state.grammarPending || state.grammarOpen) return;
   if (state.battlePending || state.rocketPending || state.essayPending || state.reviewPending || state.matchPending) return;
-  if (!noteDue(todayDone, track.todayGrammarNotes())) return;
+  // 🔤 철자 쪽지 (v356) — 그날 첫 쪽지 자리(8문장)를 쓴다 · 오늘 끝냈으면 📝 문법 쪽지는 한 자리(15문장) 뒤로 (spell.grammarCount)
+  const now = Date.now();
+  const days = spellDayMap();
+  const spell = spellSlot(todayDone, spellReady(spellRowsNow(), spellMap(), days, now, spellSeenMap()), GRAMMAR_NOTE.first);
+  if (!spell && !noteDue(grammarCount(todayDone, !!wordsToday(days, now), GRAMMAR_NOTE.every), track.todayGrammarNotes())) return;
+  state.spellPending = spell;
   state.grammarPending = true;
   loadGrammar().catch(() => {}); // 원고를 미리 받아 둔다 (열 때도 못 받았으면 그냥 이어 간다)
   syncVideoQs().catch(() => {}); // 🎬 영상 문장 문제 원고도 (📤 열쇠가 있을 때 · 10분에 한 번까지 — v350)
@@ -1269,6 +1279,7 @@ function maybeGrammar(todayDone) {
  * 받는 사이에도 grammarOpen — 다른 이동·단축키가 끼지 않게 (🚀 로켓단을 준비할 때와 같다)
  */
 function startGrammar(continueFn) {
+  if (state.spellPending) { startSpell(continueFn); return; } // 🔤 이 자리는 철자 쪽지 (v356)
   state.grammarPending = false;
   cancelShadowWait();
   hidePlayerMessage();
@@ -1289,6 +1300,30 @@ function startGrammar(continueFn) {
     });
     if (!opened) { setGrammarOpen(false); go(); }
   }).catch(() => { closeGrammarNote(); stopGrammarCue(); setGrammarOpen(false); go(); }); // 그리다 깨져도 반쯤 열린 창을 남기지 않는다 (🔍 Codex 153차 #3)
+}
+
+/**
+ * 🔤 철자 쪽지 열기 (v356) — 📝 쪽지와 같은 자리·같은 깃발(grammarOpen) · 낼 낱말이 없으면 바로 이어 감 ·
+ * 💰10은 쪽지를 끝낼 때 진도와 한 트랜잭션(xp.spellFinish) — 여기서는 칩만 바꾼다 · [계속하기 ▶]를 누르면 원래 하려던 이동을 이어감
+ */
+function startSpell(continueFn) {
+  state.grammarPending = false;
+  state.spellPending = false;
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  const spot = rememberSpot();
+  const go = () => { if (continueFn) continueFn(); else restoreSpot(spot); };
+  setGrammarOpen(true);
+  let opened = false;
+  try {
+    const { rows, words } = spellWordsNow();
+    opened = openSpellNote(words, rows, {
+      onCoins: () => { updateLevelChip(); pulseChip('coin-chip'); },
+      onDone: () => { setGrammarOpen(false); go(); },
+    });
+  } catch { closeSpellNote(); opened = false; } // 그리다 깨져도 반쯤 열린 창을 남기지 않는다
+  if (!opened) { setGrammarOpen(false); go(); }
 }
 
 /**
@@ -1917,6 +1952,7 @@ export async function openPlayer(id, opts = {}) {
 
   $('player-title').textContent = item.title;
   if (!state.parentMode && settings.grammarNote !== false) syncVideoQs().catch(() => {}); // 🎬 영상 문장 문제 원고 받기 — 첫 쪽지(8문장) 전에 (📤 열쇠가 있을 때 · 10분에 한 번까지, v350)
+  if (!state.parentMode && settings.grammarNote !== false) syncSpellRows().catch(() => {}); // 🔤 철자 노트 낱말 받기 — 비공개 essay/fixes.json의 spell 칸 (같은 열쇠 · 10분에 한 번까지, v356)
   state.objectUrl = URL.createObjectURL(blob);
   video.src = state.objectUrl;
   video.defaultPlaybackRate = SPEEDS[state.speedIdx];
@@ -1991,6 +2027,7 @@ function closeMedia() {
   abortEssay();
   closeMatch();      // 🔤 단어 잇기 중에 콘텐츠를 닫으면 그냥 접는다 (보상 없음 — 끝낸 게 아니다)
   closeGrammarNote(); // 📝 쪽지도 그냥 접는다 (저장·보상 없음 — 끝낸 게 아니다, v349)
+  closeSpellNote(); // 🔤 철자 쪽지도 (v356)
   setReviewOpen(false);
   setMatchOpen(false);
   setGrammarOpen(false);

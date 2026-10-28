@@ -12,6 +12,9 @@ import { pickMatchRound, shuffle as shuffleMons, PAIRS as MATCH_PAIRS, NEED_NEW 
 import { matchXp, XP as REAL_XP } from '../js/xp.js';
 import { noteDue as realNoteDue, NOTE as REAL_NOTE } from '../js/grammar.js'; // 📝 문법 쪽지 규칙은 진짜 (v349)
 import { normSay as realNormSay } from '../js/grammarvideo.js'; // 🎬 대사 맞추기는 진짜 (v350)
+import { spellReady as realSpellReady, spellSlot as realSpellSlot, grammarCount as realGrammarCount, pickSpell as realPickSpell } from '../js/spell.js'; // 🔤 철자 쪽지 자리 규칙은 진짜 (v356)
+import { wordsToday as realWordsToday } from '../js/korwords.js';
+import { dayNum as realDayNum } from '../js/korean.js'; // 🔤 쪽지 💰 받은 날 열쇠 (v356)
 import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoOwed, videoTier, SPEAK_COMBO } from '../js/items.js';
 import fsNode from 'node:fs';
 
@@ -92,6 +95,9 @@ function loadPlayer() {
   //   load = 원고를 받았나 · note = prepareNote가 돌려줄 쪽지(undefined면 기본 쪽지, null이면 낼 단원 없음) · closed = closeGrammarNote 부른 수
   const grammarCalls = [];
   const grammarState = { today: 0, full: false, load: true, note: undefined, closed: 0, loads: 0 };
+  // 🔤 철자 쪽지 (v356): rows = 받아 둔 낱말 · states = 진도 · days = 쪽지 💰 받은 날 · 열린 쪽지는 spellCalls에 { words, rows, onDone, onCoins } · closed = closeSpellNote 부른 수 · syncs = 받기를 부른 수
+  const spellCalls = [];
+  const spellState = { rows: [], states: {}, days: {}, closed: 0, syncs: 0, throwOpen: false };
   const essayState = { seconds: 0, done: false, saved: [] };
   const mushroomState = { today: 0, gained: 0 };
   const formState = { forms: {}, keystone: false, mega: {}, gmax: {} };
@@ -290,6 +296,16 @@ function loadPlayer() {
     sentenceKey: (id, start) => `${id}|${Math.round(start * 10)}`,
     openGrammarNote(note, opts) { if (grammarState.throwOpen) throw new Error('그리다 깨짐 (시험)'); if (!note) return false; grammarCalls.push({ note, ...opts }); return true; },
     closeGrammarNote() { grammarState.closed++; },
+    // 🔤 철자 쪽지 스텁 (v356) — 자리 규칙(spellReady·spellSlot·grammarCount·wordsToday)은 진짜, 창은 spellCalls에 기록
+    spellCalls, spellState, spellReady: realSpellReady, spellSlot: realSpellSlot, grammarCount: realGrammarCount, wordsToday: realWordsToday,
+    syncSpellRows: async () => { spellState.syncs++; return spellState.rows.length; },
+    spellRowsNow: () => spellState.rows,
+    spellMap: () => spellState.states,
+    spellDayMap: () => spellState.days,
+    spellSeenMap: () => spellState.seen || {}, // 🔤 마지막으로 풀 때 본 틀린 수 (Codex 161차 #3)
+    spellWordsNow: (now = Date.now()) => ({ rows: spellState.rows, words: realPickSpell(spellState.rows, spellState.states, now, spellState.seen || {}) }),
+    openSpellNote(words, rows, opts) { if (spellState.throwOpen) throw new Error('그리다 깨짐 (시험)'); if (!words || !words.length) return false; spellCalls.push({ words, rows, ...opts }); return true; },
+    closeSpellNote() { spellState.closed++; },
     pickMatchRound, shuffleMons, matchXp, matchCoins,
     async markVocabMatched(words) {
       const fresh = words.filter((w) => !matchState.marked.includes(w));
@@ -332,7 +348,7 @@ function loadPlayer() {
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; settings.grammarNote = false; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔, 📝 쪽지 끔(쪽지 시험이 켠다)', ctx);
-  return { ctx, video, els, videoState, speakState, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, rocketState, reviewCalls, reviewState, matchCalls, matchState, grammarCalls, grammarState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, videoState, speakState, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, rocketState, reviewCalls, reviewState, matchCalls, matchState, grammarCalls, grammarState, spellCalls, spellState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -3316,6 +3332,77 @@ test('📝 쪽지를 끝내면 force로 이어 간다 — 같이 걸린 에세�
   assert.deepEqual([grammarCalls.length, essayCalls.length], [1, 0], '쪽지가 먼저(goTo 순서 — 배틀 다음 · 퍼즐·에세이보다 먼저)');
   grammarCalls[0].onDone();
   assert.deepEqual([run('state.idx'), essayCalls.length, run('state.essayPending')], [2, 0, true], '에세이는 다음 전환에');
+});
+
+// ───────────────────── 🔤 진우 철자 쪽지 (v356) ─────────────────────
+// 📝 쪽지의 그날 첫 자리(8문장)를 쓴다 · 오늘 끝냈으면 📝 문법 쪽지는 한 자리(15문장) 뒤로 · 같은 깃발(grammarPending·grammarOpen)로 다른 것과 한 번에 하나
+// (규칙·창은 tests/spell356.test.js — 낱말은 지어낸 것)
+const SPELL_ROWS = [{ w: 'zebra', from: ['zebbra'], n: 2, day: 1, s: 'I saw a zebra.' }, { w: 'rabbit', from: ['rabit'], n: 1, day: 1, s: 'A rabbit ran.' }];
+
+test('🔤 낼 낱말이 있으면 그날 첫 쪽지 자리(8문장)는 철자 쪽지 · 📝 쪽지는 안 열림 · 쪽지 중엔 이동이 안 끼임 · 끝내면 원래 가려던 문장으로', async () => {
+  const { run, spellCalls, spellState, grammarCalls, els } = loadGrammarPlayer();
+  spellState.rows = SPELL_ROWS;
+  run(`${cues5} state.idx = 0; maybeGrammar(7);`);
+  assert.equal(run('state.grammarPending'), false, '7문장으로는 안 걸린다');
+  run('maybeGrammar(8);');
+  assert.deepEqual([run('state.grammarPending'), run('state.spellPending')], [true, true]);
+  run('goTo(1);');
+  await tick();
+  assert.deepEqual([spellCalls.length, grammarCalls.length], [1, 0]);
+  assert.deepEqual(spellCalls[0].words.map((w) => w.w), ['zebra', 'rabbit'], '자주 틀린 것 먼저');
+  assert.deepEqual([run('state.idx'), run('state.grammarOpen'), run('state.grammarPending'), run('state.spellPending')], [0, true, false, false]);
+  assert.equal(els['view-player'].inert, true, '영상 화면을 막는다');
+  run('goTo(2);');
+  assert.equal(run('state.idx'), 0, '쪽지 중에는 다른 이동이 끼지 않는다');
+  spellCalls[0].onDone();
+  assert.deepEqual([run('state.idx'), run('state.grammarOpen'), els['view-player'].inert], [1, false, false], '원래 가려던 문장으로');
+});
+
+test('🔤 오늘 철자 쪽지를 끝냈으면 📝 문법 쪽지는 한 자리 뒤(23문장) · 낼 낱말이 없으면 8문장에 📝 · ⚙ 끔·부모 모드면 안 걸린다', () => {
+  const { run, spellState } = loadGrammarPlayer();
+  spellState.rows = SPELL_ROWS;
+  spellState.days = { [realDayNum(Date.now())]: 1 };
+  run(`${cues5} maybeGrammar(8);`);
+  assert.equal(run('state.grammarPending'), false, '8문장 자리는 철자가 썼다');
+  run('maybeGrammar(22);');
+  assert.equal(run('state.grammarPending'), false);
+  run('maybeGrammar(23);');
+  assert.deepEqual([run('state.grammarPending'), run('state.spellPending')], [true, false], '📝 쪽지');
+  run('state.grammarPending = false;');
+  spellState.rows = [];
+  spellState.days = {};
+  run('maybeGrammar(8);');
+  assert.deepEqual([run('state.grammarPending'), run('state.spellPending')], [true, false], '낱말이 없으면 📝 그대로');
+  run('state.grammarPending = false;');
+  spellState.rows = SPELL_ROWS;
+  run('settings.grammarNote = false; maybeGrammar(8);');
+  assert.equal(run('state.grammarPending'), false, '⚙ 끔');
+  run('settings.grammarNote = true; state.parentMode = true; maybeGrammar(8);');
+  assert.equal(run('state.grammarPending'), false, '부모 모드');
+});
+
+test('🔤 영상을 닫으면 철자 쪽지를 접는다(저장·보상 없음) · 그리다 깨지면 막은 것을 풀고 이어 감 · 낼 낱말이 그 사이 없어졌으면 그대로 이동', async () => {
+  const { run, spellCalls, spellState } = loadGrammarPlayer();
+  spellState.rows = SPELL_ROWS;
+  run(`${cues5} maybeGrammar(8); goTo(1);`);
+  await tick();
+  assert.equal(spellCalls.length, 1);
+  run('closeMedia();');
+  assert.ok(spellState.closed >= 1, 'closeSpellNote');
+  assert.deepEqual([run('state.grammarOpen'), run('state.grammarPending')], [false, false]);
+  run(`state.open = true; ${cues5} state.idx = 0; state.grammarPending = false; state.grammarOpen = false;`);
+  spellState.throwOpen = true;
+  run('maybeGrammar(8); goTo(1);');
+  await tick();
+  assert.deepEqual([run('state.idx'), run('state.grammarOpen')], [1, false], '깨져도 이어 감');
+  spellState.throwOpen = false;
+  run('state.idx = 1; maybeGrammar(8);');
+  spellState.states = { zebra: { box: 1, due: realDayNum(Date.now()) + 1, at: Date.now(), miss: 0, d0: 1 }, rabbit: { box: 1, due: realDayNum(Date.now()) + 1, at: Date.now(), miss: 0, d0: 1 } };
+  run('goTo(2);');
+  await tick();
+  assert.deepEqual([spellCalls.length, run('state.idx'), run('state.grammarOpen')], [1, 2, false], '낼 낱말이 없으면 안 열고 이동');
+  const src = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('if (!state.parentMode && settings.grammarNote !== false) syncSpellRows().catch'), '영상을 열 때 낱말 받기');
 });
 
 // ───────────────────── 🎬 영상 문장 문제 (v350) ─────────────────────
