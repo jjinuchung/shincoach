@@ -21,6 +21,7 @@
 //           grammar/YYYY-MM-DD.md (📝 영어 문법 — 단원마다 ⭐·✅·다시 · 오개념별 틀린 수 · 🎁 깜짝 포켓몬 · 최근 7일, v348 · grammar.grammarMd · 한 번도 안 했으면 안 만든다)
 //           letters/todo.md · letters/todo.json (📮 포켓몬 편지 — 판단 기다리는 답장, v351 · letters.letterTodo · 하나도 없으면 빈 목록도 올린다
 //             · todo.md 머리에 📮 지금 우체통 한 줄 — 처음 연 날·지금 편지·띠 글·🌟, v357 · letters.letterStatusLine)
+//           backup/YYYY-MM-DD.json.gz (☁️ 전체 기록 백업 — ⚙에서 켠 기기만 하루 한 번, v361 · cloudbackup.js가 이 파일의 putFile·listDir·getRawFile로 — 📤 보내기와 따로)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
 // 받는 것 (2026-10-07 Codex 35차 #1 — 전엔 공개 저장소 coach/fixes.json·coach/math/replies.json으로 배포해 진우 글·질문이 공개됐다):
@@ -316,9 +317,9 @@ export function lettersFiles(x, today) {
   ];
 }
 
-/** UTF-8 글 → base64 (GitHub contents API) — 한글·이모지까지. 긴 글은 나눠서 (spread 한계) */
+/** UTF-8 글 → base64 (GitHub contents API) — 한글·이모지까지. 긴 글은 나눠서 (spread 한계) · 바이트(Uint8Array — ☁️ 압축한 백업, v361)는 그대로 */
 export function b64(text) {
-  const bytes = new TextEncoder().encode(String(text));
+  const bytes = text instanceof Uint8Array ? text : new TextEncoder().encode(String(text));
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(bin);
@@ -597,6 +598,22 @@ export async function getFile({ fetchFn, token, path, repo = DATA_REPO }) {
   const body = await g.json();
   if (body && Number(body.size) > PRIVATE_MAX_BYTES) throw httpError('big'); // 풀기 전에
   return unb64(body && body.content);
+}
+
+/**
+ * 폴더 하나의 파일 목록 (☁️ 백업 되살리기, v361) — 없으면(404) 빈 목록 · 못 읽으면 까닭과 함께 실패 (열쇠는 머리글에만)
+ * @param {{fetchFn:Function, token:string, path:string, repo?:string}} o
+ * @returns {Promise<Array<{name:string, path:string, size:number}>>} 파일만 (폴더는 뺀다)
+ */
+export async function listDir({ fetchFn, token, path, repo = DATA_REPO }) {
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  let g;
+  try { g = await fetchFn(`${API}/repos/${repo}/contents/${path}?ref=${DATA_BRANCH}`, { headers, cache: 'no-store' }); } catch { throw httpError(0); }
+  if (g.status === 404) return [];
+  if (g.status !== 200) throw httpError(g.status);
+  const body = await g.json();
+  return (Array.isArray(body) ? body : []).filter((f) => f && f.type === 'file' && typeof f.name === 'string')
+    .map((f) => ({ name: f.name, path: String(f.path || `${path}/${f.name}`), size: Number(f.size) || 0 }));
 }
 
 /**

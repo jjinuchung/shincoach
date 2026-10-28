@@ -229,7 +229,7 @@ test('📮 배선: 우체통은 선물을 기다리는 답장에 따라 읽기 �
   // 아이 화면에 셈 글 없음 — 몇 번·몇 개 남음을 쓰지 않는다
   const say = v.slice(v.indexOf('function sayEl('), v.indexOf('function artInto('));
   assert.ok(!/\$\{(tries|SAY_TRIES|lines\.length|i \+ 1)\}/.test(say));
-  assert.ok(read('sw.js').includes("CACHE_VERSION = 'v360'"));
+  assert.ok(+(/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1] >= 360, 'sw v360 이상 (판을 못 박으면 다음 판에서 깨진다 — v361)');
   assert.ok(read('js/xp.js').includes('return houseDo((p) => letterOpenRule(p, id, Date.now(), say));'));
 });
 

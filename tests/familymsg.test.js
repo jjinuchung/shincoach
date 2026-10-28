@@ -132,7 +132,8 @@ test('🔌 잇기 — 홈 맨 위(받기는 기다리지 않고) · 📊 한 줄
   const fv = read('js/familyview.js');
   assert.ok(fv.includes('main.insertBefore(box, main.firstChild);'), '"오늘은 무엇을 공부할까?" 위');
   const st = read('js/stats.js');
-  assert.ok(st.includes("renderUploadCard(main); // 📤 Claude에게 기록 보내기\n  renderLetterCard(main);"));
+  // 📤 카드 다음 — v361부터 그 사이에 ☁️ 자동 백업 카드(renderCloudCard)가 하나 선다
+  assert.match(st, /renderUploadCard\(main\); \/\/ 📤 Claude에게 기록 보내기\n(  renderCloudCard\(main\);[^\n]*\n)?  renderLetterCard\(main\);/);
   assert.ok(st.includes("const box = card('💌 진우에게 한 줄');"));
   const up = read('js/upload.js');
   assert.ok(up.includes("getFamily ? await Promise.resolve().then(() => getFamily(today)).catch(() => null) : null;"));

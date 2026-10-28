@@ -64,12 +64,14 @@ function makeTx(names) {
     const m = data.get(n);
     const kp = keyPaths.get(n);
     return {
+      keyPath: kp, // db.importStats가 rec[store.keyPath]로 열쇠를 읽는다 (v361 — 없으면 가져오기가 모든 줄을 조용히 건너뛰었다)
       get: (k) => request(() => copy(m.get(k))),
       getAll: () => request(() => {
         const fi = readFails.indexOf(n);
         if (fi >= 0) { readFails.splice(fi, 1); throw new Error(`읽기 실패 흉내: ${n}`); }
         return [...m.values()].map(copy);
       }),
+      getAllKeys: () => request(() => [...m.keys()]),
       put: (v) => { const c = copy(v); writes.push(() => m.set(c[kp], c)); return request(() => c[kp]); },
       delete: (k) => { writes.push(() => m.delete(k)); return request(() => undefined); },
       createIndex() {},
@@ -110,4 +112,6 @@ export const fakeIdb = {
   failNextRead: (store) => { readFails.push(store); },
   /** 걸어 둔 실패가 아직 남았나 (테스트가 엉뚱한 연산에 실패를 쓰지 않았는지 확인) */
   failsLeft: () => fails.length + readFails.length,
+  /** 모든 저장소를 비운다 — 새 기기 흉내 (☁️ 되살리기, v361) */
+  clear: () => { for (const m of data.values()) m.clear(); },
 };

@@ -4795,3 +4795,8 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 @media print {
   .zyg-cell { display: none; }
 }
+
+/* ☁️ 자동 백업 — 📊 되살리기 칸 (v361) */
+.cloud-restore { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.cloud-pick { max-width: 100%; min-height: 44px; font-size: 1rem; padding: 6px 8px; }
+.cloud-restore .btn { align-self: flex-start; min-height: 44px; }

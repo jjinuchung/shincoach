@@ -15,6 +15,7 @@ import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProf
 import { salesReport, SELL_MON_MAX } from './sell.js'; // 💰 5일장에서 판 것 (2026-10-05)
 import { pendingTickets, pendingGifts, fileLabel } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
+import { runBackup, listBackups, loadBackup, restoreBackup, backupLineNow, backupSummary, summaryLine, sizeText, cloudOn, backupFresh, readBackupState } from './cloudbackup.js'; // ☁️ 자동 백업·되살리기 (v361)
 import { ROSTER } from './pokemon.js';
 import { lvOf } from './evolve.js';
 import { visibleView } from './pokedex.js';
@@ -375,6 +376,7 @@ export async function renderStats() {
   renderRestoreOffer(main);
   renderBackupReminder(main);
   renderUploadCard(main); // 📤 Claude에게 기록 보내기
+  renderCloudCard(main); // ☁️ 자동 백업 · 백업에서 되살리기 (v361)
   renderLetterCard(main); // 💌 진우에게 한 줄 (v288)
 
   // 0) 🎟️ 아이가 산 영상 — 아빠가 파일을 넣어 줘야 볼 수 있다 (제일 위에, 놓치지 않게)
@@ -933,7 +935,7 @@ export async function renderStats() {
   }
   main.appendChild(c5);
 
-  main.appendChild(el('p', 'stats-empty', `기록은 이 기기 안에만 저장돼요. 위 "내보내기"로 파일 백업, "가져오기"로 다른 기기 기록 합치기. (${relDay(today, today)} 기준)`));
+  main.appendChild(el('p', 'stats-empty', `기록은 이 기기 안에 저장돼요(☁️ 자동 백업을 켠 기기는 하루 한 번 비공개 저장소에도). 위 "내보내기"로 파일 백업, "가져오기"로 다른 기기 기록 합치기. (${relDay(today, today)} 기준)`));
 }
 
 // ───────────────────── 🛟 기록 지키기 (부모 화면에서만) ─────────────────────
@@ -1104,7 +1106,106 @@ function renderUploadCard(main) {
   main.appendChild(box);
 }
 
+/**
+ * ☁️ 자동 백업 (v361) — 이 기기의 마지막 백업 · 「지금 백업하기」(⚙에서 켠 기기만) · 「백업에서 되살리기」(새 태블릿 — 📤 열쇠가 있으면)
+ * 되살리기는 📊 가져오기와 같은 병합(db.importStats)이라 지우는 것은 없다 · 영상은 같은 파일을 다시 넣으면 진도가 이어진다(👻 ghosts.js)
+ */
+function renderCloudCard(main) {
+  const box = card('☁️ 자동 백업');
+  const p2 = (n) => String(n).padStart(2, '0');
+  const fmt = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+  const line = el('p', 'stats-sub', backupLineNow(fmt));
+  box.appendChild(line);
+  const token = getToken();
+  const row = el('div', 'stats-actions');
+  if (cloudOn() && token) {
+    const now = el('button', 'btn', '☁️ 지금 백업하기');
+    now.type = 'button';
+    now.addEventListener('click', async () => {
+      now.disabled = true; now.textContent = '올리는 중…';
+      let r = await runBackup({ force: true }).catch((e) => ({ ok: false, why: String(e) }));
+      // 저절로 하던 백업과 겹쳐 그 결과를 받았다 — 한 번 더 (force면 나올 수 없는 까닭들)
+      if (r.skipped && ['done', 'same', 'wait'].includes(r.why)) r = await runBackup({ force: true }).catch((e) => ({ ok: false, why: String(e) }));
+      line.textContent = backupLineNow(fmt);
+      now.disabled = false; now.textContent = r.ok ? '✅ 올렸어요' : '☁️ 다시 해 보기';
+    });
+    row.appendChild(now);
+  }
+  if (token) {
+    const back = el('button', 'btn', '☁️ 백업에서 되살리기');
+    back.type = 'button';
+    back.addEventListener('click', () => { back.disabled = true; openRestore(box, fmt).catch(() => {}); });
+    row.appendChild(back);
+    box.appendChild(row);
+  } else {
+    box.appendChild(el('p', 'stats-note', '새 태블릿이면: 위 📤 카드에 열쇠를 넣으면 여기에 「☁️ 백업에서 되살리기」가 생겨요.'));
+  }
+  main.appendChild(box);
+}
+
+/** ☁️ 되살리기 칸 — 최근 백업을 고르고, 무엇을 되살리는지 본 뒤, 확인을 받고 합친다 */
+async function openRestore(box, fmt) {
+  const panel = el('div', 'cloud-restore');
+  box.appendChild(panel);
+  panel.appendChild(el('p', 'stats-note', '순서: ① 📤 열쇠 넣기 → ② 여기서 되살리기 → ③ 영상을 다시 넣기(아빠 PC의 같은 영상 파일) — 그러면 영상마다 진도가 이어져요. 지금 기록과 합쳐요 — 잡은 포켓몬은 양쪽 다 남고 지우는 것은 없어요. 새 기기면 💰·🎒 가방·🥚 알·파트너는 백업 쪽으로 맞춰요.'));
+  const say = el('p', 'stats-sub', '백업 목록을 받는 중…');
+  panel.appendChild(say);
+  let list;
+  try { list = await listBackups(); } catch (e) { say.textContent = `❌ 목록을 못 받았어요 — ${e.message}`; return; }
+  if (!list.length) { say.textContent = '아직 올라온 백업이 없어요 (⚙에서 「이 기기를 매일 백업」을 켠 기기가 올려요)'; return; }
+  say.textContent = '되살릴 백업 (최근 것부터)';
+  const pick = document.createElement('select');
+  pick.className = 'cloud-pick';
+  list.forEach((f, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = `${f.day} (${sizeText(f.size)})`; pick.appendChild(o); });
+  const sum = el('p', 'stats-row', '');
+  const go = el('button', 'btn btn-primary', '☁️ 이 백업으로 되살리기');
+  go.type = 'button';
+  go.disabled = true;
+  panel.appendChild(pick);
+  panel.appendChild(sum);
+  panel.appendChild(go);
+  let data = null;
+  let seq = 0; // 고른 백업을 바꾸면 늦게 온 옛 것은 버린다
+  const load = async () => {
+    const my = ++seq;
+    data = null; go.disabled = true; sum.textContent = '받는 중…';
+    try {
+      const d = await loadBackup(list[Number(pick.value)]);
+      if (my !== seq) return;
+      data = d;
+      const s = backupSummary(d);
+      sum.textContent = `${s.device ? `${s.device} · ` : ''}${s.at ? `${fmt(Date.parse(s.at))}에 올림 · ` : ''}${summaryLine(s)}`;
+      go.disabled = false;
+    } catch (e) {
+      if (my === seq) sum.textContent = `❌ ${e.message}`;
+    }
+  };
+  pick.addEventListener('change', () => { load(); });
+  go.addEventListener('click', async () => {
+    if (!data) return;
+    const d = data;
+    const day = list[Number(pick.value)].day;
+    if (!confirm(`${day} 백업으로 되살릴까요?\n\n${summaryLine(backupSummary(d))}\n\n지금 기록과 합쳐요 — 잡은 포켓몬은 양쪽 다 남고, 지우는 것은 없어요.`)) return;
+    go.disabled = true; pick.disabled = true; sum.textContent = '되살리는 중…';
+    try {
+      const r = await restoreBackup(d);
+      await reloadDaily();
+      await reloadProfile();
+      // 새 기기(줄지 않는 수 하나라도 백업이 큼)면 백업이 앞서 💰·가방·알·파트너도 백업 쪽 · 쓰던 기기에 합쳤으면 도감 종 수만 (그 뒤 진화·판 것이 있다 — cloudbackup.restoreBackup)
+      const mons = `🎒 포켓몬 ${r.got.have}마리 · 도감 ${r.got.species}종 (백업: ${r.want.have}마리 · ${r.want.species}종)${r.lead ? ' — 💰·🎒 가방·🥚 알·파트너는 백업 쪽으로' : ' — 이 기기가 그 백업 뒤에 쓴 기기라 지금 기록을 앞에 두고 합쳤어요'} ${r.same ? '✅' : '⚠️ 백업보다 적어요 — Claude에게 알려 주세요'}`;
+      const vids = r.ghosts ? `\n🎬 영상 ${r.ghosts}편은 같은 영상 파일을 다시 넣으면 진도가 이어져요${r.already ? ` (이미 넣은 ${r.already}편은 🗑로 지우고 다시 넣어 주세요)` : ''}` : '';
+      alert(`기록 ${r.n}건을 되살렸어요\n\n${mons}${vids}`);
+      renderStats();
+    } catch (e) {
+      go.disabled = false; pick.disabled = false;
+      sum.textContent = `❌ 되살리기 실패 — ${e.message}`;
+    }
+  });
+  await load();
+}
+
 function renderBackupReminder(main) {
+  if (backupFresh(readBackupState())) return; // ☁️ 자동 백업이 되고 있으면 손 백업 알림은 안 띄운다 (v361)
   const last = lastFileBackup();
   if (!needsFileBackup(last)) return;
   const d = daysSince(last);

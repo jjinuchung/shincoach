@@ -26,6 +26,7 @@ import { copyStock } from './stock.js'; // 🏦 포켓몬 증권시장 복사 (�
 import { matchedOf, mergeMatched } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329)
 import { dripOf, mergeDrip } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (순수 — 아무것도 import하지 않는다, v320)
 import { copyJourney, mergeJourney } from './journey.js'; // 🎒 포켓몬 대여행 복사·병합 (v341 — 순수, evolve·items·montypes만 import)
+import { pickGhost, readGhosts, writeGhosts, addGhosts, dropGhost } from './ghosts.js'; // 👻 되살린 백업의 영상 자리 (v361 — 순수·localStorage, import 없음)
 import { knownOf, mergeKnown, seenOf, mergeSeen, gMissOf, mergeGMiss, diagOf, mergeDiag, giftOf, mergeGift, videoSeenOf, mergeVideoSeen } from './grammar.js'; // 📝 영어 문법 기록 (v348 — 순수, korean·korwords만 import · v350 🎬 낸 영상 문제)
 const DB_NAME = 'shincoach';
 const DB_VERSION = 4;
@@ -121,7 +122,12 @@ function makeId() {
  */
 export async function addItem({ title, videoFile, enText, koText = '', duration = 0, thumb = '' }) {
   const db = await openDb();
-  const id = makeId();
+  // 👻 되살린 백업에 같은 영상(파일 이름 → 제목)의 자리가 있으면 그 id를 다시 쓴다 — 문장 기록·🔁 복습·🏁 영상 보상 기록이 그 id에 붙어 있다 (v361)
+  //    그 id의 영상이 이미 있으면(다른 창이 먼저 넣음) 새 id로
+  const ghost = pickGhost(readGhosts(), videoFile.name, title);
+  const busy = ghost ? await promisify(db.transaction('items', 'readonly').objectStore('items').get(ghost.id)) : null;
+  const g = ghost && !busy ? ghost : null;
+  const id = g ? g.id : makeId();
   const item = {
     id,
     title,
@@ -132,14 +138,16 @@ export async function addItem({ title, videoFile, enText, koText = '', duration 
     thumb,
     enText,
     koText,
-    lastCue: 0,
-    createdAt: Date.now(),
+    lastCue: g ? g.lastCue : 0,
+    createdAt: g && g.createdAt ? g.createdAt : Date.now(), // 넣은 차례도 그대로
     updatedAt: Date.now(),
+    ...(g && typeof g.noReview === 'boolean' ? { noReview: g.noReview } : {}),
   };
   const tx = db.transaction(['items', 'blobs'], 'readwrite');
   tx.objectStore('items').put(item);
   tx.objectStore('blobs').put({ id, blob: videoFile });
   await txDone(tx);
+  if (ghost) dropGhost(ghost.id); // 쓴 자리(또는 이미 영상이 있는 자리)는 뺀다
   return id;
 }
 
@@ -2162,15 +2170,22 @@ export function applyHouseRule(rule) {
 
 /** 기록 전체 내보내기 (영상 제외) */
 export async function exportStats() {
-  const db = await openDb();
-  const tx = db.transaction(['items', ...STAT_STORES], 'readonly');
-  const items = (await promisify(tx.objectStore('items').getAll())).map((it) => ({
+  // 영상 정보는 하나씩 읽는다(listItems) — 자막 전문이 든 레코드 하나가 깨져도(2026-09-17 사고) 내보내기·☁️ 백업 전체가 멈추지 않게 (v361)
+  //   깨진 영상은 id·제목(세션 기록에서 되찾은 것)만
+  const items = (await listItems()).map((it) => ({
     // noReview = 📊에서 부모가 고른 "🔁 복습에 쓰기" — 아이가 만든 기록이 아니라 **부모의 선택**이라
     // 기기를 옮기거나 되돌릴 때 같이 가야 한다 (Codex 9차 #8)
     id: it.id, title: it.title, duration: it.duration, lastCue: it.lastCue, createdAt: it.createdAt,
+    // 넣을 때 고른 영상 파일 이름 — 새 기기에서 같은 파일을 다시 넣으면 이 id로 이어 붙인다 (👻 ghosts.js, v361)
+    ...(typeof it.videoName === 'string' && it.videoName ? { videoName: it.videoName } : {}),
     ...(typeof it.noReview === 'boolean' ? { noReview: it.noReview } : {}),
   }));
+  // 👻 되살렸지만 아직 다시 넣지 않은 영상의 자리도 — 그 사이 백업하면 다음 기기에서 그 영상의 진도·🏁 영상 보상 기록이 끊겼다 (🔍 Codex 165차 #2 · 있는 영상이 먼저)
+  const have = new Set(items.map((it) => String(it.id)));
+  for (const g of readGhosts()) if (!have.has(g.id)) items.push({ ...g, ghost: true });
   const out = { app: 'shincoach', version: 1, exportedAt: new Date().toISOString(), items };
+  const db = await openDb();
+  const tx = db.transaction(STAT_STORES, 'readonly');
   for (const name of STAT_STORES) out[name] = await promisify(tx.objectStore(name).getAll());
   return out;
 }
@@ -2478,6 +2493,10 @@ export async function importStats(data) {
       n++;
     }
   }
+  // 👻 이 기기에 없는 영상의 자리를 적어 둔다 — 같은 영상 파일을 다시 넣으면 그 id로 들어가 문장 기록이 이어진다 (v361 · 열쇠만 읽는다)
+  const ghostIn = (data.items || []).filter((it) => it && typeof it.id === 'string');
+  const haveIds = ghostIn.length ? await promisify(tx.objectStore('items').getAllKeys()) : [];
   await txDone(tx);
+  if (ghostIn.length) writeGhosts(addGhosts(readGhosts(), ghostIn, haveIds));
   return n;
 }

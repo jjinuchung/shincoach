@@ -53,7 +53,8 @@ test('📚 contentSummary가 파일 이름·넣은 때·길이를 넘긴다 (태
   assert.deepEqual([s.videoName, s.createdAt, s.duration, s.total], ['wild2.mp4', 123, 540, 46]);
   const [o] = contentSummary([{ id: 'j', title: '옛' }], [], () => 0);
   assert.deepEqual([o.videoName, o.createdAt, o.duration], ['', 0, 0]);
-  assert.match(src('js/db.js'), /videoName: videoFile\.name,[\s\S]{0,200}createdAt: Date\.now\(\),/, '넣을 때 저장하는 값');
+  // 👻 v361: 되살린 백업의 같은 영상이면 넣은 때를 그대로(ghosts.js) — 아니면 지금
+  assert.match(src('js/db.js'), /videoName: videoFile\.name,[\s\S]{0,200}createdAt: (g && g\.createdAt \? g\.createdAt : )?Date\.now\(\),/, '넣을 때 저장하는 값');
 });
 
 test('📤 gatherFiles: 영어를 넘기면 english/library.md도 함께 · 안 넘기면 없음 · 영어를 못 읽으면 통째로 실패(그대로)', async () => {

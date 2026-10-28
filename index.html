@@ -847,6 +847,16 @@
         </label>
       </fieldset>
 
+      <!-- ☁️ 태블릿 자동 백업 (v361) — cloudbackup.js · 처음엔 꺼짐, 진우 태블릿에서만 켠다 -->
+      <fieldset class="field set-group">
+        <legend class="field-label">☁️ 자동 백업 <small>— 하루 한 번, 바뀐 것이 있으면 이 기기의 기록 전체(모은 포켓몬·코인·가방·공부 기록 — 영상 파일은 빼고)를 압축해 비공개 저장소에 올려요. 태블릿이 망가지면 새 기기의 📊 「☁️ 백업에서 되살리기」로 되살려요</small></legend>
+        <label class="field-row">
+          <input type="checkbox" id="set-cloud">
+          <span class="field-label">이 기기를 매일 백업 <small>— 진우 태블릿에서만 켜 주세요 (하루에 한 파일이라, 다른 기기도 켜면 그날 태블릿 백업을 덮어요) · 📤 열쇠가 있어야 올라가요 · 저장하면 바로 한 번 올려요</small></span>
+        </label>
+        <p id="set-cloud-note" class="field-note"></p>
+      </fieldset>
+
       <fieldset class="field set-group">
         <legend class="field-label">🎁 선물 교환권 사진 <small>— 🔔 피카츄 자전거 벨 카드에 보여요. 사진은 이 태블릿에만 저장되고 인터넷에 올라가지 않아요</small></legend>
         <div class="field-actions">

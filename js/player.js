@@ -3380,6 +3380,7 @@ function loadSettings() {
     // 🎮 게임기 미니 게임 판 (v307 → 2026-10-23 v328, 아버님) — 과목을 합친 공부 15분에 1판 · 하루 12판까지
     gameMin: GAME_MIN, gameCap: GAME_CAP,
     stockOn: true, stockCap: STOCK_CAP, // 🏦 포켓몬 증권시장 (v319) — 🔒 부모가 끄기·투자 한도
+    cloudBackup: false, // ☁️ 이 기기를 매일 백업 (v361) — 처음엔 꺼짐 · 진우 태블릿에서만 켠다 · cloudbackup.js가 같은 localStorage에서 읽는다
     // 🔢 수학 숫자판 (2026-10-01) — 켜짐이 기본. math.js가 같은 localStorage에서 읽는다
     mathPad: true };
   let saved = {};
@@ -3561,12 +3562,16 @@ function initSettingsDialog() {
     settings.stockOn = $('set-stock-on').checked; // 🏦 증권시장 (v319)
     settings.stockCap = stockCapOf($('set-stock-cap').value);
     settings.mathPad = $('set-mathpad').checked;
+    const cloudWasOn = settings.cloudBackup === true;
+    settings.cloudBackup = $('set-cloud').checked; // ☁️ 자동 백업 (v361)
     if (!settings.hideEnWhileSpeaking) state.speakHideEn = 'none'; // 끄면 대기 중이던 숨김도 해제
     if (settings.listenFirst === 0) state.enRevealed = true;
     applySubVisibility();
     updateChips();
     saveSettings();
     $('dlg-settings').close();
+    // ☁️ 방금 켰으면 바로 한 번 (저장한 설정을 읽어 간다 · 실패해도 조용히 — 까닭은 📊·⚙에)
+    if (!cloudWasOn && settings.cloudBackup) import('./cloudbackup.js').then((m) => m.autoBackup()).catch(() => {});
     if (mergeChanged && state.item) {
       // 문장 합치기 설정이 바뀌면 큐 다시 구성
       const t = video.currentTime;
@@ -3628,6 +3633,12 @@ function openSettings() {
     $('set-stock-on').checked = settings.stockOn !== false; // 🏦 증권시장 (v319)
     $('set-stock-cap').value = String(stockCapOf(settings.stockCap));
     $('set-mathpad').checked = settings.mathPad !== false;
+    $('set-cloud').checked = settings.cloudBackup === true; // ☁️ 자동 백업 (v361) — 아래 한 줄은 이 기기의 마지막 백업
+    $('set-cloud-note').textContent = '';
+    import('./cloudbackup.js').then((m) => {
+      const p2 = (n) => String(n).padStart(2, '0');
+      $('set-cloud-note').textContent = m.backupLineNow((t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${p2(d.getHours())}:${p2(d.getMinutes())}`; });
+    }).catch(() => {});
     renderTimeToday();
     renderGameToday();
     ttsSeq++; // 🔊 아직 안 끝난 지난 확인은 결과를 적지 않는다

@@ -76,6 +76,8 @@ export function showView(name) {
   if (name === 'home') retryParcel().catch(() => {});
   // 📤 홈으로 돌아올 때(앱을 열 때 포함) 기록을 비공개 저장소로 — 10분에 한 번까지, 내용이 그대로면 안 올린다. 시작을 늦추지 않게 조금 뒤에
   if (name === 'home') setTimeout(() => { autoSend(); }, 3000);
+  // ☁️ 자동 백업(v361) — ⚙에서 켠 기기만 · 하루 한 번(그날 했으면 바로 끝) · 📤보다 조금 뒤에
+  if (name === 'home') setTimeout(() => { import('./cloudbackup.js').then((m) => m.autoBackup()).catch(() => {}); }, 8000);
   // 🔢 수학은 들어올 때마다 진도를 다시 읽어 그린다 (사다리·오늘 복습이 최신이어야 한다)
   if (name === 'math') renderMath().catch(() => {});
   // 📚 국어는 읽던 글이 있으면 그대로(🎒·📊에서 돌아옴), 없으면 도감을 다시 그린다(다른 창에서 받은 별)
@@ -236,6 +238,8 @@ async function main() {
     if (document.hidden) { autoSend(); return; } // 📤 앱을 내릴 때도 — 홈을 거치지 않고 끄는 날이 있다
     import('./xp.js').then((x) => x.reloadProfile()).catch(() => {});
     import('./pokemon.js').then((m) => Promise.all([m.loadShiny(), m.loadForms()])).catch(() => {});
+    // ☁️ 켜 둔 채 날이 바뀌어 다시 올라올 때도 (홈을 거치지 않는 날 — 그날 했으면 바로 끝)
+    setTimeout(() => { import('./cloudbackup.js').then((m) => m.autoBackup()).catch(() => {}); }, 8000);
   });
   // ⏳ 하루 시간 제한 시계 — ⚙ 설정을 읽어 가고, 1초마다 칩을 갱신한다 (실패해도 학습은 계속)
   // 🎮 공부하는 동안 게임 판이 생기면 한 줄 (v307 — 1초마다 · 셈 없이)
