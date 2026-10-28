@@ -148,7 +148,7 @@ test('✍️ 다른 원고의 카드 받기(writeCardsNow): 국어 카드만 받
     assert.deepEqual([[...off.fams], off.cards.length], [['K'], KCARDS.length], '논술 원고를 못 받으면 K만');
     globalThis.fetch = async (u) => { calls.push(u); return { ok: true, json: async () => JSON.parse(read(String(u).includes('nonsul') ? 'coach/korean/nonsul.json' : 'coach/korean/reading.json')) }; };
     const on = await writeCardsNow(KCARDS);
-    assert.deepEqual([[...on.fams].sort(), on.cards.length], [['K', 'N'], KCARDS.length + NCARDS.length]);
+    assert.deepEqual([[...on.fams].sort(), on.cards.length], [['K', 'N', 'R'], KCARDS.length + NCARDS.length * 2], '논술 원고 하나에서 ✍️ N##와 💡 R##(v355)');
     const fromNs = await writeCardsNow(NCARDS);
     assert.deepEqual([[...fromNs.fams].sort(), fromNs.cards.filter((c) => c.id.startsWith('K')).length], [['K', 'N'], KCARDS.length], '논술 화면에서도 국어 카드를 더한다');
     const n = calls.length;
@@ -187,7 +187,7 @@ test('✍️ 올릴 목록·todo.md: 논술 글은 제목이 주제 · 물음은
   assert.ok(md.text.includes(`[K19 · id ${k.id} · at ${T0 + 1} · v 1] 2026-10-20 「`), '국어 줄은 그대로');
   assert.match(md.text, /N## = 🖊️ 논술 짧은 글 — 채점 기준은 coach\/korean\/nonsul\.json의 write/);
   const u = read('js/upload.js');
-  assert.ok(body(u, 'async function korTodoNow() {').includes("ns = nonsulWriteCards(await (await fetch('./coach/korean/nonsul.json')).json());") && u.includes('return writeTodo(p && p.korWrites, [...cards, ...ns]);'), '📤 목록에 논술 주제 제목·물음');
+  assert.ok(body(u, 'async function korTodoNow() {').includes("const nj = await (await fetch('./coach/korean/nonsul.json')).json(); ns = [...nonsulWriteCards(nj), ...nonsulReasonCards(nj)];") && u.includes('return writeTodo(p && p.korWrites, [...cards, ...ns]);'), '📤 목록에 논술 주제 제목·물음 (💡 내 이유 R##도 — v355)');
 });
 
 test('🔒 비공개 검사(check.mjs --private): 논술 답장도 앱과 같은 검사(논술 주제 카드를 함께) · 없는 주제는 막음', () => {
@@ -218,7 +218,7 @@ test('📤 국어 요약: ✍️ 생각 쓰기 줄은 국어 카드만 · 🖊�
   assert.ok(t.includes('## ✍️ 생각 쓰기\n- 쓴 글 1개 (카드 1장) · 답장 받은 글 0개 · 답장 기다리는 글 1개 · ✅까지 간 카드 0장'), '논술 글은 국어 생각 쓰기에 안 섞인다');
   assert.ok(t.includes('\n- ✍️ 짧은 글: 쓴 글 2개 (주제 2개) · 답장 받은 글 1개 · 답장 기다리는 글 1개 · ✅까지 간 주제 1개'), t.slice(-400));
   const s = read('js/stats.js');
-  assert.ok(s.includes("const nsWait = wtodo.filter((t) => String(t.card).startsWith('N')).length;") && s.includes('(🖊️ 논술 짧은 글 ${nsWait}개 포함)'));
+  assert.ok(s.includes("const nsWait = wtodo.filter((t) => String(t.card).startsWith('N')).length;") && s.includes('`🖊️ 논술 짧은 글 ${nsWait}개`') && s.includes('(${inc} 포함)'));
 });
 
 test('✍️ 첫 화면 목록(순수): 판을 끝낸 주제만 · 원고 차례 · 셈 없이 📬·✉️·✅·✍️ 표시', () => {
@@ -299,12 +299,12 @@ test('✍️ 화면 연결: 논술 화면 — 판 끝(저장된 뒤)·첫 화면
   assert.ok(link.includes('if (st.done && !st.unread) return null;') && link.includes("'✍️ 이번엔 내 말로 써 볼까요? (하고 싶을 때만)'"));
   assert.ok(body(v, 'function essaysEl() {').includes('essayTopics(S.list, nonsulMap(), korWritesMap())'), '첫 화면 목록은 판을 끝낸 주제만');
   const banner = body(v, 'function replyBannerEl() {');
-  assert.ok(banner.includes('unreadReplies(korWritesMap()).filter((u) => !!wcardOf(u.card));'), '논술 📬 띠엔 논술 글 답장만');
+  assert.ok(banner.includes('unreadReplies(korWritesMap()).filter((u) => !!wcardOf(u.card) || !!rcardOf(u.card));'), '논술 📬 띠엔 논술 글 답장만 (✍️ 짧은 글 · 💡 내 이유 — v355)');
   assert.ok(banner.includes("() => guardStart('korean', () => openWrite(list[0].card))"), '📬 띠로 들어가도 ⏳ 국어 시간을 본다(Codex 110차 #2 — 띠 → 다시 써 보기로 시간 밖에서 쓸 수 있었다)');
   assert.ok((v.match(/openWrite\(/g) || []).length === (v.match(/guardStart\('korean', \(\) => openWrite\(/g) || []).length + 1, '쓰기 화면을 여는 곳은 모두 guardStart 안(정의 한 줄만 빼고)');
   assert.ok(body(v, 'function renderHome() {').includes('const es = essaysEl();'));
   const enter = body(v, 'export async function enterNonsul() {');
-  assert.ok(enter.includes('syncWrites(S.wcards).then((r) => {') && enter.includes("const line = appliedLine(r, 'N');") && enter.includes('else if (S.w) renderWrite();'));
+  assert.ok(enter.includes('syncWrites([...S.wcards, ...S.rcards]).then((r) => {') && enter.includes("const line = appliedLine(r, 'NR');") && enter.includes('else if (S.w) renderWrite();'));
   assert.ok(body(v, 'function refreshAfterCatch() {').includes('else if (!S.w) renderHome();'), '잡은 뒤 쓰기 화면을 다시 그려 쓰던 칸을 날리지 않는다');
   assert.ok(body(v, "function startRound(practice, want = '') {").includes("S.w = '';")); // v316: 주제를 정해 시작(📖 독서 논술)
   assert.ok(read('js/koreanview.js').includes("const line = appliedLine(r, 'K');"), '국어 화면엔 국어 답장 수만');
@@ -318,7 +318,7 @@ test('✍️ 화면 연결: 논술 화면 — 판 끝(저장된 뒤)·첫 화면
   assert.ok(!/\.innerHTML\s*=|insertAdjacentHTML/.test(nw), '아이 글은 textContent로만');
   assert.ok(body(nw, 'export function essayFormEl(card, ctx, onSent) {').includes('r = await korWriteAdd(card.id, composeEssay(fields), ctx.cards());'), '보내는 글 = 미리 보기와 같은 합친 글');
   assert.ok(nw.includes('const DRAFT_KEY = (id) => `shincoach.nonsulDraft.${id}`;'), '쓰던 칸은 이 기기에');
-  assert.ok(read('tools/privcheck.mjs').includes("const cards = [...validCards(src('reading.json')), ...nonsulWriteCards(src('nonsul.json'))];"));
+  assert.ok(read('tools/privcheck.mjs').includes("const cards = [...validCards(src('reading.json')), ...nonsulWriteCards(nj), ...nonsulReasonCards(nj)];"), '비공개 답장 검사도 ✍️ N##·💡 R##(v355) 카드로');
   const sw = read('sw.js');
   assert.ok(sw.includes("'./js/nonsulwriteview.js',"));
   assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1]) >= 304, 'sw v304 이상');

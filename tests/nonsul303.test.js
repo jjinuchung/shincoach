@@ -391,7 +391,7 @@ test('🖊️ 화면 연결: 홈 카드 · 화면 · ⏳ 국어 시간 · 시간
   assert.ok(app.includes("  if (name === 'nonsul') enterNonsul().catch(() => {});") && app.includes('  initNonsul({ showView });'));
   assert.ok(read('js/timeup.js').includes("  { id: 'time-chip-nonsul', subject: 'korean' },"));
   const v = read('js/nonsulview.js');
-  assert.equal((v.match(/guardStart\('korean', /g) || []).length, 6, '판을 열 때마다 국어 시간을 본다(시작·연습·다음 주제) + v304 ✍️ 짧은 글을 여는 세 곳(첫 화면 목록·판 끝·📬 띠 — Codex 110차 #2)');
+  assert.equal((v.match(/guardStart\('korean', /g) || []).length, 8, '판을 열 때마다 국어 시간을 본다(시작·연습·다음 주제) + v304 ✍️ 짧은 글을 여는 세 곳(첫 화면 목록·판 끝·📬 띠 — Codex 110차 #2) + v355 💡 내 이유 두 곳(판 끝 답장 열어 보기 · 답장 뒤 이 주제 다시 해 보기)');
   const fin = body(v, 'async function finishRound() {');
   assert.ok(fin.includes('res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from }, S.list.map((t) => t.id));'), '판 끝에 한 번 저장 · ok = 한 번도 안 틀림');
   const run = body(v, 'export async function runCatch() {');

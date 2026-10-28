@@ -1061,7 +1061,9 @@ function renderUploadCard(main) {
     const wtodo = writeTodo((getProfileSnapshot() || {}).korWrites, []);
     const waiting = wtodo.length;
     const nsWait = wtodo.filter((t) => String(t.card).startsWith('N')).length;
-    box.appendChild(el('p', 'stats-sub', waiting ? `✍️ 국어 생각 쓰기: 답장 기다리는 글 ${waiting}개${nsWait ? ` (🖊️ 논술 짧은 글 ${nsWait}개 포함)` : ''} — Claude에게 "국어 답 봐 줘"` : '✍️ 국어 생각 쓰기: 답장 기다리는 글 없음'));
+    const rsWait = wtodo.filter((t) => String(t.card).startsWith('R')).length; // 💡 논술 내 이유 한 줄 (v355, R##)
+    const inc = [nsWait ? `🖊️ 논술 짧은 글 ${nsWait}개` : '', rsWait ? `💡 논술 내 이유 ${rsWait}개` : ''].filter(Boolean).join(' · ');
+    box.appendChild(el('p', 'stats-sub', waiting ? `✍️ 국어 생각 쓰기: 답장 기다리는 글 ${waiting}개${inc ? ` (${inc} 포함)` : ''} — Claude에게 "국어 답 봐 줘"` : '✍️ 국어 생각 쓰기: 답장 기다리는 글 없음'));
     const row = el('div', 'stats-actions');
     const send = el('button', 'btn btn-primary', '📤 지금 보내기');
     send.type = 'button';

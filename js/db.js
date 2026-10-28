@@ -17,7 +17,7 @@ import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows, qMissOf, mergeQMis
 import { wordsOf, mergeWords, wordDaysOf, mergeWordDays } from './korwords.js'; // 🔤 국어 낱말 칸·보상 받은 날 (순수, korean.js만 import)
 import { lettersOf, mergeLetters } from './letters.js'; // 📮 포켓몬 편지 장부 (v351 — 순수, korean.js만 import)
 import { zygOf, mergeZyg } from './zygarde.js'; // 🟢 지가르데 큐브 장부 (v352 — 순수, korean.js만 import)
-import { writesOf, mergeWrites } from './korwrite.js'; // ✍️ 국어 서술형 글·답장·보상 한도 (순수, korean.js만 import)
+import { writesOf, mergeWrites, reasonThrowsFix } from './korwrite.js'; // ✍️ 국어 서술형 글·답장·보상 한도 (순수, korean.js만 import) · 💡 내 이유 🎯 맞추기 (v355)
 import { mergePuzzles, PUZZLE_DAY_LISTS, ONE_DAY_LISTS } from './korpuzzle.js'; // 🧩 국어 퍼즐 칸 병합 · 판 기록 칸(v315) · 글 끝 퍼즐 하나 기록 칸(v331) (순수 — korean·korwords만 import)
 import { copyAvatar, mergeAvatar } from './avatar.js'; // 🧑 진우 캐릭터 복사·병합 (순수 — house만 import)
 import { copyPlay, mergePlay } from './homeplay.js'; // 🎮 일상 행동 💗·놀이 날 복사·병합 (순수 — house·avatar·evolve·korean만 import)
@@ -2392,6 +2392,8 @@ export function mergeStatRecord(name, cur, rec) {
     out.letters = mergeLetters(cur.letters, rec.letters); // 📮 보낸 답장은 id로 합집합 · 답장 붙은 쪽 · 첫 날은 이른 쪽 · 🌟 날은 늦은 쪽 (v351)
     out.zyg = mergeZyg(cur.zyg, rec.zyg); // 🟢 찾은 열쇠(날:과목) 합집합 — 따로 진행한 두 사본의 셀이 모두 남는다 · 코어는 이른 쪽 · 고른 모습은 나중에 바꾼 쪽 (v352)
     out.korWrites =mergeWrites(cur.korWrites, rec.korWrites); // ✍️ 글은 (카드, at)로 합집합 · 답장 붙은 쪽이 이김 · 보상 한도는 큰 쪽(옛 백업이 받은 보상을 되살리지 못하게)
+    // 💡 내 이유 ✅ 🎯 — 두 사본이 서로 다른 주제로 받은 🎯가 카운터 max로 줄지 않게, 합친 장부의 ✅ 카드 수에 맞춘다 (v355 · 🔍 Codex 160차 #1)
+    out.nonsulThrow = reasonThrowsFix(out.nonsulThrow, cur.korWrites, rec.korWrites, out.korWrites);
     // 💰 5일장에서 판 기록 — 장날·열쇠마다 합집합 (장날 한도를 옛 백업이 되돌리지 않게, 📊에 판 것이 남게)
     out.sales = mergeSales(cur.sales, rec.sales);
     // 🚀 끝난 로켓단 배틀 — 합집합(옛 백업이 끝난 배틀을 "진행 중"으로 되살려 두 번 빼앗거나 두 번 보상하지 않게).

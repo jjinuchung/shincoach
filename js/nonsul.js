@@ -8,10 +8,11 @@
 //   국어 글의 "별을 새로 받을 때마다"와 같은 꼴 · 주제마다 평생 한 번 · 같은 주제를 같은 날 다시 푼 ⭐는 빼고(⚡와 같은 하루 한 번)
 // ✍️ 짧은 글 (v304 — 아버님 물음 넷 모두 추천안): 판을 끝낸 주제를 칸마다 머리말(나는 · 왜냐하면 · 또 · 물론 · 그래도 나는) 채우기로 →
 //   국어 ✍️ 생각 쓰기와 같은 장부·왕복·보상(korwrite.js — 카드 열쇠 N## · 주제마다 평생 한도) · 채점 기준은 원고의 write 하나를 모든 주제가 같이 쓴다
+// 💡 내 이유 한 줄 (v355 — 아버님 「추천대로」): 판 끝 「내가 만든 글」 아래 「또, …」 한 줄 → 같은 장부·왕복(카드 열쇠 R##) · 채점 기준은 원고의 reason
 import { dayNum, throwsOf, pendingOf, PAST_MAX, FRAME_GAP, KOR_XP } from './korean.js';
 import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
 import { shuffledOrder } from './korpuzzle.js';
-import { normText, bareText, writesOf, cardWriteState, writeCheck, WRITE_MAX_HI } from './korwrite.js';
+import { normText, bareText, writesOf, cardWriteState, writeCheck, writeAddRule, WRITE_MAX_HI } from './korwrite.js';
 
 /** 그날 처음 끝낸 판의 💰 */
 export const NONSUL_COINS = 10;
@@ -108,8 +109,8 @@ function topicProblems(t) {
  * { v 판 번호(물음·rubric을 고치면 올린다), q 물음(주제마다 같은 말 — 주제는 todo의 제목), rubric { must ≥1, ok, miss }, past [{ v, q, rubric }] 옛 판 }
  * rubric은 공개 원고(앱은 보여 주지 않는다) — Claude가 세션이 바뀌어도 같은 잣대로 (국어 ✍️와 같다)
  */
-export function checkNonsulWrite(w) {
-  if (!isObj(w)) return ['write는 { v, q, rubric }'];
+export function checkNonsulWrite(w, key = 'write') {
+  if (!isObj(w)) return [`${key}는 { v, q, rubric }`];
   const bad = [];
   const strs = (a) => Array.isArray(a) && a.every(str);
   const edition = (x, name) => {
@@ -118,14 +119,14 @@ export function checkNonsulWrite(w) {
     else if (!strs(x.rubric.ok) || !strs(x.rubric.miss)) bad.push(`${name}.rubric.ok·miss는 글 목록`);
   };
   const vOk = Number.isInteger(w.v) && w.v > 0;
-  if (!vOk) bad.push('write.v(채점 기준 판 번호)는 1부터');
-  edition(w, 'write');
+  if (!vOk) bad.push(`${key}.v(채점 기준 판 번호)는 1부터`);
+  edition(w, key);
   if (w.past !== undefined) {
-    if (!Array.isArray(w.past) || w.past.length > PAST_MAX) bad.push(`write.past(옛 판)는 ${PAST_MAX}개까지의 목록`);
+    if (!Array.isArray(w.past) || w.past.length > PAST_MAX) bad.push(`${key}.past(옛 판)는 ${PAST_MAX}개까지의 목록`);
     else {
       const seen = new Set();
       w.past.forEach((x, k) => {
-        const name = `write.past ${k + 1}`;
+        const name = `${key}.past ${k + 1}`;
         if (!isObj(x)) { bad.push(`${name}은 { v, q, rubric }`); return; }
         if (!Number.isInteger(x.v) || x.v <= 0 || (vOk && x.v >= w.v) || seen.has(x.v)) bad.push(`${name}의 v는 1부터, 지금 판보다 작게, 겹치지 않게`);
         seen.add(x.v);
@@ -140,7 +141,8 @@ export function checkNonsulWrite(w) {
 export function checkNonsul(json) {
   const list = isObj(json) && Array.isArray(json.topics) ? json.topics : null;
   if (!list || !list.length) return ['topics가 없음'];
-  const bad = [...checkNonsulWrite(json.write)];
+  // 💡 내 이유 채점 기준 (v355) — 없으면 칸만 안 뜬다(nonsulReasonCards가 []) · 있으면 꼴을 본다 (지금 원고에 있는지는 시험이 본다)
+  const bad = [...checkNonsulWrite(json.write), ...(json.reason === undefined ? [] : checkNonsulWrite(json.reason, 'reason'))];
   const ids = new Set();
   for (const t of list) {
     bad.push(...topicProblems(t));
@@ -408,4 +410,91 @@ export function essayReport(writes) {
   if (!entries.length) return '✍️ 짧은 글: (아직 쓴 글 없음)';
   const ok = ids.filter((id) => cardWriteState(w, id).done).length;
   return `✍️ 짧은 글: 쓴 글 ${entries.length}개 (주제 ${ids.length}개) · 답장 받은 글 ${entries.filter((e) => e.grade).length}개 · 답장 기다리는 글 ${entries.filter((e) => !e.grade).length}개 · ✅까지 간 주제 ${ok}개`;
+}
+
+// ───────────────────── 💡 내 이유 한 줄 (v355) ─────────────────────
+// 2026-10-28 아버님 「추천대로」 — 판은 고르기만 하면 끝나고 ✍️ 짧은 글은 칸이 다섯이라 무겁다 → 판을 끝낸 그 자리에서 한 줄만:
+//   판 끝 「내가 만든 글」 아래 「또, …」 칸 하나(안 써도 판·⭐·🎯 그대로) · ⭐ 주제 연습 판에서도 · 답장 기다리는 주제·✅ 주제엔 칸이 안 뜬다
+//   같은 ✍️ 장부·왕복(korwrite — 카드 열쇠 R## = 그 주제 N##의 번호) · 보낼 글 = 판에서 고른 의견 문장 + 「또, 한 줄」(채점할 때 편이 보이게)
+//   보상: 보내면 💰5(카드마다 처음 한 번 — writeAddRule) · ✅면 🎯 논술 포켓몬 잡기 1번(카드마다 한 번 — writeReplyRule) · 🔸·🔁는 보상 없이 다시 · 🟩 없음
+//   채점 기준은 원고 reason(짧은 글 write와 따로 — 한 줄은 반대 의견·정리가 없어서) · 판 보기를 그대로 옮기면 🔸
+/** 한 줄의 「내 말」 글자·숫자 하한 · 한 줄 글자 수 상한 */
+export const REASON_MIN = 5;
+export const REASON_MAX = 60;
+/** 한 줄 머리말 */
+export const REASON_HEAD = '또,';
+const REASON_ID_RE = /^R\d{1,3}$/;
+/** 주제 N## → 내 이유 카드 R## */
+export const reasonCardId = (topicId) => `R${String(topicId).slice(1)}`;
+/** 카드 R## → 주제 N## ('' = 내 이유 카드가 아님) */
+export const reasonTopicId = (cardId) => (REASON_ID_RE.test(String(cardId)) ? `N${String(cardId).slice(1)}` : '');
+
+/** 한 줄 다듬기 — 공백 정리 · 아이가 머리말 「또,」를 다시 쓴 것은 한 번만(「또래」 같은 낱말은 그대로) */
+export function reasonLine(line) {
+  return normText(line).replace(/^또\s*,\s*|^또\s+/u, '').trim();
+}
+/** 글에 붙일 한 줄 — 끝에 마침표·물음표가 없으면 마침표 */
+export function reasonTail(line) {
+  const l = reasonLine(line);
+  return `${l}${ENDS.test(l) ? '' : '.'}`;
+}
+/** 보낼 수 있나 (순수) — { ok, n, why: 'short' | 'long' } · n = 한 줄 글자 수(화면엔 숫자를 안 띄운다) */
+export function reasonCheck(line) {
+  const t = reasonLine(line);
+  const n = [...t].length;
+  if (n > REASON_MAX) return { ok: false, n, why: 'long' };
+  if (ownChars(t) < REASON_MIN) return { ok: false, n, why: 'short' };
+  return { ok: true, n };
+}
+/** 보낼 글 (순수) — 판에서 고른 의견 문장 + 「또, 한 줄」 */
+export function composeReason(t, side, line) {
+  return `${t[side].claim} ${REASON_HEAD} ${reasonTail(line)}`;
+}
+/** 보내기 결과 말 (순수 · 아이 화면) */
+export function reasonSendWhy(r) {
+  const again = '저장을 못 했어요 — 한 번 더 눌러 주세요 (쓴 글은 그대로 있어요)';
+  if (!r) return again;
+  return ({
+    short: '조금만 더 써 볼까요? 왜 그렇게 생각하는지요',
+    own: '내 의견을 돕는 까닭을 내 말로 써 볼까요?', // 의견 문장을 그대로 옮기면 내 말이 없다(korwrite.writeCheck — 🔍 Codex 160차 #4: 「저장을 못 했어요」로 떠서 다시 눌러도 안 됐다)
+    long: '한 줄로 조금 줄여 볼까요?',
+    pending: '이 주제 내 이유는 벌써 보냈어요 — 아빠 답장을 기다려요',
+    done: '✅ 이 주제 내 이유는 벌써 끝났어요',
+    unplayed: '판을 끝낸 주제에만 쓸 수 있어요',
+    unknown: '지금은 보낼 수 없어요',
+  })[r.why] || again;
+}
+
+/**
+ * 💡 내 이유 카드 (순수) — 쓸 수 있는 주제마다 { id: R##, topic: N##, icon, title: 주제 물음, write } · 채점 기준(reason)이 깨졌으면 [] (칸을 안 띄운다)
+ * frames = 두 편의 의견 문장 — 글 앞에 붙는 의견을 「내 말」로 세지 않게(korwrite.ownLen) · 「또」는 한 글자라 뺀다(ESSAY_FRAMES와 같은 까닭)
+ */
+export function nonsulReasonCards(json) {
+  const w = isObj(json) ? json.reason : null;
+  if (checkNonsulWrite(w, 'reason').length) return [];
+  const base = { v: w.v, q: w.q, rubric: w.rubric, past: Array.isArray(w.past) ? w.past : [] };
+  return allTopics(json).map((t) => ({ id: reasonCardId(t.id), topic: t.id, icon: t.icon, title: t.q, write: { ...base, frames: [t.yes.claim, t.no.claim] } }));
+}
+
+/**
+ * 💡 한 줄 보내기 (한 트랜잭션 — xp.nonsulReasonAdd) — 판을 끝낸 주제만(그 주제 칸이 저장돼 있어야) ·
+ * 나머지는 ✍️ 글 보내기와 같다(writeAddRule — 답장 기다리는 글 하나 · ✅ 받은 카드는 끝 · 처음 보낸 글 💰5)
+ * why: 'unknown'(주제·편이 없음 · 카드 없음) · 'unplayed'(판을 안 끝낸 주제) · 'short' · 'long' · 'pending' · 'done'
+ */
+export function reasonAddRule(profile, t, side, line, now, cards) {
+  if (!isObj(t) || !ID_RE.test(String(t.id)) || !SIDES.includes(side) || !isObj(t[side]) || !str(t[side].claim)) return { ok: false, why: 'unknown' };
+  if (!own(wordsOf(profile.nonsul), t.id)) return { ok: false, why: 'unplayed' };
+  const chk = reasonCheck(line);
+  if (!chk.ok) return { ok: false, why: chk.why, n: chk.n };
+  return writeAddRule(profile, reasonCardId(t.id), composeReason(t, side, line), now, cards);
+}
+
+/** 📤 국어 요약 🖊️ 절의 내 이유 줄 (순수 · 아빠 화면) */
+export function reasonReport(writes) {
+  const w = writesOf(writes);
+  const ids = Object.keys(w).filter((id) => REASON_ID_RE.test(id) && w[id].list.length);
+  const entries = ids.flatMap((id) => w[id].list);
+  if (!entries.length) return '💡 내 이유 한 줄: (아직 보낸 줄 없음)';
+  const ok = ids.filter((id) => cardWriteState(w, id).done).length;
+  return `💡 내 이유 한 줄: 보낸 줄 ${entries.length}개 (주제 ${ids.length}개) · 답장 받은 줄 ${entries.filter((e) => e.grade).length}개 · 답장 기다리는 줄 ${entries.filter((e) => !e.grade).length}개 · ✅ 주제 ${ok}개`;
 }

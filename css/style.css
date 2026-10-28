@@ -3905,6 +3905,17 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .ns-wpreview { line-height: 1.7; word-break: keep-all; }
 .ns-wpreview.is-empty .kor-wbody { color: var(--muted); }
 .ns-write [tabindex="-1"]:focus { outline: none; } /* 쓰기 화면을 열 때 제목으로 옮긴 포커스(읽어 주기용) — 테두리는 안 띄운다 */
+/* 💡 내 이유 한 줄 (v355) — 판 끝 「내가 만든 글」 아래 · 머리말 「또,」 + 한 줄 · 답장 뒤 「이 주제 다시 해 보기」 */
+.ns-reason { width: 100%; box-sizing: border-box; display: grid; gap: 8px; text-align: left; background: #f5f8ff; border: 2px dashed var(--primary); border-radius: 12px; padding: 10px 12px; }
+.ns-reason-h { margin: 0; font-weight: 800; line-height: 1.5; word-break: keep-all; }
+.ns-reason-line { grid-template-columns: 2.4em minmax(0, 1fr); align-items: center; }
+.ns-reason-line .ns-whead { padding-top: 0; }
+.ns-reason-input { min-height: 46px; line-height: 1.5; padding: 8px 12px; background: var(--kor-paper); } /* 한 줄 칸 — 공책 줄(kor-wtext 배경)은 뺀다 */
+.ns-reason-send { justify-self: stretch; min-height: 48px; }
+.ns-reason-gain { margin: 0; color: var(--muted); line-height: 1.5; word-break: keep-all; }
+.ns-reason-sent { margin: 0; font-weight: 700; line-height: 1.6; word-break: keep-all; }
+.ns-reason .kor-wmsg:empty { display: none; }
+.ns-reason-again { display: grid; gap: 8px; }
 
 /* 🎮 게임기 미니 게임 (v307) — 게임기 화면(gameview.js) · 🕳️ 디그다 잡기(gamedig.js) · 움직이는 것은 transform·opacity만(구형 태블릿) */
 .gm { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 65; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgba(15, 23, 42, 0.78); }

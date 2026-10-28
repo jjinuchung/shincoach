@@ -8,7 +8,7 @@
 import { korWritesMap, korWriteAdd, korWriteRead, korWriteApply } from './xp.js';
 import { cardWriteState, unreadReplies, replyStats, rowsOfFams, writeCheck, textLen, ownLen, questionOf, GRADES, WRITE_MIN, WRITE_MAX, WRITE_COINS, FRAME_GAP, OWN_MIN } from './korwrite.js';
 import { circled, lineCount, validCards } from './korean.js';
-import { nonsulWriteCards } from './nonsul.js';
+import { nonsulWriteCards, nonsulReasonCards } from './nonsul.js';
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -397,6 +397,7 @@ export function renderReplyView(cardId, ctx) {
 }
 
 // ── 서술형 카드 — 📚 국어 카드(reading.json) + 🖊️ 논술 주제(nonsul.json) (v304: 같은 장부·같은 답장 파일) ──
+// 논술 원고 하나에서 ✍️ 짧은 글 카드 N##와 💡 내 이유 카드 R##(v355)를 함께 낸다 — 받은 카드의 머리 글자가 곧 fams
 const famCache = { K: null, N: null };
 const FAM_URL = { K: './coach/korean/reading.json', N: './coach/korean/nonsul.json' };
 /** 한 원고의 카드 — 받으면 이 기기 메모리에 두고 다시 쓴다 · 못 받으면 null(다음에 다시) */
@@ -406,7 +407,7 @@ async function famCards(fam) {
     const res = await fetch(FAM_URL[fam]);
     if (!res.ok) throw new Error(String(res.status));
     const json = await res.json();
-    const cards = fam === 'K' ? validCards(json) : nonsulWriteCards(json);
+    const cards = fam === 'K' ? validCards(json) : [...nonsulWriteCards(json), ...nonsulReasonCards(json)];
     if (!cards.length) return null;
     famCache[fam] = cards;
     return cards;
@@ -424,7 +425,7 @@ export async function writeCardsNow(given) {
   for (const fam of ['K', 'N']) {
     if (fams.has(fam)) continue;
     const more = await famCards(fam);
-    if (more) { cards.push(...more); fams.add(fam); }
+    if (more) { cards.push(...more); for (const c of more) fams.add(c.id[0]); } // N 원고면 N·R (v355)
   }
   return { cards, fams };
 }
@@ -453,13 +454,18 @@ export function syncWrites(given) {
   })().catch(() => ({ ok: false })).finally(() => { syncing = null; });
   return syncing;
 }
-/** 답장이 붙었을 때 도감 위 한 줄 (순수) — fam('K'·'N')을 주면 그 원고의 답장만 세고 보상도 그만큼 (국어 화면에 논술 답장 수가 섞이지 않게, v304) */
+/**
+ * 답장이 붙었을 때 도감 위 한 줄 (순수) — fam('K' · 'NR' — 머리 글자들)을 주면 그 원고의 답장만 세고 보상도 그만큼 (국어 화면에 논술 답장 수가 섞이지 않게, v304) ·
+ * 💡 내 이유 ✅의 🎯 논술 잡기도 (v355)
+ */
 export function appliedLine(r, fam) {
   if (!r || !r.ok || !r.applied || !r.applied.length) return '';
-  const mine = fam ? r.applied.filter((a) => a && String(a.card).startsWith(fam)) : r.applied;
+  const mine = fam ? r.applied.filter((a) => { const f = String(a && a.card)[0]; return !!a && !!f && fam.includes(f); }) : r.applied;
   if (!mine.length) return '';
-  const coins = fam ? mine.reduce((s, a) => s + (Number(a.coins) || 0), 0) : r.coins;
-  const stone = fam ? mine.reduce((s, a) => s + (Number(a.stone) || 0), 0) : r.stone;
-  const gain = [coins ? `💰 +${coins}` : '', stone ? `🟩 국어스톤 +${stone}` : ''].filter(Boolean).join(' · ');
+  const sum = (k) => mine.reduce((s, a) => s + (Number(a[k]) || 0), 0);
+  const coins = fam ? sum('coins') : r.coins;
+  const stone = fam ? sum('stone') : r.stone;
+  const throws = fam ? sum('throw') : r.throws;
+  const gain = [coins ? `💰 +${coins}` : '', stone ? `🟩 국어스톤 +${stone}` : '', throws ? `🎯 논술 포켓몬 잡기 ${throws}번` : ''].filter(Boolean).join(' · ');
   return `📬 아빠 답장이 ${mine.length}개 왔어요${gain ? ` — ${gain}` : ''}`;
 }

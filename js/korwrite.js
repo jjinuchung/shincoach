@@ -27,7 +27,9 @@
 //  · 판이 달라 안 붙은 답장은 📊 받기 줄에 "판 다름 N"(replyStats.stale)
 // 🖊️ 논술 짧은 글 (v304, 2026-10-20 — 아버님 물음 넷 모두 추천안): 같은 장부·같은 왕복·같은 보상 — 카드 열쇠에 논술 주제 N## ·
 //  카드마다 글 길이 상한(write.max — 논술은 머리말이 들어가 300자) · 카드 목록은 부르는 쪽이 국어 카드 + 논술 주제(nonsul.nonsulWriteCards)를 함께
-import { dayNum, KOR_STONE, WRITE_MIN, WRITE_MAX, FRAME_GAP } from './korean.js';
+// 💡 논술 내 이유 한 줄 (v355, 2026-10-28 아버님 「추천대로」): 같은 장부·같은 왕복 — 카드 열쇠 R##(그 주제 N##의 번호 · nonsul.nonsulReasonCards) ·
+//  보내면 💰5는 그대로(처음 한 번) · 답장 💰는 없고 ✅면 🟩 대신 🎯 논술 포켓몬 잡기 1번(profile.nonsulThrow — paid.stone 칸이 「✅ 보상 준 날」)
+import { dayNum, KOR_STONE, WRITE_MIN, WRITE_MAX, FRAME_GAP, throwsOf } from './korean.js';
 
 /** 글자 수(공백 정리 뒤) 10~200 — 짧은 한 문장 "엄마가 걱정하실까 봐요."도 받는다 (값은 korean.js — 원고 검사도 같은 값) */
 export { WRITE_MIN, WRITE_MAX, FRAME_GAP };
@@ -38,8 +40,10 @@ export function writeMaxOf(write) {
   const m = isObj(write) ? Math.floor(Number(write.max)) : 0;
   return m >= WRITE_MAX && m <= WRITE_MAX_HI ? m : WRITE_MAX;
 }
-/** 서술형 카드 열쇠 — 📚 국어 카드 K## · 🖊️ 논술 주제 N## (v304) */
-export const WRITE_CARD_RE = /^[KN]\d{1,3}$/;
+/** 서술형 카드 열쇠 — 📚 국어 카드 K## · 🖊️ 논술 주제 N## (v304) · 💡 논술 내 이유 R## (v355) */
+export const WRITE_CARD_RE = /^[KNR]\d{1,3}$/;
+/** 💡 내 이유 카드인가 — 답장 보상이 다르다(💰 없음 · ✅면 🎯) */
+const isReasonCard = (id) => String(id).startsWith('R');
 /** 답장 글 길이 상한 */
 export const REPLY_MAX = 600;
 /** 답장 파일 줄 수 상한 — 넘으면 하나도 받지 않는다(잘라 받지 않는다 — 잘린 뒤쪽의 "같은 글에 다른 답장"을 못 보니까, Codex 52차 #5) */
@@ -57,7 +61,7 @@ export const GRADES = {
   near: { icon: '🔸', ko: '거의 다 왔어요', rule: '뜻은 맞게 이해했지만 must 가운데 하나가 빠졌거나 근거가 약하다 · 까닭의 중심은 글에 맞는데 곁들인 말이 글에 없다' },
   again: { icon: '🔁', ko: '다시 써 볼까요', rule: '묻는 것과 다른 답이거나, 까닭의 중심이 글과 어긋나거나(지어내기·거꾸로), 생각이 드러나지 않는다' },
 };
-const CARDS_MAX = 100;
+const CARDS_MAX = 400; // 국어 K## + 논술 N## + 내 이유 R## (v355 — 100이면 세 원고를 합쳐 넘을 수 있어 뒤 카드가 조용히 빠졌다)
 const RAW_LIST_MAX = 200; // 깨진 파일 막이 — 보통은 닿지 않는다(답장 받은 글 KEEP_DONE개 + 사본마다 기다리는 글 하나)
 const RAW_TEXT_MAX = WRITE_MAX_HI * 2; // 저장된 글을 고쳐 읽을 때의 상한 (붙여 넣은 긴 글이 저장소를 키우지 않게)
 
@@ -339,7 +343,8 @@ export function replyStats(writes, list, cards) {
 
 /**
  * 📬 답장 붙이기 (한 트랜잭션) — 그 글(카드, id)이 있고 아직 답장이 없을 때만 · 보상은 카드마다 평생 한도까지 모자란 만큼
- * @returns {{ok:boolean, why?:string, applied?:Array<{card,at,grade,coins,stone}>, coins?:number, stone?:number}} why 'none' 붙일 것 없음
+ * 💡 내 이유 카드(R##, v355)는 답장 💰가 없고, ✅면 카드마다 한 번 🎯 논술 포켓몬 잡기(nonsulThrow) — 🟩는 안 준다
+ * @returns {{ok:boolean, why?:string, applied?:Array<{card,at,grade,coins,stone,throw}>, coins?:number, stone?:number, throws?:number}} why 'none' 붙일 것 없음
  */
 export function writeReplyRule(profile, replies, now, cards) {
   const { good } = checkReplies(replies, cards);
@@ -347,6 +352,7 @@ export function writeReplyRule(profile, replies, now, cards) {
   const applied = [];
   let coins = 0;
   let stone = 0;
+  let throws = 0;
   const day = dayNum(now) || 1;
   for (const r of good) {
     const w = all[r.card];
@@ -356,12 +362,17 @@ export function writeReplyRule(profile, replies, now, cards) {
     e.reply = r.text;
     e.rAt = cnt(now) || 1;
     e.read = false;
-    const add = Math.max(0, (r.grade === 'again' ? 0 : WRITE_COINS[r.grade]) - w.paid.coins);
+    const reason = isReasonCard(r.card);
+    const add = reason ? 0 : Math.max(0, (r.grade === 'again' ? 0 : WRITE_COINS[r.grade]) - w.paid.coins);
     w.paid.coins += add;
     coins += add;
     let st = 0;
-    if (r.grade === 'ok' && !w.paid.stone) { w.paid.stone = day; st = 1; stone += 1; }
-    applied.push({ card: r.card, id: e.id, at: e.at, grade: r.grade, coins: add, stone: st });
+    let th = 0;
+    if (r.grade === 'ok' && !w.paid.stone) {
+      w.paid.stone = day; // 내 이유 카드는 「✅ 보상(🎯) 준 날」 — 병합은 이른 날(두 사본이 같이 받아도 한 번)
+      if (reason) { th = 1; throws += 1; } else { st = 1; stone += 1; }
+    }
+    applied.push({ card: r.card, id: e.id, at: e.at, grade: r.grade, coins: add, stone: st, ...(reason ? { throw: th } : {}) });
   }
   if (!applied.length) return { ok: false, why: 'none' };
   for (const id of Object.keys(all)) all[id].list = tidy(all[id].list);
@@ -371,7 +382,30 @@ export function writeReplyRule(profile, replies, now, cards) {
     profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   }
   if (stone) profile.items = { ...(profile.items || {}), [KOR_STONE]: Math.min(Number.MAX_SAFE_INTEGER, (Math.floor(Number((profile.items || {})[KOR_STONE])) || 0) + stone) };
-  return { ok: true, applied, coins, stone };
+  if (throws) {
+    const tw = throwsOf(profile.nonsulThrow); // 🎯 논술 잡기 기회 — 판 끝 기회와 같은 세 카운터(nonsul.nonsulRule)
+    tw.earned = Math.min(Number.MAX_SAFE_INTEGER, tw.earned + throws);
+    profile.nonsulThrow = tw;
+  }
+  return { ok: true, applied, coins, stone, throws };
+}
+
+/** 💡 ✅ 보상(🎯)을 받은 내 이유 카드 수 (순수) — 그 🎯는 같은 트랜잭션에서 nonsulThrow.earned에 들어갔다 */
+export function reasonPaidCount(writes) {
+  const w = writesOf(writes);
+  return Object.keys(w).filter((id) => isReasonCard(id) && w[id].paid.stone > 0).length;
+}
+/**
+ * 💡 프로필 병합 뒤 🎯 맞추기 (순수, v355 — 🔍 Codex 160차 #1) — 잡기 기회는 카운터마다 큰 쪽이라, 갈라진 두 사본이 서로 다른 주제의 ✅로
+ * 받은 🎯가 하나로 줄었다(✅ 표시는 둘 다 남아 다시 받지도 못한다) → 합친 장부의 ✅ 카드 수가 두 사본 중 많은 쪽보다 크면 그만큼만 earned에 더한다 ·
+ * 같은 주제는 한 번(합집합) · 넘치게 주지 않는다 · 다시 합쳐도 그대로(합친 쪽이 이미 많은 쪽)
+ * @param {object} throws 카운터마다 큰 쪽으로 합친 nonsulThrow · a·b 두 사본의 korWrites · merged 합친 korWrites
+ */
+export function reasonThrowsFix(throws, a, b, merged) {
+  const t = throwsOf(throws);
+  const add = Math.max(0, reasonPaidCount(merged) - Math.max(reasonPaidCount(a), reasonPaidCount(b)));
+  if (add) t.earned = Math.min(Number.MAX_SAFE_INTEGER, t.earned + add);
+  return t;
 }
 
 /** 📬 답장을 읽었다 (그 글의 id) — why 'none'(그 글이 없거나 답장이 없음 · 이미 읽음) · now = 읽은 시각(v314 rdAt — 📤 usage/feedback.md) */

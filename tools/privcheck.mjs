@@ -6,7 +6,7 @@
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { checkReplies } from '../js/korwrite.js';
 import { validCards } from '../js/korean.js';
-import { nonsulWriteCards } from '../js/nonsul.js';
+import { nonsulWriteCards, nonsulReasonCards } from '../js/nonsul.js';
 import { PRIVATE_MAX_BYTES } from '../js/upload.js';
 
 export const PRIVATE_FILES = ['essay/fixes.json', 'math/replies.json', 'korean/replies.json'];
@@ -38,9 +38,10 @@ export function checkPrivateDir(dir, figureSvg) {
     if (!Array.isArray(list)) { errors.push(`내용 오류: ${f}: 배열이 아님`); continue; }
     if (rel === 'korean/replies.json') {
       // ✍️ 국어 서술형 답장 — [{ card, id, at, v, grade, text }] · 앱이 받을 때와 같은 검사(korwrite.checkReplies) — 서술형 있는 카드·id·at·판(v)·등급·길이·같은 글에 다른 답장·줄 수 상한 (v237 · id v239 · v v243)
-      // 🖊️ 논술 짧은 글(v304, N##)도 같은 파일 — 논술 주제 카드를 함께
+      // 🖊️ 논술 짧은 글(v304, N##)·💡 내 이유(v355, R##)도 같은 파일 — 논술 주제 카드를 함께
       const src = (p) => JSON.parse(readFileSync(new URL(`../coach/korean/${p}`, import.meta.url), 'utf8'));
-      const cards = [...validCards(src('reading.json')), ...nonsulWriteCards(src('nonsul.json'))];
+      const nj = src('nonsul.json');
+      const cards = [...validCards(src('reading.json')), ...nonsulWriteCards(nj), ...nonsulReasonCards(nj)];
       for (const b of checkReplies(list, cards).bad) errors.push(`내용 오류: ${b.i < 0 ? f : `${f}[${b.i}]`}: ${b.why}`);
       continue;
     }

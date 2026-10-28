@@ -5,11 +5,13 @@
 // 아이 화면에는 셈·진행 수를 띄우지 않는다 (2026-10-15)
 // ✍️ 짧은 글 (v304): 판을 끝낸 주제 — 판 끝 「✍️ 이번엔 내 말로 써 볼까요?」 · 첫 화면 「✍️ 내 말로 짧은 글 쓰기」 목록 · 📬 아빠 답장 띠 ·
 //   쓰기 화면(S.w)은 korwriteview.writeBoxEl에 칸마다 머리말 채우기(nonsulwriteview.essayFormEl)를 끼운다 · 들어올 때 비공개 저장소 답장 받기
-import { allTopics, planTopic, dealTopic, essayParts, nonsulFinishText, nonsulTodayLine, ORDER_HINTS, nonsulWriteCards, essayTopics, readingTopicOf, isSolved } from './nonsul.js';
+// 💡 내 이유 한 줄 (v355): 판 끝 「내가 만든 글」 아래 「또, …」 칸(reasonEl — 저장된 판 끝에만 · 다시 그려도 쓰던 줄·커서를 지킨다) ·
+//   답장은 같은 📬 띠 → 같은 쓰기 화면(S.w = R##) — 🔸·🔁면 「이 주제 다시 해 보기」(편이 판에서 정해지니까 한 줄은 판 끝에서만 쓴다)
+import { allTopics, planTopic, dealTopic, essayParts, nonsulFinishText, nonsulTodayLine, ORDER_HINTS, nonsulWriteCards, essayTopics, readingTopicOf, isSolved, nonsulReasonCards, reasonCardId, reasonTopicId, reasonCheck, reasonTail, reasonSendWhy, REASON_HEAD, REASON_MAX } from './nonsul.js';
 import { circled } from './korean.js';
 import { wordsToday } from './korwords.js';
-import { nonsulFinish, nonsulMap, nonsulDayMap, nonsulTakeThrow, nonsulGiveBackThrow, nonsulThrowsLeft, profileReady, getLevelInfo, isTired, getLook, inventory, catchAttempt, korWritesMap } from './xp.js';
-import { cardWriteState, unreadReplies } from './korwrite.js';
+import { nonsulFinish, nonsulMap, nonsulDayMap, nonsulTakeThrow, nonsulGiveBackThrow, nonsulThrowsLeft, profileReady, getLevelInfo, isTired, getLook, inventory, catchAttempt, korWritesMap, nonsulReasonAdd } from './xp.js';
+import { cardWriteState, unreadReplies, WRITE_COINS } from './korwrite.js';
 import { writeBoxEl, syncWrites, appliedLine } from './korwriteview.js';
 import { essayFormEl, ESSAY_WORDS } from './nonsulwriteview.js';
 import { loadCharacters, downloadCharacters, forSubject, isUnlocked, pickCharacters } from './pokemon.js';
@@ -41,7 +43,8 @@ const ding = (ok) => { try { sfxUnlock(); if (ok) sfx.ding(); else sfx.wrong(); 
 // data: 원고 · list: 쓸 수 있는 주제 · r: 푸는 판(화면을 떠나도 남아 돌아오면 이어서) · 잡기 상태는 국어 화면과 같은 꼴
 // wcards: ✍️ 짧은 글 카드(채점 기준이 깨졌으면 [] — 짧은 글을 안 연다) · w: 쓰기 화면의 주제 id(돌아오면 그대로) · writeNote: 답장이 붙었다는 한 줄(한 번)
 // stories: 📖 독서 논술 주제의 국어 글(카드 id → { title, lines }, v316 — 못 받으면 한 줄 소개만)
-const S = { data: null, list: [], wcards: [], loadErr: '', r: null, w: '', writeNote: '', catching: false, catchState: null, catchMsg: '', wired: false, charBusy: false, stories: null };
+// rcards: 💡 내 이유 카드 R##(v355 — 채점 기준이 깨졌으면 [] · 칸을 안 띄운다)
+const S = { data: null, list: [], wcards: [], rcards: [], loadErr: '', r: null, w: '', writeNote: '', catching: false, catchState: null, catchMsg: '', wired: false, charBusy: false, stories: null };
 const STEP_NAMES = ['① 내 의견', '② 이유', '③ 반대 의견', '④ 글 순서'];
 const STEP_OF = { side: 0, reasons: 1, counter: 2, order: 3, done: 4 };
 
@@ -63,6 +66,7 @@ async function loadData() {
     S.data = await res.json();
     S.list = allTopics(S.data);
     S.wcards = nonsulWriteCards(S.data);
+    S.rcards = nonsulReasonCards(S.data);
     S.loadErr = S.list.length ? '' : '주제를 읽지 못했어요';
   } catch {
     S.loadErr = '주제를 받지 못했어요 — 인터넷이 되는 곳에서 다시 들어와 주세요';
@@ -140,12 +144,30 @@ function renderHome() {
 // ───────────────────── ✍️ 짧은 글 (v304) ─────────────────────
 
 const wcardOf = (id) => S.wcards.find((c) => c.id === id) || null;
+const rcardOf = (id) => S.rcards.find((c) => c.id === id) || null;
 /** korwriteview.writeBoxEl에 건네는 것 — 쓰기 칸은 칸마다 머리말 채우기, 말은 논술 말 */
 const writeCtx = { cards: () => S.wcards, form: essayFormEl, words: ESSAY_WORDS };
+/** 💡 내 이유 쓰기 화면의 말 (v355) */
+const REASON_WORDS = {
+  label: '내 이유 한 줄',
+  head: '💡 내 이유 한 줄',
+  wait: '✉️ 아빠에게 보낸 이유예요 — 답장을 기다리고 있어요. 다른 주제를 해도 돼요.',
+  done: '✅ 이 주제 내 이유는 끝! 잘했어요',
+  where: '🖊️ 논술 첫 화면에',
+};
+/** 💡 🔸·🔁 뒤 「다시 써 보기」 — 한 줄은 판 끝에서만 쓴다(내 의견이 판에서 정해지니까) → 이 주제 판을 다시 */
+function reasonAgainEl(card) {
+  const box = el('div', 'kor-wform ns-reason-again');
+  box.appendChild(el('p', 'ns-whint', '이 주제 판을 한 번 더 끝내면 「또,」 칸이 다시 나와요.'));
+  const id = reasonTopicId(card.id);
+  if (byId(id)) box.appendChild(btn('btn btn-primary ns-reason-replay', '🖊️ 이 주제 다시 해 보기', () => guardStart('korean', () => startRound(false, id))));
+  return box;
+}
+const reasonCtx = { cards: () => S.rcards, form: reasonAgainEl, words: REASON_WORDS };
 
-/** 📬 안 읽은 논술 글 답장 — [열어 보기] (첫 것부터 · 셈 없이) */
+/** 📬 안 읽은 논술 글 답장(✍️ 짧은 글 · 💡 내 이유) — [열어 보기] (첫 것부터 · 셈 없이) */
 function replyBannerEl() {
-  const list = unreadReplies(korWritesMap()).filter((u) => !!wcardOf(u.card));
+  const list = unreadReplies(korWritesMap()).filter((u) => !!wcardOf(u.card) || !!rcardOf(u.card));
   if (!list.length) return null;
   // ⏳ 쓰기 화면은 어디서 열든 국어 시간을 본다 — 띠로 들어가 「다시 써 보기」까지 갈 수 있다(Codex 110차 #2)
   return btn('btn btn-primary kor-wbanner ns-wbanner', '📬 아빠가 봐 준 논술 글이 있어요 — 열어 보기', () => guardStart('korean', () => openWrite(list[0].card)));
@@ -180,9 +202,9 @@ function writeLinkEl(id) {
   return box;
 }
 
-/** 쓰기 화면 열기 — 판은 이미 저장됐거나(판 끝) 없다(첫 화면) */
+/** 쓰기 화면 열기 — 판은 이미 저장됐거나(판 끝) 없다(첫 화면) · id = ✍️ N## 또는 💡 R## */
 function openWrite(id) {
-  if (!wcardOf(id)) return;
+  if (!wcardOf(id) && !rcardOf(id)) return;
   S.r = null;
   S.w = id;
   renderWrite();
@@ -195,8 +217,9 @@ function closeWrite() {
 }
 function renderWrite() {
   const m = mainEl();
-  const card = wcardOf(S.w);
-  const t = byId(S.w);
+  const rc = rcardOf(S.w); // 💡 내 이유 (v355)
+  const card = rc || wcardOf(S.w);
+  const t = byId(rc ? reasonTopicId(S.w) : S.w);
   if (!m) return;
   if (!card || !t) { S.w = ''; renderHome(); return; }
   m.innerHTML = '';
@@ -206,7 +229,7 @@ function renderWrite() {
   head.appendChild(el('span', 'ns-q-icon', t.icon));
   head.appendChild(el('h2', 'ns-q-text', t.q));
   sec.appendChild(head);
-  sec.appendChild(writeBoxEl(card, writeCtx));
+  sec.appendChild(writeBoxEl(card, rc ? reasonCtx : writeCtx));
   m.appendChild(sec);
   const h = sec.querySelector('.kor-wgrade') || sec.querySelector('.kor-wh');
   if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
@@ -239,6 +262,9 @@ function renderRound() {
   const m = mainEl();
   if (!m) return;
   if (!r) { renderHome(); return; }
+  // 💡 한 줄을 쓰는 중에 판 끝이 다시 그려지면(🔥·🥚·⚔️·🎯가 늦게 와서) 칸·커서를 되살린다 — 쓰던 글은 r.reasonText에 (v355)
+  const ae = typeof document !== 'undefined' ? document.activeElement : null;
+  const typing = !!(ae && ae.classList && ae.classList.contains('ns-reason-input'));
   m.innerHTML = '';
   const card = el('section', 'ns-card ns-round');
   const head = el('div', 'ns-q');
@@ -253,6 +279,10 @@ function renderRound() {
   else if (r.step === 'order') orderEl(card, r);
   else card.appendChild(finishEl(r));
   m.appendChild(card);
+  if (typing) {
+    const inp = m.querySelector('.ns-reason-input');
+    if (inp) { inp.focus({ preventScroll: true }); const n = inp.value.length; try { inp.setSelectionRange(n, n); } catch { /* 고를 수 없는 칸 */ } }
+  }
   if (r.step !== 'done') {
     // 그만두기 — 판을 버린다(저장 안 함 · 손해 없음)
     m.appendChild(btn('btn ns-quit', '← 그만하고 처음으로', () => { if (korRocketPending('nonsul')) korRocketClear(); S.r = null; renderHome(); window.scrollTo(0, 0); }));
@@ -424,13 +454,88 @@ async function finishRound() {
   }
 }
 
+/**
+ * 💡 판 끝 — 내 이유 한 줄 (v355) · 저장된 판 끝에만(finishEl이 res.ok일 때) · ⭐ 연습 판도 · 셈 없이
+ * 보냈으면 한 줄 · 이 주제 내 이유에 안 읽은 답장이 있으면 [열어 보기] · 답장 기다림·✅ 끝이면 칸을 안 띄운다(다른 창이 먼저 보냈다는 말만)
+ * 보내는 중(r.reasonBusy)·결과 말(r.reasonMsg)은 판에 둔다 — 그 사이 🔥·🥚가 늦게 와 다시 그려도 새 칸이 잠겨 있고 말이 남게 (🔍 Codex 160차 #2)
+ */
+function reasonEl(r) {
+  const card = rcardOf(reasonCardId(r.id));
+  if (!card || !r.side) return null;
+  const box = el('div', 'ns-reason');
+  if (r.reasonSent) {
+    box.appendChild(el('p', 'ns-reason-sent', `✉️ 보냈어요!${r.reasonSent.coins ? ` 💰 +${r.reasonSent.coins}` : ''} 아빠 답장이 오면 🖊️ 논술 첫 화면에 📬가 떠요.`));
+    return box;
+  }
+  const st = cardWriteState(korWritesMap(), card.id);
+  if (st.unread) {
+    box.appendChild(btn('btn ns-wlink-btn', '📬 이 주제 내 이유에 아빠 답장이 왔어요', () => guardStart('korean', () => openWrite(card.id))));
+    return box;
+  }
+  if (!st.canWrite && !r.reasonBusy) {
+    if (!r.reasonMsg) return null;
+    box.appendChild(el('p', 'kor-wmsg', r.reasonMsg)); // 다른 창이 먼저 보냈다 · ✅ 끝 — 칸 대신 까닭 한 줄
+    return box;
+  }
+  box.appendChild(el('p', 'ns-reason-h', '💡 내 이유를 하나 더 써 볼까요? (안 써도 돼요)'));
+  const line = el('div', 'ns-wline ns-reason-line');
+  const head = el('span', 'ns-whead', REASON_HEAD);
+  head.setAttribute('aria-hidden', 'true');
+  line.appendChild(head);
+  const inp = el('input', 'kor-wtext ns-reason-input');
+  inp.type = 'text';
+  inp.maxLength = REASON_MAX + 20; // 넘치면 보낼 때 「줄여 볼까요?」 — 붙여 넣은 긴 글만 막는다
+  inp.placeholder = '… 때문이에요.';
+  inp.autocomplete = 'off';
+  inp.value = r.reasonText || '';
+  inp.setAttribute('aria-label', '내 이유 한 줄 — 「또,」 다음을 써요');
+  line.appendChild(inp);
+  box.appendChild(line);
+  const busy = !!r.reasonBusy;
+  inp.readOnly = busy; // 보내는 중에 다시 그려진 칸도 잠근다 — 그 사이 덧쓴 글이 저장 뒤 지워지지 않게
+  const send = btn('btn btn-primary ns-reason-send', busy ? '보내는 중…' : '✉️ 아빠에게 보내기', async () => {
+    if (r.reasonBusy) return;
+    const value = inp.value; // 누른 순간의 글 — 보내는 글·글에 붙는 줄이 같게
+    const chk = reasonCheck(value);
+    if (!chk.ok) { r.reasonMsg = reasonSendWhy(chk); msg.textContent = r.reasonMsg; return; }
+    r.reasonBusy = true;
+    r.reasonMsg = '';
+    msg.textContent = '';
+    send.disabled = true;
+    inp.readOnly = true;
+    send.textContent = '보내는 중…';
+    let res;
+    try { res = await nonsulReasonAdd(r.t, r.side, value, S.rcards); } catch { res = null; }
+    r.reasonBusy = false;
+    if (res && res.ok) {
+      r.reasonSent = { coins: res.coins || 0, line: reasonTail(value) };
+      r.reasonText = '';
+      try { sfx.success(); } catch { /* 소리는 없어도 */ }
+      // 📤 바로 올린다 — 아빠가 "올라온 거 봐 줘" 할 때 Claude가 볼 수 있게 (✍️ 짧은 글과 같다)
+      import('./upload.js').then((m) => m.sendReport({ force: true })).catch(() => {});
+    } else r.reasonMsg = reasonSendWhy(res); // 다른 창이 먼저 보냈으면(pending·done) 다시 그릴 때 칸 대신 이 말만
+    if (S.r === r && nonsulVisible()) renderRound(); // 지금 붙어 있는 칸으로 다시 그린다(옛 칸을 고치지 않는다)
+  });
+  send.disabled = busy;
+  box.appendChild(send);
+  box.appendChild(el('p', 'ns-note ns-reason-gain', st.paid.first ? '아빠가 ✅ 하면 🎯 논술 포켓몬 잡기!' : `보내면 💰${WRITE_COINS.first} · 아빠가 ✅ 하면 🎯 논술 포켓몬 잡기!`));
+  const msg = el('p', 'kor-wmsg', r.reasonMsg || '');
+  msg.setAttribute('role', 'status');
+  box.appendChild(msg);
+  inp.addEventListener('input', () => { r.reasonText = inp.value; r.reasonMsg = ''; msg.textContent = ''; });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send.click(); } }); // 한글 조합 중 Enter는 글자 끝내기
+  return box;
+}
+
 function finishEl(r) {
   const box = el('div', 'ns-done');
   if (r.saving || !r.result) { box.appendChild(el('p', 'ns-done-title', '저장하는 중…')); return box; }
   const res = r.result;
   box.appendChild(el('p', 'ns-done-label', '🖊️ 내가 만든 글'));
   const essay = el('div', 'ns-essay');
-  for (const p of essayParts(r.t, r.side, r.picks, r.counter)) essay.appendChild(el('p', '', p));
+  const parts = essayParts(r.t, r.side, r.picks, r.counter);
+  if (r.reasonSent) parts[1] = `${parts[1]} ${REASON_HEAD} ${r.reasonSent.line}`; // 💡 보낸 내 이유가 이유 줄 끝에 (v355)
+  for (const p of parts) essay.appendChild(el('p', '', p));
   box.appendChild(essay);
   const t = nonsulFinishText(res);
   box.appendChild(el('p', 'ns-done-title', t.title));
@@ -442,6 +547,8 @@ function finishEl(r) {
   if (bl) box.appendChild(el('p', 'ns-done-line kor-bonus', bl));
   const eg = eggLine(r.egg); // 🥚 (v327)
   if (eg) box.appendChild(el('p', 'ns-done-line kor-egg', eg));
+  const rl = res.ok ? reasonEl(r) : null; // 💡 내 이유 한 줄 (v355 · 저장이 된 뒤에만)
+  if (rl) box.appendChild(rl);
   const wl = res.ok ? writeLinkEl(r.id) : null; // ✍️ 이 주제로 짧은 글 (v304 · 저장이 된 뒤에만)
   if (wl) box.appendChild(wl);
   const row = el('div', 'ns-done-btns');
@@ -601,9 +708,9 @@ export async function enterNonsul() {
     if (r && r.t.card && S.stories && S.stories.has(r.t.card) && nonsulVisible() && m && !m.querySelector('.ns-story-text')) renderRound();
   }).catch(() => {});
   try { await profileReady(); } catch { /* 못 읽어도 빈 칸으로 그린다 */ }
-  // 📥 ✍️ 짧은 글 아빠 답장 — 국어와 같은 파일에서 받아 그 글에 한 번만 붙인다(보상도 한 트랜잭션) · 못 받으면 조용히
-  syncWrites(S.wcards).then((r) => {
-    const line = appliedLine(r, 'N');
+  // 📥 ✍️ 짧은 글·💡 내 이유 아빠 답장 — 국어와 같은 파일에서 받아 그 글에 한 번만 붙인다(보상·🎯도 한 트랜잭션) · 못 받으면 조용히
+  syncWrites([...S.wcards, ...S.rcards]).then((r) => {
+    const line = appliedLine(r, 'NR');
     if (!line) return;
     S.writeNote = line;
     if (nonsulVisible() && !S.r && !S.w) renderHome();

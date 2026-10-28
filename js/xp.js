@@ -32,7 +32,7 @@ import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국�
 import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·보상 (순수 — 낱말 칸과 같은 꼴)
 import { matchedOf, korMatchRule } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329, 순수)
 import { dripOf, dripStartRule } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (v320, 순수)
-import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule } from './nonsul.js'; // 🖊️ 논술 칸·보상·잡기 기회 (v303 — 퍼즐과 같은 꼴, 잡기 기회는 따로)
+import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule, reasonAddRule } from './nonsul.js'; // 🖊️ 논술 칸·보상·잡기 기회 (v303 — 퍼즐과 같은 꼴, 잡기 기회는 따로) · 💡 내 이유 한 줄 (v355)
 import { lettersOf, letterStartRule, letterSeenRule, letterSendRule, letterReplyRule, letterReadRule } from './letters.js'; // 📮 포켓몬 편지 (v351 — 순수)
 import { grammarRule, knownOf, seenOf, gMissOf, diagOf, giftOf, rngFrom, videoSeenOf } from './grammar.js'; // 📝 영어 문법 칸·💰·🎁 깜짝 포켓몬 (v348 — 순수 · v349 영상 사이 쪽지 — 진단 칸은 옛 기록 병합에만)
 import { writeAddRule, writeReplyRule, writeReadRule, writesOf } from './korwrite.js'; // ✍️ 국어 서술형 (순수)
@@ -1061,7 +1061,11 @@ export function letterRead(id) {
 export function korWriteAdd(cardId, text, cards) {
   return houseDo((p) => writeAddRule(p, cardId, text, Date.now(), cards));
 }
-/** 📬 비공개 저장소의 답장 붙이기 — 그 글에 한 번만 · 보상은 카드마다 평생 한도까지 (한 트랜잭션) */
+/** 💡 논술 내 이유 한 줄 보내기 (v355) — 한 트랜잭션에서 판을 끝낸 주제인지·답장 기다리는 글이 있는지 저장된 프로필로 다시 보고, 처음이면 💰5 · t = 주제 · side = 판에서 고른 편 · cards = 내 이유 카드 */
+export function nonsulReasonAdd(t, side, line, cards) {
+  return houseDo((p) => reasonAddRule(p, t, side, line, Date.now(), cards));
+}
+/** 📬 비공개 저장소의 답장 붙이기 — 그 글에 한 번만 · 보상은 카드마다 평생 한도까지 · 💡 내 이유 ✅면 🎯 논술 잡기 (한 트랜잭션) */
 export function korWriteApply(replies, cards) {
   return houseDo((p) => writeReplyRule(p, replies, Date.now(), cards));
 }
