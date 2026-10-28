@@ -7548,7 +7548,38 @@
 - 갈라진 두 사본을 합칠 때 하나가 줄어드는 일은 판 끝 🎯·지갑에도 같은 꼴로 있다(지갑은 Codex 52차 「그대로」) — 이번엔 새 💡 🎯만 맞춤
 
 ### TODO (다음 작업)
-- [ ] 아버님 "배포" → feat·docs 커밋 → push → 라이브 확인
+- [x] 아버님 "배포" → feat·docs 커밋 → push → 라이브 확인 · 라이브 확인(10-28 · ed6476f·fd2f32a): sw v355(3번째 확인) · 배포본 13개 커밋과 같음(sw·version·nonsul·nonsulview·korwrite·korwriteview·db·xp·upload·korreport·stats·style·nonsul.json) · 앱 판 v355 · 라이브 채점 기준 reason v1 · 주제 92 (`.context/v355/live_check355.sh`)
 - [ ] 태블릿: 판 끝 「또,」 칸 · 한글 입력·Enter · 보낸 뒤 글에 붙는 줄 · 📬 띠 · 🎯
 - [ ] 다음 "올라온 거 봐 줘": korean/todo.json의 R## 줄을 reason 기준으로 채점(✅면 🎯) · 📤 「💡 내 이유 한 줄」 줄
 - [ ] 다음: 추천 3번 🔤 진우 철자 노트 기본안 · 💥 주토피아 2 꺼짐
+
+## 2026-10-28 — 🔤 진우 철자 노트 (v356 — 추천 3번 · 기본안 넷 「추천대로」 · Codex 161차 반영)
+
+### 변경 파일
+- 새 `js/spell.js`(순수) — SPELL(쪽지 낱말 3 · 졸업 연속 2 · 💰10) · 교정 줄 → 노트 낱말 spellRows(철자 칸만 · 틀린 수 · 최근 문장 · 내 철자 최근 것부터 · 꼴이 깨진 칸·고친 글에 없는 낱말은 뺌 · 긴 글도 낱말은 남김) · spellRowsOf · blankOf·blankParts(답이 두 번이면 둘 다 빈칸) · spellActive(졸업 = 연속 2 · 그 뒤 틀린 수가 늘면 다시) · pickSpell(오늘 안 푼 것 · 오래 안 푼 것 → 자주 틀린 것) · spellReady·spellSlot·grammarCount · spellJudge · spellMarks(바뀐 글자) · spellFinishRule(처음 답 · 같은 날은 한 번(due) · 틀리면 0 · 💰10 하루 한 번 — 한 트랜잭션) · spellSeenOf·mergeSpellSeen · spellFinishText · spellMd
+- 새 `js/spellnote.js` — 낱말 받기 syncSpellRows(비공개 essay/fixes.json의 spell 칸 → 이 기기 localStorage · 10분 · 30초 · 빈 목록이면 그대로) · 창(문장 빈칸 → 🔊 → 쳐 넣기 → 틀리면 「내가 쓴 것 ↔ 바른 철자」 색 + 한 번 따라 쓰기 · 두 번 틀려도 넘어감 · 소리가 안 나면 글자 수 칸 · 기기 자동 고침 끔)
+- `js/player.js` — 📝 문법 쪽지의 그날 첫 자리(8문장)에 철자 쪽지(낼 낱말이 있을 때) · 오늘 끝냈으면 문법 쪽지는 한 자리(15문장) 뒤로 · 같은 깃발(grammarPending·grammarOpen) · 영상을 닫으면 접음 · 열 때 낱말 받기
+- `js/xp.js` spellMap·spellDayMap·spellSeenMap·spellFinish · `js/db.js` 프로필 spell·spellDay·spellSeen(빈 값·복사·병합) · `js/upload.js` 비공개 `english/spell.md`(아빠만) · `index.html` #spell-note · `css/style.css` .sp-* · `sw.js`(새 파일 둘)·`js/version.js` v356
+- 시험: 새 `tests/spell356.test.js` 13(지어낸 낱말만) · `tests/player.logic.test.js` 🔤 셋 + 흉내 함수
+- 비공개 저장소: 옛 교정 115줄 가운데 진짜 철자 틀림 줄에 `spell` 칸을 한 번 채움(10-28 · 다시 받아 같음 확인 · 원본 백업은 그 세션 scratchpad) — 낱말은 진우 기록이라 여기 적지 않음
+- (저장소 밖) `.context/v356/` — plan.md · walk356.sh · hh356.js · mutate_v356.mjs · codex161
+
+### 확인
+- 시험: 전체 **3066 통과 (첫 판 3066 중 3064 — 🔌 보내기 연결 시험이 옛 인자 줄을 고정해 고침 · 🎧 korlisten 진짜 시계 시험이 전체 실행 부하에서 흔들림(v356은 안 건드림 · 따로 3번 통과) → 다시 돌려 모두 통과)** · check.mjs 통과
+- 변이 **33/34**(mut356b.log — 놓친 하나 「따라 쓴 것도 처음 답으로」는 저장 규칙이 같은 낱말의 첫 답만 받아 같은 동작)
+- 헤드리스 390·1280(walk356.sh — 지어낸 낱말): 문장 빈칸 → 맞힘 → 틀림(바뀐 글자 색) → 따라 쓰기 틀림·맞음 → 긴 문장 → 끝 💰+10 → 진도 저장 → 계속하기 → onDone · 넘침 0 · 콘솔 0
+- Codex 161차: P2 넷(시계가 꼬이면 같은 날 두 번 맞혀 졸업 · 답이 두 번 나오면 하나가 보임 · 졸업한 날 또 틀린 것을 날짜로 못 잡음 · 긴 고친 글 뒤쪽 낱말이 사라짐) — 아버님 「추천대로」 → 모두 고침(due로 같은 날 · 빈칸 모두 · 틀린 수 spellSeen · 글 전체에서 확인) · 💰 하루 한 번·날짜 셈·한 번에 하나·진우 낱말이 비공개로만 가는 것은 괜찮다고 봄
+
+### 결정사항 / 메모
+- 까닭: 에세이 교정에서 같은 낱말을 거듭 틀리는데 앱의 오타 목록은 누구에게나 쓰는 흔한 것 → 진우가 실제로 틀린 낱말로
+- 처음 제안한 「두 번 넘게 고친 낱말」은 기록으로 보니 너무 적어 「한 번이라도 철자로 고친 낱말」로 시작 · 자주 틀린 것부터
+- 철자 칸은 「올라온 거 봐 줘」에서 교정할 때 Claude가 진짜 철자 틀림만 적는다(시제·복수·띄어쓰기·이름·입말·진짜 낱말끼리 헷갈림·손 미끄러짐은 안 적음) — 옛 줄의 칸을 지우지 않기
+- 졸업은 날짜가 아니라 「그 낱말을 틀린 수」로 — 교정이 에세이 쓴 날짜로 며칠 늦게 붙어도 다시 잡힌다
+- 같은 ⚙ 문법 쪽지 켜기로 함께 켜고 끈다
+- 영어 읽어 주기는 에세이와 같은 기기 음성(en-US) — 소리 기능이 있는데 재생이 실패하는 경우는 앱이 알 수 없음(태블릿에서 들어 보기)
+
+### TODO (다음 작업)
+- [ ] 아버님 "배포" → feat·docs 커밋 → push → 라이브 확인
+- [ ] 태블릿: 영상 8문장째 철자 쪽지 · 🔊 소리 · 키보드 자동 고침 · 색칠 · 💰
+- [ ] 다음 "올라온 거 봐 줘": 교정할 때 spell 칸 · 📤 english/spell.md로 쪽지를 푸는지·졸업
+- [ ] 다음: 💥 주토피아 2 꺼짐(720p 다시 인코딩)
