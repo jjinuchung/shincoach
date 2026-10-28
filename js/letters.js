@@ -9,7 +9,7 @@
 //   → 아버님 「올라온 거 봐 줘」 → Claude가 판단(🌟·👍·🙂·✉️ — 원고 grades) + 포켓몬의 짧은 답장 → letters/replies.json
 //   → 앱이 영어 화면을 열 때 읽어 그 글(mon, id)에 한 번만 붙이고 선물 (한 트랜잭션)
 // 차례 (letterNow):
-//  · 안 읽은 답장 → 답장 기다리는 글 → ✉️ 다시 써 볼 편지 → 새 편지(앞 편지의 답장을 읽은 다음 날 · 첫 편지는 이 판을 처음 연 다음 날)
+//  · 안 읽은 답장 → 답장 기다리는 글 → ✉️ 다시 써 볼 편지 → 새 편지(앞 편지의 답장을 읽은 다음 날 · 첫 편지는 이 판을 처음 연 그날 — v358)
 //  · 새 편지 = 원고 차례에서 아직 끝나지 않았고(✉️ 아닌 답장을 받지 않음) 도감에 없는 첫 포켓몬 · 답장을 안 쓰면 그 편지가 그대로 기다린다(쌓이지 않음)
 // 선물 (letterReplyRule — 앱이 정한다 · 답장 글은 선물을 말하지 않는다):
 //  · 🌟 그 포켓몬이 친구가 된다(도감 +1) + 💰30 — 2주에 한 번까지(STAR_GAP) · 그 안이거나 이미 도감에 있으면 👍 상자로
@@ -249,7 +249,7 @@ export function letterNow(raw, caught, list, now) {
   const last = L.sent.length ? L.sent[L.sent.length - 1] : null;
   if (last && last.r && last.r.g === 'again' && !finished(L, last.mon) && byMon.has(last.mon)) return { kind: 'letter', mon: last.mon, letter: byMon.get(last.mon), again: true, fresh: false };
   const doneRead = L.sent.filter((e) => e.r && e.r.g !== 'again').map((e) => dayNum(e.rd)).filter(Boolean);
-  const from = (doneRead.length ? Math.max(...doneRead) : L.start) + 1;
+  const from = doneRead.length ? Math.max(...doneRead) + 1 : L.start; // 첫 편지는 판 연 그날 (v358 — 새 판을 늦게 받은 태블릿이 하루 더 기다렸다)
   const got = isObj(caught) ? caught : {};
   const next = (Array.isArray(list) ? list : []).find((x) => !finished(L, x.id) && !(Number(got[x.id]) > 0));
   if (!next) return { kind: 'none' };
@@ -263,7 +263,7 @@ export function letterDot(st) {
 
 // ───────────────────── 트랜잭션 규칙 ─────────────────────
 
-/** 이 판을 처음 연 날 (첫 편지는 그다음 날) — 이미 있으면 그대로 */
+/** 이 판을 처음 연 날 (첫 편지는 그날 바로 — v358) — 이미 있으면 그대로 */
 export function letterStartRule(p, now) {
   const L = lettersOf(p.letters);
   if (L.start) return { ok: false, why: 'had' };
@@ -434,7 +434,7 @@ const dayYmd = (n) => new Date(n * 86400000).toISOString().slice(0, 10);
  */
 export function letterStatusLine(raw, caught, list, now) {
   const L = lettersOf(raw);
-  if (!L.start) return '📮 지금 우체통 — 판을 아직 안 엶 · 영어 영상 목록을 처음 연 다음 날 첫 편지';
+  if (!L.start) return '📮 지금 우체통 — 판을 아직 안 엶 · 영어 영상 목록을 처음 연 날 바로 첫 편지';
   const has = Array.isArray(list) && list.length > 0;
   const st = letterNow(L, caught, has ? list : [], now);
   const name = (x, mon) => (x ? `${x.ko}(${x.en})` : `mon ${mon}`);

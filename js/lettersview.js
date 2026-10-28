@@ -68,7 +68,7 @@ export async function homeLetterDot() {
   return letterDot(nowState());
 }
 
-/** 📮 영어 목록 맨 위 우체통 띠 — 처음 연 날을 적고(첫 편지는 그다음 날) · 답장을 받아 온 뒤 다시 그린다 */
+/** 📮 영어 목록 맨 위 우체통 띠 — 처음 연 날을 적고(첫 편지는 그날 바로 — v358) · 답장을 받아 온 뒤 다시 그린다 */
 export async function refreshLetterStrip() {
   const box = $('library-mail');
   if (!box) return;

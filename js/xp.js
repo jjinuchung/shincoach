@@ -1054,7 +1054,7 @@ export function grammarVideoMap() {
 export function lettersMap() {
   return lettersOf(profile.letters);
 }
-/** 📮 이 판을 처음 연 날 적기 (첫 편지는 그다음 날 — 이미 있으면 그대로) */
+/** 📮 이 판을 처음 연 날 적기 (첫 편지는 그날 바로(v358) — 이미 있으면 그대로) */
 export function letterStart() {
   return houseDo((p) => letterStartRule(p, Date.now()));
 }

@@ -112,13 +112,15 @@ test('📮 봉투 셈: 띄어쓰기 포함 · 겹친 빈칸 하나 · 한글 안
   assert.equal(letterCheck(GOOD).ok, true);
 });
 
-test('📮 차례: 처음 연 다음 날 첫 편지 → 열면 빨간 점 꺼짐 → 보냄 → 답장 → 읽은 다음 날 다음 편지', () => {
+test('📮 차례: 처음 연 그날 첫 편지(v358) → 열면 빨간 점 꺼짐 → 보냄 → 답장 → 읽은 다음 날 다음 편지', () => {
   const p = { caught: {}, coins: 0, items: {} };
   assert.equal(letterNow(p.letters, p.caught, LIST, T0).kind, 'off');
   assert.equal(letterStartRule(p, T0).ok, true);
   assert.equal(letterStartRule(p, T0 + DAY).why, 'had', '처음 연 날은 그대로');
-  assert.deepEqual(letterNow(p.letters, p.caught, LIST, T0), { kind: 'wait', from: D0 + 1 });
-  let st = letterNow(p.letters, p.caught, LIST, T0 + DAY);
+  let st = letterNow(p.letters, p.caught, LIST, T0);
+  assert.deepEqual([st.kind, st.mon, st.fresh, letterDot(st)], ['letter', 235, true, true], '판 연 그날 바로 (v358)');
+  assert.deepEqual(letterNow(p.letters, p.caught, LIST, T0 - DAY), { kind: 'wait', from: D0 }, '시계가 판 연 날보다 뒤면 그날까지 기다림');
+  st = letterNow(p.letters, p.caught, LIST, T0 + DAY);
   assert.deepEqual([st.kind, st.mon, st.fresh, letterDot(st)], ['letter', 235, true, true]);
   assert.equal(stripText(st), '📮 루브도에게서 편지가 왔어요!');
   assert.equal(letterSeenRule(p, 213, T0 + DAY, LIST).why, 'changed', '지금 편지가 아니면 안 적는다');

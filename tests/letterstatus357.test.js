@@ -29,17 +29,19 @@ function sent(at) {
 
 test('📮 지금 우체통: 판을 안 열었으면 그 말만 (원고가 있든 없든)', () => {
   const s = letterStatusLine(undefined, {}, LIST, T0);
-  assert.equal(s, '📮 지금 우체통 — 판을 아직 안 엶 · 영어 영상 목록을 처음 연 다음 날 첫 편지');
+  assert.equal(s, '📮 지금 우체통 — 판을 아직 안 엶 · 영어 영상 목록을 처음 연 날 바로 첫 편지');
   assert.equal(letterStatusLine({ start: 0, seen: {}, sent: [], star: 0 }, {}, [], T0), s);
 });
 
-test('📮 지금 우체통: 판 연 날 → 기다림 → 새 편지 → 열어 봄 → 답장 보냄 → 답장 붙음 → 읽음 → 다음 편지 날(달이 바뀌어도)', () => {
+test('📮 지금 우체통: 판 연 날 = 새 편지(v358) → 열어 봄 → 답장 보냄 → 답장 붙음 → 읽음 → 다음 편지 날(달이 바뀌어도)', () => {
   assert.deepEqual([LIST[0].id, LIST[0].ko, LIST[1].id, LIST[1].ko], [235, '루브도', 213, '단단지'], '원고 차례');
   const p = fresh();
   letterStartRule(p, T0);
   const line = (t) => letterStatusLine(p.letters, p.caught, LIST, t);
   let s = line(T0);
-  assert.equal(s, '📮 지금 우체통 — 판 연 날 2026-10-28 · 지금: 다음 편지는 2026-10-29부터 · 띠 「📮 우체통 — 새 편지는 곧 와요」 · 끝난 편지 0통 · 🌟 아직 없음(지금 줄 수 있음)');
+  assert.equal(s, '📮 지금 우체통 — 판 연 날 2026-10-28 · 지금: 루브도(Smeargle)의 편지가 와 있음 · 아직 안 엶 · 띠 「📮 루브도에게서 편지가 왔어요!」 · 끝난 편지 0통 · 🌟 아직 없음(지금 줄 수 있음)');
+  s = line(T0 - DAY);
+  assert.ok(s.includes('지금: 다음 편지는 2026-10-28부터 · 띠 「📮 우체통 — 새 편지는 곧 와요」'), `시계가 뒤면 판 연 날까지 — ${s}`);
   s = line(T0 + DAY);
   assert.ok(s.includes('지금: 루브도(Smeargle)의 편지가 와 있음 · 아직 안 엶 · 띠 「📮 루브도에게서 편지가 왔어요!」'), s);
   assert.equal(letterSeenRule(p, 235, T0 + DAY, LIST).ok, true);
