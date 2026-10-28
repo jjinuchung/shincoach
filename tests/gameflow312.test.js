@@ -11,6 +11,7 @@ import { LOOK_BASE } from '../js/avatar.js';
 import { openGames, closeGames } from '../js/gameview.js';
 import { gameMusicState } from '../js/gamebgm.js'; // 🎵 게임 음악 (v335)
 import { loadCharacters, characterUrl } from '../js/pokemon.js';
+import { START_LEN } from '../js/gamesimon.js'; // 🧠 첫 줄 길이 (v351 — 넷)
 
 // ───────────────────── 가짜 화면 (gameview·gametug가 쓰는 만큼) ─────────────────────
 
@@ -379,16 +380,21 @@ test('🧠 v346 — 한 판(진짜 시계): 네 자리 포켓몬 → 반짝인 �
     const root = gmBody.querySelector('.gc');
     const pads = gmBody.querySelectorAll('.gc-pad');
     assert.deepEqual(pads.map((b) => b.querySelector('.gc-name').textContent), ['파이리', '꼬부기', '덩쿠리', '피카츄'], '기기에 그림이 있는 그 타입 포켓몬');
+    // 보여 주는 동안 화면이 0.2초 넘게 멈췄다 오면 게임이 그 줄을 처음부터 다시 보여 준다(simonLag — 🔍 Codex 150차 #1)
+    // 시험을 한꺼번에 돌려 컴퓨터가 바쁘면 그럴 수 있다 → 본 반짝이 넷보다 많으면 「한 번 더 볼게요」를 봤어야 하고, 따라 할 것은 마지막에 본 넷
+    // (v353 — 전체 시험에서 3 + 4 = 7로 세어 흔들렸다 · .context/v353/simon_stall.mjs가 0.4초 멈춤을 넣어 재현)
     const seq = [];
     let prev = -1;
+    let again = false;
     await until(() => {
       const i = root.dataset.phase === 'show' ? pads.findIndex((b) => b.classList.contains('is-lit')) : -1;
       if (i >= 0 && i !== prev) seq.push(i);
       prev = i;
+      if (gmBody.querySelector('.gc-say').textContent === '한 번 더 볼게요 — 잘 봐!') again = true;
       return root.dataset.phase === 'input';
-    }, 8000, '따라 할 차례');
-    assert.equal(seq.length, 4, `본 반짝 ${seq}`);
-    for (const i of seq) pads[i].fire('pointerdown');
+    }, 20000, '따라 할 차례');
+    assert.ok(seq.length === START_LEN || (again && seq.length > START_LEN), `본 반짝 ${seq}${again ? ' (한 번 더 보여 줌)' : ''}`);
+    for (const i of seq.slice(-START_LEN)) pads[i].fire('pointerdown');
     assert.equal(gmBody.querySelector('.gd-score').textContent, '⭐ 6');
     xBtn.fire('click');
     await until(() => gmBody.querySelector('.gm-end'), 4000, '끝 화면');
