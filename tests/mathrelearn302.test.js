@@ -103,7 +103,7 @@ test('📚 배움 글 (원고 · Codex 108차 #2): 배움 줄기는 칸마다 le
 });
 
 test('📚 배움 한 장이 나오는 편: 처음 배우기·확인·연습·🎲 섞어 풀기만 (🤔 노트 회차·💎·📏 진단·❓ 답장 뒤 풀기는 그대로)', () => {
-  assert.deepEqual([...RELEARN_MODES].sort(), ['learn', 'mix', 'practice', 'review']);
+  assert.deepEqual([...RELEARN_MODES].sort(), ['learn', 'mix', 'practice', 'quick', 'review']); // ⚡ 3문제 한 판도 섞인 연습 판 (v354)
   for (const m of ['notes', 'note', 'special', 'diag', 'ask', 'quit']) assert.ok(!RELEARN_MODES.has(m), m);
 });
 

@@ -64,6 +64,6 @@ test('🔁 실제 카드 — 영어 복습이 밀려도 「복습 N문장」 칩
 
 test('🔗 홈 그리기가 cardSubject로 — 카드마다 따로 넘기지 않는다', () => {
   const src = read('js/home.js');
-  assert.match(src, /frag\.appendChild\(cardEl\(cardSubject\(s, \{ bonus, unread, reviewDue, korBonus, mail \}\)/); // 📮 편지 줄(v351)도 같은 자리에서
+  assert.match(src, /frag\.appendChild\(cardEl\(cardSubject\(s, \{ bonus, unread, reviewDue, korBonus, mail, quick \}\)/); // 📮 편지 줄(v351)·⚡ 3문제 줄(v354)도 같은 자리에서
   assert.doesNotMatch(src, /: \{ \.\.\.s, reviewDue \}, pickMascot/, '예전 꼴(수학 말고 모두 reviewDue)이 남지 않게');
 });

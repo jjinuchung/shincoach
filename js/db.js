@@ -1305,6 +1305,12 @@ export function mergeMath(cur, rec) {
   // 🍀 어쩌다 나온 몬스터볼의 하루 횟수 — 늦은 날짜 쪽, 같은 날이면 큰 횟수 (옛 백업으로 오늘 횟수를 되돌려 더 받지 않게)
   const lk = rec && rec.luck && rec.luck.d ? rec.luck : null;
   if (lk && (!out.luck || !out.luck.d || lk.d > out.luck.d || (lk.d === out.luck.d && (Number(lk.n) || 0) > (Number(out.luck.n) || 0)))) out.luck = { d: lk.d, n: Number(lk.n) || 0 };
+  // ⚡ 3문제 한 판의 하루 판·🎯 수 (v354) — 🍀와 같은 꼴: 늦은 날짜 쪽, 같은 날이면 칸마다 큰 쪽 (옛 백업으로 오늘 🎯를 되돌려 더 받지 않게) · 새 객체로
+  const qk = rec && rec.quick && typeof rec.quick === 'object' && typeof rec.quick.d === 'string' ? rec.quick : null;
+  const qo = out.quick && typeof out.quick === 'object' && typeof out.quick.d === 'string' ? out.quick : null;
+  const qn = (v) => Math.max(0, Math.floor(Number(v)) || 0);
+  if (qk && (!qo || qk.d > qo.d)) out.quick = { d: qk.d, n: qn(qk.n), c: qn(qk.c) };
+  else if (qk && qo && qk.d === qo.d) out.quick = { d: qo.d, n: Math.max(qn(qo.n), qn(qk.n)), c: Math.max(qn(qo.c), qn(qk.c)) };
   // ⏰ 오래 밀린 복습 보너스의 하루 횟수 (v257) — 🍀와 같은 꼴: 늦은 날짜 쪽, 같은 날이면 큰 횟수
   const lt = rec && rec.late && rec.late.d ? rec.late : null;
   if (lt && (!out.late || !out.late.d || lt.d > out.late.d || (lt.d === out.late.d && (Number(lt.n) || 0) > (Number(out.late.n) || 0)))) out.late = { d: lt.d, n: Number(lt.n) || 0 };

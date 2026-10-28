@@ -18,6 +18,7 @@ import {
   slipLine, // 💪 처음 배우기·연습 편의 "고친 실수 하나까지 통과" 말 (v279)
   isResting, restOf, restInit, dailyOk, // 🌱 학교 진도 먼저 · 선행 칸 쉬기 (v301)
   sunKey, // ☀️ 시작·완주 기록 (v331)
+  QUICK, quickPlan, quickLeft, quickCommit, // ⚡ 3문제 한 판 (v354)
   RELEARN_MODES, relearnPage, // 📚 틀리면 배움 한 장 (v302)
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
@@ -735,6 +736,8 @@ function renderLadder(state) {
     const egg = eggFor('math');
     if (egg) { const pg = eggProgress(egg); head.appendChild(el('p', 'math-note math-egg', `🥚 수학 알 ${pg.done}/${pg.need}일 — ☀️ 완주한 날마다 하루씩 (${pg.need - pg.done}일 더)`)); }
   }
+  const qb = quickButton(state, today); // ⚡ 3문제 한 판 — ☀️ 아래 (v354 · 📬 답장과 상관없이 · ☀️와 따로)
+  if (qb) head.appendChild(qb);
   head.appendChild(puzzleButton(puzzleCtx())); // 🧩 오늘의 수학 퍼즐 — ☀️ 오늘의 수학 아래 (v296)
   head.appendChild(detectButton(detectCtx())); // 🕵️ 나옹의 숙제 봐 주기 — 🧩 아래 (v299)
   // ❓ 아빠 답을 기다리는 질문 · 😄 이해했는데 아직 안 풀어 본 문제
@@ -1350,12 +1353,51 @@ function startMixRound() {
   if (!d) { renderLadder(ui.state); return; }
   d.step = 'mix';
   const base = (Date.now() % 1000000) | 0;
+  const { qs, ids } = mixQs(d.plan.mix, base);
+  // 문항이 하나도 안 만들어져도(있을 일이 거의 없다) 빈 편으로 같은 finishRound를 탄다 — 완주 기록·보상·저장 실패 재시도가 한 경로 (Codex 3차 #7)
+  ui.round = { id: null, mode: 'mix', qs, ids, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
+  if (!qs.length) { finishRound(); return; }
+  renderQuestion();
+}
+
+/**
+ * ⚡ 3문제 한 판 (v354) — 아는 칸 셋에서 한 문제씩(quickPlan) · 🎲 섞어 풀기와 같은 문항 만들기·같은 연습 기록 · ☀️ 흐름 밖
+ * 문항이 셋 다 안 만들어지면 판을 열지 않는다(🎯는 셋 다 맞힐 때만이라 빈 판·두 문제 판은 낼 까닭이 없다)
+ */
+function startQuickRound() {
+  const plan = quickPlan(ui.state, (Date.now() % 1000000) | 0);
+  const base = (Date.now() % 1000000) | 0;
+  const { qs, ids } = mixQs(plan, base);
+  if (qs.length < QUICK.n) { renderLadder(ui.state); return; }
+  ui.daily = null; // ☀️ 흐름과 따로 — 완주·✨·🥚에 안 센다
+  ui.round = { id: null, mode: 'quick', qs, ids, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
+  renderQuestion();
+}
+
+/** ⚡ 사다리 단추 (v354) — 낼 칸이 셋 있을 때만 · 셈 문구 없이 「다 맞히면 🎯」/「지금은 연습」 */
+function quickButton(state, today) {
+  if (quickPlan(state, 0).length < QUICK.n) return null;
+  const left = quickLeft(state, today) > 0;
+  const box = el('div', 'math-quick');
+  const b = el('button', 'btn btn-big-wide math-quick-btn', '⚡ 3문제 한 판');
+  b.type = 'button';
+  b.addEventListener('click', () => guardStart('math', () => startQuickRound()));
+  box.appendChild(b);
+  box.appendChild(el('p', 'math-note math-quick-sub', left ? '배운 것에서 3문제 — 다 맞히면 🎯 포켓몬 잡기!' : '오늘 🎯는 다 받았어요 — 지금은 연습이에요 (⚡💰)'));
+  return box;
+}
+
+/**
+ * 🎲 섞어 풀기·⚡ 3문제 한 판의 문항 — 칸마다 얼굴 차례대로 문항 하나(첫 성공), 🤔 노트는 그 유형(want) → { qs, ids }
+ * @param {Array<{id:string, kinds:string[], note?:object}>} list
+ */
+function mixQs(list, base) {
   const qs = [];
   const ids = [];
   // 🤔 노트 문항의 틀은 같은 개념의 일반 문항이 피한다 — 같은 틀이 한 편에 두 번 나오면 하나 맞히고 하나 틀렸을 때 노트가 꼬인다 (Codex 3차 #3)
   const noteKeys = {};
-  for (const x of d.plan.mix) if (x.note && x.note.key) (noteKeys[x.id] = noteKeys[x.id] || []).push(x.note.key);
-  d.plan.mix.forEach((x, i) => {
+  for (const x of list) if (x.note && x.note.key) (noteKeys[x.id] = noteKeys[x.id] || []).push(x.note.key);
+  list.forEach((x, i) => {
     if (!dailyOk(ui.state, x.id)) return; // 🌱 계획을 세운 뒤 📊에서 켰으면 6학년·중1 칸은 뺀다 (Codex 107차 #3)
     const sx = stemOf(x.id);
     if (!sx) return;
@@ -1376,10 +1418,7 @@ function startMixRound() {
     ui.recent[x.id] = [...recent, q.key].filter(Boolean).slice(-RECENT_KEEP);
     qs.push(q); ids.push(x.id);
   });
-  // 문항이 하나도 안 만들어져도(있을 일이 거의 없다) 빈 편으로 같은 finishRound를 탄다 — 완주 기록·보상·저장 실패 재시도가 한 경로 (Codex 3차 #7)
-  ui.round = { id: null, mode: 'mix', qs, ids, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
-  if (!qs.length) { finishRound(); return; }
-  renderQuestion();
+  return { qs, ids };
 }
 
 /** ☀️ 완주 카드 — 개념 편 결과 + 🎲 섞어 풀기 결과 + 보상(첫 완주 보너스) */
@@ -1406,6 +1445,45 @@ function renderDailyDone(state, { g, c, daily, result, offer = null, catches = 0
   b.type = 'button';
   b.addEventListener('click', () => renderLadder(state));
   card.appendChild(b);
+  m.appendChild(card);
+  addCell(card, 'math', { live: () => card.isConnected }); // 🟢 숨은 셀 (v352)
+}
+
+/**
+ * ⚡ 3문제 한 판 끝 카드 (v354) — 문제마다 개념 이름과 ⭕/❌ · 보상 · [⚡ 한 판 더] [사다리로] · 셈 문구 없음(오늘 몇 판·🎯 몇 번 남음은 쓰지 않는다)
+ * 틀려도 무섭지 않게 — 칸은 그대로라고 말한다
+ */
+function renderQuickDone(state, r, { g, c, result, catches }) {
+  const m = clearMain();
+  const today = todayKey();
+  const perfect = !!(result && result.perfect);
+  const card = el('section', 'math-card math-result math-quick-done');
+  card.appendChild(el('h2', '', perfect ? '⚡ 셋 다 맞혔어요!' : '⚡ 3문제 끝!'));
+  const ul = el('ul', 'math-daily-list');
+  r.qs.forEach((q, i) => {
+    const a = r.answers[i] || {};
+    ul.appendChild(el('li', '', `${a.correct ? '⭕' : '❌'} ${nameOf(r.ids[i] || q.concept)}${!a.correct && a.fixed ? ' (💪 비슷한 문제로 고쳤어요)' : ''}`));
+  });
+  card.appendChild(ul);
+  card.appendChild(el('p', 'math-p', perfect
+    ? (catches ? '배운 것을 잘 기억하고 있네요 — 🎯 포켓몬을 잡으러 가요!' : '오늘 🎯는 다 받았어요 — 내일 또 3문제로 만나요.')
+    : `틀린 문제가 있어도 괜찮아요 — 칸은 그대로예요.${quickLeft(state, today) > 0 ? ' 셋 다 맞히면 🎯예요.' : ''}`)); // 오늘 🎯를 다 받았으면 약속하지 않는다
+  card.appendChild(el('p', 'math-reward', `⚡+${g.gained} 💰+${c}${catches ? ` 🎯 몬스터볼 ${catches}개!` : ''}${g.leveledUp ? ` 🎉 Lv.${g.to}!` : ''}`));
+  const row = el('div', 'math-actions');
+  // 강조는 맞고 틀림과 상관없이 — 오늘 🎯를 더 받을 수 있으면 [⚡ 한 판 더], 다 받았으면 [사다리로] (틀렸을 때만 다시 하라고 밀지 않게, Codex 159차 #3)
+  const more = quickPlan(state, 0).length >= QUICK.n;
+  const left = quickLeft(state, today) > 0;
+  if (more) {
+    const again = el('button', `btn btn-big-wide${left ? ' btn-primary' : ''}`, left ? '⚡ 한 판 더' : '⚡ 한 판 더 (연습)');
+    again.type = 'button';
+    again.addEventListener('click', () => guardStart('math', () => startQuickRound()));
+    row.appendChild(again);
+  }
+  const back = el('button', `btn btn-big-wide${more && left ? '' : ' btn-primary'}`, '사다리로');
+  back.type = 'button';
+  back.addEventListener('click', () => renderLadder(state));
+  row.appendChild(back);
+  card.appendChild(row);
   m.appendChild(card);
   addCell(card, 'math', { live: () => card.isConnected }); // 🟢 숨은 셀 (v352)
 }
@@ -1671,7 +1749,7 @@ function renderQuestion(restore = false) {
 
   const top = el('div', 'math-q-top');
   top.appendChild(el('span', 'math-eyebrow', r.mode === 'diag' ? `📏 진단 ${r.at + 1} / ${r.qs.length}` : r.mode === 'notes' ? `🤔 오답 노트 ${r.at + 1} / ${r.qs.length} · ${nameOf(q.concept)}` : r.mode === 'special' ? `💎 스페셜 ${r.at + 1} / ${r.qs.length} · ${(spKindOf(String(q.kind).replace('special-', '')) || {}).ko || ''}`
-    : r.mode === 'mix' ? `🎲 섞어 풀기 ${r.at + 1} / ${r.qs.length}` : r.mode === 'ask' ? `❓ 답장 뒤 풀어보기 · ${nameOf(q.concept)}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
+    : r.mode === 'mix' ? `🎲 섞어 풀기 ${r.at + 1} / ${r.qs.length}` : r.mode === 'quick' ? `⚡ 3문제 한 판 ${r.at + 1} / ${r.qs.length}` : r.mode === 'ask' ? `❓ 답장 뒤 풀어보기 · ${nameOf(q.concept)}` : `${nameOf(r.id)} · ${r.at + 1} / ${r.qs.length}`));
   top.appendChild(el('span', 'math-kind', KIND_LABEL[q.kind] || ''));
   card.appendChild(top);
   if (q.fromNote) card.appendChild(el('p', 'math-note-badge', '🤔 지난번에 틀렸던 유형이에요 — 이번엔 맞혀 봐요'));
@@ -2307,7 +2385,7 @@ function paintAnswer(i, list, card, restoring) {
   if (list.classList.contains('is-pad')) typedAnswered(list, q, shown.text, !!ch.ok);
   if (a.pn) fb.appendChild(el('p', `math-pad-note ${ch.ok ? 'ok' : 'no'}`, a.pn)); // "약분하면 3/4" · "분수로 나타내야 해요"
   // 🎲 섞어 풀기는 답하기 전엔 개념 이름을 숨긴다("어떤 개념인지 알아내기"가 목적) — 답한 뒤에 알려 준다 (Codex 3차 #8)
-  if (r.mode === 'mix') fb.appendChild(el('p', 'math-mix-concept', `📚 ${nameOf(q.concept)} 문제였어요`));
+  if (r.mode === 'mix' || r.mode === 'quick') fb.appendChild(el('p', 'math-mix-concept', `📚 ${nameOf(q.concept)} 문제였어요`)); // ⚡도 섞인 판 (v354)
   const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && !light(r) && q.key;
   // 📚 틀린 순간을 짧게 — 그 칸의 배움 한 장 → 비슷한 문제 (v302). 비슷한 문제가 나오는 문항만 · 배움 글을 못 만들면 예전 풀이 길
   const relearn = canTwin && RELEARN_MODES.has(r.mode) ? relearnOf(q, r) : null;
@@ -3060,7 +3138,7 @@ async function finishRound() {
   let placed = null;
   let result = null;
   let tally = { ok: 0, rev: 0 }; // 🎟️ 이번 편이 실제로 더한 몫 (tallyRound가 돌려줌)
-  let spReward = null;          // 💎 스페셜 보상 — **트랜잭션 안에서 이미 지급**됐다 (화면 표시용)
+  let spReward = null;          // 💎 스페셜·⚡ 3문제 보상 — **트랜잭션 안에서 이미 지급**됐다 (화면 표시용)
   let spLevel = null;           // 그때의 레벨 변화
   let catches = 0;              // 🎯 이번 편이 준 몬스터볼 (roundCatches, 레코드 pend에 적힘)
   let lucky = 0;                // 🍀 그중 어쩌다 나온 몫 (luckyCatch)
@@ -3090,6 +3168,17 @@ async function finishRound() {
       result = c.result;
       state = c.math;
       spReward = c.reward;       // 이미 프로필에 들어갔다 — 화면은 보여 주기만 한다
+      spLevel = c.level;
+    } else if (r.mode === 'quick') {
+      // ⚡ 3문제 한 판 (v354) — 섞어 풀기와 같은 연습 기록 + 하루 판정·🎯 예약·⚡💰(그날 첫 판 💰10까지)가 수학 기록·프로필 **한 트랜잭션**
+      //   (quickCommit — 두 창·[💾 다시 저장]에도 한 번 · 💰를 따로 저장하면 「첫 판」 표시만 남고 💰10이 날아갔다, Codex 159차 #2) · 🎟️·🔷 없음
+      const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...extraQ(a) }));
+      const c = await commitChalRound((s2) => quickCommit(s2, qs, today, { correct: r.correct, fixed: r.fixed || 0 }));
+      if (!c.ok) throw new Error('⚡ 기록을 저장하지 못했어요');
+      result = c.result;
+      state = c.math;
+      catches = result.quick.catch;
+      spReward = c.reward; // 이미 프로필에 들어갔다 — 화면은 보여 주기만 한다(💎 스페셜과 같은 길)
       spLevel = c.level;
     } else if (r.mode === 'notes' || r.mode === 'mix') {
       const qs = r.answers.map((a, i) => ({ id: r.ids[i], key: r.qs[i].key, k: a.kind, ok: a.correct ? 1 : 0, ...(a.tag ? { tag: a.tag } : {}), ...(a.fixed === undefined ? {} : { fx: a.fixed ? 1 : 0 }), ...(r.qs[i].fromNote ? { note: true } : {}), ...extraQ(a) }));
@@ -3153,10 +3242,13 @@ async function finishRound() {
     : r.mode === 'special'
       // 💎 보상은 **저장 트랜잭션 안에서 이미 지급**됐다 (Codex 11차 #1). 여기서는 보여 주기만 한다
       ? { xp: (spReward && spReward.xp) || 0, coin: (spReward && spReward.coin) || 0, catchOnce: false, paid: true }
+    : r.mode === 'quick'
+      // ⚡ 문항 정답 + 💪 고침 + 그날 처음 끝낸 판 💰 — **저장 트랜잭션에서 이미 지급**(quickCommit · Codex 159차 #2) · 🎯는 트랜잭션이 정했다(catches)
+      ? { xp: (spReward && spReward.xp) || 0, coin: (spReward && spReward.coin) || 0, catchOnce: false, paid: true }
     : r.mode === 'notes' || r.mode === 'mix'
       ? { xp: r.correct * REWARD.q.xp, coin: r.correct * REWARD.q.coin, catchOnce: false } // 🤔 노트 회차·🎲 섞어 풀기: 문항 정답만, 잡기 없음 (연습)
       : roundReward(result, r.correct); // practice 여부는 저장소가 판정한 result에서 온다
-  rw.xp += (r.fixed || 0) * REWARD.fix.xp; // 🔁 쌍둥이로 바로 고친 문항 (통과 여부와 무관)
+  if (!rw.paid) rw.xp += (r.fixed || 0) * REWARD.fix.xp; // 🔁 쌍둥이로 바로 고친 문항 (통과 여부와 무관) · ⚡는 트랜잭션 보상에 넣었다
   rw.coin += lateCoin; // ⏰ 트랜잭션이 정한 몫 그대로 (개념 편만 0이 아니다)
   if (daily && daily.first) { rw.xp += REWARD.daily.xp; rw.coin += REWARD.daily.coin; } // ☀️ 하루 첫 완주 보너스
   // 🎯 수학 잡기 (2026-09-22, 아버님 결정): ☀️ 안의 개념 편을 다 맞히면 1번(처음이든 복습이든), ☀️ 하루 첫 완주에 1번 — 좋은 날 2번.
@@ -3214,6 +3306,13 @@ async function finishRound() {
     b.addEventListener('click', () => renderLadder(state));
     card.appendChild(b);
     m.appendChild(card);
+    return;
+  }
+
+  if (r.mode === 'quick') {
+    renderQuickDone(state, r, { g, c, result, catches: rw.catches });
+    runCatches(rw.catches, { g, c, run, onAll: () => showHatchIfAny() });
+    if (!rw.catches) showHatchIfAny();
     return;
   }
 

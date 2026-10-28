@@ -324,7 +324,9 @@ test('🌱 화면 배선: 수학을 열 때 ensureRest(설정이 없을 때만 �
   const resume = rm.slice(ri, rm.indexOf('startMixRound();', ri));
   const guard = "if (run !== ui.run || !ui.daily || ui.daily.step !== 'round' || ui.round) return;";
   assert.ok(resume.includes('const fresh = await getMath().catch(() => null);') && resume.includes(guard) && resume.indexOf(guard) < resume.indexOf('if (fresh) ui.state = fresh;'), resume);
-  assert.ok(body('function startMixRound() {').includes('d.plan.mix.forEach((x, i) => {\n    if (!dailyOk(ui.state, x.id)) return;'));
+  // v354 — 문항 만들기를 mixQs로 뺐다(⚡ 3문제 한 판과 함께 씀) · 거르기는 그대로
+  assert.ok(body('function startMixRound() {').includes('const { qs, ids } = mixQs(d.plan.mix, base);'));
+  assert.ok(body('function mixQs(list, base) {').includes('list.forEach((x, i) => {\n    if (!dailyOk(ui.state, x.id)) return;'));
   // 결과 카드 — 쉬는 칸을 다 맞혀도 오지 않는 확인 날을 약속하지 않는다 (Codex 107차 #1)
   assert.ok(src.includes("result.practice ? (result.rest ? '🌱 잠깐 쉬는 칸이라 연습했어요 — 칸은 그대로예요.' : '연습이라 👑 확인은 안 올라가요 — 다음 확인 날에 다시 물어볼게요.')"));
   const er = body('async function ensureRest(state) {');

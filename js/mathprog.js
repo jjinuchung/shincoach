@@ -553,7 +553,7 @@ export function slipExempt(q) {
 // 틀린 바로 그 자리에서 🔍 까닭 고르기·▶ 한 줄씩 열기·🙈 이유 대신 그 칸의 📚 배움 한 장 → 🔁 비슷한 문제.
 // 그 길은 다 지나야 다음이 열려 길었다 — 틀린 순간을 짧게 한다(방금 문제 풀이는 접어 두고 열면 그대로). 일지에는 rl만
 /** 배움 한 장이 나오는 편 — 처음 배우기·확인·연습(☀️ 개념 편 포함) · 🎲 섞어 풀기 (🤔 노트 회차·💎·📏 진단·❓ 답장 뒤 풀기는 그대로) */
-export const RELEARN_MODES = new Set(['learn', 'review', 'practice', 'mix']);
+export const RELEARN_MODES = new Set(['learn', 'review', 'practice', 'mix', 'quick']); // ⚡ 3문제 한 판도 (v354)
 /** 글의 한글 두 글자 묶음 — 그림 표시([place …])·굵게(**)는 뺀다 */
 function pageGrams(t) {
   const out = new Set();
@@ -1176,10 +1176,11 @@ export function dailyPlan(m, today, stem = 'fraction', seed = 0) {
 /**
  * 🎲 섞어 풀기 결과 반영 — 연습: 통과·라이트너 불변. 일반 문항은 개념 편과 같은 규칙(recordQ: 얼굴별 누적·오개념·틀리면 노트 등록·
  * 맞히면 노트 지움), 🤔 노트 문항(note)은 노트 회차 규칙(맞히면 지움, 틀리면 오늘로 밀어 내일 이후). 개념의 lastAt을 올려
- * 다음 날 다른 개념이 뽑히게 한다. 일지에는 'mix' 한 줄.
+ * 다음 날 다른 개념이 뽑히게 한다. 일지에는 'mix' 한 줄(⚡ 3문제 한 판도 같은 기록 — 일지 mode만 'quick', v354).
  * @param {Array<{id:string, key?:string, k:string, ok:0|1, tag?:string, fx?:0|1, sn?:0|1, w?:string, note?:boolean}>} qs
+ * @param {'mix'|'quick'} [mode] 일지에 적을 판 이름
  */
-export function applyMixRound(m, qs, today) {
+export function applyMixRound(m, qs, today, mode = 'mix') {
   m.concepts = m.concepts || {};
   m.miss = m.miss || {};
   let ok = 0;
@@ -1197,7 +1198,7 @@ export function applyMixRound(m, qs, today) {
   }
   // 낼 문항이 하나도 안 만들어진 빈 편(있을 일이 거의 없다)은 일지에 안 남긴다 — 완주 기록(markDaily)만 같은 트랜잭션에서 된다
   if ((qs || []).length) {
-    pushLog(m, { d: today, t: Date.now(), id: 'mix', mode: 'mix', ok, n: qs.length, qs: qs.map((q) => ({ ...logQ(q), c: q.id })) });
+    pushLog(m, { d: today, t: Date.now(), id: 'mix', mode: mode === 'quick' ? 'quick' : 'mix', ok, n: qs.length, qs: qs.map((q) => ({ ...logQ(q), c: q.id })) });
   }
   return { ok, total: (qs || []).length };
 }
@@ -1300,6 +1301,97 @@ export function luckyCatch(m, { mode, result, inDaily, roll, today }) {
   if (used >= LUCKY.max) return 0;
   m.luck = { d: today, n: used + 1 }; // 새 객체로 — cloneMath가 얕게 복사하므로 입력을 건드리지 않게
   return 1;
+}
+
+// ── ⚡ 3문제 한 판 (v354, 2026-10-28 아버님 「추천대로」) ──
+// 수학을 다시 켜게 — 아는 칸 셋에서 한 문제씩(🎲 섞어 풀기와 같은 연습 기록 — 칸·복습 날짜 그대로) · 처음 답 셋 다 맞히면 🎯 1 · 하루 QUICK.catchMax번까지
+//   논술 v338 「처음 ⭐면 잡기 한 번 더」가 하룻저녁 판을 크게 늘린 것을 수학에 · 🍀(아는 개념 20%·하루 3 — 10-01 결정)는 이 판에서만 바꾼다
+//   4학년 칸 먼저 → 5학년(3학년 이하 칸이 생기면 그 사이) · 6학년·중1은 안 냄 · 🥚 배우는 중은 뺌(아는 칸에서만 — 쉬운 판) · ☀️와 따로(완주·✨·🥚에 안 셈) ·
+//   🎟️ 교환권엔 안 더한다(tallyRound — 💎 스페셜처럼 몇 번이든 할 수 있어서) · 🔷 없음
+/** n 문제 수 · catchMax 하루 🎯 · coin 그날 처음 끝낸 판 💰 (🧩 수학 퍼즐과 같게) */
+export const QUICK = { n: 3, catchMax: 3, coin: 10 };
+/** ⚡ 판 얼굴 — ⭐ 특별은 뺀다(쉬운 쪽) */
+const QUICK_KINDS = ['calc', 'misread', 'why'];
+/** 아는 칸 — 🐣 안다 · 👑 · 📏 진단으로 침 (🥚 배우는 중은 다음 날 확인 전이라 뺀다) */
+const QUICK_STAGES = new Set(['known', 'crowned', 'placed']);
+const nat = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
+/** ⚡ 판 학년 무리 — 0 = 지금 학년(SCHOOL_GRADE) · 1 = 그 아래 · 2 = 그 위(REST_GRADE 아래) · null = 안 냄 */
+function quickTier(id) {
+  const g = gradeOf(id);
+  if (!g || g >= REST_GRADE) return null;
+  return g === SCHOOL_GRADE ? 0 : g < SCHOOL_GRADE ? 1 : 2;
+}
+/**
+ * ⚡ 판에 낼 칸 셋 (순수) — [{ id, kinds }] · 셋이 안 되면 [] (단추를 안 띄운다)
+ * 줄기와 상관없이 아는 칸 · 학년 무리 차례 → 같은 무리 안에서는 오래 안 본 것부터(lastAt — 푼 칸은 applyMixRound가 올려 다음 판엔 다른 칸) → 줄기 차례
+ */
+export function quickPlan(m, seed = 0) {
+  const concepts = (m && m.concepts) || {};
+  const r = fractionGen.rng(seed);
+  const order = new Map();
+  for (const k of STEM_ORDER) for (const c of (STEMS[k] ? STEMS[k].list : [])) if (!order.has(c.id)) order.set(c.id, order.size);
+  const pool = [];
+  for (const [id, rec] of Object.entries(concepts)) {
+    if (!QUICK_STAGES.has(stageOf(rec)) || !order.has(id)) continue;
+    const tier = quickTier(id);
+    if (tier === null) continue;
+    pool.push({ id, tier, at: Number(rec.lastAt) || 0, i: order.get(id) });
+  }
+  if (pool.length < QUICK.n) return [];
+  const pick = pool.sort((a, b) => (a.tier - b.tier) || (a.at - b.at) || (a.i - b.i)).slice(0, QUICK.n);
+  return fractionGen.shuffle(r, pick).map((x) => ({ id: x.id, kinds: fractionGen.shuffle(r, [...QUICK_KINDS]) }));
+}
+/**
+ * 오늘 ⚡ 판 — { n 끝낸 판, c 받은 🎯 } (지난날이면 0)
+ * 장부 날짜가 오늘보다 **뒤**(태블릿 시계가 뒤로 갔다)면 그날은 다 받은 것으로 — ahead (Codex 159차 #1: 28일에 다 받고 27일로 갔다 오면 또 받았다)
+ */
+function quickToday(m, today) {
+  const k = m && m.quick;
+  if (!k || typeof k !== 'object' || typeof k.d !== 'string') return { n: 0, c: 0 };
+  if (k.d === today) return { n: nat(k.n), c: nat(k.c) };
+  if (k.d > today) return { n: Math.max(1, nat(k.n)), c: QUICK.catchMax, ahead: true }; // 'YYYY-MM-DD'라 글자 차례가 곧 날짜 차례
+  return { n: 0, c: 0 };
+}
+/** 오늘 더 받을 수 있는 🎯 (아이 화면은 수를 쓰지 않고 「다 맞히면 🎯」/「지금은 연습」만) */
+export function quickLeft(m, today) {
+  return Math.max(0, QUICK.catchMax - quickToday(m, today).c);
+}
+/**
+ * ⚡ 판을 끝냈다 — 저장 트랜잭션 안에서 부른다(m.quick = { d, n, c }를 새 객체로 · 두 창·[다시 저장]도 같은 트랜잭션 판정)
+ * @param {boolean} perfect 처음 답 QUICK.n개가 다 맞았나
+ * @returns {{first:boolean, catch:0|1, coin:number}} first = 그날 처음 끝낸 판(💰)
+ */
+export function quickRule(m, today, perfect) {
+  const q = quickToday(m, today);
+  if (q.ahead) return { first: false, catch: 0, coin: 0 }; // 시계가 뒤로 — 장부를 되돌리지 않는다(날짜가 돌아오면 그날 받은 그대로 · Codex 159차 #1)
+  const give = perfect && q.c < QUICK.catchMax ? 1 : 0;
+  m.quick = { d: today, n: q.n + 1, c: q.c + give };
+  return { first: q.n === 0, catch: give, coin: q.n === 0 ? QUICK.coin : 0 };
+}
+/**
+ * ⚡ 판 끝 저장 규칙 (순수 — xp.commitChalRound 한 트랜잭션 안에서 · Codex 159차 #2)
+ * 연습 기록 + 하루 판정 + 🎯 예약 + 보상(문항 정답 + 💪 고침 + 그날 첫 판 💰)을 수학 기록과 프로필에 함께 —
+ * 따로 저장하면 「오늘 첫 판」 표시만 남고 💰10이 날아간다(다음 판엔 첫 판이 아니라 다시 못 받는다)
+ * @param {Array<object>} qs applyMixRound 문항 줄 (처음 답)
+ * @param {{correct:number, fixed:number}} r 처음 답 맞힌 수 · 💪 비슷한 문제로 고친 수
+ * @returns {{result:object, reward:{xp:number, coin:number, items:Object}}}
+ */
+export function quickCommit(m, qs, today, { correct = 0, fixed = 0 } = {}) {
+  const result = applyMixRound(m, qs, today, 'quick');
+  result.perfect = result.total === QUICK.n && result.ok === QUICK.n; // 처음 답 셋 다
+  result.quick = quickRule(m, today, result.perfect);
+  addPending(m, result.quick.catch);
+  const xp = nat(correct) * REWARD.q.xp + nat(fixed) * REWARD.fix.xp;
+  const coin = nat(correct) * REWARD.q.coin + result.quick.coin;
+  return { result, reward: { xp, coin, items: {} } };
+}
+/** 📤 수학 요약 ⚡ 줄 (아버님만) — 최근 7일 판·다 맞힌 판 · 오늘 받은 🎯 */
+export function quickReport(m, today) {
+  const log = ((m && m.log) || []).filter((e) => e && e.mode === 'quick' && typeof e.d === 'string' && daysBetween(e.d, today) >= 0 && daysBetween(e.d, today) < 7);
+  const q = quickToday(m, today);
+  if (!log.length && !q.ahead) return '⚡ 3문제 한 판 (최근 7일): 아직 없음';
+  const all = log.filter((e) => e.n > 0 && e.ok === e.n).length;
+  return `⚡ 3문제 한 판 (최근 7일): ${log.length}판 · 다 맞힘 ${all} · 오늘 🎯 ${q.ahead ? `없음(장부 날짜 ${m.quick.d}가 오늘보다 뒤 — 태블릿 시계 확인)` : `${q.c}/${QUICK.catchMax}`}`; // 앞날 장부 = 시계가 뒤로 (Codex 159차 #1)
 }
 
 /**
@@ -1693,13 +1785,14 @@ export function mathReportText(m, today, days) {
   lines.push('', puzzleReport(m && m.puzzle, today)); // 🧩 수학 퍼즐 단계·판 (v296)
   lines.push(detectReport(m && m.detect, today, nameOf)); // 🕵️ 나옹의 숙제 — 판·처음 답·처음에 놓친 칸 (v299)
   if (Array.isArray(days)) lines.push(sunReport(days, today, m)); // ☀️ 누른 곳·다시 시작 판·완주 (v331 — 하루 기록을 받은 📤에서만)
+  lines.push(quickReport(m, today)); // ⚡ 3문제 한 판 (v354)
   const log = shownLog((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
       const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.rl ? '📚' : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}${q.w === 's' && q.sv !== undefined ? (q.sv ? '✓' : '✗') : ''}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
       const res = e.mode === 'quit' ? `⏹그만둠 ${e.ok}/${e.n}${e.of ? ` (${e.of}문제 중)` : ''}${e.rf ? ' → 확인 못 통과로 침' : ''}` : `${e.mode || ''} ${e.ok}/${e.n}${e.kp ? ' 💪칸 그대로' : ''}`; // ⏹ 그만둔 편 (v250) · 💪 (v262)
-      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? '🎲섞어풀기' : e.id === 'ask' ? '❓답장뒤풀기' : nameOf(e.id)} ${res} ${qs}`);
+      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? (e.mode === 'quick' ? '⚡3문제' : '🎲섞어풀기') : e.id === 'ask' ? '❓답장뒤풀기' : nameOf(e.id)} ${res} ${qs}`);
     }
   }
   return lines.join('\n');

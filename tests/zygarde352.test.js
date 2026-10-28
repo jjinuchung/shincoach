@@ -394,7 +394,7 @@ test('🟢 배선: 배틀 고르기 세 벌 · 끝 화면 열세 곳 · 가방 �
     ['js/kortabs.js', 'if (res.ok && ctx.addCell) ctx.addCell(box);', 1],            // 🔤 오늘의 낱말
     ['js/korpuzzleview.js', 'if (res.ok && ctx.addCell) ctx.addCell(box);', 1],      // 🧩 국어 퍼즐 판
     ['js/nonsulview.js', "addCell(box, 'nonsul', { live: () => S.r === r });", 1],   // 🖊️
-    ['js/math.js', "addCell(card, 'math', { live: () => card.isConnected });", 3],   // ☀️ 끝 · 🎯 도전 · 개념 한 편
+    ['js/math.js', "addCell(card, 'math', { live: () => card.isConnected });", 4],   // ☀️ 끝 · 🎯 도전 · 개념 한 편 · ⚡ 3문제 한 판 끝(v354)
     ['js/math.js', "addCell: (box) => addCell(box, 'math') };", 1],                 // 퍼즐·숙제 ctx
     ['js/mathpuzzleview.js', 'if (ctx.addCell) ctx.addCell(box);', 1],               // 🧩 수학 퍼즐
     ['js/detectiveview.js', 'if (ctx.addCell) ctx.addCell(box);', 1],                // 🕵️
