@@ -454,11 +454,11 @@ export async function renderStats() {
     const jCur = journeyOf(jRaw).cur;
     if (jRows.length || jCur) {
       const cj = card('🎒 포켓몬 대여행');
-      cj.appendChild(el('p', 'stats-note', `토요일에 열려 다음 금요일까지 한 번 — 데리고 있는 6마리와 만남 9번, 이미 배운 문제로 배틀해요(공부 기록엔 안 남겨요). ❤️ 5개를 다 쓰면 스톤 20%(과목마다 최대 ${JOURNEY.loseMax.stone}개)·코인 30%(최대 ${JOURNEY.loseMax.coins})를 잃고, 끝까지 가면 💰500·스톤·레벨 +1·야생 포켓몬 하나.`));
+      cj.appendChild(el('p', 'stats-note', `토요일에 열려 다음 금요일까지 한 번 — 데리고 있는 6마리와 구역 여섯(구역마다 야생·트레이너·👑 대장 · 🎁 보물 상자·🧑‍🔬 박사 퀴즈·🔀 갈림길 이벤트 하나)·🚀 로켓단까지 만남 ${JR_STOPS}번, 이미 배운 문제로 배틀해요(공부 기록엔 안 남겨요 · v362부터 — 그 전은 만남 9번). ❤️ ${JOURNEY.hearts}개로 떠나 👑 대장을 이길 때마다 ❤️ +${JOURNEY.heal}(다섯 번 · 그 전 여행은 ❤️ 5개 · 🏥 한 번) · ❤️를 다 쓰면 스톤 20%(과목마다 최대 ${JOURNEY.loseMax.stone}개)·코인 30%(최대 ${JOURNEY.loseMax.coins})를 잃고, 끝까지 가면 💰500·스톤·레벨 +1·야생 포켓몬 하나.`));
       if (jCur) {
         const row = el('div', 'stats-row');
         row.appendChild(el('span', 'name', `${jCur.week} 주 · 지금 여행`));
-        row.appendChild(el('span', 'meta', `${jCur.phase === 'pick' ? '끝까지 감 — 데려올 포켓몬 고르는 중' : `만남 ${jCur.at + 1}/${JR_STOPS} · ❤️ ${jCur.hearts}`} · ${qLine(jCur.q)}`));
+        row.appendChild(el('span', 'meta', `${jCur.phase === 'pick' ? '끝까지 감 — 데려올 포켓몬 고르는 중' : `만남 ${jCur.at + 1}/${jCur.route.length} · ❤️ ${jCur.hearts}`} · ${qLine(jCur.q)}`));
         cj.appendChild(row);
       }
       for (const r of jRows) {

@@ -4,11 +4,12 @@
 //   — 모두 배틀과 같은 꼴이고 공부 기록에 안 남긴다 · 어느 문제를 낼지는 journey.orderOf·slotOf·questionSeed(앱이 꺼져도 같은 자리)
 // 대사창(.jr-dlg)만 Galmuri11 픽셀 글꼴(fonts/galmuri11.woff — 한 글자 12칸이라 크기는 crispPx로 기기 배율에 맞춘다)
 // 그림: 앱이 받아 둔 포켓몬 그림만(loadCharacters · 없으면 ensureCast로 받기 · 그래도 없으면 타입 색 동그라미) — 저장소에 그림 파일을 넣지 않는다
+// v362: 구역 6곳 · 👑 구역 대장(이기면 ❤️ +2 — 새 꼴 지도엔 🏥 점 없음) · 구역마다 이벤트(🎁 보물 상자 · 🧑‍🔬 박사 퀴즈 · 🔀 갈림길) · ❤️ 6 · 지도는 두 줄(산·숲·바다 → 화산·하늘·우주) · ⛺ 쉬었다 가기
 import {
-  JOURNEY, ZONES, STOPS, CENTER_AFTER, SUBJECTS, TYPE_KO, typesOf, advantage, strongZones, zoneOfStop, stateOf, makeRoute,
-  subjectFor, orderOf, slotOf, questionSeed, rngOf, crispPx, lossPreview, ownedIds,
+  JOURNEY, ZONES, PER_ZONE, OLD_STOPS, SUBJECTS, TYPE_KO, typesOf, advantage, strongZones, zoneOfStop, centersOf, zoneStart, pendingEvent, hpOf, heartsMax, stateOf, makeRoute, makeEvents,
+  profChoices, subjectFor, orderOf, slotOf, questionSeed, rngOf, crispPx, lossPreview, ownedIds,
 } from './journey.js';
-import { journeyRaw, journeyStart, journeyAnswer, journeySwap, journeyHome, journeyPick, getProfileSnapshot, getLevelInfo, rarityOf, monLv, getLook, korWordsMap, nonsulMap, profileReady, profileLoading, onProfileReload } from './xp.js';
+import { journeyRaw, journeyStart, journeyAnswer, journeySwap, journeyHome, journeyPick, journeyEvent, getProfileSnapshot, getLevelInfo, rarityOf, monLv, getLook, korWordsMap, nonsulMap, profileReady, profileLoading, onProfileReload } from './xp.js';
 import { ROSTER, loadCharacters, ensureCast, isUnlocked, isLegendary, isUltraBeast, isLetterMon } from './pokemon.js';
 import { TRAINERS, MOVES, SIGNATURE } from './battle.js';
 import { STONES } from './items.js';
@@ -33,7 +34,7 @@ function btn(cls, text, onClick) {
 }
 const play = (name) => { try { if (sfx[name]) sfx[name](); } catch { /* 소리 없이 */ } };
 const koOf = (id) => { const r = ROSTER.find((m) => m.id === Number(id)); return r ? r.ko : String(id); };
-const hearts = (n) => '❤️'.repeat(Math.max(0, n)) + '🤍'.repeat(Math.max(0, JOURNEY.hearts - n));
+const hearts = (n, max = JOURNEY.hearts) => '❤️'.repeat(Math.max(0, n)) + '🤍'.repeat(Math.max(0, max - n)); // max — v341 꼴 여행은 5
 
 let root = null;
 let cardBox = null;
@@ -64,7 +65,7 @@ export function mountJourneyCard(box) {
   body.appendChild(el('b', 'jr-home-title', '🎒 포켓몬 대여행'));
   const sub = {
     open: '이번 주 여행을 떠날 수 있어요',
-    go: `여행을 이어 가요 ${st.cur ? hearts(st.cur.hearts) : ''}`,
+    go: `여행을 이어 가요 ${st.cur ? hearts(st.cur.hearts, heartsMax(st.cur.route.length)) : ''}`,
     pick: '🎁 데려올 포켓몬을 골라요',
     done: '다음 여행은 토요일에 열려요',
   }[st.mode];
@@ -94,10 +95,10 @@ const body = () => root.querySelector('.jr-body');
 function topBar(cur) {
   const h = root.querySelector('.jr-hearts');
   const z = root.querySelector('.jr-zone');
-  h.textContent = cur ? hearts(cur.hearts) : '';
+  h.textContent = cur ? hearts(cur.hearts, cur.route ? heartsMax(cur.route.length) : JOURNEY.hearts) : '';
   h.setAttribute('aria-label', cur ? `하트 ${cur.hearts}개` : '하트');
   if (cur && cur.phase === 'go') {
-    const zi = zoneOfStop(cur.at);
+    const zi = zoneOfStop(cur.at, cur.route.length);
     z.textContent = `${ZONES[zi].emoji} ${ZONES[zi].ko}`;
     z.className = `jr-zone jr-z${zi}`;
   } else { z.textContent = ''; z.className = 'jr-zone'; }
@@ -233,10 +234,10 @@ async function loadSources() {
 }
 const availOf = () => SUBJECTS.filter((s) => ui.src && ui.src[s]);
 
-/** 지금 낼 문제 → { subj, q } · 이 만남의 과목에서 못 만들면 다른 과목에서 · 아무것도 없으면 null */
-function buildQuestion(c) {
+/** 지금 낼 문제 → { subj, q } · 이 만남의 과목에서 못 만들면 다른 과목에서 · 아무것도 없으면 null · shift = 과목 차례를 밀기(🎁 보물 상자는 그 구역 첫 만남과 다른 과목으로) */
+function buildQuestion(c, shift = 0) {
   const avail = availOf();
-  const first = subjectFor(c.at, avail);
+  const first = subjectFor(c.at + shift, avail);
   if (!first) return null;
   for (const subj of [first, ...avail.filter((s) => s !== first)]) {
     const src = ui.src[subj];
@@ -362,6 +363,7 @@ function renderPrep() {
   stakes.appendChild(win);
   stakes.appendChild(lose);
   b.appendChild(stakes);
+  b.appendChild(el('p', 'jr-sub', `${ZONES[0].emoji} 산부터 ${ZONES[ZONES.length - 1].emoji} 우주까지 여섯 곳을 지나는 긴 여행이에요. 👑 구역 대장을 이기면 ❤️가 ${JOURNEY.heal}개 돌아와요. 힘들면 ⛺ 쉬었다 가도 돼요 — 금요일까지 그 자리에서 이어 가요.`));
   b.appendChild(el('p', 'jr-sub', `포켓몬은 잃지 않아요. 스톤은 과목마다 최대 ${JOURNEY.loseMax.stone}개, 💰은 최대 ${JOURNEY.loseMax.coins}까지만 잃어요. 언제든 🏃 집으로 돌아올 수 있어요(그땐 보상도 없어요).`));
   b.appendChild(note);
   go.addEventListener('click', () => start(party.slice(), run, go));
@@ -393,9 +395,10 @@ async function start(party, run, go) {
   if (ui.busy) return;
   ui.busy = true;
   go.disabled = true;
-  const routeList = makeRoute(candidates(), Math.random, TRAINERS);
+  const cands = candidates();
+  const routeList = makeRoute(cands, Math.random, TRAINERS);
   if (!routeList) { ui.busy = false; go.disabled = false; return; }
-  const r = await journeyStart({ id: newId(), party, route: routeList });
+  const r = await journeyStart({ id: newId(), party, route: routeList, ev: makeEvents(routeList, cands, Math.random) });
   if (!alive(run)) return;
   ui.busy = false;
   if (!r.ok) {
@@ -407,28 +410,45 @@ async function start(party, run, go) {
   ui.cur = r.cur;
   ui.mon = null;
   play('whoosh');
-  await ensureArts(r.cur.route.map((s) => s.mon), 5000);
+  await ensureArts([...r.cur.route.map((s) => s.mon), ...r.cur.ev.map((e) => e.m || e.alt).filter(Boolean)], 5000); // 🧑‍🔬 그림자·🔀 갈림길 포켓몬 그림도
   if (!alive(run)) return;
   renderMap();
 }
 
 // ───────────── 여행 지도 ─────────────
 
-const NODES = [[28, 190], [78, 140], [128, 185], [168, 130], [205, 180], [245, 125], [282, 180], [322, 130], [352, 185]];
-const CENTER_NODE = [205, 180];
-// 지도 점: 만남 0~3 · 🏥 · 만남 4~7 · 🚀 (마지막) — 🏥는 만남이 아니라 자리만 하나
-function nodePos(i) {
-  if (i <= CENTER_AFTER) return NODES[i];
-  if (i === STOPS - 1) return [392, 106];
-  return NODES[i + 1];
+const EV_ICON = { chest: '🎁', prof: '🔬', fork: '🔀' }; // 박사는 한 글자 그림으로 — 🧑‍🔬(이어 붙인 그림)은 글꼴에 따라 👦🔬 둘로 갈라져 지도 동그라미를 넘는다
+const EV_KO = { chest: '보물 상자', prof: '박사 퀴즈', fork: '갈림길' };
+const KIND_ICON = { wild: '🐾', trainer: '🧢', boss: '👑', rocket: '🚀' };
+
+/**
+ * 지도 점 차례 (v362) — 구역마다 [이벤트, 만남…] · 🏥는 그 만남 다음 · 🚀 끝 · 점마다 { t: 'ev'|'stop'|'center', z, done, now }
+ * v341 꼴 길(만남 9)은 이벤트 없이 산·바다·하늘·우주 자리에
+ */
+function mapSlots(c) {
+  const n = c.route.length;
+  const centers = centersOf(n);
+  const pend = pendingEvent(c);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const z = zoneOfStop(i, n);
+    const ez = i % PER_ZONE === 0 && i < n - 1 ? i / PER_ZONE : -1;
+    if (ez >= 0 && c.ev[ez]) out.push({ t: 'ev', z, k: c.ev[ez].k, done: !!c.ev[ez].d || c.at > i, now: pend === ez });
+    out.push({ t: 'stop', z, kind: c.route[i].kind, done: i < c.at, now: i === c.at && pend < 0, rocket: i === n - 1 });
+    if (centers.includes(i) && n === OLD_STOPS) out.push({ t: 'center', z, done: c.at > i }); // 새 꼴은 👑 대장을 이기면 ❤️ +2 — 🏥 점을 따로 두지 않는다(점이 30개면 폰에서 빽빽)
+  }
+  return out;
 }
+/** 구역 띠 자리 — 위 줄 산·숲·바다(왼쪽 → 오른쪽) · 아래 줄 화산·하늘·우주(오른쪽 → 왼쪽) */
+const bandOf = (z) => (z < 3 ? { col: z, row: 0 } : { col: 5 - z, row: 1 });
+
 function mapSvg(c) {
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', '0 0 420 240');
+  svg.setAttribute('viewBox', '0 0 420 300');
   svg.setAttribute('class', 'jr-map');
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', '산에서 우주까지 이어진 길');
+  svg.setAttribute('aria-label', '산에서 숲·바다·화산·하늘을 지나 우주까지 이어진 길');
   const add = (tag, attrs, text) => {
     const n = document.createElementNS(ns, tag);
     for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
@@ -436,26 +456,33 @@ function mapSvg(c) {
     svg.appendChild(n);
     return n;
   };
-  ZONES.forEach((z, i) => add('rect', { x: i * 105, y: 0, width: 105, height: 240, class: `jr-z${i}-fill` }));
-  add('path', { d: 'M0,232 L22,206 L40,222 L62,196 L84,214 L105,200 L105,240 L0,240 Z', class: 'jr-map-hill' });
-  add('path', { d: 'M105,226 q12,-8 24,0 t24,0 t24,0 t24,0 t9,-2', class: 'jr-map-wave' });
-  for (const [x, y, r] of [[232, 48, 9], [244, 44, 12], [258, 49, 8]]) add('circle', { cx: x, cy: y, r, class: 'jr-map-cloud' });
-  for (const [x, y] of [[330, 40], [356, 58], [342, 214], [404, 200], [408, 64]]) add('circle', { cx: x, cy: y, r: 1.5, class: 'jr-map-star' });
-  ZONES.forEach((z, i) => add('text', { x: i * 105 + 52, y: [62, 62, 78, 40][i], class: 'jr-map-label' }, z.ko)); // 우주는 위로 — 로켓단 동그라미에 가리지 않게
-  add('path', { d: 'M28,190 C50,190 56,140 78,140 S106,185 128,185 S146,130 168,130 S183,180 205,180 S223,125 245,125 S260,180 282,180 S300,130 322,130 S330,185 352,185 S376,150 392,128', class: 'jr-map-road' });
-  const icon = (s) => (s.kind === 'wild' ? '🐾' : s.kind === 'trainer' ? '🧢' : '🚀');
-  for (let i = 0; i < STOPS; i++) {
-    const [x, y] = nodePos(i);
-    const boss = i === STOPS - 1;
-    const r = boss ? 26 : 14;
-    if (i === c.at) add('circle', { cx: x, cy: y, r: r + 5, class: 'jr-map-now' });
-    add('circle', { cx: x, cy: y, r, class: `jr-map-node${i < c.at ? ' is-done' : ''}${boss ? ' is-boss' : ''}` });
-    add('text', { x, y: y + 1, class: `jr-map-icon${boss ? ' is-boss' : ''}` }, i < c.at ? '✓' : icon(c.route[i]));
+  ZONES.forEach((z, i) => {
+    const { col, row } = bandOf(i);
+    add('rect', { x: col * 140, y: row * 150, width: 140, height: 150, class: `jr-z${i}-fill` });
+    add('text', { x: col * 140 + 70, y: row * 150 + 22, class: 'jr-map-label' }, `${z.emoji} ${z.ko}`);
+  });
+  const slots = mapSlots(c);
+  // 구역 안에서 고르게 · 위아래로 조금씩 엇갈리게
+  const byZone = new Map();
+  for (const s of slots) { if (!byZone.has(s.z)) byZone.set(s.z, []); byZone.get(s.z).push(s); }
+  for (const [z, list] of byZone) {
+    const { col, row } = bandOf(z);
+    const pad = 20; // 🚀 동그라미(+ 지금 자리 테두리)가 지도 밖으로 나가지 않게 (🔍 Codex 166차 #3)
+    list.forEach((s, k) => {
+      const t = (k + 0.5) / list.length;
+      s.x = Math.round(col * 140 + pad + (row === 0 ? t : 1 - t) * (140 - 2 * pad));
+      s.y = row * 150 + (s.rocket ? 92 : 88 + (k % 2 ? -22 : 20));
+    });
   }
-  const [cx, cy] = CENTER_NODE;
-  add('circle', { cx, cy, r: 14, class: `jr-map-node${c.at > CENTER_AFTER ? ' is-done' : ''}` });
-  add('text', { x: cx, y: cy + 1, class: 'jr-map-icon' }, c.at > CENTER_AFTER ? '✓' : '🏥');
-  add('text', { x: 392, y: 146, class: 'jr-map-label is-small' }, '로켓단');
+  add('path', { d: `M${slots.map((s) => `${s.x},${s.y}`).join(' L')}`, class: 'jr-map-road' });
+  for (const s of slots) {
+    const r = s.rocket ? 21 : s.t === 'ev' ? 11 : s.kind === 'boss' ? 15 : 13;
+    if (s.now) add('circle', { cx: s.x, cy: s.y, r: r + 5, class: 'jr-map-now' });
+    const kind = s.t === 'ev' ? ' is-ev' : s.t === 'center' ? ' is-center' : s.rocket ? ' is-rocket' : s.kind === 'boss' ? ' is-boss' : '';
+    add('circle', { cx: s.x, cy: s.y, r, class: `jr-map-node${s.done ? ' is-done' : ''}${kind}` });
+    const icon = s.done ? '✓' : s.t === 'ev' ? EV_ICON[s.k] : s.t === 'center' ? '🏥' : KIND_ICON[s.kind];
+    add('text', { x: s.x, y: s.y + 1, class: `jr-map-icon${s.rocket ? ' is-boss' : ''}` }, icon);
+  }
   return svg;
 }
 
@@ -463,20 +490,207 @@ function renderMap() {
   const c = ui.cur;
   if (!c) { route(); return; }
   const { b, run } = fresh(c);
+  const n = c.route.length;
+  const pend = pendingEvent(c);
   const wrap = el('div', 'jr-mapwrap');
   wrap.appendChild(mapSvg(c));
-  const first = c.at % 2 === 0 && c.hp === JOURNEY.hp[c.route[c.at].kind] && ui.ribbonAt !== c.at;
+  const first = zoneStart(c.at, n) && c.hp === hpOf(c.route, c.at) && ui.ribbonAt !== c.at;
   if (first) {
     ui.ribbonAt = c.at;
-    wrap.appendChild(el('div', 'jr-ribbon', c.at === STOPS - 1 ? '로켓단이 기다린다!' : `${ZONES[zoneOfStop(c.at)].ko}에 왔다!`));
+    const z = ZONES[zoneOfStop(c.at, n)];
+    wrap.appendChild(el('div', 'jr-ribbon', c.at === n - 1 ? '로켓단이 기다린다!' : `${z.ko}에 왔다!`));
   }
   b.appendChild(wrap);
-  b.appendChild(el('p', 'jr-legend', '🐾 야생 · 🧢 트레이너 · 🏥 포켓몬센터 · 🚀 로켓단'));
+  b.appendChild(el('p', 'jr-legend', n === OLD_STOPS ? '🐾 야생 · 🧢 트레이너 · 🏥 포켓몬센터 · 🚀 로켓단' : `🐾 야생 · 🧢 트레이너 · 👑 대장(이기면 ❤️ +${JOURNEY.heal}) · 🎁🔬🔀 이벤트 · 🚀 로켓단`));
   const row = el('div', 'jr-btns');
-  const fight = c.hp < JOURNEY.hp[c.route[c.at].kind]; // 그 만남에서 이미 한 방 넣었다
-  row.appendChild(btn('btn-primary jr-next', fight ? '배틀 이어 가기' : '다음 만남으로', () => renderIntro()));
+  if (pend >= 0) {
+    const k = c.ev[pend].k;
+    row.appendChild(btn('btn-primary jr-next', `${EV_ICON[k]} ${k === 'chest' ? '보물 상자 열어 보기' : k === 'prof' ? '박사님의 퀴즈' : '갈림길로'}`, () => renderEvent(pend)));
+  } else {
+    const fight = c.hp < hpOf(c.route, c.at); // 그 만남에서 이미 한 방 넣었다
+    row.appendChild(btn('btn-primary jr-next', fight ? '배틀 이어 가기' : '다음 만남으로', () => renderIntro()));
+  }
+  row.appendChild(btn('jr-rest', '⛺ 쉬었다 가기', () => closeJourney()));
   row.appendChild(btn('jr-home-go', '🏃 집으로', () => askHome(run)));
   b.appendChild(row);
+  b.appendChild(el('p', 'jr-legend', '⛺ 쉬었다 가기 — 이 자리에 그대로 두고 금요일까지 언제든 이어 가요'));
+}
+
+// ───────────── 구역 이벤트 (v362) ─────────────
+
+function renderEvent(z) {
+  const c = ui.cur;
+  if (!c || pendingEvent(c) !== z) { route(); return; }
+  const k = c.ev[z].k;
+  if (k === 'chest') renderChest(z);
+  else if (k === 'prof') renderProf(z);
+  else renderFork(z);
+}
+/** 이벤트 끝 — 한 줄 보여 주고 지도로 */
+function eventDone(line, text) {
+  line.textContent = text;
+  const b = body();
+  b.appendChild(btn('btn-primary jr-next', '다음으로', () => renderMap()));
+}
+/** 이벤트 저장 — 실패하면 단추를 다시 켜고 까닭 · 다른 창이 먼저면 지금 자리로 */
+async function sendEvent(run, req, buttons, line) {
+  if (ui.busy) return null;
+  ui.busy = true;
+  buttons.forEach((m) => { m.disabled = true; });
+  const r = await journeyEvent({ id: ui.cur.id, qn: ui.cur.qn, ...req });
+  if (!alive(run)) return null;
+  ui.busy = false;
+  if (!r.ok) {
+    if (r.why === 'changed') { route(); return null; }
+    buttons.forEach((m) => { m.disabled = false; });
+    line.textContent = '저장이 안 됐어요. 다시 골라 봐요';
+    return null;
+  }
+  if (r.end === 'expired') { renderNote('지난주 여행은 끝났어요.\n이번 주 여행을 새로 떠나요!'); return null; }
+  ui.cur = r.cur || null;
+  topBar(ui.cur);
+  return r;
+}
+/** 보기 단추 줄 */
+function choiceRow(choices, onPick) {
+  const moves = el('div', 'jr-moves');
+  choices.forEach((ch) => {
+    const m = el('button', 'jr-move jr-stripe-normal');
+    m.type = 'button';
+    if (ch.node) m.appendChild(ch.node()); else m.appendChild(document.createTextNode(ch.text));
+    m.addEventListener('click', () => onPick(ch, m));
+    moves.appendChild(m);
+  });
+  return moves;
+}
+/** 문제 줄기 (배틀과 같은 꼴 — 영어 낱말은 🔊) */
+function stemOf(q) {
+  const stem = el('div', 'jr-q-stem');
+  if (q.qNode) stem.appendChild(q.qNode());
+  else if (q.word) {
+    stem.appendChild(el('span', 'jr-q-word', q.word));
+    const hear = btn('jr-q-hear', '🔊', () => say(q.word));
+    hear.setAttribute('aria-label', '단어 듣기');
+    stem.appendChild(hear);
+    stem.appendChild(el('span', 'jr-q-ask', '— 뜻은?'));
+    say(q.word);
+  } else stem.textContent = q.q;
+  return stem;
+}
+
+/** 🎁 보물 상자 — 배운 문제 하나 · 맞히면 ❤️ +1(가득이면 💰) · 틀려도 ❤️ 그대로 */
+function renderChest(z) {
+  const c = ui.cur;
+  const { b, run } = fresh(c);
+  b.appendChild(el('div', 'jr-event-art', '🎁'));
+  const line = dlg('보물 상자를 찾았다!\n문제를 맞히면 상자가 열려요. 틀려도 ❤️는 그대로예요.');
+  b.appendChild(line);
+  const built = buildQuestion(c, 1);
+  if (!built) {
+    const pass = btn('btn-primary jr-next', '그냥 지나가기', async () => { const r = await sendEvent(run, { kind: 'chest', skip: true }, [pass], line); if (r) renderMap(); });
+    b.appendChild(pass);
+    return;
+  }
+  const { subj, q } = built;
+  devQ({ subj, ...q, ev: 'chest' });
+  const card = el('div', 'jr-q');
+  card.appendChild(el('span', 'jr-q-label', q.label));
+  card.appendChild(stemOf(q));
+  b.appendChild(card);
+  const moves = choiceRow(q.choices, async (ch, m) => {
+    const all = [...moves.children];
+    const r = await sendEvent(run, { kind: 'chest', subj, correct: !!ch.ok }, all, line);
+    if (!r) return;
+    const right = q.choices.findIndex((x) => x.ok);
+    if (all[right]) all[right].classList.add('is-ok');
+    if (!ch.ok) m.classList.add('is-no');
+    play(ch.ok ? 'success' : 'wrong');
+    eventDone(line, ch.ok
+      ? (r.heart ? '상자가 열렸다!\n❤️ 하나가 돌아왔다!' : `상자가 열렸다!\n💰 ${r.coins} 코인을 찾았다!`)
+      : `아쉽다! 상자가 열리지 않았다.\n정답은 「${q.choices[right] ? q.choices[right].text : ''}」`);
+  });
+  b.appendChild(moves);
+}
+
+/** 🧑‍🔬 박사 퀴즈 — 포켓몬 타입 맞히기 · 그림자 맞히기(그림이 없으면 타입) · 맞히면 💰 · 틀려도 잃는 것 없음 */
+function renderProf(z, typeOnly = false) {
+  const c = ui.cur;
+  const e = c.ev[z];
+  const { b, run } = fresh(c);
+  const pool = (candidates()[z] || []).map((x) => x.id);
+  let f = !typeOnly && e.f === 'shadow' && urlOf(e.m) ? 'shadow' : 'type';
+  let choices = profChoices(e.m, f, pool, koOf, rngOf(questionSeed(c)));
+  if (!choices) { f = 'type'; choices = profChoices(e.m, 'type', pool, koOf, rngOf(questionSeed(c))); }
+  devQ({ ev: 'prof', f, choices });
+  const ko = koOf(e.m);
+  const fig = monFig(e.m, `is-big jr-prof-mon${f === 'shadow' ? ' is-shadow' : ''}`);
+  const img = fig.querySelector('img');
+  if (img && f === 'shadow') img.alt = '그림자';
+  let answered = false;
+  // 그림 주소는 있는데 그림이 안 열리면(인터넷 끊김·깨진 그림) 그림자를 풀 수 없다 → 같은 칸을 타입 문제로 다시 (🔍 Codex 166차 #2)
+  const broken = () => { if (!answered && alive(run)) renderProf(z, true); };
+  if (img && f === 'shadow') {
+    img.addEventListener('error', broken, { once: true });
+    if (img.complete && !img.naturalWidth) setTimeout(broken, 0); // 이미 실패한 그림(캐시)
+  }
+  const art = el('div', 'jr-event-art');
+  art.appendChild(el('span', 'jr-prof', '🧑‍🔬'));
+  art.appendChild(fig);
+  b.appendChild(art);
+  if (f === 'type') { const tag = el('b', 'jr-prof-name', ko); b.appendChild(tag); }
+  const line = dlg(f === 'shadow' ? '포켓몬 박사: 「이 그림자는 누구일까?」' : `포켓몬 박사: 「${ko}${josa(ko, '은', '는')} 무슨 타입일까?」`);
+  b.appendChild(line);
+  const moves = choiceRow(choices || [], async (ch, m) => {
+    const all = [...moves.children];
+    answered = true; // 고른 뒤엔 그림이 늦게 깨져도 다시 그리지 않는다
+    const r = await sendEvent(run, { kind: 'prof', correct: !!ch.ok }, all, line);
+    if (!r) { answered = false; return; }
+    const right = choices.findIndex((x) => x.ok);
+    if (all[right]) all[right].classList.add('is-ok');
+    if (!ch.ok) m.classList.add('is-no');
+    fig.classList.remove('is-shadow');
+    if (img) img.alt = ko;
+    play(ch.ok ? 'success' : 'wrong');
+    const answer = f === 'shadow' ? ko : `${choices[right] ? choices[right].text : ''} 타입`;
+    eventDone(line, ch.ok ? `정답이야! ${f === 'shadow' ? `${ko}였어!` : '훌륭해!'}\n💰 ${r.coins} 코인을 받았다!` : `아깝다! 정답은 「${answer}」\n다음엔 맞힐 수 있을 거야!`);
+  });
+  b.appendChild(moves);
+}
+
+/** 🔀 갈림길 — 그 구역에서 만날 야생 포켓몬을 둘 가운데 고른다 (이기면 데려올 수 있는 후보) */
+function renderFork(z) {
+  const c = ui.cur;
+  const e = c.ev[z];
+  const { b, run } = fresh(c);
+  const wi = [PER_ZONE * z, PER_ZONE * z + 1].find((i) => c.route[i].kind === 'wild');
+  const pair = [c.route[wi].mon, e.alt];
+  if (rngOf(questionSeed(c))() < 0.5) pair.reverse();
+  const caught = getProfileSnapshot().caught || {};
+  const line = dlg('갈림길이다! 어느 길로 갈까?\n고른 길에서 그 포켓몬을 만나요.');
+  b.appendChild(el('div', 'jr-event-art', '🔀'));
+  b.appendChild(line);
+  const cards = el('div', 'jr-fork');
+  const all = [];
+  pair.forEach((id, i) => {
+    const k = el('button', `jr-pc jr-t-${typesOf(id)[0]}-soft`);
+    k.type = 'button';
+    k.appendChild(el('span', 'jr-fork-way', i ? '오른쪽 길 ➡️' : '⬅️ 왼쪽 길'));
+    k.appendChild(monFig(id));
+    k.appendChild(el('b', '', koOf(id)));
+    k.appendChild(typeChips(id));
+    if (!((caught[id] || 0) > 0)) k.appendChild(el('span', 'jr-super-tag', '✨ 처음 보는 포켓몬'));
+    k.addEventListener('click', async () => {
+      const r = await sendEvent(run, { kind: 'fork', pick: id }, all, line);
+      if (!r) return;
+      k.classList.add('is-sel');
+      play('whoosh');
+      const ko = koOf(id);
+      eventDone(line, `${ko}${josa(ko, '이', '가')} 사는 길로 가자!`);
+    });
+    all.push(k);
+    cards.appendChild(k);
+  });
+  b.appendChild(cards);
 }
 
 function askHome(run) {
@@ -505,10 +719,11 @@ function askHome(run) {
 
 // ───────────── 등장 · 누구를 내보낼까 ─────────────
 
-function foeLine(s) {
+function foeLine(s, zone) {
   const ko = koOf(s.mon);
   if (s.kind === 'wild') return `앗! 야생 ${ko}${josa(ko, '이', '가')} 나타났다!`;
   if (s.kind === 'trainer') return `${s.who} 트레이너가 승부를 걸어왔다!\n${ko}${josa(ko, '을', '를')} 내보냈다!`;
+  if (s.kind === 'boss') return `👑 ${zone.ko}의 대장이 길을 막아섰다!\n${ko}${josa(ko, '을', '를')} 내보냈다!`; // v362
   return '로켓단이 나타났다!\n나옹을 내보냈다!';
 }
 
@@ -516,22 +731,22 @@ function renderIntro() {
   const c = ui.cur;
   if (!c) { route(); return; }
   const s = c.route[c.at];
-  if (c.hp < JOURNEY.hp[s.kind] && ui.mon && c.party.includes(ui.mon)) { renderBattle(); return; } // 배틀 중이던 만남 — 등장은 건너뜀
+  if (c.hp < hpOf(c.route, c.at) && ui.mon && c.party.includes(ui.mon)) { renderBattle(); return; } // 배틀 중이던 만남 — 등장은 건너뜀
   const { b, run } = fresh(c);
-  const zi = zoneOfStop(c.at);
-  const vs = el('button', `jr-vs jr-z${zi}`);
+  const zi = zoneOfStop(c.at, c.route.length);
+  const vs = el('button', `jr-vs jr-z${zi}${s.kind === 'boss' ? ' is-boss' : ''}`);
   vs.type = 'button';
   vs.setAttribute('aria-label', '넘어가기');
   const l = el('span', 'jr-vs-l');
-  l.appendChild(el('span', 'jr-vs-me', s.kind === 'trainer' ? s.who : s.kind === 'rocket' ? '👩‍🦰🧑' : '🎒'));
+  l.appendChild(el('span', 'jr-vs-me', s.kind === 'trainer' ? s.who : s.kind === 'boss' ? `👑${s.who}` : s.kind === 'rocket' ? '👩‍🦰🧑' : '🎒'));
   const r = el('span', 'jr-vs-r');
   r.appendChild(monFig(s.mon, 'is-big'));
   vs.appendChild(l);
   vs.appendChild(r);
   vs.appendChild(el('span', 'jr-vs-mark', 'VS'));
   b.appendChild(vs);
-  b.appendChild(dlg(foeLine(s)));
-  play(s.kind === 'rocket' ? 'siren' : 'whoosh');
+  b.appendChild(dlg(foeLine(s, ZONES[zi])));
+  play(s.kind === 'rocket' || s.kind === 'boss' ? 'siren' : 'whoosh');
   let done = false;
   const next = () => { if (done || !alive(run)) return; done = true; renderChoose(); };
   vs.addEventListener('click', next);
@@ -575,13 +790,13 @@ function renderBattle(msg) {
   if (!c || c.phase !== 'go') { route(); return; }
   if (!ui.mon || !c.party.includes(ui.mon)) { renderChoose(); return; }
   const s = c.route[c.at];
-  const max = JOURNEY.hp[s.kind];
+  const max = hpOf(c.route, c.at);
   const { b, run } = fresh(c);
   const adv = advantage(ui.mon, s.mon);
-  const arena = el('div', `jr-arena jr-z${zoneOfStop(c.at)}-soft`);
+  const arena = el('div', `jr-arena jr-z${zoneOfStop(c.at, c.route.length)}-soft`);
   const foePlate = el('div', 'jr-plate is-foe');
   const fn = el('span', 'jr-plate-name');
-  fn.appendChild(el('b', '', s.kind === 'trainer' ? `${s.who} ${koOf(s.mon)}` : s.kind === 'rocket' ? `🚀 ${koOf(s.mon)}` : koOf(s.mon)));
+  fn.appendChild(el('b', '', s.kind === 'trainer' ? `${s.who} ${koOf(s.mon)}` : s.kind === 'boss' ? `👑 ${koOf(s.mon)}` : s.kind === 'rocket' ? `🚀 ${koOf(s.mon)}` : koOf(s.mon)));
   fn.appendChild(typeChips(s.mon));
   foePlate.appendChild(fn);
   const foePips = pips(c.hp, max);
@@ -662,7 +877,7 @@ async function doSwap(run, swap) {
   if (!alive(run)) return;
   ui.busy = false;
   if (r.ok) { ui.cur = r.cur; renderBattle(); return; }
-  if (r.why === 'changed') { route(); return; }
+  if (r.why === 'changed' || r.why === 'event') { route(); return; }
   if (r.why !== 'used') swap.disabled = false;
 }
 
@@ -678,7 +893,7 @@ async function answer(run, x) {
   if (!alive(run)) return;
   if (!r.ok) {
     ui.busy = false;
-    if (r.why === 'changed') { route(); return; }
+    if (r.why === 'changed' || r.why === 'event') { route(); return; } // 이벤트가 먼저면 지도로 (v362)
     all.forEach((m) => { m.disabled = false; });
     x.swap.disabled = c.swap === c.at;
     x.line.textContent = '저장이 안 됐어요. 다시 골라 봐요';
@@ -733,10 +948,12 @@ async function answer(run, x) {
 function renderCenter(healed) {
   const c = ui.cur;
   const { b } = fresh(c);
-  b.appendChild(el('div', 'jr-center', '🏥'));
-  b.appendChild(dlg(`포켓몬센터에서 쉬었다!\n❤️ ${healed}개가 돌아왔다!`));
+  const old = !c || c.route.length === OLD_STOPS;
+  b.appendChild(el('div', 'jr-center', old ? '🏥' : '💖'));
+  b.appendChild(dlg(old ? `포켓몬센터에서 쉬었다!\n❤️ ${healed}개가 돌아왔다!` : `👑 대장을 이겼다! 힘이 솟는다!\n❤️ ${healed}개가 돌아왔다!`));
   play('levelUp');
-  b.appendChild(btn('btn-primary jr-next', '하늘로 가자!', () => renderMap()));
+  const next = c ? ZONES[zoneOfStop(c.at, c.route.length)] : null; // 다음 구역 (v362 — 화산·우주 · v341 꼴은 하늘)
+  b.appendChild(btn('btn-primary jr-next', next ? `${next.emoji} ${next.ko}에 가자!` : '다음으로', () => renderMap()));
 }
 
 function renderNote(text) {

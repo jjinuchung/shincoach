@@ -1,12 +1,13 @@
 // 🎒 포켓몬 대여행 (v341 · 2026-10-26 진우 제안 → 아버님 기본안 2판 "이대로") — node --test tests/journey341.test.js
-// 토요일에 열려 다음 금요일까지 한 번 · 데리고 있는 6마리 · 산 → 바다 → 🏥 → 하늘 → 우주 → 🚀 만남 9번 · 맞히면 1칸(타입 유리 2칸) · 틀리면 ❤️ −1 ·
+// (v362부터 길이 세 배 — 구역 6 · 👑 대장 · 이벤트 · 🏥 두 번: 이 파일은 v341 시험을 새 꼴에 맞춘 것 · 새로 생긴 것은 tests/journey362.test.js)
+// 토요일에 열려 다음 금요일까지 한 번 · 데리고 있는 6마리 · 산 → 숲 → 바다 → 🏥 → 화산 → 하늘 → 🏥 → 우주 → 🚀 만남 19번 · 맞히면 1칸(타입 유리 2칸) · 틀리면 ❤️ −1 ·
 // ❤️를 다 잃으면 스톤 20%·코인 30%(버림 · 포켓몬은 안 잃음) · 🏃 집으로 = 잃는 것·보상 없이 끝 · 끝까지 가면 💰500·스톤 1씩·6마리 Lv+1(못 올리면 스톤)·야생 하나
 import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
-  JOURNEY, ZONES, STOPS, CENTER_AFTER, ROCKET_MON, SUBJECTS, TYPE_KO, TYPES, typesOf, mult, advantage, strongZones, zoneOfStop, dayKeyOf, weekOf,
+  JOURNEY, ZONES, STOPS, CENTERS, PER_ZONE, ROCKET_MON, eventRule, makeEvents, pendingEvent, SUBJECTS, TYPE_KO, TYPES, typesOf, mult, advantage, strongZones, zoneOfStop, dayKeyOf, weekOf,
   routeOf, journeyOf, copyJourney, mergeJourney, stateOf, ownedIds, startRule, answerRule, swapRule, homeRule, pickRule, lossPreview,
   makeRoute, subjectFor, seedOf, rngOf, orderOf, slotOf, questionSeed, crispPx, journeyRows, rowText, qLine, journeyMd,
 } from '../js/journey.js';
@@ -16,7 +17,7 @@ import { MOVES, SIGNATURE } from '../js/battle.js';
 import { STONES } from '../js/items.js';
 import { evoAt, lvOf } from '../js/evolve.js';
 import { emptyProfile, cloneProfile, mergeStatRecord } from '../js/db.js';
-import { initProfile, flushProfile, reloadProfile, journeyStart, journeyAnswer, journeyPick, journeyHome, journeySwap, getProfileSnapshot } from '../js/xp.js';
+import { initProfile, flushProfile, reloadProfile, journeyStart, journeyAnswer, journeyPick, journeyHome, journeySwap, journeyEvent, getProfileSnapshot } from '../js/xp.js';
 
 const src = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 function seeded(seed = 7) {
@@ -40,14 +41,33 @@ function cands(caught = {}) {
 }
 function started(p = pf(), seed = 3, now = SAT) {
   const route = makeRoute(cands(), seeded(seed), ['🧢', '👧']);
-  const r = startRule(p, { id: `trip${seed}abc`, party: PARTY, route }, now);
+  const r = startRule(p, { id: `trip${seed}abc`, party: PARTY, route, ev: makeEvents(route, cands(), seeded(seed + 100)) }, now);
   assert.equal(r.ok, true, `떠나기 ${r.why || ''}`);
   return { p, cur: r.cur };
+}
+/** 이벤트 차례면 셈 없이 넘긴다 (v362 — 보물 상자 skip · 박사 퀴즈 틀림 · 갈림길은 길에 있던 야생) */
+function clearEv(p, now = SAT) {
+  const c = journeyOf(p.journey).cur;
+  const z = pendingEvent(c);
+  if (z < 0) return null;
+  const e = c.ev[z];
+  const wild = c.route.slice(PER_ZONE * z, PER_ZONE * z + 2).find((x) => x.kind === 'wild').mon;
+  const req = e.k === 'chest' ? { skip: true } : e.k === 'prof' ? { correct: false } : { pick: wild };
+  const r = eventRule(p, { id: c.id, qn: c.qn, kind: e.k, ...req }, now);
+  assert.equal(r.ok, true, `이벤트 ${r.why || ''}`);
+  return r;
+}
+/** 틀린 답 하나 (이벤트는 먼저 넘김) */
+function miss(p, subj = 'korean', now = SAT) {
+  clearEv(p, now);
+  const c = journeyOf(p.journey).cur;
+  return answerRule(p, { id: c.id, qn: c.qn, mon: 25, subj, correct: false }, now, subjectOf);
 }
 /** 지금 만남을 맞혀서 이긴다 — 유리한 포켓몬이 있으면 그 포켓몬으로 */
 function beat(p, now = SAT) {
   let out = null;
   for (let k = 0; k < 10; k++) {
+    if (journeyOf(p.journey).cur && journeyOf(p.journey).cur.phase === 'go') clearEv(p, now);
     const c = journeyOf(p.journey).cur;
     if (!c || c.phase !== 'go') break;
     const at = c.at;
@@ -90,10 +110,11 @@ test('⚔️ 타입 상성 — 굉장함·별로·없음 · 두 타입은 곱 ·
   assert.equal(advantage(658, 74), true, '개굴닌자 → 꼬마돌(바위·땅)');
   assert.equal(advantage(4, 1), true, '파이리 → 이상해씨');
   assert.equal(advantage(1, 4), false);
-  assert.deepEqual(strongZones(25), [1, 2], '피카츄는 바다·하늘');
-  assert.deepEqual(strongZones(7), [0], '꼬부기는 산');
-  assert.deepEqual(strongZones(4), [], '파이리는 어디서나 꾸준히');
-  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7, 8].map(zoneOfStop), [0, 0, 1, 1, 2, 2, 3, 3, 3]);
+  assert.deepEqual(strongZones(25), [2, 4], '피카츄는 바다·하늘');
+  assert.deepEqual(strongZones(7), [0, 3], '꼬부기는 산·화산');
+  assert.deepEqual(strongZones(4), [1], '파이리는 숲');
+  assert.deepEqual(strongZones(133), [], '이브이는 어디서나 꾸준히');
+  assert.deepEqual([...Array(STOPS).keys()].map((i) => zoneOfStop(i)), [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 5]);
 });
 
 test('📅 여행 주 — 토요일에 열려 다음 금요일까지 · 해가 바뀌어도 · 꼴이 틀리면 빈 글', () => {
@@ -109,21 +130,22 @@ test('📅 여행 주 — 토요일에 열려 다음 금요일까지 · 해가 �
   assert.equal(weekOf(dayKeyOf(SAT + 7 * DAY)), '2026-10-31');
 });
 
-test('🗺️ 길 만들기 — 구역마다 야생·트레이너 하나(그 구역 타입) · 끝은 로켓단 나옹 · 같은 포켓몬 없음 · 모자라면 null', () => {
+test('🗺️ 길 만들기 — 구역마다 야생·트레이너 하나(차례 아무렇게나) 뒤 👑 대장(그 구역 타입) · 끝은 로켓단 나옹 · 같은 포켓몬 없음 · 모자라면 null', () => {
   for (let s = 1; s <= 400; s++) {
     const r = makeRoute(cands(), seeded(s), ['🧢']);
     assert.ok(r, `씨앗 ${s}`);
     assert.equal(r.length, STOPS);
-    assert.deepEqual(r[8], { kind: 'rocket', mon: ROCKET_MON });
-    for (let z = 0; z < 4; z++) {
-      assert.deepEqual([r[2 * z].kind, r[2 * z + 1].kind].sort(), ['trainer', 'wild']);
-      for (const st of [r[2 * z], r[2 * z + 1]]) assert.ok(typesOf(st.mon).some((t) => ZONES[z].types.includes(t)), `${st.mon} 구역 ${z}`);
+    assert.deepEqual(r[STOPS - 1], { kind: 'rocket', mon: ROCKET_MON });
+    for (let z = 0; z < ZONES.length; z++) {
+      assert.deepEqual([r[3 * z].kind, r[3 * z + 1].kind].sort(), ['trainer', 'wild']);
+      assert.equal(r[3 * z + 2].kind, 'boss');
+      for (const st of r.slice(3 * z, 3 * z + 3)) assert.ok(typesOf(st.mon).some((t) => ZONES[z].types.includes(t)), `${st.mon} 구역 ${z}`);
     }
-    assert.equal(new Set(r.slice(0, 8).map((x) => x.mon)).size, 8);
+    assert.equal(new Set(r.slice(0, STOPS - 1).map((x) => x.mon)).size, STOPS - 1);
   }
   const few = cands();
-  few[2] = few[2].slice(0, 1);
-  assert.equal(makeRoute(few, seeded(1)), null, '하늘 후보가 하나뿐');
+  few[4] = few[4].slice(0, 2);
+  assert.equal(makeRoute(few, seeded(1)), null, '하늘 후보가 둘뿐(셋이 있어야)');
   // 야생은 아직 못 잡은 포켓몬을 더 자주
   const caught = Object.fromEntries(ROSTER.filter((_, i) => i % 2).map((r) => [r.id, 1]));
   let fresh = 0; let old = 0;
@@ -131,23 +153,26 @@ test('🗺️ 길 만들기 — 구역마다 야생·트레이너 하나(그 구
   assert.ok(fresh > old * 2, `못 잡은 ${fresh} · 잡은 ${old}`);
   // 검사: 틀린 길
   const ok = makeRoute(cands(), seeded(5));
-  assert.equal(routeOf(ok.map((x, i) => (i === 8 ? { ...x, mon: 25 } : x))), null, '로켓단은 나옹');
+  assert.equal(routeOf(ok.map((x, i) => (i === STOPS - 1 ? { ...x, mon: 25 } : x))), null, '로켓단은 나옹');
   assert.equal(routeOf(ok.map((x, i) => (i === 0 ? { ...x, mon: 25 } : x))), null, '산에 전기 포켓몬');
   assert.equal(routeOf(ok.map((x, i) => (i < 2 ? { ...x, kind: 'wild' } : x))), null, '야생 둘');
-  assert.equal(routeOf(ok.slice(0, 8)), null);
+  assert.equal(routeOf(ok.map((x, i) => (i === 2 ? { ...x, kind: 'trainer' } : x))), null, '대장 자리에 트레이너');
+  assert.equal(routeOf(ok.map((x, i) => (i === 0 ? { ...x, kind: 'boss' } : x))), null, '대장이 앞에');
+  assert.equal(routeOf(ok.slice(0, STOPS - 1)), null);
   assert.equal(routeOf([...ok.slice(0, 1), ok[0], ...ok.slice(2)]), null);
   assert.equal(routeOf('x'), null);
   // 같은 포켓몬이 두 구역에 (갸라도스 = 물·비행 → 바다·하늘 둘 다 맞음)
   assert.deepEqual(typesOf(130), ['water', 'flying']);
-  const sea = ok[2].kind === 'wild' ? 2 : 3;
-  const sky = ok[4].kind === 'wild' ? 4 : 5;
+  const sea = ok[6].kind === 'wild' ? 6 : 7;
+  const sky = ok[12].kind === 'wild' ? 12 : 13;
   assert.ok(routeOf(ok.map((x, i) => (i === sea ? { ...x, mon: 130 } : x))), '한 번은 괜찮다');
   assert.equal(routeOf(ok.map((x, i) => (i === sea || i === sky ? { ...x, mon: 130 } : x))), null, '두 번은 안 된다');
 });
 
 test('🎒 떠나기 — 데리고 있는 6마리(모자라면 있는 만큼) · 한 주에 한 번 · 고르기·여행 중이면 못 떠남 · 지난주 여행은 집으로 닫힘', () => {
   const route = makeRoute(cands(), seeded(9));
-  const go = (p, party, now = SAT, id = 'abcdef12') => startRule(p, { id, party, route }, now);
+  const ev = makeEvents(route, cands(), seeded(90));
+  const go = (p, party, now = SAT, id = 'abcdef12') => startRule(p, { id, party, route, ev }, now);
   assert.equal(go(pf(), PARTY.slice(0, 5)).why, 'party', '여섯 마리');
   assert.equal(go(pf(), [...PARTY.slice(0, 5), 999]).why, 'party', '없는 포켓몬');
   assert.equal(go(pf(), [...PARTY.slice(0, 5), 25]).why, 'party', '같은 포켓몬 둘');
@@ -158,11 +183,12 @@ test('🎒 떠나기 — 데리고 있는 6마리(모자라면 있는 만큼) ·
   const two = pf({ caught: { 25: 1, 7: 1 } });
   assert.equal(go(two, [25, 7]).ok, true, '두 마리뿐이면 둘');
   assert.equal(go(pf(), PARTY, SAT, 'BAD').why, 'id');
-  assert.equal(startRule(pf(), { id: 'abcdef12', party: PARTY, route: route.slice(1) }, SAT).why, 'route');
+  assert.equal(startRule(pf(), { id: 'abcdef12', party: PARTY, route: route.slice(1), ev }, SAT).why, 'route');
+  assert.equal(startRule(pf(), { id: 'abcdef12', party: PARTY, route }, SAT).why, 'ev', '이벤트 없이는 못 떠남 (v362)');
   const p = pf();
   const r = go(p, PARTY);
   assert.equal(r.ok, true);
-  assert.deepEqual([r.cur.at, r.cur.hearts, r.cur.hp, r.cur.phase, r.cur.week], [0, 5, JOURNEY.hp[route[0].kind], 'go', '2026-10-24']);
+  assert.deepEqual([r.cur.at, r.cur.hearts, r.cur.hp, r.cur.phase, r.cur.week], [0, JOURNEY.hearts, JOURNEY.hp[route[0].kind], 'go', '2026-10-24']);
   assert.equal(go(p, PARTY, SAT + DAY).why, 'going');
   homeRule(p, { id: 'abcdef12' }, SAT + DAY);
   assert.equal(go(p, PARTY, SAT + 2 * DAY, 'abcdef99').why, 'done', '이번 주는 다녀옴');
@@ -178,21 +204,24 @@ test('🎒 떠나기 — 데리고 있는 6마리(모자라면 있는 만큼) ·
 
 test('✏️ 답 — 맞히면 1칸(유리 2칸) · 이기면 다음 만남 · 야생은 이긴 목록에 · 틀리면 ❤️ −1 · 몇 번째 문제가 다르면 changed · 과목별 맞힌 수', () => {
   const { p, cur } = started();
-  const foe = cur.route[0];
+  assert.equal(answerRule(p, { id: cur.id, qn: 0, mon: PARTY[0], subj: 'math', correct: true }, SAT, subjectOf).why, 'event', '구역 이벤트가 먼저 (v362)');
+  clearEv(p);
+  const q0 = journeyOf(p.journey).cur.qn;
+  const foe = journeyOf(p.journey).cur.route[0];
   const strong = PARTY.find((id) => advantage(id, foe.mon));
   const weak = PARTY.find((id) => !advantage(id, foe.mon));
-  assert.equal(answerRule(p, { id: cur.id, qn: 1, mon: weak, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed');
-  assert.equal(answerRule(p, { id: 'zzzzzz99', qn: 0, mon: weak, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed');
-  assert.equal(answerRule(p, { id: cur.id, qn: 0, mon: 133, subj: 'math', correct: true }, SAT, subjectOf).why, 'mon');
-  assert.equal(answerRule(p, { id: cur.id, qn: 0, mon: weak, subj: 'art', correct: true }, SAT, subjectOf).why, 'subj');
-  const a = answerRule(p, { id: cur.id, qn: 0, mon: weak, subj: 'math', correct: true }, SAT, subjectOf);
+  assert.equal(answerRule(p, { id: cur.id, qn: q0 + 1, mon: weak, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed');
+  assert.equal(answerRule(p, { id: 'zzzzzz99', qn: q0, mon: weak, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed');
+  assert.equal(answerRule(p, { id: cur.id, qn: q0, mon: 133, subj: 'math', correct: true }, SAT, subjectOf).why, 'mon');
+  assert.equal(answerRule(p, { id: cur.id, qn: q0, mon: weak, subj: 'art', correct: true }, SAT, subjectOf).why, 'subj');
+  const a = answerRule(p, { id: cur.id, qn: q0, mon: weak, subj: 'math', correct: true }, SAT, subjectOf);
   assert.deepEqual([a.ok, a.adv, a.hit, a.hp], [true, false, 1, JOURNEY.hp[foe.kind] - 1]);
-  const w = answerRule(p, { id: cur.id, qn: 1, mon: weak, subj: 'english', correct: false }, SAT, subjectOf);
-  assert.deepEqual([w.hearts, w.hp, w.end], [4, JOURNEY.hp[foe.kind] - 1, null]);
-  assert.equal(answerRule(p, { id: cur.id, qn: 1, mon: weak, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed', '두 번 누름');
+  const w = answerRule(p, { id: cur.id, qn: q0 + 1, mon: weak, subj: 'english', correct: false }, SAT, subjectOf);
+  assert.deepEqual([w.hearts, w.hp, w.end], [JOURNEY.hearts - 1, JOURNEY.hp[foe.kind] - 1, null]);
+  assert.equal(answerRule(p, { id: cur.id, qn: q0 + 1, mon: weak, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed', '두 번 누름');
   let beaten = false;
   if (strong) {
-    const b = answerRule(p, { id: cur.id, qn: 2, mon: strong, subj: 'math', correct: true }, SAT, subjectOf);
+    const b = answerRule(p, { id: cur.id, qn: q0 + 2, mon: strong, subj: 'math', correct: true }, SAT, subjectOf);
     assert.deepEqual([b.adv, b.hit], [true, 2]);
     beaten = b.beaten;
   }
@@ -205,36 +234,37 @@ test('✏️ 답 — 맞히면 1칸(유리 2칸) · 이기면 다음 만남 · �
   assert.equal(c.hp, JOURNEY.hp[c.route[1].kind], '새 상대는 HP 가득');
 });
 
-test('🏥 포켓몬센터 — 바다 두 번째 만남을 이기면 ❤️ +2(최대 5) · 🔄 다른 문제는 만남마다 한 번', () => {
+test('💖 👑 대장을 이기면 ❤️ +2(최대 6 — v362 Codex 166차 판단 표 「추천대로」) · 🔄 다른 문제는 만남마다 한 번', () => {
   const { p, cur } = started();
   // ❤️ 둘을 잃고
-  for (let k = 0; k < 2; k++) { const c = journeyOf(p.journey).cur; answerRule(p, { id: c.id, qn: c.qn, mon: c.party[0], subj: 'math', correct: false }, SAT, subjectOf); }
-  assert.equal(journeyOf(p.journey).cur.hearts, 3);
+  for (let k = 0; k < 2; k++) miss(p, 'math');
+  assert.equal(journeyOf(p.journey).cur.hearts, JOURNEY.hearts - 2);
   // 🔄
   const c0 = journeyOf(p.journey).cur;
   assert.equal(swapRule(p, { id: c0.id, qn: c0.qn + 1 }).why, 'changed');
+  void PER_ZONE;
   const s = swapRule(p, { id: c0.id, qn: c0.qn });
   assert.deepEqual([s.ok, s.cur.qv, s.cur.swap, s.cur.qn], [true, 1, 0, c0.qn + 1], '바꾼 문제는 새 번호');
   assert.equal(swapRule(p, { id: c0.id, qn: s.cur.qn }).why, 'used', '한 만남에 한 번');
   // 🔍 Codex 145차 #1 — 다른 창에 남은 바꾸기 전 문제의 답은 안 받는다(❤️·가방 그대로)
   const before = JSON.stringify([p.coins, p.items]);
   assert.equal(answerRule(p, { id: c0.id, qn: c0.qn, mon: 25, subj: 'math', correct: false }, SAT, subjectOf).why, 'changed');
-  assert.equal(journeyOf(p.journey).cur.hearts, 3);
+  assert.equal(journeyOf(p.journey).cur.hearts, JOURNEY.hearts - 2);
   assert.equal(JSON.stringify([p.coins, p.items]), before);
-  for (let k = 0; k < CENTER_AFTER; k++) beat(p);
+  for (let k = 0; k < CENTERS[0]; k++) beat(p);
   const c1 = journeyOf(p.journey).cur;
-  assert.equal(c1.at, CENTER_AFTER);
+  assert.equal(c1.at, CENTERS[0]);
   assert.equal(swapRule(p, { id: c1.id, qn: c1.qn }).ok, true, '새 만남에선 다시');
   const last = beat(p);
   assert.equal(last.healed, 2);
-  assert.equal(journeyOf(p.journey).cur.hearts, 5);
+  assert.equal(journeyOf(p.journey).cur.hearts, JOURNEY.hearts);
   // 가득일 때는 0
   const { p: q } = started(pf(), 11);
-  for (let k = 0; k <= CENTER_AFTER; k++) { const r = beat(q); if (k === CENTER_AFTER) assert.equal(r.healed, 0); }
+  for (let k = 0; k <= CENTERS[0]; k++) { const r = beat(q); if (k === CENTERS[0]) assert.equal(r.healed, 0); }
   void cur;
 });
 
-test('🎉 끝까지 — 💰500·공부로 번 💰 · 스톤 1개씩 · 6마리 Lv+1(진화 레벨·데리고 있지 않으면 그 포켓몬 스톤) · 이긴 야생 넷 · 하나 데려오기', () => {
+test('🎉 끝까지 — 💰500·공부로 번 💰 · 스톤 1개씩 · 6마리 Lv+1(진화 레벨·데리고 있지 않으면 그 포켓몬 스톤) · 이긴 야생 여섯 · 하나 데려오기', () => {
   const p = pf();
   p.mons[72] = { lv: evoAt(72) }; // 왕눈해는 진화 레벨에서 멈춤 → 🟩(논술 포켓몬)
   p.mons[658] = { lv: 40 };
@@ -243,7 +273,7 @@ test('🎉 끝까지 — 💰500·공부로 번 💰 · 스톤 1개씩 · 6마�
   let last = null;
   for (let k = 0; k < STOPS; k++) last = beat(p);
   assert.equal(last.end, 'won');
-  assert.deepEqual([p.coins, p.coinsEarned], [450 + 500, 1000 + 500]);
+  assert.deepEqual([p.coins, p.coinsEarned], [450 + 500, 1000 + 500], '이벤트는 셈 없이 넘겼다(보물 상자 skip · 박사 퀴즈 틀림)');
   const lvOfId = (id) => lvOf(p.mons[id]);
   assert.deepEqual([lvOfId(25), lvOfId(7), lvOfId(1), lvOfId(658), lvOfId(72), lvOfId(4)], [2, 2, 2, 41, evoAt(72), 1]);
   assert.equal(p.items.stone_math, 13);
@@ -251,7 +281,7 @@ test('🎉 끝까지 — 💰500·공부로 번 💰 · 스톤 1개씩 · 6마�
   assert.equal(p.items.stone_korean, 4 + 1 + 1, '스톤 1 + 왕눈해 대신(논술 포켓몬은 🟩)');
   const j = journeyOf(p.journey);
   assert.equal(j.cur.phase, 'pick');
-  assert.equal(j.cur.won.length, 4);
+  assert.equal(j.cur.won.length, ZONES.length);
   assert.equal(j.done['2026-10-24'].r, 'won');
   assert.deepEqual(j.done['2026-10-24'].sub.map((x) => x[0]).sort((a, b) => a - b), [4, 72]);
   assert.equal(j.done['2026-10-24'].lv.length, 4);
@@ -277,7 +307,7 @@ test('💔 ❤️를 다 잃으면 — 스톤 20%·코인 30%(버림 · v343 상
   const caught0 = { ...p.caught };
   const mons0 = JSON.stringify(p.mons);
   let r = null;
-  for (let k = 0; k < JOURNEY.hearts; k++) { const c = journeyOf(p.journey).cur; r = answerRule(p, { id: c.id, qn: c.qn, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf); }
+  for (let k = 0; k < JOURNEY.hearts; k++) r = miss(p);
   assert.equal(r.end, 'lost');
   assert.deepEqual(r.lost, { items: { stone_math: 2, stone_english: 1 }, coins: 200 });
   assert.deepEqual([p.items.stone_math, p.items.stone_english, p.items.stone_korean, p.coins], [10, 7, 4, 799]);
@@ -286,8 +316,8 @@ test('💔 ❤️를 다 잃으면 — 스톤 20%·코인 30%(버림 · v343 상
   const j = journeyOf(p.journey);
   assert.equal(j.cur, null);
   assert.deepEqual(j.done['2026-10-24'].lost, { items: { stone_math: 2, stone_english: 1 }, coins: 200 });
-  assert.deepEqual(j.done['2026-10-24'].q.korean, [0, 5]);
-  assert.equal(answerRule(p, { id: cur.id, qn: 5, mon: 25, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed');
+  assert.deepEqual(j.done['2026-10-24'].q.korean, [0, JOURNEY.hearts]);
+  assert.equal(answerRule(p, { id: cur.id, qn: 6, mon: 25, subj: 'math', correct: true }, SAT, subjectOf).why, 'changed');
   // 셈: 버림 · 정수 셈이라 소수 오차 없음
   // 상한 경계(v343): 💰 666 → 199 잃음 · 667부터 200 · 스톤 29 → 5 · 30 → 6이지만 5
   for (const [c, left] of [[0, 0], [3, 3], [7, 5], [10, 7], [20, 14], [100, 70], [396, 278], [666, 467], [667, 467], [670, 470], [1001, 801], [5000, 4800]]) assert.equal(lossPreview({ coins: c, items: {} }).coins[1], left, `코인 ${c}`);
@@ -299,7 +329,7 @@ test('💔 ❤️를 다 잃으면 — 스톤 20%·코인 30%(버림 · v343 상
   const rv = lossPreview(rich);
   started(rich);
   let rr = null;
-  for (let k = 0; k < JOURNEY.hearts; k++) { const c = journeyOf(rich.journey).cur; rr = answerRule(rich, { id: c.id, qn: c.qn, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf); }
+  for (let k = 0; k < JOURNEY.hearts; k++) rr = miss(rich);
   assert.deepEqual(rr.lost, { items: { stone_math: 5, stone_korean: 5 }, coins: 200 });
   assert.deepEqual([rich.items.stone_math, rich.items.stone_english, rich.items.stone_korean, rich.coins], [rv.items.stone_math[1], 3, rv.items.stone_korean[1], rv.coins[1]]);
 });
@@ -310,7 +340,7 @@ test('🔍 Codex 147차: 출발 화면 뒤 잔액이 바뀌어도 마지막 오�
   p.items.stone_math = 211;
   assert.deepEqual([lossPreview(p).coins, lossPreview(p).items.stone_math], [[666, 467], [211, 206]], '출발 화면');
   const { cur } = started(p);
-  const wrong = (q) => { const c = journeyOf(q.journey).cur; return answerRule(q, { id: c.id, qn: c.qn, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf); };
+  const wrong = (q) => miss(q);
   for (let k = 1; k < JOURNEY.hearts; k++) wrong(p);
   assert.equal(journeyOf(p.journey).cur.hearts, 1);
   // 여행 중에 코인을 많이 벌고(다른 과목) 수학스톤은 다른 창에서 거의 다 씀
@@ -329,7 +359,7 @@ test('🔍 Codex 147차: 출발 화면 뒤 잔액이 바뀌어도 마지막 오�
     assert.equal(j.cur, null, '❤️ 1의 옛 여행이 되살아나지 않는다');
     assert.equal(j.done['2026-10-24'].r, 'lost');
     assert.deepEqual(j.done['2026-10-24'].lost, { items: { stone_english: 1 }, coins: 200 });
-    assert.equal(answerRule(m, { id: cur.id, qn: JOURNEY.hearts - 1, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf).why, 'changed', '두 번 잃지 않는다');
+    assert.equal(answerRule(m, { id: cur.id, qn: JOURNEY.hearts, mon: 25, subj: 'korean', correct: false }, SAT, subjectOf).why, 'changed', '두 번 잃지 않는다');
     assert.equal(m.coins, 4800);
   }
 });
@@ -356,7 +386,7 @@ test('🧾 고쳐 읽기 — 깨진 값은 버림 · 토요일이 아닌 주 열
   const { p } = started();
   const good = journeyOf(p.journey).cur;
   const w = good.route.find((s) => s.kind === 'wild').mon;
-  for (const bad of [{ hearts: 0 }, { hearts: 9 }, { at: 9 }, { hp: 0 }, { hp: 9 }, { phase: 'x' }, { id: 'X!' }, { week: 'no' }, { party: [] }, { route: [] }, { won: [w, w] }, { phase: 'pick' }]) {
+  for (const bad of [{ hearts: 0 }, { hearts: 9 }, { at: STOPS }, { hp: 0 }, { hp: 9 }, { ev: [] }, { ev: 'x' }, { ev: good.ev.slice(1) }, { phase: 'x' }, { id: 'X!' }, { week: 'no' }, { party: [] }, { route: [] }, { won: [w, w] }, { phase: 'pick' }]) {
     assert.equal(journeyOf({ cur: { ...good, ...bad } }).cur, null, JSON.stringify(bad));
   }
   assert.deepEqual(journeyOf({ cur: { ...good, won: [999] } }).cur.won, [], '이긴 야생은 길의 야생만');
@@ -373,12 +403,12 @@ test('🧾 고쳐 읽기 — 깨진 값은 버림 · 토요일이 아닌 주 열
   assert.deepEqual(lost, { r: 'lost', at: 1, q: { math: [3, 3] }, lost: { items: { stone_math: 2 }, coins: 0 } });
   const c = copyJourney(p.journey);
   c.cur.hearts = 1;
-  assert.equal(journeyOf(p.journey).cur.hearts, 5, '복사는 따로');
+  assert.equal(journeyOf(p.journey).cur.hearts, JOURNEY.hearts, '복사는 따로');
   assert.equal(copyJourney('x'), null);
   // 프로필 복사도
   const cl = cloneProfile(p);
   cl.journey.cur.hearts = 2;
-  assert.equal(p.journey.cur.hearts, 5);
+  assert.equal(p.journey.cur.hearts, JOURNEY.hearts);
 });
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
@@ -470,10 +500,19 @@ test('📊📤 글 — 결과·과목별 맞힌 수·데려온 포켓몬·잃은
   assert.match(md, /- 2026-10-24 주: 🎉 끝까지 감/);
   assert.match(md, /❤️를 다 잃으면 스톤 20%\(과목마다 최대 5\)·💰 30%\(최대 200\)/, 'v343 상한을 아빠 기록에도');
   const { p } = started();
-  assert.match(journeyMd(p.journey, '2026-10-26', ko), /## 지금 여행 \(2026-10-24 주\)\n\n- 만남 1\/9 · ❤️ 5/);
+  assert.match(journeyMd(p.journey, '2026-10-26', ko), /## 지금 여행 \(2026-10-24 주\)\n\n- 만남 1\/19 · ❤️ 6/);
 });
 
 const stored = () => fakeIdb.get('profile', 'me');
+/** 저장 경로로 지금 이벤트를 셈 없이 넘긴다 (v362) */
+async function evStored(id) {
+  const c = journeyOf(stored().journey).cur;
+  const z = pendingEvent(c);
+  if (z < 0) return { ok: true };
+  const e = c.ev[z];
+  const wild = c.route.slice(3 * z, 3 * z + 2).find((x) => x.kind === 'wild').mon;
+  return journeyEvent({ id, qn: c.qn, kind: e.k, ...(e.k === 'chest' ? { skip: true } : e.k === 'prof' ? { correct: false } : { pick: wild }) });
+}
 test('★ 저장 경로 — 떠나기·답·데려오기가 저장된 프로필에 · 두 창이 같은 문제를 동시에 답해도 한 번 · 저장이 실패하면 없던 일', async () => {
   await initProfile();
   await flushProfile();
@@ -481,24 +520,25 @@ test('★ 저장 경로 — 떠나기·답·데려오기가 저장된 프로필�
   fakeIdb.put('profile', { ...pf(), updatedAt: (cur0.updatedAt || 0) + 1 });
   await reloadProfile();
   const route = makeRoute(cands(), seeded(21));
-  const s = await journeyStart({ id: 'savetrip1', party: PARTY, route });
+  const s = await journeyStart({ id: 'savetrip1', party: PARTY, route, ev: makeEvents(route, cands(), seeded(121)) });
   assert.equal(s.ok, true);
   assert.equal(journeyOf(stored().journey).cur.id, 'savetrip1');
+  assert.equal((await evStored('savetrip1')).ok, true, '이벤트 먼저 (v362)');
   const rs = await Promise.all([
-    journeyAnswer({ id: 'savetrip1', qn: 0, mon: 1, subj: 'math', correct: false }),
-    journeyAnswer({ id: 'savetrip1', qn: 0, mon: 1, subj: 'math', correct: false }),
+    journeyAnswer({ id: 'savetrip1', qn: 1, mon: 1, subj: 'math', correct: false }),
+    journeyAnswer({ id: 'savetrip1', qn: 1, mon: 1, subj: 'math', correct: false }),
   ]);
   assert.deepEqual(rs.map((r) => r.ok).sort(), [false, true]);
   assert.equal(rs.find((r) => !r.ok).why, 'changed');
-  assert.equal(journeyOf(stored().journey).cur.hearts, 4, '❤️는 하나만');
-  assert.equal(journeyOf(getProfileSnapshot().journey).cur.hearts, 4, '창의 프로필도');
+  assert.equal(journeyOf(stored().journey).cur.hearts, JOURNEY.hearts - 1, '❤️는 하나만');
+  assert.equal(journeyOf(getProfileSnapshot().journey).cur.hearts, JOURNEY.hearts - 1, '창의 프로필도');
   const before = JSON.stringify(stored().journey);
   fakeIdb.failNext('profile');
-  const f = await journeyAnswer({ id: 'savetrip1', qn: 1, mon: 1, subj: 'math', correct: false });
+  const f = await journeyAnswer({ id: 'savetrip1', qn: 2, mon: 1, subj: 'math', correct: false });
   assert.deepEqual(f, { ok: false, why: 'save' });
   assert.equal(JSON.stringify(stored().journey), before);
-  assert.equal(journeyOf(getProfileSnapshot().journey).cur.hearts, 4, '메모리로 성공한 척하지 않는다');
-  const sw = await journeySwap({ id: 'savetrip1', qn: 1 });
+  assert.equal(journeyOf(getProfileSnapshot().journey).cur.hearts, JOURNEY.hearts - 1, '메모리로 성공한 척하지 않는다');
+  const sw = await journeySwap({ id: 'savetrip1', qn: 2 });
   assert.equal(sw.ok, true);
   const h = await journeyHome({ id: 'savetrip1' });
   assert.equal(h.ok, true);
@@ -516,7 +556,9 @@ test('★ 🔍 Codex 147차 저장 경로 — ❤️ 1의 마지막 오답: 저�
   Object.assign(rich.items, { stone_math: 211, stone_english: 3, stone_korean: 37 });
   fakeIdb.put('profile', { ...rich, updatedAt: (cur0.updatedAt || 0) + 1 });
   await reloadProfile();
-  assert.equal((await journeyStart({ id: 'savetrip2', party: PARTY, route: makeRoute(cands(), seeded(22)) })).ok, true);
+  const r22 = makeRoute(cands(), seeded(22));
+  assert.equal((await journeyStart({ id: 'savetrip2', party: PARTY, route: r22, ev: makeEvents(r22, cands(), seeded(122)) })).ok, true);
+  assert.equal((await evStored('savetrip2')).ok, true);
   const wrongReq = () => { const c = journeyOf(stored().journey).cur; return { id: 'savetrip2', qn: c.qn, mon: 1, subj: 'math', correct: false }; };
   for (let k = 1; k < JOURNEY.hearts; k++) assert.equal((await journeyAnswer(wrongReq())).ok, true);
   assert.equal(journeyOf(stored().journey).cur.hearts, 1);

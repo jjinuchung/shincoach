@@ -4445,26 +4445,33 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .home-journey { margin: 0 auto 12px; max-width: 760px; width: 100%; }
 .jr-home { display: flex; align-items: stretch; width: 100%; padding: 0; border: 2px solid var(--primary); border-radius: 16px; overflow: hidden; background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; box-shadow: var(--shadow); }
 .jr-home.is-closed { border-color: var(--border); opacity: 0.8; cursor: default; box-shadow: none; }
-.jr-home-band { display: grid; grid-template-columns: repeat(4, 40px); flex: none; }
+.jr-home-band { display: grid; grid-template-columns: repeat(3, 32px); flex: none; } /* 구역 여섯 — 두 줄 (v362) */
 .jr-home-band span { display: grid; place-items: center; font-size: 1.25rem; }
 .jr-home-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 9px 14px; min-width: 0; }
 .jr-home.is-closed .jr-home-body { padding: 6px 14px; }
 .jr-home-title { font-size: 1.05rem; }
 .jr-home-sub { color: var(--muted); font-size: 0.92rem; }
+/* 구역 (v362 — 산·숲·바다·화산·하늘·우주 차례) */
 .jr-z0, .jr-z0-fill { background: #6f8f4e; fill: #6f8f4e; }
-.jr-z1, .jr-z1-fill { background: #2683bd; fill: #2683bd; }
-.jr-z2, .jr-z2-fill { background: #5fb4e8; fill: #5fb4e8; }
-.jr-z3, .jr-z3-fill { background: #34296e; fill: #34296e; }
+.jr-z1, .jr-z1-fill { background: #2f7d43; fill: #2f7d43; }
+.jr-z2, .jr-z2-fill { background: #2683bd; fill: #2683bd; }
+.jr-z3, .jr-z3-fill { background: #b3472b; fill: #b3472b; }
+.jr-z4, .jr-z4-fill { background: #5fb4e8; fill: #5fb4e8; }
+.jr-z5, .jr-z5-fill { background: #34296e; fill: #34296e; }
 .jr-z0-soft { background-image: linear-gradient(#c9dbb4, #f5f7ff 75%); }
-.jr-z1-soft { background-image: linear-gradient(#a9d3ef, #f5f7ff 75%); }
-.jr-z2-soft { background-image: linear-gradient(#d6ecfb, #f5f7ff 75%); }
-.jr-z3-soft { background-image: linear-gradient(#b9b0e6, #f5f7ff 75%); }
+.jr-z1-soft { background-image: linear-gradient(#b5dcb9, #f5f7ff 75%); }
+.jr-z2-soft { background-image: linear-gradient(#a9d3ef, #f5f7ff 75%); }
+.jr-z3-soft { background-image: linear-gradient(#f2c1a8, #f5f7ff 75%); }
+.jr-z4-soft { background-image: linear-gradient(#d6ecfb, #f5f7ff 75%); }
+.jr-z5-soft { background-image: linear-gradient(#b9b0e6, #f5f7ff 75%); }
 .jr { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 64; display: flex; align-items: center; justify-content: center; padding: 10px; background: rgba(15, 23, 42, 0.78); }
 .jr[hidden] { display: none; }
 .jr-card { width: 100%; max-width: 720px; max-height: 96vh; display: flex; flex-direction: column; background: #f5f7ff; color: var(--text); border-radius: 22px; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4); overflow: hidden; }
 .jr-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--card); border-bottom: 1px solid var(--border); }
 .jr-hearts { font-size: 1.15rem; letter-spacing: 1px; min-width: 1em; }
 .jr-title { flex: 1; font-weight: 800; text-align: center; }
+/* ❤️ 6개(v362) — 좁은 폰에서 제목이 세 줄로 접히지 않게 하트를 조금 작게 · 제목은 한 줄 */
+@media (max-width: 480px) { .jr-hearts { font-size: 0.95rem; letter-spacing: 0; } .jr-title { white-space: nowrap; font-size: 0.9rem; } .jr-top { gap: 6px; padding: 10px; } }
 .jr-zone { font-size: 0.85rem; font-weight: 800; color: #fff; border-radius: 999px; padding: 2px 10px; }
 .jr-zone:empty { display: none; }
 .jr-x { padding: 4px 10px; }
@@ -4509,16 +4516,15 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 /* 지도 */
 .jr-mapwrap { position: relative; }
 .jr-map { display: block; width: 100%; height: auto; border-radius: 16px; }
-.jr-map-hill { fill: #23263b; opacity: 0.18; }
-.jr-map-wave { fill: none; stroke: #fff; stroke-opacity: 0.4; stroke-width: 2; }
-.jr-map-cloud { fill: #fff; opacity: 0.7; }
-.jr-map-star { fill: #fff; }
-.jr-map-label { fill: #fff; font-size: 13px; font-weight: 700; text-anchor: middle; }
+.jr-map-label { fill: #fff; font-size: 16px; font-weight: 700; text-anchor: middle; } /* 지도 단위 — 폰(358px)에서도 12px쯤 (🔍 Codex 166차 #3) */
 .jr-map-label.is-small { font-size: 12px; }
 .jr-map-road { fill: none; stroke: #fff; stroke-width: 4; stroke-dasharray: 2 9; stroke-linecap: round; }
 .jr-map-node { fill: #fff; }
 .jr-map-node.is-done { opacity: 0.5; }
-.jr-map-node.is-boss { fill: #f59e0b; stroke: #fff; stroke-width: 3; }
+.jr-map-node.is-rocket { fill: #f59e0b; stroke: #fff; stroke-width: 3; }
+.jr-map-node.is-boss { fill: #fde68a; stroke: #b45309; stroke-width: 2; } /* 👑 구역 대장 (v362) */
+.jr-map-node.is-ev { fill: #fff7d6; stroke: #f59e0b; stroke-width: 2; stroke-dasharray: 3 2; } /* 🎁🧑‍🔬🔀 이벤트 */
+.jr-map-node.is-center { fill: #ffe4ec; }
 .jr-map-now { fill: none; stroke: #f59e0b; stroke-width: 4; }
 @media (prefers-reduced-motion: no-preference) { .jr-map-now { animation: jr-glow 1.6s ease-in-out infinite; } }
 @keyframes jr-glow { 50% { stroke-opacity: 0.35; } }
@@ -4527,6 +4533,7 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .jr-ribbon { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); white-space: nowrap; background: #f59e0b; color: #1f2340; font-family: "Galmuri11", sans-serif; font-size: var(--jr-dlg, 24px); padding: 4px 26px; clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%); -webkit-font-smoothing: none; }
 @media (prefers-reduced-motion: no-preference) { .jr-ribbon { animation: jr-drop 0.5s ease-out; } }
 @keyframes jr-drop { from { transform: translate(-50%, -30px); opacity: 0; } }
+.jr-mapwrap .jr-ribbon { top: calc(50% - 22px); } /* 두 줄 지도(v362) — 구역 이름을 가리지 않게 두 줄 사이에 */
 .jr-legend { margin: 0; font-size: 0.85rem; color: var(--muted); text-align: center; }
 .jr-ask { display: grid; gap: 10px; background: #fff7e6; border-radius: 16px; padding: 12px; }
 /* 등장 VS */
@@ -4587,7 +4594,16 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .jr-lvrow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .jr-lvcell { display: grid; justify-items: center; gap: 2px; font-size: 0.78rem; color: #0f7a55; font-weight: 800; font-variant-numeric: tabular-nums; }
 .jr-lvcell .jr-mon { width: 44px; height: 44px; }
-.jr-pickcards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.jr-pickcards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; } /* 이긴 야생 여섯까지 — 세 칸 두 줄 (v362) */
+/* 🎁🧑‍🔬🔀 구역 이벤트 (v362) */
+.jr-event-art { display: flex; justify-content: center; align-items: center; gap: 14px; font-size: 4.2rem; line-height: 1; padding: 6px 0; }
+.jr-prof { font-size: 3.6rem; }
+.jr-prof-name { display: block; text-align: center; font-size: 1.2rem; }
+.jr-mon.is-shadow img { filter: brightness(0); } /* 그림자 맞히기 — 답한 뒤 풀린다 */
+.jr-fork { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.jr-fork .jr-mon { width: 72px; height: 72px; }
+.jr-fork-way { font-size: 0.85rem; font-weight: 800; color: var(--muted); }
+.jr-vs.is-boss .jr-vs-mark { color: #fde68a; }
 .jr-pc { display: grid; justify-items: center; gap: 4px; padding: 10px 4px; border: 3px solid transparent; border-radius: 16px; font: inherit; cursor: pointer; min-width: 0; }
 .jr-pc.is-sel { border-color: #23263b; box-shadow: 0 4px 0 #23263b; }
 .jr-pc .jr-mon { width: 64px; height: 64px; }
