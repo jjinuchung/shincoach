@@ -30,8 +30,8 @@ import { avatarOf, partnerSpot, avatarMoveRule } from './avatar.js'; // 🧑 진
 import { avatarSvg } from './avatarart.js';
 import { closetBox, closetReset, tagOf } from './avatarview.js'; // 👕 옷장 탭
 import { syncHatMarks } from './hatmarks.js'; // 🧢 지우 모자 무늬 받기 (v293)
-import { PLAYS, playSpot, bondOf, chainOf, bondTier, palHome } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
-import { SCENE_OF, playLines } from './playart.js';
+import { PLAYS, playSpot, bondOf, chainOf, bondTier, palHome, hasPlayable } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
+import { SCENE_OF, playLines, skyOf } from './playart.js';
 import { showPlay, closePlay } from './playshow.js'; // 🎮 장면
 import { openGames, closeGames, GAME_DEVICE } from './gameview.js'; // 🎮 게임기 미니 게임 (v307)
 import { dayNum } from './korean.js'; // 📰 TV 소식은 날마다 바뀐다 (순수)
@@ -39,6 +39,16 @@ import { FURN_ART, FURN_ART_TURN } from './furnart.js'; // 🖍️ 코드로 그
 
 // 🎮 일상 행동(2026-10-18, 아버님 "이대로 해"): 놓인 📺·🎮·💻·🎹를 누르면 도구 줄 맨 앞에 놀기 단추 → 💗를 먼저 저장(homePlay 트랜잭션) →
 //   🧑·🤝가 기기 옆 칸으로 걸어가고(이 방에 서 있을 때만 · transform만 · 저장 안 함) → 장면(playshow) → 제자리로 돌아와 다시 그린다
+// 🛏️ 가구 놀기(v365): 침대·소파·쿠션·곰인형·책·화분·창문·장난감 상자도 같은 길 · 가게 카드에 「놓으면 …」 · 처음 한 번 안내(이 기기에 한 번)
+/** 🛋️ 처음 한 번 안내 — 이 기기에서 한 번 띄웠으면 다시 안 띄운다(기기 편의 · 프로필에 안 적음) */
+const PLAY_HINT_KEY = 'shincoach.furnPlayHint';
+export const PLAY_HINT = '🛋️ 가구를 눌러 보세요 — 파트너와 같이 놀 수 있어요';
+function playHintDue() {
+  try { return !localStorage.getItem(PLAY_HINT_KEY); } catch { return false; } // 못 읽는 기기엔 띄우지 않는다(매번 뜨지 않게)
+}
+function playHintSeen() {
+  try { localStorage.setItem(PLAY_HINT_KEY, '1'); } catch { /* 못 적으면 다음에 한 번 더 뜰 뿐 */ }
+}
 /** 벽 줄 높이 = 칸 × WALL_RATIO */
 export const WALL_RATIO = 1.3;
 /** 방 전체 높이(칸 단위) — size = houseShape().size */
@@ -212,6 +222,11 @@ export function openHouse(opts = {}) {
   closetReset();
   $('house').hidden = false;
   if (!ui.tick) ui.tick = setInterval(tickRests, 1000);
+  // 🛋️ 처음 한 번 — 캐릭터가 있고 놀 수 있는 가구가 방에 놓였을 때만 (v365)
+  if (ui.tab === 'room' && !profileLoading() && playHintDue()) {
+    const pf = getProfileSnapshot();
+    if (avatarOf(pf).made && hasPlayable(pf)) { ui.msg = PLAY_HINT; playHintSeen(); }
+  }
   render();
   // 🧢 지우 모자 무늬 받기 (v293 — 비공개 저장소에서 10분에 한 번까지) · 새로 받았으면 다시 그린다
   syncHatMarks().then((changed) => { if (changed && ui.open) render(); }).catch(() => {});
@@ -521,9 +536,10 @@ async function walk(me, spot) {
     node.style.transition = `transform ${WALK_MS}ms ease-in-out`;
     node.style.transform = `translate(${((b.left - a.left) / 100) * W}px, ${((b.top - a.top) / 100) * H}px)`;
     node.style.zIndex = String(10 + to.y);
-    // 🐾 쿠션에서 일어나면 앉은 높이 보정을 뗀다 (Codex 92차 — 돌아온 뒤에는 render가 다시 붙인다)
-    node.classList.remove('is-sit');
-    moved.push(node);
+    // 🐾 쿠션에서 일어나면 앉은 높이 보정을 뗀다 (Codex 92차) · 🤗 쿠션으로 가면 앉는다(v365) · 돌아올 때는 처음 앉음 그대로(Codex 169차 #5)
+    const sat = node.classList.contains('is-sit');
+    node.classList.toggle('is-sit', !!to.cushion);
+    moved.push([node, sat]);
   };
   go(meN, me.spot, spot.me);
   const pid = getPartner();
@@ -532,7 +548,7 @@ async function walk(me, spot) {
   await wait(WALK_MS + 60);
   return async () => {
     if (!ui.open) return;
-    for (const n of moved) if (n.isConnected) n.style.transform = '';
+    for (const [n, sat] of moved) if (n.isConnected) { n.style.transform = ''; n.classList.toggle('is-sit', sat); }
     await wait(WALK_MS + 60);
   };
 }
@@ -584,7 +600,7 @@ async function playAt(it) {
         look: me.look, name: me.name, mon,
         wall: (paintById(rm && rm.wall) || PAINT_BASE.wall).color, floor: (paintById(rm && rm.floor) || PAINT_BASE.floor).color,
         lv: r.mon ? monLv(r.mon) : 0, bond: r.bond, tier: bondTier(r.bond), chain: r.mon ? chainOf(r.mon).map(rosterKo).filter(Boolean) : [],
-        heart: r.heart, day: dayNum(Date.now()), score,
+        heart: r.heart, day: dayNum(Date.now()), score, sky: skyOf(new Date().getHours()), // 🔭 창밖은 태블릿 시계로 (v365)
       });
       if (!live()) return;
       await back();
@@ -801,6 +817,7 @@ function shopCard(it, c, pf) {
   if (paint) { const sw = el('span', 'house-shop-swatch'); sw.style.background = it.color; b.appendChild(sw); } else b.appendChild(artEl(it, 'span', 'house-shop-emoji'));
   b.appendChild(el('span', 'house-shop-name', it.ko));
   if (grow) b.appendChild(el('span', 'house-shop-what', it.what));
+  if (PLAYS[it.id]) b.appendChild(el('span', 'house-shop-what', `놓으면 ${PLAYS[it.id].btn}`)); // 🛏️ 사기 전에 쓸 곳이 보이게 (v365)
   b.appendChild(el('span', 'house-shop-price', priceText(it.id)));
   const have = c.have || 0;
   // 🏗️ 아직 안 산 넓히기는 💰·🔷·🔶를 각각 얼마나 모았는지 — 모자란 과목이 눈에 띄게 (차례가 안 됐으면 먼저 살 것)

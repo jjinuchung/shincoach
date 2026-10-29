@@ -1,4 +1,5 @@
 // 🎮 일상 행동 (2026-10-18, 아버님 "이대로 해") — 방에 놓은 📺 TV · 🎮 게임기 · 💻 컴퓨터 · 🎹 피아노를 누르면 캐릭터와 🤝 파트너가 함께 논다
+// 🛏️ 가구 놀기 (v365) — 침대·소파·쿠션·곰인형·책 더미·책장·큰 화분·해바라기·창문·장난감 상자도 (💗는 이 열을 합쳐 하루 셋까지)
 // 규칙(순수) — 저장은 xp.houseDo(저장된 프로필로 한 트랜잭션), 장면은 playshow.js · 그림은 playart.js
 //
 // 보상은 💰·🔷·🔶·경험치가 **아니다**(공부보다 쉬운 벌이가 되지 않게) — 기기마다 하루 한 번 파트너에게 💗 사이좋음 +1, 같은 날 두 번째부터는 장면만.
@@ -20,8 +21,31 @@ export const PLAYS = {
   f_pc: { emoji: '💻', btn: '💻 컴퓨터 하기', did: '컴퓨터를 했어요' },
   f_piano: { emoji: '🎹', btn: '🎹 피아노 치기', did: '피아노를 쳤어요' },
   f_table: { emoji: '🍽️', btn: '🍚 밥 먹기', did: '밥을 먹었어요' }, // ③ 가구 더하기 (2026-10-18) — 식탁은 가구지만 놀 수 있다
+  // 🛏️ 가구 놀기 (v365 — 아버님 기본안 「이대로」) — 진우가 가진 가구로도 논다 · 💗는 이 열 가지를 합쳐 하루 FURN_HEART_MAX까지(furn)
+  f_bed: { emoji: '🛏️', btn: '😴 낮잠 자기', did: '낮잠을 잤어요', furn: true },
+  f_sofa: { emoji: '🛋️', btn: '🛋️ 같이 쉬기', did: '소파에서 쉬었어요', furn: true },
+  f_cushion: { emoji: '🐾', btn: '🤗 쓰다듬기', did: '쓰다듬어 줬어요', furn: true },
+  f_teddy: { emoji: '🧸', btn: '🧸 인형 놀이', did: '인형 놀이를 했어요', furn: true },
+  f_books: { emoji: '📚', btn: '📖 그림책 읽기', did: '그림책을 읽었어요', furn: true },
+  f_shelf: { emoji: '📖', btn: '📖 그림책 읽기', did: '그림책을 읽었어요', furn: true },
+  f_plant: { emoji: '🌿', btn: '💧 물 주기', did: '화분에 물을 줬어요', furn: true },
+  f_flower: { emoji: '🌻', btn: '💧 물 주기', did: '해바라기에 물을 줬어요', furn: true },
+  f_window: { emoji: '🌤️', btn: '🔭 창밖 보기', did: '창밖을 봤어요', furn: true }, // 벽에 거는 가구 — 캐릭터는 그 아래 바닥 칸으로(playSpot)
+  f_toybox: { emoji: '🧩', btn: '🧩 장난감 꺼내기', did: '장난감으로 놀았어요', furn: true },
 };
 export const PLAY_IDS = Object.keys(PLAYS);
+/** 🛏️ 가구 놀기(v365)의 💗는 합쳐 하루 셋까지 — 📺🎮💻🎹🍚(기기·식탁)는 그대로 기기마다 하루 한 번이고 셋에 안 센다
+ *  (가진 가구를 다 누르면 💗 테두리 셋이 한 주 안에 끝나 버린다 — 기본안 💗 속도 표) */
+export const FURN_HEART_MAX = 3;
+export const FURN_PLAY_IDS = PLAY_IDS.filter((id) => PLAYS[id].furn);
+/** 오늘 가구 놀기로 받은 💗 수 (순수) — 오늘·내일로 적힌 가구를 센다(시계를 하루 되돌려도 더 받지 않게)
+ *  🔍 Codex 169차 #1: 「그 뒤 모두」를 세면 시계가 크게 앞섰다 돌아왔을 때 먼 앞날 기록 셋이 그날까지 가구 💗를 다 막았다
+ *  → 먼 앞날 기록은 그 가구 하나만 막는다(playRule의 가구마다 「지난 날보다 뒤」 — 기기 놀기와 같음) */
+export const FURN_DAY_SLACK = 1;
+export function furnHeartsOn(raw, day) {
+  const hp = playOf(raw);
+  return FURN_PLAY_IDS.filter((id) => { const d = hp.days[id] || 0; return d >= day && d <= day + FURN_DAY_SLACK; }).length;
+}
 /** 💗 한 칸의 끝 (깨진 큰 수가 끝없이 커지지 않게) · 💗 칸 수의 끝 */
 export const BOND_MAX = 1e6;
 const BOND_KEYS_MAX = 2000;
@@ -162,6 +186,11 @@ export function palHome(profile, spot) {
   return partnerSpot(profile, spot);
 }
 
+/** 🛋️ 방에 놀 수 있는 가구·기기가 하나라도 놓였나 (순수 — 처음 한 번 안내 「가구를 눌러 보세요」를 띄울지 · v365) */
+export function hasPlayable(profile) {
+  return houseOf(profile).rooms.some((r) => r.items.some((i) => !!PLAYS[i.id]));
+}
+
 /** 🤝 지금 파트너 — 데리고 있을 때만 id, 아니면 null */
 export function partnerOf(profile) {
   const id = Number(profile && profile.partner);
@@ -172,7 +201,9 @@ export function partnerOf(profile) {
 /** 오늘 이 기기로 💗를 받을 수 있나 (순수 — 화면 말에만 · 판정은 playRule이 트랜잭션 안에서) */
 export function heartReady(profile, id, now) {
   const day = dayNum(now);
-  return !!PLAYS[id] && day > 0 && day <= DAY_MAX && day > (playOf(profile && profile.homePlay).days[id] || 0);
+  const hp = profile && profile.homePlay;
+  if (!(!!PLAYS[id] && day > 0 && day <= DAY_MAX && day > (playOf(hp).days[id] || 0))) return false;
+  return !PLAYS[id].furn || furnHeartsOn(hp, day) < FURN_HEART_MAX;
 }
 
 /**
@@ -186,12 +217,16 @@ export function playSpot(profile, roomId, u) {
   const it = room && room.items.find((i) => i.u === u);
   if (!it) return null;
   const d = furnById(it.id);
-  if (!d || d.at !== 'floor') return null;
+  // 벽 가구는 놀 수 있는 것(🌤️ 창문 — v365)만 — 그 아래 바닥 칸으로 간다
+  if (!d || (d.at !== 'floor' && !(d.at === 'wall' && PLAYS[it.id]))) return null;
   const size = houseShape(profile).size;
   const taken = takenCells(room);
   const free = (x, y) => x >= 0 && y >= 0 && x < size.W && y < size.H && !taken.has(`${x},${y}`);
   const cand = [];
-  if (turnOf(d, it.r)) { // 🔄 세로로 놓인 가구 (v334) — 양옆을 위에서부터, 그다음 아래
+  if (d.at === 'wall') {
+    for (let dx = 0; dx < d.w; dx++) cand.push({ x: it.x + dx, y: 0 });
+    cand.push({ x: it.x - 1, y: 0 }, { x: it.x + d.w, y: 0 });
+  } else if (turnOf(d, it.r)) { // 🔄 세로로 놓인 가구 (v334) — 양옆을 위에서부터, 그다음 아래
     for (let dy = 0; dy < d.w; dy++) cand.push({ x: it.x - 1, y: it.y + dy }, { x: it.x + 1, y: it.y + dy });
     cand.push({ x: it.x, y: it.y + d.w });
   } else {
@@ -205,6 +240,8 @@ export function playSpot(profile, roomId, u) {
   const all = [...cand, ...rest].filter((c) => free(c.x, c.y));
   if (!all.length) return null;
   const hasPal = !!partnerOf(profile);
+  // 🐾 쿠션을 쓰다듬을 때(v365)는 파트너가 누른 그 쿠션 위로 — 캐릭터만 쿠션 옆 빈 칸으로
+  if (it.id === CUSHION && hasPal) return { me: { room: room.id, x: all[0].x, y: all[0].y }, pal: { room: room.id, x: it.x, y: it.y, cushion: true } };
   const palAt = (c) => partnerSpot(profile, { room: room.id, x: c.x, y: c.y });
   const pick = (hasPal && all.find((c) => palAt(c))) || all[0];
   return { me: { room: room.id, x: pick.x, y: pick.y }, pal: hasPal ? palAt(pick) : null };
@@ -229,6 +266,8 @@ export function playRule(profile, roomId, u, now) {
   const day = dayNum(now);
   // 🔍 Codex 91차 #1: 먼 앞날(DAY_MAX 넘음 — 깨진 시계)엔 주지 않는다 — 적을 때만 줄이면 그날 내내 "지난 날보다 뒤"라 계속 받았다
   if (!(day > 0 && day <= DAY_MAX && day > (hp.days[it.id] || 0))) return { ok: true, kind: it.id, heart: false, mon, bond: before };
+  // 🛏️ 가구 놀기(v365)는 합쳐 하루 셋까지 — 넷째부터는 장면만(그 가구의 날은 적지 않는다 — 적으면 💗를 안 받은 가구까지 셋에 센다)
+  if (PLAYS[it.id].furn && furnHeartsOn(hp, day) >= FURN_HEART_MAX) return { ok: true, kind: it.id, heart: false, mon, bond: before };
   hp.days[it.id] = day;
   hp.bond[String(mon)] = Math.min(BOND_MAX, before + 1);
   profile.homePlay = hp;

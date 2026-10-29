@@ -3452,6 +3452,103 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
   .pshow-key { height: 80px; font-size: 0.85rem; }
   .pshow-fly { font-size: 1.25rem; }
 }
+/* ===== 🛏️ 가구 놀기 (v365 — 아버님 기본안 「이대로」) — 침대·소파·쿠션·곰인형·책·화분·창문·장난감 상자 장면(playart.js · playshow.js) ===== */
+/* 침대·소파는 앞 판(.pshow-front)이 둘 앞을 가린다 — 뒤 판(.pshow-dev)과 같은 자리 · 움직이는 것은 transform·opacity만 */
+.pshow-front { position: absolute; z-index: 2; pointer-events: none; }
+.pshow-front svg { display: block; width: 100%; height: auto; overflow: visible; }
+/* 😴 낮잠 — 밤(어둡게 · 💤) → 아침(햇살) */
+.pshow-stage.is-nap .pshow-dev, .pshow-stage.is-nap .pshow-front { left: 4%; bottom: 1%; width: 92%; }
+.pshow-stage.is-nap .pshow-me { left: 13%; bottom: 13%; }
+.pshow-stage.is-nap .pshow-pal { left: 66%; bottom: 27%; z-index: 3; }
+.pshow-dim, .pshow-sun { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 4; pointer-events: none; opacity: 0; transition: opacity 0.9s ease-in-out; }
+.pshow-dim { background: rgba(18, 26, 62, 0.58); }
+.pshow-sun { background: radial-gradient(circle at 92% 6%, rgba(255, 236, 153, 0.9), rgba(255, 236, 153, 0) 55%); }
+.pshow-stage.is-nap .pshow-fx { z-index: 5; }
+.pshow-stage.is-night .pshow-dim, .pshow-stage.is-morning .pshow-sun { opacity: 1; }
+.pshow-stage.is-nap.is-on .pshow-pal-img, .pshow-stage.is-pet.is-on .pshow-pal-img { animation: pv-breathe 2.4s ease-in-out infinite; }
+.pshow-fly.is-zzz { font-size: 1.3rem; }
+/* 🛋️ 같이 쉬기 — 파트너가 어깨에 기댄다 */
+.pshow-stage.is-sofa .pshow-dev, .pshow-stage.is-sofa .pshow-front { left: 11%; bottom: 1%; width: 78%; }
+.pshow-stage.is-sofa .pshow-me { left: 24%; bottom: 16%; }
+.pshow-stage.is-sofa .pshow-pal { left: 54%; bottom: 23%; transition: transform 0.6s ease-in-out; }
+.pshow-stage.is-lean .pshow-pal { transform: translateX(-24%) rotate(-11deg); }
+/* 🤗 쓰다듬기 — 큰 방석 위 파트너 · 문지르는 판(.pshow-petpad) */
+.pshow-stage.is-pet .pshow-dev { left: 30%; bottom: 3%; width: 40%; }
+.pshow-stage.is-pet .pshow-me { left: 5%; bottom: 3%; }
+.pshow-stage.is-pet .pshow-pal { left: 36%; bottom: 15%; width: 28%; height: 44%; }
+.pshow-petpad { position: absolute; left: 28%; bottom: 4%; width: 44%; height: 62%; z-index: 4; padding: 0; border: 0; border-radius: 40%; background: transparent; touch-action: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pshow-petpad:focus-visible { outline: 2px dashed rgba(240, 101, 149, 0.6); outline-offset: 2px; }
+.pshow-pethint { position: absolute; right: 4%; top: 6%; font-size: 2rem; line-height: 1; pointer-events: none; animation: pv-rub 1.2s ease-in-out infinite; }
+.pshow-petpad.is-touched .pshow-pethint { display: none; }
+.pshow-fly.is-pat { font-size: 1.35rem; }
+/* 🧸 인형 놀이 — 곰인형이 둘 사이를 날아간다 (가로 .pv-tossx · 높이 .pv-tossy) */
+.pshow-stage.is-teddy .pshow-dev { left: 25%; bottom: 27%; width: 10%; z-index: 3; }
+.pshow-stage.is-teddy .pshow-me { left: 6%; bottom: 3%; }
+.pshow-stage.is-teddy .pshow-pal { left: 70%; bottom: 5%; }
+.pv-tossx { transition: transform 0.85s linear; }
+.pshow-stage.is-at-pal .pv-tossx { transform: translateX(440%); }
+.pshow-stage.is-hug .pv-tossx { transform: translateX(455%) translateY(85%) scale(0.8); }
+.pv-tossy.is-fly { animation: pv-arc 0.85s ease-in-out; }
+.pshow-stage.is-alone .pv-tossy.is-fly { animation-name: pv-up; }
+/* 📖 그림책 — 쪽이 넘어간다(.pv-page) */
+.pshow-stage.is-book .pshow-dev { left: 27%; bottom: 2%; width: 46%; z-index: 2; }
+.pshow-stage.is-book .pshow-me { left: 4%; bottom: 6%; }
+.pshow-stage.is-book .pshow-pal { left: 77%; bottom: 8%; }
+.pv-page { transform-box: view-box; transform-origin: 60px 36px; opacity: 0; }
+.pv-page.is-flip { animation: pv-flip 0.7s ease-in-out; }
+/* 💧 물 주기 — 물뿌리개가 기울고 화분이 한 단계씩 자란다(is-g1~3) */
+.pshow-stage.is-plant .pshow-dev, .pshow-stage.is-flower .pshow-dev { left: 42%; bottom: 2%; width: 20%; }
+.pshow-stage.is-plant .pshow-me, .pshow-stage.is-flower .pshow-me { left: 15%; bottom: 3%; }
+.pshow-stage.is-plant .pshow-pal, .pshow-stage.is-flower .pshow-pal { left: 72%; bottom: 5%; }
+.pshow-can { position: absolute; left: 68%; top: 46%; width: 62%; height: auto; transform-origin: 25% 70%; transition: transform 0.3s ease-out; }
+.pshow-stage.is-pour .pshow-can { transform: rotate(30deg); }
+.pv-grow { transform-box: fill-box; transform-origin: 50% 100%; transform: scale(0.55); transition: transform 0.5s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.pshow-stage.is-g1 .pv-grow { transform: scale(0.7); }
+.pshow-stage.is-g2 .pv-grow { transform: scale(0.85); }
+.pshow-stage.is-g3 .pv-grow { transform: scale(1); }
+.pv-bloom { transform-box: fill-box; transform-origin: 50% 50%; opacity: 0; transform: scale(0.3); transition: opacity 0.4s, transform 0.5s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.pshow-stage.is-g3 .pv-bloom { opacity: 1; transform: scale(1); }
+.pv-bud { transition: opacity 0.3s; }
+.pshow-stage.is-g3 .pv-bud { opacity: 0; }
+.pshow-fly.is-drop { animation-name: pv-drop; font-size: 1.1rem; }
+.pshow-keys.is-one { grid-template-columns: minmax(0, 1fr); }
+.pshow-water { min-height: 64px; border: 2px solid #1c7ed6; border-radius: 16px; background: #e7f5ff; color: #1864ab; font: inherit; font-size: 1.2rem; font-weight: 800; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.pshow-water:active { transform: translateY(2px); }
+/* 🔭 창밖 보기 — 창은 벽에 · 구름이 흐르고 별이 반짝 */
+.pshow-stage.is-window .pshow-dev { left: 27%; top: 4%; width: 46%; }
+.pshow-stage.is-window .pshow-me { left: 5%; bottom: 3%; }
+.pshow-stage.is-window .pshow-pal { left: 76%; bottom: 5%; }
+.pshow-stage.is-on .pv-cloud { animation: pv-drift var(--d, 10s) ease-in-out infinite alternate; }
+.pv-twinkle { transform-box: fill-box; transform-origin: 50% 50%; }
+.pshow-stage.is-on .pv-twinkle { animation: bond-twinkle 1.6s ease-in-out infinite; animation-delay: calc(var(--i) * 0.23s); }
+/* 🧩 장난감 꺼내기 — 뚜껑이 열리고(is-on) 장난감이 나온다(is-out) */
+.pshow-stage.is-toy .pshow-dev { left: 20%; bottom: 2%; width: 56%; }
+.pshow-stage.is-toy .pshow-me { left: 1%; bottom: 3%; }
+.pshow-stage.is-toy .pshow-pal { left: 78%; bottom: 5%; }
+.pv-lid { transform-box: fill-box; transform-origin: 0% 100%; transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.pshow-stage.is-on .pv-lid { transform: translate(-3px, -10px) rotate(-14deg); }
+.pv-toy { opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; }
+.pshow-stage.is-out .pv-toy { opacity: 1; }
+.pshow-stage.is-out .pv-b1, .pshow-stage.is-out .pv-b2, .pshow-stage.is-out .pv-b3 { animation: pv-drop-in 0.45s ease-out backwards; }
+.pshow-stage.is-out .pv-b2 { animation-delay: 0.6s; }
+.pshow-stage.is-out .pv-b3 { animation-delay: 1.2s; }
+.pshow-stage.is-out .pv-spin { animation: pv-wobble 0.5s ease-in-out infinite alternate; }
+.pshow-stage.is-out .pv-bounce { animation: pv-bounce 0.7s cubic-bezier(0.3, 0, 0.7, 1) infinite alternate; }
+@keyframes pv-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.94); } }
+@keyframes pv-rub { 0%, 100% { transform: translateX(-6px) rotate(-12deg); } 50% { transform: translateX(6px) rotate(12deg); } }
+@keyframes pv-arc { 0% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-140%) rotate(180deg); } 100% { transform: translateY(0) rotate(360deg); } }
+@keyframes pv-up { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-220%) rotate(360deg); } }
+@keyframes pv-flip { 0% { opacity: 1; transform: scaleX(1); } 99% { opacity: 1; transform: scaleX(-1); } 100% { opacity: 0; transform: scaleX(-1); } }
+@keyframes pv-drop { 0% { opacity: 0; transform: translateY(-6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(46px); } }
+@keyframes pv-drift { from { transform: translateX(-4px); } to { transform: translateX(8px); } }
+@keyframes pv-drop-in { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pv-wobble { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+@keyframes pv-bounce { from { transform: translateY(0); } to { transform: translateY(-16px); } }
+/* 「움직임 줄이기」면 멈춘 그림 — 끝 모습은 움직임 없이도 보이게 짰다(장난감 backwards · 자란 화분은 transform 그대로) */
+@media (prefers-reduced-motion: reduce) {
+  .pshow-stage.is-nap *, .pshow-stage.is-sofa *, .pshow-stage.is-pet *, .pshow-stage.is-teddy *, .pshow-stage.is-book *,
+  .pshow-stage.is-plant *, .pshow-stage.is-flower *, .pshow-stage.is-window *, .pshow-stage.is-toy * { animation: none !important; transition: none !important; }
+}
 /* ===== 🤝 홈 화면 파트너 (2026-10-18, homepal.js) — 💗 10부터 화면 아래 가장자리를 걷는다 · 누르면 톡 + 말풍선 ===== */
 .hpal { position: fixed; left: 0; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); z-index: 20; width: 60px; height: 60px; pointer-events: none; isolation: isolate; will-change: transform; }
 .hpal[hidden] { display: none; }

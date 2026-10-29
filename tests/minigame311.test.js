@@ -18,10 +18,10 @@ const SEEDS = [1, 7, 42, 2026, 99999, 31337, 5, 777];
 
 // ───────────────────── 목록 · 게임기 화면 연결 ─────────────────────
 
-test('🎮 v311 게임 목록 — 🗼 몬스터볼 탑 쌓기 30초 · 화면(RUNNERS)·준비(prep 없음 — 볼은 CSS 무늬)', () => {
+test('🎮 v311 게임 목록 — 🗼 몬스터볼 탑 쌓기 60초(v365 — 처음 30초 · 진우 「너무 짧다」 → 두 배) · 화면(RUNNERS)·준비(prep 없음 — 볼은 CSS 무늬)', () => {
   assert.deepEqual(GAMES.map((g) => g.id).slice(0, 7), ['dig', 'run', 'shadow', 'pair', 'berry', 'balloon', 'tower'], '일곱째까지 (v312부터 더 늘어난다 — minigame312)');
   assert.equal(gameById('tower').sec, TOWER_SEC);
-  assert.equal(TOWER_SEC, 30);
+  assert.equal(TOWER_SEC, 60);
   for (const g of GAMES) assert.ok(!/\d/.test(g.how), `${g.id}: 아이가 보는 설명에 숫자 없음`);
   const gv = src('js/gameview.js');
   assert.match(gv, /\n {2}tower: \{ run: runTower, prep: async \(\) => \(\{\}\) \},/);
@@ -177,7 +177,7 @@ function playAll(seed, play) {
   return out;
 }
 
-test('🗼 30초 한 판(가짜 시계 · 씨앗 여덟) — 맞춰 누르는 손은 딱이 많고 아무 때나 누르는 손보다 훨씬 높이 · 볼 빠르기는 그때 층에 맞게', () => {
+test('🗼 한 판(TOWER_SEC · 가짜 시계 · 씨앗 여덟) — 맞춰 누르는 손은 딱이 많고 아무 때나 누르는 손보다 훨씬 높이 · 볼 빠르기는 그때 층에 맞게', () => {
   for (const seed of SEEDS) {
     const aim = playAll(seed, (s, t) => { if (s.phase === 'slide' && Math.abs(s.ball.x - topX(s)) <= 1) towerTap(s, t); });
     let next = 600;
@@ -273,7 +273,7 @@ function waitFor(w, x, tol = 1.5) {
   return null;
 }
 
-test('🗼 화면 — 안내 · 응원 · 「준비!」 때 내려도 안 끝남 · 맞춰 톡 → 떨어져 ✨ 딱! ⭐2 · 마당에 쌓임 · 「🗼 1층」 · 30초 뒤 끝', async (t) => {
+test('🗼 화면 — 안내 · 응원 · 「준비!」 때 내려도 안 끝남 · 맞춰 톡 → 떨어져 ✨ 딱! ⭐2 · 마당에 쌓임 · 「🗼 1층」 · 한 판 시간 뒤 끝', async (t) => {
   const w = world(t, (stage) => runTower(stage, { rng: () => 0.1, hero: { html: '<img class="gd-pal-img">' } }));
   assert.equal(w.hint.textContent, '톡! 맨 위 볼에 딱 맞춰 떨어뜨려요');
   assert.equal(w.pal.innerHTML, '<img class="gd-pal-img">');
@@ -301,7 +301,10 @@ test('🗼 화면 — 안내 · 응원 · 「준비!」 때 내려도 안 끝남
   assert.ok(one && one.className.includes('is-land') && one.className.includes('is-perfect'));
   assert.deepEqual([one.style.left, one.style.top], [`${(50 - BALL / 2).toFixed(3)}%`, `${(((FLOOR_Y - (BASE_H + STEP / 2) - BALL / 2) / TOWER_H) * 100).toFixed(3)}%`], '받침돌 위 가운데');
   assert.ok(!w.sky.children.includes(b), '떨어진 볼은 마당으로 옮겨 감');
-  w.adv(40000);
+  w.adv(TOWER_SEC * 1000 - 20000);
+  await w.flush();
+  assert.equal(w.st.over, null, '한 판 시간 안(끝나기 몇 초 앞)에는 안 끝남 — 30초가 지나도 이어진다(v365)');
+  w.adv(30000);
   await w.flush();
   assert.ok(w.st.over && w.st.over.quit === false);
   assert.equal(w.st.over.score, 2);
@@ -412,7 +415,7 @@ test('🗼 화면 — 브라우저처럼 requestAnimationFrame으로 돌고 끝�
   assert.equal(frames.size, 1, '늘 한 장씩만 예약 (쌓이지 않는다)');
   assert.ok(w.sky.children.some((e) => /translate3d\(/.test(e.style.transform)), '볼이 움직인다');
   let atEnd = null;
-  for (let k = 0; k < 700 && !w.st.over; k++) {
+  for (let k = 0; k < (TOWER_SEC + 10) * 20 && !w.st.over; k++) { // 50ms씩 — 한 판 + 10초
     w.adv(50);
     runFrames();
     if (atEnd === null && w.banner.textContent === '끝!') atEnd = frames.size; // 끝난 바로 그 그림에서

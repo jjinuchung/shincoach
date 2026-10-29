@@ -29,10 +29,12 @@ const TV = { u: 1, id: 'f_tv', x: 3, y: 2 };
 // ───────────────────── 목록 ─────────────────────
 
 test('🎮 놀 수 있는 것 = 📺🎮💻🎹 + 🍽️ 식탁(③ 가구 더하기) · 💊 캡슐·🧊 냉장고는 아님 · 모두 바닥 가구 · 장면 이름 · 🎹 건반 여덟은 도~높은 도', () => {
-  assert.deepEqual([...PLAY_IDS].sort(), ['f_game', 'f_pc', 'f_piano', 'f_table', 'f_tv']);
+  // 🛏️ 가구 놀기(v365)의 열 가지(furn)는 tests/furnplay365.test.js — 여기는 기기 놀기 다섯 그대로
+  const dev = PLAY_IDS.filter((id) => !PLAYS[id].furn);
+  assert.deepEqual([...dev].sort(), ['f_game', 'f_pc', 'f_piano', 'f_table', 'f_tv']);
   for (const id of PLAY_IDS) assert.ok(furnById(id), id);
   assert.equal(PLAYS.f_fridge, undefined);
-  for (const id of PLAY_IDS) {
+  for (const id of dev) {
     assert.equal(furnById(id).at, 'floor', id);
     assert.match(PLAYS[id].btn, /^\S+ \S/, id); // 그림 글자 + 말 (🍽️ 식탁은 🍚 밥 먹기)
     assert.ok(['tv', 'game', 'pc', 'piano', 'meal'].includes(SCENE_OF[id]), id);
@@ -46,7 +48,7 @@ test('🎮 놀 수 있는 것 = 📺🎮💻🎹 + 🍽️ 식탁(③ 가구 더
 // ───────────────────── 기록 ─────────────────────
 
 test('💾 놀이 기록 고쳐 읽기·복사·병합 — 모르는 기기·깨진 값은 뺌 · 병합은 칸마다 큰 쪽 · 입력은 그대로 · 둘 다 없으면 null', () => {
-  const raw = { days: { f_tv: 19000, f_bed: 5, f_pc: -1, f_game: 1.5, f_piano: 1e300 }, bond: { 658: 3, 25: 0, x: 4, '1e3': 2, 7: BOND_MAX * 9 }, junk: 1 };
+  const raw = { days: { f_tv: 19000, f_clock: 5, f_pc: -1, f_game: 1.5, f_piano: 1e300 }, bond: { 658: 3, 25: 0, x: 4, '1e3': 2, 7: BOND_MAX * 9 }, junk: 1 };
   assert.deepEqual(playOf(raw), { days: { f_tv: 19000 }, bond: { 658: 3, 7: BOND_MAX } });
   assert.deepEqual(playOf('x'), { days: {}, bond: {} });
   assert.deepEqual(playOf({ days: [1], bond: null }), { days: {}, bond: {} });
@@ -84,7 +86,7 @@ test('▶️ 놀기: 캐릭터를 먼저 · 그 방에 없는 기기 · 놀 수 
   assert.deepEqual(playRule(noMe, R, 1, T), { ok: false, why: 'made' });
   assert.deepEqual(playRule(pf([TV]), R, 9, T), { ok: false, why: 'gone' });
   assert.deepEqual(playRule(pf([TV]), 'r9', 1, T), { ok: false, why: 'gone' });
-  assert.deepEqual(playRule(pf([{ u: 2, id: 'f_bed', x: 0, y: 0 }]), R, 2, T), { ok: false, why: 'play' });
+  assert.deepEqual(playRule(pf([{ u: 2, id: 'f_clock', x: 0, y: 0 }]), R, 2, T), { ok: false, why: 'play' });
   for (const extra of [{ partner: null }, { partner: 25 }, { partner: FROG, caught: {} }]) {
     const p = pf([TV], extra);
     assert.deepEqual(playRule(p, R, 1, T), { ok: true, kind: 'f_tv', heart: false, mon: null, bond: 0 }, JSON.stringify(extra));
