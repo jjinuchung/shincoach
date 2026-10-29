@@ -3527,6 +3527,8 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .kor-sent { border-radius: 4px; transition: background-color 0.25s; }
 .kor-num { color: var(--primary); font-weight: 800; margin-right: 3px; font-size: 0.95em; }
 .kor-sent.is-mark, .kor-line.is-mark { background: var(--kor-mark); }
+/* 📍 지금 소리로 읽는 근거 줄 (v363) — 줄이 꺾여도 조각마다 테두리 */
+.kor-sent.is-say, .kor-line.is-say { box-shadow: 0 0 0 2px var(--primary); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .kor-classic { background: var(--kor-gold-bg); border: 2px solid var(--kor-gold-line); border-radius: 20px; padding: 16px 20px; display: grid; gap: 10px; }
 .kor-classic-badge { font-weight: 800; color: var(--kor-gold); }
 .kor-classic-title { margin: 0; font-family: var(--kor-poem); font-size: 1.5rem; }
@@ -3562,6 +3564,9 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .kor-fb.is-ok { color: var(--ok); font-weight: 700; }
 .kor-fb.is-no { color: var(--danger); }
 .kor-fb.is-gate { color: var(--primary-dark); font-weight: 700; } /* 🔍 처음 읽는 글은 근거부터 (v273) — 틀려서가 아니니 빨갛지 않게 */
+.kor-fb.is-say { color: var(--primary-dark); font-weight: 700; background: #eef2ff; border-radius: 10px; padding: 8px 12px; word-break: keep-all; } /* 🔊 찾은 근거를 읽는 중 (v363) */
+.kor-say-again { margin: 0; }
+.kor-say-btn { min-height: 40px; padding: 6px 16px; border-radius: 999px; font-size: 0.95rem; } /* 🔊 다시 듣기 (v363) */
 .kor-ev { display: grid; gap: 8px; border-top: 1px dashed var(--border); padding-top: 12px; }
 .kor-ev-title { margin: 0; font-weight: 800; line-height: 1.5; }
 /* 🔍 근거 먼저 (v258) — 두 번 틀린 뒤 답을 고르기 전에 · 💡 둘째 힌트 — 근거가 없는 물음 */

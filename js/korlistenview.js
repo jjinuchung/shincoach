@@ -6,7 +6,8 @@
 //  · 읽기는 한 번에 하나(seq) — 새로 누르거나 멈추거나 카드·화면을 떠나면 앞의 읽기는 그 자리에서 그만
 //  · Codex 57차: 끝 알림이 빠진 줄이 있으면 "끝까지 들렸나요?" ✅를 눌러야 물음(#1) · 지난 음성이 목록에서 사라지면 다시 찾음(#5) ·
 //               읽는 동안은 상자를 새로 그리지 않고 칩·점·글자만(초점이 ⏹에 머문다) · 끝·실패는 알림 칸에 한 번(#6)
-import { listenPlan, runPlan, neverStarted, listenNote, scriptRows, fullyHeard, unsure, listenAnnounce } from './korlisten.js';
+//  · 📍 근거 줄 읽어 주기(v363, playEvSay)도 같은 읽기 번호(seq)·음성을 쓴다 — 국어 읽기 글에서 근거를 찾은 뒤 한 번
+import { listenPlan, runPlan, neverStarted, listenNote, scriptRows, fullyHeard, unsure, listenAnnounce, evSayPlan } from './korlisten.js';
 import { sayKo, waitVoices, koVoicesOf, VOICE_WAIT_MS } from './speakko.js';
 
 const el = (tag, cls, text) => {
@@ -60,6 +61,52 @@ export function stopListening() {
   seq++;
   const synth = synthOf();
   if (synth) { try { synth.cancel(); } catch { /* 없어도 */ } }
+}
+
+// ── 📍 근거 줄 읽어 주기 (v363) ──
+/** 근거를 찾은 뒤 읽기 — 줄마다 소리가 이만큼(ms) 안에 시작되지 않으면 그만(보기가 열린다 · 잠긴 보기 앞에서 오래 기다리지 않게) */
+export const EV_SAY_START_MS = 3000;
+let evSeq = -1; // 마지막 근거 읽기의 번호 — 아직 seq와 같으면 읽는 중일 수 있다
+
+/** 이 기기에 소리 내어 읽기가 있나 — 없으면 보기를 잠그지 않는다(지금처럼 바로 연다) */
+export function sayReady() {
+  return !!synthOf();
+}
+
+/**
+ * 칠한 근거와 물음을 한 번 읽는다 (korlisten.evSayPlan) — hooks { alive() 그 물음이 아직 떠 있나, onLine(p) 읽는 줄(p.i · 물음은 0) }
+ * → runPlan 결과 { done, why, started, noend } · 읽기 없음·한국어 음성 없음·읽을 근거 없음은 { done: false, why: 'none', started: false }
+ *   🎧 듣기와 같은 읽기 번호(seq) — 새 읽기·stopListening·stopEvSay면 그 자리에서 그만('stop')
+ */
+export async function playEvSay(card, q, hooks = {}) {
+  stopListening(); // 앞의 읽기를 끊는다(다시 듣기를 거듭 눌렀을 때)
+  const my = ++seq;
+  evSeq = my;
+  const none = { done: false, why: 'none', started: false, noend: 0 };
+  const synth = synthOf();
+  const plan = evSayPlan(card, q);
+  if (!synth || !plan.length) return none;
+  const alive = () => my === seq && (!hooks.alive || hooks.alive());
+  const stop = { done: false, why: 'stop', started: false, noend: 0 };
+  // 🌿 잔잔한 음악이 먼저 빠지게 (🎧 ▶와 같은 알림 — calm.js)
+  if (typeof window !== 'undefined' && window.dispatchEvent) window.dispatchEvent(new CustomEvent('shincoach:ttsstart'));
+  const voice = await koVoice(synth);
+  if (!alive()) return stop;
+  if (!voice) return none; // 한국어 음성이 없다 — 다른 말 목소리로 읽으면 알아듣지 못한다
+  await new Promise((r) => setTimeout(r, TTS_LEAD_MS)); // 끊은 바로 뒤의 말을 놓치는 기기 · 음악이 빠지는 동안
+  if (!alive()) return stop;
+  const res = await runPlan(plan, {
+    say: (text, o) => sayKo(text, { ...o, voice, startMs: EV_SAY_START_MS }),
+    alive,
+    onLine: hooks.onLine || (() => {}),
+  });
+  if (VOICE_GONE.has(res.why)) voiceP = null;
+  return res;
+}
+
+/** 근거 읽기가 지금 읽는 중이면 그만 (보기를 골랐다 · 다음 물음) — 🎧 듣기 읽기는 건드리지 않는다 */
+export function stopEvSay() {
+  if (evSeq === seq) stopListening();
 }
 
 /** 지금 읽는 중이면 멈추고 상태를 "멈춤"으로 → 멈춘 게 있었나 */

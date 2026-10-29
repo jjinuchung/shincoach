@@ -305,15 +305,17 @@ export function evRange(ev, n, pad = EV_RANGE_PAD) {
 //   k 찾은 뒤 첫 번에 맞혔나(1/0 — f에도 그 물음이 든다) · e는 "두 번 틀려 근거 먼저"만,
 //   y 🧠 아는 것으로 답하기(사실이지만 글에 없는 보기)를 고른 수(v287 📈 주간 흐름 — 그 전 줄에는 없다 · korMiss는 날짜 없는 합계뿐이라),
 //   p 🔍 두 줄로 좁힌 물음 수(v300 — 답을 고르기 전 근거 찾기에서 두 줄을 남긴 물음 · 근거부터·두 번 틀려 근거 먼저 모두 · 0도 적는다 —
-//     w만으로는 못 안다: 남길 옆 줄이 없으면 안 좁히고 w는 근거부터 물음만이라, Codex 106차 · 그 전 줄에는 없다) }]
+//     w만으로는 못 안다: 남길 옆 줄이 없으면 안 좁히고 w는 근거부터 물음만이라, Codex 106차 · 그 전 줄에는 없다),
+//   u 📍 근거부터 물음에서 근거를 찾은 뒤 🔊 칠한 근거와 물음을 읽은 첫 읽기가 끝까지 들렸나(v363 — 1 들림 · 0 소리가 안 났거나 멈춤 ·
+//     v가 있는 줄에만 · 읽기가 없는 기기와 그 전 줄에는 없다) }]
 // 병합은 열쇠로 합집합(같은 열쇠는 한 줄) · 최근 READS_MAX줄
 export const READS_MAX = 120;
 /** 한 줄의 읽은 초 상한 (6시간 — 깨진 시계 값이 요약을 부풀리지 않게) */
 export const READ_SEC_MAX = 6 * 3600;
 /** 근거부터에서 잘못 누른 줄 수 상한 (글 줄 수보다 넉넉히, v273) */
 export const READ_W_MAX = 99;
-/** 뒤에 더한 칸 — 옛 앱을 거친 사본에는 없을 수 있다 (q v260 · v·w·k v273 · y v287 · p v300) */
-const READ_OPT = ['q', 'v', 'w', 'k', 'y', 'p'];
+/** 뒤에 더한 칸 — 옛 앱을 거친 사본에는 없을 수 있다 (q v260 · v·w·k v273 · y v287 · p v300 · u v363) */
+const READ_OPT = ['q', 'v', 'w', 'k', 'y', 'p', 'u'];
 const READ_MODES = ['', 'listen', 'text'];
 const int = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) ? n : NaN; };
 const clampInt = (v, lo, hi) => { const n = int(v); return Number.isNaN(n) ? lo : Math.min(hi, Math.max(lo, n)); };
@@ -336,8 +338,8 @@ export function readOf(x) {
     f: clampInt(x.f, 0, n), x: clampInt(x.x, 0, n), e: clampInt(x.e, 0, n), h: clampInt(x.h, 0, n),
     g: clampInt(x.g, 0, 3), m: READ_MODES.includes(x.m) ? x.m : '',
     ...(q >= 0 ? { q: Math.min(q, s) } : {}), // 📖 문제 보기까지 — 없거나 깨졌으면 뺀다(옛 줄과 같게)
-    // 🔍 근거부터(v273) — v가 바른 수일 때만 셋 다 · 잘못 누른 줄은 READ_W_MAX까지
-    ...(v >= 0 ? { v: Math.min(v, s), w: clampInt(x.w, 0, READ_W_MAX), k: clampInt(x.k, 0, 1) } : {}),
+    // 🔍 근거부터(v273) — v가 바른 수일 때만 셋 다 · 잘못 누른 줄은 READ_W_MAX까지 · 🔊 u(v363)는 그 셋이 있고 0·1일 때만(아니면 뺀다 — 옛 줄과 같게)
+    ...(v >= 0 ? { v: Math.min(v, s), w: clampInt(x.w, 0, READ_W_MAX), k: clampInt(x.k, 0, 1), ...(x.u === 0 || x.u === 1 ? { u: x.u } : {}) } : {}),
     // 🧠 아는 것으로 답하기 고른 수(v287) — 없거나 깨졌으면 뺀다(옛 줄과 같게) · 물음 수 × 보기 수보다 넉넉히 READ_W_MAX까지
     ...(y >= 0 ? { y: Math.min(y, READ_W_MAX) } : {}),
     // 🔍 두 줄로 좁힌 물음 수(v300) — 없거나 깨졌으면 뺀다(옛 줄과 같게) · 물음 수까지

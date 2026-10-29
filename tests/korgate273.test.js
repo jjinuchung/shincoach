@@ -219,9 +219,11 @@ test('🔍 화면 배선 (v273): 열 때 별 0개면 근거부터 자리(기록�
   assert.ok(rq.includes('if (st.gate && st.from < 0) st.from = r.sec;'), '처음 보인 때 한 번');
   assert.ok(rq.indexOf('if (readFirst(r)) {') < rq.indexOf('if (st.gate && st.from < 0)'), '📖 [문제 보기] 전에는 재지 않는다');
   assert.ok(rq.includes('const said = qFeedback(q, st, unit, r);') && rq.includes("const fb = el('p', `kor-fb${said.cls ? ` ${said.cls}` : ''}`, said.text);"));
-  const atGate = rq.indexOf("if (said.cls === 'is-gate') card.appendChild(fb);");
+  // v363: 보기 위에 놓는 말 = 근거부터(is-gate) · 🔊 듣는 중(is-say)
+  assert.ok(rq.includes("const above = said.cls === 'is-gate' || said.cls === 'is-say';"), '보기 위에 놓는 말');
+  const atGate = rq.indexOf('if (above) card.appendChild(fb);');
   assert.ok(atGate > rq.indexOf("card.appendChild(el('p', 'kor-q-text', q.q));") && atGate < rq.indexOf("const opts = el('div'"), '근거부터 안내는 물음 글 아래·보기 위 (Codex 82차 #2)');
-  const below = rq.indexOf("if (said.cls !== 'is-gate') card.appendChild(fb);");
+  const below = rq.indexOf('if (!above) card.appendChild(fb);');
   assert.ok(below > rq.indexOf('card.appendChild(opts);') && below < rq.indexOf('let say = fb.textContent;'), '다른 말은 예전처럼 보기 아래');
   const ev = body('function evPick(n) {');
   const mark = 'if (!st.answered) { st.wrongAtEv = st.wrong.length; if (st.gate) st.evAt = r.sec; }';

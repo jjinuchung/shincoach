@@ -5,7 +5,8 @@
 //  · 처음 끝까지 들어야 물음이 나온다 — 끝까지 = 줄마다 끝 알림까지 왔다 · 끝 알림이 안 온 줄이 있으면(그런 기기가 있다)
 //    끝났는지 모르니 "끝까지 들렸나요?" ✅를 눌러야 물음이 나온다 (Codex 57차 #1 — 시작만 하고 잘린 읽기를 다 들은 것으로 보지 않는다)
 //  · 소리가 시작되지 않으면 📄 글로 읽고 풀기 (별·💰·🎯는 같고 🟩만 듣고 풀 때)
-import { speakerOf } from './korean.js';
+// 📍 근거 줄 읽어 주기 (v363, 2026-10-29 아버님 "이대로") — 답을 고르기 전에 근거를 찾으면 칠한 근거와 물음을 한 번 (evSayPlan)
+import { speakerOf, lineCount, lineText } from './korean.js';
 
 /** 읽는 빠르기 — 보통 · 🐢 천천히 (태블릿에서 들어 보고 조절) */
 export const RATE = { normal: 0.9, slow: 0.7 };
@@ -33,6 +34,52 @@ export function listenPlan(card, slow = false) {
     prev = s.who;
     return { i, who: s.who, text: s.text, rate, pitch: at >= 0 ? PITCH[at % PITCH.length] : PITCH[0], gap };
   });
+}
+
+// ── 📍 근거 줄 읽어 주기 (v363) ──
+// 근거를 찾자마자 보기가 열리면 찾은 줄을 다시 읽지 않고 고르기 쉽다 → 칠한 근거(근거부터 물음의 71%가 둘 이상 — 하나만 들으면 짐작이 안 된다)와
+// 물음을 들은 뒤에 보기가 열린다 · 보기는 읽지 않는다(스스로 읽고 견주는 것이 그 물음의 일) · 잘못 누른 줄도 읽지 않는다(맞는 줄처럼 들린다)
+
+/** 근거 줄 사이 · 물음 앞의 쉼(ms) */
+export const EV_SAY_GAP = { line: 350, ask: 600 };
+
+const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+const CIRCLED_KO = '㉠㉡㉢㉣㉤㉥㉦㉧㉨㉩㉪㉫㉬㉭';
+const JAMO = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ';
+const no = (ch) => `${CIRCLED.indexOf(ch) + 1}번`;
+
+/**
+ * 소리로 읽을 글 (순수) — 줄 번호 ⑦ → "7번" · ①~③ → "1번부터 3번까지" · ⑪·⑫ → "11번, 12번" · ㉠ → ㄱ ·
+ *   화살표·줄표·" / "는 쉼표로 · 「」『』[]는 떼고 안의 글만 (기기가 기호 이름을 읽거나 건너뛰어 물음이 엉뚱하게 들렸다)
+ */
+export function sayText(t) {
+  return String(t == null ? '' : t)
+    .replace(/([①-⑳])\s*~\s*([①-⑳])/g, (_, a, b) => `${no(a)}부터 ${no(b)}까지`)
+    .replace(/([①-⑳])\s*·\s*(?=[①-⑳])/g, (_, a) => `${no(a)}, `)
+    .replace(/[①-⑳]/g, no)
+    .replace(/[㉠-㉭]/g, (ch) => JAMO[CIRCLED_KO.indexOf(ch)])
+    .replace(/\s*(?:→|—)\s*|\s+\/\s+/g, ', ')
+    .replace(/[「」『』[\]]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
+ * 근거를 찾은 물음에서 읽을 차례 (순수) → runPlan 꼴 [{ i 줄 번호(물음은 0), who, text, rate, pitch, gap }]
+ *   칠한 근거는 글 차례 · 같은 줄은 한 번 · 글에 없는 번호는 뺀다 → 그다음 물음 · 빠르기는 🎧 보통 · 읽을 근거가 없으면 []
+ */
+export function evSayPlan(card, q) {
+  if (!card || !q || !Array.isArray(q.ev)) return [];
+  const n = lineCount(card);
+  const ev = [...new Set(q.ev.filter((x) => Number.isInteger(x) && x >= 1 && x <= n))].sort((a, b) => a - b);
+  const plan = [];
+  for (const i of ev) {
+    const text = sayText(lineText(card, i));
+    if (text) plan.push({ i, who: '', text, rate: RATE.normal, pitch: PITCH[0], gap: plan.length ? EV_SAY_GAP.line : 0 });
+  }
+  const ask = sayText(q.q);
+  if (plan.length && ask) plan.push({ i: 0, who: '', text: ask, rate: RATE.normal, pitch: PITCH[0], gap: EV_SAY_GAP.ask });
+  return plan;
 }
 
 /** 다 푼 뒤 보여 줄 들은 글 → [{ who, text }] */

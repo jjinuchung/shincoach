@@ -249,7 +249,7 @@ test('📤 국어 요약 "최근 7일 읽은 글" (korreport.readLines, v258): �
     '- 10-14 K42 「도자기 마을 체험 학습」 ★ 새로 · 4분 10초 (첫 답까지 1분 20초) · 첫 번에 2/4 · 오답 보기를 모두 고른 물음 1 · 🔍 근거 먼저 1',
     '- 10-14 K43 「개구리는 겨울에 어디에 있을까」 별 없이 다시 · 50초 (첫 답까지 10초) · 첫 번에 4/4',
   ], '연 차례 · 8일 전 · 앞날 줄은 없음');
-  assert.deepEqual(readLines([], cards, '2026-10-14').slice(1), ['## 최근 7일 읽은 글 (v258부터 셈 — 끝까지 읽을 때마다 한 줄 · 기기에 저장된 최근 120줄 안에서 · 시간은 화면이 보이고 2분 안에 손을 댄 동안만 셈 — 오래 조용히 읽은 시간은 일부 빠질 수 있음 · 첫 답까지 = 글을 연 뒤 처음 보기를 고를 때까지 · 문제 보기까지 = 글을 연 뒤 📖 [문제 보기]를 누를 때까지(v260부터, 🎧 빼고) · 🔍 근거 먼저 = 틀린 보기를 두 번 고른 뒤 근거 줄부터 찾은 물음 · 📍 근거부터 = 별을 받을 수 있는 읽기(v273은 ★ 전의 글만 · v274부터 ★·★★·★★★ 받는 날, 🎧 빼고)에서 근거가 있는 첫 물음 하나는 보기를 고르기 전에 근거 줄부터 — 그 물음이 나온 뒤 찾기까지 · 잘못 누른 줄 · 찾은 뒤 첫 번에 맞혔나(그 물음도 "첫 번에 맞힌 물음"·"첫 답까지"에 든다) · 🔍 두 줄로 좁히기(v300) = 답을 고르기 전 근거 찾기(📍 근거부터·🔍 근거 먼저)에서 줄을 세 번 잘못 누르면 근거 줄과 그 옆 줄 둘만 남김(남길 옆 줄이 없으면 안 좁힘) · 두 줄 = 그렇게 좁힌 물음 수(v300부터 적음 — 그 전 줄에는 없음) · 🎯 v300부터 ★★·★★★를 새로 받은 읽기는 첫 번에 맞힌 물음이 반 이상일 때만 🎯(별·💰는 그대로))', '(아직 기록 없음)']);
+  assert.deepEqual(readLines([], cards, '2026-10-14').slice(1), ['## 최근 7일 읽은 글 (v258부터 셈 — 끝까지 읽을 때마다 한 줄 · 기기에 저장된 최근 120줄 안에서 · 시간은 화면이 보이고 2분 안에 손을 댄 동안만 셈 — 오래 조용히 읽은 시간은 일부 빠질 수 있음 · 첫 답까지 = 글을 연 뒤 처음 보기를 고를 때까지 · 문제 보기까지 = 글을 연 뒤 📖 [문제 보기]를 누를 때까지(v260부터, 🎧 빼고) · 🔍 근거 먼저 = 틀린 보기를 두 번 고른 뒤 근거 줄부터 찾은 물음 · 📍 근거부터 = 별을 받을 수 있는 읽기(v273은 ★ 전의 글만 · v274부터 ★·★★·★★★ 받는 날, 🎧 빼고)에서 근거가 있는 첫 물음 하나는 보기를 고르기 전에 근거 줄부터 — 그 물음이 나온 뒤 찾기까지 · 잘못 누른 줄 · 찾은 뒤 첫 번에 맞혔나(그 물음도 "첫 번에 맞힌 물음"·"첫 답까지"에 든다) · 🔊 v363부터 답을 고르기 전에 근거를 찾으면(📍 근거부터·🔍 근거 먼저) 칠한 근거와 물음을 소리로 한 번 읽은 뒤 보기가 열림 — 🔊 들음 = 그 읽기가 끝까지 · 🔊 못 들음 = 소리가 안 났거나 중간에 멈춰 바로 열림 · 끝 알림이 없어 끝까지 읽었는지 확인하지 못한 기기도 못 들음(📍 근거부터 줄만 적음) · 그만큼 첫 답까지가 길어짐(찾기까지는 누른 때라 그대로) · 🔍 두 줄로 좁히기(v300) = 답을 고르기 전 근거 찾기(📍 근거부터·🔍 근거 먼저)에서 줄을 세 번 잘못 누르면 근거 줄과 그 옆 줄 둘만 남김(남길 옆 줄이 없으면 안 좁힘) · 두 줄 = 그렇게 좁힌 물음 수(v300부터 적음 — 그 전 줄에는 없음) · 🎯 v300부터 ★★·★★★를 새로 받은 읽기는 첫 번에 맞힌 물음이 반 이상일 때만 🎯(별·💰는 그대로))', '(아직 기록 없음)']);
   const lots = Array.from({ length: READ_LINES + 3 }, (_, i) => ({ ...base, t: i + 10, s: i + 1 }));
   const M = readLines(lots, cards, '2026-10-14');
   assert.equal(M[3], '- (앞의 3줄은 줄였어요)');
@@ -266,13 +266,14 @@ test('🔍 화면 연결 (v258): 두 번 틀리면 보기 잠금 · 근거 먼�
   const src = read('js/koreanview.js');
   const body = (head) => { const i = src.indexOf(head); assert.ok(i >= 0, head); return src.slice(i, src.indexOf('\n}\n', i)); };
   const rq = body('function renderQ() {');
-  assert.ok(rq.includes('const evFirst = evFirstNow(q, st);') && rq.includes('b.disabled = st.answered || isWrong || evFirst;'), '근거 먼저 동안 보기 잠금');
+  // v363: 잠금은 locked = 근거 먼저 · 🔊 찾은 근거를 읽는 동안
+  assert.ok(rq.includes('const evFirst = evFirstNow(q, st);') && rq.includes('const locked = evFirst || st.sayOn;') && rq.includes('b.disabled = st.answered || isWrong || locked;'), '근거 먼저 동안 보기 잠금');
   assert.ok(rq.includes('if (q.ev && (st.answered || evFirst)) {'), '근거 상자는 맞힌 뒤 · 근거 먼저일 때');
   assert.ok(rq.includes('if (hint2Now(q, st)) {') && rq.includes("el('p', 'kor-fb kor-hint2', `💡 ${q.hint2}`)"), '둘째 힌트');
   assert.ok(rq.includes('if (q.ev && st.evDone) for (const n of q.ev)'), '근거를 찾으면 글에 칠한다(남은 보기를 고르는 동안)');
   assert.ok(rq.includes("(st.answered || evFirst) ? 'ev' : 'opt'"), '근거 먼저면 초점은 근거 줄로');
   const pick = body('function pick(k) {');
-  assert.ok(pick.includes('if (st.answered || st.wrong.includes(k) || evFirstNow(q, st)) return;'), '잠긴 보기는 눌리지 않는다');
+  assert.ok(pick.includes('if (st.answered || st.wrong.includes(k) || evFirstNow(q, st) || st.sayOn) return;'), '잠긴 보기는 눌리지 않는다(v363 🔊 읽는 동안도)');
   assert.ok(pick.includes('if (r.firstSec < 0) r.firstSec = r.sec;') && pick.includes('if (hint2Now(q, st)) st.hint2 = true;'));
   assert.ok(pick.includes('if (evFirstNow(q, st)) bringEvFirst();'), '근거 먼저로 바뀌면 화면 밖 상자를 데려온다 (Codex 69차 #2)');
   const be = body('function bringEvFirst() {');
@@ -293,6 +294,6 @@ test('🔍 화면 연결 (v258): 두 번 틀리면 보기 잠금 · 근거 먼�
   assert.ok(src.includes("찾았어요! 칠한 ${unit}("), '번호 뒤 조사는 읽는 소리마다 달라 낱말 뒤에');
   const css = read('css/style.css');
   assert.ok(css.includes('.kor-ev.is-first {') && css.includes('.kor-fb.kor-hint2 {') && css.includes('.kor-q > .kor-fb { scroll-margin-top: var(--kor-top, 72px); }') && css.includes('.kor-opts.is-locked .kor-opt:not(.is-no) { opacity: 0.55; }'));
-  assert.ok(rq.includes("const opts = el('div', `kor-opts${evFirst ? ' is-locked' : ''}`);"), '잠긴 보기는 흐리게');
+  assert.ok(rq.includes("const opts = el('div', `kor-opts${locked ? ' is-locked' : ''}`);"), '잠긴 보기는 흐리게');
   assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1]) >= 258, 'sw는 v258 이상'); // 다음 판에서 다시 고치지 않게
 });
