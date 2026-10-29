@@ -1320,6 +1320,11 @@ export function mergeMath(cur, rec) {
   const qn = (v) => Math.max(0, Math.floor(Number(v)) || 0);
   if (qk && (!qo || qk.d > qo.d)) out.quick = { d: qk.d, n: qn(qk.n), c: qn(qk.c) };
   else if (qk && qo && qk.d === qo.d) out.quick = { d: qo.d, n: Math.max(qn(qo.n), qn(qk.n)), c: Math.max(qn(qo.c), qn(qk.c)) };
+  // 🐾 포켓몬 수학의 하루 판 수 (v364 — 그날 첫 판 💰) — ⚡와 같은 꼴: 늦은 날짜 쪽, 같은 날이면 큰 쪽 · 새 객체로 (🎯 몫은 위 quick.c를 함께 쓴다)
+  const pk = rec && rec.poke && typeof rec.poke === 'object' && typeof rec.poke.d === 'string' ? rec.poke : null;
+  const po = out.poke && typeof out.poke === 'object' && typeof out.poke.d === 'string' ? out.poke : null;
+  if (pk && (!po || pk.d > po.d)) out.poke = { d: pk.d, n: qn(pk.n) };
+  else if (pk && po && pk.d === po.d) out.poke = { d: po.d, n: Math.max(qn(po.n), qn(pk.n)) };
   // ⏰ 오래 밀린 복습 보너스의 하루 횟수 (v257) — 🍀와 같은 꼴: 늦은 날짜 쪽, 같은 날이면 큰 횟수
   const lt = rec && rec.late && rec.late.d ? rec.late : null;
   if (lt && (!out.late || !out.late.d || lt.d > out.late.d || (lt.d === out.late.d && (Number(lt.n) || 0) > (Number(out.late.n) || 0)))) out.late = { d: lt.d, n: Number(lt.n) || 0 };

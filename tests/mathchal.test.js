@@ -528,8 +528,8 @@ test('🎯 5단원 06·11 "눈금 한 칸은?": 07·12와 같은 빈 그래프�
 
 test('🎯 도전 문제 이어 풀기·⏳ 예외 끄기: 🎒·📊에서 돌아오면 풀던 문제로 · ← 뒤로와 사다리로 나가는 길은 endChal (Codex 20차 #1)', () => {
   const math = fs.readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
-  assert.match(math, /if \(ui\.chal\) \{ ui\.run\+\+; resumeChal\(\); return; \}\s*(?:if \(puzzleActive\(\)\) \{[^\n]*\n\s*)?(?:if \(detectActive\(\)\) \{[^\n]*\n\s*)?const r = ui\.round;/, 'renderMath가 풀던 편보다 먼저 도전 문제를 이어 준다(v296 🧩 퍼즐 · v299 🕵️ 나옹의 숙제 이어 보기가 그 다음)');
-  assert.match(math, /back\.addEventListener\('click', \(\) => \{ (?:quitLive\(\); )?ui\.round = null; ui\.daily = null; (?:endDetect\(\); )?endChal\(\);/, '← 뒤로(홈)도 예외를 끈다'); // v250: 그 앞에 ⏹ 그만둔 개념 편 적기 · v299: 🕵️ 나옹의 숙제 판 버리기
+  assert.match(math, /if \(ui\.chal\) \{ ui\.run\+\+; resumeChal\(\); return; \}\s*(?:if \(puzzleActive\(\)\) \{[^\n]*\n\s*)?(?:if \(detectActive\(\)\) \{[^\n]*\n\s*)?(?:if \(pokeActive\(\)\) \{[^\n]*\n\s*)?const r = ui\.round;/, 'renderMath가 풀던 편보다 먼저 도전 문제를 이어 준다(v296 🧩 퍼즐 · v299 🕵️ 나옹의 숙제 · v364 🐾 포켓몬 수학 이어 보기가 그 다음)');
+  assert.match(math, /back\.addEventListener\('click', \(\) => \{ (?:quitLive\(\); )?ui\.round = null; (?:endPoke\(\); )?ui\.daily = null; (?:endDetect\(\); )?endChal\(\);/, '← 뒤로(홈)도 예외를 끈다'); // v250: 그 앞에 ⏹ 그만둔 개념 편 적기 · v299: 🕵️ 나옹의 숙제 판 버리기 · v364: 🐾 포켓몬 수학 판 버리기
   assert.match(math, /function renderLadder\(state\) \{[\s\S]{0,200}if \(ui\.chal\) endChal\(\);/, '사다리로 나오는 길은 전부 예외를 끈다');
   assert.match(math, /function resumeChal\(\) \{[\s\S]{0,700}(else )?if \(c\.phase === 'a'\) renderChalA\(\);\s*else renderChalQ\(\);/, '답한 뒤면 정답 화면을 채점 없이 (v247: 저장 중·저장 실패 화면이 앞에 있다)');
   assert.match(math, /function renderChalA\(\) \{[\s\S]{0,200}const r = c\.results\[c\.at\]/, '정답 화면은 저장된 채점 결과로');

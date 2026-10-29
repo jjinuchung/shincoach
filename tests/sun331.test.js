@@ -87,7 +87,7 @@ test('☀️ 섞어 풀기 — 🌱 켜져 있으면 4학년 아는 칸 먼저(5
 });
 
 test('☀️ 기록 (순수) — 시작 칸 "시각:누른 곳:다시 시작" · 모르는 곳은 사다리 · 하루 기록 합집합 · 7일 · 누른 곳·다시 시작 판·완주 · 📤 수학 요약에 한 줄(하루 기록을 받았을 때만)', () => {
-  assert.deepEqual(SUN_FROM, ['ladder', 'puzzle', 'detect']);
+  assert.deepEqual(SUN_FROM, ['ladder', 'puzzle', 'detect', 'poke']); // 🐾 포켓몬 수학 끝 화면 (v364)
   assert.deepEqual(SUN_DAY_LISTS, ['sunStarts', 'sunDone']);
   assert.deepEqual([sunKey(5, 'puzzle', true), sunKey(6, 'detect', false), sunKey(7, 'nope', 1), sunKey(8, undefined, 0)], ['5:puzzle:1', '6:detect:0', '7:ladder:1', '8:ladder:0']);
   const a = mergeDailyDelta(emptyDaily(TODAY), TODAY, { sunStarts: [sunKey(1, 'ladder', true)] });

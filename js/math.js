@@ -31,6 +31,7 @@ import { ROUND_N as CHAL_N, setsOf, nextItems, checkItem, applyChalRound, applyC
 import { figureEl, inputEl } from './chalview.js';
 import { puzzleButton, puzzleActive, resumePuzzle, endPuzzle } from './mathpuzzleview.js'; // 🧩 수학 퍼즐 (v296 — 화면은 따로, ctx로 잇는다)
 import { detectButton, detectActive, resumeDetect, endDetect } from './detectiveview.js'; // 🕵️ 나옹의 숙제 봐 주기 (v299 — 화면은 따로, ctx로 잇는다)
+import { pokeButton, pokeActive, resumePoke, endPoke } from './mathpokeview.js'; // 🐾 포켓몬 수학 (v364 — 화면은 따로, ctx로 잇는다)
 // 📖 풀이 돌아보기 — 틀린 문제의 풀이를 한 줄씩 · 🔍 내 답은 왜 틀렸을까 (v248)
 import { splitLines, conceptQuiz, chalQuiz } from './lookback.js';
 import { lineReveal, reviewQuizEl } from './lookview.js';
@@ -538,6 +539,7 @@ export async function renderMath() {
   if (ui.chal) { ui.run++; resumeChal(); return; }
   if (puzzleActive()) { ui.run++; resumePuzzle(puzzleCtx()); return; } // 🧩 수학 퍼즐을 풀다 🎒·📊를 다녀왔으면 그 퍼즐로 (v296)
   if (detectActive()) { ui.run++; resumeDetect(detectCtx()); return; } // 🕵️ 나옹의 숙제를 보다 🎒·📊를 다녀왔으면 그 숙제로 (v299)
+  if (pokeActive()) { ui.run++; resumePoke(puzzleCtx()); return; } // 🐾 포켓몬 수학을 풀다 🎒·📊를 다녀왔으면 그 판으로 (v364)
   const r = ui.round;
   // 저장 중에 🎒를 다녀온 것이면 — 기다린다. 사다리 로딩으로 내려가면 run이 바뀌어 저장을 끝낸 finishRound가 결과·☀️ 다음 단계를
   // 못 그리고, renderLadder가 ui.daily를 지운다 (Codex 3차 #2). run은 그대로 두어 finishRound가 이어서 그린다
@@ -622,6 +624,7 @@ function renderStemPicker(state) {
   }
   card.appendChild(list);
   addChalButtons(card);   // 🎯 줄기를 아직 안 골랐어도 문제집 숙제는 할 수 있어야 한다
+  card.appendChild(pokeButton(puzzleCtx())); // 🐾 포켓몬 수학도 줄기와 상관없이 (v364)
   card.appendChild(puzzleButton(puzzleCtx())); // 🧩 수학 퍼즐도 줄기와 상관없이 (v296)
   card.appendChild(detectButton(detectCtx())); // 🕵️ 나옹의 숙제도 줄기와 상관없이 (v299)
   m.appendChild(card);
@@ -675,6 +678,7 @@ function renderLadder(state) {
   if (ui.chal) endChal(); // 🎯 도전 문제도 — 사다리로 나오는 길은 전부 여기를 지난다 (⏳ 예외 끄기)
   endPuzzle(); // 🧩 수학 퍼즐 판도 (v296)
   endDetect(); // 🕵️ 나옹의 숙제 판도 (v299 — 처음 답은 이미 저장했다)
+  endPoke(); // 🐾 포켓몬 수학 판도 (v364 — 끝내기 전이면 저장도 보상도 없다)
   ui.battlePending = null; // 걸어 둔 배틀도 버린다 — 편 밖에서 갑자기 열리면 아이가 당황한다 (Codex 9차 #1)
   showHatchIfAny(); // 🐣 다른 화면(영어)에서 부화했는데 아직 못 본 것
   const today = todayKey();
@@ -738,6 +742,7 @@ function renderLadder(state) {
   }
   const qb = quickButton(state, today); // ⚡ 3문제 한 판 — ☀️ 아래 (v354 · 📬 답장과 상관없이 · ☀️와 따로)
   if (qb) head.appendChild(qb);
+  head.appendChild(pokeButton(puzzleCtx())); // 🐾 포켓몬 수학 — ⚡ 아래 (v364 · ☀️와 따로 · 🎯는 ⚡와 같은 하루 몫)
   head.appendChild(puzzleButton(puzzleCtx())); // 🧩 오늘의 수학 퍼즐 — ☀️ 오늘의 수학 아래 (v296)
   head.appendChild(detectButton(detectCtx())); // 🕵️ 나옹의 숙제 봐 주기 — 🧩 아래 (v299)
   // ❓ 아빠 답을 기다리는 질문 · 😄 이해했는데 아직 안 풀어 본 문제
@@ -3490,7 +3495,7 @@ export function initMath({ showView }) {
   ui.showView = showView;
   const back = $('btn-math-back');
   // 🎯 도전 문제도 여기서 끝낸다 — 안 끄면 ⏳ 예외가 켜진 채 남아 수학 시간이 안 세어졌다 (Codex 20차 #1)
-  if (back) back.addEventListener('click', () => { quitLive(); ui.round = null; ui.daily = null; endDetect(); endChal(); endPuzzle(); ui.run++; showView('home'); }); // 🧩 퍼즐 판도 버린다(낸 답은 저장됐다, v296)
+  if (back) back.addEventListener('click', () => { quitLive(); ui.round = null; endPoke(); ui.daily = null; endDetect(); endChal(); endPuzzle(); ui.run++; showView('home'); }); // 🧩 퍼즐 판도 버린다(낸 답은 저장됐다, v296) · 🐾 판도(v364 — 끝내기 전이면 저장 없음)
 }
 
 /** 홈에서 진우가 본 영상 세계를 미리 알고 싶을 때 (표시용) */

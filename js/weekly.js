@@ -117,6 +117,7 @@ export function weeklyModel(src = {}, today) {
       row('개념 통과', '편', 'up', weeks.map((w) => cnt(w, passed))),
       row('못 넘긴 편', '편', 'down', weeks.map((w) => cnt(w, (e) => isRound(e) && !passed(e)))),
       row('그만두기', '번', 'down', weeks.map((w) => cnt(w, (e) => e.mode === 'quit'))),
+      row('🐾 포켓몬 수학 판', '판', 'up', weeks.map((w) => cnt(w, (e) => e.mode === 'poke'))), // v364 — 끝낸 판만(그만두면 안 적힌다)
       row('실수 하나 고쳐 통과', '편', null, weeks.map((w) => cnt(w, (e) => isRound(e) && e.sl === 1))),
       row('문제당 걸린 시간(가운데값)', '초', null, weeks.map((w) => {
         const l = lines(w, isRound);

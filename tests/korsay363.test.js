@@ -176,7 +176,7 @@ test('🔊 그만두기 (playEvSay): 물음이 바뀜(alive 거짓)·stopEvSay�
   await new Promise((r) => setTimeout(r, 60));
   assert.equal(fs.said.length, 1, '다음 줄을 읽지 않는다');
   // 보기를 골랐다 — stopEvSay는 읽던 말을 끊는다
-  fs = fakeSpeech({ ms: 40 });
+  fs = fakeSpeech({ ms: 2000 }); // 넉넉히 — 40ms면 전체 시험 중 PC가 바쁠 때 끊기 전에 말이 끝났다(v364 전체 시험 · 끊으면 바로 끝나 시험은 안 길어짐)
   p = playEvSay(k1, q, {});
   await until(() => fs.said.length >= 1);
   await new Promise((r) => setTimeout(r, 5));

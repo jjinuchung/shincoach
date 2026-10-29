@@ -9,6 +9,7 @@ import { schedule, isDue, enroll, addDays, daysBetween, GRADUATED, STAGES } from
 import * as fractionGen from './mathgen.js';
 import { puzzleReport } from './mathpuzzle.js'; // 🧩 수학 퍼즐 요약 줄 (v296 — import 없는 파일)
 import { detectReport } from './detective.js'; // 🕵️ 나옹의 숙제 요약 줄 (v299 — import 없는 파일)
+import { POKE_KINDS } from './mathpoke.js'; // 🐾 포켓몬 수학 꼴 이름 (v364 — mathpoke는 이 파일을 import하지 않는다)
 import * as negativeGen from './mathneg.js';
 import * as mixedGen from './mathmix.js';
 import * as decimalGen from './mathdec.js';
@@ -948,7 +949,7 @@ export function isComeback(m, today) {
   return daysBetween(d, today) > COMEBACK_DAYS;
 }
 /** ☀️를 누른 곳 — 사다리 머리 · 🧩 수학 퍼즐 끝 화면 · 🕵️ 나옹의 숙제 끝 화면 */
-export const SUN_FROM = ['ladder', 'puzzle', 'detect'];
+export const SUN_FROM = ['ladder', 'puzzle', 'detect', 'poke']; // 🐾 끝 화면 (v364)
 /** 하루 기록 목록 칸 (db.DAILY_LISTS) — 시작 "시각:누른 곳:다시 시작 판 1|0" · 완주 "시각"(시작한 시각 — 같은 흐름은 한 번) */
 export const SUN_DAY_LISTS = ['sunStarts', 'sunDone'];
 /** ☀️ 시작 한 칸 */
@@ -973,7 +974,7 @@ export function sunReport(days, today, m) {
   }
   const by = (f) => [...starts.values()].filter((s) => s.from === f).length;
   const last = m && m.daily && m.daily.d ? m.daily.d : '없음';
-  return `☀️ 최근 7일 오늘의 수학(v331부터 · 이 기간에 일어난 일을 따로 셈): 시작 ${starts.size}(사다리 ${by('ladder')} · 🧩 끝 화면 ${by('puzzle')} · 🕵️ 끝 화면 ${by('detect')} · 그중 다시 시작 판 ${[...starts.values()].filter((s) => s.cb).length}) · 완주 ${done.size} · 마지막 완주 ${last}`;
+  return `☀️ 최근 7일 오늘의 수학(v331부터 · 이 기간에 일어난 일을 따로 셈): 시작 ${starts.size}(사다리 ${by('ladder')} · 🧩 끝 화면 ${by('puzzle')} · 🕵️ 끝 화면 ${by('detect')}${by('poke') ? ` · 🐾 끝 화면 ${by('poke')}` : ''} · 그중 다시 시작 판 ${[...starts.values()].filter((s) => s.cb).length}) · 완주 ${done.size} · 마지막 완주 ${last}`;
 }
 export const KINDS = ['calc', 'misread', 'why', 'special'];
 
@@ -1394,6 +1395,73 @@ export function quickReport(m, today) {
   return `⚡ 3문제 한 판 (최근 7일): ${log.length}판 · 다 맞힘 ${all} · 오늘 🎯 ${q.ahead ? `없음(장부 날짜 ${m.quick.d}가 오늘보다 뒤 — 태블릿 시계 확인)` : `${q.c}/${QUICK.catchMax}`}`; // 앞날 장부 = 시계가 뒤로 (Codex 159차 #1)
 }
 
+// ── 🐾 포켓몬 수학 (v364, 2026-10-29 아버님 「이대로」) — 문제는 mathpoke.js(순수), 이 칸은 장부·판 끝 저장·요약 ──
+// 보상은 ⚡와 같게: 문항 정답 💰·XP · 그날 첫 판 💰POKE.coin(🐾 따로 — m.poke) · 처음 답이 다 맞으면 🎯 1(⚡와 **같은** 하루 몫 m.quick.c — QUICK.catchMax)
+//   개념 칸(사다리·복습 날짜)은 건드리지 않는다 · 🎟️·🔷·✨·☀️ 완주와 따로 · 일지에 'poke' 한 줄(주간 표의 「개념 통과」엔 안 든다 — learn·review·practice만)
+/** coin 그날 처음 끝낸 판 💰 · min 🎯를 줄 수 있는 판의 문제 수(포켓몬이 적어 판이 짧아도 셋은 되어야) */
+export const POKE = { coin: 10, min: 3 };
+/** 오늘 🐾 판 — { n 끝낸 판 } · 장부 날짜가 오늘보다 뒤(시계가 뒤로)면 ahead (⚡ quickToday와 같은 꼴) */
+function pokeToday(m, today) {
+  const k = m && m.poke;
+  if (!k || typeof k !== 'object' || typeof k.d !== 'string') return { n: 0 };
+  if (k.d === today) return { n: nat(k.n) };
+  if (k.d > today) return { n: Math.max(1, nat(k.n)), ahead: true };
+  return { n: 0 };
+}
+/**
+ * 🐾 판이 ⚡와 같은 하루 🎯 몫을 쓴다 — ⚡ 판 수(n)는 그대로 두고 🎯(c)만 하나 (저장 트랜잭션 안에서) · 시계가 뒤로면 0
+ * @returns {0|1}
+ */
+export function quickCatchOnly(m, today, perfect) {
+  const q = quickToday(m, today);
+  if (q.ahead || !perfect || q.c >= QUICK.catchMax) return 0;
+  m.quick = { d: today, n: q.n, c: q.c + 1 };
+  return 1;
+}
+/**
+ * 🐾 판 끝 저장 규칙 (순수 — xp.commitChalRound 한 트랜잭션 안에서 · ⚡ quickCommit과 같은 꼴)
+ * 일지 한 줄 + 그날 첫 판(💰) + 🎯 예약(⚡와 같은 몫) + 보상을 수학 기록과 프로필에 함께
+ * @param {Array<{k:string, ok:0|1, tag?:string}>} qs 문제마다 꼴·처음 답 맞았나·처음 틀린 실수
+ * @returns {{result:{ok:number, total:number, perfect:boolean, first:boolean, catch:0|1}, reward:{xp:number, coin:number, items:Object}}}
+ */
+export function pokeCommit(m, qs, today) {
+  const list = (Array.isArray(qs) ? qs : []).filter((q) => q && POKE_KINDS[q.k]);
+  const ok = list.filter((q) => q.ok === 1).length;
+  if (list.length) pushLog(m, { d: today, t: Date.now(), id: 'poke', mode: 'poke', ok, n: list.length, qs: list.map((q) => ({ k: q.k, ok: q.ok === 1 ? 1 : 0, ...(q.tag ? { tag: String(q.tag) } : {}) })) });
+  const p = pokeToday(m, today);
+  const perfect = list.length >= POKE.min && ok === list.length;
+  let first = false;
+  let give = 0;
+  if (!p.ahead) { // 시계가 뒤로 — 장부를 되돌리지 않는다(⚡와 같게 · Codex 159차 #1)
+    first = p.n === 0;
+    m.poke = { d: today, n: p.n + 1 };
+    give = quickCatchOnly(m, today, perfect);
+  }
+  addPending(m, give);
+  return {
+    result: { ok, total: list.length, perfect, first, catch: give },
+    reward: { xp: ok * REWARD.q.xp, coin: ok * REWARD.q.coin + (first ? POKE.coin : 0), items: {} },
+  };
+}
+/** 📤 수학 요약 🐾 줄 (아버님만) — 최근 7일 판·다 맞힌 판·꼴마다 처음 답 맞힘 · 자주 고른 실수 */
+export function pokeReport(m, today) {
+  const log = ((m && m.log) || []).filter((e) => e && e.mode === 'poke' && typeof e.d === 'string' && daysBetween(e.d, today) >= 0 && daysBetween(e.d, today) < 7);
+  if (!log.length) return '🐾 포켓몬 수학 (최근 7일): 아직 없음';
+  const all = log.filter((e) => e.n > 0 && e.ok === e.n).length;
+  const by = {};
+  const traps = {};
+  for (const e of log) for (const q of Array.isArray(e.qs) ? e.qs : []) {
+    if (!q || !POKE_KINDS[q.k]) continue;
+    const b = (by[q.k] = by[q.k] || [0, 0]);
+    b[0] += q.ok ? 1 : 0;
+    b[1] += 1;
+    if (!q.ok && q.tag) traps[`${q.k}:${q.tag}`] = (traps[`${q.k}:${q.tag}`] || 0) + 1;
+  }
+  const kinds = Object.keys(POKE_KINDS).filter((k) => by[k]).map((k) => `${POKE_KINDS[k].icon}${POKE_KINDS[k].ko} ${by[k][0]}/${by[k][1]}`).join(' · ');
+  const top = Object.entries(traps).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ${n}`).join(' · ');
+  return `🐾 포켓몬 수학 (최근 7일): ${log.length}판 · 다 맞힘 ${all} · 처음 답 ${kinds}${top ? ` · 자주 고른 실수 ${top}` : ''}`;
+}
+
 /**
  * 미룬 던지기 — 번 몬스터볼은 화면과 상관없이 레코드에 적어 두고, 던질 때마다 하나씩 쓴다.
  * 그림이 없거나(오프라인 첫날) 후보를 받는 사이 🎒로 나가도 잡기가 사라지지 않는다 (Codex 5차 #2). 트랜잭션 안에서 부른다.
@@ -1786,13 +1854,14 @@ export function mathReportText(m, today, days) {
   lines.push(detectReport(m && m.detect, today, nameOf)); // 🕵️ 나옹의 숙제 — 판·처음 답·처음에 놓친 칸 (v299)
   if (Array.isArray(days)) lines.push(sunReport(days, today, m)); // ☀️ 누른 곳·다시 시작 판·완주 (v331 — 하루 기록을 받은 📤에서만)
   lines.push(quickReport(m, today)); // ⚡ 3문제 한 판 (v354)
+  lines.push(pokeReport(m, today)); // 🐾 포켓몬 수학 (v364)
   const log = shownLog((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
       const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.rl ? '📚' : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}${q.w === 's' && q.sv !== undefined ? (q.sv ? '✓' : '✗') : ''}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
       const res = e.mode === 'quit' ? `⏹그만둠 ${e.ok}/${e.n}${e.of ? ` (${e.of}문제 중)` : ''}${e.rf ? ' → 확인 못 통과로 침' : ''}` : `${e.mode || ''} ${e.ok}/${e.n}${e.kp ? ' 💪칸 그대로' : ''}`; // ⏹ 그만둔 편 (v250) · 💪 (v262)
-      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? (e.mode === 'quick' ? '⚡3문제' : '🎲섞어풀기') : e.id === 'ask' ? '❓답장뒤풀기' : nameOf(e.id)} ${res} ${qs}`);
+      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? (e.mode === 'quick' ? '⚡3문제' : '🎲섞어풀기') : e.id === 'ask' ? '❓답장뒤풀기' : e.id === 'poke' ? '🐾포켓몬수학' : nameOf(e.id)} ${res} ${e.id === 'poke' ? (e.qs || []).map((q) => `${(POKE_KINDS[q.k] || {}).icon || '?'}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}`).join(' ') : qs}`);
     }
   }
   return lines.join('\n');
