@@ -280,8 +280,8 @@ test('🔌 잇기 — 🗺️ 물가 셋(바다 줄은 강이 열린 뒤) · 결
   assert.ok(st.includes('🌊 바다는 강 도감 ${SEA_NEED}종이면 열려요'));
   assert.ok(src('js/upload.js').includes('물고기 N마리(🏞️ 강 M · 🌊 바다 K)'));
   assert.match(src('css/style.css'), /\.lk-res-safe \{[^}]*word-break: keep-all;/, '안전 줄은 낱말 중간에서 안 끊김');
-  assert.match(src('sw.js'), /const CACHE_VERSION = 'v369';/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v369'/);
+  assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(src('sw.js')) || [])[1]) >= 369, 'sw v369 이상 (판을 못 박으면 다음 판에서 깨진다 — v370)');
+  assert.ok(Number((/APP_VERSION = 'v(\d+)'/.exec(src('js/version.js')) || [])[1]) >= 369, '앱 판 v369 이상');
   assert.match(fv, /'🔒 물고기를 더 만나면 길이 열려요'/, '잠금 줄은 숫자 없이 그대로');
   assert.doesNotMatch(fv, /\$\{SEA_NEED\}/, '아이 화면에 바다 열림 수를 안 씀');
 });

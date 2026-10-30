@@ -15,10 +15,11 @@ const CARDS = new Map(JSON.parse(read('coach/korean/reading.json')).cards.map((c
 const READ = LIST.filter((t) => t.card);
 const lineText = (l) => (typeof l === 'string' ? l : (l && (l.t || l.text)) || '');
 
-test('📖 원고 — 독서 논술 스물(v316 N33~N42 이야기 · v353 N63부터 셋째마다 — 기사문·생활문·토의 글도) · 근거 줄은 그 글 안 · 편마다 글에 근거가 있는 이유 하나 이상 · 지어낸 말은 글에 그대로 없다', () => {
+test('📖 원고 — 독서 논술 서른(v316 N33~N42 이야기 · v353·v370 N63부터 셋째마다 — 기사문·생활문·토의 글도) · 근거 줄은 그 글 안 · 편마다 글에 근거가 있는 이유 하나 이상 · 지어낸 말은 글에 그대로 없다', () => {
   const V316 = Array.from({ length: 10 }, (_, i) => `N${33 + i}`);
-  assert.deepEqual(READ.map((t) => t.id), [...V316, ...Array.from({ length: 10 }, (_, i) => `N${63 + 3 * i}`)]);
-  assert.deepEqual(READ.map((t) => t.card), ['K68', 'K4', 'K66', 'K53', 'K31', 'K95', 'K71', 'K19', 'K33', 'K32', 'K124', 'K73', 'K1', 'K119', 'K76', 'K20', 'K92', 'K47', 'K61', 'K41']);
+  assert.deepEqual(READ.map((t) => t.id), [...V316, ...Array.from({ length: 20 }, (_, i) => `N${63 + 3 * i}`)]);
+  assert.deepEqual(READ.map((t) => t.card), ['K68', 'K4', 'K66', 'K53', 'K31', 'K95', 'K71', 'K19', 'K33', 'K32', 'K124', 'K73', 'K1', 'K119', 'K76', 'K20', 'K92', 'K47', 'K61', 'K41',
+    'K116', 'K129', 'K111', 'K5', 'K128', 'K77', 'K63', 'K117', 'K23', 'K49']); // v370 — 한쪽 주장만 펴는 글은 반대편 근거 줄이 없어 뺐다
   assert.equal(new Set(READ.map((t) => t.card)).size, READ.length, '글마다 주제 하나');
   for (const t of READ) {
     const c = CARDS.get(t.card);
@@ -46,23 +47,37 @@ test('📖 원고 — 독서 논술 스물(v316 N33~N42 이야기 · v353 N63부
 });
 
 test('📖 토의·두 의견 글 — 이유가 말한 사람을 대면 근거 줄은 그 사람의 말만 · 인물의 주장은 「누구는 …」으로 (🔍 Codex 158차 — N72·N81)', () => {
-  const speaker = (l) => (/^([가-힣]{1,5})\s*:/.exec(lineText(l)) || [])[1];
+  // 줄마다 말한 사람 — 「이름: …」은 그 줄만 · 「[이름의 글]」은 다음 표시까지 그 사람의 글(K63 시우·하린이 — Codex 174차)
+  const speakers = (c) => {
+    let cur;
+    return c.lines.map((l) => {
+      const s = lineText(l);
+      const say = /^([가-힣]{1,5})\s*:/.exec(s);
+      if (say) { cur = undefined; return say[1]; }
+      const part = /^\[([가-힣]{1,5})의 글\]/.exec(s);
+      if (part) cur = part[1];
+      return cur;
+    });
+  };
   let named = 0;
   for (const t of READ) {
     const c = CARDS.get(t.card);
-    const who = new Set(c.lines.map(speaker).filter(Boolean));
+    const sp = speakers(c);
+    const who = new Set(sp.filter(Boolean));
     for (const side of ['yes', 'no']) t[side].reasons.forEach((r, i) => {
       const name = [...who].find((n) => r.startsWith(`${n}는 `) || r.startsWith(`${n}이는 `));
       if (!name) return;
       named++;
-      for (const k of t[side].ev[i]) assert.equal(speaker(c.lines[k - 1]), name, `${t.id} ${side}[${i}] ${name}의 말인데 근거 ${k}줄은 ${speaker(c.lines[k - 1])}`);
+      for (const k of t[side].ev[i]) assert.equal(sp[k - 1], name, `${t.id} ${side}[${i}] ${name}의 말인데 근거 ${k}줄은 ${sp[k - 1]}`);
     });
   }
+  assert.deepEqual(speakers(CARDS.get('K63')), [undefined, '시우', '시우', '시우', '시우', '하린이', '하린이', '하린이', '하린이'], '[이름의 글] 구간');
   assert.ok(named >= 9, `말한 사람을 댄 이유 ${named}`);
   // 이유마다 [말한 사람(없으면 null — 일어난 일·생각 이유), 근거 줄]
   const want = {
     N72: { yes: [['하윤', [3]], ['하윤', [4]], [null, []]], no: [['예준', [6]], [null, [7]], ['예준', [8]]] },
     N81: { yes: [['시우', [3]], ['시우', [5]], [null, []]], no: [['지안', [2]], ['지안', [4]], [null, []]] },
+    N111: { yes: [['시우', [3]], ['시우', [4, 5]], [null, []]], no: [['하린이', [6]], ['하린이', [9]], [null, []]] }, // v370 Codex 174차 — 시우·하린이의 예상을 글 속 사실처럼 쓰던 문장
   };
   for (const [id, sides] of Object.entries(want)) {
     const t = READ.find((x) => x.id === id);

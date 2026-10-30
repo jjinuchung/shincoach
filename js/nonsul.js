@@ -164,7 +164,21 @@ export function isSolved(st) {
 }
 
 /**
- * 오늘 할 주제 하나 — 다시 볼 것(틀린 날 다음 날부터, 오래 기다린 것부터) → 새 주제(원고 차례) · 없으면 null ·
+ * 새 주제는 하루 NEW_TOPICS_PER_DAY개까지 (v370, 2026-10-30 아버님 「추천대로」 — 넷째 묶음 30개를 이틀 만에 다 해서 다음 묶음까지 비었다) —
+ * 오늘 처음 끝낸 주제(d0)를 센다(🔤 국어 낱말 NEW_PER_DAY와 같은 꼴) · 다시 볼 주제·⭐ 연습은 그대로 · 📖 국어 글 끝 단추로 여는 주제는 막지 않는다
+ */
+export const NEW_TOPICS_PER_DAY = 4;
+const newToday = (st, today) => Object.values(st).filter((s) => s.d0 === today).length;
+
+/** 오늘 새 주제를 다 열었는데 원고에 안 해 본 주제가 남았나 (순수) — 아이 화면 「새 주제는 내일 또 와요」(셈 없이) */
+export function nonsulWaitNew(list, states, now) {
+  const st = wordsOf(states);
+  const ls = Array.isArray(list) ? list : [];
+  return newToday(st, dayNum(now)) >= NEW_TOPICS_PER_DAY && ls.some((t) => !own(st, t.id));
+}
+
+/**
+ * 오늘 할 주제 하나 — 다시 볼 것(틀린 날 다음 날부터, 오래 기다린 것부터) → 새 주제(원고 차례 · 하루 NEW_TOPICS_PER_DAY개까지) · 없으면 null ·
  * practice면 ⭐ 주제를 연습으로(오래 안 본 것부터)
  */
 export function planTopic(list, states, now, practice = false) {
@@ -177,6 +191,7 @@ export function planTopic(list, states, now, practice = false) {
   }
   const due = ls.filter((t) => own(st, t.id) && st[t.id].box < SOLVED && st[t.id].due <= today).sort((a, b) => st[a.id].due - st[b.id].due);
   if (due.length) return due[0].id;
+  if (newToday(st, today) >= NEW_TOPICS_PER_DAY) return null;
   const fresh = ls.find((t) => !own(st, t.id));
   return fresh ? fresh.id : null;
 }
@@ -252,7 +267,7 @@ export function nonsulRule(profile, ans, now, ids) {
   const xp = !practice && dayNum(cur.at) !== today ? KOR_XP.nonsul + (ans.ok === true ? KOR_XP.nonsulClean : 0) : 0;
   let solved = false;
   if (!practice) {
-    const d0 = st[id] && cur.d0 ? cur.d0 : today;
+    const d0 = own(st, id) ? cur.d0 : today; // 처음 끝낸 날은 칸이 처음 생길 때만 — d0 없는 옛 칸을 다시 풀어도 오늘 새 주제로 안 센다(Codex 174차)
     const wat = big(Math.max(at, cur.at + 1)); // 고친 때는 늘 앞으로
     if (ans.ok === true) { st[id] = { box: SOLVED, due: 0, at: wat, miss: cur.miss, d0 }; solved = true; }
     else st[id] = { box: 0, due: today + 1, at: wat, miss: big(cur.miss + 1), d0 };

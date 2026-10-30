@@ -2,12 +2,12 @@
 // 한 판 = 주제 하나: ① 내 의견 ② 이유 둘 ③ 친구가 반대로 말한다면 ④ 글 순서 → 내가 만든 글 · 판을 끝낼 때 한 번 저장(그만두면 안 남는다 — 🧩 퍼즐과 같다)
 // 🎯 논술 포켓몬 잡기는 국어 잡기와 같은 길: 화면을 띄우기 전에 기회를 빼고(nonsulTakeThrow), 안 던지고 닫으면 돌려주고,
 //   판정 전에 앱이 꺼지면 장부(throwhold)에 남아 다음에 논술에 들어올 때 돌려준다 · 기회는 국어와 따로 센다
-// 아이 화면에는 셈·진행 수를 띄우지 않는다 (2026-10-15)
+// 아이 화면에는 셈·진행 수를 띄우지 않는다 (2026-10-15) · 새 주제는 하루 넷까지(v370) — 다 열면 「새 주제는 내일 또 와요!」만(남은 수 없이)
 // ✍️ 짧은 글 (v304): 판을 끝낸 주제 — 판 끝 「✍️ 이번엔 내 말로 써 볼까요?」 · 첫 화면 「✍️ 내 말로 짧은 글 쓰기」 목록 · 📬 아빠 답장 띠 ·
 //   쓰기 화면(S.w)은 korwriteview.writeBoxEl에 칸마다 머리말 채우기(nonsulwriteview.essayFormEl)를 끼운다 · 들어올 때 비공개 저장소 답장 받기
 // 💡 내 이유 한 줄 (v355): 판 끝 「내가 만든 글」 아래 「또, …」 칸(reasonEl — 저장된 판 끝에만 · 다시 그려도 쓰던 줄·커서를 지킨다) ·
 //   답장은 같은 📬 띠 → 같은 쓰기 화면(S.w = R##) — 🔸·🔁면 「이 주제 다시 해 보기」(편이 판에서 정해지니까 한 줄은 판 끝에서만 쓴다)
-import { allTopics, planTopic, dealTopic, essayParts, nonsulFinishText, nonsulTodayLine, ORDER_HINTS, nonsulWriteCards, essayTopics, readingTopicOf, isSolved, nonsulReasonCards, reasonCardId, reasonTopicId, reasonCheck, reasonTail, reasonSendWhy, REASON_HEAD, REASON_MAX } from './nonsul.js';
+import { allTopics, planTopic, nonsulWaitNew, dealTopic, essayParts, nonsulFinishText, nonsulTodayLine, ORDER_HINTS, nonsulWriteCards, essayTopics, readingTopicOf, isSolved, nonsulReasonCards, reasonCardId, reasonTopicId, reasonCheck, reasonTail, reasonSendWhy, REASON_HEAD, REASON_MAX } from './nonsul.js';
 import { circled } from './korean.js';
 import { wordsToday } from './korwords.js';
 import { nonsulFinish, nonsulMap, nonsulDayMap, nonsulTakeThrow, nonsulGiveBackThrow, nonsulThrowsLeft, profileReady, getLevelInfo, isTired, getLook, inventory, catchAttempt, korWritesMap, nonsulReasonAdd } from './xp.js';
@@ -47,6 +47,8 @@ const ding = (ok) => { try { sfxUnlock(); if (ok) sfx.ding(); else sfx.wrong(); 
 const S = { data: null, list: [], wcards: [], rcards: [], loadErr: '', r: null, w: '', writeNote: '', catching: false, catchState: null, catchMsg: '', wired: false, charBusy: false, stories: null };
 const STEP_NAMES = ['① 내 의견', '② 이유', '③ 반대 의견', '④ 글 순서'];
 const STEP_OF = { side: 0, reasons: 1, counter: 2, order: 3, done: 4 };
+/** 오늘 새 주제를 다 열었을 때 (v370 — 하루 NEW_TOPICS_PER_DAY개 · 셈 없이) */
+const NEW_WAIT_TEXT = '새 주제는 내일 또 와요!';
 
 function nonsulVisible() {
   const v = $('view-nonsul');
@@ -131,9 +133,11 @@ function renderHome() {
   const next = planTopic(S.list, st, Date.now());
   card.appendChild(el('p', 'ns-today', nonsulTodayLine(today, !!next))); // ⭐와 🎯는 오늘 할 주제가 있을 때만 말한다 (v338)
   const practice = next ? null : planTopic(S.list, st, Date.now(), true);
+  const wait = !next && nonsulWaitNew(S.list, st, Date.now()); // 오늘 새 주제를 다 열었다 (v370 · 셈 없이)
+  if (wait) card.appendChild(el('p', 'ns-note ns-wait', NEW_WAIT_TEXT));
   if (next) card.appendChild(btn('btn btn-primary btn-big-wide ns-start', today ? '🖊️ 다음 주제 하기' : '🖊️ 오늘의 논술 시작', () => guardStart('korean', () => startRound(false))));
   else if (practice) card.appendChild(btn('btn btn-primary btn-big-wide ns-start', '⭐ 주제 다시 해 보기 (연습)', () => guardStart('korean', () => startRound(true))));
-  else card.appendChild(el('p', 'ns-note', '오늘 할 주제를 다 했어요 — 내일 다시 만나요!'));
+  else if (!wait) card.appendChild(el('p', 'ns-note', '오늘 할 주제를 다 했어요 — 내일 다시 만나요!'));
   m.appendChild(card);
   const es = essaysEl();
   if (es) m.appendChild(es);
@@ -554,6 +558,7 @@ function finishEl(r) {
   const row = el('div', 'ns-done-btns');
   if (!res.ok && res.why !== 'empty') row.appendChild(btn('btn btn-primary', '다시 저장하기', () => { r.step = 'done'; finishRound(); }));
   if (res.ok && planTopic(S.list, nonsulMap(), Date.now())) row.appendChild(btn('btn btn-primary', '🖊️ 다음 주제', () => guardStart('korean', () => startRound(false))));
+  else if (res.ok && nonsulWaitNew(S.list, nonsulMap(), Date.now())) box.appendChild(el('p', 'ns-done-line ns-wait', NEW_WAIT_TEXT)); // v370
   row.appendChild(btn('btn', '🖊️ 논술 처음으로', () => { S.r = null; renderHome(); window.scrollTo(0, 0); }));
   box.appendChild(row);
   const cb = catchBtnEl(); // 🎯 논술 잡기 기회가 있으면(그날 첫 판 · 처음 ⭐ — v338) 논술 포켓몬 잡기

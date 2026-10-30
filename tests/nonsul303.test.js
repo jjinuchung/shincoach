@@ -33,16 +33,16 @@ const DAY = 86400000;
 const seq = (seed) => { let x = seed >>> 0 || 1; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
 const body = (src, head) => { const i = src.indexOf(head); assert.ok(i >= 0, head); return src.slice(i, src.indexOf('\n}\n', i)); };
 
-test('🖊️ 원고: 주제 92 · 검사 통과 · 편마다 이유 셋 · 상관없는 말 둘 · 의견 "나는 …" · 정리 "그래도 나는 …" · 가족을 지어내지 않음', () => {
+test('🖊️ 원고: 주제 122 · 검사 통과 · 편마다 이유 셋 · 상관없는 말 둘 · 의견 "나는 …" · 정리 "그래도 나는 …" · 가족을 지어내지 않음', () => {
   assert.deepEqual(checkNonsul(RAW), []);
   // v305: 새 주제 20(N13~N32)을 끝에 붙였다 — 처음 12를 다 한 뒤 이 차례대로 나온다 · v316: 📖 독서 논술 10(N33~N42)
   // v342: 생활 주제 셋째 묶음 20(N43~N62) — N32 뒤에 📖 독서 하나 → 새 주제 둘을 번갈아(독서 열 판이 연달아 나오지 않게 · 원고 차례가 곧 나오는 차례)
-  // v353: 넷째 묶음 30(N63~N92) — 원고 끝에 📖 독서 하나 → 찬반 둘 차례로(번호 = 차례)
-  assert.equal(LIST.length, 92);
+  // v353: 넷째 묶음 30(N63~N92) — 원고 끝에 📖 독서 하나 → 찬반 둘 차례로(번호 = 차례) · v370: 다섯째 묶음 30(N93~N122) — 같은 꼴로 끝에
+  assert.equal(LIST.length, 122);
   const N = (i) => `N${i}`;
-  const ORDER = [...Array.from({ length: 32 }, (_, i) => N(i + 1)), ...Array.from({ length: 10 }, (_, i) => [N(33 + i), N(43 + 2 * i), N(44 + 2 * i)]).flat(), ...Array.from({ length: 30 }, (_, i) => N(63 + i))];
+  const ORDER = [...Array.from({ length: 32 }, (_, i) => N(i + 1)), ...Array.from({ length: 10 }, (_, i) => [N(33 + i), N(43 + 2 * i), N(44 + 2 * i)]).flat(), ...Array.from({ length: 60 }, (_, i) => N(63 + i))];
   assert.deepEqual(IDS, ORDER);
-  assert.deepEqual(IDS.filter((id) => LIST.find((t) => t.id === id).card), [...Array.from({ length: 10 }, (_, i) => N(33 + i)), ...Array.from({ length: 10 }, (_, i) => N(63 + 3 * i))], '📖 독서 논술은 N33~N42 열 · v353 N63부터 셋째마다 열');
+  assert.deepEqual(IDS.filter((id) => LIST.find((t) => t.id === id).card), [...Array.from({ length: 10 }, (_, i) => N(33 + i)), ...Array.from({ length: 20 }, (_, i) => N(63 + 3 * i))], '📖 독서 논술은 N33~N42 열 · v353·v370 N63부터 셋째마다 스물');
   const STORY = new Map(JSON.parse(read('coach/korean/reading.json')).cards.map((c) => [c.id, JSON.stringify(c.lines)]));
   // 주제끼리 같은 이유·상관없는 말·아이콘이 없다(판마다 다른 주제로 느껴지게)
   const sents = LIST.flatMap((t) => [...t.yes.reasons, ...t.no.reasons, ...t.off.map((o) => o.t)]);
@@ -151,6 +151,7 @@ test('🔍 Codex 111차: 처음 12를 다 하면 N13 · 판을 끝낼 때마다 
   assert.deepEqual([IDS[12], IDS[31]], ['N13', 'N32']);
   assert.deepEqual(IDS.slice(32, 36), ['N33', 'N43', 'N44', 'N34'], 'v342: N32 다음은 📖 하나 → 새 주제 둘');
   assert.deepEqual(IDS.slice(61, 66), ['N62', 'N63', 'N64', 'N65', 'N66'], 'v353: N62 다음은 넷째 묶음 📖 N63 → 찬반 둘 → 📖');
+  assert.deepEqual(IDS.slice(91, 96), ['N92', 'N93', 'N94', 'N95', 'N96'], 'v370: N92 다음은 다섯째 묶음 📖 N93 → 찬반 둘 → 📖');
   assert.equal(planTopic(LIST, p.nonsul, NOW + 40 * DAY), null, '새 주제가 없으면 null');
   assert.equal(planTopic(LIST, p.nonsul, NOW + 40 * DAY, true), 'N1', '연습은 오래 안 본 것부터');
 });
@@ -210,7 +211,7 @@ test('🖊️ nonsulRule: 그날 첫 판만 💰10·🎯 하나 · 한 번에 �
   const r5 = nonsulRule(p, { id: 'N1', ok: true, from: p.nonsul.N1.at }, NOW + DAY, IDS);
   assert.deepEqual([r5.first, r5.solved, r5.starCatch, p.nonsul.N1.box, p.nonsulThrow.earned, p.coins], [true, true, true, SOLVED, 4, NONSUL_COINS * 2], '다음 날 첫 판에 틀렸던 주제를 ⭐로 — 첫 판 🎯 + ⭐ 🎯');
   assert.ok(p.nonsul.N1.at > NOW, '고친 때는 늘 앞으로');
-  for (const bad of [null, {}, { id: 'N99', ok: true }, { id: 5 }]) assert.equal(nonsulRule(p, bad, NOW, IDS).why, 'empty');
+  for (const bad of [null, {}, { id: 'N999', ok: true }, { id: 5 }]) assert.equal(nonsulRule(p, bad, NOW, IDS).why, 'empty'); // v370: N99는 다섯째 묶음에 생겼다
   assert.equal(nonsulRule(p, { id: 'N3', ok: true }, NOW, []).why, 'empty', '지금 없는 주제');
 });
 
@@ -336,7 +337,7 @@ test('🖊️ 말: 판 끝·오늘 줄은 셈 없이(💰 보상 액수만) · �
   const view = read('js/nonsulview.js');
   assert.ok(!/\$\{[^}]*length[^}]*\}\s*\/|남은 \$\{|개 남|\$\{[^}]*\}\s*\/\s*\$\{/.test(view), '아이 화면에 n/m·남은 수 없음');
   const st = { N1: { box: SOLVED, due: 0, at: NOW, miss: 0, d0: D0 }, N2: { box: 0, due: D0 + 1, at: NOW, miss: 1, d0: D0 } };
-  assert.equal(nonsulReport(LIST, st, { [D0]: 1, [D0 - 3]: 1, [D0 - 9]: 1 }, NOW), '🖊️ 논술: ⭐ 처음부터 다 맞힌 주제 1/92 · 다시 볼 주제 1 · 해 본 주제 2 · 최근 7일 중 판을 끝낸 날 2');
+  assert.equal(nonsulReport(LIST, st, { [D0]: 1, [D0 - 3]: 1, [D0 - 9]: 1 }, NOW), '🖊️ 논술: ⭐ 처음부터 다 맞힌 주제 1/122 · 다시 볼 주제 1 · 해 본 주제 2 · 최근 7일 중 판을 끝낸 날 2');
 });
 
 test('🖊️ 📤 국어 요약: 논술 원고가 있으면 🖊️ 절 · 없거나 깨지면 그 절만 빠지고 국어 요약은 그대로', () => {
@@ -345,7 +346,7 @@ test('🖊️ 📤 국어 요약: 논술 원고가 있으면 🖊️ 절 · 없�
   const z = JSON.parse(read('coach/korean/puzzles.json'));
   const p = { ...emptyProfile(), nonsul: { N1: { box: SOLVED, due: 0, at: NOW, miss: 0, d0: D0 } }, nonsulDay: { [D0]: 1 } };
   const withNs = korReportFromRaw(p, [r, w, z, RAW], '2026-10-20', []);
-  assert.ok(withNs.includes('\n## 🖊️ 논술\n- 🖊️ 논술: ⭐ 처음부터 다 맞힌 주제 1/92 · 다시 볼 주제 0 · 해 본 주제 1 · 최근 7일 중 판을 끝낸 날 1'), withNs.slice(-300));
+  assert.ok(withNs.includes('\n## 🖊️ 논술\n- 🖊️ 논술: ⭐ 처음부터 다 맞힌 주제 1/122 · 다시 볼 주제 0 · 해 본 주제 1 · 최근 7일 중 판을 끝낸 날 1'), withNs.slice(-300));
   for (const ns of [undefined, null, { topics: [] }, 'x']) {
     const t = korReportFromRaw(p, [r, w, z, ns], '2026-10-20', []);
     assert.ok(t && t.includes('## 🧩 퍼즐') && !t.includes('🖊️'), '논술 절만 빠진다');
