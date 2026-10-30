@@ -280,8 +280,6 @@ test('🔌 잇기 — 집 화면(하늘 시각 · 가게 「놓으면 …」 · 
   assert.ok(css.includes('/* ===== 🛏️ 가구 놀기 (v365'));
   const rm = css.slice(css.indexOf('/* 「움직임 줄이기」면 멈춘 그림'));
   for (const s of NEW_SCENES) assert.ok(rm.slice(0, 700).includes(`.pshow-stage.is-${s} *`), `움직임 줄이기 ${s}`);
-  assert.match(src('sw.js'), /CACHE_VERSION = 'v365'/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v365'/);
 });
 
 // ───────────────────── 진짜 저장 경로 (fakeidb) ─────────────────────

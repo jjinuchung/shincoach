@@ -34,6 +34,7 @@ import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
 import { DEFAULT_MIN as TIME_MIN, KOREAN_MIN, EXTEND_MAX, EXTEND_MIN, extMaxOf, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
 import { GAME_MIN, GAME_CAP, gameMinOf, gameCapOf } from './minigame.js'; // 🎮 게임기 미니 게임 판 (v307)
 import { STOCK_CAP, stockCapOf } from './stock.js'; // 🏦 포켓몬 증권시장 투자 한도 (v319)
+import { FISH_DAY_MIN, fishMinOf } from './fishing.js'; // 🎣 학습 낚시터 하루 분 (v366 — 순수)
 import { grantPlay, gameTodayLine } from './gameview.js'; // 🎮 ⚙ 오늘 한 줄 · 🔒 +1판 (v307)
 import { setBgmEnabled } from './bgm.js';
 import { setGameBgmEnabled } from './gamebgm.js'; // 🎮 미니 게임 음악도 ⚙ 이벤트 배경음악을 따른다 (v335)
@@ -3379,6 +3380,7 @@ function loadSettings() {
     timeExtMax: EXTEND_MAX,
     // 🎮 게임기 미니 게임 판 (v307 → 2026-10-23 v328, 아버님) — 과목을 합친 공부 15분에 1판 · 하루 12판까지
     gameMin: GAME_MIN, gameCap: GAME_CAP,
+    fishMin: FISH_DAY_MIN, // 🎣 학습 낚시터 하루 분 (v366, 아버님 기본안 20분)
     stockOn: true, stockCap: STOCK_CAP, // 🏦 포켓몬 증권시장 (v319) — 🔒 부모가 끄기·투자 한도
     cloudBackup: false, // ☁️ 이 기기를 매일 백업 (v361) — 처음엔 꺼짐 · 진우 태블릿에서만 켠다 · cloudbackup.js가 같은 localStorage에서 읽는다
     // 🔢 수학 숫자판 (2026-10-01) — 켜짐이 기본. math.js가 같은 localStorage에서 읽는다
@@ -3429,6 +3431,7 @@ export function timeLimitConf() {
     minKorean: { weekday: Number(settings.timeKorean), weekend: Number(settings.timeKorean) }, // 📚 국어 — 날마다 같은 값
     extMax: extMaxOf(settings.timeExtMax),
     gameMin: gameMinOf(settings.gameMin), gameCap: gameCapOf(settings.gameCap), // 🎮 게임 판 (v307)
+    fishMin: fishMinOf(settings.fishMin), // 🎣 학습 낚시터 하루 분 (v366 — lakeview.fishMinNow가 읽는다)
   };
 }
 
@@ -3469,6 +3472,12 @@ function renderGameToday() {
   if (!p) return;
   try { p.textContent = gameTodayLine({ min: gameMinOf($('set-game-min').value), cap: gameCapOf($('set-game-cap').value) }); } catch { p.textContent = ''; }
 }
+/** 🎣 ⚙ 설정 아래 낚시터 한 줄 (v366) — 지금 칸에 적힌 분으로 셈한다 · 화면 모듈은 이때 불러온다 */
+function renderLakeToday() {
+  const p = $('set-fish-today');
+  if (!p) return;
+  import('./lakeview.js').then((m) => m.lakeTodayLine(fishMinOf($('set-fish-min').value))).then((t) => { p.textContent = t; }).catch(() => { p.textContent = ''; });
+}
 
 function initSettingsDialog() {
   $('set-merge').checked = settings.mergeSentences;
@@ -3498,6 +3507,13 @@ function initSettingsDialog() {
     const b = $('set-game-bonus');
     b.disabled = true;
     try { await grantPlay(); } catch { /* 저장 실패 — 한 줄이 그대로 */ } finally { b.disabled = false; renderGameToday(); }
+  });
+  // 🎣 학습 낚시터 (v366) — 분을 바꾸면 한 줄을 바로 다시 · 🔒 오늘 +10분(두 번 눌러 20분 주지 않게 끈다)
+  $('set-fish-min').addEventListener('change', renderLakeToday);
+  $('set-fish-bonus').addEventListener('click', async () => {
+    const b = $('set-fish-bonus');
+    b.disabled = true;
+    try { await (await import('./lakeview.js')).grantLakeTime(); } catch { /* 저장 실패 — 한 줄이 그대로 */ } finally { b.disabled = false; renderLakeToday(); }
   });
   $('set-puzzle-try').addEventListener('click', () => { $('dlg-settings').close(); startPuzzleNow(); });
   $('set-review-try').addEventListener('click', () => { $('dlg-settings').close(); startReviewNow(); });
@@ -3559,6 +3575,7 @@ function initSettingsDialog() {
     settings.timeExtMax = extMaxOf($('set-time-ext').value);
     settings.gameMin = gameMinOf($('set-game-min').value); // 🎮 게임 판 (v307)
     settings.gameCap = gameCapOf($('set-game-cap').value);
+    settings.fishMin = fishMinOf($('set-fish-min').value); // 🎣 학습 낚시터 (v366)
     settings.stockOn = $('set-stock-on').checked; // 🏦 증권시장 (v319)
     settings.stockCap = stockCapOf($('set-stock-cap').value);
     settings.mathPad = $('set-mathpad').checked;
@@ -3630,6 +3647,7 @@ function openSettings() {
     $('set-time-ext').value = String(extMaxOf(settings.timeExtMax));
     $('set-game-min').value = String(gameMinOf(settings.gameMin)); // 🎮 게임 판 (v307)
     $('set-game-cap').value = String(gameCapOf(settings.gameCap));
+    $('set-fish-min').value = String(fishMinOf(settings.fishMin)); // 🎣 학습 낚시터 (v366)
     $('set-stock-on').checked = settings.stockOn !== false; // 🏦 증권시장 (v319)
     $('set-stock-cap').value = String(stockCapOf(settings.stockCap));
     $('set-mathpad').checked = settings.mathPad !== false;
@@ -3641,6 +3659,7 @@ function openSettings() {
     }).catch(() => {});
     renderTimeToday();
     renderGameToday();
+    renderLakeToday();
     ttsSeq++; // 🔊 아직 안 끝난 지난 확인은 결과를 적지 않는다
     $('set-tts-note').textContent = ''; // 🔊 지난번 확인 결과는 지운다
     $('set-tts-try').disabled = false;

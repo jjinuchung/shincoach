@@ -32,6 +32,8 @@
       <p class="home-ask">오늘은 무엇을 공부할까?</p>
       <!-- 🎒 포켓몬 대여행 (v341) — 토요일에 열려 다음 금요일까지 한 번 · journeyview.js가 그린다 · 과목 카드 위 얇은 띠(태블릿 가로에서 카드 아래는 스크롤해야 보인다) -->
       <div id="home-journey" class="home-journey" hidden></div>
+      <!-- 🎣 학습 낚시터 (v366) — lakeview.js가 그린다 · 대여행 띠 아래 같은 꼴 띠 · 창 id는 lk-lake(fishview.js가 만든다) -->
+      <div id="home-lake" class="home-lake" hidden></div>
       <ul id="home-subjects" class="home-cards"></ul>
       <p id="home-hint" class="home-hint" hidden></p>
     </main>
@@ -827,6 +829,23 @@
         </label>
         <button type="button" id="set-game-bonus" class="btn">🎮 오늘 +1판 주기</button>
         <p id="set-game-today" class="field-note"></p>
+      </fieldset>
+
+      <fieldset class="field set-group">
+        <legend class="field-label">🎣 학습 낚시터 <small>— 홈의 🎣 띠. 낚시하며 이미 배운 문제(수학·영어·국어·논술)를 풀어요. 요즘 덜 한 과목이 더 자주 나와요(지난 7일 기록으로). 낚시 시간은 과목 시간·게임 판에 안 들어가요. 기록은 📤 usage 🎣 줄</small></legend>
+        <label class="field field-inline">
+          <span class="field-label">하루 낚시</span>
+          <select id="set-fish-min">
+            <option value="10">10분</option>
+            <option value="15">15분</option>
+            <option value="20">20분</option>
+            <option value="30">30분</option>
+            <option value="40">40분</option>
+            <option value="60">60분</option>
+          </select>
+        </label>
+        <button type="button" id="set-fish-bonus" class="btn">🎣 오늘 +10분 주기</button>
+        <p id="set-fish-today" class="field-note"></p>
       </fieldset>
 
       <fieldset class="field set-group">

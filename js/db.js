@@ -25,6 +25,7 @@ import { copyPlay, mergePlay } from './homeplay.js'; // 🎮 일상 행동 💗�
 import { copyStock } from './stock.js'; // 🏦 포켓몬 증권시장 복사 (순수 — 아무것도 import하지 않는다, v319)
 import { matchedOf, mergeMatched } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329)
 import { dripOf, mergeDrip } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (순수 — 아무것도 import하지 않는다, v320)
+import { copyLake, mergeLake } from './fishing.js'; // 🎣 학습 낚시터 도감·하루 💰 복사·병합 (v366 — 순수, 아무것도 import하지 않음)
 import { copyJourney, mergeJourney } from './journey.js'; // 🎒 포켓몬 대여행 복사·병합 (v341 — 순수, evolve·items·montypes만 import)
 import { pickGhost, readGhosts, writeGhosts, addGhosts, dropGhost } from './ghosts.js'; // 👻 되살린 백업의 영상 자리 (v361 — 순수·localStorage, import 없음)
 import { knownOf, mergeKnown, seenOf, mergeSeen, gMissOf, mergeGMiss, diagOf, mergeDiag, giftOf, mergeGift, videoSeenOf, mergeVideoSeen } from './grammar.js'; // 📝 영어 문법 기록 (v348 — 순수, korean·korwords만 import · v350 🎬 낸 영상 문제)
@@ -436,6 +437,9 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'uJourney',
   // 📝 오늘 끝낸 문법 쪽지 수 (2026-10-27 v349 — 영상 따라 하기 사이 · 하루 3장 · claimDailyCount로 선점, 병합 maxOf라 옛 백업으로 되살리지 못한다)
   'grammarNotes',
+  // 🎣 학습 낚시터 (2026-10-30 v366, fishing.js · lakeview.js) — 창에 머문 초(🕒) · 하루 낚시 초(20분 셈 — 화면이 보이고 2분 안에 손댄 때만) ·
+  //   🔒 부모가 더 준 분 · 낚은 마리 · 과목마다 낸 문제·맞힌 문제. 병합 maxOf라 옛 백업으로 오늘 쓴 낚시 시간을 되살리지 못한다
+  'uLake', 'fishSec', 'fishBonus', 'fishCatch', 'fishMathQ', 'fishMathOk', 'fishEnQ', 'fishEnOk', 'fishKorQ', 'fishKorOk', 'fishNsQ', 'fishNsOk',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
   // 🎵 게임기 음악 (2026-10-25 v337, gamebgm.js) — 소리가 난 초 · 게임기 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
@@ -1075,7 +1079,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), grammarVideo: videoSeenOf(cur.grammarVideo), spell: wordsOf(cur.spell), spellDay: wordDaysOf(cur.spellDay), spellSeen: spellSeenOf(cur.spellSeen), letters: lettersOf(cur.letters), zyg: zygOf(cur.zyg), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), ...(cur.fishing ? { fishing: copyLake(cur.fishing) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), grammarVideo: videoSeenOf(cur.grammarVideo), spell: wordsOf(cur.spell), spellDay: wordDaysOf(cur.spellDay), spellSeen: spellSeenOf(cur.spellSeen), letters: lettersOf(cur.letters), zyg: zygOf(cur.zyg), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2456,6 +2460,9 @@ export function mergeStatRecord(name, cur, rec) {
     // 🎒 포켓몬 대여행(v341) — 끝난 주는 합집합(옛 백업이 끝난 여행을 되살려 두 번 받거나 잃지 않게) · 지금 여행은 코인·가방과 같은 쪽(최근 쪽, 없으면 다른 쪽)
     const jr = mergeJourney(latest.journey, older.journey);
     if (jr) out.journey = jr; else delete out.journey;
+    // 🎣 학습 낚시터(v366) — 도감은 종마다 큰 쪽(처음 잡은 날은 이른 쪽) · 그날 받은 💰는 늦은 날 쪽, 같은 날이면 큰 쪽(옛 백업으로 하루 한도를 되살리지 않게)
+    const lk = mergeLake(cur.fishing, rec.fishing);
+    if (lk) out.fishing = lk; else delete out.fishing;
   }
   return out;
 }

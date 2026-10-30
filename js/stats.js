@@ -28,6 +28,7 @@ import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질
 import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
 import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
 import { allMsgs, addLocal, seenNow } from './familyview.js';
+import { SPECIES, lakeOf, lakeDayLine, FISH_COINS, FISH_DAY_MIN, SHARE_MIN, SHARE_MAX } from './fishing.js'; // 🎣 학습 낚시터 📊 카드 (v366 — 순수)
 
 const $ = (id) => document.getElementById(id);
 
@@ -446,6 +447,28 @@ export async function renderStats() {
     cr.appendChild(row);
     main.appendChild(cr);
   }
+
+  // 🎣 학습 낚시터 (v366) — 지난 7일 낚시 시간·낚은 마리·과목마다 맞힘/낸 문제(📤 usage 🎣 줄과 같은 말) · 도감 · 한 번도 안 갔으면 카드 없음
+  try {
+    const lk = lakeOf(getProfileSnapshot().fishing);
+    const kinds = SPECIES.filter((s) => lk.dex[s.key]);
+    const rows = daily.filter((d) => d && d.date && lakeDayLine(d)).slice(-7).reverse();
+    if (rows.length || kinds.length) {
+      const cl = card('🎣 학습 낚시터');
+      cl.appendChild(el('p', 'stats-note', `낚시하며 이미 배운 문제(대여행과 같은 원천)를 풀어요 — 던지기·밑밥·바늘 걸기·사투·뜰채마다 문제 · 지난 7일 덜 한 과목이 더 자주(한 과목 ${Math.round(SHARE_MIN * 100)}~${Math.round(SHARE_MAX * 100)}%) · 하루 ${FISH_DAY_MIN}분이 기본(⚙) · 💰 별 하나에 ${FISH_COINS.perStar} · 새 종·🏅 월척 +${FISH_COINS.newKind} · 하루 ${FISH_COINS.dayMax}까지 · 문제 하나하나는 안 적어요.`));
+      const dex = el('div', 'stats-row');
+      dex.appendChild(el('span', 'name', `도감 ${kinds.length}/${SPECIES.length}`));
+      dex.appendChild(el('span', 'meta', kinds.length ? kinds.map((s) => `${s.ko} ${lk.dex[s.key].best.toFixed(1)}cm`).join(' · ') : '아직 없음'));
+      cl.appendChild(dex);
+      for (const d of rows) {
+        const row = el('div', 'stats-row');
+        row.appendChild(el('span', 'name', d.date.slice(5)));
+        row.appendChild(el('span', 'meta', lakeDayLine(d).replace(/^🎣 낚시터 /, '')));
+        cl.appendChild(row);
+      }
+      main.appendChild(cl);
+    }
+  } catch { /* 이 카드 하나 때문에 📊가 비지 않게 */ }
 
   // 🎒 포켓몬 대여행 (v341) — 주마다 결과·과목별 맞힌 수·잃은 것 (📤 usage/journey.md와 같은 말) · 한 번도 안 떠났으면 카드 없음
   try {

@@ -260,6 +260,8 @@ export async function renderHome(showView) {
   hint.hidden = true;
   // 🎒 포켓몬 대여행 카드 (v341) — 화면 모듈은 처음 그릴 때 불러온다(못 불러와도 과목 카드는 그대로)
   import('./journeyview.js').then((m) => m.mountJourneyCard($('home-journey'))).catch(() => {});
+  // 🎣 학습 낚시터 띠 (v366) — 같은 꼴: 화면 모듈은 처음 그릴 때 불러온다
+  import('./lakeview.js').then((m) => m.mountLakeCard($('home-lake'))).catch(() => {});
   if (pal) pal.refresh(); // 🤝 그 사이 💗·파트너가 바뀌었을 수 있다
   // 💌 맨 위 편지 — 가진 것으로 바로 그리고, 받아 와서 바뀌면 다시 (못 받아도 홈은 그대로)
   refreshLetter(letterBox()).catch(() => {});

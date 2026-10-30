@@ -4974,3 +4974,76 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .cloud-restore { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .cloud-pick { max-width: 100%; min-height: 44px; font-size: 1rem; padding: 6px 8px; }
 .cloud-restore .btn { align-self: flex-start; min-height: 44px; }
+
+/* ===== 🎣 학습 낚시터 (v366) — fishview.js · 장면은 캔버스 한 장(fishart.js) · 단추·문제 카드·결과만 화면 조각 · 저수지 그림이라 색은 고정 ===== */
+.lk { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 66; background: #0b3540; overflow: hidden; user-select: none; -webkit-user-select: none; color: #12343b; }
+.lk-cv { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; } /* 터치 막기는 그림과 감기 단추에만 — 긴 문제·결과 카드는 손가락으로 내려 봄(Codex 170차) */
+.lk-top { position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; pointer-events: none; }
+.lk-top > * { pointer-events: auto; }
+.lk-spot { padding: 5px 12px; border-radius: 999px; background: rgba(255, 253, 248, 0.88); font-weight: 700; font-size: 0.98rem; }
+.lk-dist { position: absolute; left: 50%; top: 0; transform: translateX(-50%); padding: 6px 18px; border-radius: 14px; background: rgba(255, 253, 248, 0.92); font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lk-x { margin-left: auto; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(255, 253, 248, 0.88); color: #12343b; font-size: 1.2rem; cursor: pointer; }
+.lk-toast { position: absolute; top: max(70px, calc(env(safe-area-inset-top, 0px) + 60px)); left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 16px; border-radius: 12px; background: rgba(8, 30, 36, 0.82); color: #f3faf9; font-size: 1.02rem; text-align: center; pointer-events: none; }
+.lk-act { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); width: 224px; height: 150px; display: flex; align-items: flex-end; justify-content: center; transition: opacity 0.2s; }
+.lk.is-q .lk-act { opacity: 0.25; pointer-events: none; }
+.lk-gauge { position: absolute; left: 0; bottom: 18px; width: 224px; height: 124px; overflow: visible; pointer-events: none; }
+.lk-g-bg, .lk-g-fill { fill: none; stroke-width: 16; stroke-linecap: round; }
+.lk-g-bg { stroke: rgba(8, 40, 48, 0.55); }
+.lk-g-fill { stroke: #5ad15a; stroke-dasharray: 0 400; }
+.lk-g-fill.is-amber { stroke: #f2a93b; }
+.lk-g-fill.is-red { stroke: #eb5757; }
+.lk-g-fill.is-surge { animation: lk-shake 0.12s linear infinite; }
+.lk-g-label { fill: #e8f4f2; font-size: 15px; font-weight: 700; }
+@keyframes lk-shake { 50% { transform: translateX(2px); } }
+.lk-btn { position: relative; width: 124px; height: 124px; padding: 0; white-space: nowrap; border-radius: 50%; border: 4px solid rgba(255, 255, 255, 0.85); background: #e85a1c; color: #fff; font-size: 1.22rem; font-weight: 800; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); cursor: pointer; touch-action: none; }
+.lk-btn:active { transform: scale(0.95); }
+.lk-btn.is-wait { background: #7f5a44; }
+.lk-btn.is-bite { background: #ff3b14; animation: lk-pulse 0.4s ease-in-out infinite alternate; }
+.lk-btn.is-reel { background: #1f7f8c; }
+@keyframes lk-pulse { to { transform: scale(1.08); } }
+.lk-card { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(640px, calc(100% - 32px)); max-height: calc(100% - 90px); overflow-y: auto; padding: 14px 16px 16px; border-radius: 18px; background: #fffdf8; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; gap: 10px; }
+.lk-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.lk-stage { font-weight: 800; font-size: 1.02rem; color: #b8460f; }
+.lk-subj { color: #4f6a6e; font-size: 0.95rem; }
+.lk-q { font-size: 1.3rem; font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
+.lk-word { font-size: 1.6rem; color: #1f6170; letter-spacing: 0.02em; }
+.lk-hear { margin-left: 8px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: #dcecef; font-size: 1.1rem; cursor: pointer; vertical-align: middle; }
+.lk-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lk-choice { min-height: 54px; padding: 8px 12px; border-radius: 12px; border: 2px solid transparent; background: #dcecef; color: #12343b; font: inherit; font-size: 1.1rem; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.lk-choice:disabled { cursor: default; }
+.lk-choice.is-ok { background: #c9f0d4; border-color: #2c7a4b; }
+.lk-choice.is-no { background: #fde0d6; border-color: #c0472a; }
+.lk-choice.is-ans { background: #e3f6e8; border-color: #2c7a4b; }
+.lk-res { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: grid; place-items: center; padding: 16px; background: rgba(5, 20, 25, 0.45); }
+.lk-res-card { width: min(380px, 100%); max-height: 100%; overflow-y: auto; padding: 16px 18px 18px; border-radius: 20px; background: #fffdf8; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.lk-res-fish { max-width: 100%; height: auto; background: linear-gradient(#e3f1f2, #c6e0e2); border-radius: 14px; }
+.lk-res-name { font-size: 1.5rem; font-weight: 800; }
+.lk-res-size { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.lk-res-say { margin: 0; color: #4f6a6e; }
+.lk-res-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.lk-chip { padding: 2px 10px; border-radius: 999px; background: #e6efd9; color: #4e6e2f; font-size: 0.92rem; font-weight: 700; }
+.lk-chip.is-gold { background: #fff0c2; color: #8a5a00; }
+.lk-chip.is-new { background: #fde9df; color: #b8460f; }
+.lk-res-btn { margin-top: 4px; min-height: 50px; padding: 8px 22px; border-radius: 14px; border: 0; background: #e85a1c; color: #fff; font: inherit; font-size: 1.15rem; font-weight: 800; cursor: pointer; }
+.lk-res-btn:disabled { opacity: 0.6; cursor: default; }
+.lk-res-sub { min-height: 44px; padding: 6px 16px; border-radius: 12px; border: 0; background: transparent; color: #4f6a6e; font: inherit; font-size: 0.98rem; text-decoration: underline; cursor: pointer; }
+.lk-end-list { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; color: #12343b; }
+@media (max-width: 640px) {
+  .lk-act { width: 170px; height: 118px; }
+  .lk-gauge { width: 170px; height: 94px; bottom: 14px; }
+  .lk-btn { width: 96px; height: 96px; font-size: 0.95rem; }
+  .lk-dist { font-size: 1.2rem; top: 52px; }
+  .lk-q { font-size: 1.15rem; }
+  .lk-choice { font-size: 1rem; min-height: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lk-btn.is-bite, .lk-g-fill.is-surge { animation: none; }
+}
+/* 🎣 홈 띠 (v366) — 🎒 대여행 띠와 같은 꼴 · 물빛 */
+.home-lake { margin: 0 auto 12px; max-width: 760px; width: 100%; }
+.lk-home { display: flex; align-items: stretch; width: 100%; padding: 0; border: 2px solid #1f7f8c; border-radius: 16px; overflow: hidden; background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; box-shadow: var(--shadow); }
+.lk-home.is-closed { border-color: var(--border); opacity: 0.8; cursor: default; box-shadow: none; }
+.lk-home-art { flex: none; width: 64px; display: grid; place-items: center; font-size: 1.7rem; background: linear-gradient(#bfe0e8, #3d8a98); }
+.lk-home-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 9px 14px; min-width: 0; }
+.lk-home-title { font-size: 1.05rem; }
+.lk-home-sub { color: var(--muted); font-size: 0.92rem; }

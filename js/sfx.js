@@ -177,7 +177,47 @@ export const sfx = {
     const c = ac(); if (!c) return;
     [1568, 2093, 2637, 3136].forEach((f, i) => tone(c, { freq: f, at: i * 0.07, dur: i === 3 ? 0.6 : 0.1, gain: 0.08 }));
   },
+  // ── 🎣 학습 낚시터 (v366) ──
+  /** 찌가 물에 퐁당 */
+  plop() {
+    const c = ac(); if (!c) return;
+    tone(c, { freq: 520, freqEnd: 150, type: 'sine', dur: 0.16, gain: 0.22 });
+    burst(c, 'bandpass', 1400, 0.12, 0.08);
+  },
+  /** 릴 감는 짤깍 하나 (감는 동안 자주 부른다 — 작게) */
+  reel() {
+    const c = ac(); if (!c) return;
+    burst(c, 'highpass', 3200, 0.025, 0.06);
+  },
+  /** 드랙이 풀리는 지이익 */
+  drag() {
+    const c = ac(); if (!c) return;
+    tone(c, { freq: 1100, freqEnd: 700, type: 'sawtooth', dur: 0.35, gain: 0.05 });
+    burst(c, 'highpass', 2400, 0.35, 0.08);
+  },
+  /** 물고기가 물을 튀김 */
+  splash() {
+    const c = ac(); if (!c) return;
+    burst(c, 'lowpass', 2200, 0.4, 0.22);
+    tone(c, { freq: 240, freqEnd: 90, type: 'sine', dur: 0.2, gain: 0.1 });
+  },
 };
+
+/** 짧은 물소리 — 백색소음을 거름틀 하나로 (🎣) */
+function burst(c, type, hz, dur, gain) {
+  const s = noise(c);
+  const f = c.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = hz;
+  const g = c.createGain();
+  const t0 = c.currentTime;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(f).connect(g).connect(c.destination);
+  s.start(t0);
+  s.stop(t0 + dur + 0.02);
+}
 
 /** 진동 (지원 기기에서만, 설정 꺼져 있으면 무시) */
 export function vibrate(pattern) {

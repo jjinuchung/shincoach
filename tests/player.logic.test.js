@@ -328,6 +328,7 @@ function loadPlayer() {
     // ✍️ v318 — 내 에세이 🎤 기록 · 고친 문장 🎤 통과 → 🔶 (기록은 essayState.said · 받기는 essayState.sayKeys — 하루 2개 · 문장마다 한 번)
     syncCoachFixes: async () => 0, ESSAY_SAY_STONE: { maxPerDay: 2 },
     STOCK_CAP: 40, stockCapOf: (v) => ([10, 20, 30, 40, 50].includes(Number(v)) ? Number(v) : 40), // 🏦 증권시장 설정 (v319 · 기본 40%는 v351)
+    FISH_DAY_MIN: 20, fishMinOf: (v) => ([10, 15, 20, 30, 40, 60].includes(Number(v)) ? Number(v) : 20), // 🎣 학습 낚시터 하루 분 (v366)
     async markEssaySaid(id, date, how) { (essayState.said ||= []).push({ id, date, how }); return true; },
     async receiveEssaySayStone(date, key, max, entry) {
       (essayState.sayEntries ||= []).push(entry);

@@ -26,6 +26,7 @@ export const PLACES = [
   { key: 'game', field: 'uGame', ko: '🎮 게임기' }, // 🎮 미니 게임 (v307) — 집 위에 뜬 게임기 화면
   { key: 'stock', field: 'uStock', ko: '🏦 증권' }, // 🏦 포켓몬 증권시장 (v319) — 홈 위에 뜬 창
   { key: 'journey', field: 'uJourney', ko: '🎒 대여행' }, // 🎒 포켓몬 대여행 (v341) — 홈 위에 뜬 창
+  { key: 'lake', field: 'uLake', ko: '🎣 낚시터' }, // 🎣 학습 낚시터 (v366) — 홈 위에 뜬 창
   { key: 'shop', field: 'uShop', ko: '🛒 상점' },
   { key: 'catch', field: 'uCatch', ko: '🎯 잡기·진화·부화' },
   { key: 'battle', field: 'uBattle', ko: '⚔️ 배틀' },
@@ -53,6 +54,7 @@ export const OVERLAYS = [
   { place: 'house', ids: ['house'] },
   { place: 'stock', ids: ['stock'] }, // 🏦 증권시장 (v319)
   { place: 'journey', ids: ['jr-trip'] }, // 🎒 대여행 (v341 — 창 id는 jr-trip: 'journey'는 영어 플레이어 막대)
+  { place: 'lake', ids: ['lk-lake'] }, // 🎣 학습 낚시터 (v366)
   { place: 'shop', ids: ['shop', 'market'] },
 ];
 export function placeNow(view, shown) {

@@ -598,7 +598,7 @@ test('🔗 배선 — 홈 카드 자리 · 앱 셸 · 글꼴 · 다른 창이 �
   const sw = src('sw.js');
   for (const f of ['./js/journey.js', './js/journeyview.js', './js/montypes.js', './fonts/galmuri11.woff']) assert.ok(sw.includes(`'${f}'`), f);
   assert.match(src('css/style.css'), /@font-face \{ font-family: "Galmuri11"; src: url\("\.\.\/fonts\/galmuri11\.woff"\)/);
-  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip'\]/, `${f} 겹침 목록`);
+  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip'(, 'lk-lake')?\]/, `${f} 겹침 목록`); // 🎣 낚시터 창이 뒤에 붙음 (v366)
   assert.match(src('js/usage.js'), /\{ place: 'journey', ids: \['jr-trip'\] \}/);
   // 창 id는 페이지에 하나뿐 — 'journey'는 영어 플레이어의 여행 길 막대가 쓴다(겹치면 겹침 목록이 그 막대를 「떠 있는 창」으로 본다 · 진짜 화면 시험이 잡음)
   assert.match(src('js/journeyview.js'), /root\.id = 'jr-trip';/);

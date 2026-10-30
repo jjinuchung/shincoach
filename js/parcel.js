@@ -109,7 +109,7 @@ let deferred = false; // 다른 창이 열려 있어 미뤘다 — 홈으로 돌
 
 function anyModalOpen() {
   // 🎒 대여행 창(v341) 위에도
-  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'hatch', 'timeup', 'take', 'taken', 'market', 'jr-trip']
+  return ['catch', 'shop', 'mon', 'battle', 'puzzle', 'review', 'essay', 'match', 'evolve', 'hatch', 'timeup', 'take', 'taken', 'market', 'jr-trip', 'lk-lake']
     .some((id) => { const e = $(id); return e && !e.hidden; });
 }
 

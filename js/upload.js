@@ -36,6 +36,7 @@ import { VIDEO_STONE } from './items.js'; // 🏁 영상 보상 기준 (🎤 영
 // 🏷️ 앱 판(v314) — 앱을 켤 때(app.js가 이 파일을 부를 때) 함께 묶는다. 올릴 때 처음 불러오면, 앱을 연 채 새 서비스워커가 들어온 뒤엔
 //   새 판 파일을 받아 "지금 도는 코드"를 새 판으로 적었다 (🔍 Codex 120차 #6) · version.js도 아무것도 import하지 않는다
 import { APP_VERSION, cachedVersion, versionLine } from './version.js';
+import { lakeDayLine } from './fishing.js'; // 🎣 학습 낚시터 하루 한 줄 (v366 — 순수, 아무것도 import하지 않음)
 
 export const DATA_REPO = 'jjinuchung/shincoach-data';
 export const PRIVATE_FIXES = 'essay/fixes.json';
@@ -229,6 +230,7 @@ export function usageFiles(days, today, places, verLine = '') {
     '- ⏳ 과목 시간 = 시간 제한에 센 시간 (🎯 도전 문제·잠긴 뒤는 안 셈)',
     '- 🌿 잔잔한 음악 = 국어·논술 화면에서 배경 음악을 틀어 둔 시간 (v317부터 · 기기 음량·음소거는 알 수 없고 곡 사이 쉼은 들어감 · v340부터는 ⚙에서 고른 곡 파일이 실제로 재생된 시간 — 곡이 없으면 0 · 🎵로 꺼 두었거나 ⏳ 잠금·배틀·잡기 같은 창이 떠 있거나 🎧 듣기 카드가 읽는 동안은 안 셈) · 끔·다시 켬 = 진우가 🎵 단추를 누른 수',
     '- 🎮🎵 게임 음악 = 게임기에서 한 판 동안 음악이 나온 시간 (v337부터 · 기기 음량·음소거는 알 수 없음 · ⚙ 이벤트 배경음악을 껐거나 🎵로 꺼 두었거나 앱을 내린 동안은 안 셈) · 끔·다시 켬 = 진우가 게임기 🎵 단추를 누른 수',
+    '- 🎣 낚시터 = 학습 낚시터에서 낚은 시간(화면이 보이고 2분 안에 손댄 때만 · v366부터 · 하루 20분이 기본) · 맞힘/낸 문제 = 낚시 중 과목마다 (이미 배운 문제 · 지난 7일 덜 한 과목이 더 자주 나와요)',
     '- ⏱ 수학 문항마다 걸린 초는 math/latest.json 일지(log)의 qs[].s — 문제를 보인 때부터 처음 답할 때까지(앱을 내린 시간도 들어감, 쌍둥이 문제는 안 셈) · 600은 윗값 · 빠른 오답은 살펴볼 신호이지 찍었다는 증거는 아니에요',
     '', '## 최근 7일'];
   for (let k = 6; k >= 0; k--) {
@@ -257,6 +259,9 @@ export function usageFiles(days, today, places, verLine = '') {
     if (num(d.gameMusicSec) || num(d.gameMusicOff) || num(d.gameMusicOn)) parts.push(`🎮🎵 게임 음악 ${fmtMin(d.gameMusicSec)}${num(d.gameMusicOff) ? ` · 🔇 끔 ${num(d.gameMusicOff)}번` : ''}${num(d.gameMusicOn) ? ` · 다시 켬 ${num(d.gameMusicOn)}번` : ''}`);
     // 🌿 국어·논술 잔잔한 음악 (v317) — 틀어 둔 시간 · 진우가 🎵로 끈 수·다시 켠 수
     if (num(d.calmSec) || num(d.calmOff) || num(d.calmOn)) parts.push(`🌿 잔잔한 음악 ${fmtMin(d.calmSec)}${num(d.calmOff) ? ` · 🎵 끔 ${num(d.calmOff)}번` : ''}${num(d.calmOn) ? ` · 다시 켬 ${num(d.calmOn)}번` : ''}`);
+    // 🎣 학습 낚시터 (v366) — 낚시 시간 · 낚은 마리 · 과목마다 맞힘/낸 문제 · 🔒 부모가 더 준 분
+    const lake = lakeDayLine(d, fmtMin);
+    if (lake) parts.push(lake);
     lines.push(`- ${day.slice(5)}: ${parts.join(' · ')}`);
   }
   return [{ path: `usage/${today}.md`, text: `${lines.join('\n').trim()}\n` }];

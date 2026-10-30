@@ -171,7 +171,7 @@ function route() {
 
 // ───────────── 문제 원천 ─────────────
 
-async function loadSources() {
+export async function loadSources() { // 🎣 학습 낚시터(v366 lakeview.js)도 같은 원천을 쓴다
   const tasks = {
     math: async () => (await import('./math.js')).journeyMathSource(),
     english: async () => {
