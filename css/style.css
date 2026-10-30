@@ -5072,7 +5072,9 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-place.is-on { border-color: #1f7f8c; background: #e3f2f4; }
 .lk-place:disabled { cursor: default; background: #eef1f0; }
 .lk-res-photo { padding: 4px 14px; border-radius: 999px; background: #12343b; color: #fffdf8; font-weight: 800; font-size: 1.02rem; }
-.lk-res-open { margin: 0; padding: 8px 12px; border-radius: 12px; background: #e3f2f4; color: #12343b; font-weight: 800; }
+.lk-res-open { margin: 0; padding: 8px 12px; border-radius: 12px; background: #e3f2f4; color: #12343b; font-weight: 800; word-break: keep-all; }
+/* 🌊 v369 바다가 열릴 때 안전 한 줄 */
+.lk-res-safe { margin: 0; padding: 6px 12px; border-radius: 12px; background: #fff4d6; color: #5a4210; font-size: 0.95rem; font-weight: 700; word-break: keep-all; }
 .lk-dex-lock { margin: 0; padding: 10px 12px; border-radius: 12px; border: 1px dashed #cfdcda; background: #f3f7f6; color: #4f6a6e; }
 .lk-shop-coins { padding: 4px 12px; border-radius: 999px; background: #fff0c2; color: #8a5a00; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lk-shop-msg { margin: 0; padding: 8px 12px; border-radius: 12px; background: #ffffff; border: 1px solid #cfdcda; }

@@ -14,6 +14,9 @@
 //   저수지의 강 물고기 넷(끄리·누치·쏘가리·강준치)은 강에서도 가끔(같은 별 안에서 몫 1 · 도감 칸은 저수지 쪽) · 저수지 도감 10종이면 열림 ·
 //   📸 어름치(천연기념물)는 사진만 찍고 놓아줌(도감·💰는 다른 물고기와 같게) · 🎒 채비 가게(GEAR — 한 번 사면 계속 · 가방 items에 · 미끼만 같은 별 안에서 ×2 · 날씨와 곱해 최대 ×3) ·
 //   고른 물가·미끼·낚싯대 색은 fishing.pick(바꾼 시각 at — 병합은 늦은 쪽)
+// v369 (2단계 ③ 원고 「추천대로」): 🌊 바다 방파제 — 바다 물고기 9종(home 'sea' · 별마다 두 종 짝 — 미끼가 같은 별 안에서만 기울어서 감성돔 짝으로 농어) ·
+//   자리 셋(방파제 안쪽·테트라포드·먼 바다) · 강 도감 6종이면 열림 · 🦐 크릴(감성돔·볼락 — 바다가 열린 뒤에 팖) · 루어는 바다에서 농어·조피볼락 ·
+//   🏅 감성돔 40 cm 「4짜」 · 바다 날씨 줄(비·바람은 안전 한 줄) · 열릴 때 안전 한 줄(SEA_SAFE)
 // ★ 이 파일은 아무것도 import하지 않는다 — 시험이 DOM·IndexedDB 없이 부른다 · 난수는 rng() 인자로
 
 /** 하루 낚시 시간(분) · 손을 이만큼(ms) 안 대면 시간을 안 셈(⏳ 과목 시계와 같은 셈) */
@@ -64,17 +67,35 @@ const RIVER_LIST = [
   { key: 'sancheoneo', ko: '산천어', star: 4, min: 15, max: 28, a: 0.010, w: 2 },
   { key: 'eoreumchi', ko: '어름치', star: 5, min: 15, max: 38, a: 0.009, w: 2, photo: true },
 ];
-/** 낚시터 두 곳 (v368) — 저수지 · 강 */
-export const PLACES = ['lake', 'river'];
-export const PLACE_KO = { lake: '저수지', river: '강' };
-/** 모든 물고기 (도감 차례 = 저수지 16 → 강 8) · home = 사는 낚시터 */
-export const SPECIES = [...LAKE_LIST.map((s) => ({ ...s, home: 'lake' })), ...RIVER_LIST.map((s) => ({ ...s, home: 'river' }))];
+/**
+ * 🌊 바다 물고기 9종 (v369 원고 「추천대로」 — 공개 자료로 확인한 최대 길이 아래로) — 문절망둑(FishBase 30) · 전갱이(50) · 고등어(64) · 노래미(30 SL) ·
+ * 볼락(35.9) · 조피볼락(65) · 감성돔(50 SL · 40 cm 🏅 4짜) · 농어(102) · 참돔(100 SL)
+ */
+const SEA_LIST = [
+  { key: 'munjeol', ko: '문절망둑', star: 1, min: 8, max: 25, a: 0.009, w: 3 },
+  { key: 'jeongaeng', ko: '전갱이', star: 1, min: 10, max: 32, a: 0.011, w: 3 },
+  { key: 'godeung', ko: '고등어', star: 2, min: 18, max: 45, a: 0.010, w: 3 },
+  { key: 'noraemi', ko: '노래미', star: 2, min: 12, max: 28, a: 0.012, w: 2 },
+  { key: 'bollak', ko: '볼락', star: 3, min: 10, max: 30, a: 0.017, w: 2 },
+  { key: 'jopi', ko: '조피볼락', star: 3, min: 18, max: 55, a: 0.016, w: 2 },
+  { key: 'gamseong', ko: '감성돔', star: 4, min: 20, max: 48, a: 0.020, w: 2 },
+  { key: 'nongeo', ko: '농어', star: 4, min: 30, max: 85, a: 0.010, w: 2 },
+  { key: 'chamdom', ko: '참돔', star: 5, min: 30, max: 90, a: 0.017, w: 1 },
+];
+/** 낚시터 세 곳 (v368 강 · v369 바다) — 저수지 · 강 · 바다 */
+export const PLACES = ['lake', 'river', 'sea'];
+export const PLACE_KO = { lake: '저수지', river: '강', sea: '바다' };
+export const PLACE_EMOJI = { lake: '🏞️', river: '🏞️', sea: '🌊' };
+/** 모든 물고기 (도감 차례 = 저수지 16 → 강 8 → 바다 9) · home = 사는 낚시터 */
+export const SPECIES = [...LAKE_LIST.map((s) => ({ ...s, home: 'lake' })), ...RIVER_LIST.map((s) => ({ ...s, home: 'river' })), ...SEA_LIST.map((s) => ({ ...s, home: 'sea' }))];
 export const SPECIES_KEYS = SPECIES.map((s) => s.key);
 /** 강에서도 가끔 나오는 저수지 물고기 넷 — 같은 별 안에서 몫 VISIT_W (도감 칸은 저수지 쪽) */
 export const RIVER_VISITORS = ['kkeuri', 'nuchi', 'ssogari', 'gangjun'];
 export const VISIT_W = 1;
 /** 강이 열리는 저수지 도감 종 수 */
 export const RIVER_NEED = 10;
+/** 바다가 열리는 강 도감 종 수 (v369 — 기본안 「이대로」) */
+export const SEA_NEED = 6;
 const BY_KEY = Object.fromEntries(SPECIES.map((s) => [s.key, s]));
 export function speciesOf(key) {
   return Object.prototype.hasOwnProperty.call(BY_KEY, key) ? BY_KEY[key] : null;
@@ -98,13 +119,20 @@ export const RIVER_SPOTS = [
   { key: 'rock', ko: '바위 밑', m: 14, need: 6, chum: 2, w: { ...SPOTS[1].w } },
   { key: 'pool', ko: '깊은 소', m: 20, need: 16, chum: 2, w: { ...SPOTS[2].w } },
 ];
+/** 🌊 바다의 자리 셋 (v369) — 거리·열리는 정답 수·별 몫·밑밥 문제 수는 저수지 자리와 같다 */
+export const SEA_SPOTS = [
+  { key: 'harbor', ko: '방파제 안쪽', m: 8, need: 0, chum: 1, w: { ...SPOTS[0].w } },
+  { key: 'tetra', ko: '테트라포드', m: 14, need: 6, chum: 2, w: { ...SPOTS[1].w } },
+  { key: 'offshore', ko: '먼 바다', m: 20, need: 16, chum: 2, w: { ...SPOTS[2].w } },
+];
 /** 그 낚시터의 자리 셋 */
 export function spotsOf(place) {
-  return place === 'river' ? RIVER_SPOTS : SPOTS;
+  return place === 'river' ? RIVER_SPOTS : place === 'sea' ? SEA_SPOTS : SPOTS;
 }
 /** 자리가 어느 낚시터 것인가 */
 export function placeOfSpot(spot) {
-  return RIVER_SPOTS.some((s) => s.key === (spot && spot.key)) ? 'river' : 'lake';
+  const k = spot && spot.key;
+  return RIVER_SPOTS.some((s) => s.key === k) ? 'river' : SEA_SPOTS.some((s) => s.key === k) ? 'sea' : 'lake';
 }
 /** 그날 맞힌 수로 열린 자리 수 (1~3) */
 export function openSpots(okToday) {
@@ -122,7 +150,7 @@ export function chumFactor(star, c) {
 }
 /** 이 자리·밑밥에서 별마다 나올 몫 (합 1) */
 export function starOdds(spot, chum) {
-  const sp = [...SPOTS, ...RIVER_SPOTS].find((s) => s.key === (spot && spot.key)) || SPOTS[0];
+  const sp = [...SPOTS, ...RIVER_SPOTS, ...SEA_SPOTS].find((s) => s.key === (spot && spot.key)) || SPOTS[0];
   const raw = [1, 2, 3, 4, 5].map((s) => sp.w[s] * chumFactor(s, chum));
   const sum = raw.reduce((a, b) => a + b, 0) || 1;
   return Object.fromEntries(raw.map((v, i) => [i + 1, v / sum]));
@@ -145,17 +173,18 @@ export function lengthOf(sp, streak, rng = Math.random) {
 export function weightOf(sp, cm) {
   return Math.max(1, Math.round(sp.a * Math.pow(Math.max(0, Number(cm) || 0), 3)));
 }
-/** 🏅 붙는 이름 — 붕어·떡붕어만 */
+/** 🏅 붙는 이름 — 붕어·떡붕어(월척·4짜) · 🌊 감성돔은 40 cm 「4짜」만 (v369) */
 export function badgesOf(key, cm) {
+  if (key === 'gamseong') return cm >= SAJJA ? ['sajja'] : [];
   if (key !== 'bungeo' && key !== 'ttokbung') return [];
   if (cm >= SAJJA) return ['sajja'];
   if (cm >= WOLCHEOK) return ['wolcheok'];
   return [];
 }
 export const BADGE_KO = { wolcheok: '🏅 월척', sajja: '🏅 4짜' };
-/** 그 낚시터·별에서 나오는 물고기와 몫 [[종, 몫]] — 저수지는 저수지 물고기만 · 강은 강 물고기 + 저수지의 강 물고기 넷(몫 VISIT_W) */
+/** 그 낚시터·별에서 나오는 물고기와 몫 [[종, 몫]] — 저수지는 저수지 물고기만 · 강은 강 물고기 + 저수지의 강 물고기 넷(몫 VISIT_W) · 바다는 바다 물고기만 */
 export function poolAt(place, star) {
-  const home = place === 'river' ? 'river' : 'lake';
+  const home = PLACES.includes(place) ? place : 'lake';
   const out = SPECIES.filter((x) => x.home === home && x.star === star).map((x) => [x, x.w]);
   if (home === 'river') for (const k of RIVER_VISITORS) { const v = BY_KEY[k]; if (v.star === star) out.push([v, VISIT_W]); }
   return out;
@@ -465,18 +494,20 @@ export function catchRule(p, fish, now) {
   const today = dayKeyOf(now);
   const lk = lakeOf(p.fishing);
   const wasOpen = riverOpen(lk);
+  const wasSea = seaOpen(lk);
   const had = lk.dex[sp.key];
   const first = !had;
   const best = !!had && cm > had.best;
   lk.dex[sp.key] = { n: (had ? had.n : 0) + 1, best: Math.max(had ? had.best : 0, cm), d: had && had.d ? had.d : today };
   const opened = !wasOpen && riverOpen(lk); // 🏞️ 이 한 마리로 강이 열렸다 (v368 — 트랜잭션 안이라 두 창이 둘 다 「열렸어요」를 받지 않는다)
+  const seaOpened = !wasSea && seaOpen(lk); // 🌊 이 한 마리로 바다가 열렸다 (v369 — 강 도감 6종째)
   const paid = nz(lk.paid[today]); // 그날 이미 받은 💰 — 다른 날로 갔다 와도 그대로
   const want = sp.star * FISH_COINS.perStar + (first ? FISH_COINS.newKind : 0) + (badgesOf(sp.key, cm).length ? FISH_COINS.badge : 0);
   const coins = Math.max(0, Math.min(want, FISH_COINS.dayMax - paid));
   if (coins) lk.paid = paidOf({ ...lk.paid, [today]: paid + coins });
   p.fishing = lk;
   if (coins) { p.coins = nz(p.coins) + coins; p.coinsEarned = nz(p.coinsEarned) + coins; } // 문제를 풀어 번 코인 (📊 공부로 번 💰)
-  return { ok: true, first, best, coins, ...(opened ? { opened: true } : {}), ...(sp.photo ? { photo: true } : {}) }; // 🏞️·📸는 그럴 때만 (v368)
+  return { ok: true, first, best, coins, ...(opened ? { opened: true } : {}), ...(seaOpened ? { seaOpened: true } : {}), ...(sp.photo ? { photo: true } : {}) }; // 🏞️·🌊·📸는 그럴 때만 (v368 · v369)
 }
 
 // ───────────── 🏞️ 강 열림 · 🎒 채비 가게 · 고른 물가 (v368 · 원고 「이대로」) ─────────────
@@ -487,6 +518,17 @@ export function riverOpen(raw) {
   const keys = Object.keys(lk.dex);
   return keys.some((k) => BY_KEY[k].home === 'river') || keys.filter((k) => BY_KEY[k].home === 'lake').length >= RIVER_NEED;
 }
+/** 바다가 열렸나 (v369) — 강 도감 SEA_NEED종 · 바다 물고기를 한 번이라도 낚았으면 계속 열림 */
+export function seaOpen(raw) {
+  const keys = Object.keys(lakeOf(raw).dex);
+  return keys.some((k) => BY_KEY[k].home === 'sea') || keys.filter((k) => BY_KEY[k].home === 'river').length >= SEA_NEED;
+}
+/** 그 물가가 열렸나 — 저수지는 늘 */
+export function placeOpen(raw, place) {
+  return place === 'lake' || (place === 'river' && riverOpen(raw)) || (place === 'sea' && seaOpen(raw));
+}
+/** 🌊 바다가 열린 순간 결과 카드에 한 번 (v369 「추천대로」 — 안전 한 줄) */
+export const SEA_SAFE = '🦺 진짜 바다 낚시는 어른과 함께, 구명조끼를 입고 해요.';
 /**
  * 🎒 채비 (원고 표 그대로) — kind: bait 미끼(같은 별 안에서 tilt 종 ×2) · float 찌(꾸미기) · rod 낚싯대 색(꾸미기) · wear 옷(👕 옷장 — avatar.js WEAR의 lake 옷과 같은 값)
  * free = 처음부터 있음 · 산 것은 가방 profile.items[id] = 1 (💰·가방과 같은 쪽으로 병합 — 옷과 같다) · 써서 없어지는 것은 없다
@@ -495,7 +537,8 @@ export function riverOpen(raw) {
 export const GEAR = [
   { id: 'worm', kind: 'bait', ko: '지렁이', emoji: '🐛', price: 0, free: true, say: '처음부터 있어요 · 아무 물고기나' },
   { id: 'g_corn', kind: 'bait', ko: '옥수수 미끼', emoji: '🌽', price: 200, tilt: ['bungeo', 'ttokbung', 'ingeo'], say: '붕어 · 떡붕어 · 잉어가 같은 별 안에서 두 배쯤' },
-  { id: 'g_lure', kind: 'bait', ko: '루어(가짜 물고기)', emoji: '🐟', price: 300, tilt: ['bass', 'gamulchi', 'ssogari', 'kkeuri', 'gangjun', 'kkeokji', 'dongsari'], say: '사냥하는 물고기 — 배스 · 가물치 · 쏘가리 · 끄리 · 강준치 · 꺽지 · 동사리가 같은 별 안에서 두 배쯤' },
+  { id: 'g_lure', kind: 'bait', ko: '루어(가짜 물고기)', emoji: '🐟', price: 300, tilt: ['bass', 'gamulchi', 'ssogari', 'kkeuri', 'gangjun', 'kkeokji', 'dongsari', 'nongeo', 'jopi'], say: '사냥하는 물고기 — 배스 · 가물치 · 쏘가리 · 끄리 · 강준치 · 꺽지 · 동사리 · 농어 · 조피볼락이 같은 별 안에서 두 배쯤' },
+  { id: 'g_krill', kind: 'bait', ko: '크릴', emoji: '🦐', price: 300, tilt: ['gamseong', 'bollak'], sea: true, say: '바다에서 감성돔 · 볼락이 같은 별 안에서 두 배쯤' },
   { id: 'g_glow', kind: 'float', ko: '야광 찌', emoji: '✨', price: 150, say: '노을 · 흐린 날 · 비 오는 날에 찌가 빛나요' },
   { id: 'rod', kind: 'rod', ko: '나무 낚싯대', emoji: '🎣', price: 0, free: true, say: '처음부터 있어요', butt: '#3b2a1c', tip: '#5a3f28' },
   { id: 'g_rod_blue', kind: 'rod', ko: '파란 낚싯대', emoji: '🎣', price: 150, say: '꾸미기 · 가진 색 가운데 골라 써요', butt: '#1d3f7a', tip: '#3b7be0' },
@@ -507,6 +550,17 @@ export const GEAR = [
 const GEAR_BY = Object.fromEntries(GEAR.map((g) => [g.id, g]));
 export function gearOf(id) {
   return Object.prototype.hasOwnProperty.call(GEAR_BY, id) ? GEAR_BY[id] : null;
+}
+/**
+ * 받침에 맞는 조사 (순수 · v369 — 🦐 「크릴을」) — 끝 괄호는 빼고 본다(「루어(가짜 물고기)」→ 루어) · 한글이 아니면 받침 없는 쪽 ·
+ * rieulNone = ㄹ 받침을 받침 없는 쪽으로(「으로/로」 — 「…줄로」)
+ */
+export function josaOf(word, withB, withoutB, rieulNone = false) {
+  const w = String(word || '').replace(/\s*\([^)]*\)\s*$/, '');
+  const code = w.charCodeAt(w.length - 1) - 0xac00;
+  if (!(code >= 0 && code <= 11171)) return withoutB;
+  const jong = code % 28;
+  return jong === 0 || (rieulNone && jong === 8) ? withoutB : withB;
 }
 /** 미끼·날씨 기울임을 곱해도 같은 별 안에서 이만큼까지 */
 export const TILT_MAX = 3;
@@ -533,7 +587,7 @@ export function hasGear(p, id) {
 function pickRawOf(v) {
   if (!isObj(v)) return null;
   const g = (id, kind, d) => { const x = gearOf(id); return x && x.kind === kind ? id : d; };
-  return { place: v.place === 'river' ? 'river' : 'lake', bait: g(v.bait, 'bait', 'worm'), rod: g(v.rod, 'rod', 'rod'), at: Math.max(0, Number(v.at) || 0) };
+  return { place: PLACES.includes(v.place) ? v.place : 'lake', bait: g(v.bait, 'bait', 'worm'), rod: g(v.rod, 'rod', 'rod'), at: Math.max(0, Number(v.at) || 0) };
 }
 /**
  * 지금 쓰는 물가·미끼·낚싯대 (순수 · 프로필로) — 저장된 고른 값을 가진 것·열린 곳으로 다시 고친다(병합으로 안 가진 채비가 골라져 있어도) ·
@@ -542,7 +596,7 @@ function pickRawOf(v) {
 export function pickOf(p) {
   const pk = lakeOf(p && p.fishing).pick || pickRawOf({});
   return {
-    place: pk.place === 'river' && riverOpen(p && p.fishing) ? 'river' : 'lake',
+    place: placeOpen(p && p.fishing, pk.place) ? pk.place : 'lake',
     bait: hasGear(p, pk.bait) ? pk.bait : 'worm',
     rod: hasGear(p, pk.rod) ? pk.rod : 'rod',
     glow: hasGear(p, 'g_glow'),
@@ -565,14 +619,14 @@ export function syncPick(pick, owned, pend, ready) {
 }
 /**
  * 🗺️ 물가 · 미끼 칩 · 낚싯대 색 바꾸기 (프로필 규칙 — houseDo 안에서) — want = { place?, bait?, rod? } 바꿀 칸만
- * why: 'locked' 아직 안 열린 강 · 'none' 안 가진 채비 · 'bad' 모르는 값
+ * why: 'locked' 아직 안 열린 강·바다 · 'none' 안 가진 채비 · 'bad' 모르는 값
  */
 export function pickRule(p, want, now) {
   const w = isObj(want) ? want : {};
   const next = pickOf(p);
   if (w.place !== undefined) {
     if (!PLACES.includes(w.place)) return { ok: false, why: 'bad' };
-    if (w.place === 'river' && !riverOpen(p.fishing)) return { ok: false, why: 'locked' };
+    if (!placeOpen(p.fishing, w.place)) return { ok: false, why: 'locked' };
     next.place = w.place;
   }
   for (const [k, kind] of [['bait', 'bait'], ['rod', 'rod']]) {
@@ -589,12 +643,13 @@ export function pickRule(p, want, now) {
 }
 /**
  * 🎒 채비 사기 (프로필 규칙 — houseDo 안에서 저장된 프로필로) — 미끼·찌·낚싯대 색만(옷은 avatar.wearBuyRule — 옷장 규칙 그대로) ·
- * 산 미끼·낚싯대 색은 바로 쓴다 · why: 'unknown' 파는 채비가 아님 · 'owned' 이미 있음 · 'short' 💰 모자람(shortCoins)
+ * 산 미끼·낚싯대 색은 바로 쓴다 · why: 'unknown' 파는 채비가 아님 · 'owned' 이미 있음 · 'locked' 바다가 열려야 파는 채비(🦐 크릴 · v369) · 'short' 💰 모자람(shortCoins)
  */
 export function gearBuyRule(p, id, now) {
   const g = gearOf(id);
   if (!g || g.free || g.kind === 'wear') return { ok: false, why: 'unknown' };
   if (hasGear(p, id)) return { ok: false, why: 'owned' };
+  if (g.sea && !seaOpen(p.fishing)) return { ok: false, why: 'locked' }; // 🦐 크릴은 바다가 열린 뒤에 (v369)
   const have = Number(p.coins) || 0;
   if (have < g.price) return { ok: false, why: 'short', shortCoins: g.price - have };
   p.coins = have - g.price;
@@ -609,14 +664,14 @@ export function gearBuyRule(p, id, now) {
 /** 날씨 넷 — 열흘마다 맑음 다섯 · 흐림 셋 · 비 하나 · 바람 하나(n) · line은 낚시터에 들어설 때 한 줄 */
 export const WEATHER = [
   { key: 'sun', emoji: '☀️', ko: '맑은 날', n: 5, line: '☀️ 맑은 날이에요. 해 질 녘엔 노을이 져요.' },
-  { key: 'cloud', emoji: '☁️', ko: '흐린 날', n: 3, line: '☁️ 흐린 날엔 깊은 곳에서 큰 물고기가 잘 나온대요.', river: '☁️ 흐린 날엔 깊은 소에서 큰 물고기가 잘 나온대요.' },
-  { key: 'rain', emoji: '🌧️', ko: '비 오는 날', n: 1, line: '🌧️ 비 오는 날엔 메기와 뱀장어가 잘 나온대요.', river: '🌧️ 비 오는 날이에요. 빗방울 사이로 찌를 잘 봐요.' },
-  { key: 'wind', emoji: '🌬️', ko: '바람 부는 날', n: 1, line: '🌬️ 바람 부는 날이에요. 찌가 흔들려도 진짜 입질을 잘 봐요.' },
+  { key: 'cloud', emoji: '☁️', ko: '흐린 날', n: 3, line: '☁️ 흐린 날엔 깊은 곳에서 큰 물고기가 잘 나온대요.', river: '☁️ 흐린 날엔 깊은 소에서 큰 물고기가 잘 나온대요.', sea: '☁️ 흐린 날엔 먼 바다에서 큰 물고기가 잘 나온대요.' },
+  { key: 'rain', emoji: '🌧️', ko: '비 오는 날', n: 1, line: '🌧️ 비 오는 날엔 메기와 뱀장어가 잘 나온대요.', river: '🌧️ 비 오는 날이에요. 빗방울 사이로 찌를 잘 봐요.', sea: '🌧️ 비 오는 날이에요. 진짜 방파제는 미끄러우니 천천히 걸어요.' },
+  { key: 'wind', emoji: '🌬️', ko: '바람 부는 날', n: 1, line: '🌬️ 바람 부는 날이에요. 찌가 흔들려도 진짜 입질을 잘 봐요.', sea: '🌬️ 바람 부는 날엔 파도가 높아요. 진짜 바다에선 테트라포드에 올라가지 않아요.' },
 ];
-/** 들어설 때 날씨 한 줄 — 강이면 강 말(있을 때 · 메기·뱀장어는 강에 안 나오니 v368) */
+/** 들어설 때 날씨 한 줄 — 강·바다면 그 물가 말(있을 때 · 메기·뱀장어는 강에 안 나오니 v368 · 바다는 비·바람에 안전 한 줄 v369) */
 export function weatherLine(w, place) {
   if (!w) return '';
-  return (place === 'river' && w.river) || w.line || '';
+  return ((place === 'river' || place === 'sea') && w[place]) || w.line || '';
 }
 const WX_BY = Object.fromEntries(WEATHER.map((w) => [w.key, w]));
 /**
@@ -640,11 +695,14 @@ const bigOf = (home) => [1, 2, 3, 4, 5].map((s) => SPECIES.filter((x) => x.home 
 export const BIG_KIND = bigOf('lake');
 /** 🏞️ 강 물고기 가운데 별마다 가장 큰 물고기 — ☁️ 흐린 날 깊은 소에서 (v368) */
 export const BIG_KIND_RIVER = bigOf('river');
-/** 날씨가 기우는 종 (같은 별 안에서 ×2 · rollFish tilt — 별 몫은 그대로) — 🌧️ 메기·뱀장어(저수지) · ☁️ 깊은 곳·깊은 소에서만 별마다 가장 큰 물고기 · 맑음·바람은 없음 */
+/** 🌊 바다 물고기 가운데 별마다 가장 큰 물고기 — ☁️ 흐린 날 먼 바다에서 (v369) */
+export const BIG_KIND_SEA = bigOf('sea');
+/** 날씨가 기우는 종 (같은 별 안에서 ×2 · rollFish tilt — 별 몫은 그대로) — 🌧️ 메기·뱀장어(저수지) · ☁️ 깊은 곳·깊은 소·먼 바다에서만 별마다 가장 큰 물고기 · 맑음·바람은 없음 */
 export function weatherTilt(wkey, spotKey) {
   if (wkey === 'rain') return { megi: 2, jangeo: 2 };
   if (wkey === 'cloud' && spotKey === 'deep') return Object.fromEntries(BIG_KIND.map((k) => [k, 2]));
   if (wkey === 'cloud' && spotKey === 'pool') return Object.fromEntries(BIG_KIND_RIVER.map((k) => [k, 2]));
+  if (wkey === 'cloud' && spotKey === 'offshore') return Object.fromEntries(BIG_KIND_SEA.map((k) => [k, 2]));
   return null;
 }
 /** 🌬️ 바람 부는 날은 속임 입질(찌 떨림)이 한 번 더 */
@@ -681,6 +739,16 @@ export const INTRO = {
   dongsari: '우리나라에만 사는 물고기예요. 바닥을 따라 헤엄치며 작은 물고기를 잡아먹어요.',
   sancheoneo: '차고 맑은 산골짜기 냇물에 살아요. 같은 종 가운데 바다에서 자라다가 알을 낳으러 강으로 돌아오는 무리는 「송어」라고 불러요.',
   eoreumchi: '우리나라에만 사는 천연기념물이에요. 여울 바닥에 자갈을 쌓아 알을 지키는 「산란탑」을 만들어요.',
+  // 🌊 바다 (v369 원고 12번 「추천대로」 — FishBase·국립수산과학원·국립해양생물자원관 등 · Codex 173차: 표준어 「망둥이」로 · 볼락은 공공 자료에 맞게 「바위가 많은 바닷가」)
+  munjeol: '바닷물과 민물이 만나는 강어귀나 바닷가의 펄·모래 바닥에 살아요. 흔히 「망둥이」라고 불러요.',
+  jeongaeng: '우리나라 바다 어디에나 살아요. 옆줄을 따라 단단한 비늘(모비늘)이 한 줄로 늘어서 있어요.',
+  godeung: '등은 푸르고 검은 물결무늬가 있어요. 떼를 지어 빠르게 헤엄쳐요.',
+  noraemi: '바닷가 바위 사이 해초 숲에 살아요. 닮은 쥐노래미는 옆줄이 다섯 줄인데, 노래미는 한 줄이에요.',
+  bollak: '눈이 아주 커요. 밤에 먹이를 찾고, 바위가 많은 바닷가에 살아요.',
+  jopi: '흔히 「우럭」이라고 불러요. 알을 낳지 않고, 배 속에서 깨어난 새끼를 낳아요.',
+  gamseong: '어릴 때는 수컷이다가 자라면서 암컷으로 바뀌는 것이 많아요. 50 cm까지 크는 데 10년쯤 걸려요.',
+  nongeo: '바닷물과 민물을 오가요. 어린 농어는 강을 거슬러 오르기도 해요.',
+  chamdom: '붉은 몸에 파란 점이 반짝여요. 26년을 산 기록도 있어요.',
 };
 /** 안 낚은 칸 힌트 — 별마다 (지금 자리 몫 SPOTS.w 그대로) · 남은 수는 쓰지 않는다 */
 export const DEX_HINT = {
@@ -698,18 +766,26 @@ export const DEX_HINT_RIVER = {
   4: '깊은 소에 살아요.',
   5: '깊은 소에서 아주 가끔 나와요.',
 };
+/** 🌊 바다 물고기 안 낚은 칸 힌트 (v369 — 바다 자리 몫도 저수지와 같아서 자리 이름만 바꿈) */
+export const DEX_HINT_SEA = {
+  1: '방파제 안쪽에서 자주 보여요.',
+  2: '방파제 안쪽과 테트라포드에서 보여요.',
+  3: '테트라포드나 먼 바다에서 만나요.',
+  4: '먼 바다에 살아요.',
+  5: '먼 바다에서 아주 가끔 나와요.',
+};
 /** 📸 사진만 찍고 놓아주는 물고기 카드 말 (v368 — 어름치) */
 export const PHOTO_SAY = '우리나라에만 사는 천연기념물이라 놓아줘요.';
 /**
- * 도감 칸 (순수 · 그리는 차례 = SPECIES 차례 — 저수지 16 → 강 8) — 낚은 칸 { caught: true, n, best, d, intro } · 안 낚은 칸 { caught: false, hint }
- * home = 낚시터(화면이 나눠 그린다 · 강은 열린 뒤에만) · photo = 📸 사진만 찍고 놓아주는 물고기
+ * 도감 칸 (순수 · 그리는 차례 = SPECIES 차례 — 저수지 16 → 강 8 → 바다 9) — 낚은 칸 { caught: true, n, best, d, intro } · 안 낚은 칸 { caught: false, hint }
+ * home = 낚시터(화면이 나눠 그린다 · 강·바다는 열린 뒤에만) · photo = 📸 사진만 찍고 놓아주는 물고기
  */
 export function dexRows(raw) {
   const lk = lakeOf(raw);
   return SPECIES.map((sp) => {
     const e = lk.dex[sp.key];
     const base = { key: sp.key, ko: sp.ko, star: sp.star, alien: !!sp.alien, home: sp.home, photo: !!sp.photo };
-    const hint = (sp.home === 'river' ? DEX_HINT_RIVER : DEX_HINT)[sp.star] || '';
+    const hint = (sp.home === 'river' ? DEX_HINT_RIVER : sp.home === 'sea' ? DEX_HINT_SEA : DEX_HINT)[sp.star] || '';
     return e ? { ...base, caught: true, n: e.n, best: e.best, d: e.d, intro: INTRO[sp.key] || '' } : { ...base, caught: false, hint };
   });
 }
@@ -726,7 +802,9 @@ export function okOfDay(daily) {
 export const FISH_FM_Q = ['fishFmQ', 'fishFmOk'];
 /** 그날 🏞️ 강에서 낚은 마리 칸 (v368 — fishCatch 안에 든 몫) */
 export const FISH_RIVER = 'fishRiver';
-/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🔒 더 준 분 */
+/** 그날 🌊 바다에서 낚은 마리 칸 (v369 — fishCatch 안에 든 몫) */
+export const FISH_SEA = 'fishSea';
+/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🔒 더 준 분 */
 export function lakeDayLine(d, fmtMin) {
   const f = typeof fmtMin === 'function' ? fmtMin : (s) => `${Math.round(nz(s) / 60)}분`;
   const asked = SUBJECTS.filter((s) => nz(d && d[FISH_DAY_Q[s][0]]) > 0);
@@ -734,7 +812,8 @@ export function lakeDayLine(d, fmtMin) {
   const KO = { math: '수학', english: '영어', korean: '국어', nonsul: '논술' };
   const fm = (s) => (s === 'math' && nz(d[FISH_FM_Q[0]]) ? `(🐟 ${nz(d[FISH_FM_Q[1]])}/${nz(d[FISH_FM_Q[0]])})` : '');
   const q = asked.map((s) => `${KO[s]} ${nz(d[FISH_DAY_Q[s][1]])}/${nz(d[FISH_DAY_Q[s][0]])}${fm(s)}`).join(' · ');
-  const rv = nz(d && d[FISH_RIVER]) ? `(🏞️ 강 ${nz(d[FISH_RIVER])})` : '';
+  const away = [nz(d && d[FISH_RIVER]) ? `🏞️ 강 ${nz(d[FISH_RIVER])}` : '', nz(d && d[FISH_SEA]) ? `🌊 바다 ${nz(d[FISH_SEA])}` : ''].filter(Boolean);
+  const rv = away.length ? `(${away.join(' · ')})` : '';
   return `🎣 낚시터 ${f(d.fishSec)} · 물고기 ${nz(d.fishCatch)}마리${rv}${q ? ` · 맞힘/낸 문제 ${q}` : ''}${nz(d.fishBonus) ? ` · 🔒 부모 +${nz(d.fishBonus)}분` : ''}`;
 }
 

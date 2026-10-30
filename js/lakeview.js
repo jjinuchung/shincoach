@@ -11,8 +11,9 @@
 //   🐟 물고기 수학(fishmath.js — 수학 차례의 반쯤 · 배운 수학 개념이 없으면 전부 · 서로 다른 물고기 두 종 이상부터 · 기록은 수학 칸 + fishFmQ/fishFmOk)
 // v368 (2단계 ② 원고 「이대로」): 🏞️ 강(저수지 도감 10종이면 열림 · 🗺️ 물가 · 마지막 물가에서 시작 · fishing.pick) · 🎒 채비 가게(xp.lakeBuy — 가방 items) ·
 //   🐛 미끼 칩·🎣 낚싯대 색(xp.lakePick) · 강에서 낚은 마리 daily fishRiver(fishCatch 안의 몫)
+// v369 (2단계 ③ 원고 「추천대로」): 🌊 바다 방파제(강 도감 6종이면 열림 · host.seaOpen · gearState.sea) · 바다에서 낚은 마리 daily fishSea
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
-import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_RIVER, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
+import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_RIVER, FISH_SEA, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
 import { orderOf } from './journey.js';
 import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload } from './xp.js';
@@ -207,15 +208,15 @@ function fmNode(q) {
   box.appendChild(el('div', '', q.text));
   return box;
 }
-/** 🐟 한 마리를 도감에 — 저장된 뒤에만 그날 낚은 마리 +1(강이면 fishRiver도) · 못 적으면 { ok:false }(화면이 「🔁 다시 적기」) · opened = 🏞️ 강이 열렸다(v368) */
+/** 🐟 한 마리를 도감에 — 저장된 뒤에만 그날 낚은 마리 +1(강이면 fishRiver · 바다면 fishSea도) · 못 적으면 { ok:false }(화면이 「🔁 다시 적기」) · seaOpened = 🌊 바다가 열렸다(v369) · opened = 🏞️ 강이 열렸다(v368) */
 export async function keepCatch(f, put, catchFn = lakeCatch) {
   let r = null;
   try { r = await catchFn({ key: f.key, cm: f.cm }); } catch { r = null; }
   if (!r || !r.ok) return { ok: false, why: (r && r.why) || 'save' };
-  put({ fishCatch: 1, ...(f.place === 'river' ? { [FISH_RIVER]: 1 } : {}) });
-  return { ok: true, first: !!r.first, best: !!r.best, coins: nz(r.coins), ...(r.opened ? { opened: true } : {}) };
+  put({ fishCatch: 1, ...(f.place === 'river' ? { [FISH_RIVER]: 1 } : {}), ...(f.place === 'sea' ? { [FISH_SEA]: 1 } : {}) });
+  return { ok: true, first: !!r.first, best: !!r.best, coins: nz(r.coins), ...(r.opened ? { opened: true } : {}), ...(r.seaOpened ? { seaOpened: true } : {}) };
 }
-/** 🎒 채비 가게 상태 (그리기용 · 지금 프로필) — { coins, owned: { id: true }, pick, made, river } · river = 🏞️ 강이 열렸나(다른 창에서 열려도 · Codex 172차) */
+/** 🎒 채비 가게 상태 (그리기용 · 지금 프로필) — { coins, owned: { id: true }, pick, made, river, sea } · river·sea = 🏞️ 강·🌊 바다가 열렸나(다른 창에서 열려도 · Codex 172차 · v369) */
 export function gearState(p = getProfileSnapshot()) {
   return {
     coins: nz(p && p.coins),
@@ -223,6 +224,7 @@ export function gearState(p = getProfileSnapshot()) {
     pick: pickOf(p),
     made: !!avatarOf(p).made,
     river: riverOpen(p && p.fishing),
+    sea: seaOpen(p && p.fishing),
   };
 }
 
@@ -287,6 +289,7 @@ export async function openLakeNow() {
       partnerUrl: await partnerUrl(),
       place: pk.place, // 🏞️ 마지막에 간 물가 (v368)
       riverOpen: riverOpen(lakeRaw()),
+      seaOpen: seaOpen(lakeRaw()), // 🌊 (v369)
       pick: pk,
       gear: () => gearState(),
       buyGear: (id) => lakeBuy(id),

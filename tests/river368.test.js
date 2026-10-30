@@ -30,8 +30,8 @@ const RIVER_KEYS = SPECIES.filter((s) => s.home === 'river').map((s) => s.key);
 const dexWith = (keys) => ({ dex: Object.fromEntries(keys.map((k) => [k, { n: 1, best: SPECIES.find((s) => s.key === k).min, d: '2026-10-29' }])), paid: {} });
 
 test('🏞️ 강 8종 — 원고 그대로(이름·별·길이) · 저수지 16 뒤 · 고유 키 · 그림 · 📸는 어름치만 · 소개 한 줄 원고 그대로', () => {
-  assert.equal(SPECIES.length, 24);
-  assert.deepEqual(SPECIES.slice(16).map((s) => s.home), Array(8).fill('river'));
+  assert.equal(SPECIES.length, 33, 'v369 바다 9종이 뒤에 붙음');
+  assert.deepEqual(SPECIES.slice(16, 24).map((s) => s.home), Array(8).fill('river'));
   assert.deepEqual(RIVER_KEYS, ['beodeulchi', 'chamgal', 'moraemuji', 'chammaja', 'kkeokji', 'dongsari', 'sancheoneo', 'eoreumchi']);
   const R = SPECIES.filter((s) => s.home === 'river');
   assert.deepEqual(R.map((s) => [s.ko, s.star, s.min, s.max]), [
@@ -55,8 +55,8 @@ test('🏞️ 강 8종 — 원고 그대로(이름·별·길이) · 저수지 16
   assert.equal(INTRO.chammaja, '누치와 같은 무리(누치속)예요. 맑게 흐르는 강의 모래·자갈 바닥 가까이에 살아요.');
   for (const k of RIVER_KEYS) assert.match(INTRO[k], /요\.$/, k);
   assert.equal(PHOTO_SAY, '우리나라에만 사는 천연기념물이라 놓아줘요.');
-  assert.deepEqual(PLACES, ['lake', 'river']);
-  assert.deepEqual(PLACE_KO, { lake: '저수지', river: '강' });
+  assert.deepEqual(PLACES, ['lake', 'river', 'sea'], 'v369 바다');
+  assert.deepEqual(PLACE_KO, { lake: '저수지', river: '강', sea: '바다' });
 });
 
 test('🏞️ 강 자리 셋 — 여울 8 · 바위 밑 14 · 깊은 소 20 · 열리는 수·별 몫·밑밥은 저수지와 같음 · 던지기는 그 낚시터 자리', () => {
@@ -105,7 +105,7 @@ test('🎣 강에서 나오는 물고기 — 강 8종 + 저수지의 강 물고�
 
 test('🎒 미끼·날씨 기울임 — 옥수수(붕어·떡붕어·잉어) · 루어(사냥하는 물고기 일곱) ×2 · 곱해도 같은 별 안에서 최대 ×3 · 흐린 날 깊은 소는 강의 큰 물고기', () => {
   assert.deepEqual(baitTilt('g_corn'), { bungeo: 2, ttokbung: 2, ingeo: 2 });
-  assert.deepEqual(baitTilt('g_lure'), { bass: 2, gamulchi: 2, ssogari: 2, kkeuri: 2, gangjun: 2, kkeokji: 2, dongsari: 2 });
+  assert.deepEqual(baitTilt('g_lure'), { bass: 2, gamulchi: 2, ssogari: 2, kkeuri: 2, gangjun: 2, kkeokji: 2, dongsari: 2, nongeo: 2, jopi: 2 }, 'v369 바다에선 농어·조피볼락도');
   for (const id of ['worm', 'g_glow', 'g_rod_gold', 'a_hat_fish', 'nope', undefined]) assert.equal(baitTilt(id), null, String(id));
   assert.equal(TILT_MAX, 3);
   assert.deepEqual(mixTilt({ megi: 2 }, { megi: 2 }), { megi: 3 }, '2×2는 3에서 멈춤');
@@ -169,7 +169,7 @@ test('🔓 강 열림 — 저수지 도감 10종(9종은 아직) · 강 물고�
 
 test('🎒 채비 표 — 원고 값 그대로 · 처음부터 있는 지렁이·나무 낚싯대 · 🪱 대신 🐛 · 모자·조끼는 avatar WEAR의 lake 옷과 같은 값 · 👕 옷 가게엔 안 나옴', () => {
   assert.deepEqual(GEAR.map((g) => [g.id, g.kind, g.price]), [
-    ['worm', 'bait', 0], ['g_corn', 'bait', 200], ['g_lure', 'bait', 300], ['g_glow', 'float', 150],
+    ['worm', 'bait', 0], ['g_corn', 'bait', 200], ['g_lure', 'bait', 300], ['g_krill', 'bait', 300], ['g_glow', 'float', 150],
     ['rod', 'rod', 0], ['g_rod_blue', 'rod', 150], ['g_rod_green', 'rod', 150], ['g_rod_gold', 'rod', 150],
     ['a_hat_fish', 'wear', 300], ['a_top_fishvest', 'wear', 300],
   ]);
@@ -218,7 +218,8 @@ test('🛒 채비 사기 규칙 — 💰 모자람·이미 있음·옷·처음�
 test('🗺️ 고르기 규칙 — 강은 열린 뒤에만 · 안 가진 채비·모르는 값은 안 됨 · 바꾼 시각은 늘 앞으로 · 읽을 때 가진 것·열린 곳으로 다시 고침', () => {
   const p = { coins: 0, items: { g_corn: 1 }, fishing: dexWith(LAKE_KEYS.slice(0, 9)) };
   assert.deepEqual(pickRule(p, { place: 'river' }, T), { ok: false, why: 'locked' });
-  assert.deepEqual(pickRule(p, { place: 'sea' }, T), { ok: false, why: 'bad' });
+  assert.deepEqual(pickRule(p, { place: 'moon' }, T), { ok: false, why: 'bad' });
+  assert.deepEqual(pickRule(p, { place: 'sea' }, T), { ok: false, why: 'locked' }, 'v369 바다도 열린 뒤에만');
   assert.deepEqual(pickRule(p, { bait: 'g_lure' }, T), { ok: false, why: 'none' });
   assert.deepEqual(pickRule(p, { bait: 'g_rod_blue' }, T), { ok: false, why: 'bad' }, '낚싯대는 미끼 칸에 못 넣음');
   assert.deepEqual(pickRule(p, { rod: 'g_rod_blue' }, T), { ok: false, why: 'none' });
@@ -238,7 +239,7 @@ test('🗺️ 고르기 규칙 — 강은 열린 뒤에만 · 안 가진 채비�
 
 test('💾 낚시 저장값 — 고른 값(pick) 고쳐 읽기 · 없으면 칸 없음(옛 꼴 그대로) · 병합은 나중에 바꾼 쪽 · 프로필 병합도', () => {
   assert.deepEqual(lakeOf({ dex: {}, paid: {} }), { dex: {}, paid: {} }, 'pick 없는 옛 꼴');
-  assert.deepEqual(lakeOf({ pick: { place: 'sea', bait: 'g_rod_gold', rod: 'g_corn', at: 'x' } }).pick, { place: 'lake', bait: 'worm', rod: 'rod', at: 0 });
+  assert.deepEqual(lakeOf({ pick: { place: 'moon', bait: 'g_rod_gold', rod: 'g_corn', at: 'x' } }).pick, { place: 'lake', bait: 'worm', rod: 'rod', at: 0 });
   assert.deepEqual(lakeOf({ pick: { place: 'river', bait: 'g_lure', rod: 'g_rod_blue', at: 7 } }).pick, { place: 'river', bait: 'g_lure', rod: 'g_rod_blue', at: 7 });
   assert.equal(lakeOf({ pick: 'river' }).pick, undefined);
   const a = { dex: {}, pick: { place: 'river', bait: 'worm', rod: 'rod', at: 10 } };
@@ -253,10 +254,10 @@ test('💾 낚시 저장값 — 고른 값(pick) 고쳐 읽기 · 없으면 칸 
   assert.equal(m.fishing.pick.bait, 'g_corn', '프로필 저장 시각과 상관없이 고른 시각으로');
 });
 
-test('📖 도감 칸 24 — 강 칸은 home river · 힌트는 강 자리 이름(여울 몫과 맞음) · 📸 칸 · 남은 수 없음', () => {
+test('📖 도감 칸 33 — 강 칸은 home river · 힌트는 강 자리 이름(여울 몫과 맞음) · 📸 칸 · 남은 수 없음', () => {
   const rows = dexRows(dexWith(['eoreumchi', 'bungeo']));
-  assert.equal(rows.length, 24);
-  assert.deepEqual(rows.map((r) => r.home), [...Array(16).fill('lake'), ...Array(8).fill('river')]);
+  assert.equal(rows.length, 33);
+  assert.deepEqual(rows.map((r) => r.home), [...Array(16).fill('lake'), ...Array(8).fill('river'), ...Array(9).fill('sea')]);
   const e = rows.find((r) => r.key === 'eoreumchi');
   assert.equal(e.caught && e.photo, true);
   const unk = rows.find((r) => r.key === 'sancheoneo');
@@ -358,12 +359,13 @@ test('🔌 잇기 — 🗺️ 물가·🎒 채비·🐛 미끼 칩 · 가게 보
   assert.match(fv, /drawFloat\(ctx, f\.x, Math\.max\(f\.sink \|\| 0, tw\), now, ui\.reduce, glowNow\(\)\);/);
   assert.match(fv, /if \(sp\.photo\) card\.appendChild\(el\('div', 'lk-res-photo', '📸 사진만 찍고 놓아줘요'\)\);/);
   assert.match(fv, /if \(info\.opened\) \{\n\s*ui\.riverOpen = true;/);
-  assert.match(fv, /if \(!canMenu\(\) \|\| pl === ui\.place \|\| \(pl === 'river' && !ui\.riverOpen\)\) return;/);
+  assert.match(fv, /if \(!canMenu\(\) \|\| pl === ui\.place \|\| !PLACES\.includes\(pl\) \|\| !placeOk\(pl\)\) return;/);
+  assert.match(fv, /return pl === 'lake' \|\| \(pl === 'river' && ui\.riverOpen\) \|\| \(pl === 'sea' && ui\.seaOpen\);/);
   assert.match(fv, /export function closeLake\(quiet\) \{\n\s*if \(!ui\) return;\n\s*closeDexView\(\);\n\s*closeShop\(\);/);
   assert.match(fv, /closeDexView\(\);[^\n]*\n\s*closeShop\(\);\n\s*if \(ui\) closeLake\(true\);/, '낚시터를 열 때 가게도 닫음');
   const lv = src('js/lakeview.js');
   for (const k of ['place: pk.place,', 'riverOpen: riverOpen(lakeRaw()),', 'pick: pk,', 'gear: () => gearState(),', 'buyGear: (id) => lakeBuy(id),', 'onPick: (want) => lakePick(want),', 'lookNow: () => avatarOf(getProfileSnapshot()).look,']) assert.ok(lv.includes(k), k);
-  assert.match(lv, /put\(\{ fishCatch: 1, \.\.\.\(f\.place === 'river' \? \{ \[FISH_RIVER\]: 1 \} : \{\}\) \}\);/);
+  assert.match(lv, /put\(\{ fishCatch: 1, \.\.\.\(f\.place === 'river' \? \{ \[FISH_RIVER\]: 1 \} : \{\}\), \.\.\.\(f\.place === 'sea' \? \{ \[FISH_SEA\]: 1 \} : \{\}\) \}\);/);
   const xp = src('js/xp.js');
   assert.match(xp, /if \(g && g\.kind === 'wear'\) return houseDo\(\(p\) => wearBuyRule\(p, id, Date\.now\(\)\)\);\n\s*return houseDo\(\(p\) => lakeGearRule\(p, id, Date\.now\(\)\)\);/);
   assert.match(xp, /return houseDo\(\(p\) => lakePickRule\(p, want, Date\.now\(\)\)\);/);
@@ -375,8 +377,7 @@ test('🔌 잇기 — 🗺️ 물가·🎒 채비·🐛 미끼 칩 · 가게 보
   const css = src('css/style.css');
   for (const c of ['.lk-topbtn', '.lk-bait', '.lk-places', '.lk-place', '.lk-res-photo', '.lk-res-open', '.lk-dex-lock', '.lk-shop-grid', '.lk-shop-btn']) assert.ok(css.includes(`${c} {`), c);
   assert.match(src('js/stats.js'), /`\$\{PLACE_KO\[pl\]\} 도감 \$\{got\.length\}\/\$\{all\.length\}`/);
-  assert.match(src('sw.js'), /const CACHE_VERSION = 'v368';/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v368'/);
+  // 서비스워커·앱 판 글자는 다음 판 시험이 본다 (v369 → sea369)
   // 아이 화면 — 남은 수·종 셈 문구 없음 · 강이 열리기 전엔 숫자 없이
   for (const f of ['js/fishview.js', 'js/lakeview.js']) assert.doesNotMatch(code(f).split('\n').filter((l) => !/lakeTodayLine|오늘 — 낚시/.test(l)).join('\n'), /남은 (시간|분|종)|몇 종|종 남|\$\{RIVER_NEED\}종/, f);
   assert.match(fv, /'🔒 물고기를 더 만나면 길이 열려요'/);

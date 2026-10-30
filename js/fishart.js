@@ -3,6 +3,7 @@
 // 물고기 16종은 몸 모양 값(LOOKS)으로 그린다 — 몸통·꼬리·지느러미·무늬·수염·눈·입 · 작게 그릴 땐 무늬를 줄인다(LOD)
 // 안 움직이는 것(하늘·산·물가·바닥·잔교·갈대)은 paintStatic이 한 장에 그려 두고 fishview가 붙이기만 한다(태블릿 성능)
 // 생김새 근거(2026-10-30 확인): 위키백과·FishBase·경북 토속관상어 사육 매뉴얼·한국어류학회지(동자개 수염 4쌍) — 아이 눈에 「그 물고기」로 보이는 특징 위주
+// v368 강 8종 · v369 바다 9종(고등어 등 물결무늬 FAO · 전갱이 옆줄 모비늘 FishBase · 참돔 푸른 점 · 볼락 큰 눈)
 // ★ 이 파일은 아무것도 import하지 않는다
 
 export const SCENE_W = 1024;
@@ -52,6 +53,16 @@ export const LOOKS = {
   dongsari: { depth: 0.24, peak: 0.3, head: 'flat', tail: 'round', tk: 0.7, dorsal: [0.36, 0.72, 0.42, 'soft'], anal: [0.6, 0.8, 0.35, 'soft'], mouth: 'wide', eye: [0.1, 0.24, 0.022], c: ['#4a3c2a', '#8a7254', '#d8c9a8', '#5e4c34'], pat: ['blotch:#2e2416', 'mottle:#3a2e1e'] },
   sancheoneo: { depth: 0.27, peak: 0.42, head: 'round', tail: 'notch', tk: 0.85, dorsal: [0.4, 0.52, 0.5, 'soft'], anal: [0.66, 0.78, 0.4, 'soft'], adipose: [0.74, 0.8], mouth: 'big', eye: [0.11, 0.19, 0.03], c: ['#4a5a48', '#a9b6a2', '#f1ede6', '#9fa58f'], pat: ['bars:#5b5f8c:.3:8', 'speck:#2c3328:18', 'sheen:#e7a7a0'] },
   eoreumchi: { depth: 0.24, peak: 0.4, head: 'point', tail: 'fork', tk: 0.88, dorsal: [0.38, 0.52, 0.55, 'soft'], anal: [0.68, 0.8, 0.4, 'soft'], barbels: [1, 0.04], mouth: 'small', eye: [0.13, 0.17, 0.026], c: ['#6b6a4a', '#cfc9a2', '#f4f0dc', '#c9bf86'], pat: ['speck:#2a2a1e:46'] },
+  // 🌊 바다 (v369 시안) — 문절망둑 · 전갱이 · 고등어 · 노래미 · 볼락 · 조피볼락 · 감성돔 · 농어 · 참돔 (dorsal2 = 떨어진 둘째 등지느러미)
+  munjeol: { depth: 0.17, peak: 0.3, head: 'round', tail: 'round', tk: 0.8, dorsal: [0.3, 0.46, 0.5, 'spiny'], dorsal2: [0.52, 0.86, 0.42, 'soft'], anal: [0.56, 0.86, 0.34, 'soft'], mouth: 'wide', eye: [0.09, 0.34, 0.026], c: ['#6d6450', '#b5aa8a', '#efe8d6', '#a39776'], pat: ['blotch:#4a4130', 'speck:#3e3626:22'] },
+  jeongaeng: { depth: 0.25, peak: 0.42, head: 'point', tail: 'fork', tk: 0.95, dorsal: [0.34, 0.5, 0.5, 'spiny'], dorsal2: [0.52, 0.9, 0.3, 'soft'], anal: [0.58, 0.9, 0.28, 'soft'], mouth: 'big', eye: [0.1, 0.18, 0.034], c: ['#3f6b70', '#b7c9c6', '#f2f4ee', '#c9c2a0'], pat: ['scute:#d8dccf', 'ear:#26302f', 'sheen:#d6e2a0'] },
+  godeung: { depth: 0.2, peak: 0.44, head: 'point', tail: 'fork', tk: 1, dorsal: [0.36, 0.5, 0.45, 'spiny'], dorsal2: [0.6, 0.72, 0.4, 'soft'], anal: [0.62, 0.74, 0.38, 'soft'], mouth: 'big', eye: [0.1, 0.16, 0.03], c: ['#25566a', '#9fbcc4', '#f1f4f2', '#7f9aa3'], pat: ['wave:#173540:10', 'sheen:#b8e0e8'] },
+  noraemi: { depth: 0.24, peak: 0.36, head: 'point', tail: 'notch', tk: 0.8, dorsal: [0.26, 0.92, 0.42, 'spiny'], anal: [0.56, 0.92, 0.36, 'soft'], mouth: 'small', eye: [0.11, 0.24, 0.028], c: ['#5a4a32', '#9a8462', '#e6dcc6', '#7c6a4c'], pat: ['mottle:#3c3020', 'blotch:#4a3a26'] },
+  bollak: { depth: 0.33, peak: 0.36, head: 'round', tail: 'notch', tk: 0.85, dorsal: [0.24, 0.86, 0.44, 'spiny'], anal: [0.62, 0.8, 0.4, 'soft'], mouth: 'big', eye: [0.13, 0.22, 0.046], c: ['#3f3a36', '#7d7068', '#d8d0c6', '#5a504a'], pat: ['bars:#2a2522:.3:5'] },
+  jopi: { depth: 0.3, peak: 0.34, head: 'round', tail: 'round', tk: 0.8, dorsal: [0.22, 0.86, 0.46, 'spiny'], anal: [0.62, 0.8, 0.4, 'soft'], mouth: 'big', eye: [0.12, 0.24, 0.036], c: ['#4a4840', '#8a857a', '#dcd8cc', '#5c584e'], pat: ['mottle:#2e2c26', 'bars:#33302a:.25:4'] },
+  gamseong: { depth: 0.42, peak: 0.36, head: 'round', tail: 'fork', tk: 0.9, dorsal: [0.28, 0.88, 0.4, 'spiny'], anal: [0.64, 0.84, 0.4, 'soft'], mouth: 'small', eye: [0.13, 0.24, 0.032], c: ['#3a3f44', '#8e969c', '#e8ebec', '#4a5056'], pat: ['bars:#2e3236:.22:6', 'sheen:#e4ecf0'] },
+  nongeo: { depth: 0.24, peak: 0.4, head: 'point', tail: 'notch', tk: 0.9, dorsal: [0.3, 0.5, 0.55, 'spiny'], dorsal2: [0.54, 0.78, 0.4, 'soft'], anal: [0.62, 0.78, 0.36, 'soft'], mouth: 'big', eye: [0.11, 0.18, 0.028], c: ['#4e5e58', '#b9c4c0', '#f2f4f3', '#93a19c'], pat: ['speck:#2a332f:16', 'sheen:#d0dde0'] },
+  chamdom: { depth: 0.42, peak: 0.34, head: 'round', tail: 'fork', tk: 0.95, dorsal: [0.26, 0.88, 0.42, 'spiny'], anal: [0.64, 0.84, 0.4, 'soft'], mouth: 'small', eye: [0.13, 0.24, 0.032], c: ['#b2454a', '#e48a86', '#f7dcd6', '#d9706c'], pat: ['speck:#58b6ef:42', 'sheen:#ffd3c8'] },
 };
 
 // ───────────── 물고기 ─────────────
@@ -251,6 +262,33 @@ function patterns(ctx, lk, b, key, detail) {
         ctx.beginPath(); ctx.arc(lerp(x0 + Lb * 0.12, x0 + Lb * 0.95, rnd()), lerp(-hd * 0.85, hd * 0.25, rnd()), hd * lerp(0.035, 0.075, rnd()), 0, Math.PI * 2); ctx.fill();
       }
       ctx.globalAlpha = 1;
+    } else if (kind === 'wave') {
+      // 고등어 — 등 쪽 검푸른 물결무늬 (v369) — 등에서 옆 가운데까지만
+      const n = Number(a1) || 9;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = Math.max(0.8, hd * 0.08);
+      ctx.globalAlpha = 0.8;
+      for (let i = 0; i < n; i++) {
+        const x = lerp(x0 + Lb * 0.22, x0 + Lb * 0.97, i / n);
+        ctx.beginPath(); ctx.moveTo(x, -hd);
+        for (let k = 1; k <= 4; k++) ctx.quadraticCurveTo(x + Lb * (0.012 * k + (k % 2 ? 0.02 : -0.012)), -hd + hd * 0.13 * (k - 0.5), x + Lb * 0.016 * k, -hd + hd * 0.13 * k);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    } else if (kind === 'scute') {
+      // 전갱이 — 옆줄을 따라 늘어선 단단한 비늘(모비늘) 한 줄 (v369)
+      const n = detail ? 24 : 12;
+      ctx.fillStyle = col;
+      ctx.strokeStyle = 'rgba(40,50,50,.35)';
+      ctx.lineWidth = Math.max(0.5, hd * 0.025);
+      for (let i = 0; i < n; i++) {
+        const f = (i + 0.5) / n;
+        const x = lerp(x0 + Lb * 0.24, x0 + Lb * 0.99, f);
+        const y = lerp(-hd * 0.12, 0, f) - (f < 0.4 ? Math.sin((f / 0.4) * Math.PI) * hd * 0.1 : 0);
+        const w = ((Lb * 0.75) / n) * 0.6;
+        const h = hd * (0.06 + 0.05 * f);
+        ctx.beginPath(); ctx.moveTo(x - w, y); ctx.lineTo(x, y - h); ctx.lineTo(x + w, y); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
     } else if (kind === 'mottle') {
       ctx.fillStyle = col;
       ctx.globalAlpha = 0.35;
@@ -376,6 +414,7 @@ export function drawFish(ctx, key, x, y, L, opts = {}) {
   const fa = ctx.globalAlpha;
   ctx.globalAlpha = fa * 0.88;
   if (lk.dorsal) ctx.fill(finPath(lk, b, lk.dorsal, true));
+  if (lk.dorsal2) ctx.fill(finPath(lk, b, lk.dorsal2, true));
   if (lk.anal) ctx.fill(finPath(lk, b, lk.anal, false));
   if (lk.adipose) {
     const [a, z] = lk.adipose;
@@ -448,12 +487,29 @@ function cloud(ctx, cx, cy, s) {
   ctx.ellipse(cx + 20 * s, cy - 10 * s, 30 * s, 16 * s, 0, 0, Math.PI * 2);
   ctx.fill();
 }
+/** 먼 산 · 가까운 산 · 숲 줄 (저수지·강) */
+function landHills(ctx, sky, x0, x1) {
+  ctx.fillStyle = sky.hill;
+  ctx.beginPath(); ctx.moveTo(x0, 176);
+  for (const [x, y] of [[60, 150], [170, 118], [290, 150], [420, 108], [560, 146], [700, 116], [830, 150], [960, 128], [1100, 150]]) ctx.lineTo(x, y);
+  ctx.lineTo(x1, 160); ctx.lineTo(x1, WATER_Y); ctx.lineTo(x0, WATER_Y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = mix('#6f927d', '#5d5f6e', sky.k);
+  ctx.beginPath(); ctx.moveTo(x0, 190);
+  for (const [x, y] of [[90, 168], [230, 184], [380, 160], [520, 182], [650, 166], [800, 186], [930, 170], [1090, 184]]) ctx.lineTo(x, y);
+  ctx.lineTo(x1, 186); ctx.lineTo(x1, WATER_Y); ctx.lineTo(x0, WATER_Y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = mix('#3f6247', '#3a3d45', sky.k);
+  ctx.beginPath(); ctx.moveTo(x0, WATER_Y);
+  for (let x = Math.floor(x0 / 18) * 18; x <= x1 + 18; x += 18) ctx.quadraticCurveTo(x + 9, 192 - ((x * 7) % 11), x + 18, 200);
+  ctx.lineTo(x1, WATER_Y); ctx.closePath(); ctx.fill();
+}
 /**
  * 안 움직이는 층 — ctx는 이미 가상 좌표로 맞춰 둔 것 · x0~x1·y0~y1 = 화면에 보이는 가상 좌표 넓이(가장자리까지 채우려고)
- * wx = 🌦️ 날씨 key (sun · cloud · rain · wind — fishing.WEATHER) · place = 물가 ('lake' 저수지 · 'river' 강 — v368: 잔교 대신 큰 바위·자갈 · 연잎·갈대 대신 강가 바위 · 수초 대신 물속 바위 · 맑은 물빛)
+ * wx = 🌦️ 날씨 key (sun · cloud · rain · wind — fishing.WEATHER) · place = 물가 ('lake' 저수지 · 'river' 강 — v368: 잔교 대신 큰 바위·자갈 · 연잎·갈대 대신 강가 바위 · 수초 대신 물속 바위 · 맑은 물빛 ·
+ *   'sea' 바다 — v369: 산 대신 먼 섬 · 잔교 대신 방파제 · 발치·물속 테트라포드 · 빨간 등대 · 남색 물 · 모래 바닥)
  */
 export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, wx = 'sun', place = 'lake') {
   const river = place === 'river';
+  const sea = place === 'sea'; // 🌊 바다 방파제 (v369 시안) — 산 대신 먼 섬 · 잔교 대신 방파제 · 테트라포드 · 등대 · 모래 바닥
   const sky = skyOf(t);
   const sun = sunAt(t);
   const veil = WX_VEIL[wx] || '';
@@ -479,38 +535,31 @@ export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, 
     ctx.fillStyle = wx === 'rain' ? 'rgba(150,158,168,.85)' : 'rgba(205,210,216,.8)';
     for (const [cx, cy, s] of MORE_CLOUDS) cloud(ctx, cx, cy, s);
   }
-  // 먼 산 · 가까운 산 · 숲 줄
-  ctx.fillStyle = sky.hill;
-  ctx.beginPath(); ctx.moveTo(x0, 176);
-  for (const [x, y] of [[60, 150], [170, 118], [290, 150], [420, 108], [560, 146], [700, 116], [830, 150], [960, 128], [1100, 150]]) ctx.lineTo(x, y);
-  ctx.lineTo(x1, 160); ctx.lineTo(x1, WATER_Y); ctx.lineTo(x0, WATER_Y); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = mix('#6f927d', '#5d5f6e', sky.k);
-  ctx.beginPath(); ctx.moveTo(x0, 190);
-  for (const [x, y] of [[90, 168], [230, 184], [380, 160], [520, 182], [650, 166], [800, 186], [930, 170], [1090, 184]]) ctx.lineTo(x, y);
-  ctx.lineTo(x1, 186); ctx.lineTo(x1, WATER_Y); ctx.lineTo(x0, WATER_Y); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = mix('#3f6247', '#3a3d45', sky.k);
-  ctx.beginPath(); ctx.moveTo(x0, WATER_Y);
-  for (let x = Math.floor(x0 / 18) * 18; x <= x1 + 18; x += 18) ctx.quadraticCurveTo(x + 9, 192 - ((x * 7) % 11), x + 18, 200);
-  ctx.lineTo(x1, WATER_Y); ctx.closePath(); ctx.fill();
+  // 먼 산 · 가까운 산 · 숲 줄 (바다는 먼 섬과 수평선)
+  if (sea) seaHorizon(ctx, sky, x0, x1);
+  else landHills(ctx, sky, x0, x1);
   // 물 — 윗면은 하늘을 비추고 아래로 깊어진다
   const w = ctx.createLinearGradient(0, WATER_Y, 0, y1);
-  if (river) { w.addColorStop(0, mix('#78bdb6', '#8a8aa0', sky.k * 0.7)); w.addColorStop(0.06, '#4f9d97'); w.addColorStop(0.45, '#2c706b'); w.addColorStop(1, '#10403d'); }
+  if (sea) { w.addColorStop(0, mix('#5c9cc4', '#7b7c9a', sky.k * 0.7)); w.addColorStop(0.06, '#2f72a0'); w.addColorStop(0.45, '#1a4c78'); w.addColorStop(1, '#0a2846'); }
+  else if (river) { w.addColorStop(0, mix('#78bdb6', '#8a8aa0', sky.k * 0.7)); w.addColorStop(0.06, '#4f9d97'); w.addColorStop(0.45, '#2c706b'); w.addColorStop(1, '#10403d'); }
   else { w.addColorStop(0, mix('#5aa5b3', '#7b7c9a', sky.k * 0.7)); w.addColorStop(0.06, '#3d8a98'); w.addColorStop(0.45, '#1f5f6c'); w.addColorStop(1, '#0b3540'); }
   ctx.fillStyle = w;
   ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y);
-  // 산 그림자 비침
-  ctx.fillStyle = 'rgba(20,60,50,.18)';
+  // 산 그림자 비침 (바다는 하늘빛 띠)
+  ctx.fillStyle = sea ? 'rgba(255,255,255,.08)' : 'rgba(20,60,50,.18)';
   ctx.fillRect(x0, WATER_Y, x1 - x0, 14);
-  // 바닥 · 자갈 · 돌
+  // 바닥 · 자갈 · 돌 (바다는 모래)
   const bg = ctx.createLinearGradient(0, 505, 0, Math.max(y1, SCENE_H));
-  bg.addColorStop(0, '#6a6544'); bg.addColorStop(0.35, '#4c4a33'); bg.addColorStop(1, '#1d241c');
+  if (sea) { bg.addColorStop(0, '#a89c74'); bg.addColorStop(0.35, '#7c7152'); bg.addColorStop(1, '#2a2a22'); }
+  else { bg.addColorStop(0, '#6a6544'); bg.addColorStop(0.35, '#4c4a33'); bg.addColorStop(1, '#1d241c'); }
   ctx.fillStyle = bg;
   ctx.beginPath(); ctx.moveTo(x0, bottomY(x0));
   for (let x = x0; x <= x1; x += 32) ctx.lineTo(x, bottomY(x) + Math.sin(x * 0.05) * 4);
   ctx.lineTo(x1, y1); ctx.lineTo(x0, y1); ctx.closePath(); ctx.fill();
   const rnd = seeded(7);
-  ctx.fillStyle = river ? 'rgba(190,182,150,.6)' : 'rgba(160,150,110,.5)';
-  for (let i = 0; i < (river ? 150 : 70); i++) { const x = lerp(x0, x1, rnd()); ctx.beginPath(); ctx.ellipse(x, bottomY(x) + 6 + rnd() * 20, 2 + rnd() * 4, 1.5 + rnd() * 2, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = sea ? 'rgba(232,222,190,.55)' : river ? 'rgba(190,182,150,.6)' : 'rgba(160,150,110,.5)';
+  for (let i = 0; i < (river || sea ? 150 : 70); i++) { const x = lerp(x0, x1, rnd()); ctx.beginPath(); ctx.ellipse(x, bottomY(x) + 6 + rnd() * 20, 2 + rnd() * 4, 1.5 + rnd() * 2, 0, 0, Math.PI * 2); ctx.fill(); }
+  if (sea) { seaBank(ctx, x0, x1); if (veil) { ctx.fillStyle = wx === 'rain' ? 'rgba(70,80,92,.22)' : 'rgba(90,100,112,.14)'; ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y); } return; }
   ctx.fillStyle = '#3a3a2c';
   for (const [x, rx, ry] of [[420, 30, 16], [860, 40, 20], [960, 22, 12]]) { ctx.beginPath(); ctx.ellipse(x, bottomY(x) + 4, rx, ry, 0, Math.PI, 0); ctx.fill(); }
   if (river) { riverBank(ctx, x0, x1); if (veil) { ctx.fillStyle = wx === 'rain' ? 'rgba(70,80,92,.22)' : 'rgba(90,100,112,.14)'; ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y); } return; }
@@ -582,12 +631,92 @@ function riverBank(ctx, x0, x1) {
   }
 }
 
+/** 🌊 먼 섬 둘 · 수평선 안개 (v369 시안 — 바다엔 산 대신) */
+function seaHorizon(ctx, sky, x0, x1) {
+  ctx.fillStyle = mix('#8ea4ae', '#6d6f80', sky.k);
+  for (const [a, z, h] of [[300, 540, 26], [760, 920, 16]]) {
+    ctx.beginPath(); ctx.moveTo(a, WATER_Y);
+    ctx.bezierCurveTo(a + (z - a) * 0.2, WATER_Y - h, a + (z - a) * 0.6, WATER_Y - h * 1.1, z, WATER_Y);
+    ctx.closePath(); ctx.fill();
+  }
+  const g = ctx.createLinearGradient(0, WATER_Y - 18, 0, WATER_Y);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,.28)');
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, WATER_Y - 18, x1 - x0, 18);
+}
+/** 테트라포드 하나 — 다리 넷 달린 콘크리트 블록(옆에서 보면 다리 셋 + 앞으로 나온 다리 끝) · a = 돌아간 각도 · hi = 앞 다리 끝 밝은 색 */
+function tetrapod(ctx, x, y, s, a, col, hi) {
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = col;
+  for (const d of [-Math.PI / 2, Math.PI / 6, (5 * Math.PI) / 6]) {
+    const ex = x + Math.cos(a + d) * 24 * s;
+    const ey = y + Math.sin(a + d) * 24 * s;
+    ctx.lineWidth = 16 * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo((x + ex) / 2, (y + ey) / 2); ctx.stroke();
+    ctx.lineWidth = 11 * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke();
+  }
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(x, y, 12 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = hi;
+  ctx.beginPath(); ctx.arc(x - 3 * s, y - 3 * s, 7 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.lineCap = 'butt';
+}
+/** 🌊 바닷가 (v369 시안) — 캐릭터가 서는 방파제(잔교 자리 · 윗면 = 잔교 윗면) · 방파제 발치 테트라포드 · 물속 테트라포드 무더기(14m) · 조개껍데기 · 오른쪽 빨간 등대 */
+function seaBank(ctx, x0, x1) {
+  const top = DOCK_Y - 10;
+  const rnd = seeded(13);
+  for (let i = 0; i < 14; i++) {
+    const x = lerp(x0, x1, rnd());
+    const y = bottomY(x) + 8 + rnd() * 14;
+    ctx.fillStyle = ['#efe6d4', '#e8cfc0', '#d9d2c4'][i % 3];
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, 4 + rnd() * 3, Math.PI * 1.1, Math.PI * 1.9); ctx.closePath(); ctx.fill();
+  }
+  // 물속 테트라포드 무더기 (14m 「테트라포드」) — 물빛으로 흐리게
+  for (const [x, dy, s, a] of [[690, -6, 1.2, 0.3], [748, -22, 1.4, 1.1], [806, -4, 1.25, 2.0], [770, 16, 1.1, 0.7], [716, 20, 1.0, 1.6]]) tetrapod(ctx, x, bottomY(x) + dy - 18, s, a, '#56656c', 'rgba(150,190,200,.16)');
+  // 방파제 — 물속 벽(물빛으로 흐리게) · 물 위 벽 · 윗길 · 물 닿는 띠
+  ctx.fillStyle = 'rgba(70,86,94,.55)';
+  ctx.fillRect(x0, WATER_Y, DOCK_X - x0, bottomY(DOCK_X) - WATER_Y + 8);
+  ctx.fillStyle = '#a7a59c';
+  ctx.fillRect(x0, top, DOCK_X - x0, WATER_Y - top + 2);
+  ctx.fillStyle = '#c9c6bb';
+  ctx.fillRect(x0, top, DOCK_X - x0, 7);
+  ctx.strokeStyle = 'rgba(60,60,55,.25)';
+  ctx.lineWidth = 1;
+  for (let x = Math.floor(x0 / 60) * 60; x < DOCK_X; x += 60) { ctx.beginPath(); ctx.moveTo(x, top + 7); ctx.lineTo(x, WATER_Y); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(60,80,60,.35)';
+  ctx.fillRect(x0, WATER_Y - 5, DOCK_X - x0, 5);
+  // 방파제 발치 테트라포드 — 물 위로 반쯤 · 물 위·물속을 나눠 칠함(물속은 물빛)
+  const foot = [[DOCK_X + 12, WATER_Y + 28, 1.1, 0.4], [DOCK_X + 50, WATER_Y + 14, 1.0, 1.5], [DOCK_X + 20, WATER_Y, 0.9, 2.4], [DOCK_X + 82, WATER_Y + 32, 1.05, 0.9]];
+  for (const [clipY, h, col, hi] of [[0, WATER_Y + 1, '#9c9a90', 'rgba(255,255,255,.22)'], [WATER_Y + 1, SCENE_H, '#4f6470', 'rgba(150,190,200,.16)']]) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x0, clipY, x1 - x0, h - clipY); ctx.clip();
+    for (const [x, y, s, a] of foot) tetrapod(ctx, x, y, s, a, col, hi);
+    ctx.restore();
+  }
+  // 오른쪽 먼 방파제 끝 빨간 등대
+  ctx.fillStyle = '#a19f96';
+  ctx.fillRect(940, WATER_Y - 14, Math.max(0, x1 - 940), 16);
+  ctx.fillStyle = 'rgba(96,104,104,.5)';
+  ctx.fillRect(940, WATER_Y + 2, Math.max(0, x1 - 940), 30);
+  const lx = 985;
+  ctx.fillStyle = '#d4483f';
+  ctx.beginPath(); ctx.moveTo(lx - 14, WATER_Y - 14); ctx.lineTo(lx - 9, 120); ctx.lineTo(lx + 9, 120); ctx.lineTo(lx + 14, WATER_Y - 14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#f4efe6';
+  ctx.fillRect(lx - 11, 158, 22, 10);
+  ctx.fillStyle = '#3b3f44';
+  ctx.fillRect(lx - 11, 112, 22, 8);
+  ctx.fillStyle = '#ffe9a6';
+  ctx.fillRect(lx - 7, 98, 14, 14);
+  ctx.fillStyle = '#c23b33';
+  ctx.beginPath(); ctx.moveTo(lx - 10, 98); ctx.lineTo(lx, 86); ctx.lineTo(lx + 10, 98); ctx.closePath(); ctx.fill();
+}
+
 // ───────────── 움직이는 것 (프레임마다) ─────────────
 
 /** 물 윗면 반짝임 · 햇살 · 수초 — now(ms) · reduce = 움직임 줄이기 · lite = 느린 기기 · wx = 🌦️ 날씨(바람이면 물결이 크고 수초가 더 흔들림 · 흐림·비는 햇살 없음) */
 export function drawWaterFx(ctx, now, reduce, lite, x0 = 0, x1 = SCENE_W, wx = 'sun', place = 'lake') {
   const t = reduce ? 0 : now / 1000;
   if (place === 'river') { riverFx(ctx, t, lite, x0, x1, wx); return; }
+  if (place === 'sea') { seaFx(ctx, t, lite, x0, x1, wx); return; }
   const wind = wx === 'wind';
   const amp = wind ? 3.4 : 1.2;
   ctx.strokeStyle = wind ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.28)';
@@ -652,6 +781,63 @@ function riverFx(ctx, t, lite, x0, x1, wx) {
       ctx.beginPath(); ctx.moveTo(x, WATER_Y); ctx.lineTo(x + 60, WATER_Y); ctx.lineTo(x - 40, 520); ctx.lineTo(x - 120, 520); ctx.closePath(); ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+}
+/** 🌊 바닷물 (v369 시안) — 너울 줄이 천천히 오르내림(바람이면 크게) · 방파제 발치 테트라포드에 흰 파도 · 물속 모자반 · 하늘에 갈매기 둘(가벼운 그림이면 없음) */
+function seaFx(ctx, t, lite, x0, x1, wx) {
+  const wind = wx === 'wind';
+  const amp = wind ? 4.5 : 2.2;
+  ctx.strokeStyle = 'rgba(255,255,255,.3)';
+  ctx.lineWidth = 1.6;
+  for (let row = 0; row < 4; row++) {
+    const y = WATER_Y + 4 + row * 8 + Math.sin(t * 0.8 + row) * amp * 0.6;
+    const gap = 110 + row * 20;
+    for (let x = Math.floor(x0 / gap) * gap + ((t * (14 + row * 6)) % gap); x < x1; x += gap) {
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 22, y - amp * 1.6, x + 44 - row * 5, y); ctx.stroke();
+    }
+  }
+  // 흰 파도 — 방파제 발치 테트라포드
+  ctx.fillStyle = 'rgba(255,255,255,.7)';
+  const n = lite ? 5 : 10;
+  for (let i = 0; i < n; i++) {
+    const ph = (t * 0.7 + i * 0.29) % 1;
+    ctx.globalAlpha = 0.2 + 0.6 * Math.sin(ph * Math.PI);
+    ctx.beginPath(); ctx.ellipse(DOCK_X - 6 + i * 11, WATER_Y + 1 - Math.sin(ph * Math.PI) * (wind ? 10 : 5), 7 + (i % 3) * 3, 3, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  if (!lite && wx !== 'cloud' && wx !== 'rain') {
+    ctx.fillStyle = 'rgba(220,240,250,.06)';
+    for (let i = 0; i < 3; i++) {
+      ctx.globalAlpha = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(t * 0.6 + i * 2));
+      const x = 380 + i * 230;
+      ctx.beginPath(); ctx.moveTo(x, WATER_Y); ctx.lineTo(x + 60, WATER_Y); ctx.lineTo(x - 40, 520); ctx.lineTo(x - 120, 520); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // 모자반 — 테트라포드 무더기 둘레(14m 언저리)
+  ctx.strokeStyle = '#6d6a2c';
+  ctx.fillStyle = '#7d7a34';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 7; i++) {
+    const bx = 664 + i * 30 + ((i * 17) % 11);
+    const by = bottomY(bx) - 2;
+    const h = 70 + ((i * 41) % 50);
+    const sway = Math.sin(t * (wind ? 1.4 : 0.8) + i) * (wind ? 18 : 10);
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(bx + sway * 0.4, by - h * 0.5, bx + sway, by - h); ctx.stroke();
+    for (let k = 1; k <= 3; k++) { const f = k / 4; ctx.beginPath(); ctx.arc(bx + sway * f * f + 3, by - h * f, 3, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.lineCap = 'butt';
+  if (lite) return;
+  // 갈매기 둘
+  ctx.strokeStyle = 'rgba(60,64,70,.75)';
+  ctx.lineWidth = 2;
+  const span = x1 - x0 + 200;
+  for (let i = 0; i < 2; i++) {
+    const gx = x0 - 100 + ((t * (22 + i * 9) + i * 430) % span);
+    const gy = 70 + i * 34 + Math.sin(t * 0.7 + i) * 8;
+    const fl = Math.sin(t * 5 + i * 2) * 4;
+    ctx.beginPath(); ctx.moveTo(gx - 12, gy - 2 - fl); ctx.quadraticCurveTo(gx - 6, gy - 7 - fl, gx, gy); ctx.quadraticCurveTo(gx + 6, gy - 7 - fl, gx + 12, gy - 2 - fl); ctx.stroke();
   }
 }
 /** 🌧️ 빗줄기 — 40개까지(태블릿 성능 · 가벼운 그림이면 부르는 쪽이 안 부른다) · 움직임 줄이기면 멈춘 빗줄기 */
