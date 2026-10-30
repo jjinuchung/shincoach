@@ -114,7 +114,7 @@ export function offerEl(offer, viewId, after, ctx) {
 /** 다른 창(잡기·부화·⏳ 잠금·상점·진화·🚀 …)이 떠 있나 — 그 위에 배틀·🚀 로켓단(korrocket)을 겹쳐 열지 않는다 (hatch.anyModalOpen과 같은 목록 + 부화·로켓단) */
 export function overlayOpen() {
   // 🎒 대여행 창(v341)도
-  return ['catch', 'hatch', 'shop', 'mon', 'battle', 'rocket', 'puzzle', 'review', 'essay', 'match', 'evolve', 'take', 'taken', 'timeup', 'market', 'parcel', 'jr-trip', 'lk-lake']
+  return ['catch', 'hatch', 'shop', 'mon', 'battle', 'rocket', 'puzzle', 'review', 'essay', 'match', 'evolve', 'take', 'taken', 'timeup', 'market', 'parcel', 'jr-trip', 'lk-lake', 'lk-dex']
     .some((id) => { const e = document.getElementById(id); return !!e && !e.hidden; });
 }
 

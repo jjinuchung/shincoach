@@ -36,7 +36,7 @@ test('🕒 자리: 화면 이름 → 자리(영어는 목록·플레이어 둘 �
   // 겹친 창 id가 index.html에 실제로 있다 (로켓단은 rocketview.js가 만든다)
   const html = read('index.html');
   // 🚀 로켓단·🎒 대여행(v341)·🎣 낚시터(v366) 창은 JS가 만든다(rocketview·journeyview·fishview build) — 나머지는 index.html에
-  for (const id of OVERLAYS.flatMap((o) => o.ids).filter((id) => id !== 'rocket' && id !== 'jr-trip' && id !== 'lk-lake')) assert.match(html, new RegExp(`<div id="${id}" class="`), id);
+  for (const id of OVERLAYS.flatMap((o) => o.ids).filter((id) => id !== 'rocket' && id !== 'jr-trip' && id !== 'lk-lake' && id !== 'lk-dex')) assert.match(html, new RegExp(`<div id="${id}" class="`), id);
   assert.match(read('js/journeyview.js'), /root\.id = 'jr-trip';/, '🎒 대여행 창 id');
   assert.match(read('js/fishview.js'), /root\.id = 'lk-lake';/, '🎣 낚시터 창 id');
   assert.match(read('js/rocketview.js'), /root\.id = 'rocket';/);

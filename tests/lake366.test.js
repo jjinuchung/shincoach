@@ -172,7 +172,7 @@ test('★ 🎲 출제 자리 — 못 만든 자리도 넘김(같은 문제 두 �
   const ask = asker({ math: one }, '2026-10-30', { math: 1 });
   assert.equal(ask('english', 1), null);
   assert.equal(ask('math', 1).q, line[1]);
-  assert.match(src('js/lakeview.js'), /ask: asker\(ui\.src, day, start\),/);
+  assert.match(src('js/lakeview.js'), /ask: mathMix\(asker\(ui\.src, day, start\), /); // v367 — 수학 차례에 🐟 물고기 수학을 섞음
 });
 
 test('★ 🔀 과목 차례 — 고른 과목 먼저 · 못 만들면 몫이 큰 과목부터 · 셋 내리 나온 과목은 맨 끝(넷 내리는 다른 과목이 다 못 만들 때만) · 몫 0은 안 씀', () => {
@@ -300,13 +300,12 @@ test('🔌 잇기 — 홈 띠 · ⚙ 분·🔒 +10분 · 창 id · 겹침 목록
   assert.match(pl, /\$\('set-fish-min'\)\.value = String\(fishMinOf\(settings\.fishMin\)\);/);
   assert.match(pl, /\(await import\('\.\/lakeview\.js'\)\)\.grantLakeTime\(\)/);
   assert.match(pl, /renderGameToday\(\);\n\s*renderLakeToday\(\);/);
-  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake'\]/, `${f} 겹침 목록`);
+  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex'\]/, `${f} 겹침 목록`); // 📖 도감 창 (v367)
   assert.match(src('js/journeyview.js'), /^export async function loadSources\(\) \{/m);
   assert.match(src('js/lakeview.js'), /const \[\{ loadSources \}\] = await Promise\.all\(\[import\('\.\/journeyview\.js'\)/);
   const sw = src('sw.js');
   for (const f of ['fishing', 'fishart', 'fishview', 'lakeview']) assert.match(sw, new RegExp(`'\\./js/${f}\\.js',`));
-  assert.match(sw, /const CACHE_VERSION = 'v366';/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v366'/);
+  // 판 글자는 그 판의 시험에서 (v367 — fishdex367)
   // 💰는 저장된 프로필로 한 트랜잭션 · 문제 카드 동안 게임 시계가 멈춤 · 낚시 시간은 ⏳ 과목 시간에 안 들어감(과목 화면이 아님)
   assert.match(src('js/xp.js'), /export function lakeCatch\(fish\) \{\n\s*return houseDo\(\(p\) => lakeCatchRule\(p, fish, Date\.now\(\)\)\);/);
   const fv = src('js/fishview.js');

@@ -118,7 +118,7 @@ test('📦 화면 연결 — 앱을 열면(🔒 알림 뒤) 한 번 · [받기]�
   assert.match(a, /getElementById\('taken-ok'\)\?\.addEventListener\('click', \(\) => \{ setTimeout\(\(\) => \{ showParcelIfAny\(\)/, '🔒 알림을 닫은 뒤에');
   assert.match(src('js/taken.js'), /'take', 'parcel'\]/, '🔒 알림이 구호품 창 위에 겹쳐 뜨지 않는다');
   const v = src('js/parcel.js');
-  assert.match(v, /'timeup', 'take', 'taken', 'market', 'jr-trip', 'lk-lake'\]/,'다른 창이 열려 있으면 기다린다 (🎒 대여행 v341 · 🎣 낚시터 v366까지)');
+  assert.match(v, /'timeup', 'take', 'taken', 'market', 'jr-trip', 'lk-lake', 'lk-dex'\]/,'다른 창이 열려 있으면 기다린다 (🎒 대여행 v341 · 🎣 낚시터 v366 · 📖 도감 v367까지)');
   assert.match(v, /try \{ r = cur\.kind === 'video' \? await receiveVideoStones\(cur\.due\.map\(\(d\) => \(\{ id: d\.id, total: d\.total, pct: d\.pct \}\)\)\) : await receiveParcel\(cur\); \}/, '받기 버튼이 트랜잭션을 부른다 (🏁 영상 칸은 영상 트랜잭션 — tests/englishstone.test.js)');
   assert.match(v, /if \(r\.ok\) \{\s*\$\('parcel-title'\)\.textContent = onlyCoins\(cur\.items\) \? '💰 코인을 받았어요!' : '🎒 가방에 넣었어요!';/, '"넣었어요"는 저장된 뒤에만 (💰만 온 구호품은 "코인을 받았어요", v252)');
   assert.match(v, /if \(step === 'busy'\) return;/, '두 번 눌러도 한 번');
@@ -137,7 +137,7 @@ test('🔍 Codex 32차 #4 — 🥚 알은 구호품으로 못 보낸다 (가방�
 });
 
 test('🔍 Codex 32차 #6·#7 — 부화 창은 구호품 위에 안 겹친다 · 다른 창 때문에 미뤄 둔 구호품은 홈으로 돌아올 때 다시', () => {
-  assert.match(src('js/hatch.js'), /'evolve', 'take', 'taken', 'timeup', 'market', 'parcel', 'jr-trip', 'lk-lake'\]/); // 🎒 대여행 창 위에도 (v341) · 🎣 낚시터 (v366)
+  assert.match(src('js/hatch.js'), /'evolve', 'take', 'taken', 'timeup', 'market', 'parcel', 'jr-trip', 'lk-lake', 'lk-dex'\]/); // 🎒 대여행 창 위에도 (v341) · 🎣 낚시터 (v366) · 📖 도감 (v367)
   const v = src('js/parcel.js');
   assert.match(v, /if \(anyModalOpen\(\)\) \{ deferred = true; return false; \}/, '처음부터 다른 창이 열려 있으면 미룬다');
   assert.match(v, /if \(anyModalOpen\(\) \|\| !box\.hidden\) \{ deferred = true; return false; \}/, '받아 오는 사이 열렸어도 미룬다');

@@ -3,12 +3,14 @@
 // 문제 카드가 떠 있는 동안은 게임 시계(gclock)가 멈춘다 — 물고기도 숨을 고른다(시간 제한 없음 · 아버님 기본안 「이대로」)
 // 하루 시간은 진짜 시계로 센다(화면이 보이고 2분 안에 손을 댄 때만) — 다 쓰면 걸린 물고기까지 낚고 「오늘 낚시 끝」
 // host(부르는 쪽)가 주는 것: look·partnerUrl·shares·ask(subj, seed)·usedSec·dayMin·bonusMin·okToday·dex · 알림 onAnswer·onTime·onCatch·onClose
+//   v367: weather(fishing.WEATHER 한 줄 — 하늘·물결·빗줄기 · 같은 별 안에서 기우는 종) · dexRows()(📖 도감 칸 — 던지기 전에만 열림 · 보는 동안 시간 멈춤)
+//   문제 꼴에 tip(물음 밑 💡)·보기마다 hint(틀리면 그 실수에 맞춘 한 줄 + 「알겠어요」) — 🐟 물고기 수학이 쓴다
 // 성능: 안 움직이는 층은 따로 한 장(하늘이 조금 바뀔 때만 다시) · 화면 배율 2배까지 · 느리면 저절로 가벼운 그림 · 화면이 숨으면 멈춤
 import {
   STARS, SPOTS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer,
-  pickSubject, askOrder, activeStep, dayLeftSec, weightText, BADGE_KO,
+  pickSubject, askOrder, activeStep, dayLeftSec, weightText, BADGE_KO, weatherTilt, nibbleExtra,
 } from './fishing.js';
-import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, paintStatic, drawWaterFx, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet } from './fishart.js';
+import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet } from './fishart.js';
 import { avatarSvg } from './avatarart.js';
 import { sfx, unlock, vibrate } from './sfx.js';
 
@@ -44,6 +46,8 @@ function build() {
   root.innerHTML = `
     <canvas class="lk-cv" aria-hidden="true"></canvas>
     <div class="lk-top">
+      <span class="lk-wx" hidden></span>
+      <button type="button" class="lk-dexbtn" hidden>📖 도감</button>
       <span class="lk-spot" hidden></span>
       <span class="lk-dist" hidden></span>
       <button type="button" class="lk-x" aria-label="집으로 — 오늘 낚시 그만">✕</button>
@@ -60,11 +64,15 @@ function build() {
     <div class="lk-card" hidden>
       <div class="lk-card-head"><span class="lk-stage"></span><span class="lk-subj"></span></div>
       <div class="lk-q"></div>
+      <p class="lk-tip" hidden></p>
       <div class="lk-choices"></div>
+      <p class="lk-hint" hidden></p>
+      <button type="button" class="lk-go" hidden>알겠어요</button>
     </div>
     <div class="lk-res" hidden></div>`;
   document.body.appendChild(root);
   root.querySelector('.lk-x').addEventListener('click', () => closeLake());
+  root.querySelector('.lk-dexbtn').addEventListener('click', () => lakeDex());
   const btn = root.querySelector('.lk-btn');
   const down = (e) => { e.preventDefault(); touch(); try { unlock(); } catch { /* 소리 없이 */ } if (ui) { ui.hold = true; act(); } };
   const up = () => { if (ui) ui.hold = false; };
@@ -76,7 +84,9 @@ function build() {
   root.addEventListener('pointerdown', touch, { passive: true });
   window.addEventListener('pointerup', up);
   window.addEventListener('keydown', (e) => {
-    if (!ui || root.hidden) return;
+    if (!ui || root.hidden || ui.dexOpen) return;
+    const go = root.querySelector('.lk-go');
+    if (go && !go.hidden && (e.code === 'Space' || e.key === 'Enter')) { e.preventDefault(); if (!e.repeat) { touch(); go.click(); } return; } // 💡 힌트의 「알겠어요」 (Codex 171차 — 게임용 Space가 막았다)
     if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { touch(); ui.hold = true; act(); } }
     const n = Number(e.key);
     if (n >= 1 && n <= 4) { const b = root.querySelectorAll('.lk-choice')[n - 1]; if (b && !b.disabled) b.click(); }
@@ -91,6 +101,7 @@ function touch() { if (ui) ui.touchAt = performance.now(); }
 /** 🎣 낚시터 열기 — host는 위 머리말 */
 export function openLake(host) {
   if (!root) build();
+  closeDexView(); // 홈에서 연 📖 도감이 덮은 채로 낚시 시간이 흐르지 않게 (Codex 171차)
   if (ui) closeLake(true);
   const h = host || {};
   ui = {
@@ -133,6 +144,9 @@ export function openLake(host) {
     palJump: 0,
     raf: 0,
     done: false,
+    wx: (h.weather && h.weather.key) || 'sun', // 🌦️ 오늘 날씨 (v367)
+    dexOpen: false,
+    dexShown: null,
   };
   root.hidden = false;
   loadPeople(h);
@@ -142,13 +156,26 @@ export function openLake(host) {
   q$('.lk-spot').hidden = true;
   q$('.lk-dist').hidden = true;
   q$('.lk-gauge').hidden = true;
+  const wxc = q$('.lk-wx');
+  wxc.textContent = h.weather ? `${h.weather.emoji} ${h.weather.ko}` : '';
+  wxc.hidden = !h.weather;
+  q$('.lk-dexbtn').hidden = true;
   if (leftSec() <= 0) dayEnd();
-  else toast(h.firstToday ? '🌅 저수지에 왔어요! 🎣 던지기를 눌러요' : '🎣 던지기를 눌러요');
+  else {
+    // 들어설 때 날씨 한 줄 → 던지기 안내
+    const me = ui;
+    const hi = h.firstToday ? '🌅 저수지에 왔어요! ' : '';
+    if (h.weather && h.weather.line) {
+      toast(`${hi}${h.weather.line}`, 3000);
+      setTimeout(() => { if (ui === me && ui.st === 'ready' && !ui.dexOpen) toast('🎣 던지기를 눌러요'); }, 3200);
+    } else toast(`${hi}🎣 던지기를 눌러요`);
+  }
   ui.raf = requestAnimationFrame(loop);
 }
 /** 닫기 — 오늘 쓴 시간을 알리고 멈춘다 */
 export function closeLake(quiet) {
   if (!ui) return;
+  closeDexView();
   cancelAnimationFrame(ui.raf);
   ui.timers.forEach(clearTimeout);
   saveTime(true);
@@ -160,6 +187,92 @@ export function closeLake(quiet) {
 }
 export function isLakeOpen() {
   return !!root && !root.hidden;
+}
+
+// ───────────── 📖 내 물고기 도감 (v367) ─────────────
+
+let dexRoot = null;
+let dexDone = null;
+let dexKeys = false;
+/** 낚시터 위 📖 단추 — 던지기 전에만 · 보는 동안 게임 시계·하루 시간 멈춤 */
+function lakeDex() {
+  if (!ui || ui.st !== 'ready' || ui.busy || ui.paused || typeof ui.host.dexRows !== 'function') return;
+  const me = ui;
+  let rows = [];
+  try { rows = ui.host.dexRows() || []; } catch { rows = []; }
+  ui.paused = true;
+  ui.dexOpen = true;
+  openDexView(rows, { onClose: () => { if (ui === me) { ui.dexOpen = false; ui.paused = false; ui.last = 0; ui.touchAt = performance.now(); } } });
+}
+/**
+ * 도감 창 (낚시터 위 · 홈 띠 「📖 도감」 둘 다) — rows = fishing.dexRows(도감)
+ * 낚은 칸: 그림 · 이름 · 별 · 가장 긴 cm · 처음 낚은 날 · 소개 한 줄 · 외래종 / 안 낚은 칸: 그림자 · ? · 만나는 자리 힌트 — 남은 수는 쓰지 않는다
+ */
+export function openDexView(rows, opts = {}) {
+  closeDexView();
+  if (!dexRoot) {
+    dexRoot = el('div', 'lk-dexv');
+    dexRoot.id = 'lk-dex';
+    dexRoot.hidden = true;
+    dexRoot.setAttribute('role', 'dialog');
+    dexRoot.setAttribute('aria-modal', 'true');
+    dexRoot.setAttribute('aria-label', '내 물고기 도감');
+    document.body.appendChild(dexRoot);
+  }
+  if (!dexKeys) {
+    dexKeys = true;
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dexRoot && !dexRoot.hidden) closeDexView(); });
+  }
+  dexRoot.innerHTML = '';
+  const head = el('div', 'lk-dex-head');
+  head.appendChild(el('h2', 'lk-dex-title', '📖 내 물고기 도감'));
+  const x = el('button', 'lk-dex-x', '✕');
+  x.type = 'button';
+  x.setAttribute('aria-label', '도감 닫기');
+  x.addEventListener('click', () => closeDexView());
+  head.appendChild(x);
+  dexRoot.appendChild(head);
+  const body = el('div', 'lk-dex-body');
+  body.appendChild(el('h3', 'lk-dex-place', '🏞️ 저수지'));
+  const grid = el('div', 'lk-dex-grid');
+  const k = Math.min(2, window.devicePixelRatio || 1);
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const card = el('div', `lk-dex-card${r.caught ? '' : ' is-unk'}`);
+    const cv = el('canvas', 'lk-dex-fish');
+    cv.width = 132 * k; cv.height = 52 * k;
+    cv.setAttribute('aria-hidden', 'true');
+    card.appendChild(cv);
+    const nm = el('div', 'lk-dex-name');
+    nm.appendChild(el('span', '', r.caught ? r.ko : '?'));
+    nm.appendChild(el('span', 'lk-dex-star', '★'.repeat(r.star)));
+    card.appendChild(nm);
+    if (r.caught) {
+      card.appendChild(el('div', 'lk-dex-meta', `가장 긴 ${Number(r.best).toFixed(1)} cm${r.d ? ` · ${String(r.d).slice(5)}` : ''}`));
+      if (r.intro) card.appendChild(el('p', 'lk-dex-intro', r.intro));
+      if (r.alien) card.appendChild(el('span', 'lk-chip', '외래종'));
+    } else card.appendChild(el('p', 'lk-dex-intro', r.hint || ''));
+    grid.appendChild(card);
+    const g = cv.getContext('2d');
+    if (g) {
+      g.scale(k, k);
+      drawFish(g, r.key, 66, 26, r.key === 'jangeo' ? 120 : 104, r.caught ? { wag: 0.06 } : { shadow: '#94a6a9' }); // 그림자는 불투명 — 반투명이면 몸·꼬리 겹친 자리가 진한 줄로 보인다
+    }
+  }
+  body.appendChild(grid);
+  dexRoot.appendChild(body);
+  dexDone = typeof opts.onClose === 'function' ? opts.onClose : null;
+  dexRoot.hidden = false;
+  try { x.focus(); } catch { /* 무시 */ }
+}
+export function closeDexView() {
+  if (!dexRoot || dexRoot.hidden) return;
+  dexRoot.hidden = true;
+  const f = dexDone;
+  dexDone = null;
+  if (f) { try { f(); } catch { /* 무시 */ } }
+}
+export function isDexOpen() {
+  return !!dexRoot && !dexRoot.hidden;
 }
 
 // ───────────── 사람 그림 ─────────────
@@ -269,12 +382,28 @@ function ask(stage) {
       try { h.say(q.word); } catch { /* 무시 */ }
     }
   } else qBox.textContent = q.q || q.text || '';
+  const tip = q$('.lk-tip');
+  tip.textContent = q.tip || '';
+  tip.hidden = !q.tip;
+  const hint = q$('.lk-hint');
+  const go = q$('.lk-go');
+  hint.hidden = true;
+  go.hidden = true;
   const box = q$('.lk-choices');
   box.innerHTML = '';
   card.hidden = false;
   root.classList.add('is-q');
   return new Promise((resolve) => {
     let picked = false;
+    const done = (ok) => {
+      if (ui !== me) return;
+      card.hidden = true;
+      hint.hidden = true;
+      go.hidden = true;
+      root.classList.remove('is-q');
+      ui.paused = false;
+      resolve(ok);
+    };
     q.choices.forEach((c, i) => {
       const b = el('button', 'lk-choice');
       b.type = 'button';
@@ -289,14 +418,17 @@ function ask(stage) {
         if (!ok) box.querySelectorAll('button')[q.choices.findIndex((x) => x.ok)].classList.add('is-ans');
         try { (ok ? sfx.ding : sfx.wrong)(); } catch { /* 무시 */ }
         if (ok) { ui.okToday += 1; ui.streak += 1; ui.palJump = performance.now(); } else ui.streak = 0;
-        try { h.onAnswer && h.onAnswer(subj, ok, stage); } catch { /* 무시 */ }
-        setTimeout(() => {
-          if (ui !== me) return;
-          card.hidden = true;
-          root.classList.remove('is-q');
-          ui.paused = false;
-          resolve(ok);
-        }, ok ? 800 : 1500);
+        try { h.onAnswer && h.onAnswer(subj, ok, stage, q); } catch { /* 무시 */ }
+        // 틀린 보기에 그 실수의 힌트가 있으면 — 읽을 때까지 기다린다(「알겠어요」) · 없으면 잠깐 정답을 보여 주고 닫음
+        if (!ok && c.hint) {
+          hint.textContent = c.hint;
+          hint.hidden = false;
+          go.hidden = false;
+          go.onclick = () => { go.onclick = null; done(false); };
+          try { go.focus(); } catch { /* 무시 */ }
+          return;
+        }
+        setTimeout(() => done(ok), ok ? 800 : 1500);
       });
       box.appendChild(b);
     });
@@ -360,12 +492,13 @@ function nibble() {
   // 속임수 떨림 몇 번 → 쏙
   const n = 1 + Math.floor(Math.random() * 3);
   let t = 300;
-  for (let i = 0; i < n; i++) { t += 500 + Math.random() * 700; after(t, () => { if (ui.st === 'nibble') { ui.float.twitch = ui.gclock; ring(ui.float.x, false); } }); }
+  const k = n + nibbleExtra(ui.wx); // 🌬️ 바람 부는 날은 속임 떨림 한 번 더
+  for (let i = 0; i < k; i++) { t += 500 + Math.random() * 700; after(t, () => { if (ui.st === 'nibble') { ui.float.twitch = ui.gclock; ring(ui.float.x, false); } }); }
   after(t + 600 + Math.random() * 900, bite);
 }
 function bite() {
   if (ui.st !== 'nibble') return;
-  if (!ui.fish) ui.fish = rollFish(ui.spot, ui.chum, ui.streak);
+  if (!ui.fish) ui.fish = rollFish(ui.spot, ui.chum, ui.streak, Math.random, weatherTilt(ui.wx, ui.spot.key));
   ui.st = 'bite';
   ui.biteAt = ui.gclock;
   ui.float.sink = 1;
@@ -553,7 +686,7 @@ function dayEnd() {
 
 function addShadow(big) {
   const x = ui.float ? ui.float.x : spotX(ui.spot.m);
-  const fish = rollFish(ui.spot, ui.chum, ui.streak);
+  const fish = rollFish(ui.spot, ui.chum, ui.streak, Math.random, weatherTilt(ui.wx, ui.spot.key));
   ui.shadows.push({ key: fish.key, L: Math.max(28, Math.min(130, fish.cm * 1.5)), x: x + (Math.random() < 0.5 ? -1 : 1) * (140 + Math.random() * 80), y: hookY() + (Math.random() - 0.5) * 60, ph: Math.random() * 6, big });
   if (ui.shadows.length > 4) ui.shadows.shift();
 }
@@ -612,7 +745,7 @@ function paintBg() {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, ui.bg.width, ui.bg.height);
   g.setTransform(v.dpr * v.s, 0, 0, v.dpr * v.s, v.dpr * v.ox, v.dpr * v.oy);
-  paintStatic(g, step / 100, v.x0, v.x1, v.y0, v.y1);
+  paintStatic(g, step / 100, v.x0, v.x1, v.y0, v.y1, ui.wx);
 }
 
 function loop(now) {
@@ -627,9 +760,12 @@ function loop(now) {
   if (!ui.lite && ui.slowFor > 2000) ui.lite = true;
   if (ui.lite && (ui.skip = !ui.skip)) return;
   ui.last = now;
-  // 하루 시간 (진짜 시계)
-  ui.used += activeStep(dt, now - ui.touchAt, !document.hidden);
+  // 하루 시간 (진짜 시계) — 📖 도감을 보는 동안은 안 셈
+  if (!ui.dexOpen) ui.used += activeStep(dt, now - ui.touchAt, !document.hidden);
   saveTime(false);
+  // 📖 도감 단추 — 던지기 전(ready)에만
+  const canDex = ui.st === 'ready' && !ui.busy && !ui.paused && typeof ui.host.dexRows === 'function';
+  if (canDex !== ui.dexShown) { ui.dexShown = canDex; q$('.lk-dexbtn').hidden = !canDex; }
   // 게임 시계
   if (!ui.paused) {
     ui.gclock += dt;
@@ -656,7 +792,7 @@ function draw(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(ui.bg, 0, 0);
   ctx.setTransform(v.dpr * v.s, 0, 0, v.dpr * v.s, v.dpr * v.ox, v.dpr * v.oy);
-  drawWaterFx(ctx, now, ui.reduce, ui.lite, v.x0, v.x1);
+  drawWaterFx(ctx, now, ui.reduce, ui.lite, v.x0, v.x1, ui.wx);
   const g = ui.gclock;
   const st = ui.st;
   // 물속 그림자 (기다리는 동안)
@@ -726,6 +862,7 @@ function draw(now) {
   }
   drawRings(ctx, ui.rings, now);
   drawDrops(ctx, ui.drops, now);
+  if (ui.wx === 'rain' && !ui.lite) drawRain(ctx, now, ui.reduce, v.x0, v.x1, v.y0); // 🌧️ 느린 기기면 빗줄기는 끈다
   // 장력 · 거리 글
   if (st === 'fight' && ui.fs) {
     const fill = q$('.lk-g-fill');

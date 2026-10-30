@@ -440,6 +440,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // 🎣 학습 낚시터 (2026-10-30 v366, fishing.js · lakeview.js) — 창에 머문 초(🕒) · 하루 낚시 초(20분 셈 — 화면이 보이고 2분 안에 손댄 때만) ·
   //   🔒 부모가 더 준 분 · 낚은 마리 · 과목마다 낸 문제·맞힌 문제. 병합 maxOf라 옛 백업으로 오늘 쓴 낚시 시간을 되살리지 못한다
   'uLake', 'fishSec', 'fishBonus', 'fishCatch', 'fishMathQ', 'fishMathOk', 'fishEnQ', 'fishEnOk', 'fishKorQ', 'fishKorOk', 'fishNsQ', 'fishNsOk',
+  //   🐟 그 가운데 물고기 수학(v367 — 그 기기 도감의 길이·무게로 낸 수학 · 수학 칸 안의 몫)
+  'fishFmQ', 'fishFmOk',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
   // 🎵 게임기 음악 (2026-10-25 v337, gamebgm.js) — 소리가 난 초 · 게임기 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)

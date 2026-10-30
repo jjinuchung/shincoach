@@ -419,32 +419,46 @@ export function sunAt(t) {
   const k = Math.min(1, Math.max(0, Number(t) || 0));
   return { x: lerp(700, 905, k), y: lerp(58, 186, k * k), r: lerp(24, 34, k) };
 }
+/** 🌦️ 날씨마다 하늘을 덮는 회색 막 (흐림·비 — 해도 그 밑에 흐려진다 · 비는 해를 안 그린다) */
+const WX_VEIL = { cloud: 'rgba(118,128,140,.34)', rain: 'rgba(92,102,116,.5)' };
+const CLOUDS = [[180, 70, 1], [470, 44, 0.8], [880, 110, 0.7]];
+const MORE_CLOUDS = [[60, 40, 1.2], [330, 86, 1.1], [640, 64, 1.3], [760, 30, 0.9], [1010, 70, 1.1]];
+function cloud(ctx, cx, cy, s) {
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 52 * s, 14 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx - 24 * s, cy - 8 * s, 26 * s, 14 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 20 * s, cy - 10 * s, 30 * s, 16 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
 /**
  * 안 움직이는 층 — ctx는 이미 가상 좌표로 맞춰 둔 것 · x0~x1·y0~y1 = 화면에 보이는 가상 좌표 넓이(가장자리까지 채우려고)
+ * wx = 🌦️ 날씨 key (sun · cloud · rain · wind — fishing.WEATHER)
  */
-export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H) {
+export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, wx = 'sun') {
   const sky = skyOf(t);
   const sun = sunAt(t);
+  const veil = WX_VEIL[wx] || '';
   // 하늘
   const g = ctx.createLinearGradient(0, y0, 0, WATER_Y);
   g.addColorStop(0, sky.top); g.addColorStop(1, sky.low);
   ctx.fillStyle = g;
   ctx.fillRect(x0, y0, x1 - x0, WATER_Y - y0 + 1);
-  // 해 · 햇무리
-  const halo = ctx.createRadialGradient(sun.x, sun.y, sun.r * 0.5, sun.x, sun.y, sun.r * 4);
-  halo.addColorStop(0, 'rgba(255,240,200,.55)'); halo.addColorStop(1, 'rgba(255,240,200,0)');
-  ctx.fillStyle = halo;
-  ctx.fillRect(sun.x - sun.r * 4, sun.y - sun.r * 4, sun.r * 8, sun.r * 8);
-  ctx.fillStyle = sky.sun;
-  ctx.beginPath(); ctx.arc(sun.x, sun.y, sun.r, 0, Math.PI * 2); ctx.fill();
-  // 구름 셋
+  // 해 · 햇무리 (비 오는 날은 없음)
+  if (wx !== 'rain') {
+    const halo = ctx.createRadialGradient(sun.x, sun.y, sun.r * 0.5, sun.x, sun.y, sun.r * 4);
+    halo.addColorStop(0, 'rgba(255,240,200,.55)'); halo.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = halo;
+    ctx.fillRect(sun.x - sun.r * 4, sun.y - sun.r * 4, sun.r * 8, sun.r * 8);
+    ctx.fillStyle = sky.sun;
+    ctx.beginPath(); ctx.arc(sun.x, sun.y, sun.r, 0, Math.PI * 2); ctx.fill();
+  }
+  if (veil) { ctx.fillStyle = veil; ctx.fillRect(x0, y0, x1 - x0, WATER_Y - y0 + 1); }
+  // 구름 셋 (흐림·비는 잿빛 구름이 더)
   ctx.fillStyle = `rgba(255,255,255,${lerp(0.75, 0.45, sky.k)})`;
-  for (const [cx, cy, s] of [[180, 70, 1], [470, 44, 0.8], [880, 110, 0.7]]) {
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, 52 * s, 14 * s, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx - 24 * s, cy - 8 * s, 26 * s, 14 * s, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + 20 * s, cy - 10 * s, 30 * s, 16 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
+  for (const [cx, cy, s] of CLOUDS) cloud(ctx, cx, cy, s);
+  if (veil) {
+    ctx.fillStyle = wx === 'rain' ? 'rgba(150,158,168,.85)' : 'rgba(205,210,216,.8)';
+    for (const [cx, cy, s] of MORE_CLOUDS) cloud(ctx, cx, cy, s);
   }
   // 먼 산 · 가까운 산 · 숲 줄
   ctx.fillStyle = sky.hill;
@@ -506,22 +520,26 @@ export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H) 
   }
   ctx.fillStyle = '#6b4a2a';
   for (const [bx, h] of [[960, 96], [984, 110], [1004, 88]]) { ctx.beginPath(); ctx.ellipse(bx - 8, WATER_Y - h + 10, 4, 12, -0.15, 0, Math.PI * 2); ctx.fill(); }
+  // 흐림·비 — 물빛도 조금 잿빛으로
+  if (veil) { ctx.fillStyle = wx === 'rain' ? 'rgba(70,80,92,.22)' : 'rgba(90,100,112,.14)'; ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y); }
 }
 
 // ───────────── 움직이는 것 (프레임마다) ─────────────
 
-/** 물 윗면 반짝임 · 햇살 · 수초 — now(ms) · reduce = 움직임 줄이기 · lite = 느린 기기 */
-export function drawWaterFx(ctx, now, reduce, lite, x0 = 0, x1 = SCENE_W) {
+/** 물 윗면 반짝임 · 햇살 · 수초 — now(ms) · reduce = 움직임 줄이기 · lite = 느린 기기 · wx = 🌦️ 날씨(바람이면 물결이 크고 수초가 더 흔들림 · 흐림·비는 햇살 없음) */
+export function drawWaterFx(ctx, now, reduce, lite, x0 = 0, x1 = SCENE_W, wx = 'sun') {
   const t = reduce ? 0 : now / 1000;
-  ctx.strokeStyle = 'rgba(255,255,255,.28)';
+  const wind = wx === 'wind';
+  const amp = wind ? 3.4 : 1.2;
+  ctx.strokeStyle = wind ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.28)';
   ctx.lineWidth = 1.5;
-  for (let row = 0; row < 3; row++) {
+  for (let row = 0; row < (wind ? 4 : 3); row++) {
     const y = WATER_Y + 4 + row * 7;
-    for (let x = Math.floor(x0 / 90) * 90 + ((t * (12 + row * 6)) % 90); x < x1; x += 90) {
-      ctx.beginPath(); ctx.moveTo(x, y + Math.sin(t * 2 + x) * 1.2); ctx.lineTo(x + 26 - row * 6, y + Math.sin(t * 2 + x + 1) * 1.2); ctx.stroke();
+    for (let x = Math.floor(x0 / 90) * 90 + ((t * (12 + row * 6) * (wind ? 2.2 : 1)) % 90); x < x1; x += wind ? 60 : 90) {
+      ctx.beginPath(); ctx.moveTo(x, y + Math.sin(t * 2 + x) * amp); ctx.lineTo(x + 26 - row * 6, y + Math.sin(t * 2 + x + 1) * amp); ctx.stroke();
     }
   }
-  if (!lite) {
+  if (!lite && wx !== 'cloud' && wx !== 'rain') {
     ctx.fillStyle = 'rgba(220,245,240,.06)';
     for (let i = 0; i < 3; i++) {
       const a = 0.5 + 0.5 * Math.sin(t * 0.6 + i * 2);
@@ -538,11 +556,27 @@ export function drawWaterFx(ctx, now, reduce, lite, x0 = 0, x1 = SCENE_W) {
     const bx = 690 + i * 15;
     const by = bottomY(bx) + 4;
     const h = 120 + ((i * 37) % 70);
-    const sway = Math.sin(t * 0.9 + i * 0.8) * 12;
+    const sway = Math.sin(t * (wind ? 1.6 : 0.9) + i * 0.8) * (wind ? 20 : 12);
     ctx.lineWidth = 5 - (i % 2);
     ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(bx + sway * 0.4, by - h * 0.5, bx + sway, by - h); ctx.stroke();
   }
   ctx.lineCap = 'butt';
+}
+/** 🌧️ 빗줄기 — 40개까지(태블릿 성능 · 가벼운 그림이면 부르는 쪽이 안 부른다) · 움직임 줄이기면 멈춘 빗줄기 */
+export const RAIN_N = 40;
+export function drawRain(ctx, now, reduce, x0 = 0, x1 = SCENE_W, y0 = 0) {
+  const t = reduce ? 0 : now / 1000;
+  const w = Math.max(1, x1 - x0);
+  const h = WATER_Y + 30 - y0;
+  ctx.strokeStyle = 'rgba(225,236,245,.5)';
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  for (let i = 0; i < RAIN_N; i++) {
+    const x = x0 + ((i * 97.3 + t * 90) % w);
+    const y = y0 + ((i * 53.7 + t * 620) % h);
+    ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 15);
+  }
+  ctx.stroke();
 }
 /** 찌 — sink 0(떠 있음) ~ 1(쏙) · y는 물 윗면 */
 export function drawFloat(ctx, x, sink, now, reduce) {

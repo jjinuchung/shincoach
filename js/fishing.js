@@ -110,11 +110,15 @@ export function badgesOf(key, cm) {
   return [];
 }
 export const BADGE_KO = { wolcheok: '🏅 월척', sajja: '🏅 4짜' };
-/** ③ 입질 때 물고기 정하기 → { key, star, cm, g, badges } */
-export function rollFish(spot, chum, streak, rng = Math.random) {
+/**
+ * ③ 입질 때 물고기 정하기 → { key, star, cm, g, badges } · tilt = { 종: 배 } 같은 별 안에서만 기울임(🌦️ 날씨)
+ * 별을 먼저 뽑으므로 별 몫·별 하나에 💰1·하루 40은 그대로 — 다만 흐린 날 깊은 곳에서 붕어가 늘면 🏅 월척 +5는 조금 잦아질 수 있다(Codex 171차 · 그대로 둠)
+ */
+export function rollFish(spot, chum, streak, rng = Math.random, tilt = null) {
   const odds = starOdds(spot, chum);
   const star = weighted([1, 2, 3, 4, 5].map((s) => [s, odds[s]]), rng);
-  const sp = weighted(SPECIES.filter((x) => x.star === star).map((x) => [x, x.w]), rng);
+  const tw = (x) => (tilt && Object.prototype.hasOwnProperty.call(tilt, x.key) && Number(tilt[x.key]) > 0 ? Number(tilt[x.key]) : 1);
+  const sp = weighted(SPECIES.filter((x) => x.star === star).map((x) => [x, x.w * tw(x)]), rng);
   const cm = lengthOf(sp, streak, rng);
   return { key: sp.key, star: sp.star, cm, g: weightOf(sp, cm), badges: badgesOf(sp.key, cm) };
 }
@@ -418,6 +422,84 @@ export function catchRule(p, fish, now) {
   return { ok: true, first, best, coins };
 }
 
+// ───────────── 🌦️ 오늘 날씨 (v367 · 2단계 기본안 「이대로」) ─────────────
+
+/** 날씨 넷 — 열흘마다 맑음 다섯 · 흐림 셋 · 비 하나 · 바람 하나(n) · line은 낚시터에 들어설 때 한 줄 */
+export const WEATHER = [
+  { key: 'sun', emoji: '☀️', ko: '맑은 날', n: 5, line: '☀️ 맑은 날이에요. 해 질 녘엔 노을이 져요.' },
+  { key: 'cloud', emoji: '☁️', ko: '흐린 날', n: 3, line: '☁️ 흐린 날엔 깊은 곳에서 큰 물고기가 잘 나온대요.' },
+  { key: 'rain', emoji: '🌧️', ko: '비 오는 날', n: 1, line: '🌧️ 비 오는 날엔 메기와 뱀장어가 잘 나온대요.' },
+  { key: 'wind', emoji: '🌬️', ko: '바람 부는 날', n: 1, line: '🌬️ 바람 부는 날이에요. 찌가 흔들려도 진짜 입질을 잘 봐요.' },
+];
+const WX_BY = Object.fromEntries(WEATHER.map((w) => [w.key, w]));
+/**
+ * 그날 날씨 (순수) — 날짜로만 정한다(인터넷·위치 안 씀 · 두 기기가 같은 날 같은 날씨) · 'YYYY-MM-DD' → WEATHER 한 줄
+ * 열흘을 한 묶음으로 맑음 5·흐림 3·비 1·바람 1을 섞어 놓는다 — 열흘마다 몫이 정확히 맞게(묶음 안에선 비가 하루뿐 · 묶음 경계에선 이틀 이어질 수 있다) · 꼴이 틀리면 맑음
+ */
+export function weatherOf(dayKey) {
+  if (!isDay(dayKey)) return WX_BY.sun;
+  const [y, m, d] = dayKey.split('-').map(Number);
+  const dn = Math.round(Date.UTC(y, m - 1, d) / 86400000);
+  if (!Number.isFinite(dn)) return WX_BY.sun;
+  const block = Math.floor(dn / 10);
+  const slots = WEATHER.flatMap((w) => Array(w.n).fill(w.key));
+  let a = (Math.imul(block, 0x9e3779b1) ^ 0x5eed) >>> 0;
+  const r = () => { a = (a + 0x6d2b79f5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
+  return WX_BY[slots[((dn % 10) + 10) % 10]];
+}
+/** 별마다 가장 큰 물고기(길이 끝이 가장 긴 종 · 같으면 앞) — ☁️ 흐린 날 깊은 곳에서 기우는 종 */
+export const BIG_KIND = [1, 2, 3, 4, 5].map((s) => SPECIES.filter((x) => x.star === s).reduce((m, x) => (x.max > m.max ? x : m)).key);
+/** 날씨가 기우는 종 (같은 별 안에서 ×2 · rollFish tilt — 별 몫은 그대로) — 🌧️ 메기·뱀장어 · ☁️ 깊은 곳에서만 별마다 가장 큰 물고기 · 맑음·바람은 없음 */
+export function weatherTilt(wkey, spotKey) {
+  if (wkey === 'rain') return { megi: 2, jangeo: 2 };
+  if (wkey === 'cloud' && spotKey === 'deep') return Object.fromEntries(BIG_KIND.map((k) => [k, 2]));
+  return null;
+}
+/** 🌬️ 바람 부는 날은 속임 입질(찌 떨림)이 한 번 더 */
+export function nibbleExtra(wkey) {
+  return wkey === 'wind' ? 1 : 0;
+}
+
+// ───────────── 📖 내 물고기 도감 (v367 · 원고 「이대로」) ─────────────
+
+/** 도감 소개 한 줄 — 원고(2단계 기본안 10번)에서 공개 자료로 확인한 것 · 낚은 칸에만 보인다 */
+export const INTRO = {
+  chambung: '이름은 붕어지만 붕어와는 다른 물고기예요. 수컷이 돌 밑에 붙은 알을 지켜요.',
+  napjaru: '민물조개 속에 알을 낳아요. 조개 안에서 알이 깨어나고, 어린 물고기로 자란 뒤 밖으로 나와요.', // 「3~4주」는 뺌 — 찾은 공공 자료가 칼납자루 것(Codex 171차)
+  pirami: '맑은 냇물에 떼 지어 살아요. 알 낳을 때가 되면 수컷 지느러미가 붉은빛으로 물들어요.',
+  bluegill: '북아메리카에서 들어온 물고기예요. 우리 물고기를 위협해서 「생태계교란 생물」로 정해졌어요.',
+  bungeo: '우리나라 어디서나 사는 민물고기예요. 한 자(30.3 cm)가 넘으면 「월척」이라고 불러요.',
+  ttokbung: '1972년에 일본에서 들여온 붕어예요. 붕어보다 몸이 높고 넓적해요.',
+  dongjagae: '「빠가사리」라고도 불러요. 가슴지느러미 가시를 비벼서 소리를 내요.',
+  kkeuri: 'W자처럼 굽은 입으로 작은 물고기를 잡아먹는 사냥꾼이에요.',
+  nuchi: '입가에 수염이 한 쌍 있어요. 모래와 자갈이 깔린 큰 강 바닥 가까이에서 무리 지어 살아요.',
+  bass: '정식 이름은 「큰입배스」예요. 입이 아주 커서 우리 물고기를 많이 잡아먹어요.',
+  ingeo: '입가에 수염이 두 쌍 있어요. 수염이 없는 붕어와는 이걸로 가려요.',
+  gangjun: '몸이 길고 은빛이에요. 입이 하늘 쪽을 향해 있어서 영어로는 「하늘을 보는 물고기(skygazer)」라고도 해요.',
+  megi: '어른 메기는 수염이 두 쌍이에요(어릴 땐 세 쌍). 밤에 수염으로 먹이를 찾아요.',
+  gamulchi: '물 밖 공기를 들이마셔 숨 쉴 수 있어요. 엄마 아빠가 함께 새끼를 지켜요.',
+  ssogari: '표범 같은 무늬가 있고 맑은 강에 살아요. 「한강의 황쏘가리」는 천연기념물이에요.', // 지정 이름 그대로 (국가유산포털 · Codex 171차)
+  jangeo: '먼 남쪽 바다(마리아나 제도 근처)에서 태어나 강으로 올라와 자라요. 다 크면 다시 바다로 가서 알을 낳아요.',
+};
+/** 안 낚은 칸 힌트 — 별마다 (지금 자리 몫 SPOTS.w 그대로) · 남은 수는 쓰지 않는다 */
+export const DEX_HINT = {
+  1: '물가에서 자주 보여요.',
+  2: '물가와 수초 밭에서 보여요.',
+  3: '수초 밭이나 깊은 곳에서 만나요.',
+  4: '깊은 곳에 살아요.',
+  5: '깊은 곳에서 아주 가끔 나와요.',
+};
+/** 도감 칸 (순수 · 그리는 차례 = SPECIES 차례) — 낚은 칸 { caught: true, n, best, d, intro } · 안 낚은 칸 { caught: false, hint } */
+export function dexRows(raw) {
+  const lk = lakeOf(raw);
+  return SPECIES.map((sp) => {
+    const e = lk.dex[sp.key];
+    const base = { key: sp.key, ko: sp.ko, star: sp.star, alien: !!sp.alien };
+    return e ? { ...base, caught: true, n: e.n, best: e.best, d: e.d, intro: INTRO[sp.key] || '' } : { ...base, caught: false, hint: DEX_HINT[sp.star] || '' };
+  });
+}
+
 // ───────────── 하루 기록 칸 (db daily — 병합은 큰 쪽) ─────────────
 
 /** 과목 → 그날 낸 문제·맞힌 문제 칸 */
@@ -426,13 +508,16 @@ export const FISH_DAY_Q = { math: ['fishMathQ', 'fishMathOk'], english: ['fishEn
 export function okOfDay(daily) {
   return SUBJECTS.reduce((a, s) => a + nz(daily && daily[FISH_DAY_Q[s][1]]), 0);
 }
-/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리 · 과목마다 맞힌/낸 · 🔒 더 준 분 */
+/** 그날 🐟 물고기 수학 낸·맞힌 칸 (v367 — 수학 칸 안에 든 몫 · 따로 더하지 않는다) */
+export const FISH_FM_Q = ['fishFmQ', 'fishFmOk'];
+/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리 · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🔒 더 준 분 */
 export function lakeDayLine(d, fmtMin) {
   const f = typeof fmtMin === 'function' ? fmtMin : (s) => `${Math.round(nz(s) / 60)}분`;
   const asked = SUBJECTS.filter((s) => nz(d && d[FISH_DAY_Q[s][0]]) > 0);
   if (!nz(d && d.fishSec) && !nz(d && d.fishCatch) && !asked.length && !nz(d && d.fishBonus)) return '';
   const KO = { math: '수학', english: '영어', korean: '국어', nonsul: '논술' };
-  const q = asked.map((s) => `${KO[s]} ${nz(d[FISH_DAY_Q[s][1]])}/${nz(d[FISH_DAY_Q[s][0]])}`).join(' · ');
+  const fm = (s) => (s === 'math' && nz(d[FISH_FM_Q[0]]) ? `(🐟 ${nz(d[FISH_FM_Q[1]])}/${nz(d[FISH_FM_Q[0]])})` : '');
+  const q = asked.map((s) => `${KO[s]} ${nz(d[FISH_DAY_Q[s][1]])}/${nz(d[FISH_DAY_Q[s][0]])}${fm(s)}`).join(' · ');
   return `🎣 낚시터 ${f(d.fishSec)} · 물고기 ${nz(d.fishCatch)}마리${q ? ` · 맞힘/낸 문제 ${q}` : ''}${nz(d.fishBonus) ? ` · 🔒 부모 +${nz(d.fishBonus)}분` : ''}`;
 }
 
