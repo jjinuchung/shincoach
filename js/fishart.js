@@ -856,6 +856,33 @@ export function drawRain(ctx, now, reduce, x0 = 0, x1 = SCENE_W, y0 = 0) {
   }
   ctx.stroke();
 }
+// 🟢 지가르데 셀·🔴 코어 (v371) — zygview.js의 CELL_ART·CORE_ART와 같은 꼴(40×40 칸) · Path2D가 없는 옛 브라우저면 안 그린다
+const CELL_BODY = 'M20 4C30 4 36 12 35 21C34 31 27 36 20 36C12 36 5 30 5 21C5 12 10 4 20 4Z';
+const CORE_BODY = 'M20 3L35 11.5V28.5L20 37L5 28.5V11.5Z';
+/** 셀(또는 코어) 하나 — (x, y)가 가운데 · s = 폭(px) · opts.core 코어 · opts.wob 흔들기(라디안) · opts.glow 초록 빛 */
+export function drawCell(ctx, x, y, s, opts = {}) {
+  if (typeof Path2D !== 'function' || !(s > 2)) return;
+  const k = s / 40;
+  ctx.save();
+  ctx.translate(x, y);
+  if (opts.wob) ctx.rotate(Number(opts.wob) || 0);
+  ctx.scale(k, k);
+  ctx.translate(-20, -20);
+  if (opts.glow) { ctx.shadowColor = 'rgba(74,222,128,.85)'; ctx.shadowBlur = 14; }
+  ctx.lineWidth = 2.5;
+  if (opts.core) {
+    ctx.fillStyle = '#14532d'; ctx.strokeStyle = '#4ade80';
+    const p = new Path2D(CORE_BODY); ctx.fill(p); ctx.shadowBlur = 0; ctx.stroke(p);
+    ctx.beginPath(); ctx.arc(20, 20, 8, 0, Math.PI * 2); ctx.fillStyle = '#ef4444'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fecaca'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(17.5, 17.5, 2.2, 0, Math.PI * 2); ctx.fillStyle = '#fee2e2'; ctx.fill();
+  } else {
+    ctx.fillStyle = '#4ade80'; ctx.strokeStyle = '#166534';
+    const p = new Path2D(CELL_BODY); ctx.fill(p); ctx.shadowBlur = 0; ctx.stroke(p);
+    ctx.beginPath(); ctx.arc(20, 19, 5.5, 0, Math.PI * 2); ctx.fillStyle = '#14532d'; ctx.fill();
+    ctx.beginPath(); ctx.arc(18.3, 17.4, 1.8, 0, Math.PI * 2); ctx.fillStyle = '#bbf7d0'; ctx.fill();
+  }
+  ctx.restore();
+}
 /** 찌 — sink 0(떠 있음) ~ 1(쏙) · y는 물 윗면 */
 export function drawFloat(ctx, x, sink, now, reduce, glow = false) {
   const bob = reduce ? 0 : Math.sin(now / 420) * 1.6;

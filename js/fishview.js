@@ -9,13 +9,15 @@
 //   gear()(🎒 채비 가게 상태 { coins, owned, pick, made, river }) · buyGear(id) · onPick(want) · lookNow()(옷을 산 뒤 새 차림) · 📸 사진만 찍고 놓아주는 물고기 카드
 //   gear()는 🗺️ 물가를 열 때·던지기 직전·다시 ready가 될 때 다시 읽는다(다른 창에서 사거나 강이 열려도 · Codex 172차)
 //   v369: seaOpen(🌊 바다 — 강이 열린 뒤에야 🗺️·📖에 줄이 보임 · 열리면 결과 카드에 한 번 + 안전 한 줄) · 🦐 크릴은 바다가 열린 뒤 가게에 · gear().sea
+//   v371: 🟢 지가르데 셀 — 입질마다 2%(fishing.cellRoll · cellOdds는 시험용)로 물고기 대신 셀 · cellOk()(오늘 낚시 셀을 찾을 수 있나) ·
+//   onCell() → { ok, found:'core'|'cell', cells, note?:{ title, text, art() } } · 셀 10·50·100 글·그림은 결과 카드에(🐣 창은 낚시터 아래에 깔린다)
 // 성능: 안 움직이는 층은 따로 한 장(하늘이 조금 바뀔 때만 다시) · 화면 배율 2배까지 · 느리면 저절로 가벼운 그림 · 화면이 숨으면 멈춤
 import {
-  STARS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer,
+  STARS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer, cellRoll, cellFish, cellFate,
   pickSubject, askOrder, activeStep, dayLeftSec, weightText, BADGE_KO, weatherTilt, nibbleExtra,
   spotsOf, PLACES, PLACE_KO, PLACE_EMOJI, RIVER_NEED, SEA_NEED, SEA_SAFE, GEAR, gearOf, baitTilt, mixTilt, weatherLine, PHOTO_SAY, syncPick, josaOf,
 } from './fishing.js';
-import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet } from './fishart.js';
+import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, drawCell, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet } from './fishart.js';
 import { avatarSvg } from './avatarart.js';
 import { sfx, unlock, vibrate } from './sfx.js';
 
@@ -775,7 +777,7 @@ function nibble() {
 }
 function bite() {
   if (ui.st !== 'nibble') return;
-  if (!ui.fish) ui.fish = rollFish(ui.spot, ui.chum, ui.streak, Math.random, tiltNow()); // 🌦️ 날씨 × 🎒 미끼 (v368)
+  if (!ui.fish) ui.fish = biteFish();
   ui.st = 'bite';
   ui.biteAt = ui.gclock;
   ui.float.sink = 1;
@@ -791,6 +793,12 @@ function bite() {
     nibble();
   });
 }
+/** 입질 때 걸린 것 — 🟢 지가르데 셀(2% · 오늘 찾을 수 있을 때만 · v371) 아니면 물고기(🌦️ 날씨 × 🎒 미끼 — v368) */
+function biteFish() {
+  const h = ui.host;
+  if (typeof h.cellOk === 'function' && cellRoll(Math.random, h.cellOdds) && h.cellOk()) return cellFish(ui.spot);
+  return rollFish(ui.spot, ui.chum, ui.streak, Math.random, tiltNow());
+}
 async function hookSet() {
   const me = ui;
   ui.st = 'hookq';
@@ -802,7 +810,8 @@ async function hookSet() {
   ui.busy = false;
   const deep = ok !== false;
   ui.fs = fightStart(ui.fish, ui.spot.m, deep);
-  toast(deep ? '🎣 바늘이 깊이 걸렸어요! 꾹 감아요' : '🎣 살짝 걸렸어요 — 천천히 감아요', 2000);
+  if (ui.fish.cell) toast('🟢 물속에서 초록빛이 반짝여요! 꾹 감아요', 2200);
+  else toast(deep ? '🎣 바늘이 깊이 걸렸어요! 꾹 감아요' : '🎣 살짝 걸렸어요 — 천천히 감아요', 2000);
   ui.st = 'fight';
   ui.float.sink = 1;
   setBtn('🌀 꾹 감기', 'is-reel');
@@ -851,6 +860,7 @@ async function landed() {
 }
 /** 도감에 적기 — 저장된 뒤에만 「낚았다」 카드 · 못 적으면 물고기는 뜰채에 둔 채 「🔁 다시 적기」(Codex 170차 — 잡았다고 보이는데 도감·💰가 조용히 사라지던 것) */
 async function keepFish(f) {
+  if (f.cell) { await keepCell(f); return; }
   const me = ui;
   const h = ui.host;
   let info = null;
@@ -862,12 +872,27 @@ async function keepFish(f) {
   ui.caught.push(f);
   showResult(f, info);
 }
+/** 🟢 낚은 셀을 큐브에 (v371) — 저장된 뒤에만 「낚았다」 · 못 적으면 뜰채에 둔 채 🔁 · 다른 창이 오늘 낚시 셀을 먼저 받았거나 큐브가 찼으면 물속으로 */
+async function keepCell(f) {
+  const me = ui;
+  const h = ui.host;
+  let r = null;
+  try { r = h.onCell ? await h.onCell() : null; } catch { r = null; }
+  if (ui !== me) return;
+  const fate = cellFate(r);
+  if (fate === 'retry') { keepFailed(f); return; }
+  if (fate === 'gone') { cellGone(); return; }
+  ui.palJump = performance.now();
+  try { sfx.success(); } catch { /* 무시 */ }
+  ui.caught.push(r.found === 'core' ? { ...f, core: true } : f); // 날 끝 목록도 코어/셀을 갈라 적는다 (Codex 175차)
+  showCell(r);
+}
 function keepFailed(f) {
   const box = q$('.lk-res');
   box.innerHTML = '';
   const card = el('div', 'lk-res-card');
-  card.appendChild(el('div', 'lk-res-name', '📖 도감에 못 적었어요'));
-  card.appendChild(el('p', 'lk-res-say', `🐟 ${speciesOf(f.key).ko} — 물고기는 뜰채에 그대로 있어요. 다시 적어 볼까요?`));
+  card.appendChild(el('div', 'lk-res-name', f.cell ? '🎒 큐브에 못 넣었어요' : '📖 도감에 못 적었어요'));
+  card.appendChild(el('p', 'lk-res-say', f.cell ? '🟢 지가르데 셀 — 셀은 뜰채에 그대로 있어요. 다시 넣어 볼까요?' : `🐟 ${speciesOf(f.key).ko} — 물고기는 뜰채에 그대로 있어요. 다시 적어 볼까요?`));
   const again = el('button', 'lk-res-btn', '🔁 다시 적기');
   again.type = 'button';
   again.addEventListener('click', () => {
@@ -939,6 +964,72 @@ function showResult(f, info) {
   drawFish(g, f.key, w / 2, hgt / 2, w * 0.86, { wag: 0.08 });
   again.focus();
 }
+/** 결과 카드 아래 단추 — 🎣 다시 던지기 · 시간이 다 됐으면 🌇 */
+function againBtn(box) {
+  const again = el('button', 'lk-res-btn', leftSec() > 0 ? '🎣 다시 던지기' : '🌇 오늘 낚시 끝');
+  again.type = 'button';
+  again.addEventListener('click', () => {
+    box.hidden = true;
+    resetFish();
+    if (leftSec() <= 0) dayEnd();
+  });
+  return again;
+}
+/** 🟢 셀(또는 처음이면 🔴 코어)을 낚았다 (v371) — 큐브에 모인 수(아이가 모은 것 — 남은 수는 말하지 않는다) · 셀 10·50·100이면 그 글·그림도 */
+function showCell(r) {
+  const box = q$('.lk-res');
+  box.innerHTML = '';
+  const core = r.found === 'core';
+  const card = el('div', 'lk-res-card is-zyg');
+  const cv = el('canvas', 'lk-res-fish');
+  card.appendChild(cv);
+  card.appendChild(el('div', 'lk-res-name', core ? '🔴 지가르데 코어' : '🟢 지가르데 셀'));
+  card.appendChild(el('p', 'lk-res-say', core
+    ? '🔴 지가르데 코어를 낚았어요! 🎒 가방에 지가르데 큐브가 생겼어요'
+    : `🟢 지가르데 셀을 낚았어요! 큐브에 셀 ${r.cells}개`));
+  const n = r.note;
+  if (n && n.title) {
+    const note = el('div', 'lk-res-zyg');
+    note.appendChild(el('div', 'lk-res-zyg-title', n.title));
+    note.appendChild(el('p', 'lk-res-say', n.text || ''));
+    card.appendChild(note);
+    if (typeof n.art === 'function') {
+      const me = ui;
+      Promise.resolve().then(() => n.art()).then((url) => {
+        if (!url || ui !== me || !card.isConnected) return;
+        const img = el('img', 'lk-res-zyg-art');
+        img.alt = '지가르데';
+        img.src = url;
+        note.insertBefore(img, note.firstChild);
+      }).catch(() => {});
+    }
+  }
+  const again = againBtn(box);
+  card.appendChild(again);
+  box.appendChild(card);
+  box.hidden = false;
+  const w = 160;
+  const k = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = w * k; cv.height = w * k;
+  cv.style.width = `${w}px`; cv.style.height = `${w}px`;
+  const g = cv.getContext('2d');
+  g.scale(k, k);
+  drawCell(g, w / 2, w / 2, w * 0.7, { core, glow: true });
+  again.focus();
+}
+/** 다른 창이 오늘 낚시 셀을 먼저 받았거나 큐브가 다 찼다 — 셀은 물속으로 (v371) */
+function cellGone() {
+  const box = q$('.lk-res');
+  box.innerHTML = '';
+  const card = el('div', 'lk-res-card');
+  card.appendChild(el('div', 'lk-res-name', '🟢 앗, 반짝!'));
+  card.appendChild(el('p', 'lk-res-say', '초록 셀이 반짝이더니 물속으로 쏙 사라졌어요.'));
+  const again = againBtn(box);
+  card.appendChild(again);
+  box.appendChild(card);
+  box.hidden = false;
+  again.focus();
+}
 function resetFish() {
   ui.st = 'ready';
   ui.fish = null;
@@ -961,7 +1052,7 @@ function dayEnd() {
   card.appendChild(el('p', 'lk-res-say', '오늘 낚시는 여기까지! 내일 또 와요.'));
   if (ui.caught.length) {
     const list = el('ul', 'lk-end-list');
-    for (const f of ui.caught) list.appendChild(el('li', '', `${speciesOf(f.key).ko} ${f.cm.toFixed(1)}cm${speciesOf(f.key).photo ? ' 📸' : ''}`));
+    for (const f of ui.caught) list.appendChild(el('li', '', f.cell ? (f.core ? '🔴 지가르데 코어' : '🟢 지가르데 셀') : `${speciesOf(f.key).ko} ${f.cm.toFixed(1)}cm${speciesOf(f.key).photo ? ' 📸' : ''}`));
     card.appendChild(list);
   }
   const home = el('button', 'lk-res-btn', '🏠 집으로');
@@ -1120,7 +1211,8 @@ function draw(now) {
     const surge = st === 'fight' && ui.fs && ui.fs.surge > 0;
     if (surge) { x += Math.sin(now / 30) * 3; }
     if (st === 'scoop') y -= Math.min(1, (g - ui.scoopAt) / 900) * 60;
-    drawFish(ctx, ui.fish.key, x, y, L, { flip: true, wag: Math.sin(now / (surge ? 60 : 160)) * (surge ? 0.4 : 0.2), pitch: st === 'fight' ? -0.12 : 0 });
+    if (ui.fish.cell) drawCell(ctx, x, y, L * 0.8, { wob: Math.sin(now / (surge ? 60 : 200)) * (surge ? 0.3 : 0.12), glow: !ui.lite }); // 🟢 v371
+    else drawFish(ctx, ui.fish.key, x, y, L, { flip: true, wag: Math.sin(now / (surge ? 60 : 160)) * (surge ? 0.4 : 0.2), pitch: st === 'fight' ? -0.12 : 0 });
     if (surge) {
       ctx.fillStyle = '#ffb37a';
       ctx.font = 'bold 30px "Do Hyeon", sans-serif';

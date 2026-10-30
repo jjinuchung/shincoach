@@ -5075,6 +5075,12 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-res-open { margin: 0; padding: 8px 12px; border-radius: 12px; background: #e3f2f4; color: #12343b; font-weight: 800; word-break: keep-all; }
 /* 🌊 v369 바다가 열릴 때 안전 한 줄 */
 .lk-res-safe { margin: 0; padding: 6px 12px; border-radius: 12px; background: #fff4d6; color: #5a4210; font-size: 0.95rem; font-weight: 700; word-break: keep-all; }
+/* 🟢 v371 지가르데 셀을 낚았을 때 — 셀 그림은 어두운 물빛 바탕 · 셀 10·50·100 글·그림 */
+.lk-res-card.is-zyg .lk-res-fish { background: radial-gradient(circle, #1f5b4a 0%, #0b3540 72%); }
+.lk-res-card.is-zyg .lk-res-say { word-break: keep-all; }
+.lk-res-zyg { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 12px; border-radius: 14px; background: #e6f7ec; }
+.lk-res-zyg-title { color: #14532d; font-weight: 800; font-size: 1.1rem; word-break: keep-all; }
+.lk-res-zyg-art { width: 120px; height: 120px; object-fit: contain; }
 .lk-dex-lock { margin: 0; padding: 10px 12px; border-radius: 12px; border: 1px dashed #cfdcda; background: #f3f7f6; color: #4f6a6e; }
 .lk-shop-coins { padding: 4px 12px; border-radius: 999px; background: #fff0c2; color: #8a5a00; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lk-shop-msg { margin: 0; padding: 8px 12px; border-radius: 12px; background: #ffffff; border: 1px solid #cfdcda; }

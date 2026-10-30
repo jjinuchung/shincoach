@@ -12,11 +12,15 @@
 // v368 (2단계 ② 원고 「이대로」): 🏞️ 강(저수지 도감 10종이면 열림 · 🗺️ 물가 · 마지막 물가에서 시작 · fishing.pick) · 🎒 채비 가게(xp.lakeBuy — 가방 items) ·
 //   🐛 미끼 칩·🎣 낚싯대 색(xp.lakePick) · 강에서 낚은 마리 daily fishRiver(fishCatch 안의 몫)
 // v369 (2단계 ③ 원고 「추천대로」): 🌊 바다 방파제(강 도감 6종이면 열림 · host.seaOpen · gearState.sea) · 바다에서 낚은 마리 daily fishSea
+// v371 (아버님 「낚시하다가도 셀을 낚게 — 2% 정도」 → 기본안 「추천대로」): 🟢 지가르데 셀 — host.cellOk(zygarde.zygCanFish) · onCell(keepCell → xp.zygFind('fish')) ·
+//   낚시 셀은 하루 하나(공부 끝 화면 셀 하루 3과 따로) · 📖 도감·💰·그날 낚은 마리에는 안 든다 · 시험용 `?nosw=1&cell=1`이면 입질마다 셀
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
 import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_RIVER, FISH_SEA, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
 import { orderOf } from './journey.js';
-import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload } from './xp.js';
+import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload, zygMap, zygFind } from './xp.js';
+import { zygCanFish, FISH_SRC } from './zygarde.js';
+import { revealNote } from './zygview.js';
 import { listDaily, getDaily, applyDailyDelta } from './db.js';
 import { avatarOf } from './avatar.js';
 import { loadCharacters, characterUrl, artUrl, ensureArt } from './pokemon.js';
@@ -216,6 +220,25 @@ export async function keepCatch(f, put, catchFn = lakeCatch) {
   put({ fishCatch: 1, ...(f.place === 'river' ? { [FISH_RIVER]: 1 } : {}), ...(f.place === 'sea' ? { [FISH_SEA]: 1 } : {}) });
   return { ok: true, first: !!r.first, best: !!r.best, coins: nz(r.coins), ...(r.opened ? { opened: true } : {}), ...(r.seaOpened ? { seaOpened: true } : {}) };
 }
+/**
+ * 🟢 낚은 지가르데 셀을 큐브에 (v371) — xp.zygFind('fish') 한 트랜잭션(두 창이 같이 낚아도 하루 하나) ·
+ * → { ok, found, cells, note? } · 못 넣었으면 { ok:false, why } (why 'save'면 화면이 🔁 · 'day'·'full'이면 셀이 물속으로) · 그날 낚은 마리(fishCatch)에는 안 셈
+ */
+export async function keepCell(findFn = zygFind, noteFn = revealNote) {
+  let r = null;
+  try { r = await findFn(FISH_SRC); } catch { r = null; }
+  if (!r || !r.ok) return { ok: false, why: (r && r.why) || 'save' };
+  let note = null;
+  try { note = r.ev ? noteFn(r) : null; } catch { note = null; }
+  return { ok: true, found: r.found === 'core' ? 'core' : 'cell', cells: nz(r.cells), ...(note ? { note } : {}) };
+}
+/** 시험용 `?nosw=1&cell=1` — 입질마다 셀 (v371 · nosw 없이는 안 먹는다) */
+function testCellOdds() {
+  try {
+    const s = String((typeof location !== 'undefined' && location.search) || '');
+    return /[?&]nosw=1/.test(s) && /[?&]cell=1\b/.test(s) ? 1 : undefined;
+  } catch { return undefined; }
+}
 /** 🎒 채비 가게 상태 (그리기용 · 지금 프로필) — { coins, owned: { id: true }, pick, made, river, sea } · river·sea = 🏞️ 강·🌊 바다가 열렸나(다른 창에서 열려도 · Codex 172차 · v369) */
 export function gearState(p = getProfileSnapshot()) {
   return {
@@ -319,6 +342,9 @@ export async function openLakeNow() {
         sentSec = n;
       },
       onCatch: (f) => keepCatch(f, log.put),
+      cellOk: () => zygCanFish(zygMap(), Date.now()), // 🟢 오늘 낚시 셀을 찾을 수 있나 (v371)
+      cellOdds: testCellOdds(),
+      onCell: () => keepCell(),
       onClose: () => { log.flush().then(() => mountLakeCard(cardBox)).catch(() => {}); },
     });
   } finally {

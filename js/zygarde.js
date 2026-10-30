@@ -10,6 +10,8 @@
 // v359 (2026-10-28 아버님 「도감에 50%부터 시작되는 것처럼 나와 — 첫 단계 셀 모습부터」 → 기본안 「이대로」):
 //   모습은 셀 수로만 열린다 — 1%폼(앱이 그린 🔴 코어 + 🟢 셀 · 원작 폼이 아니다 · 처음부터) · 셀 10 10%폼 · 셀 50 50%폼 ·
 //   논술에서 잡은 지가르데도 같다(전에는 50%로 시작) · 셀 10·50 문턱에서 저절로 그 모습으로 · 열린 모습끼리는 도감에서 고른다
+// v371 (2026-10-30 아버님 「낚시하다가도 셀을 낚게 — 2% 정도」 → 기본안 「추천대로」): 🎣 학습 낚시터 입질마다 2%로 셀(fishing.cellRoll) ·
+//   낚시 셀은 하루 하나 · 공부 끝 화면 셀(하루 DAY_MAX)과 따로 센다 — 열쇠 「날:fish」(FISH_SRC) · 처음이면 코어 · 셀 100이면 안 나온다
 // 저장의 집 규칙:
 //  · 찾기·모습 바꾸기는 저장된 프로필로 한 트랜잭션(xp.houseDo) — 두 창이 같은 과목 셀을 둘 다 받지 않게
 //  · 찾은 것은 「날:과목」 열쇠(keys)로 남긴다 — 병합은 열쇠 합집합이라 따로 진행한 두 사본의 셀이 모두 남는다(Codex 157차) ·
@@ -22,8 +24,10 @@ import { dayNum } from './korean.js';
 export const ZYG_ID = 718;
 /** 셀이 나오는 과목 */
 export const SUBJECTS = ['english', 'math', 'korean', 'nonsul'];
-/** 하루에 찾을 수 있는 수 (코어 포함) */
+/** 하루에 찾을 수 있는 수 (코어 포함 · 🎣 낚시 셀은 따로) */
 export const DAY_MAX = 3;
+/** 🎣 낚시터에서 낚은 셀의 열쇠 이름 (v371 — 하루 하나 · DAY_MAX와 따로) */
+export const FISH_SRC = 'fish';
 /** 큐브에 모이는 셀 끝 — 퍼펙트폼 */
 export const CELL_MAX = 100;
 /** 모습이 열리는 셀 수 */
@@ -47,8 +51,12 @@ const CORE_FORM_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 
   + '<circle cx="20" cy="19" r="5.5" fill="#14532d"/><circle cx="18.3" cy="17.4" r="1.8" fill="#bbf7d0"/></g></svg>';
 /** 1%폼 그림 주소 (v359) */
 export const CORE_FORM_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(CORE_FORM_SVG)}`;
-/** 찾은 것 열쇠 「날 번호:과목」 */
-const keyOk = (k) => typeof k === 'string' && /^\d+:[a-z]+$/.test(k) && SUBJECTS.includes(k.slice(k.indexOf(':') + 1));
+/** 찾은 것 열쇠 「날 번호:과목」 · 「날 번호:fish」(🎣 v371) */
+const keyOk = (k) => {
+  if (typeof k !== 'string' || !/^\d+:[a-z]+$/.test(k)) return false;
+  const src = k.slice(k.indexOf(':') + 1);
+  return SUBJECTS.includes(src) || src === FISH_SRC;
+};
 
 /** 큐브 장부 고쳐 읽기 — 새 객체 { core, cells, keys, form, formAt, gave, seen } */
 export function zygOf(raw) {
@@ -83,10 +91,14 @@ export function mergeZyg(a, b) {
   });
 }
 
-/** 그날 찾은 과목 */
-function subsToday(z, today) {
+/** 그날 찾은 곳 (과목 · 🎣 fish) */
+function foundToday(z, today) {
   const head = `${today}:`;
   return z.keys.filter((k) => k.startsWith(head)).map((k) => k.slice(head.length));
+}
+/** 그날 찾은 과목 — 하루 DAY_MAX는 과목만 센다 (🎣 낚시 셀은 따로 · v371) */
+function subsToday(z, today) {
+  return foundToday(z, today).filter((s) => s !== FISH_SRC);
 }
 
 /** 이 과목 끝 화면에 셀(또는 코어)을 숨겨 둘까 — now는 시각(ms) */
@@ -95,6 +107,12 @@ export function zygCanFind(raw, sub, now) {
   if (!SUBJECTS.includes(sub) || z.cells >= CELL_MAX) return false;
   const subs = subsToday(z, dayNum(now));
   return !subs.includes(sub) && subs.length < DAY_MAX;
+}
+
+/** 🎣 오늘 낚시터에서 셀(또는 코어)이 걸릴 수 있나 — 오늘 낚시 셀을 아직 안 찾았고 큐브가 덜 찼다 (v371 · now는 시각(ms)) */
+export function zygCanFish(raw, now) {
+  const z = zygOf(raw);
+  return z.cells < CELL_MAX && !foundToday(z, dayNum(now)).includes(FISH_SRC);
 }
 
 /** 다음에 찾을 것 — 'core' | 'cell' */
@@ -108,13 +126,18 @@ export function zygNext(raw) {
  *   ev — gift: 셀 10에 지가르데가 생김(10%폼) · ten: 이미 있어서 10%폼으로(v359 — 전에는 고를 수 있게만) · fifty: 셀 50(50%폼으로) · perfect: 셀 100
  */
 export function zygFindRule(p, sub, now) {
-  if (!SUBJECTS.includes(sub)) return { ok: false, why: 'sub' };
+  const fish = sub === FISH_SRC; // 🎣 낚시 셀 (v371) — 하루 하나 · 과목 셀 하루 DAY_MAX와 따로
+  if (!SUBJECTS.includes(sub) && !fish) return { ok: false, why: 'sub' };
   const z = zygOf(p.zyg);
   if (z.cells >= CELL_MAX) return { ok: false, why: 'full' };
   const today = dayNum(now);
-  const subs = subsToday(z, today);
-  if (subs.includes(sub)) return { ok: false, why: 'subject' };
-  if (subs.length >= DAY_MAX) return { ok: false, why: 'day' };
+  if (fish) {
+    if (foundToday(z, today).includes(FISH_SRC)) return { ok: false, why: 'day' };
+  } else {
+    const subs = subsToday(z, today);
+    if (subs.includes(sub)) return { ok: false, why: 'subject' };
+    if (subs.length >= DAY_MAX) return { ok: false, why: 'day' };
+  }
   z.keys.push(`${today}:${sub}`);
   if (!z.core) {
     z.core = cnt(now) || 1;
@@ -195,8 +218,8 @@ export function zygPerfect(raw) {
 export function zygLine(raw, now) {
   const z = zygOf(raw);
   if (!z.core) return '';
-  const subs = subsToday(z, dayNum(now));
-  const KO = { english: '영어', math: '수학', korean: '국어', nonsul: '논술' };
+  const subs = foundToday(z, dayNum(now));
+  const KO = { english: '영어', math: '수학', korean: '국어', nonsul: '논술', [FISH_SRC]: '낚시' };
   const today = subs.length ? subs.map((s) => KO[s]).join('·') : '없음';
   return `🟢 지가르데 큐브: 셀 ${z.cells}/${CELL_MAX} · 오늘 찾은 곳 ${today} · 모습 ${zygFormOf(z)}%${z.gave ? ' · 큐브가 만든 지가르데' : ''}`;
 }

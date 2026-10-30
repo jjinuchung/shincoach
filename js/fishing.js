@@ -203,6 +203,30 @@ export function rollFish(spot, chum, streak, rng = Math.random, tilt = null) {
   const cm = lengthOf(sp, streak, rng);
   return { key: sp.key, star: sp.star, cm, g: weightOf(sp, cm), badges: badgesOf(sp.key, cm), place };
 }
+// 🟢 지가르데 셀 (v371 · 2026-10-30 아버님 「낚시하다가도 셀을 낚게 — 2% 정도」 → 기본안 「추천대로」) —
+//   입질마다 CELL_ODDS로 물고기 대신 셀이 걸린다 · 사투·뜰채 문제는 ★3 물고기와 같다 · 📖 도감·💰·그날 낚은 마리에는 안 든다 ·
+//   걸려도 되는지(오늘 낚시 셀을 아직 안 찾았나 · 큐브가 덜 찼나)는 화면이 zygarde.zygCanFish로 묻는다 — 이 파일은 지가르데 장부를 모른다
+/** 입질마다 셀이 걸릴 확률 */
+export const CELL_ODDS = 0.02;
+const CELL_STAR = 3;
+const CELL_CM = 40; // 걸린 셀을 그릴 크기 몫(물고기 길이처럼 — 그림만)
+/** 이 입질이 셀인가 (순수 — 확률만 · odds는 시험용으로 바꿀 수 있다 · 0~1 밖은 끝으로) */
+export function cellRoll(rng = Math.random, odds = CELL_ODDS) {
+  const p = Number.isFinite(Number(odds)) ? Math.max(0, Math.min(1, Number(odds))) : CELL_ODDS;
+  return Number(rng()) < p;
+}
+/** 셀이 걸린 「물고기」 — rollFish와 같은 꼴(사투·그림이 그대로 쓴다) · cell: true · 낚시터는 자리로 */
+export function cellFish(spot) {
+  return { key: 'zygcell', star: CELL_STAR, cm: CELL_CM, g: 0, badges: [], place: placeOfSpot(spot), cell: true };
+}
+/**
+ * 셀을 큐브에 넣은 결과 → 'ok' · 'gone'(다른 창이 오늘 낚시 셀을 먼저 받았거나 큐브가 다 참 — 물속으로) ·
+ * 'retry'(저장 실패·모르는 까닭 — 뜰채에 둔 채 🔁 · 모르는 까닭으로 셀을 놓아주지 않게, Codex 175차)
+ */
+export function cellFate(r) {
+  if (r && r.ok === true) return 'ok';
+  return r && (r.why === 'day' || r.why === 'full') ? 'gone' : 'retry';
+}
 /** 무게 글 — 1kg 아래는 g, 넘으면 kg 소수 둘 */
 export function weightText(g) {
   const n = nz(g);

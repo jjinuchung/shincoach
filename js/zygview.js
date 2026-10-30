@@ -3,6 +3,7 @@
 // 붙이는 곳(끝 화면마다 한 줄 — addCell(카드, 과목)): 🎤 에세이·복습·📝 쪽지 끝 · 🔢 개념 한 편·☀️·🧩·🕵️·🎯 끝 ·
 //   📚 글·🔤 오늘의 낱말·🧩 퍼즐 판 끝 · 🖊️ 논술 판 끝 — 과목마다 하루 하나 · 모두 합쳐 하루 3 (아이 화면에 셈 문구는 없다)
 // 이 파일은 끝 화면 파일들을 import하지 않는다(그쪽이 이 파일을 부른다 — 돌지 않게)
+// v371: 🎣 낚시터에서 낚은 셀은 lakeview.keepCell이 xp.zygFind('fish')로 넣고, 셀 10·50·100 글·그림(revealNote)은 낚시 결과 카드에
 import { zygMap, zygFind } from './xp.js';
 import { zygCanFind, zygNext, ZYG_ID, CELL_MAX } from './zygarde.js';
 import { ensureForm, ensureArt, characterUrl } from './pokemon.js';
@@ -99,28 +100,41 @@ function within(p, ms) {
   return Promise.race([p.catch(() => null), new Promise((res) => setTimeout(() => res(null), ms))]).catch(() => null);
 }
 
-/** 셀 10·50·100 — 🐣 창(제목·글만 바꿔)으로 크게 알린다 · 다른 창이 떠 있으면 닫힐 때까지 기다린다(30초까지) */
-async function reveal(r) {
+/**
+ * 셀 10·50·100 알림의 글·그림 — 🐣 창과 🎣 낚시 결과 카드(v371 — 🐣 창은 낚시터 아래에 깔린다)가 같이 쓴다 ·
+ * { title, text, art() → 그림 주소 Promise(5초까지 · 못 받으면 null) } · 문턱이 아니면 null
+ */
+export function revealNote(r) {
   let title = '';
   let text = '';
-  let url = null;
+  let art = null;
+  if (!r) return null;
   if (r.ev === 'gift') {
     title = '🟢 셀 10개! 지가르데가 모였어요';
     text = '지가르데 10%폼이 도감에 들어갔어요. 셀을 더 모으면 모습이 바뀌어요!';
-    url = await within(ensureForm(ZYG_ID, 'ten'), 5000);
+    art = () => within(ensureForm(ZYG_ID, 'ten'), 5000);
   } else if (r.ev === 'ten') {
     title = '🟢 셀 10개! 10%폼이 됐어요'; // v359 — 1%폼에서 저절로 (전에는 「고를 수 있어요」)
     text = '지가르데가 10%폼이 됐어요! 🎒 도감에서 1%폼으로 바꿀 수도 있어요.';
-    url = await within(ensureForm(ZYG_ID, 'ten'), 5000);
+    art = () => within(ensureForm(ZYG_ID, 'ten'), 5000);
   } else if (r.ev === 'fifty') {
     title = '🟢 셀 50개! 50%폼';
     text = r.form === '50' ? '지가르데가 50%폼이 됐어요! 도감에서 1%폼·10%폼으로 바꿀 수도 있어요.' : '이제 50%폼도 골라요.';
-    url = characterUrl(ZYG_ID) || await within(ensureArt(ZYG_ID), 5000);
+    art = async () => characterUrl(ZYG_ID) || await within(ensureArt(ZYG_ID), 5000);
   } else if (r.ev === 'perfect') {
     title = `🟢 셀 ${CELL_MAX}개! 큐브가 가득 찼어요`;
     text = '이제 배틀에서 지가르데의 HP가 절반 아래로 떨어지면 퍼펙트폼으로 변신해요! 💠 메가진화도 퍼펙트폼만 할 수 있어요.';
-    url = await within(ensureForm(ZYG_ID, 'perfect'), 5000);
-  } else return;
+    art = () => within(ensureForm(ZYG_ID, 'perfect'), 5000);
+  } else return null;
+  return { title, text, art };
+}
+
+/** 셀 10·50·100 — 🐣 창(제목·글만 바꿔)으로 크게 알린다 · 다른 창이 떠 있으면 닫힐 때까지 기다린다(30초까지) */
+async function reveal(r) {
+  const n = revealNote(r);
+  if (!n) return;
+  const { title, text } = n;
+  const url = await n.art();
   for (let i = 0; i < 60 && (anyModalOpen() || !isHidden('hatch')); i++) await new Promise((res) => setTimeout(res, 500));
   if (anyModalOpen() || !isHidden('hatch')) return; // 계속 막혀 있다 — 큐브·도감에는 이미 들어가 있다
   // 5세대 도트는 50%폼뿐 — 10%폼·퍼펙트폼을 보여 줄 때는 도트를 끈다
