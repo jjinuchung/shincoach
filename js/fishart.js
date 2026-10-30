@@ -43,6 +43,15 @@ export const LOOKS = {
   gamulchi: { depth: 0.19, peak: 0.5, head: 'flat', tail: 'round', tk: 0.7, dorsal: [0.3, 0.96, 0.3, 'low'], anal: [0.55, 0.96, 0.28, 'low'], mouth: 'big', eye: [0.08, 0.22, 0.018], c: ['#3d3926', '#8a7c54', '#d8cfae', '#4c4630'], pat: ['blotch:#262214:2'] },
   ssogari: { depth: 0.3, peak: 0.38, head: 'point', tail: 'round', tk: 0.75, dorsal: [0.26, 0.82, 0.42, 'spiny'], anal: [0.64, 0.8, 0.36, 'soft'], mouth: 'big', eye: [0.12, 0.2, 0.028], c: ['#76612f', '#c9a85a', '#efe3bd', '#a68a48'], pat: ['rosette:#3e2c14'] },
   jangeo: { depth: 0.1, tail: 'eel', mouth: 'small', eye: [0.04, 0.2, 0.012], c: ['#384836', '#5d6e4e', '#dcdfca', '#4a5a3e'], pat: [] },
+  // 🏞️ 강 (v368) — 버들치 · 참갈겨니 · 모래무지 · 참마자 · 꺽지 · 동사리 · 산천어 · 어름치
+  beodeulchi: { depth: 0.21, peak: 0.42, head: 'round', tail: 'fork', tk: 0.75, dorsal: [0.46, 0.58, 0.45, 'soft'], anal: [0.66, 0.78, 0.38, 'soft'], mouth: 'small', eye: [0.11, 0.2, 0.028], c: ['#5c5a3c', '#a29f78', '#ece8d2', '#a9a27c'], pat: ['speck:#35331f:26', 'stripe:#3c3a26:.35'] },
+  chamgal: { depth: 0.23, peak: 0.42, head: 'point', tail: 'fork', tk: 0.9, dorsal: [0.44, 0.56, 0.5, 'soft'], anal: [0.62, 0.8, 0.5, 'soft'], mouth: 'small', eye: [0.1, 0.2, 0.034], c: ['#40573f', '#a3b9a2', '#f1ede0', '#d9c06f'], pat: ['band:#2a3a55', 'sheen:#d39a82'] },
+  moraemuji: { depth: 0.18, peak: 0.36, head: 'point', tail: 'fork', tk: 0.8, dorsal: [0.34, 0.5, 0.6, 'soft'], anal: [0.7, 0.8, 0.35, 'soft'], barbels: [1, 0.04], mouth: 'small', eye: [0.17, 0.12, 0.028], c: ['#8a7a58', '#cdbb92', '#f2ead6', '#c2b088'], pat: ['blotch:#5b4a30', 'speck:#6b5a3c:20'] },
+  chammaja: { depth: 0.21, peak: 0.4, head: 'point', tail: 'fork', tk: 0.85, dorsal: [0.38, 0.52, 0.55, 'soft'], anal: [0.68, 0.8, 0.4, 'soft'], barbels: [1, 0.04], mouth: 'small', eye: [0.14, 0.17, 0.026], c: ['#5b6a70', '#c8d0d2', '#f2f4f3', '#b9c1c3'], pat: ['dots:#3d464a:12', 'speck:#4a5357:14'] },
+  kkeokji: { depth: 0.34, peak: 0.36, head: 'round', tail: 'round', tk: 0.75, dorsal: [0.28, 0.84, 0.4, 'spiny'], anal: [0.64, 0.8, 0.36, 'soft'], mouth: 'big', eye: [0.12, 0.2, 0.03], c: ['#4e5432', '#8f8f5c', '#d9d4b0', '#6e7046'], pat: ['bars:#33361e:.3:6', 'ear:#1f3a5a'] },
+  dongsari: { depth: 0.24, peak: 0.3, head: 'flat', tail: 'round', tk: 0.7, dorsal: [0.36, 0.72, 0.42, 'soft'], anal: [0.6, 0.8, 0.35, 'soft'], mouth: 'wide', eye: [0.1, 0.24, 0.022], c: ['#4a3c2a', '#8a7254', '#d8c9a8', '#5e4c34'], pat: ['blotch:#2e2416', 'mottle:#3a2e1e'] },
+  sancheoneo: { depth: 0.27, peak: 0.42, head: 'round', tail: 'notch', tk: 0.85, dorsal: [0.4, 0.52, 0.5, 'soft'], anal: [0.66, 0.78, 0.4, 'soft'], adipose: [0.74, 0.8], mouth: 'big', eye: [0.11, 0.19, 0.03], c: ['#4a5a48', '#a9b6a2', '#f1ede6', '#9fa58f'], pat: ['bars:#5b5f8c:.3:8', 'speck:#2c3328:18', 'sheen:#e7a7a0'] },
+  eoreumchi: { depth: 0.24, peak: 0.4, head: 'point', tail: 'fork', tk: 0.88, dorsal: [0.38, 0.52, 0.55, 'soft'], anal: [0.68, 0.8, 0.4, 'soft'], barbels: [1, 0.04], mouth: 'small', eye: [0.13, 0.17, 0.026], c: ['#6b6a4a', '#cfc9a2', '#f4f0dc', '#c9bf86'], pat: ['speck:#2a2a1e:46'] },
 };
 
 // ───────────── 물고기 ─────────────
@@ -231,6 +240,15 @@ function patterns(ctx, lk, b, key, detail) {
           const y = rows === 1 ? lerp(-hd * 0.5, hd * 0.1, rnd()) : (r === 0 ? -hd * 0.45 : hd * 0.12) + (rnd() - 0.5) * hd * 0.2;
           ctx.beginPath(); ctx.ellipse(x, y, Lb * lerp(0.035, 0.06, rnd()), hd * lerp(0.2, 0.36, rnd()), rnd() - 0.5, 0, Math.PI * 2); ctx.fill();
         }
+      }
+      ctx.globalAlpha = 1;
+    } else if (kind === 'speck') {
+      // 작은 점 흩뿌림 (v368 — 버들치·산천어·어름치) — 등~옆 · 정해진 난수라 그릴 때마다 같은 자리
+      const n = Number(a1) || 20;
+      ctx.fillStyle = col;
+      ctx.globalAlpha = 0.6;
+      for (let i = 0; i < n; i++) {
+        ctx.beginPath(); ctx.arc(lerp(x0 + Lb * 0.12, x0 + Lb * 0.95, rnd()), lerp(-hd * 0.85, hd * 0.25, rnd()), hd * lerp(0.035, 0.075, rnd()), 0, Math.PI * 2); ctx.fill();
       }
       ctx.globalAlpha = 1;
     } else if (kind === 'mottle') {
@@ -432,9 +450,10 @@ function cloud(ctx, cx, cy, s) {
 }
 /**
  * 안 움직이는 층 — ctx는 이미 가상 좌표로 맞춰 둔 것 · x0~x1·y0~y1 = 화면에 보이는 가상 좌표 넓이(가장자리까지 채우려고)
- * wx = 🌦️ 날씨 key (sun · cloud · rain · wind — fishing.WEATHER)
+ * wx = 🌦️ 날씨 key (sun · cloud · rain · wind — fishing.WEATHER) · place = 물가 ('lake' 저수지 · 'river' 강 — v368: 잔교 대신 큰 바위·자갈 · 연잎·갈대 대신 강가 바위 · 수초 대신 물속 바위 · 맑은 물빛)
  */
-export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, wx = 'sun') {
+export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, wx = 'sun', place = 'lake') {
+  const river = place === 'river';
   const sky = skyOf(t);
   const sun = sunAt(t);
   const veil = WX_VEIL[wx] || '';
@@ -475,7 +494,8 @@ export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, 
   ctx.lineTo(x1, WATER_Y); ctx.closePath(); ctx.fill();
   // 물 — 윗면은 하늘을 비추고 아래로 깊어진다
   const w = ctx.createLinearGradient(0, WATER_Y, 0, y1);
-  w.addColorStop(0, mix('#5aa5b3', '#7b7c9a', sky.k * 0.7)); w.addColorStop(0.06, '#3d8a98'); w.addColorStop(0.45, '#1f5f6c'); w.addColorStop(1, '#0b3540');
+  if (river) { w.addColorStop(0, mix('#78bdb6', '#8a8aa0', sky.k * 0.7)); w.addColorStop(0.06, '#4f9d97'); w.addColorStop(0.45, '#2c706b'); w.addColorStop(1, '#10403d'); }
+  else { w.addColorStop(0, mix('#5aa5b3', '#7b7c9a', sky.k * 0.7)); w.addColorStop(0.06, '#3d8a98'); w.addColorStop(0.45, '#1f5f6c'); w.addColorStop(1, '#0b3540'); }
   ctx.fillStyle = w;
   ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y);
   // 산 그림자 비침
@@ -489,10 +509,11 @@ export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, 
   for (let x = x0; x <= x1; x += 32) ctx.lineTo(x, bottomY(x) + Math.sin(x * 0.05) * 4);
   ctx.lineTo(x1, y1); ctx.lineTo(x0, y1); ctx.closePath(); ctx.fill();
   const rnd = seeded(7);
-  ctx.fillStyle = 'rgba(160,150,110,.5)';
-  for (let i = 0; i < 70; i++) { const x = lerp(x0, x1, rnd()); ctx.beginPath(); ctx.ellipse(x, bottomY(x) + 6 + rnd() * 20, 2 + rnd() * 4, 1.5 + rnd() * 2, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = river ? 'rgba(190,182,150,.6)' : 'rgba(160,150,110,.5)';
+  for (let i = 0; i < (river ? 150 : 70); i++) { const x = lerp(x0, x1, rnd()); ctx.beginPath(); ctx.ellipse(x, bottomY(x) + 6 + rnd() * 20, 2 + rnd() * 4, 1.5 + rnd() * 2, 0, 0, Math.PI * 2); ctx.fill(); }
   ctx.fillStyle = '#3a3a2c';
   for (const [x, rx, ry] of [[420, 30, 16], [860, 40, 20], [960, 22, 12]]) { ctx.beginPath(); ctx.ellipse(x, bottomY(x) + 4, rx, ry, 0, Math.PI, 0); ctx.fill(); }
+  if (river) { riverBank(ctx, x0, x1); if (veil) { ctx.fillStyle = wx === 'rain' ? 'rgba(70,80,92,.22)' : 'rgba(90,100,112,.14)'; ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y); } return; }
   // 연잎 (물 윗면)
   ctx.fillStyle = '#4f7d3c';
   for (const [x, s] of [[850, 1], [884, 0.7], [610, 0.6]]) { ctx.beginPath(); ctx.ellipse(x, WATER_Y + 1, 18 * s, 4 * s, 0, 0.25, Math.PI * 2); ctx.lineTo(x, WATER_Y + 1); ctx.fill(); }
@@ -524,11 +545,49 @@ export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, 
   if (veil) { ctx.fillStyle = wx === 'rain' ? 'rgba(70,80,92,.22)' : 'rgba(90,100,112,.14)'; ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y); }
 }
 
+/** 🏞️ 강가 (v368) — 캐릭터가 서는 넓적한 큰 바위(잔교 자리 · 윗면 = 잔교 윗면) · 물가 자갈 · 건너편 바위 · 물속 바위(14m 「바위 밑」) */
+function riverBank(ctx, x0, x1) {
+  const top = DOCK_Y - 10;
+  // 물속 바위 무리 (바위 밑)
+  for (const [x, rx, ry, c] of [[700, 46, 30, '#4f5348'], [752, 34, 24, '#5a5e52'], [800, 52, 34, '#4a4e43'], [846, 30, 20, '#565a4e']]) {
+    const by = bottomY(x) + 6;
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.ellipse(x, by, rx, ry, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = 'rgba(200,220,210,.12)';
+    ctx.beginPath(); ctx.ellipse(x - rx * 0.25, by - ry * 0.7, rx * 0.45, ry * 0.18, -0.2, 0, Math.PI * 2); ctx.fill();
+  }
+  // 캐릭터가 서는 큰 바위 — 물 위 · 물속(물빛으로 흐리게)
+  ctx.fillStyle = 'rgba(70,74,64,.45)'; // 물속은 물빛이 비치게 옅게 · 아래로 갈수록 퍼지는 바위 밑동
+  ctx.beginPath(); ctx.moveTo(x0, WATER_Y); ctx.lineTo(DOCK_X + 24, WATER_Y); ctx.quadraticCurveTo(DOCK_X + 70, WATER_Y + 120, DOCK_X + 46, bottomY(DOCK_X + 46) + 8); ctx.lineTo(x0, bottomY(x0) + 8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#7f7c70';
+  ctx.beginPath(); ctx.moveTo(x0, top + 2); ctx.lineTo(DOCK_X - 26, top); ctx.quadraticCurveTo(DOCK_X + 6, top + 2, DOCK_X + 22, WATER_Y + 2); ctx.lineTo(x0, WATER_Y + 2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#9d9a8d';
+  ctx.beginPath(); ctx.moveTo(x0, top + 2); ctx.lineTo(DOCK_X - 26, top); ctx.quadraticCurveTo(DOCK_X - 6, top + 1, DOCK_X + 2, top + 8); ctx.lineTo(x0, top + 9); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(50,48,40,.35)';
+  ctx.lineWidth = 1.2;
+  for (const [a, b] of [[40, 70], [120, 150], [176, 196]]) { ctx.beginPath(); ctx.moveTo(a, top + 10); ctx.quadraticCurveTo((a + b) / 2, top + 16, b, WATER_Y - 2); ctx.stroke(); }
+  // 물가 자갈
+  const rnd = seeded(11);
+  for (let i = 0; i < 26; i++) {
+    const x = lerp(x0, DOCK_X + 30, rnd());
+    ctx.fillStyle = ['#b8b2a0', '#9a9484', '#c9c2ae'][i % 3];
+    ctx.beginPath(); ctx.ellipse(x, WATER_Y + 1 + rnd() * 3, 3 + rnd() * 5, 2 + rnd() * 2, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  // 건너편 바위 (물 위로 조금)
+  for (const [x, rx, ry] of [[948, 30, 18], [990, 40, 24], [1030, 34, 20]]) {
+    ctx.fillStyle = '#7a776b';
+    ctx.beginPath(); ctx.ellipse(x, WATER_Y + 4, rx, ry, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.14)';
+    ctx.beginPath(); ctx.ellipse(x - rx * 0.3, WATER_Y + 4 - ry * 0.65, rx * 0.4, ry * 0.16, -0.2, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 // ───────────── 움직이는 것 (프레임마다) ─────────────
 
 /** 물 윗면 반짝임 · 햇살 · 수초 — now(ms) · reduce = 움직임 줄이기 · lite = 느린 기기 · wx = 🌦️ 날씨(바람이면 물결이 크고 수초가 더 흔들림 · 흐림·비는 햇살 없음) */
-export function drawWaterFx(ctx, now, reduce, lite, x0 = 0, x1 = SCENE_W, wx = 'sun') {
+export function drawWaterFx(ctx, now, reduce, lite, x0 = 0, x1 = SCENE_W, wx = 'sun', place = 'lake') {
   const t = reduce ? 0 : now / 1000;
+  if (place === 'river') { riverFx(ctx, t, lite, x0, x1, wx); return; }
   const wind = wx === 'wind';
   const amp = wind ? 3.4 : 1.2;
   ctx.strokeStyle = wind ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.28)';
@@ -562,6 +621,39 @@ export function drawWaterFx(ctx, now, reduce, lite, x0 = 0, x1 = SCENE_W, wx = '
   }
   ctx.lineCap = 'butt';
 }
+/** 🏞️ 강물 (v368) — 물살 줄이 오른쪽으로 흐른다(바람이면 더 크게) · 큰 바위 앞 여울엔 흰 물보라 · 수초 대신 물속 바위(바닥 층에 그려 둠) */
+function riverFx(ctx, t, lite, x0, x1, wx) {
+  const wind = wx === 'wind';
+  const amp = wind ? 3 : 1.4;
+  ctx.strokeStyle = 'rgba(255,255,255,.32)';
+  ctx.lineWidth = 1.5;
+  for (let row = 0; row < 4; row++) {
+    const y = WATER_Y + 4 + row * 8;
+    const gap = 70 + row * 14;
+    for (let x = Math.floor(x0 / gap) * gap + ((t * (60 + row * 22)) % gap); x < x1; x += gap) {
+      ctx.beginPath(); ctx.moveTo(x, y + Math.sin(t * 3 + x) * amp); ctx.lineTo(x + 34 - row * 5, y + Math.sin(t * 3 + x + 1) * amp); ctx.stroke();
+    }
+  }
+  // 여울 물보라 — 큰 바위 끝(잔교 자리) 앞
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  const n = lite ? 6 : 12;
+  for (let i = 0; i < n; i++) {
+    const ph = (t * 1.7 + i * 0.37) % 1;
+    const x = DOCK_X + 28 + i * 13 + ph * 26;
+    ctx.globalAlpha = 0.25 + 0.5 * Math.sin(ph * Math.PI);
+    ctx.beginPath(); ctx.ellipse(x, WATER_Y + 3 + (i % 3) * 3, 5 + (i % 2) * 3, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  if (!lite && wx !== 'cloud' && wx !== 'rain') {
+    ctx.fillStyle = 'rgba(220,245,240,.07)';
+    for (let i = 0; i < 3; i++) {
+      ctx.globalAlpha = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(t * 0.6 + i * 2));
+      const x = 380 + i * 230;
+      ctx.beginPath(); ctx.moveTo(x, WATER_Y); ctx.lineTo(x + 60, WATER_Y); ctx.lineTo(x - 40, 520); ctx.lineTo(x - 120, 520); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
 /** 🌧️ 빗줄기 — 40개까지(태블릿 성능 · 가벼운 그림이면 부르는 쪽이 안 부른다) · 움직임 줄이기면 멈춘 빗줄기 */
 export const RAIN_N = 40;
 export function drawRain(ctx, now, reduce, x0 = 0, x1 = SCENE_W, y0 = 0) {
@@ -579,14 +671,23 @@ export function drawRain(ctx, now, reduce, x0 = 0, x1 = SCENE_W, y0 = 0) {
   ctx.stroke();
 }
 /** 찌 — sink 0(떠 있음) ~ 1(쏙) · y는 물 윗면 */
-export function drawFloat(ctx, x, sink, now, reduce) {
+export function drawFloat(ctx, x, sink, now, reduce, glow = false) {
   const bob = reduce ? 0 : Math.sin(now / 420) * 1.6;
   const y = WATER_Y + bob + sink * 16;
   ctx.save();
   ctx.beginPath(); ctx.rect(x - 20, 0, 40, WATER_Y + 3); ctx.clip(); // 물 위만 보임
+  // ✨ 야광 찌 (v368) — 찌 머리 둘레가 연둣빛으로 은은하게 (그라디언트 한 번 · 그림자 흐림 안 씀)
+  if (glow) {
+    const pulse = reduce ? 1 : 0.8 + 0.2 * Math.sin(now / 300);
+    const halo = ctx.createRadialGradient(x, y - 31, 1, x, y - 31, 16);
+    halo.addColorStop(0, `rgba(200,255,120,${(0.75 * pulse).toFixed(2)})`);
+    halo.addColorStop(1, 'rgba(200,255,120,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(x, y - 31, 16, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(x, y - 30); ctx.lineTo(x, y + 4); ctx.stroke();
-  ctx.fillStyle = '#ff5a1f';
+  ctx.fillStyle = glow ? '#d6ff6a' : '#ff5a1f';
   ctx.fillRect(x - 2, y - 36, 4, 10);
   ctx.fillStyle = '#e8481a';
   ctx.beginPath(); ctx.ellipse(x, y - 8, 7, 11, 0, Math.PI, 0); ctx.fill();
@@ -619,8 +720,8 @@ export function drawDrops(ctx, drops, now) {
   }
   ctx.globalAlpha = 1;
 }
-/** 낚싯대 — 손에서 끝까지 · bend = 0~1(장력) · 끝이 당기는 쪽(tx,ty)으로 휜다 → 끝 자리를 돌려준다 */
-export function drawRod(ctx, hx, hy, tx, ty, bend) {
+/** 낚싯대 — 손에서 끝까지 · bend = 0~1(장력) · 끝이 당기는 쪽(tx,ty)으로 휜다 → 끝 자리를 돌려준다 · col = { butt, tip } 🎣 낚싯대 색(v368 · 없으면 나무색) */
+export function drawRod(ctx, hx, hy, tx, ty, bend, col = null) {
   const len = 210;
   const base = -0.62; // 기본 각도(위로 비스듬)
   const pull = Math.atan2(ty - hy, tx - hx);
@@ -631,9 +732,9 @@ export function drawRod(ctx, hx, hy, tx, ty, bend) {
   const cx = hx + Math.cos(base) * len * 0.6;
   const cy = hy + Math.sin(base) * len * 0.6;
   ctx.lineCap = 'round';
-  ctx.strokeStyle = '#3b2a1c'; ctx.lineWidth = 5;
+  ctx.strokeStyle = (col && col.butt) || '#3b2a1c'; ctx.lineWidth = 5;
   ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(lerp(hx, cx, 0.5), lerp(hy, cy, 0.5), lerp(hx, ex, 0.35), lerp(hy, ey, 0.35)); ctx.stroke();
-  ctx.strokeStyle = '#5a3f28'; ctx.lineWidth = 2.6;
+  ctx.strokeStyle = (col && col.tip) || '#5a3f28'; ctx.lineWidth = 2.6;
   ctx.beginPath(); ctx.moveTo(lerp(hx, ex, 0.3), lerp(hy, ey, 0.3)); ctx.quadraticCurveTo(cx, cy, ex, ey); ctx.stroke();
   // 릴
   ctx.fillStyle = '#c9c9c9';

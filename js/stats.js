@@ -28,7 +28,7 @@ import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질
 import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
 import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
 import { allMsgs, addLocal, seenNow } from './familyview.js';
-import { SPECIES, lakeOf, lakeDayLine, FISH_COINS, FISH_DAY_MIN, SHARE_MIN, SHARE_MAX } from './fishing.js'; // 🎣 학습 낚시터 📊 카드 (v366 — 순수)
+import { SPECIES, lakeOf, lakeDayLine, FISH_COINS, FISH_DAY_MIN, SHARE_MIN, SHARE_MAX, PLACES, PLACE_KO, RIVER_NEED, riverOpen, GEAR, hasGear, pickOf } from './fishing.js'; // 🎣 학습 낚시터 📊 카드 (v366 — 순수 · v368 🏞️ 강·🎒 채비)
 
 const $ = (id) => document.getElementById(id);
 
@@ -455,11 +455,25 @@ export async function renderStats() {
     const rows = daily.filter((d) => d && d.date && lakeDayLine(d)).slice(-7).reverse();
     if (rows.length || kinds.length) {
       const cl = card('🎣 학습 낚시터');
-      cl.appendChild(el('p', 'stats-note', `낚시하며 이미 배운 문제(대여행과 같은 원천)를 풀어요 — 던지기·밑밥·바늘 걸기·사투·뜰채마다 문제 · 지난 7일 덜 한 과목이 더 자주(한 과목 ${Math.round(SHARE_MIN * 100)}~${Math.round(SHARE_MAX * 100)}%) · 하루 ${FISH_DAY_MIN}분이 기본(⚙) · 💰 별 하나에 ${FISH_COINS.perStar} · 새 종·🏅 월척 +${FISH_COINS.newKind} · 하루 ${FISH_COINS.dayMax}까지 · 문제 하나하나는 안 적어요.`));
-      const dex = el('div', 'stats-row');
-      dex.appendChild(el('span', 'name', `도감 ${kinds.length}/${SPECIES.length}`));
-      dex.appendChild(el('span', 'meta', kinds.length ? kinds.map((s) => `${s.ko} ${lk.dex[s.key].best.toFixed(1)}cm`).join(' · ') : '아직 없음'));
-      cl.appendChild(dex);
+      cl.appendChild(el('p', 'stats-note', `낚시하며 이미 배운 문제(대여행과 같은 원천)를 풀어요 — 던지기·밑밥·바늘 걸기·사투·뜰채마다 문제 · 지난 7일 덜 한 과목이 더 자주(한 과목 ${Math.round(SHARE_MIN * 100)}~${Math.round(SHARE_MAX * 100)}%) · 하루 ${FISH_DAY_MIN}분이 기본(⚙) · 💰 별 하나에 ${FISH_COINS.perStar} · 새 종·🏅 월척 +${FISH_COINS.newKind} · 하루 ${FISH_COINS.dayMax}까지 · 🏞️ 강은 저수지 도감 ${RIVER_NEED}종이면 열려요 · 🎒 채비는 💰로 한 번 사면 계속(미끼만 같은 별 안에서 두 배쯤) · 문제 하나하나는 안 적어요.`));
+      // 도감은 낚시터마다 (v368 — 🏞️ 강은 저수지 도감 10종이면 열림 · 📸 어름치는 사진만 찍고 놓아줌)
+      const pf = getProfileSnapshot();
+      for (const pl of PLACES) {
+        const all = SPECIES.filter((s) => s.home === pl);
+        const got = kinds.filter((s) => s.home === pl);
+        if (pl === 'river' && !got.length && !riverOpen(pf.fishing)) continue;
+        const dex = el('div', 'stats-row');
+        dex.appendChild(el('span', 'name', `${PLACE_KO[pl]} 도감 ${got.length}/${all.length}`));
+        dex.appendChild(el('span', 'meta', got.length ? got.map((s) => `${s.ko} ${lk.dex[s.key].best.toFixed(1)}cm${s.photo ? ' 📸' : ''}`).join(' · ') : '아직 없음'));
+        cl.appendChild(dex);
+      }
+      // 🎒 산 채비 · 지금 쓰는 물가·미끼 (처음부터 있는 지렁이·나무 낚싯대는 빼고)
+      const bought = GEAR.filter((g) => !g.free && hasGear(pf, g.id));
+      const pk = pickOf(pf);
+      const gr = el('div', 'stats-row');
+      gr.appendChild(el('span', 'name', '🎒 채비'));
+      gr.appendChild(el('span', 'meta', `${bought.length ? bought.map((g) => `${g.emoji} ${g.ko}`).join(' · ') : '산 것 없음'} · 지금 ${PLACE_KO[pk.place]} · 미끼 ${(GEAR.find((g) => g.id === pk.bait) || GEAR[0]).ko}`));
+      cl.appendChild(gr);
       for (const d of rows) {
         const row = el('div', 'stats-row');
         row.appendChild(el('span', 'name', d.date.slice(5)));

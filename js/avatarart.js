@@ -148,7 +148,9 @@ function torso(top, uid) {
   else if (a.pattern === 'dots') pat = [[41, 72], [55, 74], [47, 81], [61, 84], [39, 88], [53, 91]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2" fill="${a.ink}"/>`).join('');
   // 🦺 조끼 — 몸통 양쪽을 덮는 판 둘(가운데로 검은 티가 보인다) · 앞섶을 따라 흰 깃
   else if (a.pattern === 'vest') pat = `<path d="M33 64 L45.5 64 L44.5 99 L31 99 Z" fill="${a.ink}" stroke="${LINE}" stroke-width="1.2"/><path d="M54.5 64 L67 64 L69 99 L55.5 99 Z" fill="${a.ink}" stroke="${LINE}" stroke-width="1.2"/>`
-    + (a.trim ? `<path d="M43.6 65 L45.6 66 L44.8 82" fill="none" stroke="${a.trim}" stroke-width="2.6" stroke-linecap="round"/><path d="M56.4 65 L54.4 66 L55.2 82" fill="none" stroke="${a.trim}" stroke-width="2.6" stroke-linecap="round"/>` : '');
+    + (a.trim ? `<path d="M43.6 65 L45.6 66 L44.8 82" fill="none" stroke="${a.trim}" stroke-width="2.6" stroke-linecap="round"/><path d="M56.4 65 L54.4 66 L55.2 82" fill="none" stroke="${a.trim}" stroke-width="2.6" stroke-linecap="round"/>` : '')
+    // 🎣 낚시 조끼(v368) — 판마다 주머니 둘
+    + (a.pockets ? [[34.5, 72], [35, 84], [56.5, 72], [57, 84]].map(([x, y]) => `<rect x="${x}" y="${y}" width="9" height="7.5" rx="1.4" fill="${a.pockets}" stroke="${LINE}" stroke-width="1"/>`).join('') : '');
   else if (a.pattern === 'galaxy') pat = `<polygon points="${starPts(50, 80, 6.5, 2.7)}" fill="${a.ink}"/>` + [[40, 72, 1.3], [60, 74, 1.1], [42, 90, 1.2], [58, 92, 1.4], [37, 82, 0.9], [63, 85, 1]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${a.ink}"/>`).join('');
   const neck = `<path d="M44 65 Q50 70 56 65" fill="none" stroke="${shade(a.color, 0.25)}" stroke-width="1.6"/>`;
   return `<clipPath id="${clip}"><path d="${TORSO}"/></clipPath><path d="${TORSO}" ${fillLine(a.color)}/>${pat ? `<g clip-path="url(#${clip})">${pat}</g>` : ''}${neck}`;
@@ -194,6 +196,8 @@ function hat(w) {
   }
   if (w.id === 'a_hat_beanie') return `<path d="M22 40 Q22 10 50 10 Q78 10 78 40 Z" ${fillLine(c)}/><rect x="21" y="33" width="58" height="9" rx="4.5" ${fillLine(k)}/><circle cx="50" cy="9" r="5" ${fillLine(k)}/>`;
   if (w.id === 'a_hat_straw') return `<ellipse cx="50" cy="32" rx="37" ry="7.5" ${fillLine(c)}/><path d="M31 32 Q31 12 50 12 Q69 12 69 32 Z" ${fillLine(c)}/><rect x="31" y="25" width="38" height="5.5" fill="${k}"/>`;
+  // 🎣 낚시 모자(v368) — 아래로 처진 둥근 챙 · 띠
+  if (w.id === 'a_hat_fish') return `<path d="M17 37 Q50 27 83 37 Q87 44 50 43.5 Q13 44 17 37 Z" ${fillLine(shade(c, 0.12))}/><path d="M29.5 37 Q30.5 14 50 13.5 Q69.5 14 70.5 37 Z" ${fillLine(c)}/><rect x="30" y="29.5" width="40" height="5" fill="${k}"/>`;
   if (w.id === 'a_crown') return `<path d="M29 27 L32 8 L41 18 L50 4 L59 18 L68 8 L71 27 Z" ${fillLine(c)}/><circle cx="50" cy="20" r="2.8" fill="${k}"/><circle cx="38.5" cy="22" r="1.9" fill="#3b82f6"/><circle cx="61.5" cy="22" r="1.9" fill="#22a06b"/>`;
   return '';
 }

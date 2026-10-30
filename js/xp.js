@@ -23,10 +23,10 @@ import {
   evolveRule, copyRestsDone, // 💊 회복 캡슐 — 깜짝 진화 · 받은 휴식 (2026-10-10)
 } from './db.js';
 import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진우네 집 규칙 (순수)
-import { copyAvatar } from './avatar.js'; // 🧑 진우 캐릭터 (순수)
+import { copyAvatar, wearBuyRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수) · 🎒 낚시 채비 가게 옷 사기(v368)
 import { copyPlay, playRule, gameEndRule, bestOf, fastOf, recKey } from './homeplay.js'; // 🎮 일상 행동 · 미니 게임 끝(v307) · ⏱️ 가장 빠른 시간(v339) (순수)
 import { copyJourney, startRule as jrStartRule, answerRule as jrAnswerRule, swapRule as jrSwapRule, homeRule as jrHomeRule, pickRule as jrPickRule, eventRule as jrEventRule } from './journey.js'; // 🎒 포켓몬 대여행 (v341, 순수) · 구역 이벤트 (v362)
-import { copyLake, catchRule as lakeCatchRule } from './fishing.js'; // 🎣 학습 낚시터 도감·💰 (v366, 순수)
+import { copyLake, catchRule as lakeCatchRule, gearBuyRule as lakeGearRule, pickRule as lakePickRule, gearOf as lakeGearOf } from './fishing.js'; // 🎣 학습 낚시터 도감·💰 · 🎒 채비·고른 물가(v368) (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
@@ -974,6 +974,16 @@ export function lakeRaw() {
 /** 🐟 한 마리 낚음 — { key, cm } → { ok, first, best, coins } · 날은 트랜잭션 안의 시각으로 */
 export function lakeCatch(fish) {
   return houseDo((p) => lakeCatchRule(p, fish, Date.now()));
+}
+/** 🎒 채비 사기 (v368) — 미끼·찌·낚싯대 색은 낚시 규칙 · 모자·조끼는 옷장 규칙(wearBuyRule — 사면 바로 입음) · 저장된 프로필로 한 트랜잭션(두 창이 두 번 사지 않게) */
+export function lakeBuy(id) {
+  const g = lakeGearOf(id);
+  if (g && g.kind === 'wear') return houseDo((p) => wearBuyRule(p, id, Date.now()));
+  return houseDo((p) => lakeGearRule(p, id, Date.now()));
+}
+/** 🗺️ 물가 · 🐛 미끼 · 🎣 낚싯대 색 고르기 (v368) — want = { place?, bait?, rod? } · 바꾼 시각은 트랜잭션 안에서 */
+export function lakePick(want) {
+  return houseDo((p) => lakePickRule(p, want, Date.now()));
 }
 /** 📚 국어 글 한 편을 다 읽었다 — 잘못 읽기 횟수 + 받을 별이 있으면 별·💰를 저장된 프로필로 한 트랜잭션에서(houseDo = applyHouseRule = mutateProfile)
  *  ids = 지금 있는 카드 id · 날은 트랜잭션 안의 시각으로 센다(창을 연 날이 아니라) */

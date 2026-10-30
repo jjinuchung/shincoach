@@ -9,11 +9,13 @@
 // ★ 낚시 시간은 ⏳ 과목 시간·🎮 게임 판에 안 들어간다(홈 위에 뜬 창 — 과목 화면이 아님)
 // v367 (2단계 기본안 「이대로」): 🌦️ 그날 날씨(fishing.weatherOf — 날짜로) · 📖 도감 창(낚시터 위 · 오늘 낚시가 끝난 날엔 홈 띠 「📖 도감」) ·
 //   🐟 물고기 수학(fishmath.js — 수학 차례의 반쯤 · 배운 수학 개념이 없으면 전부 · 서로 다른 물고기 두 종 이상부터 · 기록은 수학 칸 + fishFmQ/fishFmOk)
+// v368 (2단계 ② 원고 「이대로」): 🏞️ 강(저수지 도감 10종이면 열림 · 🗺️ 물가 · 마지막 물가에서 시작 · fishing.pick) · 🎒 채비 가게(xp.lakeBuy — 가방 items) ·
+//   🐛 미끼 칩·🎣 낚싯대 색(xp.lakePick) · 강에서 낚은 마리 daily fishRiver(fishCatch 안의 몫)
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
-import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, okOfDay, WEATHER, weatherOf, dexRows } from './fishing.js';
+import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_RIVER, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
 import { orderOf } from './journey.js';
-import { lakeCatch, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload } from './xp.js';
+import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload } from './xp.js';
 import { listDaily, getDaily, applyDailyDelta } from './db.js';
 import { avatarOf } from './avatar.js';
 import { loadCharacters, characterUrl, artUrl, ensureArt } from './pokemon.js';
@@ -59,9 +61,10 @@ export async function mountLakeCard(box) {
   card.appendChild(el('span', 'lk-home-art', '🎣'));
   const body = el('span', 'lk-home-body');
   body.appendChild(el('b', 'lk-home-title', '학습 낚시터')); // 🎣는 왼쪽 그림 칸에
-  body.appendChild(el('span', 'lk-home-sub', done ? '오늘 낚시는 끝 — 내일 또 와요' : nz(d && d.fishSec) ? '물고기가 기다려요 — 이어서 낚아요' : '저수지에 가 볼까요? 맞힐수록 큰 물고기!'));
+  const where = PLACE_KO[pickOf(getProfileSnapshot()).place] || PLACE_KO.lake; // 마지막에 간 물가 (v368)
+  body.appendChild(el('span', 'lk-home-sub', done ? '오늘 낚시는 끝 — 내일 또 와요' : nz(d && d.fishSec) ? '물고기가 기다려요 — 이어서 낚아요' : `${where}에 가 볼까요? 맞힐수록 큰 물고기!`));
   card.appendChild(body);
-  // 오늘 낚시가 끝난 날에도 📖 도감은 볼 수 있다 (한 마리라도 낚았으면)
+  // 오늘 낚시가 끝난 날에도 📖 도감은 볼 수 있다 (한 마리라도 낚았으면 · 🏞️ 강 칸은 열린 뒤에만 — v368)
   if (done && dexRows(lakeRaw()).some((r) => r.caught)) {
     const dx = el('button', 'lk-home-dex', '📖 도감');
     dx.type = 'button';
@@ -204,13 +207,23 @@ function fmNode(q) {
   box.appendChild(el('div', '', q.text));
   return box;
 }
-/** 🐟 한 마리를 도감에 — 저장된 뒤에만 그날 낚은 마리 +1 · 못 적으면 { ok:false }(화면이 「🔁 다시 적기」) */
+/** 🐟 한 마리를 도감에 — 저장된 뒤에만 그날 낚은 마리 +1(강이면 fishRiver도) · 못 적으면 { ok:false }(화면이 「🔁 다시 적기」) · opened = 🏞️ 강이 열렸다(v368) */
 export async function keepCatch(f, put, catchFn = lakeCatch) {
   let r = null;
   try { r = await catchFn({ key: f.key, cm: f.cm }); } catch { r = null; }
   if (!r || !r.ok) return { ok: false, why: (r && r.why) || 'save' };
-  put({ fishCatch: 1 });
-  return { ok: true, first: !!r.first, best: !!r.best, coins: nz(r.coins) };
+  put({ fishCatch: 1, ...(f.place === 'river' ? { [FISH_RIVER]: 1 } : {}) });
+  return { ok: true, first: !!r.first, best: !!r.best, coins: nz(r.coins), ...(r.opened ? { opened: true } : {}) };
+}
+/** 🎒 채비 가게 상태 (그리기용 · 지금 프로필) — { coins, owned: { id: true }, pick, made, river } · river = 🏞️ 강이 열렸나(다른 창에서 열려도 · Codex 172차) */
+export function gearState(p = getProfileSnapshot()) {
+  return {
+    coins: nz(p && p.coins),
+    owned: Object.fromEntries(GEAR.map((g) => [g.id, hasGear(p, g.id)])),
+    pick: pickOf(p),
+    made: !!avatarOf(p).made,
+    river: riverOpen(p && p.fishing),
+  };
 }
 
 function say(word) {
@@ -268,9 +281,17 @@ export async function openLakeNow() {
     const firstToday = !sentSec;
     const day = today; // 문제 차례 줄은 연 날로 · 기록은 쓰는 순간의 날로(dailyQueue)
     const log = dailyQueue(applyDailyDelta, clockDay);
+    const pk = pickOf(getProfileSnapshot());
     openLake({
       look: avatarOf(getProfileSnapshot()).look,
       partnerUrl: await partnerUrl(),
+      place: pk.place, // 🏞️ 마지막에 간 물가 (v368)
+      riverOpen: riverOpen(lakeRaw()),
+      pick: pk,
+      gear: () => gearState(),
+      buyGear: (id) => lakeBuy(id),
+      onPick: (want) => lakePick(want),
+      lookNow: () => avatarOf(getProfileSnapshot()).look, // 낚시 모자·조끼를 산 뒤 새 차림
       shares: sharesOf(days, nonsulDayMap(), today, avail),
       ask: mathMix(asker(ui.src, day, start), (seed, avoid) => {
         const q = fishMathQ(lakeRaw(), seed, avoid);

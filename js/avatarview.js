@@ -79,10 +79,10 @@ export function closetOf(profile, slot) {
   const list = WEAR.filter((w) => w.slot === slot && (w.free || (Number(bag[w.id]) || 0) > 0)).map((w) => w.id);
   return SLOT_EMPTY_OK.includes(slot) ? ['', ...list] : list;
 }
-/** 👕 가게에 보일 옷 — 아직 안 산 것(처음부터 있는 옷은 빼고) · 특별한 옷은 따로 (순수) */
+/** 👕 가게에 보일 옷 — 아직 안 산 것(처음부터 있는 옷은 빼고) · 특별한 옷은 따로 · 🎣 낚시 채비 가게 옷(lake)은 빼고 (순수) */
 export function shopOf(profile) {
   const bag = (profile && profile.items) || {};
-  const left = WEAR.filter((w) => !w.free && !((Number(bag[w.id]) || 0) > 0));
+  const left = WEAR.filter((w) => !w.free && !w.lake && !((Number(bag[w.id]) || 0) > 0));
   return { plain: left.filter((w) => !w.special).map((w) => w.id), special: left.filter((w) => w.special).map((w) => w.id) };
 }
 

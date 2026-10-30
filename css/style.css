@@ -5062,12 +5062,37 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-dex-meta { font-size: 0.85rem; color: #4f6a6e; font-variant-numeric: tabular-nums; }
 .lk-dex-intro { margin: 0; font-size: 0.9rem; line-height: 1.5; color: #12343b; }
 .lk-dex-card.is-unk .lk-dex-intro { color: #4f6a6e; }
+/* 🗺️ 물가 · 🎒 채비 단추 · 🐛 미끼 칩 · 물가 고르기 · 📸 카드 · 🏞️ 강이 열렸어요 · 채비 가게 (v368) */
+.lk-topbtn { min-height: 40px; padding: 4px 14px; border-radius: 999px; border: 0; background: rgba(255, 253, 248, 0.92); color: #12343b; font: inherit; font-size: 0.98rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.lk-bait { position: absolute; right: calc(50% + 70px); bottom: 38px; min-height: 44px; max-width: 110px; white-space: nowrap; padding: 4px 10px; border-radius: 14px; border: 2px solid rgba(255, 255, 255, 0.85); background: rgba(255, 253, 248, 0.94); color: #12343b; font: inherit; font-size: 0.92rem; font-weight: 700; line-height: 1.2; cursor: pointer; overflow-wrap: anywhere; }
+.lk-places { position: absolute; top: max(60px, calc(env(safe-area-inset-top, 0px) + 54px)); left: max(12px, env(safe-area-inset-left, 0px)); width: min(300px, calc(100% - 24px)); padding: 10px; border-radius: 16px; background: #fffdf8; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35); display: grid; gap: 8px; }
+.lk-place { min-height: 56px; padding: 8px 12px; border-radius: 12px; border: 2px solid transparent; background: #dcecef; color: #12343b; font: inherit; text-align: left; cursor: pointer; display: grid; gap: 2px; }
+.lk-place b { font-size: 1.08rem; }
+.lk-place span { font-size: 0.92rem; color: #4f6a6e; }
+.lk-place.is-on { border-color: #1f7f8c; background: #e3f2f4; }
+.lk-place:disabled { cursor: default; background: #eef1f0; }
+.lk-res-photo { padding: 4px 14px; border-radius: 999px; background: #12343b; color: #fffdf8; font-weight: 800; font-size: 1.02rem; }
+.lk-res-open { margin: 0; padding: 8px 12px; border-radius: 12px; background: #e3f2f4; color: #12343b; font-weight: 800; }
+.lk-dex-lock { margin: 0; padding: 10px 12px; border-radius: 12px; border: 1px dashed #cfdcda; background: #f3f7f6; color: #4f6a6e; }
+.lk-shop-coins { padding: 4px 12px; border-radius: 999px; background: #fff0c2; color: #8a5a00; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lk-shop-msg { margin: 0; padding: 8px 12px; border-radius: 12px; background: #ffffff; border: 1px solid #cfdcda; }
+.lk-shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.lk-shop-card { background: #ffffff; border: 1px solid #cfdcda; border-radius: 12px; padding: 10px 12px 12px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.lk-shop-card.is-own { background: #f7fbf6; }
+.lk-shop-card .lk-chip { justify-self: start; }
+.lk-shop-name { font-weight: 800; font-size: 1.05rem; }
+.lk-shop-btn { justify-self: start; min-height: 44px; padding: 6px 16px; border-radius: 12px; border: 0; background: #e85a1c; color: #fff; font: inherit; font-size: 1rem; font-weight: 800; cursor: pointer; }
+.lk-shop-btn.is-use { background: #1f7f8c; }
+.lk-shop-btn:disabled { opacity: 0.45; cursor: default; }
 .lk-home-dex { flex: none; align-self: center; margin-right: 10px; min-height: 40px; padding: 4px 14px; border-radius: 999px; border: 1px solid #1f7f8c; background: var(--card); color: var(--text); font: inherit; font-size: 0.92rem; cursor: pointer; white-space: nowrap; }
 @media (max-width: 640px) {
   .lk-act { width: 170px; height: 118px; }
   .lk-gauge { width: 170px; height: 94px; bottom: 14px; }
   .lk-btn { width: 96px; height: 96px; font-size: 0.95rem; }
   .lk-dist { font-size: 1.2rem; top: 52px; }
+  .lk-top { flex-wrap: wrap; } /* 🌦️·📖·🗺️·🎒가 좁은 폰에서 두 줄로 (v368) */
+  .lk-topbtn, .lk-dexbtn { padding: 4px 10px; font-size: 0.92rem; }
+  .lk-bait { right: calc(50% + 54px); bottom: 26px; max-width: 96px; font-size: 0.86rem; padding: 4px 8px; }
   .lk-q { font-size: 1.15rem; }
   .lk-choice { font-size: 1rem; min-height: 48px; }
 }

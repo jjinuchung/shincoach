@@ -24,7 +24,7 @@ const pf = (coins = 0, items = {}, house = houseWith([]), avatar) => cloneProfil
 /** 이미 만든 캐릭터 */
 const made = (look = {}, extra = {}) => ({ made: true, gifted: true, look: { ...LOOK_BASE, ...look }, name: '', spot: { room: R, x: 1, y: 1 }, at: T, ...extra });
 const FREE = WEAR.filter((w) => w.free);
-const SHOP = WEAR.filter((w) => !w.free);
+const SHOP = WEAR.filter((w) => !w.free && !w.lake); // 🎣 낚시 채비 가게 옷(v368 lake)은 옷 가게 값 규칙 밖 — tests/river368에서
 const SPECIAL = WEAR.filter((w) => w.special);
 
 // ───────────────────── 목록 ─────────────────────

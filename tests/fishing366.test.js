@@ -23,12 +23,15 @@ function rngOf(seed) {
 const FB_MAX = { chambung: 12.5, napjaru: 13.1, pirami: 22.5, bluegill: 41, bungeo: 48, ttokbung: 42, dongjagae: 34.5, kkeuri: 44.4, nuchi: 67, bass: 97, ingeo: 129, gangjun: 102, megi: 130, gamulchi: 100, ssogari: 40, jangeo: 150 };
 
 test('🐟 물고기 16종 — 별 4·3·4·3·2 · 길이 범위가 FishBase 최대 아래 · 그림 값 · 이름 겹침 없음', () => {
-  assert.equal(SPECIES.length, 16);
-  assert.equal(new Set(SPECIES_KEYS).size, 16);
-  assert.equal(new Set(SPECIES.map((s) => s.ko)).size, 16);
-  const byStar = [1, 2, 3, 4, 5].map((n) => SPECIES.filter((s) => s.star === n).length);
+  // v368부터 SPECIES는 저수지 16 + 🏞️ 강 8 (강 쪽은 tests/river368) — 여기는 저수지 16
+  const LAKE = SPECIES.filter((s) => s.home === 'lake');
+  assert.equal(LAKE.length, 16);
+  assert.deepEqual(SPECIES.slice(0, 16), LAKE, '도감 차례 — 저수지 먼저');
+  assert.equal(new Set(SPECIES_KEYS).size, SPECIES.length);
+  assert.equal(new Set(SPECIES.map((s) => s.ko)).size, SPECIES.length);
+  const byStar = [1, 2, 3, 4, 5].map((n) => LAKE.filter((s) => s.star === n).length);
   assert.deepEqual(byStar, [4, 3, 4, 3, 2]);
-  for (const s of SPECIES) {
+  for (const s of LAKE) {
     assert.ok(s.min > 0 && s.min < s.max, s.key);
     assert.ok(s.max <= FB_MAX[s.key], `${s.ko} ${s.max} > ${FB_MAX[s.key]}`);
     assert.ok(s.a > 0 && s.w > 0, s.key);
@@ -36,7 +39,7 @@ test('🐟 물고기 16종 — 별 4·3·4·3·2 · 길이 범위가 FishBase �
     assert.equal(speciesOf(s.key), s);
   }
   assert.equal(speciesOf('toString'), null);
-  assert.deepEqual(SPECIES.filter((s) => s.alien).map((s) => s.key).sort(), ['bass', 'bluegill', 'ttokbung']);
+  assert.deepEqual(SPECIES.filter((s) => s.alien).map((s) => s.key).sort(), ['bass', 'bluegill', 'ttokbung'], '외래종은 저수지 셋뿐');
   for (const n of [1, 2, 3, 4, 5]) assert.ok(STARS[n].fight >= 1 && STARS[n].net >= 1);
   // 아버님 기본안 표 그대로 — 사투 1·2·2·3·4 · 뜰채 1·1·2·2·3 (한 마리 문제 5~11개)
   assert.deepEqual([1, 2, 3, 4, 5].map((n) => [STARS[n].fight, STARS[n].net]), [[1, 1], [2, 1], [2, 2], [3, 2], [4, 3]]);

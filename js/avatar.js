@@ -92,6 +92,9 @@ export const WEAR = [
   { id: 'a_cape', slot: 'cape', ko: '영웅 망토', price: 2000, stones: st(1, 1), special: true, art: { color: '#7c3aed', ink: '#facc15' } },
   { id: 'a_top_galaxy', slot: 'top', ko: '별빛 티셔츠', price: 2000, stones: st(2, 1), special: true, art: { color: '#1e1b4b', ink: '#fde68a', pattern: 'galaxy' } },
   { id: 'a_crown', slot: 'hat', ko: '왕관', price: 2500, stones: st(1, 2), special: true, art: { color: '#facc15', ink: '#ef4444' } },
+  // 🎣 낚시 채비 가게에서만 파는 옷 (v368 · lake — 👕 옷 가게 목록엔 안 나옴 · 사면 옷장에서 입는다)
+  { id: 'a_hat_fish', slot: 'hat', ko: '낚시 모자', price: 300, lake: true, art: { color: '#7d8a4e', ink: '#5b6638' } },
+  { id: 'a_top_fishvest', slot: 'top', ko: '낚시 조끼', price: 300, lake: true, art: { color: '#e9e4d4', ink: '#6f7a45', trim: '#d8c48a', pattern: 'vest', pockets: '#55602f' } },
 ];
 
 const by = (list) => Object.fromEntries(list.map((x) => [x.id, x]));

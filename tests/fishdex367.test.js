@@ -94,13 +94,13 @@ test('📖 도감 칸 — SPECIES 차례 16 · 낚은 칸(가장 긴 cm·처음 
   const rows = dexRows({ dex: { bungeo: { n: 3, best: 31.2, d: '2026-10-29' }, bluegill: { n: 1, best: 99, d: '' }, gyarados: { n: 1 } } });
   assert.deepEqual(rows.map((r) => r.key), SPECIES.map((s) => s.key));
   const bg = rows.find((r) => r.key === 'bungeo');
-  assert.deepEqual(bg, { key: 'bungeo', ko: '붕어', star: 2, alien: false, caught: true, n: 3, best: 31.2, d: '2026-10-29', intro: INTRO.bungeo });
+  assert.deepEqual(bg, { key: 'bungeo', ko: '붕어', star: 2, alien: false, home: 'lake', photo: false, caught: true, n: 3, best: 31.2, d: '2026-10-29', intro: INTRO.bungeo }); // home·photo는 v368
   const blue = rows.find((r) => r.key === 'bluegill');
   assert.equal(blue.caught, true);
   assert.equal(blue.alien, true);
   assert.equal(blue.best, SPECIES.find((s) => s.key === 'bluegill').max, '길이 끝 안으로');
   const unk = rows.find((r) => r.key === 'jangeo');
-  assert.deepEqual(unk, { key: 'jangeo', ko: '뱀장어', star: 5, alien: false, caught: false, hint: DEX_HINT[5] });
+  assert.deepEqual(unk, { key: 'jangeo', ko: '뱀장어', star: 5, alien: false, home: 'lake', photo: false, caught: false, hint: DEX_HINT[5] });
   assert.equal(rows.filter((r) => r.caught).length, 2);
   assert.equal(dexRows(null).filter((r) => r.caught).length, 0);
   assert.equal(lakeOf({ dex: {} }).dex.bungeo, undefined);
@@ -124,16 +124,17 @@ test('🔌 잇기 — 날씨 칩·도감 단추·💡·힌트 카드 · 도감 �
   const fv = src('js/fishview.js');
   for (const c of ['lk-wx', 'lk-dexbtn', 'lk-tip', 'lk-hint', 'lk-go']) assert.match(fv, new RegExp(`class="${c}"`), c);
   assert.match(fv, /dexRoot\.id = 'lk-dex';/);
-  assert.match(fv, /if \(!ui\.dexOpen\) ui\.used \+= activeStep\(/, '도감 보는 동안 하루 시간 안 셈');
+  assert.match(fv, /if \(!ui\.dexOpen && !ui\.shopOpen\) ui\.used \+= activeStep\(/, '도감(v368부터 🎒 채비 가게도) 보는 동안 하루 시간 안 셈');
   assert.match(fv, /const canDex = ui\.st === 'ready' && !ui\.busy && !ui\.paused && typeof ui\.host\.dexRows === 'function';/);
   assert.match(fv, /if \(!ui \|\| ui\.st !== 'ready' \|\| ui\.busy \|\| ui\.paused \|\| typeof ui\.host\.dexRows !== 'function'\) return;\n\s*const me = ui;[\s\S]{0,200}ui\.paused = true;\n\s*ui\.dexOpen = true;/);
   assert.match(fv, /h\.onAnswer && h\.onAnswer\(subj, ok, stage, q\)/);
   assert.match(fv, /if \(!ok && c\.hint\) \{/);
-  assert.match(fv, /rollFish\(ui\.spot, ui\.chum, ui\.streak, Math\.random, weatherTilt\(ui\.wx, ui\.spot\.key\)\)/);
-  assert.equal((fv.match(/weatherTilt\(ui\.wx, ui\.spot\.key\)/g) || []).length, 2, '입질·물속 그림자 둘 다');
+  // v368부터 날씨 기울임은 미끼와 곱한 tiltNow() — 입질·물속 그림자 둘 다 그것으로
+  assert.equal((fv.match(/rollFish\(ui\.spot, ui\.chum, ui\.streak, Math\.random, tiltNow\(\)\)/g) || []).length, 2, '입질·물속 그림자 둘 다');
+  assert.match(fv, /return mixTilt\(weatherTilt\(ui\.wx, ui\.spot\.key\), baitTilt\(ui\.pick\.bait\)\);/);
   assert.match(fv, /const k = n \+ nibbleExtra\(ui\.wx\);/);
   assert.match(fv, /if \(ui\.wx === 'rain' && !ui\.lite\) drawRain\(/, '느린 기기면 빗줄기 끔');
-  assert.match(fv, /paintStatic\(g, step \/ 100, v\.x0, v\.x1, v\.y0, v\.y1, ui\.wx\);/);
+  assert.match(fv, /paintStatic\(g, step \/ 100, v\.x0, v\.x1, v\.y0, v\.y1, ui\.wx, ui\.place\);/); // 🏞️ 물가(v368)
   assert.match(fv, /export function closeLake\(quiet\) \{\n\s*if \(!ui\) return;\n\s*closeDexView\(\);/);
   assert.match(fv, /export function openLake\(host\) \{\n\s*if \(!root\) build\(\);\n\s*closeDexView\(\);/, '홈에서 연 도감은 낚시터를 열 때 닫음 (Codex 171차)');
   assert.match(fv, /if \(go && !go\.hidden && \(e\.code === 'Space' \|\| e\.key === 'Enter'\)\) \{ e\.preventDefault\(\); if \(!e\.repeat\) \{ touch\(\); go\.click\(\); \} return; \}[^\n]*\n\s*if \(e\.code === 'Space'\)/, 'Space로 「알겠어요」 (Codex 171차)');
@@ -147,15 +148,13 @@ test('🔌 잇기 — 날씨 칩·도감 단추·💡·힌트 카드 · 도감 �
   assert.match(lv, /const avail = SUBJECTS\.filter\(\(s\) => \(ui\.src && ui\.src\[s\]\) \|\| \(s === 'math' && fmOk\)\);/);
   assert.match(lv, /if \(done && dexRows\(lakeRaw\(\)\)\.some\(\(r\) => r\.caught\)\) \{/, '오늘 낚시가 끝난 날 홈 띠 📖');
   assert.doesNotMatch(src('index.html'), /id="lk-dex"/, '도감 창 id는 fishview가 만든다');
-  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex'\]/, `${f} 겹침 목록`);
+  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex', 'lk-gear'\]/, `${f} 겹침 목록`);
   assert.ok(OVERLAYS.some((o) => o.place === 'lake' && o.ids.includes('lk-dex')), '🕒 도감 창도 낚시터 자리');
   const css = src('css/style.css');
   assert.match(css, /^\.lk-dexv \{[^\n]*z-index: 67;/m, '낚시터(66) 위');
   assert.match(css, /^\.lk \{[^\n]*z-index: 66;/m);
   const sw = src('sw.js');
   assert.match(sw, /'\.\/js\/fishmath\.js',/);
-  assert.match(sw, /const CACHE_VERSION = 'v367';/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v367'/);
   // 아이 화면 — 남은 수·종 셈 문구 없음
   for (const f of ['js/fishview.js', 'js/lakeview.js']) assert.doesNotMatch(code(f).split('\n').filter((l) => !/lakeTodayLine|오늘 — 낚시/.test(l)).join('\n'), /남은 (시간|분|종)|몇 종|종 남/, f);
 });

@@ -300,7 +300,7 @@ test('🔌 잇기 — 홈 띠 · ⚙ 분·🔒 +10분 · 창 id · 겹침 목록
   assert.match(pl, /\$\('set-fish-min'\)\.value = String\(fishMinOf\(settings\.fishMin\)\);/);
   assert.match(pl, /\(await import\('\.\/lakeview\.js'\)\)\.grantLakeTime\(\)/);
   assert.match(pl, /renderGameToday\(\);\n\s*renderLakeToday\(\);/);
-  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex'\]/, `${f} 겹침 목록`); // 📖 도감 창 (v367)
+  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex', 'lk-gear'\]/, `${f} 겹침 목록`); // 📖 도감 창 (v367) · 🎒 채비 가게 (v368)
   assert.match(src('js/journeyview.js'), /^export async function loadSources\(\) \{/m);
   assert.match(src('js/lakeview.js'), /const \[\{ loadSources \}\] = await Promise\.all\(\[import\('\.\/journeyview\.js'\)/);
   const sw = src('sw.js');
