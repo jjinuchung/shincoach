@@ -201,16 +201,55 @@ export const sfx = {
     burst(c, 'lowpass', 2200, 0.4, 0.22);
     tone(c, { freq: 240, freqEnd: 90, type: 'sine', dur: 0.2, gain: 0.1 });
   },
+  /** 🎒 대여행 기술 소리 (v375) — kind는 효과 꼴(jrscene.fxKindOf(타입).k) · 모르는 꼴은 노말 */
+  move(kind) {
+    const c = ac(); if (!c) return;
+    (MOVE_SFX[kind] || MOVE_SFX.normal)(c);
+  },
 };
 
-/** 짧은 물소리 — 백색소음을 거름틀 하나로 (🎣) */
-function burst(c, type, hz, dur, gain) {
+/** 🎒 기술 소리 열두 가지 (v375) — 지브리 곡 위에 작게(세기 0.16 아래 · 맞음 「퍽」 0.2보다 작게) */
+export const MOVE_SFX = {
+  fire: (c) => { burst(c, 'lowpass', 900, 0.4, 0.14); tone(c, { freq: 160, freqEnd: 80, type: 'sawtooth', dur: 0.3, gain: 0.04 }); },
+  water: (c) => { burst(c, 'bandpass', 1300, 0.3, 0.12); tone(c, { freq: 620, freqEnd: 280, dur: 0.2, gain: 0.07 }); },
+  electric: (c) => { burst(c, 'highpass', 2200, 0.25, 0.09); tone(c, { freq: 1200, freqEnd: 300, type: 'sawtooth', dur: 0.22, gain: 0.04 }); },
+  grass: (c) => { for (let i = 0; i < 3; i++) burst(c, 'bandpass', 2600 + i * 400, 0.08, 0.08, i * 0.09); },
+  ice: (c) => { [2093, 2637, 3136].forEach((f, i) => tone(c, { freq: f, at: i * 0.06, dur: 0.12, gain: 0.05 })); },
+  rock: (c) => { tone(c, { freq: 120, freqEnd: 50, dur: 0.3, gain: 0.15 }); burst(c, 'lowpass', 420, 0.25, 0.12); },
+  ghost: (c) => { tone(c, { freq: 520, freqEnd: 240, dur: 0.45, gain: 0.07 }); tone(c, { freq: 540, freqEnd: 250, dur: 0.45, gain: 0.05 }); },
+  psychic: (c) => { tone(c, { freq: 320, freqEnd: 960, dur: 0.4, gain: 0.07 }); tone(c, { freq: 480, freqEnd: 1440, type: 'triangle', dur: 0.4, gain: 0.03 }); },
+  fairy: (c) => { [1568, 2093, 2637].forEach((f, i) => tone(c, { freq: f, at: i * 0.06, dur: i === 2 ? 0.35 : 0.1, gain: 0.06 })); },
+  dragon: (c) => { tone(c, { freq: 110, freqEnd: 70, type: 'sawtooth', dur: 0.45, gain: 0.06 }); burst(c, 'lowpass', 600, 0.4, 0.1); },
+  flying: (c) => { sweep(c, 600, 2600, 0.32, 0.12); },
+  normal: (c) => { tone(c, { freq: 220, freqEnd: 60, type: 'square', dur: 0.12, gain: 0.12 }); },
+};
+
+/** 바람 소리 — 거름틀 높이를 올리며 (🎒 비행 기술) */
+function sweep(c, from, to, dur, gain) {
+  const s = noise(c);
+  const f = c.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = 1.2;
+  const g = c.createGain();
+  const t0 = c.currentTime;
+  f.frequency.setValueAtTime(from, t0);
+  f.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.06);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(f).connect(g).connect(c.destination);
+  s.start(t0);
+  s.stop(t0 + dur + 0.02);
+}
+
+/** 짧은 물소리 — 백색소음을 거름틀 하나로 (🎣) · at초 뒤에 (🎒 풀 기술은 세 번) */
+function burst(c, type, hz, dur, gain, at = 0) {
   const s = noise(c);
   const f = c.createBiquadFilter();
   f.type = type;
   f.frequency.value = hz;
   const g = c.createGain();
-  const t0 = c.currentTime;
+  const t0 = c.currentTime + at;
   g.gain.setValueAtTime(0.0001, t0);
   g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);

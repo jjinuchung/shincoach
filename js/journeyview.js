@@ -5,11 +5,13 @@
 // 대사창(.jr-dlg)만 Galmuri11 픽셀 글꼴(fonts/galmuri11.woff — 한 글자 12칸이라 크기는 crispPx로 기기 배율에 맞춘다)
 // 그림: 앱이 받아 둔 포켓몬 그림만(loadCharacters · 없으면 ensureCast로 받기 · 그래도 없으면 타입 색 동그라미) — 저장소에 그림 파일을 넣지 않는다
 // v362: 구역 6곳 · 👑 구역 대장(이기면 ❤️ +2 — 새 꼴 지도엔 🏥 점 없음) · 구역마다 이벤트(🎁 보물 상자 · 🧑‍🔬 박사 퀴즈 · 🔀 갈림길) · ❤️ 6 · 지도는 두 줄(산·숲·바다 → 화산·하늘·우주) · ⛺ 쉬었다 가기
+// v375: 구역 그림(jrscene.js — 캔버스로 직접) · 배틀은 받침대 위(동그라미 틀은 고르는 화면에만 · 내 포켓몬은 좌우를 뒤집어 상대를 봄) · 타입마다 기술 효과·소리 ·
+//   맞으면 번쩍·숫자·HP 칸 깨짐 · 효과가 굉장하면 흔들림·큰 글씨 · 쓰러짐 · 틀리면 가벼운 반격 · 👑·🚀 등장 · 지도 위를 파트너가 걸어감 · 정답 연출은 약 1.5초(누르면 넘김)
 import {
   JOURNEY, ZONES, PER_ZONE, OLD_STOPS, SUBJECTS, TYPE_KO, typesOf, advantage, strongZones, zoneOfStop, centersOf, zoneStart, pendingEvent, hpOf, heartsMax, stateOf, makeRoute, makeEvents,
   profChoices, subjectFor, orderOf, slotOf, questionSeed, rngOf, crispPx, lossPreview, ownedIds,
 } from './journey.js';
-import { journeyRaw, journeyStart, journeyAnswer, journeySwap, journeyHome, journeyPick, journeyEvent, getProfileSnapshot, getLevelInfo, rarityOf, monLv, getLook, korWordsMap, nonsulMap, profileReady, profileLoading, onProfileReload } from './xp.js';
+import { journeyRaw, journeyStart, journeyAnswer, journeySwap, journeyHome, journeyPick, journeyEvent, getProfileSnapshot, getLevelInfo, rarityOf, monLv, getLook, korWordsMap, nonsulMap, profileReady, profileLoading, onProfileReload, getPartner } from './xp.js';
 import { ROSTER, loadCharacters, ensureCast, isUnlocked, isLegendary, isUltraBeast, isLetterMon } from './pokemon.js';
 import { TRAINERS, MOVES, SIGNATURE } from './battle.js';
 import { STONES } from './items.js';
@@ -17,6 +19,7 @@ import { todayKey } from './track.js';
 import { sfx, unlock } from './sfx.js';
 import * as bgm from './bgm.js';
 import { enterCalmTrip, leaveCalmTrip, toggleCalm } from './calm.js'; // 🎒 여행 중 음악 = 국어·논술의 지브리 곡 (v374 — 곡이 없는 기기만 bgm.js)
+import { sceneState, paintScene, platform, FOE_AT, ME_AT, createFx, travel, impact, fxKindOf, lungesFor, faintStars, landDust, popRing, crownGlow, makeStage } from './jrscene.js';
 import { josa } from './catch.js';
 
 const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
@@ -39,7 +42,9 @@ const hearts = (n, max = JOURNEY.hearts) => '❤️'.repeat(Math.max(0, n)) + '�
 
 let root = null;
 let cardBox = null;
-const ui = { open: false, run: 0, chars: new Map(), src: null, cur: null, mon: null, busy: false, ribbonAt: -1 };
+let stage = null; // 🎨 지금 화면의 움직이는 그림판 (v375 — jrscene.makeStage · 화면이 바뀌면 바꿔 끼우고 창을 닫으면 멈춤)
+// scenes: 구역 그림 자리(구역마다 한 번) · metKey/meKey: 등장을 한 번만(이 만남 · 이 포켓몬) · enterP: 등장 연출이 끝나는 때
+const ui = { open: false, run: 0, chars: new Map(), src: null, cur: null, mon: null, busy: false, ribbonAt: -1, scenes: [], metKey: '', meKey: '', enterP: null };
 
 /** 헤드리스 시험용 (?nosw=1에서만) — 지금 문제를 window에 */
 const devQ = (q) => { try { if (/[?&]nosw=1/.test(location.search)) window.__journeyQ = q; } catch { /* 무시 */ } };
@@ -89,6 +94,7 @@ function build() {
       <div class="jr-body"></div>
     </div>`;
   document.body.appendChild(root);
+  stage = makeStage(window);
   root.querySelector('.jr-x').addEventListener('click', () => { if (!ui.busy) closeJourney(); });
   root.querySelector('.jr-music').addEventListener('click', toggleCalm); // 🎵 국어·논술 머리줄 단추와 같은 켬/끔 (v374)
   root.addEventListener('pointerdown', () => { try { unlock(); } catch { /* 무시 */ } }, { passive: true });
@@ -109,6 +115,7 @@ function topBar(cur) {
 function fresh(cur) {
   ui.run++;
   ui.busy = false;
+  if (stage) stage.set([]); // 앞 화면 그림판은 멈춤 — 새 화면이 제 것을 건다
   topBar(cur);
   const b = body();
   b.innerHTML = '';
@@ -150,6 +157,7 @@ export function closeJourney() {
   ui.run++;
   ui.busy = false;
   root.hidden = true;
+  if (stage) stage.stop();
   try { leaveCalmTrip(); } catch { /* 무시 */ }
   try { bgm.stop(); } catch { /* 무시 */ }
   mountJourneyCard(cardBox);
@@ -275,7 +283,7 @@ function monFig(id, cls = '') {
     img.alt = koOf(id);
     img.draggable = false;
     f.appendChild(img);
-  } else f.appendChild(el('span', 'jr-mon-alt', koOf(id).slice(0, 1)));
+  } else { f.classList.add('is-alt'); f.appendChild(el('span', 'jr-mon-alt', koOf(id).slice(0, 1))); } // 그림이 없으면 무대 위에서도 동그라미 (v375)
   return f;
 }
 function typeChips(id) {
@@ -283,12 +291,12 @@ function typeChips(id) {
   for (const t of typesOf(id)) box.appendChild(el('span', `jr-chip jr-t-${t}`, TYPE_KO[t] || t));
   return box;
 }
-/** 내 포켓몬의 기술 — 전용 기술이 있으면 그것, 아니면 타입의 센 기술(벌레·독·비행은 기술표가 없어 다음 타입 → 노말) */
+/** 내 포켓몬의 기술 — 전용 기술이 있으면 그것, 아니면 타입의 센 기술(벌레·독·비행은 기술표가 없어 다음 타입 → 노말) · type은 효과·소리 꼴 (v375) */
 function moveOf(id) {
-  const sig = SIGNATURE[Number(id)];
-  if (sig) return { name: sig.strong, emoji: sig.emoji };
   const t = typesOf(id).find((x) => MOVES[x]) || 'normal';
-  return { name: MOVES[t].strong, emoji: MOVES[t].emoji };
+  const sig = SIGNATURE[Number(id)];
+  if (sig) return { name: sig.strong, emoji: sig.emoji, type: t };
+  return { name: MOVES[t].strong, emoji: MOVES[t].emoji, type: t };
 }
 /** 그림이 없는 포켓몬을 받아 둔다(기다리는 끝 ms) — 못 받아도 동그라미로 */
 async function ensureArts(ids, ms = 6000) {
@@ -298,6 +306,180 @@ async function ensureArts(ids, ms = 6000) {
     const got = await Promise.race([ensureCast(need), sleep(ms).then(() => [])]);
     for (const c of got || []) if (c && c.url) ui.chars.set(Number(c.id), c.url);
   } catch { /* 그림 없이 */ }
+}
+
+// ───────────── 🎨 장면 그림 · 연출 (v375) ─────────────
+
+/** 구역 그림 자리 — 구역마다 같은 씨앗이라 화면이 바뀌어도 같은 산·같은 별 */
+const sceneOf = (zi) => ui.scenes[zi] || (ui.scenes[zi] = sceneState(zi, 11 + zi * 31));
+function artCanvas(cls) {
+  const cv = el('canvas', cls);
+  cv.setAttribute('aria-hidden', 'true');
+  return cv;
+}
+/** 태블릿 「동작 줄이기」 — 배경은 멈춘 그림 · 효과·흔들림 없이 예전 시간대로 */
+const calmMotion = () => !stage || stage.reduce;
+/** 요소 움직이기 — animate가 없는 기기면 아무 일 없이 */
+function anim(node, frames, opts) {
+  try { if (node && typeof node.animate === 'function') return node.animate(frames, opts); } catch { /* 움직임 없이 */ }
+  return null;
+}
+const ended = (a) => (a && a.finished ? a.finished.catch(() => {}) : Promise.resolve());
+const sound = (kind) => { try { sfx.move(kind); } catch { /* 소리 없이 */ } };
+/** ms만큼 기다리되 화면을 누르면 바로 — 정답 연출만 (틀렸을 때는 정답을 읽을 시간이라 그대로 기다림) */
+function waitTap(ms) {
+  return new Promise((res) => {
+    let tm = 0;
+    const end = () => { clearTimeout(tm); root.removeEventListener('pointerdown', end, true); res(); };
+    tm = setTimeout(end, ms);
+    root.addEventListener('pointerdown', end, true);
+  });
+}
+
+/** 배틀 무대 — 구역 그림 · 받침대 위 두 포켓몬 · 효과판 · 이름표 · 번쩍·큰 글씨·띠 자리 */
+function buildArena(zi, s, foeFig, myFig, foePlate, myPlate) {
+  const arena = el('div', `jr-arena jr-z${zi}-soft`);
+  const bg = artCanvas('jr-arena-bg');
+  const dim = el('div', 'jr-dim');
+  const slot = (side, fig, extra = '') => {
+    const sl = el('div', `jr-stand ${side}${extra}`);
+    const act = el('div', 'jr-act');
+    const bob = el('div', 'jr-bob');
+    bob.appendChild(fig);
+    act.appendChild(bob);
+    sl.appendChild(act);
+    return [sl, act];
+  };
+  const [foeSlot, foeAct] = slot('is-foe', foeFig, s.kind === 'boss' || s.kind === 'rocket' ? ' is-boss' : '');
+  const [meSlot, meAct] = slot('is-me', myFig);
+  const fxc = artCanvas('jr-arena-fx');
+  const flash = el('div', 'jr-flash');
+  const stamp = el('div', 'jr-stamp');
+  const banner = el('div', 'jr-banner');
+  for (const n of [bg, dim, foeSlot, meSlot, fxc, foePlate, myPlate, flash, stamp, banner]) arena.appendChild(n);
+  const fx = createFx();
+  const S = sceneOf(zi);
+  const a = { arena, fxc, dim, flash, stamp, banner, foeAct, meAct, foeFig, myFig, fx, zi, tok: 0 };
+  /** 그림판 걸기 — 무대가 화면에 붙은 뒤에(크기를 재야 하니까) */
+  a.start = () => stage && stage.set([
+    { cv: bg, fps: 30, draw: (g, w, h, t) => { paintScene(g, w, h, t, zi, S); platform(g, FOE_AT.x * w, FOE_AT.y * h, Math.min(h * 0.36, w * 0.2), zi); platform(g, ME_AT.x * w, ME_AT.y * h, Math.min(h * 0.46, w * 0.25), zi); } },
+    { cv: fxc, fx, draw: (g, w, h, t, dt) => { fx.step(dt); g.clearRect(0, 0, w, h); fx.draw(g); } },
+  ]);
+  return a;
+}
+/** 그림 가운데(효과판 픽셀) · s = 그림 높이 */
+function centerIn(a, node) {
+  const ar = a.fxc.getBoundingClientRect(), r = node.getBoundingClientRect();
+  const kx = a.fxc.width / (ar.width || 1), ky = a.fxc.height / (ar.height || 1);
+  return { x: (r.left + r.width / 2 - ar.left) * kx, y: (r.top + r.height / 2 - ar.top) * ky, s: r.height * ky };
+}
+const unitOf = (a) => a.fxc.width / 640;
+const cssPer = (a) => (a.fxc.getBoundingClientRect().width || 1) / (a.fxc.width || 1);
+const lungeFrames = (dx, dy) => [{ transform: 'none' }, { transform: 'translate(-10px, 4px)', offset: 0.22 }, { transform: `translate(${dx}px, ${dy}px) rotate(${dx > 0 ? 8 : -8}deg)`, offset: 0.58 }, { transform: 'none' }];
+const CAST = [{ transform: 'none' }, { transform: 'translate(-8px, 4px) scale(.95)', offset: 0.45 }, { transform: 'translate(10px, -8px) scale(1.06)', offset: 0.8 }, { transform: 'none' }];
+
+function flashOn(a, color = '#ffffff') {
+  a.flash.style.background = color;
+  anim(a.flash, [{ opacity: 0 }, { opacity: 0.7 }, { opacity: 0 }], { duration: 260 });
+}
+function shake(node, amp) {
+  anim(node, [{ transform: 'none' }, { transform: `translate(${amp}px, ${-amp / 2}px)` }, { transform: `translate(${-amp}px, ${amp / 3}px)` }, { transform: `translate(${amp * 0.6}px, ${amp / 2}px)` }, { transform: `translate(${-amp * 0.4}px, 0)` }, { transform: 'none' }], { duration: 380 });
+}
+/** 무대 위 글씨가 떠올랐다 사라짐 — 「-1」(상대 위) · ❤️(내 포켓몬 위) */
+function floatUp(a, node, text, cls, dx) {
+  const ar = a.arena.getBoundingClientRect(), r = node.getBoundingClientRect();
+  const p = el('span', cls, text);
+  p.style.left = `${r.left - ar.left + r.width * dx}px`;
+  p.style.top = `${r.top - ar.top - 6}px`;
+  a.arena.appendChild(p);
+  const an = anim(p, [{ transform: 'translateY(8px) scale(.6)', opacity: 0 }, { transform: 'translateY(-6px) scale(1.15)', opacity: 1, offset: 0.2 }, { transform: 'translateY(-40px) scale(1)', opacity: 0 }], { duration: 950, easing: 'ease-out' });
+  if (an) ended(an).then(() => p.remove()); else setTimeout(() => p.remove(), 950);
+}
+
+/** 등장 — 상대는 위에서 내려앉아 흙먼지 · 내 포켓몬은 빛 고리에서 */
+async function enterFoe(a) {
+  const an = anim(a.foeAct, [{ transform: 'translateY(-140%) scale(.7)', opacity: 0 }, { transform: 'translateY(6%) scale(1.08, .9)', opacity: 1, offset: 0.7 }, { transform: 'none', opacity: 1 }], { duration: 620, easing: 'cubic-bezier(.3,.7,.4,1)' });
+  await sleep(430);
+  landDust(a.fx, centerIn(a, a.foeFig), unitOf(a), a.zi);
+  await ended(an);
+}
+async function enterMe(a) {
+  popRing(a.fx, centerIn(a, a.myFig), unitOf(a));
+  await ended(anim(a.meAct, [{ transform: 'scale(.15)', opacity: 0, filter: 'brightness(4)' }, { transform: 'scale(1.1)', opacity: 1, filter: 'brightness(2)', offset: 0.6 }, { transform: 'none', opacity: 1, filter: 'brightness(1)' }], { duration: 480, easing: 'ease-out' }));
+}
+/** 👑 대장 · 🚀 로켓단 — 어두워지고 띠가 지나간 뒤 금빛을 두르고 */
+async function bossIntro(a, text) {
+  a.foeAct.style.opacity = '0';
+  anim(a.dim, [{ opacity: 0 }, { opacity: 0.62 }], { duration: 300, fill: 'forwards' });
+  a.banner.textContent = text;
+  anim(a.banner, [{ transform: 'translateX(110%)', opacity: 1 }, { transform: 'translateX(0)', opacity: 1, offset: 0.2 }, { transform: 'translateX(0)', opacity: 1, offset: 0.8 }, { transform: 'translateX(-110%)', opacity: 1 }], { duration: 1600, easing: 'ease-in-out' });
+  play('whoosh');
+  await sleep(1300);
+  a.foeAct.style.opacity = '';
+  shake(a.arena, 8);
+  await enterFoe(a);
+  crownGlow(a.fx, centerIn(a, a.foeFig), unitOf(a), 0.9);
+  await sleep(500);
+  anim(a.dim, [{ opacity: 0.62 }, { opacity: 0 }], { duration: 420, fill: 'forwards' });
+}
+
+/**
+ * 기술 — 내 포켓몬이 기술을 쓰고(몸으로 달려들거나 · 날려 보내거나) 상대가 맞는다
+ * 기다림은 부른 쪽 타이머가 정하고 여기는 보이기만 · a.tok이 바뀌면(누르고 넘김) 남은 순서는 그만 · onHit은 맞는 순간(HP 칸)
+ */
+function strike(a, run, type, dmg, big, onHit) {
+  const tok = ++a.tok;
+  const live = () => alive(run) && a.tok === tok;
+  const P = centerIn(a, a.myFig), Q = centerIn(a, a.foeFig), u = unitOf(a);
+  sound(fxKindOf(type).k);
+  (async () => {
+    if (lungesFor(type)) {
+      const k = cssPer(a);
+      anim(a.meAct, lungeFrames((Q.x - P.x) * k * 0.7, (Q.y - P.y) * k * 0.7), { duration: 640, easing: 'ease-in-out' });
+      await sleep(380);
+    } else {
+      anim(a.meAct, CAST, { duration: 460, easing: 'ease-out' });
+      await sleep(260);
+      if (!live()) return;
+      travel(a.fx, type, P, Q, 0.5, u);
+      await sleep(500);
+    }
+    if (!live()) return;
+    const fl = impact(a.fx, type, Q, u, big);
+    if (fl) flashOn(a, fl);
+    play('hit');
+    anim(a.foeAct, [{ transform: 'none', opacity: 1, filter: 'brightness(1)' }, { transform: 'translateX(12px)', opacity: 1, filter: 'brightness(3)', offset: 0.15 }, { transform: 'translateX(-9px)', opacity: 0.25, offset: 0.35 }, { transform: 'translateX(6px)', opacity: 1, offset: 0.55 }, { transform: 'translateX(-3px)', opacity: 0.3, offset: 0.75 }, { transform: 'none', opacity: 1, filter: 'brightness(1)' }], { duration: 540 });
+    if (big) { shake(a.arena, 9); flashOn(a, '#ffffff'); }
+    floatUp(a, a.foeFig, `-${dmg}`, 'jr-pop', 0.62);
+    onHit();
+    if (!big) return;
+    await sleep(180);
+    if (!live()) return;
+    a.stamp.textContent = '효과가 굉장했다!';
+    anim(a.stamp, [{ transform: 'translate(-50%,-50%) scale(1.9)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.15 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: 0.82 }, { transform: 'translate(-50%,-50%) scale(1.05)', opacity: 0 }], { duration: 1150, easing: 'ease-out' });
+  })().catch(() => {});
+}
+/** 쓰러짐 — 번쩍 하고 납작해지며 사라지고 별이 튄다 */
+function faint(a) {
+  const Q = centerIn(a, a.foeFig), u = unitOf(a);
+  a.tok++;
+  anim(a.foeAct, [{ transform: 'none', opacity: 1, filter: 'brightness(1)' }, { transform: 'translateY(-6%) scale(1.04)', opacity: 1, filter: 'brightness(2.2)', offset: 0.25 }, { transform: 'translateY(40%) scale(.9, .1)', opacity: 0, filter: 'brightness(1)' }], { duration: 760, easing: 'ease-in', fill: 'forwards' });
+  a.fx.later(0.26, () => faintStars(a.fx, Q, u));
+}
+/** 틀렸을 때 — 상대가 가볍게 반격하고 내 포켓몬이 휘청 · ❤️ 하나가 떠올라 사라짐 (빨간 번쩍임·큰 소리 없이) */
+function counter(a, run, foeType) {
+  const tok = ++a.tok;
+  const live = () => alive(run) && a.tok === tok;
+  const P = centerIn(a, a.foeFig), Q = centerIn(a, a.myFig), k = cssPer(a);
+  anim(a.foeAct, lungeFrames((Q.x - P.x) * k * 0.35, (Q.y - P.y) * k * 0.35), { duration: 540, easing: 'ease-in-out' });
+  (async () => {
+    await sleep(310);
+    if (!live()) return;
+    impact(a.fx, foeType, Q, unitOf(a), false, 0.55);
+    anim(a.meAct, [{ transform: 'none', opacity: 1 }, { transform: 'translateX(-8px) rotate(-4deg)', opacity: 0.35, offset: 0.25 }, { transform: 'translateX(5px)', opacity: 1, offset: 0.5 }, { transform: 'translateX(-3px)', opacity: 0.4, offset: 0.75 }, { transform: 'none', opacity: 1 }], { duration: 540 });
+    await sleep(240);
+    if (live()) floatUp(a, a.myFig, '❤️', 'jr-heartpop', 0.5);
+  })().catch(() => {});
 }
 
 // ───────────── 출발 준비 ─────────────
@@ -448,7 +630,59 @@ function mapSlots(c) {
 /** 구역 띠 자리 — 위 줄 산·숲·바다(왼쪽 → 오른쪽) · 아래 줄 화산·하늘·우주(오른쪽 → 왼쪽) */
 const bandOf = (z) => (z < 3 ? { col: z, row: 0 } : { col: 5 - z, row: 1 });
 
-function mapSvg(c) {
+/** 지도 점 자리(지도 단위 420×300) — 구역 안에서 고르게 · 위아래로 조금씩 엇갈리게 */
+function mapLayout(c) {
+  const slots = mapSlots(c);
+  const byZone = new Map();
+  for (const s of slots) { if (!byZone.has(s.z)) byZone.set(s.z, []); byZone.get(s.z).push(s); }
+  for (const [z, list] of byZone) {
+    const { col, row } = bandOf(z);
+    const pad = 20; // 🚀 동그라미(+ 지금 자리 테두리)가 지도 밖으로 나가지 않게 (🔍 Codex 166차 #3)
+    list.forEach((s, k) => {
+      const t = (k + 0.5) / list.length;
+      s.x = Math.round(col * 140 + pad + (row === 0 ? t : 1 - t) * (140 - 2 * pad));
+      s.y = row * 150 + (s.rocket ? 92 : 88 + (k % 2 ? -22 : 20));
+    });
+  }
+  return slots;
+}
+
+/** 🎨 지도 바탕 — 구역 그림 여섯을 두 줄로 (v375 · 지도 SVG의 칸과 같은 자리) */
+function paintMapArt(g, w, h, t) {
+  const tw = w / 3, th = h / 2;
+  ZONES.forEach((z, i) => {
+    const { col, row } = bandOf(i);
+    g.save();
+    g.beginPath(); g.rect(col * tw, row * th, tw, th); g.clip();
+    g.translate(col * tw, row * th);
+    paintScene(g, tw, th, t, i, sceneOf(i));
+    g.restore();
+  });
+  g.strokeStyle = 'rgba(255,255,255,.85)';
+  g.lineWidth = Math.max(1, h * 0.006);
+  g.beginPath(); g.moveTo(tw, 0); g.lineTo(tw, h); g.moveTo(tw * 2, 0); g.lineTo(tw * 2, h); g.moveTo(0, th); g.lineTo(w, th); g.stroke();
+}
+
+/** 지도 위 파트너 — 지난 점에서 지금 점으로 콩 뛰어간다 (🤝 파트너가 함께 갔으면 그 포켓몬, 아니면 첫째 · 그림이 없으면 🎒) */
+function mapWalker(wrap, slots, c) {
+  const k = slots.findIndex((s) => s.now);
+  if (k < 0) return;
+  const to = slots[k], from = slots[Math.max(0, k - 1)];
+  const pid = Number(getPartner());
+  const id = c.party.includes(pid) ? pid : c.party[0];
+  const wk = el('span', `jr-walker${bandOf(to.z).row ? ' is-left' : ''}`);
+  const url = id ? urlOf(id) : '';
+  if (url) { const img = el('img'); img.src = url; img.alt = ''; img.draggable = false; wk.appendChild(img); } else wk.appendChild(el('span', 'jr-walker-alt', '🎒'));
+  const at = (s) => ({ left: `${(s.x / 420) * 100}%`, top: `${((s.y - 12) / 300) * 100}%` }); // 점 동그라미 위에 선다
+  Object.assign(wk.style, at(to));
+  wrap.appendChild(wk);
+  if (calmMotion() || from === to) return;
+  const a = at(from), b = at(to);
+  const mid = { left: `calc((${a.left} + ${b.left}) / 2)`, top: `calc((${a.top} + ${b.top}) / 2)` };
+  anim(wk, [{ ...a, transform: 'translate(-50%, -100%)' }, { ...mid, transform: 'translate(-50%, -130%)' }, { ...b, transform: 'translate(-50%, -100%)' }], { duration: 800, delay: 250, easing: 'ease-in-out', fill: 'backwards' });
+}
+
+function mapSvg(c, laid = mapLayout(c)) {
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', '0 0 420 300');
@@ -467,19 +701,7 @@ function mapSvg(c) {
     add('rect', { x: col * 140, y: row * 150, width: 140, height: 150, class: `jr-z${i}-fill` });
     add('text', { x: col * 140 + 70, y: row * 150 + 22, class: 'jr-map-label' }, `${z.emoji} ${z.ko}`);
   });
-  const slots = mapSlots(c);
-  // 구역 안에서 고르게 · 위아래로 조금씩 엇갈리게
-  const byZone = new Map();
-  for (const s of slots) { if (!byZone.has(s.z)) byZone.set(s.z, []); byZone.get(s.z).push(s); }
-  for (const [z, list] of byZone) {
-    const { col, row } = bandOf(z);
-    const pad = 20; // 🚀 동그라미(+ 지금 자리 테두리)가 지도 밖으로 나가지 않게 (🔍 Codex 166차 #3)
-    list.forEach((s, k) => {
-      const t = (k + 0.5) / list.length;
-      s.x = Math.round(col * 140 + pad + (row === 0 ? t : 1 - t) * (140 - 2 * pad));
-      s.y = row * 150 + (s.rocket ? 92 : 88 + (k % 2 ? -22 : 20));
-    });
-  }
+  const slots = laid;
   add('path', { d: `M${slots.map((s) => `${s.x},${s.y}`).join(' L')}`, class: 'jr-map-road' });
   for (const s of slots) {
     const r = s.rocket ? 21 : s.t === 'ev' ? 11 : s.kind === 'boss' ? 15 : 13;
@@ -499,7 +721,10 @@ function renderMap() {
   const n = c.route.length;
   const pend = pendingEvent(c);
   const wrap = el('div', 'jr-mapwrap');
-  wrap.appendChild(mapSvg(c));
+  const art = artCanvas('jr-map-bg');
+  wrap.appendChild(art);
+  const laid = mapLayout(c);
+  wrap.appendChild(mapSvg(c, laid));
   const first = zoneStart(c.at, n) && c.hp === hpOf(c.route, c.at) && ui.ribbonAt !== c.at;
   if (first) {
     ui.ribbonAt = c.at;
@@ -507,6 +732,9 @@ function renderMap() {
     wrap.appendChild(el('div', 'jr-ribbon', c.at === n - 1 ? '로켓단이 기다린다!' : `${z.ko}에 왔다!`));
   }
   b.appendChild(wrap);
+  // 구역 그림은 그림판이 그려질 때만 칸 색을 걷는다(못 그리면 예전 색 칸 그대로) · 지도는 여섯 장면이라 느리게(12장/초)
+  if (stage && stage.set([{ cv: art, fps: 12, draw: paintMapArt }])) wrap.classList.add('has-art');
+  mapWalker(wrap, laid, c);
   b.appendChild(el('p', 'jr-legend', n === OLD_STOPS ? '🐾 야생 · 🧢 트레이너 · 🏥 포켓몬센터 · 🚀 로켓단' : `🐾 야생 · 🧢 트레이너 · 👑 대장(이기면 ❤️ +${JOURNEY.heal}) · 🎁🔬🔀 이벤트 · 🚀 로켓단`));
   const row = el('div', 'jr-btns');
   if (pend >= 0) {
@@ -746,11 +974,14 @@ function renderIntro() {
   const l = el('span', 'jr-vs-l');
   l.appendChild(el('span', 'jr-vs-me', s.kind === 'trainer' ? s.who : s.kind === 'boss' ? `👑${s.who}` : s.kind === 'rocket' ? '👩‍🦰🧑' : '🎒'));
   const r = el('span', 'jr-vs-r');
+  const vbg = artCanvas('jr-vs-bg'); // 🎨 그 구역 그림 위에 상대가 선다 (v375)
+  r.appendChild(vbg);
   r.appendChild(monFig(s.mon, 'is-big'));
   vs.appendChild(l);
   vs.appendChild(r);
   vs.appendChild(el('span', 'jr-vs-mark', 'VS'));
   b.appendChild(vs);
+  if (stage) { const S = sceneOf(zi); stage.set([{ cv: vbg, fps: 30, draw: (g, w, h, t) => paintScene(g, w, h, t, zi, S) }]); }
   b.appendChild(dlg(foeLine(s, ZONES[zi])));
   play(s.kind === 'rocket' || s.kind === 'boss' ? 'siren' : 'whoosh');
   let done = false;
@@ -799,7 +1030,7 @@ function renderBattle(msg) {
   const max = hpOf(c.route, c.at);
   const { b, run } = fresh(c);
   const adv = advantage(ui.mon, s.mon);
-  const arena = el('div', `jr-arena jr-z${zoneOfStop(c.at, c.route.length)}-soft`);
+  const zi = zoneOfStop(c.at, c.route.length);
   const foePlate = el('div', 'jr-plate is-foe');
   const fn = el('span', 'jr-plate-name');
   fn.appendChild(el('b', '', s.kind === 'trainer' ? `${s.who} ${koOf(s.mon)}` : s.kind === 'boss' ? `👑 ${koOf(s.mon)}` : s.kind === 'rocket' ? `🚀 ${koOf(s.mon)}` : koOf(s.mon)));
@@ -815,11 +1046,20 @@ function renderBattle(msg) {
   mn.appendChild(typeChips(ui.mon));
   myPlate.appendChild(mn);
   myPlate.appendChild(btn('jr-swapmon', '교체', () => { if (!ui.busy) renderChoose(); }));
-  arena.appendChild(foePlate);
-  arena.appendChild(foeFig);
-  arena.appendChild(myFig);
-  arena.appendChild(myPlate);
-  b.appendChild(arena);
+  const art = buildArena(zi, s, foeFig, myFig, foePlate, myPlate);
+  b.appendChild(art.arena);
+  art.start();
+  // 등장은 이 만남에서 한 번 · 바꿔 낸 포켓몬은 그 포켓몬만 (정답·오답 뒤 다시 그릴 때는 없음)
+  const key = `${c.id}:${c.at}`;
+  const foeNew = ui.metKey !== key;
+  const meNew = foeNew || ui.meKey !== `${key}:${ui.mon}`;
+  ui.metKey = key;
+  ui.meKey = `${key}:${ui.mon}`;
+  ui.enterP = calmMotion() || !(foeNew || meNew) ? null : (async () => {
+    if (foeNew && (s.kind === 'boss' || s.kind === 'rocket')) await bossIntro(art, s.kind === 'boss' ? `👑 ${ZONES[zi].ko}의 대장이 나타났다!` : '🚀 로켓단이 나타났다!');
+    else if (foeNew) await enterFoe(art);
+    if (meNew) await enterMe(art);
+  })().catch(() => {});
   if (adv) b.appendChild(el('div', 'jr-super', `${moveOf(ui.mon).emoji} 효과가 굉장해! 맞히면 2칸`));
   const line = dlg(msg || `${koOf(ui.mon)}${josa(koOf(ui.mon), '은', '는')} 무엇을 할까?`);
   b.appendChild(line);
@@ -857,7 +1097,7 @@ function renderBattle(msg) {
     const m = el('button', `jr-move jr-stripe-${myType}`);
     m.type = 'button';
     if (ch.node) m.appendChild(ch.node()); else m.appendChild(document.createTextNode(ch.text));
-    m.addEventListener('click', () => answer(run, { subj, q, ch, m, moves, swap, line, foePips, foeFig, myFig, max }));
+    m.addEventListener('click', () => answer(run, { subj, q, ch, m, moves, swap, line, foePips, foeFig, myFig, max, art }));
     moves.appendChild(m);
   });
   b.appendChild(moves);
@@ -912,21 +1152,30 @@ async function answer(run, x) {
   const myKo = koOf(ui.mon);
   const s = c.route[c.at];
   const foeKo = koOf(s.mon);
+  const art = x.art && !calmMotion() ? x.art : null; // 🎨 연출 (v375 — 「동작 줄이기」면 예전처럼 글과 HP 칸만)
   if (correct) {
     const mv = moveOf(ui.mon);
     x.line.textContent = `${myKo}의 ${mv.name}!${r.adv ? ' 효과가 굉장했다!' : ''}`;
-    x.myFig.classList.add('is-hit-go');
-    x.foeFig.classList.add('is-hurt');
-    play('hit');
     const left = r.beaten ? 0 : r.hp;
-    [...x.foePips.children].forEach((p, i) => p.classList.toggle('is-off', i >= left));
-    await sleep(900);
+    const hpCut = () => [...x.foePips.children].forEach((p, i) => { const off = i >= left; if (off && !p.classList.contains('is-off')) p.classList.add('is-lose'); p.classList.toggle('is-off', off); });
+    if (art) {
+      if (ui.enterP) await Promise.race([ui.enterP, sleep(2600)]); // 등장 중에 골랐으면 등장부터 끝내고
+      if (!alive(run)) return;
+      const dmg = c.hp - left > 0 ? c.hp - left : r.adv ? 2 : 1;
+      strike(art, run, mv.type, dmg, !!r.adv, hpCut);
+      await waitTap(r.adv ? 2100 : 1500); // 약 1.5초 · 효과가 굉장하면 큰 글씨까지 · 누르면 바로
+      art.tok++;
+      hpCut();
+    } else {
+      play('hit');
+      hpCut();
+      await sleep(900);
+    }
     if (!alive(run)) return;
     if (r.beaten) {
       x.line.textContent = `${foeKo}${josa(foeKo, '은', '는')} 쓰러졌다!`;
-      x.foeFig.classList.add('is-down');
       play('success');
-      await sleep(1100);
+      if (art) { faint(art); await waitTap(1300); } else { x.foeFig.classList.add('is-down'); await sleep(1100); }
       if (!alive(run)) return;
       ui.busy = false;
       ui.mon = null;
@@ -943,6 +1192,7 @@ async function answer(run, x) {
     x.line.textContent = r.end === 'lost' ? '앗… ❤️를 다 써 버렸다!' : `앗, 아쉽다! ❤️ 하나를 잃었다.\n정답은 「${x.q.choices[right] ? x.q.choices[right].text : ''}」`;
     topBar(r.end === 'lost' ? { hearts: 0, phase: 'lost' } : ui.cur);
     play('wrong');
+    if (art) counter(art, run, typesOf(s.mon)[0]); // 가벼운 반격 — 기다리는 시간은 그대로(정답을 읽을 시간)
     await sleep(r.end === 'lost' ? 1500 : 2000);
     if (!alive(run)) return;
     ui.busy = false;

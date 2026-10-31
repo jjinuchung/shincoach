@@ -4753,7 +4753,16 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 /* 지도 */
 .jr-mapwrap { position: relative; }
 .jr-map { display: block; width: 100%; height: auto; border-radius: 16px; }
-.jr-map-label { fill: #fff; font-size: 16px; font-weight: 700; text-anchor: middle; } /* 지도 단위 — 폰(358px)에서도 12px쯤 (🔍 Codex 166차 #3) */
+/* 🎨 지도 바탕 = 구역 그림 여섯(v375) — 그림판이 그려질 때만 칸 색을 걷는다 · 파트너가 지금 점 위에 서서 지난 점에서 콩 뛰어온다 */
+.jr-map-bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: 16px; }
+.jr-mapwrap.has-art .jr-map { position: relative; z-index: 1; }
+.jr-mapwrap.has-art .jr-map > rect { fill: transparent; }
+.jr-walker { position: absolute; z-index: 2; width: 9%; aspect-ratio: 1; transform: translate(-50%, -100%); pointer-events: none; display: grid; place-items: end center; }
+.jr-walker img { width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35)); }
+.jr-walker.is-left img { transform: none; }
+.jr-walker-alt { font-size: 1.6rem; line-height: 1; }
+.jr-mapwrap .jr-ribbon { z-index: 3; }
+.jr-map-label { fill: #fff; font-size: 16px; font-weight: 700; text-anchor: middle; paint-order: stroke; stroke: rgba(20, 24, 48, 0.7); stroke-width: 4px; stroke-linejoin: round; } /* 지도 단위 — 폰(358px)에서도 12px쯤 (🔍 Codex 166차 #3) · 그림 위에서도 읽히게 테두리 (v375) */
 .jr-map-label.is-small { font-size: 12px; }
 .jr-map-road { fill: none; stroke: #fff; stroke-width: 4; stroke-dasharray: 2 9; stroke-linecap: round; }
 .jr-map-node { fill: #fff; }
@@ -4777,7 +4786,9 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .jr-vs { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: 200px; padding: 0; border: 0; border-radius: 18px; overflow: hidden; cursor: pointer; font: inherit; }
 .jr-vs-l { background: #4f46e5; clip-path: polygon(0 0, 100% 0, 78% 100%, 0 100%); display: grid; place-items: center start; padding-left: 30px; }
 .jr-vs-me { font-size: 3rem; }
-.jr-vs-r { margin-left: -22%; clip-path: polygon(22% 0, 100% 0, 100% 100%, 0 100%); display: grid; place-items: center end; padding-right: 30px; background: inherit; }
+.jr-vs-r { position: relative; margin-left: -22%; clip-path: polygon(22% 0, 100% 0, 100% 100%, 0 100%); display: grid; place-items: center end; padding-right: 30px; background: inherit; }
+.jr-vs-bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; } /* 🎨 그 구역 그림 (v375) */
+.jr-vs-r .jr-mon { position: relative; width: 140px; height: 140px; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.35)); }
 .jr-vs-mark { position: absolute; inset: 0; display: grid; place-items: center; font-size: 4rem; font-weight: 900; font-style: italic; color: #fff; text-shadow: 4px 4px 0 #23263b; pointer-events: none; }
 @media (prefers-reduced-motion: no-preference) { .jr-vs-mark { animation: jr-zap 0.6s ease-out; } }
 @keyframes jr-zap { 0% { transform: scale(2.4); opacity: 0; } 60% { transform: scale(0.9); opacity: 1; } }
@@ -4786,12 +4797,30 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .jr-choose-card { position: relative; display: grid; justify-items: center; gap: 4px; padding: 10px 6px; border: 2px solid var(--border); border-radius: 16px; background: var(--card); font: inherit; cursor: pointer; min-width: 0; }
 .jr-super-tag { font-size: 0.75rem; font-weight: 800; color: #92400e; background: #fff6dc; border-radius: 999px; padding: 1px 8px; }
 /* 배틀 */
-.jr-arena { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: 8px 12px; align-items: center; border-radius: 16px; padding: 10px 14px; }
+/* 🎨 배틀 무대 (v375) — 구역 그림·받침대·효과는 캔버스(jrscene.js) · 포켓몬은 동그라미 없이 받침대 위 · 내 포켓몬은 좌우를 뒤집어 상대를 본다
+   자리 .jr-stand.is-foe(72% 47%) · .is-me(27% 87%)는 jrscene.FOE_AT·ME_AT와 같아야 받침대에 선다 · 높이는 화면의 34%(문제·보기가 한 화면에 들게) */
+.jr-arena { position: relative; height: clamp(190px, 34vh, 300px); border: 3px solid #23263b; border-radius: 16px; overflow: hidden; isolation: isolate; container-type: size; }
+.jr-arena-bg, .jr-arena-fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.jr-arena-fx { z-index: 3; }
+.jr-dim { position: absolute; inset: 0; z-index: 1; background: #0b0d1f; opacity: 0; pointer-events: none; }
+.jr-stand { position: absolute; z-index: 2; transform: translate(-50%, -86%); pointer-events: none; }
+.jr-stand.is-foe { left: 72%; top: 47%; }
+.jr-stand.is-me { left: 27%; top: 87%; }
+.jr-arena .jr-mon:not(.is-alt), .jr-vs .jr-mon:not(.is-alt) { border: 0; border-radius: 0; box-shadow: none; overflow: visible; background: none; }
+.jr-arena .jr-mon:not(.is-alt) img, .jr-vs .jr-mon:not(.is-alt) img { background: none; }
+.jr-stand.is-foe .jr-mon { width: 104px; height: 104px; width: 44cqh; height: 44cqh; }
+.jr-stand.is-me .jr-mon { width: 124px; height: 124px; width: 54cqh; height: 54cqh; }
+.jr-stand.is-me .jr-mon img { transform: scaleX(-1); }
+.jr-stand.is-boss .jr-mon { filter: drop-shadow(0 0 10px rgba(255, 200, 60, 0.95)); }
 .jr-plate { display: grid; gap: 4px; background: #fff; border: 2px solid #23263b; border-radius: 10px; padding: 6px 10px; }
-.jr-plate.is-foe { justify-self: start; }
-.jr-plate.is-me { justify-self: end; grid-column: 2; grid-row: 2; }
-.jr-arena .jr-foe { grid-column: 2; grid-row: 1; }
-.jr-arena .jr-me { grid-column: 1; grid-row: 2; justify-self: center; }
+.jr-arena .jr-plate { position: absolute; z-index: 4; max-width: 48%; padding: 4px 8px; background: rgba(255, 255, 255, 0.95); }
+.jr-arena .jr-plate.is-foe { left: 2%; top: 4%; }
+.jr-arena .jr-plate.is-me { right: 2%; bottom: 4%; grid-template-columns: auto auto; align-items: center; } /* 교체는 이름 옆 — 폰에서 이름표가 내 포켓몬을 덮지 않게 낮게 */
+.jr-flash { position: absolute; inset: 0; z-index: 5; background: #fff; opacity: 0; pointer-events: none; }
+.jr-stamp { position: absolute; left: 50%; top: 40%; z-index: 6; transform: translate(-50%, -50%); font-family: "Galmuri11", var(--font, sans-serif); font-size: calc(var(--jr-dlg, 24px) * 1.5); color: #fff; -webkit-text-stroke: 2px #23263b; text-shadow: 3px 3px 0 #23263b; white-space: nowrap; opacity: 0; pointer-events: none; -webkit-font-smoothing: none; }
+.jr-banner { position: absolute; left: 0; right: 0; top: 36%; z-index: 6; padding: 10px; background: #f59e0b; color: #1f2340; font-family: "Galmuri11", var(--font, sans-serif); font-size: var(--jr-dlg, 24px); text-align: center; white-space: nowrap; opacity: 0; pointer-events: none; box-shadow: 0 4px 0 #23263b; -webkit-font-smoothing: none; } /* 지나갈 때만 보임(쉴 때 무대 밖에 두지 않게) */
+.jr-pop { position: absolute; z-index: 6; font-size: 1.9rem; font-weight: 900; color: #fff; -webkit-text-stroke: 1.5px #b91c1c; text-shadow: 2px 2px 0 #7f1d1d; pointer-events: none; }
+.jr-heartpop { position: absolute; z-index: 6; font-size: 1.5rem; pointer-events: none; }
 .jr-plate-name { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .jr-pips { display: flex; gap: 4px; }
 .jr-pips span { width: 30px; height: 9px; border-radius: 5px; background: #10b981; transition: background-color 0.4s; }
@@ -4816,15 +4845,15 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .jr-move.is-ok { background: #d1fae5; border-color: #059669; }
 .jr-move.is-no { background: #fee2e2; border-color: #dc2626; }
 .jr-move:disabled { cursor: default; }
+/* 기술·맞음·쓰러짐은 journeyview가 직접 움직인다(Web Animations) · 여기는 숨 쉬듯 흔들림과 깨지는 HP 칸만 · 「동작 줄이기」면 쓰러지면 흐려지기만 */
 @media (prefers-reduced-motion: no-preference) {
-  .jr-mon.is-hit-go { animation: jr-lunge 0.45s ease-out; }
-  .jr-mon.is-hurt { animation: jr-shake 0.45s ease-in-out 0.25s; }
-  .jr-mon.is-down { animation: jr-faint 0.7s ease-in forwards; }
+  .jr-bob { animation: jr-bob 2.4s ease-in-out infinite; }
+  .jr-stand.is-foe .jr-bob { animation-delay: -1.1s; }
+  .jr-pips span.is-lose { animation: jr-pip 0.7s ease-out; }
 }
 .jr-mon.is-down { opacity: 0.25; }
-@keyframes jr-lunge { 50% { transform: translate(18px, -14px) scale(1.08); } }
-@keyframes jr-shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
-@keyframes jr-faint { to { transform: translateY(24px); opacity: 0.25; } }
+@keyframes jr-bob { 50% { transform: translateY(-4%) scale(1.02, 0.98); } }
+@keyframes jr-pip { 0% { background: #fff; transform: scaleY(2); } 40% { background: #f87171; } 100% { background: #e5e7eb; } }
 .jr-center { font-size: 5rem; text-align: center; }
 /* 끝 */
 .jr-rewards { display: grid; gap: 6px; background: #e7f8f0; border-radius: 16px; padding: 12px 14px; font-weight: 700; }

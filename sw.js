@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v374';
+const CACHE_VERSION = 'v375';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -218,6 +218,7 @@ const APP_SHELL = [
   './js/calmfiles.js', // 🌿 국어·논술 배경음 = 고른 곡 파일 늘 무작위 (v340)
   './js/journey.js', // 🎒 포켓몬 대여행 — 규칙 · 화면 · 포켓몬 타입 표 · 대사창 글꼴 (v341)
   './js/journeyview.js',
+  './js/jrscene.js', // 🎨 대여행 구역 그림·받침대·기술 효과 (v375)
   './js/montypes.js',
   './fonts/galmuri11.woff',
   './js/calm.js', // 🌿 국어·논술에서 틀고 멈추기 (v317)
