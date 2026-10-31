@@ -16,6 +16,7 @@ import { STONES } from './items.js';
 import { todayKey } from './track.js';
 import { sfx, unlock } from './sfx.js';
 import * as bgm from './bgm.js';
+import { enterCalmTrip, leaveCalmTrip, toggleCalm } from './calm.js'; // 🎒 여행 중 음악 = 국어·논술의 지브리 곡 (v374 — 곡이 없는 기기만 bgm.js)
 import { josa } from './catch.js';
 
 const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
@@ -84,11 +85,12 @@ function build() {
   root.hidden = true;
   root.innerHTML = `
     <div class="jr-card" role="dialog" aria-modal="true" aria-label="포켓몬 대여행">
-      <div class="jr-top"><span class="jr-hearts" aria-label="하트"></span><span class="jr-title">🎒 포켓몬 대여행</span><span class="jr-zone"></span><button type="button" class="btn jr-x" aria-label="닫기 — 나중에 이어 하기">✕</button></div>
+      <div class="jr-top"><span class="jr-hearts" aria-label="하트"></span><span class="jr-title">🎒 포켓몬 대여행</span><span class="jr-zone"></span><button type="button" class="btn jr-music" data-calm hidden>🎵</button><button type="button" class="btn jr-x" aria-label="닫기 — 나중에 이어 하기">✕</button></div>
       <div class="jr-body"></div>
     </div>`;
   document.body.appendChild(root);
   root.querySelector('.jr-x').addEventListener('click', () => { if (!ui.busy) closeJourney(); });
+  root.querySelector('.jr-music').addEventListener('click', toggleCalm); // 🎵 국어·논술 머리줄 단추와 같은 켬/끔 (v374)
   root.addEventListener('pointerdown', () => { try { unlock(); } catch { /* 무시 */ } }, { passive: true });
 }
 const body = () => root.querySelector('.jr-body');
@@ -130,7 +132,10 @@ export async function openJourney() {
   ui.ribbonAt = -1;
   root.style.setProperty('--jr-dlg', `${crispPx(24, window.devicePixelRatio || 1)}px`);
   root.hidden = false;
-  try { bgm.play(); } catch { /* 음악 없이 */ }
+  let calm = false;
+  try { calm = enterCalmTrip(); } catch { calm = false; }
+  root.querySelector('.jr-music').hidden = !calm;
+  if (!calm) { try { bgm.play(); } catch { /* 음악 없이 */ } }
   const { b, run } = fresh(null);
   b.appendChild(dlg('여행 가방을 싸는 중…'));
   await prepare();
@@ -145,6 +150,7 @@ export function closeJourney() {
   ui.run++;
   ui.busy = false;
   root.hidden = true;
+  try { leaveCalmTrip(); } catch { /* 무시 */ }
   try { bgm.stop(); } catch { /* 무시 */ }
   mountJourneyCard(cardBox);
 }

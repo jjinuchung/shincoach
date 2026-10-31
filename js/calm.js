@@ -32,6 +32,7 @@ export const CALM = {
 
 const st = {
   want: false,       // 국어·논술 화면인가
+  trip: false,       // 🎒 대여행 창이 떠 있나 (v374 — 여행 중에도 같은 곡 · 📤 소리 난 초에는 안 셈: 🌿 줄은 국어 기록과 견주는 값)
   on: loadOn(),      // 🎵 진우가 켜 두었나
   timer: null,
   run: false,        // 틀라고 했나 (멈출 까닭이 없어 calmMusicPlay를 부른 뒤 — 실제로 소리가 나는지는 calmMusicAudible)
@@ -58,7 +59,7 @@ function note(delta) {
 
 /** 지금 상태 (시험·진단용) */
 export function calmState() {
-  return { want: st.want, on: st.on, playing: st.run, music: calmMusicState(), timer: st.timer !== null };
+  return { want: st.want, trip: st.trip, on: st.on, playing: st.run, music: calmMusicState(), timer: st.timer !== null };
 }
 
 // ── 멈춰야 하나 ──
@@ -66,9 +67,16 @@ export function calmState() {
 /** 🕒 사용 기록 칸은 따로 없지만 제 음악(bgm.js)이 있는 창 — 🔤 낱말 이어 주기(v329) */
 const QUIET_IDS = ['match'];
 
+/** 🎒 대여행 창 — 여행 중엔 이 창이 음악을 막지 않는다 (그 위에 뜬 다른 창은 그대로 막는다) */
+const TRIP_ID = 'jr-trip';
+
 function overlayShown() {
   if (typeof document === 'undefined') return false;
-  const shown = (id) => { const e = document.getElementById(id); return !!(e && !e.hidden); };
+  const shown = (id) => {
+    if (st.trip && id === TRIP_ID) return false;
+    const e = document.getElementById(id);
+    return !!(e && !e.hidden);
+  };
   return OVERLAYS.some((o) => o.ids.some(shown)) || QUIET_IDS.some(shown);
 }
 
@@ -92,7 +100,7 @@ function talking(now) {
 
 /** 멈춰야 하는 까닭 — 없으면 '' */
 export function calmBlock(now = Date.now()) {
-  if (!st.want) return 'view';
+  if (!st.want && !st.trip) return 'view';
   if (!st.on) return 'off';
   if (typeof document !== 'undefined' && document.hidden) return 'hidden';
   if (overlayShown()) return 'overlay';
@@ -106,7 +114,7 @@ export function calmBlock(now = Date.now()) {
 function count(now) {
   const day = todayKey(new Date(now));
   if (st.msDay !== day) { flush(); st.msDay = day; } // 자정을 넘겼다 — 쌓인 것은 전날로 먼저
-  if (calmMusicAudible()) st.ms += Math.max(0, Math.min(1000, now - st.lastT)); // 소리가 날 때만 · 멈춘 타이머가 한꺼번에 돌아도 1초까지만
+  if (st.want && calmMusicAudible()) st.ms += Math.max(0, Math.min(1000, now - st.lastT)); // 소리가 날 때만 · 멈춘 타이머가 한꺼번에 돌아도 1초까지만 · 🎒 여행 중 소리는 안 셈(v374)
   st.lastT = now;
   if (st.ms >= CALM.flushSec * 1000) flush();
 }
@@ -149,8 +157,33 @@ export function enterCalm() {
 /** 국어·논술 밖으로 (홈·🎒·📊·영어·수학) */
 export function leaveCalm() {
   st.want = false;
+  stopIfIdle();
+}
+
+/** 따질 곳이 없으면 타이머를 멈추고 뺀다 */
+function stopIfIdle() {
+  if (st.want || st.trip) { calmTick(); return; }
   if (st.timer !== null) { clearInterval(st.timer); st.timer = null; }
   fadeOut();
+}
+
+/**
+ * 🎒 대여행 창이 열렸다 (journeyview.openJourney — 여는 탭 안) — 국어·논술과 같은 곡 · 같은 🎵 켬/끔 (v374 아버님 「여행 중에는 지브리 음악으로」)
+ * 곡이 없으면(⚙에서 안 넣은 기기) false — 여행 화면이 예전 음악(bgm.js)을 튼다
+ */
+export function enterCalmTrip() {
+  if (!calmMusicReady()) return false;
+  st.trip = true;
+  if (st.timer === null && CALM.tick > 0) st.timer = setInterval(() => calmTick(), CALM.tick);
+  syncButtons();
+  calmTick();
+  return true;
+}
+
+/** 🎒 대여행 창이 닫혔다 */
+export function leaveCalmTrip() {
+  st.trip = false;
+  stopIfIdle();
 }
 
 /** 🎵 진우가 눌렀다 — 끄기·켜기 · 이 기기에 기억 · 📤 끈 수·켠 수 */

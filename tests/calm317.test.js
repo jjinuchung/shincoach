@@ -550,9 +550,55 @@ test('🌿 국어·논술을 떠나면 멈춤 · 다시 들어오면 그 곡 그
   calm.leaveCalm();
 });
 
+test('🎒 대여행 창이 떠 있는 동안 같은 곡 — 그 창은 막지 않고 그 위 창은 막음 · 🎵 끔을 따름 · 화면이 바뀌어도 이어짐 · 닫으면 멈춤 · 📤 소리 난 초는 안 셈 (v374)', async () => {
+  els['jr-trip'] = { hidden: false };
+  calm.enterCalm();
+  assert.equal(calm.calmBlock(), 'overlay', '국어·논술 위에 대여행 창만 떴을 땐(여행 음악이 아니면) 예전처럼 막는다');
+  calm.leaveCalm();
+  const before = (await getDaily(today())).calmSec || 0;
+  assert.equal(calm.enterCalmTrip(), true);
+  assert.equal(calm.calmState().trip, true);
+  assert.equal(calm.calmBlock(), '', '대여행 창은 막지 않는다');
+  await settle();
+  assert.equal(calm.calmState().playing, true);
+  assert.equal(aud().paused, false);
+  let t = Date.now();
+  for (let k = 0; k < 70; k++) { t += 1000; calm.calmTick(t); }
+  calm.leaveCalm(); // 여행 중에 화면이 홈으로 다시 그려져도(app.showView) 음악은 이어진다
+  assert.equal(calm.calmState().playing, true, 'leaveCalm이 여행 음악을 끊지 않는다');
+  els.catch.hidden = false;
+  calm.calmTick();
+  assert.equal(calm.calmBlock(), 'overlay', '여행 위에 뜬 다른 창은 막는다');
+  assert.equal(calm.calmState().playing, false);
+  els.catch.hidden = true;
+  calm.calmTick();
+  assert.equal(calm.calmState().playing, true);
+  buttons[0].click();
+  assert.equal(calm.calmBlock(), 'off', '🎵로 끈 것을 여행에서도 따른다');
+  buttons[0].click();
+  calm.calmTick();
+  calm.leaveCalmTrip();
+  els['jr-trip'].hidden = true;
+  const st = calm.calmState();
+  assert.deepEqual([st.trip, st.playing, st.timer], [false, false, false]);
+  assert.equal(calm.calmBlock(), 'view');
+  await settle(calm.CALM.fadeOut * 1000 + 150);
+  assert.equal(aud().paused, true, '닫으면 빠지고 멈춘다');
+  const after = (await getDaily(today())).calmSec || 0;
+  assert.equal(after, before, '🌿 소리 난 초는 국어·논술 것만 (국어 기록과 견주는 값)');
+  // 잇기 — 곡이 있으면 지브리 곡 · 없는 기기만 예전 음악 · 닫을 때 둘 다 멈춤 · 🎵 단추는 곡이 있을 때만
+  const jv = read('js/journeyview.js');
+  assert.ok(jv.includes("import { enterCalmTrip, leaveCalmTrip, toggleCalm } from './calm.js';"));
+  assert.ok(jv.includes("try { calm = enterCalmTrip(); } catch { calm = false; }\n  root.querySelector('.jr-music').hidden = !calm;\n  if (!calm) { try { bgm.play(); } catch { /* 음악 없이 */ } }"));
+  assert.ok(jv.includes("try { leaveCalmTrip(); } catch { /* 무시 */ }\n  try { bgm.stop(); } catch { /* 무시 */ }"));
+  assert.ok(/class="btn jr-music" data-calm hidden>🎵<\/button>/.test(jv));
+});
+
 test('🌿 곡이 없으면 소리 없음 — 합성 곡을 대신 틀지 않는다 · 곡을 넣으면 그때부터', async () => {
   files.setCalmMusicDeps({ loadList: async () => null });
   await files.loadCalmMusic();
+  assert.equal(calm.enterCalmTrip(), false, '🎒 곡이 없는 기기 — 여행 화면이 예전 음악을 튼다 (v374)');
+  assert.equal(calm.calmState().trip, false);
   calm.enterCalm();
   assert.equal(calm.calmState().playing, false, '틀 곡이 없다');
   assert.equal(calm.calmBlock(), '', '막을 까닭은 없는데');
