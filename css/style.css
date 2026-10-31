@@ -4326,6 +4326,84 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes ga-roll { to { opacity: 0; transform: translateX(220%) rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ga.is-go .ga-me .ga-me-in { animation: none; } .ga-flag { transition: none; } }
 
+/* 🌀 쏙쏙! 파트너 모험 (v373 · gamessok.js) — 🗺️ 대모험의 마당·땅·메카 꼴(.ga-*)을 그대로 쓰고 빨아들이기·둥실·능력·보스만 보탠다 · 두 엄지 = 마당 왼쪽 반·오른쪽 반 */
+.gs-field.is-intro::after { content: ''; position: absolute; left: 50%; top: 6%; bottom: 14%; border-left: 2px dashed rgba(255, 255, 255, 0.85); pointer-events: none; }
+.gs-zone { position: absolute; bottom: 2%; z-index: 3; padding: 0.1rem 0.5rem; border-radius: 999px; background: rgba(255, 255, 255, 0.55); color: #343a40; font-size: 0.68rem; font-weight: 700; white-space: nowrap; pointer-events: none; opacity: 0.75; transition: font-size 0.4s, opacity 0.4s; }
+.gs-zone.is-l { left: 2%; }
+.gs-zone.is-r { right: 2%; }
+.gs-field.is-intro .gs-zone { font-size: 0.9rem; opacity: 1; background: rgba(255, 255, 255, 0.85); }
+.gs-ab { flex: none; padding: 0.15rem 0.6rem; border-radius: 999px; background: #fff3bf; color: #5c3d00; font-size: 0.85rem; font-weight: 800; white-space: nowrap; }
+.gs-hp { position: relative; flex: 1; height: 12px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.18); }
+.gs-hp i { display: block; height: 100%; background: #fa5252; transform-origin: 0 50%; transition: transform 0.2s ease-out; }
+.gs-hp-ico { position: absolute; right: 3px; top: 50%; font-size: 0.7rem; line-height: 1; transform: translateY(-50%); }
+.gs-me { overflow: visible; }
+.gs-me .ga-me-in { transition: transform 0.15s ease-out; }
+.gs-me.is-puff .ga-me-in { transform: scale(1.2); animation: gs-puff 0.5s ease-in-out infinite alternate; } /* 🫧 둥실 — 몸이 부푼다 */
+.gs-me.is-full .ga-me-in { transform: scale(1.12, 1.05); }
+.gs-me.is-full::after { content: '⭐'; position: absolute; right: -18%; top: -14%; font-size: 0.9rem; line-height: 1; } /* 입에 물었다 — 톡 하면 별 */
+.gs-me.is-stone .ga-me-in { filter: grayscale(1) brightness(0.75) contrast(1.3); }
+.gs-wind { position: absolute; left: 92%; bottom: -27%; width: 222%; height: 155%; display: none; pointer-events: none; filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35)); }
+.gs-wind svg { display: block; width: 100%; height: 100%; }
+.gs-wind path { fill: none; stroke: rgba(255, 255, 255, 0.95); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 10 9; vector-effect: non-scaling-stroke; animation: gs-wind 0.3s linear infinite; } /* 점선이 입 쪽으로 흐른다 */
+.gs-me.is-suck .gs-wind { display: block; }
+.gs-ico { display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -0.15em; }
+.gs-ico svg { display: block; width: 100%; height: 100%; }
+.gs-me-ab { position: absolute; left: 50%; bottom: 150%; font-size: 1.1rem; line-height: 1; transform: translateX(-50%); filter: drop-shadow(0 1px 0 #fff); }
+.gs-me.is-ring::before { content: ''; position: absolute; left: 50%; top: 50%; width: 260%; height: 220%; border: 3px solid #ffd43b; border-radius: 50%; transform: translate(-50%, -50%) scale(0.4); opacity: 0; animation: gs-ring 0.35s ease-out; pointer-events: none; }
+.gs-mecha, .gs-drone, .gs-roller, .gs-shot, .gs-lost { will-change: transform; }
+.gs-badge { position: absolute; left: 50%; top: 50%; font-size: 0.85rem; line-height: 1; transform: translate(-50%, -50%); filter: drop-shadow(0 1px 0 #fff); }
+.gs-mecha .gs-badge { top: auto; bottom: 102%; padding: 0.08rem 0.2rem; border-radius: 999px; background: rgba(255, 255, 255, 0.85); font-size: 1rem; transform: translateX(-50%); } /* 능력 메카 — 머리 위 타입 그림(R 표시에 가리지 않게) */
+.gs-mecha.is-pull svg, .gs-drone.is-pull svg, .gs-roller.is-pull > *, .ga-obj.is-pull svg { animation: gs-shake 0.12s linear infinite; }
+.gs-drone svg { animation: gs-hover 0.8s ease-in-out infinite alternate; }
+.gs-roller > * { display: block; width: 100%; height: 100%; animation: gs-spin 0.5s linear infinite reverse; }
+.gs-roller img { object-fit: contain; image-rendering: pixelated; }
+.gs-shot svg { display: block; width: 100%; height: 100%; }
+.gs-shot.is-star svg, .gs-shot.is-rock svg { animation: gs-spin 0.4s linear infinite; }
+.gs-shot.is-fire svg { animation: gs-flick 0.12s linear infinite alternate; }
+.gs-shot.is-got svg { animation: gr-got 0.3s ease-out forwards; }
+.gs-lost svg { display: block; width: 100%; height: 100%; animation: gs-spin 1.2s linear infinite; filter: drop-shadow(0 0 3px #ffd43b); }
+.gs-lost.is-got svg { animation: gr-got 0.35s ease-out forwards; }
+.ga-obj.is-pop svg { animation: gs-pop 0.35s ease-out; }
+.gs-block svg { display: block; width: 100%; height: 100%; }
+.gs-boss svg { display: block; width: 100%; height: 100%; transform-origin: 50% 100%; }
+.gs-boss.is-hit svg { animation: gs-hit 0.22s linear; filter: brightness(1.6); }
+.gs-boss.is-down svg { animation: gs-down 0.8s ease-in forwards; }
+.gs-boss.is-flee svg { animation: gs-flee 1s ease-in forwards; }
+.gs-zap { z-index: 2; background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff9db 30%, #ffd43b 100%); clip-path: polygon(40% 0, 70% 0, 52% 38%, 80% 38%, 30% 100%, 44% 52%, 20% 52%); filter: drop-shadow(0 0 4px #ffd43b); }
+/* 2단계 — 🔒 로켓단 우리(갇힌 친구 위에 창살) · 🤝 뒤따라오는 친구 · 🔴 큰 몬스터볼(길에 · 머금으면 내 몸 위에서 데굴데굴) */
+.gs-pals { flex: none; font-size: 0.9rem; font-weight: 800; white-space: nowrap; }
+.gs-cage-mon, .gs-bars { position: absolute; inset: 0; display: block; }
+.gs-cage-mon { inset: 14% 8% 6%; }
+.gs-cage-mon img, .gs-pal img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.gs-bars svg { display: block; width: 100%; height: 100%; }
+.gs-cage.is-open .gs-bars { animation: gs-bars-off 0.5s ease-in forwards; }
+.gs-cage.is-open .gs-cage-mon { animation: gs-pop 0.35s ease-out; }
+.gs-pal-emoji { display: grid; width: 100%; height: 100%; place-items: center; font-size: 1.1rem; line-height: 1; }
+.gs-pal { will-change: transform; }
+.gs-pal > * { animation: gr-bob 0.35s ease-in-out infinite alternate; }
+.gs-mball svg { display: block; width: 100%; height: 100%; }
+.gs-mball.is-pull svg { animation: gs-shake 0.12s linear infinite; }
+.gs-me-ball { position: absolute; left: -10%; bottom: 0; width: 120%; height: 110%; display: none; pointer-events: none; }
+.gs-me-ball svg { display: block; width: 100%; height: 100%; animation: gs-spin 0.35s linear infinite; }
+.gs-me.is-ball .gs-me-ball { display: block; }
+.gs-me.is-ball .ga-me-in { opacity: 0.35; transform: scale(0.8); }
+@keyframes gs-bars-off { to { transform: translateY(-80%); opacity: 0; } }
+.gd.gs.is-paused .ga-world *, .gd.is-paused .gs-wind { animation-play-state: paused; }
+@keyframes gs-puff { from { transform: scale(1.18) translateY(0); } to { transform: scale(1.22) translateY(-4%); } }
+@keyframes gs-wind { to { stroke-dashoffset: 19; } }
+@keyframes gs-ring { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.4); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1); } }
+@keyframes gs-shake { 0% { transform: translateX(-4%) rotate(-6deg); } 50% { transform: translateX(4%) rotate(6deg); } 100% { transform: translateX(-4%) rotate(-6deg); } }
+@keyframes gs-hover { from { transform: translateY(0); } to { transform: translateY(-12%); } }
+@keyframes gs-spin { to { transform: rotate(360deg); } }
+@keyframes gs-flick { from { transform: scaleX(0.9); } to { transform: scaleX(1.1); } }
+@keyframes gs-pop { 0% { transform: scale(0.2) translateY(60%); } 70% { transform: scale(1.2) translateY(-20%); } 100% { transform: none; } }
+@keyframes gs-hit { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4%); } 75% { transform: translateX(4%); } }
+@keyframes gs-down { to { transform: rotate(80deg) translateY(10%); opacity: 0.4; } }
+@keyframes gs-flee { 30% { transform: translateY(6%); } 100% { transform: translate(120%, -160%) scale(0.5); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .gs-me-ball svg, .gs-pal > *, .gs-me.is-puff .ga-me-in, .gs-wind path, .gs-drone svg, .gs-roller > *, .gs-shot svg, .gs-lost svg, .gs-mecha.is-pull svg, .gs-drone.is-pull svg { animation: none; }
+}
+
 /* 🗼 몬스터볼 탑 쌓기 (v311 · gametower.js) — 마당 너비 100칸 × 높이 75칸 · 자리는 JS가 마당에 대한 %로(돌려도 다시 잴 것 없음) · 볼 무늬는 🃏 카드 뒷면과 같게 */
 .gt-floor { font-size: 0.95rem; font-weight: 800; white-space: nowrap; }
 .gt-field { position: relative; overflow: hidden; aspect-ratio: 100 / 75; border-radius: 18px; background-color: #a5d8ff; background-image: linear-gradient(180deg, #4dabf7 0%, #d0ebff 100%); cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }

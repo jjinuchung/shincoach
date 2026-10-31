@@ -21,6 +21,7 @@ import { runFish, FISH } from './gamefish.js'; // 🎣 잉어킹 낚시 (v344)
 import { runSort, sortReady, SORT_FEW } from './gamesort.js'; // 🔀 타입 나누기 (v345)
 import { runDiff } from './gamediff.js'; // 🔍 우리 집 다른 그림 찾기 (v345)
 import { runSimon, simonPick, SIMON_PADS, STAND_IN } from './gamesimon.js'; // 🧠 포켓몬 따라 하기 (v346)
+import { runSsok, SSOK_ART, ssokFriendPick } from './gamessok.js'; // 🌀 쏙쏙! 파트너 모험 (v373)
 import { MON_TYPES } from './montypes.js'; // 🔀 타입 (대여행 때 PokeAPI에서 받은 표 · 순수)
 import { PAINT_BASE, paintById } from './house.js'; // 🔍 진우 방 벽지·바닥 색 (순수)
 import { animUrl, ensureAnim } from './sprite.js';
@@ -58,6 +59,7 @@ const RUNNERS = {
   sort: { run: runSort, prep: () => sortPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🔀 그림 있는 포켓몬 + 타입 표 (잡은 포켓몬 표시)
   diff: { run: runDiff, prep: async () => ({ scene: diffScene() }) }, // 🔍 진우 1층 방 그대로 (그림은 코드·이모지라 받을 것이 없다)
   simon: { run: runSimon, prep: () => simonPrep(), none: '포켓몬 그림이 아직 없어요 — 인터넷이 될 때 다시 해 봐요.' }, // 🧠 불꽃·물·풀·전기 자리에 잡은 포켓몬 (배경 음악 없음 — GAMES quiet)
+  ssok: { run: runSsok, prep: () => ssokPrep() }, // 🌀 ⚡ 찌리리공 · 🐦 피죤(대모험과 같은 그림) · 🤝 이번 판 친구 셋 그림 · 주인공은 파트너(ctx.hero)
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -280,6 +282,13 @@ export function recordText(g) {
   const best = gameBest(g.id);
   const easy = gameEasyBest(g.id);
   return { best: best > 0 ? `최고 ⭐ ${best}` : '', easy: easy > 0 ? `쉬울 때 ⭐ ${easy}` : '' };
+}
+
+/** 🌀 쏙쏙 준비 — 이번 판 🔒 우리 속 친구 셋을 고르고 그림을 미리 받는다(못 받으면 🐾 — 판은 그대로) · 도감과는 상관없다 */
+async function ssokPrep() {
+  const friends = ssokFriendPick(Math.random);
+  const art = await artFor([SSOK_ART.volt, SSOK_ART.bird, ...friends.map((f) => f.id)]);
+  return { art, friends: friends.map((f) => ({ ...f, art: art[f.id] || null })) };
 }
 
 /** 그림 미리 받기 — ART_WAIT_MS까지만 기다리고, 그때까지 받은 것만 쓴다 */
