@@ -17,8 +17,8 @@ const PASSAGE = ALL.filter((w) => w.deck === 'passage');
 const byId = new Map(ALL.map((w) => [w.id, w]));
 const seeded = (s) => { let x = (s * 2654435761) >>> 0 || 1; return () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; }; };
 
-test('📖 같이 안 낼 무리: 원고에 53무리(검수 45 + Codex 130차 7 + v347 늪·물웅덩이 1) · 검수한 짝이 들어 있다 · 무리 낱말은 모두 글에서 만난 낱말 · 원고 검사 통과', () => {
-  assert.equal(WORDS.apart.length, 53); // v347 늪(K10)·물웅덩이(K150) 더함
+test('📖 같이 안 낼 무리: 원고에 57무리(검수 45 + Codex 130차 7 + v347 늪·물웅덩이 1 + v372 넷) · 검수한 짝이 들어 있다 · 무리 낱말은 모두 글에서 만난 낱말 · 원고 검사 통과', () => {
+  assert.equal(WORDS.apart.length, 57); // v347 늪(K10)·물웅덩이(K150) · v372 허파·아가미 · 훈민정음·해례본 · 껍데기·등딱지 · 무늬·파문 더함
   assert.deepEqual(checkWords(WORDS, CARDS), []);
   const has = (...ws) => WORDS.apart.some((g) => ws.every((w) => g.includes(w)));
   for (const g of [['횡단보도', '건널목'], ['표지판', '안내판', '게시판'], ['치어다보며', '우러러'], ['벼슬아치', '관리'], ['관찰한', '들여다볼', '들여다보다', '눈여겨본'],

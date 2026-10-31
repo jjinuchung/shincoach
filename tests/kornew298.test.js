@@ -76,7 +76,7 @@ const codesOf = (c) => c.meta.flatMap((m) => [...m.matchAll(/\[(4국0\d-0\d)\]/g
 test('📘 4학년 2학기 글 열둘 (v298): 연습 열 + ✨ 명작 둘 · 물음 서른여섯(셋씩) · 원고 검사 통과 · 짧게(12줄까지) · ✍️ 둘 · 대화·댓글·두 사람의 글은 줄마다', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(IDS.slice(106, 118), NEW);
-  assert.equal(validCards(DATA).length, 154); // v320 둘째 묶음 열둘 · v322 셋째 묶음 열둘 · v347 넷째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 166); // v320 둘째 묶음 열둘 · v322 셋째 묶음 열둘 · v347 넷째 묶음 열둘 · v372 다섯째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '의견을 제시하는 글 두 편'], ['practice', '설명하는 글'], ['practice', '보고하는 글'], ['practice', '제안하는 글'], ['practice', '토의(학급 회의)'],
     ['classic', '동시'], ['practice', '설명하는 글'], ['practice', '온라인 대화(댓글)'], ['practice', '편지'], ['practice', '어린이 뉴스'], ['classic', '옛이야기'], ['practice', '책을 소개하는 글']]);
@@ -104,7 +104,7 @@ test('📘 단원 지도 (v298): 4-2 여덟 단원이 맨 위(2022 개정 국정
     ['4-2-독서', '4-2', '독서', '생각을 나누며 책을 읽어요'], ['4-2-1', '4-2', '1', '비교하며 읽어요'], ['4-2-2', '4-2', '2', '우리말 우리글'], ['4-2-3', '4-2', '3', '의견을 모아서'],
     ['4-2-매체', '4-2', '매체', '자료를 활용하여 발표해요'], ['4-2-4', '4-2', '4', '책 속의 길을 따라'], ['4-2-5', '4-2', '5', '오가는 마음'], ['4-2-6', '4-2', '6', '상상의 날개']]);
   assert.ok(!UNITS.slice(0, 8).some((u) => /이어질 장면을 생각해요|바르고 공손하게/.test(u.title)), '2015 개정판 4-2 단원 이름과 헷갈리지 않는다');
-  assert.deepEqual(UNITS.slice(0, 8).map((u) => u.cards), [['K143', 'K118', 'K144', 'K131'], ['K132', 'K145', 'K107', 'K119', 'K146'], ['K108', 'K133', 'K109', 'K134'], ['K111', 'K147', 'K110', 'K120', 'K148'], ['K122', 'K121', 'K150', 'K135', 'K149'], ['K112', 'K123', 'K136', 'K151', 'K124', 'K113', 'K125'], ['K114', 'K126', 'K137', 'K138', 'K115', 'K127', 'K139', 'K128'], ['K116', 'K130', 'K140', 'K142', 'K153', 'K154', 'K117', 'K129', 'K141', 'K152']], '소단원 차례(①이 먼저)');
+  assert.deepEqual(UNITS.slice(0, 8).map((u) => u.cards), [['K143', 'K118', 'K144', 'K165', 'K131'], ['K132', 'K145', 'K107', 'K119', 'K146'], ['K108', 'K133', 'K164', 'K109', 'K134'], ['K111', 'K147', 'K110', 'K120', 'K148', 'K166'], ['K122', 'K121', 'K150', 'K135', 'K149'], ['K112', 'K123', 'K136', 'K151', 'K162', 'K124', 'K113', 'K125', 'K163'], ['K114', 'K126', 'K137', 'K138', 'K159', 'K160', 'K115', 'K127', 'K139', 'K161', 'K128'], ['K116', 'K130', 'K140', 'K142', 'K153', 'K154', 'K157', 'K158', 'K117', 'K129', 'K141', 'K152', 'K156', 'K155']], '소단원 차례(①이 먼저)');
   for (const id of NEW) assert.equal(UNITS.filter((u) => u.cards.includes(id)).length, 1, `${id} 단원 하나`);
   assert.deepEqual(checkUnits(UNITS_DATA, DATA.cards, WORDS), []);
   const units = unitsOf(UNITS_DATA, validCards(DATA), allWords(WORDS, DATA.cards));
@@ -129,7 +129,7 @@ test('📘 성취기준 (v298): 원고의 [4국…] 뒤 문구는 3~4학년군 �
     assert.ok(x[2].trim().startsWith(STD4[x[1]]), `${c.id} ${x[1]} 문구 — ${x[2]}`);
     checked++;
   }
-  assert.equal(checked, 87, '새 글 열둘의 18 · 🎧 듣기 K37·K40의 [4국01-01] 둘(v245) · v320 둘째 묶음 열둘의 21 · v322 셋째 묶음 열둘의 24 · v347 넷째 묶음 열둘의 22');
+  assert.equal(checked, 111, '새 글 열둘의 18 · 🎧 듣기 K37·K40의 [4국01-01] 둘(v245) · v320 둘째 묶음 열둘의 21 · v322 셋째 묶음 열둘의 24 · v347 넷째 묶음 열둘의 22 · v372 다섯째 묶음 열둘의 24');
   const linked = new Set(Object.values(LINK4).flat());
   for (const id of NEW) {
     const codes = codesOf(card(id));

@@ -46,7 +46,7 @@ const STD = {
 test('📚 새 글 열둘 (v281): 연습 여덟 + ✨ 명작 넷 · 물음 마흔여섯 · 원고 검사 통과 · 네 편뿐이던 단원 여덟에 한 편씩 · 성취기준 공식 문구 · ✍️ 셋 · 대화 글은 줄마다 · ⭐ 미리보기는 확인된 둘만', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(DATA.cards.slice(84, 96).map((c) => c.id), NEW);
-  assert.equal(validCards(DATA).length, 154); // v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 · v347 4학년 2학기 글 넷째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 166); // v282 포켓몬 글 여섯 · v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 · v347 4학년 2학기 글 넷째 묶음 열둘 · v372 4학년 2학기 글 다섯째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '독서 대화'], ['practice', '문자 대화'], ['practice', '생활문'], ['practice', '발표 준비 메모'], ['practice', '생활문'], ['practice', '생활문'],
     ['practice', '생활문'], ['practice', '토의'], ['classic', '시'], ['classic', '시'], ['classic', '옛이야기'], ['classic', '고전 수필']]);

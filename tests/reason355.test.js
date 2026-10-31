@@ -155,9 +155,11 @@ test('💡 장부 카드 상한: 국어 K## + 논술 N## + 내 이유 R##가 100
   }
   assert.equal(Object.keys(writesOf(raw)).length, 300);
   // 🔍 Codex 160차 — 원고가 늘어 상한을 넘으면 조용히 빠지니, 지금 원고의 카드가 모두 남는지 본다
-  const all = Object.fromEntries(ALL.map((c, i) => [c.id, { last: i + 1, list: [], paid: {} }]));
-  assert.ok(ALL.length > 100, `카드 ${ALL.length}`);
-  assert.deepEqual(Object.keys(writesOf(all)).sort(), ALL.map((c) => c.id).sort());
+  //   장부에 생기는 것은 국어 글 가운데 ✍️ 서술형(write)이 있는 카드뿐 — 글 전체(v372에 166편)를 세면 상한을 넘은 것처럼 보였다
+  const WRITES = ALL.filter((c) => !/^K\d+$/.test(c.id) || c.write);
+  const all = Object.fromEntries(WRITES.map((c, i) => [c.id, { last: i + 1, list: [], paid: {} }]));
+  assert.ok(WRITES.length > 100, `카드 ${WRITES.length}`);
+  assert.deepEqual(Object.keys(writesOf(all)).sort(), WRITES.map((c) => c.id).sort());
 });
 
 test('💡 프로필 병합 (🔍 Codex 160차 #1): 갈라진 두 사본이 다른 주제 ✅로 받은 🎯는 둘 다 · 같은 주제 ✅는 한 번 · 쓴 기회는 되살아나지 않음 · 다시 합쳐도 그대로', () => {

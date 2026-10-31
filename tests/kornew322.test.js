@@ -38,7 +38,7 @@ const LINK4 = {
 test('📘 셋째 묶음 열둘 (v322): 연습 열 + ✨ 명작 둘 · 물음 서른여섯(셋씩) · 원고 검사 통과 · 7~12줄 · ✍️ 둘 · 대화·카드 뉴스는 줄마다 · 바탕 글 셋', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(IDS.slice(130, 142), NEW); // v347 넷째 묶음이 뒤에 붙는다
-  assert.equal(validCards(DATA).length, 154); // v347 넷째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 166); // v347 넷째 묶음 열둘 · v372 다섯째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '독서 대화'], ['practice', '이야기'], ['practice', '설명하는 글'], ['practice', '보고하는 글'], ['practice', '카드 뉴스'], ['classic', '동시'],
     ['practice', '전화 대화'], ['practice', '단체 대화'], ['practice', '편지'], ['practice', '설명하는 글'], ['classic', '옛이야기'], ['practice', '설명하는 글']]);
@@ -73,10 +73,10 @@ test('📘 단원 (v322): 새 글은 4-2 단원 하나씩 · 만나는 곳은 �
     assert.ok(!card(id).meta.some((m) => /\[6국/.test(m)), `${id} 5~6학년 성취기준 없음`);
   }
   const of = (uid) => UNITS.find((u) => u.id === uid).cards;
-  assert.deepEqual(of('4-2-독서'), ['K143', 'K118', 'K144', 'K131'], '한 편뿐이던 독서 단원 (v347 읽기 전 질문·감상문 더함)');
+  assert.deepEqual(of('4-2-독서'), ['K143', 'K118', 'K144', 'K165', 'K131'], '한 편뿐이던 독서 단원 (v347 읽기 전 질문·감상문 · v372 인물에게 쓴 편지 더함)');
   assert.deepEqual(of('4-2-1'), ['K132', 'K145', 'K107', 'K119', 'K146'], '① 작품을 현실·내 경험과 견주기 → ② 다른 의견 비교 (v347 K145·K146 더함)');
-  assert.deepEqual(of('4-2-2'), ['K108', 'K133', 'K109', 'K134'], '① 한글 사랑 → ② 우리말 조사 보고');
-  assert.deepEqual(of('4-2-6'), ['K116', 'K130', 'K140', 'K142', 'K153', 'K154', 'K117', 'K129', 'K141', 'K152'], '① 원인과 결과 → ② 이어질 내용 상상 (v347 K153·K154·K152 더함)');
+  assert.deepEqual(of('4-2-2'), ['K108', 'K133', 'K164', 'K109', 'K134'], '① 한글 사랑 → ② 우리말 조사 보고 (v372 K164 한글날 더함)');
+  assert.deepEqual(of('4-2-6'), ['K116', 'K130', 'K140', 'K142', 'K153', 'K154', 'K157', 'K158', 'K117', 'K129', 'K141', 'K152', 'K156', 'K155'], '① 원인과 결과 → ② 이어질 내용 상상 (v347 K153·K154·K152 · v372 K157·K158·K156·K155 더함)');
 });
 
 test('📘 물음 (v322): 지어내기 보기 · 정답만 길지 않게 · 근거 풀이 줄은 근거로도 받음 · 낱말 풀이를 정답에 옮기지 않음 · 중심 정답은 글 그대로가 아님 · 정답 자리 고르게 · 🧠 하나', () => {
