@@ -7,6 +7,8 @@
 //   지면 그물이 그 포켓몬을 낚아채 열기구에 매달고 날아감.
 // 그림: 사람(로사·로이)은 이모지, 나옹은 앱이 쓰는 공식 도트 그림(52번, 없으면 😼). 저장소에 그림 파일을 넣지 않는다.
 // ★ 구호·날아갈 때 대사는 한국판 표현을 진우·아버님께 확인받을 것 (MOTTO·BLAST — 틀리면 여기만 고치면 된다)
+// v379 (2026-11-01 진우 「처음 등장 대사가 너무 길어 늘 기다려야 해」 → 아버님 「skip 기능」): 등장하는 동안 「⏭ 건너뛰기」 단추 —
+//   누르면(하늘을 눌러도) 경보·구호·노리는 포켓몬 대사의 남은 기다림이 모두 바로 끝나고 문제로 · 노리는 포켓몬은 아래 글줄에 그대로 남는다
 import { sfx, vibrate as buzz, unlock } from './sfx.js';
 import { josa } from './catch.js';
 import { movesOf } from './battle.js';
@@ -40,7 +42,7 @@ const touched = () => !navigator.userActivation || navigator.userActivation.hasB
 const vibrate = (p) => { if (touched()) buzz(p); };
 
 let root = null;
-const ui = { open: false, skip: null, closeQuiz: null };
+const ui = { open: false, intro: null, closeQuiz: null };
 
 const $ = (sel) => root.querySelector(sel);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -90,8 +92,41 @@ function build() {
       </div>
     </div>`;
   document.body.appendChild(root);
-  // 구호는 탭하면 건너뛴다 (아이가 매번 다 들을 필요는 없다)
-  root.querySelector('.rocket-sky').addEventListener('click', () => { unlock(); if (ui.skip) ui.skip(); });
+  // 등장 장면은 하늘을 눌러도 건너뛴다 (아이가 매번 다 들을 필요는 없다 · v379부터 ⏭ 단추와 같은 일)
+  root.querySelector('.rocket-sky').addEventListener('click', () => { unlock(); skipIntro(); });
+}
+
+/**
+ * 등장 장면 하나의 기다림 묶음 (v379 · 순수 — 시험이 부른다) → { nap(ms), skip(), skipped() }
+ * nap = ms 기다림 · 건너뛰었으면 바로 · 기다리는 중에 건너뛰면 그 자리에서 끝 · skip은 두 번 눌러도 한 번
+ */
+export function makeIntro() {
+  let skipped = false;
+  const wake = new Set();
+  return {
+    nap(ms) {
+      if (skipped) return Promise.resolve();
+      return new Promise((resolve) => {
+        const done = () => { clearTimeout(t); wake.delete(done); resolve(); };
+        const t = setTimeout(done, ms);
+        wake.add(done);
+      });
+    },
+    skip() {
+      if (skipped) return;
+      skipped = true;
+      for (const f of [...wake]) f();
+    },
+    skipped: () => skipped,
+  };
+}
+/** 등장 장면 동안 기다리기 — openRocket이 등장 동안만 ui.intro를 둔다 · 그 밖에서는 그냥 기다린다 */
+function introNap(ms) {
+  return ui.intro ? ui.intro.nap(ms) : sleep(ms);
+}
+/** ⏭ 등장 장면 건너뛰기 (등장 장면 밖에선 아무 일 없음) */
+function skipIntro() {
+  if (ui.intro) ui.intro.skip();
 }
 
 /** 포켓몬 그림: 움직이는 도트가 있으면 그것, 없으면 일러스트 — 도트는 받아 오면 바꿔 끼운다 */
@@ -128,16 +163,13 @@ function paintScore(st) {
   root.style.setProperty('--reach', String(Math.min(st.wrong, ROCKET.loseAt)));
 }
 
-/** 구호를 한 줄씩 — 탭하면 바로 끝 */
+/** 구호를 한 줄씩 — ⏭(하늘 탭)이면 바로 끝 */
 async function motto(lines) {
-  let skipped = false;
-  ui.skip = () => { skipped = true; };
   for (const [who, text] of lines) {
-    if (skipped || !ui.open) break;
+    if ((ui.intro && ui.intro.skipped()) || !ui.open) break;
     say(who, text);
-    for (let t = 0; t < 9 && !skipped; t++) await sleep(100);
+    await introNap(900);
   }
-  ui.skip = null;
 }
 
 /**
@@ -283,19 +315,22 @@ export async function openRocket(o) {
   let st = { asked: 0, right: 0, wrong: 0, outcome: null, ...(o.cur.st || {}) };
   paintScore(st);
   try {
-    // ① 경보 → ② 열기구가 내려옴 → ③ 구호
+    // ① 경보 → ② 열기구가 내려옴 → ③ 구호 — 이 동안 「⏭ 건너뛰기」(v379 · 문제가 시작되면 clearPanel이 치운다)
+    ui.intro = makeIntro();
+    button('⏭ 건너뛰기', false, () => { unlock(); skipIntro(); }).classList.add('rocket-skip');
     root.classList.add('alarm');
     sfx.siren(); vibrate([80, 60, 80]);
     replay($('.rocket-gang'), 'descend');
-    await sleep(1300);
+    await introNap(1300);
     root.classList.remove('alarm');
     if (o.resume) await motto([['로사', '아직 안 끝났다! 로켓단이 돌아왔다!'], ['나옹', '이번엔 꼭 가져가겠다옹!']]);
     else await motto(MOTTO);
-    // ④ 노리는 포켓몬
+    // ④ 노리는 포켓몬 (건너뛰어도 말풍선·글줄은 남는다 — 기다림만 없음)
     say('나옹', `${o.kid}의 ${o.target.ko}${josa(o.target.ko, '을', '를')} 가져가겠다옹!`);
     replay($('.rocket-target'), 'aimed');
     msg(`🚀 로켓단이 ${o.target.ko}${josa(o.target.ko, '을', '를')} 노려요! 문제를 맞혀 쫓아내요.`);
-    await sleep(900);
+    await introNap(900);
+    ui.intro = null;
     // ⑤ 문제 — 승패가 날 때까지 (저장된 상태로 이어 간다)
     while (!st.outcome && ui.open) {
       clearPanel();
@@ -360,7 +395,7 @@ export async function openRocket(o) {
     }
   } finally {
     ui.open = false;
-    ui.skip = null;
+    ui.intro = null;
     if (ui.closeQuiz) { const f = ui.closeQuiz; ui.closeQuiz = null; f(); }
     root.hidden = true;
   }
