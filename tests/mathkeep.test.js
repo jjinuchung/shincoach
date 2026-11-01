@@ -1,8 +1,8 @@
 // 💪 확인 편에서 한 번 틀려도 괜찮게 (v262, 2026-10-15 — 아버님 "이대로 진행")
 //  · 확인 편(오늘 확인 차례)에서 하나만 틀리고 그 문제의 쌍둥이를 맞히면 칸(box)·📏은 그대로, 내일 다시 (실패 +1, 일지 kp)
 //  · 쌍둥이도 틀리거나 둘 넘게 틀리면 예전처럼 한 칸 내려간다
-//  · 확인 차례에 틀린 뒤 그만두면(← · 앱 닫기) 틀린 채 끝낸 확인 편과 같다 — 한 칸 내려가고 내일 다시 (일지 rf)
-//    → 그날 새 편을 받아 다 맞혀도 연습이라 칸이 안 오른다(그만두고 새 편 받기로 칸을 올리던 길이 닫힌다)
+//  · 확인 차례에 틀린 뒤 그만두면(← · 앱 닫기) — v262~v376은 한 칸 내려갔다(일지 rf) · ⛺ v377부터는 칸·일정 그대로(일지 rq · rec.tq = 연 날)
+//    → 그날 새 편을 받아 다 맞혀도 연습이라 칸이 안 오른다(그만두고 새 편 받기로 칸을 올리던 길은 그대로 닫힘) · 내일 다시 확인 차례
 //  · 틀리기 전에 그만두거나, 처음 배우기·연습 편은 예전 그대로
 //  · 아이 화면 말은 지키는 칸 그림으로만 — 셈은 없다 · 📊·📋는 노란 점 / 빨간 ⏹ · 🛡️ 줄 맨 끝에 💪
 //  · Codex 73차: 그만둠이 못 통과인지는 연 날의 표시(due)로 · 다른 창이 이 칸 확인 편에서 틀린 채 풀고 있으면 연습 ·
@@ -121,20 +121,19 @@ test('💪 지킨 편의 보상은 못 통과한 확인 편과 같다 — 확인
   assert.equal(lateBonus(m, { mode: 'review', result: r, today: T }), 0);
 });
 
-test('💪 applyQuit: 확인 차례에 틀린 뒤 그만두면 못 통과 — 한 칸 내려가고 내일 다시 · 실패 +1 · 📏 지움 · 일지 rf · 같은 편은 한 번', () => {
+test('⛺ applyQuit: 확인 차례에 틀린 뒤 그만둬도 칸·일정·실패 수·📏 그대로 · 연 날(tq)만 연습 · 일지 rq(rf 아님) · 같은 편은 한 번 (v377)', () => {
   const m = withRec(dueRec({ box: 1, placed: true }));
   assert.equal(applyQuit(m, { rid: 7, id: ID, mode: 'review', d: T, n: 4, due: 1, qs: [ok('A'), no('B')] }, T), true);
   const rec = m.concepts[ID];
-  assert.deepEqual([rec.box, rec.dueAt, rec.fails, rec.passes, 'placed' in rec], [0, T1, 1, 3, false]);
-  assert.ok(rec.schedAt > 1);
-  assert.deepEqual([m.log.at(-1).mode, m.log.at(-1).rf, m.log.at(-1).ok, m.log.at(-1).n, m.log.at(-1).of], ['quit', 1, 1, 2, 4]);
+  assert.deepEqual([rec.box, rec.dueAt, rec.fails, rec.passes, rec.placed, rec.schedAt, rec.tq], [1, '2026-10-14', 0, 3, true, 1, T]);
+  assert.deepEqual([m.log.at(-1).mode, m.log.at(-1).rq, 'rf' in m.log.at(-1), m.log.at(-1).ok, m.log.at(-1).n, m.log.at(-1).of], ['quit', 1, false, 1, 2, 4]);
   assert.equal(applyQuit(m, { rid: 7, id: ID, mode: 'review', d: T, n: 4, due: 1, qs: [ok('A'), no('B')] }, T), false, '같은 편은 한 번');
-  assert.equal(m.concepts[ID].fails, 1);
-  // 쌍둥이를 맞힌 뒤 그만둬도(남은 문제를 안 풂) · 🙈 확인된 실수여도 틀린 답이 있으면 못 통과
+  assert.equal(m.concepts[ID].fails, 0);
+  // 쌍둥이를 맞힌 뒤 그만둬도(남은 문제를 안 풂) · 🙈 확인된 실수여도 틀린 답이 있으면 rq (칸은 그대로)
   for (const q of [no('B', { fx: 1 }), no('B', { w: 's', sv: 1, fx: 1 })]) {
     const mm = withRec(dueRec());
     applyQuit(mm, { rid: 8, id: ID, d: T, n: 4, due: 1, qs: [ok('A'), q] }, T);
-    assert.deepEqual([mm.concepts[ID].box, mm.log.at(-1).rf], [1, 1], JSON.stringify(q));
+    assert.deepEqual([mm.concepts[ID].box, mm.concepts[ID].tq, mm.log.at(-1).rq], [2, T, 1], JSON.stringify(q));
   }
 });
 
@@ -153,29 +152,33 @@ test('💪 applyQuit: 틀리기 전에 나가면 · 차례가 아니면 · 처�
     const r = m.concepts[ID];
     assert.equal(JSON.stringify({ box: r.box, dueAt: r.dueAt, fails: r.fails, passes: r.passes, schedAt: r.schedAt, done: r.done }), before, name);
     assert.equal('rf' in m.log.at(-1), false, name);
+    assert.equal('rq' in m.log.at(-1) || 'tq' in r, false, name); // ⛺ v377 표시도 없음
   }
 });
 
-test('💪 막힌 길: 틀린 뒤 그만두고 그날 새 편을 다 맞혀도 연습 — 칸이 안 오른다 · 편 수에는 그만둔 편도', () => {
+test('💪 막힌 길: 틀린 뒤 그만두고 그날 새 편을 다 맞혀도 연습 — 칸이 안 오른다(⛺ v377: 내려가지도 않음) · 편 수에는 그만둔 편도', () => {
   const m = withRec(dueRec());
   applyQuit(m, { rid: 11, id: ID, mode: 'review', d: T, n: 4, due: 1, qs: [ok('A'), ok('B'), no('C')] }, T);
+  assert.equal(reviewKeep(m.concepts[ID], T), null, '그날 다시 열면 💪 확인 편이 아니다');
+  assert.equal(reviewKeep(m.concepts[ID], T1), stageIcon(m.concepts[ID]), '내일은 다시 확인 편');
   const r = round(m, [ok('A'), ok('B'), ok('C'), ok('D')], { rid: 12 });
-  assert.deepEqual([r.passed, r.practice, r.review, m.concepts[ID].box, m.concepts[ID].dueAt], [true, true, false, 1, T1]);
+  assert.deepEqual([r.passed, r.practice, r.review, m.concepts[ID].box, m.concepts[ID].dueAt], [true, true, false, 2, '2026-10-14']);
   assert.equal(roundReward({ ...r, repeat: sameDayRounds(m, ID, T, 12) }, 4).xp, 6, '둘째 편 연습이라 문항 몫 반 · 확인 보너스 없음');
   // 내일은 다시 확인 차례 — 다 맞히면 오른다
   const r2 = round(m, [ok('A'), ok('B'), ok('C'), ok('D')], { today: T1 });
-  assert.deepEqual([r2.review, r2.passed, m.concepts[ID].box], [true, true, 2]);
+  assert.deepEqual([r2.review, r2.passed, m.concepts[ID].box], [true, true, 3]);
   // ☀️ 오늘의 수학도 이 칸을 오늘 확인으로 다시 뽑지 않는다
   const m2 = withRec(dueRec());
   applyQuit(m2, { rid: 13, id: ID, d: T, n: 4, due: 1, qs: [no('A')] }, T);
   assert.notEqual(dailyPlan(m2, T, 'fraction').roundId === ID && dailyPlan(m2, T, 'fraction').roundMode === 'review', true);
 });
 
-test('💪 앱을 닫아 다음에 열 때 정리(settleLives)도 같은 규칙 · 자정을 넘겨 정리하면 정리한 날 기준 내일', () => {
+test('💪 앱을 닫아 다음에 열 때 정리(settleLives)도 같은 규칙 · 자정을 넘겨 정리하면 연 날(tq)만 연습이라 정리한 날은 그대로 확인 차례 (⛺ v377)', () => {
   const m = withRec(dueRec());
   m.lives = { 21: { rid: 21, id: ID, mode: 'review', d: T, n: 4, due: 1, qs: [no('A')] } };
   assert.equal(settleLives(m, new Set(), T1), 1);
-  assert.deepEqual([m.concepts[ID].box, m.concepts[ID].dueAt, m.log.at(-1).rf, m.log.at(-1).d], [1, '2026-10-17', 1, T]);
+  assert.deepEqual([m.concepts[ID].box, m.concepts[ID].dueAt, m.concepts[ID].tq, m.log.at(-1).rq, m.log.at(-1).d], [2, '2026-10-14', T, 1, T]);
+  assert.equal(reviewKeep(m.concepts[ID], T1), stageIcon(m.concepts[ID]), '정리한 날(T1)은 확인 편');
   assert.equal(m.lives, undefined);
 });
 
@@ -190,11 +193,11 @@ test('💪 Codex 73차 #1: 연습 편(차례가 내일)에서 틀리고 닫았�
   a.lives = { 23: { rid: 23, id: ID, mode: 'review', d: T, n: 4, qs: [no('A')] } };
   settleLives(a, new Set(), T1);
   assert.deepEqual([a.concepts[ID].box, 'rf' in a.log.at(-1)], [2, false]);
-  // 확인 편(표시 있음)을 다음 날 정리 → 못 통과
+  // 확인 편(표시 있음)을 다음 날 정리 → rq (칸 그대로 · ⛺ v377)
   const r = withRec(dueRec());
   r.lives = { 24: { rid: 24, id: ID, mode: 'review', d: T, n: 4, due: 1, qs: [no('A')] } };
   settleLives(r, new Set(), T1);
-  assert.deepEqual([r.concepts[ID].box, r.log.at(-1).rf], [1, 1]);
+  assert.deepEqual([r.concepts[ID].box, r.log.at(-1).rq, 'rq' in a.log.at(-1)], [2, 1, false]);
 });
 
 test('💪 Codex 73차 #2: 한 창이 확인 편에서 틀린 채 열려 있으면 다른 창이 다 맞혀도 연습 — 어느 쪽이 먼저 끝나도 칸이 안 오른다', () => {
@@ -211,14 +214,14 @@ test('💪 Codex 73차 #2: 한 창이 확인 편에서 틀린 채 열려 있으�
   assert.equal(rivalWrong(allOk, ID, 202), false, '아직 안 틀림');
   assert.equal(rivalWrong(emptyMath(), ID, 1), false);
   assert.equal(rivalWrong(null, ID, 1), false);
-  // ① B가 먼저 4/4 → 연습(칸 그대로) → A 그만둠 → 못 통과(한 칸 내려감)
+  // ① B가 먼저 4/4 → 연습(칸 그대로) → A 그만둠 → rq(⛺ v377 — 칸 그대로 · 오늘은 연습)
   const m = withRec(dueRec());
   setLive(m, A([ok('A'), no('B')]));
   const rb = round(m, [ok('A'), ok('B'), ok('C'), ok('D')], { rid: 202 });
   assert.deepEqual([rb.passed, rb.practice, rb.review, m.concepts[ID].box, m.concepts[ID].dueAt], [true, true, false, 2, '2026-10-14']);
   assert.ok(m.lives[101], 'A의 푸는 중 기록은 그대로');
   applyQuit(m, m.lives[101], T);
-  assert.deepEqual([m.concepts[ID].box, m.concepts[ID].dueAt, m.log.at(-1).rf], [1, T1, 1]);
+  assert.deepEqual([m.concepts[ID].box, m.concepts[ID].dueAt, m.concepts[ID].tq, m.log.at(-1).rq], [2, '2026-10-14', T, 1]);
   // B가 하나 틀리고 쌍둥이를 맞혀도 연습이라 지킴 아님
   const k = withRec(dueRec());
   setLive(k, A([no('B')]));
@@ -236,7 +239,7 @@ test('💪 Codex 73차 #2: 한 창이 확인 편에서 틀린 채 열려 있으�
   setLive(m3, A([ok('A')]));
   assert.equal(round(m3, [ok('A'), ok('B'), ok('C'), ok('D')], { rid: 205 }).review, true);
   applyQuit(m3, A([ok('A'), no('B')]), T);
-  assert.deepEqual([m3.concepts[ID].box, 'rf' in m3.log.at(-1)], [3, false]);
+  assert.deepEqual([m3.concepts[ID].box, 'rf' in m3.log.at(-1), 'rq' in m3.log.at(-1)], [3, false, false]);
 });
 
 test('💪 Codex 73차 #3: 푸는 중 편이 넘쳐 가장 오래된 편이 밀려나도 칸은 그대로 — 그 창이 이어서 끝내면 지킴', () => {
@@ -251,20 +254,20 @@ test('💪 Codex 73차 #3: 푸는 중 편이 넘쳐 가장 오래된 편이 밀�
   assert.deepEqual([r.kept, m.concepts[ID].box, m.concepts[ID].dueAt, m.concepts[ID].fails], [true, 2, T1, 1]);
 });
 
-test('💪 합치기: 못 통과로 친 일정이 더 최근이면 그쪽 · 일지의 kp·rf는 그대로 남는다 · 복사본을 고쳐도 원본 그대로', () => {
+test('💪 합치기: 일정은 schedAt이 최근인 쪽 · 일지의 kp·rq는 그대로 남는다 · 복사본을 고쳐도 원본 그대로 (⛺ v377 — 그만둠은 일정을 안 바꾼다)', () => {
   const a = withRec(dueRec());
   const b = cloneMath(a);
   applyQuit(a, { rid: 31, id: ID, d: T, n: 4, due: 1, qs: [no('A')] }, T);
   b.concepts[ID2] = dueRec();
   applyRound(b, ID2, { correct: 3, total: 4, missTags: [], qs: [ok('A'), no('B', { fx: 1 }), ok('C'), ok('D')], mode: 'review', rid: 32, day: T }, T);
   for (const mm of [mergeMath(a, b), mergeMath(b, a)]) {
-    assert.deepEqual([mm.concepts[ID].box, mm.concepts[ID].dueAt, mm.concepts[ID2].box, mm.concepts[ID2].dueAt], [1, T1, 2, T1]);
-    assert.ok(mm.log.some((e) => e.rid === 31 && e.rf === 1) && mm.log.some((e) => e.rid === 32 && e.kp === 1));
+    assert.deepEqual([mm.concepts[ID].box, mm.concepts[ID].dueAt, mm.concepts[ID2].box, mm.concepts[ID2].dueAt], [2, '2026-10-14', 2, T1]);
+    assert.ok(mm.log.some((e) => e.rid === 31 && e.rq === 1) && mm.log.some((e) => e.rid === 32 && e.kp === 1));
   }
   assert.equal(b.concepts[ID].box, 2, '합쳐도 입력은 그대로');
 });
 
-test('💪 📊·📋: 개념 줄의 노란 점(kept)·빨간 ⏹(rf) · 기록 글 ✘3/4💪 · ⏹✘ · 일지 줄 · 🛡️ 맨 끝 줄과 ⏹ 줄의 "못 통과로 침"', () => {
+test('💪 📊·📋: 개념 줄의 노란 점(kept)·⏹(rq) · 기록 글 ✘3/4💪 · ⏹⛺ · 일지 줄 · 🛡️ 맨 끝 줄과 ⏹ 줄의 "칸 그대로" (⛺ v377 · 옛 rf 줄은 아래에서)', () => {
   const m = withRec(dueRec());
   m.concepts[ID2] = dueRec();
   round(m, [ok('A'), no('B', { fx: 1 }), ok('C'), ok('D')], { rid: 41 });
@@ -272,27 +275,32 @@ test('💪 📊·📋: 개념 줄의 노란 점(kept)·빨간 ⏹(rf) · 기록 
   applyQuit(m, { rid: 43, id: ID2, d: T, n: 4, qs: [ok('A')] }, T); // 차례가 내일이 된 뒤 — 그냥 그만둠
   const rep = conceptReport(m);
   assert.deepEqual(rep.find((r) => r.id === ID).trail.map((t) => [t.pass, t.kept || 0]), [[false, 1]]);
-  assert.deepEqual(rep.find((r) => r.id === ID2).trail.map((t) => [t.quit, t.rf || 0]), [[1, 1], [1, 0]]);
+  assert.deepEqual(rep.find((r) => r.id === ID2).trail.map((t) => [t.quit, t.rq || 0, t.rf || 0]), [[1, 1, 0], [1, 0, 0]]);
   const txt = mathReportText(m, T);
-  assert.ok(txt.includes(' · ✘3/4💪') && txt.includes(' · ⏹✘0/1 ⏹1/1'), txt);
-  assert.ok(txt.includes('review 3/4 💪칸 그대로') && txt.includes('⏹그만둠 0/1 (4문제 중) → 확인 못 통과로 침'), txt);
+  assert.ok(txt.includes(' · ✘3/4💪') && txt.includes(' · ⏹⛺0/1 ⏹1/1'), txt);
+  assert.ok(txt.includes('review 3/4 💪칸 그대로') && txt.includes('⏹그만둠 0/1 (4문제 중) → 확인 차례 그만둠(칸 그대로 · 그날은 연습)'), txt);
   const g = guardReport(m, T);
   assert.deepEqual(g.kept, [{ id: ID, name: g.kept[0].name, d: T }]);
-  assert.deepEqual(g.quits.map((x) => x.rf || 0), [0, 1], '최근 것부터');
+  assert.deepEqual(g.quits.map((x) => x.rq || 0), [0, 1], '최근 것부터');
   const L = guardLines(g);
-  assert.ok(L[1].startsWith('⏹ 그만둔 편 2(그중 확인 차례에 틀린 뒤 그만둬 못 통과로 친 편 1): ') && L[1].includes('맞힘 · 못 통과로 침)'), L[1]);
+  assert.ok(L[1].startsWith('⏹ 그만둔 편 2(확인 차례에 틀린 뒤 그만둔 편 1 — 칸 그대로 · 그날은 연습): ') && L[1].includes('맞힘 · 칸 그대로)'), L[1]);
+  // v376까지 적힌 옛 rf 줄은 예전 말 그대로 읽는다
+  const old = withRec(dueRec());
+  old.log = [{ d: T, t: 1, rid: 44, id: ID, mode: 'quit', ok: 0, n: 1, of: 4, rf: 1, qs: [] }];
+  assert.ok(mathReportText(old, T).includes('⏹그만둠 0/1 (4문제 중) → 확인 못 통과로 침'));
+  assert.ok(guardLines(guardReport(old, T))[1].includes('그중 확인 차례에 틀린 뒤 그만둬 못 통과로 친 편 1'));
   assert.equal(L.at(-1), `💪 확인 편에서 한 문제만 틀리고 비슷한 문제를 맞혀 칸을 지킨 편 1: ${g.kept[0].name} 10-15`);
   for (const l of L) assert.ok(txt.includes(`\n${l}\n`) || txt.endsWith(`\n${l}`) || txt.includes(`\n${l}`), l);
 });
 
-test('💪 진짜 저장 경로(fakeidb): 확인 차례에 틀린 뒤 그만둠을 적고 다시 읽으면 칸이 내려가 있다 · 지킨 편도', async () => {
+test('💪 진짜 저장 경로(fakeidb): 확인 차례에 틀린 뒤 그만둠을 적고 다시 읽으면 칸 그대로·tq · 지킨 편도 (⛺ v377)', async () => {
   assert.equal(fakeIdb.get('profile', 'math'), undefined, '이 파일의 첫 저장');
   await updateMath((s) => { s.concepts[ID] = dueRec(); s.concepts[ID2] = dueRec(); });
   await updateMath((s) => { applyQuit(s, { rid: 51, id: ID, mode: 'review', d: T, n: 4, due: 1, qs: [no('A')] }, T); });
   await updateMath((s) => { applyRound(s, ID2, { correct: 3, total: 4, missTags: [], qs: [ok('A'), no('B', { fx: 1 }), ok('C'), ok('D')], mode: 'review', rid: 52, day: T }, T); });
   const s = await getMath();
-  assert.deepEqual([s.concepts[ID].box, s.concepts[ID].dueAt, s.concepts[ID2].box, s.concepts[ID2].dueAt], [1, T1, 2, T1]);
-  assert.ok(s.log.some((e) => e.rid === 51 && e.rf === 1) && s.log.some((e) => e.rid === 52 && e.kp === 1));
+  assert.deepEqual([s.concepts[ID].box, s.concepts[ID].dueAt, s.concepts[ID].tq, s.concepts[ID2].box, s.concepts[ID2].dueAt], [2, '2026-10-14', T, 2, T1]);
+  assert.ok(s.log.some((e) => e.rid === 51 && e.rq === 1) && s.log.some((e) => e.rid === 52 && e.kp === 1));
 });
 
 test('💪 화면 배선: 편을 열 때 keep · 처음 틀린 문제(쌍둥이가 나올 때)에 💪 말 · 쌍둥이를 맞히면 · 결과 카드 · 📊 점과 설명 · css · sw v262', () => {

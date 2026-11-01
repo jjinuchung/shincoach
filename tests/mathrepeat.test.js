@@ -307,7 +307,8 @@ test('🔁⏹ 화면 배선(math.js): 편 번호·시작한 날·미리 안내·
   assert.ok(ql.includes('if (!r.answers.length) { releaseRoundLock(r.rid); return; }'));
   assert.ok(ql.includes('applyQuit(s, live, todayKey())') && ql.includes('.catch(() => { ui.unsaved.push(live); })') && ql.includes('.finally(() => releaseRoundLock(live.rid));'), '못 적으면 기억 · 잠금은 적기가 끝난 뒤에 (Codex 62차 #4)');
   assert.equal(ql.split('releaseRoundLock(').length - 1, 2, '잠금을 놓는 곳은 답 없이 나갈 때와 적기가 끝난 뒤 둘뿐');
-  assert.ok(src.includes("back.addEventListener('click', () => { quitLive(); ui.round = null;"), '← 머리 단추: 비우기 전에');
+  assert.ok(src.includes("back.addEventListener('click', () => { parkRound(); ui.round = null;"), '← 머리 단추: 비우기 전에 (⛺ v377 — 개념 편은 세워 두고 아니면 quitLive)');
+  assert.ok(/ {2}quitLive\(\);\r?\n\}/.test(src.slice(src.indexOf('function parkRound('), src.indexOf('function dropParked('))), '세우지 못하는 편은 예전처럼 그만둠');
   const rm = fn('renderMath');
   assert.ok(rm.indexOf('state = await settleLive(state);') > rm.indexOf('syncMathReplies(state)') && rm.indexOf('state = await settleLive(state);') < rm.indexOf('ui.state = state;'));
   assert.ok(rm.indexOf('if (r) {') < rm.indexOf('settleLive'), '🎒·📊 다녀온 것(ui.round 있음)은 정리 전에 이어서 — 멈춤');

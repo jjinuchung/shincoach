@@ -188,7 +188,7 @@ test('📚 화면 연결: 틀린 화면 · 배움 한 장 · 비슷한 문제 ·
   assert.ok(rel.includes('scrollTo = relearnBox(q, shown, a, relearn, kl);') && rel.includes('const offer = askOffer(q, a);'));
   assert.ok(!rel.includes('solveCard(q, shown, rv)') && !rel.includes('whyBlock'), '이 길엔 🔍·한 줄씩·🙈 없음');
   assert.ok(pa.includes("canTwin ? (relearn ? '비슷한 문제 풀어 볼게요 →' : '알겠어요, 비슷한 문제 하나 더 →')"), '단추 말');
-  assert.ok(pa.includes('if (!ch.ok && !light(r) && !relearn) {'), '🙈 이유·다음 잠금은 예전 길에서만');
+  assert.ok(pa.includes('if (!ch.ok && !light(r) && !relearn && !soft) {'), '🙈 이유·다음 잠금은 예전 길에서만 · v377 첫 오답(soft)은 비슷한 문제 뒤로');
   assert.ok(pa.includes("const kl = canTwin && r.answers.slice(0, r.at).every((x) => x && x.correct)") && pa.indexOf('const kl = canTwin') < iRel, '💪 칸 지킴 말은 두 길 모두');
   // 배움 한 장
   const rb = body(m, 'function relearnBox(q, shown, a, L, kl) {');

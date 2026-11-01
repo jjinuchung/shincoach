@@ -547,6 +547,8 @@ button { font-family: inherit; }
 .math-fb { font-size: 1.05rem; font-weight: 700; margin: 4px 0 6px; line-height: 1.6; }
 .math-fb.ok { color: #047857; }
 .math-fb.no { color: #b91c1c; }
+.math-fb.soft { color: #0f766e; } /* 🌱 첫 오답은 가볍게 (v377) — 빨간 글씨 대신 차분한 청록 */
+.math-soft-answer { margin: 0 0 6px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* 📖 풀이 카드 — 틀린 직후 보기 아래 (진우 2026-09-21: "한 문장 말고 그림이랑 풀이를") */
 .math-solve { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 14px; margin: 8px 0 12px; line-height: 1.65; }

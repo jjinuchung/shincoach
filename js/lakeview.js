@@ -15,7 +15,7 @@
 // v371 (아버님 「낚시하다가도 셀을 낚게 — 2% 정도」 → 기본안 「추천대로」): 🟢 지가르데 셀 — host.cellOk(zygarde.zygCanFish) · onCell(keepCell → xp.zygFind('fish')) ·
 //   낚시 셀은 하루 하나(공부 끝 화면 셀 하루 3과 따로) · 📖 도감·💰·그날 낚은 마리에는 안 든다 · 시험용 `?nosw=1&cell=1`이면 입질마다 셀
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
-import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_RIVER, FISH_SEA, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
+import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_RIVER, FISH_SEA, fishMathKey, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
 import { orderOf } from './journey.js';
 import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload, zygMap, zygFind } from './xp.js';
@@ -334,6 +334,8 @@ export async function openLakeNow() {
       onAnswer: (subj, ok, stage, q) => {
         const f = FISH_DAY_Q[subj];
         if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}) });
+        const mk = subj === 'math' && q && !q.fm ? fishMathKey(q.id, ok, Date.now(), Math.random) : ''; // 🔢 배운 칸 문제는 칸별로도 (v377)
+        if (mk) applyDailyDelta(clockDay(), { fishMathKeys: [mk] }).catch(() => {});
       },
       onTime: (sec) => {
         const n = nz(sec);

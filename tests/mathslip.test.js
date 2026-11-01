@@ -95,7 +95,7 @@ test('🙈 화면 배선(math.js): 고를 때 확인 대기(sv 0, 이름표 그�
   assert.ok(wb.includes("if (code === 's') a.sv = 0; else delete a.sv;"), '실수는 확인 대기');
   assert.ok(!wb.includes('missTags'), '고를 때는 오개념 이름표를 거두지 않는다');
   assert.ok(wb.includes("`🙈 왜 틀렸을까요? 솔직하게 골라요${SLIP_HEAD[way] || ''}`"));
-  assert.ok(src.includes("const SLIP_HEAD = { twin: ' — 실수라면 비슷한 문제로 확인해요', twinNote: ' — 실수라면 비슷한 문제로 확인해요', note: ' — 실수여도 노트에 남겨 다음에 다시 물어볼게요', log: '' };"), '💎(log)는 노트를 약속하지 않는다 (Codex 63차 #4)');
+  assert.ok(src.includes("const SLIP_HEAD = { twin: ' — 실수라면 비슷한 문제로 확인해요', twinNote: ' — 실수라면 비슷한 문제로 확인해요', note: ' — 실수여도 노트에 남겨 다음에 다시 물어볼게요', log: '', afterOk: ' (아까 틀린 문제)', afterNo: ' (아까 틀린 문제)' };"), '💎(log)는 노트를 약속하지 않는다 (Codex 63차 #4)');
   assert.ok(wb.includes('box.replaceWith(whyPicked(a, way));') && wb.includes('saveLive();'));
   assert.ok(src.includes("a.w === 's' ? (SLIP_SAID[way] || SLIP_SAID.twin) : (WHY_SAID[a.w] || '')"));
   assert.ok(src.includes("twin: '🙈 실수라고 했어요 — 비슷한 문제를 맞히면 오답 노트에 안 남겨요.'") && src.includes("twinNote: '🙈 실수라고 했어요 — 비슷한 문제로 확인해 봐요.'"));

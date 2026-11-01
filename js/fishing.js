@@ -828,7 +828,29 @@ export const FISH_FM_Q = ['fishFmQ', 'fishFmOk'];
 export const FISH_RIVER = 'fishRiver';
 /** 그날 🌊 바다에서 낚은 마리 칸 (v369 — fishCatch 안에 든 몫) */
 export const FISH_SEA = 'fishSea';
-/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🔒 더 준 분 */
+/**
+ * 🔢 낚시터 「이미 배운 수학」 한 문제의 칸별 기록 줄 (v377 — 2026-11-01 기본안 「추천대로」) — 'frac.add|1|시각36진수+무작위' · 문제 id가 m:칸이 아니면 ''
+ * (줄마다 달라 합집합 병합에서 같은 문제를 두 번 세지 않는다 · 🐟 물고기 수학은 칸이 없어 안 적는다)
+ */
+export function fishMathKey(qid, ok, now, rand = Math.random) {
+  const m = /^m:([A-Za-z0-9_.-]{1,40})$/.exec(String(qid || ''));
+  if (!m) return '';
+  return `${m[1]}|${ok ? 1 : 0}|${Math.max(0, Math.floor(Number(now) || 0)).toString(36)}${Math.floor((Number(rand()) || 0) * 1296).toString(36).padStart(2, '0')}`;
+}
+/** 칸별로 묶기 — [{ id, ok, n }] 틀린 것이 많은 칸부터(같으면 낸 수가 많은 칸) · 이상한 줄은 버림 */
+export function fishMathByConcept(keys) {
+  const by = new Map();
+  for (const k of Array.isArray(keys) ? keys : []) {
+    const m = /^([A-Za-z0-9_.-]{1,40})\|([01])\|[0-9a-z]+$/.exec(String(k || ''));
+    if (!m) continue;
+    const g = by.get(m[1]) || { id: m[1], ok: 0, n: 0 };
+    g.n += 1;
+    g.ok += Number(m[2]);
+    by.set(m[1], g);
+  }
+  return [...by.values()].sort((a, b) => (b.n - b.ok) - (a.n - a.ok) || b.n - a.n || (a.id < b.id ? -1 : 1));
+}
+/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🔒 더 준 분 · 🔢 배운 칸별(v377) */
 export function lakeDayLine(d, fmtMin) {
   const f = typeof fmtMin === 'function' ? fmtMin : (s) => `${Math.round(nz(s) / 60)}분`;
   const asked = SUBJECTS.filter((s) => nz(d && d[FISH_DAY_Q[s][0]]) > 0);
@@ -838,7 +860,9 @@ export function lakeDayLine(d, fmtMin) {
   const q = asked.map((s) => `${KO[s]} ${nz(d[FISH_DAY_Q[s][1]])}/${nz(d[FISH_DAY_Q[s][0]])}${fm(s)}`).join(' · ');
   const away = [nz(d && d[FISH_RIVER]) ? `🏞️ 강 ${nz(d[FISH_RIVER])}` : '', nz(d && d[FISH_SEA]) ? `🌊 바다 ${nz(d[FISH_SEA])}` : ''].filter(Boolean);
   const rv = away.length ? `(${away.join(' · ')})` : '';
-  return `🎣 낚시터 ${f(d.fishSec)} · 물고기 ${nz(d.fishCatch)}마리${rv}${q ? ` · 맞힘/낸 문제 ${q}` : ''}${nz(d.fishBonus) ? ` · 🔒 부모 +${nz(d.fishBonus)}분` : ''}`;
+  const by = fishMathByConcept(d && d.fishMathKeys);
+  const cm = by.length ? ` · 🔢 배운 칸별 ${by.slice(0, 8).map((g) => `${g.id} ${g.ok}/${g.n}`).join(' · ')}${by.length > 8 ? ` 외 ${by.length - 8}칸` : ''}` : '';
+  return `🎣 낚시터 ${f(d.fishSec)} · 물고기 ${nz(d.fishCatch)}마리${rv}${q ? ` · 맞힘/낸 문제 ${q}` : ''}${cm}${nz(d.fishBonus) ? ` · 🔒 부모 +${nz(d.fishBonus)}분` : ''}`;
 }
 
 function nz(v) {

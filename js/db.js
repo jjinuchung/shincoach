@@ -464,7 +464,8 @@ const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // ✍️ 에세이 🎤로 🔶를 받은 문장 (v318, applyEssaySayStone) — 같은 문장을 두 번 통과해도·두 창이 같이 받아도 한 번
 // ☀️ 오늘의 수학 시작 "시각:누른 곳:다시 시작 판" · 완주 "시각" (v331, mathprog.sunReport) — 흐름마다 한 칸
 // 🧩 글 끝 퍼즐 하나 누름·끝냄 "시각:꼴" (v331, korpuzzle.oneSessions) — 끝낸 수가 하루 단추 상한(ONE_PER_DAY)이기도 하다
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', 'essaySayKeys', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
+// 🎣 fishMathKeys: 낚시터에서 낸 「이미 배운 수학」 문제 한 줄씩 '칸|맞음 0·1|시각' (v377 — 칸별 맞힘을 📤에 · 합집합이라 두 기기가 같은 줄을 두 번 세지 않는다)
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', 'essaySayKeys', 'fishMathKeys', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {
@@ -1297,6 +1298,8 @@ export function mergeMath(cur, rec) {
       ...(sched.schedAt ? { schedAt: Number(sched.schedAt) } : {}),
       passes: Math.max(Number(mine.passes) || 0, Number(v.passes) || 0),
       fails: Math.max(Number(mine.fails) || 0, Number(v.fails) || 0),
+      // ⛺ 확인 편을 그만둔 날(v377 tq) — 늦은 날 쪽 · 그 사실을 모르는 다른 사본이 더 늦게 활동했어도 지우지 않는다 (🔍 Codex 181차 #3)
+      ...(mine.tq || v.tq ? { tq: [mine.tq, v.tq].filter((x) => typeof x === 'string' && x).sort().pop() } : {}),
       lastAt: Math.max(Number(mine.lastAt) || 0, Number(v.lastAt) || 0),
       ...(Object.keys(kinds).length ? { kinds } : {}),
       ...(Object.keys(miss).length ? { miss } : {}),

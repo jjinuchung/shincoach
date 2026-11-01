@@ -116,10 +116,10 @@ test('🌱 쉬는 칸을 열면 연습 — applyRound는 일정(box·dueAt·sche
   // 그만두기 — 확인 편 표시(due)가 있어도 쉬는 칸이면 못 통과로 안 친다
   const q = base();
   assert.equal(applyQuit(q, { rid: 21, id: 'frac.div', d: TODAY, n: 4, due: 1, qs: qs(1, 0) }, TODAY), true);
-  assert.deepEqual([q.log.at(-1).rf, q.concepts['frac.div'].box, q.concepts['frac.div'].fails], [undefined, 2, 5]);
+  assert.deepEqual([q.log.at(-1).rf, q.log.at(-1).rq, q.concepts['frac.div'].box, q.concepts['frac.div'].fails, q.concepts['frac.div'].tq], [undefined, undefined, 2, 5, undefined]);
   const qo = { ...base(), rest: OFF };
   applyQuit(qo, { rid: 22, id: 'frac.div', d: TODAY, n: 4, due: 1, qs: qs(1, 0) }, TODAY);
-  assert.deepEqual([qo.log.at(-1).rf, qo.concepts['frac.div'].box], [1, 1], '끄면 예전처럼 한 칸 내려감');
+  assert.deepEqual([qo.log.at(-1).rq, qo.concepts['frac.div'].box, qo.concepts['frac.div'].tq], [1, 2, TODAY], '끄면 확인 편 그만둠(⛺ v377 — 칸 그대로 · 그날은 연습)');
   // 화면 말
   const r0 = base().concepts['frac.div'];
   assert.equal(reviewKeep(r0, TODAY, true), null, '💪 확인 표시 없음');

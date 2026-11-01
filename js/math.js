@@ -91,6 +91,7 @@ const ui = {
   lastRid: 0,
   locks: {},
   unsaved: [],
+  parked: null, // ⛺ ←로 나가 세워 둔 개념 편 (v377) — 같은 날 같은 칸을 열면 이어 감
 };
 const RECENT_KEEP = 10; // 두 편 반 분량 — 틀이 4개뿐인 개념도 한 바퀴는 돈다
 const STEM_KEY = 'shincoach.mathStem'; // 마지막에 고른 줄기 (이 기기 편의용 — 없어도 고르기 화면이 나올 뿐)
@@ -550,12 +551,7 @@ export async function renderMath() {
   }
   if (r) {
     ui.run++;
-    if (r.phase === 'story') renderStory(r.id, r.seed);
-    else if (r.phase === 'lesson') renderLesson(r.id, r.seed, r.page || 0);
-    else if (r.phase === 'retry') renderRetry(r.id, r.wrong || []);
-    else if (r.twin) renderTwin(true);
-    else if (r.at >= r.qs.length) finishRound(); // 다 풀고 저장이 실패한 상태 — 다시 저장 (Codex 2차 #2: 문항 없는 자리를 그리다 죽었다)
-    else renderQuestion(r.answered); // 답한 뒤였으면 풀이·버튼까지 그대로 (채점은 안 한다)
+    redrawRound(r);
     return;
   }
   // ☀️ 개념 편 결과 카드에서 🎒(🎯 잡은 걸 보러)를 다녀온 것이면 — 섞어 풀기가 남아 있으니 사다리 대신 거기로
@@ -834,7 +830,28 @@ function renderLadder(state) {
  * @param {'learn'|'review'|'practice'} mode
  * @param {{again?:boolean}} [o] again: 방금 틀려서 한 번 더 — 📖 이야기를 통째로 다시 보이지 않고 되짚기 카드로
  */
+/** 편을 지금 자리로 다시 그린다 — 🎒·📊에 다녀왔을 때 · ⛺ 세워 둔 편을 이어 갈 때 (v377에서 함께 씀) */
+function redrawRound(r) {
+  if (r.phase === 'story') renderStory(r.id, r.seed);
+  else if (r.phase === 'lesson') renderLesson(r.id, r.seed, r.page || 0);
+  else if (r.phase === 'retry') renderRetry(r.id, r.wrong || []);
+  else if (r.twin) renderTwin(true);
+  else if (r.at >= r.qs.length) finishRound(); // 다 풀고 저장이 실패한 상태 — 다시 저장 (Codex 2차 #2: 문항 없는 자리를 그리다 죽었다)
+  else renderQuestion(r.answered); // 답한 뒤였으면 풀이·버튼까지 그대로 (채점은 안 한다)
+}
+
 function startRound(id, mode, o = {}) {
+  // ⛺ 같은 날 같은 칸을 세워 두었으면 그 편을 그 자리에서 이어 간다 (v377) · 다른 칸이면 세워 둔 편은 그만둠으로
+  const pk = ui.parked;
+  if (pk && pk.id === id && pk.day === todayKey() && !o.again) {
+    ui.parked = null;
+    ui.round = pk;
+    holdRoundLock(pk.rid);
+    ui.run++;
+    redrawRound(pk);
+    return;
+  }
+  dropParked();
   const seed = (Date.now() % 1000000) | 0;
   const recent = ui.recent[id] || [];
   // 🤔 오답 노트: 지난번에 틀린 유형이 있으면 그 유형을 한 문제 끼운다 (want) — 맞히면 노트에서 지워진다
@@ -1974,8 +1991,7 @@ function saveLive() {
  * ←로 나갈 때 — 답한 개념 편이면 그만둠으로 적는다(화면의 기록으로 — 마지막 답이 아직 안 적혔어도). 저장 중인 편은 finishRound가 끝낸다.
  * 못 적었으면 기억해 두었다가 다음에 수학을 열 때 다시 적는다 (Codex 62차 #4). 잠금은 적기가 끝난 뒤에 놓는다 — 그 사이 다른 창이 옛 적기로 닫지 않게
  */
-function quitLive() {
-  const r = ui.round;
+function quitLive(r = ui.round) {
   if (!isConceptRound(r) || r.saving) return;
   if (!r.answers.length) { releaseRoundLock(r.rid); return; }
   const live = liveOf(r);
@@ -1984,12 +2000,37 @@ function quitLive() {
     .finally(() => releaseRoundLock(live.rid));
 }
 /**
+ * ⛺ ←로 나갈 때 (v377 — 2026-11-01 기본안 「추천대로」) — 답한 개념 편은 그만둠으로 적지 않고 그 자리에 둔다(ui.parked · 잠금도 그대로).
+ * 같은 날 같은 칸을 다시 열면 같은 문제에서 이어 간다(startRound) — 새 문제를 뽑지 않으니 「그만두고 다시 뽑기」 꾀는 그대로 막힌다.
+ * 다른 칸 편을 열면 그때 그만둠으로 적고, 앱을 닫으면 다음에 열 때 정리(applyQuit — 확인 편이면 칸 그대로 · 그날은 연습).
+ */
+function parkRound() {
+  const r = ui.round;
+  // 배틀로 넘어가는 중(moving)이면 세우지 않는다 — 문항은 올랐는데 답 표시가 남아 다시 열면 막혔다 (🔍 Codex 181차 #1)
+  if (isConceptRound(r) && r.answers.length && !r.saving && !r.moving && r.at < r.qs.length && r.day === todayKey()) {
+    if (ui.parked && ui.parked !== r) quitLive(ui.parked);
+    ui.parked = r;
+    saveLive();
+    return;
+  }
+  quitLive();
+}
+/** ⛺ 세워 둔 편을 버린다(그만둠으로 적음) — 다른 칸 편을 열 때 · 날이 바뀌었을 때 */
+function dropParked() {
+  const p = ui.parked;
+  if (!p) return;
+  ui.parked = null;
+  quitLive(p);
+}
+
+/**
  * 수학을 열 때 — 못 적은 그만둠을 다시 적고, 쥔 창이 없는 푸는 중 편(앱을 닫아 못 끝낸 편)을 그만둠으로 정리한다.
  * 다른 창이 쥔 편·이 창이 푸는 편은 그대로 (Codex 62차 #1)
  */
 async function settleLive(state) {
   const r = ui.round;
-  const waiting = Object.values((state && state.lives) || {}).filter((l) => l && !(r && r.rid === l.rid));
+  const p = ui.parked; // ⛺ 이 창에 세워 둔 편도 푸는 중 (v377 — 잠금이 없는 브라우저에서도 그만둠으로 닫지 않게)
+  const waiting = Object.values((state && state.lives) || {}).filter((l) => l && !(r && r.rid === l.rid) && !(p && p.rid === l.rid));
   if (!state || (!waiting.length && !ui.unsaved.length)) return state;
   const held = await heldRids();
   // 잠금을 보기 **전에** 본 편만 정리한다 — 잠금을 본 뒤에 다른 창이 막 시작해 적은 편은 이 목록에 없다 (Codex 63차 #3)
@@ -2035,12 +2076,14 @@ function whyBlock(a, next, onDone, way = 'twin') {
 const WHY_SAID = { c: '🤔 헷갈렸다고 했어요 — 풀이를 읽고 비슷한 문제로 확인해요.', u: '😶 잘 몰랐다고 했어요 — 괜찮아요, 풀이를 천천히 읽어요.' };
 // 🙈 실수를 어떻게 확인하나에 맞춘 말 — 하지 않는 일을 약속하지 않게 (Codex 63차 #4)
 //   twin: 쌍둥이로 확인 · twinNote: 이미 노트에 있는 문제(노트는 남는다) · note: 쌍둥이가 없어 노트에 · log: 💎·틀 없는 문제(노트 없음, 기록에만)
-const SLIP_HEAD = { twin: ' — 실수라면 비슷한 문제로 확인해요', twinNote: ' — 실수라면 비슷한 문제로 확인해요', note: ' — 실수여도 노트에 남겨 다음에 다시 물어볼게요', log: '' };
+const SLIP_HEAD = { twin: ' — 실수라면 비슷한 문제로 확인해요', twinNote: ' — 실수라면 비슷한 문제로 확인해요', note: ' — 실수여도 노트에 남겨 다음에 다시 물어볼게요', log: '', afterOk: ' (아까 틀린 문제)', afterNo: ' (아까 틀린 문제)' }; // after*: v377 비슷한 문제를 푼 뒤에 묻기
 const SLIP_SAID = {
   twin: '🙈 실수라고 했어요 — 비슷한 문제를 맞히면 오답 노트에 안 남겨요.',
   twinNote: '🙈 실수라고 했어요 — 비슷한 문제로 확인해 봐요.',
   note: '🙈 실수라고 했어요 — 이 문제는 비슷한 문제가 없어서 노트에 남겨 두고 다음에 다시 물어볼게요.',
   log: '🙈 실수라고 했어요 — 이번 답은 기록에 남겨 둘게요. 풀이를 한 번 더 읽어 봐요.',
+  afterOk: '🙈 실수라고 했어요 — 비슷한 문제를 맞혔어요.',
+  afterNo: '🙈 실수라고 했어요 — 비슷한 문제도 틀려서 노트에 남겨 두고 다음에 다시 물어볼게요.',
 };
 /** 이 문제에서 실수를 어떻게 확인하나 — 쌍둥이가 나오면 twin(노트 문제면 twinNote), 아니면 노트가 생기는 문제는 note, 💎·틀 없는 문제는 log */
 function slipWayOf(r, q, canTwin) {
@@ -2394,6 +2437,9 @@ function paintAnswer(i, list, card, restoring) {
   const canTwin = !ch.ok && q.solve && (q.kind === 'calc' || q.kind === 'misread') && !light(r) && q.key;
   // 📚 틀린 순간을 짧게 — 그 칸의 배움 한 장 → 비슷한 문제 (v302). 비슷한 문제가 나오는 문항만 · 배움 글을 못 만들면 예전 풀이 길
   const relearn = canTwin && RELEARN_MODES.has(r.mode) ? relearnOf(q, r) : null;
+  // 🌱 개념 편의 첫 오답은 가볍게 (v377 — 2026-11-01 기본안 「추천대로」): 「하나는 틀려도 돼요」 · 정답 · 비슷한 문제 단추만 —
+  //   📚 배움 한 장·풀이는 눌러야 펼침 · 🙈 이유는 비슷한 문제 화면에서(paintTwin) · 비슷한 문제도 틀리면 그때는 예전처럼 풀이
+  const soft = !ch.ok && canTwin && isConceptRound(r) && r.answers.slice(0, r.at).every((x) => x && x.correct);
   if (ch.ok) {
     fb.appendChild(el('p', 'math-fb ok', ['맞았어요! 🎉', '정확해요! ⭐', '바로 그거예요! 👍'][r.at % 3]));
     // 맞혀도 풀이는 접어 두고 볼 수 있게 — "왜 맞았는지"도 개념이다
@@ -2407,7 +2453,22 @@ function paintAnswer(i, list, card, restoring) {
     // 💪 오늘 확인 차례인 칸에서 처음 틀렸고 비슷한 문제가 나오면 — 그만두지 않아도 된다는 걸 풀이보다 먼저 (v262)
     //    처음 배우기·연습 편은 "비슷한 문제를 맞히고 끝까지 풀면 통과" (v279)
     const kl = canTwin && r.answers.slice(0, r.at).every((x) => x && x.correct) ? (r.keep ? keepLine(r.keep, 'wrong') : slipRound(r) ? slipLine('wrong') : null) : null;
-    if (relearn) {
+    if (soft) {
+      if (!kl) fb.appendChild(el('p', 'math-fb soft', '괜찮아요! 💪 하나는 틀려도 돼요.')); // 💪 칸 지키기 말이 있으면 그 말이 같은 뜻 — 두 번 말하지 않게
+      const right = q.choices.find((x) => x.ok);
+      if (right) { const ans = el('p', 'math-soft-answer'); ans.appendChild(document.createTextNode('정답: ')); ans.appendChild(richNode(right.text)); fb.appendChild(ans); }
+      if (kl) fb.appendChild(el('p', 'math-keep', kl));
+      const more = el('button', 'btn math-solve-toggle', '📚 어떻게 푸는지 다시 보기');
+      more.type = 'button';
+      more.addEventListener('click', () => {
+        if (relearn) { if (!a.rl) { a.rl = 1; saveLive(); } more.replaceWith(relearnBox(q, shown, a, relearn, null)); } // 📚 본 표시는 펼쳤을 때만 (v302 rl)
+        else more.replaceWith(solveCard(q, shown));
+      });
+      fb.appendChild(more);
+      if (!relearn) a.whyLater = 1; // 🙈 비슷한 문제를 푼 뒤에 묻는다 (배움 한 장 길은 v302처럼 묻지 않음)
+      const offer = askOffer(q, a);
+      if (offer) fb.appendChild(offer);
+    } else if (relearn) {
       if (!a.rl) { a.rl = 1; saveLive(); } // 📚 본 표시 — 여기서 그만두거나 앱을 닫아도 일지에 남게
       scrollTo = relearnBox(q, shown, a, relearn, kl);
       fb.appendChild(scrollTo);
@@ -2433,13 +2494,13 @@ function paintAnswer(i, list, card, restoring) {
     s.appendChild(document.createTextNode(a.sn ? '' : `${numTail(noun) ? numJosa(noun, '이었어요', '였어요') : josa(noun, '이었어요', '였어요')}. 계산 전에 어느 쪽일지 한 번 더 생각해요.`));
     fb.appendChild(s);
   }
-  const next = el('button', 'btn btn-primary btn-big-wide', canTwin ? (relearn ? '비슷한 문제 풀어 볼게요 →' : '알겠어요, 비슷한 문제 하나 더 →') : r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
+  const next = el('button', 'btn btn-primary btn-big-wide', soft ? '비슷한 문제로 다시 해 보기 →' : canTwin ? (relearn ? '비슷한 문제 풀어 볼게요 →' : '알겠어요, 비슷한 문제 하나 더 →') : r.at + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
   next.addEventListener('click', () => { if (canTwin) startTwin(); else advance(); });
   // 🙈 틀린 이유 — 고를 때까지 다음이 잠긴다 (진단 제외). 복원이면 고른 것을 보여 준다
   // v248: 📖 풀이를 다 열고 🔍 돌아보기를 마친 **뒤에** 나온다 — 그때까지 다음도 잠김
   // 📚 배움 한 장 길은 🔍·한 줄씩·🙈 없이 바로 비슷한 문제로 (v302)
-  if (!ch.ok && !light(r) && !relearn) {
+  if (!ch.ok && !light(r) && !relearn && !soft) {
     const slot = el('div', 'math-why-slot');
     fb.appendChild(slot);
     next.disabled = true;
@@ -3117,9 +3178,28 @@ function paintTwin(i, list, card, restoring) {
   const next = el('button', 'btn btn-primary btn-big-wide', t.of + 1 < r.qs.length ? '다음 →' : '결과 보기');
   next.type = 'button';
   next.addEventListener('click', () => { r.at = t.of; advance(); });
+  // 🙈 첫 오답에서 미뤄 둔 「왜 틀렸을까」 — 비슷한 문제를 푼 지금 묻는다 (v377 · 고를 때까지 다음 잠김은 예전과 같다)
+  const a0 = r.answers[t.of];
+  if (a0 && a0.whyLater && !light(r)) {
+    const way = ch.ok ? 'afterOk' : 'afterNo';
+    if (a0.w) fb.appendChild(whyPicked(a0, way));
+    else {
+      next.disabled = true;
+      fb.appendChild(whyBlock(a0, next, () => settleWhyLater(r, t, a0), way));
+    }
+  }
   fb.appendChild(next);
   focusQuiet(next);
   if (scrollTo && !restoring) scrollTo.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+/** 🙈 비슷한 문제를 푼 뒤 고른 이유 (v377) — 실수(s)면 answerTwin이 하던 일을 지금: 비슷한 문제를 맞혔으면 실수로 인정(sv 1)·오개념 이름표를 거둔다 */
+function settleWhyLater(r, t, a) {
+  if (a.w !== 's') return;
+  const ok = !!(t.q.choices[t.chosenIdx] || {}).ok;
+  a.sv = ok ? 1 : 0;
+  if (ok && a.tag) { const k = r.missTags.lastIndexOf(a.tag); if (k >= 0) r.missTags.splice(k, 1); }
+  saveLive();
 }
 
 /**
@@ -3495,7 +3575,7 @@ export function initMath({ showView }) {
   ui.showView = showView;
   const back = $('btn-math-back');
   // 🎯 도전 문제도 여기서 끝낸다 — 안 끄면 ⏳ 예외가 켜진 채 남아 수학 시간이 안 세어졌다 (Codex 20차 #1)
-  if (back) back.addEventListener('click', () => { quitLive(); ui.round = null; endPoke(); ui.daily = null; endDetect(); endChal(); endPuzzle(); ui.run++; showView('home'); }); // 🧩 퍼즐 판도 버린다(낸 답은 저장됐다, v296) · 🐾 판도(v364 — 끝내기 전이면 저장 없음)
+  if (back) back.addEventListener('click', () => { parkRound(); ui.round = null; endPoke(); ui.daily = null; endDetect(); endChal(); endPuzzle(); ui.run++; showView('home'); }); // 🧩 퍼즐 판도 버린다(낸 답은 저장됐다, v296) · 🐾 판도(v364 — 끝내기 전이면 저장 없음) · ⛺ 개념 편은 세워 둔다(v377 parkRound)
 }
 
 /** 홈에서 진우가 본 영상 세계를 미리 알고 싶을 때 (표시용) */
