@@ -15,11 +15,12 @@ const CARDS = new Map(JSON.parse(read('coach/korean/reading.json')).cards.map((c
 const READ = LIST.filter((t) => t.card);
 const lineText = (l) => (typeof l === 'string' ? l : (l && (l.t || l.text)) || '');
 
-test('📖 원고 — 독서 논술 서른(v316 N33~N42 이야기 · v353·v370 N63부터 셋째마다 — 기사문·생활문·토의 글도) · 근거 줄은 그 글 안 · 편마다 글에 근거가 있는 이유 하나 이상 · 지어낸 말은 글에 그대로 없다', () => {
+test('📖 원고 — 독서 논술 마흔(v316 N33~N42 이야기 · v353·v370·v376 N63부터 셋째마다 — 기사문·생활문·토의 글도) · 근거 줄은 그 글 안 · 편마다 글에 근거가 있는 이유 하나 이상 · 지어낸 말은 글에 그대로 없다', () => {
   const V316 = Array.from({ length: 10 }, (_, i) => `N${33 + i}`);
-  assert.deepEqual(READ.map((t) => t.id), [...V316, ...Array.from({ length: 20 }, (_, i) => `N${63 + 3 * i}`)]);
+  assert.deepEqual(READ.map((t) => t.id), [...V316, ...Array.from({ length: 30 }, (_, i) => `N${63 + 3 * i}`)]);
   assert.deepEqual(READ.map((t) => t.card), ['K68', 'K4', 'K66', 'K53', 'K31', 'K95', 'K71', 'K19', 'K33', 'K32', 'K124', 'K73', 'K1', 'K119', 'K76', 'K20', 'K92', 'K47', 'K61', 'K41',
-    'K116', 'K129', 'K111', 'K5', 'K128', 'K77', 'K63', 'K117', 'K23', 'K49']); // v370 — 한쪽 주장만 펴는 글은 반대편 근거 줄이 없어 뺐다
+    'K116', 'K129', 'K111', 'K5', 'K128', 'K77', 'K63', 'K117', 'K23', 'K49', // v370 — 한쪽 주장만 펴는 글은 반대편 근거 줄이 없어 뺐다
+    'K144', 'K150', 'K141', 'K138', 'K152', 'K131', 'K147', 'K75', 'K39', 'K156']); // v376 — 양쪽 근거가 글 안에 다 있는 글만
   assert.equal(new Set(READ.map((t) => t.card)).size, READ.length, '글마다 주제 하나');
   for (const t of READ) {
     const c = CARDS.get(t.card);
@@ -65,7 +66,7 @@ test('📖 토의·두 의견 글 — 이유가 말한 사람을 대면 근거 �
     const sp = speakers(c);
     const who = new Set(sp.filter(Boolean));
     for (const side of ['yes', 'no']) t[side].reasons.forEach((r, i) => {
-      const name = [...who].find((n) => r.startsWith(`${n}는 `) || r.startsWith(`${n}이는 `));
+      const name = [...who].find((n) => [`${n}는 `, `${n}이는 `, `${n}도 `, `${n}이도 `].some((h) => r.startsWith(h))); // v376 Codex 180차 — 「나래도·수빈이도」도 그 사람의 줄로
       if (!name) return;
       named++;
       for (const k of t[side].ev[i]) assert.equal(sp[k - 1], name, `${t.id} ${side}[${i}] ${name}의 말인데 근거 ${k}줄은 ${sp[k - 1]}`);
@@ -78,13 +79,14 @@ test('📖 토의·두 의견 글 — 이유가 말한 사람을 대면 근거 �
     N72: { yes: [['하윤', [3]], ['하윤', [4]], [null, []]], no: [['예준', [6]], [null, [7]], ['예준', [8]]] },
     N81: { yes: [['시우', [3]], ['시우', [5]], [null, []]], no: [['지안', [2]], ['지안', [4]], [null, []]] },
     N111: { yes: [['시우', [3]], ['시우', [4, 5]], [null, []]], no: [['하린이', [6]], ['하린이', [9]], [null, []]] }, // v370 Codex 174차 — 시우·하린이의 예상을 글 속 사실처럼 쓰던 문장
+    N141: { yes: [['소희', [5]], [null, []], [null, []]], no: [['지민', [2]], ['하은', [8]], ['사회자', [9]]] }, // v376 Codex 180차 — 사회자의 판단을 반이 정한 사실처럼 쓰던 문장
   };
   for (const [id, sides] of Object.entries(want)) {
     const t = READ.find((x) => x.id === id);
     for (const side of ['yes', 'no']) sides[side].forEach(([name, ev], i) => {
       const r = t[side].reasons[i];
       assert.deepEqual(t[side].ev[i], ev, `${id} ${side}[${i}] 근거 줄`);
-      if (name) assert.ok(r.startsWith(`${name}는 `) || r.startsWith(`${name}이는 `), `${id} ${side}[${i}] 「${name}」의 말로: ${r}`);
+      if (name) assert.ok([`${name}는 `, `${name}이는 `, `${name}도 `, `${name}이도 `].some((h) => r.startsWith(h)), `${id} ${side}[${i}] 「${name}」의 말로: ${r}`);
     });
   }
   // 시우의 걱정(한 학기 내내)·예준이의 말(종이 울림)을 글 속 사실처럼 쓰던 문장
