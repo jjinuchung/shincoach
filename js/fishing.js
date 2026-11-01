@@ -17,6 +17,8 @@
 // v369 (2단계 ③ 원고 「추천대로」): 🌊 바다 방파제 — 바다 물고기 9종(home 'sea' · 별마다 두 종 짝 — 미끼가 같은 별 안에서만 기울어서 감성돔 짝으로 농어) ·
 //   자리 셋(방파제 안쪽·테트라포드·먼 바다) · 강 도감 6종이면 열림 · 🦐 크릴(감성돔·볼락 — 바다가 열린 뒤에 팖) · 루어는 바다에서 농어·조피볼락 ·
 //   🏅 감성돔 40 cm 「4짜」 · 바다 날씨 줄(비·바람은 안전 한 줄) · 열릴 때 안전 한 줄(SEA_SAFE)
+// v378 (난이도 기본안 「추천대로」 — 아버님 「문제가 너무 쉽다 · 물고기가 클수록 어렵게」): 물고기가 문 뒤(③ 바늘 · ④ 사투 · ⑤ 뜰채) 문제는
+//   물고기 별로 단계(levelOf — ★1·2 지금 그대로 · ★3 2단계 · ★4·5 3단계) · 과목마다 꼴은 lakelevel.js · 틀려도 안 놓침·💰는 그대로 · 단계별 낸·맞힌 칸 FISH_LV_Q
 // ★ 이 파일은 아무것도 import하지 않는다 — 시험이 DOM·IndexedDB 없이 부른다 · 난수는 rng() 인자로
 
 /** 하루 낚시 시간(분) · 손을 이만큼(ms) 안 대면 시간을 안 셈(⏳ 과목 시계와 같은 셈) */
@@ -194,10 +196,11 @@ export function poolAt(place, star) {
  * 별을 먼저 뽑으므로 별 몫·별 하나에 💰1·하루 40은 그대로 — 다만 흐린 날 깊은 곳에서 붕어가 늘면 🏅 월척 +5는 조금 잦아질 수 있다(Codex 171차 · 그대로 둠)
  * 낚시터는 자리로 안다(placeOfSpot — 강 자리면 강 물고기)
  */
-export function rollFish(spot, chum, streak, rng = Math.random, tilt = null) {
+export function rollFish(spot, chum, streak, rng = Math.random, tilt = null, wantStar = 0) {
   const place = placeOfSpot(spot);
   const odds = starOdds(spot, chum);
-  const star = weighted([1, 2, 3, 4, 5].map((s) => [s, odds[s]]), rng);
+  // wantStar = 헤드리스 시험용 별 (`?nosw=1&star=5` — v378 · 보통은 0이라 별 몫대로)
+  const star = [1, 2, 3, 4, 5].includes(wantStar) ? wantStar : weighted([1, 2, 3, 4, 5].map((s) => [s, odds[s]]), rng);
   const tw = (x) => (tilt && Object.prototype.hasOwnProperty.call(tilt, x.key) && Number(tilt[x.key]) > 0 ? Number(tilt[x.key]) : 1);
   const sp = weighted(poolAt(place, star).map(([x, w]) => [x, w * tw(x)]), rng);
   const cm = lengthOf(sp, streak, rng);
@@ -330,6 +333,29 @@ export function fightAnswer(s0, correct) {
 export function netAnswer(left, correct) {
   const n = nz(left);
   return correct ? Math.max(0, n - 1) : n;
+}
+
+// ───────────── 난이도 (v378 · 2026-11-01 기본안 「추천대로」) ─────────────
+
+/** 물고기 별 → 문제 단계 — ★1·2 지금 그대로(1) · ★3 → 2 · ★4·5 → 3 */
+export const LEVEL_OF_STAR = { 1: 1, 2: 1, 3: 2, 4: 3, 5: 3 };
+export function levelOf(star) {
+  return Object.prototype.hasOwnProperty.call(LEVEL_OF_STAR, star) ? LEVEL_OF_STAR[star] : 1;
+}
+/** 물고기 별을 따르는 단계 — 물고기가 문 뒤뿐(① 던지기·② 밑밥은 아직 어떤 물고기인지 모를 때라 1) */
+export const BIG_STAGES = ['hook', 'fight', 'net'];
+/** 이 단계에서 낼 문제 단계 (🟢 셀은 ★3이라 2) */
+export function stageLevel(stage, fish) {
+  return fish && BIG_STAGES.includes(stage) ? levelOf(fish.star) : 1;
+}
+/** 문제 카드 머리 표시 — 숫자·셈 없음 · 별 개수는 낚을 때까지 비밀 그대로 */
+export const LV_BADGE = { 2: '🐠 제법 큰 물고기 문제', 3: '🐋 큰 물고기 문제' };
+/** 카드 머리 표시 글 ('' = 안 띄움) — 🟢 셀은 정체가 드러난 뒤(사투·뜰채)엔 물고기라고 하지 않는다 */
+export function lvBadge(stage, fish) {
+  const lv = stageLevel(stage, fish);
+  if (lv < 2) return '';
+  if (fish.cell && stage !== 'hook') return '🟢 반짝이는 손님 문제';
+  return LV_BADGE[lv] || '';
 }
 
 // ───────────── 과목 비율 ─────────────
@@ -828,6 +854,8 @@ export const FISH_FM_Q = ['fishFmQ', 'fishFmOk'];
 export const FISH_RIVER = 'fishRiver';
 /** 그날 🌊 바다에서 낚은 마리 칸 (v369 — fishCatch 안에 든 몫) */
 export const FISH_SEA = 'fishSea';
+/** 그날 2·3단계 문제로 낸·맞힌 칸 (v378 — 과목 칸 안에 든 몫 · 1단계는 나머지 · 못 만들어 내려간 문제는 실제 낸 단계로 센다) */
+export const FISH_LV_Q = { 2: ['fishLv2Q', 'fishLv2Ok'], 3: ['fishLv3Q', 'fishLv3Ok'] };
 /**
  * 🔢 낚시터 「이미 배운 수학」 한 문제의 칸별 기록 줄 (v377 — 2026-11-01 기본안 「추천대로」) — 'frac.add|1|시각36진수+무작위' · 문제 id가 m:칸이 아니면 ''
  * (줄마다 달라 합집합 병합에서 같은 문제를 두 번 세지 않는다 · 🐟 물고기 수학은 칸이 없어 안 적는다)
@@ -850,7 +878,7 @@ export function fishMathByConcept(keys) {
   }
   return [...by.values()].sort((a, b) => (b.n - b.ok) - (a.n - a.ok) || b.n - a.n || (a.id < b.id ? -1 : 1));
 }
-/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🔒 더 준 분 · 🔢 배운 칸별(v377) */
+/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🐋 2·3단계 맞힌/낸(v378) · 🔢 배운 칸별(v377) · 🔒 더 준 분 */
 export function lakeDayLine(d, fmtMin) {
   const f = typeof fmtMin === 'function' ? fmtMin : (s) => `${Math.round(nz(s) / 60)}분`;
   const asked = SUBJECTS.filter((s) => nz(d && d[FISH_DAY_Q[s][0]]) > 0);
@@ -862,7 +890,9 @@ export function lakeDayLine(d, fmtMin) {
   const rv = away.length ? `(${away.join(' · ')})` : '';
   const by = fishMathByConcept(d && d.fishMathKeys);
   const cm = by.length ? ` · 🔢 배운 칸별 ${by.slice(0, 8).map((g) => `${g.id} ${g.ok}/${g.n}`).join(' · ')}${by.length > 8 ? ` 외 ${by.length - 8}칸` : ''}` : '';
-  return `🎣 낚시터 ${f(d.fishSec)} · 물고기 ${nz(d.fishCatch)}마리${rv}${q ? ` · 맞힘/낸 문제 ${q}` : ''}${cm}${nz(d.fishBonus) ? ` · 🔒 부모 +${nz(d.fishBonus)}분` : ''}`;
+  const lvs = [2, 3].filter((l) => nz(d && d[FISH_LV_Q[l][0]])).map((l) => `${l}단계 ${nz(d[FISH_LV_Q[l][1]])}/${nz(d[FISH_LV_Q[l][0]])}`);
+  const lv = lvs.length ? ` · 🐋 큰 물고기 문제 ${lvs.join(' · ')}` : '';
+  return `🎣 낚시터 ${f(d.fishSec)} · 물고기 ${nz(d.fishCatch)}마리${rv}${q ? ` · 맞힘/낸 문제 ${q}` : ''}${lv}${cm}${nz(d.fishBonus) ? ` · 🔒 부모 +${nz(d.fishBonus)}분` : ''}`;
 }
 
 function nz(v) {

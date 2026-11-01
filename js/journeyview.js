@@ -185,19 +185,21 @@ function route() {
 
 // ───────────── 문제 원천 ─────────────
 
+// 🎣 낚시터 난이도(v378): make(key, seed, lv) — lv 2·3이면 lakelevel.js 꼴(못 만들면 아래 1단계 꼴 그대로) · 🎒 대여행은 lv 없이 불러 지금 꼴만
 export async function loadSources() { // 🎣 학습 낚시터(v366 lakeview.js)도 같은 원천을 쓴다
   const tasks = {
     math: async () => (await import('./math.js')).journeyMathSource(),
     english: async () => {
-      const [{ listVocabViews }, { wordPool }, { quizChoices }] = await Promise.all([import('./db.js'), import('./rocketquiz.js'), import('./review.js')]);
+      const [{ listVocabViews }, { wordPool }, { quizChoices }, { enLevelQ }] = await Promise.all([import('./db.js'), import('./rocketquiz.js'), import('./review.js'), import('./lakelevel.js')]);
       const all = wordPool(await listVocabViews());
       const asked = new Map(all.filter((r) => Number(r.quizPass) >= 1).map((r) => [String(r.word), r]));
       if (!asked.size || all.length < 4) return null;
       return {
         keys: [...asked.keys()],
-        make(word, seed) {
+        make(word, seed, lv = 1) {
           const rec = asked.get(word);
           if (!rec) return null;
+          if (lv >= 2) { const hq = enLevelQ(rec, all, lv, rngOf(seed)); if (hq) return hq; }
           const ch = quizChoices(rec, all, rngOf(seed));
           if (ch.length !== 4) return null; // 4지선다만 — 서로 다른 뜻이 모자라면 다른 문제·다른 과목으로 (🔍 Codex 145차 #3)
           const meaning = String(rec.meaning);
@@ -206,7 +208,7 @@ export async function loadSources() { // 🎣 학습 낚시터(v366 lakeview.js)
       };
     },
     korean: async () => {
-      const [{ allWords }, kb] = await Promise.all([import('./korwords.js'), import('./korbattle.js')]);
+      const [{ allWords }, kb, { korLevelQ }] = await Promise.all([import('./korwords.js'), import('./korbattle.js'), import('./lakelevel.js')]);
       const res = await fetch('./coach/korean/words.json');
       if (!res.ok) return null;
       const pool = kb.korPool(allWords(await res.json(), []));
@@ -215,15 +217,16 @@ export async function loadSources() { // 🎣 학습 낚시터(v366 lakeview.js)
       if (!learned.size) return null;
       return {
         keys: [...learned.keys()],
-        make(id, seed) {
+        make(id, seed, lv = 1) {
           const w = learned.get(id);
-          const q = w ? kb.korQFor(w, pool, rngOf(seed)) : null;
+          const hq = w && lv >= 2 ? korLevelQ(w, pool, lv, rngOf(seed)) : null;
+          const q = hq || (w ? kb.korQFor(w, pool, rngOf(seed)) : null);
           return q ? { ...q, label: `📚 국어 · ${q.label.replace(/^🔤 /, '')}`, id: `k:${q.id}` } : null;
         },
       };
     },
     nonsul: async () => {
-      const [{ allTopics }, kb] = await Promise.all([import('./nonsul.js'), import('./korbattle.js')]);
+      const [{ allTopics }, kb, { nsLevelQ }] = await Promise.all([import('./nonsul.js'), import('./korbattle.js'), import('./lakelevel.js')]);
       const res = await fetch('./coach/korean/nonsul.json');
       if (!res.ok) return null;
       const played = nonsulMap();
@@ -232,9 +235,10 @@ export async function loadSources() { // 🎣 학습 낚시터(v366 lakeview.js)
       if (!pairs.size) return null;
       return {
         keys: [...pairs.keys()],
-        make(key, seed) {
+        make(key, seed, lv = 1) {
           const x = pairs.get(key);
-          const q = x ? kb.nonsulQFor(x[0], x[1], rngOf(seed)) : null;
+          const hq = x && lv >= 2 ? nsLevelQ(x[0], x[1], lv, rngOf(seed)) : null;
+          const q = hq || (x ? kb.nonsulQFor(x[0], x[1], rngOf(seed)) : null);
           return q ? { ...q, id: `n:${q.id}` } : null;
         },
       };

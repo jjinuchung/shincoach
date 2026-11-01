@@ -14,9 +14,12 @@
 // v369 (2단계 ③ 원고 「추천대로」): 🌊 바다 방파제(강 도감 6종이면 열림 · host.seaOpen · gearState.sea) · 바다에서 낚은 마리 daily fishSea
 // v371 (아버님 「낚시하다가도 셀을 낚게 — 2% 정도」 → 기본안 「추천대로」): 🟢 지가르데 셀 — host.cellOk(zygarde.zygCanFish) · onCell(keepCell → xp.zygFind('fish')) ·
 //   낚시 셀은 하루 하나(공부 끝 화면 셀 하루 3과 따로) · 📖 도감·💰·그날 낚은 마리에는 안 든다 · 시험용 `?nosw=1&cell=1`이면 입질마다 셀
+// v378 (난이도 기본안 「추천대로」): 창이 문제마다 단계(fishing.stageLevel)를 넘긴다 → ask(subj, seed, lv) → 원천 make(key, seed, lv)(lakelevel.js 꼴 · 못 만들면 1단계 꼴) ·
+//   🔶 영어 3단계(소리만)는 영어 목소리가 있는 기기에서만(lvFor) · 2·3단계로 낸 문제는 그날 fishLv2/3Q·Ok에도 · 시험용 `?nosw=1&star=5`면 입질마다 그 별
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
-import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_RIVER, FISH_SEA, fishMathKey, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
+import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_RIVER, FISH_SEA, fishMathKey, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
+import { lvFor } from './lakelevel.js';
 import { orderOf } from './journey.js';
 import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload, zygMap, zygFind } from './xp.js';
 import { zygCanFish, FISH_SRC } from './zygarde.js';
@@ -96,14 +99,15 @@ export function sharesOf(days, nsDayMap, today, avail) {
 /**
  * 그 과목의 다음 문제 — 그날 차례(날·과목으로 섞은 줄)의 at 자리부터 (journey.orderOf와 같은 줄 만들기) → { q, step }
  * step = 실제로 본 자리 수(못 만든 자리까지) — 부르는 쪽이 at을 그만큼 넘긴다(Codex 170차 — 못 만든 자리를 안 넘겨 같은 문제가 두 번 나오거나 그 과목이 영영 빠지던 것) · 12자리까지 보고 못 만들면 q는 null
+ * lv = 단계(v378 — 원천 make가 그 단계 꼴을 만들고, 못 만들면 1단계 꼴 · 🎒 대여행은 lv 없이 부른다)
  */
-export function askFrom(src, subj, today, at, seed) {
+export function askFrom(src, subj, today, at, seed, lv = 1) {
   if (!src || !Array.isArray(src.keys) || !src.keys.length) return { q: null, step: 0 };
   const keys = orderOf(src.keys, `lake:${today}`, subj);
   const look = Math.min(keys.length, 12);
   for (let t = 0; t < look; t++) {
     let q = null;
-    try { q = src.make(keys[(nz(at) + t) % keys.length], (seed + t * 7919) >>> 0); } catch { q = null; }
+    try { q = src.make(keys[(nz(at) + t) % keys.length], (seed + t * 7919) >>> 0, lv); } catch { q = null; }
     if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((c) => c.ok).length === 1) return { q, step: t + 1 };
   }
   return { q: null, step: look };
@@ -115,11 +119,11 @@ export function askFrom(src, subj, today, at, seed) {
 export function startOf(d) {
   return Object.fromEntries(SUBJECTS.map((s) => [s, Math.max(0, nz(d && d[FISH_DAY_Q[s][0]]) - (s === 'math' ? nz(d && d[FISH_FM_Q[0]]) : 0))]));
 }
-/** 창이 쓰는 문제 내기 (subj, seed) → 문제 | null — 과목마다 자리(start = startOf)에서 askFrom이 본 만큼(못 만든 자리까지) 넘긴다 */
+/** 창이 쓰는 문제 내기 (subj, seed, lv) → 문제 | null — 과목마다 자리(start = startOf)에서 askFrom이 본 만큼(못 만든 자리까지) 넘긴다 */
 export function asker(srcs, day, start) {
   const at = { ...(start || {}) };
-  return (subj, seed) => {
-    const r = askFrom(srcs && srcs[subj], subj, day, nz(at[subj]), seed);
+  return (subj, seed, lv = 1) => {
+    const r = askFrom(srcs && srcs[subj], subj, day, nz(at[subj]), seed, lv);
     at[subj] = nz(at[subj]) + r.step;
     return r.q;
   };
@@ -152,16 +156,28 @@ export function dailyQueue(write, dayFn, retryMs = 4000) {
 /**
  * 수학 차례에 🐟 물고기 수학 섞기 (v367) — base(subj, seed) = 「이미 배운 문제」 asker · fm(seed, avoid) → 물고기 수학 문제 | null
  * 수학이면 번갈아(배운 문제 → 물고기 → 배운 문제 …) — 반쯤 · 한쪽이 못 내면 다른 쪽(배운 수학 개념이 없으면 물고기 수학만) · 수학이 아니면 base 그대로
- * 물고기 수학은 바로 앞과 다른 꼴부터
+ * 물고기 수학은 바로 앞과 다른 꼴부터 · lv(v378 단계)는 양쪽에 그대로 넘긴다
  */
 export function mathMix(base, fm) {
   let turn = 0;
   let last = '';
-  return (subj, seed) => {
-    if (subj !== 'math') return base(subj, seed);
-    const fish = () => { const q = fm(seed, last); if (q) last = q.kind || ''; return q; };
-    return turn++ % 2 === 1 ? fish() || base(subj, seed) : base(subj, seed) || fish();
+  return (subj, seed, lv = 1) => {
+    if (subj !== 'math') return base(subj, seed, lv);
+    const fish = () => { const q = fm(seed, last, lv); if (q) last = q.kind || ''; return q; };
+    return turn++ % 2 === 1 ? fish() || base(subj, seed, lv) : base(subj, seed, lv) || fish();
   };
+}
+/** 🔊 영어 목소리가 있는 기기인가 (v378 영어 3단계 — 소리만 듣는 문제) · 목소리 목록이 아직 안 왔거나 못 읽으면 false(2단계로) */
+export function canListen() {
+  try {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;
+    return window.speechSynthesis.getVoices().some((v) => /^en/i.test(String(v && v.lang)));
+  } catch { return false; }
+}
+/** 그날 단계별 칸 증분 (v378) — 2·3단계로 실제 낸 문제만 · 1단계·단계 모름은 {} */
+export function lvDelta(q, ok) {
+  const f = q && Object.prototype.hasOwnProperty.call(FISH_LV_Q, q.lv) ? FISH_LV_Q[q.lv] : null;
+  return f ? { [f[0]]: 1, [f[1]]: ok ? 1 : 0 } : {};
 }
 const svgNS = 'http://www.w3.org/2000/svg';
 function sv(tag, attrs, text) {
@@ -231,6 +247,14 @@ export async function keepCell(findFn = zygFind, noteFn = revealNote) {
   let note = null;
   try { note = r.ev ? noteFn(r) : null; } catch { note = null; }
   return { ok: true, found: r.found === 'core' ? 'core' : 'cell', cells: nz(r.cells), ...(note ? { note } : {}) };
+}
+/** 시험용 `?nosw=1&star=5` — 입질마다 그 별 물고기 (v378 · nosw 없이는 안 먹는다 · 없으면 0) */
+function testStar() {
+  try {
+    const s = String((typeof location !== 'undefined' && location.search) || '');
+    const m = /[?&]star=([1-5])\b/.exec(s);
+    return /[?&]nosw=1/.test(s) && m ? Number(m[1]) : 0;
+  } catch { return 0; }
 }
 /** 시험용 `?nosw=1&cell=1` — 입질마다 셀 (v371 · nosw 없이는 안 먹는다) */
 function testCellOdds() {
@@ -319,10 +343,14 @@ export async function openLakeNow() {
       onPick: (want) => lakePick(want),
       lookNow: () => avatarOf(getProfileSnapshot()).look, // 낚시 모자·조끼를 산 뒤 새 차림
       shares: sharesOf(days, nonsulDayMap(), today, avail),
-      ask: mathMix(asker(ui.src, day, start), (seed, avoid) => {
-        const q = fishMathQ(lakeRaw(), seed, avoid);
-        return q ? { ...q, qNode: () => fmNode(q) } : null;
-      }),
+      ask: (() => {
+        const inner = mathMix(asker(ui.src, day, start), (seed, avoid, lv) => {
+          const q = fishMathQ(lakeRaw(), seed, avoid, lv);
+          return q ? { ...q, qNode: () => fmNode(q) } : null;
+        });
+        return (subj, seed, lv) => inner(subj, seed, lvFor(subj, lv, { listen: canListen() })); // 🔶 소리만 문제는 영어 목소리가 있을 때만 (v378)
+      })(),
+      forceStar: testStar(),
       weather: testWeather() || weatherOf(today),
       dexRows: () => dexRows(lakeRaw()),
       say,
@@ -333,7 +361,7 @@ export async function openLakeNow() {
       firstToday,
       onAnswer: (subj, ok, stage, q) => {
         const f = FISH_DAY_Q[subj];
-        if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}) });
+        if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}), ...lvDelta(q, ok) });
         const mk = subj === 'math' && q && !q.fm ? fishMathKey(q.id, ok, Date.now(), Math.random) : ''; // 🔢 배운 칸 문제는 칸별로도 (v377)
         if (mk) applyDailyDelta(clockDay(), { fishMathKeys: [mk] }).catch(() => {});
       },

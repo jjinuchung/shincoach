@@ -225,14 +225,15 @@ function shuffle(list, rng) {
 /**
  * 문제 하나 — { kind, id, w, prompt, sentence, opts: [{ t, ok, id }] } (보기 넷, 차례는 섞음). 보기가 모자라면 null
  * mean: 뜻 넷 중 고르기 — 헷갈리는 짝을 먼저 보기로 · use: 낱말 넷 중 고르기 — 짝은 빼고(둘 다 들어갈 수 있다)
+ * word: 뜻을 보고 낱말 넷 중 고르기 (v378 🎣 낚시터 3단계) — 보기 고르기는 mean과 같다(헷갈리는 짝 먼저 · 뜻이 같은 낱말은 빼고)
  * 넷 가운데 어느 둘도 같은 낱말이 아니다 · 📖 낱말은 어느 둘도 같은 무리(apart)가 아니다 (v326)
  */
 export function makeQuestion(word, kind, pool, rng = Math.random) {
   if (!word) return null;
-  const k = kind === 'use' && word.ex ? 'use' : 'mean';
+  const k = kind === 'use' && word.ex ? 'use' : kind === 'word' ? 'word' : 'mean';
   const same = (pool || []).filter((x) => x && x.id !== word.id && x.deck === word.deck && x.w !== word.w && !avoids(word, x));
   let picks;
-  if (k === 'mean') {
+  if (k === 'mean' || k === 'word') {
     const pref = shuffle(same.filter((x) => pairs(word, x)), rng);
     const rest = shuffle(same.filter((x) => !pairs(word, x)), rng);
     picks = pickApart(uniqBy([...pref, ...rest], (x) => x.mean).filter((x) => x.mean !== word.mean), 3);
@@ -243,8 +244,15 @@ export function makeQuestion(word, kind, pool, rng = Math.random) {
   const opts = shuffle([{ t: k === 'mean' ? word.mean : word.w, ok: true, id: word.id }, ...picks.map((x) => ({ t: k === 'mean' ? x.mean : x.w, ok: false, id: x.id }))], rng);
   const prompt = k === 'mean'
     ? `'${word.w}'의 뜻으로 알맞은 것은 무엇인가요?`
-    : (DECKS[word.deck] && DECKS[word.deck].ask) || '빈칸에 들어갈 알맞은 말은 무엇인가요?';
+    : k === 'word'
+      ? `「${word.mean}」${jongOf(word.mean) ? '이라는' : '라는'} 뜻의 낱말은 무엇인가요?`
+      : (DECKS[word.deck] && DECKS[word.deck].ask) || '빈칸에 들어갈 알맞은 말은 무엇인가요?';
   return { kind: k, id: word.id, w: word.w, prompt, sentence: k === 'use' ? word.ex : '', opts };
+}
+/** 끝 글자에 받침이 있나 (「…것」이라는 · 「…일」이라는 · 「…하기」라는) — 한글이 아니면 받침 없음으로 */
+function jongOf(text) {
+  const c = String(text || '').trim().slice(-1).charCodeAt(0);
+  return c >= 0xac00 && c <= 0xd7a3 ? (c - 0xac00) % 28 > 0 : false;
 }
 function uniqBy(list, key) {
   const seen = new Set();

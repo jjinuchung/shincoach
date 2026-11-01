@@ -17,6 +17,8 @@ export const FM_KINDS = {
   bar: '막대그래프',
 };
 export const FM_KIND_LIST = Object.keys(FM_KINDS);
+/** 꼴 → 단계 (v378 난이도 기본안 「추천대로」) — 1 비교·막대그래프 읽기 · 2 길이 차·합 · 3 무게 합(kg 소수 두 자리)·단위(kg → g) */
+export const FM_LEVEL = { cmp: 1, bar: 1, sub: 2, add: 2, wadd: 3, unit: 3 };
 /** 카드 머리 줄 */
 export const FM_LABEL = '🔢 수학 · 🐟 물고기 수학';
 
@@ -309,21 +311,28 @@ export function makeFishQ(kind, pool, seed) {
 
 /**
  * 낚시터에 낼 문제 하나 (순수) — 꼴을 씨앗으로 섞어 처음 만들어지는 것 · 서로 다른 물고기 두 종 아래면 null
- * → { fm: true, kind, label, facts, text, tip, chart, choices: [{ text, ok, hint }], solve } (choices는 낚시터 카드 꼴 — 틀린 보기마다 그 실수의 힌트)
- * @param {Object} raw 프로필 fishing · @param {number} seed · @param {string} [avoid] 바로 앞 꼴(되도록 다른 꼴부터)
+ * → { fm: true, kind, lv, label, facts, text, tip, chart, choices: [{ text, ok, hint }], solve } (choices는 낚시터 카드 꼴 — 틀린 보기마다 그 실수의 힌트)
+ * v378: 그 단계(lv)의 꼴부터 → 못 만들면 한 단계씩 아래 → 그래도 없으면 위 단계(물고기 두 종뿐이면 비교·막대그래프를 못 만들어 길이 차·합으로 — 수학 차례가 비지 않게) · lv = 실제 낸 꼴의 단계
+ * @param {Object} raw 프로필 fishing · @param {number} seed · @param {string} [avoid] 바로 앞 꼴(되도록 다른 꼴부터) · @param {number} [lv] 1~3
  */
-export function fishMathQ(raw, seed, avoid = '') {
+export function fishMathQ(raw, seed, avoid = '', lv = 1) {
   const pool = poolOf(raw);
   if (pool.length < 2) return null;
   const r = makeRng(seed);
   const order = shuffle(r, [...FM_KIND_LIST]);
-  const kinds = [...order.filter((k) => k !== avoid), ...order.filter((k) => k === avoid)];
+  const want = [1, 2, 3].includes(lv) ? lv : 1;
+  const steps = [want, ...[3, 2, 1].filter((l) => l < want), ...[1, 2, 3].filter((l) => l > want)];
+  const kinds = steps.flatMap((l) => {
+    const g = order.filter((k) => FM_LEVEL[k] === l);
+    return [...g.filter((k) => k !== avoid), ...g.filter((k) => k === avoid)];
+  });
   for (const kind of kinds) {
     const q = makeFishQ(kind, pool, Math.floor(r() * 2147483646) + 1);
     if (!q) continue;
     return {
       fm: true,
       kind,
+      lv: FM_LEVEL[kind],
       label: FM_LABEL,
       facts: q.facts,
       text: q.text,

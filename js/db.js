@@ -446,6 +446,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'fishRiver',
   //   🌊 그 가운데 바다에서 낚은 마리(v369 — fishCatch 안의 몫)
   'fishSea',
+  //   🐋 그 가운데 2·3단계(큰 물고기) 문제로 낸·맞힌 수(v378 — 과목 칸 안의 몫 · 실제 낸 단계로)
+  'fishLv2Q', 'fishLv2Ok', 'fishLv3Q', 'fishLv3Ok',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
   // 🎵 게임기 음악 (2026-10-25 v337, gamebgm.js) — 소리가 난 초 · 게임기 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)

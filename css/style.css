@@ -5118,6 +5118,12 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-q { font-size: 1.3rem; font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
 .lk-word { font-size: 1.6rem; color: #1f6170; letter-spacing: 0.02em; }
 .lk-hear { margin-left: 8px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: #dcecef; font-size: 1.1rem; cursor: pointer; vertical-align: middle; }
+/* v378 난이도 — 카드 머리 「🐠·🐋 큰 물고기 문제」(숫자 없음) · 📚 빈칸 문장 칸 · 🔊 답한 뒤 글자 · 논술 「아닌」 밑줄 */
+.lk-lvb { font-size: 0.9rem; font-weight: 800; padding: 1px 10px; border-radius: 999px; background: #dcecef; color: #1f6170; }
+.lk-lvb.is-big { background: #fde9df; color: #b8460f; }
+.lk-sent { margin-top: 8px; padding: 8px 12px; border-radius: 10px; background: #f3f7f6; border: 1px solid #cfdcda; font-size: 1.12rem; font-weight: 600; line-height: 1.55; }
+.lk-reveal { margin-top: 6px; font-size: 1.2rem; color: #1f6170; }
+.lk-em { text-decoration-thickness: 3px; text-underline-offset: 4px; color: #b8460f; }
 .lk-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .lk-choice { min-height: 54px; padding: 8px 12px; border-radius: 12px; border: 2px solid transparent; background: #dcecef; color: #12343b; font: inherit; font-size: 1.1rem; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .lk-choice:disabled { cursor: default; }

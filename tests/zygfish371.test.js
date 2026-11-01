@@ -168,7 +168,7 @@ test('🎣 화면 잇기 — 입질 때만 굴림 · 셀이면 그림·결과 �
   const v = src('js/fishview.js');
   const bite = v.slice(v.indexOf('function biteFish() {'), v.indexOf('async function hookSet()'));
   assert.ok(bite.includes("if (typeof h.cellOk === 'function' && cellRoll(Math.random, h.cellOdds) && h.cellOk()) return cellFish(ui.spot);"));
-  assert.ok(bite.includes('return rollFish(ui.spot, ui.chum, ui.streak, Math.random, tiltNow());'));
+  assert.ok(bite.includes('return rollFish(ui.spot, ui.chum, ui.streak, Math.random, tiltNow(), h.forceStar || 0);')); // v378 — 시험용 별(?nosw=1&star=)
   assert.ok(v.includes('if (!ui.fish) ui.fish = biteFish();'));
   assert.equal(v.split('cellRoll(').length - 1, 1, '셀 굴림은 입질 한 곳뿐(물속 그림자는 물고기만)');
   assert.ok(v.includes('if (f.cell) { await keepCell(f); return; }'), '셀은 물고기 도감에 안 적는다');

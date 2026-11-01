@@ -11,11 +11,14 @@
 //   v369: seaOpen(🌊 바다 — 강이 열린 뒤에야 🗺️·📖에 줄이 보임 · 열리면 결과 카드에 한 번 + 안전 한 줄) · 🦐 크릴은 바다가 열린 뒤 가게에 · gear().sea
 //   v371: 🟢 지가르데 셀 — 입질마다 2%(fishing.cellRoll · cellOdds는 시험용)로 물고기 대신 셀 · cellOk()(오늘 낚시 셀을 찾을 수 있나) ·
 //   onCell() → { ok, found:'core'|'cell', cells, note?:{ title, text, art() } } · 셀 10·50·100 글·그림은 결과 카드에(🐣 창은 낚시터 아래에 깔린다)
+//   v378: ask(subj, seed, lv) — 물고기가 문 뒤(③④⑤) 문제는 물고기 별로 단계(fishing.stageLevel) · 카드 머리에 「🐠·🐋 큰 물고기 문제」(lvBadge — 숫자 없음) ·
+//   문제 꼴에 listen(🔊 소리만 — 글자는 답한 뒤 reveal)·sayAfter(답한 뒤 🔊)·sentence(빈칸 문장 칸)·em(밑줄 낱말 「아닌」) · forceStar(시험용 별)
 // 성능: 안 움직이는 층은 따로 한 장(하늘이 조금 바뀔 때만 다시) · 화면 배율 2배까지 · 느리면 저절로 가벼운 그림 · 화면이 숨으면 멈춤
 import {
   STARS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer, cellRoll, cellFish, cellFate,
   pickSubject, askOrder, activeStep, dayLeftSec, weightText, BADGE_KO, weatherTilt, nibbleExtra,
   spotsOf, PLACES, PLACE_KO, PLACE_EMOJI, RIVER_NEED, SEA_NEED, SEA_SAFE, GEAR, gearOf, baitTilt, mixTilt, weatherLine, PHOTO_SAY, syncPick, josaOf,
+  stageLevel, lvBadge,
 } from './fishing.js';
 import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, drawCell, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet } from './fishart.js';
 import { avatarSvg } from './avatarart.js';
@@ -79,7 +82,7 @@ function build() {
     </div>
     <div class="lk-places" role="group" aria-label="물가 고르기" hidden></div>
     <div class="lk-card" hidden>
-      <div class="lk-card-head"><span class="lk-stage"></span><span class="lk-subj"></span></div>
+      <div class="lk-card-head"><span class="lk-stage"></span><span class="lk-lvb" hidden></span><span class="lk-subj"></span></div>
       <div class="lk-q"></div>
       <p class="lk-tip" hidden></p>
       <div class="lk-choices"></div>
@@ -620,17 +623,27 @@ function nextSeed() {
   ui.seed = (Math.imul(ui.seed ^ (ui.seed >>> 13), 0x5bd1e995) + 0x9e3779b9) >>> 0;
   return ui.seed;
 }
+/** 물음 글 — em(밑줄 낱말 · 논술 「아닌」)이 있으면 그 낱말만 <u> (v378) */
+function qText(box, q) {
+  const t = String(q.q || q.text || '');
+  const i = q.em ? t.indexOf(q.em) : -1;
+  if (i < 0) { box.appendChild(document.createTextNode(t)); return; }
+  box.appendChild(document.createTextNode(t.slice(0, i)));
+  box.appendChild(el('u', 'lk-em', q.em));
+  box.appendChild(document.createTextNode(t.slice(i + q.em.length)));
+}
 /** 문제 하나 내고 답을 기다린다 → true(맞힘) | false · 낼 문제가 하나도 없으면 null */
 function ask(stage) {
   const me = ui;
   const h = ui.host;
   const shares = h.shares || {};
+  const lv = stageLevel(stage, ui.fish); // v378 — 물고기가 문 뒤만 물고기 별로
   let subj = pickSubject(shares, ui.recent);
   const order = askOrder(shares, ui.recent, subj);
   let q = null;
   for (const s of order) {
     if (!s) continue;
-    try { q = h.ask ? h.ask(s, nextSeed()) : null; } catch { q = null; }
+    try { q = h.ask ? h.ask(s, nextSeed(), lv) : null; } catch { q = null; }
     if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((c) => c.ok).length === 1) { subj = s; break; }
     q = null;
   }
@@ -642,23 +655,34 @@ function ask(stage) {
   ui.hold = false;
   const card = q$('.lk-card');
   q$('.lk-stage').textContent = STAGE[stage] || '';
+  const lvb = q$('.lk-lvb');
+  const badge = lvBadge(stage, ui.fish);
+  lvb.textContent = badge;
+  lvb.hidden = !badge;
+  lvb.classList.toggle('is-big', lv >= 3);
   q$('.lk-subj').textContent = q.label || '';
   const qBox = q$('.lk-q');
   qBox.innerHTML = '';
-  // 문제 꼴은 🎒 대여행과 같다 — 수학 qNode · 영어 word(🔊) · 국어·논술 q
+  const hear = (word) => {
+    if (typeof h.say !== 'function') return;
+    const hb = el('button', 'lk-hear', '🔊');
+    hb.type = 'button';
+    hb.setAttribute('aria-label', '다시 듣기');
+    hb.addEventListener('click', () => { try { h.say(word); } catch { /* 무시 */ } });
+    qBox.appendChild(hb);
+    try { h.say(word); } catch { /* 무시 */ }
+  };
+  // 문제 꼴은 🎒 대여행과 같다 — 수학 qNode · 영어 word(🔊) · 국어·논술 q · v378 영어 3단계 listen(🔊 소리만 — 글자 없이)
   if (typeof q.qNode === 'function') qBox.appendChild(q.qNode());
-  else if (q.word) {
+  else if (q.listen) {
+    qText(qBox, q);
+    hear(q.listen);
+  } else if (q.word) {
     qBox.appendChild(el('span', 'lk-word', q.word));
     qBox.appendChild(document.createTextNode(' 의 뜻은?'));
-    if (typeof h.say === 'function') {
-      const hb = el('button', 'lk-hear', '🔊');
-      hb.type = 'button';
-      hb.setAttribute('aria-label', '다시 듣기');
-      hb.addEventListener('click', () => { try { h.say(q.word); } catch { /* 무시 */ } });
-      qBox.appendChild(hb);
-      try { h.say(q.word); } catch { /* 무시 */ }
-    }
-  } else qBox.textContent = q.q || q.text || '';
+    hear(q.word);
+  } else qText(qBox, q);
+  if (q.sentence) qBox.appendChild(el('div', 'lk-sent', q.sentence)); // 📚 빈칸 문장 (v378 국어 2단계)
   const tip = q$('.lk-tip');
   tip.textContent = q.tip || '';
   tip.hidden = !q.tip;
@@ -694,6 +718,9 @@ function ask(stage) {
         b.classList.add(ok ? 'is-ok' : 'is-no');
         if (!ok) box.querySelectorAll('button')[q.choices.findIndex((x) => x.ok)].classList.add('is-ans');
         try { (ok ? sfx.ding : sfx.wrong)(); } catch { /* 무시 */ }
+        // 🔊 소리만 문제는 답한 뒤 글자를 · 거꾸로 문제는 답한 뒤 소리를 (v378)
+        if (q.reveal) qBox.appendChild(el('div', 'lk-reveal', q.reveal));
+        if (q.sayAfter && typeof h.say === 'function') { try { h.say(q.sayAfter); } catch { /* 무시 */ } }
         if (ok) { ui.okToday += 1; ui.streak += 1; ui.palJump = performance.now(); } else ui.streak = 0;
         try { h.onAnswer && h.onAnswer(subj, ok, stage, q); } catch { /* 무시 */ }
         // 틀린 보기에 그 실수의 힌트가 있으면 — 읽을 때까지 기다린다(「알겠어요」) · 없으면 잠깐 정답을 보여 주고 닫음
@@ -797,7 +824,7 @@ function bite() {
 function biteFish() {
   const h = ui.host;
   if (typeof h.cellOk === 'function' && cellRoll(Math.random, h.cellOdds) && h.cellOk()) return cellFish(ui.spot);
-  return rollFish(ui.spot, ui.chum, ui.streak, Math.random, tiltNow());
+  return rollFish(ui.spot, ui.chum, ui.streak, Math.random, tiltNow(), h.forceStar || 0);
 }
 async function hookSet() {
   const me = ui;

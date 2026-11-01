@@ -172,17 +172,20 @@ test('🎯 실수 보기 — 받아내림 잊음·더함·소수점 안 맞춤�
 test('🃏 낚시터 카드 꼴 — fm 표시 · 머리 줄 · 보기마다 { text, ok, hint } · 정답엔 힌트 없음 · 바로 앞 꼴은 뒤로', () => {
   const raw = { dex: { bungeo: { n: 7, best: 31.2 }, pirami: { n: 4, best: 14.2 }, ingeo: { n: 2, best: 48.5 }, megi: { n: 3, best: 71.8 }, gamulchi: { n: 1, best: 52.5 } } };
   const kinds = new Set();
-  for (let s = 1; s <= 300; s++) {
-    const q = fishMathQ(raw, s);
-    assert.ok(q);
-    kinds.add(q.kind);
-    assert.equal(q.fm, true);
-    assert.equal(q.label, FM_LABEL);
-    assert.ok(q.text.length > 5);
-    assert.equal(q.choices.filter((c) => c.ok).length, 1);
-    for (const c of q.choices) { assert.equal(typeof c.text, 'string'); assert.equal(c.ok ? c.hint : 'x', c.ok ? '' : 'x'); if (!c.ok) assert.ok(c.hint.length > 5); }
-    const next = fishMathQ(raw, s, q.kind);
-    assert.notEqual(next.kind, q.kind, '바로 앞과 다른 꼴부터(만들 수 있으면)');
+  // v378 — 단계마다 두 꼴씩(1 비교·막대 · 2 차·합 · 3 무게·단위) · 세 단계를 합치면 여섯 꼴
+  for (const lv of [1, 2, 3]) {
+    for (let s = 1; s <= 300; s++) {
+      const q = fishMathQ(raw, s, '', lv);
+      assert.ok(q);
+      kinds.add(q.kind);
+      assert.equal(q.fm, true);
+      assert.equal(q.label, FM_LABEL);
+      assert.ok(q.text.length > 5);
+      assert.equal(q.choices.filter((c) => c.ok).length, 1);
+      for (const c of q.choices) { assert.equal(typeof c.text, 'string'); assert.equal(c.ok ? c.hint : 'x', c.ok ? '' : 'x'); if (!c.ok) assert.ok(c.hint.length > 5); }
+      const next = fishMathQ(raw, s, q.kind, lv);
+      assert.notEqual(next.kind, q.kind, '바로 앞과 다른 꼴부터(만들 수 있으면)');
+    }
   }
   assert.equal(kinds.size, FM_KIND_LIST.length, '여섯 꼴이 다 나옴');
   // 아이 화면 글 — 남은 수 없음 · 5학년 셈(소수의 곱셈·나눗셈) 없음

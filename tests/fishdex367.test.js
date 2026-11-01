@@ -129,8 +129,8 @@ test('🔌 잇기 — 날씨 칩·도감 단추·💡·힌트 카드 · 도감 �
   assert.match(fv, /if \(!ui \|\| ui\.st !== 'ready' \|\| ui\.busy \|\| ui\.paused \|\| typeof ui\.host\.dexRows !== 'function'\) return;\n\s*const me = ui;[\s\S]{0,200}ui\.paused = true;\n\s*ui\.dexOpen = true;/);
   assert.match(fv, /h\.onAnswer && h\.onAnswer\(subj, ok, stage, q\)/);
   assert.match(fv, /if \(!ok && c\.hint\) \{/);
-  // v368부터 날씨 기울임은 미끼와 곱한 tiltNow() — 입질·물속 그림자 둘 다 그것으로
-  assert.equal((fv.match(/rollFish\(ui\.spot, ui\.chum, ui\.streak, Math\.random, tiltNow\(\)\)/g) || []).length, 2, '입질·물속 그림자 둘 다');
+  // v368부터 날씨 기울임은 미끼와 곱한 tiltNow() — 입질·물속 그림자 둘 다 그것으로 (v378 입질 쪽엔 시험용 별 h.forceStar가 하나 더)
+  assert.equal((fv.match(/rollFish\(ui\.spot, ui\.chum, ui\.streak, Math\.random, tiltNow\(\)(, h\.forceStar \|\| 0)?\)/g) || []).length, 2, '입질·물속 그림자 둘 다');
   assert.match(fv, /return mixTilt\(weatherTilt\(ui\.wx, ui\.spot\.key\), baitTilt\(ui\.pick\.bait\)\);/);
   assert.match(fv, /const k = n \+ nibbleExtra\(ui\.wx\);/);
   assert.match(fv, /if \(ui\.wx === 'rain' && !ui\.lite\) drawRain\(/, '느린 기기면 빗줄기 끔');
