@@ -26,6 +26,7 @@ import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진�
 import { copyAvatar, wearBuyRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수) · 🎒 낚시 채비 가게 옷 사기(v368)
 import { copyPlay, playRule, gameEndRule, bestOf, fastOf, recKey } from './homeplay.js'; // 🎮 일상 행동 · 미니 게임 끝(v307) · ⏱️ 가장 빠른 시간(v339) (순수)
 import { copyPhotos, photosOf, takePhotoRule, hangRule } from './photo.js'; // 📸 액자 사진 (v384 · 순수)
+import { copyGuest, arriveRule, guestPlayRule, guestNow as guestNowOf } from './guest.js'; // 🐾 손님 포켓몬 (v385 · 순수)
 import { copyJourney, startRule as jrStartRule, answerRule as jrAnswerRule, swapRule as jrSwapRule, homeRule as jrHomeRule, pickRule as jrPickRule, eventRule as jrEventRule } from './journey.js'; // 🎒 포켓몬 대여행 (v341, 순수) · 구역 이벤트 (v362)
 import { copyLake, catchRule as lakeCatchRule, gearBuyRule as lakeGearRule, pickRule as lakePickRule, gearOf as lakeGearOf } from './fishing.js'; // 🎣 학습 낚시터 도감·💰 · 🎒 채비·고른 물가(v368) (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
@@ -401,7 +402,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.homeGuest ? { homeGuest: copyGuest(p.homeGuest) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
 }
 
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
@@ -930,6 +931,18 @@ export function hangPhoto(roomId, u, id) {
 /** 📷 지금 앨범 (v384 — 고쳐 읽은 새 객체) */
 export function photosNow() {
   return photosOf(profile && profile.homePhotos);
+}
+/** 🚪 손님 도착 (v385) — 집을 열 때 · 날은 트랜잭션 안에서 · sec = 그날 공부한 초(화면이 센 것) */
+export function guestArrive(sec) {
+  return houseDo((p) => arriveRule(p, Date.now(), sec));
+}
+/** 🐾 손님과 놀기 (v385) — u = 좋아하는 가구 번호(0이면 🤝 인사하기) · 손님 💗는 그날 한 번 */
+export function guestPlay(roomId, u) {
+  return houseDo((p) => guestPlayRule(p, roomId, u, Date.now()));
+}
+/** 🐾 오늘 와 있는 손님 { mon, heart } | null (v385 — 메모리 프로필로 · 그리기용) */
+export function guestHere() {
+  return guestNowOf(profile, Date.now());
 }
 /** 🎮 미니 게임 한 판 끝(v307) — 💗(하루 한 번) + 최고 점수(⏱️ sec면 가장 빠른 시간도 — v339)를 한 트랜잭션에서 · 판은 시작할 때 이미 썼다(daily gamePlays) */
 export function gameEnd(roomId, u, gameId, score, sec = 0) {

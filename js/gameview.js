@@ -75,8 +75,8 @@ export function gameConf() {
   const c = limitConf() || {};
   return gameConfOf({ min: c.gameMin, cap: c.gameCap });
 }
-/** 지금 오늘 기록 — 과목 시간은 아직 저장 안 한 초까지 (⏳ status) */
-function dailyNow() {
+/** 지금 오늘 기록 — 과목 시간은 아직 저장 안 한 초까지 (⏳ status) · 🐾 손님(v385 houseview)도 이것으로 공부 시간을 센다 */
+export function dailyNow() {
   const d = { ...(todayDaily() || {}) };
   for (const s of SUBJECTS) {
     const st = status(s);

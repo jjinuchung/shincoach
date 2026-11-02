@@ -42,7 +42,7 @@ test('📸 사진 id · 장면 목록 · 한 장 고쳐 읽기 — 깨진 id·�
   assert.match(a, /^ph[0-9a-z]{6,24}$/);
   assert.notEqual(photoIdOf(T0, 0.5), photoIdOf(T0, 0.51));
   assert.notEqual(photoIdOf(T0, 0.5), photoIdOf(T0 + 1, 0.5));
-  assert.deepEqual([...new Set(Object.values(SCENE_OF))].sort(), [...PHOTO_SCENES].sort(), '사진이 될 장면 = 놀기 장면 모두');
+  assert.deepEqual([...new Set(Object.values(SCENE_OF)), 'hello'].sort(), [...PHOTO_SCENES].sort(), '사진이 될 장면 = 놀기 장면 모두 + 🤝 손님과 인사하기(v385)');
   assert.equal(frameKey(R, 7), `${R}:7`);
   const ok = photoRecOf({ ...rec(1), at: T0 });
   assert.equal(ok.scene, 'tv');

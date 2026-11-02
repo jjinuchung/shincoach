@@ -30,15 +30,17 @@ import { avatarOf, partnerSpot, avatarMoveRule } from './avatar.js'; // 🧑 진
 import { avatarSvg } from './avatarart.js';
 import { closetBox, closetReset, tagOf } from './avatarview.js'; // 👕 옷장 탭
 import { syncHatMarks } from './hatmarks.js'; // 🧢 지우 모자 무늬 받기 (v293)
-import { PLAYS, playSpot, bondOf, chainOf, bondTier, palHome, hasPlayable } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
+import { PLAYS, playSpot, bondOf, chainOf, bondTier, palHome, hasPlayable, partnerOf } from './homeplay.js'; // 🎮 일상 행동 규칙 (순수, 2026-10-18)
 import { SCENE_OF, playLines, skyOf } from './playart.js';
 import { showPlay, closePlay } from './playshow.js'; // 🎮 장면
-import { openGames, closeGames, GAME_DEVICE } from './gameview.js'; // 🎮 게임기 미니 게임 (v307)
+import { openGames, closeGames, GAME_DEVICE, dailyNow } from './gameview.js'; // 🎮 게임기 미니 게임 (v307) · 🐾 오늘 공부 시간(v385)
 import { dayNum } from './korean.js'; // 📰 TV 소식은 날마다 바뀐다 (순수)
 import { FURN_ART, FURN_ART_TURN } from './furnart.js'; // 🖍️ 코드로 그린 가구 그림 (순수 자료) · 🔄 세로 그림(v334)
 import { FRAME_ID, framePhotoOf, hungIds, photoIdOf, takePhotoRule, hangRule } from './photo.js'; // 📸 액자 사진 (v384 · 순수)
 import { albumBox, photoEl, showPhotoBig, closePhotoBig } from './photoview.js'; // 📸 📷 앨범 · 🔍 크게 보기
-import { takePhoto, hangPhoto, photosNow } from './xp.js';
+import { takePhoto, hangPhoto, photosNow, guestArrive, guestPlay, guestHere } from './xp.js';
+import { HELLO, GUEST_ASK, guestWaiting, guestSpot, likedName, candidatesOf } from './guest.js'; // 🐾 손님 포켓몬 (v385 · 순수)
+import { studySec } from './minigame.js'; // 🐾 그날 공부한 초 — 🎮 미니 게임 판과 같은 셈 (순수)
 
 // 🎮 일상 행동(2026-10-18, 아버님 "이대로 해"): 놓인 📺·🎮·💻·🎹를 누르면 도구 줄 맨 앞에 놀기 단추 → 💗를 먼저 저장(homePlay 트랜잭션) →
 //   🧑·🤝가 기기 옆 칸으로 걸어가고(이 방에 서 있을 때만 · transform만 · 저장 안 함) → 장면(playshow) → 제자리로 돌아와 다시 그린다
@@ -178,7 +180,8 @@ export function growProgress(profile, id) {
 // ───────────────────── 화면 ─────────────────────
 
 // tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다) · drawn: 그린 집 모양(shapeKey)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0, hang: null, pendingPhoto: null, albumSel: '' };
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0, hang: null, pendingPhoto: null, albumSel: '', guestSel: false, arrive: 0, drawnDay: 0 };
+// 🐾 (v385) guestSel: 방에서 손님을 눌러 도구(같이 놀기 · 🤝 인사하기)가 떠 있다 · arrive: 방금 들어온 손님 id — 한 번만 걸어 들어오는 모습으로 그린다
 // 📸 (v384) hang: 사진을 걸 액자 { rid, u } — 📷 앨범이 「액자에 걸 사진을 골라요」로 열린다 · pendingPhoto: 앨범이 가득 차 아직 못 넣은 새 사진(진우가 뺄 사진을 고르면 넣는다)
 //   albumSel: 앨범에서 고른 사진 id(가득 찼을 때 뺄 사진)
 // 🎮 playRun: 놀기 번호 — 집을 닫으면 올려서 걷던·보던 놀기를 무효로(닫은 뒤에 장면이 뜨지 않게, Codex 91차 #2)
@@ -222,7 +225,7 @@ export function openHouse(opts = {}) {
   ui.open = true;
   ui.onClose = opts.onClose || null;
   ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.buyArm = ''; ui.floor = FIRST_ROOM;
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
   ui.hang = null; ui.pendingPhoto = null; ui.albumSel = ''; // 📸 (v384)
   ui.tab = opts.tab === 'shop' || opts.tab === 'closet' || opts.tab === 'album' ? opts.tab : 'room';
   closetReset();
@@ -233,7 +236,9 @@ export function openHouse(opts = {}) {
     const pf = getProfileSnapshot();
     if (avatarOf(pf).made && hasPlayable(pf)) { ui.msg = PLAY_HINT; playHintSeen(); }
   }
+  if (ui.tab === 'room' && !ui.msg && !profileLoading()) guestHint(); // 🐾 (v385) 손님이 없는 날 — 하루 한 번 한 줄
   render();
+  guestDoor(); // 🐾 (v385) 손님이 문 앞에서 기다리면 들어온다
   // 🧢 지우 모자 무늬 받기 (v293 — 비공개 저장소에서 10분에 한 번까지) · 새로 받았으면 다시 그린다
   syncHatMarks().then((changed) => { if (changed && ui.open) render(); }).catch(() => {});
 }
@@ -265,7 +270,7 @@ function onReloaded() {
   cancelDrag();
   const moved = ui.drawn && ui.drawn !== shapeKey();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
   ui.hang = null; ui.albumSel = ''; // 📸 걸려던 액자는 바뀐 집에서 다시 고르게 (못 넣은 새 사진은 그대로)
   closetReset();
   ui.floor = roomId();
@@ -279,7 +284,7 @@ function stale() {
   if (ui.drawn === shapeKey()) return false;
   cancelDrag();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
   ui.floor = roomId();
   ui.msg = WHY.changed;
   render();
@@ -321,6 +326,7 @@ function render() {
   if (!ui.open || profileLoading()) return; // 다시 읽는 중엔 메모리 프로필이 비어 있다 — 다 읽으면 onReloaded가 그린다
   ui.drawn = shapeKey();
   if (ui.drag) cancelDrag(); // 끄는 도중 두 번째 손가락으로 다른 것을 눌러 다시 그리면 그 끌기는 없던 일 (Codex 45차 #6 — 끌던 가구가 사라진 판에 남지 않게)
+  ui.drawnDay = dayNum(Date.now()); // 🐾 그린 날 — 집을 켜 둔 채 날이 바뀌면 tickRests가 다시 그린다 (v385 · Codex 188차 #1)
   const st = stones();
   const n = (x) => (x || 0).toLocaleString('ko-KR');
   $('house-coins').textContent = `💰 ${n(coins())} · 🔷 ${n(st.math)} · 🔶 ${n(st.english)}`;
@@ -365,11 +371,12 @@ function goTab(key, floor) {
   if (ui.tab === key && (!floor || floor === roomId())) return;
   cancelDrag();
   ui.tab = key; ui.sel = 0; ui.arm = ''; ui.buyArm = ''; ui.msg = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
   ui.hang = null; ui.pendingPhoto = null; ui.albumSel = ''; // 📸 다른 탭으로 가면 고르기는 그만두기
   closetReset();
   if (floor) ui.floor = floor;
   render();
+  if (key === 'room') guestDoor(); // 🐾 상점·옷장으로 열었다가 방으로 오면 그때 들어온다 (v385)
 }
 
 /** 방 — 벽·바닥·놓인 가구·고른 가구의 도구 */
@@ -400,6 +407,13 @@ function roomBox() {
     if (ps) box.appendChild(palEl(pid, ps));
     if (ui.meSel) box.appendChild(meToolsEl(me));
   } else ui.meSel = false;
+  // 🐾 손님 (v385) — 오늘 와 있으면 좋아하는 가구 옆(없으면 문 쪽) · 누르면 같이 놀기 도구
+  const gh = guestHere();
+  const gs = gh ? guestSpot(pf, gh.mon) : null;
+  if (gs && gs.room === rm.id) {
+    box.appendChild(guestEl(gh.mon, gs));
+    if (ui.guestSel) box.appendChild(guestToolsEl(gs));
+  } else ui.guestSel = false;
   const hint = el('div', 'house-hint');
   hint.hidden = true;
   box.appendChild(hint);
@@ -410,9 +424,9 @@ function roomBox() {
   if (ui.arm) box.classList.add('is-arming');
   // 빈 곳을 누르면: 서랍에서 고른 가구를 거기에 놓거나, 고른 가구를 놓아준다
   box.addEventListener('click', (e) => {
-    if (e.target.closest('.house-item') || e.target.closest('.house-tools') || e.target.closest('.house-me')) return;
+    if (e.target.closest('.house-item') || e.target.closest('.house-tools') || e.target.closest('.house-me') || e.target.closest('.house-guest')) return;
     if (ui.arm) { placeAt(ui.arm, box.getBoundingClientRect(), e.clientX, e.clientY); return; }
-    if (ui.sel || ui.meSel) { ui.sel = 0; ui.meSel = false; render(); }
+    if (ui.sel || ui.meSel || ui.guestSel) { ui.sel = 0; ui.meSel = false; ui.guestSel = false; render(); }
   });
   return box;
 }
@@ -615,13 +629,7 @@ async function playAt(it) {
     const floorC = (paintById(rm && rm.floor) || PAINT_BASE.floor).color;
     // 📸 이 장면의 사진 (v384) — 그때 차림·파트너·방 색 · 찍은 때는 저장할 때(트랜잭션 안) · 앨범이 가득 차면 장면을 닫은 뒤 뺄 사진을 고른다
     const photoRec = { id: photoIdOf(Date.now(), Math.random()), scene, mon: r.mon || 0, look: me.look, wall: wallC, floor: floorC, t: r.mon ? bondTier(r.bond) : 0, ...(Number.isSafeInteger(score) ? { score } : {}) };
-    const onPhoto = async () => {
-      if (!live()) return { ok: false, why: 'save' };
-      let res = null;
-      try { res = await takePhoto(photoRec); } catch { res = null; }
-      if (res && res.why === 'full' && live()) ui.pendingPhoto = photoRec;
-      return res;
-    };
+    const onPhoto = photoTaker(photoRec, live);
     ui.msg = playLines(scene, { mon: mon ? mon.ko : '', name: me.name, heart: r.heart }).end;
     try {
       const back = await walk(me, playSpot(pf, rid, it.u));
@@ -638,6 +646,164 @@ async function playAt(it) {
   } finally {
     ui.busy = false;
     ui.bondHold = null;
+    if (ui.open && ui.pendingPhoto) { ui.tab = 'album'; ui.hang = null; ui.albumSel = ''; ui.sel = 0; ui.msg = WHY.full; } // 📸 앨범이 가득 참 → 뺄 사진 고르기
+    if (ui.open) render();
+  }
+}
+
+/** 📸 장면의 [📸 사진 찍기] (v384) — 저장은 트랜잭션 안의 시각 · 앨범이 가득 차면 장면을 닫은 뒤 뺄 사진을 고른다(놀기·손님 놀기 함께) */
+function photoTaker(photoRec, live) {
+  return async () => {
+    if (!live()) return { ok: false, why: 'save' };
+    let res = null;
+    try { res = await takePhoto(photoRec); } catch { res = null; }
+    if (res && res.why === 'full' && live()) ui.pendingPhoto = photoRec;
+    return res;
+  };
+}
+
+// ───────────────────── 🐾 손님 포켓몬 (v385 — 아버님 집 다음 셋 기본안 「추천대로」 ②) ─────────────────────
+
+/** 손님이 없는 날 한 줄 — 시간 말 없이(기본안 ⑥) · 이 기기에서 하루 한 번(기기 편의 · 프로필에 안 적음) */
+const GUEST_HINT_KEY = 'shincoach.guestHintDay';
+export const GUEST_HINT = '🐾 공부를 마치고 집에 와 보면 손님이 와 있을지도 몰라요';
+function guestHint() {
+  const pf = getProfileSnapshot();
+  const now = Date.now();
+  if (!avatarOf(pf).made || guestHere() || guestWaiting(pf, now, studySec(dailyNow())) || !candidatesOf(pf).length) return;
+  const day = String(dayNum(now));
+  try {
+    if (localStorage.getItem(GUEST_HINT_KEY) === day) return;
+    localStorage.setItem(GUEST_HINT_KEY, day);
+  } catch { return; } // 못 적는 기기엔 띄우지 않는다(매번 뜨지 않게)
+  ui.msg = GUEST_HINT;
+}
+/**
+ * 🚪 손님 도착 — 그날 공부 15분 뒤 집에 들어오면(방 탭) 「띵동!」 · 도착은 저장된 프로필로 한 트랜잭션(두 창이 다른 손님을 두 번 들이지 않게)
+ * 손님이 있는 층으로 옮겨 걸어 들어오는 모습 한 번 · 놀고 있으면(ui.busy) 말만 바꾸고 놀기가 끝난 뒤 그린다
+ */
+async function guestDoor() {
+  if (!ui.open || ui.tab !== 'room' || profileLoading()) return;
+  const sec = studySec(dailyNow());
+  if (!guestWaiting(getProfileSnapshot(), Date.now(), sec)) return;
+  let r = null;
+  try { r = await guestArrive(sec); } catch { r = null; }
+  markReady();
+  if (!ui.open || !r || !r.ok || !r.fresh) return;
+  const ko = monKo(r.mon);
+  const s = guestSpot(getProfileSnapshot(), r.mon);
+  sfx.ding();
+  if (ui.busy || ui.tab !== 'room') { ui.msg = `🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요`; return; }
+  if (s) ui.floor = s.room;
+  ui.arrive = r.mon; ui.sel = 0; ui.meSel = false; ui.guestSel = false;
+  ui.msg = `🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요 — 눌러서 같이 놀아요`;
+  render();
+}
+/** 방의 손님 — 파트너와 같은 꼴 · 「🐾 손님」 이름표 · 💗 · 누르면 도구 */
+function guestEl(monId, spot) {
+  const b = meBoxOf(sz(), spot.x, spot.y);
+  const e = el('button', `house-guest${ui.guestSel ? ' is-sel' : ''}${ui.arrive === monId ? ' is-arrive' : ''}`);
+  e.type = 'button';
+  e.dataset.mon = String(monId);
+  e.setAttribute('aria-label', `손님 ${monKo(monId)} — 눌러서 같이 놀아요`);
+  Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(10 + spot.y) });
+  e.appendChild(monFace(monId, 'house-pal-img'));
+  e.appendChild(el('span', 'house-guest-tag', '🐾 손님'));
+  const n = bondOf(getProfileSnapshot().homePlay, monId); // 손님도 💗 (진화 전 모습의 💗도 이어서)
+  if (n > 0) e.appendChild(el('span', 'house-pal-bond', `💗 ${n.toLocaleString('ko-KR')}`));
+  ui.arrive = 0; // 걸어 들어오는 모습은 한 번만
+  e.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (ui.busy || stale()) return;
+    ui.guestSel = !ui.guestSel; ui.sel = 0; ui.meSel = false; ui.arm = '';
+    ui.msg = ui.guestSel ? guestAsk(monId, spot) : '';
+    render();
+    if (ev.detail === 0) guestFocus(); // ⌨️ 키보드(Enter·Space)로 골랐으면 다시 그린 뒤에도 초점을 잃지 않게 (Codex 188차 #2)
+  });
+  return e;
+}
+/** ⌨️ 손님을 고르면 첫 도구 단추로 · 고르기를 풀면 다시 그린 손님 단추로 */
+function guestFocus() {
+  const n = ui.guestSel ? document.querySelector('#house .house-tools.is-guest button') : document.querySelector('#house .house-guest');
+  if (n) { try { n.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } }
+}
+/** 손님이 조르는 말 — 좋아하는 가구가 이 방에 있으면 그 놀이 · 없으면 「다음에 ○○가 있으면 같이 놀자!」 한 줄(사라고 조르지 않게) */
+function guestAsk(monId, spot) {
+  const ko = monKo(monId);
+  const it = spot.u ? (room().items || []).find((i) => i.u === spot.u) : null;
+  if (it) return `💬 ${ko}: "${GUEST_ASK[SCENE_OF[it.id]]}"`;
+  const name = likedName(monId);
+  return name ? `💬 ${ko}: "다음에 ${name}${iga(name)} 있으면 같이 놀자!"` : `💬 ${ko}: "안녕!"`;
+}
+/** 손님을 눌렀을 때 — [좋아하는 놀이 하자!] (그 가구가 이 방에 있을 때) · [🤝 인사하기] */
+function guestToolsEl(spot) {
+  const b = meBoxOf(sz(), spot.x, spot.y);
+  const t = el('div', 'house-tools is-me is-guest');
+  t.dataset.cx = String(b.left + b.width / 2);
+  Object.assign(t.style, { left: `${b.left + b.width / 2}%`, top: `${Math.max(0, b.top - b.height * 0.6)}%` });
+  const it = spot.u ? (room().items || []).find((i) => i.u === spot.u) : null;
+  if (it) {
+    const go = el('button', 'btn btn-primary house-tool', GUEST_ASK[SCENE_OF[it.id]]);
+    go.type = 'button';
+    go.addEventListener('click', () => guestPlayAt(it));
+    t.appendChild(go);
+  }
+  const hi = el('button', it ? 'btn house-tool' : 'btn btn-primary house-tool', GUEST_ASK[HELLO]);
+  hi.type = 'button';
+  hi.addEventListener('click', () => guestPlayAt(null));
+  t.appendChild(hi);
+  return t;
+}
+/**
+ * ▶️ 손님과 놀기 — 손님 💗는 먼저 저장(그날 한 번 · 한 트랜잭션) → 좋아하는 가구면 캐릭터·파트너가 걸어가고 셋이 그 장면 · 아니면 🤝 인사하기 →
+ * [📸 같이 사진 찍기] → 돌아와 다시 그리기 · 파트너 💗·가구 하루 셋은 건드리지 않는다
+ */
+async function guestPlayAt(it) {
+  if (ui.busy || stale()) return;
+  sfxUnlock();
+  if (!avatarOf(getProfileSnapshot()).made) { say(WHY.meMade); return; }
+  const rid = roomId();
+  const run = ++ui.playRun;
+  const live = () => ui.open && ui.playRun === run;
+  ui.busy = true;
+  try {
+    let r = null;
+    try { r = await guestPlay(rid, it ? it.u : 0); } catch { r = null; }
+    if (!live()) return;
+    if (!r || !r.ok) {
+      const why = r && r.why;
+      ui.msg = WHY[why === 'made' ? 'meMade' : why] || WHY.save;
+      return;
+    }
+    ui.sel = 0; ui.meSel = false; ui.guestSel = false; ui.msg = '';
+    render();
+    const pf = getProfileSnapshot();
+    const me = avatarOf(pf);
+    const rm = room();
+    const scene = r.kind === HELLO ? HELLO : SCENE_OF[r.kind];
+    const pid = partnerOf(pf); // 데리고 있는 파트너만 (놀기의 playRule과 같게)
+    const pBond = pid ? bondOf(pf.homePlay, pid) : 0;
+    const mon = pid ? { ko: monKo(pid), url: characterUrl(pid) || artUrl(pid) || '' } : null;
+    const guest = { ko: monKo(r.guest), url: characterUrl(r.guest) || artUrl(r.guest) || '' };
+    const wallC = (paintById(rm && rm.wall) || PAINT_BASE.wall).color;
+    const floorC = (paintById(rm && rm.floor) || PAINT_BASE.floor).color;
+    const photoRec = { id: photoIdOf(Date.now(), Math.random()), scene, mon: pid || 0, g: r.guest, look: me.look, wall: wallC, floor: floorC, t: pid ? bondTier(pBond) : 0 };
+    const onPhoto = photoTaker(photoRec, live);
+    ui.msg = playLines(scene, { mon: mon ? mon.ko : '', guest: guest.ko, gHeart: r.heart, name: me.name }).end;
+    try {
+      const back = it ? await walk(me, playSpot(pf, rid, it.u)) : async () => {};
+      if (!live()) return;
+      await showPlay(scene, {
+        look: me.look, name: me.name, mon, guest, gHeart: r.heart, heart: false,
+        wall: wallC, floor: floorC, onPhoto,
+        lv: pid ? monLv(pid) : 0, bond: pBond, tier: bondTier(pBond), chain: pid ? chainOf(pid).map(rosterKo).filter(Boolean) : [],
+        day: dayNum(Date.now()), sky: skyOf(new Date().getHours()),
+      });
+      if (!live()) return;
+      await back();
+    } catch { /* 장면이 깨져도 아래(finally)에서 다시 그린다 */ }
+  } finally {
+    ui.busy = false;
     if (ui.open && ui.pendingPhoto) { ui.tab = 'album'; ui.hang = null; ui.albumSel = ''; ui.sel = 0; ui.msg = WHY.full; } // 📸 앨범이 가득 참 → 뺄 사진 고르기
     if (ui.open) render();
   }
@@ -842,6 +1008,7 @@ const WHY = {
   photoGone: '고른 사진이 벌써 빠졌어요 — 다시 골라 봐요',
   bad: '사진을 못 넣었어요 — 다시 해 볼까요?',
   noPhotos: '📷 앨범에 사진이 아직 없어요 — 가구로 놀고 끝에 📸 사진 찍기를 눌러요',
+  nobody: '🐾 손님이 집에 돌아갔어요 — 다음에 또 놀러 올 거예요', // 🐾 손님 포켓몬 (v385)
 };
 /** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다
  *  alias = 이 물건에서 다르게 말할 why ({ owned: 'grown' } — 늦은 창의 넓히기가 "칠할 수 있어요"로 나왔다, Codex 46차 #3) */
@@ -1115,9 +1282,13 @@ function markReady() {
   const now = Date.now();
   let n = 0;
   for (const r of houseNow().rooms) for (const i of r.items) if (i.rest && restLeft(i.rest, now) === 0) n++;
+  // 🔔 손님이 문 앞에서 기다린다 (v385 — 그날 공부 15분 · 오늘 아직 안 들어옴) · 숫자 없음 · 다시 읽는 중엔 끔
+  let guest = false;
+  try { guest = !profileLoading() && guestWaiting(getProfileSnapshot(), now, studySec(dailyNow())); } catch { guest = false; }
   for (const b of document.querySelectorAll('[data-open="house"]')) {
     b.classList.toggle('has-ready', n > 0);
-    b.setAttribute('aria-label', n > 0 ? '진우네 집 — 다 쉰 포켓몬이 있어요' : '진우네 집');
+    b.classList.toggle('has-guest', guest);
+    b.setAttribute('aria-label', ['진우네 집', n > 0 ? '다 쉰 포켓몬이 있어요' : '', guest ? '손님이 놀러 왔어요' : ''].filter(Boolean).join(' — '));
   }
 }
 
@@ -1144,6 +1315,8 @@ function restDecor(e, it) {
 function tickRests() {
   if (!ui.open || ui.tab !== 'room') return;
   const now = Date.now();
+  // 🐾 집을 켜 둔 채 날이 바뀌면 다시 그린다 — 어제 손님은 조용히 간다 · 놀거나(ui.busy) 끄는 중이면 그 뒤 초에 (v385 · Codex 188차 #1)
+  if (ui.drawnDay && dayNum(now) !== ui.drawnDay && !ui.busy && !ui.drag && !profileLoading()) { ui.guestSel = false; render(); return; }
   for (const e of document.querySelectorAll('#house-body .house-item.is-resting')) {
     const left = restLeft({ at: Number(e.dataset.at) }, now);
     const t = e.querySelector('.house-rest-time');
@@ -1425,11 +1598,11 @@ function cancelDrag() {
 
 /** 끌지 않고 눌렀을 때 — 놓인 가구는 고르기(도구가 뜬다), 서랍 물건은 "방을 눌러 놓기" */
 function tap(d) {
-  if (d.kind === 'me') { ui.meSel = !ui.meSel; ui.sel = 0; ui.arm = ''; ui.msg = ''; render(); return; } // 🧑 캐릭터 — 👕 옷 갈아입기 도구
+  if (d.kind === 'me') { ui.meSel = !ui.meSel; ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.guestSel = false; render(); return; } // 🧑 캐릭터 — 👕 옷 갈아입기 도구
   if (d.kind === 'move') {
     const it = d.id === HEAL && room() ? room().items.find((i) => i.u === d.u) : null;
     if (it && it.rest && restLeft(it.rest, Date.now()) === 0) { claimAt(it.u, undefined, it.rest.id); return; } // 💊 다 쉰 캡슐 — 누르면 바로 ✨ 받기
-    ui.sel = ui.sel === d.u ? 0 : d.u; ui.arm = ''; ui.outArm = 0; ui.meSel = false;
+    ui.sel = ui.sel === d.u ? 0 : d.u; ui.arm = ''; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
     if (it && it.rest && ui.sel) { const ko = monKo(it.rest.mon); ui.msg = `💤 ${ko}${iga(ko)} 쉬는 중이에요 — ${minsLeft(restLeft(it.rest, Date.now()))}`; } else ui.msg = '';
     render(); return;
   }

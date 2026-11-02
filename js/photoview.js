@@ -18,25 +18,31 @@ export function photoDate(at) {
   const d = new Date(at);
   return Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}월 ${d.getDate()}일` : '';
 }
-/** 사진 아래 두 줄 (순수) — { date: 「11월 3일」, line: 「📺 개굴닌자와 TV를 봤어요」 } · ko = 파트너 이름(없으면 혼자) */
-export function photoLabel(rec, ko) {
-  return { date: photoDate(rec.at), line: photoCaption(rec.scene, rec.mon ? ko : '') };
+/** 사진 아래 두 줄 (순수) — { date: 「11월 3일」, line: 「📺 개굴닌자와 TV를 봤어요」 } · ko = 파트너 이름(없으면 혼자) · gko = 🐾 손님 이름(v385) */
+export function photoLabel(rec, ko, gko = '') {
+  return { date: photoDate(rec.at), line: photoCaption(rec.scene, rec.mon ? ko : '', rec.g ? gko : '') };
 }
 
 /**
  * 사진 한 장 그림 (DOM) — o = { monKo(id), monUrl(id) → 그림 주소|'' , queueArt(id, node) → Promise<주소|''> }
- * 파트너 그림을 아직 안 받았으면 🐾로 그리고, 받아 오면 다시 그린다(그 자리가 아직 화면에 있을 때만)
+ * 파트너·🐾 손님 그림을 아직 안 받았으면 🐾로 그리고, 받아 오면 다시 그린다(그 자리가 아직 화면에 있을 때만)
  */
 export function photoEl(rec, o, cls = 'photo-art') {
   const box = el('div', cls);
   const draw = () => {
     seq = (seq + 1) % 1e6;
     const d = new Date(rec.at);
-    box.innerHTML = photoStageHtml(rec, { ko: rec.mon ? o.monKo(rec.mon) : '', url: rec.mon ? o.monUrl(rec.mon) || '' : '', day: dayNum(rec.at), sky: skyOf(d.getHours()), uid: `ph${seq}` });
+    box.innerHTML = photoStageHtml(rec, {
+      ko: rec.mon ? o.monKo(rec.mon) : '', url: rec.mon ? o.monUrl(rec.mon) || '' : '',
+      gko: rec.g ? o.monKo(rec.g) : '', gurl: rec.g ? o.monUrl(rec.g) || '' : '',
+      day: dayNum(rec.at), sky: skyOf(d.getHours()), uid: `ph${seq}`,
+    });
   };
   draw();
-  if (rec.mon && !o.monUrl(rec.mon) && typeof o.queueArt === 'function') {
-    o.queueArt(rec.mon, box).then((u) => { if (u && box.isConnected) draw(); }).catch(() => {});
+  if (typeof o.queueArt === 'function') {
+    for (const id of [rec.mon, rec.g]) {
+      if (id && !o.monUrl(id)) o.queueArt(id, box).then((u) => { if (u && box.isConnected) draw(); }).catch(() => {});
+    }
   }
   return box;
 }
@@ -45,7 +51,7 @@ export function photoEl(rec, o, cls = 'photo-art') {
 function cardEl(rec, o, tag, extra = '') {
   const c = el(tag, `photo-card${extra}`);
   if (tag === 'button') c.type = 'button';
-  const lb = photoLabel(rec, rec.mon ? o.monKo(rec.mon) : '');
+  const lb = photoLabel(rec, rec.mon ? o.monKo(rec.mon) : '', rec.g ? o.monKo(rec.g) : '');
   c.appendChild(photoEl(rec, o));
   c.appendChild(el('span', 'photo-date', lb.date));
   c.appendChild(el('span', 'photo-line', lb.line));
@@ -125,7 +131,7 @@ export function showPhotoBig(rec, o) {
     });
     document.addEventListener('focusin', (e) => { if (!big.hidden && !big.contains(e.target)) focusBigClose(); });
   }
-  const lb = photoLabel(rec, rec.mon ? o.monKo(rec.mon) : '');
+  const lb = photoLabel(rec, rec.mon ? o.monKo(rec.mon) : '', rec.g ? o.monKo(rec.g) : '');
   const slot = big.querySelector('.photo-big-slot');
   slot.innerHTML = '';
   slot.appendChild(photoEl(rec, o, 'photo-art is-big'));

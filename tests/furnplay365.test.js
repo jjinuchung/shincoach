@@ -263,7 +263,7 @@ test('🔌 잇기 — 집 화면(하늘 시각 · 가게 「놓으면 …」 · 
   assert.match(hv, /node\.classList\.toggle\('is-sit', !!to\.cushion\)/);
   const ps = src('js/playshow.js');
   assert.match(ps, /const hands = HANDS_ON\[scene\] \|\| '';\n\s*ok\.textContent = hands \|\| '좋아!';\n\s*ok\.hidden = !hands;/);
-  assert.match(ps, /const RUN = \{ tv: runTv, game: runGame, meal: runMeal, nap: runNap, sofa: runSofa, teddy: runTeddy, book: runBook, window: runWindow, toy: runToy \};/);
+  assert.match(ps, /const RUN = \{ tv: runTv, game: runGame, meal: runMeal, nap: runNap, sofa: runSofa, teddy: runTeddy, book: runBook, window: runWindow, toy: runToy(?:, hello: runHello)? \};/); // 🤝 인사하기(v385 🐾 손님)가 뒤에 붙어도
   assert.match(ps, /if \(HANDS_ON\[cur\.scene\] && !hearted && cur\.o\.heart && cur\.o\.mon\) \{/, '다 되기 전에 닫아도 💗를 보인다');
   assert.match(ps, /keys\.classList\.remove\('is-one'\); \}/, '닫으면 물 주기 단추 꼴을 뗀다');
   assert.match(ps, /if \(now - last < 300\) return;/);

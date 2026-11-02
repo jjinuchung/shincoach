@@ -45,22 +45,28 @@ export function whoOf(name) {
  */
 export function playLines(scene, ctx = {}, day = 0) {
   const M = ctx.mon || '';
+  const G = typeof ctx.guest === 'string' ? ctx.guest : ''; // 🐾 손님 이름 (v385)
   const W = whoOf(ctx.name);
   const pick = (list, n) => {
     const out = [];
     for (let i = 0; i < Math.min(n, list.length); i++) out.push(list[(Math.abs(Math.floor(day)) + i) % list.length]);
     return out;
   };
-  const withM = M ? `${M}${wa(M)} ` : '';
+  // 「개굴닌자와 …」 · 손님이 있으면 「개굴닌자, 꼬부기와 …」
+  const names = [M, G].filter(Boolean);
+  const withM = names.length ? `${names.join(', ')}${wa(names[names.length - 1])} ` : '';
   const did = {
     tv: 'TV를 봤어요', game: '게임을 했어요', pc: '컴퓨터를 했어요', piano: '피아노를 쳤어요', meal: '밥을 먹었어요',
     nap: '낮잠을 잤어요', sofa: '소파에서 쉬었어요', teddy: '인형 놀이를 했어요', book: '그림책을 읽었어요',
     plant: '화분에 물을 줬어요', flower: '해바라기에 물을 줬어요', window: '창밖을 봤어요', toy: '장난감으로 놀았어요',
   }[scene] || '놀았어요';
-  const icon = { tv: '📺', game: '🎮', pc: '💻', piano: '🎹', meal: '🍚', nap: '😴', sofa: '🛋️', pet: '🤗', teddy: '🧸', book: '📖', plant: '💧', flower: '💧', window: '🔭', toy: '🧩' }[scene] || '🏠';
-  // 🤗 쓰다듬기는 「○○와 …」가 아니라 「○○를 쓰다듬어 줬어요」 — 파트너가 없으면 쿠션만
-  const plain = scene === 'pet' ? (M ? `🤗 ${M}${eul(M)} 쓰다듬어 줬어요` : '🐾 쿠션을 폭신폭신 눌러 봤어요') : `${icon} ${withM}${did}`;
-  const end = ctx.heart && M ? `💗 ${M}${wa(M)} 더 친해졌어요` : plain;
+  const icon = { tv: '📺', game: '🎮', pc: '💻', piano: '🎹', meal: '🍚', nap: '😴', sofa: '🛋️', pet: '🤗', teddy: '🧸', book: '📖', plant: '💧', flower: '💧', window: '🔭', toy: '🧩', hello: '🤝' }[scene] || '🏠';
+  // 🤗 쓰다듬기는 「○○와 …」가 아니라 「○○를 쓰다듬어 줬어요」 — 파트너가 없으면 쿠션만 · 🤝 인사하기(v385)는 손님과
+  const plain = scene === 'pet' ? (M ? `🤗 ${M}${eul(M)} 쓰다듬어 줬어요` : '🐾 쿠션을 폭신폭신 눌러 봤어요')
+    : scene === 'hello' ? (G ? `🤝 ${G}${wa(G)} 인사했어요` : '🤝 인사했어요')
+      : `${icon} ${withM}${did}`;
+  // 💗 — 손님 놀기(v385)는 손님에게만 · 그 밖엔 파트너에게
+  const end = ctx.gHeart && G ? `💗 ${G}${wa(G)} 더 친해졌어요` : ctx.heart && M ? `💗 ${M}${wa(M)} 더 친해졌어요` : plain;
   /** 직접 하는 장면이 다 됐을 때 한 줄 (🤗 · 💧) — 없으면 '' */
   let extra = '';
   let start = [];
@@ -111,6 +117,9 @@ export function playLines(scene, ctx = {}, day = 0) {
   } else if (scene === 'toy') {
     const t = toyOf(day);
     start = ['🧩 장난감 상자를 열었어요', t === 'blocks' ? `🧱 ${withM}블록을 높이높이 쌓아요` : t === 'top' ? '🌀 팽이가 빙글빙글 돌아요' : `⚽ ${withM}공을 톡톡 주고받아요`];
+  } else if (scene === 'hello') { // 🤝 인사하기 (v385 — 손님이 좋아하는 가구가 없을 때)
+    const g = G || '손님';
+    start = [`🚪 띵동! ${g}${iga(g)} 놀러 왔어요`, `👋 ${g}: "${pick(GUEST_SAY, 1)[0]}"`, M ? `🤝 ${M}도 반갑게 인사해요` : `🤝 ${W.subj} 반갑게 인사해요`];
   }
   return { start, end, tip: M ? '' : '🤝 포켓몬을 눌러 [🤝 파트너로!]를 고르면 같이 놀아요', extra };
 }
@@ -121,6 +130,8 @@ export function playLines(scene, ctx = {}, day = 0) {
 /** 🛋️ 소파에서 하는 말 — 놀이 말만(공부·셈 없음) · 날마다 하나 */
 const PAL_SAY = ['오늘 재밌었어!', '같이 있으니까 좋다!', '소파가 폭신폭신해!', '내일은 뭐 하고 놀까?', '헤헤, 조금 졸려…'];
 const ME_SAY = ['나도 좋아!', '내일도 같이 놀자!', '우리 최고!', '조금만 더 쉬자!'];
+/** 🐾 손님 인사 (v385) — 놀이 말만 · 날마다 하나 */
+const GUEST_SAY = ['안녕! 같이 놀자!', '놀러 왔어!', '와, 집이 멋지다!', '오늘 뭐 하고 놀까?'];
 
 const dayIx = (day) => Math.abs(Math.floor(Number(day) || 0));
 /** 🧩 그날 장난감 (장면 말과 그림이 같은 것을 고르게 — 날 번호로) */
@@ -411,9 +422,21 @@ export function mealSvg() {
     + '</svg>';
 }
 
+/** 🚪 현관문 + 발판 (v385 🤝 인사하기 — 손님이 문으로 들어온다) · 문이 살짝 열리면(.pv-door-leaf) 안쪽이 밝다 */
+export function doorSvg() {
+  return '<svg class="pv pv-door" viewBox="0 0 60 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+    + `<rect x="8" y="4" width="44" height="82" rx="3" fill="#8a6a3d" stroke="${LINE}" stroke-width="1.8"/>`
+    + '<rect x="12" y="8" width="36" height="78" fill="#fff4cc"/>'
+    + `<g class="pv-door-leaf"><rect x="12" y="8" width="36" height="78" fill="#c08a4e" stroke="${LINE}" stroke-width="1.4"/>`
+    + '<rect x="17" y="14" width="26" height="28" rx="2" fill="#a97842"/><rect x="17" y="48" width="26" height="30" rx="2" fill="#a97842"/>'
+    + `<circle cx="42" cy="50" r="2.4" fill="#ffd43b" stroke="${LINE}" stroke-width="0.8"/></g>`
+    + `<ellipse cx="30" cy="92" rx="26" ry="5" fill="#e8590c" stroke="${LINE}" stroke-width="1.2"/>`
+    + '</svg>';
+}
+
 /**
- * 장면 무대 (순수 HTML 글자) — o = { look, name, mon: { ko, url } | null, wall, floor, lv, bond, tier, uid }
- * 자리(왼쪽·폭)는 css가 장면마다(.pshow-stage.is-tv …) 정한다
+ * 장면 무대 (순수 HTML 글자) — o = { look, name, mon: { ko, url } | null, guest: { ko, url } | null, wall, floor, lv, bond, tier, uid }
+ * 자리(왼쪽·폭)는 css가 장면마다(.pshow-stage.is-tv …) 정한다 · 🐾 손님(v385)은 .pshow-guest — 자리는 css가 장면마다
  */
 export function stageHtml(scene, o = {}) {
   const uid = String(o.uid === undefined ? 'p' : o.uid).replace(/[^\w-]/g, '');
@@ -436,17 +459,25 @@ export function stageHtml(scene, o = {}) {
   else if (scene === 'plant' || scene === 'flower') dev = potSvg(scene);
   else if (scene === 'window') dev = windowSvg(['day', 'dusk', 'night'].includes(o.sky) ? o.sky : 'day', rainbowOf(o.day), uid);
   else if (scene === 'toy') dev = toyboxSvg(toyOf(o.day));
+  else if (scene === 'hello') dev = doorSvg();
   const front = scene === 'nap' ? bedSvg('front') : scene === 'sofa' ? sofaSvg('front') : '';
   const hand = scene === 'game' ? padSvg('pshow-pad is-me') : scene === 'plant' || scene === 'flower' ? canSvg('pshow-can') : '';
   const me = avatarSvg(o.look, { uid: `play-${uid}`, cls: 'pshow-me-art', title: whoOf(o.name).bare });
   const pal = mon
     ? `<div class="pshow-pal${tier ? ` is-bond${tier}` : ''}">${url ? `<img class="pshow-pal-img" src="${esc(url)}" alt="${esc(mon.ko || '')}" draggable="false">` : '<span class="pshow-pal-img is-emoji">🐾</span>'}${scene === 'game' ? padSvg('pshow-pad is-pal') : ''}</div>`
     : '';
-  return `<div class="pshow-stage is-${esc(scene)}${mon ? '' : ' is-alone'}" style="--pw:${color(o.wall, '#fbf3e4')};--pf:${color(o.floor, '#e2c79f')}">`
+  // 🐾 손님 (v385) — 파트너 그림과 같은 꼴 · 테두리 없음
+  const gst = o.guest && typeof o.guest === 'object' ? o.guest : null;
+  const gUrl = gst ? safeUrl(gst.url) : '';
+  const guest = gst
+    ? `<div class="pshow-guest">${gUrl ? `<img class="pshow-pal-img" src="${esc(gUrl)}" alt="${esc(gst.ko || '')}" draggable="false">` : '<span class="pshow-pal-img is-emoji">🐾</span>'}</div>`
+    : '';
+  return `<div class="pshow-stage is-${esc(scene)}${mon ? '' : ' is-alone'}${gst ? ' with-guest' : ''}" style="--pw:${color(o.wall, '#fbf3e4')};--pf:${color(o.floor, '#e2c79f')}">`
     + '<div class="pshow-wall"></div><div class="pshow-floor"></div>'
     + `<div class="pshow-dev">${dev}</div>`
     + `<div class="pshow-me">${me}${hand}</div>`
     + pal
+    + guest
     + (front ? `<div class="pshow-front">${front}</div>` : '')
     + (scene === 'nap' ? '<div class="pshow-dim"></div><div class="pshow-sun"></div>' : '')
     + '<div class="pshow-fx" aria-hidden="true"></div>'
@@ -464,20 +495,21 @@ export function photoScoreOf(score, day) {
 
 /**
  * 📸 사진 무대 (순수 HTML 글자) — 장면 무대를 끝 모습으로 · 움직임 없이(.is-photo — css가 움직임을 끈다)
- * rec = photo.photoRecOf가 고쳐 읽은 사진 · o = { ko: 파트너 이름, url: 파트너 그림, day: 찍은 날 번호, sky: 찍은 때 하늘, uid }
+ * rec = photo.photoRecOf가 고쳐 읽은 사진 · o = { ko: 파트너 이름, url: 파트너 그림, gko·gurl: 🐾 손님 이름·그림(v385 — rec.g가 있을 때), day: 찍은 날 번호, sky: 찍은 때 하늘, uid }
  * uid는 한 화면에 여러 장(앨범)이어도 그림 안 이름(그라디언트·자르기)이 겹치지 않게 사진마다 다르게
  */
 export function photoStageHtml(rec, o = {}) {
   const scene = rec && typeof rec.scene === 'string' ? rec.scene : 'tv';
   const mon = rec && rec.mon ? { ko: typeof o.ko === 'string' ? o.ko : '', url: o.url || '' } : null;
-  const html = stageHtml(scene, { look: rec && rec.look, name: '', mon, wall: rec && rec.wall, floor: rec && rec.floor, tier: (rec && rec.t) || 0, day: o.day, sky: o.sky, uid: o.uid === undefined ? 'ph' : o.uid });
+  const guest = rec && rec.g ? { ko: typeof o.gko === 'string' ? o.gko : '', url: o.gurl || '' } : null;
+  const html = stageHtml(scene, { look: rec && rec.look, name: '', mon, guest, wall: rec && rec.wall, floor: rec && rec.floor, tier: (rec && rec.t) || 0, day: o.day, sky: o.sky, uid: o.uid === undefined ? 'ph' : o.uid });
   const end = ['is-on', 'is-done', 'is-photo', ...(PHOTO_END[scene] || []).filter((c) => mon || (c !== 'is-at-pal' && c !== 'is-hug'))];
   let out = html.replace('class="pshow-stage ', `class="pshow-stage ${end.join(' ')} `);
   if (scene === 'game') out = out.replace('>⭐ 0</text>', `>⭐ ${photoScoreOf(rec && rec.score, o.day)}</text>`);
   return out;
 }
 
-/** 📸 사진 아래 한 줄 — 장면 끝말(💗 없이) · 「📺 개굴닌자와 TV를 봤어요」 */
-export function photoCaption(scene, ko) {
-  return playLines(scene, { mon: typeof ko === 'string' ? ko : '' }, 0).end;
+/** 📸 사진 아래 한 줄 — 장면 끝말(💗 없이) · 「📺 개굴닌자와 TV를 봤어요」 · 🐾 손님이 있으면 「📺 개굴닌자, 꼬부기와 …」(gko — v385) */
+export function photoCaption(scene, ko, gko = '') {
+  return playLines(scene, { mon: typeof ko === 'string' ? ko : '', guest: typeof gko === 'string' ? gko : '' }, 0).end;
 }

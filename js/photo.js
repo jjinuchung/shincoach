@@ -2,7 +2,8 @@
 // 순수 함수만 — 화면 없음(node 시험에서 그대로 돈다). 저장은 xp.houseDo(저장된 프로필로 한 트랜잭션), 그림은 playart.photoStageHtml, 화면은 photoview.js·houseview.js
 //
 // 사진은 그림 파일이 아니라 장면을 다시 그릴 재료다(진짜 카메라는 쓰지 않는다 — 얼굴·집 안이 찍히지 않고 저장도 가볍다):
-//   { id, at: 찍은 때(ms), scene: 장면 이름, mon: 그때 파트너(0 = 혼자), look: 그때 캐릭터 차림, wall·floor: 그때 방 색, t?: 💗 테두리 단계, score?: 🎮 점수 }
+//   { id, at: 찍은 때(ms), scene: 장면 이름, mon: 그때 파트너(0 = 혼자), look: 그때 캐릭터 차림, wall·floor: 그때 방 색, t?: 💗 테두리 단계, score?: 🎮 점수,
+//     g?: 🐾 같이 논 손님(v385 — 파트너와 다를 때만) }
 //   → 나중에 옷을 갈아입거나 파트너가 진화해도 옛 사진은 그때 모습 그대로다
 // 저장: profile.homePhotos = { list: [사진…], gone: { 사진 id: 뺀 때 }, frames: { '방 id:놓은 번호': { p: 사진 id | '', at: 바꾼 때 } } }
 //  · 앨범은 새것부터 PHOTO_MAX장까지 · 가득 차면 진우가 뺄 사진을 골라야 새 사진이 들어간다(저절로 빠지지 않게 — 기본안 ④)
@@ -16,8 +17,8 @@ import { lookOf } from './avatar.js';
 export const PHOTO_MAX = 30;
 /** 사진을 걸 수 있는 가구 — 🖼️ 액자(벽 소품, 💰200 그대로 · 기본안 ⑤) */
 export const FRAME_ID = 'f_frame';
-/** 사진이 될 수 있는 장면 — playart.SCENE_OF의 값들(🎮 일상 행동 · 🍚 · 🛏️ 가구 놀기) */
-export const PHOTO_SCENES = ['tv', 'game', 'pc', 'piano', 'meal', 'nap', 'sofa', 'pet', 'teddy', 'book', 'plant', 'flower', 'window', 'toy'];
+/** 사진이 될 수 있는 장면 — playart.SCENE_OF의 값들(🎮 일상 행동 · 🍚 · 🛏️ 가구 놀기) + 🤝 손님과 인사하기(v385 — 가구 없는 장면) */
+export const PHOTO_SCENES = ['tv', 'game', 'pc', 'piano', 'meal', 'nap', 'sofa', 'pet', 'teddy', 'book', 'plant', 'flower', 'window', 'toy', 'hello'];
 /** 뺀 사진 표의 끝 · 액자 칸 수의 끝 · 읽을 사진 칸 수의 끝 (깨진 백업이 끝없이 커지지 않게)
  *  뺀 표는 넉넉히 — 표에서 잘린 사진은 그 사진이 든 옛 백업과 합치면 되살아나 아끼던 사진을 밀어낸다(300이면 301번째 바꾸기부터 · Codex 187차 #1) ·
  *  3,000 = 날마다 빼도 몇 년치 · 다 차도 100KB 남짓 */
@@ -64,6 +65,7 @@ export function photoRecOf(raw) {
   if (typeof raw.floor === 'string' && COLOR_RE.test(raw.floor)) out.floor = raw.floor;
   if (mon && [1, 2, 3].includes(raw.t)) out.t = raw.t;
   if (scene === 'game' && Number.isSafeInteger(raw.score) && raw.score >= 0 && raw.score <= 99999) out.score = raw.score;
+  if (Number.isSafeInteger(raw.g) && raw.g > 0 && raw.g < MON_MAX && raw.g !== mon) out.g = raw.g; // 🐾 손님 (v385)
   return out;
 }
 

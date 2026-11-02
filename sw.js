@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v384';
+const CACHE_VERSION = 'v385';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -147,6 +147,7 @@ const APP_SHELL = [
   './js/playart.js', // 🎮 장면 그림
   './js/photo.js', // 📸 액자 사진 규칙 (v384)
   './js/photoview.js', // 📸 📷 앨범 · 🔍 크게 보기 (v384)
+  './js/guest.js', // 🐾 손님 포켓몬 규칙 (v385)
   './js/playshow.js', // 🎮 장면 차례
   './js/furnart.js', // 🖍️ 코드로 그린 가구 그림 (③ 가구 더하기)
   './js/homepal.js', // 🤝 홈 화면 파트너

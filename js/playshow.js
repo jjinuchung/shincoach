@@ -50,6 +50,8 @@ function ensureBox() {
 // 📸 액자 사진 (v384) — 장면을 띄운 쪽이 o.onPhoto(저장 함수 → Promise<{ ok, why }>)를 주면 [📸 사진 찍기] 단추를 보인다
 //   보이는 때 = [좋아!]·[다 했어요]가 보일 때(직접 하는 장면은 처음부터 · 나머지는 끝 모습에서) · 한 장면에 한 장 · 저장은 띄운 쪽이(houseview → xp.houseDo)
 export const PHOTO_BTN = '📸 사진 찍기';
+/** 🐾 손님과 놀 때 (v385 기본안 — [📸 같이 사진 찍기]) */
+export const PHOTO_BTN_GUEST = '📸 같이 사진 찍기';
 export const PHOTO_SAID = {
   ok: '📸 찰칵! 📷 앨범에 넣었어요',
   full: '📷 앨범이 가득 찼어요 — 닫으면 뺄 사진을 골라요',
@@ -122,7 +124,19 @@ function fly(text, x, y, cls = '') {
 function showHeart() {
   if (hearted || !cur) return;
   hearted = true;
-  if (cur.o.heart && cur.o.mon) {
+  if (cur.o.gHeart && cur.o.guest) { // 🐾 손님 💗 (v385 — 손님 놀기는 손님에게만)
+    const g = $q('.pshow-guest');
+    const stage = $q('.pshow-stage');
+    let x = 50;
+    if (g && stage) {
+      const a = g.getBoundingClientRect();
+      const b = stage.getBoundingClientRect();
+      if (b.width > 0) x = ((a.left + a.width / 2 - b.left) / b.width) * 100;
+    }
+    fly('💗 +1', Math.max(6, Math.min(70, x - 8)), 30, 'is-heart');
+    hop(g);
+    sfx.ding();
+  } else if (cur.o.heart && cur.o.mon) {
     const pal = $q('.pshow-pal');
     const stage = $q('.pshow-stage');
     let x = 70;
@@ -310,6 +324,23 @@ async function runWindow(stage, L) {
   sfx.twinkle();
   await pause(2400);
 }
+/** 🤝 인사하기 (v385) — 문이 열리고 손님이 들어와 인사 · 손님이 없으면 문만 */
+async function runHello(stage, L) {
+  say(L.start[0]);
+  sfx.ding();
+  stage.classList.add('is-on'); // 문이 열리고 손님이 걸어 들어온다(css)
+  await pause(1500);
+  if (skip) return;
+  if (L.start[1]) say(L.start[1]);
+  hop($q('.pshow-guest'));
+  sfx.tick();
+  await pause(1700);
+  if (skip) return;
+  if (L.start[2]) say(L.start[2]);
+  hop($q('.pshow-me'));
+  hop($q('.pshow-pal'));
+  await pause(1600);
+}
 async function runToy(stage, L) {
   say(L.start[0]);
   stage.classList.add('is-on'); // 뚜껑이 열린다
@@ -496,6 +527,7 @@ function close() {
 /**
  * 장면 보이기 → Promise(닫으면 풀린다). scene = 'tv' | 'game' | 'pc' | 'piano'
  * scene에 'meal'(🍚 식탁)도 · 🛏️ 가구 놀기(v365) 'nap' | 'sofa' | 'pet' | 'teddy' | 'book' | 'plant' | 'flower' | 'window' | 'toy'(o.sky = 🔭 하늘) · o ={ look, name, mon: { ko, url } | null, wall, floor, lv, bond, tier, chain, heart, day, score? (🎮 미니 게임 점수 — v307) }
+ * 🐾 손님(v385): o.guest = { ko, url } · o.gHeart = 손님이 💗를 받았나 · 'hello'(🤝 인사하기 — 가구 없이) · 📸 단추는 「같이 사진 찍기」
  * 이미 떠 있으면 새로 띄우지 않고 바로 풀린다(두 번 눌러도 겹치지 않게)
  */
 export function showPlay(scene, o = {}) {
@@ -505,12 +537,12 @@ export function showPlay(scene, o = {}) {
     onDone = resolve;
     skip = false;
     hearted = false;
-    const lines = playLines(scene, { mon: o.mon ? o.mon.ko : '', name: o.name, heart: !!o.heart, lv: o.lv, chain: o.chain, sky: o.sky }, o.day);
+    const lines = playLines(scene, { mon: o.mon ? o.mon.ko : '', guest: o.guest ? o.guest.ko || '' : '', gHeart: !!o.gHeart, name: o.name, heart: !!o.heart, lv: o.lv, chain: o.chain, sky: o.sky }, o.day);
     // 🎮 점수 — 미니 게임(v307)을 하고 왔으면 그 점수, 아니면 날마다 다른 장면용 수
     const score = Number.isSafeInteger(o.score) && o.score >= 0 ? o.score : 12 + ((Math.abs(Number(o.day) || 0) * 5) % 9);
     cur = { scene, o, lines, score, photo: typeof o.onPhoto === 'function' ? o.onPhoto : null, shot: false, saving: null }; // 📸 (v384)
     const ph = $q('.pshow-photo');
-    ph.hidden = true; ph.disabled = false; ph.textContent = PHOTO_BTN;
+    ph.hidden = true; ph.disabled = false; ph.textContent = o.guest ? PHOTO_BTN_GUEST : PHOTO_BTN;
     $q('.pshow-slot').innerHTML = stageHtml(scene, { ...o, uid: 'show' });
     const tip = $q('.pshow-tip');
     tip.textContent = lines.tip;
@@ -532,7 +564,7 @@ export function showPlay(scene, o = {}) {
       if (first) { try { first.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } }
       return;
     }
-    const RUN = { tv: runTv, game: runGame, meal: runMeal, nap: runNap, sofa: runSofa, teddy: runTeddy, book: runBook, window: runWindow, toy: runToy };
+    const RUN = { tv: runTv, game: runGame, meal: runMeal, nap: runNap, sofa: runSofa, teddy: runTeddy, book: runBook, window: runWindow, toy: runToy, hello: runHello };
     const go = RUN[scene] || runPc;
     const mine = cur;
     (async () => {
