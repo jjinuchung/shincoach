@@ -452,3 +452,32 @@ export function stageHtml(scene, o = {}) {
     + '<div class="pshow-fx" aria-hidden="true"></div>'
     + '</div>';
 }
+
+// ───────────────────── 📸 액자 사진 (v384 — 아버님 기본안 「추천대로」) ─────────────────────
+
+/** 사진은 장면의 끝 모습 — playshow.endLook이 장면 끝에 붙이는 이름표와 같게(🎮 CLEAR · 😴 아침 · 🛋️ 기대기 · 🧸 안기 · 🧩 꺼냄 · 💧 다 자람) */
+const PHOTO_END = { game: ['is-clear'], nap: ['is-morning'], sofa: ['is-lean'], teddy: ['is-at-pal', 'is-hug'], toy: ['is-out'], plant: ['is-g3'], flower: ['is-g3'] };
+/** 🎮 사진의 점수 — 찍을 때 점수가 없으면 장면과 같은 날마다 다른 수(playshow와 같은 셈) */
+export function photoScoreOf(score, day) {
+  return Number.isSafeInteger(score) && score >= 0 ? score : 12 + ((Math.abs(Number(day) || 0) * 5) % 9);
+}
+
+/**
+ * 📸 사진 무대 (순수 HTML 글자) — 장면 무대를 끝 모습으로 · 움직임 없이(.is-photo — css가 움직임을 끈다)
+ * rec = photo.photoRecOf가 고쳐 읽은 사진 · o = { ko: 파트너 이름, url: 파트너 그림, day: 찍은 날 번호, sky: 찍은 때 하늘, uid }
+ * uid는 한 화면에 여러 장(앨범)이어도 그림 안 이름(그라디언트·자르기)이 겹치지 않게 사진마다 다르게
+ */
+export function photoStageHtml(rec, o = {}) {
+  const scene = rec && typeof rec.scene === 'string' ? rec.scene : 'tv';
+  const mon = rec && rec.mon ? { ko: typeof o.ko === 'string' ? o.ko : '', url: o.url || '' } : null;
+  const html = stageHtml(scene, { look: rec && rec.look, name: '', mon, wall: rec && rec.wall, floor: rec && rec.floor, tier: (rec && rec.t) || 0, day: o.day, sky: o.sky, uid: o.uid === undefined ? 'ph' : o.uid });
+  const end = ['is-on', 'is-done', 'is-photo', ...(PHOTO_END[scene] || []).filter((c) => mon || (c !== 'is-at-pal' && c !== 'is-hug'))];
+  let out = html.replace('class="pshow-stage ', `class="pshow-stage ${end.join(' ')} `);
+  if (scene === 'game') out = out.replace('>⭐ 0</text>', `>⭐ ${photoScoreOf(rec && rec.score, o.day)}</text>`);
+  return out;
+}
+
+/** 📸 사진 아래 한 줄 — 장면 끝말(💗 없이) · 「📺 개굴닌자와 TV를 봤어요」 */
+export function photoCaption(scene, ko) {
+  return playLines(scene, { mon: typeof ko === 'string' ? ko : '' }, 0).end;
+}

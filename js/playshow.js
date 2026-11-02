@@ -36,13 +36,54 @@ function ensureBox() {
   box.innerHTML = '<div class="pshow-card"><div class="pshow-slot"></div>'
     + '<p class="pshow-cap" aria-live="polite"></p><p class="pshow-tip" hidden></p>'
     + '<div class="pshow-keys" hidden></div>'
+    + `<button type="button" class="btn pshow-photo" hidden>${PHOTO_BTN}</button>`
     + '<button type="button" class="btn btn-primary pshow-ok">좋아!</button></div>';
   document.body.appendChild(box);
   box.addEventListener('click', (e) => {
-    if (running && !e.target.closest('.pshow-ok') && !e.target.closest('.pshow-keys')) skip = true;
+    if (running && !e.target.closest('.pshow-ok') && !e.target.closest('.pshow-keys') && !e.target.closest('.pshow-photo')) skip = true;
   });
   box.querySelector('.pshow-ok').addEventListener('click', () => onOk());
+  box.querySelector('.pshow-photo').addEventListener('click', () => onPhoto());
   return box;
+}
+
+// 📸 액자 사진 (v384) — 장면을 띄운 쪽이 o.onPhoto(저장 함수 → Promise<{ ok, why }>)를 주면 [📸 사진 찍기] 단추를 보인다
+//   보이는 때 = [좋아!]·[다 했어요]가 보일 때(직접 하는 장면은 처음부터 · 나머지는 끝 모습에서) · 한 장면에 한 장 · 저장은 띄운 쪽이(houseview → xp.houseDo)
+export const PHOTO_BTN = '📸 사진 찍기';
+export const PHOTO_SAID = {
+  ok: '📸 찰칵! 📷 앨범에 넣었어요',
+  full: '📷 앨범이 가득 찼어요 — 닫으면 뺄 사진을 골라요',
+  fail: '사진을 못 찍었어요 — 다시 눌러 볼까요?',
+};
+function showPhotoBtn() {
+  const b = $q('.pshow-photo');
+  if (b && cur && cur.photo) b.hidden = false;
+}
+/** 찰칵 — 하얗게 번쩍(opacity만) · 소리 */
+function flash() {
+  const stage = $q('.pshow-stage');
+  if (!stage) return;
+  const f = el('div', 'pshow-flash');
+  stage.appendChild(f);
+  setTimeout(() => f.remove(), 600);
+  sfx.tick();
+}
+async function onPhoto() {
+  const b = $q('.pshow-photo');
+  const mine = cur;
+  if (!b || !mine || !mine.photo || mine.shot) return;
+  mine.shot = true; // 저장을 기다리는 사이 두 번 눌러도 한 장
+  b.disabled = true;
+  flash();
+  // saving — 저장 대답을 기다리는 동안 [좋아!]는 대답 뒤에 닫는다(onOk · closeAfterSave) · 풀리기 전에 null로
+  mine.saving = (async () => { try { return await mine.photo(); } catch { return null; } finally { mine.saving = null; } })();
+  const r = await mine.saving;
+  if (cur !== mine) return; // 그새 닫힘(집을 닫음) — 닫힌 장면 단추는 그대로
+  if (r && r.ok) { b.textContent = '📸 앨범에 넣었어요'; say(PHOTO_SAID.ok); return; }
+  if (r && r.why === 'full') { b.textContent = '📷 앨범이 가득 찼어요'; say(PHOTO_SAID.full); return; }
+  mine.shot = false; // 저장이 안 됐으면 다시 누를 수 있게
+  b.disabled = false;
+  say(PHOTO_SAID.fail);
 }
 
 const $q = (s) => box.querySelector(s);
@@ -407,8 +448,22 @@ function pianoKeys(stage) {
   keys.hidden = false;
 }
 
+/**
+ * 📸 사진을 저장하는 중이면 대답이 온 뒤에 닫는다 (순수 · Codex 187차 #2) — 닫은 뒤에 「앨범이 가득 참」이 오면 집이 뺄 사진 고르기를 못 열었다
+ * sc = 장면(sc.saving = 저장 Promise | null) · still() = 아직 그 장면인가(그새 집을 닫았으면 안 닫음) · go = 닫기 · 기다리는 동안 또 눌러도 한 번
+ */
+export function closeAfterSave(sc, still, go) {
+  const job = sc && sc.saving;
+  if (!job) { go(); return; }
+  if (sc.closeWait) return;
+  sc.closeWait = true;
+  const after = () => { sc.closeWait = false; if (sc.saving === job) sc.saving = null; if (still()) go(); }; // 대답이 왔으면 다시 기다리지 않게
+  job.then(after, after);
+}
+
 function onOk() {
   if (!cur) { close(); return; }
+  if (cur.saving) { const mine = cur; closeAfterSave(mine, () => cur === mine, onOk); return; } // 📸 저장 대답 뒤에 (Codex 187차 #2)
   // 🎹·🤗·💧 한 번도(다 되기 전에) 닫으면 💗를 보이고 잠깐 뒤에 닫는다(받은 것을 못 보고 지나가지 않게)
   if (HANDS_ON[cur.scene] && !hearted && cur.o.heart && cur.o.mon) {
     showHeart();
@@ -429,6 +484,8 @@ function close() {
   cur = null;
   const keys = $q('.pshow-keys');
   if (keys) { keys.hidden = true; keys.innerHTML = ''; keys.classList.remove('is-one'); }
+  const ph = $q('.pshow-photo');
+  if (ph) { ph.hidden = true; ph.disabled = false; ph.textContent = PHOTO_BTN; }
   const slot = $q('.pshow-slot');
   if (slot) slot.innerHTML = '';
   const f = onDone;
@@ -451,7 +508,9 @@ export function showPlay(scene, o = {}) {
     const lines = playLines(scene, { mon: o.mon ? o.mon.ko : '', name: o.name, heart: !!o.heart, lv: o.lv, chain: o.chain, sky: o.sky }, o.day);
     // 🎮 점수 — 미니 게임(v307)을 하고 왔으면 그 점수, 아니면 날마다 다른 장면용 수
     const score = Number.isSafeInteger(o.score) && o.score >= 0 ? o.score : 12 + ((Math.abs(Number(o.day) || 0) * 5) % 9);
-    cur = { scene, o, lines, score };
+    cur = { scene, o, lines, score, photo: typeof o.onPhoto === 'function' ? o.onPhoto : null, shot: false, saving: null }; // 📸 (v384)
+    const ph = $q('.pshow-photo');
+    ph.hidden = true; ph.disabled = false; ph.textContent = PHOTO_BTN;
     $q('.pshow-slot').innerHTML = stageHtml(scene, { ...o, uid: 'show' });
     const tip = $q('.pshow-tip');
     tip.textContent = lines.tip;
@@ -469,6 +528,7 @@ export function showPlay(scene, o = {}) {
       stage.classList.add('is-on', 'is-done');
       const first = scene === 'piano' ? (pianoKeys(stage), $q('.pshow-key')) : scene === 'pet' ? petPad(stage) : waterBtn(stage);
       running = false; // 직접 하는 장면은 건너뛸 것이 없다 — 무대를 눌러도 아무 일 없음
+      showPhotoBtn(); // 📸 직접 하는 장면은 [다 했어요]처럼 처음부터
       if (first) { try { first.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } }
       return;
     }
@@ -485,6 +545,7 @@ export function showPlay(scene, o = {}) {
       running = false;
       showHeart();
       ok.hidden = false;
+      showPhotoBtn(); // 📸 끝 모습에서
       try { ok.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ }
     })();
   });

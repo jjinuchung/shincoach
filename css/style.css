@@ -3432,6 +3432,41 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .pshow-key { height: 96px; padding: 0 0 10px; display: flex; align-items: flex-end; justify-content: center; border: 2px solid #3b302b; border-top: 9px solid var(--kc); border-radius: 0 0 12px 12px; background: #fffdf7; color: #3b302b; font: inherit; font-weight: 800; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 .pshow-key.is-hit { background: #ffe08a; transform: translateY(3px); }
 .pshow-ok { justify-self: center; min-width: 9em; }
+/* 📸 액자 사진 (v384) — 사진은 장면 무대를 끝 모습으로 작게 그린 것 · 움직임은 끝 쪽에 멈춰 둔다(한 번 도는 것은 끝 모습 · 계속 도는 것은 한 장면) */
+/*   ::before·::after도 — 💗 2·3단계 테두리·✨는 가상 요소라 * 로는 안 멈췄다(Codex 187차 #4) */
+.pshow-stage.is-photo, .pshow-stage.is-photo *, .pshow-stage.is-photo::before, .pshow-stage.is-photo::after, .pshow-stage.is-photo *::before, .pshow-stage.is-photo *::after { animation-delay: -30s !important; animation-play-state: paused !important; transition: none !important; }
+.pshow-stage.is-photo .pshow-fx { display: none; }
+.pshow-photo { justify-self: center; min-width: 9em; border: 2px solid #3b302b; background: #fff; color: #3b302b; font-weight: 800; }
+.pshow-photo[hidden] { display: none; }
+.pshow-photo:disabled { opacity: 0.7; }
+.pshow-flash { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 9; background: #fff; pointer-events: none; animation: pshow-flash 0.55s ease-out forwards; }
+@keyframes pshow-flash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pshow-flash { animation: none; opacity: 0; } }
+/* 📷 앨범 */
+.photo-note { margin: 0; color: var(--muted); font-size: 0.9rem; word-break: keep-all; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 12px; } /* 폰 폭에서도 한 줄에 두 장 */
+.photo-card { position: relative; display: grid; gap: 3px; padding: 6px 6px 8px; border: 1px solid #e6dccb; border-radius: 4px; background: #fffdf8; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); text-align: center; font: inherit; color: #3b302b; cursor: pointer; }
+.photo-card.is-sel { outline: 3px solid #e8590c; outline-offset: 2px; }
+.photo-card:focus-visible { outline: 3px solid #4dabf7; outline-offset: 2px; }
+.photo-card.is-new { cursor: default; width: min(220px, 100%); }
+.photo-card .pshow-stage { border-width: 1px; border-radius: 3px; }
+.photo-date { font-size: 0.78rem; color: #7a6f63; }
+.photo-line { font-size: 0.82rem; font-weight: 700; line-height: 1.35; word-break: keep-all; }
+.photo-hung { position: absolute; top: 4px; left: 4px; padding: 1px 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: #3b302b; font-size: 0.72rem; font-weight: 700; }
+.photo-new { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.photo-new-tag { font-weight: 800; }
+.photo-cancel, .photo-drop { justify-self: start; }
+/* 🖼️ 벽 액자 속 사진 — 나무 테 · 누르기는 액자(가구)가 받는다 */
+.house-photo { width: 96%; aspect-ratio: 16 / 10; box-sizing: border-box; border: calc(var(--cell) * 0.07) solid #8a6a3d; border-radius: 2px; background: #fffdf8; box-shadow: 0 2px 3px rgba(0, 0, 0, 0.25); pointer-events: none; overflow: hidden; }
+.house-photo .photo-art, .house-photo .pshow-stage { width: 100%; height: 100%; }
+.house-photo .pshow-stage { border: 0; border-radius: 0; }
+/* 🔍 크게 보기 */
+.photo-big { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 66; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15, 23, 42, 0.72); }
+.photo-big[hidden] { display: none; }
+.photo-big-card { width: min(560px, 100%); display: grid; gap: 6px; padding: 14px 14px 12px; border-radius: 6px; background: #fffdf8; color: #3b302b; text-align: center; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35); }
+.photo-big-date { margin: 0; color: #7a6f63; font-size: 0.9rem; }
+.photo-big-line { margin: 0; font-weight: 800; font-size: 1.05rem; word-break: keep-all; }
+.photo-big-close { justify-self: center; min-width: 8em; }
 @keyframes pv-steam { 0% { opacity: 0; transform: translateY(2px); } 30% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-7px); } }
 @keyframes pv-eat { from { transform: scaleY(1); } to { transform: scaleY(0.2); } }
 @keyframes bond-pulse { 0%, 100% { opacity: 0.7; transform: scale(0.96); } 50% { opacity: 1; transform: scale(1.04); } }

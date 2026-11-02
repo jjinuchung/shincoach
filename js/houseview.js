@@ -36,6 +36,9 @@ import { showPlay, closePlay } from './playshow.js'; // 🎮 장면
 import { openGames, closeGames, GAME_DEVICE } from './gameview.js'; // 🎮 게임기 미니 게임 (v307)
 import { dayNum } from './korean.js'; // 📰 TV 소식은 날마다 바뀐다 (순수)
 import { FURN_ART, FURN_ART_TURN } from './furnart.js'; // 🖍️ 코드로 그린 가구 그림 (순수 자료) · 🔄 세로 그림(v334)
+import { FRAME_ID, framePhotoOf, hungIds, photoIdOf, takePhotoRule, hangRule } from './photo.js'; // 📸 액자 사진 (v384 · 순수)
+import { albumBox, photoEl, showPhotoBig, closePhotoBig } from './photoview.js'; // 📸 📷 앨범 · 🔍 크게 보기
+import { takePhoto, hangPhoto, photosNow } from './xp.js';
 
 // 🎮 일상 행동(2026-10-18, 아버님 "이대로 해"): 놓인 📺·🎮·💻·🎹를 누르면 도구 줄 맨 앞에 놀기 단추 → 💗를 먼저 저장(homePlay 트랜잭션) →
 //   🧑·🤝가 기기 옆 칸으로 걸어가고(이 방에 서 있을 때만 · transform만 · 저장 안 함) → 장면(playshow) → 제자리로 돌아와 다시 그린다
@@ -150,7 +153,7 @@ const FLOOR_KO = { [FIRST_ROOM]: '1층', [SECOND_ROOM]: '2층' };
  */
 export function houseTabs(rooms) {
   const list = rooms.length > 1 ? rooms.map((id) => ({ tab: 'room', floor: id, label: `🏠 ${FLOOR_KO[id] || id}` })) : [{ tab: 'room', floor: rooms[0], label: '🏠 꾸미기' }];
-  return [...list, { tab: 'closet', label: '👕 옷장' }, { tab: 'shop', label: '🛒 가구 상점' }];
+  return [...list, { tab: 'closet', label: '👕 옷장' }, { tab: 'album', label: '📷 앨범' }, { tab: 'shop', label: '🛒 가구 상점' }]; // 📷 앨범 (v384)
 }
 
 /** 🧑 캐릭터를 끌 때 칸 셈에 쓰는 한 칸 바닥 가구 — 캐릭터는 바닥 한 칸에 선다(dropSpot·canPlace가 가구 id로 셈한다) */
@@ -175,7 +178,9 @@ export function growProgress(profile, id) {
 // ───────────────────── 화면 ─────────────────────
 
 // tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다) · drawn: 그린 집 모양(shapeKey)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0 };
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0, hang: null, pendingPhoto: null, albumSel: '' };
+// 📸 (v384) hang: 사진을 걸 액자 { rid, u } — 📷 앨범이 「액자에 걸 사진을 골라요」로 열린다 · pendingPhoto: 앨범이 가득 차 아직 못 넣은 새 사진(진우가 뺄 사진을 고르면 넣는다)
+//   albumSel: 앨범에서 고른 사진 id(가득 찼을 때 뺄 사진)
 // 🎮 playRun: 놀기 번호 — 집을 닫으면 올려서 걷던·보던 놀기를 무효로(닫은 뒤에 장면이 뜨지 않게, Codex 91차 #2)
 // 🎮 bondHold: 노는 동안 방의 💗 칩에 보일 수(놀기 전 수) — 💗는 먼저 저장되지만 칩은 장면이 끝난 뒤에 오르게 · null이면 저장된 수
 // 🧑 meSel: 방에서 캐릭터를 눌러 도구(👕 옷 갈아입기)가 떠 있다
@@ -218,7 +223,8 @@ export function openHouse(opts = {}) {
   ui.onClose = opts.onClose || null;
   ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.buyArm = ''; ui.floor = FIRST_ROOM;
   ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
-  ui.tab = opts.tab === 'shop' || opts.tab === 'closet' ? opts.tab : 'room';
+  ui.hang = null; ui.pendingPhoto = null; ui.albumSel = ''; // 📸 (v384)
+  ui.tab = opts.tab === 'shop' || opts.tab === 'closet' || opts.tab === 'album' ? opts.tab : 'room';
   closetReset();
   $('house').hidden = false;
   if (!ui.tick) ui.tick = setInterval(tickRests, 1000);
@@ -239,6 +245,8 @@ export function closeHouse() {
   ui.playRun += 1; // 🎮 걷던·보던 놀기는 여기서 끝 (💗는 저장된 대로)
   closeGames(); // 🎮 게임기 화면도 (돌던 판은 그 자리에서 끝 — v307)
   closePlay();
+  closePhotoBig(); // 📸 (v384) — 가득 찬 앨범에 못 넣은 새 사진은 닫으면 그만두기
+  ui.hang = null; ui.pendingPhoto = null; ui.albumSel = '';
   if (ui.tick) { clearInterval(ui.tick); ui.tick = 0; }
   $('house').hidden = true;
   markReady();
@@ -258,6 +266,7 @@ function onReloaded() {
   const moved = ui.drawn && ui.drawn !== shapeKey();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
   ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  ui.hang = null; ui.albumSel = ''; // 📸 걸려던 액자는 바뀐 집에서 다시 고르게 (못 넣은 새 사진은 그대로)
   closetReset();
   ui.floor = roomId();
   if (moved) ui.msg = WHY.changed;
@@ -319,8 +328,9 @@ function render() {
   const body = $('house-body');
   body.innerHTML = '';
   const panel = ui.tab === 'room' && (ui.evoAsk || ui.pick);
-  body.classList.toggle('is-shop', ui.tab === 'shop' || ui.tab === 'closet' || !!panel); // 한 칸(가로 화면에서도)
+  body.classList.toggle('is-shop', ui.tab === 'shop' || ui.tab === 'closet' || ui.tab === 'album' || !!panel); // 한 칸(가로 화면에서도)
   if (ui.tab === 'shop') body.appendChild(shopBox());
+  else if (ui.tab === 'album') body.appendChild(albumView()); // 📷 (v384)
   else if (ui.tab === 'closet') body.appendChild(closetBox({ profile: getProfileSnapshot(), run, say, redraw: render, goTab }));
   else if (ui.evoAsk) body.appendChild(evoAskBox());
   else if (ui.pick) body.appendChild(pickBox());
@@ -356,6 +366,7 @@ function goTab(key, floor) {
   cancelDrag();
   ui.tab = key; ui.sel = 0; ui.arm = ''; ui.buyArm = ''; ui.msg = '';
   ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false;
+  ui.hang = null; ui.pendingPhoto = null; ui.albumSel = ''; // 📸 다른 탭으로 가면 고르기는 그만두기
   closetReset();
   if (floor) ui.floor = floor;
   render();
@@ -468,7 +479,14 @@ function itemEl(it) {
   e.dataset.id = it.id;
   // 앞뒤 겹침은 가구의 아래 끝 줄로 (세로 가구는 아래 칸)
   Object.assign(e.style, { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: String(d.at === 'wall' ? 5 : 10 + it.y + (turn ? d.w - 1 : 0)) });
-  e.appendChild(artEl(d, 'span', 'house-emoji', turn));
+  const ph = it.id === FRAME_ID ? framePhotoOf(getProfileSnapshot(), roomId(), it.u) : null; // 📸 걸린 사진 (v384)
+  if (ph) {
+    e.classList.add('has-photo');
+    e.setAttribute('aria-label', `${itemName(d, it.r)} — 사진`);
+    const fr = el('span', 'house-photo');
+    fr.appendChild(photoEl(ph, artOpts(), 'photo-art is-mini'));
+    e.appendChild(fr);
+  } else e.appendChild(artEl(d, 'span', 'house-emoji', turn));
   if (it.id === HEAL) restDecor(e, it);
   e.addEventListener('pointerdown', (ev) => startDrag(ev, { kind: 'move', id: it.id, u: it.u, src: e }));
   return e;
@@ -491,6 +509,7 @@ function toolsEl(it) {
   store.type = 'button';
   store.addEventListener('click', () => { if (stale()) return; ui.sel = 0; run((p) => storeRule(p, rid, it.u), `${d.emoji} ${d.ko}${eul(d.ko)} 서랍에 넣었어요`); });
   if (it.id === HEAL) t.appendChild(restTool(it)); // 💊 캡슐 — 🐾 쉬게 하기 · ⏏️ 꺼내기 · ✨ 받기
+  if (it.id === FRAME_ID) for (const b of frameTools(it, rid)) t.appendChild(b); // 📸 🔍 크게 보기 · 🖼️ 사진 걸기/바꾸기 (v384)
   if (PLAYS[it.id]) { // 🎮 일상 행동 — 맨 앞에 놀기 단추
     const go = el('button', 'btn btn-primary house-tool', PLAYS[it.id].btn);
     go.type = 'button';
@@ -592,13 +611,24 @@ async function playAt(it) {
     const rm = room();
     const scene = SCENE_OF[r.kind];
     const mon = r.mon ? { ko: monKo(r.mon), url: characterUrl(r.mon) || artUrl(r.mon) || '' } : null;
+    const wallC = (paintById(rm && rm.wall) || PAINT_BASE.wall).color;
+    const floorC = (paintById(rm && rm.floor) || PAINT_BASE.floor).color;
+    // 📸 이 장면의 사진 (v384) — 그때 차림·파트너·방 색 · 찍은 때는 저장할 때(트랜잭션 안) · 앨범이 가득 차면 장면을 닫은 뒤 뺄 사진을 고른다
+    const photoRec = { id: photoIdOf(Date.now(), Math.random()), scene, mon: r.mon || 0, look: me.look, wall: wallC, floor: floorC, t: r.mon ? bondTier(r.bond) : 0, ...(Number.isSafeInteger(score) ? { score } : {}) };
+    const onPhoto = async () => {
+      if (!live()) return { ok: false, why: 'save' };
+      let res = null;
+      try { res = await takePhoto(photoRec); } catch { res = null; }
+      if (res && res.why === 'full' && live()) ui.pendingPhoto = photoRec;
+      return res;
+    };
     ui.msg = playLines(scene, { mon: mon ? mon.ko : '', name: me.name, heart: r.heart }).end;
     try {
       const back = await walk(me, playSpot(pf, rid, it.u));
       if (!live()) return;
       await showPlay(scene, {
         look: me.look, name: me.name, mon,
-        wall: (paintById(rm && rm.wall) || PAINT_BASE.wall).color, floor: (paintById(rm && rm.floor) || PAINT_BASE.floor).color,
+        wall: wallC, floor: floorC, onPhoto,
         lv: r.mon ? monLv(r.mon) : 0, bond: r.bond, tier: bondTier(r.bond), chain: r.mon ? chainOf(r.mon).map(rosterKo).filter(Boolean) : [],
         heart: r.heart, day: dayNum(Date.now()), score, sky: skyOf(new Date().getHours()), // 🔭 창밖은 태블릿 시계로 (v365)
       });
@@ -608,6 +638,7 @@ async function playAt(it) {
   } finally {
     ui.busy = false;
     ui.bondHold = null;
+    if (ui.open && ui.pendingPhoto) { ui.tab = 'album'; ui.hang = null; ui.albumSel = ''; ui.sel = 0; ui.msg = WHY.full; } // 📸 앨범이 가득 참 → 뺄 사진 고르기
     if (ui.open) render();
   }
 }
@@ -618,6 +649,79 @@ function heroOf() {
   const url = pid ? characterUrl(pid) || artUrl(pid) : '';
   if (url) return { html: `<img class="gd-pal-img" src="${String(url).replace(/[&"<>]/g, '')}" alt="" draggable="false">` };
   return { html: avatarSvg(avatarOf(getProfileSnapshot()).look, { uid: 'game', cls: 'gd-me-art' }) };
+}
+
+// ───────────────────── 📸 액자 사진 (v384 — 아버님 기본안 「추천대로」) ─────────────────────
+
+/** 사진 그림에 넘길 것 — 파트너 이름·그림 주소·그림 받기 줄(집 화면과 같은 줄) */
+function artOpts() {
+  return { monKo, monUrl: (id) => characterUrl(id) || artUrl(id) || '', queueArt };
+}
+/** 🔍 크게 보기에 넘길 것 — 닫을 때 누른 단추가 사라졌으면(그새 다시 그림) [📷 앨범] 탭으로 (Codex 187차 #5) */
+function bigOpts() {
+  return { ...artOpts(), backTo: () => document.querySelector('#house-tabs [data-tab="album"]') };
+}
+/** 🖼️ 액자를 눌렀을 때 — 걸린 사진이 있으면 [🔍 크게 보기] · [🖼️ 사진 걸기/바꾸기] (앨범이 비었으면 말만) */
+function frameTools(it, rid) {
+  const out = [];
+  const ph = framePhotoOf(getProfileSnapshot(), rid, it.u);
+  if (ph) {
+    const see = el('button', 'btn btn-primary house-tool', '🔍 크게 보기');
+    see.type = 'button';
+    see.addEventListener('click', () => showPhotoBig(ph, bigOpts()));
+    out.push(see);
+  }
+  const hang = el('button', ph ? 'btn house-tool' : 'btn btn-primary house-tool', ph ? '🖼️ 사진 바꾸기' : '🖼️ 사진 걸기');
+  hang.type = 'button';
+  hang.addEventListener('click', () => {
+    if (stale()) return;
+    if (!photosNow().list.length) { say(WHY.noPhotos); return; }
+    goTab('album');
+    ui.hang = { rid, u: it.u };
+    render();
+  });
+  out.push(hang);
+  return out;
+}
+/** 📷 앨범 탭 — 보기 · 액자에 걸 사진 고르기(ui.hang) · 가득 찼을 때 뺄 사진 고르기(ui.pendingPhoto) */
+function albumView() {
+  const mode = ui.pendingPhoto ? 'drop' : ui.hang ? 'hang' : 'view';
+  const list = photosNow().list;
+  return albumBox({
+    ...artOpts(), list, hung: hungIds(getProfileSnapshot()), mode, pending: ui.pendingPhoto, sel: ui.albumSel,
+    onPick: (id) => pickPhoto(id, mode),
+    onDrop: (id) => dropFor(id),
+    onCancel: () => {
+      const back = mode === 'hang' ? ui.hang : null;
+      ui.pendingPhoto = null; ui.hang = null; ui.albumSel = ''; ui.msg = '';
+      if (back) goTab('room', back.rid); else render();
+    },
+  });
+}
+/** 앨범에서 사진을 눌렀을 때 — drop: 뺄 사진으로 고르기(다시 누르면 풀기) · hang: 그 액자에 걸기 · view: 크게 보기 */
+async function pickPhoto(id, mode) {
+  if (ui.busy) return;
+  if (mode === 'drop') { ui.albumSel = ui.albumSel === id ? '' : id; render(); return; }
+  if (mode === 'hang') {
+    const h = ui.hang;
+    if (!h) return;
+    const r = await run((p) => hangRule(p, h.rid, h.u, id, Date.now()), '🖼️ 액자에 사진을 걸었어요');
+    if (r && r.ok) {
+      ui.hang = null; ui.tab = 'room'; ui.floor = h.rid; ui.sel = 0;
+      render();
+      sfx.ding();
+    }
+    return;
+  }
+  const rec = photosNow().list.find((x) => x.id === id);
+  if (rec) showPhotoBig(rec, bigOpts());
+}
+/** 가득 찬 앨범 — 고른 사진을 빼고 새 사진을 넣는다(한 트랜잭션) */
+async function dropFor(id) {
+  const rec = ui.pendingPhoto;
+  if (!rec || ui.busy) return;
+  const r = await run((p) => takePhotoRule(p, rec, Date.now(), id), '📸 새 사진을 📷 앨범에 넣었어요', { changed: 'photoGone' });
+  if (r && r.ok) { ui.pendingPhoto = null; ui.albumSel = ''; render(); sfx.ding(); }
 }
 
 /** 🗄️ 서랍 — 가졌지만 안 놓은 가구 (끌어다 놓거나, 누른 뒤 방을 눌러 놓는다) */
@@ -732,6 +836,12 @@ const WHY = {
   meUnknown: '고를 수 없는 모습이에요 — 다시 골라 봐요',
   meSpot: '거기는 설 수 없어요 — 가구가 있거나 방 밖이에요',
   play: '그 가구로는 놀 수 없어요', // 🎮 일상 행동
+  // 📸 액자 사진 (v384)
+  full: '📷 앨범이 가득 찼어요 — 새 사진을 넣으려면 뺄 사진을 하나 골라요',
+  nophoto: '그 사진이 앨범에 없어요 — 다시 골라 봐요',
+  photoGone: '고른 사진이 벌써 빠졌어요 — 다시 골라 봐요',
+  bad: '사진을 못 넣었어요 — 다시 해 볼까요?',
+  noPhotos: '📷 앨범에 사진이 아직 없어요 — 가구로 놀고 끝에 📸 사진 찍기를 눌러요',
 };
 /** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다
  *  alias = 이 물건에서 다르게 말할 why ({ owned: 'grown' } — 늦은 창의 넓히기가 "칠할 수 있어요"로 나왔다, Codex 46차 #3) */

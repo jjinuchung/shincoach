@@ -761,10 +761,10 @@ test('🏗️ 화면도 집 모양으로: houseview의 canPlace는 모두 houseS
 
 test('🏗️ 화면 (넓히기 2단계): 탭 — 방 하나면 [🏠 꾸미기][🛒], 2층이 있으면 [🏠 1층][🏠 2층][🛒] · 넓히기 카드의 💰·🔷·🔶 모은 만큼 · 상점 맨 위 🏗️ 집 넓히기 · 화면은 넓히기 전 크기를 직접 안 씀', async () => {
   const v = await import('../js/houseview.js');
-  // 👕 옷장(🧑 진우 캐릭터, v283)이 가구 상점 앞에
-  assert.deepEqual(v.houseTabs([R]), [{ tab: 'room', floor: R, label: '🏠 꾸미기' }, { tab: 'closet', label: '👕 옷장' }, { tab: 'shop', label: '🛒 가구 상점' }]);
-  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.label), ['🏠 1층', '🏠 2층', '👕 옷장', '🛒 가구 상점']);
-  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.floor), [R, R2, undefined, undefined]);
+  // 👕 옷장(🧑 진우 캐릭터, v283)이 가구 상점 앞에 · 📷 앨범(📸 액자 사진, v384)이 옷장과 가구 상점 사이에
+  assert.deepEqual(v.houseTabs([R]), [{ tab: 'room', floor: R, label: '🏠 꾸미기' }, { tab: 'closet', label: '👕 옷장' }, { tab: 'album', label: '📷 앨범' }, { tab: 'shop', label: '🛒 가구 상점' }]);
+  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.label), ['🏠 1층', '🏠 2층', '👕 옷장', '📷 앨범', '🛒 가구 상점']);
+  assert.deepEqual(v.houseTabs([R, R2]).map((t) => t.floor), [R, R2, undefined, undefined, undefined]);
   const w = growById(WIDE);
   const pr = v.growProgress(pf(w.price + 1, { stone_math: w.stones.stone_math - 3, stone_english: w.stones.stone_english }), WIDE);
   assert.deepEqual(pr.map((x) => [x.emoji, x.have, x.need, x.ok]), [
