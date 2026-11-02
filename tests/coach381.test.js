@@ -130,6 +130,7 @@ test('👨‍👩‍👦 진우 화면·📊가 같은 규칙을 쓴다 · 옛 �
   assert.ok(st.includes('const st = coachState(e, Date.now());') && st.includes("st === 'read' ? ' (읽음)' : st === 'gone' ? ` (지나감 — 붙은 지"), '📊 읽음·지나감은 coachState 하나로');
   assert.ok(!/e\.readAt \? ' \(읽음\)'/.test(st), '📊가 읽은 때 칸의 참·거짓으로 읽음을 가르지 않는다 (🔍 Codex 184차 ①)');
   assert.ok(read('js/feedback.js').includes('순수 — 아무것도 import하지 않는다') && !/^import /m.test(read('js/feedback.js')), 'feedback.js는 순수 그대로');
-  assert.ok(read('js/version.js').includes("APP_VERSION = 'v381'"));
-  assert.ok(read('sw.js').includes("CACHE_VERSION = 'v381'"));
+  // 판은 v381 이상 — 다음 판에서 올려도 깨지지 않게 (v382에서 「정확히 v381」이 깨졌다)
+  assert.ok(Number((/APP_VERSION = 'v(\d+)'/.exec(read('js/version.js')) || [])[1]) >= 381);
+  assert.ok(Number((/CACHE_VERSION = 'v(\d+)'/.exec(read('sw.js')) || [])[1]) >= 381);
 });
