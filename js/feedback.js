@@ -13,7 +13,44 @@ export const FEEDBACK_DAYS = 14;
 export const FEEDBACK_MAX = 30;
 const DAY_MS = 86400000;
 
+// 👨‍👩‍👦 아빠 교정 차례 (v381 · 기본안 9sAHCrh2ZZULg9EoW2XTKh 「추천대로」) — 에세이 한 번은 세 문장인데 그날 에세이 뒤에 한 문장만 떠서
+//   날마다 둘씩 밀렸고, 최근 것부터라 밀린 것은 차례가 다시 안 왔다 → 밀린 날은 두 문장 · 오래 밀린 것은 차례에서 뺀다(지우지 않음)
+//   진우 화면(player.maybeCoachFix)·📊(stats)·📤 이 글이 모두 이 규칙 하나를 쓴다
+/** 붙은 지 이만큼 지나도록 못 본 교정은 진우 화면 차례에서 빠진다 — 📊·📤엔 「지나감」 */
+export const COACH_KEEP_DAYS = 7;
+/** 차례에 이만큼 남았으면 에세이 뒤에 COACH_MAX문장 (아래면 한 문장) */
+export const COACH_MANY = 3;
+/** 에세이 뒤 한 번에 보이는 교정 — 밀린 날 */
+export const COACH_MAX = 2;
+
 const num = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
+
+/** 지나간 교정인가 — 아직 안 봤고 붙은 지 COACH_KEEP_DAYS일이 넘음 · 붙은 때를 모르는 옛 교정은 차례에 남긴다(모르는 것으로 숨기지 않게) */
+export function coachGone(e, now) {
+  return !!e && !!e.coachFix && !(num(e.readAt) > 0) && num(e.fixedAt) > 0 && num(e.fixedAt) < now - COACH_KEEP_DAYS * DAY_MS;
+}
+
+/**
+ * 교정 하나의 상태 (순수) — 'read' 본 것 · 'gone' 지나감 · 'queue' 차례에 있음 · '' 교정 없음
+ * 읽음은 읽은 때가 양의 시각일 때만 — 📊가 글자("0")를 읽음으로 보고 진우 화면은 다시 띄우던 어긋남을 막는다 (🔍 Codex 184차 ①)
+ */
+export function coachState(e, now) {
+  if (!e || !e.coachFix) return '';
+  if (num(e.readAt) > 0) return 'read';
+  return coachGone(e, now) ? 'gone' : 'queue';
+}
+
+/**
+ * 에세이 뒤에 보일 아빠 교정 (순수) — 안 본 교정 중 지나가지 않은 것을 붙은 차례로(같으면 원래 차례) 줄 세워
+ * 차례가 COACH_MANY 이상이면 가장 최근 COACH_MAX개, 아니면 가장 최근 하나 · 고른 것은 오래된 것부터
+ * @param {Array} list listEssays 꼴(날짜 순 · 항목마다 date)
+ */
+export function coachPick(list, now) {
+  const q = (Array.isArray(list) ? list : []).map((e, i) => ({ e, i }))
+    .filter(({ e }) => coachState(e, now) === 'queue');
+  q.sort((a, b) => (num(a.e.fixedAt) - num(b.e.fixedAt)) || (a.i - b.i));
+  return q.slice(-(q.length >= COACH_MANY ? COACH_MAX : 1)).map((x) => x.e);
+}
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const p2 = (n) => String(n).padStart(2, '0');
 /** ms → 'MM-DD HH:MM' (이 기기 시간대) · 없으면 '' */
@@ -39,10 +76,11 @@ const ASK_KO = {
 
 /** 보일 것인가 — 붙은 지 FEEDBACK_DAYS일 안이거나 아직 안 봤으면 */
 const shown = (at, seen, now) => !seen || (num(at) && num(at) >= now - FEEDBACK_DAYS * DAY_MS);
-/** 줄 고르기 — 안 본 것은 모두 · 본 것은 최근 FEEDBACK_MAX개 · 붙은 차례(오래된 것부터) */
+/** 줄 고르기 — 안 본 것은 모두 · 본 것(과 ✍️ 지나간 것)은 최근 FEEDBACK_MAX개 · 붙은 차례(오래된 것부터) */
 function keep(items) {
   const byAt = (a, b) => a.at - b.at;
-  return [...items.filter((x) => !x.seen), ...items.filter((x) => x.seen).sort(byAt).slice(-FEEDBACK_MAX)].sort(byAt);
+  const done = (x) => x.seen || x.gone;
+  return [...items.filter((x) => !done(x)), ...items.filter(done).sort(byAt).slice(-FEEDBACK_MAX)].sort(byAt);
 }
 
 /** ✍️ 영어 교정 줄들 (순수) — [{ at 붙은 때, seen, text }] 오래된 것부터 */
@@ -52,11 +90,14 @@ export function essayItems(days, now) {
     if (!d || typeof d.date !== 'string') continue;
     for (const e of Array.isArray(d.essays) ? d.essays : []) {
       if (!e || !e.coachFix || !e.written) continue;
-      const seen = num(e.readAt) > 0;
-      if (!shown(e.fixedAt, seen, now)) continue;
-      const how = !seen ? '아직 안 봄 — 그날 에세이를 다 쓰면 가장 최근 것부터 하루 한 문장씩 떠요' : (HOW_KO[e.readHow] || '봄 (🎤로 읽었는지는 v314부터 적어요)');
+      const st = coachState(e, now); // 진우 화면·📊와 같은 판정 (v381)
+      const seen = st === 'read';
+      const gone = st === 'gone'; // 지나간 것은 본 것처럼 FEEDBACK_DAYS일 안에만
+      if (!shown(e.fixedAt, seen || gone, now)) continue;
+      const how = gone ? `지나감 — 붙은 지 ${COACH_KEEP_DAYS}일이 지나 진우 화면 차례에서 빠졌어요(지우지 않음)`
+        : !seen ? '아직 안 봄 — 그날 에세이를 다 쓰면 가장 최근 것부터 떠요(밀린 게 셋 이상이면 두 문장)' : (HOW_KO[e.readHow] || '봄 (🎤로 읽었는지는 v314부터 적어요)');
       out.push({
-        at: num(e.fixedAt), seen,
+        at: num(e.fixedAt), seen, gone,
         text: [`- ${d.date.slice(5)}에 쓴 글 · 붙은 때 ${fmtAt(e.fixedAt) || '(모름)'} · 본 때 ${seen ? fmtAt(e.readAt) : '—'} · ${how}`,
           `  진우: ${oneLine(e.written)}`, `  아빠: ${oneLine(e.coachFix)}`].join('\n'),
       });
@@ -143,10 +184,11 @@ export function askItems(asks, now, conceptName) {
   return keep(out);
 }
 
-/** 갈래 하나의 요약 — "3 (본 것 2 · 안 본 것 1)" */
-function tally(items) {
+/** 갈래 하나의 요약 — "3 (본 것 2 · 안 본 것 1)" · ✍️ 영어는 지나간 것을 따로 "(본 것 2 · 안 본 것 1 · 지나감 1)" (v381) */
+function tally(items, withGone = false) {
   const seen = items.filter((x) => x.seen).length;
-  return `${items.length}${items.length ? ` (본 것 ${seen} · 안 본 것 ${items.length - seen})` : ''}`;
+  const gone = items.filter((x) => x.gone).length;
+  return `${items.length}${items.length ? ` (본 것 ${seen} · 안 본 것 ${items.length - seen - gone}${withGone ? ` · 지나감 ${gone}` : ''})` : ''}`;
 }
 
 /**
@@ -160,12 +202,12 @@ export function feedbackMd({ days, writes, asks, today, now, conceptName } = {})
   const ko = korItems(writes, t);
   const ma = askItems(asks, t, conceptName);
   const lines = [
-    `# 📬 피드백이 닿았나 (${today} · 이 기기 기준) — 최근 ${FEEDBACK_DAYS}일 안에 붙은 것 + 아직 안 본 것 모두`,
+    `# 📬 피드백이 닿았나 (${today} · 이 기기 기준) — 최근 ${FEEDBACK_DAYS}일 안에 붙은 것 + 아직 안 본 것 모두(✍️ 영어 교정의 「지나감」은 본 것처럼 ${FEEDBACK_DAYS}일까지)`,
     '',
-    `요약: ✍️ 영어 교정 ${tally(en)} · 📚 국어 답장 ${tally(ko)} · 🔢 수학 답장 ${tally(ma)}`,
+    `요약: ✍️ 영어 교정 ${tally(en, true)} · 📚 국어 답장 ${tally(ko)} · 🔢 수학 답장 ${tally(ma)}`,
     '읽는 법: 붙은 때 = 태블릿이 비공개 저장소에서 받아 붙인 때 · 본 때 = 진우 화면에 떠서 읽고 넘어간 때 · 그 뒤 = 진우가 해 본 것 · 💌 한 줄 메시지는 family/read.md',
     '',
-    '## ✍️ 영어 교정 — v336부터 그날 에세이를 다 쓴 바로 뒤에 가장 최근 것 한 문장(그 전엔 영어 영상을 열 때 3개까지 · 앞의 것은 밀려 "아직 안 봄"으로 남을 수 있어요)(내 글 · 아빠 글(바뀐 곳 색) → 🔊 끝까지 들은 뒤 넘어감 → 🎤 읽어보기 · v318부터 ⚡💰는 🎤를 해 봤을 때만)',
+    `## ✍️ 영어 교정 — v336부터 그날 에세이를 다 쓴 바로 뒤에 가장 최근 것 한 문장 · v381부터 차례에 셋 이상 밀렸으면 두 문장 · 붙은 지 ${COACH_KEEP_DAYS}일 지나도록 못 본 것은 "지나감"(차례에서 빠짐 · 지우지 않음)(그 전엔 영어 영상을 열 때 3개까지)(내 글 · 아빠 글(바뀐 곳 색) → 🔊 끝까지 들은 뒤 넘어감 → 🎤 읽어보기 · v318부터 ⚡💰는 🎤를 해 봤을 때만)`,
     ...(en.length ? en.map((x) => x.text) : ['(없음)']),
     '',
     '## ✍️ 내 에세이 — 쓰고 나서 고친 문장을 🎤로 읽었나 (v318부터 · 기록 없음 = 그 전 글이거나 넘어가지 않고 닫음 · 🎤로 통과하면 🔶 하루 2개까지)',

@@ -26,6 +26,7 @@ import { writeTodo } from './korwrite.js'; // ✍️ 국어 서술형 — 답장
 import { journeyRows, rowText, journeyOf, qLine, STOPS as JR_STOPS, JOURNEY } from './journey.js'; // 🎒 포켓몬 대여행 (v341 — 순수)
 import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질문 카드도 화면·복사문처럼 (v256)
 import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
+import { coachState, COACH_KEEP_DAYS } from './feedback.js'; // 👨‍👩‍👦 아빠 교정 읽음·「지나감」 — 진우 화면 차례와 같은 판정 (v381)
 import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
 import { allMsgs, addLocal, seenNow } from './familyview.js';
 import { SPECIES, lakeOf, lakeDayLine, FISH_COINS, FISH_DAY_MIN, SHARE_MIN, SHARE_MAX, PLACES, PLACE_KO, RIVER_NEED, SEA_NEED, placeOpen, GEAR, hasGear, pickOf } from './fishing.js'; // 🎣 학습 낚시터 📊 카드 (v366 — 순수 · v368 🏞️ 강·🎒 채비)
@@ -290,7 +291,9 @@ function essayBox(e, no) {
   if (e.fixed && e.fixed !== e.written) box.appendChild(el('div', 'stats-essay-fixed', `✅ ${e.fixed}`));
   if (Array.isArray(e.notes) && e.notes.length) box.appendChild(el('div', 'stats-essay-notes', e.notes.join(' · ')));
   if (e.coachFix) {
-    box.appendChild(el('div', 'stats-essay-coach', `👨‍👩‍👦 ${e.coachFix}${e.readAt ? ' (읽음)' : ' (아직 안 읽음)'}`));
+    const st = coachState(e, Date.now()); // 읽음 판정도 진우 화면과 같게 (🔍 Codex 184차 ①)
+    const seenText = st === 'read' ? ' (읽음)' : st === 'gone' ? ` (지나감 — 붙은 지 ${COACH_KEEP_DAYS}일이 지나 진우 화면 차례에서 빠짐)` : ' (아직 안 읽음)';
+    box.appendChild(el('div', 'stats-essay-coach', `👨‍👩‍👦 ${e.coachFix}${seenText}`));
   }
   return box;
 }

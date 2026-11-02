@@ -224,7 +224,7 @@ const NOW = new Date(2026, 9, 22, 21, 0).getTime();
 
 test('📬 feedback.md — 영어: 14일 안에 붙은 것 + 안 본 것은 늘 · 🎤 꼴 · v314 전 읽음은 "봄"', () => {
   const days = [
-    { date: '2026-10-01', essays: [{ id: 'a', written: 'old unread', coachFix: 'Old unread.', fixedAt: NOW - 20 * DAY }] },
+    { date: '2026-10-01', essays: [{ id: 'a', written: 'old unread', coachFix: 'Old unread.' }] }, // 붙은 때를 모르는 옛 교정 — v381부터 「지나감」으로 안 뺀다(차례에 남음)
     { date: '2026-10-02', essays: [{ id: 'b', written: 'old read', coachFix: 'Old read.', fixedAt: NOW - 20 * DAY, readAt: NOW - 19 * DAY, readHow: 'pass' }] },
     { date: '2026-10-20', essays: [
       { id: 'c', written: 'I eat ckicken', coachFix: 'I eat chicken.', fixedAt: NOW - 2 * DAY, readAt: NOW - DAY, readHow: 'pass' },
@@ -235,7 +235,8 @@ test('📬 feedback.md — 영어: 14일 안에 붙은 것 + 안 본 것은 늘 
   ];
   const it = essayItems(days, NOW);
   assert.equal(it.length, 4, '안 본 옛것 1 + 14일 안 3 · 14일 넘은 읽은 것·교정 없는 글은 빠짐');
-  assert.ok(it[0].text.includes('아직 안 봄 — 그날 에세이를 다 쓰면 가장 최근 것부터 하루 한 문장씩 떠요') && !it[0].seen); // v336
+  assert.ok(it[0].text.includes('아직 안 봄 — 그날 에세이를 다 쓰면 가장 최근 것부터 떠요(밀린 게 셋 이상이면 두 문장)') && !it[0].seen && !it[0].gone); // v336 · v381
+  assert.ok(it[0].text.includes('붙은 때 (모름)'));
   const all = it.map((x) => x.text).join('\n');
   assert.ok(all.includes('🎤 따라 읽어 통과') && all.includes('🎤 결과 없이 넘김') && all.includes('봄 (🎤로 읽었는지는 v314부터 적어요)'));
   assert.ok(all.includes('  진우: I eat ckicken') && all.includes('  아빠: I eat chicken.'));
@@ -285,7 +286,7 @@ test('📬 feedback.md 전체 — 요약 줄 · 세 갈래 · 빈 갈래는 (없
   assert.ok(md.includes('요약: ✍️ 영어 교정 0 · 📚 국어 답장 0 · 🔢 수학 답장 0'));
   assert.equal((md.match(/\(없음\)/g) || []).length, 4, '세 갈래 + v318 ✍️ 내 에세이');
   const md2 = feedbackMd({ days: [{ date: '2026-10-20', essays: [{ id: 'c', written: 'w', coachFix: 'W.', fixedAt: NOW - DAY }] }], writes: {}, asks: [], today: '2026-10-22', now: NOW });
-  assert.ok(md2.includes('✍️ 영어 교정 1 (본 것 0 · 안 본 것 1)'));
+  assert.ok(md2.includes('✍️ 영어 교정 1 (본 것 0 · 안 본 것 1 · 지나감 0)')); // v381 지나감 칸
   const base = { getMath: async () => ({ asks: [] }), listDaily: async () => [], mathReportText: () => '', asksText: () => '', collectTodo: () => [], today: '2026-10-22' };
   const files = await gatherFiles({ ...base, getFeedback: async (today, days, math) => feedbackMd({ days, writes: {}, asks: math.asks, today, now: NOW }) });
   assert.ok(files.find((f) => f.path === 'usage/feedback.md').text.startsWith('# 📬'));
@@ -347,7 +348,7 @@ test('📬 다른 문제로 확인(sameKey 0)은 같은 틀로 적지 않는다 
 
 test('📬 안 본 것은 몇 개든 남고 본 것만 최근 FEEDBACK_MAX개 · 요약이 맞다 (🔍 Codex 120차 #2)', () => {
   const days = [
-    { date: '2026-09-01', essays: [{ id: 'old', written: 'old one', coachFix: 'Old one.', fixedAt: NOW - 40 * DAY }] },
+    { date: '2026-09-01', essays: [{ id: 'old', written: 'old one', coachFix: 'Old one.' }] }, // 붙은 때 모름 = 차례에 남는 안 본 것 (v381 — 붙은 때를 아는 옛것은 「지나감」)
     { date: '2026-10-21', essays: Array.from({ length: FEEDBACK_MAX + 5 }, (_, i) => ({ id: `s${i}`, written: `w${i}`, coachFix: `W${i}.`, fixedAt: NOW - DAY + i, readAt: NOW - DAY + i + 1, readHow: 'pass' })) },
   ];
   const it = essayItems(days, NOW);
@@ -355,7 +356,7 @@ test('📬 안 본 것은 몇 개든 남고 본 것만 최근 FEEDBACK_MAX개 ·
   assert.ok(!it[0].seen && it[0].text.includes('진우: old one'));
   assert.equal(it.filter((x) => x.seen).length, FEEDBACK_MAX);
   assert.ok(!it.some((x) => x.text.includes('진우: w4\n')) && it.some((x) => x.text.includes('진우: w5\n')), '본 것은 최근 것');
-  assert.ok(feedbackMd({ days, writes: {}, asks: [], today: '2026-10-22', now: NOW }).includes(`✍️ 영어 교정 ${FEEDBACK_MAX + 1} (본 것 ${FEEDBACK_MAX} · 안 본 것 1)`));
+  assert.ok(feedbackMd({ days, writes: {}, asks: [], today: '2026-10-22', now: NOW }).includes(`✍️ 영어 교정 ${FEEDBACK_MAX + 1} (본 것 ${FEEDBACK_MAX} · 안 본 것 1 · 지나감 0)`));
   const many = Array.from({ length: FEEDBACK_MAX + 3 }, (_, i) => ({ no: i + 1, concept: 'c', status: 'answered', replies: [{ t: NOW - 50 * DAY + i }, { t: NOW - 49 * DAY + i }] }));
   assert.equal(askItems(many, NOW).length, FEEDBACK_MAX + 3, '안 본 수학 답장도 모두');
 });

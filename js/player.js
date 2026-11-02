@@ -24,9 +24,7 @@ import {
   DEFAULT_MINUTES as ESSAY_MINUTES, DEFAULT_COUNT as ESSAY_COUNT,
   REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH, SAY_STONE as ESSAY_SAY_STONE,
 } from './essay.js';
-
-/** 👨‍👩‍👦 한 번에 보여줄 아빠 교정문 수 — 그날 에세이를 다 쓴 뒤 한 문장 (v336 — 전에는 영상을 열 때 3개까지였다) */
-const COACH_FIX_MAX = 1;
+import { coachPick } from './feedback.js'; // 👨‍👩‍👦 아빠 교정 차례 — 📊·📤 「지나감」과 같은 규칙 하나 (v381 · 순수)
 import { initMatch, openMatch, closeMatch, refreshStage, pickMatchRound, shuffle as shuffleMons } from './match.js';
 import { ensureAnims, loadAnims, animUrl } from './sprite.js';
 import { makeDictation } from './dictation.js';
@@ -1003,7 +1001,8 @@ function startEssay(practice, cont) {
 /**
  * 👨‍👩‍👦 아빠가 고쳐 준 글 보여주기 — 그날 에세이를 다 쓴 바로 뒤에 **한 문장** (v336 · 2026-10-25 아버님 "이대로")
  * 전에는 영상을 열 때 3개까지 떴다 — 보고 싶은 영상과 겹쳐 🎤 없이 넘기기 쉬웠다. 에세이 끝은 이미 🎤로 읽는 흐름이다.
- * 가장 최근에 고친 안 읽은 글 하나(listEssays는 날짜 순) · 앞의 것은 밀려도 화면엔 셈 없이 그대로(📊·📬에는 남는다)
+ * v381: 고르기는 feedback.coachPick — 가장 최근에 붙은 안 읽은 교정 · 차례에 셋 이상 밀렸으면 두 문장 · 붙은 지 7일 지난 것은 차례 밖
+ *   (화면엔 밀린 수·남은 수 없음 — 📊·📬에는 「지나감」으로 남는다)
  * 받아 오기(syncCoachFixes)는 앱을 켤 때·영상을 열 때 해 둔다 — 여기서 인터넷을 기다리며 멈춘 화면을 두지 않는다
  * @param {() => void} [then] 다 읽고 닫았을 때 · 보여 줄 게 없으면 바로
  * @returns {Promise<boolean>} 열었으면 true
@@ -1021,7 +1020,7 @@ async function maybeCoachFix(then) {
   if (!state.open || state.item !== item) return false;
   // 그사이 다른 학습 창이 떴으면 그 창이 화면을 맡는다 — 이어 가기(영상 재생)도 하지 않는다
   if (state.essayOpen || state.reviewOpen) return false;
-  const unread = list.filter((e) => e.coachFix && !e.readAt).slice(-COACH_FIX_MAX);
+  const unread = coachPick(list, Date.now());
   if (!unread.length || state.parentMode || state.coachFixDone) { go(); return false; }
   state.coachFixDone = true;
   startCoachFix(unread, then);

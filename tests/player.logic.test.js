@@ -14,6 +14,7 @@ import { noteDue as realNoteDue, NOTE as REAL_NOTE } from '../js/grammar.js'; //
 import { normSay as realNormSay } from '../js/grammarvideo.js'; // 🎬 대사 맞추기는 진짜 (v350)
 import { spellReady as realSpellReady, spellSlot as realSpellSlot, grammarCount as realGrammarCount, pickSpell as realPickSpell } from '../js/spell.js'; // 🔤 철자 쪽지 자리 규칙은 진짜 (v356)
 import { wordsToday as realWordsToday } from '../js/korwords.js';
+import { coachPick as realCoachPick, COACH_KEEP_DAYS, COACH_MAX } from '../js/feedback.js'; // 👨‍👩‍👦 아빠 교정 차례 (v381)
 import { dayNum as realDayNum } from '../js/korean.js'; // 🔤 쪽지 💰 받은 날 열쇠 (v356)
 import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoOwed, videoTier, SPEAK_COMBO } from '../js/items.js';
 import fsNode from 'node:fs';
@@ -324,7 +325,7 @@ function loadPlayer() {
     hasKeystone: () => formState.keystone, hasMegaStone: (id) => !!formState.mega[id], hasGmax: (id) => !!formState.gmax[id],
     // 🟢 v352 — 메가 판정은 xp.megaReady 한 곳(변신 표 + 🔑 + 💠 · 지가르데는 셀 100) · 배틀의 지가르데 칸 · 끝 화면 셀
     megaReady: (id) => !!((formState.forms[id] || {}).mega && formState.keystone && formState.mega[id]), zygBattle: () => null, addCell: () => null,
-    COACH_FIX_MAX: 3, listEssays: async () => [], markEssayRead: async () => true,
+    coachPick: realCoachPick, listEssays: async () => [], markEssayRead: async () => true, // 👨‍👩‍👦 아빠 교정 차례는 진짜 (v381)
     // ✍️ v318 — 내 에세이 🎤 기록 · 고친 문장 🎤 통과 → 🔶 (기록은 essayState.said · 받기는 essayState.sayKeys — 하루 2개 · 문장마다 한 번)
     syncCoachFixes: async () => 0, ESSAY_SAY_STONE: { maxPerDay: 2 },
     STOCK_CAP: 40, stockCapOf: (v) => ([10, 20, 30, 40, 50].includes(Number(v)) ? Number(v) : 40), // 🏦 증권시장 설정 (v319 · 기본 40%는 v351)
@@ -1953,6 +1954,27 @@ test('👨‍👩‍👦 v336 아빠 교정은 그날 에세이를 다 쓴 바�
   assert.ok(open.includes('syncCoachFixes().catch(() => {});') && open.includes('maybeReview();'));
   assert.ok(!open.includes('maybeCoachFix('), '영상을 열 때는 안 띄운다');
   assert.equal((src.match(/maybeCoachFix\(/g) || []).length, 2, '부르는 곳은 에세이 끝 하나(+ 정의)');
+});
+
+test('👨‍👩‍👦 v381 밀린 아빠 교정 — 차례에 셋 이상이면 에세이 뒤 두 문장(가장 최근 둘 · 오래된 것부터) · 붙은 지 7일 지난 것은 차례 밖이라 셈에도 안 듦', async () => {
+  const { run, essayCalls, ctx } = loadPlayer();
+  const now = Date.now();
+  const fx = (id, date, agoDays) => ({ id, date, written: `w ${id}`, coachFix: `W ${id}.`, fixedAt: now - agoDays * 86400000, readAt: 0 });
+  ctx.listEssays = async () => [fx('a', '2026-10-28', 3), fx('b', '2026-10-29', 2), fx('c', '2026-10-30', 1), fx('d', '2026-10-30', 1)];
+  ctx.__then = () => {};
+  assert.equal(await run('maybeCoachFix(__then)'), true);
+  assert.deepEqual(essayCalls.at(-1).prompts.map((p) => p.id), ['c', 'd'], `두 문장(COACH_MAX ${COACH_MAX})`);
+  essayCalls.at(-1).onDone({});
+  run('state.coachFixDone = false;');
+  ctx.listEssays = async () => [fx('g1', '2026-10-20', COACH_KEEP_DAYS + 3), fx('g2', '2026-10-21', COACH_KEEP_DAYS + 2), fx('a', '2026-10-30', 1), fx('b', '2026-10-31', 0.5)];
+  assert.equal(await run('maybeCoachFix(__then)'), true);
+  assert.deepEqual(essayCalls.at(-1).prompts.map((p) => p.id), ['b'], '지나간 둘은 안 셈 → 한 문장');
+  essayCalls.at(-1).onDone({});
+  run('state.coachFixDone = false;');
+  const n = essayCalls.length;
+  ctx.listEssays = async () => [fx('g1', '2026-10-20', COACH_KEEP_DAYS + 3)];
+  assert.equal(await run('maybeCoachFix(__then)'), false, '지나간 것뿐이면 안 띄움');
+  assert.equal(essayCalls.length, n);
 });
 
 // v336 에세이 흐름 시험 틀 — 바꿔 쓸 문장 셋 · 안 읽은 아빠 교정 하나 · __cont = 에세이 뒤 영상 이어 가기(센다)
