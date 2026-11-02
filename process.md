@@ -8794,7 +8794,41 @@
 
 ### TODO (다음 작업)
 - [x] 다음 세션 첫 일: v384 Codex 187차 판단 표 다섯 반영(위 절) → 시험·변이 54/54·걷기 1024·390·전체 3390 끝
-- [ ] 아버님 「배포」 → feat v384(js/photo.js·photoview.js·playart.js·playshow.js·houseview.js·xp.js·db.js·css/style.css·sw.js·version.js·tests/photo384·house — blackbox.js 빼고) + docs process.md → push → 라이브 확인(live_check383 본떠 v384 새로)
-- [ ] 그다음 ② 🐾 손님 포켓몬(기본안 그대로 — 그날 공부 15분 뒤 하루 한 번) · ③ 🏘️ 동네는 손님 한두 주 써 본 뒤 여쭘
+- [x] 아버님 「배포」 → **v384 배포됨**(234262f feat + f834f38 docs · blackbox.js 빼고) · 라이브 sw·앱 판 v384 · 배포본 10개 같음 · GONE_MAX 3000 확인(`.context/v384/live_check384.sh`)
+- [x] 그다음 ② 🐾 손님 포켓몬(기본안 그대로 — 그날 공부 15분 뒤 하루 한 번) → 아래 v385 절 · ③ 🏘️ 동네는 손님 한두 주 써 본 뒤 여쭘
 - [ ] 태블릿 앱 다시 열기(v375 → v383/v384) · 「올라온 거 봐 줘」 때 🖊️ 해 본 주제 · 수학 첫 오답 · 🐋 단계별 주 단위
 - [ ] 11/7 토요일 대여행 v375 반응 → 🎒 몬스터볼·구역 도착 · 국어 12월 방향은 11월 중순에 여쭘
+
+## 2026-11-02 — 🐾 v385 손님 포켓몬 (아버님 「손님 포켓몬 시작하자」 — 집 다음 셋 기본안 ② 「추천대로」)
+
+### 진행 내용
+- 새 `js/guest.js`(순수 규칙): GUEST_STUDY_SEC 900(🎮 미니 게임 판과 같은 셈 — minigame.studySec(gameview.dailyNow())) · LIKES(첫 타입 18 → 좋아하는 가구 — 기본안 표 그대로 · montypes 첫 타입) · GUEST_ASK(조르는 말) · guestOf·copyGuest·mergeGuest · candidatesOf(가진 것 · 파트너 빼고) · pickGuest(오래 안 온 것부터 · 같은 무리는 그날 주사위) · guestNow·guestWaiting(🔔) · arriveRule(도착 — 하루 한 번 · 시계 뒤로면 later) · likedItemOf·guestSpot(좋아하는 가구 옆 · 캐릭터·파트너·놀 때 갈 칸 피함 · 없으면 문 쪽 왼쪽 아래) · guestPlayRule(손님 💗 그날 한 번 · 파트너 💗·가구 하루 셋 안 건드림) · likedName
+- 저장: profile.homeGuest = { day, mon, at, heart, last } · db cloneProfile·mergeStatRecord · xp fromStored · xp guestArrive·guestPlay·guestHere(houseDo 한 트랜잭션)
+- 장면: playart stageHtml `.pshow-guest`(with-guest) · 🤝 'hello' 장면(doorSvg 현관문 — 문짝이 접히고 손님이 걸어 나옴) · playLines 손님 이름(「개굴닌자, 꼬부기와 …」 · 💗 말은 손님에게 · 인사 말 셋) · playshow runHello · showHeart 손님 위 💗 · [📸 같이 사진 찍기](PHOTO_BTN_GUEST) · 사진 g(손님) · photo PHOTO_SCENES에 hello · photoview 두 그림 받기
+- 집: houseview 방에 손님(🐾 손님 이름표 · 💗 · 누르면 도구 [좋아하는 놀이 하자!][🤝 인사하기]) · guestDoor(집을 열 때·방 탭으로 올 때 도착 → 손님 층으로 · 걸어 들어옴 한 번) · guestHint(손님 없는 날 하루 한 번 한 줄) · guestPlayAt(손님 놀기 — playAt처럼 걷기·장면·사진) · photoTaker(놀기·손님 놀기 같은 사진 찍기) · markReady 🔔 has-guest · WHY.nobody · gameview dailyNow export
+- css: 장면마다 손님 자리 열셋(미리보기 `.context/v385/preview.html`로 맞춤 — 📖 책 뒤 · 🧩 상자 뒤) · 인사하기 문 · 방의 손님 · 🏠 🔔(::before — ✨ ::after와 안 겹침) · 움직임 줄이기
+- sw·앱 판 v385 · 앱 셸 guest.js
+- 시험: 새 `tests/guest385.test.js` 10 · furnplay365(RUN에 hello 허용)·photo384(장면 목록에 hello) 고침 · 변이 **55/55**(`.context/v385/mutate_v385.mjs` — 처음 「놀 때 갈 칸도 앉음」 놓침 → 왼쪽을 의자로 막는 배치 시험 보탬) · 걷기 `.context/v385/walk385.sh`+`hh385.js` 1024·390: 5분 🔔 없음+한 줄 → 16분 🔔 → 띵동·걸어 들어옴·🔔 꺼짐 → 다시 열어도 같은 손님 → 💧 셋이 · 같이 사진 g 7 · 💗 손님만(파트너·가구 날 그대로) → 🤝 인사 💗 다시 없음 → 앨범 말 → 파이리(식탁 없음) 문 쪽·「다음에 식탁이 있으면 같이 놀자!」 · 넘침 0 · 콘솔 0 · 전체 **3400** 통과
+- Codex 188차 띄움(`.context/v385/codex188_prompt.txt`)
+
+### v385 Codex 188차 (`.context/v385/codex188.md` — P1 없음 · P2 2 · 지정 시험 89 통과) → 판단 표(셋 모두 「받음」 추천) → 아버님 「추천대로」
+- ① P2 집을 켜 둔 채 자정이 지나면 어제 손님이 남음(눌러도 nobody — 💗 새지는 않음) → render가 ui.drawnDay 적고 tickRests(1초)가 날이 바뀌면 다시 그림(놀기·끌기·다시 읽는 중이면 그 뒤 초) — 줄은 render의 끌기 정리 뒤에(house.test 차례 시험)
+- ② P2 키보드로 손님을 고르면 다시 그리며 초점이 사라짐 → 키보드(click detail 0)일 때만 guestFocus — 고르면 첫 도구(.house-tools.is-guest) · 풀면 손님 단추
+- ③ (Codex는 결함 아님) 💊 캡슐에서 쉬는 포켓몬도 손님이 됨 → candidatesOf·guestNow에서 쉬는 것(restsOf — 서랍에 맡긴 휴식까지) 뺌 · 손님이 온 뒤 캡슐에 넣으면 그날은 안 보임
+- 시험 guest385 10 → 11(💊) + 화면 잇기 줄 · 관련 107 통과 · 변이 **63/63**(188차 8 보탬 · 옛 둘 글자 맞춤) · 걷기 1024·390 다시: ⌨️ 골랐을 때 초점 [🤝 인사하기] · 풀면 손님 단추 · 🕛 페이지 시계 하루 앞 → 1초 안에 손님 없음 · 나머지 그대로 · 넘침 0 · 콘솔 0 · 전체 **3401** 통과
+- Codex가 괜찮다고 본 것: 가진 것만·파트너 빼고 · 같은 날·시계 되돌림·다음 날·진화·판매·교환 · 💗 손님에게만(놀기 날·하루 셋 안 건드림) · 병합 · 사진 g · 보상·기록 새는 곳 없음
+
+### 정한 것 (기본안에 없던 세부 — 바꿀 수 있음)
+- 손님과 놀기는 손님 💗만(파트너 💗·가구 하루 셋 규칙 그대로) · 🎮 게임기는 미니 게임 없이 장면만
+- 🔔 = 공부 15분 + 오늘 아직 안 들어옴 · 집에 들어가면 꺼짐(놀기 전이어도) · 손님 없는 날 한 줄은 이 기기에서 하루 한 번
+- 손님 자리 = 좋아하는 가구 옆(그 방) · 없으면 캐릭터 방의 문 쪽(왼쪽 아래) · 이름표 「🐾 손님」
+
+### 변경 파일 (커밋 안 된 것 — v385)
+- 새: `js/guest.js` · `tests/guest385.test.js`
+- 고침: `js/houseview.js` · `js/playart.js` · `js/playshow.js` · `js/photo.js` · `js/photoview.js` · `js/xp.js` · `js/db.js` · `js/gameview.js`(dailyNow export) · `css/style.css` · `sw.js`·`js/version.js`(v385) · `tests/furnplay365.test.js` · `tests/photo384.test.js` · `process.md`
+- (저장소 밖) `.context/v385/` — preview385.mjs·preview.html · hh385.js · walk385.sh(+로그) · mutate_v385.mjs(+로그) · codex188_prompt.txt·codex188.md
+- `js/blackbox.js` — 줄 끝만 다름(계속 커밋 안 함)
+
+### TODO (다음 작업)
+- [ ] 아버님 「배포」 → feat v385(js/guest.js·houseview·playart·playshow·photo·photoview·xp·db·gameview·css/style.css·sw.js·version.js·tests/guest385·furnplay365·photo384 — blackbox.js 빼고) + docs process.md → push → 라이브 확인(live_check384 본떠 v385 새로)
+- [ ] 태블릿에서 진우 반응(손님이 오는지 · 같이 사진) · 「올라온 거 봐 줘」 때 🐾 줄을 📤에 보탤지 여쭘 · ③ 🏘️ 동네는 손님 한두 주 써 본 뒤 여쭘
