@@ -94,13 +94,13 @@ test('📖 도감 칸 — SPECIES 차례 16 · 낚은 칸(가장 긴 cm·처음 
   const rows = dexRows({ dex: { bungeo: { n: 3, best: 31.2, d: '2026-10-29' }, bluegill: { n: 1, best: 99, d: '' }, gyarados: { n: 1 } } });
   assert.deepEqual(rows.map((r) => r.key), SPECIES.map((s) => s.key));
   const bg = rows.find((r) => r.key === 'bungeo');
-  assert.deepEqual(bg, { key: 'bungeo', ko: '붕어', star: 2, alien: false, home: 'lake', photo: false, caught: true, n: 3, best: 31.2, d: '2026-10-29', intro: INTRO.bungeo }); // home·photo는 v368
+  assert.deepEqual(bg, { key: 'bungeo', ko: '붕어', star: 2, alien: false, home: 'lake', photo: false, soft: '', caught: true, n: 3, best: 31.2, d: '2026-10-29', intro: INTRO.bungeo }); // home·photo는 v368 · soft(🐙 문어 무리)는 v386
   const blue = rows.find((r) => r.key === 'bluegill');
   assert.equal(blue.caught, true);
   assert.equal(blue.alien, true);
   assert.equal(blue.best, SPECIES.find((s) => s.key === 'bluegill').max, '길이 끝 안으로');
   const unk = rows.find((r) => r.key === 'jangeo');
-  assert.deepEqual(unk, { key: 'jangeo', ko: '뱀장어', star: 5, alien: false, home: 'lake', photo: false, caught: false, hint: DEX_HINT[5] });
+  assert.deepEqual(unk, { key: 'jangeo', ko: '뱀장어', star: 5, alien: false, home: 'lake', photo: false, soft: '', caught: false, hint: DEX_HINT[5] });
   assert.equal(rows.filter((r) => r.caught).length, 2);
   assert.equal(dexRows(null).filter((r) => r.caught).length, 0);
   assert.equal(lakeOf({ dex: {} }).dex.bungeo, undefined);

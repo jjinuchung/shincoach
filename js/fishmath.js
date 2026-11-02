@@ -4,6 +4,8 @@
 //  · 꼴: 📏 길이 비교 · ➖ 길이 차 · ➕ 길이 합 · ⚖️ 무게 합 · 📐 단위(kg → g) · 📊 막대그래프(지금까지 낚은 마리)
 //  · 소수의 나눗셈은 5학년이라 내지 않는다(기본안 표의 「나눗셈」 자리는 길이 합으로)
 // 낚시터(lakeview)가 수학 차례의 반쯤에 낸다 — 서로 다른 물고기를 두 종 이상 낚은 뒤부터 · 기록은 수학 칸 + daily fishFmQ/fishFmOk
+// v386 (🚤 원고 「이대로」 정할 것 3): 🐙 문어 무리(soft)는 길이 문제(비교·차·합)에 안 낸다 — 문어는 다리까지·오징어는 몸통 길이라 견주기가 공정하지 않다 ·
+//   무게 합·단위·막대그래프엔 나오고, 그 글은 「물고기」라고 부르지 않는다(막대그래프에 문어 무리가 있으면 「가장 많이 낚은 것」)
 import { rng as makeRng, shuffle, pick } from './mathgen.js';
 import { SPECIES, lakeOf, weightOf } from './fishing.js';
 
@@ -46,19 +48,24 @@ const wagwa = (w) => `${w}${jong(w) ? '과' : '와'}`;
 const eul = (w) => `${w}${jong(w) ? '을' : '를'}`;
 
 /**
- * 문제에 쓸 물고기 (순수) — 도감에서 한 번이라도 낚은 종 → [{ key, ko, L 십분의 일 cm, n 낚은 수, H 백분의 일 kg }]
+ * 문제에 쓸 물고기 (순수) — 도감에서 한 번이라도 낚은 종 → [{ key, ko, L 십분의 일 cm, n 낚은 수, H 백분의 일 kg, soft? 🐙 문어 무리(v386) }]
  * @param {Object} raw 프로필 fishing (lakeOf로 고쳐 읽음)
  */
 export function poolOf(raw) {
   const lk = lakeOf(raw);
   return SPECIES.filter((sp) => lk.dex[sp.key] && lk.dex[sp.key].best > 0).map((sp) => {
     const e = lk.dex[sp.key];
-    return { key: sp.key, ko: sp.ko, L: Math.round(e.best * 10), n: e.n, H: Math.round(weightOf(sp, e.best) / 10) };
+    return { key: sp.key, ko: sp.ko, L: Math.round(e.best * 10), n: e.n, H: Math.round(weightOf(sp, e.best) / 10), ...(sp.soft ? { soft: true } : {}) };
   });
 }
-/** 물고기 수학을 낼 수 있나 — 서로 다른 물고기 두 종 이상 */
+/** 길이 문제에 쓸 것 — 🐙 문어 무리는 빼고 (v386) */
+const finned = (pool) => pool.filter((x) => !x.soft);
+/**
+ * 물고기 수학을 낼 수 있나 — 서로 다른 물고기 두 종 이상이고, 실제로 문제가 하나라도 만들어질 때
+ * (Codex 189차 — 작은 🐙 문어 무리만 있는 도감은 길이 문제도 무게 문제도 못 만들어 「낼 수 있음」인데 문제가 안 나왔다 · 씨앗 셋으로 꼴을 모두 시도)
+ */
 export function fishMathReady(raw) {
-  return poolOf(raw).length >= 2;
+  return poolOf(raw).length >= 2 && [1, 2, 3].some((s) => fishMathQ(raw, s) !== null);
 }
 
 /** 보기 — 정답 하나 + 서로 다른 틀린 보기(먼저 온 실수부터) · 모자라면 null */
@@ -80,7 +87,8 @@ const kgTag = (x) => `${x.ko} ${hundredth(x.H)} kg`;
 const misread = (t) => (t % 10 === 0 ? t / 10 : null);
 
 /** 📏 길이 비교 — 셋 가운데 가장 긴·짧은 물고기 · 자연수 부분이 같은 둘이 있게 먼저 고른다(소수 첫째 자리로 가르게) */
-function makeCmp(r, pool) {
+function makeCmp(r, all) {
+  const pool = finned(all);
   for (let t = 0; t < 30; t++) {
     const a = pick(r, pool);
     if (!a) return null;
@@ -105,7 +113,8 @@ function makeCmp(r, pool) {
 }
 
 /** ➖ 길이 차 — 긴 물고기가 몇 cm 더 길까 (둘 가운데 하나는 소수 첫째 자리가 있게) */
-function makeSub(r, pool) {
+function makeSub(r, all) {
+  const pool = finned(all);
   for (let t = 0; t < 40; t++) {
     const [x, y] = [pick(r, pool), pick(r, pool)];
     if (!x || !y || x.key === y.key || x.L === y.L) continue;
@@ -145,7 +154,8 @@ function makeSub(r, pool) {
 }
 
 /** ➕ 길이 합 — 두 물고기를 한 줄로 이어 놓으면 (하나는 소수 첫째 자리가 있게) */
-function makeAdd(r, pool) {
+function makeAdd(r, all) {
+  const pool = finned(all);
   for (let t = 0; t < 40; t++) {
     const [a, b] = [pick(r, pool), pick(r, pool)];
     if (!a || !b || a.key === b.key) continue;
@@ -262,11 +272,12 @@ function makeBar(r, pool) {
     if (sorted[1].n === sorted[0].n || sorted[2].n === sorted[1].n) continue;
     const chart = { unit, bars: s.map((x) => ({ ko: x.ko, v: x.n })) };
     const head = `세로 눈금 한 칸은 ${unit}마리예요.`;
+    const soft = s.some((x) => x.soft); // 🐙 문어 무리가 있으면 「물고기」라고 부르지 않는다 (v386)
     if (r() < 0.4) {
       const ans = sorted[2];
       return {
         kind: 'bar', facts: [], chart,
-        text: `${head} 지금까지 가장 많이 낚은 물고기는 무엇일까요?`,
+        text: `${head} 지금까지 가장 많이 낚은 ${soft ? '것은' : '물고기는'} 무엇일까요?`,
         opts: shuffle(r, s.map((x) => (x === ans ? { t: x.ko, ok: true } : { t: x.ko, ok: false, trap: 'most' }))),
         hints: { most: '🤔 가장 긴 막대를 찾아요 — 막대가 길수록 많이 낚은 거예요.' },
         solve: `${s.map((x) => `${x.ko} ${x.n}마리`).join(' · ')} → ${ans.ko}`,
@@ -288,8 +299,8 @@ function makeBar(r, pool) {
       text: `${head} ${eun(hi.ko)} ${lo.ko}보다 몇 마리 더 낚았을까요?`,
       opts,
       hints: {
-        pair: `🤔 물음의 두 물고기 막대를 다시 보세요 — ${wagwa(hi.ko)} ${lo.ko}${jong(lo.ko) ? '이에요' : '예요'}.`,
-        read: '🤔 한 물고기의 마리 수가 아니라 두 막대의 차이를 물었어요.',
+        pair: `🤔 물음의 두 ${soft ? '' : '물고기 '}막대를 다시 보세요 — ${wagwa(hi.ko)} ${lo.ko}${jong(lo.ko) ? '이에요' : '예요'}.`,
+        read: `🤔 한 ${soft ? '막대' : '물고기'}의 마리 수가 아니라 두 막대의 차이를 물었어요.`,
         add: '🤔 「몇 마리 더」는 두 수의 차이예요 — 큰 수에서 작은 수를 빼요.',
         near: `🤔 눈금 한 칸이 ${unit}마리예요 — 칸 수를 다시 세어 봐요.`,
       },

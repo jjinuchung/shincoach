@@ -57,7 +57,7 @@ test('🐟 한 마리 — 도감(잡은 수·가장 긴 cm·처음 날) · 💰 
 test('💾 고쳐 읽기 · 병합 — 종마다 큰 쪽 · 처음 날은 이른 쪽 · 날마다 받은 💰는 날마다 큰 쪽(늦은 날 14개) · 모르는 종·깨진 칸은 버림', () => {
   assert.deepEqual(lakeOf(null), { dex: {}, paid: {} });
   assert.deepEqual(lakeOf({ dex: { bungeo: { n: 2, best: 999, d: 'x' }, gyarados: { n: 1 }, megi: { n: 0, best: 5 }, toString: { n: 1 } }, paid: { '2026-10-30': 999, '2026-10-29': 0, x: 5, '2026-1-1': 3 } }),
-    { dex: { bungeo: { n: 2, best: 45, d: '' } }, paid: { '2026-10-30': FISH_COINS.dayMax } });
+    { dex: { bungeo: { n: 2, best: 45, d: '' } }, paid: { '2026-10-30': FISH_COINS.dayMax }, more: { gyarados: { n: 1, best: 0, d: '' } } }); // v386 Codex 189차 — 모르는 종은 버리지 않고 more에 맡겨 둠(도감엔 안 씀) · 잡은 수 0·꼴 틀린 이름(toString)은 버림
   assert.deepEqual(lakeOf({ day: '2026-10-30', coins: 12, paid: { '2026-10-30': 7, '2026-10-29': 40 } }).paid, { '2026-10-29': 40, '2026-10-30': 12 }, '시안 때 한 칸(day·coins)도 읽어 들임');
   const many = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [dayKeyOf(T - i * DAY), 5]));
   assert.deepEqual(Object.keys(lakeOf({ paid: many }).paid).sort(), Array.from({ length: PAID_DAYS }, (_, i) => dayKeyOf(T - i * DAY)).sort(), `늦은 날 ${PAID_DAYS}개만`);
@@ -75,7 +75,7 @@ test('💾 고쳐 읽기 · 병합 — 종마다 큰 쪽 · 처음 날은 이른
   assert.deepEqual(copyLake(a), lakeOf(a));
   // 프로필 복사 · 백업 병합(mergeStatRecord) 길에도
   const p = { ...emptyProfile(), fishing: { ...a, dex: { ...a.dex, gyarados: { n: 1 } }, junk: 1 }, updatedAt: 5 };
-  assert.deepEqual(cloneProfile(p).fishing, lakeOf(a), '복사도 고쳐 읽기로');
+  assert.deepEqual(cloneProfile(p).fishing, { ...lakeOf(a), more: { gyarados: { n: 1, best: 0, d: '' } } }, '복사도 고쳐 읽기로 · 모르는 종은 more에 맡겨 둠(v386 Codex 189차) · junk는 버림');
   const m = mergeStatRecord('profile', { ...emptyProfile(), fishing: a, updatedAt: 5 }, { ...emptyProfile(), fishing: b, updatedAt: 9 });
   assert.deepEqual(m.fishing, mergeLake(a, b));
   const none = mergeStatRecord('profile', { ...emptyProfile(), updatedAt: 1 }, { ...emptyProfile(), updatedAt: 2 });

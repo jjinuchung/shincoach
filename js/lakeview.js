@@ -16,8 +16,10 @@
 //   낚시 셀은 하루 하나(공부 끝 화면 셀 하루 3과 따로) · 📖 도감·💰·그날 낚은 마리에는 안 든다 · 시험용 `?nosw=1&cell=1`이면 입질마다 셀
 // v378 (난이도 기본안 「추천대로」): 창이 문제마다 단계(fishing.stageLevel)를 넘긴다 → ask(subj, seed, lv) → 원천 make(key, seed, lv)(lakelevel.js 꼴 · 못 만들면 1단계 꼴) ·
 //   🔶 영어 3단계(소리만)는 영어 목소리가 있는 기기에서만(lvFor) · 2·3단계로 낸 문제는 그날 fishLv2/3Q·Ok에도 · 시험용 `?nosw=1&star=5`면 입질마다 그 별
+// v386 (진우 제안 → 기본안 「추천대로」 · 원고·시안 「이대로」): 🚤 배 낚시(바다 도감 6종이면 열림 · host.boatOpen · gearState.boat) · 배에서 낚은 마리 daily fishBoat ·
+//   홈 띠 「○○에 가 볼까요?」는 마지막 물가가 배여도 🌬️ 바람 부는 날이면 바다
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
-import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_RIVER, FISH_SEA, fishMathKey, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, GEAR, hasGear, PLACE_KO } from './fishing.js';
+import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
 import { lvFor } from './lakelevel.js';
 import { orderOf } from './journey.js';
@@ -69,7 +71,8 @@ export async function mountLakeCard(box) {
   card.appendChild(el('span', 'lk-home-art', '🎣'));
   const body = el('span', 'lk-home-body');
   body.appendChild(el('b', 'lk-home-title', '학습 낚시터')); // 🎣는 왼쪽 그림 칸에
-  const where = PLACE_KO[pickOf(getProfileSnapshot()).place] || PLACE_KO.lake; // 마지막에 간 물가 (v368)
+  const last = pickOf(getProfileSnapshot()).place;
+  const where = PLACE_KO[last === 'boat' && boatRest(weatherOf(clockDay()).key) ? 'sea' : last] || PLACE_KO.lake; // 마지막에 간 물가 (v368) · 🌬️ 배가 쉬는 날은 바다 (v386)
   body.appendChild(el('span', 'lk-home-sub', done ? '오늘 낚시는 끝 — 내일 또 와요' : nz(d && d.fishSec) ? '물고기가 기다려요 — 이어서 낚아요' : `${where}에 가 볼까요? 맞힐수록 큰 물고기!`));
   card.appendChild(body);
   // 오늘 낚시가 끝난 날에도 📖 도감은 볼 수 있다 (한 마리라도 낚았으면 · 🏞️ 강 칸은 열린 뒤에만 — v368)
@@ -228,13 +231,13 @@ function fmNode(q) {
   box.appendChild(el('div', '', q.text));
   return box;
 }
-/** 🐟 한 마리를 도감에 — 저장된 뒤에만 그날 낚은 마리 +1(강이면 fishRiver · 바다면 fishSea도) · 못 적으면 { ok:false }(화면이 「🔁 다시 적기」) · seaOpened = 🌊 바다가 열렸다(v369) · opened = 🏞️ 강이 열렸다(v368) */
+/** 🐟 한 마리를 도감에 — 저장된 뒤에만 그날 낚은 마리 +1(강이면 fishRiver · 바다면 fishSea · 배면 fishBoat도) · 못 적으면 { ok:false }(화면이 「🔁 다시 적기」) · seaOpened = 🌊 바다가 열렸다(v369) · opened = 🏞️ 강이 열렸다(v368) · boatOpened = 🚤 배 낚시가 열렸다(v386) */
 export async function keepCatch(f, put, catchFn = lakeCatch) {
   let r = null;
   try { r = await catchFn({ key: f.key, cm: f.cm }); } catch { r = null; }
   if (!r || !r.ok) return { ok: false, why: (r && r.why) || 'save' };
-  put({ fishCatch: 1, ...(f.place === 'river' ? { [FISH_RIVER]: 1 } : {}), ...(f.place === 'sea' ? { [FISH_SEA]: 1 } : {}) });
-  return { ok: true, first: !!r.first, best: !!r.best, coins: nz(r.coins), ...(r.opened ? { opened: true } : {}), ...(r.seaOpened ? { seaOpened: true } : {}) };
+  put({ fishCatch: 1, ...(f.place === 'river' ? { [FISH_RIVER]: 1 } : {}), ...(f.place === 'sea' ? { [FISH_SEA]: 1 } : {}), ...(f.place === 'boat' ? { [FISH_BOAT]: 1 } : {}) });
+  return { ok: true, first: !!r.first, best: !!r.best, coins: nz(r.coins), ...(r.opened ? { opened: true } : {}), ...(r.seaOpened ? { seaOpened: true } : {}), ...(r.boatOpened ? { boatOpened: true } : {}) };
 }
 /**
  * 🟢 낚은 지가르데 셀을 큐브에 (v371) — xp.zygFind('fish') 한 트랜잭션(두 창이 같이 낚아도 하루 하나) ·
@@ -263,7 +266,7 @@ function testCellOdds() {
     return /[?&]nosw=1/.test(s) && /[?&]cell=1\b/.test(s) ? 1 : undefined;
   } catch { return undefined; }
 }
-/** 🎒 채비 가게 상태 (그리기용 · 지금 프로필) — { coins, owned: { id: true }, pick, made, river, sea } · river·sea = 🏞️ 강·🌊 바다가 열렸나(다른 창에서 열려도 · Codex 172차 · v369) */
+/** 🎒 채비 가게 상태 (그리기용 · 지금 프로필) — { coins, owned: { id: true }, pick, made, river, sea, boat } · river·sea·boat = 🏞️ 강·🌊 바다·🚤 배가 열렸나(다른 창에서 열려도 · Codex 172차 · v369 · v386) */
 export function gearState(p = getProfileSnapshot()) {
   return {
     coins: nz(p && p.coins),
@@ -272,6 +275,7 @@ export function gearState(p = getProfileSnapshot()) {
     made: !!avatarOf(p).made,
     river: riverOpen(p && p.fishing),
     sea: seaOpen(p && p.fishing),
+    boat: boatOpen(p && p.fishing),
   };
 }
 
@@ -337,6 +341,7 @@ export async function openLakeNow() {
       place: pk.place, // 🏞️ 마지막에 간 물가 (v368)
       riverOpen: riverOpen(lakeRaw()),
       seaOpen: seaOpen(lakeRaw()), // 🌊 (v369)
+      boatOpen: boatOpen(lakeRaw()), // 🚤 (v386)
       pick: pk,
       gear: () => gearState(),
       buyGear: (id) => lakeBuy(id),

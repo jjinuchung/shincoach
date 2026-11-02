@@ -27,14 +27,14 @@ const minOf = (k) => SPECIES.find((s) => s.key === k).min;
 const dexWith = (keys) => ({ dex: Object.fromEntries(keys.map((k) => [k, { n: 1, best: minOf(k), d: '2026-10-30' }])), paid: {} });
 
 test('🌊 바다 9종 — 원고 그대로(이름·별·길이) · 강 뒤 · 그림 · 별마다 두 종 짝(참돔만 혼자) · 확인한 최대 길이 아래 · 외래종·📸 없음 · 소개 한 줄 원고 그대로', () => {
-  assert.equal(SPECIES.length, 33);
-  assert.deepEqual(SPECIES.slice(24).map((s) => s.home), Array(9).fill('sea'));
+  assert.equal(SPECIES.length, 44, 'v386 배 11종이 뒤에');
+  assert.deepEqual(SPECIES.slice(24, 33).map((s) => s.home), Array(9).fill('sea'));
   assert.deepEqual(SPECIES.filter((s) => s.home === 'sea').map((s) => [s.ko, s.star, s.min, s.max]), [
     ['문절망둑', 1, 8, 25], ['전갱이', 1, 10, 32], ['고등어', 2, 18, 45], ['노래미', 2, 12, 28], ['볼락', 3, 10, 30],
     ['조피볼락', 3, 18, 55], ['감성돔', 4, 20, 48], ['농어', 4, 30, 85], ['참돔', 5, 30, 90],
   ]);
   assert.deepEqual(SEA_KEYS, ['munjeol', 'jeongaeng', 'godeung', 'noraemi', 'bollak', 'jopi', 'gamseong', 'nongeo', 'chamdom']);
-  assert.equal(new Set(SPECIES.map((s) => s.key)).size, 33, '키가 겹치지 않음');
+  assert.equal(new Set(SPECIES.map((s) => s.key)).size, 44, '키가 겹치지 않음 (v386 배 11종 포함)');
   // 확인한 최대 길이 아래 (FishBase — 문절망둑 30 · 전갱이 50 · 고등어 64 · 노래미 30 SL · 볼락 35.9 · 조피볼락 65 · 감성돔 50 SL · 농어 102 · 참돔 100 SL)
   const CAP = { munjeol: 30, jeongaeng: 50, godeung: 64, noraemi: 30, bollak: 35.9, jopi: 65, gamseong: 50, nongeo: 102, chamdom: 100 };
   for (const s of SPECIES.filter((x) => x.home === 'sea')) {
@@ -57,9 +57,9 @@ test('🌊 바다 9종 — 원고 그대로(이름·별·길이) · 강 뒤 · �
   assert.equal(INTRO.gamseong, '어릴 때는 수컷이다가 자라면서 암컷으로 바뀌는 것이 많아요. 50 cm까지 크는 데 10년쯤 걸려요.');
   assert.equal(INTRO.nongeo, '바닷물과 민물을 오가요. 어린 농어는 강을 거슬러 오르기도 해요.');
   assert.equal(INTRO.chamdom, '붉은 몸에 파란 점이 반짝여요. 26년을 산 기록도 있어요.');
-  assert.deepEqual(PLACES, ['lake', 'river', 'sea']);
+  assert.deepEqual(PLACES, ['lake', 'river', 'sea', 'boat'], 'v386 🚤 배 낚시가 뒤에');
   assert.equal(PLACE_KO.sea, '바다');
-  assert.deepEqual(PLACE_EMOJI, { lake: '🏞️', river: '🏞️', sea: '🌊' });
+  assert.deepEqual(PLACE_EMOJI, { lake: '🏞️', river: '🏞️', sea: '🌊', boat: '🚤' }); // v386
 });
 
 test('⚓ 바다 자리 셋 — 방파제 안쪽 8 · 테트라포드 14 · 먼 바다 20 · 열리는 수·별 몫·밑밥은 저수지와 같음 · 던지기는 바다 자리 · 바다엔 바다 물고기만', () => {
@@ -183,8 +183,8 @@ test('🌦️ 바다 날씨 줄 — 흐림은 먼 바다 · 비·바람은 안�
   assert.equal(SEA_SAFE, '🦺 진짜 바다 낚시는 어른과 함께, 구명조끼를 입고 해요.');
   assert.deepEqual(DEX_HINT_SEA, { 1: '방파제 안쪽에서 자주 보여요.', 2: '방파제 안쪽과 테트라포드에서 보여요.', 3: '테트라포드나 먼 바다에서 만나요.', 4: '먼 바다에 살아요.', 5: '먼 바다에서 아주 가끔 나와요.' });
   const rows = dexRows(dexWith(['gamseong', 'bungeo']));
-  assert.equal(rows.length, 33);
-  assert.deepEqual(rows.find((r) => r.key === 'chamdom'), { key: 'chamdom', ko: '참돔', star: 5, alien: false, home: 'sea', photo: false, caught: false, hint: DEX_HINT_SEA[5] });
+  assert.equal(rows.length, 44);
+  assert.deepEqual(rows.find((r) => r.key === 'chamdom'), { key: 'chamdom', ko: '참돔', star: 5, alien: false, home: 'sea', photo: false, soft: '', caught: false, hint: DEX_HINT_SEA[5] });
   assert.equal(rows.find((r) => r.key === 'gamseong').intro, INTRO.gamseong);
   for (const r of rows.filter((x) => !x.caught)) assert.doesNotMatch(r.hint, /\d/, '힌트에 숫자 없음');
 });
@@ -250,35 +250,37 @@ test('🔌 잇기 — 🗺️ 물가 셋(바다 줄은 강이 열린 뒤) · 결
   const fv = src('js/fishview.js');
   const body = (name) => { const i = fv.indexOf(`function ${name}(`); assert.ok(i >= 0, name); return fv.slice(i, fv.indexOf('\n}\n', i)); };
   const tp = body('togglePlaces');
-  assert.match(tp, /for \(const pl of PLACES\) \{\n\s*if \(pl === 'sea' && !ui\.riverOpen\) continue;[^\n]*\n\s*const lock = !placeOk\(pl\);/);
+  assert.match(tp, /for \(const pl of PLACES\) \{\n\s*if \(pl === 'sea' && !ui\.riverOpen\) continue;[^\n]*\n\s*if \(pl === 'boat' && !ui\.seaOpen\) continue;[^\n]*\n\s*const lock = !placeOk\(pl\);/); // v386 배 줄은 바다가 열린 뒤
   assert.match(tp, /el\('b', '', `\$\{PLACE_EMOJI\[pl\]\} \$\{PLACE_KO\[pl\]\}`\)/);
-  assert.match(body('placeOk'), /return pl === 'lake' \|\| \(pl === 'river' && ui\.riverOpen\) \|\| \(pl === 'sea' && ui\.seaOpen\);/);
+  assert.match(body('placeOk'), /return pl === 'lake' \|\| \(pl === 'river' && ui\.riverOpen\) \|\| \(pl === 'sea' && ui\.seaOpen\) \|\| \(pl === 'boat' && ui\.boatOpen && !boatRest\(ui\.wx\)\);/);
   assert.match(body('switchPlace'), /if \(!canMenu\(\) \|\| pl === ui\.place \|\| !PLACES\.includes\(pl\) \|\| !placeOk\(pl\)\) return;/);
   assert.match(body('switchPlace'), /ui\.spot = spotsOf\(pl\)\[0\];\n\s*q\$\('\.lk-spot'\)\.hidden = true;/, '앞 물가 자리 칩을 숨김');
   assert.match(body('syncGear'), /if \(st && st\.sea\) ui\.seaOpen = true;/);
-  assert.match(fv, /const place = \(h\.place === 'river' && riverOk\) \|\| \(h\.place === 'sea' && seaOk\) \? h\.place : 'lake';/);
+  assert.match(fv, /const place = rested \? \(seaOk \? 'sea' : 'lake'\) : \(h\.place === 'river' && riverOk\) \|\| \(h\.place === 'sea' && seaOk\) \|\| \(h\.place === 'boat' && boatOk\) \? h\.place : 'lake';/); // v386 🚤 · 🌬️ 배가 쉬면 바다
   assert.match(fv, /if \(info\.seaOpened\) \{\n\s*ui\.seaOpen = true;\n\s*card\.appendChild\(el\('p', 'lk-res-open', '🌊 바다 낚시터가 열렸어요! 🗺️ 물가에서 가 봐요'\)\);\n\s*card\.appendChild\(el\('p', 'lk-res-safe', SEA_SAFE\)\);/);
-  assert.match(body('renderShop'), /GEAR\.filter\(\(x2\) => x2\.kind === kind && \(!x2\.sea \|\| ui\.seaOpen \|\| ui\.owned\[x2\.id\]\)\)/);
+  assert.match(body('renderShop'), /GEAR\.filter\(\(x2\) => x2\.kind === kind && \(!x2\.sea \|\| ui\.seaOpen \|\| ui\.owned\[x2\.id\]\) && \(!x2\.boat \|\| ui\.boatOpen \|\| ui\.owned\[x2\.id\]\)\)/); // v386 🦑 에기는 배가 열린 뒤
   assert.ok(fv.includes("locked: '🌊 바다가 열리면 살 수 있어요'"));
   assert.match(fv, /harbor: '⚓', tetra: '🧱', offshore: '🌊'/);
   assert.match(fv, /sea: \{ 2: '🧱 테트라포드가 열렸어요! 맞히고 던지면 더 멀리 가요', 3: '🌊 먼 바다가 열렸어요! 큰 물고기가 살아요' \}/);
   // 📖 도감 — 낚시터마다 · 바다 줄은 강이 열린 뒤 · 열리기 전엔 숫자 없이
-  assert.match(fv, /const openOk = \{ lake: true, river: got\('river'\) > 0 \|\| got\('lake'\) >= RIVER_NEED, sea: got\('sea'\) > 0 \|\| got\('river'\) >= SEA_NEED \};/);
-  assert.match(fv, /if \(!list\.some\(\(r\) => homeOf\(r\) === pl\) \|\| \(pl === 'sea' && !openOk\.river\)\) continue;/);
+  assert.match(fv, /const openOk = \{ lake: true, river: got\('river'\) > 0 \|\| got\('lake'\) >= RIVER_NEED, sea: got\('sea'\) > 0 \|\| got\('river'\) >= SEA_NEED, boat: got\('boat'\) > 0 \|\| got\('sea'\) >= BOAT_NEED \};/); // v386
+  assert.match(fv, /if \(!list\.some\(\(r\) => homeOf\(r\) === pl\) \|\| \(pl === 'sea' && !openOk\.river\) \|\| \(pl === 'boat' && !openOk\.sea\)\) continue;/);
   const lv = src('js/lakeview.js');
   assert.ok(lv.includes('seaOpen: seaOpen(lakeRaw()),'));
   assert.ok(lv.includes('sea: seaOpen(p && p.fishing),'));
   assert.ok(lv.includes('...(r.seaOpened ? { seaOpened: true } : {})'));
   const fa = src('js/fishart.js');
-  assert.match(fa, /if \(sea\) seaHorizon\(ctx, sky, x0, x1\);\n\s*else landHills\(ctx, sky, x0, x1\);/);
-  assert.match(fa, /if \(sea\) \{ seaBank\(ctx, x0, x1\);/);
-  assert.match(fa, /if \(place === 'sea'\) \{ seaFx\(ctx, t, lite, x0, x1, wx\); return; \}/);
+  // v386: 🚤 배 낚시도 바다 그림을 함께 씀(sea = 바다 또는 배 · 배는 먼 섬 하나·방파제 대신 배)
+  assert.match(fa, /const sea = place === 'sea' \|\| boat;/);
+  assert.match(fa, /if \(sea\) seaHorizon\(ctx, sky, x0, x1, boat\);\n\s*else landHills\(ctx, sky, x0, x1\);/);
+  assert.match(fa, /if \(sea\) \{ \(boat \? boatBank : seaBank\)\(ctx, x0, x1\);/);
+  assert.match(fa, /if \(place === 'sea' \|\| place === 'boat'\) \{ seaFx\(ctx, t, lite, x0, x1, wx\); return; \}/);
   assert.match(fa, /if \(lk\.dorsal2\) ctx\.fill\(finPath\(lk, b, lk\.dorsal2, true\)\);/);
   assert.match(src('js/db.js'), /^\s*'fishSea',$/m);
   const st = src('js/stats.js');
   assert.match(st, /if \(!got\.length && !placeOpen\(pf\.fishing, pl\)\) continue;/);
-  assert.ok(st.includes('🌊 바다는 강 도감 ${SEA_NEED}종이면 열려요'));
-  assert.ok(src('js/upload.js').includes('물고기 N마리(🏞️ 강 M · 🌊 바다 K)'));
+  assert.ok(st.includes('🌊 바다는 강 도감 ${SEA_NEED}종 · 🚤 배 낚시는 바다 도감 ${BOAT_NEED}종이면 열려요')); // v386
+  assert.ok(src('js/upload.js').includes('물고기 N마리(🏞️ 강 M · 🌊 바다 K · 🚤 배 J)')); // v386 🚤 배를 보탬
   assert.match(src('css/style.css'), /\.lk-res-safe \{[^}]*word-break: keep-all;/, '안전 줄은 낱말 중간에서 안 끊김');
   assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(src('sw.js')) || [])[1]) >= 369, 'sw v369 이상 (판을 못 박으면 다음 판에서 깨진다 — v370)');
   assert.ok(Number((/APP_VERSION = 'v(\d+)'/.exec(src('js/version.js')) || [])[1]) >= 369, '앱 판 v369 이상');
@@ -300,7 +302,7 @@ test('🔤 가게 알림 조사 — 받침에 맞게(「크릴을 샀어요」 �
   for (const g of GEAR) assert.match(`${g.ko}${josaOf(g.ko, '을', '를')}`, /(을|를)$/);
   const fv = src('js/fishview.js');
   assert.doesNotMatch(fv, /\}를 (샀어요|끼웠어요)|'를 끼웠어요'|'로 바꿨어요'/, '조사를 글자로 박지 않음');
-  assert.equal((fv.match(/josaOf\(/g) || []).length, 4, '칩 끼웠어요 · 가게 끼웠어요 · 바꿨어요 · 샀어요');
+  assert.equal((fv.match(/josaOf\(/g) || []).length, 5, '칩 끼웠어요 · 가게 끼웠어요 · 바꿨어요 · 샀어요 · v386 🐙 「참문어가 버텨요」');
 });
 
 test('★ 두 창이 함께 (Codex 173차) — 강 6종째를 동시에 낚아도 「바다 열렸어요」·새 종은 한 결과에만 · 크릴을 동시에 두 번 사도 💰 300 한 번', async () => {

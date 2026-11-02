@@ -13,14 +13,18 @@
 //   onCell() → { ok, found:'core'|'cell', cells, note?:{ title, text, art() } } · 셀 10·50·100 글·그림은 결과 카드에(🐣 창은 낚시터 아래에 깔린다)
 //   v378: ask(subj, seed, lv) — 물고기가 문 뒤(③④⑤) 문제는 물고기 별로 단계(fishing.stageLevel) · 카드 머리에 「🐠·🐋 큰 물고기 문제」(lvBadge — 숫자 없음) ·
 //   문제 꼴에 listen(🔊 소리만 — 글자는 답한 뒤 reveal)·sayAfter(답한 뒤 🔊)·sentence(빈칸 문장 칸)·em(밑줄 낱말 「아닌」) · forceStar(시험용 별)
+//   v386: boatOpen(🚤 배 낚시 — 바다가 열린 뒤에야 🗺️·📖에 줄 · 열리면 결과 카드에 한 번) · 🌬️ 바람 부는 날은 배가 쉼(배로 들어오면 바다에서 시작) ·
+//   배로 갈 때마다 ⚓ 출항 2초(누르면 넘김 · 움직임 줄이기면 그림 없이 한 줄) · 🐙 문어 무리: 결과 카드 무게 먼저 · 문어 셋은 사투 첫 표시점 카드 머리 「바위에 딱 붙었어요」 ·
+//   사투 오답이면 💨 먹물 · 📖 칸에 「물고기가 아니에요」 · 🦑 에기는 배가 열린 뒤 가게에
 // 성능: 안 움직이는 층은 따로 한 장(하늘이 조금 바뀔 때만 다시) · 화면 배율 2배까지 · 느리면 저절로 가벼운 그림 · 화면이 숨으면 멈춤
 import {
   STARS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer, cellRoll, cellFish, cellFate,
-  pickSubject, askOrder, activeStep, dayLeftSec, weightText, BADGE_KO, weatherTilt, nibbleExtra,
+  pickSubject, askOrder, activeStep, dayLeftSec, BADGE_KO, weatherTilt, nibbleExtra,
   spotsOf, PLACES, PLACE_KO, PLACE_EMOJI, RIVER_NEED, SEA_NEED, SEA_SAFE, GEAR, gearOf, baitTilt, mixTilt, weatherLine, PHOTO_SAY, syncPick, josaOf,
   stageLevel, lvBadge,
+  BOAT_NEED, BOAT_OPENED, BOAT_GO, BOAT_SAFE, BOAT_REST, boatRest, softOf, sizeText, kindEmoji, lenLabel, SOFT_NOTE, STICK_HEAD, STICK_OFF, inkLine,
 } from './fishing.js';
-import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, drawCell, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet } from './fishart.js';
+import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, drawCell, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet, drawInk, drawBoat } from './fishart.js';
 import { avatarSvg } from './avatarart.js';
 import { sfx, unlock, vibrate } from './sfx.js';
 
@@ -31,13 +35,16 @@ const STAGE = {
   fight: '💪 힘껏 당기기',
   net: '🥅 뜰채로 뜨기',
 };
-const SPOT_EMOJI = { shore: '🏞️', weed: '🌿', deep: '🌊', riffle: '💦', rock: '⛰️', pool: '🌊', harbor: '⚓', tetra: '🧱', offshore: '🌊' }; // 🪨는 옛 기기 글꼴에 없어 네모로 보인다 (바위 밑도 ⛰️ · 🧱 Emoji 11은 있음)
+const SPOT_EMOJI = { shore: '🏞️', weed: '🌿', deep: '🌊', riffle: '💦', rock: '⛰️', pool: '🌊', harbor: '⚓', tetra: '🧱', offshore: '🌊', sandbed: '🐚', reef: '⛰️', abyss: '🌊' }; // 🪨는 옛 기기 글꼴에 없어 네모로 보인다 (바위 밑·물속 바위도 ⛰️ · 🧱 Emoji 11은 있음)
 /** 둘째·셋째 자리가 열릴 때 한 줄 (낚시터마다) */
 const SPOT_OPEN = {
   lake: { 2: '🌿 수초 밭이 열렸어요! 맞히고 던지면 더 멀리 가요', 3: '🌊 깊은 곳이 열렸어요! 큰 물고기가 살아요' },
   river: { 2: '⛰️ 바위 밑이 열렸어요! 맞히고 던지면 더 멀리 가요', 3: '🌊 깊은 소가 열렸어요! 큰 물고기가 살아요' },
   sea: { 2: '🧱 테트라포드가 열렸어요! 맞히고 던지면 더 멀리 가요', 3: '🌊 먼 바다가 열렸어요! 큰 물고기가 살아요' },
+  boat: { 2: '⛰️ 물속 바위가 열렸어요! 맞히고 던지면 더 멀리 가요', 3: '🌊 깊은 바다가 열렸어요! 큰 녀석들이 살아요' },
 };
+/** ⚓ 출항 장면 길이(ms) — 누르면 바로 넘어간다 (v386) */
+const SAIL_MS = 2000;
 const HAND = { x: 132, y: 146 }; // 낚싯대 손잡이 (캐릭터 손)
 const ME = { x: 62, y: 86, w: 82, h: 100 }; // 캐릭터 자리(가상 좌표)
 const PAL = { x: 158, y: 128, s: 62 }; // 파트너 자리
@@ -105,9 +112,11 @@ function build() {
   btn.addEventListener('pointerleave', up);
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
   root.addEventListener('pointerdown', touch, { passive: true });
+  root.addEventListener('pointerdown', () => { if (ui && ui.sail) endSail(); }, { passive: true }); // ⚓ 출항 장면은 누르면 넘김 (v386 — 단추를 눌러도 멈춘 동안이라 던지지 않는다)
   window.addEventListener('pointerup', up);
   window.addEventListener('keydown', (e) => {
     if (!ui || root.hidden || ui.dexOpen || ui.shopOpen) return;
+    if (ui.sail) { if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); endSail(); } return; }
     const go = root.querySelector('.lk-go');
     if (go && !go.hidden && (e.code === 'Space' || e.key === 'Enter')) { e.preventDefault(); if (!e.repeat) { touch(); go.click(); } return; } // 💡 힌트의 「알겠어요」 (Codex 171차 — 게임용 Space가 막았다)
     if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { touch(); ui.hold = true; act(); } }
@@ -131,7 +140,11 @@ export function openLake(host) {
   const pk = h.pick || {};
   const riverOk = !!h.riverOpen;
   const seaOk = !!h.seaOpen;
-  const place = (h.place === 'river' && riverOk) || (h.place === 'sea' && seaOk) ? h.place : 'lake';
+  const boatOk = !!h.boatOpen;
+  const wx0 = (h.weather && h.weather.key) || 'sun';
+  // 🚤 마지막 물가가 배여도 🌬️ 바람 부는 날은 배가 쉬니 바다에서 (v386)
+  const rested = h.place === 'boat' && boatOk && boatRest(wx0);
+  const place = rested ? (seaOk ? 'sea' : 'lake') : (h.place === 'river' && riverOk) || (h.place === 'sea' && seaOk) || (h.place === 'boat' && boatOk) ? h.place : 'lake';
   ui = {
     host: h,
     st: 'ready',
@@ -146,9 +159,13 @@ export function openLake(host) {
     streak: 0,
     recent: [],
     seed: (Date.now() >>> 0) ^ 0x5eed,
-    place, // 🏞️ 저수지 · 강 (v368) · 🌊 바다 (v369)
+    place, // 🏞️ 저수지 · 강 (v368) · 🌊 바다 (v369) · 🚤 배 낚시 (v386)
     riverOpen: riverOk,
     seaOpen: seaOk,
+    boatOpen: boatOk,
+    sail: null, // ⚓ 출항 장면 { at } (v386)
+    ink: null, // 💨 먹물 { at, x, y } (v386)
+    marks: 0, // 이 한 마리의 사투 표시점 수 (v386 — 🐙 첫 표시점)
     pick: { bait: gearOf(pk.bait) ? pk.bait : 'worm', rod: gearOf(pk.rod) ? pk.rod : 'rod', glow: !!pk.glow },
     pendPick: {}, // 가게에서 늦게 온 미끼·낚싯대 바꿈 — 던지는 중이면 다음 ready에 (syncGear · Codex 172차)
     owned: ownedOf(h),
@@ -178,7 +195,7 @@ export function openLake(host) {
     palJump: 0,
     raf: 0,
     done: false,
-    wx: (h.weather && h.weather.key) || 'sun', // 🌦️ 오늘 날씨 (v367)
+    wx: wx0, // 🌦️ 오늘 날씨 (v367)
     dexOpen: false,
     dexShown: null,
     shopOpen: false, // 🎒 채비 가게 — 보는 동안 시간 멈춤 (v368)
@@ -198,6 +215,8 @@ export function openLake(host) {
   wxc.hidden = !h.weather;
   q$('.lk-dexbtn').hidden = true;
   if (leftSec() <= 0) dayEnd();
+  else if (place === 'boat') startSail(); // ⚓ 배로 들어오면 출항부터 (v386)
+  else if (rested) toast(BOAT_REST, 3600); // 🌬️ 오늘은 배가 쉬어 바다에서 (v386)
   else {
     // 들어설 때 날씨 한 줄 → 던지기 안내
     const me = ui;
@@ -205,7 +224,7 @@ export function openLake(host) {
     const wl = weatherLine(h.weather, place);
     if (wl) {
       toast(`${hi}${wl}`, 3000);
-      setTimeout(() => { if (ui === me && ui.st === 'ready' && !ui.dexOpen) toast('🎣 던지기를 눌러요'); }, 3200);
+      setTimeout(() => { if (ui === me && ui.st === 'ready' && !ui.dexOpen && !ui.sail && ui.place === place) toast('🎣 던지기를 눌러요'); }, 3200); // 그새 배로 떠났으면 출항 줄을 덮지 않게 (Codex 189차)
     } else toast(`${hi}🎣 던지기를 눌러요`);
   }
   ui.raf = requestAnimationFrame(loop);
@@ -221,7 +240,7 @@ export function closeLake(quiet) {
   const h = ui.host;
   ui.done = true;
   ui = null;
-  if (root) { root.hidden = true; root.classList.remove('is-q'); q$('.lk-card').hidden = true; }
+  if (root) { root.hidden = true; root.classList.remove('is-q', 'is-sail'); q$('.lk-card').hidden = true; }
   if (!quiet) { try { h.onClose && h.onClose(); } catch { /* 무시 */ } }
 }
 export function isLakeOpen() {
@@ -275,10 +294,10 @@ export function openDexView(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const homeOf = (r) => (PLACES.includes(r.home) ? r.home : 'lake');
   const got = (pl) => list.filter((r) => homeOf(r) === pl && r.caught).length;
-  // 🏞️ 강·🌊 바다 쪽은 열린 뒤에만 칸을 보인다 — 그 전엔 숫자 없이 한 줄 · 바다 줄은 강이 열린 뒤에야 (v368 · v369)
-  const openOk = { lake: true, river: got('river') > 0 || got('lake') >= RIVER_NEED, sea: got('sea') > 0 || got('river') >= SEA_NEED };
+  // 🏞️ 강·🌊 바다·🚤 배 쪽은 열린 뒤에만 칸을 보인다 — 그 전엔 숫자 없이 한 줄 · 바다 줄은 강이, 배 줄은 바다가 열린 뒤에야 (v368 · v369 · v386)
+  const openOk = { lake: true, river: got('river') > 0 || got('lake') >= RIVER_NEED, sea: got('sea') > 0 || got('river') >= SEA_NEED, boat: got('boat') > 0 || got('sea') >= BOAT_NEED };
   for (const pl of PLACES) {
-    if (!list.some((r) => homeOf(r) === pl) || (pl === 'sea' && !openOk.river)) continue;
+    if (!list.some((r) => homeOf(r) === pl) || (pl === 'sea' && !openOk.river) || (pl === 'boat' && !openOk.sea)) continue;
     body.appendChild(el('h3', 'lk-dex-place', `${PLACE_EMOJI[pl]} ${PLACE_KO[pl]}`));
     if (openOk[pl]) body.appendChild(dexGrid(list.filter((r) => homeOf(r) === pl)));
     else body.appendChild(el('p', 'lk-dex-lock', '🔒 물고기를 더 만나면 길이 열려요'));
@@ -287,6 +306,17 @@ export function openDexView(rows, opts = {}) {
   dexDone = typeof opts.onClose === 'function' ? opts.onClose : null;
   dexRoot.hidden = false;
   try { x.focus(); } catch { /* 무시 */ }
+}
+/**
+ * 칸 안에 그릴 자리·크기 (v386) — w×h 칸 · 뱀장어·갈치는 길게 · 🐙 문어는 다리가 위아래로 퍼져 작게 조금 위로 · 🦑 오징어 무리는 조금 작게 → { x, y, L }
+ * (옛 물고기는 칸 폭의 104/132 그대로)
+ */
+export function artFit(key, w, h) {
+  const s = softOf(key);
+  if (key === 'jangeo' || key === 'galchi') return { x: w / 2, y: h / 2, L: w * (120 / 132) };
+  if (s === 'octo') return { x: w / 2, y: h * 0.42, L: Math.min(w * 0.7, h * 1.45) };
+  if (s === 'squid') return { x: w / 2, y: h / 2, L: Math.min(w * 0.76, h * 2.9) };
+  return { x: w / 2, y: h / 2, L: w * (104 / 132) };
 }
 /** 도감 칸 묶음 하나 (낚시터 하나) */
 function dexGrid(rows) {
@@ -303,8 +333,10 @@ function dexGrid(rows) {
     nm.appendChild(el('span', 'lk-dex-star', '★'.repeat(r.star)));
     card.appendChild(nm);
     if (r.caught) {
-      card.appendChild(el('div', 'lk-dex-meta', `가장 긴 ${Number(r.best).toFixed(1)} cm${r.d ? ` · ${String(r.d).slice(5)}` : ''}`));
+      const lb = lenLabel(r.key); // 🐙 문어는 다리까지 · 오징어 무리는 몸통 (v386)
+      card.appendChild(el('div', 'lk-dex-meta', `가장 긴 ${Number(r.best).toFixed(1)} cm${lb ? ` (${lb})` : ''}${r.d ? ` · ${String(r.d).slice(5)}` : ''}`));
       if (r.intro) card.appendChild(el('p', 'lk-dex-intro', r.intro));
+      if (r.soft) card.appendChild(el('p', 'lk-dex-soft', SOFT_NOTE));
       if (r.alien) card.appendChild(el('span', 'lk-chip', '외래종'));
       if (r.photo) card.appendChild(el('span', 'lk-chip is-new', '📸 사진으로 남겼어요'));
     } else card.appendChild(el('p', 'lk-dex-intro', r.hint || ''));
@@ -312,7 +344,8 @@ function dexGrid(rows) {
     const g = cv.getContext('2d');
     if (g) {
       g.scale(k, k);
-      drawFish(g, r.key, 66, 26, r.key === 'jangeo' ? 120 : 104, r.caught ? { wag: 0.06 } : { shadow: '#94a6a9' }); // 그림자는 불투명 — 반투명이면 몸·꼬리 겹친 자리가 진한 줄로 보인다
+      const fit = artFit(r.key, 132, 52);
+      drawFish(g, r.key, fit.x, fit.y, fit.L, r.caught ? { wag: 0.06 } : { shadow: '#94a6a9' }); // 그림자는 불투명 — 반투명이면 몸·꼬리 겹친 자리가 진한 줄로 보인다
     }
   }
   return grid;
@@ -338,6 +371,7 @@ function syncGear() {
   ui.owned = ownedOf(ui.host, st);
   if (st && st.river) ui.riverOpen = true; // 열린 강·바다는 닫히지 않는다
   if (st && st.sea) ui.seaOpen = true;
+  if (st && st.boat) ui.boatOpen = true;
   const r = syncPick(ui.pick, ui.owned, ui.pendPick, ui.st === 'ready' && !ui.busy);
   ui.pick = r.pick;
   ui.pendPick = r.pend;
@@ -357,11 +391,13 @@ function togglePlaces() {
   box.innerHTML = '';
   for (const pl of PLACES) {
     if (pl === 'sea' && !ui.riverOpen) continue; // 🌊 바다 줄은 강이 열린 뒤에야 (v369)
+    if (pl === 'boat' && !ui.seaOpen) continue; // 🚤 배 줄은 바다가 열린 뒤에야 (v386)
     const lock = !placeOk(pl);
+    const rest = pl === 'boat' && ui.boatOpen && boatRest(ui.wx); // 🌬️ 오늘은 배가 쉼 (v386)
     const b = el('button', `lk-place${ui.place === pl ? ' is-on' : ''}`);
     b.type = 'button';
     b.appendChild(el('b', '', `${PLACE_EMOJI[pl]} ${PLACE_KO[pl]}`));
-    b.appendChild(el('span', '', lock ? '🔒 물고기를 더 만나면 길이 열려요' : ui.place === pl ? '지금 여기' : '여기로 가기'));
+    b.appendChild(el('span', '', rest ? '🌬️ 파도가 높아 오늘은 배가 쉬어요' : lock ? '🔒 물고기를 더 만나면 길이 열려요' : ui.place === pl ? '지금 여기' : '여기로 가기'));
     b.disabled = lock;
     b.addEventListener('click', () => { touch(); switchPlace(pl); });
     box.appendChild(b);
@@ -375,11 +411,11 @@ function hidePlaces() {
   q$('.lk-places').hidden = true;
   q$('.lk-mapbtn').setAttribute('aria-expanded', 'false');
 }
-/** 그 물가에 갈 수 있나 — 저수지는 늘 · 강·바다는 열린 뒤 */
+/** 그 물가에 갈 수 있나 — 저수지는 늘 · 강·바다·배는 열린 뒤 · 배는 🌬️ 바람 부는 날 쉼 (v386) */
 function placeOk(pl) {
-  return pl === 'lake' || (pl === 'river' && ui.riverOpen) || (pl === 'sea' && ui.seaOpen);
+  return pl === 'lake' || (pl === 'river' && ui.riverOpen) || (pl === 'sea' && ui.seaOpen) || (pl === 'boat' && ui.boatOpen && !boatRest(ui.wx));
 }
-/** 물가 바꾸기 — 던지기 전에만 · 하루 시간은 세 물가가 함께 쓴다 · 마지막 물가는 프로필에(onPick) */
+/** 물가 바꾸기 — 던지기 전에만 · 하루 시간은 네 물가가 함께 쓴다 · 마지막 물가는 프로필에(onPick) · 배로 가면 ⚓ 출항 (v386) */
 function switchPlace(pl) {
   hidePlaces();
   if (!canMenu() || pl === ui.place || !PLACES.includes(pl) || !placeOk(pl)) return;
@@ -389,8 +425,34 @@ function switchPlace(pl) {
   ui.shadows = [];
   ui.rings = [];
   ui.skyStep = -1; // 풍경을 다시 그림
-  toast(`${PLACE_EMOJI[pl]} ${PLACE_KO[pl]}에 왔어요! ${weatherLine(ui.host.weather, pl) || '🎣 던지기를 눌러요'}`, 3000);
+  if (pl === 'boat') startSail();
+  else toast(`${PLACE_EMOJI[pl]} ${PLACE_KO[pl]}에 왔어요! ${weatherLine(ui.host.weather, pl) || '🎣 던지기를 눌러요'}`, 3000);
   try { const r = ui.host.onPick({ place: pl }); if (r && r.catch) r.catch(() => {}); } catch { /* 저장 못 해도 지금 낚시는 그대로 */ }
+}
+/**
+ * ⚓ 출항 (v386) — 배 낚시로 갈 때마다 SAIL_MS 동안 방파제를 떠나는 배 · 누르면 바로 넘김 · 그동안 게임 시계·단추는 멈춤 ·
+ * 움직임 줄이기면 그림 없이 한 줄만 · 출항 한 줄 + 🦺 안전 한 줄 + 그 물가 날씨 한 줄
+ */
+function startSail() {
+  const wl = weatherLine(ui.host.weather, 'boat');
+  const me = ui;
+  const sid = (ui.sailN = (ui.sailN || 0) + 1); // 이 출항 — 그새 다른 물가로 갔거나 다시 출항했으면 늦은 날씨 줄을 안 띄운다 (Codex 189차)
+  toast(`${BOAT_GO} ${BOAT_SAFE}`, 3200);
+  if (wl) setTimeout(() => { if (ui === me && ui.sailN === sid && ui.place === 'boat' && ui.st === 'ready' && !ui.sail && !ui.dexOpen && !ui.shopOpen) toast(wl, 3000); }, ui.reduce ? 3300 : SAIL_MS + 1400);
+  if (ui.reduce) return;
+  ui.sail = { at: performance.now() };
+  ui.paused = true;
+  ui.hold = false;
+  root.classList.add('is-sail');
+}
+function endSail() {
+  if (!ui || !ui.sail) return;
+  ui.sail = null;
+  ui.paused = false;
+  ui.last = 0;
+  ui.touchAt = performance.now();
+  ui.skyStep = -1;
+  root.classList.remove('is-sail');
 }
 /** 가진 미끼 차례 (지렁이 먼저) */
 function baitsOwned() {
@@ -493,7 +555,7 @@ function renderShop(msg) {
   for (const [kind, title] of SHOP_KIND) {
     body.appendChild(el('h3', 'lk-dex-place', title));
     const grid = el('div', 'lk-shop-grid');
-    for (const g of GEAR.filter((x2) => x2.kind === kind && (!x2.sea || ui.seaOpen || ui.owned[x2.id]))) { // 🦐 크릴은 바다가 열린 뒤에 (v369)
+    for (const g of GEAR.filter((x2) => x2.kind === kind && (!x2.sea || ui.seaOpen || ui.owned[x2.id]) && (!x2.boat || ui.boatOpen || ui.owned[x2.id]))) { // 🦐 크릴은 바다가 · 🦑 에기는 배가 열린 뒤에 (v369 · v386)
       const card = el('div', `lk-shop-card${ui.owned[g.id] ? ' is-own' : ''}`);
       card.appendChild(el('div', 'lk-shop-name', `${g.emoji} ${g.ko}`));
       card.appendChild(el('p', 'lk-dex-intro', g.say || ''));
@@ -534,7 +596,7 @@ function renderShop(msg) {
             if (g.kind === 'wear' && typeof h.lookNow === 'function') { try { loadPeople({ look: h.lookNow() }); } catch { /* 옛 차림 그대로 */ } }
             const then = g.kind === 'wear' ? (g.id === 'a_hat_fish' ? ' 바로 썼어요' : ' 바로 입었어요') : g.kind === 'float' ? '' : ' 바로 써요';
             shopAfter(me, gen, `${g.emoji} ${g.ko}${josaOf(g.ko, '을', '를')} 샀어요!${then}`); // 받침에 맞게 — 「크릴을」 (v369)
-          } else shopAfter(me, gen, WHY_KO[(r && r.why) || 'save'] || WHY_KO.save);
+          } else shopAfter(me, gen, (r && r.why === 'locked' && g.boat ? '🚤 배 낚시가 열리면 살 수 있어요' : WHY_KO[(r && r.why) || 'save']) || WHY_KO.save);
         });
         card.appendChild(b);
       }
@@ -632,8 +694,8 @@ function qText(box, q) {
   box.appendChild(el('u', 'lk-em', q.em));
   box.appendChild(document.createTextNode(t.slice(i + q.em.length)));
 }
-/** 문제 하나 내고 답을 기다린다 → true(맞힘) | false · 낼 문제가 하나도 없으면 null */
-function ask(stage) {
+/** 문제 하나 내고 답을 기다린다 → true(맞힘) | false · 낼 문제가 하나도 없으면 null · head = 카드 머리 글을 바꿀 때(🐙 「바위에 딱 붙었어요」 · v386) */
+function ask(stage, head = '') {
   const me = ui;
   const h = ui.host;
   const shares = h.shares || {};
@@ -654,7 +716,7 @@ function ask(stage) {
   ui.paused = true;
   ui.hold = false;
   const card = q$('.lk-card');
-  q$('.lk-stage').textContent = STAGE[stage] || '';
+  q$('.lk-stage').textContent = head || STAGE[stage] || '';
   const lvb = q$('.lk-lvb');
   const badge = lvBadge(stage, ui.fish);
   lvb.textContent = badge;
@@ -837,6 +899,8 @@ async function hookSet() {
   ui.busy = false;
   const deep = ok !== false;
   ui.fs = fightStart(ui.fish, ui.spot.m, deep);
+  ui.marks = 0;
+  ui.ink = null;
   if (ui.fish.cell) toast('🟢 물속에서 초록빛이 반짝여요! 꾹 감아요', 2200);
   else toast(deep ? '🎣 바늘이 깊이 걸렸어요! 꾹 감아요' : '🎣 살짝 걸렸어요 — 천천히 감아요', 2000);
   ui.st = 'fight';
@@ -849,11 +913,21 @@ async function hookSet() {
 async function onMark() {
   const me = ui;
   ui.busy = true;
-  const ok = await ask('fight');
+  const soft = ui.fish && !ui.fish.cell ? softOf(ui.fish.key) : '';
+  const stick = soft === 'octo' && ui.marks === 0; // 🐙 문어 셋은 사투 첫 표시점에 바위에 붙는다 (v386 — 숫자 규칙은 물고기와 같다)
+  ui.marks += 1;
+  const ok = await ask('fight', stick ? STICK_HEAD : '');
   if (ui !== me) return;
   ui.busy = false;
   ui.fs = fightAnswer(ui.fs, ok !== false);
-  if (ok) { toast('💪 확 끌어왔어요!', 1300); splash(fishXY().x, WATER_Y, 5); } else toast('물고기가 조금 달아났어요 — 다시 감아요', 1500);
+  if (ok) { toast(stick ? STICK_OFF : '💪 확 끌어왔어요!', 1300); splash(fishXY().x, WATER_Y, 5); return; }
+  if (soft && ok === false) { // 💨 문어 무리는 먹물을 쏘고 조금 멀어짐 (v386)
+    const p = fishXY();
+    ui.ink = { at: performance.now(), x: p.x + 30, y: p.y };
+    toast(inkLine(ui.fish.key), 1600);
+    return;
+  }
+  toast('물고기가 조금 달아났어요 — 다시 감아요', 1500);
 }
 function toNet() {
   ui.st = 'net';
@@ -875,7 +949,7 @@ async function netStep() {
   ui.busy = false;
   ui.netLeft = netAnswer(ui.netLeft, ok !== false);
   ui.netPos = (FIGHT.netM * ui.netLeft) / ui.netTotal;
-  if (!ok) { splash(fishXY().x, WATER_Y, 8); try { sfx.splash(); } catch { /* 무시 */ } toast('첨벙! 물고기가 버텨요', 1300); }
+  if (!ok) { splash(fishXY().x, WATER_Y, 8); try { sfx.splash(); } catch { /* 무시 */ } toast(ui.fish && !ui.fish.cell && softOf(ui.fish.key) ? `첨벙! ${speciesOf(ui.fish.key).ko}${josaOf(speciesOf(ui.fish.key).ko, '이', '가')} 버텨요` : '첨벙! 물고기가 버텨요', 1300); }
   if (ui.netLeft <= 0) { ui.st = 'scoop'; ui.scoopAt = ui.gclock; after(1100, landed); return; }
   after(ok ? 700 : 900, netStep);
 }
@@ -919,7 +993,7 @@ function keepFailed(f) {
   box.innerHTML = '';
   const card = el('div', 'lk-res-card');
   card.appendChild(el('div', 'lk-res-name', f.cell ? '🎒 큐브에 못 넣었어요' : '📖 도감에 못 적었어요'));
-  card.appendChild(el('p', 'lk-res-say', f.cell ? '🟢 지가르데 셀 — 셀은 뜰채에 그대로 있어요. 다시 넣어 볼까요?' : `🐟 ${speciesOf(f.key).ko} — 물고기는 뜰채에 그대로 있어요. 다시 적어 볼까요?`));
+  card.appendChild(el('p', 'lk-res-say', f.cell ? '🟢 지가르데 셀 — 셀은 뜰채에 그대로 있어요. 다시 넣어 볼까요?' : `${kindEmoji(f.key)} ${speciesOf(f.key).ko} — ${softOf(f.key) ? '' : '물고기는 '}뜰채에 그대로 있어요. 다시 적어 볼까요?`));
   const again = el('button', 'lk-res-btn', '🔁 다시 적기');
   again.type = 'button';
   again.addEventListener('click', () => {
@@ -949,8 +1023,8 @@ function showResult(f, info) {
   if (sp.photo) card.appendChild(el('div', 'lk-res-photo', '📸 사진만 찍고 놓아줘요')); // 천연기념물 — 사진으로 도감에 (v368)
   const cv = el('canvas', 'lk-res-fish');
   card.appendChild(cv);
-  card.appendChild(el('div', 'lk-res-name', `${sp.ko} ${'★'.repeat(sp.star)}`));
-  card.appendChild(el('div', 'lk-res-size', `${f.cm.toFixed(1)}cm · ${weightText(f.g)}`));
+  card.appendChild(el('div', 'lk-res-name', `${sp.soft ? `${kindEmoji(sp.key)} ` : ''}${sp.ko} ${'★'.repeat(sp.star)}`));
+  card.appendChild(el('div', 'lk-res-size', sizeText(f.key, f.cm, f.g))); // 🐙 문어 무리는 무게 먼저 (v386)
   if (sp.photo) card.appendChild(el('p', 'lk-res-say', PHOTO_SAY));
   const chips = el('div', 'lk-res-chips');
   for (const b of f.badges) chips.appendChild(el('span', 'lk-chip is-gold', BADGE_KO[b]));
@@ -970,6 +1044,12 @@ function showResult(f, info) {
     card.appendChild(el('p', 'lk-res-open', '🌊 바다 낚시터가 열렸어요! 🗺️ 물가에서 가 봐요'));
     card.appendChild(el('p', 'lk-res-safe', SEA_SAFE));
   }
+  // 🚤 이 한 마리로 배 낚시가 열렸다 — 한 번 + 안전 한 줄 (v386)
+  if (info.boatOpened) {
+    ui.boatOpen = true;
+    card.appendChild(el('p', 'lk-res-open', BOAT_OPENED));
+    card.appendChild(el('p', 'lk-res-safe', BOAT_SAFE));
+  }
   const again = el('button', 'lk-res-btn', leftSec() > 0 ? '🎣 다시 던지기' : '🌇 오늘 낚시 끝');
   again.type = 'button';
   again.addEventListener('click', () => {
@@ -980,15 +1060,16 @@ function showResult(f, info) {
   card.appendChild(again);
   box.appendChild(card);
   box.hidden = false;
-  // 큰 그림
+  // 큰 그림 (🐙 문어는 다리가 위아래로 퍼져 칸을 조금 높게 · v386)
   const w = 300;
-  const hgt = Math.round(w * Math.max(0.36, Math.min(0.6, (sp.key === 'jangeo' ? 0.2 : 0.5))));
+  const hgt = Math.round(w * Math.max(0.36, Math.min(0.6, (sp.key === 'jangeo' || sp.key === 'galchi' ? 0.2 : sp.soft === 'octo' ? 0.6 : 0.5))));
   const k = Math.min(2, window.devicePixelRatio || 1);
   cv.width = w * k; cv.height = hgt * k;
   cv.style.width = `${w}px`; cv.style.height = `${hgt}px`;
   const g = cv.getContext('2d');
   g.scale(k, k);
-  drawFish(g, f.key, w / 2, hgt / 2, w * 0.86, { wag: 0.08 });
+  const fit = sp.soft ? artFit(f.key, w, hgt) : { x: w / 2, y: hgt / 2, L: w * 0.86 };
+  drawFish(g, f.key, fit.x, fit.y, fit.L, { wag: 0.08 });
   again.focus();
 }
 /** 결과 카드 아래 단추 — 🎣 다시 던지기 · 시간이 다 됐으면 🌇 */
@@ -1140,8 +1221,40 @@ function fit(cv) {
   ui.bg = document.createElement('canvas');
   ui.bg.width = cv.width;
   ui.bg.height = cv.height;
+  ui.sailBg = null; // ⚓ 출항 장면 바탕도 새 크기로 (v386)
   ui.sized = true;
   ui.skyStep = -1;
+}
+/**
+ * ⚓ 출항 장면 한 장 (v386) — 바다 방파제 풍경(한 번 그려 둠) 위로 낚싯배가 오른쪽 먼 바다로 · 뱃머리 흰 물결 · 끝 무렵 어두워졌다 배 장면으로
+ */
+function drawSail(ctx, now) {
+  const v = ui.view;
+  if (!ui.sailBg) {
+    ui.sailBg = document.createElement('canvas');
+    ui.sailBg.width = ui.bg.width;
+    ui.sailBg.height = ui.bg.height;
+    const g = ui.sailBg.getContext('2d');
+    g.setTransform(v.dpr * v.s, 0, 0, v.dpr * v.s, v.dpr * v.ox, v.dpr * v.oy);
+    const total = (dayLeftSec(0, ui.host.dayMin, ui.host.bonusMin) || 1200) * 1000;
+    paintStatic(g, Math.min(1, ui.used / total), v.x0, v.x1, v.y0, v.y1, ui.wx, 'sea');
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(ui.sailBg, 0, 0);
+  ctx.setTransform(v.dpr * v.s, 0, 0, v.dpr * v.s, v.dpr * v.ox, v.dpr * v.oy);
+  drawWaterFx(ctx, now, false, ui.lite, v.x0, v.x1, ui.wx, 'sea');
+  const k = Math.min(1, (now - ui.sail.at) / SAIL_MS);
+  const e = k * k * (3 - 2 * k);
+  const x = 320 + e * 900;
+  const y = WATER_Y + 4 + Math.sin(now / 220) * 2.5;
+  // 뱃머리 물결 · 뒤로 남는 흰 줄
+  ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x - 160 - i * 46, WATER_Y + 6 + i * 2); ctx.lineTo(x - 196 - i * 46, WATER_Y + 9 + i * 2); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.beginPath(); ctx.ellipse(x + 2, WATER_Y + 3, 14, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  drawBoat(ctx, x, y, 1.1);
+  if (k > 0.8) { ctx.fillStyle = `rgba(10,30,50,${((k - 0.8) / 0.2) * 0.6})`; ctx.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0); }
 }
 function paintBg() {
   const v = ui.view;
@@ -1202,6 +1315,7 @@ function loop(now) {
       else if (ev === 'net') toNet();
     }
   }
+  if (ui.sail && now - ui.sail.at >= SAIL_MS) endSail(); // ⚓ 출항이 끝나면 배 장면 (v386)
   if (!ui.sized) fit(q$('.lk-cv'));
   paintBg();
   draw(now);
@@ -1211,6 +1325,7 @@ function draw(now) {
   const cv = q$('.lk-cv');
   const ctx = cv.getContext('2d');
   const v = ui.view;
+  if (ui.sail) { drawSail(ctx, now); return; }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(ui.bg, 0, 0);
   ctx.setTransform(v.dpr * v.s, 0, 0, v.dpr * v.s, v.dpr * v.ox, v.dpr * v.oy);
@@ -1238,8 +1353,14 @@ function draw(now) {
     const surge = st === 'fight' && ui.fs && ui.fs.surge > 0;
     if (surge) { x += Math.sin(now / 30) * 3; }
     if (st === 'scoop') y -= Math.min(1, (g - ui.scoopAt) / 900) * 60;
+    // 💨 먹물 — 오답 뒤 1.4초 동안 퍼지며 옅어짐 (v386 · 움직임 줄이기면 퍼지지 않고 잠깐)
+    if (ui.ink) {
+      const ik = (now - ui.ink.at) / 1400;
+      if (ik >= 1 || st !== 'fight') ui.ink = null;
+      else drawInk(ctx, ui.ink.x, ui.ink.y, 70, ui.reduce ? 0.3 : ik);
+    }
     if (ui.fish.cell) drawCell(ctx, x, y, L * 0.8, { wob: Math.sin(now / (surge ? 60 : 200)) * (surge ? 0.3 : 0.12), glow: !ui.lite }); // 🟢 v371
-    else drawFish(ctx, ui.fish.key, x, y, L, { flip: true, wag: Math.sin(now / (surge ? 60 : 160)) * (surge ? 0.4 : 0.2), pitch: st === 'fight' ? -0.12 : 0 });
+    else drawFish(ctx, ui.fish.key, x, y, L, { flip: true, wag: Math.sin(now / (surge ? 60 : 160)) * (surge ? 0.4 : 0.2), pitch: st === 'fight' ? -0.12 : 0, lite: ui.lite }); // 느린 기기면 무늬·빨판·마디를 줄임 (Codex 189차)
     if (surge) {
       ctx.fillStyle = '#ffb37a';
       ctx.font = 'bold 30px "Do Hyeon", sans-serif';

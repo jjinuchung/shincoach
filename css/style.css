@@ -5170,6 +5170,7 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-toast { position: absolute; top: max(70px, calc(env(safe-area-inset-top, 0px) + 60px)); left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 16px; border-radius: 12px; background: rgba(8, 30, 36, 0.82); color: #f3faf9; font-size: 1.02rem; text-align: center; pointer-events: none; }
 .lk-act { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); width: 224px; height: 150px; display: flex; align-items: flex-end; justify-content: center; transition: opacity 0.2s; }
 .lk.is-q .lk-act { opacity: 0.25; pointer-events: none; }
+.lk.is-sail .lk-act { opacity: 0.25; } /* ⚓ 출항 장면 (v386) — 단추를 눌러도 장면만 넘긴다(멈춘 동안이라 던지지 않음) */
 .lk-gauge { position: absolute; left: 0; bottom: 18px; width: 224px; height: 124px; overflow: visible; pointer-events: none; }
 .lk-g-bg, .lk-g-fill { fill: none; stroke-width: 16; stroke-linecap: round; }
 .lk-g-bg { stroke: rgba(8, 40, 48, 0.55); }
@@ -5252,6 +5253,7 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-dex-meta { font-size: 0.85rem; color: #4f6a6e; font-variant-numeric: tabular-nums; }
 .lk-dex-intro { margin: 0; font-size: 0.9rem; line-height: 1.5; color: #12343b; }
 .lk-dex-card.is-unk .lk-dex-intro { color: #4f6a6e; }
+.lk-dex-soft { margin: 0; padding: 4px 8px; border-radius: 8px; background: #e1e8f6; color: #1d3f7a; font-size: 0.86rem; line-height: 1.45; word-break: keep-all; } /* 🐙 문어 무리 「물고기가 아니에요」 (v386) */
 /* 🗺️ 물가 · 🎒 채비 단추 · 🐛 미끼 칩 · 물가 고르기 · 📸 카드 · 🏞️ 강이 열렸어요 · 채비 가게 (v368) */
 .lk-topbtn { min-height: 40px; padding: 4px 14px; border-radius: 999px; border: 0; background: rgba(255, 253, 248, 0.92); color: #12343b; font: inherit; font-size: 0.98rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .lk-bait { position: absolute; right: calc(50% + 70px); bottom: 38px; min-height: 44px; max-width: 110px; white-space: nowrap; padding: 4px 10px; border-radius: 14px; border: 2px solid rgba(255, 255, 255, 0.85); background: rgba(255, 253, 248, 0.94); color: #12343b; font: inherit; font-size: 0.92rem; font-weight: 700; line-height: 1.2; cursor: pointer; overflow-wrap: anywhere; }

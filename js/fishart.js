@@ -63,6 +63,20 @@ export const LOOKS = {
   gamseong: { depth: 0.42, peak: 0.36, head: 'round', tail: 'fork', tk: 0.9, dorsal: [0.28, 0.88, 0.4, 'spiny'], anal: [0.64, 0.84, 0.4, 'soft'], mouth: 'small', eye: [0.13, 0.24, 0.032], c: ['#3a3f44', '#8e969c', '#e8ebec', '#4a5056'], pat: ['bars:#2e3236:.22:6', 'sheen:#e4ecf0'] },
   nongeo: { depth: 0.24, peak: 0.4, head: 'point', tail: 'notch', tk: 0.9, dorsal: [0.3, 0.5, 0.55, 'spiny'], dorsal2: [0.54, 0.78, 0.4, 'soft'], anal: [0.62, 0.78, 0.36, 'soft'], mouth: 'big', eye: [0.11, 0.18, 0.028], c: ['#4e5e58', '#b9c4c0', '#f2f4f3', '#93a19c'], pat: ['speck:#2a332f:16', 'sheen:#d0dde0'] },
   chamdom: { depth: 0.42, peak: 0.34, head: 'round', tail: 'fork', tk: 0.95, dorsal: [0.26, 0.88, 0.42, 'spiny'], anal: [0.64, 0.84, 0.4, 'soft'], mouth: 'small', eye: [0.13, 0.24, 0.032], c: ['#b2454a', '#e48a86', '#f7dcd6', '#d9706c'], pat: ['speck:#58b6ef:42', 'sheen:#ffd3c8'] },
+  // 🚤 배 낚시 (v386 시안) — 말쥐치(등의 큰 가시 하나) · 방어·부시리(노란 띠 · 부시리는 가슴지느러미가 짧다 pec) · 가자미 무리 flat(두 눈 eye2가 몸 한쪽 ·
+  //   넙치는 머리가 왼쪽 · 문치가자미는 늘 오른쪽 faceR — 「좌광우도」, 배를 아래로 놓고 본 모습) · 갈치는 띠(ribbon — 꼬리·배지느러미 없음) ·
+  //   문어 무리(form) octo 문어(다리 여덟 · 가로 틈 눈동자) · cuttle 갑오징어(몸통 둘레 지느러미 · W 눈동자) · squid 창꼴뚜기(꼬리 쪽 마름모 지느러미)
+  maljwi: { depth: 0.44, peak: 0.42, head: 'point', tail: 'round', tk: 0.48, dorsal: [0.21, 0.235, 0.95, 'spine'], dorsal2: [0.52, 0.86, 0.3, 'soft'], anal: [0.52, 0.86, 0.3, 'soft'], mouth: 'small', eye: [0.21, 0.42, 0.03], c: ['#46545e', '#8a9aa4', '#d6dde0', '#6f8fa8'], pat: ['mottle:#2f3a42', 'speck:#3a4650:14'] },
+  munchi: { depth: 0.56, peak: 0.42, head: 'round', tail: 'round', tk: 0.62, flat: true, faceR: true, dorsal: [0.12, 0.97, 0.2, 'low'], anal: [0.3, 0.97, 0.2, 'low'], mouth: 'small', eye: [0.13, 0.5, 0.03], eye2: [0.18, 0.2, 0.03], c: ['#5a4a36', '#76634a', '#86735a', '#6a5840'], pat: ['speck:#2e2418:34', 'mottle:#3e3224'] },
+  neopchi: { depth: 0.44, peak: 0.44, head: 'round', tail: 'round', tk: 0.62, flat: true, dorsal: [0.1, 0.97, 0.2, 'low'], anal: [0.28, 0.97, 0.2, 'low'], mouth: 'big', eye: [0.12, 0.48, 0.028], eye2: [0.17, 0.18, 0.028], c: ['#4e4a34', '#6a6446', '#7a7354', '#5e5a40'], pat: ['mottle:#33301f', 'speck:#d8d0b0:20'] },
+  bangeo: { depth: 0.25, peak: 0.42, head: 'point', tail: 'fork', tk: 1.05, dorsal: [0.3, 0.4, 0.28, 'spiny'], dorsal2: [0.42, 0.9, 0.3, 'soft'], anal: [0.62, 0.9, 0.28, 'soft'], mouth: 'big', eye: [0.1, 0.16, 0.024], c: ['#28507a', '#97aabb', '#f1f3ef', '#c8a63e'], pat: ['stripe:#e0bd45:.85', 'sheen:#d6e4ee'] },
+  busiri: { depth: 0.22, peak: 0.42, head: 'point', tail: 'fork', tk: 1.05, pec: 0.62, dorsal: [0.3, 0.4, 0.26, 'spiny'], dorsal2: [0.42, 0.9, 0.28, 'soft'], anal: [0.62, 0.9, 0.26, 'soft'], mouth: 'big', eye: [0.1, 0.16, 0.022], c: ['#2a5a6c', '#9cb4bc', '#f1f3ef', '#d4b03c'], pat: ['stripe:#e8c440:.95', 'sheen:#d0e6ea'] },
+  galchi: { tail: 'ribbon', c: ['#5f7080', '#c9d3da', '#f2f5f7', '#a9bccb'], pat: [] },
+  jukkumi: { form: 'octo', arm: 0.6, c: ['#5e4250', '#93707c', '#ead6d0', '#7a5662'], ring: '#e8c44a' },
+  chammuneo: { form: 'octo', arm: 0.62, c: ['#5e4836', '#97785c', '#eedfcc', '#7c6248'], spots: '#d6c2a2' },
+  daemuneo: { form: 'octo', arm: 0.66, c: ['#5e221e', '#9c4438', '#f0d2c6', '#7c2e26'], wrinkle: '#3e1410' },
+  gabojing: { form: 'cuttle', c: ['#54463a', '#8e7a66', '#efe6da', '#b8a48a'], stripe: '#2e241c' },
+  changkkol: { form: 'squid', c: ['#94503e', '#d29a88', '#f6e6e0', '#e6b4a4'], dots: '#6e2418' },
 };
 
 // ───────────── 물고기 ─────────────
@@ -333,12 +347,15 @@ function face(ctx, lk, b, L, detail) {
       ctx.stroke();
     }
   }
-  // 눈 — 금빛·은빛 홍채 + 검은 눈동자 + 빛
-  ctx.fillStyle = lk.key === 'ssogari' || lk.key === 'bass' ? '#d8b55a' : '#d6d0b4';
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#121212';
-  ctx.beginPath(); ctx.arc(cx, cy, r * 0.62, 0, Math.PI * 2); ctx.fill();
-  if (detail) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(cx - r * 0.25, cy - r * 0.25, r * 0.22, 0, Math.PI * 2); ctx.fill(); }
+  // 눈 — 금빛·은빛 홍채 + 검은 눈동자 + 빛 (가자미 무리는 몸 한쪽에 눈 둘 — eye2 · v386)
+  const eyes = lk.eye2 ? [[cx, cy, r], [x0 + Lb * lk.eye2[0], -hd * lk.eye2[1], Math.max(1.2, L * lk.eye2[2])]] : [[cx, cy, r]];
+  for (const [ex1, ey1, r1] of eyes) {
+    ctx.fillStyle = lk.key === 'ssogari' || lk.key === 'bass' ? '#d8b55a' : '#d6d0b4';
+    ctx.beginPath(); ctx.arc(ex1, ey1, r1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#121212';
+    ctx.beginPath(); ctx.arc(ex1, ey1, r1 * 0.62, 0, Math.PI * 2); ctx.fill();
+    if (detail) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(ex1 - r1 * 0.25, ey1 - r1 * 0.25, r1 * 0.22, 0, Math.PI * 2); ctx.fill(); }
+  }
 }
 function drawEel(ctx, lk, L, opts) {
   const N = 18;
@@ -384,6 +401,352 @@ function drawEel(ctx, lk, L, opts) {
   ctx.beginPath(); ctx.arc(-L / 2 + L * 0.035, top[1][1] + L * 0.022, Math.max(0.7, L * 0.005), 0, Math.PI * 2); ctx.fill();
 }
 
+/** 🗡️ 갈치 (v386 시안) — 칼처럼 길고 납작한 은빛 띠 · 꼬리지느러미·배지느러미 없이 끝이 실처럼 가늘어짐 · 등을 따라 긴 지느러미 · 아래턱이 나온 큰 입과 송곳니 · 큰 눈 */
+function drawRibbon(ctx, lk, L, opts) {
+  const N = 26;
+  const top = [];
+  const bot = [];
+  const ph = opts.wag ? opts.wag * 8 : 0;
+  for (let i = 0; i <= N; i++) {
+    const f = i / N;
+    const x = -L / 2 + L * f;
+    const y = Math.sin(ph + f * 5) * L * 0.018 * f;
+    const th = L * 0.04 * (f < 0.07 ? 0.4 + f * 8.6 : f < 0.32 ? 1 : Math.max(0.03, 1 - Math.pow((f - 0.32) / 0.68, 0.75)));
+    top.push([x, y - th]);
+    bot.push([x, y + th]);
+  }
+  const hx = -L / 2;
+  const p = new Path2D();
+  p.moveTo(hx - L * 0.01, bot[0][1] - L * 0.002); // 아래턱 끝
+  for (const [x, y] of top) p.lineTo(x, y);
+  for (let i = bot.length - 1; i >= 0; i--) p.lineTo(bot[i][0], bot[i][1]);
+  p.closePath();
+  if (opts.shadow) { ctx.fillStyle = opts.shadow; ctx.fill(p); return; }
+  // 등지느러미 — 머리 뒤에서 끝까지 이어진 얇은 막
+  ctx.strokeStyle = lk.c[3];
+  ctx.globalAlpha = 0.75;
+  ctx.lineWidth = Math.max(1, L * 0.01);
+  ctx.beginPath();
+  for (let i = 2; i <= N - 2; i++) ctx.lineTo(top[i][0], top[i][1] - L * 0.006);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  const g = ctx.createLinearGradient(0, -L * 0.045, 0, L * 0.045);
+  g.addColorStop(0, lk.c[0]); g.addColorStop(0.4, lk.c[1]); g.addColorStop(0.75, lk.c[2]); g.addColorStop(1, lk.c[1]);
+  ctx.fillStyle = g;
+  ctx.fill(p);
+  ctx.strokeStyle = 'rgba(60,72,86,.55)'; // 옅은 은빛이 밝은 바탕에 묻히지 않게 테두리
+  ctx.lineWidth = Math.max(0.6, L * 0.003);
+  ctx.stroke(p);
+  // 은빛 띠 반짝임
+  ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  ctx.lineWidth = Math.max(0.8, L * 0.005);
+  ctx.beginPath();
+  for (let i = 2; i <= N - 4; i++) ctx.lineTo(top[i][0], (top[i][1] * 2 + bot[i][1]) / 3);
+  ctx.stroke();
+  // 입 · 송곳니 · 눈
+  const my = (top[1][1] + bot[1][1]) / 2 + L * 0.004;
+  ctx.strokeStyle = 'rgba(30,34,40,.7)';
+  ctx.lineWidth = Math.max(0.7, L * 0.003);
+  ctx.beginPath(); ctx.moveTo(hx - L * 0.008, bot[0][1] - L * 0.004); ctx.lineTo(hx + L * 0.04, my); ctx.stroke();
+  if (L >= 70 && !opts.lite) { // 송곳니는 느린 기기면 안 그림 (Codex 189차)
+    ctx.fillStyle = '#fbfbf6';
+    for (let i = 0; i < 4; i++) { const tx = hx + L * (0.004 + i * 0.009); ctx.beginPath(); ctx.moveTo(tx, my - L * 0.004 + i * L * 0.0012); ctx.lineTo(tx + L * 0.003, my + L * 0.006); ctx.lineTo(tx + L * 0.006, my - L * 0.003 + i * L * 0.0012); ctx.fill(); }
+  }
+  const er = Math.max(1.2, L * 0.012);
+  const ex = hx + L * 0.042;
+  const ey = top[2][1] + L * 0.02;
+  ctx.fillStyle = '#e2e6d8'; ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#121212'; ctx.beginPath(); ctx.arc(ex, ey, er * 0.6, 0, Math.PI * 2); ctx.fill();
+}
+/** 굽는 팔의 가운데 줄 — 뿌리 (x, y) · 처음 각도 a0 · 길이 len · M 마디 · bend(s) = 마디 몫 s(0~1)에서 더하는 각도 → [[x, y, 각도]…] */
+function limbPts(x, y, a0, len, M, bend) {
+  const pts = [[x, y, a0]];
+  const step = len / M;
+  for (let k = 1; k <= M; k++) {
+    const an = a0 + bend(k / M);
+    x += Math.cos(an) * step;
+    y += Math.sin(an) * step;
+    pts.push([x, y, an]);
+  }
+  return pts;
+}
+/** 가늘어지는 팔 윤곽 — w0 = 뿌리 반너비 · tip = 끝 반너비 */
+function limbPath(pts, w0, tip) {
+  const p = new Path2D();
+  const n = pts.length - 1;
+  const at = (k, sg) => {
+    const [x, y, an] = pts[k];
+    const w = w0 * Math.pow(1 - k / n, 0.85) + tip;
+    return [x + Math.cos(an + (sg * Math.PI) / 2) * w, y + Math.sin(an + (sg * Math.PI) / 2) * w];
+  };
+  let q = at(0, -1);
+  p.moveTo(q[0], q[1]);
+  for (let k = 1; k <= n; k++) { q = at(k, -1); p.lineTo(q[0], q[1]); }
+  for (let k = n; k >= 0; k--) { q = at(k, 1); p.lineTo(q[0], q[1]); }
+  p.closePath();
+  return p;
+}
+/**
+ * 🐙 문어 (v386 시안) — 몸통 주머니가 왼쪽(헤엄칠 때 앞) · 다리 여덟이 오른쪽으로 물결치다 끝이 말림 · 앞 다리 밑에 빨판 · 눈동자는 가로로 긴 틈 · L = 다리 끝까지 전체 길이
+ * 주꾸미 ring(다리 뿌리 옆 금빛 고리 무늬 — SeaLifeBase) · 참문어 spots(밝은 얼룩) · 대문어 wrinkle(주름)
+ */
+function drawOcto(ctx, lk, L, opts) {
+  const sh = opts.shadow;
+  const detail = L >= 70 && !sh && !opts.lite; // 느린 기기면 빨판·무늬·마디를 줄임 (Codex 189차)
+  const t = (Number(opts.wag) || 0) * 6;
+  const [cD, cM, cL, cA] = lk.c;
+  const rx = -L * 0.1;
+  const ry = L * 0.06;
+  const reach = L * (lk.arm || 0.62);
+  const M = detail ? 22 : 12;
+  const arms = [];
+  for (let i = 0; i < 8; i++) {
+    const a0 = -0.42 + (i / 7) * 1.05;
+    const len = reach * (0.84 + 0.16 * Math.sin(i * 2.3 + 1));
+    const curl = (i % 2 ? 1 : -1) * (1.2 + 0.2 * (i % 3));
+    const pts = limbPts(rx + Math.cos(a0) * L * 0.03, ry + Math.sin(a0) * L * 0.03 + (i - 3.5) * L * 0.006, a0, len, M, (s) => Math.sin(t + i * 1.3 + s * 4) * 0.35 * s + (s > 0.72 ? curl * Math.pow((s - 0.72) / 0.28, 2) * 2.2 : 0));
+    arms.push({ pts, back: i % 2 === 1, w0: L * (0.032 + 0.004 * (i % 3)) });
+  }
+  const mantle = new Path2D();
+  mantle.ellipse(-L * 0.3, -L * 0.04, L * 0.16, L * 0.11, -0.32, 0, Math.PI * 2);
+  const head = new Path2D();
+  head.ellipse(-L * 0.15, L * 0.03, L * 0.085, L * 0.07, 0, 0, Math.PI * 2);
+  if (sh) {
+    ctx.fillStyle = sh;
+    for (const a of arms) ctx.fill(limbPath(a.pts, a.w0, L * 0.002));
+    ctx.fill(mantle); ctx.fill(head);
+    return;
+  }
+  // 뒤 다리(어둡게) → 앞 다리 → 빨판
+  for (const a of arms) if (a.back) { ctx.fillStyle = cD; ctx.fill(limbPath(a.pts, a.w0, L * 0.002)); }
+  for (const a of arms) {
+    if (a.back) continue;
+    ctx.fillStyle = cM;
+    ctx.fill(limbPath(a.pts, a.w0, L * 0.002));
+    if (!detail) continue;
+    const n = a.pts.length - 1;
+    ctx.fillStyle = cL;
+    ctx.globalAlpha = 0.85;
+    for (let k = 2; k < n - 2; k += 2) {
+      const [x, y, an] = a.pts[k];
+      const w = a.w0 * Math.pow(1 - k / n, 0.85);
+      ctx.beginPath(); ctx.arc(x + Math.cos(an + Math.PI / 2) * w * 0.55, y + Math.sin(an + Math.PI / 2) * w * 0.55, Math.max(0.6, w * 0.32), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // 몸통 주머니 · 머리
+  const g = ctx.createLinearGradient(0, -L * 0.15, 0, L * 0.08);
+  g.addColorStop(0, cD); g.addColorStop(0.55, cM); g.addColorStop(1, cA);
+  ctx.fillStyle = g;
+  ctx.fill(mantle);
+  ctx.fillStyle = cM;
+  ctx.fill(head);
+  const rnd = seeded(seedOfKey(lk.key));
+  if (detail) {
+    ctx.save();
+    ctx.clip(mantle);
+    if (lk.spots) {
+      ctx.fillStyle = lk.spots;
+      ctx.globalAlpha = 0.45;
+      for (let i = 0; i < 16; i++) { ctx.beginPath(); ctx.ellipse(lerp(-L * 0.45, -L * 0.16, rnd()), lerp(-L * 0.14, L * 0.05, rnd()), L * lerp(0.008, 0.018, rnd()), L * lerp(0.006, 0.012, rnd()), rnd() * 3, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (lk.wrinkle) {
+      ctx.strokeStyle = lk.wrinkle;
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = Math.max(0.8, L * 0.004);
+      for (let i = 0; i < 12; i++) { const x = lerp(-L * 0.44, -L * 0.18, rnd()); const y = lerp(-L * 0.13, L * 0.04, rnd()); ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + L * 0.015, y - L * 0.01, x + L * 0.03, y); ctx.stroke(); }
+    }
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(-L * 0.34, -L * 0.1, L * 0.07, L * 0.035, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  // 주꾸미 — 다리 뿌리 옆 금빛 고리 무늬
+  if (lk.ring) {
+    ctx.fillStyle = cD;
+    ctx.beginPath(); ctx.arc(-L * 0.095, L * 0.078, L * 0.026, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = lk.ring;
+    ctx.lineWidth = Math.max(1, L * 0.008);
+    ctx.beginPath(); ctx.arc(-L * 0.095, L * 0.078, L * 0.026, 0, Math.PI * 2); ctx.stroke();
+  }
+  // 깔때기(물을 내뿜는 관)
+  ctx.fillStyle = cA;
+  ctx.beginPath(); ctx.ellipse(-L * 0.21, L * 0.085, L * 0.03, L * 0.013, 0.4, 0, Math.PI * 2); ctx.fill();
+  // 눈 — 볼록한 눈두덩 · 가로로 긴 눈동자
+  const ex = -L * 0.16;
+  const ey = -L * 0.004;
+  const er = Math.max(1.2, L * 0.028);
+  ctx.fillStyle = cA;
+  ctx.beginPath(); ctx.arc(ex, ey - er * 0.3, er * 1.28, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#e9dcae';
+  ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#141414';
+  ctx.beginPath(); ctx.ellipse(ex, ey, er * 0.72, er * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+  if (detail) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(ex - er * 0.35, ey - er * 0.4, er * 0.2, 0, Math.PI * 2); ctx.fill(); }
+}
+/**
+ * 🦑 갑오징어 cuttle · 창꼴뚜기 squid (v386 시안) — 몸통(외투)이 왼쪽 · 다리 여덟과 긴 촉완 둘이 오른쪽 · L = 촉완 끝까지 전체 길이
+ * 갑오징어: 넓적한 타원 몸통 둘레를 따라 얇은 지느러미 · 등에 물결 줄무늬 · W 꼴 눈동자 / 창꼴뚜기: 길쭉한 몸통 · 꼬리 쪽 마름모 지느러미 · 붉은 점
+ */
+function drawSquid(ctx, lk, L, opts) {
+  const sh = opts.shadow;
+  const detail = L >= 70 && !sh && !opts.lite;
+  const cut = lk.form === 'cuttle';
+  const t = (Number(opts.wag) || 0) * 6;
+  const [cD, cM, cL, cA] = lk.c;
+  const x0 = -L / 2;
+  const mEnd = cut ? L * 0.08 : L * 0.1;
+  const mcx = (x0 + mEnd) / 2;
+  const mrx = (mEnd - x0) / 2;
+  const mh = cut ? L * 0.15 : L * 0.065;
+  const fin = new Path2D();
+  if (cut) fin.ellipse(mcx, 0, mrx + L * 0.012, mh + L * 0.03, 0, 0, Math.PI * 2);
+  else { fin.moveTo(x0 - L * 0.005, 0); fin.lineTo(x0 + L * 0.17, -L * 0.115); fin.lineTo(x0 + L * 0.3, 0); fin.lineTo(x0 + L * 0.17, L * 0.115); fin.closePath(); }
+  const body = new Path2D();
+  if (cut) body.ellipse(mcx, 0, mrx, mh, 0, 0, Math.PI * 2);
+  else {
+    body.moveTo(x0, 0);
+    body.bezierCurveTo(x0 + L * 0.15, -mh * 0.9, mEnd - L * 0.12, -mh, mEnd, -mh * 0.95);
+    body.lineTo(mEnd, mh * 0.95);
+    body.bezierCurveTo(mEnd - L * 0.12, mh, x0 + L * 0.15, mh * 0.9, x0, 0);
+    body.closePath();
+  }
+  const hcx = mEnd + L * 0.05;
+  const hrx = L * 0.065;
+  const hry = mh * (cut ? 0.62 : 0.85);
+  const head = new Path2D();
+  head.ellipse(hcx, 0, hrx, hry, 0, 0, Math.PI * 2);
+  const base = hcx + hrx * 0.6;
+  const M = detail ? 12 : 7;
+  const arms = [];
+  for (let i = 0; i < 8; i++) {
+    const f = i / 7 - 0.5;
+    const len = L * (cut ? 0.14 : 0.16) * (0.8 + 0.2 * Math.sin(i * 1.9));
+    arms.push(limbPts(base, f * hry * 1.3, f * 0.7, len, M, (s) => Math.sin(t + i + s * 3) * 0.12 * s));
+  }
+  const tents = [-1, 1].map((sg) => limbPts(base, sg * hry * 0.22, sg * 0.06, L / 2 - base - L * 0.02, M + 4, (s) => Math.sin(t * 0.7 + sg + s * 3) * 0.1 * s));
+  if (sh) {
+    ctx.fillStyle = sh;
+    for (const pts of tents) ctx.fill(limbPath(pts, L * 0.006, L * 0.004));
+    ctx.fill(fin); ctx.fill(body); ctx.fill(head);
+    for (const pts of arms) ctx.fill(limbPath(pts, L * 0.016, L * 0.002));
+    return;
+  }
+  // 촉완(뒤) — 끝이 넓적한 곤봉
+  ctx.fillStyle = cA;
+  for (const pts of tents) {
+    ctx.fill(limbPath(pts, L * 0.006, L * 0.004));
+    const [x, y, an] = pts[pts.length - 1];
+    ctx.beginPath(); ctx.ellipse(x - Math.cos(an) * L * 0.015, y - Math.sin(an) * L * 0.015, L * 0.022, L * 0.009, an, 0, Math.PI * 2); ctx.fill();
+  }
+  // 지느러미 → 몸통 → 무늬
+  ctx.fillStyle = cA;
+  ctx.globalAlpha = cut ? 0.75 : 0.85;
+  ctx.fill(fin);
+  ctx.globalAlpha = 1;
+  const g = ctx.createLinearGradient(0, -mh, 0, mh);
+  g.addColorStop(0, cD); g.addColorStop(0.45, cM); g.addColorStop(1, cL);
+  ctx.fillStyle = g;
+  ctx.fill(body);
+  if (detail) {
+    const rnd = seeded(seedOfKey(lk.key));
+    ctx.save();
+    ctx.clip(body);
+    if (lk.stripe) {
+      ctx.strokeStyle = lk.stripe;
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = Math.max(0.8, L * 0.007);
+      for (let i = 0; i < 12; i++) {
+        const x = lerp(x0 + L * 0.06, mEnd - L * 0.04, i / 11);
+        ctx.beginPath(); ctx.moveTo(x, -mh);
+        for (let k = 1; k <= 4; k++) ctx.quadraticCurveTo(x + (k % 2 ? L * 0.012 : -L * 0.012), -mh + mh * 0.2 * (k - 0.5), x, -mh + mh * 0.2 * k);
+        ctx.stroke();
+      }
+    }
+    if (lk.dots) {
+      ctx.fillStyle = lk.dots;
+      ctx.globalAlpha = 0.55;
+      for (let i = 0; i < 46; i++) { ctx.beginPath(); ctx.arc(lerp(x0 + L * 0.03, mEnd, rnd()), lerp(-mh, mh * 0.6, rnd()), L * lerp(0.003, 0.007, rnd()), 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(mcx, -mh * 0.45, mrx * 0.6, mh * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  // 머리 → 다리 여덟 → 눈
+  ctx.fillStyle = cM;
+  ctx.fill(head);
+  for (let i = 0; i < arms.length; i++) { ctx.fillStyle = i % 2 ? cA : cM; ctx.fill(limbPath(arms[i], L * 0.016, L * 0.002)); }
+  const er = Math.max(1.2, L * (cut ? 0.026 : 0.028));
+  const ex = hcx - hrx * 0.1;
+  const ey = -hry * 0.25;
+  ctx.fillStyle = cut ? '#d8cfa8' : '#c9ccd2';
+  ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2); ctx.fill();
+  if (cut) {
+    // W 꼴 눈동자
+    ctx.strokeStyle = '#141414';
+    ctx.lineWidth = Math.max(0.8, er * 0.32);
+    ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(ex - er * 0.6, ey - er * 0.25); ctx.lineTo(ex - er * 0.3, ey + er * 0.3); ctx.lineTo(ex, ey - er * 0.05); ctx.lineTo(ex + er * 0.3, ey + er * 0.3); ctx.lineTo(ex + er * 0.6, ey - er * 0.25); ctx.stroke();
+    ctx.lineJoin = 'miter';
+  } else {
+    ctx.fillStyle = '#141414';
+    ctx.beginPath(); ctx.arc(ex, ey, er * 0.7, 0, Math.PI * 2); ctx.fill();
+  }
+  if (detail) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(ex - er * 0.3, ey - er * 0.35, er * 0.2, 0, Math.PI * 2); ctx.fill(); }
+}
+/** ⚓ 출항 장면의 작은 낚싯배 (v386) — 오른쪽을 보고 · (x, y) = 물에 닿는 뱃머리 아래 · s 배율(1 = 길이 약 150) · 낚싯배 장면(boatBank)과 같은 색 */
+export function drawBoat(ctx, x, y, s = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  // 물속 배 밑
+  ctx.fillStyle = 'rgba(128,56,50,.55)';
+  ctx.beginPath(); ctx.moveTo(-150, 0); ctx.lineTo(-6, 0); ctx.quadraticCurveTo(-14, 14, -40, 18); ctx.lineTo(-146, 18); ctx.closePath(); ctx.fill();
+  // 뱃전 · 파란 띠
+  const hull = new Path2D();
+  hull.moveTo(-150, -22); hull.lineTo(-40, -22); hull.quadraticCurveTo(-12, -24, 6, -38); hull.quadraticCurveTo(2, -16, -6, 1); hull.lineTo(-150, 1); hull.closePath();
+  ctx.fillStyle = '#eef0ec';
+  ctx.fill(hull);
+  ctx.save();
+  ctx.clip(hull);
+  ctx.fillStyle = '#2f5d9a';
+  ctx.fillRect(-160, -14, 180, 5);
+  ctx.restore();
+  // 조타실 · 창 · 지붕 · 안테나 · 깃발
+  ctx.fillStyle = '#f4f4ef';
+  ctx.fillRect(-120, -58, 46, 36);
+  ctx.fillStyle = '#2f5d9a';
+  ctx.fillRect(-124, -64, 54, 7);
+  ctx.fillStyle = '#9cc4dc';
+  ctx.fillRect(-114, -52, 34, 14);
+  ctx.strokeStyle = '#5a6068';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-104, -64); ctx.lineTo(-104, -96); ctx.stroke();
+  ctx.fillStyle = '#d4483f';
+  ctx.beginPath(); ctx.moveTo(-104, -96); ctx.lineTo(-86, -91); ctx.lineTo(-104, -86); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#f07a24';
+  ctx.beginPath(); ctx.arc(-84, -34, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+/** 💨 먹물 (v386 시안) — 문어 무리가 사투에서 오답일 때 · (x, y) 가운데 · s 크기(px) · k 0 → 1 퍼지며 옅어짐 */
+export function drawInk(ctx, x, y, s, k = 0.4) {
+  const rnd = seeded(29);
+  const kk = Math.min(1, Math.max(0, Number(k) || 0));
+  for (let i = 0; i < 9; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = s * (0.15 + 0.55 * rnd()) * (0.4 + kk);
+    const r = s * (0.18 + 0.22 * rnd()) * (0.5 + kk);
+    const cx = x + Math.cos(a) * d;
+    const cy = y + Math.sin(a) * d * 0.7;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `rgba(22,18,28,${(0.8 * (1 - kk)).toFixed(3)})`);
+    g.addColorStop(1, 'rgba(22,18,28,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 /**
  * 물고기 한 마리 — (x, y)가 몸 가운데 · L = 전체 길이(px) · 주둥이는 왼쪽(opts.flip이면 오른쪽)
  * opts.wag 꼬리 흔들기(라디안) · opts.pitch 몸 기울기 · opts.shadow 그림자 색(있으면 실루엣만) · opts.alpha
@@ -394,11 +757,14 @@ export function drawFish(ctx, key, x, y, L, opts = {}) {
   const lk = { ...lk0, key };
   ctx.save();
   ctx.translate(x, y);
-  if (opts.flip) ctx.scale(-1, 1);
+  if (opts.flip || lk.faceR) ctx.scale(-1, 1); // 문치가자미는 늘 머리가 오른쪽 (v386 — 「좌광우도」)
   if (opts.pitch) ctx.rotate(opts.pitch);
   if (opts.alpha !== undefined) ctx.globalAlpha = opts.alpha;
   if (lk.tail === 'eel') { drawEel(ctx, lk, L, opts); ctx.restore(); return; }
-  const detail = L >= 70 && !opts.shadow;
+  if (lk.tail === 'ribbon') { drawRibbon(ctx, lk, L, opts); ctx.restore(); return; }
+  if (lk.form === 'octo') { drawOcto(ctx, lk, L, opts); ctx.restore(); return; }
+  if (lk.form === 'cuttle' || lk.form === 'squid') { drawSquid(ctx, lk, L, opts); ctx.restore(); return; }
+  const detail = L >= 70 && !opts.shadow && !opts.lite; // opts.lite = 느린 기기(무늬를 줄임 · v386 Codex 189차)
   const b = body(lk, L);
   const wag = Number(opts.wag) || 0;
   const tail = tailPath(lk, b, L);
@@ -421,10 +787,12 @@ export function drawFish(ctx, key, x, y, L, opts = {}) {
     const ya = edgeY(lk, b, a, true) * 0.9;
     ctx.beginPath(); ctx.moveTo(b.x0 + b.Lb * a, ya); ctx.quadraticCurveTo(b.x0 + b.Lb * (a + z) / 2, ya - b.hd * 0.4, b.x0 + b.Lb * z, edgeY(lk, b, z, true) * 0.9); ctx.fill();
   }
-  // 배지느러미
-  ctx.beginPath();
-  const pv = b.x0 + b.Lb * 0.45;
-  ctx.moveTo(pv, b.hd * 0.8); ctx.lineTo(pv + b.Lb * 0.09, b.hd * 1.25); ctx.lineTo(pv + b.Lb * 0.1, b.hd * 0.78); ctx.fill();
+  // 배지느러미 (가자미 무리는 위에서 본 모습이라 안 그림)
+  if (!lk.flat) {
+    ctx.beginPath();
+    const pv = b.x0 + b.Lb * 0.45;
+    ctx.moveTo(pv, b.hd * 0.8); ctx.lineTo(pv + b.Lb * 0.09, b.hd * 1.25); ctx.lineTo(pv + b.Lb * 0.1, b.hd * 0.78); ctx.fill();
+  }
   ctx.save(); ctx.translate(b.x0 + b.Lb - 1, 0); ctx.rotate(wag); ctx.fill(tail);
   if (detail) {
     ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 0.8;
@@ -439,16 +807,17 @@ export function drawFish(ctx, key, x, y, L, opts = {}) {
   ctx.save();
   ctx.clip(b.p);
   patterns(ctx, lk, b, key, detail);
-  // 위에서 오는 빛 — 등은 어둡게 배는 밝게(입체)
-  const sh = ctx.createLinearGradient(0, -b.hd, 0, b.hd);
-  sh.addColorStop(0, 'rgba(0,0,0,.18)'); sh.addColorStop(0.5, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(255,255,255,.1)');
+  // 위에서 오는 빛 — 등은 어둡게 배는 밝게(입체) · 가자미 무리는 위에서 본 모습이라 가운데가 살짝 밝게 (v386)
+  const sh = lk.flat ? ctx.createRadialGradient(b.x0 + b.Lb * 0.45, -b.hd * 0.2, b.hd * 0.1, b.x0 + b.Lb * 0.45, 0, b.Lb * 0.6) : ctx.createLinearGradient(0, -b.hd, 0, b.hd);
+  if (lk.flat) { sh.addColorStop(0, 'rgba(255,255,255,.12)'); sh.addColorStop(1, 'rgba(0,0,0,.14)'); } else { sh.addColorStop(0, 'rgba(0,0,0,.18)'); sh.addColorStop(0.5, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(255,255,255,.1)'); }
   ctx.fillStyle = sh;
   ctx.fillRect(b.x0, -b.hd, b.Lb, b.hd * 2);
   ctx.restore();
-  // 가슴지느러미
+  // 가슴지느러미 (pec = 길이 몫 — 부시리는 짧다 · v386)
   ctx.fillStyle = lk.c[3];
   ctx.globalAlpha = fa * 0.7;
-  ctx.beginPath(); ctx.ellipse(b.x0 + b.Lb * 0.24, b.hd * 0.4, b.Lb * 0.075, b.hd * 0.16, 0.5 + wag * 0.5, 0, Math.PI * 2); ctx.fill();
+  const pk = Number(lk.pec) || 1;
+  ctx.beginPath(); ctx.ellipse(b.x0 + b.Lb * (0.24 + 0.075 * (pk - 1)), b.hd * 0.4, b.Lb * 0.075 * pk, b.hd * 0.16, 0.5 + wag * 0.5, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = fa;
   face(ctx, lk, b, L, detail);
   ctx.restore();
@@ -509,7 +878,8 @@ function landHills(ctx, sky, x0, x1) {
  */
 export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, wx = 'sun', place = 'lake') {
   const river = place === 'river';
-  const sea = place === 'sea'; // 🌊 바다 방파제 (v369 시안) — 산 대신 먼 섬 · 잔교 대신 방파제 · 테트라포드 · 등대 · 모래 바닥
+  const boat = place === 'boat'; // 🚤 배 낚시 (v386 시안) — 바다 그대로 · 방파제 대신 낚싯배 · 먼 섬 하나 · 물속 바위
+  const sea = place === 'sea' || boat; // 🌊 바다 방파제 (v369 시안) — 산 대신 먼 섬 · 잔교 대신 방파제 · 테트라포드 · 등대 · 모래 바닥
   const sky = skyOf(t);
   const sun = sunAt(t);
   const veil = WX_VEIL[wx] || '';
@@ -536,7 +906,7 @@ export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, 
     for (const [cx, cy, s] of MORE_CLOUDS) cloud(ctx, cx, cy, s);
   }
   // 먼 산 · 가까운 산 · 숲 줄 (바다는 먼 섬과 수평선)
-  if (sea) seaHorizon(ctx, sky, x0, x1);
+  if (sea) seaHorizon(ctx, sky, x0, x1, boat);
   else landHills(ctx, sky, x0, x1);
   // 물 — 윗면은 하늘을 비추고 아래로 깊어진다
   const w = ctx.createLinearGradient(0, WATER_Y, 0, y1);
@@ -559,7 +929,7 @@ export function paintStatic(ctx, t, x0 = 0, x1 = SCENE_W, y0 = 0, y1 = SCENE_H, 
   const rnd = seeded(7);
   ctx.fillStyle = sea ? 'rgba(232,222,190,.55)' : river ? 'rgba(190,182,150,.6)' : 'rgba(160,150,110,.5)';
   for (let i = 0; i < (river || sea ? 150 : 70); i++) { const x = lerp(x0, x1, rnd()); ctx.beginPath(); ctx.ellipse(x, bottomY(x) + 6 + rnd() * 20, 2 + rnd() * 4, 1.5 + rnd() * 2, 0, 0, Math.PI * 2); ctx.fill(); }
-  if (sea) { seaBank(ctx, x0, x1); if (veil) { ctx.fillStyle = wx === 'rain' ? 'rgba(70,80,92,.22)' : 'rgba(90,100,112,.14)'; ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y); } return; }
+  if (sea) { (boat ? boatBank : seaBank)(ctx, x0, x1); if (veil) { ctx.fillStyle = wx === 'rain' ? 'rgba(70,80,92,.22)' : 'rgba(90,100,112,.14)'; ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y); } return; }
   ctx.fillStyle = '#3a3a2c';
   for (const [x, rx, ry] of [[420, 30, 16], [860, 40, 20], [960, 22, 12]]) { ctx.beginPath(); ctx.ellipse(x, bottomY(x) + 4, rx, ry, 0, Math.PI, 0); ctx.fill(); }
   if (river) { riverBank(ctx, x0, x1); if (veil) { ctx.fillStyle = wx === 'rain' ? 'rgba(70,80,92,.22)' : 'rgba(90,100,112,.14)'; ctx.fillRect(x0, WATER_Y, x1 - x0, y1 - WATER_Y); } return; }
@@ -631,10 +1001,10 @@ function riverBank(ctx, x0, x1) {
   }
 }
 
-/** 🌊 먼 섬 둘 · 수평선 안개 (v369 시안 — 바다엔 산 대신) */
-function seaHorizon(ctx, sky, x0, x1) {
+/** 🌊 먼 섬 둘 · 수평선 안개 (v369 시안 — 바다엔 산 대신) · 🚤 배 낚시는 더 먼 바다라 낮은 섬 하나 (v386) */
+function seaHorizon(ctx, sky, x0, x1, far = false) {
   ctx.fillStyle = mix('#8ea4ae', '#6d6f80', sky.k);
-  for (const [a, z, h] of [[300, 540, 26], [760, 920, 16]]) {
+  for (const [a, z, h] of far ? [[560, 700, 9]] : [[300, 540, 26], [760, 920, 16]]) {
     ctx.beginPath(); ctx.moveTo(a, WATER_Y);
     ctx.bezierCurveTo(a + (z - a) * 0.2, WATER_Y - h, a + (z - a) * 0.6, WATER_Y - h * 1.1, z, WATER_Y);
     ctx.closePath(); ctx.fill();
@@ -709,6 +1079,77 @@ function seaBank(ctx, x0, x1) {
   ctx.fillStyle = '#c23b33';
   ctx.beginPath(); ctx.moveTo(lx - 10, 98); ctx.lineTo(lx, 86); ctx.lineTo(lx + 10, 98); ctx.closePath(); ctx.fill();
 }
+/**
+ * 🚤 낚싯배 (v386 시안) — 캐릭터가 서는 갑판(잔교 자리 · 윗면 = 잔교 윗면) · 흰 뱃전과 파란 띠 · 위로 솟은 뱃머리 · 물속 배 밑(붉은 칠 · 물빛으로 흐리게) ·
+ * 왼쪽 조타실(창 · 주황 구명 튜브 · 안테나와 깃발) · 갑판 난간 · 물속 바위(14m 「물속 바위」)
+ */
+function boatBank(ctx, x0, x1) {
+  const top = DOCK_Y - 10;
+  const bow = DOCK_X + 36;
+  // 물속 바위 무리 (여)
+  for (const [x, rx, ry, c] of [[700, 52, 40, '#3e4a52'], [760, 40, 30, '#46525a'], [812, 56, 44, '#3a464e'], [858, 30, 22, '#44505a']]) {
+    const by = bottomY(x) + 6;
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.ellipse(x, by, rx, ry, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = 'rgba(150,190,200,.12)';
+    ctx.beginPath(); ctx.ellipse(x - rx * 0.25, by - ry * 0.7, rx * 0.45, ry * 0.18, -0.2, 0, Math.PI * 2); ctx.fill();
+  }
+  // 배 밑 (물속 — 붉은 칠을 물빛으로 흐리게)
+  ctx.fillStyle = 'rgba(128,56,50,.55)';
+  ctx.beginPath(); ctx.moveTo(x0, WATER_Y); ctx.lineTo(bow - 6, WATER_Y); ctx.quadraticCurveTo(bow - 16, WATER_Y + 34, bow - 64, WATER_Y + 46); ctx.lineTo(x0, WATER_Y + 50); ctx.closePath(); ctx.fill();
+  // 뱃전 (물 위 — 흰 칠 · 뱃머리는 위로)
+  const hull = new Path2D();
+  hull.moveTo(x0, top);
+  hull.lineTo(DOCK_X - 34, top);
+  hull.quadraticCurveTo(DOCK_X + 8, top - 2, bow + 8, top - 20);
+  hull.quadraticCurveTo(bow + 2, WATER_Y - 16, bow - 6, WATER_Y + 1);
+  hull.lineTo(x0, WATER_Y + 1);
+  hull.closePath();
+  ctx.fillStyle = '#eef0ec';
+  ctx.fill(hull);
+  ctx.save();
+  ctx.clip(hull);
+  ctx.fillStyle = '#2f5d9a';
+  ctx.fillRect(x0, top + 8, bow + 20 - x0, 6);
+  ctx.fillStyle = 'rgba(60,70,80,.18)';
+  ctx.fillRect(x0, WATER_Y - 5, bow + 20 - x0, 6);
+  ctx.restore();
+  // 갑판 가장자리 · 난간
+  ctx.strokeStyle = '#b9bdb6';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x0, top + 1); ctx.lineTo(DOCK_X - 34, top + 1); ctx.quadraticCurveTo(DOCK_X + 8, top - 1, bow + 8, top - 19); ctx.stroke();
+  ctx.strokeStyle = '#8e949a';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(Math.max(x0, 66), top - 16); ctx.lineTo(DOCK_X - 34, top - 16); ctx.quadraticCurveTo(DOCK_X + 6, top - 18, bow + 4, top - 34); ctx.stroke();
+  for (const px of [96, 150, 204, 250]) {
+    const y = px < DOCK_X - 34 ? top : top - ((px - (DOCK_X - 34)) / (bow + 8 - (DOCK_X - 34))) * 19;
+    ctx.beginPath(); ctx.moveTo(px, y); ctx.lineTo(px, y - 16 - (px > DOCK_X - 34 ? (px - (DOCK_X - 34)) * 0.2 : 0)); ctx.stroke();
+  }
+  // 조타실 — 흰 벽 · 파란 지붕 · 창 · 주황 구명 튜브
+  const cx0 = Math.max(x0, -60);
+  ctx.fillStyle = '#f4f4ef';
+  ctx.fillRect(cx0, 112, 58 - cx0, top - 112);
+  ctx.fillStyle = '#2f5d9a';
+  ctx.fillRect(cx0 - 4, 104, 66 - cx0, 10);
+  ctx.fillStyle = '#9cc4dc';
+  ctx.fillRect(10, 124, 38, 22);
+  ctx.strokeStyle = '#5c6e7c';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(10, 124, 38, 22);
+  ctx.beginPath(); ctx.moveTo(29, 124); ctx.lineTo(29, 146); ctx.stroke();
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = '#f07a24';
+  ctx.beginPath(); ctx.arc(30, 166, 8, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 5;
+  for (const a of [0.4, 2.0, 3.6, 5.2]) { ctx.beginPath(); ctx.arc(30, 166, 8, a, a + 0.35); ctx.stroke(); }
+  // 안테나 · 깃발
+  ctx.strokeStyle = '#5a6068';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(22, 104); ctx.lineTo(22, 58); ctx.moveTo(12, 70); ctx.lineTo(32, 70); ctx.stroke();
+  ctx.fillStyle = '#d4483f';
+  ctx.beginPath(); ctx.moveTo(22, 58); ctx.lineTo(44, 64); ctx.lineTo(22, 70); ctx.closePath(); ctx.fill();
+}
 
 // ───────────── 움직이는 것 (프레임마다) ─────────────
 
@@ -716,7 +1157,7 @@ function seaBank(ctx, x0, x1) {
 export function drawWaterFx(ctx, now, reduce, lite, x0 = 0, x1 = SCENE_W, wx = 'sun', place = 'lake') {
   const t = reduce ? 0 : now / 1000;
   if (place === 'river') { riverFx(ctx, t, lite, x0, x1, wx); return; }
-  if (place === 'sea') { seaFx(ctx, t, lite, x0, x1, wx); return; }
+  if (place === 'sea' || place === 'boat') { seaFx(ctx, t, lite, x0, x1, wx); return; }
   const wind = wx === 'wind';
   const amp = wind ? 3.4 : 1.2;
   ctx.strokeStyle = wind ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.28)';
