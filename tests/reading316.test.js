@@ -15,12 +15,13 @@ const CARDS = new Map(JSON.parse(read('coach/korean/reading.json')).cards.map((c
 const READ = LIST.filter((t) => t.card);
 const lineText = (l) => (typeof l === 'string' ? l : (l && (l.t || l.text)) || '');
 
-test('📖 원고 — 독서 논술 마흔(v316 N33~N42 이야기 · v353·v370·v376 N63부터 셋째마다 — 기사문·생활문·토의 글도) · 근거 줄은 그 글 안 · 편마다 글에 근거가 있는 이유 하나 이상 · 지어낸 말은 글에 그대로 없다', () => {
+test('📖 원고 — 독서 논술 쉰(v316 N33~N42 이야기 · v353·v370·v376·v383 N63부터 셋째마다 — 기사문·생활문·토의 글도) · 근거 줄은 그 글 안 · 편마다 글에 근거가 있는 이유 하나 이상 · 지어낸 말은 글에 그대로 없다', () => {
   const V316 = Array.from({ length: 10 }, (_, i) => `N${33 + i}`);
-  assert.deepEqual(READ.map((t) => t.id), [...V316, ...Array.from({ length: 30 }, (_, i) => `N${63 + 3 * i}`)]);
+  assert.deepEqual(READ.map((t) => t.id), [...V316, ...Array.from({ length: 40 }, (_, i) => `N${63 + 3 * i}`)]);
   assert.deepEqual(READ.map((t) => t.card), ['K68', 'K4', 'K66', 'K53', 'K31', 'K95', 'K71', 'K19', 'K33', 'K32', 'K124', 'K73', 'K1', 'K119', 'K76', 'K20', 'K92', 'K47', 'K61', 'K41',
     'K116', 'K129', 'K111', 'K5', 'K128', 'K77', 'K63', 'K117', 'K23', 'K49', // v370 — 한쪽 주장만 펴는 글은 반대편 근거 줄이 없어 뺐다
-    'K144', 'K150', 'K141', 'K138', 'K152', 'K131', 'K147', 'K75', 'K39', 'K156']); // v376 — 양쪽 근거가 글 안에 다 있는 글만
+    'K144', 'K150', 'K141', 'K138', 'K152', 'K131', 'K147', 'K75', 'K39', 'K156', // v376 — 양쪽 근거가 글 안에 다 있는 글만
+    'K97', 'K67', 'K21', 'K98', 'K78', 'K12', 'K153', 'K74', 'K157', 'K132']); // v383 — K153·K157은 11월 8~10일쯤 열리는 4-2 글이라 묶음 뒤쪽(19·25번째)
   assert.equal(new Set(READ.map((t) => t.card)).size, READ.length, '글마다 주제 하나');
   for (const t of READ) {
     const c = CARDS.get(t.card);
@@ -96,6 +97,16 @@ test('📖 토의·두 의견 글 — 이유가 말한 사람을 대면 근거 �
   const n75 = READ.find((x) => x.id === 'N75');
   assert.deepEqual(n75.no.ev, [[9], [], [8]]);
   assert.ok(!n75.no.reasons.some((r) => r.includes('푸바오')));
+  // v383 Codex 186차 — 인용한 줄에 없는 판단은 생각 이유로(N162 ② 「잘 아는 친구도 있다」 ≠ 「반가워한다」 · N174 ③ 「들여온 품종」 ≠ 「새로 익혀야」) · 이유의 핵심 수치가 있는 줄까지(N159 3분 ⑨)
+  const R = (id) => READ.find((x) => x.id === id);
+  assert.deepEqual(R('N162').yes.ev[1], []);
+  assert.deepEqual(R('N174').no.ev[1], []);
+  assert.deepEqual(R('N159').yes.ev[0], [9, 10]);
+  // 광고의 약속은 광고의 말로(사실처럼 「더 받을 수 있어요」 아님) · 상관없는 말은 방법 고르기와 이어 읽히는 「부피가 늘어나요」가 아님
+  assert.ok(R('N168').yes.reasons.every((r) => !/^지금 사면/.test(r)) && R('N168').yes.reasons.some((r) => r.startsWith('광고에는 지금 사면')));
+  assert.ok(!R('N171').off.some((o) => /부피가 10분의 1/.test(o.t)));
+  // 한쪽 선택을 압박하던 말(N180 「다시 해 봐야」 · N176 「조르지 말고」)
+  assert.ok(!txt.includes('다시 해 봐야 다음에도 겁내지 않아요') && !/조르지 말고/.test(JSON.stringify(LIST)));
 });
 
 test('📖 checkNonsul — 독서 논술 칸이 깨지면 잡는다 · card 없는 주제는 예전 그대로', () => {
