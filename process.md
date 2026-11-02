@@ -8738,3 +8738,63 @@
 - [ ] v382 검수 「이대로」 → 변이 검사 · 폰 화면 걷기 · Codex 185차 → 전체 시험 → 「배포」
 - [ ] 🖊️ 논술 일곱째 묶음 원고(N153~) → 검수 페이지
 - [ ] 🏠 손님 포켓몬 · 🏘️ 우리 동네 · 📸 액자 사진 — 기본안부터(「새 화면인지 집 안 흐름인지」 1번으로)
+
+## 2026-11-02 — 🏡 집 다음 셋 기본안 (📸 액자 사진 · 🐾 손님 포켓몬 · 🏘️ 우리 동네 — v384 후보)
+
+### 진행 내용
+- 아버님 「손님 포켓몬 · 우리 동네 · 액자 사진 기본안 보자」 → 먼저 지금 상태를 봄: 셋 다 아직 안 만듦(git log) · 🖼️ 액자는 이미 파는 벽 소품(꾸밈뿐) · 놀기 장면(PLAYS 15)·💗(bond)·공부 시간 셈(minigame.studySec)이 있음 · 비공개 usage로 집에 머문 시간과 낚시터 시간을 견줌(수치는 대화로만)
+- 기본안 https://claude.ai/artifact/YQH1987JwBjJepXdE1iWqc (`.context/v384/home_basic.html`) — 원칙: 집 안(홈 화면엔 🔔만) · 새 보상은 💗와 사진뿐 · 진짜 카메라 없음(앱이 그린 장면 = 사진, 저장은 누가·무엇·언제·차림) · 셈 문구 없음 · 합치기 규칙 그대로
+  - ① 📸: 놀기 끝 카드 [📸 사진 찍기] → [📷 앨범] 30장(가득 차면 진우가 뺄 것 고름) → 벽 🖼️ 액자에 걸기 · 공부 기념 사진(🎣·🎒)은 2단계
+  - ② 🐾: 그날 공부 15분 뒤 하루 한 번 · 가진 포켓몬(파트너 빼고) 오래 안 온 것부터 · 첫 타입별 좋아하는 놀이 표(진우에게 맡겨도) · 손님에게 💗 +1 · 같이 사진 · 다음 날 떠남
+  - ③ 🏘️: A 손님이 사는 동네(보기 위주 · 추천) / B 앱 지도 / C 산책 놀이 — 손님을 한두 주 써 본 뒤 다시 여쭘
+  - 정할 것 11 → 아버님 답 기다림
+
+### 📸 v384 액자 사진 구현 (아버님 기본안 「추천대로」 — ① 📸부터)
+- 새 파일: `js/photo.js`(순수 규칙 — PHOTO_MAX 30 · photoRecOf·photosOf·copyPhotos·mergePhotos · takePhotoRule(가득 차면 drop 없이는 why full — 저절로 안 뺌 · 뺀 사진은 gone · 같은 id는 again) · hangRule(놓인 🖼️ 액자에만 · 앨범에 있는 사진만 · '' 빈 액자 · 때는 늘 앞으로) · framePhotoOf·hungIds) · `js/photoview.js`(📷 앨범 view·hang·drop · 🔍 크게 보기 · 사진 카드 — 파트너 그림이 없으면 🐾 뒤 받아 오면 다시 그림)
+- `js/playart.js` photoStageHtml(장면 무대 + 끝 이름표 + is-photo · 🎮 점수) · photoCaption(장면 끝말 💗 없이) · `js/playshow.js` o.onPhoto → [📸 사진 찍기](끝 모습 · 직접 하는 장면은 처음부터 · 한 장 · 번쩍 · 건너뛰기에서 뺌)
+- `js/houseview.js` 탭 [📷 앨범] · 액자 도구 [🔍 크게 보기][🖼️ 사진 걸기/바꾸기] · 벽 액자 속 작은 사진 · 놀기 장면에 onPhoto(그때 차림·파트너·방 색) · 가득 차면 장면 뒤 📷 앨범 drop(고르고 다시 누르면 풀기 · [🗑️ 고른 사진을 빼고 새 사진 넣기] · 그만두기) · 상태 ui.hang·pendingPhoto·albumSel 풀기(열기·닫기·탭·다시 읽기)
+- 저장 잇기: `js/xp.js` takePhoto·hangPhoto·photosNow · fromStored 복사 · `js/db.js` cloneProfile 복사 · 프로필 병합 mergePhotos · `css/style.css` 사진·앨범·액자·크게 보기(움직임은 -30s에 멈춤) · `sw.js` APP_SHELL 둘 · sw·앱 판 v384
+- 시험: `tests/photo384.test.js` 10 · `tests/house.test.js` 탭 · 관련 옛 시험 362 통과 · 변이 **36/36**(`.context/v384/mutate_v384.mjs` — 처음 「앨범 31장」 놓침 → 30장 못 박음)
+- 걷기 `.context/v384/walk384.sh` 1024·390: 장면 중 단추 숨김 → 끝에 [📸] · 번쩍 · 두 번 눌러도 한 장 · 장면 열넷 + 혼자 둘 앨범 그림(실제 끝 모습과 같음) · 크게 보기 · 걸기·바꾸기·그만두기 · 벽 작은 사진 · 가득 참 → 장면 뒤 고르기 → 빼고 넣기(30장) · 그만두기(30장 그대로) · 넘침 0 · 콘솔 0 · 폰 폭 앨범 두 줄로(칸 최소 124px)
+- Codex 187차 띄움(`.context/v384/codex187_prompt.txt`)
+
+### v384 Codex 187차 (`.context/v384/codex187.md` — P1 3 · P2 2 · 지정 시험 79 통과) → 판단 표(모두 「받음」 추천) → 아버님 「추천대로 하기 전에 /ress·clear, 다음 세션에서」
+- ① P1 뺀 표(gone)를 300에서 자르면 301번째 교체부터 맨 처음 뺀 사진이 옛 백업으로 되살아나고 아끼던 사진이 밀려남(Codex 재현) → GONE_MAX 3,000(몇 년치 · 다 차도 100KB 남짓) + 시험(29장 유지 → 301번 교체 → 첫 뺀 사진 든 백업 병합 → 안 되살아남·유지 사진 그대로)
+- ② P1 [📸] 누르고 저장 대답 전에 [좋아!]로 닫으면 늦은 full이 고르기 화면을 못 엶(그 뒤 앨범 탭을 누르면 goTab이 새 사진도 지움) → playshow onOk가 사진 저장 Promise를 기다린 뒤 닫기(closePlay/집 닫기는 그대로 즉시) + 순서 시험(저장 보류 → 좋아 → full → drop 화면)
+- ③ P1 액자를 서랍↔방 오가며 frames 열쇠가 쌓여 200 넘으면 새로 건 사진이 「걸었어요」인데 빈 액자 · 병합 차례에 따라 다름 → hangRule에서 지금 방에 없는 액자 열쇠 지우기 + photosOf 상한은 바꾼 때 최근 것부터(차례 무관) + 시험(놓기·서랍 반복 뒤 걸기 보존 · mergePhotos(a,b)=(b,a) 200 경계)
+- ④ P2 💗 2·3단계 테두리·반짝임(::before/::after)이 사진에서도 움직임 → 멈춤 규칙에 ::before·::after
+- ⑤ P2 크게 보기 — 초점 가두기·Esc 닫기 · 돌아갈 단추가 사라졌으면 [📷 앨범] 탭으로
+- 괜찮다고 본 것: 저장 경로(full·changed·gone·같은 id) · 보상 없음 · 개인 정보 없음 · 끝 모습 일치 · 같은 방 옮기기 · 새 시험은 10이 아니라 9개(보고를 바로잡음)
+
+### v384 Codex 187차 반영 (11-02 · 새 세션 — 판단 표 다섯 「추천대로」)
+- ① `js/photo.js` GONE_MAX 300 → 3,000(까닭 주석) · 시험: 29장 아끼고 한 자리만 301번 바꿈 → 첫 뺀 사진이 든 옛 백업과 합쳐도 안 되살아남·29장 그대로·(a,b)=(b,a)
+- ② `js/playshow.js` onPhoto가 저장 Promise를 `mine.saving`에(풀리기 전에 null) · onOk는 saving이면 `closeAfterSave`(새 export — 대답 뒤 닫기 · 기다리며 또 눌러도 한 번 · 실패해도 닫힘 · 그새 다른 장면이면 안 닫음 · 대답 뒤 saving 비움)로 · closePlay(집 닫기)는 그대로 바로 · 순서 시험(보류 → 좋아 → full → 닫힘 → 앨범)
+- ③ hangRule이 지금 놓인 🖼️ 액자 칸만 남기고 지움(지운 것은 기록 안 함 — 옛 백업이 되돌려도 놓인 액자가 아니라 그만) · photosOf 액자 칸 끝(200)은 바꾼 때가 나중인 것부터 · 같은 때는 열쇠 차례 · 시험: 서랍↔방 210번(걸 때마다 정말 걸림 · 칸은 놓인 둘만 · 다른 액자 그대로) · 200 경계(맨 뒤에 붙은 새 칸 남음 · (a,b)=(b,a) · 같은 때 250칸 차례 무관)
+- ④ `css/style.css` 멈춤 규칙에 `.is-photo::before·::after`와 `*::before·*::after`
+- ⑤ `js/photoview.js` aria-modal · Esc 닫기 · Tab은 닫기 단추에 · focusin으로 뒤로 빠진 초점 되돌림 · 열 때 o.backTo(houseview `bigOpts` = [📷 앨범] 탭) — 누른 단추가 사라졌으면 그리로
+- 덤: db.js·xp.js import 줄 끝 주석이 사진 줄에 붙어 있던 것 제자리로(동작 같음)
+- 시험 photo384 9 → 14(새 5) · photo384+house 56 통과 · 변이 **54/54**(`.context/v384/mutate_v384.mjs`에 19 보탬 — 파일에 photoview·style.css 더함 · 「뺀 표 400」은 「300(옛 값)」·「4000」으로) · 새 걷기 `.context/v384/walk384b.sh`+`hh384b.js`(다른 연결로 IndexedDB profile 쓰기 트랜잭션을 잡아 저장을 붙잡음) 1024·390: ④ ::before·::after paused · ⑤ Tab 막음·뒤로 빠진 초점 되돌림·Esc·다시 그린 뒤 앨범 탭으로 · ② 붙잡은 채 좋아 → 1.5초 뒤에도 장면 → 풀면 닫히고 「📷 앨범이 가득 찼어요」 새 사진 있음 → 빼고 넣기 30장 · 넘침 0 · 콘솔 0 · 옛 걷기 walk384 1024 다시 — 같은 밀리초 사진 차례 말고 같음 · 전체 **3390** 통과
+- 걷기 함정: 같은 탭을 다시 누르면 goTab이 일찍 돌아가 다시 그리지 않는다 → 「다시 그림」은 다른 탭 → 그 탭으로
+
+## 2026-11-02 — 세션 정리 (/ress · clear 전 · 아버님 「세션이 많이 찼으니」)
+
+### 진행 내용
+- 이 세션(새 세션): 다음 일 추천 → 아버님 차례(국어 일곱째 → 논술 일곱째 → 집 셋) · v382 국어 일곱째 검수·Codex 185차·배포(3040732) · v383 논술 일곱째 일꾼 원고·검수·Codex 186차 25곳·배포(8a4e6e8) · docs 63bbd93 · 집 다음 셋 기본안 YQH1987JwBjJepXdE1iWqc 「추천대로」 · 📸 v384 구현·시험·변이 36/36·걷기 1024·390·Codex 187차 판단 표
+
+### 변경 파일 (커밋 안 된 것 — v384)
+- 새: `js/photo.js` · `js/photoview.js` · `tests/photo384.test.js`
+- 고침: `js/playart.js` · `js/playshow.js` · `js/houseview.js` · `js/xp.js` · `js/db.js` · `css/style.css` · `sw.js`·`js/version.js`(v384) · `tests/house.test.js`(탭) · `process.md`
+- `js/blackbox.js` — 줄 끝만 다름(계속 커밋 안 함)
+- (저장소 밖) `.context/v384/` — home_basic.html(기본안) · hh384.js · walk384.sh(+로그) · mutate_v384.mjs · codex187_prompt.txt·codex187.md
+
+### 결정사항 / 메모
+- 자동 열림 env 0이 이 세션에서 먹음(검수·기본안 게시 넷 — 창 안 뜸)
+- 두 판을 한 작업 트리에서 낼 때: 커밋은 파일을 골라 둘로 · 뒤 판 push는 앞 판 라이브 확인 뒤
+- 판을 「정확히 vNNN」으로 못 박은 시험은 다음 판에서 깨진다(coach381) → 「이상」으로
+
+### TODO (다음 작업)
+- [x] 다음 세션 첫 일: v384 Codex 187차 판단 표 다섯 반영(위 절) → 시험·변이 54/54·걷기 1024·390·전체 3390 끝
+- [ ] 아버님 「배포」 → feat v384(js/photo.js·photoview.js·playart.js·playshow.js·houseview.js·xp.js·db.js·css/style.css·sw.js·version.js·tests/photo384·house — blackbox.js 빼고) + docs process.md → push → 라이브 확인(live_check383 본떠 v384 새로)
+- [ ] 그다음 ② 🐾 손님 포켓몬(기본안 그대로 — 그날 공부 15분 뒤 하루 한 번) · ③ 🏘️ 동네는 손님 한두 주 써 본 뒤 여쭘
+- [ ] 태블릿 앱 다시 열기(v375 → v383/v384) · 「올라온 거 봐 줘」 때 🖊️ 해 본 주제 · 수학 첫 오답 · 🐋 단계별 주 단위
+- [ ] 11/7 토요일 대여행 v375 반응 → 🎒 몬스터볼·구역 도착 · 국어 12월 방향은 11월 중순에 여쭘
