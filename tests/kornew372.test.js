@@ -40,7 +40,7 @@ const LINK4 = {
 test('📘 다섯째 묶음 열둘 (v372): 연습 열 + ✨ 명작 둘 · 물음 서른여섯(셋씩) · 원고 검사 통과 · 7~12줄 · ✍️ 둘 · 게임 대화창은 줄마다 · 바탕 글 넷', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(IDS.slice(154, 166), NEW); // v380 여섯째 묶음이 뒤에 이어짐
-  assert.equal(validCards(DATA).length, 190); // v380 여섯째 묶음 열둘 · v382 일곱째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 202); // v380 여섯째 묶음 열둘 · v382 일곱째 묶음 열둘 · v389 여덟째 묶음 열둘 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '이야기'], ['classic', '옛이야기'], ['practice', '설명하는 글'], ['practice', '날씨 예보(방송)'], ['practice', '온라인 대화(게임 대화창)'], ['practice', '생활문'],
     ['practice', '초대장'], ['classic', '동시'], ['practice', '설명하는 글'], ['practice', '설명하는 글'], ['practice', '독서 편지'], ['practice', '제안하는 글']]);
@@ -78,12 +78,12 @@ test('📘 단원 (v372): 새 글은 4-2 단원 하나씩 · 만나는 곳은 �
     assert.ok(!card(id).meta.some((m) => /\[6국/.test(m)), `${id} 5~6학년 성취기준 없음`);
   }
   const of = (uid) => UNITS.find((u) => u.id === uid).cards;
-  assert.deepEqual(of('4-2-5'), ['K114', 'K126', 'K137', 'K188', 'K138', 'K159', 'K160', 'K171', 'K115', 'K127', 'K139', 'K161', 'K170', 'K187', 'K128'], '① 온라인 대화 → 가리키는 말·이어 주는 말 → ② 편지·초대장 → 일기');
-  assert.deepEqual(of('4-2-6'), ['K116', 'K130', 'K140', 'K142', 'K153', 'K154', 'K157', 'K158', 'K167', 'K169', 'K189', 'K117', 'K129', 'K141', 'K152', 'K156', 'K155', 'K168', 'K190'], '① 원인과 결과 → ② 이어질 내용 상상');
+  assert.deepEqual(of('4-2-5'), ['K114', 'K126', 'K137', 'K188', 'K138', 'K159', 'K160', 'K171', 'K115', 'K127', 'K139', 'K161', 'K170', 'K187', 'K198', 'K128'], '① 온라인 대화 → 가리키는 말·이어 주는 말 → ② 편지·초대장 → 일기');
+  assert.deepEqual(of('4-2-6'), ['K116', 'K130', 'K140', 'K142', 'K153', 'K154', 'K157', 'K158', 'K167', 'K169', 'K189', 'K199', 'K200', 'K117', 'K129', 'K141', 'K152', 'K156', 'K155', 'K168', 'K190', 'K201', 'K202'], '① 원인과 결과 → ② 이어질 내용 상상');
   assert.deepEqual(of('4-2-4'), ['K112', 'K123', 'K136', 'K151', 'K162', 'K172', 'K185', 'K124', 'K186', 'K113', 'K125', 'K163'], '① 시·이야기 → ② 질문으로 읽기');
-  assert.deepEqual(of('4-2-2'), ['K108', 'K133', 'K164', 'K176', 'K109', 'K134', 'K175', 'K182']);
-  assert.deepEqual(of('4-2-독서'), ['K143', 'K178', 'K118', 'K144', 'K165', 'K131', 'K179']);
-  assert.deepEqual(of('4-2-3'), ['K111', 'K147', 'K173', 'K110', 'K120', 'K148', 'K183', 'K166']);
+  assert.deepEqual(of('4-2-2'), ['K108', 'K133', 'K164', 'K176', 'K109', 'K134', 'K175', 'K182', 'K194']);
+  assert.deepEqual(of('4-2-독서'), ['K197', 'K143', 'K178', 'K192', 'K118', 'K144', 'K165', 'K131', 'K179']);
+  assert.deepEqual(of('4-2-3'), ['K111', 'K147', 'K173', 'K110', 'K120', 'K148', 'K183', 'K195', 'K166']);
   assert.match(JSON.parse(read('coach/korean/units.json')).about, /v372 다섯째 묶음/);
 });
 
