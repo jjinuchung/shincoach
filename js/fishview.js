@@ -16,12 +16,14 @@
 //   v386: boatOpen(🚤 배 낚시 — 바다가 열린 뒤에야 🗺️·📖에 줄 · 열리면 결과 카드에 한 번) · 🌬️ 바람 부는 날은 배가 쉼(배로 들어오면 바다에서 시작) ·
 //   배로 갈 때마다 ⚓ 출항 2초(누르면 넘김 · 움직임 줄이기면 그림 없이 한 줄) · 🐙 문어 무리: 결과 카드 무게 먼저 · 문어 셋은 사투 첫 표시점 카드 머리 「바위에 딱 붙었어요」 ·
 //   사투 오답이면 💨 먹물 · 📖 칸에 「물고기가 아니에요」 · 🦑 에기는 배가 열린 뒤 가게에
+//   v387: ask(subj, seed, lv, { fish, stage }) — fish = 던질 때마다 늘어나는 물고기 번호(🔁 다시 풀기가 「다음 물고기」를 셈) · steps(🎚️ 과목 단계 — lv = stepLevel(물고기 단계, 과목 단계)) ·
+//   stepUp(오늘 오른 과목 — 열 때 한 줄 뒤에 들어서기 안내) · 문제에 redo가 있으면 카드 머리 「🔁 아까 그 문제, 다시 한 번!」(다음 날 몫은 「지난번」)·맞히면 「🔁 이번엔 맞혔어요!」
 // 성능: 안 움직이는 층은 따로 한 장(하늘이 조금 바뀔 때만 다시) · 화면 배율 2배까지 · 느리면 저절로 가벼운 그림 · 화면이 숨으면 멈춤
 import {
   STARS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer, cellRoll, cellFish, cellFate,
   pickSubject, askOrder, activeStep, dayLeftSec, BADGE_KO, weatherTilt, nibbleExtra,
   spotsOf, PLACES, PLACE_KO, PLACE_EMOJI, RIVER_NEED, SEA_NEED, SEA_SAFE, GEAR, gearOf, baitTilt, mixTilt, weatherLine, PHOTO_SAY, syncPick, josaOf,
-  stageLevel, lvBadge,
+  stageLevel, lvBadge, stepLevel, stepUpLine, redoBadge, REDO_OK,
   BOAT_NEED, BOAT_OPENED, BOAT_GO, BOAT_SAFE, BOAT_REST, boatRest, softOf, sizeText, kindEmoji, lenLabel, SOFT_NOTE, STICK_HEAD, STICK_OFF, inkLine,
 } from './fishing.js';
 import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, drawCell, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet, drawInk, drawBoat } from './fishart.js';
@@ -158,6 +160,8 @@ export function openLake(host) {
     okToday: Math.max(0, Number(h.okToday) || 0),
     streak: 0,
     recent: [],
+    castN: 0, // 던진 수 = 물고기 번호 (v387 — 🔁 다시 풀기는 다음 물고기부터)
+    steps: h.steps && typeof h.steps === 'object' ? h.steps : {}, // 🎚️ 과목 단계 (v387)
     seed: (Date.now() >>> 0) ^ 0x5eed,
     place, // 🏞️ 저수지 · 강 (v368) · 🌊 바다 (v369) · 🚤 배 낚시 (v386)
     riverOpen: riverOk,
@@ -214,19 +218,27 @@ export function openLake(host) {
   wxc.textContent = h.weather ? `${h.weather.emoji} ${h.weather.ko}` : '';
   wxc.hidden = !h.weather;
   q$('.lk-dexbtn').hidden = true;
+  const enter = () => {
+    if (place === 'boat') startSail(); // ⚓ 배로 들어오면 출항부터 (v386)
+    else if (rested) toast(BOAT_REST, 3600); // 🌬️ 오늘은 배가 쉬어 바다에서 (v386)
+    else {
+      // 들어설 때 날씨 한 줄 → 던지기 안내
+      const me = ui;
+      const hi = h.firstToday ? `🌅 ${PLACE_KO[place]}에 왔어요! ` : '';
+      const wl = weatherLine(h.weather, place);
+      if (wl) {
+        toast(`${hi}${wl}`, 3000);
+        setTimeout(() => { if (ui === me && ui.st === 'ready' && !ui.dexOpen && !ui.sail && ui.place === place) toast('🎣 던지기를 눌러요'); }, 3200); // 그새 배로 떠났으면 출항 줄을 덮지 않게 (Codex 189차)
+      } else toast(`${hi}🎣 던지기를 눌러요`);
+    }
+  };
+  const up = stepUpLine(h.stepUp); // ⬆️ 오늘 오른 과목 — 한 줄 먼저, 들어서기 안내는 그 뒤 (v387 · 그새 던졌거나 물가를 바꿨으면 안내는 건너뜀)
   if (leftSec() <= 0) dayEnd();
-  else if (place === 'boat') startSail(); // ⚓ 배로 들어오면 출항부터 (v386)
-  else if (rested) toast(BOAT_REST, 3600); // 🌬️ 오늘은 배가 쉬어 바다에서 (v386)
-  else {
-    // 들어설 때 날씨 한 줄 → 던지기 안내
+  else if (up) {
     const me = ui;
-    const hi = h.firstToday ? `🌅 ${PLACE_KO[place]}에 왔어요! ` : '';
-    const wl = weatherLine(h.weather, place);
-    if (wl) {
-      toast(`${hi}${wl}`, 3000);
-      setTimeout(() => { if (ui === me && ui.st === 'ready' && !ui.dexOpen && !ui.sail && ui.place === place) toast('🎣 던지기를 눌러요'); }, 3200); // 그새 배로 떠났으면 출항 줄을 덮지 않게 (Codex 189차)
-    } else toast(`${hi}🎣 던지기를 눌러요`);
-  }
+    toast(up, 3200);
+    setTimeout(() => { if (ui === me && ui.st === 'ready' && !ui.dexOpen && !ui.shopOpen && !ui.sail && ui.place === place) enter(); }, 3400);
+  } else enter();
   ui.raf = requestAnimationFrame(loop);
 }
 /** 닫기 — 오늘 쓴 시간을 알리고 멈춘다 */
@@ -705,7 +717,8 @@ function ask(stage, head = '') {
   let q = null;
   for (const s of order) {
     if (!s) continue;
-    try { q = h.ask ? h.ask(s, nextSeed(), lv) : null; } catch { q = null; }
+    // v387 — 과목 단계를 더한 단계 · 물고기 번호(🔁 다시 풀기는 다음 물고기의 첫 수학 차례)
+    try { q = h.ask ? h.ask(s, nextSeed(), stepLevel(lv, ui.steps[s]), { fish: ui.castN, stage }) : null; } catch { q = null; }
     if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((c) => c.ok).length === 1) { subj = s; break; }
     q = null;
   }
@@ -718,10 +731,11 @@ function ask(stage, head = '') {
   const card = q$('.lk-card');
   q$('.lk-stage').textContent = head || STAGE[stage] || '';
   const lvb = q$('.lk-lvb');
-  const badge = lvBadge(stage, ui.fish);
+  const badge = q.redo ? redoBadge(q.redo.step) : lvBadge(stage, ui.fish); // 🔁 다시 풀기면 물고기 표시 대신 (v387 · 다음 날 몫은 「지난번」 — Codex 190차)
   lvb.textContent = badge;
   lvb.hidden = !badge;
-  lvb.classList.toggle('is-big', lv >= 3);
+  lvb.classList.toggle('is-big', !q.redo && lv >= 3);
+  lvb.classList.toggle('is-redo', !!q.redo);
   q$('.lk-subj').textContent = q.label || '';
   const qBox = q$('.lk-q');
   qBox.innerHTML = '';
@@ -780,6 +794,7 @@ function ask(stage, head = '') {
         b.classList.add(ok ? 'is-ok' : 'is-no');
         if (!ok) box.querySelectorAll('button')[q.choices.findIndex((x) => x.ok)].classList.add('is-ans');
         try { (ok ? sfx.ding : sfx.wrong)(); } catch { /* 무시 */ }
+        if (ok && q.redo) toast(REDO_OK, 1600); // 🔁 (v387 — 틀리면 말없이 풀이 한 줄만)
         // 🔊 소리만 문제는 답한 뒤 글자를 · 거꾸로 문제는 답한 뒤 소리를 (v378)
         if (q.reveal) qBox.appendChild(el('div', 'lk-reveal', q.reveal));
         if (q.sayAfter && typeof h.say === 'function') { try { h.say(q.sayAfter); } catch { /* 무시 */ } }
@@ -816,6 +831,7 @@ async function startCast() {
   hidePlaces();
   syncGear(); // 던지기 직전 — 가진 채비로 다시 고침 · 가게에서 늦게 온 바꿈도 여기서 (Codex 172차)
   ui.busy = true;
+  ui.castN += 1; // 새 물고기 (v387)
   const before = openSpots(ui.okToday);
   const ok = await ask('cast');
   if (ui !== me) return;

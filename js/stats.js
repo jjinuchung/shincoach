@@ -29,7 +29,7 @@ import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 —
 import { coachState, COACH_KEEP_DAYS } from './feedback.js'; // 👨‍👩‍👦 아빠 교정 읽음·「지나감」 — 진우 화면 차례와 같은 판정 (v381)
 import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
 import { allMsgs, addLocal, seenNow } from './familyview.js';
-import { SPECIES, lakeOf, lakeDayLine, FISH_COINS, FISH_DAY_MIN, SHARE_MIN, SHARE_MAX, PLACES, PLACE_KO, RIVER_NEED, SEA_NEED, BOAT_NEED, placeOpen, GEAR, hasGear, pickOf, lenLabel } from './fishing.js'; // 🎣 학습 낚시터 📊 카드 (v366 — 순수 · v368 🏞️ 강·🎒 채비 · v386 🚤 배)
+import { SPECIES, lakeOf, lakeDayLine, FISH_COINS, FISH_DAY_MIN, SHARE_MIN, SHARE_MAX, PLACES, PLACE_KO, RIVER_NEED, SEA_NEED, BOAT_NEED, placeOpen, GEAR, hasGear, pickOf, lenLabel, STEP_NEED, STEP_UP, STEP_DOWN } from './fishing.js'; // 🎣 학습 낚시터 📊 카드 (v366 — 순수 · v368 🏞️ 강·🎒 채비 · v386 🚤 배 · v387 🔁·🎚️)
 
 const $ = (id) => document.getElementById(id);
 
@@ -458,7 +458,7 @@ export async function renderStats() {
     const rows = daily.filter((d) => d && d.date && lakeDayLine(d)).slice(-7).reverse();
     if (rows.length || kinds.length) {
       const cl = card('🎣 학습 낚시터');
-      cl.appendChild(el('p', 'stats-note', `낚시하며 이미 배운 문제(대여행과 같은 원천)를 풀어요 — 던지기·밑밥·바늘 걸기·사투·뜰채마다 문제 · 지난 7일 덜 한 과목이 더 자주(한 과목 ${Math.round(SHARE_MIN * 100)}~${Math.round(SHARE_MAX * 100)}%) · 하루 ${FISH_DAY_MIN}분이 기본(⚙) · 💰 별 하나에 ${FISH_COINS.perStar} · 새 종·🏅 월척 +${FISH_COINS.newKind} · 하루 ${FISH_COINS.dayMax}까지 · 🏞️ 강은 저수지 도감 ${RIVER_NEED}종 · 🌊 바다는 강 도감 ${SEA_NEED}종 · 🚤 배 낚시는 바다 도감 ${BOAT_NEED}종이면 열려요(🌬️ 바람 부는 날은 배가 쉼) · 🎒 채비는 💰로 한 번 사면 계속(미끼만 같은 별 안에서 두 배쯤) · 문제 하나하나는 안 적어요.`));
+      cl.appendChild(el('p', 'stats-note', `낚시하며 이미 배운 문제(대여행과 같은 원천)를 풀어요 — 던지기·밑밥·바늘 걸기·사투·뜰채마다 문제 · 지난 7일 덜 한 과목이 더 자주(한 과목 ${Math.round(SHARE_MIN * 100)}~${Math.round(SHARE_MAX * 100)}%) · 하루 ${FISH_DAY_MIN}분이 기본(⚙) · 💰 별 하나에 ${FISH_COINS.perStar} · 새 종·🏅 월척 +${FISH_COINS.newKind} · 하루 ${FISH_COINS.dayMax}까지 · 🏞️ 강은 저수지 도감 ${RIVER_NEED}종 · 🌊 바다는 강 도감 ${SEA_NEED}종 · 🚤 배 낚시는 바다 도감 ${BOAT_NEED}종이면 열려요(🌬️ 바람 부는 날은 배가 쉼) · 🎒 채비는 💰로 한 번 사면 계속(미끼만 같은 별 안에서 두 배쯤) · 🔁 틀린 배운 수학 칸은 다음 물고기·다음 낚시 날에 한 번씩 다시 풀고, 그래도 틀리면 「거듭 틀린 칸」 · 🎚️ 과목마다 지금 단계로 ${STEP_NEED}문제 넘게 쌓이면 ${Math.round(STEP_UP * 100)}% 넘게 맞힌 과목은 한 단계 위, ${Math.round(STEP_DOWN * 100)}% 아래는 한 단계 아래(그날 처음 열 때) · 문제 하나하나는 안 적어요.`));
       // 도감은 낚시터마다 (v368 — 🏞️ 강은 저수지 도감 10종이면 열림 · 📸 어름치는 사진만 찍고 놓아줌 · v369 🌊 바다는 강 도감 6종이면)
       const pf = getProfileSnapshot();
       for (const pl of PLACES) {

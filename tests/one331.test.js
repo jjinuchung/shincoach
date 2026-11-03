@@ -188,7 +188,7 @@ test('🧩 기록 — 하루 기록 목록 칸(합집합) · 오늘 끝낸 수(�
   assert.ok(md.includes('- 🧩 최근 7일 글 끝 퍼즐 하나(v331부터 · 이 기간에 일어난 일을 따로 셈): 누름 3 · 끝냄 2 (⏰ 1 · 🔗 1)'), md.slice(md.indexOf('## 🧩'), md.indexOf('## 🧩') + 1200));
   assert.ok(korReportFromRaw({}, raw, '2026-10-24', []).includes('- 🧩 최근 7일 글 끝 퍼즐 하나(v331부터 · 이 기간에 일어난 일을 따로 셈): 누름 0 · 끝냄 0\n'), '없으면 0');
   const db = read('js/db.js');
-  assert.ok(db.includes("'essaySayKeys', 'fishMathKeys', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];"), 'db 하루 기록 목록 칸 (v377 🎣 fishMathKeys 더함)');
+  assert.ok(db.includes("'essaySayKeys', 'fishMathKeys', 'fishRedoKeys', 'fishSteps', 'fishRedoWait', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];"), 'db 하루 기록 목록 칸 (v377 🎣 fishMathKeys · v387 🔁 fishRedoKeys·🎚️ fishSteps·🔁 fishRedoWait 더함)');
 });
 
 test('🧩 화면 잇기 — 국어 글 끝: 저장된 글만 · 🔤 아래 · 눌릴 때 끝 화면·🎯·⚔️·🔤·🚀 확인 두 번 · 읽던 글을 닫고 퍼즐 탭에서 하나로 · 못 열면 퍼즐 탭', () => {

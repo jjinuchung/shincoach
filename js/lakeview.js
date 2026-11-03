@@ -18,8 +18,10 @@
 //   🔶 영어 3단계(소리만)는 영어 목소리가 있는 기기에서만(lvFor) · 2·3단계로 낸 문제는 그날 fishLv2/3Q·Ok에도 · 시험용 `?nosw=1&star=5`면 입질마다 그 별
 // v386 (진우 제안 → 기본안 「추천대로」 · 원고·시안 「이대로」): 🚤 배 낚시(바다 도감 6종이면 열림 · host.boatOpen · gearState.boat) · 배에서 낚은 마리 daily fishBoat ·
 //   홈 띠 「○○에 가 볼까요?」는 마지막 물가가 배여도 🌬️ 바람 부는 날이면 바다
+// v387 (낚시터 문제 손보기 기본안 「추천대로」): 🔁 다시 풀기 — redoPlan(지난 낚시 날·오늘 기록) → redoQueue → redoAsker가 물고기마다 첫 수학 차례에 같은 칸 문제 ·
+//   답은 fishRedoKeys·fishRedoQ/Ok에 · 🎚️ 과목 단계 — subjectSteps로 그날 처음 열 때 정해 fishSteps에 적고 창에 steps·stepUp(오른 과목)을 넘긴다
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
-import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
+import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_REDO_Q, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, redoKey, redoPlan, redoQueue, qFingerprint, waitKey, subjectSteps, stepLines, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
 import { lvFor } from './lakelevel.js';
 import { orderOf } from './journey.js';
@@ -116,11 +118,42 @@ export function askFrom(src, subj, today, at, seed, lv = 1) {
   return { q: null, step: look };
 }
 /**
- * 창을 열 때 과목마다 「배운 문제」 차례 자리 — 그날 낸 수에서 시작 · 수학은 그 가운데 🐟 물고기 수학으로 낸 수를 뺀다
- * (Codex 171차 — 물고기 수학까지 세면 다시 열 때 배운 문제 차례가 그만큼 더 넘어갔다)
+ * 창을 열 때 과목마다 「배운 문제」 차례 자리 — 그날 낸 수에서 시작 · 수학은 그 가운데 🐟 물고기 수학·🔁 다시 풀기(v387)로 낸 수를 뺀다
+ * (Codex 171차 — 물고기 수학까지 세면 다시 열 때 배운 문제 차례가 그만큼 더 넘어갔다 · 다시 풀기도 차례 줄 밖에서 낸다)
  */
 export function startOf(d) {
-  return Object.fromEntries(SUBJECTS.map((s) => [s, Math.max(0, nz(d && d[FISH_DAY_Q[s][0]]) - (s === 'math' ? nz(d && d[FISH_FM_Q[0]]) : 0))]));
+  return Object.fromEntries(SUBJECTS.map((s) => [s, Math.max(0, nz(d && d[FISH_DAY_Q[s][0]]) - (s === 'math' ? nz(d && d[FISH_FM_Q[0]]) + nz(d && d[FISH_REDO_Q[0]]) : 0))]));
+}
+/**
+ * 🔁 다시 풀기 문제 만들기 (v387) — 같은 칸·같은 단계로 씨앗만 바꿔 · 틀린 그 문제 글의 지문(avoid = qFingerprint)과 같으면 다음 씨앗 · 6번 안에 못 만들면 null
+ * → 문제 + redo { id, step } (창이 카드 머리를 바꾸고, 답이 오면 fishRedoKeys에 적는다)
+ */
+export function redoMake(src, r, seed) {
+  if (!src || typeof src.make !== 'function' || !r || !r.id) return null;
+  for (let t = 0; t < 6; t++) {
+    let q = null;
+    try { q = src.make(r.id, ((Number(seed) || 0) + 104729 + t * 7919) >>> 0, r.lv || 1); } catch { q = null; }
+    if (!q || !Array.isArray(q.choices) || q.choices.length < 2 || q.choices.filter((c) => c.ok).length !== 1) continue;
+    if (r.avoid && qFingerprint(q.qk) === r.avoid) continue;
+    return { ...q, redo: { id: r.id, step: r.step } };
+  }
+  return null;
+}
+/**
+ * 창이 쓰는 문제 내기에 🔁 다시 풀기를 끼움 (v387) — base(subj, seed, lv) · mathSrc = 「이미 배운 수학」 원천 · rq = redoQueue
+ * ctx.fish(지금 물고기 번호)를 rq에 알리고, 수학 차례면 그 물고기의 첫 수학 차례에 한 번 다시 풀기 · 못 만들면 보통 문제 ·
+ * alive()가 거짓이면(창을 연 뒤 자정이 지남 — Codex 190차 #5) 다시 풀기 없이 보통 문제만 (새 날 계획은 다시 열 때)
+ */
+export function redoAsker(base, mathSrc, rq, alive = () => true) {
+  return (subj, seed, lv = 1, ctx = {}) => {
+    if (rq && ctx && ctx.fish !== undefined) rq.at(ctx.fish);
+    if (subj === 'math' && rq && mathSrc && alive()) {
+      const r = rq.take();
+      const q = r ? redoMake(mathSrc, r, seed) : null;
+      if (q) return q;
+    }
+    return base(subj, seed, lv);
+  };
 }
 /** 창이 쓰는 문제 내기 (subj, seed, lv) → 문제 | null — 과목마다 자리(start = startOf)에서 askFrom이 본 만큼(못 만든 자리까지) 넘긴다 */
 export function asker(srcs, day, start) {
@@ -334,6 +367,11 @@ export async function openLakeNow() {
     const firstToday = !sentSec;
     const day = today; // 문제 차례 줄은 연 날로 · 기록은 쓰는 순간의 날로(dailyQueue)
     const log = dailyQueue(applyDailyDelta, clockDay);
+    const rq = redoQueue(redoPlan(days, today)); // 🔁 지난 낚시 날 몫 → 오늘 앞 창에서 틀린 칸 (v387)
+    const alive = () => clockDay() === today; // 창을 연 뒤 자정이 지나면 다시 풀기를 멈춤 (Codex 190차 #5 — 새 날 계획은 다시 열 때)
+    const stp = subjectSteps(days, today); // 🎚️ 오늘 과목 단계 — 처음 연 때만 적는다 (v387)
+    if (stp.write.length) applyDailyDelta(today, { fishSteps: stp.write }).catch(() => {});
+    let stepDay = today; // 자정을 넘겨 답하면 새 날에도 지금 단계를 한 번 적는다 (#5)
     const pk = pickOf(getProfileSnapshot());
     openLake({
       look: avatarOf(getProfileSnapshot()).look,
@@ -348,12 +386,15 @@ export async function openLakeNow() {
       onPick: (want) => lakePick(want),
       lookNow: () => avatarOf(getProfileSnapshot()).look, // 낚시 모자·조끼를 산 뒤 새 차림
       shares: sharesOf(days, nonsulDayMap(), today, avail),
+      steps: stp.steps, // 🎚️ 과목 단계 (v387 — 창이 물고기 단계에 더한다)
+      stepUp: stp.up, // 오늘 오른 과목 — 열 때 한 줄
       ask: (() => {
         const inner = mathMix(asker(ui.src, day, start), (seed, avoid, lv) => {
           const q = fishMathQ(lakeRaw(), seed, avoid, lv);
           return q ? { ...q, qNode: () => fmNode(q) } : null;
         });
-        return (subj, seed, lv) => inner(subj, seed, lvFor(subj, lv, { listen: canListen() })); // 🔶 소리만 문제는 영어 목소리가 있을 때만 (v378)
+        // 🔶 소리만 문제는 영어 목소리가 있을 때만 (v378) · 🔁 물고기마다 첫 수학 차례에 다시 풀기 (v387)
+        return redoAsker((subj, seed, lv) => inner(subj, seed, lvFor(subj, lv, { listen: canListen() })), ui.src && ui.src.math, rq, alive);
       })(),
       forceStar: testStar(),
       weather: testWeather() || weatherOf(today),
@@ -365,10 +406,21 @@ export async function openLakeNow() {
       okToday: okOfDay(d),
       firstToday,
       onAnswer: (subj, ok, stage, q) => {
+        const now = clockDay();
+        if (now !== stepDay) { stepDay = now; applyDailyDelta(now, { fishSteps: stepLines(stp.steps) }).catch(() => {}); } // 🎚️ 자정 뒤 새 날에도 (#5)
+        const redo = q && q.redo && alive() ? q.redo : null; // 자정 뒤에 답한 다시 풀기는 보통 답으로 — 새 날 차례를 꼬지 않게 (#5)
         const f = FISH_DAY_Q[subj];
-        if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}), ...lvDelta(q, ok) });
+        const rd = redo ? { [FISH_REDO_Q[0]]: 1, [FISH_REDO_Q[1]]: ok ? 1 : 0 } : {}; // 🔁 (v387 — 수학 칸 안의 몫)
+        if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}), ...lvDelta(q, ok), ...rd });
         const mk = subj === 'math' && q && !q.fm ? fishMathKey(q.id, ok, Date.now(), Math.random) : ''; // 🔢 배운 칸 문제는 칸별로도 (v377)
-        if (mk) applyDailyDelta(clockDay(), { fishMathKeys: [mk] }).catch(() => {});
+        const rk = subj === 'math' && redo ? redoKey(redo.id, redo.step, ok, Date.now(), Math.random) : '';
+        // 틀린 배운 칸은 그 문제의 단계·글 지문도 — 다시 열거나 다음 날에도 같은 단계·다른 문제로 (Codex 190차 #2)
+        const cm = !ok && subj === 'math' && q && !q.fm && !q.redo ? /^m:([A-Za-z0-9_.-]{1,40})$/.exec(String(q.id || '')) : null;
+        const fp = cm ? qFingerprint(q.qk) : '';
+        const wk = cm ? waitKey(cm[1], q.lv, fp, Date.now(), Math.random) : '';
+        // 칸별 줄·다시 풀기 줄·틀린 칸 줄은 한 번에 — 하나만 적히면 다음 창이 그 칸을 또 다시 풀기로 낸다
+        if (mk || rk || wk) applyDailyDelta(now, { ...(mk ? { fishMathKeys: [mk] } : {}), ...(rk ? { fishRedoKeys: [rk] } : {}), ...(wk ? { fishRedoWait: [wk] } : {}) }).catch(() => {});
+        if (cm && alive()) rq.wrong(cm[1], q.lv, fp); // 틀린 배운 칸 → 다음 물고기에 한 번 (v387)
       },
       onTime: (sec) => {
         const n = nz(sec);

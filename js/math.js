@@ -2743,8 +2743,8 @@ function battleQuestion(seed, stemKey = null) {
  * 🎒 포켓몬 대여행(v341) 수학 문제 원천 — **모든 줄기**에서 ✅ 다 배운 개념만(배우는 중인 칸은 안 낸다) · 배틀과 같은 계산 문제 ·
  * **기록하지 않는다**(배틀과 같다 — 얼굴별 누적·오개념·🤔 노트를 안 건드린다)
  * → { keys: 개념 id들, make(id, seed, lv) → { id, label, qNode(), choices: [{ text, ok, node(), hint? }], lv } | null } · 다 배운 개념이 없으면 null
- * 🎣 낚시터 난이도(v378): lv 2 = ② 함정 → 계산 · lv 3 = ③ 이유(있는 칸만) → 함정 → 계산(lakelevel.mathKinds) · 2·3단계 틀린 보기엔 그 칸 풀이 한 줄(hint) ·
- *   lv = 실제 낸 얼굴의 단계 · 🎒 대여행은 lv 없이 불러 계산 문제만(지금 그대로)
+ * 🎣 낚시터 난이도(v378): lv 2 = ② 함정 → 계산 · lv 3 = ③ 이유(있는 칸만) → 함정 → 계산(lakelevel.mathKinds) · 틀린 보기엔 그 칸 풀이 한 줄(hint — v387부터 1단계도) ·
+ *   lv = 실제 낸 얼굴의 단계 · qk = 문제 글(🔁 다시 풀기가 같은 문제를 피하려고 · v387) · 🎒 대여행은 lv 없이 불러 계산 문제만(지금 그대로 — hint·qk는 안 씀)
  */
 export async function journeyMathSource() {
   try {
@@ -2764,8 +2764,8 @@ export async function journeyMathSource() {
             const q = sx.gen.makeQuestion(id, kind, ((Number(seed) || 0) + t * 7919) % 2147483647, { ...optsFor(sx.key), recent: [] });
             if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((c) => c.ok).length === 1) {
               const L = MATH_KIND_LV[kind] || 1;
-              const hint = (c) => (L >= 2 ? mathHint(q, c) : '');
-              return { id: `m:${id}`, label: `🔢 ${nameOf(id)}`, qNode: () => qtNode(q.q), lv: L, choices: q.choices.map((c) => ({ text: String(c.text), ok: !!c.ok, node: () => richNode(c.text), ...(hint(c) ? { hint: hint(c) } : {}) })) };
+              const hint = (c) => mathHint(q, c); // v387 — 1단계(계산)도 틀린 보기에 그 실수의 풀이 한 줄 (🎒 대여행은 hint를 안 씀)
+              return { id: `m:${id}`, label: `🔢 ${nameOf(id)}`, qNode: () => qtNode(q.q), qk: String(q.q), lv: L, choices: q.choices.map((c) => ({ text: String(c.text), ok: !!c.ok, node: () => richNode(c.text), ...(hint(c) ? { hint: hint(c) } : {}) })) };
             }
           }
         }

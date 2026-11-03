@@ -5167,7 +5167,7 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-spot { padding: 5px 12px; border-radius: 999px; background: rgba(255, 253, 248, 0.88); font-weight: 700; font-size: 0.98rem; }
 .lk-dist { position: absolute; left: 50%; top: 0; transform: translateX(-50%); padding: 6px 18px; border-radius: 14px; background: rgba(255, 253, 248, 0.92); font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lk-x { margin-left: auto; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(255, 253, 248, 0.88); color: #12343b; font-size: 1.2rem; cursor: pointer; }
-.lk-toast { position: absolute; top: max(70px, calc(env(safe-area-inset-top, 0px) + 60px)); left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 16px; border-radius: 12px; background: rgba(8, 30, 36, 0.82); color: #f3faf9; font-size: 1.02rem; text-align: center; pointer-events: none; }
+.lk-toast { position: absolute; top: max(70px, calc(env(safe-area-inset-top, 0px) + 60px)); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); word-break: keep-all; padding: 8px 16px; /* v387 — left 50%라 폭이 반으로 묶여 「늘었어/요」처럼 끊기던 것 */ border-radius: 12px; background: rgba(8, 30, 36, 0.82); color: #f3faf9; font-size: 1.02rem; text-align: center; pointer-events: none; }
 .lk-act { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); width: 224px; height: 150px; display: flex; align-items: flex-end; justify-content: center; transition: opacity 0.2s; }
 .lk.is-q .lk-act { opacity: 0.25; pointer-events: none; }
 .lk.is-sail .lk-act { opacity: 0.25; } /* ⚓ 출항 장면 (v386) — 단추를 눌러도 장면만 넘긴다(멈춘 동안이라 던지지 않음) */
@@ -5196,6 +5196,7 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 /* v378 난이도 — 카드 머리 「🐠·🐋 큰 물고기 문제」(숫자 없음) · 📚 빈칸 문장 칸 · 🔊 답한 뒤 글자 · 논술 「아닌」 밑줄 */
 .lk-lvb { font-size: 0.9rem; font-weight: 800; padding: 1px 10px; border-radius: 999px; background: #dcecef; color: #1f6170; }
 .lk-lvb.is-big { background: #fde9df; color: #b8460f; }
+.lk-lvb.is-redo { background: #dff3e6; color: #1d6b3f; } /* 🔁 다시 풀기 (v387) */
 .lk-sent { margin-top: 8px; padding: 8px 12px; border-radius: 10px; background: #f3f7f6; border: 1px solid #cfdcda; font-size: 1.12rem; font-weight: 600; line-height: 1.55; }
 .lk-reveal { margin-top: 6px; font-size: 1.2rem; color: #1f6170; }
 .lk-em { text-decoration-thickness: 3px; text-underline-offset: 4px; color: #b8460f; }
@@ -5291,6 +5292,7 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
   .lk-btn { width: 96px; height: 96px; font-size: 0.95rem; }
   .lk-dist { font-size: 1.2rem; top: 52px; }
   .lk-top { flex-wrap: wrap; } /* 🌦️·📖·🗺️·🎒가 좁은 폰에서 두 줄로 (v368) */
+  .lk-toast { top: max(118px, calc(env(safe-area-inset-top, 0px) + 108px)); } /* 두 줄 아래로 — 넓어진 알림이 ✕를 덮지 않게 (v387) */
   .lk-topbtn, .lk-dexbtn { padding: 4px 10px; font-size: 0.92rem; }
   .lk-bait { right: calc(50% + 54px); bottom: 26px; max-width: 96px; font-size: 0.86rem; padding: 4px 8px; }
   .lk-q { font-size: 1.15rem; }

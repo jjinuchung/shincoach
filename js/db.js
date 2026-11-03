@@ -452,6 +452,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'fishBoat',
   //   🐋 그 가운데 2·3단계(큰 물고기) 문제로 낸·맞힌 수(v378 — 과목 칸 안의 몫 · 실제 낸 단계로)
   'fishLv2Q', 'fishLv2Ok', 'fishLv3Q', 'fishLv3Ok',
+  //   🔁 그 가운데 틀린 배운 수학 칸을 다시 풀기로 낸·맞힌 수(v387 — 수학 칸 안의 몫)
+  'fishRedoQ', 'fishRedoOk',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
   // 🎵 게임기 음악 (2026-10-25 v337, gamebgm.js) — 소리가 난 초 · 게임기 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
@@ -471,7 +473,9 @@ const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // ☀️ 오늘의 수학 시작 "시각:누른 곳:다시 시작 판" · 완주 "시각" (v331, mathprog.sunReport) — 흐름마다 한 칸
 // 🧩 글 끝 퍼즐 하나 누름·끝냄 "시각:꼴" (v331, korpuzzle.oneSessions) — 끝낸 수가 하루 단추 상한(ONE_PER_DAY)이기도 하다
 // 🎣 fishMathKeys: 낚시터에서 낸 「이미 배운 수학」 문제 한 줄씩 '칸|맞음 0·1|시각' (v377 — 칸별 맞힘을 📤에 · 합집합이라 두 기기가 같은 줄을 두 번 세지 않는다)
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', 'essaySayKeys', 'fishMathKeys', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
+// 🔁 fishRedoKeys: 다시 풀기 한 줄씩 '칸|차례 1·2|맞음|시각' (v387 — 다음 낚시 날 몫·「거듭 틀린 칸」을 이것으로) · 🎚️ fishSteps: 그날 과목 단계 'english:1'·'top:english' (그날 처음 열 때 한 번 적음) ·
+//   🔁 fishRedoWait: 틀린 배운 칸 '칸|단계|문제 글 지문|시각' (Codex 190차 — 다시 열거나 다음 날에도 같은 단계·다른 문제로)
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', 'essaySayKeys', 'fishMathKeys', 'fishRedoKeys', 'fishSteps', 'fishRedoWait', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {

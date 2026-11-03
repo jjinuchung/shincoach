@@ -23,6 +23,11 @@
 //   새 11종(home 'boat' · 별마다 🐙 문어 무리 하나 + 물고기 — soft 'octo' 문어는 다리까지 길이 · 'squid' 오징어 무리는 몸통 길이) · 포인트 셋(모래 바닥 · 물속 바위 · 깊은 바다 —
 //   열리는 수·별 몫은 다른 물가와 같다) · 🦑 에기(배가 열린 뒤 · 문어 무리 같은 별 안 ×2) · 루어는 갈치·넙치·방어·부시리에도 · 🌬️ 바람 부는 날은 배가 쉼(boatRest — 화면이 바다로) ·
 //   그날 배에서 낚은 마리 daily fishBoat
+// v387 (낚시터 문제 손보기 기본안 「추천대로」): 🔁 틀린 배운 수학 칸 다시 풀기 — 다음 물고기의 첫 수학 차례에 같은 칸 한 번(redoQueue) · 또 틀리면
+//   다음 낚시 날 처음에 한 번(redoPlan — 하루 기록 fishRedoKeys로) · 그래도 틀리면 멈춤(📊 「거듭 틀린 칸」) · 🎚️ 과목 단계(subjectSteps — 그날 처음 열 때 과목마다
+//   −2~+2 · 지금 단계로 STEP_NEED문제 넘게 쌓이면 STEP_UP 넘게 맞힘 → +1 · STEP_DOWN 아래 → −1 · 문제 단계 = 물고기 단계 + 과목 단계(stepLevel · 1~3 안))
+//   Codex 190차 「추천대로」: 안 푼 다음 날 몫은 7일 안에서 이어 감 · 틀린 칸의 단계·문제 글 지문(fishRedoWait)으로 다시 열어도 같은 단계·다른 문제 ·
+//   다음 날 몫 상한은 하루에 · 다음 날 몫 카드 머리 「지난번」 · 자정을 넘긴 창 처리는 lakeview(stepLines)
 // ★ 이 파일은 아무것도 import하지 않는다 — 시험이 DOM·IndexedDB 없이 부른다 · 난수는 rng() 인자로
 
 /** 하루 낚시 시간(분) · 손을 이만큼(ms) 안 대면 시간을 안 셈(⏳ 과목 시계와 같은 셈) */
@@ -985,6 +990,8 @@ export const FISH_SEA = 'fishSea';
 export const FISH_BOAT = 'fishBoat';
 /** 그날 2·3단계 문제로 낸·맞힌 칸 (v378 — 과목 칸 안에 든 몫 · 1단계는 나머지 · 못 만들어 내려간 문제는 실제 낸 단계로 센다) */
 export const FISH_LV_Q = { 2: ['fishLv2Q', 'fishLv2Ok'], 3: ['fishLv3Q', 'fishLv3Ok'] };
+/** 그날 🔁 다시 풀기로 낸·맞힌 칸 (v387 — 수학 칸 안에 든 몫) */
+export const FISH_REDO_Q = ['fishRedoQ', 'fishRedoOk'];
 /**
  * 🔢 낚시터 「이미 배운 수학」 한 문제의 칸별 기록 줄 (v377 — 2026-11-01 기본안 「추천대로」) — 'frac.add|1|시각36진수+무작위' · 문제 id가 m:칸이 아니면 ''
  * (줄마다 달라 합집합 병합에서 같은 문제를 두 번 세지 않는다 · 🐟 물고기 수학은 칸이 없어 안 적는다)
@@ -1007,7 +1014,242 @@ export function fishMathByConcept(keys) {
   }
   return [...by.values()].sort((a, b) => (b.n - b.ok) - (a.n - a.ok) || b.n - a.n || (a.id < b.id ? -1 : 1));
 }
-/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다 · 🚤 배) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🐋 2·3단계 맞힌/낸(v378) · 🔢 배운 칸별(v377) · 🔒 더 준 분 */
+
+// ───────────── 🔁 틀린 수학 칸 다시 풀기 (v387) ─────────────
+
+/** 다시 풀기 차례 — 1 같은 날(다음 물고기) · 2 다음 낚시 날(처음) */
+export const REDO_SAME = 1;
+export const REDO_NEXT = 2;
+/** 다음 날 몫은 많아야 이만큼 (하루치가 밀려 낚시가 다시 풀기로만 채워지지 않게) */
+export const REDO_NEXT_MAX = 12;
+/** 카드 머리(같은 날 · 다음 낚시 날 — Codex 190차) · 다시 맞혔을 때 (셈 없음) */
+export const REDO_BADGE = '🔁 아까 그 문제, 다시 한 번!';
+export const REDO_BADGE_NEXT = '🔁 지난번 그 문제, 다시 한 번!';
+export const REDO_OK = '🔁 이번엔 맞혔어요!';
+export const redoBadge = (step) => (step === REDO_NEXT ? REDO_BADGE_NEXT : REDO_BADGE);
+const CONCEPT_RE = /^[A-Za-z0-9_.-]{1,40}$/;
+/** 다시 풀기 한 줄 'frac.add|1|0|시각36진수+무작위' — 칸 | 차례 | 맞음 0·1 (fishMathKey처럼 줄마다 달라 합집합에서 두 번 안 셈) · 칸이나 차례가 이상하면 '' */
+export function redoKey(id, step, ok, now, rand = Math.random) {
+  if (!CONCEPT_RE.test(String(id || '')) || (step !== REDO_SAME && step !== REDO_NEXT)) return '';
+  return `${id}|${step}|${ok ? 1 : 0}|${Math.max(0, Math.floor(Number(now) || 0)).toString(36)}${Math.floor((Number(rand()) || 0) * 1296).toString(36).padStart(2, '0')}`;
+}
+/** 다시 풀기 줄 읽기 → [{ id, step, ok }] · 이상한 줄은 버림 */
+export function redoRows(keys) {
+  const out = [];
+  for (const k of Array.isArray(keys) ? keys : []) {
+    const m = /^([A-Za-z0-9_.-]{1,40})\|([12])\|([01])\|[0-9a-z]+$/.exec(String(k || ''));
+    if (m) out.push({ id: m[1], step: Number(m[2]), ok: m[3] === '1' });
+  }
+  return out;
+}
+/** 문제 글 지문 — 짧은 36진수(같은 글이면 같음) · 다시 풀기가 똑같은 문제를 피하려고 (Codex 190차 — 다시 열어도 알게 하루 기록에 적음) */
+export function qFingerprint(text) {
+  const s = String(text || '');
+  if (!s) return '';
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 33) + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+/** 틀린 배운 칸 한 줄 'frac.add|2|지문|시각' — 칸 | 그 문제의 단계 | 그 문제 글 지문 (fishRedoWait · 다시 열어도 같은 단계·다른 문제로) · 이상하면 '' */
+export function waitKey(id, lv, fp, now, rand = Math.random) {
+  if (!CONCEPT_RE.test(String(id || ''))) return '';
+  const l = [1, 2, 3].includes(lv) ? lv : 1;
+  const f = /^[0-9a-z]{1,8}$/.test(String(fp || '')) ? fp : '';
+  return `${id}|${l}|${f}|${Math.max(0, Math.floor(Number(now) || 0)).toString(36)}${Math.floor((Number(rand()) || 0) * 1296).toString(36).padStart(2, '0')}`;
+}
+/** 틀린 칸 줄 읽기 → Map 칸 → { lv, avoid } (그날 처음 틀린 것) · 이상한 줄은 버림 */
+export function waitInfo(keys) {
+  const best = new Map();
+  for (const k of Array.isArray(keys) ? keys : []) {
+    const m = /^([A-Za-z0-9_.-]{1,40})\|([123])\|([0-9a-z]{0,8})\|([0-9a-z]{3,})$/.exec(String(k || ''));
+    if (!m) continue;
+    const at = parseInt(m[4].slice(0, -2), 36) || 0;
+    if (!best.has(m[1]) || at < best.get(m[1]).at) best.set(m[1], { lv: Number(m[2]), avoid: m[3], at });
+  }
+  return new Map([...best.entries()].map(([id, x]) => [id, { lv: x.lv, avoid: x.avoid }]));
+}
+/** 그날 배운 수학 칸 가운데 틀린 칸 — 처음 틀린 때 차례 · 한 번씩 (fishMathKeys 줄 '칸|0|시각') */
+export function wrongIds(keys) {
+  const first = new Map();
+  for (const k of Array.isArray(keys) ? keys : []) {
+    const m = /^([A-Za-z0-9_.-]{1,40})\|0\|([0-9a-z]{3,})$/.exec(String(k || ''));
+    if (!m) continue;
+    const at = parseInt(m[2].slice(0, -2), 36) || 0;
+    if (!first.has(m[1]) || at < first.get(m[1])) first.set(m[1], at);
+  }
+  return [...first.entries()].sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : 1)).map((e) => e[0]);
+}
+/** 그날 다음 날 다시 풀기까지 틀린 칸 (📊 「거듭 틀린 칸」) */
+export function stuckIds(d) {
+  return [...new Set(redoRows(d && d.fishRedoKeys).filter((r) => r.step === REDO_NEXT && !r.ok).map((r) => r.id))];
+}
+/**
+ * 창을 열 때 다시 풀기 계획 (순수) → { next, same, done, meta }
+ *   next = 다음 낚시 날 몫 — 오늘 앞 7일의 낚시 날을 옛날부터 훑어, 같은 날 다시 풀기도 틀렸거나 틀렸는데 다시 풀 틈 없이 끝난 칸을 「빚」으로 들고 가다가
+ *   다음 날 다시 풀기(2)를 한 날(맞든 틀리든) 지움 — 아직 안 푼 빚은 다음 날로 이어 감(Codex 190차 #1 — 가장 가까운 날만 보면 하나만 풀고 닫은 날 남은 칸이 사라졌다) ·
+ *   하루 REDO_NEXT_MAX까지(오늘 이미 낸 다음 날 몫을 빼고 — #3)
+ *   same = 오늘 틀렸는데 아직 다시 안 푼 칸(앞 창에서 틀린 것 — 이미 다음 물고기가 지났다) · done = 오늘 이미 다시 푼 칸(오늘은 더 안 냄)
+ *   meta = 칸 → { lv, avoid } 그 칸을 처음 틀린 문제의 단계·글 지문(fishRedoWait — #2 · 없으면 1단계·피할 글 없음)
+ *   한 칸은 하루 한 번만 다시 낸다 · 다음 날 다시 풀기(2)를 마친 칸은 그걸로 끝
+ */
+export function redoPlan(days, today) {
+  const t = dayIndex(today);
+  const list = (Array.isArray(days) ? days : []).filter((r) => r && r.date);
+  const mine = list.find((r) => r.date === today) || null;
+  const rowsToday = redoRows(mine && mine.fishRedoKeys);
+  const doneToday = new Set(rowsToday.map((r) => r.id));
+  const nextToday = new Set(rowsToday.filter((r) => r.step === REDO_NEXT).map((r) => r.id)).size;
+  const prev = list
+    .filter((r) => { const i = dayIndex(r.date); return Number.isFinite(i) && Number.isFinite(t) && i < t && i >= t - 7; })
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const owed = new Map(); // 칸 → { lv, avoid } (넣은 차례 = 다음 날 차례)
+  for (const r of prev) {
+    const rows = redoRows(r.fishRedoKeys);
+    for (const x of rows) if (x.step === REDO_NEXT) owed.delete(x.id);
+    const redone = new Set(rows.map((x) => x.id));
+    const info = waitInfo(r.fishRedoWait);
+    const failed = rows.filter((x) => x.step === REDO_SAME && !x.ok).map((x) => x.id);
+    const missed = wrongIds(r.fishMathKeys).filter((id) => !redone.has(id));
+    for (const id of [...failed, ...missed]) if (!owed.has(id)) owed.set(id, info.get(id) || { lv: 1, avoid: '' });
+  }
+  const room = Math.max(0, REDO_NEXT_MAX - nextToday);
+  const nextAll = [...owed.keys()].filter((id) => !doneToday.has(id));
+  const next = nextAll.slice(0, room);
+  const infoToday = waitInfo(mine && mine.fishRedoWait);
+  const same = wrongIds(mine && mine.fishMathKeys).filter((id) => !doneToday.has(id) && !next.includes(id));
+  const meta = {};
+  for (const id of next) meta[id] = owed.get(id);
+  for (const id of same) meta[id] = infoToday.get(id) || { lv: 1, avoid: '' };
+  return { next, same, done: [...doneToday], meta };
+}
+/**
+ * 창 하나 동안의 다시 풀기 차례 (순수 · 상태는 안에) — plan = redoPlan
+ *   at(n) 지금 물고기 번호(던질 때마다 늘어남) · take(n) 이 물고기의 첫 수학 차례면 낼 칸 { id, step, lv, avoid } | null(물고기마다 하나 · 이번 물고기에서 틀린 칸은 다음 물고기부터 ·
+ *   꺼낸 칸은 못 만들어도 다시 안 넣는다) · wrong(id, lv, avoid) 지금 물고기에서 배운 칸을 틀림 — 오늘 아직 안 낸 칸이면 다음 물고기에 같은 단계로(avoid = 틀린 문제 글 지문 · 똑같은 문제는 피함)
+ *   계획 몫은 meta의 단계·지문으로 (Codex 190차 #2)
+ */
+export function redoQueue(plan) {
+  const p = plan || {};
+  const m = (id) => { const x = p.meta && hasOwn(p.meta, id) ? p.meta[id] : null; return { lv: x && [1, 2, 3].includes(x.lv) ? x.lv : 1, avoid: x && x.avoid ? String(x.avoid).slice(0, 12) : '' }; };
+  const due = [...(p.next || []).map((id) => ({ id, step: REDO_NEXT, ...m(id), from: -1 })), ...(p.same || []).map((id) => ({ id, step: REDO_SAME, ...m(id), from: -1 }))];
+  const used = new Set([...(p.next || []), ...(p.same || []), ...(p.done || [])]);
+  let fish = 0;
+  let took = -1;
+  const at = (n) => { const v = Math.floor(Number(n)); if (Number.isFinite(v)) fish = v; };
+  return {
+    at,
+    take(n) {
+      if (n !== undefined) at(n);
+      if (took === fish) return null;
+      const i = due.findIndex((x) => x.from < fish);
+      if (i < 0) return null;
+      took = fish;
+      const [x] = due.splice(i, 1);
+      return { id: x.id, step: x.step, lv: x.lv, avoid: x.avoid || '' };
+    },
+    wrong(id, lv = 1, avoid = '') {
+      if (!CONCEPT_RE.test(String(id || '')) || used.has(id)) return false;
+      used.add(id);
+      due.push({ id, step: REDO_SAME, lv: [1, 2, 3].includes(lv) ? lv : 1, from: fish, avoid: String(avoid || '').slice(0, 12) });
+      return true;
+    },
+    left: () => due.map((x) => x.id),
+  };
+}
+
+// ───────────── 🎚️ 과목 단계 (v387) ─────────────
+
+/** 과목 단계를 바꾸려면 지금 단계로 쌓인 문제 수 · 올림(넘게 맞힘)·내림(아래) 비율 · 위아래 끝 */
+export const STEP_NEED = 30;
+export const STEP_UP = 0.9;
+export const STEP_DOWN = 0.6;
+export const STEP_MAX = 2;
+const SUBJ_KO = { math: '수학', english: '영어', korean: '국어', nonsul: '논술' };
+const STEP_RE = /^(math|english|korean|nonsul):(-2|-1|0|1|2)$/;
+const TOP_RE = /^top:(math|english|korean|nonsul)$/;
+/** 그날 기록의 과목 단계 { 과목: 단계 } — fishSteps 줄 'english:1' (적힌 과목만 · 같은 과목이 둘이면 앞의 것) */
+export function stepsOfDay(d) {
+  const out = {};
+  for (const k of Array.isArray(d && d.fishSteps) ? d.fishSteps : []) {
+    const m = STEP_RE.exec(String(k || ''));
+    if (m && !hasOwn(out, m[1])) out[m[1]] = Number(m[2]);
+  }
+  return out;
+}
+/** 그날 「맨 위 단계도 쉬움」 과목 (fishSteps 'top:english') */
+export function topsOfDay(d) {
+  const out = [];
+  for (const k of Array.isArray(d && d.fishSteps) ? d.fishSteps : []) {
+    const m = TOP_RE.exec(String(k || ''));
+    if (m && !out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+/**
+ * 오늘 과목 단계 (순수) → { steps: { 과목: −2~2 }, write: [오늘 적을 줄], up: [오른 과목] }
+ * 오늘 기록에 적힌 과목은 그대로(하루 한 번 — 처음 연 때 정함) · 안 적힌 과목만 셈:
+ *   지난 단계 = 오늘 앞의 가장 가까운 날에 적힌 단계(없으면 0) · 오늘 앞 7일 안에서 그 단계로 낚시한 날들(가까운 날부터 · 다른 단계 날에서 멈춤 ·
+ *   단계가 안 적힌 날은 낚시 문제가 있으면 0단계 날, 없으면 건너뜀)의 그 과목 낸·맞힌 수 → STEP_NEED 넘게 쌓였을 때만 바꿈
+ *   맨 위(+STEP_MAX)에서도 STEP_UP 넘게 맞히면 'top:과목'도 적는다(📊 「맨 위 단계도 쉬움」)
+ */
+export function subjectSteps(days, today) {
+  const t = dayIndex(today);
+  const list = (Array.isArray(days) ? days : []).filter((r) => r && r.date);
+  const have = stepsOfDay(list.find((r) => r.date === today));
+  const prev = list
+    .filter((r) => { const i = dayIndex(r.date); return Number.isFinite(i) && Number.isFinite(t) && i < t; })
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  const fished = (r) => SUBJECTS.some((s) => nz(r[FISH_DAY_Q[s][0]]) > 0);
+  const steps = {};
+  const write = [];
+  const tops = [];
+  const up = [];
+  for (const s of SUBJECTS) {
+    if (hasOwn(have, s)) { steps[s] = have[s]; continue; }
+    let cur = 0;
+    for (const r of prev) { const st = stepsOfDay(r); if (hasOwn(st, s)) { cur = st[s]; break; } }
+    let q = 0;
+    let ok = 0;
+    for (const r of prev) {
+      if (dayIndex(r.date) < t - 7) break;
+      const st = stepsOfDay(r);
+      if (!hasOwn(st, s) && !fished(r)) continue;
+      if ((hasOwn(st, s) ? st[s] : 0) !== cur) break;
+      q += nz(r[FISH_DAY_Q[s][0]]);
+      ok += nz(r[FISH_DAY_Q[s][1]]);
+    }
+    let next = cur;
+    if (q >= STEP_NEED) {
+      if (ok > q * STEP_UP) next = Math.min(STEP_MAX, cur + 1);
+      else if (ok < q * STEP_DOWN) next = Math.max(-STEP_MAX, cur - 1);
+      if (cur === STEP_MAX && ok > q * STEP_UP) tops.push(s);
+    }
+    steps[s] = next;
+    if (next > cur) up.push(s);
+    write.push(`${s}:${next}`);
+  }
+  return { steps, write: write.length ? [...write, ...tops.map((s) => `top:${s}`)] : [], up };
+}
+/** 과목 단계 → 하루 기록 줄 (네 과목 모두 · 이상한 값은 0) — 자정을 넘겨 낚을 때 새 날에도 적는다 (Codex 190차 #5) */
+export function stepLines(steps) {
+  return SUBJECTS.map((s) => {
+    const v = steps && hasOwn(steps, s) ? steps[s] : 0;
+    return `${s}:${Number.isInteger(v) && Math.abs(v) <= STEP_MAX ? v : 0}`;
+  });
+}
+/** 문제 단계 = 물고기 단계 + 과목 단계 (1~3 안) */
+export function stepLevel(base, step) {
+  const b = [1, 2, 3].includes(base) ? base : 1;
+  const s = Number.isInteger(step) ? step : 0;
+  return Math.min(3, Math.max(1, b + s));
+}
+/** 오른 과목 → 낚시터를 열 때 한 줄 ('' = 없음 · 셈 없음) */
+export function stepUpLine(subjs) {
+  const ko = (Array.isArray(subjs) ? subjs : []).filter((s) => hasOwn(SUBJ_KO, s)).map((s) => SUBJ_KO[s]);
+  if (!ko.length) return '';
+  return ko.length === 1 ? `⬆️ ${ko[0]} 실력이 늘었어요! 이제 한 단계 위 ${ko[0]} 문제가 나와요` : `⬆️ ${ko.join('·')} 실력이 늘었어요! 이제 한 단계 위 문제가 나와요`;
+}
+/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다 · 🚤 배) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🐋 2·3단계 맞힌/낸(v378) · 🔁 다시 풀기 맞힌/낸(v387) · 🔢 배운 칸별(v377) · 거듭 틀린 칸·🎚️ 과목 단계(v387) · 🔒 더 준 분 */
 export function lakeDayLine(d, fmtMin) {
   const f = typeof fmtMin === 'function' ? fmtMin : (s) => `${Math.round(nz(s) / 60)}분`;
   const asked = SUBJECTS.filter((s) => nz(d && d[FISH_DAY_Q[s][0]]) > 0);
@@ -1021,7 +1263,14 @@ export function lakeDayLine(d, fmtMin) {
   const cm = by.length ? ` · 🔢 배운 칸별 ${by.slice(0, 8).map((g) => `${g.id} ${g.ok}/${g.n}`).join(' · ')}${by.length > 8 ? ` 외 ${by.length - 8}칸` : ''}` : '';
   const lvs = [2, 3].filter((l) => nz(d && d[FISH_LV_Q[l][0]])).map((l) => `${l}단계 ${nz(d[FISH_LV_Q[l][1]])}/${nz(d[FISH_LV_Q[l][0]])}`);
   const lv = lvs.length ? ` · 🐋 큰 물고기 문제 ${lvs.join(' · ')}` : '';
-  return `🎣 낚시터 ${f(d.fishSec)} · 물고기 ${nz(d.fishCatch)}마리${rv}${q ? ` · 맞힘/낸 문제 ${q}` : ''}${lv}${cm}${nz(d.fishBonus) ? ` · 🔒 부모 +${nz(d.fishBonus)}분` : ''}`;
+  // v387 — 🔁 다시 풀기 · 거듭 틀린 칸 · 🎚️ 그날 과목 단계(0이 아닌 것) · 맨 위 단계도 쉬움
+  const rd = nz(d && d[FISH_REDO_Q[0]]) ? ` · 🔁 다시 풀기 ${nz(d[FISH_REDO_Q[1]])}/${nz(d[FISH_REDO_Q[0]])}` : '';
+  const stuck = stuckIds(d);
+  const st = stepsOfDay(d);
+  const moved = SUBJECTS.filter((s) => hasOwn(st, s) && st[s] !== 0).map((s) => `${SUBJ_KO[s]} ${st[s] > 0 ? '+' : '−'}${Math.abs(st[s])}`);
+  const tops = topsOfDay(d).map((s) => SUBJ_KO[s]);
+  const sl = `${stuck.length ? ` · 거듭 틀린 칸 ${stuck.join(' · ')}` : ''}${moved.length ? ` · 🎚️ 과목 단계 ${moved.join(' · ')}` : ''}${tops.length ? ` · ⬆️ ${tops.join('·')} 맨 위 단계도 쉬움` : ''}`;
+  return `🎣 낚시터 ${f(d.fishSec)} · 물고기 ${nz(d.fishCatch)}마리${rv}${q ? ` · 맞힘/낸 문제 ${q}` : ''}${lv}${rd}${cm}${sl}${nz(d.fishBonus) ? ` · 🔒 부모 +${nz(d.fishBonus)}분` : ''}`;
 }
 
 function nz(v) {

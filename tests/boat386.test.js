@@ -366,7 +366,7 @@ test('🔌 잇기 — 🗺️ 배 줄은 바다가 열린 뒤 · 바람 날 잠�
   const body = (name) => { const i = fv.indexOf(`function ${name}(`); assert.ok(i >= 0, name); return fv.slice(i, fv.indexOf('\n}\n', i)); };
   assert.match(fv, /const SAIL_MS = 2000;/);
   assert.match(body('switchPlace'), /if \(pl === 'boat'\) startSail\(\);\n\s*else toast\(/);
-  assert.match(fv, /else if \(place === 'boat'\) startSail\(\);/, '배로 들어오면 출항부터');
+  assert.match(fv, /if \(place === 'boat'\) startSail\(\);[^\n]*\n\s*else if \(rested\)/, '배로 들어오면 출항부터 (v387 — 들어서기 안내를 enter()로 묶음)');
   assert.match(fv, /else if \(rested\) toast\(BOAT_REST, 3600\);/, '바람 날은 바다에서 + 쉼 한 줄');
   assert.match(fv, /const rested = h\.place === 'boat' && boatOk && boatRest\(wx0\);/, '마지막 물가가 배여도 바람 날이면 쉼(변이 mut386a)');
   assert.match(fv, /const wx0 = \(h\.weather && h\.weather\.key\) \|\| 'sun';/);
@@ -416,6 +416,6 @@ test('🔌 잇기 — 🗺️ 배 줄은 바다가 열린 뒤 · 바람 날 잠�
   assert.ok(st.includes('🚤 배 낚시는 바다 도감 ${BOAT_NEED}종이면 열려요(🌬️ 바람 부는 날은 배가 쉼)'));
   assert.ok(src('js/upload.js').includes('물고기 N마리(🏞️ 강 M · 🌊 바다 K · 🚤 배 J)'));
   assert.match(src('css/style.css'), /\.lk-dex-soft \{/);
-  assert.match(src('sw.js'), /const CACHE_VERSION = 'v386';/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v386'/);
+  assert.match(src('sw.js'), /const CACHE_VERSION = 'v(38[6-9]|39\d|[4-9]\d\d)';/); // v386 이상 (v387이 판을 올림)
+  assert.match(src('js/version.js'), /APP_VERSION = 'v(38[6-9]|39\d|[4-9]\d\d)'/);
 });
