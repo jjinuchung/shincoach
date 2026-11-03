@@ -8902,5 +8902,36 @@
   - 반영 뒤: redo387 15 · 변이 84/84(`mut387b.log`) · 걷기 1024·390 다시(`walk387b_1024.log`·`walk387c_390.log` — 다음 날 몫 「지난번」 · 넘침 0 · 콘솔 0) · 폰(640px 이하)에선 넓어진 알림이 두 줄 단추 줄의 ✕를 덮어 알림을 그 아래로 · **전체 3427 통과**
 
 ### TODO
-- [ ] 아버님 **「배포」**(11-03) → feat + docs 커밋(blackbox.js 빼고 · tests/redo387.test.js 포함) → push → 라이브 확인(live_check386 본떠 · sw js/version js/fishing js/lakeview js/fishview js/math js/db js/stats js/upload css/style)
+- [x] 아버님 **「배포」**(11-03) → **v387 배포됨**(d334594 feat + de3c78f docs · blackbox.js 빼고) · 라이브 sw·앱 판 v387 · 배포본 10개 같음 · STEP_NEED 30·REDO_NEXT_MAX 12 확인(`.context/v387/live_check387.sh`)
 - [ ] 배포 뒤 태블릿 앱 완전히 닫고 다시 열기 · 「올라온 거 봐 줘」 때 📤 🔁 다시 풀기·거듭 틀린 칸·🎚️ 과목 단계 줄로 주 단위 효과
+
+## 2026-11-03 — ✍️ 영어 「💡 오늘의 글감」 기본안 (v388)
+
+- 아버님 「다음으로 할 만한 것」 → 추천 1번(영어 「오늘의 글감」) 「기본안부터 시작하자」
+- 지금 구조: 에세이는 배운 문장 셋의 앞부분을 두고 뒤 4~8단어를 「내 이야기」로 바꿔 씀(`js/essay.js` makeFrame·pickPrompts) · **무엇을 쓸지는 아이에게 맡겨져 있음** → 고를 거리를 하나 놓기로(까닭이 된 기록은 비공개 쪽에만 — 숫자·글은 공개 저장소에 안 씀)
+- 기본안 https://claude.ai/artifact/DCkRaCE77mgqCidiQFmipL (`.context/v388/topic_plan.html`) — 정할 것 일곱, 추천:
+  1. 자리 = 지금 「✍️ 오늘의 에세이」 안(시작 화면 · 쓰기 칸 위) — 새 과목·새 화면 아님 2. 하루 셋 중 하나 + 「✏️ 내 마음대로」 · 세 문장 같은 글감 3. 카드 = 한국어 물음 한 줄 + 영어 낱말 다섯(뜻) · 보기 문장 없음 4. 낱말 누르면 🔊만(칸에 안 넣음 — 철자 연습) 5. 원고 30을 검수 페이지로 · 지난 7일 나온 글감은 다시 안 나옴 · 「오늘 한 일」 글감(물고기·파트너 영어 이름)은 나중 6. 글감 낱말을 쓰면 칭찬 한 줄만 · 보상 그대로 7. 글 내용을 두고 앱은 아무 말 안 함(글감 카드만 보임)
+  - 그대로: ⚡·💰·🔶 · 하루 세 문장 · 30분 · 빈칸 4~8단어 · 신코치 교정·🎤 · 아빠 교정 왕복 꼴 · 쓴 글은 내용과 상관없이 받음 · 셈 문구 없음 · 📤 교정 목록에 글감 표시 · 📊 주 단위 줄
+
+### TODO
+- [x] 아버님 답 → 글감 원고 30 검수 페이지 → 「이대로」 → v388 구현 → 시험·변이·걷기 (아래) → Codex 191차 → 판단 표 → 「배포」
+- [x] 아버님 **「이대로」**(기본안 일곱 모두 추천대로) → 글감 원고 30 — `.context/v388/topics.json`(무리 셋 🎮 좋아하는 것 A1~A10 · 🏠 내 하루 B1~B10 · ✨ 상상 C1~C10 · 글감마다 물음 한 줄 + 낱말 다섯 · 낱말 150 모두 다름 · `build_review.mjs`가 검사하고 페이지를 만듦) · 검수 https://claude.ai/artifact/9gk5MVGtzowCvHMyE48BTN
+  - 고르는 법(원고 페이지에 적음): 하루 셋 = 무리마다 하나 · 무리마다 열 개를 차례로 돌려 7일 안 다시 안 나옴 · 날짜로 정해 같은 날 다시 열어도 같은 셋
+- [x] 원고 검수 답 → 아버님 **「이대로」** → **v388 구현**(미커밋):
+  - 새 `js/essaytopic.js`(순수 · import 없음) — 원고 30(`.context/v388/topics.json`과 글자까지 같음 확인) · dayTopics(날짜 → 무리마다 하나 · step 1·3·7) · topicHits(-s·-es·-oes·-ies·-ed·-ing·겹자음·끝 e·'s) · praiseLine · topicDayText(📤 english 하루 줄) · topicWeekLine(📊 7일 줄)
+  - `js/essay.js` — 시작 화면 #essay-topics(셋 + ✏️ 내 마음대로 · 처음엔 아무것도 안 켜짐 · aria-pressed · 시작 뒤엔 못 바꿈 · 아빠 교정 회차엔 없음) · 쓰기 칸 위 #essay-idea(물음 + 낱말 다섯 · 누르면 🔊만 · mousedown 막아 자판 유지 · 소리 없는 기기는 글자만) · 쓴 뒤 it.topic·it.topicHits · 결과 #essay-praise 한 줄 · `index.html` 칸 셋 · `css/style.css` · `js/player.js` topics 넘김·쓴 글에 topic·tw · `js/db.js` mergeEssayEntry가 글을 바꾸면 topic·tw도 지움 · `js/stats.js` 7일 줄·설명·글 상자 💡 줄 · `js/upload.js` essay/todo 💡 줄·json topic·tw · english 하루 줄 끝 + 에세이만 쓴 날도 줄로(걷기에서 찾음) · sw(새 파일)·앱 판 v388
+  - 시험: 새 `tests/essaytopic388.test.js` 10 · 옛 englishskip(머리 줄)·player.logic(dayTopics 주입)·redo387(판 번호를 「v387 이상」으로) · 변이 51/52(`.context/v388/mutate_v388.mjs` · `mut388a/b.log` — 놓친 하나 「짧은 낱말 -s도 뗌」은 글감 낱말이 모두 세 글자 이상이라 결과가 같은 변이) · 걷기 `walk388.sh`+`hh388.js` 1024·390(고르기·카드·🔊·칭찬·📊·📤 · 넘침 0 · 콘솔 0 · 긴 글감 이름 한 줄) · 전체 3437 중 1(redo387 판 번호 — 고침)
+  - 시험 파일·주석에서 아이 글을 짐작하게 하는 말(가게 이름 목록·행동 묘사)은 뺌
+- [x] Codex 191차(`.context/v388/codex191.md` — 38만 토큰 · 지정 시험 100 통과 · **P1 없음** · P2 3 · 「괜찮음」: 회차·화면 상태 · 듣기·🎤와 카드 분리 · 일반 저장·교정 부착 · [번호] 왕복 · 집계·내보내기 · aria-pressed)
+  1. (P2) 낱말 꼴 찾기가 다른 낱말을 글감 낱말로 셈 — staring·stared → stars(stare) · pasted → past(paste)
+  2. (P2) 백업 두 사본을 합칠 때(mergeEssayCopies → pickCopy) 같은 글인데 고른 사본에 글감이 없으면 다른 사본의 topic·tw를 잃음
+  3. (P2) 낱말 단추 높이 36px(글감 단추는 44px)
+  4. 시험 보탤 곳: 일반 → 아빠 교정 → 연습 → 일반 · abortEssay 뒤 다시 열기 · 「나중에 할래」 뒤 같은 날 · Enter 제출
+- [x] 판단 표(넷 모두 고침·보탬 추천 · 「v387 옛 창 병합」·「모르는 글감 번호 = 안 고름」은 그대로) → 아버님 **「추천대로」** → 반영(미커밋):
+  1. `js/essaytopic.js` — -ing·-ed를 뗀 바탕이 한 음절 「자음·모음 하나·자음」(CVC — w·x·y 끝은 빼고)이고 끝 자음이 안 겹쳤으면 끝 e를 붙인 꼴만(staring·stared → stare · starred → star · drawing → draw · riding → ride · traveled → travel) · 동사가 아닌 글감 낱말 NOT_VERB(past)는 -ed·-ied·-ing을 안 뗀 꼴과만 맞춤(pasted ≠ past)
+  2. `js/db.js` withTopic — 같은 글의 두 사본이면 고른 사본에 글감이 없을 때 다른 사본의 topic·tw를 한 쌍으로(어느 쪽이 지금 기기든) · 고른 사본에 있으면 그 쌍 그대로 · 글이 다르면 지금 기기의 것 그대로
+  3. `css/style.css` — 누르는 낱말(button.essay-word) min-height 44px · 글자 가운데
+  4. 시험 — 낱말 꼴 11줄 · 백업 양쪽 방향·둘 다 없음·글 다름·고른 쪽 우선 · 새 흐름 시험 「🔁 이어 열기」(일반 Enter → abortEssay → 다시 · 「나중에 할래」 → 다시 · 고른 채 아빠 교정 → 연습(카드는 보이고 기록 없음) → 일반 — 앞 회차의 글감이 안 샘) · CSS 44px
+  - 검증: 글감 시험 11 통과 · 변이 65/66(`mut388c.log` — 새 191차 변이 16 모두 잡힘 · 놓친 하나는 앞과 같은 「짧은 낱말 -s도 뗌」) · 걷기 390(`walk388_390b.log` — 낱말 단추 다섯 모두 44 · 넘침 0 · 콘솔 0 · 글자 가운데) · 전체 3438 통과
+- [ ] 아버님 **「배포」**(11-03) → feat + docs 커밋(blackbox.js 빼고) → push → 라이브 확인(live_check387 본떠 · sw js/version js/essaytopic js/essay js/player js/db js/stats js/upload css/style index.html)
+- [ ] 태블릿 다시 열기(v384 → v388) · 다음 「올라온 거 봐 줘」 때 essay/todo 💡 줄·english 하루 줄로 글감 고른 날·글감 낱말 쓴 글(수치는 대화·비공개에만)
