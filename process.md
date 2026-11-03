@@ -8875,5 +8875,32 @@
   - 반영 뒤: boat386 12(🛟 맡아 두기 시험 하나 더) · 옛 lake366의 「모르는 종은 버림」 두 줄을 새 동작으로 · 변이 79/79(`mut386c.log`) · 걷기 1024 다시(`walk386b_1024.log` — 「🐙 떼어 냈어요!」까지 · 넘침 0 · 콘솔 0) · **전체 3413 통과**
 
 ### TODO
-- [ ] 아버님 **「배포」**(11-03) → feat + docs 커밋(blackbox.js 빼고) → push → 라이브 확인
+- [x] 아버님 **「배포」**(11-03) → **v386 배포됨**(ffae7e2 feat + 96df4e2 docs · blackbox.js 빼고) · 라이브 sw·앱 판 v386 · 배포본 11개 같음 · BOAT_NEED 6·MORE_MAX 64 확인(`.context/v386/live_check386.sh`)
 - [ ] 배포 뒤 태블릿 앱을 완전히 닫고 다시 열기(v375 → v386) · 11-03은 🌬️ 배가 쉬는 날(내일 11-04 ☁️ 배 뜸)
+
+## 2026-11-03 — 🎣 낚시터 문제 손보기 기본안 (v387)
+
+- 아버님 「낚시 중 문제 난이도는? 학습에 도움이 되나?」 → 비공개 기록·코드를 보고 답함 → 제안 셋 가운데 **1번(틀린 수학 칸 다시 풀기)·2번(과목마다 단계 맞추기)부터 기본안** (3번 영어 새 문제 꼴은 2번 뒤)
+- 지금 구조의 빈틈: 낚시 문제 원천은 모두 이미 배운 것(복습 자리) · 틀린 배운 칸은 📤 칸별 기록에만 남고 다시 풀기로 안 이어짐 · 1단계(calc) 오답은 풀이 없이 정답 1.5초(`journeyMathSource`가 L ≥ 2일 때만 hint) · 단계는 물고기 크기로만(stageLevel)
+- 조사(`.context/v387/hintcov.mjs`·`hintsample.mjs`·`similar.mjs`): 1단계 calc 문제의 틀린 보기 대부분에 이미 풀이 한 줄(mathHint — solve.why[tag]·whyAny)이 있음 · 줄 길이 가운데 35자 · 같은 칸 다른 씨앗은 숫자나 묻는 꼴이 조금 다름
+- 기본안 https://claude.ai/artifact/9vxGm3GPAp4y1nWBYYiQBR (`.context/v387/fish_q_plan.html`) — 정할 것 일곱, 추천:
+  1. 다시 풀 자리 = 낚시 안 2. 1단계 오답에도 풀이 한 줄(「알겠어요」) 3. 다음 물고기의 첫 수학 차례 → 또 틀리면 다음 날 낚시 처음 → 그래도 틀리면 멈춤 + 📊 「낚시에서 거듭 틀린 칸」 4. 수학 배운 칸만 5. 과목 단계(−2~+2 · 문제 단계 = 물고기 단계 + 과목 단계, 1~3 안) — 하루 한 번 그날 처음 열 때 · 지금 단계로 7일 안 30문제 넘게 쌓이면 90% 넘으면 올림 · 60% 아래면 내림 6. 올라간 날 낚시터를 열 때 한 줄 칭찬 · 내림은 말없이 7. v387 하나로
+  - 그대로: 물고기 안 놓침 · 💰 하루 상한 · 20분 · 과목 비율 · 🎒 대여행 문제 · 셈 문구 없음 · 📊/📤에 🔁 다시 풀기·거듭 틀린 칸·🎚️ 과목 단계
+
+- 11-03 아버님 **「추천대로」**(일곱 모두) → **v387 구현**(미커밋):
+  - `js/fishing.js` — 🔁 redoKey·redoRows·wrongIds·stuckIds·redoPlan(지난 낚시 날의 같은 날 다시 풀기 실패·다시 풀 틈 없던 칸 → 오늘 처음 · 12까지)·redoQueue(물고기마다 하나 · 틀린 물고기 다음부터 · 한 칸 하루 한 번 · 같은 단계·틀린 문제 글 피함) · REDO_BADGE·REDO_OK · 🎚️ subjectSteps(그날 처음 열 때 · 지금 단계로 30문제 넘게면 90% 넘게 +1 · 60% 아래 −1 · ±2 · 맨 위에서도 쉬우면 top) · stepLevel · stepUpLine · lakeDayLine에 🔁 다시 풀기·거듭 틀린 칸·🎚️ 과목 단계
+  - `js/lakeview.js` — redoMake·redoAsker(ctx.fish) · 열 때 redoPlan·subjectSteps(fishSteps 적기) · onAnswer는 fishMathKeys+fishRedoKeys를 한 번에 + fishRedoQ/Ok · 틀린 배운 칸 rq.wrong · startOf가 다시 풀기 수를 뺌 · `js/fishview.js` castN·steps·🔁 카드 머리(.is-redo)·맞힘 한 줄·열 때 ⬆️ 한 줄 뒤 들어서기 안내 · `js/math.js` 1단계 계산도 풀이 한 줄·qk · `js/db.js` fishRedoQ/Ok(합)·fishRedoKeys·fishSteps(목록) · 📊·📤 설명 · css .is-redo · 낚시터 알림(.lk-toast)이 폭 절반에 묶여 낱말 중간에서 끊기던 것(max-content·keep-all) · sw·앱 판 v387
+  - 시험: 새 `tests/redo387.test.js` 13 · 옛 lakelevel378·boat386·one331의 소스 줄을 v387 값으로 · 변이 67/67(`.context/v387/mutate_v387.mjs` — 놓친 「가장 먼 날」은 시험 보탬) · 걷기 `walk387.sh`+`hh387.js` 1024·390(어제 기록 심기 → ⬆️ 영어 한 줄 → 들어서기 안내 · 작은 물고기도 영어 2단계 · 첫 물고기 첫 수학 차례 🔁 · 1단계 💡 · 다시 열면 ⬆️ 없음 · 넘침 0 · 콘솔 0) · 전체 3425 중 1(one331 소스 줄 — 고침)
+  - Codex 190차(`.context/v387/codex190.md` — 42만 토큰 · P1 1 · P2 5 · 「괜찮음」: 한 창·같은 날 흐름 · 단계 경계 · 배지·키보드 · 기록 병합) → 판단 표 → 아버님 **「추천대로」** → 반영:
+    1. (P1) 다음 날 몫을 하나만 풀고 닫으면 남은 칸이 그다음 날 사라지던 것 → redoPlan이 7일 안 낚시 날을 옛날부터 훑어 「빚」으로 들고 가다 다음 날 다시 풀기를 한 날 지움
+    2. 같은 날 다시 열거나 다음 날이면 1단계·같은 문제가 될 수 있던 것 → 틀릴 때 하루 기록 fishRedoWait에 그 문제의 단계·글 지문(qFingerprint) · 계획 meta로 같은 단계·다른 문제
+    3. 다음 날 몫 12가 다시 열 때마다 새로 → 오늘 이미 낸 다음 날 몫을 빼고 셈
+    4. 두 창 → 그대로(드물고, 생겨도 한 문제를 한 번 더)
+    5. 자정을 넘긴 창 → 다시 풀기를 멈춤(alive) · 자정 뒤 답한 다시 풀기는 보통 답으로 · 새 날에도 지금 단계를 적음(stepLines)
+    6. 영어 목소리 없는 기기의 「맨 위 단계도 쉬움」 → 그대로 + 📤 설명 한 줄
+    7. 다음 날 몫 카드 머리 「🔁 지난번 그 문제, 다시 한 번!」(redoBadge)
+  - 반영 뒤: redo387 15 · 변이 84/84(`mut387b.log`) · 걷기 1024·390 다시(`walk387b_1024.log`·`walk387c_390.log` — 다음 날 몫 「지난번」 · 넘침 0 · 콘솔 0) · 폰(640px 이하)에선 넓어진 알림이 두 줄 단추 줄의 ✕를 덮어 알림을 그 아래로 · **전체 3427 통과**
+
+### TODO
+- [ ] 아버님 **「배포」**(11-03) → feat + docs 커밋(blackbox.js 빼고 · tests/redo387.test.js 포함) → push → 라이브 확인(live_check386 본떠 · sw js/version js/fishing js/lakeview js/fishview js/math js/db js/stats js/upload css/style)
+- [ ] 배포 뒤 태블릿 앱 완전히 닫고 다시 열기 · 「올라온 거 봐 줘」 때 📤 🔁 다시 풀기·거듭 틀린 칸·🎚️ 과목 단계 줄로 주 단위 효과
