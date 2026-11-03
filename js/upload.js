@@ -37,6 +37,7 @@ import { VIDEO_STONE } from './items.js'; // 🏁 영상 보상 기준 (🎤 영
 //   새 판 파일을 받아 "지금 도는 코드"를 새 판으로 적었다 (🔍 Codex 120차 #6) · version.js도 아무것도 import하지 않는다
 import { APP_VERSION, cachedVersion, versionLine } from './version.js';
 import { lakeDayLine } from './fishing.js'; // 🎣 학습 낚시터 하루 한 줄 (v366 — 순수, 아무것도 import하지 않음)
+import { topicById, topicLabel, topicDayText } from './essaytopic.js'; // 💡 오늘의 글감 (v388 — 순수, 아무것도 import하지 않음)
 
 export const DATA_REPO = 'jjinuchung/shincoach-data';
 export const PRIVATE_FIXES = 'essay/fixes.json';
@@ -79,10 +80,15 @@ export function essayFiles(todo, today) {
     lines.push(`    진우: ${e.written}`);
     if (e.fixed && e.fixed !== e.written) lines.push(`    앱 교정: ${e.fixed}`);
     if (Array.isArray(e.notes) && e.notes.length) lines.push(`    앱 메모: ${e.notes.join(' · ')}`);
+    const tp = topicById(e.topic); // 💡 고른 글감 (v388)
+    if (tp) lines.push(`    💡 글감: ${topicLabel(tp)} (${tp.id})${Array.isArray(e.tw) && e.tw.length ? ` · 쓴 글감 낱말: ${e.tw.join(', ')}` : ''}`);
     lines.push('');
   });
   if (!list.length) lines.push('(고칠 글 없음)');
-  const json = list.map((e, i) => ({ no: i + 1, id: e.id, date: e.date || '', origin: e.origin || '', written: e.written, fixed: e.fixed || '', notes: Array.isArray(e.notes) ? e.notes : [] }));
+  const json = list.map((e, i) => ({
+    no: i + 1, id: e.id, date: e.date || '', origin: e.origin || '', written: e.written, fixed: e.fixed || '', notes: Array.isArray(e.notes) ? e.notes : [],
+    ...(topicById(e.topic) ? { topic: e.topic, tw: Array.isArray(e.tw) ? e.tw : [] } : {}), // 💡 글감을 고른 글만 (v388)
+  }));
   return [
     { path: 'essay/todo.md', text: `${lines.join('\n').trim()}\n` },
     { path: 'essay/todo.json', text: `${JSON.stringify(json, null, 1)}\n` },
@@ -109,15 +115,16 @@ export const EN_VIDEOS = 10;
 export function englishFiles(days, summaries, today) {
   const num = (v) => Number(v) || 0;
   const byDate = new Map((Array.isArray(days) ? days : []).filter((d) => d && d.date).map((d) => [d.date, d]));
-  const lines = [`🎤 영어 기록 (${today}) — ⏭ 직접 넘김과 3번 해 보고 넘어감은 v253부터 따로 셉니다 (그 전 날은 0)`, '', '## 최근 7일'];
+  const lines = [`🎤 영어 기록 (${today}) — ⏭ 직접 넘김과 3번 해 보고 넘어감은 v253부터 따로 셉니다 (그 전 날은 0) · ✍️ 에세이 줄의 💡 글감(시작 화면에서 고른 것 · 글감 낱말 = 카드의 영어 낱말 다섯 가운데 글에 쓴 것)은 v388부터`, '', '## 최근 7일'];
   for (let k = 6; k >= 0; k--) {
     const day = dayBefore(today, k);
     const d = byDate.get(day);
     const done = d && Array.isArray(d.doneKeys) ? d.doneKeys.length : 0;
     // 복습·퍼즐·단어 잇기·영어 화면 시간만 있는 날도 영어를 한 날 (Codex 65차 #5 — 전엔 "영어 안 함"으로 적었다)
-    const any = d && (done || ['speakAttempts', 'reviewItems', 'reviewSentences', 'puzzles', 'matches', 'seconds', 'enTime'].some((k) => num(d[k]) > 0));
+    // ✍️ 에세이만 쓴 날(자정을 넘겨 쓴 글)도 — 💡 글감 줄이 「영어 기록 없음」에 묻히지 않게 (v388)
+    const any = d && (done || ['speakAttempts', 'reviewItems', 'reviewSentences', 'puzzles', 'matches', 'seconds', 'enTime'].some((k) => num(d[k]) > 0) || topicDayText(d));
     if (!any) { lines.push(`- ${day.slice(5)}: (영어 기록 없음)`); continue; }
-    lines.push(`- ${day.slice(5)}: 한 문장 ${done} · 🔁 복습 문장 ${num(d.reviewSentences)} · 🎤 말하기 통과 ${num(d.speakPass)}/${num(d.speakAttempts)} · ⏭ 직접 넘김 ${num(d.speakSkipBtn)} · 3번 해 보고 넘어감 ${num(d.speakGaveUp)} · 🎤 연속 보너스 ${num(d.speakCombos)}번`);
+    lines.push(`- ${day.slice(5)}: 한 문장 ${done} · 🔁 복습 문장 ${num(d.reviewSentences)} · 🎤 말하기 통과 ${num(d.speakPass)}/${num(d.speakAttempts)} · ⏭ 직접 넘김 ${num(d.speakSkipBtn)} · 3번 해 보고 넘어감 ${num(d.speakGaveUp)} · 🎤 연속 보너스 ${num(d.speakCombos)}번${topicDayText(d)}`);
   }
   const vids = (Array.isArray(summaries) ? summaries : []).filter((x) => x && !x.broken && num(x.lastAt) > 0 && num(x.total) > 0)
     .sort((a, b) => num(b.lastAt) - num(a.lastAt)).slice(0, EN_VIDEOS);

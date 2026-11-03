@@ -3,8 +3,11 @@
 // 교정은 **오프라인 규칙 기반**이다. 원칙은 하나: *확실한 것만 고치고 나머지는 아이가 쓴 그대로 둔다.*
 // 어순·시제처럼 판단이 필요한 것은 건드리지 않는다 — 규칙으로 어설프게 고치면
 // 아이가 하려던 말이 바뀌어 버리고, 그건 안 고치는 것보다 나쁘다.
+//
+// 💡 v388 오늘의 글감: 시작 화면에서 글감 하나(그날 셋 + 내 마음대로)를 고르면 쓰기 칸 위에 물음 한 줄 + 영어 낱말 다섯 (essaytopic.js)
 import { splitWords, hasEchoedRun } from './puzzle.js';
 import { stemWord } from './vocab.js';
+import { topicHits, topicLabel, praiseLine } from './essaytopic.js'; // 💡 오늘의 글감 (v388)
 
 const $ = (id) => document.getElementById(id);
 
@@ -464,6 +467,8 @@ const ui = {
   open: false, o: null, i: 0, started: false, granted: false, busy: false,
   finished: false, speakStop: null, run: 0,
   readTok: 0, // 🔊 고친 문장 첫 읽어 주기 번호 — 끝나야 「다음 문장 →」 (v318)
+  topic: null, // 💡 시작 화면에서 고른 글감 (v388 — 없으면 내 마음대로)
+  picked: false, // 💡 글감 단추를 눌렀나 (안 눌렀으면 어느 단추도 켜지 않는다)
 };
 
 function playSfx(name) {
@@ -556,6 +561,7 @@ export function isEssayOpen() {
  * @param {(item:object) => void} [o.onSaid] 내 에세이 문장에서 넘어갈 때 — item.said(pass·try·없음)로 🎤를 했나 적는다 (v318)
  * @param {() => object} o.onFinished 전부 완성
  * @param {(summary:object) => void} o.onDone
+ * @param {Array<object>} [o.topics] 💡 오늘의 글감 셋 (v388 — essaytopic.dayTopics · 아빠 교정 회차엔 안 보임) · 고른 글감은 it.topic·it.topicHits로
  */
 export function openEssay(o) {
   closeEssay();
@@ -588,6 +594,8 @@ export function openEssay(o) {
   $('essay-note').textContent = coach
     ? '내가 쓴 글을 아빠가 읽고 고쳐 줬어요. 바뀐 곳은 색으로 보여요 — 듣고 🎤로 소리 내어 읽어 봐요!'
     : '틀린 곳은 신코치가 고쳐 줄 거예요. 편하게 써 보세요!';
+  ui.topic = null;
+  renderTopics(coach ? [] : (o.topics || []).filter(Boolean));
 
   $('essay-intro').hidden = false;
   $('essay-write').hidden = true;
@@ -624,6 +632,63 @@ function finish(patch) {
   if (o && o.onDone) o.onDone(summary);
 }
 
+/** 💡 시작 화면 — 그날 글감 셋 + 「✏️ 내 마음대로」 (v388) · 아무것도 안 눌러도 지금처럼 쓴다 · 시작한 뒤엔 못 바꾼다(세 문장 같은 글감) */
+function renderTopics(list) {
+  const box = $('essay-topics');
+  box.innerHTML = '';
+  box.hidden = !list.length;
+  if (!list.length) return;
+  box.appendChild(el('div', 'essay-topics-head', '💡 오늘의 글감'));
+  box.appendChild(el('div', 'essay-topics-sub', '하나 골라 봐요 · 안 골라도 돼요'));
+  const row = el('div', 'essay-topics-row');
+  const btns = [];
+  const paint = () => btns.forEach((b) => {
+    const on = ui.picked && b.topic === ui.topic;
+    b.className = `essay-topic${b.topic ? '' : ' free'}${on ? ' on' : ''}`;
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  for (const t of [...list, null]) {
+    const b = el('button', '', t ? topicLabel(t) : '✏️ 내 마음대로');
+    b.type = 'button';
+    b.topic = t;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!ui.open || ui.started) return;
+      ui.topic = t;
+      ui.picked = true;
+      paint();
+    });
+    btns.push(b);
+    row.appendChild(b);
+  }
+  ui.picked = false;
+  paint();
+  box.appendChild(row);
+}
+
+/** 💡 쓰기 칸 위 글감 카드 — 물음 한 줄 + 영어 낱말 다섯(뜻) · 누르면 🔊만(칸에 넣지 않음 — 손으로 쳐 보는 것이 철자 연습) */
+function renderIdea(t) {
+  const box = $('essay-idea');
+  box.innerHTML = '';
+  box.hidden = !t;
+  if (!t) return;
+  box.appendChild(el('div', 'essay-idea-q', `💡 ${topicLabel(t)}: ${t.q}`));
+  const row = el('div', 'essay-words');
+  const speak = canReadAloud();
+  for (const [en, ko] of t.words) {
+    const w = el(speak ? 'button' : 'span', 'essay-word');
+    if (speak) {
+      w.type = 'button';
+      w.addEventListener('mousedown', (e) => e.preventDefault()); // 쓰던 칸에서 손을 떼지 않게 — 자판이 닫히지 않는다
+      w.addEventListener('click', (e) => { e.stopPropagation(); if (ui.open) readAloud(en); });
+    }
+    w.appendChild(el('b', null, en));
+    w.appendChild(el('span', null, ko));
+    row.appendChild(w);
+  }
+  box.appendChild(row);
+}
+
 function renderDots() {
   const box = $('essay-dots');
   box.innerHTML = '';
@@ -653,6 +718,7 @@ function showPrompt() {
   $('essay-origin-en').textContent = it.frame.full;
   $('essay-origin-ko').textContent = (it.rec && it.rec.ko) || '';
   $('essay-origin-ko').hidden = !(it.rec && it.rec.ko);
+  renderIdea(ui.topic);
   $('essay-keep').textContent = it.frame.keep;
   const input = $('essay-input');
   input.value = '';
@@ -674,6 +740,9 @@ function submitWriting() {
   const result = correct(it.frame.keep, text, { known: ui.o.known });
   it.written = text;
   it.result = result;
+  // 💡 고른 글감과 글에 쓴 글감 낱말 (v388 — 기록·칭찬 한 줄 · 고르지 않았으면 빈 값)
+  it.topic = ui.topic ? ui.topic.id : '';
+  it.topicHits = ui.topic ? topicHits(ui.topic, text) : [];
   playSfx('ding');
   if (!ui.o.practice && ui.o.onWritten) ui.o.onWritten(it);
   showResult(it);
@@ -705,6 +774,9 @@ function showResult(it) {
       notes.appendChild(li);
     }
   }
+  const praise = ui.o.mode === 'coach' ? '' : praiseLine(it.topicHits); // 💡 글감 낱말을 썼으면 칭찬 한 줄 (v388 — 보상은 그대로)
+  $('essay-praise').textContent = praise;
+  $('essay-praise').hidden = !praise;
   $('essay-read').hidden = !canReadAloud();
   // 고친 문장을 한 번 끝까지 들려준 뒤에 「다음 문장 →」 (v318 — 읽어 주기가 시작되자마자 끊고 넘어가지 않게) · 소리가 안 나는 기기는 바로
   // 읽어 주기는 끝 소식이 안 오는 기기도 있어 readAloud가 글 길이 + 3초 뒤에 스스로 끝낸다 · 🎤를 누르면 바로 (startSpeaking)

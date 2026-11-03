@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v387';
+const CACHE_VERSION = 'v388';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -214,6 +214,7 @@ const APP_SHELL = [
   './js/review.js',
   './js/dictation.js',
   './js/essay.js',
+  './js/essaytopic.js', // 💡 오늘의 글감 (v388 — 순수)
   './js/backup.js',
   './js/cloudbackup.js', // ☁️ 태블릿 자동 백업 — 하루 한 번 비공개 저장소 backup/ · 📊 되살리기 (v361)
   './js/ghosts.js', // 👻 되살린 백업의 영상 자리 — 같은 파일을 다시 넣으면 옛 id로 (v361)

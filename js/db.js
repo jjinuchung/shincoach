@@ -495,7 +495,8 @@ const sameText = (a, b) => String(a || '').trim() === String(b || '').trim();
 export function mergeEssayEntry(old, e) {
   const out = { ...(old || {}), ...(e || {}) };
   if (old && e && 'written' in e && !sameText(old.written, e.written)) {
-    for (const k of ['coachFix', 'fixedAt', 'readAt', 'readHow', 'sayHow']) if (!(k in e)) delete out[k];
+    // 💡 글감(topic·tw)도 앞 글의 것 — 새 글을 글감 없이 썼으면 지운다 (v388)
+    for (const k of ['coachFix', 'fixedAt', 'readAt', 'readHow', 'sayHow', 'topic', 'tw']) if (!(k in e)) delete out[k];
   }
   return out;
 }
@@ -523,7 +524,7 @@ function mergeRead(win, lose) {
  */
 export function mergeEssayCopies(a, b) {
   if (!a || !b || !sameText(a.written, b.written)) return a || b;
-  return withSay(pickCopy(a, b), a, b);
+  return withTopic(withSay(pickCopy(a, b), a, b), a, b);
 }
 
 function pickCopy(a, b) {
@@ -543,6 +544,14 @@ function withSay(out, a, b) {
   if (howRank(how) >= 0) o.sayHow = how;
   if (paid) o.sayPaid = true;
   return o;
+}
+
+/** 같은 글의 두 사본 — 💡 글감(topic·tw)은 한 쌍으로: 고른 사본에 없으면 다른 사본의 것 (v388 · 🔍 Codex 191차 #2 — 아빠 교정 쪽을 고르며 잃었다) */
+function withTopic(out, a, b) {
+  if (out.topic) return out;
+  const src = a.topic ? a : b.topic ? b : null;
+  if (!src) return out;
+  return { ...out, topic: src.topic, tw: Array.isArray(src.tw) ? src.tw : [] };
 }
 
 /**

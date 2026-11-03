@@ -25,6 +25,7 @@ import {
   REWARD as ESSAY_REWARD, FINISH_REWARD as ESSAY_FINISH, SAY_STONE as ESSAY_SAY_STONE,
 } from './essay.js';
 import { coachPick } from './feedback.js'; // 👨‍👩‍👦 아빠 교정 차례 — 📊·📤 「지나감」과 같은 규칙 하나 (v381 · 순수)
+import { dayTopics } from './essaytopic.js'; // 💡 오늘의 글감 셋 (v388 · 순수)
 import { initMatch, openMatch, closeMatch, refreshStage, pickMatchRound, shuffle as shuffleMons } from './match.js';
 import { ensureAnims, loadAnims, animUrl } from './sprite.js';
 import { makeDictation } from './dictation.js';
@@ -931,6 +932,7 @@ function startEssay(practice, cont) {
   openEssay({
     prompts,
     practice,
+    topics: dayTopics(track.dailyDate()), // 💡 오늘의 글감 셋 — 날짜로 정해 다시 열어도 같은 셋 (v388)
     reward: ESSAY_FINISH,
     known: state.vocab ? state.vocab.known : new Set(),
     common: state.vocab ? state.vocab.basic : null,
@@ -955,6 +957,7 @@ function startEssay(practice, cont) {
         origin: it.frame.full, keep: it.frame.keep,
         written: it.result.raw, fixed: it.result.fixed,
         notes: it.result.notes.map((n) => n.why),
+        ...(it.topic ? { topic: it.topic, tw: it.topicHits || [] } : {}), // 💡 고른 글감·쓴 글감 낱말 (v388 — 📊·📤)
       });
       track.flush();
       if (!first) return;

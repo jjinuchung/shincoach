@@ -99,7 +99,7 @@ test('📤 영어 요약(english/날짜.md) — 최근 7일 날마다 넘김·�
   const [f] = englishFiles(days, sums, T);
   assert.equal(f.path, `english/${T}.md`);
   const L = f.text.split('\n');
-  assert.equal(L[0], `🎤 영어 기록 (${T}) — ⏭ 직접 넘김과 3번 해 보고 넘어감은 v253부터 따로 셉니다 (그 전 날은 0)`);
+  assert.equal(L[0], `🎤 영어 기록 (${T}) — ⏭ 직접 넘김과 3번 해 보고 넘어감은 v253부터 따로 셉니다 (그 전 날은 0) · ✍️ 에세이 줄의 💡 글감(시작 화면에서 고른 것 · 글감 낱말 = 카드의 영어 낱말 다섯 가운데 글에 쓴 것)은 v388부터`);
   assert.ok(f.text.includes(`- 10-14: 한 문장 3 · 🔁 복습 문장 0 · 🎤 말하기 통과 3/6 · ⏭ 직접 넘김 2 · 3번 해 보고 넘어감 1 · 🎤 연속 보너스 1번\n`));
   assert.ok(f.text.includes('- 10-08: (영어 기록 없음)\n'), '아무것도 안 한 날');
   assert.ok(!f.text.includes('10-01'), '7일 밖');

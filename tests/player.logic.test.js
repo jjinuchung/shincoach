@@ -15,6 +15,7 @@ import { normSay as realNormSay } from '../js/grammarvideo.js'; // 🎬 대사 �
 import { spellReady as realSpellReady, spellSlot as realSpellSlot, grammarCount as realGrammarCount, pickSpell as realPickSpell } from '../js/spell.js'; // 🔤 철자 쪽지 자리 규칙은 진짜 (v356)
 import { wordsToday as realWordsToday } from '../js/korwords.js';
 import { coachPick as realCoachPick, COACH_KEEP_DAYS, COACH_MAX } from '../js/feedback.js'; // 👨‍👩‍👦 아빠 교정 차례 (v381)
+import { dayTopics as realDayTopics } from '../js/essaytopic.js'; // 💡 오늘의 글감 셋 (v388)
 import { dayNum as realDayNum } from '../js/korean.js'; // 🔤 쪽지 💰 받은 날 열쇠 (v356)
 import { matchCoins, COIN as REAL_COIN, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoOwed, videoTier, SPEAK_COMBO } from '../js/items.js';
 import fsNode from 'node:fs';
@@ -326,6 +327,7 @@ function loadPlayer() {
     // 🟢 v352 — 메가 판정은 xp.megaReady 한 곳(변신 표 + 🔑 + 💠 · 지가르데는 셀 100) · 배틀의 지가르데 칸 · 끝 화면 셀
     megaReady: (id) => !!((formState.forms[id] || {}).mega && formState.keystone && formState.mega[id]), zygBattle: () => null, addCell: () => null,
     coachPick: realCoachPick, listEssays: async () => [], markEssayRead: async () => true, // 👨‍👩‍👦 아빠 교정 차례는 진짜 (v381)
+    dayTopics: realDayTopics, // 💡 오늘의 글감 셋은 진짜 (v388)
     // ✍️ v318 — 내 에세이 🎤 기록 · 고친 문장 🎤 통과 → 🔶 (기록은 essayState.said · 받기는 essayState.sayKeys — 하루 2개 · 문장마다 한 번)
     syncCoachFixes: async () => 0, ESSAY_SAY_STONE: { maxPerDay: 2 },
     STOCK_CAP: 40, stockCapOf: (v) => ([10, 20, 30, 40, 50].includes(Number(v)) ? Number(v) : 40), // 🏦 증권시장 설정 (v319 · 기본 40%는 v351)

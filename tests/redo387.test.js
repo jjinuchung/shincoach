@@ -372,6 +372,6 @@ test('🔌 잇기 — 1단계 풀이 한 줄·문제 글(qk) · 물고기 번호
   const st = src('js/stats.js');
   assert.ok(st.includes('🎚️ 과목마다 지금 단계로 ${STEP_NEED}문제 넘게 쌓이면'));
   assert.ok(src('js/upload.js').includes('🔁 다시 풀기 맞힘/낸 = 틀린 배운 수학 칸을 다음 물고기의 첫 수학 차례에 한 번'));
-  assert.match(src('sw.js'), /const CACHE_VERSION = 'v387';/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v387'/);
+  assert.match(src('sw.js'), /const CACHE_VERSION = 'v(38[7-9]|39\d|[4-9]\d\d)';/);
+  assert.match(src('js/version.js'), /APP_VERSION = 'v(38[7-9]|39\d|[4-9]\d\d)'/);
 });

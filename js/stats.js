@@ -27,6 +27,7 @@ import { journeyRows, rowText, journeyOf, qLine, STOPS as JR_STOPS, JOURNEY } fr
 import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질문 카드도 화면·복사문처럼 (v256)
 import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
 import { coachState, COACH_KEEP_DAYS } from './feedback.js'; // 👨‍👩‍👦 아빠 교정 읽음·「지나감」 — 진우 화면 차례와 같은 판정 (v381)
+import { topicById, topicLabel, topicWeekLine } from './essaytopic.js'; // 💡 오늘의 글감 (v388 — 순수)
 import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
 import { allMsgs, addLocal, seenNow } from './familyview.js';
 import { SPECIES, lakeOf, lakeDayLine, FISH_COINS, FISH_DAY_MIN, SHARE_MIN, SHARE_MAX, PLACES, PLACE_KO, RIVER_NEED, SEA_NEED, BOAT_NEED, placeOpen, GEAR, hasGear, pickOf, lenLabel, STEP_NEED, STEP_UP, STEP_DOWN } from './fishing.js'; // 🎣 학습 낚시터 📊 카드 (v366 — 순수 · v368 🏞️ 강·🎒 채비 · v386 🚤 배 · v387 🔁·🎚️)
@@ -288,6 +289,8 @@ function essayBox(e, no) {
   if (no) box.appendChild(el('div', 'stats-essay-no', `[${no}] 고쳐 주세요`));
   box.appendChild(el('div', 'stats-essay-origin', `배운 문장: ${e.origin || ''}`));
   box.appendChild(el('div', 'stats-essay-mine', `✍️ ${e.written || ''}`));
+  const tp = topicById(e.topic); // 💡 고른 글감 (v388)
+  if (tp) box.appendChild(el('div', 'stats-essay-notes', `💡 글감 ${topicLabel(tp)}${Array.isArray(e.tw) && e.tw.length ? ` · 쓴 글감 낱말 ${e.tw.join(' · ')}` : ''}`));
   if (e.fixed && e.fixed !== e.written) box.appendChild(el('div', 'stats-essay-fixed', `✅ ${e.fixed}`));
   if (Array.isArray(e.notes) && e.notes.length) box.appendChild(el('div', 'stats-essay-notes', e.notes.join(' · ')));
   if (e.coachFix) {
@@ -686,6 +689,12 @@ export async function renderStats() {
     cE.appendChild(el('p', 'stats-sub', lastDay
       ? `마지막으로 고쳐 준 글: ${lastDay.date} (${agoLabel(lastDay.date, today)})`
       : '아직 고쳐 준 글이 없어요'));
+    // 💡 최근 7일 글감 (v388) — 진우가 시작 화면에서 글감을 골랐나 · 글감 낱말을 썼나
+    const topicLine = topicWeekLine(daily, today);
+    if (topicLine) {
+      cE.appendChild(el('p', 'stats-sub', topicLine));
+      cE.appendChild(el('p', 'stats-note', '💡 글감은 에세이 시작 화면에서 진우가 고른 것이에요(그날 셋 + 내 마음대로 · v388). 안 고르면 전처럼 자유롭게 써요. 글감 낱말 = 카드에 보인 영어 낱말 다섯 가운데 글에 쓴 것(-s·-ed·-ing 꼴도 같은 낱말). 보상은 글감과 상관없이 같아요.'));
+    }
 
     // 아직 고쳐 주지 않은 글의 번호 — 화면에 그대로 보여 준다.
     // 복사 없이 **사진만 찍어 보내도** 번호가 남으므로 [번호] 줄로 되돌려 받을 수 있다.

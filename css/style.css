@@ -2076,6 +2076,46 @@ button { font-family: inherit; }
 .essay-input::placeholder { color: #a5a9bd; font-weight: 500; font-size: 0.92rem; }
 .essay-warn { color: var(--danger); font-size: 0.9rem; font-weight: 700; min-height: 1.2em; margin: 6px 0; }
 .essay-submit { width: 100%; margin-top: 4px; }
+/* 💡 오늘의 글감 (v388) — 시작 화면 고르기 · 쓰기 칸 위 카드 · 다 쓴 뒤 칭찬 한 줄 */
+.essay-topics[hidden], .essay-idea[hidden], .essay-praise[hidden] { display: none; }
+.essay-topics { text-align: center; margin: 2px 0 12px; }
+.essay-topics-head { font-weight: 800; font-size: 1rem; }
+.essay-topics-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
+.essay-topics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.essay-topic {
+  min-height: 44px;
+  border: 2px solid #ddd6fe;
+  background: #faf5ff;
+  border-radius: 12px;
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.98rem;
+  color: var(--text);
+  cursor: pointer;
+  word-break: keep-all;
+}
+.essay-topic.free { background: transparent; border-style: dashed; color: var(--muted); }
+.essay-topic.on { background: #7c3aed; border-color: #7c3aed; border-style: solid; color: #fff; }
+.essay-idea { background: #fff8e6; border: 1px solid #f3d48a; border-radius: 12px; padding: 9px 12px; margin-bottom: 12px; }
+.essay-idea-q { font-weight: 700; font-size: 0.95rem; margin-bottom: 7px; word-break: keep-all; }
+.essay-words { display: flex; flex-wrap: wrap; gap: 6px; }
+.essay-word {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-height: 36px;
+  padding: 4px 9px;
+  border: 1px solid #f3d48a;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  color: var(--text);
+}
+button.essay-word { cursor: pointer; min-height: 44px; align-items: center; } /* 누르는 낱말은 글감 단추와 같은 높이 (🔍 Codex 191차 #3) */
+.essay-word b { font-size: 1rem; }
+.essay-word span { color: var(--muted); font-size: 0.82rem; }
+.essay-praise { color: #7c3aed; font-weight: 700; font-size: 0.92rem; text-align: center; margin: 0 0 8px; word-break: keep-all; }
 
 .essay-box { border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
 .essay-box.mine { background: #f8fafc; border: 1px solid var(--border); }
