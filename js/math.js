@@ -1304,11 +1304,9 @@ function startNotesRound(list) {
     q.fromNote = true;
     qs.push(q); ids.push(x.id);
   });
-  if (stale.length) {
-    updateMath((m) => { for (const x of stale) { const rec = m.concepts && m.concepts[x.id]; if (rec && Array.isArray(rec.notes)) rec.notes = rec.notes.filter((n) => n.key !== x.note.key); } })
-      .then((m) => { ui.state = m; }).catch(() => {});
-  }
-  if (!qs.length) { renderLadder(ui.state); return; }
+  const saved = !stale.length ? Promise.resolve() : updateMath((m) => { for (const x of stale) { const rec = m.concepts && m.concepts[x.id]; if (rec && Array.isArray(rec.notes)) rec.notes = rec.notes.filter((n) => n.key !== x.note.key); } })
+    .then((m) => { ui.state = m; }).catch(() => {});
+  if (!qs.length) { saved.then(() => { if (!ui.round && mathVisible()) renderLadder(ui.state); }); return; } // 지운 뒤에 그려야 단추가 사라진다 (v394)
   ui.round = { id: null, mode: 'notes', qs, ids, at: 0, correct: 0, missTags: [], answers: [], answered: false, seed: base, phase: 'q' };
   renderQuestion();
 }

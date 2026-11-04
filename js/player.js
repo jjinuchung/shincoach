@@ -1499,6 +1499,7 @@ function startReview(items, practice, after) {
       playPuzzleSentence(cue, () => {});
     },
     onDictation: (item, passed) => {
+      stopGrammarCue(); // 듣던 문장을 멈춘다 — 안 그러면 다음 문제까지 소리가 이어진다 (v394 · 덤 문장·연습 판도)
       if (item && item.extra) return favExtraDone(item.cue, passed, practice);
       if (!passed) state.reviewFails = (state.reviewFails || 0) + 1;
       state.reviewDw = (state.reviewDw || 0) + 1;

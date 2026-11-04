@@ -279,6 +279,7 @@ function isInflection(lower, known) {
 function articleFor(next) {
   if (!next || !/^[a-z]/.test(next)) return null;
   if (VOWEL_EXCEPT.has(next)) return 'an';
+  if (/^(one|ones|once)\b/.test(next)) return null; // a one-dollar toy — 철자는 모음이어도 소리는 자음 (v394)
   const c = next[0];
   if (c === 'u' || c === 'h' || c === 'y') return null;  // useful/hour/year — 소리를 장담할 수 없다
   if ('aeio'.includes(c)) return 'an';
@@ -856,11 +857,20 @@ function startSpeaking() {
         if (got && ui.open && run === ui.run && ui.i === at && !$('essay-speak').hidden) $('essay-speak-msg').textContent += ` ${got}`;
       }).catch(() => { it.passAsked = false; });
     }
-    setTimeout(() => {
-      // 아이가 그 사이에 "다음 문장"을 직접 눌렀으면 여기서 또 넘기지 않는다 (문장을 건너뛰게 된다)
+    // 아이가 그 사이에 "다음 문장"을 직접 눌렀으면 여기서 또 넘기지 않는다 (문장을 건너뛰게 된다)
+    const go = () => {
       if (!ui.open || run !== ui.run || ui.i !== at || $('essay-speak').hidden) return;
-      if (typeof document !== 'undefined' && document.hidden) return; // 화면이 꺼진 동안엔 넘어가지 않는다
       nextPrompt();
+    };
+    setTimeout(() => {
+      if (typeof document === 'undefined' || !document.hidden) { go(); return; }
+      // 화면이 꺼진 동안엔 넘어가지 않고, 돌아오면 이어서 — 그냥 끝내면 누를 단추 없는 말하기 화면에 남는다 (v394)
+      const back = () => {
+        if (document.hidden) return;
+        document.removeEventListener('visibilitychange', back);
+        go();
+      };
+      document.addEventListener('visibilitychange', back);
     }, 1200);
   });
 }

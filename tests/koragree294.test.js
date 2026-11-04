@@ -158,7 +158,7 @@ test('🔗 화면 연결 — 끝 보기는 판을 시작할 때 섞고 · 고른
   assert.ok(pv.includes('ps.ends.some((c) => c !== undefined)'));
   assert.match(pv, /ps\.picks = \[\];\n {2}ps\.ends = \[\];\n {2}ps\.lineFor = -1;/, '다음 퍼즐에서 고른 끝을 비운다');
   assert.ok(pv.includes('submit(ctx, p, gradeAgree(p, p.items.map((_, k) => ps.ends[k])))'));
-  assert.ok(pv.includes("a ? `앞뒤 어울리기 ${a}` : ''"));
+  assert.ok(pv.includes("'🧩 오늘의 퍼즐 시작'"), '시작 단추에 문제 수는 안 쓴다 (v394)');
   assert.ok(pv.includes('문장의 앞뒤가 어울리게 끝을 골라요'));
   assert.ok(pv.includes('for (const j of it.deal[k])'), '보기는 섞은 차례로');
   assert.ok(pv.includes('boldIn(right, x.choices[0], x.mate, true);'), '짝 조각은 낱말 덩이로 굵게("않" → "않을")');

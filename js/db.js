@@ -1498,6 +1498,9 @@ export function purchaseRule(profile, cost, gain) {
   // 🎟️ 교환권처럼 하나만 갖는 물건(gain.once) — **저장된** 가방에 이미 있으면 거절한다.
   // 화면의 판정은 그 창이 기억하는 옛 가방이라, 다른 창에서 먼저 산 교환권을 또 사 코인이 두 번 나갔다 (Codex 28차 #1)
   if (gain && gain.once && (profile.items[gain.once] || 0) > 0) return { ok: false, why: 'owned' };
+  // 💠🍲 포켓몬 하나에 한 번인 것(gain.monOnce) — 겹친 요청이 재료를 두 번 쓰지 않게 저장된 기록으로 (v394)
+  const mo = gain && gain.monOnce;
+  if (mo && profile.mons[mo.id] && profile.mons[mo.id][mo.key]) return { ok: false, why: 'owned' };
   const need = Number((cost && cost.coins) || 0);
   const needItems = (cost && cost.items) || {};
   const short = (Number(profile.coins) || 0) < need

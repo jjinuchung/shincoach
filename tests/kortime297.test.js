@@ -187,7 +187,7 @@ test('⏰ 화면 연결 — 차례 맞추기 화면을 같이 씀 · 카드는 �
   assert.ok(pv.includes("li.appendChild(clueEl('span', 'kor-pslot-t', p.chunks[at], key(at)));"), '놓은 칸에도');
   assert.ok(pv.includes('const key = (k) => (time ? p.keys[k] : \'\');'), '차례 맞추기는 굵게 안 함(실마리는 확인 뒤에만)');
   assert.ok(pv.includes('`· 글에서 ${NTH[p.told.indexOf(k)] || \'\'} 문장`'), '확인 뒤 글에서 몇째');
-  assert.ok(pv.includes("tm ? `일어난 차례 ${tm}` : ''"), '시작 단추');
+  assert.ok(pv.includes("'🧩 오늘의 퍼즐 시작'"), '시작 단추에 문제 수는 안 쓴다 (v394)');
   assert.ok(pv.includes('하는 차례·일이 실제로 일어난 차례를 맞추고'), '소개 말');
   const css = read('css/style.css');
   for (const c of ['.kor-ptold {', '.kor-ptold-h {', '.kor-ptold-t {', '.kor-porder-tag {']) assert.ok(css.includes(`\n${c}`), c);

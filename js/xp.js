@@ -288,9 +288,9 @@ export async function equipMega(id, on) {
     if (itemCount(MEGASTONE.id) <= 0) return false; // 빠른 거르기
     // 💠 메가스톤 하나로 두 창에서 둘 다 끼우지 않게 트랜잭션 안에서 판정
     const cost = { items: { [MEGASTONE.id]: 1 } };
-    const gain = { mons: { [id]: { mega: true } } };
+    const gain = { mons: { [id]: { mega: true } }, monOnce: { id, key: 'mega' } };
     const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
-    return r.ok;
+    return r.ok || r.why === 'owned';
   }
   if (!m.mega) return true;
   // 💠 빼기도 저장된 기록으로 (Codex 32차 #1) — 다른 창이 먼저 뺐으면 돌려주지 않는다 (메가스톤 복제 → 💰 팔기로 300씩 끝없이)
@@ -313,9 +313,9 @@ export async function makeSoup(id) {
   if (m.gmax) return false;
   // 🍄 열 개를 두 창에서 나눠 쓰지 못하게 트랜잭션 안에서 판정
   const cost = { items: { [MUSHROOM.id]: SOUP_MUSHROOMS } };
-  const gain = { mons: { [id]: { gmax: true } } };
+  const gain = { mons: { [id]: { gmax: true } }, monOnce: { id, key: 'gmax' } };
   const r = await runProfileOp(() => applyPurchase(cost, gain), (pf) => purchaseRule(pf, cost, gain));
-  return r.ok;
+  return r.ok || r.why === 'owned';
 }
 
 /** ⚙ 등급 초기화: 옮긴 것과 신청을 모두 없앰 (원래 등급으로) */

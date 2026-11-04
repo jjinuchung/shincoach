@@ -37,7 +37,8 @@ export function initShop(ctx) {
   $('mon-to-shop').addEventListener('click', () => { closeMon(); openShop(); });
   $('mon-partner').addEventListener('click', () => {
     if (!mon) return;
-    setPartner(mon.id).then((ok) => change(ok, `🤝 ${mon.ko}${josaIga(mon.ko)} 파트너가 됐어요!`));
+    const m = mon; // 저장 사이 창을 닫거나 다른 포켓몬을 열어도 (v394)
+    setPartner(m.id).then((ok) => change(ok, `🤝 ${m.ko}${josaIga(m.ko)} 파트너가 됐어요!`, m));
   });
   const sb = $('mon-shiny');
   if (sb) sb.addEventListener('click', async () => {
@@ -676,10 +677,11 @@ function renderForms() {
     } else {
       const n = itemCount(MEGASTONE.id);
       const btn = option('💠', '메가스톤 끼우기', n ? `가방 ${n}개` : `🛒 상점 ${MEGASTONE.price}코인`, false, '', async () => {
-        if (!await equipMega(mon.id, true)) { renderMon('💠 가방에 메가스톤이 없어요 — 🛒 상점에서 살 수 있어요'); return; }
-        const art = await ensureForm(mon.id, 'mega').catch(() => null);
-        change(true, `💠 ${mon.ko}${josaIga(mon.ko)} 메가진화할 수 있게 됐어요! 배틀에서 써 보세요`
-          + (art ? '' : ' (모습 그림은 인터넷이 될 때 받을게요)'));
+        const m = mon; // 그림을 받는 사이 창을 닫아도 (v394)
+        if (!await equipMega(m.id, true)) { renderMon('💠 가방에 메가스톤이 없어요 — 🛒 상점에서 살 수 있어요'); return; }
+        const art = await ensureForm(m.id, 'mega').catch(() => null);
+        change(true, `💠 ${m.ko}${josaIga(m.ko)} 메가진화할 수 있게 됐어요! 배틀에서 써 보세요`
+          + (art ? '' : ' (모습 그림은 인터넷이 될 때 받을게요)'), m);
       });
       if (!n) btn.disabled = true;
       box.appendChild(btn);
@@ -691,10 +693,11 @@ function renderForms() {
       notes.push('🍲 다이스프를 먹어서 거다이맥스할 수 있어요');
     } else {
       const btn = option('🍲', '다이스프 먹이기', `🍄 ${shrooms}/${SOUP_MUSHROOMS}개`, false, '', async () => {
-        if (!await makeSoup(mon.id)) { renderMon(`🍄 다이버섯이 ${SOUP_MUSHROOMS}개 있어야 해요 (지금 ${itemCount(MUSHROOM.id)}개)`); return; }
-        const art = await ensureForm(mon.id, 'gmax').catch(() => null);
-        change(true, `🍲 ${mon.ko}${josaIga(mon.ko)} 거다이맥스할 수 있게 됐어요!`
-          + (art ? '' : ' (모습 그림은 인터넷이 될 때 받을게요)'));
+        const m = mon; // 그림을 받는 사이 창을 닫아도 (v394)
+        if (!await makeSoup(m.id)) { renderMon(`🍄 다이버섯이 ${SOUP_MUSHROOMS}개 있어야 해요 (지금 ${itemCount(MUSHROOM.id)}개)`); return; }
+        const art = await ensureForm(m.id, 'gmax').catch(() => null);
+        change(true, `🍲 ${m.ko}${josaIga(m.ko)} 거다이맥스할 수 있게 됐어요!`
+          + (art ? '' : ' (모습 그림은 인터넷이 될 때 받을게요)'), m);
       });
       if (shrooms < SOUP_MUSHROOMS) btn.disabled = true;
       box.appendChild(btn);
@@ -740,12 +743,19 @@ function option(emoji, name, sub, on, extraCls, onClick) {
   btn.appendChild(el('span', 'em', emoji));
   btn.appendChild(el('span', 'nm', name));
   if (sub) btn.appendChild(el('span', 'cnt', sub));
-  btn.addEventListener('click', onClick);
+  let busy = false; // 저장이 끝나기 전에 또 눌러도 한 번만 (v394)
+  btn.addEventListener('click', async (e) => {
+    if (busy) return;
+    busy = true;
+    try { await onClick(e); } finally { busy = false; }
+  });
   return btn;
 }
 
-function change(ok, msg) {
-  if (!mon) return;
+/** m = 일을 시작한 포켓몬 — 그 사이 창을 닫았거나 다른 포켓몬을 열었으면 그 화면은 안 건드리고 알리기만 (v394 · Codex 197차 #5·#6) */
+function change(ok, msg, m = mon) {
+  if (!m) return;
+  if (mon !== m) { if (ok) notify(m.id); return; }
   if (!ok) { renderMon('앗, 가방에 없어요'); return; }
   unlock();
   sfx.ding();

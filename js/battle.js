@@ -477,7 +477,8 @@ function showPick() {
 function startFight(c) {
   const o = ui.o;
   ui.my = c;
-  ui.form = null;        // ⭐ 이번 배틀에서 변신했는지 ('mega' | 'gmax')
+  ui.form = null;        // ⭐ 지금 변신한 모습 ('mega' | 'gmax')
+  ui.formUsed = false;   // 이번 배틀에서 변신했는지 — 거다이맥스가 끝나도 그대로 (v394 · 배틀당 한 번)
   ui.gmaxLeft = 0;       // 거다이맥스 남은 턴
   ui.zPerfect = false;   // 🟢 지가르데 퍼펙트폼이 됐는지 (v352 — 변신(form)과 따로: 퍼펙트폼 뒤에 💠 메가가 열린다)
   ui.myHp = BATTLE.hp;
@@ -547,8 +548,9 @@ function palBox(on) {
  *   이제 ① 없으면 그 자리에서 받아 보고 ② 끝내 못 받아도 **번쩍하며 커지는 연출은 반드시** 한다.
  */
 async function transform(kind) {
-  if (ui.form) return;
+  if (ui.form || ui.formUsed) return;
   ui.form = kind;
+  ui.formUsed = true;
   ui.gmaxLeft = kind === 'gmax' ? FORM.gmaxTurns : 0;
   const fig = $('battle-my-fig');
   const my = ui.my;
@@ -623,7 +625,7 @@ function renderActions() {
   box.innerHTML = '';
   box.hidden = false;
   // ⭐ 아직 변신 안 했으면 변신 버튼을 맨 앞에
-  if (!ui.form) {
+  if (!ui.form && !ui.formUsed) {
     for (const [kind, ok, emoji, name, hint] of [
       ['mega', ui.my.canMega && (!ui.my.zyg || ui.zPerfect), '💠', '메가진화!', `공격 ×${FORM.megaMult}`], // 🟢 지가르데는 퍼펙트폼이 된 뒤에만 (원작 · v352)
       ['gmax', ui.my.canGmax, '🍲', '거다이맥스!', `${FORM.gmaxTurns}턴 동안 ×${FORM.gmaxMult}`],

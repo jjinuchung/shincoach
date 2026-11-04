@@ -226,7 +226,7 @@ test('📍 화면 연결: 확인은 모두 골랐을 때만(gradeIntext) · 판�
   assert.ok(pv.includes("if (s.io === 'in') {\n      const show = el('button', 'btn btn-small kor-pin-show',") || pv.includes("if (s.io === 'in') {\r\n      const show = el('button', 'btn btn-small kor-pin-show',"), '확인 뒤 있어요 문장마다 [글에서 보기]');
   assert.ok(pv.includes("show.addEventListener('click', () => showLine(show, p, s.line));"));
   assert.equal((pv.match(/직접 말하는 줄/g) || []).length, 4, '안내 넷 — 물음 · 글 상자 · 문장 칸 · 읽어 주기');
-  assert.ok(pv.includes("t ? `글에 있나요 ${t}` : ''"), '시작 단추에 글에 있나요 수');
+  assert.ok(pv.includes("'🧩 오늘의 퍼즐 시작'"), '시작 단추에 문제 수는 안 쓴다 (v394)');
   for (const fn of ['function setIo(ctx, k, io) {', 'function pickLine(ctx, p, n) {']) {
     const body = pv.slice(pv.indexOf(fn), pv.indexOf('\n}\n', pv.indexOf(fn)));
     assert.ok(body.includes('if (!ps || ps.grade') && body.includes('ps.quitAsk = false;'), `${fn} — 확인 뒤에는 못 바꾸고, 다시 고르면 그만하기 물음을 거둔다`);

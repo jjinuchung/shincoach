@@ -132,7 +132,7 @@ test('⚖️ 화면 연결 — 사실·의견 화면을 같이 씀(단추·안�
   assert.ok(pv.includes('for (const fo of Object.keys(side.map))'), '단추는 그 꼴의 두 라벨');
   assert.ok(pv.includes('const ok = ps.labels[k] === s[side.key];'), '확인 뒤 ✓/✗도 그 꼴의 답으로');
   assert.ok(pv.includes("const fo = /^fo:(\\d+):(fact|opinion|did|felt|in|out)$/.exec(focusTo);"));
-  assert.ok(pv.includes("e ? `겪은 일·생각 ${e}` : ''"));
+  assert.ok(pv.includes("'🧩 오늘의 퍼즐 시작'"), '시작 단추에 문제 수는 안 쓴다 (v394)');
   assert.ok(pv.includes('사실과 의견·겪은 일과 생각을 가리고'));
   assert.deepEqual(EF, { did: '겪은 일', felt: '생각·느낌' });
   const css = read('css/style.css');

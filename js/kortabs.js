@@ -81,8 +81,7 @@ export async function renderWordsTab(box, ctx) {
   head.appendChild(el('p', 'kor-count', todayLine(wordsToday(korWordDayMap(), now))));
   const start = (extra) => guardStart('korean', () => startSession(ctx, extra));
   if (plan.length) {
-    const reviews = plan.filter((p) => states[p.id]).length;
-    const b = el('button', 'btn btn-primary btn-big-wide kor-wstart', `🔤 오늘의 낱말 시작 (${plan.length}개${reviews ? ` · 복습 ${reviews}` : ''})`);
+    const b = el('button', 'btn btn-primary btn-big-wide kor-wstart', '🔤 오늘의 낱말 시작');
     b.type = 'button';
     b.addEventListener('click', () => start(0));
     head.appendChild(b);
@@ -90,7 +89,7 @@ export async function renderWordsTab(box, ctx) {
     head.appendChild(el('p', 'kor-intro', '오늘 복습할 낱말을 다 했어요 — 내일 또 만나요'));
     const more = planToday(words, states, done, now, NEW_PER_DAY);
     if (more.length) {
-      const b = el('button', 'btn kor-wstart', `🔤 새 낱말 ${more.length}개 더 배우기`);
+      const b = el('button', 'btn kor-wstart', '🔤 새 낱말 더 배우기');
       b.type = 'button';
       b.addEventListener('click', () => start(NEW_PER_DAY));
       head.appendChild(b);
@@ -104,9 +103,8 @@ export async function renderWordsTab(box, ctx) {
     const d = DECKS[s.deck];
     const row = el('div', 'kor-deck');
     row.appendChild(el('span', 'kor-deck-name', `${d.icon} ${d.ko}`));
-    row.appendChild(el('span', 'kor-deck-star', `⭐ ${s.mastered} / ${s.total}`));
-    const sub = [s.learning ? `배우는 중 ${s.learning}` : '', s.total > s.open ? `🔒 ${s.total - s.open}개는 글을 읽으면 열려요` : ''].filter(Boolean).join(' · ');
-    if (sub) row.appendChild(el('span', 'kor-deck-sub', sub));
+    row.appendChild(el('span', 'kor-deck-star', `⭐ ${s.mastered}`)); // 전체·배우는 중·잠긴 수는 안 쓴다 (v394 — 📤에는 그대로)
+    if (s.total > s.open) row.appendChild(el('span', 'kor-deck-sub', '🔒 글을 읽으면 더 열려요'));
     decks.appendChild(row);
   }
   box.appendChild(decks);
@@ -375,8 +373,6 @@ export async function renderUnitsTab(box, ctx) {
   const head = el('section', 'kor-head');
   head.appendChild(el('h2', 'kor-h', '📘 국어 단원 지도'));
   head.appendChild(el('p', 'kor-intro', '지금 배우는 4학년 2학기와 내년 5학년 국어책의 단원이에요. 단원마다 이어진 글 카드와 낱말을 익혀 두면 수업이 쉬워져요.'));
-  const ready = units.filter((u) => !unitProgress(u, done, states).empty).length;
-  head.appendChild(el('p', 'kor-count', `준비된 단원 ${ready} / ${units.length}`));
   if (S.unitsData && typeof S.unitsData.source === 'string') head.appendChild(el('p', 'kor-tnote', S.unitsData.source));
   box.appendChild(head);
   for (const term of TERMS) {
@@ -415,7 +411,7 @@ function unitEl(u, done, states, ctx) {
       row.appendChild(el('span', `kor-chip${star ? ' is-star' : ''}`, `${star ? '⭐' : '🔤'} ${w.w}`));
     }
     sec.appendChild(row);
-    sec.appendChild(el('p', 'kor-tnote', `🔤 익힌 낱말 ⭐ ${p.mastered} / ${p.words}${u.cards.length ? ` · 📚 ★ ${p.stars} / ${p.starMax}` : ''}`));
-  } else if (u.cards.length) sec.appendChild(el('p', 'kor-tnote', `📚 ★ ${p.stars} / ${p.starMax}`));
+    sec.appendChild(el('p', 'kor-tnote', `🔤 익힌 낱말 ⭐ ${p.mastered}${u.cards.length ? ` · 📚 ★ ${p.stars}` : ''}`));
+  } else if (u.cards.length) sec.appendChild(el('p', 'kor-tnote', `📚 ★ ${p.stars}`));
   return sec;
 }

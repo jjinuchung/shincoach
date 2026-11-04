@@ -45,9 +45,12 @@ export function pickBlanks(words, opts = {}) {
   const known = opts.known || null;
   const count = Math.max(1, opts.count || 1);
   const scored = [];
+  const times = new Map();
+  for (const w of words) times.set(bare(w), (times.get(bare(w)) || 0) + 1);
   words.forEach((w, i) => {
     const b = bare(w);
     if (b.length < 2) return;                    // "I", "a"는 뚫어도 소리가 너무 짧다
+    if (times.get(b) > 1) return;                // 문장 다른 자리에 같은 낱말이 있으면 답이 그대로 보인다 (v394)
     const missCount = Object.prototype.hasOwnProperty.call(missed, b) && Number.isFinite(missed[b]) ? missed[b] : 0;
     const inVocab = known ? (known.has ? known.has(b) : false) : false;
     const isStop = STOP_WORDS.has(b);

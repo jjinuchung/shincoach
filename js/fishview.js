@@ -155,6 +155,7 @@ export function openLake(host) {
     hold: false,
     last: 0,
     touchAt: performance.now(),
+    day: typeof h.dayNow === 'function' ? h.dayNow() : '', // 시간을 세는 날 (v394)
     used: Math.max(0, Number(h.usedSec) || 0) * 1000, // 오늘 쓴 낚시 ms
     savedUsed: Math.max(0, Number(h.usedSec) || 0),
     okToday: Math.max(0, Number(h.okToday) || 0),
@@ -679,11 +680,23 @@ function runTimers() {
   ui.timers = ui.timers.filter((t) => t.at > ui.gclock);
   for (const t of due) if (t.me === ui) t.fn();
 }
+/** 창을 켜 둔 채 날이 바뀌면 새날 시간으로 (v394) — 어제 쓴 시간으로 새날 낚시가 일찍 끝나지 않게 · 🔒 +10분은 그날 것 */
+function rollDay() {
+  const d = typeof ui.host.dayNow === 'function' ? ui.host.dayNow() : '';
+  if (!d || !ui.day || d === ui.day) return;
+  ui.day = d;
+  ui.used = 0;
+  ui.savedUsed = 0;
+  ui.host.bonusMin = 0;
+  try { ui.host.onNewDay && ui.host.onNewDay(); } catch { /* 무시 */ }
+}
 function leftSec() {
+  rollDay();
   return dayLeftSec(ui.used / 1000, ui.host.dayMin, ui.host.bonusMin);
 }
 function saveTime(force) {
   if (!ui) return;
+  rollDay(); // 어제 쓴 시간에 이어 적지 않게 — 프레임마다 여기를 지난다 (Codex 197차 #3)
   const sec = Math.floor(ui.used / 1000);
   if (force || sec - ui.savedUsed >= 5) {
     ui.savedUsed = sec;

@@ -1,6 +1,6 @@
 // 📊 학습 기록 화면 (부모용): 이번 주 요약, 콘텐츠별 진행률, 어려워한 문장, 복습 단어장, 최근 세션, 내보내기/가져오기
 import {
-  listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats, importStats,
+  listItems, getAllSentenceStats, listSessions, listDaily, listVocabViews, exportStats,
   applyEssayFixes, getMath, updateMath, updateItem, saidOf, sentenceKey,
 } from './db.js';
 import { mathSummary, nameOf as mathNameOf, ladderOf as mathLadderOf, conceptReport, mathReportText, guardReport, guardLines, KIND_SHORT, WHY_LABEL, STAGE_MARK, LOG_MAX, restOf, setRest, restLine, relearnLine } from './mathprog.js';
@@ -1287,7 +1287,7 @@ function doImport(file) {
   const fr = new FileReader();
   fr.onload = async () => {
     try {
-      const n = await importStats(JSON.parse(fr.result));
+      const { n } = await restoreBackup(JSON.parse(fr.result)); // 새 기기면 백업이 앞선다 — 자동 백업 되살리기와 같은 길 (v394)
       await reloadDaily();
       await reloadProfile();
       alert(`기록 ${n}건을 가져왔어요`);

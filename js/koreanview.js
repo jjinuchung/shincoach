@@ -268,7 +268,7 @@ export async function renderList() {
   const head = el('section', 'kor-head');
   head.appendChild(el('h2', 'kor-h', '📚 작품 도감'));
   head.appendChild(el('p', 'kor-intro', '글을 읽고 문제를 풀면 카드가 모여요. 다른 날 다시 읽으면 ★★, 처음 읽은 날부터 일주일이 지나 다시 읽으면 ★★★!'));
-  head.appendChild(el('p', 'kor-count', `모은 카드 ${got} / ${total} · ★ ${stars} / ${total * 3}`));
+  head.appendChild(el('p', 'kor-count', `모은 카드 ${got} · ★ ${stars}`)); // 전체 수는 안 쓴다 — 남은 양은 쫓기는 기분을 준다 (v394)
   const fresh = freshEl(cards); // 🌱 오늘 새로 열린 글 바로가기 (Codex 126차 #6)
   if (fresh) head.appendChild(fresh);
   // 📦 아직 열리지 않은 새 글이 있으면 한 줄 — 몇 편 남았는지 셈 없이 (v320) · 「내일」은 내일 정말 열릴 때만 (Codex 127차 #4)

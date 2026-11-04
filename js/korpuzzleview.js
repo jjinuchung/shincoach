@@ -80,14 +80,7 @@ export async function renderPuzzleTab(box, ctx) {
   head.appendChild(el('p', 'kor-intro', '이야기의 흐름과 하는 차례·일이 실제로 일어난 차례를 맞추고, 글에 있는 내용인지 확인하고, 사실과 의견·겪은 일과 생각을 가리고, 문장의 앞뒤가 어울리게 끝을 골라요. 다 맞힌 퍼즐은 ⭐, 틀린 퍼즐은 다음 날 다시 나와요.'));
   head.appendChild(el('p', 'kor-count', puzzleTodayLine(wordsToday(korPuzzleDayMap(), now))));
   if (plan.length) {
-    const cnt = (kind) => plan.filter((p) => p.kind === kind).length;
-    const o = cnt('order');
-    const t = cnt('intext');
-    const s = cnt('sort');
-    const a = cnt('agree');
-    const e = cnt('exp');
-    const tm = cnt('time');
-    const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', `🧩 오늘의 퍼즐 시작 (${[o ? `차례 ${o}` : '', tm ? `일어난 차례 ${tm}` : '', t ? `글에 있나요 ${t}` : '', s ? `사실·의견 ${s}` : '', e ? `겪은 일·생각 ${e}` : '', a ? `앞뒤 어울리기 ${a}` : ''].filter(Boolean).join(' · ')})`);
+    const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', '🧩 오늘의 퍼즐 시작'); // 문제 수는 안 쓴다 (v394)
     b.type = 'button';
     b.addEventListener('click', () => guardStart('korean', () => startSession(ctx, false)));
     head.appendChild(b);
@@ -95,7 +88,7 @@ export async function renderPuzzleTab(box, ctx) {
     head.appendChild(el('p', 'kor-intro', '지금 풀 수 있는 퍼즐을 다 했어요 — 틀린 퍼즐은 내일 다시 나와요'));
     const more = planPuzzles(list, states, done, now, true);
     if (more.length) {
-      const b = el('button', 'btn kor-pstart', `🔁 다 푼 퍼즐 다시 해 보기 (연습 ${more.length}개)`);
+      const b = el('button', 'btn kor-pstart', '🔁 다 푼 퍼즐 다시 해 보기');
       b.type = 'button';
       b.addEventListener('click', () => guardStart('korean', () => startSession(ctx, true)));
       head.appendChild(b);
@@ -108,9 +101,8 @@ export async function renderPuzzleTab(box, ctx) {
   for (const s of puzzleStats(list, states, done)) {
     const row = el('div', 'kor-deck');
     row.appendChild(el('span', 'kor-deck-name', `${KINDS[s.kind].icon} ${KINDS[s.kind].ko}`));
-    row.appendChild(el('span', 'kor-deck-star', `⭐ ${s.solved} / ${s.total}`));
-    const sub = [s.tried ? `다시 풀 것 ${s.tried}` : '', s.total > s.open ? `🔒 ${s.total - s.open}개는 글을 읽으면 열려요` : ''].filter(Boolean).join(' · ');
-    if (sub) row.appendChild(el('span', 'kor-deck-sub', sub));
+    row.appendChild(el('span', 'kor-deck-star', `⭐ ${s.solved}`)); // 전체·다시 풀 것·잠긴 수는 안 쓴다 (v394)
+    if (s.total > s.open) row.appendChild(el('span', 'kor-deck-sub', '🔒 글을 읽으면 더 열려요'));
     decks.appendChild(row);
   }
   box.appendChild(decks);

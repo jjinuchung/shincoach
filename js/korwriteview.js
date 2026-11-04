@@ -9,6 +9,7 @@ import { korWritesMap, korWriteAdd, korWriteRead, korWriteApply } from './xp.js'
 import { cardWriteState, unreadReplies, replyStats, rowsOfFams, writeCheck, textLen, ownLen, questionOf, GRADES, WRITE_MIN, WRITE_MAX, WRITE_COINS, FRAME_GAP, OWN_MIN } from './korwrite.js';
 import { circled, lineCount, validCards } from './korean.js';
 import { nonsulWriteCards, nonsulReasonCards } from './nonsul.js';
+import { guardStart } from './timeup.js';
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -371,7 +372,7 @@ export function replyBannerEl(ctx) {
   if (!list.length) return null;
   const b = el('button', 'btn btn-primary kor-wbanner', `📬 아빠가 봐 준 생각 쓰기 ${list.length}개 — 열어 보기`);
   b.type = 'button';
-  b.addEventListener('click', () => renderReplyView(list[0].card, ctx));
+  b.addEventListener('click', () => guardStart('korean', () => renderReplyView(list[0].card, ctx))); // ⏳ 다시 써 보기까지 갈 수 있다 — 논술 띠와 같게 (v394)
   return b;
 }
 

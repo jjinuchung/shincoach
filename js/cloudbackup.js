@@ -337,6 +337,9 @@ export function backupAhead(cur, bk) {
   return monCount(cur).species < monCount(bk).species || ['coinsEarned', 'xp', 'catches'].some((k) => n(cur, k) < n(bk, k));
 }
 
+/** 💰·가방까지 든 온전한 프로필인가 — 일부만 든 파일을 앞세우면 없는 칸이 지워진다 (v394 · Codex 197차 #1 — 📊 파일 가져오기도 이 길) */
+const wholeMe = (me) => !!me && typeof me.coins === 'number' && !!me.items && typeof me.items === 'object';
+
 /**
  * 되살리기 — 가져오기와 같은 병합(db.importStats). 되살린 뒤 포켓몬 셈을 백업과 견준다.
  *   이 기기가 그 백업을 이은 기기가 아니면(lead — backupAhead) 백업이 앞선다(leadData — 백업 쪽 💰·가방·알·파트너) ·
@@ -348,7 +351,7 @@ export function backupAhead(cur, bk) {
 export async function restoreBackup(data) {
   const before = await getProfile().catch(() => null);
   const want = monCount(meOf(data));
-  const lead = backupAhead(before, meOf(data));
+  const lead = wholeMe(meOf(data)) && backupAhead(before, meOf(data));
   const n = await importStats(lead && before ? leadData(data, before) : data); // 프로필이 아예 없으면 그대로 들어간다(옮길 시각이 없다)
   const got = monCount(await getProfile());
   const same = lead ? got.have >= want.have && got.species >= want.species && got.eggs >= want.eggs : got.species >= want.species;

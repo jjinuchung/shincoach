@@ -417,6 +417,8 @@ export async function openLakeNow() {
       dexRows: () => dexRows(lakeRaw()),
       say,
       usedSec: sentSec,
+      dayNow: clockDay, // 창을 켜 둔 채 날이 바뀌면 새날 시간으로 (v394)
+      onNewDay: () => { sentSec = 0; },
       dayMin: fishMinNow(),
       bonusMin: nz(d && d.fishBonus),
       okToday: okOfDay(d),

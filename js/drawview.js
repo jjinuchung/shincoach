@@ -915,7 +915,7 @@ export function drawBox(draw, { onSubmit, onIdk }) {
   const { G } = g;
   const mode = draw.mode === 'bar' ? 'bar' : 'point';
   const min = mode === 'bar' ? 1 : 0; // 막대는 1칸부터 (0칸 막대는 그린 게 아니다)
-  let k = null;
+  let k = Number.isInteger(draw.pending) && draw.pending >= min && draw.pending <= G.cells ? draw.pending : null; // 그리다 🎒에 다녀와도 그대로 (v394 · 점의 0칸도 값)
   let done = false;
 
   const wrap = el('div', 'math-draw');
@@ -963,6 +963,7 @@ export function drawBox(draw, { onSubmit, onIdk }) {
 
   function set(kk) {
     k = Math.min(G.cells, Math.max(min, kk));
+    draw.pending = k;
     paint();
   }
   /** 손가락 아래 y → 칸 (svg 좌표로 바꿔서) */

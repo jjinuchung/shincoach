@@ -24,7 +24,8 @@ const el = (tag, cls, text) => {
 /** 숫자 원고 */
 export const POKE_URL = './coach/math/pokemath.json';
 // ps: 지금 푸는 판 { qs, i, wrong: [[틀린 보기 글]], first: [처음 답 맞았나], trap: [처음 틀린 실수], sec: [처음 답까지 초], shown: 문제를 처음 그린 자리, t0: 그때 시각, solved, finishing, finishErr, done }
-const S = { ps: null, data: null, loading: null };
+// req: 판을 여는 차례 — 받는 사이 나가거나 다시 누르면 늦게 온 판을 버린다 (v394)
+const S = { ps: null, data: null, loading: null, req: 0 };
 
 /** 지금 🐾 판을 푸는 중인가 (math.js가 🎒·📊에서 돌아올 때 본다) */
 export function pokeActive() {
@@ -37,6 +38,7 @@ const devQ = (q) => { try { if (/[?&]nosw=1/.test(location.search)) window.__pok
 /** 판을 버린다 (사다리·홈으로 나갈 때 — 끝내기 전이면 저장도 보상도 없다) */
 export function endPoke() {
   S.ps = null;
+  S.req += 1;
 }
 
 /** 숫자 원고 받기 (한 번 · 실패하면 다음에 다시) */
@@ -68,14 +70,18 @@ export function pokeButton(ctx) {
 /** 새 판 — 잡은 포켓몬으로 (씨앗은 판을 열 때 정해 🎒를 다녀와도 같은 문제) */
 export async function startPoke(ctx) {
   sfxUnlock();
+  const my = ++S.req;
+  if (!S.data) waitEl(ctx);
   let data;
   try { data = await loadData(); } catch { data = null; }
+  if (my !== S.req) return;
   if (!data) { failEl(ctx); return; }
   const p = getProfileSnapshot();
   const names = new Map(ROSTER.map((r) => [r.id, r.ko]));
   const pool = poolOf(p.caught, data, names);
   // 🎣에서 단계가 바뀌었을 수 있어 화면이 들고 있는 기록 대신 저장된 장부로 (못 읽으면 그 판만 다지기 없이)
   const unit = await getMath().then(unitStage, () => 0);
+  if (my !== S.req) return;
   const qs = makeBoard(pool, (Date.now() % 2147483646) + 1, { evo: EVO, partner: Number(p.partner) || 0, unit });
   if (!qs.length) { failEl(ctx); return; }
   S.ps = { qs, i: 0, wrong: qs.map(() => []), first: [], trap: [], sec: [], shown: -1, t0: 0, solved: false, finishing: false, finishErr: false, done: null };
@@ -90,6 +96,18 @@ export function resumePoke(ctx) {
 function quit(ctx) {
   S.ps = null;
   ctx.back();
+}
+
+/** 숫자 원고를 처음 받는 동안 — 사다리를 비워 다른 활동이 겹쳐 시작되지 않게 · 그만하기로 나갈 수 있다 */
+function waitEl(ctx) {
+  const m = ctx.clearMain();
+  const card = el('section', 'math-card mpk-card');
+  card.appendChild(el('p', 'mpk-done-title', '🐾 포켓몬 숫자를 받는 중…'));
+  const q = el('button', 'btn btn-small mpk-quit', '← 그만하기');
+  q.type = 'button';
+  q.addEventListener('click', () => { S.req += 1; ctx.back(); });
+  card.appendChild(q);
+  m.appendChild(card);
 }
 
 /** 숫자 원고를 못 받았다 (처음 열 때 인터넷이 없고 아직 받아 둔 적도 없음) */
