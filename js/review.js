@@ -5,7 +5,7 @@
 //
 // 이 파일 앞부분은 순수 로직(테스트 대상)이고, 뒷부분은 오버레이 UI다.
 
-import { soundOnly } from './sounds.js';
+import { soundOnly, isSoundToken } from './sounds.js';
 
 // ── 규칙 ──
 
@@ -16,6 +16,71 @@ import { soundOnly } from './sounds.js';
  */
 function quietRec(rec) {
   return !!(rec && typeof rec.en === 'string' && soundOnly(rec.en));
+}
+
+/**
+ * 🔁 복습에 낼 문장의 낱말 수 (v391) — 서로 다른 낱말 min개 이상 · 낱말 max개 이하 (소리 낱말은 안 셈).
+ * 두 낱말부터 받으면 「I know.」는 살지만 「Jimmy Dean?」 같은 이름 부르기도 들어와서 3 (아버님 「추천대로」)
+ */
+export const REVIEW_WORDS = { min: 3, max: 12 };
+
+/**
+ * 🔁 복습에 낼 만한 영어 문장인가 (순수, v391 — 2026-11-03 아버님 「문장도 아닌 것들, 이상한 소리 지르는 것도 나와서
+ * 복습과 학습의 의미가 안 된다」). 감탄사 목록(v292)은 소리 낱말만 걸러서 한 낱말 외침(Paw! · Boom.)·이름 부르기(Mabel!)·
+ * 끊긴 조각(We… · Which is why...)·앞 줄에서 이어진 조각(of the invention of…)·노래 줄·아주 긴 뉴스 문장이 그대로 나왔다.
+ *   · . ! ? 로 끝나야 한다 — 「...」「…」로 끝나면 끊긴 조각
+ *   · 소문자나 「...」로 시작하면 앞 줄에서 이어진 조각
+ *   · ♪ 노래 줄은 뺀다 · 같은 말 되풀이(Shoo! Shoo, shoo!)는 서로 다른 낱말로 센다
+ * 단어장 없이 정한다 — 홈·목록의 밀린 수(dueByItem)도 단어장을 읽기 전에 같은 판정을 쓴다. 기록은 지우지 않는다
+ */
+export function reviewWorthy(en) {
+  const s = String(en || '').replace(/\s+/g, ' ').trim();
+  if (!s || /[♪♫]/.test(s)) return false;
+  const head = s.replace(/^[\s"'“”‘’«»‹›(\[-]+/, '');
+  if (/^(\.\.|…)/.test(head) || /^[a-z]/.test(head)) return false;
+  const tail = s.replace(/["'“”‘’«»‹›)\]]+$/, '');
+  if (/(\.\.|…)$/.test(tail) || !/[.!?]$/.test(tail)) return false;
+  const words = s.split(' ')
+    .filter((tok) => /[a-z]/i.test(tok) && !isSoundToken(tok))
+    .map((tok) => tok.toLowerCase().replace(/[^a-z']/g, ''));
+  return words.length <= REVIEW_WORDS.max && new Set(words).size >= REVIEW_WORDS.min;
+}
+
+/**
+ * 🔁 아직 한 번도 복습하지 않은 문장이 복습 차례로 남는 날 수 — 배운 다음 날(처음 dueAt)부터 이만큼 (v391).
+ * 끝까지 들은 줄은 다 복습에 들어가는데 하루 복습은 몇 문장뿐이라 밀린 줄이 끝없이 쌓였고, 순서가 늘 같은 줄을 위로 올렸다.
+ * 지난 새 문장은 복습 차례에서만 빠진다 (기록·🎟️ 교환권 조건은 그대로)
+ */
+export const NEW_DAYS = 7;
+
+/** 영어 문장 기록인가 — 문장 기록은 영상(itemId)에 달린다. 수학 개념 기록(en·itemId 없음)은 옛 규칙 그대로 */
+function sentenceRec(rec) {
+  return typeof rec.en === 'string' || (rec.itemId !== undefined && rec.itemId !== null);
+}
+
+/** 복습을 시작한 문장인가 — 줄인 사본(backup.slimStats)엔 reviews가 없어 reviewedAt·box로도 본다 */
+function startedRec(rec) {
+  return (Number(rec.reviews) || 0) > 0 || (Number(rec.reviewedAt) || 0) > 0 || (Number(rec.box) || 0) > 0;
+}
+
+/**
+ * 🔁 두 기기 기록을 합칠 때 남길 첫 차례 (순수, v391 · Codex 194차) — 둘 다 복습 전이면 이른 날.
+ * 늦은 날을 남기면 이미 지난 새 문장의 NEW_DAYS가 다시 열린다.
+ * 어느 쪽이든 복습을 시작했으면 null — 최근에 복습한 쪽 한 쌍(db.pickReviewState)을 쓴다
+ */
+export function firstDueOf(a, b) {
+  if (startedRec(a) || startedRec(b)) return null;
+  return [a.dueAt, b.dueAt].filter(Boolean).sort()[0] || '';
+}
+
+/**
+ * 영어 문장이 복습 자리에 있는가 (날짜는 안 봄 · v391) — 복습에 낼 만한 문장이고, 복습을 시작했거나 배운 지 NEW_DAYS일 안.
+ * 영어(en)가 없는 문장 기록(줄인 사본에서 되살린 것)은 문장을 못 보므로 날짜만 본다
+ */
+function inQueue(rec, today) {
+  if (!sentenceRec(rec)) return true;
+  if (typeof rec.en === 'string' && !reviewWorthy(rec.en)) return false;
+  return startedRec(rec) || daysBetween(rec.dueAt, today) < NEW_DAYS;
 }
 
 /** box 단계별 "다음 복습까지 며칠" (box 0 → 1일 뒤, 1 → 2일 뒤 …) */
@@ -90,12 +155,34 @@ export function schedule(box, passed, today) {
   return { box: next, dueAt: addDays(today, 1) };
 }
 
-/** 이 문장이 오늘 복습 대상인가 */
+/**
+ * 🔁 문장 복습을 못 넘겼을 때 (v391): 내일이 아니라 MISS_RETRY_DAYS일 뒤 · 거듭 MISS_REST.after번 못 넘기면 MISS_REST.days일 쉰다.
+ * 내일 다시 내던 때는 못 하는 줄(「Paw!」)이 날마다 맨 앞에 왔다. 쉬는 동안에도 영상을 볼 때는 그대로 만난다
+ */
+export const MISS_RETRY_DAYS = 2;
+export const MISS_REST = { after: 2, days: 30 };
+
+/**
+ * 영어 문장 복습 결과 → 다음 상태 (순수, v391) — 통과는 schedule과 같고, 못 넘기면 box 한 단계 아래 + 위 날짜.
+ * 수학 개념 복습은 schedule 그대로 (mathprog)
+ * @param {number} box 지금 단계
+ * @param {number} miss 지금까지 거듭 못 넘긴 수 (기록의 reviewMiss)
+ * @returns {{box:number, dueAt:string, reviewMiss:number}}
+ */
+export function scheduleSentence(box, miss, passed, today) {
+  if (passed) return { ...schedule(box, true, today), reviewMiss: 0 };
+  const next = schedule(box, false, today).box;
+  const m = (Number(miss) || 0) + 1;
+  if (m >= MISS_REST.after) return { box: next, dueAt: addDays(today, MISS_REST.days), reviewMiss: 0 };
+  return { box: next, dueAt: addDays(today, MISS_RETRY_DAYS), reviewMiss: m };
+}
+
+/** 이 문장이 오늘 복습 대상인가 — 영어 문장은 복습에 낼 만한 문장이고 복습 자리에 있을 때만 (v391 · 🎤 감탄사만 있는 줄도 여기서 빠진다) */
 export function isDue(rec, today) {
   if (!rec || !rec.dueAt) return false;
   if ((rec.box || 0) >= GRADUATED) return false;
-  if (quietRec(rec)) return false; // 🎤 감탄사만 있는 문장 (v292)
-  return rec.dueAt <= today;
+  if (rec.dueAt > today) return false;
+  return inQueue(rec, today);
 }
 
 /** 문장의 성장 단계 아이콘 */
@@ -112,26 +199,33 @@ export function stageIcon(rec) {
 export const FAV_ICON = '💖';
 
 /**
- * 오늘 낼 복습 문장 고르기.
- * 우선순위: ⓪ 💖 내 문장 ① 그냥 넘긴 문장 ② box 낮은 것 ③ 발음 점수 낮은 것 ④ 오래 밀린 것 ⑤ 앞 문장
- * (넘긴 문장 = 말하기 3번 미달로 통과된 적이 있는 문장 — 가장 안 되는 문장이므로 먼저 본다)
+ * 오늘 낼 복습 문장 고르기 (v391 — 아버님 「매번 똑같은 것만 나온다」).
+ * 옛 순서(넘긴 문장 → box 낮은 것 → 발음 점수 낮은 것)는 못 하는 줄을 날마다 맨 앞에 세웠다.
+ * 우선순위: ⓪ 💖 내 문장 ① 복습을 시작한 문장 — 차례가 오래된 것부터(같으면 box 낮은 것)
+ *          ② 남은 자리에 새 문장 — 영상 볼 때 따라 말하기를 통과한 것 → 최근에 배운 것 ③ 앞 문장
+ * 복습 중인 문장이 자리를 다 채우면 끝자리 하나는 새 문장에 내준다 — 밀린 복습이 많을 때 새 문장이 몇 주씩 못 들어왔다
+ * (Codex 194차 「추천대로」). 자리가 하나뿐인 회차와 💖로 꽉 찬 회차는 그대로
  */
 export function pickReviews(records, today, count = DEFAULT_COUNT) {
   const due = (records || []).filter((r) => isDue(r, today));
-  const score = (r) => ({
-    fav: r.fav ? 0 : 1,
-    skipped: (r.speakSkipped || 0) > 0 ? 0 : 1,
-    box: r.box || 0,
-    ratio: r.bestRatio || 0,
-    late: -daysBetween(r.dueAt, today), // 오래 밀릴수록 앞으로
-    start: r.start || 0,
-  });
+  const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
   due.sort((a, b) => {
-    const x = score(a);
-    const y = score(b);
-    return x.fav - y.fav || x.skipped - y.skipped || x.box - y.box || x.ratio - y.ratio || x.late - y.late || x.start - y.start;
+    const fav = (a.fav ? 0 : 1) - (b.fav ? 0 : 1);
+    if (fav) return fav;
+    const sa = startedRec(a) ? 0 : 1;
+    const sb = startedRec(b) ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    if (!sa) return cmp(a.dueAt, b.dueAt) || (a.box || 0) - (b.box || 0) || (a.start || 0) - (b.start || 0);
+    const said = ((a.speakPass || 0) > 0 ? 0 : 1) - ((b.speakPass || 0) > 0 ? 0 : 1);
+    return said || cmp(b.dueAt, a.dueAt) || (a.start || 0) - (b.start || 0);
   });
-  return due.slice(0, Math.max(0, count));
+  const picks = due.slice(0, Math.max(0, count));
+  const last = picks.length - 1;
+  if (last >= 1 && !picks[last].fav && picks.every(startedRec)) {
+    const fresh = due.find((r) => !startedRec(r));
+    if (fresh) picks[last] = fresh;
+  }
+  return picks;
 }
 
 /**
@@ -236,7 +330,7 @@ export function reviewSummary(records, today) {
   let graduated = 0;
   (records || []).forEach((r) => {
     if ((r.box || 0) >= GRADUATED) { graduated++; return; }
-    if (!r.dueAt || quietRec(r)) return; // 🎤 감탄사만 있는 문장은 복습 대상이 아니다 (v292 — isDue와 같은 판정)
+    if (!r.dueAt || !inQueue(r, today)) return; // 🎤 감탄사만 있는 줄(v292)·복습에 안 내는 줄·기간이 지난 새 문장(v391)은 복습 대상이 아니다 — isDue와 같은 판정
     if (r.dueAt <= today) dueCount++;
     else waiting++;
   });
@@ -457,7 +551,7 @@ export function openReview(o) {
   } else fig.hidden = true;
   $('review-note').textContent = o.waiting
     ? `다른 ${o.waiting}문장은 아직 쉬는 중이에요 (며칠 뒤에 다시 만나요)`
-    : '맞히면 다음에 더 늦게, 못 하면 내일 또 만나요';
+    : '맞히면 다음에 더 늦게, 못 하면 며칠 뒤에 또 만나요'; // 못 넘기면 이틀 뒤·거듭이면 한 달 쉼 (v391 — 전엔 내일)
 
   $('review-intro').hidden = false;
   $('review-stage').hidden = true;
@@ -813,7 +907,7 @@ async function settleSentence(cue, passed, result) {
     if (o.sfx) o.sfx.ding();
   } else {
     fb.className = 'review-feedback bad';
-    fb.textContent = '👍 괜찮아요 — 내일 또 만나요';
+    fb.textContent = '👍 괜찮아요 — 며칠 뒤에 또 만나요';
     if (o.sfx) o.sfx.wrong();
   }
   await settle(passed ? 1600 : 1900);

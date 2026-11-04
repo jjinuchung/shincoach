@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { enroll, schedule, GRADUATED, addDays } from '../js/review.js';
+import { enroll, schedule, scheduleSentence, GRADUATED, addDays } from '../js/review.js';
 import { soundOnly } from '../js/sounds.js';
 // 오늘 기록 합치기 규칙은 **실제 db.js 함수**를 그대로 쓴다 (스텁이 진짜 규칙과 어긋나지 않게)
 import { emptyDaily, mergeDailyDelta, saidOf, saidFlag } from '../js/db.js';
@@ -53,7 +53,7 @@ function stub() {
       return { won: true, count: next[field], daily: next };
     },
     // 🔁 복습 규칙은 실제 모듈을 그대로 씀 (vm에는 import가 없으므로 주입) · 🎤 감탄사 판정도 (v292)
-    enroll, schedule, GRADUATED, soundOnly,
+    enroll, schedule, scheduleSentence, GRADUATED, soundOnly,
   };
 }
 
@@ -202,10 +202,20 @@ test('🔁 복습 통과/미달이 box와 횟수에 반영된다', async () => {
 
   const fail = run(`review(${cue}, false)`);
   assert.equal(fail.box, 0, '미달이면 한 단계 내려감');
-  assert.equal(fail.dueAt, addDays(today, 1), '내일 다시');
+  assert.equal(fail.dueAt, addDays(today, 2), '이틀 뒤 다시 (v391 — 전엔 내일)');
   r = run('statsList()[0]');
   assert.equal(r.reviews, 2);
   assert.equal(r.reviewPass, 1, '통과한 것만 셈');
+  assert.equal(r.reviewMiss, 1, '거듭 못 넘긴 수');
+
+  // 🔁 v391: 거듭 두 번 못 넘기면 한 달 쉼 · 통과하면 다시 0부터
+  const rest = run(`review(${cue}, false)`);
+  assert.equal(rest.dueAt, addDays(today, 30), '거듭 못 넘기면 한 달 쉼');
+  assert.equal(run('statsList()[0]').reviewMiss, 0, '쉬고 나면 다시 두 번까지');
+  run(`review(${cue}, false)`);
+  assert.equal(run('statsList()[0]').reviewMiss, 1);
+  run(`review(${cue}, true)`);
+  assert.equal(run('statsList()[0]').reviewMiss, 0, '통과하면 거듭 못 넘긴 수가 0으로');
 });
 
 test('🔁 오늘 복습한 문장 수·회차가 daily에 쌓이고 세션에도 남는다', async () => {

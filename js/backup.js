@@ -36,6 +36,7 @@ export function slimStats(records = []) {
     if (r.dueAt) keep.dueAt = r.dueAt;
     if (r.reviewedAt) keep.reviewedAt = r.reviewedAt;
     if (r.reviewPass) keep.reviewPass = r.reviewPass;
+    if (r.reviewMiss) keep.reviewMiss = r.reviewMiss; // 🔁 거듭 못 넘긴 수 (v391 — 없으면 되살린 뒤 한 번 더 이틀 뒤로 돈다)
     if (r.speakPass) keep.speakPass = r.speakPass;
     if (r.essayAt) keep.essayAt = r.essayAt; // ✍️ 에세이로 나온 때 — 복구한 뒤 나온 문장이 또 나오지 않게 (Codex 35차 #8)
     // 💖 아이가 고른 문장 — 다시 만들 수 없다 (뺀 것도 favAt째로 남겨야 되살아나지 않는다).

@@ -1352,7 +1352,7 @@ function vocabStub(reviewState, list) {
 
 /** 복습 대상 문장 기록 하나 만들기 */
 function due(start, patch = {}) {
-  return { key: `x|${start * 10}`, itemId: 'x', start, en: 'Hello there.', ko: '안녕.', done: true, box: 0, dueAt: '2026-09-01', bestRatio: 0.5, speakSkipped: 0, lastAt: start, ...patch };
+  return { key: `x|${start * 10}`, itemId: 'x', start, en: 'Hello there, my friend.', ko: '안녕.', done: true, box: 0, dueAt: '2026-09-10', bestRatio: 0.5, speakSkipped: 0, lastAt: start, ...patch };
 }
 
 test('🔁 콘텐츠를 열면 오늘 할 복습을 제안하고, 설정한 문장 수만큼만 낸다', () => {
@@ -3086,11 +3086,11 @@ test('🎤 v292 🔁 복습·⚔️ 배틀의 따라 말하기(speakSentence) �
 test('🎤 v292 🔁 복습 — 확인하지 않는 줄을 통과해도 ⚡💰는 없다(일정·말해 본 문장만) · 확인하는 줄은 그대로 · ⚔️ 배틀 문장은 확인하는 줄에서만 고른다', () => {
   const { run, ctx, reviewCalls, reviewState, speakState, xpLog, coinLog } = loadPlayer();
   ctx.REAL_VOCAB = REAL_VOCAB;
-  reviewState.stats = [due(1, { en: 'Oh, Gengar!' }), due(2, { en: 'I like it.' })];
-  run('state.vocab = REAL_VOCAB; state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:2,end:3,en:"I like it.",ko:""}]; settings.reviewCount = 2; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
+  reviewState.stats = [due(1, { en: 'Gengar, Haunter, Gastly!' }), due(2, { en: 'I like it.' })];
+  run('state.vocab = REAL_VOCAB; state.cues = [{start:1,end:2,en:"Gengar, Haunter, Gastly!",ko:""},{start:2,end:3,en:"I like it.",ko:""}]; settings.reviewCount = 2; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
   const o = reviewCalls[0];
   assert.ok(o, '복습이 열림');
-  o.onSentence({ start: 1, en: 'Oh, Gengar!' }, true);
+  o.onSentence({ start: 1, en: 'Gengar, Haunter, Gastly!' }, true);
   assert.deepEqual([xpLog.length, coinLog.length], [0, 0], '확인하지 않는 줄 — 보상 없음');
   assert.deepEqual(speakState.saidCues, [1], '일정·말해 본 문장은 넘긴다');
   o.onSentence({ start: 2, en: 'I like it.' }, true);
@@ -3107,8 +3107,8 @@ test('🎤 v292 🔁 복습 — 확인하지 않는 줄을 통과해도 ⚡💰�
 test('🎤 v292 ⚙ 지금 복습 해보기(연습) — 확인하지 않는 줄(이름 외침·미니언즈어)은 빼고 고른다', () => {
   const { run, ctx, reviewCalls, reviewState } = loadPlayer();
   ctx.REAL_VOCAB = REAL_VOCAB;
-  reviewState.stats = [due(1, { en: 'Oh, Gengar!', lastAt: 9 }), due(2, { en: 'I like it.', lastAt: 1 })];
-  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:2,end:3,en:"I like it.",ko:""}]; settings.reviewCount = 5; state.item = { id: "x", title: "t" }; openPracticeReview();');
+  reviewState.stats = [due(1, { en: 'Gengar, Haunter, Gastly!', lastAt: 9 }), due(2, { en: 'I like it.', lastAt: 1 })];
+  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Gengar, Haunter, Gastly!",ko:""},{start:2,end:3,en:"I like it.",ko:""}]; settings.reviewCount = 5; state.item = { id: "x", title: "t" }; openPracticeReview();');
   assert.deepEqual(reviewCalls[reviewCalls.length - 1].items.map((it) => it.cue.en), ['I like it.']);
 });
 
@@ -3137,8 +3137,8 @@ test('🔍 Codex 98차 ② 🔁 복습 — 확인하지 않는 줄만 있는 회
   const { run, ctx, reviewCalls, reviewState, xpLog, coinLog, itemLog, mushroomState } = loadPlayer();
   await tick();
   ctx.REAL_VOCAB = REAL_VOCAB;
-  reviewState.stats = [due(1, { en: 'Oh, Gengar!' }), due(2, { en: 'Huh? Gengar?' })];
-  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:2,end:3,en:"Huh? Gengar?",ko:""}]; settings.reviewCount = 5; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
+  reviewState.stats = [due(1, { en: 'Gengar, Haunter, Gastly!' }), due(2, { en: 'Pikachu, Raichu, Pichu!' })];
+  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Gengar, Haunter, Gastly!",ko:""},{start:2,end:3,en:"Pikachu, Raichu, Pichu!",ko:""}]; settings.reviewCount = 5; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
   let o = reviewCalls[reviewCalls.length - 1];
   assert.equal(o.items.length, 2, '회차에는 들어간다 (일정이 넘어가야 홈 숫자가 준다)');
   o.onSentence(o.items[0].cue, true, o.items[0]);
@@ -3147,9 +3147,9 @@ test('🔍 Codex 98차 ② 🔁 복습 — 확인하지 않는 줄만 있는 회
   await tick();
   assert.deepEqual([xpLog.length, coinLog.length, itemLog.length, reviewState.rounds, mushroomState.today, (reviewState.stoneKeys || []).length], [0, 0, 0, 0, 0, 0], '말하지 않은 회차 — 보상 없음');
   // 섞인 회차: 확인하지 않는 줄 셋 + 확인하는 줄 하나를 못 함 → 🔶 셈은 확인하는 줄 하나뿐(하나까지 봐주기는 셋 이상일 때)
-  reviewState.stats = [due(1, { en: 'Oh, Gengar!' }), due(2, { en: 'Huh? Gengar?' }), due(3, { en: 'Oh, Pikachu!' }), due(4, { en: 'I like it.' })];
+  reviewState.stats = [due(1, { en: 'Gengar, Haunter, Gastly!' }), due(2, { en: 'Pikachu, Raichu, Pichu!' }), due(3, { en: 'Eevee, Vaporeon, Jolteon!' }), due(4, { en: 'I like it.' })];
   reviewState.items = 0; reviewState.sentences = 0; // 오늘 복습 수를 비운다 — 안 그러면 회차 길이가 남은 수로 준다
-  run('state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:2,end:3,en:"Huh? Gengar?",ko:""},{start:3,end:4,en:"Oh, Pikachu!",ko:""},{start:4,end:5,en:"I like it.",ko:""}]; state.reviewOpen = false; state.reviewCooldown = 0; state.reviewDone = false; maybeReview();');
+  run('state.cues = [{start:1,end:2,en:"Gengar, Haunter, Gastly!",ko:""},{start:2,end:3,en:"Pikachu, Raichu, Pichu!",ko:""},{start:3,end:4,en:"Eevee, Vaporeon, Jolteon!",ko:""},{start:4,end:5,en:"I like it.",ko:""}]; state.reviewOpen = false; state.reviewCooldown = 0; state.reviewDone = false; maybeReview();');
   o = reviewCalls[reviewCalls.length - 1];
   assert.equal(o.items.length, 4);
   for (const it of o.items) o.onSentence(it.cue, it.cue.en !== 'I like it.', it);
@@ -3168,9 +3168,9 @@ test('🔍 Codex 98차 ③ 💖 덤 — 확인하지 않는 줄은 통과해도 
   await tick();
   ctx.REAL_VOCAB = REAL_VOCAB;
   reviewState.stats = [due(4, { en: 'I like it.' })];
-  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Oh, Gengar!",ko:""},{start:4,end:5,en:"I like it.",ko:""}]; settings.reviewCount = 5; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
+  run('state.vocab = REAL_VOCAB; state.vocabViews = []; state.cues = [{start:1,end:2,en:"Gengar, Haunter, Gastly!",ko:""},{start:4,end:5,en:"I like it.",ko:""}]; settings.reviewCount = 5; state.reviewDone = false; state.item = { id: "x", title: "t" }; maybeReview();');
   const o = reviewCalls[reviewCalls.length - 1];
-  o.onSentence({ start: 1, end: 2, en: 'Oh, Gengar!' }, true, { type: 'sentence', extra: true });
+  o.onSentence({ start: 1, end: 2, en: 'Gengar, Haunter, Gastly!' }, true, { type: 'sentence', extra: true });
   await tick();
   assert.deepEqual([xpLog.length, coinLog.length], [0, 0], '말하지 않은 덤');
   assert.deepEqual(reviewState.favDone, [1], '덤으로 푼 날은 적는다');

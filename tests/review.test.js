@@ -12,7 +12,7 @@ import {
 /** 테스트용 문장 기록 만들기 */
 function rec(patch = {}) {
   return {
-    key: patch.key || `it|${patch.start || 0}`, itemId: 'it', start: 0, en: 'Hello there.', ko: '안녕.',
+    key: patch.key || `it|${patch.start || 0}`, itemId: 'it', start: 0, en: 'Hello there, my friend.', ko: '안녕.',
     plays: 1, listens: 1, done: true, seconds: 3,
     speakAttempts: 1, speakPass: 1, speakFail: 0, speakSkipped: 0, bestRatio: 0.6, lastRatio: 0.6, lastAt: 0,
     box: 0, dueAt: '2026-09-15', reviews: 0, reviewPass: 0,
@@ -80,7 +80,8 @@ test('isDue: 오늘 이전이면 대상, 미래·미등록·졸업은 제외', (
   assert.equal(isDue(null, today), false);
 });
 
-test('pickReviews: 넘긴 문장 → box 낮은 순 → 점수 낮은 순 → 오래 밀린 순', () => {
+// v391: 옛 순서(넘긴 문장 → box 낮은 순 → 점수 낮은 순)는 못 하는 줄을 날마다 맨 앞에 세웠다 — 새 순서 자세한 시험은 review391.test.js
+test('pickReviews (v391): 복습 중인 문장(차례가 오래된 것부터) → 새 문장 — 넘긴 것·점수 낮은 것을 먼저 세우지 않는다', () => {
   const today = '2026-09-15';
   const list = [
     rec({ key: 'a', start: 10, box: 0, bestRatio: 0.9, dueAt: '2026-09-15' }),
@@ -90,17 +91,19 @@ test('pickReviews: 넘긴 문장 → box 낮은 순 → 점수 낮은 순 → �
     rec({ key: 'e', start: 50, box: 1, bestRatio: 0.8, dueAt: '2026-09-16' }),                  // 내일 → 제외
   ];
   const got = pickReviews(list, today, 3).map((r) => r.key);
-  assert.deepEqual(got, ['c', 'd', 'a'], '넘긴 c가 먼저, 같은 box 0끼리는 점수 낮은 d가 먼저');
+  assert.deepEqual(got, ['c', 'b', 'a'], '복습 중인 c(오래된 차례)·b 다음 새 문장은 앞 문장 a — 점수 낮은 d가 먼저가 아니다');
   assert.equal(pickReviews(list, today, 10).length, 4, 'due 아닌 e는 절대 안 나옴');
 });
 
-test('pickReviews: 같은 조건이면 오래 밀린 문장이 먼저', () => {
+test('pickReviews (v391): 복습 중인 문장은 차례가 오래된 것부터, 새 문장은 최근에 배운 것부터', () => {
   const today = '2026-09-15';
   const list = [
-    rec({ key: 'new', start: 10, dueAt: '2026-09-15' }),
-    rec({ key: 'old', start: 20, dueAt: '2026-09-05' }),
+    rec({ key: 'new', start: 10, dueAt: '2026-09-15', reviews: 1, box: 1 }),
+    rec({ key: 'old', start: 20, dueAt: '2026-09-05', reviews: 1, box: 1 }),
+    rec({ key: 'fresh-old', start: 30, dueAt: '2026-09-11' }),
+    rec({ key: 'fresh-new', start: 40, dueAt: '2026-09-14' }),
   ];
-  assert.deepEqual(pickReviews(list, today, 2).map((r) => r.key), ['old', 'new']);
+  assert.deepEqual(pickReviews(list, today, 4).map((r) => r.key), ['old', 'new', 'fresh-new', 'fresh-old']);
 });
 
 test('pickReviews: 대상이 없거나 개수가 0이면 빈 배열', () => {
@@ -295,7 +298,7 @@ test('dueByItem: 밀린 수가 같으면 더 오래 기다린 영상이 먼저',
   const today = '2026-09-23';
   const list = [
     at('new', { start: 1, dueAt: '2026-09-23' }),
-    at('old', { start: 1, dueAt: '2026-09-10' }),
+    at('old', { start: 1, dueAt: '2026-09-10', reviews: 1 }), // 복습을 시작한 문장 — 새 문장은 배운 뒤 7일이 지나면 차례에서 빠진다 (v391)
   ];
   assert.deepEqual(dueByItem(list, today).map((x) => x.itemId), ['old', 'new']);
 });
@@ -352,7 +355,7 @@ test('pickDueItem: 뺀 콘텐츠는 후보 목록에서 빠지므로 그다음�
   const today = '2026-09-23';
   const items = [{ id: 'min', title: '미니언즈' }, { id: 'ash', title: '지우와 피카츄' }];
   const list = [
-    ...Array.from({ length: 1043 }, (_, i) => at('min', { start: i, dueAt: '2026-09-01' })),
+    ...Array.from({ length: 1043 }, (_, i) => at('min', { start: i, dueAt: '2026-09-01', reviews: 1 })),
     at('ash', { start: 1, dueAt: '2026-09-22' }),
     at('ash', { start: 2, dueAt: '2026-09-22' }),
   ];

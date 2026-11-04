@@ -10,7 +10,7 @@ import { slimStats, withStart, startOfKey } from '../js/backup.js';
 import { pickPrompts } from '../js/essay.js';
 
 const T = '2026-10-02';
-const rec = (start, patch = {}) => ({ key: `v|${start * 10}`, itemId: 'v', start, en: `Line ${start}.`, ko: '', done: true, box: 1, dueAt: '2026-10-01', lastAt: start, speakSkipped: 0, bestRatio: 0.5, ...patch });
+const rec = (start, patch = {}) => ({ key: `v|${start * 10}`, itemId: 'v', start, en: `I said line ${start}.`, ko: '', done: true, box: 1, dueAt: '2026-10-01', lastAt: start, speakSkipped: 0, bestRatio: 0.5, ...patch }); // 영어 낱말 셋 이상 — 복습에 낼 만한 문장 (v391)
 
 test('💖 아이콘은 ⭐(발음 정복)와 다르다', () => {
   assert.equal(FAV_ICON, '💖');
@@ -18,10 +18,10 @@ test('💖 아이콘은 ⭐(발음 정복)와 다르다', () => {
   assert.match(css, /\.script-item\.star \.en::before \{ content: '⭐ '; \}/, '⭐는 그대로 정복 표시');
 });
 
-test('🔁 차례인 문장 중 💖가 먼저 — 넘긴 문장·낮은 box보다도', () => {
-  const list = [rec(1, { speakSkipped: 2, box: 0 }), rec(2, { box: 0 }), rec(3, { box: 3, fav: true })];
-  assert.deepEqual(pickReviews(list, T, 2).map((r) => r.start), [3, 1]);
-  assert.deepEqual(pickReviews(list.map((r) => ({ ...r, fav: false })), T, 2).map((r) => r.start), [1, 2], '💖가 없으면 옛 순서 그대로');
+test('🔁 차례인 문장 중 💖가 먼저 — 복습 중인 문장보다도 (v391 순서)', () => {
+  const list = [rec(1, { speakSkipped: 2, box: 0 }), rec(2, { box: 2, reviews: 1 }), rec(3, { box: 0, fav: true })];
+  assert.deepEqual(pickReviews(list, T, 2).map((r) => r.start), [3, 2], '새 문장이라도 💖가 먼저, 그다음 복습 중인 2');
+  assert.deepEqual(pickReviews(list.map((r) => ({ ...r, fav: false })), T, 2).map((r) => r.start), [2, 1], '💖가 없으면 복습 중인 문장 → 새 문장(앞 문장부터)');
   assert.deepEqual(pickReviews([rec(4, { fav: true, dueAt: '2026-10-09' })], T, 3), [], '💖라도 차례가 아니면 차례 목록엔 안 든다');
 });
 

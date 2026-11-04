@@ -89,7 +89,8 @@ test('🎤 🔁 복습 — 감탄사만 있는 문장 기록은 차례·요약·
   const quiet = rec(1, 'Huh?');
   const quiet2 = rec(2, 'Whoa, whoa, whoa!');
   const real = rec(3, 'Whoa! Look at that!');
-  const name = rec(4, 'Oh, Gengar!'); // 단어장 없이는 이름을 못 가린다 → 복습에는 남고, 복습 화면에서 확인 없이 넘어간다(player)
+  const name = rec(4, 'Gengar, Haunter, Gastly!'); // 단어장 없이는 이름을 못 가린다 → 복습에는 남고, 복습 화면에서 확인 없이 넘어간다(player) · 「Oh, Gengar!」는 v391부터 낱말이 모자라 빠진다
+  assert.equal(isDue(rec(9, 'Oh, Gengar!'), T), false, 'v391: 한 낱말 이름 외침은 복습에 안 낸다');
   const all = [quiet, quiet2, real, name];
   assert.equal(isDue(quiet, T), false);
   assert.equal(isDue(quiet2, T), false);
@@ -98,7 +99,7 @@ test('🎤 🔁 복습 — 감탄사만 있는 문장 기록은 차례·요약·
   assert.equal(isDue({ box: 1, dueAt: '2026-10-10' }, T), true, '수학 개념 기록 (en 없음)');
   assert.deepEqual(pickReviews(all, T).map((r) => r.start), [3, 4]);
   assert.deepEqual(dueByItem(all, T), [{ itemId: 'v', due: 2, oldest: '2026-10-10' }], '홈·목록의 밀린 수 = 실제 회차');
-  assert.deepEqual(reviewSummary([...all, rec(5, 'Ooh.', { dueAt: '2026-10-30' }), rec(6, 'Wait!', { dueAt: '2026-10-30' })], T), { dueCount: 2, waiting: 1, graduated: 0 });
+  assert.deepEqual(reviewSummary([...all, rec(5, 'Ooh.', { dueAt: '2026-10-30' }), rec(6, 'Wait for me!', { dueAt: '2026-10-30' })], T), { dueCount: 2, waiting: 1, graduated: 0 });
   const favs = [rec(7, 'Huh?', { fav: true, dueAt: '2026-10-30' }), rec(8, 'I like it.', { fav: true, dueAt: '2026-10-30' })];
   assert.equal(pickFavExtra(favs, T).start, 8, '💖 덤에도 감탄사 줄은 안 나온다');
 });

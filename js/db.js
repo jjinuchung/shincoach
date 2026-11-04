@@ -13,6 +13,7 @@ import { tradeCheck, tradersFor, mergeTrades, copyTrades } from './trade.js'; //
 import { sellCheck, saleKey, mergeSales, copySales } from './sell.js'; // 💰 5일장 팔기 규칙 (순수 — fusion·evolve·items만 import)
 import { ROCKET, rocketGapOk, stealables, hideout, rocketStep, copyRocketCur, mergeRocketDone } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수 — evolve만 import)
 import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 — house·evolve만 import)
+import { firstDueOf } from './review.js'; // 🔁 둘 다 복습 전인 문장의 첫 차례 (v391 — review·sounds는 db를 import하지 않는다)
 import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows, qMissOf, mergeQMiss, readsOf, mergeReads, KOR_DAY_SUMS, KOR_DAY_LISTS } from './korean.js'; // 📚 국어 잘못 읽기 횟수 · 📈 읽기 날마다 합계 칸(v314) (순수, import 없음)
 import { wordsOf, mergeWords, wordDaysOf, mergeWordDays } from './korwords.js'; // 🔤 국어 낱말 칸·보상 받은 날 (순수, korean.js만 import)
 import { lettersOf, mergeLetters } from './letters.js'; // 📮 포켓몬 편지 장부 (v351 — 순수, korean.js만 import)
@@ -2238,14 +2239,25 @@ const maxOf = (a, b) => Math.max(Number(a) || 0, Number(b) || 0);
  * 둘 다 복습 이력이 없으면(옛 기록) 더 나아간 box 쪽, 그것도 같으면 늦은 dueAt 쪽.
  */
 export function pickReviewState(a, b) {
-  const state = (r) => ({ box: r.box || 0, dueAt: r.dueAt || '' });
+  const r = reviewSide(a, b);
+  return { box: r.box || 0, dueAt: r.dueAt || '' };
+}
+
+/** pickReviewState가 고르는 기록 그 자체 — 🔁 거듭 못 넘긴 수(reviewMiss · v391)도 box·dueAt과 같은 쪽에서 가져온다 */
+function reviewSide(a, b) {
   const ta = Number(a.reviewedAt) || 0;
   const tb = Number(b.reviewedAt) || 0;
-  if (ta !== tb) return state(ta > tb ? a : b);
+  if (ta !== tb) return ta > tb ? a : b;
   const boxA = a.box || 0;
   const boxB = b.box || 0;
-  if (boxA !== boxB) return state(boxA > boxB ? a : b);
-  return state((a.dueAt || '') >= (b.dueAt || '') ? a : b);
+  if (boxA !== boxB) return boxA > boxB ? a : b;
+  return (a.dueAt || '') >= (b.dueAt || '') ? a : b;
+}
+
+/** 🔁 거듭 못 넘긴 수 합치기 (v391) — box·dueAt과 같은 쪽에서 · 복습 상태가 똑같으면 큰 값 (어느 쪽을 먼저 합쳐도 같게 · Codex 194차) */
+function mergedMiss(a, b) {
+  const same = (Number(a.reviewedAt) || 0) === (Number(b.reviewedAt) || 0) && (a.box || 0) === (b.box || 0) && (a.dueAt || '') === (b.dueAt || '');
+  return same ? maxOf(a.reviewMiss, b.reviewMiss) : Number(reviewSide(a, b).reviewMiss) || 0;
 }
 
 /**
@@ -2288,7 +2300,9 @@ export function mergeStatRecord(name, cur, rec) {
     // 더 늦게 돌아온다 (Codex #6). reviewedAt이 없는 옛 기록끼리는 더 나아간 box 쪽을 쓴다.
     const pick = pickReviewState(cur, rec);
     out.box = pick.box;
-    out.dueAt = pick.dueAt;
+    const firstDue = firstDueOf(cur, rec); // 둘 다 복습 전이면 이른 첫 차례 — 지난 새 문장이 되살아나지 않게 (v391)
+    out.dueAt = firstDue === null ? pick.dueAt : firstDue;
+    if (cur.reviewMiss !== undefined || rec.reviewMiss !== undefined) out.reviewMiss = mergedMiss(cur, rec); // 🔁 거듭 못 넘긴 수 — 한 쌍으로 (v391)
     // 💖 내 문장은 켜고 끄는 값이라 OR/max로 못 합친다 — 나중에 누른 쪽(favAt)을 한 쌍으로 (뺀 것이 옛 백업으로 되살아나지 않게)
     const fa = Number(cur.favAt) || 0;
     const fb = Number(rec.favAt) || 0;

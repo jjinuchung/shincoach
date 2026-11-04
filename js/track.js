@@ -3,7 +3,7 @@
 import {
   sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, bumpVocabViews,
   emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey, mergeEssayEntry, saidOf, saidFlag } from './db.js';
-import { enroll, schedule, GRADUATED } from './review.js';
+import { enroll, scheduleSentence, GRADUATED } from './review.js';
 import { soundOnly } from './sounds.js';
 
 export const MASTER_RATIO = 0.8; // 발음 점수 80% 이상이면 ⭐ 정복
@@ -189,7 +189,8 @@ export function review(cue, passed) {
   const r = rec(cue); if (!r) return null;
   r.reviews = (r.reviews || 0) + 1;
   if (passed) r.reviewPass = (r.reviewPass || 0) + 1;
-  Object.assign(r, schedule(r.box || 0, passed, todayKey()));
+  // 못 넘기면 이틀 뒤 · 거듭 못 넘기면 한 달 쉼 — 거듭 못 넘긴 수는 reviewMiss (v391)
+  Object.assign(r, scheduleSentence(r.box || 0, r.reviewMiss || 0, passed, todayKey()));
   r.reviewedAt = Date.now(); // 백업 병합에서 "어느 쪽이 최신 복습인지" 판단하는 기준 (db.mergeStatRecord)
   if (t.session) {
     t.session.reviews = (t.session.reviews || 0) + 1;
