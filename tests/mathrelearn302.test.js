@@ -172,7 +172,7 @@ test('🔁 비슷한 문제는 문항의 칸에서 줄기를 찾는다 (Codex 10
   const tw = sx.gen.makeQuestion(id, 'calc', 17, { ...o, want: { k: 'calc', key: q.key } });
   assert.ok(tw && tw.key === q.key, '그 칸의 줄기로 만들면 같은 틀');
   // 사다리의 🤔 노트 단추는 지금 줄기 노트만 연다 — 그래서 지금 앱에서는 다른 줄기 칸이 노트 회차에 안 온다(안전장치일 뿐 동작은 그대로)
-  assert.ok(read('js/math.js').includes('const notesDue = dueNotes(state, today).filter((x) => { const s = stemOf(x.id); return s && s.key === ui.stem; });'));
+  assert.ok(read('js/math.js').includes('const notesDue = stemNotes(state, today, ui.stem);'));
 });
 
 test('📚 화면 연결: 틀린 화면 · 배움 한 장 · 비슷한 문제 · 기록 · sw', () => {

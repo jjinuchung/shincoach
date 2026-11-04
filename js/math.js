@@ -9,7 +9,7 @@ import { WORLDS, rng, shuffle, josa, numJosa, numTail, fixNumJosa } from './math
 import { renderFigures, figText, barSvg, compareLineSvg, walkWidget, walkRange, shadeWidget, richParts, cutLine } from './mathdraw.js';
 import {
   needsPlacement, applyPlacement, applyRound, roundReward, ladderOf, dueIds, nowId, nameOf, seenWorlds, REWARD, kidTags, META_TAGS, nextNote,
-  dueNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
+  stemNotes, countNotes, applyNotesRound, STEMS, STEM_ORDER, stemOf, gradeLabel, dailyPlan, applyMixRound, markDaily, dailyDone, tallyRound, roundCatches, LUCKY, luckyCatch, addPending, takePending, giveBackPending, pendingThrows, stoneReward,
   applySpecialRound, badgesOf, spPass, claimGym, gymClaimed, specialReward, widenRound, rungSub, practiceNote, waitNote, LEARNING_MAX,
   sameDayRounds, repeatNote, roundPay, setLive, applyQuit, settleLives, liveKeep,
   stemPickOrder, LATE, lateBonus, lateLeft, bridgeOf, bridgeOffers,
@@ -763,7 +763,7 @@ function renderLadder(state) {
     head.appendChild(bridgeBtn(state, bo.key, '그림으로 다시 배우기'));
   }
   // 🤔 오답 노트 회차 — 어제 이전에 틀린 유형만 (개념 일정과 따로). 오늘 틀린 건 그 개념을 다시 열면 끼어 든다. 이 줄기의 것만
-  const notesDue = dueNotes(state, today).filter((x) => { const s = stemOf(x.id); return s && s.key === ui.stem; });
+  const notesDue = stemNotes(state, today, ui.stem);
   if (notesDue.length) {
     const nb = el('button', 'btn btn-big-wide math-notes-btn', '🤔 틀렸던 유형 다시 풀기 — 이번엔 맞혀서 지워요'); // 남은 수는 쓰지 않는다 (v260)
     nb.type = 'button';

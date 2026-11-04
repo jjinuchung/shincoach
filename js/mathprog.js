@@ -874,6 +874,11 @@ export function dueNotes(m, today, limit = NOTES_ROUND) {
   return out.sort((a, b) => (a.note.t || 0) - (b.note.t || 0)).slice(0, limit);
 }
 
+/** 그 줄기의 🤔 오답 노트 회차 (v393) — 줄기를 먼저 고른 뒤 자른다: 다른 줄기의 옛 노트가 앞자리를 다 차지하면 사다리 단추가 사라진다 */
+export function stemNotes(m, today, stem) {
+  return dueNotes(m, today, Infinity).filter((x) => (stemOf(x.id) || {}).key === stem).slice(0, NOTES_ROUND);
+}
+
 /** 모든 개념의 노트 수 (사다리 버튼·📊용). due: 어제 이전 것만 */
 export function countNotes(m, today) {
   let all = 0; let due = 0;

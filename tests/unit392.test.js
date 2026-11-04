@@ -577,7 +577,7 @@ test('📐 🎣 차례 (unitTurn · mathMix): 하루 세 번 · 이미 답한 �
   assert.ok(!kinds.join('').includes('DD'), `붙어 나오지 않음 ${kinds.join('')}`);
 });
 
-test('📐 화면·잇기: 판을 열 때 저장된 장부 · 단계·셈 문구가 아이 화면에 없음 · 🎣 카드 머리에 큰 물고기 표시 안 함 · 답은 처음 답·실수·시각으로 · 판 번호', () => {
+test('📐 화면·잇기: 판을 열 때 저장된 장부 · 단계·셈 문구가 아이 화면에 없음 · 🎣 카드 머리에 큰 물고기 표시 안 함 · 답은 처음 답·실수·시각으로', () => {
   const v = read('js/mathpokeview.js');
   assert.ok(v.includes('const unit = await getMath().then(unitStage, () => 0);'), '저장된 장부로');
   assert.ok(v.includes("evo: EVO, partner: Number(p.partner) || 0, unit });"), '판에 단계');
@@ -594,6 +594,4 @@ test('📐 화면·잇기: 판을 열 때 저장된 장부 · 단계·셈 문구
   assert.ok(fv.includes("const badge = q.redo ? redoBadge(q.redo.step) : q.ud ? '' : lvBadge(stage, ui.fish);"), '다지기 문제엔 큰 물고기 표시 없음');
   assert.ok(fv.includes("lvb.classList.toggle('is-big', !q.redo && !q.ud && lv >= 3);"));
   assert.equal(lvBadge('hook', { star: 5 }), '🐋 큰 물고기 문제', '보통 문제는 그대로');
-  assert.match(read('sw.js'), /CACHE_VERSION = 'v392'/);
-  assert.match(read('js/version.js'), /APP_VERSION = 'v392'/);
 });

@@ -761,6 +761,7 @@ function askWord() {
 
   const box = $('review-choices');
   box.innerHTML = '';
+  box.dataset.done = ''; // 앞 받아쓰기의 마지막 칸이 남긴 연타 표시 — 남아 있으면 보기를 눌러도 반응이 없고 나갈 길도 없다 (v393)
   box.hidden = false;
   for (const choice of item.choices) {
     const b = el('button', 'review-choice', choice);
