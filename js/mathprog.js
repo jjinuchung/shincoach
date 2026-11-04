@@ -1429,7 +1429,8 @@ export function quickCatchOnly(m, today, perfect) {
 export function pokeCommit(m, qs, today) {
   const list = (Array.isArray(qs) ? qs : []).filter((q) => q && POKE_KINDS[q.k]);
   const ok = list.filter((q) => q.ok === 1).length;
-  if (list.length) pushLog(m, { d: today, t: Date.now(), id: 'poke', mode: 'poke', ok, n: list.length, qs: list.map((q) => ({ k: q.k, ok: q.ok === 1 ? 1 : 0, ...(q.tag ? { tag: String(q.tag) } : {}) })) });
+  if (list.length) pushLog(m, { d: today, t: Date.now(), id: 'poke', mode: 'poke', ok, n: list.length, qs: list.map((q) => ({ k: q.k, ok: q.ok === 1 ? 1 : 0, ...(q.tag ? { tag: String(q.tag) } : {}), ...(unitLv(q) ? { lv: q.lv } : {}), ...secQ(q) })) }); // ⏱ 걸린 초 · 📐 단계 (v392)
+  for (const q of list) if (unitLv(q)) unitStep(m, q.ok === 1, today, Date.now(), q.lv); // 처음 답만 — 다지기 문제로 낸 📐만
   const p = pokeToday(m, today);
   const perfect = list.length >= POKE.min && ok === list.length;
   let first = false;
@@ -1462,6 +1463,73 @@ export function pokeReport(m, today) {
   const kinds = Object.keys(POKE_KINDS).filter((k) => by[k]).map((k) => `${POKE_KINDS[k].icon}${POKE_KINDS[k].ko} ${by[k][0]}/${by[k][1]}`).join(' · ');
   const top = Object.entries(traps).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ${n}`).join(' · ');
   return `🐾 포켓몬 수학 (최근 7일): ${log.length}판 · 다 맞힘 ${all} · 처음 답 ${kinds}${top ? ` · 자주 고른 실수 ${top}` : ''}`;
+}
+
+// ── 📐 단위 바꾸기 다지기 (v392, 2026-11-04 아버님 기본안 「추천대로」) — 🐾 판과 🎣 낚시터의 📐를 쉬운 꼴부터 · 새 과목·새 화면·사다리 칸 없음 ──
+// 장부 m.unit = { v 단계(1 자연수 · 2 소수 부분 · 3 지금 꼴), up 잇달아 맞힘, miss 잇달아 틀림, at 바꾼 시각, done? 끝낸 날 } — 아이 화면엔 안 보임(📤 unitReport만)
+// 처음 답만 센다 · 단계는 오르내리는 상태라 병합은 바꾼 시각이 늦은 쪽 한 벌(db.mergeMath) · 끝내면 예전처럼 섞인다 · 💰·🎯는 그 판·낚시터 규칙 그대로
+/** up 오르는 데 잇달아 맞힘 · down 내려가는 데 잇달아 틀림 · done ③을 끝내는 데 잇달아 맞힘 · fishDay 🎣 하루 몫 */
+export const UNIT_DRILL = { up: 3, down: 2, done: 5, fishDay: 3 };
+const UNIT_MARK = { 1: '①', 2: '②', 3: '③' };
+/** 다지기로 낸 📐 답인가 (옛 일지·다지기가 끝난 뒤의 📐는 단계가 없다) */
+const unitLv = (q) => !!(q && q.k === 'unit' && [1, 2, 3].includes(q.lv));
+/** 장부 고쳐 읽기 — 없거나 깨졌으면 처음부터 */
+export function unitOf(m) {
+  const u = m && m.unit && typeof m.unit === 'object' ? m.unit : {};
+  return { v: [1, 2, 3].includes(u.v) ? u.v : 1, up: nat(u.up), miss: nat(u.miss), at: nat(u.at), ...(typeof u.done === 'string' && u.done ? { done: u.done } : {}) };
+}
+/** 지금 낼 단계 — 끝냈으면 0 */
+export function unitStage(m) {
+  const u = unitOf(m);
+  return u.done ? 0 : u.v;
+}
+/** 📐 처음 답 하나 (저장 트랜잭션 안에서 · m.unit은 새 객체로) — 끝낸 뒤엔 그대로 · 지금 단계보다 쉬운 문제의 답은 안 셈(일지에만 — Codex 195차 #1) · 바꾼 시각은 늘 앞으로 */
+export function unitStep(m, ok, today, now = Date.now(), lv = 3) {
+  const u = unitOf(m);
+  if (u.done || lv < u.v) return;
+  const n = ok ? { ...u, up: u.up + 1, miss: 0 } : { ...u, up: 0, miss: u.miss + 1 };
+  if (ok && n.v === 3 && n.up >= UNIT_DRILL.done) n.done = today;
+  else if (ok && n.v < 3 && n.up >= UNIT_DRILL.up) { n.v += 1; n.up = 0; }
+  else if (!ok && n.miss >= UNIT_DRILL.down) { n.v = Math.max(1, n.v - 1); n.miss = 0; }
+  n.at = Math.max(nat(now), u.at + 1);
+  m.unit = n;
+}
+/** 🎣 📐 다지기 답 하나 (db.updateMath 안에서) — 일지 한 줄 + 장부 · a = { ok, lv, tag?, s? } */
+export function unitFishCommit(m, a, today, now = Date.now()) {
+  const q = { k: 'unit', ok: a && a.ok ? 1 : 0, lv: a && a.lv, ...(a && a.tag ? { tag: String(a.tag) } : {}), ...secQ(a || {}) };
+  if (!unitLv(q)) return;
+  pushLog(m, { d: today, t: now, id: 'unit', mode: 'unit', ok: q.ok, n: 1, qs: [q] });
+  unitStep(m, q.ok === 1, today, now, q.lv);
+}
+/** 오늘 🎣에서 답한 📐 수 — 일지에서 센다 */
+export function unitFishToday(m, today) {
+  return ((m && Array.isArray(m.log)) ? m.log : []).filter((e) => e && e.mode === 'unit' && e.d === today).length;
+}
+/** 가운데값 — 짝수 개면 가운데 둘의 평균(weekly.median과 같게 · 반올림) · 없으면 null */
+function midOf(list) {
+  const a = [...list].sort((x, y) => x - y);
+  const h = Math.floor(a.length / 2);
+  if (!a.length) return null;
+  return a.length % 2 ? a[h] : Math.round((a[h - 1] + a[h]) / 2);
+}
+/** 📤 수학 요약 📐 줄 (아버님만) — 지금 단계 · 최근 7일 단계마다 처음 답 맞힘 · 🐾·🎣 문제 수 · 자주 고른 실수 · 답까지 걸린 초(맞힘·틀림 가운데값) */
+export function unitReport(m, today) {
+  const u = unitOf(m);
+  const head = `📐 단위 바꾸기 다지기: ${u.done ? `끝(${u.done})` : `지금 ${UNIT_MARK[u.v]}단계`}`;
+  const rows = [];
+  for (const e of (m && Array.isArray(m.log)) ? m.log : []) {
+    if (!e || (e.mode !== 'poke' && e.mode !== 'unit') || typeof e.d !== 'string' || daysBetween(e.d, today) < 0 || daysBetween(e.d, today) >= 7) continue;
+    for (const q of Array.isArray(e.qs) ? e.qs : []) if (unitLv(q)) rows.push({ ...q, fish: e.mode === 'unit' });
+  }
+  if (!rows.length) return `${head} · 최근 7일 없음`;
+  const lvs = [1, 2, 3].map((lv) => [lv, rows.filter((q) => q.lv === lv)]).filter(([, l]) => l.length).map(([lv, l]) => `${UNIT_MARK[lv]} ${l.filter((q) => q.ok).length}/${l.length}`).join(' · ');
+  const traps = {};
+  for (const q of rows) if (!q.ok && q.tag) traps[q.tag] = (traps[q.tag] || 0) + 1;
+  const top = Object.entries(traps).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ${n}`).join(' · ');
+  const sec = (ok) => midOf(rows.filter((q) => !!q.ok === ok && Number.isFinite(q.s)).map((q) => q.s));
+  const [a, b] = [sec(true), sec(false)];
+  const secs = [a === null ? '' : `맞힘 ${a}초`, b === null ? '' : `틀림 ${b}초`].filter(Boolean).join(' · ');
+  return `${head} · 최근 7일 처음 답 ${lvs} (🐾 ${rows.filter((q) => !q.fish).length} · 🎣 ${rows.filter((q) => q.fish).length})${top ? ` · 자주 고른 실수 ${top}` : ''}${secs ? ` · 답까지 가운데값 ${secs}` : ''}`;
 }
 
 /**
@@ -1858,13 +1926,14 @@ export function mathReportText(m, today, days) {
   if (Array.isArray(days)) lines.push(sunReport(days, today, m)); // ☀️ 누른 곳·다시 시작 판·완주 (v331 — 하루 기록을 받은 📤에서만)
   lines.push(quickReport(m, today)); // ⚡ 3문제 한 판 (v354)
   lines.push(pokeReport(m, today)); // 🐾 포켓몬 수학 (v364)
+  lines.push(unitReport(m, today)); // 📐 단위 바꾸기 다지기 (v392)
   const log = shownLog((m && m.log) || []).slice(-30);
   if (log.length) {
     lines.push('', `최근 ${log.length}편 (날짜 · 개념 · 결과 · 문항별 정오와 오개념):`);
     for (const e of log) {
       const qs = (e.qs || []).map((q) => `${(KIND_SHORT[q.k] || q.k || '?').slice(0, 1)}${q.p ? '✍' : ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${q.g ? `«${q.g}»` : ''}${q.pf ? `‹${q.pf === 'reduce' ? '약분 덜 함' : '꼴이 다름'}›` : ''}${q.rl ? '📚' : ''}${q.fx === 1 ? '→고침' : q.fx === 0 ? '→또틀림' : ''}${q.sn === 1 ? '감○' : q.sn === 0 ? '감✘' : ''}${q.w ? `{${WHY_LABEL[q.w] || q.w}${q.w === 's' && q.sv !== undefined ? (q.sv ? '✓' : '✗') : ''}}` : ''}${q.c ? `[${nameOf(q.c)}]` : ''}`).join(' ');
       const res = e.mode === 'quit' ? `⏹그만둠 ${e.ok}/${e.n}${e.of ? ` (${e.of}문제 중)` : ''}${e.rf ? ' → 확인 못 통과로 침' : e.rq ? ' → 확인 차례 그만둠(칸 그대로 · 그날은 연습)' : ''}` : `${e.mode || ''} ${e.ok}/${e.n}${e.kp ? ' 💪칸 그대로' : ''}`; // ⏹ 그만둔 편 (v250) · 💪 (v262)
-      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? (e.mode === 'quick' ? '⚡3문제' : '🎲섞어풀기') : e.id === 'ask' ? '❓답장뒤풀기' : e.id === 'poke' ? '🐾포켓몬수학' : nameOf(e.id)} ${res} ${e.id === 'poke' ? (e.qs || []).map((q) => `${(POKE_KINDS[q.k] || {}).icon || '?'}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}`).join(' ') : qs}`);
+      lines.push(`${e.d} ${e.id === 'diag' ? '📏진단' : e.id === 'notes' ? '🤔오답노트' : e.id === 'mix' ? (e.mode === 'quick' ? '⚡3문제' : '🎲섞어풀기') : e.id === 'ask' ? '❓답장뒤풀기' : e.id === 'poke' ? '🐾포켓몬수학' : e.id === 'unit' ? '🎣📐단위' : nameOf(e.id)} ${res} ${e.id === 'poke' || e.id === 'unit' ? (e.qs || []).map((q) => `${(POKE_KINDS[q.k] || {}).icon || '?'}${UNIT_MARK[q.lv] || ''}${q.ok ? '○' : '✘'}${q.tag ? `(${q.tag})` : ''}${Number.isFinite(q.s) ? `${q.s}초` : ''}`).join(' ') : qs}`);
     }
   }
   return lines.join('\n');

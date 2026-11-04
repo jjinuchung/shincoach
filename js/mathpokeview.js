@@ -3,9 +3,10 @@
 // math.js가 ctx로 화면 비우기·사다리로 돌아가기·수학 기록을 건넨다(이 파일은 math.js를 import하지 않는다 — mathpuzzleview와 같은 꼴)
 //  · 문제마다 보기 넷 — 틀리면 그 실수에 맞춘 힌트(소수점 맞춰 세로 셈 등)로 한 번 더 · 두 번 틀리면 풀이를 보여 주고 다음 문제
 //  · 처음 고른 답만 센다(💰·🎯) · 💔·감점·남은 수 문구 없음 · 그만하기는 언제든(판을 버린다 — 저장도 보상도 없음)
+// v392 (📐 다지기 기본안 「추천대로」): 판을 열 때 저장된 장부의 단계로 📐 한 문제(화면엔 단계 없음) · 문제마다 답까지 걸린 초를 일지에(📤만)
 import { makeBoard, dataOf, poolOf, POKE_KINDS, tenth, colRows } from './mathpoke.js';
-import { quickLeft, pokeCommit } from './mathprog.js';
-import { applyDailyDelta } from './db.js';
+import { quickLeft, pokeCommit, unitStage, answerSecOf } from './mathprog.js';
+import { applyDailyDelta, getMath } from './db.js';
 import { commitChalRound, getProfileSnapshot } from './xp.js';
 import { ROSTER, characterUrl, artUrl, ensureArt } from './pokemon.js';
 import { EVO } from './evolve.js';
@@ -22,7 +23,7 @@ const el = (tag, cls, text) => {
 
 /** 숫자 원고 */
 export const POKE_URL = './coach/math/pokemath.json';
-// ps: 지금 푸는 판 { qs, i, wrong: [[틀린 보기 글]], first: [처음 답 맞았나], trap: [처음 틀린 실수], solved, finishing, finishErr, done }
+// ps: 지금 푸는 판 { qs, i, wrong: [[틀린 보기 글]], first: [처음 답 맞았나], trap: [처음 틀린 실수], sec: [처음 답까지 초], shown: 문제를 처음 그린 자리, t0: 그때 시각, solved, finishing, finishErr, done }
 const S = { ps: null, data: null, loading: null };
 
 /** 지금 🐾 판을 푸는 중인가 (math.js가 🎒·📊에서 돌아올 때 본다) */
@@ -73,9 +74,11 @@ export async function startPoke(ctx) {
   const p = getProfileSnapshot();
   const names = new Map(ROSTER.map((r) => [r.id, r.ko]));
   const pool = poolOf(p.caught, data, names);
-  const qs = makeBoard(pool, (Date.now() % 2147483646) + 1, { evo: EVO, partner: Number(p.partner) || 0 });
+  // 🎣에서 단계가 바뀌었을 수 있어 화면이 들고 있는 기록 대신 저장된 장부로 (못 읽으면 그 판만 다지기 없이)
+  const unit = await getMath().then(unitStage, () => 0);
+  const qs = makeBoard(pool, (Date.now() % 2147483646) + 1, { evo: EVO, partner: Number(p.partner) || 0, unit });
   if (!qs.length) { failEl(ctx); return; }
-  S.ps = { qs, i: 0, wrong: qs.map(() => []), first: [], trap: [], solved: false, finishing: false, finishErr: false, done: null };
+  S.ps = { qs, i: 0, wrong: qs.map(() => []), first: [], trap: [], sec: [], shown: -1, t0: 0, solved: false, finishing: false, finishErr: false, done: null };
   render(ctx);
 }
 /** 🎒·📊에서 돌아왔다 — 하던 자리 그대로 */
@@ -188,6 +191,7 @@ function render(ctx) {
   }
   const q = ps.qs[ps.i];
   devQ(q);
+  if (ps.shown !== ps.i) { ps.shown = ps.i; ps.t0 = Date.now(); } // 틀린 뒤·🎒에서 돌아와 다시 그릴 때는 그대로
   const k = POKE_KINDS[q.kind];
   card.appendChild(el('div', 'math-eyebrow', `🐾 포켓몬 수학 · ${k.icon} ${k.ko}`)); // 몇째 문제인지는 안 보인다 (셈 문구 — Codex 168차 #4)
   if (q.mons.length) {
@@ -249,6 +253,7 @@ function pick(ctx, o) {
   const wrong = ps.wrong[ps.i];
   if (wrong.includes(o.t)) return;
   const firstTry = !wrong.length;
+  if (firstTry) ps.sec[ps.i] = answerSecOf(ps.t0, Date.now());
   if (o.ok) {
     if (firstTry) ps.first[ps.i] = true;
     ps.solved = true;
@@ -279,7 +284,7 @@ async function finish(ctx) {
   ps.finishErr = false;
   render(ctx);
   const today = todayKey();
-  const recs = ps.qs.map((q, i) => ({ k: q.kind, ok: ps.first[i] ? 1 : 0, ...(ps.trap[i] ? { tag: ps.trap[i] } : {}) }));
+  const recs = ps.qs.map((q, i) => ({ k: q.kind, ok: ps.first[i] ? 1 : 0, ...(ps.trap[i] ? { tag: ps.trap[i] } : {}), ...(q.lv ? { lv: q.lv } : {}), s: ps.sec[i] }));
   let saved;
   try { saved = await commitChalRound((s) => pokeCommit(s, recs, today)); } catch { saved = { ok: false }; }
   const good = !!(saved && saved.ok);

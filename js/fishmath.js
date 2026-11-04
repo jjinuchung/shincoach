@@ -6,8 +6,11 @@
 // 낚시터(lakeview)가 수학 차례의 반쯤에 낸다 — 서로 다른 물고기를 두 종 이상 낚은 뒤부터 · 기록은 수학 칸 + daily fishFmQ/fishFmOk
 // v386 (🚤 원고 「이대로」 정할 것 3): 🐙 문어 무리(soft)는 길이 문제(비교·차·합)에 안 낸다 — 문어는 다리까지·오징어는 몸통 길이라 견주기가 공정하지 않다 ·
 //   무게 합·단위·막대그래프엔 나오고, 그 글은 「물고기」라고 부르지 않는다(막대그래프에 문어 무리가 있으면 「가장 많이 낚은 것」)
+// v392 (📐 다지기 기본안 「추천대로」): 다지는 동안(ud.stage) 📐은 🐾과 같은 단계·같은 몸통(mathpoke.unitCore)으로 하루 세 번까지(ud.ask) · 옛 꼴(1.38 kg)은 다른 꼴이 없을 때만 ·
+//   🐟 도감 무게는 어림값이라 「약」을 붙이고 자연수·소수 한 자리로 · 끝나면(ud 없음) 옛 꼴 그대로
 import { rng as makeRng, shuffle, pick } from './mathgen.js';
 import { SPECIES, lakeOf, weightOf } from './fishing.js';
+import { unitCore } from './mathpoke.js';
 
 /** 꼴 — 아이 화면 머리 줄엔 안 쓴다(셈 없음) · 📤·시험용 이름 */
 export const FM_KINDS = {
@@ -253,10 +256,28 @@ function makeUnit(r, pool) {
     hints: {
       small: '🤔 1 kg은 1000 g이에요 — 0을 하나 더 붙여 볼까요?',
       mix: `🤔 0.${pp} kg은 ${part} g이 아니라 ${part * 10} g이에요 (0.01 kg = 10 g).`,
-      big: '🤔 1 kg = 1000 g이에요 — 0의 개수를 다시 세어 봐요.',
+      big: `🤔 ${v * 10} g이면 ${hundredth(a.H * 10)} kg이에요. ${iga(a.ko)} 그렇게 무거울까요?`, // 크기 감각 (v392 — 🐾과 같게)
     },
     solve: `${hundredth(a.H)} kg = ${Math.floor(a.H / 100)} kg ${part * 10} g = ${v} g`,
   };
+}
+
+/** 📐 다지기 단계마다 쓸 무게 (십분의 일 kg · 못 쓰면 0) — 1 자연수 kg(2 kg부터 — 🐾과 같게) · 2 소수 첫째 자리가 2 이상(1 kg 아래도) · 3 1 kg 이상이고 소수 첫째 자리가 있게 */
+function drillKg(H, s) {
+  const t = s === 1 ? Math.round(H / 100) * 10 : Math.round(H / 10);
+  if (s === 1) return t >= 20 ? t : 0;
+  if (s === 2) return t % 10 >= 2 ? t : 0;
+  return t % 10 !== 0 && t >= 10 ? t : 0;
+}
+/** 📐 다지기 문제 — 그 단계를 만들 물고기가 없으면 다음 단계 · ud = 실제로 낸 단계 */
+function makeDrill(r, pool, stage) {
+  for (let s = stage; s <= 3; s++) {
+    const a = pick(r, pool.filter((x) => drillKg(x.H, s)));
+    const t = a ? drillKg(a.H, s) : 0;
+    const c = t ? unitCore(r, t, 'w', a.ko, s) : null;
+    if (c) return { kind: 'unit', facts: [`${a.ko} 약 ${tenth(t)} kg`], text: c.ask, tip: c.tip, opts: c.opts, hints: c.hints, solve: c.solve, ud: s };
+  }
+  return null;
 }
 
 /** 📊 막대그래프 — 지금까지 낚은 마리(세 종 · 20마리까지 · 눈금 한 칸 1마리, 10마리 넘으면 2마리) · 가장 많이 낚은 물고기 또는 두 종의 차 */
@@ -324,34 +345,42 @@ export function makeFishQ(kind, pool, seed) {
  * 낚시터에 낼 문제 하나 (순수) — 꼴을 씨앗으로 섞어 처음 만들어지는 것 · 서로 다른 물고기 두 종 아래면 null
  * → { fm: true, kind, lv, label, facts, text, tip, chart, choices: [{ text, ok, hint }], solve } (choices는 낚시터 카드 꼴 — 틀린 보기마다 그 실수의 힌트)
  * v378: 그 단계(lv)의 꼴부터 → 못 만들면 한 단계씩 아래 → 그래도 없으면 위 단계(물고기 두 종뿐이면 비교·막대그래프를 못 만들어 길이 차·합으로 — 수학 차례가 비지 않게) · lv = 실제 낸 꼴의 단계
- * @param {Object} raw 프로필 fishing · @param {number} seed · @param {string} [avoid] 바로 앞 꼴(되도록 다른 꼴부터) · @param {number} [lv] 1~3
+ * v392: ud = { stage 📐 다지기 단계(0이면 끝남), ask 지금 내도 되나(하루 몫) } — 내도 되고 바로 앞이 📐이 아니면 다지기 문제(lv 1 · ud 단계 — 🐋 단계 칸에 안 셈) · 다지는 동안 옛 📐 꼴은 맨 뒤로
+ * @param {Object} raw 프로필 fishing · @param {number} seed · @param {string} [avoid] 바로 앞 꼴(되도록 다른 꼴부터) · @param {number} [lv] 1~3 · @param {{stage:number, ask:boolean}} [ud]
  */
-export function fishMathQ(raw, seed, avoid = '', lv = 1) {
+export function fishMathQ(raw, seed, avoid = '', lv = 1, ud = null) {
   const pool = poolOf(raw);
   if (pool.length < 2) return null;
   const r = makeRng(seed);
   const order = shuffle(r, [...FM_KIND_LIST]);
+  const stage = ud && [1, 2, 3].includes(ud.stage) ? ud.stage : 0;
+  const card = (kind, l, q) => ({
+    fm: true,
+    kind,
+    lv: l,
+    label: FM_LABEL,
+    facts: q.facts,
+    text: q.text,
+    tip: q.tip || '',
+    chart: q.chart || null,
+    choices: q.opts.map((o) => ({ text: o.t, ok: !!o.ok, hint: o.ok ? '' : (q.hints && q.hints[o.trap]) || '', ...(o.trap ? { trap: o.trap } : {}) })),
+    solve: q.solve,
+    ...(q.ud ? { ud: q.ud } : {}),
+  });
+  if (stage && ud.ask && avoid !== 'unit') {
+    const q = makeDrill(r, pool, stage);
+    if (q) return card('unit', 1, q);
+  }
   const want = [1, 2, 3].includes(lv) ? lv : 1;
   const steps = [want, ...[3, 2, 1].filter((l) => l < want), ...[1, 2, 3].filter((l) => l > want)];
   const kinds = steps.flatMap((l) => {
     const g = order.filter((k) => FM_LEVEL[k] === l);
     return [...g.filter((k) => k !== avoid), ...g.filter((k) => k === avoid)];
   });
+  if (stage) kinds.push(...kinds.splice(kinds.indexOf('unit'), 1)); // 옛 📐은 맨 뒤 — 다른 꼴을 하나도 못 만드는 도감에서만 (Codex 195차 #5)
   for (const kind of kinds) {
     const q = makeFishQ(kind, pool, Math.floor(r() * 2147483646) + 1);
-    if (!q) continue;
-    return {
-      fm: true,
-      kind,
-      lv: FM_LEVEL[kind],
-      label: FM_LABEL,
-      facts: q.facts,
-      text: q.text,
-      tip: q.tip || '',
-      chart: q.chart || null,
-      choices: q.opts.map((o) => ({ text: o.t, ok: !!o.ok, hint: o.ok ? '' : (q.hints && q.hints[o.trap]) || '' })),
-      solve: q.solve,
-    };
+    if (q) return card(kind, FM_LEVEL[kind], q);
   }
   return null;
 }

@@ -343,7 +343,7 @@ test('🔌 잇기 — 1단계 풀이 한 줄·문제 글(qk) · 물고기 번호
   const v = src('js/fishview.js');
   assert.match(v, /h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\]\), \{ fish: ui\.castN, stage \}\)/);
   assert.match(v, /ui\.castN \+= 1;[^\n]*\n\s*const before = openSpots\(ui\.okToday\);\n\s*const ok = await ask\('cast'\);/, '던질 때마다 새 물고기 번호 — 던지기 문제보다 먼저');
-  assert.match(v, /const badge = q\.redo \? redoBadge\(q\.redo\.step\) : lvBadge\(stage, ui\.fish\);/, '다음 날 몫은 「지난번」 (Codex 190차)');
+  assert.match(v, /const badge = q\.redo \? redoBadge\(q\.redo\.step\) : q\.ud \? '' : lvBadge\(stage, ui\.fish\);/, '다음 날 몫은 「지난번」 (Codex 190차)');
   assert.match(v, /lvb\.classList\.toggle\('is-redo', !!q\.redo\);/);
   assert.match(v, /if \(ok && q\.redo\) toast\(REDO_OK, \d+\);/);
   assert.match(v, /const up = stepUpLine\(h\.stepUp\);[\s\S]{0,200}else if \(up\) \{\n\s*const me = ui;\n\s*toast\(up, \d+\);\n\s*setTimeout\(\(\) => \{ if \(ui === me && ui\.st === 'ready' && !ui\.dexOpen && !ui\.shopOpen && !ui\.sail && ui\.place === place\) enter\(\); \}, \d+\);\n\s*\} else enter\(\);/);

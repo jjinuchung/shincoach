@@ -5,6 +5,8 @@
 //    (소수×자연수·소수÷자연수는 5학년 — 「3마리면 몇 kg?」은 내지 않는다)
 //  · 보기는 넷(크기 비교는 포켓몬 셋) — 틀린 보기마다 그 실수(trap)가 있고, 고르면 그 실수에 맞춘 힌트(hints[trap]) · 두 번 틀리면 풀이(solve)
 //  · 기술 위력·종족값은 쓰지 않는다(게임마다 숫자가 달라 사실이 흔들린다)
+// v392 (📐 다지기 기본안 「추천대로」): 단위 바꾸기 단계 — 1 자연수(2 m) · 2 소수 부분(0.7 m) · 3 지금 꼴(1.7 m) · 다지는 동안 판마다 📐 한 문제(makeBoard o.unit) ·
+//   단계 장부는 mathprog(unitOf·unitStep) · 🎣 물고기 수학도 같은 몸통(unitCore)을 쓴다 · 다지기가 끝나면(o.unit 없음) 옛 판 그대로
 import { rng as makeRng, shuffle, pick } from './mathgen.js';
 import { GEAR, POTION, GREATBALL, ULTRABALL, CALL_PAL } from './items.js';
 
@@ -245,55 +247,112 @@ function makeAdd(r, pool) {
   return null;
 }
 
-/** 📐 단위 바꾸기 — 키 m → cm (1 m 이상 · 소수 첫째 자리가 있게) · 몸무게 kg → g (1 kg 이상 100 kg 아래 · 소수 첫째 자리가 있게) */
-function makeUnit(r, pool, prefer) {
-  const cm = r() < 0.5;
-  const fit = cm ? (x) => x.h >= 10 && x.h <= HIGH && x.h % 10 : (x) => x.w >= 10 && x.w < HEAVY && x.w % 10;
-  const ok = pool.filter(fit);
-  const a = prefer && fit(prefer) && r() < 0.5 ? prefer : pick(r, ok);
-  if (!a) return null;
-  if (cm) {
-    const v = a.h * 10; // cm
-    const opts = optsOf(r, `${v} cm`, [
-      { t: `${v / 10} cm`, trap: 'small' },
-      { t: `${Math.floor(a.h / 10) * 100 + (a.h % 10)} cm`, trap: 'mix' },
-      { t: `${v * 10} cm`, trap: 'big' },
+/** 📐 글에 쓰는 말 — 키 m → cm · 몸무게 kg → g (두 단위의 받침이 같아 조사도 같다) */
+const UW = {
+  h: { ko: '키', a: 'm', b: 'cm', k: 100, un: '는', wa: '와', ga: '가', be: '예요', me: '면', less: '짧아요', much: '클까요' },
+  w: { ko: '몸무게', a: 'kg', b: 'g', k: 1000, un: '은', wa: '과', ga: '이', be: '이에요', me: '이면', less: '가벼워요', much: '무거울까요' },
+};
+/** 단계마다 고를 수 있는 포켓몬 — 1 자연수(2 m·2 kg부터 — 1 m는 💡를 옮겨 적는 문제가 된다) · 2 소수 첫째 자리가 2 이상(0.1 m도 같은 까닭 · 1 m·1 kg 아래도) · 3 1 m·1 kg 이상이고 소수 첫째 자리가 있게 */
+const UNIT_FIT = {
+  1: { h: (x) => x.h >= 20 && x.h <= HIGH && x.h % 10 === 0, w: (x) => x.w >= 20 && x.w < HEAVY && x.w % 10 === 0 },
+  2: { h: (x) => x.h <= HIGH && x.h % 10 >= 2, w: (x) => x.w < HEAVY && x.w % 10 >= 2 },
+  3: { h: (x) => x.h >= 10 && x.h <= HIGH && x.h % 10 !== 0, w: (x) => x.w >= 10 && x.w < HEAVY && x.w % 10 !== 0 },
+};
+
+/**
+ * 📐 단계 문제 몸통 (순수 · 🐾·🎣가 함께 쓴다) → { ask, tip, opts, hints, solve } | null
+ * 1·2단계 힌트는 답을 말하지 않는다 · 답이 10배 큰 보기는 크기 감각으로(「1700 cm면 17 m예요」 — 곱하는 크기를 틀리는 실수)
+ * @param {Function} r 난수 · @param {number} t 십분의 일 정수 · @param {'h'|'w'} p 키·몸무게 · @param {string} ko 이름 · @param {1|2|3} s 단계
+ */
+export function unitCore(r, t, p, ko, s) {
+  const u = UW[p];
+  const x = tenth(t);
+  const whole = Math.floor(t / 10);
+  const rest = t % 10;
+  const v = (t * u.k) / 10;
+  const tenthOf = u.k / 10;
+  const tooBig = (n) => `🤔 ${n} ${u.b}${u.me} ${n / u.k} ${u.a}${u.be}. ${iga(ko)} 그렇게 ${u.much}?`;
+  if (s === 1) {
+    const opts = optsOf(r, `${v} ${u.b}`, [
+      { t: `${v / 10} ${u.b}`, trap: 'small' },
+      { t: `${whole} ${u.b}`, trap: 'same' },
+      { t: `${v * 10} ${u.b}`, trap: 'big' },
     ]);
     if (!opts) return null;
-    const rest = a.h % 10;
     return {
-      kind: 'unit', mons: [{ id: a.id, ko: a.ko, tag: tag(a, 'h') }],
-      text: `${a.ko}의 키 ${tenth(a.h)} m는 몇 cm일까요?`,
-      tip: '💡 1 m = 100 cm', // 물음 밑에 처음부터 (쉬운 판 — Codex 168차)
+      ask: `${x} ${u.a}${u.un} 몇 ${u.b}일까요?`,
+      tip: `💡 1 ${u.a} = ${u.k} ${u.b}`,
       opts,
       hints: {
-        small: '🤔 1 m는 100 cm예요 — 1 m가 넘으니 100 cm보다 커요.',
-        mix: `🤔 0.${rest} m는 ${rest} cm가 아니라 ${rest * 10} cm예요 (0.1 m = 10 cm).`,
-        big: '🤔 1 m = 100 cm예요 — 1000을 곱하지 않아요.',
+        small: `🤔 1 ${u.a}${u.ga} ${u.k} ${u.b}${u.be} — ${u.k} ${u.b}${u.ga} ${whole}개면 몇 ${u.b}일까요?`,
+        same: `🤔 ${x} ${u.a}${u.wa} ${x} ${u.b}${u.un} 달라요 — 1 ${u.a}${u.ga} ${u.k} ${u.b}${u.be}.`,
+        big: tooBig(v * 10),
       },
-      solve: `${tenth(a.h)} m = ${Math.floor(a.h / 10)} m ${rest * 10} cm = ${v} cm`,
+      solve: `${x} ${u.a} = ${u.k} ${u.b} × ${whole} = ${v} ${u.b}`,
     };
   }
-  const v = a.w * 100; // g
-  const opts = optsOf(r, `${v} g`, [
-    { t: `${v / 10} g`, trap: 'small' },
-    { t: `${Math.floor(a.w / 10) * 1000 + (a.w % 10)} g`, trap: 'mix' },
-    { t: `${v * 10} g`, trap: 'big' },
+  if (s === 2) {
+    const part = tenth(rest);
+    const pv = rest * tenthOf;
+    const opts = optsOf(r, `${pv} ${u.b}`, [
+      { t: `${rest} ${u.b}`, trap: 'mix' },
+      { t: `${pv * 10} ${u.b}`, trap: 'big' },
+      { t: `${pv / 10} ${u.b}`, trap: 'small' }, // cm는 위 보기와 같아 빠지고 아래가 들어온다
+      { t: `${part} ${u.b}`, trap: 'same' },
+    ]);
+    if (!opts) return null;
+    const per = `🤔 0.1 ${u.a}${u.ga} ${tenthOf} ${u.b}${u.be} — ${part} ${u.a}${u.un} 0.1 ${u.a}${u.ga} ${rest}개예요.`;
+    return {
+      ask: `${whole ? `${x} ${u.a}${u.un} ${whole} ${u.a}${u.wa} ${part} ${u.a}${u.be}. ` : ''}${part} ${u.a}${u.un} 몇 ${u.b}일까요?`,
+      tip: `💡 1 ${u.a} = ${u.k} ${u.b} · 0.1 ${u.a} = ${tenthOf} ${u.b}`,
+      opts,
+      hints: {
+        mix: per,
+        small: per,
+        same: `🤔 ${part} ${u.a}${u.wa} ${part} ${u.b}${u.un} 달라요 — 0.1 ${u.a}${u.ga} ${tenthOf} ${u.b}${u.be}.`,
+        big: `🤔 ${pv * 10} ${u.b}${u.me} ${rest} ${u.a}${u.be}. ${part} ${u.a}${u.un} 1 ${u.a}보다 ${u.less}.`,
+      },
+      solve: `${part} ${u.a} = ${tenthOf} ${u.b} × ${rest} = ${pv} ${u.b}`,
+    };
+  }
+  const opts = optsOf(r, `${v} ${u.b}`, [
+    { t: `${v / 10} ${u.b}`, trap: 'small' },
+    { t: `${whole * u.k + rest} ${u.b}`, trap: 'mix' },
+    { t: `${v * 10} ${u.b}`, trap: 'big' },
   ]);
   if (!opts) return null;
-  const rest = a.w % 10;
   return {
-    kind: 'unit', mons: [{ id: a.id, ko: a.ko, tag: tag(a, 'w') }],
-    text: `${a.ko}의 몸무게 ${tenth(a.w)} kg은 몇 g일까요?`,
-    tip: '💡 1 kg = 1000 g · 0.1 kg = 100 g', // 소수 kg → g는 교과서마다 직접 배운다는 보장이 없어 처음부터 (Codex 168차)
+    ask: `${x} ${u.a}${u.un} 몇 ${u.b}일까요?`,
+    // 물음 밑에 처음부터 (쉬운 판 — Codex 168차) · 소수 kg → g는 교과서마다 직접 배운다는 보장이 없어 0.1 kg까지 (Codex 168차)
+    tip: p === 'h' ? '💡 1 m = 100 cm' : '💡 1 kg = 1000 g · 0.1 kg = 100 g',
     opts,
     hints: {
-      small: '🤔 1 kg은 1000 g이에요 — 0을 하나 더 붙여 볼까요?',
-      mix: `🤔 0.${rest} kg은 ${rest} g이 아니라 ${rest * 100} g이에요 (0.1 kg = 100 g).`,
-      big: '🤔 1 kg = 1000 g이에요 — 0의 개수를 다시 세어 봐요.',
+      small: p === 'h' ? '🤔 1 m는 100 cm예요 — 1 m가 넘으니 100 cm보다 커요.' : '🤔 1 kg은 1000 g이에요 — 0을 하나 더 붙여 볼까요?',
+      mix: `🤔 0.${rest} ${u.a}${u.un} ${rest} ${u.b}${u.ga} 아니라 ${rest * tenthOf} ${u.b}${u.be} (0.1 ${u.a} = ${tenthOf} ${u.b}).`,
+      big: tooBig(v * 10),
     },
-    solve: `${tenth(a.w)} kg = ${Math.floor(a.w / 10)} kg ${rest * 100} g = ${v} g`,
+    solve: `${x} ${u.a} = ${whole} ${u.a} ${rest * tenthOf} ${u.b} = ${v} ${u.b}`,
   };
+}
+
+/** 📐 단위 바꾸기 — 키 m → cm · 몸무게 kg → g · lv 다지기 단계(없으면 3단계 꼴 · lv 표시 없음) · 다질 때 그 단계를 못 만들면 다른 쪽 단위 → 다음 단계 */
+function makeUnit(r, pool, prefer, lv = 0) {
+  const first = r() < 0.5 ? 'h' : 'w';
+  for (let s = UNIT_FIT[lv] ? lv : 3; s <= 3; s++) {
+    for (const p of UNIT_FIT[lv] ? [first, first === 'h' ? 'w' : 'h'] : [first]) { // 옛 판은 옛 그대로 — 한쪽 단위만
+      const fit = UNIT_FIT[s][p];
+      const a = prefer && fit(prefer) && r() < 0.5 ? prefer : pick(r, pool.filter(fit));
+      const c = a ? unitCore(r, a[p], p, a.ko, s) : null;
+      if (!c) continue;
+      return {
+        kind: 'unit', mons: [{ id: a.id, ko: a.ko, tag: tag(a, p) }],
+        text: `${a.ko}의 ${UW[p].ko} ${c.ask}`,
+        tip: c.tip, opts: c.opts, hints: c.hints, solve: c.solve,
+        ...(UNIT_FIT[lv] ? { lv: s } : {}), // 실제로 낸 단계
+      };
+    }
+  }
+  return null;
 }
 
 /** 🔢 큰 수 읽기 — 몸무게를 g으로 (10 kg 이상 → 1만 g 이상) */
@@ -461,7 +520,7 @@ const MAKERS = {
   cmp: (r, pool) => makeCmp(r, pool),
   sub: (r, pool) => makeSub(r, pool),
   add: (r, pool) => makeAdd(r, pool),
-  unit: (r, pool, o) => makeUnit(r, pool, o.prefer),
+  unit: (r, pool, o) => makeUnit(r, pool, o.prefer, o.unit),
   big: (r, pool, o) => makeBig(r, pool, o.prefer),
   mul: (r, pool, o) => makeMul(r, pool, o.prefer, o.items),
   div: (r, pool, o) => makeDiv(r, pool, o.prefer, o.items),
@@ -469,24 +528,29 @@ const MAKERS = {
 };
 
 /** 문제 하나 (시험·화면) — 꼴 하나로 · 못 만들면 null */
-export function makePokeQ(kind, pool, seed, { items = POKE_GOODS, evo = {}, partner = 0 } = {}) {
+export function makePokeQ(kind, pool, seed, { items = POKE_GOODS, evo = {}, partner = 0, unit = 0 } = {}) {
   const f = MAKERS[kind];
   if (!f || !Array.isArray(pool) || !pool.length) return null;
   const r = makeRng(seed);
   const prefer = pool.find((x) => x.id === Number(partner)) || null;
-  const q = f(r, pool, { items, evo, prefer });
+  const q = f(r, pool, { items, evo, prefer, unit });
   return q ? { ...q, seed } : null;
 }
 
 /**
  * 한 판 (순수) — 꼴을 섞어 POKE_N 문제 · 꼴은 겹치지 않게(못 만드는 꼴은 건너뜀) · 셋이 안 되면 [] (단추를 안 띄운다)
  * @param {Array} pool poolOf 결과 · @param {number} seed
- * @param {{items?:Array, evo?:Object, partner?:number}} o items 가게 물건 { ko, emoji, price } · evo 진화표 · partner 파트너 id(한 마리 문제에 먼저)
+ * @param {{items?:Array, evo?:Object, partner?:number, unit?:number}} o items 가게 물건 { ko, emoji, price } · evo 진화표 · partner 파트너 id(한 마리 문제에 먼저) · unit 📐 다지기 단계(v392 — 있으면 판마다 📐 한 문제)
  */
 export function makeBoard(pool, seed, o = {}) {
   const r = makeRng(seed);
   const out = [];
-  for (const kind of shuffle(r, [...POKE_KIND_LIST])) {
+  const kinds = shuffle(r, [...POKE_KIND_LIST]);
+  if (UNIT_FIT[o.unit]) { // 앞 다섯 자리 가운데 아무 곳 — 판 안 자리는 그때그때
+    kinds.splice(kinds.indexOf('unit'), 1);
+    kinds.splice(Math.floor(r() * POKE_N), 0, 'unit');
+  }
+  for (const kind of kinds) {
     if (out.length >= POKE_N) break;
     const q = makePokeQ(kind, pool, Math.floor(r() * 2147483646) + 1, o);
     if (q) out.push(q);

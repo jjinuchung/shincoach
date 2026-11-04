@@ -731,10 +731,11 @@ function ask(stage, head = '') {
   const card = q$('.lk-card');
   q$('.lk-stage').textContent = head || STAGE[stage] || '';
   const lvb = q$('.lk-lvb');
-  const badge = q.redo ? redoBadge(q.redo.step) : lvBadge(stage, ui.fish); // 🔁 다시 풀기면 물고기 표시 대신 (v387 · 다음 날 몫은 「지난번」 — Codex 190차)
+  // 🔁 다시 풀기면 물고기 표시 대신 (v387 · 다음 날 몫은 「지난번」 — Codex 190차) · 📐 다지기 문제(q.ud)는 큰 물고기 문제가 아니라 안 띄운다 (v392)
+  const badge = q.redo ? redoBadge(q.redo.step) : q.ud ? '' : lvBadge(stage, ui.fish);
   lvb.textContent = badge;
   lvb.hidden = !badge;
-  lvb.classList.toggle('is-big', !q.redo && lv >= 3);
+  lvb.classList.toggle('is-big', !q.redo && !q.ud && lv >= 3);
   lvb.classList.toggle('is-redo', !!q.redo);
   q$('.lk-subj').textContent = q.label || '';
   const qBox = q$('.lk-q');
@@ -770,6 +771,7 @@ function ask(stage, head = '') {
   box.innerHTML = '';
   card.hidden = false;
   root.classList.add('is-q');
+  const askedAt = Date.now(); // 답까지 걸린 초 (v392 — 📐 다지기)
   return new Promise((resolve) => {
     let picked = false;
     const done = (ok) => {
@@ -799,7 +801,7 @@ function ask(stage, head = '') {
         if (q.reveal) qBox.appendChild(el('div', 'lk-reveal', q.reveal));
         if (q.sayAfter && typeof h.say === 'function') { try { h.say(q.sayAfter); } catch { /* 무시 */ } }
         if (ok) { ui.okToday += 1; ui.streak += 1; ui.palJump = performance.now(); } else ui.streak = 0;
-        try { h.onAnswer && h.onAnswer(subj, ok, stage, q); } catch { /* 무시 */ }
+        try { h.onAnswer && h.onAnswer(subj, ok, stage, q, { trap: c.trap, at: askedAt }); } catch { /* 무시 */ }
         // 틀린 보기에 그 실수의 힌트가 있으면 — 읽을 때까지 기다린다(「알겠어요」) · 없으면 잠깐 정답을 보여 주고 닫음
         if (!ok && c.hint) {
           hint.textContent = c.hint;

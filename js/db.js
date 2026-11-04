@@ -1178,6 +1178,7 @@ export function cloneMath(m) {
   if (m.puzzle) out.puzzle = puzzleOf(m.puzzle); // 🧩 수학 퍼즐(v296) — 안쪽 맵까지 새 객체로
   if (m.detect) out.detect = detectOf(m.detect); // 🕵️ 나옹의 숙제(v299) — 안쪽 맵까지 새 객체로
   if (m.rest && typeof m.rest === 'object') out.rest = { ...m.rest }; // 🌱 학교 진도 먼저(v301) — 새 객체로
+  if (m.unit && typeof m.unit === 'object') out.unit = { ...m.unit }; // 📐 단위 바꾸기 다지기(v392) — 새 객체로
   for (const [k, v] of Object.entries(m.concepts || {})) out.concepts[k] = cloneConcept(v);
   if (Array.isArray(m.asks)) out.asks = m.asks.map(cloneAsk); // ❓ 질문은 안쪽에 답장 배열이 있어 따로 복사
   return out;
@@ -1358,6 +1359,12 @@ export function mergeMath(cur, rec) {
   const po = out.poke && typeof out.poke === 'object' && typeof out.poke.d === 'string' ? out.poke : null;
   if (pk && (!po || pk.d > po.d)) out.poke = { d: pk.d, n: qn(pk.n) };
   else if (pk && po && pk.d === po.d) out.poke = { d: po.d, n: Math.max(qn(po.n), qn(pk.n)) };
+  // 📐 단위 바꾸기 다지기 장부 (v392) — 단계는 오르내리는 상태라 칸마다 큰 값으로 못 합친다: 바꾼 시각이 늦은 쪽 한 벌 · 새 객체로 ·
+  // 시각이 같으면 더 나아간 쪽(끝냄 → 단계 → 연속) — 합치는 차례가 바뀌어도 같게 (Codex 195차 #6)
+  const un = rec && rec.unit && typeof rec.unit === 'object' ? rec.unit : null;
+  const unitAt = (u) => Number(u && u.at) || 0;
+  const unitGone = (u) => (u && u.done ? 1000 : 0) + (Number(u && u.v) || 0) * 100 + (Number(u && u.up) || 0);
+  if (un && (unitAt(un) > unitAt(out.unit) || (unitAt(un) === unitAt(out.unit) && unitGone(un) > unitGone(out.unit)))) out.unit = { ...un };
   // ⏰ 오래 밀린 복습 보너스의 하루 횟수 (v257) — 🍀와 같은 꼴: 늦은 날짜 쪽, 같은 날이면 큰 횟수
   const lt = rec && rec.late && rec.late.d ? rec.late : null;
   if (lt && (!out.late || !out.late.d || lt.d > out.late.d || (lt.d === out.late.d && (Number(lt.n) || 0) > (Number(out.late.n) || 0)))) out.late = { d: lt.d, n: Number(lt.n) || 0 };

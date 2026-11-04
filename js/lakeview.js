@@ -20,15 +20,17 @@
 //   홈 띠 「○○에 가 볼까요?」는 마지막 물가가 배여도 🌬️ 바람 부는 날이면 바다
 // v387 (낚시터 문제 손보기 기본안 「추천대로」): 🔁 다시 풀기 — redoPlan(지난 낚시 날·오늘 기록) → redoQueue → redoAsker가 물고기마다 첫 수학 차례에 같은 칸 문제 ·
 //   답은 fishRedoKeys·fishRedoQ/Ok에 · 🎚️ 과목 단계 — subjectSteps로 그날 처음 열 때 정해 fishSteps에 적고 창에 steps·stepUp(오른 과목)을 넘긴다
+// v392 (📐 다지기 기본안 「추천대로」): 🐟 물고기 수학 차례에 📐 다지기 문제 하루 세 번까지 — 연 때 수학 장부로 unitTurn · 답하면 mathprog.unitFishCommit(일지 한 줄 + 단계)
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
 import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_REDO_Q, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, redoKey, redoPlan, redoQueue, qFingerprint, waitKey, subjectSteps, stepLines, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
+import { UNIT_DRILL, unitStage, unitFishToday, unitFishCommit, answerSecOf } from './mathprog.js';
 import { lvFor } from './lakelevel.js';
 import { orderOf } from './journey.js';
 import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload, zygMap, zygFind } from './xp.js';
 import { zygCanFish, FISH_SRC } from './zygarde.js';
 import { revealNote } from './zygview.js';
-import { listDaily, getDaily, applyDailyDelta } from './db.js';
+import { listDaily, getDaily, applyDailyDelta, getMath, updateMath } from './db.js';
 import { avatarOf } from './avatar.js';
 import { loadCharacters, characterUrl, artUrl, ensureArt } from './pokemon.js';
 import { clockDay, limitConf } from './timelimit.js';
@@ -203,6 +205,19 @@ export function mathMix(base, fm) {
     return turn++ % 2 === 1 ? fish() || base(subj, seed, lv) : base(subj, seed, lv) || fish();
   };
 }
+/**
+ * 📐 다지기 차례 (v392) — 창을 연 때의 수학 장부 m으로 (못 읽었으면 다지기 없이) · now() = fishMathQ의 ud · answered() 답 하나 · kept(m) 저장된 새 장부 ·
+ * alive()가 거짓이면(자정을 넘김) 그날 몫을 모르니 내지 않는다
+ */
+export function unitTurn(m, today, alive = () => true) {
+  let stage = m ? unitStage(m) : 0;
+  let left = Math.max(0, UNIT_DRILL.fishDay - unitFishToday(m, today));
+  return {
+    now: () => ({ stage, ask: left > 0 && alive() }),
+    answered: () => { left = Math.max(0, left - 1); },
+    kept: (next) => { stage = unitStage(next); },
+  };
+}
 /** 🔊 영어 목소리가 있는 기기인가 (v378 영어 3단계 — 소리만 듣는 문제) · 목소리 목록이 아직 안 왔거나 못 읽으면 false(2단계로) */
 export function canListen() {
   try {
@@ -372,6 +387,7 @@ export async function openLakeNow() {
     const stp = subjectSteps(days, today); // 🎚️ 오늘 과목 단계 — 처음 연 때만 적는다 (v387)
     if (stp.write.length) applyDailyDelta(today, { fishSteps: stp.write }).catch(() => {});
     let stepDay = today; // 자정을 넘겨 답하면 새 날에도 지금 단계를 한 번 적는다 (#5)
+    const ut = unitTurn(await getMath().catch(() => null), today, alive); // 📐 다지기 (v392)
     const pk = pickOf(getProfileSnapshot());
     openLake({
       look: avatarOf(getProfileSnapshot()).look,
@@ -390,7 +406,7 @@ export async function openLakeNow() {
       stepUp: stp.up, // 오늘 오른 과목 — 열 때 한 줄
       ask: (() => {
         const inner = mathMix(asker(ui.src, day, start), (seed, avoid, lv) => {
-          const q = fishMathQ(lakeRaw(), seed, avoid, lv);
+          const q = fishMathQ(lakeRaw(), seed, avoid, lv, ut.now());
           return q ? { ...q, qNode: () => fmNode(q) } : null;
         });
         // 🔶 소리만 문제는 영어 목소리가 있을 때만 (v378) · 🔁 물고기마다 첫 수학 차례에 다시 풀기 (v387)
@@ -405,9 +421,13 @@ export async function openLakeNow() {
       bonusMin: nz(d && d.fishBonus),
       okToday: okOfDay(d),
       firstToday,
-      onAnswer: (subj, ok, stage, q) => {
+      onAnswer: (subj, ok, stage, q, a) => {
         const now = clockDay();
         if (now !== stepDay) { stepDay = now; applyDailyDelta(now, { fishSteps: stepLines(stp.steps) }).catch(() => {}); } // 🎚️ 자정 뒤 새 날에도 (#5)
+        if (q && q.ud) { // 📐 다지기 (v392)
+          ut.answered();
+          updateMath((m) => { unitFishCommit(m, { ok, lv: q.ud, tag: a && a.trap, s: a ? answerSecOf(a.at, Date.now()) : null }, now); }).then(ut.kept).catch(() => {});
+        }
         const redo = q && q.redo && alive() ? q.redo : null; // 자정 뒤에 답한 다시 풀기는 보통 답으로 — 새 날 차례를 꼬지 않게 (#5)
         const f = FISH_DAY_Q[subj];
         const rd = redo ? { [FISH_REDO_Q[0]]: 1, [FISH_REDO_Q[1]]: ok ? 1 : 0 } : {}; // 🔁 (v387 — 수학 칸 안의 몫)
