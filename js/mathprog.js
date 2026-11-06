@@ -335,6 +335,9 @@ export function rungSub(r) {
   return r.state === 'now' ? '지금 배울 차례' : '배울 수 있어요';
 }
 
+/** 장부 날짜가 오늘보다 뒤인가(태블릿 시계가 뒤로 갔다) — 깨진 날짜는 아니다: 다음 완주가 바로잡게 (v396 · Codex 199차) */
+const isAhead = (d, today) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) && d > today;
+
 /**
  * 연습 편 첫 화면 한 줄 — 확인 차례가 아닌 아는 칸을 다시 풀 때만(applyRound가 practice로 판정하는 것과 같은 조건). 막지 않고 알리기만.
  * 🍀는 오늘 LUCKY.max번을 다 받았으면 말하지 않는다.
@@ -342,7 +345,7 @@ export function rungSub(r) {
  */
 export function practiceNote(rec, today, luck, pay = 1, rest = false) {
   if (!rec || !rec.done || (isDue(rec, today) && !rest)) return null;
-  const clover = luck && luck.d === today && (Number(luck.n) || 0) >= LUCKY.max ? '' : ' (🍀 가끔 몬스터볼)';
+  const clover = luck && (isAhead(luck.d, today) || (luck.d === today && (Number(luck.n) || 0) >= LUCKY.max)) ? '' : ' (🍀 가끔 몬스터볼)';
   // 🔁 같은 날 둘째 편부터는 문항 ⚡💰가 줄어든다(repeatPay, v250) — "⚡💰만"이라 해 놓고 안 주지 않게
   const get = pay >= 1 ? '⚡💰만' : pay > 0 ? '⚡💰 반만' : '⚡💰 없이';
   if ((rec.box || 0) >= GRADUATED) return `👑 이해 완료한 칸이라 연습이에요 — ${get}${clover}`;
@@ -1305,6 +1308,7 @@ export function luckyCatch(m, { mode, result, inDaily, roll, today }) {
   if (mode !== 'learn' && mode !== 'review' && mode !== 'practice') return 0;
   if (!result || !result.passed) return 0;
   if (roundCatches({ mode, result, inDaily }) > 0) return 0; // 처음 통과·☀️ 안 통과는 이미 1개
+  if (m.luck && isAhead(m.luck.d, today)) return 0; // 시계가 뒤로 — 장부를 되돌리면 날짜가 돌아왔을 때 그날 몫을 또 받는다 (⏰ lateLeft와 같은 꼴 · v396)
   const used = m.luck && m.luck.d === today ? Number(m.luck.n) || 0 : 0;
   if (used >= LUCKY.max) return 0;
   m.luck = { d: today, n: used + 1 }; // 새 객체로 — cloneMath가 얕게 복사하므로 입력을 건드리지 않게
@@ -1586,6 +1590,8 @@ export function pendingThrows(m) {
  * @returns {{first:boolean, n:number, gold?:boolean}} gold는 perfect를 물었을 때만 — 이번에 새로 받는지
  */
 export function markDaily(m, today, opts) {
+  // 장부 날짜가 오늘보다 뒤(태블릿 시계가 뒤로 갔다) — 장부를 되돌리지 않는다: 날짜가 돌아오면 그날 받은 첫 완주·🌟를 또 받았다 (⚡ quickToday와 같은 꼴 · v396)
+  if (m.daily && isAhead(m.daily.d, today)) return { first: false, n: Math.max(1, Number(m.daily.n) || 0), ...(opts && opts.perfect !== undefined ? { gold: false } : {}) };
   const same = !!(m.daily && m.daily.d === today);
   const n = same ? (Number(m.daily.n) || 0) + 1 : 1;
   const hadGold = same && !!m.daily.gold;
@@ -1601,6 +1607,7 @@ export function markDaily(m, today, opts) {
 
 /** 오늘 ☀️를 몇 번 완주했나 (0이면 아직) */
 export function dailyDone(m, today) {
+  if (m && m.daily && isAhead(m.daily.d, today)) return Math.max(1, Number(m.daily.n) || 0); // 시계가 뒤로 — 그날은 끝낸 것으로 (markDaily와 같게 · v396)
   return (m && m.daily && m.daily.d === today) ? (Number(m.daily.n) || 0) : 0;
 }
 

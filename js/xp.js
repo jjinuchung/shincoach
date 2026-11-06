@@ -183,7 +183,7 @@ export const RARITY_IDS = {
       144, 145, 146, 251, 483, 484, 487, 643, 644, 716,
       132, 359, // 2026-09-20 추가분 중 포획률 45 미만 — 메타몽(35)·앱솔(30)
       // 🔢 수학 전용 (2026-09-22) 포획률 <45 또는 3단계 최종형(스타터·600족) 30
-      34, 36, 76, 157, 160, 181, 208, 254, 330, 306, 375, 392, 395, 405, 468, 500, 503, 635, 612, 655, 681, 706, 727, 730, 815, 818, 823, 908, 914, 998,,
+      34, 36, 76, 157, 160, 181, 208, 254, 330, 306, 375, 392, 395, 405, 468, 500, 503, 635, 612, 655, 681, 706, 727, 730, 815, 818, 823, 908, 914, 998,
       // 📚 국어 전용 (2026-10-11) 희귀 30
       497, 652, 812, 272, 275, 365, 477, 534, 537, 542, 545, 579, 576, 584, 601, 604, 526, 666, 671, 784, 826, 839, 861, 1019, 930, 934, 936, 937, 15, 31,
       // 🖊️ 논술 전용 (2026-10-20) 희귀 20
@@ -405,6 +405,12 @@ function fromStored(p) {
   return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.homeGuest ? { homeGuest: copyGuest(p.homeGuest) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
 }
 
+/** 저장소가 준 프로필을 메모리로 — 아직 못 쓴 몫은 얹어 둔다: 쓴 물건이 되살아나거나 번 코인이 사라져 보이지 않게 (v396 · Codex 199차) */
+function adoptProfile(p) {
+  profile = fromStored(p);
+  if (!isEmptyDelta(pending)) mergeProfileDelta(profile, pending);
+}
+
 /** 모아둔 증분을 저장소에 더해 쓰고, 메모리 프로필을 저장소의 최신값으로 맞춤. 실패하면 증분을 되돌려 다음에 재시도 */
 export function flushProfile() {
   flushChain = flushChain.then(async () => {
@@ -413,7 +419,7 @@ export function flushProfile() {
     pending = emptyDelta();
     try {
       const next = await applyProfileDelta(d);
-      profile = fromStored(next);
+      adoptProfile(next);
     } catch (e) {
       console.warn('프로필 저장 실패 (다음에 재시도):', e);
       const p = pending; pending = d; mergeDelta(pending, p);
@@ -436,7 +442,7 @@ function runProfileOp(op, fallback) {
   const p = flushProfile().then(async () => {
     try {
       const r = await op();
-      if (r && r.profile) profile = fromStored(r.profile);
+      if (r && r.profile) adoptProfile(r.profile);
       return r;
     } catch (e) {
       console.warn('프로필 저장 실패 (메모리로만 이어감):', e);
@@ -469,11 +475,11 @@ export function profileLoading() {
   return !loaded;
 }
 
-export async function initProfile() {
+export async function initProfile(kept = null) {
   try {
     const p = await getProfile();
-    if (p) profile = fromStored(p);
-  } catch { /* 저장소 문제면 메모리로만 */ }
+    if (p || kept) adoptProfile(p || EMPTY()); // 다시 읽기는 저장된 줄이 없어도 못 쓴 몫을 얹는다 (v396 · Codex 199차)
+  } catch { if (kept) profile = kept; /* 저장소 문제면 메모리로만 — 다시 읽기였으면 보이던 값 그대로 (v396) */ }
   loaded = true;
   ensurePartner();
   if (readyResolve) { readyResolve(); readyResolve = null; }
@@ -753,7 +759,7 @@ export function ownedIds() {
 export async function takeMons(ids) {
   await flushProfile();                       // 밀려 있던 증분을 먼저 (트랜잭션이 최신 프로필을 읽게)
   const r = await applyTakeMons(ids);
-  if (r && r.profile) profile = fromStored(r.profile);
+  if (r && r.profile) adoptProfile(r.profile);
   return { ok: !!(r && r.ok), results: (r && r.results) || [] };
 }
 
@@ -767,7 +773,7 @@ export function unseenTaken() {
 /** 🔒 알림을 보여 줬다고 적는다 */
 export async function markTakenSeen() {
   const r = await applyTakenSeen();
-  if (r && r.profile) profile = fromStored(r.profile);
+  if (r && r.profile) adoptProfile(r.profile);
   return !!(r && r.ok);
 }
 
@@ -1421,7 +1427,7 @@ export async function commitSpecialRound(rule) {
       const after = levelFromXp(p.xp || 0).level;
       return { result, reward: rw, level: { from: before, to: after, leveledUp: after > before } };
     });
-    profile = fromStored(r.profile); // 저장된 값을 메모리에 (다시 더하지 않는다 — 이미 들어 있다)
+    adoptProfile(r.profile); // 저장된 값을 메모리에 (다시 더하지 않는다 — 이미 들어 있다)
     return { ok: true, ...r.out, math: r.math };
   } catch (e) {
     console.warn('💎 스페셜 저장 실패:', e);
@@ -1450,7 +1456,7 @@ export async function commitChalRound(rule) {
       const after = levelFromXp(p.xp || 0).level;
       return { result, reward: rw, level: { from: before, to: after, leveledUp: after > before } };
     });
-    profile = fromStored(r.profile);
+    adoptProfile(r.profile);
     return { ok: true, ...r.out, math: r.math };
   } catch (e) {
     console.warn('🎯 도전 문제 저장 실패:', e);
@@ -1758,11 +1764,14 @@ export async function rocketSaveStep(battleId, correct) {
   return { ok: !!(r && r.ok), why: r && r.why, st: (r && r.st) || null };
 }
 
-/** 백업 가져오기 뒤 다시 읽기 */
+/**
+ * 백업 가져오기 뒤·앱으로 돌아올 때 다시 읽기
+ * ★ pending은 비우지 않는다 — flushProfile은 실패를 삼키고 못 쓴 증분을 pending에 되돌려 둔다. 여기서 비우면 번 코인이 사라졌다 (v396)
+ */
 export async function reloadProfile() {
   await flushProfile();
   loaded = false;
+  const kept = profile;
   profile = EMPTY();
-  pending = emptyDelta();
-  return initProfile();
+  return initProfile(kept);
 }

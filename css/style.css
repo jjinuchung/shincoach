@@ -1697,6 +1697,11 @@ button { font-family: inherit; }
   .partner-chip .partner-face { width: 26px; height: 26px; }
   .topbar { gap: 6px; }
   .hide-narrow { display: none; } /* 🎒·📊가 들어오면서 제목이 밀려 '＋ 영상 가져오기'를 '＋ 가져오기'로 */
+  /* 영상 화면은 칩이 많아 ⚙가 화면 밖으로 밀렸다 (v396) — 수학 화면처럼 칩만 둘째 줄로 */
+  #view-player .topbar { flex-wrap: wrap; row-gap: 0; }
+  #view-player .topbar::after { content: ''; order: 1; flex-basis: 100%; }
+  #view-player .topbar > .parent-chip, #view-player .topbar > .partner-chip, #view-player .topbar > .time-chip,
+  #view-player .topbar > .goal-chip, #view-player .topbar > .level-chip, #view-player .topbar > .coin-chip { order: 2; margin-top: 6px; }
 }
 
 /* ===== 모달 (🛒 상점 · 포켓몬 상세) ===== */
@@ -5257,7 +5262,7 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-chip.is-gold { background: #fff0c2; color: #8a5a00; }
 .lk-chip.is-new { background: #fde9df; color: #b8460f; }
 .lk-res-btn { margin-top: 4px; min-height: 50px; padding: 8px 22px; border-radius: 14px; border: 0; background: #e85a1c; color: #fff; font: inherit; font-size: 1.15rem; font-weight: 800; cursor: pointer; }
-.lk-res-btn:disabled { opacity: 0.6; cursor: default; }
+.lk-res-btn:disabled, .lk-res-sub:disabled { opacity: 0.6; cursor: default; }
 .lk-res-sub { min-height: 44px; padding: 6px 16px; border-radius: 12px; border: 0; background: transparent; color: #4f6a6e; font: inherit; font-size: 0.98rem; text-decoration: underline; cursor: pointer; }
 .lk-end-list { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; color: #12343b; }
 /* 🌦️ 날씨 칩 · 📖 도감 단추 · 💡 물음 밑 도움말 · 틀렸을 때 그 실수의 힌트 (v367) */

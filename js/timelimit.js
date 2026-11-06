@@ -231,7 +231,9 @@ export function initTimeLimit({ conf, onTick } = {}) {
 
 /** 오늘 기록을 읽어 둔다 (날짜가 바뀌면 다시) */
 export async function loadToday() {
-  clock.today = dayKey();
+  const day = dayKey();
+  if (day !== clock.today) for (const s of SUBJECTS) clock.pending[s] = 0; // 못 쓴 초는 어제 몫 — 오늘 기록에 더하면 오늘 시간이 그만큼 깎인다 (v396)
+  clock.today = day;
   clock.ready = false;
   try { clock.daily = await getDaily(clock.today); } catch { clock.daily = null; }
   clock.ready = true;
@@ -342,11 +344,13 @@ export async function flushTime() {
   const s = clock.subject;
   const sec = s ? clock.pending[s] || 0 : 0;
   if (!s || sec <= 0) return clock.daily;
+  const day = clock.today; // 저장하는 사이 자정을 넘기면 어제 결과를 오늘 것으로 들이지 않는다 (v396)
   clock.pending[s] = 0;
   try {
-    clock.daily = await applyDailyDelta(clock.today, tickDelta(s, sec));
+    const saved = await applyDailyDelta(day, tickDelta(s, sec));
+    if (day === clock.today) clock.daily = saved;
   } catch {
-    clock.pending[s] = (clock.pending[s] || 0) + sec; // 저장이 안 됐으면 다음에 다시
+    if (day === clock.today) clock.pending[s] = (clock.pending[s] || 0) + sec; // 저장이 안 됐으면 다음에 다시
   }
   if (clock.onTick) clock.onTick();
   return clock.daily;
@@ -356,9 +360,9 @@ export async function flushTime() {
 export async function grantMinutes(subject, minutes) {
   const d = grantDelta(subject, minutes);
   if (!Object.keys(d).length) return null;
+  await ensureToday(); // 창을 켜 둔 채 자정을 넘겨도 오늘 몫으로 (v396 · Codex 199차)
   await flushTime();
-  clock.daily = await applyDailyDelta(clock.today, d);
-  if (clock.onTick) clock.onTick();
+  adoptDaily(await applyDailyDelta(clock.today, d));
   return status(subject);
 }
 

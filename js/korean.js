@@ -204,7 +204,7 @@ export function mergeMiss(a, b) {
 /** 📤 물음마다 틀린 보기를 고른 수 (v254, 아버님 "8번을 넣자" — 국어 요약의 "자주 틀린 물음") · 열쇠 = 물음 id('K12-3') ·
  *  늘어나기만 하는 수(병합 max) · 한 번 읽을 때 물음마다 많아야 QMISS_ONCE(틀린 보기 셋) · 열쇠는 QMISS_KEYS까지 */
 export const QMISS_ONCE = 3;
-export const QMISS_KEYS = 600;
+export const QMISS_KEYS = 2000; // 물음이 칸보다 많으면 새 물음의 오답이 안 적힌다 — 원고 물음 수의 여유를 시험이 본다 (v396)
 const QID_RE = /^K\d{1,3}-[1-5]$/;
 /** 물음별 틀린 수 고쳐 읽기 — 물음 id 꼴의 열쇠만, 안전한 양의 정수만 */
 export function qMissOf(m) {

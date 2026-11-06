@@ -516,7 +516,7 @@ export function rngFrom(rolls) {
 /** 🎁 깜짝 포켓몬 (grammarRule 안) — 오늘 아직이고 확률에 들면 못 잡은 후보 하나를 도감에 · 준 포켓몬 id(없으면 0) */
 function giftRoll(profile, today, opt) {
   const g = giftOf(profile.grammarGift);
-  if (g.day === today) return 0;
+  if (g.day >= today) return 0; // 오늘 이미 줬다 · 시계가 뒤로 가도 다시 안 준다 (v396)
   const rng = typeof opt.rng === 'function' ? opt.rng : Math.random;
   if (!((Number(rng()) || 0) < GIFT_CHANCE)) return 0;
   const caught = isObj(profile.caught) ? profile.caught : {};

@@ -549,10 +549,7 @@ const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 export const PAID_DAYS = 14;
 function paidOf(src) {
   const out = {};
-  for (const k of Object.keys(src).filter(isDay).sort().slice(-PAID_DAYS)) {
-    const c = Math.min(FISH_COINS.dayMax, nz(src[k]));
-    if (c) out[k] = c;
-  }
+  for (const k of Object.keys(src).filter((d) => isDay(d) && nz(src[d])).sort().slice(-PAID_DAYS)) out[k] = Math.min(FISH_COINS.dayMax, nz(src[k])); // 0코인 날을 먼저 빼고 자른다 — 받은 날이 밀려나지 않게 (v396 · Codex 199차)
   return out;
 }
 /** 모르는 종 칸을 맡아 두는 수 끝 (v386 · Codex 189차) — 깨진 저장값이 끝없이 불어나지 않게 */
@@ -645,7 +642,9 @@ export function catchRule(p, fish, now) {
   const boatOpened = !wasBoat && boatOpen(lk); // 🚤 이 한 마리로 배 낚시가 열렸다 (v386 — 바다 도감 6종째)
   const paid = nz(lk.paid[today]); // 그날 이미 받은 💰 — 다른 날로 갔다 와도 그대로
   const want = sp.star * FISH_COINS.perStar + (first ? FISH_COINS.newKind : 0) + (badgesOf(sp.key, cm).length ? FISH_COINS.badge : 0);
-  const coins = Math.max(0, Math.min(want, FISH_COINS.dayMax - paid));
+  const kept = Object.keys(lk.paid);
+  const noRoom = kept.length >= PAID_DAYS && kept.every((k) => k > today); // 시계가 크게 뒤로 — 오늘 몫을 적어도 paidOf가 바로 버려 한도를 못 지킨다 → 💰 없이 도감만 (v396)
+  const coins = noRoom ? 0 : Math.max(0, Math.min(want, FISH_COINS.dayMax - paid));
   if (coins) lk.paid = paidOf({ ...lk.paid, [today]: paid + coins });
   p.fishing = lk;
   if (coins) { p.coins = nz(p.coins) + coins; p.coinsEarned = nz(p.coinsEarned) + coins; } // 문제를 풀어 번 코인 (📊 공부로 번 💰)

@@ -158,12 +158,8 @@ export async function saveMirror(now = new Date()) {
   let daily = [];
   let sentenceStats = [];
   try {
-    [profile, math, daily, sentenceStats] = await Promise.all([
-      getProfile().catch(() => null),
-      getMath().catch(() => null),
-      listDaily().catch(() => []),
-      getAllSentenceStats().catch(() => []),
-    ]);
+    // ★ 하나라도 못 읽으면 이번엔 사본을 안 고친다 — 빈 값으로 채운 사본이 멀쩡한 사본을 덮으면 마지막 보루를 잃는다 (v396)
+    [profile, math, daily, sentenceStats] = await Promise.all([getProfile(), getMath(), listDaily(), getAllSentenceStats()]);
   } catch {
     return false;
   }

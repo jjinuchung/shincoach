@@ -8,10 +8,12 @@
 //  · fakeIdb.failNext('profile') — 그 저장소를 쓰는 다음 쓰기 트랜잭션 하나를 중단한다 (저장 실패 흉내)
 //  · fakeIdb.get / fakeIdb.put — 저장된 값을 직접 읽고 쓴다 (다른 창이 쓴 것 흉내)
 //  · fakeIdb.failNextRead('daily') — 그 저장소의 다음 getAll 하나가 오류 (목록 읽기 실패 흉내, v329 🔥)
+//  · fakeIdb.failNextGet('profile', 'math') — 그 저장소의 다음 get 하나가 오류 · 열쇠를 주면 그 줄만 (한 줄 읽기 실패 흉내, v396)
 const data = new Map(); // 저장소 이름 → Map(열쇠 → 값)
 const keyPaths = new Map();
 const fails = [];
 const readFails = [];
+const getFails = [];
 let chain = Promise.resolve();
 
 const copy = (v) => (v === undefined ? undefined : structuredClone(v));
@@ -65,13 +67,18 @@ function makeTx(names) {
     const kp = keyPaths.get(n);
     return {
       keyPath: kp, // db.importStats가 rec[store.keyPath]로 열쇠를 읽는다 (v361 — 없으면 가져오기가 모든 줄을 조용히 건너뛰었다)
-      get: (k) => request(() => copy(m.get(k))),
+      get: (k) => request(() => {
+        const fi = getFails.findIndex((f) => f.store === n && (f.key === undefined || f.key === k));
+        if (fi >= 0) { getFails.splice(fi, 1); throw new Error(`읽기 실패 흉내: ${n}`); }
+        return copy(m.get(k));
+      }),
       getAll: () => request(() => {
         const fi = readFails.indexOf(n);
         if (fi >= 0) { readFails.splice(fi, 1); throw new Error(`읽기 실패 흉내: ${n}`); }
         return [...m.values()].map(copy);
       }),
       getAllKeys: () => request(() => [...m.keys()]),
+      index: (field) => ({ getAll: (v) => request(() => [...m.values()].filter((r) => r[field] === v).map(copy)) }), // db.getSentenceStats (v396)
       put: (v) => { const c = copy(v); writes.push(() => m.set(c[kp], c)); return request(() => c[kp]); },
       delete: (k) => { writes.push(() => m.delete(k)); return request(() => undefined); },
       createIndex() {},
@@ -110,8 +117,10 @@ export const fakeIdb = {
   failNext: (store) => { fails.push(store); },
   /** 그 저장소의 다음 getAll 하나를 오류로 */
   failNextRead: (store) => { readFails.push(store); },
+  /** 그 저장소의 다음 get 하나를 오류로 (key를 주면 그 줄을 읽을 때만) */
+  failNextGet: (store, key) => { getFails.push({ store, key }); },
   /** 걸어 둔 실패가 아직 남았나 (테스트가 엉뚱한 연산에 실패를 쓰지 않았는지 확인) */
-  failsLeft: () => fails.length + readFails.length,
+  failsLeft: () => fails.length + readFails.length + getFails.length,
   /** 모든 저장소를 비운다 — 새 기기 흉내 (☁️ 되살리기, v361) */
   clear: () => { for (const m of data.values()) m.clear(); },
 };

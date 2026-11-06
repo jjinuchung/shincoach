@@ -2,7 +2,7 @@
 // 메모리에 모았다가 5초마다·닫을 때 IndexedDB에 저장 (문장마다 쓰지 않도록)
 import {
   sentenceKey, getSentenceStats, putSentenceStats, putSession, getDaily, bumpVocabViews,
-  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey, mergeEssayEntry, saidOf, saidFlag } from './db.js';
+  emptyDaily, mergeDailyDelta, applyDailyDelta, claimDailyCount, claimDailyKey, mergeEssayEntry, saidOf, saidFlag, mergeStatRecord } from './db.js';
 import { enroll, scheduleSentence, GRADUATED } from './review.js';
 import { soundOnly } from './sounds.js';
 
@@ -18,6 +18,7 @@ const t = {
   item: null,
   stats: new Map(),   // key → record
   dirty: new Set(),   // 저장 대기 key
+  lost: new Map(),    // 저장에 실패한 문장 (key → record) — 영상을 닫아 stats가 비어도 다음 flush에서 다시 쓴다 (v396)
   session: null,
   daily: null,        // 화면에 보여줄 오늘 기록 (저장된 값 + 아직 안 쓴 증분)
   dailyDelta: null,   // 아직 저장하지 않은 증분 — 통째로 덮어쓰지 않으려고 이것만 더해 쓴다
@@ -139,6 +140,12 @@ export async function open(item) {
   await close();
   t.item = item;
   t.stats = await getSentenceStats(item.id).catch(() => new Map());
+  for (const [k, r] of t.lost) { // 아직 못 쓴 문장은 저장값과 합쳐 잇는다 — 어느 한쪽으로 가리면 그쪽 기록을 잃는다 (v396 · Codex 199차)
+    if (r.itemId !== item.id) continue;
+    const both = mergeStatRecord('sentenceStats', t.stats.get(k), r);
+    t.stats.set(k, both);
+    t.lost.set(k, both);
+  }
   t.dirty = new Set();
   t.session = {
     id: `${Date.now()}-${item.id}`, itemId: item.id, title: item.title,
@@ -663,13 +670,17 @@ export function markHpMissed() {
 export let lastFlushError = null;
 
 export async function flush() {
-  const keys = [...t.dirty];
-  const recs = keys.map((k) => t.stats.get(k)).filter(Boolean);
+  const send = new Map(t.lost);
+  for (const k of t.dirty) { const r = t.stats.get(k); if (r) send.set(k, r); }
   t.dirty = new Set();
   const jobs = [];
-  if (recs.length) {
-    // 실패하면 다시 대기 목록에 넣어 다음 flush에서 재시도
-    jobs.push(putSentenceStats(recs).catch((e) => { keys.forEach((k) => t.dirty.add(k)); throw e; }));
+  if (send.size) {
+    const recs = [...send.values()];
+    // 실패하면 다음 flush에서 재시도 — 키가 아니라 기록을 둔다: 영상을 닫으면 stats가 비어 키로는 못 찾는다 (v396)
+    jobs.push(putSentenceStats(recs).then(
+      () => { for (const r of recs) if (t.lost.get(r.key) === r) t.lost.delete(r.key); },
+      (e) => { for (const r of recs) t.lost.set(r.key, r); throw e; },
+    ));
   }
   if (t.session && t.session.seconds > 0) {
     const s = { ...t.session };

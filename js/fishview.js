@@ -1030,6 +1030,7 @@ function keepFailed(f) {
   again.addEventListener('click', () => {
     if (again.disabled) return;
     again.disabled = true;
+    off.disabled = true; // 적는 동안 놓아주면 늦게 온 결과 카드가 새 낚시를 덮는다 (v396) — 실패하면 keepFailed가 단추를 새로 그린다
     again.textContent = '적는 중…';
     keepFish(f).catch(() => {});
   });
