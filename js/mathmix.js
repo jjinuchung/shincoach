@@ -541,7 +541,7 @@ export const MIXED = [
 
   {
     id: 'mix.frac', grade: 6, name: '분수가 섞인 혼합 계산', needs: ['mix.four'],
-    idea: '숫자가 분수여도 순서는 그대로. **통분은 더하고 뺄 때만** 해요 (곱셈은 통분하지 않아요).',
+    idea: '숫자가 분수여도 순서는 그대로. **통분은 더하고 뺄 때만** 해요 (곱셈은 통분이 필요 없어요).',
     calc(r, c) {
       const d = pick(r, [2, 3, 4, 6]);
       const n1 = int(r, 1, d - 1);
@@ -558,7 +558,7 @@ export const MIXED = [
       const badB = reduce(n1 * d2 + n2 * k * d, d * d2); // 괄호 무시: 뒤 분수만 곱함
       const fams = [
         { expr: `${n1}/${d} + ${n2}/${d2} × ${k}`, ans: fracText(ansA.n, ansA.d), bad: fracText(badA.n, badA.d), tag: TAGS.left,
-          steps: ['곱셈 먼저 (통분하지 않아요)', '그다음 덧셈 — 여기서 통분'], pools: {
+          steps: ['곱셈 먼저 (통분은 필요 없어요)', '그다음 덧셈 — 여기서 통분'], pools: {
           pokemon: [
             `${n1}/${d} + ${n2}/${d2} × ${k} 를 계산하면?`,
             `{me/이/가} 피자 ${n1}/${d}판을 먹고, ${n2}/${d2}판씩 ${k}번 더 먹었어요. 모두 얼마일까요?`,
@@ -566,7 +566,7 @@ export const MIXED = [
           toystory: [`보니가 케이크 ${n1}/${d}판을 먹고 ${n2}/${d2}판씩 ${k}번 더 먹었어요. 모두 얼마일까요?`],
         } },
         { expr: `(${n1}/${d} + ${n2}/${d2}) × ${k}`, ans: fracText(ansB.n, ansB.d), bad: fracText(badB.n, badB.d), tag: TAGS.paren,
-          steps: ['괄호 안을 먼저 — 통분해서 더하기', '그다음 곱셈 (통분하지 않아요)'], pools: {
+          steps: ['괄호 안을 먼저 — 통분해서 더하기', '그다음 곱셈 (통분은 필요 없어요)'], pools: {
           pokemon: [
             `(${n1}/${d} + ${n2}/${d2}) × ${k} 를 계산하면?`,
             `{me/이/가} 한 번에 ${n1}/${d}판과 ${n2}/${d2}판을 먹기를 ${k}번 했어요. 모두 얼마일까요?`,
@@ -583,7 +583,7 @@ export const MIXED = [
           why: {
             [TAGS.left]: '분수여도 곱셈이 먼저예요. 앞에서부터 더하면 안 돼요.',
             [TAGS.paren]: '괄호 안을 먼저 하나로 만든 뒤에 곱해요.',
-            [TAGS.common]: '곱셈은 통분하지 않아요. 분자끼리, 분모끼리 곱해요.',
+            [TAGS.common]: '곱셈은 통분이 필요 없어요. 분자끼리, 분모끼리 곱해요.',
           },
           rule: '분수여도 순서는 그대로. 통분은 더하고 뺄 때만.',
         }),

@@ -270,7 +270,7 @@ export const CIRCLE = [
       })()]));
       // 원 여러 개를 한 줄로
       fams.push(famOf([
-        (() => { const [R, n] = rowPick(r); return rowOf(R, n, `반지름이 ${R} cm인 동전 ${n}개를 한 줄로 맞닿게 놓았어요.\n\n[circle row n=${n} r=${R}]\n\n양 끝 사이의 길이는 몇 cm일까요?`); })(),
+        (() => { const [R, n] = rowPick(r); return rowOf(R, n, `반지름이 ${R} cm인 둥근 판 ${n}개를 한 줄로 맞닿게 놓았어요.\n\n[circle row n=${n} r=${R}]\n\n양 끝 사이의 길이는 몇 cm일까요?`); })(),
         (() => { const [R, n] = rowPick(r); return rowOf(R, n, `{mon/이/가} 반지름이 ${R} cm인 원 모양 쿠키 ${n}개를 한 줄로 맞닿게 놓았어요.\n\n[circle row n=${n} r=${R}]\n\n쿠키 줄의 전체 길이는 몇 cm일까요?`); })(),
       ]));
       return calcAsk(r, c, this, runFamily(r, c, fams));
@@ -294,15 +294,15 @@ export const CIRCLE = [
       }
       const [R, n] = rowPick(r);
       return misAsk(r, c, this, 'row', {
-        q: `동전 ${n}개를 한 줄로 맞닿게 놓았어요.\n\n[circle row n=${n} r=${R}]\n\n${showWork(`반지름이 ${R} cm인 동전 ${n}개를 한 줄로 놓으면 전체 길이는 ${R} × ${n} = ${R * n} cm예요`)}`,
-        ok: `동전 하나의 폭은 지름 — ${R} × 2 × ${n} = ${2 * R * n} cm`,
+        q: `둥근 판 ${n}개를 한 줄로 맞닿게 놓았어요.\n\n[circle row n=${n} r=${R}]\n\n${showWork(`반지름이 ${R} cm인 둥근 판 ${n}개를 한 줄로 놓으면 전체 길이는 ${R} × ${n} = ${R * n} cm예요`)}`,
+        ok: `둥근 판 하나의 폭은 지름 — ${R} × 2 × ${n} = ${2 * R * n} cm`,
         wr: [
           { text: '맞게 말했어요', tag: RIGHT_AS_WRONG },
           { text: `${R} × 2 + ${n} = ${2 * R + n} cm예요`, tag: TAGS.addForMul },
-          { text: '동전은 둥글어서 길이를 잴 수 없어요', tag: OFF },
+          { text: '둥근 판은 길이를 잴 수 없어요', tag: OFF },
         ],
-        steps: [`동전 하나의 폭 = 지름 = ${R} × 2 = ${2 * R} cm`, `${n}개 → ${2 * R} × ${n} = ${2 * R * n} cm`],
-        whyAny: '동전 하나가 차지하는 길이는 반지름이 아니라 지름이에요.',
+        steps: [`둥근 판 하나의 폭 = 지름 = ${R} × 2 = ${2 * R} cm`, `${n}개 → ${2 * R} × ${n} = ${2 * R * n} cm`],
+        whyAny: '둥근 판 하나가 차지하는 길이는 반지름이 아니라 지름이에요.',
         rule: '맞닿게 놓은 원 하나의 폭은 지름.',
         probe: { r: R, n, shown: R * n, ask: 'row' },
       });

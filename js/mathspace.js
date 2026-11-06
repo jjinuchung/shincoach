@@ -456,7 +456,7 @@ export const SPACE = [
         const g = genStack(r, 3, 3, 3, 6, 14, (x) => topsVisible(x) && hiddenOf(x) >= 1);
         const vis = total(g) - hiddenOf(g);
         return misAsk(r, c, this, 'visible', {
-          q: `쌓기나무로 쌓은 모양과 위에서 본 모양을 보고\n\n${ST(g)}\n\n${VW([['위', footV(g)]])}\n\n${showWork(`보이는 쌓기나무를 세었더니 모두 ${vis}개예요`)}`,
+          q: `쌓기나무로 쌓은 모양과 위에서 본 모양을 보고\n\n${ST(g)}\n\n${VW([['위', footV(g)]])}\n\n${showWork(`쌓기나무는 모두 ${vis}개예요 — 보이는 것을 다 세었어요`)}`,
           ok: `보이지 않는 쌓기나무도 있어요 — 기둥마다 층 수를 더하면 ${total(g)}개`,
           wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `위에서 본 칸 수만 세어야 해요 — ${cellsOf(g)}개`, tag: TAGS.cellsOnly }, { text: '쌓기나무의 개수는 그림으로 알 수 없어요', tag: OFF }],
           steps: [`위에서 본 모양으로 기둥 자리 ${cellsOf(g)}곳`, `${sumText(g)} = ${total(g)}`],

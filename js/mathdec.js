@@ -74,6 +74,9 @@ function aligned(a, b) {
   const L = Math.max(A.length, B.length, P + 1);
   return [A.padStart(L, '0'), B.padStart(L, '0'), P];
 }
+/** 곱의 끝이 0이면 소수점을 찍은 뒤 지운다 — 「곱도 소수 두 자리」라고만 하면 답 23.6과 어긋난다 (v395) */
+const zeroTail = (u) => (u % 10 ? '' : '(끝의 0은 지워요)');
+
 /** 끝자리를 맞춤 — 소수점을 무시하고 오른쪽 끝을 맞춰 셈한 뒤, 자리가 긴 쪽에 맞춰 소수점을 찍는다 (3.46 + 0.8 → 346 + 8 → 3.54) */
 function alignEnd(a, b, sign) {
   const v = a.u + sign * b.u;
@@ -1058,7 +1061,7 @@ export const DECIMAL = [
       return {
         ...ask(this.id, 'calc', fill(story, c), numChoices(r, ans, wr), {
           expr: f.expr,
-          solve: solve([step(0, `소수점을 떼고 ${a.u} × ${n} = ${a.u * n}`), step(1, `${jn(T(a), '은', '는')} 소수 ${PLACE[a.p]} 자리 → 곱도 소수 ${PLACE[a.p]} 자리`), step(2, `답은 ${ans}`)], {
+          solve: solve([step(0, `소수점을 떼고 ${a.u} × ${n} = ${a.u * n}`), step(1, `${jn(T(a), '은', '는')} 소수 ${PLACE[a.p]} 자리 → ${a.u * n}에 소수점을 ${PLACE[a.p]} 자리로 찍어요${zeroTail(a.u * n)}`), step(2, `답은 ${ans}`)], {
             why: {
               [TAGS.dropPoint]: '소수점을 빼먹었어요. 자연수처럼 곱한 뒤 **소수점을 다시 찍어야** 해요.',
               [TAGS.pointPos]: '소수점을 한 칸 더 옮겼어요. 곱해지는 소수의 자리 수만큼만 옮겨요.',
@@ -1138,7 +1141,7 @@ export const DECIMAL = [
                 [TAGS.placesNotAdded]: `소수점 자리 수를 **더해야** 해요. ${a.p}자리 × ${b.p}자리면 ${a.p + b.p}자리예요.`,
                 [TAGS.dropPoint]: '소수점을 빼먹었어요. 곱한 뒤 두 수의 자리 수를 더한 만큼 소수점을 찍어요.',
               },
-              rule: '곱의 소수 자리 수 = 두 수의 소수 자리 수의 합.',
+              rule: `곱의 소수 자리 수 = 두 수의 소수 자리 수의 합${zeroTail(a.u * b.u)}.`,
             }),
         }),
         probe: f.probe,
@@ -1149,16 +1152,16 @@ export const DECIMAL = [
       const shown = decText(a.u * b.u, 1);
       const right = decText(a.u * b.u, 2);
       const q = showWork(`${T(a)} × ${T(b)} = ${shown}`);
-      const chs = textChoices(r, `소수 한 자리 × 소수 한 자리는 소수 두 자리예요 — 답은 ${right}`, [
+      const chs = textChoices(r, `소수 한 자리 × 소수 한 자리는 소수점을 두 자리로 찍어요${zeroTail(a.u * b.u)} — 답은 ${right}`, [
         { text: '맞게 계산했어요', tag: RIGHT_AS_WRONG },
         { text: '곱하면 항상 커져야 해요', tag: MIS_OK },
         { text: '소수점을 빼먹었어요', tag: OFF },
       ]);
       return {
         ...misreadAsk(this.id, 'places', fill(q, c), chs, {
-          solve: solve([step(0, `${a.u} × ${b.u} = ${a.u * b.u}`), step(1, `1자리 + 1자리 = 2자리 → ${right}`)], {
+          solve: solve([step(0, `${a.u} × ${b.u} = ${a.u * b.u}`), step(1, `1자리 + 1자리 = 2자리${zeroTail(a.u * b.u)} → ${right}`)], {
             whyAny: `소수점 자리 수를 더하지 않았어요. ${jn(T(b), '은', '는')} 1보다 작으니 답은 ${T(a)}보다 작아야 해요.`,
-            rule: '곱의 소수 자리 수 = 두 수의 소수 자리 수의 합.',
+            rule: `곱의 소수 자리 수 = 두 수의 소수 자리 수의 합${zeroTail(a.u * b.u)}.`,
           }),
         }),
         probe: { calc: `${T(a)} × ${T(b)}`, shown, bug: 'placesNotAdded' },

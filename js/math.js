@@ -138,7 +138,7 @@ function qtNode(text) {
 /**
  * "2 3/8" → 2 와 세로 분수, "5/6"·"x/3"·"(x + 2)/3" → 세로 분수, 문자 x·a → 기울임, **굵게**.
  * 나누기는 mathdraw.richParts (검수 페이지와 같은 규칙). DOM으로 만든다 (innerHTML에 글을 넣지 않는다)
- * 숫자 바로 뒤 조사는 읽는 소리로 고쳐 그린다(fixNumJosa — "5이 돼요"·"4/1은"·"−16는", v249) — richNode를 거치는 글만(🎯 도전 문제·평문 힌트·❓ 짧은 버튼은 아님)
+ * 숫자 바로 뒤 조사는 읽는 소리로 고쳐 그린다(fixNumJosa — "5이 돼요"·"4/1은"·"−16는", v249) — richNode를 거치는 글만(🎯 도전 문제·평문 힌트는 아님 · ❓ 짧은 버튼은 직접 고친다)
  */
 function richNode(text) {
   const frag = document.createDocumentFragment();
@@ -2232,7 +2232,7 @@ function askOfferForRound(r, state, today) {
   box.appendChild(el('p', 'math-ask-lead', '❓ 아빠에게 물어볼 게 있어요? 틀린 문제를 골라요 — 문제는 앱이 그대로 보내요.'));
   for (const x of wrongs) {
     const q1 = oneLine(x.q.q);
-    const b = el('button', 'btn math-ask-btn', `❓ ${KIND_LABEL[x.q.kind] || ''} · ${cutLine(q1, 26)}`);
+    const b = el('button', 'btn math-ask-btn', `❓ ${KIND_LABEL[x.q.kind] || ''} · ${cutLine(fixNumJosa(q1), 26)}`);
     b.type = 'button';
     b.addEventListener('click', () => { box.replaceWith(askForm(askContext(x.q, x.a), (res) => { if (res.ok) x.a.asked = res.ask.no; })); });
     box.appendChild(b);

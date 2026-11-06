@@ -81,9 +81,10 @@ function numSpots(text) {
 function badJosa(text) {
   return numSpots(text).filter((p) => p.ok && wantJosa(p.tok, p.jo) !== p.jo).map((p) => `${p.tok}${p.jo} → ${p.tok}${wantJosa(p.tok, p.jo)}`);
 }
-/** 고치면 안 되는 자리(맞는 숫자 꼴이 아님)를 fixNumJosa가 건드렸나 — 고치기 전과 뒤의 자리를 차례로 맞춰 본다 */
+/** 고치면 안 되는 자리(맞는 숫자 꼴이 아님)를 fixNumJosa가 건드렸나 — 고치기 전과 뒤의 자리를 차례로 맞춰 본다
+ *  「3 를 계산하면?」만은 일부러 붙이므로(v395) 고치기 전 글도 붙여서 본다 — 다른 띄어쓴 조사가 붙으면 자리 수가 달라져 잡힌다 */
 function touchedOdd(before, after) {
-  const a = numSpots(before);
+  const a = numSpots(String(before).replace(/(\d) 를 계산하면/g, '$1를 계산하면'));
   const b = numSpots(after);
   if (a.length !== b.length) return [`자리 수가 달라짐 ${a.length} → ${b.length}`];
   return a.flatMap((p, i) => (p.tok !== b[i].tok || (!p.ok && p.jo !== b[i].jo) ? [`${p.tok}${p.jo} → ${b[i].tok}${b[i].jo}`] : []));

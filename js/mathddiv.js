@@ -253,7 +253,8 @@ export const DDIV = [
       ]);
     },
     misread(r, c) {
-      const [q, n] = draw(() => [rd(r, 0, 0, 1), int(r, 2, 9)], ([x, k]) => isP(mulD(x, nat(k)), 1));
+      // 몫 0.1은 뽑지 않는다 — 어림 글의 「0.1보다 커서 몫은 0.1보다 커요」가 틀린 말이 된다 (v395)
+      const [q, n] = draw(() => [rd(r, 0, 0, 1), int(r, 2, 9)], ([x, k]) => isP(mulD(x, nat(k)), 1) && x.u > 1);
       const A = mulD(q, nat(n)); const ans = T(q);
       if (branchOf(r, c, ['drop', 'est']) === 'drop') {
         return misAsk(r, c, this, 'drop', {
@@ -545,7 +546,7 @@ export const DDIV = [
         ok: `두 수에 똑같이 100을 곱해요 — ${A.u * 10} ÷ ${B.u} = ${ans}`,
         wr: [RIGHT, { text: `나누어지는 수를 한 자리만 옮겨서 ${T(shiftD(q, -1))}`, tag: TAGS.moves }, { text: '자릿수가 다른 소수끼리는 나눌 수 없어요', tag: OFF }],
         steps: [`두 수에 100을 곱해요 — ${A.u * 10} ÷ ${B.u}`, `${A.u * 10} ÷ ${B.u} = ${ans}`],
-        whyAny: `나누는 수만 옮겼어요. 0보다 큰 수를 1보다 작은 수로 나누면 몫은 처음 수보다 커요 — ${shown}은 ${T(A)}보다 작아요.`,
+        whyAny: `나누는 수만 옮겼어요. 0보다 큰 수를 1보다 작은 수로 나누면 몫은 처음 수보다 커요 — ${shown}은 ${T(A)}보다 크지 않아요.`,
         probe: { ask: 'divisor', calc: `${T(A)} ÷ ${T(B)}` },
       });
     },

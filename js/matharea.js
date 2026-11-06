@@ -692,7 +692,7 @@ export const AREA = [
   {
     id: 'are.use', grade: 5, name: '둘레와 넓이 활용', needs: ['are.trap'],
     idea: '복잡한 모양은 **큰 직사각형에서 빈 곳을 빼거나** 나눠서 더해요. 넓이를 알면 **거꾸로** 높이를 구할 수 있어요 — 삼각형은 × 2를 먼저.',
-    slip: '큰 직사각형을 먼저 그리고, 빈 곳이 어디인지 찾아봐요.',
+    slip: '구하는 것을 먼저 봐요 — 복잡한 모양이면 큰 직사각형에서 빈 곳을 빼고, 넓이를 알면 거꾸로 높이를 구해요.',
     calc(r, c) {
       const W = int(r, 6, 14); const H = int(r, 5, 12); const w = int(r, 2, W - 3); const h = int(r, 2, H - 3);
       const pb = int(r, 4, 15); const ph = int(r, 3, 12); const pA = pb * ph;

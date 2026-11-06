@@ -424,15 +424,15 @@ export const FMUL = [
 
   {
     id: 'fmul.frac', grade: 5, name: '(진분수)×(진분수)', needs: ['fmul.unit'],
-    idea: '**분자는 분자끼리, 분모는 분모끼리 곱해요** — 2/3 × 4/5 = 8/15. 가로 2/3 m, 세로 4/5 m인 직사각형의 넓이와 같아요 — 전체 3 × 5 = 15칸 중 2 × 4 = 8칸. 덧셈과 달리 **통분하지 않아요.** 곱하기 전에 약분하면 편해요 — 3/4 × 2/9 = 1/2 × 1/3 = 1/6.',
-    rule: '분자끼리, 분모끼리 곱해요 — 통분하지 않아요(약분은 먼저 해도 돼요).',
+    idea: '**분자는 분자끼리, 분모는 분모끼리 곱해요** — 2/3 × 4/5 = 8/15. 가로 2/3 m, 세로 4/5 m인 직사각형의 넓이와 같아요 — 전체 3 × 5 = 15칸 중 2 × 4 = 8칸. 덧셈과 달리 **통분이 필요 없어요.** 곱하기 전에 약분하면 편해요 — 3/4 × 2/9 = 1/2 × 1/3 = 1/6.',
+    rule: '분자끼리, 분모끼리 곱해요 — 통분은 필요 없어요(약분은 먼저 해도 돼요).',
     slip: '덧셈처럼 통분하거나 더하지 않았는지 봐요.',
     calc(r, c) {
       const fams = [];
       const lcdV = (a, b, cc, d) => { const L = lcm(b, d); return V(a * (L / b) * cc * (L / d), L); };
       const wrongs = (a, b, cc, d) => [{ text: lcdV(a, b, cc, d), tag: TAGS.lcdOnce }, { text: V(a + cc, b + d), tag: TAGS.allSum }, { text: V(a * cc, b + d), tag: TAGS.denSum }, { text: V(a * d + cc * b, b * d), tag: TAGS.addInstead }];
       const whys = (a, b, cc, d) => ({
-        [TAGS.lcdOnce]: '곱셈은 통분하지 않아요 — 분자끼리, 분모끼리 곱해요.',
+        [TAGS.lcdOnce]: '곱셈은 통분이 필요 없어요 — 분자끼리, 분모끼리 곱해요.',
         [TAGS.allSum]: '더하지 않고 곱해요 — 분자끼리, 분모끼리.',
         [TAGS.denSum]: `분모끼리 더하지 않고 곱해요 — ${b} × ${d} = ${b * d}`,
         [TAGS.addInstead]: '곱셈이에요 — 두 분수를 더하지 않아요.',
@@ -480,10 +480,10 @@ export const FMUL = [
       if (branchOf(r, c, ['lcd', 'add']) === 'lcd') {
         return misAsk(r, c, this, 'lcd', {
           q: `그림을 보고 곱셈을 계산해요.\n\n[fmul area ${a}/${b} ${cc}/${d}]\n\n${showWork(`${a}/${b} × ${cc}/${d} = ${a * d}/${b * d} × ${cc * b}/${b * d} = ${V(a * d * cc * b, b * d)}`)}`,
-          ok: `통분하지 않아요 — 분자끼리, 분모끼리 곱해서 ${ans}`,
+          ok: `곱셈은 통분이 필요 없어요 — 분자끼리, 분모끼리 곱해서 ${ans}`,
           wr: [{ text: '맞게 말했어요', tag: RIGHT_AS_WRONG }, { text: `분모끼리 더해서 ${V(a * cc, b + d)}`, tag: TAGS.denSum }, { text: '분모가 다르면 곱할 수 없어요', tag: OFF }],
           steps: [`전체 ${b} × ${d} = ${b * d}칸 중 진한 칸 ${a} × ${cc} = ${a * cc}칸`, `${a}/${b} × ${cc}/${d} = ${chain(a * cc, b * d)}`],
-          whyAny: '덧셈처럼 통분했어요. 곱셈은 통분하지 않고 분자끼리, 분모끼리 곱해요.',
+          whyAny: '덧셈처럼 통분한 뒤 분모를 그대로 뒀어요. 곱셈은 분자끼리, 분모끼리 곱해요.',
           probe: { ask: 'lcd', a, b, cc, d },
         });
       }

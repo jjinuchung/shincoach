@@ -268,6 +268,9 @@ const bg = (sc, unit, labels, vals, ask = -1) => `[bgraph ${sc.s}x${sc.lab} ${un
 /** 꺾은선그래프 지시문 (~base면 물결선) */
 const lg = (s, unit, xs, vals, base = 0, ask = -1) => `[lgraph ${s}x${LAB_OF[s] || 5} ${unit}${base ? ` ~${base}` : ''} ${xs.map((x, i) => `${x}:${i === ask ? '?' : vals[i]}`).join(' ')}]`;
 
+/** 키 그래프 — 사람도 강낭콩도 키는 줄지 않는다 (v395) */
+const GROWS = new Set(['wtall', 'bean']);
+
 /**
  * 꺾은선 칸 수 — lo..hi칸 안에서 이웃끼리 1~4칸씩(내려가기도), 가장 많이 변한 곳이 하나.
  * want(i, j)가 있으면 j칸 값이 i칸 값보다 크게(늘어난 구간을 묻는 쌍둥이)
@@ -591,7 +594,7 @@ export const DATA = [
       // 늘어난 구간을 묻는 쌍둥이 — 요일처럼 이름에 수가 없으면 열쇠에 구간이 남는다
       const reqs = []; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) reqs.push([i, j]);
       const req = reqs.find(([i, j]) => wantOf(c).includes(`${T.xs[i]}부터 ${T.xs[j]}까지`));
-      const cells = lineCells(r, n, 1, 12, { rise: req || null, anyRise: true });
+      const cells = lineCells(r, n, 1, 12, { rise: req || null, anyRise: true, up: GROWS.has(T.id) });
       const vals = cells.map((k) => k * s);
       const G = lg(s, T.unit, T.xs, vals);
       const head = `${T.topic} 꺾은선그래프로 나타냈어요.\n\n${G}\n\n`;
@@ -647,7 +650,7 @@ export const DATA = [
       const n = T.xs.length;
       if (branchOf(r, c, ['most', 'cells']) === 'most') {
         const s = pick(r, T.steps);
-        const cells = lineCells(r, n, 1, 12, { topNotBig: true }); const vals = cells.map((k) => k * s);
+        const cells = lineCells(r, n, 1, 12, { topNotBig: true, up: GROWS.has(T.id) }); const vals = cells.map((k) => k * s);
         const ad = vals.slice(1).map((v, i) => Math.abs(v - vals[i])); const big = ad.indexOf(Math.max(...ad)); const top = vals.indexOf(Math.max(...vals));
         const G = lg(s, T.unit, T.xs, vals);
         const gap = (i) => `${jw(T.xs[i], '과', '와')} ${T.xs[i + 1]} 사이`;
@@ -666,7 +669,7 @@ export const DATA = [
         });
       }
       const s = T.steps.find((x) => x > 1) || 2; const lab = LAB_OF[s];
-      const cells = lineCells(r, n, 1, 12); const vals = cells.map((k) => k * s);
+      const cells = lineCells(r, n, 1, 12, { up: GROWS.has(T.id) }); const vals = cells.map((k) => k * s);
       const G = lg(s, T.unit, T.xs, vals);
       const xi = int(r, 0, n - 1); const v = vals[xi]; const k = cells[xi];
       return finishMis(this.id, 'cells', r, c, {
@@ -691,7 +694,7 @@ export const DATA = [
     calc(r, c) {
       const T = pickFor(r, c, WAVE_THEMES, (t, w) => w.includes(t.topic));
       const s = pick(r, T.steps); const base = pick(r, T.base); const n = T.xs.length;
-      const cells = lineCells(r, n, 1, 10); const vals = cells.map((k) => base + k * s);
+      const cells = lineCells(r, n, 1, 10, { up: GROWS.has(T.id) }); const vals = cells.map((k) => base + k * s);
       const G = lg(s, T.unit, T.xs, vals, base);
       const X = pickFor(r, c, T.xs, (x, w) => w.includes(`${x}의 ${T.noun}`)); const xi = T.xs.indexOf(X); const v = vals[xi]; const k = cells[xi];
       // 가운데 값 — 온도(한 시간마다, 2도 눈금)
@@ -739,7 +742,7 @@ export const DATA = [
       const T = pickFor(r, c, WAVE_THEMES, (t, w) => w.includes(t.topic));
       const s = pick(r, T.steps); const base = pick(r, T.base); const n = T.xs.length;
       if (branchOf(r, c, ['zero', 'mid']) === 'zero') {
-        const cells = lineCells(r, n, 1, 10); const vals = cells.map((k) => base + k * s);
+        const cells = lineCells(r, n, 1, 10, { up: GROWS.has(T.id) }); const vals = cells.map((k) => base + k * s);
         const G = lg(s, T.unit, T.xs, vals, base);
         const xi = int(r, 0, n - 1); const v = vals[xi];
         return finishMis(this.id, 'zero', r, c, {
@@ -801,11 +804,12 @@ export const DATA = [
       // 점 찍기 — 물결선 그래프에 빠진 점 하나 (가장 큰 값이 아닌 것)
       const T = pickFor(r, c, WAVE_THEMES, (t, w) => w.includes(t.topic));
       const s = pick(r, T.steps); const base = pick(r, T.base); const n = T.xs.length;
-      const cells = lineCells(r, n, 1, 10); const vals = cells.map((k) => base + k * s);
+      const cells = lineCells(r, n, 1, 10, { up: GROWS.has(T.id) }); const vals = cells.map((k) => base + k * s);
       const ai = askIdx(c, 'lgraph');
-      const xi = ai >= 0 && ai < n ? ai : int(r, 0, n - 1);
+      let xi = ai >= 0 && ai < n ? ai : int(r, 0, n - 1);
       const tp = vals.indexOf(Math.max(...vals));
-      if (tp === xi) { const j = (xi + 1) % n; [vals[xi], vals[j]] = [vals[j], vals[xi]]; [cells[xi], cells[j]] = [cells[j], cells[xi]]; }
+      if (tp === xi && GROWS.has(T.id)) xi -= 1; // 값을 맞바꾸면 키가 줄어든다 — 빠진 점을 앞 칸으로 (v395)
+      else if (tp === xi) { const j = (xi + 1) % n; [vals[xi], vals[j]] = [vals[j], vals[xi]]; [cells[xi], cells[j]] = [cells[j], cells[xi]]; }
       const X = T.xs[xi]; const v = vals[xi];
       const G = lg(s, T.unit, T.xs, vals, base, xi);
       // 물결선 위 첫 눈금 — 모든 값을 나타낼 수 있는 가장 큰 5의 배수

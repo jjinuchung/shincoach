@@ -152,13 +152,16 @@ export const TAGS = {
   mulBigger: '곱하면 항상 커진다',
 };
 
+/** 곱의 끝이 0이면 소수점을 찍은 뒤 지운다 — 「곱은 소수 두 자리」라고만 하면 답 23.6과 어긋난다 (v395) */
+const zeroTail = (u) => (u % 10 ? '' : '(끝의 0은 지워요)');
+
 /** (소수) × (자연수) · (자연수) × (소수) 오답 이유 — 이 문제의 수로, 문제의 곱셈 순서 그대로 (natFirst = 자연수가 앞, W3·W4)
  *  (헤드리스가 잡음: "2 m 리본의 0.3배" 풀이 카드가 "0.3 × 2는 0.3을 2번 더한 거예요"로 순서를 뒤집어 말했다) */
 function whyNat(a, n, ans, places, natFirst = false) {
   const e = natFirst ? `${n} × ${a.u}` : `${a.u} × ${n}`;
   return {
     [TAGS.dropPoint]: `소수점을 빼먹었어요 — ${e} = ${a.u * n}은 ${places}이 ${a.u * n}개라는 뜻이에요. 곱은 ${ans}.`,
-    [TAGS.pointPos]: `소수점을 한 자리 잘못 찍었어요 — ${natFirst ? '곱하는' : '곱해지는'} 수의 소수 자리 수만큼 곱도 소수 ${a.p}자리예요.`,
+    [TAGS.pointPos]: `소수점을 한 자리 잘못 찍었어요 — ${natFirst ? '곱하는' : '곱해지는'} 수가 소수 ${a.p}자리라서 ${a.u * n}에 소수점을 ${a.p}자리로 찍어요${zeroTail(a.u * n)}.`,
     [TAGS.tenth]: `소수 두 자리 수는 분모가 100인 분수예요 — ${T(a)} = ${a.u}/${P10[a.p]}.`,
     [TAGS.splitMul]: `따로 곱한 두 곱을 소수점 앞뒤에 이어 쓰면 안 돼요 — 소수 부분의 곱이 1을 넘으면 자연수 부분에 더해요. ${places}이 ${a.u * n}개예요.`,
     [TAGS.noCarry]: `자연수 곱셈에서 받아올림을 빠뜨렸어요 — ${e} = ${a.u * n}.`,
@@ -226,7 +229,7 @@ export const DMUL = [
     id: 'dmul.d2nat', grade: 5, name: '(소수 두 자리 수) × (자연수)', needs: ['dmul.d1nat'],
     idea: '0.46 × 7 — 0.46은 0.01이 46개라서 0.01이 46 × 7 = 322개 → **3.22**. 1.27 × 5는 1.27을 5번 더한 것과 같아요 — 127 × 5 = 635의 1/100배라서 6.35.',
     rule: '자연수처럼 곱한 다음 소수 두 자리로 — 곱의 1/100배예요.',
-    slip: '소수 두 자리 수를 곱했으면 곱도 소수 두 자리인지 봐요.',
+    slip: '소수 두 자리 수를 곱했으면 소수점을 두 자리로 찍었는지 봐요(끝의 0은 지워요).',
     calc(r, c) {
       const one = (big, t) => {
         const a = rd(r, big ? 1 : 0, big ? 6 : 0, 2); const n = int(r, 2, 9); const N = nat(n);
@@ -455,7 +458,7 @@ export const DMUL = [
           why: {
             [TAGS.placesNotAdded]: `두 수의 소수 자리 수를 더해요 — ${a.p}자리 + ${b.p}자리 = ${a.p + b.p}자리.`,
             [TAGS.dropPoint]: `소수점을 빼먹었어요 — ${a.u} × ${b.u} = ${a.u * b.u}에서 소수 ${a.p + b.p}자리로.`,
-            [TAGS.pointPos]: `소수점을 한 자리 더 옮겼어요 — 곱은 소수 ${a.p + b.p}자리예요.`,
+            [TAGS.pointPos]: `소수점을 한 자리 더 옮겼어요 — ${a.u * b.u}에 소수점을 ${a.p + b.p}자리로 찍어요${zeroTail(a.u * b.u)}.`,
             [TAGS.addInstead]: '더하지 않고 곱해요.',
           },
           steps: [`${a.u} × ${b.u} = ${a.u * b.u}`, `소수 ${a.p}자리 + ${b.p}자리 = ${a.p + b.p}자리 — ${T(a)} × ${T(b)} = ${full(a.u * b.u, a.p + b.p)}`],

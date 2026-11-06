@@ -434,7 +434,7 @@ export const FACTOR = [
             { text: pairText(x1.a, x1.b), tag: TAGS.commonAsRel },
             { text: pairText(x2.a, x2.b), tag: TAGS.commonAsRel },
             { text: pairText(s, s * t + 1), tag: '계산 실수' }],
-          why: { [TAGS.commonAsRel]: '둘 다 같은 수로 나누어떨어진다고(공약수가 있다고) 관계가 있는 게 아니에요. **큰 수를 작은 수로 나누어떨어져야** 약수와 배수의 관계예요.' },
+          why: { [TAGS.commonAsRel]: '둘 다 같은 수로 나누어떨어진다고(공약수가 있다고) 관계가 있는 게 아니에요. **큰 수가 작은 수로 나누어떨어져야** 약수와 배수의 관계예요.' },
           probe: { relPair: true }, steps: [`${s * t} ÷ ${s} = ${jn(t, '이라서', '라서')} 나누어떨어져요`, `${jn(s * t, '은', '는')} ${s}의 배수 → ${pairText(s, s * t)}`], pools: {
             pokemon: [`두 수가 약수와 배수의 관계인 것은 어느 것일까요?`],
           } },

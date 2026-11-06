@@ -913,7 +913,7 @@ test('🖋 한 줄 요약(🤔 오답 노트 60자·❓ 버튼 26자)은 괄호�
   const app = readFileSync(new URL('../js/math.js', import.meta.url), 'utf8');
   assert.ok(app.includes("const oneLine = (t) => figText(t, true).replace(/\\*\\*/g, '').replace(/\\s*\\n+\\s*/g, ' · ');"), 'math.js의 oneLine이 이 테스트와 같은 꼴');
   assert.match(app, /richNode\(cutLine\(q1, 60\)\)/);
-  assert.match(app, /cutLine\(q1, 26\)/);
+  assert.match(app, /cutLine\(fixNumJosa\(q1\), 26\)/);
   assert.match(app, /qtNode\(w\.q\.q\)/, '펼친 오답 노트에 문제 글 전체');
   const oneLine = (t) => figText(t, true).replace(/\*\*/g, '').replace(/\s*\n+\s*/g, ' · ');
   const repro = cutLine(oneLine(makeQuestion('exp.div', 'misread', 1, OPTS).q), 60);

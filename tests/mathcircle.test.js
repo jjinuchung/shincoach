@@ -298,7 +298,7 @@ test('★ ② 오개념 문항: 보여 준 것은 정말 틀렸다 · 고치는 
     const br = q.key.slice(8);
     let m;
     if (c.id === 'cir.parts' && br === 'half') { const R = +num(/반지름이 (\d+) cm인 원이/, t); right = String(2 * R); shown = endsNum(said.replace(/ cm예요$/, '')); }
-    else if (c.id === 'cir.parts' && br === 'row') { m = /반지름이 (\d+) cm인 동전 (\d+)개/.exec(said); right = String(2 * m[1] * m[2]); shown = endsNum(said.replace(/ cm예요$/, '')); }
+    else if (c.id === 'cir.parts' && br === 'row') { m = /반지름이 (\d+) cm인 둥근 판 (\d+)개/.exec(said); right = String(2 * m[1] * m[2]); shown = endsNum(said.replace(/ cm예요$/, '')); }
     else if (c.id === 'cir.ratio' && br === 'radius') {
       const C = toU(num(/원주가 ([\d.]+) cm/, t)); const R = I(num(/\[circle r=(\d+)\]/, t));
       right = str(div(C, R * 2n)); shown = str(div(C, R));

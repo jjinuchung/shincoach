@@ -276,7 +276,7 @@ export const EXPR = [
       ]));
       // 백분율
       fams.push(famOf([
-        (() => { const p = pick(r, [10, 20, 30, 40, 60, 70, 80, 90]); return { t: `정가가 a원인 옷을 ${p} % 할인했어요.\n\n할인한 금액은 몇 원인지 ${FORMULA}`, text: true, ans: `a × ${p}/100`, wr: [{ text: `a × ${p}`, tag: TAGS.pctWhole }, { text: `a × 100/${p}`, tag: TAGS.pctFlip }], steps: [`${p} %는 ${p}/100`, `a원의 ${p} % → a × ${p}/100 (원)`], why: { [TAGS.pctWhole]: `${p}를 그대로 곱하면 정가보다 커져요 — ${p} %는 ${p}/100.`, [TAGS.pctFlip]: `${p} %는 100분의 ${p} — 분모가 100, 분자가 ${p}.` }, probe: { ask: 'pct', p }, rule: '백분율만큼은 정가 × (백분율 ÷ 100) — 백분율을 100으로 나눠 곱해요.' }; })(),
+        (() => { const p = pick(r, [10, 20, 30, 40, 60, 70, 80, 90]); return { t: `정가가 a원인 옷을 ${p} % 할인했어요.\n\n깎아 준 금액은 몇 원인지 ${FORMULA}`, text: true, ans: `a × ${p}/100`, wr: [{ text: `a × ${p}`, tag: TAGS.pctWhole }, { text: `a × 100/${p}`, tag: TAGS.pctFlip }], steps: [`${p} %는 ${p}/100`, `a원의 ${p} % → a × ${p}/100 (원)`], why: { [TAGS.pctWhole]: `${p}를 그대로 곱하면 정가보다 커져요 — ${p} %는 ${p}/100.`, [TAGS.pctFlip]: `${p} %는 100분의 ${p} — 분모가 100, 분자가 ${p}.` }, probe: { ask: 'pct', p }, rule: '백분율만큼은 정가 × (백분율 ÷ 100) — 백분율을 100으로 나눠 곱해요.' }; })(),
       ]));
       // 둘레·평균 (괄호)
       fams.push(famOf([

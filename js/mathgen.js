@@ -73,15 +73,18 @@ const NUM_JOSA_ALONE = new Set(['이랑', '랑', '으로', '로', '은', '는', 
 // 쉼표 묶음은 한 수로 잡는다 — 앞 글자에 쉼표를 허용하면 "1,000,000,000,000는"의 끝 "000"만 읽어 '은'으로 바꿨다 (Codex 61차 #1)
 const NUM_JOSA_RE = /(^|[^\d./,])([−–-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:\/\d+)?)(\*\*)?(이에요|예요|이었|였|이랑|랑|으로|로|은|는|을|를|과|와|이|가)/g;
 
+// 「… 를 계산하면?」 틀 36곳은 수 뒤에 한 칸을 띄워 조사가 안 고쳐졌다 — 틀 글을 바꾸면 열쇠(tplKey)가 달라져 🤔 오답 노트가 지워지니 그릴 때 붙인다 (v395)
+const NUM_ASK_RE = /(\d) 를 계산하면/g;
+
 /**
  * 글 속 "숫자 + 조사"를 읽는 소리에 맞게 고친다 — **richNode로 그리는 수학 글**(math.js — 문제·보기·풀이·배틀·로켓단 퀴즈)과
  * ❓ 아빠에게 보내는 복사문(mathask.js asksText)에서 (v249, Codex 61차).
  * 틀 글마다 조사를 손으로 맞추다 "5이 돼요 · 16.5이 · −16는 · 4/1은 · 1예요"가 300가지 나왔다 → 틀은 그대로 두고 여기서.
  * 바뀌는 것은 숫자에 바로 붙은 조사뿐이고, 3가지·2과목처럼 뒤에 한글이 이어지면 조사가 아니라 그대로 둔다.
- * 닿지 않는 곳: 🎯 도전 문제 화면·평문 힌트·❓ 짧은 버튼(지금 글에는 틀린 조사 없음) · "(−3)는"·"10²는"·따옴표 숫자처럼 숫자에 바로 붙지 않은 조사는 그대로 둔다.
+ * 닿지 않는 곳: 🎯 도전 문제 화면·평문 힌트(지금 글에는 틀린 조사 없음) · "(−3)는"·"10²는"·따옴표 숫자처럼 숫자에 바로 붙지 않은 조사는 그대로 둔다.
  */
 export function fixNumJosa(text) {
-  return String(text == null ? '' : text).replace(NUM_JOSA_RE, (all, pre, num, star, jo, at, src) => {
+  return String(text == null ? '' : text).replace(NUM_ASK_RE, '$1를 계산하면').replace(NUM_JOSA_RE, (all, pre, num, star, jo, at, src) => {
     if (NUM_JOSA_ALONE.has(jo) && /[가-힣]/.test(src[at + all.length] || '')) return all;
     const t = numTail(num);
     if (!t) return all;
