@@ -40,6 +40,7 @@ import { FRAME_ID, framePhotoOf, hungIds, photoIdOf, takePhotoRule, hangRule } f
 import { albumBox, photoEl, showPhotoBig, closePhotoBig } from './photoview.js'; // 📸 📷 앨범 · 🔍 크게 보기
 import { takePhoto, hangPhoto, photosNow, guestArrive, guestPlay, guestHere } from './xp.js';
 import { HELLO, GUEST_ASK, guestWaiting, guestSpot, likedName, candidatesOf } from './guest.js'; // 🐾 손님 포켓몬 (v385 · 순수)
+import { moveHello } from './moveday.js'; // 🚚 끝난 뒤 며칠 집들이 말 (v397)
 import { studySec } from './minigame.js'; // 🐾 그날 공부한 초 — 🎮 미니 게임 판과 같은 셈 (순수)
 
 // 🎮 일상 행동(2026-10-18, 아버님 "이대로 해"): 놓인 📺·🎮·💻·🎹를 누르면 도구 줄 맨 앞에 놀기 단추 → 💗를 먼저 저장(homePlay 트랜잭션) →
@@ -696,7 +697,8 @@ async function guestDoor() {
   if (ui.busy || ui.tab !== 'room') { ui.msg = `🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요`; return; }
   if (s) ui.floor = s.room;
   ui.arrive = r.mon; ui.sel = 0; ui.meSel = false; ui.guestSel = false;
-  ui.msg = `🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요 — 눌러서 같이 놀아요`;
+  const warm = moveHello(getProfileSnapshot().journey, Date.now());
+  ui.msg = warm ? `🚪 띵동! ${ko}: ${warm}` : `🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요 — 눌러서 같이 놀아요`;
   render();
 }
 /** 방의 손님 — 파트너와 같은 꼴 · 「🐾 손님」 이름표 · 💗 · 누르면 도구 */

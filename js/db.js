@@ -29,6 +29,7 @@ import { copyStock } from './stock.js'; // 🏦 포켓몬 증권시장 복사 (�
 import { matchedOf, mergeMatched } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329)
 import { dripOf, mergeDrip } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (순수 — 아무것도 import하지 않는다, v320)
 import { copyLake, mergeLake } from './fishing.js'; // 🎣 학습 낚시터 도감·하루 💰 복사·병합 (v366 — 순수, 아무것도 import하지 않음)
+import { healMoveHouse } from './moveday.js'; // 🚚 이사를 끝낸 기록과 가방이 갈라지면 집 선물만 되찾기 (v397 — 순수)
 import { copyJourney, mergeJourney } from './journey.js'; // 🎒 포켓몬 대여행 복사·병합 (v341 — 순수, evolve·items·montypes만 import)
 import { pickGhost, readGhosts, writeGhosts, addGhosts, dropGhost } from './ghosts.js'; // 👻 되살린 백업의 영상 자리 (v361 — 순수·localStorage, import 없음)
 import { knownOf, mergeKnown, seenOf, mergeSeen, gMissOf, mergeGMiss, diagOf, mergeDiag, giftOf, mergeGift, videoSeenOf, mergeVideoSeen } from './grammar.js'; // 📝 영어 문법 기록 (v348 — 순수, korean·korwords만 import · v350 🎬 낸 영상 문제)
@@ -2517,7 +2518,7 @@ export function mergeStatRecord(name, cur, rec) {
     if (sk && typeof sk === 'object' && !Array.isArray(sk)) out.stock = copyStock(sk); else delete out.stock;
     // 🎒 포켓몬 대여행(v341) — 끝난 주는 합집합(옛 백업이 끝난 여행을 되살려 두 번 받거나 잃지 않게) · 지금 여행은 코인·가방과 같은 쪽(최근 쪽, 없으면 다른 쪽)
     const jr = mergeJourney(latest.journey, older.journey);
-    if (jr) out.journey = jr; else delete out.journey;
+    if (jr) { out.journey = jr; healMoveHouse(out); } else delete out.journey;
     // 🎣 학습 낚시터(v366) — 도감은 종마다 큰 쪽(처음 잡은 날은 이른 쪽) · 그날 받은 💰는 늦은 날 쪽, 같은 날이면 큰 쪽(옛 백업으로 하루 한도를 되살리지 않게)
     const lk = mergeLake(cur.fishing, rec.fishing);
     if (lk) out.fishing = lk; else delete out.fishing;

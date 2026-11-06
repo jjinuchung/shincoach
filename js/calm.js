@@ -68,12 +68,12 @@ export function calmState() {
 const QUIET_IDS = ['match'];
 
 /** 🎒 대여행 창 — 여행 중엔 이 창이 음악을 막지 않는다 (그 위에 뜬 다른 창은 그대로 막는다) */
-const TRIP_ID = 'jr-trip';
+const TRIP_IDS = ['jr-trip', 'mv-trip']; // 🚚 이사 대작전 창도 (v397)
 
 function overlayShown() {
   if (typeof document === 'undefined') return false;
   const shown = (id) => {
-    if (st.trip && id === TRIP_ID) return false;
+    if (st.trip && TRIP_IDS.includes(id)) return false;
     const e = document.getElementById(id);
     return !!(e && !e.hidden);
   };

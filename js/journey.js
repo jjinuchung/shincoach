@@ -93,7 +93,7 @@ const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ID_RE = /^[a-z0-9]{6,24}$/;
 const RESULTS = ['won', 'lost', 'home'];
 const STONE_IDS = STONES.map((s) => s.id);
-const isMon = (v) => Number.isSafeInteger(v) && own(MON_TYPES, v);
+export const isMon = (v) => Number.isSafeInteger(v) && own(MON_TYPES, v);
 
 /** 포켓몬 타입 (타입 표에 없으면 노말) */
 export function typesOf(id) {
@@ -173,7 +173,7 @@ export function weekOf(dayKey) {
 
 // ── 저장된 값 고쳐 읽기 ──
 
-function qOf(raw) {
+export function qOf(raw) {
   const out = {};
   if (!isObj(raw)) return out;
   for (const s of SUBJECTS) {
@@ -247,7 +247,7 @@ function evOf(raw, route) {
   return out;
 }
 /** [맞힌 수, 푼 수] 한 쌍 (없거나 깨졌으면 null) */
-function pairOf(v) {
+export function pairOf(v) {
   if (!Array.isArray(v) || v.length !== 2) return null;
   const n = Math.min(cnt(v[1]), 9999);
   return n ? [Math.min(cnt(v[0]), n), n] : null;
@@ -304,6 +304,7 @@ function doneEntryOf(raw) {
   const e = { r: raw.r, at: cnt(raw.at), q: qOf(raw.q) };
   const pf = pairOf(raw.pf);
   if (pf) e.pf = pf; // 🧑‍🔬 박사 퀴즈 (v362 — 📊·📤에만)
+  if (raw.mv) e.mv = 1; // 🚚 이사 대작전으로 채운 주 (v397)
   if (raw.r === 'won') {
     const pick = Number(raw.pick);
     if (isMon(pick)) e.pick = pick;
@@ -322,10 +323,24 @@ function doneOf(raw) {
   return out;
 }
 
-/** 저장된 대여행 기록 고쳐 읽기 (새 객체) → { cur, done } */
+/** 🚚 이사 대작전 칸 (v397) — 대여행 기록과 함께 복사·병합되게 여기 두고, 내용을 고쳐 읽는 것은 moveday.moveOf */
+const moveCopy = (v) => { if (!isObj(v)) return null; try { return JSON.parse(JSON.stringify(v)); } catch { return null; } };
+const MOVE_RANK = ['go', 'gift', 'pick', 'furn', 'last', 'end'];
+const moveRank = (m) => MOVE_RANK.indexOf(m.phase) * 100 + (Number(m.at) || 0);
+const moveShapeOk = (m) => isObj(m) && typeof m.id === 'string' && MOVE_RANK.includes(m.phase) && Array.isArray(m.party) && m.party.length > 0 && Array.isArray(m.guests) && m.guests.length === 3 && Array.isArray(m.ev) && m.ev.length === 6;
+/** 더 나아간 쪽 (같으면 latest) — 옛 백업이 끝난 이사를 되돌려 보상을 또 받지 않게 */
+function mergeMove(latest, older) {
+  const a = moveShapeOk(latest) ? latest : null;
+  const b = moveShapeOk(older) ? older : null;
+  if (!a || !b) return a || b || latest || older || null; // 깨진 쪽이 멀쩡한 쪽을 밀어내지 않게 (Codex 200차 #3)
+  return moveRank(b) > moveRank(a) ? b : a;
+}
+
+/** 저장된 대여행 기록 고쳐 읽기 (새 객체) → { cur, done, move? } */
 export function journeyOf(raw) {
   const r = isObj(raw) ? raw : {};
-  return { cur: curOf(r.cur), done: doneOf(r.done) };
+  const move = moveCopy(r.move);
+  return { cur: curOf(r.cur), done: doneOf(r.done), ...(move ? { move } : {}) };
 }
 /** 복사 (프로필 복사용) — 객체가 아니면 null */
 export function copyJourney(raw) {
@@ -344,7 +359,7 @@ export function mergeJourney(latest, older) {
   for (const k of Object.keys(a.done)) done[k] = !own(done, k) || own(a.done[k], 'pick') || !own(done[k], 'pick') ? a.done[k] : done[k];
   let cur = a.cur || b.cur;
   if (cur && own(done, cur.week) && (cur.phase === 'go' || own(done[cur.week], 'pick'))) cur = null;
-  return journeyOf({ cur, done });
+  return journeyOf({ cur, done, move: mergeMove(a.move, b.move) });
 }
 
 /**
@@ -411,7 +426,7 @@ export function startRule(p, req, now) {
 }
 
 /** 💰 끝까지 간 보상 — 코인 · 스톤 1개씩 · 함께 간 6마리 레벨 +1(데리고 있지 않거나 만렙·진화 레벨이면 그 포켓몬 스톤 1개) */
-function rewardRule(p, c, subjectOf) {
+export function rewardRule(p, c, subjectOf) {
   p.coins = cnt(p.coins) + JOURNEY.coins;
   p.coinsEarned = cnt(p.coinsEarned) + JOURNEY.coins; // 문제를 풀어 번 코인 (📊 공부로 번 💰)
   p.items = isObj(p.items) ? p.items : {};
@@ -606,14 +621,14 @@ export function pickRule(p, req, now) {
 // ── 길 만들기 · 문제 차례 (화면이 부른다 — 순수) ──
 
 /** 무게대로 하나 고르기 (r = 0~1 난수 함수) */
-function weighted(list, w, r) {
+export function weighted(list, w, r) {
   const total = list.reduce((a, c) => a + w(c), 0);
   let x = r() * total;
   for (const c of list) { x -= w(c); if (x < 0) return c; }
   return list[list.length - 1];
 }
 /** 야생 무게 — 아직 못 잡은 포켓몬을 더 자주(데려올 수 있으니) · 흔함일수록 자주 */
-const wildW = (c) => (c.caught ? 1 : 3) * ([0, 6, 4, 2, 1][Number(c.rarity)] || 2);
+export const wildW = (c) => (c.caught ? 1 : 3) * ([0, 6, 4, 2, 1][Number(c.rarity)] || 2);
 /** 구역 후보 — 그 구역 타입 · 표에 있는 포켓몬 · 이미 쓴 것 뺌 */
 function zoneList(cands, z, used) {
   return (Array.isArray(cands && cands[z]) ? cands[z] : []).filter((c) => c && isMon(Number(c.id)) && !used.has(Number(c.id))
@@ -715,6 +730,26 @@ export function profChoices(m, f, pool, nameOf, rng = Math.random) {
   return mix([{ text: label(mine), ok: true }, ...wrong.map((ts) => ({ text: label(ts), ok: false }))]);
 }
 
+/**
+ * 지금 낼 문제 → { subj, q } · src: 과목마다 { keys, make } · 이 자리의 과목에서 못 만들면 다른 과목에서 · 아무것도 없으면 null ·
+ * shift = 과목 차례를 밀기(🎁 상자는 그 구역 첫 만남과 다른 과목으로) · c = 지금 여행(at·id·q·qv·qn)
+ */
+export function questionFrom(src, c, shift = 0) {
+  const avail = SUBJECTS.filter((s) => src && src[s]);
+  const first = subjectFor(c.at + shift, avail);
+  if (!first) return null;
+  for (const subj of [first, ...avail.filter((s) => s !== first)]) {
+    const one = src[subj];
+    const keys = orderOf(one.keys, c.id, subj);
+    for (let t = 0; t < Math.min(keys.length, 12); t++) {
+      let q = null;
+      try { q = one.make(keys[slotOf(c, subj, keys.length, t)], questionSeed(c, t)); } catch { q = null; }
+      if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((x) => x.ok).length === 1) return { subj, q };
+    }
+  }
+  return null;
+}
+
 /** 이 만남의 과목 — 문제가 있는 과목(avail) 가운데 SUBJECTS 차례로 돌아가며 · 하나도 없으면 null */
 export function subjectFor(at, avail) {
   const list = SUBJECTS.filter((s) => (avail || []).includes(s));
@@ -775,6 +810,7 @@ export function journeyRows(raw) {
   return Object.keys(d).sort().reverse().map((week) => ({ week, ...d[week] }));
 }
 const R_KO = { won: '🎉 끝까지 감', lost: '💔 ❤️를 다 씀', home: '🏃 집으로' };
+const MV_KO = '🚚 이사 대작전 끝';
 /** 과목별 맞힌 수 한 줄 — '🔢 수학 5/6 · 🔶 영어 4/4' */
 export function qLine(q) {
   const parts = SUBJECTS.filter((s) => q && q[s]).map((s) => `${SUBJECT_KO[s]} ${q[s][0]}/${q[s][1]}`);
@@ -782,7 +818,7 @@ export function qLine(q) {
 }
 /** 결과 한 줄 (📊·📤 같은 말) */
 export function rowText(row, monKo = (id) => String(id)) {
-  const bits = [R_KO[row.r] || row.r, qLine(row.q)];
+  const bits = [row.mv ? MV_KO : R_KO[row.r] || row.r, qLine(row.q)];
   if (row.pf) bits.push(`🧑‍🔬 박사 퀴즈 ${row.pf[0]}/${row.pf[1]}`);
   if (row.r === 'won' && row.pick) bits.push(`데려옴 ${monKo(row.pick)}`);
   if (row.r === 'lost' && row.lost) {

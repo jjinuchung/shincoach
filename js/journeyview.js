@@ -9,8 +9,9 @@
 //   맞으면 번쩍·숫자·HP 칸 깨짐 · 효과가 굉장하면 흔들림·큰 글씨 · 쓰러짐 · 틀리면 가벼운 반격 · 👑·🚀 등장 · 지도 위를 파트너가 걸어감 · 정답 연출은 약 1.5초(누르면 넘김)
 import {
   JOURNEY, ZONES, PER_ZONE, OLD_STOPS, SUBJECTS, TYPE_KO, typesOf, advantage, strongZones, zoneOfStop, centersOf, zoneStart, pendingEvent, hpOf, heartsMax, stateOf, makeRoute, makeEvents,
-  profChoices, subjectFor, orderOf, slotOf, questionSeed, rngOf, crispPx, lossPreview, ownedIds,
+  profChoices, questionFrom, questionSeed, rngOf, crispPx, lossPreview, ownedIds,
 } from './journey.js';
+import { moveState, moveOnCard } from './moveday.js'; // 🚚 이사 대작전 (v397) — 끝낼 때까지 이 자리에 나온다
 import { journeyRaw, journeyStart, journeyAnswer, journeySwap, journeyHome, journeyPick, journeyEvent, getProfileSnapshot, getLevelInfo, rarityOf, monLv, getLook, korWordsMap, nonsulMap, profileReady, profileLoading, onProfileReload, getPartner } from './xp.js';
 import { ROSTER, loadCharacters, ensureCast, isUnlocked, isLegendary, isUltraBeast, isLetterMon } from './pokemon.js';
 import { TRAINERS, MOVES, SIGNATURE } from './battle.js';
@@ -60,6 +61,7 @@ export function mountJourneyCard(box) {
   if (profileLoading()) { b.hidden = true; profileReady().then(() => mountJourneyCard(b)).catch(() => {}); return; } // 다 읽은 뒤 다시 (읽기 훅을 화면 모듈보다 늦게 걸면 못 들음)
   const p = getProfileSnapshot();
   if (!ownedIds(p).length) { b.hidden = true; return; }
+  if (moveOnCard(moveState(journeyRaw(), todayKey()))) { import('./moveview.js').then((m) => m.mountMoveCard(b)).catch(() => {}); return; } // 🚚 (v397)
   const st = stateOf(journeyRaw(), todayKey());
   const closed = st.mode === 'done';
   const card = el(closed ? 'div' : 'button', `jr-home${closed ? ' is-closed' : ''}`);
@@ -254,19 +256,7 @@ const availOf = () => SUBJECTS.filter((s) => ui.src && ui.src[s]);
 
 /** 지금 낼 문제 → { subj, q } · 이 만남의 과목에서 못 만들면 다른 과목에서 · 아무것도 없으면 null · shift = 과목 차례를 밀기(🎁 보물 상자는 그 구역 첫 만남과 다른 과목으로) */
 function buildQuestion(c, shift = 0) {
-  const avail = availOf();
-  const first = subjectFor(c.at + shift, avail);
-  if (!first) return null;
-  for (const subj of [first, ...avail.filter((s) => s !== first)]) {
-    const src = ui.src[subj];
-    const keys = orderOf(src.keys, c.id, subj);
-    for (let t = 0; t < Math.min(keys.length, 12); t++) {
-      let q = null;
-      try { q = src.make(keys[slotOf(c, subj, keys.length, t)], questionSeed(c, t)); } catch { q = null; }
-      if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((x) => x.ok).length === 1) return { subj, q };
-    }
-  }
-  return null;
+  return questionFrom(ui.src, c, shift);
 }
 
 // ───────────── 포켓몬 그림 ─────────────
@@ -595,6 +585,7 @@ async function start(party, run, go) {
   ui.busy = false;
   if (!r.ok) {
     if (r.why === 'going' || r.why === 'pick' || r.why === 'done') { route(); return; }
+    if (r.why === 'move') { closeJourney(); return; } // 🚚 다른 창에서 이사가 열렸다 — 홈 카드가 이사로 바뀐다 (v397)
     go.disabled = false;
     body().querySelector('.jr-note').textContent = r.why === 'save' ? '저장이 안 돼서 떠나지 못했어요. 잠시 뒤 다시 눌러 봐요' : '떠나지 못했어요. 다시 골라 봐요';
     return;

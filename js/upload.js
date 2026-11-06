@@ -422,10 +422,12 @@ async function stockNow(today) {
 
 /** 🎒 포켓몬 대여행 글 (v341) — 저장된 프로필에서 · 한 번도 안 떠났으면 null(파일을 안 만든다) */
 async function journeyNow(today) {
-  const [{ getProfile }, jr, pk] = await Promise.all([import('./db.js'), import('./journey.js'), import('./pokemon.js')]);
+  const [{ getProfile }, jr, pk, mv] = await Promise.all([import('./db.js'), import('./journey.js'), import('./pokemon.js'), import('./moveday.js')]);
   const p = await getProfile();
   const ko = (id) => { const r = pk.ROSTER.find((m) => m.id === Number(id)); return r ? r.ko : String(id); };
-  return p ? jr.journeyMd(p.journey, today, ko) : null;
+  if (!p) return null;
+  const md = [jr.journeyMd(p.journey, today, ko), mv.moveMd(p.journey, ko)].filter(Boolean).join('\n'); // 🚚 이사 대작전 줄 (v397 — 비공개 저장소에만)
+  return md || null;
 }
 
 /** 📝 영어 문법 글 (v348) — 저장된 프로필 + 원고(단원 제목·오개념 이름표) · 한 번도 안 했으면 null(파일을 안 만든다) · 원고를 못 받으면 null */

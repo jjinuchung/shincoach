@@ -27,6 +27,7 @@ import { copyAvatar, wearBuyRule } from './avatar.js'; // 🧑 진우 캐릭터 
 import { copyPlay, playRule, gameEndRule, bestOf, fastOf, recKey } from './homeplay.js'; // 🎮 일상 행동 · 미니 게임 끝(v307) · ⏱️ 가장 빠른 시간(v339) (순수)
 import { copyPhotos, photosOf, takePhotoRule, hangRule } from './photo.js'; // 📸 액자 사진 (v384 · 순수)
 import { copyGuest, arriveRule, guestPlayRule, guestNow as guestNowOf } from './guest.js'; // 🐾 손님 포켓몬 (v385 · 순수)
+import { moveBlocksTrip, moveStartRule, moveAnswerRule, moveSwapRule, moveEventRule, moveGiftRule, movePickRule, moveFurnRule, moveEndRule } from './moveday.js'; // 🚚 이사 대작전 (v397 — 순수)
 import { copyJourney, startRule as jrStartRule, answerRule as jrAnswerRule, swapRule as jrSwapRule, homeRule as jrHomeRule, pickRule as jrPickRule, eventRule as jrEventRule } from './journey.js'; // 🎒 포켓몬 대여행 (v341, 순수) · 구역 이벤트 (v362)
 import { copyLake, catchRule as lakeCatchRule, gearBuyRule as lakeGearRule, pickRule as lakePickRule, gearOf as lakeGearOf } from './fishing.js'; // 🎣 학습 낚시터 도감·💰 · 🎒 채비·고른 물가(v368) (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
@@ -970,13 +971,23 @@ export function gameEasyFast(gameId) {
   return fastOf(profile && profile.homePlay, gameId);
 }
 // 🎒 포켓몬 대여행 (v341) — 바꾸기는 모두 저장된 프로필로 한 트랜잭션(houseDo — 저장이 안 되면 없던 일 { ok:false, why:'save' }) · 시각은 트랜잭션 안에서
+/** 🚚 이사 대작전 (v397) — 대여행과 같이 저장된 프로필로 한 트랜잭션에서 (moveday.js 규칙) */
+export const moveStart = (req) => houseDo((p) => moveStartRule(p, req, Date.now()));
+export const moveAnswer = (req) => houseDo((p) => moveAnswerRule(p, req, Date.now(), subjectOf));
+export const moveSwap = (req) => houseDo((p) => moveSwapRule(p, req));
+export const moveEvent = (req) => houseDo((p) => moveEventRule(p, req));
+export const moveGift = (req) => houseDo((p) => moveGiftRule(p, req));
+export const movePick = (req) => houseDo((p) => movePickRule(p, req));
+export const moveFurn = (req) => houseDo((p) => moveFurnRule(p, req));
+export const moveEnd = (req) => houseDo((p) => moveEndRule(p, req, Date.now()));
+
 /** 🎒 대여행 저장값 (지금 프로필 — 화면은 journey.stateOf로 읽는다) */
 export function journeyRaw() {
   return profile && profile.journey;
 }
 /** 🎒 떠나기 — { id, party, route } */
 export function journeyStart(req) {
-  return houseDo((p) => jrStartRule(p, req, Date.now()));
+  return houseDo((p) => (moveBlocksTrip(p, Date.now()) ? { ok: false, why: 'move' } : jrStartRule(p, req, Date.now()))); // 🚚 이사가 이 자리에 있으면 (v397)
 }
 /** ✏️ 답 하나 — { id, qn, mon, subj, correct } (끝까지 가면 보상, ❤️를 다 잃으면 잃기까지 같은 트랜잭션에서) */
 export function journeyAnswer(req) {
