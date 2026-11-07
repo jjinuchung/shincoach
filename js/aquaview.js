@@ -5,7 +5,7 @@
 // 낚시터에서 열면 낚시 시계가 멈춘다(onClose로 되돌림) · 닫으면 장면을 버려 메모리를 돌려준다 · 화면이 안 보이면 그리기를 멈춘다
 
 import { getProfileSnapshot, aquaUpTier, aquaBuy, aquaPut, aquaTake, aquaSlot, onProfileReload } from './xp.js';
-import { TANKS, TOP_TIER, DECO, DECO_GROUPS, decoOf, decoCount, aquaOf, aquaFishRows, aquaPhoto } from './aquarium.js';
+import { TANKS, TOP_TIER, DECO, DECO_GROUPS, decoOf, decoCount, aquaOf, aquaFishRows, aquaPhoto, aquaBest } from './aquarium.js';
 import { lenLabel, speciesOf } from './fishing.js';
 import { AQ_W, AQ_H, makeScene, setFish, setDeco, resetScene, drawScene, fishAt, slotAt, decoThumb } from './aquaart.js';
 import { drawFish } from './fishart.js';
@@ -97,7 +97,8 @@ function sync() {
   const a = aquaOf(p);
   const photo = aquaPhoto(p);
   const tierKey = `${a.tier}|${photo}`;
-  const fishKey = a.fish.join();
+  const best = aquaBest(p);
+  const fishKey = `${a.fish.join()}|${a.fish.map((k) => best[k]).join()}`; // 더 긴 걸 낚으면 크기도 다시 (v400)
   const decoKey = a.deco.join();
   let fresh = false;
   if (!ui.scene || ui.shownTier !== tierKey) {
@@ -107,7 +108,7 @@ function sync() {
     ui.shownDeco = null;
     fresh = true;
   }
-  if (ui.shownFish !== fishKey) { setFish(ui.scene, a.fish, nameOf); ui.shownFish = fishKey; }
+  if (ui.shownFish !== fishKey) { setFish(ui.scene, a.fish, nameOf, (k) => best[k]); ui.shownFish = fishKey; }
   if (ui.shownDeco !== decoKey) { setDeco(ui.scene, artsOf(a)); ui.shownDeco = decoKey; }
   if (ui.sel >= a.deco.length) ui.sel = -1;
   if (fresh) resetScene(ui.scene, ui.ctx);

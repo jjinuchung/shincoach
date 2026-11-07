@@ -47,7 +47,7 @@ test('🎮 v346 게임 목록 — 🧠 포켓몬 따라 하기 60초 · 열다�
   const sw = src('sw.js');
   assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1]) >= 346);
   assert.ok(sw.includes("'./js/gamesimon.js'"));
-  assert.match(src('js/version.js'), /export const APP_VERSION = 'v(34[6-9]|3[5-9]\d)';/);
+  assert.match(src('js/version.js'), /export const APP_VERSION = 'v(34[6-9]|3[5-9]\d|[4-9]\d\d)';/); // v400에서 넓힘 — 판을 못 박으면 다음 판에서 깨진다
   const css = src('css/style.css');
   assert.match(css, /\.gc-grid \{[^}]*width: min\(100%, calc\(\(100vh - 330px\) \* 1\.15\)\);/, '칸 넷은 화면 높이에 맞춰');
   assert.match(css, /\.gc-pad\.is-lit \{[^}]*transform: scale\(1\.04\);/);

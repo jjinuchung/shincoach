@@ -176,6 +176,18 @@ export function aquaFishRows(p) {
   const a = aquaOf(p);
   return dexRows(p && p.fishing).filter((r) => r.caught).map((r) => ({ ...r, put: a.fish.filter((k) => k === r.key).length }));
 }
+/** 🐟 수조 물고기 크기 (v400) — { 종: 낚은 가장 긴 cm } · 도감 기록이 비었으면 그 종 길이 가운데 */
+export function aquaBest(p) {
+  const { dex } = lakeOf(p && p.fishing);
+  const out = {};
+  for (const k of aquaOf(p).fish) {
+    if (Object.prototype.hasOwnProperty.call(out, k)) continue;
+    const sp = speciesOf(k);
+    const best = dex[k] ? Number(dex[k].best) : 0;
+    out[k] = best > 0 ? best : sp ? (sp.min + sp.max) / 2 : 0;
+  }
+  return out;
+}
 /** 📸 벽에 걸 사진이 있나 — 어름치를 찍었으면 */
 export function aquaPhoto(p) {
   const { dex } = lakeOf(p && p.fishing);

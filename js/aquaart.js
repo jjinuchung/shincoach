@@ -922,6 +922,40 @@ const DEPTH = {
   front: { k: 1.24, top: 0.26, low: 0.78, tint: 0, ax: [0.16, 0.27], sp: 1 },
 };
 const ORDER = ['mid', 'back', 'front', 'back', 'mid', 'mid', 'back', 'front', 'mid', 'back'];
+const RANK = { back: 0, mid: 1, front: 2 };
+// 길이 → 크기 (v400) — 진우가 낚은 가장 긴 기록 · 4 cm 붕어와 3 m 문어를 그대로 그리면 점과 수조 밖이라 제곱근으로 줄인다(10 cm와 1 m가 약 세 배)
+// 로그로 줄이면 90 cm 잉어와 3 m 대문어가 거의 같아 보였다(걷기에서 봄)
+const SIZE_CM = [5, 300];
+const sizeOf = (cm) => Math.sqrt(Math.min(SIZE_CM[1], Math.max(SIZE_CM[0], cm)) / 35);
+// 겹마다 크기 — 작은 것이 이미 뒤 겹이라 깊이는 안개·빛이 맡고 크기 차는 조금만 (v399의 0.6~1.24를 길이에 곱하면 작은 것이 점이 된다)
+const SIZE_AT = { back: 0.8, mid: 0.92, front: 1.08 };
+/** 한 마리 크기 끝 — 수조 높이·폭에 맞춰 (몸이 유리를 덮지 않게) */
+export const fishCap = (iw, ih) => Math.max(24, Math.min(ih * 0.6, iw * 0.32));
+/**
+ * 물고기 크기·겹 (순수 · v400) — keys 수조 차례 · cmOf(key) 낚은 가장 긴 cm · fishMax 그 단계 마리 수
+ * 작은 것부터 뒤 겹에 두고 큰 것을 앞에 둔다 → 겹(멀면 작게)과 길이가 같은 쪽으로 가서, 더 길게 낚은 물고기가 화면에서 더 작게 보이지 않는다
+ * (v399는 겹으로만 크기를 정해 뒤 겹의 큰 문어가 앞 겹의 작은 물고기보다 작았다 — 진우 발견)
+ * 흔들림을 넣은 뒤에도 차례를 다시 맞추고 · 수조보다 크면 끝에 맞춘다 → [{ where 그리는 겹, size 크기를 정한 겹, L }]
+ */
+export function fishPlan(keys, cmOf, fishMax, iw, ih) {
+  const base = Math.max(40, Math.min(92, iw / (5 + fishMax * 0.17)));
+  const cap = fishCap(iw, ih);
+  const cms = keys.map((key) => {
+    const v = Number(cmOf(key));
+    return v > 0 ? Math.min(v, 1e6) : 0; // 깨진 값은 가장 짧게 줄 세운다(크기는 sizeOf가 5 cm로) · 끝없이 크면 가장 길게 (Codex 202차)
+  });
+  const byCm = keys.map((_, i) => i).sort((a, b) => cms[a] - cms[b] || a - b);
+  const layers = keys.map((_, i) => ORDER[i % ORDER.length]).sort((a, b) => RANK[a] - RANK[b]);
+  const plan = new Array(keys.length);
+  let top = 0;
+  byCm.forEach((i, r) => {
+    const size = layers[r];
+    top = Math.max(top, base * SIZE_AT[size] * sizeOf(cms[i]) * (0.94 + rnd(i + 21) * 0.12));
+    const flat = !!(LOOKS[keys[i]] && LOOKS[keys[i]].flat); // 가자미 무리는 바닥에 눕는다 — 몸을 뒤집으면 눈 방향이 틀린다(좌광우도)
+    plan[i] = { where: flat ? 'mid' : size, size, flat, L: Math.max(16, Math.min(Math.floor(cap), Math.round(top))) };
+  });
+  return plan;
+}
 /** 앱 drawFish로 다섯 꼬리 모습을 한 번씩 찍어 둔다 — 장면마다는 붙이기만 */
 function sprites(key, L, tint, fog) {
   const w = Math.ceil(L * 1.72 + 14);
@@ -941,32 +975,42 @@ function sprites(key, L, tint, fog) {
   });
   return { frames, w, h };
 }
-/** 물고기 바꾸기 — keys 수조 차례 · nameOf(key) 이름 · 같은 모습은 찍어 둔 것을 쓴다 */
-export function setFish(s, keys, nameOf = (k) => k) {
+/** 헤엄치는 가로 폭을 물 칸 안으로 — 몸 절반이 유리 밖으로 나가 잘리지 않게 (v400 — 큰 물고기가 생겨서) */
+export function keepIn(cx, ax, half, iw) {
+  const room = iw / 2 - half;
+  if (room <= 0) return { cx: iw / 2, ax: 0 };
+  const a = Math.min(ax, room);
+  return { cx: Math.min(iw - half - a, Math.max(half + a, cx)), ax: a };
+}
+/** 물고기 바꾸기 — keys 수조 차례 · nameOf(key) 이름 · cmOf(key) 낚은 가장 긴 cm(크기) · 같은 모습은 찍어 둔 것을 쓴다 */
+export function setFish(s, keys, nameOf = (k) => k, cmOf = () => 0) {
   const { iw, ih } = s.in;
-  const base = Math.max(40, Math.min(92, iw / (5 + s.tank.fish * 0.17)));
   const fog = midWater(s.tank.key);
   const count = { back: 0, mid: 0, front: 0 };
   const used = new Map();
+  const plan = fishPlan(keys, cmOf, s.tank.fish, iw, ih);
   s.fish = keys.map((key, i) => {
-    const flat = !!(LOOKS[key] && LOOKS[key].flat); // 가자미 무리는 바닥에 눕는다 — 몸을 뒤집으면 눈 방향이 틀린다(좌광우도)
-    const where = flat ? 'mid' : ORDER[i % ORDER.length];
+    const { where, size, flat, L } = plan[i];
     const D = DEPTH[where];
     const no = count[where]++;
-    const L = Math.round(base * D.k * (0.86 + rnd(i + 21) * 0.28));
     const u = (no * 0.618 + 0.17 + i * 0.03) % 1;
     const axF = D.ax[0] + rnd(i + 2) * (D.ax[1] - D.ax[0]);
     const id = `${key}|${where}|${L}`;
-    const spr = s.sprites.get(id) || sprites(key, L, D.tint, fog);
+    const spr = used.get(id) || s.sprites.get(id) || sprites(key, L, D.tint, fog); // 이번에 찍은 것부터 — 같은 모습을 마리마다 또 찍지 않게 (Codex 202차 · 대문어 32마리면 그림 메모리 약 7배)
     used.set(id, spr);
+    const bob = flat ? 0 : 7 * D.k;
+    const lowY = Math.max(L * 0.42 + bob + 4, Math.min(ih * (D.top + (D.low - D.top) * u), floorAt(0.2, ih) - L * 0.42 - bob)); // 큰 물고기가 모래에 묻히지 않게
+    const run = flat
+      ? keepIn(iw * (0.3 + rnd(i + 5) * 0.4), 8, L * 0.62, iw)
+      : keepIn(iw * (0.5 + (rnd(i + 8) - 0.5) * (1 - axF * 2) * 0.9), iw * axF, L * 0.62, iw);
     return {
-      i, key, ko: nameOf(key), where, L, flat, spr,
-      y: flat ? floorAt(0.42, ih) - L * 0.14 : ih * (D.top + (D.low - D.top) * u),
-      cx: iw * (flat ? 0.3 + rnd(i + 5) * 0.4 : 0.5 + (rnd(i + 8) - 0.5) * (1 - axF * 2) * 0.9),
-      ax: flat ? 8 : iw * axF,
+      i, key, ko: nameOf(key), where, size, L, flat, spr,
+      y: flat ? floorAt(0.42, ih) - L * 0.14 : lowY,
+      cx: run.cx,
+      ax: run.ax,
       w: (flat ? 0.08 : 0.16 + rnd(i + 3) * 0.14) * D.sp,
       ph: rnd(i + 11) * 6.28,
-      bob: flat ? 0 : 7 * D.k,
+      bob,
       wag: 4 + rnd(i + 6) * 3,
     };
   });
@@ -1115,13 +1159,16 @@ function topOf(cv, ih) {
   return ih;
 }
 /** 한 단계 장면 — 무거운 일은 여기서 한 번만 · 물고기는 setFish · 장식은 setDeco */
-export function makeScene(tank, { photo = false } = {}) {
+/** 물 칸 { ix, iy, iw, ih } — 픽셀에 맞춘다(그려 둔 그림을 늘이지 않고 그대로 붙여야 빠르고 또렷하다) · 시험도 이 값으로 (v400 Codex 202차) */
+export function waterOf(tank) {
   const b = tankBox(tank);
-  // 물 칸을 픽셀에 맞춘다 — 그려 둔 그림을 늘이지 않고 그대로 붙여야 빠르고 또렷하다
   const ix = Math.floor((b.x + b.f) * SC) / SC;
   const iy = Math.floor((b.y + b.f) * SC) / SC;
-  const iw = Math.ceil((b.x + b.w - b.f) * SC) / SC - ix;
-  const ih = Math.ceil((b.y + b.h - b.f) * SC) / SC - iy;
+  return { ix, iy, iw: Math.ceil((b.x + b.w - b.f) * SC) / SC - ix, ih: Math.ceil((b.y + b.h - b.f) * SC) / SC - iy };
+}
+export function makeScene(tank, { photo = false } = {}) {
+  const b = tankBox(tank);
+  const { ix, iy, iw, ih } = waterOf(tank);
   const key = tank.key;
   const lw = Math.ceil(iw * EDGE_L * SC) / SC;
   const rw = Math.ceil(iw * EDGE_R * SC) / SC;
