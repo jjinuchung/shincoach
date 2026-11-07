@@ -638,7 +638,7 @@ test('📱 고르는 칸이 눌리지 않는다 — 대여행과 이사가 같�
 test('🔗 배선 — 앱 셸 · 다른 창 목록 · 음악 · 사용 기록 · 📤 · 홈 카드 · 🐾 말', () => {
   const sw = read('sw.js');
   for (const f of ['./js/moveday.js', './js/moveview.js', './js/movescene.js']) assert.ok(sw.includes(`'${f}'`), f);
-  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(read(f), /'mv-trip', 'jr-trip', 'lk-lake', 'lk-dex', 'lk-gear'\]/, f);
+  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(read(f), /'mv-trip', 'jr-trip', 'lk-lake', 'lk-dex', 'lk-gear', 'aq-tank'\]/, f);
   assert.match(read('js/usage.js'), /\{ place: 'journey', ids: \['mv-trip'\] \}/);
   assert.match(read('js/calm.js'), /const TRIP_IDS = \['jr-trip', 'mv-trip'\];/);
   assert.match(read('js/calm.js'), /st\.trip && TRIP_IDS\.includes\(id\)/);

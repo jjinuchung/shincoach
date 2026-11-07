@@ -125,7 +125,20 @@ function renderShop(msg, boughtId) {
   // 📣 동료 부르기 (v324) — 배틀 소모품. 물약 칸 바로 밑에
   list.appendChild(shopSection('⚔️ 배틀', '배틀에서 내 포켓몬 HP가 30 이하일 때 써요 — 📣 레벨이 같은 동료가 달려와 대신 맞아 주고, 내가 공격할 때마다 함께 공격해요. 같은 레벨이 없으면 레벨이 가장 가까운 동료가 와요 (한 배틀에 한 번 · 동료는 져도 패배가 안 늘어요)', [CALL_PAL], boughtId));
   list.appendChild(shopSection('🔴 몬스터볼', '등급이 올라갈수록 잡기 쉬워요. 던지면 없어져요 — 🔵 슈퍼볼 1.5배 · 🟡 하이퍼볼 2배 · 🟣 마스터볼은 반드시 잡혀요 (🌟 황금 볼은 🔁 복습으로만)', SHOP_BALLS, boughtId));
+  list.appendChild(aquaSection());
   list.appendChild(shopSection('⭐ 메가진화', '🔑 키스톤은 한 번만 사면 계속 쓰고, 💠 메가스톤은 포켓몬에게 끼워요. 배틀에서 한 마리만 메가진화할 수 있어요 (🍄 거다이맥스는 살 수 없고 학습으로 모아요)', [KEYSTONE, MEGASTONE], boughtId));
+}
+
+/** 🐠 꾸미기 가게로 가는 단추 (v399) — 장식과 수조 단계는 아쿠아리움 안 가게에서 판다 */
+function aquaSection() {
+  const sec = el('div');
+  sec.appendChild(el('div', 'shop-section-title', '🐠 아쿠아리움 꾸미기'));
+  sec.appendChild(el('div', 'shop-section-sub', '산호와 침몰선 같은 장식, 수조 단계는 꾸미기 가게에서 사요.'));
+  const b = el('button', 'btn', '🛒 꾸미기 가게 가기');
+  b.type = 'button';
+  b.addEventListener('click', () => { closeShop(); import('./aquaview.js').then((m) => m.openAqua({ tab: 'shop' })).catch(() => {}); });
+  sec.appendChild(b);
+  return sec;
 }
 
 function shopSection(title, sub, items, boughtId) {

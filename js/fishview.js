@@ -75,6 +75,7 @@ function build() {
       <button type="button" class="lk-dexbtn" hidden>📖 도감</button>
       <button type="button" class="lk-topbtn lk-mapbtn" aria-expanded="false" hidden>🗺️ 물가</button>
       <button type="button" class="lk-topbtn lk-gearbtn" hidden>🎒 채비</button>
+      <button type="button" class="lk-topbtn lk-aqbtn" aria-label="아쿠아리움" hidden>🐠</button>
       <span class="lk-spot" hidden></span>
       <span class="lk-dist" hidden></span>
       <button type="button" class="lk-x" aria-label="집으로 — 오늘 낚시 그만">✕</button>
@@ -104,6 +105,7 @@ function build() {
   root.querySelector('.lk-dexbtn').addEventListener('click', () => lakeDex());
   root.querySelector('.lk-mapbtn').addEventListener('click', () => togglePlaces());
   root.querySelector('.lk-gearbtn').addEventListener('click', () => lakeShop());
+  root.querySelector('.lk-aqbtn').addEventListener('click', () => lakeAqua());
   root.querySelector('.lk-bait').addEventListener('click', () => cycleBait());
   const btn = root.querySelector('.lk-btn');
   const down = (e) => { e.preventDefault(); touch(); try { unlock(); } catch { /* 소리 없이 */ } if (ui) { ui.hold = true; act(); } };
@@ -525,6 +527,16 @@ function lakeShop() {
   renderShop('');
   shopRoot.hidden = false;
   try { shopRoot.querySelector('.lk-dex-x').focus(); } catch { /* 무시 */ }
+}
+/** 🐠 아쿠아리움 (v399) — 던지기 전에만 · 보는 동안 게임 시계·하루 시간 멈춤(🎒 채비와 같다) · 닫으면 host가 done을 부른다 */
+function lakeAqua() {
+  if (!canMenu() || typeof ui.host.aqua !== 'function') return;
+  hidePlaces();
+  const me = ui;
+  ui.paused = true;
+  ui.shopOpen = true;
+  ui.covered = true;
+  ui.host.aqua(() => { if (ui === me) { ui.covered = false; ui.shopOpen = false; ui.paused = false; ui.last = 0; ui.touchAt = performance.now(); ui.menuShown = ''; } });
 }
 export function closeShop() {
   if (!shopRoot || shopRoot.hidden) return;
@@ -1306,7 +1318,7 @@ function loop(now) {
   if (!ui) return;
   const me = ui;
   ui.raf = requestAnimationFrame(loop);
-  if (document.hidden) { ui.last = 0; return; }
+  if (document.hidden || ui.covered) { ui.last = 0; return; } // 🐠 아쿠아리움이 덮은 동안은 낚시터를 안 그린다 — 두 장면을 함께 그리지 않게 (Codex 201차)
   const dt = ui.last ? Math.min(100, now - ui.last) : 16;
   // 느린 기기 — 프레임이 길면 한 장 걸러 그리고 햇살을 끈다
   ui.frameEma = ui.frameEma * 0.92 + dt * 0.08;
@@ -1328,6 +1340,7 @@ function loop(now) {
     ui.menuShown = mk;
     q$('.lk-mapbtn').hidden = !menu || typeof ui.host.onPick !== 'function';
     q$('.lk-gearbtn').hidden = !menu || typeof ui.host.gear !== 'function';
+    q$('.lk-aqbtn').hidden = !menu || typeof ui.host.aqua !== 'function';
     const bc = q$('.lk-bait');
     bc.hidden = baits.length < 2;
     if (!bc.hidden) { bc.textContent = baitName(ui.pick.bait); bc.setAttribute('aria-label', `미끼 바꾸기 — 지금 ${baitName(ui.pick.bait)}`); }

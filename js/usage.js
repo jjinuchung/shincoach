@@ -55,7 +55,7 @@ export const OVERLAYS = [
   { place: 'stock', ids: ['stock'] }, // 🏦 증권시장 (v319)
   { place: 'journey', ids: ['jr-trip'] }, // 🎒 대여행 (v341 — 창 id는 jr-trip: 'journey'는 영어 플레이어 막대)
   { place: 'journey', ids: ['mv-trip'] }, // 🚚 이사 대작전 (v397 — 대여행 자리의 특별편)
-  { place: 'lake', ids: ['lk-lake', 'lk-dex', 'lk-gear'] }, // 🎣 학습 낚시터 (v366) · 📖 도감 창 (v367) · 🎒 채비 가게 (v368)
+  { place: 'lake', ids: ['lk-lake', 'lk-dex', 'lk-gear', 'aq-tank'] }, // 🎣 학습 낚시터 (v366) · 📖 도감 창 (v367) · 🎒 채비 가게 (v368)
   { place: 'shop', ids: ['shop', 'market'] },
 ];
 export function placeNow(view, shown) {

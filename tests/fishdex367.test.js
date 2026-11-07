@@ -146,9 +146,9 @@ test('🔌 잇기 — 날씨 칩·도감 단추·💡·힌트 카드 · 도감 �
   assert.match(lv, /dexRows: \(\) => dexRows\(lakeRaw\(\)\),/);
   assert.match(lv, /\.\.\.\(q && q\.fm \? \{ \[FISH_FM_Q\[0\]\]: 1, \[FISH_FM_Q\[1\]\]: ok \? 1 : 0 \} : \{\}\)/);
   assert.match(lv, /const avail = SUBJECTS\.filter\(\(s\) => \(ui\.src && ui\.src\[s\]\) \|\| \(s === 'math' && fmOk\)\);/);
-  assert.match(lv, /if \(done && dexRows\(lakeRaw\(\)\)\.some\(\(r\) => r\.caught\)\) \{/, '오늘 낚시가 끝난 날 홈 띠 📖');
+  assert.match(lv, /const caught = dexRows\(lakeRaw\(\)\)\.some\(\(r\) => r\.caught\);\n  if \(done && caught\) \{/, '오늘 낚시가 끝난 날 홈 띠 📖');
   assert.doesNotMatch(src('index.html'), /id="lk-dex"/, '도감 창 id는 fishview가 만든다');
-  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex', 'lk-gear'\]/, `${f} 겹침 목록`);
+  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex', 'lk-gear', 'aq-tank'\]/, `${f} 겹침 목록`);
   assert.ok(OVERLAYS.some((o) => o.place === 'lake' && o.ids.includes('lk-dex')), '🕒 도감 창도 낚시터 자리');
   const css = src('css/style.css');
   assert.match(css, /^\.lk-dexv \{[^\n]*z-index: 67;/m, '낚시터(66) 위');

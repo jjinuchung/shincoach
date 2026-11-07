@@ -5,6 +5,7 @@
 //   "그날의 마지막 값"으로 이 기기에 적어 두고(upload.js — localStorage), 하루 줄 = 그날 값 − 그 앞에 기록이 있는 날의 값.
 //   보상 화면 곳곳에 새 셈을 끼우지 않는다 — 셀 곳을 하나라도 빠뜨리면 조용히 틀린다(잡기·배틀·알·레이더·로켓단…).
 // 순수 — 화면·저장소 없음 (evolve·items·zygarde만 import — 앞 둘은 아무것도, zygarde는 korean.js 날 번호만)
+import { aquaLine } from './aquarium.js'; // 🐠 아쿠아리움 한 줄 (v399 — 순수)
 import { haveOf, lvOf, candyCount, candyOf } from './evolve.js';
 import { itemById } from './items.js';
 import { zygOf, zygLine } from './zygarde.js'; // 🟢 지가르데 큐브 (v352)
@@ -84,6 +85,7 @@ export function holdingLines(p) {
     `- 가방: ${bag.length ? bag.join(' ') : '(비어 있음)'}`,
     `- 도감 ${snap.kinds}종 · 데리고 있는 포켓몬 ${have}마리 · 레벨 칸 합 ${snap.lvSum} · 진화 ${snap.evoSum}번`,
     ...(zygLine(pf.zyg, Date.now()) ? [`- ${zygLine(pf.zyg, Date.now())}`] : []), // 🟢 셀 수 · 오늘 찾은 과목 (v352 — 셀이 과목을 끌어오는지)
+    `- ${aquaLine(pf)}`,
   ];
 }
 

@@ -371,7 +371,7 @@ test('🔌 잇기 — 🗺️ 물가·🎒 채비·🐛 미끼 칩 · 가게 보
   assert.match(xp, /return houseDo\(\(p\) => lakePickRule\(p, want, Date\.now\(\)\)\);/);
   assert.match(src('js/fishart.js'), /if \(place === 'river'\) \{ riverFx\(ctx, t, lite, x0, x1, wx\); return; \}/);
   assert.match(src('js/db.js'), /^\s*'fishRiver',$/m);
-  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex', 'lk-gear'\]/, `${f} 겹침 목록`);
+  for (const f of ['js/hatch.js', 'js/parcel.js', 'js/korbattleview.js']) assert.match(src(f), /'jr-trip', 'lk-lake', 'lk-dex', 'lk-gear', 'aq-tank'\]/, `${f} 겹침 목록`);
   assert.ok(OVERLAYS.some((o) => o.place === 'lake' && o.ids.includes('lk-gear')), '🕒 가게도 낚시터 자리');
   assert.doesNotMatch(src('index.html'), /id="lk-gear"/);
   const css = src('css/style.css');

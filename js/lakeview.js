@@ -80,16 +80,33 @@ export async function mountLakeCard(box) {
   body.appendChild(el('span', 'lk-home-sub', done ? '오늘 낚시는 끝 — 내일 또 와요' : nz(d && d.fishSec) ? '물고기가 기다려요 — 이어서 낚아요' : `${where}에 가 볼까요? 맞힐수록 큰 물고기!`));
   card.appendChild(body);
   // 오늘 낚시가 끝난 날에도 📖 도감은 볼 수 있다 (한 마리라도 낚았으면 · 🏞️ 강 칸은 열린 뒤에만 — v368)
-  if (done && dexRows(lakeRaw()).some((r) => r.caught)) {
+  const caught = dexRows(lakeRaw()).some((r) => r.caught);
+  if (done && caught) {
     const dx = el('button', 'lk-home-dex', '📖 도감');
     dx.type = 'button';
     dx.addEventListener('click', () => openLakeDex());
     card.appendChild(dx);
   }
-  b.appendChild(card);
+  // 🐠 아쿠아리움 (v399) — 한 마리라도 낚았으면 낚시가 끝난 날에도 들어간다 · 띠 옆 단추(띠가 단추라 안에 못 넣는다)
+  const row = el('div', 'lk-home-row');
+  row.appendChild(card);
+  if (caught) {
+    const aq = el('button', 'lk-home-aq');
+    aq.type = 'button';
+    aq.appendChild(el('b', '', '🐠'));
+    aq.appendChild(el('span', '', '아쿠아리움'));
+    aq.addEventListener('click', () => { openAquaNow().catch(() => {}); });
+    row.appendChild(aq);
+  }
+  b.appendChild(row);
   b.hidden = false;
 }
 onProfileReload(() => { if (cardBox && !isLakeOpen()) mountLakeCard(cardBox).catch(() => {}); });
+/** 🐠 아쿠아리움 열기 (v399) — 그림 코드는 들어갈 때 받는다 · onClose는 낚시터가 시계를 되돌릴 때 */
+export async function openAquaNow(onClose) {
+  const m = await import('./aquaview.js');
+  m.openAqua({ onClose });
+}
 /** 📖 도감 창만 (홈 띠에서) */
 export function openLakeDex() {
   if (isDexOpen()) return;
@@ -398,6 +415,7 @@ export async function openLakeNow() {
       boatOpen: boatOpen(lakeRaw()), // 🚤 (v386)
       pick: pk,
       gear: () => gearState(),
+      aqua: (done) => { openAquaNow(done).catch(() => { done(); }); },
       buyGear: (id) => lakeBuy(id),
       onPick: (want) => lakePick(want),
       lookNow: () => avatarOf(getProfileSnapshot()).look, // 낚시 모자·조끼를 산 뒤 새 차림

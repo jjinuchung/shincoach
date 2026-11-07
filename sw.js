@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v398';
+const CACHE_VERSION = 'v399';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -221,6 +221,9 @@ const APP_SHELL = [
   './js/bgm.js',
   './js/calmsong.js', // 🌿 합성 곡 (v317 — v340부터 앱은 안 틂 · 시험 듣기·되돌릴 때를 위해 남김)
   './js/calmfiles.js', // 🌿 국어·논술 배경음 = 고른 곡 파일 늘 무작위 (v340)
+  './js/aquarium.js', // 🐠 진우 아쿠아리움 — 규칙 · 그림 · 화면 (v399)
+  './js/aquaart.js',
+  './js/aquaview.js',
   './js/moveday.js', // 🚚 이사 대작전 — 규칙 · 화면 · 그림 (v397)
   './js/moveview.js',
   './js/movescene.js',
