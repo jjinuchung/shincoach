@@ -3,6 +3,7 @@
 // 네 칸: 👀 구경(물고기를 누르면 이름·가장 긴 기록·소개) · 🐟 물고기(넣고 빼기) · 🐚 꾸미기(칸을 눌러 장식 놓기) · 🛒 가게(단계 올리기 · 장식 사기)
 // 아이 화면에 남은 수·모자란 수를 쓰지 않는다 — 빈자리는 점선 칸으로만 · 값은 값대로 보여 준다
 // 낚시터에서 열면 낚시 시계가 멈춘다(onClose로 되돌림) · 닫으면 장면을 버려 메모리를 돌려준다 · 화면이 안 보이면 그리기를 멈춘다
+// v401 🎟️ 손님 맞이(tourview.js) — 수조 아래 한 줄(기다리는 손님이 있으면 🎟️ 단추) · 맞이하는 동안은 탭·패널 자리에 손님 카드 · 닫으면 멈춤
 
 import { getProfileSnapshot, aquaUpTier, aquaBuy, aquaPut, aquaTake, aquaSlot, onProfileReload } from './xp.js';
 import { TANKS, TOP_TIER, DECO, DECO_GROUPS, decoOf, decoCount, aquaOf, aquaFishRows, aquaPhoto, aquaBest } from './aquarium.js';
@@ -10,6 +11,7 @@ import { lenLabel, speciesOf } from './fishing.js';
 import { AQ_W, AQ_H, makeScene, setFish, setDeco, resetScene, drawScene, fishAt, slotAt, decoThumb } from './aquaart.js';
 import { drawFish } from './fishart.js';
 import { sfx, unlock } from './sfx.js';
+import { guestBar, startTour, stopTour, tourActive } from './tourview.js'; // 🎟️ 손님 맞이 (v401)
 
 const TABS = [['see', '👀 구경'], ['fish', '🐟 물고기'], ['deco', '🐚 꾸미기'], ['shop', '🛒 가게']];
 const FPS_MS = 32;
@@ -47,8 +49,10 @@ function build() {
       <canvas class="aq-cv" width="${AQ_W * 1.5}" height="${AQ_H * 1.5}" role="img" aria-label="물고기가 헤엄치는 수조"></canvas>
       <div class="aq-tip" role="status" hidden></div>
     </div>
+    <div class="aq-guest"></div>
     <div class="aq-tabs" role="tablist"></div>
-    <div class="aq-panel" hidden></div>`;
+    <div class="aq-panel" hidden></div>
+    <div class="aq-tour" aria-live="polite" hidden></div>`;
   document.body.appendChild(root);
   ui.root = root;
   ui.cv = root.querySelector('.aq-cv');
@@ -189,9 +193,23 @@ async function act(run, done) {
   if (r && r.ok) { if (done) done(r); } else say(WHY_KO[(r && r.why) || 'save'] || WHY_KO.save);
   render();
 }
+/** 🎟️ 손님 맞이 시작 (v401) — 구경 칸으로 돌리고 탭·패널을 감춘 뒤 손님 카드 · 끝나면 다시 그린다 */
+function beginTour() {
+  if (tourActive() || ui.busy) return;
+  ui.tab = 'see';
+  ui.sel = -1;
+  say('');
+  startTour(q$('.aq-tour'), () => render(), () => render()).catch(() => { render(); say(WHY_KO.save); });
+  render();
+}
 function render() {
   if (!isAquaOpen()) return;
   const { p, a } = sync();
+  const touring = tourActive();
+  q$('.aq-tabs').hidden = touring;
+  q$('.aq-guest').hidden = touring;
+  if (touring) { q$('.aq-panel').hidden = true; ui.root.classList.remove('is-wide'); paintBase(); return; }
+  guestBar(q$('.aq-guest'), beginTour);
   ui.root.querySelectorAll('.aq-tab').forEach((b) => {
     const on = b.dataset.tab === ui.tab;
     b.classList.toggle('is-on', on);
@@ -331,6 +349,7 @@ export function openAqua({ tab, onClose } = {}) {
 }
 export function closeAqua() {
   if (!isAquaOpen()) return;
+  stopTour(); // 🎟️ 맞이하던 손님은 없던 일 (v401)
   ui.root.hidden = true;
   ui.gen += 1;
   if (ui.raf) { cancelAnimationFrame(ui.raf); ui.raf = 0; }

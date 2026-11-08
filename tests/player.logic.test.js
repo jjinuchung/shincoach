@@ -132,6 +132,7 @@ function loadPlayer() {
     // ⏳ timelimit.js 스텁 — player.js는 기본값과 ⚙ 설정 표시에만 쓴다
     TIME_MIN: { weekday: 60, weekend: 120 },
     KOREAN_MIN: { weekday: 90, weekend: 90 }, // 📚 국어 하루 1시간 30분 (2026-10-11)
+    MUSIC_MIN: { weekday: 40, weekend: 40 }, // 🎹 음악 하루 40분 (v402 · 공부 시간과 따로)
     statusOf: () => ({ used: 0, limit: 3600, bonus: 0, total: 3600, left: 3600, locked: false, warn: false, off: false }),
     fmtUsed: (sec) => `${Math.floor((Number(sec) || 0) / 60)}분`, todayDaily: () => null,
     EXTEND_MAX: 2, EXTEND_MIN: 15, extMaxOf: (v) => (Number.isFinite(Math.floor(Number(v))) && Number(v) >= 0 ? Math.min(3, Math.floor(Number(v))) : 2), // ⏳ 연장권 (2026-10-01)

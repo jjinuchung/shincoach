@@ -433,7 +433,7 @@ test('📝 📤 grammar/날짜.md: 단원마다 표시 · 오개념 이름과 �
 
 test('📝 화면 연결(v349): 홈 카드·문법 화면·⏳ 칩·진단을 걷음 · 영상 사이 쪽지 창 · ⚙ 켜기·끄기 · sw · 원고 검사 · 잡기·🎯 없음 · 문법 전용 포켓몬 없음', () => {
   assert.ok(!SUBJECTS.some((s) => s.key === 'grammar' || s.view === 'grammar'), '첫 화면 카드 넷 — 문법 카드 없음');
-  assert.equal(SUBJECTS.length, 4);
+  assert.deepEqual(SUBJECTS.map((s) => s.key), ['english', 'math', 'korean', 'nonsul', 'music']); // 🎹 음악 카드는 v402 (문법 카드는 없다)
   assert.ok(!ROSTER.some((m) => m.subject === 'grammar'), '문법 전용 명단은 없다(아버님 10-27)');
   const html = read('index.html');
   for (const id of ['view-grammar', 'btn-grammar-back', 'time-chip-grammar', 'grammar-main']) assert.ok(!html.includes(`id="${id}"`), `걷음 ${id}`);

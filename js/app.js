@@ -12,6 +12,7 @@ import { initMath, renderMath, stopCheer } from './math.js';
 import { initNonsul, enterNonsul } from './nonsulview.js'; // 🖊️ 논술 (v303)
 import { initLetters, enterLetters, leaveLetters, refreshLetterStrip } from './lettersview.js'; // 📮 포켓몬 편지 (v351)
 import { initKorean, enterKorean, leaveKorean } from './koreanview.js'; // 📚 국어 — 작품 도감 (2026-10-11) · 🎧 떠나면 소리 멈춤 (v245)
+import { initMusic, enterMusic, leaveMusic } from './pianoview.js'; // 🎹 음악 (v402)
 import { initCalm, enterCalm, leaveCalm } from './calm.js'; // 🌿 국어·논술 잔잔한 배경 음악 (v317)
 import { stopKorCheer } from './korcheer.js'; // 📣 국어·논술 응원 포켓몬 (v327)
 import { initStock, refreshStockBtn } from './stockview.js'; // 🏦 포켓몬 증권시장 (v319)
@@ -40,6 +41,7 @@ const views = {
   korean: document.getElementById('view-korean'),
   nonsul: document.getElementById('view-nonsul'),
   letters: document.getElementById('view-letters'), // 📮 포켓몬 편지 (v351)
+  music: document.getElementById('view-music'), // 🎹 음악 (v402)
 };
 
 /** 지금 화면이 어느 과목의 시간을 쓰는가 — 🎒 도감·📊 기록·🏠 홈은 **안 센다** (아버님 결정 2026-09-27)
@@ -50,6 +52,7 @@ function subjectOfView(name) {
   if (name === 'nonsul') return 'korean'; // 🖊️ 논술은 국어 시간 안 (아버님 2026-10-20)
   if (name === 'library' || name === 'player') return 'english';
   if (name === 'letters') return 'english'; // 📮 편지는 영어 시간 안 (기본안 「추천대로」 2026-10-27)
+  if (name === 'music') return 'music'; // 🎹 음악은 따로 40분 — 🎮 게임기 판을 세는 공부 시간에는 안 들어감 (아버님 2026-11-08)
   return null;
 }
 
@@ -89,6 +92,9 @@ export function showView(name) {
   // 🌿 잔잔한 음악은 국어·논술에서만 — 둘 사이를 오가면 끊기지 않고 이어진다 (v317)
   if (name === 'korean' || name === 'nonsul') enterCalm();
   else leaveCalm();
+  // 🎹 음악 — 들어오면 곡 목록(받은 곡이 있으면 다시) · 나가면 소리·연주 멈춤 (v402)
+  if (name === 'music') enterMusic().catch(() => {});
+  else leaveMusic();
 }
 
 /** 전체 화면 로딩 표시 (영상 열기/저장처럼 수 초 이상 걸리는 작업용) */
@@ -202,6 +208,7 @@ async function main() {
   initKorean({ showView });  // 📚 국어 — ← 버튼 · 다시 읽으면 도감 다시 그리기
   initNonsul({ showView });  // 🖊️ 논술 — ← 버튼 (v303)
   initLetters({ showView }); // 📮 포켓몬 편지 — ← 버튼·우체통 띠 (v351)
+  initMusic({ showView });   // 🎹 음악 — ← 버튼 · ⚙ 집 피아노 연결 확인 (v402)
   initCalm();                // 🌿 국어·논술 머리줄 🎵 단추 (v317)
   initStock({ conf: stockConf }); // 🏦 홈의 🏦 — 🔒 부모 설정(켜기·투자 한도)은 player.stockConf (v319)
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)

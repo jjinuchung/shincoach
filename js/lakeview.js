@@ -21,6 +21,7 @@
 // v387 (낚시터 문제 손보기 기본안 「추천대로」): 🔁 다시 풀기 — redoPlan(지난 낚시 날·오늘 기록) → redoQueue → redoAsker가 물고기마다 첫 수학 차례에 같은 칸 문제 ·
 //   답은 fishRedoKeys·fishRedoQ/Ok에 · 🎚️ 과목 단계 — subjectSteps로 그날 처음 열 때 정해 fishSteps에 적고 창에 steps·stepUp(오른 과목)을 넘긴다
 // v392 (📐 다지기 기본안 「추천대로」): 🐟 물고기 수학 차례에 📐 다지기 문제 하루 세 번까지 — 연 때 수학 장부로 unitTurn · 답하면 mathprog.unitFishCommit(일지 한 줄 + 단계)
+// v401 (🎟️ 손님 맞이 기본안 판 2 「이대로」): 🐠 단추에 손님이 기다리면 🔔(숫자 없음) · askFrom·asker에 차례 꼬리표(tag — 손님 맞이는 'aqua'로 낚시와 다른 줄) · fmNode·fmChart를 내보냄
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
 import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_REDO_Q, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, redoKey, redoPlan, redoQueue, qFingerprint, waitKey, subjectSteps, stepLines, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
@@ -34,6 +35,9 @@ import { listDaily, getDaily, applyDailyDelta, getMath, updateMath } from './db.
 import { avatarOf } from './avatar.js';
 import { loadCharacters, characterUrl, artUrl, ensureArt } from './pokemon.js';
 import { clockDay, limitConf } from './timelimit.js';
+import { studySec } from './minigame.js'; // 🎟️ 그날 공부한 초 — 🎮 게임기 판·🐾 손님과 같은 셈 (v401)
+import { dailyNow } from './gameview.js'; // 🎟️ 아직 저장 안 한 과목 초까지 (v401 — app.js가 이미 불러 둔 모듈)
+import { waitingOf } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 (v401 — 순수)
 
 let cardBox = null;
 const ui = { busy: false, src: null };
@@ -95,6 +99,13 @@ export async function mountLakeCard(box) {
     aq.type = 'button';
     aq.appendChild(el('b', '', '🐠'));
     aq.appendChild(el('span', '', '아쿠아리움'));
+    // 🎟️ 손님이 기다리면 🔔 하나 (v401 — 몇 무리인지는 쓰지 않는다)
+    let bell = false;
+    try { bell = waitingOf(getProfileSnapshot(), Date.now(), studySec(dailyNow())).waiting; } catch { bell = false; }
+    if (bell) {
+      aq.appendChild(el('span', 'lk-home-bell', '🔔'));
+      aq.setAttribute('aria-label', '아쿠아리움 — 손님이 왔어요');
+    }
     aq.addEventListener('click', () => { openAquaNow().catch(() => {}); });
     row.appendChild(aq);
   }
@@ -105,7 +116,8 @@ onProfileReload(() => { if (cardBox && !isLakeOpen()) mountLakeCard(cardBox).cat
 /** 🐠 아쿠아리움 열기 (v399) — 그림 코드는 들어갈 때 받는다 · onClose는 낚시터가 시계를 되돌릴 때 */
 export async function openAquaNow(onClose) {
   const m = await import('./aquaview.js');
-  m.openAqua({ onClose });
+  // 닫으면 홈 띠도 다시 — 🎟️ 손님을 맞이했으면 🔔를 내린다 (v401)
+  m.openAqua({ onClose: () => { if (onClose) onClose(); if (cardBox && !isLakeOpen()) mountLakeCard(cardBox).catch(() => {}); } });
 }
 /** 📖 도감 창만 (홈 띠에서) */
 export function openLakeDex() {
@@ -125,9 +137,9 @@ export function sharesOf(days, nsDayMap, today, avail) {
  * step = 실제로 본 자리 수(못 만든 자리까지) — 부르는 쪽이 at을 그만큼 넘긴다(Codex 170차 — 못 만든 자리를 안 넘겨 같은 문제가 두 번 나오거나 그 과목이 영영 빠지던 것) · 12자리까지 보고 못 만들면 q는 null
  * lv = 단계(v378 — 원천 make가 그 단계 꼴을 만들고, 못 만들면 1단계 꼴 · 🎒 대여행은 lv 없이 부른다)
  */
-export function askFrom(src, subj, today, at, seed, lv = 1) {
+export function askFrom(src, subj, today, at, seed, lv = 1, tag = 'lake') {
   if (!src || !Array.isArray(src.keys) || !src.keys.length) return { q: null, step: 0 };
-  const keys = orderOf(src.keys, `lake:${today}`, subj);
+  const keys = orderOf(src.keys, `${tag}:${today}`, subj);
   const look = Math.min(keys.length, 12);
   for (let t = 0; t < look; t++) {
     let q = null;
@@ -174,12 +186,16 @@ export function redoAsker(base, mathSrc, rq, alive = () => true) {
     return base(subj, seed, lv);
   };
 }
-/** 창이 쓰는 문제 내기 (subj, seed, lv) → 문제 | null — 과목마다 자리(start = startOf)에서 askFrom이 본 만큼(못 만든 자리까지) 넘긴다 */
-export function asker(srcs, day, start) {
+/**
+ * 창이 쓰는 문제 내기 (subj, seed, lv) → 문제 | null — 과목마다 자리(start = startOf)에서 askFrom이 본 만큼(못 만든 자리까지) 넘긴다 ·
+ * onStep(subj, step) = 넘긴 자리 수 (🎟️ 손님 맞이는 단계가 낮아 버린 문제까지 적어 두고 다시 열 때 그 뒤부터 — Codex 203차 · 낚시터는 안 씀)
+ */
+export function asker(srcs, day, start, tag = 'lake', onStep = null) {
   const at = { ...(start || {}) };
   return (subj, seed, lv = 1) => {
-    const r = askFrom(srcs && srcs[subj], subj, day, nz(at[subj]), seed, lv);
+    const r = askFrom(srcs && srcs[subj], subj, day, nz(at[subj]), seed, lv, tag);
     at[subj] = nz(at[subj]) + r.step;
+    if (onStep && r.step) { try { onStep(subj, r.step); } catch { /* 무시 */ } }
     return r.q;
   };
 }
@@ -255,7 +271,7 @@ function sv(tag, attrs, text) {
   return e;
 }
 /** 📊 물고기 수학 막대그래프 (SVG) — 눈금 한 칸 = chart.unit마리 · 칸마다 글자(칸이 많으면 두 칸마다) */
-function fmChart(chart) {
+export function fmChart(chart) {
   const bars = chart.bars;
   const unit = chart.unit || 1;
   const ticks = Math.ceil(Math.max(...bars.map((b) => b.v)) / unit) + 1;
@@ -285,7 +301,7 @@ function fmChart(chart) {
   return svg;
 }
 /** 🐟 물고기 수학 카드 몸통 — 📖 도감 기록 칩 · 물음 · 막대그래프 (💡 도움말은 카드의 tip 줄) */
-function fmNode(q) {
+export function fmNode(q) {
   const box = el('div', 'lk-fm');
   if (q.facts && q.facts.length) {
     const fs = el('div', 'lk-fm-facts');

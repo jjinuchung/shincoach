@@ -30,6 +30,8 @@ import { copyGuest, arriveRule, guestPlayRule, guestNow as guestNowOf } from './
 import { moveBlocksTrip, moveStartRule, moveAnswerRule, moveSwapRule, moveEventRule, moveGiftRule, movePickRule, moveFurnRule, moveEndRule } from './moveday.js'; // 🚚 이사 대작전 (v397 — 순수)
 import { copyJourney, startRule as jrStartRule, answerRule as jrAnswerRule, swapRule as jrSwapRule, homeRule as jrHomeRule, pickRule as jrPickRule, eventRule as jrEventRule } from './journey.js'; // 🎒 포켓몬 대여행 (v341, 순수) · 구역 이벤트 (v362)
 import { copyAqua, aquaTierRule, aquaBuyRule, aquaPutRule, aquaTakeRule, aquaSlotRule } from './aquarium.js'; // 🐠 진우 아쿠아리움 (v399 — 순수)
+import { copyTour, tourEndRule, bookRule as tourBookRule } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 (v401 — 순수)
+import { copyPiano, pianoOf, tapRule as pianoTapRule, listenRule as pianoListenRule } from './piano.js'; // 🎹 음악 과목 (v402 — 순수)
 import { copyLake, catchRule as lakeCatchRule, gearBuyRule as lakeGearRule, pickRule as lakePickRule, gearOf as lakeGearOf } from './fishing.js'; // 🎣 학습 낚시터 도감·💰 · 🎒 채비·고른 물가(v368) (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
@@ -404,7 +406,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.homeGuest ? { homeGuest: copyGuest(p.homeGuest) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), ...(p.aquarium ? { aquarium: copyAqua(p.aquarium) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.homeGuest ? { homeGuest: copyGuest(p.homeGuest) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), ...(p.aquarium ? { aquarium: copyAqua(p.aquarium) } : {}), ...(p.aquaTour ? { aquaTour: copyTour(p.aquaTour) } : {}), ...(p.piano ? { piano: copyPiano(p.piano) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
 }
 
 /** 저장소가 준 프로필을 메모리로 — 아직 못 쓴 몫은 얹어 둔다: 쓴 물건이 되살아나거나 번 코인이 사라져 보이지 않게 (v396 · Codex 199차) */
@@ -1048,6 +1050,27 @@ export function aquaTake(key) {
 /** 🐚 장식 칸에 놓기 · 빼기(id '') */
 export function aquaSlot(slot, id) {
   return houseDo((p) => aquaSlotRule(p, slot, id, Date.now()));
+}
+// 🎟️ 아쿠아리움 손님 맞이 (v401) — 정산·장부 💰는 저장된 프로필로 한 트랜잭션(두 창이 같은 무리를 두 번 받지 않게 · 저장 실패면 { ok: false, why: 'save' })
+/** 🧾 한 무리 정산 — req = { n, t, good, sec, likes, visitors } · 날은 트랜잭션 안의 시각으로 */
+export function tourEnd(req) {
+  return houseDo((p) => tourEndRule(p, req, Date.now()));
+}
+/** 📊 지난주 장부를 봤다 — req = { week, good } */
+export function tourBook(req) {
+  return houseDo((p) => tourBookRule(p, req, Date.now()));
+}
+/** 🎹 태블릿으로 치기 한 판 끝 (v402) — 💰는 저장된 프로필로 한 트랜잭션에서(두 창이어도 하루 세 번) · 날은 트랜잭션 안의 시각으로 */
+export function pianoTap(req) {
+  return houseDo((p) => pianoTapRule(p, req, Date.now()));
+}
+/** 🎧 「다 쳤어요 ✋」 (v402) — 음표 칸은 저장된 프로필로 한 트랜잭션에서(하루 세 칸) */
+export function pianoListen(req) {
+  return houseDo((p) => pianoListenRule(p, req, Date.now()));
+}
+/** 🎹 지금 음악 기록 (그리기용 — 고쳐 읽은 새 객체) */
+export function pianoNow() {
+  return pianoOf(profile && profile.piano);
 }
 /** 📚 국어 글 한 편을 다 읽었다 — 잘못 읽기 횟수 + 받을 별이 있으면 별·💰를 저장된 프로필로 한 트랜잭션에서(houseDo = applyHouseRule = mutateProfile)
  *  ids = 지금 있는 카드 id · 날은 트랜잭션 안의 시각으로 센다(창을 연 날이 아니라) */

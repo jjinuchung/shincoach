@@ -1,0 +1,454 @@
+// 🎹 음악(피아노) 과목 — 규칙 (v402, 2026-11-08 · 아버님·어머님·진우 기본안 판 3 「추천대로」)
+//
+// 진우가 선생님 없이 악보를 보고 칠 건반을 찾게 한다. 한 무대(악보 · 떨어지는 막대 · 건반)를 두 가지로 쓴다:
+//   🎹 태블릿으로 치기 — 진우가 화면 건반을 누른다 · 맞는 건반을 칠 때까지 기다린다 · 고르지 않은 손은 앱이 친다
+//      → 끝까지 치고 맞게 누른 비율이 PASS_OK를 넘으면 💰 (한 줄 COIN.line · 곡 전체 COIN.all · 하루 TAP_DAY번까지)
+//   🎧 듣고 따라 치기 — 앱이 연주하고 진우는 보면대 앞 진짜 피아노로 따라 친다 (어머님 바람)
+//      → 앱이 그 줄을 끝까지 연주한 뒤 「다 쳤어요 ✋」 = 음표 한 칸 (하루 LISTEN_DAY칸까지 · 💰 없음)
+//      → 다섯 칸(NOTES_PER_MON)마다 음악 포켓몬 (포켓몬은 v403 — 칸은 v402부터 센다 · 그때까지 찬 칸도 인정)
+// 도움은 잠그지 않는다 — 네 단계(1 막대 · 2 계이름 · 3 건반 빛 · 4 악보만)를 처음부터 고르고, 끝나면 한 단계 걷기를 권하기만.
+// ⏳ 하루 40분은 음악만 따로(timelimit.js 'music') — 🎮 게임기 판을 세는 공부 시간(timelimit.SUBJECTS)에는 넣지 않는다.
+//
+// 곡 표기 (pianosongs.js 공개 연습곡 · 비공개 저장소 music/songs.json — 진우 책 곡은 저작권이 있어 공개 저장소에 두지 않는다):
+//   { id, ko, by?, bpm, beats, lines:[줄 첫 마디(1부터)], segno?, fine?, dsAlFine?, chords?:{마디:[이름]}, dyn?:{마디:'mf'},
+//     right:[마디마다 한 칸], left:[…] }
+//   한 칸 = 빈칸으로 나눈 '음:박:손가락' — 화음 'B4+G5:2:1+5' · 쉼표 'R:1' · 붙임줄은 끝에 '~'(다음 같은 음과 이어 한 번만 친다)
+//
+// ★ 이 파일은 아무것도 import하지 않는다 — 시험이 DOM·IndexedDB 없이 부른다.
+
+/** 🎹 태블릿으로 치기 — 맞게 누른 비율이 이만큼 넘어야 💰 (화면에는 비율을 보이지 않는다) */
+export const PASS_OK = 0.7;
+/** 💰 한 줄 · 곡 전체 */
+export const COIN = { line: 5, all: 15 };
+/** 💰를 받는 하루 횟수 */
+export const TAP_DAY = 3;
+/** 🎧 「다 쳤어요」 음표 칸 — 하루 셈 */
+export const LISTEN_DAY = 3;
+/** 음표 칸 다섯마다 음악 포켓몬 (v403) */
+export const NOTES_PER_MON = 5;
+/** 도움 단계 */
+export const LEVELS = [1, 2, 3, 4];
+/** 빠르기 막대 — 원래 빠르기의 몇 배 (아버님: 단추 대신 밀어서) */
+export const SPEED = { min: 0.4, max: 1.2, step: 0.05, def: 0.75 };
+/** 날마다 남기는 칸 수 · 연습 기록 줄 수 */
+export const KEEP_DAYS = 14;
+export const LOG_MAX = 60;
+/** 곡 하나의 상한 (비공개 원고가 깨져도 화면이 버티게) */
+export const MAX_BARS = 200;
+/** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 */
+export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes'];
+
+const LETTERS = 'CDEFGAB';
+const SEMI = [0, 2, 4, 5, 7, 9, 11];
+const SOL = ['도', '레', '미', '파', '솔', '라', '시'];
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const nz = (v) => { const n = Math.floor(Number(v) || 0); return n > 0 ? n : 0; };
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const EPS = 1e-6;
+
+// ───────────────────── 음 ─────────────────────
+
+/** 'G#4' → { li, acc, oct, d(흰건반 차례 — 오선 자리), midi } · 아니면 null */
+export function parseNote(s) {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(String(s || ''));
+  if (!m) return null;
+  const li = LETTERS.indexOf(m[1]);
+  const acc = m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0;
+  const oct = Number(m[3]);
+  return { li, acc, oct, d: oct * 7 + li, midi: 12 * (oct + 1) + SEMI[li] + acc };
+}
+
+/** 계이름 '도'·'파♯'·'시♭' */
+export function solOf(n) {
+  if (!n) return '';
+  return SOL[n.li] + (n.acc > 0 ? '♯' : n.acc < 0 ? '♭' : '');
+}
+
+/** midi → 흰건반 차례(검은 건반은 왼쪽 흰건반) */
+const WHITE_OF = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
+export function whiteIdx(midi) {
+  return Math.floor(midi / 12) * 7 + WHITE_OF[((midi % 12) + 12) % 12];
+}
+export function isBlack(midi) {
+  return [1, 3, 6, 8, 10].includes(((midi % 12) + 12) % 12);
+}
+export function midiOfWhite(wi) {
+  return 12 * Math.floor(wi / 7) + SEMI[((wi % 7) + 7) % 7];
+}
+
+// ───────────────────── 곡 읽기 ─────────────────────
+
+/** 한 마디 글 → [{ notes:[parseNote+finger], rest, dur, tie, t }] · 깨졌으면 { bad } */
+function readBar(text, beats) {
+  const out = [];
+  let t = 0;
+  const toks = String(text == null ? '' : text).trim().split(/\s+/).filter(Boolean);
+  if (!toks.length) return { bad: '빈 마디' };
+  for (const raw of toks) {
+    const tie = raw.endsWith('~');
+    const [ns, ds, fs = ''] = raw.replace(/~$/, '').split(':');
+    const dur = Number(ds);
+    if (!(dur > 0) || dur > beats * 2) return { bad: `박 ${ds}` };
+    if (ns === 'R') {
+      if (tie) return { bad: '쉼표에 붙임줄' };
+      out.push({ rest: true, notes: [], dur, t, tie: false });
+    } else {
+      const names = ns.split('+');
+      const fins = fs ? fs.split('+') : [];
+      if (fins.length && fins.length !== names.length) return { bad: `손가락 수 ${raw}` };
+      const notes = [];
+      for (let k = 0; k < names.length; k += 1) {
+        const n = parseNote(names[k]);
+        if (!n || n.midi < 21 || n.midi > 108) return { bad: `음 ${names[k]}` };
+        const f = fins[k] ? Number(fins[k]) : 0;
+        if (fins[k] && !(Number.isInteger(f) && f >= 1 && f <= 5)) return { bad: `손가락 ${fins[k]}` };
+        notes.push({ ...n, name: names[k], finger: f });
+      }
+      out.push({ rest: false, notes, dur, t, tie });
+    }
+    t += dur;
+  }
+  if (Math.abs(t - beats) > EPS) return { bad: `박 합 ${t}` };
+  return { groups: out };
+}
+
+/**
+ * 곡 원고 → 쓸 수 있는 곡 (순수) · 깨졌으면 { ok:false, bad:[까닭] }
+ * 붙임줄(~)은 같은 손·같은 음으로만 이어진다(마디를 넘어도) · 줄 첫 마디는 1부터 늘어나야 · 세뇨·피네는 마디 안
+ */
+export function readSong(raw) {
+  const bad = [];
+  if (!isObj(raw)) return { ok: false, bad: ['곡이 아님'] };
+  const id = String(raw.id || '').trim();
+  if (!/^[a-z0-9_-]{1,40}$/i.test(id)) bad.push('id');
+  const ko = String(raw.ko || '').trim().slice(0, 40);
+  if (!ko) bad.push('이름');
+  const beats = Number(raw.beats);
+  if (![2, 3, 4].includes(beats)) bad.push('박자');
+  const bpm = Number(raw.bpm);
+  if (!(bpm >= 30 && bpm <= 240)) bad.push('빠르기');
+  const R = Array.isArray(raw.right) ? raw.right : null;
+  const L = Array.isArray(raw.left) ? raw.left : null;
+  if (!R || !L || !R.length || R.length !== L.length || R.length > MAX_BARS) bad.push('마디 수');
+  if (bad.length) return { ok: false, bad };
+  const n = R.length;
+  const bars = { R: [], L: [] };
+  for (const [hand, list] of [['R', R], ['L', L]]) {
+    for (let b = 0; b < n; b += 1) {
+      const r = readBar(list[b], beats);
+      if (r.bad) { bad.push(`${hand === 'R' ? '오른손' : '왼손'} ${b + 1}마디 ${r.bad}`); bars[hand].push([]); } else bars[hand].push(r.groups);
+    }
+    // 붙임줄 — 다음 음(마디를 넘어도)이 같은 음이어야
+    const flat = bars[hand].flatMap((gs, b) => gs.map((g) => ({ g, b })));
+    flat.forEach(({ g, b }, i) => {
+      if (!g.tie) return;
+      const nx = flat[i + 1];
+      const same = nx && !nx.g.rest && nx.g.notes.map((x) => x.midi).join() === g.notes.map((x) => x.midi).join();
+      if (!same) bad.push(`${hand === 'R' ? '오른손' : '왼손'} ${b + 1}마디 붙임줄이 같은 음으로 안 이어짐`);
+    });
+  }
+  const lines = Array.isArray(raw.lines) && raw.lines.length ? raw.lines.map(Number) : [1];
+  if (lines[0] !== 1 || lines.some((v, i) => !Number.isInteger(v) || v < 1 || v > n || (i && v <= lines[i - 1]))) bad.push('줄 첫 마디');
+  const segno = raw.segno == null ? 0 : Number(raw.segno);
+  const fine = raw.fine == null ? 0 : Number(raw.fine);
+  const ds = raw.dsAlFine === true;
+  if (segno && !(Number.isInteger(segno) && segno >= 1 && segno <= n)) bad.push('세뇨');
+  if (fine && !(Number.isInteger(fine) && fine >= (segno || 1) && fine <= n)) bad.push('피네');
+  if (ds && !(segno && fine)) bad.push('D.S. al Fine에 세뇨·피네가 없음');
+  if (bad.length) return { ok: false, bad };
+  const chords = {};
+  if (isObj(raw.chords)) for (const [k, v] of Object.entries(raw.chords)) if (Array.isArray(v)) chords[k] = v.map((x) => String(x).slice(0, 12)).slice(0, 4);
+  const dyn = {};
+  if (isObj(raw.dyn)) for (const [k, v] of Object.entries(raw.dyn)) dyn[k] = String(v).slice(0, 4);
+  return {
+    ok: true,
+    song: { id, ko, by: String(raw.by || '').slice(0, 40), from: String(raw.from || '').slice(0, 120), bpm, beats, n, lines, segno, fine, ds, chords, dyn, bars },
+  };
+}
+
+/** 줄 k의 마디(0부터) [첫, 끝+1) */
+export function lineBars(song, k) {
+  const a = song.lines[k] - 1;
+  const b = k + 1 < song.lines.length ? song.lines[k + 1] - 1 : song.n;
+  return [a, b];
+}
+
+/**
+ * 연주 차례 — 마디 번호(0부터) 목록 (순수)
+ * line < 0(곡 전체): 처음부터 끝까지, D.S. al Fine이면 세뇨로 돌아가 피네에서 끝 · 줄 하나: 그 줄 마디만(되돌이 없이)
+ */
+export function playOrder(song, line = -1) {
+  if (line >= 0 && line < song.lines.length) {
+    const [a, b] = lineBars(song, line);
+    return Array.from({ length: b - a }, (_, i) => a + i);
+  }
+  const order = Array.from({ length: song.n }, (_, i) => i);
+  if (song.ds) for (let b = song.segno - 1; b <= song.fine - 1; b += 1) order.push(b);
+  return order;
+}
+
+/**
+ * 연주판 — 차례대로 펼친 마디 · 소리 낼 음(붙임줄은 한 번) · 그릴 머리 (순수)
+ * @returns {{ bars:[{src, at}], notes:[{hand, midi, d, li, acc, t, dur, finger, src}], heads:[{hand, t, dur, notes, rest, tie, src, gi}], end }}
+ *   t·at·end는 박(0부터) · src는 원래 마디(0부터)
+ */
+export function perform(song, line = -1) {
+  const order = playOrder(song, line);
+  const bars = order.map((src, i) => ({ src, at: i * song.beats }));
+  const heads = [];
+  const notes = [];
+  for (const hand of ['R', 'L']) {
+    let hold = null; // 붙임줄로 이어 가는 중인 소리
+    bars.forEach(({ src, at }, bi) => {
+      bars[bi].first = bi === 0 || bars[bi - 1].src !== src - 1; // 되돌아온 첫 마디(세뇨) — 그림에 표시
+      bar(song.bars[hand][src]).forEach((g, gi) => {
+        const t = at + g.t;
+        heads.push({ hand, t, dur: g.dur, notes: g.notes, rest: g.rest, tie: g.tie, src, gi });
+        if (g.rest) { hold = null; return; }
+        if (hold && hold.next === t && hold.key === g.notes.map((x) => x.midi).join()) {
+          for (const s of hold.list) s.dur += g.dur;
+        } else {
+          hold = { list: g.notes.map((x) => { const s = { hand, midi: x.midi, d: x.d, li: x.li, acc: x.acc, t, dur: g.dur, finger: x.finger, src }; notes.push(s); return s; }) };
+        }
+        hold = g.tie ? { ...hold, next: t + g.dur, key: g.notes.map((x) => x.midi).join() } : null;
+      });
+    });
+  }
+  notes.sort((a, b) => a.t - b.t || a.midi - b.midi);
+  heads.sort((a, b) => a.t - b.t);
+  return { bars, notes, heads, end: bars.length * song.beats };
+}
+const bar = (gs) => (Array.isArray(gs) ? gs : []);
+
+/**
+ * 🎹 태블릿으로 치기 — 기다릴 걸음 (순수): 진우가 치는 손의 음을 같은 때끼리 묶는다
+ * @param {'R'|'L'|'B'} hands
+ * @returns {Array<{t:number, need:number[]}>}
+ */
+export function stepsOf(perf, hands) {
+  const m = new Map();
+  for (const s of perf.notes) {
+    if (hands !== 'B' && s.hand !== hands) continue;
+    const k = s.t.toFixed(4);
+    if (!m.has(k)) m.set(k, { t: s.t, need: [] });
+    if (!m.get(k).need.includes(s.midi)) m.get(k).need.push(s.midi);
+  }
+  return [...m.values()].sort((a, b) => a.t - b.t);
+}
+
+/** 보여 줄 건반 창 — 흰건반 차례 [lo, hi] (순수) · 그 음들 + 양옆 pad · 적어도 minKeys개 (88건반 양 끝에서도) */
+export function keyWindow(midis, pad = 1, minKeys = 12) {
+  const ws = (midis.length ? midis : [60]).map(whiteIdx);
+  const A0 = whiteIdx(21);
+  const C8 = whiteIdx(108);
+  let lo = Math.min(...ws) - pad;
+  let hi = Math.max(...ws) + pad;
+  while (hi - lo + 1 < minKeys) { if ((hi - lo) % 2) lo -= 1; else hi += 1; }
+  // 88건반 밖으로 나간 만큼 반대쪽으로 옮긴 뒤 자른다 — 자르기만 하면 맨 아래·맨 위 곡에서 건반이 적어진다 (Codex 204차 P3-8)
+  if (lo < A0) { hi += A0 - lo; lo = A0; }
+  if (hi > C8) { lo -= hi - C8; hi = C8; }
+  return { lo: Math.max(A0, lo), hi: Math.min(C8, hi) };
+}
+
+/** 🎹 칠 때가 이만큼(박) 남았으면 미리 눌러도 맞음 */
+export const EARLY = 0.6;
+
+/**
+ * 🎹 누른 건반 판정 (순수) — st = 지금 기다리는 걸음 { t, need, got:Set } · t = 지금 박
+ * → 'ok'(칠 음) · 'bad'(칠 때가 가까운데 다른 건반) · 'plain'(아직 멀거나 이미 누른 음 — 세지 않음)
+ * ★ 틀린 건반은 기다리는 동안만이 아니라 「가까울 때」 모두 센다 — 건반을 마구 눌러 미리 맞혀도 비율이 오르지 않게
+ */
+export function pressKind(st, t, waiting, midi) {
+  if (!st) return 'plain';
+  if (!waiting && st.t - t > EARLY) return 'plain';
+  if (!st.need.includes(midi)) return 'bad';
+  return st.got && st.got.has(midi) ? 'plain' : 'ok';
+}
+
+/** 맞게 누른 비율로 잘 쳤나 (순수) — 누른 게 하나도 없으면 아니다 */
+export function goodPass(ok, bad) {
+  const a = nz(ok);
+  const b = nz(bad);
+  return a > 0 && a / (a + b) >= PASS_OK - EPS;
+}
+
+/** 다음에 권할 도움 걷기 (아이 화면 말) */
+export function nextHint(lv) {
+  return ['', '다음엔 막대 없이 해 볼까요?', '다음엔 계이름 없이 해 볼까요?', '다음엔 건반 빛 없이 해 볼까요?', '악보만 보고 끝까지 쳤어요!'][lv] || '';
+}
+
+// ───────────────────── 저장 (profile.piano) ─────────────────────
+
+/** 지역 날짜 "YYYY-MM-DD" */
+export function dayKeyOf(now = Date.now()) {
+  const d = new Date(now);
+  const p = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 연습 기록 한 줄 고쳐 읽기 — 깨졌으면 null */
+function logRow(r) {
+  if (!isObj(r)) return null;
+  const at = Number(r.at);
+  if (!(at > 0) || !['t', 'l'].includes(r.m)) return null;
+  return {
+    at, m: r.m, s: String(r.s || '').slice(0, 40), n: Number.isInteger(r.n) && r.n >= -1 && r.n < MAX_BARS ? r.n : -1,
+    h: ['R', 'L', 'B'].includes(r.h) ? r.h : 'B', lv: LEVELS.includes(r.lv) ? r.lv : 1,
+    sp: Math.round(Math.min(SPEED.max, Math.max(SPEED.min, Number(r.sp) || SPEED.def)) * 100) / 100,
+    ok: nz(r.ok), bad: nz(r.bad), c: nz(r.c), x: r.x === 1 ? 1 : 0,
+  };
+}
+
+/**
+ * profile.piano 고쳐 읽기 (순수) → { days:{날:{paid, coins, notes}}, notes, log:[…] }
+ * days는 빈 날을 빼고 늦은 날 KEEP_DAYS개 · notes(모든 음표 칸)는 날 칸 합보다 작을 수 없다
+ */
+export function pianoOf(raw) {
+  const src = isObj(raw) ? raw : {};
+  const ds = isObj(src.days) ? src.days : {};
+  const kept = Object.entries(ds).filter(([k, e]) => DAY_RE.test(k) && isObj(e))
+    .map(([k, e]) => [k, { paid: Math.min(TAP_DAY, nz(e.paid)), coins: nz(e.coins), notes: Math.min(LISTEN_DAY, nz(e.notes)) }])
+    .filter(([, e]) => e.paid || e.coins || e.notes)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, KEEP_DAYS);
+  const days = Object.fromEntries(kept);
+  const dayNotes = kept.reduce((a, [, e]) => a + e.notes, 0);
+  const log = (Array.isArray(src.log) ? src.log : []).map(logRow).filter(Boolean).sort((a, b) => a.at - b.at).slice(-LOG_MAX);
+  return { days, notes: Math.max(nz(src.notes), dayNotes), log };
+}
+
+/** 깊은 복사 (xp·db fromStored) */
+export function copyPiano(raw) {
+  const p = pianoOf(raw);
+  return { days: Object.fromEntries(Object.entries(p.days).map(([k, e]) => [k, { ...e }])), notes: p.notes, log: p.log.map((r) => ({ ...r })) };
+}
+
+/**
+ * 백업 병합 (순수) — 날마다 칸은 큰 쪽(옛 백업으로 그날 한도를 다시 열지 못하게) · 모든 음표 칸은 큰 쪽(줄지 않는다) ·
+ * 연습 기록은 합집합(같은 때·같은 방법·같은 곡은 한 줄) · 둘 다 없으면 null
+ */
+export function mergePiano(a, b) {
+  if (!isObj(a) && !isObj(b)) return null;
+  const x = pianoOf(a);
+  const y = pianoOf(b);
+  const days = { ...x.days };
+  for (const [k, e] of Object.entries(y.days)) {
+    const o = days[k];
+    days[k] = o ? { paid: Math.max(o.paid, e.paid), coins: Math.max(o.coins, e.coins), notes: Math.max(o.notes, e.notes) } : { ...e };
+  }
+  const seen = new Map();
+  for (const r of [...x.log, ...y.log]) seen.set(`${r.at}:${r.m}:${r.s}`, r);
+  return pianoOf({ days, notes: Math.max(x.notes, y.notes), log: [...seen.values()] });
+}
+
+/** 음표 칸 — 지금 찬 칸(0~5 · 다섯이 막 찼으면 5) · 지금까지 찬 묶음 수 (순수) */
+export function slotsOf(notes) {
+  const n = nz(notes);
+  return { filled: n && n % NOTES_PER_MON === 0 ? NOTES_PER_MON : n % NOTES_PER_MON, sets: Math.floor(n / NOTES_PER_MON) };
+}
+
+/** 오늘 칸 (순수) */
+export function todayOf(p, now = Date.now()) {
+  const tr = pianoOf(p && p.piano);
+  return tr.days[dayKeyOf(now)] || { paid: 0, coins: 0, notes: 0 };
+}
+
+/** 요청 확인 — 곡·줄·손·단계·빠르기 */
+function reqOk(r) {
+  return isObj(r) && /^[a-z0-9_-]{1,40}$/i.test(String(r.song || '')) && Number.isInteger(r.line) && r.line >= -1 && r.line < MAX_BARS
+    && ['R', 'L', 'B'].includes(r.hand) && LEVELS.includes(r.lv) && Number(r.sp) >= SPEED.min - EPS && Number(r.sp) <= SPEED.max + EPS;
+}
+function pushLog(tr, row) {
+  tr.log = [...tr.log, logRow(row)].filter(Boolean).slice(-LOG_MAX);
+}
+/** 시계가 뒤로 갔나 — 남은 날이 모두 오늘보다 늦으면 (오늘 칸을 새로 만들어 한도를 다시 여는 길을 막는다) */
+function clockBack(tr, today) {
+  const ks = Object.keys(tr.days);
+  return !own(tr.days, today) && ks.length > 0 && ks.every((k) => k > today);
+}
+
+/**
+ * 🎹 태블릿으로 치기 한 판 끝 (순수 — xp.houseDo 안에서 저장된 프로필로) → { ok, coins, why? }
+ * req = { song, line(-1 곡 전체), hand, lv, sp, ok(맞게 누른 수), bad(틀리게 누른 수) }
+ * 잘 쳤고(goodPass) 오늘 TAP_DAY번 안이면 💰(coins·coinsEarned 함께) · 아니면 기록만(why 'try' | 'cap')
+ */
+export function tapRule(p, req, now) {
+  if (!reqOk(req) || !Number.isFinite(Number(req.ok)) || !Number.isFinite(Number(req.bad))) return { ok: false, why: 'bad' };
+  const tr = pianoOf(p.piano);
+  const today = dayKeyOf(now);
+  if (clockBack(tr, today)) return { ok: false, why: 'clock' };
+  const good = goodPass(req.ok, req.bad);
+  const day = tr.days[today] || { paid: 0, coins: 0, notes: 0 };
+  let coins = 0;
+  let why = good ? '' : 'try';
+  if (good && day.paid >= TAP_DAY) why = 'cap';
+  if (good && !why) {
+    coins = req.line < 0 ? COIN.all : COIN.line;
+    tr.days[today] = { ...day, paid: day.paid + 1, coins: day.coins + coins };
+    p.coins = nz(p.coins) + coins;
+    p.coinsEarned = nz(p.coinsEarned) + coins; // 낚시(fishing.catchRule)와 같이 — 번 💰는 함께 오른다
+  }
+  pushLog(tr, { at: now, m: 't', s: req.song, n: req.line, h: req.hand, lv: req.lv, sp: req.sp, ok: req.ok, bad: req.bad, c: coins, x: 0 });
+  p.piano = tr;
+  return { ok: true, coins, good, ...(why ? { why } : {}) };
+}
+
+/**
+ * 🎧 「다 쳤어요 ✋」 (순수) → { ok, counted, notes(모든 칸), why? }
+ * 오늘 LISTEN_DAY칸 안이면 음표 한 칸 · 아니면 기록만(why 'cap')
+ */
+export function listenRule(p, req, now) {
+  if (!reqOk(req)) return { ok: false, why: 'bad' };
+  const tr = pianoOf(p.piano);
+  const today = dayKeyOf(now);
+  if (clockBack(tr, today)) return { ok: false, why: 'clock' };
+  const day = tr.days[today] || { paid: 0, coins: 0, notes: 0 };
+  const counted = day.notes < LISTEN_DAY;
+  if (counted) {
+    tr.days[today] = { ...day, notes: day.notes + 1 };
+    tr.notes += 1;
+  }
+  pushLog(tr, { at: now, m: 'l', s: req.song, n: req.line, h: req.hand, lv: req.lv, sp: req.sp, ok: 0, bad: 0, c: 0, x: counted ? 1 : 0 });
+  p.piano = tr;
+  return { ok: true, counted, notes: tr.notes, ...(counted ? {} : { why: 'cap' }) };
+}
+
+// ───────────────────── 📤 ─────────────────────
+
+/** 📤 usage 하루 한 줄 (순수) — 하루 칸(PIANO_DAILY)으로 · 한 것이 없으면 '' */
+export function pianoDayLine(d) {
+  const g = (k) => nz(d && d[k]);
+  if (!g('pnTapN') && !g('pnListenN')) return '';
+  const parts = [];
+  if (g('pnTapN')) parts.push(`🎹 태블릿 치기 끝까지 ${g('pnTapN')}판(잘 친 판 ${g('pnTapOk')} · 💰${g('pnCoins')})`);
+  if (g('pnListenN')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')})`);
+  return parts.join(' · ');
+}
+
+/**
+ * 📤 usage/music.md (순수) — 모든 음표 칸 · 최근 연습 기록 (새것부터)
+ * @param {object} raw profile.piano · @param {string} today · @param {(id:string)=>string} nameOf 곡 id → 이름
+ * @param {{at:number, ok:boolean, name?:string, note?:string, why?:string}|null} [midi] ⚙ 집 피아노 연결 확인 결과(이 기기)
+ */
+export function pianoMd(raw, today, nameOf = (s) => s, midi = null) {
+  const tr = pianoOf(raw);
+  if (!tr.log.length && !tr.notes && !midi) return '';
+  const midiLine = midi ? `🎹 집 피아노 연결 확인 (${dayKeyOf(midi.at)}): ${midi.ok ? `잡힘 — ${String(midi.name || '이름 없음').slice(0, 60)}${midi.note ? ` · 마지막에 누른 건반 ${String(midi.note).slice(0, 12)}` : ' · 건반 신호는 아직 못 받음'}` : `안 됨 — ${String(midi.why || '').slice(0, 80)}`}` : '';
+  const sl = slotsOf(tr.notes);
+  const HAND = { R: '오른손', L: '왼손', B: '양손' };
+  const hm = (t) => { const d = new Date(t); return `${dayKeyOf(t).slice(5)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const lines = [`🎹 음악 연습 기록 (${today}) — v402부터`, '', '## 읽는 법',
+    '- 🎹 태블릿 치기 = 화면 건반으로 끝까지 친 판 · 맞게/틀리게 누른 수(맞는 건반을 기다리는 동안 다른 건반) · 맞게 누른 비율 70% 넘고 하루 세 번 안이면 💰(한 줄 5 · 곡 전체 15)',
+    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「다 쳤어요 ✋」를 누른 것 — 진짜로 쳤는지는 앱이 모른다(누른 때와 ⏳ 음악 시간으로 보기) · 하루 세 칸까지 음표 칸 · 다섯 칸마다 음악 포켓몬(v403)',
+    '- 줄 = 책의 한 줄(그 곡 원고의 lines) · 도움 1 막대·계이름·건반 빛 → 2 막대 없이 → 3 계이름도 없이 → 4 악보만 · 빠르기 = 원래 빠르기의 %',
+    '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets})`, '', '## 최근 연습 (새것부터)'];
+  for (const r of [...tr.log].reverse()) {
+    const where = `${nameOf(r.s)} ${r.n < 0 ? '곡 전체' : `${r.n + 1}째 줄`}`;
+    const head = `${hm(r.at)} ${r.m === 't' ? '🎹 치기' : '🎧 따라 치기'} · ${where} · ${HAND[r.h]} · 도움 ${r.lv} · ${Math.round(r.sp * 100)}%`;
+    if (r.m === 't') {
+      const all = r.ok + r.bad;
+      lines.push(`- ${head} · 맞게 ${r.ok}/${all}${all ? ` (${Math.round((r.ok / all) * 100)}%)` : ''}${r.c ? ` · 💰${r.c}` : ''}`);
+    } else lines.push(`- ${head} · ${r.x ? '음표 한 칸' : '(오늘 칸은 다 참)'}`);
+  }
+  return `${lines.join('\n')}\n`;
+}

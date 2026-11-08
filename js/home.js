@@ -73,6 +73,16 @@ export const SUBJECTS = [
     view: 'nonsul',
     ready: true,
   },
+  {
+    key: 'music',
+    title: 'Music',
+    ko: '음악',
+    desc: '악보 보고 피아노 치기',
+    emoji: '🎹',
+    mascot: 648,  // 메로엣타 — 노래하는 포켓몬 (2026-11-08 🎹 음악 · v402)
+    view: 'music',
+    ready: true,
+  },
   // 📝 영어 문법 카드(v348)는 v349에서 걷었다 — 아버님 10-27 "과목을 새롭게 만들자는 게 아니었다" → 🎬 영상 따라 하기 사이 📝 문법 쪽지(grammarnote.js)
 ];
 

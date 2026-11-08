@@ -20,6 +20,7 @@ export const PLACES = [
   { key: 'math', field: 'uMath', ko: '🔢 수학' },
   { key: 'korean', field: 'uKor', ko: '📚 국어' },
   { key: 'english', field: 'uEn', ko: '🎤 영어' },
+  { key: 'music', field: 'uMusic', ko: '🎹 음악' }, // 🎹 음악 과목 (v402)
   { key: 'home', field: 'uHome', ko: '🏠 홈' },
   { key: 'pokedex', field: 'uDex', ko: '🎒 도감' },
   { key: 'house', field: 'uHouse', ko: '🏡 집' },

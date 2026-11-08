@@ -29,6 +29,8 @@ import { copyStock } from './stock.js'; // 🏦 포켓몬 증권시장 복사 (�
 import { matchedOf, mergeMatched } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329)
 import { dripOf, mergeDrip } from './kordrip.js'; // 📦 새 국어 글 하루 두 편 — 묶음 시작 날 (순수 — 아무것도 import하지 않는다, v320)
 import { copyAqua, mergeAqua } from './aquarium.js'; // 🐠 진우 아쿠아리움 놓은 자리 복사·병합 (v399 — 순수)
+import { copyTour, mergeTour } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 복사·병합 (v401 — 순수)
+import { copyPiano, mergePiano, PIANO_DAILY } from './piano.js'; // 🎹 음악 과목 복사·병합·하루 칸 (v402 — 순수)
 import { copyLake, mergeLake } from './fishing.js'; // 🎣 학습 낚시터 도감·하루 💰 복사·병합 (v366 — 순수, 아무것도 import하지 않음)
 import { healMoveHouse } from './moveday.js'; // 🚚 이사를 끝낸 기록과 가방이 갈라지면 집 선물만 되찾기 (v397 — 순수)
 import { copyJourney, mergeJourney } from './journey.js'; // 🎒 포켓몬 대여행 복사·병합 (v341 — 순수, evolve·items·montypes만 import)
@@ -420,6 +422,9 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'mathTime', 'mathBonus', 'enTime', 'enBonus', 'korTime', 'korBonus', // 📚 국어 (2026-10-11)
   // ⏳ 오늘 쓴 시간 연장권 수 (2026-10-01) — 하루 한도 판정용. 병합이 maxOf라 옛 백업으로 한도를 되살리지 못한다
   'mathExt', 'enExt', 'korExt',
+  // 🎹 음악 (2026-11-08 v402) — 음악 화면에 머문 초(⏳ 하루 40분 · 🎮 게임기 판을 세는 공부 시간에는 안 들어감) · 부모가 더 준 초 · 연장권 수 · 🕒 머문 초 ·
+  //   태블릿 치기 끝까지 친 판·잘 친 판·받은 💰 · 「다 쳤어요」·센 음표 칸 (piano.PIANO_DAILY — 📤 usage 한 줄)
+  'musicTime', 'musicBonus', 'musicExt', 'uMusic', ...PIANO_DAILY,
   // 🚀 오늘 로켓단이 나온 수 (2026-10-09) — 과목마다 하루 3번(아버님), claimDailyCount로 선점. 병합 maxOf라 옛 백업으로 한도를 되살리지 못한다
   'rocketMath', 'rocketEn', 'rocketKor', // v327 📚 국어·논술 합쳐 하루 3번(영어·수학과 따로)
   // 🖊️ 오늘 끝낸 논술 판 수 (v327) — 🚀 국어 로켓단 등장 조건(ROCKET.minDone.kor = 국어 글 korReads + 논술 판 nsRounds)
@@ -457,6 +462,10 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'fishLv2Q', 'fishLv2Ok', 'fishLv3Q', 'fishLv3Ok',
   //   🔁 그 가운데 틀린 배운 수학 칸을 다시 풀기로 낸·맞힌 수(v387 — 수학 칸 안의 몫)
   'fishRedoQ', 'fishRedoOk',
+  // 🎟️ 아쿠아리움 손님 맞이 (2026-11-08 v401, aquatour.js) — 맞이한 무리 · 받은 💰(📊 장부 💰까지) · 🎟️ 매표 낸·맞힌 · 해설 과목마다(🐟 수조 물고기 수학은 수학 칸 안의 몫) · 2·3단계 · 📊 장부 질문
+  'aqGroups', 'aqCoins', 'aqPayQ', 'aqPayOk', 'aqFmQ', 'aqFmOk', 'aqBookQ', 'aqBookOk', 'aqMathQ', 'aqMathOk', 'aqEnQ', 'aqEnOk', 'aqKorQ', 'aqKorOk', 'aqNsQ', 'aqNsOk', 'aqLv2Q', 'aqLv2Ok', 'aqLv3Q', 'aqLv3Ok',
+  //   과목마다 그날 차례 줄에서 넘긴 자리(단계가 낮아 버린 문제까지 — 다시 열면 그 뒤부터 · Codex 203차 · 📤엔 안 씀)
+  'aqMathAt', 'aqEnAt', 'aqKorAt', 'aqNsAt',
   // 🌿 국어·논술 잔잔한 음악 (2026-10-22 v317, calm.js) — 틀어 둔 초 · 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
   'calmSec', 'calmOff', 'calmOn',
   // 🎵 게임기 음악 (2026-10-25 v337, gamebgm.js) — 소리가 난 초 · 게임기 🎵로 끈 수 · 다시 켠 수 (📤 usage/날짜.md로만)
@@ -1108,7 +1117,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.homePhotos ? { homePhotos: copyPhotos(cur.homePhotos) } : {}), ...(cur.homeGuest ? { homeGuest: copyGuest(cur.homeGuest) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), ...(cur.fishing ? { fishing: copyLake(cur.fishing) } : {}), ...(cur.aquarium ? { aquarium: copyAqua(cur.aquarium) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), grammarVideo: videoSeenOf(cur.grammarVideo), spell: wordsOf(cur.spell), spellDay: wordDaysOf(cur.spellDay), spellSeen: spellSeenOf(cur.spellSeen), letters: lettersOf(cur.letters), zyg: zygOf(cur.zyg), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.homePhotos ? { homePhotos: copyPhotos(cur.homePhotos) } : {}), ...(cur.homeGuest ? { homeGuest: copyGuest(cur.homeGuest) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), ...(cur.fishing ? { fishing: copyLake(cur.fishing) } : {}), ...(cur.aquarium ? { aquarium: copyAqua(cur.aquarium) } : {}), ...(cur.aquaTour ? { aquaTour: copyTour(cur.aquaTour) } : {}), ...(cur.piano ? { piano: copyPiano(cur.piano) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), grammarVideo: videoSeenOf(cur.grammarVideo), spell: wordsOf(cur.spell), spellDay: wordDaysOf(cur.spellDay), spellSeen: spellSeenOf(cur.spellSeen), letters: lettersOf(cur.letters), zyg: zygOf(cur.zyg), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2526,6 +2535,12 @@ export function mergeStatRecord(name, cur, rec) {
     // 🐠 진우 아쿠아리움(v399) — 놓은 자리는 바꾼 시각이 늦은 쪽 · 단계·장식은 위 가방과 같은 쪽(돈과 물건이 어긋나지 않게) · 안 가진 것은 읽을 때 aquaOf가 뺀다
     const aq = mergeAqua(cur.aquarium, rec.aquarium);
     if (aq) out.aquarium = aq; else delete out.aquarium;
+    // 🎟️ 손님 맞이(v401) — 날마다 맞이한 무리·받은 💰는 큰 쪽(옛 백업으로 그날 한도를 다시 열지 못하게) · 고른 물고기는 칸마다 큰 쪽 · 장부는 합집합
+    const at = mergeTour(cur.aquaTour, rec.aquaTour);
+    if (at) out.aquaTour = at; else delete out.aquaTour;
+    // 🎹 음악(v402) — 날마다 💰 받은 수·음표 칸은 큰 쪽(옛 백업으로 그날 한도를 다시 열지 못하게) · 모든 음표 칸은 큰 쪽 · 연습 기록은 합집합
+    const pn = mergePiano(cur.piano, rec.piano);
+    if (pn) out.piano = pn; else delete out.piano;
   }
   return out;
 }

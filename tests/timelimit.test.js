@@ -274,7 +274,7 @@ test('★ ⏳ 연장권 Codex 21차 — 자정 넘김·느린 저장 사이 다�
   assert.match(doEx, /const here = seq === openSeq && box && !box\.hidden;/, '그 사이 다른 창이 열렸으면 그 창은 건드리지 않는다');
   assert.equal((up.match(/openSeq \+= 1;/g) || []).length, 2, '열 때·닫을 때 둘 다');
   // #6 다른 창에서 바꾼 ⚙ 시간 제한·연장권 한도를 이 창도 따른다
-  assert.match(read('js/player.js'), /window\.addEventListener\('storage', \(e\) => \{[\s\S]{0,300}for \(const k of \['timeLimit', 'timeWeekday', 'timeWeekend', 'timeKorean', 'timeExtMax'\]\)/);
+  assert.match(read('js/player.js'), /window\.addEventListener\('storage', \(e\) => \{[\s\S]{0,300}for \(const k of \['timeLimit', 'timeWeekday', 'timeWeekend', 'timeKorean', (?:'timeMusic', )?'timeExtMax'\]\)/); // 🎹 음악 분(v402)도 다른 창에서 받는다
   // #7 영어 영상·🔁 복습도 잠금 뒤 "계속하기"로 이어서 연다 — 이어 할 것 없이 부르는 곳이 남지 않았다
   const lib = read('js/library.js');
   assert.equal((lib.match(/guardStart\('english', \(\) => \{ open\(\)/g) || []).length, 2);
@@ -322,7 +322,9 @@ test('📚 국어 시간 (2026-10-11 아버님 "국어는 하루 1시간30분"):
   assert.match(read('js/player.js'), /minKorean: \{ weekday: Number\(settings\.timeKorean\), weekend: Number\(settings\.timeKorean\) \}/);
   assert.match(read('js/stats.js'), /\['📚 국어', td && td\.korExt\]/);
   assert.match(read('js/app.js'), /if \(name === 'korean'\) return 'korean';/);
-  assert.match(read('js/timelimit.js'), /return statusOf\(clock\.daily, s, clock\.today, s === 'korean' \? c\.minKorean : c\.min,/);
+  // v402: 과목마다 고르는 일은 minOf 하나로 (🎹 음악 minMusic이 더해짐) — 국어는 여전히 minKorean
+  assert.match(read('js/timelimit.js'), /return statusOf\(clock\.daily, s, clock\.today, minOf\(c, s\),/);
+  assert.match(read('js/timelimit.js'), /return subject === 'korean' \? c\.minKorean : subject === 'music' \? c\.minMusic : c\.min;/);
   const kv = read('js/koreanview.js');
   assert.ok(kv.includes("b.addEventListener('click', () => guardStart('korean', () => openCard(c.id)));") && kv.includes("re.addEventListener('click', () => guardStart('korean', () => openCard(r.card.id)));"), '새 글·다시 읽기만 막는다 — 읽던 글은 끝까지');
 });

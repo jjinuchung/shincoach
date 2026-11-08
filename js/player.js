@@ -30,7 +30,7 @@ import { initMatch, openMatch, closeMatch, refreshStage, pickMatchRound, shuffle
 import { ensureAnims, loadAnims, animUrl } from './sprite.js';
 import { makeDictation } from './dictation.js';
 import { sfx, unlock, setSfxEnabled, setVibrateEnabled } from './sfx.js';
-import { DEFAULT_MIN as TIME_MIN, KOREAN_MIN, EXTEND_MAX, EXTEND_MIN, extMaxOf, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
+import { DEFAULT_MIN as TIME_MIN, KOREAN_MIN, MUSIC_MIN, EXTEND_MAX, EXTEND_MIN, extMaxOf, statusOf, fmtUsed, todayDaily } from './timelimit.js'; // ⏳ 하루 시간 제한
 import { GAME_MIN, GAME_CAP, gameMinOf, gameCapOf } from './minigame.js'; // 🎮 게임기 미니 게임 판 (v307)
 import { STOCK_CAP, stockCapOf } from './stock.js'; // 🏦 포켓몬 증권시장 투자 한도 (v319)
 import { FISH_DAY_MIN, fishMinOf } from './fishing.js'; // 🎣 학습 낚시터 하루 분 (v366 — 순수)
@@ -172,7 +172,7 @@ export function initPlayer(ctx) {
     if (e.key !== 'shincoach.settings') return;
     let s = {};
     try { s = JSON.parse(e.newValue || '{}') || {}; } catch { return; }
-    for (const k of ['timeLimit', 'timeWeekday', 'timeWeekend', 'timeKorean', 'timeExtMax']) if (s[k] !== undefined) settings[k] = s[k];
+    for (const k of ['timeLimit', 'timeWeekday', 'timeWeekend', 'timeKorean', 'timeMusic', 'timeExtMax']) if (s[k] !== undefined) settings[k] = s[k];
   });
 
   $('btn-back').addEventListener('click', closePlayer);
@@ -3378,7 +3378,7 @@ function releaseWakeLock() {
 function loadSettings() {
   const defaults = { mergeSentences: true, shadowFactor: 2, resultPause: 3, listenFirst: 3, speakCheck: true, hideEnWhileSpeaking: true, dailyGoal: 20, puzzleEvery: 10, grammarNote: true, sfx: true, vibrate: true, bgm: true, hp: true, reviewCount: REVIEW_COUNT, essayMinutes: ESSAY_MINUTES, essayCount: ESSAY_COUNT, rereadMode: 'missed',
     // ⏳ 하루 과목별 시간 제한 (2026-09-27, 아버님) — 켜짐이 기본. 지워도 이 값으로 돌아올 뿐 시간이 늘지 않는다
-    timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend, timeKorean: KOREAN_MIN.weekday,
+    timeLimit: true, timeWeekday: TIME_MIN.weekday, timeWeekend: TIME_MIN.weekend, timeKorean: KOREAN_MIN.weekday, timeMusic: MUSIC_MIN.weekday, // 🎹 음악 40분 (v402)
     // ⏳ 시간 연장권 — 과목마다 하루 최대 (2026-10-01, 아버님 "이대로 진행"). 0이면 아이가 못 쓴다
     timeExtMax: EXTEND_MAX,
     // 🎮 게임기 미니 게임 판 (v307 → 2026-10-23 v328, 아버님) — 과목을 합친 공부 15분에 1판 · 하루 12판까지
@@ -3432,6 +3432,7 @@ export function timeLimitConf() {
     off: settings.timeLimit === false || state.parentMode === true,
     min: { weekday: Number(settings.timeWeekday), weekend: Number(settings.timeWeekend) },
     minKorean: { weekday: Number(settings.timeKorean), weekend: Number(settings.timeKorean) }, // 📚 국어 — 날마다 같은 값
+    minMusic: { weekday: Number(settings.timeMusic ?? MUSIC_MIN.weekday), weekend: Number(settings.timeMusic ?? MUSIC_MIN.weekday) }, // 🎹 음악 — 날마다 같은 값 (v402)
     extMax: extMaxOf(settings.timeExtMax),
     gameMin: gameMinOf(settings.gameMin), gameCap: gameCapOf(settings.gameCap), // 🎮 게임 판 (v307)
     fishMin: fishMinOf(settings.fishMin), // 🎣 학습 낚시터 하루 분 (v366 — lakeview.fishMinNow가 읽는다)
@@ -3459,9 +3460,10 @@ function renderTimeToday() {
   const key = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
   const min = { weekday: clampMin($('set-time-weekday').value, TIME_MIN.weekday), weekend: clampMin($('set-time-weekend').value, TIME_MIN.weekend) };
   const kor = clampMin($('set-time-korean').value, KOREAN_MIN.weekday);
+  const mus = clampMin($('set-time-music').value, MUSIC_MIN.weekday);
   const parts = [];
-  for (const [s, ko] of [['math', '🔢 수학'], ['english', '🎤 영어'], ['korean', '📚 국어']]) {
-    const st = statusOf(d, s, key, s === 'korean' ? { weekday: kor, weekend: kor } : min);
+  for (const [s, ko] of [['math', '🔢 수학'], ['english', '🎤 영어'], ['korean', '📚 국어'], ['music', '🎹 음악']]) {
+    const st = statusOf(d, s, key, s === 'korean' ? { weekday: kor, weekend: kor } : s === 'music' ? { weekday: mus, weekend: mus } : min);
     const more = [st.bonus ? `+${Math.round(st.bonus / 60)}분 더 줌` : '', st.extN ? `⏳ 연장권 ${st.extN}개 +${st.extN * EXTEND_MIN}분` : ''].filter(Boolean);
     const extra = more.length ? ` (${more.join(' · ')})` : '';
     parts.push(`${ko} ${fmtUsed(st.used)} / ${fmtUsed(st.total)}${extra}`);
@@ -3575,6 +3577,7 @@ function initSettingsDialog() {
     settings.timeWeekday = clampMin($('set-time-weekday').value, TIME_MIN.weekday);
     settings.timeWeekend = clampMin($('set-time-weekend').value, TIME_MIN.weekend);
     settings.timeKorean = clampMin($('set-time-korean').value, KOREAN_MIN.weekday);
+    settings.timeMusic = clampMin($('set-time-music').value, MUSIC_MIN.weekday); // 🎹 음악 (v402)
     settings.timeExtMax = extMaxOf($('set-time-ext').value);
     settings.gameMin = gameMinOf($('set-game-min').value); // 🎮 게임 판 (v307)
     settings.gameCap = gameCapOf($('set-game-cap').value);
@@ -3647,6 +3650,7 @@ function openSettings() {
     $('set-time-weekday').value = String(Number(settings.timeWeekday));
     $('set-time-weekend').value = String(Number(settings.timeWeekend));
     $('set-time-korean').value = String(Number(settings.timeKorean ?? KOREAN_MIN.weekday));
+    $('set-time-music').value = String(Number(settings.timeMusic ?? MUSIC_MIN.weekday)); // 🎹 음악 (v402)
     $('set-time-ext').value = String(extMaxOf(settings.timeExtMax));
     $('set-game-min').value = String(gameMinOf(settings.gameMin)); // 🎮 게임 판 (v307)
     $('set-game-cap').value = String(gameCapOf(settings.gameCap));

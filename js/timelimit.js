@@ -19,13 +19,18 @@
 
 import { applyDailyDelta, getDaily } from './db.js';
 
-/** 과목 세 가지 — 📚 국어는 2026-10-11 (아버님 "국어는 하루 1시간30분 제한") */
+/** 공부 과목 세 가지 — 📚 국어는 2026-10-11 (아버님 "국어는 하루 1시간30분 제한")
+ *  ★ 🎮 게임기 판(minigame.studySec · gameview)이 이 목록으로 공부 시간을 센다 — 🎹 음악은 넣지 않는다 (아버님 11-08 「게임기 판이 늘어나니까」) */
 export const SUBJECTS = ['math', 'english', 'korean'];
+/** ⏳ 시계가 세는 과목 — 공부 과목 + 🎹 음악(v402 · 하루 40분은 따로, 공부 시간에는 안 들어감) */
+export const TIMED = [...SUBJECTS, 'music'];
 
 /** 기본 제한(분) — 아버님 요청값. ⚙ 설정에서 바꿀 수 있다 (수학·영어) */
 export const DEFAULT_MIN = { weekday: 60, weekend: 120 };
 /** 📚 국어 기본 제한(분) — 날마다 1시간 30분 (아버님 2026-10-11) · ⚙ 설정에서 따로 바꾼다 */
 export const KOREAN_MIN = { weekday: 90, weekend: 90 };
+/** 🎹 음악 기본 제한(분) — 날마다 40분 (아버님 2026-11-08) · ⚙ 설정에서 따로 바꾼다 */
+export const MUSIC_MIN = { weekday: 40, weekend: 40 };
 
 /** 남은 시간을 미리 알려 주기 시작하는 지점(초) */
 export const WARN_SEC = 600;
@@ -52,14 +57,21 @@ export const FIELD = {
   math: { used: 'mathTime', bonus: 'mathBonus', ext: 'mathExt' },
   english: { used: 'enTime', bonus: 'enBonus', ext: 'enExt' },
   korean: { used: 'korTime', bonus: 'korBonus', ext: 'korExt' },
+  music: { used: 'musicTime', bonus: 'musicBonus', ext: 'musicExt' }, // 🎹 음악 (v402)
 };
 
 /** 과목 이름 (화면에 쓰는 말) */
-export const KO = { math: '🔢 수학', english: '🎤 영어', korean: '📚 국어' };
+export const KO = { math: '🔢 수학', english: '🎤 영어', korean: '📚 국어', music: '🎹 음악' };
 
-/** 그 과목의 기본 제한(분) — 국어만 따로 */
+/** 그 과목의 기본 제한(분) — 국어·음악은 따로 */
 export function baseMinOf(subject) {
-  return subject === 'korean' ? KOREAN_MIN : DEFAULT_MIN;
+  return subject === 'korean' ? KOREAN_MIN : subject === 'music' ? MUSIC_MIN : DEFAULT_MIN;
+}
+
+/** ⚙ 설정에서 그 과목의 제한(분) 고르기 — 국어 minKorean · 음악 minMusic · 수학·영어 min */
+export function minOf(conf, subject) {
+  const c = conf || {};
+  return subject === 'korean' ? c.minKorean : subject === 'music' ? c.minMusic : c.min;
 }
 
 /**
@@ -189,8 +201,9 @@ export function fmtUsed(sec) {
 // ───────────────────── 시계 (여기부터 브라우저) ─────────────────────
 
 const clock = {
-  subject: null,        // 지금 세고 있는 과목 ('math' | 'english' | 'korean' | null)
-  pending: { math: 0, english: 0, korean: 0 }, // 아직 저장 안 한 초
+  subject: null,        // 지금 세고 있는 과목 ('math' | 'english' | 'korean' | 'music' | null)
+  pending: { math: 0, english: 0, korean: 0, music: 0 }, // 아직 저장 안 한 초
+  saving: new Set(),    // 저장하는 중인 초 { day, s, sec } — 저장이 끝나기 전에도 잠금이 풀려 보이지 않게 (Codex 205차)
   lastActive: 0,        // 마지막 입력 시각(ms)
   today: '',            // 지금 세고 있는 날짜
   daily: null,          // 오늘 기록 (저장할 때마다 갱신)
@@ -232,7 +245,7 @@ export function initTimeLimit({ conf, onTick } = {}) {
 /** 오늘 기록을 읽어 둔다 (날짜가 바뀌면 다시) */
 export async function loadToday() {
   const day = dayKey();
-  if (day !== clock.today) for (const s of SUBJECTS) clock.pending[s] = 0; // 못 쓴 초는 어제 몫 — 오늘 기록에 더하면 오늘 시간이 그만큼 깎인다 (v396)
+  if (day !== clock.today) for (const s of TIMED) clock.pending[s] = 0; // 못 쓴 초는 어제 몫 — 오늘 기록에 더하면 오늘 시간이 그만큼 깎인다 (v396)
   clock.today = day;
   clock.ready = false;
   try { clock.daily = await getDaily(clock.today); } catch { clock.daily = null; }
@@ -279,7 +292,7 @@ export function noteActivity() {
  * 🎒 도감·📊 기록·🏠 홈은 null — 아버님 결정 ③(잠겨도 볼 수 있고, 시간도 안 센다)
  */
 export function setSubject(subject) {
-  const next = SUBJECTS.includes(subject) ? subject : null;
+  const next = TIMED.includes(subject) ? subject : null;
   if (clock.subject === next) return;
   flushTime().catch(() => {});
   clock.subject = next;
@@ -296,12 +309,19 @@ function confNow() {
   try { return clock.conf ? clock.conf() || {} : {}; } catch { return {}; }
 }
 
-/** 지금 형편 (아직 저장 안 한 초까지 넣어서) */
+/** 오늘 그 과목에서 저장하는 중인 초 (어제 몫은 빼고) */
+function savingSec(s) {
+  let n = 0;
+  for (const j of clock.saving) if (j.s === s && j.day === clock.today) n += j.sec;
+  return n;
+}
+
+/** 지금 형편 (아직 저장 안 한 초 · 저장하는 중인 초까지 넣어서) */
 export function status(subject) {
   const s = subject || clock.subject;
   if (!s) return null;
   const c = confNow();
-  return statusOf(clock.daily, s, clock.today, s === 'korean' ? c.minKorean : c.min, { off: !!c.off, extra: clock.pending[s] || 0 }); // 📚 국어는 제한이 따로
+  return statusOf(clock.daily, s, clock.today, minOf(c, s), { off: !!c.off, extra: (clock.pending[s] || 0) + savingSec(s) }); // 📚 국어·🎹 음악은 제한이 따로
 }
 
 /** 지금 그 과목이 잠겼나 (제한을 껐으면 언제나 false) */
@@ -346,10 +366,14 @@ export async function flushTime() {
   if (!s || sec <= 0) return clock.daily;
   const day = clock.today; // 저장하는 사이 자정을 넘기면 어제 결과를 오늘 것으로 들이지 않는다 (v396)
   clock.pending[s] = 0;
+  const job = { day, s, sec }; // 저장이 끝날 때까지 형편에 넣는다 — 빼는 것은 저장값을 들일 때 함께
+  clock.saving.add(job);
   try {
     const saved = await applyDailyDelta(day, tickDelta(s, sec));
+    clock.saving.delete(job);
     if (day === clock.today) clock.daily = saved;
   } catch {
+    clock.saving.delete(job);
     if (day === clock.today) clock.pending[s] = (clock.pending[s] || 0) + sec; // 저장이 안 됐으면 다음에 다시
   }
   if (clock.onTick) clock.onTick();

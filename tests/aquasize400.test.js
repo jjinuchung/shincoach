@@ -168,6 +168,7 @@ test('화면이 낚은 길이를 그림에 넘기고 · 더 긴 걸 낚으면 �
   const view = read('js/aquaview.js');
   assert.ok(view.includes('setFish(ui.scene, a.fish, nameOf, (k) => best[k])'));
   assert.ok(/const fishKey = `\$\{a\.fish\.join\(\)\}\|\$\{a\.fish\.map\(\(k\) => best\[k\]\)\.join\(\)\}`/.test(view));
-  assert.ok(read('js/version.js').includes("APP_VERSION = 'v400'"));
-  assert.ok(read('sw.js').includes("CACHE_VERSION = 'v400'"));
+  // 판은 v400부터 (v401에서 판 꼴을 못 박아 깨지던 것을 넓힘)
+  assert.ok(Number(/APP_VERSION = 'v(\d+)'/.exec(read('js/version.js'))[1]) >= 400);
+  assert.ok(Number(/CACHE_VERSION = 'v(\d+)'/.exec(read('sw.js'))[1]) >= 400);
 });

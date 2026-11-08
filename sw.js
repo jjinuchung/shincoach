@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v400';
+const CACHE_VERSION = 'v402';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -224,6 +224,11 @@ const APP_SHELL = [
   './js/aquarium.js', // 🐠 진우 아쿠아리움 — 규칙 · 그림 · 화면 (v399)
   './js/aquaart.js',
   './js/aquaview.js',
+  './js/aquatour.js', // 🎟️ 아쿠아리움 손님 맞이 — 규칙 · 화면 (v401)
+  './js/tourview.js',
+  './js/piano.js',
+  './js/pianosongs.js',
+  './js/pianoview.js',
   './js/moveday.js', // 🚚 이사 대작전 — 규칙 · 화면 · 그림 (v397)
   './js/moveview.js',
   './js/movescene.js',
@@ -232,6 +237,7 @@ const APP_SHELL = [
   './js/jrscene.js', // 🎨 대여행 구역 그림·받침대·기술 효과 (v375)
   './js/montypes.js',
   './fonts/galmuri11.woff',
+  './fonts/notomusic-sub.woff', // 🎹 음악 — 높은·낮은음자리표·쉼표·세뇨·올림·내림표만 떼어 낸 Noto Music (OFL · v402)
   './js/calm.js', // 🌿 국어·논술에서 틀고 멈추기 (v317)
   './js/stock.js', // 🏦 포켓몬 증권시장 — 규칙 (v319)
   './js/stockview.js', // 🏦 증권시장 화면 (v319)

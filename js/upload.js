@@ -37,6 +37,8 @@ import { VIDEO_STONE } from './items.js'; // 🏁 영상 보상 기준 (🎤 영
 //   새 판 파일을 받아 "지금 도는 코드"를 새 판으로 적었다 (🔍 Codex 120차 #6) · version.js도 아무것도 import하지 않는다
 import { APP_VERSION, cachedVersion, versionLine } from './version.js';
 import { lakeDayLine } from './fishing.js'; // 🎣 학습 낚시터 하루 한 줄 (v366 — 순수, 아무것도 import하지 않음)
+import { tourDayLine } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 하루 한 줄 (v401 — 순수)
+import { pianoDayLine } from './piano.js'; // 🎹 음악 하루 한 줄 (v402 — 순수)
 import { topicById, topicLabel, topicDayText } from './essaytopic.js'; // 💡 오늘의 글감 (v388 — 순수, 아무것도 import하지 않음)
 
 export const DATA_REPO = 'jjinuchung/shincoach-data';
@@ -227,18 +229,20 @@ export function usageFiles(days, today, places, verLine = '') {
   const num = (v) => Math.max(0, Math.floor(Number(v) || 0));
   const byDate = new Map((Array.isArray(days) ? days : []).filter((d) => d && d.date).map((d) => [d.date, d]));
   const list = Array.isArray(places) ? places : [];
-  const SUBJ = [['수학', 'mathTime', 'mathBonus', 'mathExt'], ['영어', 'enTime', 'enBonus', 'enExt'], ['국어', 'korTime', 'korBonus', 'korExt']];
+  const SUBJ = [['수학', 'mathTime', 'mathBonus', 'mathExt'], ['영어', 'enTime', 'enBonus', 'enExt'], ['국어', 'korTime', 'korBonus', 'korExt'], ['음악', 'musicTime', 'musicBonus', 'musicExt']];
   // 읽는 법 — 숫자를 넘겨 읽지 않게 (🔍 Codex 81차 A·E)
   const lines = [`🕒 앱 사용 기록 (${today}) — 머문 시간·쓴 때·앱을 연 수는 v272부터 셉니다 (그 전 날은 ⏳ 과목 시간만)`, ...(verLine ? [`🏷️ ${verLine}`] : []), '', '## 읽는 법',
     '- 머문 시간 = 화면이 보이고 2분 안에 손을 댄 동안 — 영상을 보거나 긴 글을 읽으며 2분 넘게 손을 안 대면 그동안은 빠져요',
     '- 쓴 때 = 센 초가 있는 10분 칸을 이은 것 (그 칸 내내 썼다는 뜻은 아니에요)',
     '- 앱을 연 수 = 창을 새로 연 수 (내렸다 다시 올린 것은 안 셈 · 밤을 넘겨 켜 둔 날은 0일 수 있어요)',
     '- 한 기기에서 두 창(홈 화면 앱·Chrome 탭)이 동시에 보이면 겹쳐 셀 수 있어요',
-    '- ⏳ 과목 시간 = 시간 제한에 센 시간 (🎯 도전 문제·잠긴 뒤는 안 셈)',
+    '- ⏳ 과목 시간 = 시간 제한에 센 시간 (🎯 도전 문제·잠긴 뒤는 안 셈) · 🎹 음악은 v402부터 하루 40분 따로(🎮 게임기 판을 세는 공부 시간에는 안 들어감 · 🎧 듣고 따라 치기는 앱이 연주하는 동안도 셈)',
+    '- 🎹 = 음악 — 🎹 태블릿 치기 끝까지 친 판(잘 친 판 = 맞게 누른 비율 70% 넘음 · 💰 하루 세 번) · 🎧 듣고 따라 치기 「다 쳤어요」(음표 칸 하루 세 칸 · 다섯 칸마다 음악 포켓몬 v403) · 곡·줄·손은 usage/music.md',
     '- 🌿 잔잔한 음악 = 국어·논술 화면에서 배경 음악을 틀어 둔 시간 (v317부터 · 기기 음량·음소거는 알 수 없고 곡 사이 쉼은 들어감 · v340부터는 ⚙에서 고른 곡 파일이 실제로 재생된 시간 — 곡이 없으면 0 · 🎵로 꺼 두었거나 ⏳ 잠금·배틀·잡기 같은 창이 떠 있거나 🎧 듣기 카드가 읽는 동안은 안 셈) · 끔·다시 켬 = 진우가 🎵 단추를 누른 수',
     '- 🎮🎵 게임 음악 = 게임기에서 한 판 동안 음악이 나온 시간 (v337부터 · 기기 음량·음소거는 알 수 없음 · ⚙ 이벤트 배경음악을 껐거나 🎵로 꺼 두었거나 앱을 내린 동안은 안 셈) · 끔·다시 켬 = 진우가 게임기 🎵 단추를 누른 수',
     '- 🎣 낚시터 = 학습 낚시터에서 낚은 시간(화면이 보이고 2분 안에 손댄 때만 · v366부터 · 하루 20분이 기본) · 맞힘/낸 문제 = 낚시 중 과목마다 (이미 배운 문제 · 지난 7일 덜 한 과목이 더 자주 나와요) · 수학 뒤 (🐟 맞힘/낸) = 그 가운데 낚은 물고기 길이·무게로 낸 물고기 수학(v367부터) · 물고기 N마리(🏞️ 강 M · 🌊 바다 K · 🚤 배 J) = 그 가운데 강·바다·배에서 낚은 마리(강은 v368부터 — 저수지 도감 10종이면 · 바다는 v369부터 — 강 도감 6종이면 · 배 낚시는 v386부터 — 바다 도감 6종이면 열려요 · 배에선 문어·오징어 무리도 「마리」로 셈)',
     '- 🎣 줄 뒤쪽 = 🐋 큰 물고기 2·3단계 문제 맞힘/낸(v378) · 🔁 다시 풀기 맞힘/낸 = 틀린 배운 수학 칸을 다음 물고기의 첫 수학 차례에 한 번 · 또 틀리면 다음 낚시 날 처음에 한 번(v387 · 수학 칸 안의 몫) · 🔢 배운 칸별(v377) · 거듭 틀린 칸 = 다음 날 다시 풀기도 틀린 칸(그 뒤로는 안 냄) · 🎚️ 과목 단계 = 그날 과목마다 더한 단계(그날 처음 열 때 · 지금 단계로 30문제 넘게 쌓이면 90% 넘게 맞힌 과목 +1 · 60% 아래 −1 · 위아래 2까지 · v387) · 맨 위 단계도 쉬움 = +2에서도 90% 넘음(영어 목소리가 없는 기기는 영어 3단계가 2단계로 나와요 — 어느 쪽이든 영어에 새 문제 꼴이 필요하다는 뜻)',
+    '- 🎟️ 손님 맞이 = 아쿠아리움에 온 손님 무리(그날 과목을 합친 공부 15분마다 한 무리 · 하루 세 무리 · v401부터) · 💰 = 표값(손님 수 × 표 한 장) + 맞힌 해설마다 팁 5 + 📊 장부 질문마다 10 · 매표 = 거스름돈·표 한 장 거꾸로·오늘 표값 모두 문장제 · 해설 = 2·3·3단계(낚시터와 같은 원천 · 🐟는 수조에 든 물고기 수학) · 맞힘/낸',
     '- ⏱ 수학 문항마다 걸린 초는 math/latest.json 일지(log)의 qs[].s — 문제를 보인 때부터 처음 답할 때까지(앱을 내린 시간도 들어감, 쌍둥이 문제는 안 셈) · 600은 윗값 · 빠른 오답은 살펴볼 신호이지 찍었다는 증거는 아니에요',
     '', '## 최근 7일'];
   for (let k = 6; k >= 0; k--) {
@@ -270,6 +274,12 @@ export function usageFiles(days, today, places, verLine = '') {
     // 🎣 학습 낚시터 (v366) — 낚시 시간 · 낚은 마리 · 과목마다 맞힘/낸 문제 · 🔒 부모가 더 준 분
     const lake = lakeDayLine(d, fmtMin);
     if (lake) parts.push(lake);
+    // 🎟️ 아쿠아리움 손님 맞이 (v401) — 맞이한 무리 · 받은 💰 · 매표 · 해설 과목마다 · 2·3단계 · 📊 장부
+    const tour = tourDayLine(d);
+    if (tour) parts.push(tour);
+    // 🎹 음악 (v402) — 태블릿 치기 판·잘 친 판·💰 · 듣고 따라 치기 「다 쳤어요」·음표 칸
+    const piano = pianoDayLine(d);
+    if (piano) parts.push(piano);
     lines.push(`- ${day.slice(5)}: ${parts.join(' · ')}`);
   }
   return [{ path: `usage/${today}.md`, text: `${lines.join('\n').trim()}\n` }];
@@ -356,7 +366,7 @@ export function unb64(s) {
  * getFeedback(있으면) = 📬 피드백이 닿았나 글(today, days, math) — 못 만들면 이 파일만 빠진다 (v314)
  * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getLetterTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, getFeedback, getStock, getJourney, getGrammar, getSpell, uploadLog, crashLog, verLine, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getLetterTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, getFeedback, getStock, getJourney, getGrammar, getSpell, getMusic, uploadLog, crashLog, verLine, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
@@ -378,6 +388,8 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
   // 📝 영어 문법(v348)도 못 만들면 빼고 나머지는 그대로
   const grammar = getGrammar ? await Promise.resolve().then(() => getGrammar(today)).catch(() => null) : null;
   const spell = getSpell ? await Promise.resolve().then(() => getSpell(today)).catch(() => null) : null;
+  // 🎹 음악(v402)도 못 만들면 빼고 나머지는 그대로
+  const music = getMusic ? await Promise.resolve().then(() => getMusic(today)).catch(() => null) : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today, days || []) : '(수학 기록 없음)', math ? asksText(math, today) : ''), // ☀️ 줄은 하루 기록으로 (v331)
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
@@ -394,6 +406,7 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(typeof stock === 'string' && stock ? [{ path: 'usage/stock.md', text: stock }] : []), // 🏦 증권시장 — 가진 것·주문·까닭·떨어진 뒤 더 산 수 (v319)
     ...(typeof journey === 'string' && journey ? [{ path: 'usage/journey.md', text: journey }] : []), // 🎒 포켓몬 대여행 — 주마다 결과·과목별 맞힌 수·잃은 것 (v341)
     ...(typeof grammar === 'string' && grammar ? [{ path: `grammar/${today}.md`, text: grammar }] : []), // 📝 영어 문법 — 단원마다 ⭐·✅·다시 · 오개념별 틀린 수 · 🎁 (v348)
+    ...(typeof music === 'string' && music ? [{ path: 'usage/music.md', text: music }] : []), // 🎹 음악 연습 기록 — 곡·줄·손·도움·빠르기·맞게 누른 수·음표 칸 (v402)
     ...(typeof spell === 'string' && spell ? [{ path: 'english/spell.md', text: spell }] : []), // 🔤 철자 노트 — 노트 낱말·졸업·쪽지 날 · 낱말마다 내 철자·칸 (v356 · 날짜 없이 늘 최신)
     ...(typeof uploadLog === 'string' && uploadLog ? [{ path: 'usage/upload-log.md', text: uploadLog }] : []), // 📤 올리기 실패 기록 (v278)
     ...(typeof crashLog === 'string' && crashLog ? [{ path: 'usage/crash-log.md', text: crashLog }] : []), // 🛑 앱이 저절로 꺼진 기록 (v292)
@@ -421,6 +434,14 @@ async function stockNow(today) {
 }
 
 /** 🎒 포켓몬 대여행 글 (v341) — 저장된 프로필에서 · 한 번도 안 떠났으면 null(파일을 안 만든다) */
+/** 🎹 음악 연습 기록 (v402) — 저장된 프로필로 · 곡 이름은 이 기기 곡 목록 · 🎹 집 피아노 연결 확인 결과(이 기기) */
+async function musicNow(today) {
+  const [{ getProfile }, pn, ps] = await Promise.all([import('./db.js'), import('./piano.js'), import('./pianosongs.js')]);
+  const p = await getProfile();
+  if (!p) return null;
+  return pn.pianoMd(p.piano, today, ps.songName, ps.midiCheckNow()) || null;
+}
+
 async function journeyNow(today) {
   const [{ getProfile }, jr, pk, mv] = await Promise.all([import('./db.js'), import('./journey.js'), import('./pokemon.js'), import('./moveday.js')]);
   const p = await getProfile();
@@ -832,7 +853,7 @@ async function sendOnce(force) {
     // 🎮 저장을 기다리는 프로필 증분도 먼저 — 보상 쪽 누적(rewardNow)이 저장된 프로필을 읽는다 (Codex 86차 B · 실패해도 그대로 올린다)
     await import('./xp.js').then((xp) => xp.flushProfile()).catch(() => {});
     const crashLog = await import('./blackbox.js').then((bb) => bb.crashLogNow(today)).catch(() => null); // 🛑 앱이 저절로 꺼진 기록(v292) — 못 만들면 이것만 빠진다
-    files = await gatherFiles({ getLetterTodo: letterTodoNow, getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, verLine, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, getFeedback: feedbackNow, getStock: stockNow, getJourney: journeyNow, getGrammar: grammarNow, getSpell: spellNow, uploadLog: logTextNow(today), today });
+    files = await gatherFiles({ getLetterTodo: letterTodoNow, getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, verLine, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, getFeedback: feedbackNow, getStock: stockNow, getJourney: journeyNow, getGrammar: grammarNow, getSpell: spellNow, getMusic: musicNow, uploadLog: logTextNow(today), today });
   } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };

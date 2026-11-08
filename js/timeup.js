@@ -37,6 +37,7 @@ const CHIPS = [
   { id: 'time-chip-library', subject: 'english' },
   { id: 'time-chip-player', subject: 'english' },
   { id: 'time-chip-letters', subject: 'english' }, // 📮 편지는 영어 시간 (v351)
+  { id: 'time-chip-music', subject: 'music' }, // 🎹 음악은 따로 40분 (v402)
 ];
 
 export function initTimeUp({ requirePin } = {}) {
