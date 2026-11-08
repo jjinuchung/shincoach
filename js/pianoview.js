@@ -4,7 +4,7 @@
 //   🎧 듣고 따라 치기 — 앱이 연주하고 진우는 보면대 앞 진짜 피아노로 → 끝까지 연주한 뒤 「다 쳤어요 ✋」 → 음표 칸 (xp.pianoListen)
 // 규칙은 piano.js(순수) · 곡은 pianosongs.js · ⏳ 음악 시간은 timelimit 'music'(하루 40분 · 공부 시간과 따로)
 // 아이 화면엔 셈·남은 수를 쓰지 않는다 — 음표 칸은 ♪ 다섯 개가 차오르는 그림으로만
-import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, LEVELS, SPEED, NOTES_PER_MON } from './piano.js';
+import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
 import { pianoTap, pianoListen, pianoNow } from './xp.js';
 import { applyDailyDelta } from './db.js';
@@ -121,7 +121,8 @@ function click(strong) {
     o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + 0.08);
   } catch { /* 소리 없이도 */ }
 }
-const secPerBeat = () => 60 / (S.song.bpm * S.sp);
+// 빠르기가 바뀌는 곡(v403 tempo)은 지금 치는 마디의 빠르기로
+const secPerBeat = () => 60 / (bpmAt(S.song, S.perf, S.t) * S.sp);
 
 // ───────────────────── 화면 꺼짐 막기 ─────────────────────
 
@@ -172,11 +173,11 @@ function advance(db) {
       else { t1 = st.t; S.waiting = true; }
     }
   }
-  const spb = secPerBeat();
+  const secOf = (s) => (secsOf(S.song, S.perf, s.t, s.dur) / S.sp) * 0.95;   // 빠르기가 바뀌는 자리를 걸치는 음은 마디마다 그 빠르기로 (Codex 208차 P2)
   for (const s of S.perf.notes) {
     if (s.t < t0 || s.t >= t1 || isPlayer(s)) continue;
     const vel = S.mode === 'tap' ? 0.18 : S.hands === 'B' ? 0.26 : focusHand(s.hand) ? 0.32 : 0.1;
-    const sec = s.dur * spb * 0.95;
+    const sec = secOf(s);
     const v = noteOn(s.midi, vel, sec);
     if (v) S.auto.add(v);
     S.sounding.set(s.midi, { hand: s.hand, until: performance.now() + sec * 1000 });
@@ -504,6 +505,66 @@ function drawHead(g, h, x, now) {
   ctx.globalAlpha = 1;
 }
 
+/** 도돌이표 — dir 1 = 여는 ‖: (마디 줄 x 오른쪽) · -1 = 닫는 :‖ (x 왼쪽) · 두 오선 모두 */
+function repeatSign(g, x, dir) {
+  const s = g.s;
+  ctx.strokeStyle = '#2a2f3c';
+  ctx.fillStyle = '#2a2f3c';
+  const thick = x + dir * 0.15 * s;
+  const thin = x + dir * 0.55 * s;
+  const dot = x + dir * 0.85 * s;
+  for (const [top, bot] of [[g.tTop, g.tBot], [g.bTop, g.bBot]]) {
+    ctx.lineWidth = Math.max(2.5, s * 0.32);
+    ctx.beginPath(); ctx.moveTo(thick, top); ctx.lineTo(thick, bot); ctx.stroke();
+    ctx.lineWidth = Math.max(1, s * 0.12);
+    ctx.beginPath(); ctx.moveTo(thin, top); ctx.lineTo(thin, bot); ctx.stroke();
+    for (const k of [1.5, 2.5]) { ctx.beginPath(); ctx.arc(dot, top + k * s, s * 0.17, 0, Math.PI * 2); ctx.fill(); }
+  }
+}
+/** 1·2번 괄호 — 오선 위(코드 이름 줄 위) 선 · 첫 마디엔 왼쪽 갈고리와 「1.」 · 되돌아가는 괄호의 끝 마디엔 오른쪽 갈고리 */
+function endingMark(g, e, num, x0, x1) {
+  const s = g.s;
+  const y = g.tTop - 3.5 * s;
+  const { open, close } = endingShape(S.song, e, num);   // 되돌아가지 않는 괄호는 열린 채로 끝난다(책처럼)
+  ctx.strokeStyle = '#2a2f3c';
+  ctx.lineWidth = Math.max(1, s * 0.12);
+  ctx.beginPath();
+  if (open) { ctx.moveTo(x0 + 0.3 * s, y + 1.2 * s); ctx.lineTo(x0 + 0.3 * s, y); } else ctx.moveTo(x0, y);
+  if (close) { ctx.lineTo(x1 - 0.3 * s, y); ctx.lineTo(x1 - 0.3 * s, y + 1.2 * s); } else ctx.lineTo(x1, y);
+  ctx.stroke();
+  if (open) {
+    ctx.fillStyle = '#2a2f3c';
+    ctx.font = `700 ${Math.max(10, s * 1.1)}px Georgia, serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(e.label, x0 + 0.6 * s, y + 1.15 * s);
+  }
+}
+/** 8va·8vb — 적힌 자리보다 옥타브 위·아래로 치는 마디 · 점선과 첫 마디의 글자 (8vb는 오선 아래 · 8va는 위) */
+function ottavaMark(g, o, num, x0, x1) {
+  const s = g.s;
+  const top = o.hand === 'R' ? g.tTop : g.bTop;
+  const bot = o.hand === 'R' ? g.tBot : g.bBot;
+  // 8vb 오른손은 계이름(두 줄까지) 아래 · 낮은음자리표 덧줄 위
+  // 8va 오른손은 코드 이름 바로 위(괄호 선 아래) — 더 위는 악보 그림 밖이라 잘린다 (Codex 207차 P2-1) · 글자는 코드 이름 줄에
+  const y = o.shift < 0 ? bot + (o.hand === 'R' ? 6.4 : 6.2) * s : top - (o.hand === 'R' ? 3.25 : 1.4) * s;
+  ctx.strokeStyle = '#2a2f3c';
+  ctx.lineWidth = Math.max(1, s * 0.1);
+  ctx.setLineDash([s * 0.5, s * 0.4]);
+  ctx.beginPath(); ctx.moveTo(num === o.from ? x0 + 2.6 * s : x0, y); ctx.lineTo(x1, y); ctx.stroke();
+  ctx.setLineDash([]);
+  if (num === o.to) { ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x1, y + (o.shift < 0 ? -0.9 : 0.9) * s); ctx.stroke(); }
+  if (num === o.from) {
+    ctx.fillStyle = '#2a2f3c';
+    ctx.font = `700 italic ${Math.max(10, s * 1.05)}px Georgia, serif`;
+    ctx.textAlign = 'left';
+    const above = o.shift > 0 && o.hand === 'R';
+    ctx.textBaseline = above ? 'alphabetic' : 'middle';
+    ctx.fillText(o.shift < 0 ? '8vb' : '8va', x0 + 0.3 * s, above ? g.tTop - 2.4 * s : y);
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+
 function drawSheet(now) {
   const g = staffGeom();
   const s = g.s;
@@ -518,34 +579,49 @@ function drawSheet(now) {
   ctx.beginPath(); ctx.moveTo(18, g.tTop); ctx.lineTo(18, g.bBot); ctx.stroke();
   ctx.save();
   ctx.beginPath(); ctx.rect(g.clefW, 6, G.W - g.clefW - 10, G.sheetH - 10); ctx.clip();
-  const beats = S.song.beats;
   S.perf.bars.forEach((b, bi) => {
     const x0 = xOf(b.at) - 1.5 * s;
-    const x1 = xOf(b.at + beats) - 1.5 * s;
+    const x1 = xOf(b.at + b.len) - 1.5 * s;
     if (x1 < g.clefW - 4 || x0 > G.W) return;
+    const num = barNum(S.song, b.src);   // 책의 마디 번호 (못갖춘마디가 있으면 0부터)
     const last = bi === S.perf.bars.length - 1;
+    const repEnd = (S.song.repeats || []).some((r) => r.to === num);
     ctx.strokeStyle = '#3a3f4b';
-    ctx.lineWidth = last ? Math.max(2.5, s * 0.35) : Math.max(1, s * 0.12);
+    ctx.lineWidth = last && !repEnd ? Math.max(2.5, s * 0.35) : Math.max(1, s * 0.12);
     ctx.beginPath(); ctx.moveTo(x1, g.tTop); ctx.lineTo(x1, g.tBot); ctx.moveTo(x1, g.bTop); ctx.lineTo(x1, g.bBot); ctx.stroke();
+    if (repEnd) repeatSign(g, x1, -1);
+    if ((S.song.repeats || []).some((r) => r.from === num)) repeatSign(g, x0, 1);
     // 마디 번호는 마디 줄 왼쪽 위 — 오른쪽에 두면 첫 음의 손가락 번호와 겹친다
     ctx.fillStyle = '#8a8f9c';
     ctx.font = `italic ${Math.max(10, s * 1.1)}px Georgia, serif`;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(String(b.src + 1), x0 - 3, g.tTop - 0.5 * s);
+    if (!(S.song.pickup && b.src === 0)) ctx.fillText(String(num), x0 - 3, g.tTop - 0.5 * s);   // 못갖춘마디는 책처럼 번호 없이
     ctx.textAlign = 'left';
-    const ch = S.song.chords[String(b.src + 1)] || [];
+    const ch = S.song.chords[String(num)] || [];
     ctx.fillStyle = '#6a7080';
     ctx.font = `600 ${Math.max(10, s * 1.05)}px Arial, sans-serif`;
     ch.forEach((c, i) => ctx.fillText(c, x0 + 2.2 * s + (i * (x1 - x0)) / ch.length, g.tTop - 2.4 * s));
     // 𝄋 세뇨 — 마디 줄 바로 오른쪽, 코드 이름 줄 높이 (손가락 번호보다 위)
-    if (S.song.segno === b.src + 1) glyph('\u{1D10B}', x0 + 0.9 * s, g.tTop - 2.4 * s, s * 1.7, '#2a2f3c');
+    if (S.song.segno && S.song.segno === num) glyph('\u{1D10B}', x0 + 0.9 * s, g.tTop - 2.4 * s, s * 1.7, '#2a2f3c');
+    for (const e of S.song.endings || []) if (e.bars.includes(num)) endingMark(g, e, num, x0, x1);
+    for (const o of S.song.ottava || []) if (num >= o.from && num <= o.to) ottavaMark(g, o, num, x0, x1);
     ctx.fillStyle = '#2a2f3c';
     ctx.font = `700 italic ${Math.max(10, s * 1.05)}px Georgia, serif`;
     ctx.textAlign = 'right';
-    if (S.song.fine === b.src + 1 && S.line < 0) ctx.fillText('Fine', x1 - 4, g.bBot + 3.4 * s);
+    // 세뇨·피네가 없으면 0 — 못갖춘마디 번호도 0이라 「있을 때만」 견준다
+    if (S.song.fine && S.song.fine === num && S.line < 0) ctx.fillText('Fine', x1 - 4, g.bBot + 3.4 * s);
     if (S.song.ds && b.src === S.song.n - 1 && S.line < 0) ctx.fillText('D.S. al Fine', x1 - 4, g.bBot + 3.4 * s);
-    const dy = S.song.dyn[String(b.src + 1)];
+    // 박자가 바뀌는 마디 — 마디 줄 바로 앞에 작은 박자표 (마디 첫머리에 두면 첫 음 머리와 겹쳤다 — Codex 208차 P3)
+    const mt = S.song.meter && S.song.meter[num];
+    if (mt) {
+      ctx.textAlign = 'center';
+      ctx.font = `800 ${s * 1.9}px Georgia, serif`;
+      for (const top of [g.tTop, g.bTop]) { ctx.fillText(String(mt), x0 - 0.9 * s, top + 1.75 * s); ctx.fillText('4', x0 - 0.9 * s, top + 3.75 * s); }
+      ctx.font = `700 italic ${Math.max(10, s * 1.05)}px Georgia, serif`;
+      ctx.textAlign = 'right';
+    }
+    const dy = S.song.dyn[String(num)];
     if (dy) { ctx.textAlign = 'left'; ctx.fillText(dy, x0 + 1.4 * s, g.tBot + 2.4 * s); }
   });
   ctx.fillStyle = `rgba(255,92,149,${S.waiting ? 0.55 : S.running ? 0.4 : 0.25})`;
@@ -577,7 +653,10 @@ function drawSheet(now) {
   ctx.textBaseline = 'middle';
   ctx.font = `800 ${s * 2.3}px Georgia, serif`;
   const tsX = g.clefW - 2.4 * s;
-  for (const top of [g.tTop, g.bTop]) { ctx.fillText(String(S.song.beats), tsX, top + 1.05 * s); ctx.fillText('4', tsX, top + 3.0 * s); }
+  // 박자가 바뀌는 곡은 지금 치는 마디의 박자로 (v403)
+  const here = S.perf.bars.find((b) => S.t < b.at + b.len) || S.perf.bars[S.perf.bars.length - 1];
+  const nowBeats = here && Array.isArray(S.song.meters) ? S.song.meters[here.src] : S.song.beats;
+  for (const top of [g.tTop, g.bTop]) { ctx.fillText(String(nowBeats), tsX, top + 1.05 * s); ctx.fillText('4', tsX, top + 3.0 * s); }
 }
 
 function drawBars() {
@@ -1081,4 +1160,4 @@ export function leaveMusic() {
 }
 
 /** 걷기용 */
-if (typeof window !== 'undefined') window.__piano = { S, toStart, advance, press, passEnd, openSong, renderList };
+if (typeof window !== 'undefined') window.__piano = { S, toStart, advance, press, passEnd, openSong, renderList, draw, secPerBeat };

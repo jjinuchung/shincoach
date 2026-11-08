@@ -13,6 +13,9 @@
 //   { id, ko, by?, bpm, beats, lines:[줄 첫 마디(1부터)], segno?, fine?, dsAlFine?, chords?:{마디:[이름]}, dyn?:{마디:'mf'},
 //     right:[마디마다 한 칸], left:[…] }
 //   한 칸 = 빈칸으로 나눈 '음:박:손가락' — 화음 'B4+G5:2:1+5' · 쉼표 'R:1' · 붙임줄은 끝에 '~'(다음 같은 음과 이어 한 번만 친다)
+//   (v403) pickup?: 못갖춘마디 박 수 — 첫 칸이 그 마디(책처럼 0번) · 마지막 마디는 beats 또는 beats - pickup
+//          play?: [[첫, 끝], …] 곡 전체 연주 차례(도돌이표·1·2번 괄호) · repeats?: [{from, to}] · endings?: [{label, bars:[…]}] (그림만)
+//          ottava?: [{hand, from, to, shift}] — 그 마디들은 적힌 자리보다 shift 옥타브 소리(8vb = -1) · 마디 번호는 모두 책 번호
 //
 // ★ 이 파일은 아무것도 import하지 않는다 — 시험이 DOM·IndexedDB 없이 부른다.
 
@@ -78,7 +81,12 @@ export function midiOfWhite(wi) {
 
 // ───────────────────── 곡 읽기 ─────────────────────
 
-/** 한 마디 글 → [{ notes:[parseNote+finger], rest, dur, tie, t }] · 깨졌으면 { bad } */
+/** 책의 첫 마디 번호 — 못갖춘마디가 있으면 0(책이 1로 세면 pickupBar: 1 → song.first) · 없으면 1 */
+export const firstNum = (song) => (Number.isInteger(song.first) ? song.first : song.pickup ? 0 : 1);
+/** 원고 차례(0부터) → 책의 마디 번호 */
+export const barNum = (song, i) => i + firstNum(song);
+
+/** 한 마디 글 → { groups:[{ notes:[parseNote+finger], rest, dur, tie, t }], t:박 합 } · 깨졌으면 { bad } — 박 합은 부르는 쪽이 본다 */
 function readBar(text, beats) {
   const out = [];
   let t = 0;
@@ -108,13 +116,25 @@ function readBar(text, beats) {
     }
     t += dur;
   }
-  if (Math.abs(t - beats) > EPS) return { bad: `박 합 ${t}` };
-  return { groups: out };
+  return { groups: out, t };
 }
+
+/** 곡 전체 연주 차례(원고 차례 0부터) — play가 있으면 그대로 · 없으면 처음부터 끝까지(D.S. al Fine이면 세뇨로 돌아가 피네까지) */
+function fullOrder(song) {
+  const f = firstNum(song);
+  if (Array.isArray(song.play) && song.play.length) return song.play.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a - f + i));
+  const order = Array.from({ length: song.n }, (_, i) => i);
+  if (song.ds) for (let b = song.segno - f; b <= song.fine - f; b += 1) order.push(b);
+  return order;
+}
+
+/** 책 번호 마디 목록 칸 하나가 [첫, 끝] 안의 정수인지 */
+const inBars = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 
 /**
  * 곡 원고 → 쓸 수 있는 곡 (순수) · 깨졌으면 { ok:false, bad:[까닭] }
- * 붙임줄(~)은 같은 손·같은 음으로만 이어진다(마디를 넘어도) · 줄 첫 마디는 1부터 늘어나야 · 세뇨·피네는 마디 안
+ * 붙임줄(~)은 같은 손·같은 음으로만 이어진다 — 곡 전체 연주 차례대로 본다(되돌아가는 자리를 넘어도 · 곡 끝에서 끊기면 안 됨)
+ * 줄 첫 마디는 책의 첫 마디부터 늘어나야 · 세뇨·피네·차례·도돌이표·괄호·옥타브는 마디 안 · 마디 번호는 모두 책 번호
  */
 export function readSong(raw) {
   const bad = [];
@@ -130,31 +150,134 @@ export function readSong(raw) {
   const R = Array.isArray(raw.right) ? raw.right : null;
   const L = Array.isArray(raw.left) ? raw.left : null;
   if (!R || !L || !R.length || R.length !== L.length || R.length > MAX_BARS) bad.push('마디 수');
+  const pickup = raw.pickup == null ? 0 : Number(raw.pickup);
+  // 숫자가 아니면(오타) 「못갖춘마디 없음」으로 넘기지 않는다 (Codex 207차 P3-5)
+  if (raw.pickup != null && !(Number.isFinite(pickup) && (pickup === 0 || (pickup > 0 && pickup < beats && R && R.length >= 2)))) bad.push('못갖춘마디');
   if (bad.length) return { ok: false, bad };
   const n = R.length;
+  // 못갖춘마디를 책이 0으로 세는지 1로 세는지는 책마다 다르다 — pickupBar: 1이면 못갖춘마디가 1마디 (v403)
+  if (raw.pickupBar != null && !(pickup && [0, 1].includes(raw.pickupBar))) bad.push('못갖춘마디 번호');
+  const f = pickup ? (raw.pickupBar === 1 ? 1 : 0) : 1;
+  const last = n - 1 + f;
+  const handKo = (hand) => (hand === 'R' ? '오른손' : '왼손');
+  // 박자 바꿈(v403) — meter {책 마디 번호: 박} · 그 마디부터 끝까지(다음 바꿈까지) · 첫 박자는 beats
+  const meters = Array(n).fill(beats);
+  const meter = {};
+  if (raw.meter != null) {
+    if (!isObj(raw.meter) || Object.keys(raw.meter).length > 20) bad.push('박자 바꿈');
+    else {
+      for (const [k, v] of Object.entries(raw.meter)) {
+        const num = Number(k);
+        const val = Number(v);   // 빠르기 바꿈처럼 글자 "4"도 숫자로 (Codex 208차)
+        if (!inBars(num, f + 1, last) || ![2, 3, 4].includes(val)) { bad.push('박자 바꿈'); break; }
+        meter[num] = val;
+      }
+      for (let b = 0, cur = beats; b < n; b += 1) { if (meter[b + f]) cur = meter[b + f]; meters[b] = cur; }
+    }
+  }
+  // 빠르기 바꿈(v403) — tempo {책 마디 번호: ♩ 빠르기} · 그 마디부터 · 없으면 bpms를 두지 않는다(옛 곡 그대로)
+  let bpms = null;
+  if (raw.tempo != null) {
+    if (!isObj(raw.tempo) || Object.keys(raw.tempo).length > 20) bad.push('빠르기 바꿈');
+    else {
+      const at = {};
+      for (const [k, v] of Object.entries(raw.tempo)) {
+        const num = Number(k);
+        if (!inBars(num, f + 1, last) || !(Number(v) >= 30 && Number(v) <= 240)) { bad.push('빠르기 바꿈'); break; }
+        at[num] = Number(v);
+      }
+      bpms = Array(n);
+      for (let b = 0, cur = bpm; b < n; b += 1) { if (at[b + f]) cur = at[b + f]; bpms[b] = cur; }
+    }
+  }
+  // 마디 길이 — 못갖춘마디는 pickup박 · 그때 마지막 마디는 그 박자 또는 남은 박 · 나머지는 그 마디 박자 · 두 손이 같아야
+  const allowed = (b) => (pickup && b === 0 ? [pickup] : pickup && b === n - 1 ? [meters[b], meters[b] - pickup] : [meters[b]]);
   const bars = { R: [], L: [] };
+  const lens = [];
   for (const [hand, list] of [['R', R], ['L', L]]) {
     for (let b = 0; b < n; b += 1) {
-      const r = readBar(list[b], beats);
-      if (r.bad) { bad.push(`${hand === 'R' ? '오른손' : '왼손'} ${b + 1}마디 ${r.bad}`); bars[hand].push([]); } else bars[hand].push(r.groups);
+      const r = readBar(list[b], meters[b]);
+      if (r.bad) { bad.push(`${handKo(hand)} ${b + f}마디 ${r.bad}`); bars[hand].push([]); continue; }
+      bars[hand].push(r.groups);
+      if (!allowed(b).some((v) => Math.abs(r.t - v) <= EPS)) bad.push(`${handKo(hand)} ${b + f}마디 박 합 ${r.t}`);
+      else if (hand === 'R') lens[b] = r.t;
+      else if (lens[b] != null && Math.abs(lens[b] - r.t) > EPS) bad.push(`${b + f}마디 두 손 박 합이 다름`);
     }
-    // 붙임줄 — 다음 음(마디를 넘어도)이 같은 음이어야
-    const flat = bars[hand].flatMap((gs, b) => gs.map((g) => ({ g, b })));
+  }
+  const lines = Array.isArray(raw.lines) && raw.lines.length ? raw.lines.map(Number) : [f];
+  if (lines[0] !== f || lines.some((v, i) => !inBars(v, f, last) || (i && v <= lines[i - 1]))) bad.push('줄 첫 마디');
+  const segno = raw.segno == null ? 0 : Number(raw.segno);
+  const fine = raw.fine == null ? 0 : Number(raw.fine);
+  const ds = raw.dsAlFine === true;
+  if (segno && !inBars(segno, Math.max(1, f), last)) bad.push('세뇨');
+  if (fine && !inBars(fine, segno || Math.max(1, f), last)) bad.push('피네');
+  if (ds && !(segno && fine)) bad.push('D.S. al Fine에 세뇨·피네가 없음');
+  // 연주 차례(도돌이표·1·2번 괄호) — 모든 마디가 한 번은 나와야 · D.S.와 함께 쓰지 않는다
+  let play = null;
+  if (raw.play != null) {
+    const ok = Array.isArray(raw.play) && raw.play.length >= 1 && raw.play.length <= 20
+      && raw.play.every((p) => Array.isArray(p) && p.length === 2 && inBars(p[0], f, last) && inBars(p[1], p[0], last));
+    if (!ok) bad.push('연주 차례');
+    else {
+      play = raw.play.map(([a, b]) => [a, b]);
+      const seen = new Set(play.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i)));
+      if (seen.size !== n) bad.push('연주 차례에 빠진 마디');
+      if (play.reduce((s, [a, b]) => s + b - a + 1, 0) > MAX_BARS * 3) bad.push('연주 차례가 너무 김');
+      if (ds) bad.push('D.S.와 연주 차례를 함께 씀');
+    }
+  }
+  // 도돌이표·괄호는 그림만 — 연주 차례(play)가 있어야 소리와 맞는다
+  const repeats = [];
+  if (raw.repeats != null) {
+    if (!Array.isArray(raw.repeats) || raw.repeats.length > 10) bad.push('도돌이표');
+    else for (const r of raw.repeats) {
+      if (!isObj(r) || !inBars(r.from, f, last) || !inBars(r.to, r.from, last)) { bad.push('도돌이표'); break; }
+      repeats.push({ from: r.from, to: r.to });
+    }
+  }
+  const endings = [];
+  if (raw.endings != null) {
+    if (!Array.isArray(raw.endings) || raw.endings.length > 10) bad.push('괄호');
+    else for (const e of raw.endings) {
+      const label = isObj(e) ? String(e.label || '').trim().slice(0, 4) : '';
+      if (!label || !Array.isArray(e.bars) || !e.bars.length || e.bars.length > 20 || !e.bars.every((v) => inBars(v, f, last))) { bad.push('괄호'); break; }
+      endings.push({ label, bars: [...new Set(e.bars)].sort((a, b) => a - b) });
+    }
+  }
+  if ((repeats.length || endings.length) && !play) bad.push('도돌이표·괄호가 있으면 연주 차례도');
+  // 옥타브(8va·8vb) — 그 손의 그 마디들은 적힌 자리(그림)는 두고 소리(midi)만 옮긴다
+  const ottava = [];
+  if (raw.ottava != null) {
+    if (!Array.isArray(raw.ottava) || raw.ottava.length > 20) bad.push('옥타브');
+    else for (const o of raw.ottava) {
+      if (!isObj(o) || !['R', 'L'].includes(o.hand) || ![-1, 1].includes(o.shift) || !inBars(o.from, f, last) || !inBars(o.to, o.from, last)) { bad.push('옥타브'); break; }
+      // 같은 손의 구간이 겹치면 두 번 옮겨져 두 옥타브가 된다 — 깨진 원고로 (Codex 207차 P2-2)
+      if (ottava.some((p) => p.hand === o.hand && o.from <= p.to && p.from <= o.to)) { bad.push('옥타브 구간이 겹침'); break; }
+      ottava.push({ hand: o.hand, from: o.from, to: o.to, shift: o.shift });
+    }
+  }
+  if (bad.length) return { ok: false, bad };
+  for (const o of ottava) {
+    for (let b = o.from - f; b <= o.to - f; b += 1) {
+      for (const g of bars[o.hand][b]) for (const x of g.notes) {
+        x.midi += 12 * o.shift;
+        if (x.midi < 21 || x.midi > 108) bad.push(`${handKo(o.hand)} ${b + f}마디 옥타브 옮긴 음이 건반 밖`);
+      }
+    }
+  }
+  // 붙임줄 — 곡 전체 연주 차례에서 다음 음이 같은 음이어야 (D.S.·도돌이로 돌아가는 자리도 · 곡 끝에서 끊기면 안 됨)
+  const order = fullOrder({ n, pickup, first: f, play, ds, segno, fine });   // first를 빼면 pickupBar 1인 곡의 차례가 한 마디 밀린다
+  for (const hand of ['R', 'L']) {
+    const flat = order.flatMap((b) => bars[hand][b].map((g) => ({ g, b })));
+    const said = new Set();
     flat.forEach(({ g, b }, i) => {
       if (!g.tie) return;
       const nx = flat[i + 1];
       const same = nx && !nx.g.rest && nx.g.notes.map((x) => x.midi).join() === g.notes.map((x) => x.midi).join();
-      if (!same) bad.push(`${hand === 'R' ? '오른손' : '왼손'} ${b + 1}마디 붙임줄이 같은 음으로 안 이어짐`);
+      const msg = `${handKo(hand)} ${b + f}마디 붙임줄이 같은 음으로 안 이어짐`;
+      if (!same && !said.has(msg)) { said.add(msg); bad.push(msg); }
     });
   }
-  const lines = Array.isArray(raw.lines) && raw.lines.length ? raw.lines.map(Number) : [1];
-  if (lines[0] !== 1 || lines.some((v, i) => !Number.isInteger(v) || v < 1 || v > n || (i && v <= lines[i - 1]))) bad.push('줄 첫 마디');
-  const segno = raw.segno == null ? 0 : Number(raw.segno);
-  const fine = raw.fine == null ? 0 : Number(raw.fine);
-  const ds = raw.dsAlFine === true;
-  if (segno && !(Number.isInteger(segno) && segno >= 1 && segno <= n)) bad.push('세뇨');
-  if (fine && !(Number.isInteger(fine) && fine >= (segno || 1) && fine <= n)) bad.push('피네');
-  if (ds && !(segno && fine)) bad.push('D.S. al Fine에 세뇨·피네가 없음');
   if (bad.length) return { ok: false, bad };
   const chords = {};
   if (isObj(raw.chords)) for (const [k, v] of Object.entries(raw.chords)) if (Array.isArray(v)) chords[k] = v.map((x) => String(x).slice(0, 12)).slice(0, 4);
@@ -162,48 +285,60 @@ export function readSong(raw) {
   if (isObj(raw.dyn)) for (const [k, v] of Object.entries(raw.dyn)) dyn[k] = String(v).slice(0, 4);
   return {
     ok: true,
-    song: { id, ko, by: String(raw.by || '').slice(0, 40), from: String(raw.from || '').slice(0, 120), bpm, beats, n, lines, segno, fine, ds, chords, dyn, bars },
+    song: {
+      id, ko, by: String(raw.by || '').slice(0, 40), from: String(raw.from || '').slice(0, 120), bpm, beats, n, lines, segno, fine, ds,
+      pickup, first: f, lens, meters, meter, bpms, play, repeats, endings, ottava, chords, dyn, bars,
+    },
   };
 }
 
-/** 줄 k의 마디(0부터) [첫, 끝+1) */
+/** 줄 k의 마디(원고 차례 0부터) [첫, 끝+1) */
 export function lineBars(song, k) {
-  const a = song.lines[k] - 1;
-  const b = k + 1 < song.lines.length ? song.lines[k + 1] - 1 : song.n;
+  const f = firstNum(song);
+  const a = song.lines[k] - f;
+  const b = k + 1 < song.lines.length ? song.lines[k + 1] - f : song.n;
   return [a, b];
 }
 
 /**
- * 연주 차례 — 마디 번호(0부터) 목록 (순수)
- * line < 0(곡 전체): 처음부터 끝까지, D.S. al Fine이면 세뇨로 돌아가 피네에서 끝 · 줄 하나: 그 줄 마디만(되돌이 없이)
+ * 연주 차례 — 원고 차례(0부터) 목록 (순수)
+ * line < 0(곡 전체): play가 있으면 그 차례(도돌이표·1·2번 괄호) · 없으면 처음부터 끝까지, D.S. al Fine이면 세뇨로 돌아가 피네에서 끝
+ * 줄 하나: 그 줄 마디만(되돌이 없이)
  */
 export function playOrder(song, line = -1) {
   if (line >= 0 && line < song.lines.length) {
     const [a, b] = lineBars(song, line);
     return Array.from({ length: b - a }, (_, i) => a + i);
   }
-  const order = Array.from({ length: song.n }, (_, i) => i);
-  if (song.ds) for (let b = song.segno - 1; b <= song.fine - 1; b += 1) order.push(b);
-  return order;
+  return fullOrder(song);
 }
 
 /**
  * 연주판 — 차례대로 펼친 마디 · 소리 낼 음(붙임줄은 한 번) · 그릴 머리 (순수)
- * @returns {{ bars:[{src, at}], notes:[{hand, midi, d, li, acc, t, dur, finger, src}], heads:[{hand, t, dur, notes, rest, tie, src, gi}], end }}
- *   t·at·end는 박(0부터) · src는 원래 마디(0부터)
+ * @returns {{ bars:[{src, at, len}], notes:[{hand, midi, d, li, acc, t, dur, finger, src}], heads:[{hand, t, dur, notes, rest, tie, src, gi}], end }}
+ *   t·at·len·end는 박(0부터) · src는 원래 마디(원고 차례 0부터) · len은 그 마디 박 수(못갖춘마디·마지막 마디는 짧을 수 있다)
  */
 export function perform(song, line = -1) {
   const order = playOrder(song, line);
-  const bars = order.map((src, i) => ({ src, at: i * song.beats }));
+  let at = 0;
+  const bars = order.map((src) => {
+    const len = Array.isArray(song.lens) && song.lens[src] > 0 ? song.lens[src] : song.beats;
+    const b = { src, at, len };
+    at += len;
+    return b;
+  });
   const heads = [];
   const notes = [];
   for (const hand of ['R', 'L']) {
     let hold = null; // 붙임줄로 이어 가는 중인 소리
+    const mine = []; // 이 손의 머리 (차례대로)
     bars.forEach(({ src, at }, bi) => {
       bars[bi].first = bi === 0 || bars[bi - 1].src !== src - 1; // 되돌아온 첫 마디(세뇨) — 그림에 표시
       bar(song.bars[hand][src]).forEach((g, gi) => {
         const t = at + g.t;
-        heads.push({ hand, t, dur: g.dur, notes: g.notes, rest: g.rest, tie: g.tie, src, gi });
+        const h = { hand, t, dur: g.dur, notes: g.notes, rest: g.rest, tie: g.tie, src, gi };
+        heads.push(h);
+        mine.push(h);
         if (g.rest) { hold = null; return; }
         if (hold && hold.next === t && hold.key === g.notes.map((x) => x.midi).join()) {
           for (const s of hold.list) s.dur += g.dur;
@@ -213,12 +348,54 @@ export function perform(song, line = -1) {
         hold = g.tie ? { ...hold, next: t + g.dur, key: g.notes.map((x) => x.midi).join() } : null;
       });
     });
+    // 그릴 붙임줄은 이 차례에서 정말 이어지는 것만 — 줄 연습(원고 차례)에서는 곡 전체 차례의 이음이 다른 음에 닿을 수 있다 (Codex 207차 P3-3)
+    const key = (h) => h.notes.map((x) => x.midi).join();
+    mine.forEach((h, i) => {
+      if (!h.tie) return;
+      const nx = mine[i + 1];
+      h.tie = !!nx && !nx.rest && key(nx) === key(h) && Math.abs(nx.t - (h.t + h.dur)) < EPS;
+    });
   }
   notes.sort((a, b) => a.t - b.t || a.midi - b.midi);
   heads.sort((a, b) => a.t - b.t);
-  return { bars, notes, heads, end: bars.length * song.beats };
+  return { bars, notes, heads, end: at };
 }
 const bar = (gs) => (Array.isArray(gs) ? gs : []);
+
+/** 박 t에서의 빠르기 (순수) — tempo 바꿈이 없으면 곡 빠르기 · 시작 전(t<0)은 첫 마디 빠르기 */
+export function bpmAt(song, perf, t) {
+  if (!Array.isArray(song.bpms) || !perf || !perf.bars.length) return song.bpm;
+  const b = perf.bars.find((x) => t < x.at + x.len) || perf.bars[perf.bars.length - 1];
+  return song.bpms[b.src] || song.bpm;
+}
+
+/**
+ * 박 t부터 dur박이 몇 초인지 (순수 · 빠르기 배율 1) — 빠르기가 바뀌는 마디를 걸치면 마디마다 그 빠르기로 나눠 더한다
+ * (시작 때의 빠르기 하나로 재면 ♩64 → ♩150 자리의 첫 음이 두 배 넘게 길게 울렸다 — Codex 208차 P2)
+ */
+export function secsOf(song, perf, t, dur) {
+  if (!Array.isArray(song.bpms) || !perf || !perf.bars.length) return (dur * 60) / song.bpm;
+  let sec = 0;
+  let left = dur;
+  for (const b of perf.bars) {
+    const lo = Math.max(t, b.at);
+    const hi = Math.min(t + dur, b.at + b.len);
+    if (hi <= lo) continue;
+    sec += ((hi - lo) * 60) / (song.bpms[b.src] || song.bpm);
+    left -= hi - lo;
+  }
+  return left > EPS ? sec + (left * 60) / bpmAt(song, perf, t) : sec;   // 연주판 밖(그럴 일은 드물다)은 가까운 마디 빠르기로
+}
+
+/**
+ * 1·2번 괄호 한 조각의 모양 (순수) — 책 번호 num 마디에서
+ * open: 괄호의 첫 마디(왼쪽 갈고리 + 「1.」) · close: 괄호의 끝 마디이고 그 끝에서 되돌아갈 때(도돌이표 끝)만 오른쪽 갈고리
+ * (배열에서 몇째인지로 정하면 괄호 묶음이 둘인 곡에서 되돌아가지 않는 2번 괄호도 닫혔다 — Codex 207차 P3-4)
+ */
+export function endingShape(song, e, num) {
+  const end = e.bars[e.bars.length - 1];
+  return { open: e.bars[0] === num, close: end === num && (song.repeats || []).some((r) => r.to === end) };
+}
 
 /**
  * 🎹 태블릿으로 치기 — 기다릴 걸음 (순수): 진우가 치는 손의 음을 같은 때끼리 묶는다
