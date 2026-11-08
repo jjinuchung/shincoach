@@ -116,7 +116,9 @@ test('🛟 일부를 못 읽으면 사본을 안 고친다 — 문장·하루 �
     assert.equal(await saveMirror(new Date(2030, 0, 1)), false);
     assert.equal(fakeIdb.failsLeft(), 0, '실패가 쓰였다');
     assert.deepEqual(readMirror(), before, '사본 그대로');
-    await new Promise((r) => setTimeout(r, 20)); // 먼저 끝난 판의 남은 읽기가 다음 판의 실패를 대신 쓰지 않게
+    // 먼저 끝난 판의 남은 읽기가 다음 판의 실패를 대신 쓰지 않게 — 가짜 DB는 트랜잭션을 한 줄로 차례로 돌리니 읽기 하나를 줄 끝에 세워 기다린다
+    // (20 ms를 기다리던 때는 Windows 타이머가 거칠어 남은 getMath가 다음 판의 실패를 먹어 세 번에 한 번꼴로 실패했다 · 0 ms면 늘 실패)
+    await getAllSentenceStats();
   }
   await putSentenceStats([{ key: 'mirror|2', itemId: 'mirror', start: 2, en: 'yo', done: true }]);
   assert.equal(await saveMirror(), true);
