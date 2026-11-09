@@ -34,8 +34,8 @@ test('📤 하루 줄 — 안내 창만 본 날도 한 줄 · 다른 것 뒤에 
   const md = pianoMd({ notes: 1 }, '2026-11-09');
   assert.match(md, /「✋ 피아노로 다 쳤어요」\(v404까지 「다 쳤어요 ✋」\)를 누른 것 — 진짜로 쳤는지는 앱이 모른다\(피아노 연결 전\)/);
   assert.match(src('js/upload.js'), /🐾 안내 창 봄 = 「음악 포켓몬은 진짜 피아노로」 안내를 「알겠어요!」로 닫은 번\(v405\)/);
-  assert.match(src('sw.js'), /CACHE_VERSION = 'v405'/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v405'/);
+  assert.ok(Number((/CACHE_VERSION = 'v(\d+)'/.exec(src('sw.js')) || [])[1]) >= 405, 'sw v405 이상');
+  assert.ok(Number((/APP_VERSION = 'v(\d+)'/.exec(src('js/version.js')) || [])[1]) >= 405, '앱 판 v405 이상');
 });
 
 // ───────────────────── 화면 — 가짜 화면으로 pianoview.js를 직접 ─────────────────────
@@ -206,7 +206,8 @@ test('화면 — 온 창이 떠 있으면 안내 창은 다음에 들어올 때 
   await setPiano({ notes: 10, mons: 1, days: {} });
   await PV.enterMusic(); // 안내 창이 먼저 뜬다 — 온 창은 뒤에
   assert.ok(byId('pn-intro'));
-  await settle(80);
+  await waitFor(() => pianoOf(getProfileSnapshot().piano).mons === 2, '밀린 몫 받기 — 온 창은 안내 뒤에 줄 선다'); // 전체 시험 때 저장이 늦다(v406 전체 시험)
+  await settle(20);
   // 안내를 닫지 않은 채 다른 화면에 갔다 와도 창은 하나
   PV.leaveMusic();
   await PV.enterMusic();
