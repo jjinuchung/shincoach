@@ -182,7 +182,8 @@ test('🔍 물음 아래 말 (qFeedback, 순수): 근거부터는 파란 안내 
   assert.match(say({ wrong: [1, 2] }).text, /^🔍 두 번 틀렸어요\./);
   // 근거부터에서 찾은 직후 — "남은" 없이
   const found = { gate: true, evFirst: true, evDone: true, wrongAtEv: 0 };
-  assert.deepEqual(say(found), { cls: 'is-ok', text: '찾았어요! 칠한 줄(③, ⑤)을 다시 읽고 보기에서 골라 봐요.' });
+  assert.deepEqual(say(found), { cls: 'is-ok', text: '🎯 한 번에 찾았어요! 칠한 줄(③, ⑤)을 다시 읽고 보기에서 골라 봐요.' }, '줄을 한 번에 찾았으면 칭찬 (v406)');
+  assert.deepEqual(say({ ...found, evWrong: [2] }), { cls: 'is-ok', text: '찾았어요! 칠한 줄(③, ⑤)을 다시 읽고 보기에서 골라 봐요.' }, '잘못 누른 줄이 있었으면 예전 말');
   // 그 뒤에 보기를 틀렸다 — 초록 "찾았어요!"가 아니라 방금 고른 보기의 힌트
   assert.deepEqual(say({ ...found, wrong: [1] }), { cls: 'is-no', text: `🤔 ${hintOf('detail', r)}` });
   assert.deepEqual(say({ ...found, wrong: [1, 2] }), { cls: 'is-no', text: `🤔 ${hintOf('make', r)}` }, '두 번째 오답도 그 보기의 힌트(새 말이라 다시 읽힌다)');
@@ -190,7 +191,8 @@ test('🔍 물음 아래 말 (qFeedback, 순수): 근거부터는 파란 안내 
   assert.equal(evFirstNow(q, st({ ...found, wrong: [1, 2] })), false, '찾은 뒤 두 번 틀려도 다시 잠그지 않는다');
   // 두 번 틀려 근거 먼저(v258)로 찾은 직후는 "남은 보기" · 그 뒤 새로 틀리면 힌트
   const found2 = { wrong: [1, 2], evFirst: true, evDone: true, wrongAtEv: 2 };
-  assert.deepEqual(say(found2), { cls: 'is-ok', text: '찾았어요! 칠한 줄(③, ⑤)을 다시 읽고 남은 보기에서 골라 봐요.' });
+  assert.deepEqual(say({ ...found2, evWrong: [2] }), { cls: 'is-ok', text: '찾았어요! 칠한 줄(③, ⑤)을 다시 읽고 남은 보기에서 골라 봐요.' });
+  assert.deepEqual(say(found2), { cls: 'is-ok', text: '🎯 한 번에 찾았어요! 칠한 줄(③, ⑤)을 다시 읽고 남은 보기에서 골라 봐요.' }, '두 번 틀려 근거 먼저여도 줄을 한 번에 찾았으면 칭찬 (v406)');
   assert.deepEqual(say({ ...found2, wrong: [1, 2, 3] }), { cls: 'is-no', text: `🤔 ${hintOf('detail', r)}` });
   // 맞힘이 가장 먼저 · 아무 일도 없으면 빈 말
   assert.deepEqual(say({ ...found, wrong: [1], answered: true }), { cls: 'is-ok', text: '맞아요!' });
@@ -214,7 +216,7 @@ test('🔍 화면 배선 (v273): 열 때 별 0개면 근거부터 자리(기록�
   const open = body('function openCard(id) {');
   // v300: 받을 별을 한 번 세어 🎯 다시 읽기 안내와 같이 쓴다 — 다시 읽는 사이엔 0(gateAtOf(card, 0)은 -1)
   assert.ok(open.includes('const starNow = profileLoading() ? 0 : nextStar(korDoneMap(), card.id, Date.now()).star;') && open.includes('const gateAt = gateAtOf(card, starNow);'), '연 때 이번에 받을 별로 · 다시 읽는 사이(받은 별이 비어 보임)는 안 걺');
-  assert.ok(open.includes('gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1 })'), '물음마다 상태');
+  assert.ok(open.includes('gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1, evFrom: -1, waitTo: 0 })'), '물음마다 상태 (v406 evFrom·waitTo)');
   const rq = body('function renderQ() {');
   assert.ok(rq.includes('if (st.gate && st.from < 0) st.from = r.sec;'), '처음 보인 때 한 번');
   assert.ok(rq.indexOf('if (readFirst(r)) {') < rq.indexOf('if (st.gate && st.from < 0)'), '📖 [문제 보기] 전에는 재지 않는다');

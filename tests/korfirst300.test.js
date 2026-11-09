@@ -188,7 +188,7 @@ test('🔍·🎯 화면 배선: 연 때 받을 별 한 번 · 물음마다 옆 �
   assert.ok(open.includes('    starNow,\n'), '읽는 상태에 둔다');
   assert.ok(open.includes('pairSide: Math.random() < 0.5 ? 0 : 1, pair: null,'), '물음마다 한 번 무작위');
   const pick = body('function evPick(n) {');
-  const fix = 'if (!st.answered && !st.pair && st.evWrong.length >= EV_PAIR_AT) st.pair = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);';
+  const fix = 'if (pairDue(st, r.sec)) st.pair = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);'; // v406 — 잘못 셋 + 근거 찾기 20초 뒤(pairDue가 답 전·안 좁힘을 본다)
   assert.ok(pick.includes(fix), '한 번 정하면 그대로 · 맞힌 뒤의 근거 잡기엔 없음');
   assert.ok(pick.indexOf('st.evWrong.push(n);') < pick.indexOf(fix), '방금 누른 줄까지 세고');
   const ev = body('function evidenceEl(q, st, unit) {');
@@ -217,7 +217,7 @@ test('🔍·🎯 화면 배선: 연 때 받을 별 한 번 · 물음마다 옆 �
 
 test('📤 국어 요약 머리말: 두 줄로 좁히기(두 곳 · 남길 옆 줄이 없으면 안 좁힘 · 두 줄 = 좁힌 물음 수) · v300부터 ★★·★★★ 🎯 규칙 (괄호는 닫힌다)', () => {
   const L = readLines([], DATA.cards, '2026-10-20');
-  assert.match(L[1], /🔍 두 줄로 좁히기\(v300\) = 답을 고르기 전 근거 찾기\(📍 근거부터·🔍 근거 먼저\)에서 줄을 세 번 잘못 누르면 근거 줄과 그 옆 줄 둘만 남김\(남길 옆 줄이 없으면 안 좁힘\) · 두 줄 = 그렇게 좁힌 물음 수\(v300부터 적음 — 그 전 줄에는 없음\)/);
+  assert.match(L[1], /🔍 두 줄로 좁히기\(v300\) = 답을 고르기 전 근거 찾기\(📍 근거부터·🔍 근거 먼저\)에서 줄을 세 번 잘못 누르면 근거 줄과 그 옆 줄 둘만 남김\(남길 옆 줄이 없으면 안 좁힘 · v406부터는 근거 찾기가 시작된 지 20초가 지난 뒤에만 · 잘못 누르면 2초 동안 줄을 못 누름 · 한 번에 찾으면 🎯 칭찬 말 — 잘못 누른 줄·찾기까지를 v406 전후로 견주기\) · 두 줄 = 그렇게 좁힌 물음 수\(v300부터 적음 — 그 전 줄에는 없음\)/);
   assert.ok(!L[1].includes('3 이상이면 본 것'), 'Codex 106차 — w만으로는 두 줄을 봤는지 모른다');
   assert.ok(L[1].includes('그 전 줄에는 없음) · 🎯 v300부터') && !/ ·\S/u.test(L[1]), '띄어 쓴 가운뎃점(나눔) 뒤는 늘 띄어 쓴다');
   assert.match(L[1], /🎯 v300부터 ★★·★★★를 새로 받은 읽기는 첫 번에 맞힌 물음이 반 이상일 때만 🎯\(별·💰는 그대로\)\)$/);

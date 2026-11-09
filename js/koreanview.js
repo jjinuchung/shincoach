@@ -10,7 +10,7 @@
 //  · v300: 🔍 근거 먼저에서 줄을 세 번 잘못 누르면 두 줄만 남긴다(korean.evPair) · 🎯 다시 읽기(★★·★★★)는 처음 고른 답이 반 이상일 때만(korean.catchFirstOk) — 안내는 규칙만
 //  · v363: 📍 근거부터·🔍 근거 먼저에서 근거를 찾으면 칠한 근거와 물음을 🔊 한 번 읽은 뒤 보기가 열린다(sayEvidence) · 🔊 다시 듣기 ·
 //    소리가 안 나면(읽기 없음·한국어 음성 없음·3초 안에 시작 안 함) 바로 연다 · 📤 근거부터 줄에 u(끝까지 들었나)
-import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT, evPair, EV_PAIR_AT, gateAtOf, CATCH_FIRST_STAR } from './korean.js';
+import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT, evPair, EV_PAIR_AT, gateAtOf, CATCH_FIRST_STAR, EV_WAIT_MS, evWaitLeft, pairDue } from './korean.js';
 import { IDLE_SEC } from './timelimit.js'; // ⏱️ 읽는 시계는 ⏳ 시계와 같은 쉼 규칙(2분 넘게 손을 안 대면 안 센다)
 import { newListenState, playListen, haltListen, stopListening, listenBoxEl, scriptEl, confirmHeard, syncListenBox, sayReady, playEvSay, stopEvSay } from './korlistenview.js'; // 🎧 듣기 카드 (v245) — 이 파일을 import하지 않는다
 import { fullyHeard } from './korlisten.js'; // 📍 근거 줄 읽기가 끝까지 들렸나 (v363 📤 u)
@@ -346,7 +346,7 @@ function openCard(id) {
     // gate = 근거부터 물음 · from = 그 물음이 처음 보인 때의 읽은 초 · evAt = 근거 줄을 찾은 때의 읽은 초 (v273 📤 찾기까지)
     // wrongAtEv = 맞히기 전에 근거를 찾을 때까지 틀린 보기 수 (그 뒤에 새로 틀리면 "찾았어요!" 대신 힌트, Codex 82차 #1)
     // sayOn = 찾은 근거를 🔊 읽는 중(보기 잠금) · said = 그 첫 읽기가 끝까지 들렸나(1) · 아니었나(0) · 안 읽었나(-1) (v363 📤 u)
-    qs: card.qs.map((q, i) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false, pairSide: Math.random() < 0.5 ? 0 : 1, pair: null, sayOn: false, said: -1, gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1 })),
+    qs: card.qs.map((q, i) => ({ order: shuffled(q.opts.length), wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false, pairSide: Math.random() < 0.5 ? 0 : 1, pair: null, sayOn: false, said: -1, gate: i === gateAt, from: -1, evAt: -1, wrongAtEv: -1, evFrom: -1, waitTo: 0 })),
     misses: {},
     evMiss: 0, // 근거를 잘못 누른 수 — 잘못 읽기로는 안 세고 🟩 "한 번에 다 맞힘"에만
     result: null,
@@ -660,12 +660,13 @@ function renderQ() {
   const unit = unitOf(r.card);
   const evFirst = evFirstNow(q, st); // 🔍 두 번 틀렸다 — 근거부터 (v258) · 근거부터 물음 (v273)
   if (st.gate && st.from < 0) st.from = r.sec; // 🔍 근거부터 물음이 처음 보인 때 (📤 찾기까지 초)
+  if (evFirst && st.evFrom < 0) st.evFrom = r.sec; // 🤔 근거 찾기가 시작된 때 — 두 줄 도움은 이만큼 뒤에 (v406)
   const card = el('div', 'kor-q');
   const head = el('div', 'kor-q-head');
   head.appendChild(el('span', 'kor-q-no', `문제 ${r.qi + 1} / ${r.card.qs.length}`));
   head.appendChild(el('span', 'kor-q-skill', q.skill));
   card.appendChild(head);
-  card.appendChild(el('p', 'kor-q-text', q.q));
+  card.appendChild(el('p', `kor-q-text${evWaitLeft(st, waitClock()) > 0 ? ' is-reread' : ''}`, q.q)); // 🤔 잘못 누른 뒤 — 물음을 다시 읽게 (v406)
   const said = qFeedback(q, st, unit, r);
   const fb = el('p', `kor-fb${said.cls ? ` ${said.cls}` : ''}`, said.text);
   // 🔍 근거부터 안내는 잠긴 보기 위에 — 좁은 세로 화면에서 눌리지 않는 보기만 먼저 보였다 (Codex 82차 #2) · 🔊 듣는 중 안내도 (v363)
@@ -750,13 +751,15 @@ export function qFeedback(q, st, unit, r) {
   const lastWrong = st.wrong.length ? q.opts[st.wrong[st.wrong.length - 1]] : null;
   if (st.answered) return { cls: 'is-ok', text: q.ev && !st.evDone ? '맞아요! 이제 그렇게 생각한 까닭을 글에서 찾아볼까요?' : '맞아요!' };
   // 🔊 찾은 근거를 읽는 중 (v363) — 셈 말 없이 · 틀려서가 아니니 빨갛지 않게
-  if (st.sayOn) return { cls: 'is-say', text: `🔊 찾은 ${unit}을 읽어 줄게요. 다 들으면 보기가 열려요.` };
+  // 🎯 답을 고르기 전에 한 번에 찾았다 — 칭찬 말 (v406 · 말만)
+  const once = st.evFirst && Array.isArray(st.evWrong) && st.evWrong.length === 0 ? '🎯 한 번에 찾았어요! ' : '';
+  if (st.sayOn) return { cls: 'is-say', text: `${once}🔊 찾은 ${unit}을 읽어 줄게요. 다 들으면 보기가 열려요.` };
   if (evFirstNow(q, st)) {
     if (st.gate) return { cls: 'is-gate', text: `🔍 이 물음은 근거부터! 답을 고르기 전에, 답이 들어 있는 ${unit}을 글에서 먼저 찾아 눌러 봐요.` };
     return { cls: 'is-no', text: `🔍 두 번 틀렸어요. 답을 고르기 전에, 답이 들어 있는 ${unit}을 글에서 먼저 찾아 눌러 봐요.` };
   }
   // 번호 뒤 조사는 읽는 소리마다 달라 낱말 뒤에 · 근거부터 물음은 아직 안 틀렸다("남은" 없이)
-  if (st.evFirst && st.wrong.length === st.wrongAtEv) return { cls: 'is-ok', text: `찾았어요! 칠한 ${unit}(${q.ev.map(circled).join(', ')})을 다시 읽고 ${st.wrong.length ? '남은 ' : ''}보기에서 골라 봐요.` };
+  if (st.evFirst && st.wrong.length === st.wrongAtEv) return { cls: 'is-ok', text: `${once || '찾았어요! '}칠한 ${unit}(${q.ev.map(circled).join(', ')})을 다시 읽고 ${st.wrong.length ? '남은 ' : ''}보기에서 골라 봐요.` };
   if (lastWrong) return { cls: 'is-no', text: `🤔 ${hintOf(lastWrong.type, r)}` };
   return { cls: '', text: '' };
 }
@@ -788,6 +791,8 @@ function evidenceEl(q, st, unit) {
   const rows = el('div', 'kor-ev-rows');
   const card = ui.read.card;
   const pair = first && !st.evDone ? st.pair : null; // 🔍 두 줄로 좁혔다(v300) — 그 밖의 줄은 흐리게 · 못 누름
+  const wait = first ? evWaitLeft(st, waitClock()) : 0; // 🤔 잘못 누른 뒤 잠깐 (v406) — 줄은 그대로 두고(초점이 안 사라지게) 누름만 막는다(evPick)
+  if (wait) rows.classList.add('is-wait');
   for (let n = 1; n <= lineCount(card); n++) {
     const hit = st.evDone && q.ev.includes(n);
     const miss = st.evWrong.includes(n);
@@ -804,7 +809,17 @@ function evidenceEl(q, st, unit) {
   box.appendChild(rows);
   const msg = el('p', 'kor-fb');
   if (st.evDone) { msg.classList.add('is-ok'); msg.textContent = `찾았어요! 근거 ${unit}: ${q.ev.map(circled).join(', ')}`; }
-  else if (pair) { msg.classList.add('is-no'); msg.textContent = evPairSay(pair, st.evWrong, unit); }
+  else if (wait) {
+    // 🤔 물음을 다시 읽고 — 남은 때는 숫자 없이 줄어드는 막대로 (v406 · 셈 말 없음)
+    msg.classList.add('is-no');
+    msg.textContent = `🤔 물음을 다시 읽고, 답을 더 잘 받쳐 주는 ${unit}을 찾아봐요.`; // 그 줄도 조금은 관계있을 수 있다 — 단정하지 않게 (Codex 48차 #2 · 211차)
+    const bar = el('span', 'kor-ev-wait');
+    bar.setAttribute('aria-hidden', 'true');
+    const fill = el('i');
+    fill.style.animationDuration = `${wait}ms`;
+    bar.appendChild(fill);
+    msg.appendChild(bar);
+  } else if (pair) { msg.classList.add('is-no'); msg.textContent = evPairSay(pair, st.evWrong, unit); }
   // "까닭이 없어요"는 너무 단정적 — 그 문장도 조금은 관계있을 수 있다 (Codex 48차 #2)
   else if (first && st.evWrong.length >= EV_RANGE_AT && evRange(q.ev, lineCount(card))) {
     // 근거 먼저에서 두 번 잘못 눌렀다 — 근거 둘레 범위만 (답 줄은 알려 주지 않는다)
@@ -870,6 +885,7 @@ function evPick(n) {
   const q = r.card.qs[r.qi];
   const st = r.qs[r.qi];
   if (!(st.answered || evFirstNow(q, st)) || !q.ev || st.evDone || st.evWrong.includes(n)) return; // 맞힌 뒤 · 🔍 근거 먼저
+  if (evWaitLeft(st, waitClock()) > 0) return; // 🤔 잘못 누른 뒤 잠깐 — 줄을 차례로 눌러 찾지 않게 (v406 · 답을 고르기 전만)
   let reopen = false;
   if (q.ev.includes(n)) {
     if (!st.answered) { st.wrongAtEv = st.wrong.length; if (st.gate) st.evAt = r.sec; } // 찾을 때까지 틀린 수(그 뒤 새로 틀리면 힌트, Codex 82차 #1) · 🔍 근거부터 물음은 찾은 때(📤 찾기까지 초, v273)
@@ -880,7 +896,9 @@ function evPick(n) {
     st.evWrong.push(n);
     r.evMiss += 1;
     // 🔍 답을 고르기 전에 EV_PAIR_AT번 잘못 눌렀다 — 두 줄로 좁힌다(v300). 한 번 정하면 그대로(하나를 또 잘못 누르면 남은 줄 하나)
-    if (!st.answered && !st.pair && st.evWrong.length >= EV_PAIR_AT) st.pair = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);
+    // v406: 근거 찾기가 시작된 지 EV_PAIR_SEC초가 지나야 — 그 전에 셋을 눌렀으면 읽는 시계가 그때에 닿을 때(tickRead)
+    if (pairDue(st, r.sec)) st.pair = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);
+    if (!st.answered) evWaitStart(r, st); // 🤔 잠깐 (v406)
     try { sfx.wrong(); } catch { /* 소리는 없어도 */ }
   }
   // 📍 답을 고르기 전에 찾았다 — 칠한 근거와 물음을 한 번 읽은 뒤 보기를 연다 (v363 · 읽기가 없는 기기는 지금처럼 바로)
@@ -889,6 +907,17 @@ function evPick(n) {
   renderQ();
   if (reopen) bringQ(); // 근거 상자가 사라져 화면이 짧아진다 — 다시 열린 보기를 데려온다(세로 화면에서 긴 줄 목록 아래였다)
   if (st.sayOn) sayEvidence(r, r.qi, true);
+}
+
+/** 🤔 쉼을 재는 시계 (ms) — 앱을 켠 뒤 흐른 시간이라 기기 시계를 뒤로 돌려도 2초가 길어지지 않는다 (Codex 211차 P2) */
+function waitClock() {
+  return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+}
+
+/** 🤔 잘못 누른 뒤 EV_WAIT_MS 동안 줄을 못 누른다 (v406) — 끝나면 그 물음이 아직 떠 있을 때만 다시 그려 연다 */
+function evWaitStart(r, st) {
+  st.waitTo = waitClock() + EV_WAIT_MS;
+  setTimeout(() => { if (ui.read === r && r.qs[r.qi] === st && !st.evDone && !st.answered) renderQ(); }, EV_WAIT_MS + 30);
 }
 
 /**
@@ -1274,6 +1303,13 @@ function tickRead() {
   if (!koreanVisible()) return;
   if (!(r.ls && r.ls.playing) && Date.now() - lastAct > IDLE_SEC * 1000) return;
   r.sec += 1;
+  // 🤔 두 줄 도움은 근거 찾기가 시작된 지 EV_PAIR_SEC초 뒤에 (v406) — 그 전에 잘못 EV_PAIR_AT번이었으면 시계가 그때에 닿을 때 좁힌다
+  const q = r.card.qs[r.qi];
+  const st = r.qs[r.qi];
+  if (st && evFirstNow(q, st) && pairDue(st, r.sec)) {
+    const p = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);
+    if (p) { st.pair = p; renderQ(); }
+  }
 }
 
 /** 배선 (app.main) — ← 과목 고르기 · 다른 창에서 별을 받고 돌아오면 도감을 다시 그린다 */

@@ -248,12 +248,14 @@ test('🔍 물음 아래 말 (qFeedback): 🔊 읽는 중은 파란 안내 「�
   const st = (o) => ({ wrong: [], answered: false, evDone: false, evWrong: [], evFirst: false, hint2: false, sayOn: false, said: -1, gate: false, from: -1, evAt: -1, wrongAtEv: -1, ...o });
   const r = { ls: null };
   const found = { gate: true, evFirst: true, evDone: true, wrongAtEv: 0 };
-  assert.deepEqual(qFeedback(q, st({ ...found, sayOn: true }), '문장', r), { cls: 'is-say', text: '🔊 찾은 문장을 읽어 줄게요. 다 들으면 보기가 열려요.' });
-  assert.equal(qFeedback(q, st({ ...found, sayOn: true }), '줄', r).text, '🔊 찾은 줄을 읽어 줄게요. 다 들으면 보기가 열려요.');
+  assert.deepEqual(qFeedback(q, st({ ...found, sayOn: true, evWrong: [1] }), '문장', r), { cls: 'is-say', text: '🔊 찾은 문장을 읽어 줄게요. 다 들으면 보기가 열려요.' });
+  assert.equal(qFeedback(q, st({ ...found, sayOn: true, evWrong: [1] }), '줄', r).text, '🔊 찾은 줄을 읽어 줄게요. 다 들으면 보기가 열려요.');
+  assert.equal(qFeedback(q, st({ ...found, sayOn: true }), '문장', r).text, '🎯 한 번에 찾았어요! 🔊 찾은 문장을 읽어 줄게요. 다 들으면 보기가 열려요.', '한 번에 찾았으면 칭찬 먼저 (v406)');
   assert.ok(!/\d/.test(qFeedback(q, st({ ...found, sayOn: true }), '문장', r).text), '수가 없다');
   assert.equal(qFeedback(q, st({ wrong: [1, 2], evFirst: true, evDone: true, wrongAtEv: 2, sayOn: true }), '문장', r).cls, 'is-say', '두 번 틀려 근거 먼저로 찾았을 때도');
   assert.equal(qFeedback(q, st({ ...found, sayOn: true, answered: true }), '문장', r).cls, 'is-ok', '맞힘이 먼저');
-  assert.equal(qFeedback(q, st(found), '문장', r).text, '찾았어요! 칠한 문장(③, ⑤)을 다시 읽고 보기에서 골라 봐요.', '다 들은 뒤는 예전 말');
+  assert.equal(qFeedback(q, st({ ...found, evWrong: [1] }), '문장', r).text, '찾았어요! 칠한 문장(③, ⑤)을 다시 읽고 보기에서 골라 봐요.', '다 들은 뒤는 예전 말');
+  assert.equal(qFeedback(q, st(found), '문장', r).text, '🎯 한 번에 찾았어요! 칠한 문장(③, ⑤)을 다시 읽고 보기에서 골라 봐요.', '한 번에 찾았으면 다 들은 뒤에도 칭찬 (v406)');
 });
 
 test('📤 u (readLog): 근거부터 물음의 첫 읽기가 끝까지면 1 · 아니면 0 · 안 읽었으면(-1 · 읽기가 없는 기기) 없음 · 근거부터가 아닌 물음의 읽기는 안 적는다', async () => {

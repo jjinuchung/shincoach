@@ -286,6 +286,29 @@ export function evPair(ev, n, wrong, side = 0) {
   return null;
 }
 
+// ── 🤔 잘못 누르면 잠깐 · 두 줄 도움은 천천히 (v406, 2026-11-09 아버님 「이대로」) ──
+// 📍 근거부터에서 줄을 빨리 셋 눌러 두 줄 도움(v300)을 받고 둘 중 하나를 고르는 길이 글을 읽는 길보다 빠를 수 있다
+// (📤 잘못 누른 줄·찾기까지로 본다 — 기록은 비공개 저장소에만).
+// 답을 고르기 전 근거 찾기(📍 근거부터 · 🔍 두 번 틀려 근거 먼저)에서만 — 맞힌 뒤의 근거 잡기는 그대로:
+//   ① 줄을 잘못 누르면 EV_WAIT_MS 동안 줄을 못 누른다(물음을 다시 읽게 · 숫자 없이 줄어드는 막대 · 별·💰·⚡ 그대로)
+//   ② 두 줄로 좁히기는 잘못 EV_PAIR_AT번 **그리고** 근거 찾기가 시작된 지 EV_PAIR_SEC초(⏱️ 읽는 시계) 뒤 — 그 전엔 둘레 범위 말만
+//   ③ 한 번에 찾으면 「🎯 한 번에 찾았어요!」(말만 — ⚡는 한 주 보고)
+/** 잘못 누른 뒤 줄을 못 누르는 동안 (ms) */
+export const EV_WAIT_MS = 2000;
+/** 두 줄로 좁히기 — 근거 찾기가 시작된 뒤 이만큼(읽는 초) 지나야 */
+export const EV_PAIR_SEC = 20;
+/** 잘못 누른 뒤 남은 쉼 (순수, ms) — 답을 고르기 전 · 찾기 전 · waitTo(그 시각까지) 안이면 남은 ms(EV_WAIT_MS까지) · 아니면 0
+ *  now·waitTo는 화면이 같은 시계로 준다(koreanview.waitClock — 앱을 켠 뒤 흐른 시간이라 기기 시계를 돌려도 안 흔들림, Codex 211차 P2) */
+export function evWaitLeft(st, now) {
+  if (!st || st.answered || st.evDone || !Number.isFinite(st.waitTo) || !Number.isFinite(now)) return 0;
+  return Math.max(0, Math.min(EV_WAIT_MS, st.waitTo - now));
+}
+/** 두 줄로 좁힐 때인가 (순수) — 답을 고르기 전 · 찾기 전 · 아직 안 좁힘 · 잘못 EV_PAIR_AT번 · 근거 찾기가 시작된 때(evFrom, 읽는 초)에서 EV_PAIR_SEC초 */
+export function pairDue(st, sec) {
+  return !!st && !st.answered && !st.evDone && !st.pair && Array.isArray(st.evWrong) && st.evWrong.length >= EV_PAIR_AT &&
+    Number.isFinite(st.evFrom) && st.evFrom >= 0 && Number.isFinite(sec) && sec - st.evFrom >= EV_PAIR_SEC;
+}
+
 /** 근거 둘레 줄 범위 [처음, 끝] (순수) — 근거 가운데 **첫 줄** 앞뒤로 pad줄 (근거는 하나만 눌러도 맞다 — 근거가 ③⑤⑨처럼 흩어져 있으면
  *  모두를 감싼 범위가 글 거의 전체가 되어 도움이 안 됐다, 헤드리스 v258) · n = 글의 줄 수 · 근거가 없거나 깨졌으면 null */
 export function evRange(ev, n, pad = EV_RANGE_PAD) {

@@ -3861,6 +3861,14 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 /* 🔍 두 줄로 좁히기 (v300) — 남은 두 줄은 굵은 테두리, 나머지는 흐리게(못 누름) */
 .kor-ev-row.is-pair { border: 2px solid var(--primary); }
 .kor-ev-row.is-far { opacity: 0.35; }
+/* 🤔 잘못 누른 뒤 잠깐 (v406) — 줄은 흐리게 · 물음은 테두리로 다시 읽게 · 남은 때는 숫자 없이 줄어드는 막대 */
+.kor-ev-rows.is-wait .kor-ev-row { opacity: 0.55; cursor: wait; }
+.kor-q-text.is-reread { border-radius: 10px; box-shadow: 0 0 0 3px var(--kor-gold-line); background: var(--kor-mark); animation: korReread 1s ease-in-out 2; }
+@keyframes korReread { 50% { box-shadow: 0 0 0 6px var(--kor-gold-line); } }
+.kor-ev-wait { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.08); overflow: hidden; }
+.kor-ev-wait i { display: block; height: 100%; background: var(--danger); transform-origin: left; animation: korWait linear forwards; }
+@keyframes korWait { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .kor-q-text.is-reread { animation: none; } }
 @keyframes korShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .kor-note { display: grid; gap: 6px; background: #eef2ff; border-radius: 10px; padding: 10px 14px; line-height: 1.6; word-break: keep-all; }
 .kor-note p { margin: 0; }
