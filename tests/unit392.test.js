@@ -117,6 +117,7 @@ test('📐 🐾 판 쓸기 (씨앗 3000 × 세 단계 · 잡은 포켓몬 4~60�
   const sides = { m: 0, kg: 0 };
   let split = 0;
   let up = 0;
+  let none = 0; // 맞는 포켓몬이 없어 📐 없이 낸 판 (아주 드물어야)
   for (let s = 1; s <= 3000; s++) {
     const n = 4 + Math.floor(r() * 57);
     const caught = {};
@@ -129,6 +130,14 @@ test('📐 🐾 판 쓸기 (씨앗 3000 × 세 단계 · 잡은 포켓몬 4~60�
       assert.equal(board.length, POKE_N, `${where} 문제 수`);
       assert.equal(new Set(board.map((q) => q.kind)).size, board.length, `${where} 꼴 겹침`);
       const units = board.filter((q) => q.kind === 'unit');
+      // 그 단계부터 ③까지 맞는 포켓몬이 하나도 없으면 📐 없이 (makeUnit은 위로만 간다 — 단계보다 쉬운 문제는 안 낸다 · 「아무 꼴도 못 만들면 null」)
+      //   v404에서 명단이 672로 늘며 뽑기가 바뀌어 처음 나왔다(씨앗 1356 ③ — 라이츄·플라베베·차곡차곡·우르) · 맞는 포켓몬이 있는데 없으면 버그
+      if (!units.length) {
+        const fitAt = { 1: (m) => (m.h >= 20 && m.h <= 30 && m.h % 10 === 0) || (m.w >= 20 && m.w < 1000 && m.w % 10 === 0), 2: (m) => (m.h <= 30 && m.h % 10 >= 2) || (m.w < 1000 && m.w % 10 >= 2), 3: (m) => (m.h >= 10 && m.h <= 30 && m.h % 10 !== 0) || (m.w >= 10 && m.w < 1000 && m.w % 10 !== 0) };
+        assert.ok(![1, 2, 3].filter((k) => k >= stage).some((k) => pool.some(fitAt[k])), `${where} 맞는 포켓몬이 있는데 📐이 없다`);
+        none++;
+        continue;
+      }
       assert.equal(units.length, 1, `${where} 📐 하나`);
       seenAt.add(board.indexOf(units[0]));
       const q = units[0];
@@ -173,6 +182,7 @@ test('📐 🐾 판 쓸기 (씨앗 3000 × 세 단계 · 잡은 포켓몬 4~60�
   assert.ok(sides.m > 2000 && sides.kg > 2000, `단위 ${JSON.stringify(sides)}`);
   assert.ok(split > 500, `나눠 묻는 문제 ${split}`);
   assert.ok(up < 200, `단계를 못 만들어 올린 판은 드물다 ${up}`);
+  assert.ok(none <= 3, `맞는 포켓몬이 없어 📐 없이 낸 판은 아주 드물다 ${none}`);
 });
 
 test('📐 🐾 못 만드는 단계: 자연수 포켓몬이 없으면 소수 부분 · 소수 포켓몬뿐이면 ③까지 — 실제로 낸 단계(lv) · 다른 쪽 단위부터 · 아무 꼴도 못 만들면 null', () => {
