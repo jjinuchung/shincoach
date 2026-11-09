@@ -5492,6 +5492,9 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .pn-done { background: #1e8a55; color: #fff; border-color: transparent; font-weight: 800; }
 .pn-retry { background: #fff3dc; border-color: #f0a35c; font-weight: 700; }
 .pn-slots-box { font-size: 22px; }
+button.pn-slots-box { background: none; border: 0; padding: 2px 6px; margin: 0; color: inherit; cursor: pointer; border-radius: 10px; } /* ♪ 칸 → 🐾 — 누르면 음악 포켓몬 안내 (v405) */
+button.pn-slots-box:focus-visible { outline: 3px solid #d23a73; outline-offset: 2px; }
+.pn-slots-mon { margin-left: 6px; font-size: 18px; color: #5b6275; }
 .pn-slots { display: inline-flex; gap: 3px; letter-spacing: 0; }
 .pn-slots span { color: #d7dbe4; }
 .pn-slots span.on { color: #d23a73; }
@@ -5510,6 +5513,14 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .pn-arrive-ok { margin-top: 6px; min-width: 140px; font-size: 17px; }
 @keyframes pn-arrive-in { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pn-arrive-card { animation: none; } }
+/* 🐾 음악 포켓몬 안내 (v405) — 온 창과 같은 틀 */
+.pn-intro-card { max-width: min(92vw, 460px); gap: 10px; }
+.pn-intro-mons { display: flex; gap: 16px; justify-content: center; }
+.pn-intro-mon { display: grid; justify-items: center; gap: 2px; color: #5b6275; font-size: 13px; }
+.pn-intro-mon img { width: 84px; height: 84px; object-fit: contain; }
+.pn-intro-steps { margin: 2px 0 0; padding-left: 1.5em; display: grid; gap: 7px; text-align: left; font-size: 16px; line-height: 1.45; }
+.pn-intro-steps .pn-slots { font-size: 19px; vertical-align: -1px; }
+.pn-intro-tap { margin: 0; padding: 7px 12px; border-radius: 10px; background: #f1f3f8; color: #4a5164; font-size: 14px; }
 #set-midi-out { margin: 6px 0 0; font-size: 14px; color: #4b5563; }
 @media (max-width: 640px) {
   .pn-speed input[type="range"] { width: 120px; }

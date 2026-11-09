@@ -226,6 +226,7 @@ Object.defineProperty(globalThis, 'navigator', { value: { wakeLock: { request: (
 const store = new Map();
 globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => { store.set(k, String(v)); }, removeItem: (k) => { store.delete(k); } };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
+store.set('shincoach.musicIntro', '1'); // 🐾 안내 창(v405)은 이미 본 것으로 — 안내 창 차례는 music405
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(cond, what, ms = 4000) {
   const t0 = Date.now();

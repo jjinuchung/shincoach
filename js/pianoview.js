@@ -4,6 +4,8 @@
 //   🎧 듣고 따라 치기 — 앱이 연주하고 진우는 보면대 앞 진짜 피아노로 → 끝까지 연주한 뒤 「다 쳤어요 ✋」 → 음표 칸 (xp.pianoListen)
 // 규칙은 piano.js(순수) · 곡은 pianosongs.js · ⏳ 음악 시간은 timelimit 'music'(하루 40분 · 공부 시간과 따로)
 // 아이 화면엔 셈·남은 수를 쓰지 않는다 — 음표 칸은 ♪ 다섯 개가 차오르는 그림으로만
+// 🐾 음악 포켓몬 안내 (v405, 11-09 아버님 「가」) — 처음 들어올 때 한 번 + ♪ 칸을 누르면 다시: 🎧에서 진짜 피아노로 끝까지 친 뒤 · 화면 건반은 💰
+//   앱은 아직 피아노 소리를 못 듣는다(연결 전) — 「✋ 피아노로 다 쳤어요」는 진우의 약속 · 아버님은 📤로 보신다
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
 import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, rarityOf, RARITY } from './xp.js';
@@ -228,7 +230,7 @@ function passEnd() {
   } else {
     S.passDone = true;
     showDone();
-    if (!S.loop) toast('<b>끝까지 연주했어요</b>진우도 끝까지 쳤으면 「✋ 다 쳤어요」를 눌러요.', 3000);
+    if (!S.loop) toast('<b>끝까지 연주했어요</b>진짜 피아노로 끝까지 쳤으면 「✋ 피아노로 다 쳤어요」를 눌러요.', 3000);
   }
   toStart();
   if (!S.loop) setRun(false);
@@ -276,7 +278,7 @@ function sendListen() {
     if (!r || !r.ok) {
       S.passDone = true;
       showDone();
-      toast('<b>저장이 안 됐어요</b>「✋ 다 쳤어요」를 한 번 더 눌러 주세요.', 3200);
+      toast('<b>저장이 안 됐어요</b>「✋ 피아노로 다 쳤어요」를 한 번 더 눌러 주세요.', 3200);
       return;
     }
     const sl = slotsOf(r.notes, r.mons);
@@ -874,7 +876,7 @@ function renderSlots() {
   if (!box) return;
   box.hidden = S.mode !== 'listen';
   const pn = pianoNow();
-  box.innerHTML = slotsHtml(slotsOf(pn.notes, pn.mons).filled); // 포켓몬이 오면 다시 0부터 (v404)
+  box.innerHTML = `${slotsHtml(slotsOf(pn.notes, pn.mons).filled)}<span class="pn-slots-mon">→ 🐾</span>`; // 포켓몬이 오면 다시 0부터 (v404) · 누르면 🐾 안내 (v405)
 }
 
 // ───────────────────── 🐾 음악 포켓몬이 왔어요 (v404) ─────────────────────
@@ -886,7 +888,7 @@ const arrive = { queue: [] };
  */
 function showArrivals(ids, firsts = []) {
   ids.forEach((id, i) => { if (Number.isInteger(id) && id > 0) arrive.queue.push({ id, first: typeof firsts[i] === 'boolean' ? firsts[i] : null }); });
-  if (!$('pn-arrive')) nextArrival();
+  if (!$('pn-arrive') && !$('pn-intro')) nextArrival(); // 🐾 안내 창이 떠 있으면 닫은 뒤에 (v405)
 }
 function nextArrival() {
   const old = $('pn-arrive');
@@ -916,6 +918,78 @@ function nextArrival() {
   host.appendChild(box);
   try { ok.focus(); } catch { /* 초점 없이도 */ }
   ensureCast([id]).then((c) => { if (c[0] && c[0].url && $('pn-arrive') === box) { img.src = c[0].url; img.hidden = false; } }).catch(() => {});
+}
+
+// ───────────────────── 🐾 음악 포켓몬 안내 (v405) ─────────────────────
+
+const INTRO_KEY = 'shincoach.musicIntro';
+/** 안내 창에 보일 음악 포켓몬 — 랑딸랑(흔함) · 치렁(보통) · 테라파고스(전설) */
+const INTRO_MONS = [433, 358, 1024];
+function introSeen() {
+  try { return localStorage.getItem(INTRO_KEY) === '1'; } catch { return false; }
+}
+/** 글 조각을 이어 붙인 한 줄 — [글, 굵게?] (innerHTML 없이) */
+function introLine(tag, parts) {
+  const e = el(tag);
+  for (const [t, b] of parts) e.appendChild(el(b ? 'b' : 'span', '', t));
+  return e;
+}
+/**
+ * 🐾 음악 포켓몬은 어떻게 만나요? — 처음 들어올 때 한 번(「알겠어요!」로 닫아야 본 것) · ♪ 칸을 누르면 다시
+ * 태블릿 화면 건반으로 얻는 줄 알 수 있어서 진짜 피아노로 끝까지 따라 쳐야 한다고 적는다 (아버님 11-09) · 셈·남은 수 없음
+ */
+function showIntro() {
+  const host = $('view-music');
+  if (!host || $('pn-intro') || $('pn-arrive')) return;
+  if (S.running) setRun(false); // 연주 중에 ♪ 칸을 눌렀다 — 창이 악보를 가리니 ⏸처럼 멈춘다 · 닫은 뒤 ▶로 이어 (Codex 210차 P2)
+  const box = el('div', 'pn-arrive pn-intro');
+  box.id = 'pn-intro';
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-label', '음악 포켓몬을 만나요');
+  const card = el('div', 'pn-arrive-card pn-intro-card');
+  card.appendChild(el('b', 'pn-arrive-h', '🎵 음악 포켓몬을 만나요!'));
+  const row = el('div', 'pn-intro-mons');
+  const imgs = new Map();
+  for (const id of INTRO_MONS) {
+    const r = ROSTER.find((m) => m.id === id);
+    const f = el('span', 'pn-intro-mon');
+    const img = el('img');
+    img.alt = '';
+    img.hidden = true;
+    f.appendChild(img);
+    f.appendChild(el('small', '', r ? r.ko : ''));
+    row.appendChild(f);
+    imgs.set(id, img);
+  }
+  card.appendChild(row);
+  const ol = el('ol', 'pn-intro-steps');
+  ol.appendChild(introLine('li', [['「🎧 듣고 따라 치기」', true], ['를 골라요', false]]));
+  ol.appendChild(introLine('li', [['앱이 치는 소리를 들으며 ', false], ['진짜 피아노', true], ['로 끝까지 따라 쳐요', false]]));
+  ol.appendChild(introLine('li', [['「✋ 피아노로 다 쳤어요」', true], ['를 누르면 ♪ 하나', false]]));
+  const last = el('li');
+  const five = el('span', 'pn-slots'); // 빈 ♪ 다섯 — 무대의 칸과 같은 그림(수는 안 쓴다)
+  for (let i = 0; i < NOTES_PER_MON; i++) five.appendChild(el('span', '', '♪'));
+  last.appendChild(five);
+  last.appendChild(el('span', '', '가 다 차면 🐾 음악 포켓몬이 와요!'));
+  ol.appendChild(last);
+  card.appendChild(ol);
+  const tap = introLine('p', [['🎹 태블릿으로 치기', true], ['(화면 건반)는 💰를 받아요', false]]);
+  tap.className = 'pn-intro-tap';
+  card.appendChild(tap);
+  const ok = btn('알겠어요!', 'btn btn-primary pn-arrive-ok', () => {
+    try { localStorage.setItem(INTRO_KEY, '1'); } catch { /* 못 적으면 다음에 또 */ }
+    applyDailyDelta(clockDay(), { pnIntro: 1 }).catch(() => {}); // 📤 「🐾 안내 창 봄」 — 아버님이 안내가 닿았는지 보신다
+    box.remove();
+    if (!$('pn-arrive') && arrive.queue.length) nextArrival(); // 안내하는 사이 온 포켓몬
+  });
+  card.appendChild(ok);
+  box.appendChild(card);
+  host.appendChild(box);
+  try { ok.focus(); } catch { /* 초점 없이도 */ }
+  ensureCast(INTRO_MONS).then((cs) => {
+    if ($('pn-intro') !== box) return;
+    for (const c of cs) { const img = imgs.get(c.id); if (img) { img.src = c.url; img.hidden = false; } }
+  }).catch(() => {});
 }
 
 /** 🐾 밀린 음악 포켓몬 — 음악 화면에 들어올 때 (v402·v403 때 찬 다섯 칸 몫 · 저장 실패로 못 받은 몫) · 받을 몫이 없으면 저장하지 않는다 */
@@ -1046,7 +1120,7 @@ function renderStage(keep = false) {
   go.id = 'pn-go';
   acts.appendChild(go);
   acts.appendChild(btn('⟲ 처음부터', 'btn', () => restart()));
-  const done = btn('✋ 다 쳤어요', 'btn pn-done', () => sendListen());
+  const done = btn('✋ 피아노로 다 쳤어요', 'btn pn-done', () => sendListen()); // 「피아노로」 — 화면 건반이 아니라 진짜 피아노 (v405)
   done.id = 'pn-done';
   done.hidden = true;
   acts.appendChild(done);
@@ -1054,9 +1128,9 @@ function renderStage(keep = false) {
   retry.id = 'pn-retry';
   retry.hidden = true;
   acts.appendChild(retry);
-  const slots = el('span', 'pn-slots-box');
+  const slots = btn('', 'pn-slots-box', () => showIntro()); // ♪ 칸 → 🐾 — 누르면 음악 포켓몬 안내 (v405)
   slots.id = 'pn-slots';
-  slots.setAttribute('aria-label', '음표 칸');
+  slots.setAttribute('aria-label', '음표 칸 — 음악 포켓몬 안내');
   acts.appendChild(slots);
   r2.appendChild(acts);
   wrap.appendChild(r2);
@@ -1208,6 +1282,7 @@ export async function enterMusic() {
   if (S.screen === 'stage' && S.song && allSongs().some((s) => s.id === S.song.id)) {
     renderStage(true);
   } else renderList();
+  if (!introSeen()) showIntro(); // 🐾 처음 한 번 — 온 창이 떠 있으면 다음에 들어올 때 (v405)
   dueMons(); // 🐾 v404
   const before = allSongs().map((s) => s.id).join();
   try { await syncSongs(); } catch { /* 받아 둔 곡 그대로 */ }

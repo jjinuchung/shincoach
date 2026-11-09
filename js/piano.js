@@ -43,8 +43,8 @@ export const KEEP_DAYS = 14;
 export const LOG_MAX = 60;
 /** 곡 하나의 상한 (비공개 원고가 깨져도 화면이 버티게) */
 export const MAX_BARS = 200;
-/** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 · 온 음악 포켓몬(v404) */
-export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons'];
+/** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 · 온 음악 포켓몬(v404) · 🐾 안내 창을 「알겠어요!」로 닫은 번(v405) */
+export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro'];
 
 const LETTERS = 'CDEFGAB';
 const SEMI = [0, 2, 4, 5, 7, 9, 11];
@@ -663,11 +663,12 @@ export function monsDueRule(p, now, pool = [], rng = Math.random) {
 /** 📤 usage 하루 한 줄 (순수) — 하루 칸(PIANO_DAILY)으로 · 한 것이 없으면 '' */
 export function pianoDayLine(d) {
   const g = (k) => nz(d && d[k]);
-  if (!g('pnTapN') && !g('pnListenN') && !g('pnMons')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3)
+  if (!g('pnTapN') && !g('pnListenN') && !g('pnMons') && !g('pnIntro')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405)
   const parts = [];
   if (g('pnTapN')) parts.push(`🎹 태블릿 치기 끝까지 ${g('pnTapN')}판(잘 친 판 ${g('pnTapOk')} · 💰${g('pnCoins')})`);
   if (g('pnListenN')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')})`);
   if (g('pnMons')) parts.push(`🐾 음악 포켓몬 ${g('pnMons')}마리 옴`);
+  if (g('pnIntro')) parts.push(`🐾 음악 포켓몬 안내 창 ${g('pnIntro')}번 봄`);
   return parts.join(' · ');
 }
 
@@ -686,7 +687,7 @@ export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (i
   const hm = (t) => { const d = new Date(t); return `${dayKeyOf(t).slice(5)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const lines = [`🎹 음악 연습 기록 (${today}) — v402부터`, '', '## 읽는 법',
     '- 🎹 태블릿 치기 = 화면 건반으로 끝까지 친 판 · 맞게/틀리게 누른 수(맞는 건반을 기다리는 동안 다른 건반) · 맞게 누른 비율 70% 넘고 하루 세 번 안이면 💰(한 줄 5 · 곡 전체 15)',
-    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「다 쳤어요 ✋」를 누른 것 — 진짜로 쳤는지는 앱이 모른다(누른 때와 ⏳ 음악 시간으로 보기) · 하루 세 칸까지 음표 칸 · 다섯 칸마다 🐾 음악 포켓몬 한 마리가 옴(v404)',
+    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「✋ 피아노로 다 쳤어요」(v404까지 「다 쳤어요 ✋」)를 누른 것 — 진짜로 쳤는지는 앱이 모른다(피아노 연결 전)(누른 때와 ⏳ 음악 시간으로 보기) · 하루 세 칸까지 음표 칸 · 다섯 칸마다 🐾 음악 포켓몬 한 마리가 옴(v404)',
     '- 줄 = 책의 한 줄(그 곡 원고의 lines) · 도움 1 막대·계이름·건반 빛 → 2 막대 없이 → 3 계이름도 없이 → 4 악보만 · 빠르기 = 원래 빠르기의 %',
     '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets} · 온 음악 포켓몬 ${tr.mons}${sl.sets > tr.mons ? ` · 아직 안 온 몫 ${sl.sets - tr.mons} — 음악 화면에 들어오면 옴` : ''})`, '', '## 최근 연습 (새것부터)'];
   for (const r of [...tr.log].reverse()) {
