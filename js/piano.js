@@ -45,8 +45,9 @@ export const KEEP_DAYS = 14;
 export const LOG_MAX = 60;
 /** 곡 하나의 상한 (비공개 원고가 깨져도 화면이 버티게) */
 export const MAX_BARS = 200;
-/** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 · 온 음악 포켓몬(v404) · 🐾 안내 창을 「알겠어요!」로 닫은 번(v405) */
-export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro'];
+/** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 · 온 음악 포켓몬(v404) · 🐾 안내 창을 「알겠어요!」로 닫은 번(v405) ·
+ *  🎹 자유롭게 치기(v408) 연 번 · 누른 건반 · 친 초(쉰 틈은 10초까지만) */
+export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec'];
 
 const LETTERS = 'CDEFGAB';
 const SEMI = [0, 2, 4, 5, 7, 9, 11];
@@ -665,12 +666,16 @@ export function monsDueRule(p, now, pool = [], rng = Math.random) {
 /** 📤 usage 하루 한 줄 (순수) — 하루 칸(PIANO_DAILY)으로 · 한 것이 없으면 '' */
 export function pianoDayLine(d) {
   const g = (k) => nz(d && d[k]);
-  if (!g('pnTapN') && !g('pnListenN') && !g('pnMons') && !g('pnIntro')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405)
+  if (!g('pnTapN') && !g('pnListenN') && !g('pnMons') && !g('pnIntro') && !g('pnFreeN') && !g('pnFreeKeys')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405) · 자유롭게 치기만 한 날도 (v408)
   const parts = [];
   if (g('pnTapN')) parts.push(`🎹 태블릿 치기 끝까지 ${g('pnTapN')}판(잘 친 판 ${g('pnTapOk')} · 💰${g('pnCoins')})`);
   if (g('pnListenN')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')})`);
   if (g('pnMons')) parts.push(`🐾 음악 포켓몬 ${g('pnMons')}마리 옴`);
   if (g('pnIntro')) parts.push(`🐾 음악 포켓몬 안내 창 ${g('pnIntro')}번 봄`);
+  if (g('pnFreeN') || g('pnFreeKeys')) {
+    const sec = g('pnFreeSec');
+    parts.push(`🎹 자유롭게 치기 ${g('pnFreeN')}번 열고 ${sec < 60 ? '1분 안' : `${Math.round(sec / 60)}분`} · 건반 ${g('pnFreeKeys')}번`);
+  }
   return parts.join(' · ');
 }
 

@@ -242,7 +242,9 @@ test('🪶 멈춰 있으면 1초에 네 번만 그린다 · 크기를 다시 잡
   assert.ok(count(idle) >= 3 && count(idle) <= 5, `멈춰 있는 1초에 ${count(idle)}번 (전엔 62번)`);
   assert.equal(grads, g0, '배경 물감은 그릴 때마다 새로 안 만든다');
   // 도움 단계를 바꾸면 크기를 다시 잡아 그림판이 비워진다 — 다음 화면에 바로 (막 그린 뒤 16ms라 쉴 차례였다)
-  while (!frames(1)[0]);
+  let drew = false;
+  for (let i = 0; i < 40 && !drew; i += 1) drew = frames(1)[0]; // 그림이 안 나오면 멈추지 말고 떨어지게 40장까지
+  assert.ok(drew);
   button('2 계이름').click();
   assert.deepEqual(frames(1), [true], '크기를 다시 잡은 다음 화면');
   assert.equal(grads, g0 + 1, '새 크기의 배경 물감 한 번');

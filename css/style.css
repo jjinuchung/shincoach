@@ -5478,6 +5478,9 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .pn-song-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pn-song-tx b { font-size: 18px; }
 .pn-song-tx small { color: #6b7280; font-size: 13.5px; }
+/* 🎹 자유롭게 치기 (v408) — 곡 칸과 다른 색으로 맨 앞에 · ◀ ▶ 단추 */
+.pn-song.pn-free { border-color: #93c5fd; background: linear-gradient(180deg, #eef6ff 0%, #ffffff 70%); }
+.pn-oct .btn { min-height: 40px; padding: 6px 14px; }
 .pn-note { color: #6b7280; font-size: 14.5px; margin: 0; }
 .pn-stage-wrap { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .pn-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }

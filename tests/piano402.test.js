@@ -271,7 +271,7 @@ test('병합 — 날마다 큰 쪽(옛 백업으로 한도를 다시 열지 못�
 });
 
 test('📤 — 하루 한 줄(하루 칸으로) · music.md(모든 칸 · 최근 기록 새것부터 · 연결 확인)', () => {
-  assert.deepEqual(PIANO_DAILY, ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro'], 'pnMons = 온 음악 포켓몬 (v404) · pnIntro = 🐾 안내 창 봄 (v405)');
+  assert.deepEqual(PIANO_DAILY, ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec'], 'pnMons = 온 음악 포켓몬 (v404) · pnIntro = 🐾 안내 창 봄 (v405) · pnFree* = 🎹 자유롭게 치기 (v408)');
   assert.equal(pianoDayLine({}), '');
   assert.equal(pianoDayLine({ pnTapN: 4, pnTapOk: 3, pnCoins: 15, pnListenN: 2, pnNotes: 2 }), '🎹 태블릿 치기 끝까지 4판(잘 친 판 3 · 💰15) · 🎧 듣고 따라 치기 「다 쳤어요」 2번(음표 칸 2)');
   const p = {};

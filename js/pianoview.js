@@ -9,6 +9,9 @@
 // 🪶 태블릿 부담 줄이기 (v407, 11-09 아버님 — 음악을 태블릿으로 칠 때 앱이 닫히고 태블릿 첫 화면이 나온다)
 //   멈춰 있고 움직이는 그림이 없으면 1초에 네 번만 그린다(전엔 늘 1초에 60번 처음부터) · 별은 세 번에 칠하고 배경 물감은 한 번 만든다 ·
 //   곡을 바꾸거나 음악을 떠나면 옛 그림판의 픽셀을 바로 비운다 · 떠나거나 내리면 소리 장치를 재운다 · 🛑 블랙박스에 「지금 무엇을 하나」(setScene)
+// 🎹 자유롭게 치기 (v408, 11-09 진우 바람 「곡을 정하지 않고 그냥」 → 아버님 「이대로」) — 곡 목록 맨 앞 칸 · 큰 건반 두 옥타브(◀ ▶ 한 옥타브씩) ·
+//   위에 방금 친 계이름(「계이름 숨기기」로 끔) · 💰·음표 칸·음악 포켓몬 없음 · ⏳ 음악 시간에는 든다 · 📤 하루 줄에 연 번·친 시간·건반 수
+//   Codex 213차 — 미끄러지듯 쳐도 ⏳ 손댐 · 같은 건반을 누른 손이 하나라도 남으면 소리 그대로 · 못 넣은 셈은 날짜째 두었다 다음에 · 자정엔 전날 몫 먼저
 import { setScene } from './blackbox.js';
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
@@ -34,7 +37,13 @@ const S = {
   passDone: false, saving: false, retry: null,
   sounding: new Map(), flash: new Map(), held: new Map(), ptr: new Map(), auto: new Set(), win: { lo: 30, hi: 50 },
   raf: 0, ro: null, drawn: 0, busy: false,
+  freeOct: 3, freeNames: true, trail: [], freeKeys: 0, freeMs: 0, freeLast: 0, freeDay: '', freeOwe: new Map(), // 🎹 자유롭게 치기 (v408)
+  pcDown: new Set(), // PC 자판으로 누르고 있는 건반 (Codex 213차)
 };
+/** 🎹 자유롭게 치기 — 왼쪽 끝 도의 옥타브(C1~C6 · 셋이면 가운데 도가 한가운데) · 방금 친 계이름 수 · 친 시간에 넣는 쉰 틈 상한 */
+const FREE_OCT = { min: 1, max: 6, def: 3 };
+const TRAIL_MAX = 8;
+const FREE_GAP_MS = 10000;
 
 // ───────────────────── 고른 것 기억 (이 기기) ─────────────────────
 
@@ -47,11 +56,13 @@ function loadPrefs() {
     const sp = Number(v.sp);
     if (sp >= SPEED.min && sp <= SPEED.max) S.sp = sp;
     S.loop = v.loop === true;
+    if (Number.isInteger(v.freeOct) && v.freeOct >= FREE_OCT.min && v.freeOct <= FREE_OCT.max) S.freeOct = v.freeOct;
+    S.freeNames = v.freeNames !== false;
     return v;
   } catch { return {}; }
 }
 function savePrefs() {
-  try { localStorage.setItem(PREF_KEY, JSON.stringify({ mode: S.mode, hands: S.hands, lv: S.lv, sp: S.sp, loop: S.loop, song: S.song ? S.song.id : '', line: S.line })); } catch { /* 못 적어도 */ }
+  try { localStorage.setItem(PREF_KEY, JSON.stringify({ mode: S.mode, hands: S.hands, lv: S.lv, sp: S.sp, loop: S.loop, song: S.song ? S.song.id : '', line: S.line, freeOct: S.freeOct, freeNames: S.freeNames })); } catch { /* 못 적어도 */ }
 }
 
 // ───────────────────── 소리 (Web Audio · 잔향 없음) ─────────────────────
@@ -229,12 +240,21 @@ function flashKey(midi, kind, hand) {
 }
 function keyDown(midi) {
   if (S.held.has(midi)) return;
+  // 🎹 자유롭게 치기 — 음악 시간을 다 쓰면 ⏳ 잠금 화면 (판이 없어 「하던 것만 끝내고」가 없다 · v408)
+  if (S.screen === 'free' && isLocked('music')) { guardStart('music', () => {}); return; }
   S.held.set(midi, noteOn(midi, 0.34));
+  if (S.screen === 'free') noteFree(midi);
   press(midi);
 }
 function keyUp(midi) {
   noteOff(S.held.get(midi));
   S.held.delete(midi);
+}
+/** 손 하나를 뗐다 — 같은 건반을 아직 누르는 다른 손가락·PC 자판이 있으면 소리를 그대로 둔다 (Codex 213차 P2) */
+function release(midi) {
+  if (S.pcDown.has(midi)) return;
+  for (const m of S.ptr.values()) if (m === midi) return;
+  keyUp(midi);
 }
 
 /** 그 판(줄·곡)을 끝까지 갔다 */
@@ -376,7 +396,17 @@ function layout() {
   cv.style.height = `${G.H}px`;
   G.bg = null;   // 높이가 바뀌었을 수 있다 — 배경 물감을 다시
   S.drawn = 0;   // 크기를 다시 잡으면 그림판이 비워진다 — 멈춰 있어도 다음 화면에 바로 그린다 (v407)
-  cv.style.touchAction = S.mode === 'tap' ? 'none' : 'manipulation';
+  cv.style.touchAction = S.mode === 'tap' || S.screen === 'free' ? 'none' : 'manipulation';
+  if (S.screen === 'free') {
+    // 🎹 자유롭게 치기 — 위 ⅓은 방금 친 계이름 · 아래는 큰 건반 두 옥타브(흰 건반 15개 · C부터 C까지)
+    G.keysH = Math.round(G.H * 0.66);
+    G.keysTop = G.H - G.keysH;
+    G.mapY = G.keysTop - 13;
+    const lo = whiteIdx(12 * (S.freeOct + 1));
+    S.win = { lo, hi: lo + 14 };
+    G.kw = G.W / 15;
+    return;
+  }
   G.keysH = Math.round(G.H * (S.mode === 'tap' ? 0.26 : 0.22));
   G.keysTop = G.H - G.keysH;
   G.mapY = G.keysTop - 13;
@@ -738,7 +768,8 @@ function drawBars() {
   ctx.restore();
 }
 
-function drawKeys(now) {
+/** 건반 — names면 흰 건반마다 계이름(🎹 자유롭게 치기 · v408) · 아니면 도에만 */
+function drawKeys(now, names = false) {
   const top = G.keysTop;
   const kh = G.keysH;
   ctx.fillStyle = 'rgba(255,170,205,0.85)';
@@ -774,13 +805,16 @@ function drawKeys(now) {
     const midi = midiOfWhite(wi);
     const r = keyRect(midi);
     paint(r, '#f6f6f2', lit(midi), false, kh - 2);
-    if (((wi % 7) + 7) % 7 === 0) {
-      const fs = Math.min(15, G.kw * 0.4);
-      ctx.fillStyle = '#7b8090';
+    const isDo = ((wi % 7) + 7) % 7 === 0;
+    const fs = names ? Math.min(22, G.kw * 0.3) : Math.min(15, G.kw * 0.4);
+    if (isDo || names) {
+      ctx.fillStyle = isDo ? '#7b8090' : '#9aa0ae';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.font = `700 ${fs}px "Noto Sans KR", sans-serif`;
-      ctx.fillText('도', r.x + r.w / 2, top + kh - 8);
+      ctx.fillText(names ? NAMES[midi % 12] : '도', r.x + r.w / 2, top + kh - 8);
+    }
+    if (isDo) {
       if (midi === 60) {
         ctx.fillStyle = '#d23a73';
         ctx.beginPath(); ctx.arc(r.x + r.w / 2, top + kh - 8 - fs - 7, 3.5, 0, Math.PI * 2); ctx.fill();
@@ -809,7 +843,7 @@ function drawKeys(now) {
 }
 
 function draw(now) {
-  if (!ctx || !S.perf) return;
+  if (!ctx || (!S.perf && S.screen !== 'free')) return;
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   if (!G.bg) {
     G.bg = ctx.createLinearGradient(0, 0, 0, G.H);
@@ -832,6 +866,7 @@ function draw(now) {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  if (S.screen === 'free') { drawTrail(); drawKeys(now, S.freeNames); return; } // 🎹 자유롭게 치기 (v408)
   drawSheet(now);
   if (S.lv === 1) drawBars();
   drawKeys(now);
@@ -869,7 +904,7 @@ function moving(now) {
 }
 function frame(now) {
   S.raf = 0;
-  if (!S.active || S.screen !== 'stage') return;
+  if (!S.active || (S.screen !== 'stage' && S.screen !== 'free')) return;
   if (S.running) {
     advance(Math.min(0.25, (now - S.last) / 1000) / secPerBeat());
     // 🎧 진우는 진짜 피아노를 치느라 태블릿을 안 만진다 — 앱이 연주하는 동안은 손댄 것으로 (⏳ 음악 시간이 2분 쉼에 멈추지 않게)
@@ -1091,6 +1126,15 @@ function renderList() {
   wrap.appendChild(el('h2', 'pn-h', '🎹 칠 곡을 골라요'));
   const songs = allSongs();
   const grid = el('div', 'pn-songs');
+  // 🎹 자유롭게 치기 — 맨 앞 칸 (v408 진우 바람 「곡을 정하지 않고 그냥」) · 들어갈 때 ⏳ 관문
+  const free = btn('', 'pn-song pn-free', () => guardStart('music', () => renderFree()));
+  free.id = 'pn-free';
+  free.appendChild(el('span', 'pn-song-ico', '🎹'));
+  const ft = el('span', 'pn-song-tx');
+  ft.appendChild(el('b', '', '자유롭게 치기'));
+  ft.appendChild(el('small', '', '곡 없이 마음대로'));
+  free.appendChild(ft);
+  grid.appendChild(free);
   for (const s of songs) {
     const b = btn('', 'pn-song', () => openSong(s.id));
     b.appendChild(el('span', 'pn-song-ico', s.book ? '📖' : '🎼'));
@@ -1195,10 +1239,22 @@ function renderStage(keep = false) {
   r2.appendChild(acts);
   wrap.appendChild(r2);
 
+  mountCanvas(m, wrap, '악보, 떨어지는 막대, 건반');
+  if (keep && S.perf) {
+    layout();
+    showDone();
+    showRetry();
+    renderSlots();
+  } else rebuild();
+  startLoop();
+}
+
+/** 그림판 붙이기 (무대 · 🎹 자유롭게 치기) — 알림 자리 · 글꼴 · 누르기 · 너비 지켜보기 */
+function mountCanvas(m, wrap, label) {
   const stage = el('div', 'pn-stage');
   stage.id = 'pn-stage';
   cv = el('canvas', 'pn-canvas');
-  cv.setAttribute('aria-label', '악보, 떨어지는 막대, 건반');
+  cv.setAttribute('aria-label', label);
   stage.appendChild(cv);
   const t = el('div', 'pn-toast');
   t.id = 'pn-toast';
@@ -1212,22 +1268,117 @@ function renderStage(keep = false) {
   wireCanvas();
   // 너비가 바뀔 때만 다시 — layout이 캔버스 높이를 바꾸면 무대가 또 바뀌어 「ResizeObserver loop」 경고가 난다 (높이는 창 높이와 무대 위치로 정하고, 창 크기가 바뀌면 resize가 다시 배치한다)
   if (typeof ResizeObserver === 'function') { S.ro = new ResizeObserver(() => { if (Math.max(300, Math.round(stage.clientWidth)) !== G.W) layout(); }); S.ro.observe(stage); }
-  if (keep && S.perf) {
-    layout();
-    showDone();
-    showRetry();
-    renderSlots();
-  } else rebuild();
+}
+
+// ───────────────────── 🎹 자유롭게 치기 (v408) ─────────────────────
+
+/** 곡 없이 큰 건반 두 옥타브 — 💰·음표 칸·음악 포켓몬 없음 · ⏳ 음악 시간에는 든다(들어올 때 관문) · again = 🎒·📊 갔다 옴(연 수 안 셈) */
+function renderFree(again = false) {
+  stopPlay();
+  dropCanvas();
+  S.gen += 1;
+  S.screen = 'free';
+  if (!again) S.trail = [];
+  const m = main();
+  if (!m) return;
+  m.textContent = '';
+  if (!again) applyDailyDelta(clockDay(), { pnFreeN: 1 }).catch(() => {});
+  const wrap = el('div', 'pn-stage-wrap pn-free-wrap');
+  const head = el('div', 'pn-row pn-head');
+  head.appendChild(btn('← 곡', 'btn pn-back', () => renderList()));
+  head.appendChild(el('h2', 'pn-title', '🎹 자유롭게 치기'));
+  wrap.appendChild(head);
+  const r1 = el('div', 'pn-row');
+  const oct = el('div', 'pn-field pn-oct');
+  oct.appendChild(el('span', 'pn-label', '건반'));
+  const lo = btn('◀ 낮게', 'btn', () => shiftFree(-1));
+  lo.id = 'pn-free-lo';
+  const hi = btn('높게 ▶', 'btn', () => shiftFree(1));
+  hi.id = 'pn-free-hi';
+  oct.appendChild(lo);
+  oct.appendChild(hi);
+  r1.appendChild(oct);
+  r1.appendChild(seg('계이름', [[true, '보이기'], [false, '숨기기']], S.freeNames, (v) => { S.freeNames = v; S.drawn = 0; savePrefs(); }));
+  wrap.appendChild(r1);
+  mountCanvas(m, wrap, '건반 — 마음대로 쳐요');
+  layout();
+  showOct();
   startLoop();
+}
+/** ◀ ▶ 한 옥타브씩 — 진짜 피아노 범위 안 (끝에선 그쪽 단추가 잠긴다) */
+function shiftFree(d) {
+  S.freeOct = Math.min(FREE_OCT.max, Math.max(FREE_OCT.min, S.freeOct + d));
+  savePrefs();
+  layout();
+  showOct();
+}
+function showOct() {
+  const lo = $('pn-free-lo');
+  const hi = $('pn-free-hi');
+  if (lo) lo.disabled = S.freeOct <= FREE_OCT.min;
+  if (hi) hi.disabled = S.freeOct >= FREE_OCT.max;
+}
+/** 건반 하나 — 방금 친 계이름 줄 · 📤 셈(건반 수 · 친 시간 — 쉰 틈은 FREE_GAP_MS까지만) */
+function noteFree(midi) {
+  // ⏳ 손댐 — 손가락을 떼지 않고 미끄러지듯 쳐도 음악 시간이 「쉬는 중」이 되지 않게 (전역 손댐은 새로 누를 때만 · Codex 213차 P2)
+  noteActivity();
+  const now = performance.now();
+  const day = clockDay();
+  // 자정을 넘겼다 — 전날 몫은 전날 칸으로 · 쉰 틈도 거기서 끊는다 (Codex 213차 P3)
+  if (S.freeDay && S.freeDay !== day) flushFree(true);
+  S.freeDay = day;
+  if (S.freeLast) S.freeMs += Math.min(FREE_GAP_MS, Math.max(0, now - S.freeLast));
+  S.freeLast = now;
+  S.freeKeys += 1;
+  S.trail = [...S.trail, NAMES[((midi % 12) + 12) % 12]].slice(-TRAIL_MAX);
+  if (S.freeKeys >= 50 || S.freeMs >= 60000) flushFree();
+}
+/** 모아 둔 셈을 📤 하루 칸으로 — 떠날 때·내릴 때·50번·1분마다 · 못 넣은 몫은 날짜째 두었다가 다음 저장 때 함께 (바로 되풀이하지 않음 · Codex 213차 P3) */
+function flushFree(stop = false) {
+  const sec = Math.floor(S.freeMs / 1000);
+  const keys = S.freeKeys;
+  S.freeMs -= sec * 1000;
+  S.freeKeys = 0;
+  if (keys || sec) oweFree(S.freeDay, keys, sec);
+  if (stop) { S.freeLast = 0; S.freeMs = 0; }
+  for (const [day, o] of S.freeOwe) {
+    S.freeOwe.delete(day);
+    applyDailyDelta(day, { ...(o.keys ? { pnFreeKeys: o.keys } : {}), ...(o.sec ? { pnFreeSec: o.sec } : {}) })
+      .catch(() => oweFree(day, o.keys, o.sec));
+  }
+}
+function oweFree(day, keys, sec) {
+  const o = S.freeOwe.get(day) || { keys: 0, sec: 0 };
+  S.freeOwe.set(day, { keys: o.keys + keys, sec: o.sec + sec });
+}
+/** 위쪽 — 방금 친 계이름이 오른쪽부터 (오래된 것일수록 작고 흐리게) */
+function drawTrail() {
+  if (!S.freeNames || !S.trail.length) return;
+  const cy = G.keysTop / 2;
+  const big = Math.min(64, G.keysTop * 0.42);
+  let x = G.W / 2 + big * 1.6;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let k = S.trail.length - 1, age = 0; k >= 0; k -= 1, age += 1) {
+    const size = Math.max(16, big * (1 - age * 0.11));
+    ctx.globalAlpha = Math.max(0.25, 1 - age * 0.12);
+    ctx.fillStyle = age === 0 ? '#ffd1e3' : '#ffffff';
+    ctx.font = `800 ${Math.round(size)}px "Noto Sans KR", sans-serif`;
+    ctx.fillText(S.trail[k], x, cy);
+    x -= size * 1.5;
+    if (x < 0) break;
+  }
+  ctx.globalAlpha = 1;
 }
 
 function wireCanvas() {
   cv.addEventListener('click', (e) => {
+    if (S.screen === 'free') return; // 자유롭게 치기엔 ▶가 없다
     if (S.mode === 'tap' && e.offsetY >= G.keysTop) return;
     toggle();
   });
   cv.addEventListener('pointerdown', (e) => {
-    if (S.mode !== 'tap') return;
+    if (S.mode !== 'tap' && S.screen !== 'free') return;
     const m = hitKey(e.offsetX, e.offsetY);
     if (m == null) return;
     e.preventDefault();
@@ -1241,15 +1392,15 @@ function wireCanvas() {
     const m = hitKey(e.offsetX, e.offsetY);
     const old = S.ptr.get(e.pointerId);
     if (m === old) return;
-    if (old != null) keyUp(old);
+    S.ptr.set(e.pointerId, m); // 먼저 옮겨 두고 놓는다 — 옛 건반을 다른 손가락이 누르고 있으면 그대로
+    if (old != null) release(old);
     if (m != null) keyDown(m);
-    S.ptr.set(e.pointerId, m);
   });
   const lift = (e) => {
     if (!S.ptr.has(e.pointerId)) return;
     const m = S.ptr.get(e.pointerId);
-    if (m != null) keyUp(m);
     S.ptr.delete(e.pointerId);
+    if (m != null) release(m);
   };
   cv.addEventListener('pointerup', lift);
   cv.addEventListener('pointercancel', lift);
@@ -1258,13 +1409,13 @@ function wireCanvas() {
 /** PC 자판 — 가온 다부터 한 옥타브(A S D F G H J K · 검은 건반 W E T Y U) · 한 옥타브 아래(Z X C V B N M) */
 const PC = { a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72, z: 48, x: 50, c: 52, v: 53, b: 55, n: 57, m: 59 };
 function pcKey(e, down) {
-  if (!S.active || S.screen !== 'stage' || S.mode !== 'tap') return;
+  if (!S.active || !((S.screen === 'stage' && S.mode === 'tap') || S.screen === 'free')) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = (e.target && e.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   const m = PC[String(e.key || '').toLowerCase()];
   if (m == null) return;
-  if (down) { if (e.repeat) return; audio(); keyDown(m); } else keyUp(m);
+  if (down) { if (e.repeat) return; S.pcDown.add(m); audio(); keyDown(m); } else { S.pcDown.delete(m); release(m); }
 }
 
 /** 소리·연주 멈춤 — 판은 그대로 (판을 버리는 곳은 rebuild·renderList가 S.gen을 올린다) */
@@ -1273,8 +1424,10 @@ function stopPlay() {
   for (const v of S.held.values()) noteOff(v);
   S.held.clear();
   S.ptr.clear();
+  S.pcDown.clear();
   S.sounding.clear();
   keepAwake(false);
+  flushFree(true); // 🎹 자유롭게 치기 셈 — 떠날 때·내릴 때 (v408)
 }
 
 // ───────────────────── 🎹 ⚙ 집 피아노 연결 확인 ─────────────────────
@@ -1327,7 +1480,7 @@ export function initMusic({ showView } = {}) {
   S.showView = showView;
   loadPrefs();
   const back = $('btn-music-back');
-  if (back) back.addEventListener('click', () => { if (S.screen === 'stage') renderList(); else if (S.showView) S.showView('home'); });
+  if (back) back.addEventListener('click', () => { if (S.screen === 'stage' || S.screen === 'free') renderList(); else if (S.showView) S.showView('home'); });
   window.addEventListener('keydown', (e) => pcKey(e, true));
   window.addEventListener('keyup', (e) => pcKey(e, false));
   document.addEventListener('visibilitychange', () => {
@@ -1336,13 +1489,14 @@ export function initMusic({ showView } = {}) {
     stopPlay();
     sleepAudio(); // v407
   });
-  window.addEventListener('resize', () => { if (S.active && S.screen === 'stage') layout(); });
+  window.addEventListener('resize', () => { if (S.active && (S.screen === 'stage' || S.screen === 'free')) layout(); });
   initMidiCheck();
   setScene('music', musicScene); // 🛑 v407
 }
 
 /** 🛑 블랙박스 한 줄 — 곡·치기/듣기·연주 중·그림판 크기 (꺼졌을 때 음악 어디였나) */
 function musicScene() {
+  if (S.screen === 'free') return `🎹 자유롭게 치기${cv ? ` · 그림판 ${cv.width}×${cv.height}` : ''}`;
   if (S.screen !== 'stage' || !S.song) return '곡 고르기';
   const how = S.mode === 'tap' ? '🎹 치기' : '🎧 따라 치기';
   return `「${S.song.ko}」 ${how} · ${S.running ? '연주 중' : '멈춤'}${cv ? ` · 그림판 ${cv.width}×${cv.height}` : ''}`;
@@ -1353,7 +1507,8 @@ export async function enterMusic() {
   S.active = true;
   if (S.screen === 'stage' && S.song && allSongs().some((s) => s.id === S.song.id)) {
     renderStage(true);
-  } else renderList();
+  } else if (S.screen === 'free') renderFree(true); // 🎒·📊 갔다 오면 치던 자리 그대로 (v408)
+  else renderList();
   if (!introSeen()) showIntro(); // 🐾 처음 한 번 — 온 창이 떠 있으면 다음에 들어올 때 (v405)
   dueMons(); // 🐾 v404
   const before = allSongs().map((s) => s.id).join();
