@@ -32,7 +32,7 @@ test('⭐ v313 변신 표 — PokeAPI 실측 44종이 그 모습 id로 · 명단
   assert.equal(Object.keys(ADDED).length, 44);
   assert.equal(formsOf(670), null, '플라엣테 — 원작에선 영원의 꽃 플라엣테만 메가진화 (🔍 Codex 119차 #1)');
   assert.equal(formsOf(718), null, '지가르데 — 원작에선 퍼펙트폼만 메가진화');
-  assert.equal(Object.keys(FORMS).length, 74);
+  assert.equal(Object.keys(FORMS).length, 79, '74 + v404 🎹 음악 다섯(치렁·다부니·대여르 메가 · 사다이사·우라오스 거다이맥스 — music404.test.js)');
   for (const [id, [kind, form, subj]] of Object.entries(ADDED)) {
     const n = Number(id);
     assert.equal(formsOf(n) && formsOf(n)[kind], form, `${n} ${kind}`);
@@ -52,17 +52,17 @@ test('⭐ 원작 거다이맥스 종은 명단에 있으면 모두 거다이맥�
   }
 });
 
-test('⭐ 과목마다 변신할 포켓몬이 있다 — 거다이맥스는 영어·수학·국어·논술 모두 · 메가도 모두', () => {
+test('⭐ 과목마다 변신할 포켓몬이 있다 — 거다이맥스는 영어·수학·국어·논술·음악 모두 · 메가도 모두', () => {
   const by = { gmax: {}, mega: {} };
   for (const [id, f] of Object.entries(FORMS)) {
     const s = subjectOf(Number(id));
     for (const k of ['gmax', 'mega']) if (f[k]) by[k][s] = (by[k][s] || 0) + 1;
   }
-  for (const s of ['english', 'math', 'korean', 'nonsul']) {
+  for (const s of ['english', 'math', 'korean', 'nonsul', 'music']) {
     assert.ok(by.gmax[s] >= 1, `${s} 거다이맥스`);
     assert.ok(by.mega[s] >= 1, `${s} 메가`);
   }
-  assert.deepEqual(by.gmax, { english: 11, nonsul: 1, korean: 6, math: 5 }, '거다이맥스 23종');
+  assert.deepEqual(by.gmax, { english: 11, nonsul: 1, korean: 6, math: 5, music: 2 }, '거다이맥스 25종');
 });
 
 test('🍲 다이스프는 과목을 안 따진다 — 수학 에이스번 · 국어 고릴타 · 논술 킹크랩도 먹고 거다이맥스', async () => {
@@ -104,7 +104,7 @@ test('🎒 도감 창 「⭐ 변신」 칸은 변신 표에 있는 잡은 포켓
   assert.match(body, /const forms = isZyg \? \{ mega: zygPerfect\(z\) \? ZYG_FORMS\.mega : 0 \} : mon && mon\.caught !== false \? formsOf\(mon\.id\) : null;/);
   const head = body.slice(0, body.indexOf('if (!forms)'));
   assert.ok(!/subjectOf|forSubject|english/.test(head), '변신 칸을 보일지는 과목으로 거르지 않는다');
-  assert.match(body, /if \(!isZyg && \(subj === 'korean' \|\| subj === 'nonsul'\)\) notes\.push\('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요'\);/, '국어·논술 포켓몬엔 어디서 쓰는지 한 줄 (🔍 Codex 119차) — 과목은 이 안내에만');
+  assert.match(body, /if \(!isZyg && \(subj === 'korean' \|\| subj === 'nonsul' \|\| subj === 'music'\)\) notes\.push\('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요'\);/, '국어·논술 포켓몬엔 어디서 쓰는지 한 줄 (🔍 Codex 119차) — 과목은 이 안내에만');
   assert.ok(formsOf(815).gmax && formsOf(812).gmax && formsOf(99).gmax && formsOf(36).mega, '수학·국어·논술 포켓몬도 표에');
 });
 

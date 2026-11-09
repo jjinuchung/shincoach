@@ -7,7 +7,7 @@ import { JOURNEY, TYPE_KO, typesOf, questionFrom, questionSeed, profChoices, rng
 import { loadSources } from './journeyview.js';
 import { paintMove } from './movescene.js';
 import { journeyRaw, moveStart, moveAnswer, moveSwap, moveEvent, moveGift, movePick, moveFurn, moveEnd, getProfileSnapshot, getLevelInfo, rarityOf, monLv, getLook, profileReady, getPartner } from './xp.js';
-import { ROSTER, loadCharacters, ensureCast, isUnlocked, isLegendary, isUltraBeast, isLetterMon } from './pokemon.js';
+import { ROSTER, loadCharacters, ensureCast, isUnlocked, isLegendary, isUltraBeast, isLetterMon, isMusicMon } from './pokemon.js';
 import { PAINT, PAINT_BASE } from './house.js';
 import { avatarOf } from './avatar.js';
 import { avatarSvg } from './avatarart.js';
@@ -293,7 +293,7 @@ function renderPrep() {
 function candidates() {
   const level = getLevelInfo().level;
   const caught = getProfileSnapshot().caught || {};
-  const ok = (id) => id !== 52 && !isLegendary(id) && !isUltraBeast(id) && !isLetterMon(id) && rarityOf(id) <= 3;
+  const ok = (id) => id !== 52 && !isLegendary(id) && !isUltraBeast(id) && !isLetterMon(id) && !isMusicMon(id) && rarityOf(id) <= 3; // 🎹 음악 포켓몬도 (v404)
   const open = ROSTER.filter((r) => ok(r.id) && isUnlocked(r.id, level));
   const withArt = open.filter((r) => ui.chars.has(r.id));
   const list = withArt.length >= 8 ? withArt : open.length >= 8 ? open : ROSTER.filter((r) => ok(r.id));

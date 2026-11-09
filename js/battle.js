@@ -7,7 +7,7 @@ import * as bgm from './bgm.js';
 import { POTION, CALL_PAL, itemById, makeFigure, setFigure } from './items.js';
 import { sfx, vibrate, unlock } from './sfx.js';
 import { burstConfetti, josa } from './catch.js';
-import { ensureForm, isUltraBeast, isLetterMon } from './pokemon.js'; // ⭐ 변신 그림 · 🌌 울트라비스트·📮 편지 포켓몬은 상대로 안 나온다
+import { ensureForm, isUltraBeast, isLetterMon, isMusicMon } from './pokemon.js'; // ⭐ 변신 그림 · 🌌 울트라비스트·📮 편지·🎹 음악 포켓몬은 상대로 안 나온다
 import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 그림 (5세대 스프라이트)
 import { playFx, syncFx, stopFx } from './battlefx.js'; // 🐸 기술 그림 (v306 — 비공개 저장소에서 받아 둔 장면)
 
@@ -181,6 +181,22 @@ export const TYPE_OF = {
   764: 'fairy',
   875: 'ice',
   962: 'dark',
+  // 🎹 음악 전용 50 (2026-11-09) — 같은 규칙(첫 타입이 기술표에 없으면 두 번째 · 그것도 없으면 노말)
+  433: 'psychic', 527: 'psychic', 358: 'psychic', 528: 'psychic', 898: 'psychic',
+  965: 'steel', 966: 'steel',
+  753: 'grass', 548: 'grass', 754: 'grass', 549: 'grass', 1010: 'grass', 1017: 'grass',
+  960: 'water', 692: 'water', 963: 'water', 961: 'water', 693: 'water', 964: 'water', 1009: 'water',
+  531: 'normal', 919: 'normal', 917: 'normal', 918: 'normal', 734: 'normal', 735: 'normal', 1024: 'normal',
+  974: 'ice', 975: 'ice', 991: 'ice',
+  971: 'ghost', 972: 'ghost', 987: 'ghost',
+  942: 'dark', 943: 'dark', 920: 'dark',
+  843: 'ground', 844: 'ground', 984: 'ground', 990: 'ground',
+  950: 'rock',
+  985: 'fairy', 1006: 'fairy',
+  870: 'fighting', 973: 'fighting', 891: 'fighting', 892: 'fighting',
+  1005: 'dragon',
+  1021: 'electric',
+  1020: 'fire',
 };
 
 export function typeOf(id) {
@@ -284,7 +300,7 @@ export function pickOpponent(unlocked, caught, rng = Math.random) {
     //    (영어 배틀에서도 나오던 구멍, Codex 11차 #3)
     if (isUltraBeast(m.id)) continue;
     // 📮 편지 포켓몬도 — 이기면 얻게 되어 「편지에서만 친구가 된다」가 무너진다 (2026-10-27)
-    if (isLetterMon(m.id)) continue;
+    if (isLetterMon(m.id) || isMusicMon(m.id)) continue; // 🎹 음악 포켓몬도 — 「음악에서만 온다」 (v404)
     const w = [0, 6, 4, 2, 1][rarityOf(m.id)] || 2; // 흔함 6 : 보통 4 : 희귀 2 : 전설 1
     for (let i = 0; i < w; i++) pool.push(m);
   }

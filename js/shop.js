@@ -344,7 +344,7 @@ function renderMon(msg, pop) {
     ? `${RARITY[r].stars} ${RARITY[r].label} · Lv${monLv(mon.id)} · ${haveCount(mon.id) > 0 ? `데리고 있어요 ×${haveCount(mon.id)}` : (fusedCount(mon.id) > 0 ? '🔀 퓨전에 들어가 있어요 — 🏪 5일장에서 나누면 돌아와요' : takenCount(mon.id) > 0 ? '🔒 아빠가 데려갔어요 — 다시 잡으면 돌아와요' : fledCount(mon.id) > 0 ? '💨 배틀에서 져서 떠났어요 — 다시 잡으면 돌아와요' : '🧬 진화로 보냈어요')}`
       + (caughtCount(mon.id) > haveCount(mon.id) ? ` (도감 ×${caughtCount(mon.id)})` : '')
       + (look.hp === 0 ? ' · 😴 쉬는 중 — 물약을 먹여 주세요' : isPartner ? ' · 파트너' : '')
-    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${{ math: ' · 🔢 수학에서 만나요', korean: ' · 📚 국어에서 만나요', nonsul: ' · 🖊️ 논술에서 만나요', letter: ' · 📮 편지에서 친구가 돼요' }[subjectOf(mon.id)] || ' · 🎤 영어 퍼즐에서 만나요'}`;
+    : `${RARITY[r].stars} ${RARITY[r].label} · 아직 못 잡았어요${{ math: ' · 🔢 수학에서 만나요', korean: ' · 📚 국어에서 만나요', nonsul: ' · 🖊️ 논술에서 만나요', letter: ' · 📮 편지에서 친구가 돼요', music: ' · 🎹 음악 ♪ 칸에서 와요' }[subjectOf(mon.id)] || ' · 🎤 영어 퍼즐에서 만나요'}`;
   const fig = $('mon-figure');
   setFigure(fig, mon.url || '', got ? look : null);
   fig.classList.toggle('unknown', !got); // 실루엣 (도감과 같은 모습)
@@ -718,9 +718,9 @@ function renderForms() {
     }
   }
 
-  // 국어·논술 화면엔 배틀이 없다 — 변신은 영어·수학 배틀에서 (배틀에 내보낼 포켓몬은 과목을 안 가린다 · 🔍 Codex 119차)
+  // 국어·논술·음악 화면엔 배틀이 없다 — 변신은 영어·수학 배틀에서 (배틀에 내보낼 포켓몬은 과목을 안 가린다 · 🔍 Codex 119차 · 🎹 v404)
   const subj = subjectOf(mon.id);
-  if (!isZyg && (subj === 'korean' || subj === 'nonsul')) notes.push('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요');
+  if (!isZyg && (subj === 'korean' || subj === 'nonsul' || subj === 'music')) notes.push('⚔️ 변신은 영어·수학 배틀에서 쓸 수 있어요');
   if (!box.children.length && !notes.length) notes.push('이 포켓몬은 변신할 수 없어요');
   $('mon-form-msg').textContent = notes.join('  ·  ');
 }

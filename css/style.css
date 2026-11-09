@@ -5500,6 +5500,16 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .pn-toast { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); background: #fff; color: #1b2030; border-radius: 16px; padding: 14px 22px; text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); max-width: min(90%, 440px); font-size: 15.5px; pointer-events: none; }
 .pn-toast b { display: block; font-size: 21px; margin-bottom: 2px; }
 .pn-toast .pn-slots { font-size: 26px; margin: 4px 0; }
+/* 🐾 음악 포켓몬이 왔어요 (v404) — 음악 화면 안 창 · 「좋아요!」로 닫음 */
+.pn-arrive { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(16, 20, 32, .55); }
+.pn-arrive-card { background: #fff; color: #1b2030; border-radius: 20px; padding: 20px 26px 18px; display: grid; justify-items: center; gap: 6px; text-align: center; box-shadow: 0 14px 50px rgba(0, 0, 0, .4); max-width: min(92vw, 380px); animation: pn-arrive-in .35s ease-out; }
+.pn-arrive-h { font-size: 21px; color: #d23a73; }
+.pn-arrive-img { width: 150px; height: 150px; object-fit: contain; }
+.pn-arrive-name { font-size: 26px; font-weight: 800; }
+.pn-arrive-sub { color: #5b6275; font-size: 14px; }
+.pn-arrive-ok { margin-top: 6px; min-width: 140px; font-size: 17px; }
+@keyframes pn-arrive-in { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pn-arrive-card { animation: none; } }
 #set-midi-out { margin: 6px 0 0; font-size: 14px; color: #4b5563; }
 @media (max-width: 640px) {
   .pn-speed input[type="range"] { width: 120px; }

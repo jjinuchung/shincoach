@@ -6,13 +6,15 @@ import { getCharacters, putCharacter } from './db.js';
 /**
  * 명단: 처음 40마리(Lv1) + 레벨 마일스톤에서 열리는 20마리씩(Lv5·10·15) + 2026-09-20에 더한 60마리(Lv1)
  *       + 2026-09-22 🔢 수학 전용 150마리(`subject: 'math'`, Lv1) + 2026-10-11 📚 국어 전용 150마리(`subject: 'korean'`, Lv1)
- *       + 2026-10-20 🖊️ 논술 전용 100마리(`subject: 'nonsul'`, Lv1) + 2026-10-27 📮 편지 전용 30마리(`subject: 'letter'`, Lv1). unlock 없으면 1.
+ *       + 2026-10-20 🖊️ 논술 전용 100마리(`subject: 'nonsul'`, Lv1) + 2026-10-27 📮 편지 전용 30마리(`subject: 'letter'`, Lv1)
+ *       + 2026-11-09 🎹 음악 전용 50마리(`subject: 'music'`, Lv1). unlock 없으면 1.
  * 여기에 추가하면 ⚙ "받기"가 없는 것만 받아옴. ★ 늘릴 때 battle.TYPE_OF(타입)·xp.RARITY_IDS(등급)도 같이 — 빠지면 조용히 노말·보통이 된다
  * 이름·타입·등급은 tools/roster_candidates.mjs·tools/math_roster.mjs(PokeAPI)로 받은 것만 쓴다 (기억으로 쓰면 틀린다)
  *
  * subject — 🎯 **어디서 잡히나**만 가른다: 없으면 영어(퍼즐 정답 뒤 잡기), 'math'면 수학(☀️ 완주·개념 편 통과 뒤 잡기),
  *           'korean'이면 📚 국어(글을 다 읽고 별을 새로 받을 때), 'nonsul'이면 🖊️ 논술(그날 처음 끝낸 논술 판),
- *           'letter'면 📮 편지(정말 잘 쓴 영어 답장 — letters.js · 잡히지 않고 친구가 된다).
+ *           'letter'면 📮 편지(정말 잘 쓴 영어 답장 — letters.js · 잡히지 않고 친구가 된다),
+ *           'music'이면 🎹 음악(🎧 「다 쳤어요 ✋」 ♪ 다섯 칸마다 한 마리가 온다 — piano.js · 잡기 없음).
  * 도감·파트너·배틀·꾸미기·상점·레벨·코인은 과목이 한 몸이다 (아버님 2026-09-22: "모으는 곳은 한 곳이어야 재미가 안 반감된다").
  * 왜 새 150을 더했나: 아이가 영어(쉬움·🎯 하루 4회)만 골라서, 수학에서만 만나는 얼굴이 있어야 수학으로 간다.
  */
@@ -670,12 +672,65 @@ export const ROSTER = [
   { id: 875, ko: '빙큐보', en: 'Eiscue', subject: 'letter' }, // 보통 g8
   { id: 931, ko: '시비꼬', en: 'Squawkabilly', subject: 'letter' }, // 흔함 g9
   { id: 962, ko: '떨구새', en: 'Bombirdier', subject: 'letter' }, // 희귀 g9
+  // 🎹 음악 전용 50 (2026-11-09 아버님 「이대로」 — 기본안 EGq5MVTaHoizdPmxVTPzqb) — 🎧 듣고 따라 치기 ♪ 다섯 칸마다 한 마리가 온다(잡기 없음 · piano.listenRule)
+  //   명단에 한 마리도 없던 진화 가족만 · 다른 과목 잡기·알·5일장·배틀 상대·대여행·기술 배우기·문법 🎁에서 안 나온다(isMusicMon) · 진화는 음악 가족 안에서
+  //   흔함 20 · 보통 15 · 희귀 10 · 전설 5 · 이름·등급·타입은 PokeAPI(.context/v404/make_lines.mjs) · 노래·소리와 닿는 것은 메로엣타·음뱃·누리공·푸린이 이미 다른 과목이라 14마리뿐
+  { id: 433, ko: '랑딸랑', en: 'Chingling', subject: 'music' }, // 흔함 g4
+  { id: 527, ko: '또르박쥐', en: 'Woobat', subject: 'music' }, // 흔함 g5
+  { id: 965, ko: '부르롱', en: 'Varoom', subject: 'music' }, // 흔함 g9
+  { id: 753, ko: '짜랑랑', en: 'Fomantis', subject: 'music' }, // 흔함 g7
+  { id: 960, ko: '바다그다', en: 'Wiglett', subject: 'music' }, // 흔함 g9
+  { id: 531, ko: '다부니', en: 'Audino', subject: 'music' }, // 흔함 g5
+  { id: 548, ko: '치릴리', en: 'Petilil', subject: 'music' }, // 흔함 g5
+  { id: 692, ko: '완철포', en: 'Clauncher', subject: 'music' }, // 흔함 g6
+  { id: 963, ko: '맨돌핀', en: 'Finizen', subject: 'music' }, // 흔함 g9
+  { id: 919, ko: '콩알뚜기', en: 'Nymble', subject: 'music' }, // 흔함 g9
+  { id: 974, ko: '터벅고래', en: 'Cetoddle', subject: 'music' }, // 흔함 g9
+  { id: 971, ko: '망망이', en: 'Greavard', subject: 'music' }, // 흔함 g9
+  { id: 942, ko: '오라티프', en: 'Maschiff', subject: 'music' }, // 흔함 g9
+  { id: 917, ko: '타랜툴라', en: 'Tarountula', subject: 'music' }, // 흔함 g9
+  { id: 918, ko: '트래피더', en: 'Spidops', subject: 'music' }, // 흔함 g9
+  { id: 734, ko: '영구스', en: 'Yungoos', subject: 'music' }, // 흔함 g7
+  { id: 735, ko: '형사구스', en: 'Gumshoos', subject: 'music' }, // 흔함 g7
+  { id: 843, ko: '모래뱀', en: 'Silicobra', subject: 'music' }, // 흔함 g8
+  { id: 844, ko: '사다이사', en: 'Sandaconda', subject: 'music' }, // 흔함 g8
+  { id: 950, ko: '절벼게', en: 'Klawf', subject: 'music' }, // 흔함 g9
+  { id: 358, ko: '치렁', en: 'Chimecho', subject: 'music' }, // 보통 g3
+  { id: 528, ko: '맘박쥐', en: 'Swoobat', subject: 'music' }, // 보통 g5
+  { id: 966, ko: '부르르룸', en: 'Revavroom', subject: 'music' }, // 보통 g9
+  { id: 754, ko: '라란티스', en: 'Lurantis', subject: 'music' }, // 보통 g7
+  { id: 961, ko: '바닥트리오', en: 'Wugtrio', subject: 'music' }, // 보통 g9
+  { id: 985, ko: '우렁찬꼬리', en: 'Scream Tail', subject: 'music' }, // 보통 g9
+  { id: 870, ko: '대여르', en: 'Falinks', subject: 'music' }, // 보통 g8
+  { id: 549, ko: '드레디어', en: 'Lilligant', subject: 'music' }, // 보통 g5
+  { id: 693, ko: '블로스터', en: 'Clawitzer', subject: 'music' }, // 보통 g6
+  { id: 964, ko: '돌핀맨', en: 'Palafin', subject: 'music' }, // 보통 g9
+  { id: 975, ko: '우락고래', en: 'Cetitan', subject: 'music' }, // 보통 g9
+  { id: 972, ko: '묘두기', en: 'Houndstone', subject: 'music' }, // 보통 g9
+  { id: 943, ko: '마피티프', en: 'Mabosstiff', subject: 'music' }, // 보통 g9
+  { id: 973, ko: '꼬이밍고', en: 'Flamigo', subject: 'music' }, // 보통 g9
+  { id: 991, ko: '무쇠보따리', en: 'Iron Bundle', subject: 'music' }, // 보통 g9
+  { id: 1005, ko: '고동치는달', en: 'Roaring Moon', subject: 'music' }, // 희귀 g9
+  { id: 1021, ko: '날뛰는우레', en: 'Raging Bolt', subject: 'music' }, // 희귀 g9
+  { id: 920, ko: '엑스레그', en: 'Lokix', subject: 'music' }, // 희귀 g9
+  { id: 984, ko: '위대한엄니', en: 'Great Tusk', subject: 'music' }, // 희귀 g9
+  { id: 987, ko: '날개치는머리', en: 'Flutter Mane', subject: 'music' }, // 희귀 g9
+  { id: 990, ko: '무쇠바퀴', en: 'Iron Treads', subject: 'music' }, // 희귀 g9
+  { id: 1006, ko: '무쇠무인', en: 'Iron Valiant', subject: 'music' }, // 희귀 g9
+  { id: 1009, ko: '굽이치는물결', en: 'Walking Wake', subject: 'music' }, // 희귀 g9
+  { id: 1010, ko: '무쇠잎새', en: 'Iron Leaves', subject: 'music' }, // 희귀 g9
+  { id: 1020, ko: '꿰뚫는화염', en: 'Gouging Fire', subject: 'music' }, // 희귀 g9
+  { id: 891, ko: '치고마', en: 'Kubfu', subject: 'music' }, // 전설 g8
+  { id: 892, ko: '우라오스', en: 'Urshifu', subject: 'music' }, // 전설 g8
+  { id: 898, ko: '버드렉스', en: 'Calyrex', subject: 'music' }, // 전설 g8
+  { id: 1017, ko: '오거폰', en: 'Ogerpon', subject: 'music' }, // 전설 g9
+  { id: 1024, ko: '테라파고스', en: 'Terapagos', subject: 'music' }, // 전설 g9
 ];
 
 /** 이 레벨에서 열려 있는 명단 */
 /**
  * ⭐ 변신 폼 — PokeAPI의 폼 그림 id (메가진화 / 거다이맥스).
- * 명단(모든 과목)에서 원작에 변신 모습이 있는 74종 — v313부터 수학·국어·논술 포켓몬도(아래 FORMS). 그림은 필요할 때만 받는다(ensureForm).
+ * 명단(모든 과목)에서 원작에 변신 모습이 있는 79종 — v313부터 수학·국어·논술 포켓몬도 · v404 🎹 음악 다섯(아래 FORMS). 그림은 필요할 때만 받는다(ensureForm).
  * 라이츄·개굴닌자 등 레전즈 Z-A 메가는 최신작 자료라 아이가 아는 것과 다를 수 있다.
  */
 /**
@@ -697,6 +752,8 @@ export const LEGENDARY = [
   // 📚 국어 전용 전설·환상 15 — v232에서 빠졌다(국어 알에서 나올 수 있었다) · 🖊️ 논술 전용 10 (2026-10-20 PokeAPI 실측 · Codex 109차 #4)
   480, 481, 482, 488, 490, 648, 638, 639, 640, 785, 786, 787, 788, 801, 802,
   377, 378, 486, 641, 642, 647, 718, 719, 720, 721,
+  // 🎹 음악 전용 전설 5 (2026-11-09 PokeAPI 실측 — 치고마·우라오스·버드렉스·오거폰·테라파고스)
+  891, 892, 898, 1017, 1024,
 ];
 const legendSet = new Set(LEGENDARY);
 
@@ -818,6 +875,12 @@ export const FORMS = {
   861: { gmax: 10222 },              // 오롱털 (국어)
   884: { gmax: 10225 },              // 두랄루돈 (수학)
   998: { mega: 10325 },              // 드닐레이브 (수학)
+  // 🎹 음악 전용 다섯 (v404 — PokeAPI 실측 .context/v404/forms50.mjs · 공식 그림 있음) · 우라오스는 거다이맥스가 둘이라 기본 모습(일격) 하나
+  358: { mega: 10306 },              // 치렁 (음악 · 레전즈 Z-A)
+  531: { mega: 10069 },              // 다부니 (음악)
+  844: { gmax: 10218 },              // 사다이사 (음악)
+  870: { mega: 10303 },              // 대여르 (음악 · 레전즈 Z-A)
+  892: { gmax: 10226 },              // 우라오스 (음악 · 일격의 태세)
 };
 
 /** 이 포켓몬이 할 수 있는 변신 { mega?, gmax? } (없으면 null) */
@@ -1017,9 +1080,9 @@ export function unlockedRoster(level) {
   return ROSTER.filter((r) => (r.unlock || 1) <= level);
 }
 
-const subjectById = new Map(ROSTER.map((r) => [r.id, r.subject === 'math' || r.subject === 'korean' || r.subject === 'nonsul' || r.subject === 'letter' ? r.subject : 'english']));
+const subjectById = new Map(ROSTER.map((r) => [r.id, ['math', 'korean', 'nonsul', 'letter', 'music'].includes(r.subject) ? r.subject : 'english']));
 
-/** 이 포켓몬은 어느 과목에서 잡히나 — 'math' | 'english' | 'korean' | 'nonsul' | 'letter' (명단에 없으면 영어) · 📚 국어 150마리는 2026-10-11 · 🖊️ 논술 100마리는 2026-10-20 · 📮 편지 30마리는 2026-10-27 */
+/** 이 포켓몬은 어느 과목에서 잡히나 — 'math' | 'english' | 'korean' | 'nonsul' | 'letter' | 'music' (명단에 없으면 영어) · 📚 국어 150마리는 2026-10-11 · 🖊️ 논술 100마리는 2026-10-20 · 📮 편지 30마리는 2026-10-27 · 🎹 음악 50마리는 2026-11-09 */
 export function subjectOf(id) {
   return subjectById.get(id) || 'english';
 }
@@ -1030,6 +1093,11 @@ export function subjectOf(id) {
  */
 export function isLetterMon(id) {
   return subjectById.get(Number(id)) === 'letter';
+}
+
+/** 🎹 음악에서만 오는 포켓몬인가 (v404) — 편지 포켓몬처럼 과목을 안 보는 길(⚔️ 배틀 상대 · 🤝 5일장 · 🎒 대여행 · 기술 배우기)은 이것으로 뺀다 */
+export function isMusicMon(id) {
+  return subjectById.get(Number(id)) === 'music';
 }
 
 /**

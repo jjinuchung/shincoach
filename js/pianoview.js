@@ -6,7 +6,8 @@
 // 아이 화면엔 셈·남은 수를 쓰지 않는다 — 음표 칸은 ♪ 다섯 개가 차오르는 그림으로만
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
-import { pianoTap, pianoListen, pianoNow } from './xp.js';
+import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, rarityOf, RARITY } from './xp.js';
+import { ROSTER, ensureCast } from './pokemon.js'; // 🐾 음악 포켓몬 이름·그림 (v404)
 import { applyDailyDelta } from './db.js';
 import { clockDay, noteActivity, isLocked } from './timelimit.js';
 import { guardStart } from './timeup.js';
@@ -267,7 +268,10 @@ function sendListen() {
   showDone();
   pianoListen(req).then((r) => {
     S.saving = false;
-    if (r && r.ok) applyDailyDelta(clockDay(), { pnListenN: 1, ...(r.counted ? { pnNotes: 1 } : {}) }).catch(() => {});
+    const got = r && r.ok && Array.isArray(r.got) ? r.got : [];
+    if (r && r.ok) applyDailyDelta(clockDay(), { pnListenN: 1, ...(r.counted ? { pnNotes: 1 } : {}), ...(got.length ? { pnMons: got.length } : {}) }).catch(() => {});
+    if (got.length) showArrivals(got, r.firsts); // 🐾 판이 바뀌었어도 온 포켓몬은 보여 준다 — 도감에는 이미 들어갔다 (v404)
+    if (r && r.ok) renderSlots(); // ♪ 칸은 판 것이 아니라 기록 것 — 저장하는 사이 줄·곡을 바꿨어도 새 화면에 맞게 (Codex 209차 P3)
     if (gen !== S.gen) return;
     if (!r || !r.ok) {
       S.passDone = true;
@@ -275,9 +279,9 @@ function sendListen() {
       toast('<b>저장이 안 됐어요</b>「✋ 다 쳤어요」를 한 번 더 눌러 주세요.', 3200);
       return;
     }
-    renderSlots();
-    const sl = slotsOf(r.notes);
+    const sl = slotsOf(r.notes, r.mons);
     // 음표 칸은 ♪ 그림으로만 — 알림 말에도 칸 수를 쓰지 않는다 (Codex 204차 P2-4)
+    if (got.length) return; // 🐾 온 포켓몬 창이 대신 말한다
     if (!r.counted) toast('<b>오늘 음표 칸은 다 채웠어요</b>연습은 얼마든지 해도 돼요!', 3200);
     else if (sl.filled === NOTES_PER_MON) toast(`<b>🎉 음표가 가득 찼어요!</b>${slotsHtml(sl.filled)}<br>음악 포켓몬을 만날 준비 끝!`, 3800);
     else toast(`<b>🎵 음표를 채웠어요!</b>${slotsHtml(sl.filled)}<br>${nextHint(S.lv)}`, 3200);
@@ -869,7 +873,65 @@ function renderSlots() {
   const box = $('pn-slots');
   if (!box) return;
   box.hidden = S.mode !== 'listen';
-  box.innerHTML = slotsHtml(slotsOf(pianoNow().notes).filled);
+  const pn = pianoNow();
+  box.innerHTML = slotsHtml(slotsOf(pn.notes, pn.mons).filled); // 포켓몬이 오면 다시 0부터 (v404)
+}
+
+// ───────────────────── 🐾 음악 포켓몬이 왔어요 (v404) ─────────────────────
+
+const arrive = { queue: [] };
+/**
+ * 온 음악 포켓몬을 차례로 — 「좋아요!」로 닫으면 다음 · 그림은 받아서(못 받으면 이름만) · 창은 음악 화면 안(다른 화면에선 안 보인다)
+ * firsts = 올 때 처음 만났나(규칙이 준 것 · got과 같은 차례) — 지금 마릿수로 짐작하면 마지막 새 아이와 또 온 아이가 한꺼번에 올 때 첫 창도 「또」가 됐다 (Codex 209차 P3)
+ */
+function showArrivals(ids, firsts = []) {
+  ids.forEach((id, i) => { if (Number.isInteger(id) && id > 0) arrive.queue.push({ id, first: typeof firsts[i] === 'boolean' ? firsts[i] : null }); });
+  if (!$('pn-arrive')) nextArrival();
+}
+function nextArrival() {
+  const old = $('pn-arrive');
+  if (old) old.remove();
+  const host = $('view-music');
+  const item = arrive.queue.shift();
+  if (!host || !item) return;
+  const { id } = item;
+  const r = ROSTER.find((m) => m.id === id);
+  const rank = RARITY[rarityOf(id)] || RARITY[2];
+  const again = item.first === null ? caughtCount(id) > 1 : !item.first; // 50마리를 다 만난 뒤엔 만난 아이가 또 온다 (기본안 ④)
+  const box = el('div', 'pn-arrive');
+  box.id = 'pn-arrive';
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-label', '음악 포켓몬이 왔어요');
+  const card = el('div', 'pn-arrive-card');
+  card.appendChild(el('b', 'pn-arrive-h', again ? '🎵 음악 포켓몬이 또 놀러 왔어요!' : '🎵 새 음악 포켓몬이 왔어요!'));
+  const img = el('img', 'pn-arrive-img');
+  img.alt = '';
+  img.hidden = true;
+  card.appendChild(img);
+  card.appendChild(el('span', 'pn-arrive-name', r ? r.ko : `#${id}`));
+  card.appendChild(el('small', 'pn-arrive-sub', `${rank.stars} ${rank.label} · ${again ? '도감에 한 마리 더' : '도감에 들어갔어요'}`));
+  const ok = btn('좋아요!', 'btn btn-primary pn-arrive-ok', () => nextArrival());
+  card.appendChild(ok);
+  box.appendChild(card);
+  host.appendChild(box);
+  try { ok.focus(); } catch { /* 초점 없이도 */ }
+  ensureCast([id]).then((c) => { if (c[0] && c[0].url && $('pn-arrive') === box) { img.src = c[0].url; img.hidden = false; } }).catch(() => {});
+}
+
+/** 🐾 밀린 음악 포켓몬 — 음악 화면에 들어올 때 (v402·v403 때 찬 다섯 칸 몫 · 저장 실패로 못 받은 몫) · 받을 몫이 없으면 저장하지 않는다 */
+let dueBusy = false;
+function dueMons() {
+  const pn = pianoNow();
+  if (dueBusy || Math.floor(pn.notes / NOTES_PER_MON) <= pn.mons) return;
+  dueBusy = true;
+  pianoMonsDue().then((r) => {
+    dueBusy = false;
+    const got = r && r.ok && Array.isArray(r.got) ? r.got : [];
+    if (!got.length) return;
+    applyDailyDelta(clockDay(), { pnMons: got.length }).catch(() => {});
+    renderSlots();
+    showArrivals(got, r.firsts);
+  }).catch(() => { dueBusy = false; });
 }
 function showDone() {
   const b = $('pn-done');
@@ -1146,6 +1208,7 @@ export async function enterMusic() {
   if (S.screen === 'stage' && S.song && allSongs().some((s) => s.id === S.song.id)) {
     renderStage(true);
   } else renderList();
+  dueMons(); // 🐾 v404
   const before = allSongs().map((s) => s.id).join();
   try { await syncSongs(); } catch { /* 받아 둔 곡 그대로 */ }
   if (S.active && S.screen === 'list' && allSongs().map((s) => s.id).join() !== before) renderList();

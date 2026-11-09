@@ -11,9 +11,9 @@ import { battleLossRule, cloneProfile, emptyProfile, evolveRule, gearRule, level
 const ids = new Set(ROSTER.map((r) => r.id));
 const links = Object.entries(EVO).flatMap(([from, list]) => list.map((e) => ({ from: Number(from), ...e })));
 
-test('🧬 진화표: 237링크·223종, 양쪽이 모두 명단에 있다', () => {
-  assert.equal(links.length, 237, '🧬 줄기 중간 20을 채워 66 → 107 (2026-09-27) · 📚 국어 150의 진화 84를 더해 191 (2026-10-11) · 🖊️ 논술 100의 진화 46을 더해 237 (2026-10-20)');
-  assert.equal(Object.keys(EVO).length, 223);
+test('🧬 진화표: 253링크·239종, 양쪽이 모두 명단에 있다', () => {
+  assert.equal(links.length, 253, '🧬 줄기 중간 20을 채워 66 → 107 (2026-09-27) · 📚 국어 150의 진화 84를 더해 191 (2026-10-11) · 🖊️ 논술 100의 진화 46을 더해 237 (2026-10-20) · 🎹 음악 50의 진화 16을 더해 253 (v404)');
+  assert.equal(Object.keys(EVO).length, 239);
   for (const l of links) {
     assert.ok(ids.has(l.from), `진화 전 ${l.from}이 명단에 없다`);
     assert.ok(ids.has(l.to), `진화 후 ${l.to}이 명단에 없다`);

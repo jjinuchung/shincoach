@@ -246,6 +246,23 @@ export const EVO = {
   605: [{ to: 606, at: 5, orig: 'Lv42' }],              // 리그레 → 벰크
   636: [{ to: 637, at: 5, orig: 'Lv59' }],              // 활화르바 → 불카모스
   684: [{ to: 685, at: 5, orig: '휘핑팝을 지니고 통신교환' }],     // 나룸퍼프 → 나루림
+  // 🎹 음악 전용 50의 진화 16 (v404 — tools/evo_table.mjs · 명단에 둘 다 있는 링크만 · 음악 가족 안에서 · 치고마 조건은 PokeAPI 아이템 한국어명으로 손으로)
+  433: [{ to: 358, at: 5, orig: '밤에 친하게 지내면' }],        // 랑딸랑 → 치렁
+  527: [{ to: 528, at: 5, orig: '친하게 지내면' }],           // 또르박쥐 → 맘박쥐
+  548: [{ to: 549, at: 5, orig: '태양의돌 사용' }],           // 치릴리 → 드레디어
+  692: [{ to: 693, at: 5, orig: 'Lv37' }],              // 완철포 → 블로스터
+  734: [{ to: 735, at: 5, orig: 'Lv20' }],              // 영구스 → 형사구스
+  753: [{ to: 754, at: 5, orig: 'Lv34' }],              // 짜랑랑 → 라란티스
+  843: [{ to: 844, at: 5, orig: 'Lv36' }],              // 모래뱀 → 사다이사
+  891: [{ to: 892, at: 5, orig: '악의 족자나 물의 족자를 보고' }],                            // 치고마 → 우라오스
+  917: [{ to: 918, at: 5, orig: 'Lv15' }],              // 타랜툴라 → 트래피더
+  919: [{ to: 920, at: 5, orig: 'Lv24' }],              // 콩알뚜기 → 엑스레그
+  942: [{ to: 943, at: 5, orig: 'Lv30' }],              // 오라티프 → 마피티프
+  960: [{ to: 961, at: 5, orig: 'Lv26' }],              // 바다그다 → 바닥트리오
+  963: [{ to: 964, at: 5, orig: 'Lv38' }],              // 맨돌핀 → 돌핀맨
+  965: [{ to: 966, at: 5, orig: 'Lv40' }],              // 부르롱 → 부르르룸
+  971: [{ to: 972, at: 5, orig: 'Lv30' }],              // 망망이 → 묘두기
+  974: [{ to: 975, at: 5, orig: '얼음의돌 사용' }],           // 터벅고래 → 우락고래
 };
 
 /**
@@ -273,7 +290,8 @@ export const LV_MARKS = [25, 50, 75, 100];
 /** 스톤 아이템 id (items.js STONE_MATH/STONE_ENGLISH/STONE_KOREAN과 같아야 한다 — 테스트로 고정) */
 export const STONE_ID = { math: 'stone_math', english: 'stone_english', korean: 'stone_korean' };
 
-/** 그 과목을 키우는 데 쓰는 스톤 id (📚 국어 포켓몬은 🟩 — 2026-10-11 · 🖊️ 논술 포켓몬도 🟩 — 국어 시간 안이라 새 스톤을 만들지 않는다, 2026-10-20) */
+/** 그 과목을 키우는 데 쓰는 스톤 id (📚 국어 포켓몬은 🟩 — 2026-10-11 · 🖊️ 논술 포켓몬도 🟩 — 국어 시간 안이라 새 스톤을 만들지 않는다, 2026-10-20 ·
+ *  📮 편지·🎹 음악 포켓몬은 🔶 영어스톤 — 기본 갈래 · 음악은 v404 기본안 ③ 「이대로」) */
 export function stoneIdFor(subject) {
   return subject === 'math' ? STONE_ID.math : subject === 'korean' || subject === 'nonsul' ? STONE_ID.korean : STONE_ID.english;
 }

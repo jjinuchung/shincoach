@@ -434,12 +434,13 @@ async function stockNow(today) {
 }
 
 /** 🎒 포켓몬 대여행 글 (v341) — 저장된 프로필에서 · 한 번도 안 떠났으면 null(파일을 안 만든다) */
-/** 🎹 음악 연습 기록 (v402) — 저장된 프로필로 · 곡 이름은 이 기기 곡 목록 · 🎹 집 피아노 연결 확인 결과(이 기기) */
+/** 🎹 음악 연습 기록 (v402) — 저장된 프로필로 · 곡 이름은 이 기기 곡 목록 · 🎹 집 피아노 연결 확인 결과(이 기기) · 🐾 온 음악 포켓몬 이름(v404) */
 async function musicNow(today) {
-  const [{ getProfile }, pn, ps] = await Promise.all([import('./db.js'), import('./piano.js'), import('./pianosongs.js')]);
+  const [{ getProfile }, pn, ps, pk] = await Promise.all([import('./db.js'), import('./piano.js'), import('./pianosongs.js'), import('./pokemon.js')]);
   const p = await getProfile();
   if (!p) return null;
-  return pn.pianoMd(p.piano, today, ps.songName, ps.midiCheckNow()) || null;
+  const ko = (id) => { const r = pk.ROSTER.find((m) => m.id === Number(id)); return r ? r.ko : `#${id}`; };
+  return pn.pianoMd(p.piano, today, ps.songName, ps.midiCheckNow(), ko) || null;
 }
 
 async function journeyNow(today) {

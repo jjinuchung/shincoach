@@ -31,7 +31,7 @@ import { moveBlocksTrip, moveStartRule, moveAnswerRule, moveSwapRule, moveEventR
 import { copyJourney, startRule as jrStartRule, answerRule as jrAnswerRule, swapRule as jrSwapRule, homeRule as jrHomeRule, pickRule as jrPickRule, eventRule as jrEventRule } from './journey.js'; // 🎒 포켓몬 대여행 (v341, 순수) · 구역 이벤트 (v362)
 import { copyAqua, aquaTierRule, aquaBuyRule, aquaPutRule, aquaTakeRule, aquaSlotRule } from './aquarium.js'; // 🐠 진우 아쿠아리움 (v399 — 순수)
 import { copyTour, tourEndRule, bookRule as tourBookRule } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 (v401 — 순수)
-import { copyPiano, pianoOf, tapRule as pianoTapRule, listenRule as pianoListenRule } from './piano.js'; // 🎹 음악 과목 (v402 — 순수)
+import { copyPiano, pianoOf, tapRule as pianoTapRule, listenRule as pianoListenRule, monsDueRule as pianoMonsDueRule } from './piano.js'; // 🎹 음악 과목 (v402 — 순수 · v404 음악 포켓몬)
 import { copyLake, catchRule as lakeCatchRule, gearBuyRule as lakeGearRule, pickRule as lakePickRule, gearOf as lakeGearOf } from './fishing.js'; // 🎣 학습 낚시터 도감·💰 · 🎒 채비·고른 물가(v368) (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
@@ -51,7 +51,7 @@ import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUS
 import { activeEgg, newEgg, unseenHatched } from './egg.js';
 import { canEvolve, capReason, evoOf, evoAt, haveOf, levelCapOf, lvOf, nextCost, soleEvo, stoneIdFor, takenOf, takenUnseen, fusedOf, fledOf, tradedOf, soldOf, rocketHeldOf, candyOf, candyCost, MAX_LV } from './evolve.js';
 import { stealables, pickTarget, hideout } from './rocket.js'; // 🚀 로켓단 습격 규칙 (순수)
-import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER, isLetterMon, formsOf, formUrl } from './pokemon.js';
+import { anchorFor, shinyUrl, subjectOf, isUltraBeast, isLegendary, isUnlocked, ROSTER, isLetterMon, isMusicMon, formsOf, formUrl } from './pokemon.js';
 import { ZYG_ID, zygOf, zygFindRule, zygFormRule, zygFormOf, zygPerfect, CORE_FORM_URL } from './zygarde.js'; // 🟢 지가르데 셀 모으기 (v352 — 순수)
 import { setNoDot } from './sprite.js'; // 🟢 10%폼 지가르데는 도트 대신 일러스트 (5세대 도트는 50%폼뿐 — v352)
 import { findVoucher, GIVEN_BY_DAD } from './unlock.js';
@@ -164,7 +164,9 @@ export const RARITY_IDS = {
       // 🖊️ 논술 전용 (2026-10-20) 흔함 40
       69, 70, 265, 266, 268, 406, 315, 439, 23, 46, 48, 72, 84, 86, 88, 98, 109, 118, 278, 285, 307, 309, 325, 333, 343, 353, 360, 517, 605, 296, 297, 322, 323, 341, 342, 504, 505, 684, 685, 327,
       // 📮 편지 전용 (2026-10-27) 흔함 9
-      213, 313, 314, 352, 357, 370, 556, 676, 931],
+      213, 313, 314, 352, 357, 370, 556, 676, 931,
+      // 🎹 음악 전용 (2026-11-09) 흔함 20
+      433, 527, 965, 753, 960, 531, 548, 692, 963, 919, 974, 971, 942, 917, 918, 734, 735, 843, 844, 950],
   2: [25, 133, 175, 143, 131, 94, 26, 95, 113,
       2, 5, 8, 447, 12, 147, 246, 123, 125, 137, 148, 91,
       212, 257, 260,
@@ -181,7 +183,9 @@ export const RARITY_IDS = {
       // 🖊️ 논술 전용 (2026-10-20) 보통 30
       108, 114, 193, 207, 240, 126, 122, 636, 222, 24, 47, 49, 73, 85, 87, 89, 99, 110, 119, 279, 286, 308, 310, 326, 334, 344, 354, 202, 518, 606,
       // 📮 편지 전용 (2026-10-27) 보통 20
-      235, 351, 479, 337, 338, 335, 594, 618, 621, 631, 703, 707, 741, 764, 765, 771, 775, 780, 845, 875],
+      235, 351, 479, 337, 338, 335, 594, 618, 621, 631, 703, 707, 741, 764, 765, 771, 775, 780, 845, 875,
+      // 🎹 음악 전용 (2026-11-09) 보통 15
+      358, 528, 966, 754, 961, 985, 870, 549, 693, 964, 975, 972, 943, 973, 991],
   3: [6, 9, 3, 130, 448, 658, 778, 248, 282, 445, 149, 373, 376, 887, // 149 망나뇽은 전설이 아니라 600족(마기라스·한카리아스급) — 아이 지적으로 수정
       // 전설조(3신조·기타 전설) — 전설만큼은 아니어도 귀하게
       144, 145, 146, 251, 483, 484, 487, 643, 644, 716,
@@ -193,7 +197,9 @@ export const RARITY_IDS = {
       // 🖊️ 논술 전용 (2026-10-20) 희귀 20
       71, 463, 465, 469, 198, 430, 472, 467, 267, 269, 407, 866, 441, 458, 226, 637, 774, 864, 227, 369,
       // 📮 편지 전용 (2026-10-27) 희귀 1
-      962
+      962,
+      // 🎹 음악 전용 (2026-11-09) 희귀 10
+      1005, 1021, 920, 984, 987, 990, 1006, 1009, 1010, 1020
 ],
   // 🌌 울트라비스트 11 (2026-09-27) — ⭐ 등급 밖의 제 등급. 원작에서도 전설이 아니다(is_legendary: false)
   5: [793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806],
@@ -203,7 +209,9 @@ export const RARITY_IDS = {
       // 📚 국어 전용 (2026-10-11) 전설·환상 15
       480, 481, 482, 488, 490, 648, 638, 639, 640, 785, 786, 787, 788, 801, 802,
       // 🖊️ 논술 전용 (2026-10-20) 전설·환상 10
-      377, 378, 486, 641, 642, 647, 718, 719, 720, 721],
+      377, 378, 486, 641, 642, 647, 718, 719, 720, 721,
+      // 🎹 음악 전용 (2026-11-09) 전설·환상 5
+      891, 892, 898, 1017, 1024],
 };
 const rarityById = {};
 for (const r of Object.keys(RARITY_IDS)) for (const id of RARITY_IDS[r]) rarityById[id] = Number(r);
@@ -676,7 +684,7 @@ export function tradeCtx(pf, art) {
   return {
     rarity: (id) => rarityIn(pf, Number(id)),
     subject: (id) => subjectOf(Number(id)),
-    allowed: (id) => rosterSet.has(Number(id)) && !isLegendary(id) && !isUltraBeast(id) && !isLetterMon(id), // 📮 편지 포켓몬은 상인이 안 가져오고 진우도 못 준다 (2026-10-27)
+    allowed: (id) => rosterSet.has(Number(id)) && !isLegendary(id) && !isUltraBeast(id) && !isLetterMon(id) && !isMusicMon(id), // 📮 편지·🎹 음악 포켓몬은 상인이 안 가져오고 진우도 못 준다 (2026-10-27 · v404)
     unlocked: (id) => isUnlocked(Number(id), level),
     ...(art ? { art } : {}),
   };
@@ -1064,9 +1072,16 @@ export function tourBook(req) {
 export function pianoTap(req) {
   return houseDo((p) => pianoTapRule(p, req, Date.now()));
 }
-/** 🎧 「다 쳤어요 ✋」 (v402) — 음표 칸은 저장된 프로필로 한 트랜잭션에서(하루 세 칸) */
+/** 🎹 음악 포켓몬 후보 (v404) — 명단의 음악 50 · 등급은 넘겨받은 프로필에서(부모가 옮긴 등급까지 · 트랜잭션 안의 저장된 프로필) */
+const MUSIC_IDS = ROSTER.filter((r) => r.subject === 'music').map((r) => r.id);
+const musicPool = (pf) => MUSIC_IDS.map((id) => ({ id, r: rarityIn(pf, id) }));
+/** 🎧 「다 쳤어요 ✋」 (v402) — 음표 칸은 저장된 프로필로 한 트랜잭션에서(하루 세 칸) · 다섯 칸이 차면 음악 포켓몬도 같은 트랜잭션에서(v404 — got) */
 export function pianoListen(req) {
-  return houseDo((p) => pianoListenRule(p, req, Date.now()));
+  return houseDo((p) => pianoListenRule(p, req, Date.now(), musicPool(p), Math.random));
+}
+/** 🎹 밀린 음악 포켓몬 (v404) — 음악 화면에 들어올 때 · v402·v403 때 찬 다섯 칸 몫 · 저장이 실패해 못 받은 몫 → { ok, got } */
+export function pianoMonsDue() {
+  return houseDo((p) => pianoMonsDueRule(p, Date.now(), musicPool(p), Math.random));
 }
 /** 🎹 지금 음악 기록 (그리기용 — 고쳐 읽은 새 객체) */
 export function pianoNow() {

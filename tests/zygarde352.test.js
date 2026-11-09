@@ -26,7 +26,7 @@ const seenAt = (n) => [STEP.perfect, STEP.fifty, STEP.ten].find((s) => n >= s) |
 /** 셀 n개가 모인 프로필 (코어는 찾음 · 오늘 찾은 과목 없음) */
 const withCells = (n, extra = {}) => ({ caught: {}, partner: null, zyg: { core: T0 - 9 * DAY, cells: n, keys: [`${D0 - 1}:math`], seen: seenAt(n) }, ...extra });
 
-test('🟢 모습 그림 id: PokeAPI zygarde-10·complete·mega · 변신 표(FORMS)는 그대로 74 · formsOf(718)은 그대로 null', () => {
+test('🟢 모습 그림 id: PokeAPI zygarde-10·complete·mega · 변신 표(FORMS)는 지가르데 없이 79(v404 음악 다섯 더함) · formsOf(718)은 그대로 null', () => {
   assert.equal(ZYG_ID, 718);
   assert.deepEqual(ZYG_FORMS, { ten: 10181, perfect: 10120, mega: 10301 });
   assert.equal(formIdOf(718, 'ten'), 10181);
@@ -36,7 +36,7 @@ test('🟢 모습 그림 id: PokeAPI zygarde-10·complete·mega · 변신 표(FO
   assert.equal(formIdOf(6, 'mega'), FORMS[6].mega, '다른 포켓몬은 변신 표 그대로');
   assert.equal(formIdOf(25, 'ten'), 0, '지가르데 모습은 지가르데만');
   assert.equal(formsOf(718), null, '⭐ 변신 칸은 shop.js가 지가르데만 따로 그린다 (v313 시험 그대로)');
-  assert.equal(Object.keys(FORMS).length, 74);
+  assert.equal(Object.keys(FORMS).length, 79);
   assert.equal(formUrl(718, 'ten'), null, '받아 둔 그림이 없으면 null (50%폼 그림으로)');
   const src = read('js/pokemon.js');
   assert.match(src, /for \(const fid of Object\.values\(ZYG_FORMS\)\) known\.add\(fid\);/, '앱을 열 때 받아 둔 지가르데 모습 그림도 올린다');

@@ -246,7 +246,7 @@ test('저장값 고쳐 읽기 — 깨진 칸 빼기 · 한도 넘는 칸 깎기 
   assert.equal(p.notes, KEEP_DAYS * LISTEN_DAY, '모든 칸은 남은 날 칸 합보다 작지 않다');
   assert.equal(p.log.length, LOG_MAX);
   assert.equal(p.log[0].at, 1010, '오래된 기록부터 빠짐');
-  assert.deepEqual(pianoOf('junk'), { days: {}, notes: 0, log: [] });
+  assert.deepEqual(pianoOf('junk'), { days: {}, notes: 0, mons: 0, log: [] }, 'mons = 받은 음악 포켓몬 수 (v404)');
   const c = copyPiano({ days: { [TODAY]: { paid: 1, coins: 5 } }, notes: 3 });
   c.days[TODAY].paid = 9;
   assert.notEqual(copyPiano({ days: { [TODAY]: { paid: 1, coins: 5 } } }).days[TODAY].paid, 9);
@@ -271,14 +271,14 @@ test('병합 — 날마다 큰 쪽(옛 백업으로 한도를 다시 열지 못�
 });
 
 test('📤 — 하루 한 줄(하루 칸으로) · music.md(모든 칸 · 최근 기록 새것부터 · 연결 확인)', () => {
-  assert.deepEqual(PIANO_DAILY, ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes']);
+  assert.deepEqual(PIANO_DAILY, ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons'], 'pnMons = 온 음악 포켓몬 (v404)');
   assert.equal(pianoDayLine({}), '');
   assert.equal(pianoDayLine({ pnTapN: 4, pnTapOk: 3, pnCoins: 15, pnListenN: 2, pnNotes: 2 }), '🎹 태블릿 치기 끝까지 4판(잘 친 판 3 · 💰15) · 🎧 듣고 따라 치기 「다 쳤어요」 2번(음표 칸 2)');
   const p = {};
   tapRule(p, { ...REQ, ok: 42, bad: 6 }, NOW);
   listenRule(p, { ...REQ, line: -1, hand: 'B', lv: 1, sp: 1 }, NOW + 60000);
   const md = pianoMd(p.piano, TODAY, (id) => (id === 'ode' ? '환희의 송가' : id), { at: NOW, ok: true, name: 'SP2X', note: '도4' });
-  assert.match(md, /음표 칸 모두 1 \(다섯 칸 묶음 0\)/);
+  assert.match(md, /음표 칸 모두 1 \(다섯 칸 묶음 0 · 온 음악 포켓몬 0\)/, 'v404 — 온 음악 포켓몬 수도');
   assert.match(md, /🎹 집 피아노 연결 확인 \(2026-11-10\): 잡힘 — SP2X · 마지막에 누른 건반 도4/);
   const rows = md.split('\n').filter((l) => l.startsWith('- 11-10'));
   assert.equal(rows.length, 2);
@@ -357,7 +357,7 @@ test('🔌 잇기 — 홈 카드 · 화면 · 시계 · ⚙ · 칩 · 저장·�
   const xp = read('js/xp.js');
   assert.match(xp, /\.\.\.\(p\.piano \? \{ piano: copyPiano\(p\.piano\) \} : \{\}\)/);
   assert.match(xp, /export function pianoTap\(req\) \{\n  return houseDo\(\(p\) => pianoTapRule\(p, req, Date\.now\(\)\)\);/);
-  assert.match(xp, /export function pianoListen\(req\) \{\n  return houseDo\(\(p\) => pianoListenRule\(p, req, Date\.now\(\)\)\);/);
+  assert.match(xp, /export function pianoListen\(req\) \{\n  return houseDo\(\(p\) => pianoListenRule\(p, req, Date\.now\(\), musicPool\(p\), Math\.random\)\);/, 'v404 — 음악 포켓몬 후보도 같은 트랜잭션에서');
   assert.match(read('js/usage.js'), /\{ key: 'music', field: 'uMusic', ko: '🎹 음악' \}/);
   const up = read('js/upload.js');
   assert.match(up, /\['음악', 'musicTime', 'musicBonus', 'musicExt'\]/);

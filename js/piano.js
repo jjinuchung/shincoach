@@ -5,7 +5,8 @@
 //      → 끝까지 치고 맞게 누른 비율이 PASS_OK를 넘으면 💰 (한 줄 COIN.line · 곡 전체 COIN.all · 하루 TAP_DAY번까지)
 //   🎧 듣고 따라 치기 — 앱이 연주하고 진우는 보면대 앞 진짜 피아노로 따라 친다 (어머님 바람)
 //      → 앱이 그 줄을 끝까지 연주한 뒤 「다 쳤어요 ✋」 = 음표 한 칸 (하루 LISTEN_DAY칸까지 · 💰 없음)
-//      → 다섯 칸(NOTES_PER_MON)마다 음악 포켓몬 (포켓몬은 v403 — 칸은 v402부터 센다 · 그때까지 찬 칸도 인정)
+//      → 다섯 칸(NOTES_PER_MON)마다 🎹 음악 포켓몬 한 마리가 온다(v404 기본안 「이대로」 — 잡기 없음 · 아직 안 만난 것 가운데 MON_WEIGHT대로 ·
+//        다 만났으면 만난 것 가운데 또) · 칸은 v402부터 셌다 — 그때 찬 칸 몫은 음악 화면에 처음 들어올 때(monsDueRule) 온다
 // 도움은 잠그지 않는다 — 네 단계(1 막대 · 2 계이름 · 3 건반 빛 · 4 악보만)를 처음부터 고르고, 끝나면 한 단계 걷기를 권하기만.
 // ⏳ 하루 40분은 음악만 따로(timelimit.js 'music') — 🎮 게임기 판을 세는 공부 시간(timelimit.SUBJECTS)에는 넣지 않는다.
 //
@@ -27,8 +28,12 @@ export const COIN = { line: 5, all: 15 };
 export const TAP_DAY = 3;
 /** 🎧 「다 쳤어요」 음표 칸 — 하루 셈 */
 export const LISTEN_DAY = 3;
-/** 음표 칸 다섯마다 음악 포켓몬 (v403) */
+/** 음표 칸 다섯마다 음악 포켓몬 (v404) */
 export const NOTES_PER_MON = 5;
+/** 🎹 음악 포켓몬 한 마리마다의 무게 — 흔함 4 · 보통 3 · 희귀 2 · 전설 1 (v404 기본안 ② · 흔한 아이가 자주, 전설은 대개 뒤쪽에) */
+export const MON_WEIGHT = { 1: 4, 2: 3, 3: 2, 4: 1 };
+/** 한 번에 줄 음악 포켓몬 상한 (밀린 몫이 많아도 창이 끝없이 이어지지 않게 — 나머지는 다음 「다 쳤어요」·다음 들어올 때) */
+export const MONS_AT_ONCE = 5;
 /** 도움 단계 */
 export const LEVELS = [1, 2, 3, 4];
 /** 빠르기 막대 — 원래 빠르기의 몇 배 (아버님: 단추 대신 밀어서) */
@@ -38,8 +43,8 @@ export const KEEP_DAYS = 14;
 export const LOG_MAX = 60;
 /** 곡 하나의 상한 (비공개 원고가 깨져도 화면이 버티게) */
 export const MAX_BARS = 200;
-/** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 */
-export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes'];
+/** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 · 온 음악 포켓몬(v404) */
+export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons'];
 
 const LETTERS = 'CDEFGAB';
 const SEMI = [0, 2, 4, 5, 7, 9, 11];
@@ -468,7 +473,8 @@ const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 function logRow(r) {
   if (!isObj(r)) return null;
   const at = Number(r.at);
-  if (!(at > 0) || !['t', 'l'].includes(r.m)) return null;
+  if (!(at > 0) || !['t', 'l', 'p'].includes(r.m)) return null;
+  if (r.m === 'p' && !/^\d{1,4}$/.test(String(r.s))) return null; // 🎹 음악 포켓몬이 온 줄(v404) — s는 포켓몬 번호
   return {
     at, m: r.m, s: String(r.s || '').slice(0, 40), n: Number.isInteger(r.n) && r.n >= -1 && r.n < MAX_BARS ? r.n : -1,
     h: ['R', 'L', 'B'].includes(r.h) ? r.h : 'B', lv: LEVELS.includes(r.lv) ? r.lv : 1,
@@ -478,8 +484,9 @@ function logRow(r) {
 }
 
 /**
- * profile.piano 고쳐 읽기 (순수) → { days:{날:{paid, coins, notes}}, notes, log:[…] }
- * days는 빈 날을 빼고 늦은 날 KEEP_DAYS개 · notes(모든 음표 칸)는 날 칸 합보다 작을 수 없다
+ * profile.piano 고쳐 읽기 (순수) → { days:{날:{paid, coins, notes}}, notes, mons, log:[…] }
+ * days는 빈 날을 빼고 늦은 날 KEEP_DAYS개 · notes(모든 음표 칸)는 날 칸 합보다 작을 수 없다 ·
+ * mons(받은 음악 포켓몬 수 · v404)는 다섯 칸 묶음 수보다 클 수 없다 — 묶음 수 − mons = 아직 안 온 몫
  */
 export function pianoOf(raw) {
   const src = isObj(raw) ? raw : {};
@@ -491,17 +498,19 @@ export function pianoOf(raw) {
   const days = Object.fromEntries(kept);
   const dayNotes = kept.reduce((a, [, e]) => a + e.notes, 0);
   const log = (Array.isArray(src.log) ? src.log : []).map(logRow).filter(Boolean).sort((a, b) => a.at - b.at).slice(-LOG_MAX);
-  return { days, notes: Math.max(nz(src.notes), dayNotes), log };
+  const notes = Math.max(nz(src.notes), dayNotes);
+  return { days, notes, mons: Math.min(nz(src.mons), Math.floor(notes / NOTES_PER_MON)), log };
 }
 
 /** 깊은 복사 (xp·db fromStored) */
 export function copyPiano(raw) {
   const p = pianoOf(raw);
-  return { days: Object.fromEntries(Object.entries(p.days).map(([k, e]) => [k, { ...e }])), notes: p.notes, log: p.log.map((r) => ({ ...r })) };
+  return { days: Object.fromEntries(Object.entries(p.days).map(([k, e]) => [k, { ...e }])), notes: p.notes, mons: p.mons, log: p.log.map((r) => ({ ...r })) };
 }
 
 /**
- * 백업 병합 (순수) — 날마다 칸은 큰 쪽(옛 백업으로 그날 한도를 다시 열지 못하게) · 모든 음표 칸은 큰 쪽(줄지 않는다) ·
+ * 백업 병합 (순수) — 날마다 칸은 큰 쪽(옛 백업으로 그날 한도를 다시 열지 못하게) · 모든 음표 칸·받은 음악 포켓몬 수는 큰 쪽(줄지 않는다 —
+ * 옛 백업으로 받은 수가 줄면 같은 묶음 몫이 한 번 더 왔다) ·
  * 연습 기록은 합집합(같은 때·같은 방법·같은 곡은 한 줄) · 둘 다 없으면 null
  */
 export function mergePiano(a, b) {
@@ -515,13 +524,60 @@ export function mergePiano(a, b) {
   }
   const seen = new Map();
   for (const r of [...x.log, ...y.log]) seen.set(`${r.at}:${r.m}:${r.s}`, r);
-  return pianoOf({ days, notes: Math.max(x.notes, y.notes), log: [...seen.values()] });
+  return pianoOf({ days, notes: Math.max(x.notes, y.notes), mons: Math.max(x.mons, y.mons), log: [...seen.values()] });
 }
 
-/** 음표 칸 — 지금 찬 칸(0~5 · 다섯이 막 찼으면 5) · 지금까지 찬 묶음 수 (순수) */
-export function slotsOf(notes) {
+/**
+ * 음표 칸 — 지금 찬 칸(0~5) · 지금까지 찬 묶음 수 (순수)
+ * mons(받은 음악 포켓몬 수 · v404)를 주면: 아직 안 온 몫이 있을 때만 가득(5) · 온 뒤엔 다시 0부터 차오른다
+ * mons를 안 주면 v402처럼 다섯이 막 찼으면 5
+ */
+export function slotsOf(notes, mons) {
   const n = nz(notes);
-  return { filled: n && n % NOTES_PER_MON === 0 ? NOTES_PER_MON : n % NOTES_PER_MON, sets: Math.floor(n / NOTES_PER_MON) };
+  const sets = Math.floor(n / NOTES_PER_MON);
+  if (mons != null) return { filled: sets > nz(mons) ? NOTES_PER_MON : n % NOTES_PER_MON, sets };
+  return { filled: n && n % NOTES_PER_MON === 0 ? NOTES_PER_MON : n % NOTES_PER_MON, sets };
+}
+
+/**
+ * 🎹 음악 포켓몬 하나 고르기 (순수 · v404) — 아직 안 만난 것(caught 0) 가운데 MON_WEIGHT대로 · 다 만났으면 모두 가운데 · 후보가 없으면 0
+ * @param {Array<{id:number, r:number}>} pool 음악 포켓몬과 등급(1 흔함 ~ 4 전설 — xp가 저장된 프로필의 등급으로 만든다)
+ * @param {object} caught profile.caught · @param {() => number} rng 0 이상 1 미만
+ */
+export function pickMusicMon(pool, caught, rng = Math.random) {
+  const list = (Array.isArray(pool) ? pool : []).filter((m) => isObj(m) && Number.isInteger(m.id) && m.id > 0 && MON_WEIGHT[m.r]);
+  const got = isObj(caught) ? caught : {};
+  const fresh = list.filter((m) => !(Number(got[m.id]) > 0));
+  const from = fresh.length ? fresh : list;
+  const total = from.reduce((a, m) => a + MON_WEIGHT[m.r], 0);
+  if (!total) return 0;
+  let x = Math.min(Math.max(Number(rng()) || 0, 0), 1 - EPS) * total;
+  for (const m of from) {
+    x -= MON_WEIGHT[m.r];
+    if (x < 0) return m.id;
+  }
+  return from[from.length - 1].id;
+}
+
+/**
+ * 받을 차례가 된 음악 포켓몬을 준다 (순수 · 트랜잭션 안) — 다섯 칸 묶음 수가 받은 수(tr.mons)보다 크면 그만큼(한 번에 MONS_AT_ONCE까지) ·
+ * 도감 칸(p.caught)에 하나씩 더하고 연습 기록에 'p' 줄 · 후보(pool)가 없으면 아무것도 안 준다(몫은 남는다)
+ * → { got: 준 id 목록, firsts: 그때 처음 만났나(got과 같은 차례) } — 마지막 새 아이와 또 온 아이가 한꺼번에 와도 창 말이 맞게 (Codex 209차 P3)
+ */
+function giveMons(p, tr, pool, rng, now) {
+  const got = [];
+  const firsts = [];
+  while (tr.mons < Math.floor(tr.notes / NOTES_PER_MON) && got.length < MONS_AT_ONCE) {
+    const caught = isObj(p.caught) ? p.caught : {};
+    const id = pickMusicMon(pool, caught, rng);
+    if (!id) break;
+    firsts.push(!(nz(caught[id]) > 0));
+    p.caught = { ...caught, [id]: nz(caught[id]) + 1 };
+    tr.mons += 1;
+    got.push(id);
+    pushLog(tr, { at: now, m: 'p', s: String(id) });
+  }
+  return { got, firsts };
 }
 
 /** 오늘 칸 (순수) */
@@ -571,10 +627,10 @@ export function tapRule(p, req, now) {
 }
 
 /**
- * 🎧 「다 쳤어요 ✋」 (순수) → { ok, counted, notes(모든 칸), why? }
- * 오늘 LISTEN_DAY칸 안이면 음표 한 칸 · 아니면 기록만(why 'cap')
+ * 🎧 「다 쳤어요 ✋」 (순수) → { ok, counted, notes(모든 칸), mons(받은 수), got:[온 음악 포켓몬 id], why? }
+ * 오늘 LISTEN_DAY칸 안이면 음표 한 칸 · 아니면 기록만(why 'cap') · 다섯 칸 묶음이 차면 음악 포켓몬이 온다(pool · rng — v404)
  */
-export function listenRule(p, req, now) {
+export function listenRule(p, req, now, pool = [], rng = Math.random) {
   if (!reqOk(req)) return { ok: false, why: 'bad' };
   const tr = pianoOf(p.piano);
   const today = dayKeyOf(now);
@@ -586,8 +642,20 @@ export function listenRule(p, req, now) {
     tr.notes += 1;
   }
   pushLog(tr, { at: now, m: 'l', s: req.song, n: req.line, h: req.hand, lv: req.lv, sp: req.sp, ok: 0, bad: 0, c: 0, x: counted ? 1 : 0 });
+  const { got, firsts } = giveMons(p, tr, pool, rng, now);
   p.piano = tr;
-  return { ok: true, counted, notes: tr.notes, ...(counted ? {} : { why: 'cap' }) };
+  return { ok: true, counted, notes: tr.notes, mons: tr.mons, got, firsts, ...(counted ? {} : { why: 'cap' }) };
+}
+
+/**
+ * 🎹 밀린 음악 포켓몬 (순수 · v404) — 음악 화면에 들어올 때: v402·v403 때 찬 다섯 칸 몫 · 저장이 실패해 못 받은 몫 → { ok, got, mons, notes }
+ * 칸을 세지 않고 몫만 준다 · 날짜와 상관없다(시계가 뒤로 가도 이미 찬 칸의 몫은 그대로)
+ */
+export function monsDueRule(p, now, pool = [], rng = Math.random) {
+  const tr = pianoOf(p.piano);
+  const { got, firsts } = giveMons(p, tr, pool, rng, now);
+  if (got.length) p.piano = tr;
+  return { ok: true, got, firsts, mons: tr.mons, notes: tr.notes };
 }
 
 // ───────────────────── 📤 ─────────────────────
@@ -595,10 +663,11 @@ export function listenRule(p, req, now) {
 /** 📤 usage 하루 한 줄 (순수) — 하루 칸(PIANO_DAILY)으로 · 한 것이 없으면 '' */
 export function pianoDayLine(d) {
   const g = (k) => nz(d && d[k]);
-  if (!g('pnTapN') && !g('pnListenN')) return '';
+  if (!g('pnTapN') && !g('pnListenN') && !g('pnMons')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3)
   const parts = [];
   if (g('pnTapN')) parts.push(`🎹 태블릿 치기 끝까지 ${g('pnTapN')}판(잘 친 판 ${g('pnTapOk')} · 💰${g('pnCoins')})`);
   if (g('pnListenN')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')})`);
+  if (g('pnMons')) parts.push(`🐾 음악 포켓몬 ${g('pnMons')}마리 옴`);
   return parts.join(' · ');
 }
 
@@ -606,8 +675,9 @@ export function pianoDayLine(d) {
  * 📤 usage/music.md (순수) — 모든 음표 칸 · 최근 연습 기록 (새것부터)
  * @param {object} raw profile.piano · @param {string} today · @param {(id:string)=>string} nameOf 곡 id → 이름
  * @param {{at:number, ok:boolean, name?:string, note?:string, why?:string}|null} [midi] ⚙ 집 피아노 연결 확인 결과(이 기기)
+ * @param {(id:number)=>string} [monName] 포켓몬 번호 → 이름 (🎹 음악 포켓몬이 온 줄 · v404)
  */
-export function pianoMd(raw, today, nameOf = (s) => s, midi = null) {
+export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (id) => `#${id}`) {
   const tr = pianoOf(raw);
   if (!tr.log.length && !tr.notes && !midi) return '';
   const midiLine = midi ? `🎹 집 피아노 연결 확인 (${dayKeyOf(midi.at)}): ${midi.ok ? `잡힘 — ${String(midi.name || '이름 없음').slice(0, 60)}${midi.note ? ` · 마지막에 누른 건반 ${String(midi.note).slice(0, 12)}` : ' · 건반 신호는 아직 못 받음'}` : `안 됨 — ${String(midi.why || '').slice(0, 80)}`}` : '';
@@ -616,10 +686,11 @@ export function pianoMd(raw, today, nameOf = (s) => s, midi = null) {
   const hm = (t) => { const d = new Date(t); return `${dayKeyOf(t).slice(5)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const lines = [`🎹 음악 연습 기록 (${today}) — v402부터`, '', '## 읽는 법',
     '- 🎹 태블릿 치기 = 화면 건반으로 끝까지 친 판 · 맞게/틀리게 누른 수(맞는 건반을 기다리는 동안 다른 건반) · 맞게 누른 비율 70% 넘고 하루 세 번 안이면 💰(한 줄 5 · 곡 전체 15)',
-    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「다 쳤어요 ✋」를 누른 것 — 진짜로 쳤는지는 앱이 모른다(누른 때와 ⏳ 음악 시간으로 보기) · 하루 세 칸까지 음표 칸 · 다섯 칸마다 음악 포켓몬(v403)',
+    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「다 쳤어요 ✋」를 누른 것 — 진짜로 쳤는지는 앱이 모른다(누른 때와 ⏳ 음악 시간으로 보기) · 하루 세 칸까지 음표 칸 · 다섯 칸마다 🐾 음악 포켓몬 한 마리가 옴(v404)',
     '- 줄 = 책의 한 줄(그 곡 원고의 lines) · 도움 1 막대·계이름·건반 빛 → 2 막대 없이 → 3 계이름도 없이 → 4 악보만 · 빠르기 = 원래 빠르기의 %',
-    '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets})`, '', '## 최근 연습 (새것부터)'];
+    '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets} · 온 음악 포켓몬 ${tr.mons}${sl.sets > tr.mons ? ` · 아직 안 온 몫 ${sl.sets - tr.mons} — 음악 화면에 들어오면 옴` : ''})`, '', '## 최근 연습 (새것부터)'];
   for (const r of [...tr.log].reverse()) {
+    if (r.m === 'p') { lines.push(`- ${hm(r.at)} 🐾 음악 포켓몬이 옴 — ${monName(Number(r.s))}`); continue; }
     const where = `${nameOf(r.s)} ${r.n < 0 ? '곡 전체' : `${r.n + 1}째 줄`}`;
     const head = `${hm(r.at)} ${r.m === 't' ? '🎹 치기' : '🎧 따라 치기'} · ${where} · ${HAND[r.h]} · 도움 ${r.lv} · ${Math.round(r.sp * 100)}%`;
     if (r.m === 't') {
