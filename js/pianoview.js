@@ -6,6 +6,10 @@
 // 아이 화면엔 셈·남은 수를 쓰지 않는다 — 음표 칸은 ♪ 다섯 개가 차오르는 그림으로만
 // 🐾 음악 포켓몬 안내 (v405, 11-09 아버님 「가」) — 처음 들어올 때 한 번 + ♪ 칸을 누르면 다시: 🎧에서 진짜 피아노로 끝까지 친 뒤 · 화면 건반은 💰
 //   앱은 아직 피아노 소리를 못 듣는다(연결 전) — 「✋ 피아노로 다 쳤어요」는 진우의 약속 · 아버님은 📤로 보신다
+// 🪶 태블릿 부담 줄이기 (v407, 11-09 아버님 — 음악을 태블릿으로 칠 때 앱이 닫히고 태블릿 첫 화면이 나온다)
+//   멈춰 있고 움직이는 그림이 없으면 1초에 네 번만 그린다(전엔 늘 1초에 60번 처음부터) · 별은 세 번에 칠하고 배경 물감은 한 번 만든다 ·
+//   곡을 바꾸거나 음악을 떠나면 옛 그림판의 픽셀을 바로 비운다 · 떠나거나 내리면 소리 장치를 재운다 · 🛑 블랙박스에 「지금 무엇을 하나」(setScene)
+import { setScene } from './blackbox.js';
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
 import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, rarityOf, RARITY } from './xp.js';
@@ -29,7 +33,7 @@ const S = {
   running: false, t: -LEAD, last: 0, lastAct: 0, steps: [], si: 0, waiting: false, ok: 0, bad: 0,
   passDone: false, saving: false, retry: null,
   sounding: new Map(), flash: new Map(), held: new Map(), ptr: new Map(), auto: new Set(), win: { lo: 30, hi: 50 },
-  raf: 0, ro: null,
+  raf: 0, ro: null, drawn: 0, busy: false,
 };
 
 // ───────────────────── 고른 것 기억 (이 기기) ─────────────────────
@@ -110,6 +114,20 @@ function hushAuto() {
   for (const v of S.auto) noteOff(v);
   S.auto.clear();
 }
+/** 음악을 떠났거나 앱을 내렸으면 소리 장치를 재운다 — 깨어 있는 소리 장치는 소리가 없어도 태블릿 소리 길을 계속 연다 (v407) ·
+ *  끄던 음이 다 사그라진 뒤에 · 다시 누르면 audio()가 깨운다 */
+function sleepAudio() {
+  setTimeout(() => {
+    if (!AC || AC.state !== 'running' || typeof AC.suspend !== 'function' || (S.active && !document.hidden)) return;
+    const a = AC;
+    let p;
+    try { p = Promise.resolve(a.suspend()); } catch { return; }
+    // 재우기는 늦게 끝날 수 있다 — 그사이 돌아와 건반을 누르면 audio()는 아직 깨어 있는 줄 알고 깨우지 않는다 → 끝났을 때 돌아와 있으면 다시 깨운다 (Codex 212차 P2)
+    p.catch(() => {}).then(() => {
+      if (AC === a && a.state === 'suspended' && S.active && !document.hidden) a.resume().catch(() => {});
+    });
+  }, 700);
+}
 function click(strong) {
   const a = audio();
   if (!a) return;
@@ -163,6 +181,7 @@ function toStart() {
   S.si = 0; S.waiting = false; S.ok = 0; S.bad = 0;
   S.sounding.clear(); S.flash.clear();
   for (const h of S.perf.heads) delete h.okAt;
+  S.drawn = 0; // 처음으로 — 멈춰 있어도 다음 화면에 바로 그린다 (v407 · Codex 212차)
 }
 
 function advance(db) {
@@ -322,10 +341,21 @@ function restart() {
 
 // ───────────────────── 그리기 ─────────────────────
 
-const G = { W: 800, H: 480, dpr: 1 };
+const G = { W: 800, H: 480, dpr: 1, bg: null };
 let cv = null;
 let ctx = null;
-const STARS = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.3 + 0.3, a: Math.random() * 0.6 + 0.25 }));
+/** 별은 밝기 세 무리로 — 무리마다 한 번에 칠한다 (v407 · 전엔 별마다 한 번씩 90번) */
+const STAR_A = [0.35, 0.55, 0.75];
+const STARS = Array.from({ length: 90 }, (_, i) => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.3 + 0.3, g: i % STAR_A.length }));
+
+/** 옛 그림판을 버린다 — 떼어 낸 캔버스도 쓰레기 줍기 전까지 큰 픽셀 판(최대 약 2560×1520)을 쥐고 있어 크기를 0으로 바로 비운다 (v407) */
+function dropCanvas() {
+  if (S.ro) { S.ro.disconnect(); S.ro = null; }
+  if (cv) { try { cv.width = 0; cv.height = 0; } catch { /* 이미 */ } }
+  cv = null;
+  ctx = null;
+  G.bg = null;
+}
 
 function computeWindow() {
   const notes = S.mode === 'tap' ? S.perf.notes.filter((s) => focusHand(s.hand)) : S.perf.notes;
@@ -344,6 +374,8 @@ function layout() {
   cv.width = Math.round(G.W * G.dpr);
   cv.height = Math.round(G.H * G.dpr);
   cv.style.height = `${G.H}px`;
+  G.bg = null;   // 높이가 바뀌었을 수 있다 — 배경 물감을 다시
+  S.drawn = 0;   // 크기를 다시 잡으면 그림판이 비워진다 — 멈춰 있어도 다음 화면에 바로 그린다 (v407)
   cv.style.touchAction = S.mode === 'tap' ? 'none' : 'manipulation';
   G.keysH = Math.round(G.H * (S.mode === 'tap' ? 0.26 : 0.22));
   G.keysTop = G.H - G.keysH;
@@ -779,12 +811,26 @@ function drawKeys(now) {
 function draw(now) {
   if (!ctx || !S.perf) return;
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
-  const bg = ctx.createLinearGradient(0, 0, 0, G.H);
-  bg.addColorStop(0, '#0a0f24');
-  bg.addColorStop(1, '#151b3a');
-  ctx.fillStyle = bg;
+  if (!G.bg) {
+    G.bg = ctx.createLinearGradient(0, 0, 0, G.H);
+    G.bg.addColorStop(0, '#0a0f24');
+    G.bg.addColorStop(1, '#151b3a');
+  }
+  ctx.fillStyle = G.bg;
   ctx.fillRect(0, 0, G.W, G.H);
-  for (const st of STARS) { ctx.globalAlpha = st.a; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(st.x * G.W, st.y * G.H, st.r, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = '#ffffff';
+  for (let k = 0; k < STAR_A.length; k += 1) {
+    ctx.globalAlpha = STAR_A[k];
+    ctx.beginPath();
+    for (const st of STARS) {
+      if (st.g !== k) continue;
+      const x = st.x * G.W;
+      const y = st.y * G.H;
+      ctx.moveTo(x + st.r, y);
+      ctx.arc(x, y, st.r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
   ctx.globalAlpha = 1;
   drawSheet(now);
   if (S.lv === 1) drawBars();
@@ -812,6 +858,15 @@ function draw(now) {
   }
 }
 
+/** 멈춰 있고 움직이는 그림이 없으면 이만큼에 한 번만 그린다 (v407 — 전엔 멈춰 있어도 1초에 60번 처음부터) */
+export const IDLE_MS = 250;
+/** 지금 움직이는 그림이 있나 — 연주 중 · 누르고 있는 건반 · 아직 사그라지는 건반 빛 · 맞힌 음표의 반짝임 */
+function moving(now) {
+  if (S.running || S.held.size) return true;
+  for (const f of S.flash.values()) if (f.until > now) return true;
+  for (const s of S.sounding.values()) if (s.until > now) return true;
+  return !!S.perf && S.perf.heads.some((h) => h.okAt && now - h.okAt < 600);
+}
 function frame(now) {
   S.raf = 0;
   if (!S.active || S.screen !== 'stage') return;
@@ -821,7 +876,10 @@ function frame(now) {
     if (now - S.lastAct > 5000) { S.lastAct = now; noteActivity(); }
   }
   S.last = now;
-  draw(now);
+  // 움직임이 막 끝난 화면도 한 번 더 그린다 — 사그라진 빛이 다음 그리기까지 남지 않게
+  const mv = moving(now);
+  if (mv || S.busy || now - S.drawn >= IDLE_MS) { S.drawn = now; draw(now); }
+  S.busy = mv;
   S.raf = requestAnimationFrame(frame);
 }
 function startLoop() {
@@ -1023,6 +1081,7 @@ function main() {
 /** 곡 고르기 — 하던 판은 버린다 */
 function renderList() {
   stopPlay();
+  dropCanvas();
   S.gen += 1;
   S.screen = 'list';
   const m = main();
@@ -1074,6 +1133,7 @@ function rebuild() {
 /** 무대 짓기 — keep이면 하던 판(t·걸음·맞힌 수·「다 쳤어요」·다시 받기)을 그대로 두고 화면만 (🎒·📊 갔다 올 때 · Codex 204차 P2-3) */
 function renderStage(keep = false) {
   stopPlay();
+  dropCanvas();
   S.screen = 'stage';
   const m = main();
   if (!m) return;
@@ -1150,7 +1210,6 @@ function renderStage(keep = false) {
   // 캔버스는 글꼴을 스스로 불러오지 않는다 — 음악 글꼴(자리표·쉼표)을 먼저 부른다 (태블릿엔 대신 쓸 기기 글꼴이 없을 수 있음)
   try { if (document.fonts && document.fonts.load) document.fonts.load('40px "NotoMusicSub"', '\u{1D11E}\u{1D122}\u{1D13D}♯').catch(() => {}); } catch { /* 글꼴 없이도 */ }
   wireCanvas();
-  if (S.ro) S.ro.disconnect();
   // 너비가 바뀔 때만 다시 — layout이 캔버스 높이를 바꾸면 무대가 또 바뀌어 「ResizeObserver loop」 경고가 난다 (높이는 창 높이와 무대 위치로 정하고, 창 크기가 바뀌면 resize가 다시 배치한다)
   if (typeof ResizeObserver === 'function') { S.ro = new ResizeObserver(() => { if (Math.max(300, Math.round(stage.clientWidth)) !== G.W) layout(); }); S.ro.observe(stage); }
   if (keep && S.perf) {
@@ -1271,9 +1330,22 @@ export function initMusic({ showView } = {}) {
   if (back) back.addEventListener('click', () => { if (S.screen === 'stage') renderList(); else if (S.showView) S.showView('home'); });
   window.addEventListener('keydown', (e) => pcKey(e, true));
   window.addEventListener('keyup', (e) => pcKey(e, false));
-  document.addEventListener('visibilitychange', () => { if (document.hidden && S.running) setRun(false); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    // 누른 건반·손가락까지 정리 — 누른 채 내리면 뗀 소식이 안 올 수 있다(남은 「누르고 있음」이 그리기를 쉬지 못하게 하고 같은 건반을 막는다 · Codex 212차 P3)
+    stopPlay();
+    sleepAudio(); // v407
+  });
   window.addEventListener('resize', () => { if (S.active && S.screen === 'stage') layout(); });
   initMidiCheck();
+  setScene('music', musicScene); // 🛑 v407
+}
+
+/** 🛑 블랙박스 한 줄 — 곡·치기/듣기·연주 중·그림판 크기 (꺼졌을 때 음악 어디였나) */
+function musicScene() {
+  if (S.screen !== 'stage' || !S.song) return '곡 고르기';
+  const how = S.mode === 'tap' ? '🎹 치기' : '🎧 따라 치기';
+  return `「${S.song.ko}」 ${how} · ${S.running ? '연주 중' : '멈춤'}${cv ? ` · 그림판 ${cv.width}×${cv.height}` : ''}`;
 }
 
 /** 음악 화면에 들어올 때 — 무대에 있었으면 멈춘 채 그대로 · 아니면 곡 목록 · 진우 책 곡을 받아 온다(10분에 한 번까지) */
@@ -1295,6 +1367,8 @@ export function leaveMusic() {
   S.active = false;
   stopPlay();
   if (S.raf) { cancelAnimationFrame(S.raf); S.raf = 0; }
+  dropCanvas(); // 돌아오면 renderStage가 새로 짓는다 (v407)
+  sleepAudio();
 }
 
 /** 걷기용 */

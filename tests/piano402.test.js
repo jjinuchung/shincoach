@@ -179,8 +179,8 @@ test('잘 쳤나 — 맞게 누른 비율 70% 이상 · 하나도 안 눌렀으�
   assert.equal(nextHint(4), '악보만 보고 끝까지 쳤어요!');
 });
 
-test('🎹 태블릿 치기 💰 — 한 줄 5 · 곡 전체 15 · 번 💰도 함께 · 하루 세 번 · 못 쳐도 잃는 것 없음', () => {
-  assert.deepEqual([COIN.line, COIN.all, TAP_DAY], [5, 15, 3]);
+test('🎹 태블릿 치기 💰 — 한 줄 5 · 곡 전체 15 · 번 💰도 함께 · 하루 다섯 번(v407 · 전엔 세 번) · 못 쳐도 잃는 것 없음', () => {
+  assert.deepEqual([COIN.line, COIN.all, TAP_DAY], [5, 15, 5]);
   const p = { coins: 10, coinsEarned: 100 };
   const a = tapRule(p, { ...REQ, ok: 9, bad: 1 }, NOW);
   assert.deepEqual([a.ok, a.coins, a.good], [true, 5, true]);
@@ -190,11 +190,11 @@ test('🎹 태블릿 치기 💰 — 한 줄 5 · 곡 전체 15 · 번 💰도 �
   const t = tapRule(p, { ...REQ, ok: 1, bad: 9 }, NOW);
   assert.deepEqual([t.ok, t.coins, t.why], [true, 0, 'try']);
   assert.equal(p.coins, 30, '못 쳐도 그대로');
-  assert.equal(tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW).coins, 5);
+  for (let i = 2; i < TAP_DAY; i += 1) assert.equal(tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW).coins, 5, `${i + 1}번째`);
   const c = tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW);
-  assert.deepEqual([c.coins, c.why], [0, 'cap'], '네 번째는 기록만');
-  assert.deepEqual(todayOf(p, NOW), { paid: 3, coins: 25, notes: 0 });
-  assert.equal(pianoOf(p.piano).log.length, 5, '판마다 기록');
+  assert.deepEqual([c.coins, c.why], [0, 'cap'], `${TAP_DAY + 1}번째는 기록만`);
+  assert.deepEqual(todayOf(p, NOW), { paid: TAP_DAY, coins: 20 + 5 * (TAP_DAY - 2), notes: 0 });
+  assert.equal(pianoOf(p.piano).log.length, TAP_DAY + 2, '판마다 기록');
   // 다음 날은 다시
   assert.equal(tapRule(p, { ...REQ, ok: 5, bad: 0 }, NOW + 86400000).coins, 5);
 });
@@ -242,7 +242,7 @@ test('저장값 고쳐 읽기 — 깨진 칸 빼기 · 한도 넘는 칸 깎기 
   const p = pianoOf({ days, notes: 2, log });
   assert.equal(Object.keys(p.days).length, KEEP_DAYS);
   assert.ok(!('nope' in p.days) && !('2026-11-01' in p.days));
-  assert.deepEqual(p.days['2026-10-20'], { paid: TAP_DAY, coins: 5, notes: LISTEN_DAY });
+  assert.deepEqual(p.days['2026-10-20'], { paid: 9, coins: 5, notes: LISTEN_DAY }, '💰 받은 횟수는 한도로 자르지 않는다 (v407 · Codex 212차 P2) · 음표 칸은 그날 상한으로');
   assert.equal(p.notes, KEEP_DAYS * LISTEN_DAY, '모든 칸은 남은 날 칸 합보다 작지 않다');
   assert.equal(p.log.length, LOG_MAX);
   assert.equal(p.log[0].at, 1010, '오래된 기록부터 빠짐');
@@ -385,7 +385,7 @@ test('🔌 잇기 — 홈 카드 · 화면 · 시계 · ⚙ · 칩 · 저장·�
 
 before(async () => { console.warn = () => {}; await initProfile(); });
 
-test('저장 — 💰·음표 칸이 한 트랜잭션으로 · 저장 실패면 그대로 · 하루 세 번', async () => {
+test('저장 — 💰·음표 칸이 한 트랜잭션으로 · 저장 실패면 그대로 · 하루 TAP_DAY번', async () => {
   await flushProfile();
   const c0 = getProfileSnapshot().coins;
   fakeIdb.failNext('profile');
@@ -393,10 +393,10 @@ test('저장 — 💰·음표 칸이 한 트랜잭션으로 · 저장 실패면 
   assert.deepEqual([bad.ok, bad.why], [false, 'save']);
   assert.equal(getProfileSnapshot().coins, c0);
   const r = [];
-  for (let i = 0; i < 4; i += 1) r.push(await pianoTap({ ...REQ, ok: 9, bad: 1 }));
-  assert.deepEqual(r.map((x) => x.coins), [5, 5, 5, 0]);
-  assert.equal(getProfileSnapshot().coins, c0 + 15);
-  assert.equal(fakeIdb.get('profile', 'me').coins, c0 + 15);
+  for (let i = 0; i < TAP_DAY + 1; i += 1) r.push(await pianoTap({ ...REQ, ok: 9, bad: 1 }));
+  assert.deepEqual(r.map((x) => x.coins), [...Array(TAP_DAY).fill(5), 0]);
+  assert.equal(getProfileSnapshot().coins, c0 + 5 * TAP_DAY);
+  assert.equal(fakeIdb.get('profile', 'me').coins, c0 + 5 * TAP_DAY);
   const l = await pianoListen({ ...REQ, hand: 'B' });
   assert.deepEqual([l.ok, l.counted, l.notes], [true, true, 1]);
   assert.equal(pianoNow().notes, 1);

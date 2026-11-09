@@ -118,13 +118,13 @@ test('🎯 한 번에 찾으면 칭찬 (qFeedback): 잘못 누른 줄이 없을 
   assert.ok(!/\d/.test('🎯 한 번에 찾았어요! '));
 });
 
-test('📤 국어 요약 머리말 — v406 바뀐 점이 정한 값으로 · css · sw v406', () => {
+test('📤 국어 요약 머리말 — v406 바뀐 점이 정한 값으로 · css · sw v406 이상', () => {
   const L = readLines([], [], '2026-11-09');
   assert.ok(L[1].includes(`v406부터는 근거 찾기가 시작된 지 ${EV_PAIR_SEC}초가 지난 뒤에만 · 잘못 누르면 ${EV_WAIT_MS / 1000}초 동안 줄을 못 누름 · 한 번에 찾으면 🎯 칭찬 말 — 잘못 누른 줄·찾기까지를 v406 전후로 견주기`));
   assert.match(read('js/korreport.js'), /v406부터는 근거 찾기가 시작된 지 \$\{EV_PAIR_SEC\}초가 지난 뒤에만 · 잘못 누르면 \$\{EV_WAIT_MS \/ 1000\}초/, '값을 글로 박지 않는다');
   const css = read('css/style.css');
   for (const s of ['.kor-ev-rows.is-wait .kor-ev-row {', '.kor-q-text.is-reread {', '.kor-ev-wait {', '.kor-ev-wait i {', '@keyframes korWait {']) assert.ok(css.includes(s), s);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.kor-q-text\.is-reread \{ animation: none; \} \}/);
-  assert.match(read('sw.js'), /CACHE_VERSION = 'v406'/);
-  assert.match(read('js/version.js'), /APP_VERSION = 'v406'/);
+  assert.ok(Number((/CACHE_VERSION = 'v(\d+)'/.exec(read('sw.js')) || [])[1]) >= 406, 'sw v406 이상');
+  assert.ok(Number((/APP_VERSION = 'v(\d+)'/.exec(read('js/version.js')) || [])[1]) >= 406, '앱 판 v406 이상');
 });

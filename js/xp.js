@@ -1068,7 +1068,7 @@ export function tourEnd(req) {
 export function tourBook(req) {
   return houseDo((p) => tourBookRule(p, req, Date.now()));
 }
-/** 🎹 태블릿으로 치기 한 판 끝 (v402) — 💰는 저장된 프로필로 한 트랜잭션에서(두 창이어도 하루 세 번) · 날은 트랜잭션 안의 시각으로 */
+/** 🎹 태블릿으로 치기 한 판 끝 (v402) — 💰는 저장된 프로필로 한 트랜잭션에서(두 창이어도 하루 TAP_DAY번) · 날은 트랜잭션 안의 시각으로 */
 export function pianoTap(req) {
   return houseDo((p) => pianoTapRule(p, req, Date.now()));
 }

@@ -24,8 +24,10 @@
 export const PASS_OK = 0.7;
 /** 💰 한 줄 · 곡 전체 */
 export const COIN = { line: 5, all: 15 };
-/** 💰를 받는 하루 횟수 */
-export const TAP_DAY = 3;
+/** 💰를 받는 하루 횟수 — 곡 상관없이 (v407 아버님 11-09 「5번까지 줘도 될 거 같은데」 · v406까지 3) */
+export const TAP_DAY = 5;
+/** 그날 💰 받은 횟수를 읽을 때의 상한 — 한도(TAP_DAY)로 자르지 않는다: 한도를 바꾼 뒤 옛 판 창이 횟수를 깎아 저장하면 한도가 다시 열린다 (Codex 212차 P2) */
+const PAID_KEEP = 99;
 /** 🎧 「다 쳤어요」 음표 칸 — 하루 셈 */
 export const LISTEN_DAY = 3;
 /** 음표 칸 다섯마다 음악 포켓몬 (v404) */
@@ -492,7 +494,7 @@ export function pianoOf(raw) {
   const src = isObj(raw) ? raw : {};
   const ds = isObj(src.days) ? src.days : {};
   const kept = Object.entries(ds).filter(([k, e]) => DAY_RE.test(k) && isObj(e))
-    .map(([k, e]) => [k, { paid: Math.min(TAP_DAY, nz(e.paid)), coins: nz(e.coins), notes: Math.min(LISTEN_DAY, nz(e.notes)) }])
+    .map(([k, e]) => [k, { paid: Math.min(PAID_KEEP, nz(e.paid)), coins: nz(e.coins), notes: Math.min(LISTEN_DAY, nz(e.notes)) }])
     .filter(([, e]) => e.paid || e.coins || e.notes)
     .sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, KEEP_DAYS);
   const days = Object.fromEntries(kept);
@@ -686,7 +688,7 @@ export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (i
   const HAND = { R: '오른손', L: '왼손', B: '양손' };
   const hm = (t) => { const d = new Date(t); return `${dayKeyOf(t).slice(5)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const lines = [`🎹 음악 연습 기록 (${today}) — v402부터`, '', '## 읽는 법',
-    '- 🎹 태블릿 치기 = 화면 건반으로 끝까지 친 판 · 맞게/틀리게 누른 수(맞는 건반을 기다리는 동안 다른 건반) · 맞게 누른 비율 70% 넘고 하루 세 번 안이면 💰(한 줄 5 · 곡 전체 15)',
+    `- 🎹 태블릿 치기 = 화면 건반으로 끝까지 친 판 · 맞게/틀리게 누른 수(맞는 건반을 기다리는 동안 다른 건반) · 맞게 누른 비율 70% 넘고 하루 ${TAP_DAY}번 안이면(곡 상관없이 · v406까지 3번) 💰(한 줄 5 · 곡 전체 15)`,
     '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「✋ 피아노로 다 쳤어요」(v404까지 「다 쳤어요 ✋」)를 누른 것 — 진짜로 쳤는지는 앱이 모른다(피아노 연결 전)(누른 때와 ⏳ 음악 시간으로 보기) · 하루 세 칸까지 음표 칸 · 다섯 칸마다 🐾 음악 포켓몬 한 마리가 옴(v404)',
     '- 줄 = 책의 한 줄(그 곡 원고의 lines) · 도움 1 막대·계이름·건반 빛 → 2 막대 없이 → 3 계이름도 없이 → 4 악보만 · 빠르기 = 원래 빠르기의 %',
     '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets} · 온 음악 포켓몬 ${tr.mons}${sl.sets > tr.mons ? ` · 아직 안 온 몫 ${sl.sets - tr.mons} — 음악 화면에 들어오면 옴` : ''})`, '', '## 최근 연습 (새것부터)'];

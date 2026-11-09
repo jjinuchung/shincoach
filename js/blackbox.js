@@ -7,7 +7,7 @@
 //   · 내려 둔 사이 닫힘(bg) — 홈 버튼으로 내린 뒤 끝남 (최근 앱에서 밀어 닫음·안드로이드가 정리 — 참고만)
 //   · 🗑 다시 열린 창이 document.wasDiscarded — Chrome이 메모리를 비우려고 내려 둔 창을 버렸다가 다시 연 것
 // 무엇을 적나: 화면·겹친 창 · 영상 제목·재생 자리 · 따라 말하기 중인지 · 이 창에서 마이크를 켠 수 · 연 지 몇 분 ·
-//   JS 메모리(Chrome만) · 화면 요소 수 · 마지막 오류 · 앱 판
+//   JS 메모리(Chrome만) · 화면 요소 수 · 마지막 오류 · 앱 판 · (v407) 화면이 걸어 둔 「지금 무엇을 하나」(setScene — 🎹 음악) · 기기 RAM(Chrome 어림)
 // ★ 아이 화면에는 아무것도 안 보인다 — 📤 usage/crash-log.md로 아버님·Claude만 본다 (아이 화면에 셈 문구 금지, 2026-10-15)
 // ★ 이 파일 위쪽(규칙)은 아무것도 import하지 않는다 — 테스트가 DOM 없이 부른다. 아래쪽(박동)만 브라우저를 쓴다
 
@@ -21,13 +21,13 @@ const CRASH_MAX = 40;
 export const BEAT_PREFIX = 'shincoach.bb.';
 export const LOG_KEY = 'shincoach.crashLog';
 
-/** 화면 id(view-…) → 이름 */
-const VIEW_KO = { home: '🏠 홈', library: '🎬 영어 목록', player: '🎤 영어', math: '🔢 수학', korean: '📚 국어', pokedex: '🎒 도감', stats: '📊 기록' };
+/** 화면 id(view-…) → 이름 · 🎹 음악은 v407 (11-09 아버님 「음악을 태블릿으로 연주할 때 앱이 닫히고 태블릿 첫 화면이 나온다」) */
+const VIEW_KO = { home: '🏠 홈', library: '🎬 영어 목록', player: '🎤 영어', math: '🔢 수학', korean: '📚 국어', pokedex: '🎒 도감', stats: '📊 기록', music: '🎹 음악' };
 /** 겹친 창 id → 이름 (앞에 뜨는 것부터) */
 export const OVERLAY_KO = [
   ['timeup', '⏳ 잠금'], ['battle', '⚔️ 배틀'], ['rocket', '🚀 로켓단'], ['catch', '🎯 잡기'], ['evolve', '✨ 진화'], ['hatch', '🥚 부화'],
   ['review', '🔁 복습'], ['puzzle', '🧩 퍼즐'], ['essay', '✍️ 에세이'], ['match', '🔤 단어 잇기'], ['house', '🏡 집'], ['shop', '🛒 상점'], ['market', '🛒 시장'],
-  ['shadow-overlay', '🗣 따라 말하기'],
+  ['shadow-overlay', '🗣 따라 말하기'], ['pn-arrive', '🐾 음악 포켓몬 옴'], ['pn-intro', '🐾 음악 안내'],
 ];
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -76,6 +76,8 @@ export function crashOf(beat, o = {}) {
     nodes: Math.max(0, Math.floor(num(beat.nodes))),
     err: str(beat.err, 120),
     ver: str(beat.ver, 12),
+    scene: str(beat.scene, 80), // 그 화면이 알려 준 「지금 무엇을 하나」 (v407 · 🎹 음악 — 곡·치기/듣기·연주 중·그림판 크기)
+    dm: Math.max(0, num(beat.dm)), // 기기 RAM GB (Chrome 어림 navigator.deviceMemory · v407)
   };
   if (o.discarded && !beat.vis) ev.discarded = 1;
   return ev;
@@ -105,11 +107,13 @@ export function crashLine(c) {
   const view = str(c.view, 20);
   parts.push([VIEW_KO[view] || view || '화면 모름', ...over.map((id) => (OVERLAY_KO.find(([k]) => k === id) || [id, id])[1])].join(' · '));
   if (view === 'player' && str(c.title, 80)) parts.push(`「${str(c.title, 80)}」 ${clock(c.vt)}${c.play ? ' 재생 중' : ' 멈춤'}`);
+  if (str(c.scene, 80)) parts.push(str(c.scene, 80));
   if (c.speak) parts.push('🎤 마이크 듣는 중');
   if (num(c.mic) > 0) parts.push(`마이크 ${Math.floor(num(c.mic))}번째`);
   parts.push(`연 지 ${Math.max(0, Math.floor(num(c.up)))}분`);
   if (num(c.heap) > 0) parts.push(`메모리 ${Math.round(num(c.heap))}${num(c.heapMax) > 0 ? `/${Math.round(num(c.heapMax))}` : ''} MB`);
   if (num(c.nodes) > 0) parts.push(`요소 ${Math.floor(num(c.nodes)).toLocaleString('en-US')}`);
+  if (num(c.dm) > 0) parts.push(`기기 RAM 약 ${num(c.dm)} GB`);
   if (str(c.err, 120)) parts.push(`마지막 오류 "${str(c.err, 120)}"`);
   if (str(c.ver, 12)) parts.push(str(c.ver, 12));
   return `- ${parts.join(' · ')}`;
@@ -140,10 +144,26 @@ export function crashLogText(log, today) {
 
 const bb = { sid: '', t0: 0, timer: null, mic: 0, speak: 0, err: '', ver: '', started: false, errAt: 0, closed: false };
 
+/** 화면 id → 「지금 무엇을 하나」 한 줄을 돌려주는 함수 (v407 · 🎹 음악이 건다 — 박동 때마다 부른다) */
+const scenes = new Map();
+export function setScene(view, fn) {
+  if (typeof view === 'string' && typeof fn === 'function') scenes.set(view, fn);
+}
+/** 그 화면의 한 줄 — 건 것이 없거나 던지면 '' */
+export function sceneOf(view) {
+  const fn = scenes.get(view);
+  if (!fn) return '';
+  try { return str(String(fn() || ''), 80); } catch { return ''; }
+}
+
 function readJson(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
 }
-const shown = (id) => { const e = document.getElementById(id); return !!(e && !e.hidden); };
+/** 그 창이 보이나 — 숨은 화면 안에 남은 창(🐾 안내를 띄운 채 다른 화면으로 감)은 안 보이는 것 (Codex 212차 P3) */
+const shown = (id) => {
+  const e = document.getElementById(id);
+  return !!(e && !e.hidden && !(typeof e.closest === 'function' && e.closest('[hidden]')));
+};
 
 /** 지금 자리 (박동 한 번) */
 function snapshot() {
@@ -155,6 +175,10 @@ function snapshot() {
     beat.title = t ? String(t.textContent || '').slice(0, 80) : '';
     if (v) { beat.vt = Math.floor(Number(v.currentTime) || 0); beat.play = v.paused ? 0 : 1; }
   }
+  const scene = sceneOf(view);
+  if (scene) beat.scene = scene;
+  const dm = typeof navigator !== 'undefined' && Number(navigator.deviceMemory);
+  if (dm > 0) beat.dm = dm;
   const m = typeof performance !== 'undefined' && performance.memory;
   if (m && m.usedJSHeapSize) { beat.heap = m.usedJSHeapSize / 1048576; beat.heapMax = m.jsHeapSizeLimit / 1048576; }
   try { beat.nodes = document.getElementsByTagName('*').length; } catch { /* 못 세도 */ }

@@ -274,7 +274,7 @@ test('🔁 다시 받기 — 💰만 다시 · 끝낸 판의 하루 칸은 한 �
   await waitFor(() => getProfileSnapshot().coins > c0, '다시 받은 💰');
   await settle(60);
   const d1 = await getDaily(day);
-  assert.equal(getProfileSnapshot().coins - c0, 5, '한 줄 💰5 (오늘 둘째 판 — 하루 세 번 안)');
+  assert.equal(getProfileSnapshot().coins - c0, 5, '한 줄 💰5 (오늘 둘째 판 — 하루 다섯 번 안)');
   assert.deepEqual([d1.pnTapN - n0, d1.pnTapOk - ok0], [1, 1], '한 판은 한 판');
   assert.equal(byId('pn-retry').hidden, true);
 });
