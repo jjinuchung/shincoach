@@ -394,7 +394,7 @@ test('🔗 잇기 — 고친 글은 textContent로만(HTML로 넣지 않음) · 
   assert.ok(/\.essay-chg \{[^}]*background: #fde68a;[^}]*text-decoration: underline;/.test(css), '색을 못 가려도 보이게 밑줄');
   assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1]) >= 318);
   const pl = read('js/player.js');
-  assert.ok(pl.includes("if (!it.said) return;\n      awardXp(ESSAY_REWARD.xp);"), '아빠 교정 ⚡💰는 🎤를 해 봤을 때만');
+  assert.ok(pl.includes("if (!it.said) return null;\n      awardXp(ESSAY_REWARD.xp);"), '아빠 교정 ⚡💰는 🎤를 해 봤을 때만 (v409부터 준 것을 돌려준다)');
 });
 
 test('🟢 v352 지난 회차에 안 누른 지가르데 셀·찾은 줄은 끝 화면을 띄울 때 걷는다 — 연습·아빠 교정 끝에 다시 보이지 않게 (Codex 157차)', async () => {

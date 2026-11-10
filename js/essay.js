@@ -17,6 +17,8 @@ export const REWARD = { xp: 10, coin: 5 };        // 문장 하나 완성
 export const FINISH_REWARD = { xp: 50, coin: 20 }; // 전부 완성 (하루 1번)
 // 🔶 고친 문장을 🎤로 따라 읽어 통과하면 영어스톤 (v318 — 내 에세이·아빠 교정 함께 · 문장마다 한 번 · 하루 이만큼까지 · db.applyEssaySayStone)
 export const SAY_STONE = { maxPerDay: 2 };
+/** 👨‍👩‍👦 아빠 교정 — 🎤로 읽고 넘어가면 받은 ⚡💰 칩을 창 안에 띄워 두는 시간 (v409) */
+export const GAIN_MS = 2200;
 
 // 5단어짜리("I know, right? She's adorable.")를 내면 아이가 채울 게 2단어뿐이라
 // 에세이가 아니라 빈칸 채우기가 된다 (아버님이 실제 결과를 보고 지적).
@@ -384,10 +386,11 @@ export function normalizeWritten(text) {
  *   · 교정에 date가 있으면 그날 글에만 붙는다 (업로드 essay/todo.json에 날짜가 있다)
  *   · 자기 글이 이미 고쳐진 옛 교정(옛 fixes.json에 남아 있다)은 거기서 멈춘다 — 전엔 ②·③으로 같은 문장의 새 글에 옮겨 붙었다
  *   · 단계마다 모든 교정을 먼저 훑는다 — 앞 교정의 흐린 짝(②·③)이 뒤 교정의 똑같은 짝(①)을 가로채지 않게
+ * 🤫 (v409) `quiet: true` 줄 = 「확인만」 — 아빠가 봤지만 진우에게 띄우지는 않을 글(배울 거리가 적은 글 등). 그대로 넘겨준다
  *
  * @param {Array<{id:string, written:string, origin:string, coachFix?:string}>} entries 앱에 쌓인 에세이
- * @param {Array<{written?:string, origin?:string, fixed:string}>} fixes 배포로 온 교정문
- * @returns {Array<{id:string, date?:string, fixed:string}>} 아직 안 고쳐진 글에만
+ * @param {Array<{written?:string, origin?:string, fixed:string, quiet?:boolean}>} fixes 배포로 온 교정문
+ * @returns {Array<{id:string, date?:string, fixed:string, quiet?:true}>} 아직 안 고쳐진 글에만
  */
 export function matchFixes(entries, fixes) {
   const all = (entries || []).filter((e) => e && e.id);
@@ -416,7 +419,10 @@ export function matchFixes(entries, fixes) {
   const out = [];
   list.forEach((f, i) => {
     const e = got[i];
-    if (e) out.push(e.date ? { id: e.id, date: e.date, fixed: String(f.fixed).trim() } : { id: e.id, fixed: String(f.fixed).trim() });
+    if (!e) return;
+    const o = e.date ? { id: e.id, date: e.date, fixed: String(f.fixed).trim() } : { id: e.id, fixed: String(f.fixed).trim() };
+    if (f.quiet === true) o.quiet = true; // 🤫 확인만 — 고쳐 준 글로 치되 진우 화면 차례엔 안 넣는다 (v409)
+    out.push(o);
   });
   return out;
 }
@@ -470,6 +476,8 @@ const ui = {
   readTok: 0, // 🔊 고친 문장 첫 읽어 주기 번호 — 끝나야 「다음 문장 →」 (v318)
   topic: null, // 💡 시작 화면에서 고른 글감 (v388 — 없으면 내 마음대로)
   picked: false, // 💡 글감 단추를 눌렀나 (안 눌렀으면 어느 단추도 켜지 않는다)
+  gain: { xp: 0, coin: 0 }, // 👨‍👩‍👦 이 회차에 🎤로 받은 ⚡💰 — 끝 화면 칩 (v409)
+  gainTimer: 0, // 🎤 받은 칩을 잠깐 띄웠다 숨기는 타이머 (v409)
 };
 
 function playSfx(name) {
@@ -560,6 +568,7 @@ export function isEssayOpen() {
  * @param {(item:object) => void} [o.onShown] 문장이 화면에 떴다 — 한 번 나온 문장은 다시 안 내려고 적는다 (연습·아빠 교정 회차는 안 부름)
  * @param {(item:object) => Promise<string|null>} [o.onPass] 고친 문장을 🎤로 통과 — 문장마다 한 번 · 받은 것의 이름(🔶)을 돌려주면 말 칸에 붙인다 · null = 저장 실패(다시 통과하면 다시) (v318)
  * @param {(item:object) => void} [o.onSaid] 내 에세이 문장에서 넘어갈 때 — item.said(pass·try·없음)로 🎤를 했나 적는다 (v318)
+ * @param {(item:object) => ({xp:number, coin:number}|null)} [o.onRead] 아빠 교정 문장에서 넘어갈 때 — 읽음을 적고 🎤를 했으면 ⚡💰 · 실제로 준 것을 돌려주면 창 안에 잠깐·끝 화면에 합 (v409)
  * @param {() => object} o.onFinished 전부 완성
  * @param {(summary:object) => void} o.onDone
  * @param {Array<object>} [o.topics] 💡 오늘의 글감 셋 (v388 — essaytopic.dayTopics · 아빠 교정 회차엔 안 보임) · 고른 글감은 it.topic·it.topicHits로
@@ -575,6 +584,7 @@ export function openEssay(o) {
   ui.busy = false;
   ui.finished = false;
   ui.speakStop = null;
+  ui.gain = { xp: 0, coin: 0 }; // 앞 칩은 맨 위 closeEssay가 숨겼다
 
   const coach = o.mode === 'coach'; // 👨‍👩‍👦 아빠가 고쳐 준 글을 읽는 회차 (쓰기 단계 없음)
   $('essay-title').textContent = coach ? '👨‍👩‍👦 아빠가 고쳐준 글' : (o.practice ? '✍️ 에세이 연습' : '✍️ 오늘의 에세이');
@@ -612,8 +622,30 @@ export function closeEssay() {
   ui.run++;
   stopReading();
   if (ui.speakStop) { try { ui.speakStop('cancel'); } catch (e) { /* 무시 */ } ui.speakStop = null; }
+  hideGain();
   $('essay').hidden = true;
   ui.o = null;
+}
+
+/** 🎤로 받은 ⚡💰를 창 안에 잠깐 (v409 — 전엔 어두운 창 뒤 💰 칩만 깜빡여 받은 것이 잘 안 보였다) */
+function flashGain(got) {
+  const g = $('essay-gain');
+  clearTimeout(ui.gainTimer);
+  g.textContent = gainText(got);
+  g.className = 'review-chip gold essay-gain';
+  g.hidden = false;
+  void g.offsetWidth; // 다시 띄울 때 움직임을 처음부터
+  g.className = 'review-chip gold essay-gain show';
+  ui.gainTimer = setTimeout(hideGain, GAIN_MS);
+}
+function hideGain() {
+  clearTimeout(ui.gainTimer);
+  ui.gainTimer = 0;
+  $('essay-gain').hidden = true;
+}
+/** ⚡+10 💰+5 (순수) — 0인 쪽은 뺀다 */
+export function gainText(got) {
+  return [got && got.xp > 0 ? `⚡+${got.xp}` : '', got && got.coin > 0 ? `💰+${got.coin}` : ''].filter(Boolean).join(' ');
 }
 
 /** 진행 중 강제로 닫힘 (콘텐츠 닫기 등) */
@@ -779,6 +811,8 @@ function showResult(it) {
   $('essay-praise').textContent = praise;
   $('essay-praise').hidden = !praise;
   $('essay-read').hidden = !canReadAloud();
+  // 👨‍👩‍👦 아빠 교정은 🎤를 해 봐야 ⚡💰 — 누를 단추에 받을 것을 적는다 (v409 · 전엔 시작 창 칩에만 있었다)
+  $('essay-say').textContent = ui.o.mode === 'coach' && !ui.o.practice ? `🎤 읽어보기 💰+${REWARD.coin}` : '🎤 읽어보기';
   // 고친 문장을 한 번 끝까지 들려준 뒤에 「다음 문장 →」 (v318 — 읽어 주기가 시작되자마자 끊고 넘어가지 않게) · 소리가 안 나는 기기는 바로
   // 읽어 주기는 끝 소식이 안 오는 기기도 있어 readAloud가 글 길이 + 3초 뒤에 스스로 끝낸다 · 🎤를 누르면 바로 (startSpeaking)
   setNext(!canReadAloud());
@@ -883,7 +917,13 @@ function nextPrompt() {
   const cur = ui.o.prompts[ui.i];
   if (ui.o.mode === 'coach' && cur && !cur.marked) {
     cur.marked = true;
-    if (!ui.o.practice && ui.o.onRead) ui.o.onRead(cur);
+    // onRead는 실제로 준 ⚡💰를 돌려준다 (🎤 없이 넘기면 null) → 창 안에 잠깐 · 끝 화면에 합 (v409)
+    const got = !ui.o.practice && ui.o.onRead ? ui.o.onRead(cur) : null;
+    if (got && gainText(got)) {
+      ui.gain = { xp: ui.gain.xp + (got.xp > 0 ? got.xp : 0), coin: ui.gain.coin + (got.coin > 0 ? got.coin : 0) };
+      flashGain(got);
+      playSfx('twinkle');
+    }
   }
   // ✍️ 내 에세이 — 고친 문장을 🎤로 읽었나를 넘어갈 때 한 번 (v318 · 📤 usage/feedback.md)
   if (ui.o.mode !== 'coach' && cur && cur.result && !cur.sayMarked) {
@@ -922,6 +962,8 @@ async function showDone() {
   const box = $('essay-done-reward');
   box.innerHTML = '';
   if (reward) box.appendChild(el('span', 'review-chip gold', `⚡+${reward.xp} 💰+${reward.coin}`));
+  // 👨‍👩‍👦 아빠 교정 — 이 회차에 🎤로 받은 합 (v409) · 🎤를 안 했으면 아무것도 안 띄운다(못 받았다는 말 없이)
+  if (ui.o.mode === 'coach' && gainText(ui.gain)) box.appendChild(el('span', 'review-chip gold', gainText(ui.gain)));
   playSfx('levelUp');
   // 🟢 끝 화면이 떴다 — 부르는 쪽(player.js)이 숨은 지가르데 셀을 붙인다 (v352 · 이 파일은 xp를 모른다 — node 시험이 그대로 부른다)
   if (!ui.o.practice && typeof ui.o.onDoneShown === 'function') {

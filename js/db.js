@@ -508,7 +508,7 @@ export function mergeEssayEntry(old, e) {
   const out = { ...(old || {}), ...(e || {}) };
   if (old && e && 'written' in e && !sameText(old.written, e.written)) {
     // 💡 글감(topic·tw)도 앞 글의 것 — 새 글을 글감 없이 썼으면 지운다 (v388)
-    for (const k of ['coachFix', 'fixedAt', 'readAt', 'readHow', 'sayHow', 'topic', 'tw']) if (!(k in e)) delete out[k];
+    for (const k of ['coachFix', 'fixedAt', 'readAt', 'readHow', 'coachQuiet', 'sayHow', 'topic', 'tw']) if (!(k in e)) delete out[k];
   }
   return out;
 }
@@ -544,7 +544,11 @@ function pickCopy(a, b) {
   if (!a.coachFix) return b;
   const win = (Number(b.fixedAt) || 0) > (Number(a.fixedAt) || 0) ? b : a;
   const lose = win === a ? b : a;
-  return sameText(win.coachFix, lose.coachFix) ? mergeRead(win, lose) : win;
+  if (!sameText(win.coachFix, lose.coachFix)) return win; // 다른 교정 — 고른 교정의 뜻(확인만 여부)을 그대로
+  const out = mergeRead(win, lose);
+  // 🤫 같은 교정이 한쪽에서만 확인만 — v409 전 기기·사본이 같은 줄을 일반으로 붙였다 · 확인만을 지킨다 (sync는 붙은 글을 다시 안 본다 · 🔍 Codex 214차 ①)
+  if (a.coachQuiet || b.coachQuiet) out.coachQuiet = true;
+  return out;
 }
 
 /** 같은 글의 두 사본 — 내 에세이 🎤(sayHow)는 더 해 본 쪽 · 🔶 받은 표시(sayPaid)는 하나라도 있으면 (v318 · 🔍 Codex 124차 #3 — 아빠 교정 쪽을 고르며 잃었다) */
@@ -569,14 +573,16 @@ function withTopic(out, a, b) {
 /**
  * ✍️ 글 하나에 아빠 교정을 붙인다 (순수, 트랜잭션 안에서 부른다) — 똑같은 교정이면 아무 일도 안 한다:
  * 두 번 붙여넣기·두 창이 같은 교정을 동시에 붙여도 읽은 글이 "안 읽음"으로 돌아가지 않게 (Codex 35차 #5). 다른 교정이면 새로 (아빠가 다시 고쳐 줌).
+ * 🤫 quiet = 「확인만」(v409) — 고쳐 준 글로 치되(📮에서 빠짐) 진우 화면 차례·📬 셈엔 안 든다 · 다른 교정이 오면 그 교정의 뜻을 따른다
  * @returns {boolean} 바뀌었는가
  */
-export function fixEssayEntry(e, fixed, now = Date.now()) {
+export function fixEssayEntry(e, fixed, now = Date.now(), quiet = false) {
   if (!e || sameText(e.coachFix, fixed)) return false;
   e.coachFix = String(fixed).trim();
   e.fixedAt = now;
   e.readAt = 0; // 아이가 아직 안 읽음
   delete e.readHow; // 앞 교정을 읽은 꼴이다 (v314)
+  if (quiet) e.coachQuiet = true; else delete e.coachQuiet;
   return true;
 }
 
@@ -822,7 +828,7 @@ export async function listEssays() {
 /**
  * ✍️ 부모가 고쳐 준 문장을 해당 에세이에 붙인다.
  * 며칠 전 글도 고쳐 줄 수 있으므로 날짜 기록을 훑어 id로 찾는다.
- * @param {Array<{id:string, fixed:string}>} fixes
+ * @param {Array<{id:string, fixed:string, quiet?:boolean}>} fixes
  * @returns {Promise<number>} 실제로 붙은 문장 수
  */
 export async function applyEssayFixes(fixes) {
@@ -832,6 +838,10 @@ export async function applyEssayFixes(fixes) {
   //   날짜가 없는 교정(옛 붙여넣기)은 아직 안 고친 글에만 붙인다.
   const dated = new Map(fixes.filter((f) => f && f.date).map((f) => [`${f.date}|${f.id}`, f.fixed]));
   const undated = new Map(fixes.filter((f) => f && !f.date).map((f) => [f.id, f.fixed]));
+  // 🤫 확인만 (v409) — 고친 글과 같은 열쇠로 따로 들고 간다
+  const hush = fixes.filter((f) => f && f.quiet === true);
+  const quietDated = new Set(hush.filter((f) => f.date).map((f) => `${f.date}|${f.id}`));
+  const quietUndated = new Set(hush.filter((f) => !f.date).map((f) => f.id));
   const pick = (date, e) => (dated.has(`${date}|${e.id}`) ? dated.get(`${date}|${e.id}`) : !e.coachFix && undated.has(e.id) ? undated.get(e.id) : null);
   const days = await listDaily();
   let n = 0;
@@ -845,7 +855,9 @@ export async function applyEssayFixes(fixes) {
         if (!e || !e.id) continue;
         const fixed = pick(day.date, e);
         if (fixed === null) continue;
-        if (fixEssayEntry(e, fixed, now)) touched++; // 똑같은 교정이면 그대로 (읽은 글을 "안 읽음"으로 돌리지 않게)
+        const k = `${day.date}|${e.id}`;
+        const hushed = dated.has(k) ? quietDated.has(k) : quietUndated.has(e.id); // pick과 같은 줄의 뜻
+        if (fixEssayEntry(e, fixed, now, hushed)) touched++; // 똑같은 교정이면 그대로 (읽은 글을 "안 읽음"으로 돌리지 않게)
       }
       return touched ? d : null;
     });

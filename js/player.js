@@ -1081,9 +1081,9 @@ function startCoachFix(entries, then) {
     onRead: (it) => {
       markEssayRead(it.id, it.date, it.said || 'skip').catch(() => {}); // 한 번 읽으면 다시 안 뜬다 (날짜를 주면 그 날만 연다) · 📬 🎤로 읽었나(v314)
       // ⚡💰는 🎤로 읽어 봤을 때만 (v318 아버님 "이대로 진행" — 그냥 넘기면 보상 없이 넘어간다 · 넘기는 것 자체는 막지 않는다)
-      if (!it.said) return;
+      if (!it.said) return null;
       awardXp(ESSAY_REWARD.xp);
-      awardCoins(ESSAY_REWARD.coin);
+      return { xp: ESSAY_REWARD.xp, coin: awardCoins(ESSAY_REWARD.coin) }; // 실제로 준 것 — 교정 창 안에 잠깐·끝 화면에 합 (v409)
     },
     onPass: (it) => essaySayStone(`coach|${it.date || ''}|${it.id}`, { date: it.date, id: it.id }),
     onDone: () => {

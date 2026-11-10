@@ -54,7 +54,11 @@ export function checkPrivateDir(dir, figureSvg) {
       continue;
     }
     if (rel === 'essay/fixes.json') {
-      list.forEach((e, i) => { if (!e || typeof e.fixed !== 'string' || !e.fixed.trim()) errors.push(`내용 오류: ${f}[${i}]: fixed(고친 글)가 있어야 함`); });
+      list.forEach((e, i) => {
+        if (!e || typeof e.fixed !== 'string' || !e.fixed.trim()) errors.push(`내용 오류: ${f}[${i}]: fixed(고친 글)가 있어야 함`);
+        // 🤫 확인만(v409) — 앱은 true일 때만 알아듣는다 ("true" 글자·1은 진우 화면에 그대로 뜬다)
+        else if ('quiet' in e && e.quiet !== true) errors.push(`내용 오류: ${f}[${i}]: quiet는 true만 써요 (확인만이 아니면 칸을 빼기)`);
+      });
       continue;
     }
     // ❓ 아빠 답장 — [{ no, text }], 그림 지시문은 앱이 아는 것만

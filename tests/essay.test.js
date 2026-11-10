@@ -388,7 +388,7 @@ test('🔍 Codex 35차 #5 — 교정 붙이기는 똑같은 교정이면 아무 
   assert.equal(fixEssayEntry(fresh, 'I ran.', 400), true);
   assert.deepEqual(fresh, { id: 'v|11', written: 'I run', coachFix: 'I ran.', fixedAt: 400, readAt: 0 });
   const src = fs.readFileSync(new URL('../js/db.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(fixEssayEntry\(e, fixed, now\)\) touched\+\+;/, 'applyEssayFixes가 이 규칙으로 붙인다');
+  assert.match(src, /if \(fixEssayEntry\(e, fixed, now, hushed\)\) touched\+\+;/, 'applyEssayFixes가 이 규칙으로 붙인다 (🤫 확인만 v409)');
 });
 
 test('✍️ 화면 연결 — 문장이 뜰 때 적는다(연습·아빠 교정 회차는 안 적음) · 기록은 sentenceStats.essayAt(백업 병합 max) · 이미 쓴 글도 나온 것', () => {

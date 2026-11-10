@@ -296,7 +296,8 @@ function essayBox(e, no) {
   if (Array.isArray(e.notes) && e.notes.length) box.appendChild(el('div', 'stats-essay-notes', e.notes.join(' · ')));
   if (e.coachFix) {
     const st = coachState(e, Date.now()); // 읽음 판정도 진우 화면과 같게 (🔍 Codex 184차 ①)
-    const seenText = st === 'read' ? ' (읽음)' : st === 'gone' ? ` (지나감 — 붙은 지 ${COACH_KEEP_DAYS}일이 지나 진우 화면 차례에서 빠짐)` : ' (아직 안 읽음)';
+    const seenText = st === 'quiet' ? ' (🤫 확인만 — 진우 화면엔 안 띄움)' // v409
+      : st === 'read' ? ' (읽음)' : st === 'gone' ? ` (지나감 — 붙은 지 ${COACH_KEEP_DAYS}일이 지나 진우 화면 차례에서 빠짐)` : ' (아직 안 읽음)';
     box.appendChild(el('div', 'stats-essay-coach', `👨‍👩‍👦 ${e.coachFix}${seenText}`));
   }
   return box;

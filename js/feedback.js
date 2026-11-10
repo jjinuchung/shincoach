@@ -25,17 +25,18 @@ export const COACH_MAX = 2;
 
 const num = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
 
-/** 지나간 교정인가 — 아직 안 봤고 붙은 지 COACH_KEEP_DAYS일이 넘음 · 붙은 때를 모르는 옛 교정은 차례에 남긴다(모르는 것으로 숨기지 않게) */
+/** 지나간 교정인가 — 아직 안 봤고 붙은 지 COACH_KEEP_DAYS일이 넘음 · 붙은 때를 모르는 옛 교정은 차례에 남긴다(모르는 것으로 숨기지 않게) · 🤫 확인만은 처음부터 차례 밖 */
 export function coachGone(e, now) {
-  return !!e && !!e.coachFix && !(num(e.readAt) > 0) && num(e.fixedAt) > 0 && num(e.fixedAt) < now - COACH_KEEP_DAYS * DAY_MS;
+  return !!e && !!e.coachFix && !e.coachQuiet && !(num(e.readAt) > 0) && num(e.fixedAt) > 0 && num(e.fixedAt) < now - COACH_KEEP_DAYS * DAY_MS;
 }
 
 /**
- * 교정 하나의 상태 (순수) — 'read' 본 것 · 'gone' 지나감 · 'queue' 차례에 있음 · '' 교정 없음
+ * 교정 하나의 상태 (순수) — 'read' 본 것 · 'gone' 지나감 · 'queue' 차례에 있음 · 'quiet' 확인만(v409 — 진우에게 안 띄움) · '' 교정 없음
  * 읽음은 읽은 때가 양의 시각일 때만 — 📊가 글자("0")를 읽음으로 보고 진우 화면은 다시 띄우던 어긋남을 막는다 (🔍 Codex 184차 ①)
  */
 export function coachState(e, now) {
   if (!e || !e.coachFix) return '';
+  if (e.coachQuiet) return 'quiet';
   if (num(e.readAt) > 0) return 'read';
   return coachGone(e, now) ? 'gone' : 'queue';
 }
@@ -91,6 +92,7 @@ export function essayItems(days, now) {
     for (const e of Array.isArray(d.essays) ? d.essays : []) {
       if (!e || !e.coachFix || !e.written) continue;
       const st = coachState(e, now); // 진우 화면·📊와 같은 판정 (v381)
+      if (st === 'quiet') continue; // 🤫 확인만은 진우에게 보낸 것이 아니다 — 닿았나 셈에 안 든다 (v409)
       const seen = st === 'read';
       const gone = st === 'gone'; // 지나간 것은 본 것처럼 FEEDBACK_DAYS일 안에만
       if (!shown(e.fixedAt, seen || gone, now)) continue;
@@ -207,7 +209,7 @@ export function feedbackMd({ days, writes, asks, today, now, conceptName } = {})
     `요약: ✍️ 영어 교정 ${tally(en, true)} · 📚 국어 답장 ${tally(ko)} · 🔢 수학 답장 ${tally(ma)}`,
     '읽는 법: 붙은 때 = 태블릿이 비공개 저장소에서 받아 붙인 때 · 본 때 = 진우 화면에 떠서 읽고 넘어간 때 · 그 뒤 = 진우가 해 본 것 · 💌 한 줄 메시지는 family/read.md',
     '',
-    `## ✍️ 영어 교정 — v336부터 그날 에세이를 다 쓴 바로 뒤에 가장 최근 것 한 문장 · v381부터 차례에 셋 이상 밀렸으면 두 문장 · 붙은 지 ${COACH_KEEP_DAYS}일 지나도록 못 본 것은 "지나감"(차례에서 빠짐 · 지우지 않음)(그 전엔 영어 영상을 열 때 3개까지)(내 글 · 아빠 글(바뀐 곳 색) → 🔊 끝까지 들은 뒤 넘어감 → 🎤 읽어보기 · v318부터 ⚡💰는 🎤를 해 봤을 때만)`,
+    `## ✍️ 영어 교정 — v336부터 그날 에세이를 다 쓴 바로 뒤에 가장 최근 것 한 문장 · v381부터 차례에 셋 이상 밀렸으면 두 문장 · 붙은 지 ${COACH_KEEP_DAYS}일 지나도록 못 본 것은 "지나감"(차례에서 빠짐 · 지우지 않음)(그 전엔 영어 영상을 열 때 3개까지)(내 글 · 아빠 글(바뀐 곳 색) → 🔊 끝까지 들은 뒤 넘어감 → 🎤 읽어보기 · v318부터 ⚡💰는 🎤를 해 봤을 때만) · v409부터 🤫 확인만(quiet) 줄은 진우 화면에 안 뜨고 여기에도 안 셈`,
     ...(en.length ? en.map((x) => x.text) : ['(없음)']),
     '',
     '## ✍️ 내 에세이 — 쓰고 나서 고친 문장을 🎤로 읽었나 (v318부터 · 기록 없음 = 그 전 글이거나 넘어가지 않고 닫음 · 🎤로 통과하면 🔶 하루 2개까지)',
