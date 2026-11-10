@@ -117,7 +117,7 @@ globalThis.localStorage = {
   removeItem: (k) => { store.delete(k); },
 };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
-store.set('shincoach.musicIntro', '1');
+store.set('shincoach.musicIntro', '2'); // 🐾 안내 창은 이미 본 것으로 — v413 판은 '2'
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(cond, what, ms = 4000) {
   const t0 = Date.now();

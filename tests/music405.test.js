@@ -19,9 +19,9 @@ const MUSIC = ROSTER.filter((r) => r.subject === 'music').map((r) => r.id);
 
 // ───────────────────── 순수·잇기 ─────────────────────
 
-test('🏠 홈 음악 카드 — 「🐾 피아노로 따라 치면 음악 포켓몬!」 · 다른 과목 카드 줄은 그대로', () => {
+test('🏠 홈 음악 카드 — 「🐾 끝까지 치면 음악 포켓몬!」(v413 — 화면 건반으로도) · 다른 과목 카드 줄은 그대로', () => {
   const mu = SUBJECTS.find((s) => s.key === 'music');
-  assert.equal(mu.desc, '🐾 피아노로 따라 치면 음악 포켓몬!');
+  assert.equal(mu.desc, '🐾 끝까지 치면 음악 포켓몬!');
   assert.equal(cardSubject(mu, {}).desc, mu.desc, '카드에 그대로 간다');
   assert.deepEqual(SUBJECTS.filter((s) => s.key !== 'music').map((s) => s.desc), ['영상 보고 따라 말하기', '분수부터 차근차근', '글 읽고 작품 카드 모으기', '내 의견과 이유 말하기']);
 });
@@ -122,12 +122,17 @@ before(async () => {
   P = globalThis.window.__piano;
 });
 
-test('화면 — 처음 들어오면 안내 창: 🎧 · 진짜 피아노 · 새 단추 이름 · ♪ 다섯 · 화면 건반은 💰 · 보상·남은 수 문구 없음 · 음악 포켓몬 셋', async () => {
+test('화면 — 처음 들어오면 안내 창: 🎧 · 진짜 피아노 · 새 단추 이름 · ♪ 다섯 · (v413) 🎹 화면 건반도 「곡 전체」 → 건반 열 칸 · 💰도 · 보상·남은 수 문구 없음 · 음악 포켓몬 셋', async () => {
   const box = byId('pn-intro');
   assert.ok(box, '안내 창');
   assert.equal(box.parent, VIEW, '창은 음악 화면 안');
   const t = box.textContent;
-  for (const w of ['🎵 음악 포켓몬을 만나요!', '「🎧 듣고 따라 치기」를 골라요', '앱이 치는 소리를 들으며 진짜 피아노로 끝까지 따라 쳐요', '「✋ 피아노로 다 쳤어요」를 누르면 ♪ 하나', '♪♪♪♪♪가 다 차면 🐾 음악 포켓몬이 와요!', '🎹 태블릿으로 치기(화면 건반)는 💰를 받아요']) assert.ok(t.includes(w), `글: ${w}`);
+  for (const w of ['🎵 음악 포켓몬을 만나요!', '🎧 진짜 피아노로', '「🎧 듣고 따라 치기」를 골라요', '앱이 치는 소리를 들으며 진짜 피아노로 끝까지 따라 쳐요', '「✋ 피아노로 다 쳤어요」를 누르면 ♪ 하나', '♪♪♪♪♪가 다 차면 🐾 음악 포켓몬이 와요!',
+    '🎹 태블릿 화면 건반으로', '「🎹 태블릿으로 치기」에서 「곡 전체」를 골라요', '끝까지 잘 치면 건반 칸 하나 — 💰도 받아요', '이 다 차면 🐾 음악 포켓몬이 와요!']) assert.ok(t.includes(w), `글: ${w}`);
+  assert.ok(!t.includes('는 💰를 받아요'), 'v405의 「화면 건반은 💰」 말은 없다 (v413)');
+  const ten = all.filter((e) => { if (e.className !== 'pn-tkeys') return false; for (let x = e; x; x = x.parent) if (x === box) return true; return false; });
+  assert.equal(ten.length, 1, '빈 건반 열 칸 그림 하나');
+  assert.equal(ten[0].children.length, 10, '건반 열 — 수는 글로 안 쓴다');
   assert.doesNotMatch(t, /\d/, '글에 보상 수·남은 수 없음 (단계 앞 1.~4.는 <ol>이 그리는 차례 번호 — 셈 문구가 아니라 둔다 · Codex 210차 P3)');
   for (const id of [433, 358, 1024]) {
     assert.ok(MUSIC.includes(id), `${id}는 음악 포켓몬`);
@@ -145,7 +150,7 @@ test('화면 — 안내 창이 떠 있는 동안 온 포켓몬은 뒤에 선다 
   assert.equal(byId('pn-intro'), null);
   assert.ok(byId('pn-arrive'), '닫으면 기다리던 온 창');
   assert.match(text('pn-arrive'), /🎵 새 음악 포켓몬이 왔어요!/);
-  assert.equal(store.get('shincoach.musicIntro'), '1');
+  assert.equal(store.get('shincoach.musicIntro'), '2', 'v413 판 안내를 본 것');
   await settle(30);
   assert.equal(await introN(), 1, '📤 「안내 창 1번 봄」');
   button('좋아요!').click();
@@ -155,7 +160,7 @@ test('화면 — 안내 창이 떠 있는 동안 온 포켓몬은 뒤에 선다 
   assert.equal(byId('pn-intro'), null, '본 뒤엔 들어와도 안 뜬다');
 });
 
-test('화면 — 🎧 무대: 「✋ 피아노로 다 쳤어요」 · ♪ 칸 → 🐾 · 누르면 안내 창이 다시 · 🎹 태블릿으로 치기에선 칸이 숨음', async () => {
+test('화면 — 🎧 무대: 「✋ 피아노로 다 쳤어요」 · ♪ 칸 → 🐾 · 누르면 안내 창이 다시 · 🎹 태블릿으로 치기에선 건반 열 칸(v413)', async () => {
   P.openSong('ode');
   button('🎧 듣고 따라 치기').click();
   const slots = byId('pn-slots');
@@ -198,7 +203,9 @@ test('화면 — 🎧 무대: 「✋ 피아노로 다 쳤어요」 · ♪ 칸 �
   await waitFor(() => !P.S.saving, '다 쳤어요 저장');
   assert.equal(pianoOf(getProfileSnapshot().piano).notes, 6, '새 이름 단추도 음표 칸');
   button('🎹 태블릿으로 치기').click();
-  assert.equal(byId('pn-slots').hidden, true, '태블릿 치기엔 ♪ 칸이 없다');
+  assert.equal(byId('pn-slots').hidden, false, '태블릿 치기엔 건반 열 칸 (v413)');
+  assert.match(byId('pn-slots').innerHTML, /^<span class="pn-tkeys">(<span class=""><\/span>){10}<\/span><span class="pn-slots-mon">→ 🐾<\/span>$/);
+  assert.equal(byId('pn-slots').getAttribute('aria-label'), '건반 칸 — 음악 포켓몬 안내');
 });
 
 test('화면 — 온 창이 떠 있으면 안내 창은 다음에 들어올 때 · 이 기기 저장이 막혀도 안 멈춤(그때는 들어올 때마다)', async () => {

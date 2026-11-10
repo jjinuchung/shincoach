@@ -77,7 +77,7 @@ export const SUBJECTS = [
     key: 'music',
     title: 'Music',
     ko: '음악',
-    desc: '🐾 피아노로 따라 치면 음악 포켓몬!', // v405 안내
+    desc: '🐾 끝까지 치면 음악 포켓몬!', // v405 안내 · v413 🎹 화면 건반으로도
     emoji: '🎹',
     mascot: 648,  // 메로엣타 — 노래하는 포켓몬 (2026-11-08 🎹 음악 · v402)
     view: 'music',

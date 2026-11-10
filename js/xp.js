@@ -1068,9 +1068,10 @@ export function tourEnd(req) {
 export function tourBook(req) {
   return houseDo((p) => tourBookRule(p, req, Date.now()));
 }
-/** 🎹 태블릿으로 치기 한 판 끝 (v402) — 💰는 저장된 프로필로 한 트랜잭션에서(두 창이어도 하루 TAP_DAY번) · 날은 트랜잭션 안의 시각으로 */
+/** 🎹 태블릿으로 치기 한 판 끝 (v402) — 💰는 저장된 프로필로 한 트랜잭션에서(두 창이어도 하루 TAP_DAY번) · 날은 트랜잭션 안의 시각으로 ·
+ *  🎹 건반 칸 열이 차면 음악 포켓몬도 같은 트랜잭션에서(v413 — got) */
 export function pianoTap(req) {
-  return houseDo((p) => pianoTapRule(p, req, Date.now()));
+  return houseDo((p) => pianoTapRule(p, req, Date.now(), musicPool(p), Math.random));
 }
 /** 🎹 음악 포켓몬 후보 (v404) — 명단의 음악 50 · 등급은 넘겨받은 프로필에서(부모가 옮긴 등급까지 · 트랜잭션 안의 저장된 프로필) */
 const MUSIC_IDS = ROSTER.filter((r) => r.subject === 'music').map((r) => r.id);

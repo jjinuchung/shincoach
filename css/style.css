@@ -5523,10 +5523,17 @@ button.pn-slots-box:focus-visible { outline: 3px solid #d23a73; outline-offset: 
 .pn-slots { display: inline-flex; gap: 3px; letter-spacing: 0; }
 .pn-slots span { color: #d7dbe4; }
 .pn-slots span.on { color: #d23a73; }
+/* 🎹 건반 칸 (v413) — 작은 건반 열 개가 하나씩 빛난다 · 수는 안 쓴다 */
+.pn-tkeys { display: inline-flex; gap: 2px; vertical-align: -3px; }
+.pn-tkeys span { width: 10px; height: 22px; border-radius: 0 0 3px 3px; background: #eceef4; box-shadow: inset 0 0 0 1px #c3c8d4; }
+.pn-tkeys span.on { background: #d23a73; box-shadow: inset 0 0 0 1px #a8285a; }
+.pn-toast .pn-tkeys { margin: 6px 0 2px; }
+.pn-toast .pn-tkeys span { width: 13px; height: 28px; }
 .pn-stage { position: relative; border-radius: 14px; overflow: hidden; background: #0b1022; box-shadow: 0 8px 30px rgba(10, 14, 30, .25); }
 .pn-canvas { display: block; width: 100%; user-select: none; -webkit-user-select: none; }
 .pn-toast { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); background: #fff; color: #1b2030; border-radius: 16px; padding: 14px 22px; text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); max-width: min(90%, 440px); font-size: 15.5px; pointer-events: none; }
 .pn-toast b { display: block; font-size: 21px; margin-bottom: 2px; }
+.pn-toast.is-high { top: 22%; } /* 🎺 판 끝 효과 띠(건반 위)를 가리지 않게 (v413) */
 .pn-toast .pn-slots { font-size: 26px; margin: 4px 0; }
 /* 🐾 음악 포켓몬이 왔어요 (v404) — 음악 화면 안 창 · 「좋아요!」로 닫음 */
 .pn-arrive { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(16, 20, 32, .55); }
@@ -5545,7 +5552,10 @@ button.pn-slots-box:focus-visible { outline: 3px solid #d23a73; outline-offset: 
 .pn-intro-mon img { width: 84px; height: 84px; object-fit: contain; }
 .pn-intro-steps { margin: 2px 0 0; padding-left: 1.5em; display: grid; gap: 7px; text-align: left; font-size: 16px; line-height: 1.45; }
 .pn-intro-steps .pn-slots { font-size: 19px; vertical-align: -1px; }
-.pn-intro-tap { margin: 0; padding: 7px 12px; border-radius: 10px; background: #f1f3f8; color: #4a5164; font-size: 14px; }
+/* 🎹 v413 — 두 길(🎧 진짜 피아노 · 🎹 화면 건반)을 나란히 · 길어져도 낮은 화면에서 창 안에서 내려 본다 */
+.pn-intro-card { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.pn-intro-way { margin: 4px 0 0; justify-self: start; font-weight: 800; font-size: 15px; color: #1b2030; }
+.pn-intro-steps .pn-tkeys span { width: 8px; height: 18px; }
 #set-midi-out { margin: 6px 0 0; font-size: 14px; color: #4b5563; }
 @media (max-width: 640px) {
   .pn-speed input[type="range"] { width: 120px; }

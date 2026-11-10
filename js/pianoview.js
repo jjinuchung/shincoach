@@ -12,8 +12,13 @@
 // 🎹 자유롭게 치기 (v408, 11-09 진우 바람 「곡을 정하지 않고 그냥」 → 아버님 「이대로」) — 곡 목록 맨 앞 칸 · 큰 건반 두 옥타브(◀ ▶ 한 옥타브씩) ·
 //   위에 방금 친 계이름(「계이름 숨기기」로 끔) · 💰·음표 칸·음악 포켓몬 없음 · ⏳ 음악 시간에는 든다 · 📤 하루 줄에 연 번·친 시간·건반 수
 //   Codex 213차 — 미끄러지듯 쳐도 ⏳ 손댐 · 같은 건반을 누른 손이 하나라도 남으면 소리 그대로 · 못 넣은 셈은 날짜째 두었다 다음에 · 자정엔 전날 몫 먼저
+// 🎹 v413 (11-10 아버님 기본안 「추천대로」) — ① 🎹 태블릿으로 치기도 「곡 전체」를 잘 끝까지 치면 건반 한 칸 · 열 칸이면 음악 포켓몬(♪ 칸 자리에 건반 열 개 그림)
+//   ② 「치다 보면 멈췄다가 3~4초 뒤 풀린다」 — 연주 중에 건반 위쪽을 누르면 ⏸가 되던 것(그림판 톡 = 시작·멈춤)을 시작만으로 · 건반 바로 위 띠(KEY_SLOP)는 건반 ·
+//      멈춰 있으면 가운데에 크게 「⏸ 멈췄어요」 · 연주 중 화면이 STALL.ms 넘게 멈칫하면 📤 하루 칸(태블릿이 버거워 멈추는 것인지 가르려고)
+//   ③ 끝날 때 박자 판정(진우 바람) — 🎉 빵빠레·꽃가루 · 👏 짝짝 · 🎺 뿌우~ (소리는 Web Audio로 새로 지음 · 점수는 📤에만 · 보상과 상관없음)
 import { setScene } from './blackbox.js';
-import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON } from './piano.js';
+import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON,
+  TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
 import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, rarityOf, RARITY } from './xp.js';
 import { ROSTER, ensureCast } from './pokemon.js'; // 🐾 음악 포켓몬 이름·그림 (v404)
@@ -39,7 +44,12 @@ const S = {
   raf: 0, ro: null, drawn: 0, busy: false,
   freeOct: 3, freeNames: true, trail: [], freeKeys: 0, freeMs: 0, freeLast: 0, freeDay: '', freeOwe: new Map(), // 🎹 자유롭게 치기 (v408)
   pcDown: new Set(), // PC 자판으로 누르고 있는 건반 (Codex 213차)
+  keyAt: -1e9, passStall: 0, fx: null, // v413 — 마지막으로 건반을 누른 때(위쪽 톡과 가르기) · 이 판의 가장 긴 화면 멈칫(ms) · 판 끝 박자 효과
 };
+/** 건반 바로 위 이만큼(px)은 건반으로 친다 — 건반 윗부분을 누르다 살짝 위로 빗나간 손가락 (v413) */
+const KEY_SLOP = 20;
+/** 건반을 누른 뒤 이만큼(ms) 안에 오는 그림판 「톡」은 시작이 아니다 — 건반에서 위로 미끄러져 뗀 손가락 (v413) */
+const KEY_CLICK_MS = 800;
 /** 🎹 자유롭게 치기 — 왼쪽 끝 도의 옥타브(C1~C6 · 셋이면 가운데 도가 한가운데) · 방금 친 계이름 수 · 친 시간에 넣는 쉰 틈 상한 */
 const FREE_OCT = { min: 1, max: 6, def: 3 };
 const TRAIL_MAX = 8;
@@ -189,7 +199,7 @@ const focusHand = (hand) => S.hands === 'B' || hand === S.hands;
 function toStart() {
   S.t = -LEAD;
   S.steps = S.mode === 'tap' ? stepsOf(S.perf, S.hands).map((s) => ({ t: s.t, need: s.need, got: new Set() })) : [];
-  S.si = 0; S.waiting = false; S.ok = 0; S.bad = 0;
+  S.si = 0; S.waiting = false; S.ok = 0; S.bad = 0; S.passStall = 0;
   S.sounding.clear(); S.flash.clear();
   for (const h of S.perf.heads) delete h.okAt;
   S.drawn = 0; // 처음으로 — 멈춰 있어도 다음 화면에 바로 그린다 (v407 · Codex 212차)
@@ -203,7 +213,11 @@ function advance(db) {
     const st = S.steps[S.si];
     if (st && t1 >= st.t) {
       if (st.got.size >= st.need.length) S.si += 1;
-      else { t1 = st.t; S.waiting = true; }
+      else {
+        st.late = (st.late || 0) + (t1 - st.t); // 🎺 막대가 닿은 뒤 기다리게 한 박 (v413 — 한 화면에 0.25초까지만 들어온다: 태블릿 멈칫은 아이 탓이 아니다)
+        t1 = st.t;
+        S.waiting = true;
+      }
     }
   }
   const secOf = (s) => (secsOf(S.song, S.perf, s.t, s.dur) / S.sp) * 0.95;   // 빠르기가 바뀌는 자리를 걸치는 음은 마디마다 그 빠르기로 (Codex 208차 P2)
@@ -230,6 +244,7 @@ function press(midi) {
     for (const h of S.perf.heads) if (Math.abs(h.t - st.t) < 1e-6 && h.notes.some((n) => n.midi === midi)) h.okAt = performance.now();
     flashKey(midi, 'ok', s ? s.hand : 'R');
     if (st.got.size >= st.need.length && S.waiting) { S.waiting = false; S.si += 1; }
+    else if (st.got.size >= st.need.length) st.early = Math.max(0, st.t - S.t); // 🎺 막대가 닿기 전에 다 눌렀다 — 남은 박 (v413)
   } else if (kind === 'bad') {
     S.bad += 1;
     flashKey(midi, 'bad');
@@ -260,18 +275,22 @@ function release(midi) {
 /** 그 판(줄·곡)을 끝까지 갔다 */
 function passEnd() {
   const req = { song: S.song.id, line: S.line, hand: S.hands, lv: S.lv, sp: Math.round(S.sp * 100) / 100 };
+  let grade = '';
   if (S.mode === 'tap') {
     const ok = S.ok;
     const bad = S.bad;
+    const g = beatScore(S.steps, ok, bad); // 🎺 박자 점수 — 아이 화면엔 안 쓴다 (v413)
+    grade = beatGrade(g, ok, bad);
     // 끝낸 판의 하루 칸은 여기서 한 번 — 「🔁 다시 받기」는 💰만 다시 받는다 (Codex 204차 P3-7)
-    applyDailyDelta(clockDay(), { pnTapN: 1, ...(goodPass(ok, bad) ? { pnTapOk: 1 } : {}) }).catch(() => {});
-    sendTap({ ...req, ok, bad });
+    applyDailyDelta(clockDay(), { pnTapN: 1, ...(goodPass(ok, bad) ? { pnTapOk: 1 } : {}), [GRADE_DAILY[grade]]: 1 }).catch(() => {});
+    sendTap({ ...req, ok, bad, g, st: Math.round(S.passStall) });
   } else {
     S.passDone = true;
     showDone();
     if (!S.loop) toast('<b>끝까지 연주했어요</b>진짜 피아노로 끝까지 쳤으면 「✋ 피아노로 다 쳤어요」를 눌러요.', 3000);
   }
   toStart();
+  if (grade) startFx(grade); // 처음으로 돌린 뒤에 — 다음 판 준비 박 동안에도 보인다
   if (!S.loop) setRun(false);
   else rerun();
 }
@@ -282,7 +301,12 @@ function sendTap(req) {
   S.retry = null;
   showRetry();
   pianoTap(req).then((r) => {
-    if (r && r.ok && r.coins) applyDailyDelta(clockDay(), { pnCoins: r.coins }).catch(() => {});
+    const got = r && r.ok && Array.isArray(r.got) ? r.got : [];
+    if (r && r.ok && (r.coins || r.slot === 'ok' || got.length)) {
+      applyDailyDelta(clockDay(), { ...(r.coins ? { pnCoins: r.coins } : {}), ...(r.slot === 'ok' ? { pnTapSlots: 1 } : {}), ...(got.length ? { pnMons: got.length } : {}) }).catch(() => {});
+    }
+    if (got.length) showArrivals(got, r.firsts); // 🐾 건반 열 칸 (v413) — 판이 바뀌었어도 온 포켓몬은 보여 준다
+    if (r && r.ok) renderSlots();
     if (gen !== S.gen) return;
     if (!r || !r.ok) {
       S.retry = () => sendTap(req);
@@ -290,8 +314,11 @@ function sendTap(req) {
       toast('<b>저장이 안 됐어요</b>「🔁 다시 받기」를 눌러 주세요.', 3200);
       return;
     }
-    if (r.coins) toast(`<b>끝까지 쳤어요! 💰 +${r.coins}</b>${nextHint(S.lv)}`, 3200);
-    else if (r.why === 'cap') toast('<b>끝까지 쳤어요!</b>오늘 💰는 다 받았어요 — 연습은 얼마든지!', 3200);
+    if (got.length) return; // 🐾 온 포켓몬 창이 대신 말한다
+    // 🎹 건반 칸 한 줄 (v413) — 칸 수는 쓰지 않는다 · 잘 치지 못한 판은 「한 번 더」 말만
+    const slot = { ok: `<br>${keysHtml(slotsOf(r.taps, r.tapMons, TAPS_PER_MON).filled)}`, line: '<br>「곡 전체」를 끝까지 치면 🎹 건반 칸이 차요', cap: '<br>오늘 🎹 건반 칸은 다 채웠어요' }[r.slot] || '';
+    if (r.coins) toast(`<b>끝까지 쳤어요! 💰 +${r.coins}</b>${nextHint(S.lv)}${slot}`, 3400);
+    else if (r.why === 'cap') toast(`<b>끝까지 쳤어요!</b>오늘 💰는 다 받았어요 — 연습은 얼마든지!${slot}`, 3400);
     else toast('<b>끝까지 쳤어요!</b>한 번 더 해 볼까요? 잃는 건 없어요.', 3000);
   }).catch(() => {
     if (gen !== S.gen) return;
@@ -428,7 +455,8 @@ function keyRect(midi) {
   return { x: x + G.kw - bw / 2, w: bw, black: true };
 }
 function hitKey(px, py) {
-  if (py < G.keysTop) return null;
+  if (py < G.keysTop - KEY_SLOP) return null;
+  py = Math.max(py, G.keysTop); // 건반 바로 위 띠는 건반 윗부분 (v413)
   if (py - G.keysTop < G.keysH * 0.62) {
     for (let wi = S.win.lo; wi < S.win.hi; wi += 1) {
       const li = ((wi % 7) + 7) % 7;
@@ -872,7 +900,8 @@ function draw(now) {
   drawKeys(now);
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
-  if (S.running && S.t < 0) {
+  const fxOn = !!S.fx && now - S.fx.at < FX_MS;
+  if (S.running && S.t < 0 && !fxOn) {
     const n = Math.ceil(-S.t);
     const cy = S.lv === 1 ? (G.barsTop + G.keysTop) / 2 : G.sheetH / 2;
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
@@ -886,11 +915,169 @@ function draw(now) {
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.font = '600 13px "Noto Sans KR", sans-serif';
     ctx.fillText('기다릴게요 — 천천히 찾아봐요', G.W - 14, G.mapY - 6);
-  } else if (!S.running) {
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = '700 14px "Noto Sans KR", sans-serif';
-    ctx.fillText(S.mode === 'tap' ? '위쪽을 톡 = 시작' : '톡 누르면 시작', G.W - 14, G.mapY - 6);
+  } else if (!S.running && !fxOn) {
+    if (S.t > -LEAD + 1e-6 || S.si > 0) drawPaused(); // 판 도중에 멈췄다 — 고장이 아니라 멈춤인 것이 보이게 (v413)
+    else {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = '700 14px "Noto Sans KR", sans-serif';
+      ctx.fillText(S.mode === 'tap' ? '위쪽을 톡 = 시작' : '톡 누르면 시작', G.W - 14, G.mapY - 6);
+    }
   }
+  if (fxOn) drawFx(now);
+}
+
+/** 가운데 큰 글 자리 — 막대 칸(도움 1) 또는 악보 가운데 */
+const midY = () => (S.lv === 1 ? (G.barsTop + G.keysTop) / 2 : G.sheetH / 2);
+/** 판 도중 멈춤 (v413) — 가운데 띠에 크게 */
+function drawPaused() {
+  const cy = midY();
+  const h = Math.min(120, G.H * 0.2);
+  ctx.fillStyle = 'rgba(10,15,36,0.78)';
+  rr(G.W * 0.12, cy - h / 2, G.W * 0.76, h, 18);
+  ctx.fill();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `800 ${Math.round(h * 0.34)}px "Noto Sans KR", sans-serif`;
+  ctx.fillText('⏸ 멈췄어요', G.W / 2, cy - h * 0.16);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = `600 ${Math.round(h * 0.16)}px "Noto Sans KR", sans-serif`;
+  ctx.fillText(S.mode === 'tap' ? '▶ 시작을 누르면 이어서 쳐요' : '톡 누르면 이어서 들어요', G.W / 2, cy + h * 0.24);
+}
+
+// ───────────────────── 🎺 판 끝 박자 효과 (v413 진우 바람) ─────────────────────
+
+/** 효과가 보이는 시간 */
+export const FX_MS = 2400;
+const FX_TEXT = {
+  great: ['🎉 빠바밤!', '박자가 딱딱 맞았어요!'],
+  good: ['👏 짝짝짝!', '끝까지 잘 쳤어요!'],
+  boo: ['🎺 뿌우~', '다음엔 박자에 맞춰 볼까요?'],
+};
+const CONFETTI = ['#ff5c95', '#ffd166', '#3fa6f0', '#2fbf7a', '#c08cff', '#ff9f43'];
+/** 효과 시작 — 그림(꽃가루는 🎉만 · 조각 서른여섯 · 자리는 시간으로 셈해 따로 들고 있지 않는다)과 소리 */
+function startFx(kind) {
+  const bits = kind === 'great' ? Array.from({ length: 36 }, (_, i) => ({
+    x: Math.random(), vx: (Math.random() - 0.5) * 220, vy: -260 - Math.random() * 260, c: CONFETTI[i % CONFETTI.length], r: Math.random() * 6, spin: (Math.random() - 0.5) * 12,
+  })) : null;
+  S.fx = { kind, at: performance.now(), bits };
+  fxSound(kind);
+}
+function drawFx(now) {
+  const f = S.fx;
+  const e = now - f.at;
+  const fade = e < FX_MS * 0.75 ? 1 : Math.max(0, (FX_MS - e) / (FX_MS * 0.25));
+  const [big, small] = FX_TEXT[f.kind] || FX_TEXT.good;
+  const pop = 1 + 0.3 * Math.max(0, 1 - e / 220); // 처음에 톡 커졌다가
+  const droop = f.kind === 'boo' ? Math.min(14, e / 60) : 0; // 🎺은 글이 축 처진다
+  const h = Math.min(130, G.H * 0.22);
+  const cy = G.keysTop - h / 2 - 22 + droop; // 건반 바로 위 — 가운데 위쪽의 💰 알림과 겹치지 않게
+  ctx.globalAlpha = fade;
+  ctx.fillStyle = f.kind === 'boo' ? 'rgba(40,44,70,0.85)' : 'rgba(10,15,36,0.8)';
+  rr(G.W * 0.14, cy - h / 2, G.W * 0.72, h, 20);
+  ctx.fill();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = f.kind === 'great' ? '#ffd166' : f.kind === 'good' ? '#ffffff' : '#c9cbe0';
+  ctx.font = `900 ${Math.round(h * 0.36 * pop)}px "Noto Sans KR", sans-serif`;
+  ctx.fillText(big, G.W / 2, cy - h * 0.14);
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.font = `600 ${Math.round(h * 0.15)}px "Noto Sans KR", sans-serif`;
+  ctx.fillText(small, G.W / 2, cy + h * 0.26);
+  // 꽃가루는 띠 위로 지나가게 마지막에
+  if (f.bits) {
+    const sec = e / 1000;
+    for (const b of f.bits) {
+      const x = b.x * G.W + b.vx * sec;
+      const y = G.H * 0.62 + b.vy * sec + 450 * sec * sec;
+      if (y > G.H || x < -10 || x > G.W + 10) continue;
+      ctx.fillStyle = b.c;
+      ctx.setTransform(G.dpr, 0, 0, G.dpr, G.dpr * x, G.dpr * y);
+      ctx.rotate(b.r + b.spin * sec);
+      ctx.fillRect(-5, -3, 10, 6);
+    }
+    ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
+  }
+  ctx.globalAlpha = 1;
+}
+/** 울리고 있는 효과 소리 — 떠날 때·내릴 때·판을 새로 할 때 끈다 (안 끄면 돌아와서 남은 가락이 이어졌다 · Codex 217차 P2) */
+const fxNodes = new Set();
+function fxNode(n, out) {
+  fxNodes.add(n);
+  n.onended = () => { fxNodes.delete(n); try { out.disconnect(); } catch { /* 이미 */ } };
+}
+function hushFx() {
+  for (const n of fxNodes) { try { n.stop(); } catch { /* 이미 멈춤 */ } }
+  fxNodes.clear();
+}
+/** 거른 톱니파 한 음 — 나팔·트롬본 비슷한 소리 (bend: 끝으로 갈수록 내려가는 반음 수 · vib: 떨림) */
+function horn(a, f, t0, dur, vol, { bend = 0, vib = 0, cut = 1800 } = {}) {
+  const o = a.createOscillator();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(f, t0);
+  if (bend) o.frequency.linearRampToValueAtTime(f * Math.pow(2, -bend / 12), t0 + dur);
+  if (vib) {
+    const l = a.createOscillator();
+    const lg = a.createGain();
+    l.frequency.value = 6;
+    lg.gain.value = vib;
+    l.connect(lg);
+    lg.connect(o.frequency);
+    l.start(t0 + dur * 0.3);
+    l.stop(t0 + dur + 0.05);
+    fxNode(l, lg);
+  }
+  const flt = a.createBiquadFilter();
+  flt.type = 'lowpass';
+  flt.frequency.setValueAtTime(cut * 0.5, t0);
+  flt.frequency.linearRampToValueAtTime(cut, t0 + 0.06);
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.025);
+  g.gain.setValueAtTime(vol, t0 + dur * 0.75);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(flt); flt.connect(g); g.connect(master);
+  o.start(t0);
+  o.stop(t0 + dur + 0.05);
+  fxNode(o, g);
+}
+/** 손뼉 한 번 — 짧은 잡음 */
+function clap(a, t0) {
+  const n = Math.round(a.sampleRate * 0.09);
+  const buf = a.createBuffer(1, n, a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i += 1) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+  const src = a.createBufferSource();
+  src.buffer = buf;
+  const flt = a.createBiquadFilter();
+  flt.type = 'bandpass';
+  flt.frequency.value = 1400;
+  flt.Q.value = 0.9;
+  const g = a.createGain();
+  g.gain.value = 0.6;
+  src.connect(flt); flt.connect(g); g.connect(master);
+  src.start(t0);
+  fxNode(src, g);
+}
+/** 효과 소리 — 앱이 지은 가락(다른 게임·포켓몬 효과음을 베끼지 않음) · 소리 장치가 모자라면 그림만 */
+function fxSound(kind) {
+  const a = audio();
+  if (!a) return;
+  try {
+    const t = a.currentTime + 0.05;
+    if (kind === 'great') {
+      // 솔·도·미 → 솔 → 도미솔도 화음
+      [[392, 0, 0.12], [523.3, 0.13, 0.12], [659.3, 0.26, 0.12], [784, 0.39, 0.24]].forEach(([f, d, l]) => horn(a, f, t + d, l, 0.16));
+      for (const f of [523.3, 659.3, 784, 1046.5]) horn(a, f, t + 0.68, 0.95, 0.09, { vib: 3 });
+    } else if (kind === 'good') {
+      for (const d of [0, 0.17, 0.34]) clap(a, t + d);
+      horn(a, 1046.5, t + 0.5, 0.25, 0.06, { cut: 3000 });
+    } else {
+      // 뿌- 뿌- 뿌- 뿌우~ (반음씩 내려가고 마지막은 길게 떨며 처진다)
+      [[293.7, 0], [277.2, 0.42], [261.6, 0.84]].forEach(([f, d]) => horn(a, f, t + d, 0.36, 0.15, { bend: 0.4, cut: 900 }));
+      horn(a, 246.9, t + 1.26, 1.15, 0.15, { bend: 1.5, vib: 5, cut: 900 });
+    }
+  } catch { /* 소리 없이 그림만 */ }
 }
 
 /** 멈춰 있고 움직이는 그림이 없으면 이만큼에 한 번만 그린다 (v407 — 전엔 멈춰 있어도 1초에 60번 처음부터) */
@@ -898,6 +1085,7 @@ export const IDLE_MS = 250;
 /** 지금 움직이는 그림이 있나 — 연주 중 · 누르고 있는 건반 · 아직 사그라지는 건반 빛 · 맞힌 음표의 반짝임 */
 function moving(now) {
   if (S.running || S.held.size) return true;
+  if (S.fx && now - S.fx.at < FX_MS) return true; // 🎺 판 끝 효과 (v413)
   for (const f of S.flash.values()) if (f.until > now) return true;
   for (const s of S.sounding.values()) if (s.until > now) return true;
   return !!S.perf && S.perf.heads.some((h) => h.okAt && now - h.okAt < 600);
@@ -906,6 +1094,7 @@ function frame(now) {
   S.raf = 0;
   if (!S.active || (S.screen !== 'stage' && S.screen !== 'free')) return;
   if (S.running) {
+    if (now - S.last >= STALL.ms) noteStall(now - S.last); // ⚠️ 화면이 멈칫했다 (v413)
     advance(Math.min(0.25, (now - S.last) / 1000) / secPerBeat());
     // 🎧 진우는 진짜 피아노를 치느라 태블릿을 안 만진다 — 앱이 연주하는 동안은 손댄 것으로 (⏳ 음악 시간이 2분 쉼에 멈추지 않게)
     if (now - S.lastAct > 5000) { S.lastAct = now; noteActivity(); }
@@ -916,6 +1105,11 @@ function frame(now) {
   if (mv || S.busy || now - S.drawn >= IDLE_MS) { S.drawn = now; draw(now); }
   S.busy = mv;
   S.raf = requestAnimationFrame(frame);
+}
+/** ⚠️ 연주 중 화면 멈칫 (v413) — 그 판의 가장 긴 것은 🎹 치기 기록 줄에 · 하루 칸은 번 수와 긴 것 수 (아이 화면엔 아무것도 없다) */
+function noteStall(ms) {
+  S.passStall = Math.max(S.passStall, ms);
+  applyDailyDelta(clockDay(), { pnStallN: 1, ...(ms >= STALL.long ? { pnStallLong: 1 } : {}) }).catch(() => {});
 }
 function startLoop() {
   if (!S.raf) S.raf = requestAnimationFrame(frame);
@@ -959,17 +1153,27 @@ function toast(html, ms) {
   const t = $('pn-toast');
   if (!t) return;
   t.innerHTML = html;
+  t.className = S.fx && performance.now() - S.fx.at < FX_MS ? 'pn-toast is-high' : 'pn-toast'; // 판 끝 효과가 떠 있으면 위로 — 건반 위 효과 띠를 가리지 않게 (v413)
   t.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, ms);
 }
 const slotsHtml = (filled) => `<span class="pn-slots">${Array.from({ length: NOTES_PER_MON }, (_, i) => `<span class="${i < filled ? 'on' : ''}">♪</span>`).join('')}</span>`;
+/** 🎹 건반 칸 그림 (v413) — 작은 건반 열 개가 하나씩 빛난다 · 수는 안 쓴다 */
+const keysHtml = (filled) => `<span class="pn-tkeys">${Array.from({ length: TAPS_PER_MON }, (_, i) => `<span class="${i < filled ? 'on' : ''}"></span>`).join('')}</span>`;
 function renderSlots() {
   const box = $('pn-slots');
   if (!box) return;
-  box.hidden = S.mode !== 'listen';
+  box.hidden = false;
   const pn = pianoNow();
-  box.innerHTML = `${slotsHtml(slotsOf(pn.notes, pn.mons).filled)}<span class="pn-slots-mon">→ 🐾</span>`; // 포켓몬이 오면 다시 0부터 (v404) · 누르면 🐾 안내 (v405)
+  // 🎹 태블릿으로 치기는 건반 열 칸(v413) · 🎧 듣고 따라 치기는 ♪ 다섯 칸 — 포켓몬이 오면 다시 0부터 (v404) · 누르면 🐾 안내 (v405)
+  if (S.mode === 'tap') {
+    box.innerHTML = `${keysHtml(slotsOf(pn.taps, pn.tapMons, TAPS_PER_MON).filled)}<span class="pn-slots-mon">→ 🐾</span>`;
+    box.setAttribute('aria-label', '건반 칸 — 음악 포켓몬 안내');
+  } else {
+    box.innerHTML = `${slotsHtml(slotsOf(pn.notes, pn.mons).filled)}<span class="pn-slots-mon">→ 🐾</span>`;
+    box.setAttribute('aria-label', '음표 칸 — 음악 포켓몬 안내');
+  }
 }
 
 // ───────────────────── 🐾 음악 포켓몬이 왔어요 (v404) ─────────────────────
@@ -989,6 +1193,7 @@ function nextArrival() {
   const host = $('view-music');
   const item = arrive.queue.shift();
   if (!host || !item) return;
+  if (S.running) setRun(false); // 🔁 계속으로 치다 열째 칸 — 창이 악보를 가리니 ⏸처럼 멈춘다(안 멈추면 다음 판 첫 음이 「늦음」) · 닫은 뒤 ▶로 이어 (Codex 217차 P2)
   const { id } = item;
   const r = ROSTER.find((m) => m.id === id);
   const rank = RARITY[rarityOf(id)] || RARITY[2];
@@ -1016,10 +1221,12 @@ function nextArrival() {
 // ───────────────────── 🐾 음악 포켓몬 안내 (v405) ─────────────────────
 
 const INTRO_KEY = 'shincoach.musicIntro';
+/** 본 안내 판 — v413에 🎹 건반 칸이 생겨 한 번 더 보여 준다 (v405 판은 '1') */
+const INTRO_VER = '2';
 /** 안내 창에 보일 음악 포켓몬 — 랑딸랑(흔함) · 치렁(보통) · 테라파고스(전설) */
 const INTRO_MONS = [433, 358, 1024];
 function introSeen() {
-  try { return localStorage.getItem(INTRO_KEY) === '1'; } catch { return false; }
+  try { return localStorage.getItem(INTRO_KEY) === INTRO_VER; } catch { return false; }
 }
 /** 글 조각을 이어 붙인 한 줄 — [글, 굵게?] (innerHTML 없이) */
 function introLine(tag, parts) {
@@ -1030,6 +1237,7 @@ function introLine(tag, parts) {
 /**
  * 🐾 음악 포켓몬은 어떻게 만나요? — 처음 들어올 때 한 번(「알겠어요!」로 닫아야 본 것) · ♪ 칸을 누르면 다시
  * 태블릿 화면 건반으로 얻는 줄 알 수 있어서 진짜 피아노로 끝까지 따라 쳐야 한다고 적는다 (아버님 11-09) · 셈·남은 수 없음
+ * (v413) 🎹 태블릿으로 치기도 「곡 전체」를 끝까지 잘 치면 건반 칸 — 두 길을 나란히
  */
 function showIntro() {
   const host = $('view-music');
@@ -1055,6 +1263,7 @@ function showIntro() {
     imgs.set(id, img);
   }
   card.appendChild(row);
+  card.appendChild(el('p', 'pn-intro-way', '🎧 진짜 피아노로'));
   const ol = el('ol', 'pn-intro-steps');
   ol.appendChild(introLine('li', [['「🎧 듣고 따라 치기」', true], ['를 골라요', false]]));
   ol.appendChild(introLine('li', [['앱이 치는 소리를 들으며 ', false], ['진짜 피아노', true], ['로 끝까지 따라 쳐요', false]]));
@@ -1066,11 +1275,20 @@ function showIntro() {
   last.appendChild(el('span', '', '가 다 차면 🐾 음악 포켓몬이 와요!'));
   ol.appendChild(last);
   card.appendChild(ol);
-  const tap = introLine('p', [['🎹 태블릿으로 치기', true], ['(화면 건반)는 💰를 받아요', false]]);
-  tap.className = 'pn-intro-tap';
-  card.appendChild(tap);
+  // 🎹 태블릿 화면 건반으로 (v413) — 「곡 전체」를 끝까지 잘 치면 건반 칸 하나 · 건반 칸이 다 차면 🐾 · 💰도
+  card.appendChild(el('p', 'pn-intro-way', '🎹 태블릿 화면 건반으로'));
+  const ol2 = el('ol', 'pn-intro-steps');
+  ol2.appendChild(introLine('li', [['「🎹 태블릿으로 치기」', true], ['에서 ', false], ['「곡 전체」', true], ['를 골라요', false]]));
+  ol2.appendChild(introLine('li', [['끝까지 잘 치면 건반 칸 하나 — ', false], ['💰', true], ['도 받아요', false]]));
+  const last2 = el('li');
+  const ten = el('span', 'pn-tkeys'); // 빈 건반 열 — 무대의 칸과 같은 그림(수는 안 쓴다)
+  for (let i = 0; i < TAPS_PER_MON; i++) ten.appendChild(el('span', ''));
+  last2.appendChild(ten);
+  last2.appendChild(el('span', '', '이 다 차면 🐾 음악 포켓몬이 와요!'));
+  ol2.appendChild(last2);
+  card.appendChild(ol2);
   const ok = btn('알겠어요!', 'btn btn-primary pn-arrive-ok', () => {
-    try { localStorage.setItem(INTRO_KEY, '1'); } catch { /* 못 적으면 다음에 또 */ }
+    try { localStorage.setItem(INTRO_KEY, INTRO_VER); } catch { /* 못 적으면 다음에 또 */ }
     applyDailyDelta(clockDay(), { pnIntro: 1 }).catch(() => {}); // 📤 「🐾 안내 창 봄」 — 아버님이 안내가 닿았는지 보신다
     box.remove();
     if (!$('pn-arrive') && arrive.queue.length) nextArrival(); // 안내하는 사이 온 포켓몬
@@ -1089,7 +1307,7 @@ function showIntro() {
 let dueBusy = false;
 function dueMons() {
   const pn = pianoNow();
-  if (dueBusy || Math.floor(pn.notes / NOTES_PER_MON) <= pn.mons) return;
+  if (dueBusy || (Math.floor(pn.notes / NOTES_PER_MON) <= pn.mons && Math.floor(pn.taps / TAPS_PER_MON) <= pn.tapMons)) return; // 🎹 건반 칸 몫도 (v413)
   dueBusy = true;
   pianoMonsDue().then((r) => {
     dueBusy = false;
@@ -1165,6 +1383,8 @@ function rebuild() {
   S.perf = perform(S.song, S.line);
   S.passDone = false;
   S.retry = null;
+  S.fx = null;
+  hushFx();
   setRun(false);
   toStart();
   layout();
@@ -1374,7 +1594,9 @@ function drawTrail() {
 function wireCanvas() {
   cv.addEventListener('click', (e) => {
     if (S.screen === 'free') return; // 자유롭게 치기엔 ▶가 없다
-    if (S.mode === 'tap' && e.offsetY >= G.keysTop) return;
+    // 🎹 v413 — 위쪽 톡은 시작만: 연주 중에 건반 위쪽을 잘못 누르면 ⏸가 되어 「멈췄다가 3~4초 뒤 풀린다」였다(멈춤은 ⏸ 단추로만) ·
+    //   건반·건반 바로 위 띠는 톡이 아니다 · 건반을 누른 손가락이 위로 미끄러져 뗀 톡도 시작이 아니다
+    if (S.mode === 'tap' && (S.running || e.offsetY >= G.keysTop - KEY_SLOP || performance.now() - S.keyAt < KEY_CLICK_MS)) return;
     toggle();
   });
   cv.addEventListener('pointerdown', (e) => {
@@ -1382,6 +1604,7 @@ function wireCanvas() {
     const m = hitKey(e.offsetX, e.offsetY);
     if (m == null) return;
     e.preventDefault();
+    S.keyAt = performance.now();
     audio();
     try { cv.setPointerCapture(e.pointerId); } catch { /* 없음 */ }
     S.ptr.set(e.pointerId, m);
@@ -1398,6 +1621,7 @@ function wireCanvas() {
   });
   const lift = (e) => {
     if (!S.ptr.has(e.pointerId)) return;
+    S.keyAt = performance.now(); // 건반에서 시작한 손가락을 뗄 때도 — 0.8초 넘게 누르다 위로 미끄러져 떼면 그 톡이 시작이 됐다 (Codex 217차 P3)
     const m = S.ptr.get(e.pointerId);
     S.ptr.delete(e.pointerId);
     if (m != null) release(m);
@@ -1426,6 +1650,8 @@ function stopPlay() {
   S.ptr.clear();
   S.pcDown.clear();
   S.sounding.clear();
+  hushFx(); // 🎺 판 끝 효과도 — 소리와 그림 함께 (Codex 217차 P2 · 판 끝의 setRun(false)는 효과를 끄지 않는다)
+  S.fx = null;
   keepAwake(false);
   flushFree(true); // 🎹 자유롭게 치기 셈 — 떠날 때·내릴 때 (v408)
 }
@@ -1527,4 +1753,4 @@ export function leaveMusic() {
 }
 
 /** 걷기용 */
-if (typeof window !== 'undefined') window.__piano = { S, toStart, advance, press, passEnd, openSong, renderList, draw, secPerBeat };
+if (typeof window !== 'undefined') window.__piano = { S, G, toStart, advance, press, passEnd, openSong, renderList, draw, secPerBeat, hitKey };
