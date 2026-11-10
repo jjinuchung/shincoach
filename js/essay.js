@@ -589,7 +589,7 @@ export function openEssay(o) {
   const coach = o.mode === 'coach'; // 👨‍👩‍👦 아빠가 고쳐 준 글을 읽는 회차 (쓰기 단계 없음)
   $('essay-title').textContent = coach ? '👨‍👩‍👦 아빠가 고쳐준 글' : (o.practice ? '✍️ 에세이 연습' : '✍️ 오늘의 에세이');
   $('essay-msg').textContent = coach
-    ? `아빠가 고쳐준 문장 ${o.prompts.length}개를 읽어 봐요`
+    ? '아빠가 고쳐준 문장을 읽어 봐요' // 아이 화면에 수 없이 (v410 아버님 「숫자를 빼」)
     : `배운 문장 ${o.prompts.length}개를 내 이야기로 바꿔 써요`;
   $('essay-start').textContent = coach ? '👀 보러 가기' : '✍️ 시작!';
   $('essay-fixed-label').textContent = coach ? '👨‍👩‍👦 아빠가 고쳐준 글' : '✅ 신코치가 고친 글';
@@ -955,7 +955,7 @@ async function showDone() {
   // 기다리는 사이 닫혔거나 다른 회차가 열렸으면 그 화면을 건드리지 않는다 (v318 시험이 찾음 — ui.o가 비어 오류가 났다)
   if (!ui.open || run !== ui.run) return;
   $('essay-done-msg').textContent = ui.o.mode === 'coach'
-    ? `아빠가 고쳐준 문장 ${ui.o.prompts.length}개를 다 읽었어요 👏`
+    ? '아빠가 고쳐준 문장을 다 읽었어요 👏' // 수 없이 (v410)
     : ui.o.practice
       ? '연습 끝! 잘했어요 👏'
       : `오늘의 에세이 완성! 문장 ${ui.o.prompts.length}개를 내 이야기로 바꿨어요 🎉`;

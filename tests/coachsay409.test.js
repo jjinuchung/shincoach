@@ -182,3 +182,17 @@ test('🎤 연결 — player onRead가 준 것을 돌려준다 · 화면 칸 · 
   assert.ok(/prefers-reduced-motion: reduce\) \{ \.essay-gain\.show \{ animation: none; \} \}/.test(css));
   assert.ok(Number((/APP_VERSION = 'v(\d+)'/.exec(read('js/version.js')) || [])[1]) >= 409);
 });
+
+test('🔢 v410 교정 회차 시작·끝 문구에 수가 없다 — 한 문장이든 두 문장이든 (아버님 「숫자를 빼」)', async () => {
+  for (const n of [1, 2]) {
+    coachOpen([coachPrompt('n1', 'i run', 'I run.'), coachPrompt('n2', 'he go', 'He goes.')].slice(0, n));
+    assert.equal($('essay-msg').textContent, '아빠가 고쳐준 문장을 읽어 봐요');
+    $('essay-start').click();
+    for (let k = 0; k < n; k++) { $('essay-say').click(); await tick(6); $('essay-next').click(); }
+    await tick();
+    assert.equal($('essay-done-msg').textContent, '아빠가 고쳐준 문장을 다 읽었어요 👏');
+    assert.ok(!/\d/.test($('essay-msg').textContent + $('essay-done-msg').textContent), '문구에 숫자 없음(보상 칩의 ⚡💰 양은 따로)');
+    closeEssay();
+  }
+  assert.ok(Number((/CACHE_VERSION = 'v(\d+)'/.exec(read('sw.js')) || [])[1]) >= 410);
+});
