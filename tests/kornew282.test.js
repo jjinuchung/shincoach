@@ -62,7 +62,7 @@ const namesIn = (s) => EEVEELUTIONS.filter((n) => s.includes(n));
 test('📚 포켓몬 글 여섯 (v282): 연습 카드 · 물음 스물넷 · 원고 검사 통과 · 다섯 편이던 단원에 한 편씩(5-1-4 분류는 여덟이어도) · 성취기준 공식 문구 · ✍️ 하나 · 메모·토의·광고는 줄마다', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(IDS.slice(96, 102), NEW);
-  assert.equal(validCards(DATA).length, 202); // v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 · v347 4학년 2학기 글 넷째 묶음 열둘 · v372 4학년 2학기 글 다섯째 묶음 열둘 · v380 4학년 2학기 글 여섯째 묶음 열둘 · v382 4학년 2학기 글 일곱째 묶음 열둘 · v389 4학년 2학기 글 여덟째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 226); // v291 호상놀이 글 넷 · v298 4학년 2학기 글 열둘 · v320 4학년 2학기 글 둘째 묶음 열둘 · v322 4학년 2학기 글 셋째 묶음 열둘 · v347 4학년 2학기 글 넷째 묶음 열둘 · v372 4학년 2학기 글 다섯째 묶음 열둘 · v380 4학년 2학기 글 여섯째 묶음 열둘 · v382 4학년 2학기 글 일곱째 묶음 열둘 · v389 4학년 2학기 글 여덟째 묶음 열둘 · v411 아홉째·열째 묶음 스물넷 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '설명하는 글'], ['practice', '발표 준비 메모'], ['practice', '토의'], ['practice', '광고'], ['practice', '소개하는 글'], ['practice', '독서 일기'],
   ]);
@@ -72,7 +72,8 @@ test('📚 포켓몬 글 여섯 (v282): 연습 카드 · 물음 스물넷 · 원
   // 📘 단원 지도 — 한 단원에 하나씩
   const unitOf = (id) => UNITS.filter((u) => u.cards.includes(id)).map((u) => u.id);
   assert.deepEqual(NEW.map(unitOf), [['5-1-4'], ['5-1-3'], ['5-1-5'], ['5-2-매체'], ['5-2-2'], ['5-2-독서']]);
-  for (const u of ['5-1-3', '5-1-5', '5-2-매체', '5-2-2', '5-2-독서']) assert.equal(UNITS.find((x) => x.id === u).cards.length, 6, `${u} 다섯 편 → 여섯 편`);
+  const LATER = { '5-1-3': 7, '5-1-5': 8 }; // v411 5-1 미리보기 — 3단원 K215 · 5단원 K225·K226
+  for (const u of ['5-1-3', '5-1-5', '5-2-매체', '5-2-2', '5-2-독서']) assert.equal(UNITS.find((x) => x.id === u).cards.length, LATER[u] || 6, `${u} 다섯 편 → 여섯 편`);
   assert.equal(UNITS.find((x) => x.id === '5-1-4').cards.length, 11); // v291 K104·K105 더함
   // 성취기준 — 공식 문구 그대로 · 그 글의 단원
   for (const id of NEW) {

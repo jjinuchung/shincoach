@@ -42,7 +42,7 @@ before(async () => {
 test('📘 둘째 묶음 열둘 (v320): 연습 열 + ✨ 명작 둘 · 물음 서른여섯(셋씩) · 원고 검사 통과 · 짧게(7~12줄, 원문 여섯 줄 동시만 예외) · ✍️ 둘 · 두 사람의 글·메시지는 줄마다', () => {
   assert.deepEqual(checkContent(DATA), []);
   assert.deepEqual(IDS.slice(118, 130), NEW);
-  assert.equal(validCards(DATA).length, 202); // v322 셋째 묶음 열둘 · v347 넷째 묶음 열둘 · v372 다섯째 묶음 열둘 · v380 여섯째 묶음 열둘 · v382 일곱째 묶음 열둘 · v389 여덟째 묶음 열둘 더함
+  assert.equal(validCards(DATA).length, 226); // v322 셋째 묶음 열둘 · v347 넷째 묶음 열둘 · v372 다섯째 묶음 열둘 · v380 여섯째 묶음 열둘 · v382 일곱째 묶음 열둘 · v389 여덟째 묶음 열둘 · v411 아홉째·열째 묶음 스물넷 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '의견을 제시하는 글 두 편'], ['practice', '제안하는 글'], ['practice', '발표하는 글'], ['practice', '일기'], ['classic', '동시'], ['practice', '이야기'],
     ['practice', '설명하는 글'], ['practice', '메시지 대화'], ['practice', '편지'], ['practice', '일기'], ['classic', '옛이야기'], ['practice', '설명하는 글']]);
@@ -75,7 +75,7 @@ test('📘 단원 (v320): 새 글은 4-2 단원 하나씩 · 만나는 곳은 �
     assert.ok(codes.some((k) => LINK4[u.id].includes(k)), `${id} 단원 ${u.id}와 이어진 성취기준`);
     assert.ok(!card(id).meta.some((m) => /\[6국/.test(m)), `${id} 5~6학년 성취기준 없음`);
   }
-  assert.deepEqual(UNITS.find((u) => u.id === '4-2-매체').cards, ['K122', 'K177', 'K191', 'K121', 'K184', 'K196', 'K150', 'K135', 'K149'], '자료를 고르고 만들기 → (v380) 내용마다 알맞은 자료 → (v389) 믿을 만한 자료 고르기 → 자료를 보여 주며 발표 → (v382) 조사한 내용을 표·지도로 정리해 발표 → (v389) 표로 정리한 안전 약속 → (v347) 출처 밝히기 → (v322) 카드 뉴스 → (v347) 발표 되돌아보기');
+  assert.deepEqual(UNITS.find((u) => u.id === '4-2-매체').cards, ['K122', 'K177', 'K191', 'K203', 'K121', 'K184', 'K196', 'K213', 'K150', 'K135', 'K149'], '(v411) 양포켓몬 자료 고르기 · 오리온자리 발표 · 자료를 고르고 만들기 → (v380) 내용마다 알맞은 자료 → (v389) 믿을 만한 자료 고르기 → 자료를 보여 주며 발표 → (v382) 조사한 내용을 표·지도로 정리해 발표 → (v389) 표로 정리한 안전 약속 → (v347) 출처 밝히기 → (v322) 카드 뉴스 → (v347) 발표 되돌아보기');
   assert.match(UNITS.find((u) => u.id === '4-2-1').goal, /비교/);
 });
 
@@ -211,10 +211,10 @@ test('📦 시작 날 저장·병합 (v320 · Codex 126차 #4): 저장이 안 �
   assert.deepEqual(await stored(), {}, '저장소에도 없다');
   const r = await korDripStart(ids, t); // 다시 — 이번엔 적힌다
   assert.equal(r.ok, true);
-  assert.deepEqual((await getProfile()).korDrip, { b320: t, b322: t, b347: t, b372: t, b380: t, b382: t, b389: t }, 'v322·v347·v372·v380·v382·v389 — 뒤 묶음도 처음 받은 날을 적는다(열리는 날은 앞 묶음 다음 날부터 — kordrip322·kordrip347·kordrip372)');
-  assert.deepEqual(korDripMap(), { b320: t, b322: t, b347: t, b372: t, b380: t, b382: t, b389: t }, '메모리 프로필도 같이');
+  assert.deepEqual((await getProfile()).korDrip, { b320: t, b322: t, b347: t, b372: t, b380: t, b382: t, b389: t, b411a: t, b411b: t }, 'v322·v347·v372·v380·v382·v389 — 뒤 묶음도 처음 받은 날을 적는다(열리는 날은 앞 묶음 다음 날부터 — kordrip322·kordrip347·kordrip372)');
+  assert.deepEqual(korDripMap(), { b320: t, b322: t, b347: t, b372: t, b380: t, b382: t, b389: t, b411a: t, b411b: t }, '메모리 프로필도 같이');
   assert.equal((await korDripStart(ids, '2026-10-25')).why, 'same', '다시 열어도 그대로');
-  assert.deepEqual((await getProfile()).korDrip, { b320: t, b322: t, b347: t, b372: t, b380: t, b382: t, b389: t });
+  assert.deepEqual((await getProfile()).korDrip, { b320: t, b322: t, b347: t, b372: t, b380: t, b382: t, b389: t, b411a: t, b411b: t });
   const p = cloneProfile({ korDrip: { b320: t, zz: 1 } });
   assert.deepEqual(p.korDrip, { b320: t }, '모르는 묶음은 버림');
   const m = mergeStatRecord('profile', { id: 'me', updatedAt: 20, korDrip: { b320: '2026-10-25' } }, { id: 'me', updatedAt: 10, korDrip: { b320: '2026-10-23' } });

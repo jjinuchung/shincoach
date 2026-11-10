@@ -42,8 +42,8 @@ const LINK4 = {
 
 test('📘 여덟째 묶음 열둘 (v389): 연습 아홉 + ✨ 명작 셋 · 물음 서른여섯(셋씩) · 원고 검사 통과 · 7~12줄(동시는 원문 다섯 줄) · ✍️ 둘 · 두 친구의 글·모둠 대화는 줄마다 · 바탕 글 여섯', () => {
   assert.deepEqual(checkContent(DATA), []);
-  assert.deepEqual(IDS.slice(190), NEW);
-  assert.equal(validCards(DATA).length, 202);
+  assert.deepEqual(IDS.slice(190, 202), NEW); // v411 아홉째·열째 묶음이 뒤에 이어짐
+  assert.equal(validCards(DATA).length, 226); // · v411 아홉째·열째 묶음 스물넷 더함
   assert.deepEqual(NEW.map((id) => [card(id).kind, card(id).genre]), [
     ['practice', '발표 준비 메모'], ['classic', '동시'], ['practice', '의견을 제시하는 글 두 편'], ['practice', '보고하는 글'], ['practice', '제안하는 글'], ['practice', '발표하는 글'],
     ['practice', '모둠 대화'], ['practice', '카드'], ['practice', '어린이 과학 방송'], ['practice', '설명하는 글'], ['classic', '동화'], ['classic', '옛이야기']]);
@@ -84,13 +84,13 @@ test('📘 단원 (v389): 새 글은 4-2 단원 하나씩 · 만나는 곳은 �
     assert.ok(!card(id).meta.some((m) => /\[6국/.test(m)), `${id} 5~6학년 성취기준 없음`);
   }
   const of = (uid) => UNITS.find((u) => u.id === uid).cards;
-  assert.deepEqual(of('4-2-독서'), ['K197', 'K143', 'K178', 'K192', 'K118', 'K144', 'K165', 'K131', 'K179'], '책 고르기가 맨 앞 → 읽기 전 질문 → …');
-  assert.deepEqual(of('4-2-1'), ['K132', 'K145', 'K181', 'K107', 'K119', 'K146', 'K174', 'K180', 'K193'], '① 작품과 내 경험 → ② 다른 의견 비교');
-  assert.deepEqual(of('4-2-2'), ['K108', 'K133', 'K164', 'K176', 'K109', 'K134', 'K175', 'K182', 'K194'], '① 한글 → ② 보고하는 글');
-  assert.deepEqual(of('4-2-3'), ['K111', 'K147', 'K173', 'K110', 'K120', 'K148', 'K183', 'K195', 'K166'], '① 토의 → ② 제안하는 글 · 고쳐 쓰기는 끝');
-  assert.deepEqual(of('4-2-매체'), ['K122', 'K177', 'K191', 'K121', 'K184', 'K196', 'K150', 'K135', 'K149']);
+  assert.deepEqual(of('4-2-독서'), ['K197', 'K143', 'K178', 'K192', 'K118', 'K144', 'K165', 'K131', 'K179', 'K206', 'K205'], '책 고르기가 맨 앞 → 읽기 전 질문 → …');
+  assert.deepEqual(of('4-2-1'), ['K132', 'K145', 'K181', 'K207', 'K107', 'K119', 'K146', 'K174', 'K180', 'K193', 'K208'], '① 작품과 내 경험 → ② 다른 의견 비교');
+  assert.deepEqual(of('4-2-2'), ['K108', 'K133', 'K164', 'K176', 'K109', 'K134', 'K175', 'K182', 'K194', 'K209', 'K210'], '① 한글 → ② 보고하는 글');
+  assert.deepEqual(of('4-2-3'), ['K111', 'K147', 'K173', 'K211', 'K110', 'K120', 'K148', 'K183', 'K195', 'K212', 'K166'], '① 토의 → ② 제안하는 글 · 고쳐 쓰기는 끝');
+  assert.deepEqual(of('4-2-매체'), ['K122', 'K177', 'K191', 'K203', 'K121', 'K184', 'K196', 'K213', 'K150', 'K135', 'K149']);
   assert.deepEqual(of('4-2-5'), ['K114', 'K126', 'K137', 'K188', 'K138', 'K159', 'K160', 'K171', 'K115', 'K127', 'K139', 'K161', 'K170', 'K187', 'K198', 'K128'], '① 대화 → ② 편지');
-  assert.deepEqual(of('4-2-6'), ['K116', 'K130', 'K140', 'K142', 'K153', 'K154', 'K157', 'K158', 'K167', 'K169', 'K189', 'K199', 'K200', 'K117', 'K129', 'K141', 'K152', 'K156', 'K155', 'K168', 'K190', 'K201', 'K202'], '① 원인과 결과 → ② 이어질 내용 상상');
+  assert.deepEqual(of('4-2-6'), ['K116', 'K130', 'K140', 'K142', 'K153', 'K154', 'K157', 'K158', 'K167', 'K169', 'K189', 'K199', 'K200', 'K117', 'K129', 'K141', 'K152', 'K156', 'K155', 'K168', 'K190', 'K201', 'K202', 'K214'], '① 원인과 결과 → ② 이어질 내용 상상');
   // 일곱·여덟 편이던 단원(독서·1·2·3·매체)을 채워 4-2 단원이 모두 아홉 편 넘게 — 기본안에서 말한 것
   for (const u of UNITS.filter((x) => x.term === '4-2')) assert.ok(u.cards.length >= 9, `${u.id} ${u.cards.length}`);
   assert.match(JSON.parse(read('coach/korean/units.json')).about, /v389 여덟째 묶음/);
@@ -233,8 +233,8 @@ test('🔁 겹침 (v389): 새 글 제목이 옛 글과 같지 않다 · 제목�
 });
 
 test('📖 같이 안 낼 무리 (v389): 관찰 — 옛 무리(관찰한·들여다볼·들여다보다·눈여겨본)와 한 무리 · 긁개 — 도구', () => {
-  assert.equal(WORDS.apart.length, 61);
-  assert.deepEqual(WORDS.apart.slice(-2), [['관찰', '관찰한', '들여다볼', '들여다보다', '눈여겨본'], ['도구', '긁개']]);
+  assert.equal(WORDS.apart.length, 64); // v411이 셋 더함(kornew411)
+  assert.deepEqual(WORDS.apart.slice(-5, -3), [['관찰', '관찰한', '들여다볼', '들여다보다', '눈여겨본'], ['도구', '긁개']]);
 });
 
 test('📦 여덟째 묶음 b389 (v389): 열둘 = 새 글 · b382 다음에 이어서 · 포켓몬 글과 명작 동시가 첫날 · ✍️ 둘은 다른 날 · 12월 6단원은 끝', () => {
