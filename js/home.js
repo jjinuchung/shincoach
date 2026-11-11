@@ -12,7 +12,7 @@ import { dailyDone, quickPlan, quickLeft, QUICK } from './mathprog.js';
 import { todayKey } from './track.js';
 import { homePalOf } from './homeplay.js'; // 🤝 홈 화면 파트너 — 누구를 보일지 (순수)
 import { mountHomePal } from './homepal.js'; // 🤝 홈 화면 파트너 — 그리기·걷기
-import { letterBox, refreshLetter } from './familyview.js'; // 💌 아빠·엄마 한 줄 메시지 (v288)
+import { letterBox, refreshLetter, setLetterGo } from './familyview.js'; // 💌 아빠·엄마 한 줄 메시지 (v288) · 📮 편지 포켓몬이 보낸 말 (v415)
 
 const $ = (id) => document.getElementById(id);
 
@@ -281,6 +281,8 @@ export async function renderHome(showView) {
 export function initHome({ showView }) {
   const back = $('btn-library-back');
   if (back) back.addEventListener('click', () => showView('home'));
+  // 📮 💌 편지 포켓몬이 보낸 말의 [답장하러 가기] → 우체통 (v415 — ⏳ 영어 시간 관문: 영어 화면 📮 띠와 같은 길)
+  setLetterGo(() => import('./timeup.js').then(({ guardStart }) => guardStart('english', () => showView('letters'))).catch(() => {}));
   // 🤝 홈 화면 파트너 — 한 번만 붙이고, 다른 창에서 돌아와 프로필을 다시 읽으면 다시 본다
   const view = $('view-home');
   if (view && !pal) {

@@ -2,6 +2,8 @@
 // 받기: 비공개 저장소 family/messages.json을 📤 열쇠로 — 홈에 올 때 10분에 한 번까지 · 받은 것은 이 기기에 두어 인터넷이 없어도 지난 말이 남는다
 // 그리기: 과목 고르기 맨 위 #home-letter — 안 읽은 맨 앞 하나 → [💗 고마워요]면 읽음(이 기기에 시각) · 다 읽으면 [💌 지난 말 보기]만
 // 📊 "💌 한 줄 쓰기"(부모)는 이 기기 목록에 더한다 — 저장소에는 안 올리고, 읽음과 함께 📤 family/read.md로
+// v415 📮 편지 포켓몬이 보낸 말 — 그림 자리에 그 포켓몬 그림(기기에 있으면 바로 · 없으면 받아 오고 · 못 받으면 📮) ·
+//   [📮 답장하러 가기]는 읽음으로 하고 우체통으로(⏳ 영어 시간 관문 — 영어 화면의 📮 띠와 같은 길 · 길은 home.js가 setLetterGo로 준다)
 import { MSG_PATH, msgsOf, unreadOf, markSeen, localMsg, letterHtml, pastHtml, readMd } from './familymsg.js';
 
 const KEY = { cache: 'shincoach.familyCache', local: 'shincoach.familyLocal', seen: 'shincoach.familySeen', at: 'shincoach.familyAt' };
@@ -68,6 +70,42 @@ export function renderLetter(box) {
   const msgs = allMsgs();
   const un = unreadOf(msgs, seenAll());
   box.innerHTML = un.length ? letterHtml(un[0]) : msgs.length ? '<button type="button" class="btn letter-past letter-chip">💌 지난 말 보기</button>' : '';
+  monArt(box);
+}
+
+/** 📮 [답장하러 가기]의 길 (v415 — home.js가 준다 · 없으면 읽음만) */
+let goLetters = null;
+export function setLetterGo(fn) {
+  goLetters = typeof fn === 'function' ? fn : null;
+}
+/** 📮 그림 자리 → 그 포켓몬 그림 (그림 모듈은 그때 불러온다 — 못 불러오거나 못 받으면 📮 그대로) */
+function monArt(box) {
+  const spots = box.querySelectorAll ? [...box.querySelectorAll('.letter-mon[data-mon]')] : [];
+  if (!spots.length) return;
+  import('./pokemon.js').then(({ characterUrl, ensureArt }) => {
+    for (const s of spots) {
+      const mon = Number(s.dataset.mon);
+      const put = (url) => putArt(s, url, document);
+      const have = characterUrl(mon);
+      if (have) put(have);
+      else ensureArt(mon).then(put).catch(() => {});
+    }
+  }).catch(() => {});
+}
+/** 그림 자리에 그림 하나 — 다 그려진 뒤에만 📮와 바꾼다 (못 그리면 📮 그대로 · 그새 카드가 바뀌었으면 안 붙임) (🔍 Codex 219차 P3-1) */
+export function putArt(s, url, doc) {
+  if (!url || !s.isConnected) return null;
+  const img = doc.createElement('img');
+  img.alt = '';
+  img.width = 72;
+  img.height = 72;
+  img.onload = () => {
+    if (!s.isConnected) return;
+    s.textContent = '';
+    s.appendChild(img);
+  };
+  img.src = url;
+  return img;
 }
 
 /** 누르기 — 한 번만 붙인다 (칸 안을 다시 그려도 그대로) */
@@ -77,7 +115,7 @@ function wire(box) {
   box.addEventListener('click', (e) => {
     const b = e.target && e.target.closest ? e.target.closest('button') : null;
     if (!b) return;
-    if (b.classList.contains('letter-ok')) {
+    if (b.classList.contains('letter-ok') || b.classList.contains('letter-go')) {
       const card = b.closest('.letter');
       const id = card && card.dataset.id;
       if (id) {
@@ -85,6 +123,7 @@ function wire(box) {
         if (!save(KEY.seen, next)) memSeen = next;
       }
       renderLetter(box);
+      if (b.classList.contains('letter-go') && goLetters) goLetters(); // 📮 우체통으로 (v415)
     } else if (b.classList.contains('letter-past')) {
       box.innerHTML = pastHtml(allMsgs());
     } else if (b.classList.contains('letter-close')) {

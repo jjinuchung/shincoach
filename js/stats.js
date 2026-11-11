@@ -29,7 +29,7 @@ import { fixNumJosa } from './mathgen.js'; // 🔤 숫자 뒤 조사 — ❓ 질
 import { weeklyModel, weeklyHtml } from './weekly.js'; // 📈 주간 흐름 — 최근 7일씩 4주 (v287)
 import { coachState, COACH_KEEP_DAYS } from './feedback.js'; // 👨‍👩‍👦 아빠 교정 읽음·「지나감」 — 진우 화면 차례와 같은 판정 (v381)
 import { topicById, topicLabel, topicWeekLine } from './essaytopic.js'; // 💡 오늘의 글감 (v388 — 순수)
-import { MSG_LEN, FROM } from './familymsg.js'; // 💌 한 줄 메시지 (v288)
+import { MSG_LEN, FROM, iconOf } from './familymsg.js'; // 💌 한 줄 메시지 (v288) · 📮 편지 포켓몬이 보낸 말 표시 (v415)
 import { allMsgs, addLocal, seenNow } from './familyview.js';
 import { SPECIES, lakeOf, lakeDayLine, FISH_COINS, FISH_DAY_MIN, SHARE_MIN, SHARE_MAX, PLACES, PLACE_KO, RIVER_NEED, SEA_NEED, BOAT_NEED, placeOpen, GEAR, hasGear, pickOf, lenLabel, STEP_NEED, STEP_UP, STEP_DOWN } from './fishing.js'; // 🎣 학습 낚시터 📊 카드 (v366 — 순수 · v368 🏞️ 강·🎒 채비 · v386 🚤 배 · v387 🔁·🎚️)
 
@@ -1038,7 +1038,7 @@ function renderRestoreOffer(main) {
  */
 /**
  * 💌 진우에게 한 줄 (2026-10-18 v288, 아버님 "이대로 진행") — 집에 계실 때 태블릿에서 바로 남긴다(이 기기에만).
- * 밖에서는 Claude에게 "진우에게: …"라고 하면 비공개 저장소로 온다. 보낸 말마다 읽었나(진우가 [💗 고마워요]를 누른 때)를 보여 준다
+ * 밖에서는 Claude에게 "진우에게: …"라고 하면 비공개 저장소로 온다. 보낸 말마다 읽었나(진우가 [💗 고마워요]·[📮 답장하러 가기]를 누른 때)를 보여 준다
  */
 function renderLetterCard(main) {
   const box = card('💌 진우에게 한 줄');
@@ -1079,7 +1079,7 @@ function renderLetterCard(main) {
     if (!list.length) sent.appendChild(el('li', '', '아직 보낸 말이 없어요'));
     for (const m of list) {
       const short = [...m.text].length > 18 ? `${[...m.text].slice(0, 18).join('')}…` : m.text;
-      sent.appendChild(el('li', '', `${fmt(m.at)} ${FROM[m.from]} ${m.from}${m.id.startsWith('l') ? '' : '(Claude로)'}: "${short}" — ${seen[m.id] ? `💗 읽음 ${fmt(seen[m.id])}` : '아직'}`));
+      sent.appendChild(el('li', '', `${fmt(m.at)} ${iconOf(m)} ${m.from}${m.id.startsWith('l') ? '' : '(Claude로)'}: "${short}" — ${seen[m.id] ? `💗 읽음 ${fmt(seen[m.id])}` : '아직'}`));
     }
   };
   go.addEventListener('click', () => {

@@ -3737,6 +3737,13 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .letter-from span { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
 .letter-text { margin: 0; color: var(--text); font-size: 1.2rem; font-weight: 700; line-height: 1.55; word-break: keep-all; overflow-wrap: anywhere; }
 .letter-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+/* 📮 편지 포켓몬이 보낸 말 (v415) — 왼쪽에 그 포켓몬 그림 · 우체통 색 띠 */
+.letter.is-mon { border-color: #f08c8c; background-color: #fff6f6; }
+.letter.is-mon::before { background: repeating-linear-gradient(90deg, #e03131 0 14px, #ffffff 14px 20px, #e03131 20px 34px, #ffffff 34px 40px); }
+.letter-row { display: flex; align-items: center; gap: 12px; }
+.letter-mon { flex: 0 0 auto; display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: #ffe3e3; font-size: 2rem; }
+.letter-mon img { width: 72px; height: 72px; object-fit: contain; }
+.letter-go { background: #e03131; color: #fff; border-color: transparent; font-weight: 800; }
 .letter-chip { display: block; margin: 0 auto; padding: 6px 14px; min-height: 36px; font-size: 0.9rem; }
 .letter-list { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--text); overflow-wrap: anywhere; }
 .letter-who { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
