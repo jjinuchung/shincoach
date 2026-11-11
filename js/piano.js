@@ -55,13 +55,19 @@ export const LOG_MAX = 60;
 export const MAX_BARS = 200;
 /** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 · 온 음악 포켓몬(v404) · 🐾 안내 창을 「알겠어요!」로 닫은 번(v405) ·
  *  🎹 자유롭게 치기(v408) 연 번 · 누른 건반 · 친 초(쉰 틈은 10초까지만) ·
- *  (v413) 🎹 건반 칸을 센 판 · 박자 판정 🎉·👏·🎺 판 수 · 연주 중 화면이 STALL.ms 넘게 멈칫한 번 · 그 가운데 STALL.long 넘은 번 */
+ *  (v413) 🎹 건반 칸을 센 판 · 박자 판정 🎉·👏·🎺 판 수 · 연주 중 화면이 STALL.ms 넘게 멈칫한 번 · 그 가운데 STALL.long 넘은 번 ·
+ *  (v414) 연주 중 소리 멎음 번 · 그 가운데 MUTE.long 넘은 번 · 소리 장치가 꺼져 있던 번 · 느린 장면 번 · 그 시간 합(ms) · 건반 누름이 끊긴 번 */
 export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec',
-  'pnTapSlots', 'pnFan', 'pnClap', 'pnBoo', 'pnStallN', 'pnStallLong'];
+  'pnTapSlots', 'pnFan', 'pnClap', 'pnBoo', 'pnStallN', 'pnStallLong',
+  'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN'];
 /** 🎺 박자 판정 등급 → 하루 칸 (v413) */
 export const GRADE_DAILY = { great: 'pnFan', good: 'pnClap', boo: 'pnBoo' };
 /** 연주 중 화면 멈칫 (v413 — 「멈췄다가 3~4초 뒤 풀린다」가 태블릿이 버거워 멈춘 것인지 가르려고) · ms 이상이면 셈 · long 이상은 따로 */
 export const STALL = { ms: 1000, long: 2500 };
+/** 연주 중 소리 멎음 (v414 — 「멈췄을 때 건반 소리가 안 났다 · 누른 모양은 보였다」: 화면은 도는데 소리 엔진 시계가 안 간 것) · ms 이상이면 셈 · long 이상은 따로 */
+export const MUTE = { ms: 500, long: 2500 };
+/** 연주 중 느린 장면 (v414) — 화면 한 장 사이가 ms 이상이고 STALL.ms 아래(⚠️ 멈칫이 못 잡는 「기어가기」) */
+export const SLOW = { ms: 200 };
 
 const LETTERS = 'CDEFGAB';
 const SEMI = [0, 2, 4, 5, 7, 9, 11];
@@ -530,6 +536,7 @@ function logRow(r) {
     // 🎹 치기 줄(v413) — g 박자 점수(0~100) · st 그 판의 가장 긴 화면 멈칫(ms · STALL.ms 넘은 것만) · x는 🎹 건반 칸을 셌나
     ...(r.m === 't' && Number.isInteger(r.g) && r.g >= 0 && r.g <= 100 ? { g: r.g } : {}),
     ...(r.m === 't' && nz(r.st) >= STALL.ms ? { st: Math.min(600000, nz(r.st)) } : {}),
+    ...(r.m === 't' && nz(r.mu) >= MUTE.ms ? { mu: Math.min(600000, nz(r.mu)) } : {}), // v414 — 그 판의 가장 긴 소리 멎음(ms)
   };
 }
 
@@ -661,7 +668,7 @@ function clockBack(tr, today) {
 
 /**
  * 🎹 태블릿으로 치기 한 판 끝 (순수 — xp.houseDo 안에서 저장된 프로필로) → { ok, coins, good, slot, taps, tapMons, got, firsts, why? }
- * req = { song, line(-1 곡 전체), hand, lv, sp, ok(맞게 누른 수), bad(틀리게 누른 수), g?(박자 점수 0~100 · v413), st?(가장 긴 화면 멈칫 ms · v413) }
+ * req = { song, line(-1 곡 전체), hand, lv, sp, ok(맞게 누른 수), bad(틀리게 누른 수), g?(박자 점수 0~100 · v413), st?(가장 긴 화면 멈칫 ms · v413), mu?(가장 긴 소리 멎음 ms · v414) }
  * 잘 쳤고(goodPass) 오늘 TAP_DAY번 안이면 💰(coins·coinsEarned 함께) · 아니면 기록만(why 'try' | 'cap')
  * (v413) 🎹 건반 칸 — slot: 'ok'(셈) · 'try'(잘 치지 못함) · 'line'(한 줄 연습 — 「곡 전체」만 센다) · 'cap'(오늘 TAP_SLOT_DAY칸 다 참) ·
  *   💰 한도와 따로 · 열 칸 묶음이 차면 음악 포켓몬이 같은 트랜잭션에서 온다(pool · rng — got)
@@ -692,7 +699,7 @@ export function tapRule(p, req, now, pool = [], rng = Math.random) {
   if (coins || slot === 'ok') tr.days[today] = next;
   const g = Number(req.g);
   pushLog(tr, { at: now, m: 't', s: req.song, n: req.line, h: req.hand, lv: req.lv, sp: req.sp, ok: req.ok, bad: req.bad, c: coins, x: slot === 'ok' ? 1 : 0,
-    ...(Number.isInteger(g) ? { g } : {}), st: req.st });
+    ...(Number.isInteger(g) ? { g } : {}), st: req.st, mu: req.mu });
   const { got, firsts } = giveMons(p, tr, pool, rng, now);
   p.piano = tr;
   return { ok: true, coins, good, slot, taps: tr.taps, tapMons: tr.tapMons, got, firsts, ...(why ? { why } : {}) };
@@ -735,7 +742,8 @@ export function monsDueRule(p, now, pool = [], rng = Math.random) {
 /** 📤 usage 하루 한 줄 (순수) — 하루 칸(PIANO_DAILY)으로 · 한 것이 없으면 '' */
 export function pianoDayLine(d) {
   const g = (k) => nz(d && d[k]);
-  if (!g('pnTapN') && !g('pnListenN') && !g('pnMons') && !g('pnIntro') && !g('pnFreeN') && !g('pnFreeKeys') && !g('pnStallN')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405) · 자유롭게 치기만 한 날도 (v408) · 멈칫만 있던 날도 (v413)
+  if (!g('pnTapN') && !g('pnListenN') && !g('pnMons') && !g('pnIntro') && !g('pnFreeN') && !g('pnFreeKeys') && !g('pnStallN')
+    && !g('pnMuteN') && !g('pnSlowN') && !g('pnCancelN')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405) · 자유롭게 치기만 한 날도 (v408) · 멈칫만 있던 날도 (v413) · 소리 멎음·느린 장면·누름 끊김만 있던 날도 (v414)
   const parts = [];
   if (g('pnTapN')) {
     // (v413) 🎹 건반 칸 · 박자 판정 — 셈이 있을 때만 붙인다(옛 날 줄 꼴 그대로)
@@ -751,6 +759,10 @@ export function pianoDayLine(d) {
     parts.push(`🎹 자유롭게 치기 ${g('pnFreeN')}번 열고 ${sec < 60 ? '1분 안' : `${Math.round(sec / 60)}분`} · 건반 ${g('pnFreeKeys')}번`);
   }
   if (g('pnStallN')) parts.push(`⚠️ 연주 중 화면 멈칫 ${g('pnStallN')}번(${STALL.long / 1000}초 넘게 ${g('pnStallLong')}번)`); // v413
+  // v414 — 멈춤이 소리 쪽인지 · 화면이 기어간 것인지 · 손가락을 가로챈 것인지
+  if (g('pnMuteN')) parts.push(`🔇 연주 중 소리 멎음 ${g('pnMuteN')}번(${MUTE.long / 1000}초 넘게 ${g('pnMuteLong')}번 · 소리 장치 꺼짐 ${g('pnMuteOff')}번)`);
+  if (g('pnSlowN')) parts.push(`🐢 연주 중 느린 장면 ${g('pnSlowN')}번(모두 ${(g('pnSlowMs') / 1000).toFixed(1)}초)`);
+  if (g('pnCancelN')) parts.push(`✋ 건반 누름 끊김 ${g('pnCancelN')}번`);
   return parts.join(' · ');
 }
 
@@ -774,6 +786,7 @@ export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (i
     `- 🎹 건반 칸(v413) = 🎹 태블릿 치기로 「곡 전체」를 잘(맞게 70% 넘게) 끝까지 친 판 · 하루 ${TAP_SLOT_DAY}칸까지 · ${TAPS_PER_MON}칸마다 🐾 음악 포켓몬 한 마리(💰 한도와 따로 · 한 줄 연습은 안 셈) — 줄 끝 「🎹 칸」`,
     `- 박자(v413) = 판 끝 판정 점수 — 음표마다 제때 눌렀나(막대가 닿기 전 ${BEAT.early}박 안 · 닿은 뒤 기다리게 한 게 ${BEAT.late}박 안이면 한 점 · ${BEAT.lateHalf}박 안이면 반 점) 평균 × 맞게 누른 비율 → 🎉 빵빠레 ${BEAT.great}점 이상 · 👏 짝짝 ${BEAT.good}점 이상 · 🎺 뿌우~ 그 아래(맞게 70% 아래도) — 아이 화면엔 점수 없이 소리·그림만 · 보상과 상관없음`,
     `- 멈칫(v413) = 그 판 동안 화면이 ${STALL.ms / 1000}초 넘게 멈춘 가장 긴 시간(태블릿이 버거워 멈춘 것 — 아이가 ⏸로 멈춘 것은 안 셈)`,
+    `- 소리 멎음(v414) = 그 판 동안 화면은 도는데 소리 엔진 시계가 ${MUTE.ms / 1000}초 넘게 안 간 가장 긴 시간(앱이 소리를 끈 것이 아님 — 태블릿·브라우저 쪽)`,
     '- 줄 = 책의 한 줄(그 곡 원고의 lines) · 도움 1 막대·계이름·건반 빛 → 2 막대 없이 → 3 계이름도 없이 → 4 악보만 · 빠르기 = 원래 빠르기의 %',
     '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets} · 온 음악 포켓몬 ${tr.mons}${sl.sets > tr.mons ? ` · 아직 안 온 몫 ${sl.sets - tr.mons} — 음악 화면에 들어오면 옴` : ''})`,
     ...(tr.taps || tr.tapMons ? [`🎹 건반 칸 모두 ${tr.taps} (열 칸 묶음 ${tk.sets} · 온 음악 포켓몬 ${tr.tapMons}${tk.sets > tr.tapMons ? ` · 아직 안 온 몫 ${tk.sets - tr.tapMons} — 음악 화면에 들어오면 옴` : ''})`] : []),
@@ -785,7 +798,7 @@ export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (i
     if (r.m === 't') {
       const all = r.ok + r.bad;
       const grade = r.g == null ? '' : ` · 박자 ${r.g}점 ${{ great: '🎉', good: '👏', boo: '🎺' }[beatGrade(r.g, r.ok, r.bad)]}`;
-      lines.push(`- ${head} · 맞게 ${r.ok}/${all}${all ? ` (${Math.round((r.ok / all) * 100)}%)` : ''}${r.c ? ` · 💰${r.c}` : ''}${r.x ? ' · 🎹 칸' : ''}${grade}${r.st ? ` · 멈칫 ${(r.st / 1000).toFixed(1)}초` : ''}`);
+      lines.push(`- ${head} · 맞게 ${r.ok}/${all}${all ? ` (${Math.round((r.ok / all) * 100)}%)` : ''}${r.c ? ` · 💰${r.c}` : ''}${r.x ? ' · 🎹 칸' : ''}${grade}${r.st ? ` · 멈칫 ${(r.st / 1000).toFixed(1)}초` : ''}${r.mu ? ` · 소리 멎음 ${(r.mu / 1000).toFixed(1)}초` : ''}`);
     } else lines.push(`- ${head} · ${r.x ? '음표 한 칸' : '(오늘 칸은 다 참)'}`);
   }
   return `${lines.join('\n')}\n`;

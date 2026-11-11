@@ -16,9 +16,11 @@
 //   ② 「치다 보면 멈췄다가 3~4초 뒤 풀린다」 — 연주 중에 건반 위쪽을 누르면 ⏸가 되던 것(그림판 톡 = 시작·멈춤)을 시작만으로 · 건반 바로 위 띠(KEY_SLOP)는 건반 ·
 //      멈춰 있으면 가운데에 크게 「⏸ 멈췄어요」 · 연주 중 화면이 STALL.ms 넘게 멈칫하면 📤 하루 칸(태블릿이 버거워 멈추는 것인지 가르려고)
 //   ③ 끝날 때 박자 판정(진우 바람) — 🎉 빵빠레·꽃가루 · 👏 짝짝 · 🎺 뿌우~ (소리는 Web Audio로 새로 지음 · 점수는 📤에만 · 보상과 상관없음)
+// 🎹 v414 (11-11 아버님 「추천대로」) — 「멈췄을 때 소리가 안 났다 · 누른 모양은 보였다」 → 화면은 돌았다 · 무엇이 멈췄나 가르는 📤 기록만(아이 화면·보상 그대로):
+//   🔇 소리 엔진 시계가 MUTE.ms 넘게 안 감(소리 장치가 꺼져 있었나도) · 🐢 화면 한 장이 SLOW.ms~STALL.ms · ✋ 건반을 누른 손가락을 가로챔(pointercancel)
 import { setScene } from './blackbox.js';
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON,
-  TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL } from './piano.js';
+  TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL, MUTE, SLOW } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
 import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, rarityOf, RARITY } from './xp.js';
 import { ROSTER, ensureCast } from './pokemon.js'; // 🐾 음악 포켓몬 이름·그림 (v404)
@@ -45,6 +47,7 @@ const S = {
   freeOct: 3, freeNames: true, trail: [], freeKeys: 0, freeMs: 0, freeLast: 0, freeDay: '', freeOwe: new Map(), // 🎹 자유롭게 치기 (v408)
   pcDown: new Set(), // PC 자판으로 누르고 있는 건반 (Codex 213차)
   keyAt: -1e9, passStall: 0, fx: null, // v413 — 마지막으로 건반을 누른 때(위쪽 톡과 가르기) · 이 판의 가장 긴 화면 멈칫(ms) · 판 끝 박자 효과
+  passMute: 0, acWatch: null, diag: { slowN: 0, slowMs: 0, cancel: 0 }, diagOwe: new Map(), // v414 — 이 판의 가장 긴 소리 멎음(ms) · 소리 시계 지켜보기 · 아직 안 쓴 🐢·✋ 셈 · 못 넣은 몫(날짜째)
 };
 /** 건반 바로 위 이만큼(px)은 건반으로 친다 — 건반 윗부분을 누르다 살짝 위로 빗나간 손가락 (v413) */
 const KEY_SLOP = 20;
@@ -199,7 +202,7 @@ const focusHand = (hand) => S.hands === 'B' || hand === S.hands;
 function toStart() {
   S.t = -LEAD;
   S.steps = S.mode === 'tap' ? stepsOf(S.perf, S.hands).map((s) => ({ t: s.t, need: s.need, got: new Set() })) : [];
-  S.si = 0; S.waiting = false; S.ok = 0; S.bad = 0; S.passStall = 0;
+  S.si = 0; S.waiting = false; S.ok = 0; S.bad = 0; S.passStall = 0; S.passMute = 0;
   S.sounding.clear(); S.flash.clear();
   for (const h of S.perf.heads) delete h.okAt;
   S.drawn = 0; // 처음으로 — 멈춰 있어도 다음 화면에 바로 그린다 (v407 · Codex 212차)
@@ -276,6 +279,9 @@ function release(midi) {
 function passEnd() {
   const req = { song: S.song.id, line: S.line, hand: S.hands, lv: S.lv, sp: Math.round(S.sp * 100) / 100 };
   let grade = '';
+  // 🔇 끝날 때까지 이어진 소리 멎음도 이 판 몫으로 (v414) — 🔁 계속이면 시계는 이어서 본다(판 경계에서 두 토막으로 버리지 않게 · Codex 218차 P2)
+  if (S.loop) passMuteSoFar(performance.now()); else endMute(performance.now());
+  flushDiag();
   if (S.mode === 'tap') {
     const ok = S.ok;
     const bad = S.bad;
@@ -283,7 +289,7 @@ function passEnd() {
     grade = beatGrade(g, ok, bad);
     // 끝낸 판의 하루 칸은 여기서 한 번 — 「🔁 다시 받기」는 💰만 다시 받는다 (Codex 204차 P3-7)
     applyDailyDelta(clockDay(), { pnTapN: 1, ...(goodPass(ok, bad) ? { pnTapOk: 1 } : {}), [GRADE_DAILY[grade]]: 1 }).catch(() => {});
-    sendTap({ ...req, ok, bad, g, st: Math.round(S.passStall) });
+    sendTap({ ...req, ok, bad, g, st: Math.round(S.passStall), mu: Math.round(S.passMute) });
   } else {
     S.passDone = true;
     showDone();
@@ -362,8 +368,10 @@ function sendListen() {
 }
 
 function setRun(on) {
+  if (!on) { endMute(performance.now()); flushDiag(); } // v414 — 멈추기 전에
   S.running = on;
   S.last = performance.now();
+  S.acWatch = null; // 소리 시계는 판이 돌 때만 · 다시 시작하면 처음부터
   if (!on) hushAuto();
   const go = $('pn-go');
   if (go) go.textContent = on ? '⏸ 멈춤' : '▶ 시작';
@@ -1094,8 +1102,11 @@ function frame(now) {
   S.raf = 0;
   if (!S.active || (S.screen !== 'stage' && S.screen !== 'free')) return;
   if (S.running) {
-    if (now - S.last >= STALL.ms) noteStall(now - S.last); // ⚠️ 화면이 멈칫했다 (v413)
-    advance(Math.min(0.25, (now - S.last) / 1000) / secPerBeat());
+    const gap = now - S.last;
+    if (gap >= STALL.ms) noteStall(gap); // ⚠️ 화면이 멈칫했다 (v413)
+    else if (gap >= SLOW.ms) { S.diag.slowN += 1; S.diag.slowMs += gap; } // 🐢 화면이 기어간다 (v414 — 하루 칸엔 멈출 때·판 끝에 한 번에)
+    watchAudio(now); // 🔇 v414
+    advance(Math.min(0.25, gap / 1000) / secPerBeat());
     // 🎧 진우는 진짜 피아노를 치느라 태블릿을 안 만진다 — 앱이 연주하는 동안은 손댄 것으로 (⏳ 음악 시간이 2분 쉼에 멈추지 않게)
     if (now - S.lastAct > 5000) { S.lastAct = now; noteActivity(); }
   }
@@ -1110,6 +1121,60 @@ function frame(now) {
 function noteStall(ms) {
   S.passStall = Math.max(S.passStall, ms);
   applyDailyDelta(clockDay(), { pnStallN: 1, ...(ms >= STALL.long ? { pnStallLong: 1 } : {}) }).catch(() => {});
+}
+/** 🔇 연주 중 소리 시계 (v414) — 화면마다 소리 엔진의 시계를 본다 · 시계가 다시 가면 그동안 안 간 만큼(벽시계 − 소리 시계)을 잰다 ·
+ *  판을 시작하고 시계가 처음 한 번 가기 전(새로 켜거나 깨우는 때)은 안 셈 · 화면이 멈칫한 동안 소리는 돈 것도 안 셈 */
+function watchAudio(now) {
+  if (!AC) return;
+  const t = AC.currentTime;
+  const off = AC.state !== 'running';
+  const w = S.acWatch;
+  if (!w) { S.acWatch = { t, at: now, off, live: false }; return; }
+  if (off) w.off = true;
+  if (t === w.t) return;
+  if (w.live) {
+    const lag = now - w.at - (t - w.t) * 1000;
+    if (lag >= MUTE.ms) noteMute(lag, w.off);
+  }
+  S.acWatch = { t, at: now, off: false, live: true };
+}
+/** 판이 멈추거나 끝날 때 — 아직 안 가는 시계는 여기까지를 한 번으로 */
+function endMute(now) {
+  if (S.acWatch) watchAudio(now);
+  const w = S.acWatch;
+  S.acWatch = null;
+  if (w && w.live && now - w.at >= MUTE.ms) noteMute(now - w.at, w.off);
+}
+/** 🔁 계속의 판 끝 — 아직 안 가는 시계는 이 판 기록 줄에도 넣고 끊김은 이어서 지켜본다(하루 칸은 끝날 때 한 번 · 다음 판 줄엔 끝까지 잰 것 · Codex 218차 P2) */
+function passMuteSoFar(now) {
+  if (S.acWatch) watchAudio(now);
+  const w = S.acWatch;
+  if (w && w.live && now - w.at >= MUTE.ms) S.passMute = Math.max(S.passMute, now - w.at);
+}
+/** 🔇 연주 중 소리 멎음 (v414) — 그 판의 가장 긴 것은 🎹 치기 기록 줄에 · 하루 칸은 번 수·긴 것·소리 장치가 멈춤 상태였던 것 (아이 화면엔 아무것도 없다) ·
+ *  끊김은 끝날 때마다 바로 쓴다(그동안 모은 🐢·✋와 밀린 몫도 함께) */
+function noteMute(ms, off) {
+  S.passMute = Math.max(S.passMute, ms);
+  oweDiag(clockDay(), { pnMuteN: 1, ...(ms >= MUTE.long ? { pnMuteLong: 1 } : {}), ...(off ? { pnMuteOff: 1 } : {}) });
+  flushDiag();
+}
+/** 🐢 느린 장면 · ✋ 누름 끊김 셈을 하루 칸에 (v414) — 화면마다 쓰지 않고 멈출 때·판 끝·떠날 때 한 번에(버거운 태블릿에 저장을 더 얹지 않게) ·
+ *  못 넣은 몫은 날짜째 두었다가 다음 저장 때 함께 — 버거울 때가 저장이 실패하기 쉬운 때다 (flushFree와 같은 꼴 · 바로 되풀이하지 않음 · Codex 218차 P3) */
+function flushDiag() {
+  const d = S.diag;
+  S.diag = { slowN: 0, slowMs: 0, cancel: 0 };
+  oweDiag(clockDay(), { ...(d.slowN ? { pnSlowN: d.slowN, pnSlowMs: Math.round(d.slowMs) } : {}), ...(d.cancel ? { pnCancelN: d.cancel } : {}) });
+  for (const [day, o] of S.diagOwe) {
+    S.diagOwe.delete(day);
+    applyDailyDelta(day, o).catch(() => oweDiag(day, o));
+  }
+}
+function oweDiag(day, delta) {
+  const ks = Object.keys(delta);
+  if (!ks.length) return;
+  const o = { ...(S.diagOwe.get(day) || {}) };
+  for (const k of ks) o[k] = (o[k] || 0) + delta[k];
+  S.diagOwe.set(day, o);
 }
 function startLoop() {
   if (!S.raf) S.raf = requestAnimationFrame(frame);
@@ -1627,7 +1692,10 @@ function wireCanvas() {
     if (m != null) release(m);
   };
   cv.addEventListener('pointerup', lift);
-  cv.addEventListener('pointercancel', lift);
+  cv.addEventListener('pointercancel', (e) => {
+    if (S.ptr.has(e.pointerId)) S.diag.cancel += 1; // ✋ 건반을 누른 손가락을 태블릿·브라우저가 가로챘다 (v414 — 📤에만 · 건반 밖으로 미끄러져 나갔어도 가로챈 것은 같다 · Codex 218차 P3)
+    lift(e);
+  });
 }
 
 /** PC 자판 — 가온 다부터 한 옥타브(A S D F G H J K · 검은 건반 W E T Y U) · 한 옥타브 아래(Z X C V B N M) */
@@ -1654,6 +1722,7 @@ function stopPlay() {
   S.fx = null;
   keepAwake(false);
   flushFree(true); // 🎹 자유롭게 치기 셈 — 떠날 때·내릴 때 (v408)
+  flushDiag(); // ✋ 멈춰 있을 때·자유롭게 치기의 누름 끊김도 (v414)
 }
 
 // ───────────────────── 🎹 ⚙ 집 피아노 연결 확인 ─────────────────────
@@ -1753,4 +1822,4 @@ export function leaveMusic() {
 }
 
 /** 걷기용 */
-if (typeof window !== 'undefined') window.__piano = { S, G, toStart, advance, press, passEnd, openSong, renderList, draw, secPerBeat, hitKey };
+if (typeof window !== 'undefined') window.__piano = { S, G, toStart, advance, press, passEnd, openSong, renderList, draw, secPerBeat, hitKey, ac: () => AC };
