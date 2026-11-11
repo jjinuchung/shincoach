@@ -341,7 +341,7 @@ test('🔌 잇기 — 1단계 풀이 한 줄·문제 글(qk) · 물고기 번호
   assert.match(m, /const hint = \(c\) => mathHint\(q, c\);/);
   assert.match(m, /qk: String\(q\.q\)/);
   const v = src('js/fishview.js');
-  assert.match(v, /h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\]\), \{ fish: ui\.castN, stage \}\)/);
+  assert.match(v, /h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\], lvTop\(s\)\), \{ fish: ui\.castN, stage \}\)/); // v416 — 과목 맨 위 단계까지
   assert.match(v, /ui\.castN \+= 1;[^\n]*\n\s*const before = openSpots\(ui\.okToday\);\n\s*const ok = await ask\('cast'\);/, '던질 때마다 새 물고기 번호 — 던지기 문제보다 먼저');
   assert.match(v, /const badge = q\.redo \? redoBadge\(q\.redo\.step\) : q\.ud \? '' : lvBadge\(stage, ui\.fish\);/, '다음 날 몫은 「지난번」 (Codex 190차)');
   assert.match(v, /lvb\.classList\.toggle\('is-redo', !!q\.redo\);/);
@@ -367,7 +367,7 @@ test('🔌 잇기 — 1단계 풀이 한 줄·문제 글(qk) · 물고기 번호
   assert.match(l, /const rk = subj === 'math' && redo \? redoKey\(redo\.id, redo\.step, ok,/);
   assert.match(l, /if \(r\.avoid && qFingerprint\(q\.qk\) === r\.avoid\) continue;/);
   assert.match(src('js/db.js'), /'fishRedoKeys', 'fishSteps', 'fishRedoWait',/);
-  assert.ok(src('js/upload.js').includes('영어 목소리가 없는 기기는 영어 3단계가 2단계로 나와요'), 'Codex 190차 #6 설명 한 줄');
+  assert.ok(src('js/upload.js').includes('영어 목소리가 없는 기기는 영어 3·4단계가 2단계로 나와요'), 'Codex 190차 #6 설명 한 줄 (v416 — 4단계도)');
   assert.match(src('css/style.css'), /\.lk-lvb\.is-redo \{/);
   const st = src('js/stats.js');
   assert.ok(st.includes('🎚️ 과목마다 지금 단계로 ${STEP_NEED}문제 넘게 쌓이면'));

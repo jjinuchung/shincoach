@@ -3,6 +3,7 @@
 //   단계는 fishing.stageLevel(물고기가 문 뒤 ③④⑤만 · ★3 → 2 · ★4·5 → 3) · 새 글 없이 앱에 이미 있는 꼴만 · 못 만들면 한 단계 아래(부르는 쪽이 1단계 꼴로)
 //   · 🔢 수학 배운 칸: 2 ② 함정(misread — 포켓몬이 한 말에서 틀린 곳) · 3 ③ 이유(why — 사람이 쓴 문제라 있는 칸만) → 함정 → 계산
 //   · 🔶 영어: 2 뜻 보고 영어 단어(거꾸로 · 답한 뒤 🔊) · 3 🔊 소리만 듣고 뜻(글자는 답한 뒤 · 영어 목소리가 없는 기기면 2 — lvFor)
+//     · 4 🎬 영상 대사 빈칸(v416 · 11-11 아버님 「한 단계 어려운 꼴」 → 「추천대로」 — 그 단어를 본 대사 한 줄을 🔊로 들려주고 빈칸 · 보기 영어 넷 · 못 만들면 3 · 낚시터만 — 손님 맞이는 3까지)
 //   · 📚 국어: 2 빈칸 문장(korwords 'use' — 같이 들어갈 낱말은 원고가 걸러 둠) · 3 뜻 보고 낱말(korwords 'word' — 헷갈리는 짝 먼저)
 //   · 🖊️ 논술: 2 이유 고르기인데 상관없는 말 대신 반대편 이유 셋 · 3 이유가 「아닌」 것(내 편 셋 + 반대편 하나)
 //   · 2·3단계의 틀린 보기에는 왜 아닌지 한 줄(hint) — 낚시터 카드가 「알겠어요」까지 보여 준다(🐟 물고기 수학과 같은 길)
@@ -15,10 +16,14 @@ function shuffle(list, rng) {
 }
 const pick = (list, rng) => list[Math.min(list.length - 1, Math.floor((Number(rng()) || 0) * list.length))];
 
-/** 실제로 낼 단계 — 1~3 밖은 1 · 🔶 영어 3단계(소리만)는 영어 목소리가 있는 기기에서만(caps.listen · 없으면 2) */
+/**
+ * 실제로 낼 단계 — 1~3 밖은 1(🔶 영어는 1~4) · 🔶 영어 3·4단계는 영어 목소리가 있는 기기에서만(caps.listen · 없으면 2 —
+ * 4단계를 못 만들면 3단계 소리만 꼴로 내려가니)
+ */
 export function lvFor(subj, lv, caps = {}) {
-  const n = [1, 2, 3].includes(lv) ? lv : 1;
-  return subj === 'english' && n === 3 && !(caps && caps.listen) ? 2 : n;
+  const top = subj === 'english' ? 4 : 3;
+  const n = Number.isInteger(lv) && lv >= 1 && lv <= top ? lv : 1;
+  return subj === 'english' && n >= 3 && !(caps && caps.listen) ? 2 : n;
 }
 
 // ───────────── 🔢 수학 배운 칸 ─────────────
@@ -111,12 +116,14 @@ function otherWords(rec, all, rng, listen = false) {
   return out.length >= 3 ? out : null;
 }
 /**
- * 🔶 영어 2·3단계 → { id, label, q, choices, lv, sayAfter? | listen?, reveal? } | null (보기를 못 만들면 — 부르는 쪽이 1단계 꼴로)
+ * 🔶 영어 2·3·4단계 → { id, label, q, choices, lv, sayAfter? | listen?, reveal?, sentence? } | null (보기를 못 만들면 — 부르는 쪽이 1단계 꼴로)
  *   2 거꾸로: 「뜻」에 맞는 영어는? — 보기 영어 단어 넷 · 답한 뒤 🔊(sayAfter)
  *   3 소리만: 🔊 들리는 말의 뜻은? — 단어 글자는 안 보이고(listen) 답한 뒤에(reveal) · 보기 뜻 넷
+ *   4 🎬 대사 빈칸(v416): 그 단어를 본 대사를 🔊로 들려주고(listen) 빈칸 대사(sentence) · 보기 영어 넷 · 답한 뒤 뜻(reveal) · 못 만들면 3
  */
 export function enLevelQ(rec, all, lv, rng = Math.random) {
   if (!rec || !rec.word || !rec.meaning || lv < 2) return null;
+  if (lv >= 4) return lineQ(rec, all, rng) || enLevelQ(rec, all, 3, rng);
   const others = otherWords(rec, all, rng, lv >= 3);
   if (!others) return null;
   const word = String(rec.word);
@@ -128,6 +135,81 @@ export function enLevelQ(rec, all, lv, rng = Math.random) {
   }
   const choices = shuffle([{ text: word, ok: true }, ...others.map((o) => ({ text: o.word, ok: false, hint: `${o.word} = ${o.meaning}` }))], rng);
   return { id: `e:${word}`, label, q: `「${meaning}」에 맞는 영어는?`, sayAfter: word, choices, lv: 2 };
+}
+
+// ───────────── 🎬 영어 4단계 — 영상 대사 빈칸 (v416) ─────────────
+
+/** 대사 길이(낱말 수) — 짧으면 앞뒤 없이 짐작만 남고, 길면 읽기만 길다 */
+export const LINE_WORDS = { min: 4, max: 12 };
+export const BLANK = '____';
+/** 틀린 보기는 정답과 글자 수가 이만큼 안쪽인 것부터 (길이로 정답이 드러나지 않게) */
+export const LEN_NEAR = 2;
+const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** 자막의 굽은 따옴표(’)도 곧은 것으로 · 빈칸 여럿은 하나로 */
+const lineOf = (s) => String(s || '').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
+/**
+ * 대사 속 그 말 자리 — 앞뒤가 영문자·'가 아닌 곳(don't 속 don · snowman 속 man은 아님) · 대소문자 무시 · 구는 말 사이 빈칸 하나 이상 ·
+ * 앞 글자는 잡아 두었다 돌려놓는다(뒤돌아보기 정규식은 옛 iOS Safari가 못 읽어서)
+ */
+function spotRe(w) {
+  const parts = lineOf(w).split(' ').filter(Boolean);
+  return parts.length ? new RegExp(`(^|[^A-Za-z'])${parts.map(reEsc).join('\\s+')}(?![A-Za-z'])`, 'gi') : null;
+}
+const inLine = (line, w) => { const re = spotRe(w); return !!re && re.test(line); };
+/** 빈칸 뒤에도 그 말 글자가 보이나 — '를 낱말 밖으로 봄(따옴표 속 'boat' · It's 속 It) (🔍 Codex 220차 P2-1) */
+function leftIn(text, w) {
+  const parts = lineOf(w).split(' ').filter(Boolean);
+  return new RegExp(`(^|[^A-Za-z])${parts.map(reEsc).join('\\s+')}(?![A-Za-z])`, 'i').test(text);
+}
+/**
+ * 대사 → 그 말이 그대로 든 자리를 모두 빈칸으로 (순수) — 그대로 든 자리가 없거나(running ≠ run) 낱말 수가 LINE_WORDS 밖이거나
+ * 빈칸 뒤에도 답 글자가 보이면(따옴표 속 · 줄임말 속) null
+ */
+export function blankLine(sentence, word) {
+  const line = lineOf(sentence);
+  const n = line ? line.split(' ').length : 0;
+  if (n < LINE_WORDS.min || n > LINE_WORDS.max || !inLine(line, word)) return null;
+  const out = line.replace(spotRe(word), (m, pre) => pre + BLANK);
+  return leftIn(out, word) ? null : out;
+}
+/** 낱말인가 구인가 — 기록의 kind가 phrase이거나 띄어 쓴 말이면 구 */
+const kindOf = (r) => (r.kind === 'phrase' || /\s/.test(String(r.word).trim()) ? 'phrase' : 'word');
+/**
+ * 4단계 틀린 보기 셋 [{ word, meaning }] — 정답과 같은 꼴(낱말·구) · 대사에 든 말 아님 · 정답과 소리 같은 짝 아님 ·
+ * 정답·서로와 단어도 뜻도 안 겹침 · 글자 수가 LEN_NEAR 안쪽인 것부터(섞은 뒤) · 모자라면 null
+ */
+function lineOthers(rec, all, line, rng) {
+  const kind = kindOf(rec);
+  const len = String(rec.word).trim().length;
+  const pool = shuffle((all || []).filter((x) => x && x.word && x.meaning && kindOf(x) === kind && !inLine(line, x.word) && !soundAlike(rec.word, x.word)), rng);
+  const near = (r) => Math.abs(String(r.word).trim().length - len) <= LEN_NEAR;
+  const seenM = [String(rec.meaning)];
+  const seenW = new Set([wordKey(rec.word)]);
+  const out = [];
+  for (const r of [...pool.filter(near), ...pool.filter((r) => !near(r))]) {
+    const w = wordKey(r.word);
+    if (!meanKey(r.meaning) || !w || seenW.has(w) || seenM.some((m) => meanClash(m, r.meaning))) continue;
+    seenM.push(String(r.meaning));
+    seenW.add(w);
+    out.push({ word: String(r.word), meaning: String(r.meaning) });
+    if (out.length >= 3) break;
+  }
+  return out.length >= 3 ? out : null;
+}
+/**
+ * 🎬 4단계 하나 — 그 단어를 본 대사(rec.sentence)가 없거나 맞지 않거나 보기가 모자라면 null (부르는 쪽이 3단계 꼴로)
+ * 대사 전체를 먼저 들려준다(listen · 🔊 다시 듣기) — 보기도 빈칸에 말이 되게 들어갈 수 있어 정답 = 들은 말 (🔍 Codex 220차 P2-2 · 아버님 「추천대로」)
+ */
+function lineQ(rec, all, rng) {
+  const line = lineOf(rec.sentence);
+  const blanked = blankLine(line, rec.word);
+  if (!blanked) return null;
+  const others = lineOthers(rec, all, line, rng);
+  if (!others) return null;
+  const word = String(rec.word);
+  const meaning = String(rec.meaning);
+  const choices = shuffle([{ text: word, ok: true }, ...others.map((o) => ({ text: o.word, ok: false, hint: `${o.word} = ${o.meaning} · 이 대사에선 ${word}(${meaning})였어요` }))], rng);
+  return { id: `e:${word}`, label: '🔶 영어 · 🎬 영상 대사', q: '대사를 듣고, 빈칸에 들어간 말을 골라요', listen: line, sentence: blanked, reveal: `${word} = ${meaning}`, choices, lv: 4 };
 }
 
 // ───────────── 📚 국어 ─────────────

@@ -434,10 +434,10 @@ test('🔗 단계를 넘김 — askFrom → 원천 make(key, seed, lv) · asker 
 });
 
 test('📅 단계별 하루 칸 — 2·3단계로 실제 낸 문제만 · 더하기 · 백업 병합은 큰 쪽 · 📤 줄 「🐋 큰 물고기 문제」', () => {
-  assert.deepEqual(FISH_LV_Q, { 2: ['fishLv2Q', 'fishLv2Ok'], 3: ['fishLv3Q', 'fishLv3Ok'] });
+  assert.deepEqual(FISH_LV_Q, { 2: ['fishLv2Q', 'fishLv2Ok'], 3: ['fishLv3Q', 'fishLv3Ok'], 4: ['fishLv4Q', 'fishLv4Ok'] }, 'v416 — 4 = 🎬 영어 대사 빈칸');
   assert.deepEqual(lvDelta({ lv: 2 }, true), { fishLv2Q: 1, fishLv2Ok: 1 });
   assert.deepEqual(lvDelta({ lv: 3 }, false), { fishLv3Q: 1, fishLv3Ok: 0 });
-  for (const q of [{ lv: 1 }, {}, null, { lv: 4 }, { lv: 'toString' }]) assert.deepEqual(lvDelta(q, true), {});
+  for (const q of [{ lv: 1 }, {}, null, { lv: 5 }, { lv: 'toString' }]) assert.deepEqual(lvDelta(q, true), {});
   const D = '2026-11-01';
   const e = emptyDaily(D);
   for (const k of ['fishLv2Q', 'fishLv2Ok', 'fishLv3Q', 'fishLv3Ok']) assert.equal(e[k], 0, `${k} 빈 칸`);
@@ -457,7 +457,7 @@ test('📅 단계별 하루 칸 — 2·3단계로 실제 낸 문제만 · 더하
 test('🧵 화면 배선 — 창은 단계를 원천까지 · 1단계 꼴은 대여행과 같은 길 · 새 파일은 sw 목록에', () => {
   const fv = read('js/fishview.js');
   assert.match(fv, /const lv = stageLevel\(stage, ui\.fish\);/);
-  assert.match(fv, /h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\]\), \{ fish: ui\.castN, stage \}\)/, 'v387 — 물고기 단계에 과목 단계를 더해 넘김');
+  assert.match(fv, /h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\], lvTop\(s\)\), \{ fish: ui\.castN, stage \}\)/, 'v387 — 물고기 단계에 과목 단계를 더해 넘김 (v416 — 과목 맨 위 단계까지)');
   assert.match(fv, /lvBadge\(stage, ui\.fish\)/);
   assert.match(fv, /tiltNow\(\), h\.forceStar \|\| 0\)/);
   const jv = read('js/journeyview.js');

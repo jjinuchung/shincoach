@@ -23,7 +23,7 @@ import {
   STARS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer, cellRoll, cellFish, cellFate,
   pickSubject, askOrder, activeStep, dayLeftSec, BADGE_KO, weatherTilt, nibbleExtra,
   spotsOf, PLACES, PLACE_KO, PLACE_EMOJI, RIVER_NEED, SEA_NEED, SEA_SAFE, GEAR, gearOf, baitTilt, mixTilt, weatherLine, PHOTO_SAY, syncPick, josaOf,
-  stageLevel, lvBadge, stepLevel, stepUpLine, redoBadge, REDO_OK,
+  stageLevel, lvBadge, stepLevel, lvTop, stepUpLine, redoBadge, REDO_OK,
   BOAT_NEED, BOAT_OPENED, BOAT_GO, BOAT_SAFE, BOAT_REST, boatRest, softOf, sizeText, kindEmoji, lenLabel, SOFT_NOTE, STICK_HEAD, STICK_OFF, inkLine,
 } from './fishing.js';
 import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, drawCell, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet, drawInk, drawBoat } from './fishart.js';
@@ -743,7 +743,7 @@ function ask(stage, head = '') {
   for (const s of order) {
     if (!s) continue;
     // v387 — 과목 단계를 더한 단계 · 물고기 번호(🔁 다시 풀기는 다음 물고기의 첫 수학 차례)
-    try { q = h.ask ? h.ask(s, nextSeed(), stepLevel(lv, ui.steps[s]), { fish: ui.castN, stage }) : null; } catch { q = null; }
+    try { q = h.ask ? h.ask(s, nextSeed(), stepLevel(lv, ui.steps[s], lvTop(s)), { fish: ui.castN, stage }) : null; } catch { q = null; }
     if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((c) => c.ok).length === 1) { subj = s; break; }
     q = null;
   }
@@ -784,7 +784,11 @@ function ask(stage, head = '') {
     qBox.appendChild(document.createTextNode(' 의 뜻은?'));
     hear(q.word);
   } else qText(qBox, q);
-  if (q.sentence) qBox.appendChild(el('div', 'lk-sent', q.sentence)); // 📚 빈칸 문장 (v378 국어 2단계)
+  if (q.sentence) { // 📚 빈칸 문장 (v378 국어 2단계) · 🎬 영어 대사 빈칸 (v416 — 영어 글로 읽히게 · Codex 220차 P3)
+    const sent = el('div', 'lk-sent', q.sentence);
+    if (subj === 'english') sent.lang = 'en';
+    qBox.appendChild(sent);
+  }
   const tip = q$('.lk-tip');
   tip.textContent = q.tip || '';
   tip.hidden = !q.tip;

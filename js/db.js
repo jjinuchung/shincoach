@@ -458,8 +458,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'fishSea',
   //   🚤 그 가운데 배 낚시에서 낚은 마리(v386 — fishCatch 안의 몫)
   'fishBoat',
-  //   🐋 그 가운데 2·3단계(큰 물고기) 문제로 낸·맞힌 수(v378 — 과목 칸 안의 몫 · 실제 낸 단계로)
-  'fishLv2Q', 'fishLv2Ok', 'fishLv3Q', 'fishLv3Ok',
+  //   🐋 그 가운데 2·3·4단계(큰 물고기) 문제로 낸·맞힌 수(v378 — 과목 칸 안의 몫 · 실제 낸 단계로 · 4 = 🎬 영어 대사 빈칸 v416)
+  'fishLv2Q', 'fishLv2Ok', 'fishLv3Q', 'fishLv3Ok', 'fishLv4Q', 'fishLv4Ok',
   //   🔁 그 가운데 틀린 배운 수학 칸을 다시 풀기로 낸·맞힌 수(v387 — 수학 칸 안의 몫)
   'fishRedoQ', 'fishRedoOk',
   // 🎟️ 아쿠아리움 손님 맞이 (2026-11-08 v401, aquatour.js) — 맞이한 무리 · 받은 💰(📊 장부 💰까지) · 🎟️ 매표 낸·맞힌 · 해설 과목마다(🐟 수조 물고기 수학은 수학 칸 안의 몫) · 2·3단계 · 📊 장부 질문

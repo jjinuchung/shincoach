@@ -28,6 +28,7 @@
 //   −2~+2 · 지금 단계로 STEP_NEED문제 넘게 쌓이면 STEP_UP 넘게 맞힘 → +1 · STEP_DOWN 아래 → −1 · 문제 단계 = 물고기 단계 + 과목 단계(stepLevel · 1~3 안))
 //   Codex 190차 「추천대로」: 안 푼 다음 날 몫은 7일 안에서 이어 감 · 틀린 칸의 단계·문제 글 지문(fishRedoWait)으로 다시 열어도 같은 단계·다른 문제 ·
 //   다음 날 몫 상한은 하루에 · 다음 날 몫 카드 머리 「지난번」 · 자정을 넘긴 창 처리는 lakeview(stepLines)
+// v416 (2026-11-11 아버님 「낚시터 영어에 한 단계 어려운 꼴」 → 「추천대로」): 🔶 영어만 맨 위 단계 4(lvTop — 🎬 대사 빈칸 · lakelevel.js) · 단계별 칸 FISH_LV_Q[4]
 // ★ 이 파일은 아무것도 import하지 않는다 — 시험이 DOM·IndexedDB 없이 부른다 · 난수는 rng() 인자로
 
 /** 하루 낚시 시간(분) · 손을 이만큼(ms) 안 대면 시간을 안 셈(⏳ 과목 시계와 같은 셈) */
@@ -988,7 +989,7 @@ export const FISH_SEA = 'fishSea';
 /** 그날 🚤 배에서 낚은 마리 칸 (v386 — fishCatch 안에 든 몫) */
 export const FISH_BOAT = 'fishBoat';
 /** 그날 2·3단계 문제로 낸·맞힌 칸 (v378 — 과목 칸 안에 든 몫 · 1단계는 나머지 · 못 만들어 내려간 문제는 실제 낸 단계로 센다) */
-export const FISH_LV_Q = { 2: ['fishLv2Q', 'fishLv2Ok'], 3: ['fishLv3Q', 'fishLv3Ok'] };
+export const FISH_LV_Q = { 2: ['fishLv2Q', 'fishLv2Ok'], 3: ['fishLv3Q', 'fishLv3Ok'], 4: ['fishLv4Q', 'fishLv4Ok'] }; // 4 = 🎬 영어 대사 빈칸 (v416)
 /** 그날 🔁 다시 풀기로 낸·맞힌 칸 (v387 — 수학 칸 안에 든 몫) */
 export const FISH_REDO_Q = ['fishRedoQ', 'fishRedoOk'];
 /**
@@ -1236,11 +1237,16 @@ export function stepLines(steps) {
     return `${s}:${Number.isInteger(v) && Math.abs(v) <= STEP_MAX ? v : 0}`;
   });
 }
-/** 문제 단계 = 물고기 단계 + 과목 단계 (1~3 안) */
-export function stepLevel(base, step) {
+/** 과목마다 맨 위 문제 단계 (v416 — 🔶 영어만 4 🎬 대사 빈칸 · 나머지 3) */
+export const LV_TOP = { english: 4 };
+export function lvTop(subj) {
+  return hasOwn(LV_TOP, subj) ? LV_TOP[subj] : 3;
+}
+/** 문제 단계 = 물고기 단계 + 과목 단계 (1~맨 위 안 — top은 lvTop · 3·4 밖이면 3) */
+export function stepLevel(base, step, top = 3) {
   const b = [1, 2, 3].includes(base) ? base : 1;
   const s = Number.isInteger(step) ? step : 0;
-  return Math.min(3, Math.max(1, b + s));
+  return Math.min(top === 4 ? 4 : 3, Math.max(1, b + s));
 }
 /** 오른 과목 → 낚시터를 열 때 한 줄 ('' = 없음 · 셈 없음) */
 export function stepUpLine(subjs) {
@@ -1248,7 +1254,7 @@ export function stepUpLine(subjs) {
   if (!ko.length) return '';
   return ko.length === 1 ? `⬆️ ${ko[0]} 실력이 늘었어요! 이제 한 단계 위 ${ko[0]} 문제가 나와요` : `⬆️ ${ko.join('·')} 실력이 늘었어요! 이제 한 단계 위 문제가 나와요`;
 }
-/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다 · 🚤 배) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🐋 2·3단계 맞힌/낸(v378) · 🔁 다시 풀기 맞힌/낸(v387) · 🔢 배운 칸별(v377) · 거듭 틀린 칸·🎚️ 과목 단계(v387) · 🔒 더 준 분 */
+/** 📤 사용 기록 한 줄 (순수 · 없으면 '') — 낚시 시간 · 잡은 마리(그 가운데 🏞️ 강 · 🌊 바다 · 🚤 배) · 과목마다 맞힌/낸(수학은 그 안의 🐟 물고기 수학도) · 🐋 2·3·4단계 맞힌/낸(v378 · 4는 v416) · 🔁 다시 풀기 맞힌/낸(v387) · 🔢 배운 칸별(v377) · 거듭 틀린 칸·🎚️ 과목 단계(v387) · 🔒 더 준 분 */
 export function lakeDayLine(d, fmtMin) {
   const f = typeof fmtMin === 'function' ? fmtMin : (s) => `${Math.round(nz(s) / 60)}분`;
   const asked = SUBJECTS.filter((s) => nz(d && d[FISH_DAY_Q[s][0]]) > 0);
@@ -1260,7 +1266,7 @@ export function lakeDayLine(d, fmtMin) {
   const rv = away.length ? `(${away.join(' · ')})` : '';
   const by = fishMathByConcept(d && d.fishMathKeys);
   const cm = by.length ? ` · 🔢 배운 칸별 ${by.slice(0, 8).map((g) => `${g.id} ${g.ok}/${g.n}`).join(' · ')}${by.length > 8 ? ` 외 ${by.length - 8}칸` : ''}` : '';
-  const lvs = [2, 3].filter((l) => nz(d && d[FISH_LV_Q[l][0]])).map((l) => `${l}단계 ${nz(d[FISH_LV_Q[l][1]])}/${nz(d[FISH_LV_Q[l][0]])}`);
+  const lvs = [2, 3, 4].filter((l) => nz(d && d[FISH_LV_Q[l][0]])).map((l) => `${l}단계 ${nz(d[FISH_LV_Q[l][1]])}/${nz(d[FISH_LV_Q[l][0]])}`);
   const lv = lvs.length ? ` · 🐋 큰 물고기 문제 ${lvs.join(' · ')}` : '';
   // v387 — 🔁 다시 풀기 · 거듭 틀린 칸 · 🎚️ 그날 과목 단계(0이 아닌 것) · 맨 위 단계도 쉬움
   const rd = nz(d && d[FISH_REDO_Q[0]]) ? ` · 🔁 다시 풀기 ${nz(d[FISH_REDO_Q[1]])}/${nz(d[FISH_REDO_Q[0]])}` : '';
