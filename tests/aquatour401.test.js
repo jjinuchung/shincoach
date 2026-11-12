@@ -527,9 +527,9 @@ test('아이 화면 글 — 남은 손님·셈 문구 없음 · 🔔에 숫자 �
 test('🔌 잇기 — 홈 🐠 🔔 · 아쿠아리움 안 단추 · 닫으면 멈춤 · 정산·장부 트랜잭션 · 저장 복사·병합 · 📤 · sw · 판', () => {
   const lv = read('js/lakeview.js');
   assert.match(lv, /waitingOf\(getProfileSnapshot\(\), Date\.now\(\), studySec\(dailyNow\(\)\)\)\.waiting/);
-  assert.match(lv, /export function askFrom\(src, subj, today, at, seed, lv = 1, tag = 'lake'\)/);
+  assert.match(lv, /export function askFrom\(src, subj, today, at, seed, lv = 1, tag = 'lake', max = 12\)/); // v418 — max(✍️ 직접 쓰기 수학은 한 바퀴)
   assert.match(lv, /orderOf\(src\.keys, `\$\{tag\}:\$\{today\}`, subj\)/);
-  assert.match(lv, /mathMix\(asker\(ui\.src, day, start\),/, '낚시터는 옛 줄 그대로');
+  assert.match(lv, /mathMix\(asker\(srcs, day, start, 'lake',/, '낚시터는 옛 줄 그대로(v418부터 ✍️ 직접 쓰기 원천 srcs · 넘긴 자리 · 수학 한 바퀴)');
   assert.match(lv, /m\.openAqua\(\{ onClose: \(\) => \{ if \(onClose\) onClose\(\); if \(cardBox && !isLakeOpen\(\)\) mountLakeCard\(cardBox\)/, '닫으면 홈 띠 🔔를 다시');
   const tv = read('js/tourview.js');
   assert.match(tv, /asker\(src \|\| \{\}, today, start, 'aqua', stepped\)/, '손님 맞이는 낚시와 다른 차례 줄 · 넘긴 자리부터');

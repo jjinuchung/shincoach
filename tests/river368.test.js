@@ -349,7 +349,7 @@ test('🔌 잇기 — 🗺️ 물가·🎒 채비·🐛 미끼 칩 · 가게 보
   const fv = src('js/fishview.js');
   for (const c of ['lk-topbtn lk-mapbtn', 'lk-topbtn lk-gearbtn', 'lk-bait', 'lk-places']) assert.match(fv, new RegExp(`class="${c}"`), c);
   assert.match(fv, /shopRoot\.id = 'lk-gear';/);
-  assert.match(fv, /if \(!ui\.dexOpen && !ui\.shopOpen\) ui\.used \+= activeStep\(/);
+  assert.match(fv, /if \(!ui\.dexOpen && !ui\.shopOpen && !ui\.padOpen\) ui\.used \+= activeStep\(/);
   assert.match(fv, /if \(!ui \|\| root\.hidden \|\| ui\.dexOpen \|\| ui\.shopOpen\) return;/, '가게 동안 Space·숫자 키 안 먹음');
   assert.match(fv, /function lakeShop\(\) \{\n\s*if \(!canMenu\(\) \|\| typeof ui\.host\.gear !== 'function'\) return;[\s\S]{0,80}ui\.paused = true;\n\s*ui\.shopOpen = true;/);
   assert.match(fv, /return !!ui && ui\.st === 'ready' && !ui\.busy && !ui\.paused;/, '던지기 전에만');

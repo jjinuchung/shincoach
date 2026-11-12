@@ -992,6 +992,10 @@ export const FISH_BOAT = 'fishBoat';
 export const FISH_LV_Q = { 2: ['fishLv2Q', 'fishLv2Ok'], 3: ['fishLv3Q', 'fishLv3Ok'], 4: ['fishLv4Q', 'fishLv4Ok'] }; // 4 = 🎬 영어 대사 빈칸 (v416)
 /** 그날 🔁 다시 풀기로 낸·맞힌 칸 (v387 — 수학 칸 안에 든 몫) */
 export const FISH_REDO_Q = ['fishRedoQ', 'fishRedoOk'];
+/** 그날 ✍️ 숫자판으로 직접 쓴 수학 — 낸·맞힌·🤷 모르겠어요 칸 (v418 — 수학 칸 안에 든 몫) */
+export const FISH_PAD_Q = ['fishPadQ', 'fishPadOk', 'fishPadIdk'];
+/** 그날 「이미 배운 수학」 차례 줄에서 넘긴 자리 (v418 — 숫자로 못 내 건너뛴 칸까지 · 다시 열면 그 뒤부터 · 📤엔 안 씀 · Codex 221차) */
+export const FISH_MATH_AT = 'fishMathAt';
 /**
  * 🔢 낚시터 「이미 배운 수학」 한 문제의 칸별 기록 줄 (v377 — 2026-11-01 기본안 「추천대로」) — 'frac.add|1|시각36진수+무작위' · 문제 id가 m:칸이 아니면 ''
  * (줄마다 달라 합집합 병합에서 같은 문제를 두 번 세지 않는다 · 🐟 물고기 수학은 칸이 없어 안 적는다)
@@ -1260,7 +1264,12 @@ export function lakeDayLine(d, fmtMin) {
   const asked = SUBJECTS.filter((s) => nz(d && d[FISH_DAY_Q[s][0]]) > 0);
   if (!nz(d && d.fishSec) && !nz(d && d.fishCatch) && !asked.length && !nz(d && d.fishBonus)) return '';
   const KO = { math: '수학', english: '영어', korean: '국어', nonsul: '논술' };
-  const fm = (s) => (s === 'math' && nz(d[FISH_FM_Q[0]]) ? `(🐟 ${nz(d[FISH_FM_Q[1]])}/${nz(d[FISH_FM_Q[0]])})` : '');
+  // 수학 칸 안의 몫 — 🐟 물고기 수학 · ✍️ 직접 쓰기(v418 · 🤷 모르겠어요 수)
+  const fm = (s) => {
+    if (s !== 'math') return '';
+    const parts = [nz(d[FISH_FM_Q[0]]) ? `🐟 ${nz(d[FISH_FM_Q[1]])}/${nz(d[FISH_FM_Q[0]])}` : '', nz(d[FISH_PAD_Q[0]]) ? `✍️ 직접 쓰기 ${nz(d[FISH_PAD_Q[1]])}/${nz(d[FISH_PAD_Q[0]])} · 🤷 ${nz(d[FISH_PAD_Q[2]])}` : ''].filter(Boolean);
+    return parts.length ? `(${parts.join(' · ')})` : '';
+  };
   const q = asked.map((s) => `${KO[s]} ${nz(d[FISH_DAY_Q[s][1]])}/${nz(d[FISH_DAY_Q[s][0]])}${fm(s)}`).join(' · ');
   const away = [nz(d && d[FISH_RIVER]) ? `🏞️ 강 ${nz(d[FISH_RIVER])}` : '', nz(d && d[FISH_SEA]) ? `🌊 바다 ${nz(d[FISH_SEA])}` : '', nz(d && d[FISH_BOAT]) ? `🚤 배 ${nz(d[FISH_BOAT])}` : ''].filter(Boolean);
   const rv = away.length ? `(${away.join(' · ')})` : '';

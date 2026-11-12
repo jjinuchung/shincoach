@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v416';
+const CACHE_VERSION = 'v418';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -73,6 +73,7 @@ const APP_SHELL = [
   './js/lakeview.js', // 🎣 학습 낚시터 홈 띠·앱 잇기 (v366)
   './js/fishmath.js', // 🐟 물고기 수학 (v367)
   './js/lakelevel.js', // 🐋 학습 낚시터 난이도 — 과목별 2·3단계 꼴 (v378)
+  './js/lakepad.js', // ✍️ 학습 낚시터 수학 직접 쓰기 — 숫자판 꼴·채점 (v418)
   './js/gamesort.js', // 🔀 타입 나누기 (v345)
   './js/gamediff.js', // 🔍 우리 집 다른 그림 찾기 (v345)
   './js/gamesimon.js', // 🧠 포켓몬 따라 하기 (v346)

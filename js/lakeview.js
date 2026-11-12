@@ -22,8 +22,11 @@
 //   답은 fishRedoKeys·fishRedoQ/Ok에 · 🎚️ 과목 단계 — subjectSteps로 그날 처음 열 때 정해 fishSteps에 적고 창에 steps·stepUp(오른 과목)을 넘긴다
 // v392 (📐 다지기 기본안 「추천대로」): 🐟 물고기 수학 차례에 📐 다지기 문제 하루 세 번까지 — 연 때 수학 장부로 unitTurn · 답하면 mathprog.unitFishCommit(일지 한 줄 + 단계)
 // v401 (🎟️ 손님 맞이 기본안 판 2 「이대로」): 🐠 단추에 손님이 기다리면 🔔(숫자 없음) · askFrom·asker에 차례 꼬리표(tag — 손님 맞이는 'aqua'로 낚시와 다른 줄) · fmNode·fmChart를 내보냄
+// v418 (11-12 아버님 「낚시에서 나오는 수학 문제들을 주관식으로」 → 기본안 「추천대로」): ✍️ 수학은 숫자판으로 직접 쓰기 — 배운 칸은 계산 문제만(typedSrcs) ·
+//   🐟 물고기 수학·📐 다지기는 답이 수인 꼴만(fishMathQ typed) · 숫자로 낼 문제가 하나도 없을 때만 보기 그대로 · ⚙ 「🔢 수학 숫자판」을 따름(mathPadOn) ·
+//   답은 fishPadQ·Ok·Idk(수학 칸 안의 몫) · 🎒 대여행·🎟️ 손님 맞이는 그대로
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
-import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_REDO_Q, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, redoKey, redoPlan, redoQueue, qFingerprint, waitKey, subjectSteps, stepLines, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
+import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_REDO_Q, FISH_PAD_Q, FISH_MATH_AT, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, redoKey, redoPlan, redoQueue, qFingerprint, waitKey, subjectSteps, stepLines, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
 import { UNIT_DRILL, unitStage, unitFishToday, unitFishCommit, answerSecOf } from './mathprog.js';
 import { lvFor } from './lakelevel.js';
@@ -137,10 +140,10 @@ export function sharesOf(days, nsDayMap, today, avail) {
  * step = 실제로 본 자리 수(못 만든 자리까지) — 부르는 쪽이 at을 그만큼 넘긴다(Codex 170차 — 못 만든 자리를 안 넘겨 같은 문제가 두 번 나오거나 그 과목이 영영 빠지던 것) · 12자리까지 보고 못 만들면 q는 null
  * lv = 단계(v378 — 원천 make가 그 단계 꼴을 만들고, 못 만들면 1단계 꼴 · 🎒 대여행은 lv 없이 부른다)
  */
-export function askFrom(src, subj, today, at, seed, lv = 1, tag = 'lake') {
+export function askFrom(src, subj, today, at, seed, lv = 1, tag = 'lake', max = 12) {
   if (!src || !Array.isArray(src.keys) || !src.keys.length) return { q: null, step: 0 };
   const keys = orderOf(src.keys, `${tag}:${today}`, subj);
-  const look = Math.min(keys.length, 12);
+  const look = Math.min(keys.length, max); // max — ✍️ 직접 쓰기 수학은 한 바퀴 다(숫자로 못 내는 칸이 앞에 몰려도 보기로 돌아가지 않게 · v418 Codex 221차 P2-4)
   for (let t = 0; t < look; t++) {
     let q = null;
     try { q = src.make(keys[(nz(at) + t) % keys.length], (seed + t * 7919) >>> 0, lv); } catch { q = null; }
@@ -153,7 +156,11 @@ export function askFrom(src, subj, today, at, seed, lv = 1, tag = 'lake') {
  * (Codex 171차 — 물고기 수학까지 세면 다시 열 때 배운 문제 차례가 그만큼 더 넘어갔다 · 다시 풀기도 차례 줄 밖에서 낸다)
  */
 export function startOf(d) {
-  return Object.fromEntries(SUBJECTS.map((s) => [s, Math.max(0, nz(d && d[FISH_DAY_Q[s][0]]) - (s === 'math' ? nz(d && d[FISH_FM_Q[0]]) + nz(d && d[FISH_REDO_Q[0]]) : 0))]));
+  return Object.fromEntries(SUBJECTS.map((s) => {
+    const asked = Math.max(0, nz(d && d[FISH_DAY_Q[s][0]]) - (s === 'math' ? nz(d && d[FISH_FM_Q[0]]) + nz(d && d[FISH_REDO_Q[0]]) : 0));
+    // ✍️ 수학은 차례 줄에서 실제로 넘긴 자리(fishMathAt — 숫자로 못 내 건너뛴 칸까지 · v418 Codex 221차 P2-3)가 더 크면 그 뒤부터
+    return [s, s === 'math' ? Math.max(asked, nz(d && d[FISH_MATH_AT])) : asked];
+  }));
 }
 /**
  * 🔁 다시 풀기 문제 만들기 (v387) — 같은 칸·같은 단계로 씨앗만 바꿔 · 틀린 그 문제 글의 지문(avoid = qFingerprint)과 같으면 다음 씨앗 · 6번 안에 못 만들면 null
@@ -190,10 +197,10 @@ export function redoAsker(base, mathSrc, rq, alive = () => true) {
  * 창이 쓰는 문제 내기 (subj, seed, lv) → 문제 | null — 과목마다 자리(start = startOf)에서 askFrom이 본 만큼(못 만든 자리까지) 넘긴다 ·
  * onStep(subj, step) = 넘긴 자리 수 (🎟️ 손님 맞이는 단계가 낮아 버린 문제까지 적어 두고 다시 열 때 그 뒤부터 — Codex 203차 · 낚시터는 안 씀)
  */
-export function asker(srcs, day, start, tag = 'lake', onStep = null) {
+export function asker(srcs, day, start, tag = 'lake', onStep = null, wide = []) {
   const at = { ...(start || {}) };
   return (subj, seed, lv = 1) => {
-    const r = askFrom(srcs && srcs[subj], subj, day, nz(at[subj]), seed, lv, tag);
+    const r = askFrom(srcs && srcs[subj], subj, day, nz(at[subj]), seed, lv, tag, wide.includes(subj) ? Infinity : 12);
     at[subj] = nz(at[subj]) + r.step;
     if (onStep && r.step) { try { onStep(subj, r.step); } catch { /* 무시 */ } }
     return r.q;
@@ -257,6 +264,26 @@ export function canListen() {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;
     return window.speechSynthesis.getVoices().some((v) => /^en/i.test(String(v && v.lang)));
   } catch { return false; }
+}
+/** ⚙ 「🔢 수학 숫자판」 — 기본 켬 · 수학 과목(math.js padOn)과 같은 스위치(기기별) — 낚시터 수학도 따른다 (v418) */
+export function mathPadOn() {
+  try { return (JSON.parse(localStorage.getItem('shincoach.settings') || '{}') || {}).mathPad !== false; } catch { return true; }
+}
+/** ✍️ 배운 수학 원천을 직접 쓰기 꼴로 (v418) — make에 { typed: true }(숫자판으로 받을 계산 문제만) · 다른 과목은 그대로 */
+export function typedSrcs(srcs) {
+  const m = srcs && srcs.math;
+  if (!m || typeof m.make !== 'function') return srcs;
+  return { ...srcs, math: { ...m, make: (id, seed, lv) => m.make(id, seed, lv, { typed: true }) } };
+}
+/** ✍️ 직접 쓰기 먼저 (v418) — 수학인데 숫자로 낼 문제가 하나도 없으면 그때만 보기 그대로(plain · 수학 차례가 비지 않게) · 다른 과목은 inner 그대로 */
+export function typedFirst(inner, plain) {
+  return (subj, seed, lv) => inner(subj, seed, lv) || (plain && subj === 'math' ? plain(subj, seed, lv) : null);
+}
+/** 그날 ✍️ 직접 쓰기 칸 증분 (v418) — 숫자판으로 답한 수학만(a.how 'typed' 확인 · 'idk' 🤷 모르겠어요) · 아니면 {} */
+export function padDelta(subj, ok, a) {
+  const how = a && a.how;
+  if (subj !== 'math' || (how !== 'typed' && how !== 'idk')) return {};
+  return { [FISH_PAD_Q[0]]: 1, [FISH_PAD_Q[1]]: ok ? 1 : 0, ...(how === 'idk' ? { [FISH_PAD_Q[2]]: 1 } : {}) };
 }
 /** 그날 단계별 칸 증분 (v378) — 2·3단계로 실제 낸 문제만 · 1단계·단계 모름은 {} */
 export function lvDelta(q, ok) {
@@ -415,6 +442,9 @@ export async function openLakeNow() {
     const firstToday = !sentSec;
     const day = today; // 문제 차례 줄은 연 날로 · 기록은 쓰는 순간의 날로(dailyQueue)
     const log = dailyQueue(applyDailyDelta, clockDay);
+    // ✍️ 배운 수학 차례 자리(fishMathAt)를 연 때 자리에 맞춘다 — 그 뒤로는 넘긴 만큼 더한다(atStep) · 다시 열면 startOf가 그 뒤부터 (v418 Codex 221차 P2-3)
+    const atGap = start.math - nz(d && d[FISH_MATH_AT]);
+    if (atGap > 0) log.put({ [FISH_MATH_AT]: atGap });
     const rq = redoQueue(redoPlan(days, today)); // 🔁 지난 낚시 날 몫 → 오늘 앞 창에서 틀린 칸 (v387)
     const alive = () => clockDay() === today; // 창을 연 뒤 자정이 지나면 다시 풀기를 멈춤 (Codex 190차 #5 — 새 날 계획은 다시 열 때)
     const stp = subjectSteps(days, today); // 🎚️ 오늘 과목 단계 — 처음 연 때만 적는다 (v387)
@@ -439,12 +469,20 @@ export async function openLakeNow() {
       steps: stp.steps, // 🎚️ 과목 단계 (v387 — 창이 물고기 단계에 더한다)
       stepUp: stp.up, // 오늘 오른 과목 — 열 때 한 줄
       ask: (() => {
-        const inner = mathMix(asker(ui.src, day, start), (seed, avoid, lv) => {
-          const q = fishMathQ(lakeRaw(), seed, avoid, lv, ut.now());
+        // ✍️ 수학은 숫자판으로 직접 쓰기 (v418 — ⚙ 「🔢 수학 숫자판」을 따른다) · 숫자로 낼 수학 문제가 하나도 없을 때만 보기 그대로(plain)
+        const typed = mathPadOn();
+        const fm = (only) => (seed, avoid, lv) => {
+          const q = fishMathQ(lakeRaw(), seed, avoid, lv, ut.now(), only);
           return q ? { ...q, qNode: () => fmNode(q) } : null;
-        });
-        // 🔶 소리만 문제는 영어 목소리가 있을 때만 (v378) · 🔁 물고기마다 첫 수학 차례에 다시 풀기 (v387)
-        return redoAsker((subj, seed, lv) => inner(subj, seed, lvFor(subj, lv, { listen: canListen() })), ui.src && ui.src.math, rq, alive);
+        };
+        const srcs = typed ? typedSrcs(ui.src) : ui.src;
+        // 수학은 넘긴 자리를 그날 칸에(자정 뒤엔 안 적음) · 직접 쓰기면 수학 차례 줄을 한 바퀴 다 본다(wide)
+        const atStep = (subj, step) => { if (subj === 'math' && alive()) log.put({ [FISH_MATH_AT]: step }); };
+        const inner = mathMix(asker(srcs, day, start, 'lake', atStep, typed ? ['math'] : []), fm(typed));
+        const plain = typed ? mathMix(asker({ math: ui.src && ui.src.math }, day, start), fm(false)) : null;
+        const base = typedFirst(inner, plain);
+        // 🔶 소리만 문제는 영어 목소리가 있을 때만 (v378) · 🔁 물고기마다 첫 수학 차례에 다시 풀기 (v387 — 직접 쓰기면 다시 풀기도)
+        return redoAsker((subj, seed, lv) => base(subj, seed, lvFor(subj, lv, { listen: canListen() })), srcs && srcs.math, rq, alive);
       })(),
       forceStar: testStar(),
       weather: testWeather() || weatherOf(today),
@@ -467,7 +505,7 @@ export async function openLakeNow() {
         const redo = q && q.redo && alive() ? q.redo : null; // 자정 뒤에 답한 다시 풀기는 보통 답으로 — 새 날 차례를 꼬지 않게 (#5)
         const f = FISH_DAY_Q[subj];
         const rd = redo ? { [FISH_REDO_Q[0]]: 1, [FISH_REDO_Q[1]]: ok ? 1 : 0 } : {}; // 🔁 (v387 — 수학 칸 안의 몫)
-        if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}), ...lvDelta(q, ok), ...rd });
+        if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}), ...lvDelta(q, ok), ...rd, ...padDelta(subj, ok, a) });
         const mk = subj === 'math' && q && !q.fm ? fishMathKey(q.id, ok, Date.now(), Math.random) : ''; // 🔢 배운 칸 문제는 칸별로도 (v377)
         const rk = subj === 'math' && redo ? redoKey(redo.id, redo.step, ok, Date.now(), Math.random) : '';
         // 틀린 배운 칸은 그 문제의 단계·글 지문도 — 다시 열거나 다음 날에도 같은 단계·다른 문제로 (Codex 190차 #2)

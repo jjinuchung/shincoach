@@ -717,6 +717,7 @@ button { font-family: inherit; }
   width: 100%;
 }
 .pin-error { margin: 0; min-height: 1.2em; color: var(--danger); font-size: 0.9rem; text-align: center; }
+.pin-lead { margin: 0 0 10px; font-size: 0.95rem; line-height: 1.45; text-align: center; } /* 🎹 「다 쳤어요」 어른 확인 (v417) */
 
 .diag { border-top: 1px solid var(--border); padding-top: 12px; }
 .diag-list { list-style: none; margin: 6px 0; padding: 0; font-size: 0.9rem; line-height: 1.7; }
@@ -5324,6 +5325,36 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
 .lk-dexbtn { min-height: 40px; padding: 4px 14px; border-radius: 999px; border: 0; background: rgba(255, 253, 248, 0.92); color: #12343b; font: inherit; font-size: 0.98rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .lk-tip { margin: 0; padding: 6px 10px; border-radius: 10px; background: #fff4d6; color: #6b4a00; font-size: 1rem; }
 .lk-hint { margin: 0; padding: 8px 12px; border-radius: 10px; background: #e8f1f3; color: #12343b; font-size: 1.02rem; line-height: 1.5; }
+/* ✍️ 수학 직접 쓰기 숫자판 (v418 — padview 판을 낚시 카드 안에 · 카드는 늘 밝은 바탕이라 색을 따로 · 낚시 장면이 덜 가리게 촘촘히) */
+.lk-choices.is-pad { display: block; }
+.lk-card .math-pad { max-width: 400px; }
+.lk-card .math-pad-lead { margin: 0 0 6px; color: #4f6a6e; font-size: 0.95rem; }
+.lk-card .math-pad .btn { background: #dcecef; color: #12343b; border: 2px solid #b9d3d7; }
+.lk-card .math-pad .btn:disabled { opacity: 0.5; }
+.lk-card .math-pad-mode.on, .lk-card .math-pad-key.is-sign.on { background: #1f7f8c; color: #fff; border-color: #1f7f8c; }
+.lk-card .math-pad-key.is-del { background: #fde0d6; }
+.lk-card .math-pad-show { min-height: 56px; margin: 4px 0 8px; }
+.lk-card .math-pad-field { min-height: 50px; color: #12343b; border-color: #b9d3d7; }
+.lk-card .math-pad-field.is-focus { border-color: #1f7f8c; box-shadow: 0 0 0 3px rgba(31, 127, 140, 0.25); }
+.lk-card .math-pad-unit, .lk-card .math-pad-sign, .lk-card .math-pad-colon { color: #12343b; }
+.lk-card .math-pad-key { padding: 10px 0; font-size: 1.3rem; }
+.lk-card .math-pad-actions { flex-direction: row; justify-content: center; margin-top: 10px; }
+.lk-card .math-pad .btn.math-pad-ok { min-width: 140px; background: #1f7f8c; color: #fff; border-color: #1f7f8c; }
+.lk-card .math-pad .btn.math-pad-idk { background: transparent; border-color: transparent; color: #4f6a6e; white-space: nowrap; }
+/* 낮은 화면(1024×600 등 · 높이 760 아래) — 숫자 키를 오른쪽 칸으로 옮겨 「확인」까지 한 화면에 (v418 걷기에서 카드가 넘쳐 스크롤해야 했다) */
+@media (max-height: 760px) {
+  .lk-card .math-pad { max-width: 600px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; align-items: center; }
+  .lk-card .math-pad > .math-pad-lead, .lk-card .math-pad > .math-pad-modes, .lk-card .math-pad > .math-pad-show, .lk-card .math-pad > .math-pad-actions { grid-column: 1; }
+  .lk-card .math-pad > .math-pad-keys { grid-column: 2; grid-row: 1 / span 4; gap: 6px; width: 100%; max-width: 280px; justify-self: center; }
+  .lk-card .math-pad-mode { min-width: 0; padding: 8px 10px; font-size: 0.98rem; }
+  .lk-card .math-pad-key { padding: 7px 0; font-size: 1.15rem; }
+  .lk-card .math-pad-field { min-height: 44px; font-size: 1.4rem; }
+  .lk-card .math-pad-frac .math-pad-field { min-height: 40px; }
+  .lk-card .math-pad-show { margin: 2px 0 4px; }
+  .lk-card .math-pad-actions { margin-top: 4px; }
+}
+.lk-hint-ans { display: block; font-size: 1.12rem; }
+.lk-hint-why { display: block; margin-top: 4px; }
 .lk-go { justify-self: end; align-self: flex-end; min-height: 46px; padding: 6px 20px; border-radius: 12px; border: 0; background: #1f7f8c; color: #fff; font: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer; }
 /* 🐟 물고기 수학 — 도감 기록 칩 · 막대그래프 (낚시 카드는 늘 밝은 바탕이라 색을 따로) */
 .lk-fm { display: grid; gap: 8px; }

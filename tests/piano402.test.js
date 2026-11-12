@@ -271,7 +271,7 @@ test('병합 — 날마다 큰 쪽(옛 백업으로 한도를 다시 열지 못�
 });
 
 test('📤 — 하루 한 줄(하루 칸으로) · music.md(모든 칸 · 최근 기록 새것부터 · 연결 확인)', () => {
-  assert.deepEqual(PIANO_DAILY, ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec', 'pnTapSlots', 'pnFan', 'pnClap', 'pnBoo', 'pnStallN', 'pnStallLong', 'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN'], 'pnMons = 온 음악 포켓몬 (v404) · pnIntro = 🐾 안내 창 봄 (v405) · pnFree* = 🎹 자유롭게 치기 (v408) · 🎹 건반 칸·박자 판정·화면 멈칫 (v413) · 소리 멎음·느린 장면·누름 끊김 (v414)');
+  assert.deepEqual(PIANO_DAILY, ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec', 'pnTapSlots', 'pnFan', 'pnClap', 'pnBoo', 'pnStallN', 'pnStallLong', 'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN', 'pnListenAsk', 'pnPinBad'], 'pnMons = 온 음악 포켓몬 (v404) · pnIntro = 🐾 안내 창 봄 (v405) · pnFree* = 🎹 자유롭게 치기 (v408) · 🎹 건반 칸·박자 판정·화면 멈칫 (v413) · 소리 멎음·느린 장면·누름 끊김 (v414) · 「다 쳤어요」 누름·비밀번호 틀림 (v417)');
   assert.equal(pianoDayLine({}), '');
   assert.equal(pianoDayLine({ pnTapN: 4, pnTapOk: 3, pnCoins: 15, pnListenN: 2, pnNotes: 2 }), '🎹 태블릿 치기 끝까지 4판(잘 친 판 3 · 💰15) · 🎧 듣고 따라 치기 「다 쳤어요」 2번(음표 칸 2)');
   const p = {};
@@ -338,7 +338,7 @@ test('🔌 잇기 — 홈 카드 · 화면 · 시계 · ⚙ · 칩 · 저장·�
   assert.match(app, /if \(name === 'music'\) return 'music';/);
   assert.match(app, /music: document\.getElementById\('view-music'\)/);
   assert.match(app, /if \(name === 'music'\) enterMusic\(\)\.catch\(\(\) => \{\}\);\n  else leaveMusic\(\);/);
-  assert.match(app, /initMusic\(\{ showView \}\);/);
+  assert.match(app, /initMusic\(\{ showView, requirePin \}\);/); // 👨‍👩‍👦 「다 쳤어요」 어른 확인 (v417)
   const home = read('js/home.js');
   assert.match(home, /key: 'music',\n    title: 'Music',\n    ko: '음악',[\s\S]{0,160}view: 'music',\n    ready: true,/);
   const html = read('index.html');

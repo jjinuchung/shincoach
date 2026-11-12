@@ -11,6 +11,7 @@
 import { rng as makeRng, shuffle, pick } from './mathgen.js';
 import { SPECIES, lakeOf, weightOf } from './fishing.js';
 import { unitCore } from './mathpoke.js';
+import { numPad } from './lakepad.js'; // ✍️ 낚시터 직접 쓰기 (v418)
 
 /** 꼴 — 아이 화면 머리 줄엔 안 쓴다(셈 없음) · 📤·시험용 이름 */
 export const FM_KINDS = {
@@ -346,9 +347,10 @@ export function makeFishQ(kind, pool, seed) {
  * → { fm: true, kind, lv, label, facts, text, tip, chart, choices: [{ text, ok, hint }], solve } (choices는 낚시터 카드 꼴 — 틀린 보기마다 그 실수의 힌트)
  * v378: 그 단계(lv)의 꼴부터 → 못 만들면 한 단계씩 아래 → 그래도 없으면 위 단계(물고기 두 종뿐이면 비교·막대그래프를 못 만들어 길이 차·합으로 — 수학 차례가 비지 않게) · lv = 실제 낸 꼴의 단계
  * v392: ud = { stage 📐 다지기 단계(0이면 끝남), ask 지금 내도 되나(하루 몫) } — 내도 되고 바로 앞이 📐이 아니면 다지기 문제(lv 1 · ud 단계 — 🐋 단계 칸에 안 셈) · 다지는 동안 옛 📐 꼴은 맨 뒤로
- * @param {Object} raw 프로필 fishing · @param {number} seed · @param {string} [avoid] 바로 앞 꼴(되도록 다른 꼴부터) · @param {number} [lv] 1~3 · @param {{stage:number, ask:boolean}} [ud]
+ * v418: typed = ✍️ 직접 쓰기(낚시터 숫자판) — 답이 같은 단위의 수인 문제만(lakepad.numPad · 물고기 이름을 고르는 길이 비교·「가장 많이」는 건너뜀) · 붙인 pad를 카드가 쓴다
+ * @param {Object} raw 프로필 fishing · @param {number} seed · @param {string} [avoid] 바로 앞 꼴(되도록 다른 꼴부터) · @param {number} [lv] 1~3 · @param {{stage:number, ask:boolean}} [ud] · @param {boolean} [typed]
  */
-export function fishMathQ(raw, seed, avoid = '', lv = 1, ud = null) {
+export function fishMathQ(raw, seed, avoid = '', lv = 1, ud = null, typed = false) {
   const pool = poolOf(raw);
   if (pool.length < 2) return null;
   const r = makeRng(seed);
@@ -367,9 +369,16 @@ export function fishMathQ(raw, seed, avoid = '', lv = 1, ud = null) {
     solve: q.solve,
     ...(q.ud ? { ud: q.ud } : {}),
   });
+  /** ✍️ 직접 쓰기면 숫자판 꼴을 붙이고, 못 붙이는 문제는 null (v418) */
+  const fit = (c) => {
+    if (!typed) return c;
+    const pad = numPad(c);
+    return pad ? { ...c, pad } : null;
+  };
   if (stage && ud.ask && avoid !== 'unit') {
     const q = makeDrill(r, pool, stage);
-    if (q) return card('unit', 1, q);
+    const c = q ? fit(card('unit', 1, q)) : null;
+    if (c) return c;
   }
   const want = [1, 2, 3].includes(lv) ? lv : 1;
   const steps = [want, ...[3, 2, 1].filter((l) => l < want), ...[1, 2, 3].filter((l) => l > want)];
@@ -380,7 +389,8 @@ export function fishMathQ(raw, seed, avoid = '', lv = 1, ud = null) {
   if (stage) kinds.push(...kinds.splice(kinds.indexOf('unit'), 1)); // 옛 📐은 맨 뒤 — 다른 꼴을 하나도 못 만드는 도감에서만 (Codex 195차 #5)
   for (const kind of kinds) {
     const q = makeFishQ(kind, pool, Math.floor(r() * 2147483646) + 1);
-    if (q) return card(kind, FM_LEVEL[kind], q);
+    const c = q ? fit(card(kind, FM_LEVEL[kind], q)) : null;
+    if (c) return c;
   }
   return null;
 }

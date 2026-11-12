@@ -353,12 +353,12 @@ test('🔌 잇기 — 1단계 풀이 한 줄·문제 글(qk) · 물고기 번호
   assert.match(l, /const stp = subjectSteps\(days, today\);[^\n]*\n\s*if \(stp\.write\.length\) applyDailyDelta\(today, \{ fishSteps: stp\.write \}\)/);
   assert.match(l, /steps: stp\.steps,/);
   assert.match(l, /stepUp: stp\.up,/);
-  assert.match(l, /return redoAsker\(\(subj, seed, lv\) => inner\(subj, seed, lvFor\(subj, lv, \{ listen: canListen\(\) \}\)\), ui\.src && ui\.src\.math, rq, alive\);/);
+  assert.match(l, /return redoAsker\(\(subj, seed, lv\) => base\(subj, seed, lvFor\(subj, lv, \{ listen: canListen\(\) \}\)\), srcs && srcs\.math, rq, alive\);/);
   assert.match(l, /if \(mk \|\| rk \|\| wk\) applyDailyDelta\(now, \{ \.\.\.\(mk \? \{ fishMathKeys: \[mk\] \} : \{\}\), \.\.\.\(rk \? \{ fishRedoKeys: \[rk\] \} : \{\}\), \.\.\.\(wk \? \{ fishRedoWait: \[wk\] \} : \{\}\) \}\)/, '세 줄은 한 번에');
   assert.match(l, /const cm = !ok && subj === 'math' && q && !q\.fm && !q\.redo \?/);
   assert.match(l, /const fp = cm \? qFingerprint\(q\.qk\) : '';\n\s*const wk = cm \? waitKey\(cm\[1\], q\.lv, fp, Date\.now\(\), Math\.random\) : '';/, '틀린 칸 줄에 단계·지문 (Codex 190차 #2)');
   assert.match(l, /if \(cm && alive\(\)\) rq\.wrong\(cm\[1\], q\.lv, fp\);/);
-  assert.match(l, /\.\.\.lvDelta\(q, ok\), \.\.\.rd \}\);/);
+  assert.match(l, /\.\.\.lvDelta\(q, ok\), \.\.\.rd, \.\.\.padDelta\(subj, ok, a\) \}\);/);
   // Codex 190차 #5 — 자정이 지나면 다시 풀기를 멈추고 새 날에도 지금 단계를 적음
   assert.match(l, /const alive = \(\) => clockDay\(\) === today;/);
   assert.match(l, /if \(now !== stepDay\) \{ stepDay = now; applyDailyDelta\(now, \{ fishSteps: stepLines\(stp\.steps\) \}\)/);

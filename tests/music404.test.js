@@ -247,7 +247,7 @@ before(async () => {
   await loadToday();
   await setPiano({ notes: 5, days: {} }); // v402·v403 때 다섯 칸이 찼고 아직 안 온 몫 하나
   PV = await import('../js/pianoview.js');
-  PV.initMusic({ showView: () => {} });
+  PV.initMusic({ showView: () => {}, requirePin: (ok) => ok() }); // 👨‍👩‍👦 어른 확인(v417)은 바로 맞음으로 — 확인 창 자체는 pianoflow402
   await PV.enterMusic();
   P = globalThis.window.__piano;
 });

@@ -774,7 +774,8 @@
   <!-- ===== 설정 비밀번호 (아이가 설정을 못 바꾸게) ===== -->
   <dialog id="dlg-pin" class="dialog dialog-pin">
     <form id="form-pin" method="dialog">
-      <h2>🔒 부모님 비밀번호</h2>
+      <h2 id="pin-title">🔒 부모님 비밀번호</h2>
+      <p id="pin-lead" class="pin-lead" hidden></p>
       <input type="password" id="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="숫자 입력">
       <p id="pin-error" class="pin-error"></p>
       <div class="dialog-actions">

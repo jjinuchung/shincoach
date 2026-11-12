@@ -463,11 +463,11 @@ test('🧵 화면 배선 — 창은 단계를 원천까지 · 1단계 꼴은 대
   const jv = read('js/journeyview.js');
   for (const f of ['enLevelQ', 'korLevelQ', 'nsLevelQ']) assert.match(jv, new RegExp(`lv >= 2[^\\n]*${f}|${f}[^\\n]*lv >= 2|if \\(lv >= 2\\) \\{ const hq = ${f}`), `${f}는 2단계부터만`);
   const mj = read('js/math.js');
-  assert.match(mj, /for \(const kind of mathKinds\(lv\)\)/);
+  assert.match(mj, /for \(const kind of typed \? \['calc'\] : mathKinds\(lv\)\)/);
   assert.match(mj, /const hint = \(c\) => mathHint\(q, c\);/, 'v387 — 1단계(계산)도 한 줄 (기본안 「추천대로」 2)');
   const lk = read('js/lakeview.js');
-  assert.match(lk, /\.\.\.lvDelta\(q, ok\), \.\.\.rd \}\);/, '단계별 칸을 그날 기록에 (v387 다시 풀기 칸과 함께)');
-  assert.match(lk, /redoAsker\(\(subj, seed, lv\) => inner\(subj, seed, lvFor\(subj, lv, \{ listen: canListen\(\) \}\)\)/, '소리만 문제는 영어 목소리가 있을 때만');
+  assert.match(lk, /\.\.\.lvDelta\(q, ok\), \.\.\.rd, \.\.\.padDelta\(subj, ok, a\) \}\);/, '단계별 칸을 그날 기록에 (v387 다시 풀기 칸과 함께)');
+  assert.match(lk, /redoAsker\(\(subj, seed, lv\) => base\(subj, seed, lvFor\(subj, lv, \{ listen: canListen\(\) \}\)\)/, '소리만 문제는 영어 목소리가 있을 때만');
   assert.match(lk, /forceStar: testStar\(\),/);
   assert.match(read('sw.js'), /'\.\/js\/lakelevel\.js'/);
 });

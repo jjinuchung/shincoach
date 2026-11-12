@@ -6,6 +6,8 @@
 // 아이 화면엔 셈·남은 수를 쓰지 않는다 — 음표 칸은 ♪ 다섯 개가 차오르는 그림으로만
 // 🐾 음악 포켓몬 안내 (v405, 11-09 아버님 「가」) — 처음 들어올 때 한 번 + ♪ 칸을 누르면 다시: 🎧에서 진짜 피아노로 끝까지 친 뒤 · 화면 건반은 💰
 //   앱은 아직 피아노 소리를 못 듣는다(연결 전) — 「✋ 피아노로 다 쳤어요」는 진우의 약속 · 아버님은 📤로 보신다
+// 👨‍👩‍👦 v417 (11-12 아버님 「추천대로」) — 「다 쳤어요」를 누르면 아빠·엄마가 부모 비밀번호로 확인해야 ♪ 칸(앱의 requirePin을 받아 씀) ·
+//   취소·틀림이면 안 셈 · 📤 누름·어른 확인·비밀번호 틀림 · 🎹 태블릿으로 치기는 앱이 건반을 직접 들으니 그대로
 // 🪶 태블릿 부담 줄이기 (v407, 11-09 아버님 — 음악을 태블릿으로 칠 때 앱이 닫히고 태블릿 첫 화면이 나온다)
 //   멈춰 있고 움직이는 그림이 없으면 1초에 네 번만 그린다(전엔 늘 1초에 60번 처음부터) · 별은 세 번에 칠하고 배경 물감은 한 번 만든다 ·
 //   곡을 바꾸거나 음악을 떠나면 옛 그림판의 픽셀을 바로 비운다 · 떠나거나 내리면 소리 장치를 재운다 · 🛑 블랙박스에 「지금 무엇을 하나」(setScene)
@@ -41,7 +43,8 @@ const S = {
   wired: false, showView: null, active: false, screen: 'list', gen: 0,
   song: null, perf: null, mode: 'tap', hands: 'R', lv: 1, sp: SPEED.def, line: -1, loop: false,
   running: false, t: -LEAD, last: 0, lastAct: 0, steps: [], si: 0, waiting: false, ok: 0, bad: 0,
-  passDone: false, saving: false, retry: null,
+  passDone: false, saving: false, retry: null, askPin: null,
+  passNo: 0, pinPass: 0, // 🎧 끝낸 판 번호(끝날 때마다 +1) · 어른이 확인한 판 번호(0 = 없음 · 저장되면 0) — 확인은 그 판에만 (v417 · Codex 221차 P2-1 — 🔁 계속의 다음 판엔 안 이어짐)
   sounding: new Map(), flash: new Map(), held: new Map(), ptr: new Map(), auto: new Set(), win: { lo: 30, hi: 50 },
   raf: 0, ro: null, drawn: 0, busy: false,
   freeOct: 3, freeNames: true, trail: [], freeKeys: 0, freeMs: 0, freeLast: 0, freeDay: '', freeOwe: new Map(), // 🎹 자유롭게 치기 (v408)
@@ -291,9 +294,10 @@ function passEnd() {
     applyDailyDelta(clockDay(), { pnTapN: 1, ...(goodPass(ok, bad) ? { pnTapOk: 1 } : {}), [GRADE_DAILY[grade]]: 1 }).catch(() => {});
     sendTap({ ...req, ok, bad, g, st: Math.round(S.passStall), mu: Math.round(S.passMute) });
   } else {
+    S.passNo += 1; // 새로 끝낸 판 — 지난 판의 어른 확인은 여기서 끝 (Codex 221차 P2-1)
     S.passDone = true;
     showDone();
-    if (!S.loop) toast('<b>끝까지 연주했어요</b>진짜 피아노로 끝까지 쳤으면 「✋ 피아노로 다 쳤어요」를 눌러요.', 3000);
+    if (!S.loop) toast('<b>끝까지 연주했어요</b>진짜 피아노로 끝까지 쳤으면 「✋ 피아노로 다 쳤어요」를 누르고 아빠·엄마 확인을 받아요.', 3200);
   }
   toStart();
   if (grade) startFx(grade); // 처음으로 돌린 뒤에 — 다음 판 준비 박 동안에도 보인다
@@ -333,7 +337,31 @@ function sendTap(req) {
   });
 }
 
+/**
+ * ✋ 「피아노로 다 쳤어요」 → 👨‍👩‍👦 아빠·엄마가 부모 비밀번호로 확인해야 ♪ 칸 (v417, 11-12 아버님 — 「어차피 디지털 피아노를 사용할 수 있을 때는 어른이 함께 있을 때」)
+ * 앱은 진짜 피아노 소리를 못 듣는다 — 들은 것만으로는 칸이 차지 않게. 취소·틀림이면 아무것도 안 센다(버튼은 그대로 · 다시 받을 수 있다)
+ * 📤 하루 칸: 누름(pnListenAsk) · 확인 뒤 저장(pnListenN — 옛 칸) · 비밀번호 틀림(pnPinBad) — 아이 화면엔 셈 없음
+ */
 function sendListen() {
+  if (!S.passDone || S.saving) return;
+  applyDailyDelta(clockDay(), { pnListenAsk: 1 }).catch(() => {});
+  const pass = S.passNo;
+  if (S.pinPass === pass) { saveListen(); return; } // 이 판은 확인을 받았는데 저장이 안 됐다 — 다시 묻지 않는다
+  if (!S.askPin) { toast('<b>아빠나 엄마를 불러 주세요</b>확인 창을 열지 못했어요.', 3000); return; } // 확인 없이는 세지 않는다
+  const gen = S.gen;
+  S.askPin(() => {
+    if (gen !== S.gen || pass !== S.passNo || !S.passDone || S.saving) return; // 확인하는 사이 곡·줄이 바뀌었거나 🔁 다음 판이 끝났으면 — 새 판에서 다시
+    S.pinPass = pass;
+    saveListen();
+  }, {
+    title: '👨‍👩‍👦 아빠나 엄마에게 확인을 받아요',
+    lead: '진짜 피아노로 끝까지 쳤나요? 아빠나 엄마가 비밀번호를 넣어 주면 ♪가 차요.',
+    onBad: () => { applyDailyDelta(clockDay(), { pnPinBad: 1 }).catch(() => {}); },
+  });
+}
+
+/** 어른이 확인한 「다 쳤어요」 → ♪ 칸 저장 */
+function saveListen() {
   if (!S.passDone || S.saving) return;
   const req = { song: S.song.id, line: S.line, hand: S.hands, lv: S.lv, sp: Math.round(S.sp * 100) / 100 };
   const gen = S.gen;
@@ -342,6 +370,7 @@ function sendListen() {
   showDone();
   pianoListen(req).then((r) => {
     S.saving = false;
+    if (r && r.ok) S.pinPass = 0; // 확인 한 번에 칸 한 번
     const got = r && r.ok && Array.isArray(r.got) ? r.got : [];
     if (r && r.ok) applyDailyDelta(clockDay(), { pnListenN: 1, ...(r.counted ? { pnNotes: 1 } : {}), ...(got.length ? { pnMons: got.length } : {}) }).catch(() => {});
     if (got.length) showArrivals(got, r.firsts); // 🐾 판이 바뀌었어도 온 포켓몬은 보여 준다 — 도감에는 이미 들어갔다 (v404)
@@ -1332,7 +1361,7 @@ function showIntro() {
   const ol = el('ol', 'pn-intro-steps');
   ol.appendChild(introLine('li', [['「🎧 듣고 따라 치기」', true], ['를 골라요', false]]));
   ol.appendChild(introLine('li', [['앱이 치는 소리를 들으며 ', false], ['진짜 피아노', true], ['로 끝까지 따라 쳐요', false]]));
-  ol.appendChild(introLine('li', [['「✋ 피아노로 다 쳤어요」', true], ['를 누르면 ♪ 하나', false]]));
+  ol.appendChild(introLine('li', [['「✋ 피아노로 다 쳤어요」', true], ['를 누르고 ', false], ['아빠·엄마 확인', true], ['을 받으면 ♪ 하나', false]])); // v417
   const last = el('li');
   const five = el('span', 'pn-slots'); // 빈 ♪ 다섯 — 무대의 칸과 같은 그림(수는 안 쓴다)
   for (let i = 0; i < NOTES_PER_MON; i++) five.appendChild(el('span', '', '♪'));
@@ -1447,6 +1476,7 @@ function rebuild() {
   S.gen += 1;
   S.perf = perform(S.song, S.line);
   S.passDone = false;
+  S.pinPass = 0;
   S.retry = null;
   S.fx = null;
   hushFx();
@@ -1769,10 +1799,11 @@ function initMidiCheck() {
 
 // ───────────────────── 바깥에서 부르는 것 ─────────────────────
 
-export function initMusic({ showView } = {}) {
+export function initMusic({ showView, requirePin } = {}) {
   if (S.wired) return;
   S.wired = true;
   S.showView = showView;
+  S.askPin = typeof requirePin === 'function' ? requirePin : null; // 👨‍👩‍👦 「다 쳤어요」 어른 확인 (v417) — player.js를 직접 부르지 않고 받는다(timeup.js와 같은 꼴)
   loadPrefs();
   const back = $('btn-music-back');
   if (back) back.addEventListener('click', () => { if (S.screen === 'stage' || S.screen === 'free') renderList(); else if (S.showView) S.showView('home'); });

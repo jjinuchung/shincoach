@@ -18,6 +18,8 @@
 //   사투 오답이면 💨 먹물 · 📖 칸에 「물고기가 아니에요」 · 🦑 에기는 배가 열린 뒤 가게에
 //   v387: ask(subj, seed, lv, { fish, stage }) — fish = 던질 때마다 늘어나는 물고기 번호(🔁 다시 풀기가 「다음 물고기」를 셈) · steps(🎚️ 과목 단계 — lv = stepLevel(물고기 단계, 과목 단계)) ·
 //   stepUp(오늘 오른 과목 — 열 때 한 줄 뒤에 들어서기 안내) · 문제에 redo가 있으면 카드 머리 「🔁 아까 그 문제, 다시 한 번!」(다음 날 몫은 「지난번」)·맞히면 「🔁 이번엔 맞혔어요!」
+//   v418: 문제에 pad(lakepad 꼴)가 있으면 보기 대신 숫자판(padview — 수학 과목과 같은 판) · 확인 → lakeTyped로 채점 · 🤷 모르겠어요 = 틀림 ·
+//   틀리면 「정답: …」과 풀이 한 줄을 「알겠어요」까지 · 숫자판이 떠 있는 동안은 하루 낚시 시간이 안 감(ui.padOpen) · onAnswer에 how('typed'|'idk')
 // 성능: 안 움직이는 층은 따로 한 장(하늘이 조금 바뀔 때만 다시) · 화면 배율 2배까지 · 느리면 저절로 가벼운 그림 · 화면이 숨으면 멈춤
 import {
   STARS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer, cellRoll, cellFish, cellFate,
@@ -29,6 +31,8 @@ import {
 import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, drawCell, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet, drawInk, drawBoat } from './fishart.js';
 import { avatarSvg } from './avatarart.js';
 import { sfx, unlock, vibrate } from './sfx.js';
+import { padBox, padAnswered } from './padview.js'; // ✍️ 수학 직접 쓰기 숫자판 — 수학 과목과 같은 판 (v418)
+import { lakeTyped, shownTyped } from './lakepad.js';
 
 const STAGE = {
   cast: '🎯 힘껏 던지기',
@@ -798,13 +802,18 @@ function ask(stage, head = '') {
   go.hidden = true;
   const box = q$('.lk-choices');
   box.innerHTML = '';
+  const pad = !!(q.pad && q.pad.spec); // ✍️ 숫자판으로 직접 쓰기 (v418 — lakeview가 수학에만 붙인다)
+  box.classList.toggle('is-pad', pad);
+  card.classList.toggle('is-pad', pad);
   card.hidden = false;
   root.classList.add('is-q');
+  ui.padOpen = pad; // ✍️ 쓰는 동안은 하루 낚시 시간이 안 간다 — 천천히 풀어도 낚시가 줄지 않게 (v418)
   const askedAt = Date.now(); // 답까지 걸린 초 (v392 — 📐 다지기)
   return new Promise((resolve) => {
     let picked = false;
     const done = (ok) => {
       if (ui !== me) return;
+      ui.padOpen = false;
       card.hidden = true;
       hint.hidden = true;
       go.hidden = true;
@@ -812,6 +821,54 @@ function ask(stage, head = '') {
       ui.paused = false;
       resolve(ok);
     };
+    /** 「알겠어요」를 누를 때까지 한 줄(또는 마디)을 보여 준다 */
+    const waitRead = (fill) => {
+      hint.textContent = '';
+      fill(hint);
+      hint.hidden = false;
+      go.hidden = false;
+      go.onclick = () => { go.onclick = null; done(false); };
+      try { go.focus(); } catch { /* 무시 */ }
+    };
+    /** 답 하나를 받은 뒤 (보기를 누름 · 숫자판 확인 · 🤷) — 소리·🔁·글자·소리 다시·셈·기록 · info = { trap, how('typed'|'idk' — 숫자판) } */
+    const answered = (ok, info = {}) => {
+      try { (ok ? sfx.ding : sfx.wrong)(); } catch { /* 무시 */ }
+      if (ok && q.redo) toast(REDO_OK, 1600); // 🔁 (v387 — 틀리면 말없이 풀이 한 줄만)
+      // 🔊 소리만 문제는 답한 뒤 글자를 · 거꾸로 문제는 답한 뒤 소리를 (v378)
+      if (q.reveal) qBox.appendChild(el('div', 'lk-reveal', q.reveal));
+      if (q.sayAfter && typeof h.say === 'function') { try { h.say(q.sayAfter); } catch { /* 무시 */ } }
+      if (ok) { ui.okToday += 1; ui.streak += 1; ui.palJump = performance.now(); } else ui.streak = 0;
+      try { h.onAnswer && h.onAnswer(subj, ok, stage, q, { trap: info.trap, at: askedAt, ...(info.how ? { how: info.how } : {}) }); } catch { /* 무시 */ }
+    };
+    if (pad) {
+      const okC = q.choices.find((c) => c.ok) || {};
+      const unit = q.pad.spec.unit || '';
+      /** 숫자판 자리에 「✍️ 내 답」 → 맞으면 잠깐(한 줄 안내는 알림으로) · 틀리면 정답과 풀이 한 줄을 읽을 때까지 */
+      const settle = (ok, mine, r) => {
+        if (picked || ui !== me) return;
+        picked = true;
+        box.innerHTML = '';
+        box.appendChild(padAnswered(mine, ok));
+        answered(ok, { trap: r && r.trap, how: r ? 'typed' : 'idk' });
+        if (ok) {
+          if (r && r.note) toast(r.note, 2200);
+          setTimeout(() => done(true), 900);
+          return;
+        }
+        waitRead((hb) => {
+          const right = el('b', 'lk-hint-ans', '정답: ');
+          if (typeof okC.node === 'function') right.appendChild(okC.node()); else right.appendChild(document.createTextNode(String(okC.text || '')));
+          hb.appendChild(right);
+          const why = r ? r.hint : q.pad.why || ''; // 🤷도 풀이 한 줄 (걷기 — 정답만 보였다)
+          if (why) hb.appendChild(el('span', 'lk-hint-why', why));
+        });
+      };
+      box.appendChild(padBox(q.pad.spec, {
+        onSubmit: (typed) => { const r = lakeTyped(q, typed); settle(r.ok, shownTyped(typed.text, unit), r); },
+        onIdk: () => settle(false, '🤷 모르겠어요', null),
+      }));
+      return;
+    }
     q.choices.forEach((c, i) => {
       const b = el('button', 'lk-choice');
       b.type = 'button';
@@ -824,20 +881,10 @@ function ask(stage, head = '') {
         const ok = !!c.ok;
         b.classList.add(ok ? 'is-ok' : 'is-no');
         if (!ok) box.querySelectorAll('button')[q.choices.findIndex((x) => x.ok)].classList.add('is-ans');
-        try { (ok ? sfx.ding : sfx.wrong)(); } catch { /* 무시 */ }
-        if (ok && q.redo) toast(REDO_OK, 1600); // 🔁 (v387 — 틀리면 말없이 풀이 한 줄만)
-        // 🔊 소리만 문제는 답한 뒤 글자를 · 거꾸로 문제는 답한 뒤 소리를 (v378)
-        if (q.reveal) qBox.appendChild(el('div', 'lk-reveal', q.reveal));
-        if (q.sayAfter && typeof h.say === 'function') { try { h.say(q.sayAfter); } catch { /* 무시 */ } }
-        if (ok) { ui.okToday += 1; ui.streak += 1; ui.palJump = performance.now(); } else ui.streak = 0;
-        try { h.onAnswer && h.onAnswer(subj, ok, stage, q, { trap: c.trap, at: askedAt }); } catch { /* 무시 */ }
+        answered(ok, { trap: c.trap });
         // 틀린 보기에 그 실수의 힌트가 있으면 — 읽을 때까지 기다린다(「알겠어요」) · 없으면 잠깐 정답을 보여 주고 닫음
         if (!ok && c.hint) {
-          hint.textContent = c.hint;
-          hint.hidden = false;
-          go.hidden = false;
-          go.onclick = () => { go.onclick = null; done(false); };
-          try { go.focus(); } catch { /* 무시 */ }
+          waitRead((hb) => { hb.textContent = c.hint; });
           return;
         }
         setTimeout(() => done(ok), ok ? 800 : 1500);
@@ -1331,7 +1378,7 @@ function loop(now) {
   if (ui.lite && (ui.skip = !ui.skip)) return;
   ui.last = now;
   // 하루 시간 (진짜 시계) — 📖 도감·🎒 채비 가게를 보는 동안은 안 셈
-  if (!ui.dexOpen && !ui.shopOpen) ui.used += activeStep(dt, now - ui.touchAt, !document.hidden);
+  if (!ui.dexOpen && !ui.shopOpen && !ui.padOpen) ui.used += activeStep(dt, now - ui.touchAt, !document.hidden); // ✍️ 숫자판을 쓰는 동안도 안 감 (v418)
   saveTime(false);
   // 📖 도감 단추 — 던지기 전(ready)에만
   const canDex = ui.st === 'ready' && !ui.busy && !ui.paused && typeof ui.host.dexRows === 'function';

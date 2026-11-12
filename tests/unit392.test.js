@@ -598,7 +598,7 @@ test('📐 화면·잇기: 판을 열 때 저장된 장부 · 단계·셈 문구
   assert.ok(!/단계|다지기|잇달아/.test(shown), `아이 화면 글 ${shown}`);
   const lake = read('js/lakeview.js');
   assert.ok(lake.includes('const ut = unitTurn(await getMath().catch(() => null), today, alive);'), '연 때 장부');
-  assert.ok(lake.includes('fishMathQ(lakeRaw(), seed, avoid, lv, ut.now())'), '물고기 수학에 차례');
+  assert.ok(lake.includes('fishMathQ(lakeRaw(), seed, avoid, lv, ut.now(), only)'), '물고기 수학에 차례');
   assert.ok(lake.includes('if (q && q.ud) {') && lake.includes('.then(ut.kept).catch(() => {});'), '답하면 저장 뒤 새 단계');
   const fv = read('js/fishview.js');
   assert.ok(fv.includes("const badge = q.redo ? redoBadge(q.redo.step) : q.ud ? '' : lvBadge(stage, ui.fish);"), '다지기 문제엔 큰 물고기 표시 없음');

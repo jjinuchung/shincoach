@@ -36,6 +36,7 @@ import { pokeButton, pokeActive, resumePoke, endPoke } from './mathpokeview.js';
 import { splitLines, conceptQuiz, chalQuiz } from './lookback.js';
 import { lineReveal, reviewQuizEl } from './lookview.js';
 import { padSpec, matchTyped } from './mathpad.js';
+import { learnedPad } from './lakepad.js'; // ✍️ 🎣 낚시터 수학 직접 쓰기 (v418)
 import { padBox, padAnswered } from './padview.js';
 import { drawBox, drawAnswered, canDraw } from './drawview.js';
 import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound, megaReady, zygBattle } from './xp.js';
@@ -2754,16 +2755,19 @@ export async function journeyMathSource() {
     if (!keys.length) return null;
     return {
       keys,
-      make(id, seed, lv = 1) {
+      make(id, seed, lv = 1, opt = {}) {
         const sx = stemOf(id);
         if (!sx) return null;
-        for (const kind of mathKinds(lv)) {
+        const typed = !!(opt && opt.typed); // ✍️ 🎣 낚시터 직접 쓰기 (v418) — 숫자판으로 받을 수 있는 계산 문제만(padSpec) · 못 만들면 null(낚시터가 다음 칸으로)
+        for (const kind of typed ? ['calc'] : mathKinds(lv)) {
           for (let t = 0; t < 6; t++) {
             const q = sx.gen.makeQuestion(id, kind, ((Number(seed) || 0) + t * 7919) % 2147483647, { ...optsFor(sx.key), recent: [] });
             if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((c) => c.ok).length === 1) {
+              const pad = typed ? learnedPad(q, sx.key) : null; // ✍️ 숫자판 꼴 (lakepad — 수학 과목 숫자판과 같은 padSpec)
+              if (typed && !pad) continue;
               const L = MATH_KIND_LV[kind] || 1;
               const hint = (c) => mathHint(q, c); // v387 — 1단계(계산)도 틀린 보기에 그 실수의 풀이 한 줄 (🎒 대여행은 hint를 안 씀)
-              return { id: `m:${id}`, label: `🔢 ${nameOf(id)}`, qNode: () => qtNode(q.q), qk: String(q.q), lv: L, choices: q.choices.map((c) => ({ text: String(c.text), ok: !!c.ok, node: () => richNode(c.text), ...(hint(c) ? { hint: hint(c) } : {}) })) };
+              return { id: `m:${id}`, label: `🔢 ${nameOf(id)}`, qNode: () => qtNode(q.q), qk: String(q.q), lv: L, choices: q.choices.map((c) => ({ text: String(c.text), ok: !!c.ok, node: () => richNode(c.text), ...(hint(c) ? { hint: hint(c) } : {}) })), ...(pad ? { pad } : {}) };
             }
           }
         }

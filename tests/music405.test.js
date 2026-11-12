@@ -117,7 +117,7 @@ before(async () => {
   await loadToday();
   await setPiano({ notes: 5, days: {} }); // 다섯 칸이 찼고 아직 안 온 몫 하나 — 안내 창이 먼저, 온 창은 그 뒤
   PV = await import('../js/pianoview.js');
-  PV.initMusic({ showView: () => {} });
+  PV.initMusic({ showView: () => {}, requirePin: (ok) => ok() }); // 👨‍👩‍👦 어른 확인(v417)은 바로 맞음으로 — 확인 창 자체는 pianoflow402
   await PV.enterMusic();
   P = globalThis.window.__piano;
 });
@@ -127,7 +127,7 @@ test('화면 — 처음 들어오면 안내 창: 🎧 · 진짜 피아노 · 새
   assert.ok(box, '안내 창');
   assert.equal(box.parent, VIEW, '창은 음악 화면 안');
   const t = box.textContent;
-  for (const w of ['🎵 음악 포켓몬을 만나요!', '🎧 진짜 피아노로', '「🎧 듣고 따라 치기」를 골라요', '앱이 치는 소리를 들으며 진짜 피아노로 끝까지 따라 쳐요', '「✋ 피아노로 다 쳤어요」를 누르면 ♪ 하나', '♪♪♪♪♪가 다 차면 🐾 음악 포켓몬이 와요!',
+  for (const w of ['🎵 음악 포켓몬을 만나요!', '🎧 진짜 피아노로', '「🎧 듣고 따라 치기」를 골라요', '앱이 치는 소리를 들으며 진짜 피아노로 끝까지 따라 쳐요', '「✋ 피아노로 다 쳤어요」를 누르고 아빠·엄마 확인을 받으면 ♪ 하나', '♪♪♪♪♪가 다 차면 🐾 음악 포켓몬이 와요!',
     '🎹 태블릿 화면 건반으로', '「🎹 태블릿으로 치기」에서 「곡 전체」를 골라요', '끝까지 잘 치면 건반 칸 하나 — 💰도 받아요', '이 다 차면 🐾 음악 포켓몬이 와요!']) assert.ok(t.includes(w), `글: ${w}`);
   assert.ok(!t.includes('는 💰를 받아요'), 'v405의 「화면 건반은 💰」 말은 없다 (v413)');
   const ten = all.filter((e) => { if (e.className !== 'pn-tkeys') return false; for (let x = e; x; x = x.parent) if (x === box) return true; return false; });
@@ -182,7 +182,7 @@ test('화면 — 🎧 무대: 「✋ 피아노로 다 쳤어요」 · ♪ 칸 �
   assert.equal(P.S.running, true);
   P.advance(100);
   assert.equal(button('✋ 피아노로 다 쳤어요').hidden, false, '끝까지 연주하면 새 이름의 단추');
-  assert.match(byId('pn-toast').innerHTML, /진짜 피아노로 끝까지 쳤으면 「✋ 피아노로 다 쳤어요」를 눌러요\./);
+  assert.match(byId('pn-toast').innerHTML, /진짜 피아노로 끝까지 쳤으면 「✋ 피아노로 다 쳤어요」를 누르고 아빠·엄마 확인을 받아요\./); // v417
   assert.throws(() => button('✋ 다 쳤어요'), /단추 없음/, '옛 이름은 없다');
   slots.click();
   assert.ok(byId('pn-intro'), '♪ 칸을 누르면 안내 창');

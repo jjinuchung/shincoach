@@ -172,7 +172,7 @@ test('★ 🎲 출제 자리 — 못 만든 자리도 넘김(같은 문제 두 �
   const ask = asker({ math: one }, '2026-10-30', { math: 1 });
   assert.equal(ask('english', 1), null);
   assert.equal(ask('math', 1).q, line[1]);
-  assert.match(src('js/lakeview.js'), /const inner = mathMix\(asker\(ui\.src, day, start\), /); // v367 — 수학 차례에 🐟 물고기 수학을 섞음 (v378부터 단계를 lvFor로 고쳐 넘기는 겉싸개 안)
+  assert.match(src('js/lakeview.js'), /const inner = mathMix\(asker\(srcs, day, start, 'lake', atStep, typed \? \['math'\] : \[\]\), fm\(typed\)\);/); // v367 (v418부터 ✍️ 직접 쓰기 원천 srcs · fm(typed) · 넘긴 자리 atStep · 수학은 한 바퀴) — 수학 차례에 🐟 물고기 수학을 섞음 (v378부터 단계를 lvFor로 고쳐 넘기는 겉싸개 안)
 });
 
 test('★ 🔀 과목 차례 — 고른 과목 먼저 · 못 만들면 몫이 큰 과목부터 · 셋 내리 나온 과목은 맨 끝(넷 내리는 다른 과목이 다 못 만들 때만) · 몫 0은 안 씀', () => {

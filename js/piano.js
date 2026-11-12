@@ -56,10 +56,11 @@ export const MAX_BARS = 200;
 /** 하루 칸 (db.js DAILY_SUMS — 📤 usage 한 줄) : 끝까지 친 판 · 그 가운데 잘 친 판 · 받은 💰 · 「다 쳤어요」 · 센 음표 칸 · 온 음악 포켓몬(v404) · 🐾 안내 창을 「알겠어요!」로 닫은 번(v405) ·
  *  🎹 자유롭게 치기(v408) 연 번 · 누른 건반 · 친 초(쉰 틈은 10초까지만) ·
  *  (v413) 🎹 건반 칸을 센 판 · 박자 판정 🎉·👏·🎺 판 수 · 연주 중 화면이 STALL.ms 넘게 멈칫한 번 · 그 가운데 STALL.long 넘은 번 ·
- *  (v414) 연주 중 소리 멎음 번 · 그 가운데 MUTE.long 넘은 번 · 소리 장치가 꺼져 있던 번 · 느린 장면 번 · 그 시간 합(ms) · 건반 누름이 끊긴 번 */
+ *  (v414) 연주 중 소리 멎음 번 · 그 가운데 MUTE.long 넘은 번 · 소리 장치가 꺼져 있던 번 · 느린 장면 번 · 그 시간 합(ms) · 건반 누름이 끊긴 번 ·
+ *  (v417) 🎧 「다 쳤어요」를 누른 번(어른 확인 전 — 확인 뒤 저장된 번은 pnListenN) · 그 확인 창에서 비밀번호가 틀린 번 */
 export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec',
   'pnTapSlots', 'pnFan', 'pnClap', 'pnBoo', 'pnStallN', 'pnStallLong',
-  'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN'];
+  'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN', 'pnListenAsk', 'pnPinBad'];
 /** 🎺 박자 판정 등급 → 하루 칸 (v413) */
 export const GRADE_DAILY = { great: 'pnFan', good: 'pnClap', boo: 'pnBoo' };
 /** 연주 중 화면 멈칫 (v413 — 「멈췄다가 3~4초 뒤 풀린다」가 태블릿이 버거워 멈춘 것인지 가르려고) · ms 이상이면 셈 · long 이상은 따로 */
@@ -743,7 +744,7 @@ export function monsDueRule(p, now, pool = [], rng = Math.random) {
 export function pianoDayLine(d) {
   const g = (k) => nz(d && d[k]);
   if (!g('pnTapN') && !g('pnListenN') && !g('pnMons') && !g('pnIntro') && !g('pnFreeN') && !g('pnFreeKeys') && !g('pnStallN')
-    && !g('pnMuteN') && !g('pnSlowN') && !g('pnCancelN')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405) · 자유롭게 치기만 한 날도 (v408) · 멈칫만 있던 날도 (v413) · 소리 멎음·느린 장면·누름 끊김만 있던 날도 (v414)
+    && !g('pnMuteN') && !g('pnSlowN') && !g('pnCancelN') && !g('pnListenAsk') && !g('pnPinBad')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405) · 자유롭게 치기만 한 날도 (v408) · 멈칫만 있던 날도 (v413) · 소리 멎음·느린 장면·누름 끊김만 있던 날도 (v414) · 누르기만 하고 확인을 못 받은 날도 (v417)
   const parts = [];
   if (g('pnTapN')) {
     // (v413) 🎹 건반 칸 · 박자 판정 — 셈이 있을 때만 붙인다(옛 날 줄 꼴 그대로)
@@ -751,7 +752,9 @@ export function pianoDayLine(d) {
     const beat = g('pnFan') || g('pnClap') || g('pnBoo') ? ` · 박자 🎉${g('pnFan')} 👏${g('pnClap')} 🎺${g('pnBoo')}` : '';
     parts.push(`🎹 태블릿 치기 끝까지 ${g('pnTapN')}판(잘 친 판 ${g('pnTapOk')} · 💰${g('pnCoins')}${slot}${beat})`);
   }
-  if (g('pnListenN')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')})`);
+  // v417 — 누른 번이 있는 날은 「누름 · 어른 확인 · 비밀번호 틀림」 (옛 날은 옛 줄 그대로)
+  if (g('pnListenAsk') || g('pnPinBad')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 누름 ${g('pnListenAsk')}번 · 어른 확인 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')}) · 비밀번호 틀림 ${g('pnPinBad')}번`);
+  else if (g('pnListenN')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')})`);
   if (g('pnMons')) parts.push(`🐾 음악 포켓몬 ${g('pnMons')}마리 옴`);
   if (g('pnIntro')) parts.push(`🐾 음악 포켓몬 안내 창 ${g('pnIntro')}번 봄`);
   if (g('pnFreeN') || g('pnFreeKeys')) {
@@ -782,7 +785,7 @@ export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (i
   const hm = (t) => { const d = new Date(t); return `${dayKeyOf(t).slice(5)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const lines = [`🎹 음악 연습 기록 (${today}) — v402부터`, '', '## 읽는 법',
     `- 🎹 태블릿 치기 = 화면 건반으로 끝까지 친 판 · 맞게/틀리게 누른 수(맞는 건반을 기다리는 동안 다른 건반) · 맞게 누른 비율 70% 넘고 하루 ${TAP_DAY}번 안이면(곡 상관없이 · v406까지 3번) 💰(한 줄 5 · 곡 전체 15)`,
-    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「✋ 피아노로 다 쳤어요」(v404까지 「다 쳤어요 ✋」)를 누른 것 — 진짜로 쳤는지는 앱이 모른다(피아노 연결 전)(누른 때와 ⏳ 음악 시간으로 보기) · 하루 세 칸까지 음표 칸 · 다섯 칸마다 🐾 음악 포켓몬 한 마리가 옴(v404)',
+    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「✋ 피아노로 다 쳤어요」(v404까지 「다 쳤어요 ✋」)를 누른 것 — 진짜로 쳤는지는 앱이 모른다(피아노 연결 전)(누른 때와 ⏳ 음악 시간으로 보기) · v417부터는 누른 뒤 아빠·엄마가 부모 비밀번호로 확인한 것만 이 줄에 남는다 · 하루 세 칸까지 음표 칸 · 다섯 칸마다 🐾 음악 포켓몬 한 마리가 옴(v404)',
     `- 🎹 건반 칸(v413) = 🎹 태블릿 치기로 「곡 전체」를 잘(맞게 70% 넘게) 끝까지 친 판 · 하루 ${TAP_SLOT_DAY}칸까지 · ${TAPS_PER_MON}칸마다 🐾 음악 포켓몬 한 마리(💰 한도와 따로 · 한 줄 연습은 안 셈) — 줄 끝 「🎹 칸」`,
     `- 박자(v413) = 판 끝 판정 점수 — 음표마다 제때 눌렀나(막대가 닿기 전 ${BEAT.early}박 안 · 닿은 뒤 기다리게 한 게 ${BEAT.late}박 안이면 한 점 · ${BEAT.lateHalf}박 안이면 반 점) 평균 × 맞게 누른 비율 → 🎉 빵빠레 ${BEAT.great}점 이상 · 👏 짝짝 ${BEAT.good}점 이상 · 🎺 뿌우~ 그 아래(맞게 70% 아래도) — 아이 화면엔 점수 없이 소리·그림만 · 보상과 상관없음`,
     `- 멈칫(v413) = 그 판 동안 화면이 ${STALL.ms / 1000}초 넘게 멈춘 가장 긴 시간(태블릿이 버거워 멈춘 것 — 아이가 ⏸로 멈춘 것은 안 셈)`,

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { applyDailyDelta, getDaily } from '../js/db.js';
 import { initProfile, flushProfile, getProfileSnapshot } from '../js/xp.js';
 import { loadToday, clockDay, isLocked } from '../js/timelimit.js';
+import { pianoOf } from '../js/piano.js';
 
 // ───────────────────── 가짜 화면 ─────────────────────
 
@@ -110,6 +111,15 @@ async function waitFor(cond, what, ms = 4000) {
 }
 let PV;
 let P;
+// 👨‍👩‍👦 「다 쳤어요」 어른 확인 (v417) — 가짜 비밀번호 창: 'ok' 바로 맞음 · 'bad' 틀림 한 번(창은 떠 있음) · 'cancel' 취소 · 'hold' 열어 두기(나중에 pin.ok())
+const pin = { mode: 'ok', asked: 0, opt: null, ok: null };
+function fakePin(onOk, opt = {}) {
+  pin.asked += 1;
+  pin.opt = opt;
+  pin.ok = onOk;
+  if (pin.mode === 'ok') onOk();
+  else if (pin.mode === 'bad' && opt.onBad) opt.onBad();
+}
 
 /** 무대를 새로 — 곡·방법·손·어디를·되풀이를 단추로 고른다 */
 function stage({ mode = 'listen', hand = '오른손', line = '1줄', loop = '한 번' } = {}) {
@@ -139,7 +149,7 @@ before(async () => {
   await initProfile();
   await loadToday();
   PV = await import('../js/pianoview.js');
-  PV.initMusic({ showView: () => {} });
+  PV.initMusic({ showView: () => {}, requirePin: fakePin });
   await PV.enterMusic();
   P = globalThis.window.__piano;
 });
@@ -323,4 +333,119 @@ test('🎵 음표 알림 말 — ♪ 그림만 · 칸 수를 말로 쓰지 않�
   assert.match(html, /음표를 채웠어요|음표가 가득 찼어요|오늘 음표 칸은 다 채웠어요/);
   assert.doesNotMatch(html, /다섯 칸|한 칸|\d\s*칸/);
   assert.match(html, /♪/);
+});
+
+// ───────────────────── 👨‍👩‍👦 v417 「다 쳤어요」 어른 확인 ─────────────────────
+
+test('👨‍👩‍👦 「다 쳤어요」 어른 확인 (v417) — 확인 전엔 안 셈 · 취소·틀림은 그대로 · 맞으면 칸 · 저장 실패 뒤엔 다시 안 물음 · 확인하는 사이 판이 바뀌면 안 셈', async () => {
+  await setMusicUsed(0);
+  const day = async () => (await getDaily(clockDay())) || {};
+  const rows = () => pianoOf(getProfileSnapshot().piano).log.filter((r) => r.m === 'l').length;
+  const n = (d, k) => Number(d[k]) || 0;
+  const d0 = await day();
+  const r0 = rows();
+  stage();
+  go();
+  P.advance(100);
+  assert.deepEqual([P.S.passDone, byId('pn-done').hidden], [true, false]);
+  // 취소 — 창은 떴고 아무것도 안 셈 · 버튼 그대로
+  pin.mode = 'cancel';
+  const a0 = pin.asked;
+  byId('pn-done').click();
+  assert.equal(pin.asked, a0 + 1, '누르면 확인 창');
+  assert.match(pin.opt.title, /아빠나 엄마에게 확인을 받아요/);
+  assert.match(pin.opt.lead, /비밀번호/);
+  assert.doesNotMatch(pin.opt.title + pin.opt.lead, /\d/, '창에 셈 없음');
+  assert.deepEqual([P.S.saving, P.S.passDone, byId('pn-done').hidden], [false, true, false]);
+  // 틀림 — 📤 비밀번호 틀림 · 여전히 안 셈
+  pin.mode = 'bad';
+  byId('pn-done').click();
+  await settle(60);
+  let d = await day();
+  assert.equal(n(d, 'pnListenAsk') - n(d0, 'pnListenAsk'), 2, '누름 둘');
+  assert.equal(n(d, 'pnPinBad') - n(d0, 'pnPinBad'), 1, '틀림 하나');
+  assert.equal(n(d, 'pnListenN') - n(d0, 'pnListenN'), 0, '확인 전엔 안 셈');
+  assert.equal(rows(), r0);
+  assert.equal(P.S.passDone, true);
+  // 열어 둔 사이 판이 바뀌었다 — 늦은 확인은 안 셈
+  pin.mode = 'hold';
+  byId('pn-done').click();
+  button('2줄').click();
+  pin.ok();
+  await settle(60);
+  assert.deepEqual([P.S.saving, rows()], [false, r0], '새 판에서 다시');
+  // 맞음 — 칸
+  stage();
+  go();
+  P.advance(100);
+  pin.mode = 'ok';
+  byId('pn-done').click();
+  await waitFor(() => !P.S.saving, '확인 뒤 저장');
+  d = await day();
+  assert.equal(n(d, 'pnListenN') - n(d0, 'pnListenN'), 1, '어른 확인 하나');
+  assert.equal(rows(), r0 + 1);
+  assert.deepEqual([P.S.passDone, P.S.pinPass], [false, 0], '확인 한 번에 칸 한 번');
+  // 확인은 받았는데 저장이 실패했다 — 다시 누르면 또 묻지 않고 저장
+  stage();
+  go();
+  P.advance(100);
+  fakeIdb.failNext('profile');
+  byId('pn-done').click();
+  await waitFor(() => !P.S.saving, '실패한 저장');
+  assert.deepEqual([P.S.passDone, P.S.pinPass === P.S.passNo, rows()], [true, true, r0 + 1]);
+  pin.mode = 'cancel';
+  const a1 = pin.asked;
+  byId('pn-done').click();
+  await waitFor(() => !P.S.saving, '다시 저장');
+  assert.equal(pin.asked, a1, '또 묻지 않는다');
+  assert.deepEqual([P.S.passDone, P.S.pinPass, rows()], [false, 0, r0 + 2]);
+  // 판이 바뀌면 확인도 처음부터
+  stage();
+  go();
+  P.advance(100);
+  byId('pn-done').click();
+  assert.equal(pin.asked, a1 + 1, '새 판은 다시 묻는다');
+  assert.equal(P.S.passDone, true);
+  pin.mode = 'ok';
+});
+
+test('👨‍👩‍👦 🔁 계속 — 확인은 끝낸 그 판에만 (Codex 221차 P2-1): 저장 실패 뒤 다음 판은 다시 묻는다 · 창을 연 채 다음 판이 끝나면 늦은 확인은 안 셈', async () => {
+  await setMusicUsed(0);
+  const rows = () => pianoOf(getProfileSnapshot().piano).log.filter((r) => r.m === 'l').length;
+  stage({ loop: '🔁 계속' });
+  go();
+  P.advance(100);
+  assert.deepEqual([P.S.running, P.S.passDone], [true, true]);
+  const r0 = rows();
+  // 확인 → 저장 실패 — 이 판은 확인 받음
+  pin.mode = 'ok';
+  fakeIdb.failNext('profile');
+  byId('pn-done').click();
+  await waitFor(() => !P.S.saving, '실패한 저장');
+  assert.equal(rows(), r0);
+  assert.equal(P.S.pinPass, P.S.passNo, '이 판은 확인 받음');
+  // 다음 판이 끝났다 — 지난 판의 확인은 안 이어짐
+  P.advance(100);
+  assert.equal(P.S.passDone, true);
+  assert.notEqual(P.S.pinPass, P.S.passNo);
+  pin.mode = 'cancel';
+  const a0 = pin.asked;
+  byId('pn-done').click();
+  assert.equal(pin.asked, a0 + 1, '새 판은 다시 묻는다');
+  await settle(60);
+  assert.equal(rows(), r0, '확인 없이는 안 셈');
+  // 창을 연 채 다음 판이 끝났다 — 늦은 확인은 안 셈
+  pin.mode = 'hold';
+  byId('pn-done').click();
+  P.advance(100);
+  pin.ok();
+  await settle(60);
+  assert.deepEqual([P.S.saving, rows()], [false, r0], '늦은 확인');
+  // 지금 판에서 다시 받으면 셈
+  pin.mode = 'ok';
+  byId('pn-done').click();
+  await waitFor(() => !P.S.saving, '저장');
+  assert.equal(rows(), r0 + 1);
+  assert.equal(P.S.pinPass, 0);
+  go(); // ⏸
 });

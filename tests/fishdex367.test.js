@@ -124,10 +124,11 @@ test('🔌 잇기 — 날씨 칩·도감 단추·💡·힌트 카드 · 도감 �
   const fv = src('js/fishview.js');
   for (const c of ['lk-wx', 'lk-dexbtn', 'lk-tip', 'lk-hint', 'lk-go']) assert.match(fv, new RegExp(`class="${c}"`), c);
   assert.match(fv, /dexRoot\.id = 'lk-dex';/);
-  assert.match(fv, /if \(!ui\.dexOpen && !ui\.shopOpen\) ui\.used \+= activeStep\(/, '도감(v368부터 🎒 채비 가게도) 보는 동안 하루 시간 안 셈');
+  assert.match(fv, /if \(!ui\.dexOpen && !ui\.shopOpen && !ui\.padOpen\) ui\.used \+= activeStep\(/, '도감(v368부터 🎒 채비 가게도) 보는 동안 하루 시간 안 셈');
   assert.match(fv, /const canDex = ui\.st === 'ready' && !ui\.busy && !ui\.paused && typeof ui\.host\.dexRows === 'function';/);
   assert.match(fv, /if \(!ui \|\| ui\.st !== 'ready' \|\| ui\.busy \|\| ui\.paused \|\| typeof ui\.host\.dexRows !== 'function'\) return;\n\s*const me = ui;[\s\S]{0,200}ui\.paused = true;\n\s*ui\.dexOpen = true;/);
-  assert.match(fv, /h\.onAnswer && h\.onAnswer\(subj, ok, stage, q, \{ trap: c\.trap/);
+  assert.match(fv, /h\.onAnswer && h\.onAnswer\(subj, ok, stage, q, \{ trap: info\.trap/); // v418 — 보기·숫자판이 함께 쓰는 answered(ok, info)
+  assert.match(fv, /answered\(ok, \{ trap: c\.trap \}\);/);
   assert.match(fv, /if \(!ok && c\.hint\) \{/);
   // v368부터 날씨 기울임은 미끼와 곱한 tiltNow() — 입질·물속 그림자 둘 다 그것으로 (v378 입질 쪽엔 시험용 별 h.forceStar가 하나 더)
   assert.equal((fv.match(/rollFish\(ui\.spot, ui\.chum, ui\.streak, Math\.random, tiltNow\(\)(, h\.forceStar \|\| 0)?\)/g) || []).length, 2, '입질·물속 그림자 둘 다');

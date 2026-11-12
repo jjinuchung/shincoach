@@ -208,7 +208,7 @@ async function main() {
   initKorean({ showView });  // 📚 국어 — ← 버튼 · 다시 읽으면 도감 다시 그리기
   initNonsul({ showView });  // 🖊️ 논술 — ← 버튼 (v303)
   initLetters({ showView }); // 📮 포켓몬 편지 — ← 버튼·우체통 띠 (v351)
-  initMusic({ showView });   // 🎹 음악 — ← 버튼 · ⚙ 집 피아노 연결 확인 (v402)
+  initMusic({ showView, requirePin });   // 🎹 음악 — ← 버튼 · ⚙ 집 피아노 연결 확인 (v402) · 「다 쳤어요」 어른 확인 비밀번호 (v417)
   initCalm();                // 🌿 국어·논술 머리줄 🎵 단추 (v317)
   initStock({ conf: stockConf }); // 🏦 홈의 🏦 — 🔒 부모 설정(켜기·투자 한도)은 player.stockConf (v319)
   initTimeUp({ requirePin }); // ⏳ 잠금 화면 — 비밀번호는 주입한다 (player.js ↔ timeup.js 고리 방지)

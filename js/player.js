@@ -3628,13 +3628,25 @@ async function checkPin(pin) {
 }
 
 let pinCallback = null;
+let pinBad = null; // 틀릴 때마다 (🎹 「다 쳤어요」 어른 확인 — 📤 비밀번호 틀림 · v417)
+let pinReq = 0; // 요청 번호 — 비밀번호를 견주는(비동기) 사이 취소·Esc·다른 요청이 오면 옛 결과는 버린다 (Codex 221차 P2-2)
+const PIN_TITLE = '🔒 부모님 비밀번호';
 
-/** 부모 비밀번호 확인 후 onOk 실행 (설정·학습 기록 공용) */
-export function requirePin(onOk) {
+/**
+ * 부모 비밀번호 확인 후 onOk 실행 (설정·학습 기록 공용)
+ * opt (v417 — 🎹 「✋ 피아노로 다 쳤어요」 어른 확인): title·lead 창 머리 글 · onBad 비밀번호가 틀릴 때마다 — 없으면 늘 그대로
+ */
+export function requirePin(onOk, opt = {}) {
+  pinReq += 1;
   pinCallback = onOk;
+  pinBad = typeof opt.onBad === 'function' ? opt.onBad : null;
   const dlg = $('dlg-pin');
   const input = $('pin-input');
   const err = $('pin-error');
+  $('pin-title').textContent = opt.title || PIN_TITLE;
+  const lead = $('pin-lead');
+  lead.textContent = opt.lead || '';
+  lead.hidden = !opt.lead;
   input.value = '';
   err.textContent = '';
   dlg.showModal();
@@ -3677,20 +3689,28 @@ function openSettings() {
 let ttsSeq = 0;
 
 function initPinDialog() {
-  $('pin-cancel').addEventListener('click', () => $('dlg-pin').close());
+  $('pin-cancel').addEventListener('click', () => { pinReq += 1; $('dlg-pin').close(); });
+  $('dlg-pin').addEventListener('cancel', () => { pinReq += 1; }); // Esc로 닫음 — 견주던 결과도 버린다
   $('form-pin').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = $('pin-input');
+    // 누른 때의 요청 · 그 요청의 콜백 — 견주는 사이 바뀌면 버린다(옛 비밀번호로 새 요청을 승인하거나 새 요청의 틀림으로 세지 않게 · 두 번 눌러도 한 번)
+    const req = pinReq;
+    const cb = pinCallback;
+    const bad = pinBad;
     const ok = await checkPin(input.value.trim());
+    if (req !== pinReq || !$('dlg-pin').open) return;
     if (!ok) {
       $('pin-error').textContent = '비밀번호가 틀렸어요';
       input.value = '';
       input.focus();
+      if (bad) { try { bad(); } catch { /* 기록만 */ } }
       return;
     }
-    $('dlg-pin').close();
-    const cb = pinCallback;
+    pinReq += 1;
     pinCallback = null;
+    pinBad = null;
+    $('dlg-pin').close();
     if (cb) cb();
   });
 }
