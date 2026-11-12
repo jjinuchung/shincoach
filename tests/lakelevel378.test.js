@@ -457,7 +457,7 @@ test('📅 단계별 하루 칸 — 2·3단계로 실제 낸 문제만 · 더하
 test('🧵 화면 배선 — 창은 단계를 원천까지 · 1단계 꼴은 대여행과 같은 길 · 새 파일은 sw 목록에', () => {
   const fv = read('js/fishview.js');
   assert.match(fv, /const lv = stageLevel\(stage, ui\.fish\);/);
-  assert.match(fv, /h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\], lvTop\(s\)\), \{ fish: ui\.castN, stage \}\)/, 'v387 — 물고기 단계에 과목 단계를 더해 넘김 (v416 — 과목 맨 위 단계까지)');
+  assert.match(fv, /const ctx = \{ fish: ui\.castN, stage, [^\n]*\n[^\n]*h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\], lvTop\(s\)\), ctx\)/, 'v387 — 물고기 단계에 과목 단계를 더해 넘김 (v416 — 과목 맨 위 단계까지)');
   assert.match(fv, /lvBadge\(stage, ui\.fish\)/);
   assert.match(fv, /tiltNow\(\), h\.forceStar \|\| 0\)/);
   const jv = read('js/journeyview.js');
@@ -466,7 +466,7 @@ test('🧵 화면 배선 — 창은 단계를 원천까지 · 1단계 꼴은 대
   assert.match(mj, /for \(const kind of typed \? \['calc'\] : mathKinds\(lv\)\)/);
   assert.match(mj, /const hint = \(c\) => mathHint\(q, c\);/, 'v387 — 1단계(계산)도 한 줄 (기본안 「추천대로」 2)');
   const lk = read('js/lakeview.js');
-  assert.match(lk, /\.\.\.lvDelta\(q, ok\), \.\.\.rd, \.\.\.padDelta\(subj, ok, a\) \}\);/, '단계별 칸을 그날 기록에 (v387 다시 풀기 칸과 함께)');
+  assert.match(lk, /\.\.\.lvDelta\(q, ok\), \.\.\.rd, \.\.\.padDelta\(subj, ok, a\), [^\n]*FISH_AGAIN_Q[^\n]* \}\);/, '단계별 칸을 그날 기록에 (v387 다시 풀기 칸과 함께)');
   assert.match(lk, /redoAsker\(\(subj, seed, lv\) => base\(subj, seed, lvFor\(subj, lv, \{ listen: canListen\(\) \}\)\)/, '소리만 문제는 영어 목소리가 있을 때만');
   assert.match(lk, /forceStar: testStar\(\),/);
   assert.match(read('sw.js'), /'\.\/js\/lakelevel\.js'/);

@@ -6,6 +6,8 @@
 //   · 바꾸기는 모두 xp.houseDo(저장된 프로필로 한 트랜잭션) · 답은 qn이 맞아야 받는다(두 창·두 번 누름이 두 번 받지 않게)
 //   · 끝까지 간 답이 phase를 go → gift로 넘기는 한 번만 보상 · 집 선물은 몇 번 불러도 같다(옛 백업이 가방을 되돌려도 다음 단계에서 다시 채운다)
 //   · 끝나면 그 주 대여행 자리(journey.done)를 채운다 — 그 주에 여행이 또 열리지 않게
+// v419 (11-12 보상 길 점검 → 아버님 「추천대로」): 끝 보상의 💰·스톤은 맞힌 비율로(moveFull — 모자라면 💰 반 · 스톤 없음 · 받은 것은 m.coins·m.full) ·
+//   수학은 낚시터처럼 숫자판(moveview — ⚙ 🔢 수학 숫자판을 따름)
 import { JOURNEY, ROCKET_MON, EVENTS, SUBJECTS, isMon, advantage, typesOf, journeyOf, stateOf, ownedIds, weekOf, dayKeyOf, rewardRule, qOf, pairOf, weighted, wildW, qLine } from './journey.js';
 import { PAINT, houseOf, paintRule, storeRule } from './house.js';
 
@@ -20,7 +22,27 @@ export const MOVE = {
   hp: { job: 2, big: 4, guest: 2, rocket: JOURNEY.hp.rocket }, // 일의 양 — 👑 큰일은 대장 자리, 🚀는 대여행과 같게
   noteMax: 80, // 한 줄 쓰기 글자 끝
   helloDays: 7, // 끝난 뒤 며칠 🐾 손님이 집들이 말을 하나
+  // 끝 보상의 💰·스톤은 맞힌 비율로 (v419 — 11-12 보상 길 점검 「추천대로」 · 찍기만으로 끝까지 갈 수 있던 길) — 이만큼 맞혔으면 전부, 아니면 💰 반·스톤 없음 ·
+  //   집 선물·Lv +1·손님 포켓몬은 그대로 · 틀려도 잃는 것 없음은 그대로
+  fullRate: 0.6,
+  halfCoins: 250,
 };
+/** 맞힌 비율 (순수) — m.q 과목마다 [맞힘, 낸] 합 · 🎁 상자 문제도 든다 → { ok, n } */
+export function moveRate(q) {
+  let ok = 0;
+  let n = 0;
+  for (const v of Object.values(isObj(q) ? q : {})) {
+    if (!Array.isArray(v)) continue;
+    ok += cnt(v[0]);
+    n += cnt(v[1]);
+  }
+  return { ok: Math.min(ok, n), n };
+}
+/** 끝 보상을 전부 받나 — 낸 문제가 있고 맞힌 비율이 MOVE.fullRate 이상 */
+export function moveFull(q) {
+  const r = moveRate(q);
+  return r.n > 0 && r.ok >= r.n * MOVE.fullRate;
+}
 /** 넓히기·2층 — 집 규칙(houseShape)이 가방의 이 둘로 집 모양을 정한다 */
 export const HOUSE_GIFT = ['x_wide', 'x_floor2'];
 
@@ -110,6 +132,8 @@ export function moveOf(raw) {
     swap: Number.isSafeInteger(swap) && swap >= 0 && swap < MOVE_STOPS ? swap : -1,
     q: qOf(raw.q), pf: pairOf(raw.pf) || [0, 0], startAt: cnt(raw.startAt), endAt: cnt(raw.endAt),
     lv: rowsOf(raw.lv), sub: rowsOf(raw.sub),
+    // 받은 끝 보상 (v419) — 💰 · 스톤까지 받았나(1) · 옛 기록(v418까지 — 맞힌 비율 없이 늘 전부)은 전부로 읽는다
+    coins: own(raw, 'coins') ? Math.min(cnt(raw.coins), JOURNEY.coins) : JOURNEY.coins, full: raw.full === 0 ? 0 : 1,
     week: typeof raw.week === 'string' ? raw.week.slice(0, 10) : '',
     wall: typeof raw.wall === 'string' ? raw.wall : '', floor: typeof raw.floor === 'string' ? raw.floor : '',
     pick: isMon(Number(raw.pick)) ? Number(raw.pick) : 0, furn: FURN_WAYS.includes(raw.furn) ? raw.furn : '',
@@ -212,11 +236,12 @@ export function moveAnswerRule(p, req, now, subjectOf) {
       out.finished = true;
       m.at += 1;
       if (m.at >= MOVE_STOPS) {
-        const rw = rewardRule(p, m, subjectOf);
+        const full = moveFull(m.q); // 💰·스톤은 맞힌 비율로 (v419)
+        const rw = rewardRule(p, m, subjectOf, full ? null : { coins: MOVE.halfCoins, stones: false });
         grantHouse(p);
         const week = weekOf(dayKeyOf(now));
         j.done[week] = own(j.done, week) ? { ...j.done[week], mv: 1 } : { r: 'won', at: now, q: m.q, ...(m.pf[1] ? { pf: m.pf } : {}), lv: rw.lv, sub: rw.sub, mv: 1 }; // 이미 끝낸 주면 그 줄에 표시만
-        Object.assign(m, { phase: 'gift', lv: rw.lv, sub: rw.sub, week, hp: 0 });
+        Object.assign(m, { phase: 'gift', lv: rw.lv, sub: rw.sub, week, hp: 0, coins: rw.coins, full: full ? 1 : 0 });
         out.end = 'won';
       } else {
         const next = stopAt(m, m.at);
@@ -399,6 +424,10 @@ export function moveMd(raw, monKo = (id) => String(id)) {
   if (!m) return '';
   const st = stopAt(m, Math.min(m.at, MOVE_STOPS - 1));
   const lines = ['## 🚚 이사 대작전', '', `- ${m.phase === 'go' ? `지금 ${STAGES[st.stage].ko} · 자리 ${m.at + 1}/${MOVE_STOPS}` : m.phase === 'end' ? '끝' : `끝까지 감 — 남은 단계 ${m.phase}`} · ${qLine(m.q)}${m.pf[1] ? ` · 🔬 박사 퀴즈 ${m.pf[0]}/${m.pf[1]}` : ''}`];
+  if (m.phase !== 'go') {
+    const r = moveRate(m.q);
+    lines.push(`- 끝 보상 ${m.full ? '전부' : '반'} — 💰 ${m.coins}${m.full ? ' · 스톤 1개씩' : ' · 스톤 없음'} (맞힌 ${r.ok}/${r.n} · 기준 ${Math.round(MOVE.fullRate * 100)}%)`);
+  }
   if (m.phase !== 'go') lines.push(`- 벽지 ${m.wall || '그대로'} · 바닥 ${m.floor || '그대로'} · 손님 ${m.pick ? monKo(m.pick) : '아직'} · 가구 ${m.furn === 'fresh' ? '새로 놓기' : m.furn === 'keep' ? '자리 그대로' : '아직'}`);
   if (m.old) lines.push(`- 옛집에서 제일 좋았던 것: ${m.old}`);
   if (m.fav) lines.push(`- 새 집에서 제일 좋은 곳: ${m.fav}`);

@@ -341,10 +341,10 @@ test('🔌 잇기 — 1단계 풀이 한 줄·문제 글(qk) · 물고기 번호
   assert.match(m, /const hint = \(c\) => mathHint\(q, c\);/);
   assert.match(m, /qk: String\(q\.q\)/);
   const v = src('js/fishview.js');
-  assert.match(v, /h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\], lvTop\(s\)\), \{ fish: ui\.castN, stage \}\)/); // v416 — 과목 맨 위 단계까지
-  assert.match(v, /ui\.castN \+= 1;[^\n]*\n\s*const before = openSpots\(ui\.okToday\);\n\s*const ok = await ask\('cast'\);/, '던질 때마다 새 물고기 번호 — 던지기 문제보다 먼저');
-  assert.match(v, /const badge = q\.redo \? redoBadge\(q\.redo\.step\) : q\.ud \? '' : lvBadge\(stage, ui\.fish\);/, '다음 날 몫은 「지난번」 (Codex 190차)');
-  assert.match(v, /lvb\.classList\.toggle\('is-redo', !!q\.redo\);/);
+  assert.match(v, /const ctx = \{ fish: ui\.castN, stage, [^\n]*\n[^\n]*h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\], lvTop\(s\)\), ctx\)/); // v416 — 과목 맨 위 단계까지 · v419 — ctx에 again
+  assert.match(v, /ui\.castN \+= 1;[^\n]*\n\s*ui\.owe = null;[^\n]*\n\s*const before = openSpots\(ui\.okToday\);\n\s*const ok = await ask\('cast'\);/, '던질 때마다 새 물고기 번호 — 던지기 문제보다 먼저');
+  assert.match(v, /const badge = q\.redo \? redoBadge\(q\.redo\.step\) : q\.again \? AGAIN_BADGE : q\.ud \? '' : lvBadge\(stage, ui\.fish\);/, '다음 날 몫은 「지난번」 (Codex 190차 · v419 뜰채 한 번 더)');
+  assert.match(v, /lvb\.classList\.toggle\('is-redo', !!\(q\.redo \|\| q\.again\)\);/);
   assert.match(v, /if \(ok && q\.redo\) toast\(REDO_OK, \d+\);/);
   assert.match(v, /const up = stepUpLine\(h\.stepUp\);[\s\S]{0,200}else if \(up\) \{\n\s*const me = ui;\n\s*toast\(up, \d+\);\n\s*setTimeout\(\(\) => \{ if \(ui === me && ui\.st === 'ready' && !ui\.dexOpen && !ui\.shopOpen && !ui\.sail && ui\.place === place\) enter\(\); \}, \d+\);\n\s*\} else enter\(\);/);
   assert.match(v, /steps: h\.steps && typeof h\.steps === 'object' \? h\.steps : \{\}/);
@@ -358,7 +358,7 @@ test('🔌 잇기 — 1단계 풀이 한 줄·문제 글(qk) · 물고기 번호
   assert.match(l, /const cm = !ok && subj === 'math' && q && !q\.fm && !q\.redo \?/);
   assert.match(l, /const fp = cm \? qFingerprint\(q\.qk\) : '';\n\s*const wk = cm \? waitKey\(cm\[1\], q\.lv, fp, Date\.now\(\), Math\.random\) : '';/, '틀린 칸 줄에 단계·지문 (Codex 190차 #2)');
   assert.match(l, /if \(cm && alive\(\)\) rq\.wrong\(cm\[1\], q\.lv, fp\);/);
-  assert.match(l, /\.\.\.lvDelta\(q, ok\), \.\.\.rd, \.\.\.padDelta\(subj, ok, a\) \}\);/);
+  assert.match(l, /\.\.\.lvDelta\(q, ok\), \.\.\.rd, \.\.\.padDelta\(subj, ok, a\), [^\n]*FISH_AGAIN_Q[^\n]* \}\);/); // v419 — 뜰채 한 번 더 칸
   // Codex 190차 #5 — 자정이 지나면 다시 풀기를 멈추고 새 날에도 지금 단계를 적음
   assert.match(l, /const alive = \(\) => clockDay\(\) === today;/);
   assert.match(l, /if \(now !== stepDay\) \{ stepDay = now; applyDailyDelta\(now, \{ fishSteps: stepLines\(stp\.steps\) \}\)/);

@@ -25,8 +25,10 @@
 // v418 (11-12 아버님 「낚시에서 나오는 수학 문제들을 주관식으로」 → 기본안 「추천대로」): ✍️ 수학은 숫자판으로 직접 쓰기 — 배운 칸은 계산 문제만(typedSrcs) ·
 //   🐟 물고기 수학·📐 다지기는 답이 수인 꼴만(fishMathQ typed) · 숫자로 낼 문제가 하나도 없을 때만 보기 그대로 · ⚙ 「🔢 수학 숫자판」을 따름(mathPadOn) ·
 //   답은 fishPadQ·Ok·Idk(수학 칸 안의 몫) · 🎒 대여행·🎟️ 손님 맞이는 그대로
+// v419 (11-12 보상 길 점검 → 아버님 「추천대로」): 🥅 뜰채에서 숫자판 수학을 못 풀면 창이 다음도 수학(fishing.netOwe) — 배운 칸이면 ctx.again으로
+//   같은 칸·다른 수(againMake · 다시 풀기 줄은 안 건드림) · 낸 수는 fishAgainQ(다시 열 때 차례 자리에서 뺀다)
 import { openLake, isLakeOpen, openDexView, isDexOpen } from './fishview.js';
-import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_REDO_Q, FISH_PAD_Q, FISH_MATH_AT, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, redoKey, redoPlan, redoQueue, qFingerprint, waitKey, subjectSteps, stepLines, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
+import { SUBJECTS, doneOf, subjectShares, dayLeftSec, FISH_DAY_Q, FISH_DAY_MIN, FISH_FM_Q, FISH_LV_Q, FISH_REDO_Q, FISH_PAD_Q, FISH_MATH_AT, FISH_AGAIN_Q, FISH_RIVER, FISH_SEA, FISH_BOAT, fishMathKey, redoKey, redoPlan, redoQueue, qFingerprint, waitKey, subjectSteps, stepLines, okOfDay, WEATHER, weatherOf, dexRows, pickOf, riverOpen, seaOpen, boatOpen, boatRest, GEAR, hasGear, PLACE_KO } from './fishing.js';
 import { fishMathQ, fishMathReady } from './fishmath.js';
 import { UNIT_DRILL, unitStage, unitFishToday, unitFishCommit, answerSecOf } from './mathprog.js';
 import { lvFor } from './lakelevel.js';
@@ -157,7 +159,8 @@ export function askFrom(src, subj, today, at, seed, lv = 1, tag = 'lake', max = 
  */
 export function startOf(d) {
   return Object.fromEntries(SUBJECTS.map((s) => {
-    const asked = Math.max(0, nz(d && d[FISH_DAY_Q[s][0]]) - (s === 'math' ? nz(d && d[FISH_FM_Q[0]]) + nz(d && d[FISH_REDO_Q[0]]) : 0));
+    // 🔁 뜰채 한 번 더(v419)도 차례 줄 밖에서 낸다
+    const asked = Math.max(0, nz(d && d[FISH_DAY_Q[s][0]]) - (s === 'math' ? nz(d && d[FISH_FM_Q[0]]) + nz(d && d[FISH_REDO_Q[0]]) + nz(d && d[FISH_AGAIN_Q]) : 0));
     // ✍️ 수학은 차례 줄에서 실제로 넘긴 자리(fishMathAt — 숫자로 못 내 건너뛴 칸까지 · v418 Codex 221차 P2-3)가 더 크면 그 뒤부터
     return [s, s === 'math' ? Math.max(asked, nz(d && d[FISH_MATH_AT])) : asked];
   }));
@@ -182,9 +185,27 @@ export function redoMake(src, r, seed) {
  * ctx.fish(지금 물고기 번호)를 rq에 알리고, 수학 차례면 그 물고기의 첫 수학 차례에 한 번 다시 풀기 · 못 만들면 보통 문제 ·
  * alive()가 거짓이면(창을 연 뒤 자정이 지남 — Codex 190차 #5) 다시 풀기 없이 보통 문제만 (새 날 계획은 다시 열 때)
  */
+/**
+ * 🥅 뜰채에서 못 푼 숫자판 수학 → 같은 칸·다른 수 (v419) — again = { id: 'm:칸', lv, qk(못 푼 문제 글) } · 같은 글이면 다음 씨앗 ·
+ * 🔁 다시 풀기 표시(redo) 없이 again: 1(카드 머리 「숫자만 바꿔 한 번 더」 · fishAgainQ) · 칸이 이상하거나 못 만들면 null
+ */
+export function againMake(src, again, seed) {
+  const m = /^m:([A-Za-z0-9_.-]{1,40})$/.exec(String((again && again.id) || ''));
+  if (!m) return null;
+  const q = redoMake(src, { id: m[1], lv: again.lv, avoid: qFingerprint(again.qk) }, seed);
+  if (!q) return null;
+  const out = { ...q, again: 1 };
+  delete out.redo;
+  return out;
+}
 export function redoAsker(base, mathSrc, rq, alive = () => true) {
   return (subj, seed, lv = 1, ctx = {}) => {
     if (rq && ctx && ctx.fish !== undefined) rq.at(ctx.fish);
+    // 🥅 뜰채에서 못 푼 칸을 숫자만 바꿔 (v419) — 다시 풀기 줄(rq)은 꺼내지 않는다
+    if (subj === 'math' && ctx && ctx.again && mathSrc) {
+      const q = againMake(mathSrc, ctx.again, seed);
+      if (q) return q;
+    }
     if (subj === 'math' && rq && mathSrc && alive()) {
       const r = rq.take();
       const q = r ? redoMake(mathSrc, r, seed) : null;
@@ -505,7 +526,7 @@ export async function openLakeNow() {
         const redo = q && q.redo && alive() ? q.redo : null; // 자정 뒤에 답한 다시 풀기는 보통 답으로 — 새 날 차례를 꼬지 않게 (#5)
         const f = FISH_DAY_Q[subj];
         const rd = redo ? { [FISH_REDO_Q[0]]: 1, [FISH_REDO_Q[1]]: ok ? 1 : 0 } : {}; // 🔁 (v387 — 수학 칸 안의 몫)
-        if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}), ...lvDelta(q, ok), ...rd, ...padDelta(subj, ok, a) });
+        if (f) log.put({ [f[0]]: 1, [f[1]]: ok ? 1 : 0, ...(q && q.fm ? { [FISH_FM_Q[0]]: 1, [FISH_FM_Q[1]]: ok ? 1 : 0 } : {}), ...lvDelta(q, ok), ...rd, ...padDelta(subj, ok, a), ...(subj === 'math' && q && q.again ? { [FISH_AGAIN_Q]: 1 } : {}) });
         const mk = subj === 'math' && q && !q.fm ? fishMathKey(q.id, ok, Date.now(), Math.random) : ''; // 🔢 배운 칸 문제는 칸별로도 (v377)
         const rk = subj === 'math' && redo ? redoKey(redo.id, redo.step, ok, Date.now(), Math.random) : '';
         // 틀린 배운 칸은 그 문제의 단계·글 지문도 — 다시 열거나 다음 날에도 같은 단계·다른 문제로 (Codex 190차 #2)

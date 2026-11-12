@@ -996,6 +996,28 @@ export const FISH_REDO_Q = ['fishRedoQ', 'fishRedoOk'];
 export const FISH_PAD_Q = ['fishPadQ', 'fishPadOk', 'fishPadIdk'];
 /** 그날 「이미 배운 수학」 차례 줄에서 넘긴 자리 (v418 — 숫자로 못 내 건너뛴 칸까지 · 다시 열면 그 뒤부터 · 📤엔 안 씀 · Codex 221차) */
 export const FISH_MATH_AT = 'fishMathAt';
+/** 그날 🥅 뜰채에서 못 푼 숫자판 수학을 같은 칸·다른 수로 한 번 더 낸 수 (v419 — 수학 칸 안의 몫 · 다시 열 때 차례 자리에서 뺀다) */
+export const FISH_AGAIN_Q = 'fishAgainQ';
+export const AGAIN_BADGE = '🔁 숫자만 바꿔 한 번 더';
+/**
+ * 🥅 뜰채에서 숫자판 수학을 못 풀면 다음 문제도 수학 (v419 — 2026-11-12 아버님 「추천대로」 · 🤷 하고 다른 과목 보기를 찍어 넘길 수 있던 길) — 순수
+ * owe = null | { again } · 수학을 맞히면 null · 뜰채에서 숫자판 수학을 틀리거나 🤷 → 배운 칸(m:)이면 같은 칸·다른 수(again) ·
+ * 그 한 번 더도 못 풀었거나 🐟 물고기 수학이면 다른 수학(again null) · 그 밖의 답은 owe 그대로
+ */
+/**
+ * 🥅 뜰채가 한 걸음 다가오나 (v419 Codex 222차 P2-3 · 순수) — ok = ask 결과(true · false · null 문제 없음) · owe = 답한 뒤의 netOwe ·
+ * 못 푼 수학이 남았으면 수학을 맞혀야만(수학을 못 만들어 다른 과목을 맞혀도 안 다가옴) · 문제 없음(null)은 빚이 없을 때만 예전처럼 다가옴
+ */
+export function netGain(ok, owe) {
+  return ok !== false && !owe;
+}
+export const NET_MATH_FIRST = '🔢 수학을 맞혀야 뜰채가 다가와요';
+export function netOwe(owe, stage, subj, q, ok) {
+  if (subj === 'math' && ok) return null;
+  if (stage !== 'net' || subj !== 'math' || ok || !q || !q.pad) return owe || null;
+  const id = String(q.id || '');
+  return { again: !q.again && /^m:[A-Za-z0-9_.-]{1,40}$/.test(id) ? { id, lv: q.lv, qk: q.qk } : null };
+}
 /**
  * 🔢 낚시터 「이미 배운 수학」 한 문제의 칸별 기록 줄 (v377 — 2026-11-01 기본안 「추천대로」) — 'frac.add|1|시각36진수+무작위' · 문제 id가 m:칸이 아니면 ''
  * (줄마다 달라 합집합 병합에서 같은 문제를 두 번 세지 않는다 · 🐟 물고기 수학은 칸이 없어 안 적는다)
@@ -1264,10 +1286,10 @@ export function lakeDayLine(d, fmtMin) {
   const asked = SUBJECTS.filter((s) => nz(d && d[FISH_DAY_Q[s][0]]) > 0);
   if (!nz(d && d.fishSec) && !nz(d && d.fishCatch) && !asked.length && !nz(d && d.fishBonus)) return '';
   const KO = { math: '수학', english: '영어', korean: '국어', nonsul: '논술' };
-  // 수학 칸 안의 몫 — 🐟 물고기 수학 · ✍️ 직접 쓰기(v418 · 🤷 모르겠어요 수)
+  // 수학 칸 안의 몫 — 🐟 물고기 수학 · ✍️ 직접 쓰기(v418 · 🤷 모르겠어요 수) · 🔁 뜰채에서 숫자만 바꿔 한 번 더 낸 수(v419)
   const fm = (s) => {
     if (s !== 'math') return '';
-    const parts = [nz(d[FISH_FM_Q[0]]) ? `🐟 ${nz(d[FISH_FM_Q[1]])}/${nz(d[FISH_FM_Q[0]])}` : '', nz(d[FISH_PAD_Q[0]]) ? `✍️ 직접 쓰기 ${nz(d[FISH_PAD_Q[1]])}/${nz(d[FISH_PAD_Q[0]])} · 🤷 ${nz(d[FISH_PAD_Q[2]])}` : ''].filter(Boolean);
+    const parts = [nz(d[FISH_FM_Q[0]]) ? `🐟 ${nz(d[FISH_FM_Q[1]])}/${nz(d[FISH_FM_Q[0]])}` : '', nz(d[FISH_PAD_Q[0]]) ? `✍️ 직접 쓰기 ${nz(d[FISH_PAD_Q[1]])}/${nz(d[FISH_PAD_Q[0]])} · 🤷 ${nz(d[FISH_PAD_Q[2]])}` : '', nz(d[FISH_AGAIN_Q]) ? `🔁 뜰채 한 번 더 ${nz(d[FISH_AGAIN_Q])}` : ''].filter(Boolean);
     return parts.length ? `(${parts.join(' · ')})` : '';
   };
   const q = asked.map((s) => `${KO[s]} ${nz(d[FISH_DAY_Q[s][1]])}/${nz(d[FISH_DAY_Q[s][0]])}${fm(s)}`).join(' · ');

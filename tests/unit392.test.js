@@ -601,7 +601,7 @@ test('📐 화면·잇기: 판을 열 때 저장된 장부 · 단계·셈 문구
   assert.ok(lake.includes('fishMathQ(lakeRaw(), seed, avoid, lv, ut.now(), only)'), '물고기 수학에 차례');
   assert.ok(lake.includes('if (q && q.ud) {') && lake.includes('.then(ut.kept).catch(() => {});'), '답하면 저장 뒤 새 단계');
   const fv = read('js/fishview.js');
-  assert.ok(fv.includes("const badge = q.redo ? redoBadge(q.redo.step) : q.ud ? '' : lvBadge(stage, ui.fish);"), '다지기 문제엔 큰 물고기 표시 없음');
-  assert.ok(fv.includes("lvb.classList.toggle('is-big', !q.redo && !q.ud && lv >= 3);"));
+  assert.ok(fv.includes("const badge = q.redo ? redoBadge(q.redo.step) : q.again ? AGAIN_BADGE : q.ud ? '' : lvBadge(stage, ui.fish);"), '다지기 문제엔 큰 물고기 표시 없음 (v419 — 뜰채 한 번 더 머리)');
+  assert.ok(fv.includes("lvb.classList.toggle('is-big', !q.redo && !q.again && !q.ud && lv >= 3);"));
   assert.equal(lvBadge('hook', { star: 5 }), '🐋 큰 물고기 문제', '보통 문제는 그대로');
 });

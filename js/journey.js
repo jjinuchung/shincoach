@@ -425,13 +425,18 @@ export function startRule(p, req, now) {
   return { ok: true, cur: journeyOf(p.journey).cur };
 }
 
-/** 💰 끝까지 간 보상 — 코인 · 스톤 1개씩 · 함께 간 6마리 레벨 +1(데리고 있지 않거나 만렙·진화 레벨이면 그 포켓몬 스톤 1개) */
-export function rewardRule(p, c, subjectOf) {
-  p.coins = cnt(p.coins) + JOURNEY.coins;
-  p.coinsEarned = cnt(p.coinsEarned) + JOURNEY.coins; // 문제를 풀어 번 코인 (📊 공부로 번 💰)
+/**
+ * 💰 끝까지 간 보상 — 코인 · 스톤 1개씩 · 함께 간 6마리 레벨 +1(데리고 있지 않거나 만렙·진화 레벨이면 그 포켓몬 스톤 1개)
+ * opt = { coins, stones: false } — 🚚 이사 대작전이 맞힌 비율이 낮을 때 코인을 줄이고 스톤 1개씩을 뺀다 (v419 · 대여행은 opt 없이)
+ */
+export function rewardRule(p, c, subjectOf, opt) {
+  const coins = opt && Number.isSafeInteger(opt.coins) && opt.coins >= 0 ? opt.coins : JOURNEY.coins;
+  const stones = !(opt && opt.stones === false);
+  p.coins = cnt(p.coins) + coins;
+  p.coinsEarned = cnt(p.coinsEarned) + coins; // 문제를 풀어 번 코인 (📊 공부로 번 💰)
   p.items = isObj(p.items) ? p.items : {};
   p.mons = isObj(p.mons) ? p.mons : {};
-  for (const id of STONE_IDS) p.items[id] = cnt(p.items[id]) + 1;
+  if (stones) for (const id of STONE_IDS) p.items[id] = cnt(p.items[id]) + 1;
   const lv = [];
   const sub = [];
   for (const id of c.party) {
@@ -447,7 +452,7 @@ export function rewardRule(p, c, subjectOf) {
       sub.push([id, sid]);
     }
   }
-  return { coins: JOURNEY.coins, lv, sub };
+  return { coins, stones, lv, sub };
 }
 
 /** 잃을 것 셈 (순수 · 바꾸지 않음) → { items: { 스톤 id: [가진 수, 남는 수] }, coins: [가진 수, 남는 수] } — 출발 준비 화면에 */
@@ -733,18 +738,25 @@ export function profChoices(m, f, pool, nameOf, rng = Math.random) {
 /**
  * 지금 낼 문제 → { subj, q } · src: 과목마다 { keys, make } · 이 자리의 과목에서 못 만들면 다른 과목에서 · 아무것도 없으면 null ·
  * shift = 과목 차례를 밀기(🎁 상자는 그 구역 첫 만남과 다른 과목으로) · c = 지금 여행(at·id·q·qv·qn)
+ * opt (🚚 이사 ✍️ 숫자판 · v419 Codex 222차 P2-1) — wide: 수학은 칸을 한 바퀴 다 본다 · plain: 수학을 못 만들면 다른 과목보다 먼저 이 수학 원천(보기)으로 ·
+ *   대여행은 opt 없이(열둘까지 · 다음 과목)
  */
-export function questionFrom(src, c, shift = 0) {
+export function questionFrom(src, c, shift = 0, opt = {}) {
   const avail = SUBJECTS.filter((s) => src && src[s]);
   const first = subjectFor(c.at + shift, avail);
   if (!first) return null;
+  const o = opt || {};
   for (const subj of [first, ...avail.filter((s) => s !== first)]) {
-    const one = src[subj];
-    const keys = orderOf(one.keys, c.id, subj);
-    for (let t = 0; t < Math.min(keys.length, 12); t++) {
-      let q = null;
-      try { q = one.make(keys[slotOf(c, subj, keys.length, t)], questionSeed(c, t)); } catch { q = null; }
-      if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((x) => x.ok).length === 1) return { subj, q };
+    const math = subj === 'math';
+    const tries = [[src[subj], math && o.wide ? Infinity : 12], ...(math && o.plain ? [[o.plain, 12]] : [])];
+    for (const [one, max] of tries) {
+      if (!one || !Array.isArray(one.keys) || typeof one.make !== 'function') continue;
+      const keys = orderOf(one.keys, c.id, subj);
+      for (let t = 0; t < Math.min(keys.length, max); t++) {
+        let q = null;
+        try { q = one.make(keys[slotOf(c, subj, keys.length, t)], questionSeed(c, t)); } catch { q = null; }
+        if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((x) => x.ok).length === 1) return { subj, q };
+      }
     }
   }
   return null;

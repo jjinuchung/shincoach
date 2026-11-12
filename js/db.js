@@ -466,6 +466,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   'fishPadQ', 'fishPadOk', 'fishPadIdk',
   //   그날 배운 수학 차례 줄에서 넘긴 자리(v418 — 숫자로 못 내 건너뛴 칸까지 · 다시 열면 그 뒤부터 · 📤엔 안 씀)
   'fishMathAt',
+  //   🔁 그 가운데 뜰채에서 못 푼 숫자판 수학을 같은 칸·다른 수로 한 번 더 낸 수(v419 — 수학 칸 안의 몫 · 다시 열 때 차례 자리에서 뺀다)
+  'fishAgainQ',
   // 🎟️ 아쿠아리움 손님 맞이 (2026-11-08 v401, aquatour.js) — 맞이한 무리 · 받은 💰(📊 장부 💰까지) · 🎟️ 매표 낸·맞힌 · 해설 과목마다(🐟 수조 물고기 수학은 수학 칸 안의 몫) · 2·3단계 · 📊 장부 질문
   'aqGroups', 'aqCoins', 'aqPayQ', 'aqPayOk', 'aqFmQ', 'aqFmOk', 'aqBookQ', 'aqBookOk', 'aqMathQ', 'aqMathOk', 'aqEnQ', 'aqEnOk', 'aqKorQ', 'aqKorOk', 'aqNsQ', 'aqNsOk', 'aqLv2Q', 'aqLv2Ok', 'aqLv3Q', 'aqLv3Ok',
   //   과목마다 그날 차례 줄에서 넘긴 자리(단계가 낮아 버린 문제까지 — 다시 열면 그 뒤부터 · Codex 203차 · 📤엔 안 씀)

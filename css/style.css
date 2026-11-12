@@ -5353,6 +5353,21 @@ button.lt-card:focus-visible { outline: 3px solid #7c3aed; outline-offset: 1px; 
   .lk-card .math-pad-show { margin: 2px 0 4px; }
   .lk-card .math-pad-actions { margin-top: 4px; }
 }
+/* 🚚 이사 대작전 ✍️ 숫자판 (v419) — 문제 카드 밑 · 장면은 낮게 · 태블릿 폭이면 키를 오른쪽 칸으로(낚시터 낮은 화면과 같은 꼴) — 키·「확인」이 한 화면에 */
+.jr-pad { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 10px 12px; }
+.mvt-arena.is-pad { height: clamp(140px, 22vh, 190px); }
+@media (min-width: 600px) {
+  .jr-pad .math-pad-actions { flex-direction: row; justify-content: center; gap: 14px; }
+  .jr-pad .math-pad-idk { white-space: nowrap; }
+  .jr-pad .math-pad { max-width: 600px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; align-items: center; }
+  .jr-pad .math-pad > .math-pad-lead, .jr-pad .math-pad > .math-pad-modes, .jr-pad .math-pad > .math-pad-show, .jr-pad .math-pad > .math-pad-actions { grid-column: 1; }
+  .jr-pad .math-pad > .math-pad-keys { grid-column: 2; grid-row: 1 / span 4; gap: 6px; width: 100%; max-width: 280px; justify-self: center; }
+  .jr-pad .math-pad-mode { min-width: 0; padding: 8px 10px; font-size: 0.98rem; }
+  .jr-pad .math-pad-key { padding: 7px 0; font-size: 1.15rem; }
+  .jr-pad .math-pad-field { min-height: 44px; font-size: 1.4rem; }
+  .jr-pad .math-pad-show { margin: 2px 0 4px; }
+  .jr-pad .math-pad-actions { margin-top: 4px; }
+}
 .lk-hint-ans { display: block; font-size: 1.12rem; }
 .lk-hint-why { display: block; margin-top: 4px; }
 .lk-go { justify-self: end; align-self: flex-end; min-height: 46px; padding: 6px 20px; border-radius: 12px; border: 0; background: #1f7f8c; color: #fff; font: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer; }

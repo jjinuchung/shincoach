@@ -20,12 +20,14 @@
 //   stepUp(오늘 오른 과목 — 열 때 한 줄 뒤에 들어서기 안내) · 문제에 redo가 있으면 카드 머리 「🔁 아까 그 문제, 다시 한 번!」(다음 날 몫은 「지난번」)·맞히면 「🔁 이번엔 맞혔어요!」
 //   v418: 문제에 pad(lakepad 꼴)가 있으면 보기 대신 숫자판(padview — 수학 과목과 같은 판) · 확인 → lakeTyped로 채점 · 🤷 모르겠어요 = 틀림 ·
 //   틀리면 「정답: …」과 풀이 한 줄을 「알겠어요」까지 · 숫자판이 떠 있는 동안은 하루 낚시 시간이 안 감(ui.padOpen) · onAnswer에 how('typed'|'idk')
+//   v419: 🥅 뜰채에서 숫자판 수학을 못 풀면 다음 문제도 수학(ui.owe = fishing.netOwe — 수학을 맞히거나 새 물고기면 풀림) · 배운 칸이면
+//   ask ctx.again(같은 칸·다른 수 · 카드 머리 「🔁 숫자만 바꿔 한 번 더」) · 🤷 모르겠어요 뒤 「알겠어요」까지는 시간이 간다
 // 성능: 안 움직이는 층은 따로 한 장(하늘이 조금 바뀔 때만 다시) · 화면 배율 2배까지 · 느리면 저절로 가벼운 그림 · 화면이 숨으면 멈춤
 import {
   STARS, FIGHT, speciesOf, castSpot, openSpots, rollFish, fightStart, fightStep, fightAnswer, netAnswer, cellRoll, cellFish, cellFate,
   pickSubject, askOrder, activeStep, dayLeftSec, BADGE_KO, weatherTilt, nibbleExtra,
   spotsOf, PLACES, PLACE_KO, PLACE_EMOJI, RIVER_NEED, SEA_NEED, SEA_SAFE, GEAR, gearOf, baitTilt, mixTilt, weatherLine, PHOTO_SAY, syncPick, josaOf,
-  stageLevel, lvBadge, stepLevel, lvTop, stepUpLine, redoBadge, REDO_OK,
+  stageLevel, lvBadge, stepLevel, lvTop, stepUpLine, redoBadge, REDO_OK, netOwe, netGain, NET_MATH_FIRST, AGAIN_BADGE,
   BOAT_NEED, BOAT_OPENED, BOAT_GO, BOAT_SAFE, BOAT_REST, boatRest, softOf, sizeText, kindEmoji, lenLabel, SOFT_NOTE, STICK_HEAD, STICK_OFF, inkLine,
 } from './fishing.js';
 import { SCENE_W, SCENE_H, WATER_Y, DOCK_Y, DOCK_X, spotX, bottomY, drawFish, drawCell, paintStatic, drawWaterFx, drawRain, drawFloat, drawRings, drawDrops, drawRod, drawLine, drawNet, drawInk, drawBoat } from './fishart.js';
@@ -168,6 +170,7 @@ export function openLake(host) {
     streak: 0,
     recent: [],
     castN: 0, // 던진 수 = 물고기 번호 (v387 — 🔁 다시 풀기는 다음 물고기부터)
+    owe: null, // 🥅 뜰채에서 못 푼 숫자판 수학 — 다음 문제도 수학 (v419 · fishing.netOwe)
     steps: h.steps && typeof h.steps === 'object' ? h.steps : {}, // 🎚️ 과목 단계 (v387)
     seed: (Date.now() >>> 0) ^ 0x5eed,
     place, // 🏞️ 저수지 · 강 (v368) · 🌊 바다 (v369) · 🚤 배 낚시 (v386)
@@ -742,12 +745,16 @@ function ask(stage, head = '') {
   const shares = h.shares || {};
   const lv = stageLevel(stage, ui.fish); // v378 — 물고기가 문 뒤만 물고기 별로
   let subj = pickSubject(shares, ui.recent);
+  // 🥅 뜰채에서 숫자판 수학을 못 풀었으면 수학부터 (v419 — 🤷 하고 다른 과목으로 넘기지 못하게 · 수학을 못 만들면 차례대로)
+  const owe = stage === 'net' && ui.owe && shares.math > 0 ? ui.owe : null;
+  if (owe) subj = 'math';
   const order = askOrder(shares, ui.recent, subj);
   let q = null;
   for (const s of order) {
     if (!s) continue;
-    // v387 — 과목 단계를 더한 단계 · 물고기 번호(🔁 다시 풀기는 다음 물고기의 첫 수학 차례)
-    try { q = h.ask ? h.ask(s, nextSeed(), stepLevel(lv, ui.steps[s], lvTop(s)), { fish: ui.castN, stage }) : null; } catch { q = null; }
+    // v387 — 과목 단계를 더한 단계 · 물고기 번호(🔁 다시 풀기는 다음 물고기의 첫 수학 차례) · v419 — 못 푼 배운 칸은 숫자만 바꿔(again)
+    const ctx = { fish: ui.castN, stage, ...(owe && owe.again && s === 'math' ? { again: owe.again } : {}) };
+    try { q = h.ask ? h.ask(s, nextSeed(), stepLevel(lv, ui.steps[s], lvTop(s)), ctx) : null; } catch { q = null; }
     if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.choices.filter((c) => c.ok).length === 1) { subj = s; break; }
     q = null;
   }
@@ -761,11 +768,11 @@ function ask(stage, head = '') {
   q$('.lk-stage').textContent = head || STAGE[stage] || '';
   const lvb = q$('.lk-lvb');
   // 🔁 다시 풀기면 물고기 표시 대신 (v387 · 다음 날 몫은 「지난번」 — Codex 190차) · 📐 다지기 문제(q.ud)는 큰 물고기 문제가 아니라 안 띄운다 (v392)
-  const badge = q.redo ? redoBadge(q.redo.step) : q.ud ? '' : lvBadge(stage, ui.fish);
+  const badge = q.redo ? redoBadge(q.redo.step) : q.again ? AGAIN_BADGE : q.ud ? '' : lvBadge(stage, ui.fish);
   lvb.textContent = badge;
   lvb.hidden = !badge;
-  lvb.classList.toggle('is-big', !q.redo && !q.ud && lv >= 3);
-  lvb.classList.toggle('is-redo', !!q.redo);
+  lvb.classList.toggle('is-big', !q.redo && !q.again && !q.ud && lv >= 3);
+  lvb.classList.toggle('is-redo', !!(q.redo || q.again));
   q$('.lk-subj').textContent = q.label || '';
   const qBox = q$('.lk-q');
   qBox.innerHTML = '';
@@ -839,6 +846,7 @@ function ask(stage, head = '') {
       if (q.sayAfter && typeof h.say === 'function') { try { h.say(q.sayAfter); } catch { /* 무시 */ } }
       if (ok) { ui.okToday += 1; ui.streak += 1; ui.palJump = performance.now(); } else ui.streak = 0;
       try { h.onAnswer && h.onAnswer(subj, ok, stage, q, { trap: info.trap, at: askedAt, ...(info.how ? { how: info.how } : {}) }); } catch { /* 무시 */ }
+      ui.owe = netOwe(ui.owe, stage, subj, q, ok); // 🥅 (v419)
     };
     if (pad) {
       const okC = q.choices.find((c) => c.ok) || {};
@@ -850,6 +858,7 @@ function ask(stage, head = '') {
         box.innerHTML = '';
         box.appendChild(padAnswered(mine, ok));
         answered(ok, { trap: r && r.trap, how: r ? 'typed' : 'idk' });
+        if (!r) ui.padOpen = false; // 🤷 뒤 「알겠어요」까지는 하루 시간이 간다 — 써 보고 틀린 풀이를 읽는 동안만 멈춤 (v419)
         if (ok) {
           if (r && r.note) toast(r.note, 2200);
           setTimeout(() => done(true), 900);
@@ -910,6 +919,7 @@ async function startCast() {
   syncGear(); // 던지기 직전 — 가진 채비로 다시 고침 · 가게에서 늦게 온 바꿈도 여기서 (Codex 172차)
   ui.busy = true;
   ui.castN += 1; // 새 물고기 (v387)
+  ui.owe = null; // 🥅 못 푼 수학은 그 물고기 뜰채에서만 (v419)
   const before = openSpots(ui.okToday);
   const ok = await ask('cast');
   if (ui !== me) return;
@@ -1041,7 +1051,11 @@ async function netStep() {
   const ok = await ask('net');
   if (ui !== me) return;
   ui.busy = false;
-  ui.netLeft = netAnswer(ui.netLeft, ok !== false);
+  // 🥅 못 푼 수학이 남았으면 수학을 맞혀야만 다가온다 (v419 Codex 222차 P2-3) — 다른 과목을 맞히면 한 줄 · 문제를 하나도 못 만들면 빚을 풀고 다음 걸음은 예전처럼(맴돌지 않게)
+  const gain = netGain(ok, ui.owe);
+  if (ok && ui.owe) toast(NET_MATH_FIRST, 1600);
+  if (ok === null && ui.owe) ui.owe = null;
+  ui.netLeft = netAnswer(ui.netLeft, gain);
   ui.netPos = (FIGHT.netM * ui.netLeft) / ui.netTotal;
   if (!ok) { splash(fishXY().x, WATER_Y, 8); try { sfx.splash(); } catch { /* 무시 */ } toast(ui.fish && !ui.fish.cell && softOf(ui.fish.key) ? `첨벙! ${speciesOf(ui.fish.key).ko}${josaOf(speciesOf(ui.fish.key).ko, '이', '가')} 버텨요` : '첨벙! 물고기가 버텨요', 1300); }
   if (ui.netLeft <= 0) { ui.st = 'scoop'; ui.scoopAt = ui.gclock; after(1100, landed); return; }

@@ -2,9 +2,14 @@
 // 홈 카드(대여행 자리) → 함께 갈 6마리 → 단계 지도 → 일(문제) → 🍙 새참 → … → 🚀 → 보상 → 벽지·바닥 → 손님 → 가구 → 새 집 첫 밤 → 한 줄 쓰기
 // 틀 양식은 대여행(.jr-*)을 그대로 쓴다 · 문제 원천도 대여행과 같다(journeyview.loadSources) — 공부 기록에 안 남긴다
 // 아이 화면에 남은 수·셈을 쓰지 않는다 — 일의 양은 숫자 없는 막대로만
+// v419 (11-12 보상 길 점검 → 아버님 「추천대로」): ✍️ 수학은 낚시터처럼 숫자판(typedSrcs — 숫자로 낼 수학이 없으면 보기 그대로 · ⚙ 🔢 수학 숫자판을 따름) ·
+//   틀리거나 🤷 → 정답과 풀이 한 줄을 「알겠어요」까지 · 끝 💰·스톤은 맞힌 비율로(moveday.moveFull) — 출발 준비엔 「많이 맞힐수록 선물이 커져요」(셈 없음)
 import { MOVE, STAGES, PER_STAGE, MOVE_STOPS, stopAt, hpOfStop, helps, strongStages, moveState, pendingEvent, makeGuests, makeMoveEvents } from './moveday.js';
 import { JOURNEY, TYPE_KO, typesOf, questionFrom, questionSeed, profChoices, rngOf, crispPx, ownedIds } from './journey.js';
 import { loadSources } from './journeyview.js';
+import { mathPadOn, typedSrcs } from './lakeview.js';
+import { padBox, padAnswered } from './padview.js';
+import { lakeTyped, shownTyped } from './lakepad.js';
 import { paintMove } from './movescene.js';
 import { journeyRaw, moveStart, moveAnswer, moveSwap, moveEvent, moveGift, movePick, moveFurn, moveEnd, getProfileSnapshot, getLevelInfo, rarityOf, monLv, getLook, profileReady, getPartner } from './xp.js';
 import { ROSTER, loadCharacters, ensureCast, isUnlocked, isLegendary, isUltraBeast, isLetterMon, isMusicMon } from './pokemon.js';
@@ -280,9 +285,9 @@ function renderPrep() {
   b.appendChild(grid);
   const win = el('div', 'jr-stake is-win');
   win.appendChild(el('h3', '', '이사가 끝나면'));
-  for (const [k, v] of [['🏠 넓은 새 집', '2층까지'], ['🖌️ 벽지 · 바닥', '골라서 선물'], ['💰 코인', `+${JOURNEY.coins}`], [STONES.map((s) => s.emoji).join(''), '+1씩'], ['함께 간 포켓몬', 'Lv +1'], ['🎉 손님', '하나 데려오기']]) win.appendChild(rowEl(k, v));
+  for (const [k, v] of [['🏠 넓은 새 집', '2층까지'], ['🖌️ 벽지 · 바닥', '골라서 선물'], ['💰 코인', `+${MOVE.halfCoins}~${JOURNEY.coins}`], [STONES.map((s) => s.emoji).join(''), '많이 맞히면 +1씩'], ['함께 간 포켓몬', 'Lv +1'], ['🎉 손님', '하나 데려오기']]) win.appendChild(rowEl(k, v));
   b.appendChild(win);
-  b.appendChild(el('p', 'jr-sub', '일을 할 때마다 문제가 나와요. 틀려도 잃는 것이 없고, 며칠에 나눠서 해도 돼요.'));
+  b.appendChild(el('p', 'jr-sub', '일을 할 때마다 문제가 나와요. 틀려도 잃는 것이 없고, 며칠에 나눠서 해도 돼요. 천천히 풀어서 많이 맞힐수록 💰·스톤 선물이 커져요.'));
   b.appendChild(note);
   go.addEventListener('click', () => start(party.slice(), run, go));
   b.appendChild(go);
@@ -427,7 +432,53 @@ function stemOf(q) {
   } else stem.textContent = q.q;
   return stem;
 }
-const buildQuestion = (c, shift = 0) => questionFrom(ui.src, c, shift);
+/**
+ * 그 자리 문제 — ✍️ 수학은 숫자판 꼴 먼저(v419 · 칸을 한 바퀴 다 봄) → 못 만들면 보기 수학 → 그래도 없으면 다른 과목
+ * (Codex 222차 P2-1 — 숫자판을 못 만들면 수학 차례가 영어·국어로 넘어가 수학을 건너뛰었다)
+ */
+const buildQuestion = (c, shift = 0) => (mathPadOn()
+  ? questionFrom(typedSrcs(ui.src), c, shift, { wide: true, plain: ui.src && ui.src.math })
+  : questionFrom(ui.src, c, shift));
+/**
+ * ✍️ 숫자판 (v419) — 확인 → lakeTyped로 채점 · 🤷 = 틀림 · done(ok, r) — r은 채점 결과(🤷면 null) · 답한 뒤엔 「✍️ 내 답」으로 바뀐다 ·
+ * ready()가 거짓이면(🔄 다른 문제를 저장하는 중) 답을 받지 않고 숫자판을 새로 — 숫자판은 「확인」을 누르면 스스로 잠긴다 (Codex 222차 P2-2)
+ */
+function padRow(q, done, ready = () => true) {
+  const wrap = el('div', 'jr-pad');
+  const unit = q.pad.spec.unit || '';
+  let picked = false;
+  const settle = (ok, mine, r) => {
+    if (picked) return;
+    if (!ready()) { box(); return; }
+    picked = true;
+    wrap.innerHTML = '';
+    wrap.appendChild(padAnswered(mine, ok));
+    done(ok, r);
+  };
+  const box = () => {
+    wrap.innerHTML = '';
+    wrap.appendChild(padBox(q.pad.spec, {
+      onSubmit: (typed) => { const r = lakeTyped(q, typed); settle(r.ok, shownTyped(typed.text, unit), r); },
+      onIdk: () => settle(false, '🤷 모르겠어요', null),
+    }));
+  };
+  box();
+  return wrap;
+}
+/** 숫자판 문제를 틀렸을 때 — 정답 + 풀이 한 줄 (🤷면 그 문제의 풀이) */
+function padWrongLine(q, r) {
+  const okC = q.choices.find((x) => x.ok) || {};
+  const why = r ? r.hint : q.pad.why || '';
+  return `정답은 「${okC.text || ''}」${why ? `\n${why}` : ''}`;
+}
+/** 「알겠어요」를 누를 때까지 */
+function waitOk(b, run) {
+  return new Promise((res) => {
+    const go = btn('btn-primary jr-next', '알겠어요', () => { go.remove(); res(); });
+    b.appendChild(go);
+    try { go.focus(); } catch { /* 무시 */ }
+  }).then(() => alive(run));
+}
 
 function renderChest() {
   const c = ui.cur;
@@ -447,6 +498,17 @@ function renderChest() {
   card.appendChild(el('span', 'jr-q-label', q.label));
   card.appendChild(stemOf(q));
   b.appendChild(card);
+  if (q.pad) { // ✍️ 숫자판 (v419) — 저장이 안 되면 같은 상자를 다시
+    const pad = padRow(q, async (ok, pr) => {
+      const r = await sendEvent(run, { kind: 'chest', subj, correct: ok }, [], line);
+      if (!r) { if (alive(run)) renderChest(); return; }
+      play(ok ? 'success' : 'wrong');
+      eventDone(line, ok ? `상자가 열렸다!\n💰 ${r.coins} 코인을 찾았다!` : `아쉽다! 상자는 그대로 트럭에 싣자.\n${padWrongLine(q, pr)}`);
+    });
+    b.appendChild(pad);
+    requestAnimationFrame(() => { try { pad.scrollIntoView({ block: 'nearest' }); } catch { /* 옛 기기 */ } }); // 「확인」까지 보이게
+    return;
+  }
   const moves = choiceRow(q.choices, async (ch, m) => {
     const all = [...moves.children];
     const r = await sendEvent(run, { kind: 'chest', subj, correct: !!ch.ok }, all, line);
@@ -647,16 +709,23 @@ function renderWork(msg) {
   }
   const { subj, q } = built;
   devQ({ subj, ...q });
+  if (q.pad) arena.classList.add('is-pad'); // ✍️ 숫자판이면 장면을 낮게 — 키·「확인」이 한 화면에 (v419)
   const card = el('div', 'jr-q');
   card.appendChild(el('span', 'jr-q-label', q.label));
   card.appendChild(stemOf(q));
   b.appendChild(card);
   const head = el('div', 'jr-movehead');
-  head.appendChild(el('span', '', `정답을 고르면 ${my}${josa(my, '이', '가')} 힘을 내요!`));
+  head.appendChild(el('span', '', `정답을 ${q.pad ? '맞히면' : '고르면'} ${my}${josa(my, '이', '가')} 힘을 내요!`));
   const swap = btn('jr-swapq', '🔄 다른 문제', () => doSwap(run, swap));
   swap.disabled = c.swap === c.at;
   head.appendChild(swap);
   b.appendChild(head);
+  if (q.pad) { // ✍️ 숫자판 (v419)
+    const pad = padRow(q, (ok, pr) => answer(run, { subj, q, ok, pr, pad: true, moves: null, swap, line, work, arena, fx, fxc, foeAct, meAct, foeFig, myFig, s }), () => !ui.busy);
+    b.appendChild(pad);
+    requestAnimationFrame(() => { try { pad.scrollIntoView({ block: 'nearest' }); } catch { /* 옛 기기 */ } }); // 「확인」까지 보이게
+    return;
+  }
   const moves = el('div', 'jr-moves');
   const myType = typesOf(ui.mon)[0];
   q.choices.forEach((ch) => {
@@ -679,7 +748,7 @@ async function doSwap(run, swap) {
   ui.busy = false;
   if (r.ok) { ui.cur = r.cur; renderWork(); return; }
   if (r.why === 'changed' || r.why === 'event') { route(); return; }
-  if (r.why !== 'used') swap.disabled = false;
+  if (r.why !== 'used') renderWork('다른 문제로 못 바꿨어요. 이 문제를 풀어 봐요'); // 같은 문제를 다시 — 그 사이 숫자판이 잠겼어도 새로 (Codex 222차 P2-2)
 }
 
 /** 힘쓰기 연출 — 내 포켓몬이 달려들고 일이 들썩인다 */
@@ -702,15 +771,16 @@ async function answer(run, x) {
   const c = ui.cur;
   if (ui.busy || !c) return;
   ui.busy = true;
-  const all = [...x.moves.children];
+  const all = x.moves ? [...x.moves.children] : []; // ✍️ 숫자판이면 보기 단추가 없다 (v419)
   all.forEach((m) => { m.disabled = true; });
   x.swap.disabled = true;
-  const correct = !!x.ch.ok;
+  const correct = x.pad ? !!x.ok : !!x.ch.ok;
   const r = await moveAnswer({ id: c.id, qn: c.qn, mon: ui.mon, subj: x.subj, correct });
   if (!alive(run)) return;
   if (!r.ok) {
     ui.busy = false;
     if (r.why === 'changed' || r.why === 'event') { route(); return; }
+    if (x.pad) { renderWork('저장이 안 됐어요. 다시 풀어 봐요'); return; } // 숫자판은 이미 「내 답」으로 바뀌었다 — 같은 문제를 다시
     all.forEach((m) => { m.disabled = false; });
     x.swap.disabled = c.swap === c.at;
     setDlg(x.line, '저장이 안 됐어요. 다시 골라 봐요');
@@ -748,6 +818,14 @@ async function answer(run, x) {
     renderWork();
     return;
   }
+  if (x.pad) { // ✍️ 정답과 풀이 한 줄을 「알겠어요」까지 (v419)
+    setDlg(x.line, `앗, 미끄러졌다! 괜찮아, 다시 해 보자.\n${padWrongLine(x.q, x.pr)}`);
+    play('wrong');
+    if (!(await waitOk(body(), run))) return;
+    ui.busy = false;
+    renderWork();
+    return;
+  }
   const chosen = all[x.q.choices.indexOf(x.ch)];
   if (chosen) chosen.classList.add('is-no');
   setDlg(x.line, `앗, 미끄러졌다! 괜찮아, 다시 해 보자.\n정답은 「${x.q.choices[right] ? x.q.choices[right].text : ''}」`);
@@ -779,8 +857,8 @@ function renderWin() {
   b.appendChild(dlg('이사 끝!\n함께 간 포켓몬들의 레벨이 올랐다!'));
   play('levelUp');
   const rw = el('div', 'jr-rewards');
-  rw.appendChild(rowEl('💰 코인', `+${JOURNEY.coins}`));
-  rw.appendChild(rowEl(`${STONES.map((s) => s.emoji).join('')} 스톤`, '+1씩'));
+  rw.appendChild(rowEl('💰 코인', `+${c.coins}`)); // 맞힌 비율로 (v419 — 셈은 📤에만)
+  if (c.full) rw.appendChild(rowEl(`${STONES.map((s) => s.emoji).join('')} 스톤`, '+1씩'));
   const lvRow = el('div', 'jr-lvrow');
   const lvMap = new Map((c.lv || []).map((x) => [x[0], x]));
   const subMap = new Map((c.sub || []).map((x) => [x[0], x]));

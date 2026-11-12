@@ -170,7 +170,7 @@ test('📅 하루 칸·📤 — 4단계로 낸·맞힌 수 · 더하기 · 백�
 });
 
 test('🔌 잇기 — 낚시터만 영어 맨 위 4 · 손님 맞이(3까지)·대여행(단계 없음)은 그대로 · 원천은 단계를 그대로 넘김 · 단어 기록에 대사 · 📤 설명 · sw v416', () => {
-  assert.match(read('js/fishview.js'), /h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\], lvTop\(s\)\), \{ fish: ui\.castN, stage \}\)/);
+  assert.match(read('js/fishview.js'), /const ctx = \{ fish: ui\.castN, stage, [^\n]*\n[^\n]*h\.ask\(s, nextSeed\(\), stepLevel\(lv, ui\.steps\[s\], lvTop\(s\)\), ctx\)/); // v419 — ctx에 again
   assert.ok(Math.max(...TOUR_LVS) <= 3, '🎟️ 손님 맞이는 3단계까지');
   assert.match(read('js/tourview.js'), /lvFor\(s, TOUR_LVS\[i\], \{ listen: canListen\(\) \}\)/);
   const jv = read('js/journeyview.js');
