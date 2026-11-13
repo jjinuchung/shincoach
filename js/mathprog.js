@@ -960,8 +960,36 @@ export function isComeback(m, today) {
 }
 /** ☀️를 누른 곳 — 사다리 머리 · 🧩 수학 퍼즐 끝 화면 · 🕵️ 나옹의 숙제 끝 화면 */
 export const SUN_FROM = ['ladder', 'puzzle', 'detect', 'poke']; // 🐾 끝 화면 (v364)
-/** 하루 기록 목록 칸 (db.DAILY_LISTS) — 시작 "시각:누른 곳:다시 시작 판 1|0" · 완주 "시각"(시작한 시각 — 같은 흐름은 한 번) */
-export const SUN_DAY_LISTS = ['sunStarts', 'sunDone'];
+/**
+ * 하루 기록 목록 칸 (db.DAILY_LISTS) — 시작 "시각:누른 곳:다시 시작 판 1|0" · 완주 "시각"(시작한 시각 — 같은 흐름은 한 번) ·
+ * 🎯 처음 답 판정 "꼴:판 열쇠:몇째:맞힘/낸:결과"(v421 · prizeKey — ☀️·🧩·🕵️ 끝낸 판마다 한 칸 · 📤에만)
+ */
+export const SUN_DAY_LISTS = ['sunStarts', 'sunDone', 'mathPrize'];
+const PRIZE_KINDS = ['sun', 'puzzle', 'detect'];
+/** 🎯 처음 답 판정 한 칸 (v421) — kind ☀️ sun · 🧩 puzzle · 🕵️ detect · key 판 열쇠(숫자·점) · idx 몇째 판(0 = 셈 밖) · s 'w'|'m'|'d'|'o' */
+export function prizeKey(kind, key, idx, ok, total, s) {
+  const n = (v) => Math.max(0, Math.floor(Number(v)) || 0);
+  return `${PRIZE_KINDS.includes(kind) ? kind : 'sun'}:${String(key).replace(/[^0-9.]/g, '') || '0'}:${n(idx)}:${n(ok)}/${n(total)}:${/^[wmdo]$/.test(s) ? s : 'o'}`;
+}
+/**
+ * 📤 🎯 처음 답 줄 (순수 · v421) — 오늘부터 7일 · 끝낸 판마다 「날짜 몇째 맞힘/낸 결과」 · 아이 화면에는 안 쓴다
+ */
+export function prizeReport(days, today) {
+  const want = new Set(Array.from({ length: 7 }, (_, k) => addDays(today, -k)));
+  const rows = { sun: [], puzzle: [], detect: [] };
+  for (const d of Array.isArray(days) ? days : []) {
+    if (!d || !want.has(d.date)) continue;
+    for (const k of Array.isArray(d.mathPrize) ? d.mathPrize : []) {
+      const x = /^(sun|puzzle|detect):([0-9.]+):(\d+):(\d+)\/(\d+):([wmdo])$/.exec(String(k));
+      if (x) rows[x[1]].push({ date: d.date, key: x[2], idx: Number(x[3]), ok: x[4], total: x[5], s: x[6] });
+    }
+  }
+  const mark = { w: '✅받음', m: '❌못 미침', d: '(이미 받은 날)', o: '(기회 지남)' };
+  const part = (icon, list) => `${icon} ${list.length
+    ? list.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : Number(a.key) - Number(b.key))).map((r) => `${r.date.slice(5)} ${r.idx ? `${r.idx}째` : '셋째 뒤'} ${r.ok}/${r.total} ${mark[r.s]}`).join(' · ')
+    : '없음'}`;
+  return `🎯 처음 답 반 이상(v421 · 최근 7일 · 끝낸 판마다 · 둘째 판까지): ${part('☀️', rows.sun)} | ${part('🧩', rows.puzzle)} | ${part('🕵️', rows.detect)}`;
+}
 /** ☀️ 시작 한 칸 */
 export function sunKey(t0, from, comeback) {
   return `${t0}:${SUN_FROM.includes(from) ? from : 'ladder'}:${comeback ? 1 : 0}`;
@@ -1232,21 +1260,21 @@ export function bumpTot(m, key, n = 1) {
  * 한 편이 끝난 뒤 누적에 더한다 — 진단은 안 센다(배운 게 아니라 잰 것).
  * ★ 반복으로 채워지는 길을 전부 막는다 (Codex 5차 #4 — 일부러 3/4로 틀리는 편을 다섯 번 돌리면 30점이 났다):
  *   · 개념 편(learn/review)은 **통과한 편만**, 연습 편은 0 — 통과 뒤엔 같은 개념이 연습이 되고 복습은 일정대로만 오므로 유한
- *   · 🎲 섞어 풀기는 **하루 첫 완주의 것만** (두 번째 ☀️는 0)
+ *   · 🎲 섞어 풀기는 **☀️ 묶음을 받은 판의 것만** (v421 — 전엔 하루 첫 완주 · 그 밖 ☀️는 0)
  *   · ❓ 답장 풀어보기는 **처음 고친 때만** (fixed)
  *   · 🤔 노트 회차는 그대로(틀린 건 내일로 밀려 오늘 다시 안 나옴 — 자체로 유한)
  * 영어의 📼가 문장마다 한 번(done)인 것과 같은 성질이 되게.
  * @param {object} m
- * @param {{mode:string, correct:number, result?:object, dailyFirst?:boolean}} r result = applyRound/applyAskTry의 결과
+ * @param {{mode:string, correct:number, result?:object, sunPrize?:boolean}} r result = applyRound/applyAskTry의 결과 · sunPrize = sunPrizeRule이 묶음을 준 판
  * @returns {{ok:number, rev:number}} 이번 편이 실제로 더한 몫 (화면 표시용)
  */
-export function tallyRound(m, { mode, correct, result, dailyFirst }) {
+export function tallyRound(m, { mode, correct, result, sunPrize }) {
   let ok = 0;
   let rev = 0;
   if (mode === 'learn' || mode === 'review') {
     if (result && result.passed && !result.practice) { ok = correct; if (result.review) rev = 1; }
   } else if (mode === 'mix') {
-    if (dailyFirst) ok = correct;
+    if (sunPrize) ok = correct;
   } else if (mode === 'ask') {
     if (result && result.fixed) ok = correct;
   } else if (mode === 'special') {
@@ -1277,17 +1305,18 @@ export function stoneReward({ mode, result }) {
 
 // ── 🎯 잡기 자격 (Codex 5차 #2·#6 — 화면(math.js)에 있던 규칙을 순수 함수로, 미룬 던지기는 레코드에) ──
 /**
- * 이 편이 주는 몬스터볼 횟수 — 아버님 결정(2026-09-22): 개념 처음 통과 1 / ☀️ 안의 개념 편 통과(복습 포함) 1 / ☀️ 하루 첫 완주 +1.
- * @param {{mode:string, result?:object, inDaily?:boolean, dailyFirst?:boolean}} o inDaily = ☀️ 흐름의 개념 편
+ * 이 편이 주는 몬스터볼 횟수 — 아버님 결정(2026-09-22): 개념 처음 통과 1 / ☀️ 안의 개념 편 통과(복습 포함) 1 / ☀️ 하루 첫 완주 +1
+ * → v421(11-13 아버님 「추천대로」): 「☀️ 하루 첫 완주 +1」은 ☀️ 묶음을 받은 판에만(sunPrizeRule — 마지막 편 처음 답 반 이상 · 둘째 판까지).
+ * @param {{mode:string, result?:object, inDaily?:boolean, sunPrize?:boolean}} o inDaily = ☀️ 흐름의 개념 편
  */
-export function roundCatches({ mode, result, inDaily, dailyFirst }) {
+export function roundCatches({ mode, result, inDaily, sunPrize }) {
   let n = 0;
   if ((mode === 'learn' || mode === 'review') && result && !result.practice) {
     if (result.first) n = 1;
     // 💪 확인 차례에서 고친 실수 하나로 칸을 지킨 편(kept)도 ☀️ 안이면 1 (v279, 아버님 "니 제안대로" — 9/22 "통과한 편에만"을 넓힘: 끝까지 풀면 받는 것이 있게)
     if (inDaily && (result.passed || result.kept)) n = Math.max(n, 1);
   }
-  if (dailyFirst) n += 1;
+  if (sunPrize) n += 1;
   return n;
 }
 
@@ -1597,7 +1626,7 @@ export function markDaily(m, today, opts) {
   const hadGold = same && !!m.daily.gold;
   m.daily = { d: today, n, ...(hadGold ? { gold: true } : {}) };
   const out = { first: n === 1, n };
-  if (n === 1) bumpTot(m, 'daily', 1); // 🎟️ 하루 첫 완주만 — "한 번 더"로 교환권을 채우진 못한다
+  // 🎟️ 완주 몫(tot.daily)은 v421부터 sunPrizeRule이 묶음과 함께 — 누르기만으로 끝낸 완주는 교환권을 채우지 못한다
   if (opts && opts.perfect !== undefined) {
     out.gold = !!opts.perfect && !hadGold;
     if (out.gold) m.daily.gold = true;
@@ -1609,6 +1638,59 @@ export function markDaily(m, today, opts) {
 export function dailyDone(m, today) {
   if (m && m.daily && isAhead(m.daily.d, today)) return Math.max(1, Number(m.daily.n) || 0); // 시계가 뒤로 — 그날은 끝낸 것으로 (markDaily와 같게 · v396)
   return (m && m.daily && m.daily.d === today) ? (Number(m.daily.n) || 0) : 0;
+}
+
+// ── ☀️ 묶음 (v421, 2026-11-13 아버님 「추천대로」 — 점검 3: 🤷·아무 보기로 끝까지 가도 첫 완주면 🎯·🥚·✨·🎟️를 다 받을 수 있던 길) ──
+// 끝내기 ⚡·💰(REWARD.daily)는 그대로 첫 완주에 · 🎯 1·🥚 하루치·✨ 오늘의 보너스·🎟️ 20점은 마지막 편(🎲 섞어 풀기 · 없는 날은 개념 편)의
+// 처음 답이 반 이상일 때만 · 못 미치면 그날 둘째 완주까지 한 번 더 기회 · 하루 한 번 · 9/22 결정 ⑦ 「첫 완주 🎯 1」을 바꾼 것
+/** ☀️ 묶음을 받을 수 있는 완주 — 그날 둘째까지 */
+export const SUN_PRIZE = { tries: 2 };
+/** 처음 낸 답이 반 이상 맞았나 — ☀️·🧩·🕵️ 같은 기준 (낸 답이 없으면 아님) */
+export function halfRight(ok, total) {
+  const t = Math.floor(Number(total));
+  const k = Math.floor(Number(ok));
+  return Number.isSafeInteger(t) && t > 0 && Number.isSafeInteger(k) && k >= 0 && k * 2 >= t;
+}
+/** 오늘 묶음 기록 — 없으면 null (m.sunPrize = { d, won: 0|1 }) */
+function sunPrizeToday(m, today) {
+  const p = m && m.sunPrize;
+  return p && typeof p === 'object' && p.d === today ? p : null;
+}
+/**
+ * ☀️ 묶음 판정 (저장 트랜잭션 안 · markDaily 바로 뒤) — n = markDaily가 돌려준 그날 완주 수 · ok/total = 마지막 편의 처음 답(🤷는 틀림).
+ * 오늘 기록이 없는데 n이 둘 이상이면 v420 이하가 오늘 이미 완주한 것(그때는 첫 완주에 묶음을 줬다) — 받은 것으로(규칙을 바꾼 날 두 번 받지 않게).
+ * → { prize 이번에 받음, won 오늘 받았음, again 다음 완주도 기회, s 'w' 받음 | 'm' 못 미침 | 'd' 이미 받은 날 | 'o' 기회 지남 }
+ */
+export function sunPrizeRule(m, today, n, { ok = 0, total = 0 } = {}) {
+  if (m.daily && isAhead(m.daily.d, today)) return { prize: false, won: true, again: false, s: 'o' }; // 시계가 뒤로 — 장부를 건드리지 않는다 (markDaily와 같게)
+  const p = sunPrizeToday(m, today);
+  const had = p ? p.won === 1 : n >= 2;
+  const prize = !had && n >= 1 && n <= SUN_PRIZE.tries && halfRight(ok, total);
+  const won = had || prize;
+  m.sunPrize = { d: today, won: won ? 1 : 0 };
+  if (prize) bumpTot(m, 'daily', 1); // 🎟️ 하루 한 번
+  return { prize, won, again: !won && n < SUN_PRIZE.tries, s: prize ? 'w' : had ? 'd' : n <= SUN_PRIZE.tries ? 'm' : 'o' };
+}
+/**
+ * 화면용 (순수) — 오늘 묶음을 받았나 · 아직 기회가 있나 (오늘 완주했는데 기록이 없으면 v420 이하가 준 것) ·
+ * 시계가 뒤로면 기회 없음 · 받았나는 그 장부대로(못 받았는데 「✅ 받았어요」라고 하지 않게 · Codex 224차 P3)
+ */
+export function sunPrizeOf(m, today) {
+  if (m && m.daily && isAhead(m.daily.d, today)) { const p = sunPrizeToday(m, m.daily.d); return { won: p ? p.won === 1 : true, left: false }; }
+  const n = dailyDone(m, today);
+  const p = sunPrizeToday(m, today);
+  const won = p ? p.won === 1 : n >= 1;
+  return { won, left: !won && n < SUN_PRIZE.tries };
+}
+/**
+ * 병합용 (순수 · v421 Codex 224차 P2-2) — 한 기록의 ☀️ 묶음 { d, won } · 마지막 완주 날에 묶음 기록이 없으면 v420 이하가 준 것(받음) ·
+ * 합친 뒤에는 어느 쪽 완주인지 알 수 없어 합치기 전에 기록마다 본다 · 없으면 null
+ */
+export function sunPrizeNorm(m) {
+  const dd = m && m.daily && /^\d{4}-\d{2}-\d{2}$/.test(String(m.daily.d || '')) && (Number(m.daily.n) || 0) >= 1 ? m.daily.d : '';
+  const p = m && m.sunPrize && typeof m.sunPrize === 'object' && typeof m.sunPrize.d === 'string' ? { d: m.sunPrize.d, won: m.sunPrize.won === 1 ? 1 : 0 } : null;
+  if (dd && (!p || p.d < dd)) return { d: dd, won: 1 };
+  return p;
 }
 
 // ── 💎 스페셜 문제 · 🏅 체육관 배지 (2026-09-26, 아버님 "새로운 보상과 함께") ──
@@ -1936,6 +2018,7 @@ export function mathReportText(m, today, days) {
   lines.push('', puzzleReport(m && m.puzzle, today)); // 🧩 수학 퍼즐 단계·판 (v296)
   lines.push(detectReport(m && m.detect, today, nameOf)); // 🕵️ 나옹의 숙제 — 판·처음 답·처음에 놓친 칸 (v299)
   if (Array.isArray(days)) lines.push(sunReport(days, today, m)); // ☀️ 누른 곳·다시 시작 판·완주 (v331 — 하루 기록을 받은 📤에서만)
+  if (Array.isArray(days)) lines.push(prizeReport(days, today)); // 🎯 ☀️·🧩·🕵️ 처음 답 판정 (v421)
   lines.push(quickReport(m, today)); // ⚡ 3문제 한 판 (v354)
   lines.push(pokeReport(m, today)); // 🐾 포켓몬 수학 (v364)
   lines.push(unitReport(m, today)); // 📐 단위 바꾸기 다지기 (v392)

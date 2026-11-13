@@ -4,10 +4,10 @@
 // 한 판을 끝내면 xp.commitChalRound(못 적은 처음 답 먼저 + finishRule — 수학 기록과 💰·🔷를 한 트랜잭션 · 🎯는 수학 기록의 잡기 예약 addPending)
 // math.js가 ctx로 화면 비우기·사다리로 돌아가기·수학 기록·글 그리기(richNode — 세로 분수·숫자 뒤 조사)·칸 원고를 건넨다
 // (이 파일은 math.js를 import하지 않는다 — mathpuzzleview와 같은 꼴)
-import { ROUND_N, kindsOf, lineWhy, optionOrder, pickRound, validItems, answerRule, finishRule, detectOf, detectTodayLine, answerQueue } from './detective.js';
-import { updateMath } from './db.js';
+import { ROUND_N, kindsOf, lineWhy, optionOrder, pickRound, validItems, answerRule, finishRule, detectOf, detectTodayLine, detectPrizeOf, answerQueue } from './detective.js';
+import { updateMath, applyDailyDelta } from './db.js';
 import { commitChalRound } from './xp.js';
-import { addPending, stageOf } from './mathprog.js';
+import { addPending, stageOf, prizeKey } from './mathprog.js';
 import { todayKey } from './track.js';
 import { guardStart } from './timeup.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
@@ -25,7 +25,7 @@ const el = (tag, cls, text) => {
 };
 
 // data: 원고 (undefined = 아직 안 받음 · null = 못 받음) · ctx: 마지막으로 건네받은 화면 잇기(저장된 수학 기록을 건넨다) ·
-// ds: 지금 보는 판 { seed, items: [{ it, kinds, order }], i, phase: 'find'|'fix'|'done', taps: { 줄: 1 }, tried: [보기], firstLine, firstFix, msg, msgOk,
+// ds: 지금 보는 판 { rid 판 열쇠(v421 — 🎯 기회는 답을 낸 판부터), day 판을 연 날, seed, items: [{ it, kinds, order }], i, phase: 'find'|'fix'|'done', taps: { 줄: 1 }, tried: [보기], firstLine, firstFix, msg, msgOk,
 //      saveErr, results, finishing, finishErr, done }
 const S = { data: undefined, ds: null, ctx: null };
 // 처음 답 줄 — 판과 따로(그만두고 새 판을 열어도 못 적은 답은 그대로 남아 다음 저장·판 끝 트랜잭션에서 적힌다, Codex 105차 #2) ·
@@ -73,12 +73,14 @@ export function detectButton(ctx) {
   loadData().then((data) => {
     if (!data || !slot.isConnected) return;
     if (planRound(ctx, 0).length < ROUND_N) return;
-    const got = detectOf((ctx.getState() || {}).detect).day[todayKey()] || 0;
+    const raw = (ctx.getState() || {}).detect;
+    const today = todayKey();
+    const got = detectOf(raw).day[today] || 0;
     const b = el('button', `btn btn-big-wide dtv-btn${got ? ' is-done' : ''}`, got ? '🕵️ 나옹의 숙제 한 판 더' : '🕵️ 나옹의 숙제 봐 주기');
     b.type = 'button';
     b.addEventListener('click', () => guardStart('math', () => startDetect(ctx)));
     slot.appendChild(b);
-    slot.appendChild(el('p', 'math-note dtv-slot-note', `😼 "맞았는지 봐 달라옹!" — ${detectTodayLine(got)}`));
+    slot.appendChild(el('p', 'math-note dtv-slot-note', `😼 "맞았는지 봐 달라옹!" — ${detectTodayLine(got, detectPrizeOf(raw, today))}`));
   }).catch(() => {});
   return slot;
 }
@@ -93,6 +95,8 @@ export async function startDetect(ctx) {
   const items = S.data ? planRound(ctx, seed) : [];
   if (items.length < ROUND_N) { ctx.back(); return; }
   S.ds = {
+    // 판 열쇠(두 창이 같은 밀리초여도 안 겹치게 — 개념 편과 같은 꼴) · 판을 연 날(판은 연 날의 것 · Codex 224차)
+    rid: Date.now() * 1000 + Math.floor(Math.random() * 1000), day: todayKey(),
     seed, items: items.map((it) => ({ it, kinds: kindsOf(it), order: optionOrder(it.id, seed) })), i: 0,
     phase: 'find', taps: {}, tried: [], firstLine: null, firstFix: null, msg: '', msgOk: false,
     saveErr: false, results: [], finishing: false, finishErr: false, done: null,
@@ -267,7 +271,7 @@ function pickFix(ctx, o) {
 // ── 저장 — 처음 답은 누른 날을 붙여 줄(Q)에 · 줄은 저장에 성공한 답만 뺀다
 function enqueue(ctx, ans) {
   const ds = S.ds;
-  Q.push({ ...ans, d: todayKey() }).then((ok) => {
+  Q.push({ ...ans, d: ds.day, rid: ds.rid }).then((ok) => { // 판을 연 날·판 열쇠 — 판은 연 날의 것(자정을 넘겨 누른 답도 그 날로 · Codex 224차) · 답을 낸 판이 🎯 기회를 쓴다 (v421)
     if (S.ds !== ds) return; // 그 사이 나갔다 — 못 적은 답은 줄에 남는다
     ds.saveErr = !ok;
     render(ctx, true);
@@ -330,12 +334,13 @@ async function finish(ctx) {
   try {
     saved = await commitChalRound((s) => {
       for (const a of batch) answerRule(s, a, today);
-      const r = finishRule(s, today, ids, perfect);
+      const r = finishRule(s, today, ids, perfect, { rid: ds.rid, day: ds.day }); // 🎯는 이 판 문제들의 그날 처음 답이 반 이상일 때 (v421)
       if (r.throws) addPending(s, r.throws);
       return { result: r, reward: { xp: 0, coin: r.coin, items: {}, stone: r.stone, throws: r.throws } };
     });
   } catch { saved = { ok: false }; }
   if (saved && saved.ok) Q.drop(batch);
+  if (saved && saved.ok && saved.result && saved.result.ball) { const b = saved.result.ball; applyDailyDelta(today, { mathPrize: [prizeKey('detect', ds.rid, b.idx, b.ok, b.total, b.s)] }).catch(() => {}); } // 📤에만 (v421)
   if (S.ds !== ds) return;
   ds.finishing = false;
   if (!saved || !saved.ok) { ds.finishErr = true; render(ctx); return; }
@@ -364,15 +369,22 @@ function finishEl(ctx) {
   box.appendChild(meowthEl());
   box.appendChild(el('p', 'dtv-done-title', d.first ? '🕵️ 나옹의 숙제를 다 봐 줬어요!' : '🕵️ 나옹의 숙제 한 판 더 끝!'));
   box.appendChild(el('p', 'dtv-done-line', `😼 "고마워다옹! 다음엔 안 틀린다옹!" · 한 번에 고친 숙제 ${okN} / ${ds.items.length}`));
-  if (d.first) box.appendChild(el('p', 'dtv-done-line', `💰 +${d.coin} · 🎯 포켓몬 잡기 ${d.throws}번${d.stone ? ` · 🔷 수학스톤 +${d.stone} (오늘 셋 다 한 번에 고쳤어요!)` : ''}`));
-  else box.appendChild(el('p', 'dtv-done-line', '오늘 숙제 보상은 이미 받았어요 — 더 봐 줘도 돼요'));
+  const gotList = [d.coin ? `💰 +${d.coin}` : '', d.throws ? `🎯 포켓몬 잡기 ${d.throws}번` : '', d.stone ? `🔷 수학스톤 +${d.stone} (오늘 셋 다 한 번에 고쳤어요!)` : ''].filter(Boolean);
+  if (gotList.length) box.appendChild(el('p', 'dtv-done-line', gotList.join(' · ')));
+  // 🎯 (v421) — 못 미쳤으면 기회가 남았을 때 「한 판 더」로, 아니면 내일 · 셈 문구 없음
+  const st = (d.ball && d.ball.s) || 'd';
+  const retry = st === 'm' && !!d.again;
+  const tip = st === 'm' ? (retry ? '🎯는 한 번에 많이 맞히면 나와요 — 🕵️ 한 판 더 해 볼까요?' : '🎯는 내일 또 기회가 있어요!')
+    : st === 'o' ? '🎯는 내일 또 기회가 있어요 — 더 봐 줘도 돼요'
+      : gotList.length ? '' : '오늘 숙제 보상은 이미 받았어요 — 더 봐 줘도 돼요';
+  if (tip) box.appendChild(el('p', 'dtv-done-line dtv-ball-tip', tip));
   if (d.throws) box.appendChild(el('p', 'math-note', '🎯 잡기는 수학 화면 위 🎯 단추에서 던져요'));
   const row = el('div', 'dtv-tools');
-  const back = el('button', 'btn btn-primary dtv-back', '🔢 수학으로');
+  const back = el('button', `btn${retry ? '' : ' btn-primary'} dtv-back`, '🔢 수학으로');
   back.type = 'button';
   back.addEventListener('click', () => quit(ctx));
   row.appendChild(back);
-  const more = el('button', 'btn dtv-more', '🕵️ 한 판 더');
+  const more = el('button', `btn${retry ? ' btn-primary' : ''} dtv-more`, '🕵️ 한 판 더');
   more.type = 'button';
   more.addEventListener('click', () => guardStart('math', () => startDetect(ctx)));
   row.appendChild(more);

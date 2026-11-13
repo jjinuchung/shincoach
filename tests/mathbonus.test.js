@@ -37,7 +37,7 @@ test('홈 카드 mathBonusFor: 완주 전엔 got=false(반짝), 완주하면 got
   const before = mathBonusFor(m, T);
   assert.equal(before.got, false);
   assert.equal(before.text, bonusText(dailyBonus(T)), '사다리·완주 카드와 같은 보너스');
-  markDaily(m, T);
+  markDaily(m, T); // v421: sunPrizeRule 없이 markDaily만 = v420 이하가 적은 완주 → 받은 것으로 (새 규칙은 tests/reward421)
   assert.equal(mathBonusFor(m, T).got, true);
   assert.equal(mathBonusFor(null, T).got, false, '레코드 없음 = 아직');
   assert.equal(mathBonusFor({ daily: { d: '2026-09-21', n: 3 } }, T).got, false, '어제 완주는 오늘 것이 아니다');

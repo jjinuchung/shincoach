@@ -130,40 +130,40 @@ test('🧩 답을 낼 때(answerRule) — 그날 꼴마다 처음 답만 적는�
   assert.deepEqual(answerRule(m, 'nope', true, 1, T2), { lv: 0, up: false, firstOfDay: false });
 });
 
-test('🧩 판을 끝냈을 때(finishRule) — 그날 처음 끝낸 판만 💰10 + 🎯 1번 · 🔷는 그날 꼴마다 처음 낸 답이 셋 다 맞았을 때만(그만두고 다시 열어도 못 뽑는다) · 둘째 판은 보상 없음', () => {
+test('🧩 판을 끝냈을 때(finishRule) — 그날 처음 끝낸 판만 💰10 · 🎯 1번은 한 번에 많이 맞힌 판(v421 — tests/reward421) · 🔷는 그날 꼴마다 처음 낸 답이 셋 다 맞았을 때만(그만두고 다시 열어도 못 뽑는다) · 둘째 판은 보상 없음', () => {
   const m = cloneMath(emptyMath());
   for (const k of KIND_LIST) answerRule(m, k, true, 1, T);
-  const r = finishRule(m, T);
-  assert.deepEqual(r, { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: REWARD.stone });
+  const r = finishRule(m, T, { rid: 1, ok: 3, total: 3 });
+  assert.deepEqual(r, { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: REWARD.stone, ball: { idx: 1, ok: 3, total: 3, s: 'w' }, again: false });
   assert.equal(addPending(m, r.throws), 1, '🎯 잡기 예약 하나');
-  assert.deepEqual(finishRule(m, T), { first: false, coin: 0, throws: 0, stone: 0 });
+  assert.deepEqual(finishRule(m, T, { rid: 2, ok: 3, total: 3 }), { first: false, coin: 0, throws: 0, stone: 0, ball: { idx: 2, ok: 3, total: 3, s: 'd' }, again: false });
   assert.equal(m.puzzle.day[T], 2);
   assert.equal(m.puzzle.sets, 2);
   // 처음 판에서 하나 틀리고 그만둠 → 새 판을 다 맞혀도 🔷 없음
   const q = cloneMath(emptyMath());
   answerRule(q, 'magic', false, 1, T);
   for (const k of KIND_LIST) answerRule(q, k, true, 1, T);
-  assert.deepEqual(finishRule(q, T), { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: 0 });
+  assert.deepEqual(finishRule(q, T, { rid: 1, ok: 3, total: 3 }), { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: 0, ball: { idx: 1, ok: 3, total: 3, s: 'w' }, again: false });
   assert.equal(q.puzzle.day[T], 1);
   // 어제 다 맞힌 처음 답은 오늘 🔷에 쓰지 않는다
   const y = cloneMath(emptyMath());
   for (const k of KIND_LIST) answerRule(y, k, true, 1, T);
   assert.equal(finishRule(y, T2).stone, 0);
-  assert.equal(puzzleTodayLine(0), '처음 끝내면 💰10 · 🎯 포켓몬 잡기 1번 · 셋 다 한 번에 맞히면 🔷 수학스톤');
+  assert.equal(puzzleTodayLine(0), '끝내면 💰10 · 한 번에 많이 맞히면 🎯 · 셋 다 한 번에 맞히면 🔷 수학스톤'); // v421
   assert.match(puzzleTodayLine(1), /오늘의 퍼즐 끝 ✅/);
   assert.match(puzzleTodayLine(2), /🔷까지/);
 });
 
 test('🧩 기록 고쳐 읽기·합치기 — 단계·판 수는 큰 쪽 · 보상 받은 날은 날마다 큰 쪽 · 같은 날 처음 답은 틀린 쪽 · 다른 날이면 나중 날 · 깨진 값은 처음 값 · 날은 최근 60일 · db.mergeMath·cloneMath', () => {
-  assert.deepEqual(puzzleOf(null), { lv: { magic: 1, pyramid: 1, cards: 1 }, day: {}, first: { d: '', r: {} }, sets: 0, solved: 0 });
-  assert.deepEqual(puzzleOf({ lv: { magic: 9, pyramid: -2, cards: 'x' }, day: { bad: 1, '2026-10-01': 7 }, first: { d: 'x', r: { magic: 1 } }, sets: -1 }), { lv: { magic: 5, pyramid: 1, cards: 1 }, day: { '2026-10-01': 2 }, first: { d: '', r: {} }, sets: 0, solved: 0 });
+  assert.deepEqual(puzzleOf(null), { lv: { magic: 1, pyramid: 1, cards: 1 }, day: {}, first: { d: '', r: {} }, sets: 0, solved: 0, ball: { d: '', r: [], f: 0 }, won: {} });
+  assert.deepEqual(puzzleOf({ lv: { magic: 9, pyramid: -2, cards: 'x' }, day: { bad: 1, '2026-10-01': 7 }, first: { d: 'x', r: { magic: 1 } }, sets: -1 }), { lv: { magic: 5, pyramid: 1, cards: 1 }, day: { '2026-10-01': 2 }, first: { d: '', r: {} }, sets: 0, solved: 0, ball: { d: '', r: [], f: 0 }, won: {} });
   const many = {};
   for (let i = 0; i < 80; i++) many[`2026-0${1 + Math.floor(i / 28)}-${String(1 + (i % 28)).padStart(2, '0')}`] = 1;
   assert.equal(Object.keys(puzzleOf({ day: many }).day).length, DAY_KEEP);
   const a = { lv: { magic: 3, pyramid: 1, cards: 2 }, day: { [T]: 1 }, first: { d: T, r: { magic: 1, pyramid: 1 } }, sets: 4, solved: 9 };
   const b = { lv: { magic: 2, pyramid: 4, cards: 2 }, day: { [T]: 2, '2026-10-18': 1 }, first: { d: T, r: { magic: 0, cards: 1 } }, sets: 2, solved: 11 };
   const ab = mergePuzzle(a, b);
-  assert.deepEqual(ab, { lv: { magic: 3, pyramid: 4, cards: 2 }, day: { [T]: 2, '2026-10-18': 1 }, first: { d: T, r: { magic: 0, pyramid: 1, cards: 1 } }, sets: 4, solved: 11 });
+  assert.deepEqual(ab, { lv: { magic: 3, pyramid: 4, cards: 2 }, day: { [T]: 2, '2026-10-18': 1 }, first: { d: T, r: { magic: 0, pyramid: 1, cards: 1 } }, sets: 4, solved: 11, ball: { d: '', r: [], f: 0 }, won: { [T]: 1 } }); // 🎯 받은 날: v420 이하가 끝낸 마지막 날은 받은 것으로 (v421 Codex 224차 — tests/reward421)
   assert.deepEqual(mergePuzzle(b, a), ab, '어느 차례로 합쳐도 같다');
   assert.deepEqual(mergePuzzle({ first: { d: T2, r: { magic: 1 } } }, a).first, { d: T2, r: { magic: 1 } }, '다른 날이면 나중 날');
   const cur = { ...emptyMath(), puzzle: a };
@@ -179,8 +179,8 @@ test('🧩 기록 고쳐 읽기·합치기 — 단계·판 수는 큰 쪽 · 보
 
 test('🧩 📤 수학 요약 — 꼴마다 단계 · 끝낸 판 · 맞힌 퍼즐 · 최근 7일 퍼즐 한 날', () => {
   const p = { lv: { magic: 2, pyramid: 1, cards: 3 }, day: { [T]: 1, '2026-10-14': 2, '2026-10-12': 1 }, sets: 5, solved: 12 };
-  assert.equal(puzzleReport(p, T), '🧩 수학 퍼즐 — ⬛ 마방진 2단계 · 🔺 수 피라미드 1단계 · 🃏 숫자 카드 3단계 · 끝낸 판 5 · 맞힌 퍼즐 12 · 최근 7일 퍼즐 한 날 2');
-  assert.match(puzzleReport(null, T), /끝낸 판 0 · 맞힌 퍼즐 0 · 최근 7일 퍼즐 한 날 0$/);
+  assert.equal(puzzleReport(p, T), '🧩 수학 퍼즐 — ⬛ 마방진 2단계 · 🔺 수 피라미드 1단계 · 🃏 숫자 카드 3단계 · 끝낸 판 5 · 맞힌 퍼즐 12 · 최근 7일 퍼즐 한 날 2 · 그중 🎯 받은 날 0(v421부터 — 한 번에 많이 맞힌 판)');
+  assert.match(puzzleReport(null, T), /끝낸 판 0 · 맞힌 퍼즐 0 · 최근 7일 퍼즐 한 날 0 · 그중 🎯 받은 날 0\(v421부터 — 한 번에 많이 맞힌 판\)$/);
   assert.ok(mathReportText({ ...emptyMath(), puzzle: p }, T).includes('🧩 수학 퍼즐 — ⬛ 마방진 2단계'));
 });
 
@@ -197,8 +197,8 @@ test('🧩 화면 연결 — 사다리 머리(☀️ 아래)·줄기 고르기�
   assert.ok(math.includes("endChal(); endPuzzle(); ui.run++; showView('home'); });"), '← 뒤로(홈)도 판을 버린다');
   const pv = read('js/mathpuzzleview.js');
   assert.ok(pv.includes("b.addEventListener('click', () => guardStart('math', () => startPuzzle(ctx)));"));
-  assert.ok(pv.includes('const m = await updateMath((mm) => { res = answerRule(mm, it.kind, ps.grade.ok, it.from, todayKey()); });'));
-  assert.ok(pv.includes('      const r = finishRule(s, today);\n      if (r.throws) addPending(s, r.throws);\n      return { result: r, reward: { xp: 0, coin: r.coin, items: {}, stone: r.stone, throws: r.throws } };'));
+  assert.ok(pv.includes('const m = await updateMath((mm) => { res = answerRule(mm, it.kind, ps.grade.ok, it.from, todayKey(), ps.rid, ps.day); });')); // 판 열쇠·판을 연 날 (v421)
+  assert.ok(pv.includes('      const r = finishRule(s, today, { rid: ps.rid, ok, total: ps.items.length, day: ps.day });\n      if (r.throws) addPending(s, r.throws);\n      return { result: r, reward: { xp: 0, coin: r.coin, items: {}, stone: r.stone, throws: r.throws } };'));
   assert.ok(pv.includes('  if (!ps || ps.grade) return;'), '확인은 한 번');
   // 🔍 Codex 102차 — 숫자·빈칸·카드를 누를 때는 읽던 자리 그대로 · 확인 뒤 초점은 [다음 퍼즐] 또는 [다시 저장하기]
   assert.ok(pv.includes('  const y = keep ? window.scrollY : 0;') && pv.includes('  if (keep && y) window.scrollTo(0, y);'));

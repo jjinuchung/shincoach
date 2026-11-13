@@ -3,6 +3,7 @@
 
 import { activeEgg, eggRule, eggSeenRule } from './egg.js'; // 🥚 알 규칙 (순수) — egg.js는 아무것도 import하지 않는다 (순환 없음)
 import { normThrows, SUN_DAY_LISTS } from './mathprog.js'; // 🎯 던지기 카운터 정규화 · ☀️ 시작·완주 기록 칸(v331) (mathprog·그 아래 모듈은 db를 import하지 않는다 — 순환 없음)
+import { sunPrizeNorm } from './mathprog.js'; // ☀️ 묶음 병합 — 기록마다 v420 이하 몫을 받음으로 읽기 (v421 Codex 224차)
 import { mergeReviewFirst } from './mathchal.js'; // 🔍 🎯 까닭 고르기 첫 선택 합치기 (v252) — mathchal.js는 아무것도 import하지 않는다
 import { mergePuzzle, puzzleOf } from './mathpuzzle.js'; // 🧩 수학 퍼즐 기록 (v296) — mathpuzzle.js도 아무것도 import하지 않는다
 import { mergeDetect, detectOf } from './detective.js'; // 🕵️ 나옹의 숙제 기록 (v299) — detective.js도 아무것도 import하지 않는다
@@ -1368,12 +1369,22 @@ export function mergeMath(cur, rec) {
     out.asks = ma.asks;
     out.askSeq = ma.askSeq;
   }
+  // ☀️ 묶음(v421) — 합치기 전에 기록마다(완주 날에 묶음 기록이 없으면 v420 이하가 준 것 · 합친 뒤에는 어느 쪽 완주인지 모른다 · Codex 224차 P2-2)
+  const spA = out.sunPrize || (rec && rec.sunPrize) ? sunPrizeNorm(out) : null;
+  const spB = out.sunPrize || (rec && rec.sunPrize) ? sunPrizeNorm(rec) : null;
   // ☀️ 오늘의 수학 완주 기록은 늦은 날짜 쪽, 같은 날이면 큰 횟수 — 옛 백업이 오늘 완주를 지우지 않게
   const dl = rec && rec.daily && rec.daily.d ? rec.daily : null;
   // 🌟 황금볼(하루 1개)은 같은 날이면 어느 쪽이 받았든 "받은 것" — 옛 백업이 오늘 받은 황금볼을 두 번 주지 않게
   const goldToday = !!(dl && out.daily && out.daily.d === dl.d && (out.daily.gold || dl.gold));
   if (dl && (!out.daily || !out.daily.d || dl.d > out.daily.d || (dl.d === out.daily.d && (Number(dl.n) || 0) > (Number(out.daily.n) || 0)))) out.daily = { d: dl.d, n: Number(dl.n) || 0, ...(dl.gold ? { gold: true } : {}) };
   if (goldToday && out.daily && out.daily.d === dl.d) out.daily = { ...out.daily, gold: true }; // cloneMath는 daily를 얕게 복사하므로 입력을 건드리지 않게 새 객체로
+  // ☀️ 묶음(v421 sunPrizeRule) — 늦은 날짜 쪽, 같은 날이면 어느 쪽이 받았든 「받음」(옛 백업으로 오늘 받은 🎯·🥚·✨를 또 받지 않게) · 새 객체로 ·
+  //   어느 쪽에도 묶음 기록이 없으면 칸을 안 만든다(v420 이하 기록끼리는 완주 수로 읽는다)
+  if (spA || spB) {
+    if (!spA || (spB && spB.d > spA.d)) out.sunPrize = { ...spB };
+    else if (!spB || spA.d > spB.d) out.sunPrize = { ...spA };
+    else out.sunPrize = { d: spA.d, won: spA.won === 1 || spB.won === 1 ? 1 : 0 };
+  }
   // 🍀 어쩌다 나온 몬스터볼의 하루 횟수 — 늦은 날짜 쪽, 같은 날이면 큰 횟수 (옛 백업으로 오늘 횟수를 되돌려 더 받지 않게)
   const lk = rec && rec.luck && rec.luck.d ? rec.luck : null;
   if (lk && (!out.luck || !out.luck.d || lk.d > out.luck.d || (lk.d === out.luck.d && (Number(lk.n) || 0) > (Number(out.luck.n) || 0)))) out.luck = { d: lk.d, n: Number(lk.n) || 0 };

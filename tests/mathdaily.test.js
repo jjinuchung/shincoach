@@ -209,7 +209,7 @@ test('🛟 백업 병합: 🌟 황금볼 표시는 같은 날이면 어느 쪽�
   assert.deepEqual(mergeMath(b, c).daily, { d: T, n: 2 });
 });
 
-test('🎟️ 누적 카운터 tot — 반복으로 채워지는 길이 없다 (Codex 5차 #4): 개념 편은 통과한 것만, 섞어 풀기는 하루 첫 완주만, ❓는 처음 고친 때만, 연습·진단 0 · 병합은 키마다 max, 입력은 안 건드린다', () => {
+test('🎟️ 누적 카운터 tot — 반복으로 채워지는 길이 없다 (Codex 5차 #4): 개념 편은 통과한 것만, 섞어 풀기는 ☀️ 묶음을 받은 판만(v421), ❓는 처음 고친 때만, 연습·진단 0 · 병합은 키마다 max, 입력은 안 건드린다', () => {
   const m = emptyMath();
   assert.equal(m.tot, undefined, '처음엔 없다 (옛 레코드와 같은 모양)');
   assert.deepEqual(tallyRound(m, { mode: 'diag', correct: 5 }), { ok: 0, rev: 0 });
@@ -221,8 +221,8 @@ test('🎟️ 누적 카운터 tot — 반복으로 채워지는 길이 없다 (
   assert.deepEqual(tallyRound(m, { mode: 'review', correct: 4, result: { passed: true, review: true, practice: false } }), { ok: 4, rev: 1 }, '복습 통과 +1');
   assert.deepEqual(m.tot, { ok: 8, daily: 0, rev: 1 });
   assert.deepEqual(tallyRound(m, { mode: 'review', correct: 4, result: { passed: true, review: true, practice: true } }), { ok: 0, rev: 0 }, '연습 편은 정답도 복습 통과도 안 센다');
-  assert.deepEqual(tallyRound(m, { mode: 'mix', correct: 3, dailyFirst: true }), { ok: 3, rev: 0 }, '하루 첫 완주의 섞어 풀기');
-  assert.deepEqual(tallyRound(m, { mode: 'mix', correct: 3, dailyFirst: false }), { ok: 0, rev: 0 }, '두 번째 ☀️의 섞어 풀기는 0');
+  assert.deepEqual(tallyRound(m, { mode: 'mix', correct: 3, sunPrize: true }), { ok: 3, rev: 0 }, '☀️ 묶음을 받은 섞어 풀기 (v421 — 전엔 하루 첫 완주)');
+  assert.deepEqual(tallyRound(m, { mode: 'mix', correct: 3, sunPrize: false }), { ok: 0, rev: 0 }, '묶음을 안 받은 ☀️의 섞어 풀기는 0');
   assert.deepEqual(tallyRound(m, { mode: 'ask', correct: 1, result: { ok: true, fixed: true } }), { ok: 1, rev: 0 }, '❓ 처음 고친 때');
   assert.deepEqual(tallyRound(m, { mode: 'ask', correct: 1, result: { ok: true, fixed: false } }), { ok: 0, rev: 0 }, '이미 고친 걸 다른 창에서 또 내도 0');
   assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2, result: { ok: 2, total: 2, resolved: 2 } }), { ok: 2, rev: 0 }, '노트 회차는 실제로 지운 노트 수');
@@ -230,7 +230,7 @@ test('🎟️ 누적 카운터 tot — 반복으로 채워지는 길이 없다 (
   assert.deepEqual(tallyRound(m, { mode: 'notes', correct: 2 }), { ok: 0, rev: 0 }, 'result 없이 부르면 0 — 관대한 폴백이 재제출을 다시 세게 했다 (Codex 7차 #1)');
   assert.deepEqual(m.tot, { ok: 14, daily: 0, rev: 1 });
   markDaily(m, T); markDaily(m, T); markDaily(m, '2026-09-22');
-  assert.deepEqual(m.tot, { ok: 14, daily: 2, rev: 1 }, '하루 첫 완주만 — "한 번 더"는 안 센다');
+  assert.deepEqual(m.tot, { ok: 14, daily: 0, rev: 1 }, '완주만으로는 안 센다 — 🎟️ 완주 몫은 v421부터 sunPrizeRule이 묶음과 함께');
   assert.deepEqual(bumpTot({}, 'ok', 2), { ok: 2, daily: 0, rev: 0 });
   // 병합: 키마다 max (옛 백업이 진도를 되돌리지 않게), 입력 객체는 그대로
   const a = emptyMath(); a.tot = { ok: 10, daily: 1, rev: 0 };
@@ -242,16 +242,16 @@ test('🎟️ 누적 카운터 tot — 반복으로 채워지는 길이 없다 (
   assert.equal(mergeMath(emptyMath(), emptyMath()).tot, undefined, '둘 다 없으면 안 만든다');
 });
 
-test('🎯 잡기 자격 roundCatches — 처음 통과 1 · ☀️ 안 개념 편 통과 1(겹치면 1) · 하루 첫 완주 +1 · 연습·진단·노트·ask 0', () => {
+test('🎯 잡기 자격 roundCatches — 처음 통과 1 · ☀️ 안 개념 편 통과 1(겹치면 1) · ☀️ 묶음 +1(v421 — 전엔 하루 첫 완주) · 연습·진단·노트·ask 0', () => {
   assert.equal(roundCatches({ mode: 'learn', result: { passed: true, first: true, practice: false } }), 1, '처음 통과');
   assert.equal(roundCatches({ mode: 'learn', result: { passed: true, first: true, practice: false }, inDaily: true }), 1, '☀️ 안이어도 겹쳐 2가 되진 않는다');
   assert.equal(roundCatches({ mode: 'review', result: { passed: true, first: false, review: true, practice: false }, inDaily: true }), 1, '☀️ 안 복습 통과');
   assert.equal(roundCatches({ mode: 'review', result: { passed: true, first: false, review: true, practice: false }, inDaily: false }), 0, '사다리에서 직접 한 복습 통과는 없음(☀️로 가게)');
   assert.equal(roundCatches({ mode: 'review', result: { passed: false, practice: false }, inDaily: true }), 0, '못 넘기면 없음');
   assert.equal(roundCatches({ mode: 'learn', result: { passed: true, first: false, practice: true }, inDaily: true }), 0, '연습 편');
-  assert.equal(roundCatches({ mode: 'learn', result: { passed: true, first: true, practice: false }, inDaily: true, dailyFirst: true }), 2, '섞어 풀기가 없는 날: 개념 편 통과 + 첫 완주 = 2');
-  assert.equal(roundCatches({ mode: 'mix', result: { ok: 3, total: 3 }, dailyFirst: true }), 1, '섞어 풀기 끝 = 첫 완주 1');
-  assert.equal(roundCatches({ mode: 'mix', result: { ok: 3, total: 3 }, dailyFirst: false }), 0, '두 번째 ☀️');
+  assert.equal(roundCatches({ mode: 'learn', result: { passed: true, first: true, practice: false }, inDaily: true, sunPrize: true }), 2, '섞어 풀기가 없는 날: 개념 편 통과 + ☀️ 묶음 = 2');
+  assert.equal(roundCatches({ mode: 'mix', result: { ok: 3, total: 3 }, sunPrize: true }), 1, '섞어 풀기 끝 = ☀️ 묶음 1');
+  assert.equal(roundCatches({ mode: 'mix', result: { ok: 3, total: 3 }, sunPrize: false }), 0, '묶음을 안 받은 ☀️');
   assert.equal(roundCatches({ mode: 'notes', result: { ok: 2, total: 2 } }), 0);
   assert.equal(roundCatches({ mode: 'ask', result: { fixed: true } }), 0);
   assert.equal(roundCatches({ mode: 'diag' }), 0);

@@ -4,10 +4,10 @@
 // math.js가 ctx로 화면 비우기·사다리로 돌아가기·수학 기록을 건넨다(이 파일은 math.js를 import하지 않는다 — korpuzzleview와 같은 꼴)
 //  · 퍼즐마다 확인은 한 번(처음 낸 답만 센다) · 빈칸을 누르고 숫자판으로 넣는다 · 🃏는 카드를 차례로 누른다
 //  · 그만하기는 언제든 — 낸 답은 이미 저장됐다(그날의 처음 답이라 다시 열어도 🔷를 다시 뽑을 수 없다)
-import { KINDS, KIND_LIST, makePuzzle, answersOf, digitsOf, gradePuzzle, puzzleWhy, cardsAsk, answerRule, finishRule, puzzleOf, puzzleTodayLine } from './mathpuzzle.js';
-import { updateMath } from './db.js';
+import { KINDS, KIND_LIST, makePuzzle, answersOf, digitsOf, gradePuzzle, puzzleWhy, cardsAsk, answerRule, finishRule, puzzleOf, puzzleTodayLine, puzzlePrizeOf } from './mathpuzzle.js';
+import { updateMath, applyDailyDelta } from './db.js';
 import { commitChalRound } from './xp.js';
-import { addPending } from './mathprog.js';
+import { addPending, prizeKey } from './mathprog.js';
 import { todayKey } from './track.js';
 import { guardStart } from './timeup.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
@@ -19,7 +19,7 @@ const el = (tag, cls, text) => {
   return e;
 };
 
-// ps: 지금 푸는 판 { items: [{ kind, from, seed, p }], i, input: [글자], sel, picked: [카드 번호], grade, saving, saveErr, results, finishing, finishErr, done }
+// ps: 지금 푸는 판 { rid 판 열쇠(v421 — 🎯 기회는 답을 낸 판부터), day 판을 연 날, items: [{ kind, from, seed, p }], i, input: [글자], sel, picked: [카드 번호], grade, saving, saveErr, results, finishing, finishErr, done }
 const S = { ps: null };
 
 /** 지금 퍼즐 판을 푸는 중인가 (math.js가 🎒·📊에서 돌아올 때 본다) */
@@ -34,13 +34,15 @@ export function endPuzzle() {
 /** 사다리 머리의 🧩 단추 + 오늘 보상 줄 + 꼴마다 단계 */
 export function puzzleButton(ctx) {
   const box = el('div', 'mpz-slot');
-  const st = puzzleOf((ctx.getState() || {}).puzzle);
-  const got = st.day[todayKey()] || 0;
+  const raw = (ctx.getState() || {}).puzzle;
+  const st = puzzleOf(raw);
+  const today = todayKey();
+  const got = st.day[today] || 0;
   const b = el('button', `btn btn-big-wide mpz-btn${got ? ' is-done' : ''}`, got ? '🧩 수학 퍼즐 한 판 더' : '🧩 오늘의 수학 퍼즐');
   b.type = 'button';
   b.addEventListener('click', () => guardStart('math', () => startPuzzle(ctx)));
   box.appendChild(b);
-  box.appendChild(el('p', 'math-note mpz-note', `${KIND_LIST.map((k) => `${KINDS[k].icon} ${KINDS[k].ko} ${st.lv[k]}단계`).join(' · ')} — ${puzzleTodayLine(got)}`));
+  box.appendChild(el('p', 'math-note mpz-note', `${KIND_LIST.map((k) => `${KINDS[k].icon} ${KINDS[k].ko} ${st.lv[k]}단계`).join(' · ')} — ${puzzleTodayLine(got, puzzlePrizeOf(raw, today))}`));
   return box;
 }
 
@@ -54,7 +56,8 @@ export function startPuzzle(ctx) {
     return { kind, from: st.lv[kind], seed, p: makePuzzle(kind, st.lv[kind], seed) };
   }).filter((x) => x.p);
   if (!items.length) { ctx.back(); return; }
-  S.ps = { items, i: 0, input: [], sel: 0, picked: [], grade: null, saving: false, saveErr: false, results: [], finishing: false, finishErr: false, done: null };
+  // 판 열쇠 = 시각 × 1000 + 무작위 세 자리(두 창이 같은 밀리초에 열어도 안 겹치게 — 개념 편과 같은 꼴) · day = 판을 연 날(판은 연 날의 것 · Codex 224차)
+  S.ps = { rid: Date.now() * 1000 + Math.floor(Math.random() * 1000), day: todayKey(), items, i: 0, input: [], sel: 0, picked: [], grade: null, saving: false, saveErr: false, results: [], finishing: false, finishErr: false, done: null };
   render(ctx);
 }
 /** 🎒·📊에서 돌아왔다 — 하던 자리 그대로 */
@@ -248,7 +251,7 @@ async function save(ctx) {
   render(ctx, true);
   let res = null;
   try {
-    const m = await updateMath((mm) => { res = answerRule(mm, it.kind, ps.grade.ok, it.from, todayKey()); });
+    const m = await updateMath((mm) => { res = answerRule(mm, it.kind, ps.grade.ok, it.from, todayKey(), ps.rid, ps.day); });
     if (S.ps !== ps) return; // 그 사이 나갔다 — 저장은 남았다
     ctx.setState(m);
     ps.results[ps.i] = { ok: ps.grade.ok, up: !!(res && res.up), lv: res ? res.lv : it.from };
@@ -273,7 +276,7 @@ function nextItem(ctx) {
   render(ctx);
 }
 
-/** 판 끝 — 수학 기록(보상 받은 날·판 수)과 💰·🔷를 한 트랜잭션 · 🎯는 잡기 예약 */
+/** 판 끝 — 수학 기록(보상 받은 날·판 수)과 💰·🔷를 한 트랜잭션 · 🎯는 잡기 예약 (v421 — 이 판에서 한 번에 맞힌 퍼즐이 반 이상일 때) */
 async function finish(ctx) {
   const ps = S.ps;
   if (!ps || ps.finishing || ps.done) return;
@@ -281,14 +284,16 @@ async function finish(ctx) {
   ps.finishErr = false;
   render(ctx);
   const today = todayKey();
+  const ok = ps.results.filter((x) => x && x.ok).length;
   let saved;
   try {
     saved = await commitChalRound((s) => {
-      const r = finishRule(s, today);
+      const r = finishRule(s, today, { rid: ps.rid, ok, total: ps.items.length, day: ps.day });
       if (r.throws) addPending(s, r.throws);
       return { result: r, reward: { xp: 0, coin: r.coin, items: {}, stone: r.stone, throws: r.throws } };
     });
   } catch { saved = { ok: false }; }
+  if (saved && saved.ok && saved.result && saved.result.ball) { const b = saved.result.ball; applyDailyDelta(today, { mathPrize: [prizeKey('puzzle', ps.rid, b.idx, b.ok, b.total, b.s)] }).catch(() => {}); } // 📤에만 (v421)
   if (S.ps !== ps) return;
   ps.finishing = false;
   if (!saved || !saved.ok) { ps.finishErr = true; render(ctx); return; }
@@ -317,16 +322,23 @@ function finishEl(ctx) {
   box.appendChild(el('p', 'mpz-done-icon', '🧩'));
   box.appendChild(el('p', 'mpz-done-title', d.first ? '🧩 오늘의 수학 퍼즐 끝!' : '🧩 수학 퍼즐 한 판 더 끝!'));
   box.appendChild(el('p', 'mpz-done-line', `한 번에 맞힌 퍼즐 ${okN} / ${ps.items.length}`));
-  if (d.first) box.appendChild(el('p', 'mpz-done-line', `💰 +${d.coin} · 🎯 포켓몬 잡기 ${d.throws}번${d.stone ? ` · 🔷 수학스톤 +${d.stone} (오늘 셋 다 한 번에 맞혔어요!)` : ''}`));
-  else box.appendChild(el('p', 'mpz-done-line', '오늘 퍼즐 보상은 이미 받았어요 — 맞히면 단계는 올라가요'));
+  const gotList = [d.coin ? `💰 +${d.coin}` : '', d.throws ? `🎯 포켓몬 잡기 ${d.throws}번` : '', d.stone ? `🔷 수학스톤 +${d.stone} (오늘 셋 다 한 번에 맞혔어요!)` : ''].filter(Boolean);
+  if (gotList.length) box.appendChild(el('p', 'mpz-done-line', gotList.join(' · ')));
+  // 🎯 (v421) — 못 미쳤으면 기회가 남았을 때 「한 판 더」로, 아니면 내일 · 셈 문구 없음
+  const st = (d.ball && d.ball.s) || 'd';
+  const retry = st === 'm' && !!d.again;
+  const tip = st === 'm' ? (retry ? '🎯는 한 번에 많이 맞히면 나와요 — 🧩 한 판 더 해 볼까요?' : '🎯는 내일 또 기회가 있어요!')
+    : st === 'o' ? '🎯는 내일 또 기회가 있어요 — 맞히면 단계는 올라가요'
+      : gotList.length ? '' : '오늘 퍼즐 보상은 이미 받았어요 — 맞히면 단계는 올라가요';
+  if (tip) box.appendChild(el('p', 'mpz-done-line mpz-ball-tip', tip));
   for (const [k, r] of ps.results.entries()) if (r && r.up) box.appendChild(el('p', 'mpz-done-line mpz-up', `⬆️ ${KINDS[ps.items[k].kind].icon} ${KINDS[ps.items[k].kind].ko} ${r.lv}단계로!`));
   if (d.throws) box.appendChild(el('p', 'math-note', '🎯 잡기는 수학 화면 위 🎯 단추에서 던져요'));
   const row = el('div', 'mpz-tools');
-  const back = el('button', 'btn btn-primary mpz-back', '🔢 수학으로');
+  const back = el('button', `btn${retry ? '' : ' btn-primary'} mpz-back`, '🔢 수학으로');
   back.type = 'button';
   back.addEventListener('click', () => quit(ctx));
   row.appendChild(back);
-  const more = el('button', 'btn mpz-more', '🧩 한 판 더');
+  const more = el('button', `btn${retry ? ' btn-primary' : ''} mpz-more`, '🧩 한 판 더');
   more.type = 'button';
   more.addEventListener('click', () => guardStart('math', () => startPuzzle(ctx)));
   row.appendChild(more);

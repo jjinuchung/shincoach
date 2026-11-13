@@ -311,15 +311,15 @@ test('🕵️ 처음 답(answerRule) — 그날 문제·걸음마다 처음 답�
   assert.deepEqual(detectOf(m2.detect).first, { d: '', r: {} });
 });
 
-test('🕵️ 판 끝(finishRule) — 그날 처음 끝낸 판만 💰10 + 🎯 1번 · 🔷는 판의 셋을 모두 한 번에 고치고 그날 처음 답에 틀린 것이 없을 때만(틀린 뒤 그만두고 새 판을 열어도 못 뽑는다) · 둘째 판은 보상 없음', () => {
+test('🕵️ 판 끝(finishRule) — 그날 처음 끝낸 판만 💰10 · 🎯 1번은 처음 답 반 이상인 판(v421 — tests/reward421) · 🔷는 판의 셋을 모두 한 번에 고치고 그날 처음 답에 틀린 것이 없을 때만(틀린 뒤 그만두고 새 판을 열어도 못 뽑는다) · 둘째 판은 보상 없음', () => {
   const ids = ['D1', 'D7', 'D13'];
   const cellOf = (id) => ITEMS.find((x) => x.id === id).cell;
   const allRight = (m, list, day = T) => { for (const id of list) for (const step of ['line', 'fix', 'solve']) answerRule(m, { id, cell: cellOf(id), step, ok: true }, day); };
   const m = {};
   allRight(m, ids);
-  assert.deepEqual(finishRule(m, T, ids, true), { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: REWARD.stone });
+  assert.deepEqual(finishRule(m, T, ids, true, { rid: 1 }), { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: REWARD.stone, ball: { idx: 1, ok: 6, total: 6, s: 'w' }, again: false });
   assert.equal(detectOf(m.detect).day[T], 2);
-  assert.deepEqual(finishRule(m, T, ids, true), { first: false, coin: 0, throws: 0, stone: 0 }, '둘째 판');
+  assert.deepEqual(finishRule(m, T, ids, true, { rid: 2 }), { first: false, coin: 0, throws: 0, stone: 0, ball: { idx: 2, ok: 6, total: 6, s: 'd' }, again: false }, '둘째 판 — 🎯는 이미 받은 날');
   assert.equal(detectOf(m.detect).sets, 2);
   // 판 안에 하나라도 처음에 틀리면 🔷 없음 (perfect를 잘못 넘겨도 그날 처음 답이 막는다)
   const m2 = {};
@@ -327,7 +327,7 @@ test('🕵️ 판 끝(finishRule) — 그날 처음 끝낸 판만 💰10 + 🎯 
   answerRule(m2, { id: 'D13', cell: cellOf('D13'), step: 'line', ok: true }, T);
   answerRule(m2, { id: 'D13', cell: cellOf('D13'), step: 'fix', ok: false }, T);
   answerRule(m2, { id: 'D13', cell: cellOf('D13'), step: 'solve', ok: true }, T);
-  assert.deepEqual(finishRule(m2, T, ids, true), { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: 0 });
+  assert.deepEqual(finishRule(m2, T, ids, true, { rid: 1 }), { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: 0, ball: { idx: 1, ok: 5, total: 6, s: 'w' }, again: false });
   assert.equal(detectOf(m2.detect).day[T], 1);
   // 그만두고 새 판 — 앞 판에서 틀린 처음 답이 남아 🔷를 못 뽑는다
   const m3 = {};
@@ -345,7 +345,7 @@ test('🕵️ 판 끝(finishRule) — 그날 처음 끝낸 판만 💰10 + 🎯 
   allRight(m4, ['D1', 'D7']);
   assert.equal(finishRule(m4, T, ['D1', 'D7'], true).stone, 0);
   allRight(m4, ids, T2);
-  assert.deepEqual(finishRule(m4, T2, ids, true), { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: REWARD.stone });
+  assert.deepEqual(finishRule(m4, T2, ids, true, { rid: 3 }), { first: true, coin: REWARD.coin, throws: REWARD.throws, stone: REWARD.stone, ball: { idx: 1, ok: 6, total: 6, s: 'w' }, again: false });
   const m6 = {};
   allRight(m6, ids);
   assert.equal(finishRule(m6, T, ids).stone, 0, 'perfect 기본값은 false');
@@ -445,7 +445,7 @@ test('🕵️ 기록 고쳐 읽기·합치기 — 받은 날은 날마다 큰 �
   const later = mergeDetect(a, { first: { d: T2, r: { D9: { l: 1 } } } });
   assert.deepEqual(later.first, { d: T2, r: { D9: { l: 1 } } });
   assert.deepEqual(detectOf({ day: { nope: 3, [T]: 9 }, first: { d: 'x', r: { D1: { l: 1 } } }, seen: { D1: 'soon', bad: T }, sets: -2, miss: { '<x>': 4 } }),
-    { day: { [T]: 2 }, first: { d: '', r: {} }, seen: {}, sets: 0, done: 0, lineOk: 0, lineN: 0, fixOk: 0, fixN: 0, miss: {} });
+    { day: { [T]: 2 }, first: { d: '', r: {} }, seen: {}, sets: 0, done: 0, lineOk: 0, lineN: 0, fixOk: 0, fixN: 0, miss: {}, ball: { d: '', r: [], f: 0 }, won: {} });
   // db — 복사는 안쪽까지 새 객체 · 병합은 mergeDetect
   const rec = { ...emptyMath(), detect: copy(a) };
   const c = cloneMath(rec);
@@ -462,9 +462,9 @@ test('🕵️ 📤 수학 요약 줄 — 끝낸 판 · 고친 숙제 · 처음 �
   const line = detectReport(raw, T, nameOf);
   assert.ok(line.startsWith('🕵️ 나옹의 숙제 — 끝낸 판 4 · 고친 숙제 12 · 처음에 틀린 줄을 찾음 9/12 · 처음에 바르게 고침 10/12 · 최근 7일 한 날 2'), line);
   assert.ok(line.includes(`처음에 놓친 칸: ${nameOf('dec.add')}×3, ${nameOf('fac.lcm')}×2, ${nameOf('mix.order')}×1`), line);
-  assert.equal(detectReport(undefined, T), '🕵️ 나옹의 숙제 — 끝낸 판 0 · 고친 숙제 0 · 처음에 틀린 줄을 찾음 0/0 · 처음에 바르게 고침 0/0 · 최근 7일 한 날 0');
+  assert.equal(detectReport(undefined, T), '🕵️ 나옹의 숙제 — 끝낸 판 0 · 고친 숙제 0 · 처음에 틀린 줄을 찾음 0/0 · 처음에 바르게 고침 0/0 · 최근 7일 한 날 0 · 그중 🎯 받은 날 0(v421부터 — 처음 답이 반 이상인 판)');
   assert.ok(mathReportText({ ...emptyMath(), detect: raw }, T).includes('🕵️ 나옹의 숙제 — 끝낸 판 4'));
-  assert.match(detectTodayLine(0), /💰10 · 🎯 포켓몬 잡기 1번/);
+  assert.equal(detectTodayLine(0), '끝내면 💰10 · 한 번에 많이 맞히면 🎯 · 셋 다 한 번에 고치면 🔷 수학스톤'); // v421
   assert.match(detectTodayLine(1), /오늘의 숙제 끝 ✅/);
   assert.match(detectTodayLine(2), /🔷까지/);
 });
@@ -482,12 +482,12 @@ test('🕵️ 화면 연결 — 사다리 머리 🧩 아래·줄기 고르기�
   const v = read('js/detectiveview.js');
   assert.ok(v.includes("b.addEventListener('click', () => guardStart('math', () => startDetect(ctx)));"));
   assert.ok(v.includes('  (batch) => updateMath((mm) => { for (const a of batch) answerRule(mm, a, todayKey()); }),'), '처음 답 줄은 판과 따로 하나 (Codex 105차 #2)');
-  assert.ok(v.includes('  Q.push({ ...ans, d: todayKey() }).then((ok) => {'), '누른 날을 붙인다 (Codex 105차 #7)');
+  assert.ok(v.includes('  Q.push({ ...ans, d: ds.day, rid: ds.rid }).then((ok) => {'), '날을 붙인다 (Codex 105차 #7 → v421 Codex 224차: 판을 연 날 — 판은 연 날의 것) · 판 열쇠도');
   assert.ok(v.includes("if (ds.firstLine === null) { ds.firstLine = ok; enqueue(ctx, { id: it.id, cell: it.cell, step: 'line', ok }); }"), '처음 누른 줄은 그 순간 저장');
   assert.ok(v.includes("if (ds.firstFix === null) { ds.firstFix = ok; enqueue(ctx, { id: it.id, cell: it.cell, step: 'fix', ok }); }"), '처음 고른 보기도');
   assert.ok(v.includes("    enqueue(ctx, { id: it.id, cell: it.cell, step: 'solve', ok: true });"), '바르게 고친 것 (Codex 105차 #6)');
   assert.ok(v.includes('  const perfect = ds.results.length === ds.items.length && ds.results.every((r) => r && r.line && r.fix);'), '이번 판 셋 다 한 번에 (Codex 105차 #1)');
-  assert.ok(v.includes('      for (const a of batch) answerRule(s, a, today);\n      const r = finishRule(s, today, ids, perfect);\n      if (r.throws) addPending(s, r.throws);\n      return { result: r, reward: { xp: 0, coin: r.coin, items: {}, stone: r.stone, throws: r.throws } };'), '판 끝은 못 적은 처음 답부터');
+  assert.ok(v.includes('      for (const a of batch) answerRule(s, a, today);\n      const r = finishRule(s, today, ids, perfect, { rid: ds.rid, day: ds.day }); // 🎯는 이 판 문제들의 그날 처음 답이 반 이상일 때 (v421)\n      if (r.throws) addPending(s, r.throws);\n      return { result: r, reward: { xp: 0, coin: r.coin, items: {}, stone: r.stone, throws: r.throws } };'), '판 끝은 못 적은 처음 답부터');
   assert.ok(v.includes('  if (saved && saved.ok) Q.drop(batch);'), '판 끝이 성공한 것만 줄에서 뺀다');
   assert.ok(v.includes('  if (Q.size) Q.flush().catch(() => {});'), '나갈 때 못 적은 처음 답(실패하면 줄에 남는다)');
   assert.ok(!/flushLater|queue\.splice|ds\.queue/.test(v), '옛 판 안 대기열은 없다');

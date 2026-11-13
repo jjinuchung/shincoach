@@ -8,7 +8,7 @@ import { ROSTER, loadCharacters, characterUrl, artUrl } from './pokemon.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
 import { korBonusFor } from './korday.js'; // ✨ 국어·논술 카드 오늘의 보너스 (v329)
 import { getLook, getProfileSnapshot, onProfileReload } from './xp.js';
-import { dailyDone, quickPlan, quickLeft, QUICK } from './mathprog.js';
+import { sunPrizeOf, quickPlan, quickLeft, QUICK } from './mathprog.js';
 import { todayKey } from './track.js';
 import { homePalOf } from './homeplay.js'; // 🤝 홈 화면 파트너 — 누구를 보일지 (순수)
 import { mountHomePal } from './homepal.js'; // 🤝 홈 화면 파트너 — 그리기·걷기
@@ -156,14 +156,14 @@ export function cardEl(subject, mascot, onPick) {
   // ✨ 오늘의 보너스 칩 (수학 카드) — 아직 안 받았으면 카드가 반짝이고, 받았으면 차분하게 "받았어요"
   if (subject.bonus) {
     const chip = document.createElement('span');
-    chip.className = 'home-card-bonus' + (subject.bonus.got ? ' got' : '');
-    chip.textContent = subject.bonus.got ? `✅ 오늘의 보너스 ${subject.bonus.text} 받았어요` : `✨ 오늘의 보너스 ${subject.bonus.text}`;
+    chip.className = 'home-card-bonus' + (subject.bonus.got || subject.bonus.rest ? ' got' : '');
+    chip.textContent = subject.bonus.got ? `✅ 오늘의 보너스 ${subject.bonus.text} 받았어요` : subject.bonus.rest ? `✨ 오늘의 보너스 ${subject.bonus.text} — 내일 또 기회가 있어요` : `✨ 오늘의 보너스 ${subject.bonus.text}`;
     btn.appendChild(chip);
-    if (!subject.bonus.got) {
+    if (!subject.bonus.got && !subject.bonus.rest) { // ☀️ 기회가 지났으면 반짝이지 않는다 (v421)
       li.classList.add('sparkle');
       const tip = document.createElement('span');
       tip.className = 'home-card-bonus-tip';
-      tip.textContent = subject.bonus.tip || '☀️ 오늘의 수학 완주하면 받아요'; // 📚·🖊️ 카드는 제 말(v329 korday.BONUS_TIP)
+      tip.textContent = subject.bonus.tip || '☀️ 오늘의 수학에서 처음에 잘 맞히면 받아요'; // 📚·🖊️ 카드는 제 말(v329 korday.BONUS_TIP) · 수학은 v421부터 처음 답 반 이상
       btn.appendChild(tip);
       for (let i = 0; i < 4; i++) { const sp = document.createElement('i'); sp.className = `spark s${i + 1}`; sp.textContent = '✨'; sp.setAttribute('aria-hidden', 'true'); btn.appendChild(sp); }
     }
@@ -174,14 +174,16 @@ export function cardEl(subject, mascot, onPick) {
 }
 
 /**
- * 수학 카드에 얹을 오늘의 보너스 — {text, got}. 기록을 못 읽어도 카드는 떠야 하므로 실패하면 null.
+ * 수학 카드에 얹을 오늘의 보너스 — {text, got, rest?}. 기록을 못 읽어도 카드는 떠야 하므로 실패하면 null.
+ * got = ☀️ 묶음을 받았음 · rest = 못 받았고 오늘 기회가 지남(반짝이지 않고 「내일 또」) (v421 sunPrizeOf — 전엔 완주만 보면 got)
  * @param {object|null} m 수학 레코드 (db.getMath)
  * @param {string} today track.todayKey()
  */
 export function mathBonusFor(m, today) {
   try {
     const b = dailyBonus(today);
-    return { text: bonusText(b), got: dailyDone(m, today) > 0 };
+    const sp = sunPrizeOf(m, today);
+    return { text: bonusText(b), got: sp.won, ...(!sp.won && !sp.left ? { rest: true } : {}) };
   } catch { return null; }
 }
 

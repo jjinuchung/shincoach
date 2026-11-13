@@ -7,12 +7,16 @@
 //    나머지 뒷줄은 틀린 값을 따라간 줄 · opts[0]이 고친 줄(화면은 섞는다) · no[k] 틀린 보기 k의 말 · okWhy[i]·follow[i] 줄을 누르면 나오는 말
 //    ans·chain은 시험이 문제의 수로 정답을 따로 풀 때 쓴다(앱은 안 씀)
 //  · 한 판 = 셋 — 진우가 🐣 「안다」 이상인 칸의 문제만 · 줄기가 겹치지 않게 · 최근 7일 안에 본 문제는 뒤로 · 🤔 다시 볼 유형이 있는 칸 먼저
-//  · 보상(🧩 퍼즐과 같은 꼴): 그날 처음 끝낸 판만 💰 REWARD.coin + 🎯 잡기 REWARD.throws ·
+//  · 보상(🧩 퍼즐과 같은 꼴): 그날 처음 끝낸 판만 💰 REWARD.coin ·
 //    그 판의 세 문제를 모두 한 번에(줄도 고친 줄도) 맞히고, 그날 낸 처음 답에 틀린 것이 없으면 🔷 REWARD.stone
 //    — 처음 답은 누르는 순간 저장한다(answerRule · answerQueue — 저장에 성공한 답만 빼고, 못 적은 답은 판 끝 트랜잭션에서 먼저 적는다) ·
 //      틀린 뒤 그만두고 새 판을 열어도 그날의 틀린 답이 남아 🔷를 다시 뽑을 수 없다 (Codex 105차 #1·#2)
+//  · 🎯 잡기 REWARD.throws (v421, 2026-11-13 아버님 「추천대로」 — 점검 4: 아무 줄·보기나 눌러도 끝나 🎯를 받을 수 있던 길): 그 판 세 문제의 처음 답
+//    여섯(처음 누른 줄 셋 + 처음 고른 보기 셋 — 그날 이미 본 문제면 그날 처음 낸 답) 중 셋 이상이 맞으면 · 하루 한 번 ·
+//    기회는 그날 둘째 판까지 — 답을 하나라도 낸 판부터 센다(그만둔 판도 · 판을 새로 열어 다시 뽑지 못하게, ball.r)
 // 저장: 수학 기록 m.detect { day: { 'YYYY-MM-DD': 1 | 2 }, first: { d, r: { 문제 id: { l, f, s } } }, seen: { 문제 id: 'YYYY-MM-DD' },
-//   sets, done, lineOk, lineN, fixOk, fixN, miss: { 칸 id: 수 } } — 병합은 mergeDetect(받은 날·센 수는 큰 쪽 · 같은 날 처음 답은 틀린 쪽 · 본 날은 나중)
+//   sets, done, lineOk, lineN, fixOk, fixN, miss: { 칸 id: 수 }, ball: { d, r: [판 열쇠 둘째까지], f: 그날 끝낸 판(v421부터) }, won: { 'YYYY-MM-DD': 1 } } —
+//   병합은 mergeDetect(받은 날·센 수는 큰 쪽 · 같은 날 처음 답은 틀린 쪽 · 본 날은 나중 · 🎯 받은 날은 합집합 · 같은 날의 판 열쇠는 합쳐 이른 둘)
 // ★ 이 파일은 아무것도 import하지 않는다 (db.js가 수학 기록 병합에서 쓴다 — mathpuzzle.js와 같은 원칙)
 
 /** 한 판에 내는 문제 수 */
@@ -21,8 +25,10 @@ export const ROUND_N = 3;
 export const SEEN_DAYS = 7;
 /** 보상 받은 날·본 날은 최근 이만큼만 남긴다 */
 export const DAY_KEEP = 60;
-/** 그날 처음 끝낸 판의 보상 — 🧩 퍼즐과 같은 꼴 */
+/** 그날 처음 끝낸 판의 보상 — 🧩 퍼즐과 같은 꼴 (🎯는 v421부터 처음 답이 반 이상인 판에) */
 export const REWARD = { coin: 10, throws: 1, stone: 1 };
+/** 🎯 기회 — 그날 답을 낸 판 둘째까지 (v421 · 🧩와 같게) */
+export const BALL_TRIES = 2;
 /** 따라간 줄을 눌렀는데 원고에 따로 쓴 말이 없을 때 */
 export const FOLLOW_SAY = '이 줄은 바로 위 줄을 따라 바르게 계산했어요. 처음 틀린 줄은 더 위에 있어요.';
 
@@ -171,6 +177,56 @@ function missOf(raw) {
   return out;
 }
 const bit = (v) => (v === 1 ? 1 : 0);
+/** 판 열쇠 목록 — 양의 정수 · 겹침 없이 · 이른 차례로 BALL_TRIES개까지 (mathpuzzle과 같은 꼴) */
+function ridsOf(raw) {
+  const out = [...new Set((Array.isArray(raw) ? raw : []).map(cnt).filter(Boolean))].sort((a, b) => a - b);
+  return out.slice(0, BALL_TRIES);
+}
+/** 🎯 기회 기록 고쳐 읽기 (v421) */
+function ballOf(raw) {
+  const b = isObj(raw) ? raw : {};
+  const d = typeof b.d === 'string' && DAY_RE.test(b.d) ? b.d : '';
+  return { d, r: d ? ridsOf(b.r) : [], f: d ? cnt(b.f) : 0 };
+}
+/** 그날의 🎯 기회 칸으로 (지난 날이면 새로) — 늦게 온 전날 판이면 false */
+function ballDay(s, day) {
+  if (s.ball.d && day < s.ball.d) return false;
+  if (s.ball.d !== day) s.ball = { d: day, r: [], f: 0 };
+  return true;
+}
+/** 답을 낸 판을 센다 — 그날 둘째 판까지만 적는다(같은 판은 한 번) */
+function noteTry(s, day, rid) {
+  const id = cnt(rid);
+  if (!id || !DAY_RE.test(String(day)) || !ballDay(s, day)) return;
+  if (!s.ball.r.includes(id) && s.ball.r.length < BALL_TRIES) s.ball.r = [...s.ball.r, id].sort((a, b) => a - b);
+}
+/** 판을 연 날 — 이상한 날·앞날이면 오늘 (v421 Codex 224차) */
+function roundDay(day, today) {
+  return DAY_RE.test(String(day)) && day <= today ? day : today;
+}
+/**
+ * 그날 🎯를 받았나 · 아직 기회가 있나 (고쳐 읽은 기록) — 그날 끝낸 판이 있는데 v421로 끝낸 판이 없으면 v420 이하가 준 것 ·
+ * 기회 칸이 앞날이면(시계가 뒤로) 기회 없음 (v421 Codex 224차 · mathpuzzle과 같은 꼴)
+ */
+function prizeAt(s, day) {
+  const live = s.ball.d === day;
+  const won = own(s.won, day) || (own(s.day, day) && !(live && s.ball.f > 0));
+  const ahead = !!s.ball.d && s.ball.d > day;
+  return { won, left: !won && !ahead && (!live || s.ball.r.length < BALL_TRIES) };
+}
+/** 병합 전 한 기록 — 마지막으로 판을 끝낸 날에 v421로 끝낸 판이 없으면 그날 🎯는 v420 이하가 준 것(받음) · 그 뒤에 v421 판이 있었으면 알 수 없어 그대로 */
+function legacyWon(x) {
+  const last = Object.keys(x.day).sort().pop();
+  if (!last || own(x.won, last)) return x.won;
+  const v421 = x.ball.d > last || (x.ball.d === last && x.ball.f > 0);
+  return v421 ? x.won : daysOf({ ...x.won, [last]: 1 });
+}
+/** 처음 낸 답이 반 이상 맞았나 (mathprog.halfRight와 같은 기준 — 이 파일은 import하지 않는다) */
+function halfRight(ok, total) {
+  const t = Math.floor(Number(total));
+  const k = Math.floor(Number(ok));
+  return Number.isSafeInteger(t) && t > 0 && Number.isSafeInteger(k) && k >= 0 && k * 2 >= t;
+}
 /** 나옹의 숙제 기록 고쳐 읽기 (순수 · 새 객체) — 모르는 값은 처음 값으로 */
 export function detectOf(raw) {
   const r = isObj(raw) ? raw : {};
@@ -186,7 +242,7 @@ export function detectOf(raw) {
       first.r[id] = x;
     }
   }
-  return { day: daysOf(r.day), first, seen: seenOf(r.seen), sets: cnt(r.sets), done: cnt(r.done), lineOk: cnt(r.lineOk), lineN: cnt(r.lineN), fixOk: cnt(r.fixOk), fixN: cnt(r.fixN), miss: missOf(r.miss) };
+  return { day: daysOf(r.day), first, seen: seenOf(r.seen), sets: cnt(r.sets), done: cnt(r.done), lineOk: cnt(r.lineOk), lineN: cnt(r.lineN), fixOk: cnt(r.fixOk), fixN: cnt(r.fixN), miss: missOf(r.miss), ball: ballOf(r.ball), won: daysOf(r.won) };
 }
 const inc = (v) => Math.min(Number.MAX_SAFE_INTEGER, v + 1);
 const STEP_KEY = { line: 'l', fix: 'f', solve: 's' };
@@ -194,12 +250,14 @@ const STEP_KEY = { line: 'l', fix: 'f', solve: 's' };
  * 답을 냈다 (수학 기록 m을 고친다 — db.updateMath 안) — step 'line'(처음 누른 줄이 처음 틀린 줄인가) · 'fix'(처음 고른 보기가 고친 줄인가) ·
  * 'solve'(바르게 고쳤다 — 틀린 보기를 먼저 골랐어도, Codex 105차 #6).
  * 그날 그 문제의 그 걸음 **처음 답**만 적고 센다(다시 열어도 그대로 · 같은 답을 두 번 적어도 한 번) · 본 날을 적는다 ·
- * 처음 답이 틀리면 그 칸의 놓친 수를 하루 한 번 · d = 누른 날(저장이 늦어 자정을 넘겨도 누른 날로 — Codex 105차 #7) — 늦게 도착한 전날 답은 오늘 기록을 건드리지 않는다 → { firstOfDay }
+ * 처음 답이 틀리면 그 칸의 놓친 수를 하루 한 번 · d = 누른 날(저장이 늦어 자정을 넘겨도 누른 날로 — Codex 105차 #7) — 늦게 도착한 전날 답은 오늘 기록을 건드리지 않는다 ·
+ * rid = 판 열쇠(🎯 기회는 답을 낸 판부터 센다 — v421) → { firstOfDay }
  */
-export function answerRule(m, { id, cell, step, ok, d }, today) {
+export function answerRule(m, { id, cell, step, ok, d, rid }, today) {
   const s = detectOf(m.detect);
   const day = typeof d === 'string' && DAY_RE.test(d) ? d : today;
   if (!ID_RE.test(String(id)) || !own(STEP_KEY, step) || !DAY_RE.test(String(day))) { m.detect = s; return { firstOfDay: false }; }
+  noteTry(s, day, rid);
   if (!s.seen[id] || s.seen[id] < day) s.seen = seenOf({ ...s.seen, [id]: day });
   if (s.first.d && day < s.first.d) { m.detect = s; return { firstOfDay: false }; } // 늦게 도착한 전날 답
   if (s.first.d !== day) s.first = { d: day, r: {} };
@@ -219,29 +277,53 @@ export function answerRule(m, { id, cell, step, ok, d }, today) {
   return { firstOfDay };
 }
 /**
- * 한 판을 끝냈다 (수학 기록 m을 고친다 — 보상과 한 트랜잭션) — 그날 처음 끝낸 판이면 💰·🎯,
+ * 한 판을 끝냈다 (수학 기록 m을 고친다 — 보상과 한 트랜잭션) — 그날 처음 끝낸 판이면 💰,
  * **이번 판**의 셋을 모두 한 번에 고쳤고(perfect — 화면이 이번 판에서 본 답 · Codex 105차 #1: 그날 처음 답만 보면 앞 판에서 맞히고 그만둔 문제를
- * 이번에 틀려도 🔷가 나갔다) 그 문제들의 그날 처음 답도 맞고, 그날 낸 처음 답에 틀린 것이 없으면 🔷 → { first, coin, throws, stone }
+ * 이번에 틀려도 🔷가 나갔다) 그 문제들의 그날 처음 답도 맞고, 그날 낸 처음 답에 틀린 것이 없으면 🔷 ·
+ * 🎯는 (v421) 이 판 문제들의 그날 처음 답(줄·보기 — 앞 판에서 본 문제면 그때 답이라 답을 본 뒤 맞힌 것은 안 센다)이 반 이상이고
+ * 그날 둘째 판 안이고(rid) 아직 안 받았으면 · 오늘 끝낸 판이 있는데 v421로 끝낸 판이 없으면 v420 이하가 준 것으로 적어 둔다(규칙을 바꾼 날 두 번 받지 않게 · Codex 224차 P2-1) ·
+ * day = 판을 연 날 — 판은 연 날의 것(답도 그 날로 적힌다 · 자정을 넘겨 끝내도 그날 처음 답으로 판정 · 새날 기회를 안 쓴다 · Codex 224차 P2-5) →
+ * { first, coin, throws, stone, ball: { idx 몇째 판(0 = 셈 밖), ok, total, s 'w'|'m'|'d'|'o' }, again 오늘 다음 판도 기회 }
  */
-export function finishRule(m, today, ids, perfect = false) {
+export function finishRule(m, today, ids, perfect = false, { rid = 0, day = '' } = {}) {
   const s = detectOf(m.detect);
+  const bd = roundDay(day, today);
   s.sets = inc(s.sets);
-  const first = !own(s.day, today);
+  const first = !own(s.day, bd);
+  const had = prizeAt(s, bd).won; // 이 판을 적기 전에 — v420 이하가 준 몫까지
+  const r = s.first.d === bd ? s.first.r : {};
+  const list = Array.isArray(ids) ? ids : [];
   let stone = 0;
   if (first) {
-    const r = s.first.d === today ? s.first.r : {};
-    const list = Array.isArray(ids) ? ids : [];
     const roundOk = perfect === true && list.length === ROUND_N && list.every((id) => r[id] && r[id].l === 1 && r[id].f === 1);
     const clean = Object.values(r).every((a) => a.l !== 0 && a.f !== 0);
     stone = roundOk && clean ? REWARD.stone : 0;
-    s.day = daysOf({ ...s.day, [today]: stone ? 2 : 1 });
+    s.day = daysOf({ ...s.day, [bd]: stone ? 2 : 1 });
   }
+  noteTry(s, bd, rid);
+  const live = ballDay(s, bd);
+  const idx = live ? s.ball.r.indexOf(cnt(rid)) + 1 : 0;
+  if (live) s.ball.f = inc(s.ball.f);
+  const ok = list.reduce((a, id) => a + (r[id] && r[id].l === 1 ? 1 : 0) + (r[id] && r[id].f === 1 ? 1 : 0), 0);
+  const total = list.length * 2;
+  const prize = !had && idx > 0 && halfRight(ok, total);
+  if (had || prize) s.won = daysOf({ ...s.won, [bd]: 1 });
   m.detect = s;
-  return { first, coin: first ? REWARD.coin : 0, throws: first ? REWARD.throws : 0, stone };
+  return {
+    first, coin: first ? REWARD.coin : 0, throws: prize ? REWARD.throws : 0, stone,
+    ball: { idx, ok, total, s: prize ? 'w' : had ? 'd' : idx > 0 ? 'm' : 'o' },
+    again: prizeAt(s, today).left,
+  };
+}
+/** 화면용 (순수 · v421) — 오늘 🎯를 받았나 · 아직 기회가 있나 (prizeAt) */
+export function detectPrizeOf(raw, today) {
+  return prizeAt(detectOf(raw), today);
 }
 /**
  * 두 기기의 기록 합치기 (순수) — 받은 날은 날마다 큰 쪽 · 센 수·놓친 수는 큰 쪽 · 본 날은 나중 날 ·
- * 처음 답은 같은 날이면 문제·걸음마다 틀린 쪽(🔷를 다른 기기로 다시 뽑지 못하게), 다른 날이면 나중 날
+ * 처음 답은 같은 날이면 문제·걸음마다 틀린 쪽(🔷를 다른 기기로 다시 뽑지 못하게), 다른 날이면 나중 날 ·
+ * 🎯 받은 날은 합집합(합치기 전에 기록마다 v420 이하가 준 마지막 날 몫을 받음으로 — legacyWon · Codex 224차 P2-2) ·
+ * 판 열쇠는 같은 날이면 합쳐 이른 둘 · 끝낸 판 수는 큰 쪽, 다른 날이면 나중 날 (v421)
  */
 export function mergeDetect(a, b) {
   const x = detectOf(a);
@@ -268,7 +350,12 @@ export function mergeDetect(a, b) {
   const miss = { ...x.miss };
   for (const [c, n] of Object.entries(y.miss)) miss[c] = Math.max(miss[c] || 0, n);
   const mx = (k) => Math.max(x[k], y[k]);
-  return { day: daysOf(day), first, seen: seenOf(seen), sets: mx('sets'), done: mx('done'), lineOk: mx('lineOk'), lineN: mx('lineN'), fixOk: mx('fixOk'), fixN: mx('fixN'), miss };
+  const won = { ...legacyWon(x) };
+  for (const [k, v] of Object.entries(legacyWon(y))) won[k] = Math.max(won[k] || 0, v);
+  let ball;
+  if (x.ball.d && x.ball.d === y.ball.d) ball = { d: x.ball.d, r: ridsOf([...x.ball.r, ...y.ball.r]), f: Math.max(x.ball.f, y.ball.f) };
+  else { const w = x.ball.d > y.ball.d ? x.ball : y.ball; ball = { d: w.d, r: [...w.r], f: w.f }; }
+  return { day: daysOf(day), first, seen: seenOf(seen), sets: mx('sets'), done: mx('done'), lineOk: mx('lineOk'), lineN: mx('lineN'), fixOk: mx('fixOk'), fixN: mx('fixN'), miss, ball, won: daysOf(won) };
 }
 /**
  * 처음 답 줄 (Codex 105차 #2) — 판과 따로 둔다: **저장에 성공한 답만** 뺀다 · 실패하면 남겨 두고 다음 저장이나 판 끝 트랜잭션(snapshot → 성공하면 drop)에서 다시.
@@ -303,17 +390,19 @@ export function answerQueue(save, onSaved = () => {}) {
   return api;
 }
 
-/** 오늘 보상 줄 (순수) — 그날 받은 값 0·1·2 */
-export function detectTodayLine(got) {
-  if (got >= 2) return '오늘의 숙제 끝 ✅ 🔷까지 받았어요 — 더 봐 줘도 돼요';
-  if (got === 1) return '오늘의 숙제 끝 ✅ — 더 봐 줘도 돼요';
-  return `처음 끝내면 💰${REWARD.coin} · 🎯 포켓몬 잡기 ${REWARD.throws}번 · 셋 다 한 번에 고치면 🔷 수학스톤`;
+/**
+ * 오늘 보상 줄 (순수) — got 그날 받은 값 0·1·2 · prize 오늘 🎯 { won 받음, left 아직 기회 } (v421 — detectPrizeOf) · 셈 문구 없음
+ */
+export function detectTodayLine(got, prize = { won: false, left: true }) {
+  const ball = prize && prize.won ? '' : prize && prize.left ? '한 번에 많이 맞히면 🎯' : '🎯는 내일 또 기회가 있어요';
+  if (got >= 1) return `오늘의 숙제 끝 ✅${got >= 2 ? ' 🔷까지 받았어요' : ''} — ${ball || '더 봐 줘도 돼요'}`;
+  return `끝내면 💰${REWARD.coin}${ball ? ` · ${ball}` : ''} · 셋 다 한 번에 고치면 🔷 수학스톤`;
 }
-/** 📤 수학 요약 줄 (순수) — 끝낸 판 · 고친 숙제 · 처음 답 · 최근 7일 한 날 · 처음에 놓친 칸(많은 차례로 다섯) · name: 칸 id → 이름 */
+/** 📤 수학 요약 줄 (순수) — 끝낸 판 · 고친 숙제 · 처음 답 · 최근 7일 한 날 · 🎯 받은 날(v421) · 처음에 놓친 칸(많은 차례로 다섯) · name: 칸 id → 이름 */
 export function detectReport(raw, todayKey, name = (c) => c) {
   const s = detectOf(raw);
   const t = dayNum(todayKey);
-  const week = Number.isFinite(t) ? Object.keys(s.day).filter((d) => { const x = dayNum(d); return x <= t && t - x < 7; }).length : 0;
+  const inWeek = (days) => (Number.isFinite(t) ? Object.keys(days).filter((d) => { const x = dayNum(d); return x <= t && t - x < 7; }).length : 0);
   const miss = Object.entries(s.miss).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 5).map(([c, n]) => `${name(c)}×${n}`);
-  return `🕵️ 나옹의 숙제 — 끝낸 판 ${s.sets} · 고친 숙제 ${s.done} · 처음에 틀린 줄을 찾음 ${s.lineOk}/${s.lineN} · 처음에 바르게 고침 ${s.fixOk}/${s.fixN} · 최근 7일 한 날 ${week}${miss.length ? ` · 처음에 놓친 칸: ${miss.join(', ')}` : ''}`;
+  return `🕵️ 나옹의 숙제 — 끝낸 판 ${s.sets} · 고친 숙제 ${s.done} · 처음에 틀린 줄을 찾음 ${s.lineOk}/${s.lineN} · 처음에 바르게 고침 ${s.fixOk}/${s.fixN} · 최근 7일 한 날 ${inWeek(s.day)} · 그중 🎯 받은 날 ${inWeek(s.won)}(v421부터 — 처음 답이 반 이상인 판)${miss.length ? ` · 처음에 놓친 칸: ${miss.join(', ')}` : ''}`;
 }

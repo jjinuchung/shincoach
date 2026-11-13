@@ -6,10 +6,13 @@
 //  · 🃏 숫자 카드(cards) — 카드를 한 번씩 써서 가장 큰 수·가장 작은 수(0은 맨 앞에 못 옴)·둘째로 큰 수·목표에 가장 가까운 수 (4-1 큰 수)
 // 한 판 = 셋(꼴마다 하나) · 꼴마다 1~5단계(처음엔 1단계 · 처음 낸 답이 맞으면 다음 단계 · 틀리면 그 단계의 새 문제) ·
 // 문제는 씨앗(seed)으로 만든다 — 같은 씨앗이면 같은 문제(🎒·📊를 다녀와도 그대로) · 빈칸은 늘 채워진 줄·칸으로 풀 수 있게 검사해서 낸다
-// 보상(국어 퍼즐과 같은 꼴): 그날 처음 끝낸 판만 💰 REWARD.coin + 🎯 잡기 REWARD.throws · 그날 꼴마다 **처음 낸 답**이 셋 다 맞으면 🔷 REWARD.stone
+// 보상(국어 퍼즐과 같은 꼴): 그날 처음 끝낸 판만 💰 REWARD.coin · 그날 꼴마다 **처음 낸 답**이 셋 다 맞으면 🔷 REWARD.stone
 //  — 처음 낸 답은 내는 순간 적는다(answerRule) · 판을 그만두고 새로 열어도 그날의 처음 답은 그대로라 🔷를 다시 뽑을 수 없다
-// 저장: 수학 기록 m.puzzle { lv: { 꼴: 1~5 }, day: { 'YYYY-MM-DD': 1 | 2 }, first: { d, r: { 꼴: 0|1 } }, sets, solved } —
-//  병합은 mergePuzzle(단계·보상 받은 날·센 수는 큰 쪽 · 같은 날의 처음 답은 틀린 쪽)
+// 🎯 잡기 REWARD.throws (v421, 2026-11-13 아버님 「추천대로」 — 점검 4: 아무 수나 채워 끝내도 🎯를 받을 수 있던 길): 그 판에서 셋 중 둘 이상을 한 번에 맞히면 ·
+//  하루 한 번 · 기회는 그날 둘째 판까지 — 답을 하나라도 낸 판부터 센다(그만둔 판도 · 판을 새로 열어 다시 뽑지 못하게, ball.r)
+// 저장: 수학 기록 m.puzzle { lv: { 꼴: 1~5 }, day: { 'YYYY-MM-DD': 1 | 2 }, first: { d, r: { 꼴: 0|1 } }, sets, solved,
+//  ball: { d, r: [판 열쇠 — 그날 답을 낸 판 둘째까지], f: 그날 끝낸 판(v421부터) }, won: { 'YYYY-MM-DD': 1 — 🎯 받은 날 } } —
+//  병합은 mergePuzzle(단계·보상 받은 날·센 수는 큰 쪽 · 같은 날의 처음 답은 틀린 쪽 · 같은 날의 판 열쇠는 합쳐 이른 둘)
 // ★ 이 파일은 아무것도 import하지 않는다 (db.js가 수학 기록 병합에서 쓴다 — mathchal.js와 같은 원칙)
 
 export const KINDS = {
@@ -20,8 +23,10 @@ export const KINDS = {
 /** 한 판에 내는 차례 */
 export const KIND_LIST = ['magic', 'pyramid', 'cards'];
 export const LV_MAX = 5;
-/** 그날 처음 끝낸 판의 보상 — 국어 퍼즐과 같은 꼴 */
+/** 그날 처음 끝낸 판의 보상 — 국어 퍼즐과 같은 꼴 (🎯는 v421부터 한 번에 많이 맞힌 판에) */
 export const REWARD = { coin: 10, throws: 1, stone: 1 };
+/** 🎯 기회 — 그날 답을 낸 판 둘째까지 (v421) */
+export const BALL_TRIES = 2;
 /** 보상 받은 날은 최근 이만큼만 남긴다 */
 export const DAY_KEEP = 60;
 
@@ -273,6 +278,17 @@ function daysOf(raw) {
   for (const k of keys) { const v = cnt(raw[k]); if (v) out[k] = Math.min(2, v); }
   return out;
 }
+/** 판 열쇠 목록 — 양의 정수 · 겹침 없이 · 이른 차례로 BALL_TRIES개까지 */
+function ridsOf(raw) {
+  const out = [...new Set((Array.isArray(raw) ? raw : []).map(cnt).filter(Boolean))].sort((a, b) => a - b);
+  return out.slice(0, BALL_TRIES);
+}
+/** 🎯 기회 기록 고쳐 읽기 (v421) */
+function ballOf(raw) {
+  const b = isObj(raw) ? raw : {};
+  const d = typeof b.d === 'string' && DAY_RE.test(b.d) ? b.d : '';
+  return { d, r: d ? ridsOf(b.r) : [], f: d ? cnt(b.f) : 0 };
+}
 /** 퍼즐 기록 고쳐 읽기 (순수 · 새 객체) — 모르는 값은 처음 값으로 */
 export function puzzleOf(raw) {
   const r = isObj(raw) ? raw : {};
@@ -281,15 +297,56 @@ export function puzzleOf(raw) {
   const f = isObj(r.first) ? r.first : {};
   const first = { d: typeof f.d === 'string' && DAY_RE.test(f.d) ? f.d : '', r: {} };
   if (first.d && isObj(f.r)) for (const k of KIND_LIST) if (own(f.r, k)) first.r[k] = f.r[k] === 1 ? 1 : 0;
-  return { lv, day: daysOf(r.day), first, sets: cnt(r.sets), solved: cnt(r.solved) };
+  return { lv, day: daysOf(r.day), first, sets: cnt(r.sets), solved: cnt(r.solved), ball: ballOf(r.ball), won: daysOf(r.won) };
+}
+/** 그날의 🎯 기회 칸으로 (지난 날이면 새로) — 늦게 온 전날 판이면 false */
+function ballDay(s, day) {
+  if (s.ball.d && day < s.ball.d) return false;
+  if (s.ball.d !== day) s.ball = { d: day, r: [], f: 0 };
+  return true;
+}
+/** 답을 낸 판을 센다 — 그날 둘째 판까지만 적는다(같은 판은 한 번) */
+function noteTry(s, day, rid) {
+  const id = cnt(rid);
+  if (!id || !DAY_RE.test(String(day)) || !ballDay(s, day)) return;
+  if (!s.ball.r.includes(id) && s.ball.r.length < BALL_TRIES) s.ball.r = [...s.ball.r, id].sort((a, b) => a - b);
+}
+/** 판을 연 날 — 이상한 날·앞날이면 오늘 (v421 Codex 224차) */
+function roundDay(day, today) {
+  return DAY_RE.test(String(day)) && day <= today ? day : today;
+}
+/**
+ * 그날 🎯를 받았나 · 아직 기회가 있나 (고쳐 읽은 기록) — 그날 끝낸 판이 있는데 v421로 끝낸 판이 없으면 v420 이하가 준 것 ·
+ * 기회 칸이 앞날이면(시계가 뒤로) 기회 없음 (v421 Codex 224차)
+ */
+function prizeAt(s, day) {
+  const live = s.ball.d === day;
+  const won = own(s.won, day) || (own(s.day, day) && !(live && s.ball.f > 0));
+  const ahead = !!s.ball.d && s.ball.d > day;
+  return { won, left: !won && !ahead && (!live || s.ball.r.length < BALL_TRIES) };
+}
+/** 병합 전 한 기록 — 마지막으로 판을 끝낸 날에 v421로 끝낸 판이 없으면 그날 🎯는 v420 이하가 준 것(받음) · 그 뒤에 v421 판이 있었으면 알 수 없어 그대로 */
+function legacyWon(x) {
+  const last = Object.keys(x.day).sort().pop();
+  if (!last || own(x.won, last)) return x.won;
+  const v421 = x.ball.d > last || (x.ball.d === last && x.ball.f > 0);
+  return v421 ? x.won : daysOf({ ...x.won, [last]: 1 });
+}
+/** 처음 낸 답이 반 이상 맞았나 (mathprog.halfRight와 같은 기준 — 이 파일은 import하지 않는다) */
+function halfRight(ok, total) {
+  const t = Math.floor(Number(total));
+  const k = Math.floor(Number(ok));
+  return Number.isSafeInteger(t) && t > 0 && Number.isSafeInteger(k) && k >= 0 && k * 2 >= t;
 }
 /**
  * 퍼즐 하나의 답을 냈다 (수학 기록 m을 고친다 — db.updateMath 안) — 그날 그 꼴의 **처음 답**이면 적고(그만두고 다시 열어도 그대로),
- * 맞았으면 단계를 하나 올린다. from = 판을 시작할 때의 단계(그 사이 다른 창이 올렸으면 두 번 올리지 않는다) → { lv, up, firstOfDay }
+ * 맞았으면 단계를 하나 올린다. from = 판을 시작할 때의 단계(그 사이 다른 창이 올렸으면 두 번 올리지 않는다) ·
+ * rid = 판 열쇠 · rday = 판을 연 날(🎯 기회는 답을 낸 판부터 그 판의 날로 센다 — 자정을 넘겨 낸 답이 새날 기회를 쓰지 않게 · v421) → { lv, up, firstOfDay }
  */
-export function answerRule(m, kind, ok, from, today) {
+export function answerRule(m, kind, ok, from, today, rid = 0, rday = '') {
   const s = puzzleOf(m.puzzle);
   if (!own(KINDS, kind)) { m.puzzle = s; return { lv: 0, up: false, firstOfDay: false }; }
+  noteTry(s, roundDay(rday, today), rid);
   if (s.first.d !== today) s.first = { d: today, r: {} };
   const firstOfDay = !own(s.first.r, kind);
   if (firstOfDay) s.first.r[kind] = ok === true ? 1 : 0;
@@ -302,25 +359,48 @@ export function answerRule(m, kind, ok, from, today) {
   return { lv: s.lv[kind], up, firstOfDay };
 }
 /**
- * 한 판을 끝냈다 (수학 기록 m을 고친다 — 보상과 한 트랜잭션) — 그날 처음 끝낸 판이면 💰·🎯, 그날 꼴마다 처음 낸 답이 셋 다 맞았으면 🔷 →
- * { first, coin, throws, stone } (🎯는 부르는 쪽이 addPending으로 · 💰·🔷는 프로필로)
+ * 한 판을 끝냈다 (수학 기록 m을 고친다 — 보상과 한 트랜잭션) — 그날 처음 끝낸 판이면 💰, 그날 꼴마다 처음 낸 답이 셋 다 맞았으면 🔷 ·
+ * 🎯는 (v421) 이 판에서 한 번에 맞힌 퍼즐이 반 이상이고(ok/total — 화면이 이번 판에서 본 답) 그날 둘째 판 안이고 아직 안 받았으면.
+ * 오늘 끝낸 판이 있는데 v421로 끝낸 판이 없으면 v420 이하가 끝낸 것(그때는 첫 판에 🎯를 줬다) — 받은 것으로 적어 둔다(규칙을 바꾼 날 두 번 받지 않게 · Codex 224차 P2-1).
+ * day = 판을 연 날 — 판은 연 날의 것(자정을 넘겨 끝내도 그날 몫 · 새날 기회를 안 쓴다 · Codex 224차 P2-5) →
+ * { first, coin, throws, stone, ball: { idx 몇째 판(0 = 셈 밖), ok, total, s 'w' 받음 | 'm' 못 미침 | 'd' 이미 받은 날 | 'o' 기회 지남 }, again 오늘 다음 판도 기회 }
+ * (🎯는 부르는 쪽이 addPending으로 · 💰·🔷는 프로필로)
  */
-export function finishRule(m, today) {
+export function finishRule(m, today, { rid = 0, ok = 0, total = 0, day = '' } = {}) {
   const s = puzzleOf(m.puzzle);
+  const bd = roundDay(day, today);
   s.sets = Math.min(Number.MAX_SAFE_INTEGER, s.sets + 1);
-  const first = !own(s.day, today);
+  const first = !own(s.day, bd);
+  const had = prizeAt(s, bd).won; // 이 판을 적기 전에 — v420 이하가 준 몫까지
   let stone = 0;
   if (first) {
-    const r = s.first.d === today ? s.first.r : {};
+    const r = s.first.d === bd ? s.first.r : {};
     stone = KIND_LIST.every((k) => r[k] === 1) ? REWARD.stone : 0;
-    s.day = daysOf({ ...s.day, [today]: stone ? 2 : 1 });
+    s.day = daysOf({ ...s.day, [bd]: stone ? 2 : 1 });
   }
+  noteTry(s, bd, rid);
+  const live = ballDay(s, bd);
+  const idx = live ? s.ball.r.indexOf(cnt(rid)) + 1 : 0;
+  if (live) s.ball.f = Math.min(Number.MAX_SAFE_INTEGER, s.ball.f + 1);
+  const prize = !had && idx > 0 && halfRight(ok, total);
+  if (had || prize) s.won = daysOf({ ...s.won, [bd]: 1 });
   m.puzzle = s;
-  return { first, coin: first ? REWARD.coin : 0, throws: first ? REWARD.throws : 0, stone };
+  const n = (v) => Math.max(0, Math.floor(Number(v)) || 0);
+  return {
+    first, coin: first ? REWARD.coin : 0, throws: prize ? REWARD.throws : 0, stone,
+    ball: { idx, ok: n(ok), total: n(total), s: prize ? 'w' : had ? 'd' : idx > 0 ? 'm' : 'o' },
+    again: prizeAt(s, today).left,
+  };
+}
+/** 화면용 (순수 · v421) — 오늘 🎯를 받았나 · 아직 기회가 있나 (prizeAt) */
+export function puzzlePrizeOf(raw, today) {
+  return prizeAt(puzzleOf(raw), today);
 }
 /**
  * 두 기기의 퍼즐 기록 합치기 (순수) — 단계·센 수는 큰 쪽 · 보상 받은 날은 날마다 큰 쪽(옛 백업이 받은 보상을 되돌리지 못하게) ·
- * 처음 답은 같은 날이면 꼴마다 틀린 쪽(🔷를 다른 기기로 다시 뽑지 못하게), 다른 날이면 나중 날
+ * 처음 답은 같은 날이면 꼴마다 틀린 쪽(🔷를 다른 기기로 다시 뽑지 못하게), 다른 날이면 나중 날 ·
+ * 🎯 받은 날은 합집합(합치기 전에 기록마다 v420 이하가 준 마지막 날 몫을 받음으로 — legacyWon · Codex 224차 P2-2) ·
+ * 판 열쇠는 같은 날이면 합쳐 이른 둘(다른 기기에서 연 판도 기회를 쓴다) · 끝낸 판 수는 큰 쪽, 다른 날이면 나중 날 (v421)
  */
 export function mergePuzzle(a, b) {
   const x = puzzleOf(a);
@@ -335,19 +415,26 @@ export function mergePuzzle(a, b) {
     for (const k of KIND_LIST) if (own(x.first.r, k) || own(y.first.r, k)) r[k] = own(x.first.r, k) && own(y.first.r, k) ? Math.min(x.first.r[k], y.first.r[k]) : own(x.first.r, k) ? x.first.r[k] : y.first.r[k];
     first = { d: x.first.d, r };
   } else first = (x.first.d > y.first.d ? x : y).first;
-  return { lv, day: daysOf(day), first: { d: first.d, r: { ...first.r } }, sets: Math.max(x.sets, y.sets), solved: Math.max(x.solved, y.solved) };
+  const won = { ...legacyWon(x) };
+  for (const [k, v] of Object.entries(legacyWon(y))) won[k] = Math.max(won[k] || 0, v);
+  let ball;
+  if (x.ball.d && x.ball.d === y.ball.d) ball = { d: x.ball.d, r: ridsOf([...x.ball.r, ...y.ball.r]), f: Math.max(x.ball.f, y.ball.f) };
+  else { const w = x.ball.d > y.ball.d ? x.ball : y.ball; ball = { d: w.d, r: [...w.r], f: w.f }; }
+  return { lv, day: daysOf(day), first: { d: first.d, r: { ...first.r } }, sets: Math.max(x.sets, y.sets), solved: Math.max(x.solved, y.solved), ball, won: daysOf(won) };
 }
-/** 오늘 보상 줄 (순수) — 그날 받은 값 0·1·2 */
-export function puzzleTodayLine(got) {
-  if (got >= 2) return '오늘의 퍼즐 끝 ✅ 🔷까지 받았어요 — 더 풀어도 단계는 올라가요';
-  if (got === 1) return '오늘의 퍼즐 끝 ✅ — 더 풀어도 단계는 올라가요';
-  return `처음 끝내면 💰${REWARD.coin} · 🎯 포켓몬 잡기 ${REWARD.throws}번 · 셋 다 한 번에 맞히면 🔷 수학스톤`;
+/**
+ * 오늘 보상 줄 (순수) — got 그날 받은 값 0·1·2 · prize 오늘 🎯 { won 받음, left 아직 기회 } (v421 — puzzlePrizeOf) · 셈 문구 없음
+ */
+export function puzzleTodayLine(got, prize = { won: false, left: true }) {
+  const ball = prize && prize.won ? '' : prize && prize.left ? '한 번에 많이 맞히면 🎯' : '🎯는 내일 또 기회가 있어요';
+  if (got >= 1) return `오늘의 퍼즐 끝 ✅${got >= 2 ? ' 🔷까지 받았어요' : ''} — ${ball || '더 풀어도 단계는 올라가요'}`;
+  return `끝내면 💰${REWARD.coin}${ball ? ` · ${ball}` : ''} · 셋 다 한 번에 맞히면 🔷 수학스톤`;
 }
-/** 📤 수학 요약 줄 (순수) — 단계 · 끝낸 판 · 맞힌 퍼즐 · 최근 7일 퍼즐 한 날 */
+/** 📤 수학 요약 줄 (순수) — 단계 · 끝낸 판 · 맞힌 퍼즐 · 최근 7일 퍼즐 한 날 · 🎯 받은 날(v421) */
 export function puzzleReport(raw, todayKey) {
   const s = puzzleOf(raw);
   const lvs = KIND_LIST.map((k) => `${KINDS[k].icon} ${KINDS[k].ko} ${s.lv[k]}단계`).join(' · ');
   const t = Date.parse(`${todayKey}T00:00:00Z`);
-  const week = Number.isFinite(t) ? Object.keys(s.day).filter((d) => { const x = Date.parse(`${d}T00:00:00Z`); return x <= t && t - x < 7 * 86400000; }).length : 0;
-  return `🧩 수학 퍼즐 — ${lvs} · 끝낸 판 ${s.sets} · 맞힌 퍼즐 ${s.solved} · 최근 7일 퍼즐 한 날 ${week}`;
+  const inWeek = (days) => (Number.isFinite(t) ? Object.keys(days).filter((d) => { const x = Date.parse(`${d}T00:00:00Z`); return x <= t && t - x < 7 * 86400000; }).length : 0);
+  return `🧩 수학 퍼즐 — ${lvs} · 끝낸 판 ${s.sets} · 맞힌 퍼즐 ${s.solved} · 최근 7일 퍼즐 한 날 ${inWeek(s.day)} · 그중 🎯 받은 날 ${inWeek(s.won)}(v421부터 — 한 번에 많이 맞힌 판)`;
 }
