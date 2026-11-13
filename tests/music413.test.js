@@ -7,7 +7,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  TAPS_PER_MON, TAP_SLOT_DAY, TAP_DAY, COIN, BEAT, STALL, GRADE_DAILY, PIANO_DAILY, MONS_AT_ONCE,
+  TAPS_PER_MON, TAP_DAY, COIN, BEAT, STALL, GRADE_DAILY, PIANO_DAILY, MONS_AT_ONCE,
   tapRule, listenRule, monsDueRule, pianoOf, copyPiano, mergePiano, slotsOf, todayOf, dayKeyOf, stepPoint, beatScore, beatGrade, pianoDayLine, pianoMd,
 } from '../js/piano.js';
 import { SUBJECTS } from '../js/home.js';
@@ -26,7 +26,7 @@ const rng0 = () => 0;
 // ───────────────────── ① 🎹 건반 칸 (순수) ─────────────────────
 
 test('🎹 건반 칸 — 「곡 전체」를 잘 친 판만 · 한 줄 연습·잘 못 친 판은 안 셈 · 💰 한도와 따로 · 하루 열 칸 · 열 칸이면 음악 포켓몬', () => {
-  assert.deepEqual([TAPS_PER_MON, TAP_SLOT_DAY], [10, 10]);
+  assert.equal(TAPS_PER_MON, 10);
   const p = { coins: 0, coinsEarned: 0 };
   const line = tapRule(p, { ...REQ, line: 0, ok: 9, bad: 1 }, NOW, POOL, rng0);
   assert.deepEqual([line.slot, line.coins, line.taps], ['line', COIN.line, 0], '한 줄 연습은 💰만');
@@ -34,18 +34,19 @@ test('🎹 건반 칸 — 「곡 전체」를 잘 친 판만 · 한 줄 연습·
   assert.deepEqual([miss.slot, miss.coins, miss.why, miss.taps], ['try', 0, 'try', 0], '맞게 70% 아래는 칸도 💰도 없음');
   const r = [];
   for (let i = 0; i < 11; i += 1) r.push(tapRule(p, { ...REQ, ok: 9, bad: 1 }, NOW, POOL, rng0));
-  assert.deepEqual(r.map((x) => x.slot), [...Array(10).fill('ok'), 'cap'], '하루 열 칸 · 열하나째는 cap');
+  assert.deepEqual(r.map((x) => x.slot), [...Array(10).fill('ok'), 'cap'], '같은 곡 열 번 연달아 · 열하나째는 cap(하루 한 마리 — v420)');
   assert.deepEqual(r.map((x) => x.coins), [15, 15, 15, 15, 0, 0, 0, 0, 0, 0, 0], `💰는 하루 ${TAP_DAY}번 (한 줄 판 하나 포함) — 칸과 따로`);
   assert.deepEqual(r.map((x) => x.got.length), [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], '열째 칸에 한 마리');
   assert.deepEqual([r[9].got[0], r[9].firsts[0], r[9].taps, r[9].tapMons], [433, true, 10, 1], '안 만난 아이 가운데 무게대로 · 받은 수 +1');
+  assert.deepEqual(r.slice(0, 9).map((x) => x.taps), Array(9).fill(0), 'v420 — 모든 칸은 열 번을 채운 때 열 묶음째로');
   assert.equal(p.caught[433], 1, '도감에 들어감');
-  assert.deepEqual(todayOf(p, NOW), { paid: 5, coins: 65, notes: 0, taps: 10 });
+  assert.deepEqual(todayOf(p, NOW), { paid: 5, coins: 65, notes: 0, taps: 10, run: { s: 'ode', n: 10, at: NOW }, won: 1 });
   const log = pianoOf(p.piano).log;
   assert.deepEqual(log.filter((x) => x.m === 't').map((x) => x.x), [0, 0, ...Array(10).fill(1), 0], '기록 줄 x = 건반 칸을 셌나');
   assert.equal(log.filter((x) => x.m === 'p').length, 1, '온 줄');
-  // 다음 날은 다시 · 다음 열 칸에 또
+  // 다음 날은 처음부터 (v420 — 그날 연달아 한 칸)
   const next = tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW + DAY, POOL, rng0);
-  assert.deepEqual([next.slot, next.taps, next.tapMons, next.got.length], ['ok', 11, 1, 0]);
+  assert.deepEqual([next.slot, next.taps, next.tapMons, next.got.length, next.run], ['ok', 10, 1, 0, { s: 'ode', n: 1, at: NOW + DAY }]);
   // 시계가 뒤로 가면 아무것도 안 셈
   assert.deepEqual(tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW - 3 * DAY, POOL, rng0), { ok: false, why: 'clock' });
 });
@@ -57,8 +58,9 @@ test('🎹 건반 칸 저장 — 받은 수는 묶음 수보다 클 수 없다 �
   // Codex 217차 P2 — 읽을 때 하루 칸(열)으로 자르면 한도를 바꾼 뒤 옛 창이 깎아 저장해 같은 날 칸이 다시 열린다 (💰 PAID_KEEP과 같은 꼴)
   assert.equal(pianoOf({ days: { [today]: { paid: 0, coins: 0, notes: 0, taps: 12 } } }).days[today].taps, 12, '날 칸은 줄이지 않는다');
   assert.equal(pianoOf({ days: { [today]: { paid: 0, coins: 0, notes: 0, taps: 400 } } }).days[today].taps, 99, '터무니없는 수만 막는다');
+  // v420 — 옛 규칙으로 칸이 찬 날도 새 규칙은 0부터(연달아 한 칸) · 날 칸은 그대로(열 번을 채우기 전엔 안 늚)
   const over = { coins: 0, coinsEarned: 0, piano: { taps: 12, tapMons: 1, days: { [today]: { paid: 0, coins: 0, notes: 0, taps: 12 } } } };
-  assert.deepEqual([tapRule(over, { ...REQ, ok: 9, bad: 1 }, NOW, POOL, rng0).slot, todayOf(over, NOW).taps], ['cap', 12], `열(${TAP_SLOT_DAY}) 넘게 찬 날은 cap · 날 칸 그대로`);
+  assert.deepEqual([tapRule(over, { ...REQ, ok: 9, bad: 1 }, NOW, POOL, rng0).slot, todayOf(over, NOW).taps, todayOf(over, NOW).run], ['ok', 12, { s: 'ode', n: 1, at: NOW }], '옛 날 칸 그대로 · 새 규칙은 한 칸부터');
   assert.equal(pianoOf({ days: { [today]: { paid: 0, coins: 0, notes: 0, taps: 7 } } }).taps, 7, '모든 칸은 날 칸 합보다 작을 수 없다');
   assert.deepEqual(pianoOf({ days: { [today]: { paid: 1, coins: 5, notes: 0 } } }).days[today], { paid: 1, coins: 5, notes: 0 }, '칸이 없는 날은 옛 꼴 그대로');
   const m = mergePiano({ taps: 12, tapMons: 1, days: { [today]: { paid: 1, coins: 5, notes: 0, taps: 2 } } }, { taps: 8, tapMons: 0, days: { [today]: { paid: 2, coins: 10, notes: 1, taps: 1 } } });
@@ -120,10 +122,11 @@ test('📤 하루 줄 — 건반 칸 · 박자 🎉👏🎺 · 화면 멈칫(멈
   tapRule(p, { ...REQ, ok: 9, bad: 1, g: 85, st: 3210 }, NOW, POOL, rng0);
   tapRule(p, { ...REQ, line: 0, ok: 6, bad: 4, g: 95 }, NOW, POOL, rng0);
   const md = pianoMd(p.piano, '2026-11-10');
-  assert.match(md, /- 🎹 건반 칸\(v413\) = 🎹 태블릿 치기로 「곡 전체」를 잘\(맞게 70% 넘게\) 끝까지 친 판 · 하루 10칸까지 · 10칸마다 🐾 음악 포켓몬 한 마리/);
+  assert.match(md, /- 🎹 건반 칸\(v413\) = 🎹 태블릿 치기로 「곡 전체」를 잘\(맞게 70% 넘게\) 끝까지 친 판 — 줄 끝 「🎹 칸」 · v420부터 \*\*한 곡을 하루에 10번 연달아\*\* 쳐야 🐾 음악 포켓몬 한 마리/);
   assert.match(md, /- 박자\(v413\) = .*🎉 빵빠레 80점 이상 · 👏 짝짝 50점 이상 · 🎺 뿌우~ 그 아래/);
   assert.match(md, /- 멈칫\(v413\) = 그 판 동안 화면이 1초 넘게 멈춘 가장 긴 시간/);
-  assert.match(md, /\n🎹 건반 칸 모두 1 \(열 칸 묶음 0 · 온 음악 포켓몬 0\)\n/);
+  assert.doesNotMatch(md, /\n🎹 건반 칸 모두/, 'v420 — 열 번을 채우기 전엔 모든 칸이 안 늚');
+  assert.match(md, /\n🎹 연달아\(v420 — 날마다 마지막 곡\) 11-10 「ode」 1\/10\n/, '오늘 연달아 줄');
   assert.match(md, /🎹 치기 · ode 곡 전체 · 오른손 · 도움 1 · 100% · 맞게 9\/10 \(90%\) · 💰15 · 🎹 칸 · 박자 85점 🎉 · 멈칫 3\.2초\n/);
   assert.match(md, /🎹 치기 · ode 1째 줄 · 오른손 · 도움 1 · 100% · 맞게 6\/10 \(60%\) · 박자 95점 🎺\n/, '잘 못 친 판은 점수가 높아도 🎺');
   assert.doesNotMatch(pianoMd({ notes: 1 }, '2026-11-10'), /🎹 건반 칸 모두/, '칸이 없으면 그 줄 없음');
@@ -135,7 +138,7 @@ test('🔌 잇기 — 홈 카드 · xp 한 트랜잭션 · 안내 판 · CSS · 
   assert.equal(SUBJECTS.find((s) => s.key === 'music').desc, '🐾 끝까지 치면 음악 포켓몬!');
   assert.match(src('js/xp.js'), /pianoTapRule\(p, req, Date\.now\(\), musicPool\(p\), Math\.random\)/);
   const v = src('js/pianoview.js');
-  assert.match(v, /const INTRO_VER = '2';/);
+  assert.match(v, /const INTRO_VER = '3';/); // v420 — 새 규칙으로 한 번 더
   const css = src('css/style.css');
   for (const s of ['.pn-tkeys {', '.pn-tkeys span.on {', '.pn-intro-way {', '.pn-toast .pn-tkeys span {', '.pn-toast.is-high { top: 22%; }']) assert.ok(css.includes(s), s);
   assert.match(css, /\.pn-intro-card \{ max-height: calc\(100vh - 32px\); max-height: calc\(100dvh - 32px\); overflow-y: auto; \}/, '안내 창이 길어져도 낮은 화면에서 내려 본다');
@@ -234,7 +237,7 @@ globalThis.localStorage = {
   removeItem: (k) => { store.delete(k); },
 };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
-store.set('shincoach.musicIntro', '2');
+store.set('shincoach.musicIntro', '3');
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(cond, what, ms = 4000) {
   const t0 = Date.now();
@@ -464,9 +467,10 @@ test('① 화면 — 🎹 치기 칸은 건반 열 · 곡 전체를 잘 치면 �
   const d0 = await daily();
   byId('pn-go').click();
   playTimed(0);
-  await waitFor(() => piano().taps === 1, '한 칸');
+  const runN = () => { const e = piano().days[clockDay()]; return e && e.run ? e.run.n : 0; }; // v420 — 오늘 연달아
+  await waitFor(() => runN() === 1, '한 칸');
   await settle(30);
-  assert.match(byId('pn-slots').innerHTML, /^<span class="pn-tkeys"><span class="on"><\/span>(<span class=""><\/span>){9}<\/span>/, '건반 하나가 빛남');
+  assert.match(byId('pn-slots').innerHTML, /^<span class="pn-run-song">🎹 [^<]+<\/span><span class="pn-tkeys"><span class="on"><\/span>(<span class=""><\/span>){9}<\/span>/, '건반 하나가 빛남 · 칸 옆에 곡 이름(v420)');
   assert.match(byId('pn-toast').innerHTML, /<span class="pn-tkeys"><span class="on"><\/span>/, '알림에도 칸 그림');
   assert.equal(byId('pn-toast').className, 'pn-toast is-high', '효과가 떠 있으면 알림은 위로 — 효과 띠를 가리지 않게');
   assert.doesNotMatch(byId('pn-toast').innerHTML.replace(/💰 \+\d+/, ''), /\d/, '칸 수는 글로 안 쓴다');
@@ -476,25 +480,25 @@ test('① 화면 — 🎹 치기 칸은 건반 열 · 곡 전체를 잘 치면 �
   byId('pn-go').click();
   playTimed(0);
   await waitFor(() => /「곡 전체」를 끝까지 치면 🎹 건반 칸이 차요/.test(byId('pn-toast').innerHTML), '한 줄 연습 안내');
-  assert.equal(piano().taps, 1, '한 줄은 안 셈');
-  // 아홉 칸이 찬 날 — 열째 판에 음악 포켓몬
-  await setPiano({ taps: 9, tapMons: 0, days: { [clockDay()]: { paid: 0, coins: 0, notes: 0, taps: 9 } } });
+  assert.equal(runN(), 1, '한 줄은 안 셈·안 끊음');
+  // 같은 곡을 아홉 번 연달아 친 날 — 열째 판에 음악 포켓몬 (v420)
+  await setPiano({ taps: 0, tapMons: 0, days: { [clockDay()]: { paid: 0, coins: 0, notes: 0, run: { s: 'ode', n: 9 } } } });
   stage();
-  assert.match(byId('pn-slots').innerHTML, /^<span class="pn-tkeys">(<span class="on"><\/span>){9}<span class=""><\/span><\/span>/);
+  assert.match(byId('pn-slots').innerHTML, /^<span class="pn-run-song">🎹 [^<]+<\/span><span class="pn-tkeys">(<span class="on"><\/span>){9}<span class=""><\/span><\/span>/);
   const m0 = num((await daily()).pnMons);
   byId('pn-go').click();
   playTimed(0);
   await waitFor(() => byId('pn-arrive'), '온 창');
   assert.match(byId('pn-arrive').textContent, /🎵 (새 음악 포켓몬이 왔어요!|음악 포켓몬이 또 놀러 왔어요!)/);
   assert.deepEqual([piano().taps, piano().tapMons], [10, 1]);
-  assert.match(byId('pn-slots').innerHTML, /^<span class="pn-tkeys">(<span class=""><\/span>){10}<\/span>/, '온 뒤엔 다시 0부터');
+  assert.match(byId('pn-slots').innerHTML, /<span class="pn-tkeys">(<span class="on"><\/span>){10}<\/span>/, '오늘 받았으면 가득(하루 한 마리 · v420)');
   await waitFor(async () => num((await daily()).pnMons) === m0 + 1, '하루 칸 온 수');
   button('좋아요!').click();
-  // 하루 열 칸이 다 찼다
+  // 오늘은 받았다 — 더 쳐도 💰만
   stage();
   byId('pn-go').click();
   playTimed(0);
-  await waitFor(() => /오늘 🎹 건반 칸은 다 채웠어요/.test(byId('pn-toast').innerHTML), '하루 열 칸');
+  await waitFor(() => /오늘 음악 포켓몬은 만났어요/.test(byId('pn-toast').innerHTML), '하루 한 마리');
   assert.equal(piano().taps, 10);
 });
 
@@ -510,7 +514,7 @@ test('① 들어올 때 밀린 건반 몫도 — 저장이 실패해 못 받은 
 // ───────────────────── Codex 217차 ─────────────────────
 
 test('Codex 217차 P2 — 🔁 계속으로 치다 열째 칸 — 온 창이 뜨면 ⏸ · 창 뒤에서 다음 판이 흐르지 않는다 · 닫고 ▶로 이어', async () => {
-  await setPiano({ taps: 9, tapMons: 0, days: { [clockDay()]: { paid: 0, coins: 0, notes: 0, taps: 9 } } });
+  await setPiano({ taps: 0, tapMons: 0, days: { [clockDay()]: { paid: 0, coins: 0, notes: 0, run: { s: 'ode', n: 9 } } } }); // v420 — 같은 곡 아홉 번 연달아
   stage({ loop: '🔁 계속' });
   byId('pn-go').click();
   playTimed(0);

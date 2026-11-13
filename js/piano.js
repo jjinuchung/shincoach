@@ -8,7 +8,7 @@
 //      → 다섯 칸(NOTES_PER_MON)마다 🎹 음악 포켓몬 한 마리가 온다(v404 기본안 「이대로」 — 잡기 없음 · 아직 안 만난 것 가운데 MON_WEIGHT대로 ·
 //        다 만났으면 만난 것 가운데 또) · 칸은 v402부터 셌다 — 그때 찬 칸 몫은 음악 화면에 처음 들어올 때(monsDueRule) 온다
 //   (v413 아버님 11-10 「태블릿으로 쳐도 곡을 10번 완주하면 포켓몬」 → 기본안 「추천대로」) 🎹 태블릿으로 치기도 「곡 전체」를 잘(goodPass) 끝까지 친 판이
-//      🎹 건반 한 칸(하루 TAP_SLOT_DAY칸까지) · 열 칸(TAPS_PER_MON)마다 음악 포켓몬 — ♪ 칸과 따로 센다(taps · tapMons) ·
+//      🎹 건반 한 칸 · 열 칸(TAPS_PER_MON)마다 음악 포켓몬 — ♪ 칸과 따로 센다(taps · tapMons) · v420부터 한 곡을 하루에 열 번 연달아(날 칸 run · won) ·
 //      끝날 때 박자 판정(beatScore — 음표마다 제때 눌렀나 × 맞게 누른 비율) → 🎉 빵빠레 · 👏 짝짝 · 🎺 뿌우~ (진우 바람 · 보상과는 상관없음)
 // 도움은 잠그지 않는다 — 네 단계(1 막대 · 2 계이름 · 3 건반 빛 · 4 악보만)를 처음부터 고르고, 끝나면 한 단계 걷기를 권하기만.
 // ⏳ 하루 40분은 음악만 따로(timelimit.js 'music') — 🎮 게임기 판을 세는 공부 시간(timelimit.SUBJECTS)에는 넣지 않는다.
@@ -35,10 +35,14 @@ const PAID_KEEP = 99;
 export const LISTEN_DAY = 3;
 /** 음표 칸 다섯마다 음악 포켓몬 (v404) */
 export const NOTES_PER_MON = 5;
-/** 🎹 건반 칸 열마다 음악 포켓몬 (v413 아버님 「곡을 10번 완주하면」) · 하루 셀 칸 — 태블릿으로는 하루 한 마리까지 */
+/**
+ * 🎹 건반 칸 — 한 곡을 하루에 이만큼 연달아 「곡 전체」를 잘 치면 음악 포켓몬 한 마리 (v413 아버님 「곡을 10번 완주하면」 →
+ * v420 11-12 아버님 「하루에 한 곡을 연달아서 10번을 완주해서 치지 않으면 포켓몬을 주지 않는 걸로」 기본안 「추천대로」) ·
+ * 다른 곡을 잘 끝까지 치면 처음부터 · 못 친 판·한 줄 연습은 안 셈·안 끊음 · 자정이면 처음부터 · 하루 한 마리
+ */
 export const TAPS_PER_MON = 10;
-export const TAP_SLOT_DAY = 10;
-/** 그날 🎹 건반 칸을 읽을 때의 상한 — 하루 칸(TAP_SLOT_DAY)으로 자르지 않는다: PAID_KEEP과 같은 까닭 (Codex 217차 P2) */
+const SONG_RE = /^[a-z0-9_-]{1,40}$/i;
+/** 그날 🎹 건반 칸을 읽을 때의 상한 — 하루 몫으로 자르지 않는다: PAID_KEEP과 같은 까닭 (Codex 217차 P2) */
 const TAPS_KEEP = 99;
 /** 🎹 음악 포켓몬 한 마리마다의 무게 — 흔함 4 · 보통 3 · 희귀 2 · 전설 1 (v404 기본안 ② · 흔한 아이가 자주, 전설은 대개 뒤쪽에) */
 export const MON_WEIGHT = { 1: 4, 2: 3, 3: 2, 4: 1 };
@@ -553,9 +557,10 @@ export function pianoOf(raw) {
   const kept = Object.entries(ds).filter(([k, e]) => DAY_RE.test(k) && isObj(e))
     .map(([k, e]) => {
       const t = Math.min(TAPS_KEEP, nz(e.taps));
-      return [k, { paid: Math.min(PAID_KEEP, nz(e.paid)), coins: nz(e.coins), notes: Math.min(LISTEN_DAY, nz(e.notes)), ...(t ? { taps: t } : {}) }];
+      const run = runOf(e.run);
+      return [k, { paid: Math.min(PAID_KEEP, nz(e.paid)), coins: nz(e.coins), notes: Math.min(LISTEN_DAY, nz(e.notes)), ...(t ? { taps: t } : {}), ...(run ? { run } : {}), ...(e.won ? { won: 1 } : {}) }];
     })
-    .filter(([, e]) => e.paid || e.coins || e.notes || e.taps)
+    .filter(([, e]) => e.paid || e.coins || e.notes || e.taps || e.run || e.won)
     .sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, KEEP_DAYS);
   const days = Object.fromEntries(kept);
   const dayNotes = kept.reduce((a, [, e]) => a + e.notes, 0);
@@ -565,10 +570,37 @@ export function pianoOf(raw) {
   return { days, notes, mons: Math.min(nz(src.mons), Math.floor(notes / NOTES_PER_MON)), taps, tapMons: Math.min(nz(src.tapMons), Math.floor(taps / TAPS_PER_MON)), log };
 }
 
+/**
+ * 🎹 연주 중(메뉴를 접은 때) 건반 높이 (v420 · 순수) — H = 그림판 높이 · keysH0 = 접기 전 비율의 건반 높이 · up0 = 접기 전 위쪽(악보·막대) 높이 ·
+ * 위쪽은 접기 전 높이 그대로, 남는 높이는 건반 · 접기 전 비율보다 작지 않게 · 그림판의 60%까지 · up0을 모르면 keysH0
+ */
+export function playKeysH(H, keysH0, up0) {
+  return up0 > 0 ? Math.round(Math.min(H * 0.6, Math.max(keysH0, H - up0))) : keysH0;
+}
+
+/** 그날 🎹 연달아 (v420) — { s: 곡, n: 1~TAPS_PER_MON } · 이상하면 null */
+function runOf(r) {
+  const n = isObj(r) ? Math.floor(Number(r.n)) : 0;
+  const at = isObj(r) ? nz(r.at) : 0; // 마지막으로 센 때 (Codex 223차 P2-1 — 병합은 나중 기록)
+  return isObj(r) && SONG_RE.test(String(r.s || '')) && n >= 1 && n <= TAPS_PER_MON ? { s: String(r.s), n, ...(at ? { at } : {}) } : null;
+}
+/**
+ * 두 기록의 그날 연달아 중 나중에 센 쪽 (병합) — 횟수가 큰 쪽을 고르면 옛 백업이 이미 끊긴 연달아(다른 곡을 치기 전 아홉 번)를 되살렸다 (Codex 223차 P2-1) ·
+ * 센 때가 같거나 없으면 더 간 쪽 · 그래도 같으면 앞
+ */
+const laterRun = (a, b) => {
+  if (!a) return b || null;
+  if (!b) return a;
+  const ta = nz(a.at);
+  const tb = nz(b.at);
+  if (ta !== tb) return tb > ta ? b : a;
+  return b.n > a.n ? b : a;
+};
+
 /** 깊은 복사 (xp·db fromStored) */
 export function copyPiano(raw) {
   const p = pianoOf(raw);
-  return { days: Object.fromEntries(Object.entries(p.days).map(([k, e]) => [k, { ...e }])), notes: p.notes, mons: p.mons, taps: p.taps, tapMons: p.tapMons, log: p.log.map((r) => ({ ...r })) };
+  return { days: Object.fromEntries(Object.entries(p.days).map(([k, e]) => [k, { ...e }])), notes: p.notes, mons: p.mons, taps: p.taps, tapMons: p.tapMons, log: p.log.map((r) => ({ ...r })) }; // run은 pianoOf가 새로 만든다(runOf)
 }
 
 /**
@@ -584,7 +616,8 @@ export function mergePiano(a, b) {
   for (const [k, e] of Object.entries(y.days)) {
     const o = days[k];
     const t = o ? Math.max(nz(o.taps), nz(e.taps)) : 0;
-    days[k] = o ? { paid: Math.max(o.paid, e.paid), coins: Math.max(o.coins, e.coins), notes: Math.max(o.notes, e.notes), ...(t ? { taps: t } : {}) } : { ...e };
+    const run = o ? laterRun(o.run, e.run) : null; // 🎹 연달아는 나중에 센 쪽 · 받은 날은 OR (v420 · Codex 223차 P2-1)
+    days[k] = o ? { paid: Math.max(o.paid, e.paid), coins: Math.max(o.coins, e.coins), notes: Math.max(o.notes, e.notes), ...(t ? { taps: t } : {}), ...(run ? { run } : {}), ...(o.won || e.won ? { won: 1 } : {}) } : { ...e };
   }
   const seen = new Map();
   for (const r of [...x.log, ...y.log]) seen.set(`${r.at}:${r.m}:${r.s}`, r);
@@ -671,8 +704,10 @@ function clockBack(tr, today) {
  * 🎹 태블릿으로 치기 한 판 끝 (순수 — xp.houseDo 안에서 저장된 프로필로) → { ok, coins, good, slot, taps, tapMons, got, firsts, why? }
  * req = { song, line(-1 곡 전체), hand, lv, sp, ok(맞게 누른 수), bad(틀리게 누른 수), g?(박자 점수 0~100 · v413), st?(가장 긴 화면 멈칫 ms · v413), mu?(가장 긴 소리 멎음 ms · v414) }
  * 잘 쳤고(goodPass) 오늘 TAP_DAY번 안이면 💰(coins·coinsEarned 함께) · 아니면 기록만(why 'try' | 'cap')
- * (v413) 🎹 건반 칸 — slot: 'ok'(셈) · 'try'(잘 치지 못함) · 'line'(한 줄 연습 — 「곡 전체」만 센다) · 'cap'(오늘 TAP_SLOT_DAY칸 다 참) ·
- *   💰 한도와 따로 · 열 칸 묶음이 차면 음악 포켓몬이 같은 트랜잭션에서 온다(pool · rng — got)
+ * (v413) 🎹 건반 칸 — slot: 'ok'(셈) · 'try'(잘 치지 못함) · 'line'(한 줄 연습 — 「곡 전체」만 센다) · 'cap'(오늘 음악 포켓몬을 이미 받음) ·
+ *   💰 한도와 따로 · (v420) 그날 한 곡을 연달아 — run { s, n }: 같은 곡이면 n+1 · 다른 곡을 잘 끝까지 치면 그 곡으로 1부터(restart) ·
+ *   n이 TAPS_PER_MON이 되면 won · 모든 칸(tr.taps)·날 칸(taps)은 열 묶음째로 늘어 음악 포켓몬이 같은 트랜잭션에서 온다(pool · rng — got) ·
+ *   못 친 판·한 줄 연습은 run을 건드리지 않는다
  */
 export function tapRule(p, req, now, pool = [], rng = Math.random) {
   if (!reqOk(req) || !Number.isFinite(Number(req.ok)) || !Number.isFinite(Number(req.bad))) return { ok: false, why: 'bad' };
@@ -692,10 +727,17 @@ export function tapRule(p, req, now, pool = [], rng = Math.random) {
     p.coins = nz(p.coins) + coins;
     p.coinsEarned = nz(p.coinsEarned) + coins; // 낚시(fishing.catchRule)와 같이 — 번 💰는 함께 오른다
   }
-  const slot = !good ? 'try' : req.line >= 0 ? 'line' : nz(day.taps) >= TAP_SLOT_DAY ? 'cap' : 'ok';
+  const slot = !good ? 'try' : req.line >= 0 ? 'line' : day.won ? 'cap' : 'ok';
+  const restart = slot === 'ok' && !!day.run && day.run.s !== req.song;
   if (slot === 'ok') {
-    next.taps = nz(day.taps) + 1;
-    tr.taps += 1;
+    const n = Math.min(TAPS_PER_MON, (day.run && day.run.s === req.song ? day.run.n : 0) + 1);
+    next.run = { s: req.song, n, at: nz(now) };
+    if (n >= TAPS_PER_MON) {
+      // 열 번 연달아 — 열 칸 묶음 하나(옛 판 칸이 남아 있어도 묶음 하나만 더해 한 마리 · 날 칸 합이 모든 칸을 넘지 않게 날 칸도 열째로)
+      next.won = 1;
+      next.taps = nz(day.taps) + TAPS_PER_MON;
+      tr.taps += TAPS_PER_MON;
+    }
   }
   if (coins || slot === 'ok') tr.days[today] = next;
   const g = Number(req.g);
@@ -703,7 +745,8 @@ export function tapRule(p, req, now, pool = [], rng = Math.random) {
     ...(Number.isInteger(g) ? { g } : {}), st: req.st, mu: req.mu });
   const { got, firsts } = giveMons(p, tr, pool, rng, now);
   p.piano = tr;
-  return { ok: true, coins, good, slot, taps: tr.taps, tapMons: tr.tapMons, got, firsts, ...(why ? { why } : {}) };
+  const run = runOf(next.run || day.run);
+  return { ok: true, coins, good, slot, run, won: !!(next.won || day.won), restart, taps: tr.taps, tapMons: tr.tapMons, got, firsts, ...(why ? { why } : {}) };
 }
 
 /**
@@ -781,18 +824,23 @@ export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (i
   const midiLine = midi ? `🎹 집 피아노 연결 확인 (${dayKeyOf(midi.at)}): ${midi.ok ? `잡힘 — ${String(midi.name || '이름 없음').slice(0, 60)}${midi.note ? ` · 마지막에 누른 건반 ${String(midi.note).slice(0, 12)}` : ' · 건반 신호는 아직 못 받음'}` : `안 됨 — ${String(midi.why || '').slice(0, 80)}`}` : '';
   const sl = slotsOf(tr.notes);
   const tk = slotsOf(tr.taps, null, TAPS_PER_MON);
+  // 🎹 연달아 (v420) — 늦은 날부터 일주일 · 「곡」 n/10 · 받은 날 🐾
+  // 오늘부터 7일 안(쉰 날이 있어도 더 옛날은 안 씀 · Codex 223차 P3)
+  const week = DAY_RE.test(String(today)) ? (() => { const d = new Date(`${today}T12:00:00`); d.setDate(d.getDate() - 6); return dayKeyOf(d.getTime()); })() : '';
+  const runs = Object.entries(tr.days).filter(([k, e]) => e.run && (!week || (k >= week && k <= today))).map(([k, e]) => `${k.slice(5)} 「${nameOf(e.run.s)}」 ${e.run.n}/${TAPS_PER_MON}${e.won ? ' 🐾' : ''}`);
   const HAND = { R: '오른손', L: '왼손', B: '양손' };
   const hm = (t) => { const d = new Date(t); return `${dayKeyOf(t).slice(5)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const lines = [`🎹 음악 연습 기록 (${today}) — v402부터`, '', '## 읽는 법',
     `- 🎹 태블릿 치기 = 화면 건반으로 끝까지 친 판 · 맞게/틀리게 누른 수(맞는 건반을 기다리는 동안 다른 건반) · 맞게 누른 비율 70% 넘고 하루 ${TAP_DAY}번 안이면(곡 상관없이 · v406까지 3번) 💰(한 줄 5 · 곡 전체 15)`,
     '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「✋ 피아노로 다 쳤어요」(v404까지 「다 쳤어요 ✋」)를 누른 것 — 진짜로 쳤는지는 앱이 모른다(피아노 연결 전)(누른 때와 ⏳ 음악 시간으로 보기) · v417부터는 누른 뒤 아빠·엄마가 부모 비밀번호로 확인한 것만 이 줄에 남는다 · 하루 세 칸까지 음표 칸 · 다섯 칸마다 🐾 음악 포켓몬 한 마리가 옴(v404)',
-    `- 🎹 건반 칸(v413) = 🎹 태블릿 치기로 「곡 전체」를 잘(맞게 70% 넘게) 끝까지 친 판 · 하루 ${TAP_SLOT_DAY}칸까지 · ${TAPS_PER_MON}칸마다 🐾 음악 포켓몬 한 마리(💰 한도와 따로 · 한 줄 연습은 안 셈) — 줄 끝 「🎹 칸」`,
+    `- 🎹 건반 칸(v413) = 🎹 태블릿 치기로 「곡 전체」를 잘(맞게 70% 넘게) 끝까지 친 판 — 줄 끝 「🎹 칸」 · v420부터 **한 곡을 하루에 ${TAPS_PER_MON}번 연달아** 쳐야 🐾 음악 포켓몬 한 마리(다른 곡을 잘 끝까지 치면 처음부터 · 못 친 판·한 줄 연습은 안 셈·안 끊음 · 자정이면 처음부터 · 하루 한 마리 · 💰 한도와 따로 — 「🎹 연달아」 줄) · v419까지는 곡 섞기·날 넘김도 이어 열 칸마다`,
     `- 박자(v413) = 판 끝 판정 점수 — 음표마다 제때 눌렀나(막대가 닿기 전 ${BEAT.early}박 안 · 닿은 뒤 기다리게 한 게 ${BEAT.late}박 안이면 한 점 · ${BEAT.lateHalf}박 안이면 반 점) 평균 × 맞게 누른 비율 → 🎉 빵빠레 ${BEAT.great}점 이상 · 👏 짝짝 ${BEAT.good}점 이상 · 🎺 뿌우~ 그 아래(맞게 70% 아래도) — 아이 화면엔 점수 없이 소리·그림만 · 보상과 상관없음`,
     `- 멈칫(v413) = 그 판 동안 화면이 ${STALL.ms / 1000}초 넘게 멈춘 가장 긴 시간(태블릿이 버거워 멈춘 것 — 아이가 ⏸로 멈춘 것은 안 셈)`,
     `- 소리 멎음(v414) = 그 판 동안 화면은 도는데 소리 엔진 시계가 ${MUTE.ms / 1000}초 넘게 안 간 가장 긴 시간(앱이 소리를 끈 것이 아님 — 태블릿·브라우저 쪽)`,
     '- 줄 = 책의 한 줄(그 곡 원고의 lines) · 도움 1 막대·계이름·건반 빛 → 2 막대 없이 → 3 계이름도 없이 → 4 악보만 · 빠르기 = 원래 빠르기의 %',
     '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets} · 온 음악 포켓몬 ${tr.mons}${sl.sets > tr.mons ? ` · 아직 안 온 몫 ${sl.sets - tr.mons} — 음악 화면에 들어오면 옴` : ''})`,
     ...(tr.taps || tr.tapMons ? [`🎹 건반 칸 모두 ${tr.taps} (열 칸 묶음 ${tk.sets} · 온 음악 포켓몬 ${tr.tapMons}${tk.sets > tr.tapMons ? ` · 아직 안 온 몫 ${tk.sets - tr.tapMons} — 음악 화면에 들어오면 옴` : ''})`] : []),
+    ...(runs.length ? [`🎹 연달아(v420 — 날마다 마지막 곡) ${runs.join(' · ')}`] : []),
     '', '## 최근 연습 (새것부터)'];
   for (const r of [...tr.log].reverse()) {
     if (r.m === 'p') { lines.push(`- ${hm(r.at)} 🐾 음악 포켓몬이 옴 — ${monName(Number(r.s))}`); continue; }

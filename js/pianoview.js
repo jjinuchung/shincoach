@@ -20,9 +20,12 @@
 //   ③ 끝날 때 박자 판정(진우 바람) — 🎉 빵빠레·꽃가루 · 👏 짝짝 · 🎺 뿌우~ (소리는 Web Audio로 새로 지음 · 점수는 📤에만 · 보상과 상관없음)
 // 🎹 v414 (11-11 아버님 「추천대로」) — 「멈췄을 때 소리가 안 났다 · 누른 모양은 보였다」 → 화면은 돌았다 · 무엇이 멈췄나 가르는 📤 기록만(아이 화면·보상 그대로):
 //   🔇 소리 엔진 시계가 MUTE.ms 넘게 안 감(소리 장치가 꺼져 있었나도) · 🐢 화면 한 장이 SLOW.ms~STALL.ms · ✋ 건반을 누른 손가락을 가로챔(pointercancel)
+// 🎹 v420 (11-12 아버님 → 기본안 「추천대로」) — ① 음악 포켓몬은 한 곡을 하루에 열 번 연달아(piano.tapRule run) · 건반 칸은 오늘 그 곡 몫(그림 · 옆에 곡 이름) ·
+//   다른 곡으로 처음부터면 한 줄 · 🐾 안내 판 3(새 규칙) ② 🎹 태블릿으로 치기에서 ▶ 시작 → 앱 머리줄·메뉴 세 줄을 접고(#view-music.pn-playing) ·
+//   악보·막대는 그 높이 그대로 위로 · 남는 높이는 건반(G.up0) · 그림판 모서리 ⏸(#pn-pause) · 멈추거나 끝나면 돌아옴 · 🎧는 그대로
 import { setScene } from './blackbox.js';
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON,
-  TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL, MUTE, SLOW } from './piano.js';
+  TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL, MUTE, SLOW, dayKeyOf, playKeysH } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
 import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, rarityOf, RARITY } from './xp.js';
 import { ROSTER, ensureCast } from './pokemon.js'; // 🐾 음악 포켓몬 이름·그림 (v404)
@@ -51,6 +54,7 @@ const S = {
   pcDown: new Set(), // PC 자판으로 누르고 있는 건반 (Codex 213차)
   keyAt: -1e9, passStall: 0, fx: null, // v413 — 마지막으로 건반을 누른 때(위쪽 톡과 가르기) · 이 판의 가장 긴 화면 멈칫(ms) · 판 끝 박자 효과
   passMute: 0, acWatch: null, diag: { slowN: 0, slowMs: 0, cancel: 0 }, diagOwe: new Map(), // v414 — 이 판의 가장 긴 소리 멎음(ms) · 소리 시계 지켜보기 · 아직 안 쓴 🐢·✋ 셈 · 못 넣은 몫(날짜째)
+  folded: false, // v420 — 🎹 연주 중이라 메뉴를 접었나
 };
 /** 건반 바로 위 이만큼(px)은 건반으로 친다 — 건반 윗부분을 누르다 살짝 위로 빗나간 손가락 (v413) */
 const KEY_SLOP = 20;
@@ -320,19 +324,25 @@ function sendTap(req) {
     if (gen !== S.gen) return;
     if (!r || !r.ok) {
       S.retry = () => sendTap(req);
+      if (S.running) setRun(false); // 🔁 계속 — 다음 판이 이 판의 「다시 받기」를 지우지 않게 멈추고 메뉴를 펼친다 (v420 Codex 223차 P2-3)
       showRetry();
       toast('<b>저장이 안 됐어요</b>「🔁 다시 받기」를 눌러 주세요.', 3200);
       return;
     }
     if (got.length) return; // 🐾 온 포켓몬 창이 대신 말한다
-    // 🎹 건반 칸 한 줄 (v413) — 칸 수는 쓰지 않는다 · 잘 치지 못한 판은 「한 번 더」 말만
-    const slot = { ok: `<br>${keysHtml(slotsOf(r.taps, r.tapMons, TAPS_PER_MON).filled)}`, line: '<br>「곡 전체」를 끝까지 치면 🎹 건반 칸이 차요', cap: '<br>오늘 🎹 건반 칸은 다 채웠어요' }[r.slot] || '';
+    // 🎹 건반 칸 한 줄 (v413) — 칸 수는 쓰지 않는다 · 잘 치지 못한 판은 「한 번 더」 말만 · v420 — 오늘 그 곡 몫 · 다른 곡으로 처음부터면 한 줄
+    const slot = {
+      ok: `<br>${keysHtml(r.run ? r.run.n : 0)}${r.restart ? '<br>새 곡으로 🎹 칸이 처음부터 차요 — 한 곡을 연달아 쳐요!' : ''}`,
+      line: '<br>「곡 전체」를 끝까지 치면 🎹 건반 칸이 차요',
+      cap: '<br>오늘 음악 포켓몬은 만났어요 — 내일 또 만나요!',
+    }[r.slot] || '';
     if (r.coins) toast(`<b>끝까지 쳤어요! 💰 +${r.coins}</b>${nextHint(S.lv)}${slot}`, 3400);
     else if (r.why === 'cap') toast(`<b>끝까지 쳤어요!</b>오늘 💰는 다 받았어요 — 연습은 얼마든지!${slot}`, 3400);
     else toast('<b>끝까지 쳤어요!</b>한 번 더 해 볼까요? 잃는 건 없어요.', 3000);
   }).catch(() => {
     if (gen !== S.gen) return;
     S.retry = () => sendTap(req);
+    if (S.running) setRun(false); // 🔁 계속 — 위와 같이 (Codex 223차 P2-3)
     showRetry();
   });
 }
@@ -404,9 +414,23 @@ function setRun(on) {
   if (!on) hushAuto();
   const go = $('pn-go');
   if (go) go.textContent = on ? '⏸ 멈춤' : '▶ 시작';
+  foldMenu();
   keepAwake(on);
 }
 /** ▶·⏸ — 새로 시작할 때만 ⏳ 관문 (하던 판은 끝까지 — 아버님 결정 ②) */
+/** 🎹 태블릿으로 치기 연주 중인가 (v420 — 메뉴를 접고 건반을 키우는 때) */
+const isPlaying = () => S.running && S.mode === 'tap' && S.screen === 'stage';
+/** 연주 중이면 앱 머리줄·메뉴를 접고 모서리 ⏸ · 아니면 되돌림 — 바뀌었을 때만 다시 배치 (v420) */
+function foldMenu() {
+  const fold = isPlaying();
+  const p = $('pn-pause');
+  if (p) p.hidden = !fold;
+  if (S.folded === fold) return;
+  S.folded = fold;
+  const v = $('view-music');
+  if (v && v.classList) v.classList.toggle('pn-playing', fold);
+  layout();
+}
 function toggle() {
   audio();
   if (S.running) { setRun(false); return; }
@@ -471,10 +495,14 @@ function layout() {
     G.kw = G.W / 15;
     return;
   }
-  G.keysH = Math.round(G.H * (S.mode === 'tap' ? 0.26 : 0.22));
+  // 🎹 v420 — 태블릿으로 치기 연주 중(메뉴 접힘)엔 악보·막대를 접기 전 높이(G.up0 · G.sheet0) 그대로 · 남는 높이는 건반(그림판의 60%까지)
+  const playing = isPlaying();
+  const keysH0 = Math.round(G.H * (S.mode === 'tap' ? 0.26 : 0.22));
+  G.keysH = playing ? playKeysH(G.H, keysH0, G.up0) : keysH0;
   G.keysTop = G.H - G.keysH;
   G.mapY = G.keysTop - 13;
-  G.sheetH = S.lv === 1 ? Math.round(G.H * 0.42) : G.keysTop - 38;
+  G.sheetH = S.lv === 1 ? (playing && G.sheet0 ? Math.min(G.sheet0, G.keysTop - 60) : Math.round(G.H * 0.42)) : G.keysTop - 38;
+  if (!playing) { G.up0 = G.keysTop; G.sheet0 = G.sheetH; }
   G.s = (G.sheetH - 14) / 26.5;
   G.barsTop = S.lv === 1 ? G.sheetH : G.keysTop;
   G.ppbB = (G.keysTop - 16 - G.barsTop) / 3.3;
@@ -1255,6 +1283,13 @@ function toast(html, ms) {
 const slotsHtml = (filled) => `<span class="pn-slots">${Array.from({ length: NOTES_PER_MON }, (_, i) => `<span class="${i < filled ? 'on' : ''}">♪</span>`).join('')}</span>`;
 /** 🎹 건반 칸 그림 (v413) — 작은 건반 열 개가 하나씩 빛난다 · 수는 안 쓴다 */
 const keysHtml = (filled) => `<span class="pn-tkeys">${Array.from({ length: TAPS_PER_MON }, (_, i) => `<span class="${i < filled ? 'on' : ''}"></span>`).join('')}</span>`;
+/** 🎹 오늘 연달아 (v420) — { filled: 찬 칸(오늘 받았으면 가득), song: 그 곡 이름 | '' } */
+function tapToday(pn) {
+  const day = pn && pn.days ? pn.days[dayKeyOf(Date.now())] : null;
+  const run = day && day.run;
+  const song = run ? allSongs().find((s) => s.id === run.s) : null;
+  return { filled: day && day.won ? TAPS_PER_MON : run ? run.n : 0, song: run ? (song ? song.ko : run.s) : '' };
+}
 function renderSlots() {
   const box = $('pn-slots');
   if (!box) return;
@@ -1262,7 +1297,10 @@ function renderSlots() {
   const pn = pianoNow();
   // 🎹 태블릿으로 치기는 건반 열 칸(v413) · 🎧 듣고 따라 치기는 ♪ 다섯 칸 — 포켓몬이 오면 다시 0부터 (v404) · 누르면 🐾 안내 (v405)
   if (S.mode === 'tap') {
-    box.innerHTML = `${keysHtml(slotsOf(pn.taps, pn.tapMons, TAPS_PER_MON).filled)}<span class="pn-slots-mon">→ 🐾</span>`;
+    // v420 — 오늘 한 곡을 연달아 친 몫 · 칸 옆에 그 곡 이름(셈 없음) · 오늘 받았으면 가득
+    const r = tapToday(pn);
+    const song = r.song ? `<span class="pn-run-song">🎹 ${String(r.song).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</span>` : '';
+    box.innerHTML = `${song}${keysHtml(r.filled)}<span class="pn-slots-mon">→ 🐾</span>`;
     box.setAttribute('aria-label', '건반 칸 — 음악 포켓몬 안내');
   } else {
     box.innerHTML = `${slotsHtml(slotsOf(pn.notes, pn.mons).filled)}<span class="pn-slots-mon">→ 🐾</span>`;
@@ -1315,8 +1353,8 @@ function nextArrival() {
 // ───────────────────── 🐾 음악 포켓몬 안내 (v405) ─────────────────────
 
 const INTRO_KEY = 'shincoach.musicIntro';
-/** 본 안내 판 — v413에 🎹 건반 칸이 생겨 한 번 더 보여 준다 (v405 판은 '1') */
-const INTRO_VER = '2';
+/** 본 안내 판 — v413에 🎹 건반 칸이 생겨 한 번 더('2') · v420에 「한 곡을 하루에 열 번 연달아」로 바뀌어 한 번 더 (v405 판은 '1') */
+const INTRO_VER = '3';
 /** 안내 창에 보일 음악 포켓몬 — 랑딸랑(흔함) · 치렁(보통) · 테라파고스(전설) */
 const INTRO_MONS = [433, 358, 1024];
 function introSeen() {
@@ -1374,11 +1412,13 @@ function showIntro() {
   const ol2 = el('ol', 'pn-intro-steps');
   ol2.appendChild(introLine('li', [['「🎹 태블릿으로 치기」', true], ['에서 ', false], ['「곡 전체」', true], ['를 골라요', false]]));
   ol2.appendChild(introLine('li', [['끝까지 잘 치면 건반 칸 하나 — ', false], ['💰', true], ['도 받아요', false]]));
+  // v420 — 한 곡을 하루에 열 번 연달아 · 다른 곡을 끝까지 치면 처음부터 · 하루 한 마리
+  ol2.appendChild(introLine('li', [['한 곡', true], ['을 ', false], ['하루에 열 번 연달아', true], [' 쳐요 — 다른 곡을 끝까지 치면 칸이 처음부터예요', false]]));
   const last2 = el('li');
   const ten = el('span', 'pn-tkeys'); // 빈 건반 열 — 무대의 칸과 같은 그림(수는 안 쓴다)
   for (let i = 0; i < TAPS_PER_MON; i++) ten.appendChild(el('span', ''));
   last2.appendChild(ten);
-  last2.appendChild(el('span', '', '이 다 차면 🐾 음악 포켓몬이 와요!'));
+  last2.appendChild(el('span', '', '이 다 차면 🐾 음악 포켓몬이 와요! (하루 한 마리)'));
   ol2.appendChild(last2);
   card.appendChild(ol2);
   const ok = btn('알겠어요!', 'btn btn-primary pn-arrive-ok', () => {
@@ -1575,6 +1615,13 @@ function mountCanvas(m, wrap, label) {
   t.id = 'pn-toast';
   t.hidden = true;
   stage.appendChild(t);
+  if (S.screen === 'stage') { // 🎹 연주 중 메뉴가 접히면 모서리에 ⏸ 하나 (v420)
+    const pz = btn('⏸', 'btn pn-pause', () => toggle());
+    pz.id = 'pn-pause';
+    pz.setAttribute('aria-label', '멈춤');
+    pz.hidden = !isPlaying();
+    stage.appendChild(pz);
+  }
   wrap.appendChild(stage);
   m.appendChild(wrap);
   ctx = cv.getContext('2d');

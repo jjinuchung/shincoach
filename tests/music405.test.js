@@ -150,7 +150,7 @@ test('화면 — 안내 창이 떠 있는 동안 온 포켓몬은 뒤에 선다 
   assert.equal(byId('pn-intro'), null);
   assert.ok(byId('pn-arrive'), '닫으면 기다리던 온 창');
   assert.match(text('pn-arrive'), /🎵 새 음악 포켓몬이 왔어요!/);
-  assert.equal(store.get('shincoach.musicIntro'), '2', 'v413 판 안내를 본 것');
+  assert.equal(store.get('shincoach.musicIntro'), '3', 'v420 판 안내를 본 것');
   await settle(30);
   assert.equal(await introN(), 1, '📤 「안내 창 1번 봄」');
   button('좋아요!').click();
