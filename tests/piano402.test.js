@@ -193,7 +193,7 @@ test('🎹 태블릿 치기 💰 — 한 줄 5 · 곡 전체 15 · 번 💰도 �
   for (let i = 2; i < TAP_DAY; i += 1) assert.equal(tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW).coins, 5, `${i + 1}번째`);
   const c = tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW);
   assert.deepEqual([c.coins, c.why], [0, 'cap'], `${TAP_DAY + 1}번째는 기록만`);
-  assert.deepEqual(todayOf(p, NOW), { paid: TAP_DAY, coins: 20 + 5 * (TAP_DAY - 2), notes: 0, run: { s: REQ.song, n: 1, at: NOW } }, '곡 전체를 잘 친 판(b)은 🎹 연달아 한 칸 (v413 · v420)');
+  assert.deepEqual(todayOf(p, NOW), { paid: TAP_DAY, coins: 20 + 5 * (TAP_DAY - 2), notes: 0 }, '곡 전체를 잘 친 판(b)도 🎼 연습곡이면 🎹 칸 없음 (v413 · v423 — 책 곡만)');
   assert.equal(pianoOf(p.piano).log.length, TAP_DAY + 2, '판마다 기록');
   // 다음 날은 다시
   assert.equal(tapRule(p, { ...REQ, ok: 5, bad: 0 }, NOW + 86400000).coins, 5);

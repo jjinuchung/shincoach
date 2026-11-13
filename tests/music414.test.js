@@ -144,7 +144,7 @@ globalThis.localStorage = {
   removeItem: (k) => { store.delete(k); },
 };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
-store.set('shincoach.musicIntro', '3');
+store.set('shincoach.musicIntro', '4');
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(cond, what, ms = 4000) {
   const t0 = Date.now();

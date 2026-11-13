@@ -128,7 +128,8 @@ test('화면 — 처음 들어오면 안내 창: 🎧 · 진짜 피아노 · 새
   assert.equal(box.parent, VIEW, '창은 음악 화면 안');
   const t = box.textContent;
   for (const w of ['🎵 음악 포켓몬을 만나요!', '🎧 진짜 피아노로', '「🎧 듣고 따라 치기」를 골라요', '앱이 치는 소리를 들으며 진짜 피아노로 끝까지 따라 쳐요', '「✋ 피아노로 다 쳤어요」를 누르고 아빠·엄마 확인을 받으면 ♪ 하나', '♪♪♪♪♪가 다 차면 🐾 음악 포켓몬이 와요!',
-    '🎹 태블릿 화면 건반으로', '「🎹 태블릿으로 치기」에서 「곡 전체」를 골라요', '끝까지 잘 치면 건반 칸 하나 — 💰도 받아요', '이 다 차면 🐾 음악 포켓몬이 와요!']) assert.ok(t.includes(w), `글: ${w}`);
+    '🎹 태블릿 화면 건반으로', '「🎹 태블릿으로 치기」에서 📖 진우 책 곡의 「곡 전체」를 골라요', '끝까지 잘 치면 건반 칸 하나 — 💰도 받아요', '곡은 섞어 쳐도 돼요 — 🎼 연습곡은 💰만 받아요', // v423
+    '이 하루에 다 차면 🐾 음악 포켓몬이 와요! (하루 한 마리)']) assert.ok(t.includes(w), `글: ${w}`);
   assert.ok(!t.includes('는 💰를 받아요'), 'v405의 「화면 건반은 💰」 말은 없다 (v413)');
   const ten = all.filter((e) => { if (e.className !== 'pn-tkeys') return false; for (let x = e; x; x = x.parent) if (x === box) return true; return false; });
   assert.equal(ten.length, 1, '빈 건반 열 칸 그림 하나');
@@ -150,7 +151,7 @@ test('화면 — 안내 창이 떠 있는 동안 온 포켓몬은 뒤에 선다 
   assert.equal(byId('pn-intro'), null);
   assert.ok(byId('pn-arrive'), '닫으면 기다리던 온 창');
   assert.match(text('pn-arrive'), /🎵 새 음악 포켓몬이 왔어요!/);
-  assert.equal(store.get('shincoach.musicIntro'), '3', 'v420 판 안내를 본 것');
+  assert.equal(store.get('shincoach.musicIntro'), '4', 'v423 판 안내를 본 것');
   await settle(30);
   assert.equal(await introN(), 1, '📤 「안내 창 1번 봄」');
   button('좋아요!').click();

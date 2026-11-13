@@ -29,7 +29,7 @@ test('💰 태블릿 치기 — 하루 다섯 번(곡 상관없이) · 오늘 �
   const got = [];
   for (const song of ['ode', 'ode', 'mary']) got.push(tapRule(p, { ...REQ, song, ok: 9, bad: 1 }, NOW));
   assert.deepEqual(got.map((r) => [r.coins, r.why || '']), [[15, ''], [15, ''], [0, 'cap']], '같은 곡이어도 다섯 번까지');
-  assert.deepEqual(todayOf(p, NOW), { paid: 5, coins: 75, notes: 0, run: { s: 'mary', n: 1, at: NOW } }, '곡 전체를 잘 친 세 판 — 🎹 연달아는 마지막 곡(다른 곡이면 처음부터 · v420) · 💰 한도와 따로');
+  assert.deepEqual(todayOf(p, NOW), { paid: 5, coins: 75, notes: 0 }, '곡 전체를 잘 친 세 판 — 🎼 연습곡이라 🎹 칸 없음(v423 — 책 곡만) · 💰는 그대로');
   assert.equal(p.coins, 30);
   // 한도를 바꾼 뒤 옛 판 창이 받은 횟수를 깎아 저장하면 한도가 다시 열린다 — 읽을 때 한도로 자르지 않는다 (Codex 212차 P2)
   assert.equal(pianoOf({ days: { [dayKeyOf(NOW)]: { paid: 9, coins: 1, notes: 0 } } }).days[dayKeyOf(NOW)].paid, 9, '한도보다 많아도 그대로');
@@ -214,7 +214,7 @@ globalThis.localStorage = {
   removeItem: (k) => { store.delete(k); },
 };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
-store.set('shincoach.musicIntro', '3'); // 🐾 안내 창은 이미 본 것으로 — v420 판은 '3'
+store.set('shincoach.musicIntro', '4'); // 🐾 안내 창은 이미 본 것으로 — v423 판은 '4'
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 let PV;
 let P;

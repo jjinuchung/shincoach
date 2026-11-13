@@ -23,6 +23,8 @@
 // 🎹 v420 (11-12 아버님 → 기본안 「추천대로」) — ① 음악 포켓몬은 한 곡을 하루에 열 번 연달아(piano.tapRule run) · 건반 칸은 오늘 그 곡 몫(그림 · 옆에 곡 이름) ·
 //   다른 곡으로 처음부터면 한 줄 · 🐾 안내 판 3(새 규칙) ② 🎹 태블릿으로 치기에서 ▶ 시작 → 앱 머리줄·메뉴 세 줄을 접고(#view-music.pn-playing) ·
 //   악보·막대는 그 높이 그대로 위로 · 남는 높이는 건반(G.up0) · 그림판 모서리 ⏸(#pn-pause) · 멈추거나 끝나면 돌아옴 · 🎧는 그대로
+// 🎹 v423 (11-13 아버님 「다른 곡들도 완주해서 10번 · 내가 넣은 곡들로만」 → 기본안 「추천대로」) — 음악 포켓몬은 📖 진우 책 곡(S.song.book)을 하루에 열 번 ·
+//   곡을 섞어도 이어 셈(piano.tapRule book) · 🎼 연습곡은 💰만 — 끝낸 판에 한 줄 · 칸 옆 곡 이름·「처음부터」 알림 없앰 · 🐾 안내 판 4
 import { setScene } from './blackbox.js';
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON,
   TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL, MUTE, SLOW, dayKeyOf, playKeysH } from './piano.js';
@@ -284,7 +286,7 @@ function release(midi) {
 
 /** 그 판(줄·곡)을 끝까지 갔다 */
 function passEnd() {
-  const req = { song: S.song.id, line: S.line, hand: S.hands, lv: S.lv, sp: Math.round(S.sp * 100) / 100 };
+  const req = { song: S.song.id, line: S.line, hand: S.hands, lv: S.lv, sp: Math.round(S.sp * 100) / 100, book: S.song.book === true }; // book — 📖 진우 책 곡만 🎹 칸 (v423)
   let grade = '';
   // 🔇 끝날 때까지 이어진 소리 멎음도 이 판 몫으로 (v414) — 🔁 계속이면 시계는 이어서 본다(판 경계에서 두 토막으로 버리지 않게 · Codex 218차 P2)
   if (S.loop) passMuteSoFar(performance.now()); else endMute(performance.now());
@@ -330,10 +332,11 @@ function sendTap(req) {
       return;
     }
     if (got.length) return; // 🐾 온 포켓몬 창이 대신 말한다
-    // 🎹 건반 칸 한 줄 (v413) — 칸 수는 쓰지 않는다 · 잘 치지 못한 판은 「한 번 더」 말만 · v420 — 오늘 그 곡 몫 · 다른 곡으로 처음부터면 한 줄
+    // 🎹 건반 칸 한 줄 (v413) — 칸 수는 쓰지 않는다 · 잘 치지 못한 판은 「한 번 더」 말만 · v423 — 오늘 책 곡 몫 · 🎼 연습곡은 칸이 안 찬다고 한 줄
     const slot = {
-      ok: `<br>${keysHtml(r.run ? r.run.n : 0)}${r.restart ? '<br>새 곡으로 🎹 칸이 처음부터 차요 — 한 곡을 연달아 쳐요!' : ''}`,
+      ok: `<br>${keysHtml(r.book ? r.book.n : 0)}`,
       line: '<br>「곡 전체」를 끝까지 치면 🎹 건반 칸이 차요',
+      free: '<br>🎼 연습곡은 🎹 칸이 안 차요 — 📖 진우 책 곡으로 채워요',
       cap: '<br>오늘 음악 포켓몬은 만났어요 — 내일 또 만나요!',
     }[r.slot] || '';
     if (r.coins) toast(`<b>끝까지 쳤어요! 💰 +${r.coins}</b>${nextHint(S.lv)}${slot}`, 3400);
@@ -1283,12 +1286,10 @@ function toast(html, ms) {
 const slotsHtml = (filled) => `<span class="pn-slots">${Array.from({ length: NOTES_PER_MON }, (_, i) => `<span class="${i < filled ? 'on' : ''}">♪</span>`).join('')}</span>`;
 /** 🎹 건반 칸 그림 (v413) — 작은 건반 열 개가 하나씩 빛난다 · 수는 안 쓴다 */
 const keysHtml = (filled) => `<span class="pn-tkeys">${Array.from({ length: TAPS_PER_MON }, (_, i) => `<span class="${i < filled ? 'on' : ''}"></span>`).join('')}</span>`;
-/** 🎹 오늘 연달아 (v420) — { filled: 찬 칸(오늘 받았으면 가득), song: 그 곡 이름 | '' } */
+/** 🎹 오늘 책 곡 칸 (v423) — 찬 칸 · 오늘 받았으면 가득 */
 function tapToday(pn) {
   const day = pn && pn.days ? pn.days[dayKeyOf(Date.now())] : null;
-  const run = day && day.run;
-  const song = run ? allSongs().find((s) => s.id === run.s) : null;
-  return { filled: day && day.won ? TAPS_PER_MON : run ? run.n : 0, song: run ? (song ? song.ko : run.s) : '' };
+  return day && day.won ? TAPS_PER_MON : day && day.book ? day.book.n : 0;
 }
 function renderSlots() {
   const box = $('pn-slots');
@@ -1297,10 +1298,8 @@ function renderSlots() {
   const pn = pianoNow();
   // 🎹 태블릿으로 치기는 건반 열 칸(v413) · 🎧 듣고 따라 치기는 ♪ 다섯 칸 — 포켓몬이 오면 다시 0부터 (v404) · 누르면 🐾 안내 (v405)
   if (S.mode === 'tap') {
-    // v420 — 오늘 한 곡을 연달아 친 몫 · 칸 옆에 그 곡 이름(셈 없음) · 오늘 받았으면 가득
-    const r = tapToday(pn);
-    const song = r.song ? `<span class="pn-run-song">🎹 ${String(r.song).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</span>` : '';
-    box.innerHTML = `${song}${keysHtml(r.filled)}<span class="pn-slots-mon">→ 🐾</span>`;
+    // v423 — 오늘 📖 책 곡으로 찬 몫(곡을 섞어도) · 오늘 받았으면 가득
+    box.innerHTML = `${keysHtml(tapToday(pn))}<span class="pn-slots-mon">→ 🐾</span>`;
     box.setAttribute('aria-label', '건반 칸 — 음악 포켓몬 안내');
   } else {
     box.innerHTML = `${slotsHtml(slotsOf(pn.notes, pn.mons).filled)}<span class="pn-slots-mon">→ 🐾</span>`;
@@ -1353,8 +1352,8 @@ function nextArrival() {
 // ───────────────────── 🐾 음악 포켓몬 안내 (v405) ─────────────────────
 
 const INTRO_KEY = 'shincoach.musicIntro';
-/** 본 안내 판 — v413에 🎹 건반 칸이 생겨 한 번 더('2') · v420에 「한 곡을 하루에 열 번 연달아」로 바뀌어 한 번 더 (v405 판은 '1') */
-const INTRO_VER = '3';
+/** 본 안내 판 — v413에 🎹 건반 칸이 생겨 한 번 더('2') · v420에 「한 곡을 하루에 열 번 연달아」로 바뀌어 한 번 더('3') · v423에 「📖 책 곡을 섞어서」로 한 번 더 (v405 판은 '1') */
+const INTRO_VER = '4';
 /** 안내 창에 보일 음악 포켓몬 — 랑딸랑(흔함) · 치렁(보통) · 테라파고스(전설) */
 const INTRO_MONS = [433, 358, 1024];
 function introSeen() {
@@ -1410,15 +1409,15 @@ function showIntro() {
   // 🎹 태블릿 화면 건반으로 (v413) — 「곡 전체」를 끝까지 잘 치면 건반 칸 하나 · 건반 칸이 다 차면 🐾 · 💰도
   card.appendChild(el('p', 'pn-intro-way', '🎹 태블릿 화면 건반으로'));
   const ol2 = el('ol', 'pn-intro-steps');
-  ol2.appendChild(introLine('li', [['「🎹 태블릿으로 치기」', true], ['에서 ', false], ['「곡 전체」', true], ['를 골라요', false]]));
+  // v423 — 📖 진우 책 곡만 · 곡을 섞어도 이어 셈 · 🎼 연습곡은 💰만 · 하루 한 마리
+  ol2.appendChild(introLine('li', [['「🎹 태블릿으로 치기」', true], ['에서 ', false], ['📖 진우 책 곡', true], ['의 ', false], ['「곡 전체」', true], ['를 골라요', false]]));
   ol2.appendChild(introLine('li', [['끝까지 잘 치면 건반 칸 하나 — ', false], ['💰', true], ['도 받아요', false]]));
-  // v420 — 한 곡을 하루에 열 번 연달아 · 다른 곡을 끝까지 치면 처음부터 · 하루 한 마리
-  ol2.appendChild(introLine('li', [['한 곡', true], ['을 ', false], ['하루에 열 번 연달아', true], [' 쳐요 — 다른 곡을 끝까지 치면 칸이 처음부터예요', false]]));
+  ol2.appendChild(introLine('li', [['곡은 ', false], ['섞어 쳐도 돼요', true], [' — 🎼 연습곡은 💰만 받아요', false]]));
   const last2 = el('li');
   const ten = el('span', 'pn-tkeys'); // 빈 건반 열 — 무대의 칸과 같은 그림(수는 안 쓴다)
   for (let i = 0; i < TAPS_PER_MON; i++) ten.appendChild(el('span', ''));
   last2.appendChild(ten);
-  last2.appendChild(el('span', '', '이 다 차면 🐾 음악 포켓몬이 와요! (하루 한 마리)'));
+  last2.appendChild(el('span', '', '이 하루에 다 차면 🐾 음악 포켓몬이 와요! (하루 한 마리)'));
   ol2.appendChild(last2);
   card.appendChild(ol2);
   const ok = btn('알겠어요!', 'btn btn-primary pn-arrive-ok', () => {
