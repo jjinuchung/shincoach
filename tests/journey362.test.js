@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   JOURNEY, ZONES, STOPS, PER_ZONE, CENTERS, OLD_STOPS, OLD_HEARTS, ROCKET_MON, EVENTS, hpOf, heartsMax, mergeJourney, TYPE_KO, typesOf, zoneOfStop, centersOf, zoneStart, pendingEvent,
-  routeOf, journeyOf, copyJourney, startRule, answerRule, swapRule, eventRule, homeRule, makeRoute, makeEvents, profChoices, rowText, journeyRows, journeyMd,
+  routeOf, journeyOf, copyJourney, startRule, answerRule, swapRule, eventRule, homeRule, makeRoute, makeEvents, profChoices, rowText, journeyRows, journeyMd, weekOf, dayKeyOf,
 } from '../js/journey.js';
 import { ROSTER, subjectOf } from '../js/pokemon.js';
 import { STONES } from '../js/items.js';
@@ -373,11 +373,13 @@ test('🧑‍🔬 박사 퀴즈 보기 — 타입: 정답 하나 · 같은 꼴(�
 });
 
 const stored = () => fakeIdb.get('profile', 'me');
+/** 🚚 이사는 지난주에 끝낸 대여행 기록 — 11/14부터는 이사가 대여행 자리를 막으니(v397) 지금 시각을 쓰는 저장 경로 시험이 날짜와 상관없게 */
+const moved = () => ({ done: { [weekOf(dayKeyOf(Date.now() - 7 * 86400000))]: { r: 'won', at: 1, mv: 1 } } });
 test('★ 저장 경로 — 이벤트도 저장된 프로필에 한 트랜잭션 · 두 창이 같은 상자를 동시에 열어도 한 번 · 저장이 실패하면 없던 일', async () => {
   await initProfile();
   await flushProfile();
   const cur0 = stored() || emptyProfile();
-  fakeIdb.put('profile', { ...pf(), updatedAt: (cur0.updatedAt || 0) + 1 });
+  fakeIdb.put('profile', { ...pf({ journey: moved() }), updatedAt: (cur0.updatedAt || 0) + 1 });
   await reloadProfile();
   // 첫 이벤트가 🎁인 길을 고른다
   let route = null; let evs = null;

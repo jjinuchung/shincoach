@@ -504,6 +504,8 @@ test('📊📤 글 — 결과·과목별 맞힌 수·데려온 포켓몬·잃은
 });
 
 const stored = () => fakeIdb.get('profile', 'me');
+/** 🚚 이사는 지난주에 끝낸 대여행 기록 — 11/14부터는 이사가 대여행 자리를 막으니(v397) 지금 시각을 쓰는 저장 경로 시험이 날짜와 상관없게 */
+const moved = () => ({ done: { [weekOf(dayKeyOf(Date.now() - 7 * 86400000))]: { r: 'won', at: 1, mv: 1 } } });
 /** 저장 경로로 지금 이벤트를 셈 없이 넘긴다 (v362) */
 async function evStored(id) {
   const c = journeyOf(stored().journey).cur;
@@ -517,7 +519,7 @@ test('★ 저장 경로 — 떠나기·답·데려오기가 저장된 프로필�
   await initProfile();
   await flushProfile();
   const cur0 = stored() || emptyProfile();
-  fakeIdb.put('profile', { ...pf(), updatedAt: (cur0.updatedAt || 0) + 1 });
+  fakeIdb.put('profile', { ...pf({ journey: moved() }), updatedAt: (cur0.updatedAt || 0) + 1 });
   await reloadProfile();
   const route = makeRoute(cands(), seeded(21));
   const s = await journeyStart({ id: 'savetrip1', party: PARTY, route, ev: makeEvents(route, cands(), seeded(121)) });
@@ -552,7 +554,7 @@ test('★ 🔍 Codex 147차 저장 경로 — ❤️ 1의 마지막 오답: 저�
   await initProfile();
   await flushProfile();
   const cur0 = stored() || emptyProfile();
-  const rich = pf({ coins: 5000 });
+  const rich = pf({ coins: 5000, journey: moved() });
   Object.assign(rich.items, { stone_math: 211, stone_english: 3, stone_korean: 37 });
   fakeIdb.put('profile', { ...rich, updatedAt: (cur0.updatedAt || 0) + 1 });
   await reloadProfile();
