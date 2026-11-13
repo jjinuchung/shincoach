@@ -19,9 +19,10 @@ import { guardStart } from './timeup.js';
  * 그 과목을 끝냈다 — 🔥(국어·논술 합쳐 그날 처음) · ✨(그 과목 그날 처음)을 선점하고 준다 → { streak: {days, xp, coin}|null, bonus: 보너스|null }
  * 국어 글은 읽은 기록 줄이 새로 생겼을 때(res.newRead — [다시 저장하기]는 아님) · 논술은 판을 저장했을 때(⭐ 연습 포함) 부른다
  * ★ 화면이 바뀌었어도 준다(받은 몫은 이미 잡았다) — 그리기만 부르는 쪽이 본다
+ * opts.bonus — ✨를 이번에 받을 수 있나(v422 · 그 글·판의 처음 답이 반 이상) · 아니면 ✨는 선점하지 않는다(다음 글·판에서 받게) · 🔥는 그대로(공부한 날)
  * @param {'korean'|'nonsul'} kind
  */
-export async function korDayDone(kind) {
+export async function korDayDone(kind, opts = {}) {
   const today = todayKey();
   const out = { streak: null, bonus: null };
   let xp = 0;
@@ -40,7 +41,7 @@ export async function korDayDone(kind) {
   } catch { /* 못 읽었거나 저장이 막혔다 — 이번엔 줄이 없다(선점도 안 됐다) · 다음 끝냄에 다시 */ }
   // ✨ — 홈 카드가 미리 보여 준 바로 그것 · 선점한 뒤 주는 것은 하나씩 따로(하나가 실패해도 나머지는 준다, 🔍 Codex 133차 #1)
   try {
-    const field = bonusField(kind);
+    const field = opts.bonus === false ? '' : bonusField(kind);
     if (field && (await claimDailyCount(today, field, 1)).won) {
       const b = subjectBonus(today, kind);
       if (b) {

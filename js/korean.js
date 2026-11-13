@@ -406,8 +406,9 @@ export function mergeReads(a, b) {
 // 다시 읽기(★★·★★★)가 한 편 몇십 초 · [문제 보기]까지 몇 초 · 처음 고른 답이 반도 안 맞는데도 별과 🎯가 나왔다 = 빨리 끝내기.
 // 그래서 ★★·★★★의 🎯는 처음 고른 답으로 물음의 반 이상을 맞혔을 때만 — "처음 고른 답으로 맞힘" = 📤 읽은 기록의 f(보기를 한 번에 맞힌 물음)와 같은 값.
 // ★(처음 읽기)는 그대로 · 별·💰·🟩·🥚는 그대로 · 못 받은 🎯는 그 별의 것이 없다(★★ 뒤에는 ★★★에서 다시) · 이미 가진 🎯는 그대로
-/** 🎯 조건이 걸리는 별 — ★★부터 */
-export const CATCH_FIRST_STAR = 2;
+// → v422(2026-11-13 아버님 「추천대로」 — 「누르기만 하면 보상」 점검 5): ★(새 글 · 🎧 듣기·글로 읽고 풀기 포함)의 🎯도 같은 조건 · 못 받으면 다음 날 ★★에서 다시 · 별·💰는 그대로
+/** 🎯 조건이 걸리는 별 — ★부터(v422 · 전엔 ★★부터) */
+export const CATCH_FIRST_STAR = 1;
 /** 이번 별에 🎯를 주나 (순수) — star 이번에 받는 별 · f 처음 고른 답으로 맞힌 물음 · n 물음 수 (반 이상 = f × 2 ≥ n — 2물음 1 · 3물음 2 · 4물음 2) */
 export function catchFirstOk(star, f, n) {
   return !(star >= CATCH_FIRST_STAR) || f * 2 >= n;
@@ -454,6 +455,8 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
     } else profile.korReads = cur;
   }
   const fresh = newRead ? { newRead } : {};
+  // half — 이 읽기의 처음 고른 답이 반 이상(✨ 오늘의 보너스·🥚 국어 알 칸을 이 글로 받을 수 있나 — v422 · 별이 없는 다시 읽기도)
+  if (rd) fresh.half = rd.n > 0 && rd.f * 2 >= rd.n;
   if (!next.star) {
     profile.korDone = done;
     return { ok: true, star: 0, coins: 0, xp, stars: starsOf(done, cardId), wait: next.why, ...fresh, ...(next.days ? { next: next.next, days: next.days } : {}) };
@@ -484,7 +487,7 @@ export function korFinishRule(profile, cardId, now, misses, ids, evMiss = 0, opt
 // 별 없이 다시 읽은 판(g 0)은 읽은 글 수와 근거·🧠에만
 /** 하루 기록에 더하는 국어 칸 — 수 · 목록(📍 근거 찾기 초 "카드@연 시각:초" — 가운데값을 내려고 하나씩, 같은 읽기는 한 번) */
 export const KOR_DAY_SUMS = ['korReads', 'korNewF', 'korNewN', 'korReF', 'korReN', 'korEvN', 'korEvK', 'korKnow'];
-export const KOR_DAY_LISTS = ['korEvSecs'];
+export const KOR_DAY_LISTS = ['korEvSecs', 'korPrize']; // 🎯 처음 답 판정 「꼴:판 열쇠:몇째:맞힘/낸:결과」(v422 · korwords.korPrizeKey — 📤 국어 요약에만)
 /** 날 번호 → 'YYYY-MM-DD' (dayNum의 거꾸로 — 하루 기록의 열쇠) */
 export function dayKeyOf(n) {
   const d = new Date(Number(n) * 86400000);

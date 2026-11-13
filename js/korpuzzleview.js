@@ -10,8 +10,8 @@
 //  · ⏰ 일어난 차례(v297): 차례 맞추기 화면(orderEl)을 같이 쓴다 — 위에 글(쓰인 차례 그대로 · 때 말 굵게) · 카드는 글 차례로 놓여 시작 ·
 //    확인 뒤 조각마다 "글에서 몇째 문장"
 import { ASKS, FO, EF, IO, KINDS, KIND_LIST, AGREE_TYPES, allPuzzles, quitKey, planPuzzles, puzzleStats, shuffledOrder, dealChoices, gradeOrder, gradeSort, gradeIntext, gradeAgree, intextWhy, isOpen, isSolved, puzzleFinishText, puzzleTodayLine, ONE_KINDS, ONE_PER_DAY, oneKey, oneDoneCount, pickOne } from './korpuzzle.js';
-import { wordsToday } from './korwords.js';
-import { korPuzzleFinish, korPuzzleMap, korPuzzleDayMap, korDoneMap } from './xp.js';
+import { wordsToday, korPrizeKey } from './korwords.js';
+import { korPuzzleFinish, korPuzzleMap, korPuzzleDayMap, korDoneMap, korBallToday } from './xp.js';
 import { circled, dayNum, dayKeyOf } from './korean.js';
 import { applyDailyDelta, getDaily } from './db.js'; // 🧩 판 기록(v315) — 하루 기록 목록 칸에 (아이 화면엔 안 보임) · 글 끝 퍼즐 하나 하루 수(v331)
 import { guardStart } from './timeup.js';
@@ -78,7 +78,7 @@ export async function renderPuzzleTab(box, ctx) {
   const head = el('section', 'kor-head');
   head.appendChild(el('h2', 'kor-h', '🧩 오늘의 퍼즐'));
   head.appendChild(el('p', 'kor-intro', '이야기의 흐름과 하는 차례·일이 실제로 일어난 차례를 맞추고, 글에 있는 내용인지 확인하고, 사실과 의견·겪은 일과 생각을 가리고, 문장의 앞뒤가 어울리게 끝을 골라요. 다 맞힌 퍼즐은 ⭐, 틀린 퍼즐은 다음 날 다시 나와요.'));
-  head.appendChild(el('p', 'kor-count', puzzleTodayLine(wordsToday(korPuzzleDayMap(), now))));
+  head.appendChild(el('p', 'kor-count', puzzleTodayLine(wordsToday(korPuzzleDayMap(), now), korBallToday('pz', now)))); // 🎯 오늘 기회 (v422)
   if (plan.length) {
     const b = el('button', 'btn btn-primary btn-big-wide kor-pstart', '🧩 오늘의 퍼즐 시작'); // 문제 수는 안 쓴다 (v394)
     b.type = 'button';
@@ -796,7 +796,9 @@ async function finishSession(ctx) {
     if (ps.one) notePlay({ korPzOneDone: [oneKey(ps.t0, ps.items[0].kind)] }); // 🧩 글 끝 퍼즐 하나 끝냄 (v331 — 하루 단추 상한도 이 칸으로 센다)
     else if (!ps.practice) notePlay({ korPzDone: [String(ps.t0)] }); // 🧩 끝낸 판 (v315 · [다시 저장하기]로 두 번 와도 같은 칸)
     if (live && (res.stone || (res.solved && res.solved.length))) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
-    const egg = await ctx.tickKorDay(); // 🥚 오늘의 퍼즐을 끝낸 날 = 국어 알 하루 칸
+    if (res.ball) notePlay({ korPrize: [korPrizeKey('pz', ps.t0, res.ball.idx, res.ball.ok, res.ball.total, res.ball.s)] }); // 📤 🎯 판정 (v422)
+    // 🥚 오늘의 퍼즐을 끝낸 날 = 국어 알 하루 칸 — v422부터 한 번에 맞힌 퍼즐이 반 이상인 판만
+    const egg = res.half ? await ctx.tickKorDay() : null;
     if (S.ps === ps && egg && egg.ok) { ps.egg = egg; renderSession(ctx); }
   }
 }
@@ -821,14 +823,15 @@ function finishEl(ctx) {
     again.addEventListener('click', () => finishSession(ctx));
     row.appendChild(again);
   }
-  // 글 끝 퍼즐 하나(v331)는 읽던 도감으로 먼저
-  const back = el('button', `btn${res.ok && !ps.one ? ' btn-primary' : ''}`, '🧩 퍼즐로');
+  // 글 끝 퍼즐 하나(v331)는 읽던 도감으로 먼저 — 🎯를 못 미쳤고 오늘 기회가 남았으면 🧩 퍼즐로를 앞에 (v422)
+  const retry = !!(res.ok && res.ball && res.ball.s === 'm' && res.again);
+  const back = el('button', `btn${res.ok && (!ps.one || retry) ? ' btn-primary' : ''}`, '🧩 퍼즐로');
   back.type = 'button';
   back.addEventListener('click', () => { S.ps = null; ctx.toPuzzle(); });
-  const cards = el('button', `btn${res.ok && ps.one ? ' btn-primary' : ''}`, '📚 도감으로');
+  const cards = el('button', `btn${res.ok && ps.one && !retry ? ' btn-primary' : ''}`, '📚 도감으로');
   cards.type = 'button';
   cards.addEventListener('click', () => { S.ps = null; ctx.toCards(); });
-  if (ps.one) { row.appendChild(cards); row.appendChild(back); } else { row.appendChild(back); row.appendChild(cards); }
+  if (ps.one && !retry) { row.appendChild(cards); row.appendChild(back); } else { row.appendChild(back); row.appendChild(cards); }
   box.appendChild(row);
   const cb = ctx.catchBtnEl(); // 🎯 그날 처음 끝냈으면 국어 포켓몬 잡기
   if (cb) box.appendChild(cb);

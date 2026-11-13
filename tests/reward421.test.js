@@ -369,7 +369,7 @@ test('🧩·🕵️ 화면 — 판 열쇠(rid)를 답과 판 끝에 · 판 끝 �
   assert.ok(dv.includes("'🎯는 한 번에 많이 맞히면 나와요 — 🕵️ 한 판 더 해 볼까요?'"));
   assert.ok(dv.includes('detectTodayLine(got, detectPrizeOf(raw, today))'));
   for (const f of ['js/mathpuzzle.js', 'js/detective.js']) assert.equal(/^import /m.test(src(f)), false, `${f} 규칙 파일은 import 없음`);
-  assert.ok(src('sw.js').includes("const CACHE_VERSION = 'v421';") && src('js/version.js').includes("export const APP_VERSION = 'v421';"));
+  assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(src('sw.js')) || [])[1]) >= 421 && Number((/export const APP_VERSION = 'v(\d+)';/.exec(src('js/version.js')) || [])[1]) >= 421, 'v421 이상');
 });
 
 // ───────────── 🔍 Codex 224차 고침 ─────────────

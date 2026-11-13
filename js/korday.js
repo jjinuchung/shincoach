@@ -18,7 +18,7 @@ export const KOR_DAY = {
 };
 
 /** 홈 카드 밑 한 줄 — 무엇을 하면 받나 */
-export const BONUS_TIP = { korean: '📚 글 한 편 다 읽으면 받아요', nonsul: '🖊️ 논술 한 판 끝내면 받아요' };
+export const BONUS_TIP = { korean: '📚 글을 잘 읽고 처음에 많이 맞히면 받아요', nonsul: '🖊️ 논술 한 판을 처음에 많이 맞히면 받아요' }; // v422 — ✨는 처음 답이 반 이상인 글·판에
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const num = (v) => Number(v) || 0;

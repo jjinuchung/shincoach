@@ -176,14 +176,14 @@ test('🧩 보상 규칙: 그날 첫 판만 💰·🎯 · 3개 모두 한 번에
   assert.deepEqual([r4.n, r4.okN], [1, 1]);
   assert.deepEqual(korPuzzleRule(pf({}), [{ id: 'X1', ok: true }], T0, IDS), { ok: false, why: 'empty' });
   // 말(순수)
-  assert.deepEqual(puzzleFinishText({ ok: true, first: true, coins: 10, stone: 1, n: 3, okN: 3, solved: ['O11'] }, () => '하는 차례 「씨앗 심기」'), {
+  assert.deepEqual(puzzleFinishText({ ok: true, first: true, coins: 10, stone: 1, prize: true, ball: { s: 'w' }, n: 3, okN: 3, solved: ['O11'] }, () => '하는 차례 「씨앗 심기」'), {
     title: '🧩 오늘의 퍼즐 끝!', lines: ['한 번에 맞힌 퍼즐 3 / 3', '💰 +10 · 🎯 국어 포켓몬 잡기 1번 · 🟩 국어스톤 +1 (모두 한 번에 맞혔어요!)', '⭐ 새로 푼 퍼즐: 하는 차례 「씨앗 심기」'],
   });
   assert.match(puzzleFinishText({ ok: true, first: false, n: 1, okN: 0, solved: [] }).lines[1], /이미 받았어요/);
   assert.equal(puzzleFinishText({ ok: true, first: false, n: 1, okN: 0, solved: [] }).title, '🧩 퍼즐 연습 끝!');
   assert.equal(puzzleFinishText({ ok: true, first: false, n: 1, okN: 1, solved: ['F2'] }).title, '🧩 퍼즐 더 풀기 끝!', '새로 ⭐를 받은 판은 연습이 아니다');
   assert.match(puzzleFinishText({ ok: false, why: 'save' }).title, /저장이 안 됐어요/);
-  assert.match(puzzleTodayLine(0), /💰10 · 🎯 국어 포켓몬 잡기 1번 · 퍼즐 3개 이상을 모두 한 번에/);
+  assert.match(puzzleTodayLine(0), /^끝내면 💰10 · 한 번에 많이 맞히면 🎯 · 퍼즐 3개 이상을 모두 한 번에/); // v422 — 🎯는 한 번에 많이 맞힌 판에
   assert.match(puzzleTodayLine(2), /🟩까지/);
   assert.equal(ASKS.event.prompt, '일이 일어난 차례대로 놓아 보세요.');
 });

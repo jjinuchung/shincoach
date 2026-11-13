@@ -17,6 +17,7 @@ import { restCount } from './rest.js'; // 💊 💤 카운터 읽기 (순수 —
 import { firstDueOf } from './review.js'; // 🔁 둘 다 복습 전인 문장의 첫 차례 (v391 — review·sounds는 db를 import하지 않는다)
 import { mergeMiss, missOf, mergeDone, throwsOf, mergeThrows, qMissOf, mergeQMiss, readsOf, mergeReads, KOR_DAY_SUMS, KOR_DAY_LISTS } from './korean.js'; // 📚 국어 잘못 읽기 횟수 · 📈 읽기 날마다 합계 칸(v314) (순수, import 없음)
 import { wordsOf, mergeWords, wordDaysOf, mergeWordDays } from './korwords.js'; // 🔤 국어 낱말 칸·보상 받은 날 (순수, korean.js만 import)
+import { mergeBall } from './korwords.js'; // 🎯 🔤·🧩·🖊️ 판 기회 기록 병합 (v422)
 import { lettersOf, mergeLetters } from './letters.js'; // 📮 포켓몬 편지 장부 (v351 — 순수, korean.js만 import)
 import { zygOf, mergeZyg } from './zygarde.js'; // 🟢 지가르데 큐브 장부 (v352 — 순수, korean.js만 import)
 import { spellSeenOf, mergeSpellSeen } from './spell.js'; // 🔤 철자 노트 — 틀린 수 기록 (v356 · 순수, korean·korwords만 import)
@@ -2495,6 +2496,11 @@ export function mergeStatRecord(name, cur, rec) {
     out.nonsul = mergePuzzles(cur.nonsul, rec.nonsul);
     out.nonsulDay = mergeWordDays(cur.nonsulDay, rec.nonsulDay);
     out.nonsulThrow = mergeThrows(cur.nonsulThrow, rec.nonsulThrow);
+    // 🎯 🔤·🧩·🖊️ 판 기회 기록(v422) — 늦은 날 · 같은 날 판 수 큰 쪽·받음은 어느 쪽이든 · 합친 날에 💰를 받았는데 그날 기록이 없는 쪽이 있으면 v421 이하 몫(받음 — mergeBall) · 둘 다 없으면 칸을 안 둔다
+    for (const [f, days] of [['korWordBall', 'korWordDay'], ['korPuzzleBall', 'korPuzzleDay'], ['nonsulBall', 'nonsulDay']]) {
+      const mb = cur[f] || rec[f] ? mergeBall(cur[f], rec[f], cur[days], rec[days]) : null;
+      if (mb) out[f] = mb; else delete out[f];
+    }
     // 📝 문법 칸 — 🖊️ 논술과 같은 꼴(한쪽이라도 ⭐면 ⭐ · 보상 받은 날은 날마다 큰 쪽) · 진단 ✅는 합집합(이른 날) ·
     //   오개념 수는 열쇠마다 큰 쪽(늘어나기만) · 진단 날은 이른 날 · 🎁 깜짝 포켓몬은 받은 수가 큰 쪽·날은 늦은 쪽(옛 백업이 하루에 두 번 나오게 하지 않게) (v348) ·
     //   본 문제는 단원마다 최근 쪽(아래)

@@ -113,6 +113,7 @@ export function finishText(r, listen = false) {
 /** 🎯 다시 읽기 안내 한 줄 (순수, v300) — star = 연 때 이번에 받을 별(nextStar) · ★★·★★★를 받을 수 있는 읽기면 규칙만(셈 없이) · 아니면 '' */
 export function catchRuleLine(star, listen = false) {
   if (!(star >= CATCH_FIRST_STAR)) return '';
+  if (star === 1) return '🎯 처음 고른 답이 반 이상 맞으면 포켓몬을 만나요'; // 새 글·새 듣기 ★ (v422 — 「다시 읽을 때는」이 아니다)
   return `🎯 다시 ${listen ? '들을' : '읽을'} 때는 처음 고른 답이 반 이상 맞으면 포켓몬을 만나요`;
 }
 
@@ -976,14 +977,15 @@ async function finishCard() {
   if (res && res.ok) korGainXp(res.xp); // ⚡ (v327) — 같은 글은 하루 한 번 · [다시 저장하기]는 0(규칙이 정함) · 화면이 바뀌었어도 준다
   if (res && res.ok && res.newRead) korRocketDone('korean'); // 🚀 오늘 끝낸 글 (로켓단 등장 조건 — 하루 기록 korReads는 korFinish가 적는다)
   // 🔥·✨ (v329) — 새로 읽은 글일 때(다시 읽기·🎧 포함 · [다시 저장하기]는 아님) · 준 것은 화면과 상관없이 · 줄은 그 끝 화면이 떠 있을 때만
+  //   ✨는 처음 고른 답이 반 이상인 글에서만(v422 — 아니면 다음 글에서 · 🔥는 그대로)
   if (res && res.ok && res.newRead) {
-    korDayDone('korean').then((day) => {
+    korDayDone('korean', { bonus: !!res.half }).then((day) => {
       if ((day.streak || day.bonus) && ui.read === r && r.result === res) { r.day = day; renderQ(); }
     }).catch(() => {});
   }
   // 🥚 글 한 편을 끝까지 읽은 날 — 별이 없어도(다시 읽기도 공부). ★ 저장이 됐으면 화면과 상관없이 칸을 채운다
-  //   (저장하는 사이 ← 도감을 누르면 그날 칸이 빠졌다, Codex 51차 — 🔤 낱말 판과 같은 꼴)
-  const eggP = res && res.ok ? tickKorDay() : null;
+  //   (저장하는 사이 ← 도감을 누르면 그날 칸이 빠졌다, Codex 51차 — 🔤 낱말 판과 같은 꼴) · v422부터 처음 고른 답이 반 이상인 글만
+  const eggP = res && res.ok && res.half ? tickKorDay() : null;
   if (ui.read !== r) return; // 그 사이 도감으로 나갔다 — 그리기만 그만
   r.saving = false;
   r.result = res;

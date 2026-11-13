@@ -41,7 +41,7 @@ test('숫자 — 하루 기록 칸 넷(⏳ korBonus와 다른 칸) · 🔤 다�
   assert.deepEqual([1, 2, 3, 10, 11].map(streakCoins), [5, 10, 15, 50, 50]);
   assert.deepEqual([0, 1, 2, 3, 9].map(matchXp), [30, 20, 20, 10, 10]);
   assert.deepEqual([0, 1, 2, 3, 9].map(matchCoins), [5, 3, 3, 2, 2]);
-  assert.deepEqual(BONUS_TIP, { korean: '📚 글 한 편 다 읽으면 받아요', nonsul: '🖊️ 논술 한 판 끝내면 받아요' });
+  assert.deepEqual(BONUS_TIP, { korean: '📚 글을 잘 읽고 처음에 많이 맞히면 받아요', nonsul: '🖊️ 논술 한 판을 처음에 많이 맞히면 받아요' }); // v422 — ✨는 처음 답이 반 이상인 글·판에
 });
 
 test('🔥 공부한 날 = 국어 글(korReads)·논술 판(nsRounds)·🔥 받은 날 — 🔤 낱말·🧩 퍼즐만 한 날은 아니다', () => {
@@ -209,13 +209,13 @@ test('🔤 이은 낱말 기록 — 판에 낸 다섯만 · 두 번째(다른 �
 
 test('화면 연결 — 국어 글(새로 읽은 줄일 때)·논술 판 끝에 🔥·✨ · 끝 화면 줄 · 🔤 단추는 국어 글 끝에만 · 홈 카드 · 짝 맞추기 국어 꼴 · 음악 · 저장 병합 · 앱 셸', () => {
   const kv = read('js/koreanview.js');
-  assert.match(kv, /if \(res && res\.ok && res\.newRead\) \{\n\s+korDayDone\('korean'\)/, '국어 — 새로 읽은 줄일 때만([다시 저장하기]는 아님)');
+  assert.match(kv, /if \(res && res\.ok && res\.newRead\) \{\n\s+korDayDone\('korean', \{ bonus: !!res\.half \}\)/, '국어 — 새로 읽은 줄일 때만([다시 저장하기]는 아님) · ✨는 처음 고른 답이 반 이상인 글만(v422)');
   assert.match(kv, /streakLine\(r\.day\.streak\)/);
   assert.match(kv, /bonusLine\(r\.day\.bonus\)/);
   assert.match(kv, /korMatchOffer\(ui\.cards \|\| \[\]\)/);
   assert.match(kv, /korMatchEl\(m, \{ viewId: 'view-korean'/);
   const ns = read('js/nonsulview.js');
-  assert.match(ns, /korDayDone\('nonsul'\)/);
+  assert.match(ns, /korDayDone\('nonsul', \{ bonus: !!res\.half \}\)/); // ✨는 세 걸음 중 둘 이상을 안 틀린 판만(v422)
   assert.match(ns, /streakLine\(r\.day\.streak\)/);
   assert.doesNotMatch(ns, /korMatchOffer/, '🔤은 국어 글 끝에만');
   const home = read('js/home.js');

@@ -454,19 +454,19 @@ test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘·🧩 v242) · 낱말�
   assert.ok(kt.includes("const answers = [...ws.first.entries()].map(([id, ok]) => ({ id, ok, from: ws.from.get(id) || 0 }));"), '시작 때 상태를 같이 (50차 #4)');
   assert.ok(kt.includes('  if (ws.i < n && !ws.saving) {'), '저장이 시작되면 그만하기 없음 (50차 #6)');
   const fin = kt.slice(kt.indexOf('async function finishSession(ctx) {'), kt.indexOf('/** 판을 끝낸 말 (순수)'));
-  const between = fin.slice(fin.indexOf('res = await korWordsFinish('), fin.indexOf('const egg = await ctx.tickKorDay();'));
+  const between = fin.slice(fin.indexOf('res = await korWordsFinish('), fin.indexOf('const egg = res.half ? await ctx.tickKorDay() : null;'));
   assert.ok(between.length > 0 && !/\breturn\b/.test(between), '🥚 칸은 화면이 바뀌어도 — 저장과 알 칸 사이에 빠져나가는 길이 없다');
   assert.ok(kt.includes("top.appendChild(el('span', 'kor-q-no', `문제 ${Math.min(ws.i + 1, n)} / ${n}`));"), '문제 수 (50차 #9)');
-  assert.ok(kt.includes('const egg = await ctx.tickKorDay();'), '🥚 낱말을 끝낸 날');
+  assert.ok(kt.includes('const egg = res.half ? await ctx.tickKorDay() : null;'), '🥚 낱말을 끝낸 날 — v422부터 처음 고른 답이 반 이상인 판만');
   assert.ok(kt.includes('res = await korWordsFinish(answers, (S.all || []).map((w) => w.id));'));
   const { wordsFinishText, todayLine } = await import('../js/kortabs.js');
-  assert.deepEqual(wordsFinishText({ ok: true, first: true, coins: 10, stone: 1, n: 6, okN: 6, mastered: ['c:비유'] }, (id) => id.slice(2)), {
+  assert.deepEqual(wordsFinishText({ ok: true, first: true, coins: 10, stone: 1, prize: true, ball: { s: 'w' }, n: 6, okN: 6, mastered: ['c:비유'] }, (id) => id.slice(2)), {
     title: '🔤 오늘의 낱말 끝!', lines: ['한 번에 맞힌 낱말 6 / 6', '💰 +10 · 🎯 국어 포켓몬 잡기 1번 · 🟩 국어스톤 +1 (모두 한 번에 맞혔어요!)', '⭐ 새로 익힌 낱말: 비유'],
   });
   assert.equal(wordsFinishText({ ok: true, first: false, coins: 0, stone: 0, n: 3, okN: 2, mastered: [] }).title, '🔤 낱말 연습 끝!');
   assert.match(wordsFinishText({ ok: true, first: false, n: 3, okN: 2, mastered: [] }).lines[1], /이미 받았어요/);
   assert.equal(wordsFinishText({ ok: false, why: 'save' }).title, '저장이 안 됐어요');
-  assert.match(todayLine(0), /💰10 · 🎯 국어 포켓몬 잡기 1번 · 낱말 5개 이상을 모두 한 번에/);
+  assert.match(todayLine(0), /^끝내면 💰10 · 한 번에 많이 맞히면 🎯 · 낱말 5개 이상을 모두 한 번에/); // v422
   assert.match(todayLine(2), /🟩까지/);
   const sw = read('sw.js');
   for (const f of ['./js/korwords.js', './js/korunits.js', './js/kortabs.js', './coach/korean/words.json', './coach/korean/units.json']) assert.ok(sw.includes(`'${f}',`), f);

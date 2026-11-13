@@ -36,6 +36,8 @@ import { copyLake, catchRule as lakeCatchRule, gearBuyRule as lakeGearRule, pick
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
+import { ballOf, wordsToday, korPrizeKey } from './korwords.js'; // 🎯 오늘 판 기회 그리기용 · 📤 별 받은 글 판정 칸 (v422)
+import { dayNum } from './korean.js'; // 🎯 오늘 판 기회 그리기용 (v422)
 import { spellFinishRule, spellSeenOf } from './spell.js'; // 🔤 진우 철자 노트 — 진도·💰 (v356 · 순수)
 import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·보상 (순수 — 낱말 칸과 같은 꼴)
 import { matchedOf, korMatchRule } from './kormatch.js'; // 🔤 국어 낱말 이어 주기 — 이은 낱말 (v329, 순수)
@@ -1094,6 +1096,8 @@ export async function korFinish(cardId, misses, ids, evMiss = 0, opts = {}) {
   const r = await houseDo((p) => korFinishRule(p, cardId, Date.now(), misses, ids, evMiss, opts)); // evMiss — 🟩 "한 번에 다 맞힘" 판정 · opts.noStone 🎧 글로 읽고 풀었다
   // 📈 읽은 기록 줄이 새로 생겼으면 그날 하루 기록에도 (v314 — 📈 주간 흐름 국어 줄) · 프로필 저장 뒤 따로라 드물게 못 적으면 그 한 편만 빠진다(별·💰와는 상관없다 — 수학 푼 문제 수와 같은 꼴)
   const dd = r && r.ok && r.newRead ? korDayDelta(r.newRead) : null;
+  // 📤 별을 받은 글의 🎯 판정 (v422 — 국어 요약에만 · 같은 날 기록에 함께 · 같은 읽기는 한 칸)
+  if (dd && dd.date && r.star) dd.delta = { ...dd.delta, korPrize: [korPrizeKey('read', r.newRead.t, r.star, r.newRead.f, r.newRead.n, r.noCatch ? 'm' : 'w')] };
   if (dd && dd.date) await applyDailyDelta(dd.date, dd.delta).catch(() => {});
   return r;
 }
@@ -1244,6 +1248,12 @@ export function korPuzzleMap() {
 /** 🧩 퍼즐 보상 받은 날 { 날 번호: 1 | 2 } (그리기용 복사본) */
 export function korPuzzleDayMap() {
   return wordDaysOf(profile.korPuzzleDay);
+}
+/** 🎯 오늘 판 기회 (v422 · 그리기용) — kind 'word'|'pz'|'ns' → { won, left } (korwords.ballOf · 오늘 💰를 받은 판이 있나도 함께 본다) */
+export function korBallToday(kind, now = Date.now()) {
+  const f = { word: ['korWordBall', 'korWordDay'], pz: ['korPuzzleBall', 'korPuzzleDay'], ns: ['nonsulBall', 'nonsulDay'] }[kind];
+  if (!f) return { won: false, left: true };
+  return ballOf(profile[f[0]], dayNum(now), wordsToday(profile[f[1]], now) > 0);
 }
 /** 📚 받은 별 { '카드id:별': 날 } (그리기용 복사본) */
 export function korDoneMap() {

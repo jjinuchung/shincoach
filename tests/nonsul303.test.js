@@ -193,10 +193,10 @@ test('🔍 Codex 111차: 모든 주제·두 편·고른 이유 둘(차례까지)
   }
 });
 
-test('🖊️ nonsulRule: 그날 첫 판만 💰10·🎯 하나 · 한 번에 다 맞힘 → ⭐(처음 ⭐면 🎯 하나 더 — v338) · 틀린 판 → 내일 다시(틀린 수 +1) · ⭐·낡은 판은 연습(칸 그대로) · 모르는 주제는 안 받음', () => {
+test('🖊️ nonsulRule: 그날 첫 판만 💰10 · 🎯 하나(v422 — 세 걸음 중 둘 이상을 안 틀린 판) · 한 번에 다 맞힘 → ⭐(처음 ⭐면 🎯 하나 더 — v338) · 틀린 판 → 내일 다시(틀린 수 +1) · ⭐·낡은 판은 연습(칸 그대로) · 모르는 주제는 안 받음', () => {
   assert.equal(NONSUL_COINS, 10, '보상은 🧩 국어 퍼즐과 같게(아버님 결정)');
   const p = emptyProfile();
-  const r1 = nonsulRule(p, { id: 'N1', ok: false, from: 0 }, NOW, IDS);
+  const r1 = nonsulRule(p, { id: 'N1', ok: false, from: 0, steps: { ok: 2 } }, NOW, IDS);
   assert.deepEqual([r1.ok, r1.first, r1.coins, r1.throws, r1.solved, r1.starCatch, r1.practice], [true, true, NONSUL_COINS, 1, false, false, false]);
   assert.deepEqual([p.coins, p.coinsEarned, p.nonsulThrow.earned], [NONSUL_COINS, NONSUL_COINS, 1]);
   assert.deepEqual([p.nonsul.N1.box, p.nonsul.N1.due, p.nonsul.N1.miss, p.nonsul.N1.d0], [0, D0 + 1, 1, D0]);
@@ -220,7 +220,7 @@ test('🖊️ nonsulRule: 그날 첫 판만 💰10·🎯 하나 · 한 번에 �
 
 test('🎯 ⭐ (v338): 같은 날 틀린 뒤 바로 다시 푼 ⭐는 ⭐만(🎯 없음) · 다음 날 다시 틀려도 🎯 없음 · 그다음 날 ⭐면 🎯 · 오늘 첫 판에 새 주제 ⭐면 🎯 둘', () => {
   const p = emptyProfile();
-  nonsulRule(p, { id: 'N1', ok: false, from: 0 }, NOW, IDS);
+  nonsulRule(p, { id: 'N1', ok: false, from: 0, steps: { ok: 2 } }, NOW, IDS);
   assert.equal(p.nonsulThrow.earned, 1, '첫 판(틀림) — 🎯 하나');
   const same = nonsulRule(p, { id: 'N1', ok: true, from: p.nonsul.N1.at }, NOW + 60000, IDS); // 📖 국어 글 끝에서 같은 주제를 다시 연 길
   assert.deepEqual([same.practice, same.solved, same.starCatch, p.nonsul.N1.box, p.nonsulThrow.earned], [false, true, false, SOLVED, 1], '같은 날 다시 — ⭐는 서지만 🎯는 없다(⚡와 같은 하루 한 번)');
@@ -229,8 +229,8 @@ test('🎯 ⭐ (v338): 같은 날 틀린 뒤 바로 다시 푼 ⭐는 ⭐만(�
   const stale = nonsulRule(p, { id: 'N4', ok: true, from: 777 }, NOW + 4 * DAY, IDS);
   assert.deepEqual([stale.practice, stale.starCatch, p.nonsulThrow.earned], [true, false, 3], '다른 날 낡은 판 — 첫 판 🎯만');
   const q = emptyProfile();
-  nonsulRule(q, { id: 'N2', ok: false, from: 0 }, NOW, IDS);
-  const d1 = nonsulRule(q, { id: 'N2', ok: false, from: q.nonsul.N2.at }, NOW + DAY, IDS);
+  nonsulRule(q, { id: 'N2', ok: false, from: 0, steps: { ok: 2 } }, NOW, IDS);
+  const d1 = nonsulRule(q, { id: 'N2', ok: false, from: q.nonsul.N2.at, steps: { ok: 2 } }, NOW + DAY, IDS);
   assert.deepEqual([d1.first, d1.solved, d1.starCatch, q.nonsulThrow.earned], [true, false, false, 2], '다음 날 또 틀림 — 첫 판 🎯만');
   const d2 = nonsulRule(q, { id: 'N2', ok: true, from: q.nonsul.N2.at }, NOW + 2 * DAY + 1000, IDS);
   assert.deepEqual([d2.first, d2.starCatch, q.nonsulThrow.earned], [true, true, 4], '그다음 날 ⭐ — 첫 판 🎯 + ⭐ 🎯');
@@ -242,7 +242,7 @@ test('🎯 ⭐ (v338): 같은 날 틀린 뒤 바로 다시 푼 ⭐는 ⭐만(�
 test('🖊️ 잡기 기회: 국어와 따로 센다 · 없으면 못 뺌 · 뺀 만큼만 돌려줌', () => {
   const p = emptyProfile();
   assert.equal(nonsulTakeRule(p).why, 'none');
-  nonsulRule(p, { id: 'N1', ok: false, from: 0 }, NOW, IDS);
+  nonsulRule(p, { id: 'N1', ok: false, from: 0, steps: { ok: 2 } }, NOW, IDS);
   assert.deepEqual(p.korThrow, { earned: 0, used: 0, refunded: 0 }, '국어 잡기 기회는 그대로');
   assert.deepEqual([nonsulTakeRule(p).ok, nonsulTakeRule(p).why], [true, 'none']);
   assert.equal(nonsulGiveBackRule(p).ok, true);
@@ -278,7 +278,7 @@ async function seed(p) {
 }
 
 test('★ 🖊️ 저장 경로(가짜 IndexedDB): 판을 끝내면 칸·💰·🎯가 저장된 프로필에 · 두 창이 동시에 첫 판을 끝내도 보상 한 번 · 저장이 안 되면 없던 일 · 잡기 기회 빼기·돌려주기', async () => {
-  await seed({ coins: 0, coinsEarned: 0, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 } });
+  await seed({ coins: 0, coinsEarned: 0, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, nonsulBall: null }); // 판 🎯 기회 칸도 처음으로 (v422 — 앞 시험이 남긴 오늘 기록)
   fakeIdb.failNext('profile');
   const bad = await nonsulFinish({ id: 'N1', ok: true, from: 0 }, IDS);
   assert.equal(bad.ok, false);
@@ -302,7 +302,7 @@ test('★ 🖊️ 저장 경로(가짜 IndexedDB): 판을 끝내면 칸·💰·�
 });
 
 test('★ 🎯 ⭐ 저장 경로 (🔍 Codex 142차): 두 창이 같은 주제를 같은 from으로 다 맞혀도 ⭐ 🎯는 한 번 · 첫 판·⭐ 기회 둘을 차례로 쓰면 셋째는 없음', async () => {
-  await seed({ coins: 0, coinsEarned: 0, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 } });
+  await seed({ coins: 0, coinsEarned: 0, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, nonsulBall: null }); // 판 🎯 기회 칸도 처음으로 (v422 — 앞 시험이 남긴 오늘 기록)
   const [a, b] = await Promise.all([nonsulFinish({ id: 'N3', ok: true, from: 0 }, IDS), nonsulFinish({ id: 'N3', ok: true, from: 0 }, IDS)]);
   assert.ok(a.ok && b.ok);
   assert.deepEqual([a.starCatch, b.starCatch].sort(), [false, true], '⭐ 🎯는 한 창만');
@@ -318,7 +318,7 @@ test('★ 🎯 ⭐ 저장 경로 (🔍 Codex 142차): 두 창이 같은 주제�
 });
 
 test('🖊️ 말: 판 끝·오늘 줄은 셈 없이(💰 보상 액수만) · 📊·📤 줄은 아빠용 셈', () => {
-  const f1 = nonsulFinishText({ ok: true, first: true, coins: NONSUL_COINS, solved: true, starCatch: true, practice: false });
+  const f1 = nonsulFinishText({ ok: true, first: true, coins: NONSUL_COINS, prize: true, ball: { s: 'w' }, solved: true, starCatch: true, practice: false });
   assert.equal(f1.title, '🖊️ 오늘의 논술 끝!');
   assert.deepEqual(f1.lines, [`💰 +${NONSUL_COINS} · 🎯 논술 포켓몬 잡기 1번`, '⭐ 처음부터 다 맞혔어요! · 🎯 논술 포켓몬 잡기 1번 더']);
   // 🎯 ⭐ (v338) — 판 끝 말 갈래 넷
@@ -326,16 +326,20 @@ test('🖊️ 말: 판 끝·오늘 줄은 셈 없이(💰 보상 액수만) · �
   const PAID = '오늘의 💰는 이미 받았어요 — 한 것은 기록에 들어갔어요';
   assert.deepEqual(nonsulFinishText({ ok: true, first: false, coins: 0, solved: true, starCatch: true, practice: false }).lines, [PAID, '⭐ 처음부터 다 맞혔어요! · 🎯 논술 포켓몬 잡기 1번'], '둘째 판 처음 ⭐ — 「더」 없이');
   assert.deepEqual(nonsulFinishText({ ok: true, first: false, coins: 0, solved: true, starCatch: false, practice: false }).lines, [PAID, '⭐ 처음부터 다 맞혔어요!'], '같은 날 다시 푼 ⭐ — 🎯 말 없음');
-  assert.deepEqual(nonsulFinishText({ ok: true, first: true, coins: NONSUL_COINS, solved: false, starCatch: false, practice: false }).lines, [`💰 +${NONSUL_COINS} · 🎯 논술 포켓몬 잡기 1번`, MORE], '틀린 판 — 다음에 ⭐로 끝낼 까닭');
+  assert.deepEqual(nonsulFinishText({ ok: true, first: true, coins: NONSUL_COINS, prize: true, ball: { s: 'w' }, solved: false, starCatch: false, practice: false }).lines, [`💰 +${NONSUL_COINS} · 🎯 논술 포켓몬 잡기 1번`, MORE], '틀린 판 — 다음에 ⭐로 끝낼 까닭');
   assert.deepEqual(nonsulFinishText({ ok: true, first: false, coins: 0, solved: false, starCatch: false, practice: true }).lines, [PAID], '연습 판 — ⭐·🎯 약속 없음');
   assert.equal(nonsulFinishText({ ok: true, first: false, practice: true }).title, '🖊️ 논술 연습 끝!');
   assert.equal(nonsulFinishText({ ok: true, first: false, practice: false }).title, '🖊️ 논술 더 하기 끝!');
   assert.equal(nonsulFinishText({ ok: false, why: 'save' }).title, '저장이 안 됐어요');
-  assert.equal(nonsulTodayLine(0), `오늘 처음 끝내면 💰${NONSUL_COINS} · 🎯 논술 포켓몬 잡기 1번 · 처음부터 다 맞히면 ⭐와 🎯 하나 더`);
-  assert.equal(nonsulTodayLine(1), '오늘의 논술 끝 ✅ — 처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!');
-  assert.equal(nonsulTodayLine(0, false), `오늘 처음 끝내면 💰${NONSUL_COINS} · 🎯 논술 포켓몬 잡기 1번`, '오늘 할 주제가 없으면 ⭐ 약속 없음');
-  assert.equal(nonsulTodayLine(1, false), '오늘의 논술 끝 ✅');
-  assert.ok(read('js/nonsulview.js').includes("card.appendChild(el('p', 'ns-today', nonsulTodayLine(today, !!next)));"), '첫 화면은 오늘 할 주제가 있는지 건넨다');
+  // v422 — 판 🎯는 한 번에 많이 맞힌 판에(세 걸음 중 둘 이상) · 셈 없이
+  const WON = { won: true, left: false };
+  assert.equal(nonsulTodayLine(0), `끝내면 💰${NONSUL_COINS} · 한 번에 많이 맞히면 🎯 · 처음부터 다 맞히면 ⭐와 🎯 하나 더`);
+  assert.equal(nonsulTodayLine(1, true, WON), '오늘의 논술 끝 ✅ — 처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!');
+  assert.equal(nonsulTodayLine(1), '오늘의 논술 끝 ✅ — 한 번에 많이 맞히면 🎯 · 처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!');
+  assert.equal(nonsulTodayLine(0, false), `끝내면 💰${NONSUL_COINS} · 한 번에 많이 맞히면 🎯`, '오늘 할 주제가 없으면 ⭐ 약속 없음');
+  assert.equal(nonsulTodayLine(1, false, WON), '오늘의 논술 끝 ✅');
+  assert.equal(nonsulTodayLine(1, false, { won: false, left: false }), '오늘의 논술 끝 ✅ — 🎯는 내일 또 기회가 있어요');
+  assert.ok(read('js/nonsulview.js').includes("card.appendChild(el('p', 'ns-today', nonsulTodayLine(today, !!next, korBallToday('ns'))));"), '첫 화면은 오늘 할 주제가 있는지 · 오늘 판 🎯 기회(v422)를 건넨다');
   // 아이 화면 글에 셈·진행 수(n / m · 몇 개 남음)가 없다 (2026-10-15)
   const view = read('js/nonsulview.js');
   assert.ok(!/\$\{[^}]*length[^}]*\}\s*\/|남은 \$\{|개 남|\$\{[^}]*\}\s*\/\s*\$\{/.test(view), '아이 화면에 n/m·남은 수 없음');
@@ -397,7 +401,7 @@ test('🖊️ 화면 연결: 홈 카드 · 화면 · ⏳ 국어 시간 · 시간
   const v = read('js/nonsulview.js');
   assert.equal((v.match(/guardStart\('korean', /g) || []).length, 8, '판을 열 때마다 국어 시간을 본다(시작·연습·다음 주제) + v304 ✍️ 짧은 글을 여는 세 곳(첫 화면 목록·판 끝·📬 띠 — Codex 110차 #2) + v355 💡 내 이유 두 곳(판 끝 답장 열어 보기 · 답장 뒤 이 주제 다시 해 보기)');
   const fin = body(v, 'async function finishRound() {');
-  assert.ok(fin.includes('res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from }, S.list.map((t) => t.id));'), '판 끝에 한 번 저장 · ok = 한 번도 안 틀림');
+  assert.ok(fin.includes('res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from, steps }, S.list.map((t) => t.id));'), '판 끝에 한 번 저장 · ok = 한 번도 안 틀림 · steps = 안 틀린 걸음(v422)');
   const run = body(v, 'export async function runCatch() {');
   const iTake = run.indexOf('taken = await nonsulTakeThrow();');
   const iTrack = run.indexOf('const st = { threw: false, hold: holds.track() };');

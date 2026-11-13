@@ -986,7 +986,7 @@ export function prizeReport(days, today) {
   }
   const mark = { w: '✅받음', m: '❌못 미침', d: '(이미 받은 날)', o: '(기회 지남)' };
   const part = (icon, list) => `${icon} ${list.length
-    ? list.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : Number(a.key) - Number(b.key))).map((r) => `${r.date.slice(5)} ${r.idx ? `${r.idx}째` : '셋째 뒤'} ${r.ok}/${r.total} ${mark[r.s]}`).join(' · ')
+    ? list.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : Number(a.key) - Number(b.key))).map((r) => `${r.date.slice(5)} ${r.idx ? `${r.idx}째` : '셈 밖'} ${r.ok}/${r.total} ${mark[r.s]}`).join(' · ')
     : '없음'}`;
   return `🎯 처음 답 반 이상(v421 · 최근 7일 · 끝낸 판마다 · 둘째 판까지): ${part('☀️', rows.sun)} | ${part('🧩', rows.puzzle)} | ${part('🕵️', rows.detect)}`;
 }

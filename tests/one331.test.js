@@ -151,7 +151,7 @@ test('🧩 하루 한 꼴은 두 길을 합쳐 (🔍 Codex 135차 #3) — 퍼즐
 });
 
 test('🧩 끝 화면 말 — 퍼즐 하나는 맞힌 수 대신 한 줄 · 틀리면 내일 다시 · 첫 퍼즐이면 💰·🎯 · 탭 줄은 "판 끝"이라 하지 않는다', () => {
-  const ok = puzzleFinishText({ ok: true, first: true, coins: 10, stone: 0, n: 1, okN: 1, solved: ['H1'] }, () => '🔗 꾸미는 말', true);
+  const ok = puzzleFinishText({ ok: true, first: true, coins: 10, stone: 0, prize: true, ball: { s: 'w' }, n: 1, okN: 1, solved: ['H1'] }, () => '🔗 꾸미는 말', true);
   assert.deepEqual(ok, { title: '🧩 퍼즐 하나 끝!', lines: ['한 번에 맞혔어요!', '💰 +10 · 🎯 국어 포켓몬 잡기 1번', '⭐ 새로 푼 퍼즐: 🔗 꾸미는 말'] });
   const no = puzzleFinishText({ ok: true, first: false, coins: 0, stone: 0, n: 1, okN: 0, solved: [], moved: 1 }, undefined, true);
   assert.deepEqual(no, { title: '🧩 퍼즐 하나 끝!', lines: ['틀린 퍼즐은 내일 다시 나와요 — 그때 또 풀어 봐요'] });
@@ -161,7 +161,8 @@ test('🧩 끝 화면 말 — 퍼즐 하나는 맞힌 수 대신 한 줄 · 틀�
   assert.ok(!/\d+ \/ \d+/.test(no.lines.join(' ')), '0 / 1 같은 셈 없음');
   assert.match(puzzleFinishText({ ok: false, why: 'save' }, undefined, true).title, /저장이 안 됐어요/, '저장 실패는 판과 같다');
   assert.equal(puzzleFinishText({ ok: true, first: false, n: 1, okN: 0, solved: [] }).title, '🧩 퍼즐 연습 끝!', '판은 예전 그대로');
-  assert.equal(puzzleTodayLine(1), '오늘 퍼즐 보상은 받았어요 ✅ — 더 풀어도 ⭐는 모여요');
+  assert.equal(puzzleTodayLine(1, { won: true, left: false }), '오늘 퍼즐 보상은 받았어요 ✅ — 더 풀어도 ⭐는 모여요');
+  assert.equal(puzzleTodayLine(1), '오늘 퍼즐 보상은 받았어요 ✅ — 한 번에 많이 맞히면 🎯', '🎯는 아직 — 기회가 남았으면 (v422)');
   assert.ok(!puzzleTodayLine(1).includes('오늘의 퍼즐 끝'));
 });
 
@@ -227,8 +228,8 @@ test('🧩 화면 잇기 — 퍼즐 판: 하나짜리 판 · 누름·끝냄 기�
   assert.ok(p.includes('if (!ps.practice && !ps.one) notePlay({ korPzQuits:'), '그만둠은 판 기록에 안 넣는다');
   assert.ok(/S\.ps = null;\s+if \(ps\.one\) ctx\.toCards\(\); else ctx\.toPuzzle\(\);/.test(p), '그만두면 도감으로');
   assert.ok(p.includes('const t = puzzleFinishText(res, (id) => nameOf(byId(id)) || id, ps.one);'));
-  assert.ok(p.includes('if (ps.one) { row.appendChild(cards); row.appendChild(back); } else { row.appendChild(back); row.appendChild(cards); }'), '📚 도감으로 먼저');
-  assert.ok(p.includes("const cards = el('button', `btn${res.ok && ps.one ? ' btn-primary' : ''}`, '📚 도감으로');"));
+  assert.ok(p.includes('if (ps.one && !retry) { row.appendChild(cards); row.appendChild(back); } else { row.appendChild(back); row.appendChild(cards); }'), '📚 도감으로 먼저 · 🎯를 못 미쳤고 기회가 남았으면 🧩 퍼즐로 먼저(v422)');
+  assert.ok(p.includes("const cards = el('button', `btn${res.ok && ps.one && !retry ? ' btn-primary' : ''}`, '📚 도감으로');"));
   const css = read('css/style.css');
   assert.ok(css.includes('.kor-one-offer {') && css.includes('.kor-one-btn { width: 100%; }'));
   const sw = read('sw.js');

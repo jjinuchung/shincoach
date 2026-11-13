@@ -5,7 +5,11 @@
 //  · 판 중간에 나가면(🎒·📊) 그대로 이어서, "← 그만하기"를 두 번 누르면 저장 없이 끝
 import { DECKS, DECK_ORDER, NEW_PER_DAY, WORD_COINS, PERFECT_MIN, MASTER_BOX, allWords, planToday, makeQuestion, deckStats, wordsToday, isOpen } from './korwords.js';
 import { unitsOf, unitLabel, unitProgress, TERMS, TERM_LABEL } from './korunits.js';
-import { korWordsFinish, korWordsMap, korWordDayMap, korDoneMap } from './xp.js';
+import { korWordsFinish, korWordsMap, korWordDayMap, korDoneMap, korBallToday } from './xp.js';
+import { applyDailyDelta } from './db.js'; // 📤 🎯 판정 칸 (v422)
+import { korPrizeKey } from './korwords.js'; // 📤 🎯 판정 칸 (v422)
+import { gotLine, ballTip } from './korpuzzle.js'; // 끝 화면 받은 것·🎯 한 줄 (v422 — 🧩와 같은 말)
+import { todayKey } from './track.js';
 import { starsOf, circled } from './korean.js';
 import { guardStart } from './timeup.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
@@ -61,11 +65,12 @@ export function inSession() {
 
 // ───────────────────── 🔤 낱말 탭 ─────────────────────
 
-/** 오늘 보상 말 (순수) — wordsToday 값(0·1·2) → 한 줄 */
-export function todayLine(today) {
-  if (today >= 2) return '오늘의 낱말 끝 ✅ 🟩까지 받았어요';
-  if (today === 1) return '오늘의 낱말 끝 ✅ — 더 해도 복습 날짜는 그대로 쌓여요';
-  return `오늘 처음 끝내면 💰${WORD_COINS} · 🎯 국어 포켓몬 잡기 1번 · 낱말 ${PERFECT_MIN}개 이상을 모두 한 번에 맞히면 🟩 국어스톤`;
+/** 오늘 보상 말 (순수) — wordsToday 값(0·1·2) · prize 오늘 🎯 { won 받음, left 아직 기회 }(v422 ballOf) → 한 줄 · 셈 없음 */
+export function todayLine(today, prize = { won: false, left: true }) {
+  const ball = prize && prize.won ? '' : prize && prize.left ? '한 번에 많이 맞히면 🎯' : '🎯는 내일 또 기회가 있어요';
+  if (today >= 2) return `오늘의 낱말 끝 ✅ 🟩까지 받았어요${ball ? ` — ${ball}` : ''}`;
+  if (today === 1) return `오늘의 낱말 끝 ✅ — ${ball || '더 해도 복습 날짜는 그대로 쌓여요'}`;
+  return `끝내면 💰${WORD_COINS}${ball ? ` · ${ball}` : ''} · 낱말 ${PERFECT_MIN}개 이상을 모두 한 번에 맞히면 🟩 국어스톤`;
 }
 
 export async function renderWordsTab(box, ctx) {
@@ -78,7 +83,7 @@ export async function renderWordsTab(box, ctx) {
   const head = el('section', 'kor-head');
   head.appendChild(el('h2', 'kor-h', '🔤 오늘의 낱말'));
   head.appendChild(el('p', 'kor-intro', '국어 시간에 쓰는 말, 관용 표현, 속담, 사자성어, 글에서 만난 낱말을 익혀요. 맞힌 낱말은 다음 날 → 3일 → 7일 → 14일 뒤에 다시 나오고, 끝까지 맞히면 ⭐ 익힌 낱말이 돼요.'));
-  head.appendChild(el('p', 'kor-count', todayLine(wordsToday(korWordDayMap(), now))));
+  head.appendChild(el('p', 'kor-count', todayLine(wordsToday(korWordDayMap(), now), korBallToday('word', now)))); // 🎯 오늘 기회 (v422)
   const start = (extra) => guardStart('korean', () => startSession(ctx, extra));
   if (plan.length) {
     const b = el('button', 'btn btn-primary btn-big-wide kor-wstart', '🔤 오늘의 낱말 시작');
@@ -146,7 +151,7 @@ function startSession(ctx, extra) {
     if (q) items.push({ id: p.id, kind: q.kind, q, retry: false });
   }
   if (!items.length) { ctx.rerender(); return; }
-  S.ws = { items, i: 0, first: new Map(), from, picked: null, result: null, saving: false, egg: null, quitAsk: false, focus: 'opt' };
+  S.ws = { t0: Date.now(), items, i: 0, first: new Map(), from, picked: null, result: null, saving: false, egg: null, quitAsk: false, focus: 'opt' }; // t0 — 📤 판 열쇠 (v422)
   renderSession(ctx);
   window.scrollTo(0, 0);
 }
@@ -310,7 +315,8 @@ async function finishSession(ctx) {
   if (res && res.ok) {
     korGainXp(res.xp); // ⚡ (v327) — 칸을 옮긴 판만(규칙이 정함) · 화면이 바뀌었어도 준다
     if (live && (res.stone || (res.mastered && res.mastered.length))) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
-    const egg = await ctx.tickKorDay(); // 🥚 오늘의 낱말을 끝낸 날 = 국어 알 하루 칸
+    if (res.ball) applyDailyDelta(todayKey(), { korPrize: [korPrizeKey('word', ws.t0, res.ball.idx, res.ball.ok, res.ball.total, res.ball.s)] }).catch(() => {}); // 📤 🎯 판정 (v422)
+    const egg = res.half ? await ctx.tickKorDay() : null; // 🥚 오늘의 낱말을 끝낸 날 = 국어 알 하루 칸 — v422부터 처음 고른 답이 반 이상인 판만
     if (S.ws === ws && egg && egg.ok) { ws.egg = egg; renderSession(ctx); }
   }
 }
@@ -322,8 +328,11 @@ export function wordsFinishText(res, nameOf = (id) => id) {
     return { title: '저장이 안 됐어요', lines: ['[다시 저장하기]를 눌러 주세요 — 푼 것은 그대로예요'] };
   }
   const lines = [`한 번에 맞힌 낱말 ${res.okN} / ${res.n}`];
-  if (res.first) lines.push(`💰 +${res.coins} · 🎯 국어 포켓몬 잡기 1번${res.stone ? ' · 🟩 국어스톤 +1 (모두 한 번에 맞혔어요!)' : ''}`);
-  else lines.push('오늘 보상은 이미 받았어요 — 푼 낱말은 복습 날짜에 들어갔어요');
+  const got = gotLine(res); // 💰(그날 처음 끝낸 판)·🎯(처음 답 반 이상인 판 — v422)·🟩
+  if (got) lines.push(got);
+  const tip = ballTip(res, '🔤 낱말에서');
+  if (tip) lines.push(tip);
+  else if (!got) lines.push('오늘 보상은 이미 받았어요 — 푼 낱말은 복습 날짜에 들어갔어요');
   if (res.mastered && res.mastered.length) lines.push(`⭐ 새로 익힌 낱말: ${res.mastered.map(nameOf).join(', ')}`);
   return { title: res.first ? '🔤 오늘의 낱말 끝!' : '🔤 낱말 연습 끝!', lines };
 }

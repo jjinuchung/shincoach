@@ -9,7 +9,7 @@
 //    앞날 짐작("~겠다", "~것 같다"), 마음이 섞인 "드디어", 물음·따옴표는 원고 검사가 막는다 ·
 //    사실에는 좋다·재미있다·~해야 한다 같은 생각 말이 없고, 의견에는 있어야 한다(OPINION_WORDS)
 // 판정: 퍼즐마다 처음 낸 것 · 다 맞힌 퍼즐 = ⭐(SOLVED — 다시 안 나온다, 연습으로만) · 틀리면 다음 날 다시
-// 보상(🔤 낱말과 따로 · 그날 처음 끝낸 판만): 💰 PUZZLE_COINS + 🎯 국어 포켓몬 잡기 1번 · PUZZLE_PERFECT_MIN개 이상을 모두 한 번에 → 🟩 1
+// 보상(🔤 낱말과 따로 · 그날 처음 끝낸 판만): 💰 PUZZLE_COINS · PUZZLE_PERFECT_MIN개 이상을 모두 한 번에 → 🟩 1 · 🎯 국어 포켓몬 잡기 1번은 한 번에 맞힌 퍼즐이 반 이상인 판(v422 — 그날 둘째 판까지 · korwords.ballRule)
 // 저장: profile.korPuzzle { 퍼즐 id: { box 0|1, due, at, miss, d0 } } — 🔤 낱말 칸과 같은 꼴 · 병합은 따로(mergePuzzles — ⭐는 한쪽이라도) ·
 //       profile.korPuzzleDay { 날 번호: 1 | 2 } — 낱말 보상 날과 같은 꼴(wordDaysOf·mergeWordDays)
 // 퍼즐 내용을 크게 바꾸면 새 번호로 — ⭐는 번호에 묶여 있어 옛 ⭐가 새 내용에 그대로 남는다(puzzles.json about)
@@ -38,7 +38,7 @@
 //   한 조각엔 한 때만 — "~하기로 했다"·"~하려고 한다"처럼 정한 때와 할 때가 섞이는 꼴은 원고 검사가 막는다 ·
 //   오늘의 판에서는 차례 칸을 🧩 차례 맞추기와 번갈아 쓴다(SLOT_OF · 판은 그대로 넷) · 늘 열린다
 import { dayNum, throwsOf, pendingOf, KOR_STONE, KOR_XP, circled } from './korean.js';
-import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
+import { stateOf, wordsOf, wordDaysOf, wordsToday, ballRule, halfRight } from './korwords.js'; // 🎯 처음 답 반 이상 (v422)
 
 export const PUZZLE_COINS = 10;
 export const PUZZLE_PERFECT_MIN = 3;
@@ -764,12 +764,17 @@ export function korPuzzleRule(profile, answers, now, ids) {
   const days = wordDaysOf(profile.korPuzzleDay, today);
   let coins = 0;
   let stone = 0;
-  if (first) {
-    coins = PUZZLE_COINS;
-    days[today] = 1;
+  // 🎯 (v422) — 한 번에 맞힌 퍼즐이 반 이상인 판에(글 끝 퍼즐 하나도 한 판) · 그날 둘째 판까지 · 하루 한 번 (💰·🟩는 그날 처음 끝낸 판 그대로)
+  const br = ballRule(profile.korPuzzleBall, today, { paid: !first, ok: okN, total: n });
+  profile.korPuzzleBall = br.rec;
+  if (br.prize) {
     const tw = throwsOf(profile.korThrow);
     tw.earned = Math.min(Number.MAX_SAFE_INTEGER, tw.earned + 1);
     profile.korThrow = tw;
+  }
+  if (first) {
+    coins = PUZZLE_COINS;
+    days[today] = 1;
     if (n >= PUZZLE_PERFECT_MIN && okN === n) {
       stone = 1;
       days[today] = 2;
@@ -780,7 +785,7 @@ export function korPuzzleRule(profile, answers, now, ids) {
   }
   profile.korPuzzleDay = wordDaysOf(days, today);
   const xp = moved ? okMoved * KOR_XP.puzzle + KOR_XP.puzzles : 0;
-  return { ok: true, first, coins, xp, stone, throws: pendingOf(profile.korThrow), n, okN, solved, moved };
+  return { ok: true, first, coins, xp, stone, throws: pendingOf(profile.korThrow), n, okN, solved, moved, prize: br.prize, ball: br.ball, again: br.again, half: halfRight(okN, n) };
 }
 
 /** 꼴마다 { kind, total, open, solved, tried } (🧩 탭) — tried = 풀어 봤지만 아직 ⭐ 아님 */
@@ -808,21 +813,42 @@ export function puzzleFinishText(res, nameOf = (id) => id, one = false) {
   if (one) {
     // 칸을 안 옮긴 답(그 사이 다른 판이 ⭐로 만든 퍼즐 · 다른 창이 먼저 푼 퍼즐)은 연습 — "내일 다시"는 약속하지 않는다 (🔍 Codex 135차 #1)
     const lines = [res.okN === res.n ? '한 번에 맞혔어요!' : res.moved === 0 ? '이번 풀이는 연습이었어요 — 기록은 그대로예요' : '틀린 퍼즐은 내일 다시 나와요 — 그때 또 풀어 봐요'];
-    if (res.first) lines.push(`💰 +${res.coins} · 🎯 국어 포켓몬 잡기 1번`);
+    const got = gotLine(res);
+    if (got) lines.push(got);
+    const tip = ballTip(res, '🧩 퍼즐에서');
+    if (tip) lines.push(tip);
     if (res.solved && res.solved.length) lines.push(`⭐ 새로 푼 퍼즐: ${res.solved.map(nameOf).join(', ')}`);
     return { title: '🧩 퍼즐 하나 끝!', lines };
   }
   const lines = [`한 번에 맞힌 퍼즐 ${res.okN} / ${res.n}`];
-  if (res.first) lines.push(`💰 +${res.coins} · 🎯 국어 포켓몬 잡기 1번${res.stone ? ' · 🟩 국어스톤 +1 (모두 한 번에 맞혔어요!)' : ''}`);
-  else lines.push('오늘 퍼즐 보상은 이미 받았어요 — 푼 것은 기록에 들어갔어요');
+  const got = gotLine(res);
+  if (got) lines.push(got);
+  const tip = ballTip(res, '🧩 퍼즐에서');
+  if (tip) lines.push(tip);
+  else if (!got) lines.push('오늘 퍼즐 보상은 이미 받았어요 — 푼 것은 기록에 들어갔어요');
   if (res.solved && res.solved.length) lines.push(`⭐ 새로 푼 퍼즐: ${res.solved.map(nameOf).join(', ')}`);
   // 보상을 이미 받은 날 — 새로 ⭐를 받았으면 "더 풀기", ⭐ 퍼즐만 다시 했으면 "연습" (v242 헤드리스: 새 퍼즐을 풀었는데 "연습"이라고 했다)
   const title = res.first ? '🧩 오늘의 퍼즐 끝!' : res.solved && res.solved.length ? '🧩 퍼즐 더 풀기 끝!' : '🧩 퍼즐 연습 끝!';
   return { title, lines };
 }
-/** 오늘 보상 말 (순수) — wordsToday(korPuzzleDay) 값 0·1·2 → 한 줄 */
-export function puzzleTodayLine(today) {
-  if (today >= 2) return '오늘의 퍼즐 끝 ✅ 🟩까지 받았어요';
-  if (today === 1) return '오늘 퍼즐 보상은 받았어요 ✅ — 더 풀어도 ⭐는 모여요'; // v331 — 글 끝 퍼즐 하나로도 받으니 "판 끝"이라 하지 않는다
-  return `오늘 처음 끝내면 💰${PUZZLE_COINS} · 🎯 국어 포켓몬 잡기 1번 · 퍼즐 ${PUZZLE_PERFECT_MIN}개 이상을 모두 한 번에 맞히면 🟩 국어스톤`; // v294 — 판이 넷이 되어 "3개를"이 틀린 말이 됐다
+/** 끝 화면의 받은 것 한 줄 (순수 · v422) — 💰(그날 처음 끝낸 판)·🎯(처음 답 반 이상인 판)·🟩 · 없으면 '' */
+export function gotLine(res) {
+  const parts = [res.coins ? `💰 +${res.coins}` : '', res.prize ? '🎯 국어 포켓몬 잡기 1번' : '', res.stone ? '🟩 국어스톤 +1 (모두 한 번에 맞혔어요!)' : ''].filter(Boolean);
+  return parts.join(' · ');
+}
+/** 끝 화면의 🎯 한 줄 (순수 · v422 · 셈 없음) — 못 미쳤으면 기회가 남았을 때 「한 판 더」, 아니면 「내일 또」 · where = 한 판 더 할 곳(「🧩 퍼즐에서」) */
+export function ballTip(res, where = '') {
+  const s = res && res.ball && res.ball.s;
+  if (s === 'm') return res.again ? `🎯는 한 번에 많이 맞히면 나와요 — ${where ? `${where} ` : ''}한 판 더 해 볼까요?` : '🎯는 내일 또 기회가 있어요!';
+  if (s === 'o') return '🎯는 내일 또 기회가 있어요!';
+  return '';
+}
+/**
+ * 오늘 보상 말 (순수) — wordsToday(korPuzzleDay) 값 0·1·2 · prize 오늘 🎯 { won 받음, left 아직 기회 }(v422 ballOf) → 한 줄 · 셈 없음
+ */
+export function puzzleTodayLine(today, prize = { won: false, left: true }) {
+  const ball = prize && prize.won ? '' : prize && prize.left ? '한 번에 많이 맞히면 🎯' : '🎯는 내일 또 기회가 있어요';
+  if (today >= 2) return `오늘의 퍼즐 끝 ✅ 🟩까지 받았어요${ball ? ` — ${ball}` : ''}`;
+  if (today === 1) return `오늘 퍼즐 보상은 받았어요 ✅ — ${ball || '더 풀어도 ⭐는 모여요'}`; // v331 — 글 끝 퍼즐 하나로도 받으니 "판 끝"이라 하지 않는다
+  return `끝내면 💰${PUZZLE_COINS}${ball ? ` · ${ball}` : ''} · 퍼즐 ${PUZZLE_PERFECT_MIN}개 이상을 모두 한 번에 맞히면 🟩 국어스톤`; // v294 — 판이 넷이 되어 "3개를"이 틀린 말이 됐다
 }

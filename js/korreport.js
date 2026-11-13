@@ -5,7 +5,7 @@
 //          자주 틀린 물음(v254부터 셈 — profile.korQMiss) · 🔤 낱말 묶음마다 · 🧩 퍼즐 꼴마다 · ✍️ 생각 쓰기
 // ★ 공개 저장소에는 올리지 않는다 — upload.js가 비공개 저장소로만 (아이 기록)
 import { TYPES, starsOf, missOf, qMissOf, readsOf, READS_MAX, validCards, EV_WAIT_MS, EV_PAIR_SEC } from './korean.js';
-import { deckStats, DECKS, DECK_ORDER, allWords } from './korwords.js';
+import { deckStats, DECKS, DECK_ORDER, allWords, korPrizeReport } from './korwords.js';
 import { puzzleStats, KINDS as PUZZLE_KINDS, allPuzzles, puzzleSessions, oneSessions } from './korpuzzle.js';
 import { writesOf, cardWriteState } from './korwrite.js';
 import { allTopics, nonsulReport, essayReport, reasonReport } from './nonsul.js'; // 🖊️ 논술 (v303 · ✍️ 짧은 글 v304 · 💡 내 이유 v355)
@@ -154,6 +154,8 @@ export function korReportText(p, data, today, days) {
   // 🧩 글 끝 퍼즐 하나 (v331) — 국어 글을 다 읽은 화면의 단추로 연 한 개짜리 판 · 오늘의 퍼즐 판 줄과 따로
   const one = oneSessions(Array.from({ length: 7 }, (_, k) => byDate.get(dayBefore(today, k))));
   L.push(`- 🧩 최근 7일 글 끝 퍼즐 하나(v331부터 · 이 기간에 일어난 일을 따로 셈): 누름 ${one.start} · 끝냄 ${one.done}${one.kinds.length ? ` (${one.kinds.map(([k, n]) => `${k} ${n}`).join(' · ')})` : ''}`);
+  // 🎯 처음 답 반 이상 (v422) — 별 받은 글 · 🧩·🔤·🖊️ 판마다 몇째 판 · 맞힘/낸 · 받음/못 미침 (하루 기록 korPrize — 아이 화면엔 안 보임)
+  L.push(`- ${korPrizeReport(Array.isArray(days) ? days : [], Array.from({ length: 7 }, (_, k) => dayBefore(today, k)))}`);
   // 생각 쓰기
   const w = writesOf(prof.korWrites);
   const wcards = Object.keys(w).filter((id) => id.startsWith('K') && w[id].list.length); // 📚 국어 카드만 — 🖊️ 논술 짧은 글(N##)은 논술 절에 (v304)

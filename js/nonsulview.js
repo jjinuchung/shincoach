@@ -10,7 +10,10 @@
 import { allTopics, planTopic, nonsulWaitNew, dealTopic, essayParts, nonsulFinishText, nonsulTodayLine, ORDER_HINTS, nonsulWriteCards, essayTopics, readingTopicOf, isSolved, nonsulReasonCards, reasonCardId, reasonTopicId, reasonCheck, reasonTail, reasonSendWhy, REASON_HEAD, REASON_MAX } from './nonsul.js';
 import { circled } from './korean.js';
 import { wordsToday } from './korwords.js';
-import { nonsulFinish, nonsulMap, nonsulDayMap, nonsulTakeThrow, nonsulGiveBackThrow, nonsulThrowsLeft, profileReady, getLevelInfo, isTired, getLook, inventory, catchAttempt, korWritesMap, nonsulReasonAdd } from './xp.js';
+import { nonsulFinish, nonsulMap, nonsulDayMap, nonsulTakeThrow, nonsulGiveBackThrow, nonsulThrowsLeft, profileReady, getLevelInfo, isTired, getLook, inventory, catchAttempt, korWritesMap, nonsulReasonAdd, korBallToday } from './xp.js';
+import { applyDailyDelta } from './db.js'; // 📤 🎯 판정 칸 (v422)
+import { korPrizeKey } from './korwords.js'; // 📤 🎯 판정 칸 (v422)
+import { todayKey } from './track.js'; // 📤 🎯 판정 칸의 날 (v422)
 import { cardWriteState, unreadReplies, WRITE_COINS } from './korwrite.js';
 import { writeBoxEl, syncWrites, appliedLine } from './korwriteview.js';
 import { essayFormEl, ESSAY_WORDS } from './nonsulwriteview.js';
@@ -131,7 +134,7 @@ function renderHome() {
   const today = wordsToday(nonsulDayMap(), Date.now());
   const st = nonsulMap();
   const next = planTopic(S.list, st, Date.now());
-  card.appendChild(el('p', 'ns-today', nonsulTodayLine(today, !!next))); // ⭐와 🎯는 오늘 할 주제가 있을 때만 말한다 (v338)
+  card.appendChild(el('p', 'ns-today', nonsulTodayLine(today, !!next, korBallToday('ns')))); // ⭐와 🎯는 오늘 할 주제가 있을 때만 말한다 (v338) · 판 🎯 기회 (v422)
   const practice = next ? null : planTopic(S.list, st, Date.now(), true);
   const wait = !next && nonsulWaitNew(S.list, st, Date.now()); // 오늘 새 주제를 다 열었다 (v370 · 셈 없이)
   if (wait) card.appendChild(el('p', 'ns-note ns-wait', NEW_WAIT_TEXT));
@@ -249,7 +252,8 @@ function startRound(practice, want = '') {
   const cur = nonsulMap()[id];
   S.w = '';
   // from = 시작할 때 그 주제의 at — 그 사이 다른 창이 옮겼으면 이 판은 연습(nonsulRule)
-  S.r = { id, t, from: cur ? cur.at : 0, side: '', deal: null, step: 'side', picks: [], tapped: [], counter: '', ctapped: [], placed: [], hint: '', miss: false, saving: false, result: null };
+  // missR·missC·missO — ② 이유 · ③ 반대 의견 · ④ 글 순서에서 틀린 적이 있나(판 🎯는 셋 중 둘 이상을 안 틀린 판 — v422) · t0 📤 판 열쇠
+  S.r = { id, t, from: cur ? cur.at : 0, side: '', deal: null, step: 'side', picks: [], tapped: [], counter: '', ctapped: [], placed: [], hint: '', miss: false, missR: false, missC: false, missO: false, t0: Date.now(), saving: false, result: null };
   renderRound();
   window.scrollTo(0, 0);
 }
@@ -332,7 +336,7 @@ function reasonsEl(card, r) {
       if (r.picks.length >= 2) return;
       r.tapped.push(i);
       if (o.k === 'mine') r.picks.push(o.t);
-      else r.miss = true;
+      else { r.miss = true; r.missR = true; }
       onAnswer(r, o.k === 'mine');
       ding(o.k === 'mine');
       renderRound();
@@ -359,7 +363,7 @@ function counterEl(card, r) {
       if (r.counter) return;
       r.ctapped.push(i);
       if (o.k === 'other') r.counter = o.t;
-      else r.miss = true;
+      else { r.miss = true; r.missC = true; }
       onAnswer(r, o.k === 'other');
       ding(o.k === 'other');
       renderRound();
@@ -417,7 +421,7 @@ function orderEl(card, r) {
     if (r.placed.includes(i)) continue;
     pool.appendChild(btn('kor-opt ns-piece', parts[i], () => {
       if (i === r.placed.length) { r.placed.push(i); r.hint = ''; ding(true); }
-      else { r.miss = true; r.hint = ORDER_HINTS[r.placed.length]; ding(false); }
+      else { r.miss = true; r.missO = true; r.hint = ORDER_HINTS[r.placed.length]; ding(false); }
       if (r.placed.length >= parts.length) { r.step = 'done'; finishRound(); return; }
       renderRound();
     }));
@@ -434,7 +438,8 @@ async function finishRound() {
   r.result = null;
   renderRound();
   let res;
-  try { res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from }, S.list.map((t) => t.id)); } catch { res = { ok: false, why: 'save' }; }
+  const steps = { ok: [r.missR, r.missC, r.missO].filter((x) => !x).length }; // 세 걸음 중 안 틀린 걸음 (v422)
+  try { res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from, steps }, S.list.map((t) => t.id)); } catch { res = { ok: false, why: 'save' }; }
   r.saving = false;
   r.result = res;
   if (res && res.ok && (res.first || res.solved)) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
@@ -443,12 +448,13 @@ async function finishRound() {
   if (res && res.ok) {
     korGainXp(res.xp); // ⚡ (v327) — 같은 주제는 하루 한 번 · 연습·[다시 저장]은 0(규칙이 정함) · 화면이 바뀌었어도 준다
     korRocketDone('nonsul'); // 🚀 오늘 끝낸 판 (로켓단 등장 조건 — 하루 기록 nsRounds)
-    // 🔥·✨ (v329) — ⭐ 연습 판도 · 준 것은 화면과 상관없이 · 줄은 그 끝 화면이 떠 있을 때만
-    korDayDone('nonsul').then((day) => {
+    // 🔥·✨ (v329) — ⭐ 연습 판도 · 준 것은 화면과 상관없이 · 줄은 그 끝 화면이 떠 있을 때만 · ✨는 세 걸음 중 둘 이상을 안 틀린 판에서만(v422 — 🔥는 그대로)
+    if (res.ball) applyDailyDelta(todayKey(), { korPrize: [korPrizeKey('ns', r.t0, res.ball.idx, res.ball.ok, res.ball.total, res.ball.s)] }).catch(() => {}); // 📤 🎯 판정 (v422)
+    korDayDone('nonsul', { bonus: !!res.half }).then((day) => {
       if ((day.streak || day.bonus) && S.r === r && r.result === res) { r.day = day; if (nonsulVisible()) renderRound(); }
     }).catch(() => {});
-    // 🥚 논술 판을 끝낸 날 = 국어 알 하루 칸 (국어 글·낱말·퍼즐과 같은 칸 — 5일째면 그 트랜잭션에서 부화)
-    tickKorDay().then((egg) => { if (egg && egg.ok && S.r === r) { r.egg = egg; if (nonsulVisible()) renderRound(); } }).catch(() => {});
+    // 🥚 논술 판을 끝낸 날 = 국어 알 하루 칸 (국어 글·낱말·퍼즐과 같은 칸 — 5일째면 그 트랜잭션에서 부화) · v422부터 세 걸음 중 둘 이상을 안 틀린 판만
+    if (res.half) tickKorDay().then((egg) => { if (egg && egg.ok && S.r === r) { r.egg = egg; if (nonsulVisible()) renderRound(); } }).catch(() => {});
   }
   // ⚔️ 논술 배틀 (v325) — 저장된 한 판 끝에 가끔 단추 하나(턴 문제는 이 의견에 알맞은 이유 — 원고 문장 그대로) · 그 사이 다음 판으로 갔으면 안 붙인다
   if (res && res.ok) {

@@ -31,11 +31,11 @@ const rd = (n, f, o = {}) => ({ t: T0, s: 120, a: 40, n, f, x: 0, e: 0, h: 0, m:
 const afterStar1 = (id) => pf({ korDone: { [`${id}:1`]: dayNum(at(-1)) } });
 const afterStar2 = (id) => pf({ korDone: { [`${id}:1`]: dayNum(at(-8)), [`${id}:2`]: dayNum(at(-7)) } });
 
-test('🎯 catchFirstOk (순수): ★는 늘 · ★★·★★★는 처음 고른 답 × 2 ≥ 물음 수 — 2물음 1 · 3물음 2 · 4물음 2 (경계 양쪽)', () => {
-  assert.equal(CATCH_FIRST_STAR, 2);
-  for (const n of [2, 3, 4]) for (let f = 0; f <= n; f++) assert.equal(catchFirstOk(1, f, n), true, `★ ${f}/${n}`);
+test('🎯 catchFirstOk (순수): ★도(v422 — 전엔 늘) · ★★·★★★는 처음 고른 답 × 2 ≥ 물음 수 — 2물음 1 · 3물음 2 · 4물음 2 (경계 양쪽)', () => {
+  assert.equal(CATCH_FIRST_STAR, 1); // v422 — ★부터
+  assert.equal(catchFirstOk(0, 0, 3), true, '별이 없는 읽기는 조건 밖');
   const need = { 2: 1, 3: 2, 4: 2, 5: 3 };
-  for (const star of [2, 3]) {
+  for (const star of [1, 2, 3]) {
     for (const n of [2, 3, 4, 5]) {
       for (let f = 0; f <= n; f++) assert.equal(catchFirstOk(star, f, n), f >= need[n], `★${star} ${f}/${n}`);
     }
@@ -67,17 +67,17 @@ test('🎯 korFinishRule — ★★: 처음 고른 답이 반이 안 되면 별�
   }
 });
 
-test('🎯 korFinishRule — ★★★도 같은 규칙 · ★는 처음 고른 답이 0이어도 🎯 · 🟩는 그대로(다 맞히면 🎯도) · 🎧 듣기·글로 읽기도 같다', () => {
+test('🎯 korFinishRule — ★★★도 같은 규칙 · ★도 처음 고른 답이 반이 안 되면 🎯 없음(v422) · 🟩는 그대로(다 맞히면 🎯도) · 🎧 듣기·글로 읽기도 같다', () => {
   const c = cardOf(4);
   const p3 = afterStar2(c.id);
   const r3 = korFinishRule(p3, c.id, T0, { detail: 2 }, IDS, 0, { read: rd(4, 1) });
   assert.deepEqual([r3.star, r3.coins, r3.noCatch, p3.korThrow.earned], [3, KOR_COINS[3], 'first', 0]);
   const q3 = afterStar2(c.id);
   assert.deepEqual([korFinishRule(q3, c.id, T0, {}, IDS, 0, { read: rd(4, 2) }).noCatch, q3.korThrow.earned], [undefined, 1]);
-  // ★ (처음 읽기) — 처음 고른 답이 하나도 안 맞아도 그대로
+  // ★ (처음 읽기) — v422부터 같은 규칙: 처음 고른 답이 하나도 안 맞으면 별·💰는 받고 🎯는 없다
   const p1 = pf();
   const r1 = korFinishRule(p1, c.id, T0, { make: 4 }, IDS, 0, { read: rd(4, 0, { x: 2 }) });
-  assert.deepEqual([r1.star, r1.noCatch, r1.throws], [1, undefined, 1]);
+  assert.deepEqual([r1.star, r1.coins, r1.noCatch, r1.throws], [1, KOR_COINS[1], 'first', 0]);
   // 🟩 — 보기·근거를 다 한 번에 맞혔다(f = n) → 🎯도
   const ps = afterStar1(c.id);
   const rs = korFinishRule(ps, c.id, T0, {}, IDS, 0, { read: rd(4, 4) });
@@ -158,7 +158,7 @@ test('🔍 evPair — 넓게: 무작위 원고 수천 개에서 늘 [작은, 큰
   assert.ok(sides.up > 500 && sides.down > 500, `위·아래 둘 다 ${JSON.stringify(sides)} — 늘 위 줄이 답이면 읽지 않고 맞힌다`);
 });
 
-test('🎯·🔍 화면 말 (순수): 다 읽은 화면 — 못 받으면 셈 없이 규칙만 · 받으면 예전 그대로 · 안내 한 줄은 ★★·★★★ 받는 읽기만 · 두 줄 말', async () => {
+test('🎯·🔍 화면 말 (순수): 다 읽은 화면 — 못 받으면 셈 없이 규칙만 · 받으면 예전 그대로 · 안내 한 줄은 별을 받는 읽기(★는 「다시」 없이 — v422) · 두 줄 말', async () => {
   const v = await import('../js/koreanview.js');
   const RULE = '🎯 포켓몬은 처음 고른 답이 반 이상 맞을 때 나와요';
   assert.deepEqual(v.finishText({ ok: true, star: 2, coins: 8, stone: 0, stars: 2, noCatch: 'first', next: 3, days: 6 }).lines, [`💰 +8 · ${RULE}`, '6일 뒤 다시 읽으면 ★★★ 💰20']);
@@ -168,7 +168,9 @@ test('🎯·🔍 화면 말 (순수): 다 읽은 화면 — 못 받으면 셈 �
   assert.equal(v.finishText({ ok: true, star: 2, coins: 8, stone: 1, stars: 2, next: 3, days: 6 }).lines[0], '💰 +8 · 🟩 국어스톤 +1 (한 번에 다 맞혔어요!) · 🎯 국어 포켓몬 잡기 1번');
   assert.ok(!/\d/.test(RULE), '규칙 말에 수가 없다(셈 문구 금지)');
   // 안내 한 줄 — 연 때 받을 별(0 = 별 없이 다시 읽기 · 다시 읽는 사이)
-  assert.deepEqual([0, 1, undefined, NaN].map((s) => v.catchRuleLine(s)), ['', '', '', '']);
+  assert.deepEqual([0, undefined, NaN].map((s) => v.catchRuleLine(s)), ['', '', '']);
+  assert.equal(v.catchRuleLine(1), '🎯 처음 고른 답이 반 이상 맞으면 포켓몬을 만나요', '새 글 ★ — 「다시 읽을 때는」이 아니다 (v422)');
+  assert.equal(v.catchRuleLine(1, true), v.catchRuleLine(1));
   assert.equal(v.catchRuleLine(2), '🎯 다시 읽을 때는 처음 고른 답이 반 이상 맞으면 포켓몬을 만나요');
   assert.equal(v.catchRuleLine(3), v.catchRuleLine(2));
   assert.equal(v.catchRuleLine(2, true), '🎯 다시 들을 때는 처음 고른 답이 반 이상 맞으면 포켓몬을 만나요');

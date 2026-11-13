@@ -11,7 +11,7 @@
 // 복습 칸(box): 맞히면 +1 — 1 → 다음 날 · 2 → 3일 뒤 · 3 → 7일 뒤 · 4 → 14일 뒤 · 5 = ⭐ 익힌 낱말(더 안 나온다)
 //   틀리면 0 → 다음 날 다시. 판정은 그 판에서 **처음 고른 것**으로(같은 판에서 한 번 더 보는 것은 연습)
 // 오늘의 낱말: 복습할 것(오래 기다린 것부터) + 새 낱말 NEW_PER_DAY, 한 번에 SESSION_MAX
-// 보상(그날 처음 끝낸 판만): 💰 WORD_COINS + 🎯 국어 포켓몬 잡기 1번 · PERFECT_MIN개 이상을 모두 한 번에 맞히면 🟩 1
+// 보상(그날 처음 끝낸 판만): 💰 WORD_COINS · PERFECT_MIN개 이상을 모두 한 번에 맞히면 🟩 1 · 🎯 국어 포켓몬 잡기 1번은 처음 고른 답이 반 이상인 판(v422 — 그날 둘째 판까지 · ballRule)
 import { dayNum, throwsOf, pendingOf, KOR_STONE, KOR_XP } from './korean.js';
 
 export const NEW_PER_DAY = 5;
@@ -182,6 +182,96 @@ export function wordsToday(days, now) {
   return isObj(days) ? cnt(days[dayNum(now)], 2) : 0; // 자르기 전 기록에서 바로 (앞날 기록이 꽉 차도 오늘을 본다)
 }
 
+// ── 🎯 판의 처음 답 반 이상 (v422, 2026-11-13 아버님 「추천대로」 — 「누르기만 하면 보상」 점검 5 · 수학 v421과 같은 규칙) ──
+// 🔤 오늘의 낱말·🧩 국어 퍼즐·🖊️ 논술: 그날 처음 끝낸 판의 💰는 그대로 · 🎯 1번은 그 판의 처음 답이 반 이상일 때 · 못 미치면 그날 둘째 판까지 · 하루 한 번
+// 기록 { d 날 번호, n 그날 끝낸 판(v422부터), w 🎯 받음 0|1 } — 그만둔 판은 저장이 안 남는 구조라 끝낸 판으로 센다
+/** 🎯 기회 — 그날 끝낸 판 둘째까지 */
+export const BALL_TRIES = 2;
+/** 처음 고른 답이 반 이상 맞았나 — 낸 답이 없으면 아님 (mathprog.halfRight와 같은 기준) */
+export function halfRight(ok, total) {
+  const t = Math.floor(Number(total));
+  const k = Math.floor(Number(ok));
+  return Number.isSafeInteger(t) && t > 0 && Number.isSafeInteger(k) && k >= 0 && k * 2 >= t;
+}
+/** 🎯 기회 기록 고쳐 읽기 — 깨졌으면 null */
+function ballRec(raw) {
+  if (!isObj(raw) || !cnt(raw.d)) return null;
+  return { d: cnt(raw.d), n: cnt(raw.n), w: raw.w === 1 ? 1 : 0 };
+}
+/**
+ * 판 끝 🎯 판정 (순수 · 트랜잭션 안) — raw 그 판 꼴의 기록 · today 날 번호 · paid 이 판 전에 오늘 💰를 받은 판이 있었나 · ok/total 이 판의 처음 답.
+ * 오늘 💰를 받은 판이 있는데 v422로 끝낸 판이 없으면 v421 이하가 끝낸 것(그때는 첫 판에 🎯를 줬다) — 받은 것으로 적는다(규칙을 바꾼 날 두 번 받지 않게) ·
+ * 기록이 앞날이면(시계가 뒤로) 판정하지 않는다 → { rec 새 기록, prize 이번에 받음, ball { idx 몇째 판(0 = 셈 밖), ok, total, s 'w'|'m'|'d'|'o' }, again 오늘 다음 판도 기회 }
+ */
+export function ballRule(raw, today, { paid = false, ok = 0, total = 0 } = {}) {
+  const n = (v) => Math.max(0, Math.floor(Number(v)) || 0);
+  const b = ballRec(raw);
+  if (b && b.d > today) return { rec: b, prize: false, ball: { idx: 0, ok: n(ok), total: n(total), s: 'o' }, again: false };
+  const cur = b && b.d === today ? b : { d: today, n: 0, w: 0 };
+  const had = cur.w === 1 || (paid && cur.n === 0);
+  const idx = Math.min(Number.MAX_SAFE_INTEGER, cur.n + 1);
+  const prize = !had && idx <= BALL_TRIES && halfRight(ok, total);
+  const won = had || prize;
+  return {
+    rec: { d: today, n: idx, w: won ? 1 : 0 },
+    prize,
+    ball: { idx: idx <= BALL_TRIES ? idx : 0, ok: n(ok), total: n(total), s: prize ? 'w' : had ? 'd' : idx <= BALL_TRIES ? 'm' : 'o' },
+    again: !won && idx < BALL_TRIES,
+  };
+}
+/** 화면용 (순수) — 오늘 🎯를 받았나 · 아직 기회가 있나 · paid = 오늘 💰를 받은 판이 있나(기록이 없으면 v421 이하가 준 것) · 기록이 앞날이면 기회 없음 */
+export function ballOf(raw, today, paid = false) {
+  const b = ballRec(raw);
+  if (b && b.d > today) return { won: b.w === 1, left: false };
+  const cur = b && b.d === today ? b : { d: today, n: 0, w: 0 };
+  const won = cur.w === 1 || (!!paid && cur.n === 0);
+  return { won, left: !won && cur.n < BALL_TRIES };
+}
+/**
+ * 두 기기의 기록 합치기 (순수) — 실제 기록끼리: 늦은 날 쪽 · 같은 날이면 판 수는 큰 쪽 · 받음은 어느 쪽이든 · 둘 다 없으면 null ·
+ * 합친 날에 💰를 받았는데 그날 기록이 없는 쪽이 있으면 그날 🎯는 v421 이하가 준 것(받음 — 합친 뒤에는 어느 쪽 판인지 모른다) ·
+ * 💰 날로 기록을 짐작해 만들지는 않는다(옛 백업의 앞날 💰 날이 오늘 기록을 덮어 둘째 판 기회를 지웠다, Codex 225차 — 오늘 v421 몫은 ballRule·ballOf의 paid가 본다)
+ */
+export function mergeBall(a, b, daysA, daysB) {
+  const x = ballRec(a);
+  const y = ballRec(b);
+  if (!x && !y) return null;
+  const r = !x || !y ? { ...(x || y) } : x.d !== y.d ? { ...(x.d > y.d ? x : y) } : { d: x.d, n: Math.max(x.n, y.n), w: x.w || y.w ? 1 : 0 };
+  const legacy = (own, days) => !(own && own.d === r.d) && isObj(days) && cnt(days[r.d]) > 0;
+  if (legacy(x, daysA) || legacy(y, daysB)) r.w = 1;
+  return r;
+}
+/** 📤 🎯 판정 한 칸 (v422 · 하루 기록 목록 korPrize) — kind 📚 read(별 받은 글 · idx = 별) · 🧩 pz · 🔤 word · 🖊️ ns · key 판 열쇠(숫자) · s 'w'|'m'|'d'|'o' */
+export const KOR_PRIZE_KINDS = ['read', 'pz', 'word', 'ns'];
+export function korPrizeKey(kind, key, idx, ok, total, s) {
+  const n = (v) => Math.max(0, Math.floor(Number(v)) || 0);
+  return `${KOR_PRIZE_KINDS.includes(kind) ? kind : 'pz'}:${String(key).replace(/[^0-9]/g, '') || '0'}:${n(idx)}:${n(ok)}/${n(total)}:${/^[wmdo]$/.test(s) ? s : 'o'}`;
+}
+/** 📤 국어 요약 한 줄 (순수 · v422) — days 하루 기록(listDaily) 최근 7일 · 아이 화면에는 안 쓴다 */
+export function korPrizeReport(days, dateKeys) {
+  const want = new Set(Array.isArray(dateKeys) ? dateKeys : []);
+  const rows = { read: [], pz: [], word: [], ns: [] };
+  for (const d of Array.isArray(days) ? days : []) {
+    if (!d || !want.has(d.date)) continue;
+    for (const k of Array.isArray(d.korPrize) ? d.korPrize : []) {
+      const x = /^(read|pz|word|ns):(\d+):(\d+):(\d+)\/(\d+):([wmdo])$/.exec(String(k));
+      if (x) rows[x[1]].push({ date: d.date, key: Number(x[2]), idx: Number(x[3]), ok: x[4], total: x[5], s: x[6] });
+    }
+  }
+  const mark = { w: '✅받음', m: '❌못 미침', d: '(이미 받은 날)', o: '(기회 지남)' };
+  const sorted = (list) => list.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.key - b.key));
+  const part = (icon, list) => `${icon} ${sorted(list).map((r) => `${r.date.slice(5)} ${r.idx ? `${r.idx}째` : '셈 밖'} ${r.ok}/${r.total} ${mark[r.s]}`).join(' · ')}`;
+  const stars = [1, 2, 3].map((s) => { const l = rows.read.filter((r) => r.idx === s); return `${'★'.repeat(s)} 받음 ${l.filter((r) => r.s === 'w').length}·못 미침 ${l.filter((r) => r.s === 'm').length}`; }).join(' · ');
+  // 기록이 있는 꼴만 — 논술 원고가 없는 요약에 🖊️가 끼지 않게
+  const parts = [
+    rows.read.length ? `📚 별 받은 글 ${stars}` : '',
+    rows.pz.length ? part('🧩', rows.pz) : '',
+    rows.word.length ? part('🔤', rows.word) : '',
+    rows.ns.length ? part('🖊️', rows.ns) : '',
+  ].filter(Boolean);
+  return `🎯 처음 답 반 이상(v422 · 최근 7일): ${parts.length ? parts.join(' | ') : '아직 없음'}`;
+}
+
 /**
  * 🔤 오늘의 낱말 — [{ id, kind }]. 복습할 것(기다린 지 오래된 것·낮은 칸부터) 먼저, 모자라면 새 낱말을 묶음마다 번갈아 —
  *   새 낱말은 **하루에** NEW_PER_DAY개까지(오늘 처음 배운 낱말 d0을 센다 — 판을 끝낼 때마다 새 5개가 또 나오던 것, v234 헤드리스).
@@ -274,14 +364,15 @@ function pickApart(list, n) {
 }
 
 /**
- * 🔤 오늘의 낱말 한 판을 끝냈다 — 한 트랜잭션에서: 낱말마다 칸 옮기기 · 그날 처음 끝낸 판이면 💰·🎯(·🟩)
+ * 🔤 오늘의 낱말 한 판을 끝냈다 — 한 트랜잭션에서: 낱말마다 칸 옮기기 · 그날 처음 끝낸 판이면 💰(·🟩) · 🎯는 처음 고른 답이 반 이상인 판(v422 ballRule — 그날 둘째 판까지)
  * @param {object} profile 저장된 프로필 (mutateProfile 안)
  * @param {Array<{id:string, ok:boolean, from?:number}>} answers 낱말마다 **처음 고른 것**이 맞았나 (같은 id는 처음 것만) ·
  *   from = 판을 시작할 때 그 낱말의 at(새 낱말이면 0) — 그 사이 다른 판(두 창·같은 판 여러 번 저장)이 그 낱말을 이미 옮겼으면
  *   이 답은 **연습**(칸을 안 옮김): 낡은 판으로 하루에 ⭐까지 가거나 익힌 낱말이 낡은 오답으로 되돌아가지 않게 (Codex 50차 #4)
  * @param {number} now 트랜잭션 안의 시각
  * @param {string[]} ids 지금 있는 낱말 id (모르는 낱말은 세지 않는다 · 📖은 그 글에 ★이 있어야)
- * @returns {{ok:boolean, why?:string, first?:boolean, coins?:number, stone?:number, throws?:number, n?:number, okN?:number, mastered?:string[]}}
+ * @returns {{ok:boolean, why?:string, first?:boolean, coins?:number, stone?:number, throws?:number, n?:number, okN?:number, mastered?:string[], prize?:boolean, ball?:object, again?:boolean, half?:boolean}}
+ *   half = 이 판의 처음 답이 반 이상(✨·🥚를 이 판으로 받을 수 있나 — v422)
  */
 export function korWordsRule(profile, answers, now, ids) {
   const valid = new Set(Array.isArray(ids) ? ids : []);
@@ -322,12 +413,17 @@ export function korWordsRule(profile, answers, now, ids) {
   const days = wordDaysOf(profile.korWordDay, today);
   let coins = 0;
   let stone = 0;
-  if (first) {
-    coins = WORD_COINS;
-    days[today] = 1;
+  // 🎯 (v422) — 처음 고른 답이 반 이상인 판에 · 그날 둘째 판까지 · 하루 한 번 (💰·🟩는 그날 처음 끝낸 판 그대로)
+  const br = ballRule(profile.korWordBall, today, { paid: !first, ok: okN, total: n });
+  profile.korWordBall = br.rec;
+  if (br.prize) {
     const tw = throwsOf(profile.korThrow);
     tw.earned = Math.min(Number.MAX_SAFE_INTEGER, tw.earned + 1);
     profile.korThrow = tw;
+  }
+  if (first) {
+    coins = WORD_COINS;
+    days[today] = 1;
     if (n >= PERFECT_MIN && okN === n) {
       stone = 1;
       days[today] = 2;
@@ -338,7 +434,7 @@ export function korWordsRule(profile, answers, now, ids) {
   }
   profile.korWordDay = wordDaysOf(days, today);
   const xp = moved ? okMoved * KOR_XP.word + KOR_XP.words : 0;
-  return { ok: true, first, coins, xp, stone, throws: pendingOf(profile.korThrow), n, okN, mastered };
+  return { ok: true, first, coins, xp, stone, throws: pendingOf(profile.korThrow), n, okN, mastered, prize: br.prize, ball: br.ball, again: br.again, half: halfRight(okN, n) };
 }
 
 /** 묶음마다 { deck, total, open, learning, mastered } (🔤 탭·📘 단원 지도) */

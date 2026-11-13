@@ -3,14 +3,14 @@
 //   ③ 친구가 반대로 말한다면(반대편 이유 · 내 편 이유 · 상관없는 말) ④ 글 순서(내 의견 → 이유 둘 → 반대 의견 → 정리) → 고른 것으로 만든 글
 // 2022 [4국03-03] "대상에 대한 자신의 의견과 그렇게 생각한 이유가 드러나게 글을 쓴다" — 아이 화면 말은 4학년 교과서 말 "의견·이유"
 // 칸은 🧩 국어 퍼즐과 같은 꼴(주제마다 { box, due, at, miss, d0 } · 병합도 korpuzzle.mergePuzzles) ·
-// 그날 처음 끝낸 판에 💰 + 🎯 논술 포켓몬 잡기 한 번 — 잡기 기회는 국어(korThrow)와 따로 센다(nonsulThrow, 같은 세 카운터 꼴)
+// 그날 처음 끝낸 판에 💰 · 🎯 논술 포켓몬 잡기 한 번은 세 걸음 중 둘 이상을 안 틀린 판(v422 — 그날 둘째 판까지) — 잡기 기회는 국어(korThrow)와 따로 센다(nonsulThrow, 같은 세 카운터 꼴)
 // 🎯 ⭐ (v338, 2026-10-25 — 둘째 판부터 ⚡·⭐뿐이라 더 할 까닭이 안 보였다 → 기본안 "이대로"): 주제를 처음 ⭐로 끝낼 때도 잡기 한 번 —
 //   국어 글의 "별을 새로 받을 때마다"와 같은 꼴 · 주제마다 평생 한 번 · 같은 주제를 같은 날 다시 푼 ⭐는 빼고(⚡와 같은 하루 한 번)
 // ✍️ 짧은 글 (v304 — 아버님 물음 넷 모두 추천안): 판을 끝낸 주제를 칸마다 머리말(나는 · 왜냐하면 · 또 · 물론 · 그래도 나는) 채우기로 →
 //   국어 ✍️ 생각 쓰기와 같은 장부·왕복·보상(korwrite.js — 카드 열쇠 N## · 주제마다 평생 한도) · 채점 기준은 원고의 write 하나를 모든 주제가 같이 쓴다
 // 💡 내 이유 한 줄 (v355 — 아버님 「추천대로」): 판 끝 「내가 만든 글」 아래 「또, …」 한 줄 → 같은 장부·왕복(카드 열쇠 R##) · 채점 기준은 원고의 reason
 import { dayNum, throwsOf, pendingOf, PAST_MAX, FRAME_GAP, KOR_XP } from './korean.js';
-import { stateOf, wordsOf, wordDaysOf, wordsToday } from './korwords.js';
+import { stateOf, wordsOf, wordDaysOf, wordsToday, ballRule, halfRight } from './korwords.js'; // 🎯 처음 답 반 이상 (v422)
 import { shuffledOrder } from './korpuzzle.js';
 import { normText, bareText, writesOf, cardWriteState, writeCheck, writeAddRule, WRITE_MAX_HI } from './korwrite.js';
 
@@ -246,10 +246,10 @@ const big = (n) => Math.min(Number.MAX_SAFE_INTEGER, n);
 const cnt = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
 
 /**
- * 논술 한 판을 끝냈다 — 한 트랜잭션에서: 그 주제의 칸 · 그날 처음 끝낸 판이면 💰 + 🎯 논술 잡기 기회 하나 ·
+ * 논술 한 판을 끝냈다 — 한 트랜잭션에서: 그 주제의 칸 · 그날 처음 끝낸 판이면 💰 · 🎯 논술 잡기 기회 하나는 세 걸음 중 둘 이상을 안 틀린 판(v422 — 그날 둘째 판까지) ·
  *   주제를 처음 ⭐로 끝냈으면 🎯 하나 더(starCatch — 그 주제를 오늘 앞서 푼 적이 없을 때만, v338)
  * @param {object} profile 저장된 프로필 (mutateProfile 안)
- * @param {{id:string, ok:boolean, from?:number}} ans ok = 처음부터 한 번도 안 틀렸나 · from = 판을 시작할 때 그 주제의 at(새 주제면 0) —
+ * @param {{id:string, ok:boolean, from?:number, steps?:{ok:number}}} ans ok = 처음부터 한 번도 안 틀렸나 · steps.ok = 안 틀린 걸음(셋 중 — v422) · from = 판을 시작할 때 그 주제의 at(새 주제면 0) —
  *   그 사이 다른 창이 그 주제를 옮겼으면 이 판은 연습(🧩 국어 퍼즐과 같다)
  * @param {number} now 트랜잭션 안의 시각
  * @param {string[]} ids 지금 있는 주제 id (모르는 주제는 안 받는다)
@@ -284,14 +284,27 @@ export function nonsulRule(profile, ans, now, ids) {
     profile.coins = (Number(profile.coins) || 0) + coins;
     profile.coinsEarned = (Number(profile.coinsEarned) || 0) + coins;
   }
-  const add = (first ? 1 : 0) + (starCatch ? 1 : 0);
+  // 🎯 판 몫 (v422) — 세 걸음(② 이유 둘 · ③ 반대 의견 · ④ 글 순서) 중 둘 이상을 안 틀린 판에 · 그날 둘째 판까지 · 하루 한 번 (💰는 그날 처음 끝낸 판 그대로)
+  //   ans.steps가 없으면(옛 부름) 처음부터 다 맞혔나로 — 다 맞혔으면 셋 다, 아니면 0
+  const steps = stepsOf(ans);
+  const br = ballRule(profile.nonsulBall, today, { paid: !first, ok: steps.ok, total: steps.n });
+  profile.nonsulBall = br.rec;
+  const add = (br.prize ? 1 : 0) + (starCatch ? 1 : 0);
   if (add) {
     const tw = throwsOf(profile.nonsulThrow);
     tw.earned = big(tw.earned + add);
     profile.nonsulThrow = tw;
   }
   profile.nonsulDay = wordDaysOf(days, today);
-  return { ok: true, first, coins, xp, throws: pendingOf(profile.nonsulThrow), solved, starCatch, practice };
+  return { ok: true, first, coins, xp, throws: pendingOf(profile.nonsulThrow), solved, starCatch, practice, prize: br.prize, ball: br.ball, again: br.again, half: halfRight(steps.ok, steps.n) };
+}
+/** 논술 판의 세 걸음 — { ok 안 틀린 걸음, n 3 } · 옛 부름(steps 없음)은 처음부터 다 맞혔나로 */
+export const NONSUL_STEPS = 3;
+function stepsOf(ans) {
+  const s = ans && ans.steps;
+  const k = s ? Math.floor(Number(s.ok)) : NaN;
+  if (Number.isSafeInteger(k) && k >= 0 && k <= NONSUL_STEPS) return { ok: k, n: NONSUL_STEPS };
+  return { ok: ans && ans.ok === true ? NONSUL_STEPS : 0, n: NONSUL_STEPS };
 }
 
 /** 🎯 논술 잡기 기회 하나 빼기 (잡기 화면을 띄우기 전, 한 트랜잭션) — why 'none' 남은 기회 없음 */
@@ -318,18 +331,27 @@ export function nonsulFinishText(res) {
     return { title: '저장이 안 됐어요', lines: ['[다시 저장하기]를 눌러 주세요 — 고른 것은 그대로예요'] };
   }
   const lines = [];
-  if (res.first) lines.push(`💰 +${res.coins} · 🎯 논술 포켓몬 잡기 1번`);
-  else lines.push('오늘의 💰는 이미 받았어요 — 한 것은 기록에 들어갔어요');
+  // 💰 그날 처음 끝낸 판 · 🎯 세 걸음 중 둘 이상을 안 틀린 판(v422 — 못 미치면 그날 둘째 판까지 · 셈 없이)
+  const got = [res.coins ? `💰 +${res.coins}` : '', res.prize ? '🎯 논술 포켓몬 잡기 1번' : ''].filter(Boolean).join(' · ');
+  if (got) lines.push(got);
+  const s = res.ball && res.ball.s;
+  if (s === 'm') lines.push(res.again ? '🎯는 한 번에 많이 맞히면 나와요 — 한 판 더 해 볼까요?' : '🎯는 내일 또 기회가 있어요!');
+  else if (s === 'o') lines.push('🎯는 내일 또 기회가 있어요!');
+  else if (!got) lines.push('오늘의 💰는 이미 받았어요 — 한 것은 기록에 들어갔어요');
   // 🎯 ⭐ (v338) — 처음 ⭐면 잡기 한 번 더 · 틀린 판이면 다음에 ⭐로 끝낼 까닭을 (연습 판은 ⭐가 더 안 생기니 말하지 않는다)
-  if (res.solved) lines.push(res.starCatch ? `⭐ 처음부터 다 맞혔어요! · 🎯 논술 포켓몬 잡기 1번${res.first ? ' 더' : ''}` : '⭐ 처음부터 다 맞혔어요!');
+  if (res.solved) lines.push(res.starCatch ? `⭐ 처음부터 다 맞혔어요! · 🎯 논술 포켓몬 잡기 1번${res.prize ? ' 더' : ''}` : '⭐ 처음부터 다 맞혔어요!');
   else if (!res.practice) lines.push('다음에 이 주제를 처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!');
   const title = res.first ? '🖊️ 오늘의 논술 끝!' : res.practice ? '🖊️ 논술 연습 끝!' : '🖊️ 논술 더 하기 끝!';
   return { title, lines };
 }
-/** 오늘 보상 말 (순수) — wordsToday(nonsulDay) 0·1 · canStar = 오늘 ⭐를 받을 수 있는 주제가 남았나(planTopic이 주제를 줄 때) → 한 줄 */
-export function nonsulTodayLine(today, canStar = true) {
-  if (today >= 1) return canStar ? '오늘의 논술 끝 ✅ — 처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!' : '오늘의 논술 끝 ✅';
-  return `오늘 처음 끝내면 💰${NONSUL_COINS} · 🎯 논술 포켓몬 잡기 1번${canStar ? ' · 처음부터 다 맞히면 ⭐와 🎯 하나 더' : ''}`;
+/**
+ * 오늘 보상 말 (순수) — wordsToday(nonsulDay) 0·1 · canStar = 오늘 ⭐를 받을 수 있는 주제가 남았나(planTopic이 주제를 줄 때) ·
+ * prize 오늘 판 🎯 { won 받음, left 아직 기회 }(v422 ballOf) → 한 줄 · 셈 없음
+ */
+export function nonsulTodayLine(today, canStar = true, prize = { won: false, left: true }) {
+  const ball = prize && prize.won ? '' : prize && prize.left ? '한 번에 많이 맞히면 🎯' : '🎯는 내일 또 기회가 있어요';
+  if (today >= 1) return `오늘의 논술 끝 ✅${ball ? ` — ${ball}` : ''}${canStar ? `${ball ? ' · ' : ' — '}처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!` : ''}`;
+  return `끝내면 💰${NONSUL_COINS}${ball ? ` · ${ball}` : ''}${canStar ? ' · 처음부터 다 맞히면 ⭐와 🎯 하나 더' : ''}`;
 }
 
 /** 📊·📤 한 줄 (순수 · 아빠 화면) — ⭐ 주제 · 다시 볼 주제 · 해 본 주제 · 최근 7일 판을 끝낸 날 */
