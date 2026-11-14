@@ -371,13 +371,20 @@ export async function flushTime() {
   try {
     const saved = await applyDailyDelta(day, tickDelta(s, sec));
     clock.saving.delete(job);
+    clock.failed = false;
     if (day === clock.today) clock.daily = saved;
   } catch {
     clock.saving.delete(job);
+    clock.failed = true;
     if (day === clock.today) clock.pending[s] = (clock.pending[s] || 0) + sec; // 저장이 안 됐으면 다음에 다시
   }
   if (clock.onTick) clock.onTick();
   return clock.daily;
+}
+
+/** 마지막 초 저장이 실패했나 — 🆕 「지금 바꾸기」가 저장이 안 됐으면 다시 켜지 않게 (v425 Codex 228차 P2-1) · 남은 초는 시계가 도는 동안 늘 생겨 실패로 보지 않는다 */
+export function timeSaveFailed() {
+  return clock.failed === true;
 }
 
 /** 🔒 부모가 추가 시간을 준다 (오늘만) — @returns {Promise<object|null>} 새 형편 */

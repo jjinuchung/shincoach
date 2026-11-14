@@ -1,7 +1,7 @@
 // 서비스워커: 앱 셸(HTML/CSS/JS/아이콘)을 버전별로 통째로 캐시 → 오프라인 실행 + 홈 화면 설치
 // ★ 코드를 수정해 배포할 때마다 CACHE_VERSION을 올릴 것 (안 올리면 기기에 예전 코드가 남음)
 // 전략: 앱 셸은 cache-first (한 버전의 파일이 항상 함께 제공되어 새 HTML + 옛 JS 섞임 방지)
-const CACHE_VERSION = 'v424';
+const CACHE_VERSION = 'v425';
 const CACHE_PREFIX = 'shincoach-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [
@@ -199,6 +199,7 @@ const APP_SHELL = [
   './js/usage.js',
   './js/blackbox.js', // 🛑 앱이 저절로 꺼진 때 남기기 (v292 — 📤 usage/crash-log.md)
   './js/version.js', // 🏷️ 앱 판 번호 (v314 — 📤 usage/날짜.md 머리 · sw CACHE_VERSION과 같게, check.mjs)
+  './js/update.js', // 🆕 새 버전 받기 — 받는 중 % · 큰 창 [지금 바꾸기][나중에] · 30분마다 확인 (v425)
   './js/feedback.js', // 📬 피드백이 닿았나 (v314 — 📤 usage/feedback.md) · 👨‍👩‍👦 아빠 교정 차례 coachPick (v381 — player·stats도 부른다)
   './js/sounds.js', // 🎤 감탄사(소리 낱말) — 따라 말하기 확인·채점에서 뺀다 (v292)
   './js/hatmarks.js', // 🧢 지우 모자 무늬 받기 — 비공개 저장소에서 (v293)
@@ -264,13 +265,57 @@ const APP_SHELL = [
   './icons/icon-512-maskable.png',
 ];
 
+// 🆕 받는 중 % (v425 — update.js가 홈 띠·한쪽 딱지에) — 열린 창들에 알린다 (아직 이 판이 맡지 않은 창도)
+const SHELL_AT_ONCE = 6;
+const SHELL_DONE = './__shell-done__'; // 다 받은 판에만 들어가는 표시 (version.js cachedVersion과 같은 이름)
+function tell(msg) {
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then((cs) => { for (const c of cs) c.postMessage(msg); })
+    .catch(() => {});
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      // cache: 'reload' → 브라우저 HTTP 캐시를 거치지 않고 서버의 최신 파일을 받음
-      .then((cache) => cache.addAll(APP_SHELL.map((u) => new Request(u, { cache: 'reload' }))))
-      .then(() => self.skipWaiting())
-  );
+  // 파일을 여섯씩 받아 하나씩 넣으며 알린다 — 하나라도 못 받으면 이 판 캐시를 지우고 설치 실패(다음 확인 때 처음부터 · 반쯤 받은 판이 남지 않게)
+  // ★ 다 받아도 **기다린다**(skipWaiting 없음) — 창이 「지금 바꾸기」를 보내거나(아래 message) 창이 다 닫혀야 넘겨받는다.
+  //   전엔 받자마자 넘겨받아, 돌던 옛 코드가 새 화면을 열 때 새 판 조각을 섞어 썼다 (v425)
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const total = APP_SHELL.length;
+    const queue = APP_SHELL.slice();
+    let done = 0;
+    let told = 0;
+    let failed = false; // 하나라도 못 받으면 나머지도 멈춘다 — 더 받지도·알리지도 않게 (늦은 % 알림이 「받는 중」을 다시 띄우지 않게 · Codex 228차 P2-4)
+    const one = async () => {
+      try {
+        for (let u = queue.shift(); u && !failed; u = queue.shift()) {
+          // cache: 'reload' → 브라우저 HTTP 캐시를 거치지 않고 서버의 최신 파일을 받음
+          const res = await fetch(new Request(u, { cache: 'reload' }));
+          if (!res.ok) throw new Error(`${u} ${res.status}`);
+          if (failed) return;
+          await cache.put(u, res);
+          done += 1;
+          if (!failed && (done === total || Date.now() - told > 200)) { told = Date.now(); tell({ type: 'sw-progress', ver: CACHE_VERSION, done, total }); }
+        }
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: SHELL_AT_ONCE }, one));
+      // 다 받음 표시 — 📤 보고의 「받아 둔 새 판」은 이것이 있는 캐시만 센다(받는 중인 판을 받아 뒀다고 적지 않게 · version.js cachedVersion · Codex 228차 P3)
+      await cache.put(SHELL_DONE, new Response(CACHE_VERSION));
+    } catch (err) {
+      failed = true;
+      await caches.delete(CACHE_NAME);
+      throw err;
+    }
+  })());
+});
+
+// 「지금 바꾸기」(update.js) — 저장을 마친 창이 보낸다 → 기다리던 새 판이 넘겨받는다(아래 activate) → 창이 다시 켜진다
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'skip-waiting') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -289,25 +334,27 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;           // 외부 요청은 관여 안 함
   if (!url.protocol.startsWith('http')) return;         // blob: 등 (영상)은 관여 안 함
 
+  // ★ 이 판(CACHE_NAME) 캐시에서만 꺼낸다 — 모든 캐시를 뒤지면 새 판이 기다리는 동안 옛 판에 없는 파일을 새 판 캐시에서 꺼내
+  //   옛 코드와 새 조각이 섞일 수 있었다 (v425 Codex 228차 P2-3)
   // 페이지 이동(주소 입력/새로고침) → 캐시된 index.html, 없으면 네트워크
   if (req.mode === 'navigate') {
     event.respondWith(
-      caches.match('./index.html').then((hit) => hit || fetch(req))
+      caches.open(CACHE_NAME).then((cache) => cache.match('./index.html')).then((hit) => hit || fetch(req))
     );
     return;
   }
 
   // 앱 셸 파일 → cache-first, 캐시에 없으면 네트워크에서 받아 캐시에 보관
   event.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((hit) => {
+    caches.open(CACHE_NAME).then((cache) => cache.match(req, { ignoreSearch: true }).then((hit) => {
       if (hit) return hit;
       return fetch(req).then((res) => {
         if (res && res.ok) {
           const copy = res.clone();
-          event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {}));
+          event.waitUntil(cache.put(req, copy).catch(() => {}));
         }
         return res;
       });
-    })
+    }))
   );
 });

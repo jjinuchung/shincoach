@@ -17,8 +17,8 @@ import { initCalm, enterCalm, leaveCalm } from './calm.js'; // 🌿 국어·논�
 import { stopKorCheer } from './korcheer.js'; // 📣 국어·논술 응원 포켓몬 (v327)
 import { initStock, refreshStockBtn } from './stockview.js'; // 🏦 포켓몬 증권시장 (v319)
 import { getDaily, syncCoachFixes } from './db.js';
-import { todayKey, byeSummary, flush as flushTrack } from './track.js';
-import { initTimeLimit, setSubject, flushTime, isLocked } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
+import { todayKey, byeSummary, flush as flushTrack, lastFlushError } from './track.js';
+import { initTimeLimit, setSubject, flushTime, isLocked, timeSaveFailed } from './timelimit.js'; // ⏳ 하루 과목별 시간 제한
 import { profileReady, rocketCurrent } from './xp.js'; // 🚀 끝나지 않은 로켓단 배틀 이어 가기
 import { initTimeUp, refreshChips } from './timeup.js';
 import { initTaken, openTakeTool, showTakenNoticeIfAny } from './taken.js'; // 🔒 부모가 포켓몬 데려가기
@@ -30,6 +30,7 @@ import { initUsage, setUsageView } from './usage.js'; // 🕒 앱 사용 기록 
 import { initBlackbox } from './blackbox.js'; // 🛑 앱이 저절로 꺼진 때 남기기 — 📤 usage/crash-log.md로만 (v292)
 import { loadHatMarks } from './hatmarks.js'; // 🧢 받아 둔 지우 모자 무늬를 그림에 (v293)
 import { loadFx, syncFx } from './battlefx.js'; // 🐸 받아 둔 기술 그림을 메모리에 · 받기 (v306)
+import { initUpdate, updView } from './update.js'; // 🆕 새 버전 받기 — 받는 중 % · 큰 창 [지금 바꾸기][나중에] (v425)
 
 const views = {
   home: document.getElementById('view-home'),
@@ -65,6 +66,7 @@ export function showView(name) {
   setSubject(subjectOfView(name)); // ⏳ 과목이 바뀌면 그 전 과목의 초를 저장하고 시계를 옮긴다
   setUsageView(name); // 🕒 머문 초는 화면마다 (⏳와 따로 — 홈·도감·기록도 센다)
   refreshChips();
+  updView(); // 🆕 받는 중·대기 중 딱지 — 홈에서는 홈 띠로 (v425)
   // 목록으로 돌아올 때마다 다시 그린다 — 🎟️ 다음 영상 조건이 방금 한 공부를 반영해야 한다
   if (name === 'library') refreshList().catch(() => {});
   // 📮 우체통 띠 — 처음 연 날을 적고(첫 편지는 그다음 날) · 기다리는 답장이 있으면 받아 온다 (v351)
@@ -151,23 +153,21 @@ function initExit() {
   });
 }
 
-/** 서비스워커 등록 (PWA 오프라인/설치) — file:// 에서는 동작하지 않음 */
-async function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  if (location.protocol === 'file:') return;
-  if (/[?&]nosw\b/.test(location.search)) return; // 개발용: ?nosw 로 열면 캐시 없이 항상 최신 파일 (헤드리스 테스트)
-  try {
-    await navigator.serviceWorker.register('./sw.js');
-    // 새 버전 SW가 페이지를 넘겨받으면 안내 (학습 중 자동 새로고침은 하지 않음)
-    let hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (hadController) document.getElementById('update-toast').hidden = false;
-      hadController = true;
-    });
-    document.getElementById('update-reload').addEventListener('click', () => location.reload());
-  } catch (err) {
-    console.warn('서비스워커 등록 실패:', err);
-  }
+/**
+ * 서비스워커 등록 (PWA 오프라인/설치) + 🆕 새 버전 받기 (v425 — update.js: 받는 중 % · 다 받으면 큰 창 [지금 바꾸기][나중에] · 30분마다 확인)
+ * 「지금 바꾸기」 전에 🚪 종료와 같은 저장(기록·⏳ 초·프로필)을 하고, **저장이 다 됐는지** 돌려준다 — 안 됐으면 다시 켜지 않는다
+ * (저장 함수들은 실패해도 조용히 증분을 되돌려 두므로 실패 표시를 따로 본다 · Codex 228차 P2-1) · 학습 중 저절로 다시 켜지는 일은 없다
+ */
+function registerServiceWorker() {
+  initUpdate({
+    flush: async () => {
+      try { await flushTrack(); } catch { /* 아래 lastFlushError로 본다 */ }
+      try { await flushTime(); } catch { /* 아래 timeSaveFailed로 본다 */ }
+      const xp = await import('./xp.js').catch(() => null);
+      try { if (xp) await xp.flushProfile(); } catch { /* 아래 profileUnsaved로 본다 */ }
+      return !lastFlushError && !timeSaveFailed() && !!xp && !xp.profileUnsaved();
+    },
+  }).catch(() => {});
 }
 
 /** 브라우저가 저장 데이터를 임의로 지우지 않도록 영구 저장 요청 (결과를 기다리지 않음 — 일부 기기에서 응답이 없을 수 있음) */

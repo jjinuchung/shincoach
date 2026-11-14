@@ -1794,25 +1794,25 @@ button { font-family: inherit; }
 .mon-opt.none .em { color: var(--muted); }
 .mon-empty { color: var(--muted); font-size: 0.85rem; padding: 4px 6px; }
 
-/* ===== 새 버전 안내 ===== */
-.update-toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(16px + var(--safe-bottom));
-  transform: translateX(-50%);
-  background: var(--text);
-  color: #fff;
-  border-radius: 999px;
-  padding: 8px 8px 8px 18px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-weight: 600;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-  z-index: 90;
-}
-.update-toast[hidden] { display: none; }
-.update-toast .btn { min-height: 36px; padding: 6px 14px; border-radius: 999px; }
+/* ===== 🆕 새 버전 (v425 — update.js) — 홈 띠(받는 중 % · 준비됐으면 [지금 바꾸기]) · 큰 창 · 한쪽 딱지 ===== */
+.upd-home { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin: 0 0 12px; padding: 14px 16px; border-radius: 16px; background: #eef4ff; border: 2px solid #6b8cff; font-size: 1.1rem; }
+.upd-home[hidden] { display: none; }
+.upd-home.ready { background: #ecfdf5; border-color: #10b981; }
+.upd-home-t { font-weight: 800; }
+.upd-bar { flex: 1 1 160px; height: 14px; border-radius: 999px; background: #dbe4ff; overflow: hidden; }
+.upd-bar-fill { display: block; height: 100%; width: 0; background: #4f6bff; border-radius: 999px; transition: width .3s; }
+.upd-home-pct { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 3.2em; text-align: right; }
+.upd-home .btn { min-height: 44px; padding: 8px 20px; font-size: 1.05rem; }
+/* 한쪽 딱지 — 어느 화면이든(홈 위에 여는 🏠 집·🎮 게임이 홈 띠를 가려도 · Codex 228차 P2-5) · 오른쪽 아래(왼쪽 아래는 홈의 🐾 친구) · 게임·잡기 창(z 60~67) 위 */
+.upd-chip { position: fixed; right: 8px; bottom: calc(8px + var(--safe-bottom)); z-index: 96; padding: 6px 12px; border-radius: 999px; border: 2px solid #6b8cff; background: #fff; color: #1e2a78; font-size: .85rem; font-weight: 800; box-shadow: 0 4px 14px rgba(0,0,0,.18); font-variant-numeric: tabular-nums; cursor: default; }
+.upd-chip.ready { border-color: #10b981; color: #065f46; cursor: pointer; }
+.upd-chip[hidden] { display: none; }
+.upd-dlg { max-width: min(440px, calc(100vw - 32px)); text-align: center; }
+.upd-dlg h2 { margin: 4px 0 8px; font-size: 1.5rem; }
+.upd-dlg-msg { margin: 0 0 16px; line-height: 1.5; }
+.upd-dlg-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.upd-dlg-btns .btn { min-height: 48px; padding: 10px 22px; font-size: 1.05rem; }
+.set-upd-now { margin: 4px 0 8px; font-weight: 700; }
 
 /* ===== 로딩 오버레이 ===== */
 .loading {

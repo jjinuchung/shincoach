@@ -437,6 +437,11 @@ function isEmptyDelta(d) {
     && !Object.keys(d.caught).length && !Object.keys(d.items).length && !Object.keys(d.mons).length;
 }
 
+/** 아직 저장소에 못 쓴 증분이 있나 — flushProfile이 실패하면 증분을 되돌려 두므로, 그 뒤 남아 있으면 저장이 안 된 것 (🆕 v425 Codex 228차 P2-1) */
+export function profileUnsaved() {
+  return !isEmptyDelta(pending);
+}
+
 function addDelta(d) {
   mergeDelta(pending, d);
   if (loaded) flushProfile();

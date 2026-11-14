@@ -29,6 +29,8 @@
     </header>
 
     <main class="home-main">
+      <!-- 🆕 새 버전 받는 중 % · 준비됐으면 [지금 바꾸기] (v425 — update.js) -->
+      <div id="upd-home" class="upd-home" hidden></div>
       <p class="home-ask">오늘은 무엇을 공부할까?</p>
       <!-- 🎒 포켓몬 대여행 (v341) — 토요일에 열려 다음 금요일까지 한 번 · journeyview.js가 그린다 · 과목 카드 위 얇은 띠(태블릿 가로에서 카드 아래는 스크롤해야 보인다) -->
       <div id="home-journey" class="home-journey" hidden></div>
@@ -743,11 +745,16 @@
     </div>
   </div>
 
-  <!-- ===== 새 버전 안내 ===== -->
-  <div id="update-toast" class="update-toast" hidden>
-    <span>새 버전이 준비됐어요</span>
-    <button id="update-reload" class="btn btn-primary">새로고침</button>
-  </div>
+  <!-- ===== 🆕 새 버전 (v425 — update.js) — 다 받으면 큰 창 · 「나중에」면 한쪽 딱지 · 받는 중이면 딱지에 % ===== -->
+  <button type="button" id="upd-chip" class="upd-chip" hidden></button>
+  <dialog id="upd-dlg" class="dialog upd-dlg" aria-labelledby="upd-dlg-h">
+    <h2 id="upd-dlg-h">🆕 새 버전이 왔어요!</h2>
+    <p id="upd-dlg-msg" class="upd-dlg-msg"></p>
+    <div class="upd-dlg-btns">
+      <button type="button" id="upd-later" class="btn">나중에</button>
+      <button type="button" id="upd-now" class="btn btn-primary upd-now-btn">지금 바꾸기</button>
+    </div>
+  </dialog>
 
   <!-- ===== 로딩 오버레이 ===== -->
   <div id="loading" class="loading" hidden>
@@ -789,6 +796,12 @@
   <dialog id="dlg-settings" class="dialog">
     <form id="form-settings" method="dialog">
       <h2>설정</h2>
+
+      <fieldset class="field set-group">
+        <legend class="field-label">🆕 앱 판 <small>— 새 버전이 나오면 앱이 스스로 받아요(켜 둔 채로 30분마다 확인). 다 받으면 「지금 바꾸기」 창이 떠요 — 「나중에」를 누르면 화면 한쪽에 「🆕 새 버전 대기 중」이 남고, 앱을 완전히 닫았다 열어도 바뀌어요</small></legend>
+        <p id="set-upd-now" class="set-upd-now"></p>
+        <button type="button" id="set-upd-check" class="btn">🔄 새 버전 확인</button>
+      </fieldset>
 
       <label class="field field-row parent-row">
         <input type="checkbox" id="set-parent">
