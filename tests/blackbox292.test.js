@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { crashOf, addCrash, crashLogText, crashLine, BEAT_MS, SETTLE_MS, BEAT_PREFIX, LOG_KEY, CRASH_DAYS } from '../js/blackbox.js';
+import { crashOf, addCrash, crashLogText, crashLine, BEAT_MS, SETTLE_MS, BEAT_PREFIX, LOG_KEY, CRASH_DAYS, HEAP_EVERY, SPANS_KEEP } from '../js/blackbox.js';
 import { gatherFiles } from '../js/upload.js';
 
 const T = '2026-10-18';
@@ -194,4 +194,132 @@ test('🔍 Codex 98차 ④ 두 창 — 숨긴 채 살아 있는 창 A를 B가 "�
   assert.deepEqual(A.log().crashes.map((c) => [c.sid, c.kind]), [['dead', 'fg']], '살아 돌아온 창의 기록은 지운다');
   assert.ok(A.beats().some(([k]) => k === BEAT_PREFIX + sidA), 'A는 박동을 다시 적는다');
   assert.equal(crashLine(A.log().crashes[0]).includes('dead'), false, '글에 창 이름은 안 나온다');
+});
+
+// ───────── v426 — 끝나기 전 일 · 최근 숨음 · 메모리 흐름 · 다음 창(간격과 열린 방식) (11-14 아버님 「영어 영상 하던 중에 갑자기 영어 콘텐츠에서 나가졌어 — 화면이 까매진 건 아니고 바로 다시 들어가 이어 했어」 · Codex 229차 「추천대로」) ─────────
+test('🛑 v426 기록 한 줄 — 끝나기 전 일은 「N초 전」(0~한 시간 · 범위는 밀리초로 먼저 · 아는 것만 · 가까운 것부터) · 최근 숨음 · 메모리 흐름(둘 이상) · 다음 창(아는 방식만 · 있는 그대로)', () => {
+  const end = at('10:22');
+  const b = { sid: 's', t0: end - 58 * 60000, at: end, vis: 0, view: 'player', title: '레고 원피스 1화', vt: 933, play: 0, mic: 197, ver: 'v426',
+    t: { hide: end - 3000, touch: end - 40000, mic: end - 12000, play: end + 5000, pause: 'x', freeze: end - 4000 * 1000, bogus: end - 1000, micEnd: end - 10400 },
+    h: [20, 35, 'x', -1, 83],
+    sp: [[end - 50000, 1200], [end - 130000, 400], ['x', 3], [end + 1000, 5], [end - 3700000, 9000], [end - 20000, 3000]] };
+  const ev = crashOf(b, { now: end + 4000, nav: 'reload' });
+  assert.deepEqual(ev.ago, { hide: 3, touch: 40, mic: 12, micEnd: 10 }, '나중 때·글자·한 시간 넘은 것·모르는 이름은 뺀다');
+  assert.deepEqual([ev.mem, ev.gap, ev.nav], [[20, 35, 83], 4, 'reload']);
+  assert.deepEqual(ev.hid, [[50, 1], [130, 0], [20, 3]], '숨은 순간 — 한 시간 안·깨진 것·미래는 빼고 [몇 초 전, 몇 초]');
+  // 경계 (Codex 229차 P3-1) — 1ms 미래는 빼고, 정확히 한 시간은 넣고, 한 시간 + 1ms는 뺀다
+  const edge = crashOf({ ...b, t: { hide: end + 1, touch: end - 3600000, mic: end - 3600001 }, sp: undefined });
+  assert.deepEqual(edge.ago, { touch: 3600 });
+  for (const k of ['weird', 'toString', 'constructor', '__proto__', '']) assert.equal(crashOf(b, { now: end + 4000, nav: k }).nav, undefined, `모르는 방식 ${k} (상속 이름도 · Codex 229차 P3-2)`);
+  assert.equal(crashOf(b, { now: end - 1 }).gap, undefined, '거꾸로 간 시계는 간격 없음');
+  assert.equal(crashOf({ ...b, h: Array.from({ length: 9 }, (_, i) => i + 1) }).mem.length, 6, '메모리는 마지막 여섯');
+  assert.equal(crashOf({ ...b, sp: Array.from({ length: 9 }, (_, i) => [end - (i + 1) * 1000, 100]) }).hid.length, 5, '숨음은 마지막 다섯');
+  const line = crashLine(ev);
+  assert.ok(line.includes(' · 끝나기 전: 숨음 3초 전, 마이크 끔 10초 전, 마이크 켬 12초 전, 손댐 40초 전 · 최근 숨음: 20초 전 3초, 50초 전 1초, 2분 전 1초 안 · 메모리 흐름 20→35→83 MB · 다음 창 4초 뒤(다시 불러옴 reload)'), line);
+  assert.ok(line.indexOf('v426') < line.indexOf('끝나기 전'), '옛 줄 꼴 뒤에 붙인다');
+  assert.ok(crashLine({ ...ev, gap: 300, nav: 'navigate' }).includes('다음 창 5분 뒤(새로 엶 navigate)'));
+  assert.ok(crashLine({ ...ev, gap: 7300, nav: 'toString' }).endsWith('다음 창 2시간 뒤'), '저장값이 깨져도 상속 이름은 안 쓴다');
+  const plain = crashLine({ ...ev, ago: undefined, hid: undefined, mem: [44], gap: 0 });
+  assert.equal(/끝나기 전|최근 숨음|메모리 흐름|다음 창/.test(plain), false, '없으면 안 쓴다(메모리 하나뿐이면 흐름 아님)');
+  assert.doesNotThrow(() => crashLine({ at: end, kind: 'bg', ago: 'x', hid: 'y', mem: 'y', gap: 'z' }));
+  assert.doesNotThrow(() => crashLine({ at: end, kind: 'bg', hid: [null, 'x', [1]] }));
+  const read = crashLogText({ crashes: [ev] }, '2026-10-18');
+  assert.ok(read.includes('- (v426) 끝나기 전 = 마지막으로 적어 둔 때에서 거슬러'), '읽는 법');
+  assert.ok(read.includes('기록 없음 ≠ 안 함') && read.includes('다시 켜진 까닭(사람이 새로고침했는지 Chrome이 저절로 살렸는지)은 몰라요') && read.includes('보이는 동안 5분마다'), '읽는 법은 있는 그대로 (Codex 229차 P2)');
+  assert.equal(/저절로 다시 켜짐/.test(read), false);
+});
+
+test('🛑 v426 박동 — 숨음·다시 보임·손댐·마이크 켬/끔·영상 재생/멈춤·❄️ 얼림/깨어남·오류의 때를 적고(얼림·깨어남은 바로 · 손댐은 다음 박동에) · 숨었다 돌아온 길이 · 메모리는 보일 때 5분마다 한 번 마지막 여섯', () => {
+  const b = loadBox();
+  b.run('initBlackbox()');
+  const t0 = at('11:00');
+  const every = b.timers.find((t) => t.every);
+  const last = () => b.beats()[0][1];
+  assert.deepEqual(last().h, [150], '켤 때 한 번');
+  b.advance(1000); b.fire('doc', 'pointerdown');
+  assert.equal(last().t, undefined, '손댐은 바로 쓰지 않는다 (Codex 229차)');
+  b.advance(BEAT_MS); every.fn();
+  assert.equal(last().t.touch, t0 + 1000, '다음 박동에 적힌다');
+  b.advance(1000); b.fire('doc', 'play');
+  b.advance(1000); b.fire('doc', 'pause');
+  b.advance(1000); b.fire('win', 'shincoach:micstart');
+  const s = t0 + 1000 + BEAT_MS;
+  assert.deepEqual([last().t.play, last().t.pause, last().t.mic], [s + 1000, s + 2000, s + 3000], '마이크 켬은 바로 적는다(그 앞 것들도 함께)');
+  b.advance(1000); b.fire('win', 'shincoach:micend');
+  b.advance(1000); b.fire('win', 'error', { message: 'boom' });
+  assert.deepEqual([last().t.micEnd, last().t.err], [s + 4000, s + 5000]);
+  b.advance(1000); b.document.hidden = true; b.fire('doc', 'visibilitychange');
+  assert.deepEqual([last().vis, last().t.hide], [0, s + 6000], '숨으면 그때를 바로');
+  b.advance(1000); b.fire('doc', 'freeze');
+  assert.equal(last().t.freeze, s + 7000, '얼리면 바로 적는다(숨은 동안에도)');
+  b.advance(1000); b.fire('doc', 'resume'); b.document.hidden = false; b.fire('doc', 'visibilitychange');
+  assert.deepEqual([last().t.resume, last().t.show, last().vis], [s + 8000, s + 8000, 1]);
+  assert.deepEqual(last().sp, [[s + 6000, 2000]], '숨었다 돌아온 길이 [숨은 때, 밀리초]');
+  b.fire('doc', 'visibilitychange');
+  assert.equal(last().sp.length, 1, '숨지 않고 보임만 또 오면 안 늘린다');
+  for (let i = 0; i < 6; i++) { b.document.hidden = true; b.fire('doc', 'visibilitychange'); b.advance(500); b.document.hidden = false; b.fire('doc', 'visibilitychange'); }
+  assert.equal(last().sp.length, 5, '최근 다섯');
+  assert.deepEqual(last().sp[4][1], 500);
+  // 메모리 — 5분이 안 됐으면 안 적고, 5분마다 한 번 · 마지막 여섯 · 숨은 동안엔 안 잰다
+  b.advance(BEAT_MS); every.fn();
+  assert.deepEqual(last().h, [150]);
+  for (let i = 1; i <= 7; i++) { b.ctx.performance.memory.usedJSHeapSize = (150 + i * 10) * 1048576; b.advance(HEAP_EVERY); every.fn(); }
+  assert.deepEqual(last().h, [170, 180, 190, 200, 210, 220]);
+  b.document.hidden = true; b.ctx.performance.memory.usedJSHeapSize = 999 * 1048576; b.advance(HEAP_EVERY); every.fn();
+  assert.deepEqual(last().h, [170, 180, 190, 200, 210, 220], '숨은 동안엔 안 잰다');
+  b.document.hidden = false; b.fire('doc', 'visibilitychange');
+  assert.deepEqual(last().h, [170, 180, 190, 200, 210, 220], '다시 보여도 숨은 동안 잰 것이 없다');
+  // 재다 오류가 나도 박동은 그대로
+  Object.defineProperty(b.ctx.performance, 'memory', { get() { throw new Error('막힘'); }, configurable: true });
+  b.advance(HEAP_EVERY);
+  assert.doesNotThrow(() => every.fn());
+});
+
+test('🛑 v426 닫힌 뒤(pagehide) 얼림·깨어남이 와도 박동을 다시 안 쓴다 · bfcache로 돌아오면(pageshow persisted)만 다시 (Codex 229차)', () => {
+  const b = loadBox();
+  b.run('initBlackbox()');
+  b.fire('win', 'pagehide');
+  assert.equal(b.beats().length, 0);
+  b.fire('doc', 'freeze'); b.fire('doc', 'resume'); b.document.hidden = true; b.fire('doc', 'visibilitychange');
+  assert.equal(b.beats().length, 0, '닫힌 뒤 얼림·깨어남·숨음은 안 쓴다');
+  b.document.hidden = false;
+  b.fire('win', 'pageshow', { persisted: false });
+  assert.equal(b.beats().length, 0, 'bfcache가 아니면 그대로');
+  b.fire('win', 'pageshow', { persisted: true });
+  assert.equal(b.beats().length, 1);
+});
+
+test('🛑 v426 다음에 켤 때 — 가장 최근에 끝난 창에만 다음 창 간격(이 창이 켜진 때까지)과 열린 방식 · 방식을 못 알면 간격만 · 가장 최근 것이 그새 살아 있으면 옛 창에도 안 붙인다', () => {
+  const store = new Map();
+  const old = (sid, vis, t, extra = {}) => store.set(BEAT_PREFIX + sid, JSON.stringify({ sid, t0: t - 58 * 60000, at: t, vis, view: 'player', title: '레고 원피스 1화', vt: 258, mic: 76, ...extra }));
+  old('older', 1, at('09:14'));
+  old('newest', 0, at('10:59') + 50000, { t: { hide: at('10:59') + 47000 } });
+  const b = loadBox({ store });
+  b.ctx.performance.getEntriesByType = (k) => (k === 'navigation' ? [{ type: 'reload' }] : []);
+  b.run('initBlackbox()');
+  b.settle();
+  const [o, n] = b.log().crashes;
+  assert.deepEqual([o.gap, o.nav], [undefined, undefined], '옛 창에는 안 붙인다');
+  assert.deepEqual([n.gap, n.nav, n.ago], [10, 'reload', { hide: 3 }]);
+  assert.ok(crashLine(n).includes('끝나기 전: 숨음 3초 전 · 다음 창 10초 뒤(다시 불러옴 reload)'), crashLine(n));
+  // 방식을 못 알면(옛 Chrome · 막힘) 간격만
+  const s2 = new Map();
+  s2.set(BEAT_PREFIX + 'x', JSON.stringify({ sid: 'x', t0: at('10:00'), at: at('10:58'), vis: 0, view: 'home' }));
+  const b2 = loadBox({ store: s2 });
+  b2.ctx.performance.getEntriesByType = () => { throw new Error('없음'); };
+  b2.run('initBlackbox()');
+  b2.settle();
+  assert.deepEqual([b2.log().crashes[0].gap, b2.log().crashes[0].nav], [120, undefined]);
+  // 가장 최근 것이 그새 살아 있는 다른 창이면(박동이 바뀜) — 옛 창에도 간격을 넘겨 붙이지 않는다 (Codex 229차)
+  const s3 = new Map();
+  const put3 = (sid, t) => s3.set(BEAT_PREFIX + sid, JSON.stringify({ sid, t0: t - 60000, at: t, vis: 0, view: 'home' }));
+  put3('gone', at('10:30'));
+  put3('alive', at('10:59'));
+  const b3 = loadBox({ store: s3 });
+  b3.ctx.performance.getEntriesByType = () => [{ type: 'navigate' }];
+  b3.run('initBlackbox()');
+  put3('alive', at('11:00'));
+  b3.settle();
+  assert.deepEqual(b3.log().crashes.map((c) => [c.sid, c.gap, c.nav]), [['gone', undefined, undefined]]);
+  assert.match(readFileSync(new URL('../js/version.js', import.meta.url), 'utf8'), /APP_VERSION = 'v4(2[6-9]|[3-9]\d)'/);
 });
