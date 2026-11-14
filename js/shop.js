@@ -2,7 +2,7 @@
 // 도감(pokedex.js)과 플레이어 파트너 칩에서 연다. 코인·가방·꾸밈·HP 상태는 xp.js 프로필, 카탈로그는 items.js
 // 상태가 바뀌면 onChange(monId) 콜백 + document 'shincoach:profilechange' 이벤트 (플레이어 칩·도감이 각자 갱신)
 import { GEAR, DYE, POTION, CALL_PAL, HP, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, SHOP_BALLS, CATCH_SHOP, STONE_SHOP, STONES, SHINY_STONE, EXTENDERS, itemById, canBuy, priceText, setFigure, ENGLISH_STONE_HOW } from './items.js';
-import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, candyLevelUpMon, evolveMon, rarityOf, rarityAskOf, askRarity, RARITY, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone, shinyLeft, undoShiny, fusedCount, fledCount } from './xp.js';
+import { getProfileSnapshot, inventory, coins, itemCount, buyItem, buyEgg, eggFor, getLook, equipGear, applyDye, caughtCount, haveCount, takenCount, monLv, growInfo, levelUpMon, candyLevelUpMon, evolveMon, rarityOf, shownRarity, rarityAskOf, askRarity, RARITY, RARITY_PARA, getPartner, setPartner, hpOf, usePotion, setGearPos, hasKeystone, hasMegaStone, hasGmax, equipMega, makeSoup, useShinyStone, shinyLeft, undoShiny, fusedCount, fledCount } from './xp.js';
 import { formsOf, formUrl, ensureForm, ensureShiny, subjectOf, ROSTER, forSubject, characterUrl, forHole, isLegendary, isTrueBase, ZYG_FORMS } from './pokemon.js';
 import { zygMap, zygForm } from './xp.js';
 import { ZYG_ID, STEP as ZYG_STEP, CELL_MAX, zygFormOf, zygFormOpen, zygPerfect } from './zygarde.js'; // 🟢 지가르데 모습 칸 (v352)
@@ -335,7 +335,7 @@ async function retryFormArt(id, kind, doneMsg) {
 function renderMon(msg, pop) {
   if (!mon) return;
   const look = getLook(mon.id);
-  const r = rarityOf(mon.id);
+  const r = shownRarity(mon.id); // 보여 주는 등급 — ⏳ 패러독스로 옮긴 포켓몬은 ⏳ (셈은 rarityOf · v424)
   const isPartner = getPartner() === mon.id;
   const got = mon.caught !== false; // 아직 못 잡은 포켓몬은 등급만 손댈 수 있다
   $('mon-title').textContent = got ? (isPartner ? '🤝 ' : '') + mon.ko : '???';
@@ -403,18 +403,20 @@ function renderMon(msg, pop) {
   $('mon-rarity-now').textContent = `${RARITY[r].stars} ${RARITY[r].label}`;
   const rb = $('mon-rarity');
   rb.innerHTML = '';
-  for (let want = 1; want <= 4; want++) {
+  // ⏳ 패러독스(v424)도 같은 줄에서 신청 — 패러독스에 든 포켓몬이 ⭐를 고르면 패러독스에서 빼 달라는 신청
+  const mark = (x) => (x === RARITY_PARA ? '⏳' : '⭐');
+  for (const want of [1, 2, 3, 4, RARITY_PARA]) {
     const info = RARITY[want];
     const btn = option(info.stars, info.label, want === r ? '지금 등급' : (want === asked ? '보낸 신청' : ''), want === r || want === asked, '', () => {
       const now = askRarity(mon.id, want);
       renderMon(now
-        ? `⭐ "${mon.ko}은(는) ${RARITY[now].label} 같아요" 라고 아빠에게 보냈어요`
+        ? `${mark(now)} "${mon.ko}은(는) ${RARITY[now].label} 같아요" 라고 아빠에게 보냈어요`
         : '신청을 취소했어요');
     });
     rb.appendChild(btn);
   }
   $('mon-rarity-msg').textContent = asked
-    ? `⭐ ${RARITY[asked].label}(으)로 보내달라고 했어요 — 아빠가 보고 정해 줄 거예요`
+    ? `${mark(asked)} ${RARITY[asked].label}(으)로 보내달라고 했어요 — 아빠가 보고 정해 줄 거예요`
     : '등급이 이상하다고 생각하면 눌러서 아빠에게 알려 줄 수 있어요';
 
   const pb = $('mon-partner');
@@ -561,12 +563,14 @@ function renderGrow() {
   }
 
   const myR = rarityOf(mon.id);
+  const myS = shownRarity(mon.id); // 그림은 보여 주는 등급(⏳ 패러독스) · 내려감(evo-down)은 셈 등급으로 (v424)
   for (const e of g.evo) {
     const to = ROSTER.find((r) => r.id === e.to);
     if (!to) continue;
     const toR = rarityOf(e.to);
+    const toS = shownRarity(e.to);
     // ⭐ 등급이 내려가는 진화가 있다(윤겔라 ⭐⭐ → 후딘 ⭐, 이브이 → 이브이 진화들). 누르기 전에 보여 준다 (아버님 결정)
-    const rar = toR === myR ? RARITY[toR].stars : `${RARITY[myR].stars}→${RARITY[toR].stars}`;
+    const rar = toS === myS ? RARITY[toS].stars : `${RARITY[myS].stars}→${RARITY[toS].stars}`;
     const sub = [rar, e.orig ? `원래는 ${e.orig}` : ''].filter(Boolean).join(' · ');
     const btn = option('🧬', to.ko, sub, false, 'mon-evo-btn' + (toR < myR ? ' evo-down' : ''), () => doEvolve(e.to));
     btn.disabled = busy;

@@ -29,7 +29,7 @@ import { setScene } from './blackbox.js';
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON,
   TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL, MUTE, SLOW, dayKeyOf, playKeysH } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
-import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, rarityOf, RARITY } from './xp.js';
+import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, shownRarity, RARITY } from './xp.js';
 import { ROSTER, ensureCast } from './pokemon.js'; // 🐾 음악 포켓몬 이름·그림 (v404)
 import { applyDailyDelta } from './db.js';
 import { clockDay, noteActivity, isLocked } from './timelimit.js';
@@ -1327,7 +1327,7 @@ function nextArrival() {
   if (S.running) setRun(false); // 🔁 계속으로 치다 열째 칸 — 창이 악보를 가리니 ⏸처럼 멈춘다(안 멈추면 다음 판 첫 음이 「늦음」) · 닫은 뒤 ▶로 이어 (Codex 217차 P2)
   const { id } = item;
   const r = ROSTER.find((m) => m.id === id);
-  const rank = RARITY[rarityOf(id)] || RARITY[2];
+  const rank = RARITY[shownRarity(id)] || RARITY[2]; // ⏳ 패러독스로 옮겼으면 ⏳ (v424)
   const again = item.first === null ? caughtCount(id) > 1 : !item.first; // 50마리를 다 만난 뒤엔 만난 아이가 또 온다 (기본안 ④)
   const box = el('div', 'pn-arrive');
   box.id = 'pn-arrive';

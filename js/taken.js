@@ -10,7 +10,7 @@
 // ★ 도감 칸은 남는다(잡았던 적 있음). 보유만 0이 되어 🤝 파트너·⚔️ 배틀·🎀 꾸미기에서 빠지고,
 //   **다시 잡으면 돌아온다.** 영구 삭제가 아니다.
 
-import { ownedIds, takeMons, haveCount, rarityOf, RARITY, unseenTaken, markTakenSeen, getLook } from './xp.js';
+import { ownedIds, takeMons, haveCount, shownRarity, RARITY, unseenTaken, markTakenSeen, getLook } from './xp.js';
 import { ROSTER, ensureCast, characterUrl } from './pokemon.js';
 import { sfx } from './sfx.js';
 
@@ -60,10 +60,10 @@ function renderTakeTool(msg) {
     return;
   }
 
-  // 등급이 높은 것부터 (전설 → 희귀 → …) — 부모가 찾는 것은 보통 위쪽에 있다
+  // 등급이 높은 것부터 (전설 → 희귀 → …) — 부모가 찾는 것은 보통 위쪽에 있다 · ⏳ 패러독스·🌌는 별 밖이라 맨 위 (보여 주는 등급 · v424)
   const byRarity = new Map();
   for (const id of ids) {
-    const r = rarityOf(id);
+    const r = shownRarity(id);
     if (!byRarity.has(r)) byRarity.set(r, []);
     byRarity.get(r).push(id);
   }
@@ -116,7 +116,7 @@ function confirmTake() {
   card.appendChild(el('h3', '', `정말 ${list.length}마리를 데려갈까요?`));
   const ul = el('ul', 'take-confirm-list');
   for (const id of list) {
-    const info = RARITY[rarityOf(id)] || { stars: '' };
+    const info = RARITY[shownRarity(id)] || { stars: '' };
     ul.appendChild(el('li', '', `${info.stars} ${nameOf(id)}`));
   }
   card.appendChild(ul);

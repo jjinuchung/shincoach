@@ -40,6 +40,17 @@ export function nextMarket(dateKey) {
   return null;
 }
 
+// 🏷️ 띠부실 번호 (v424 — 진우 신청 · 아버님 「추천대로」) — 포켓몬빵 띠부실 책처럼 퓨전마다 번호를 붙여 번호 순으로 모은다.
+//  번호 = 모양(앞) 포켓몬의 전국도감 번호(명단 id) · 색(뒤)은 상관없음 → 같은 모양·다른 색은 같은 번호로 나란히(색 번호 순).
+//  저장하지 않고 앞 포켓몬에서 셈 — 이미 만든 퓨전·앞으로 만들 퓨전·나눈 퓨전(도감에 남은 것) 모두 저절로.
+//  아직 안 모은 번호의 빈 칸은 그리지 않는다 (번호가 800 넘게라 책이 너무 길고, 아이 화면에 남은 수를 보이지 않게)
+/** 띠부실 번호 — 모양(앞) 포켓몬의 도감 번호 */
+export const fusionNo = (f) => Math.max(0, Math.floor(Number(f && f.a) || 0));
+/** 번호 글 — 세 자리(No.025) · 천 넘으면 네 자리(No.1007) */
+export const noText = (n) => `No.${String(Math.max(0, Math.floor(Number(n) || 0))).padStart(3, '0')}`;
+/** 번호 순 — 모양 번호 → 색 번호 (같은 모양·다른 색이 나란히) */
+export const byFusionNo = (x, y) => fusionNo(x) - fusionNo(y) || (Number(x && x.b) || 0) - (Number(y && y.b) || 0);
+
 /** 퓨전 id — 순서가 있다 (앞-뒤) */
 export const fusionId = (a, b) => `${Number(a)}-${Number(b)}`;
 export function parseFusionId(fid) {

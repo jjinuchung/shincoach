@@ -1,6 +1,6 @@
 // 🎒 내 포켓몬(도감) 화면: 레벨·경험치·💰 코인, 잡은 포켓몬(그림·마릿수, 누르면 장식·염색), 못 잡은 포켓몬(검은 실루엣 + ???), 🛒 상점
 import { ROSTER, loadCharacters, nextUnlockLevel, unlockCountAt, subjectOf, isUltraBeast } from './pokemon.js';
-import { getLevelInfo, getProfileSnapshot, rarityOf, RARITY, RARITY_UB, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner, candyTotal } from './xp.js';
+import { getLevelInfo, getProfileSnapshot, shownRarity, RARITY, RARITY_UB, RARITY_PARA, caughtKinds, streakBefore, STREAK_MIN_DONE, xpToReach, coins, getLook, inventory, getPartner, candyTotal } from './xp.js';
 import { listDaily, getMath } from './db.js';
 import { todayKey, todayDone } from './track.js';
 import { makeFigure, setFigure, itemById, STONES, FUTURE_STONES, SHINY_STONE, shinyUsesLeft, ENGLISH_STONE_SHORT } from './items.js';
@@ -8,7 +8,7 @@ import { eggSummary, EGG_SUBJECT_KO } from './egg.js';
 import { gymClaimed } from './mathprog.js'; // 🕳 울트라홀 = 💎 스페셜 여덟 배지
 import { haveOf, lvOf, fusedOf, fledOf, rocketHeldOf } from './evolve.js';
 import { initMarket, openMarket, fusionFigure, fusionName } from './marketview.js'; // 🏪 5일장 · 🔀 퓨전 (2026-10-04)
-import { marketOpen, nextMarket } from './fusion.js';
+import { marketOpen, nextMarket, noText } from './fusion.js';
 import { fusionList, zygMap } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { initShop, openShop, openMon } from './shop.js';
@@ -200,6 +200,7 @@ export async function openPokedex(opts) {
   main.appendChild(card);
 
   // 🔀 퓨전 도감 — 만든 적 있는 퓨전 (누르면 5일장에서 이름을 바꾸거나 장날에 나눈다)
+  // 🏷️ 띠부실 번호 순 · 칸 왼쪽 위에 번호(모양 포켓몬의 도감 번호 · v424)
   const fz = fusionList();
   if (fz.length) {
     const sec = el('div', 'stats-card');
@@ -207,6 +208,7 @@ export async function openPokedex(opts) {
     const grid = el('div', 'pokedex-grid');
     for (const f of fz) {
       const cell = el('div', 'pokedex-cell got fz-dex-cell');
+      cell.appendChild(el('div', 'fz-no', noText(f.a)));
       cell.appendChild(fusionFigure(f.a, f.b, urlById, 'fz-art small'));
       cell.appendChild(el('div', 'nm', fusionName(f)));
       if (f.held > 1) cell.appendChild(el('div', 'cnt', `×${f.held}`));
@@ -225,13 +227,18 @@ export async function openPokedex(opts) {
   }
 
   // 희귀도별 도감 (지금 레벨에서 열린 것만). 🌌 울트라비스트는 ⭐ 밖의 제 등급이라 맨 아래 따로 선다
-  for (let r = 1; r <= RARITY_UB; r++) {
-    const list = unlocked.filter((m) => rarityOf(m.id) === r);
-    if (!list.length) continue;
+  // ⏳ 패러독스(v424)는 그 아래 — 아빠가 옮긴 포켓몬만 들고, 비어 있어도 칸은 보인다(진우가 찾는 자리라 어떻게 채우는지 한 줄)
+  for (const r of [1, 2, 3, 4, RARITY_UB, RARITY_PARA]) {
+    const list = unlocked.filter((m) => shownRarity(m.id) === r);
+    const para = r === RARITY_PARA;
+    if (!list.length && !para) continue;
     const ub = r === RARITY_UB;
-    const sec = el('div', 'stats-card' + (ub ? ' pokedex-ub' : ''));
+    const sec = el('div', 'stats-card' + (ub ? ' pokedex-ub' : para ? ' pokedex-para' : ''));
     const got = list.filter((m) => p.caught[m.id] > 0).length;
-    sec.appendChild(el('h2', '', `${RARITY[r].stars} ${RARITY[r].label} (${got}/${list.length})`));
+    sec.appendChild(el('h2', '', list.length ? `${RARITY[r].stars} ${RARITY[r].label} (${got}/${list.length})` : `${RARITY[r].stars} ${RARITY[r].label}`));
+    if (para) sec.appendChild(el('p', 'pokedex-para-note', list.length
+      ? '⏳ 고대·미래에서 온 포켓몬 칸이에요 — 아빠가 옮겨 준 포켓몬이 여기 모여요'
+      : '⏳ 고대·미래에서 온 포켓몬 칸이에요 — 포켓몬을 눌러 ⭐ 등급에서 ⏳ 패러독스를 고르면 아빠에게 보내져요'));
     // 🕳 울트라홀이 아직이면 왜 못 만나는지 알려 준다 — 아이가 "이건 뭐지?" 하고 묻는 자리다
     if (ub) sec.appendChild(el('p', 'pokedex-ub-note', hole
       ? '🕳 울트라홀이 열렸어요! 🔢 수학 잡기에서 만날 수 있어요 — ⚪ 비스트볼로 던져야 잡혀요'

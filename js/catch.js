@@ -1,6 +1,6 @@
 // 🎯 포켓몬 잡기 화면: 퍼즐 정답 뒤 경험치를 보여주고, 퍼즐에 나온 포켓몬 중 한 마리를 골라 몬스터볼을 던진다.
 // 잡힐지는 운(xp.catchAttempt) — 볼이 날아가 맞고, 포켓몬이 볼로 들어가고, 볼이 흔들리다가 잡히거나 튀어나온다 (전부 CSS 연출)
-import { rarityOf, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold, spendBall, refundBall, getLook } from './xp.js';
+import { shownRarity, RARITY, caughtCount, haveCount, xpToReach, inventory, rollTrueGold, spendBall, refundBall, getLook } from './xp.js';
 import * as bgm from './bgm.js';
 import { nextUnlockLevel, unlockCountAt } from './pokemon.js';
 import { sfx, vibrate, unlock } from './sfx.js';
@@ -178,7 +178,7 @@ function renderPick(candidates, pickId) {
   pick.hidden = false;
   ui.candidates = candidates.slice();
   for (const c of candidates) {
-    const r = rarityOf(c.id);
+    const r = shownRarity(c.id); // 이름표는 보여 주는 등급(⏳ 패러독스 · v424) — 잡기 확률은 xp가 rarityOf로
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'catch-cand' + (pickId && c.id === pickId ? ' radar' : '');

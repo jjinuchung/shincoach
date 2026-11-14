@@ -1,6 +1,6 @@
 // 🏪 5일장 화면 — 🔀 퓨전 가게 (두 마리를 앞(모양) + 뒤(색)로 섞기) · 🤝 교환 상인 (2단계) · 💰 팔기 (3단계) · 내 퓨전(분리) · 퓨전 도감(이름 바꾸기)
 // 규칙은 fusion.js(순수)와 db.js(트랜잭션), 화면은 여기. 🎒 도감의 "🏪 5일장" 버튼에서 연다 (장이 안 서는 날도 열려 다음 장날을 알려 준다)
-import { marketOpen, nextMarket, blendName, fusionId, recolor, FUSION_COST, NAME_MAX } from './fusion.js';
+import { marketOpen, nextMarket, blendName, fusionId, recolor, FUSION_COST, NAME_MAX, noText } from './fusion.js';
 import { ROSTER, loadCharacters } from './pokemon.js';
 import { haveCount, itemCount, fuseMons, unfuseMon, renameFusion, fusionList, tradeOffers, tradeMon, RARITY, coins, sellOffers, sellThing, getLook } from './xp.js';
 import { STONE_MATH, STONE_ENGLISH, itemById, ENGLISH_STONE_HOW } from './items.js';
@@ -313,6 +313,7 @@ function resultCard() {
   const box = el('div', 'fz-result');
   box.appendChild(el('div', 'fz-result-title', r.first ? '✨ 새 포켓몬이 태어났어요! 퓨전 도감에 들어갔어요' : '✨ 또 만들었어요!'));
   box.appendChild(fusionFigure(f.a, f.b, ui.urlById, 'fz-art big'));
+  box.appendChild(el('div', 'fz-no', `🏷️ ${noText(f.a)}`)); // 띠부실 번호 = 모양(앞) 포켓몬의 도감 번호 (v424)
   box.appendChild(nameRow(f, 'result'));
   return box;
 }
@@ -364,9 +365,12 @@ function dexCard(open) {
   const card = el('div', 'market-sec');
   card.appendChild(el('h3', 'market-h', `📖 퓨전 도감 (${list.length}종)`));
   if (!list.length) { card.appendChild(el('p', 'market-note', open ? '아직 만든 퓨전이 없어요 — 위에서 두 마리를 골라 섞어 봐요!' : '아직 만든 퓨전이 없어요 — 장날에 퓨전 가게에서 만들어요')); return card; }
+  // 🏷️ 띠부실 책처럼 번호 순 (fusionList가 모양 번호 → 색 번호로 늘어놓는다 · v424)
+  card.appendChild(el('p', 'market-note', '🏷️ 띠부실 번호는 모양(앞) 포켓몬의 도감 번호예요 — 번호 순서대로 모여요'));
   const grid = el('div', 'fz-dex');
   for (const f of list) {
     const cell = el('div', 'fz-cell' + (f.held > 0 ? ' held' : ''));
+    cell.appendChild(el('div', 'fz-no', noText(f.a)));
     cell.appendChild(fusionFigure(f.a, f.b, ui.urlById));
     cell.appendChild(nameRow(f, 'dex'));
     cell.appendChild(el('div', 'market-note', `${KO.get(f.a)} + ${KO.get(f.b)}`));

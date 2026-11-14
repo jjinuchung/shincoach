@@ -46,7 +46,7 @@ import { nonsulRule, nonsulTakeRule, nonsulGiveBackRule, reasonAddRule } from '.
 import { lettersOf, letterStartRule, letterSeenRule, letterSendRule, letterReplyRule, letterReadRule, letterOpenRule } from './letters.js'; // 📮 포켓몬 편지 (v351 — 순수 · v360 선물 열기)
 import { grammarRule, knownOf, seenOf, gMissOf, diagOf, giftOf, rngFrom, videoSeenOf } from './grammar.js'; // 📝 영어 문법 칸·💰·🎁 깜짝 포켓몬 (v348 — 순수 · v349 영상 사이 쪽지 — 진단 칸은 옛 기록 병합에만)
 import { writeAddRule, writeReplyRule, writeReadRule, writesOf } from './korwrite.js'; // ✍️ 국어 서술형 (순수)
-import { copyFusions, fusionHeld, parseFusionId } from './fusion.js';
+import { copyFusions, fusionHeld, parseFusionId, byFusionNo } from './fusion.js';
 import { copyTrades, offerFor, tradesOn, TRADER_COUNT } from './trade.js';
 import { copySales, sellableMons, sellableItems, monsSoldOn, salesOn, SELL_MON_MAX } from './sell.js';
 import { itemById, HP, GOLDEN, POKEBALL, KEYSTONE, MEGASTONE, MUSHROOM, SOUP_MUSHROOMS, costOf, STONES, SHINY_STONE, STONE_MATH, extenderOf, videoOwed, shinyUsesLeft, TRUE_GOLD, TRUE_GOLD_CHANCE } from './items.js';
@@ -139,10 +139,16 @@ export const RARITY = [
   // 다른 차원에서 온 존재라 ⭐ 체계 밖에 둔다. base는 희귀와 같지만 실제 확률은 ⚪ 비스트볼이 정한다
   // (보통 볼 ×0.1 = 2.6% / 비스트볼 ×5 = 90%, xp.ballChance)
   { stars: '🌌', label: '울트라비스트', base: 0.15, ub: true },
+  // ⏳ 패러독스 (v424 — 진우 신청 · 아버님 「추천대로」) — 🌌처럼 ⭐ 밖에 선 칸이지만 **보여 주는 칸**이다.
+  // 아빠가 옮긴 포켓몬만 들고(mons[id].para), 도감 칸·이름표만 바뀐다. 잡기 확률·값·교환·배틀은 원래 ⭐ 등급(rarityOf) 그대로 —
+  // 옮기기만으로 잡기가 쉬워지거나 어려워지지 않게. 그래서 base가 없다(셈에 안 씀 · rarityOf는 이 번호를 돌려주지 않는다)
+  { stars: '⏳', label: '패러독스', para: true },
 ];
 
 /** 🌌 울트라비스트 등급 번호 — "희귀 이상"류 규칙이 이 등급을 빨아들이지 않게 이름으로 쓴다 */
 export const RARITY_UB = 5;
+/** ⏳ 패러독스 칸 번호 (v424) — 보여 주는 등급(shownRarity)에만 나온다 */
+export const RARITY_PARA = 6;
 /** ⭐ 별로 매기는 보통 등급인가 (아이가 등급을 신청할 수 있는 범위) */
 export const STAR_RARITIES = [1, 2, 3, 4];
 // 명단(pokemon.js ROSTER) 확장 시 여기도 추가. 등급 없으면 보통(2)
@@ -232,16 +238,29 @@ export function rarityIn(pf, id) {
 function isRarity(r) {
   return Number.isInteger(r) && r >= 1 && r <= 4;
 }
+/** 아이가 신청할 수 있는 값 — ⭐ 넷 + ⏳ 패러독스 (v424) */
+function isAsk(r) {
+  return isRarity(r) || r === RARITY_PARA;
+}
+
+/** 보여 주는 등급 (v424) — 아빠가 ⏳ 패러독스로 옮겼으면 RARITY_PARA, 아니면 rarityOf. 도감 칸·이름표에만 쓰고 셈(확률·값·교환)엔 rarityOf */
+export function shownRarity(id) {
+  return shownIn(profile, id);
+}
+export function shownIn(pf, id) {
+  const m = pf && pf.mons && pf.mons[id];
+  return m && m.para === 1 ? RARITY_PARA : rarityIn(pf, id);
+}
 
 // ── ⭐ 등급 옮기기: 아이가 신청하고 부모가 📊에서 승인한다 ──
 // 등급은 곧 잡기 확률이라(흔함 45% … 전설 3%) 아이 마음대로 내리면 잡기의 긴장감이 사라진다.
 // 그래서 아이는 "이건 다른 등급 같아요"를 남기고, 부모가 보고 결정한다.
 
-/** 아이가 등급 신청 (같은 등급이면 신청을 지운다) */
+/** 아이가 등급 신청 (같은 등급이면 신청을 지운다) · ⏳ 패러독스(RARITY_PARA)도 — 패러독스에 든 포켓몬이 ⭐를 고르면 패러독스에서 빼 달라는 신청 (v424) */
 export function askRarity(id, rarity) {
-  if (!isRarity(rarity)) return null;
+  if (!isAsk(rarity)) return null;
   const m = profile.mons[id] || (profile.mons[id] = {});
-  if (rarity === rarityOf(id)) delete m.rarityAsk;
+  if (rarity === shownRarity(id)) delete m.rarityAsk;
   else m.rarityAsk = rarity;
   addDelta({ mons: { [id]: { rarityAsk: m.rarityAsk || null } } });
   return m.rarityAsk || null;
@@ -250,26 +269,33 @@ export function askRarity(id, rarity) {
 /** 이 포켓몬에 대해 아이가 신청해 둔 등급 (없으면 null) */
 export function rarityAskOf(id) {
   const m = profile.mons && profile.mons[id];
-  return m && isRarity(m.rarityAsk) ? m.rarityAsk : null;
+  return m && isAsk(m.rarityAsk) ? m.rarityAsk : null;
 }
 
-/** 지금 신청 중인 것 [{ id, from, to }] (부모 화면용) */
+/** 지금 신청 중인 것 [{ id, from, to }] (부모 화면용) — from은 보여 주는 등급(⏳ 패러독스면 RARITY_PARA) */
 export function listRarityAsks() {
   const out = [];
   for (const [id, m] of Object.entries(profile.mons || {})) {
-    if (m && isRarity(m.rarityAsk)) out.push({ id: Number(id), from: rarityOf(Number(id)), to: m.rarityAsk });
+    if (m && isAsk(m.rarityAsk)) out.push({ id: Number(id), from: shownRarity(Number(id)), to: m.rarityAsk });
   }
   return out.sort((a, b) => a.id - b.id);
 }
 
-/** 부모가 결정: ok면 그 등급으로 옮기고, 아니면 신청만 지운다 */
+/**
+ * 부모가 결정: ok면 그 등급으로 옮기고, 아니면 신청만 지운다.
+ * ⏳ 패러독스로 옮기면 para만 — ⭐(셈)는 그대로 · 패러독스에서 ⭐로 옮기면 para를 빼고 그 ⭐로 (v424)
+ */
 export function decideRarity(id, ok) {
   const m = profile.mons[id];
-  if (!m || !isRarity(m.rarityAsk)) return null;
+  if (!m || !isAsk(m.rarityAsk)) return null;
   const to = m.rarityAsk;
   delete m.rarityAsk;
-  if (ok) m.rarity = to;
-  addDelta({ mons: { [id]: { rarityAsk: null, rarity: ok ? to : (m.rarity || null) } } });
+  // 바뀌는 칸만 저장한다 — 오래된 창의 거절이 다른 창에서 승인한 ⏳·⭐를 그 창이 기억하는 옛 값으로 덮지 않게 (Codex 227차 P2-1)
+  //   거절 = 신청만 지움 · ⏳ 승인 = para만(옮긴 ⭐는 안 건드림) · ⭐ 승인 = 그 ⭐ + para 빼기
+  const patch = { rarityAsk: null };
+  if (ok && to === RARITY_PARA) { m.para = 1; patch.para = 1; }
+  else if (ok) { delete m.para; m.rarity = to; patch.para = null; patch.rarity = to; }
+  addDelta({ mons: { [id]: patch } });
   return ok ? to : null;
 }
 
@@ -332,14 +358,15 @@ export async function makeSoup(id) {
   return r.ok || r.why === 'owned';
 }
 
-/** ⚙ 등급 초기화: 옮긴 것과 신청을 모두 없앰 (원래 등급으로) */
+/** ⚙ 등급 초기화: 옮긴 것과 신청을 모두 없앰 (원래 등급으로) · ⏳ 패러독스로 옮긴 것도 (v424) */
 export function resetRarity() {
   let n = 0;
   for (const [id, m] of Object.entries(profile.mons || {})) {
-    if (!m || (!isRarity(m.rarity) && !isRarity(m.rarityAsk))) continue;
+    if (!m || (!isRarity(m.rarity) && !isAsk(m.rarityAsk) && m.para !== 1)) continue;
     delete m.rarity;
     delete m.rarityAsk;
-    addDelta({ mons: { [id]: { rarity: null, rarityAsk: null } } });
+    delete m.para;
+    addDelta({ mons: { [id]: { rarity: null, rarityAsk: null, para: null } } });
     n++;
   }
   return n;
@@ -639,7 +666,7 @@ export function fledCount(id) {
 }
 
 /**
- * 🔀 퓨전 도감 — 만든 적 있는 퓨전 [{ fid, a, b, made, split, held, name, at }] (처음 만든 순)
+ * 🔀 퓨전 도감 — 만든 적 있는 퓨전 [{ fid, a, b, made, split, held, name, at }] (🏷️ 띠부실 번호 순 — 모양 번호 → 색 번호 · v424, 그전엔 처음 만든 순)
  * name은 아이가 지은 이름 (없으면 null — 화면이 앞 두 글자 + 끝 한 글자로 지어 보인다)
  */
 export function fusionList() {
@@ -647,7 +674,7 @@ export function fusionList() {
     const f = profile.fusions[fid] || {};
     const ids = parseFusionId(fid);
     return ids && (Number(f.made) || 0) > 0 ? { fid, a: ids.a, b: ids.b, made: Number(f.made) || 0, split: Number(f.split) || 0, held: fusionHeld(f), name: f.name || null, at: Number(f.at) || 0 } : null;
-  }).filter(Boolean).sort((x, y) => x.at - y.at || (x.fid < y.fid ? -1 : 1));
+  }).filter(Boolean).sort(byFusionNo);
 }
 
 /** 🔀 섞기 — 한 트랜잭션 (장날·두 마리·스톤). 저장이 안 되면 못 한 것 */

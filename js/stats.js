@@ -11,7 +11,7 @@ import { figText } from './mathdraw.js';
 import { openPlayer, applyItemPatch } from './player.js';
 import { todayKey, MASTER_RATIO, reloadDaily } from './track.js';
 import { reviewSummary, wordSummary, stageIcon, reviewable, GRADUATED, favList, FAV_ICON } from './review.js';
-import { reloadProfile, listRarityAsks, decideRarity, RARITY, inventory, getProfileSnapshot, giftsGiven, markGiven, salesByDay, rocketRecord, rocketHideout } from './xp.js';
+import { reloadProfile, listRarityAsks, decideRarity, RARITY, RARITY_PARA, rarityOf, inventory, getProfileSnapshot, giftsGiven, markGiven, salesByDay, rocketRecord, rocketHideout } from './xp.js';
 import { salesReport, SELL_MON_MAX } from './sell.js'; // 💰 5일장에서 판 것 (2026-10-05)
 import { pendingTickets, pendingGifts, fileLabel } from './unlock.js';
 import { restoreOffer, restoreFromMirror, lastFileBackup, markFileBackup, needsFileBackup, daysSince } from './backup.js';
@@ -929,6 +929,8 @@ export async function renderStats() {
   if (asks.length) {
     const cR = card(`⭐ 등급 바꿔달라는 신청 ${asks.length}개 — 진우가 보낸 것`);
     cR.appendChild(el('p', 'stats-note', '등급은 곧 잡기 확률이에요 (흔함 45% · 보통 30% · 희귀 15% · 전설 3%). 맞다고 생각되면 옮겨 주세요.'));
+    // ⏳ 패러독스(v424)는 도감 칸·이름표만 — 잡기 확률·값은 원래 ⭐ 그대로라 그것을 한 줄로
+    if (asks.some((a) => a.to === RARITY_PARA)) cR.appendChild(el('p', 'stats-note', '⏳ 패러독스는 도감에서 따로 모이는 칸이에요 — 옮겨도 잡기 확률·값·교환은 원래 ⭐ 등급 그대로예요.'));
     // 하나씩 누르고 화면을 다시 내리는 게 번거로워서 일괄 처리를 위에 둔다
     const bulk = el('div', 'stats-ask-bulk');
     const allYes = el('button', 'btn btn-primary', `✅ ${asks.length}개 전부 옮겨 주기`);
@@ -944,7 +946,8 @@ export async function renderStats() {
       const mon = ROSTER.find((m) => m.id === a.id);
       const row = el('div', 'stats-ask');
       row.appendChild(el('div', 'stats-ask-name', `${mon ? mon.ko : '#' + a.id}`));
-      row.appendChild(el('div', 'stats-ask-move', `${RARITY[a.from].stars} ${RARITY[a.from].label}  →  ${RARITY[a.to].stars} ${RARITY[a.to].label}`));
+      const keep = a.to === RARITY_PARA ? RARITY[rarityOf(a.id)] : null; // ⏳로 옮겨도 셈은 이 ⭐ (v424)
+      row.appendChild(el('div', 'stats-ask-move', `${RARITY[a.from].stars} ${RARITY[a.from].label}  →  ${RARITY[a.to].stars} ${RARITY[a.to].label}${keep ? ` (잡기는 ${keep.stars} ${keep.label} 그대로)` : ''}`));
       const btns = el('div', 'stats-ask-btns');
       const yes = el('button', 'btn btn-primary', '옮겨 주기');
       yes.type = 'button';

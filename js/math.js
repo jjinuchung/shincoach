@@ -40,7 +40,7 @@ import { padSpec, matchTyped } from './mathpad.js';
 import { learnedPad } from './lakepad.js'; // ✍️ 🎣 낚시터 수학 직접 쓰기 (v418)
 import { padBox, padAnswered } from './padview.js';
 import { drawBox, drawAnswered, canDraw } from './drawview.js';
-import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound, megaReady, zygBattle } from './xp.js';
+import { gainXp, gainCoins, getLevelInfo, coins, caughtCount, getLook, isTired, catchAttempt, inventory, addItem, unlockBase, itemCount, useItem, rarityOf, shownRarity, RARITY, getProfileSnapshot, getPartner, lossesOf, battleWin, battleLoss, consumeItem, commitSpecialRound, commitChalRound, megaReady, zygBattle } from './xp.js';
 import { unlockState, MATH_PTS, nextTarget, previewGift, ownedVoucherIds, needOf, isGift } from './unlock.js';
 import { GOLDEN, STONE_MATH, STONE_ENGLISH, BEASTBALL, RADAR, POTION, CALL_PAL, setFigure } from './items.js';
 import { dailyBonus, bonusText } from './mathbonus.js';
@@ -310,7 +310,7 @@ async function useRadar(pool, candidates) {
   if (!pick) { addItem(RADAR.id, 1); return null; } // 그림을 못 받았다 — 레이더는 돌려준다
   const out = candidates.filter((c) => c.id !== pick.id).slice(0, 3);
   out.splice(Math.floor(Math.random() * (out.length + 1)), 0, pick);
-  const rr = RARITY[rarityOf(pick.id)];
+  const rr = RARITY[shownRarity(pick.id)]; // 이름표는 보여 주는 등급(⏳ 패러독스 · v424) — 고르는 것(rare)은 셈 등급
   return { candidates: out, pickId: pick.id, note: `🧭 레이더! ${rr.stars} ${rr.label} ${pick.ko}${josa(pick.ko, '이', '가')} 나타났어요` };
 }
 

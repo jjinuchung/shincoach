@@ -2,7 +2,7 @@
 // 공격 = 문장 하나를 따라 말하기 → 얼마나 잘 말했는지가 데미지 (배틀이 곧 학습). 상대는 자동 공격.
 // 이기면 상대 포켓몬을 얻고, 지면 그 포켓몬의 패배 수가 +1 (3번 지면 잃음 — xp.js battleLoss). 참가는 선택.
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 화면(DOM)
-import { rarityOf, RARITY } from './xp.js';
+import { rarityOf, shownRarity, RARITY } from './xp.js';
 import * as bgm from './bgm.js';
 import { POTION, CALL_PAL, itemById, makeFigure, setFigure } from './items.js';
 import { sfx, vibrate, unlock } from './sfx.js';
@@ -408,7 +408,7 @@ export function openBattle(o) {
   $('battle-msg').textContent = `"${o.opponent.ko}${josa(o.opponent.ko, '이', '가')} 나랑 있어. 배틀 할래?"`;
   const ef = $('battle-intro-fig');
   setFigure(ef, o.opponent.url || '', null);
-  $('battle-intro-name').textContent = `${o.opponent.ko} · ${RARITY[rarityOf(o.opponent.id)].stars}`;
+  $('battle-intro-name').textContent = `${o.opponent.ko} · ${RARITY[shownRarity(o.opponent.id)].stars}`; // ⏳ 패러독스로 옮겼으면 ⏳ (v424)
   $('battle-intro').hidden = false;
   $('battle-pick').hidden = true;
   $('battle-stage').hidden = true;
