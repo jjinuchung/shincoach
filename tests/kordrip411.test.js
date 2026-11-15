@@ -3,7 +3,8 @@
 //  · 두 묶음을 한꺼번에 받아도 하루 두 편 · 그 전에는 한 편도 안 열린다 · 앞 묶음이 다 열린 지 오래면 처음 받은 날(적힌 날)부터 · 읽은 글은 잠그지 않는다
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DRIP, startsOf, lockedIds, visibleCards, opensTomorrow, freshIds, withFirst, mergeDrip } from '../js/kordrip.js';
+import { DRIP, NEWS_ORDER, startsOf, lockedIds, visibleCards, opensTomorrow, freshIds as freshIdsAll, withFirst, mergeDrip } from '../js/kordrip.js';
+const freshIds = (...a) => freshIdsAll(...a).filter((id) => !NEWS_ORDER.includes(id)); // 📰 신문 묶음(bnews, v428 — 따로 하루 두 편)은 news428
 
 const ord = (k) => DRIP.bundles.find((b) => b.key === k).order;
 const H = ord('b389');
@@ -17,7 +18,7 @@ const day = (m, d, y = 2026) => `${y}-${String(m).padStart(2, '0')}-${String(d).
 const S = { b320: day(10, 23), b322: day(10, 24), b347: day(10, 26), b372: day(10, 31), b380: day(11, 2), b382: day(11, 3), b389: day(11, 10), b411a: day(11, 20), b411b: day(11, 20) }; // 태블릿이 v411을 11/20에 받는다고 치면
 
 test('📦 아홉째 b411a·열째 b411b — 열둘씩 K203~K214 · K215~K226 · b389 → b411a → b411b로 이어서 · 아홉 묶음에 겹치는 글 없음', () => {
-  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320', 'b322', 'b347', 'b372', 'b380', 'b382', 'b389', 'b411a', 'b411b'], '저장 열쇠는 바꾸지 않는다');
+  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320', 'b322', 'b347', 'b372', 'b380', 'b382', 'b389', 'b411a', 'b411b', 'bnews'], '저장 열쇠는 바꾸지 않는다');
   assert.equal(DRIP.bundles.find((b) => b.key === 'b411a').after, 'b389');
   assert.equal(DRIP.bundles.find((b) => b.key === 'b411b').after, 'b411a');
   assert.deepEqual(I, Array.from({ length: 12 }, (_, i) => `K${203 + i}`), '아홉째 — 기본안 차례 그대로');
@@ -45,7 +46,7 @@ test('📅 b389를 다 연 지 오래 뒤에 받으면 받은 날부터 · 아�
   assert.equal(startsOf(late, day(12, 20)).b411a, day(12, 20), '앞 묶음이 오래전에 다 열렸으면 받은 날부터');
   assert.equal(startsOf(late, day(12, 20)).b411b, day(12, 26), '열째는 아홉째가 다 열린 다음 날');
   const all = Object.fromEntries(DRIP.bundles.map((b) => [b.key, day(11, 1)]));
-  assert.deepEqual(startsOf(all, day(11, 1)), { b320: day(11, 1), b322: day(11, 7), b347: day(11, 13), b372: day(11, 19), b380: day(11, 25), b382: day(12, 1), b389: day(12, 7), b411a: day(12, 13), b411b: day(12, 19) });
+  assert.deepEqual(startsOf(all, day(11, 1)), { b320: day(11, 1), b322: day(11, 7), b347: day(11, 13), b372: day(11, 19), b380: day(11, 25), b382: day(12, 1), b389: day(12, 7), b411a: day(12, 13), b411b: day(12, 19), bnews: day(11, 1) }, '📰 bnews는 따로(after 없음 — 적힌 날 그대로, v428)');
   assert.deepEqual(seenJ(all, day(12, 24)), J.slice(0, 12), '12/24 — 열째까지 모두(하루 두 편씩 이어져)');
   assert.deepEqual(startsOf({}, day(11, 1)), { b322: day(11, 7), b347: day(11, 13), b372: day(11, 19), b380: day(11, 25), b382: day(12, 1), b389: day(12, 7), b411a: day(12, 13), b411b: day(12, 19) });
   assert.deepEqual(seenI({}, 'nope'), [], '날이 깨지면 b411a는 열지 않음');
@@ -75,7 +76,7 @@ test('🌱 오늘 새로 열린 글 · 📦 내일 새 글 — b389 마지막 �
 
 test('🚩 시작 날 · 🔀 두 기기 병합 — b411a·b411b도 이른 날 · 이어 셀 때는 앞 묶음 다음 날보다 일찍 열리지 않는다', () => {
   const before = { b320: day(10, 23), b322: day(10, 24), b347: day(10, 26), b372: day(10, 31), b380: day(11, 2), b382: day(11, 3), b389: day(11, 10) };
-  assert.deepEqual(withFirst(before, day(11, 20)), S, '새 묶음 둘은 처음 받은 날을 적는다');
+  assert.deepEqual(withFirst(before, day(11, 20)), { ...S, bnews: day(11, 20) }, '새 묶음 둘은 처음 받은 날을 적는다 (📰 bnews도 — v428)');
   assert.deepEqual(mergeDrip({ b411a: day(11, 22), b411b: day(11, 22) }, { b411a: day(11, 20), b411b: day(11, 21) }), { b411a: day(11, 20), b411b: day(11, 21) });
   const M = mergeDrip(S, { b320: day(10, 20) });
   assert.deepEqual(startsOf(M, day(11, 20)), { b320: day(10, 20), b322: day(10, 26), b347: day(11, 1), b372: day(11, 7), b380: day(11, 13), b382: day(11, 19), b389: day(11, 25), b411a: day(12, 1), b411b: day(12, 7) }, 'b320이 당겨지면 뒤 묶음도 따라잡는다');

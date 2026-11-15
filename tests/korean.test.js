@@ -46,7 +46,7 @@ test('📚 원고: 형식 검사 통과 · 이백스물여섯 편(연습 백예�
   assert.deepEqual(DATA.cards[2].stanzas, [['가자 가자 가자', '숲으로 가자', '달 조각을 주우려', '숲으로 가자.'], ['그믐밤 반딧불은', '부서진 달 조각,'], ['가자 가자 가자', '숲으로 가자', '달 조각을 주우려', '숲으로 가자.']]);
   assert.deepEqual(DATA.cards[5].stanzas, [['엄마야 누나야 강변 살자,', '뜰에는 반짝이는 금모래 빛,', '뒷문 밖에는 갈잎의 노래', '엄마야 누나야 강변 살자.']]);
   assert.deepEqual([lineCount(DATA.cards[2]), lineText(DATA.cards[2], 6), unitOf(DATA.cards[2]), unitOf(DATA.cards[0])], [10, '부서진 달 조각,', '줄', '문장']);
-  assert.deepEqual([circled(1), circled(9), circled(20), circled(21)], ['①', '⑨', '⑳', '21']);
+  assert.deepEqual([circled(1), circled(9), circled(20), circled(21), circled(50), circled(51)], ['①', '⑨', '⑳', '㉑', '㊿', '51']); // ㉑~㊿는 v428 📰 신문 기사(40줄)
 });
 
 test('📚 원고 검사가 잡는다 — 한 곳만 틀리게 바꾼 원고마다 그 오류 하나(정답 둘·정답 없음·모르는 잘못 읽기·까닭 빔·보기 셋·같은 보기·근거 번호 밖·근거 차례·글에 없는 ①번호·id·종류·명작 저작권 줄·글 둘 다·풀이 없음)', () => {

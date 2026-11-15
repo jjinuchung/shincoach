@@ -83,7 +83,16 @@ const PUBLIC_PRIVATE = ['coach/fixes.json', 'coach/math/replies.json', 'coach/ko
 for (const f of PUBLIC_PRIVATE) if (existsSync(f)) { bad++; console.error(`공개 저장소에 아이 기록: ${f} — 비공개 저장소(shincoach-data)에 올려 주세요`); }
 // 비공개 저장소에 올리기 전 검사: node tools/check.mjs --private <폴더> (그 안의 essay/fixes.json · math/replies.json 중 있는 것)
 // 없는 폴더·빈 폴더·폴더 이름 빠짐은 실패 (Codex 36차 #5) — tools/privcheck.mjs
-const { privateArg, checkPrivateDir } = await import('./privcheck.mjs');
+const { privateArg, checkPrivateDir, publicNewsHits } = await import('./privcheck.mjs');
+// 📰 신문 기사 원고(v428)는 저작권 — 비공개 저장소 news/n1~n4.json에만 · 공개 저장소에 news/ 폴더가 생기면 막는다
+//   git이 올릴 수 있는 파일(올린 것 · 아직 안 올렸지만 무시하지 않는 것) 중 news/ 안의 것 + 둘 만한 빈 폴더 자리(privcheck PUBLIC_NEWS_DIRS) — .context처럼 git이 무시하는 곳은 그대로
+//   공개 원고에 신문 카드·주제를 넣는 길은 아래 checkContent(korean.js — kind news·K701~K999)·checkNonsul(nonsul.js — N701~N999)이 막는다
+{
+  let tracked = [];
+  // git 목록을 못 읽으면 「신문 경로 없음」이 아니라 「검사할 수 없음」 — 통과로 넘기지 않는다 (🔍 Codex 230차 #4 — assets/news/n1.json 같은 자리를 놓쳤다)
+  try { tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\n').filter(Boolean); } catch { bad++; console.error('공개 저장소 신문 경로 검사를 못 했어요 — git 파일 목록을 읽지 못함(git이 없거나 저장소 소유자 검사 오류) · git이 되는 곳에서 다시 돌려 주세요'); }
+  for (const f of publicNewsHits(tracked)) { bad++; console.error(`공개 저장소에 신문 기사 원고 자리: ${f} — 기사 글은 저작권이라 비공개 저장소(shincoach-data) news/에만 올려 주세요`); }
+}
 const priv = privateArg(process.argv);
 if (priv.error) { bad++; console.error(priv.error); }
 if (priv.dir) {

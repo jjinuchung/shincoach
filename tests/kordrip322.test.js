@@ -3,7 +3,8 @@
 //  · 그 전에는 한 편도 안 열린다 · b320이 다 열린 지 오래면 b322를 처음 받은 날(적힌 날)부터 · 읽은 글은 잠그지 않는다
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DRIP, startsOf, lockedIds, visibleCards, hasLocked, opensTomorrow, freshIds, dripStartRule, needsStart, withFirst, mergeDrip } from '../js/kordrip.js';
+import { DRIP, NEWS_ORDER, startsOf, lockedIds, visibleCards, hasLocked, opensTomorrow, freshIds as freshIdsAll, dripStartRule, needsStart, withFirst, mergeDrip } from '../js/kordrip.js';
+const freshIds = (...a) => freshIdsAll(...a).filter((id) => !NEWS_ORDER.includes(id)); // 📰 신문 묶음(bnews, v428 — 따로 하루 두 편)은 news428
 
 const A = DRIP.bundles.find((b) => b.key === 'b320').order;
 const B = DRIP.bundles.find((b) => b.key === 'b322').order;
@@ -13,7 +14,7 @@ const seenA = (state, today, read) => visibleCards(ALL, state, today, read).map(
 const day = (m, d) => `2026-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
 test('📦 셋째 묶음 b322 — 열둘 K131~K142 · b320 다음에 이어서 · 포켓몬 글이 첫날 · 6단원 이어질 내용은 끝 무렵', () => {
-  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320', 'b322', 'b347', 'b372', 'b380', 'b382', 'b389', 'b411a', 'b411b'], '저장 열쇠는 바꾸지 않는다 (v347 넷째 묶음 b347 — kordrip347 · v372 다섯째 b372 — kordrip372 · v380 여섯째 b380 — kordrip380 · v382 일곱째 b382 — kordrip382 · v389 여덟째 b389 — kordrip389)');
+  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320', 'b322', 'b347', 'b372', 'b380', 'b382', 'b389', 'b411a', 'b411b', 'bnews'], '저장 열쇠는 바꾸지 않는다 (v347 넷째 묶음 b347 — kordrip347 · v372 다섯째 b372 — kordrip372 · v380 여섯째 b380 — kordrip380 · v382 일곱째 b382 — kordrip382 · v389 여덟째 b389 — kordrip389)');
   const b = DRIP.bundles[1];
   assert.equal(b.after, 'b320');
   assert.deepEqual(B.slice().sort(), Array.from({ length: 12 }, (_, i) => `K${131 + i}`));
@@ -91,7 +92,7 @@ test('🚩 시작 날 적기·병합 — b322도 원고에 글이 들어오면 �
   assert.deepEqual(p.korDrip, { b320: day(10, 23), b322: day(10, 24) });
   assert.equal(dripStartRule(p, day(10, 25), ['K142']).why, 'same');
   assert.deepEqual(mergeDrip({ b322: day(10, 26) }, { b322: day(10, 24) }), { b322: day(10, 24) });
-  assert.deepEqual(withFirst({ b320: day(10, 23) }, day(10, 24)), { b320: day(10, 23), b322: day(10, 24), b347: day(10, 24), b372: day(10, 24), b380: day(10, 24), b382: day(10, 24), b389: day(10, 24), b411a: day(10, 24), b411b: day(10, 24) });
+  assert.deepEqual(withFirst({ b320: day(10, 23) }, day(10, 24)), { b320: day(10, 23), b322: day(10, 24), b347: day(10, 24), b372: day(10, 24), b380: day(10, 24), b382: day(10, 24), b389: day(10, 24), b411a: day(10, 24), b411b: day(10, 24), bnews: day(10, 24) });
   assert.equal(startsOf(withFirst({ b320: day(10, 23) }, day(10, 24)), day(10, 24)).b322, day(10, 29));
 });
 

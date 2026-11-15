@@ -3,7 +3,8 @@
 //  · 그 전에는 한 편도 안 열린다 · b380이 다 열린 지 오래면 b382를 처음 받은 날(적힌 날)부터 · 읽은 글은 잠그지 않는다
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DRIP, startsOf, lockedIds, visibleCards, hasLocked, opensTomorrow, freshIds, withFirst, mergeDrip } from '../js/kordrip.js';
+import { DRIP, NEWS_ORDER, startsOf, lockedIds, visibleCards, hasLocked, opensTomorrow, freshIds as freshIdsAll, withFirst, mergeDrip } from '../js/kordrip.js';
+const freshIds = (...a) => freshIdsAll(...a).filter((id) => !NEWS_ORDER.includes(id)); // 📰 신문 묶음(bnews, v428 — 따로 하루 두 편)은 news428
 
 const ord = (k) => DRIP.bundles.find((b) => b.key === k).order;
 const A = ord('b320');
@@ -20,7 +21,7 @@ const day = (m, d) => `2026-${String(m).padStart(2, '0')}-${String(d).padStart(2
 const S = { b320: day(10, 23), b322: day(10, 24), b347: day(10, 26), b372: day(10, 31), b380: day(11, 2), b382: day(11, 3) }; // 태블릿이 v382를 11/3에 받는다고 치면
 
 test('📦 일곱째 묶음 b382 — 열둘 K179~K190 · b380 다음에 이어서 · 여섯 묶음에 겹치는 글 없음', () => {
-  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320', 'b322', 'b347', 'b372', 'b380', 'b382', 'b389', 'b411a', 'b411b'], '저장 열쇠는 바꾸지 않는다 (v389 b389 — kordrip389)');
+  assert.deepEqual(DRIP.bundles.map((b) => b.key), ['b320', 'b322', 'b347', 'b372', 'b380', 'b382', 'b389', 'b411a', 'b411b', 'bnews'], '저장 열쇠는 바꾸지 않는다 (v389 b389 — kordrip389)');
   assert.equal(DRIP.bundles[5].after, 'b380');
   assert.deepEqual(G.slice().sort(), Array.from({ length: 12 }, (_, i) => `K${179 + i}`));
   assert.equal(new Set([...A, ...B, ...C, ...E, ...F, ...G]).size, 72, '여섯 묶음에 겹치는 글 없음');
@@ -71,7 +72,7 @@ test('🌱 오늘 새로 열린 글 · 📦 내일 새 글 — b380 마지막 �
 });
 
 test('🚩 시작 날 · 🔀 두 기기 병합 — b382도 이른 날 · 이어 셀 때는 앞 묶음 다음 날보다 일찍 열리지 않는다', () => {
-  assert.deepEqual(withFirst({ b320: day(10, 23), b322: day(10, 24), b347: day(10, 26), b372: day(10, 31), b380: day(11, 2) }, day(11, 3)), { ...S, b389: day(11, 3), b411a: day(11, 3), b411b: day(11, 3) }, 'v389 b389도 처음 받은 날을 적는다');
+  assert.deepEqual(withFirst({ b320: day(10, 23), b322: day(10, 24), b347: day(10, 26), b372: day(10, 31), b380: day(11, 2) }, day(11, 3)), { ...S, b389: day(11, 3), b411a: day(11, 3), b411b: day(11, 3), bnews: day(11, 3) }, 'v389 b389도 처음 받은 날을 적는다');
   assert.deepEqual(mergeDrip({ b382: day(11, 5) }, { b382: day(11, 3) }), { b382: day(11, 3) });
   const pc = { b320: day(10, 20) };
   const M = mergeDrip(S, pc);

@@ -80,7 +80,8 @@ export function passageWords(cards) {
     for (const pair of (c && Array.isArray(c.words) ? c.words : [])) {
       const [w, mean] = Array.isArray(pair) ? pair : [];
       if (typeof w !== 'string' || !w || typeof mean !== 'string' || !mean) continue;
-      const src = linesOf(c).find((t) => typeof t === 'string' && t.includes(w)) || '';
+      // 📰 신문 기사 첫 줄 「[제목] …」의 머리는 떼고 보인다 (v428 — 「…에서:」 문장에 「[제목]」이 따라 나왔다)
+      const src = (linesOf(c).find((t) => typeof t === 'string' && t.includes(w)) || '').replace(/^\[제목\] /, '');
       out.push({ id: wordId('passage', w, c.id), deck: 'passage', w, mean, ex: '', src, card: c.id, title: c.title, pair: [], avoid: [] });
     }
   }
@@ -241,8 +242,8 @@ export function mergeBall(a, b, daysA, daysB) {
   if (legacy(x, daysA) || legacy(y, daysB)) r.w = 1;
   return r;
 }
-/** 📤 🎯 판정 한 칸 (v422 · 하루 기록 목록 korPrize) — kind 📚 read(별 받은 글 · idx = 별) · 🧩 pz · 🔤 word · 🖊️ ns · key 판 열쇠(숫자) · s 'w'|'m'|'d'|'o' */
-export const KOR_PRIZE_KINDS = ['read', 'pz', 'word', 'ns'];
+/** 📤 🎯 판정 한 칸 (v422 · 하루 기록 목록 korPrize) — kind 📚 read(별 받은 글 · idx = 별) · 🧩 pz · 🔤 word · 🖊️ ns · 📰 nn(신문 논술 — 판 몫이 생활 논술과 따로, v428) · key 판 열쇠(숫자) · s 'w'|'m'|'d'|'o' */
+export const KOR_PRIZE_KINDS = ['read', 'pz', 'word', 'ns', 'nn'];
 export function korPrizeKey(kind, key, idx, ok, total, s) {
   const n = (v) => Math.max(0, Math.floor(Number(v)) || 0);
   return `${KOR_PRIZE_KINDS.includes(kind) ? kind : 'pz'}:${String(key).replace(/[^0-9]/g, '') || '0'}:${n(idx)}:${n(ok)}/${n(total)}:${/^[wmdo]$/.test(s) ? s : 'o'}`;
@@ -250,11 +251,11 @@ export function korPrizeKey(kind, key, idx, ok, total, s) {
 /** 📤 국어 요약 한 줄 (순수 · v422) — days 하루 기록(listDaily) 최근 7일 · 아이 화면에는 안 쓴다 */
 export function korPrizeReport(days, dateKeys) {
   const want = new Set(Array.isArray(dateKeys) ? dateKeys : []);
-  const rows = { read: [], pz: [], word: [], ns: [] };
+  const rows = { read: [], pz: [], word: [], ns: [], nn: [] };
   for (const d of Array.isArray(days) ? days : []) {
     if (!d || !want.has(d.date)) continue;
     for (const k of Array.isArray(d.korPrize) ? d.korPrize : []) {
-      const x = /^(read|pz|word|ns):(\d+):(\d+):(\d+)\/(\d+):([wmdo])$/.exec(String(k));
+      const x = /^(read|pz|word|ns|nn):(\d+):(\d+):(\d+)\/(\d+):([wmdo])$/.exec(String(k));
       if (x) rows[x[1]].push({ date: d.date, key: Number(x[2]), idx: Number(x[3]), ok: x[4], total: x[5], s: x[6] });
     }
   }
@@ -268,6 +269,7 @@ export function korPrizeReport(days, dateKeys) {
     rows.pz.length ? part('🧩', rows.pz) : '',
     rows.word.length ? part('🔤', rows.word) : '',
     rows.ns.length ? part('🖊️', rows.ns) : '',
+    rows.nn.length ? part('📰🖊️', rows.nn) : '', // 📰 신문 논술 (v428)
   ].filter(Boolean);
   return `🎯 처음 답 반 이상(v422 · 최근 7일): ${parts.length ? parts.join(' | ') : '아직 없음'}`;
 }

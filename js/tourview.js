@@ -4,7 +4,7 @@
 // 문제 카드 꼴과 글자 모양은 낚시터 카드(lk- 양식)를 그대로 빌린다 · 틀려도 표값은 그대로 · 아이 화면에 남은 손님·셈 문구 없음
 // 하루 기록: 매표·해설 과목마다·단계마다·장부 낸/맞힌 수 · 맞이한 무리 · 받은 💰 (daily aq… — 📤 🎟️ 줄)
 
-import { getProfileSnapshot, lakeRaw, nonsulDayMap, tourEnd, tourBook } from './xp.js';
+import { getProfileSnapshot, lakeRaw, nonsulDoneDayMap, tourEnd, tourBook } from './xp.js';
 import { aquaOf } from './aquarium.js';
 import { TOUR_LVS, TIP, BOOK_COIN, TOUR_Q, TOUR_LV_Q, TOUR_PAY, TOUR_FM, TOUR_BOOK, TOUR_GROUPS, TOUR_COINS, TOUR_AT, groupSize, ticketOf, tourDay, tourAtBook, seekTourQ, waitingOf, waitingDay, pickVisitors, favOf, payForm, payQuestion, bookOf, jong } from './aquatour.js';
 import { SUBJECTS, pickSubject, askOrder, speciesOf } from './fishing.js';
@@ -290,7 +290,7 @@ export async function startTour(box, onEnd, onPaid) {
     const raw = tankRaw(p);
     const fmReady = (() => { try { return fishMathReady(raw); } catch { return false; } })();
     const avail = SUBJECTS.filter((s) => (src && src[s]) || (s === 'math' && fmReady));
-    const shares = avail.length ? sharesOf(days, nonsulDayMap(), today, avail) : {};
+    const shares = avail.length ? sharesOf(days, nonsulDoneDayMap(), today, avail) : {}; // 🖊️ 논술 한 날 = 생활·📰 신문 어느 쪽이든 (v428)
     // 차례 줄에서 넘긴 자리는 낸 문제와 따로 적는다 — 단계가 낮아 버린 문제까지 넘겨 다시 열면 그 뒤부터 (Codex 203차)
     const start = AT.start(d, today);
     const pos = { ...start };

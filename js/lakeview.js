@@ -33,7 +33,7 @@ import { fishMathQ, fishMathReady } from './fishmath.js';
 import { UNIT_DRILL, unitStage, unitFishToday, unitFishCommit, answerSecOf } from './mathprog.js';
 import { lvFor } from './lakelevel.js';
 import { orderOf } from './journey.js';
-import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDayMap, profileReady, profileLoading, onProfileReload, zygMap, zygFind } from './xp.js';
+import { lakeCatch, lakeBuy, lakePick, lakeRaw, getProfileSnapshot, getPartner, getLook, nonsulDoneDayMap, profileReady, profileLoading, onProfileReload, zygMap, zygFind } from './xp.js';
 import { zygCanFish, FISH_SRC } from './zygarde.js';
 import { revealNote } from './zygview.js';
 import { listDaily, getDaily, applyDailyDelta, getMath, updateMath } from './db.js';
@@ -486,7 +486,7 @@ export async function openLakeNow() {
       buyGear: (id) => lakeBuy(id),
       onPick: (want) => lakePick(want),
       lookNow: () => avatarOf(getProfileSnapshot()).look, // 낚시 모자·조끼를 산 뒤 새 차림
-      shares: sharesOf(days, nonsulDayMap(), today, avail),
+      shares: sharesOf(days, nonsulDoneDayMap(), today, avail), // 🖊️ 논술 한 날 = 생활·📰 신문 어느 쪽이든 (v428)
       steps: stp.steps, // 🎚️ 과목 단계 (v387 — 창이 물고기 단계에 더한다)
       stepUp: stp.up, // 오늘 오른 과목 — 열 때 한 줄
       ask: (() => {

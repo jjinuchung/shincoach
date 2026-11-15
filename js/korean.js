@@ -100,12 +100,36 @@ export const STAR3_DAYS = 7;
 /** 한 번 다 읽을 때 셀 수 있는 잘못 읽기 수(종류마다) — 보기가 넷이라 틀린 보기는 물음마다 셋, 물음은 많아야 다섯 */
 export const MISS_MAX = 15;
 
-const CIRC = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+// ①~⑳ 다음 ㉑~㉟ · ㊱~㊿ (v428 📰 신문 기사는 40줄까지 — 모두 BMP 한 글자라 CIRC[n - 1]·indexOf가 그대로 맞는다)
+const CIRC = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒㉓㉔㉕㉖㉗㉘㉙㉚㉛㉜㉝㉞㉟㊱㊲㊳㊴㊵㊶㊷㊸㊹㊺㊻㊼㊽㊾㊿';
 const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
 const isObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
 const nonEmpty = (s) => typeof s === 'string' && s.trim().length > 0;
 
-/** 번호 → ① (20까지) */
+// ── 📰 신문 칸 (v428, 2026-11-15 아버님 기본안 다섯 「추천대로」) ──
+// 어린이신문 기사 하나 = 국어 카드 하나(읽기 카드와 같은 꼴 — 보기 넷 · 🔍 근거 · ★ · 💰 · 🎯) · 물음 다섯 · 📖 낱말 여섯까지
+// 기사 글은 저작권이 있어 **비공개 저장소(news/n1~n4.json)에만** — 받기·사본은 news.js · 공개 원고(reading.json)는 K701~K999를 쓰지 않는다(checkCard가 막는다)
+// 카드 꼴: kind 'news' · layout 'rows' · 첫 줄 "[제목] …" · 글 NEWS_LINES_MAX줄까지(근거 번호 ㉑~㊵) · news { article 기사 번호, paper?, date?, page? } ·
+//   deco { captions?: [사진 설명], boxes?: [{ name, title?, body: [글] }] } — 기사 아래 회색 칸(줄 번호 없음 · 근거로 누르지 않음)
+/** 신문 카드 종류 이름 (KINDS에는 넣지 않는다 — 공개 원고 검사가 KINDS로 막는다) */
+export const NEWS_KIND = '📰 신문 기사';
+/** 신문 기사 글 줄 수 상한 (공개 글은 20줄) */
+export const NEWS_LINES_MAX = 40;
+/** 신문 카드 번호 몫 K701~K999 */
+export const NEWS_ID_MIN = 701;
+export const NEWS_ID_MAX = 999;
+/** 신문 카드 번호인가 (K701~K999 — 세 자리 그대로, 'K0701' 같은 앞 0은 아님) */
+export function isNewsId(id) {
+  if (typeof id !== 'string' || !/^K\d{3}$/.test(id)) return false;
+  const n = Number(id.slice(1));
+  return n >= NEWS_ID_MIN && n <= NEWS_ID_MAX;
+}
+/** 신문 카드인가 */
+export function isNews(card) {
+  return !!card && card.kind === 'news';
+}
+
+/** 번호 → ① (50까지 — ㉑~㊿는 v428) */
 export function circled(n) {
   return CIRC[n - 1] || String(n);
 }
@@ -567,27 +591,35 @@ export function checkContent(data) {
   return errs;
 }
 
-/** 카드 하나 검사 (ids = 이미 본 카드 id — 겹침) */
-export function checkCard(c, ids = new Set()) {
+/**
+ * 카드 하나 검사 (ids = 이미 본 카드 id — 겹침)
+ * opt.news (v428) = 📰 신문 카드로 검사 — kind 'news'를 받고 · 글 NEWS_LINES_MAX줄까지 · source를 받는다 (나머지 신문 꼴은 checkNewsCard)
+ *   opt 없이(공개 원고 reading.json)는 kind 'news'와 K701~K999 id를 막는다 — 신문 몫 번호가 공개 원고와 겹치면 진도·별이 섞인다
+ */
+export function checkCard(c, ids = new Set(), opt = {}) {
   const errs = [];
   const at = (m) => errs.push(`${(c && c.id) || '?'}: ${m}`);
   if (!isObj(c)) return ['카드가 객체가 아니에요'];
+  const news = !!(opt && opt.news);
   const idOk = typeof c.id === 'string' && /^K\d{1,3}$/.test(c.id);
   if (!idOk) at('id는 K숫자');
   else if (ids.has(c.id)) at('id가 겹쳐요');
   else ids.add(c.id);
-  if (!own(KINDS, c.kind)) at('kind는 practice 또는 classic');
+  if (idOk && !news && isNewsId(c.id)) at(`K${NEWS_ID_MIN}~K${NEWS_ID_MAX}는 신문 몫 — 공개 원고에 쓰지 않아요`);
+  if (c.kind === 'news' ? !news : !own(KINDS, c.kind)) at(c.kind === 'news' ? 'kind news(신문 기사)는 비공개 신문 원고에만' : 'kind는 practice 또는 classic');
   if (own(c, 'pre') && !own(PRE, c.pre)) at(`pre(미리보기)는 ${Object.keys(PRE).join('·')}`);
   for (const k of ['title', 'genre', 'icon', 'skill']) if (!nonEmpty(c[k])) at(`${k}가 비었어요`);
   if (!Array.isArray(c.meta) || !c.meta.length || !c.meta.every(nonEmpty)) at('meta(만나는 곳·성취기준)가 비었어요');
-  if (own(c, 'source') && (c.kind !== 'practice' || !nonEmpty(c.source) || [...c.source].length > SOURCE_MAX)) at(`source(바탕 글)는 연습 카드에 ${SOURCE_MAX}자까지의 글로`);
+  const srcKind = c.kind === 'practice' || (news && c.kind === 'news'); // 바탕 글을 밝히는 카드 — 연습 · 📰 신문(v428)
+  if (own(c, 'source') && (!srcKind || !nonEmpty(c.source) || [...c.source].length > SOURCE_MAX)) at(`source(바탕 글)는 연습 카드에 ${SOURCE_MAX}자까지의 글로`);
   const hasLines = Array.isArray(c.lines);
   const hasStanzas = Array.isArray(c.stanzas);
   if (hasLines === hasStanzas) at('글은 lines 또는 stanzas 하나만');
   if (own(c, 'layout') && (!own(LAYOUTS, c.layout) || !hasLines)) at(`layout(글 꼴)은 ${Object.keys(LAYOUTS).join('·')}만 — 문장(lines)으로 된 글에`);
   // 대사 꼴(이름: 말) 줄이 둘 이상인 읽는 글은 사람마다 줄 (v266 — 이어 쓴 문단이면 누가 한 말인지 놓친다 · 🎧 듣기 카드는 rowsLayout이 알아서)
   if (hasLines && !isListen(c) && c.layout !== 'rows' && c.lines.filter((t) => LOOKS_SPEAKER.test(String(t))).length >= 2) at('대사 꼴(이름: 말) 줄이 있는 글은 layout rows로 — 사람마다 줄을 바꿔요');
-  if (hasLines && (!c.lines.length || c.lines.length > 20 || !c.lines.every(nonEmpty))) at('lines는 1~20개의 문장');
+  const linesMax = news ? NEWS_LINES_MAX : 20;
+  if (hasLines && (!c.lines.length || c.lines.length > linesMax || !c.lines.every(nonEmpty))) at(`lines는 1~${linesMax}개의 문장`);
   if (hasStanzas && (!c.stanzas.length || !c.stanzas.every((s) => Array.isArray(s) && s.length && s.every(nonEmpty)) || lineCount(c) > 20)) at('stanzas는 연마다 줄 하나 이상(모두 20줄까지)');
   if (c.kind === 'classic') {
     if (!nonEmpty(c.author)) at('명작은 지은이가 있어야 해요');
@@ -782,4 +814,63 @@ export function checkWriteItem(w) {
 export function validCards(data) {
   const ids = new Set();
   return (data && Array.isArray(data.cards) ? data.cards : []).filter((c) => !checkCard(c, ids).length);
+}
+
+/** 📰 신문 카드에 없어야 하는 칸 (v428) — ✍️ 쓰기 · 🎧 듣기 · ⭐ 미리보기 · 시 · 명작 칸 */
+const NEWS_NO = ['write', 'listen', 'pre', 'stanzas', 'facts', 'author'];
+/** 📰 신문 물음 수 — 기사마다 정확히 다섯 */
+export const NEWS_QS = 5;
+/** 📰 첫 줄 머리 — 기사 제목 줄 */
+export const NEWS_TITLE_HEAD = '[제목] ';
+
+/**
+ * 📰 신문 카드 하나 검사 (v428) → 틀린 곳 목록(비면 통과) — 받은 비공개 원고(news.js newsOf)·privcheck·시험이 같이 쓴다
+ *   checkCard(news) + kind 'news' · K701~K999 · layout rows · 물음 정확히 NEWS_QS · 첫 줄 "[제목] " · source(바탕 기사) ·
+ *   news { article 기사 번호(글), paper?·date?·page? 글 } · deco { captions?: [글], boxes?: [{ name, title?, body: [글] }] } · NEWS_NO 칸 없음
+ * 받은 원고가 나중에 고쳐져도 id·물음 차례는 그대로라야 별·물음 기록(K7xx-n)이 맞는다 — 검사로는 못 보니 원고를 고치는 쪽이 지킨다
+ */
+export function checkNewsCard(c, ids = new Set()) {
+  if (!isObj(c)) return ['카드가 객체가 아니에요'];
+  const errs = checkCard(c, ids, { news: true });
+  const at = (m) => errs.push(`${c.id || '?'}: ${m}`);
+  if (c.kind !== 'news') at('신문 카드의 kind는 news');
+  if (!isNewsId(c.id)) at(`신문 카드 id는 K${NEWS_ID_MIN}~K${NEWS_ID_MAX}`);
+  if (c.layout !== 'rows') at('신문 카드는 layout rows(문장마다 줄 바꿈)');
+  if (!Array.isArray(c.qs) || c.qs.length !== NEWS_QS) at(`신문 카드의 물음은 정확히 ${NEWS_QS}개`);
+  if (!Array.isArray(c.lines) || !String(c.lines[0] || '').startsWith(NEWS_TITLE_HEAD) || !nonEmpty(String(c.lines[0] || '').slice(NEWS_TITLE_HEAD.length))) at(`첫 줄은 "${NEWS_TITLE_HEAD}…" 기사 제목`);
+  if (!nonEmpty(c.source)) at('source(바탕 기사 — 신문 이름·날짜·면)가 있어야 해요');
+  const nw = c.news;
+  if (!isObj(nw) || !nonEmpty(nw.article)) at('news는 { article: 기사 번호 글, paper?, date?, page? }');
+  else for (const k of ['paper', 'date', 'page']) if (own(nw, k) && !nonEmpty(nw[k])) at(`news.${k}는 글`);
+  if (own(c, 'deco')) for (const m of decoProblems(c.deco)) at(m);
+  for (const k of NEWS_NO) if (own(c, k)) at(`신문 카드에는 ${k}가 없어요`);
+  return errs;
+}
+
+/** 📰 사진 설명·상자(deco)의 틀린 곳 — { captions?: [글], boxes?: [{ name, title?, body: [글] }] } (둘 다 없거나 빈 목록이면 칸을 빼 주세요) */
+function decoProblems(d) {
+  const errs = [];
+  const texts = (a) => Array.isArray(a) && a.length > 0 && a.every(nonEmpty);
+  if (!isObj(d)) return ['deco는 { captions?, boxes? }'];
+  for (const k of Object.keys(d)) if (k !== 'captions' && k !== 'boxes') errs.push(`deco에는 captions·boxes만 — ${k}`);
+  if (!own(d, 'captions') && !own(d, 'boxes')) errs.push('deco가 비었어요 — 없으면 칸을 빼 주세요');
+  if (own(d, 'captions') && !texts(d.captions)) errs.push('deco.captions(사진 설명)는 글 하나 이상의 목록');
+  if (own(d, 'boxes')) {
+    if (!Array.isArray(d.boxes) || !d.boxes.length) errs.push('deco.boxes(상자)는 하나 이상의 목록');
+    else d.boxes.forEach((b, k) => {
+      const name = `deco.boxes ${k + 1}`;
+      if (!isObj(b)) { errs.push(`${name}은 { name, title?, body }`); return; }
+      for (const x of Object.keys(b)) if (!['name', 'title', 'body'].includes(x)) errs.push(`${name}에는 name·title·body만 — ${x}`);
+      if (!nonEmpty(b.name)) errs.push(`${name}의 name(상자 이름)이 비었어요`);
+      if (own(b, 'title') && !nonEmpty(b.title)) errs.push(`${name}의 title은 글`);
+      if (!texts(b.body)) errs.push(`${name}의 body는 글 하나 이상의 목록`);
+    });
+  }
+  return errs;
+}
+
+/** 📰 쓸 수 있는 신문 카드만 (v428 — 카드 목록을 받는다 · 깨진 카드와 앞 카드와 겹친 id는 뺀다) */
+export function validNewsCards(cards) {
+  const ids = new Set();
+  return (Array.isArray(cards) ? cards : []).filter((c) => !checkNewsCard(c, ids).length);
 }

@@ -43,9 +43,14 @@ export function listenPlan(card, slow = false) {
 /** 근거 줄 사이 · 물음 앞의 쉼(ms) */
 export const EV_SAY_GAP = { line: 350, ask: 600 };
 
-const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+// ⑳ 다음은 ㉑~㉟(U+3251~325F)·㊱~㊿(U+32B1~32BF) — 📰 신문 기사는 40줄까지(v428) · ㉠~㉭(U+3260~)는 ㉟ 바로 뒤라 범위를 둘로 끊는다
+const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒㉓㉔㉕㉖㉗㉘㉙㉚㉛㉜㉝㉞㉟㊱㊲㊳㊴㊵㊶㊷㊸㊹㊺㊻㊼㊽㊾㊿';
 const CIRCLED_KO = '㉠㉡㉢㉣㉤㉥㉦㉧㉨㉩㉪㉫㉬㉭';
 const JAMO = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ';
+const NUM = '①-⑳㉑-㉟㊱-㊿';
+const RANGE_RE = new RegExp(`([${NUM}])\\s*~\\s*([${NUM}])`, 'g');
+const LIST_RE = new RegExp(`([${NUM}])\\s*·\\s*(?=[${NUM}])`, 'g');
+const ONE_RE = new RegExp(`[${NUM}]`, 'g');
 const no = (ch) => `${CIRCLED.indexOf(ch) + 1}번`;
 
 /**
@@ -54,9 +59,9 @@ const no = (ch) => `${CIRCLED.indexOf(ch) + 1}번`;
  */
 export function sayText(t) {
   return String(t == null ? '' : t)
-    .replace(/([①-⑳])\s*~\s*([①-⑳])/g, (_, a, b) => `${no(a)}부터 ${no(b)}까지`)
-    .replace(/([①-⑳])\s*·\s*(?=[①-⑳])/g, (_, a) => `${no(a)}, `)
-    .replace(/[①-⑳]/g, no)
+    .replace(RANGE_RE, (_, a, b) => `${no(a)}부터 ${no(b)}까지`)
+    .replace(LIST_RE, (_, a) => `${no(a)}, `)
+    .replace(ONE_RE, no)
     .replace(/[㉠-㉭]/g, (ch) => JAMO[CIRCLED_KO.indexOf(ch)])
     .replace(/\s*(?:→|—)\s*|\s+\/\s+/g, ', ')
     .replace(/[「」『』[\]]/g, '')

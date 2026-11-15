@@ -227,7 +227,7 @@ test('아이 화면 말 — 시작 줄·끝 화면 🎯 줄은 셈 없이 · 받
 
 test('📤 korPrize — 하루 기록 목록 칸 · 열쇠 꼴 · 최근 7일 · 기록이 있는 꼴만(논술 원고가 없는 요약에 🖊️가 끼지 않게) · 국어 요약에 한 줄', async () => {
   assert.ok(KOR_DAY_LISTS.includes('korPrize'));
-  assert.deepEqual(KOR_PRIZE_KINDS, ['read', 'pz', 'word', 'ns']);
+  assert.deepEqual(KOR_PRIZE_KINDS, ['read', 'pz', 'word', 'ns', 'nn']); // 📰 nn 신문 논술 (v428)
   assert.equal(korPrizeKey('pz', 123, 2, 1, 3, 'w'), 'pz:123:2:1/3:w');
   assert.equal(korPrizeKey('nope', 'a1.5', -1, 'x', 4, 'z'), 'pz:15:0:0/4:o');
   const days = [
@@ -264,13 +264,13 @@ test('화면 잇기 — ✨는 반 이상인 글·판만(🔥는 그대로) · �
   const kt = read('js/kortabs.js');
   assert.ok(kt.includes('const egg = res.half ? await ctx.tickKorDay() : null;') && kt.includes("    if (res.ball) applyDailyDelta(todayKey(), { korPrize: [korPrizeKey('word', ws.t0, res.ball.idx, res.ball.ok, res.ball.total, res.ball.s)] })") && kt.includes("korBallToday('word', now)") && kt.includes('S.ws = { t0: Date.now(),'));
   const nv = read('js/nonsulview.js');
-  assert.ok(nv.includes("korDayDone('nonsul', { bonus: !!res.half })") && nv.includes('if (res.half) tickKorDay().then(') && nv.includes("    if (res.ball) applyDailyDelta(todayKey(), { korPrize: [korPrizeKey('ns', r.t0, res.ball.idx, res.ball.ok, res.ball.total, res.ball.s)] })"));
+  assert.ok(nv.includes("korDayDone('nonsul', { bonus: !!res.half })") && nv.includes('if (res.half) tickKorDay().then(') && nv.includes("    if (res.ball) applyDailyDelta(todayKey(), { korPrize: [korPrizeKey(res.news ? 'nn' : 'ns', r.t0, res.ball.idx, res.ball.ok, res.ball.total, res.ball.s)] })")); // 📰 신문 판은 nn (v428)
   assert.ok(nv.includes('const steps = { ok: [r.missR, r.missC, r.missO].filter((x) => !x).length };'));
   for (const s of ['else { r.miss = true; r.missR = true; }', 'else { r.miss = true; r.missC = true; }', 'r.miss = true; r.missO = true;']) assert.ok(nv.includes(s), s);
   assert.ok(nv.includes("import { todayKey } from './track.js';"), '📤 날');
   assert.ok(read('js/korday.js').includes("korean: '📚 글을 잘 읽고 처음에 많이 맞히면 받아요'"));
   assert.ok(read('js/korreport.js').includes('korPrizeReport('));
   const db = read('js/db.js');
-  assert.ok(db.includes("for (const [f, days] of [['korWordBall', 'korWordDay'], ['korPuzzleBall', 'korPuzzleDay'], ['nonsulBall', 'nonsulDay']]) {"));
+  assert.ok(db.includes("for (const [f, days] of [['korWordBall', 'korWordDay'], ['korPuzzleBall', 'korPuzzleDay'], ['nonsulBall', 'nonsulDay'], ['nonsulNewsBall', 'nonsulNewsDay']]) {")); // 📰 신문 논술 칸 (v428)
   assert.ok(Number((/const CACHE_VERSION = 'v(\d+)';/.exec(read('sw.js')) || [])[1]) >= 422);
 });

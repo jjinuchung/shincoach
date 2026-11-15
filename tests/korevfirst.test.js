@@ -255,7 +255,7 @@ test('📤 국어 요약 "최근 7일 읽은 글" (korreport.readLines, v258): �
   assert.equal(M[3], '- (앞의 3줄은 줄였어요)');
   assert.equal(M.length, 4 + READ_LINES);
   assert.ok(M[4].includes(' · 4초 (') && M[M.length - 1].includes(` · ${secText(READ_LINES + 3)} (`), '줄이 넘치면 최근 것을 남긴다');
-  assert.ok(readLines([{ ...base, c: 'K999' }], [], '2026-10-14')[3].includes('K999 「?」'), '모르는 카드는 ?');
+  assert.ok(readLines([{ ...base, c: 'K600' }], [], '2026-10-14')[3].includes('K600 「?」'), '모르는 카드는 ? (K701~K999는 📰 신문 몫이라 까닭을 적는다 — v428 news428rep)');
   // 요약 글 안 자리 — 국어 시간 바로 다음
   const t = korReportText({ korReads: reads }, { cards, words: [], puzzles: [] }, '2026-10-14', []);
   assert.ok(t.indexOf('## 최근 7일 국어 시간') < t.indexOf('## 최근 7일 읽은 글') && t.indexOf('## 최근 7일 읽은 글') < t.indexOf('## 글 — '));

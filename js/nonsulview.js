@@ -7,10 +7,16 @@
 //   쓰기 화면(S.w)은 korwriteview.writeBoxEl에 칸마다 머리말 채우기(nonsulwriteview.essayFormEl)를 끼운다 · 들어올 때 비공개 저장소 답장 받기
 // 💡 내 이유 한 줄 (v355): 판 끝 「내가 만든 글」 아래 「또, …」 칸(reasonEl — 저장된 판 끝에만 · 다시 그려도 쓰던 줄·커서를 지킨다) ·
 //   답장은 같은 📬 띠 → 같은 쓰기 화면(S.w = R##) — 🔸·🔁면 「이 주제 다시 해 보기」(편이 판에서 정해지니까 한 줄은 판 끝에서만 쓴다)
+// 📰 신문 논술 (v428 — 아버님 기본안 「추천대로」): 신문 주제(news.js — 비공개 저장소에서 받은 사본 · 열쇠 없는 기기는 빈 목록)는 S.news에 따로(생활 주제 S.list와 섞지 않는다) ·
+//   첫 화면 「📰 신문 논술」 칸(★ 받은 기사의 주제가 있을 때만 · 새 주제 하루 둘) · 📚 국어 기사 끝 단추(readingTopicFor·openTopic) · 판 머리 📖에 기사 글 ·
+//   💰·🎯 판 몫은 규칙이 id로 따로 센다 · ✍️ 짧은 글·💡 내 이유는 신문 판에 없다 · ⚔️·🚀 문제 원천은 생활 주제 그대로
 import { allTopics, planTopic, nonsulWaitNew, dealTopic, essayParts, nonsulFinishText, nonsulTodayLine, ORDER_HINTS, nonsulWriteCards, essayTopics, readingTopicOf, isSolved, nonsulReasonCards, reasonCardId, reasonTopicId, reasonCheck, reasonTail, reasonSendWhy, REASON_HEAD, REASON_MAX } from './nonsul.js';
-import { circled } from './korean.js';
+import { planNewsTopic, newsWaitNew, newsQuotaFull, newsTopicsOpen, isNewsTopicId } from './nonsul.js'; // 📰 신문 논술 하루 몫 (v428)
+import { circled, isNewsId } from './korean.js';
 import { wordsToday } from './korwords.js';
 import { nonsulFinish, nonsulMap, nonsulDayMap, nonsulTakeThrow, nonsulGiveBackThrow, nonsulThrowsLeft, profileReady, getLevelInfo, isTired, getLook, inventory, catchAttempt, korWritesMap, nonsulReasonAdd, korBallToday } from './xp.js';
+import { nonsulNewsDayMap, korDoneMap } from './xp.js'; // 📰 신문 논술 보상 받은 날 · ★ 받은 기사 (v428)
+import { loadNews, syncNews, newsNow } from './news.js'; // 📰 신문 주제·기사 사본 (v428)
 import { applyDailyDelta } from './db.js'; // 📤 🎯 판정 칸 (v422)
 import { korPrizeKey } from './korwords.js'; // 📤 🎯 판정 칸 (v422)
 import { todayKey } from './track.js'; // 📤 🎯 판정 칸의 날 (v422)
@@ -47,11 +53,14 @@ const ding = (ok) => { try { sfxUnlock(); if (ok) sfx.ding(); else sfx.wrong(); 
 // wcards: ✍️ 짧은 글 카드(채점 기준이 깨졌으면 [] — 짧은 글을 안 연다) · w: 쓰기 화면의 주제 id(돌아오면 그대로) · writeNote: 답장이 붙었다는 한 줄(한 번)
 // stories: 📖 독서 논술 주제의 국어 글(카드 id → { title, lines }, v316 — 못 받으면 한 줄 소개만)
 // rcards: 💡 내 이유 카드 R##(v355 — 채점 기준이 깨졌으면 [] · 칸을 안 띄운다)
-const S = { data: null, list: [], wcards: [], rcards: [], loadErr: '', r: null, w: '', writeNote: '', catching: false, catchState: null, catchMsg: '', wired: false, charBusy: false, stories: null };
+// news: 📰 신문 주제·기사 카드 { cards, topics }(v428 — news.js 사본을 들어올 때마다 다시 · 생활 주제와 따로)
+const S = { data: null, list: [], wcards: [], rcards: [], loadErr: '', r: null, w: '', writeNote: '', catching: false, catchState: null, catchMsg: '', wired: false, charBusy: false, stories: null, news: { cards: [], topics: [] } };
 const STEP_NAMES = ['① 내 의견', '② 이유', '③ 반대 의견', '④ 글 순서'];
 const STEP_OF = { side: 0, reasons: 1, counter: 2, order: 3, done: 4 };
 /** 오늘 새 주제를 다 열었을 때 (v370 — 하루 NEW_TOPICS_PER_DAY개 · 셈 없이) */
 const NEW_WAIT_TEXT = '새 주제는 내일 또 와요!';
+/** 📰 오늘 새 신문 주제를 다 열었을 때 (v428 — 하루 NEWS_TOPICS_PER_DAY개 · 셈 없이) */
+const NEWS_WAIT_TEXT = '📰 새 신문 주제는 내일 또 와요!';
 
 function nonsulVisible() {
   const v = $('view-nonsul');
@@ -60,7 +69,21 @@ function nonsulVisible() {
 function mainEl() {
   return $('nonsul-main');
 }
-const byId = (id) => S.list.find((t) => t.id === id) || null;
+/** 주제 찾기 — 생활·📖 주제(S.list) · 📰 신문 주제(S.news, v428) */
+const byId = (id) => S.list.find((t) => t.id === id) || S.news.topics.find((t) => t.id === id) || null;
+/** 지금 있는 주제 id — 판 저장 때 규칙에 건넨다(📰 신문 주제도 — 💰·🎯 몫은 규칙이 id로 가른다, v428) ·
+ *  r = 끝내는 판: 시작할 때 검사를 통과한 📰 주제는 그사이 받은 원고에서 빠져도 그 판은 저장한다(🔍 Codex 230차 #1 — 끝까지 풀고도 ⭐·💰·🎯를 잃었다) */
+const topicIds = (r = null) => {
+  const ids = [...S.list, ...S.news.topics].map((t) => t.id);
+  if (r && r.news && r.t && isNewsTopicId(r.id) && !ids.includes(r.id)) ids.push(r.id);
+  return ids;
+};
+
+/** 📰 신문 주제·기사 (v428) — 이 기기에 받아 둔 사본(blobs)을 한 번 읽고 지금 사본으로 바꿔 둔다 · 못 읽으면 빈 목록(📰 칸이 안 보일 뿐) */
+async function loadNewsData() {
+  try { await loadNews(); } catch { /* 못 읽어도 빈 목록 */ }
+  S.news = newsNow();
+}
 
 /** 원고 — 한 번 받아 두고 계속 쓴다 (못 받으면 다음에 들어올 때 다시) */
 async function loadData() {
@@ -92,6 +115,16 @@ async function loadStories() {
 }
 /** 글 한 줄 (극본 대사 {who, t}도) */
 const storyLine = (l) => (typeof l === 'string' ? l : l && typeof l === 'object' ? `${l.who ? `${l.who}: ` : ''}${l.t || l.text || ''}` : '');
+/**
+ * 주제의 글 { title, lines } — 📖 국어 글(S.stories — reading.json) · 📰 신문 기사(news.js 사본, v428 — 줄 번호가 근거 ev와 같다 · 사진 설명·상자는 안 보인다) · 없으면 null
+ */
+function storyOf(cardId) {
+  if (isNewsId(cardId)) {
+    const c = S.news.cards.find((x) => x && x.id === cardId);
+    return c && Array.isArray(c.lines) ? { title: String(c.title || ''), lines: c.lines } : null;
+  }
+  return (S.stories && S.stories.get(cardId)) || null;
+}
 
 /**
  * 📖 독서 논술 머리 (v316) — 「이야기 제목」 한 줄 소개 + [📖 글 다시 보기](접어 둠 · 판 안에서는 펼친 채로 다시 그린다)
@@ -99,7 +132,7 @@ const storyLine = (l) => (typeof l === 'string' ? l : l && typeof l === 'object'
  */
 function storyEl(t, r) {
   const box = el('div', 'ns-story');
-  const st = S.stories && S.stories.get(t.card);
+  const st = (r && r.story) || storyOf(t.card); // 📖 국어 글 · 📰 신문 기사 (v428 — 📰 판은 시작할 때 쥔 글)
   box.appendChild(el('p', 'ns-story-intro', `📖 ${st ? `「${st.title}」 ` : ''}${t.intro}`));
   if (st) {
     const det = el('details', 'kor-script ns-story-text');
@@ -129,6 +162,8 @@ function renderHome() {
   if (S.loadErr) {
     card.appendChild(el('p', 'ns-err', S.loadErr));
     m.appendChild(card);
+    const nw = newsHomeEl(); // 📰 신문 주제는 이 기기 사본이라 생활 원고를 못 받아도 (v428)
+    if (nw) m.appendChild(nw);
     return;
   }
   const today = wordsToday(nonsulDayMap(), Date.now());
@@ -142,10 +177,48 @@ function renderHome() {
   else if (practice) card.appendChild(btn('btn btn-primary btn-big-wide ns-start', '⭐ 주제 다시 해 보기 (연습)', () => guardStart('korean', () => startRound(true))));
   else if (!wait) card.appendChild(el('p', 'ns-note', '오늘 할 주제를 다 했어요 — 내일 다시 만나요!'));
   m.appendChild(card);
+  const nw = newsHomeEl(); // 📰 신문 논술 (v428)
+  if (nw) m.appendChild(nw);
   const es = essaysEl();
   if (es) m.appendChild(es);
   const cb = catchBtnEl();
   if (cb) m.appendChild(cb);
+}
+
+// ───────────────────── 📰 신문 논술 (v428) ─────────────────────
+
+/**
+ * 첫 화면 「📰 신문 논술」 칸 — 신문 주제가 있고 ★ 받은 기사의 주제가 하나라도 있을 때만(열쇠 없는 기기·아직 안 읽음이면 칸이 없다) ·
+ * 오늘 할 것이 있으면 단추(⏳ 국어 시간) · 새 것을 다 열었으면 「내일 또」 · 💰·🎯 말은 신문 판 몫으로(생활 판과 따로) · 셈 없이
+ */
+function newsHomeEl() {
+  const list = S.news.topics;
+  const done = korDoneMap();
+  if (!newsTopicsOpen(list, done).length) return null;
+  const now = Date.now();
+  const st = nonsulMap();
+  const next = planNewsTopic(list, st, done, now);
+  const today = wordsToday(nonsulNewsDayMap(), now);
+  const sec = el('section', 'ns-card ns-news');
+  sec.appendChild(el('h2', 'ns-title ns-news-title', '📰 신문 논술'));
+  sec.appendChild(el('p', 'ns-note', '★를 받은 신문 기사로 내 의견을 말해 봐요'));
+  sec.appendChild(el('p', 'ns-today', nonsulTodayLine(today, !!next, korBallToday('nn'), true))); // 「오늘의 신문 논술 끝」 — 생활 칸 줄과 따로
+  if (next) sec.appendChild(btn('btn btn-primary btn-big-wide ns-start ns-news-start', today ? '📰 다음 신문 주제 하기' : '📰 신문 논술 시작', () => guardStart('korean', () => startNewsRound())));
+  else {
+    // 안 해 본 주제가 남았는데 오늘 몫을 다 썼으면 ★를 더 받아도 오늘은 안 열린다 → 「내일 또」 · 몫이 남았으면 ★ 안내 · 다 해 봤으면 그 말 (v428 검토)
+    const fresh = list.some((t) => t && !Object.prototype.hasOwnProperty.call(st, t.id));
+    if (newsWaitNew(list, st, done, now) || (fresh && newsQuotaFull(st, now))) sec.appendChild(el('p', 'ns-note ns-wait', NEWS_WAIT_TEXT));
+    else if (fresh) sec.appendChild(el('p', 'ns-note', '📚 국어 📰 신문 기사를 읽고 ★를 받으면 그 기사 주제가 열려요'));
+    else sec.appendChild(el('p', 'ns-note', '📰 지금 열린 신문 주제는 다 해 봤어요'));
+  }
+  return sec;
+}
+
+/** 오늘 할 신문 주제로 판 시작 — 없으면 첫 화면(생활 주제로 새지 않게 want를 꼭 건넨다) */
+function startNewsRound() {
+  const id = planNewsTopic(S.news.topics, nonsulMap(), korDoneMap(), Date.now());
+  if (!id) { renderHome(); return; }
+  startRound(false, id);
 }
 
 // ───────────────────── ✍️ 짧은 글 (v304) ─────────────────────
@@ -200,7 +273,7 @@ function essaysEl() {
 
 /** 판 끝 — 이 주제로 짧은 글 쓰러 가기 (✅로 끝난 주제는 안 띄운다) */
 function writeLinkEl(id) {
-  if (!wcardOf(id)) return null;
+  if (isNewsTopicId(id) || !wcardOf(id)) return null; // 📰 신문 주제엔 ✍️ 짧은 글이 없다 (v428)
   const st = cardWriteState(korWritesMap(), id);
   if (st.done && !st.unread) return null;
   const label = st.unread ? '📬 이 주제 글에 아빠 답장이 왔어요' : st.pending ? '✉️ 이 주제 글은 아빠 답장을 기다려요' : '✍️ 이번엔 내 말로 써 볼까요? (하고 싶을 때만)';
@@ -253,7 +326,9 @@ function startRound(practice, want = '') {
   S.w = '';
   // from = 시작할 때 그 주제의 at — 그 사이 다른 창이 옮겼으면 이 판은 연습(nonsulRule)
   // missR·missC·missO — ② 이유 · ③ 반대 의견 · ④ 글 순서에서 틀린 적이 있나(판 🎯는 셋 중 둘 이상을 안 틀린 판 — v422) · t0 📤 판 열쇠
-  S.r = { id, t, from: cur ? cur.at : 0, side: '', deal: null, step: 'side', picks: [], tapped: [], counter: '', ctapped: [], placed: [], hint: '', miss: false, missR: false, missC: false, missO: false, t0: Date.now(), saving: false, result: null };
+  // news — 📰 신문 주제 판(v428 — 판 끝 다음 단추·📤 판정 칸이 신문 몫 · ✍️·💡 없음)
+  // story — 📰 판은 시작할 때의 기사 글을 쥐고 간다(판 도중 받은 원고가 기사를 바꾸거나 빼도 그 판의 글은 그대로 · Codex 230차 #1)
+  S.r = { id, t, from: cur ? cur.at : 0, side: '', deal: null, step: 'side', picks: [], tapped: [], counter: '', ctapped: [], placed: [], hint: '', miss: false, missR: false, missC: false, missO: false, t0: Date.now(), saving: false, result: null, news: isNewsTopicId(id), story: isNewsTopicId(id) ? storyOf(t.card) : null };
   renderRound();
   window.scrollTo(0, 0);
 }
@@ -439,7 +514,7 @@ async function finishRound() {
   renderRound();
   let res;
   const steps = { ok: [r.missR, r.missC, r.missO].filter((x) => !x).length }; // 세 걸음 중 안 틀린 걸음 (v422)
-  try { res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from, steps }, S.list.map((t) => t.id)); } catch { res = { ok: false, why: 'save' }; }
+  try { res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from, steps }, topicIds(r)); } catch { res = { ok: false, why: 'save' }; } // 📰 신문 주제 id도 (v428)
   r.saving = false;
   r.result = res;
   if (res && res.ok && (res.first || res.solved)) { try { sfx.success(); } catch { /* 소리는 없어도 */ } }
@@ -449,7 +524,7 @@ async function finishRound() {
     korGainXp(res.xp); // ⚡ (v327) — 같은 주제는 하루 한 번 · 연습·[다시 저장]은 0(규칙이 정함) · 화면이 바뀌었어도 준다
     korRocketDone('nonsul'); // 🚀 오늘 끝낸 판 (로켓단 등장 조건 — 하루 기록 nsRounds)
     // 🔥·✨ (v329) — ⭐ 연습 판도 · 준 것은 화면과 상관없이 · 줄은 그 끝 화면이 떠 있을 때만 · ✨는 세 걸음 중 둘 이상을 안 틀린 판에서만(v422 — 🔥는 그대로)
-    if (res.ball) applyDailyDelta(todayKey(), { korPrize: [korPrizeKey('ns', r.t0, res.ball.idx, res.ball.ok, res.ball.total, res.ball.s)] }).catch(() => {}); // 📤 🎯 판정 (v422)
+    if (res.ball) applyDailyDelta(todayKey(), { korPrize: [korPrizeKey(res.news ? 'nn' : 'ns', r.t0, res.ball.idx, res.ball.ok, res.ball.total, res.ball.s)] }).catch(() => {}); // 📤 🎯 판정 (v422 · 📰 신문 판은 nn — v428)
     korDayDone('nonsul', { bonus: !!res.half }).then((day) => {
       if ((day.streak || day.bonus) && S.r === r && r.result === res) { r.day = day; if (nonsulVisible()) renderRound(); }
     }).catch(() => {});
@@ -470,6 +545,7 @@ async function finishRound() {
  * 보내는 중(r.reasonBusy)·결과 말(r.reasonMsg)은 판에 둔다 — 그 사이 🔥·🥚가 늦게 와 다시 그려도 새 칸이 잠겨 있고 말이 남게 (🔍 Codex 160차 #2)
  */
 function reasonEl(r) {
+  if (r.news) return null; // 📰 신문 판엔 💡 내 이유가 없다 (v428 — 아버님 결정)
   const card = rcardOf(reasonCardId(r.id));
   if (!card || !r.side) return null;
   const box = el('div', 'ns-reason');
@@ -563,7 +639,10 @@ function finishEl(r) {
   if (wl) box.appendChild(wl);
   const row = el('div', 'ns-done-btns');
   if (!res.ok && res.why !== 'empty') row.appendChild(btn('btn btn-primary', '다시 저장하기', () => { r.step = 'done'; finishRound(); }));
-  if (res.ok && planTopic(S.list, nonsulMap(), Date.now())) row.appendChild(btn('btn btn-primary', '🖊️ 다음 주제', () => guardStart('korean', () => startRound(false))));
+  if (r.news) { // 📰 신문 판 끝 (v428) — 다음도 신문 주제(하루 둘)로 · 생활 주제 단추는 안 띄운다
+    if (res.ok && planNewsTopic(S.news.topics, nonsulMap(), korDoneMap(), Date.now())) row.appendChild(btn('btn btn-primary', '📰 다음 신문 주제', () => guardStart('korean', () => startNewsRound())));
+    else if (res.ok && newsWaitNew(S.news.topics, nonsulMap(), korDoneMap(), Date.now())) box.appendChild(el('p', 'ns-done-line ns-wait', NEWS_WAIT_TEXT));
+  } else if (res.ok && planTopic(S.list, nonsulMap(), Date.now())) row.appendChild(btn('btn btn-primary', '🖊️ 다음 주제', () => guardStart('korean', () => startRound(false))));
   else if (res.ok && nonsulWaitNew(S.list, nonsulMap(), Date.now())) box.appendChild(el('p', 'ns-done-line ns-wait', NEW_WAIT_TEXT)); // v370
   row.appendChild(btn('btn', '🖊️ 논술 처음으로', () => { S.r = null; renderHome(); window.scrollTo(0, 0); }));
   box.appendChild(row);
@@ -712,6 +791,13 @@ export async function enterNonsul() {
   settleThrows();
   topUpChars();
   await loadData();
+  await loadNewsData(); // 📰 이 기기에 받아 둔 신문 주제(v428 — blobs 한 번 · 빠르다)
+  // 📰 비공개 저장소에서 새 기사 받기는 기다리지 않는다(10분에 한 번 · 열쇠 없으면 그대로) — 바뀌었으면 사본을 바꾸고 첫 화면만 다시 그린다(푸는 판·쓰기 화면은 그대로)
+  syncNews().then((n) => {
+    if (!n || !n.changed) return;
+    S.news = { cards: n.cards, topics: n.topics };
+    if (nonsulVisible() && !S.r && !S.w) renderHome();
+  }).catch(() => {});
   // 📖 국어 글(v316)은 기다리지 않는다 — 화면을 먼저 그리고, 받으면 글이 아직 안 붙은 독서 논술 판만 다시 그린다(고른 것·펼친 상태는 판에 남아 있다) (🔍 Codex 122차 #2)
   loadStories().then(() => {
     const r = S.r;
@@ -740,16 +826,17 @@ export async function enterNonsul() {
 
 /**
  * 그 국어 글로 만든 독서 논술 주제 — 아직 ⭐가 아니면 { id, icon, q }, 없거나 ⭐면 null (국어 글을 다 읽은 화면이 단추를 띄울지)
- * 원고를 못 받으면 null (단추가 안 뜰 뿐)
+ * 원고를 못 받으면 null (단추가 안 뜰 뿐) · 📰 신문 기사(K701~K999)면 신문 주제에서 찾는다(v428 — 하루 몫과 상관없이 연다 · 생활 주제와 같다)
  */
 export async function readingTopicFor(cardId) {
   await loadData();
-  const t = readingTopicOf(S.list, cardId);
+  if (isNewsId(cardId)) await loadNewsData(); // 📰 국어 화면이 받은 새 사본까지 (v428)
+  const t = readingTopicOf(isNewsId(cardId) ? S.news.topics : S.list, cardId);
   if (!t) return null;
   try { await profileReady(); } catch { /* 못 읽으면 ⭐인지 모른다 — 단추를 띄운다(판은 연습이면 연습으로 저장) */ }
   return isSolved(nonsulMap()[t.id]) ? null : { id: t.id, icon: t.icon, q: t.q };
 }
-/** 그 주제로 판을 준비한다 — 부르는 쪽이 이어서 논술 화면을 연다(enterNonsul이 이 판을 그린다) · 푸는 판·쓰기 화면은 버린다 */
+/** 그 주제로 판을 준비한다 — 부르는 쪽이 이어서 논술 화면을 연다(enterNonsul이 이 판을 그린다) · 푸는 판·쓰기 화면은 버린다 · 📰 신문 주제도(byId — readingTopicFor가 사본을 읽은 뒤, v428) */
 export function openTopic(id) {
   if (!byId(id)) return false;
   startRound(false, id);

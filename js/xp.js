@@ -37,6 +37,7 @@ import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from '.
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
 import { ballOf, wordsToday, korPrizeKey } from './korwords.js'; // 🎯 오늘 판 기회 그리기용 · 📤 별 받은 글 판정 칸 (v422)
+import { mergeWordDays } from './korwords.js'; // 🖊️ 논술 한 날 = 생활·📰 신문 합집합 (v428)
 import { dayNum } from './korean.js'; // 🎯 오늘 판 기회 그리기용 (v422)
 import { spellFinishRule, spellSeenOf } from './spell.js'; // 🔤 진우 철자 노트 — 진도·💰 (v356 · 순수)
 import { korPuzzleRule } from './korpuzzle.js'; // 🧩 국어 글 퍼즐 칸·보상 (순수 — 낱말 칸과 같은 꼴)
@@ -406,7 +407,7 @@ export function rollCatch(chance, rng = Math.random) {
 // ── 프로필 (아이 한 명) ──
 
 // coins: 지금 가진 코인 / coinsEarned: 지금까지 번 코인(통계) / items: { 아이템id: 개수 } / mons: { 포켓몬id: { gear, dye, hp } } / partner: 🤝 파트너 포켓몬 id
-const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, letters: { start: 0, seen: {}, sent: [], star: 0 }, zyg: zygOf(null), updatedAt: 0 });
+const EMPTY = () => ({ id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, eggs: [], fusions: {}, trades: {}, parcels: {}, sales: {}, rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulNewsDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, letters: { start: 0, seen: {}, sent: [], star: 0 }, zyg: zygOf(null), updatedAt: 0 });
 let profile = EMPTY();
 /** 🟢 진우가 가진 지가르데의 모습 — '1' | '10' | '50' · 도감에 없으면 '50'(야생·상대 지가르데는 원작 그대로 · v359) */
 function myZygForm() {
@@ -448,7 +449,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.homeGuest ? { homeGuest: copyGuest(p.homeGuest) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), ...(p.aquarium ? { aquarium: copyAqua(p.aquarium) } : {}), ...(p.aquaTour ? { aquaTour: copyTour(p.aquaTour) } : {}), ...(p.piano ? { piano: copyPiano(p.piano) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.homeGuest ? { homeGuest: copyGuest(p.homeGuest) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), ...(p.aquarium ? { aquarium: copyAqua(p.aquarium) } : {}), ...(p.aquaTour ? { aquaTour: copyTour(p.aquaTour) } : {}), ...(p.piano ? { piano: copyPiano(p.piano) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulNewsDay: wordDaysOf(p.nonsulNewsDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
 }
 
 /** 저장소가 준 프로필을 메모리로 — 아직 못 쓴 몫은 얹어 둔다: 쓴 물건이 되살아나거나 번 코인이 사라져 보이지 않게 (v396 · Codex 199차) */
@@ -1153,7 +1154,7 @@ export function korWordsFinish(answers, ids) {
 export function korPuzzleFinish(answers, ids) {
   return houseDo((p) => korPuzzleRule(p, answers, Date.now(), ids));
 }
-/** 🖊️ 논술 한 판을 끝냈다 — 그 주제의 칸 + 그날 처음이면 💰·🎯 논술 잡기 기회 (한 트랜잭션) · ans = { id, ok, from } · ids = 지금 있는 주제 id */
+/** 🖊️ 논술 한 판을 끝냈다 — 그 주제의 칸 + 그날 처음이면 💰·🎯 논술 잡기 기회 (한 트랜잭션) · ans = { id, ok, from } · ids = 지금 있는 주제 id(📰 신문 주제도 — 그 판의 💰·🎯 몫은 규칙이 id로 가른다, v428) */
 export function nonsulFinish(ans, ids) {
   return houseDo((p) => nonsulRule(p, ans, Date.now(), ids));
 }
@@ -1173,9 +1174,17 @@ export function nonsulThrowsLeft() {
 export function nonsulMap() {
   return wordsOf(profile.nonsul);
 }
-/** 🖊️ 논술 보상 받은 날 { 날 번호: 1 } (그리기용 복사본) */
+/** 🖊️ 논술 보상 받은 날 { 날 번호: 1 } (그리기용 복사본) — 생활·📖 주제 판만 (📰 신문 판은 nonsulNewsDayMap, v428) */
 export function nonsulDayMap() {
   return wordDaysOf(profile.nonsulDay);
+}
+/** 📰 신문 논술 보상 받은 날 { 날 번호: 1 } (그리기용 복사본, v428 — 생활 논술과 하루 몫이 따로) */
+export function nonsulNewsDayMap() {
+  return wordDaysOf(profile.nonsulNewsDay);
+}
+/** 🖊️ 논술 한 날 { 날 번호: 1 } (그리기용 · v428) — 생활·신문 어느 쪽이든 그날 판을 끝냈으면 (🎣 낚시터·🐠 여행 과목 몫) */
+export function nonsulDoneDayMap() {
+  return mergeWordDays(profile.nonsulDay, profile.nonsulNewsDay);
 }
 /** 🔤 철자 노트 진도 { 낱말: { box, due, at, miss, d0 } } (그리기용 복사본, v356) */
 export function spellMap() {
@@ -1281,9 +1290,9 @@ export function korPuzzleMap() {
 export function korPuzzleDayMap() {
   return wordDaysOf(profile.korPuzzleDay);
 }
-/** 🎯 오늘 판 기회 (v422 · 그리기용) — kind 'word'|'pz'|'ns' → { won, left } (korwords.ballOf · 오늘 💰를 받은 판이 있나도 함께 본다) */
+/** 🎯 오늘 판 기회 (v422 · 그리기용) — kind 'word'|'pz'|'ns'|'nn'(📰 신문 논술, v428) → { won, left } (korwords.ballOf · 오늘 💰를 받은 판이 있나도 함께 본다) */
 export function korBallToday(kind, now = Date.now()) {
-  const f = { word: ['korWordBall', 'korWordDay'], pz: ['korPuzzleBall', 'korPuzzleDay'], ns: ['nonsulBall', 'nonsulDay'] }[kind];
+  const f = { word: ['korWordBall', 'korWordDay'], pz: ['korPuzzleBall', 'korPuzzleDay'], ns: ['nonsulBall', 'nonsulDay'], nn: ['nonsulNewsBall', 'nonsulNewsDay'] }[kind];
   if (!f) return { won: false, left: true };
   return ballOf(profile[f[0]], dayNum(now), wordsToday(profile[f[1]], now) > 0);
 }

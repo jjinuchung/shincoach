@@ -9,7 +9,8 @@
 // ✍️ 짧은 글 (v304 — 아버님 물음 넷 모두 추천안): 판을 끝낸 주제를 칸마다 머리말(나는 · 왜냐하면 · 또 · 물론 · 그래도 나는) 채우기로 →
 //   국어 ✍️ 생각 쓰기와 같은 장부·왕복·보상(korwrite.js — 카드 열쇠 N## · 주제마다 평생 한도) · 채점 기준은 원고의 write 하나를 모든 주제가 같이 쓴다
 // 💡 내 이유 한 줄 (v355 — 아버님 「추천대로」): 판 끝 「내가 만든 글」 아래 「또, …」 한 줄 → 같은 장부·왕복(카드 열쇠 R##) · 채점 기준은 원고의 reason
-import { dayNum, throwsOf, pendingOf, PAST_MAX, FRAME_GAP, KOR_XP } from './korean.js';
+// 📰 신문 논술 (v428): 신문 기사로 하는 같은 판 — 주제 N701~N999(비공개 · news.js) · 새 주제·💰·🎯 판 몫은 생활 주제와 따로(planNewsTopic · nonsulNewsDay·nonsulNewsBall) · ✍️·💡 없음
+import { dayNum, throwsOf, pendingOf, PAST_MAX, FRAME_GAP, KOR_XP, isNewsId, lineCount, starsOf } from './korean.js'; // 📰 신문 카드 번호 몫·줄 수 · ★ 받은 기사 (v428)
 import { stateOf, wordsOf, wordDaysOf, wordsToday, ballRule, halfRight } from './korwords.js'; // 🎯 처음 답 반 이상 (v422)
 import { shuffledOrder } from './korpuzzle.js';
 import { normText, bareText, writesOf, cardWriteState, writeCheck, writeAddRule, WRITE_MAX_HI } from './korwrite.js';
@@ -137,7 +138,8 @@ export function checkNonsulWrite(w, key = 'write') {
   return bad;
 }
 
-/** 원고(coach/korean/nonsul.json) 형식 검사 → 틀린 곳 목록(비면 통과) — check.mjs가 배포 전에, 화면은 allTopics로 깨진 주제를 뺀다 */
+/** 원고(coach/korean/nonsul.json) 형식 검사 → 틀린 곳 목록(비면 통과) — check.mjs가 배포 전에, 화면은 allTopics로 깨진 주제를 뺀다 ·
+ *  📰 N701~N999·신문 카드(K701~K999)는 비공개 신문 몫이라 공개 원고에 쓰지 않는다 (v428 — 생활 주제와 번호·진도가 섞이지 않게) */
 export function checkNonsul(json) {
   const list = isObj(json) && Array.isArray(json.topics) ? json.topics : null;
   if (!list || !list.length) return ['topics가 없음'];
@@ -145,17 +147,55 @@ export function checkNonsul(json) {
   const bad = [...checkNonsulWrite(json.write), ...(json.reason === undefined ? [] : checkNonsulWrite(json.reason, 'reason'))];
   const ids = new Set();
   for (const t of list) {
-    bad.push(...topicProblems(t));
+    bad.push(...topicProblems(t), ...newsSlotProblems(t));
     if (isObj(t) && str(t.id)) { if (ids.has(t.id)) bad.push(`${t.id}: 번호가 겹침`); ids.add(t.id); }
   }
   return bad;
 }
 
-/** 쓸 수 있는 주제만 (깨진 주제는 조용히 뺀다 — 배포 전 검사는 checkNonsul) */
+/** 쓸 수 있는 주제만 (깨진 주제는 조용히 뺀다 — 배포 전 검사는 checkNonsul · 📰 신문 몫 번호도 뺀다, v428) */
 export function allTopics(json) {
   const list = isObj(json) && Array.isArray(json.topics) ? json.topics : [];
   const seen = new Set();
-  return list.filter((t) => !topicProblems(t).length && !seen.has(t.id) && !!seen.add(t.id));
+  return list.filter((t) => !topicProblems(t).length && !newsSlotProblems(t).length && !seen.has(t.id) && !!seen.add(t.id));
+}
+
+// ── 📰 신문 논술 주제 검사 (v428, 2026-11-15 아버님 기본안 「추천대로」) ──
+// 신문 기사(국어 📰 카드 K701~K999)를 읽고 하는 논술 = 📖 독서 논술 꼴 그대로 { id: N7xx, icon, card: K7xx, intro, q, yes, no, off } —
+// 비공개 저장소(news/n*.json)의 줄마다 topic 칸 · 받기는 news.js · 주제 번호는 카드와 같은 수(K703 → N703)
+/** 📰 신문 논술 주제 번호인가 (N701~N999) */
+export function isNewsTopicId(id) {
+  return typeof id === 'string' && /^N\d{3}$/.test(id) && isNewsId(`K${id.slice(1)}`);
+}
+/** 공개 원고 주제가 신문 몫(N701~N999 · 신문 카드 K701~K999)을 쓰면 틀린 곳 */
+function newsSlotProblems(t) {
+  if (!isObj(t)) return [];
+  const id = str(t.id) ? t.id : '?';
+  const bad = [];
+  if (isNewsTopicId(t.id)) bad.push(`${id}: N701~N999는 신문 몫 — 공개 원고에 쓰지 않아요`);
+  if (isNewsId(t.card)) bad.push(`${id}: 신문 카드(${t.card})는 비공개 신문 원고의 주제만`);
+  return bad;
+}
+/**
+ * 📰 신문 논술 주제 하나 검사 → 틀린 곳 목록(비면 통과) — card = 그 기사 국어 카드(checkNewsCard를 통과한 것)
+ *   주제 꼴(topicProblems) + 📖 독서 논술 칸(card·intro·ev·off) + 번호 N701~N999 · 카드와 같은 수 · 근거 줄 번호는 그 기사 줄 수까지
+ */
+export function checkNewsTopic(t, card) {
+  if (!isObj(t)) return ['주제가 객체가 아님'];
+  const id = str(t.id) ? t.id : '?';
+  const bad = topicProblems(t);
+  if (t.card === undefined) bad.push(`${id}: card(이어진 신문 카드 K###)가 있어야 해요`);
+  if (!isNewsTopicId(t.id)) bad.push(`${id}: 신문 주제 번호는 N701~N999`);
+  if (!isObj(card) || !isNewsId(card.id)) { bad.push(`${id}: 이어진 신문 카드가 없어요`); return bad; }
+  if (t.card !== card.id) bad.push(`${id}: card는 ${card.id}`);
+  if (t.id !== `N${card.id.slice(1)}`) bad.push(`${id}: 번호는 카드와 같은 수 N${card.id.slice(1)}`);
+  const n = lineCount(card);
+  const evs = [
+    ...SIDES.flatMap((s) => (isObj(t[s]) && Array.isArray(t[s].ev) ? t[s].ev.flat() : [])),
+    ...(Array.isArray(t.off) ? t.off.flatMap((o) => (isObj(o) && Array.isArray(o.ev) ? o.ev : [])) : []),
+  ];
+  if (evs.some((k) => !Number.isInteger(k) || k < 1 || k > n)) bad.push(`${id}: 근거 줄 번호는 1~${n}(그 기사 줄 수)`);
+  return bad;
 }
 
 /** ⭐ 주제인가 */
@@ -168,12 +208,15 @@ export function isSolved(st) {
  * 오늘 처음 끝낸 주제(d0)를 센다(🔤 국어 낱말 NEW_PER_DAY와 같은 꼴) · 다시 볼 주제·⭐ 연습은 그대로 · 📖 국어 글 끝 단추로 여는 주제는 막지 않는다
  */
 export const NEW_TOPICS_PER_DAY = 4;
-const newToday = (st, today) => Object.values(st).filter((s) => s.d0 === today).length;
+/** 오늘 처음 끝낸 주제 수 — news면 📰 신문 주제(N701~N999)만, 아니면 생활·📖 주제만 (v428 — 두 몫을 따로 센다) */
+const newToday = (st, today, news = false) => Object.keys(st).filter((k) => st[k].d0 === today && isNewsTopicId(k) === news).length;
+/** 생활 목록에서 📰 신문 주제를 뺀다 (v428 — 섞어 넘겨도 생활 계획이 신문 주제를 고르지 않게) */
+const lifeOf = (list) => (Array.isArray(list) ? list : []).filter((t) => t && !isNewsTopicId(t.id));
 
 /** 오늘 새 주제를 다 열었는데 원고에 안 해 본 주제가 남았나 (순수) — 아이 화면 「새 주제는 내일 또 와요」(셈 없이) */
 export function nonsulWaitNew(list, states, now) {
   const st = wordsOf(states);
-  const ls = Array.isArray(list) ? list : [];
+  const ls = lifeOf(list);
   return newToday(st, dayNum(now)) >= NEW_TOPICS_PER_DAY && ls.some((t) => !own(st, t.id));
 }
 
@@ -184,7 +227,7 @@ export function nonsulWaitNew(list, states, now) {
 export function planTopic(list, states, now, practice = false) {
   const today = dayNum(now);
   const st = wordsOf(states);
-  const ls = Array.isArray(list) ? list : [];
+  const ls = lifeOf(list);
   if (practice) {
     const pool = ls.filter((t) => own(st, t.id) && st[t.id].box >= SOLVED).sort((a, b) => st[a.id].at - st[b.id].at);
     return pool.length ? pool[0].id : null;
@@ -194,6 +237,47 @@ export function planTopic(list, states, now, practice = false) {
   if (newToday(st, today) >= NEW_TOPICS_PER_DAY) return null;
   const fresh = ls.find((t) => !own(st, t.id));
   return fresh ? fresh.id : null;
+}
+
+// ── 📰 신문 논술 하루 몫 (v428, 2026-11-15 아버님 기본안 「추천대로」) ──
+// 신문 주제(N701~N999 · news.js가 비공개 저장소에서 받은 것)는 생활 주제와 따로: 새 주제 하루 NEWS_TOPICS_PER_DAY개 ·
+//   ★ 받은 기사(국어 📰 카드 별 하나 이상)의 주제만 새로 연다 · 💰·🎯 판 몫도 따로(nonsulRule이 id로 가른다 — nonsulNewsDay·nonsulNewsBall) ·
+//   📖 국어 글 끝 단추(🖊️ 이 기사로 생각해 보기)로 여는 주제는 막지 않는다(생활 주제와 같다) · ⭐·⚡·처음 ⭐ 🎯는 생활 주제와 같다
+/** 📰 새 신문 주제 하루 몫 */
+export const NEWS_TOPICS_PER_DAY = 2;
+const newsListOf = (list) => (Array.isArray(list) ? list : []).filter((t) => t && isNewsTopicId(t.id));
+/** ★를 받은 기사의 주제인가 — done = 국어 받은 별(korDone) */
+const starred = (t, done) => starsOf(isObj(done) ? done : {}, t.card) >= 1;
+
+/** 📰 열린 신문 주제 (순수) — ★를 받은 기사의 주제만(받은 차례 그대로) · 첫 화면 「📰 신문 논술」 칸을 띄울지 */
+export function newsTopicsOpen(list, done) {
+  return newsListOf(list).filter((t) => starred(t, done));
+}
+
+/**
+ * 📰 오늘 할 신문 주제 하나 (순수) — 다시 볼 것(틀린 날 다음 날부터, 오래 기다린 것부터) → ★ 받은 기사의 새 주제(받은 차례 · 하루 NEWS_TOPICS_PER_DAY개까지) · 없으면 null
+ * @param {object[]} list 신문 주제(news.js topics — 생활 주제가 섞여 와도 뺀다) · @param {object} states 논술 칸 · @param {object} done 국어 받은 별 · @param {number} now
+ */
+export function planNewsTopic(list, states, done, now) {
+  const today = dayNum(now);
+  const st = wordsOf(states);
+  const ls = newsListOf(list);
+  const due = ls.filter((t) => own(st, t.id) && st[t.id].box < SOLVED && st[t.id].due <= today).sort((a, b) => st[a.id].due - st[b.id].due);
+  if (due.length) return due[0].id;
+  if (newToday(st, today, true) >= NEWS_TOPICS_PER_DAY) return null;
+  const fresh = ls.find((t) => !own(st, t.id) && starred(t, done));
+  return fresh ? fresh.id : null;
+}
+
+/** 📰 오늘 새 신문 주제 몫을 다 썼나 (순수) — 다 썼으면 지금 ★를 더 받아도 오늘은 안 열린다(첫 화면이 「★를 받으면」 대신 「내일 또」) */
+export function newsQuotaFull(states, now) {
+  return newToday(wordsOf(states), dayNum(now), true) >= NEWS_TOPICS_PER_DAY;
+}
+
+/** 📰 오늘 새 신문 주제를 다 열었는데 ★ 받은 기사의 안 해 본 주제가 남았나 (순수) — 아이 화면 「📰 새 신문 주제는 내일 또 와요」(셈 없이) */
+export function newsWaitNew(list, states, done, now) {
+  const st = wordsOf(states);
+  return newToday(st, dayNum(now), true) >= NEWS_TOPICS_PER_DAY && newsListOf(list).some((t) => !own(st, t.id) && starred(t, done));
 }
 
 /** 섞기 — 원본은 그대로 */
@@ -248,6 +332,7 @@ const cnt = (v) => { const n = Math.floor(Number(v)); return Number.isSafeIntege
 /**
  * 논술 한 판을 끝냈다 — 한 트랜잭션에서: 그 주제의 칸 · 그날 처음 끝낸 판이면 💰 · 🎯 논술 잡기 기회 하나는 세 걸음 중 둘 이상을 안 틀린 판(v422 — 그날 둘째 판까지) ·
  *   주제를 처음 ⭐로 끝냈으면 🎯 하나 더(starCatch — 그 주제를 오늘 앞서 푼 적이 없을 때만, v338)
+ *   📰 신문 주제(N701~N999)면 💰(그날 첫 판)·🎯 판 몫은 따로 센다 — nonsulNewsDay·nonsulNewsBall (v428 · 넘겨받은 값이 아니라 id로 가른다)
  * @param {object} profile 저장된 프로필 (mutateProfile 안)
  * @param {{id:string, ok:boolean, from?:number, steps?:{ok:number}}} ans ok = 처음부터 한 번도 안 틀렸나 · steps.ok = 안 틀린 걸음(셋 중 — v422) · from = 판을 시작할 때 그 주제의 at(새 주제면 0) —
  *   그 사이 다른 창이 그 주제를 옮겼으면 이 판은 연습(🧩 국어 퍼즐과 같다)
@@ -275,8 +360,12 @@ export function nonsulRule(profile, ans, now, ids) {
   profile.nonsul = st;
   // 🎯 ⭐ (v338) — 처음 ⭐ = 연습이 아닌 판(⭐ 주제·낡은 판은 solved가 안 선다) · 같은 날 틀린 뒤 바로 다시 푼 ⭐는 안 준다
   const starCatch = solved && dayNum(cur.at) !== today;
-  const first = !wordsToday(profile.nonsulDay, now);
-  const days = wordDaysOf(profile.nonsulDay, today);
+  // 📰 신문 판은 하루 몫 칸이 따로 (v428) — 같은 날 생활 판 + 신문 판이면 💰 둘 · 🎯 판 몫도 따로
+  const news = isNewsTopicId(id);
+  const DAY = news ? 'nonsulNewsDay' : 'nonsulDay';
+  const BALL = news ? 'nonsulNewsBall' : 'nonsulBall';
+  const first = !wordsToday(profile[DAY], now);
+  const days = wordDaysOf(profile[DAY], today);
   let coins = 0;
   if (first) {
     coins = NONSUL_COINS;
@@ -287,16 +376,16 @@ export function nonsulRule(profile, ans, now, ids) {
   // 🎯 판 몫 (v422) — 세 걸음(② 이유 둘 · ③ 반대 의견 · ④ 글 순서) 중 둘 이상을 안 틀린 판에 · 그날 둘째 판까지 · 하루 한 번 (💰는 그날 처음 끝낸 판 그대로)
   //   ans.steps가 없으면(옛 부름) 처음부터 다 맞혔나로 — 다 맞혔으면 셋 다, 아니면 0
   const steps = stepsOf(ans);
-  const br = ballRule(profile.nonsulBall, today, { paid: !first, ok: steps.ok, total: steps.n });
-  profile.nonsulBall = br.rec;
+  const br = ballRule(profile[BALL], today, { paid: !first, ok: steps.ok, total: steps.n });
+  profile[BALL] = br.rec;
   const add = (br.prize ? 1 : 0) + (starCatch ? 1 : 0);
   if (add) {
     const tw = throwsOf(profile.nonsulThrow);
     tw.earned = big(tw.earned + add);
     profile.nonsulThrow = tw;
   }
-  profile.nonsulDay = wordDaysOf(days, today);
-  return { ok: true, first, coins, xp, throws: pendingOf(profile.nonsulThrow), solved, starCatch, practice, prize: br.prize, ball: br.ball, again: br.again, half: halfRight(steps.ok, steps.n) };
+  profile[DAY] = wordDaysOf(days, today);
+  return { ok: true, first, coins, xp, throws: pendingOf(profile.nonsulThrow), solved, starCatch, practice, prize: br.prize, ball: br.ball, again: br.again, half: halfRight(steps.ok, steps.n), news };
 }
 /** 논술 판의 세 걸음 — { ok 안 틀린 걸음, n 3 } · 옛 부름(steps 없음)은 처음부터 다 맞혔나로 */
 export const NONSUL_STEPS = 3;
@@ -341,16 +430,19 @@ export function nonsulFinishText(res) {
   // 🎯 ⭐ (v338) — 처음 ⭐면 잡기 한 번 더 · 틀린 판이면 다음에 ⭐로 끝낼 까닭을 (연습 판은 ⭐가 더 안 생기니 말하지 않는다)
   if (res.solved) lines.push(res.starCatch ? `⭐ 처음부터 다 맞혔어요! · 🎯 논술 포켓몬 잡기 1번${res.prize ? ' 더' : ''}` : '⭐ 처음부터 다 맞혔어요!');
   else if (!res.practice) lines.push('다음에 이 주제를 처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!');
-  const title = res.first ? '🖊️ 오늘의 논술 끝!' : res.practice ? '🖊️ 논술 연습 끝!' : '🖊️ 논술 더 하기 끝!';
+  const title = res.news // 📰 신문 판 (v428 — 💰·🎯 몫이 생활 판과 따로라 머리도 따로)
+    ? (res.first ? '📰 오늘의 신문 논술 끝!' : res.practice ? '📰 신문 논술 연습 끝!' : '📰 신문 논술 더 하기 끝!')
+    : res.first ? '🖊️ 오늘의 논술 끝!' : res.practice ? '🖊️ 논술 연습 끝!' : '🖊️ 논술 더 하기 끝!';
   return { title, lines };
 }
 /**
  * 오늘 보상 말 (순수) — wordsToday(nonsulDay) 0·1 · canStar = 오늘 ⭐를 받을 수 있는 주제가 남았나(planTopic이 주제를 줄 때) ·
- * prize 오늘 판 🎯 { won 받음, left 아직 기회 }(v422 ballOf) → 한 줄 · 셈 없음
+ * prize 오늘 판 🎯 { won 받음, left 아직 기회 }(v422 ballOf) → 한 줄 · 셈 없음 ·
+ * news = 📰 신문 논술 칸의 줄(v428 — 💰 몫이 따로라 「오늘의 신문 논술 끝」 · 신문 판만 한 날에 생활 칸 줄과 엇갈려 「논술은 다 했다」로 읽히지 않게)
  */
-export function nonsulTodayLine(today, canStar = true, prize = { won: false, left: true }) {
+export function nonsulTodayLine(today, canStar = true, prize = { won: false, left: true }, news = false) {
   const ball = prize && prize.won ? '' : prize && prize.left ? '한 번에 많이 맞히면 🎯' : '🎯는 내일 또 기회가 있어요';
-  if (today >= 1) return `오늘의 논술 끝 ✅${ball ? ` — ${ball}` : ''}${canStar ? `${ball ? ' · ' : ' — '}처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!` : ''}`;
+  if (today >= 1) return `오늘의 ${news ? '신문 ' : ''}논술 끝 ✅${ball ? ` — ${ball}` : ''}${canStar ? `${ball ? ' · ' : ' — '}처음부터 다 맞히면 ⭐와 🎯 논술 포켓몬 잡기!` : ''}`;
   return `끝내면 💰${NONSUL_COINS}${ball ? ` · ${ball}` : ''}${canStar ? ' · 처음부터 다 맞히면 ⭐와 🎯 하나 더' : ''}`;
 }
 
@@ -520,6 +612,7 @@ export function nonsulReasonCards(json) {
  */
 export function reasonAddRule(profile, t, side, line, now, cards) {
   if (!isObj(t) || !ID_RE.test(String(t.id)) || !SIDES.includes(side) || !isObj(t[side]) || !str(t[side].claim)) return { ok: false, why: 'unknown' };
+  if (isNewsTopicId(t.id)) return { ok: false, why: 'unknown' }; // 📰 신문 주제엔 💡 내 이유가 없다 (v428 — 아버님 결정)
   if (!own(wordsOf(profile.nonsul), t.id)) return { ok: false, why: 'unplayed' };
   const chk = reasonCheck(line);
   if (!chk.ok) return { ok: false, why: chk.why, n: chk.n };

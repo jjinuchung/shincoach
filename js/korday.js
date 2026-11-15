@@ -4,7 +4,7 @@
 //    🔤 낱말·🧩 퍼즐만 한 날은 치지 않는다(글·논술 쪽으로 이끌려고) · 그날 처음 끝냈을 때 한 번 — daily.korStreak를 claimDailyCount로 선점(두 창이어도 한 번)
 //    얼마는 영어와 같다: xp.streakBonus ⚡ 10 → 15 → … 40 · items.streakCoins 💰 5 → 10 → … 50
 //    끝 화면 한 줄만 — 끊겨도 아무 말 없음 · 영어의 "어제 안 하면 HP 깎기"는 없음 · 목록·홈에 날 수를 띄우지 않음(압박하는 셈 금지)
-//    지난날: 하루 기록(korReads v314 · nsRounds v327 · korStreak) + 프로필의 읽은 기록 줄(korReads — 최근 120줄)·논술 보상 받은 날(nonsulDay)
+//    지난날: 하루 기록(korReads v314 · nsRounds v327 · korStreak) + 프로필의 읽은 기록 줄(korReads — 최근 120줄)·논술 보상 받은 날(nonsulDay · 📰 nonsulNewsDay v428)
 // ✨ 오늘의 보너스 — 국어 카드·논술 카드 따로(mathbonus.subjectBonus — 수학·국어·논술이 그날 모두 다르다)
 //    그 과목 그날 첫 끝냄에 한 번 — daily.korDayBonus · nsDayBonus (★ korBonus는 ⏳ 국어 부모 추가 시간 칸이라 쓰지 않는다)
 import { readsOf, dayKeyOf } from './korean.js';
@@ -57,8 +57,11 @@ export function korStreakBefore(list, today, extra = []) {
 export function profileKorDays(p) {
   const out = new Set();
   for (const x of readsOf(p && p.korReads)) { const k = dayKeyOf(x.d); if (k) out.add(k); }
-  const nd = p && p.nonsulDay && typeof p.nonsulDay === 'object' && !Array.isArray(p.nonsulDay) ? p.nonsulDay : {};
-  for (const k of Object.keys(nd)) { const s = dayKeyOf(Number(k)); if (s && num(nd[k]) > 0) out.add(s); }
+  // 논술 보상 받은 날 — 생활 판(nonsulDay)·📰 신문 판(nonsulNewsDay, v428) 어느 쪽이든
+  for (const f of ['nonsulDay', 'nonsulNewsDay']) {
+    const nd = p && p[f] && typeof p[f] === 'object' && !Array.isArray(p[f]) ? p[f] : {};
+    for (const k of Object.keys(nd)) { const s = dayKeyOf(Number(k)); if (s && num(nd[k]) > 0) out.add(s); }
+  }
   return [...out];
 }
 

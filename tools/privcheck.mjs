@@ -4,14 +4,68 @@
 //   (교정만 올릴 때는 답장 파일이 없어도 된다).
 // ★ 없는 폴더·검사할 파일이 하나도 없는 폴더·폴더 이름 빠짐은 실패다 (Codex 36차 #5 — 전엔 "검사 통과"로 끝나
 //   경로를 잘못 쳐도 검사한 줄 알았다). 검사한 파일 이름을 돌려줘 check.mjs가 찍는다.
-import { readFileSync, existsSync, statSync } from 'node:fs';
+// 📰 신문 기사 원고 news/n1~n4.json(v428)도 있는 것만 — 앱이 받을 때와 같은 검사(news.js) · 겹친 id · NEWS_ORDER와 맞는지
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { checkReplies } from '../js/korwrite.js';
-import { validCards } from '../js/korean.js';
-import { nonsulWriteCards, nonsulReasonCards } from '../js/nonsul.js';
+import { validCards, checkNewsCard } from '../js/korean.js';
+import { nonsulWriteCards, nonsulReasonCards, checkNewsTopic } from '../js/nonsul.js';
 import { PRIVATE_MAX_BYTES } from '../js/upload.js';
 import { checkLetterReplies, lettersList } from '../js/letters.js';
+import { NEWS_PATHS, newsFilesOf } from '../js/news.js';
+import { NEWS_ORDER } from '../js/kordrip.js';
 
 export const PRIVATE_FILES = ['essay/fixes.json', 'math/replies.json', 'korean/replies.json', 'letters/replies.json'];
+
+/** 📰 공개 저장소에 있으면 안 되는 신문 경로인가 (v428) — 어느 깊이든 이름이 news인 폴더 안 (js/news.js 같은 파일 이름은 괜찮다) */
+export function isNewsPath(p) {
+  return /(^|\/)news\//.test(String(p).replace(/\\/g, '/'));
+}
+/** 📰 기사 원고를 둘 만한 공개 저장소 폴더 자리 — 빈 폴더는 git 목록에 안 나오니 따로 본다 */
+export const PUBLIC_NEWS_DIRS = ['news', 'coach/news', 'coach/korean/news'];
+/**
+ * 📰 공개 저장소의 신문 원고 자리 (v428 — check.mjs가 부른다) → 걸린 경로 목록(비면 통과)
+ * @param {string[]} files git이 올릴 수 있는 파일(git ls-files --cached --others --exclude-standard — .context처럼 무시하는 곳은 안 나온다)
+ * @param {(p:string) => boolean} [exists] 폴더 자리가 있나 (시험용)
+ */
+export function publicNewsHits(files, exists = existsSync) {
+  const hits = [...PUBLIC_NEWS_DIRS.filter((d) => exists(d)).map((d) => `${d}/`), ...(Array.isArray(files) ? files : []).filter(isNewsPath)];
+  return [...new Set(hits)];
+}
+
+/**
+ * 📰 신문 기사 원고 검사 (v428) — { 경로: 원고 배열 } (NEWS_PATHS 중 받은 것만) → 틀린 곳 글 목록
+ *   줄마다 카드 checkNewsCard · 주제 checkNewsTopic(앱 news.newsOf와 같은 검사 — 앱은 깨진 줄·주제를 조용히 빼고 📥에 ⚠️만) ·
+ *   앞 파일과 겹친 id(NEWS_PATHS 차례 — 앱은 앞 파일 것을 쓴다) · NEWS_ORDER에 없는 카드(앱이 열지 않는다) ·
+ *   넷이 다 있으면 NEWS_ORDER의 기사가 모두 있는지 (한 파일만 고쳐 올릴 때는 빠진 것을 묻지 않는다)
+ * @param {Object<string, Array>} files @param {(rel:string) => string} [nameOf] 글에 쓸 파일 이름
+ */
+export function newsProblems(files, nameOf = (rel) => rel) {
+  const errors = [];
+  const ids = new Set();
+  const order = new Set(NEWS_ORDER);
+  for (const rel of NEWS_PATHS) {
+    if (!files || !Array.isArray(files[rel])) continue;
+    files[rel].forEach((row, i) => {
+      const at = `${nameOf(rel)}[${i}]`;
+      if (!row || typeof row !== 'object' || Array.isArray(row) || !row.card || typeof row.card !== 'object') { errors.push(`내용 오류: ${at}: 줄은 { card, topic? }`); return; }
+      for (const k of Object.keys(row)) if (k !== 'card' && k !== 'topic') errors.push(`내용 오류: ${at}: 줄에는 card·topic만 — ${k}`);
+      const errs = checkNewsCard(row.card, ids);
+      for (const m of errs) errors.push(`내용 오류: ${at}: ${m}`);
+      if (errs.length) return;
+      if (!order.has(row.card.id)) errors.push(`내용 오류: ${at}: ${row.card.id}는 kordrip NEWS_ORDER에 없어 앱이 열지 않아요`);
+      if (row.topic !== undefined) for (const m of checkNewsTopic(row.topic, row.card)) errors.push(`내용 오류: ${at}: 주제 ${m}`);
+    });
+  }
+  // 앱이 실제로 쓰는 것과 같은지 (상한 MAX_NEWS 같은 위 검사 밖의 까닭도)
+  const all = newsFilesOf(files);
+  for (const [rel, n] of Object.entries(all.bad)) if (n && !errors.some((m) => m.includes(`${nameOf(rel)}[`))) errors.push(`내용 오류: ${nameOf(rel)}: 앱이 받지 않는 줄 ${n}`);
+  if (NEWS_PATHS.every((rel) => files && Array.isArray(files[rel]))) {
+    const have = new Set(all.cards.map((c) => c.id));
+    const lost = NEWS_ORDER.filter((id) => !have.has(id));
+    if (lost.length) errors.push(`내용 오류: news/: NEWS_ORDER의 기사 ${lost.length}편이 네 파일에 없어요 — ${lost.join(' ')}`);
+  }
+  return errors;
+}
 
 /** argv → { dir } (--private을 안 쓰면 dir null) · --private 뒤에 폴더 이름이 없으면 { error } */
 export function privateArg(argv) {
@@ -67,6 +121,22 @@ export function checkPrivateDir(dir, figureSvg) {
       for (const m of e.text.matchAll(/\[([a-z]+) [^\]]*\]/g)) if (!String(figureSvg(m[0].slice(1, -1))).startsWith('<svg')) errors.push(`내용 오류: ${f}[${i}] (💬${e.no}): 그림 지시문을 못 그림 ${m[0]} — 문법은 [bar 3/4] [pizza 1/4] [bars 1/4 1/6] [line -5..5] [walk -2 +5]`);
     });
   }
-  if (!checked.length) errors.push(`검사할 파일이 없음: ${dir} 안에 ${PRIVATE_FILES.join(' · ')} 중 하나가 있어야 해요`);
+  // 📰 신문 기사 원고 (v428) — news/n1~n4.json 중 있는 것 · 앱은 NEWS_PATHS만 받는다(news/의 다른 파일은 안 받으니 이름을 바로잡게)
+  const news = {};
+  for (const rel of NEWS_PATHS) {
+    const f = `${dir}/${rel}`;
+    if (!existsSync(f)) continue;
+    checked.push(rel);
+    if (statSync(f).size > PRIVATE_MAX_BYTES) { errors.push(`크기 오류: ${f}: ${PRIVATE_MAX_BYTES} 바이트를 넘음 — 앱이 이 파일을 하나도 안 받는다(기사를 다른 파일로 나눌 것)`); continue; }
+    let list;
+    try { list = JSON.parse(readFileSync(f, 'utf8')); } catch (e) { errors.push(`JSON 오류: ${f}: ${e.message}`); continue; }
+    if (!Array.isArray(list)) { errors.push(`내용 오류: ${f}: 배열이 아님`); continue; }
+    news[rel] = list;
+  }
+  if (existsSync(`${dir}/news`) && statSync(`${dir}/news`).isDirectory()) {
+    for (const x of readdirSync(`${dir}/news`)) if (!NEWS_PATHS.includes(`news/${x}`)) errors.push(`내용 오류: ${dir}/news/${x}: 앱은 ${NEWS_PATHS.join(' · ')}만 받아요`);
+  }
+  errors.push(...newsProblems(news, (rel) => `${dir}/${rel}`));
+  if (!checked.length) errors.push(`검사할 파일이 없음: ${dir} 안에 ${[...PRIVATE_FILES, ...NEWS_PATHS].join(' · ')} 중 하나가 있어야 해요`);
   return { errors, checked };
 }

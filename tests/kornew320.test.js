@@ -173,17 +173,18 @@ test('📦 하루 두 편 (v320 · Codex 126차 #3·#6): 묶음 b320 = 새 글 �
   assert.deepEqual(b.order.slice(0, 2), ['K121', 'K123'], '첫날 — 포켓몬 타입 발표 · 윤동주 동시(4단원·매체)');
   assert.deepEqual(b.order.slice(-2), ['K129', 'K130'], '마지막 날 — 6단원(12월) · 잠만보');
   const v = read('js/koreanview.js');
-  assert.ok(v.includes("import { visibleCards, hasLocked, opensTomorrow, freshIds, needsStart, withFirst } from './kordrip.js';"));
+  assert.ok(v.includes("import { DRIP, dripOf, visibleCards, hasLocked, opensTomorrow, freshIds, needsStart, withFirst } from './kordrip.js';"));
   assert.ok(v.includes('ui.cards = ui.all ? visibleCards(ui.all, dripState(), todayKey(), readIds()) : null;'), '부를 때마다 오늘 날짜로 다시 거른다');
   // 시작 날 — 목록을 부를 때마다 없으면 적는다(저장이 안 됐으면 다음에 부를 때 다시) · 이 실행에서 처음 받은 날로 · 화면도 그 날로 센다 (126차 #3)
   assert.ok(v.includes('  if (ui.all) ensureDripStart();\n  ui.cards = '), '목록을 부를 때 시작 날');
-  assert.ok(v.includes('if (dripSaving || !needsStart(korDripMap(), ids)) return;'));
-  assert.ok(v.includes('if (!dripFirst) dripFirst = todayKey();') && v.includes('korDripStart(ids, dripFirst)'), '처음 받은 날로 적는다');
+  assert.ok(v.includes('const st = korDripMap();\n  if (dripSaving || !needsStart(st, ids)) return;'));
+  assert.ok(v.includes('const plan = dripFirstPlan(dripFirst, st, ids, todayKey());') && v.includes('korDripStart(list, day)'), '처음 받은 날로 적는다(v428부터 묶음마다 — Codex 230차 #3)');
   assert.ok(v.includes('.finally(() => { dripSaving = null; })'), '실패해도 다음에 부를 때 다시');
-  assert.ok(v.includes('const dripState = () => withFirst(korDripMap(), dripFirst);'));
+  assert.ok(v.includes('for (const [k, d] of Object.entries(dripFirst)) if (!st[k]) st[k] = d;'), '화면은 못 적은 묶음을 그 묶음의 처음 받은 날로 센다');
   assert.ok(!/korDripMap\(\), todayKey\(\)/.test(v), '화면은 dripState로만 센다');
   // 「내일」은 내일 정말 열릴 때만 — 아니면 셈 없이 「차례로 열려요」 (Codex 127차 #4 · 규칙은 tests/kordrip322.test.js)
-  assert.ok(v.includes('if (ui.all && hasLocked(ui.all, dripState(), todayKey(), readIds())) {\n    const soon = opensTomorrow(ui.all, dripState(), todayKey(), readIds());'));
+  // v428: 📚 도감의 📦 줄은 공개 글(ui.pub)로만 — 📰 신문 기사는 📰 탭이 따로 센다(tests/news428kor.test.js)
+  assert.ok(v.includes('if (ui.pub && hasLocked(ui.pub, dripState(), todayKey(), readIds())) {\n    const soon = opensTomorrow(ui.pub, dripState(), todayKey(), readIds());'));
   assert.ok(v.includes("head.appendChild(el('p', 'kor-drip', soon ? '📦 내일 새 글이 와요' : '📦 새 글이 차례로 열려요'));"));
   // 🌱 오늘 새로 열린 글 바로가기 — 제목만(셈 없이) · 여는 길은 도감 칸과 같다(⏳ guardStart) (126차 #6)
   assert.ok(v.includes('freshIds(dripState(), todayKey(), readIds())'));

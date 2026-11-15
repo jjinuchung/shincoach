@@ -99,7 +99,7 @@ test('🔌 배선 — 읽는 시계: 근거 찾기 중이고 pairDue면 두 줄�
   const inc = tick.indexOf('r.sec += 1;');
   assert.ok(inc >= 0 && inc < tick.indexOf('pairDue(st, r.sec)'), '센 뒤에 본다');
   assert.ok(tick.includes('if (st && evFirstNow(q, st) && pairDue(st, r.sec)) {'), '근거 찾기 중일 때만');
-  assert.ok(tick.includes('const p = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);') && tick.includes('if (p) { st.pair = p; renderQ(); }'));
+  assert.ok(tick.includes('const p = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);') && tick.includes('if (p) { st.pair = p; renderQ(); bringNear(); }')); // v428 bringNear — 줄이 많은 글만 움직인다
   assert.ok(tick.indexOf('if (!r || r.result || r.saving || r.qi >= r.card.qs.length) return;') < tick.indexOf('const q = r.card.qs[r.qi];'), '다 읽은 뒤엔 물음을 안 본다');
 });
 

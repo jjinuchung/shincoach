@@ -314,6 +314,37 @@ export async function clearMusicSet() {
   await txDone(tx);
 }
 
+/**
+ * 📰 신문 기사 사본 (v428) — 비공개 저장소 news/n1~n4.json에서 받은 원고를 **이 기기의 blobs에만** (기사 글은 저작권 · 백업에 안 들어간다)
+ * 'news:list' = { id, files: { 경로: [{ card, topic? }…] }, at } — 받기·검사는 news.js · 영상 id·'music:'·'gift:'와 겹치지 않는다
+ * 파일마다 따로 바꾼다(한 파일을 못 받으면 그 파일은 받아 둔 것 그대로) — 받은 파일만 넘기면 같은 트랜잭션에서 옛 사본에 겹쳐 넣는다
+ */
+export const NEWS_LIST_ID = 'news:list';
+
+/** 받아 둔 신문 사본 — 없거나 꼴이 틀리면 null */
+export async function getNewsCache() {
+  const db = await openDb();
+  const rec = await promisify(db.transaction('blobs', 'readonly').objectStore('blobs').get(NEWS_LIST_ID));
+  return rec && rec.files && typeof rec.files === 'object' && !Array.isArray(rec.files) ? rec : null;
+}
+
+/** 받은 파일들을 사본에 넣는다 (한 트랜잭션) — files = { 경로: 원고 배열 } · 넘기지 않은 경로는 그대로 → 새 사본 */
+export async function putNewsCache(files) {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readwrite');
+  const store = tx.objectStore('blobs');
+  const old = await promisify(store.get(NEWS_LIST_ID));
+  const kept = old && old.files && typeof old.files === 'object' && !Array.isArray(old.files) ? old.files : {};
+  const add = {};
+  for (const [p, list] of Object.entries(files && typeof files === 'object' ? files : {})) if (Array.isArray(list)) add[p] = list;
+  // at은 늘 커진다 — 같은 밀리초 두 저장·뒤로 돌린 시계에서도 다른 창이 「바뀐 사본」을 알아보게 (news.js가 at이 다르면 다시 읽는다 · 🔍 Codex 232차)
+  const oldAt = old && Number.isFinite(Number(old.at)) && Number(old.at) > 0 ? Number(old.at) : 0;
+  const rec = { id: NEWS_LIST_ID, files: { ...kept, ...add }, at: Math.max(Date.now(), oldAt + 1) };
+  store.put(rec);
+  await txDone(tx);
+  return rec;
+}
+
 /** 일부 필드만 갱신 (진행 위치, 제목, 자막 교체 등) */
 export async function updateItem(id, patch) {
   const db = await openDb();
@@ -1121,7 +1152,7 @@ export async function getProfile() {
 export function emptyProfile() {
   // unlockBase = 🎟️ 직전 교환권을 산 시점의 학습 누적치 { done, reviewed }.
   // 다음 영상 조건은 여기서부터 다시 센다 (null이면 아직 기준선을 안 잡은 것)
-  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, spell: {}, spellDay: {}, spellSeen: {}, letters: { start: 0, seen: {}, sent: [], star: 0 }, zyg: zygOf(null), rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
+  return { id: 'me', xp: 0, caught: {}, throws: 0, catches: 0, coins: 0, coinsEarned: 0, items: {}, mons: {}, partner: null, unlockBase: null, eggs: [], stonesSpent: 0, giftsGiven: {}, fusions: {}, trades: {}, parcels: {}, sales: {}, korDone: {}, korMiss: {}, korQMiss: {}, korReads: [], korThrow: { earned: 0, used: 0, refunded: 0 }, korWords: {}, korWordDay: {}, korPuzzle: {}, korPuzzleDay: {}, korWrites: {}, nonsul: {}, nonsulDay: {}, nonsulNewsDay: {}, nonsulThrow: { earned: 0, used: 0, refunded: 0 }, grammar: {}, grammarDay: {}, grammarKnown: {}, grammarSeen: {}, grammarMiss: {}, grammarDiag: 0, grammarGift: { n: 0, day: 0, id: 0 }, grammarVideo: {}, spell: {}, spellDay: {}, spellSeen: {}, letters: { start: 0, seen: {}, sent: [], star: 0 }, zyg: zygOf(null), rocketWon: 0, rocketLost: 0, rocketCur: null, rocketDone: {}, rocketLast: {}, restsDone: {}, updatedAt: 0 };
 }
 
 /** 🏠 진우네 집 복사 — 방·놓은 가구까지 (규칙이 고쳐도 원본이 안 바뀌게) · 없으면 undefined */
@@ -1137,7 +1168,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.homePhotos ? { homePhotos: copyPhotos(cur.homePhotos) } : {}), ...(cur.homeGuest ? { homeGuest: copyGuest(cur.homeGuest) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), ...(cur.fishing ? { fishing: copyLake(cur.fishing) } : {}), ...(cur.aquarium ? { aquarium: copyAqua(cur.aquarium) } : {}), ...(cur.aquaTour ? { aquaTour: copyTour(cur.aquaTour) } : {}), ...(cur.piano ? { piano: copyPiano(cur.piano) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), grammarVideo: videoSeenOf(cur.grammarVideo), spell: wordsOf(cur.spell), spellDay: wordDaysOf(cur.spellDay), spellSeen: spellSeenOf(cur.spellSeen), letters: lettersOf(cur.letters), zyg: zygOf(cur.zyg), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.homePhotos ? { homePhotos: copyPhotos(cur.homePhotos) } : {}), ...(cur.homeGuest ? { homeGuest: copyGuest(cur.homeGuest) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), ...(cur.fishing ? { fishing: copyLake(cur.fishing) } : {}), ...(cur.aquarium ? { aquarium: copyAqua(cur.aquarium) } : {}), ...(cur.aquaTour ? { aquaTour: copyTour(cur.aquaTour) } : {}), ...(cur.piano ? { piano: copyPiano(cur.piano) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulNewsDay: wordDaysOf(cur.nonsulNewsDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), grammarVideo: videoSeenOf(cur.grammarVideo), spell: wordsOf(cur.spell), spellDay: wordDaysOf(cur.spellDay), spellSeen: spellSeenOf(cur.spellSeen), letters: lettersOf(cur.letters), zyg: zygOf(cur.zyg), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2495,9 +2526,11 @@ export function mergeStatRecord(name, cur, rec) {
     // 🖊️ 논술 칸 — 🧩 퍼즐과 같은 꼴(한쪽이라도 ⭐면 ⭐) · 보상 받은 날은 날마다 큰 쪽 · 잡기 기회는 세 카운터마다 max (v303)
     out.nonsul = mergePuzzles(cur.nonsul, rec.nonsul);
     out.nonsulDay = mergeWordDays(cur.nonsulDay, rec.nonsulDay);
+    out.nonsulNewsDay = mergeWordDays(cur.nonsulNewsDay, rec.nonsulNewsDay); // 📰 신문 논술 보상 받은 날 — 생활 논술과 같은 꼴 · 따로 센다 (v428)
     out.nonsulThrow = mergeThrows(cur.nonsulThrow, rec.nonsulThrow);
     // 🎯 🔤·🧩·🖊️ 판 기회 기록(v422) — 늦은 날 · 같은 날 판 수 큰 쪽·받음은 어느 쪽이든 · 합친 날에 💰를 받았는데 그날 기록이 없는 쪽이 있으면 v421 이하 몫(받음 — mergeBall) · 둘 다 없으면 칸을 안 둔다
-    for (const [f, days] of [['korWordBall', 'korWordDay'], ['korPuzzleBall', 'korPuzzleDay'], ['nonsulBall', 'nonsulDay']]) {
+    //   📰 신문 논술(v428)도 같은 꼴 — 칸이 따로라 생활 판 기록과 섞이지 않는다
+    for (const [f, days] of [['korWordBall', 'korWordDay'], ['korPuzzleBall', 'korPuzzleDay'], ['nonsulBall', 'nonsulDay'], ['nonsulNewsBall', 'nonsulNewsDay']]) {
       const mb = cur[f] || rec[f] ? mergeBall(cur[f], rec[f], cur[days], rec[days]) : null;
       if (mb) out[f] = mb; else delete out[f];
     }

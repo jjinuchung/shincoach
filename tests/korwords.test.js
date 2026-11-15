@@ -436,7 +436,9 @@ test('📘 단원 지도: 단원 24(v298 4-2 여덟이 맨 위 · 5-1·5-2) · �
 
 test('🔤📘 화면 연결: 탭 막대(📚·🔤·📘·🧩 v242) · 낱말·퍼즐 판 중엔 도감을 다시 그리지 않음 · 🎒에서 돌아오면 이어서 · 시작은 ⏳ guardStart · 끝나면 🥚 하루 칸 · 처음 고른 것만 · 말(순수) · sw', async () => {
   const kv = read('js/koreanview.js');
-  assert.match(kv, /for \(const \[id, label\] of \[\['cards', '📚 도감'\], \['words', '🔤 낱말'\], \['units', '📘 단원'\], \['puzzle', '🧩 퍼즐'\]\]\)/);
+  // v428: 탭 목록은 tabsOf — 넷 그대로 + 📰 신문은 신문 카드가 있을 때만(tests/news428kor.test.js)
+  assert.match(kv, /const list = \[\['cards', '📚 도감'\], \['words', '🔤 낱말'\], \['units', '📘 단원'\], \['puzzle', '🧩 퍼즐'\]\];/);
+  assert.ok(kv.includes('for (const [id, label] of list) {'));
   assert.ok(kv.includes('if (ui.read || anySession() || ui.wview) return;'), '판을 시작했으면(· 📬 답장 화면이면) 목록이 덮지 않는다');
   assert.ok(kv.includes('return tabs.inSession() || puzzles.inSession();'), 'v242: 판 = 🔤 낱말 판 또는 🧩 퍼즐 판');
   assert.ok(!/tabs\.inSession\(\)/.test(kv.replace('return tabs.inSession() || puzzles.inSession();', '')), '낱말 판만 보던 자리가 남지 않는다(퍼즐 판을 덮지 않게)');

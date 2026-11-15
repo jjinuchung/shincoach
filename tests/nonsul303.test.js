@@ -399,9 +399,9 @@ test('🖊️ 화면 연결: 홈 카드 · 화면 · ⏳ 국어 시간 · 시간
   assert.ok(app.includes("  if (name === 'nonsul') enterNonsul().catch(() => {});") && app.includes('  initNonsul({ showView });'));
   assert.ok(read('js/timeup.js').includes("  { id: 'time-chip-nonsul', subject: 'korean' },"));
   const v = read('js/nonsulview.js');
-  assert.equal((v.match(/guardStart\('korean', /g) || []).length, 8, '판을 열 때마다 국어 시간을 본다(시작·연습·다음 주제) + v304 ✍️ 짧은 글을 여는 세 곳(첫 화면 목록·판 끝·📬 띠 — Codex 110차 #2) + v355 💡 내 이유 두 곳(판 끝 답장 열어 보기 · 답장 뒤 이 주제 다시 해 보기)');
+  assert.equal((v.match(/guardStart\('korean', /g) || []).length, 10, '판을 열 때마다 국어 시간을 본다(시작·연습·다음 주제) + v304 ✍️ 짧은 글을 여는 세 곳(첫 화면 목록·판 끝·📬 띠 — Codex 110차 #2) + v355 💡 내 이유 두 곳(판 끝 답장 열어 보기 · 답장 뒤 이 주제 다시 해 보기) + v428 📰 신문 논술 두 곳(첫 화면 시작 · 판 끝 다음 신문 주제)');
   const fin = body(v, 'async function finishRound() {');
-  assert.ok(fin.includes('res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from, steps }, S.list.map((t) => t.id));'), '판 끝에 한 번 저장 · ok = 한 번도 안 틀림 · steps = 안 틀린 걸음(v422)');
+  assert.ok(fin.includes('res = await nonsulFinish({ id: r.id, ok: !r.miss, from: r.from, steps }, topicIds(r));'), '판 끝에 한 번 저장 · ok = 한 번도 안 틀림 · steps = 안 틀린 걸음(v422) · ids에 📰 신문 주제도(v428)');
   const run = body(v, 'export async function runCatch() {');
   const iTake = run.indexOf('taken = await nonsulTakeThrow();');
   const iTrack = run.indexOf('const st = { threw: false, hold: holds.track() };');

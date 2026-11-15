@@ -4,11 +4,13 @@
 //          글마다 별·처음 받은 날·틀린 물음 · 완료 기록이 없는 글 · 잘못 읽기 종류별 합 ·
 //          자주 틀린 물음(v254부터 셈 — profile.korQMiss) · 🔤 낱말 묶음마다 · 🧩 퍼즐 꼴마다 · ✍️ 생각 쓰기
 // ★ 공개 저장소에는 올리지 않는다 — upload.js가 비공개 저장소로만 (아이 기록)
-import { TYPES, starsOf, missOf, qMissOf, readsOf, READS_MAX, validCards, EV_WAIT_MS, EV_PAIR_SEC } from './korean.js';
-import { deckStats, DECKS, DECK_ORDER, allWords, korPrizeReport } from './korwords.js';
+// 📰 신문 기사(v428): 이 기기에 받아 둔 기사(news.js 사본)를 따로 받아 「📰 신문 기사」 절로 갈라 싣는다(별·처음 날·틀린 물음 —
+//   요약은 비공개 저장소로만 가니 기사 제목이 들어가도 된다) · 읽은 글·자주 틀린 물음 줄에는 📰 · 🖊️ 논술 절에 신문 주제 한 줄(nonsulNewsDay)
+import { TYPES, starsOf, missOf, qMissOf, readsOf, READS_MAX, validCards, EV_WAIT_MS, EV_PAIR_SEC, isNewsId, validNewsCards } from './korean.js';
+import { deckStats, DECKS, DECK_ORDER, allWords, korPrizeReport, wordsOf } from './korwords.js';
 import { puzzleStats, KINDS as PUZZLE_KINDS, allPuzzles, puzzleSessions, oneSessions } from './korpuzzle.js';
 import { writesOf, cardWriteState } from './korwrite.js';
-import { allTopics, nonsulReport, essayReport, reasonReport } from './nonsul.js'; // 🖊️ 논술 (v303 · ✍️ 짧은 글 v304 · 💡 내 이유 v355)
+import { allTopics, nonsulReport, essayReport, reasonReport, isSolved, checkNewsTopic } from './nonsul.js'; // 🖊️ 논술 (v303 · ✍️ 짧은 글 v304 · 💡 내 이유 v355 · 📰 신문 주제 v428)
 
 /** 자주 틀린 물음을 몇 개까지 싣나 */
 export const KOR_TOP = 12;
@@ -44,6 +46,7 @@ export function secText(sec) {
 
 /**
  * 📤 최근 7일 읽은 글 (순수, v258) — profile.korReads(korean.readsOf)에서 today를 넣은 7일 · 연 차례
+ * cards = 제목을 찾을 카드(공개 + 📰 신문 — 신문 기사 줄은 앞에 📰, v428) ·
  * 맨 위 한 줄은 모은 수(글 몇 번 · 한 편 평균 · 📖 문제 보기까지 평균(v260, 누른 줄만) · 첫 번에 맞힌 물음 · 오답 보기를 모두 고른 물음 · 근거 먼저 · 둘째 힌트 ·
  * 📍 근거부터(v273, 있는 줄만 — 찾기까지 평균 · 잘못 누른 줄 · 찾은 뒤 첫 번에)), 그 아래 READ_LINES줄까지(최근 것)
  * 기기에 저장된 최근 READS_MAX줄 안에서 센다 — 그보다 많이 읽은 주에는 앞의 것이 빠진다 (Codex 69차 #5)
@@ -75,20 +78,75 @@ export function readLines(reads, cards, today) {
     const star = x.g ? `${'★'.repeat(x.g)} 새로` : '별 없이 다시';
     const gate = x.v !== undefined ? `📍 근거부터 찾기까지 ${secText(x.v)}${x.w ? `(잘못 누른 줄 ${x.w})` : ''}${x.u === 1 ? ' · 🔊 들음' : x.u === 0 ? ' · 🔊 못 들음' : ''}${x.k ? '' : ' · 찾은 뒤에도 틀림'}` : '';
     const more = [x.x ? `오답 보기를 모두 고른 물음 ${x.x}` : '', x.e ? `🔍 근거 먼저 ${x.e}` : '', x.h ? `💡 둘째 힌트 ${x.h}` : '', gate, x.p ? `🔍 두 줄 ${x.p}` : ''].filter(Boolean);
-    L.push(`- ${dayLabel(x.d)} ${x.c} 「${title.get(x.c) || '?'}」${how} ${star} · ${secText(x.s)} (${x.q !== undefined ? `문제 보기까지 ${secText(x.q)} · ` : ''}첫 답까지 ${secText(x.a)}) · 첫 번에 ${x.f}/${x.n}${more.length ? ` · ${more.join(' · ')}` : ''}`);
+    // 📰 받아 둔 기사에 없는 신문 카드는 「?」 대신 까닭을 (v428 — 사본을 못 읽은 기기 · 아직 못 받았거나 원고에서 빠진 기사)
+    const name = title.get(x.c) || !isNewsId(x.c) ? `「${title.get(x.c) || '?'}」` : '(이 기기에 받아 둔 기사에 없어 제목 모름)';
+    L.push(`- ${dayLabel(x.d)} ${isNewsId(x.c) ? '📰 ' : ''}${x.c} ${name}${how} ${star} · ${secText(x.s)} (${x.q !== undefined ? `문제 보기까지 ${secText(x.q)} · ` : ''}첫 답까지 ${secText(x.a)}) · 첫 번에 ${x.f}/${x.n}${more.length ? ` · ${more.join(' · ')}` : ''}`);
   }
   return L;
 }
 
 /**
+ * 📰 신문 기사 절 (순수, v428) — 받아 둔 기사마다 별·처음 받은 날·틀린 물음 · 완료 기록이 없는 기사(번호만 — 하루 두 편씩 열려 아직 안 열린 기사도 든다)
+ * 기사를 받아 두지 못한 기기인데 신문 별 기록이 있으면 번호만 한 줄(제목 없는 「?」 줄로 새지 않게) · 기록도 없으면 절을 안 만든다(열쇠 없는 기기 · v428 전) ·
+ * 받아 둔 기사는 있는데 그 밖의 기사에 별 기록이 있으면(파일 하나를 아직 못 받음 · 고친 원고에서 빠진 기사) 그것도 번호만 한 줄 — 조용히 빠지지 않게
+ * @param {Array} news 쓸 수 있는 신문 카드(validNewsCards) · @param {object} done korDone · @param {object} qmiss qMissOf(korQMiss)
+ */
+export function newsLines(news, done, qmiss) {
+  const list = Array.isArray(news) ? news : [];
+  const d = done && typeof done === 'object' ? done : {};
+  const qm = qmiss && typeof qmiss === 'object' ? qmiss : {};
+  const head = '## 📰 신문 기사 (v428 — 비공개 저장소 news/에서 이 기기에 받아 둔 기사 · 국어 새 글과 따로 하루 두 편씩 열림 · 별·틀린 물음은 국어 글과 같은 셈)';
+  const known = new Set(list.map((c) => c.id));
+  const rec = [...new Set(Object.keys(d).map((k) => k.split(':')[0]).filter((id) => isNewsId(id) && !known.has(id)))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+  if (!list.length) return rec.length ? ['', head, `- 이 기기에 받아 둔 기사가 없어 제목을 못 붙였어요 — 별 기록이 있는 기사 ${rec.length}편: ${rec.join(' · ')}`] : [];
+  const st = list.map((c) => ({ c, s: starsOf(d, c.id), wrong: c.qs.filter((q) => qm[q.id]).map((q) => `${q.id}(${qm[q.id]})`) }));
+  const read = st.filter((x) => x.s > 0 || x.wrong.length);
+  const n = (k) => st.filter((x) => x.s === k).length;
+  const L = ['', head, `- ${list.length}편 중 별을 받은 기사 ${n(1) + n(2) + n(3)}편 (★★★ ${n(3)} · ★★ ${n(2)} · ★ ${n(1)})`];
+  for (const { c, s, wrong } of read) {
+    const first = s ? ` — 처음 ${dayLabel(d[`${c.id}:1`])}` : ' — 별 없음';
+    L.push(`- 📰 ${c.id} 「${c.title}」 ${s ? '★'.repeat(s) : '☆'}${first}${wrong.length ? ` · 틀린 물음 ${wrong.join(' ')}` : ''}`);
+  }
+  if (!read.length) L.push('(아직 완료 기록 없음)');
+  const unread = st.filter((x) => !x.s && !x.wrong.length);
+  if (unread.length) L.push(`- 완료 기록이 없는 기사 ${unread.length}편(아직 안 열린 기사도 들어요): ${unread.map(({ c }) => c.id).join(' · ')}`);
+  if (rec.length) L.push(`- 받아 둔 기사에 없는데 별 기록이 있는 기사 ${rec.length}편(이 기기가 아직 못 받았거나 고친 원고에서 빠진 기사 — 제목 모름): ${rec.join(' · ')}`);
+  return L;
+}
+
+/**
+ * 🖊️ 논술 절의 📰 신문 주제 줄 (순수, v428) — 열린 주제(★ 받은 기사의 주제) · ⭐ · 다시 볼 주제 · 해 본 주제 · 최근 7일 신문 판을 끝낸 날(nonsulNewsDay) ·
+ * 다시 볼 주제는 기사 제목과 함께 · 주제 칸(profile.nonsul)은 생활 논술과 같은 장부(주제 번호로 갈린다)
+ * @param {Array} topics 신문 주제(checkNewsTopic을 통과한 것) · @param {Array} news 신문 카드 · @param {object} prof 프로필 · @param {number} now
+ */
+export function newsNonsulLines(topics, news, prof, now) {
+  const list = Array.isArray(topics) ? topics : [];
+  if (!list.length) return [];
+  const pr = prof && typeof prof === 'object' ? prof : {};
+  const done = pr.korDone && typeof pr.korDone === 'object' ? pr.korDone : {};
+  const title = new Map((Array.isArray(news) ? news : []).map((c) => [c.id, c.title]));
+  const st = wordsOf(pr.nonsul);
+  const open = list.filter((t) => starsOf(done, t.card) > 0).length;
+  const again = list.filter((t) => Object.prototype.hasOwnProperty.call(st, t.id) && !isSolved(st[t.id]));
+  // nonsulReport의 셈 그대로(⭐·다시 볼·해 본·판을 끝낸 날) — 날은 신문 판 칸 nonsulNewsDay(없으면 빈 것)
+  const sums = nonsulReport(list, pr.nonsul, pr.nonsulNewsDay, now).replace(/^🖊️ 논술: /, '');
+  const L = [`- 📰 신문 논술 (v428 — 기사마다 주제 · ★ 받은 기사의 주제만 열림 · 생활 논술과 하루 몫·💰·🎯 따로 · 판을 끝낸 날은 신문 판만): 열린 주제 ${open}/${list.length} · ${sums}`];
+  if (again.length) L.push(`- 📰 다시 볼 신문 주제: ${again.map((t) => `${t.id} 「${title.get(t.card) || '?'}」`).join(' · ')}`);
+  return L;
+}
+
+/**
  * 국어 요약 글 (순수)
- * @param {object} p 프로필(korDone·korMiss·korQMiss·korWords·korPuzzle·korWrites)
- * @param {{cards:Array, words:Array, puzzles:Array}} data 쓸 수 있는 카드(validCards) · 모든 낱말(allWords) · 모든 퍼즐(allPuzzles)
+ * @param {object} p 프로필(korDone·korMiss·korQMiss·korWords·korPuzzle·korWrites · 📰 nonsulNewsDay)
+ * @param {{cards:Array, words:Array, puzzles:Array, nonsul?:Array, news?:Array, newsTopics?:Array}} data 쓸 수 있는 카드(validCards) · 모든 낱말(allWords) · 모든 퍼즐(allPuzzles) ·
+ *   🖊️ 논술 주제(allTopics) · 📰 신문 카드(validNewsCards)·신문 주제(v428 — 없으면 신문 절만 빠진다)
  * @param {string} today 'YYYY-MM-DD' · @param {Array<object>} days listDaily 결과(korTime 초 · korExt)
  */
 export function korReportText(p, data, today, days) {
   const prof = p && typeof p === 'object' ? p : {};
   const cards = Array.isArray(data && data.cards) ? data.cards : [];
+  const news = Array.isArray(data && data.news) ? data.news : []; // 📰 (v428)
+  const newsTopics = Array.isArray(data && data.newsTopics) ? data.newsTopics : [];
   const done = prof.korDone && typeof prof.korDone === 'object' ? prof.korDone : {};
   const qmiss = qMissOf(prof.korQMiss);
   const byDate = new Map((Array.isArray(days) ? days : []).filter((d) => d && d.date).map((d) => [d.date, d]));
@@ -104,7 +162,7 @@ export function korReportText(p, data, today, days) {
     // 30초 아래는 반올림하면 0분 — "기록 없음"이 아니라 "1분 미만" (Codex 66차)
     L.push(`- ${day.slice(5)}: ${min ? `${min}분` : sec ? '1분 미만' : '(국어 기록 없음)'}${ext ? ` · ⏳ 연장권 ${ext}개` : ''}`);
   }
-  L.push(...readLines(prof.korReads, cards, today)); // 📤 최근 7일 읽은 글 (v258)
+  L.push(...readLines(prof.korReads, news.length ? [...cards, ...news] : cards, today)); // 📤 최근 7일 읽은 글 (v258) · 📰 신문 기사 제목도 (v428)
   // 글마다
   const st = cards.map((c) => ({ c, s: starsOf(done, c.id), wrong: c.qs.filter((q) => qmiss[q.id]).map((q) => `${q.id}(${qmiss[q.id]})`) }));
   const read = st.filter((x) => x.s > 0 || x.wrong.length);
@@ -120,17 +178,18 @@ export function korReportText(p, data, today, days) {
   if (!read.length) L.push('(아직 완료 기록 없음)');
   const unread = st.filter((x) => !x.s && !x.wrong.length);
   if (unread.length) L.push(`- 완료 기록이 없는 글 ${unread.length}편: ${unread.map(({ c }) => `${c.id} 「${c.title}」`).join(' · ')}`);
+  L.push(...newsLines(news, done, qmiss)); // 📰 신문 기사 — 공개 글과 갈라서 (v428)
   // 잘못 읽기
   const miss = missOf(prof.korMiss);
   const kinds = Object.keys(TYPES).filter((k) => miss[k]);
   L.push('', '## 잘못 읽기 (모두 합친 수)', kinds.length ? `- ${kinds.map((k) => `${TYPES[k].name} ${miss[k]}`).join(' · ')}` : '(없음)');
   // 자주 틀린 물음
-  const qinfo = new Map(cards.flatMap((c) => c.qs.map((q) => [q.id, { c, q }])));
+  const qinfo = new Map([...cards, ...news].flatMap((c) => c.qs.map((q) => [q.id, { c, q }]))); // 📰 신문 물음도 — 줄 앞에 📰 (v428)
   const top = Object.keys(qmiss).filter((id) => qinfo.has(id)).sort((a, b) => qmiss[b] - qmiss[a] || a.localeCompare(b, 'en', { numeric: true })).slice(0, KOR_TOP);
   L.push('', `## 자주 틀린 물음 (v254부터 셈 — 다 읽은 글에서 틀린 보기를 고른 수 · 두 기기는 큰 쪽 수, 많은 차례 ${KOR_TOP}개까지)`);
   for (const id of top) {
     const { c, q } = qinfo.get(id);
-    L.push(`- ${id} 「${c.title}」 ${q.skill} — ${qmiss[id]}번 · 물음: ${q.q}`);
+    L.push(`- ${id} ${isNewsId(c.id) ? '📰 ' : ''}「${c.title}」 ${q.skill} — ${qmiss[id]}번 · 물음: ${q.q}`);
   }
   if (!top.length) L.push('(아직 없음)');
   // 낱말
@@ -164,10 +223,14 @@ export function korReportText(p, data, today, days) {
   L.push('', '## ✍️ 생각 쓰기', entries.length
     ? `- 쓴 글 ${entries.length}개 (카드 ${wcards.length}장) · 답장 받은 글 ${entries.filter((e) => e.grade).length}개 · 답장 기다리는 글 ${entries.filter((e) => !e.grade).length}개 · ✅까지 간 카드 ${okCards}장`
     : '(아직 쓴 글 없음)');
-  // 🖊️ 논술 (v303) — 원고를 못 받았으면 이 절만 빠진다
-  if (Array.isArray(data && data.nonsul) && data.nonsul.length) {
-    const now = new Date(`${today}T12:00:00`).getTime();
-    L.push('', '## 🖊️ 논술', `- ${nonsulReport(data.nonsul, prof.nonsul, prof.nonsulDay, Number.isFinite(now) ? now : Date.now())}`, `- ${essayReport(prof.korWrites)}`, `- ${reasonReport(prof.korWrites)}`); // 💡 내 이유 한 줄 (v355)
+  // 🖊️ 논술 (v303) — 원고를 못 받았으면 이 절만 빠진다 · 📰 신문 주제(v428)는 받아 둔 것이 있을 때 한 줄 더(생활 논술 원고가 없어도)
+  const pubNs = Array.isArray(data && data.nonsul) && data.nonsul.length > 0;
+  if (pubNs || newsTopics.length) {
+    const t12 = new Date(`${today}T12:00:00`).getTime();
+    const now = Number.isFinite(t12) ? t12 : Date.now();
+    L.push('', '## 🖊️ 논술');
+    if (pubNs) L.push(`- ${nonsulReport(data.nonsul, prof.nonsul, prof.nonsulDay, now)}`, `- ${essayReport(prof.korWrites)}`, `- ${reasonReport(prof.korWrites)}`); // 💡 내 이유 한 줄 (v355)
+    L.push(...newsNonsulLines(newsTopics, news, prof, now));
   }
   return `${L.join('\n').trim()}\n`;
 }
@@ -175,14 +238,21 @@ export function korReportText(p, data, today, days) {
 /**
  * 받은 원고 세 파일로 요약 글 (순수) — 꼴이 틀리면 null: 이번엔 국어 요약만 안 올린다
  * (Codex 66차: JSON은 맞지만 cards가 없는 원고가 "0편" 요약으로 비공개 저장소의 좋은 요약을 덮을 뻔했다)
- * @param {object} p 프로필 · @param {Array} raw [reading.json, words.json, puzzles.json] 받은 그대로
+ * @param {object} p 프로필 · @param {Array} raw [reading.json, words.json, puzzles.json, nonsul.json?, 📰 news?] 받은 그대로 —
+ *   news = 이 기기에 받아 둔 신문 기사 { cards, topics }(news.js loadNews · v428 — 없거나 깨지면 신문 절만 빠진다 · 공개 원고 꼴 검사와 상관없다)
  * @param {string} today · @param {Array<object>} days
  */
 export function korReportFromRaw(p, raw, today, days) {
-  const [r, w, z, ns] = Array.isArray(raw) ? raw : []; // ns = 🖊️ 논술 원고(v303 · 없거나 깨지면 논술 절만 빠진다)
+  const [r, w, z, ns, nw] = Array.isArray(raw) ? raw : []; // ns = 🖊️ 논술 원고(v303 · 없거나 깨지면 논술 절만 빠진다)
   const listOf = (o, k) => (o && typeof o === 'object' && Array.isArray(o[k]) && o[k].length ? o[k] : null);
   if (!listOf(r, 'cards') || !listOf(w, 'words') || !listOf(z, 'puzzles')) return null;
   const cards = validCards(r);
   if (!cards.length) return null;
-  return korReportText(p || {}, { cards, words: allWords(w, cards), puzzles: allPuzzles(z, cards), nonsul: allTopics(ns) }, today, days);
+  // 📰 신문 기사 (v428) — 받아 둘 때 이미 검사했지만 한 번 더 거른다(공개 카드와 겹친 번호도 뺀다) · 주제는 그 기사 카드와 함께 맞는 것만
+  const pub = new Set(cards.map((c) => c.id));
+  const news = validNewsCards(listOf(nw, 'cards') || []).filter((c) => !pub.has(c.id));
+  const byId = new Map(news.map((c) => [c.id, c]));
+  const newsTopics = (listOf(nw, 'topics') || []).filter((t) => t && byId.has(t.card) && !checkNewsTopic(t, byId.get(t.card)).length);
+  // 🔤 낱말에는 신문 기사 📖 낱말도(앱의 🔤 칸과 같게 — 그 기사에 ★이 있어야 열린다)
+  return korReportText(p || {}, { cards, words: allWords(w, news.length ? [...cards, ...news] : cards), puzzles: allPuzzles(z, cards), nonsul: allTopics(ns), news, newsTopics }, today, days);
 }

@@ -10,7 +10,11 @@
 //  · v300: 🔍 근거 먼저에서 줄을 세 번 잘못 누르면 두 줄만 남긴다(korean.evPair) · 🎯 다시 읽기(★★·★★★)는 처음 고른 답이 반 이상일 때만(korean.catchFirstOk) — 안내는 규칙만
 //  · v363: 📍 근거부터·🔍 근거 먼저에서 근거를 찾으면 칠한 근거와 물음을 🔊 한 번 읽은 뒤 보기가 열린다(sayEvidence) · 🔊 다시 듣기 ·
 //    소리가 안 나면(읽기 없음·한국어 음성 없음·3초 안에 시작 안 함) 바로 연다 · 📤 근거부터 줄에 u(끝까지 들었나)
-import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT, evPair, EV_PAIR_AT, gateAtOf, CATCH_FIRST_STAR, EV_WAIT_MS, evWaitLeft, pairDue } from './korean.js';
+//  · v428 📰 신문 칸: 이 기기에 받아 둔 신문 기사(news.js — 열쇠가 있는 기기만)를 공개 글 뒤에 붙여 같은 읽기 화면으로 · 탭 「📰 신문」은 기사가 있을 때만(newsview.js) ·
+//    📚 도감은 공개 글만 · 하루 두 편(kordrip bnews) · 기사 아래 📷·🗂️ 회색 칸(번호 없음 · 근거 아님) · 줄이 많은 글(⑳ 넘음)은 근거 줄 단추를 촘촘히 · 범위를 알려 준 뒤엔 그 줄을 테두리로
+import { TYPES, KINDS, PRE, KOR_COINS, LISTEN_KIND, isListen, rowsLayout, circled, lineCount, lineText, unitOf, validCards, starsOf, nextStar, evFirstNow, hint2Now, evRange, EV_RANGE_AT, evPair, EV_PAIR_AT, gateAtOf, CATCH_FIRST_STAR, EV_WAIT_MS, evWaitLeft, pairDue, NEWS_KIND, isNews, isNewsId } from './korean.js';
+import { loadNews, syncNews, newsNow } from './news.js'; // 📰 신문 기사 — 받기·사본 (v428 · 화면 없음)
+import { NEWS_TAB, splitNews, newsByline, decoEl, renderNewsTab } from './newsview.js'; // 📰 탭·기사 조각 (v428) — 이 파일을 import하지 않는다(ctx로 건넴)
 import { IDLE_SEC } from './timelimit.js'; // ⏱️ 읽는 시계는 ⏳ 시계와 같은 쉼 규칙(2분 넘게 손을 안 대면 안 센다)
 import { newListenState, playListen, haltListen, stopListening, listenBoxEl, scriptEl, confirmHeard, syncListenBox, sayReady, playEvSay, stopEvSay } from './korlistenview.js'; // 🎧 듣기 카드 (v245) — 이 파일을 import하지 않는다
 import { fullyHeard } from './korlisten.js'; // 📍 근거 줄 읽기가 끝까지 들렸나 (v363 📤 u)
@@ -28,7 +32,7 @@ import * as puzzles from './korpuzzleview.js'; // 🧩 퍼즐 탭 (v242) — 같
 import { writeBoxEl, replyBannerEl, renderReplyView, slotWriteText, syncWrites, appliedLine } from './korwriteview.js'; // ✍️ 서술형 (v237) — 이 파일을 import하지 않는다(ctx로 건넴)
 import { cardWriteState } from './korwrite.js';
 import { korWritesMap, korDripMap, korDripStart } from './xp.js';
-import { visibleCards, hasLocked, opensTomorrow, freshIds, needsStart, withFirst } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
+import { DRIP, dripOf, visibleCards, hasLocked, opensTomorrow, freshIds, needsStart, withFirst } from './kordrip.js'; // 📦 새 글은 하루에 두 편씩 (v320) — 아이 화면에서만 잠긴 글을 뺀다
 import { rollOffer, offerEl, korWordsSource } from './korbattleview.js'; // ⚔️ 국어 배틀 (v325) — 이 파일을 import하지 않는다
 import { isBattleOpen } from './battle.js';
 import { korGainXp } from './korxp.js'; // ⚡ 국어 경험치 (v327)
@@ -54,9 +58,10 @@ const el = (tag, cls, text) => {
 export const CONTENT_URL = './coach/korean/reading.json';
 
 // cards: 쓸 수 있는 카드(validCards) · read: 읽는 중인 글 { card, qi, qs: [물음 상태], misses, result, saving }
-const ui = { all: null, cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards', wview: '', writeNote: '', showView: null };
+const ui = { pub: null, all: null, cards: null, loadErr: '', read: null, wired: false, catching: false, catchMsg: '', charBusy: false, catchState: null, tab: 'cards', wview: '', writeNote: '', showView: null };
+// pub = 받은 공개 원고 글(reading.json — 한 번) · all = pub + 📰 이 기기에 받아 둔 신문 기사(v428 — 부를 때마다 news.js 사본에서) · cards = all 가운데 오늘 열린 글
 // wview = 📬 답장 화면을 보고 있는 카드 id (그동안 목록이 덮지 않게) · writeNote = 답장이 붙었을 때 도감 위 한 줄(한 번)
-// tab = 📚 도감(cards) · 🔤 낱말(words) · 📘 단원(units) — 글을 읽고 돌아오면 그 탭으로
+// tab = 📚 도감(cards) · 🔤 낱말(words) · 📘 단원(units) · 🧩 퍼즐(puzzle) · 📰 신문(news, v428) — 글을 읽고 돌아오면 그 탭으로
 // catchState = 지금 열어 둔 잡기 창 { threw, hold } — 창이 바깥에서 닫혀(catch.closeCatch는 부른 쪽에 안 알린다) 소식이 없을 때 안 던진 기회를 돌려주려고
 
 /** 보기 차례를 섞는다 (rng = 0 이상 1 미만) → 원고 보기 번호 배열 */
@@ -120,40 +125,72 @@ export function catchRuleLine(star, listen = false) {
 /** 읽은 글 id — 별 기록('카드id:별')이 하나라도 있는 글 (📦 이미 읽은 글은 잠그지 않는다) */
 const readIds = () => new Set(Object.keys(korDoneMap()).map((k) => k.split(':')[0]));
 
-// 📦 묶음 시작 날 (Codex 126차 #3) — dripFirst = 이 실행에서 처음 국어 글을 받은 날(시작 날을 못 적었을 때 그 날로 다시 적고, 그사이 화면도 그 날로 센다) · dripSaving = 적는 중
-let dripFirst = '';
+// 📦 묶음 시작 날 (Codex 126차 #3) — dripFirst = { 묶음: 이 실행에서 그 묶음의 글을 처음 받은 날 }(시작 날을 못 적었을 때 그 날로 다시 적고, 그사이 화면도 그 날로 센다) · dripSaving = 적는 중
+//   묶음마다 따로 (🔍 Codex 230차 #3 — 하나로 두면 앱을 며칠 켜 둔 채 늦게 받은 📰 bnews가 앞서 공개 묶음을 받은 날로 잡혀 첫날 여러 편이 열렸다)
+let dripFirst = {};
 let dripSaving = null;
 
-/** 화면이 셀 묶음 시작 날 — 적힌 날 · 아직 못 적은 묶음은 이 실행에서 처음 받은 날 */
-const dripState = () => withFirst(korDripMap(), dripFirst);
+/** 화면이 셀 묶음 시작 날 — 적힌 날 · 아직 못 적은 묶음은 이 실행에서 그 묶음을 처음 받은 날 */
+const dripState = () => {
+  const st = withFirst(korDripMap(), '');
+  for (const [k, d] of Object.entries(dripFirst)) if (!st[k]) st[k] = d;
+  return st;
+};
 
 /**
- * 📦 묶음 시작 날 적기 — 원고에 묶음 글이 있고 적힌 날이 없으면 이 실행에서 처음 받은 날로(v320 → Codex 126차 #3)
+ * 📦 묶음 시작 날 적기 — 원고에 묶음 글이 있고 적힌 날이 없으면 이 실행에서 그 묶음을 처음 받은 날로(v320 → Codex 126차 #3 · 230차 #3)
  *   저장이 안 되면 목록을 부를 때마다 다시 · 적는 중이면 겹쳐 부르지 않는다 · 첫날 몫은 적기 전과 같아 다시 그리지 않는다
+ *   처음 받은 날이 같은 묶음끼리 한 번에 적는다(dripStartRule은 넘긴 id가 든 묶음만 적는다)
  */
 function ensureDripStart() {
   const ids = ui.all ? ui.all.map((c) => c.id) : [];
-  if (dripSaving || !needsStart(korDripMap(), ids)) return;
-  if (!dripFirst) dripFirst = todayKey();
-  dripSaving = Promise.resolve(korDripStart(ids, dripFirst)).catch(() => null).finally(() => { dripSaving = null; });
+  const st = korDripMap();
+  if (dripSaving || !needsStart(st, ids)) return;
+  const plan = dripFirstPlan(dripFirst, st, ids, todayKey());
+  dripFirst = plan.first;
+  dripSaving = Promise.all(Object.entries(plan.byDay).map(([day, list]) => Promise.resolve(korDripStart(list, day)).catch(() => null))).finally(() => { dripSaving = null; });
 }
 
 /**
- * 원고를 한 번 받아 두고(ui.all), 아이 화면에 보일 글(ui.cards)은 부를 때마다 오늘 날짜로 다시 거른다 —
+ * 📦 시작 날이 없는 묶음의 처음 받은 날 (순수 · Codex 230차 #3) → { first, byDay }
+ *   first = 묶음마다 처음 받은 날(이미 있던 날은 그대로 · 이번에 처음 보인 묶음만 today) · byDay = { 날: [그날 적을 묶음의 글 id] }
+ * @param {object} first 지금까지의 { 묶음: 날 } · @param {object} state 적힌 시작 날(korDrip) · @param {string[]} ids 원고에 있는 글 id · @param {string} today
+ */
+export function dripFirstPlan(first, state, ids, today) {
+  const have = new Set(ids || []);
+  const set = dripOf(state);
+  const out = { ...(first && typeof first === 'object' ? first : {}) };
+  const byDay = {};
+  for (const b of DRIP.bundles) {
+    if (set[b.key] || !b.order.some((id) => have.has(id))) continue;
+    if (!out[b.key]) out[b.key] = today;
+    (byDay[out[b.key]] ||= []).push(...b.order.filter((id) => have.has(id)));
+  }
+  return { first: out, byDay };
+}
+
+/** 📰 받아 둔 신문 사본을 처음 읽을 때 이만큼까지만 기다린다 (v428) — 이 기기 저장소가 늦으면 공개 글부터 그리고, 읽히면 다시 그린다(refreshNews) */
+const NEWS_WAIT_MS = 1500;
+
+/**
+ * 원고를 한 번 받아 두고(ui.pub → ui.all), 아이 화면에 보일 글(ui.cards)은 부를 때마다 오늘 날짜로 다시 거른다 —
  * 📦 새 글 묶음은 하루에 두 편씩 열린다(v320 kordrip) · 앱을 켜 둔 채 날이 바뀌어도 다음에 부를 때 열린다 · 시작 날이 없으면 여기서 적는다
+ * 📰 신문 기사(v428)는 부를 때마다 news.js 사본에서 공개 글 뒤에 붙인다(id 몫 K701~K999가 달라 겹치지 않는다) — 처음 받은 날이 bnews 시작 날
  */
 async function loadCards() {
-  if (!ui.all) {
+  if (!ui.pub) {
     try {
       const res = await fetch(CONTENT_URL);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      ui.all = validCards(await res.json());
+      ui.pub = validCards(await res.json());
       ui.loadErr = '';
     } catch (e) {
       ui.loadErr = String((e && e.message) || e);
-      ui.all = null;
+      ui.pub = null;
     }
   }
+  await Promise.race([loadNews().catch(() => null), new Promise((res) => setTimeout(res, NEWS_WAIT_MS))]);
+  ui.all = ui.pub ? [...ui.pub, ...newsNow().cards] : null;
   if (ui.all) ensureDripStart();
   ui.cards = ui.all ? visibleCards(ui.all, dripState(), todayKey(), readIds()) : null;
   return ui.cards;
@@ -176,10 +213,23 @@ export async function enterKorean() {
     ui.writeNote = line;
     if (!ui.read && !anySession() && !ui.wview && ui.tab === 'cards') renderList().catch(() => {});
   }).catch(() => {});
+  refreshNews(); // 📰 신문 기사 — 받아 둔 사본을 읽고 비공개 저장소에서 새로 받는다 (v428)
   if (ui.read) { if (!$('korean-main').querySelector('.kor-read')) renderRead(); return; }
   if (anySession()) { resumeSession(); return; } // 🔤 낱말·🧩 퍼즐을 풀다 🎒·📊를 다녀왔다 — 그대로 이어서
   if (ui.wview) { renderReplyView(ui.wview, writeCtx); return; } // 📬 답장을 보다 🎒·📊를 다녀왔다
   await renderList();
+}
+
+/**
+ * 📰 신문 기사 받기 (v428) — 이 기기 사본(loadNews · 한 번)을 읽은 뒤 비공개 저장소에서 새로 받는다(syncNews · 10분에 한 번 · 열쇠가 없으면 그대로)
+ *   사본이 늦게 읽혔거나(loadCards는 NEWS_WAIT_MS만 기다린다) 새로 받아 기사 목록이 바뀌었으면 목록을 다시 그린다 — 읽는 중·판 중·답장 화면이면 그대로
+ */
+function refreshNews() {
+  const ids = () => newsNow().cards.map((c) => c.id).join();
+  const redraw = () => { if (koreanVisible() && !ui.read && !anySession() && !ui.wview) renderList().catch(() => {}); };
+  const shown = () => (ui.all ? ui.all.filter(isNews).map((c) => c.id).join() : '');
+  loadNews().then(() => { if (ui.all && ids() !== shown()) redraw(); return syncNews(); })
+    .then((r) => { if (r && r.changed) redraw(); }).catch(() => {});
 }
 
 /** ✍️ 서술형 쪽(korwriteview)에 건네는 것 — 서로 import하지 않게 */
@@ -203,6 +253,11 @@ const tabCtx = {
   toCards: () => { ui.tab = 'cards'; renderList(); window.scrollTo(0, 0); },
   rerender: () => { renderList(); },
   addCell: (box) => addCell(box, 'korean'), // 🟢 지가르데 셀 (v352)
+  // 📰 신문 탭 (v428 newsview) — 열린 기사 · 받은 기사(잠긴 것까지) · 묶음 날짜(📚 도감과 같은 셈) · 칸의 ★·상태
+  newsCards: () => splitNews(ui.cards).news,
+  newsAll: () => splitNews(ui.all).news,
+  drip: () => ({ state: dripState(), today: todayKey(), read: readIds() }),
+  starState: (id) => { const done = korDoneMap(); return { stars: starsOf(done, id), ...statusOf(done, id, Date.now()) }; },
 };
 /** 🔤 낱말 판 · 🧩 퍼즐 판을 푸는 중인가 — 다시 그릴 때 목록이 판을 덮지 않게 (v242: 퍼즐 판도 같은 다섯 자리에서 본다) */
 function anySession() {
@@ -214,11 +269,20 @@ function resumeSession() {
   else tabs.renderSession(tabCtx);
 }
 
-/** 📚 도감 · 🔤 낱말 · 📘 단원 · 🧩 퍼즐 탭 막대 */
+/** 탭 목록 (순수) — 📚 도감 · 🔤 낱말 · 📘 단원 · 🧩 퍼즐 + 📰 신문(v428 — 열린 신문 기사가 있을 때만 · 열쇠가 없는 기기엔 없다) */
+export function tabsOf(cards) {
+  const list = [['cards', '📚 도감'], ['words', '🔤 낱말'], ['units', '📘 단원'], ['puzzle', '🧩 퍼즐']];
+  if (splitNews(cards).news.length) list.push(['news', NEWS_TAB]);
+  return list;
+}
+
+/** 📚 도감 · 🔤 낱말 · 📘 단원 · 🧩 퍼즐 · 📰 신문 탭 막대 */
 function tabBarEl() {
   const bar = el('div', 'kor-tabs');
   bar.setAttribute('role', 'tablist');
-  for (const [id, label] of [['cards', '📚 도감'], ['words', '🔤 낱말'], ['units', '📘 단원'], ['puzzle', '🧩 퍼즐']]) {
+  const list = tabsOf(ui.cards);
+  if (list.length > 4) bar.classList.add('has-news'); // 다섯 탭 — 좁은 화면에선 두 줄로 (css)
+  for (const [id, label] of list) {
     const b = el('button', `kor-tab${ui.tab === id ? ' is-on' : ''}`, label);
     b.type = 'button';
     b.dataset.tab = id;
@@ -239,7 +303,7 @@ export function groupOf(c) {
 export async function renderList() {
   const main = $('korean-main');
   if (!main) return;
-  const cards = await loadCards();
+  let cards = await loadCards();
   if (ui.read || anySession() || ui.wview) return; // 읽는 사이 글을 골랐다 · 🔤 낱말·🧩 퍼즐 판을 시작했다 · 📬 답장 화면
   main.textContent = '';
   if (!cards || !cards.length) {
@@ -248,11 +312,12 @@ export async function renderList() {
     if (ui.loadErr) box.appendChild(el('p', 'kor-small', ui.loadErr));
     const again = el('button', 'btn btn-primary', '다시 불러오기');
     again.type = 'button';
-    again.addEventListener('click', () => { ui.all = null; ui.cards = null; renderList(); });
+    again.addEventListener('click', () => { ui.pub = null; ui.all = null; ui.cards = null; renderList(); });
     box.appendChild(again);
     main.appendChild(box);
     return;
   }
+  if (ui.tab === 'news' && !splitNews(cards).news.length) ui.tab = 'cards'; // 📰 기사가 없어졌다 — 📚 도감으로 (v428)
   main.appendChild(tabBarEl());
   if (ui.tab === 'words' || ui.tab === 'units' || ui.tab === 'puzzle') {
     const body = el('div', 'kor-tabbody');
@@ -261,6 +326,13 @@ export async function renderList() {
     else await (ui.tab === 'words' ? tabs.renderWordsTab(body, tabCtx) : tabs.renderUnitsTab(body, tabCtx));
     return;
   }
+  if (ui.tab === 'news') {
+    const body = el('div', 'kor-tabbody');
+    main.appendChild(body);
+    renderNewsTab(body, tabCtx); // 📰 신문 기사만 (v428 newsview)
+    return;
+  }
+  cards = splitNews(cards).pub; // 📚 도감은 공개 원고 글만 — 📰 신문 기사는 📰 탭에 · 🌱·📦 줄도 공개 글로만 센다 (v428)
   const done = korDoneMap();
   const now = Date.now();
   const total = cards.length;
@@ -273,8 +345,8 @@ export async function renderList() {
   const fresh = freshEl(cards); // 🌱 오늘 새로 열린 글 바로가기 (Codex 126차 #6)
   if (fresh) head.appendChild(fresh);
   // 📦 아직 열리지 않은 새 글이 있으면 한 줄 — 몇 편 남았는지 셈 없이 (v320) · 「내일」은 내일 정말 열릴 때만 (Codex 127차 #4)
-  if (ui.all && hasLocked(ui.all, dripState(), todayKey(), readIds())) {
-    const soon = opensTomorrow(ui.all, dripState(), todayKey(), readIds());
+  if (ui.pub && hasLocked(ui.pub, dripState(), todayKey(), readIds())) {
+    const soon = opensTomorrow(ui.pub, dripState(), todayKey(), readIds());
     head.appendChild(el('p', 'kor-drip', soon ? '📦 내일 새 글이 와요' : '📦 새 글이 차례로 열려요'));
   }
   const cb = catchBtnEl(); // 🎯 남은 국어 잡기 기회 — 다 읽은 카드에서 안 던지고 나왔어도 여기서
@@ -332,6 +404,7 @@ function freshEl(cards) {
 function openCard(id) {
   const card = (ui.cards || []).find((c) => c.id === id);
   if (!card) return;
+  if (isNews(card)) ui.tab = 'news'; // 📰 다 읽고 돌아가는 곳 — 「← 신문」·「📰 신문으로」 (v428)
   sfxUnlock();
   // 🔍 이번에 별을 받을 수 있는 읽기 — 근거가 있는 첫 물음은 근거부터 (v273 ★ 전 → v274 ★·★★·★★★ 받는 날). 프로필을 다시 읽는 사이
   //   (앱을 앞으로 가져온 순간)는 받은 별이 비어 보여 잘못 걸 수 있다 → 그때는 걸지 않는다(한 번 빠지는 것은 해가 없다)
@@ -506,13 +579,16 @@ function passageEl(card) {
     box.appendChild(facts);
     return box;
   }
-  const box = el('div', 'kor-passage');
+  const news = isNews(card); // 📰 신문 기사 (v428) — 「글 신코치」 대신 신문 이름·날짜 · 기사 아래 📷·🗂️ 회색 칸
+  const box = el('div', news ? 'kor-passage is-news' : 'kor-passage');
   const top = el('div', 'kor-passage-top');
-  top.appendChild(el('span', 'kor-passage-badge', KINDS.practice));
-  top.appendChild(el('span', 'kor-passage-by', `${card.genre} · 글 신코치`));
+  top.appendChild(el('span', 'kor-passage-badge', news ? NEWS_KIND : KINDS.practice));
+  top.appendChild(el('span', 'kor-passage-by', news ? newsByline(card) || card.genre : `${card.genre} · 글 신코치`));
   box.appendChild(top);
   box.appendChild(el('h3', 'kor-passage-title', `「${card.title}」`));
   box.appendChild(proseEl(card));
+  const deco = news && card.deco ? decoEl(card.deco) : null; // 줄 번호 없음 · data-n 없음 — 🔍 근거 줄에 안 들어간다
+  if (deco) box.appendChild(deco);
   if (card.words) box.appendChild(wordsEl(card));
   if (card.source) box.appendChild(el('p', 'kor-source', `📰 ${card.source}`)); // 바탕 글 (v265 — 신문 기사를 다시 쓴 글)
   return box;
@@ -539,7 +615,7 @@ function renderRead() {
   main.textContent = '';
   const wrap = el('section', 'kor-read');
   const top = el('div', 'kor-read-top');
-  const back = el('button', 'btn kor-back', '← 도감');
+  const back = el('button', 'btn kor-back', isNews(r.card) ? '← 신문' : '← 도감'); // 📰 신문 기사는 📰 탭에서 연다 (v428)
   back.type = 'button';
   back.addEventListener('click', backToList);
   top.appendChild(back);
@@ -794,11 +870,14 @@ function evidenceEl(q, st, unit) {
   const pair = first && !st.evDone ? st.pair : null; // 🔍 두 줄로 좁혔다(v300) — 그 밖의 줄은 흐리게 · 못 누름
   const wait = first ? evWaitLeft(st, waitClock()) : 0; // 🤔 잘못 누른 뒤 잠깐 (v406) — 줄은 그대로 두고(초점이 안 사라지게) 누름만 막는다(evPick)
   if (wait) rows.classList.add('is-wait');
+  if (lineCount(card) > EV_LONG) rows.classList.add('is-long'); // 📰 줄이 많은 글 — 줄 단추를 촘촘히 (v428)
+  const near = evNear(lineCount(card), q, st); // 📰 범위 안내를 줄 테두리로도 (v428 — 줄이 많은 글만 · 범위 밖도 누를 수 있다)
   for (let n = 1; n <= lineCount(card); n++) {
     const hit = st.evDone && q.ev.includes(n);
     const miss = st.evWrong.includes(n);
     const far = !!pair && !pair.includes(n) && !miss;
-    const b = el('button', `kor-ev-row${hit ? ' is-mark' : ''}${miss ? ' is-no' : ''}${far ? ' is-far' : ''}${pair && !far && !miss ? ' is-pair' : ''}`);
+    const close = !!near && n >= near[0] && n <= near[1] && !miss;
+    const b = el('button', `kor-ev-row${hit ? ' is-mark' : ''}${miss ? ' is-no' : ''}${far ? ' is-far' : ''}${pair && !far && !miss ? ' is-pair' : ''}${close ? ' is-near' : ''}`);
     b.type = 'button';
     b.dataset.n = String(n);
     b.disabled = st.evDone || miss || far;
@@ -832,6 +911,29 @@ function evidenceEl(q, st, unit) {
   if (first) { if (msg.textContent) box.insertBefore(msg, rows); } // 할 말이 없으면 빈 줄을 두지 않는다
   else box.appendChild(msg);
   return box;
+}
+
+/** 🔍 줄이 많은 글 (v428 📰 신문 기사는 40줄까지) — 줄 번호가 ⑳을 넘으면 근거 줄 단추를 촘촘히(css .kor-ev-rows.is-long) · 범위 줄 테두리(evNear) */
+export const EV_LONG = 20;
+
+/**
+ * 🔍 범위 테두리 (순수, v428) — 줄이 EV_LONG보다 많은 글에서 답을 고르기 전에 근거를 EV_RANGE_AT번 잘못 눌렀으면 그 범위 [a, b] (evRange · 범위 말과 같은 때) ·
+ *   두 줄로 좁혔거나 · 찾았거나 · 답을 고른 뒤면 null — 답 줄은 알려 주지 않는다 · 범위 밖 줄도 그대로 누를 수 있다
+ */
+export function evNear(n, q, st) {
+  if (!(n > EV_LONG) || !q || !Array.isArray(q.ev) || !st || st.answered || st.evDone || st.pair) return null;
+  if (!Array.isArray(st.evWrong) || st.evWrong.length < EV_RANGE_AT) return null;
+  return evRange(q.ev, n);
+}
+
+/** 🔍 범위·두 줄이 막 생겼을 때 그 줄이 화면 밖이면 가운데로 (v428 — 줄이 많은 글만 · 40줄 목록에서 테두리 줄을 찾아 내려가지 않게) */
+function bringNear() {
+  const t = document.querySelector('#korean-main .kor-ev-rows.is-long .kor-ev-row.is-near, #korean-main .kor-ev-rows.is-long .kor-ev-row.is-pair');
+  if (!t) return;
+  const bar = document.querySelector('#view-korean .topbar');
+  const under = bar ? bar.getBoundingClientRect().bottom : 0;
+  const rc = t.getBoundingClientRect();
+  if (rc.top < under + 4 || rc.bottom > window.innerHeight - 8) t.scrollIntoView({ block: 'center' });
 }
 
 /** 🔍 두 줄로 좁힌 뒤의 말 (순수, v300) — 둘 다 남았으면 두 줄을 읽고 고르게 · 하나를 잘못 눌렀으면 남은 줄 ·
@@ -887,6 +989,8 @@ function evPick(n) {
   const st = r.qs[r.qi];
   if (!(st.answered || evFirstNow(q, st)) || !q.ev || st.evDone || st.evWrong.includes(n)) return; // 맞힌 뒤 · 🔍 근거 먼저
   if (evWaitLeft(st, waitClock()) > 0) return; // 🤔 잘못 누른 뒤 잠깐 — 줄을 차례로 눌러 찾지 않게 (v406 · 답을 고르기 전만)
+  const zoneOf = () => (st.pair ? 'pair' : evNear(lineCount(r.card), q, st) ? 'near' : ''); // 📰 테두리 — 두 줄 · 범위 · 없음 (v428)
+  const zoned = zoneOf(); // 이미 있던 테두리 — 이번에 새로 생기거나 범위가 두 줄로 바뀌면 그 줄로
   let reopen = false;
   if (q.ev.includes(n)) {
     if (!st.answered) { st.wrongAtEv = st.wrong.length; if (st.gate) st.evAt = r.sec; } // 찾을 때까지 틀린 수(그 뒤 새로 틀리면 힌트, Codex 82차 #1) · 🔍 근거부터 물음은 찾은 때(📤 찾기까지 초, v273)
@@ -907,6 +1011,7 @@ function evPick(n) {
   r.focus = 'answer';
   renderQ();
   if (reopen) bringQ(); // 근거 상자가 사라져 화면이 짧아진다 — 다시 열린 보기를 데려온다(세로 화면에서 긴 줄 목록 아래였다)
+  else if (zoneOf() && zoneOf() !== zoned) bringNear(); // 📰 줄이 많은 글 — 범위·두 줄이 막 생겼고(범위 → 두 줄도) 그 줄이 화면 밖이면 (v428)
   if (st.sayOn) sayEvidence(r, r.qi, true);
 }
 
@@ -1060,6 +1165,8 @@ function finishEl() {
   if (r.saving || !r.result) { box.appendChild(el('p', 'kor-done-title', '저장하는 중…')); return box; }
   const res = r.result;
   const t = finishText(res, !!r.ls);
+  const news = isNews(r.card); // 📰 신문 기사 (v428) — 📚 도감이 아니라 📰 칸에 모인다
+  if (news && res.ok && res.star === 1) t.title = '📰 기사 카드 등록!';
   const stars = res.ok ? res.stars : starsOf(korDoneMap(), r.card.id);
   box.classList.toggle('is-star', !!(res.ok && res.star));
   box.appendChild(el('p', 'kor-done-icon', r.card.icon));
@@ -1084,7 +1191,7 @@ function finishEl() {
     again.addEventListener('click', () => { r.result = null; finishCard(); });
     row.appendChild(again);
   }
-  const list = el('button', `btn${res.ok ? ' btn-primary' : ''}`, '📚 도감으로');
+  const list = el('button', `btn${res.ok ? ' btn-primary' : ''}`, news ? '📰 신문으로' : '📚 도감으로');
   list.type = 'button';
   list.addEventListener('click', backToList);
   row.appendChild(list);
@@ -1138,13 +1245,14 @@ function onePuzzleEl(r, one) {
 /**
  * 🖊️ 이 글로 생각해 보기 (v316 📖 독서 논술 · v353부터 기사문·토의 글도 있어 「이야기로」에서 바꿈) — 그 글로 만든 논술 주제가 있고 아직 ⭐가 아니면 단추 하나(셈 문구 없음) ·
  * 원고는 논술 화면 쪽이 받는다(그동안은 빈 자리 — 받으면 그 자리에 단추) · 누르면 그 주제 판을 준비하고 논술 화면으로(⏳ 국어 시간 안)
+ * 📰 신문 기사(v428)도 같은 길 — 신문 주제는 논술 화면 쪽(readingTopicFor·openTopic)이 news.js에서 찾는다 · 단추 글만 「이 기사로」
  */
 function storyNonsulEl(cardId) {
   const slot = el('div', 'kor-ns-link');
   import('./nonsulview.js').then((ns) => ns.readingTopicFor(cardId).then((t) => {
     if (!t || !slot.isConnected || !ui.showView) return;
     slot.appendChild(el('p', 'kor-ns-q', `${t.icon} ${t.q}`));
-    const b = el('button', 'btn btn-primary kor-ns-btn', '🖊️ 이 글로 생각해 보기');
+    const b = el('button', 'btn btn-primary kor-ns-btn', isNewsId(cardId) ? '🖊️ 이 기사로 생각해 보기' : '🖊️ 이 글로 생각해 보기');
     b.type = 'button';
     b.addEventListener('click', () => guardStart('korean', () => { if (ns.openTopic(t.id)) ui.showView('nonsul'); }));
     slot.appendChild(b);
@@ -1310,7 +1418,7 @@ function tickRead() {
   const st = r.qs[r.qi];
   if (st && evFirstNow(q, st) && pairDue(st, r.sec)) {
     const p = evPair(q.ev, lineCount(r.card), st.evWrong, st.pairSide);
-    if (p) { st.pair = p; renderQ(); }
+    if (p) { st.pair = p; renderQ(); bringNear(); } // 📰 줄이 많은 글은 두 줄이 화면 밖이면 데려온다 (v428 — 짧은 글은 bringNear가 안 움직인다)
   }
 }
 
