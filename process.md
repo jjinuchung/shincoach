@@ -10153,7 +10153,7 @@
 - 11-15 아침 PC 쓸 수 있는 메모리 0.4 GB(프로세스 합은 7 GB · 커널 쪽 6 GB · 나머지는 안 보임) → 재부팅으로 22 GB
 
 ### TODO (다음 작업)
-- [ ] 라이브 v427 확인(`.context/v427/live_check427.sh`)
+- [x] 라이브 v427 확인(11-15 · 374c873 feat · 3708632 docs · 전체 3892 · `.context/v427/live_check427.sh` → sw v427 · 배포본 4개 같음 · Pages built 3708632)
 - [ ] 태블릿: 영상 세 파일 옮겨 영어 가져오기 · 「지금 바꾸기」로 v427
 
 ## 2026-11-15 — 📰 신문 2~3단계: 원문 옮기기 · 문제 만들기 (아버님 「모든 기사로」)
@@ -10169,4 +10169,29 @@
 - 기사 글·제목은 공개 저장소·시험·커밋 메시지에 넣지 않음(시험은 지어낸 기사로)
 
 ### TODO (다음 작업)
-- [ ] v428 구현 → Codex → 변이 → 걷기 → 전체 → 「배포」 · 비공개 news/ 올리기
+- [x] v428 구현(아래 v428 절) → Codex 230차 → 변이 → 걷기 → 전체
+- [x] 「배포」(11-15) · 비공개 news/ 올리기
+
+## 2026-11-15 — 📰 v428 신문 칸 (국어·논술 안 · 아버님 「추천대로」 · ultracode 워크플로)
+
+### 진행 내용
+- 설계서 `.context/v428/spec.md`(칸마다 주인 파일) → 워크플로: 🧱 바탕 → 📚 국어 · 🖊️ 논술 · 📤 보고·검사·자료 동시 → 칸마다 새 눈 검토(에이전트 7)
+- 🧱 `js/korean.js` CIRC ㊿까지 · `checkCard(c, ids, {news})`·`checkNewsCard`·`validNewsCards` · 공개 원고는 kind news·K701~K999 막음 / `js/nonsul.js` `checkNewsTopic`·공개 N701~N999 막음 / `js/kordrip.js` `NEWS_ORDER`(104) + 묶음 `bnews`(after 없음 — b411b와 따로 하루 2) / `js/db.js` blobs 'news:list' / 새 `js/news.js`(news/n1~n4.json · 파일마다 따로 · 10분 · newsOf·newsFilesOf·loadNews·syncNews) / upload READ_NAMES '📰 신문 1~4'
+- 📚 `js/koreanview.js` ui.pub + 신문 = ui.all · 「📰 신문」 탭은 신문 카드 있을 때만 · 📚 도감·🌱·📦은 공개 글만 · 바이라인 신문 이름 · 기사 아래 회색 칸(deco — 번호 없음) · 40줄 근거 목록(촘촘 · 범위 테두리 · 화면 옮김) · 끝 「📰 기사 카드 등록!」·「🖊️ 이 기사로 생각해 보기」 / 새 `js/newsview.js`(📰 탭)
+- 🖊️ `js/nonsul.js` 신문 주제 하루 2(NEWS_TOPICS_PER_DAY) · 생활 4와 따로 세기 · 💰·🎯 판 몫은 id로 `nonsulNewsDay`·`nonsulNewsBall` · `js/nonsulview.js` 첫 화면 「📰 신문 논술」 · 신문 판엔 ✍️·💡 없음 · db·xp 빈 꼴·복사·병합 · 낚시터·여행 「논술 한 날」은 둘 다
+- 📤 `js/korreport.js` 국어 요약 「📰 신문 기사」 절 · 논술 절 신문 줄 · `tools/check.mjs` 공개 저장소 news/ 막음 · `tools/privcheck.mjs` 신문 파일 검사 · `.context/news1114/make_upload.mjs` → `upload/news/n1~n4.json`(26편씩 · 약 340 KB · 출처 줄 검수 메모는 cleanSource로 지움)
+- 검토 뒤 손봄: korlisten ㉑~㊿ 읽기 · 낱말 풀이 「[제목]」 떼기 · 신문 논술 칸 「내일 또」(newsQuotaFull) · 범위 테두리 진한 금빛
+- Codex 230차(P1 없음 · P2 셋 · P3 하나) 모두 고침: 논술 판 도중 원고가 바뀌어 주제가 빠져도 그 판은 저장(topicIds(r) · 기사 글 쥐고 감) · 두 창 — 받기마다 기기 사본을 다시 읽고 쓴 때가 다르면 바꿈(Codex 231차: 표시 시각은 시계·저장 차례에 따라 거꾸로 갈 수 있어 「더 새로운가」 대신 「다른가」) · 저장이 돌려준 합친 기록 · 묶음마다 처음 받은 날(dripFirstPlan) · check.mjs git 목록 실패 = 실패
+- Codex 231차: 넷 중 셋 확인 · 손본 다섯 이상 없음 · 두 창 P2 하나 더 → 위처럼 고침 · 232차: 같은 밀리초 두 저장 → `putNewsCache` at = max(지금, 옛 at + 1)(시계를 멈춘 시험) · 「고친 뒤 배포 권고」
+- 변이 `.context/v428/mutate_v428.mjs` 33/33(두 창·at 변이 넷 더해 모두 잡음) · 진짜 Chrome 걷기 `.context/v428/walk428.sh`(hh428.js가 upload 자료를 blobs에 넣음) 1334×800·800×1280 · 전체 3946 통과
+
+### 결정사항 / 메모
+- 기사 글·제목은 공개 저장소에 없음 — 시험은 지어낸 기사 · Codex가 원문 2,364조각을 공개 파일 536개와 대조해 0건
+- 신문 카드 id·물음 차례는 원고를 고쳐도 바꾸지 않는다(별·진도 기록이 id로 이어짐) · 기사를 더하면 NEWS_ORDER도 함께 늘린다
+- 원고(qs)의 출처 줄 검수 메모는 아버님 검수용으로 남기고, 올리는 파일에서만 지운다
+
+### TODO (다음 작업)
+- [x] 아버님 「배포」(11-15) → feat → docs → `npm test && git push` · 비공개 `add_private.sh news/n1~n4.json`
+- [ ] 라이브 v428 확인(`.context/v428/live_check428.sh`)
+- [ ] 태블릿: 「지금 바꾸기」로 v428 → 국어에 들어가면 기사를 받아 옴(10분에 한 번) → 📰 탭 · 다음 「올라온 거 봐 줘」에 📥 「📰 신문 1~4」 줄 · 📤 「📰 신문 기사」 절
+- [ ] □ 네 기사(04-1·38-1·41-1·53-2) 다시 찍기 → 원고 고쳐 make_upload → 비공개만 다시 올림(배포 없이)
