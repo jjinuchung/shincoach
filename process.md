@@ -10192,6 +10192,30 @@
 
 ### TODO (다음 작업)
 - [x] 아버님 「배포」(11-15) → feat → docs → `npm test && git push` · 비공개 `add_private.sh news/n1~n4.json`
-- [ ] 라이브 v428 확인(`.context/v428/live_check428.sh`)
+- [x] 라이브 v428 확인(11-15 · f30b698 feat · a8f3791 docs · 전체 3946(한 번은 PC가 바빠 🎹 시간 재는 시험 하나가 흔들림 — 따로 세 번 통과 · 다시 전체 통과 뒤 push) · 비공개 news/n1~n4 add_private(다시 받아 같음 · 앱 방식으로 104편·67주제·bad 0) · `.context/v428/live_check428.sh` → sw v428 · 배포본 8개 같음 · Pages built a8f3791)
 - [ ] 태블릿: 「지금 바꾸기」로 v428 → 국어에 들어가면 기사를 받아 옴(10분에 한 번) → 📰 탭 · 다음 「올라온 거 봐 줘」에 📥 「📰 신문 1~4」 줄 · 📤 「📰 신문 기사」 절
 - [ ] □ 네 기사(04-1·38-1·41-1·53-2) 다시 찍기 → 원고 고쳐 make_upload → 비공개만 다시 올림(배포 없이)
+
+## 2026-11-15~16 — 🎹 v429 음악 포켓몬 → 몬스터볼 잡기 (아버님 「추천대로」 · ultracode 워크플로)
+
+### 진행 내용
+- 설계서 `.context/v429/spec.md` → 워크플로 구현: 📖 책 곡 하루 열 번 · 🎧 ♪ 다섯 칸마다 「그냥 오던」 음악 포켓몬을 다른 과목과 같은 잡기 화면으로(가방의 볼 · 한 번 던지기 · 못 잡으면 그 기회 끝)
+- `js/piano.js` 기회 장부 `profile.piano.ball { earned, used, refunded }`(늘기만 · 병합 max · refunded ≤ used) · musicTakeRule·musicGiveBackRule·musicJudgedRule·musicThrowsLeft·pickMusicCands · 밀린 몫(monsDueRule)은 새 판 첫 진입에 기회로 · 하루 칸 pnBall·pnCaught·pnFled · 기록 줄 'b'(기회 생김)·'j'(🎯 잡음·놓침 — 포켓몬)
+- `js/xp.js` pianoTakeThrow·pianoGiveBackThrow·pianoThrowsLeft·pianoJudged / `js/pianoview.js` runMusicCatch(국어 runKorCatch 차례: 멈춤 → settleLost → 한 번에 하나 → 후보 → 띄우기 전 빼기(못 빼면 안 띄움) → 장부 줄 throwhold 'shincoach.music.throwHolds' → openCatch → 안 던지면 돌려주기) · 곡 목록·무대 「🎯 음악 포켓몬 잡기」 단추(숫자 없음) / `js/catch.js` subject 'music' 문구 / home·shop·upload 읽는 법
+- 검토 뒤 손봄(Codex 233차 P2-4·P3-5·P3-6 · 새 눈 검토 확인분): 그림 받기 하나로 묶기(artJob — 둘째 잡기는 도는 받기를 같이 기다림) · 받는 차례 = 안 만난 아이 먼저·등급 무게(`downloadCharacters` 넷째 인자 order) · 8초를 넘기면 그 사이 저장된 그림까지 다시 읽기 · 「돌려줘요」 한 줄은 이 창 장부 줄이 없을 때만 지움 · ▶는 잡기를 부르는 중엔 시작 안 함(먼저 settleLost) · 잡기 창 밑 PC 자판 막음 · 📤 장부 줄 「받음 · 씀(뺌 · 돌려줌) · 남음」 · 책 곡 칸 받은 날 ✅ · 던진 결과 'j' 줄
+- Codex 234차(P1 없음 · P2 하나 · P3 둘) 모두 고침: 끝나지 않는 그림 요청이 받기를 영영 막음 → `js/pokemon.js` ART_FETCH_MS 한 장 20초(AbortController · 국어·수학·논술 자동 받기에도) · 빈틈 ⓝ · ⓘ 여유 6초
+- 변이: 첫 검사 75/86 → 빈틈 시험 ⓐ~ⓜ로 살아남은 열하나 모두 잡음 · 검토 뒤 고침 36/40(살아남은 ㉥·㉬ → 빈틈 ⓢ·ⓤ·xp 직접 시험으로 잡음 확인 · 나머지 둘은 동등) · 빈틈 ⓞ~ⓤ(소스 정규식으로만 잡히던 변이를 동작으로) · ⓝ 흔들림(잡기 창이 받으러 가는 도트 .gif까지 매달림) 고침
+- 마지막 새 눈 검토(두 갈래 → 반박 확인): 📤 읽는 법 「다음은 내일」을 몫마다 바로 씀(책 곡은 내일 · ♪는 다섯 칸 새로 · 같은 날 다른 몫·남은 기회면 그날 또) · 후보 범위(그림 있는 것 가운데 · 8초 안에 못 받으면 만난 아이로) · 하루 줄 칸 하나만 있는 날 단언 · 「잡기 창이 손가락 밑에서 떠 공짜 볼로 던져짐」 지적은 반박됨(판 끝 0.6박 + 준비 박 4 · 포인터 붙잡기)
+- 진짜 Chrome 걷기 `.context/v429/walk429.sh`·`walk429b.sh` 1024×600·1280×800 · music429 47개 · 전체 3993 통과
+
+### 결정사항 / 메모
+- 단추·화면에 기회 수 없음(셈 문구 금지) · 기록은 📤 music.md 「🎯 음악 잡기 기회」 줄·하루 줄·기록 줄에만
+- 이미 받은 음악 포켓몬·옛 'p' 줄·pnMons는 그대로(옛 규칙 기록) · 「🎹 책 곡 칸」 ✅는 v428 포켓몬·v429 기회 둘 다
+- 일부러 안 고친 것: throwhold 공통 한계(국어·수학과 같음 — Codex 233차 P2-2·P2-3) · 1024×600에서 무대 실패 줄이 그림판을 조금 밀어냄(멈춘 때만 · 드묾) · 잡기 창 밑 알림(설계) · 깨진 큰 수(v428도 같음)
+- 저장소 판 번호 DB_VERSION 4→5(옛 v428 창이 열려 있으면 새 장부 ball을 지울 수 있음 — 판을 올리면 옛 창은 「새 버전이 열렸어요」로 닫힘 · Codex 234차 「안전」) → 아버님 「넣어」(11-16) · `js/db.js` 한 줄(스토어 변화 없음 · 업그레이드는 없는 스토어만 만듦 — 🗄️ 소스 시험)
+
+### TODO (다음 작업)
+- [x] 아버님 「추천대로 배포」(11-16) → feat → docs → `npm test && git push`
+- [ ] 라이브 v429 확인(라이브 줄은 다음 docs에)
+- [ ] 태블릿 「지금 바꾸기」(v428 → v429) → 다음 「올라온 거 봐 줘」에 📤 🎯 줄(기회 생김 · 잡음·놓침 — 포켓몬)
+- [ ] 다음: 🎬 v430 영어 영상 시험(`.context/v430/spec.md`) · `upload/english/tests/t1~t3.json` 비공개 올리기는 v430 배포 때
