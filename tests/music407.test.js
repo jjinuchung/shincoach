@@ -214,7 +214,7 @@ globalThis.localStorage = {
   removeItem: (k) => { store.delete(k); },
 };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
-store.set('shincoach.musicIntro', '4'); // 🐾 안내 창은 이미 본 것으로 — v423 판은 '4'
+store.set('shincoach.musicIntro', '5'); // 🐾 안내 창은 이미 본 것으로 — v423 판은 '4' · v429 판은 '5'
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 let PV;
 let P;

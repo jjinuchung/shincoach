@@ -206,7 +206,9 @@ test('화면 배선 — 도감 ⏳ 칸(비어도 보임 · 한 줄 안내) · �
   assert.match(shop, /'mon-evo-btn' \+ \(toR < myR \? ' evo-down' : ''\)/, '내려감 표시는 셈 등급으로');
 
   assert.match(src('js/catch.js'), /const r = shownRarity\(c\.id\);[^\n]*\n[\s\S]*?rr\.textContent = `\$\{RARITY\[r\]\.stars\} \$\{RARITY\[r\]\.label\}`;/);
-  assert.match(src('js/pianoview.js'), /const rank = RARITY\[shownRarity\(id\)\] \|\| RARITY\[2\];/);
+  // 🎹 v429 — 음악 포켓몬 「왔어요」 창(이름표 shownRarity)이 없어지고 잡기 화면(위 catch.js 줄 — 보여 주는 등급)으로 · 후보 무게는 셈 등급
+  assert.doesNotMatch(src('js/pianoview.js'), /shownRarity/, '음악 화면에 따로 그리는 등급 이름표가 없다(잡기 화면이 그린다)');
+  assert.match(src('js/pianoview.js'), /pickMusicCands\(pool\.map\(\(c\) => \(\{ id: c\.id, r: rarityOf\(c\.id\) \}\)\), caught, CANDS\)/, '잡기 후보 무게는 셈 등급(⏳로 옮겨도 무게 그대로)');
   assert.match(src('js/math.js'), /const rare = \(c\) => rarityOf\(c\.id\) >= 3;/, '레이더가 고르는 것은 셈 등급');
   assert.match(src('js/math.js'), /const rr = RARITY\[shownRarity\(pick\.id\)\];/);
   assert.match(src('js/battle.js'), /RARITY\[shownRarity\(o\.opponent\.id\)\]\.stars/);

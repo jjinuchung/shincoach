@@ -14,8 +14,6 @@ void fakeIdb;
 const src = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const REQ = { song: 'ode', line: -1, hand: 'R', lv: 1, sp: 1 };
 const NOW = new Date('2026-11-11T18:00:00').getTime();
-const POOL = [{ id: 433, r: 1 }, { id: 358, r: 2 }, { id: 1024, r: 4 }];
-const rng0 = () => 0;
 
 // ───────────────────── 📤 (순수) ─────────────────────
 
@@ -36,11 +34,11 @@ test('📤 하루 줄 — 🔇 소리 멎음 · 🐢 느린 장면 · ✋ 누름
 
 test('🔇 기록 줄 — 그 판의 가장 긴 소리 멎음(0.5초 넘은 것만 · 상한) · 🎧 줄엔 없음 · 복사·병합 · music.md 읽는 법·줄 끝', () => {
   const p = {};
-  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 85, st: 3210, mu: 1840 }, NOW, POOL, rng0);
-  tapRule(p, { ...REQ, ok: 9, bad: 1, mu: 499 }, NOW, POOL, rng0);
-  tapRule(p, { ...REQ, ok: 9, bad: 1, mu: 9e9 }, NOW, POOL, rng0);
-  tapRule(p, { ...REQ, ok: 9, bad: 1, mu: 'x' }, NOW, POOL, rng0);
-  tapRule(p, { ...REQ, ok: 9, bad: 1 }, NOW, POOL, rng0);
+  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 85, st: 3210, mu: 1840 }, NOW);
+  tapRule(p, { ...REQ, ok: 9, bad: 1, mu: 499 }, NOW);
+  tapRule(p, { ...REQ, ok: 9, bad: 1, mu: 9e9 }, NOW);
+  tapRule(p, { ...REQ, ok: 9, bad: 1, mu: 'x' }, NOW);
+  tapRule(p, { ...REQ, ok: 9, bad: 1 }, NOW);
   const rows = pianoOf(p.piano).log.filter((r) => r.m === 't');
   assert.deepEqual(rows.map((r) => r.mu), [1840, undefined, 600000, undefined, undefined]);
   assert.deepEqual(rows.map((r) => 'mu' in r), [true, false, true, false, false], '없으면 칸도 없다(옛 줄 꼴)');
@@ -144,7 +142,7 @@ globalThis.localStorage = {
   removeItem: (k) => { store.delete(k); },
 };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
-store.set('shincoach.musicIntro', '4');
+store.set('shincoach.musicIntro', '5'); // v429 판
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(cond, what, ms = 4000) {
   const t0 = Date.now();

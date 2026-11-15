@@ -11,6 +11,10 @@
 //      🎹 건반 한 칸 · 열 칸(TAPS_PER_MON)마다 음악 포켓몬 — ♪ 칸과 따로 센다(taps · tapMons) · v420부터 한 곡을 하루에 열 번 연달아(날 칸 run · won) ·
 //      v423부터 📖 진우 책 곡(아빠가 넣은 곡)만 하루에 열 번 — 곡을 섞어도 이어 센다(날 칸 book · won · 🎼 연습곡은 💰만) ·
 //      끝날 때 박자 판정(beatScore — 음표마다 제때 눌렀나 × 맞게 누른 비율) → 🎉 빵빠레 · 👏 짝짝 · 🎺 뿌우~ (진우 바람 · 보상과는 상관없음)
+//   (v429 11-15 아버님 「추천대로」) 📖 책 곡 하루 열 번 · 🎧 ♪ 다섯 칸 = 음악 포켓몬이 그냥 오던 것을 **잡기 기회 하나**로(giveChances) —
+//      다른 과목과 같은 잡기 화면(catch.js · 가방의 볼 · 한 번 던지기 · 못 잡으면 그 기회 끝) · 하루 한 기회(책 곡 day.won 그대로) ·
+//      장부는 profile.piano.ball { earned, used, refunded }(korean.throwsOf 꼴 · 늘기만) · 띄우기 전에 빼고(musicTakeRule) 안 던지면 돌려준다(musicGiveBackRule) ·
+//      이미 받은 음악 포켓몬(p.caught)·옛 'p' 기록 줄·📤 pnMons 칸은 옛 규칙 기록으로 그대로
 // 도움은 잠그지 않는다 — 네 단계(1 막대 · 2 계이름 · 3 건반 빛 · 4 악보만)를 처음부터 고르고, 끝나면 한 단계 걷기를 권하기만.
 // ⏳ 하루 40분은 음악만 따로(timelimit.js 'music') — 🎮 게임기 판을 세는 공부 시간(timelimit.SUBJECTS)에는 넣지 않는다.
 //
@@ -34,22 +38,23 @@ export const TAP_DAY = 5;
 const PAID_KEEP = 99;
 /** 🎧 「다 쳤어요」 음표 칸 — 하루 셈 */
 export const LISTEN_DAY = 3;
-/** 음표 칸 다섯마다 음악 포켓몬 (v404) */
+/** 음표 칸 다섯마다 음악 포켓몬 (v404) — v429부터 🎯 잡기 기회 하나 */
 export const NOTES_PER_MON = 5;
 /**
  * 🎹 건반 칸 — 📖 진우 책 곡의 「곡 전체」를 하루에 이만큼 잘 치면 음악 포켓몬 한 마리 (v413 아버님 「곡을 10번 완주하면」 →
  * v420 11-12 아버님 「하루에 한 곡을 연달아서 10번을 완주해서 치지 않으면 포켓몬을 주지 않는 걸로」 →
  * v423 11-13 아버님 「한 곡을 연속 10번은 좀 너무 했다 · 다른 곡들도 완주를 해서 10번이 되면 · 너가 넣은 교향곡은 제외하고 내가 넣은 곡들로만」 기본안 「추천대로」) ·
  * 곡을 섞어도·같은 곡을 다시 쳐도 이어 센다 · 🎼 연습곡(공개 곡)은 💰만 · 못 친 판·한 줄 연습은 안 셈 · 자정이면 처음부터 · 하루 한 마리
+ * (v429부터 하루 한 번 🎯 잡기 기회 — 못 잡으면 내일 다시 열 번)
  */
 export const TAPS_PER_MON = 10;
 const SONG_RE = /^[a-z0-9_-]{1,40}$/i;
 /** 그날 🎹 건반 칸을 읽을 때의 상한 — 하루 몫으로 자르지 않는다: PAID_KEEP과 같은 까닭 (Codex 217차 P2) */
 const TAPS_KEEP = 99;
-/** 🎹 음악 포켓몬 한 마리마다의 무게 — 흔함 4 · 보통 3 · 희귀 2 · 전설 1 (v404 기본안 ② · 흔한 아이가 자주, 전설은 대개 뒤쪽에) */
+/** 🎹 음악 포켓몬 한 마리마다의 무게 — 흔함 4 · 보통 3 · 희귀 2 · 전설 1 (v404 기본안 ② · 흔한 아이가 자주, 전설은 대개 뒤쪽에) · v429부터 잡기 후보 고르기(pickMusicCands) */
 export const MON_WEIGHT = { 1: 4, 2: 3, 3: 2, 4: 1 };
-/** 한 번에 줄 음악 포켓몬 상한 (밀린 몫이 많아도 창이 끝없이 이어지지 않게 — 나머지는 다음 「다 쳤어요」·다음 들어올 때) */
-export const MONS_AT_ONCE = 5;
+/** 🎯 잡기 화면 후보 수 (v429 — 다른 과목 잡기와 같이 넷) */
+export const CANDS = 4;
 /** 도움 단계 */
 export const LEVELS = [1, 2, 3, 4];
 /** 빠르기 막대 — 원래 빠르기의 몇 배 (아버님: 단추 대신 밀어서) */
@@ -63,10 +68,12 @@ export const MAX_BARS = 200;
  *  🎹 자유롭게 치기(v408) 연 번 · 누른 건반 · 친 초(쉰 틈은 10초까지만) ·
  *  (v413) 🎹 건반 칸을 센 판 · 박자 판정 🎉·👏·🎺 판 수 · 연주 중 화면이 STALL.ms 넘게 멈칫한 번 · 그 가운데 STALL.long 넘은 번 ·
  *  (v414) 연주 중 소리 멎음 번 · 그 가운데 MUTE.long 넘은 번 · 소리 장치가 꺼져 있던 번 · 느린 장면 번 · 그 시간 합(ms) · 건반 누름이 끊긴 번 ·
- *  (v417) 🎧 「다 쳤어요」를 누른 번(어른 확인 전 — 확인 뒤 저장된 번은 pnListenN) · 그 확인 창에서 비밀번호가 틀린 번 */
+ *  (v417) 🎧 「다 쳤어요」를 누른 번(어른 확인 전 — 확인 뒤 저장된 번은 pnListenN) · 그 확인 창에서 비밀번호가 틀린 번 ·
+ *  (v429) 🎯 생긴 잡기 기회 · 던져서 잡은 번 · 놓친 번 (pnMons는 v428까지 그냥 온 음악 포켓몬 — 옛 날 줄) */
 export const PIANO_DAILY = ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec',
   'pnTapSlots', 'pnFan', 'pnClap', 'pnBoo', 'pnStallN', 'pnStallLong',
-  'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN', 'pnListenAsk', 'pnPinBad'];
+  'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN', 'pnListenAsk', 'pnPinBad',
+  'pnBall', 'pnCaught', 'pnFled'];
 /** 🎺 박자 판정 등급 → 하루 칸 (v413) */
 export const GRADE_DAILY = { great: 'pnFan', good: 'pnClap', boo: 'pnBoo' };
 /** 연주 중 화면 멈칫 (v413 — 「멈췄다가 3~4초 뒤 풀린다」가 태블릿이 버거워 멈춘 것인지 가르려고) · ms 이상이면 셈 · long 이상은 따로 */
@@ -533,8 +540,9 @@ const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 function logRow(r) {
   if (!isObj(r)) return null;
   const at = Number(r.at);
-  if (!(at > 0) || !['t', 'l', 'p'].includes(r.m)) return null;
-  if (r.m === 'p' && !/^\d{1,4}$/.test(String(r.s))) return null; // 🎹 음악 포켓몬이 온 줄(v404) — s는 포켓몬 번호
+  if (!(at > 0) || !['t', 'l', 'p', 'b', 'j'].includes(r.m)) return null;
+  if ((r.m === 'p' || r.m === 'j') && !/^\d{1,4}$/.test(String(r.s))) return null; // 🎹 음악 포켓몬이 온 줄(v404~v428 옛 규칙) · 🎯 던져서 판정이 난 줄(v429 · x 1 잡음 · 0 놓침) — s는 포켓몬 번호
+  if (r.m === 'b' && !(['n', 't'].includes(r.s) && nz(r.c) >= 1)) return null; // 🎯 잡기 기회가 생긴 줄(v429) — s 'n' ♪ 다섯 칸 · 't' 책 곡 열 번 · c 그때 생긴 수
   return {
     at, m: r.m, s: String(r.s || '').slice(0, 40), n: Number.isInteger(r.n) && r.n >= -1 && r.n < MAX_BARS ? r.n : -1,
     h: ['R', 'L', 'B'].includes(r.h) ? r.h : 'B', lv: LEVELS.includes(r.lv) ? r.lv : 1,
@@ -548,11 +556,33 @@ function logRow(r) {
   };
 }
 
+// ───────────────────── 🎯 음악 포켓몬 잡기 기회 (v429) ─────────────────────
+// 📖 책 곡 하루 열 번 · 🎧 ♪ 다섯 칸마다 기회 하나(giveChances). korean.throwsOf와 같은 꼴 — 늘어나기만 하는 세 카운터
+// { earned 받은 수, used 뺀 수, refunded 돌려준 수 } · 남은 기회 = earned − used + refunded · 돌려준 수는 뺀 수를 넘지 않는다
+// 잡기 화면을 띄우기 **전에** 하나 빼고(musicTakeRule), 한 번도 안 던지고 닫으면 돌려준다(musicGiveBackRule) — 병합은 카운터마다 max
+// ★ 이 파일은 import를 하지 않으니 korean.js의 셈을 가져오지 않고 몇 줄을 여기 둔다
+
+const cnt = (v) => { const n = Math.floor(Number(v)); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
+/** 잡기 기회 장부 고쳐 읽기 (순수) — 새 객체 { earned, used, refunded } */
+export function ballOf(t) {
+  const x = isObj(t) ? t : {};
+  const used = cnt(x.used);
+  return { earned: cnt(x.earned), used, refunded: Math.min(cnt(x.refunded), used) };
+}
+/** 남은 잡기 기회 (순수) */
+export function ballLeft(t) {
+  const x = ballOf(t);
+  return Math.max(0, x.earned - x.used + x.refunded);
+}
+/** 장부에 셈이 하나라도 있나 — 없으면 profile.piano에 칸을 두지 않는다(옛 기록 꼴 그대로) */
+const hasBall = (b) => b.earned > 0 || b.used > 0 || b.refunded > 0;
+
 /**
- * profile.piano 고쳐 읽기 (순수) → { days:{날:{paid, coins, notes, taps?}}, notes, mons, taps, tapMons, log:[…] }
+ * profile.piano 고쳐 읽기 (순수) → { days:{날:{paid, coins, notes, taps?}}, notes, mons, taps, tapMons, log:[…], ball? }
  * days는 빈 날을 빼고 늦은 날 KEEP_DAYS개 · notes(모든 음표 칸)는 날 칸 합보다 작을 수 없다 ·
- * mons(받은 음악 포켓몬 수 · v404)는 다섯 칸 묶음 수보다 클 수 없다 — 묶음 수 − mons = 아직 안 온 몫
- * (v413) taps = 모든 🎹 건반 칸 · tapMons = 건반 칸 열 묶음으로 받은 음악 포켓몬 수 — ♪ 칸과 같은 꼴로 따로 · 날 칸 taps는 있을 때만(옛 날 칸 꼴 그대로)
+ * mons(몫을 받은 다섯 칸 묶음 수 · v404~v428은 음악 포켓몬 · v429부터 잡기 기회)는 다섯 칸 묶음 수보다 클 수 없다 — 묶음 수 − mons = 아직 안 받은 몫
+ * (v413) taps = 모든 🎹 건반 칸 · tapMons = 건반 칸 열 묶음으로 몫을 받은 수 — ♪ 칸과 같은 꼴로 따로 · 날 칸 taps는 있을 때만(옛 날 칸 꼴 그대로)
+ * (v429) ball = 🎯 잡기 기회 장부(ballOf) — 셈이 있을 때만
  */
 export function pianoOf(raw) {
   const src = isObj(raw) ? raw : {};
@@ -571,7 +601,8 @@ export function pianoOf(raw) {
   const log = (Array.isArray(src.log) ? src.log : []).map(logRow).filter(Boolean).sort((a, b) => a.at - b.at).slice(-LOG_MAX);
   const notes = Math.max(nz(src.notes), dayNotes);
   const taps = Math.max(nz(src.taps), kept.reduce((a, [, e]) => a + nz(e.taps), 0));
-  return { days, notes, mons: Math.min(nz(src.mons), Math.floor(notes / NOTES_PER_MON)), taps, tapMons: Math.min(nz(src.tapMons), Math.floor(taps / TAPS_PER_MON)), log };
+  const ball = ballOf(src.ball);
+  return { days, notes, mons: Math.min(nz(src.mons), Math.floor(notes / NOTES_PER_MON)), taps, tapMons: Math.min(nz(src.tapMons), Math.floor(taps / TAPS_PER_MON)), log, ...(hasBall(ball) ? { ball } : {}) };
 }
 
 /**
@@ -612,12 +643,13 @@ const moreBook = (a, b) => (!a ? b || null : !b ? a : b.n > a.n ? b : a);
 /** 깊은 복사 (xp·db fromStored) */
 export function copyPiano(raw) {
   const p = pianoOf(raw);
-  return { days: Object.fromEntries(Object.entries(p.days).map(([k, e]) => [k, { ...e }])), notes: p.notes, mons: p.mons, taps: p.taps, tapMons: p.tapMons, log: p.log.map((r) => ({ ...r })) }; // run·book은 pianoOf가 새로 만든다(runOf·bookOf)
+  return { days: Object.fromEntries(Object.entries(p.days).map(([k, e]) => [k, { ...e }])), notes: p.notes, mons: p.mons, taps: p.taps, tapMons: p.tapMons, log: p.log.map((r) => ({ ...r })), ...(p.ball ? { ball: { ...p.ball } } : {}) }; // run·book·ball은 pianoOf가 새로 만든다(runOf·bookOf·ballOf)
 }
 
 /**
  * 백업 병합 (순수) — 날마다 칸은 큰 쪽(옛 백업으로 그날 한도를 다시 열지 못하게) · 모든 음표 칸·받은 음악 포켓몬 수는 큰 쪽(줄지 않는다 —
  * 옛 백업으로 받은 수가 줄면 같은 묶음 몫이 한 번 더 왔다) · 🎹 건반 칸·그것으로 받은 수(v413)도 같은 꼴 ·
+ * 🎯 잡기 기회 장부(v429)는 카운터마다 큰 쪽(쓴 기회를 옛 백업이 되살리지 못하게 · 돌려준 수는 뺀 수를 넘지 않는다) ·
  * 연습 기록은 합집합(같은 때·같은 방법·같은 곡은 한 줄) · 둘 다 없으면 null
  */
 export function mergePiano(a, b) {
@@ -634,12 +666,15 @@ export function mergePiano(a, b) {
   }
   const seen = new Map();
   for (const r of [...x.log, ...y.log]) seen.set(`${r.at}:${r.m}:${r.s}`, r);
-  return pianoOf({ days, notes: Math.max(x.notes, y.notes), mons: Math.max(x.mons, y.mons), taps: Math.max(x.taps, y.taps), tapMons: Math.max(x.tapMons, y.tapMons), log: [...seen.values()] });
+  const bx = ballOf(x.ball);
+  const by = ballOf(y.ball);
+  const ball = { earned: Math.max(bx.earned, by.earned), used: Math.max(bx.used, by.used), refunded: Math.max(bx.refunded, by.refunded) };
+  return pianoOf({ days, notes: Math.max(x.notes, y.notes), mons: Math.max(x.mons, y.mons), taps: Math.max(x.taps, y.taps), tapMons: Math.max(x.tapMons, y.tapMons), log: [...seen.values()], ball });
 }
 
 /**
  * 음표 칸 — 지금 찬 칸(0~5) · 지금까지 찬 묶음 수 (순수)
- * mons(받은 음악 포켓몬 수 · v404)를 주면: 아직 안 온 몫이 있을 때만 가득(5) · 온 뒤엔 다시 0부터 차오른다
+ * mons(몫을 받은 묶음 수 · v404 · v429부터 잡기 기회)를 주면: 아직 안 받은 몫이 있을 때만 가득(5) · 받은 뒤엔 다시 0부터 차오른다
  * mons를 안 주면 v402처럼 다섯이 막 찼으면 5 · per = 한 묶음 칸 수(🎹 건반 칸은 TAPS_PER_MON · v413)
  */
 export function slotsOf(notes, mons, per = NOTES_PER_MON) {
@@ -651,7 +686,7 @@ export function slotsOf(notes, mons, per = NOTES_PER_MON) {
 
 /**
  * 🎹 음악 포켓몬 하나 고르기 (순수 · v404) — 아직 안 만난 것(caught 0) 가운데 MON_WEIGHT대로 · 다 만났으면 모두 가운데 · 후보가 없으면 0
- * @param {Array<{id:number, r:number}>} pool 음악 포켓몬과 등급(1 흔함 ~ 4 전설 — xp가 저장된 프로필의 등급으로 만든다)
+ * @param {Array<{id:number, r:number}>} pool 음악 포켓몬과 등급(1 흔함 ~ 4 전설 — 부르는 쪽이 프로필의 등급으로 만든다)
  * @param {object} caught profile.caught · @param {() => number} rng 0 이상 1 미만
  */
 export function pickMusicMon(pool, caught, rng = Math.random) {
@@ -670,27 +705,76 @@ export function pickMusicMon(pool, caught, rng = Math.random) {
 }
 
 /**
- * 받을 차례가 된 음악 포켓몬을 준다 (순수 · 트랜잭션 안) — 다섯 칸 묶음 수가 받은 수(tr.mons)보다 크면 그만큼(한 번에 MONS_AT_ONCE까지) ·
- * 도감 칸(p.caught)에 하나씩 더하고 연습 기록에 'p' 줄 · 후보(pool)가 없으면 아무것도 안 준다(몫은 남는다)
- * → { got: 준 id 목록, firsts: 그때 처음 만났나(got과 같은 차례) } — 마지막 새 아이와 또 온 아이가 한꺼번에 와도 창 말이 맞게 (Codex 209차 P3)
+ * 🎯 잡기 후보 n마리 고르기 (순수 · v429) — pickMusicMon을 되풀이해 겹치지 않게: 아직 안 만난 아이 먼저(MON_WEIGHT 무게) ·
+ * 안 만난 아이가 n보다 적으면 만난 아이로 채운다(그것도 무게대로) · 후보가 모자라면 있는 만큼
+ * @param {Array<{id:number, r:number}>} pool 그림이 있는 음악 포켓몬과 등급 · @param {object} caught 포켓몬 번호 → 잡은 수
+ * @returns {number[]} 고른 번호(고른 차례)
  */
-function giveMons(p, tr, pool, rng, now) {
-  const got = [];
-  const firsts = [];
-  // ♪ 다섯 칸 묶음(mons) 몫 다음에 🎹 건반 열 칸 묶음(tapMons · v413) 몫 — 한 번에 모두 MONS_AT_ONCE까지
-  for (const [k, n, per] of [['mons', 'notes', NOTES_PER_MON], ['tapMons', 'taps', TAPS_PER_MON]]) {
-    while (tr[k] < Math.floor(tr[n] / per) && got.length < MONS_AT_ONCE) {
-      const caught = isObj(p.caught) ? p.caught : {};
-      const id = pickMusicMon(pool, caught, rng);
-      if (!id) break;
-      firsts.push(!(nz(caught[id]) > 0));
-      p.caught = { ...caught, [id]: nz(caught[id]) + 1 };
-      tr[k] += 1;
-      got.push(id);
-      pushLog(tr, { at: now, m: 'p', s: String(id) });
-    }
+export function pickMusicCands(pool, caught, n = CANDS, rng = Math.random) {
+  let left = (Array.isArray(pool) ? pool : []).filter((m) => isObj(m) && Number.isInteger(m.id) && m.id > 0 && MON_WEIGHT[m.r]);
+  const out = [];
+  while (out.length < n && left.length) {
+    const id = pickMusicMon(left, caught, rng);
+    if (!id) break;
+    out.push(id);
+    left = left.filter((m) => m.id !== id);
   }
-  return { got, firsts };
+  return out;
+}
+
+/**
+ * 🎯 몫이 찬 묶음을 잡기 기회로 (순수 · 트랜잭션 안 · v429) — ♪ 다섯 칸 묶음 수가 몫을 받은 수(tr.mons)보다 크면 그만큼 ·
+ * 🎹 책 곡 열 번 묶음(tapMons · v413)도 같은 꼴 · 묶음마다 받은 수 +1과 장부 earned +1을 **같은 트랜잭션에서** 함께 —
+ * 받은 수(병합 max)가 묶음을 소비했다고 남아 옛 백업으로 같은 묶음 기회를 두 번 받지 못한다 ·
+ * 연습 기록엔 'b' 줄(s 'n' ♪ · 't' 책 곡 · c 그때 생긴 수) → 이번에 생긴 기회 수
+ * (v404~v428은 여기서 음악 포켓몬을 그냥 줬다 — giveMons · 'p' 줄 · 그 기록·도감은 그대로 둔다)
+ */
+function giveChances(tr, now) {
+  let made = 0;
+  const ball = ballOf(tr.ball);
+  for (const [k, n, per, s] of [['mons', 'notes', NOTES_PER_MON, 'n'], ['tapMons', 'taps', TAPS_PER_MON, 't']]) {
+    const due = Math.floor(tr[n] / per) - tr[k];
+    if (due <= 0) continue;
+    tr[k] += due;
+    ball.earned += due;
+    made += due;
+    pushLog(tr, { at: now, m: 'b', s, c: due });
+  }
+  if (made) tr.ball = ball;
+  return made;
+}
+
+/** 🎯 잡기 기회 하나 빼기 (순수 · 잡기 화면을 띄우기 전 · 한 트랜잭션) — why 'none' 남은 기회 없음 */
+export function musicTakeRule(p) {
+  const tr = pianoOf(p.piano);
+  const t = ballOf(tr.ball);
+  if (t.earned - t.used + t.refunded <= 0) return { ok: false, why: 'none' };
+  t.used += 1;
+  tr.ball = t;
+  p.piano = tr;
+  return { ok: true, left: ballLeft(t) };
+}
+/** 🎯 뺐는데 한 번도 안 던졌다 → 돌려준다 (순수 · 뺀 수보다 많이 돌려주지 않는다 · used를 줄이지 않고 refunded +1) — why 'none' */
+export function musicGiveBackRule(p) {
+  const tr = pianoOf(p.piano);
+  const t = ballOf(tr.ball);
+  if (t.refunded >= t.used) return { ok: false, why: 'none' };
+  t.refunded += 1;
+  tr.ball = t;
+  p.piano = tr;
+  return { ok: true, left: ballLeft(t) };
+}
+/** 🎯 던져서 판정이 났다 — 📤 「최근 연습」에 어느 음악 포켓몬을 잡았나·놓쳤나 한 줄 (순수 · 기록만 — 기회·도감은 안 건드린다 · v428까지는 'p' 줄에 온 포켓몬 이름이 있었다) */
+export function musicJudgedRule(p, id, caught, now) {
+  if (!/^\d{1,4}$/.test(String(id))) return { ok: false, why: 'id' };
+  const tr = pianoOf(p.piano);
+  pushLog(tr, { at: now, m: 'j', s: String(id), x: caught ? 1 : 0 });
+  p.piano = tr;
+  return { ok: true };
+}
+/** 🎯 남은 음악 잡기 기회 (순수) — raw = profile.piano */
+export function musicThrowsLeft(raw) {
+  return ballLeft(isObj(raw) ? raw.ball : null);
 }
 
 /** 오늘 칸 (순수) */
@@ -714,17 +798,18 @@ function clockBack(tr, today) {
 }
 
 /**
- * 🎹 태블릿으로 치기 한 판 끝 (순수 — xp.houseDo 안에서 저장된 프로필로) → { ok, coins, good, slot, taps, tapMons, got, firsts, why? }
+ * 🎹 태블릿으로 치기 한 판 끝 (순수 — xp.houseDo 안에서 저장된 프로필로) → { ok, coins, good, slot, taps, tapMons, chances, left, why? }
  * req = { song, line(-1 곡 전체), hand, lv, sp, ok(맞게 누른 수), bad(틀리게 누른 수), g?(박자 점수 0~100 · v413), st?(가장 긴 화면 멈칫 ms · v413), mu?(가장 긴 소리 멎음 ms · v414),
  *   book?(true면 📖 진우 책 곡 — 비공개 저장소에서 받은 곡 · v423) }
  * 잘 쳤고(goodPass) 오늘 TAP_DAY번 안이면 💰(coins·coinsEarned 함께) · 아니면 기록만(why 'try' | 'cap')
  * (v413) 🎹 건반 칸 — slot: 'ok'(셈) · 'try'(잘 치지 못함) · 'line'(한 줄 연습 — 「곡 전체」만 센다) · 'free'(🎼 연습곡 — 💰만 · v423) ·
- *   'cap'(오늘 음악 포켓몬을 이미 받음) · 💰 한도와 따로 ·
+ *   'cap'(오늘 몫을 이미 받음 — v428까지 음악 포켓몬 · v429부터 잡기 기회) · 💰 한도와 따로 ·
  *   (v423) 그날 책 곡 칸 — book { n }: 책 곡이면 곡 상관없이 n+1 · n이 TAPS_PER_MON이 되면 won ·
- *   모든 칸(tr.taps)·날 칸(taps)은 열 묶음째로 늘어 음악 포켓몬이 같은 트랜잭션에서 온다(pool · rng — got) ·
- *   v420~v422의 연달아(run)는 더 쓰지 않는다(남은 기록은 📤에만 · 그날 받았으면 won으로 하루 한 마리)
+ *   모든 칸(tr.taps)·날 칸(taps)은 열 묶음째로 늘어 몫이 같은 트랜잭션에서 온다 ·
+ *   v420~v422의 연달아(run)는 더 쓰지 않는다(남은 기록은 📤에만 · 그날 받았으면 won으로 하루 한 번)
+ *   (v429) 몫 = 🎯 잡기 기회 하나(giveChances — chances 이번에 생긴 수 · left 남은 기회) · 음악 포켓몬은 잡기 화면에서 잡아야 온다
  */
-export function tapRule(p, req, now, pool = [], rng = Math.random) {
+export function tapRule(p, req, now) {
   if (!reqOk(req) || !Number.isFinite(Number(req.ok)) || !Number.isFinite(Number(req.bad))) return { ok: false, why: 'bad' };
   const tr = pianoOf(p.piano);
   const today = dayKeyOf(now);
@@ -758,16 +843,16 @@ export function tapRule(p, req, now, pool = [], rng = Math.random) {
   const g = Number(req.g);
   pushLog(tr, { at: now, m: 't', s: req.song, n: req.line, h: req.hand, lv: req.lv, sp: req.sp, ok: req.ok, bad: req.bad, c: coins, x: slot === 'ok' ? 1 : 0,
     ...(Number.isInteger(g) ? { g } : {}), st: req.st, mu: req.mu, ...(book ? { k: 1 } : {}) });
-  const { got, firsts } = giveMons(p, tr, pool, rng, now);
+  const chances = giveChances(tr, now);
   p.piano = tr;
-  return { ok: true, coins, good, slot, book: bookOf(next.book || day.book), won: !!(next.won || day.won), taps: tr.taps, tapMons: tr.tapMons, got, firsts, ...(why ? { why } : {}) };
+  return { ok: true, coins, good, slot, book: bookOf(next.book || day.book), won: !!(next.won || day.won), taps: tr.taps, tapMons: tr.tapMons, chances, left: ballLeft(tr.ball), ...(why ? { why } : {}) };
 }
 
 /**
- * 🎧 「다 쳤어요 ✋」 (순수) → { ok, counted, notes(모든 칸), mons(받은 수), got:[온 음악 포켓몬 id], why? }
- * 오늘 LISTEN_DAY칸 안이면 음표 한 칸 · 아니면 기록만(why 'cap') · 다섯 칸 묶음이 차면 음악 포켓몬이 온다(pool · rng — v404)
+ * 🎧 「다 쳤어요 ✋」 (순수) → { ok, counted, notes(모든 칸), mons(몫을 받은 묶음 수), chances(이번에 생긴 잡기 기회), left(남은 기회), why? }
+ * 오늘 LISTEN_DAY칸 안이면 음표 한 칸 · 아니면 기록만(why 'cap') · 다섯 칸 묶음이 차면 v404~v428은 음악 포켓몬이 왔고 v429부터 🎯 잡기 기회 하나
  */
-export function listenRule(p, req, now, pool = [], rng = Math.random) {
+export function listenRule(p, req, now) {
   if (!reqOk(req)) return { ok: false, why: 'bad' };
   const tr = pianoOf(p.piano);
   const today = dayKeyOf(now);
@@ -779,20 +864,21 @@ export function listenRule(p, req, now, pool = [], rng = Math.random) {
     tr.notes += 1;
   }
   pushLog(tr, { at: now, m: 'l', s: req.song, n: req.line, h: req.hand, lv: req.lv, sp: req.sp, ok: 0, bad: 0, c: 0, x: counted ? 1 : 0 });
-  const { got, firsts } = giveMons(p, tr, pool, rng, now);
+  const chances = giveChances(tr, now);
   p.piano = tr;
-  return { ok: true, counted, notes: tr.notes, mons: tr.mons, got, firsts, ...(counted ? {} : { why: 'cap' }) };
+  return { ok: true, counted, notes: tr.notes, mons: tr.mons, chances, left: ballLeft(tr.ball), ...(counted ? {} : { why: 'cap' }) };
 }
 
 /**
- * 🎹 밀린 음악 포켓몬 (순수 · v404) — 음악 화면에 들어올 때: v402·v403 때 찬 다섯 칸 몫 · 저장이 실패해 못 받은 몫 → { ok, got, mons, notes }
- * 칸을 세지 않고 몫만 준다 · 날짜와 상관없다(시계가 뒤로 가도 이미 찬 칸의 몫은 그대로)
+ * 🎹 밀린 몫 (순수 · v404) — 음악 화면에 들어올 때: v402·v403 때 찬 다섯 칸 몫(옛 MONS_AT_ONCE를 넘친 것) · 업데이트 전 판의 몫 · 저장이 실패해 못 받은 몫
+ * → { ok, chances(이번에 생긴 잡기 기회), left, mons, notes } · v429부터 몫은 🎯 잡기 기회로 바뀐다(음악 포켓몬이 그냥 오지 않는다)
+ * 칸을 세지 않고 몫만 준다 · 날짜와 상관없다(시계가 뒤로 가도 이미 찬 칸의 몫은 그대로) · 몫이 없으면 프로필을 안 건드린다(들어올 때마다 쓰지 않게)
  */
-export function monsDueRule(p, now, pool = [], rng = Math.random) {
+export function monsDueRule(p, now) {
   const tr = pianoOf(p.piano);
-  const { got, firsts } = giveMons(p, tr, pool, rng, now);
-  if (got.length) p.piano = tr;
-  return { ok: true, got, firsts, mons: tr.mons, notes: tr.notes };
+  const chances = giveChances(tr, now);
+  if (chances) p.piano = tr;
+  return { ok: true, chances, left: ballLeft(tr.ball), mons: tr.mons, notes: tr.notes };
 }
 
 // ───────────────────── 📤 ─────────────────────
@@ -801,7 +887,8 @@ export function monsDueRule(p, now, pool = [], rng = Math.random) {
 export function pianoDayLine(d) {
   const g = (k) => nz(d && d[k]);
   if (!g('pnTapN') && !g('pnListenN') && !g('pnMons') && !g('pnIntro') && !g('pnFreeN') && !g('pnFreeKeys') && !g('pnStallN')
-    && !g('pnMuteN') && !g('pnSlowN') && !g('pnCancelN') && !g('pnListenAsk') && !g('pnPinBad')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405) · 자유롭게 치기만 한 날도 (v408) · 멈칫만 있던 날도 (v413) · 소리 멎음·느린 장면·누름 끊김만 있던 날도 (v414) · 누르기만 하고 확인을 못 받은 날도 (v417)
+    && !g('pnMuteN') && !g('pnSlowN') && !g('pnCancelN') && !g('pnListenAsk') && !g('pnPinBad')
+    && !g('pnBall') && !g('pnCaught') && !g('pnFled')) return ''; // 밀린 포켓몬만 받은 날도 (Codex 209차 P3) · 안내만 본 날도 (v405) · 자유롭게 치기만 한 날도 (v408) · 멈칫만 있던 날도 (v413) · 소리 멎음·느린 장면·누름 끊김만 있던 날도 (v414) · 누르기만 하고 확인을 못 받은 날도 (v417) · 들어오기만 해서 기회만 생긴 날도 · 밀린 기회로 잡기만 한 날도 (v429)
   const parts = [];
   if (g('pnTapN')) {
     // (v413) 🎹 건반 칸 · 박자 판정 — 셈이 있을 때만 붙인다(옛 날 줄 꼴 그대로)
@@ -812,7 +899,9 @@ export function pianoDayLine(d) {
   // v417 — 누른 번이 있는 날은 「누름 · 어른 확인 · 비밀번호 틀림」 (옛 날은 옛 줄 그대로)
   if (g('pnListenAsk') || g('pnPinBad')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 누름 ${g('pnListenAsk')}번 · 어른 확인 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')}) · 비밀번호 틀림 ${g('pnPinBad')}번`);
   else if (g('pnListenN')) parts.push(`🎧 듣고 따라 치기 「다 쳤어요」 ${g('pnListenN')}번(음표 칸 ${g('pnNotes')})`);
-  if (g('pnMons')) parts.push(`🐾 음악 포켓몬 ${g('pnMons')}마리 옴`);
+  if (g('pnMons')) parts.push(`🐾 음악 포켓몬 ${g('pnMons')}마리 옴`); // v428까지(옛 규칙 — 그냥 옴)
+  // v429 — 🎯 잡기 기회 생김 · 그날 던져 잡음 · 놓침 (그날 생긴 기회와 그날 던진 것은 다를 수 있다 — 밀린 기회)
+  if (g('pnBall') || g('pnCaught') || g('pnFled')) parts.push(`🎯 음악 포켓몬 잡기 기회 ${g('pnBall')}번 생김 · 던져서 잡음 ${g('pnCaught')} · 놓침 ${g('pnFled')}`);
   if (g('pnIntro')) parts.push(`🐾 음악 포켓몬 안내 창 ${g('pnIntro')}번 봄`);
   if (g('pnFreeN') || g('pnFreeKeys')) {
     const sec = g('pnFreeSec');
@@ -830,7 +919,7 @@ export function pianoDayLine(d) {
  * 📤 usage/music.md (순수) — 모든 음표 칸 · 최근 연습 기록 (새것부터)
  * @param {object} raw profile.piano · @param {string} today · @param {(id:string)=>string} nameOf 곡 id → 이름
  * @param {{at:number, ok:boolean, name?:string, note?:string, why?:string}|null} [midi] ⚙ 집 피아노 연결 확인 결과(이 기기)
- * @param {(id:number)=>string} [monName] 포켓몬 번호 → 이름 (🎹 음악 포켓몬이 온 줄 · v404)
+ * @param {(id:number)=>string} [monName] 포켓몬 번호 → 이름 (🎹 음악 포켓몬이 온 줄 · v404~v428 옛 규칙 · 🎯 잡음·놓침 줄 · v429)
  */
 export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (id) => `#${id}`) {
   const tr = pianoOf(raw);
@@ -843,28 +932,33 @@ export function pianoMd(raw, today, nameOf = (s) => s, midi = null, monName = (i
   const week = DAY_RE.test(String(today)) ? (() => { const d = new Date(`${today}T12:00:00`); d.setDate(d.getDate() - 6); return dayKeyOf(d.getTime()); })() : '';
   const inWeek = (k) => !week || (k >= week && k <= today);
   const runs = Object.entries(tr.days).filter(([k, e]) => e.run && inWeek(k)).map(([k, e]) => `${k.slice(5)} 「${nameOf(e.run.s)}」 ${e.run.n}/${TAPS_PER_MON}${e.won ? ' 🐾' : ''}`);
-  // 📖 책 곡 칸 (v423) — 같은 일주일 · n/10 · 받은 날 🐾 · 그날 칸을 채운 곡(최근 기록 LOG_MAX 줄에 남은 것만 — 칸 수·🐾는 날 칸이라 정확 · Codex 226차 P3-1)
+  // 📖 책 곡 칸 (v423) — 같은 일주일 · n/10 · 받은 날 ✅(v428까지 🐾 포켓몬이 옴 · v429부터 🎯 잡기 기회 — 날 칸엔 둘을 가르는 칸이 없어 같은 표시) · 그날 칸을 채운 곡(최근 기록 LOG_MAX 줄에 남은 것만 — 칸 수·✅는 날 칸이라 정확 · Codex 226차 P3-1)
   const books = Object.entries(tr.days).filter(([k, e]) => e.book && inWeek(k)).map(([k, e]) => {
     const ss = [...new Set(tr.log.filter((r) => r.m === 't' && r.x && r.k && dayKeyOf(r.at) === k).map((r) => nameOf(r.s)))];
-    return `${k.slice(5)} ${e.book.n}/${TAPS_PER_MON}${e.won ? ' 🐾' : ''}${ss.length ? ` (${ss.join('·')})` : ''}`;
+    return `${k.slice(5)} ${e.book.n}/${TAPS_PER_MON}${e.won ? ' ✅' : ''}${ss.length ? ` (${ss.join('·')})` : ''}`;
   });
   const HAND = { R: '오른손', L: '왼손', B: '양손' };
   const hm = (t) => { const d = new Date(t); return `${dayKeyOf(t).slice(5)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const lines = [`🎹 음악 연습 기록 (${today}) — v402부터`, '', '## 읽는 법',
     `- 🎹 태블릿 치기 = 화면 건반으로 끝까지 친 판 · 맞게/틀리게 누른 수(맞는 건반을 기다리는 동안 다른 건반) · 맞게 누른 비율 70% 넘고 하루 ${TAP_DAY}번 안이면(곡 상관없이 · v406까지 3번) 💰(한 줄 5 · 곡 전체 15)`,
-    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「✋ 피아노로 다 쳤어요」(v404까지 「다 쳤어요 ✋」)를 누른 것 — 진짜로 쳤는지는 앱이 모른다(피아노 연결 전)(누른 때와 ⏳ 음악 시간으로 보기) · v417부터는 누른 뒤 아빠·엄마가 부모 비밀번호로 확인한 것만 이 줄에 남는다 · 하루 세 칸까지 음표 칸 · 다섯 칸마다 🐾 음악 포켓몬 한 마리가 옴(v404)',
-    `- 🎹 건반 칸(v413) = 🎹 태블릿 치기로 「곡 전체」를 잘(맞게 70% 넘게) 끝까지 친 판 — 줄 끝 「🎹 칸」 · v423부터 **📖 진우 책 곡(아빠가 넣은 곡)을 하루에 ${TAPS_PER_MON}번** 치면 🐾 음악 포켓몬 한 마리(곡을 섞어도·같은 곡을 다시 쳐도 이어 셈 · 🎼 연습곡(앱에 든 공개 곡)은 💰만 · 못 친 판·한 줄 연습은 안 셈 · 자정이면 처음부터 · 하루 한 마리 · 💰 한도와 따로 — 「🎹 책 곡 칸」 줄) · v420~v422는 한 곡을 하루에 ${TAPS_PER_MON}번 연달아(「🎹 연달아」 줄) · v419까지는 곡 섞기·날 넘김도 이어 열 칸마다`,
+    '- 🎧 듣고 따라 치기 = 앱이 끝까지 연주한 뒤 진우가 「✋ 피아노로 다 쳤어요」(v404까지 「다 쳤어요 ✋」)를 누른 것 — 진짜로 쳤는지는 앱이 모른다(피아노 연결 전)(누른 때와 ⏳ 음악 시간으로 보기) · v417부터는 누른 뒤 아빠·엄마가 부모 비밀번호로 확인한 것만 이 줄에 남는다 · 하루 세 칸까지 음표 칸 · 다섯 칸마다 몫 하나 — v404~v428은 🐾 음악 포켓몬이 그냥 왔고 v429부터 🎯 잡기 기회',
+    `- 🎹 건반 칸(v413) = 🎹 태블릿 치기로 「곡 전체」를 잘(맞게 70% 넘게) 끝까지 친 판 — 줄 끝 「🎹 칸」 · v423부터 **📖 진우 책 곡(아빠가 넣은 곡)을 하루에 ${TAPS_PER_MON}번** 치면 몫 하나 — v428까지 🐾 음악 포켓몬이 그냥 왔고 v429부터 🎯 잡기 기회(곡을 섞어도·같은 곡을 다시 쳐도 이어 셈 · 🎼 연습곡(앱에 든 공개 곡)은 💰만 · 못 친 판·한 줄 연습은 안 셈 · 자정이면 처음부터 · 하루 한 번 · 💰 한도와 따로 — 「🎹 책 곡 칸」 줄) · v420~v422는 한 곡을 하루에 ${TAPS_PER_MON}번 연달아(「🎹 연달아」 줄) · v419까지는 곡 섞기·날 넘김도 이어 열 칸마다`,
+    '- 🎯 잡기 기회(v429) = 몫마다 하나 — 몫이 찬 그 자리에서 바로 잡기 화면(다른 과목과 같이 가방의 볼을 골라 한 번 던지기 · 못 잡으면 그 기회는 끝 — 놓쳐도 같은 몫을 다시 주지 않는다: 📖 책 곡은 하루 한 번이라 다음은 내일 다시 열 번 · 🎧 ♪는 다섯 칸을 새로 채워야 해서(하루 세 칸) 빨라야 내일 · 같은 날 다른 몫이 차거나 남은 기회가 있으면 그날 또 잡기(남은 기회는 단추로)) · 안 던지고 닫았거나 밀린 기회는 곡 목록·무대의 「🎯 음악 포켓몬 잡기」 단추로 다시 · 후보 넷은 이 기기에 그림이 있는 음악 포켓몬 가운데 아직 안 만난 아이 먼저(흔함 4·보통 3·희귀 2·전설 1 무게) — 안 만난 아이 그림이 넷이 안 되면 잡기를 열 때 몇 마리 받아 오고, 8초 안에 못 받은 만큼은 만난 아이로 채운다(인터넷이 느리거나 끊긴 때) · 기록 줄엔 던진 아이만 남고 후보 넷은 안 남는다 ·「🎯 음악 잡기 기회」 줄 = 받음 · 씀(잡기 화면을 띄우며 뺀 수 − 돌려준 수 = 던진 수 + 지금 열린 잡기 창 + 앱이 꺼졌거나 저장이 안 돼 아직 못 돌려준 것 — 음악에 다시 들어오면 돌려줌) · 남음 · 돌려줌 = 안 던지고 닫았거나 창을 못 띄운 것 · 던진 결과는 기록 줄 「🎯 잡음·놓침 — 포켓몬」과 하루 줄 · 「🎹 책 곡 칸」 줄 끝 ✅ = 그날 몫을 받은 날(v428까지 🐾 음악 포켓몬이 옴 · v429부터 🎯 잡기 기회) · 기록 줄 「🐾 음악 포켓몬이 옴」은 v404~v428 옛 규칙(잡기 없이 그냥 옴)',
     `- 박자(v413) = 판 끝 판정 점수 — 음표마다 제때 눌렀나(막대가 닿기 전 ${BEAT.early}박 안 · 닿은 뒤 기다리게 한 게 ${BEAT.late}박 안이면 한 점 · ${BEAT.lateHalf}박 안이면 반 점) 평균 × 맞게 누른 비율 → 🎉 빵빠레 ${BEAT.great}점 이상 · 👏 짝짝 ${BEAT.good}점 이상 · 🎺 뿌우~ 그 아래(맞게 70% 아래도) — 아이 화면엔 점수 없이 소리·그림만 · 보상과 상관없음`,
     `- 멈칫(v413) = 그 판 동안 화면이 ${STALL.ms / 1000}초 넘게 멈춘 가장 긴 시간(태블릿이 버거워 멈춘 것 — 아이가 ⏸로 멈춘 것은 안 셈)`,
     `- 소리 멎음(v414) = 그 판 동안 화면은 도는데 소리 엔진 시계가 ${MUTE.ms / 1000}초 넘게 안 간 가장 긴 시간(앱이 소리를 끈 것이 아님 — 태블릿·브라우저 쪽)`,
     '- 줄 = 책의 한 줄(그 곡 원고의 lines) · 도움 1 막대·계이름·건반 빛 → 2 막대 없이 → 3 계이름도 없이 → 4 악보만 · 빠르기 = 원래 빠르기의 %',
-    '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets} · 온 음악 포켓몬 ${tr.mons}${sl.sets > tr.mons ? ` · 아직 안 온 몫 ${sl.sets - tr.mons} — 음악 화면에 들어오면 옴` : ''})`,
-    ...(tr.taps || tr.tapMons ? [`🎹 건반 칸 모두 ${tr.taps} (열 칸 묶음 ${tk.sets} · 온 음악 포켓몬 ${tr.tapMons}${tk.sets > tr.tapMons ? ` · 아직 안 온 몫 ${tk.sets - tr.tapMons} — 음악 화면에 들어오면 옴` : ''})`] : []),
+    '', ...(midiLine ? [midiLine] : []), `음표 칸 모두 ${tr.notes} (다섯 칸 묶음 ${sl.sets} · 몫을 받은 묶음 ${tr.mons}${sl.sets > tr.mons ? ` · 아직 안 받은 몫 ${sl.sets - tr.mons} — 음악 화면에 들어오면 🎯 잡기 기회로` : ''})`,
+    ...(tr.taps || tr.tapMons ? [`🎹 건반 칸 모두 ${tr.taps} (열 칸 묶음 ${tk.sets} · 몫을 받은 묶음 ${tr.tapMons}${tk.sets > tr.tapMons ? ` · 아직 안 받은 몫 ${tk.sets - tr.tapMons} — 음악 화면에 들어오면 🎯 잡기 기회로` : ''})`] : []),
+    // v429 — 🎯 잡기 기회 장부 (생긴 적이 있을 때만)
+    ...(tr.ball ? [`🎯 음악 잡기 기회(v429) 받음 ${tr.ball.earned} · 씀 ${tr.ball.used - tr.ball.refunded}(뺌 ${tr.ball.used} · 돌려줌 ${tr.ball.refunded}) · 남음 ${ballLeft(tr.ball)}`] : []),
     ...(books.length ? [`🎹 책 곡 칸(v423 — 날마다 찬 칸 · 채운 곡 — 최근 기록에 남은 것) ${books.join(' · ')}`] : []),
     ...(runs.length ? [`🎹 연달아(v420 — 날마다 마지막 곡) ${runs.join(' · ')}`] : []),
     '', '## 최근 연습 (새것부터)'];
   for (const r of [...tr.log].reverse()) {
-    if (r.m === 'p') { lines.push(`- ${hm(r.at)} 🐾 음악 포켓몬이 옴 — ${monName(Number(r.s))}`); continue; }
+    if (r.m === 'p') { lines.push(`- ${hm(r.at)} 🐾 음악 포켓몬이 옴(옛 규칙 — 잡기 없이) — ${monName(Number(r.s))}`); continue; }
+    if (r.m === 'b') { lines.push(`- ${hm(r.at)} 🎯 잡기 기회 생김 — ${r.s === 'n' ? '🎧 ♪ 다섯 칸' : '📖 책 곡 열 번'}${r.c > 1 ? ` ×${r.c}` : ''}`); continue; } // v429
+    if (r.m === 'j') { lines.push(`- ${hm(r.at)} 🎯 ${r.x ? '잡음' : '놓침'} — ${monName(Number(r.s))}`); continue; } // v429 — 던진 결과
     const where = `${nameOf(r.s)} ${r.n < 0 ? '곡 전체' : `${r.n + 1}째 줄`}`;
     const head = `${hm(r.at)} ${r.m === 't' ? '🎹 치기' : '🎧 따라 치기'} · ${where} · ${HAND[r.h]} · 도움 ${r.lv} · ${Math.round(r.sp * 100)}%`;
     if (r.m === 't') {

@@ -271,14 +271,14 @@ test('병합 — 날마다 큰 쪽(옛 백업으로 한도를 다시 열지 못�
 });
 
 test('📤 — 하루 한 줄(하루 칸으로) · music.md(모든 칸 · 최근 기록 새것부터 · 연결 확인)', () => {
-  assert.deepEqual(PIANO_DAILY, ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec', 'pnTapSlots', 'pnFan', 'pnClap', 'pnBoo', 'pnStallN', 'pnStallLong', 'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN', 'pnListenAsk', 'pnPinBad'], 'pnMons = 온 음악 포켓몬 (v404) · pnIntro = 🐾 안내 창 봄 (v405) · pnFree* = 🎹 자유롭게 치기 (v408) · 🎹 건반 칸·박자 판정·화면 멈칫 (v413) · 소리 멎음·느린 장면·누름 끊김 (v414) · 「다 쳤어요」 누름·비밀번호 틀림 (v417)');
+  assert.deepEqual(PIANO_DAILY, ['pnTapN', 'pnTapOk', 'pnCoins', 'pnListenN', 'pnNotes', 'pnMons', 'pnIntro', 'pnFreeN', 'pnFreeKeys', 'pnFreeSec', 'pnTapSlots', 'pnFan', 'pnClap', 'pnBoo', 'pnStallN', 'pnStallLong', 'pnMuteN', 'pnMuteLong', 'pnMuteOff', 'pnSlowN', 'pnSlowMs', 'pnCancelN', 'pnListenAsk', 'pnPinBad', 'pnBall', 'pnCaught', 'pnFled'], 'pnMons = 온 음악 포켓몬 (v404~v428) · pnIntro = 🐾 안내 창 봄 (v405) · pnFree* = 🎹 자유롭게 치기 (v408) · 🎹 건반 칸·박자 판정·화면 멈칫 (v413) · 소리 멎음·느린 장면·누름 끊김 (v414) · 「다 쳤어요」 누름·비밀번호 틀림 (v417) · 🎯 잡기 기회·잡음·놓침 (v429)');
   assert.equal(pianoDayLine({}), '');
   assert.equal(pianoDayLine({ pnTapN: 4, pnTapOk: 3, pnCoins: 15, pnListenN: 2, pnNotes: 2 }), '🎹 태블릿 치기 끝까지 4판(잘 친 판 3 · 💰15) · 🎧 듣고 따라 치기 「다 쳤어요」 2번(음표 칸 2)');
   const p = {};
   tapRule(p, { ...REQ, ok: 42, bad: 6 }, NOW);
   listenRule(p, { ...REQ, line: -1, hand: 'B', lv: 1, sp: 1 }, NOW + 60000);
   const md = pianoMd(p.piano, TODAY, (id) => (id === 'ode' ? '환희의 송가' : id), { at: NOW, ok: true, name: 'SP2X', note: '도4' });
-  assert.match(md, /음표 칸 모두 1 \(다섯 칸 묶음 0 · 온 음악 포켓몬 0\)/, 'v404 — 온 음악 포켓몬 수도');
+  assert.match(md, /음표 칸 모두 1 \(다섯 칸 묶음 0 · 몫을 받은 묶음 0\)/, 'v404 — 몫을 받은 묶음 수도 (v429부터 몫 = 🎯 잡기 기회)');
   assert.match(md, /🎹 집 피아노 연결 확인 \(2026-11-10\): 잡힘 — SP2X · 마지막에 누른 건반 도4/);
   const rows = md.split('\n').filter((l) => l.startsWith('- 11-10'));
   assert.equal(rows.length, 2);
@@ -356,8 +356,8 @@ test('🔌 잇기 — 홈 카드 · 화면 · 시계 · ⚙ · 칩 · 저장·�
   assert.match(db, /const pn = mergePiano\(cur\.piano, rec\.piano\);\n    if \(pn\) out\.piano = pn; else delete out\.piano;/);
   const xp = read('js/xp.js');
   assert.match(xp, /\.\.\.\(p\.piano \? \{ piano: copyPiano\(p\.piano\) \} : \{\}\)/);
-  assert.match(xp, /export function pianoTap\(req\) \{\n  return houseDo\(\(p\) => pianoTapRule\(p, req, Date\.now\(\), musicPool\(p\), Math\.random\)\);/, '🎹 건반 열 칸이면 음악 포켓몬도 같은 트랜잭션에서 (v413)');
-  assert.match(xp, /export function pianoListen\(req\) \{\n  return houseDo\(\(p\) => pianoListenRule\(p, req, Date\.now\(\), musicPool\(p\), Math\.random\)\);/, 'v404 — 음악 포켓몬 후보도 같은 트랜잭션에서');
+  assert.match(xp, /export function pianoTap\(req\) \{\n  return houseDo\(\(p\) => pianoTapRule\(p, req, Date\.now\(\)\)\);/, '📖 책 곡 열 번이면 🎯 잡기 기회도 같은 트랜잭션에서 (v413 음악 포켓몬 → v429 기회)');
+  assert.match(xp, /export function pianoListen\(req\) \{\n  return houseDo\(\(p\) => pianoListenRule\(p, req, Date\.now\(\)\)\);/, 'v404 — ♪ 다섯 칸 몫도 같은 트랜잭션에서 (v429부터 🎯 잡기 기회)');
   assert.match(read('js/usage.js'), /\{ key: 'music', field: 'uMusic', ko: '🎹 음악' \}/);
   const up = read('js/upload.js');
   assert.match(up, /\['음악', 'musicTime', 'musicBonus', 'musicExt'\]/);

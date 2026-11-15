@@ -2,6 +2,7 @@
 //   진우는 음악에서 포켓몬을 만나는 줄 모르고, 알아도 태블릿 화면 건반으로 얻는 줄 알 수 있다 →
 //   홈 카드 줄 · 음악 화면 처음 한 번 안내 창(「알겠어요!」로 닫아야 본 것) · ♪ 칸 → 🐾을 누르면 다시 · 단추 「✋ 피아노로 다 쳤어요」 ·
 //   📤 하루 줄 「🐾 음악 포켓몬 안내 창 N번 봄」 · 앱은 아직 피아노 소리를 못 듣는다(연결 전 — 「다 쳤어요」는 약속)
+//   (v429) 칸이 차면 「그냥 온다」가 「🎯 잡을 기회」로 — 안내 판 '5' · 「왔어요」 창 대신 잡기 단추(잡기 흐름 시험은 music429)
 import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,9 +20,9 @@ const MUSIC = ROSTER.filter((r) => r.subject === 'music').map((r) => r.id);
 
 // ───────────────────── 순수·잇기 ─────────────────────
 
-test('🏠 홈 음악 카드 — 「🐾 끝까지 치면 음악 포켓몬!」(v413 — 화면 건반으로도) · 다른 과목 카드 줄은 그대로', () => {
+test('🏠 홈 음악 카드 — 「🎯 끝까지 치면 음악 포켓몬 잡기!」(v413 — 화면 건반으로도 · v429 잡기로) · 다른 과목 카드 줄은 그대로', () => {
   const mu = SUBJECTS.find((s) => s.key === 'music');
-  assert.equal(mu.desc, '🐾 끝까지 치면 음악 포켓몬!');
+  assert.equal(mu.desc, '🎯 끝까지 치면 음악 포켓몬 잡기!');
   assert.equal(cardSubject(mu, {}).desc, mu.desc, '카드에 그대로 간다');
   assert.deepEqual(SUBJECTS.filter((s) => s.key !== 'music').map((s) => s.desc), ['영상 보고 따라 말하기', '분수부터 차근차근', '글 읽고 작품 카드 모으기', '내 의견과 이유 말하기']);
 });
@@ -106,7 +107,6 @@ async function waitFor(cond, what, ms = 4000) {
   }
 }
 const setPiano = (piano) => houseDo((p) => { p.piano = piano; return { ok: true }; });
-const text = (id) => (byId(id) ? byId(id).textContent : '');
 const introN = async () => Number(((await getDaily(clockDay())) || {}).pnIntro) || 0;
 let P;
 let PV;
@@ -115,21 +115,22 @@ before(async () => {
   console.warn = () => {};
   await initProfile();
   await loadToday();
-  await setPiano({ notes: 5, days: {} }); // 다섯 칸이 찼고 아직 안 온 몫 하나 — 안내 창이 먼저, 온 창은 그 뒤
+  await setPiano({ notes: 5, days: {} }); // 다섯 칸이 찼고 아직 안 받은 몫 하나 — 안내 창이 뜨고, 몫은 🎯 잡기 기회로(v429 — 창은 겹쳐 안 뜬다)
   PV = await import('../js/pianoview.js');
   PV.initMusic({ showView: () => {}, requirePin: (ok) => ok() }); // 👨‍👩‍👦 어른 확인(v417)은 바로 맞음으로 — 확인 창 자체는 pianoflow402
   await PV.enterMusic();
   P = globalThis.window.__piano;
 });
 
-test('화면 — 처음 들어오면 안내 창: 🎧 · 진짜 피아노 · 새 단추 이름 · ♪ 다섯 · (v413) 🎹 화면 건반도 「곡 전체」 → 건반 열 칸 · 💰도 · 보상·남은 수 문구 없음 · 음악 포켓몬 셋', async () => {
+test('화면 — 처음 들어오면 안내 창: 🎧 · 진짜 피아노 · 새 단추 이름 · ♪ 다섯 · (v413) 🎹 화면 건반도 「곡 전체」 → 건반 열 칸 · 💰도 · (v429) 🎯 잡을 기회 · 보상·남은 수 문구 없음 · 음악 포켓몬 셋', async () => {
   const box = byId('pn-intro');
   assert.ok(box, '안내 창');
   assert.equal(box.parent, VIEW, '창은 음악 화면 안');
   const t = box.textContent;
-  for (const w of ['🎵 음악 포켓몬을 만나요!', '🎧 진짜 피아노로', '「🎧 듣고 따라 치기」를 골라요', '앱이 치는 소리를 들으며 진짜 피아노로 끝까지 따라 쳐요', '「✋ 피아노로 다 쳤어요」를 누르고 아빠·엄마 확인을 받으면 ♪ 하나', '♪♪♪♪♪가 다 차면 🐾 음악 포켓몬이 와요!',
+  for (const w of ['🎵 음악 포켓몬을 만나요!', '🎧 진짜 피아노로', '「🎧 듣고 따라 치기」를 골라요', '앱이 치는 소리를 들으며 진짜 피아노로 끝까지 따라 쳐요', '「✋ 피아노로 다 쳤어요」를 누르고 아빠·엄마 확인을 받으면 ♪ 하나', '♪♪♪♪♪가 다 차면 🎯 음악 포켓몬을 잡을 기회!',
     '🎹 태블릿 화면 건반으로', '「🎹 태블릿으로 치기」에서 📖 진우 책 곡의 「곡 전체」를 골라요', '끝까지 잘 치면 건반 칸 하나 — 💰도 받아요', '곡은 섞어 쳐도 돼요 — 🎼 연습곡은 💰만 받아요', // v423
-    '이 하루에 다 차면 🐾 음악 포켓몬이 와요! (하루 한 마리)']) assert.ok(t.includes(w), `글: ${w}`);
+    '이 하루에 다 차면 🎯 음악 포켓몬을 잡을 기회! (하루 한 번)', '🎯 잡기는 다른 과목과 같아요 — 한 마리 골라 몬스터볼을 던져요. 못 잡으면 다음 기회에 또!']) assert.ok(t.includes(w), `글: ${w}`); // v429
+  assert.ok(!t.includes('음악 포켓몬이 와요'), 'v429 — 「그냥 와요」 말은 없다');
   assert.ok(!t.includes('는 💰를 받아요'), 'v405의 「화면 건반은 💰」 말은 없다 (v413)');
   const ten = all.filter((e) => { if (e.className !== 'pn-tkeys') return false; for (let x = e; x; x = x.parent) if (x === box) return true; return false; });
   assert.equal(ten.length, 1, '빈 건반 열 칸 그림 하나');
@@ -142,32 +143,35 @@ test('화면 — 처음 들어오면 안내 창: 🎧 · 진짜 피아노 · 새
   assert.equal(button('알겠어요!').parent.parent, box, '닫는 단추는 안내 창에');
 });
 
-test('화면 — 안내 창이 떠 있는 동안 온 포켓몬은 뒤에 선다 · 「알겠어요!」로 닫으면 온 창 · 본 것으로 적힘 · 📤 하루 칸', async () => {
-  await waitFor(() => pianoOf(getProfileSnapshot().piano).mons === 1, '들어올 때 밀린 몫 받기 — 도감엔 이미 들어갔다');
+test('화면 — 안내 창이 떠 있는 동안 밀린 몫은 🎯 잡기 기회로(v429 — 창은 겹쳐 안 뜬다) · 「알겠어요!」로 닫으면 본 것으로 적힘 · 📤 하루 칸 · 곡 목록에 잡기 단추(숫자 없음)', async () => {
+  await waitFor(() => pianoOf(getProfileSnapshot().piano).mons === 1, '들어올 때 밀린 몫 → 잡기 기회');
+  assert.deepEqual(pianoOf(getProfileSnapshot().piano).ball, { earned: 1, used: 0, refunded: 0 }, '기회 하나');
+  assert.ok(!MUSIC.some((id) => Number(getProfileSnapshot().caught[id]) > 0), '음악 포켓몬이 그냥 오지 않는다');
   await settle(30);
-  assert.equal(byId('pn-arrive'), null, '안내 창 위에 겹치지 않는다');
+  assert.equal(byId('pn-arrive'), null, '「왔어요」 창은 없다');
+  assert.ok(byId('pn-intro'), '안내 창 그대로');
   assert.equal(await introN(), 0, '닫기 전엔 본 것이 아니다');
   button('알겠어요!').click();
   assert.equal(byId('pn-intro'), null);
-  assert.ok(byId('pn-arrive'), '닫으면 기다리던 온 창');
-  assert.match(text('pn-arrive'), /🎵 새 음악 포켓몬이 왔어요!/);
-  assert.equal(store.get('shincoach.musicIntro'), '4', 'v423 판 안내를 본 것');
+  assert.equal(byId('pn-arrive'), null);
+  assert.equal(store.get('shincoach.musicIntro'), '5', 'v429 판 안내를 본 것');
+  assert.equal(P.S.catching, false, '밀린 기회는 바로 띄우지 않는다 — 단추로');
+  assert.doesNotMatch(byId('pn-catch').textContent, /\d/, '단추 칸에 숫자 없음');
+  button('🎯 음악 포켓몬 잡기');
   await settle(30);
   assert.equal(await introN(), 1, '📤 「안내 창 1번 봄」');
-  button('좋아요!').click();
-  assert.equal(byId('pn-arrive'), null);
   await PV.enterMusic();
   await settle(40);
   assert.equal(byId('pn-intro'), null, '본 뒤엔 들어와도 안 뜬다');
 });
 
-test('화면 — 🎧 무대: 「✋ 피아노로 다 쳤어요」 · ♪ 칸 → 🐾 · 누르면 안내 창이 다시 · 🎹 태블릿으로 치기에선 건반 열 칸(v413)', async () => {
+test('화면 — 🎧 무대: 「✋ 피아노로 다 쳤어요」 · ♪ 칸 → 🎯(v429 — 전엔 🐾) · 누르면 안내 창이 다시 · 🎹 태블릿으로 치기에선 건반 열 칸(v413)', async () => {
   P.openSong('ode');
   button('🎧 듣고 따라 치기').click();
   const slots = byId('pn-slots');
   assert.equal(slots.tagName, 'BUTTON', '♪ 칸은 누르는 단추');
   assert.equal(slots.hidden, false);
-  assert.match(slots.innerHTML, /<span class="pn-slots">(<span class="">♪<\/span>){5}<\/span><span class="pn-slots-mon">→ 🐾<\/span>$/);
+  assert.match(slots.innerHTML, /<span class="pn-slots">(<span class="">♪<\/span>){5}<\/span><span class="pn-slots-mon">→ 🎯<\/span>$/);
   assert.equal(slots.getAttribute('aria-label'), '음표 칸 — 음악 포켓몬 안내');
   // 연주 도중 ♪ 칸을 누르면 — 창이 악보를 가리니 멈추고 자리는 그대로 · 닫아도 저절로 가지 않는다 (Codex 210차 P2)
   byId('pn-go').click();
@@ -205,16 +209,18 @@ test('화면 — 🎧 무대: 「✋ 피아노로 다 쳤어요」 · ♪ 칸 �
   assert.equal(pianoOf(getProfileSnapshot().piano).notes, 6, '새 이름 단추도 음표 칸');
   button('🎹 태블릿으로 치기').click();
   assert.equal(byId('pn-slots').hidden, false, '태블릿 치기엔 건반 열 칸 (v413)');
-  assert.match(byId('pn-slots').innerHTML, /^<span class="pn-tkeys">(<span class=""><\/span>){10}<\/span><span class="pn-slots-mon">→ 🐾<\/span>$/);
+  assert.match(byId('pn-slots').innerHTML, /^<span class="pn-tkeys">(<span class=""><\/span>){10}<\/span><span class="pn-slots-mon">→ 🎯<\/span>$/);
   assert.equal(byId('pn-slots').getAttribute('aria-label'), '건반 칸 — 음악 포켓몬 안내');
 });
 
-test('화면 — 온 창이 떠 있으면 안내 창은 다음에 들어올 때 · 이 기기 저장이 막혀도 안 멈춤(그때는 들어올 때마다)', async () => {
+test('화면 — 잡기 창이 떠 있으면 안내 창은 안 뜬다(v429 — 전엔 온 창) · 다시 들어와도 안내 창은 하나 · 이 기기 저장이 막혀도 안 멈춤(그때는 들어올 때마다)', async () => {
+  // 잡기 창(#catch)은 이 가짜 화면에 없어 소스로 본다 — 띄우는 흐름은 music429
+  assert.match(src('js/pianoview.js').replace(/\r\n/g, '\n'), /function showIntro\(\) \{\n  const host = \$\('view-music'\);\n  settleLostMusicCatch\(\);[^\n]*\n  if \(!host \|\| \$\('pn-intro'\) \|\| isCatchOpen\(\) \|\| S\.catching\) return;/, '잡기 창 위에 겹치지 않는다');
   store.delete('shincoach.musicIntro');
   await setPiano({ notes: 10, mons: 1, days: {} });
-  await PV.enterMusic(); // 안내 창이 먼저 뜬다 — 온 창은 뒤에
+  await PV.enterMusic(); // 안내 창이 뜬다 — 밀린 몫은 기회로(창 없음)
   assert.ok(byId('pn-intro'));
-  await waitFor(() => pianoOf(getProfileSnapshot().piano).mons === 2, '밀린 몫 받기 — 온 창은 안내 뒤에 줄 선다'); // 전체 시험 때 저장이 늦다(v406 전체 시험)
+  await waitFor(() => pianoOf(getProfileSnapshot().piano).mons === 2, '밀린 몫 → 기회'); // 전체 시험 때 저장이 늦다(v406 전체 시험)
   await settle(20);
   // 안내를 닫지 않은 채 다른 화면에 갔다 와도 창은 하나
   PV.leaveMusic();
@@ -223,13 +229,8 @@ test('화면 — 온 창이 떠 있으면 안내 창은 다음에 들어올 때 
   assert.equal(all.filter((e) => e.id === 'pn-intro' && attached(e)).length, 1);
   assert.equal(byId('pn-arrive'), null);
   button('알겠어요!').click();
-  assert.ok(byId('pn-arrive'), '닫으면 온 창');
-  // 온 창이 떠 있는 채로 들어오면 — 안내 창을 겹쳐 띄우지 않는다
+  assert.equal(byId('pn-arrive'), null, '닫아도 「왔어요」 창은 없다(v429)');
   store.delete('shincoach.musicIntro');
-  await PV.enterMusic();
-  assert.equal(byId('pn-intro'), null, '온 창 위에 겹치지 않는다');
-  button('좋아요!').click();
-  assert.equal(byId('pn-intro'), null, '온 창을 닫아도 그 자리에서 뜨지 않는다');
   await PV.enterMusic();
   assert.ok(byId('pn-intro'), '다음에 들어올 때');
   // 저장이 막힌 기기 — 닫히기는 한다 · 본 것이 안 적혀서 다음에 또

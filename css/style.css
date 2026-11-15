@@ -5621,14 +5621,16 @@ button.pn-slots-box:focus-visible { outline: 3px solid #d23a73; outline-offset: 
 .pn-toast b { display: block; font-size: 21px; margin-bottom: 2px; }
 .pn-toast.is-high { top: 22%; } /* 🎺 판 끝 효과 띠(건반 위)를 가리지 않게 (v413) */
 .pn-toast .pn-slots { font-size: 26px; margin: 4px 0; }
-/* 🐾 음악 포켓몬이 왔어요 (v404) — 음악 화면 안 창 · 「좋아요!」로 닫음 */
+/* 🐾 음악 화면 안 창 틀 (v404 「왔어요」 창 → v429부터 🐾 안내 창만 씀 — 잡기는 #catch) */
 .pn-arrive { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(16, 20, 32, .55); }
 .pn-arrive-card { background: #fff; color: #1b2030; border-radius: 20px; padding: 20px 26px 18px; display: grid; justify-items: center; gap: 6px; text-align: center; box-shadow: 0 14px 50px rgba(0, 0, 0, .4); max-width: min(92vw, 380px); animation: pn-arrive-in .35s ease-out; }
 .pn-arrive-h { font-size: 21px; color: #d23a73; }
-.pn-arrive-img { width: 150px; height: 150px; object-fit: contain; }
-.pn-arrive-name { font-size: 26px; font-weight: 800; }
-.pn-arrive-sub { color: #5b6275; font-size: 14px; }
 .pn-arrive-ok { margin-top: 6px; min-width: 140px; font-size: 17px; }
+/* 🎯 음악 포켓몬 잡기 (v429) — 곡 목록·무대의 단추(남은 기회가 있을 때만 · 숫자 없음) · 못 열었을 때 한 줄 · 안내 창 끝 줄 */
+.pn-catch { display: inline-flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.pn-catch-btn { min-height: 44px; font-weight: 800; }
+.pn-catch-msg { margin: 0; flex-basis: 100%; font-size: 14px; color: #5b6275; line-height: 1.45; word-break: keep-all; }
+.pn-intro-catch { text-align: left; justify-self: start; line-height: 1.45; word-break: keep-all; }
 @keyframes pn-arrive-in { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pn-arrive-card { animation: none; } }
 /* 🐾 음악 포켓몬 안내 (v405) — 온 창과 같은 틀 */

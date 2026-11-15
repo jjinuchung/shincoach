@@ -39,7 +39,7 @@ import { copyJourney, mergeJourney } from './journey.js'; // 🎒 포켓몬 대�
 import { pickGhost, readGhosts, writeGhosts, addGhosts, dropGhost } from './ghosts.js'; // 👻 되살린 백업의 영상 자리 (v361 — 순수·localStorage, import 없음)
 import { knownOf, mergeKnown, seenOf, mergeSeen, gMissOf, mergeGMiss, diagOf, mergeDiag, giftOf, mergeGift, videoSeenOf, mergeVideoSeen } from './grammar.js'; // 📝 영어 문법 기록 (v348 — 순수, korean·korwords만 import · v350 🎬 낸 영상 문제)
 const DB_NAME = 'shincoach';
-const DB_VERSION = 4;
+const DB_VERSION = 5; // v429 — 옛 창이 음악 잡기 장부를 지우지 못하게 판 번호만 · 스토어 변화 없음(옛 창은 onversionchange로 닫힘)
 
 // 학습 기록 스토어 (v2에서 추가)
 //  sentenceStats: 문장별 누적 { key: "<itemId>|<start×10>", itemId, start, en, ko, plays, listens, done, seconds,

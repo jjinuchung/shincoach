@@ -31,7 +31,7 @@ import { moveBlocksTrip, moveStartRule, moveAnswerRule, moveSwapRule, moveEventR
 import { copyJourney, startRule as jrStartRule, answerRule as jrAnswerRule, swapRule as jrSwapRule, homeRule as jrHomeRule, pickRule as jrPickRule, eventRule as jrEventRule } from './journey.js'; // 🎒 포켓몬 대여행 (v341, 순수) · 구역 이벤트 (v362)
 import { copyAqua, aquaTierRule, aquaBuyRule, aquaPutRule, aquaTakeRule, aquaSlotRule } from './aquarium.js'; // 🐠 진우 아쿠아리움 (v399 — 순수)
 import { copyTour, tourEndRule, bookRule as tourBookRule } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 (v401 — 순수)
-import { copyPiano, pianoOf, tapRule as pianoTapRule, listenRule as pianoListenRule, monsDueRule as pianoMonsDueRule } from './piano.js'; // 🎹 음악 과목 (v402 — 순수 · v404 음악 포켓몬)
+import { copyPiano, pianoOf, tapRule as pianoTapRule, listenRule as pianoListenRule, monsDueRule as pianoMonsDueRule, musicTakeRule, musicGiveBackRule, musicJudgedRule, musicThrowsLeft } from './piano.js'; // 🎹 음악 과목 (v402 — 순수 · v404 음악 포켓몬 · v429 🎯 잡기 기회)
 import { copyLake, catchRule as lakeCatchRule, gearBuyRule as lakeGearRule, pickRule as lakePickRule, gearOf as lakeGearOf } from './fishing.js'; // 🎣 학습 낚시터 도감·💰 · 🎒 채비·고른 물가(v368) (순수)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
@@ -1104,20 +1104,33 @@ export function tourBook(req) {
   return houseDo((p) => tourBookRule(p, req, Date.now()));
 }
 /** 🎹 태블릿으로 치기 한 판 끝 (v402) — 💰는 저장된 프로필로 한 트랜잭션에서(두 창이어도 하루 TAP_DAY번) · 날은 트랜잭션 안의 시각으로 ·
- *  🎹 건반 칸 열이 차면 음악 포켓몬도 같은 트랜잭션에서(v413 — got) */
+ *  📖 책 곡 열 번이 차면 🎯 잡기 기회도 같은 트랜잭션에서(v413 음악 포켓몬 → v429 기회 — chances) */
 export function pianoTap(req) {
-  return houseDo((p) => pianoTapRule(p, req, Date.now(), musicPool(p), Math.random));
+  return houseDo((p) => pianoTapRule(p, req, Date.now()));
 }
-/** 🎹 음악 포켓몬 후보 (v404) — 명단의 음악 50 · 등급은 넘겨받은 프로필에서(부모가 옮긴 등급까지 · 트랜잭션 안의 저장된 프로필) */
-const MUSIC_IDS = ROSTER.filter((r) => r.subject === 'music').map((r) => r.id);
-const musicPool = (pf) => MUSIC_IDS.map((id) => ({ id, r: rarityIn(pf, id) }));
-/** 🎧 「다 쳤어요 ✋」 (v402) — 음표 칸은 저장된 프로필로 한 트랜잭션에서(하루 세 칸) · 다섯 칸이 차면 음악 포켓몬도 같은 트랜잭션에서(v404 — got) */
+/** 🎧 「다 쳤어요 ✋」 (v402) — 음표 칸은 저장된 프로필로 한 트랜잭션에서(하루 세 칸) · 다섯 칸이 차면 🎯 잡기 기회도 같은 트랜잭션에서(v404 음악 포켓몬 → v429 기회 — chances) */
 export function pianoListen(req) {
-  return houseDo((p) => pianoListenRule(p, req, Date.now(), musicPool(p), Math.random));
+  return houseDo((p) => pianoListenRule(p, req, Date.now()));
 }
-/** 🎹 밀린 음악 포켓몬 (v404) — 음악 화면에 들어올 때 · v402·v403 때 찬 다섯 칸 몫 · 저장이 실패해 못 받은 몫 → { ok, got } */
+/** 🎹 밀린 몫 (v404) — 음악 화면에 들어올 때 · 업데이트 전·저장 실패로 못 받은 몫 → { ok, chances } (v429부터 🎯 잡기 기회로 바뀐다) */
 export function pianoMonsDue() {
-  return houseDo((p) => pianoMonsDueRule(p, Date.now(), musicPool(p), Math.random));
+  return houseDo((p) => pianoMonsDueRule(p, Date.now()));
+}
+/** 🎯 음악 잡기 기회 하나 빼기 (v429) — 잡기 화면을 띄우기 전에(두 창이 같은 기회를 두 번 던지지 못하게) */
+export function pianoTakeThrow() {
+  return houseDo((p) => musicTakeRule(p));
+}
+/** 🎯 뺐는데 한 번도 안 던지고 닫았다 → 돌려준다 (v429) */
+export function pianoGiveBackThrow() {
+  return houseDo((p) => musicGiveBackRule(p));
+}
+/** 🎯 던져서 판정이 났다 — 📤 기록 줄에 잡음·놓침과 포켓몬 (v429 · 기록만 · 잡기 저장과 따로) */
+export function pianoJudged(id, caught) {
+  return houseDo((p) => musicJudgedRule(p, id, caught, Date.now()));
+}
+/** 🎯 남은 음악 잡기 기회 (v429 · 그리기용 — 메모리 프로필) */
+export function pianoThrowsLeft() {
+  return musicThrowsLeft(profile && profile.piano);
 }
 /** 🎹 지금 음악 기록 (그리기용 — 고쳐 읽은 새 객체) */
 export function pianoNow() {

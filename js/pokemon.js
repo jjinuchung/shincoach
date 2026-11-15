@@ -14,7 +14,7 @@ import { getCharacters, putCharacter } from './db.js';
  * subject — 🎯 **어디서 잡히나**만 가른다: 없으면 영어(퍼즐 정답 뒤 잡기), 'math'면 수학(☀️ 완주·개념 편 통과 뒤 잡기),
  *           'korean'이면 📚 국어(글을 다 읽고 별을 새로 받을 때), 'nonsul'이면 🖊️ 논술(그날 처음 끝낸 논술 판),
  *           'letter'면 📮 편지(정말 잘 쓴 영어 답장 — letters.js · 잡히지 않고 친구가 된다),
- *           'music'이면 🎹 음악(🎧 「다 쳤어요 ✋」 ♪ 다섯 칸마다 한 마리가 온다 — piano.js · 잡기 없음).
+ *           'music'이면 🎹 음악(🎧 ♪ 다섯 칸 · 📖 책 곡 하루 열 번마다 잡기 기회 — piano.js · v404~v428은 잡기 없이 그냥 왔다 · v429부터 잡기).
  * 도감·파트너·배틀·꾸미기·상점·레벨·코인은 과목이 한 몸이다 (아버님 2026-09-22: "모으는 곳은 한 곳이어야 재미가 안 반감된다").
  * 왜 새 150을 더했나: 아이가 영어(쉬움·🎯 하루 4회)만 골라서, 수학에서만 만나는 얼굴이 있어야 수학으로 간다.
  */
@@ -672,7 +672,7 @@ export const ROSTER = [
   { id: 875, ko: '빙큐보', en: 'Eiscue', subject: 'letter' }, // 보통 g8
   { id: 931, ko: '시비꼬', en: 'Squawkabilly', subject: 'letter' }, // 흔함 g9
   { id: 962, ko: '떨구새', en: 'Bombirdier', subject: 'letter' }, // 희귀 g9
-  // 🎹 음악 전용 50 (2026-11-09 아버님 「이대로」 — 기본안 EGq5MVTaHoizdPmxVTPzqb) — 🎧 듣고 따라 치기 ♪ 다섯 칸마다 한 마리가 온다(잡기 없음 · piano.listenRule)
+  // 🎹 음악 전용 50 (2026-11-09 아버님 「이대로」 — 기본안 EGq5MVTaHoizdPmxVTPzqb) — 🎧 ♪ 다섯 칸 · 📖 책 곡 하루 열 번마다 잡기 기회(v429 — 전엔 잡기 없이 한 마리가 왔다 · piano.giveChances · pianoview.runMusicCatch)
   //   명단에 한 마리도 없던 진화 가족만 · 다른 과목 잡기·알·5일장·배틀 상대·대여행·기술 배우기·문법 🎁에서 안 나온다(isMusicMon) · 진화는 음악 가족 안에서
   //   흔함 20 · 보통 15 · 희귀 10 · 전설 5 · 이름·등급·타입은 PokeAPI(.context/v404/make_lines.mjs) · 노래·소리와 닿는 것은 메로엣타·음뱃·누리공·푸린이 이미 다른 과목이라 14마리뿐
   { id: 433, ko: '랑딸랑', en: 'Chingling', subject: 'music' }, // 흔함 g4
@@ -1252,25 +1252,38 @@ async function anchorOf(blob) {
   return r.anchor;
 }
 
+/** 그림 한 장 받기 제한 시간(본문까지) — 느린 와이파이에서도 한 장(수백 KB)은 넉넉히 · 끝나지 않는 요청은 끊는다 (v429) */
+export const ART_FETCH_MS = 20000;
+
 /**
  * 명단 중 아직 없는 캐릭터를 인터넷에서 받아 저장. onProgress(done, total, name)
  * 반환: { ok: 받은 수, fail: 실패 수 } — 일부 실패해도 받은 것은 남고, 다시 누르면 없는 것만 이어서 받음
  */
-export async function downloadCharacters(onProgress, limit, subject) {
+export async function downloadCharacters(onProgress, limit, subject, order) {
   const have = new Set((await loadCharacters()).map((c) => c.id));
   // limit이 있으면 그만큼만 — 한 번에 수십 마리를 받다 느린 와이파이에서 끊기면
   // 받은 것도 없이 끝나기 때문에, 자동 받기는 조금씩 나눠 받는다.
   // subject('math')를 주면 그 과목 것부터 — 명단 뒤쪽의 수학 150마리가 영어 다음에 오므로, 수학 화면은 제 것을 먼저 받는다
-  const todo = forSubject(ROSTER, subject).filter((r) => !have.has(r.id)).slice(0, limit && limit > 0 ? limit : undefined);
+  // order(번호 차례)를 주면 그 과목 가운데 그 차례로 — 🎯 음악 잡기는 안 만난 아이·등급 무게 차례로 받는다(음악 명단은 흔함 스물부터라 명단 차례면 희귀·전설이 한동안 안 나온다 · v429)
+  const list = forSubject(ROSTER, subject);
+  const ranked = Array.isArray(order) ? order.map((id) => list.find((r) => r.id === id)).filter(Boolean) : list;
+  const todo = ranked.filter((r) => !have.has(r.id)).slice(0, limit && limit > 0 ? limit : undefined);
   let ok = 0;
   let fail = 0;
   for (let i = 0; i < todo.length; i++) {
     const r = todo[i];
     if (onProgress) onProgress(i, todo.length, r.ko);
+    // 한 장마다 제한 시간 — 끝나지 않는 요청 하나가 받기 전체(🎯 음악 잡기의 묶은 받기 · 과목 자동 받기의 「받는 중」)를 영영 붙잡지 않게 (Codex 234차 P2)
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), ART_FETCH_MS) : 0;
     try {
-      const res = await fetch(ART_URL(r.id), { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const made = await prepare(await res.blob());
+      let blob;
+      try {
+        const res = await fetch(ART_URL(r.id), ctl ? { cache: 'no-store', signal: ctl.signal } : { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        blob = await res.blob();
+      } finally { clearTimeout(timer); }
+      const made = await prepare(blob);
       await putCharacter({ id: r.id, ko: r.ko, en: r.en, blob: made.blob, anchor: made.anchor, savedAt: Date.now() });
       ok++;
     } catch (e) {

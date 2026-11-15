@@ -78,7 +78,7 @@ test('🔌 화면 잇기 — ▶ 시작에 메뉴 접기(🎹 태블릿·무대�
   assert.match(v, /G\.keysH = playing \? playKeysH\(G\.H, keysH0, G\.up0\) : keysH0;/);
   assert.match(v, /G\.sheetH = S\.lv === 1 \? \(playing && G\.sheet0 \? Math\.min\(G\.sheet0, G\.keysTop - 60\) : Math\.round\(G\.H \* 0\.42\)\) : G\.keysTop - 38;\n\s+if \(!playing\) \{ G\.up0 = G\.keysTop; G\.sheet0 = G\.sheetH; \}/, '접기 전 위쪽·악보 높이를 기억');
   assert.match(v, /const pz = btn\('⏸', 'btn pn-pause', \(\) => toggle\(\)\);\n\s+pz\.id = 'pn-pause';\n\s+pz\.setAttribute\('aria-label', '멈춤'\);/);
-  assert.match(v, /cap: '<br>오늘 음악 포켓몬은 만났어요 — 내일 또 만나요!',/);
+  assert.match(v, /cap: '<br>오늘 음악 포켓몬 잡을 기회는 받았어요 — 내일 또 쳐요!',/); // v429 — 하루 한 마리 → 하루 한 기회
   assert.doesNotMatch(v, /TAP_SLOT_DAY/);
   const css = src('css/style.css');
   assert.match(css, /#view-music\.pn-playing > \.topbar, #view-music\.pn-playing \.pn-stage-wrap > \.pn-row \{ display: none; \}/);

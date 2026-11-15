@@ -2,12 +2,13 @@
 //   ① 🎹 태블릿으로 치기도 「곡 전체」를 잘 끝까지 치면 건반 한 칸(하루 열 칸) · 열 칸이면 음악 포켓몬 — ♪ 칸과 따로
 //   ② 「치다 보면 멈췄다가 3~4초 뒤 풀린다」 — 연주 중 위쪽 톡이 ⏸가 되던 것 · 건반 바로 위 띠는 건반 · 판 도중 멈춤은 크게 · 화면 멈칫은 📤
 //   ③ 끝날 때 박자 판정(진우 바람) — 🎉 빵빠레 · 👏 짝짝 · 🎺 뿌우~ · 점수는 📤에만 · 보상과 상관없음
+//   (v429) 열 칸 몫은 음악 포켓몬이 아니라 🎯 잡기 기회(chances) — 「왔어요」 창 대신 잡기 흐름(이 가짜 화면엔 그림이 없어 「그림을 못 받았어요」 한 줄 · 띄우는 흐름은 music429)
 import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  TAPS_PER_MON, TAP_DAY, COIN, BEAT, STALL, GRADE_DAILY, PIANO_DAILY, MONS_AT_ONCE,
+  TAPS_PER_MON, TAP_DAY, COIN, BEAT, STALL, GRADE_DAILY, PIANO_DAILY,
   tapRule, listenRule, monsDueRule, pianoOf, copyPiano, mergePiano, slotsOf, todayOf, dayKeyOf, stepPoint, beatScore, beatGrade, pianoDayLine, pianoMd,
 } from '../js/piano.js';
 import { SUBJECTS } from '../js/home.js';
@@ -21,35 +22,33 @@ const src = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const REQ = { song: 'ode', line: -1, hand: 'R', lv: 1, sp: 1, book: true }; // v423 — 🎹 칸은 📖 진우 책 곡만(book) · 연습곡은 music423
 const NOW = new Date('2026-11-10T18:00:00').getTime();
 const DAY = 86400000;
-const POOL = [{ id: 433, r: 1 }, { id: 358, r: 2 }, { id: 1024, r: 4 }];
-const rng0 = () => 0;
 
 // ───────────────────── ① 🎹 건반 칸 (순수) ─────────────────────
 
-test('🎹 건반 칸 — 「곡 전체」를 잘 친 판만 · 한 줄 연습·잘 못 친 판은 안 셈 · 💰 한도와 따로 · 하루 열 칸 · 열 칸이면 음악 포켓몬', () => {
+test('🎹 건반 칸 — 「곡 전체」를 잘 친 판만 · 한 줄 연습·잘 못 친 판은 안 셈 · 💰 한도와 따로 · 하루 열 칸 · 열 칸이면 🎯 잡기 기회(v429 — 전엔 음악 포켓몬)', () => {
   assert.equal(TAPS_PER_MON, 10);
   const p = { coins: 0, coinsEarned: 0 };
-  const line = tapRule(p, { ...REQ, line: 0, ok: 9, bad: 1 }, NOW, POOL, rng0);
+  const line = tapRule(p, { ...REQ, line: 0, ok: 9, bad: 1 }, NOW);
   assert.deepEqual([line.slot, line.coins, line.taps], ['line', COIN.line, 0], '한 줄 연습은 💰만');
-  const miss = tapRule(p, { ...REQ, ok: 6, bad: 4 }, NOW, POOL, rng0);
+  const miss = tapRule(p, { ...REQ, ok: 6, bad: 4 }, NOW);
   assert.deepEqual([miss.slot, miss.coins, miss.why, miss.taps], ['try', 0, 'try', 0], '맞게 70% 아래는 칸도 💰도 없음');
   const r = [];
-  for (let i = 0; i < 11; i += 1) r.push(tapRule(p, { ...REQ, ok: 9, bad: 1 }, NOW, POOL, rng0));
+  for (let i = 0; i < 11; i += 1) r.push(tapRule(p, { ...REQ, ok: 9, bad: 1 }, NOW));
   assert.deepEqual(r.map((x) => x.slot), [...Array(10).fill('ok'), 'cap'], '책 곡 열 번 · 열하나째는 cap(하루 한 마리 — v420 · v423)');
   assert.deepEqual(r.map((x) => x.coins), [15, 15, 15, 15, 0, 0, 0, 0, 0, 0, 0], `💰는 하루 ${TAP_DAY}번 (한 줄 판 하나 포함) — 칸과 따로`);
-  assert.deepEqual(r.map((x) => x.got.length), [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], '열째 칸에 한 마리');
-  assert.deepEqual([r[9].got[0], r[9].firsts[0], r[9].taps, r[9].tapMons], [433, true, 10, 1], '안 만난 아이 가운데 무게대로 · 받은 수 +1');
+  assert.deepEqual(r.map((x) => x.chances), [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], '열째 칸에 기회 하나');
+  assert.deepEqual([r[9].left, r[9].taps, r[9].tapMons], [1, 10, 1], '남은 기회 하나 · 몫을 받은 수 +1');
   assert.deepEqual(r.slice(0, 9).map((x) => x.taps), Array(9).fill(0), 'v420 — 모든 칸은 열 번을 채운 때 열 묶음째로');
-  assert.equal(p.caught[433], 1, '도감에 들어감');
+  assert.equal(p.caught, undefined, '음악 포켓몬은 그냥 오지 않는다 — 잡기 화면에서');
   assert.deepEqual(todayOf(p, NOW), { paid: 5, coins: 65, notes: 0, taps: 10, book: { n: 10, at: NOW }, won: 1 });
   const log = pianoOf(p.piano).log;
   assert.deepEqual(log.filter((x) => x.m === 't').map((x) => x.x), [0, 0, ...Array(10).fill(1), 0], '기록 줄 x = 건반 칸을 셌나');
-  assert.equal(log.filter((x) => x.m === 'p').length, 1, '온 줄');
+  assert.deepEqual(log.filter((x) => x.m === 'b').map((x) => [x.s, x.c]), [['t', 1]], '기회가 생긴 줄 — 책 곡 열 번');
   // 다음 날은 처음부터 (v420 · v423 — 그날 책 곡 한 칸)
-  const next = tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW + DAY, POOL, rng0);
-  assert.deepEqual([next.slot, next.taps, next.tapMons, next.got.length, next.book], ['ok', 10, 1, 0, { n: 1, at: NOW + DAY }]);
+  const next = tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW + DAY);
+  assert.deepEqual([next.slot, next.taps, next.tapMons, next.chances, next.book], ['ok', 10, 1, 0, { n: 1, at: NOW + DAY }]);
   // 시계가 뒤로 가면 아무것도 안 셈
-  assert.deepEqual(tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW - 3 * DAY, POOL, rng0), { ok: false, why: 'clock' });
+  assert.deepEqual(tapRule(p, { ...REQ, ok: 9, bad: 0 }, NOW - 3 * DAY), { ok: false, why: 'clock' });
 });
 
 test('🎹 건반 칸 저장 — 받은 수는 묶음 수보다 클 수 없다 · 날 칸은 하루 칸으로 자르지 않는다 · 옛 기록(칸 없음)은 0 · 병합은 큰 쪽 · 복사', () => {
@@ -61,7 +60,7 @@ test('🎹 건반 칸 저장 — 받은 수는 묶음 수보다 클 수 없다 �
   assert.equal(pianoOf({ days: { [today]: { paid: 0, coins: 0, notes: 0, taps: 400 } } }).days[today].taps, 99, '터무니없는 수만 막는다');
   // v420 · v423 — 옛 규칙으로 칸이 찬 날도 새 규칙은 0부터(책 곡 한 칸) · 날 칸은 그대로(열 번을 채우기 전엔 안 늚)
   const over = { coins: 0, coinsEarned: 0, piano: { taps: 12, tapMons: 1, days: { [today]: { paid: 0, coins: 0, notes: 0, taps: 12 } } } };
-  assert.deepEqual([tapRule(over, { ...REQ, ok: 9, bad: 1 }, NOW, POOL, rng0).slot, todayOf(over, NOW).taps, todayOf(over, NOW).book], ['ok', 12, { n: 1, at: NOW }], '옛 날 칸 그대로 · 새 규칙은 한 칸부터');
+  assert.deepEqual([tapRule(over, { ...REQ, ok: 9, bad: 1 }, NOW).slot, todayOf(over, NOW).taps, todayOf(over, NOW).book], ['ok', 12, { n: 1, at: NOW }], '옛 날 칸 그대로 · 새 규칙은 한 칸부터');
   assert.equal(pianoOf({ days: { [today]: { paid: 0, coins: 0, notes: 0, taps: 7 } } }).taps, 7, '모든 칸은 날 칸 합보다 작을 수 없다');
   assert.deepEqual(pianoOf({ days: { [today]: { paid: 1, coins: 5, notes: 0 } } }).days[today], { paid: 1, coins: 5, notes: 0 }, '칸이 없는 날은 옛 꼴 그대로');
   const m = mergePiano({ taps: 12, tapMons: 1, days: { [today]: { paid: 1, coins: 5, notes: 0, taps: 2 } } }, { taps: 8, tapMons: 0, days: { [today]: { paid: 2, coins: 10, notes: 1, taps: 1 } } });
@@ -74,17 +73,17 @@ test('🎹 건반 칸 저장 — 받은 수는 묶음 수보다 클 수 없다 �
   assert.deepEqual(slotsOf(7, 0), { filled: 5, sets: 1 }, '♪ 칸은 그대로 다섯');
 });
 
-test('🎹 밀린 몫 — 들어올 때 ♪ 몫 다음 건반 몫 · 한 번에 다섯까지 · 「다 쳤어요」도 건반 몫을 함께 · 후보가 없으면 남는다', () => {
+test('🎹 밀린 몫 — 들어올 때 ♪ 몫과 건반 몫이 모두 🎯 잡기 기회로(v429 — 전엔 한 번에 다섯 마리까지 · 후보가 없으면 남음) · 「다 쳤어요」도 밀린 건반 몫을 함께', () => {
   const p = { piano: { notes: 10, mons: 1, taps: 40, tapMons: 0, days: {} } };
-  const a = monsDueRule(p, NOW, POOL, rng0);
-  assert.equal(a.got.length, MONS_AT_ONCE, '♪ 하나 + 건반 넷');
+  const a = monsDueRule(p, NOW);
+  assert.deepEqual([a.chances, a.left], [5, 5], '♪ 하나 + 건반 넷 — 기회는 창이 아니라 장부라 상한 없이');
   const tr = pianoOf(p.piano);
-  assert.deepEqual([tr.mons, tr.tapMons], [2, 4]);
+  assert.deepEqual([tr.mons, tr.tapMons, tr.ball.earned], [2, 4, 5]);
+  assert.deepEqual(tr.log.filter((x) => x.m === 'b').map((x) => [x.s, x.c]), [['n', 1], ['t', 4]], '기회 줄 — ♪ · 책 곡');
+  assert.equal(p.caught, undefined, '음악 포켓몬은 그냥 오지 않는다');
   const none = { piano: { taps: 10, days: {} } };
-  assert.equal(monsDueRule(none, NOW, [], rng0).got.length, 0);
-  assert.equal(pianoOf(none.piano).tapMons, 0, '후보가 없으면 몫은 남는다');
-  const l = listenRule(none, { ...REQ, line: 0 }, NOW, POOL, rng0);
-  assert.deepEqual([l.counted, l.got.length], [true, 1], '「다 쳤어요」 때 밀린 건반 몫도 온다');
+  const l = listenRule(none, { ...REQ, line: 0 }, NOW);
+  assert.deepEqual([l.counted, l.chances], [true, 1], '「다 쳤어요」 때 밀린 건반 몫도 기회로');
 });
 
 // ───────────────────── ③ 🎺 박자 판정 (순수) ─────────────────────
@@ -101,9 +100,9 @@ test('🎺 박자 판정 — 걸음마다 제때 한 점 · 반 점 · 0점 · �
   assert.equal(beatGrade(100, 6, 4), 'boo', '건반을 마구 누른 판(맞게 70% 아래)은 박자가 맞아도 🎺');
   assert.deepEqual(GRADE_DAILY, { great: 'pnFan', good: 'pnClap', boo: 'pnBoo' });
   const p = {};
-  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 85, st: 3210 }, NOW, POOL, rng0);
-  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 101, st: 400 }, NOW, POOL, rng0);
-  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 'x' }, NOW, POOL, rng0);
+  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 85, st: 3210 }, NOW);
+  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 101, st: 400 }, NOW);
+  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 'x' }, NOW);
   const rows = pianoOf(p.piano).log;
   assert.deepEqual([rows[0].g, rows[0].st], [85, 3210]);
   assert.deepEqual(['g' in rows[1], 'st' in rows[1], 'g' in rows[2]], [false, false, false], '깨진 점수 · 1초 아래 멈칫은 안 남긴다');
@@ -120,10 +119,10 @@ test('📤 하루 줄 — 건반 칸 · 박자 🎉👏🎺 · 화면 멈칫(멈
   assert.equal(pianoDayLine({ pnStallN: 2, pnStallLong: 1 }), '⚠️ 연주 중 화면 멈칫 2번(2.5초 넘게 1번)', '멈칫만 있던 날도');
   assert.equal(pianoDayLine({ pnStallLong: 1 }), '');
   const p = {};
-  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 85, st: 3210 }, NOW, POOL, rng0);
-  tapRule(p, { ...REQ, line: 0, ok: 6, bad: 4, g: 95 }, NOW, POOL, rng0);
+  tapRule(p, { ...REQ, ok: 9, bad: 1, g: 85, st: 3210 }, NOW);
+  tapRule(p, { ...REQ, line: 0, ok: 6, bad: 4, g: 95 }, NOW);
   const md = pianoMd(p.piano, '2026-11-10');
-  assert.match(md, /- 🎹 건반 칸\(v413\) = 🎹 태블릿 치기로 「곡 전체」를 잘\(맞게 70% 넘게\) 끝까지 친 판 — 줄 끝 「🎹 칸」 · v423부터 \*\*📖 진우 책 곡\(아빠가 넣은 곡\)을 하루에 10번\*\* 치면 🐾 음악 포켓몬 한 마리/);
+  assert.match(md, /- 🎹 건반 칸\(v413\) = 🎹 태블릿 치기로 「곡 전체」를 잘\(맞게 70% 넘게\) 끝까지 친 판 — 줄 끝 「🎹 칸」 · v423부터 \*\*📖 진우 책 곡\(아빠가 넣은 곡\)을 하루에 10번\*\* 치면 몫 하나 — v428까지 🐾 음악 포켓몬이 그냥 왔고 v429부터 🎯 잡기 기회/);
   assert.match(md, /- 박자\(v413\) = .*🎉 빵빠레 80점 이상 · 👏 짝짝 50점 이상 · 🎺 뿌우~ 그 아래/);
   assert.match(md, /- 멈칫\(v413\) = 그 판 동안 화면이 1초 넘게 멈춘 가장 긴 시간/);
   assert.doesNotMatch(md, /\n🎹 건반 칸 모두/, 'v420 — 열 번을 채우기 전엔 모든 칸이 안 늚');
@@ -132,14 +131,14 @@ test('📤 하루 줄 — 건반 칸 · 박자 🎉👏🎺 · 화면 멈칫(멈
   assert.match(md, /🎹 치기 · ode 1째 줄 · 오른손 · 도움 1 · 100% · 맞게 6\/10 \(60%\) · 박자 95점 🎺\n/, '잘 못 친 판은 점수가 높아도 🎺');
   assert.doesNotMatch(pianoMd({ notes: 1 }, '2026-11-10'), /🎹 건반 칸 모두/, '칸이 없으면 그 줄 없음');
   assert.ok(pianoMd({ taps: 1 }, '2026-11-10'), '칸만 있어도 파일');
-  assert.match(src('js/upload.js'), /🎹 건반 칸\(v413\) = 태블릿 치기로 「곡 전체」를 잘 끝까지 친 판\(하루 열 칸 · 열 칸마다 음악 포켓몬 · v423부터 📖 진우 책 곡만 — 자세히는 music\.md\) · 박자 🎉 빵빠레·👏 짝짝·🎺 뿌우~ = 판 끝 박자 판정\(아이 화면엔 점수 없음 · 점수는 music\.md\) · ⚠️ 연주 중 화면 멈칫 = 연주 중에 화면이 1초 넘게 멈춘 번/);
+  assert.match(src('js/upload.js'), /🎹 건반 칸\(v413\) = 태블릿 치기로 「곡 전체」를 잘 끝까지 친 판\(하루 열 칸 · 열 칸마다 음악 포켓몬 · v423부터 📖 진우 책 곡만 · v429부터 🎯 잡기 기회 — 자세히는 music\.md\) · 박자 🎉 빵빠레·👏 짝짝·🎺 뿌우~ = 판 끝 박자 판정\(아이 화면엔 점수 없음 · 점수는 music\.md\) · ⚠️ 연주 중 화면 멈칫 = 연주 중에 화면이 1초 넘게 멈춘 번/);
 });
 
 test('🔌 잇기 — 홈 카드 · xp 한 트랜잭션 · 안내 판 · CSS · sw v413', () => {
-  assert.equal(SUBJECTS.find((s) => s.key === 'music').desc, '🐾 끝까지 치면 음악 포켓몬!');
-  assert.match(src('js/xp.js'), /pianoTapRule\(p, req, Date\.now\(\), musicPool\(p\), Math\.random\)/);
+  assert.equal(SUBJECTS.find((s) => s.key === 'music').desc, '🎯 끝까지 치면 음악 포켓몬 잡기!'); // v429
+  assert.match(src('js/xp.js'), /pianoTapRule\(p, req, Date\.now\(\)\)/); // v429 — 후보 풀은 잡기 화면에서
   const v = src('js/pianoview.js');
-  assert.match(v, /const INTRO_VER = '4';/); // v420 · v423 — 새 규칙으로 한 번 더
+  assert.match(v, /const INTRO_VER = '5';/); // v420 · v423 · v429 — 새 규칙으로 한 번 더
   const css = src('css/style.css');
   for (const s of ['.pn-tkeys {', '.pn-tkeys span.on {', '.pn-intro-way {', '.pn-toast .pn-tkeys span {', '.pn-toast.is-high { top: 22%; }']) assert.ok(css.includes(s), s);
   assert.match(css, /\.pn-intro-card \{ max-height: calc\(100vh - 32px\); max-height: calc\(100dvh - 32px\); overflow-y: auto; \}/, '안내 창이 길어져도 낮은 화면에서 내려 본다');
@@ -239,7 +238,7 @@ globalThis.localStorage = {
 };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
 store.set('shincoach.pianoSongs', JSON.stringify([{ ...PUBLIC_SONGS[0], id: 'bk', ko: '책 곡' }])); // 📖 진우 책 곡 하나 — v423부터 🎹 칸은 책 곡만
-store.set('shincoach.musicIntro', '4');
+store.set('shincoach.musicIntro', '5'); // v429 판
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(cond, what, ms = 4000) {
   const t0 = Date.now();
@@ -462,7 +461,7 @@ test('③ 🔁 계속 — 효과 동안 다음 판 준비 숫자를 가린다 ·
   assert.equal(P.S.fx, null, '판을 새로 하면 효과는 지운다');
 });
 
-test('① 화면 — 🎹 치기 칸은 건반 열 · 곡 전체를 잘 치면 한 칸(알림에 칸 그림) · 한 줄 연습은 「곡 전체」 안내 · 열째 칸에 음악 포켓몬 · 하루 칸', async () => {
+test('① 화면 — 🎹 치기 칸은 건반 열 · 곡 전체를 잘 치면 한 칸(알림에 칸 그림) · 한 줄 연습은 「곡 전체」 안내 · 열째 칸에 🎯 잡기 기회(v429) · 하루 칸', async () => {
   await setPiano({ taps: 0, tapMons: 0, days: {} });
   stage({ song: 'bk' });
   assert.match(byId('pn-slots').innerHTML, /^<span class="pn-tkeys">(<span class=""><\/span>){10}<\/span>/);
@@ -490,51 +489,64 @@ test('① 화면 — 🎹 치기 칸은 건반 열 · 곡 전체를 잘 치면 �
   await waitFor(() => /🎼 연습곡은 🎹 칸이 안 차요 — 📖 진우 책 곡으로 채워요/.test(byId('pn-toast').innerHTML), '연습곡 안내');
   assert.equal(bookN(), 1, '연습곡은 안 셈');
   assert.equal(num((await daily()).pnTapSlots) - num(d0.pnTapSlots), 1, '하루 칸도 그대로');
-  // 책 곡으로 아홉 칸 찬 날 — 열째 판에 음악 포켓몬 (v423 — 곡을 섞어도)
+  // 책 곡으로 아홉 칸 찬 날 — 열째 판에 🎯 잡기 기회 (v423 — 곡을 섞어도 · v429 — 음악 포켓몬 대신 기회)
   await setPiano({ taps: 0, tapMons: 0, days: { [clockDay()]: { paid: 0, coins: 0, notes: 0, book: { n: 9 } } } });
+  P.S.catchMsg = '';
   stage({ song: 'bk' });
   assert.match(byId('pn-slots').innerHTML, /^<span class="pn-tkeys">(<span class="on"><\/span>){9}<span class=""><\/span><\/span>/);
-  const m0 = num((await daily()).pnMons);
+  assert.equal(byId('pn-catch').hidden, true, '기회가 없으면 잡기 단추 칸은 숨음');
+  const b0 = num((await daily()).pnBall);
   byId('pn-go').click();
   playTimed(0);
-  await waitFor(() => byId('pn-arrive'), '온 창');
-  assert.match(byId('pn-arrive').textContent, /🎵 (새 음악 포켓몬이 왔어요!|음악 포켓몬이 또 놀러 왔어요!)/);
-  assert.deepEqual([piano().taps, piano().tapMons], [10, 1]);
-  assert.match(byId('pn-slots').innerHTML, /<span class="pn-tkeys">(<span class="on"><\/span>){10}<\/span>/, '오늘 받았으면 가득(하루 한 마리 · v420)');
-  await waitFor(async () => num((await daily()).pnMons) === m0 + 1, '하루 칸 온 수');
-  button('좋아요!').click();
+  await waitFor(() => P.S.catchMsg && !P.S.catching, '잡기 흐름(이 가짜 화면엔 그림이 없어 못 엶)');
+  assert.equal(byId('pn-arrive'), null, '「왔어요」 창은 없다');
+  assert.match(P.S.catchMsg, /그림을 아직 못 받았어요.*잡을 기회는 그대로/, '그림이 없으면 한 줄 — 기회는 남는다');
+  assert.deepEqual([piano().taps, piano().tapMons, piano().ball], [10, 1, { earned: 1, used: 0, refunded: 0 }], '뺀 것 없음');
+  assert.equal(Object.keys(getProfileSnapshot().caught).filter((id) => [433, 358, 1024].includes(Number(id)) && getProfileSnapshot().caught[id] > 0).length, 0, '그냥 오지 않는다');
+  assert.match(byId('pn-toast').innerHTML, /🎯 음악 포켓몬을 잡을 기회!/);
+  assert.match(byId('pn-slots').innerHTML, /<span class="pn-tkeys">(<span class="on"><\/span>){10}<\/span>/, '오늘 받았으면 가득(하루 한 번 · v420)');
+  assert.equal(byId('pn-catch').hidden, false);
+  assert.ok(button('🎯 음악 포켓몬 잡기'), '무대에 잡기 단추(숫자 없음)');
+  assert.doesNotMatch(byId('pn-catch').textContent, /\d/);
+  await waitFor(async () => num((await daily()).pnBall) === b0 + 1, '하루 칸 생긴 기회');
   // 오늘은 받았다 — 더 쳐도 💰만
   stage({ song: 'bk' });
   byId('pn-go').click();
   playTimed(0);
-  await waitFor(() => /오늘 음악 포켓몬은 만났어요/.test(byId('pn-toast').innerHTML), '하루 한 마리');
-  assert.equal(piano().taps, 10);
+  await waitFor(() => /오늘 음악 포켓몬 잡을 기회는 받았어요/.test(byId('pn-toast').innerHTML), '하루 한 번');
+  assert.deepEqual([piano().taps, piano().ball.earned], [10, 1]);
 });
 
-test('① 들어올 때 밀린 건반 몫도 — 저장이 실패해 못 받은 몫', async () => {
+test('① 들어올 때 밀린 건반 몫도 — 저장이 실패해 못 받은 몫 → 🎯 잡기 기회(바로 띄우지 않고 단추 · v429)', async () => {
   await setPiano({ taps: 20, tapMons: 1, days: {} });
+  P.S.catchMsg = '';
   PV.leaveMusic();
   await PV.enterMusic();
-  await waitFor(() => byId('pn-arrive'), '밀린 몫 온 창');
-  assert.equal(piano().tapMons, 2);
-  button('좋아요!').click();
+  await waitFor(() => piano().tapMons === 2, '밀린 몫 → 기회');
+  assert.deepEqual(piano().ball, { earned: 1, used: 0, refunded: 0 });
+  await settle(30);
+  assert.equal(P.S.catching, false, '밀린 기회는 바로 띄우지 않는다');
+  assert.equal(byId('pn-arrive'), null);
+  assert.ok(button('🎯 음악 포켓몬 잡기'), '곡 목록에 잡기 단추');
 });
 
 // ───────────────────── Codex 217차 ─────────────────────
 
-test('Codex 217차 P2 — 🔁 계속으로 치다 열째 칸 — 온 창이 뜨면 ⏸ · 창 뒤에서 다음 판이 흐르지 않는다 · 닫고 ▶로 이어', async () => {
+test('Codex 217차 P2 — 🔁 계속으로 치다 열째 칸 — 잡기 흐름이 시작되면 ⏸(v429 — 전엔 온 창) · 창 뒤에서 다음 판이 흐르지 않는다 · 끝나고 ▶로 이어', async () => {
   await setPiano({ taps: 0, tapMons: 0, days: { [clockDay()]: { paid: 0, coins: 0, notes: 0, book: { n: 9 } } } }); // v423 — 책 곡 아홉 칸
+  P.S.catchMsg = '';
   stage({ loop: '🔁 계속', song: 'bk' });
   byId('pn-go').click();
   playTimed(0);
   assert.equal(P.S.running, true, '계속 — 다음 판');
-  await waitFor(() => byId('pn-arrive'), '온 창');
-  assert.equal(P.S.running, false, '온 창이 뜨면 멈춤');
+  await waitFor(() => (piano().ball || {}).earned === 1, '열째 판 — 기회');
+  await waitFor(() => !P.S.running, '잡기 흐름이 시작되면 멈춤');
   const t0 = P.S.t;
   frames(60);
   assert.equal(P.S.t, t0, '창 뒤에서 흐르지 않는다');
   assert.ok(!P.S.steps[0].late, '다음 판 첫 음에 「늦음」이 쌓이지 않는다');
-  button('좋아요!').click();
+  await waitFor(() => !P.S.catching, '잡기 흐름 끝(그림이 없어 못 엶)');
+  assert.equal(P.S.running, false, '저절로 다시 가지 않는다');
   byId('pn-go').click();
   assert.equal(P.S.running, true, '닫고 ▶로 이어');
   byId('pn-go').click();

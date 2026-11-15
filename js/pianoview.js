@@ -25,12 +25,17 @@
 //   악보·막대는 그 높이 그대로 위로 · 남는 높이는 건반(G.up0) · 그림판 모서리 ⏸(#pn-pause) · 멈추거나 끝나면 돌아옴 · 🎧는 그대로
 // 🎹 v423 (11-13 아버님 「다른 곡들도 완주해서 10번 · 내가 넣은 곡들로만」 → 기본안 「추천대로」) — 음악 포켓몬은 📖 진우 책 곡(S.song.book)을 하루에 열 번 ·
 //   곡을 섞어도 이어 셈(piano.tapRule book) · 🎼 연습곡은 💰만 — 끝낸 판에 한 줄 · 칸 옆 곡 이름·「처음부터」 알림 없앰 · 🐾 안내 판 4
+// 🎯 v429 (11-15 아버님 「추천대로」) — 책 곡 열 번 · ♪ 다섯 칸마다 음악 포켓몬이 그냥 오던 「왔어요」 창(pn-arrive) 자리를 **다른 과목과 같은 잡기 화면**으로:
+//   몫이 찬 그 자리에서 바로 잡기(catch.openCatch — 가방의 볼 · 한 번 던지기 · 못 잡으면 그 기회 끝) · 안 던지고 닫았거나 밀린 기회는
+//   곡 목록·무대의 「🎯 음악 포켓몬 잡기」 단추로(숫자 없음) · 국어 runKorCatch와 같은 안전(띄우기 전 빼기 · 판정 때 장부 줄 지우기 · 안 던지면 돌려주기) · 🐾 안내 판 5
 import { setScene } from './blackbox.js';
 import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON,
-  TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL, MUTE, SLOW, dayKeyOf, playKeysH } from './piano.js';
+  TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL, MUTE, SLOW, dayKeyOf, playKeysH, pickMusicCands, CANDS } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
-import { pianoTap, pianoListen, pianoNow, pianoMonsDue, caughtCount, shownRarity, RARITY } from './xp.js';
-import { ROSTER, ensureCast } from './pokemon.js'; // 🐾 음악 포켓몬 이름·그림 (v404)
+import { pianoTap, pianoListen, pianoNow, pianoMonsDue, pianoTakeThrow, pianoGiveBackThrow, pianoJudged, pianoThrowsLeft, caughtCount, rarityOf, catchAttempt, inventory, getLevelInfo, isTired, getLook } from './xp.js';
+import { ROSTER, ensureCast, loadCharacters, forSubject, downloadCharacters, isUnlocked } from './pokemon.js'; // 🐾 음악 포켓몬 이름·그림 (v404) · 🎯 잡기 후보 (v429)
+import { openCatch, isCatchOpen } from './catch.js'; // 🎯 다른 과목과 같은 잡기 화면 (v429)
+import { holdStore, refundOutcome, PAGE_ID } from './throwhold.js'; // 🎯 뺀 기회 장부 (v429 — 국어·수학과 같은 도구)
 import { applyDailyDelta } from './db.js';
 import { clockDay, noteActivity, isLocked } from './timelimit.js';
 import { guardStart } from './timeup.js';
@@ -57,6 +62,7 @@ const S = {
   keyAt: -1e9, passStall: 0, fx: null, // v413 — 마지막으로 건반을 누른 때(위쪽 톡과 가르기) · 이 판의 가장 긴 화면 멈칫(ms) · 판 끝 박자 효과
   passMute: 0, acWatch: null, diag: { slowN: 0, slowMs: 0, cancel: 0 }, diagOwe: new Map(), // v414 — 이 판의 가장 긴 소리 멎음(ms) · 소리 시계 지켜보기 · 아직 안 쓴 🐢·✋ 셈 · 못 넣은 몫(날짜째)
   folded: false, // v420 — 🎹 연주 중이라 메뉴를 접었나
+  catching: false, catchState: null, catchMsg: '', catchWant: false, // 🎯 v429 — 잡기 흐름이 도는 중(한 번에 하나만) · 열어 둔 잡기 창 { threw, hold } · 못 열었을 때 한 줄 · 안내 창을 닫으면 열기
 };
 /** 건반 바로 위 이만큼(px)은 건반으로 친다 — 건반 윗부분을 누르다 살짝 위로 빗나간 손가락 (v413) */
 const KEY_SLOP = 20;
@@ -317,12 +323,12 @@ function sendTap(req) {
   S.retry = null;
   showRetry();
   pianoTap(req).then((r) => {
-    const got = r && r.ok && Array.isArray(r.got) ? r.got : [];
-    if (r && r.ok && (r.coins || r.slot === 'ok' || got.length)) {
-      applyDailyDelta(clockDay(), { ...(r.coins ? { pnCoins: r.coins } : {}), ...(r.slot === 'ok' ? { pnTapSlots: 1 } : {}), ...(got.length ? { pnMons: got.length } : {}) }).catch(() => {});
+    const n = chancesOf(r);
+    if (r && r.ok && (r.coins || r.slot === 'ok' || n)) {
+      applyDailyDelta(clockDay(), { ...(r.coins ? { pnCoins: r.coins } : {}), ...(r.slot === 'ok' ? { pnTapSlots: 1 } : {}), ...(n ? { pnBall: n } : {}) }).catch(() => {});
     }
-    if (got.length) showArrivals(got, r.firsts); // 🐾 건반 열 칸 (v413) — 판이 바뀌었어도 온 포켓몬은 보여 준다
     if (r && r.ok) renderSlots();
+    if (n) gotChances(); // 🎯 책 곡 열째 판 (v429 — v413~v428은 온 포켓몬 창) — 판이 바뀌었어도 바로 잡기 화면
     if (gen !== S.gen) return;
     if (!r || !r.ok) {
       S.retry = () => sendTap(req);
@@ -331,17 +337,17 @@ function sendTap(req) {
       toast('<b>저장이 안 됐어요</b>「🔁 다시 받기」를 눌러 주세요.', 3200);
       return;
     }
-    if (got.length) return; // 🐾 온 포켓몬 창이 대신 말한다
-    // 🎹 건반 칸 한 줄 (v413) — 칸 수는 쓰지 않는다 · 잘 치지 못한 판은 「한 번 더」 말만 · v423 — 오늘 책 곡 몫 · 🎼 연습곡은 칸이 안 찬다고 한 줄
-    const slot = {
+    // 🎹 건반 칸 한 줄 (v413) — 칸 수는 쓰지 않는다 · 잘 치지 못한 판은 「한 번 더」 말만 · v423 — 오늘 책 곡 몫 · 🎼 연습곡은 칸이 안 찬다고 한 줄 ·
+    // v429 — 기회가 생긴 판은 「🎯 잡을 기회!」(잡기 화면이 위에 뜬다 — 못 열면 이 말과 단추가 남는다)
+    const slot = ({
       ok: `<br>${keysHtml(r.book ? r.book.n : 0)}`,
       line: '<br>「곡 전체」를 끝까지 치면 🎹 건반 칸이 차요',
       free: '<br>🎼 연습곡은 🎹 칸이 안 차요 — 📖 진우 책 곡으로 채워요',
-      cap: '<br>오늘 음악 포켓몬은 만났어요 — 내일 또 만나요!',
-    }[r.slot] || '';
+      cap: '<br>오늘 음악 포켓몬 잡을 기회는 받았어요 — 내일 또 쳐요!',
+    }[r.slot] || '') + (n ? '<br>🎯 음악 포켓몬을 잡을 기회!' : '');
     if (r.coins) toast(`<b>끝까지 쳤어요! 💰 +${r.coins}</b>${nextHint(S.lv)}${slot}`, 3400);
     else if (r.why === 'cap') toast(`<b>끝까지 쳤어요!</b>오늘 💰는 다 받았어요 — 연습은 얼마든지!${slot}`, 3400);
-    else toast('<b>끝까지 쳤어요!</b>한 번 더 해 볼까요? 잃는 건 없어요.', 3000);
+    else toast(`<b>끝까지 쳤어요!</b>한 번 더 해 볼까요? 잃는 건 없어요.${n ? '<br>🎯 음악 포켓몬을 잡을 기회!' : ''}`, 3000); // v429 — 밀린 몫이 이 판에 기회로 바뀌었으면
   }).catch(() => {
     if (gen !== S.gen) return;
     S.retry = () => sendTap(req);
@@ -384,10 +390,10 @@ function saveListen() {
   pianoListen(req).then((r) => {
     S.saving = false;
     if (r && r.ok) S.pinPass = 0; // 확인 한 번에 칸 한 번
-    const got = r && r.ok && Array.isArray(r.got) ? r.got : [];
-    if (r && r.ok) applyDailyDelta(clockDay(), { pnListenN: 1, ...(r.counted ? { pnNotes: 1 } : {}), ...(got.length ? { pnMons: got.length } : {}) }).catch(() => {});
-    if (got.length) showArrivals(got, r.firsts); // 🐾 판이 바뀌었어도 온 포켓몬은 보여 준다 — 도감에는 이미 들어갔다 (v404)
+    const n = chancesOf(r);
+    if (r && r.ok) applyDailyDelta(clockDay(), { pnListenN: 1, ...(r.counted ? { pnNotes: 1 } : {}), ...(n ? { pnBall: n } : {}) }).catch(() => {});
     if (r && r.ok) renderSlots(); // ♪ 칸은 판 것이 아니라 기록 것 — 저장하는 사이 줄·곡을 바꿨어도 새 화면에 맞게 (Codex 209차 P3)
+    if (n) gotChances(); // 🎯 ♪ 다섯째 칸 (v429 — v404~v428은 온 포켓몬 창) — 판이 바뀌었어도 바로 잡기 화면
     if (gen !== S.gen) return;
     if (!r || !r.ok) {
       S.passDone = true;
@@ -396,10 +402,10 @@ function saveListen() {
       return;
     }
     const sl = slotsOf(r.notes, r.mons);
-    // 음표 칸은 ♪ 그림으로만 — 알림 말에도 칸 수를 쓰지 않는다 (Codex 204차 P2-4)
-    if (got.length) return; // 🐾 온 포켓몬 창이 대신 말한다
-    if (!r.counted) toast('<b>오늘 음표 칸은 다 채웠어요</b>연습은 얼마든지 해도 돼요!', 3200);
-    else if (sl.filled === NOTES_PER_MON) toast(`<b>🎉 음표가 가득 찼어요!</b>${slotsHtml(sl.filled)}<br>음악 포켓몬을 만날 준비 끝!`, 3800);
+    // 음표 칸은 ♪ 그림으로만 — 알림 말에도 칸 수를 쓰지 않는다 (Codex 204차 P2-4) · v429 — 기회가 생겼으면 가득 찬 ♪와 「🎯 잡을 기회!」(잡기 화면이 위에 뜬다)
+    // 「가득 찼어요」는 ♪ 묶음이 이번 칸으로 찼을 때만 — 밀린 책 곡 몫만 기회로 바뀐 드문 때(들어올 때 저장 실패)엔 보통 알림 · 잡기 화면은 그대로 뜬다
+    if (n && r.counted && r.notes % NOTES_PER_MON === 0) toast(`<b>🎉 음표가 가득 찼어요!</b>${slotsHtml(NOTES_PER_MON)}<br>🎯 음악 포켓몬을 잡을 기회!`, 3800);
+    else if (!r.counted) toast('<b>오늘 음표 칸은 다 채웠어요</b>연습은 얼마든지 해도 돼요!', 3200);
     else toast(`<b>🎵 음표를 채웠어요!</b>${slotsHtml(sl.filled)}<br>${nextHint(S.lv)}`, 3200);
   }).catch(() => {
     S.saving = false;
@@ -437,6 +443,11 @@ function foldMenu() {
 function toggle() {
   audio();
   if (S.running) { setRun(false); return; }
+  settleLostMusicCatch(); // 잡기 창이 소식 없이 닫혔으면 먼저 — 「잡는 중」이 남아 ▶가 막히지 않게
+  if (S.catching) { // 🎯 잡기 흐름이 그림을 받는 사이(최대 8초) — 지금 시작하면 곧 뜰 잡기 창이 판 가운데를 끊는다 (v429 검토)
+    if (!isCatchOpen()) toast('<b>🎯 음악 포켓몬을 부르는 중이에요</b>조금만 기다려 주세요', 2400);
+    return;
+  }
   guardStart('music', () => setRun(true));
 }
 /** 연주 중에 새 판이 시작된다(🔁 계속의 다음 판 · ⟲ 처음부터) — 이것도 새로 시작이라 ⏳ 관문 · 잠겼으면 멈춘다 (Codex 204차 P2-1) */
@@ -1296,64 +1307,214 @@ function renderSlots() {
   if (!box) return;
   box.hidden = false;
   const pn = pianoNow();
-  // 🎹 태블릿으로 치기는 건반 열 칸(v413) · 🎧 듣고 따라 치기는 ♪ 다섯 칸 — 포켓몬이 오면 다시 0부터 (v404) · 누르면 🐾 안내 (v405)
+  // 🎹 태블릿으로 치기는 건반 열 칸(v413) · 🎧 듣고 따라 치기는 ♪ 다섯 칸 — 몫을 받으면 다시 0부터 (v404) · 누르면 🐾 안내 (v405) · 칸 끝은 🎯 잡기 기회 (v429 — 전엔 🐾)
   if (S.mode === 'tap') {
     // v423 — 오늘 📖 책 곡으로 찬 몫(곡을 섞어도) · 오늘 받았으면 가득
-    box.innerHTML = `${keysHtml(tapToday(pn))}<span class="pn-slots-mon">→ 🐾</span>`;
+    box.innerHTML = `${keysHtml(tapToday(pn))}<span class="pn-slots-mon">→ 🎯</span>`;
     box.setAttribute('aria-label', '건반 칸 — 음악 포켓몬 안내');
   } else {
-    box.innerHTML = `${slotsHtml(slotsOf(pn.notes, pn.mons).filled)}<span class="pn-slots-mon">→ 🐾</span>`;
+    box.innerHTML = `${slotsHtml(slotsOf(pn.notes, pn.mons).filled)}<span class="pn-slots-mon">→ 🎯</span>`;
     box.setAttribute('aria-label', '음표 칸 — 음악 포켓몬 안내');
   }
 }
 
-// ───────────────────── 🐾 음악 포켓몬이 왔어요 (v404) ─────────────────────
+// ───────────────────── 🎯 음악 포켓몬 잡기 (v429) ─────────────────────
+// 📖 책 곡 하루 열 번 · 🎧 ♪ 다섯 칸마다 잡기 기회 하나(piano.giveChances — 장부 profile.piano.ball). v404~v428의 「왔어요」 창(pn-arrive) 자리에
+// 다른 과목과 같은 잡기 화면(catch.openCatch). 국어 runKorCatch와 같은 안전:
+//  화면을 띄우기 **전에** 기회를 하나 빼고(xp.pianoTakeThrow — 두 창이 같은 기회를 두 번 던지지 못하게) · 못 빼면 안 띄운다 ·
+//  판정이 나는 순간(attempt) 장부 줄을 지우고 · 한 번도 안 던지고 닫으면 돌려준다(pianoGiveBackThrow — 저장이 안 되면 장부 줄이 남아 다음 진입에) ·
+//  후보 넷은 그림이 있는 음악 포켓몬 가운데 아직 안 만난 아이 먼저(piano.pickMusicCands — v404 무게 그대로) · 4마리가 안 되면 몇 마리 받아 온다
 
-const arrive = { queue: [] };
-/**
- * 온 음악 포켓몬을 차례로 — 「좋아요!」로 닫으면 다음 · 그림은 받아서(못 받으면 이름만) · 창은 음악 화면 안(다른 화면에선 안 보인다)
- * firsts = 올 때 처음 만났나(규칙이 준 것 · got과 같은 차례) — 지금 마릿수로 짐작하면 마지막 새 아이와 또 온 아이가 한꺼번에 올 때 첫 창도 「또」가 됐다 (Codex 209차 P3)
- */
-function showArrivals(ids, firsts = []) {
-  ids.forEach((id, i) => { if (Number.isInteger(id) && id > 0) arrive.queue.push({ id, first: typeof firsts[i] === 'boolean' ? firsts[i] : null }); });
-  if (!$('pn-arrive') && !$('pn-intro')) nextArrival(); // 🐾 안내 창이 떠 있으면 닫은 뒤에 (v405)
+/** 못 열었을 때 단추 밑 한 줄 — 숫자 없음 (아이 화면 셈 글 금지) */
+export const CATCH_WHY = {
+  nopics: '🎯 음악 포켓몬 그림을 아직 못 받았어요 — 인터넷이 되는 곳에서 다시 눌러 주세요 (잡을 기회는 그대로 있어요)',
+  noavail: '🎯 지금은 만날 수 있는 음악 포켓몬이 없어요 — 조금 뒤에 다시 눌러 주세요 (잡을 기회는 그대로 있어요)',
+  save: '🎯 기록이 잠깐 저장되지 않았어요 — 다시 눌러 주세요 (잡을 기회는 그대로 있어요)',
+  error: '🎯 잡기 화면을 열지 못했어요 — 다시 눌러 주세요 (잡을 기회는 돌려놨어요)',
+  // 돌려주는 저장까지 안 됐다 — "돌려놨어요"라고 하면 거짓말이다 (국어 Codex 49차 #2와 같은 까닭)
+  errorOwed: '🎯 잡기 화면을 열지 못했어요 — 잡을 기회는 음악에 다시 들어오면 돌려줘요',
+  owed: '🎯 잡을 기회를 돌려주는 기록이 잠깐 저장되지 않았어요 — 음악에 다시 들어오면 돌려줘요',
+};
+/** 「다시 들어오면 돌려줘요」 한 줄 — 장부 줄이 정리될 때까지 남긴다 */
+const OWED = [CATCH_WHY.owed, CATCH_WHY.errorOwed];
+/** 규칙이 돌려준 「이번에 생긴 기회 수」 (저장 실패·옛 꼴이면 0) */
+const chancesOf = (r) => (r && r.ok ? Math.max(0, Math.floor(Number(r.chances) || 0)) : 0);
+
+// 🎯 뺀 기회 장부 — 뺄 때 한 줄, 판정이 나면(attempt) 지우고, 돌려주기가 저장되면 지운다. 남은 줄은 음악에 들어올 때 돌려준다
+const holds = holdStore('shincoach.music.throwHolds');
+/** 기회 하나 돌려주기 → 'ok' · 'none'(돌려줄 게 없다) · 'fail'(저장 안 됨 — houseDo는 실패를 오류 대신 {ok:false}로 준다) */
+async function musicGiveBack() {
+  try { return refundOutcome(await pianoGiveBackThrow()); } catch { return 'fail'; }
 }
-function nextArrival() {
-  const old = $('pn-arrive');
-  if (old) old.remove();
-  const host = $('view-music');
-  const item = arrive.queue.shift();
-  if (!host || !item) return;
-  if (S.running) setRun(false); // 🔁 계속으로 치다 열째 칸 — 창이 악보를 가리니 ⏸처럼 멈춘다(안 멈추면 다음 판 첫 음이 「늦음」) · 닫은 뒤 ▶로 이어 (Codex 217차 P2)
-  const { id } = item;
-  const r = ROSTER.find((m) => m.id === id);
-  const rank = RARITY[shownRarity(id)] || RARITY[2]; // ⏳ 패러독스로 옮겼으면 ⏳ (v424)
-  const again = item.first === null ? caughtCount(id) > 1 : !item.first; // 50마리를 다 만난 뒤엔 만난 아이가 또 온다 (기본안 ④)
-  const box = el('div', 'pn-arrive');
-  box.id = 'pn-arrive';
-  box.setAttribute('role', 'dialog');
-  box.setAttribute('aria-label', '음악 포켓몬이 왔어요');
-  const card = el('div', 'pn-arrive-card');
-  card.appendChild(el('b', 'pn-arrive-h', again ? '🎵 음악 포켓몬이 또 놀러 왔어요!' : '🎵 새 음악 포켓몬이 왔어요!'));
-  const img = el('img', 'pn-arrive-img');
-  img.alt = '';
-  img.hidden = true;
-  card.appendChild(img);
-  card.appendChild(el('span', 'pn-arrive-name', r ? r.ko : `#${id}`));
-  card.appendChild(el('small', 'pn-arrive-sub', `${rank.stars} ${rank.label} · ${again ? '도감에 한 마리 더' : '도감에 들어갔어요'}`));
-  const ok = btn('좋아요!', 'btn btn-primary pn-arrive-ok', () => nextArrival());
-  card.appendChild(ok);
-  box.appendChild(card);
-  host.appendChild(box);
-  try { ok.focus(); } catch { /* 초점 없이도 */ }
-  ensureCast([id]).then((c) => { if (c[0] && c[0].url && $('pn-arrive') === box) { img.src = c[0].url; img.hidden = false; } }).catch(() => {});
+let holdTimer = null;
+/** 남은 예약을 돌려준다 — 돌려준 게 있으면 단추를 다시 그린다 · 다른 창의 줄은 그 창이 닫힌 지 1분 뒤에 (그때 다시 돈다) */
+function settleMusicThrows() {
+  return holds.settle(musicGiveBack).then((n) => {
+    // 「다시 들어오면 돌려줘요」라고 한 이 창의 몫이 다 정리됐으면 그 한 줄을 지운다 — 돌려준 수(n)엔 다른 창 줄도 섞여 장부로 본다 (Codex 233차 P3)
+    const cleared = OWED.includes(S.catchMsg) && !Object.values(holds.list()).some((h) => h.page === PAGE_ID);
+    if (cleared) S.catchMsg = '';
+    if (n > 0 || cleared) renderCatchBtns();
+    const w = holds.waitMs();
+    if (w !== null && !holdTimer) holdTimer = setTimeout(() => { holdTimer = null; settleMusicThrows(); }, w + 1000);
+    return n;
+  }).catch(() => 0);
+}
+/** 잡기 창이 소식 없이 닫혔다(다른 화면이 catch.closeCatch를 불렀다 — onDone이 안 온다) — 안 던졌으면 기회를 돌려주고 단추를 다시 살린다 */
+function settleLostMusicCatch() {
+  const st = S.catchState;
+  if (!S.catching || !st || isCatchOpen()) return null;
+  S.catchState = null;
+  S.catching = false;
+  if (st.threw) return null; // 판정이 났다 — 쓴 기회
+  return st.hold.refund(musicGiveBack).then((ok) => { if (!ok) S.catchMsg = CATCH_WHY.owed; renderCatchBtns(); });
+}
+
+/** 🎹 음악 포켓몬 50 (명단 차례) */
+const MUSIC_IDS = forSubject(ROSTER, 'music').map((r) => r.id);
+/** 잡기 후보 — 🎹 음악 전용 · 그림이 있는 것 · 레벨에 열린 것(음악 50은 모두 Lv1) · 😴 쉬는 중 빼고 */
+let artJob = null; // 음악 그림 받기는 한 번에 하나 — 8초를 넘겨 뒤에서 도는 받기를 다음 잡기가 같이 기다린다(같은 그림을 또 받지 않게)
+async function musicPool() {
+  let chars = [];
+  const read = async (force = false) => {
+    try { chars = await loadCharacters(force); } catch { chars = []; }
+    const level = getLevelInfo().level;
+    return forSubject(chars, 'music').filter((c) => isUnlocked(c.id, level) && !isTired(c.id)).map((c) => ({ ...c, look: getLook(c.id) }));
+  };
+  let pool = await read();
+  // 몇 마리 받아서라도 — ① 그림이 4마리도 없으면(번 기회를 그림이 없다고 삼키지 않는다) ② 안 만난 아이 그림이 넷이 안 되는데 아직 안 받은
+  //   안 만난 아이가 있으면(기기엔 v404~v428에 온 아이 그림만 있기 쉽다 — 그것만으로는 「안 만난 아이 먼저」가 안 된다) · 받을 게 없으면 다시 읽지 않는다 · 8초 안에 못 받으면 있는 만큼
+  const fresh = (id) => !(caughtCount(id) > 0);
+  const have = new Set(chars.map((c) => c.id));
+  const missing = MUSIC_IDS.filter((id) => !have.has(id));
+  const need = pool.length < CANDS || (pool.filter((c) => fresh(c.id)).length < CANDS && missing.some(fresh));
+  if (need && missing.length && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+    if (!artJob) {
+      // 안 만난 아이 먼저 · 등급 무게 차례로 받는다 — 명단 차례(흔함 스물부터)면 그림이 없는 기기에서 한동안 흔함만 후보에 나온다 (v429 검토)
+      const order = pickMusicCands(missing.map((id) => ({ id, r: rarityOf(id) })), Object.fromEntries(missing.map((id) => [id, caughtCount(id)])), missing.length);
+      artJob = downloadCharacters(null, 6, 'music', order).catch(() => null).finally(() => { artJob = null; }); // 오프라인·실패 — 있는 만큼으로
+    }
+    let wait = 0;
+    let late = false;
+    try {
+      await Promise.race([artJob, new Promise((res) => { wait = setTimeout(() => { late = true; res(); }, 8000); })]);
+    } finally { clearTimeout(wait); } // 다 받았으면 8초 시계를 남기지 않는다
+    // 받기는 다 끝나야 그림 캐시를 새로 고친다 — 8초를 넘겼으면 그 사이 저장된 그림까지 다시 읽는다 (Codex 233차 P2)
+    pool = await read(late);
+  }
+  return pool;
+}
+
+/** 🎯 단추 칸 — 남은 기회가 있을 때만 「🎯 음악 포켓몬 잡기」(숫자 없음 — 음악 화면엔 셈 문구를 쓰지 않는다) · 못 열었을 때 한 줄 */
+function catchBox() {
+  const box = el('div', 'pn-catch');
+  box.id = 'pn-catch';
+  fillCatch(box);
+  return box;
+}
+function fillCatch(box) {
+  settleLostMusicCatch(); // 지난 창이 소식 없이 닫혔으면 먼저 — 단추가 「도는 중」으로 잠긴 채 남지 않게
+  box.textContent = '';
+  const left = pianoThrowsLeft();
+  // 「다시 눌러 주세요 (잡을 기회는 그대로 있어요)」는 누를 단추가 있을 때만 맞는 말 — 다른 창·병합이 기회를 다 썼으면 지운다(다음 기회 때 지난 한 줄이 되살아나지 않게) · 「돌려줘요」 한 줄은 장부가 정리될 때까지
+  if (left <= 0 && !OWED.includes(S.catchMsg)) S.catchMsg = '';
+  if (left > 0) {
+    const b = btn('🎯 음악 포켓몬 잡기', 'btn btn-primary pn-catch-btn', () => { runMusicCatch().catch(() => {}); });
+    b.id = 'pn-catch-go';
+    b.disabled = !!S.catching;
+    box.appendChild(b);
+  }
+  if (S.catchMsg) box.appendChild(el('p', 'pn-catch-msg', S.catchMsg));
+  box.hidden = !box.children.length;
+}
+/** 남은 기회·한 줄이 바뀌었다 — 지금 화면(곡 목록·무대)의 단추 칸을 다시 */
+function renderCatchBtns() {
+  const box = $('pn-catch');
+  if (!box) return;
+  const h = box.offsetHeight;
+  fillCatch(box);
+  if (S.screen === 'stage' && box.offsetHeight !== h) layout(); // 무대 단추 줄이 늘거나 줄었다 — 그림판 위쪽 자리가 바뀌어 건반이 화면 밖으로 밀리지 않게
+}
+
+/** 🎯 기회가 생겼다 — 단추를 다시 그리고 바로 잡기 화면 · 🐾 안내 창이 떠 있으면 닫은 뒤에 · 음악을 떠났으면 단추만(돌아오면 보인다) */
+function gotChances() {
+  renderCatchBtns();
+  if (!S.active) return;
+  if ($('pn-intro')) { S.catchWant = true; return; }
+  runMusicCatch().catch(() => {});
+}
+
+/** 잡기 창이 악보를 가린다 — ⏸처럼 멈추고 누른 건반 소리도 끈다(창 위에서 뗀 손가락은 그림판이 못 듣는다) · 🎉 판 끝 효과는 그대로 · 닫은 뒤 ▶로 이어 (Codex 217차 P2와 같은 멈춤) */
+function pauseForCatch() {
+  if (S.running) setRun(false);
+  for (const v of S.held.values()) noteOff(v);
+  S.held.clear();
+  S.ptr.clear();
+  S.pcDown.clear();
+}
+
+/** 🎯 음악 포켓몬 잡기 — 기회가 생긴 그 자리(gotChances) · 단추(「🎯 음악 포켓몬 잡기」) · 한 번에 하나만 */
+async function runMusicCatch() {
+  if (!S.active) return;
+  await settleLostMusicCatch(); // 남은 단추를 눌렀다 — 지난 창이 소식 없이 닫혔으면 먼저 정리
+  if (S.catching || isCatchOpen()) return; // 한 번에 하나만 — 다른 잡기 창 위에 겹쳐 열지 않는다
+  S.catching = true;
+  S.catchMsg = '';
+  pauseForCatch(); // 🔁 계속으로 치다 열째 판 — 창 뒤에서 다음 판이 흐르면 첫 음이 「늦음」
+  renderCatchBtns();
+  const done = () => { S.catching = false; renderCatchBtns(); };
+  let pool = [];
+  try { pool = await musicPool(); } catch { pool = []; }
+  if (!S.active) { done(); return; } // 그 사이 나갔다 — 기회는 그대로(빼기 전)
+  if (!pool.length) {
+    let hasPics = false;
+    try { hasPics = forSubject(await loadCharacters(), 'music').length > 0; } catch { hasPics = false; }
+    S.catchMsg = CATCH_WHY[hasPics ? 'noavail' : 'nopics'];
+    done();
+    return;
+  }
+  let taken;
+  try { taken = await pianoTakeThrow(); } catch { taken = { ok: false, why: 'save' }; }
+  if (!taken || !taken.ok) { S.catchMsg = taken && taken.why === 'none' ? '' : CATCH_WHY.save; done(); return; }
+  const st = { threw: false, hold: holds.track() }; // 뺀 기회를 장부에 — 판정 전에 앱이 꺼져도 다음에 돌려준다
+  if (!S.active || isCatchOpen()) { await st.hold.refund(musicGiveBack); done(); return; } // 뺀 사이 나갔거나 다른 잡기 창이 열렸다 — 돌려준다
+  pauseForCatch(); // 기다리는 사이 ▶를 눌렀어도
+  S.catchState = st;
+  try {
+    const caught = Object.fromEntries(pool.map((c) => [c.id, caughtCount(c.id)]));
+    const ids = pickMusicCands(pool.map((c) => ({ id: c.id, r: rarityOf(c.id) })), caught, CANDS);
+    openCatch({
+      candidates: ids.map((id) => pool.find((c) => c.id === id)), subject: 'music', xpGain: 0, coinGain: 0, levelInfo: getLevelInfo(), levelUp: 0,
+      ballCounts: inventory(),
+      // 판정이 나는 순간 쓴 기회 — 장부의 줄을 지운다(동기). 판정 전에 닫히면 attempt가 안 불려 돌려준다 · 📤 잡음·놓침
+      attempt: (id, opts) => {
+        st.threw = true;
+        st.hold.judged();
+        const r = catchAttempt(id, Math.random, opts);
+        applyDailyDelta(clockDay(), r && r.caught ? { pnCaught: 1 } : { pnFled: 1 }).catch(() => {});
+        pianoJudged(id, !!(r && r.caught)).catch(() => {}); // 📤 기록 줄 「🎯 잡음·놓침 — 포켓몬」 — 판정 뒤에 · 안 되면 기록 한 줄만 빠진다
+        return r;
+      },
+      // ★ 한 번도 안 던지고 닫았으면 기회를 돌려준다 — 화면을 띄우기 전에 이미 뺐다 (저장이 안 되면 장부에 남아 다음에)
+      onDone: (r) => {
+        if (S.catchState === st) S.catchState = null;
+        if (r && r.threw === false && !st.threw) st.hold.refund(musicGiveBack).then((ok) => { if (!ok) S.catchMsg = CATCH_WHY.owed; }).finally(done);
+        else done();
+      },
+    });
+  } catch {
+    if (S.catchState === st) S.catchState = null;
+    const back = await st.hold.refund(musicGiveBack);
+    S.catchMsg = back ? CATCH_WHY.error : CATCH_WHY.errorOwed;
+    done();
+  }
 }
 
 // ───────────────────── 🐾 음악 포켓몬 안내 (v405) ─────────────────────
 
 const INTRO_KEY = 'shincoach.musicIntro';
-/** 본 안내 판 — v413에 🎹 건반 칸이 생겨 한 번 더('2') · v420에 「한 곡을 하루에 열 번 연달아」로 바뀌어 한 번 더('3') · v423에 「📖 책 곡을 섞어서」로 한 번 더 (v405 판은 '1') */
-const INTRO_VER = '4';
+/** 본 안내 판 — v413에 🎹 건반 칸이 생겨 한 번 더('2') · v420에 「한 곡을 하루에 열 번 연달아」로 바뀌어 한 번 더('3') · v423에 「📖 책 곡을 섞어서」로 한 번 더('4') ·
+ *  v429에 「그냥 온다」가 「🎯 잡을 기회」로 바뀌어 한 번 더 (v405 판은 '1') */
+const INTRO_VER = '5';
 /** 안내 창에 보일 음악 포켓몬 — 랑딸랑(흔함) · 치렁(보통) · 테라파고스(전설) */
 const INTRO_MONS = [433, 358, 1024];
 function introSeen() {
@@ -1369,10 +1530,12 @@ function introLine(tag, parts) {
  * 🐾 음악 포켓몬은 어떻게 만나요? — 처음 들어올 때 한 번(「알겠어요!」로 닫아야 본 것) · ♪ 칸을 누르면 다시
  * 태블릿 화면 건반으로 얻는 줄 알 수 있어서 진짜 피아노로 끝까지 따라 쳐야 한다고 적는다 (아버님 11-09) · 셈·남은 수 없음
  * (v413) 🎹 태블릿으로 치기도 「곡 전체」를 끝까지 잘 치면 건반 칸 — 두 길을 나란히
+ * (v429) 칸이 다 차면 🎯 음악 포켓몬을 잡을 기회 — 잡기 창이 떠 있으면 띄우지 않는다(다음에 들어올 때·♪ 칸을 누를 때)
  */
 function showIntro() {
   const host = $('view-music');
-  if (!host || $('pn-intro') || $('pn-arrive')) return;
+  settleLostMusicCatch(); // 지난 잡기 창이 소식 없이 닫혔으면 먼저 — 「잡는 중」이 남아 ♪ 칸이 말없이 안 열리지 않게
+  if (!host || $('pn-intro') || isCatchOpen() || S.catching) return; // 잡기 흐름이 그림을 받는 사이(창은 아직)에도 — 곧 뜰 잡기 창 밑에 안내 창이 남지 않게
   if (S.running) setRun(false); // 연주 중에 ♪ 칸을 눌렀다 — 창이 악보를 가리니 ⏸처럼 멈춘다 · 닫은 뒤 ▶로 이어 (Codex 210차 P2)
   const box = el('div', 'pn-arrive pn-intro');
   box.id = 'pn-intro';
@@ -1403,13 +1566,13 @@ function showIntro() {
   const five = el('span', 'pn-slots'); // 빈 ♪ 다섯 — 무대의 칸과 같은 그림(수는 안 쓴다)
   for (let i = 0; i < NOTES_PER_MON; i++) five.appendChild(el('span', '', '♪'));
   last.appendChild(five);
-  last.appendChild(el('span', '', '가 다 차면 🐾 음악 포켓몬이 와요!'));
+  last.appendChild(el('span', '', '가 다 차면 🎯 음악 포켓몬을 잡을 기회!')); // v429 — 전엔 「🐾 음악 포켓몬이 와요!」
   ol.appendChild(last);
   card.appendChild(ol);
-  // 🎹 태블릿 화면 건반으로 (v413) — 「곡 전체」를 끝까지 잘 치면 건반 칸 하나 · 건반 칸이 다 차면 🐾 · 💰도
+  // 🎹 태블릿 화면 건반으로 (v413) — 「곡 전체」를 끝까지 잘 치면 건반 칸 하나 · 건반 칸이 다 차면 🎯(v429 — 전엔 🐾) · 💰도
   card.appendChild(el('p', 'pn-intro-way', '🎹 태블릿 화면 건반으로'));
   const ol2 = el('ol', 'pn-intro-steps');
-  // v423 — 📖 진우 책 곡만 · 곡을 섞어도 이어 셈 · 🎼 연습곡은 💰만 · 하루 한 마리
+  // v423 — 📖 진우 책 곡만 · 곡을 섞어도 이어 셈 · 🎼 연습곡은 💰만 · 하루 한 번
   ol2.appendChild(introLine('li', [['「🎹 태블릿으로 치기」', true], ['에서 ', false], ['📖 진우 책 곡', true], ['의 ', false], ['「곡 전체」', true], ['를 골라요', false]]));
   ol2.appendChild(introLine('li', [['끝까지 잘 치면 건반 칸 하나 — ', false], ['💰', true], ['도 받아요', false]]));
   ol2.appendChild(introLine('li', [['곡은 ', false], ['섞어 쳐도 돼요', true], [' — 🎼 연습곡은 💰만 받아요', false]]));
@@ -1417,14 +1580,16 @@ function showIntro() {
   const ten = el('span', 'pn-tkeys'); // 빈 건반 열 — 무대의 칸과 같은 그림(수는 안 쓴다)
   for (let i = 0; i < TAPS_PER_MON; i++) ten.appendChild(el('span', ''));
   last2.appendChild(ten);
-  last2.appendChild(el('span', '', '이 하루에 다 차면 🐾 음악 포켓몬이 와요! (하루 한 마리)'));
+  last2.appendChild(el('span', '', '이 하루에 다 차면 🎯 음악 포켓몬을 잡을 기회! (하루 한 번)')); // v429 — 전엔 「🐾 음악 포켓몬이 와요! (하루 한 마리)」
   ol2.appendChild(last2);
   card.appendChild(ol2);
+  // 🎯 잡기는 다른 과목과 같다 (v429) — 가방의 볼을 골라 한 번 · 못 잡으면 다음 기회에
+  card.appendChild(el('p', 'pn-note pn-intro-catch', '🎯 잡기는 다른 과목과 같아요 — 한 마리 골라 몬스터볼을 던져요. 못 잡으면 다음 기회에 또!'));
   const ok = btn('알겠어요!', 'btn btn-primary pn-arrive-ok', () => {
     try { localStorage.setItem(INTRO_KEY, INTRO_VER); } catch { /* 못 적으면 다음에 또 */ }
     applyDailyDelta(clockDay(), { pnIntro: 1 }).catch(() => {}); // 📤 「🐾 안내 창 봄」 — 아버님이 안내가 닿았는지 보신다
     box.remove();
-    if (!$('pn-arrive') && arrive.queue.length) nextArrival(); // 안내하는 사이 온 포켓몬
+    if (S.catchWant) { S.catchWant = false; gotChances(); } // 🎯 안내하는 사이 생긴 기회 (v429 — 전엔 온 포켓몬 창)
   });
   card.appendChild(ok);
   box.appendChild(card);
@@ -1436,7 +1601,10 @@ function showIntro() {
   }).catch(() => {});
 }
 
-/** 🐾 밀린 음악 포켓몬 — 음악 화면에 들어올 때 (v402·v403 때 찬 다섯 칸 몫 · 저장 실패로 못 받은 몫) · 받을 몫이 없으면 저장하지 않는다 */
+/**
+ * 🎯 밀린 몫 — 음악 화면에 들어올 때 (업데이트 전 판에 찬 몫 · 저장 실패로 못 받은 몫) · 받을 몫이 없으면 저장하지 않는다
+ * v429부터 몫은 잡기 기회로 바뀐다(v404~v428은 음악 포켓몬이 왔다) — 「밀린 기회」라 바로 띄우지 않고 「🎯 음악 포켓몬 잡기」 단추로
+ */
 let dueBusy = false;
 function dueMons() {
   const pn = pianoNow();
@@ -1444,11 +1612,11 @@ function dueMons() {
   dueBusy = true;
   pianoMonsDue().then((r) => {
     dueBusy = false;
-    const got = r && r.ok && Array.isArray(r.got) ? r.got : [];
-    if (!got.length) return;
-    applyDailyDelta(clockDay(), { pnMons: got.length }).catch(() => {});
+    const n = chancesOf(r);
+    if (!n) return;
+    applyDailyDelta(clockDay(), { pnBall: n }).catch(() => {});
     renderSlots();
-    showArrivals(got, r.firsts);
+    renderCatchBtns();
   }).catch(() => { dueBusy = false; });
 }
 function showDone() {
@@ -1475,6 +1643,7 @@ function renderList() {
   m.textContent = '';
   const wrap = el('div', 'pn-list');
   wrap.appendChild(el('h2', 'pn-h', '🎹 칠 곡을 골라요'));
+  wrap.appendChild(catchBox()); // 🎯 남은 잡기 기회가 있으면 단추 (v429)
   const songs = allSongs();
   const grid = el('div', 'pn-songs');
   // 🎹 자유롭게 치기 — 맨 앞 칸 (v408 진우 바람 「곡을 정하지 않고 그냥」) · 들어갈 때 ⏳ 관문
@@ -1590,6 +1759,7 @@ function renderStage(keep = false) {
   slots.id = 'pn-slots';
   slots.setAttribute('aria-label', '음표 칸 — 음악 포켓몬 안내');
   acts.appendChild(slots);
+  acts.appendChild(catchBox()); // 🎯 남은 잡기 기회가 있으면 칸 옆에 단추 (v429)
   r2.appendChild(acts);
   wrap.appendChild(r2);
 
@@ -1783,6 +1953,7 @@ function pcKey(e, down) {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   const m = PC[String(e.key || '').toLowerCase()];
   if (m == null) return;
+  if (down && isCatchOpen()) return; // 🎯 잡기 창(🛒 볼 상점 포함) 밑에서는 건반을 새로 치지 않는다 — 뗌은 정리라 그대로 (v429 검토)
   if (down) { if (e.repeat) return; S.pcDown.add(m); audio(); keyDown(m); } else { S.pcDown.delete(m); release(m); }
 }
 
@@ -1881,8 +2052,9 @@ export async function enterMusic() {
     renderStage(true);
   } else if (S.screen === 'free') renderFree(true); // 🎒·📊 갔다 오면 치던 자리 그대로 (v408)
   else renderList();
-  if (!introSeen()) showIntro(); // 🐾 처음 한 번 — 온 창이 떠 있으면 다음에 들어올 때 (v405)
-  dueMons(); // 🐾 v404
+  if (!introSeen()) showIntro(); // 🐾 처음 한 번 — 잡기 창이 떠 있으면 다음에 들어올 때 (v405 · v429)
+  // 🎯 v429 — 소식 없이 닫힌 잡기 창부터 → 남은 장부 줄(판정 전에 꺼진 기회 · 돌려주다 실패한 기회) → 그다음 밀린 몫을 기회로 (국어 enterKorean과 같은 차례)
+  Promise.resolve(settleLostMusicCatch()).catch(() => {}).then(() => settleMusicThrows()).then(() => dueMons());
   const before = allSongs().map((s) => s.id).join();
   try { await syncSongs(); } catch { /* 받아 둔 곡 그대로 */ }
   if (S.active && S.screen === 'list' && allSongs().map((s) => s.id).join() !== before) renderList();
@@ -1899,4 +2071,4 @@ export function leaveMusic() {
 }
 
 /** 걷기용 */
-if (typeof window !== 'undefined') window.__piano = { S, G, toStart, advance, press, passEnd, openSong, renderList, draw, secPerBeat, hitKey, ac: () => AC };
+if (typeof window !== 'undefined') window.__piano = { S, G, toStart, advance, press, passEnd, openSong, renderList, draw, secPerBeat, hitKey, ac: () => AC, runMusicCatch, holds };

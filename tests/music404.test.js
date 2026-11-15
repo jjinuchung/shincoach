@@ -1,16 +1,18 @@
 // 🐾 v404 음악 포켓몬 50 (2026-11-09 아버님 「이대로」 — 기본안 EGq5MVTaHoizdPmxVTPzqb)
 //   🎧 「다 쳤어요 ✋」 ♪ 다섯 칸마다 한 마리가 온다(잡기 없음) · 아직 안 만난 것 가운데 흔함 4 · 보통 3 · 희귀 2 · 전설 1의 무게 ·
 //   다 만났으면 만난 아이가 또 · v402부터 찬 칸 몫은 음악 화면에 들어올 때 · 진화는 🔶 영어스톤 · 음악에서만(잡기·배틀 상대·5일장·대여행·기술 배우기·🎁에 안 나옴)
+//   (v429 11-15 아버님 「추천대로」) 몫은 「그냥 온다」가 아니라 🎯 잡기 기회 하나 — 여기 오는 규칙·화면 시험은 새 규칙으로 고쳤다 ·
+//   기회 장부·잡기 흐름·후보 고르기(안 만난 아이 먼저)는 music429
 import { fakeIdb } from './fakeidb.js'; // ★ db.js·xp.js보다 먼저
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  MON_WEIGHT, MONS_AT_ONCE, NOTES_PER_MON, LISTEN_DAY, pickMusicMon, listenRule, monsDueRule, pianoOf, copyPiano, mergePiano, slotsOf,
+  MON_WEIGHT, NOTES_PER_MON, LISTEN_DAY, pickMusicMon, listenRule, monsDueRule, pianoOf, copyPiano, mergePiano, slotsOf,
   pianoDayLine, pianoMd, dayKeyOf,
 } from '../js/piano.js';
 import { ROSTER, LEGENDARY, FORMS, subjectOf, forSubject, forPuzzle, isMusicMon, isUnlocked } from '../js/pokemon.js';
-import { RARITY_IDS, tradeCtx, initProfile, flushProfile, getProfileSnapshot, houseDo, pianoListen, pianoMonsDue } from '../js/xp.js';
+import { RARITY_IDS, tradeCtx, initProfile, getProfileSnapshot, houseDo, pianoListen, pianoMonsDue } from '../js/xp.js';
 import { MON_TYPES } from '../js/montypes.js';
 import { pickOpponent, typeOf, MOVES } from '../js/battle.js';
 import { EVO, stoneIdFor, STONE_ID } from '../js/evolve.js';
@@ -71,7 +73,7 @@ test('🎹 게이트: 다른 과목 잡기 후보·퍼즐·⚔️ 배틀 상대�
   for (const f of ['js/journeyview.js', 'js/moveview.js']) assert.match(src(f), /const ok = \(id\) => [^\n]*!isMusicMon\(id\)/, `${f} 후보`);
   assert.match(src('js/pokedex.js'), /subjectOf\(m\.id\) === 'music'\) cell\.appendChild\(el\('div', 'subj', '🎹'\)\)/);
   assert.match(src('js/pokedex.js'), /🎹 음악에서 만나요 \$\{got\(mu\)\}\/\$\{mu\.length\}/);
-  assert.match(src('js/shop.js'), /music: ' · 🎹 음악 ♪ 칸에서 와요'/);
+  assert.match(src('js/shop.js'), /music: ' · 🎹 음악에서 만나요'/, 'v429 — ♪ 칸에서 「와요」가 아니라 음악에서 잡는다');
 });
 
 // ───────────────────── 고르기 (순수) ─────────────────────
@@ -91,66 +93,56 @@ test('🐾 고르기 — 안 만난 것 가운데 무게 흔함 4 · 보통 3 ·
   assert.equal(legend, N / 30);
 });
 
-// ───────────────────── 오는 규칙 (순수) ─────────────────────
+// ───────────────────── 몫 규칙 (순수 · v429부터 🎯 잡기 기회) ─────────────────────
 
-test('🐾 「다 쳤어요」 다섯째 칸 — 한 마리가 와서 도감에 · 받은 수 +1 · 연습 기록에 온 줄 · 칸은 다시 0부터 · 여섯째는 그냥 칸', () => {
+test('🎯 「다 쳤어요」 다섯째 칸 — 잡기 기회 하나(v429 — 전엔 한 마리가 와서 도감에) · 몫을 받은 수 +1 · 기회 줄 · 칸은 다시 0부터 · 여섯째는 그냥 칸', () => {
   const p = { caught: { 25: 1 }, piano: { notes: 4, days: {} } };
-  const r = listenRule(p, REQ, T0, SMALL, () => 0);
+  const r = listenRule(p, REQ, T0);
   assert.equal(r.ok, true);
-  assert.deepEqual([r.counted, r.notes, r.mons, r.got], [true, 5, 1, [433]]);
-  assert.deepEqual(p.caught, { 25: 1, 433: 1 }, '다른 칸은 그대로');
+  assert.deepEqual([r.counted, r.notes, r.mons, r.chances, r.left], [true, 5, 1, 1, 1]);
+  assert.deepEqual(p.caught, { 25: 1 }, '음악 포켓몬은 그냥 오지 않는다 — 잡기 화면에서 잡아야');
   assert.equal(p.piano.mons, 1);
-  assert.deepEqual(p.piano.log.filter((x) => x.m === 'p').map((x) => [x.at, x.s]), [[T0, '433']]);
-  assert.deepEqual(slotsOf(5, 1), { filled: 0, sets: 1 }, '온 뒤엔 다시 0부터');
-  assert.deepEqual(slotsOf(5, 0), { filled: 5, sets: 1 }, '아직 안 왔으면 가득');
+  assert.deepEqual(p.piano.ball, { earned: 1, used: 0, refunded: 0 });
+  assert.deepEqual(p.piano.log.filter((x) => x.m === 'b').map((x) => [x.at, x.s, x.c]), [[T0, 'n', 1]], '기회가 생긴 줄 — ♪ 다섯 칸');
+  assert.equal(p.piano.log.filter((x) => x.m === 'p').length, 0, '「온」 줄은 없다');
+  assert.deepEqual(slotsOf(5, 1), { filled: 0, sets: 1 }, '받은 뒤엔 다시 0부터');
+  assert.deepEqual(slotsOf(5, 0), { filled: 5, sets: 1 }, '아직 안 받았으면 가득');
   assert.deepEqual(slotsOf(5), { filled: 5, sets: 1 }, 'mons 없이 부르면 v402 그대로');
-  const r2 = listenRule(p, REQ, T0 + 1000, SMALL, () => 0);
-  assert.deepEqual([r2.notes, r2.mons, r2.got], [6, 1, []]);
+  const r2 = listenRule(p, REQ, T0 + 1000);
+  assert.deepEqual([r2.notes, r2.mons, r2.chances, r2.left], [6, 1, 0, 1], '남은 기회는 그대로 하나');
   assert.equal(slotsOf(r2.notes, r2.mons).filled, 1);
-  assert.equal(listenRule(p, REQ, T0 + 2000, SMALL, () => 0).got.length, 0);
-  const capped = listenRule(p, REQ, T0 + 3000, SMALL, () => 0);
+  assert.equal(listenRule(p, REQ, T0 + 2000).chances, 0);
+  const capped = listenRule(p, REQ, T0 + 3000);
   assert.deepEqual([capped.counted, capped.why, capped.notes], [false, 'cap', 7], `오늘 ${LISTEN_DAY}칸 뒤엔 칸이 안 찬다`);
 });
 
-test('🐾 몫 — 후보가 없으면 몫은 남고 · 들어올 때 받는다 · 한 번에 다섯까지 · 다 만났으면 또 · 시계가 뒤로면 안 셈 · 깨진 기록', () => {
-  const p = { caught: {}, piano: { notes: 4, days: {} } };
-  const r = listenRule(p, REQ, T0, [], () => 0);
-  assert.deepEqual([r.notes, r.mons, r.got], [5, 0, []], '후보가 없으면 아무것도 안 준다');
-  const due = monsDueRule(p, T0 + 1, SMALL, () => 0.5);
-  assert.deepEqual([due.ok, due.got, due.mons], [true, [358], 1]);
-  assert.deepEqual(monsDueRule(p, T0 + 2, SMALL, () => 0.5).got, [], '두 번 받지 않는다');
-  // v402·v403 때 찬 칸 40 = 묶음 8 → 다섯, 그다음 셋
+test('🎯 밀린 몫 — 들어올 때 기회로(v429) · 두 번 받지 않는다 · 옛 판에 넘친 몫도 한꺼번에 · 옛 규칙으로 받은 묶음은 그대로 · 몫이 없으면 기록을 안 건드림 · 시계가 뒤로면 안 셈 · 깨진 요청', () => {
+  // v402·v403 때 찬 칸 40 = 묶음 8 (v404~v428은 한 번에 다섯 마리까지라 넘친 몫이 남을 수 있었다) → 기회 여덟
   const old = { caught: {}, piano: { notes: 40, days: {} } };
-  assert.equal(MONS_AT_ONCE, 5);
-  assert.equal(monsDueRule(old, T0, POOL, () => 0.3).got.length, 5);
-  assert.equal(monsDueRule(old, T0, POOL, () => 0.3).got.length, 3);
+  const due = monsDueRule(old, T0);
+  assert.deepEqual([due.ok, due.chances, due.left, due.mons], [true, 8, 8, 8]);
+  assert.deepEqual(old.caught, {}, '포켓몬은 그냥 오지 않는다');
   const before = JSON.stringify(old);
-  assert.deepEqual(monsDueRule(old, T0, POOL, () => 0.3).got, []);
+  assert.deepEqual([monsDueRule(old, T0 + 1).chances, monsDueRule(old, T0 + 1).left], [0, 8], '두 번 받지 않는다');
   assert.equal(JSON.stringify(old), before, '받을 몫이 없으면 프로필을 안 건드린다');
-  assert.equal(Object.keys(old.caught).length, 8, '안 만난 것부터 — 여덟 마리가 모두 다르다');
   const raw = { notes: 3, days: {}, extra: 1 };
   const quiet = { caught: {}, piano: raw };
-  monsDueRule(quiet, T0, POOL, () => 0.3);
+  monsDueRule(quiet, T0);
   assert.equal(quiet.piano, raw, '몫이 없으면 저장된 기록을 고쳐 쓰지 않는다(들어올 때마다 쓰지 않게)');
-  // 다 만났으면 만난 아이가 또
-  const full = { caught: Object.fromEntries(SMALL.map((m) => [m.id, 1])), piano: { notes: 9, mons: 1, days: {} } };
-  const again = listenRule(full, REQ, T0, SMALL, () => 0);
-  assert.deepEqual([again.got, again.firsts], [[433], [false]]);
-  assert.equal(full.caught[433], 2, '그 포켓몬 수가 하나 는다');
-  // 마지막 새 아이와 또 온 아이가 한꺼번에 — 처음 만났는지는 올 때마다 (Codex 209차 P3)
-  const last = { caught: { 433: 1, 358: 1, 920: 1 }, piano: { notes: 10, days: {} } };
-  const two = monsDueRule(last, T0, SMALL, () => 0.95);
-  assert.deepEqual([two.got, two.firsts], [[891, 891], [true, false]], '같은 아이가 두 번 와도 첫째만 처음');
-  assert.deepEqual(listenRule({ caught: {}, piano: { notes: 4, days: {} } }, REQ, T0, SMALL, () => 0).firsts, [true]);
-  // 시계가 뒤로 — 칸도 포켓몬도 없음
+  // 옛 규칙(v404~v428)으로 이미 음악 포켓몬을 받은 묶음(mons)은 다시 기회가 되지 않는다
+  const got = { caught: { 433: 1, 358: 1 }, piano: { notes: 10, mons: 2, days: {} } };
+  assert.equal(monsDueRule(got, T0).chances, 0, '옛 규칙으로 받은 묶음은 그대로');
+  assert.deepEqual(got.caught, { 433: 1, 358: 1 }, '이미 받은 음악 포켓몬도 그대로');
+  // 시계가 뒤로 — 칸도 기회도 없음
   const back = { caught: {}, piano: { notes: 4, days: { [dayKeyOf(T0 + 5 * DAY)]: { paid: 0, coins: 0, notes: 1 } } } };
-  const b = listenRule(back, REQ, T0, SMALL, () => 0);
-  assert.deepEqual([b.ok, b.why, Object.keys(back.caught).length], [false, 'clock', 0]);
+  const b = listenRule(back, REQ, T0);
+  assert.deepEqual([b.ok, b.why], [false, 'clock']);
+  assert.equal(pianoOf(back.piano).ball, undefined);
   // 깨진 요청
-  assert.equal(listenRule({ caught: {} }, { ...REQ, hand: 'X' }, T0, SMALL, () => 0).ok, false);
+  assert.equal(listenRule({ caught: {} }, { ...REQ, hand: 'X' }, T0).ok, false);
 });
 
-test('🐾 저장·병합 — 받은 수는 줄지 않는 쪽 · 묶음 수보다 클 수 없다 · 옛 기록(받은 수 없음)은 0 · 온 줄도 고쳐 읽는다', () => {
+test('🐾 저장·병합 — 받은 수는 줄지 않는 쪽 · 묶음 수보다 클 수 없다 · 옛 기록(받은 수 없음)은 0 · 옛 「온」 줄도 고쳐 읽는다', () => {
   assert.equal(pianoOf({ notes: 12 }).mons, 0, 'v402·v403 기록');
   assert.equal(pianoOf({ notes: 12, mons: 9 }).mons, 2, '묶음 수(2)보다 클 수 없다');
   assert.equal(pianoOf({ notes: 12, mons: -1 }).mons, 0);
@@ -158,21 +150,22 @@ test('🐾 저장·병합 — 받은 수는 줄지 않는 쪽 · 묶음 수보�
   assert.equal(mergePiano({ notes: 10, mons: 2 }, { notes: 15, mons: 1 }).mons, 2, '옛 백업이 받은 수를 줄이면 같은 몫이 또 온다');
   assert.equal(mergePiano({ notes: 10, mons: 2 }, { notes: 15, mons: 3 }).mons, 3);
   const log = pianoOf({ notes: 5, mons: 1, log: [{ at: T0, m: 'p', s: '433' }, { at: T0, m: 'p', s: 'x' }, { at: T0, m: 'q', s: '1' }] }).log;
-  assert.deepEqual(log.map((x) => [x.m, x.s]), [['p', '433']], '번호가 아닌 온 줄 · 모르는 줄은 뺀다');
+  assert.deepEqual(log.map((x) => [x.m, x.s]), [['p', '433']], '번호가 아닌 온 줄 · 모르는 줄은 뺀다 — v404~v428 옛 줄은 그대로 남는다');
 });
 
-test('🐾 📤 — 하루 한 줄에 온 수 · music.md에 온 포켓몬 이름과 아직 안 온 몫', () => {
+test('🐾 📤 — 하루 한 줄에 옛 「온」 수 · music.md에 옛 규칙 「온」 줄 이름과 아직 안 받은 몫(→ 잡기 기회)', () => {
   assert.match(pianoDayLine({ pnListenN: 1, pnNotes: 1, pnMons: 1 }), /🐾 음악 포켓몬 1마리 옴/);
-  assert.equal(pianoDayLine({ pnMons: 2 }), '🐾 음악 포켓몬 2마리 옴', '연습 없이 밀린 포켓몬만 받은 날도 (Codex 209차 P3)');
+  assert.equal(pianoDayLine({ pnMons: 2 }), '🐾 음악 포켓몬 2마리 옴', '연습 없이 밀린 포켓몬만 받은 날도 (Codex 209차 P3) — 옛 날 줄');
   assert.equal(pianoDayLine({}), '');
   assert.doesNotMatch(pianoDayLine({ pnListenN: 1, pnNotes: 1 }), /음악 포켓몬/);
   const md = pianoMd({ notes: 10, mons: 1, log: [{ at: T0, m: 'p', s: '433' }] }, '2026-11-09', (s) => s, null, (id) => (id === 433 ? '랑딸랑' : '?'));
-  assert.match(md, /🐾 음악 포켓몬이 옴 — 랑딸랑/);
-  assert.match(md, /온 음악 포켓몬 1 · 아직 안 온 몫 1 — 음악 화면에 들어오면 옴/);
-  assert.match(pianoMd({ notes: 5, mons: 1 }, '2026-11-09'), /온 음악 포켓몬 1\)/, '다 왔으면 몫 말이 없다');
+  assert.match(md, /🐾 음악 포켓몬이 옴\(옛 규칙 — 잡기 없이\) — 랑딸랑/);
+  assert.match(md, /몫을 받은 묶음 1 · 아직 안 받은 몫 1 — 음악 화면에 들어오면 🎯 잡기 기회로/);
+  assert.match(pianoMd({ notes: 5, mons: 1 }, '2026-11-09'), /몫을 받은 묶음 1\)/, '다 받았으면 몫 말이 없다');
 });
 
 // ───────────────────── 화면 — 가짜 화면으로 pianoview.js를 직접 ─────────────────────
+// (잡기 창 #catch는 이 가짜 화면에 없다 — 그림도 없어 잡기 흐름은 「그림을 못 받았어요」 한 줄로 끝난다 · 띄우는 흐름은 music429)
 
 const all = [];
 class El {
@@ -226,7 +219,7 @@ Object.defineProperty(globalThis, 'navigator', { value: { wakeLock: { request: (
 const store = new Map();
 globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => { store.set(k, String(v)); }, removeItem: (k) => { store.delete(k); } };
 store.set('shincoach.pianoSongsAt', String(Date.now()));
-store.set('shincoach.musicIntro', '4'); // 🐾 안내 창(v405 · v413 판 '2' · v420 판 '3' · v423 판 '4')은 이미 본 것으로 — 안내 창 차례는 music405
+store.set('shincoach.musicIntro', '5'); // 🐾 안내 창(v405 · v413 판 '2' · v420 판 '3' · v423 판 '4' · v429 판 '5')은 이미 본 것으로 — 안내 창 차례는 music405
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(cond, what, ms = 4000) {
   const t0 = Date.now();
@@ -237,7 +230,8 @@ async function waitFor(cond, what, ms = 4000) {
 }
 /** 저장된 음악 기록을 바로 바꾼다 (시험용 — 같은 트랜잭션 길) */
 const setPiano = (piano) => houseDo((p) => { p.piano = piano; return { ok: true }; });
-const arriveText = () => (byId('pn-arrive') ? byId('pn-arrive').textContent : '');
+const ball = () => pianoOf(getProfileSnapshot().piano).ball || { earned: 0, used: 0, refunded: 0 };
+const onSlots = () => (byId('pn-slots').innerHTML.match(/class="on"/g) || []).length;
 let P;
 let PV;
 
@@ -245,126 +239,76 @@ before(async () => {
   console.warn = () => {};
   await initProfile();
   await loadToday();
-  await setPiano({ notes: 5, days: {} }); // v402·v403 때 다섯 칸이 찼고 아직 안 온 몫 하나
+  await setPiano({ notes: 5, days: {} }); // v402·v403 때 다섯 칸이 찼고 아직 안 받은 몫 하나
   PV = await import('../js/pianoview.js');
   PV.initMusic({ showView: () => {}, requirePin: (ok) => ok() }); // 👨‍👩‍👦 어른 확인(v417)은 바로 맞음으로 — 확인 창 자체는 pianoflow402
   await PV.enterMusic();
   P = globalThis.window.__piano;
 });
 
-test('화면 — 들어오면 밀린 몫이 「새 음악 포켓몬이 왔어요!」로 · 도감에 들어감 · 「좋아요!」로 닫힘 · 하루 칸 pnMons', async () => {
-  await waitFor(() => byId('pn-arrive'), '들어올 때 온 창');
-  const caught = getProfileSnapshot().caught;
-  const got = MUSIC.filter((id) => caught[id] > 0);
-  assert.equal(got.length, 1, '한 마리');
-  const name = ROSTER.find((r) => r.id === got[0]).ko;
-  assert.match(arriveText(), /🎵 새 음악 포켓몬이 왔어요!/);
-  assert.ok(arriveText().includes(name), `이름 ${name}`);
-  assert.match(arriveText(), /도감에 들어갔어요/);
-  assert.doesNotMatch(arriveText(), /\d+\s*\/\s*50|남은|마리 남/, '아이 화면엔 몇 마리 남았는지 없음');
-  assert.equal(byId('pn-arrive').parent, VIEW, '창은 음악 화면 안(곡 목록·무대를 다시 그려도 안 지워진다)');
-  button('좋아요!').click();
-  assert.equal(byId('pn-arrive'), null);
+test('화면 — 들어오면 밀린 몫이 🎯 잡기 기회로(v429 — 「왔어요」 창 없음 · 바로 띄우지 않고 단추) · 하루 칸 pnBall · 다시 들어와도 또 생기지 않음 · 단추 → 그림이 없으면 한 줄', async () => {
+  await waitFor(() => ball().earned === 1, '들어올 때 밀린 몫 → 기회');
+  assert.ok(!MUSIC.some((id) => Number(getProfileSnapshot().caught[id]) > 0), '음악 포켓몬이 그냥 오지 않는다');
   await settle(30);
-  assert.equal(Number(((await getDaily(clockDay())) || {}).pnMons), 1, '📤 하루 칸');
-  // 다시 들어와도 또 오지 않는다
+  assert.equal(byId('pn-arrive'), null, '「왔어요」 창은 없다');
+  assert.equal(P.S.catching, false, '밀린 기회는 바로 띄우지 않는다');
+  button('🎯 음악 포켓몬 잡기'); // 곡 목록에 잡기 단추 (없으면 던진다)
+  assert.equal(byId('pn-catch').hidden, false);
+  assert.doesNotMatch(byId('pn-catch').textContent, /\d|남은|개/, '아이 화면엔 몇 번 남았는지 없음');
+  assert.equal(Number(((await getDaily(clockDay())) || {}).pnBall), 1, '📤 하루 칸');
   await PV.enterMusic();
   await settle(60);
-  assert.equal(byId('pn-arrive'), null);
+  assert.equal(ball().earned, 1, '다시 들어와도 또 생기지 않는다');
+  // 단추를 누르면 잡기 흐름 — 그림이 없고 받지도 못하면 한 줄 · 기회는 빼지 않는다
+  button('🎯 음악 포켓몬 잡기').click();
+  await waitFor(() => P.S.catchMsg && !P.S.catching, '잡기 흐름 끝');
+  assert.equal(P.S.catchMsg, PV.CATCH_WHY.nopics);
+  assert.ok(byId('pn-catch').textContent.includes(PV.CATCH_WHY.nopics), '단추 밑 한 줄');
+  assert.deepEqual(ball(), { earned: 1, used: 0, refunded: 0 }, '못 띄우면 빼지 않는다');
+  assert.equal(button('🎯 음악 포켓몬 잡기').disabled, false, '다시 누를 수 있다');
 });
 
-test('화면 — 듣고 따라 치기 다섯째 「다 쳤어요」 → 그 자리에서 온 창 · ♪ 칸은 0부터 · 둘이 밀렸으면 차례로', async () => {
+test('화면 — 듣고 따라 치기 다섯째 「다 쳤어요」 → 그 자리에서 잡기 흐름(v429) · ♪ 칸은 0부터 · 알림 「잡을 기회」 · 저장하는 사이 줄을 바꿔도', async () => {
   await setPiano({ notes: 9, mons: 1, days: {} });
+  P.S.catchMsg = '';
   P.openSong('ode');
   button('🎧 듣고 따라 치기').click();
   button('1줄').click();
   byId('pn-go').click();
   P.advance(100);
   byId('pn-done').click();
-  await waitFor(() => byId('pn-arrive'), '다섯째 칸 창');
-  assert.match(arriveText(), /음악 포켓몬이/);
-  assert.equal(P.S.saving, false);
-  assert.equal((byId('pn-slots').innerHTML.match(/class="on"/g) || []).length, 0, '온 뒤 ♪ 칸은 비었다');
-  button('좋아요!').click();
+  await waitFor(() => !P.S.saving && ball().earned === 1, '다섯째 칸 — 기회');
+  await waitFor(() => P.S.catchMsg && !P.S.catching, '바로 잡기 흐름(그림이 없어 한 줄)');
   assert.equal(byId('pn-arrive'), null);
-  // 둘이 밀렸을 때 — 하나 닫으면 다음
-  await setPiano({ notes: 20, mons: 2, days: {} });
-  await PV.enterMusic();
-  await waitFor(() => byId('pn-arrive'), '첫째');
-  const first = arriveText();
-  button('좋아요!').click();
-  assert.ok(byId('pn-arrive'), '둘째가 이어서');
-  assert.notEqual(arriveText(), first);
-  button('좋아요!').click();
-  assert.equal(byId('pn-arrive'), null);
-  await flushProfile();
-  assert.equal(pianoOf(getProfileSnapshot().piano).mons, 4);
-  // 창이 떠 있는 동안 또 오면 — 떠 있는 창을 건너뛰지 않고 뒤에 선다
-  await setPiano({ notes: 25, mons: 4, days: {} });
-  await PV.enterMusic();
-  await waitFor(() => byId('pn-arrive'), '하나 뜬 창');
-  const shown = arriveText();
-  await setPiano({ notes: 30, mons: 5, days: {} });
-  await PV.enterMusic();
-  await settle(80);
-  assert.equal(arriveText(), shown, '먼저 뜬 창 그대로');
-  button('좋아요!').click();
-  assert.ok(byId('pn-arrive'), '그다음 것이 이어서');
-  button('좋아요!').click();
-  assert.equal(byId('pn-arrive'), null);
-  // 저장하는 사이 줄을 바꿔도 — 새 화면의 ♪ 칸이 저장된 기록대로(포켓몬이 왔으면 0) (Codex 209차 P3)
-  await setPiano({ notes: 29, mons: 5, days: {} });
+  assert.equal(onSlots(), 0, '받은 뒤 ♪ 칸은 비었다');
+  assert.match(byId('pn-toast').innerHTML, /🎉 음표가 가득 찼어요![\s\S]*🎯 음악 포켓몬을 잡을 기회!/);
+  assert.doesNotMatch(byId('pn-toast').innerHTML.replace(/<[^>]+>/g, ''), /\d/, '알림에 칸 수 없음');
+  assert.ok(button('🎯 음악 포켓몬 잡기'), '무대에 잡기 단추');
+  assert.deepEqual(MUSIC.filter((id) => Number(getProfileSnapshot().caught[id]) > 0), [], '그냥 오지 않는다');
+  // 저장하는 사이 줄을 바꿔도 — 새 화면의 ♪ 칸이 저장된 기록대로(몫을 받았으면 0) (Codex 209차 P3)
+  await setPiano({ notes: 14, mons: 2, days: {} });
+  P.S.catchMsg = '';
   button('1줄').click();
   byId('pn-go').click();
   P.advance(100);
   byId('pn-done').click();
   button('2줄').click(); // 저장이 끝나기 전에 — 판이 바뀐다
-  assert.equal((byId('pn-slots').innerHTML.match(/class="on"/g) || []).length, 4, '저장 전엔 넷');
-  await waitFor(() => !P.S.saving && byId('pn-arrive'), '바꾼 줄에서 온 창');
-  assert.equal((byId('pn-slots').innerHTML.match(/class="on"/g) || []).length, 0, '저장된 뒤엔 0');
-  button('좋아요!').click();
-  // 50마리를 다 만난 뒤 — 만난 아이가 「또 놀러 왔어요」 (기본안 ④)
-  await houseDo((p) => { for (const id of MUSIC) p.caught[id] = Math.max(1, Number(p.caught[id]) || 0); p.piano = { notes: 40, mons: 7, days: {} }; return { ok: true }; });
-  await PV.enterMusic();
-  await waitFor(() => byId('pn-arrive'), '또 온 창');
-  assert.match(arriveText(), /🎵 음악 포켓몬이 또 놀러 왔어요!/);
-  assert.match(arriveText(), /도감에 한 마리 더/);
-  button('좋아요!').click();
-  // 마지막 새 아이(랑딸랑)와 또 온 아이가 한꺼번에 — 첫 창은 「새」, 둘째는 「또」 (rng 0 → 둘 다 랑딸랑 · Codex 209차 P3)
-  await houseDo((p) => { p.caught[433] = 0; p.piano = { notes: 50, mons: 8, days: {} }; return { ok: true }; });
-  const realRandom = Math.random;
-  Math.random = () => 0;
-  try {
-    await PV.enterMusic();
-    await waitFor(() => byId('pn-arrive'), '마지막 새 아이 창');
-  } finally { Math.random = realRandom; }
-  assert.match(arriveText(), /🎵 새 음악 포켓몬이 왔어요!랑딸랑/);
-  button('좋아요!').click();
-  assert.match(arriveText(), /🎵 음악 포켓몬이 또 놀러 왔어요!랑딸랑/);
-  button('좋아요!').click();
-  assert.equal(byId('pn-arrive'), null);
+  assert.equal(onSlots(), 4, '저장 전엔 넷');
+  await waitFor(() => !P.S.saving && ball().earned === 1, '바꾼 줄에서도 기회');
+  assert.equal(onSlots(), 0, '저장된 뒤엔 0');
+  await waitFor(() => P.S.catchMsg && !P.S.catching, '판이 바뀌었어도 잡기 흐름');
 });
 
-test('xp — pianoListen·pianoMonsDue는 저장된 프로필로 한 트랜잭션에서 · 후보는 음악 50만', async () => {
+test('xp — pianoListen·pianoMonsDue는 저장된 프로필로 한 트랜잭션에서 · 기회만 생기고 포켓몬은 안 온다(v429)', async () => {
   await setPiano({ notes: 4, days: {} });
+  const before = JSON.stringify(getProfileSnapshot().caught);
   const r = await pianoListen({ ...REQ, line: 0 });
-  assert.equal(r.ok, true);
-  assert.equal(r.got.length, 1);
-  assert.ok(isMusicMon(r.got[0]), `음악 포켓몬 ${r.got[0]}`);
-  assert.ok(getProfileSnapshot().caught[r.got[0]] >= 1, '메모리 프로필에도');
+  assert.deepEqual([r.ok, r.chances, r.left], [true, 1, 1]);
+  assert.equal(JSON.stringify(getProfileSnapshot().caught), before, '도감은 그대로');
+  assert.deepEqual(pianoOf(fakeIdb.get('profile', 'me').piano).ball, { earned: 1, used: 0, refunded: 0 }, '저장됨');
   await setPiano({ notes: 15, mons: 1, days: {} });
   const d = await pianoMonsDue();
-  assert.equal(d.got.length, 2);
-  assert.ok(d.got.every(isMusicMon));
-  assert.equal((await pianoMonsDue()).got.length, 0);
+  assert.deepEqual([d.ok, d.chances, d.left], [true, 2, 2]);
+  assert.equal((await pianoMonsDue()).chances, 0);
   assert.ok(NOTES_PER_MON === 5);
-  // 등급 무게가 xp까지 이어지나 — 아무도 안 만났을 때 rng 0.97 = 무게 150 가운데 145.5 → 첫 전설(명단 차례 891)
-  //   (등급이 모두 같으면 200 가운데 194 → 49째 · 등급을 안 넘기면 여기서 갈린다)
-  await houseDo((p) => { for (const id of MUSIC) delete p.caught[id]; p.piano = { notes: 4, days: {} }; return { ok: true }; });
-  const realRandom = Math.random;
-  Math.random = () => 0.97;
-  try {
-    const w = await pianoListen({ ...REQ, line: 0 });
-    assert.deepEqual(w.got, [891]);
-  } finally { Math.random = realRandom; }
 });
