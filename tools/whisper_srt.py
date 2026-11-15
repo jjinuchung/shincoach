@@ -27,6 +27,23 @@ def set_idle_priority():
         print(f"[warn] 우선순위 조정 실패: {e}", file=sys.stderr)
 
 
+def add_cuda_dlls():
+    """pip의 nvidia-cublas-cu12·nvidia-cudnn-cu12 DLL 폴더를 PATH 앞에 (ctranslate2가 이름으로 찾는다)"""
+    import os
+    import site
+    roots = [site.getusersitepackages(), *site.getsitepackages()]
+    for root in roots:
+        nv = Path(root) / "nvidia"
+        if not nv.is_dir():
+            continue
+        for b in nv.glob("*/bin"):
+            os.environ["PATH"] = str(b) + os.pathsep + os.environ.get("PATH", "")
+            try:
+                os.add_dll_directory(str(b))
+            except (OSError, AttributeError):
+                pass
+
+
 def fmt_time(sec: float) -> str:
     """초 → SRT 타임코드 (HH:MM:SS,mmm)"""
     if sec < 0:
@@ -59,6 +76,8 @@ def main():
     ap.add_argument("--force", action="store_true", help="무음/저확률 판정 끄기 (음악 때문에 통째로 건너뛴 구간용)")
     ap.add_argument("--offset", type=float, default=0.0, help="잘라낸 클립이면 원본 기준 시작 초 (출력 시간에 더함)")
     ap.add_argument("--threads", type=int, default=4, help="CPU 스레드 수 (기본 4, 다른 서비스 배려)")
+    ap.add_argument("--device", default="cpu", choices=["cpu", "cuda"],
+                    help="cuda = GTX 1650(4 GB)에서 int8_float16 — 긴 영화용 (2026-11-14 소닉 3)")
     args = ap.parse_args()
 
     # 진행 로그에 é(Pokémon) 같은 글자가 섞이면 CP949 콘솔에서 UnicodeEncodeError로 죽는다 → UTF-8로 출력
@@ -76,10 +95,15 @@ def main():
 
     set_idle_priority()
 
+    if args.device == "cuda":
+        add_cuda_dlls()
     from faster_whisper import WhisperModel
 
     print(f"[1/3] 모델 로드: {args.model} (처음이면 다운로드, 수 GB)", flush=True)
-    model = WhisperModel(args.model, device="cpu", compute_type="int8", cpu_threads=args.threads)
+    if args.device == "cuda":
+        model = WhisperModel(args.model, device="cuda", compute_type="int8_float16", cpu_threads=args.threads)
+    else:
+        model = WhisperModel(args.model, device="cpu", compute_type="int8", cpu_threads=args.threads)
 
     lang = None if args.lang == "auto" else args.lang
     print(f"[2/3] 인식 시작: {media.name} (lang={args.lang})", flush=True)
