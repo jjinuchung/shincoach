@@ -10216,6 +10216,28 @@
 
 ### TODO (다음 작업)
 - [x] 아버님 「추천대로 배포」(11-16) → feat → docs → `npm test && git push`
-- [ ] 라이브 v429 확인(라이브 줄은 다음 docs에)
+- [x] 라이브 v429 확인(11-16 · e926e8b feat · 959d4a6 docs · 전체 3993(판 번호 뒤 두 번) · `.context/v429/live_check429.sh` → sw v429 · 앱 판 v429 · 배포본 10개 같음 · Pages built 959d4a6)
 - [ ] 태블릿 「지금 바꾸기」(v428 → v429) → 다음 「올라온 거 봐 줘」에 📤 🎯 줄(기회 생김 · 잡음·놓침 — 포켓몬)
 - [ ] 다음: 🎬 v430 영어 영상 시험(`.context/v430/spec.md`) · `upload/english/tests/t1~t3.json` 비공개 올리기는 v430 배포 때
+
+## 2026-11-16 — 🎬 v430 영어 영상 시험 (아버님 「추천대로」 · ultracode 워크플로)
+
+### 진행 내용
+- 설계서 `.context/v430/spec.md` → 구현 워크플로(바탕 → 화면·보고 동시): 영상마다 시험 5단계 × 20문제(1 낱말 · 2 문장 뜻 · 3 빈칸·문법 · 4 문장 만들기 · 5 이해 · 유형 14) · 그 영상 「한 문장」 95%(지금 문장 열쇠로 거름)면 열림 · toy5는 늘 · 16개(80점) 넘으면 다음 단계 · 💰 그 단계에서 더 높은 칸(80·90·100)을 처음 넘을 때 차액만(10·20·30 + 단계마다 2) · 100점 처음이면 🎯 영어 포켓몬 잡기 기회
+- `js/entest.js`(순수 — 원고 검사 checkTestQ · testsOf · 열림 openMapOf · 판 dealRound · 채점 judge · 보상 enTestRule · 칸 병합 · 🎯 장부 enThrow · 📤 testsMd·enTestDayLine) · `js/entestsync.js`(신문 꼴 비공개 받기 english/tests/t1~t3.json · blobs 'entest:list' · 10분) · `js/entestview.js`(플레이어 위 불투명 시험 창 · 고르기·쳐 넣기·카드 · 🔊 그 장면 소리 · 끝 화면 · runEnCatch — 국어·음악 차례 · throwhold 'shincoach.entest.throwHolds') · db.js(profile.enTest·enThrow 복사·병합 max · 하루 칸 enTestRuns·Pass·Ball·Caught·Fled) · xp.js(enTestFinish 한 트랜잭션 · enTakeThrow·enGiveBackThrow·enJudged) · player.js(openPlayer(id,{test:true}) · 창 동안 멈춤·inert·goTo·자판·문장 초 막음 · 🔊 장면은 say로 찾고 없으면 원고 시각) · library.js(카드 「📝 시험 · 단계 이름」 · 「🎯 영어 포켓몬 잡기」 단추 — 숫자 없음) · upload.js(english/tests.md · usage 🎬 줄 · 받기 이름 「📝 영상 시험 1~3」) · check.mjs·privcheck(공개 저장소의 english/tests · 옮긴 원고 막기 · 비공개 원고 검사)
+- 원고 17편 1,700문제 → `.context/entest1115/make_upload.mjs`가 앱 검사로 `upload/english/tests/t1~t3.json`(438 · 444 · 368 KB · 버린 줄 0 · 안 연 영상 0)
+- 새 눈 검토 워크플로(다섯 갈래 → 갈래마다 반박꾼 · 확인 P3 열) + Codex 235차(P2 넷 · P3 셋) → 고침 열둘: ⏳ 새 판은 guardStart(연장권 뒤 「계속하기」) · 👀 그냥 보기에선 시험이 쉼 · 1.2초 안에 단추를 누르면 잡기가 먼저 · 잡기를 부르는 중·잡기 창 밑에선 판을 안 시작 · 저절로 부른 잡기는 그 판 끝 화면일 때만(아니면 안 빼고·뺐으면 돌려줌) · 끝 화면 「단계 고르기」 · 한글 자판으로 쓴 답은 안 셈(「⌨️ 영어 자판으로」) · 답한 뒤 풀이·「다음」 끌어올림(1024×600) · 한 번 푼 시험은 「한 문장」이 다시 내려가도 열림(everOpened) · 자막 셈 기억 stats.cueInfoOf(목록·📤 같이) · 틀린 수 상한 20 · 따옴표 풀이 「빠졌어요」 · 겹친 창 목록 en-test · 공개 막기 .js·.md·.csv까지 · 닫으면 레벨 칩 · 날짜 시험 자정
+- Codex 236차(P1 없음 · P2 둘 · P3 둘) 모두 고침: 연장권 「계속하기」는 같은 판·화면일 때만 · 자막 기억은 글 전체로 · 날짜 시험 r.day · 공개 막기 표 머리줄(따옴표 없는 JS 객체는 범위 밖이라고 적음)
+- 변이 `.context/v430/mutate_v430.mjs`(사본 worktree에서) 서로 다른 53 중 51 잡힘 — 살아남은 둘(같은 칸 💰 · 복사 줄)은 동등 · 빈틈 다섯(넘은 단계 내려감 · 떨어진 판 「넘음」 · 거절 판 하루 칸 · 「다시 저장하기」 두 번 · 받기 10분)은 시험을 더해 잡음
+- 진짜 Chrome 걷기 `.context/v430/walk430.sh`+`hh430.js` 1280×800·1024×600(이 PC 비공개 원고 t1을 사본에만): 카드 단추(95% 미만 없음) · 창이 다 덮음·inert·자판 · 💰 30 → 0 → 22 → 10 · 잡기 창이 시험 창 위 · 잡힘·놓침·하루 칸 · 바깥 닫힘 → 다음 판에 돌려줌 · 그만하기 결과 없음 · 📤 대사 섞임 0 · 쳐 넣기·카드·한글 줄·「다음」 화면 안 · 콘솔 오류 0
+- 전체 4040 → 고친 뒤 4048 → 마지막 4050 통과(check 포함)
+
+### 결정사항 / 메모
+- 설계서 밖에서 메인이 정한 것(아버님께 보고): 창이 영상 그림을 다 덮음(박힌 한글 안 보임 · 🔊는 소리만) · 열린 가장 높은 단계부터 · 넘은 단계는 이름 칩으로 다시 · 처음 낸 답만 · 답마다 풀이 · 💰 차액 · 열쇠 = 영상 제목 · 끝 화면 「다음 단계 ▶」·「단계 고르기」 · 🎯 단추는 목록과 시험 창 둘 다 · 칩 ✅·💯 · 장면을 못 찾으면 기기 읽어 주기 · 그만하기는 묻지 않음 · 시험 시간은 ⏳에는 들고 📊 문장 초에는 안 듦 · 👀 그냥 보기에선 시험이 쉼
+- 일부러 안 고친 것: 기회 빼기와 장부 줄 쓰기 사이에 앱이 꺼지면 그 기회 하나가 사라질 수 있음(국어·음악과 같은 throwhold 공통 한계 — Codex 235차 #4) · 잡기 창은 던져야 닫힘(다른 과목과 같음)
+- 원고는 저작권 → 비공개 저장소에만(공개 저장소엔 시험 재료도 지어낸 문장) · DB_VERSION 5 그대로(새 칸은 맨 위 칸이라 옛 창 ...cur 펼침에 남음)
+
+### TODO (다음 작업)
+- [x] 아버님 「배포」(11-16) → feat a1d6387 → docs(v429 라이브 줄 포함) → `npm test && git push`
+- [ ] 라이브 v430 확인 → 비공개 `english/tests/t1~t3.json` 올리기(add_private.sh · `node tools/check.mjs --private .context/entest1115/upload` 먼저)
+- [ ] 태블릿 「지금 바꾸기」(v429·v430) → 다음 「올라온 거 봐 줘」에 📤 english/tests.md · usage 🎬 줄
