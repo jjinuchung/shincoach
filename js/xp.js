@@ -33,6 +33,8 @@ import { copyAqua, aquaTierRule, aquaBuyRule, aquaPutRule, aquaTakeRule, aquaSlo
 import { copyTour, tourEndRule, bookRule as tourBookRule } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 (v401 — 순수)
 import { copyPiano, pianoOf, tapRule as pianoTapRule, listenRule as pianoListenRule, monsDueRule as pianoMonsDueRule, musicTakeRule, musicGiveBackRule, musicJudgedRule, musicThrowsLeft } from './piano.js'; // 🎹 음악 과목 (v402 — 순수 · v404 음악 포켓몬 · v429 🎯 잡기 기회)
 import { copyLake, catchRule as lakeCatchRule, gearBuyRule as lakeGearRule, pickRule as lakePickRule, gearOf as lakeGearOf } from './fishing.js'; // 🎣 학습 낚시터 도감·💰 · 🎒 채비·고른 물가(v368) (순수)
+import { copyEnTest, enTestOf, enTestRule, enTakeRule, enGiveBackRule, enThrowsLeft as enLeftOf, enDayKey } from './entest.js'; // 🎬 영어 영상 시험 칸·💰·🎯 영어 잡기 장부 (v430 — 순수)
+import { enTestsNow } from './entestsync.js'; // 🎬 시험이 있는 영상 제목 (v430 — 받아 둔 사본 · 화면 없음)
 import { restStartRule, restCancelRule, restClaimRule, rollLuck, expOf } from './rest.js'; // 💊 회복 캡슐 규칙 (순수)
 import { korFinishRule, missOf, qMissOf, readsOf, throwsOf, pendingOf, korTakeRule, korGiveBackRule, korDayDelta } from './korean.js'; // 📚 국어 별·💰 규칙 · 📈 날마다 합계(v314) (순수)
 import { korWordsRule, wordsOf, wordDaysOf } from './korwords.js'; // 🔤 국어 낱말 칸·보상 (순수)
@@ -449,7 +451,7 @@ function addDelta(d) {
 }
 
 function fromStored(p) {
-  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.homeGuest ? { homeGuest: copyGuest(p.homeGuest) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), ...(p.aquarium ? { aquarium: copyAqua(p.aquarium) } : {}), ...(p.aquaTour ? { aquaTour: copyTour(p.aquaTour) } : {}), ...(p.piano ? { piano: copyPiano(p.piano) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulNewsDay: wordDaysOf(p.nonsulNewsDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
+  return { ...EMPTY(), ...p, ...(p.house ? { house: copyHouse(p.house) } : {}), ...(p.avatar ? { avatar: copyAvatar(p.avatar) } : {}), ...(p.homePlay ? { homePlay: copyPlay(p.homePlay) } : {}), ...(p.homePhotos ? { homePhotos: copyPhotos(p.homePhotos) } : {}), ...(p.homeGuest ? { homeGuest: copyGuest(p.homeGuest) } : {}), ...(p.journey ? { journey: copyJourney(p.journey) } : {}), ...(p.fishing ? { fishing: copyLake(p.fishing) } : {}), ...(p.aquarium ? { aquarium: copyAqua(p.aquarium) } : {}), ...(p.aquaTour ? { aquaTour: copyTour(p.aquaTour) } : {}), ...(p.piano ? { piano: copyPiano(p.piano) } : {}), ...(p.enTest ? { enTest: copyEnTest(p.enTest) } : {}), ...(p.enThrow ? { enThrow: throwsOf(p.enThrow) } : {}), caught: { ...(p.caught || {}) }, items: { ...(p.items || {}) }, mons: { ...(p.mons || {}) }, eggs: (p.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(p.giftsGiven || {}) }, fusions: copyFusions(p.fusions), trades: copyTrades(p.trades), parcels: { ...(p.parcels || {}) }, restsDone: copyRestsDone(p.restsDone), korDone: copyRestsDone(p.korDone), korMiss: missOf(p.korMiss), korQMiss: qMissOf(p.korQMiss), korReads: readsOf(p.korReads), korThrow: throwsOf(p.korThrow), korWords: wordsOf(p.korWords), korWordDay: wordDaysOf(p.korWordDay), korPuzzle: wordsOf(p.korPuzzle), korPuzzleDay: wordDaysOf(p.korPuzzleDay), korWrites: writesOf(p.korWrites), nonsul: wordsOf(p.nonsul), nonsulDay: wordDaysOf(p.nonsulDay), nonsulNewsDay: wordDaysOf(p.nonsulNewsDay), nonsulThrow: throwsOf(p.nonsulThrow), grammar: wordsOf(p.grammar), grammarDay: wordDaysOf(p.grammarDay), grammarKnown: knownOf(p.grammarKnown), grammarSeen: seenOf(p.grammarSeen), grammarMiss: gMissOf(p.grammarMiss), grammarDiag: diagOf(p.grammarDiag), grammarGift: giftOf(p.grammarGift), grammarVideo: videoSeenOf(p.grammarVideo), letters: lettersOf(p.letters), zyg: zygOf(p.zyg), sales: copySales(p.sales) };
 }
 
 /** 저장소가 준 프로필을 메모리로 — 아직 못 쓴 몫은 얹어 둔다: 쓴 물건이 되살아나거나 번 코인이 사라져 보이지 않게 (v396 · Codex 199차) */
@@ -1135,6 +1137,46 @@ export function pianoThrowsLeft() {
 /** 🎹 지금 음악 기록 (그리기용 — 고쳐 읽은 새 객체) */
 export function pianoNow() {
   return pianoOf(profile && profile.piano);
+}
+/**
+ * 🎬 영어 영상 시험 한 판 끝 (v430) — 💰(그 단계에서 더 높은 칸을 처음 넘을 때 차액만)·넘은 단계·🎯 영어 잡기 기회(그 단계 100점을 처음)를
+ * **저장된 프로필로** 한 트랜잭션에서(두 창이 같은 칸을 두 번 받지 못하게) · 시각은 트랜잭션 안에서 · 저장 실패는 {ok:false, why:'save'}
+ * args = { title 영상 제목, stage 1~5, correct 처음 낸 답으로 맞힌 수, wrong { 유형: 틀린 수 }, known? 시험이 있는 제목들(안 주면 받아 둔 사본 — entestsync.enTestsNow) }
+ * 받은 뒤 그날 하루 칸(📤)에 판 · 넘은 판 · 생긴 기회 (프로필 저장 뒤 따로라 드물게 못 적으면 그 한 판만 빠진다 — 💰·기회와는 상관없다)
+ * @returns {Promise<object>} entest.enTestRule의 돌려줌 (ok·why·coins·tier·passed·firstPass·opened·chance·best·s·left·day …)
+ */
+export async function enTestFinish(args) {
+  const a = args && typeof args === 'object' ? args : {};
+  const known = a.known || Object.keys(enTestsNow().tests);
+  const r = await houseDo((p) => enTestRule(p, { ...a, known, now: Date.now() }));
+  if (r && r.ok) await applyDailyDelta(r.day, { enTestRuns: 1, ...(r.passed ? { enTestPass: 1 } : {}), ...(r.chance ? { enTestBall: 1 } : {}) }).catch(() => {});
+  return r;
+}
+/** 🎯 영어 잡기 기회 하나 빼기 (v430) — 잡기 화면을 띄우기 전에(두 창이 같은 기회를 두 번 던지지 못하게) */
+export function enTakeThrow() {
+  return houseDo((p) => enTakeRule(p));
+}
+/** 🎯 뺐는데 한 번도 안 던지고 닫았다 → 돌려준다 (v430) */
+export function enGiveBackThrow() {
+  return houseDo((p) => enGiveBackRule(p));
+}
+/** 🎯 남은 영어 잡기 기회 (v430 · 그리기용 — 메모리 프로필) */
+export function enThrowsLeft() {
+  return enLeftOf(profile && profile.enThrow);
+}
+/** 🎯 던져서 판정이 났다 (v430) — 그날 하루 칸(📤)에 잡음·놓침 하나 · 기록만(잡기 저장·도감과 따로) · id = 포켓몬 번호 → {ok} */
+export async function enJudged(id, caught) {
+  if (!/^\d{1,4}$/.test(String(id))) return { ok: false, why: 'id' };
+  try {
+    await applyDailyDelta(enDayKey(Date.now()), caught ? { enTestCaught: 1 } : { enTestFled: 1 });
+    return { ok: true };
+  } catch {
+    return { ok: false, why: 'save' };
+  }
+}
+/** 🎬 지금 시험 기록 { 영상 제목: 칸 } (v430 · 그리기용 — 고쳐 읽은 새 객체 · 칸 꼴은 entest.js 머리) */
+export function enTestMap() {
+  return enTestOf(profile && profile.enTest);
 }
 /** 📚 국어 글 한 편을 다 읽었다 — 잘못 읽기 횟수 + 받을 별이 있으면 별·💰를 저장된 프로필로 한 트랜잭션에서(houseDo = applyHouseRule = mutateProfile)
  *  ids = 지금 있는 카드 id · 날은 트랜잭션 안의 시각으로 센다(창을 연 날이 아니라) */

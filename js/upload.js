@@ -21,6 +21,8 @@
 //           grammar/YYYY-MM-DD.md (📝 영어 문법 — 단원마다 ⭐·✅·다시 · 오개념별 틀린 수 · 🎁 깜짝 포켓몬 · 최근 7일, v348 · grammar.grammarMd · 한 번도 안 했으면 안 만든다)
 //           letters/todo.md · letters/todo.json (📮 포켓몬 편지 — 판단 기다리는 답장, v351 · letters.letterTodo · 하나도 없으면 빈 목록도 올린다
 //             · todo.md 머리에 📮 지금 우체통 한 줄 — 처음 연 날·지금 편지·띠 글·🌟, v357 · letters.letterStatusLine)
+//           english/tests.md (🎬 영어 영상 시험 — 영상마다 넘은 단계·단계별 최고·받은 칸·판·처음 넘은 날·유형별 틀린 수 · 🎯 영어 잡기 기회 · 받아 둔 원고의 시험이 있는 영상과 열림,
+//             v430 · entest.testsMd · 날짜 없이 늘 최신 · 받아 둔 원고도 시험 기록도 없으면 안 만든다 · 문제·대사는 싣지 않는다)
 //           backup/YYYY-MM-DD.json.gz (☁️ 전체 기록 백업 — ⚙에서 켠 기기만 하루 한 번, v361 · cloudbackup.js가 이 파일의 putFile·listDir·getRawFile로 — 📤 보내기와 따로)
 // 언제: 앱을 열 때 · 🏠 홈으로 돌아올 때 · 앱을 내릴 때 — 10분에 한 번까지, 내용이 그대로면 안 올린다.
 //       📊 "📤 지금 보내기"는 바로. 못 올려도 앱은 그대로이고 진우 화면엔 아무것도 안 뜬다 (다음에 다시).
@@ -39,6 +41,7 @@ import { APP_VERSION, cachedVersion, versionLine } from './version.js';
 import { lakeDayLine } from './fishing.js'; // 🎣 학습 낚시터 하루 한 줄 (v366 — 순수, 아무것도 import하지 않음)
 import { tourDayLine } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 하루 한 줄 (v401 — 순수)
 import { pianoDayLine } from './piano.js'; // 🎹 음악 하루 한 줄 (v402 — 순수)
+import { enTestDayLine } from './entest.js'; // 🎬 영어 영상 시험 하루 한 줄 (v430 — 순수, grammar·korean만 import · db.js도 이미 부른다)
 import { topicById, topicLabel, topicDayText } from './essaytopic.js'; // 💡 오늘의 글감 (v388 — 순수, 아무것도 import하지 않음)
 
 export const DATA_REPO = 'jjinuchung/shincoach-data';
@@ -242,6 +245,7 @@ export function usageFiles(days, today, places, verLine = '') {
     '- 🎮🎵 게임 음악 = 게임기에서 한 판 동안 음악이 나온 시간 (v337부터 · 기기 음량·음소거는 알 수 없음 · ⚙ 이벤트 배경음악을 껐거나 🎵로 꺼 두었거나 앱을 내린 동안은 안 셈) · 끔·다시 켬 = 진우가 게임기 🎵 단추를 누른 수',
     '- 🎣 낚시터 = 학습 낚시터에서 낚은 시간(화면이 보이고 2분 안에 손댄 때만 · v366부터 · 하루 20분이 기본) · 맞힘/낸 문제 = 낚시 중 과목마다 (이미 배운 문제 · 지난 7일 덜 한 과목이 더 자주 나와요) · 수학 뒤 (🐟 맞힘/낸) = 그 가운데 낚은 물고기 길이·무게로 낸 물고기 수학(v367부터) · ✍️ 직접 쓰기 맞힘/낸 · 🤷 N = 그 가운데 보기 없이 숫자판으로 답을 쓴 문제(v418부터 — 수가 답인 문제만 내고, 🤷 모르겠어요는 틀림으로 셈 · 숫자판을 쓰는 동안은 낚시 시간이 안 감 · ⚙ 「🔢 수학 숫자판」을 끄면 보기 · 🔁 뜰채 한 번 더 N = 뜰채에서 숫자판 수학을 못 풀어 같은 칸을 숫자만 바꿔 다시 낸 수 — v419부터 뜰채에서 수학을 못 풀면 다음 문제도 수학이고 🤷 뒤 풀이를 읽는 동안은 낚시 시간이 감) · 물고기 N마리(🏞️ 강 M · 🌊 바다 K · 🚤 배 J) = 그 가운데 강·바다·배에서 낚은 마리(강은 v368부터 — 저수지 도감 10종이면 · 바다는 v369부터 — 강 도감 6종이면 · 배 낚시는 v386부터 — 바다 도감 6종이면 열려요 · 배에선 문어·오징어 무리도 「마리」로 셈)',
     '- 🎣 줄 뒤쪽 = 🐋 큰 물고기 2·3·4단계 문제 맞힘/낸(v378 · 4단계 = 🔶 영어만 🎬 본 영상 대사의 빈칸 v416 — 맞는 대사가 없는 단어는 3단계 꼴로) · 🔁 다시 풀기 맞힘/낸 = 틀린 배운 수학 칸을 다음 물고기의 첫 수학 차례에 한 번 · 또 틀리면 다음 낚시 날 처음에 한 번(v387 · 수학 칸 안의 몫) · 🔢 배운 칸별(v377) · 거듭 틀린 칸 = 다음 날 다시 풀기도 틀린 칸(그 뒤로는 안 냄) · 🎚️ 과목 단계 = 그날 과목마다 더한 단계(그날 처음 열 때 · 지금 단계로 30문제 넘게 쌓이면 90% 넘게 맞힌 과목 +1 · 60% 아래 −1 · 위아래 2까지 · v387) · 맨 위 단계도 쉬움 = +2에서도 90% 넘음(영어 목소리가 없는 기기는 영어 3·4단계가 2단계로 나와요 — 어느 쪽이든 영어에 새 문제 꼴이 필요하다는 뜻 · v416부터 영어 맨 위는 4단계)',
+    '- 🎬 영상 시험(v430) = 영어 영상 시험을 끝까지 푼 판(넘음 = 20문제 중 16개 이상 맞혀 그 단계를 넘은 판 · 다시 푼 판도 셈) · 🎯 영어 잡기 기회 생김 = 그날 한 단계에서 100점을 처음 넘어 생긴 기회 · 던져서 잡음/놓침 = 그날 잡기 화면에서 던진 결과(전에 생긴 기회로 던진 것도) · 영상·단계마다는 english/tests.md',
     '- 🎟️ 손님 맞이 = 아쿠아리움에 온 손님 무리(그날 과목을 합친 공부 15분마다 한 무리 · 하루 세 무리 · v401부터) · 💰 = 표값(손님 수 × 표 한 장) + 맞힌 해설마다 팁 5 + 📊 장부 질문마다 10 · 매표 = 거스름돈·표 한 장 거꾸로·오늘 표값 모두 문장제 · 해설 = 2·3·3단계(낚시터와 같은 원천 · 🐟는 수조에 든 물고기 수학) · 맞힘/낸',
     '- ⏱ 수학 문항마다 걸린 초는 math/latest.json 일지(log)의 qs[].s — 문제를 보인 때부터 처음 답할 때까지(앱을 내린 시간도 들어감, 쌍둥이 문제는 안 셈) · 600은 윗값 · 빠른 오답은 살펴볼 신호이지 찍었다는 증거는 아니에요',
     '', '## 최근 7일'];
@@ -280,6 +284,9 @@ export function usageFiles(days, today, places, verLine = '') {
     // 🎹 음악 (v402) — 태블릿 치기 판·잘 친 판·💰 · 듣고 따라 치기 「다 쳤어요」·음표 칸
     const piano = pianoDayLine(d);
     if (piano) parts.push(piano);
+    // 🎬 영어 영상 시험 (v430) — 끝낸 판·넘은 판 · 🎯 영어 잡기 기회 생김·던진 결과
+    const entest = enTestDayLine(d);
+    if (entest) parts.push(entest);
     lines.push(`- ${day.slice(5)}: ${parts.join(' · ')}`);
   }
   return [{ path: `usage/${today}.md`, text: `${lines.join('\n').trim()}\n` }];
@@ -364,9 +371,10 @@ export function unb64(s) {
  * crashLog(있으면) = 🛑 앱이 저절로 꺼진 기록 글(blackbox.crashLogNow) — 못 만들면 null이라 이 파일만 빠진다 (v292)
  * verLine(있으면) = 🏷️ 앱 판 줄 — 🕒 사용 기록 머리에 (v314)
  * getFeedback(있으면) = 📬 피드백이 닿았나 글(today, days, math) — 못 만들면 이 파일만 빠진다 (v314)
- * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, usagePlaces?:Array, today:string}} o
+ * getEnTest(있으면) = 🎬 영어 영상 시험 글(today) → english/tests.md — null이면 안 만들고, 못 만들면 이 파일만 빠진다 (v430 · enTestMdNow)
+ * @param {{getMath:Function, listDaily:Function, mathReportText:Function, asksText:Function, collectTodo:Function, getKorTodo?:Function, getEnglish?:Function, getKorReport?:Function, getEnTest?:Function, usagePlaces?:Array, today:string}} o
  */
-export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getLetterTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, getFeedback, getStock, getJourney, getGrammar, getSpell, getMusic, uploadLog, crashLog, verLine, today }) {
+export async function gatherFiles({ getMath, listDaily, mathReportText, asksText, collectTodo, getKorTodo, getLetterTodo, getEnglish, getKorReport, usagePlaces, getReward, getWeekly, getFamily, getFeedback, getStock, getJourney, getGrammar, getSpell, getMusic, getEnTest, uploadLog, crashLog, verLine, today }) {
   const math = await getMath();
   const days = await listDaily();
   const kor = getKorTodo ? await getKorTodo() : null;
@@ -390,6 +398,8 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
   const spell = getSpell ? await Promise.resolve().then(() => getSpell(today)).catch(() => null) : null;
   // 🎹 음악(v402)도 못 만들면 빼고 나머지는 그대로
   const music = getMusic ? await Promise.resolve().then(() => getMusic(today)).catch(() => null) : null;
+  // 🎬 영어 영상 시험(v430)도 못 만들면 빼고 나머지는 그대로
+  const enTest = getEnTest ? await Promise.resolve().then(() => getEnTest(today)).catch(() => null) : null;
   return [
     ...reportFiles(math, today, math ? mathReportText(math, today, days || []) : '(수학 기록 없음)', math ? asksText(math, today) : ''), // ☀️ 줄은 하루 기록으로 (v331)
     ...essayFiles(collectTodo(days || []), today), // ✍️ 📊 "📮 고쳐 주세요"와 같은 목록·번호
@@ -408,6 +418,7 @@ export async function gatherFiles({ getMath, listDaily, mathReportText, asksText
     ...(typeof grammar === 'string' && grammar ? [{ path: `grammar/${today}.md`, text: grammar }] : []), // 📝 영어 문법 — 단원마다 ⭐·✅·다시 · 오개념별 틀린 수 · 🎁 (v348)
     ...(typeof music === 'string' && music ? [{ path: 'usage/music.md', text: music }] : []), // 🎹 음악 연습 기록 — 곡·줄·손·도움·빠르기·맞게 누른 수·음표 칸 (v402)
     ...(typeof spell === 'string' && spell ? [{ path: 'english/spell.md', text: spell }] : []), // 🔤 철자 노트 — 노트 낱말·졸업·쪽지 날 · 낱말마다 내 철자·칸 (v356 · 날짜 없이 늘 최신)
+    ...(typeof enTest === 'string' && enTest ? [{ path: 'english/tests.md', text: enTest }] : []), // 🎬 영어 영상 시험 — 영상마다 단계·최고·칸·판·처음 넘은 날·틀린 유형 · 🎯 (v430 · 날짜 없이 늘 최신)
     ...(typeof uploadLog === 'string' && uploadLog ? [{ path: 'usage/upload-log.md', text: uploadLog }] : []), // 📤 올리기 실패 기록 (v278)
     ...(typeof crashLog === 'string' && crashLog ? [{ path: 'usage/crash-log.md', text: crashLog }] : []), // 🛑 앱이 저절로 꺼진 기록 (v292)
   ];
@@ -441,6 +452,36 @@ async function musicNow(today) {
   if (!p) return null;
   const ko = (id) => { const r = pk.ROSTER.find((m) => m.id === Number(id)); return r ? r.ko : `#${id}`; };
   return pn.pianoMd(p.piano, today, ps.songName, ps.midiCheckNow(), ko) || null;
+}
+
+/**
+ * 🎬 영어 영상 시험 글 (v430) — 저장된 프로필(시험 칸 enTest · 🎯 영어 잡기 장부 enThrow) + 이 기기에 받아 둔 원고(entestsync.loadEnTests — 여기서는 받지 않는다) +
+ *   시험이 있는 영상마다 열림(entest.openMapOf — 영어 목록과 같은 셈)
+ * 받아 둔 원고도 시험 기록도 없으면 null(파일을 안 만든다 — 📤 열쇠가 없거나 아직 못 받은 기기) · 영상 기록을 못 읽으면 열림만 빠진다(글은 그대로)
+ * 문장 기록은 시험이 있는 제목의 첫 편만 그 영상 것으로 읽는다(🎤 영어 요약 enNow가 이미 전부 읽으니 또 전부 읽지 않게 — 태블릿 메모리)
+ */
+export async function enTestMdNow(today) {
+  const [{ getProfile, listItems, getSentenceStats }, et, es] = await Promise.all([import('./db.js'), import('./entest.js'), import('./entestsync.js')]);
+  const p = await getProfile();
+  const got = await es.loadEnTests();
+  const titles = Object.keys(got.tests);
+  const th = et.enThrowOf(p && p.enThrow);
+  if (!titles.length && !Object.keys(et.enTestOf(p && p.enTest)).length && !th.earned && !th.used && !th.refunded) return null;
+  let open = null;
+  if (titles.length) {
+    try {
+      const st = await import('./stats.js');
+      const items = await listItems();
+      // openMapOf와 같은 차례로 고른 첫 편(깨진 영상 건너뜀)의 기록만
+      const want = new Set(titles);
+      const firsts = new Map();
+      for (const it of Array.isArray(items) ? items : []) if (it && !it.broken && want.has(it.title) && !firsts.has(it.title)) firsts.set(it.title, it.id);
+      const records = [];
+      for (const id of firsts.values()) for (const r of (await getSentenceStats(id)).values()) records.push(r);
+      open = et.openMapOf(items, records, (it) => st.cueInfoOf(it).count, (it) => st.cueInfoOf(it).keys, titles); // 영어 목록이 나눠 둔 셈을 같이 (자막을 또 나누지 않게)
+    } catch { open = null; }
+  }
+  return et.testsMd({ enTest: p && p.enTest, enThrow: p && p.enThrow, tests: got.tests, closed: got.closed, open, today });
 }
 
 async function journeyNow(today) {
@@ -722,8 +763,11 @@ export const PRIVATE_FX = 'fx/fx.json';
 export const PRIVATE_GRAMMAR_VIDEO = 'grammar/video.json';
 /** 📰 신문 기사 원고 넷 (v428 — news.NEWS_PATHS와 같은 경로 · 시험이 본다) */
 export const PRIVATE_NEWS = ['news/n1.json', 'news/n2.json', 'news/n3.json', 'news/n4.json'];
+/** 📝 영어 영상 시험 원고 셋 (v430 — entestsync.EN_TEST_PATHS와 같은 경로 · 시험이 본다) */
+export const PRIVATE_EN_TESTS = ['english/tests/t1.json', 'english/tests/t2.json', 'english/tests/t3.json'];
 const READ_NAMES = { [PRIVATE_FIXES]: '✍️ 교정', [PRIVATE_REPLIES]: '❓ 답장', [PRIVATE_KOR_REPLIES]: '📚 국어 답장', [PRIVATE_FAMILY]: '💌 메시지', [PRIVATE_HATMARKS]: '🧢 모자 무늬', [PRIVATE_FX]: '🐸 기술 그림', [PRIVATE_GRAMMAR_VIDEO]: '🎬 영상 문장 문제', [PRIVATE_LETTER_REPLIES]: '📮 편지 답장',
-  ...Object.fromEntries(PRIVATE_NEWS.map((p, k) => [p, `📰 신문 ${k + 1}`])) };
+  ...Object.fromEntries(PRIVATE_NEWS.map((p, k) => [p, `📰 신문 ${k + 1}`])),
+  ...Object.fromEntries(PRIVATE_EN_TESTS.map((p, k) => [p, `📝 영상 시험 ${k + 1}`])) };
 /**
  * 📊 📤 카드의 받기 한 줄 (순수) — "📥 받기: ✍️ 교정 ✅ 10/07 10:32 (3개) · ❓ 답장 · 아직 없음"
  * check(국어 답장 — 붙여 본 뒤의 수, noteReadCheck)가 있으면: 너무 많아 통째로 안 받음 ❌ · 받지 않은 줄·맞는 글 없음·판 다름 ⚠️
@@ -739,8 +783,9 @@ export function readSummary(state, fmt) {
     const c = r.check;
     if (c && c.over) return `${name} ❌ ${fmt(r.at)} 답장이 너무 많아(${c.rows}줄) 하나도 안 받았어요 — Claude에게 오래된 줄을 지워 달라고 해 주세요`;
     const news = PRIVATE_NEWS.includes(p); // 📰 신문 기사 (v428)
-    const warn = c ? [c.bad ? `받지 않은 ${p === PRIVATE_HATMARKS ? '무늬' : p === PRIVATE_FX ? '그림' : p === PRIVATE_GRAMMAR_VIDEO ? '문제' : news ? '기사' : '줄'} ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : '', c.stale ? `판 다름 ${c.stale}` : ''].filter(Boolean).join(' · ') : '';
-    const ask = p === PRIVATE_FAMILY ? '메시지 확인해 줘' : p === PRIVATE_HATMARKS ? '모자 무늬 확인해 줘' : p === PRIVATE_FX ? '기술 그림 확인해 줘' : p === PRIVATE_GRAMMAR_VIDEO ? '영상 문장 문제 확인해 줘' : p === PRIVATE_LETTER_REPLIES ? '편지 답장 확인해 줘' : news ? '신문 확인해 줘' : '국어 답장 확인해 줘';
+    const entest = PRIVATE_EN_TESTS.includes(p); // 📝 영어 영상 시험 (v430)
+    const warn = c ? [c.bad ? `받지 않은 ${p === PRIVATE_HATMARKS ? '무늬' : p === PRIVATE_FX ? '그림' : p === PRIVATE_GRAMMAR_VIDEO || entest ? '문제' : news ? '기사' : '줄'} ${c.bad}` : '', c.none ? `맞는 글 없음 ${c.none}` : '', c.stale ? `판 다름 ${c.stale}` : ''].filter(Boolean).join(' · ') : '';
+    const ask = p === PRIVATE_FAMILY ? '메시지 확인해 줘' : p === PRIVATE_HATMARKS ? '모자 무늬 확인해 줘' : p === PRIVATE_FX ? '기술 그림 확인해 줘' : p === PRIVATE_GRAMMAR_VIDEO ? '영상 문장 문제 확인해 줘' : p === PRIVATE_LETTER_REPLIES ? '편지 답장 확인해 줘' : news ? '신문 확인해 줘' : entest ? '영상 시험 확인해 줘' : '국어 답장 확인해 줘';
     return warn ? `${name} ⚠️ ${fmt(r.at)} (${r.n}개 — ${warn} · Claude에게 "${ask}")` : `${name} ✅ ${fmt(r.at)} (${r.n}개)`;
   });
   return parts.length ? `📥 받기: ${parts.join(' · ')}` : '📥 받기: 아직 받아 본 적이 없어요 (앱을 열 때·수학을 열 때 저절로)';
@@ -860,7 +905,7 @@ async function sendOnce(force) {
     // 🎮 저장을 기다리는 프로필 증분도 먼저 — 보상 쪽 누적(rewardNow)이 저장된 프로필을 읽는다 (Codex 86차 B · 실패해도 그대로 올린다)
     await import('./xp.js').then((xp) => xp.flushProfile()).catch(() => {});
     const crashLog = await import('./blackbox.js').then((bb) => bb.crashLogNow(today)).catch(() => null); // 🛑 앱이 저절로 꺼진 기록(v292) — 못 만들면 이것만 빠진다
-    files = await gatherFiles({ getLetterTodo: letterTodoNow, getMath, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, verLine, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, getFeedback: feedbackNow, getStock: stockNow, getJourney: journeyNow, getGrammar: grammarNow, getSpell: spellNow, getMusic: musicNow, uploadLog: logTextNow(today), today });
+    files = await gatherFiles({ getLetterTodo: letterTodoNow, getMath, getEnTest: enTestMdNow, listDaily, mathReportText: prog.mathReportText, asksText: ask.asksText, collectTodo: st.collectTodo, getKorTodo: korTodoNow, getEnglish: enNow, getKorReport: korReportNow, usagePlaces: usage ? usage.PLACES : undefined, crashLog, verLine, getReward: rewardNow, getWeekly: weeklyNow, getFamily: familyNow, getFeedback: feedbackNow, getStock: stockNow, getJourney: journeyNow, getGrammar: grammarNow, getSpell: spellNow, getMusic: musicNow, uploadLog: logTextNow(today), today });
   } catch {
     // 기기 기록을 못 읽었다 — 아무것도 안 올린다 (빈 기록으로 덮어쓰지 않게). 실패로 적어 두면 10분 뒤 다시
     const fail = { ok: false, at: Date.now(), why: '이 기기 기록을 못 읽었어요 — 잠시 뒤 다시' };

@@ -97,6 +97,8 @@ function loadPlayer() {
   //   load = 원고를 받았나 · note = prepareNote가 돌려줄 쪽지(undefined면 기본 쪽지, null이면 낼 단원 없음) · closed = closeGrammarNote 부른 수
   const grammarCalls = [];
   const grammarState = { today: 0, full: false, load: true, note: undefined, closed: 0, loads: 0 };
+  const enTestCalls = [];
+  const enTestState = { open: true, closed: 0 };
   // 🔤 철자 쪽지 (v356): rows = 받아 둔 낱말 · states = 진도 · days = 쪽지 💰 받은 날 · 열린 쪽지는 spellCalls에 { words, rows, onDone, onCoins } · closed = closeSpellNote 부른 수 · syncs = 받기를 부른 수
   const spellCalls = [];
   const spellState = { rows: [], states: {}, days: {}, closed: 0, syncs: 0, throwOpen: false };
@@ -299,6 +301,10 @@ function loadPlayer() {
     sentenceKey: (id, start) => `${id}|${Math.round(start * 10)}`,
     openGrammarNote(note, opts) { if (grammarState.throwOpen) throw new Error('그리다 깨짐 (시험)'); if (!note) return false; grammarCalls.push({ note, ...opts }); return true; },
     closeGrammarNote() { grammarState.closed++; },
+    // 📝 영상 시험 창 스텁 (v430) — 열린 창은 enTestCalls에 { title, hooks } · enTestState.open = 열 수 있나 · closed = closeEnTest 부른 수
+    enTestCalls, enTestState,
+    openEnTest(title, hooks) { if (!enTestState.open) return false; enTestCalls.push({ title, hooks }); return true; },
+    closeEnTest() { enTestState.closed++; },
     // 🔤 철자 쪽지 스텁 (v356) — 자리 규칙(spellReady·spellSlot·grammarCount·wordsToday)은 진짜, 창은 spellCalls에 기록
     spellCalls, spellState, spellReady: realSpellReady, spellSlot: realSpellSlot, grammarCount: realGrammarCount, wordsToday: realWordsToday,
     syncSpellRows: async () => { spellState.syncs++; return spellState.rows.length; },
@@ -353,7 +359,7 @@ function loadPlayer() {
   });
   vm.runInContext(src, ctx);
   vm.runInContext('initPlayer({ showView() {} }); state.open = true; state.repeatIdx = 0; settings.speakCheck = false; settings.puzzleEvery = 0; settings.grammarNote = false; // 테스트 기준: 반복 끔, 말하기 확인 끔, 퍼즐 끔, 📝 쪽지 끔(쪽지 시험이 켠다)', ctx);
-  return { ctx, video, els, videoState, speakState, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, rocketState, reviewCalls, reviewState, matchCalls, matchState, grammarCalls, grammarState, spellCalls, spellState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
+  return { ctx, video, els, videoState, speakState, essayCalls, essayState, mushroomState, formState, puzzleCalls, xpLog, catchCalls, coinLog, itemLog, hpLog, hpState, battleCalls, battleState, rocketState, reviewCalls, reviewState, matchCalls, matchState, grammarCalls, grammarState, spellCalls, spellState, enTestCalls, enTestState, missedLog, vocabViewsStub, vocabReviewLog, run: (code) => vm.runInContext(code, ctx) };
 }
 
 test('#2 앞으로 크게 탐색하면 반복을 소비하지 않고 해당 문장으로 동기화', () => {
@@ -3539,4 +3545,57 @@ test('📝 배선: 오늘 쪽지 수는 track의 grammarNotes 선점 · 영상�
   assert.ok(open.includes('state.grammarPending = false;') && open.includes('state.grammarOpen = false;'), '영상을 열 때 지운다');
   assert.ok(src.includes("settings.grammarNote = $('set-grammar').checked;") && src.includes("$('set-grammar').checked = settings.grammarNote !== false;"), '⚙ 칸');
   assert.ok(src.includes('grammarNote: true,'), '기본은 켜짐');
+});
+
+test('📝 v430 영상 시험 창 — 열면 inert·이동 막기 · 🔊 같은 대사 장면(원고 시각에 가까운 것) · 글이 다르면 원고 시각 · 영상 밖이면 못 틂 · 닫으면 보던 자리로 · 못 열면 한 줄 · 영상을 닫으면 접는다', () => {
+  const { run, video, els, enTestCalls, enTestState } = loadPlayer();
+  run('state.open = true; state.item = { id: "v1", title: "Test Movie" }; state.cues = [{start:1,end:2,en:"Hello there.",ko:""},{start:5,end:7,en:"I like red apples.",ko:""},{start:30,end:32,en:"I like red apples!",ko:""}]; state.idx = 0;');
+  video.currentTime = 1.5;
+  run('startTestNow()');
+  assert.equal(enTestCalls.length, 1);
+  assert.equal(enTestCalls[0].title, 'Test Movie', '영상 열쇠 = 제목');
+  assert.equal(run('state.testOpen'), true);
+  assert.equal(els['view-player'].inert, true, '플레이어 단추·자막이 시험 뒤로 새지 않게');
+  run('goTo(1)');
+  assert.equal(run('state.idx'), 0, '시험 창이 떠 있으면 다음 문장으로 안 간다');
+  run('startTestNow()');
+  assert.equal(enTestCalls.length, 1, '두 번 열지 않는다');
+  const h = enTestCalls[0].hooks;
+  assert.equal(h.listen({ say: 'I like red apples', at: 29, end: 31 }), true);
+  assert.equal(run('state.puzzleCue.start'), 30, '같은 대사가 둘이면 원고 시각에 가까운 장면');
+  assert.deepEqual([video.currentTime, video.paused], [30, false]);
+  video.currentTime = 31.99;
+  run('onTick()');
+  assert.equal(video.paused, true, '장면 끝에서 멈춘다');
+  assert.equal(run('state.idx'), 0, '지금 문장은 그대로');
+  assert.equal(h.listen({ say: 'Nothing like this line.', at: 50, end: 52 }), true);
+  assert.deepEqual([run('state.puzzleCue.start'), run('state.puzzleCue.end'), run('state.puzzleCue.index')], [50, 52, -1], '글이 다르면 원고 시각 그대로');
+  assert.equal(h.listen({ say: 'Nothing like this line.', at: 150, end: 152 }), false, '영상 길이 밖');
+  assert.equal(h.listen(null), false);
+  h.onClose();
+  assert.deepEqual([run('state.testOpen'), els['view-player'].inert, run('state.puzzleCue'), run('state.idx'), video.currentTime], [false, false, null, 0, 1.5], '닫으면 보던 자리로');
+  assert.equal(h.listen({ say: 'I like red apples', at: 29, end: 31 }), false, '닫은 뒤엔 틀지 않는다');
+  // 원고가 없는 영상 — 창 없이 한 줄
+  enTestState.open = false;
+  run('startTestNow()');
+  assert.deepEqual([run('state.testOpen'), els['view-player'].inert, enTestCalls.length], [false, false, 1]);
+  // 영상을 닫으면 접는다
+  enTestState.open = true;
+  run('startTestNow()');
+  const closed = enTestState.closed;
+  run('closeMedia()');
+  assert.equal(enTestState.closed, closed + 1);
+  assert.deepEqual([run('state.testOpen'), els['view-player'].inert], [false, false]);
+});
+
+test('📝 v430 배선(소스) — 메타데이터 뒤 opts.test로 시험 창 · 복습 제안 안 함 · 키보드·문장 초 무시 · closeMedia가 접는다', () => {
+  const src = fs.readFileSync(new URL('../js/player.js', import.meta.url), 'utf8');
+  const open = src.slice(src.indexOf('export async function openPlayer('), src.indexOf('function closeMedia('));
+  assert.ok(open.includes('goTo(startIdx, { play: false });\n    // 📝 영어 목록 「📝 시험」으로 들어왔다 (v430) — 메타데이터 뒤(🔊 장면을 틀 수 있게) 바로 시험 창\n    if (opts.test) startTestNow();'));
+  assert.ok(open.includes('if (opts.test) return; // 📝 시험으로 들어왔다 — 복습 제안은 하지 않는다 (v430)'));
+  assert.ok(src.includes('state.matchOpen || state.grammarOpen) return; // 퍼즐·잡기·배틀·복습·에세이·단어 잇기·📝 쪽지 화면 중에는 플레이어 단축키 무시\n  if (state.testOpen) return;'), '키보드');
+  assert.ok(src.includes('    if (state.practiceOpen) return; // ⚙ 연습(퍼즐·복습·배틀·잡기)은 기록하지 않는다 (Codex #9)\n    if (state.testOpen) return;'), '문장 초');
+  const cm = src.slice(src.indexOf('function closeMedia('), src.indexOf('function buildCues('));
+  assert.ok(cm.includes('closeEnTest();') && cm.includes('setTestOpen(false);'));
+  assert.ok(src.includes("import { openEnTest, closeEnTest } from './entestview.js';\n"), 'import 줄 끝에 주석 없음');
 });

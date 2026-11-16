@@ -13,6 +13,11 @@ import { guardStart } from './timeup.js'; // ⏳ 하루 시간 제한 — 영상
 import { showLoading, hideLoading } from './app.js';
 import { pickDueItem, reviewable } from './review.js';
 import { todayKey } from './track.js';
+import { openMapOf } from './entest.js'; // 📝 영상 시험 열림(지금 문장 열쇠로 거른 「한 문장」 95%) — 순수 (v430)
+import { loadEnTests, syncEnTests, enTestsNow } from './entestsync.js'; // 📝 영상 시험 원고 — 이 기기 사본·비공개 저장소 받기 (v430 · 화면 없음)
+import { enTestMap } from './xp.js'; // 📝 영상마다 넘은 단계 (v430 — 단추 글에 지금 단계 이름)
+import { cueInfoOf } from './stats.js'; // 📝 영상 문장 수·지금 문장 열쇠 — 📊 진도와 같은 셈 · 영상마다 기억(📤와 같이 씀) (v430)
+import { testCardsOf, enterEnList, drawEnCatch } from './entestview.js'; // 📝 카드 「📝 시험」 단추 · 🎯 영어 포켓몬 잡기 단추·장부 정리 (v430)
 
 const $ = (id) => document.getElementById(id);
 
@@ -373,11 +378,13 @@ export async function refreshList() {
   const list = $('library-list');
   list.innerHTML = '';
   $('library-empty').hidden = items.length > 0;
+  const cards = new Map(); // 영상 id → 카드 (📝 시험 단추를 기록을 읽은 뒤에 붙인다, v430)
 
   for (const item of items) {
     const li = document.createElement('li');
     li.className = 'library-item';
     li.dataset.id = item.id;
+    cards.set(item.id, li);
 
     const thumb = item.broken
       ? `<div class="library-thumb">⚠️</div>`
@@ -402,6 +409,7 @@ export async function refreshList() {
 
     li.addEventListener('click', async (e) => {
       if (e.target.closest('.library-delete')) return;
+      if (e.target.closest('.library-test')) return; // 📝 시험 단추는 따로 (v430)
       // 깨진 영상은 열 수 없다 — 열려고 하면 플레이어까지 같은 오류로 죽는다
       if (item.broken) {
         alert('이 영상은 저장이 깨져서 열 수 없어요.\n🗑로 지운 다음 다시 가져와 주세요.\n(공부한 기록·코인·포켓몬은 그대로 있어요)');
@@ -435,8 +443,69 @@ export async function refreshList() {
   const records = await getAllSentenceStats().catch(() => []);
   if (seq !== renderSeq) return;
   await renderTodayReview(items, records);
+  renderEnTests(items, records, cards, seq).catch(() => {}); // 📝 기다리지 않는다 — 🎟️ 다음 영상 카드가 늦지 않게 (v430)
   await renderNextVideo(items, records, seq);
   updateStorageText();
+}
+
+// ───────────────────── 📝 영어 영상 시험 (v430) ─────────────────────
+
+/**
+ * 📝 카드마다 「📝 시험」 단추 + 🎯 영어 포켓몬 잡기 단추 (v430) — 들어올 때마다:
+ *  ① 🎯 소식 없이 닫힌 잡기 창·앱이 꺼져 남은 장부 줄부터 돌려준다(enterEnList) ② 이 기기 원고 사본(blobs · 한 번)을 읽어 단추를 그린다 ·
+ *  ③ 비공개 저장소에서 새로 받아(10분에 한 번 · 열쇠가 없으면 그대로) 바뀌었으면 단추만 다시 (📰 신문이 국어에서 부르는 꼴)
+ */
+async function renderEnTests(items, records, cards, seq) {
+  enterEnList().catch(() => {});
+  await initProfile().catch(() => {}); // 넘은 단계·🎯 남은 기회는 프로필에서
+  if (seq !== renderSeq) return;
+  drawEnCatch();
+  await loadEnTests().catch(() => null);
+  if (seq !== renderSeq) return;
+  drawTestBtns(items, records, cards);
+  syncEnTests().then((r) => { if (r && r.changed && seq === renderSeq) drawTestBtns(items, records, cards); }).catch(() => {});
+}
+
+/** 카드의 「📝 시험」 단추 — 원고가 받아져 있고 시험이 열린 영상(같은 제목이면 첫 편)만 · 글은 지금 단계 이름만(숫자 셈 없음) */
+function drawTestBtns(items, records, cards) {
+  const tests = enTestsNow().tests;
+  const titles = Object.keys(tests);
+  let map = {};
+  // 문장 나누기는 시험 원고가 있는 영상만 (열쇠가 없는 기기는 아무것도 안 센다) · 셈은 📊 진도와 같은 stats.cueCountOf·cueKeysOf
+  if (titles.length) { try { map = openMapOf(items, records, (it) => cueInfoOf(it).count, (it) => cueInfoOf(it).keys, titles); } catch { map = {}; } }
+  const btns = testCardsOf(items, map, tests, enTestMap());
+  for (const item of items) {
+    const li = cards.get(item.id);
+    if (!li) continue;
+    const old = li.querySelector('.library-test');
+    if (old) old.remove();
+    const b = btns[String(item.id)];
+    const info = li.querySelector('.library-info');
+    if (!b || !info) continue;
+    const t = document.createElement('button');
+    t.type = 'button';
+    t.className = 'btn library-test';
+    t.textContent = b.label;
+    t.addEventListener('click', (e) => { e.stopPropagation(); openTest(item); });
+    info.appendChild(t);
+  }
+}
+
+/** 📝 시험 — 그 영상을 열고 메타데이터 뒤 시험 창 (⏳ 잠겼으면 연장권 뒤 「계속하기」로 이어서) */
+function openTest(item) {
+  if (opening || item.broken) return; // 큰 영상은 몇 초 걸리므로 중복 탭 방지
+  const openTestNow = async () => {
+    if (opening) return;
+    opening = true;
+    showLoading('시험 준비 중...');
+    try {
+      await openPlayer(item.id, { test: true });
+    } finally {
+      hideLoading();
+      opening = false;
+    }
+  };
+  guardStart('english', () => { openTestNow().catch((err) => console.warn('시험 열기 실패:', err)); });
 }
 
 // ───────────────────── 🔁 오늘의 복습 ─────────────────────

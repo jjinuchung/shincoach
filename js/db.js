@@ -33,6 +33,7 @@ import { dripOf, mergeDrip } from './kordrip.js'; // 📦 새 국어 글 하루 
 import { copyAqua, mergeAqua } from './aquarium.js'; // 🐠 진우 아쿠아리움 놓은 자리 복사·병합 (v399 — 순수)
 import { copyTour, mergeTour } from './aquatour.js'; // 🎟️ 아쿠아리움 손님 맞이 복사·병합 (v401 — 순수)
 import { copyPiano, mergePiano, PIANO_DAILY } from './piano.js'; // 🎹 음악 과목 복사·병합·하루 칸 (v402 — 순수)
+import { copyEnTest, mergeEnTest, mergeEnThrow, EN_TEST_DAILY } from './entest.js'; // 🎬 영어 영상 시험 칸·🎯 영어 잡기 장부 복사·병합·하루 칸 (v430 — 순수, grammar·korean만 import)
 import { copyLake, mergeLake } from './fishing.js'; // 🎣 학습 낚시터 도감·하루 💰 복사·병합 (v366 — 순수, 아무것도 import하지 않음)
 import { healMoveHouse } from './moveday.js'; // 🚚 이사를 끝낸 기록과 가방이 갈라지면 집 선물만 되찾기 (v397 — 순수)
 import { copyJourney, mergeJourney } from './journey.js'; // 🎒 포켓몬 대여행 복사·병합 (v341 — 순수, evolve·items·montypes만 import)
@@ -345,6 +346,35 @@ export async function putNewsCache(files) {
   return rec;
 }
 
+/**
+ * 🎬 영어 영상 시험 원고 사본 (v430) — 비공개 저장소 english/tests/t1~t3.json에서 받은 문제를 **이 기기의 blobs에만** (대사는 저작권 · 백업에 안 들어간다)
+ * 'entest:list' = { id, files: { 경로: [문제 줄…] }, at } — 받기·검사는 entestsync.js · 📰 'news:list'와 같은 꼴(파일마다 따로 · at은 늘 커진다 — 두 창이 「바뀐 사본」을 알아보게)
+ */
+export const EN_TEST_LIST_ID = 'entest:list';
+
+/** 받아 둔 시험 원고 사본 — 없거나 꼴이 틀리면 null */
+export async function getEnTestCache() {
+  const db = await openDb();
+  const rec = await promisify(db.transaction('blobs', 'readonly').objectStore('blobs').get(EN_TEST_LIST_ID));
+  return rec && rec.files && typeof rec.files === 'object' && !Array.isArray(rec.files) ? rec : null;
+}
+
+/** 받은 파일들을 사본에 넣는다 (한 트랜잭션) — files = { 경로: 문제 배열 } · 넘기지 않은 경로는 그대로 → 새 사본 */
+export async function putEnTestCache(files) {
+  const db = await openDb();
+  const tx = db.transaction('blobs', 'readwrite');
+  const store = tx.objectStore('blobs');
+  const old = await promisify(store.get(EN_TEST_LIST_ID));
+  const kept = old && old.files && typeof old.files === 'object' && !Array.isArray(old.files) ? old.files : {};
+  const add = {};
+  for (const [p, list] of Object.entries(files && typeof files === 'object' ? files : {})) if (Array.isArray(list)) add[p] = list;
+  const oldAt = old && Number.isFinite(Number(old.at)) && Number(old.at) > 0 ? Number(old.at) : 0;
+  const rec = { id: EN_TEST_LIST_ID, files: { ...kept, ...add }, at: Math.max(Date.now(), oldAt + 1) };
+  store.put(rec);
+  await txDone(tx);
+  return rec;
+}
+
 /** 일부 필드만 갱신 (진행 위치, 제목, 자막 교체 등) */
 export async function updateItem(id, patch) {
   const db = await openDb();
@@ -458,6 +488,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // 🎹 음악 (2026-11-08 v402) — 음악 화면에 머문 초(⏳ 하루 40분 · 🎮 게임기 판을 세는 공부 시간에는 안 들어감) · 부모가 더 준 초 · 연장권 수 · 🕒 머문 초 ·
   //   태블릿 치기 끝까지 친 판·잘 친 판·받은 💰 · 「다 쳤어요」·센 음표 칸 (piano.PIANO_DAILY — 📤 usage 한 줄)
   'musicTime', 'musicBonus', 'musicExt', 'uMusic', ...PIANO_DAILY,
+  // 🎬 영어 영상 시험 (2026-11-16 v430) — 끝낸 판 · 넘은 판 · 생긴 🎯 영어 잡기 기회 · 던져서 잡음 · 놓침 (entest.EN_TEST_DAILY — 📤용 · 병합 maxOf)
+  ...EN_TEST_DAILY,
   // 🚀 오늘 로켓단이 나온 수 (2026-10-09) — 과목마다 하루 3번(아버님), claimDailyCount로 선점. 병합 maxOf라 옛 백업으로 한도를 되살리지 못한다
   'rocketMath', 'rocketEn', 'rocketKor', // v327 📚 국어·논술 합쳐 하루 3번(영어·수학과 따로)
   // 🖊️ 오늘 끝낸 논술 판 수 (v327) — 🚀 국어 로켓단 등장 조건(ROCKET.minDone.kor = 국어 글 korReads + 논술 판 nsRounds)
@@ -1168,7 +1200,7 @@ export function copyHouse(h) {
 /** 규칙이 마음껏 고칠 수 있게 얕은 복사 (하위 객체까지) */
 export function cloneProfile(p) {
   const cur = p || emptyProfile();
-  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.homePhotos ? { homePhotos: copyPhotos(cur.homePhotos) } : {}), ...(cur.homeGuest ? { homeGuest: copyGuest(cur.homeGuest) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), ...(cur.fishing ? { fishing: copyLake(cur.fishing) } : {}), ...(cur.aquarium ? { aquarium: copyAqua(cur.aquarium) } : {}), ...(cur.aquaTour ? { aquaTour: copyTour(cur.aquaTour) } : {}), ...(cur.piano ? { piano: copyPiano(cur.piano) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulNewsDay: wordDaysOf(cur.nonsulNewsDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), grammarVideo: videoSeenOf(cur.grammarVideo), spell: wordsOf(cur.spell), spellDay: wordDaysOf(cur.spellDay), spellSeen: spellSeenOf(cur.spellSeen), letters: lettersOf(cur.letters), zyg: zygOf(cur.zyg), restsDone: copyRestsDone(cur.restsDone) };
+  return { ...emptyProfile(), ...cur, ...(cur.house ? { house: copyHouse(cur.house) } : {}), ...(cur.avatar ? { avatar: copyAvatar(cur.avatar) } : {}), ...(cur.homePlay ? { homePlay: copyPlay(cur.homePlay) } : {}), ...(cur.homePhotos ? { homePhotos: copyPhotos(cur.homePhotos) } : {}), ...(cur.homeGuest ? { homeGuest: copyGuest(cur.homeGuest) } : {}), ...(cur.stock ? { stock: copyStock(cur.stock) } : {}), ...(cur.journey ? { journey: copyJourney(cur.journey) } : {}), ...(cur.fishing ? { fishing: copyLake(cur.fishing) } : {}), ...(cur.aquarium ? { aquarium: copyAqua(cur.aquarium) } : {}), ...(cur.aquaTour ? { aquaTour: copyTour(cur.aquaTour) } : {}), ...(cur.piano ? { piano: copyPiano(cur.piano) } : {}), ...(cur.enTest ? { enTest: copyEnTest(cur.enTest) } : {}), ...(cur.enThrow ? { enThrow: throwsOf(cur.enThrow) } : {}), caught: { ...(cur.caught || {}) }, items: { ...(cur.items || {}) }, mons: { ...(cur.mons || {}) }, eggs: (cur.eggs || []).map((e) => ({ ...e, days: [...((e && e.days) || [])] })), giftsGiven: { ...(cur.giftsGiven || {}) }, fusions: copyFusions(cur.fusions), trades: copyTrades(cur.trades), parcels: { ...(cur.parcels || {}) }, sales: copySales(cur.sales), rocketCur: copyRocketCur(cur.rocketCur), rocketDone: { ...(cur.rocketDone || {}) }, rocketLast: { ...(cur.rocketLast || {}) }, korDone: copyRestsDone(cur.korDone), korMiss: missOf(cur.korMiss), korQMiss: qMissOf(cur.korQMiss), korReads: readsOf(cur.korReads), korThrow: throwsOf(cur.korThrow), korWords: wordsOf(cur.korWords), korWordDay: wordDaysOf(cur.korWordDay), korPuzzle: wordsOf(cur.korPuzzle), korPuzzleDay: wordDaysOf(cur.korPuzzleDay), korDrip: dripOf(cur.korDrip), korMatch: matchedOf(cur.korMatch), korWrites: writesOf(cur.korWrites), nonsul: wordsOf(cur.nonsul), nonsulDay: wordDaysOf(cur.nonsulDay), nonsulNewsDay: wordDaysOf(cur.nonsulNewsDay), nonsulThrow: throwsOf(cur.nonsulThrow), grammar: wordsOf(cur.grammar), grammarDay: wordDaysOf(cur.grammarDay), grammarKnown: knownOf(cur.grammarKnown), grammarSeen: seenOf(cur.grammarSeen), grammarMiss: gMissOf(cur.grammarMiss), grammarDiag: diagOf(cur.grammarDiag), grammarGift: giftOf(cur.grammarGift), grammarVideo: videoSeenOf(cur.grammarVideo), spell: wordsOf(cur.spell), spellDay: wordDaysOf(cur.spellDay), spellSeen: spellSeenOf(cur.spellSeen), letters: lettersOf(cur.letters), zyg: zygOf(cur.zyg), restsDone: copyRestsDone(cur.restsDone) };
 }
 
 /** 💊 받은/꺼낸 휴식 { id: 때 } — 객체가 아니면(깨진 백업) 빈 것 */
@@ -2609,6 +2641,12 @@ export function mergeStatRecord(name, cur, rec) {
     // 🎹 음악(v402) — 날마다 💰 받은 수·음표 칸은 큰 쪽(옛 백업으로 그날 한도를 다시 열지 못하게) · 모든 음표 칸은 큰 쪽 · 연습 기록은 합집합
     const pn = mergePiano(cur.piano, rec.piano);
     if (pn) out.piano = pn; else delete out.piano;
+    // 🎬 영어 영상 시험(v430) — 영상마다 칸마다 큰 쪽(옛 백업으로 받은 칸을 되돌려 💰·🎯를 다시 받지 못하게 · 넘은 단계가 다시 잠기지 않게) · 처음 넘은 날은 이른 날 ·
+    //   🎯 영어 잡기 장부는 세 카운터마다 max(쓴 기회를 옛 백업이 되살리지 못하게) · 깨진 값은 없는 것 · 둘 다 비면 칸을 두지 않는다
+    const et = mergeEnTest(cur.enTest, rec.enTest);
+    if (et) out.enTest = et; else delete out.enTest;
+    const eb = mergeEnThrow(cur.enThrow, rec.enThrow);
+    if (eb) out.enThrow = eb; else delete out.enThrow;
   }
   return out;
 }

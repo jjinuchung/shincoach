@@ -227,6 +227,22 @@ export function cueKeysOf(item) {
   return new Set(playableStarts(item.enText, { merge: mergeSetting(), duration: item.duration }).map((s) => sentenceKey(item.id, s)));
 }
 
+// 📝 영상 시험 열림(v430)용 — 영상마다 문장 수·지금 문장 열쇠를 기억해 둔다(영어 목록 카드 단추와 📤 english/tests.md가 같이 쓴다 ·
+// 🏠 돌아올 때·앱을 내릴 때마다 영화 자막을 다시 나누지 않게 — 태블릿이 느리다) · 자막 글 전체·영상 길이·⚙ 설정(문장 합치기)이 그대로일 때만 다시 쓴다
+// (자막 글은 목록이 이미 들고 있는 글을 가리킬 뿐 — 길이·앞뒤만 보면 가운데 시각을 고친 자막을 놓친다 🔍 Codex 236차 #2)
+const cueMemo = new Map();
+export function cueInfoOf(item) {
+  let set = '';
+  try { set = localStorage.getItem('shincoach.settings') || ''; } catch { set = ''; }
+  const en = String(item.enText || '');
+  const sig = `${Number(item.duration) || 0}|${set}`;
+  const m = cueMemo.get(item.id);
+  if (m && m.sig === sig && m.en === en) return m;
+  const v = { sig, en, count: cueCountOf(item), keys: cueKeysOf(item) };
+  cueMemo.set(item.id, v);
+  return v;
+}
+
 /**
  * 👨‍👩‍👦 부모용 도구: 아이 글을 복사해 나가고, 고쳐 온 글을 붙여넣어 앱에 되돌린다.
  * 태블릿과 PC 사이에 서버가 없으므로 "글자를 복사해 옮기는" 길을 만들어 둔다.

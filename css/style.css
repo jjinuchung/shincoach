@@ -5160,6 +5160,45 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gr-done-btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .gr-done-btns .btn { white-space: normal; word-break: keep-all; }
 
+/* ===== 📝 영어 영상 시험 (v430) — 플레이어 위를 다 덮는 **불투명** 창(영상 그림이 안 보이게 — 한글이 박힌 영상) · 📝 쪽지 카드(gr-*·kor-opt)를 그대로 쓰고 필름 띠 호박색 ===== */
+.et { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 60; overflow-y: auto; overscroll-behavior: contain; padding: max(12px, var(--safe-top)) max(12px, env(safe-area-inset-right, 0px)) max(16px, var(--safe-bottom)) max(12px, env(safe-area-inset-left, 0px)); background: #1f2340; }
+.et[hidden] { display: none; }
+.et-main { --kor-ok-bg: #e4f5ea; --kor-no-bg: #fcebea; --gr-ink: #92400e; --gr-soft: #fff7ed; --gr-line: #fed7aa; width: 100%; max-width: 640px; margin: 0 auto; }
+.et-card { border-top: 6px solid #b7791f; }
+.et-head { display: flex; align-items: flex-start; gap: 10px; }
+.et-head-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.et-film { margin: 0; font-weight: 800; color: #7a4a00; line-height: 1.4; word-break: keep-all; overflow-wrap: anywhere; }
+.et-step { margin: 0; font-size: 0.92rem; font-weight: 700; color: var(--gr-ink); }
+.et-close { flex: none; min-height: 40px; padding: 6px 12px; font-size: 0.92rem; }
+.et-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.et-chip { font: inherit; font-weight: 800; min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--gr-line); background: var(--gr-soft); color: var(--gr-ink); cursor: pointer; }
+.et-chip.is-on { background: var(--gr-ink); border-color: var(--gr-ink); color: #fff; }
+.et-now { margin: 0; font-weight: 800; font-size: 1.05rem; }
+.et-rule { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; word-break: keep-all; }
+.et-listen { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; background: #fff4dc; border-left: 4px solid #b7791f; border-radius: 0 12px 12px 0; padding: 8px 12px; }
+.et-listen-btn { font-weight: 800; }
+.et-listen-note { margin: 0; font-size: 0.9rem; color: #7a4a00; word-break: keep-all; }
+.et-sent .is-ctx { color: var(--muted); font-size: 0.98rem; }
+.et-sent .is-say { font-weight: 700; }
+.et-ask-next { margin: 0; font-size: 1.3rem; }
+.et-mark { background: #fde68a; border-radius: 4px; padding: 0 2px; color: inherit; }
+.et-hint { margin: 0; color: var(--gr-ink); font-weight: 700; word-break: keep-all; }
+.et-mine { margin: 0; overflow-wrap: anywhere; }
+.et-ko-key { margin: 0; color: #b45309; font-weight: 800; word-break: keep-all; } /* ⌨️ 한글 자판으로 쓴 답 — 채점하지 않고 알린다 */
+.et-fb { display: grid; gap: 6px; border-radius: 14px; padding: 10px 12px; background: var(--kor-ok-bg); }
+.et-fb.is-no { background: var(--kor-no-bg); }
+.et-fb p { margin: 0; line-height: 1.5; word-break: keep-all; overflow-wrap: anywhere; }
+.et-line { display: grid; gap: 2px; border-top: 1px dashed rgba(31, 35, 64, 0.2); padding-top: 6px; }
+.et-score { font-size: 1.35rem; }
+.et-catch { display: grid; gap: 6px; justify-items: center; }
+.et-catch[hidden] { display: none; }
+.et-catch-btn { min-width: 220px; font-weight: 800; }
+.et-catch-msg { margin: 0; font-size: 0.88rem; color: var(--muted); line-height: 1.5; word-break: keep-all; text-align: center; }
+/* 영어 목록 — 카드 「📝 시험」(지금 단계 이름만) · 🎯 영어 포켓몬 잡기 (숫자 없음) */
+.library-test { display: inline-flex; margin-top: 6px; min-height: 40px; padding: 6px 12px; font-size: 0.92rem; font-weight: 800; border: 2px solid #f6c66b; background: #fff4dc; color: #7a4a00; }
+.library-entest { display: grid; gap: 6px; justify-items: start; margin-bottom: 14px; }
+.library-entest[hidden] { display: none; }
+
 /* ───────── 📮 포켓몬 편지 (v351) — 항공우편 봉투: 빨강·파랑 사선 테두리는 편지지에만, 나머지는 조용히 ───────── */
 .library-mail { margin-bottom: 14px; }
 .lt-strip {

@@ -42,6 +42,7 @@ export const OVERLAY_KO = [
   ['timeup', '⏳ 잠금'], ['battle', '⚔️ 배틀'], ['rocket', '🚀 로켓단'], ['catch', '🎯 잡기'], ['evolve', '✨ 진화'], ['hatch', '🥚 부화'],
   ['review', '🔁 복습'], ['puzzle', '🧩 퍼즐'], ['essay', '✍️ 에세이'], ['match', '🔤 단어 잇기'], ['house', '🏡 집'], ['shop', '🛒 상점'], ['market', '🛒 시장'],
   ['shadow-overlay', '🗣 따라 말하기'], ['pn-arrive', '🐾 음악 포켓몬 옴'], ['pn-intro', '🐾 음악 안내'],
+  ['en-test', '📝 영상 시험'], // v430 — 플레이어 위 불투명 창 (영상 중 나가짐을 가를 때 시험 창이었는지)
 ];
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);

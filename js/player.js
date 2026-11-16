@@ -52,6 +52,8 @@ import { wordsToday } from './korwords.js';
 import { syncVideoQs, videoList, normSay } from './grammarvideo.js'; // 🎬 영상 문장 문제 — 비공개 원고 받기 · 받아 둔 원고 · 대사 맞추기 (v350)
 import { addCell } from './zygview.js'; // 🟢 지가르데 셀 — 에세이·복습 끝 화면 구석 (v352)
 import { getAllSentenceStats, listItems, sentenceKey } from './db.js'; // 🎬 끝낸 문장·영상 이름 (v350 — 쪽지에 끼울 영상 문제를 고를 때)
+// 📝 영어 영상 시험 창 (v430) — 플레이어 위를 다 덮는 불투명 창 · 판·채점·보상·🎯 잡기는 그쪽 (이 파일은 열기·🔊 장면 소리·접기만)
+import { openEnTest, closeEnTest } from './entestview.js';
 // ⏳ 남은 시간 · 홈에서 이어 간 영어 배틀도 영어 시간으로 (Codex 43차 #7) — 마지막 import 줄 끝에는 주석을 달지 않는다(player.logic 테스트가 import를 줄 끝 ';'로 걸러 낸다)
 import { status as rocketTimeStatus, setSubject as rocketTimeSubject, currentSubject as rocketTimeNow } from './timelimit.js';
 
@@ -127,6 +129,7 @@ const state = {
   grammarPending: false, // 📝 다음 문장으로 넘어갈 때 열 문법 쪽지가 걸려 있는지 (v349 — 🔁·🔤와 같은 방식)
   grammarOpen: false,  // 📝 문법 쪽지를 받는 중이거나 열려 있음 (키보드·이동 무시) — 🔤 철자 쪽지도 같은 깃발 (v356)
   spellPending: false, // 🔤 걸어 둔 쪽지가 철자 쪽지인지 (grammarPending과 함께 · maybeGrammar가 정한다, v356)
+  testOpen: false,     // 📝 영상 시험 창이 떠 있음 (v430 — 키보드·이동·문장 학습 시간 무시 · 플레이어는 inert)
   parentMode: false,  // 👨‍👩‍👦 부모 모드(그냥 보기): 학습 장치(반복·듣기 먼저·따라 말하기·퍼즐)와 기록·XP 없이 끝까지 이어서 재생. 저장하지 않음 → 앱을 다시 열면 꺼짐
   raf: null,
   wordSpans: [],
@@ -230,6 +233,7 @@ export function initPlayer(ctx) {
   setInterval(() => {
     if (!state.open || state.parentMode) return;
     if (state.practiceOpen) return; // ⚙ 연습(퍼즐·복습·배틀·잡기)은 기록하지 않는다 (Codex #9)
+    if (state.testOpen) return; // 📝 영상 시험(v430) — 🔊 장면은 그 문장 공부가 아니다(문장 초를 쌓지 않는다 · 원고 시각으로 튼 장면은 자막 문장도 아니다)
     // 퍼즐·복습·배틀이 들려주는 문장은 화면의 현재 문장이 아니므로 그 문장에 시간을 쌓는다
     const cue = state.puzzleCue || state.cues[state.idx];
     if (cue && (!video.paused || state.speakRun || state.puzzleCue)) track.tick(cue, 1);
@@ -1389,6 +1393,80 @@ function setGrammarOpen(on) {
   if (view) view.inert = on;
 }
 
+// ───────────────────── 📝 영어 영상 시험 (v430) ─────────────────────
+
+/**
+ * 📝 영상 시험 창 (영어 목록 「📝 시험」 → openPlayer(id, { test: true }) → 메타데이터 뒤) — 창은 플레이어 위를 다 덮는다(영상 그림이 안 보인다 —
+ * 쿵푸팬더 4·수퍼 소닉 3은 화면에 한글이 박혀 있다) · 그동안 영상은 멈추고 플레이어는 inert(자막·단어 패널·단추가 시험 뒤로 새지 않게 — 📝 쪽지와 같다) ·
+ * 아이가 「닫기」로 닫으면 보던 자리로 · 영상을 닫으면 closeMedia가 접는다(판 도중이면 결과 없음)
+ */
+function startTestNow() {
+  if (!state.open || !state.item || state.testOpen) return;
+  // 👀 그냥 보기(부모 모드)는 기록·보상이 없는 모드 — 시험은 진우 기록(넘은 단계·처음 넘을 때 💰·🎯)이라 쉰다 (🔍 v430 검토 · Codex 235차 #2)
+  if (state.parentMode) { showPlayerMessage('👀 그냥 보기 중에는 시험이 쉬어요 — ⚙에서 그냥 보기를 끄면 볼 수 있어요', 4000); return; }
+  cancelShadowWait();
+  hidePlayerMessage();
+  if (!video.paused) video.pause();
+  const spot = rememberSpot();
+  const myItem = state.item;
+  setTestOpen(true);
+  let opened = false;
+  try {
+    opened = openEnTest(myItem.title, {
+      listen: listenTestScene,
+      onCoins: () => { updateLevelChip(); pulseChip('coin-chip'); },
+      // 잡기(다시 잡은 XP·레벨 · 첫 파트너 · 잡기 창 🛒 볼)로 바뀐 칩도 — 같은 문장이면 restoreSpot이 goTo를 안 해 칩이 안 바뀐다 (퍼즐 잡기 onDone과 같다)
+      onClose: () => { stopGrammarCue(); setTestOpen(false); updateLevelChip(); updatePartnerChip(); if (state.item === myItem) restoreSpot(spot); },
+    });
+  } catch { closeEnTest(); opened = false; } // 그리다 깨져도 반쯤 열린 창을 남기지 않는다
+  if (!opened) {
+    stopGrammarCue();
+    setTestOpen(false);
+    showPlayerMessage('📝 이 영상 시험은 지금 열 수 없어요 — 영상 목록에서 다시 눌러 주세요', 4000);
+  }
+}
+
+function setTestOpen(on) {
+  state.testOpen = !!on;
+  const view = $('view-player');
+  if (view) view.inert = !!on;
+}
+
+/**
+ * 📝 🔊 듣기 문제의 그 장면 — 🧩 퍼즐 🔊와 같은 길(그 구간만 틀고 끝에서 멈춘다 · puzzleCue를 잡아 두어 지금 문장이 그 장면으로 옮겨 가지 않게 —
+ * 창을 닫을 때 stopGrammarCue가 놓는다) · 소리만(그림은 시험 창이 덮는다) → 틀었나
+ */
+function listenTestScene(q) {
+  if (!state.open || !state.testOpen) return false;
+  const cue = testCueOf(q);
+  if (!cue) return false;
+  state.puzzleCue = cue;
+  playPuzzleSentence(cue, null);
+  return true;
+}
+
+/**
+ * 원고 문제 → 틀 장면 — 원고 대사(say)와 같은 문장(normSay · 같은 글이 여럿이면 원고 시각에 가까운 것) ·
+ * 없으면(⚙ 문장 합치기를 껐거나 자막 판이 달라 글이 다르면) 원고 시각 at~end를 그대로 (영상 길이 안일 때만) · 못 찾으면 null
+ */
+function testCueOf(q) {
+  if (!q || typeof q !== 'object') return null;
+  const want = normSay(q.say);
+  const at = Number(q.at);
+  let best = null;
+  if (want) {
+    for (const c of state.cues) {
+      if (normSay(c.en) !== want) continue;
+      if (!best || (Number.isFinite(at) && Math.abs(c.start - at) < Math.abs(best.start - at))) best = c;
+    }
+  }
+  if (best) return best;
+  const end = Number(q.end);
+  if (!(Number.isFinite(at) && Number.isFinite(end) && at >= 0 && end > at)) return null;
+  if (Number.isFinite(video.duration) && video.duration > 0 && at >= video.duration) return null;
+  return { start: at, end, en: String(q.say || ''), ko: '', index: -1 };
+}
+
 /**
  * 🍄 다이버섯 하나 — 🔁 복습 완주 · ⚔️ 배틀 승리 · 🏁 여행 도착에서만 (하루 2개까지).
  * 돈으로 못 사는 것이라야 🍲 다이스프(거다이맥스)가 "모아서 얻는 것"이 된다.
@@ -1995,12 +2073,15 @@ export async function openPlayer(id, opts = {}) {
       startIdx = best;
     }
     goTo(startIdx, { play: false });
+    // 📝 영어 목록 「📝 시험」으로 들어왔다 (v430) — 메타데이터 뒤(🔊 장면을 틀 수 있게) 바로 시험 창
+    if (opts.test) startTestNow();
     // 🔤 단어 문항을 만들려면 본 단어 기록이 필요하다 — 읽고 나서 복습을 제안
     const myItem = state.item;
     // 👨‍👩‍👦 아빠 교정은 받아만 둔다 — 보여 주기는 그날 에세이를 다 쓴 바로 뒤에 한 문장(v336 · maybeCoachFix)
     syncCoachFixes().catch(() => {});
     refreshVocabViews().then(() => {
       if (!(state.open && state.item === myItem)) return;
+      if (opts.test) return; // 📝 시험으로 들어왔다 — 복습 제안은 하지 않는다 (v430)
       // 🔁 "오늘의 복습"으로 들어온 것 — 아이가 직접 고른 것이므로 확률·거절 횟수를 묻지 않고 바로 연다
       if (opts.review) { startReviewNow(true); return; }
       maybeReview();
@@ -2034,9 +2115,11 @@ function closeMedia() {
   closeMatch();      // 🔤 단어 잇기 중에 콘텐츠를 닫으면 그냥 접는다 (보상 없음 — 끝낸 게 아니다)
   closeGrammarNote(); // 📝 쪽지도 그냥 접는다 (저장·보상 없음 — 끝낸 게 아니다, v349)
   closeSpellNote(); // 🔤 철자 쪽지도 (v356)
+  closeEnTest(); // 📝 영상 시험 창도 그냥 접는다 (판 도중이면 결과·보상 없음 — 끝낸 게 아니다, v430)
   setReviewOpen(false);
   setMatchOpen(false);
   setGrammarOpen(false);
+  setTestOpen(false);
   state.grammarPending = false;
   state.matchPending = null;
   state.battlePending = null;
@@ -2139,6 +2222,8 @@ function goTo(i, { play = true, force = false } = {}) {
   if (!force && state.rocketOpen) return;
   // 📝 문법 쪽지를 받거나 푸는 중에도 (v349 — [계속하기 ▶]가 가려던 문장으로 데려간다)
   if (!force && state.grammarOpen) return;
+  // 📝 영상 시험 창이 떠 있는 동안에도 (v430 — 창을 닫으면 보던 자리로)
+  if (!force && state.testOpen) return;
   // 🚀 로켓단이 걸려 있으면 앞으로 넘어가기 전에 먼저 (배틀보다 먼저 — 따라 말하기 흐름은 이 goTo를 탄다)
   if (!force && i > state.idx && state.rocketPending) {
     startRocketEn(() => goTo(i, { play, force: true }));
@@ -3329,6 +3414,7 @@ function updateChips() {
 function onKeyDown(e) {
   if ($('view-player').hidden) return;
   if (state.puzzleCue || state.catchOpen || state.battleOpen || state.reviewOpen || state.essayOpen || state.matchOpen || state.grammarOpen) return; // 퍼즐·잡기·배틀·복습·에세이·단어 잇기·📝 쪽지 화면 중에는 플레이어 단축키 무시
+  if (state.testOpen) return; // 📝 영상 시험 창(v430)이 떠 있는 동안에도 — Space·←→·Esc가 창 뒤 영상을 움직이지 않게
   // 버튼·요약·링크에 포커스가 있으면 그 요소의 기본 동작(Space/Enter로 누르기)을 살린다 (Codex #5)
   const tag = e.target && e.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SUMMARY' || tag === 'A') return;
