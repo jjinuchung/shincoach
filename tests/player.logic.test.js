@@ -26,6 +26,7 @@ const VOCAB_KNOWN = new Set([
   ...JSON.parse(fsNode.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8')),
 ]);
 import { wordTimings as realWordTimings } from '../js/srt.js';
+import { winLine as realWinLine } from '../js/battle.js'; // ⚔️ 이긴 뒤 알림 한 줄은 진짜 (v434)
 import { isSpeakable as realIsSpeakable, createVocab as realCreateVocab } from '../js/vocab.js';
 import { soundOnly as realSoundOnly } from '../js/sounds.js';
 // 외국어 표시(미니언 말·스페인어…)까지 있어야 제대로 판정된다 → 진짜 단어장을 쓴다
@@ -247,6 +248,9 @@ function loadPlayer() {
     wordQuestion: () => (rocketState.words ? { word: 'a', meaning: 'b', choices: ['b', 'c', 'd'] } : null),
     isRocketOpen: () => false, rocketTimeStatus: () => null,
     pickOpponent: (list, caught) => list.find((m) => !caught[m.id]) || null, eligibleMine: (ids, partner, tired) => ids.filter((id) => id !== partner && !(tired && tired(id))),
+    // 🔁 다 잡았으면 이미 잡은 것과 다시 대결 (v434 — 진짜 pickFoe는 battle434 시험이 본다)
+    pickFoe: (list, caught) => list.find((m) => !caught[m.id]) || ((m) => (m ? { ...m, rematch: true } : null))(list.find((m) => caught[m.id] > 0)),
+    winLine: realWinLine,
     getProfileSnapshot: () => ({ caught: battleState.caught }), lossesOf: () => 0,
     // 🧬 레벨업·진화 (2026-09-25): 배틀 후보는 **보유**(도감 누적 − 진화로 내보낸 수)로 고른다
     haveCount: (id) => battleState.caught[id] || 0, monLv: () => 1,
@@ -1240,6 +1244,36 @@ test('⚔️ 배틀: 문장 완료 때 추첨 → 다음 전환에서 열림(퍼
   // 부모 모드·HP 끔이면 추첨 없음
   run('setParentMode(true); markDone(state.cues[7]); setParentMode(false); settings.hp = false; markDone(state.cues[7])');
   assert.equal(run('state.battlePending'), null);
+});
+
+test('⚔️ 🔁 다시 대결(v434): 열린 포켓몬을 다 잡았어도 배틀이 걸린다 → 이미 잡은 포켓몬이 상대 · 이기면 ⚡40 💰15만(포켓몬은 안 늘림) · 알림 「…를 이겼어요!」', async () => {
+  const { run, els, battleCalls, battleState, xpLog, coinLog, ctx } = loadPlayer();
+  const keys = new Set();
+  ctx.track.done = (c) => keys.add(c.start);
+  ctx.track.todayDone = () => keys.size;
+  battleState.caught = { 25: 1, 4: 1, 7: 1 }; // 다 잡음 — v433까지는 여기서 배틀이 아예 안 걸렸다
+  run('settings.listenFirst = 0; settings.puzzleEvery = 1; settings.dailyGoal = 0; state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }, { id: 7, ko: "꼬부기", url: "z" }]; state.cues = Array.from({ length: 8 }, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
+  for (let i = 0; i < 5; i++) run(`markDone(state.cues[${i}])`);
+  battleState.roll = true;
+  run('markDone(state.cues[5])');
+  const pending = run('state.battlePending');
+  assert.ok(pending && pending.id === 25 && pending.rematch === true, '이미 잡은 피카츄와 다시 대결');
+  assert.equal(run('state.characters[0].rematch'), undefined, '화면의 캐릭터 목록은 고치지 않는다');
+  run('goTo(6)');
+  await tick();
+  assert.equal(battleCalls.length, 1, '전환 때 배틀 열림');
+  const o = battleCalls[0];
+  assert.equal(o.opponent.rematch, true);
+  o.onDone({ outcome: 'win', my: o.mine.find((m) => m.id === 4), opponent: o.opponent, turns: 3 });
+  assert.deepEqual(battleState.won, [], '이미 잡은 포켓몬은 또 주지 않는다');
+  assert.ok(xpLog.includes(40) && coinLog.includes(15), '⚡💰는 그대로');
+  assert.equal(els['player-msg'].textContent, '🎉 피카츄를 이겼어요! ⚡+40 💰+15');
+  // 지면 지금처럼 패배 +1
+  run('state.battlePending = { id: 7, ko: "꼬부기", url: "z", rematch: true }; goTo(7)');
+  await tick();
+  battleCalls[1].onDone({ outcome: 'lose', my: battleCalls[1].mine.find((m) => m.id === 4), opponent: battleCalls[1].opponent, turns: 5 });
+  assert.deepEqual(battleState.lost, [4]);
+  assert.deepEqual(battleState.won, []);
 });
 
 test('⚔️ Codex #3/#4/#6: 화면 꺼짐이면 배틀 턴 중단(interrupted), 마지막 문장 섀도잉 뒤에도 배틀, 배틀 중 연습 진입 무시', async () => {

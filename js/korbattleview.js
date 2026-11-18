@@ -3,7 +3,7 @@
 //   누르면 하루 몫을 선점(db.claimDailyCount 'battles' — 영어·수학과 같은 칸)하고 openBattle → 끝나면 결과 반영(수학 배틀과 같은 함수) → after()
 // 배틀을 곧바로 띄우지 않고 단추로 — 방금 받은 ★·💰 화면을 가리지 않게, 🐣 부화·🎯 잡기 화면과 겹치지 않게
 // 이 파일은 koreanview·nonsulview를 import하지 않는다(서로 돌지 않게 — 원고·화면은 부르는 쪽이 건넨다)
-import { openBattle, BATTLE, TRAINERS, pickOpponent, eligibleMine } from './battle.js';
+import { openBattle, BATTLE, TRAINERS, pickFoe, winLine, eligibleMine } from './battle.js';
 import { offerRoll, korBattleQ } from './korbattle.js';
 import { allWords } from './korwords.js';
 import { getDaily, claimDailyCount, releaseDailyCount } from './db.js';
@@ -82,7 +82,7 @@ export async function rollOffer(subject, prep) {
   let chars = [];
   try { chars = (await loadCharacters()) || []; } catch { chars = []; }
   const level = getLevelInfo().level;
-  const opponent = pickOpponent(chars.filter((c) => c && isUnlocked(c.id, level)), getProfileSnapshot().caught);
+  const opponent = pickFoe(chars.filter((c) => c && isUnlocked(c.id, level)), getProfileSnapshot().caught); // 다 잡았으면 🔁 다시 대결 (v434)
   if (!opponent || !battleMons(chars).length) return null;
   return { subject, opponent, trainer: TRAINERS[Math.floor(Math.random() * TRAINERS.length)], chars, getQ, used: false };
 }
@@ -209,16 +209,14 @@ export function battleQuiz(box, hooks, getQ, seen) {
   });
 }
 
-/** 배틀 결과: 승 → 상대 획득 + ⚡💰, 패(그만둠 포함) → 그 포켓몬 패배 +1 — 영어·수학과 같은 규칙·같은 함수 */
+/** 배틀 결과: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패(그만둠 포함) → 그 포켓몬 패배 +1 — 영어·수학과 같은 규칙·같은 함수 */
 async function applyResult(r) {
   if (!r || r.outcome === 'declined') return;
   if (r.outcome === 'win') {
-    const w = battleWin(r.opponent.id);
+    const w = r.opponent.rematch ? null : battleWin(r.opponent.id); // 🔁 이미 잡은 포켓몬은 또 주지 않는다 (v434)
     gainXp(BATTLE.winXp);
     gainCoins(BATTLE.winCoins);
-    toast(w.first
-      ? `🎉 ${r.opponent.ko}${josa(r.opponent.ko, '이', '가')} 도감에 들어왔어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`
-      : `🎉 ${r.opponent.ko} 한 마리 더! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`);
+    toast(winLine(r.opponent, !!(w && w.first)));
   } else if (r.my) {
     const l = await battleLoss(r.my.id, BATTLE.lossesToLose).catch(() => null);
     if (l && l.lost) toast(`😢 ${r.my.ko}${josa(r.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요…`);

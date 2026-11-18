@@ -15,7 +15,7 @@ import { gymClaimed } from './mathprog.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone, receiveEssaySayStone, megaReady, zygBattle } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { STONE_ENGLISH, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoTier, SPEAK_COMBO, COIN, HP, POTION, CALL_PAL, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
-import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
+import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickFoe, winLine, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
 import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, reviewStones, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT, pickFavExtra, FAV_ICON } from './review.js';
@@ -494,11 +494,11 @@ function maybeBattle(todayDone) {
   state.battlePending = opponent;
 }
 
-/** 상대: 열린 명단 중 아직 못 잡은 포켓몬 (그림이 있는 것만) */
+/** 상대: 열린 명단 중 아직 못 잡은 포켓몬 (그림이 있는 것만) · 다 잡았으면 이미 잡은 포켓몬과 🔁 다시 대결 (v434) */
 function pickBattleOpponent() {
   const level = getLevelInfo().level;
   const caught = getProfileSnapshot().caught;
-  return pickOpponent(state.characters.filter((c) => isUnlocked(c.id, level)), caught);
+  return pickFoe(state.characters.filter((c) => isUnlocked(c.id, level)), caught);
 }
 
 /** 내가 내보낼 수 있는 포켓몬: 잡은 것 중 파트너·😴 제외, 그림·꾸밈·패배 수 포함 */
@@ -742,14 +742,14 @@ export async function resumeEnglishRocket() {
   return true;
 }
 
-/** 배틀 결과 반영: 승 → 상대 획득 + ⚡💰, 패/도중 이탈 → 그 포켓몬 패배 +1 (3번이면 잃음) */
+/** 배틀 결과 반영: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패/도중 이탈 → 그 포켓몬 패배 +1 (3번이면 잃음) */
 async function applyBattleResult(r) {
   if (!r || r.outcome === 'declined') return;
   if (r.outcome === 'win') {
-    const w = battleWin(r.opponent.id);
+    const w = r.opponent.rematch ? null : battleWin(r.opponent.id); // 🔁 이미 잡은 포켓몬은 또 주지 않는다 (v434)
     awardXp(BATTLE.winXp);
     awardCoins(BATTLE.winCoins);
-    showPlayerMessage(w.first ? `🎉 ${r.opponent.ko}${josaIga(r.opponent.ko)} 도감에 들어왔어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}` : `🎉 ${r.opponent.ko} 한 마리 더! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`, 5000);
+    showPlayerMessage(winLine(r.opponent, !!(w && w.first)), 5000);
     setTimeout(() => dropMushroom('배틀에서 이겼어요'), 5200); // 🍄 승리 메시지 뒤에
   } else if (r.my) {
     // 패배 누적·판정은 저장소에서 (두 창이 각각 세면 두 마리를 잃는다)

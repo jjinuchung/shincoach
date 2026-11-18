@@ -57,7 +57,7 @@ import { setExempt, status as timeStatus, isLocked } from './timelimit.js'; // �
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole, formsOf, formUrl } from './pokemon.js';
 import { openCatch, isCatchOpen } from './catch.js';
 import { holdStore } from './throwhold.js'; // 🎯 뺀 던지기 예약 장부 (Codex 49차 #1·#2)
-import { openBattle, closeBattle, BATTLE, shouldBattle, pickOpponent, eligibleMine } from './battle.js';
+import { openBattle, closeBattle, BATTLE, shouldBattle, pickFoe, winLine, eligibleMine } from './battle.js';
 import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN } from './cheer.js';
 import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
 import { contentSummary, cueCountOf } from './stats.js';
@@ -2691,12 +2691,12 @@ function maybeBattle() {
   ui.battlePending = opponent;
 }
 
-/** 상대: 지금 레벨에서 열린 명단 중 아직 못 잡은 포켓몬 (영어와 같은 규칙 — 수학 포켓몬도 여기 섞여 있다) */
+/** 상대: 지금 레벨에서 열린 명단 중 아직 못 잡은 포켓몬 (영어와 같은 규칙 — 수학 포켓몬도 여기 섞여 있다) · 다 잡았으면 🔁 다시 대결 (v434) */
 function pickBattleOpponent() {
   const level = getLevelInfo().level;
   const caught = getProfileSnapshot().caught;
   const chars = (ui.chars || []).filter((c) => c && isUnlocked(c.id, level));
-  return pickOpponent(chars, caught);
+  return pickFoe(chars, caught);
 }
 
 /**
@@ -2928,17 +2928,15 @@ function resumeRocketIfAny() {
   }).catch(() => {});
 }
 
-/** 배틀 결과: 승 → 상대 획득 + ⚡💰, 패 → 그 포켓몬 패배 +1 (영어와 같은 규칙·같은 함수) */
+/** 배틀 결과: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패 → 그 포켓몬 패배 +1 (영어와 같은 규칙·같은 함수) */
 async function applyMathBattleResult(r) {
   if (!r || r.outcome === 'declined') return;
   if (r.outcome === 'win') {
-    const w = battleWin(r.opponent.id);
+    const w = r.opponent.rematch ? null : battleWin(r.opponent.id); // 🔁 이미 잡은 포켓몬은 또 주지 않는다 (v434)
     gainXp(BATTLE.winXp);
     gainCoins(BATTLE.winCoins);
     updateChip();
-    mathToast(w.first
-      ? `🎉 ${r.opponent.ko}${josa(r.opponent.ko, '이', '가')} 도감에 들어왔어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`
-      : `🎉 ${r.opponent.ko} 한 마리 더! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`);
+    mathToast(winLine(r.opponent, !!(w && w.first)));
   } else if (r.my) {
     const l = await battleLoss(r.my.id, BATTLE.lossesToLose).catch(() => null);
     if (l && l.lost) mathToast(`😢 ${r.my.ko}${josa(r.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요…`);

@@ -1,6 +1,7 @@
 // ⚔️ 배틀 이벤트: 학습 중 아주 가끔 트레이너가 배틀을 걸어옴 → 내 포켓몬을 골라 싸움.
 // 공격 = 문장 하나를 따라 말하기 → 얼마나 잘 말했는지가 데미지 (배틀이 곧 학습). 상대는 자동 공격.
 // 이기면 상대 포켓몬을 얻고, 지면 그 포켓몬의 패배 수가 +1 (3번 지면 잃음 — xp.js battleLoss). 참가는 선택.
+// 못 잡은 상대가 없으면 이미 잡은 포켓몬과 🔁 다시 대결 — 이겨도 포켓몬 없이 ⚡💰만 (v434 pickFoe)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 화면(DOM)
 import { rarityOf, shownRarity, RARITY } from './xp.js';
 import * as bgm from './bgm.js';
@@ -308,6 +309,29 @@ export function pickOpponent(unlocked, caught, rng = Math.random) {
   return pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
 }
 
+/**
+ * ⚔️ 배틀에 나올 상대 (v434, 2026-11-18 진우 「배틀이 안 나와요」 → 아버님 「이미 잡은 포켓몬과 다시 배틀하기」)
+ * 못 잡은 상대(pickOpponent)가 먼저. 그런 상대가 하나도 없으면 이미 잡은 포켓몬 중에서 🔁 다시 대결 — { ...상대, rematch: true }.
+ * 다 잡은 아이는 pickOpponent가 늘 null이라 11-07부터 배틀이 하루도 안 나왔다(레벨 76에 명단이 다 열림 · 못 잡은 것은 🌌📮🎹뿐).
+ * 다시 대결에도 🌌 울트라비스트·📮 편지·🎹 음악 포켓몬은 안 나온다(같은 거르기) · 무게도 같다(흔함 6 : 보통 4 : 희귀 2 : 전설 1) · 없으면 null
+ * 받은 목록의 칸은 고치지 않는다(화면이 들고 있는 캐릭터 목록이다)
+ */
+export function pickFoe(unlocked, caught, rng = Math.random) {
+  const fresh = pickOpponent(unlocked, caught, rng);
+  if (fresh) return fresh;
+  // 못 잡은 상대가 없다 = 🌌📮🎹를 거르고 남는 것은 모두 잡은 것 → 잡은 것을 안 보고(빈 caught) 같은 무게로 다시 고른다
+  const again = pickOpponent(unlocked, {}, rng);
+  return again ? { ...again, rematch: true } : null;
+}
+
+/** 이긴 뒤 알림 한 줄 — first = 처음 도감에 들어옴(battleWin) · 🔁 다시 대결은 포켓몬 없이 ⚡💰만 (영어·수학·국어 같은 말) */
+export function winLine(opponent, first) {
+  const ko = opponent.ko;
+  const gain = `⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`;
+  if (opponent.rematch) return `🎉 ${ko}${josa(ko, '을', '를')} 이겼어요! ${gain}`;
+  return first ? `🎉 ${ko}${josa(ko, '이', '가')} 도감에 들어왔어요! ${gain}` : `🎉 ${ko} 한 마리 더! ${gain}`;
+}
+
 /** 내가 내보낼 수 있는 포켓몬: 잡은 것 중 파트너·😴 제외 */
 export function eligibleMine(caughtIds, partnerId, isTiredFn) {
   return caughtIds.filter((id) => id !== partnerId && !(isTiredFn && isTiredFn(id)));
@@ -418,7 +442,10 @@ export function openBattle(o) {
   $('battle-actions').hidden = true;
   $('battle-result').textContent = '';
   $('battle-continue').hidden = true;
-  $('battle-note').textContent = o.practice ? '연습이라 결과가 남지 않아요' : `이기면 ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려와요. 지면 내보낸 포켓몬의 패배가 1 늘어요 (${BATTLE.lossesToLose}번 지면 떠나요)`;
+  const lose = `지면 내보낸 포켓몬의 패배가 1 늘어요 (${BATTLE.lossesToLose}번 지면 떠나요)`;
+  $('battle-note').textContent = o.practice ? '연습이라 결과가 남지 않아요'
+    : o.opponent.rematch ? `🔁 다시 대결 — ${o.opponent.ko}${josa(o.opponent.ko, '은', '는')} 벌써 도감에 있어요. 이기면 ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}. ${lose}` // v434
+      : `이기면 ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려와요. ${lose}`;
   $('battle').hidden = false;
   syncFx().catch(() => {}); // 🐸 기술 그림 받기(10분에 한 번까지 — 첫 공격 전에 오면 그때부터 나온다)
 }
@@ -997,7 +1024,9 @@ function endFight(outcome) {
     $('battle-my-fig').classList.add('win-jump'); // 🏆 이겼으면 폴짝
     if (palOn()) $('battle-pal-fig').classList.add('win-jump'); // 📣 서 있던 동료도 같이
     $('battle-msg').textContent = '🏆 이겼다!';
-    res.textContent = o.practice ? `(연습) ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려왔을 거예요` : `🎉 ${o.opponent.ko}${josa(o.opponent.ko, '이', '가')} 우리 편이 됐어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`;
+    res.textContent = o.practice ? `(연습) ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려왔을 거예요`
+      : o.opponent.rematch ? winLine(o.opponent, false) // 🔁 다시 대결 — 데려오지 않는다 (v434)
+        : `🎉 ${o.opponent.ko}${josa(o.opponent.ko, '이', '가')} 우리 편이 됐어요! ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}`;
     sfx.success(); vibrate([40, 60, 40, 60, 160]); burstConfetti();
   } else {
     $('battle-my-fig').classList.add('down');
