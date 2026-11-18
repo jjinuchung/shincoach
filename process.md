@@ -10287,5 +10287,28 @@
 
 ### TODO (다음 작업)
 - [x] 아버님 「배포」(11-17) → 여유 16.9 GB · 전체 4050 통과 → feat bd0cccc → docs(v431 라이브 줄 포함) → push
-- [ ] 라이브 v432 확인
+- [x] 라이브 v432 확인(11-17 · bd0cccc feat · 608cc74 docs · `.context/v432/live_check432.sh` → sw v432 · 앱 판 v432 · 배포본 5개 같음(words.json 포함) · Pages built 608cc74)
 - [ ] 태블릿: 릴로 & 스티치 두 파일 옮겨 영어 가져오기 · 「지금 바꾸기」로 v432
+
+## 2026-11-18 — 🧱 피스 바이 피스 영어 학습 자료 + 단어장 (v433 · 아버님 「Piece by Piece (레고 다큐)를 태블릿 영상 자료로 만들자」)
+
+### 진행 내용
+- 원본 WEBRip(HEVC 10비트 1920×800 · 5.1 · 94분) · mkv 안에 영어 글자 자막(보통 1,731 · Forced 5) · 한글 없음 → 영어만(11-17 결정대로)
+- 짧은 길: `ffmpeg -map 0:s:0 -c:s srt` → `tools/sdh_clean.py --text`(whisper 안 씀 · 두 사람 말은 "-" 그대로)
+- 한글 짝이 없어 시각은 표본으로: 영화 곳곳 대사 24초 12곳을 `tools/relisten.py`(GPU 한 번)로 다시 듣고 자막 시각과 견줌 → 48큐 중 45가 ±0.7초 · 가운데 0.20초 · 처음~끝 밀림 없음 → 그대로
+- 아이에게 안 맞는 줄 30큐 뺌: 거친 말 넷 · 어른 노래 가사 · 가사 속 삐 소리 자리 — 소리엔 남고 자막·🎤 문장에서만 빠짐 · hell·damn은 소닉 3 자막에도 있어 둠 → 영어 1,701줄(앱 자막 읽기로 다 읽힘)
+- 인코딩 `F:\per\mp3\pbp\encode.ps1`(공개 저장소 밖 · d3d11va로 HEVC 풀고 x264 faster crf23 · 1440×600 · 5.1 → 스테레오 pan + loudnorm · Idle · 4.5배속 20분) → 744 MB · −18.5 dB → `F:\per\mp3\pbp\tablet\`(피스 바이 피스.mp4 · .en.srt)
+- 단어장 +234(3,822 → 4,056 · `.context/pbp/vocab_add.json` → merge_vocab · 영화 속 꼴 모두 뜻 찾음) · 입말(gon' · lil' · mo' · shoulda · bruh · hella · dope 등)은 넣고 이름·더듬기는 뺌 · 뜻 검토 워크플로(두 갈래 · 영화 예문 대조) 고칠 곳 23 반영(English Channel · the hood · poetic justice 등 · 틀린 뜻 없음)
+- stem_gain(이 영화 꼴이 어느 기본형으로 가는지 훑기): 이 영화 꼴이 엉뚱한 기본형으로 가던 것 여덟 막음(ladder → lad · career → care · hated → hat · barely → bare · tapes → tap · banger → bang · mixer → mix · purposely → purpose) · stem_clash: 새 stat이 다른 자막의 states를 빼앗아 stat은 뺌
+- vocab·dictation 시험 28 · check.mjs 통과 · 아버님 「배포」(11-18)
+- 배포 전 전체 시험에서 🎹 「연주 중 화면 멈칫」 하나가 떨어짐(3100이 3100.000000000002) — 음악 시험 가짜 시계가 실제 `performance.now()` 소수 값에서 출발해 시계 차에 소수 오차 → music407·408·413·414 네 파일 모두 `Math.floor`로 정수에서 출발(263f9ea) · 네 파일 세 번 48/48 · 다시 전체 4050 통과
+
+### 결정사항 / 메모
+- 한글 짝이 없는 글자 자막은 GPU 표본 다시 듣기로 시각만 확인한다(통째로 다시 맞추지 않음)
+- 아이에게 안 맞는 줄은 기본으로 빼고 아버님께 알린다(되돌릴 수 있음) · hell·damn은 둔다(소닉 3 선례)
+- `=기본형`은 words.json 안에서만 따라가므로 기본형이 basic.json에만 있으면 뜻을 바로 적는다(hated)
+
+### TODO (다음 작업)
+- [x] 아버님 「배포」(11-18) → 여유 7.4 GB · 전체 4050 통과(시계 고친 뒤 다시) → feat 76783df · test 263f9ea → docs(v432 라이브 줄 포함) → push
+- [ ] 라이브 v433 확인
+- [ ] 태블릿: 엘리오 · 릴로 & 스티치 · 피스 바이 피스 파일은 아버님이 정한 때 옮김 · 「지금 바꾸기」로 v433
