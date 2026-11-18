@@ -121,7 +121,7 @@ let rafId = 0;
 globalThis.requestAnimationFrame = (f) => { rafId += 1; rafs.set(rafId, f); return rafId; };
 globalThis.cancelAnimationFrame = (id) => { rafs.delete(id); };
 let skew = 0;
-const base = performance.now();
+const base = Math.floor(performance.now()); // 정수에서 출발해야 시계 차가 소수 오차 없이 딱 맞는다(3100이 3100.000000000002로 나와 떨어진 적 있음)
 Object.defineProperty(performance, 'now', { value: () => base + skew, configurable: true, writable: true });
 /** 화면 n장 — 한 장마다 벽시계 step(ms) · 소리 시계는 sound(ms)만큼 (주지 않으면 같이 간다) */
 function frames(n, step = 16, sound = step) {

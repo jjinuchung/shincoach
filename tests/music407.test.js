@@ -188,7 +188,7 @@ globalThis.requestAnimationFrame = (f) => { rafId += 1; rafs.set(rafId, f); retu
 globalThis.cancelAnimationFrame = (id) => { rafs.delete(id); };
 // 시계 — 앱이 performance.now()로 잰 건반 빛과 같은 시계로 화면을 넘긴다 · 손으로만 간다(전체 시험 때 바빠도 어긋나지 않게)
 let skew = 0;
-const base = performance.now();
+const base = Math.floor(performance.now()); // 정수에서 출발해야 시계 차가 소수 오차 없이 딱 맞는다(3100이 3100.000000000002로 나와 떨어진 적 있음)
 Object.defineProperty(performance, 'now', { value: () => base + skew, configurable: true, writable: true });
 /** 화면 n장 (16ms씩) → 장마다 그렸나 */
 function frames(n, step = 16) {
