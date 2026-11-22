@@ -101,7 +101,7 @@ test('🌳 수학: 줄기 고르기·사다리 머리에 얼마나 했고·남�
   assert.ok(pk.includes("started ? '하던 줄기 — 이어서 해요'"));
   assert.ok(pk.includes('for (const key of stemPickOrder(state, today))'), '밀린 줄기를 위로 놓는 차례는 그대로(말은 없이)');
   const ld = src.slice(src.indexOf('function renderLadder(state) {'), src.indexOf('// 💎 스페셜 문제', src.indexOf('function renderLadder(state) {')));
-  assert.ok(ld.includes("head.appendChild(el('h2', '', '🪜 개념 사다리'));"));
+  assert.ok(ld.includes("head.appendChild(el('h2', '', '🧗 개념 사다리'));"), '🪜는 Emoji 13이라 태블릿에서 깨짐 (v436)');
   assert.ok(ld.includes("'🔁 오늘 다시 확인하기 — 정말 아는지 볼까?'") && ld.includes("'🤔 틀렸던 유형 다시 풀기 — 이번엔 맞혀서 지워요'") && ld.includes("'🤔 오늘 틀린 유형은 내일부터 다시 풀 수 있어요.'"));
   for (const s of [pk, ld]) assert.ok(!/개를 알아요|개념 \$\{|일 지남|일 지난|기다려요|\$\{due\.length\}개|\$\{notesDue\.length\}개|\$\{nc\.all\}개/.test(s), '셈·밀린 날 말이 없다');
   // Codex 71차 #1 — 사다리 칸·도우미 단추 글까지: 📚 그림 배움 단추 · 칸마다 🤔 다시 볼 유형 · 🔁 아빠 답장 문제 (👑까지 N번은 상을 향한 진행이라 그대로 — 아버님)

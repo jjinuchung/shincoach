@@ -32,6 +32,11 @@
 //  · 저장 = house.stair (계단 왼쪽 칸 x · 숫자 하나) — 집과 함께 같은 쪽으로 합쳐진다. 없거나 깨졌으면 읽을 때
 //    가구가 가장 적게 걸리는 자리를 고른다(autoStairX · 걸린 가구는 서랍으로) → 처음 열 때 stairStartRule이 저장하고 알려 준다
 //  · 캐릭터가 층을 옮기는 길은 계단뿐(avatar.avatarFloorRule) — 위 [1층]·[2층] 탭은 그 층을 보기만 한다
+// 🧊 냉장고 채우기 · 🥕 집 안 마트 (v436 · 같은 시안 「이대로」 — 자료와 고쳐 읽기는 food.js):
+//  · 음식은 가방(profile.items['food_…']) · 넣은 자리는 house.fridge { 칸: 음식 } — houseOf가 fridgeCopy로 고쳐 함께 싣는다(집 규칙이 저장해도 안 사라지게)
+//  · 🥕 사기는 🧊 냉장고를 가져야(서랍에 있어도) · 실마다 칸 수까지 · 넣기·꺼내기는 놓인 냉장고가 있어야(어느 층이든 · 안은 하나)
+
+import { foodById, slotZone, fridgeCopy, foodTray, zoneOwned, CAP as FOOD_CAP } from './food.js'; // 🧊 음식 자료 (순수 — food.js는 아무것도 import하지 않는다)
 
 /** 방 크기 — 바닥 W × H칸, 벽 WALL칸 */
 export const ROOM = { W: 8, H: 6, WALL: 8 };
@@ -63,6 +68,8 @@ export const SEQ_MAX = 1e9;
 const isHouseObj = (h) => !!h && typeof h === 'object' && !Array.isArray(h);
 /** 🪜 계단 너비(칸) — 1층은 바닥·벽 STAIR_W칸씩, 2층은 바닥 STAIR_W칸(구멍) */
 export const STAIR_W = 2;
+/** 🧊 냉장고 가구 id — 놓인 냉장고를 누르면 [🧊 열기] (v436) */
+export const FRIDGE_ID = 'f_fridge';
 
 /**
  * 가구 — id는 'f_'로 시작 · w = 차지하는 칸(가로) · at = 'floor' 바닥 | 'wall' 벽 · group = small 소품 | furn 가구 | device 기기
@@ -402,6 +409,9 @@ function buildHouse(profile, shape, src, stairX) {
     resting.add(rest.mon);
   }
   if (parked.length) out.parked = parked;
+  // 🧊 냉장고 안 (v436) — 고쳐서 함께 싣는다: 안 실으면 다른 집 규칙(놓기·옮기기…)이 profile.house = h로 저장할 때 사라진다 · 비었으면 칸 없음
+  const fridge = fridgeCopy(src.fridge, profile && profile.items);
+  if (Object.keys(fridge).length) out.fridge = fridge;
   return out;
 }
 
@@ -616,4 +626,82 @@ export function stairStartRule(profile) {
   for (const r of before.rooms) for (const i of r.items) if (left[i.id] > 0) { left[i.id] -= 1; moved.push(i.id); }
   profile.house = h;
   return { ok: true, x: h.stair, moved };
+}
+
+// ───────────────────── 🧊 냉장고 채우기 · 🥕 집 안 마트 (v436) ─────────────────────
+
+/** 🧊 놓인 냉장고가 있나 (어느 층이든 — 안은 하나라 어느 냉장고를 열어도 같다) · h = houseOf 결과 */
+export function fridgePlaced(h) {
+  return !!h && h.rooms.some((r) => r.items.some((i) => i.id === FRIDGE_ID));
+}
+
+/**
+ * 🥕 살 수 있나 (순수) — 마트 화면과 사기 규칙이 같은 판정을 쓴다.
+ * why: 'unknown' 파는 음식이 아님 · 'gift' 이사 선물 전 · 'nofridge' 🧊 냉장고가 없음(서랍에 있으면 됨 — 넣을 곳이 없는데 코인만 쓰지 않게) ·
+ *      'full' 그 실에 넣을 음식이 칸 수만큼(zone · placed = 그 실에 넣은 수 — 다 넣었으면 「꽉 찼어요」, 아니면 「바구니부터 넣어요」) ·
+ *      'short' 코인이 모자람(shortCoins)
+ */
+export function foodBuyCheck(profile, id) {
+  const f = foodById(id);
+  if (!f) return { ok: false, why: 'unknown' };
+  const h = houseOf(profile);
+  if (!h.started) return { ok: false, why: 'gift' };
+  if (ownedOf(profile, FRIDGE_ID) < 1) return { ok: false, why: 'nofridge' };
+  if (zoneOwned(profile && profile.items, f.zone) >= FOOD_CAP[f.zone]) {
+    const placed = Object.keys(h.fridge || {}).filter((k) => slotZone(k) === f.zone).length;
+    return { ok: false, why: 'full', zone: f.zone, placed };
+  }
+  const shortCoins = Math.max(0, f.price - (Number(profile && profile.coins) || 0));
+  if (shortCoins > 0) return { ok: false, why: 'short', shortCoins };
+  return { ok: true };
+}
+
+/**
+ * 🥕 음식 사기 — 💰만 (저장된 가방으로 판정) · 산 음식은 🧺 내 음식(바구니)으로 · 되팔지 않는다 · 안 되면 판정 그대로(zone·placed·shortCoins — 화면이 말로)
+ * 사기 전에 저장된 냉장고 안을 지금 가방으로 고쳐 둔다 — 가방이 줄어든 백업과 합쳐져 숨어 있던 옛 자리가
+ * 가진 수가 늘면 되살아나, 산 음식이 바구니가 아니라 아이가 넣지 않은 칸에 나타났다 (리뷰 워크플로)
+ */
+export function foodBuyRule(profile, id) {
+  const c = foodBuyCheck(profile, id);
+  if (!c.ok) return c;
+  if (isHouseObj(profile.house) && profile.house.fridge !== undefined) {
+    const fr = fridgeCopy(profile.house.fridge, profile.items);
+    if (Object.keys(fr).length) profile.house.fridge = fr; else delete profile.house.fridge;
+  }
+  profile.coins = (Number(profile.coins) || 0) - foodById(id).price;
+  profile.items[id] = ownedOf(profile, id) + 1;
+  return { ok: true };
+}
+
+/**
+ * 🧊 냉장고 칸에 넣기 — why: 'nofridge' 놓인 냉장고가 없음 · 'unknown' 모르는 칸·음식 · 'zone' 실이 안 맞음(아이스크림은 냉동실) ·
+ * 'taken' 그 칸에 벌써 있음(다른 화면에서 넣음) · 'none' 바구니에 없음
+ */
+export function fridgePutRule(profile, slot, id) {
+  const h = houseOf(profile);
+  if (!fridgePlaced(h)) return { ok: false, why: 'nofridge' };
+  const z = slotZone(slot);
+  const f = foodById(id);
+  if (!z || !f) return { ok: false, why: 'unknown' };
+  if (f.zone !== z) return { ok: false, why: 'zone' };
+  const fr = h.fridge || {};
+  if (Object.prototype.hasOwnProperty.call(fr, slot)) return { ok: false, why: 'taken' };
+  if (!(foodTray(profile.items, fr)[id] > 0)) return { ok: false, why: 'none' };
+  h.fridge = { ...fr, [slot]: id };
+  profile.house = h;
+  return { ok: true };
+}
+
+/** 🧊 냉장고 칸에서 꺼내기(바구니로) — why: 'nofridge' · 'empty' 그 칸이 비었음(다른 화면에서 꺼냄) · id = 꺼낸 음식 */
+export function fridgeTakeRule(profile, slot) {
+  const h = houseOf(profile);
+  if (!fridgePlaced(h)) return { ok: false, why: 'nofridge' };
+  const fr = h.fridge || {};
+  if (!Object.prototype.hasOwnProperty.call(fr, slot)) return { ok: false, why: 'empty' };
+  const id = fr[slot];
+  const next = { ...fr };
+  delete next[slot];
+  if (Object.keys(next).length) h.fridge = next; else delete h.fridge;
+  profile.house = h;
+  return { ok: true, id };
 }

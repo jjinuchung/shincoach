@@ -691,7 +691,7 @@ function renderLadder(state) {
   sw.addEventListener('click', () => renderStemPicker(state));
   eye.appendChild(sw);
   head.appendChild(eye);
-  head.appendChild(el('h2', '', '🪜 개념 사다리')); // 아는 칸 수·전체 칸 수는 쓰지 않는다 (v260 — 🌳 줄기 고르기와 같은 까닭)
+  head.appendChild(el('h2', '', '🧗 개념 사다리')); // (🪜는 Emoji 13이라 태블릿에서 깨짐 → 🧗 · v436) // 아는 칸 수·전체 칸 수는 쓰지 않는다 (v260 — 🌳 줄기 고르기와 같은 까닭)
   // 📬 아빠의 답장 — 사다리 맨 위, 읽어야 ☀️가 열린다 (아버님 결정 2026-09-21: 수학 전체는 안 막고 ☀️만)
   const unread = unreadAsks(state);
   if (unread.length) {

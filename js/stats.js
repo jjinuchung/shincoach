@@ -1022,7 +1022,7 @@ export async function renderStats() {
  * 자동으로 되돌리지 않는 이유: 사본이 낡았을 수도 있고, 되돌리는 건 부모가 알고 눌러야 한다.
  */
 function renderRestoreOffer(main) {
-  const box = card('🛟 기록 되돌리기');
+  const box = card('💾 기록 되돌리기'); // (🛟는 Emoji 14라 태블릿에서 네모 → 💾 · v436)
   box.hidden = true;
   main.appendChild(box);
   restoreOffer().then((offer) => {
@@ -1031,7 +1031,7 @@ function renderRestoreOffer(main) {
     box.hidden = false;
     box.appendChild(el('p', 'stats-note', `공부 기록이 비어 있어요. 기기 안에 남아 있는 사본으로 되돌릴 수 있어요 (${when === 0 ? '오늘' : `${when}일 전`} 저장됨).`));
     box.appendChild(el('p', 'stats-row', offer.summary));
-    const btn = el('button', 'btn btn-primary', '🛟 이 사본으로 되돌리기');
+    const btn = el('button', 'btn btn-primary', '💾 이 사본으로 되돌리기');
     btn.addEventListener('click', async () => {
       if (!confirm(`사본으로 되돌릴까요?\n\n${offer.summary}\n\n지금 기록과 합쳐지며, 큰 값이 남습니다.`)) return;
       btn.disabled = true;

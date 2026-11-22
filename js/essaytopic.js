@@ -33,7 +33,7 @@ export const TOPICS = [
   { id: 'B5', icon: '🚲', name: '자전거', q: '자전거를 타고 간 곳', words: [['ride', '타다'], ['bell', '벨'], ['helmet', '헬멧'], ['park', '공원'], ['wheel', '바퀴']] },
   { id: 'B6', icon: '🎂', name: '생일', q: '생일에 하고 싶은 일이나, 받고 싶은 선물', words: [['birthday', '생일'], ['cake', '케이크'], ['gift', '선물'], ['party', '파티'], ['candles', '초']] },
   { id: 'B7', icon: '👨‍👩‍👦', name: '아빠·엄마와', q: '아빠나 엄마와 같이 한 일', words: [['dad', '아빠'], ['mom', '엄마'], ['weekend', '주말'], ['helped', '도왔다'], ['trip', '나들이']] },
-  { id: 'B8', icon: '🛝', name: '놀이터', q: '밖에서 뛰어논 이야기', words: [['slide', '미끄럼틀'], ['swing', '그네'], ['climb', '오르다'], ['sand', '모래'], ['outside', '밖에서']] },
+  { id: 'B8', icon: '🤸', name: '놀이터', q: '밖에서 뛰어논 이야기', words: [['slide', '미끄럼틀'], ['swing', '그네'], ['climb', '오르다'], ['sand', '모래'], ['outside', '밖에서']] },
   { id: 'B9', icon: '🌅', name: '아침', q: '아침에 일어나서 한 일', words: [['morning', '아침'], ['breakfast', '아침밥'], ['late', '늦은'], ['hurry', '서두르다'], ['brush', '(이를) 닦다']] },
   { id: 'B10', icon: '🎨', name: '그림', q: '그린 그림이나, 그리고 싶은 그림', words: [['draw', '그리다'], ['color', '색칠하다'], ['paper', '종이'], ['picture', '그림'], ['bright', '밝은']] },
   { id: 'C1', icon: '🦸', name: '내가 히어로라면', q: '내가 가진 힘이 하나 있다면', words: [['power', '힘'], ['fly', '날다'], ['save', '구하다'], ['invisible', '보이지 않는'], ['city', '도시']] },
@@ -43,7 +43,7 @@ export const TOPICS = [
   { id: 'C5', icon: '🤖', name: '내 로봇', q: '나를 도와주는 로봇이 있다면', words: [['robot', '로봇'], ['button', '단추'], ['clean', '청소하다'], ['homework', '숙제'], ['helper', '도우미']] },
   { id: 'C6', icon: '⏰', name: '시간 여행', q: '옛날이나 미래로 간다면', words: [['future', '미래'], ['past', '과거'], ['dinosaur', '공룡'], ['travel', '여행하다'], ['year', '해(년)']] },
   { id: 'C7', icon: '🐜', name: '아주 작아진다면', q: '개미만큼 작아진다면', words: [['tiny', '아주 작은'], ['giant', '거대한'], ['ant', '개미'], ['hide', '숨다'], ['grass', '풀']] },
-  { id: 'C8', icon: '🪄', name: '마법', q: '마법을 하나 쓸 수 있다면', words: [['magic', '마법'], ['wand', '지팡이'], ['spell', '주문'], ['disappear', '사라지다'], ['wish', '소원']] },
+  { id: 'C8', icon: '🔮', name: '마법', q: '마법을 하나 쓸 수 있다면', words: [['magic', '마법'], ['wand', '지팡이'], ['spell', '주문'], ['disappear', '사라지다'], ['wish', '소원']] },
   { id: 'C9', icon: '🦁', name: '동물이 된다면', q: '하루 동안 동물이 된다면', words: [['lion', '사자'], ['bird', '새'], ['swim', '헤엄치다'], ['roar', '으르렁거리다'], ['forest', '숲']] },
   { id: 'C10', icon: '🧪', name: '내 발명품', q: '세상에 없는 물건을 만든다면', words: [['invent', '발명하다'], ['machine', '기계'], ['idea', '생각'], ['press', '누르다'], ['amazing', '놀라운']] },
 ];

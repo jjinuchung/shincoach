@@ -3414,6 +3414,107 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 @media (prefers-reduced-motion: reduce) {
   .is-walk > .house-me-art, .is-walk > .house-pal-img { animation: none !important; }
 }
+/* 🥕 집 안 마트 (v436) — 🛒 가구 상점 안 두 칸 [🪑 가구][🥕 마트] · 음식 카드(두 번 눌러 산다) */
+.house-subtabs { display: flex; gap: 8px; margin: 0 0 8px; }
+.house-subtab { flex: 1; padding: 7px 10px; font-weight: 800; border: 2px solid var(--border); background: #fff; }
+.house-subtab.is-on { border-color: #e8590c; background: #fff4e6; color: #c2410c; }
+.house-mart { display: grid; gap: 10px; }
+.house-mart-need { padding: 8px 10px; border-radius: 10px; background: #fff4e6; color: #9a3412; font-weight: 700; }
+.house-mart-group { display: grid; gap: 6px; }
+.house-mart-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
+.house-mart-item { display: grid; justify-items: center; gap: 1px; padding: 6px 4px; border-radius: 12px; border: 2px solid var(--border); background: #fff; font: inherit; color: inherit; cursor: pointer; }
+.house-mart-item.is-arm { border-color: var(--primary); background: #eef2ff; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); }
+.house-mart-item.is-short { opacity: 0.6; }
+.house-mart-e { font-size: 1.7rem; line-height: 1.15; }
+.house-mart-n { font-size: 0.78rem; font-weight: 700; }
+.house-mart-p { font-size: 0.75rem; font-weight: 800; color: #9a6700; font-variant-numeric: tabular-nums; }
+.house-mart-item.is-arm .house-mart-p { color: var(--primary); }
+
+/* 🧊 냉장고 화면 (v436 · fridgeview.js) — 화면 가득(🏠 집 창 위) · 앞모습(위 작은 문 ❄️ 냉동실 · 아래 큰 문 🥛 냉장실) → 문을 열면 안을 가까이 */
+.fz { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 66; display: flex; background: #f4f7fb; }
+.fz[hidden] { display: none; }
+.fz-card { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-width: 980px; margin: 0 auto; color: #1f2937; }
+.fz-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; }
+.fz-title { flex: 1; font-size: 1.15rem; font-weight: 800; }
+.fz-back[hidden] { display: none; }
+.fz-stage { position: relative; display: grid; place-items: center; padding: 6px 12px; min-height: 0; overflow: hidden; }
+.fz-foot { display: grid; gap: 6px; padding: 4px 12px 12px; }
+.fz-msg { min-height: 1.4em; margin: 0; font-size: 0.92rem; font-weight: 700; color: #374151; text-align: center; }
+/* 앞모습 — 방 그림(furnart fridge)과 같은 색·꼴 */
+.fz-front { position: relative; height: 100%; max-height: 420px; aspect-ratio: 40 / 74; display: flex; flex-direction: column; background: #e2e9ef; border: 3px solid #6b7a8a; border-radius: 16px; perspective: 900px; }
+.fz-part { position: relative; flex: 27; border-bottom: 3px solid #6b7a8a; }
+.fz-part.is-cold { flex: 47; border-bottom: 0; }
+.fz-cav { position: absolute; inset: 4px; border-radius: 10px; background: linear-gradient(#ffffff, #e9f1f7); box-shadow: inset 0 0 16px rgba(80, 120, 160, 0.35); }
+.fz-part.is-frozen .fz-cav { background: linear-gradient(#e8f6ff, #bfe3fb); }
+.fz-door { position: absolute; inset: 0; display: grid; place-items: center; padding: 0; border: 0; border-radius: 12px; background: #eef3f7; color: #334155; font: inherit; cursor: pointer; transform-origin: left center; transition: transform 0.52s ease-in; box-shadow: inset 0 0 0 1px rgba(107, 122, 138, 0.25); }
+.fz-door.is-open { transform: rotateY(-105deg); }
+.fz-door:focus-visible { outline: 3px solid #4dabf7; outline-offset: -3px; }
+.fz-handle { position: absolute; right: 12%; top: 22%; width: 7%; height: 46%; border-radius: 999px; background: #9aa8b6; }
+.fz-part.is-cold .fz-handle { top: 12%; height: 40%; }
+.fz-lbl { font-weight: 800; font-size: clamp(0.85rem, 2.4vw, 1.1rem); background: rgba(255, 255, 255, 0.92); border: 2px solid #94a3b8; border-radius: 999px; padding: 2px 10px; }
+.fz-magnet { position: absolute; left: 14%; top: 18%; width: 12%; aspect-ratio: 1; border-radius: 50%; background: #e5484d; }
+.fz-memo { position: absolute; left: 14%; top: 14%; width: 30%; aspect-ratio: 1.15; background: #fff3a6; transform: rotate(-6deg); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12); }
+.fz-memo::before { content: ""; position: absolute; left: 44%; top: -6%; width: 14%; aspect-ratio: 1; border-radius: 50%; background: #4dabf7; }
+.fz-feet { position: absolute; bottom: -9px; width: 14%; height: 7px; border-radius: 2px; background: #6b7a8a; }
+.fz-feet.is-l { left: 12%; }
+.fz-feet.is-r { right: 12%; }
+/* 안 — 클로즈업 · 칸 크기는 안 상자 크기를 따른다(cqw·cqh — 못 쓰는 기기는 vw 글자 크기) */
+.fz-inside { width: 100%; height: 100%; max-height: 460px; display: grid; gap: 8px; animation: fz-zoom 0.35s ease-out; container-type: size; }
+@keyframes fz-zoom { from { transform: scale(0.8); opacity: 0; } to { transform: none; opacity: 1; } }
+.fz-inside.is-cold { grid-template-columns: minmax(0, 3.2fr) minmax(0, 1fr); }
+.fz-inside.is-frozen { grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr); }
+.fz-box { position: relative; display: grid; gap: 4px; min-height: 0; overflow: hidden; padding: 8px 8px 6px; border: 3px solid #6b7a8a; border-radius: 14px; }
+.fz-box.is-cold { background: linear-gradient(#ffffff 0%, #eef4f8 70%, #e3ecf2 100%); grid-template-rows: auto repeat(3, minmax(0, 1fr)) minmax(0, 1.15fr); }
+.fz-box.is-frozen { background: linear-gradient(#f1faff 0%, #cdeafc 100%); grid-template-rows: auto repeat(3, minmax(0, 1fr)); }
+.fz-led { height: 6px; margin: 0 18%; border-radius: 999px; background: #fff; box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.95), 0 2px 10px rgba(120, 170, 220, 0.5); }
+.fz-box.is-frozen .fz-led { background: #e0f4ff; box-shadow: 0 0 14px 5px rgba(150, 215, 255, 0.95); }
+.fz-shelf { position: relative; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; align-items: end; padding-bottom: 7px; }
+.fz-shelf::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: 0; height: 6px; border-radius: 3px; background: linear-gradient(rgba(170, 205, 230, 0.75), rgba(120, 165, 200, 0.6)); box-shadow: 0 2px 3px rgba(0, 0, 0, 0.08); }
+.fz-drawer { position: relative; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; align-items: end; padding: 14px 6px 4px; border-radius: 10px; background: linear-gradient(rgba(200, 235, 210, 0.45), rgba(170, 215, 190, 0.6)); border: 2px solid rgba(110, 160, 130, 0.55); }
+.fz-drawer.is-ice { grid-template-columns: repeat(3, minmax(0, 1fr)); background: linear-gradient(rgba(220, 240, 255, 0.55), rgba(170, 210, 245, 0.7)); border-color: rgba(100, 150, 200, 0.6); }
+.fz-dl { position: absolute; left: 8px; top: 1px; font-size: 0.68rem; font-weight: 800; color: #3f6f55; }
+.fz-drawer.is-ice .fz-dl { color: #2f5f8f; }
+.fz-doorp { position: relative; display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 6px; min-height: 0; padding: 10px 7px; border: 3px solid #6b7a8a; border-radius: 14px; background: linear-gradient(90deg, #e9eff4, #f8fbfd); box-shadow: inset 0 0 0 5px #dfe6ec; }
+.fz-doorp.is-two { grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.fz-inside.is-cold .fz-doorp { transform: perspective(500px) rotateY(-14deg); transform-origin: left center; }
+.fz-inside.is-frozen .fz-doorp.is-l { transform: perspective(500px) rotateY(14deg); transform-origin: right center; }
+.fz-inside.is-frozen .fz-doorp.is-r { transform: perspective(500px) rotateY(-14deg); transform-origin: left center; }
+/* 문 칸 = 앞턱이 있는 통 — 음식 아래쪽이 앞턱 뒤로 살짝 숨는다 */
+.fz-pocket { position: relative; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; align-items: end; padding: 0 3px 3px; }
+.fz-pocket::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40%; border-radius: 3px 3px 8px 8px; background: linear-gradient(rgba(190, 222, 248, 0.55), rgba(140, 188, 228, 0.75)); border: 2px solid rgba(100, 150, 200, 0.7); pointer-events: none; z-index: 2; }
+.fz-slot { position: relative; width: 100%; height: 92%; min-width: 0; min-height: 0; display: grid; place-items: end center; padding: 0 0 2px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: clamp(16px, 3.4vw, 40px); font-size: min(6.6cqw, 9cqh); line-height: 1; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fz-pocket .fz-slot { height: 100%; font-size: clamp(14px, 2.8vw, 32px); font-size: min(5.6cqw, 7.5cqh); }
+.fz-slot:focus-visible { outline: 3px solid #4dabf7; outline-offset: -3px; }
+.fz-food { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.22)); }
+.fz-slot.is-drop .fz-food { animation: fz-drop 0.3s ease-out; }
+@keyframes fz-drop { from { transform: translateY(-40%) scale(1.2); } to { transform: none; } }
+.fz-slot.is-target { outline: 2px dashed #10b981; outline-offset: -5px; background: rgba(16, 185, 129, 0.06); animation: fz-glow 0.9s ease-in-out infinite alternate; }
+.fz-slot.is-target::before { content: "+"; position: absolute; inset: 0; display: grid; place-items: center; color: #0e9f6e; font-weight: 800; font-size: 0.6em; }
+@keyframes fz-glow { from { background: rgba(16, 185, 129, 0.04); } to { background: rgba(16, 185, 129, 0.16); } }
+.fz-peek { position: absolute; left: 6px; bottom: 2px; width: clamp(40px, 9%, 70px); height: auto; pointer-events: none; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25)); }
+.fz-say { position: absolute; left: 8px; bottom: calc(clamp(40px, 9%, 70px) + 6px); padding: 1px 8px; border: 2px solid #1f2937; border-radius: 12px; background: #fff; color: #1f2937; font-size: 0.85rem; font-weight: 800; white-space: nowrap; pointer-events: none; }
+.fz-say[hidden] { display: none; }
+/* 냉동실은 왼쪽 아래 문 칸 음식을 가리지 않게 그림·말풍선을 왼쪽 위(문 칸 윗부분 빈자리)로 (리뷰 워크플로) · 냉장실 말풍선은 그림 머리 위 */
+.fz-inside.is-frozen ~ .fz-peek { top: 2px; bottom: auto; }
+.fz-inside.is-frozen ~ .fz-say { top: calc(clamp(40px, 9%, 70px) + 6px); bottom: auto; }
+/* 🧺 내 음식 */
+.fz-tray { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 6px; border-radius: 12px; background: #fffaf2; border: 1px solid #ecdfc8; }
+.fz-tray[hidden] { display: none; }
+.fz-tray-lbl { flex: none; font-size: 0.82rem; font-weight: 800; white-space: nowrap; color: #6b4e2a; }
+.fz-tray-item { position: relative; flex: none; display: inline-flex; flex-direction: column; align-items: center; min-width: 58px; padding: 4px 6px; border-radius: 10px; border: 2px solid #e3e8ee; background: #fff; font: inherit; color: #1f2937; cursor: pointer; }
+.fz-tray-item.is-arm { border-color: var(--primary); background: #eef2ff; transform: translateY(-3px); }
+.fz-e { font-size: 1.6rem; line-height: 1.1; }
+.fz-n { font-size: 0.74rem; font-weight: 700; }
+.fz-c { position: absolute; top: 0; right: 4px; font-size: 0.72rem; font-weight: 800; color: var(--primary); }
+.fz-tray-empty { font-size: 0.82rem; color: #6b7280; }
+@media (max-width: 520px) {
+  .fz-inside { gap: 4px; }
+  .fz-box, .fz-doorp { padding: 5px 4px; border-width: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fz-slot.is-target, .fz-inside, .fz-slot.is-drop .fz-food { animation: none !important; }
+  .fz-door { transition: none; }
+}
 .closet { display: grid; grid-template-columns: minmax(0, 230px) minmax(0, 1fr); gap: 12px; align-items: start; }
 .closet-intro { grid-column: 1 / -1; }
 .closet-mirror { position: sticky; top: 0; display: grid; justify-items: center; gap: 8px; padding: 10px; border: 1px solid #ecdfc8; border-radius: 14px; background: #fffaf2; }

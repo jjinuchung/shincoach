@@ -1194,6 +1194,7 @@ export function copyHouse(h) {
   const item = (it) => ({ ...it, ...(it && it.rest && typeof it.rest === 'object' ? { rest: { ...it.rest } } : {}) });
   const out = { ...h, rooms: (Array.isArray(h.rooms) ? h.rooms : []).map((r) => ({ ...r, items: (Array.isArray(r && r.items) ? r.items : []).map(item) })) };
   if (Array.isArray(h.parked)) out.parked = h.parked.map((r) => (r && typeof r === 'object' ? { ...r } : r)); // 💊 맡겨 둔 휴식도 (Codex 47차 #1)
+  if (h.fridge && typeof h.fridge === 'object' && !Array.isArray(h.fridge)) out.fridge = { ...h.fridge }; // 🧊 냉장고 안도 새 객체로 (v436)
   return out;
 }
 

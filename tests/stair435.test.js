@@ -344,10 +344,11 @@ test('🪜 화면 차례 — 계단은 가구보다 먼저(맨 뒤 줄) · 오�
   assert.match(css, /@keyframes house-waddle \{/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\n {2}\.is-walk > \.house-me-art, \.is-walk > \.house-pal-img \{ animation: none !important; \}/);
   const sw = src('sw.js');
-  assert.match(sw, /const CACHE_VERSION = 'v435';/);
+  const ver = Number((/const CACHE_VERSION = 'v(\d+)';/.exec(sw) || [])[1]);
+  assert.ok(ver >= 435);
   assert.match(sw, /'\.\/js\/stairart\.js'/);
   assert.match(sw, /'\.\/js\/stairview\.js'/);
-  assert.match(src('js/version.js'), /APP_VERSION = 'v435'/);
+  assert.match(src('js/version.js'), new RegExp(`APP_VERSION = 'v${ver}'`));
   const sv = src('js/stairview.js');
   assert.ok(!/\.style\.(left|top) = /.test(sv.replace(/Object\.assign\(node\.style, \{ left: '0', top: '0'/, '')), '움직임은 transform만');
   assert.match(fn('function stairToolsEl('), /house-tools is-stair\$\{up \? ' is-below' : ''\}/, '1층은 계단 아래 · 2층은 구멍 위(막 올라온 얼굴을 가리지 않게)');

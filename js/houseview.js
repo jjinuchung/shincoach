@@ -18,7 +18,9 @@
 //   남은 시간 · ⏏️ 꺼내기(두 번 — 보상 없음) · 다 쉬면 캡슐을 눌러 ✨ 받기 · 깜짝 진화면 진우가 갈래를 고르거나 그대로 둔다. 규칙은 rest.js
 // 🔍 Codex 46차 #1: 다른 창에서 돌아와 프로필을 다시 읽으면(app.js visibilitychange) 열린 집을 새로 그린다 — 화면은 옛 2층 10 × 7인데
 //   누르면 새 1층 8 × 6으로 셈해 다른 칸·다른 층에 놓였다. 그린 모양(ui.drawn)과 지금 모양이 다르면 놓기·끌기·칠하기·도구는 하지 않고 다시 그린다(stale)
-import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, turnRule, canTurn, turnOf, storeRule, paintRule, restsOf, STAIR_W, canStair, stairMoveRule, stairStartRule, stairSaved, takenCells } from './house.js';
+import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, turnRule, canTurn, turnOf, storeRule, paintRule, restsOf, STAIR_W, canStair, stairMoveRule, stairStartRule, stairSaved, takenCells, FRIDGE_ID, foodBuyCheck, foodBuyRule, fridgePlaced } from './house.js';
+import { FOODS, ZONE_KO, CAP as FOOD_CAP, foodById } from './food.js'; // 🥕 마트 음식 (v436 · 순수)
+import { openFridge, closeFridge } from './fridgeview.js'; // 🧊 냉장고 화면 (v436)
 import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading, restStart, restCancel, restClaim, ownedMonIds, monExp, houseFurnMax, hpOf, monLv, getPartner, homePlay } from './xp.js';
 import { REST_EXP, REST_MS, CAP_KO, restLeft } from './rest.js';
 import { lvMarkCrossed } from './evolve.js'; // 🎖️ 축하 레벨 (v332 · 순수)
@@ -183,7 +185,8 @@ export function growProgress(profile, id) {
 // ───────────────────── 화면 ─────────────────────
 
 // tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다) · drawn: 그린 집 모양(shapeKey)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0, hang: null, pendingPhoto: null, albumSel: '', guestSel: false, arrive: 0, drawnDay: 0, stairSel: false, climb: 0, climbDraw: false, stairAsked: false };
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0, hang: null, pendingPhoto: null, albumSel: '', guestSel: false, arrive: 0, drawnDay: 0, stairSel: false, climb: 0, climbDraw: false, stairAsked: false, shopSub: 'furn' };
+// 🥕 (v436) shopSub: 🛒 가구 상점 안 칸 — 'furn' 🪑 가구 | 'mart' 🥕 마트
 // 🪜 (v435) stairSel: 방에서 계단(구멍)을 눌러 [⬆️ 2층으로]·[⬇️ 1층으로]가 떠 있다 · climb: 오르내리는 오르기 번호(0이면 아님 — 탭·방 누르기·다른 그리기를 받지 않는다) ·
 //   climbDraw: 오르기가 스스로 다른 층을 그리는 중 ·
 //   stairAsked: 이번에 연 집에서 처음 계단 저장(stairStartRule)을 한 번 해 봤다
@@ -233,6 +236,7 @@ export function openHouse(opts = {}) {
   ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.buyArm = ''; ui.floor = FIRST_ROOM;
   ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
   ui.stairSel = false; ui.stairAsked = false; // 🪜 (v435)
+  ui.shopSub = 'furn'; // 🥕 (v436) 상점은 🪑 가구부터
   if (!profileLoading()) { const sp = avatarOf(getProfileSnapshot()).spot; if (sp) ui.floor = sp.room; } // 🪜 캐릭터가 있는 층으로 연다 — 2층에 올라간 뒤 다시 열면 빈 1층이 보이지 않게 (없는 층은 roomId가 1층으로)
   ui.hang = null; ui.pendingPhoto = null; ui.albumSel = ''; // 📸 (v384)
   ui.tab = opts.tab === 'shop' || opts.tab === 'closet' || opts.tab === 'album' ? opts.tab : 'room';
@@ -261,6 +265,7 @@ export function closeHouse() {
   closeGames(); // 🎮 게임기 화면도 (돌던 판은 그 자리에서 끝 — v307)
   closePlay();
   closePhotoBig(); // 📸 (v384) — 가득 찬 앨범에 못 넣은 새 사진은 닫으면 그만두기
+  closeFridge(); // 🧊 냉장고 화면도 (넣은 것은 저장된 대로 — v436)
   ui.hang = null; ui.pendingPhoto = null; ui.albumSel = '';
   if (ui.tick) { clearInterval(ui.tick); ui.tick = 0; }
   $('house').hidden = true;
@@ -757,6 +762,13 @@ function toolsEl(it) {
   store.type = 'button';
   store.addEventListener('click', () => { if (stale()) return; ui.sel = 0; run((p) => storeRule(p, rid, it.u), `${d.emoji} ${d.ko}${eul(d.ko)} 서랍에 넣었어요`); });
   if (it.id === HEAL) t.appendChild(restTool(it)); // 💊 캡슐 — 🐾 쉬게 하기 · ⏏️ 꺼내기 · ✨ 받기
+  if (it.id === FRIDGE_ID) { // 🧊 냉장고 — 화면 가득 열어 음식 넣기·꺼내기 (v436)
+    const open = el('button', 'btn btn-primary house-tool', '🧊 열기');
+    open.type = 'button';
+    // 닫으면 초점은 지금 보는 층 탭으로 — [🧊 열기] 단추는 다시 그려져 없고 가구 칸은 초점을 못 받는다 (Codex 240차 #1)
+    open.addEventListener('click', () => { if (ui.busy || stale()) return; ui.sel = 0; ui.msg = ''; render(); openFridge({ onClose: () => { const n = document.querySelector('#house-tabs .house-tab.is-on'); if (n) { try { n.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } } } }); });
+    t.appendChild(open);
+  }
   if (it.id === FRAME_ID) for (const b of frameTools(it, rid)) t.appendChild(b); // 📸 🔍 크게 보기 · 🖼️ 사진 걸기/바꾸기 (v384)
   if (PLAYS[it.id]) { // 🎮 일상 행동 — 맨 앞에 놀기 단추
     const go = el('button', 'btn btn-primary house-tool', PLAYS[it.id].btn);
@@ -1315,6 +1327,28 @@ function shopBox() {
     card.appendChild(go);
     wrap.appendChild(card);
   }
+  // 🥕 상점 안 두 칸 — 🪑 가구 · 🥕 마트 (v436 — 아버님 「마트는 집 가게 탭 안」)
+  const subs = el('div', 'house-subtabs');
+  subs.setAttribute('role', 'tablist');
+  for (const [key, label] of [['furn', '🪑 가구'], ['mart', '🥕 마트']]) {
+    const on = ui.shopSub === key;
+    const b = el('button', `btn house-subtab${on ? ' is-on' : ''}`, label);
+    b.type = 'button';
+    b.dataset.sub = key;
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+    b.addEventListener('click', () => {
+      if (ui.shopSub === key || ui.busy) return;
+      ui.shopSub = key; ui.buyArm = '';
+      ui.msg = key === 'mart' ? MART_HINT : '';
+      render();
+      const again = document.querySelector(`#house-body .house-subtab[data-sub="${key}"]`); // ⌨️ 다시 그린 뒤에도 초점
+      if (again) { try { again.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } }
+    });
+    subs.appendChild(b);
+  }
+  wrap.appendChild(subs);
+  if (ui.shopSub === 'mart') { wrap.appendChild(martBox(pf)); return wrap; }
   for (const g of SHOP_GROUPS) {
     const sec = el('div', 'house-sec');
     sec.appendChild(el('h3', 'house-h', g.title));
@@ -1354,6 +1388,65 @@ function shopCard(it, c, pf) {
   }
   b.addEventListener('click', () => shopTap(it.id));
   return b;
+}
+
+// ───────────────────── 🥕 집 안 마트 (v436) ─────────────────────
+
+/** 마트에 들어오면 한 줄 */
+export const MART_HINT = '🥕 두 번 누르면 사요 — 산 음식은 🧊 냉장고를 열면 🧺 내 음식에 있어요';
+/** 마트 — 🥛 냉장실 음식 · ❄️ 냉동실 음식 (💰만 · 두 번 눌러 산다) · 냉장고가 없으면 먼저 사라고 */
+function martBox(pf) {
+  const box = el('div', 'house-sec house-mart');
+  if (!(itemCount(FRIDGE_ID) > 0)) box.appendChild(el('p', 'house-note house-mart-need', '🧊 냉장고가 있어야 음식을 살 수 있어요 — 🪑 가구의 📺 기기에서 냉장고를 먼저 사요.'));
+  for (const zone of ['cold', 'frozen']) {
+    const g = el('div', 'house-mart-group');
+    g.appendChild(el('h3', 'house-h', zone === 'cold' ? `🥛 ${ZONE_KO.cold}에 넣는 음식` : `❄️ ${ZONE_KO.frozen}에 넣는 음식`));
+    const grid = el('div', 'house-mart-grid');
+    for (const f of FOODS.filter((x) => x.zone === zone)) {
+      const c = foodBuyCheck(pf, f.id);
+      const armed = ui.buyArm === f.id;
+      const b = el('button', `house-mart-item${armed ? ' is-arm' : ''}${c.ok ? '' : ' is-short'}`);
+      b.type = 'button';
+      b.dataset.buy = f.id;
+      b.setAttribute('aria-label', `${f.ko} 💰${f.price}${armed ? ' — 한 번 더 누르면 사요' : ''}`);
+      b.appendChild(el('span', 'house-mart-e', f.emoji));
+      b.appendChild(el('span', 'house-mart-n', f.ko));
+      b.appendChild(el('span', 'house-mart-p', armed ? '한 번 더!' : `💰${f.price}`));
+      b.addEventListener('click', () => martTap(f.id));
+      grid.appendChild(b);
+    }
+    g.appendChild(grid);
+    box.appendChild(g);
+  }
+  return box;
+}
+/** 마트에서 안 될 때의 말 (순수) — 꽉 찬 실은 이름으로(칸을 다 채웠으면 「꽉 찼어요」, 바구니에 남았으면 「바구니부터 넣어요」) · 모자란 코인은 몇 개 */
+export function martWhy(c, f) {
+  if (c.why === 'nofridge') return '🧊 냉장고가 있어야 음식을 살 수 있어요 — 🪑 가구의 📺 기기에서 냉장고를 먼저 사요';
+  if (c.why === 'full') {
+    const zone = ZONE_KO[c.zone] || '냉장고';
+    return ZONE_KO[c.zone] && (Number(c.placed) || 0) >= FOOD_CAP[c.zone] ? `${zone}이 꽉 찼어요 — 더 넣을 칸이 없어요` : `${zone}에 넣을 음식을 칸만큼 가졌어요 — 🧊 냉장고를 열어 🧺 내 음식부터 넣어 봐요`;
+  }
+  if (c.why === 'short') return `${f.emoji} ${f.ko} — 코인 ${(Number(c.shortCoins) || 0).toLocaleString('ko-KR')}개가 모자라요. 배우고 다시 와요!`;
+  return WHY[c.why] || '다시 해 볼까요?';
+}
+/** 🥕 음식 누르기 — 처음엔 값 · 한 번 더 누르면 산다(저장된 가방으로 판정 · 한 트랜잭션) */
+async function martTap(id) {
+  if (ui.busy) return;
+  const f = foodById(id);
+  const c = foodBuyCheck(getProfileSnapshot(), id);
+  const focusBack = () => { const n = document.querySelector(`#house-body .house-mart-item[data-buy="${id}"]`); if (n) { try { n.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } } };
+  if (!c.ok) { ui.buyArm = ''; ui.msg = martWhy(c, f); render(); focusBack(); return; }
+  if (ui.buyArm !== id) { ui.buyArm = id; ui.msg = `${f.emoji} ${f.ko} — 💰${f.price}. 한 번 더 누르면 사요`; render(); focusBack(); return; }
+  ui.buyArm = '';
+  sfxUnlock();
+  ui.busy = true;
+  let r = null;
+  try { r = await houseDo((p) => foodBuyRule(p, id)); } catch { r = null; } finally { ui.busy = false; }
+  // 안 됐으면 저장된 판정 그대로(zone·placed·shortCoins — 규칙이 돌려준다) · 냉장고가 서랍에만 있으면 「방에 놓으면 열 수 있어요」
+  if (r && r.ok) { ui.msg = `${f.emoji} ${f.ko}${eul(f.ko)} 샀어요 → 🧺 내 음식 · ${fridgePlaced(houseNow()) ? '🧊 냉장고를 열어 넣어 봐요' : '🗄️ 서랍의 🧊 냉장고를 방에 놓으면 열 수 있어요'}`; sfx.ding(); } else ui.msg = r ? martWhy(r, f) : WHY.save;
+  render();
+  focusBack();
 }
 
 /** 🏗️ 넓히기를 산 뒤의 말 */
