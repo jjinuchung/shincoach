@@ -25,6 +25,9 @@
 //   (v403) pickup?: 못갖춘마디 박 수 — 첫 칸이 그 마디(책처럼 0번) · 마지막 마디는 beats 또는 beats - pickup
 //          play?: [[첫, 끝], …] 곡 전체 연주 차례(도돌이표·1·2번 괄호) · repeats?: [{from, to}] · endings?: [{label, bars:[…]}] (그림만)
 //          ottava?: [{hand, from, to, shift}] — 그 마디들은 적힌 자리보다 shift 옥타브 소리(8vb = -1) · 마디 번호는 모두 책 번호
+//   (v437) den?: 8 — 8분음표 박자(6/8·9/8·12/8) · 그때 beats·meter 값은 책의 분자(8분음표 수)이고 bpm·tempo는 책의 ♩. 빠르기 ·
+//          음 길이(박)는 늘 4분음표 1 · 읽은 곡(song)의 beats·meters·bpm·bpms는 4분음표 박으로 바꿔 둔다(12/8 → 6박 · ♩.=123 → ♩=184.5)
+//   (v437) 셋잇단은 따로 적지 않는다 — 한 박을 셋으로 'D4:0.333333 D4:0.333333 C4:0.333334'(합이 1) · 그림은 tripletGroups로 묶어 작은 3
 //
 // ★ 이 파일은 아무것도 import하지 않는다 — 시험이 DOM·IndexedDB 없이 부른다.
 
@@ -90,6 +93,8 @@ const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const nz = (v) => { const n = Math.floor(Number(v) || 0); return n > 0 ? n : 0; };
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const EPS = 1e-6;
+/** 8분음표 박자(den 8)의 한 박(♩.)이 4분음표 몇 박인지 (v437) */
+const BEAT8 = 1.5;
 
 // ───────────────────── 음 ─────────────────────
 
@@ -127,6 +132,10 @@ export function midiOfWhite(wi) {
 export const firstNum = (song) => (Number.isInteger(song.first) ? song.first : song.pickup ? 0 : 1);
 /** 원고 차례(0부터) → 책의 마디 번호 */
 export const barNum = (song, i) => i + firstNum(song);
+/** 4분음표 박 수(마디 길이) → 그릴 박자표 [위, 아래] — 8분음표 박자(den 8)면 책처럼 12/8 (v437) */
+export const timeSig = (song, beats) => (song && song.den === 8 ? [Math.round(beats * 2), 8] : [beats, 4]);
+/** 세는 한 박이 4분음표 몇 박인지 — 8분음표 박자는 ♩.(1.5) · 시작 전 준비 박을 곡의 박대로 센다 (v437) */
+export const pulseOf = (song) => (song && song.den === 8 ? BEAT8 : 1);
 
 /** 한 마디 글 → { groups:[{ notes:[parseNote+finger], rest, dur, tie, t }], t:박 합 } · 깨졌으면 { bad } — 박 합은 부르는 쪽이 본다 */
 function readBar(text, beats) {
@@ -185,10 +194,17 @@ export function readSong(raw) {
   if (!/^[a-z0-9_-]{1,40}$/i.test(id)) bad.push('id');
   const ko = String(raw.ko || '').trim().slice(0, 40);
   if (!ko) bad.push('이름');
-  const beats = Number(raw.beats);
-  if (![2, 3, 4].includes(beats)) bad.push('박자');
-  const bpm = Number(raw.bpm);
-  if (!(bpm >= 30 && bpm <= 240)) bad.push('빠르기');
+  // 8분음표 박자(v437 · 진우 책 Golden 12/8) — 책의 분자·♩. 빠르기를 4분음표 박으로 (BEAT8 = 8분음표 박자의 한 박이 4분음표 몇 개인지)
+  const den = raw.den == null ? 4 : Number(raw.den);
+  const tops = den === 8 ? [6, 9, 12] : [2, 3, 4];
+  const toBeats = (v) => (den === 8 ? v / 2 : v);
+  const toBpm = (v) => (den === 8 ? v * BEAT8 : v);
+  const top = Number(raw.beats);
+  if (![4, 8].includes(den) || !tops.includes(top)) bad.push('박자');
+  const beats = toBeats(top);
+  const bookBpm = Number(raw.bpm);
+  if (!(bookBpm >= 30 && bookBpm <= 240)) bad.push('빠르기');
+  const bpm = toBpm(bookBpm);
   const R = Array.isArray(raw.right) ? raw.right : null;
   const L = Array.isArray(raw.left) ? raw.left : null;
   if (!R || !L || !R.length || R.length !== L.length || R.length > MAX_BARS) bad.push('마디 수');
@@ -211,8 +227,8 @@ export function readSong(raw) {
       for (const [k, v] of Object.entries(raw.meter)) {
         const num = Number(k);
         const val = Number(v);   // 빠르기 바꿈처럼 글자 "4"도 숫자로 (Codex 208차)
-        if (!inBars(num, f + 1, last) || ![2, 3, 4].includes(val)) { bad.push('박자 바꿈'); break; }
-        meter[num] = val;
+        if (!inBars(num, f + 1, last) || !tops.includes(val)) { bad.push('박자 바꿈'); break; }
+        meter[num] = toBeats(val);
       }
       for (let b = 0, cur = beats; b < n; b += 1) { if (meter[b + f]) cur = meter[b + f]; meters[b] = cur; }
     }
@@ -226,7 +242,7 @@ export function readSong(raw) {
       for (const [k, v] of Object.entries(raw.tempo)) {
         const num = Number(k);
         if (!inBars(num, f + 1, last) || !(Number(v) >= 30 && Number(v) <= 240)) { bad.push('빠르기 바꿈'); break; }
-        at[num] = Number(v);
+        at[num] = toBpm(Number(v));
       }
       bpms = Array(n);
       for (let b = 0, cur = bpm; b < n; b += 1) { if (at[b + f]) cur = at[b + f]; bpms[b] = cur; }
@@ -328,7 +344,7 @@ export function readSong(raw) {
   return {
     ok: true,
     song: {
-      id, ko, by: String(raw.by || '').slice(0, 40), from: String(raw.from || '').slice(0, 120), bpm, beats, n, lines, segno, fine, ds,
+      id, ko, by: String(raw.by || '').slice(0, 40), from: String(raw.from || '').slice(0, 120), bpm, beats, den, n, lines, segno, fine, ds,
       pickup, first: f, lens, meters, meter, bpms, play, repeats, endings, ottava, chords, dyn, bars,
     },
   };
@@ -401,6 +417,36 @@ export function perform(song, line = -1) {
   notes.sort((a, b) => a.t - b.t || a.midi - b.midi);
   heads.sort((a, b) => a.t - b.t);
   return { bars, notes, heads, end: at };
+}
+
+/** 셋잇단으로 보는 길이 — 16분·8분·4분·2분 셋잇단 1/6·1/3·2/3·4/3박만(0.333·0.334도) (v437 · 16분 셋잇단은 Codex 243차) */
+const isTriplet = (dur) => {
+  const m = Math.round(dur * 6);
+  return [1, 2, 4, 8].includes(m) && Math.abs(dur * 6 - m) < 0.04;
+};
+/** 그릴 음표 모양의 길이 — 셋잇단은 셋이 둘 자리라 1.5배(1/3 → 8분 · 2/3 → 4분 · 4/3 → 2분 · 1/6 → 16분) (v437 Codex 243차) */
+export const shownDur = (dur) => (isTriplet(dur) ? Math.round(dur * 6) / 4 : dur);
+
+/**
+ * 셋잇단 묶음 (v437 — 진우 새 책의 셋잇단에 책처럼 작은 3을 그리려고) · 순수
+ * 손마다 셋잇단 길이 머리(쉼표도)가 이어져 합이 반 박의 배수(16분 셋 0.5 · 8분 셋 1 · 4분 셋 2)가 되면 한 묶음 · 다른 길이가 끼면 모으던 것을 버린다
+ * (한 손의 머리는 마디를 빈틈없이 채우므로 차례만 보면 된다)
+ * @returns {Array<Array<head>>} perform().heads의 머리 그대로
+ */
+export function tripletGroups(heads) {
+  const out = [];
+  for (const hand of ['R', 'L']) {
+    let run = [];
+    let sum = 0;
+    for (const h of heads) {
+      if (h.hand !== hand) continue;
+      if (!isTriplet(h.dur)) { run = []; sum = 0; continue; }
+      run.push(h);
+      sum += h.dur;
+      if (Math.abs(sum * 2 - Math.round(sum * 2)) < 0.04) { out.push(run); run = []; sum = 0; }
+    }
+  }
+  return out;
 }
 const bar = (gs) => (Array.isArray(gs) ? gs : []);
 

@@ -29,7 +29,7 @@
 //   몫이 찬 그 자리에서 바로 잡기(catch.openCatch — 가방의 볼 · 한 번 던지기 · 못 잡으면 그 기회 끝) · 안 던지고 닫았거나 밀린 기회는
 //   곡 목록·무대의 「🎯 음악 포켓몬 잡기」 단추로(숫자 없음) · 국어 runKorCatch와 같은 안전(띄우기 전 빼기 · 판정 때 장부 줄 지우기 · 안 던지면 돌려주기) · 🐾 안내 판 5
 import { setScene } from './blackbox.js';
-import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON,
+import { perform, stepsOf, keyWindow, whiteIdx, isBlack, midiOfWhite, solOf, goodPass, nextHint, slotsOf, pressKind, barNum, timeSig, pulseOf, tripletGroups, shownDur, endingShape, bpmAt, secsOf, LEVELS, SPEED, NOTES_PER_MON,
   TAPS_PER_MON, beatScore, beatGrade, GRADE_DAILY, STALL, MUTE, SLOW, dayKeyOf, playKeysH, pickMusicCands, CANDS } from './piano.js';
 import { allSongs, syncSongs, saveMidiCheck } from './pianosongs.js';
 import { pianoTap, pianoListen, pianoNow, pianoMonsDue, pianoTakeThrow, pianoGiveBackThrow, pianoJudged, pianoThrowsLeft, caughtCount, rarityOf, catchAttempt, inventory, getLevelInfo, isTired, getLook } from './xp.js';
@@ -44,6 +44,8 @@ const $ = (id) => document.getElementById(id);
 const FONT = '"NotoMusicSub", "Noto Music", "Segoe UI Symbol", serif';
 const COLOR = { R: '#ff5c95', L: '#3fa6f0' };
 const RGB = { R: '255,92,149', L: '63,166,240' };
+/** 점을 찍는 길이(4분음표 박) — 점8분 · 점4분 · 점2분 · 점온(12/8 한 마디 · v437) */
+const DOTTED = [0.75, 1.5, 3, 6];
 const LEAD = 4;      // 시작 전 준비 박
 const PREF_KEY = 'shincoach.pianoPrefs';
 const HAND_KO = { R: '오른손', L: '왼손', B: '양손' };
@@ -215,7 +217,7 @@ const isPlayer = (s) => S.mode === 'tap' && (S.hands === 'B' || s.hand === S.han
 const focusHand = (hand) => S.hands === 'B' || hand === S.hands;
 
 function toStart() {
-  S.t = -LEAD;
+  S.t = -LEAD * pulseOf(S.song);
   S.steps = S.mode === 'tap' ? stepsOf(S.perf, S.hands).map((s) => ({ t: s.t, need: s.need, got: new Set() })) : [];
   S.si = 0; S.waiting = false; S.ok = 0; S.bad = 0; S.passStall = 0; S.passMute = 0;
   S.sounding.clear(); S.flash.clear();
@@ -226,7 +228,9 @@ function toStart() {
 function advance(db) {
   const t0 = S.t;
   let t1 = t0 + db;
-  for (let k = Math.ceil(t0); k <= -1; k += 1) if (k >= t0 && k < t1) click(k === -LEAD);
+  // 준비 박 딸깍 — 곡의 박마다(12/8은 ♩.마다 · v437)
+  const pl = pulseOf(S.song);
+  for (let k = Math.ceil(t0 / pl); k <= -1; k += 1) if (k * pl >= t0 && k * pl < t1) click(k === -LEAD);
   if (S.mode === 'tap') {
     const st = S.steps[S.si];
     if (st && t1 >= st.t) {
@@ -587,6 +591,50 @@ function glyph(ch, x, y, size, color, align = 'center') {
   ctx.fillText(ch, x, y);
 }
 
+/** 꼬리가 위로 — 머리들 가운데가 가운데 줄보다 낮으면 (셋잇단 3도 같은 쪽 끝을 본다) */
+function stemUp(h) {
+  const avg = h.notes.reduce((a, n) => a + n.d, 0) / h.notes.length;
+  return avg < (h.hand === 'R' ? 34 : 22);
+}
+
+/** 셋잇단 3 (v437) — 오른손은 묶음 위 · 왼손은 아래 · 위로 뻗은 꼬리(왼손은 아래로)면 꼬리 끝 너머 · 책은 3을 적는데 앱은 8분 꼬리만 그려 박이 헷갈렸다 */
+function tripletMark(g, grp, xOf) {
+  const s = g.s;
+  const hand = grp[0].hand;
+  const xa = xOf(grp[0].t);
+  const xb = xOf(grp[grp.length - 1].t);
+  if (xb < g.clefW - 3 * s || xa > G.W + 3 * s) return;
+  const R = hand === 'R';
+  let edge = R ? Infinity : -Infinity;
+  for (const h of grp) {
+    if (h.rest) { edge = R ? Math.min(edge, g.tTop + 0.5 * s) : Math.max(edge, g.bTop + 3.5 * s); continue; }
+    const ys = h.notes.map((n) => noteY(g, hand, n.d));
+    const up = stemUp(h);
+    edge = R ? Math.min(edge, up ? Math.min(...ys) - 3.4 * s : Math.min(...ys) - 0.6 * s)
+      : Math.max(edge, up ? Math.max(...ys) + 0.6 * s : Math.max(...ys) + 3.4 * s);
+    // 손가락 번호가 있으면 그 너머 — drawHead가 쌓는 자리와 같게 (Codex 243차)
+    const fn = h.notes.filter((n) => n.finger).length;
+    if (fn) {
+      edge = R ? Math.min(edge, Math.min(g.tTop - 1.6 * s, Math.min(...ys) - 1.6 * s) - (fn - 1) * 1.25 * s - 0.7 * s)
+        : Math.max(edge, Math.max(g.bBot + 1.8 * s, Math.max(...ys) + 1.6 * s) + (fn - 1) * 1.25 * s + 0.7 * s);
+    }
+  }
+  const last = grp[grp.length - 1];
+  ctx.save();
+  ctx.globalAlpha = last.t + last.dur <= S.t - 0.05 ? 0.42 : focusHand(hand) ? 1 : 0.5;
+  ctx.fillStyle = COLOR[hand];
+  ctx.font = `700 italic ${Math.max(11, s * 1.3)}px Georgia, serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // 오선 줄에 걸리면 흐려 보여 종이 색 테두리를 먼저
+  ctx.strokeStyle = '#fbfaf6';
+  ctx.lineWidth = Math.max(2, s * 0.35);
+  ctx.lineJoin = 'round';
+  ctx.strokeText('3', (xa + xb) / 2, R ? edge - 0.8 * s : edge + 0.8 * s);
+  ctx.fillText('3', (xa + xb) / 2, R ? edge - 0.8 * s : edge + 0.8 * s);
+  ctx.restore();
+}
+
 function drawHead(g, h, x, now) {
   const s = g.s;
   const hand = h.hand;
@@ -594,10 +642,14 @@ function drawHead(g, h, x, now) {
   const isFocus = focusHand(hand);
   const past = h.t + h.dur <= S.t - 0.05;
   ctx.globalAlpha = past ? 0.42 : isFocus ? 1 : 0.5;
+  // 모양은 그릴 길이로 — 셋잇단 2/3박은 4분음표 모양 (v437 Codex 243차)
+  const look = shownDur(h.dur);
   if (h.rest) {
-    const ch = h.dur >= 4 ? '\u{1D13B}' : h.dur >= 2 ? '\u{1D13C}' : h.dur >= 1 ? '\u{1D13D}' : '\u{1D13E}';
+    const ch = look >= 4 ? '\u{1D13B}' : look >= 2 ? '\u{1D13C}' : look >= 1 ? '\u{1D13D}' : '\u{1D13E}';
     const top = hand === 'R' ? g.tTop : g.bTop;
     glyph(ch, x, top + 3.1 * s, s * 3.2, '#3a3f4b');
+    // 점쉼표 — 12/8 곡(v437)은 점4분·점2분 쉼표가 흔하다 · 점이 없으면 박이 짧아 보였다 · 한 마디 내내 쉼(6박)은 책처럼 온쉼표만
+    if (DOTTED.some((v) => v < 4 && Math.abs(h.dur - v) < 1e-6)) { ctx.beginPath(); ctx.arc(x + s * 1.3, top + 1.5 * s, s * 0.2, 0, Math.PI * 2); ctx.fill(); }
     ctx.globalAlpha = 1;
     return;
   }
@@ -612,9 +664,8 @@ function drawHead(g, h, x, now) {
       for (const n of h.notes) { ctx.beginPath(); ctx.arc(x, noteY(g, hand, n.d), s * 1.4, 0, Math.PI * 2); ctx.fill(); }
     }
   }
-  const avg = h.notes.reduce((a, n) => a + n.d, 0) / h.notes.length;
-  const up = avg < (hand === 'R' ? 34 : 22);
-  const open = h.dur >= 2;
+  const up = stemUp(h);
+  const open = look >= 2;
   const okNow = h.okAt && now - h.okAt < 600;
   for (const n of h.notes) {
     ledger(g, hand, n.d, x);
@@ -628,14 +679,14 @@ function drawHead(g, h, x, now) {
     if (open) { ctx.lineWidth = s * 0.2; ctx.strokeStyle = c; ctx.stroke(); } else { ctx.fillStyle = c; ctx.fill(); }
     ctx.restore();
     if (n.acc) glyph(n.acc > 0 ? '♯' : '♭', x - s * 1.6, y + s * 0.7, s * 2.1, col);
-    if ([0.75, 1.5, 3].some((v) => Math.abs(h.dur - v) < 1e-6)) {
+    if (DOTTED.some((v) => Math.abs(h.dur - v) < 1e-6)) {
       ctx.fillStyle = col;
       ctx.beginPath();
       ctx.arc(x + s * 1.05, y - (n.d % 2 === 0 ? s * 0.5 : 0), s * 0.17, 0, Math.PI * 2);
       ctx.fill();
     }
   }
-  if (h.dur < 4 - 1e-6) {
+  if (look < 4 - 1e-6) {
     const ys = h.notes.map((n) => noteY(g, hand, n.d));
     const sx = up ? x + s * 0.6 : x - s * 0.6;
     const y0 = up ? Math.max(...ys) : Math.min(...ys);
@@ -643,7 +694,7 @@ function drawHead(g, h, x, now) {
     ctx.strokeStyle = col;
     ctx.lineWidth = Math.max(1.2, s * 0.13);
     ctx.beginPath(); ctx.moveTo(sx, y0); ctx.lineTo(sx, y1); ctx.stroke();
-    const flags = h.dur <= 0.25 + 1e-6 ? 2 : h.dur <= 0.75 + 1e-6 ? 1 : 0;
+    const flags = look <= 0.25 + 1e-6 ? 2 : look <= 0.75 + 1e-6 ? 1 : 0;
     const dir = up ? 1 : -1;
     for (let f = 0; f < flags; f += 1) {
       const fy = y1 + dir * f * s * 0.9;
@@ -792,7 +843,8 @@ function drawSheet(now) {
     if (mt) {
       ctx.textAlign = 'center';
       ctx.font = `800 ${s * 1.9}px Georgia, serif`;
-      for (const top of [g.tTop, g.bTop]) { ctx.fillText(String(mt), x0 - 0.9 * s, top + 1.75 * s); ctx.fillText('4', x0 - 0.9 * s, top + 3.75 * s); }
+      const [mtTop, mtBot] = timeSig(S.song, mt);
+      for (const top of [g.tTop, g.bTop]) { ctx.fillText(String(mtTop), x0 - 0.9 * s, top + 1.75 * s); ctx.fillText(String(mtBot), x0 - 0.9 * s, top + 3.75 * s); }
       ctx.font = `700 italic ${Math.max(10, s * 1.05)}px Georgia, serif`;
       ctx.textAlign = 'right';
     }
@@ -820,6 +872,9 @@ function drawSheet(now) {
     if (x < g.clefW - 3 * s || x > G.W + 3 * s) continue;
     drawHead(g, h, x, now);
   }
+  // 셋잇단 3 — 묶음은 연주판마다 한 번 (v437)
+  if (!S.perf.tri) S.perf.tri = tripletGroups(S.perf.heads);
+  for (const grp of S.perf.tri) tripletMark(g, grp, xOf);
   ctx.restore();
   glyph('\u{1D11E}', 20 + s * 2.4, g.tTop + 3.0 * s, s * 4.4, '#2a2f3c');
   glyph('\u{1D122}', 20 + s * 2.4, g.bTop + 2.9 * s, s * 4.1, '#2a2f3c');
@@ -831,7 +886,8 @@ function drawSheet(now) {
   // 박자가 바뀌는 곡은 지금 치는 마디의 박자로 (v403)
   const here = S.perf.bars.find((b) => S.t < b.at + b.len) || S.perf.bars[S.perf.bars.length - 1];
   const nowBeats = here && Array.isArray(S.song.meters) ? S.song.meters[here.src] : S.song.beats;
-  for (const top of [g.tTop, g.bTop]) { ctx.fillText(String(nowBeats), tsX, top + 1.05 * s); ctx.fillText('4', tsX, top + 3.0 * s); }
+  const [tsTop, tsBot] = timeSig(S.song, nowBeats);
+  for (const top of [g.tTop, g.bTop]) { ctx.fillText(String(tsTop), tsX, top + 1.05 * s); ctx.fillText(String(tsBot), tsX, top + 3.0 * s); }
 }
 
 function drawBars() {
@@ -981,7 +1037,7 @@ function draw(now) {
   ctx.textBaseline = 'bottom';
   const fxOn = !!S.fx && now - S.fx.at < FX_MS;
   if (S.running && S.t < 0 && !fxOn) {
-    const n = Math.ceil(-S.t);
+    const n = Math.ceil(-S.t / pulseOf(S.song));
     const cy = S.lv === 1 ? (G.barsTop + G.keysTop) / 2 : G.sheetH / 2;
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
     ctx.textAlign = 'center';
@@ -995,7 +1051,7 @@ function draw(now) {
     ctx.font = '600 13px "Noto Sans KR", sans-serif';
     ctx.fillText('기다릴게요 — 천천히 찾아봐요', G.W - 14, G.mapY - 6);
   } else if (!S.running && !fxOn) {
-    if (S.t > -LEAD + 1e-6 || S.si > 0) drawPaused(); // 판 도중에 멈췄다 — 고장이 아니라 멈춤인 것이 보이게 (v413)
+    if (S.t > -LEAD * pulseOf(S.song) + 1e-6 || S.si > 0) drawPaused(); // 판 도중에 멈췄다 — 고장이 아니라 멈춤인 것이 보이게 (v413)
     else {
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
       ctx.font = '700 14px "Noto Sans KR", sans-serif';
