@@ -26,6 +26,12 @@
 //    (가구와 함께 옮겨 다니고, 집과 같은 쪽으로 합쳐진다) · 받은/꺼낸 휴식 id는 profile.restsDone(합집합) — houseOf가 지운다
 //  · 맡겨 둔 휴식 house.parked = [rest…] — 방이 줄어든 백업과 합쳐져 쉬던 캡슐이 서랍으로 가도 휴식은 버리지 않는다(Codex 47차 #1).
 //    빈 캡슐이 놓여 있으면 거기로 옮겨 이어 쉬고, 없으면 서랍의 캡슐을 다시 놓을 때 이어진다(houseOf·placeRule)
+// 🪜 계단 (v435 · 2026-11-21 진우 「1층에서 2층으로 올라가는 계단 · 캐릭터가 올라가는 모션」 → 아버님 시안 「이대로」):
+//  · 🏗️ 2층이 있으면 공짜로 생긴다 — 1층 맨 뒤 줄(y 0) 바닥 두 칸 + 그 위 벽 두 칸 · 2층 같은 자리 바닥 두 칸은 계단 구멍
+//    (가구·캐릭터·파트너·손님이 그 칸에 못 선다 — houseOf가 방마다 room.stair를 붙이고 takenCells가 막는다)
+//  · 저장 = house.stair (계단 왼쪽 칸 x · 숫자 하나) — 집과 함께 같은 쪽으로 합쳐진다. 없거나 깨졌으면 읽을 때
+//    가구가 가장 적게 걸리는 자리를 고른다(autoStairX · 걸린 가구는 서랍으로) → 처음 열 때 stairStartRule이 저장하고 알려 준다
+//  · 캐릭터가 층을 옮기는 길은 계단뿐(avatar.avatarFloorRule) — 위 [1층]·[2층] 탭은 그 층을 보기만 한다
 
 /** 방 크기 — 바닥 W × H칸, 벽 WALL칸 */
 export const ROOM = { W: 8, H: 6, WALL: 8 };
@@ -55,6 +61,8 @@ export const CUSHION = 'f_cushion';
  *  (Codex 45차 #3: 깨진 백업의 아주 큰 번호로 두 번 놓으면 둘 다 "놓았어요"인데 번호가 겹쳐 하나가 사라졌다) */
 export const SEQ_MAX = 1e9;
 const isHouseObj = (h) => !!h && typeof h === 'object' && !Array.isArray(h);
+/** 🪜 계단 너비(칸) — 1층은 바닥·벽 STAIR_W칸씩, 2층은 바닥 STAIR_W칸(구멍) */
+export const STAIR_W = 2;
 
 /**
  * 가구 — id는 'f_'로 시작 · w = 차지하는 칸(가로) · at = 'floor' 바닥 | 'wall' 벽 · group = small 소품 | furn 가구 | device 기기
@@ -215,8 +223,8 @@ function inRoom(size, def, x, y, r = 0) {
   if (turnOf(def, r) === 1) return x >= 0 && y >= 0 && x < size.W && y + def.w <= size.H;
   return x >= 0 && y >= 0 && x + def.w <= size.W && y < size.H;
 }
-/** 방에서 차지한 칸 (skipU는 빼고 — 옮길 때 제자리와 겹쳐도 되게) · 🧑 캐릭터가 설 빈 칸을 찾을 때도(avatar.js) · 🔄 세로 가구는 세로 칸 */
-export function takenCells(room, skipU) {
+/** 가구가 차지한 칸만 (계단 칸은 빼고 — 계단을 옮길 자리를 볼 때) */
+function itemCells(room, skipU) {
   const set = new Set();
   for (const it of room.items) {
     if (it.u === skipU) continue;
@@ -224,6 +232,54 @@ export function takenCells(room, skipU) {
     if (d) for (const c of cellsOf(d, it.x, it.y, it.r)) set.add(c);
   }
   return set;
+}
+/** 🪜 계단이 막는 칸 — 1층(FIRST_ROOM)은 맨 뒤 줄 바닥 + 그 위 벽 · 2층은 맨 뒤 줄 바닥(구멍) · x = 왼쪽 칸 */
+export function stairCells(roomId, x) {
+  const out = [];
+  for (let i = 0; i < STAIR_W; i++) {
+    out.push(`${x + i},0`);
+    if (roomId === FIRST_ROOM) out.push(`w:${x + i}`);
+  }
+  return out;
+}
+/** 방에서 차지한 칸 (skipU는 빼고 — 옮길 때 제자리와 겹쳐도 되게) · 🧑 캐릭터가 설 빈 칸을 찾을 때도(avatar.js) · 🔄 세로 가구는 세로 칸 ·
+ *  🪜 계단 칸도(houseOf가 붙인 room.stair — 가구·캐릭터·파트너·손님이 계단 위에 서지 않게) */
+export function takenCells(room, skipU) {
+  const set = itemCells(room, skipU);
+  if (Number.isInteger(room.stair)) for (const c of stairCells(room.id, room.stair)) set.add(c);
+  return set;
+}
+/** 🪜 저장된 계단 자리가 바른가 — 방 안의 정수 x면 그 x, 아니면 null */
+function stairXOf(raw, size) {
+  return Number.isInteger(raw) && raw >= 0 && raw + STAIR_W <= size.W ? raw : null;
+}
+/** 🪜 그 자리(x)에 계단을 놓을 수 있나 (순수) — 방마다 계단 칸에 가구가 없어야 (h = houseOf 결과 · 지금 계단 칸은 셈에서 뺀다) */
+export function canStair(size, h, x) {
+  if (!size || !h || stairXOf(x, size) === null) return false;
+  return h.rooms.every((r) => {
+    const t = itemCells(r);
+    return stairCells(r.id, x).every((c) => !t.has(c));
+  });
+}
+/** 🪜 저장된 계단이 없을 때 고르는 자리 (순수) — 계단 칸에 걸리는 가구가 가장 적은 x(쉬는 💊 캡슐은 많이 센다) · 같으면 오른쪽 */
+function autoStairX(h, size) {
+  let best = null;
+  for (let x = size.W - STAIR_W; x >= 0; x--) {
+    let cost = 0;
+    for (const r of h.rooms) {
+      const keys = new Set(stairCells(r.id, x));
+      for (const it of r.items) {
+        const d = furnById(it.id);
+        if (d && cellsOf(d, it.x, it.y, it.r).some((c) => keys.has(c))) cost += it.rest ? 100 : 1;
+      }
+    }
+    if (!best || cost < best.cost) best = { x, cost };
+  }
+  return best ? best.x : null;
+}
+/** 🪜 계단 앞 칸 — 그 층에 내려서서 처음 밟는 칸. 1층은 계단 발치(왼쪽 칸 앞), 2층은 구멍의 높은 쪽(오른쪽 칸 앞) */
+export function stairExit(roomId, x) {
+  return roomId === FIRST_ROOM ? { x, y: 1 } : { x: x + STAIR_W - 1, y: 1 };
 }
 /** 그 자리에 놓을 수 있나 — 방 안이고 다른 가구와 겹치지 않으면 (화면이 끄는 동안 빨갛게 보일지 정할 때도 쓴다)
  *  size는 맨 앞 — 넓힌 집에서 크기를 빠뜨리면 조용히 8 × 6으로 재지 않고 바로 틀리게 */
@@ -242,7 +298,24 @@ export function canPlace(size, room, id, x, y, skipU, r = 0) {
 export function houseOf(profile) {
   const src = profile && isHouseObj(profile.house) ? profile.house : null;
   const shape = houseShape(profile);
+  if (shape.rooms.length < 2) return buildHouse(profile, shape, src, null);
+  // 🪜 2층이 있으면 계단 — 저장된 자리, 없거나 깨졌으면 가구가 가장 적게 걸리는 자리(계단 없이 한 번 지어 보고 고른다)
+  const saved = src ? stairXOf(src.stair, shape.size) : null;
+  if (saved !== null) return buildHouse(profile, shape, src, saved);
+  return buildHouse(profile, shape, src, autoStairX(buildHouse(profile, shape, src, null), shape.size));
+}
+
+/** 🪜 저장된 계단 자리가 있나 (순수) — 없으면 화면이 처음 열 때 stairStartRule로 저장하고 「계단이 생겼어요」를 알린다 */
+export function stairSaved(profile) {
+  const shape = houseShape(profile);
+  return shape.rooms.length > 1 && !!profile && isHouseObj(profile.house) && stairXOf(profile.house.stair, shape.size) !== null;
+}
+
+/** houseOf의 몸통 — stairX가 숫자면 그 자리에 계단(방마다 room.stair · 집에 stair)을 먼저 두고 가구를 고쳐 읽는다(계단 칸의 가구는 서랍으로) */
+function buildHouse(profile, shape, src, stairX) {
   const out = { ...emptyHouse(), rooms: shape.rooms.map(emptyRoom) };
+  const withStair = (room) => { if (stairX !== null) room.stair = stairX; return room; };
+  if (stairX !== null) { out.rooms.forEach(withStair); out.stair = stairX; }
   if (!src) return out;
   out.started = !!src.started;
   const seqRaw = src.seq === undefined || src.seq === null ? 0 : Number(src.seq);
@@ -259,7 +332,7 @@ export function houseOf(profile) {
   for (const id of shape.rooms) if (!seen.has(id)) fixed.push(emptyRoom(id));
   fixed.sort((a, b) => shape.rooms.indexOf(a.id) - shape.rooms.indexOf(b.id));
   out.rooms = fixed.map((r) => {
-    const room = emptyRoom(r.id);
+    const room = withStair(emptyRoom(r.id));
     const paint = (part) => {
       const id = r[part];
       const d = typeof id === 'string' ? paintById(id) : null;
@@ -508,4 +581,39 @@ export function paintRule(profile, roomId, part, id) {
   room[part] = id || '';
   profile.house = h;
   return { ok: true };
+}
+
+/** 🪜 계단 옮기기 (v435) — 두 층 모두 그 자리(1층 바닥 두 칸·벽 두 칸 · 2층 바닥 두 칸)에 가구가 없어야 · 캐릭터·파트너는 읽을 때 비켜 선다
+ *  why: 'room' 계단이 없음(2층 전) · 'spot' 방 밖이거나 가구가 있음 */
+export function stairMoveRule(profile, x) {
+  const h = houseOf(profile);
+  if (!Number.isInteger(h.stair)) return { ok: false, why: 'room' };
+  if (!canStair(houseShape(profile).size, h, x)) return { ok: false, why: 'spot' };
+  h.stair = x;
+  for (const r of h.rooms) r.stair = x;
+  profile.house = h;
+  return { ok: true };
+}
+
+/**
+ * 🪜 처음 계단 (v435) — 저장된 자리가 없으면 읽을 때 고른 자리를 저장한다(한 번 — 화면이 「🪜 계단이 생겼어요」).
+ * moved = 계단 때문에 서랍으로 간 가구 id(계단 없이 지은 집에서 놓인 차례) — 가구마다 「계단 없이 놓인 수 − 계단과 놓인 수」만큼.
+ * (자리로 견주면 틀렸다: 가진 수보다 많이 놓인 집에서 계단 자리의 의자가 빠지면 넘쳐 빠지던 다른 자리 의자가 들어와, 방에 있는 의자를 「서랍에 넣었어요」라고 했다)
+ * why: 'room' 2층 전 · 'already' 이미 저장됨
+ */
+export function stairStartRule(profile) {
+  const shape = houseShape(profile);
+  if (shape.rooms.length < 2) return { ok: false, why: 'room' };
+  if (stairSaved(profile)) return { ok: false, why: 'already' };
+  const src = profile && isHouseObj(profile.house) ? profile.house : null;
+  const h = houseOf(profile);
+  const before = buildHouse(profile, shape, src, null);
+  const count = (hh) => { const c = {}; for (const r of hh.rooms) for (const i of r.items) c[i.id] = (c[i.id] || 0) + 1; return c; };
+  const left = count(before);
+  const now = count(h);
+  for (const id of Object.keys(left)) left[id] -= now[id] || 0;
+  const moved = [];
+  for (const r of before.rooms) for (const i of r.items) if (left[i.id] > 0) { left[i.id] -= 1; moved.push(i.id); }
+  profile.house = h;
+  return { ok: true, x: h.stair, moved };
 }

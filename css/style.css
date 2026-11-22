@@ -3385,6 +3385,35 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .house-pal-img.is-emoji { width: auto; height: auto; font-size: calc(var(--cell) * 0.8); line-height: 1; }
 .house-ghost.is-me svg { display: block; width: 100%; height: auto; }
 .house-me-card { margin-bottom: 2px; }
+/* 🪜 계단 (v435 — 진우 「계단을 캐릭터가 올라가는 모션」 · 아버님 시안 「이대로」) — 1층 계단(벽 + 맨 뒤 줄 두 칸) · 2층 계단 구멍(맨 뒤 줄 두 칸) ·
+   앞 그림(난간)은 평소엔 계단과 같은 앞뒤(10), 오르내리는 동안(is-up)은 계단 위 캐릭터 앞(11 — 앞줄 가구보다는 뒤) */
+.house-stair { position: absolute; touch-action: none; cursor: grab; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+.house-stair svg, .house-stair-front svg, .house-ghost.is-stair svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.house-stair.is-sel { outline: 3px dashed var(--primary); outline-offset: -2px; }
+.house-stair.is-lifted, .house-stair.is-lifted + .house-stair-front { opacity: 0.35; }
+.house-stair:focus-visible { outline: 3px solid #4dabf7; outline-offset: -2px; }
+.house-stair-front { position: absolute; pointer-events: none; }
+.house-stair-front.is-up { z-index: 11 !important; }
+.house-ghost.is-stair { opacity: 0.9; }
+/* 오르내리는 「배우」(stairview.js) — 방과 같은 크기의 덧칸에 하나씩 · 덧칸을 잘라(clip-path) 천장 너머·구멍 아래 몸을 가린다 */
+.house-climb { position: absolute; inset: 0; pointer-events: none; }
+.house-climb-actor { position: absolute; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; will-change: transform; }
+/* 🚶 걷는 동안 몸이 좌우로 흔들리며 통통 — 놀러 갈 때(walk)도 · 왼쪽으로 가면 몸을 돌린다(배우만) */
+.house-me-art { transform-origin: 50% 96%; }
+.house-pal-img { transform-origin: 50% 96%; }
+.is-walk > .house-me-art { animation: house-waddle 0.3s ease-in-out infinite alternate; }
+.is-walk > .house-pal-img { animation: house-waddle-pal 0.3s ease-in-out infinite alternate; }
+.house-climb-actor.is-left > .house-me-art { transform: translateX(-50%) scaleX(-1); }
+.house-climb-actor.is-left > .house-pal-img { transform: scaleX(-1); }
+.house-climb-actor.is-left.is-walk > .house-me-art { animation-name: house-waddle-left; }
+.house-climb-actor.is-left.is-walk > .house-pal-img { animation-name: house-waddle-pal-left; }
+@keyframes house-waddle { from { transform: translateX(-50%) rotate(-6deg); } to { transform: translateX(-50%) translateY(-4%) rotate(6deg); } }
+@keyframes house-waddle-left { from { transform: translateX(-50%) scaleX(-1) rotate(-6deg); } to { transform: translateX(-50%) translateY(-4%) scaleX(-1) rotate(6deg); } }
+@keyframes house-waddle-pal { from { transform: rotate(-6deg); } to { transform: translateY(-4%) rotate(6deg); } }
+@keyframes house-waddle-pal-left { from { transform: scaleX(-1) rotate(-6deg); } to { transform: translateY(-4%) scaleX(-1) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .is-walk > .house-me-art, .is-walk > .house-pal-img { animation: none !important; }
+}
 .closet { display: grid; grid-template-columns: minmax(0, 230px) minmax(0, 1fr); gap: 12px; align-items: start; }
 .closet-intro { grid-column: 1 / -1; }
 .closet-mirror { position: sticky; top: 0; display: grid; justify-items: center; gap: 8px; padding: 10px; border: 1px solid #ecdfc8; border-radius: 14px; background: #fffaf2; }

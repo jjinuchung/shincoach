@@ -18,7 +18,7 @@
 //   남은 시간 · ⏏️ 꺼내기(두 번 — 보상 없음) · 다 쉬면 캡슐을 눌러 ✨ 받기 · 깜짝 진화면 진우가 갈래를 고르거나 그대로 둔다. 규칙은 rest.js
 // 🔍 Codex 46차 #1: 다른 창에서 돌아와 프로필을 다시 읽으면(app.js visibilitychange) 열린 집을 새로 그린다 — 화면은 옛 2층 10 × 7인데
 //   누르면 새 1층 8 × 6으로 셈해 다른 칸·다른 층에 놓였다. 그린 모양(ui.drawn)과 지금 모양이 다르면 놓기·끌기·칠하기·도구는 하지 않고 다시 그린다(stale)
-import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, turnRule, canTurn, turnOf, storeRule, paintRule, restsOf } from './house.js';
+import { FURN, PAINT, GROW, PAINT_BASE, FIRST_ROOM, SECOND_ROOM, FURN_MAX_2F, START_GIFT, HEAL, furnById, paintById, growById, canPlace, houseCost, houseBuyCheck, houseBuyRule, houseStartRule, placeRule, moveRule, flipRule, turnRule, canTurn, turnOf, storeRule, paintRule, restsOf, STAIR_W, canStair, stairMoveRule, stairStartRule, stairSaved, takenCells } from './house.js';
 import { houseDo, houseNow, houseLeft, houseShapeNow, coins, itemCount, stones, getProfileSnapshot, onProfileReload, profileLoading, restStart, restCancel, restClaim, ownedMonIds, monExp, houseFurnMax, hpOf, monLv, getPartner, homePlay } from './xp.js';
 import { REST_EXP, REST_MS, CAP_KO, restLeft } from './rest.js';
 import { lvMarkCrossed } from './evolve.js'; // 🎖️ 축하 레벨 (v332 · 순수)
@@ -26,7 +26,9 @@ import { showRestDone } from './restshow.js'; // ✨ 다 쉰 포켓몬 받기 �
 import { ROSTER, characterUrl, artUrl, ensureArt } from './pokemon.js';
 import { ENGLISH_STONE_HOW } from './items.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
-import { avatarOf, partnerSpot, avatarMoveRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수, 2026-10-17)
+import { avatarOf, partnerSpot, avatarMoveRule, avatarFloorRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수, 2026-10-17) · 🪜 계단으로 층 옮기기(v435)
+import { geoOf, cellFoot, stairBox, holeBox, stairBackSvg, stairFrontSvg, holeBackSvg, holeFrontSvg } from './stairart.js'; // 🪜 계단 그림·자리 (v435 · 순수)
+import { actorOf, dropActor, leave as stairLeave, arriveStart as stairArriveStart, arrive as stairArrive } from './stairview.js'; // 🪜 오르내리기 연출 (v435)
 import { avatarSvg } from './avatarart.js';
 import { closetBox, closetReset, tagOf } from './avatarview.js'; // 👕 옷장 탭
 import { syncHatMarks } from './hatmarks.js'; // 🧢 지우 모자 무늬 받기 (v293)
@@ -181,7 +183,10 @@ export function growProgress(profile, id) {
 // ───────────────────── 화면 ─────────────────────
 
 // tab: 'room' 🏠 꾸미기 | 'shop' 🛒 가구 상점 · floor: 보는 층(방 id) · buyArm: 한 번 누른 상점 물건(한 번 더 누르면 산다) · drawn: 그린 집 모양(shapeKey)
-const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0, hang: null, pendingPhoto: null, albumSel: '', guestSel: false, arrive: 0, drawnDay: 0 };
+const ui = { open: false, wired: false, busy: false, sel: 0, arm: '', drag: null, msg: '', onClose: null, tab: 'room', buyArm: '', floor: FIRST_ROOM, drawn: '', pick: 0, evoAsk: null, outArm: 0, tick: 0, meSel: false, bondHold: null, playRun: 0, hang: null, pendingPhoto: null, albumSel: '', guestSel: false, arrive: 0, drawnDay: 0, stairSel: false, climb: 0, climbDraw: false, stairAsked: false };
+// 🪜 (v435) stairSel: 방에서 계단(구멍)을 눌러 [⬆️ 2층으로]·[⬇️ 1층으로]가 떠 있다 · climb: 오르내리는 오르기 번호(0이면 아님 — 탭·방 누르기·다른 그리기를 받지 않는다) ·
+//   climbDraw: 오르기가 스스로 다른 층을 그리는 중 ·
+//   stairAsked: 이번에 연 집에서 처음 계단 저장(stairStartRule)을 한 번 해 봤다
 // 🐾 (v385) guestSel: 방에서 손님을 눌러 도구(같이 놀기 · 🤝 인사하기)가 떠 있다 · arrive: 방금 들어온 손님 id — 한 번만 걸어 들어오는 모습으로 그린다
 // 📸 (v384) hang: 사진을 걸 액자 { rid, u } — 📷 앨범이 「액자에 걸 사진을 골라요」로 열린다 · pendingPhoto: 앨범이 가득 차 아직 못 넣은 새 사진(진우가 뺄 사진을 고르면 넣는다)
 //   albumSel: 앨범에서 고른 사진 id(가득 찼을 때 뺄 사진)
@@ -227,6 +232,8 @@ export function openHouse(opts = {}) {
   ui.onClose = opts.onClose || null;
   ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.buyArm = ''; ui.floor = FIRST_ROOM;
   ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
+  ui.stairSel = false; ui.stairAsked = false; // 🪜 (v435)
+  if (!profileLoading()) { const sp = avatarOf(getProfileSnapshot()).spot; if (sp) ui.floor = sp.room; } // 🪜 캐릭터가 있는 층으로 연다 — 2층에 올라간 뒤 다시 열면 빈 1층이 보이지 않게 (없는 층은 roomId가 1층으로)
   ui.hang = null; ui.pendingPhoto = null; ui.albumSel = ''; // 📸 (v384)
   ui.tab = opts.tab === 'shop' || opts.tab === 'closet' || opts.tab === 'album' ? opts.tab : 'room';
   closetReset();
@@ -240,6 +247,7 @@ export function openHouse(opts = {}) {
   if (ui.tab === 'room' && !ui.msg && !profileLoading()) guestHint(); // 🐾 (v385) 손님이 없는 날 — 하루 한 번 한 줄
   render();
   guestDoor(); // 🐾 (v385) 손님이 문 앞에서 기다리면 들어온다
+  stairStart(); // 🪜 (v435) 2층이 있는데 계단 자리가 저장 안 됐으면 저장하고 「계단이 생겼어요」 (한 번)
   // 🧢 지우 모자 무늬 받기 (v293 — 비공개 저장소에서 10분에 한 번까지) · 새로 받았으면 다시 그린다
   syncHatMarks().then((changed) => { if (changed && ui.open) render(); }).catch(() => {});
 }
@@ -249,6 +257,7 @@ export function closeHouse() {
   cancelDrag();
   ui.open = false;
   ui.playRun += 1; // 🎮 걷던·보던 놀기는 여기서 끝 (💗는 저장된 대로)
+  if (ui.climb) { ui.busy = false; ui.climb = 0; } // 🪜 오르던 것도 여기서 끝 — 다시 연 집이 잠긴 채 남지 않게 (Codex 238차 #2 · 저장된 층은 그대로)
   closeGames(); // 🎮 게임기 화면도 (돌던 판은 그 자리에서 끝 — v307)
   closePlay();
   closePhotoBig(); // 📸 (v384) — 가득 찬 앨범에 못 넣은 새 사진은 닫으면 그만두기
@@ -269,14 +278,21 @@ export function isHouseOpen() {
 function onReloaded() {
   if (!ui.open) return;
   cancelDrag();
+  // 🪜 오르는 중에 다시 읽었으면 그 오르기는 그만 — 다른 창이 계단을 옮겼을 수 있다(옛 자리로 오지 않게) · 캐릭터가 저장된 층을 그린다 (Codex 238차 #1)
+  if (ui.climb) {
+    ui.playRun += 1; ui.busy = false; ui.climb = 0;
+    const sp = avatarOf(getProfileSnapshot()).spot;
+    if (sp) ui.floor = sp.room;
+  }
   const moved = ui.drawn && ui.drawn !== shapeKey();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false; ui.stairSel = false;
   ui.hang = null; ui.albumSel = ''; // 📸 걸려던 액자는 바뀐 집에서 다시 고르게 (못 넣은 새 사진은 그대로)
   closetReset();
   ui.floor = roomId();
   if (moved) ui.msg = WHY.changed;
   render();
+  if (ui.tab === 'room') stairStart(); // 🪜 집을 열 때 읽는 중이라 못 했으면 지금 (한 번)
 }
 
 /** 그린 집과 지금 집 모양이 다르면 그대로 하지 않고 다시 그린다 — 옛 화면의 자리·층으로 놓지 않게 (Codex 46차 #1) · 읽는 중이면 아무것도 안 한다 */
@@ -285,7 +301,7 @@ function stale() {
   if (ui.drawn === shapeKey()) return false;
   cancelDrag();
   ui.sel = 0; ui.arm = ''; ui.buyArm = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false; ui.stairSel = false;
   ui.floor = roomId();
   ui.msg = WHY.changed;
   render();
@@ -320,11 +336,13 @@ function sizeRoom() {
     const w = r.clientWidth;
     const half = t.offsetWidth / 2 + 4;
     t.style.left = `${Math.min(w - half, Math.max(half, (Number(t.dataset.cx) / 100) * w))}px`;
+    // 🪜 2층 구멍 위 단추 — 좁은 화면(390폭)에선 벽이 낮아 방 위 끝에 잘린다 → 단추 높이만큼은 내려 둔다 (v435)
+    if (t.classList.contains('is-stair') && !t.classList.contains('is-below')) t.style.top = `${Math.max((Number(t.dataset.top) / 100) * r.clientHeight, t.offsetHeight * 1.1 + 2)}px`;
   }
 }
 
 function render() {
-  if (!ui.open || profileLoading()) return; // 다시 읽는 중엔 메모리 프로필이 비어 있다 — 다 읽으면 onReloaded가 그린다
+  if (!ui.open || profileLoading()) return; if (ui.climb && !ui.climbDraw) return; // 다시 읽는 중엔 메모리 프로필이 비어 있다 — 다 읽으면 onReloaded가 그린다 · 🪜 오르는 중엔 연출이 그린다(끝나면 다시 그림 — 모자 무늬 받기 같은 다른 그리기가 배우를 떼어 내지 않게)
   ui.drawn = shapeKey();
   if (ui.drag) cancelDrag(); // 끄는 도중 두 번째 손가락으로 다른 것을 눌러 다시 그리면 그 끌기는 없던 일 (Codex 45차 #6 — 끌던 가구가 사라진 판에 남지 않게)
   ui.drawnDay = dayNum(Date.now()); // 🐾 그린 날 — 집을 켜 둔 채 날이 바뀌면 tickRests가 다시 그린다 (v385 · Codex 188차 #1)
@@ -369,15 +387,17 @@ function renderTabs() {
   }
 }
 function goTab(key, floor) {
+  if (ui.climb) return; // 🪜 오르내리는 동안은 화면이 알아서 층을 바꾼다 (v435)
   if (ui.tab === key && (!floor || floor === roomId())) return;
   cancelDrag();
   ui.tab = key; ui.sel = 0; ui.arm = ''; ui.buyArm = ''; ui.msg = '';
-  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false;
+  ui.pick = 0; ui.evoAsk = null; ui.outArm = 0; ui.meSel = false; ui.guestSel = false; ui.stairSel = false;
   ui.hang = null; ui.pendingPhoto = null; ui.albumSel = ''; // 📸 다른 탭으로 가면 고르기는 그만두기
   closetReset();
   if (floor) ui.floor = floor;
   render();
   if (key === 'room') guestDoor(); // 🐾 상점·옷장으로 열었다가 방으로 오면 그때 들어온다 (v385)
+  if (key === 'room') stairStart(); // 🪜 2층을 막 올렸으면 계단 (v435)
 }
 
 /** 방 — 벽·바닥·놓인 가구·고른 가구의 도구 */
@@ -396,11 +416,14 @@ function roomBox() {
   floor.style.backgroundColor = (paintById(rm.floor) || PAINT_BASE.floor).color;
   box.appendChild(wall);
   box.appendChild(floor);
+  const stair = Number.isInteger(rm.stair); // 🪜 2층이 있으면 1층 계단 · 2층 계단 구멍 (v435 — 가구보다 먼저: 맨 뒤 줄)
+  if (stair) for (const e of stairEls(rm)) box.appendChild(e);
   for (const it of rm.items) box.appendChild(itemEl(it));
   // 🧑 내 캐릭터 + 🤝 파트너 — 이 방에 서 있으면 (선 칸은 avatarOf가 가구를 피해 고쳐 읽는다)
   const pf = getProfileSnapshot();
   const me = avatarOf(pf);
   const here = me.made && me.spot && me.spot.room === rm.id;
+  if (ui.stairSel && stair && here) box.appendChild(stairToolsEl(rm)); else ui.stairSel = false;
   if (here) {
     box.appendChild(meEl(me));
     const pid = getPartner();
@@ -425,11 +448,221 @@ function roomBox() {
   if (ui.arm) box.classList.add('is-arming');
   // 빈 곳을 누르면: 서랍에서 고른 가구를 거기에 놓거나, 고른 가구를 놓아준다
   box.addEventListener('click', (e) => {
-    if (e.target.closest('.house-item') || e.target.closest('.house-tools') || e.target.closest('.house-me') || e.target.closest('.house-guest')) return;
+    if (ui.climb) return; // 🪜 오르내리는 중
+    if (e.target.closest('.house-item') || e.target.closest('.house-stair') || e.target.closest('.house-tools') || e.target.closest('.house-me') || e.target.closest('.house-guest')) return;
     if (ui.arm) { placeAt(ui.arm, box.getBoundingClientRect(), e.clientX, e.clientY); return; }
-    if (ui.sel || ui.meSel || ui.guestSel) { ui.sel = 0; ui.meSel = false; ui.guestSel = false; render(); }
+    if (ui.sel || ui.meSel || ui.guestSel || ui.stairSel) { ui.sel = 0; ui.meSel = false; ui.guestSel = false; ui.stairSel = false; render(); }
   });
   return box;
+}
+
+// ───────────────────── 🪜 계단 (v435 — 진우 「계단을 캐릭터가 올라가는 모션」 · 아버님 시안 「이대로」) ─────────────────────
+
+/** 방 % 셈판 (stairart) — 지금 집 크기 */
+const geo = () => geoOf(sz(), WALL_RATIO);
+/** 🪜 1층 계단 · 2층 계단 구멍 — 뒤 그림(누르기·끌기)과 앞 그림(난간 — 오르내리는 동안 캐릭터 앞에) */
+function stairEls(rm) {
+  const up = rm.id === FIRST_ROOM;
+  const b = up ? stairBox(geo(), rm.stair) : holeBox(geo(), rm.stair);
+  const pos = { left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%`, zIndex: '10' }; // 맨 뒤 줄 가구와 같은 앞뒤
+  const back = el('div', `house-stair${up ? '' : ' is-hole'}${ui.stairSel ? ' is-sel' : ''}`);
+  back.setAttribute('role', 'button');
+  back.tabIndex = 0;
+  back.setAttribute('aria-label', up ? '계단 — 눌러서 2층으로 · 끌어서 옮겨요' : '계단 구멍 — 눌러서 1층으로 · 끌어서 옮겨요');
+  Object.assign(back.style, pos);
+  back.innerHTML = up ? stairBackSvg(rm.id) : holeBackSvg(rm.id); // 코드가 만든 그림 글뿐(아이가 쓴 글 없음)
+  back.addEventListener('pointerdown', (ev) => startDrag(ev, { kind: 'stair', id: '', src: back }));
+  back.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault();
+    stairTap();
+    // ⌨️ 다시 그린 뒤에도 초점을 잃지 않게 — 도구가 떴으면 그 단추로, 아니면 다시 그린 계단으로 (손님 단추와 같은 까닭 · Codex 188차 #2)
+    const n = document.querySelector(ui.stairSel ? '#house .house-tools.is-stair button' : '#house .house-stair');
+    if (n) { try { n.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } }
+  });
+  const front = el('div', 'house-stair-front');
+  Object.assign(front.style, pos);
+  front.innerHTML = up ? stairFrontSvg() : holeFrontSvg();
+  return [back, front];
+}
+/** 계단을 눌렀을 때 — 캐릭터가 이 층에 있으면 [⬆️ 2층으로]·[⬇️ 1층으로] · 다른 층이면 어디 있는지 · 아직 없으면 만들러 */
+function stairTap() {
+  if (ui.busy || stale()) return;
+  const me = avatarOf(getProfileSnapshot());
+  const rid = roomId();
+  const up = rid === FIRST_ROOM;
+  ui.sel = 0; ui.meSel = false; ui.guestSel = false; ui.arm = '';
+  if (!me.made) { ui.stairSel = false; ui.msg = WHY.meMade; render(); return; }
+  if (!me.spot || me.spot.room !== rid) {
+    ui.stairSel = false;
+    const name = tagOf(me.name);
+    ui.msg = up ? `🧑 ${name}${eun(name)} 2층에 있어요 — 2층 계단 구멍으로 내려와요` : `🧑 ${name}${eun(name)} 1층에 있어요 — 1층 계단으로 올라와요`;
+    render();
+    return;
+  }
+  ui.stairSel = !ui.stairSel;
+  ui.msg = !ui.stairSel ? '' : up ? '👆 [⬆️ 2층으로]를 누르면 올라가요 — 계단을 끌면 옮길 수 있어요' : '👆 [⬇️ 1층으로]를 누르면 내려가요 — 구멍을 끌면 계단을 옮길 수 있어요';
+  render();
+}
+/** 계단 도구 — 1층은 계단 아래에 [⬆️ 2층으로](위에 두면 방 위 끝에서 잘린다) · 2층은 구멍 위에 [⬇️ 1층으로](아래에 두면 막 올라온 캐릭터 얼굴을 가린다) */
+function stairToolsEl(rm) {
+  const up = rm.id === FIRST_ROOM;
+  const b = up ? stairBox(geo(), rm.stair) : holeBox(geo(), rm.stair);
+  const t = el('div', `house-tools is-stair${up ? ' is-below' : ''}`);
+  t.dataset.cx = String(b.left + b.width / 2);
+  t.dataset.top = String(up ? b.top + b.height : b.top); // sizeRoom이 좁은 화면에서 2층 단추를 방 안으로 내린다
+  Object.assign(t.style, { left: `${b.left + b.width / 2}%`, top: `${up ? b.top + b.height : b.top}%` });
+  const go = el('button', 'btn btn-primary house-tool', up ? '⬆️ 2층으로' : '⬇️ 1층으로');
+  go.type = 'button';
+  go.addEventListener('click', () => climbAt(up));
+  t.appendChild(go);
+  return t;
+}
+/**
+ * 손가락 자리 → 계단을 옮길 칸 (순수 — node 시험이 직접 부른다) · 계단은 늘 맨 뒤 줄(y 0)이라 가로 자리만 고른다 —
+ * 계단 가운데가 손가락 아래에 오게 · 방 가장자리에서는 방 안으로 당긴다 · 방 밖이면 null
+ */
+export function stairDrop(size, rect, px, py) {
+  if (!size || !rect || !(rect.width > 0)) return null;
+  const cell = rect.width / size.W;
+  const rx = px - rect.left;
+  const ry = py - rect.top;
+  if (rx < 0 || ry < 0 || rx > rect.width || ry > cell * rowsOf(size)) return null;
+  return { x: Math.min(size.W - STAIR_W, Math.max(0, Math.round(rx / cell - STAIR_W / 2))), y: 0 };
+}
+/** 🪜 처음 계단 말 (순수) — 그 자리에 있어 서랍으로 간 가구가 있으면 이름으로 (아이가 「소파가 어디 갔지?」 하지 않게) */
+export function stairHello(moved) {
+  const head = '✨ 2층으로 가는 계단이 생겼어요! 계단을 누르면 올라가요';
+  const names = [...new Set((moved || []).map((id) => furnById(id)).filter(Boolean).map((d) => `${d.emoji} ${d.ko}`))];
+  if (!names.length) return head;
+  return `${head} — 그 자리에 있던 ${names.join('·')}${eun(names[names.length - 1])} 🗄️ 서랍에 넣었어요`;
+}
+/**
+ * 🪜 처음 계단 — 2층이 있는데 계단 자리가 저장 안 됐으면 저장하고(집을 열 때 한 번) 알린다.
+ * run()을 쓰지 않는다 — 다른 창이 먼저 저장했으면(already) 「이사 선물은 벌써 받았어요」 같은 엉뚱한 말이 떴고, ui.busy를 잡아 같은 때 온 손님 띵동을 삼켰다.
+ * 됐을 때만 말하고(그새 온 띵동이 있으면 뒤에 잇는다) · 저장이 안 됐으면 다음 열기·다시 읽기에서 또 해 본다
+ */
+async function stairStart() {
+  if (!ui.open || ui.tab !== 'room' || ui.busy || ui.stairAsked || profileLoading()) return;
+  if (houseShapeNow().rooms.length < 2 || stairSaved(getProfileSnapshot())) return;
+  ui.stairAsked = true;
+  let r = null;
+  try { r = await houseDo(stairStartRule); } catch { r = null; }
+  if (!r || !r.ok) { if (!r || r.why === 'save') ui.stairAsked = false; if (ui.open && !ui.busy) render(); return; }
+  const hi = stairHello(r.moved);
+  ui.msg = ui.msg && ui.msg.startsWith('🚪') ? `${ui.msg} · ${hi}` : hi;
+  sfx.ding();
+  if (ui.open && !ui.busy) render(); else say(ui.msg);
+}
+/** 층이 바뀌는 화면 (transform·opacity만) — out: 지금 방이 d 쪽(1 아래 · -1 위)으로 빠지며 흐려진다 · in: 새 방이 반대쪽에서 들어온다 */
+const SLIDE_MS = 520;
+async function slideRoom(box, d, phase) {
+  if (phase === 'in') {
+    box.style.transition = 'none';
+    box.style.transform = `translateY(${-16 * d}%)`;
+    box.style.opacity = '0';
+    void box.offsetWidth; // 처음 자리를 그린 뒤에 움직인다
+  }
+  box.style.transition = `transform ${SLIDE_MS}ms ${phase === 'in' ? 'ease-out' : 'ease-in'}, opacity ${SLIDE_MS}ms`;
+  box.style.transform = phase === 'in' ? '' : `translateY(${16 * d}%)`;
+  box.style.opacity = phase === 'in' ? '' : '0';
+  await wait(SLIDE_MS + 40);
+  if (phase === 'in') box.style.transition = '';
+}
+/** 오르내리는 「배우」 그림 — 방의 캐릭터·파트너와 같은 꼴(.house-me-art · .house-pal-img) */
+function meActorEl(look) {
+  const e = el('div', 'is-me');
+  e.insertAdjacentHTML('beforeend', avatarSvg(look, { uid: 'climb', cls: 'house-me-art' }));
+  return e;
+}
+function palActorEl(real) {
+  const e = el('div', 'is-pal');
+  const img = real.querySelector('.house-pal-img');
+  if (img) e.appendChild(img.cloneNode(true));
+  return e;
+}
+/** 다른 층으로 가는 말 — 저장이 안 됐을 때 (가구 말과 겹치는 why는 다르게) */
+const FLOOR_WHY = { made: 'meMade', here: 'floorHere', full: 'floorFull' };
+/**
+ * 🪜 계단으로 다른 층에 — 선 칸을 먼저 저장(avatarFloorRule — 저장된 프로필로 한 트랜잭션) → 캐릭터·파트너가 걸어가 오르내리고(1층은 한 단씩 폴짝 ·
+ * 2층은 구멍으로) → 화면이 그 층으로 넘어가고 → 계단 끝에서 나와 선 칸까지 걷는다. 저장 안 함 · 집을 닫으면 그 자리에서 끝 ·
+ * 움직임 줄이기(prefers-reduced-motion)면 걷지 않고 바로 그 층
+ */
+async function climbAt(up) {
+  if (ui.busy || stale()) return;
+  sfxUnlock();
+  const pf = getProfileSnapshot();
+  const me = avatarOf(pf);
+  const from = roomId();
+  const to = up ? SECOND_ROOM : FIRST_ROOM;
+  if (!me.made) { say(WHY.meMade); return; }
+  if (!me.spot || me.spot.room !== from || from === to) return;
+  const pid = getPartner();
+  const palFrom = pid ? palHome(pf, me.spot) : null;
+  const run = ++ui.playRun;
+  // 이 오르기가 아직 이 화면의 것인가 — 집을 닫거나(closeHouse) 다시 읽으면(onReloaded) 번호가 올라 여기서 끝난다 (Codex 238차 #1·#2)
+  const live = () => ui.open && ui.playRun === run;
+  ui.busy = true; ui.climb = run;
+  ui.sel = 0; ui.meSel = false; ui.guestSel = false; ui.stairSel = false; ui.arm = '';
+  let moved = false;
+  const actors = [];
+  try {
+    let r = null;
+    try { r = await houseDo((p) => avatarFloorRule(p, to, Date.now())); } catch { r = null; }
+    if (!live()) return;
+    if (!r || !r.ok) { ui.msg = WHY[FLOOR_WHY[r && r.why] || (r && r.why)] || WHY.save; return; }
+    moved = true;
+    ui.msg = ''; // 「👆 [⬆️ 2층으로]를 누르면…」은 지운다 — 움직임 줄이기로 바로 가도 새 층에 옛 안내가 남지 않게
+    const box0 = document.querySelector('#house-body .house-room');
+    const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!box0 || calm) return; // 아래(finally)에서 그 층을 그린다
+    const tools = box0.querySelector('.house-tools');
+    if (tools) tools.remove();
+    for (const s of box0.querySelectorAll('.house-stair.is-sel')) s.classList.remove('is-sel'); // 고른 점선은 떼고 오른다
+    say(up ? '⬆️ 2층으로 올라가요…' : '⬇️ 1층으로 내려가요…');
+    const h = houseNow();
+    const x = h.stair;
+    const g = geo();
+    const size = sz();
+    const meN = box0.querySelector('.house-me');
+    const palN = box0.querySelector('.house-pal');
+    if (!meN || !Number.isInteger(x)) return;
+    // 파트너를 먼저 붙인다 — 같은 앞뒤(z)면 나중에 붙인 캐릭터가 앞 (뒤따르는 파트너가 머리를 가리지 않게)
+    const p1 = palN && palFrom ? actorOf(box0, g, palActorEl(palN), palN, cellFoot(g, palFrom.x, palFrom.y)) : null;
+    const a1 = actorOf(box0, g, meActorEl(me.look), meN, cellFoot(g, me.spot.x, me.spot.y));
+    actors.push(a1, p1);
+    await stairLeave({ g, size, x, up, me: a1, pal: p1, meCell: me.spot, palCell: palFrom, taken: takenCells(h.rooms.find((rr) => rr.id === from)), front: box0.querySelector('.house-stair-front'), live });
+    if (!live()) return;
+    await slideRoom(box0, up ? 1 : -1, 'out');
+    if (!live()) return;
+    ui.floor = to;
+    if (!ui.msg || ui.msg.endsWith('…')) ui.msg = up ? '🏠 2층에 왔어요!' : '🏠 1층에 왔어요!'; // 그새 온 말(✨ 캡슐 다 쉼 등)은 그대로
+    ui.climbDraw = true;
+    try { render(); } finally { ui.climbDraw = false; }
+    const box1 = document.querySelector('#house-body .house-room');
+    const pf2 = getProfileSnapshot();
+    const me2 = avatarOf(pf2);
+    const meN2 = box1 && box1.querySelector('.house-me');
+    if (!meN2 || !me2.spot) return;
+    const palTo = pid ? palHome(pf2, me2.spot) : null;
+    const palN2 = box1.querySelector('.house-pal');
+    const p2 = palN2 && palTo ? actorOf(box1, g, palActorEl(palN2), palN2, cellFoot(g, palTo.x, palTo.y)) : null;
+    const a2 = actorOf(box1, g, meActorEl(me2.look), meN2, cellFoot(g, me2.spot.x, me2.spot.y));
+    actors.push(a2, p2);
+    const o = { g, size, x, up, me: a2, pal: p2, meCell: me2.spot, palCell: palTo, taken: takenCells(houseNow().rooms.find((rr) => rr.id === to)), front: box1.querySelector('.house-stair-front'), live };
+    stairArriveStart(o);
+    await slideRoom(box1, up ? 1 : -1, 'in');
+    if (!live()) return;
+    await stairArrive(o);
+  } finally {
+    for (const a of actors) dropActor(a); // 이 오르기가 만든 배우만 (다시 연 집에 남지 않게)
+    // 닫았다 다시 열었거나 다시 읽었으면 그쪽이 이미 잠금을 풀고 새 화면을 그렸다 — 옛 오르기는 새 화면의 층·말을 건드리지 않는다 (Codex 238차 #2)
+    if (ui.climb === run) { ui.busy = false; ui.climb = 0; }
+    if (ui.playRun === run) {
+      if (moved) { ui.floor = to; if (!ui.msg || ui.msg.endsWith('…')) ui.msg = up ? '🏠 2층에 왔어요!' : '🏠 1층에 왔어요!'; }
+      if (ui.open) render();
+    }
+  }
 }
 
 /** 🧑 방에 선 내 캐릭터 — 바닥 한 칸, 그림은 칸보다 크게 서 있다 · 끌어서 옮기고 누르면 도구 */
@@ -570,20 +803,25 @@ async function walk(me, spot) {
     node.style.transition = `transform ${WALK_MS}ms ease-in-out`;
     node.style.transform = `translate(${((b.left - a.left) / 100) * W}px, ${((b.top - a.top) / 100) * H}px)`;
     node.style.zIndex = String(10 + to.y);
+    const step = a.left !== b.left || a.top !== b.top; // 제자리면 흔들지 않는다
+    if (step) node.classList.add('is-walk'); // 🚶 걷는 동안 몸이 좌우로 흔들리며 통통 (v435 시안 「이대로」)
     // 🐾 쿠션에서 일어나면 앉은 높이 보정을 뗀다 (Codex 92차) · 🤗 쿠션으로 가면 앉는다(v365) · 돌아올 때는 처음 앉음 그대로(Codex 169차 #5)
     const sat = node.classList.contains('is-sit');
     node.classList.toggle('is-sit', !!to.cushion);
-    moved.push([node, sat]);
+    moved.push([node, sat, step]);
   };
   go(meN, me.spot, spot.me);
   const pid = getPartner();
   go(box.querySelector('.house-pal'), pid ? palHome(getProfileSnapshot(), me.spot) : null, spot.pal);
   if (!moved.length) return stay;
   await wait(WALK_MS + 60);
+  for (const [n] of moved) n.classList.remove('is-walk');
   return async () => {
     if (!ui.open) return;
     for (const [n, sat] of moved) if (n.isConnected) { n.style.transform = ''; n.classList.toggle('is-sit', sat); }
+    for (const [n, , step] of moved) if (step) n.classList.add('is-walk'); // 🚶 돌아올 때도 통통 (v435)
     await wait(WALK_MS + 60);
+    for (const [n] of moved) n.classList.remove('is-walk');
   };
 }
 
@@ -694,11 +932,12 @@ async function guestDoor() {
   const ko = monKo(r.mon);
   const s = guestSpot(getProfileSnapshot(), r.mon);
   sfx.ding();
-  if (ui.busy || ui.tab !== 'room') { ui.msg = `🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요`; return; }
+  const stairHi = ui.msg && ui.msg.startsWith('✨ 2층으로 가는 계단') ? `${ui.msg} · ` : ''; // 🪜 막 뜬 「계단이 생겼어요」는 덮지 않고 앞에 둔다 (v435)
+  if (ui.busy || ui.tab !== 'room') { ui.msg = `${stairHi}🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요`; return; }
   if (s) ui.floor = s.room;
   ui.arrive = r.mon; ui.sel = 0; ui.meSel = false; ui.guestSel = false;
   const warm = moveHello(getProfileSnapshot().journey, Date.now());
-  ui.msg = warm ? `🚪 띵동! ${ko}: ${warm}` : `🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요 — 눌러서 같이 놀아요`;
+  ui.msg = stairHi + (warm ? `🚪 띵동! ${ko}: ${warm}` : `🚪 띵동! ${ko}${iga(ko)} 놀러 왔어요 — 눌러서 같이 놀아요`);
   render();
 }
 /** 방의 손님 — 파트너와 같은 꼴 · 「🐾 손님」 이름표 · 💗 · 누르면 도구 */
@@ -717,7 +956,7 @@ function guestEl(monId, spot) {
   e.addEventListener('click', (ev) => {
     ev.stopPropagation();
     if (ui.busy || stale()) return;
-    ui.guestSel = !ui.guestSel; ui.sel = 0; ui.meSel = false; ui.arm = '';
+    ui.guestSel = !ui.guestSel; ui.sel = 0; ui.meSel = false; ui.arm = ''; ui.stairSel = false;
     ui.msg = ui.guestSel ? guestAsk(monId, spot) : '';
     render();
     if (ev.detail === 0) guestFocus(); // ⌨️ 키보드(Enter·Space)로 골랐으면 다시 그린 뒤에도 초점을 잃지 않게 (Codex 188차 #2)
@@ -1011,6 +1250,10 @@ const WHY = {
   bad: '사진을 못 넣었어요 — 다시 해 볼까요?',
   noPhotos: '📷 앨범에 사진이 아직 없어요 — 가구로 놀고 끝에 📸 사진 찍기를 눌러요',
   nobody: '🐾 손님이 집에 돌아갔어요 — 다음에 또 놀러 올 거예요', // 🐾 손님 포켓몬 (v385)
+  // 🪜 계단 (v435)
+  stairSpot: '거기는 계단을 놓을 수 없어요 — 1층 맨 뒤 줄 두 칸과 그 위 벽, 2층 같은 자리가 모두 비어야 해요',
+  floorHere: '벌써 그 층에 있어요',
+  floorFull: '그 층에 설 자리가 없어요 — 가구를 조금 서랍에 넣고 다시 해 봐요',
 };
 /** 규칙 하나를 저장소에서 — 끝나면 저장된 집으로 다시 그린다(다른 창이 바꾼 것도 보인다) · 결과를 돌려준다
  *  alias = 이 물건에서 다르게 말할 why ({ owned: 'grown' } — 늦은 창의 넓히기가 "칠할 수 있어요"로 나왔다, Codex 46차 #3) */
@@ -1116,7 +1359,7 @@ function shopCard(it, c, pf) {
 /** 🏗️ 넓히기를 산 뒤의 말 */
 const GROW_DONE = {
   x_wide: '📐 방을 넓혔어요! 바닥이 커졌어요 — 🏠 꾸미기에서 봐요',
-  x_floor2: '🏗️ 2층을 올렸어요! 위의 [🏠 2층]을 눌러 꾸며 봐요',
+  x_floor2: '🏗️ 2층을 올렸어요! 1층에 계단도 생겼어요 — 계단을 누르면 2층으로 올라가요',
 };
 /** 넓히기는 "이미 있어요 — 칠할 수 있어요"(벽지 말)가 아니라 "벌써 했어요" — 누르기 전 판정과 저장소 판정 모두 */
 const GROW_WHY = { owned: 'grown' };
@@ -1514,6 +1757,13 @@ function beginDrag(d) {
     g = el('div', 'house-ghost is-me');
     g.insertAdjacentHTML('beforeend', avatarSvg(avatarOf(getProfileSnapshot()).look, { uid: 'ghost', shadow: false }));
     g.style.width = `${cell * 1.15}px`;
+  } else if (d.kind === 'stair') {
+    // 🪜 계단 — 끄는 동안 손가락 아래에 계단(2층이면 구멍) 그림 (v435)
+    const up = d.room === FIRST_ROOM;
+    g = el('div', 'house-ghost is-stair');
+    g.innerHTML = up ? stairBackSvg('ghost') + stairFrontSvg() : holeBackSvg('ghost') + holeFrontSvg();
+    g.style.width = `${cell * STAIR_W}px`;
+    g.style.height = `${cell * (up ? WALL_RATIO + 1 : 1)}px`;
   } else {
     // 뒤집어 놓은 가구는 끄는 그림도 뒤집어서 — 바깥 transform은 onMove가 손가락 자리로 쓰니 안쪽 그림에 (Codex 64차)
     const it = d.kind === 'move' ? ((room() || {}).items || []).find((x) => x.u === d.u) : null;
@@ -1525,7 +1775,7 @@ function beginDrag(d) {
   document.body.appendChild(g);
   d.ghost = g;
   if (d.src) d.src.classList.add('is-lifted');
-  ui.sel = 0; ui.meSel = false;
+  ui.sel = 0; ui.meSel = false; ui.stairSel = false;
   const tools = document.querySelector('#house-body .house-tools');
   if (tools) tools.remove();
 }
@@ -1534,6 +1784,16 @@ function showHint(d) {
   const box = document.querySelector('#house-body .house-room');
   const hint = box && box.querySelector('.house-hint');
   if (!hint) return;
+  if (d.kind === 'stair') { // 🪜 계단 — 맨 뒤 줄의 가로 자리만 · 두 층 모두 비어야 (v435)
+    d.spot = stairDrop(sz(), box.getBoundingClientRect(), d.x, d.y);
+    d.ok = !!(d.spot && canStair(sz(), houseNow(), d.spot.x));
+    if (!d.spot) { hint.hidden = true; return; }
+    const sb = d.room === FIRST_ROOM ? stairBox(geo(), d.spot.x) : holeBox(geo(), d.spot.x);
+    Object.assign(hint.style, { left: `${sb.left}%`, top: `${sb.top}%`, width: `${sb.width}%`, height: `${sb.height}%` });
+    hint.classList.toggle('is-bad', !d.ok);
+    hint.hidden = false;
+    return;
+  }
   d.spot = dropSpot(sz(), box.getBoundingClientRect(), d.id, d.x, d.y, d.r);
   d.ok = !!(d.spot && canPlace(houseShapeNow().size, room(), d.id, d.spot.x, d.spot.y, d.kind === 'move' ? d.u : undefined, d.r));
   if (!d.spot) { hint.hidden = true; return; }
@@ -1577,7 +1837,8 @@ function onUp(e) {
   endDrag(d);
   const f = furnById(d.id);
   if (!d.spot) { ui.msg = ''; render(); return; } // 방 밖에서 손을 떼면 없던 일 (서랍 물건은 서랍에, 놓인 가구는 제자리에)
-  if (!d.ok) { say(d.kind === 'me' ? WHY.meSpot : WHY.spot); render(); return; }
+  if (!d.ok) { say(d.kind === 'me' ? WHY.meSpot : d.kind === 'stair' ? WHY.stairSpot : WHY.spot); render(); return; }
+  if (d.kind === 'stair') { run((p) => stairMoveRule(p, d.spot.x), '↔️ 계단을 옮겼어요 — 1층 계단과 2층 구멍이 함께 옮겨졌어요', { spot: 'stairSpot' }); return; } // 🪜 (v435)
   if (d.kind === 'me') { run((p) => avatarMoveRule(p, d.room, d.spot.x, d.spot.y, Date.now()), '🚶 옮겼어요', { spot: 'meSpot', made: 'meMade' }); return; } // 🧑 캐릭터
   if (d.kind === 'new') { ui.arm = ''; run((p) => placeRule(p, d.room, d.id, d.spot.x, d.spot.y), placedText(f)); }
   else run((p) => moveRule(p, d.room, d.u, d.spot.x, d.spot.y), `${f.emoji} ${f.ko}${eul(f.ko)} 옮겼어요`);
@@ -1600,6 +1861,8 @@ function cancelDrag() {
 
 /** 끌지 않고 눌렀을 때 — 놓인 가구는 고르기(도구가 뜬다), 서랍 물건은 "방을 눌러 놓기" */
 function tap(d) {
+  if (d.kind === 'stair') { stairTap(); return; } // 🪜 계단 — [⬆️ 2층으로]·[⬇️ 1층으로] (v435)
+  ui.stairSel = false;
   if (d.kind === 'me') { ui.meSel = !ui.meSel; ui.sel = 0; ui.arm = ''; ui.msg = ''; ui.guestSel = false; render(); return; } // 🧑 캐릭터 — 👕 옷 갈아입기 도구
   if (d.kind === 'move') {
     const it = d.id === HEAL && room() ? room().items.find((i) => i.u === d.u) : null;

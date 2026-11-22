@@ -10,7 +10,7 @@
 // 🧢 v293 (2026-10-18 아버님 "포켓몬 주인공처럼" → 지우(애니) 느낌 · 처음부터 무료 · 진우가 직접 입게):
 //  트레이너 모자·조끼·손가락 장갑·배낭을 free로 · 장갑 칸(gloves) 새로 · OUTFITS "한 번에 입기"는 진우가 누를 때만(앱이 모습을 바꾸지 않는다)
 //  모자 앞 무늬는 아버님 "만화에 있는 무늬 중 하나로 · 여러 무늬를 사게" → 무늬 그림은 공개 저장소에 두지 않고 비공개 저장소에서 받는다(hatmarks.js · avatarart 「지우 모자 무늬」)
-import { houseOf, houseShape, takenCells } from './house.js'; // 🏠 서 있을 빈 칸 (순수 — house.js는 avatar.js를 import하지 않는다)
+import { houseOf, houseShape, takenCells, stairExit } from './house.js'; // 🏠 서 있을 빈 칸 · 🪜 계단 앞 칸 (순수 — house.js는 avatar.js를 import하지 않는다)
 
 /** 피부색 */
 export const SKINS = [
@@ -327,6 +327,27 @@ export function avatarMoveRule(profile, roomId, x, y, now) {
   if (!freeCell(houseShape(profile).size, room, x, y)) return { ok: false, why: 'spot' };
   save(profile, { ...cur, spot: { room: roomId, x, y } }, now);
   return { ok: true };
+}
+
+/**
+ * 🪜 계단으로 다른 층에 가기 (v435) — 선 칸은 내린 층의 계단 앞 칸(house.stairExit)에서 가장 가까운 빈 칸.
+ * 화면은 먼저 저장하고(두 창이 같은 때 눌러도 한 층에만 선다) 걸어가 오르내리는 모습을 보여 준다 · spot = 새로 선 칸.
+ * why: 'made' · 'room' 그 층이나 계단이 없음(2층 전) · 'here' 이미 그 층 · 'full' 그 층에 설 빈 칸이 없음
+ */
+export function avatarFloorRule(profile, roomId, now) {
+  const cur = avatarOf(profile);
+  if (!cur.made) return { ok: false, why: 'made' };
+  const h = houseOf(profile);
+  const room = h.rooms.find((r) => r.id === roomId);
+  if (!room || !Number.isInteger(h.stair)) return { ok: false, why: 'room' }; // (2층 방이 있으면 houseOf가 늘 계단을 붙인다 — 그 약속이 깨져도 NaN 칸으로 가지 않게)
+  if (cur.spot && cur.spot.room === roomId) return { ok: false, why: 'here' };
+  const size = houseShape(profile).size;
+  const e = stairExit(roomId, h.stair);
+  const at = freeCell(size, room, e.x, e.y) ? e : nearestFree(size, room, e.x, e.y);
+  if (!at) return { ok: false, why: 'full' };
+  const spot = { room: roomId, x: at.x, y: at.y };
+  save(profile, { ...cur, spot }, now);
+  return { ok: true, spot: { ...spot } };
 }
 
 /** 값 — { coins, items: { 스톤id: 개수 } } (houseCost와 같은 꼴) */

@@ -701,8 +701,9 @@ test('🏗️ 2층: 한 가지 가구를 6개까지 · 2층 방에 놓기·옮�
   assert.deepEqual(placeRule(p, R2, FLOOR1, ROOM_WIDE.W - 1, ROOM_WIDE.H - 1), { ok: true, u: b.u + 1 }, '2층도 넓힌 크기');
   assert.deepEqual(leftOf(p), { [FLOOR1]: FURN_MAX_2F - 3 });
   assert.deepEqual(moveRule(p, R2, b.u, 2, 2), { ok: true });
-  assert.deepEqual(moveRule(p, R, a.u, ROOM_WIDE.W - 1, 0), { ok: true }, '넓힌 칸으로 옮기기');
-  assert.deepEqual(houseOf(p).rooms[0].items.map((i) => [i.x, i.y]), [[ROOM_WIDE.W - 1, 0]]);
+  // (맨 뒤 줄 오른쪽 두 칸은 🪜 계단 자리(v435) — 넓힌 칸은 한 줄 앞에서 본다)
+  assert.deepEqual(moveRule(p, R, a.u, ROOM_WIDE.W - 1, 1), { ok: true }, '넓힌 칸으로 옮기기');
+  assert.deepEqual(houseOf(p).rooms[0].items.map((i) => [i.x, i.y]), [[ROOM_WIDE.W - 1, 1]]);
   assert.deepEqual(moveRule(p, R, b.u, 3, 3), { ok: false, why: 'gone' }, '다른 방의 번호로는 못 옮긴다');
   assert.deepEqual(flipRule(p, R2, b.u), { ok: true });
   assert.deepEqual(storeRule(p, R2, b.u), { ok: true });
