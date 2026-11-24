@@ -15,7 +15,7 @@ import { gymClaimed } from './mathprog.js';
 import { initProfile, getLevelInfo, gainXp, catchAttempt, previewAttempt, puzzleXp, matchXp, XP, streakBefore, streakBonus, STREAK_MIN_DONE, flushProfile, coins, gainCoins, addItem, getLook, getPartner, hpOf, isTired, changeHp, getProfileSnapshot, lossesOf, battleWin, battleLoss, consumeItem, inventory, resetRarity, gainMushroom, hasKeystone, hasMegaStone, hasGmax, caughtCount, tickEgg, haveCount, monLv, videoStoneOwed, receiveVideoStones, receiveSpeakStone, receiveEssaySayStone, megaReady, zygBattle } from './xp.js';
 import { showHatchIfAny } from './hatch.js';
 import { STONE_ENGLISH, VIDEO_STONE, VIDEO_STEPS, SPEAK_STONE, videoPct, videoTier, SPEAK_COMBO, COIN, HP, POTION, CALL_PAL, GOLDEN, puzzleCoins, matchCoins, streakCoins, lootBox, itemById, setFigure, MUSHROOM_PER_DAY, SOUP_MUSHROOMS } from './items.js';
-import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickFoe, winLine, eligibleMine } from './battle.js';
+import { initBattle, openBattle, abortBattle, BATTLE, shouldBattle, pickFoe, winLine, lossCounts, rematchLoseLine, eligibleMine } from './battle.js';
 import { openMon } from './shop.js';
 import { initCatch, openCatch, closeCatch, burstConfetti } from './catch.js';
 import { initReview, openReview, abortReview, isReviewOpen, pickReviews, pickWordReviews, quizChoices, reviewSummary, roundReward, reviewStones, schedule as reviewSchedule, reviewable, GRADUATED as REVIEW_GRADUATED, MAX_WORD_ITEMS, REWARD as REVIEW_REWARD, DEFAULT_COUNT as REVIEW_COUNT, pickFavExtra, FAV_ICON } from './review.js';
@@ -742,7 +742,7 @@ export async function resumeEnglishRocket() {
   return true;
 }
 
-/** 배틀 결과 반영: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패/도중 이탈 → 그 포켓몬 패배 +1 (3번이면 잃음) */
+/** 배틀 결과 반영: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패/도중 이탈 → 그 포켓몬 패배 +1 (3번이면 잃음 · 🔁 다시 대결은 안 셈 — v438) */
 async function applyBattleResult(r) {
   if (!r || r.outcome === 'declined') return;
   if (r.outcome === 'win') {
@@ -751,6 +751,8 @@ async function applyBattleResult(r) {
     awardCoins(BATTLE.winCoins);
     showPlayerMessage(winLine(r.opponent, !!(w && w.first)), 5000);
     setTimeout(() => dropMushroom('배틀에서 이겼어요'), 5200); // 🍄 승리 메시지 뒤에
+  } else if (r.my && !lossCounts(r.opponent)) {
+    showPlayerMessage(rematchLoseLine(r.my), 4500); // 🔁 다시 대결은 패배로 안 센다 (v438)
   } else if (r.my) {
     // 패배 누적·판정은 저장소에서 (두 창이 각각 세면 두 마리를 잃는다)
     const l = await battleLoss(r.my.id, BATTLE.lossesToLose);

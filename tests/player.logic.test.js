@@ -26,7 +26,7 @@ const VOCAB_KNOWN = new Set([
   ...JSON.parse(fsNode.readFileSync(new URL('../vocab/basic.json', import.meta.url), 'utf8')),
 ]);
 import { wordTimings as realWordTimings } from '../js/srt.js';
-import { winLine as realWinLine } from '../js/battle.js'; // ⚔️ 이긴 뒤 알림 한 줄은 진짜 (v434)
+import { winLine as realWinLine, lossCounts as realLossCounts, rematchLoseLine as realRematchLoseLine } from '../js/battle.js'; // ⚔️ 이긴 뒤 알림 한 줄은 진짜 (v434) · 다시 대결 패배 안 셈도 진짜 (v438)
 import { isSpeakable as realIsSpeakable, createVocab as realCreateVocab } from '../js/vocab.js';
 import { soundOnly as realSoundOnly } from '../js/sounds.js';
 // 외국어 표시(미니언 말·스페인어…)까지 있어야 제대로 판정된다 → 진짜 단어장을 쓴다
@@ -86,7 +86,7 @@ function loadPlayer() {
   const hpLog = [];
   const hpState = { partner: null, hp: {}, opened: null };
   const battleCalls = [];
-  const battleState = { roll: false, caught: {}, won: [], lost: [] };
+  const battleState = { roll: false, caught: {}, won: [], lost: [], lv: {} };
   // 🚀 로켓단 스텁 (2026-10-09): shouldRocket은 rocketState.roll로, 열린 로켓단(playRocket)은 rocketState.played에
   // 시작은 몫과 배틀 기록을 한 저장에서(rocketAdmit, Codex 43차 #3) — busy면 진행 중인 배틀을 돌려준다 · subjects는 ⏳ 시간을 세는 과목이 바뀐 차례
   const rocketState = { roll: false, targets: [{ id: 7, tier: 1 }], played: [], words: true, claims: 0, claim: true, release: null, busy: null, subjects: [], timeSubject: 'english', current: null };
@@ -250,10 +250,10 @@ function loadPlayer() {
     pickOpponent: (list, caught) => list.find((m) => !caught[m.id]) || null, eligibleMine: (ids, partner, tired) => ids.filter((id) => id !== partner && !(tired && tired(id))),
     // 🔁 다 잡았으면 이미 잡은 것과 다시 대결 (v434 — 진짜 pickFoe는 battle434 시험이 본다)
     pickFoe: (list, caught) => list.find((m) => !caught[m.id]) || ((m) => (m ? { ...m, rematch: true } : null))(list.find((m) => caught[m.id] > 0)),
-    winLine: realWinLine,
+    winLine: realWinLine, lossCounts: realLossCounts, rematchLoseLine: realRematchLoseLine,
     getProfileSnapshot: () => ({ caught: battleState.caught }), lossesOf: () => 0,
     // 🧬 레벨업·진화 (2026-09-25): 배틀 후보는 **보유**(도감 누적 − 진화로 내보낸 수)로 고른다
-    haveCount: (id) => battleState.caught[id] || 0, monLv: () => 1,
+    haveCount: (id) => battleState.caught[id] || 0, monLv: (id) => battleState.lv[id] || 1, // 종마다 레벨 (v438 — 상대 레벨이 이걸 따른다)
     battleWin: (id) => { battleState.won.push(id); return { first: true }; }, battleLoss: (id) => { battleState.lost.push(id); return { losses: 1, lost: false }; },
     consumeItem: () => true, inventory: () => ({}), POTION: [], GOLDEN: { id: 'goldenball', emoji: '🌟', ko: '황금 몬스터볼', mult: 2, kind: 'ball' },
     STONE_ENGLISH: { id: 'stone_english', emoji: '🔶', ko: '영어스톤', subject: 'english', kind: 'stone' }, // 🧤 스톤 (2026-09-22)
@@ -1252,6 +1252,7 @@ test('⚔️ 🔁 다시 대결(v434): 열린 포켓몬을 다 잡았어도 배�
   ctx.track.done = (c) => keys.add(c.start);
   ctx.track.todayDone = () => keys.size;
   battleState.caught = { 25: 1, 4: 1, 7: 1 }; // 다 잡음 — v433까지는 여기서 배틀이 아예 안 걸렸다
+  battleState.lv = { 4: 42 }; // 파이리만 Lv42 — 나머지는 Lv1
   run('settings.listenFirst = 0; settings.puzzleEvery = 1; settings.dailyGoal = 0; state.characters = [{ id: 25, ko: "피카츄", url: "x" }, { id: 4, ko: "파이리", url: "y" }, { id: 7, ko: "꼬부기", url: "z" }]; state.cues = Array.from({ length: 8 }, (_, i) => ({ start: i * 10, end: i * 10 + 2, en: "a b c", ko: "" })); state.idx = 0;');
   for (let i = 0; i < 5; i++) run(`markDone(state.cues[${i}])`);
   battleState.roll = true;
@@ -1264,16 +1265,33 @@ test('⚔️ 🔁 다시 대결(v434): 열린 포켓몬을 다 잡았어도 배�
   assert.equal(battleCalls.length, 1, '전환 때 배틀 열림');
   const o = battleCalls[0];
   assert.equal(o.opponent.rematch, true);
+  // ⚔️ 내 포켓몬마다 제 레벨이 배틀로 넘어간다 — 상대 레벨(foeLevel)이 이걸 따른다 (v438)
+  assert.equal(o.mine.find((m) => m.id === 4).lv, 42);
+  assert.equal(o.mine.find((m) => m.id === 7).lv, 1);
   o.onDone({ outcome: 'win', my: o.mine.find((m) => m.id === 4), opponent: o.opponent, turns: 3 });
   assert.deepEqual(battleState.won, [], '이미 잡은 포켓몬은 또 주지 않는다');
   assert.ok(xpLog.includes(40) && coinLog.includes(15), '⚡💰는 그대로');
   assert.equal(els['player-msg'].textContent, '🎉 피카츄를 이겼어요! ⚡+40 💰+15');
-  // 지면 지금처럼 패배 +1
+  // 🔁 다시 대결에서 지면 패배로 안 센다 (v438 — v434까지는 +1이었다)
   run('state.battlePending = { id: 7, ko: "꼬부기", url: "z", rematch: true }; goTo(7)');
   await tick();
   battleCalls[1].onDone({ outcome: 'lose', my: battleCalls[1].mine.find((m) => m.id === 4), opponent: battleCalls[1].opponent, turns: 5 });
-  assert.deepEqual(battleState.lost, [4]);
+  await tick();
+  assert.deepEqual(battleState.lost, [], '다시 대결 패배는 battleLoss를 안 부른다');
   assert.deepEqual(battleState.won, []);
+  assert.equal(els['player-msg'].textContent, '😢 졌어요. 🔁 다시 대결이라 파이리 패배는 늘지 않아요');
+  // 도중에 그만둬도(quit) 다시 대결이면 안 센다
+  run('state.idx = 5; state.battlePending = { id: 25, ko: "피카츄", url: "x", rematch: true }; goTo(6)'); // 배틀은 앞으로 넘어갈 때만 열린다
+  await tick();
+  battleCalls[2].onDone({ outcome: 'quit', my: battleCalls[2].mine.find((m) => m.id === 4), opponent: battleCalls[2].opponent, turns: 2 });
+  await tick();
+  assert.deepEqual(battleState.lost, []);
+  // 못 잡은 상대에게 지면 지금처럼 패배 +1
+  run('state.idx = 6; state.battlePending = { id: 7, ko: "꼬부기", url: "z" }; goTo(7)');
+  await tick();
+  battleCalls[3].onDone({ outcome: 'lose', my: battleCalls[3].mine.find((m) => m.id === 4), opponent: battleCalls[3].opponent, turns: 5 });
+  await tick();
+  assert.deepEqual(battleState.lost, [4]);
 });
 
 test('⚔️ Codex #3/#4/#6: 화면 꺼짐이면 배틀 턴 중단(interrupted), 마지막 문장 섀도잉 뒤에도 배틀, 배틀 중 연습 진입 무시', async () => {

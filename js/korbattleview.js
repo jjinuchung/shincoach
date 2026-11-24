@@ -3,7 +3,7 @@
 //   누르면 하루 몫을 선점(db.claimDailyCount 'battles' — 영어·수학과 같은 칸)하고 openBattle → 끝나면 결과 반영(수학 배틀과 같은 함수) → after()
 // 배틀을 곧바로 띄우지 않고 단추로 — 방금 받은 ★·💰 화면을 가리지 않게, 🐣 부화·🎯 잡기 화면과 겹치지 않게
 // 이 파일은 koreanview·nonsulview를 import하지 않는다(서로 돌지 않게 — 원고·화면은 부르는 쪽이 건넨다)
-import { openBattle, BATTLE, TRAINERS, pickFoe, winLine, eligibleMine } from './battle.js';
+import { openBattle, BATTLE, TRAINERS, pickFoe, winLine, lossCounts, rematchLoseLine, eligibleMine } from './battle.js';
 import { offerRoll, korBattleQ } from './korbattle.js';
 import { allWords } from './korwords.js';
 import { getDaily, claimDailyCount, releaseDailyCount } from './db.js';
@@ -209,7 +209,7 @@ export function battleQuiz(box, hooks, getQ, seen) {
   });
 }
 
-/** 배틀 결과: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패(그만둠 포함) → 그 포켓몬 패배 +1 — 영어·수학과 같은 규칙·같은 함수 */
+/** 배틀 결과: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패(그만둠 포함) → 그 포켓몬 패배 +1(🔁 다시 대결은 안 셈 — v438) — 영어·수학과 같은 규칙·같은 함수 */
 async function applyResult(r) {
   if (!r || r.outcome === 'declined') return;
   if (r.outcome === 'win') {
@@ -217,6 +217,8 @@ async function applyResult(r) {
     gainXp(BATTLE.winXp);
     gainCoins(BATTLE.winCoins);
     toast(winLine(r.opponent, !!(w && w.first)));
+  } else if (r.my && !lossCounts(r.opponent)) {
+    toast(rematchLoseLine(r.my)); // 🔁 다시 대결은 패배로 안 센다 (v438)
   } else if (r.my) {
     const l = await battleLoss(r.my.id, BATTLE.lossesToLose).catch(() => null);
     if (l && l.lost) toast(`😢 ${r.my.ko}${josa(r.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요…`);

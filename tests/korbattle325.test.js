@@ -154,7 +154,7 @@ test('⚔️ 문제 풀기 배틀의 말: 기술 단추 「잘 풀면 세게!」
   const b = read('js/battle.js');
   assert.ok(b.includes("btn.appendChild(el('span', 'hint', moveHint(mv, !!ui.o.quiz)));"));
   assert.ok(b.includes('const tip = loseTip(!!o.quiz);'));
-  assert.equal(b.split('${tip}').length - 1, 2, '세 번 져 떠날 때 · 패배 n/3 둘 다');
+  assert.equal(b.split('${tip}').length - 1, 3, '🔁 다시 대결(v438) · 세 번 져 떠날 때 · 패배 n/3 셋 다');
   assert.ok(!/또렷하게 말해봐요`/.test(b), '진 화면 글에 박힌 말이 남지 않게');
   assert.ok(b.includes('const trainer = o.trainer || TRAINERS['), '단추에 보인 트레이너가 배틀에도');
 });

@@ -57,7 +57,7 @@ import { setExempt, status as timeStatus, isLocked } from './timelimit.js'; // �
 import { ROSTER, loadCharacters, isUnlocked, pickCharacters, forSubject, downloadCharacters, ensureCast, isUltraBeast, forHole, formsOf, formUrl } from './pokemon.js';
 import { openCatch, isCatchOpen } from './catch.js';
 import { holdStore } from './throwhold.js'; // 🎯 뺀 던지기 예약 장부 (Codex 49차 #1·#2)
-import { openBattle, closeBattle, BATTLE, shouldBattle, pickFoe, winLine, eligibleMine } from './battle.js';
+import { openBattle, closeBattle, BATTLE, shouldBattle, pickFoe, winLine, lossCounts, rematchLoseLine, eligibleMine } from './battle.js';
 import { shouldCheer, pickCheerer, pickLine, pickSide, WALK_MS, COOLDOWN } from './cheer.js';
 import { animUrl, ensureAnims } from './sprite.js'; // 🕺 움직이는 도트 그림
 import { contentSummary, cueCountOf } from './stats.js';
@@ -2928,7 +2928,7 @@ function resumeRocketIfAny() {
   }).catch(() => {});
 }
 
-/** 배틀 결과: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패 → 그 포켓몬 패배 +1 (영어와 같은 규칙·같은 함수) */
+/** 배틀 결과: 승 → 상대 획득 + ⚡💰(🔁 다시 대결은 ⚡💰만), 패 → 그 포켓몬 패배 +1(🔁 다시 대결은 안 셈 — v438) (영어와 같은 규칙·같은 함수) */
 async function applyMathBattleResult(r) {
   if (!r || r.outcome === 'declined') return;
   if (r.outcome === 'win') {
@@ -2937,6 +2937,8 @@ async function applyMathBattleResult(r) {
     gainCoins(BATTLE.winCoins);
     updateChip();
     mathToast(winLine(r.opponent, !!(w && w.first)));
+  } else if (r.my && !lossCounts(r.opponent)) {
+    mathToast(rematchLoseLine(r.my)); // 🔁 다시 대결은 패배로 안 센다 (v438)
   } else if (r.my) {
     const l = await battleLoss(r.my.id, BATTLE.lossesToLose).catch(() => null);
     if (l && l.lost) mathToast(`😢 ${r.my.ko}${josa(r.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요…`);

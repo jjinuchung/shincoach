@@ -2,6 +2,7 @@
 // 공격 = 문장 하나를 따라 말하기 → 얼마나 잘 말했는지가 데미지 (배틀이 곧 학습). 상대는 자동 공격.
 // 이기면 상대 포켓몬을 얻고, 지면 그 포켓몬의 패배 수가 +1 (3번 지면 잃음 — xp.js battleLoss). 참가는 선택.
 // 못 잡은 상대가 없으면 이미 잡은 포켓몬과 🔁 다시 대결 — 이겨도 포켓몬 없이 ⚡💰만 (v434 pickFoe)
+// 상대 레벨은 내보낸 포켓몬 레벨 ±2 · 상대 공격도 같은 레벨 배수 · 🔁 다시 대결에서 진 것은 패배로 안 센다 (v438 foeLevel·lossCounts)
 // 위쪽은 순수 규칙(테스트 가능), 아래쪽은 화면(DOM)
 import { rarityOf, shownRarity, RARITY } from './xp.js';
 import * as bgm from './bgm.js';
@@ -13,7 +14,7 @@ import { animUrl, ensureAnim } from './sprite.js'; // 🕺 움직이는 도트 �
 import { playFx, syncFx, stopFx } from './battlefx.js'; // 🐸 기술 그림 (v306 — 비공개 저장소에서 받아 둔 장면)
 
 // ── 규칙 ──
-import { lvMult } from './evolve.js'; // 🧬 포켓몬 레벨 배수 (evolve.js는 아무것도 import하지 않는다 — 순환 없음)
+import { lvMult, lvOf, MAX_LV } from './evolve.js'; // 🧬 포켓몬 레벨 배수 (evolve.js는 아무것도 import하지 않는다 — 순환 없음)
 
 export const BATTLE = {
   // 문장을 제대로 완료할 때마다 이 확률로 등장 (3% → 4% → 8%).
@@ -27,7 +28,8 @@ export const BATTLE = {
   minDoneToday: 5,   // 오늘 이만큼 완료해야 등장 (대충 넘기기로는 못 만남)
   hp: 100,           // 양쪽 배틀 HP (파트너 HP와 별개)
   maxTurns: 8,       // 이 안에 못 끝내면 HP 많은 쪽 승
-  enemyMin: 15, enemyMax: 25, // 상대 공격 데미지
+  enemyMin: 15, enemyMax: 25, // 상대 공격 데미지 (Lv1 기준 — 상대 레벨 배수를 곱한다 · v438)
+  foeLvSpread: 2,    // 상대 레벨 = 내보낸 포켓몬 레벨 ± 이만큼 (v438)
   winXp: 40, winCoins: 15,
   lossesToLose: 3,   // 포켓몬마다 이만큼 지면 잃음
 };
@@ -76,7 +78,7 @@ export function formMult(form, turnsLeft) {
 /**
  * ⚔️ 이번 턴 내 공격에 곱할 배율 전부 — ⭐ 변신 × 🧬 레벨.
  * 레벨은 Lv12까지 한 칸에 +3%(×1.33) · 그 위로 한 칸에 +0.2%라 만렙(Lv100)이어도 ×1.506 — 거다이맥스와 겹쳐도 한 방에 못 이긴다 (v332).
- * 상대(야생)에는 레벨이 없다 — 키운 보람이 공격력으로만 돌아온다.
+ * 상대도 v438부터 레벨이 있다(foeLevel) — 상대 공격에 같은 배수(enemyDamage)
  */
 export function attackMult(form, turnsLeft, lv) {
   return formMult(form, turnsLeft) * lvMult(lv);
@@ -277,8 +279,34 @@ export function palDamage(tier, lv) {
   return Math.round(damageForTier('safe', tier) * lvMult(lv));
 }
 
-export function enemyDamage(rng = Math.random) {
-  return BATTLE.enemyMin + Math.floor(rng() * (BATTLE.enemyMax - BATTLE.enemyMin + 1));
+/** 상대 공격 데미지 — Lv1이면 15~25 그대로 · 상대 레벨이 있으면 내 공격과 같은 레벨 배수(lvMult)를 곱한다 (v438) */
+export function enemyDamage(rng = Math.random, lv = 1) {
+  const base = BATTLE.enemyMin + Math.floor(rng() * (BATTLE.enemyMax - BATTLE.enemyMin + 1));
+  return Math.round(base * lvMult(lv));
+}
+
+/**
+ * ⚔️ 상대 레벨 (v438, 2026-11-24 진우 「상대 레벨이 너무 낮아 재미없어요」 → 아버님 「비슷한 레벨로」 「이대로」)
+ * 상대는 진우가 고르기 전에 나오므로, 고른 포켓몬 레벨 ± foeLvSpread 안에서 정한다 (Lv1 아래·만렙 위로는 안 감).
+ * 레벨은 싸울 때만 — 이겨서 데려와도 레벨은 따라오지 않는다(battleWin은 마릿수만 +1 · 레벨은 진우 쪽 종 기록)
+ */
+export function foeLevel(myLv, rng = Math.random) {
+  const s = BATTLE.foeLvSpread;
+  const lv = lvOf({ lv: myLv }) - s + Math.min(2 * s, Math.floor(rng() * (2 * s + 1)));
+  return Math.max(1, Math.min(MAX_LV, lv));
+}
+
+/**
+ * 진 것을 패배로 세나 (v438 · 아버님 「이대로」) — 🔁 다시 대결은 이겨도 포켓몬을 안 주니 져도 패배가 늘지 않는다(세 번 지면 떠나는 규칙 밖).
+ * 못 잡은 상대와의 배틀은 그대로 센다
+ */
+export function lossCounts(opponent) {
+  return !(opponent && opponent.rematch);
+}
+
+/** 🔁 다시 대결에서 졌을 때 알림 한 줄 (영어·수학·국어 같은 말 · v438) */
+export function rematchLoseLine(my) {
+  return `😢 졌어요. 🔁 다시 대결이라 ${my.ko} 패배는 늘지 않아요`;
 }
 
 /** 오늘 배틀이 나올 차례인지 (문장을 제대로 완료한 시점에 호출) */
@@ -378,7 +406,7 @@ const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const TRAINERS = ['🧢', '👧', '👦', '🤠', '🧙', '🧝', '🕵️', '👮']; // ZWJ 조합·최신 이모지 없이 (안드로이드 10) · ⚔️ 국어·논술 단추가 미리 고른다(o.trainer)
 // 📣 pal = 불러온 동료(물러나도 기록은 남는다) · palHp = 동료 HP(0이면 물러남) · palUsed = 이번 배틀에 불렀나
-const ui = { open: false, run: 0, o: null, my: null, myHp: 0, enemyHp: 0, turn: 0, busy: false, result: null, pal: null, palHp: 0, palUsed: false };
+const ui = { open: false, run: 0, o: null, my: null, myHp: 0, enemyHp: 0, foeLv: 1, turn: 0, busy: false, result: null, pal: null, palHp: 0, palUsed: false };
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -443,9 +471,10 @@ export function openBattle(o) {
   $('battle-result').textContent = '';
   $('battle-continue').hidden = true;
   const lose = `지면 내보낸 포켓몬의 패배가 1 늘어요 (${BATTLE.lossesToLose}번 지면 떠나요)`;
-  $('battle-note').textContent = o.practice ? '연습이라 결과가 남지 않아요'
-    : o.opponent.rematch ? `🔁 다시 대결 — ${o.opponent.ko}${josa(o.opponent.ko, '은', '는')} 벌써 도감에 있어요. 이기면 ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}. ${lose}` // v434
-      : `이기면 ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려와요. ${lose}`;
+  const lvNote = '상대는 내보낸 포켓몬과 비슷한 레벨로 나와요'; // v438
+  $('battle-note').textContent = o.practice ? `연습이라 결과가 남지 않아요. ${lvNote}`
+    : o.opponent.rematch ? `🔁 다시 대결 — ${o.opponent.ko}${josa(o.opponent.ko, '은', '는')} 벌써 도감에 있어요. 이기면 ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins} · 져도 패배는 늘지 않아요. ${lvNote}` // v434 · v438
+      : `이기면 ${o.opponent.ko}${josa(o.opponent.ko, '을', '를')} 데려와요(레벨은 따라오지 않아요). ${lose}. ${lvNote}`;
   $('battle').hidden = false;
   syncFx().catch(() => {}); // 🐸 기술 그림 받기(10분에 한 번까지 — 첫 공격 전에 오면 그때부터 나온다)
 }
@@ -508,7 +537,7 @@ function showPick() {
     const t = MOVES[typeOf(c.id)];
     btn.appendChild(el('span', 'rr', `${t.emoji} ${t.ko}`));
     if (c.lv > 1) btn.appendChild(el('span', 'own lv', `Lv${c.lv} · 공격 ×${lvMult(c.lv).toFixed(2)}`));
-    if (c.losses) btn.appendChild(el('span', 'own lose', `패배 ${c.losses}/${BATTLE.lossesToLose}`));
+    if (c.losses && lossCounts(o.opponent)) btn.appendChild(el('span', 'own lose', `패배 ${c.losses}/${BATTLE.lossesToLose}`)); // 🔁 다시 대결엔 안 보임 (v438)
     if (c.zyg && c.zyg.perfect) btn.appendChild(el('span', 'own mega', c.canMega ? '🟢 퍼펙트폼 · 💠 메가진화' : '🟢 퍼펙트폼'));
     else if (c.canMega) btn.appendChild(el('span', 'own mega', '💠 메가진화'));
     else if (c.canGmax) btn.appendChild(el('span', 'own mega', '🍲 거다이맥스'));
@@ -526,6 +555,7 @@ function startFight(c) {
   ui.zPerfect = false;   // 🟢 지가르데 퍼펙트폼이 됐는지 (v352 — 변신(form)과 따로: 퍼펙트폼 뒤에 💠 메가가 열린다)
   ui.myHp = BATTLE.hp;
   ui.enemyHp = BATTLE.hp;
+  ui.foeLv = foeLevel(c.lv); // ⚔️ 상대 레벨 — 고른 포켓몬 ±2 (v438)
   ui.turn = 0;
   ui.pal = null;         // 📣 아직 아무도 안 불렀다
   ui.palHp = 0;
@@ -534,8 +564,8 @@ function startFight(c) {
   $('battle-pick').hidden = true;
   const stage = $('battle-stage');
   stage.hidden = false;
-  $('battle-enemy-name').textContent = o.opponent.ko;
-  $('battle-my-name').textContent = c.ko;
+  nameWithLv($('battle-enemy-name'), o.opponent.ko, ui.foeLv); // 레벨을 나란히 (v438)
+  nameWithLv($('battle-my-name'), c.ko, lvOf(c));
   $('battle-enemy-fig').className = 'mon-figure battle-fig';
   $('battle-my-fig').className = 'mon-figure battle-fig';
   showBattleMon($('battle-enemy-fig'), o.opponent, null);
@@ -546,6 +576,12 @@ function startFight(c) {
   $('battle-msg').textContent = `${c.ko}, 가자! 기술을 골라요`;
   sfx.whoosh();
   renderActions();
+}
+
+/** 무대 이름 칸 — 이름 뒤에 작은 「Lv41」 (v438) */
+function nameWithLv(box, ko, lv) {
+  box.textContent = ko;
+  box.appendChild(el('span', 'blv', `Lv${lv}`));
 }
 
 function renderHp() {
@@ -928,7 +964,7 @@ async function enemyTurn() {
   const alive = () => ui.open && ui.run === run;
   const o = ui.o;
   const t = MOVES[typeOf(o.opponent.id)];
-  const dmg = enemyDamage();
+  const dmg = enemyDamage(Math.random, ui.foeLv); // 상대 레벨 배수 (v438)
   const pal = palOn() ? ui.pal : null; // 📣 동료가 서 있으면 동료가 대신 맞는다
   $('battle-msg').textContent = `상대 ${o.opponent.ko}의 ${t.emoji} ${t.safe}!${pal ? ` ${pal.ko}${josa(pal.ko, '이', '가')} 막아요!` : ''}`;
   await sleep(700); if (!alive()) return;
@@ -1033,7 +1069,8 @@ function endFight(outcome) {
     $('battle-msg').textContent = '😢 졌어요…';
     const losses = (ui.my.losses || 0) + 1;
     const tip = loseTip(!!o.quiz);
-    res.textContent = o.practice ? '(연습) 진짜 배틀이면 패배가 1 늘어요'
+    res.textContent = o.practice ? (lossCounts(o.opponent) ? '(연습) 진짜 배틀이면 패배가 1 늘어요' : '(연습) 다시 대결은 져도 패배가 늘지 않아요') // v438
+      : !lossCounts(o.opponent) ? `🔁 다시 대결이라 ${ui.my.ko} 패배는 늘지 않아요 — ${tip}` // v438
       : losses >= BATTLE.lossesToLose ? `${ui.my.ko}${josa(ui.my.ko, '이', '가')} ${BATTLE.lossesToLose}번 져서 떠났어요… ${tip}` : `${ui.my.ko} 패배 ${losses}/${BATTLE.lossesToLose} — ${tip}`;
     sfx.fail(); vibrate(200);
   }

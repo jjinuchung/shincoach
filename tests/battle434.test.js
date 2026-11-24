@@ -99,7 +99,8 @@ test('세 과목 배선 — 영어·수학·국어(논술) 모두 pickFoe로 고
 
 test('배틀 창 글 — 다시 대결이면 「데려와요」 대신 「🔁 다시 대결 — 벌써 도감에 있어요」 · 이긴 줄도 「우리 편이 됐어요」 대신 winLine', () => {
   const s = read('js/battle.js');
-  assert.ok(s.includes("o.opponent.rematch ? `🔁 다시 대결 — ${o.opponent.ko}${josa(o.opponent.ko, '은', '는')} 벌써 도감에 있어요. 이기면 ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins}. ${lose}`"));
+  // v438: 다시 대결은 져도 패배가 늘지 않는다 → 「지면 패배가 1 늘어요」 대신 「져도 패배는 늘지 않아요」 · 레벨 안내 덧붙임
+  assert.ok(s.includes("o.opponent.rematch ? `🔁 다시 대결 — ${o.opponent.ko}${josa(o.opponent.ko, '은', '는')} 벌써 도감에 있어요. 이기면 ⚡+${BATTLE.winXp} 💰+${BATTLE.winCoins} · 져도 패배는 늘지 않아요. ${lvNote}`"));
   assert.ok(s.includes('o.opponent.rematch ? winLine(o.opponent, false)'));
   // 데려온다는 말은 다시 대결이 아닌 길에만
   const note = s.slice(s.indexOf("$('battle-note').textContent"), s.indexOf("$('battle').hidden = false;"));

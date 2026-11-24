@@ -1385,6 +1385,7 @@ button { font-family: inherit; }
 }
 .battle-info { min-width: 150px; }
 .battle-info .nm { font-weight: 800; }
+.battle-info .nm .blv { margin-left: 4px; font-size: 0.8rem; color: var(--muted); white-space: nowrap; } /* ⚔️ 레벨 나란히 (v438) */
 .battle-hpbar { height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin: 4px 0 2px; }
 .battle-hp { height: 100%; width: 100%; background: linear-gradient(90deg, #4ade80, #22c55e); transition: width 0.5s; }
 .battle-hp.low { background: linear-gradient(90deg, #fbbf24, #ef4444); }
