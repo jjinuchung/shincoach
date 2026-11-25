@@ -1117,8 +1117,11 @@ export function stuckIds(d) {
  *   same = 오늘 틀렸는데 아직 다시 안 푼 칸(앞 창에서 틀린 것 — 이미 다음 물고기가 지났다) · done = 오늘 이미 다시 푼 칸(오늘은 더 안 냄)
  *   meta = 칸 → { lv, avoid } 그 칸을 처음 틀린 문제의 단계·글 지문(fishRedoWait — #2 · 없으면 1단계·피할 글 없음)
  *   한 칸은 하루 한 번만 다시 낸다 · 다음 날 다시 풀기(2)를 마친 칸은 그걸로 끝
+ *   allow = 지금 낼 수 있는 칸(Set — 「이미 배운 수학」 원천 keys · v439) · 없으면 다 — 밖의 칸(🥚·🌱 쉬는 학년)은 next·same에서 빼되 빚은 그대로
+ *   (다음 날 몫 REDO_NEXT_MAX 자리를 못 낼 칸이 막지 않게 · 🌱를 끄면 7일 안의 빚은 돌아온다)
  */
-export function redoPlan(days, today) {
+export function redoPlan(days, today, allow = null) {
+  const can = (id) => !(allow instanceof Set) || allow.has(id);
   const t = dayIndex(today);
   const list = (Array.isArray(days) ? days : []).filter((r) => r && r.date);
   const mine = list.find((r) => r.date === today) || null;
@@ -1139,10 +1142,10 @@ export function redoPlan(days, today) {
     for (const id of [...failed, ...missed]) if (!owed.has(id)) owed.set(id, info.get(id) || { lv: 1, avoid: '' });
   }
   const room = Math.max(0, REDO_NEXT_MAX - nextToday);
-  const nextAll = [...owed.keys()].filter((id) => !doneToday.has(id));
+  const nextAll = [...owed.keys()].filter((id) => !doneToday.has(id) && can(id));
   const next = nextAll.slice(0, room);
   const infoToday = waitInfo(mine && mine.fishRedoWait);
-  const same = wrongIds(mine && mine.fishMathKeys).filter((id) => !doneToday.has(id) && !next.includes(id));
+  const same = wrongIds(mine && mine.fishMathKeys).filter((id) => !doneToday.has(id) && !next.includes(id) && can(id));
   const meta = {};
   for (const id of next) meta[id] = owed.get(id);
   for (const id of same) meta[id] = infoToday.get(id) || { lv: 1, avoid: '' };

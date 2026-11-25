@@ -349,7 +349,7 @@ test('🔌 잇기 — 1단계 풀이 한 줄·문제 글(qk) · 물고기 번호
   assert.match(v, /const up = stepUpLine\(h\.stepUp\);[\s\S]{0,200}else if \(up\) \{\n\s*const me = ui;\n\s*toast\(up, \d+\);\n\s*setTimeout\(\(\) => \{ if \(ui === me && ui\.st === 'ready' && !ui\.dexOpen && !ui\.shopOpen && !ui\.sail && ui\.place === place\) enter\(\); \}, \d+\);\n\s*\} else enter\(\);/);
   assert.match(v, /steps: h\.steps && typeof h\.steps === 'object' \? h\.steps : \{\}/);
   const l = src('js/lakeview.js');
-  assert.match(l, /const rq = redoQueue\(redoPlan\(days, today\)\);/);
+  assert.match(l, /const rq = redoQueue\(redoPlan\(days, today, mathKeys\)\);/); // v439 — 원천 keys 밖의 칸(🥚·🌱 쉬는 학년)은 다시 풀기 계획에서 뺀다 (learnpool439)
   assert.match(l, /const stp = subjectSteps\(days, today\);[^\n]*\n\s*if \(stp\.write\.length\) applyDailyDelta\(today, \{ fishSteps: stp\.write \}\)/);
   assert.match(l, /steps: stp\.steps,/);
   assert.match(l, /stepUp: stp\.up,/);

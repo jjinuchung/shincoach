@@ -20,6 +20,7 @@ import {
   sunKey, // ☀️ 시작·완주 기록 (v331)
   QUICK, quickPlan, quickLeft, quickCommit, // ⚡ 3문제 한 판 (v354)
   SUN_PRIZE, sunPrizeRule, sunPrizeOf, prizeKey, // ☀️ 묶음은 처음 답 반 이상 · 둘째 완주까지 (v421)
+  learnedPool, // 🎣 배운 수학 원천 칸 — ⚡와 같은 단계 · ☀️와 같은 학년 (v439)
   RELEARN_MODES, relearnPage, // 📚 틀리면 배움 한 장 (v302)
 } from './mathprog.js';
 import { getMath, updateMath, applyDailyDelta, listItems, getAllSentenceStats, getDaily, claimDailyCount } from './db.js';
@@ -2752,9 +2753,12 @@ function battleQuestion(seed, stemKey = null) {
 }
 
 /**
- * 🎒 포켓몬 대여행(v341) 수학 문제 원천 — **모든 줄기**에서 ✅ 다 배운 개념만(배우는 중인 칸은 안 낸다) · 배틀과 같은 계산 문제 ·
+ * 🎒 포켓몬 대여행(v341) 수학 문제 원천 — 🎣 낚시터·🎟️ 손님 맞이·🚚 이사도 같이 쓴다 · **모든 줄기**에서 이미 아는 칸만(mathprog.learnedPool — v439):
+ *   🐣 안다·👑·📏 진단으로 침(🥚 배우는 중은 안 낸다 — ⚡와 같게) · 🌱 학교 진도 먼저가 켜져 있으면 6학년·중1 칸도 안 낸다(☀️와 같게 · 끄면 돌아옴) ·
+ *   (v438까지는 rec.done 전부 — 🥚·🌱 쉬는 칸까지 나왔다) · 배틀과 같은 계산 문제 ·
  * **기록하지 않는다**(배틀과 같다 — 얼굴별 누적·오개념·🤔 노트를 안 건드린다)
- * → { keys: 개념 id들, make(id, seed, lv) → { id, label, qNode(), choices: [{ text, ok, node(), hint? }], lv } | null } · 다 배운 개념이 없으면 null
+ * → { keys: 개념 id들, make(id, seed, lv) → { id, label, qNode(), choices: [{ text, ok, node(), hint? }], lv } | null } · 낼 칸이 없으면 null ·
+ *   make는 keys 밖의 칸이면 null(🔁 다시 풀기·🥅 뜰채 한 번 더가 지난 기록의 칸으로 바로 부른다 — v439)
  * 🎣 낚시터 난이도(v378): lv 2 = ② 함정 → 계산 · lv 3 = ③ 이유(있는 칸만) → 함정 → 계산(lakelevel.mathKinds) · 틀린 보기엔 그 칸 풀이 한 줄(hint — v387부터 1단계도) ·
  *   lv = 실제 낸 얼굴의 단계 · qk = 문제 글(🔁 다시 풀기가 같은 문제를 피하려고 · v387) · 🎒 대여행은 lv 없이 불러 계산 문제만(지금 그대로 — hint·qk는 안 씀)
  */
@@ -2762,13 +2766,13 @@ export async function journeyMathSource() {
   try {
     if (!ui.opts) await buildOpts();
     const [st, { mathKinds, MATH_KIND_LV, mathHint }] = await Promise.all([getMath(), import('./lakelevel.js')]);
-    const today = todayKey();
-    const keys = [];
-    for (const key of STEM_ORDER) for (const x of ladderOf(st, today, key)) if (x.state === 'done' && !keys.includes(x.id)) keys.push(x.id);
+    const keys = learnedPool(st);
     if (!keys.length) return null;
+    const allow = new Set(keys);
     return {
       keys,
       make(id, seed, lv = 1, opt = {}) {
+        if (!allow.has(id)) return null; // v439 — 거른 칸(🥚·🌱 쉬는 학년)은 다시 풀기·뜰채 길로도 안 낸다
         const sx = stemOf(id);
         if (!sx) return null;
         const typed = !!(opt && opt.typed); // ✍️ 🎣 낚시터 직접 쓰기 (v418) — 숫자판으로 받을 수 있는 계산 문제만(padSpec) · 못 만들면 null(낚시터가 다음 칸으로)

@@ -614,7 +614,7 @@ test('🔗 배선 — 홈 카드 자리 · 앱 셸 · 글꼴 · 다른 창이 �
   assert.match(src('js/stats.js'), /card\('🎒 포켓몬 대여행'\)/);
   assert.match(src('js/home.js'), /import\('\.\/journeyview\.js'\)\.then\(\(m\) => m\.mountJourneyCard/);
   assert.match(src('js/math.js'), /export async function journeyMathSource\(\)/);
-  assert.match(src('js/math.js'), /x\.state === 'done'/, '다 배운 개념만');
+  assert.match(src('js/math.js'), /const keys = learnedPool\(st\);\n\s+if \(!keys\.length\) return null;/, '이미 아는 칸만 (v439 — 🥚·🌱 쉬는 학년 뺌 · 시험은 learnpool439)');
   assert.match(src('js/journeyview.js'), /Number\(r\.quizPass\) >= 1/, '영어는 뜻을 맞혀 본 단어만');
   assert.match(src('js/journeyview.js'), /if \(ch\.length !== 4\) return null;/, '영어도 4지선다만 (Codex 145차 #3)');
   assert.match(src('js/journeyview.js'), /yes\.disabled = false;/, '집으로 저장 실패 뒤 다시 누를 수 있다 (Codex 145차 #2)');

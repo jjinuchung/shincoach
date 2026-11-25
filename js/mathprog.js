@@ -1382,6 +1382,46 @@ export function quickPlan(m, seed = 0) {
   const pick = pool.sort((a, b) => (a.tier - b.tier) || (a.at - b.at) || (a.i - b.i)).slice(0, QUICK.n);
   return fractionGen.shuffle(r, pick).map((x) => ({ id: x.id, kinds: fractionGen.shuffle(r, [...QUICK_KINDS]) }));
 }
+
+// ── 🎣 「이미 배운 수학」 원천 칸 (v439, 2026-11-25 아버님 기본안 「이대로」) ──
+// 🎣 낚시터·🎒 대여행·🎟️ 손님 맞이·🚚 이사가 함께 쓰는 수학 원천(math.journeyMathSource)이 rec.done 전부를 내서
+//   🥚 배우는 중 칸과 🌱로 쉬게 한 6학년·중1 칸까지 나왔다(주석은 「다 배운 개념만」) →
+//   단계는 ⚡와 같게(QUICK_STAGES — 🐣·👑·📏) · 학년은 ☀️와 같게(dailyOk — 🌱 켜져 있으면 6학년·중1 뺌 · 끄면 돌아옴) ·
+//   낼 칸이 없으면 [] (원천 null — 옛 원천으로 돌아가지 않는다 · 낚시터는 🐟 물고기 수학·다른 과목으로)
+/** 이미 배운 문제로 낼 수학 칸 (순수) — 줄기 차례(STEM_ORDER) · 사다리 차례 · 겹침 없음 */
+export function learnedPool(m) {
+  const concepts = (m && m.concepts) || {};
+  const out = [];
+  const seen = new Set();
+  for (const k of STEM_ORDER) {
+    for (const c of (STEMS[k] ? STEMS[k].list : [])) {
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      if (QUICK_STAGES.has(stageOf(concepts[c.id])) && dailyOk(m, c.id)) out.push(c.id);
+    }
+  }
+  return out;
+}
+/** 📤 한 줄 — 원천 칸 수 · 뺀 칸 (아이 화면에는 안 쓴다) */
+export function learnedPoolLine(m) {
+  const concepts = (m && m.concepts) || {};
+  const n = learnedPool(m).length;
+  let egg = 0;
+  let rest = 0;
+  const seen = new Set();
+  for (const k of STEM_ORDER) {
+    for (const c of (STEMS[k] ? STEMS[k].list : [])) {
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      const st = stageOf(concepts[c.id]);
+      if (!st) continue;
+      if (!dailyOk(m, c.id)) rest += 1;
+      else if (st === 'learning') egg += 1;
+    }
+  }
+  const tail = restOf(m).on ? ` · 🌱 6학년·중1 ${rest}칸 뺌` : ' · 🌱 꺼짐이라 6학년·중1도 냄';
+  return `🎣 배운 수학 원천(낚시터·대여행·손님 맞이) ${n}칸 — 🥚 배우는 중 ${egg}칸 뺌${tail}${n ? '' : ' · 낼 칸이 없어 배운 수학은 건너뜀'}`; // 대여행엔 🐟 물고기 수학이 없다 (Codex 247차 P3)
+}
 /**
  * 오늘 ⚡ 판 — { n 끝낸 판, c 받은 🎯 } (지난날이면 0)
  * 장부 날짜가 오늘보다 **뒤**(태블릿 시계가 뒤로 갔다)면 그날은 다 받은 것으로 — ahead (Codex 159차 #1: 28일에 다 받고 27일로 갔다 오면 또 받았다)
@@ -2014,6 +2054,7 @@ export function mathReportText(m, today, days) {
   if (s.miss.length) lines.push(`전체 오개념 TOP: ${s.miss.map((x) => `${x.tag}×${x.n}`).join(', ')}`);
   lines.push('', ...guardLines(guardReport(m, today))); // 🛡️ 📊와 같은 줄 (v252)
   lines.push(restLine(m)); // 🌱 학교 진도 먼저 (v301)
+  lines.push(learnedPoolLine(m)); // 🎣 배운 수학 원천 — 🥚·🌱 쉬는 학년을 뺀 칸 수 (v439)
   lines.push(relearnLine(m, today)); // 📚 틀린 뒤 배움 한 장 (v302)
   lines.push('', puzzleReport(m && m.puzzle, today)); // 🧩 수학 퍼즐 단계·판 (v296)
   lines.push(detectReport(m && m.detect, today, nameOf)); // 🕵️ 나옹의 숙제 — 판·처음 답·처음에 놓친 칸 (v299)

@@ -1,6 +1,6 @@
 // 🎣 학습 낚시터 — 앱에 잇기 (v366 · 2026-10-30 아버님 기본안 「물고기 16종 · 나머지 이대로」 → 장면 시안 「이대로」)
 // 홈 화면 과목 카드 위 띠(🎒 대여행 띠 아래) → 저수지 창(fishview) · 규칙은 fishing.js · 그림은 fishart.js
-// 문제: 🎒 대여행과 같은 「이미 배운 문제」 원천(journeyview.loadSources — 수학 ✅ 다 배운 개념 · 영어 뜻을 맞혀 본 단어 · 국어 배운 낱말 · 논술 해 본 주제)
+// 문제: 🎒 대여행과 같은 「이미 배운 문제」 원천(journeyview.loadSources — 수학 이미 아는 칸(🐣·👑·📏 · 🌱 켜지면 6학년·중1 뺌 — v439) · 영어 뜻을 맞혀 본 단어 · 국어 배운 낱말 · 논술 해 본 주제)
 //   · 과목마다 그날 차례(날·과목으로 섞은 줄)에서 그날 낸 수만큼 넘긴 자리 — 창을 다시 열어도 같은 문제가 처음부터 되풀이되지 않게
 //   · 문제 하나하나는 안 적는다(대여행·배틀과 같다) — 과목마다 낸 수·맞힌 수만 그날 기록(daily fish…Q/Ok · 📤 🎣 줄)
 // 과목 몫: 지난 7일(오늘 빼고) 과목 화면 시간·논술 한 날로 — 덜 한 과목이 더 자주(한 과목 10~50%) · 아이 화면엔 안 보임
@@ -466,7 +466,8 @@ export async function openLakeNow() {
     // ✍️ 배운 수학 차례 자리(fishMathAt)를 연 때 자리에 맞춘다 — 그 뒤로는 넘긴 만큼 더한다(atStep) · 다시 열면 startOf가 그 뒤부터 (v418 Codex 221차 P2-3)
     const atGap = start.math - nz(d && d[FISH_MATH_AT]);
     if (atGap > 0) log.put({ [FISH_MATH_AT]: atGap });
-    const rq = redoQueue(redoPlan(days, today)); // 🔁 지난 낚시 날 몫 → 오늘 앞 창에서 틀린 칸 (v387)
+    const mathKeys = new Set((ui.src && ui.src.math && Array.isArray(ui.src.math.keys)) ? ui.src.math.keys : []); // 🌱·🥚로 거른 칸은 다시 풀기에도 안 낸다 (v439)
+    const rq = redoQueue(redoPlan(days, today, mathKeys)); // 🔁 지난 낚시 날 몫 → 오늘 앞 창에서 틀린 칸 (v387)
     const alive = () => clockDay() === today; // 창을 연 뒤 자정이 지나면 다시 풀기를 멈춤 (Codex 190차 #5 — 새 날 계획은 다시 열 때)
     const stp = subjectSteps(days, today); // 🎚️ 오늘 과목 단계 — 처음 연 때만 적는다 (v387)
     if (stp.write.length) applyDailyDelta(today, { fishSteps: stp.write }).catch(() => {});
