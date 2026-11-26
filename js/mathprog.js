@@ -1174,11 +1174,13 @@ export function bridgeOffers(m, today, stem) {
 /**
  * ☀️ 오늘의 수학 계획.
  *  1) 개념 편 하나 — 🔁 복습 차례가 있으면 **줄기와 상관없이 가장 오래 밀린 칸**(oldestDue, review · v257), 없으면 지금 줄기의 ▶(learn). 사다리가 끝났으면 null
- *  2) 🎲 섞어 풀기 — 개념 편 줄기(roundStem)의 아는 개념(done) 중 **안 본 지 오래된**(lastAt) 것부터 MIX_CONCEPTS개, 각각 약한 얼굴 순서
+ *  2) 🎲 섞어 풀기 — 개념 편 줄기(roundStem)의 배운 칸(done) 중 **안 본 지 오래된**(lastAt) 것부터 MIX_CONCEPTS개, 각각 약한 얼굴 순서 ·
+ *     🐣·👑·📏 칸 먼저 — 🥚 배우는 중 칸은 그것으로 다 못 채울 때만(v442)
  *     + 🤔 노트(어제 이전에 틀린 유형, 그 줄기, 개념 편의 개념은 제외 — 그 편에 이미 한 문제 끼어 든다) 하나. 순서는 섞는다.
  * 아는 개념이 없으면 mix는 비고 개념 편만 — 그것도 오늘의 수학이다. 화면은 roundStem으로 줄기를 옮겨 편을 연다.
  * 🌱 학교 진도 먼저(m.rest 켜짐, v301)면 1)은 schoolDue → schoolNow, 그리고 1)·2) 모두 6학년·중1 칸을 뺀다(dailyOk) ·
- *   2)의 아는 개념은 SCHOOL_GRADE 이하 칸으로 먼저 채우고 모자라면 5학년 (v331)
+ *   2)의 칸은 같은 단계(🐣·👑·📏 / 🥚) 안에서 SCHOOL_GRADE 이하 칸으로 먼저 채우고 모자라면 5학년 (v331 · v442부터 단계가 먼저)
+ *   (🤔 노트 자리는 단계를 보지 않는다 — 노트는 개념 일정과 따로 돈다: 🥚 칸의 노트도 나온다)
  * ☀️ 다시 시작 판(isComeback, v331)이면 개념 편이 있을 때 2)를 비운다 — 개념 편 하나로 완주(섞어 풀기가 없는 날과 같은 길)
  * @returns {{ roundId: string|null, roundMode: 'review'|'learn'|null, roundStem: string, late: number, mix: Array<{id:string, kinds:string[], note?:object}>, waiting: boolean, comeback: boolean }}
  */
@@ -1196,11 +1198,14 @@ export function dailyPlan(m, today, stem = 'fraction', seed = 0) {
   const concepts = (m && m.concepts) || {};
   // ☀️ 다시 시작 판 — 개념 편이 있는 날만(없으면 섞어 풀기가 그날 ☀️의 전부라 그대로 둔다)
   const comeback = !!roundId && isComeback(m, today);
-  // 🌱 켜져 있으면 SCHOOL_GRADE 이하 칸 먼저 (v331 — 아버님 10-19 "수학이 너무 어렵대" → 4학년 다지기) · 같은 무리 안에서는 예전처럼 안 본 지 오래된 것부터
+  // 🌱 켜져 있으면 SCHOOL_GRADE 이하 칸 먼저 (v331 — 아버님 10-19 "수학이 너무 어렵대" → 4학년 다지기 · v442부터 🥚 단계 다음) · 같은 무리 안에서는 예전처럼 안 본 지 오래된 것부터
   const tier = (id) => (school && gradeOf(id) > SCHOOL_GRADE ? 1 : 0);
+  // 🥚 배우는 중 칸은 🐣·👑·📏로 다 못 채울 때만 — 확인 차례여도 (v442 — 섞어 풀기는 🥚가 생기기 전(v105)에 짜여 done 전부를 냈다 ·
+  //   ⚡·🎣·⚔️🚀(배운 칸이 하나도 없을 때의 옛 원천 말고)는 이미 🥚를 뺀다 · 아예 빼면 🥚 2칸으로 잠긴 날 ☀️가 사라진다(v156 「오늘 배운 🥚 둘은 섞어 풀기로」))
+  const egg = (x) => (x.stage === 'learning' ? 1 : 0);
   const known = comeback ? [] : rows.filter((x) => x.state === 'done' && x.id !== roundId && ok(x.id))
-    .map((x, i) => ({ id: x.id, rec: concepts[x.id] || {}, i }))
-    .sort((a, b) => (tier(a.id) - tier(b.id)) || ((a.rec.lastAt || 0) - (b.rec.lastAt || 0)) || (a.i - b.i))
+    .map((x, i) => ({ id: x.id, rec: concepts[x.id] || {}, i, egg: egg(x) }))
+    .sort((a, b) => (a.egg - b.egg) || (tier(a.id) - tier(b.id)) || ((a.rec.lastAt || 0) - (b.rec.lastAt || 0)) || (a.i - b.i))
     .slice(0, MIX_CONCEPTS)
     .map((x) => ({ id: x.id, kinds: weakKinds(x.rec, r) }));
   const stemKey = STEMS[roundStem].key;
