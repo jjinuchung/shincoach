@@ -20,6 +20,7 @@ import {
   sunKey, // ☀️ 시작·완주 기록 (v331)
   QUICK, quickPlan, quickLeft, quickCommit, // ⚡ 3문제 한 판 (v354)
   SUN_PRIZE, sunPrizeRule, sunPrizeOf, prizeKey, // ☀️ 묶음은 처음 답 반 이상 · 둘째 완주까지 (v421)
+  battlePool, // ⚔️·🚀 배틀·로켓단 원천 — 줄기 안 아는 칸 → 배운 수학 전체 → 옛 원천 (v441)
   learnedPool, // 🎣 배운 수학 원천 칸 — ⚡와 같은 단계 · ☀️와 같은 학년 (v439)
   RELEARN_MODES, relearnPage, // 📚 틀리면 배움 한 장 (v302)
 } from './mathprog.js';
@@ -2732,22 +2733,22 @@ function mathPotions() {
 }
 
 /**
- * ⚔️ 배틀 턴에 낼 문제 — 아는 개념에서 하나. **기록하지 않는다**(연습과 같은 성격):
- * 얼굴별 누적·오개념·🤔 노트·교환권을 건드리지 않는다. 영어 배틀이 문장 기록을 안 남기는 것과 같다.
+ * ⚔️ 배틀·🚀 로켓단 턴에 낼 문제 — 아는 칸에서 하나(mathprog.battlePool — v441):
+ *   지금 줄기의 🐣 안다·👑·📏 칸(🎣와 같은 거름 — 🥚 배우는 중은 안 낸다 · 🌱 켜져 있으면 6학년·중1도 안 낸다)이 셋 이상이면 그 칸들 →
+ *   아니면 모든 줄기의 그런 칸(6학년·중1 줄기를 골랐을 때도) → 그것도 없으면 옛 원천(지금 줄기 done → 지금 배울 ▶) ·
+ *   (v440까지는 지금 줄기 done 전부 — 🥚·🌱 쉬는 칸까지 나왔다) · 칸 하나가 문제를 못 만들면 다음 칸으로(null이면 🚀는 틀림으로 센다) ·
+ * **기록하지 않는다**(연습과 같은 성격): 얼굴별 누적·오개념·🤔 노트·교환권을 건드리지 않는다. 영어 배틀이 문장 기록을 안 남기는 것과 같다.
  */
 function battleQuestion(seed, stemKey = null) {
-  const st = ui.state;
-  const today = todayKey();
-  const rows = ladderOf(st, today, stemKey || ui.stem || savedStem() || undefined);
-  const known = rows.filter((x) => x.state === 'done');
-  const pool = known.length ? known : rows.filter((x) => x.state === 'now');
-  if (!pool.length) return null;
-  const sx = stemOf(pool[seed % pool.length].id);
-  const id = pool[seed % pool.length].id;
-  if (!sx) return null;
-  for (let t = 0; t < 6; t++) {
-    const q = sx.gen.makeQuestion(id, 'calc', seed + t * 7919, { ...optsFor(sx.key), recent: ui.recent[id] || [] });
-    if (q) return q;
+  const { ids } = battlePool(ui.state, todayKey(), stemKey || ui.stem || savedStem() || undefined);
+  for (let k = 0; k < ids.length; k++) {
+    const id = ids[(seed + k) % ids.length];
+    const sx = stemOf(id);
+    if (!sx) continue;
+    for (let t = 0; t < 6; t++) {
+      const q = sx.gen.makeQuestion(id, 'calc', seed + t * 7919, { ...optsFor(sx.key), recent: ui.recent[id] || [] });
+      if (q) return q;
+    }
   }
   return null;
 }
@@ -2901,6 +2902,8 @@ async function startRocket(after) {
   const run = ui.run; // 트랜잭션을 기다리는 사이 아이가 홈·사다리로 나갔으면 열지 않는다 (배틀과 같다)
   const target = rocketPick();
   if (!target || !getPartner() || mathHidden()) { after(); return; }
+  // 낼 문제가 없으면 열지 않는다 — 몫·진행 중 배틀 칸(과목 공용 한 칸)을 쓰기 전에 · 문제 없이 열면 ⏭처럼 틀림으로 세어 포켓몬을 빼앗긴다 (v441)
+  if (!battleQuestion(0, ui.stem)) { after(); return; }
   // 오늘 몫(수학 하루 3번)과 배틀 기록을 한 트랜잭션에서 — 저장된 20분 간격·진행 중인 배틀도 거기서 본다 (Codex 43차 #3)
   const b = await rocketAdmit(todayKey(), ROCKET.field.math, ROCKET.maxPerDay, rocketNew({ subject: 'math', target: target.id, stem: ui.stem }));
   if (b.ok) ui.today.rockets = Number(b.daily && b.daily[ROCKET.field.math]) || (ui.today.rockets || 0) + 1;
@@ -2909,7 +2912,7 @@ async function startRocket(after) {
   await runRocket(b.cur, !b.ok, after);
 }
 
-/** 로켓단 화면을 연다 (새 배틀·이어 가기 공통). 문제는 그 배틀을 시작한 줄기의 아는 개념에서 — 기록하지 않는다(배틀 문제와 같다) */
+/** 로켓단 화면을 연다 (새 배틀·이어 가기 공통). 문제는 그 배틀을 시작한 줄기의 아는 칸에서(셋보다 적으면 모든 줄기의 아는 칸 — battleQuestion · v441) — 기록하지 않는다(배틀 문제와 같다) */
 async function runRocket(cur, resume, after) {
   ui.rocketOpen = true;
   try {

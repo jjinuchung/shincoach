@@ -1422,6 +1422,35 @@ export function learnedPoolLine(m) {
   const tail = restOf(m).on ? ` · 🌱 6학년·중1 ${rest}칸 뺌` : ' · 🌱 꺼짐이라 6학년·중1도 냄';
   return `🎣 배운 수학 원천(낚시터·대여행·손님 맞이) ${n}칸 — 🥚 배우는 중 ${egg}칸 뺌${tail}${n ? '' : ' · 낼 칸이 없어 배운 수학은 건너뜀'}`; // 대여행엔 🐟 물고기 수학이 없다 (Codex 247차 P3)
 }
+
+// ── ⚔️ 수학 배틀·🚀 수학 로켓단 문제 원천 (v441, 2026-11-26 아버님 기본안 「이대로」 · 🌱 6학년·중1도 뺌 · 6학년·중1 줄기는 다른 줄기의 아는 칸) ──
+// 둘은 같은 문제(math.battleQuestion)를 지금 줄기 사다리의 done 전부에서 냈다 — 🥚 배우는 중 칸과 🌱로 쉬게 한 6학년·중1 칸까지 ·
+//   🚀는 거절할 수 없고 지면 포켓몬을 빼앗긴다 → 🎣 원천(learnedPool)과 같은 거름으로:
+//   ① 지금 줄기 칸 중 원천 칸이 BATTLE_POOL_MIN칸 이상이면 그 칸들(사다리 차례) ·
+//   ② 아니면 모든 줄기의 원천 칸(6학년·중1 줄기를 골랐을 때도 여기 — 다른 줄기의 4·5학년 아는 칸) ·
+//   ③ 그것도 없으면 옛 원천(지금 줄기 done → 없으면 지금 배울 ▶) — 원천이 비면 🚀가 문제 없이 3번 틀린 것으로 져서
+//   포켓몬을 빼앗긴다(rocketview는 ⏭를 틀림으로 센다): 🎣처럼 「없으면 null」로 두지 않는다
+/** ① 줄기 안 아는 칸이 이보다 적으면 넓힌다 — ⚡ 한 판 문제 수와 같게(걸러서 남은 두 칸에 다섯 문제가 몰리지 않게) */
+export const BATTLE_POOL_MIN = QUICK.n;
+/** ⚔️·🚀에 낼 칸 (순수) — { ids, from: 'stem' ① | 'all' ② | 'old' ③ | 'none' 낼 칸 없음 } */
+export function battlePool(m, today, stem) {
+  const rows = ladderOf(m, today, stem);
+  const learned = learnedPool(m);
+  const allow = new Set(learned);
+  const mine = rows.filter((x) => allow.has(x.id)).map((x) => x.id);
+  if (mine.length >= BATTLE_POOL_MIN) return { ids: mine, from: 'stem' };
+  if (learned.length) return { ids: learned, from: 'all' };
+  const done = rows.filter((x) => x.state === 'done').map((x) => x.id);
+  if (done.length) return { ids: done, from: 'old' };
+  const now = rows.filter((x) => x.state === 'now').map((x) => x.id);
+  return { ids: now, from: now.length ? 'old' : 'none' };
+}
+/** 📤 한 줄 — 줄기마다 ⚔️·🚀 문제를 어디서 내나 (아이 화면에는 안 쓴다) */
+export function battlePoolLine(m, today) {
+  const n = { stem: 0, all: 0, old: 0, none: 0 };
+  for (const k of STEM_ORDER) n[battlePool(m, today, k).from] += 1;
+  return `⚔️🚀 배틀·로켓단 수학 원천(🎣와 같은 칸) — 줄기 안 아는 칸에서 ${n.stem}줄기 · 줄기 안 아는 칸이 ${BATTLE_POOL_MIN}칸 미만이라 배운 수학 전체에서 ${n.all}줄기${n.old ? ` · 배운 칸이 없어 옛 원천(🥚·쉬는 칸까지) ${n.old}줄기` : ''}${n.none ? ` · 낼 칸 없음 ${n.none}줄기(🚀 안 옴)` : ''}`;
+}
 /**
  * 오늘 ⚡ 판 — { n 끝낸 판, c 받은 🎯 } (지난날이면 0)
  * 장부 날짜가 오늘보다 **뒤**(태블릿 시계가 뒤로 갔다)면 그날은 다 받은 것으로 — ahead (Codex 159차 #1: 28일에 다 받고 27일로 갔다 오면 또 받았다)
@@ -2055,6 +2084,7 @@ export function mathReportText(m, today, days) {
   lines.push('', ...guardLines(guardReport(m, today))); // 🛡️ 📊와 같은 줄 (v252)
   lines.push(restLine(m)); // 🌱 학교 진도 먼저 (v301)
   lines.push(learnedPoolLine(m)); // 🎣 배운 수학 원천 — 🥚·🌱 쉬는 학년을 뺀 칸 수 (v439)
+  lines.push(battlePoolLine(m, today)); // ⚔️🚀 배틀·로켓단 원천 — 줄기 안 / 배운 수학 전체 / 옛 원천 (v441)
   lines.push(relearnLine(m, today)); // 📚 틀린 뒤 배움 한 장 (v302)
   lines.push('', puzzleReport(m && m.puzzle, today)); // 🧩 수학 퍼즐 단계·판 (v296)
   lines.push(detectReport(m && m.detect, today, nameOf)); // 🕵️ 나옹의 숙제 — 판·처음 답·처음에 놓친 칸 (v299)
